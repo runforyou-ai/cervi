@@ -45,9 +45,6 @@ func newAgentTelegramFixture(t *testing.T, db *bun.DB, identity *models.Identity
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := agentaction.NewUpdateWorkStatusAction(db).Execute(ctx, identity, agent.ID, agentaction.WorkStatusInput{WorkStatus: domain.WorkStatusWorking}); err != nil {
-		t.Fatal(err)
-	}
 	channel, err := channelaction.NewCreateMessageChannelAction(db).Execute(ctx, identity, channelaction.CreateMessageChannelInput{
 		Type: domain.ChannelTypeTelegram, Name: "Telegram AI 验证", DefaultLocale: domain.LocaleChineseSimplified,
 		NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypeMember, ID: agent.IdentityID},

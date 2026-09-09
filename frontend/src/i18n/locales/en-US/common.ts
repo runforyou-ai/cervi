@@ -23,6 +23,12 @@ const common = {
     clearFilters: "Clear filters",
     more: "More",
   },
+  unsavedChanges: {
+    title: "Discard unsaved changes?",
+    description: "Unsaved changes will be lost if you continue.",
+    keepEditing: "Keep editing",
+    discard: "Discard changes",
+  },
   pagination: {
     total: "{{count}} total",
     previous: "Previous",

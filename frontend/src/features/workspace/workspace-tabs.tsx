@@ -36,6 +36,7 @@ import {
   resolveWorkspaceLocation,
   type ResolvedWorkspaceTab,
 } from "@/features/workspace/workspace-page-routes"
+import { useUnsavedChangesContext } from "@/contexts/unsaved-changes-context"
 import { resourceClient } from "@/lib/resource-client"
 import { cn } from "@/lib/utils"
 
@@ -381,6 +382,7 @@ export function WorkspaceTabs({
   const { t } = useTranslation("workspace")
   const navigate = useNavigate()
   const navigationType = useNavigationType()
+  const unsavedChanges = useUnsavedChangesContext()
   const pendingActivationRef = useRef<string | null>(null)
   const tabButtonRefs = useRef(new Map<string, HTMLButtonElement>())
   const [reloadRevisionById, setReloadRevisionById] = useState<
@@ -467,7 +469,8 @@ export function WorkspaceTabs({
   }
 
   /** 关闭一个标签，当前标签关闭后激活相邻页面。 */
-  function closeTab(id: string) {
+  async function closeTab(id: string) {
+    if (unsavedChanges && !(await unsavedChanges.confirmTabs([id]))) return
     const index = state.tabs.findIndex((tab) => tab.id === id)
     const nextTab =
       id === state.activeId
@@ -486,7 +489,8 @@ export function WorkspaceTabs({
   }
 
   /** 重新挂载指定标签并失效查询缓存，保留其他标签的页面实例。 */
-  function reloadTab(id: string) {
+  async function reloadTab(id: string) {
+    if (unsavedChanges && !(await unsavedChanges.confirmTabs([id]))) return
     /* 缓存默认永久新鲜，重挂载不会自动重取，这里显式失效全部查询。 */
     void resourceClient.invalidateQueries()
     setReloadRevisionById((current) => ({
@@ -497,7 +501,9 @@ export function WorkspaceTabs({
   }
 
   /** 只保留指定标签，并在需要时将它激活。 */
-  function closeOtherTabs(id: string) {
+  async function closeOtherTabs(id: string) {
+    const removedIds = state.tabs.filter((tab) => tab.id !== id).map((tab) => tab.id)
+    if (unsavedChanges && !(await unsavedChanges.confirmTabs(removedIds))) return
     const targetTab = state.tabs.find((tab) => tab.id === id)!
     dispatch({
       type: "keep",
@@ -511,12 +517,13 @@ export function WorkspaceTabs({
   }
 
   /** 关闭指定标签右侧的所有标签。 */
-  function closeTabsToRight(id: string) {
+  async function closeTabsToRight(id: string) {
     const targetIndex = state.tabs.findIndex((tab) => tab.id === id)
     const targetTab = state.tabs[targetIndex]
     const removedIds = new Set(
       state.tabs.slice(targetIndex + 1).map((tab) => tab.id),
     )
+    if (unsavedChanges && !(await unsavedChanges.confirmTabs([...removedIds]))) return
     const activeId = removedIds.has(state.activeId) ? id : state.activeId
     dispatch({
       type: "keep",

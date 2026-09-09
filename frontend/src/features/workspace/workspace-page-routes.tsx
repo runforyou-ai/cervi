@@ -3,6 +3,7 @@ import { Route, Routes, matchPath, type Location } from "react-router"
 
 import { MessageChannelFormPage } from "@/features/channels/message-channel-form-page"
 import { MessageChannelListPage } from "@/features/channels/message-channel-list-page"
+import { AgentFormPage } from "@/features/contacts/agents/agent-form-page"
 import { ContactsPage } from "@/features/contacts/contacts-page"
 import { InboxRoute } from "@/features/inbox/inbox-route"
 import { AppsPage } from "@/features/apps/apps-page"
@@ -50,6 +51,16 @@ const workspaceRouteDefinitions = [
   { path: "/settings/storage", titleKey: "tabs.routes.storage" },
   { path: "/contacts/employees", titleKey: "tabs.routes.employees" },
   { path: "/contacts/ai-employees", titleKey: "tabs.routes.aiEmployees" },
+  {
+    path: "/contacts/ai-employees/new",
+    tabPath: "/contacts/ai-employees",
+    titleKey: "tabs.routes.aiEmployees",
+  },
+  {
+    path: "/contacts/ai-employees/:agentId",
+    tabPath: "/contacts/ai-employees",
+    titleKey: "tabs.routes.aiEmployees",
+  },
   { path: "/contacts/teams/:teamId", titleKey: "tabs.routes.team" },
   { path: "/contacts/external", titleKey: "tabs.routes.externalContacts" },
   {
@@ -282,6 +293,23 @@ export function WorkspacePageRoutes({ location }: { location: string }) {
       <Route
         path="/contacts/ai-employees"
         element={<ContactsPage scope="agents" />}
+      />
+
+      <Route
+        path="/contacts/ai-employees/new"
+        element={
+          <ContactsPage scope="agents">
+            <AgentFormPage mode="create" />
+          </ContactsPage>
+        }
+      />
+      <Route
+        path="/contacts/ai-employees/:agentId"
+        element={
+          <ContactsPage scope="agents">
+            <AgentFormPage mode="edit" />
+          </ContactsPage>
+        }
       />
       <Route
         path="/contacts/teams/:teamId"

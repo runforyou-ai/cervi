@@ -3,7 +3,8 @@ import React from "react"
 import ReactDOM from "react-dom/client"
 import { QueryClientProvider } from "@tanstack/react-query"
 import { ThemeProvider } from "next-themes"
-import { HashRouter } from "react-router"
+import { createHashRouter } from "react-router"
+import { RouterProvider } from "react-router/dom"
 
 import App from "@/App"
 import { TooltipProvider } from "@/components/ui/tooltip"
@@ -23,15 +24,17 @@ async function bootstrap() {
     })
   }
 
+  const router = createHashRouter([
+    { path: "*", element: <App platform={platform} /> },
+  ])
+
   ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
     <React.StrictMode>
       <QueryClientProvider client={resourceClient}>
         <ThemeProvider attribute="class" defaultTheme="system" enableSystem>
-          <HashRouter>
-            <TooltipProvider>
-              <App platform={platform} />
-            </TooltipProvider>
-          </HashRouter>
+          <TooltipProvider>
+            <RouterProvider router={router} />
+          </TooltipProvider>
         </ThemeProvider>
       </QueryClientProvider>
     </React.StrictMode>,

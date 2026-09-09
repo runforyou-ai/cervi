@@ -22,6 +22,7 @@ import {
   type Identity,
   type WorkStatus,
 } from "@/api"
+import { useUnsavedChangesContext } from "@/contexts/unsaved-changes-context"
 import { recoverSession } from "@/lib/session-navigation"
 import {
   DropdownMenu,
@@ -144,6 +145,7 @@ export function WorkspaceNavigation({
   const { t } = useTranslation("workspace")
   const { t: tCommon } = useTranslation("common")
   const navigate = useNavigate()
+  const unsavedChanges = useUnsavedChangesContext()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const changingWorkStatusRef = useRef(false)
   const userMenuTriggerRef = useRef<HTMLButtonElement>(null)
@@ -288,8 +290,9 @@ export function WorkspaceNavigation({
             <DropdownMenuItem
               destructive
               disabled={loggingOut}
-              onSelect={(event) => {
-                event.preventDefault()
+              onSelect={async () => {
+                setUserMenuOpen(false)
+                if (unsavedChanges && !(await unsavedChanges.confirmTabs())) return
                 onLogout()
               }}
             >

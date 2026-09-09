@@ -23,6 +23,12 @@ const common = {
     clearFilters: "清除筛选",
     more: "更多",
   },
+  unsavedChanges: {
+    title: "放弃未保存的修改？",
+    description: "继续操作后，未保存的修改将丢失。",
+    keepEditing: "继续编辑",
+    discard: "放弃修改",
+  },
   pagination: {
     total: "共 {{count}} 条",
     previous: "上一页",

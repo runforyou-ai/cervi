@@ -105,7 +105,6 @@ type DirectBackend struct {
 	updateAgent                       *agentaction.UpdateAgentAction
 	updateAgentExecution              *agentaction.UpdateExecutionAction
 	updateAgentStatus                 *agentaction.UpdateStatusAction
-	updateAgentWorkStatus             *agentaction.UpdateWorkStatusAction
 	listUsers                         *useraction.ListUsersQuery
 	getUser                           *useraction.GetUserQuery
 	createUser                        *useraction.CreateUserAction
@@ -245,7 +244,6 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tena
 		updateAgent:                       agentaction.NewUpdateAgentAction(db),
 		updateAgentExecution:              agentaction.NewUpdateExecutionAction(db),
 		updateAgentStatus:                 agentaction.NewUpdateStatusAction(db),
-		updateAgentWorkStatus:             agentaction.NewUpdateWorkStatusAction(db),
 		listUsers:                         useraction.NewListUsersQuery(db),
 		getUser:                           useraction.NewGetUserQuery(db),
 		createUser:                        useraction.NewCreateUserAction(db),

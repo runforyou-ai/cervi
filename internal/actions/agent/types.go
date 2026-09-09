@@ -23,11 +23,7 @@ type UpdateInput struct {
 	DisplayName string
 	RoleID      string
 	TeamIDs     []string
-}
-
-// WorkStatusInput 定义 AI 员工工作状态修改字段。
-type WorkStatusInput struct {
-	WorkStatus domain.WorkStatus
+	WorkStatus  domain.WorkStatus
 }
 
 // TeamSummary 定义 AI 员工所属团队摘要。

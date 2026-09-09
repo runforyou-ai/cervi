@@ -11,6 +11,7 @@ export function TeamCheckboxField({
   value,
   onChange,
   onBlur,
+  disabled = false,
 }: {
   teams: Team[]
   label: string
@@ -18,6 +19,7 @@ export function TeamCheckboxField({
   value: string[]
   onChange: (ids: string[]) => void
   onBlur: () => void
+  disabled?: boolean
 }) {
   return (
     <Field>
@@ -26,6 +28,7 @@ export function TeamCheckboxField({
         <FieldDescription>{emptyMessage}</FieldDescription>
       ) : (
         <TeamCheckboxOptions
+          disabled={disabled}
           teams={teams}
           value={value}
           onChange={onChange}

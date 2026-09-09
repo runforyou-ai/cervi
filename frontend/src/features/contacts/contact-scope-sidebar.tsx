@@ -1,9 +1,5 @@
 /** 通讯录二级导航：分类树和来源渠道筛选。 */
-import {
-  forwardRef,
-  useMemo,
-  type ButtonHTMLAttributes,
-} from "react"
+import { forwardRef, useMemo, type ButtonHTMLAttributes } from "react"
 import {
   ChevronRightIcon,
   ContactRoundIcon,
@@ -13,7 +9,7 @@ import {
   type LucideIcon,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { useNavigate } from "react-router"
+import { useLocation, useNavigate } from "react-router"
 
 import { ChannelType, type ChannelOption, type Team } from "@/api"
 import { messageChannelTypeDefinition } from "@/features/channels/message-channel-types"
@@ -30,6 +26,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { agentReturnPath } from "@/features/contacts/agents/agent-navigation"
 import { channelTypeLabel } from "@/features/contacts/external/contact-labels"
 import type { ContactScope } from "@/features/contacts/contact-scope"
 import { cn } from "@/lib/utils"
@@ -91,6 +88,7 @@ export function ContactScopeSidebar({
 }) {
   const { t } = useTranslation(["contacts", "common"])
   const navigate = useNavigate()
+  const location = useLocation()
   const groupedChannels = useMemo(() => {
     const groups = new Map<ChannelType, ChannelOption[]>()
     for (const channel of channels) {
@@ -132,8 +130,8 @@ export function ContactScopeSidebar({
               onSelect={() =>
                 navigate(
                   scope === "team" && teamId
-                    ? `/contacts/teams/${encodeURIComponent(teamId)}?newAgent=1`
-                    : "/contacts/ai-employees?newAgent=1",
+                    ? `/contacts/ai-employees/new?teamId=${encodeURIComponent(teamId)}&returnTo=${encodeURIComponent(agentReturnPath(location.pathname, location.search))}`
+                    : `/contacts/ai-employees/new?returnTo=${encodeURIComponent(agentReturnPath(location.pathname, location.search))}`,
                 )
               }
             >

@@ -1,18 +1,15 @@
-/** AI 员工列表、筛选、详情和账号状态管理面板。 */
-import { useEffect, useState } from "react"
+/** AI 员工列表、筛选、配置入口和状态管理面板。 */
+import { useState } from "react"
 import { MoreHorizontalIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { useNavigate } from "react-router"
+import { useLocation, useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
   UserStatus,
   deactivateAgent,
-  getAgent,
-  isApiError,
   listAgents,
   reactivateAgent,
-  sessionPath,
   type AgentListItemData,
   type ChannelOption,
   type RoleData,
@@ -51,9 +48,7 @@ import {
   TableRow,
 } from "@/components/ui/table"
 import { WorkStatusBadge } from "@/components/work-status"
-import { AgentDetailView } from "@/features/contacts/agents/agent-detail"
 import { ContactCreateDialogs } from "@/features/contacts/contact-create-dialogs"
-import { ContactDetailSheet } from "@/features/contacts/contact-detail-sheet"
 import { ContactListLayout } from "@/features/contacts/contact-list-layout"
 import { ContactScopeMobileSelect } from "@/features/contacts/contact-scope-mobile-select"
 import { userStatusLabel } from "@/features/contacts/external/contact-labels"
@@ -68,7 +63,7 @@ import { useResource } from "@/hooks/use-resource"
 import { recoverSession } from "@/lib/session-navigation"
 import { optionalWailsEnum } from "@/lib/wails-enum"
 
-/** AI 员工范围的列表、详情和弹窗。 */
+/** 显示 AI 员工目录并提供配置和状态操作。 */
 export function AgentsPanel({
   channels,
   roles,
@@ -81,17 +76,11 @@ export function AgentsPanel({
   const { t } = useTranslation("contacts")
   const { t: tCommon } = useTranslation("common")
   const navigate = useNavigate()
+  const location = useLocation()
   const { formatDateTime } = useDateTime()
   const invalidateContact = useContactInvalidator()
-  const {
-    searchParams,
-    setParameters,
-    query,
-    search,
-    setSearch,
-    currentPage,
-    selected,
-  } = useContactSearch()
+  const { searchParams, setParameters, query, search, setSearch, currentPage } =
+    useContactSearch()
   const status =
     optionalWailsEnum(UserStatus, searchParams.get("status")) ??
     UserStatus.UserStatusActive
@@ -105,31 +94,6 @@ export function AgentsPanel({
   )
   const agents = list.data?.agents ?? []
   const page = list.data?.page ?? { number: currentPage, size: 50, total: 0 }
-
-  const detail = useResource(resourceKeys.agent(selected), () => getAgent(selected), {
-    enabled: Boolean(selected),
-  })
-  const detailAgent = selected ? (detail.data ?? null) : null
-
-  const detailError = detail.error
-  useEffect(() => {
-    if (!selected || !detailError) return
-    if (isApiError(detailError) && sessionPath(detailError.state)) return
-    console.warn("联系人详情加载失败", detailError)
-    toast.error(t("detail.loadError"))
-    setParameters({ selected: null })
-  }, [detailError, selected, setParameters, t])
-
-  /** 关闭 AI 员工详情。 */
-  function closeDetail() {
-    setParameters({ selected: null, new: null })
-  }
-
-  /** 刷新列表并关闭详情。 */
-  function refreshAndClose() {
-    closeDetail()
-    void invalidateContact("agent")
-  }
 
   /** 禁用 AI 员工账号或恢复为正常状态。 */
   async function changeAgentStatus() {
@@ -281,16 +245,24 @@ export function AgentsPanel({
                       <Button
                         size="sm"
                         disabled={agent.status !== UserStatus.UserStatusActive}
-                        onClick={() => navigate(`/inbox?scope=internal&target=${agent.identityId}`)}
+                        onClick={() =>
+                          navigate(
+                            `/inbox?scope=internal&target=${agent.identityId}`,
+                          )
+                        }
                       >
                         {t("sendMessage")}
                       </Button>
                       <Button
                         variant="outline"
                         size="sm"
-                        onClick={() => setParameters({ selected: agent.id })}
+                        onClick={() =>
+                          navigate(
+                            `/contacts/ai-employees/${agent.id}?tab=basic&returnTo=${encodeURIComponent(location.pathname + location.search)}`,
+                          )
+                        }
                       >
-                        {tCommon("actions.view")}
+                        {t("agents.configure")}
                       </Button>
                       <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -336,27 +308,6 @@ export function AgentsPanel({
           </Table>
         </ContactListLayout>
       </section>
-
-      <ContactDetailSheet
-        open={Boolean(selected)}
-        onClose={closeDetail}
-        title={detailAgent?.displayName ?? t("detail.agentTitle")}
-        description={t("detail.agentDescription")}
-        loading={detail.loading && Boolean(selected)}
-      >
-        {detailAgent ? (
-          <AgentDetailView
-            key={detailAgent.id}
-            agent={detailAgent}
-            roles={roles}
-            teams={teams}
-            onSaved={(saved) => {
-              void invalidateContact("agent", saved.id)
-            }}
-            onNotFound={refreshAndClose}
-          />
-        ) : null}
-      </ContactDetailSheet>
 
       <ContactCreateDialogs
         scope="agents"

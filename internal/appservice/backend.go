@@ -242,9 +242,6 @@ type Backend interface {
 	// UpdateAgentExecution 修改企业 AI 员工的执行配置。
 	//cervi:route PUT /agents/:agentID/execution
 	UpdateAgentExecution(context.Context, RequestMeta, string, AgentExecutionInput) (Agent, error)
-	// UpdateAgentWorkStatus 修改企业 AI 员工工作状态。
-	//cervi:route PUT /agents/:agentID/work-status
-	UpdateAgentWorkStatus(context.Context, RequestMeta, string, AgentWorkStatusInput) (Agent, error)
 	// DeactivateAgent 禁用企业 AI 员工账号。
 	//cervi:route POST /agents/:agentID/deactivate
 	DeactivateAgent(context.Context, RequestMeta, string) (Agent, error)

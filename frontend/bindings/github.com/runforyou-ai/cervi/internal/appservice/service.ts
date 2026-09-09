@@ -967,13 +967,6 @@ export function UpdateAgentExecution(meta: $models.RequestMeta, agentID: string,
 }
 
 /**
- * UpdateAgentWorkStatus 修改企业 AI 员工工作状态。
- */
-export function UpdateAgentWorkStatus(meta: $models.RequestMeta, agentID: string, input: $models.AgentWorkStatusInput): $CancellablePromise<$models.Agent> {
-    return $Call.ByID(160063679, meta, agentID, input);
-}
-
-/**
  * UpdateAttachmentUploads 更新附件上传状态或取消尚未完成的消息。
  */
 export function UpdateAttachmentUploads(meta: $models.RequestMeta, input: $models.AttachmentUploadUpdate): $CancellablePromise<void> {
