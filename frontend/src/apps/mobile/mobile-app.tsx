@@ -12,7 +12,8 @@ import { MobileGroupConversationPage } from "@/apps/mobile/mobile-group-conversa
 import { MobileGroupProfileEditor } from "@/apps/mobile/mobile-group-profile-editor"
 import { MobileGroupMembersPage } from "@/apps/mobile/mobile-group-members"
 import { MobileGroupDetailsPage } from "@/apps/mobile/mobile-group-details-page"
-import { MobileEmployeesPage } from "@/apps/mobile/mobile-employees-page"
+import { MobileDirectoryPage } from "@/apps/mobile/mobile-directory-page"
+import { MobileAgentChatPage, MobileAgentConversationPage } from "@/apps/mobile/mobile-agent-chat-page"
 import { MobileInboxPage } from "@/apps/mobile/mobile-inbox-page"
 import {
   MobileMePage,
@@ -93,11 +94,7 @@ export default function MobileApp() {
             </Route>
             <Route
               path="/inbox/agent/:conversationID"
-              element={
-                <MobileIndividualConversationPage
-                  conversationType={ConversationType.ConversationTypeAgent}
-                />
-              }
+              element={<MobileAgentConversationPage />}
             />
             <Route
               path="/inbox/direct/:conversationID"
@@ -111,7 +108,7 @@ export default function MobileApp() {
             <Route path="/me/security" element={<MobileSecurityPage />} />
             <Route
               path="/contacts/employees"
-              element={<MobileEmployeesPage />}
+              element={<MobileDirectoryPage key="employees" kind="employees" />}
             />
             <Route
               path="/contacts/employees/:userID"
@@ -120,6 +117,14 @@ export default function MobileApp() {
             <Route
               path="/contacts/employees/:userID/chat"
               element={<MobileEmployeeChatPage />}
+            />
+            <Route
+              path="/contacts/ai-employees"
+              element={<MobileDirectoryPage key="agents" kind="agents" />}
+            />
+            <Route
+              path="/contacts/ai-employees/:agentID/chat"
+              element={<MobileAgentChatPage />}
             />
             <Route
               path="/contacts/:category"

@@ -16,10 +16,13 @@ import { Button } from "@/components/ui/button"
 import { useConversationSummary } from "@/features/inbox/use-conversation-summary"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
-type MobileIndividualLocationState = { memberUserID?: string }
+type MobileIndividualLocationState = {
+  memberUserID?: string
+  agentDirectory?: boolean
+}
 
 /** 展示当前双方会话的移动端头部。 */
-function MobileIndividualHeader({
+export function MobileIndividualHeader({
   conversation,
   peerName,
 }: {
@@ -29,8 +32,8 @@ function MobileIndividualHeader({
   const { t: tInbox } = useTranslation("inbox")
   const { inboxURL } = useMobileNavigation()
   const location = useLocation()
-  const memberUserID = (location.state as MobileIndividualLocationState | null)
-    ?.memberUserID
+  const { memberUserID, agentDirectory } =
+    (location.state as MobileIndividualLocationState | null) ?? {}
   const agentRunLabel = agentRunStatusLabel(
     conversation?.agent?.agentRunStatus ?? null,
     tInbox,
@@ -38,7 +41,13 @@ function MobileIndividualHeader({
 
   return (
     <MobilePageHeader
-      backTo={memberUserID ? `/contacts/employees/${memberUserID}` : inboxURL}
+      backTo={
+        agentDirectory
+          ? "/contacts/ai-employees"
+          : memberUserID
+            ? `/contacts/employees/${memberUserID}`
+            : inboxURL
+      }
       title={
         <span className="block min-w-0">
           <span className="block truncate">{peerName}</span>

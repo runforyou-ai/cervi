@@ -27,6 +27,14 @@ const mobile = {
     external: "External contacts",
     unavailableDescription: "The mobile directory is not available yet.",
   },
+  agents: {
+    search: "Search AI employees by name",
+    empty: "No AI employees found",
+    loadError: "Could not load AI employees. Please try again.",
+    allLoaded: "All AI employees shown",
+    chatError: "Could not open the AI conversation. Please try again.",
+    unavailable: "This AI employee does not exist or has been deactivated.",
+  },
   tabs: {
     label: "Main navigation",
     contacts: "Contacts",

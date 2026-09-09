@@ -27,6 +27,14 @@ const mobile = {
     external: "外部联系人",
     unavailableDescription: "移动端通讯录功能暂未开放。",
   },
+  agents: {
+    search: "搜索 AI 员工姓名",
+    empty: "没有找到 AI 员工",
+    loadError: "无法加载 AI 员工，请重试。",
+    allLoaded: "已显示全部 AI 员工",
+    chatError: "无法打开 AI 对话，请重试。",
+    unavailable: "该 AI 员工不存在或已停用。",
+  },
   tabs: {
     label: "主导航",
     contacts: "通讯录",

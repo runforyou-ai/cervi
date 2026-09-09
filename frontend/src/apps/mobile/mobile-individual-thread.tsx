@@ -21,9 +21,11 @@ export function MobileIndividualThread({
   conversationID,
   conversationType = ConversationType.ConversationTypeDirect,
   sendIndividualMessage,
+  enabled = Boolean(conversationID),
 }: {
   conversationID: string
   conversationType?: ConversationType
+  enabled?: boolean
   sendIndividualMessage?: (
     input: DirectTextMessageInput,
   ) => Promise<ConversationMessageData>
@@ -41,7 +43,7 @@ export function MobileIndividualThread({
         conversationType={conversationType}
         currentUser={identity.user}
         requireWindowFocus={false}
-        enabled={Boolean(conversationID)}
+        enabled={enabled}
         outgoingMessages={outgoing.messages}
         onRetryFailedMessage={setRetryDraft}
         retryFailedMessageDisabled={outgoing.messages.some(
