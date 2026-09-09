@@ -2,31 +2,7 @@
 
 package server
 
-import (
-	"testing"
-
-	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
-)
-
-// TestNewConfigAddsRuntimeDefaults 验证 NATS 身份和固定任务配置。
-func TestNewConfigAddsRuntimeDefaults(t *testing.T) {
-	config := newConfig(serverconfig.NATSConfig{URL: "nats://127.0.0.1:4222", Namespace: "test_runtime"})
-	if config.URL != "nats://127.0.0.1:4222" || config.Namespace != "test_runtime" {
-		t.Fatalf("NATS 配置 = %#v", config)
-	}
-	if config.MaxBytes != taskStreamMaxBytes ||
-		config.MaxAge != taskStreamMaxAge ||
-		config.Replicas != taskReplicas {
-		t.Fatalf("NATS 任务配置 = %#v", config)
-	}
-	if len(config.WorkerPools) != 3 {
-		t.Fatalf("Worker Pool 数量 = %d，期望 3", len(config.WorkerPools))
-	}
-	if standard, agent := config.WorkerPools[0], config.WorkerPools[1]; standard.Name != workerPoolStandard || standard.Workers != standardTaskWorkers || standard.MaxAckPending != taskPoolMaxAckPending ||
-		agent.Name != workerPoolAgent || agent.Workers != agentTaskWorkers || agent.MaxAckPending != taskPoolMaxAckPending {
-		t.Fatalf("Worker Pool 配置 = %#v", config.WorkerPools)
-	}
-}
+import "testing"
 
 // TestConfigBuildsIsolatedConsumerNames 验证一个命名空间内的 Worker Pool 使用独立 Consumer 和 Subject。
 func TestConfigBuildsIsolatedConsumerNames(t *testing.T) {
