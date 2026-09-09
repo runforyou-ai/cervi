@@ -41,7 +41,7 @@
     "mammoth": "1.11.0",
     "xlsx": "https://cdn.sheetjs.com/xlsx-0.20.3/xlsx-0.20.3.tgz",
     "dompurify": "3.3.1",
-    "pdfjs-dist": "5.4.624"
+    "pdfjs-dist": "6.3.289"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.3.3",
