@@ -72,3 +72,21 @@ test("活跃列表清除敏感摘要后重新读取，不保留旧数据快照",
     assert.ok(seen.includes(undefined))
   } finally { unsubscribe(); client.clear() }
 })
+
+test("窗口批次失权重读期间保留其余摘要，已确认安全的新批次不被重复清理", () => {
+  const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } })
+  const oldKey = resourceKeys.inboxConversations({ conversationIds: ["removed", "other"] })
+  const safeKey = resourceKeys.inboxConversations({ conversationIds: ["other"] })
+  client.setQueryData(oldKey, { results: [{ id: "removed", conversation: { id: "removed" } }, { id: "other", conversation: { id: "other" } }] })
+  const observer = new QueryObserver(client, { queryKey: oldKey, enabled: false })
+  const unsubscribe = observer.subscribe(() => {})
+  try {
+    clearConversationResources(client, "removed")
+    assert.ok(observer.getCurrentResult().data)
+    client.setQueryData(safeKey, { results: [{ id: "other", conversation: { id: "other" } }] })
+    unsubscribe()
+    clearConversationResources(client, "removed")
+    assert.equal(client.getQueryData(oldKey), undefined)
+    assert.ok(client.getQueryData(safeKey))
+  } finally { unsubscribe(); client.clear() }
+})

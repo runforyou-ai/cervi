@@ -77,7 +77,9 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { usePortalContainer } from "@/components/ui/portal-container"
-import { ScrollArea } from "@/components/ui/scroll-area"
+import { InboxListPanel } from "./inbox-list-panel"
+import type { InboxList } from "./use-inbox-list"
+import type { useInboxListViewport } from "./use-inbox-list-viewport"
 import {
   Sheet,
   SheetContent,
@@ -447,13 +449,13 @@ function InboxCustomerQueueFilter({
 /** 会话列表。 */
 function InboxConversationList({
   conversations,
-  loading,
+  onMenuChange,
   selectedId,
   onSelect,
   onMarkRead,
 }: {
   conversations: InboxConversation[]
-  loading: boolean
+  onMenuChange: (open: boolean) => void
   selectedId?: string
   onSelect: (conversationId: string) => void
   onMarkRead: (conversation: InboxConversation) => Promise<void>
@@ -526,19 +528,8 @@ function InboxConversationList({
     }
   }
 
-  if (loading) {
-    return (
-      <LoadingIndicator className="min-h-0 flex-1 justify-center">
-        {t("messagesLoading")}
-      </LoadingIndicator>
-    )
-  }
-
-  if (conversations.length === 0) return null
-
   return (
-    <ScrollArea className="min-h-0 min-w-0 flex-1 [&>[data-slot=scroll-area-viewport]>div]:block">
-      <div className="grid min-w-0 pb-1.5">
+      <>
         {conversations.map((conversation) => {
           const name = isAgentInboxConversation(conversation)
             ? `${conversation.agent.agentName} · ${conversation.agent.title}`
@@ -584,14 +575,15 @@ function InboxConversationList({
             isDirectInboxConversation(conversation) ||
             isGroupInboxConversation(conversation)
           return (
-            <ContextMenu key={conversation.id}>
+            <ContextMenu key={conversation.id} onOpenChange={onMenuChange}>
               <ContextMenuTrigger asChild>
                 <button
                   type="button"
+                  data-inbox-id={conversation.id}
                   aria-pressed={selectedId === conversation.id}
                   aria-label={name}
                   className={cn(
-                    "flex w-full min-w-0 items-start gap-3 px-3 py-2.5 text-left transition-colors",
+                    "flex h-[68px] w-full min-w-0 items-start gap-3 px-3 py-2.5 text-left transition-colors",
                     selectedId === conversation.id
                       ? "bg-accent text-accent-foreground"
                       : "hover:bg-muted",
@@ -736,8 +728,7 @@ function InboxConversationList({
             </ContextMenu>
           )
         })}
-      </div>
-    </ScrollArea>
+      </>
   )
 }
 
@@ -1121,11 +1112,8 @@ function ConversationThread({
 
 /** 消息页中栏和当前会话。 */
 export function InboxPage({
-  conversations,
-  attentionUnreadCount,
-  listLoading,
-  listError,
-  onListRefresh,
+  list,
+  listViewport,
   scope,
   customerView,
   assigneeIdentityId,
@@ -1134,11 +1122,8 @@ export function InboxPage({
   onSelectedConversationChange,
   onQueryChange,
 }: {
-  conversations: InboxConversation[]
-  attentionUnreadCount: number
-  listLoading: boolean
-  listError: boolean
-  onListRefresh: () => void
+  list: InboxList
+  listViewport: ReturnType<typeof useInboxListViewport>
   scope: InboxScope
   customerView: CustomerInboxView
   assigneeIdentityId: string
@@ -1156,6 +1141,9 @@ export function InboxPage({
     replace?: boolean
   }) => void
 }) {
+  const { conversations, attentionUnreadCount } = list
+  // 空窗口或尚未完成首次读取时，不把整个筛选解释为没有会话。
+  const hasConversations = conversations.length > 0 || list.hasBefore || list.hasAfter || list.revision === 0
   const { t } = useTranslation(["inbox", "common"])
   const { identity } = useWorkspace()
   const isNarrowViewport = useIsNarrowViewport()
@@ -1292,15 +1280,6 @@ export function InboxPage({
         onCreateGroup={() => setGroupDialogOpen(true)}
         onCreateAgent={() => setAgentDialogOpen(true)}
       />
-      {listError || summary.error ? (
-        <button
-          type="button"
-          className="min-h-9 w-full shrink-0 border-b bg-warning/10 px-3 py-2 text-center text-xs text-warning"
-          onClick={() => { onListRefresh(); if (selectedConversationId) void summary.refresh() }}
-        >
-          {t(summary.error ? "conversationLoadError" : "inboxRefreshError")}
-        </button>
-      ) : null}
       <div className="flex min-h-0 flex-1">
         {railCollapsed ? null : (
           <InboxScopeRail
@@ -1327,13 +1306,15 @@ export function InboxPage({
               }
             />
           ) : null}
-          <InboxConversationList
-            conversations={conversations}
-            loading={listLoading}
-            selectedId={selectedConversation?.id}
-            onSelect={selectConversation}
-            onMarkRead={markConversationAsRead}
-          />
+          <InboxListPanel list={list} viewport={listViewport} detailError={Boolean(summary.error)} retryDetail={() => void summary.refresh()}>
+            <InboxConversationList
+              conversations={conversations}
+              onMenuChange={(open) => { listViewport.interaction.current.menu = open }}
+              selectedId={selectedConversation?.id}
+              onSelect={selectConversation}
+              onMarkRead={markConversationAsRead}
+            />
+          </InboxListPanel>
         </div>
       </div>
     </div>
@@ -1372,10 +1353,10 @@ export function InboxPage({
                 <MessagesSquareIcon className="size-5 text-muted-foreground" />
               </div>
               <h2 className="text-base font-semibold tracking-tight">
-                {t(conversations.length ? "selectConversationTitle" : "emptyTitle")}
+                {t(hasConversations ? "selectConversationTitle" : "emptyTitle")}
               </h2>
               <p className="mt-2 text-sm text-muted-foreground">
-                {t(conversations.length ? "selectConversationDescription" : "emptyDescription")}
+                {t(hasConversations ? "selectConversationDescription" : "emptyDescription")}
               </p>
             </div>
           </div>

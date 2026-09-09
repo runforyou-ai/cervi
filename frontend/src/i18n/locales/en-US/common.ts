@@ -3,6 +3,8 @@ const common = {
   notifications: "Notifications",
   closeNotification: "Close notification",
   actions: {
+    refresh: "Refresh",
+    loadMore: "Load more",
     close: "Close",
     back: "Back",
     edit: "Edit",
