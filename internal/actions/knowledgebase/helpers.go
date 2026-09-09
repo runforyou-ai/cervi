@@ -129,6 +129,15 @@ func recordFromModel(knowledgeBase servermodels.KnowledgeBase) Record {
 	return Record{
 		ID: knowledgeBase.ID, Name: knowledgeBase.Name, Category: domain.KnowledgeBaseCategory(knowledgeBase.Category),
 		Description: knowledgeBase.Description, Groups: make([]GroupRecord, 0),
+		EmbeddingProviderID:      knowledgeBase.EmbeddingProviderID,
+		EmbeddingModelIdentifier: knowledgeBase.EmbeddingModelIdentifier,
+		EmbeddingDimension:       knowledgeBase.EmbeddingDimension,
+		ChunkLength:              knowledgeBase.ChunkLength,
+		ChunkOverlap:             knowledgeBase.ChunkOverlap,
+		RetrievalCount:           knowledgeBase.RetrievalCount,
+		RerankProviderID:         knowledgeBase.RerankProviderID,
+		RerankModelIdentifier:    knowledgeBase.RerankModelIdentifier,
+
 		CreatedAt: knowledgeBase.CreatedAt, UpdatedAt: knowledgeBase.UpdatedAt,
 	}
 }

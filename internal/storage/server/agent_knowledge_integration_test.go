@@ -24,7 +24,7 @@ func testAgentKnowledgeScopes(t *testing.T, db *bun.DB, identity *servermodels.I
 	ctx := context.Background()
 	bases := make([]string, 0, 2)
 	for _, category := range []domain.KnowledgeBaseCategory{domain.KnowledgeBaseCategoryStandard, domain.KnowledgeBaseCategoryQA} {
-		base, err := knowledgeaction.NewCreateKnowledgeBaseAction(db).Execute(ctx, identity, knowledgeaction.Input{Name: uuid.NewV7().String(), Category: category})
+		base, err := knowledgeaction.NewCreateKnowledgeBaseAction(db).Execute(ctx, identity, newKnowledgeBaseInput(t, db, identity, uuid.NewV7().String(), category))
 		if err != nil {
 			t.Fatal(err)
 		}

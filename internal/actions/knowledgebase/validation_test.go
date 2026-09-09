@@ -11,7 +11,8 @@ import (
 
 // TestNormalizeInput 验证知识库字段会被规范化并校验长度。
 func TestNormalizeInput(t *testing.T) {
-	input, fields := normalizeInput(Input{Name: "  产品知识  ", Category: domain.KnowledgeBaseCategoryStandard, Description: "  产品资料  "})
+	length, overlap := 512, 50
+	input, fields := normalizeInput(Input{Name: "  产品知识  ", Category: domain.KnowledgeBaseCategoryStandard, Description: "  产品资料  ", EmbeddingProviderID: "01991b28-5721-7000-8000-000000000001", EmbeddingModelIdentifier: "embedding", EmbeddingDimension: 1024, ChunkLength: &length, ChunkOverlap: &overlap, RetrievalCount: 3})
 	if len(fields) != 0 || input.Name != "产品知识" || input.Description != "产品资料" {
 		t.Fatalf("input = %#v, fields = %#v", input, fields)
 	}
@@ -46,5 +47,43 @@ func TestNormalizeGroupInput(t *testing.T) {
 	_, fields = normalizeGroupInput(GroupInput{Name: "   "})
 	if fields["name"] != ValidationGroupNameRequired {
 		t.Fatalf("fields = %#v", fields)
+	}
+}
+
+// TestKnowledgeSettingsBounds 验证必填、边界值、小于下限及超过上限的数值配置。
+func TestKnowledgeSettingsBounds(t *testing.T) {
+	length, overlap := 512, 50
+	valid := Input{Name: "知识库", Category: domain.KnowledgeBaseCategoryStandard, EmbeddingProviderID: "01991b28-5721-7000-8000-000000000001", EmbeddingModelIdentifier: "embedding", EmbeddingDimension: 1024, ChunkLength: &length, ChunkOverlap: &overlap, RetrievalCount: 3}
+	for _, test := range []struct {
+		length, overlap, count int
+		field                  string
+	}{
+		{256, 0, 1, ""}, {2048, 200, 20, ""}, {255, 50, 3, "chunkLength"}, {2049, 50, 3, "chunkLength"},
+		{512, -1, 3, "chunkOverlap"}, {512, 201, 3, "chunkOverlap"}, {512, 50, 0, "retrievalCount"}, {512, 50, 21, "retrievalCount"},
+	} {
+		input := valid
+		input.ChunkLength, input.ChunkOverlap, input.RetrievalCount = &test.length, &test.overlap, test.count
+		_, fields := normalizeInput(input)
+		if test.field == "" && len(fields) != 0 || test.field != "" && fields[test.field] == "" {
+			t.Fatalf("test=%+v fields=%+v", test, fields)
+		}
+	}
+	input := valid
+	input.ChunkLength, input.ChunkOverlap, input.EmbeddingDimension = nil, nil, 0
+	_, fields := normalizeInput(input)
+	if fields["chunkLength"] == "" || fields["chunkOverlap"] == "" || fields["embeddingDimension"] == "" {
+		t.Fatalf("required fields=%+v", fields)
+	}
+	input = valid
+	input.RerankProviderID = valid.EmbeddingProviderID
+	_, fields = normalizeInput(input)
+	if fields["rerankModelIdentifier"] != ValidationRerankModelInvalid {
+		t.Fatalf("rerank fields=%+v", fields)
+	}
+	input = valid
+	input.Category = domain.KnowledgeBaseCategoryQA
+	normalized, fields := normalizeInput(input)
+	if len(fields) != 0 || normalized.ChunkLength != nil || normalized.ChunkOverlap != nil {
+		t.Fatalf("QA=%+v fields=%+v", normalized, fields)
 	}
 }

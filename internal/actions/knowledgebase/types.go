@@ -10,9 +10,17 @@ import (
 
 // Input 定义知识库可编辑字段。
 type Input struct {
-	Name        string
-	Category    domain.KnowledgeBaseCategory
-	Description string
+	EmbeddingProviderID      string
+	EmbeddingModelIdentifier string
+	EmbeddingDimension       int
+	ChunkLength              *int
+	ChunkOverlap             *int
+	RetrievalCount           int
+	RerankProviderID         string
+	RerankModelIdentifier    string
+	Name                     string
+	Category                 domain.KnowledgeBaseCategory
+	Description              string
 }
 
 // GroupInput 定义知识库分组可编辑字段。
@@ -23,13 +31,21 @@ type GroupInput struct {
 
 // Record 定义知识库详情字段。
 type Record struct {
-	ID          string                       `bun:"id"`
-	Name        string                       `bun:"name"`
-	Category    domain.KnowledgeBaseCategory `bun:"category"`
-	Description string                       `bun:"description"`
-	Groups      []GroupRecord
-	CreatedAt   time.Time `bun:"created_at"`
-	UpdatedAt   time.Time `bun:"updated_at"`
+	EmbeddingProviderID      string
+	EmbeddingModelIdentifier string
+	EmbeddingDimension       int
+	ChunkLength              *int
+	ChunkOverlap             *int
+	RetrievalCount           int
+	RerankProviderID         string
+	RerankModelIdentifier    string
+	ID                       string                       `bun:"id"`
+	Name                     string                       `bun:"name"`
+	Category                 domain.KnowledgeBaseCategory `bun:"category"`
+	Description              string                       `bun:"description"`
+	Groups                   []GroupRecord
+	CreatedAt                time.Time `bun:"created_at"`
+	UpdatedAt                time.Time `bun:"updated_at"`
 }
 
 // GroupRecord 定义知识库分组树节点。

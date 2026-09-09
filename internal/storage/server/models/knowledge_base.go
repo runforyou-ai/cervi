@@ -12,6 +12,15 @@ import (
 type KnowledgeBase struct {
 	bun.BaseModel `bun:"table:knowledge_bases,alias:kb"`
 
+	EmbeddingProviderID      string `bun:"embedding_provider_id,nullzero"`
+	EmbeddingModelIdentifier string `bun:"embedding_model_identifier"`
+	EmbeddingDimension       int    `bun:"embedding_dimension"`
+	ChunkLength              *int   `bun:"chunk_length"`
+	ChunkOverlap             *int   `bun:"chunk_overlap"`
+	RetrievalCount           int    `bun:"retrieval_count"`
+	RerankProviderID         string `bun:"rerank_provider_id,nullzero"`
+	RerankModelIdentifier    string `bun:"rerank_model_identifier"`
+
 	ID              string    `bun:"id,pk"`
 	OrganizationID  string    `bun:"organization_id"`
 	CreatedByUserID string    `bun:"created_by_user_id"`

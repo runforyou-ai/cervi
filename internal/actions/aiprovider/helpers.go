@@ -93,7 +93,7 @@ func replaceModels(ctx context.Context, tx bun.Tx, organizationID, providerID st
 	return err
 }
 
-// validateReferencedModels 校验新目录保留 AI 员工正在使用的文本对话模型。
+// validateReferencedModels 校验新目录保留 AI 员工和知识库正在使用的模型。
 func validateReferencedModels(ctx context.Context, db bun.IDB, organizationID, providerID string, models []Model) error {
 	activeIdentifiers := make([]string, 0)
 	if err := db.NewSelect().TableExpr("agents AS a").
@@ -122,6 +122,35 @@ func validateReferencedModels(ctx context.Context, db bun.IDB, organizationID, p
 	for _, identifier := range activeIdentifiers {
 		if _, exists := available[identifier]; !exists {
 			return &ValidationError{Fields: map[string]ValidationCode{"models": ValidationModelsInUse}}
+		}
+	}
+	// 知识库引用的向量和重排模型必须保留原有用途。
+	bases := make([]servermodels.KnowledgeBase, 0)
+	if err := db.NewSelect().Model(&bases).Where("organization_id = ?", organizationID).
+		Where("embedding_provider_id = ? OR rerank_provider_id = ?", providerID, providerID).Scan(ctx); err != nil {
+		return err
+	}
+	for _, base := range bases {
+		for _, reference := range []struct {
+			providerID, identifier string
+			modelType              domain.AIModelType
+		}{
+			{base.EmbeddingProviderID, base.EmbeddingModelIdentifier, domain.AIModelTypeEmbedding},
+			{base.RerankProviderID, base.RerankModelIdentifier, domain.AIModelTypeRerank},
+		} {
+			if reference.providerID != providerID {
+				continue
+			}
+			found := false
+			for _, model := range models {
+				if model.Identifier == reference.identifier && model.Type == reference.modelType {
+					found = true
+					break
+				}
+			}
+			if !found {
+				return &ValidationError{Fields: map[string]ValidationCode{"models": ValidationModelsInUse}}
+			}
 		}
 	}
 	return nil

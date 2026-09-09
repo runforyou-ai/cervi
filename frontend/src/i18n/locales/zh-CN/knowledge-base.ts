@@ -102,6 +102,20 @@ const knowledgeBase = {
     createQA: "新建问答知识库",
   },
   form: {
+    embeddingModel: "向量模型",
+    embeddingDimension: "向量维度",
+    chunkLength: "分段长度",
+    chunkOverlap: "分段重叠",
+    retrievalCount: "召回数量",
+    rerankModel: "重排模型",
+    selectEmbeddingModel: "请选择向量模型",
+    noRerank: "不启用重排",
+    noEmbeddingModels: "请先在模型服务中配置向量模型。",
+    noRerankModels: "尚未配置重排模型。",
+    changeEmbeddingTitle: "更换向量模型？",
+    changeEmbeddingDescription: "更换向量模型后，需要重新索引此知识库的全部资料。确定保存？",
+    confirmSave: "确认保存",
+
     createTitle: "新建知识库",
     editTitle: "编辑知识库",
     category: "知识库类型",
@@ -113,6 +127,12 @@ const knowledgeBase = {
     saveError: "保存知识库失败，请重试。",
   },
   validation: {
+    embeddingModelRequired: "请选择向量模型。",
+    embeddingDimensionInvalid: "向量维度必须是正整数。",
+    chunkLengthInvalid: "分段长度必须是 256 至 2048 的整数。",
+    chunkOverlapInvalid: "分段重叠必须是 0 至 200 的整数。",
+    retrievalCountInvalid: "召回数量必须是 1 至 20 的整数。",
+
     nameRequired: "请输入知识库名称。",
     nameTooLong: "知识库名称不能超过 120 个字符。",
     descriptionTooLong: "知识库描述不能超过 1000 个字符。",

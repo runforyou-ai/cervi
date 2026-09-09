@@ -26,7 +26,7 @@ func newQAFixture(t *testing.T, db *bun.DB) (*servermodels.Identity, *knowledgea
 	if err != nil {
 		t.Fatal(err)
 	}
-	base, err := knowledgeaction.NewCreateKnowledgeBaseAction(db).Execute(ctx, installed.Identity, knowledgeaction.Input{Name: "FAQ", Category: domain.KnowledgeBaseCategoryQA})
+	base, err := knowledgeaction.NewCreateKnowledgeBaseAction(db).Execute(ctx, installed.Identity, newKnowledgeBaseInput(t, db, installed.Identity, "FAQ", domain.KnowledgeBaseCategoryQA))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -116,7 +116,7 @@ func TestKnowledgeQALifecycle(t *testing.T) {
 	if _, err := knowledgeaction.NewDeleteKnowledgeGroupAction(db).Execute(ctx, identity, base.ID, groupID); !errors.Is(err, knowledgeaction.ErrGroupNotEmpty) {
 		t.Fatalf("delete occupied group=%v", err)
 	}
-	if _, err := knowledgeaction.NewUpdateKnowledgeBaseAction(db).Execute(ctx, identity, base.ID, knowledgeaction.Input{Name: base.Name, Category: domain.KnowledgeBaseCategoryStandard}); !errors.Is(err, knowledgeaction.ErrBaseHasContent) {
+	if _, err := knowledgeaction.NewUpdateKnowledgeBaseAction(db).Execute(ctx, identity, base.ID, newKnowledgeBaseInput(t, db, identity, base.Name, domain.KnowledgeBaseCategoryStandard)); !errors.Is(err, knowledgeaction.ErrBaseHasContent) {
 		t.Fatalf("change type=%v", err)
 	}
 	input.SimilarQuestions = []knowledgeaction.QASimilarQuestion{{Content: "新增相似问题"}}
@@ -201,7 +201,7 @@ func TestKnowledgeQAIsolation(t *testing.T) {
 	if _, err := save.Execute(ctx, identity, base.ID, entry.ID, input); !errors.Is(err, knowledgeaction.ErrGroupNotFound) {
 		t.Fatalf("foreign group=%v", err)
 	}
-	sameOrgBase, err := knowledgeaction.NewCreateKnowledgeBaseAction(db).Execute(ctx, identity, knowledgeaction.Input{Name: "其他FAQ", Category: domain.KnowledgeBaseCategoryQA})
+	sameOrgBase, err := knowledgeaction.NewCreateKnowledgeBaseAction(db).Execute(ctx, identity, newKnowledgeBaseInput(t, db, identity, "其他FAQ", domain.KnowledgeBaseCategoryQA))
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -237,7 +237,7 @@ func TestKnowledgeQAIsolation(t *testing.T) {
 	if !errors.As(err, &fields) || fields.Fields["question"] != knowledgeaction.ValidationQAQuestionRequired {
 		t.Fatalf("empty question=%v", err)
 	}
-	standard, err := knowledgeaction.NewCreateKnowledgeBaseAction(db).Execute(ctx, identity, knowledgeaction.Input{Name: "文档库", Category: domain.KnowledgeBaseCategoryStandard})
+	standard, err := knowledgeaction.NewCreateKnowledgeBaseAction(db).Execute(ctx, identity, newKnowledgeBaseInput(t, db, identity, "文档库", domain.KnowledgeBaseCategoryStandard))
 	if err != nil {
 		t.Fatal(err)
 	}
