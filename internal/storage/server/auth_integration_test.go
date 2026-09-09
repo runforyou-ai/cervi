@@ -1605,17 +1605,29 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			DisplayName: "售前智能体",
 			RoleID:      customerServiceRole.ID,
 			TeamIDs:     []string{team.ID},
+			WorkStatus:  domain.WorkStatusAway,
 		})
-		if err != nil || updatedAgent.DisplayName != "售前智能体" {
+		if err != nil || updatedAgent.DisplayName != "售前智能体" || updatedAgent.WorkStatus != domain.WorkStatusAway {
 			t.Fatalf("updated agent = %#v, error = %v", updatedAgent, err)
 		}
 		agent, err := agentaction.NewGetAgentQuery(db).Execute(context.Background(), loggedIn.Identity, createdAgent.ID)
-		if err != nil || agent.DisplayName != "售前智能体" {
+		if err != nil || agent.DisplayName != "售前智能体" || agent.WorkStatus != domain.WorkStatusAway {
 			t.Fatalf("agent detail = %#v, error = %v", agent, err)
 		}
-		updatedAgent, err = agentaction.NewUpdateWorkStatusAction(db).Execute(context.Background(), loggedIn.Identity, createdAgent.ID, agentaction.WorkStatusInput{WorkStatus: domain.WorkStatusAway})
-		if err != nil || updatedAgent.WorkStatus != domain.WorkStatusAway {
-			t.Fatalf("away agent = %#v, error = %v", updatedAgent, err)
+		// 无效工作状态不能保存同一次提交中的资料修改。
+		if _, err := agentaction.NewUpdateAgentAction(db).Execute(context.Background(), loggedIn.Identity, createdAgent.ID, agentaction.UpdateInput{
+			DisplayName: "不应保存的名称", RoleID: customerServiceRole.ID, TeamIDs: []string{team.ID}, WorkStatus: "invalid",
+		}); err == nil {
+			t.Fatal("invalid agent work status update succeeded")
+		} else {
+			var fieldError *common.FieldError
+			if !errors.As(err, &fieldError) || fieldError.Fields["workStatus"] != agentaction.ValidationWorkStatusInvalid {
+				t.Fatalf("invalid agent work status error = %#v", err)
+			}
+		}
+		agent, err = agentaction.NewGetAgentQuery(db).Execute(context.Background(), loggedIn.Identity, createdAgent.ID)
+		if err != nil || agent.DisplayName != "售前智能体" || agent.WorkStatus != domain.WorkStatusAway {
+			t.Fatalf("agent after rejected update = %#v, error = %v", agent, err)
 		}
 		teamMembers, err := teamaction.NewListMembersQuery(db).Execute(context.Background(), loggedIn.Identity, team.ID, teamaction.MemberListInput{WorkStatus: domain.WorkStatusAway, Page: 1, PageSize: 50})
 		if err != nil || teamMembers.Page.Total != 1 || len(teamMembers.Members) != 1 || teamMembers.Members[0].IdentityID != createdAgent.IdentityID || teamMembers.Members[0].WorkStatus != domain.WorkStatusAway {
@@ -1856,7 +1868,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil || teamAfterAgentDeactivation.MemberCount != 1 {
 			t.Fatalf("team after agent deactivation = %#v, error = %v", teamAfterAgentDeactivation, err)
 		}
-		if _, err := agentaction.NewUpdateWorkStatusAction(db).Execute(context.Background(), loggedIn.Identity, createdAgent.ID, agentaction.WorkStatusInput{WorkStatus: domain.WorkStatusWorking}); err == nil {
+		if _, err := agentaction.NewUpdateAgentAction(db).Execute(context.Background(), loggedIn.Identity, createdAgent.ID, agentaction.UpdateInput{DisplayName: updatedAgent.DisplayName, RoleID: updatedAgent.RoleID, TeamIDs: []string{team.ID}, WorkStatus: domain.WorkStatusWorking}); err == nil {
 			t.Fatal("inactive agent work status update succeeded")
 		} else {
 			var fieldError *common.FieldError
@@ -1879,7 +1891,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil || len(teamAfterAgentReactivation.Teams) != 1 || teamAfterAgentReactivation.Teams[0].MemberCount != 2 {
 			t.Fatalf("team after agent reactivation = %#v, error = %v", teamAfterAgentReactivation, err)
 		}
-		updatedAgent, err = agentaction.NewUpdateWorkStatusAction(db).Execute(context.Background(), loggedIn.Identity, createdAgent.ID, agentaction.WorkStatusInput{WorkStatus: domain.WorkStatusWorking})
+		updatedAgent, err = agentaction.NewUpdateAgentAction(db).Execute(context.Background(), loggedIn.Identity, createdAgent.ID, agentaction.UpdateInput{DisplayName: updatedAgent.DisplayName, RoleID: updatedAgent.RoleID, TeamIDs: []string{team.ID}, WorkStatus: domain.WorkStatusWorking})
 		if err != nil || updatedAgent.WorkStatus != domain.WorkStatusWorking {
 			t.Fatalf("working agent = %#v, error = %v", updatedAgent, err)
 		}

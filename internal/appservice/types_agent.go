@@ -23,14 +23,10 @@ type CreateAgentInput struct {
 
 // UpdateAgentInput 定义 AI 员工可编辑字段。
 type UpdateAgentInput struct {
-	DisplayName string   `json:"displayName"`
-	RoleID      string   `json:"roleId"`
-	TeamIDs     []string `json:"teamIds"`
-}
-
-// AgentWorkStatusInput 定义 AI 员工工作状态修改字段。
-type AgentWorkStatusInput struct {
-	WorkStatus WorkStatus `json:"workStatus"`
+	DisplayName string     `json:"displayName"`
+	RoleID      string     `json:"roleId"`
+	TeamIDs     []string   `json:"teamIds"`
+	WorkStatus  WorkStatus `json:"workStatus"`
 }
 
 // AgentExecutionInput 定义 AI 员工执行配置输入。

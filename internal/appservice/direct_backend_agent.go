@@ -117,21 +117,23 @@ func (b *DirectBackend) GetAgent(ctx context.Context, meta RequestMeta, agentID 
 	return agentFromAction(*agent), nil
 }
 
-// UpdateAgent 修改企业 AI 员工名称和所属团队。
+// UpdateAgent 保存企业 AI 员工基本资料和工作状态。
 func (b *DirectBackend) UpdateAgent(ctx context.Context, meta RequestMeta, agentID string, input UpdateAgentInput) (Agent, error) {
 	identity, err := b.authenticate(ctx, meta)
 	if err != nil {
 		return Agent{}, err
 	}
-	agent, err := b.updateAgent.Execute(ctx, identity, agentID, agentaction.UpdateInput{DisplayName: input.DisplayName, RoleID: input.RoleID, TeamIDs: input.TeamIDs})
+	agent, err := b.updateAgent.Execute(ctx, identity, agentID, agentaction.UpdateInput{DisplayName: input.DisplayName, RoleID: input.RoleID, TeamIDs: input.TeamIDs, WorkStatus: domain.WorkStatus(input.WorkStatus)})
 	if err != nil {
 		return Agent{}, b.agentError(ctx, meta, err, cervii18n.ErrorAgentUpdateFailed, identity.Organization.ID, agentID, map[common.FieldCode]cervii18n.Key{
-			agentaction.ValidationDisplayNameRequired: cervii18n.FieldAgentNameRequired,
-			agentaction.ValidationRoleInvalid:         cervii18n.FieldMemberRoleInvalid,
-			agentaction.ValidationTeamInvalid:         cervii18n.FieldTeamInvalid,
+			agentaction.ValidationDisplayNameRequired:   cervii18n.FieldAgentNameRequired,
+			agentaction.ValidationRoleInvalid:           cervii18n.FieldMemberRoleInvalid,
+			agentaction.ValidationTeamInvalid:           cervii18n.FieldTeamInvalid,
+			agentaction.ValidationWorkStatusInvalid:     cervii18n.FieldWorkStatusInvalid,
+			agentaction.ValidationWorkStatusUnavailable: cervii18n.FieldAgentWorkStatusUnavailable,
 		})
 	}
-	slog.Info("AI 员工已保存", "organization_id", identity.Organization.ID, "identity_id", agent.IdentityID, "agent_id", agentID)
+	slog.Info("AI 员工已保存", "organization_id", identity.Organization.ID, "identity_id", agent.IdentityID, "agent_id", agentID, "work_status", agent.WorkStatus)
 	return agentFromAction(*agent), nil
 }
 
@@ -161,23 +163,6 @@ func (b *DirectBackend) UpdateAgentExecution(ctx context.Context, meta RequestMe
 		"model_identifier", agent.Execution.Managed.ModelIdentifier,
 		"knowledge_base_count", len(agent.Execution.Managed.KnowledgeBaseIDs),
 	)
-	return agentFromAction(*agent), nil
-}
-
-// UpdateAgentWorkStatus 修改企业 AI 员工工作状态。
-func (b *DirectBackend) UpdateAgentWorkStatus(ctx context.Context, meta RequestMeta, agentID string, input AgentWorkStatusInput) (Agent, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return Agent{}, err
-	}
-	agent, err := b.updateAgentWorkStatus.Execute(ctx, identity, agentID, agentaction.WorkStatusInput{WorkStatus: domain.WorkStatus(input.WorkStatus)})
-	if err != nil {
-		return Agent{}, b.agentError(ctx, meta, err, cervii18n.ErrorWorkStatusUpdateFailed, identity.Organization.ID, agentID, map[common.FieldCode]cervii18n.Key{
-			agentaction.ValidationWorkStatusInvalid:     cervii18n.FieldWorkStatusInvalid,
-			agentaction.ValidationWorkStatusUnavailable: cervii18n.FieldAgentWorkStatusUnavailable,
-		})
-	}
-	slog.Info("AI 员工工作状态已修改", "organization_id", identity.Organization.ID, "identity_id", agent.IdentityID, "agent_id", agentID, "work_status", input.WorkStatus)
 	return agentFromAction(*agent), nil
 }
 

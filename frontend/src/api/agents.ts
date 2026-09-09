@@ -8,7 +8,6 @@ import {
   ReactivateAgent,
   UpdateAgent,
   UpdateAgentExecution,
-  UpdateAgentWorkStatus,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import {
   AgentExecutionMode,
@@ -17,7 +16,6 @@ import {
   type AgentList,
   type AgentListInput,
   type AgentListItem,
-  type AgentWorkStatusInput,
   type CreateAgentInput,
   type UpdateAgentInput,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
@@ -31,7 +29,10 @@ export type ManagedAgentExecutionData = Omit<
   "mode" | "managed"
 > & {
   mode: AgentExecutionMode.AgentExecutionModeManaged
-  managed: Omit<NonNullable<Agent["execution"]["managed"]>, "knowledgeBaseIds"> & {
+  managed: Omit<
+    NonNullable<Agent["execution"]["managed"]>,
+    "knowledgeBaseIds"
+  > & {
     knowledgeBaseIds: NonNullable<
       NonNullable<Agent["execution"]["managed"]>["knowledgeBaseIds"]
     >
@@ -66,7 +67,6 @@ const getAgentBound = bind(GetAgent)
 const createAgentBound = bind(CreateAgent)
 const updateAgentBound = bind(UpdateAgent)
 const updateAgentExecutionBound = bind(UpdateAgentExecution)
-const updateAgentWorkStatusBound = bind(UpdateAgentWorkStatus)
 const deactivateAgentBound = bind(DeactivateAgent)
 const reactivateAgentBound = bind(ReactivateAgent)
 
@@ -96,14 +96,6 @@ export function updateAgentExecution(
   input: AgentExecutionInput,
 ) {
   return updateAgentExecutionBound(agentId, input).then(normalizeAgent)
-}
-
-/** 修改企业 AI 员工的工作状态。 */
-export function updateAgentWorkStatus(
-  agentId: string,
-  input: AgentWorkStatusInput,
-) {
-  return updateAgentWorkStatusBound(agentId, input).then(normalizeAgent)
 }
 
 /** 禁用企业 AI 员工账号。 */

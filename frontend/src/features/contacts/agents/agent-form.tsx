@@ -12,45 +12,40 @@ import {
   createAgent,
   isApiError,
   type RoleData,
-  type Team,
+  type AgentData,
 } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
 import { Button } from "@/components/ui/button"
-import {
-  Field,
-  FieldGroup,
-  FieldLabel,
-} from "@/components/ui/field"
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Textarea } from "@/components/ui/textarea"
-import { AgentKnowledgeField } from "@/features/contacts/agents/agent-knowledge-field"
 import { AgentModelField } from "@/features/contacts/agents/agent-model-field"
 import { parseAgentModelSelection } from "@/features/contacts/agents/agent-model-selection"
 import {
   createAgentSchema,
   type AgentFormValues,
 } from "@/features/contacts/agents/agent-schema"
+import { useContactInvalidator } from "@/features/contacts/use-contact-invalidator"
+import { useFormLifetime } from "@/hooks/use-form-lifetime"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 import { RoleSelectField } from "@/features/contacts/role-select-field"
-import { TeamCheckboxField } from "@/features/contacts/team-checkbox-field"
 
 /** 创建 AI 员工。 */
 export function AgentForm({
-  teams,
   roles,
   defaultTeamIds = [],
   onSaved,
   onCancel,
 }: {
-  teams: Team[]
   roles: RoleData[]
   defaultTeamIds?: string[]
-  onSaved: () => void
+  onSaved: (agent: AgentData) => void
   onCancel: () => void
 }) {
   const { t } = useTranslation("contacts")
   const { t: tCommon } = useTranslation("common")
   const navigate = useNavigate()
+  const invalidateContact = useContactInvalidator()
   const schema = useMemo(
     () =>
       createAgentSchema({
@@ -86,6 +81,8 @@ export function AgentForm({
       },
     },
   })
+  const { mounted, dirty } = useFormLifetime(form.formState.isDirty)
+
   /** 提交 AI 员工表单。 */
   async function submit(values: AgentFormValues) {
     try {
@@ -105,6 +102,8 @@ export function AgentForm({
           },
         },
       })
+      void invalidateContact("agent")
+      if (!mounted.current) return
       console.info("AI 员工已创建", {
         agent_id: created.id,
         execution_mode: created.execution.mode,
@@ -113,9 +112,11 @@ export function AgentForm({
         model_identifier: created.execution.managed.modelIdentifier,
       })
       toast.success(t("agents.form.created"))
-      onSaved()
+      dirty.current = false
+      form.reset(values)
+      onSaved(created)
     } catch (error) {
-      if (recoverSession(error, navigate)) return
+      if (!mounted.current || recoverSession(error, navigate)) return
       console.warn("创建 AI 员工失败", { error })
       toast.error(
         isApiError(error)
@@ -136,16 +137,18 @@ export function AgentForm({
 
   return (
     <form
-      className="space-y-9"
+      className="w-full max-w-2xl space-y-9"
       onSubmit={form.handleSubmit(submit)}
       noValidate
     >
-      <FieldGroup className="gap-5">
+      <FieldGroup>
         <FormInputField
           name="displayName"
+          id="agent-create-name"
           control={form.control}
           label={t("agents.form.name")}
           autoFocus
+          disabled={form.formState.isSubmitting}
         />
         <Controller
           name="roleId"
@@ -154,34 +157,30 @@ export function AgentForm({
             <RoleSelectField
               {...field}
               id={field.name}
+              required
+              disabled={form.formState.isSubmitting}
               aria-invalid={fieldState.invalid}
               roles={assignableRoles}
             />
           )}
         />
-        <AgentManagedExecutionFields control={form.control} />
-        <Controller
-          name="teamIds"
+        <AgentManagedExecutionFields
           control={form.control}
-          render={({ field }) => (
-            <TeamCheckboxField
-              teams={teams}
-              label={t("agents.form.teams")}
-              emptyMessage={t("agents.form.noTeams")}
-              value={field.value}
-              onChange={field.onChange}
-              onBlur={field.onBlur}
-            />
-          )}
+          disabled={form.formState.isSubmitting}
         />
       </FieldGroup>
       <div className="flex items-center gap-2">
         <Button type="submit" disabled={form.formState.isSubmitting}>
           {form.formState.isSubmitting
             ? tCommon("actions.saving")
-            : tCommon("actions.save")}
+            : tCommon("actions.create")}
         </Button>
-        <Button type="button" variant="outline" onClick={onCancel}>
+        <Button
+          type="button"
+          variant="outline"
+          disabled={form.formState.isSubmitting}
+          onClick={onCancel}
+        >
           {tCommon("actions.cancel")}
         </Button>
       </div>
@@ -192,7 +191,9 @@ export function AgentForm({
 /** 渲染平台托管执行配置字段。 */
 function AgentManagedExecutionFields({
   control,
+  disabled,
 }: {
+  disabled: boolean
   control: Control<AgentFormValues>
 }) {
   const { t } = useTranslation("contacts")
@@ -201,6 +202,7 @@ function AgentManagedExecutionFields({
       <AgentModelField
         control={control}
         name="execution.managed.modelSelection"
+        disabled={disabled}
       />
       <Controller
         name="execution.managed.systemInstruction"
@@ -214,19 +216,10 @@ function AgentManagedExecutionFields({
               {...field}
               id="agent-system-instruction"
               rows={6}
+              disabled={disabled}
               required
               aria-invalid={fieldState.invalid}
             />
-          </Field>
-        )}
-      />
-      <Controller
-        name="execution.managed.knowledgeBaseIds"
-        control={control}
-        render={({ field }) => (
-          <Field>
-            <FieldLabel>{t("agents.execution.knowledgeBases")}</FieldLabel>
-            <AgentKnowledgeField value={field.value} onChange={field.onChange} />
           </Field>
         )}
       />

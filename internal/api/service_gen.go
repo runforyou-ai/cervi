@@ -89,7 +89,6 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.GET("/agents/:agentID", s.getAgent)
 	router.PUT("/agents/:agentID", s.updateAgent)
 	router.PUT("/agents/:agentID/execution", s.updateAgentExecution)
-	router.PUT("/agents/:agentID/work-status", s.updateAgentWorkStatus)
 	router.POST("/agents/:agentID/deactivate", s.deactivateAgent)
 	router.POST("/agents/:agentID/reactivate", s.reactivateAgent)
 	router.GET("/users", s.listUsers)
@@ -790,16 +789,6 @@ func (s *Service) updateAgentExecution(c *gin.Context) {
 		return
 	}
 	output, err := s.application.UpdateAgentExecution(c.Request.Context(), requestMeta(c), c.Param("agentID"), input)
-	writeResult(c, http.StatusOK, output, err)
-}
-
-// updateAgentWorkStatus 修改企业 AI 员工工作状态。
-func (s *Service) updateAgentWorkStatus(c *gin.Context) {
-	var input appservice.AgentWorkStatusInput
-	if !bindJSON(c, &input) {
-		return
-	}
-	output, err := s.application.UpdateAgentWorkStatus(c.Request.Context(), requestMeta(c), c.Param("agentID"), input)
 	writeResult(c, http.StatusOK, output, err)
 }
 

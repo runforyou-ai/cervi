@@ -127,13 +127,18 @@ const contacts = {
     },
   },
   agents: {
+    configure: "配置",
+    editTitle: "配置 AI 员工",
+    edit: "配置 AI 员工 · {{name}}",
+    basic: "基本资料",
     create: "添加 AI 员工",
-    createDescription: "设置 AI 员工的名称、对话模型和工作指令。",
     form: {
       name: "AI 员工名称",
       teams: "所属团队",
       noTeams: "还没有可选择的团队。",
       created: "AI 员工已添加",
+      saved: "AI 员工已保存",
+      loadError: "AI 员工配置加载失败，请重试。",
       networkError: "无法连接服务器，请稍后重试。",
     },
     validation: {
@@ -144,11 +149,9 @@ const contacts = {
     },
     execution: {
       knowledgeBases: "知识库",
-      knowledgeDisabled: "未绑定知识库",
       knowledgeEmpty: "暂无知识库",
       knowledgeLoading: "正在加载知识库…",
       knowledgeLoadError: "知识库加载失败",
-      knowledgeUnavailable: "已失效的知识库",
       knowledgeUnavailableCount: "已失效的知识库（{{count}} 个）",
 
       title: "运行配置",
@@ -173,9 +176,6 @@ const contacts = {
       deactivated: "AI 员工已禁用",
       reactivated: "AI 员工已恢复正常",
       error: "修改 AI 员工账号状态失败，请重试。",
-    },
-    workStatus: {
-      error: "修改 AI 员工工作状态失败，请重试。",
     },
   },
   teams: {
@@ -241,8 +241,6 @@ const contacts = {
     linkedChannels: "关联渠道",
     memberTitle: "企业成员",
     memberDescription: "查看和编辑企业成员资料。",
-    agentTitle: "AI 员工",
-    agentDescription: "查看和编辑 AI 员工资料。",
     contactDescription: "查看和编辑外部联系人资料。",
     loadError: "联系人详情加载失败。",
     channels: "关联渠道",

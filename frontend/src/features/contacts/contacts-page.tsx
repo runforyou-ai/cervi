@@ -1,5 +1,5 @@
 /** 通讯录页面协调层：加载共享目录数据并按范围渲染面板。 */
-import { useEffect } from "react"
+import { useEffect, type ReactNode } from "react"
 import { useParams, useSearchParams } from "react-router"
 
 import { listChannelOptions, listRoles, listTeams } from "@/api"
@@ -16,7 +16,13 @@ import { useResource } from "@/hooks/use-resource"
 export type { ContactScope }
 
 /** 按分类列出通讯录。 */
-export function ContactsPage({ scope }: { scope: ContactScope }) {
+export function ContactsPage({
+  scope,
+  children,
+}: {
+  scope: ContactScope
+  children?: ReactNode
+}) {
   const { teamId = "" } = useParams()
   const [searchParams] = useSearchParams()
   const deleted = scope === "external" && searchParams.get("view") === "trash"
@@ -59,24 +65,25 @@ export function ContactsPage({ scope }: { scope: ContactScope }) {
         />
       }
     >
-      {scope === "employees" ? (
-        <MembersPanel channels={channels} roles={roles} teams={teams} />
-      ) : scope === "agents" ? (
-        <AgentsPanel channels={channels} roles={roles} teams={teams} />
-      ) : scope === "team" ? (
-        <TeamPanel
-          channels={channels}
-          roles={roles}
-          teams={teams}
-          teamId={teamId}
-        />
-      ) : (
-        <ExternalContactsPanel
-          channels={channels}
-          roles={roles}
-          teams={teams}
-        />
-      )}
+      {children ??
+        (scope === "employees" ? (
+          <MembersPanel channels={channels} roles={roles} teams={teams} />
+        ) : scope === "agents" ? (
+          <AgentsPanel channels={channels} roles={roles} teams={teams} />
+        ) : scope === "team" ? (
+          <TeamPanel
+            channels={channels}
+            roles={roles}
+            teams={teams}
+            teamId={teamId}
+          />
+        ) : (
+          <ExternalContactsPanel
+            channels={channels}
+            roles={roles}
+            teams={teams}
+          />
+        ))}
     </PageSplit>
   )
 }

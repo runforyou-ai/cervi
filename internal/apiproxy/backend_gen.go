@@ -572,14 +572,6 @@ func (b *Backend) UpdateAgentExecution(ctx context.Context, meta appservice.Requ
 	return output, err
 }
 
-// UpdateAgentWorkStatus 修改企业 AI 员工工作状态。
-func (b *Backend) UpdateAgentWorkStatus(ctx context.Context, meta appservice.RequestMeta, agentID string, input appservice.AgentWorkStatusInput) (appservice.Agent, error) {
-	var output appservice.Agent
-	err := b.do(ctx, meta, http.MethodPut, "/agents/"+url.PathEscape(agentID)+"/work-status", nil, input, &output)
-	b.normalizeOutput(&output)
-	return output, err
-}
-
 // DeactivateAgent 禁用企业 AI 员工账号。
 func (b *Backend) DeactivateAgent(ctx context.Context, meta appservice.RequestMeta, agentID string) (appservice.Agent, error) {
 	var output appservice.Agent

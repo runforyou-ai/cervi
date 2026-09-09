@@ -24,6 +24,7 @@ import type {
   WorkspaceNewMessageNotification,
   WorkspaceOutletContext,
 } from "@/contexts/workspace-context"
+import { WorkspaceNavigationGuard } from "@/features/workspace/workspace-navigation-guard"
 import { WorkspaceNavigation } from "@/features/workspace/workspace-navigation"
 import {
   defaultWorkspaceTab,
@@ -320,30 +321,37 @@ export function WorkspaceLayout() {
 
   return (
     <UserPreferencesProvider user={identity.user}>
-      <AttachmentQueueProvider key={identity.user.id}>
-      <div className="cervi-workspace-shell relative flex h-svh min-h-0 w-full overflow-hidden">
-        <WorkspaceNavigation
-          identity={identity}
-          onUserUpdated={updateUser}
-          onLogout={handleLogout}
-          loggingOut={loggingOut}
-        />
-        <div
-          aria-hidden="true"
-          className="cervi-workspace-top-drag-region"
-        />
-        <div className="cervi-workspace-content-frame flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl bg-background shadow-sm">
-          {identity.user.workspaceTabsEnabled ? (
-            <WorkspaceTabs currentTab={currentTab} context={workspaceContext} />
-          ) : (
-            <WorkspaceSinglePage
-              href={currentTab.href}
-              context={workspaceContext}
+      <WorkspaceNavigationGuard
+        tabsEnabled={identity.user.workspaceTabsEnabled}
+      >
+        <AttachmentQueueProvider key={identity.user.id}>
+          <div className="cervi-workspace-shell relative flex h-svh min-h-0 w-full overflow-hidden">
+            <WorkspaceNavigation
+              identity={identity}
+              onUserUpdated={updateUser}
+              onLogout={handleLogout}
+              loggingOut={loggingOut}
             />
-          )}
-        </div>
-      </div>
-    </AttachmentQueueProvider>
+            <div
+              aria-hidden="true"
+              className="cervi-workspace-top-drag-region"
+            />
+            <div className="cervi-workspace-content-frame flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl bg-background shadow-sm">
+              {identity.user.workspaceTabsEnabled ? (
+                <WorkspaceTabs
+                  currentTab={currentTab}
+                  context={workspaceContext}
+                />
+              ) : (
+                <WorkspaceSinglePage
+                  href={currentTab.href}
+                  context={workspaceContext}
+                />
+              )}
+            </div>
+          </div>
+        </AttachmentQueueProvider>
+      </WorkspaceNavigationGuard>
     </UserPreferencesProvider>
   )
 }

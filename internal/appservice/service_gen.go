@@ -369,11 +369,6 @@ func (s *Service) UpdateAgentExecution(ctx context.Context, meta RequestMeta, ag
 	return s.backend.UpdateAgentExecution(ctx, meta, agentID, input)
 }
 
-// UpdateAgentWorkStatus 修改企业 AI 员工工作状态。
-func (s *Service) UpdateAgentWorkStatus(ctx context.Context, meta RequestMeta, agentID string, input AgentWorkStatusInput) (Agent, error) {
-	return s.backend.UpdateAgentWorkStatus(ctx, meta, agentID, input)
-}
-
 // DeactivateAgent 禁用企业 AI 员工账号。
 func (s *Service) DeactivateAgent(ctx context.Context, meta RequestMeta, agentID string) (Agent, error) {
 	return s.backend.DeactivateAgent(ctx, meta, agentID)

@@ -129,13 +129,18 @@ const contacts = {
     },
   },
   agents: {
+    configure: "Configure",
+    editTitle: "Configure AI employee",
+    edit: "Configure AI employee · {{name}}",
+    basic: "Basic information",
     create: "Add AI employee",
-    createDescription: "Set the AI employee name, chat model, and work instructions.",
     form: {
       name: "AI employee name",
       teams: "Teams",
       noTeams: "There are no teams to select.",
       created: "AI employee added",
+      saved: "AI employee saved",
+      loadError: "Could not load AI employee settings. Try again.",
       networkError: "Could not connect to the server. Try again later.",
     },
     validation: {
@@ -146,11 +151,9 @@ const contacts = {
     },
     execution: {
       knowledgeBases: "Knowledge bases",
-      knowledgeDisabled: "No knowledge bases bound",
       knowledgeEmpty: "No knowledge bases",
       knowledgeLoading: "Loading knowledge bases…",
       knowledgeLoadError: "Failed to load knowledge bases",
-      knowledgeUnavailable: "Unavailable knowledge base",
       knowledgeUnavailableCount: "Unavailable knowledge bases ({{count}})",
 
       title: "Execution settings",
@@ -176,9 +179,6 @@ const contacts = {
       deactivated: "AI employee disabled",
       reactivated: "AI employee restored",
       error: "Could not update the AI employee account status. Try again.",
-    },
-    workStatus: {
-      error: "Could not update the AI employee work status. Try again.",
     },
   },
   teams: {
@@ -247,8 +247,6 @@ const contacts = {
     linkedChannels: "Linked channels",
     memberTitle: "Company member",
     memberDescription: "View and edit a company member.",
-    agentTitle: "AI employee",
-    agentDescription: "View and edit an AI employee.",
     contactDescription: "View and edit an external contact.",
     loadError: "Could not load contact details.",
     channels: "Connected channels",

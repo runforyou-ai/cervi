@@ -348,13 +348,6 @@ export enum AgentToolCallStatus {
 };
 
 /**
- * AgentWorkStatusInput 定义 AI 员工工作状态修改字段。
- */
-export interface AgentWorkStatusInput {
-    "workStatus": WorkStatus;
-}
-
-/**
  * AttachmentBatchInput 定义按顺序发送的附件消息。
  */
 export interface AttachmentBatchInput {
@@ -2538,6 +2531,7 @@ export interface UpdateAgentInput {
     "displayName": string;
     "roleId": string;
     "teamIds": string[] | null;
+    "workStatus": WorkStatus;
 }
 
 /**

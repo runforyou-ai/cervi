@@ -1,4 +1,4 @@
-/** 通讯录新建成员、AI 员工和团队的共享弹窗。 */
+/** 通讯录新建成员和团队的共享弹窗。 */
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 
@@ -10,7 +10,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { AgentForm } from "@/features/contacts/agents/agent-form"
 import type { ContactScope } from "@/features/contacts/contact-scope"
 import { ContactForm } from "@/features/contacts/external/contact-form"
 import { MemberForm } from "@/features/contacts/members/member-form"
@@ -19,7 +18,7 @@ import { useContactInvalidator } from "@/features/contacts/use-contact-invalidat
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
 
-/** 按查询参数渲染新建成员或联系人、新建 AI 员工和新建团队弹窗。 */
+/** 按查询参数渲染新建成员或联系人和新建团队弹窗。 */
 export function ContactCreateDialogs({
   scope,
   channels,
@@ -42,7 +41,6 @@ export function ContactCreateDialogs({
   const invalidate = useResourceInvalidator()
   const invalidateContact = useContactInvalidator()
   const creating = searchParams.get("new") === "1"
-  const creatingAgent = searchParams.get("newAgent") === "1"
   const creatingTeam = searchParams.get("newTeam") === "1"
 
   return (
@@ -54,7 +52,9 @@ export function ContactCreateDialogs({
         <DialogContent className="max-w-xl">
           <DialogHeader>
             <DialogTitle>
-              {t(scope !== "external" ? "members.create" : "detail.createTitle")}
+              {t(
+                scope !== "external" ? "members.create" : "detail.createTitle",
+              )}
             </DialogTitle>
             <DialogDescription>
               {t(
@@ -85,30 +85,6 @@ export function ContactCreateDialogs({
               onCancel={() => setParameters({ new: null })}
             />
           )}
-        </DialogContent>
-      </Dialog>
-
-      <Dialog
-        open={creatingAgent}
-        onOpenChange={(open) => !open && setParameters({ newAgent: null })}
-      >
-        <DialogContent className="max-w-xl">
-          <DialogHeader>
-            <DialogTitle>{t("agents.create")}</DialogTitle>
-            <DialogDescription>
-              {t("agents.createDescription")}
-            </DialogDescription>
-          </DialogHeader>
-          <AgentForm
-            teams={teams}
-            roles={roles}
-            defaultTeamIds={selectedTeam ? [selectedTeam.id] : []}
-            onSaved={() => {
-              setParameters({ newAgent: null })
-              void invalidateContact("agent")
-            }}
-            onCancel={() => setParameters({ newAgent: null })}
-          />
         </DialogContent>
       </Dialog>
 

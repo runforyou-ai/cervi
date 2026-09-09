@@ -24,6 +24,7 @@ export function createAgentProfileSchema(messages: {
   return z.object({
     displayName: z.string().trim().min(1, messages.nameRequired),
     roleId: z.string().uuid(messages.roleRequired),
+    workStatus: requiredWailsEnum(WorkStatus),
     teamIds: z.array(z.string().uuid()),
   })
 }
@@ -42,24 +43,23 @@ export function createAgentManagedExecutionSchema(
       .string()
       .trim()
       .min(1, messages.instructionRequired)
-      .refine(
-        (value) => {
-          // 校验系统指令的 Unicode 字符数上限。
-          return [...value].length <= maxSystemInstructionLength
-        },
-        messages.instructionTooLong,
-      ),
+      .refine((value) => {
+        // 校验系统指令的 Unicode 字符数上限。
+        return [...value].length <= maxSystemInstructionLength
+      }, messages.instructionTooLong),
   })
 }
 
 /** 创建新增 AI 员工表单校验规则。 */
 export function createAgentSchema(messages: AgentValidationMessages) {
-  return createAgentProfileSchema(messages).extend({
-    execution: z.object({
-      mode: z.literal(AgentExecutionMode.AgentExecutionModeManaged),
-      managed: createAgentManagedExecutionSchema(messages),
-    }),
-  })
+  return createAgentProfileSchema(messages)
+    .omit({ workStatus: true })
+    .extend({
+      execution: z.object({
+        mode: z.literal(AgentExecutionMode.AgentExecutionModeManaged),
+        managed: createAgentManagedExecutionSchema(messages),
+      }),
+    })
 }
 
 export type AgentProfileFormValues = z.infer<
@@ -71,12 +71,3 @@ export type AgentManagedExecutionFormValues = z.infer<
 >
 
 export type AgentFormValues = z.infer<ReturnType<typeof createAgentSchema>>
-
-/** 校验 AI 员工工作状态。 */
-export const agentWorkStatusSchema = z.object({
-  workStatus: requiredWailsEnum(WorkStatus),
-})
-
-export type AgentWorkStatusFormValues = z.infer<
-  typeof agentWorkStatusSchema
->

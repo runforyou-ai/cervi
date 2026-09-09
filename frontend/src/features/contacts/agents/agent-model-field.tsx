@@ -1,5 +1,5 @@
 /** AI 员工对话模型选择字段。 */
-import { useMemo, type KeyboardEventHandler } from "react"
+import { useMemo } from "react"
 import {
   Controller,
   type Control,
@@ -10,11 +10,7 @@ import { useTranslation } from "react-i18next"
 import { Link } from "react-router"
 
 import { listAgentModelOptions, type AgentModelOption } from "@/api"
-import {
-  Field,
-  FieldDescription,
-  FieldLabel,
-} from "@/components/ui/field"
+import { Field, FieldDescription, FieldLabel } from "@/components/ui/field"
 import { NativeSelect } from "@/components/ui/native-select"
 import { agentModelSelection } from "@/features/contacts/agents/agent-model-selection"
 import { resourceKeys } from "@/hooks/resource-keys"
@@ -45,20 +41,10 @@ export function AgentModelField<TValues extends FieldValues>({
   control,
   name,
   disabled = false,
-  hideLabel = false,
-  autoFocus = false,
-  onValueChange,
-  onBlur,
-  onKeyDown,
 }: {
   control: Control<TValues>
   name: FieldPathByValue<TValues, string>
   disabled?: boolean
-  hideLabel?: boolean
-  autoFocus?: boolean
-  onValueChange?: (value: string) => void
-  onBlur?: () => void
-  onKeyDown?: KeyboardEventHandler<HTMLSelectElement>
 }) {
   const { t } = useTranslation("contacts")
   const modelsResource = useResource(
@@ -77,28 +63,16 @@ export function AgentModelField<TValues extends FieldValues>({
       control={control}
       render={({ field, fieldState }) => (
         <Field data-invalid={fieldState.invalid}>
-          {hideLabel ? null : (
-            <FieldLabel htmlFor={`${name}-select`} required>
-              {t("agents.execution.model")}
-            </FieldLabel>
-          )}
+          <FieldLabel htmlFor={`${name}-select`} required>
+            {t("agents.execution.model")}
+          </FieldLabel>
           <NativeSelect
             {...field}
             id={`${name}-select`}
             required
             disabled={disabled || loading}
-            autoFocus={autoFocus}
             aria-label={t("agents.execution.model")}
             aria-invalid={fieldState.invalid}
-            onChange={(event) => {
-              field.onChange(event.target.value)
-              onValueChange?.(event.target.value)
-            }}
-            onBlur={() => {
-              field.onBlur()
-              onBlur?.()
-            }}
-            onKeyDown={onKeyDown}
           >
             <option value="">
               {loading

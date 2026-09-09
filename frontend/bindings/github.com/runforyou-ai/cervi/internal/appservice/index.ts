@@ -77,7 +77,6 @@ export type {
     AgentRunContentBlock,
     AgentTextMessageInput,
     AgentToolCall,
-    AgentWorkStatusInput,
     AttachmentBatchInput,
     AttachmentBatchItem,
     AttachmentBatchResult,
