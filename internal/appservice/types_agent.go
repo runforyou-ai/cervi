@@ -35,6 +35,25 @@ type AgentExecutionInput struct {
 	Managed *AgentManagedExecutionInput `json:"managed,omitempty"`
 }
 
+// UpdateAgentExecutionInput 定义运行配置表单整体保存的字段。
+type UpdateAgentExecutionInput struct {
+	Mode         AgentExecutionMode          `json:"mode"`
+	Managed      *AgentManagedExecutionInput `json:"managed,omitempty"`
+	MCPServerIDs []string                    `json:"mcpServerIds"`
+}
+
+// AgentMCPServerOption 定义不含凭据的 MCP 服务选择项。
+type AgentMCPServerOption struct {
+	ID        string `json:"id"`
+	Name      string `json:"name"`
+	ToolCount int    `json:"toolCount"`
+}
+
+// AgentMCPServerOptionList 定义当前企业的 MCP 服务选择列表。
+type AgentMCPServerOptionList struct {
+	MCPServers []AgentMCPServerOption `json:"mcpServers"`
+}
+
 // AgentManagedExecutionInput 定义平台托管执行配置输入。
 type AgentManagedExecutionInput struct {
 	ProviderID        string   `json:"providerId"`
@@ -79,9 +98,10 @@ type AgentListItem struct {
 
 // AgentExecution 定义 AI 员工当前生效的执行配置。
 type AgentExecution struct {
-	RevisionID string                 `json:"revisionId"`
-	Mode       AgentExecutionMode     `json:"mode"`
-	Managed    *AgentManagedExecution `json:"managed,omitempty"`
+	MCPServerIDs []string               `json:"mcpServerIds"`
+	RevisionID   string                 `json:"revisionId"`
+	Mode         AgentExecutionMode     `json:"mode"`
+	Managed      *AgentManagedExecution `json:"managed,omitempty"`
 }
 
 // AgentManagedExecution 定义平台托管执行配置。

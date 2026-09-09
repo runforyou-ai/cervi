@@ -82,7 +82,7 @@ func (a *CreateAgentAction) Execute(ctx context.Context, identity *servermodels.
 			Exec(ctx); err != nil {
 			return err
 		}
-		execution, err := insertExecutionRevision(ctx, tx, identity, agent.ID, revisionID.String(), executionInput, model)
+		execution, err := insertExecutionRevision(ctx, tx, identity, agent.ID, revisionID.String(), executionInput, model, []string{})
 		if err != nil {
 			return err
 		}

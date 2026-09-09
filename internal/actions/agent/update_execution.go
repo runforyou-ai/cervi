@@ -15,6 +15,12 @@ import (
 	"github.com/uptrace/bun"
 )
 
+// UpdateExecutionInput 定义编辑页保存的完整执行配置。
+type UpdateExecutionInput struct {
+	ExecutionInput
+	MCPServerIDs []string
+}
+
 // UpdateExecutionAction 修改 AI 员工当前生效的执行配置。
 type UpdateExecutionAction struct{ db *bun.DB }
 
@@ -24,17 +30,22 @@ func NewUpdateExecutionAction(db *bun.DB) *UpdateExecutionAction {
 }
 
 // Execute 创建新执行配置版本并切换 AI 员工的当前版本。
-func (a *UpdateExecutionAction) Execute(ctx context.Context, identity *servermodels.Identity, agentID string, input ExecutionInput) (*Agent, error) {
+func (a *UpdateExecutionAction) Execute(ctx context.Context, identity *servermodels.Identity, agentID string, input UpdateExecutionInput) (*Agent, error) {
 	if !common.ValidUUID(agentID) {
 		return nil, ErrNotFound
 	}
-	input, err := normalizeExecutionInput(input)
+	executionInput, err := normalizeExecutionInput(input.ExecutionInput)
 	if err != nil {
 		return nil, err
 	}
 	var output *Agent
 	err = a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
+			return err
+		}
+		// 保存与删除均先锁服务、再锁员工，避免反向取锁。
+		mcpServerIDs, err := validateAndLockMCPServers(ctx, tx, identity.Organization.ID, input.MCPServerIDs)
+		if err != nil {
 			return err
 		}
 		stored := &servermodels.Agent{}
@@ -50,12 +61,12 @@ func (a *UpdateExecutionAction) Execute(ctx context.Context, identity *servermod
 		if err != nil {
 			return err
 		}
-		model, err := loadManagedExecutionModel(ctx, tx, identity.Organization.ID, *input.Managed)
+		model, err := loadManagedExecutionModel(ctx, tx, identity.Organization.ID, *executionInput.Managed)
 		if err != nil {
 			return err
 		}
 		revisionID := uuid.NewV7()
-		execution, err := insertExecutionRevision(ctx, tx, identity, agentID, revisionID.String(), input, model)
+		execution, err := insertExecutionRevision(ctx, tx, identity, agentID, revisionID.String(), executionInput, model, mcpServerIDs)
 		if err != nil {
 			return err
 		}

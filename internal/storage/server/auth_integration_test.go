@@ -1578,12 +1578,12 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatalf("AI customer service missing from assignees: %#v", customerServiceAssignees)
 		}
 		originalRevisionID := createdAgent.Execution.RevisionID
-		agentWithUpdatedExecution, err := agentaction.NewUpdateExecutionAction(db).Execute(context.Background(), loggedIn.Identity, createdAgent.ID, agentaction.ExecutionInput{
+		agentWithUpdatedExecution, err := agentaction.NewUpdateExecutionAction(db).Execute(context.Background(), loggedIn.Identity, createdAgent.ID, agentaction.UpdateExecutionInput{ExecutionInput: agentaction.ExecutionInput{
 			Mode: domain.AgentExecutionModeManaged,
 			Managed: &agentaction.ManagedExecutionInput{
 				ProviderID: provider.ID, ModelIdentifier: model.Identifier, SystemInstruction: "负责接待并回答客户问题。",
 			},
-		})
+		}})
 		if err != nil || agentWithUpdatedExecution.Execution.RevisionID == originalRevisionID || agentWithUpdatedExecution.Execution.Managed.SystemInstruction != "负责接待并回答客户问题。" {
 			t.Fatalf("updated agent execution = %#v, error = %v", agentWithUpdatedExecution, err)
 		}
@@ -2315,6 +2315,10 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 
 		t.Run("Telegram AI 客服", func(t *testing.T) {
 			testAgentTelegramReplies(t, db, loggedIn.Identity, customerServiceRole.ID, provider.ID, model.Identifier)
+		})
+
+		t.Run("Agent MCP 服务配置", func(t *testing.T) {
+			testAgentMCPServices(t, db, loggedIn.Identity, customerServiceRole.ID, provider.ID, model.Identifier)
 		})
 
 		t.Run("Agent 本地知识库范围", func(t *testing.T) {

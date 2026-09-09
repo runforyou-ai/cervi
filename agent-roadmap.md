@@ -24,6 +24,7 @@
 - `organization_identities.type = agent` 和 `agents` 已提供企业 AI 员工身份、状态、团队关系及管理接口。
 - Web 与桌面端创建群聊和添加成员支持同企业活跃 Agent，成员列表展示 AI 员工标识。群主仍由真人担任；群聊消息不触发 Agent，群内 @Agent 与响应策略留待后续设计。
 - Agent 已保存模型选择、系统指令、知识库绑定和不可变配置版本，`agents.active_revision_id` 指向当前版本。
+- AI 员工编辑页的运行配置支持通过三列卡片模态框选择 MCP 服务，确认只回写表单，页面保存时整体提交。创建页保留必要字段。MCP 服务选择随 Revision 保存；删除服务时在同一事务为受影响员工生成移除该服务的新版本，不测试远端可用性，也不改写历史 Revision。MCP 工具调用尚未接入。
 - AI Provider 和模型目录已经存在，可以保存企业配置的模型服务；模型使用现有复合键 `(provider_id, identifier)`。
 - 服务端已有 PostgreSQL、NATS JetStream、`task_runs + task_outbox`、数据库租约、心跳和至少一次任务执行能力。
 - Web、桌面端与移动端已有企业成员文本单聊、统一消息时间线和前台轮询；`direct_conversations` 已用企业内规范身份对唯一约束收敛首发，Agent 复用同一 ChatSubject、Participant 和 Message 路径。
@@ -181,7 +182,7 @@ agent_revisions
 
 `execution_mode` 表示 AI 员工的执行方式，当前只接受 `managed`。外部平台后续统一通过 MCP 提供工具，由托管 Agent 自主调用，不因接入工具而增加执行模式或 Agent 身份类型。代码只在真实模式可用时增加对应枚举值和强类型配置，不接受尚未实现的空配置。
 
-`configuration` 是按 `(execution_mode, schema_version)` 解释的完整、规范化、非敏感 JSON 快照。当前 `managed/v1` 保存模型服务编号与名称快照、模型标识与名称快照、系统指令和 `knowledgeBaseIds`。Action 必须使用对应版本的强类型编解码器严格校验，未知模式、未知结构版本和未知字段都必须失败，不能静默降级。项目不创建数据库外键，因此 Action 仍须在事务中校验企业、Agent、Provider、模型和配置版本的关联；平台托管配置选择的模型必须对应现有模型目录中的同企业文本 Chat 模型。
+`configuration` 是按 `(execution_mode, schema_version)` 解释的完整、规范化、非敏感 JSON 快照。当前 `managed/v1` 保存模型服务编号与名称快照、模型标识与名称快照、系统指令、`knowledgeBaseIds` 和 `mcpServerIds`。Action 必须使用对应版本的强类型编解码器严格校验，未知模式、未知结构版本和未知字段都必须失败，不能静默降级。项目不创建数据库外键，因此 Action 仍须在事务中校验企业、Agent、Provider、模型和配置版本的关联；平台托管配置选择的模型必须对应现有模型目录中的同企业文本 Chat 模型。
 
 ```json
 {
@@ -192,7 +193,8 @@ agent_revisions
     "name": "GPT-5 mini"
   },
   "systemInstruction": "负责回答企业产品问题。",
-  "knowledgeBaseIds": []
+  "knowledgeBaseIds": [],
+  "mcpServerIds": []
 }
 ```
 
@@ -202,7 +204,8 @@ agent_revisions
 - 已被 Run 引用的 Revision 不物理删除。
 - Agent 支持绑定当前企业的本地知识库，范围随 Revision 固定；保存时校验并锁定知识库，失效绑定可从详情移除。本地检索接入遵循 [知识库 Agent Tool 方案](knowledge-base-agent-tool-plan.md)，查询与游标读取使用相同范围。
 - Run 使用自身 Revision 的配置；修改当前版本不改变在途 Run。
-- Revision 保存管理员当时配置的完整业务快照和非敏感名称快照；当前详情可以继续解析模型目录中的最新显示名称。
+- Revision 保存模型、指令、知识库等版本配置及非敏感名称快照；当前详情可以继续解析模型目录中的最新显示名称。
+- MCP 服务 ID 集合随 Revision 固定，与模型、指令和知识库范围一起保存。删除服务时在同一事务为当前引用它的员工创建移除该服务的新 Revision，并切换当前版本；保存与删除统一先锁服务、再锁员工。历史 Revision 保留原选择，服务地址与凭据仍由 MCP 服务目录维护；历史引用不代表已删除服务仍可调用。
 - Provider 密钥和 Endpoint 仍属于 Provider 配置，不复制到 Revision 或 Run；未来外部平台凭据同样通过独立调用目标与凭据配置解析。
 - Tool Policy 保存产品能力标识和策略，不保存 Eino Tool 实例或 Go 类型。
 - Eino 是 `managed` 模式的内部执行适配器，不写入 `execution_mode`。Eino 升级不能改变历史 Revision 的业务含义；必要时通过 `schema_version` 解释。

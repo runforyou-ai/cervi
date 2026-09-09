@@ -49,7 +49,7 @@ func testAgentKnowledgeScopes(t *testing.T, db *bun.DB, identity *servermodels.I
 	for _, id := range []string{foreign.ID, uuid.NewV7().String()} {
 		input.Managed.KnowledgeBaseIDs = []string{id}
 		var fields *common.FieldError
-		if _, err := update.Execute(ctx, identity, created.ID, input); !errors.As(err, &fields) || fields.Fields["knowledgeBaseIds"] != agentaction.ValidationKnowledgeBaseInvalid {
+		if _, err := update.Execute(ctx, identity, created.ID, agentaction.UpdateExecutionInput{ExecutionInput: input}); !errors.As(err, &fields) || fields.Fields["knowledgeBaseIds"] != agentaction.ValidationKnowledgeBaseInvalid {
 			t.Fatalf("invalid update err=%v", err)
 		}
 		if _, err := create.Execute(ctx, identity, agentaction.CreateInput{DisplayName: "无效绑定助手", RoleID: roleID, Execution: input}); !errors.As(err, &fields) || fields.Fields["knowledgeBaseIds"] != agentaction.ValidationKnowledgeBaseInvalid {
@@ -65,7 +65,7 @@ func testAgentKnowledgeScopes(t *testing.T, db *bun.DB, identity *servermodels.I
 		t.Fatalf("invalid creates left agents: count=%d before=%d err=%v", count, before, err)
 	}
 	input.Managed.KnowledgeBaseIDs = bases
-	updated, err := update.Execute(ctx, identity, created.ID, input)
+	updated, err := update.Execute(ctx, identity, created.ID, agentaction.UpdateExecutionInput{ExecutionInput: input})
 	if err != nil || updated.Execution.RevisionID == originalRevisionID || !slices.Equal(updated.Execution.Managed.KnowledgeBaseIDs, bases) {
 		t.Fatalf("update=%+v err=%v", updated, err)
 	}
@@ -87,11 +87,11 @@ func testAgentKnowledgeScopes(t *testing.T, db *bun.DB, identity *servermodels.I
 	if err != nil || !slices.Equal(detail.Execution.Managed.KnowledgeBaseIDs, bases) {
 		t.Fatalf("deleted binding detail=%+v err=%v", detail, err)
 	}
-	if _, err := update.Execute(ctx, identity, created.ID, input); err == nil {
+	if _, err := update.Execute(ctx, identity, created.ID, agentaction.UpdateExecutionInput{ExecutionInput: input}); err == nil {
 		t.Fatal("deleted binding saved")
 	}
 	input.Managed.KnowledgeBaseIDs = []string{}
-	cleared, err := update.Execute(ctx, identity, created.ID, input)
+	cleared, err := update.Execute(ctx, identity, created.ID, agentaction.UpdateExecutionInput{ExecutionInput: input})
 	if err != nil || len(cleared.Execution.Managed.KnowledgeBaseIDs) != 0 {
 		t.Fatalf("clear=%+v err=%v", cleared, err)
 	}

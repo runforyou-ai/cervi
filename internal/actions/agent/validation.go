@@ -5,6 +5,7 @@ package agent
 import "github.com/runforyou-ai/cervi/internal/common"
 
 const (
+	ValidationMCPServerInvalid          common.FieldCode = "AGENT_MCP_SERVER_INVALID"
 	ValidationDisplayNameRequired       common.FieldCode = "AGENT_DISPLAY_NAME_REQUIRED"
 	ValidationTeamInvalid               common.FieldCode = "AGENT_TEAM_INVALID"
 	ValidationRoleInvalid               common.FieldCode = "AGENT_ROLE_INVALID"

@@ -149,6 +149,15 @@ const contacts = {
       instructionRequired: "Enter work instructions.",
       instructionTooLong: "Work instructions cannot exceed 20,000 characters.",
     },
+    mcp: {
+      services: "MCP services",
+      title: "Configure MCP services",
+      unconfigured: "Not configured",
+      selected: "Selected services: {{count}}",
+      empty: "No MCP services",
+      loadError: "Could not load MCP services. Try again.",
+      tools: "Tools: {{count}}",
+    },
     execution: {
       knowledgeBases: "Knowledge bases",
       knowledgeEmpty: "No knowledge bases",

@@ -83,6 +83,7 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.POST("/channels/:channelID/activate", s.activateMessageChannel)
 	router.GET("/channels/options", s.listChannelOptions)
 	router.GET("/members/options", s.listMemberOptions)
+	router.GET("/agents/mcp-server-options", s.listAgentMCPServerOptions)
 	router.GET("/agents/model-options", s.listAgentModelOptions)
 	router.POST("/agents", s.createAgent)
 	router.GET("/agents", s.listAgents)
@@ -740,6 +741,12 @@ func (s *Service) listMemberOptions(c *gin.Context) {
 	writeResult(c, http.StatusOK, output, err)
 }
 
+// listAgentMCPServerOptions 返回当前企业可配置的 MCP 服务。
+func (s *Service) listAgentMCPServerOptions(c *gin.Context) {
+	output, err := s.application.ListAgentMCPServerOptions(c.Request.Context(), requestMeta(c))
+	writeResult(c, http.StatusOK, output, err)
+}
+
 // listAgentModelOptions 返回 AI 员工可使用的对话模型。
 func (s *Service) listAgentModelOptions(c *gin.Context) {
 	output, err := s.application.ListAgentModelOptions(c.Request.Context(), requestMeta(c))
@@ -784,7 +791,7 @@ func (s *Service) updateAgent(c *gin.Context) {
 
 // updateAgentExecution 修改企业 AI 员工的执行配置。
 func (s *Service) updateAgentExecution(c *gin.Context) {
-	var input appservice.AgentExecutionInput
+	var input appservice.UpdateAgentExecutionInput
 	if !bindJSON(c, &input) {
 		return
 	}

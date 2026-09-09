@@ -123,6 +123,7 @@ export function MCPServerFormPage({ mode }: { mode: "create" | "edit" }) {
         void invalidateResource(resourceKeys.mcpServer(mcpServerId))
       }
       void invalidateResource(resourceKeys.mcpServers())
+      void invalidateResource(resourceKeys.agentMCPServerOptions())
       if (!mounted.current) return
       form.reset(values)
       console.info(mode === "create" ? "MCP 服务已创建" : "MCP 服务已保存", {

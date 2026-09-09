@@ -224,6 +224,9 @@ type Backend interface {
 	// ListMemberOptions 返回可分配的企业成员和 AI 员工。
 	//cervi:route GET /members/options
 	ListMemberOptions(context.Context, RequestMeta, MemberOptionListInput) (MemberOptionList, error)
+	// ListAgentMCPServerOptions 返回当前企业可配置的 MCP 服务。
+	//cervi:route GET /agents/mcp-server-options
+	ListAgentMCPServerOptions(context.Context, RequestMeta) (AgentMCPServerOptionList, error)
 	// ListAgentModelOptions 返回 AI 员工可使用的对话模型。
 	//cervi:route GET /agents/model-options
 	ListAgentModelOptions(context.Context, RequestMeta) (AgentModelOptionList, error)
@@ -241,7 +244,7 @@ type Backend interface {
 	UpdateAgent(context.Context, RequestMeta, string, UpdateAgentInput) (Agent, error)
 	// UpdateAgentExecution 修改企业 AI 员工的执行配置。
 	//cervi:route PUT /agents/:agentID/execution
-	UpdateAgentExecution(context.Context, RequestMeta, string, AgentExecutionInput) (Agent, error)
+	UpdateAgentExecution(context.Context, RequestMeta, string, UpdateAgentExecutionInput) (Agent, error)
 	// DeactivateAgent 禁用企业 AI 员工账号。
 	//cervi:route POST /agents/:agentID/deactivate
 	DeactivateAgent(context.Context, RequestMeta, string) (Agent, error)

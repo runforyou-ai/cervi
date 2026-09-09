@@ -111,6 +111,10 @@ func newInboxPaginationFixture(t *testing.T) inboxPaginationFixture {
 			t.Fatal(err)
 		}
 	}
+	// 批量造数后刷新统计信息，避免查询计划依赖自动分析的执行时机。
+	if _, err := f.db.ExecContext(ctx, "ANALYZE"); err != nil {
+		t.Fatal(err)
+	}
 	return f
 }
 

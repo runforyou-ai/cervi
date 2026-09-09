@@ -339,6 +339,11 @@ func (s *Service) ListMemberOptions(ctx context.Context, meta RequestMeta, input
 	return s.backend.ListMemberOptions(ctx, meta, input)
 }
 
+// ListAgentMCPServerOptions 返回当前企业可配置的 MCP 服务。
+func (s *Service) ListAgentMCPServerOptions(ctx context.Context, meta RequestMeta) (AgentMCPServerOptionList, error) {
+	return s.backend.ListAgentMCPServerOptions(ctx, meta)
+}
+
 // ListAgentModelOptions 返回 AI 员工可使用的对话模型。
 func (s *Service) ListAgentModelOptions(ctx context.Context, meta RequestMeta) (AgentModelOptionList, error) {
 	return s.backend.ListAgentModelOptions(ctx, meta)
@@ -365,7 +370,7 @@ func (s *Service) UpdateAgent(ctx context.Context, meta RequestMeta, agentID str
 }
 
 // UpdateAgentExecution 修改企业 AI 员工的执行配置。
-func (s *Service) UpdateAgentExecution(ctx context.Context, meta RequestMeta, agentID string, input AgentExecutionInput) (Agent, error) {
+func (s *Service) UpdateAgentExecution(ctx context.Context, meta RequestMeta, agentID string, input UpdateAgentExecutionInput) (Agent, error) {
 	return s.backend.UpdateAgentExecution(ctx, meta, agentID, input)
 }
 

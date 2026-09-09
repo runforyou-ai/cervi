@@ -72,12 +72,12 @@ func TestDecodeRevisionExecutionReadsManagedV1(t *testing.T) {
 		ID:            "revision-1",
 		ExecutionMode: string(domain.AgentExecutionModeManaged),
 		SchemaVersion: managedExecutionSchemaVersion,
-		Configuration: []byte(`{"model":{"providerId":"019c7f37-8c0b-7ef0-8eca-cb672194d28d","providerName":"企业模型","identifier":"chat-model","name":"对话模型"},"systemInstruction":"回答产品问题。","knowledgeBaseIds":["019c7f37-8c0b-7ef0-8eca-cb672194d28d"]}`),
+		Configuration: []byte(`{"model":{"providerId":"019c7f37-8c0b-7ef0-8eca-cb672194d28d","providerName":"企业模型","identifier":"chat-model","name":"对话模型"},"systemInstruction":"回答产品问题。","knowledgeBaseIds":["019c7f37-8c0b-7ef0-8eca-cb672194d28d"],"mcpServerIds":["019c7f37-8c0b-7ef0-8eca-cb672194d28d"]}`),
 	})
 	if err != nil {
 		t.Fatalf("decodeRevisionExecution() error = %v", err)
 	}
-	if execution.RevisionID != "revision-1" || execution.Mode != domain.AgentExecutionModeManaged || execution.Managed == nil || execution.Managed.ProviderName != "企业模型" || execution.Managed.ModelIdentifier != "chat-model" || execution.Managed.SystemInstruction != "回答产品问题。" || !slices.Equal(execution.Managed.KnowledgeBaseIDs, []string{"019c7f37-8c0b-7ef0-8eca-cb672194d28d"}) {
+	if !slices.Equal(execution.MCPServerIDs, []string{"019c7f37-8c0b-7ef0-8eca-cb672194d28d"}) || execution.RevisionID != "revision-1" || execution.Mode != domain.AgentExecutionModeManaged || execution.Managed == nil || execution.Managed.ProviderName != "企业模型" || execution.Managed.ModelIdentifier != "chat-model" || execution.Managed.SystemInstruction != "回答产品问题。" || !slices.Equal(execution.Managed.KnowledgeBaseIDs, []string{"019c7f37-8c0b-7ef0-8eca-cb672194d28d"}) {
 		t.Fatalf("decodeRevisionExecution() = %#v", execution)
 	}
 }

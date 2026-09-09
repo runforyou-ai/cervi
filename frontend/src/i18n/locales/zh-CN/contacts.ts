@@ -147,6 +147,15 @@ const contacts = {
       instructionRequired: "请输入工作指令。",
       instructionTooLong: "工作指令不能超过 20000 个字符。",
     },
+    mcp: {
+      services: "MCP 服务",
+      title: "配置 MCP 服务",
+      unconfigured: "未配置",
+      selected: "已选择 {{count}} 个服务",
+      empty: "暂无 MCP 服务",
+      loadError: "MCP 服务列表加载失败，请重试。",
+      tools: "{{count}} 个工具",
+    },
     execution: {
       knowledgeBases: "知识库",
       knowledgeEmpty: "暂无知识库",

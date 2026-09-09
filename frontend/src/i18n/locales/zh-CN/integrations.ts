@@ -93,7 +93,7 @@ const integrations = {
     },
     delete: {
       title: "删除“{{name}}”？",
-      description: "删除后，该 MCP 服务配置将无法恢复。",
+      description: "删除后，该 MCP 服务配置将无法恢复，同时会移除 AI 员工对该服务的配置。",
       success: "MCP 服务已删除。",
       error: "删除 MCP 服务失败，请重试。",
     },

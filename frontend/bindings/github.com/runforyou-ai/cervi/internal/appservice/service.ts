@@ -484,6 +484,13 @@ export function ListAIProviders(meta: $models.RequestMeta): $CancellablePromise<
 }
 
 /**
+ * ListAgentMCPServerOptions 返回当前企业可配置的 MCP 服务。
+ */
+export function ListAgentMCPServerOptions(meta: $models.RequestMeta): $CancellablePromise<$models.AgentMCPServerOptionList> {
+    return $Call.ByID(4205316032, meta);
+}
+
+/**
  * ListAgentModelOptions 返回 AI 员工可使用的对话模型。
  */
 export function ListAgentModelOptions(meta: $models.RequestMeta): $CancellablePromise<$models.AgentModelOptionList> {
@@ -962,7 +969,7 @@ export function UpdateAgent(meta: $models.RequestMeta, agentID: string, input: $
 /**
  * UpdateAgentExecution 修改企业 AI 员工的执行配置。
  */
-export function UpdateAgentExecution(meta: $models.RequestMeta, agentID: string, input: $models.AgentExecutionInput): $CancellablePromise<$models.Agent> {
+export function UpdateAgentExecution(meta: $models.RequestMeta, agentID: string, input: $models.UpdateAgentExecutionInput): $CancellablePromise<$models.Agent> {
     return $Call.ByID(3177846414, meta, agentID, input);
 }
 

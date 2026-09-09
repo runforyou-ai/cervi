@@ -66,8 +66,13 @@ export type AgentProfileFormValues = z.infer<
   ReturnType<typeof createAgentProfileSchema>
 >
 
-export type AgentManagedExecutionFormValues = z.infer<
-  ReturnType<typeof createAgentManagedExecutionSchema>
->
+/** 创建运行配置编辑表单校验规则，服务绑定仅在编辑页配置。 */
+export function createAgentExecutionSchema(
+  messages: Omit<AgentValidationMessages, "nameRequired" | "roleRequired">,
+) {
+  return createAgentManagedExecutionSchema(messages).extend({ mcpServerIds: z.array(z.string().uuid()) })
+}
+
+export type AgentExecutionFormValues = z.infer<ReturnType<typeof createAgentExecutionSchema>>
 
 export type AgentFormValues = z.infer<ReturnType<typeof createAgentSchema>>
