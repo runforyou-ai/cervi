@@ -70,11 +70,13 @@ class ProcessingTests(unittest.TestCase):
                 if suffix == ".xlsx":
                     self.assertIn("0012", "".join(doc.content or "" for doc in documents))
                     self.assertEqual(segments[0]["source_label"], "合同")
-            # 构造含两页真实文本的 PDF，核验 converter 的页码映射。
+            # 首尾及中间空白页不能改变正文的真实页码。
             from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
             pdf = PdfWriter()
-            for text in ["Contract page one", "Amount 1234.50 page two"]:
+            for text in ["", "Contract page two", "", "Amount 1234.50 page four", ""]:
                 page = pdf.add_blank_page(612, 792)
+                if not text:
+                    continue
                 font = DictionaryObject({NameObject("/Type"): NameObject("/Font"), NameObject("/Subtype"): NameObject("/Type1"), NameObject("/BaseFont"): NameObject("/Helvetica")})
                 page[NameObject("/Resources")] = DictionaryObject({NameObject("/Font"): DictionaryObject({NameObject("/F1"): pdf._add_object(font)})})
                 stream = DecodedStreamObject()
@@ -82,7 +84,7 @@ class ProcessingTests(unittest.TestCase):
                 page[NameObject("/Contents")] = pdf._add_object(stream)
             pdf.write(root / "sample.pdf")
             segments = split_documents(convert_file(root / "sample.pdf"), 256, 50)
-            self.assertEqual([s["page_number"] for s in segments], [1, 2])
+            self.assertEqual([s["page_number"] for s in segments], [2, 4])
 
     def test_invalid_and_empty_files(self):
         """空白、损坏和加密原件不会成为可用分段。"""

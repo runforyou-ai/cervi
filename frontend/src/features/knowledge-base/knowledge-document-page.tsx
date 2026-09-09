@@ -18,7 +18,8 @@ export function KnowledgeDocumentPage() {
   const { t } = useTranslation(["knowledgeBase", "common"])
   const { knowledgeBaseId = "", groupId = "", documentId = "" } = useParams()
   const location = useLocation()
-  const [segmentsOpen, setSegmentsOpen] = useState(false)
+  // 打开时固定批次，后台发布新结果不会重置当前阅读位置。
+  const [segmentBatchId, setSegmentBatchId] = useState("")
   const trigger = useRef<HTMLButtonElement>(null)
   const document = useResource(
     resourceKeys.knowledgeDocument(knowledgeBaseId, documentId),
@@ -30,7 +31,7 @@ export function KnowledgeDocumentPage() {
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <PageHeader title={document.data?.name ?? t("documents.title")}>
-        <Button ref={trigger} variant="outline" size="sm" disabled={!document.data?.segmentBatchId} onClick={() => setSegmentsOpen(true)}>
+        <Button ref={trigger} variant="outline" size="sm" disabled={!document.data?.segmentBatchId} onClick={() => setSegmentBatchId(document.data?.segmentBatchId ?? "")}>
           {t("documentDetail.viewSegments")}
         </Button>
         <Button variant="ghost" size="sm" asChild>
@@ -54,9 +55,9 @@ export function KnowledgeDocumentPage() {
           />
         )}
       </PageContent>
-      {segmentsOpen && document.data?.segmentBatchId && <KnowledgeSegmentsDialog
+      {segmentBatchId && document.data && <KnowledgeSegmentsDialog
         knowledgeBaseId={knowledgeBaseId} documentId={documentId} documentName={document.data.name}
-        segmentBatchId={document.data.segmentBatchId} triggerRef={trigger} onClose={() => setSegmentsOpen(false)}
+        segmentBatchId={segmentBatchId} triggerRef={trigger} onClose={() => setSegmentBatchId("")}
       />}
     </div>
   )

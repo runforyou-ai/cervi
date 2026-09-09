@@ -182,10 +182,10 @@ def process_file(metadata: str = Form(), file: UploadFile = File()) -> dict:
     except HTTPException:
         raise
     except psycopg.Error:
-        logger.warning("知识分段存储失败 document_id=%s stage=%s", input.documentId, stage)
+        logger.warning("知识分段存储失败 document_id=%s stage=%s", input.documentId, stage, exc_info=True)
         raise HTTPException(503, detail={"code": "service_failed", "stage": stage}) from None
     except Exception:
-        logger.warning("知识原件处理失败 document_id=%s stage=%s", input.documentId, stage)
+        logger.warning("知识原件处理失败 document_id=%s stage=%s", input.documentId, stage, exc_info=True)
         raise HTTPException(422, detail={"code": "parse_failed", "stage": stage}) from None
 
 
