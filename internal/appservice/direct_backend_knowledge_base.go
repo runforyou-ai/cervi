@@ -52,6 +52,14 @@ func (b *DirectBackend) CreateKnowledgeBase(ctx context.Context, meta RequestMet
 	}
 	record, err := b.createKnowledgeBase.Execute(ctx, identity, knowledgebaseaction.Input{
 		Name: input.Name, Category: domain.KnowledgeBaseCategory(input.Category), Description: input.Description,
+		EmbeddingProviderID:      input.EmbeddingProviderID,
+		EmbeddingModelIdentifier: input.EmbeddingModelIdentifier,
+		EmbeddingDimension:       input.EmbeddingDimension,
+		ChunkLength:              input.ChunkLength,
+		ChunkOverlap:             input.ChunkOverlap,
+		RetrievalCount:           input.RetrievalCount,
+		RerankProviderID:         input.RerankProviderID,
+		RerankModelIdentifier:    input.RerankModelIdentifier,
 	})
 	if err != nil {
 		return KnowledgeBase{}, b.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeBaseCreateFailed, identity.Organization.ID, "")
@@ -68,6 +76,14 @@ func (b *DirectBackend) UpdateKnowledgeBase(ctx context.Context, meta RequestMet
 	}
 	record, err := b.updateKnowledgeBase.Execute(ctx, identity, knowledgeBaseID, knowledgebaseaction.Input{
 		Name: input.Name, Category: domain.KnowledgeBaseCategory(input.Category), Description: input.Description,
+		EmbeddingProviderID:      input.EmbeddingProviderID,
+		EmbeddingModelIdentifier: input.EmbeddingModelIdentifier,
+		EmbeddingDimension:       input.EmbeddingDimension,
+		ChunkLength:              input.ChunkLength,
+		ChunkOverlap:             input.ChunkOverlap,
+		RetrievalCount:           input.RetrievalCount,
+		RerankProviderID:         input.RerankProviderID,
+		RerankModelIdentifier:    input.RerankModelIdentifier,
 	})
 	if err != nil {
 		return KnowledgeBase{}, b.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeBaseUpdateFailed, identity.Organization.ID, knowledgeBaseID)
@@ -187,7 +203,16 @@ func (b *DirectBackend) knowledgeBaseError(ctx context.Context, meta RequestMeta
 func knowledgeBaseFromAction(record knowledgebaseaction.Record) KnowledgeBase {
 	return KnowledgeBase{
 		ID: record.ID, Name: record.Name, Category: KnowledgeBaseCategory(record.Category), Description: record.Description,
-		Groups:    knowledgeGroupsFromAction(record.Groups),
+		Groups:                   knowledgeGroupsFromAction(record.Groups),
+		EmbeddingProviderID:      record.EmbeddingProviderID,
+		EmbeddingModelIdentifier: record.EmbeddingModelIdentifier,
+		EmbeddingDimension:       record.EmbeddingDimension,
+		ChunkLength:              record.ChunkLength,
+		ChunkOverlap:             record.ChunkOverlap,
+		RetrievalCount:           record.RetrievalCount,
+		RerankProviderID:         record.RerankProviderID,
+		RerankModelIdentifier:    record.RerankModelIdentifier,
+
 		CreatedAt: record.CreatedAt, UpdatedAt: record.UpdatedAt,
 	}
 }
@@ -211,6 +236,13 @@ func knowledgeGroupsFromAction(records []knowledgebaseaction.GroupRecord) []Know
 // knowledgeBaseFieldKeys 把知识库校验错误码映射为本地化文案键。
 func knowledgeBaseFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key {
 	keys := map[common.FieldCode]cervii18n.Key{
+		knowledgebaseaction.ValidationEmbeddingModelInvalid:     cervii18n.FieldKnowledgeBaseEmbeddingModelInvalid,
+		knowledgebaseaction.ValidationEmbeddingDimensionInvalid: cervii18n.FieldKnowledgeBaseEmbeddingDimensionInvalid,
+		knowledgebaseaction.ValidationChunkLengthInvalid:        cervii18n.FieldKnowledgeBaseChunkLengthInvalid,
+		knowledgebaseaction.ValidationChunkOverlapInvalid:       cervii18n.FieldKnowledgeBaseChunkOverlapInvalid,
+		knowledgebaseaction.ValidationRetrievalCountInvalid:     cervii18n.FieldKnowledgeBaseRetrievalCountInvalid,
+		knowledgebaseaction.ValidationRerankModelInvalid:        cervii18n.FieldKnowledgeBaseRerankModelInvalid,
+
 		knowledgebaseaction.ValidationQAQuestionRequired: cervii18n.FieldKnowledgeQAQuestionRequired,
 		knowledgebaseaction.ValidationQAAnswerRequired:   cervii18n.FieldKnowledgeQAAnswerRequired,
 		knowledgebaseaction.ValidationQAGroupInvalid:     cervii18n.FieldKnowledgeQAGroupInvalid,

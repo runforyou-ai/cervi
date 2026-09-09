@@ -102,6 +102,20 @@ const knowledgeBase = {
     createQA: "New Q&A knowledge base",
   },
   form: {
+    embeddingModel: "Embedding model",
+    embeddingDimension: "Embedding dimension",
+    chunkLength: "Chunk length",
+    chunkOverlap: "Chunk overlap",
+    retrievalCount: "Retrieval count",
+    rerankModel: "Rerank model",
+    selectEmbeddingModel: "Select an embedding model",
+    noRerank: "No reranking",
+    noEmbeddingModels: "Configure an embedding model in model services first.",
+    noRerankModels: "No rerank models are configured.",
+    changeEmbeddingTitle: "Change embedding model?",
+    changeEmbeddingDescription: "Changing the embedding model requires reindexing all content in this knowledge base. Save changes?",
+    confirmSave: "Confirm save",
+
     createTitle: "New knowledge base",
     editTitle: "Edit knowledge base",
     category: "Knowledge base type",
@@ -113,6 +127,12 @@ const knowledgeBase = {
     saveError: "Could not save the knowledge base. Try again.",
   },
   validation: {
+    embeddingModelRequired: "Select an embedding model.",
+    embeddingDimensionInvalid: "Embedding dimension must be a positive integer.",
+    chunkLengthInvalid: "Chunk length must be an integer between 256 and 2048.",
+    chunkOverlapInvalid: "Chunk overlap must be an integer between 0 and 200.",
+    retrievalCountInvalid: "Retrieval count must be an integer between 1 and 20.",
+
     nameRequired: "Enter a knowledge base name.",
     nameTooLong: "The knowledge base name cannot exceed 120 characters.",
     descriptionTooLong: "The knowledge base description cannot exceed 1000 characters.",

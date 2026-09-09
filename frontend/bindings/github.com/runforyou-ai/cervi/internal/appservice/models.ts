@@ -1539,6 +1539,14 @@ export interface InstallationStatus {
  * KnowledgeBase 定义知识库详情。
  */
 export interface KnowledgeBase {
+    "embeddingProviderId": string;
+    "embeddingModelIdentifier": string;
+    "embeddingDimension": number;
+    "chunkLength": number | null;
+    "chunkOverlap": number | null;
+    "retrievalCount": number;
+    "rerankProviderId": string;
+    "rerankModelIdentifier": string;
     "id": string;
     "name": string;
     "category": KnowledgeBaseCategory;
@@ -1565,6 +1573,14 @@ export enum KnowledgeBaseCategory {
  * KnowledgeBaseInput 定义知识库可编辑字段。
  */
 export interface KnowledgeBaseInput {
+    "embeddingProviderId": string;
+    "embeddingModelIdentifier": string;
+    "embeddingDimension": number;
+    "chunkLength": number | null;
+    "chunkOverlap": number | null;
+    "retrievalCount": number;
+    "rerankProviderId": string;
+    "rerankModelIdentifier": string;
     "name": string;
     "category": KnowledgeBaseCategory;
     "description": string;

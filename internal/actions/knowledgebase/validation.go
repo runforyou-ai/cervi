@@ -11,6 +11,13 @@ import (
 )
 
 const (
+	ValidationEmbeddingModelInvalid     common.FieldCode = "KNOWLEDGE_BASE_EMBEDDING_MODEL_INVALID"
+	ValidationEmbeddingDimensionInvalid common.FieldCode = "KNOWLEDGE_BASE_EMBEDDING_DIMENSION_INVALID"
+	ValidationChunkLengthInvalid        common.FieldCode = "KNOWLEDGE_BASE_CHUNK_LENGTH_INVALID"
+	ValidationChunkOverlapInvalid       common.FieldCode = "KNOWLEDGE_BASE_CHUNK_OVERLAP_INVALID"
+	ValidationRetrievalCountInvalid     common.FieldCode = "KNOWLEDGE_BASE_RETRIEVAL_COUNT_INVALID"
+	ValidationRerankModelInvalid        common.FieldCode = "KNOWLEDGE_BASE_RERANK_MODEL_INVALID"
+
 	ValidationQAQuestionRequired common.FieldCode = "KNOWLEDGE_QA_QUESTION_REQUIRED"
 	ValidationQAAnswerRequired   common.FieldCode = "KNOWLEDGE_QA_ANSWER_REQUIRED"
 	ValidationQAGroupInvalid     common.FieldCode = "KNOWLEDGE_QA_GROUP_INVALID"
@@ -30,6 +37,10 @@ const (
 func normalizeInput(input Input) (Input, map[string]common.FieldCode) {
 	input.Name = strings.TrimSpace(input.Name)
 	input.Description = strings.TrimSpace(input.Description)
+	input.EmbeddingProviderID = strings.TrimSpace(input.EmbeddingProviderID)
+	input.EmbeddingModelIdentifier = strings.TrimSpace(input.EmbeddingModelIdentifier)
+	input.RerankProviderID = strings.TrimSpace(input.RerankProviderID)
+	input.RerankModelIdentifier = strings.TrimSpace(input.RerankModelIdentifier)
 	fields := make(map[string]common.FieldCode)
 	if input.Name == "" {
 		fields["name"] = ValidationNameRequired
@@ -41,6 +52,29 @@ func normalizeInput(input Input) (Input, map[string]common.FieldCode) {
 	}
 	if utf8.RuneCountInString(input.Description) > domain.KnowledgeBaseDescriptionMaxLength {
 		fields["description"] = ValidationDescriptionTooLong
+	}
+	if !common.ValidUUID(input.EmbeddingProviderID) || input.EmbeddingModelIdentifier == "" {
+		fields["embeddingModelIdentifier"] = ValidationEmbeddingModelInvalid
+	}
+	if input.EmbeddingDimension <= 0 {
+		fields["embeddingDimension"] = ValidationEmbeddingDimensionInvalid
+	}
+	if input.Category == domain.KnowledgeBaseCategoryQA {
+		input.ChunkLength, input.ChunkOverlap = nil, nil
+	} else {
+		if input.ChunkLength == nil || *input.ChunkLength < 256 || *input.ChunkLength > 2048 {
+			fields["chunkLength"] = ValidationChunkLengthInvalid
+		}
+		if input.ChunkOverlap == nil || *input.ChunkOverlap < 0 || *input.ChunkOverlap > 200 {
+			fields["chunkOverlap"] = ValidationChunkOverlapInvalid
+		}
+	}
+	if input.RetrievalCount < 1 || input.RetrievalCount > 20 {
+		fields["retrievalCount"] = ValidationRetrievalCountInvalid
+	}
+	if (input.RerankProviderID != "" || input.RerankModelIdentifier != "") &&
+		(!common.ValidUUID(input.RerankProviderID) || input.RerankModelIdentifier == "") {
+		fields["rerankModelIdentifier"] = ValidationRerankModelInvalid
 	}
 	return input, fields
 }

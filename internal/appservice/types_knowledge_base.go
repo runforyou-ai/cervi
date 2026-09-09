@@ -16,9 +16,17 @@ const (
 
 // KnowledgeBaseInput 定义知识库可编辑字段。
 type KnowledgeBaseInput struct {
-	Name        string                `json:"name"`
-	Category    KnowledgeBaseCategory `json:"category"`
-	Description string                `json:"description"`
+	EmbeddingProviderID      string                `json:"embeddingProviderId"`
+	EmbeddingModelIdentifier string                `json:"embeddingModelIdentifier"`
+	EmbeddingDimension       int                   `json:"embeddingDimension"`
+	ChunkLength              *int                  `json:"chunkLength"`
+	ChunkOverlap             *int                  `json:"chunkOverlap"`
+	RetrievalCount           int                   `json:"retrievalCount"`
+	RerankProviderID         string                `json:"rerankProviderId"`
+	RerankModelIdentifier    string                `json:"rerankModelIdentifier"`
+	Name                     string                `json:"name"`
+	Category                 KnowledgeBaseCategory `json:"category"`
+	Description              string                `json:"description"`
 }
 
 // KnowledgeGroupInput 定义知识库分组可编辑字段。
@@ -38,13 +46,21 @@ type KnowledgeGroup struct {
 
 // KnowledgeBase 定义知识库详情。
 type KnowledgeBase struct {
-	ID          string                `json:"id"`
-	Name        string                `json:"name"`
-	Category    KnowledgeBaseCategory `json:"category"`
-	Description string                `json:"description"`
-	Groups      []KnowledgeGroup      `json:"groups"`
-	CreatedAt   time.Time             `json:"createdAt"`
-	UpdatedAt   time.Time             `json:"updatedAt"`
+	EmbeddingProviderID      string                `json:"embeddingProviderId"`
+	EmbeddingModelIdentifier string                `json:"embeddingModelIdentifier"`
+	EmbeddingDimension       int                   `json:"embeddingDimension"`
+	ChunkLength              *int                  `json:"chunkLength"`
+	ChunkOverlap             *int                  `json:"chunkOverlap"`
+	RetrievalCount           int                   `json:"retrievalCount"`
+	RerankProviderID         string                `json:"rerankProviderId"`
+	RerankModelIdentifier    string                `json:"rerankModelIdentifier"`
+	ID                       string                `json:"id"`
+	Name                     string                `json:"name"`
+	Category                 KnowledgeBaseCategory `json:"category"`
+	Description              string                `json:"description"`
+	Groups                   []KnowledgeGroup      `json:"groups"`
+	CreatedAt                time.Time             `json:"createdAt"`
+	UpdatedAt                time.Time             `json:"updatedAt"`
 }
 
 // KnowledgeBaseList 定义知识库列表。

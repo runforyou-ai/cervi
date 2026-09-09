@@ -32,7 +32,7 @@ func (a *DeleteAIProviderAction) Execute(ctx context.Context, identity *servermo
 		if err != nil {
 			return err
 		}
-		// 判断供应商是否被 AI 员工使用。
+		// 校验 AI 员工和知识库对供应商的引用。
 		inUse, err := tx.NewSelect().TableExpr("agents AS a").
 			Join("JOIN agent_revisions AS ar ON ar.id = a.active_revision_id AND ar.organization_id = a.organization_id AND ar.agent_id = a.id").
 			Where("a.organization_id = ?", identity.Organization.ID).
@@ -41,6 +41,14 @@ func (a *DeleteAIProviderAction) Execute(ctx context.Context, identity *servermo
 			Exists(ctx)
 		if err != nil {
 			return err
+		}
+		if !inUse {
+			inUse, err = tx.NewSelect().Model((*servermodels.KnowledgeBase)(nil)).
+				Where("organization_id = ?", identity.Organization.ID).
+				Where("embedding_provider_id = ? OR rerank_provider_id = ?", provider.ID, provider.ID).Exists(ctx)
+			if err != nil {
+				return err
+			}
 		}
 		if inUse {
 			return ErrInUse
