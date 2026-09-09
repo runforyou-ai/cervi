@@ -109,7 +109,7 @@ function KnowledgeDocumentRow({
     } catch (error) {
       if (!recoverSession(error, navigate)) toast.error(isApiError(error) ? apiErrorMessage(error) : t("documents.retryFailed"))
     } finally {
-      // 连接失败也会更新服务端状态，请求结束后统一重新读取。
+      // 请求结束后刷新列表和详情中的文档状态。
       await Promise.all([
         invalidate(resourceKeys.knowledgeDocuments(knowledgeBaseId)),
         invalidate(resourceKeys.knowledgeDocument(knowledgeBaseId, document.id)),

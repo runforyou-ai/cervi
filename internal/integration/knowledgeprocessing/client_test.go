@@ -58,7 +58,7 @@ func TestClientStreamsOriginalAndReadsAnchor(t *testing.T) {
 	}
 }
 
-// TestClientFailureDoesNotExposeRemoteBody 验证未知错误体不进入业务错误。
+// TestClientFailureDoesNotExposeRemoteBody 验证未知错误响应映射为服务失败原因码。
 func TestClientFailureDoesNotExposeRemoteBody(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		w.WriteHeader(500)

@@ -143,7 +143,7 @@ func knowledgeDocumentFromAction(meta RequestMeta, record knowledgeaction.Docume
 		}
 		message, _ = cervii18n.Localize(string(meta.Locale), key)
 	}
-	// 中间技术步骤统一映射为处理中，产品展示状态不写入数据库。
+	// 将文档处理阶段映射为展示状态。
 	status := KnowledgeDocumentRunning
 	switch record.Status {
 	case domain.KnowledgeDocumentInitial:

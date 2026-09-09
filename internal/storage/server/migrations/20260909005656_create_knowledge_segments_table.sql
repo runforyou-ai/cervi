@@ -6,8 +6,8 @@ CREATE TABLE public.knowledge_segments (
 );
 CREATE UNIQUE INDEX knowledge_segments_batch_position_unique ON public.knowledge_segments
     ((meta->>'document_id'), (meta->>'batch_id'), ((meta->>'position')::integer));
-COMMENT ON TABLE public.knowledge_segments IS '知识文档分段，正文仅保存于此';
-COMMENT ON COLUMN public.knowledge_segments.id IS '同批次重复执行保持不变的分段编号';
+COMMENT ON TABLE public.knowledge_segments IS '知识文档分段';
+COMMENT ON COLUMN public.knowledge_segments.id IS '分段唯一编号';
 COMMENT ON COLUMN public.knowledge_segments.content IS '分段完整正文';
 COMMENT ON COLUMN public.knowledge_segments.meta IS '企业、知识库、文档、批次、位置及来源信息';
 

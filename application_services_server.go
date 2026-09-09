@@ -47,7 +47,7 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	// 创建各业务共用的可靠任务运行时，由服务生命周期统一启停。
 	tasks := servertask.New(appStorage.DB(), config.NATS)
 
-	// 注册文档处理任务，文件读取与解析不占用通用任务队列。
+	// 注册文档处理任务及最终失败时的状态处理。
 	knowledgeClient := knowledgeprocessing.NewClient(config.HaystackURL)
 	processDocument := knowledgeaction.NewProcessDocumentAction(appStorage.DB(), knowledgeClient, serverfilecontent.NewReader(localFiles, resolveFileS3))
 	if err := tasks.Registry().RegisterJSONWithTerminalFailure(knowledgeaction.ProcessDocumentActionName, processDocument.Execute, processDocument.FinalizeFailure); err != nil {

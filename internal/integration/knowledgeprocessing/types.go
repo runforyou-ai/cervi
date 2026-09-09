@@ -51,7 +51,7 @@ type SegmentPage struct {
 	AnchorPosition  int       `json:"anchorPosition"`
 }
 
-// Error 返回可本地化的处理失败原因，不包含原件或供应商凭据。
+// Error 定义文档处理的失败原因码和执行阶段。
 type Error struct {
 	Code  string                         `json:"code"`
 	Stage domain.KnowledgeDocumentStatus `json:"stage"`

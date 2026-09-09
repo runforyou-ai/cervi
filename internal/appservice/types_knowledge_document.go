@@ -6,7 +6,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
-// KnowledgeDocumentStatus 定义仅用于产品展示的派生状态。
+// KnowledgeDocumentStatus 定义文档展示状态。
 type KnowledgeDocumentStatus string
 
 const (
@@ -18,7 +18,7 @@ const (
 	KnowledgeDocumentCancelled KnowledgeDocumentStatus = "cancelled"
 )
 
-// KnowledgeDocumentProcessingStatus 定义持久化的技术状态。
+// KnowledgeDocumentProcessingStatus 定义文档处理流程的执行状态。
 type KnowledgeDocumentProcessingStatus string
 
 const (
@@ -124,7 +124,7 @@ type KnowledgeDocumentSegment struct {
 	SourceLabel    string `json:"sourceLabel"`
 }
 
-// KnowledgeDocumentSegmentPage 返回一页分段及真实锚点位置。
+// KnowledgeDocumentSegmentPage 返回一页分段及锚点位置。
 type KnowledgeDocumentSegmentPage struct {
 	SegmentBatchID  string                     `json:"segmentBatchId"`
 	Segments        []KnowledgeDocumentSegment `json:"segments"`

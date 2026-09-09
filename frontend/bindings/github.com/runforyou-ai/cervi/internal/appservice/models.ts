@@ -1738,7 +1738,7 @@ export interface KnowledgeDocumentPreviewRequest {
 }
 
 /**
- * KnowledgeDocumentProcessingStatus 定义持久化的技术状态。
+ * KnowledgeDocumentProcessingStatus 定义文档处理流程的执行状态。
  */
 export enum KnowledgeDocumentProcessingStatus {
     /**
@@ -1784,7 +1784,7 @@ export interface KnowledgeDocumentSegmentInput {
 }
 
 /**
- * KnowledgeDocumentSegmentPage 返回一页分段及真实锚点位置。
+ * KnowledgeDocumentSegmentPage 返回一页分段及锚点位置。
  */
 export interface KnowledgeDocumentSegmentPage {
     "segmentBatchId": string;
@@ -1795,7 +1795,7 @@ export interface KnowledgeDocumentSegmentPage {
 }
 
 /**
- * KnowledgeDocumentStatus 定义仅用于产品展示的派生状态。
+ * KnowledgeDocumentStatus 定义文档展示状态。
  */
 export enum KnowledgeDocumentStatus {
     /**

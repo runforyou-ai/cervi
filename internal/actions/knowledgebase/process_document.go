@@ -36,7 +36,7 @@ func NewProcessDocumentAction(db *bun.DB, processor documentProcessor, files doc
 	return &ProcessDocumentAction{db: db, processor: processor, files: files}
 }
 
-// Execute 只处理仍有效的任务，并在远端完整写入后发布分段批次。
+// Execute 执行当前文档任务，并在远端完整写入后发布分段批次。
 func (a *ProcessDocumentAction) Execute(ctx context.Context, input knowledgeprocessing.ProcessInput) error {
 	started := time.Now()
 	result, err := a.db.NewUpdate().Model((*servermodels.KnowledgeDocument)(nil)).Set("status = ?", domain.KnowledgeDocumentFetching).Set("failure_code = ''").Set("updated_at = now()").Where("id = ? AND processing_id = ? AND status NOT IN (?, ?, ?, ?)", input.DocumentID, input.ProcessingID, domain.KnowledgeDocumentInitial, domain.KnowledgeDocumentSucceeded, domain.KnowledgeDocumentFailed, domain.KnowledgeDocumentCancelled).Exec(ctx)
@@ -69,7 +69,7 @@ func (a *ProcessDocumentAction) Execute(ctx context.Context, input knowledgeproc
 		return nil
 	}
 	published := false
-	// 发布与删除都持有文档行锁，任务重放不会把已失效的结果重新公开。
+	// 持有文档行锁校验当前任务并发布分段批次。
 	err = a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		document := &servermodels.KnowledgeDocument{}
 		if err := tx.NewSelect().Model(document).Where("kd.id = ?", input.DocumentID).For("UPDATE").Scan(ctx); errors.Is(err, sql.ErrNoRows) {
@@ -91,7 +91,7 @@ func (a *ProcessDocumentAction) Execute(ctx context.Context, input knowledgeproc
 		if err != nil {
 			return err
 		}
-		// 切换批次与清理旧正文在同一事务中完成，读取不会遇到空档。
+		// 在发布事务中清理旧批次的分段。
 		if _, err := tx.NewDelete().TableExpr("public.knowledge_segments").Where("meta->>'document_id' = ? AND meta->>'batch_id' <> ?", input.DocumentID, input.ProcessingID).Exec(ctx); err != nil {
 			return err
 		}
@@ -107,7 +107,7 @@ func (a *ProcessDocumentAction) Execute(ctx context.Context, input knowledgeproc
 	return err
 }
 
-// FinalizeFailure 在可靠任务最终失败后记录面向产品的失败原因。
+// FinalizeFailure 保存当前文档任务的失败状态和原因码。
 func (a *ProcessDocumentAction) FinalizeFailure(ctx context.Context, input knowledgeprocessing.ProcessInput, runErr error) error {
 	code := "service_failed"
 	var stage domain.KnowledgeDocumentStatus

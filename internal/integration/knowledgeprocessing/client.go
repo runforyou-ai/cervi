@@ -20,12 +20,12 @@ type Client struct {
 	http *http.Client
 }
 
-// NewClient 创建知识处理客户端，空地址在调用时报告未配置。
+// NewClient 创建知识文档处理客户端。
 func NewClient(url string) *Client {
 	return &Client{url: strings.TrimRight(url, "/"), http: &http.Client{Timeout: 15 * time.Minute}}
 }
 
-// CheckConnection 在三秒内检查处理服务，失败后不再尝试。
+// CheckConnection 在三秒内执行一次处理服务连接检查。
 func (c *Client) CheckConnection(ctx context.Context) error {
 	if c.url == "" {
 		return &Error{Code: "unavailable"}
@@ -51,7 +51,7 @@ func (c *Client) CheckConnection(ctx context.Context) error {
 	return nil
 }
 
-// Process 流式提交原件，避免在 Go 内存中复制整份文件。
+// Process 流式提交原件并读取分段处理结果。
 func (c *Client) Process(ctx context.Context, input ProcessInput, name string, source io.Reader) (ProcessResult, error) {
 	var output ProcessResult
 	reader, writer := io.Pipe()

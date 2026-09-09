@@ -45,7 +45,7 @@ class SegmentInput(BaseModel):
     pageSize: int = Field(default=20, ge=1, le=100)
 
 
-# 更新阶段只作用于仍在运行的同一任务。
+# 更新当前文档处理任务的执行阶段。
 def set_stage(input: ProcessInput, stage: str) -> None:
     with psycopg.connect(os.environ["PG_CONN_STR"]) as connection:
         connection.execute(
@@ -55,7 +55,7 @@ def set_stage(input: ProcessInput, stage: str) -> None:
         )
 
 
-# 将格式转换为有真实来源位置的正文，不接受空提取结果。
+# 提取文档正文及页码、工作表等来源信息。
 def convert_file(path: Path) -> list[Document]:
     extension = path.suffix.lower()
     if extension == ".json":
@@ -66,12 +66,12 @@ def convert_file(path: Path) -> list[Document]:
         pdf = PdfReader(path)
         if pdf.is_encrypted:
             raise HTTPException(422, detail={"code": "encrypted_file", "stage": "extracting"})
-        # 有图像却没有文字的页面需要 OCR，不能把部分提取当成整份文档成功。
+        # 含图像且无可提取文字的页面返回文字识别错误。
         for page in pdf.pages:
             if not (page.extract_text() or "").strip() and len(page.images):
                 raise HTTPException(422, detail={"code": "recognition_required", "stage": "recognizing"})
     if extension == ".xlsx":
-        # 文本单元格按原值读取，避免编号前导零被推断为数字。
+        # 按文本读取单元格，保留编号前导零。
         return XLSXToDocument(read_excel_kwargs={"dtype": str, "keep_default_na": False}).run(sources=[path])["documents"]
     converted = MultiFileConverter().run(sources=[path])
     if converted.get("unclassified") or converted.get("failed"):
@@ -87,7 +87,7 @@ def convert_file(path: Path) -> list[Document]:
     return documents
 
 
-# 使用 Haystack 按字符切分，并只保留 converter 提供的来源信息。
+# 按字符切分正文并记录分段的来源位置。
 def split_documents(documents: list[Document], length: int, overlap: int) -> list[dict]:
     splitter = RecursiveDocumentSplitter(
         split_length=length, split_overlap=0, split_unit="char",
@@ -109,10 +109,10 @@ def split_documents(documents: list[Document], length: int, overlap: int) -> lis
             end = min(start + length, len(text))
             if end < len(text):
                 boundary = boundaries[bisect_right(boundaries, end) - 1]
-                # 段落边界至少覆盖半段，并确保扣除重叠后仍能前进。
+                # 选取覆盖半段且长度大于重叠长度的段落边界。
                 if boundary >= start + max(overlap + 1, length // 2):
                     end = boundary
-            # 只从原文截取连续区间，递归层级不会重复叠加重叠内容。
+            # 从原文连续截取当前分段的正文。
             content = text[start:end]
             segments.append({
                 "position": len(segments) + 1,
@@ -129,7 +129,7 @@ def split_documents(documents: list[Document], length: int, overlap: int) -> lis
     return segments
 
 
-# 在文档行锁内提交全部分段，删除和过期任务均不能重新写入。
+# 锁定文档并校验当前任务后写入完整分段批次。
 def save_segments(input: ProcessInput, segments: list[dict]) -> dict:
     with psycopg.connect(os.environ["PG_CONN_STR"]) as connection:
         current = connection.execute(
@@ -158,7 +158,7 @@ def save_segments(input: ProcessInput, segments: list[dict]) -> dict:
 
 
 @router.post("/process")
-# 接收流式上传原件，处理临时文件在所有退出路径中清理。
+# 接收上传原件并在临时目录中完成解析和分段。
 def process_file(metadata: str = Form(), file: UploadFile = File()) -> dict:
     try:
         input = ProcessInput.model_validate_json(metadata)
@@ -214,7 +214,7 @@ def list_segments(input: SegmentInput) -> dict:
             if not anchor:
                 raise HTTPException(409, detail={"code": "segment_stale"})
             position = anchor["position"]
-            # 按实际记录数定位页码，不依赖分段序号永久连续。
+            # 根据锚点前的分段数量计算页码。
             preceding = connection.execute(
                 f"SELECT count(*) AS count FROM public.knowledge_segments WHERE {condition} AND (meta->>'position')::int < %s",
                 (*scope, position),

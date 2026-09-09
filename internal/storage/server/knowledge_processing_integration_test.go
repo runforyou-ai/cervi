@@ -84,7 +84,7 @@ func TestKnowledgeProcessingRetryAndPublication(t *testing.T) {
 	if err != nil || failed.Status != domain.KnowledgeDocumentFailed || failed.FailureCode != "parse_failed" {
 		t.Fatalf("failure=%+v %v", failed, err)
 	}
-	// 每个重试请求都创建新任务，只有最后一次请求的任务仍有效。
+	// 核验连续重试后生效的任务标识。
 	retry := knowledgeaction.NewDocumentProcessing(db, tasks)
 	var group sync.WaitGroup
 	for range 2 {
@@ -105,7 +105,7 @@ func TestKnowledgeProcessingRetryAndPublication(t *testing.T) {
 	if err != nil || count != 3 {
 		t.Fatalf("tasks=%d %v", count, err)
 	}
-	// 旧任务的成功和失败都不得覆盖新任务。
+	// 核验旧任务成功和失败后的当前任务状态。
 	if err := worker.Execute(ctx, input); err != nil {
 		t.Fatal(err)
 	}
@@ -318,7 +318,7 @@ func TestKnowledgeSegmentsScopeAndBatch(t *testing.T) {
 	}
 }
 
-// TestKnowledgeConnectionFailureSkipsTask 验证连接失败落库但不投递任务，并阻止旧任务覆盖失败状态。
+// TestKnowledgeConnectionFailureSkipsTask 验证连接失败状态、任务数量及过期任务校验。
 func TestKnowledgeConnectionFailureSkipsTask(t *testing.T) {
 	ctx := context.Background()
 	store, err := Open(ctx, testDatabaseConfig(t))

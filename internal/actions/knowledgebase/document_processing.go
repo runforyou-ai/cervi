@@ -80,7 +80,7 @@ func (p *DocumentProcessing) Retry(ctx context.Context, identity *servermodels.I
 			if errors.As(connectionErr, &failure) {
 				code = failure.Code
 			}
-			// 替换处理标识，连接失败后旧任务也不能再覆盖文档状态。
+			// 生成新的处理标识并保存连接失败状态。
 			_, err := tx.NewUpdate().Model(document).Set("processing_id = ?", uuid.NewV7().String()).Set("status = ?", domain.KnowledgeDocumentFailed).Set("failure_code = ?", code).Set("updated_at = now()").WherePK().Exec(ctx)
 			return err
 		}

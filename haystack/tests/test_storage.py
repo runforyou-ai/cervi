@@ -46,7 +46,7 @@ class StorageTests(unittest.TestCase):
         return SegmentInput(organizationId=self.input.organizationId,knowledgeBaseId=self.input.knowledgeBaseId,documentId=self.input.documentId,segmentBatchId=self.input.processingId,**kwargs)
 
     def test_pagination_anchor_and_replay(self):
-        """重复写入不增加记录，任意锚点直接定位且相邻页无遗漏。"""
+        """验证批次写入幂等、锚点定位和分页完整性。"""
         for _ in range(2):
             self.assertEqual(save_segments(self.input,self.segments)["segmentCount"],105)
         with self.assertRaises(HTTPException):
@@ -64,7 +64,7 @@ class StorageTests(unittest.TestCase):
         self.assertTrue(save_segments(self.input,self.segments)["stale"])
 
     def test_foreign_and_stale_queries(self):
-        """错误企业、错误文档和旧批次均不能读取正文。"""
+        """验证企业隔离、文档归属和批次有效性校验。"""
         save_segments(self.input,self.segments)
         self.publish()
         for field in ["organizationId","knowledgeBaseId","documentId","segmentBatchId"]:
@@ -81,7 +81,7 @@ class StorageTests(unittest.TestCase):
             list_segments(self.query(page=1))
 
     def test_http_upload(self):
-        """通过真正的 multipart 接口完成解析、保存及分页读取。"""
+        """通过 multipart 接口验证解析、保存及分页读取。"""
         app=FastAPI()
         app.include_router(router)
         with TestClient(app) as client:
@@ -97,7 +97,7 @@ class StorageTests(unittest.TestCase):
             self.assertEqual(len(page.json()["segments"]),20)
 
     def test_reprocessing_preserves_published_batch(self):
-        """重试写入新批次时旧分段仍可读，旧任务不能修改新任务状态或正文。"""
+        """验证重处理期间已发布分段可读及过期任务的写入校验。"""
         from knowledge import set_stage
         save_segments(self.input, self.segments)
         self.publish()

@@ -1,4 +1,4 @@
-/** 文档详情和检索结果共用的连续分段阅读弹窗。 */
+/** 支持锚点定位和双向分页的分段阅读弹窗。 */
 import { useEffect, useLayoutEffect, useRef, useState, type RefObject } from "react"
 import { useTranslation } from "react-i18next"
 import { isApiError, listKnowledgeDocumentSegments } from "@/api"
@@ -59,7 +59,7 @@ export function KnowledgeSegmentsDialog({ knowledgeBaseId, documentId, documentN
     }
   }, [pages, positioned, segmentId, resource.hasNextPage, resource.isFetchNextPageError, resource.isFetching, resource.fetchNextPage])
 
-  // 仅在分段页实际插入后恢复阅读位置，不在请求开始时消耗锚点。
+  // 分段页插入后按新增内容高度恢复阅读位置。
   useLayoutEffect(() => {
     const pane = viewport.current
     if (!pages || !pane || !anchor.current) return
@@ -67,7 +67,7 @@ export function KnowledgeSegmentsDialog({ knowledgeBaseId, documentId, documentN
     anchor.current = null
   }, [pages])
 
-  // 只有边界进入阅读窗口时才加载相邻页，失败后由用户重试。
+  // 阅读边界进入窗口时加载相邻页，加载失败时等待手动重试。
   useEffect(() => {
     if (!positioned || !viewport.current || resource.isFetching) return
     const observer = new IntersectionObserver((entries) => {

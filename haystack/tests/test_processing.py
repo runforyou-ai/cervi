@@ -29,14 +29,14 @@ class ProcessingTests(unittest.TestCase):
                     content = segment["content"]
                     self.assertLessEqual(len(content), length)
                     self.assertEqual(segment["character_count"], len(content))
-                    # 按原文偏移核对覆盖，不依赖某个固定切分输出。
+                    # 按原文偏移核对分段内容和字符覆盖范围。
                     start = max(0, len(restored) - overlap)
                     self.assertTrue(text.startswith(content, start), (length, overlap, start))
                     restored = text[:start] + content
                 self.assertEqual(restored, text)
 
     def test_supported_formats(self):
-        """九类文件提取有效内容，工作表和 PDF 页码不伪造。"""
+        """验证各类文件的正文、工作表名称和 PDF 页码。"""
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             for suffix, text in {
@@ -70,7 +70,7 @@ class ProcessingTests(unittest.TestCase):
                 if suffix == ".xlsx":
                     self.assertIn("0012", "".join(doc.content or "" for doc in documents))
                     self.assertEqual(segments[0]["source_label"], "合同")
-            # 首尾及中间空白页不能改变正文的真实页码。
+            # 核验首尾及中间含空白页的 PDF 正文页码。
             from pypdf.generic import DecodedStreamObject, DictionaryObject, NameObject
             pdf = PdfWriter()
             for text in ["", "Contract page two", "", "Amount 1234.50 page four", ""]:
@@ -87,7 +87,7 @@ class ProcessingTests(unittest.TestCase):
             self.assertEqual([s["page_number"] for s in segments], [2, 4])
 
     def test_invalid_and_empty_files(self):
-        """空白、损坏和加密原件不会成为可用分段。"""
+        """验证空白、损坏和加密原件的失败原因。"""
         with self.assertRaises(HTTPException) as empty:
             split_documents([Document(content=" \n\t")], 256, 50)
         self.assertEqual(empty.exception.detail["code"], "empty_content")

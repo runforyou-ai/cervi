@@ -8,7 +8,7 @@ import (
 	"testing"
 )
 
-// TestKnowledgeDocumentPresentationStatus 验证全部技术状态映射为简洁的产品状态。
+// TestKnowledgeDocumentPresentationStatus 验证文档执行状态到展示状态的映射。
 func TestKnowledgeDocumentPresentationStatus(t *testing.T) {
 	cases := map[domain.KnowledgeDocumentStatus]KnowledgeDocumentStatus{
 		domain.KnowledgeDocumentInitial:     KnowledgeDocumentInitial,

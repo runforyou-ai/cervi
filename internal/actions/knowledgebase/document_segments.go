@@ -49,7 +49,7 @@ func (q *DocumentQuery) Segments(ctx context.Context, identity *servermodels.Ide
 		}
 		return empty, err
 	}
-	// 返回前再次核验来源，拒绝已删除或换批次的内容。
+	// 返回前核验文档归属和已发布批次。
 	current, err := q.Get(ctx, identity, baseID, documentID)
 	if err != nil {
 		return empty, err

@@ -18,7 +18,7 @@ export function KnowledgeDocumentPage() {
   const { t } = useTranslation(["knowledgeBase", "common"])
   const { knowledgeBaseId = "", groupId = "", documentId = "" } = useParams()
   const location = useLocation()
-  // 打开时固定批次，后台发布新结果不会重置当前阅读位置。
+  // 保存弹窗打开时的分段批次。
   const [segmentBatchId, setSegmentBatchId] = useState("")
   const trigger = useRef<HTMLButtonElement>(null)
   const document = useResource(

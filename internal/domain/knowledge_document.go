@@ -5,7 +5,7 @@ import (
 	"strings"
 )
 
-// KnowledgeDocumentStatus 表示持久化的技术处理状态，产品状态由应用服务映射。
+// KnowledgeDocumentStatus 表示文档处理流程的执行状态。
 type KnowledgeDocumentStatus string
 
 const (
@@ -24,7 +24,7 @@ const (
 	KnowledgeDocumentCancelled   KnowledgeDocumentStatus = "cancelled"
 )
 
-// IsProcessing 判断技术状态是否仍允许当前任务执行。
+// IsProcessing 判断文档是否处于待处理或执行中的状态。
 func (status KnowledgeDocumentStatus) IsProcessing() bool {
 	switch status {
 	case KnowledgeDocumentQueued, KnowledgeDocumentFetching, KnowledgeDocumentConverting, KnowledgeDocumentExtracting, KnowledgeDocumentRecognizing, KnowledgeDocumentSplitting, KnowledgeDocumentEmbedding, KnowledgeDocumentIndexing, KnowledgeDocumentPublishing:
