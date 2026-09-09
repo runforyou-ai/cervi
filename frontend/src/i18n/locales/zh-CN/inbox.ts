@@ -1,7 +1,5 @@
 /** 简体中文·收件箱文案。 */
 const inbox = {
-  listPendingChanges: "有新动态",
-  listViewLatest: "查看最新",
   listWindowEmpty: "此处暂无会话",
   selectConversationTitle: "选择会话",
   selectConversationDescription: "从列表选择会话，或发起新的聊天。",
@@ -253,7 +251,7 @@ const inbox = {
   replyClosedUnavailable: "会话已关闭，重新打开后可回复。",
   replyAssignedUnavailable: "当前由 {{name}} 接待，接管后可回复。",
   channelReplyUnsupported: "当前消息渠道暂不支持回复。",
-  inboxRefreshError: "会话列表刷新失败，点击重试",
+  inboxLoadError: "会话列表加载失败",
   contextOpen: "展开资料栏",
   contextClose: "收起资料栏",
   contextResize: "调整资料栏宽度",

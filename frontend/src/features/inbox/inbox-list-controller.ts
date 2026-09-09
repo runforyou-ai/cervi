@@ -2,10 +2,12 @@
 import type { InboxConversation, InboxQuery, InboxWindow } from "@/api"
 import type { loadInbox, readInboxConversations } from "@/api"
 
-export type InboxListOperation = "initial" | "before" | "after" | "poll" | "refresh" | "latest"
+export type InboxListOperation = "initial" | "before" | "after" | "poll" | "refresh"
 export type InboxListAnchor = {
   id: string
   cursor: string
+  width: number
+  height: number
   neighbors: { id: string; offset: number }[]
 }
 type ListPosition = Pick<InboxConversation, "id" | "positionCursor" | "lastActivityAt">
@@ -22,13 +24,14 @@ export type InboxListState = {
   endCursor: string
   hasBefore: boolean
   hasAfter: boolean
-  pendingChanges: boolean
   attentionUnreadCount: number
   status: "initial" | "ready" | "loadingMore" | "refreshing"
   operation: InboxListOperation | null
   error: InboxListOperation | null
   revision: number
 }
+
+export type InboxListBookmark = { state: InboxListState; anchor: InboxListAnchor | null }
 
 export type InboxListPorts = {
   page: (cursor?: string, beforeCursor?: string) => Promise<Page>
@@ -47,7 +50,7 @@ export type InboxListPorts = {
 export class InboxListController {
   private state: InboxListState = {
     ids: [], positions: [], rowIds: [], unavailableIds: [], startCursor: "", endCursor: "",
-    hasBefore: false, hasAfter: false, pendingChanges: false,
+    hasBefore: false, hasAfter: false,
     attentionUnreadCount: 0, status: "initial", operation: null, error: null, revision: 0,
   }
   private listeners = new Set<() => void>()
@@ -55,12 +58,46 @@ export class InboxListController {
   private running = false
   private completion = Promise.resolve()
   private generation = 0
-  private headIds: string[] = []
+  private deferred: InboxListState | null = null
+  private returnAnchor: InboxListAnchor | null = null
   private ports: InboxListPorts
   private query: InboxQuery
 
   /** 绑定当前页面的读取和视口适配器。 */
-  constructor(ports: InboxListPorts, query: InboxQuery) { this.ports = ports; this.query = query }
+  constructor(ports: InboxListPorts, query: InboxQuery, bookmark?: InboxListBookmark, cached = false) {
+    this.ports = ports
+    this.query = query
+    this.returnAnchor = bookmark?.anchor ?? null
+    if (bookmark && cached) {
+      this.state = { ...bookmark.state, operation: null, error: null, status: "ready" }
+      this.ports.restore(this.returnAnchor, new Set(), !this.returnAnchor)
+    }
+  }
+
+  /** 保存窗口元数据与原邻域，摘要继续由 Query 缓存持有。 */
+  remember(): InboxListBookmark {
+    return { state: this.state, anchor: this.ports.capture() ?? this.returnAnchor }
+  }
+
+  /** 交互结束后应用最后一份权威顺序，使用当时可见的原邻居保位。 */
+  settle = () => {
+    if (!this.deferred || this.ports.interacting()) return
+    const next = this.deferred
+    this.deferred = null
+    this.applyWindow(next, false)
+  }
+
+  /** 以原后继、前驱替代已移动的锚点，不跟随活跃会话上浮。 */
+  private applyWindow(next: InboxListState, initial: boolean) {
+    const positions = new Map(next.positions.map((row) => [row.id, row]))
+    const moved = new Set(this.state.positions.filter((row) => positions.get(row.id)?.lastActivityAt !== row.lastActivityAt).map((row) => row.id))
+    const anchor = initial ? this.returnAnchor : this.ports.capture()
+    if (anchor && positions.has(anchor.id) && positions.get(anchor.id)!.positionCursor !== anchor.cursor) moved.add(anchor.id)
+    const top = initial ? !anchor : !this.state.hasBefore && this.ports.atTop()
+    this.ports.restore(anchor, moved, top)
+    this.publish({ ...next, status: this.state.status, operation: this.state.operation, error: this.state.error, revision: this.state.revision + 1 })
+    this.returnAnchor = null
+  }
 
   /** 返回可供 React 订阅的稳定状态快照。 */
   getSnapshot = () => this.state
@@ -81,14 +118,16 @@ export class InboxListController {
   dispose() {
     this.generation++
     this.queue = []
+    this.deferred = null
     this.publish({ operation: null })
   }
 
   /** 独立详情先确认失权时立即移除该行，旧批量响应不能恢复它。 */
   removeUnavailable(id: string) {
-    if (!this.state.ids.includes(id)) return
+    if (!this.state.rowIds.includes(id) || this.state.unavailableIds.includes(id)) return
     this.generation++
     this.queue = []
+    this.deferred = null
     this.ports.restore(this.ports.capture(), new Set([id]), false)
     this.publish({
       ids: this.state.ids.filter((value) => value !== id),
@@ -119,7 +158,8 @@ export class InboxListController {
     try {
       while (this.queue.length && generation === this.generation) {
         const operation = this.queue.shift()!
-        if ((operation === "before" && !this.state.hasBefore) || (operation === "after" && !this.state.hasAfter)) continue
+        const window = this.deferred ?? this.state
+        if ((operation === "before" && !window.hasBefore) || (operation === "after" && !window.hasAfter)) continue
         if (operation === "poll" && this.state.error) continue
         this.publish({
           operation, error: null,
@@ -140,83 +180,77 @@ export class InboxListController {
     }
   }
 
-  /** 按用户意图读取首页、相邻页或已加载的完整范围。 */
+  /** 串行重读连续窗口，已覆盖顶部的窗口自动扩展到最新首页。 */
   private async execute(operation: InboxListOperation, generation: number) {
-    const base = this.state
-    const anchor = this.ports.capture()
+    const base = this.deferred ?? this.state
+    const initial = this.state.revision === 0
+    const anchor = this.returnAnchor ?? this.ports.capture()
     const pagination = operation === "before" || operation === "after"
-    const latest = operation === "latest" || !base.startCursor
-    // 局部窗口的顶边不等于整个筛选的顶部。
-    const follow = !pagination && !base.hasBefore && this.ports.atTop() && !this.ports.interacting()
     let head: Page | undefined
+    let appendIds: string[] = []
     let window: Window
-    if (pagination) {
+    if (initial && this.returnAnchor) {
+      window = await this.ports.context(this.returnAnchor)
+    } else if (pagination) {
       const page = await this.ports.page(operation === "after" ? base.endCursor : "", operation === "before" ? base.startCursor : "")
-      window = { ...page, hasAfter: page.hasMore }
+      if (operation === "after") appendIds = page.conversations.map((row) => row.id)
+      // 补页重读完整区间，以额外读取收敛上浮行和连续边界。
+      window = await this.ports.window(
+        operation === "before" ? page.startCursor || base.startCursor : base.startCursor,
+        operation === "after" ? page.endCursor || base.endCursor : base.endCursor,
+      )
     } else {
-      // 首页同时提供全量未读与窗口外新增提示，不用已加载行累加总数。
       head = await this.ports.page()
-      window = latest
+      window = !base.startCursor
         ? { ...head, hasAfter: head.hasMore }
         : await this.ports.window(base.startCursor, base.endCursor)
-      // 顶部新增跨过一页时重读连续扩展范围，不把首页和旧窗口直接拼接。
-      if (!latest && follow && window.hasBefore && head.startCursor) window = await this.ports.window(head.startCursor, base.endCursor)
-      if (!latest && !window.conversations.length) {
-        if (follow) window = { ...head, hasAfter: head.hasMore }
-        else if (anchor) window = await this.ports.context(anchor)
+      // 已覆盖顶部的窗口在深处也纳入新会话，并读取中间范围以免跨页遗漏。
+      if (base.startCursor && !base.hasBefore && window.hasBefore && head.startCursor) {
+        window = await this.ports.window(head.startCursor, base.endCursor)
       }
     }
+    if (!initial && !window.conversations.length && anchor) window = await this.ports.context(anchor)
     if (generation !== this.generation) return
-    const rowIds = [...new Set([...base.ids, ...window.conversations.map((row) => row.id)])].sort()
+    const rowIds = [...new Set([...this.state.ids, ...window.conversations.map((row) => row.id)])].sort()
     const rows = await this.ports.rows(rowIds)
     if (generation !== this.generation) return
-    this.commit(operation, base, window, rows, rowIds, head, follow)
+    this.commit(window, rows, rowIds, head, initial, appendIds)
   }
 
-  /** 根据当前资格提交顺序，深处轮询只替换内容并立即移除失权或筛选外的行。 */
-  private commit(operation: InboxListOperation, base: InboxListState, window: Window, rows: RowResults, rowIds: string[], head: Page | undefined, follow: boolean) {
-    const matching = new Map(rows.results.filter((row) => row.availability === "matching" && row.conversation).map((row) => [row.id, row.conversation!]))
-    const previous = base.ids.filter((id) => matching.has(id))
+  /** 内容与资格立即更新，操作期间仅延后列表顺序和边界的布局提交。 */
+  private commit(window: Window, rows: RowResults, rowIds: string[], head: Page | undefined, initial: boolean, appendIds: string[]) {
+    const matching = new Set(rows.results.filter((row) => row.availability === "matching" && row.conversation).map((row) => row.id))
     const incoming = window.conversations.filter((row) => matching.has(row.id))
-    const moved = new Set(base.positions.filter((position) => matching.has(position.id) && matching.get(position.id)!.lastActivityAt !== position.lastActivityAt).map((position) => position.id))
-    const anchor = this.ports.capture()
-    const latest = operation === "latest" || base.revision === 0
-    follow = follow && this.ports.atTop()
-    const reorder = latest || ((operation === "refresh" || follow) && !this.ports.interacting())
-    let ids = previous
-    if (operation === "after") ids = [...new Set([...previous, ...incoming.map((row) => row.id)])]
-    else if (operation === "before") ids = [...new Set([...incoming.map((row) => row.id).filter((id) => !previous.includes(id)), ...previous])]
-    else if (reorder || !previous.length) ids = incoming.map((row) => row.id)
-    const candidateIds = incoming.map((row) => row.id)
-    const headChanged = head !== undefined && head.conversations.map((row) => row.id).join() !== this.headIds.join()
-    const pagination = operation === "before" || operation === "after"
-    let pendingChanges = base.pendingChanges || moved.size > 0
-    if (!pagination) {
-      if (latest || (reorder && !window.hasBefore)) pendingChanges = false
-      else if (reorder) pendingChanges = window.hasBefore && (pendingChanges || headChanged)
-      else pendingChanges ||= headChanged || candidateIds.join() !== previous.join()
+    const next: InboxListState = {
+      ...this.state, ids: incoming.map((row) => row.id), rowIds,
+      positions: incoming.map((row) => ({ id: row.id, positionCursor: row.positionCursor, lastActivityAt: row.lastActivityAt })),
+      startCursor: window.startCursor, endCursor: window.endCursor,
+      hasBefore: window.hasBefore, hasAfter: window.hasAfter,
+      attentionUnreadCount: head?.attentionUnreadCount ?? this.state.attentionUnreadCount,
+      error: null,
     }
-    const positions = new Map(base.positions.map((position) => [position.id, position]))
-    for (const row of incoming) {
-      if (reorder || !positions.has(row.id)) positions.set(row.id, { id: row.id, positionCursor: row.positionCursor, lastActivityAt: row.lastActivityAt })
+    const unavailable = rows.results.filter((row) => row.availability === "unavailable" && this.state.ids.includes(row.id)).map((row) => row.id)
+    if (!initial && this.ports.interacting()) {
+      this.deferred = next
+      const removed = new Set(this.state.ids.filter((id) => !matching.has(id)))
+      if (removed.size) this.ports.restore(this.ports.capture(), removed, false)
+      // 向下补页只在尾部追加新行，不等待松手，也不移动当前可见内容。
+      const tail = next.positions.filter((row) => appendIds.includes(row.id) && !this.state.ids.includes(row.id))
+      this.publish({
+        ids: [...this.state.ids.filter((id) => matching.has(id)), ...tail.map((row) => row.id)],
+        positions: [...this.state.positions.filter((row) => matching.has(row.id)), ...tail],
+        ...(appendIds.length ? { endCursor: next.endCursor, hasAfter: next.hasAfter } : {}),
+        rowIds, attentionUnreadCount: next.attentionUnreadCount,
+      })
+    } else {
+      this.deferred = null
+      this.applyWindow(next, initial)
     }
-    if (head) this.headIds = head.conversations.map((row) => row.id)
-    const before = operation === "after" ? base.startCursor : window.startCursor || base.startCursor
-    const after = operation === "before" ? base.endCursor : window.endCursor || base.endCursor
-    this.ports.restore(anchor, reorder ? moved : new Set(), latest || (follow && reorder))
-    this.publish({
-      ids, rowIds, positions: ids.map((id) => positions.get(id)!),
-      startCursor: latest ? window.startCursor : before, endCursor: latest ? window.endCursor : after,
-      hasBefore: operation === "after" ? base.hasBefore : window.hasBefore,
-      hasAfter: operation === "before" ? base.hasAfter : window.hasAfter,
-      pendingChanges, attentionUnreadCount: head?.attentionUnreadCount ?? base.attentionUnreadCount,
-      revision: base.revision + 1,
-    })
-    const unavailable = rows.results.filter((row) => row.availability === "unavailable" && base.ids.includes(row.id)).map((row) => row.id)
     if (unavailable.length) this.ports.unavailable(unavailable)
     if (head) this.ports.unread(head.attentionUnreadCount)
-    if (base.revision === 0) console.info("收件箱窗口已加载", { query: this.query, conversationCount: ids.length })
+    if (initial) console.info("收件箱窗口已加载", { query: this.query, conversationCount: next.ids.length })
   }
+
 }
 
 /** 规范化查询身份，内部与全部范围不携带客户筛选。 */

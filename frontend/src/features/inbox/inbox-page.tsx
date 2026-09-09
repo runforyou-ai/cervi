@@ -1165,6 +1165,10 @@ export function InboxPage({
   useEffect(() => {
     if (isNarrowViewport && selectedConversationId) setIsNarrowDetailOpen(true)
   }, [isNarrowViewport, selectedConversationId])
+  useEffect(() => {
+    listViewport.setCovered(isNarrowViewport && isNarrowDetailOpen)
+    return () => listViewport.setCovered(false)
+  }, [isNarrowViewport, isNarrowDetailOpen, listViewport])
   const conversationName = useConversationName()
   const { data: customerServiceAssignees = [] } = useResource(
     resourceKeys.customerServiceAssignees(),
@@ -1309,7 +1313,7 @@ export function InboxPage({
           <InboxListPanel list={list} viewport={listViewport} detailError={Boolean(summary.error)} retryDetail={() => void summary.refresh()}>
             <InboxConversationList
               conversations={conversations}
-              onMenuChange={(open) => { listViewport.interaction.current.menu = open }}
+              onMenuChange={listViewport.setMenu}
               selectedId={selectedConversation?.id}
               onSelect={selectConversation}
               onMarkRead={markConversationAsRead}
