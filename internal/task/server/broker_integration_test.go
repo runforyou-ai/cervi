@@ -18,7 +18,7 @@ import (
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 )
 
-// TestWorkerPoolsIsolateAgentTasks 验证 Agent 阻塞不会占用标准任务的 Worker 配额。
+// TestWorkerPoolsIsolateAgentTasks 验证 Agent 与标准任务各自使用独立的 Worker 配额。
 func TestWorkerPoolsIsolateAgentTasks(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
@@ -186,7 +186,7 @@ func startTestConsumers(parent context.Context, runtime *Runtime) error {
 	return nil
 }
 
-// publishTestTask 直接发布本测试创建的 Run，避免领取共享 Outbox。
+// publishTestTask 按本测试创建的 Run 发布任务消息。
 func publishTestTask(ctx context.Context, runtime *Runtime, task testBrokerTask) error {
 	payload, err := json.Marshal(taskMessage{RunID: task.runID})
 	if err != nil {
@@ -201,7 +201,7 @@ func publishTestTask(ctx context.Context, runtime *Runtime, task testBrokerTask)
 	return err
 }
 
-// testNATSConfig 创建不会与其他测试共享 JetStream 资源的 NATS 配置。
+// testNATSConfig 创建使用独立 JetStream 命名空间的 NATS 测试配置。
 func testNATSConfig(t *testing.T) serverconfig.NATSConfig {
 	t.Helper()
 	url := os.Getenv("TEST_NATS_URL")

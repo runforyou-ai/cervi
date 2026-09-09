@@ -80,7 +80,7 @@ func (q *LoadInboxQuery) ReadContext(ctx context.Context, identity *servermodels
 		if point == nil {
 			point = current
 		}
-		// 没有可恢复的位置时返回空窗口，不用首页或其他筛选替代。
+		// 缺少可恢复位置时返回空窗口。
 		if point == nil {
 			return nil
 		}

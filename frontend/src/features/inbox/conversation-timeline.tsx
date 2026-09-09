@@ -263,7 +263,7 @@ function ConversationTimelineContent({
     timeline.mode === "latest" ? outgoingMessages : [],
     groupParticipants,
   )
-  // 刷新窗口内附件与引用目标的状态，上传完成和取消不会生成新的消息游标。
+  // 刷新窗口内已有消息的附件与引用目标状态。
   const attachmentIDs = [...new Set(combinedMessages.flatMap(message => [
     ...(message.attachment && message.persistedMessageID ? [message.persistedMessageID] : []),
     ...(message.replyTo?.type === MessageType.MessageTypeAttachment && !message.replyTo.deleted ? [message.replyTo.id] : []),
@@ -629,7 +629,7 @@ function ConversationTimelineContent({
     <div className="relative min-h-0 flex-1 bg-background">
       <ScrollArea
         ref={scrollRootRef}
-        // 覆盖 Radix Viewport 的内联 table 布局，避免气泡撑出视口。
+        // 将 Radix Viewport 的内联 table 布局覆盖为块级布局。
         className="h-full min-h-0 bg-background [&>[data-slot=scroll-area-viewport]>div]:!flex [&>[data-slot=scroll-area-viewport]>div]:!min-h-full [&>[data-slot=scroll-area-viewport]>div]:!flex-col"
       >
         <div className="flex w-full flex-1 flex-col px-4 pb-3 md:px-6">
@@ -701,7 +701,7 @@ function ConversationTimelineContent({
                 (message.sender?.kind === ChatSubjectKind.ChatSubjectKindContact
                   ? t("anonymousVisitor")
                   : t("unknownSender"))
-              // 头像始终使用身份资料，避免“你”等展示文案改变默认头像。
+              // 从身份资料生成头像及默认头像。
               const useCurrentUserAvatar =
                 message.local ||
                 (message.sender?.kind ===

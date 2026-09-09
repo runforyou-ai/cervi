@@ -81,7 +81,7 @@ func (a *SendFirstAgentTextMessageAction) Execute(ctx context.Context, identity 
 
 // ensureAgentConversation 创建 AI 聊天，重试时核对固定的业务归属。
 func ensureAgentConversation(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, conversationID, agentID, body string) error {
-	// 已有草稿先锁定并核对归属，不重新创建共享主体。
+	// 锁定已有草稿并核对归属后复用共享主体。
 	if found, err := lockAgentConversationDraft(ctx, tx, identity, conversationID, agentID); err != nil || found {
 		return err
 	}

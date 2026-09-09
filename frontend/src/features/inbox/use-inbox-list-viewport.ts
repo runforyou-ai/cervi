@@ -52,7 +52,7 @@ export function useInboxListViewport() {
       const neighbor = intent.anchor?.neighbors.find((row) => !intent.moved.has(row.id) && rows.has(row.id))
       if (neighbor) {
         const bounds = rows.get(neighbor.id)!.getBoundingClientRect()
-        // 尺寸改变后避免旧负偏移把缩短的锚点行完全移出视口。
+        // 尺寸改变后调整负偏移，使锚点行至少保留一像素可见高度。
         const resized = intent.anchor?.width !== container.clientWidth || intent.anchor?.height !== container.clientHeight
         const offset = resized ? Math.max(neighbor.offset, 1 - bounds.height) : neighbor.offset
         container.scrollTop += bounds.top - top - offset
@@ -88,7 +88,7 @@ export function useInboxListViewport() {
       if (programmatic.current === container!.scrollTop) { programmatic.current = null; return }
       programmatic.current = null
       interaction.current.scrollingUntil = performance.now() + 180
-      // 用户已继续浏览时，以新位置接替之前因资格移除或尺寸变化保留的意图。
+      // 用户继续浏览时按当前位置更新阅读意图。
       pending.current = null
       viewport.capture()
       const nextNearTop = container!.scrollTop <= 120
@@ -98,7 +98,7 @@ export function useInboxListViewport() {
     }
     /** 指针按下后保持命中行，松手与惯性停止后才允许重排。 */
     function down() { interaction.current.pointer = true; settle() }
-    /** 指针取消通常意味着触摸开始滚动，仍等待后续 scroll 安静。 */
+    /** 指针释放后等待滚动平稳，再应用列表重排。 */
     function release() { interaction.current.pointer = false; settle() }
     /** 键盘操作期间保持焦点行的位置。 */
     function keydown() { interaction.current.keyboard = true; settle() }

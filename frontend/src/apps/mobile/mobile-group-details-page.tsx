@@ -58,7 +58,7 @@ export function MobileGroupDetailsPage() {
   )
   const canManage = isOwner && !archived
   useEffect(() => {
-    // 群聊解散或群主身份变化后关闭不再适用的退出、解散确认。
+    // 群聊解散或群主身份变化后关闭退出、解散确认。
     if ((archived || isOwner) && !save.saving) setLeaveOpen(false)
     if (archived || !isOwner) setDissolveOpen(false)
   }, [archived, isOwner, save.saving])
@@ -108,7 +108,7 @@ export function MobileGroupDetailsPage() {
     }
   }
 
-  /** 独立保存免打扰，失败时恢复开关，不触发整页刷新。 */
+  /** 保存免打扰开关，失败时恢复原值。 */
   async function changeMuted(muted: boolean) {
     const request = muteSave.begin()
     if (request === null) return

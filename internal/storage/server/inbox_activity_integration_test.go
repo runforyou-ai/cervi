@@ -128,7 +128,7 @@ func TestInboxActivityAppend(t *testing.T) {
 	}
 }
 
-// TestInboxSnapshot 验证列表读取后提交的新消息不会进入本次响应的未读总数。
+// TestInboxSnapshot 验证响应未读总数使用列表读取时的快照。
 func TestInboxSnapshot(t *testing.T) {
 	f := newNavigationFixture(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
@@ -246,7 +246,7 @@ func TestInboxActivityOrder(t *testing.T) {
 		t.Fatalf("settings activity=%v err=%v", groupActivity, err)
 	}
 
-	// 从空群只改简介不会生成活动，改名追加系统消息后才进入活动区。
+	// 核验空群简介更新保留活动状态，改名系统消息更新活动位置。
 	if _, err := conversationaction.NewUpdateGroupConversationAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationProfileInput{ConversationID: empty.ID, Title: "空群", Description: "仅资料"}); err != nil {
 		t.Fatal(err)
 	}
@@ -311,7 +311,7 @@ func TestInboxTelegramActivity(t *testing.T) {
 			t.Fatalf("public queue leaked into all: %+v", row)
 		}
 	}
-	// 阅读与处理状态只改变投影，不改变活动位置。
+	// 阅读与处理状态更新投影并保留活动位置。
 	if _, err := conversationaction.NewMarkConversationReadAction(f.db).Execute(ctx, f.owner, telegram.ID, *telegram.LastMessageID, false); err != nil {
 		t.Fatal(err)
 	}

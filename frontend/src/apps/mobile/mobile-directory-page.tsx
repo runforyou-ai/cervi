@@ -105,7 +105,7 @@ function MobileDirectoryList({
     listPageCounts.set(storageKey, pageCount)
   }, [listPageCounts, storageKey, pageCount])
 
-  /** 初始页面全部就绪后开放位置记录，后续追加不会重新定位。 */
+  /** 初始页面全部就绪后完成定位并开始记录位置。 */
   const onReady = useCallback((page: number) => {
     loadedPages.current.add(page)
     if (loadedPages.current.size >= initialPageCount.current) setReady(true)

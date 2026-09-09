@@ -30,7 +30,7 @@ func TestValidWebsiteExternalIDRejectsNonHex(t *testing.T) {
 	}
 }
 
-// TestNormalizeWebsiteReplyTarget 验证引用编号格式及新会话不能携带引用。
+// TestNormalizeWebsiteReplyTarget 验证引用编号格式和新会话的引用限制。
 func TestNormalizeWebsiteReplyTarget(t *testing.T) {
 	conversationID := "0198ddee-c056-7bc5-a1d9-586f878ee966"
 	for _, input := range []WebsiteCustomerTextMessageInput{

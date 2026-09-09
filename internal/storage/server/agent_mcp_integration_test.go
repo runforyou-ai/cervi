@@ -20,7 +20,7 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// newAgentMCPService 创建无法连接且没有工具的服务，验证绑定无需远端可用性。
+// newAgentMCPService 创建远端不可用、工具目录为空的绑定测试服务。
 func newAgentMCPService(t *testing.T, db *bun.DB, identity *servermodels.Identity) string {
 	t.Helper()
 	service := &servermodels.MCPServer{
@@ -97,7 +97,7 @@ func testAgentMCPServices(t *testing.T, db *bun.DB, owner *servermodels.Identity
 			t.Fatalf("invalid binding: %v", err)
 		}
 	}
-	// 其他字段校验失败不得切换当前版本或留下新版本。
+	// 核验字段校验失败后配置版本与当前版本指针保持原值。
 	invalid := agentaction.ExecutionInput{Mode: execution.Mode, Managed: &agentaction.ManagedExecutionInput{ProviderID: providerID, ModelIdentifier: "missing-model", SystemInstruction: "新指令"}}
 	if _, err := update.Execute(ctx, owner, agents[0].ID, agentaction.UpdateExecutionInput{ExecutionInput: invalid}); err == nil {
 		t.Fatal("invalid model saved")
@@ -159,7 +159,7 @@ func testAgentMCPServices(t *testing.T, db *bun.DB, owner *servermodels.Identity
 		t.Fatalf("last service deletion=%+v err=%v", detail, err)
 	}
 
-	// 使用两个真实用户和查询屏障，避免用户行锁掩盖服务及员工行锁。
+	// 使用两个用户和查询屏障控制服务及员工的取锁顺序。
 	colleague := newChatLockUser(t, db, owner)
 	db.AddQueryHook(chatQueryHook{})
 	for _, saveFirst := range []bool{true, false} {
@@ -243,7 +243,7 @@ func testAgentMCPDeleteRace(t *testing.T, db *bun.DB, owner, colleague *servermo
 	}
 }
 
-// testAgentMCPSaveRace 验证同一员工两次保存不会把两个草稿合并。
+// testAgentMCPSaveRace 验证同一员工并发保存时各草稿的版本独立性。
 func testAgentMCPSaveRace(t *testing.T, db *bun.DB, owner, colleague *servermodels.Identity, agentID string, execution agentaction.ExecutionInput) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()

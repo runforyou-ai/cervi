@@ -137,7 +137,7 @@ export function ContactScopeSidebar({
             >
               {t("add.agent")}
             </DropdownMenuItem>
-            {/* TODO: 等手工联系人身份和可发送渠道关系明确后再恢复添加外部联系人入口。 */}
+            {/* TODO: 添加外部联系人入口，校验联系人身份和可发送渠道。 */}
             {/*
             <DropdownMenuItem
               disabled={channels.length === 0}

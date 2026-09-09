@@ -210,7 +210,7 @@ export const defaultWorkspaceTab = {
 export function resolveWorkspaceLocation(
   location: Pick<Location, "pathname" | "search" | "hash">,
 ): ResolvedWorkspaceLocation {
-  // 规范化工作台路径，避免同一页面生成重复标签。
+  // 规范化工作台路径并复用对应标签。
   const pathname =
     location.pathname === "/"
       ? location.pathname

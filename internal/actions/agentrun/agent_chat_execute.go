@@ -28,7 +28,7 @@ func (p agentChatRunPolicy) lockContext(ctx context.Context, db bun.IDB, run *se
 	if cv.Type != string(domain.ConversationTypeAgent) {
 		return agentRunPolicyContext{}, errors.New("agent run does not belong to an AI conversation")
 	}
-	// 停用或归档不取消已提交输入；这里只核对固定归属和发送关系。
+	// 校验已提交输入的固定归属和发送关系。
 	var participantID string
 	if err := db.NewSelect().TableExpr("conversation_participants AS cp").
 		ColumnExpr("cp.id").

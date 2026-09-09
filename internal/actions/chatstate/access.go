@@ -17,7 +17,7 @@ import (
 var (
 	// ErrConversationNotFound 表示会话不存在或当前身份无权访问。
 	ErrConversationNotFound = errors.New("conversation not found")
-	// ErrGroupOwnerRequired 表示当前成员不是群主。
+	// ErrGroupOwnerRequired 表示群主身份校验失败。
 	ErrGroupOwnerRequired = errors.New("group conversation owner required")
 )
 
@@ -74,7 +74,7 @@ func LockMember(ctx context.Context, tx bun.Tx, identity *servermodels.Identity,
 	if err != nil {
 		return Member{}, err
 	}
-	// 单独查询取得等待会话锁之后的成员资格，避免使用锁等待前的关系快照。
+	// 取得会话锁后重新查询当前成员资格。
 	member := Member{Conversation: conversation}
 	err = MemberQuery(tx, identity, conversationID).
 		ColumnExpr("mine.id AS participant_id, mine.subject_id, mine.role").

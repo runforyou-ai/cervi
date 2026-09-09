@@ -134,7 +134,7 @@ func assertCustomerLockSummary(t *testing.T, ctx context.Context, db *bun.DB, co
 	}
 }
 
-// testCustomerLateResult 控制人工操作与 AI 写回事务的先后，并验证旧 Run 不能在新周期复活。
+// testCustomerLateResult 控制人工操作与 AI 写回事务顺序，并验证 Run 的客服周期归属。
 func testCustomerLateResult(t *testing.T, db *bun.DB, identity *models.Identity, agentID string, tasks *servertask.Runtime, change string, aiFirst bool) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
@@ -148,7 +148,7 @@ func testCustomerLateResult(t *testing.T, db *bun.DB, identity *models.Identity,
 		return agentruntime.RunResult{Content: "迟到结果", EndSeq: claim.EndSeq}, err
 	}}
 	executor := agentrunaction.NewExecuteAction(db, tasks, model)
-	// 使用另一进程等价的协调器，确保正确性不依赖本地 context 取消。
+	// 使用独立协调器验证跨进程的事务校验。
 	coordinator := agentrunaction.NewExecuteAction(db, tasks, nil)
 	executed, managed := make(chan error, 1), make(chan error, 1)
 	go func() {
@@ -187,7 +187,7 @@ func testCustomerLateResult(t *testing.T, db *bun.DB, identity *models.Identity,
 			t.Fatal(err)
 		}
 	}
-	// 重复执行及最终失败回调不能再追加结果或改变终态。
+	// 核验重复执行及最终失败回调的结果和终态幂等性。
 	if err := executor.Execute(ctx, agentrunaction.RunInput{RunID: run.ID}); err != nil {
 		t.Fatal(err)
 	}
@@ -381,7 +381,7 @@ func TestCustomerReopenAndInboundConverge(t *testing.T) {
 	}
 }
 
-// TestTelegramInboundCredentialLock 验证回调持锁期间停用等待，停用先提交时旧回调不能入站。
+// TestTelegramInboundCredentialLock 验证回调与停用操作的锁顺序及凭据有效性校验。
 func TestTelegramInboundCredentialLock(t *testing.T) {
 	for _, disableFirst := range []bool{false, true} {
 		name := "入站先提交"

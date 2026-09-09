@@ -64,7 +64,7 @@ func TestSendTextOutcomes(t *testing.T) {
 	}
 }
 
-// TestSendTextNetworkFailure 验证传输错误不会泄漏 Token 或被自动重试。
+// TestSendTextNetworkFailure 验证传输失败时的 Token 脱敏和单次请求。
 func TestSendTextNetworkFailure(t *testing.T) {
 	client := NewClient(httpDoerFunc(func(*http.Request) (*http.Response, error) {
 		return nil, fmt.Errorf("network error with %s", testBotToken)

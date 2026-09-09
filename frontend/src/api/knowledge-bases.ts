@@ -287,7 +287,7 @@ export const getKnowledgeDocumentPreview = bind(GetKnowledgeDocumentPreview)
 function normalizeKnowledgeDocument(document: KnowledgeDocument): KnowledgeDocumentData {
   return { ...document, status: document.status as KnowledgeDocumentData["status"] }
 }
-/** 使用服务端签发的请求读取原件，文件内容不经过 Wails 绑定。 */
+/** 使用服务端签发的请求直接读取原件。 */
 export async function readKnowledgeDocumentPreview(
   baseId: string,
   documentId: string,

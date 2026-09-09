@@ -35,7 +35,7 @@ const routingChoices = [
   ChannelRoutingTargetType.ChannelRoutingTargetTypeMember,
 ] as const
 
-/** 显示一个不带分组边框的接待目标字段。 */
+/** 显示接待目标字段。 */
 function ReceptionTargetField<
   TValues extends FieldValues & ChannelReceptionSettingsFormValues,
 >({

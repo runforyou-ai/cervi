@@ -98,7 +98,7 @@ export function useConversationViewport({
     }
   }, [root, Boolean(page), syncPosition, readPosition])
 
-  /** 定位前保留跟随意图，窗口外目标也需先暂停，避免上下文布局抢先贴底。 */
+  /** 定位前保存跟随意图并暂停自动贴底。 */
   const holdForLocation = useCallback(() => {
     locationHold.current = following.current
   }, [])
@@ -148,7 +148,7 @@ export function useConversationViewport({
     setPositionRevision((revision) => revision + 1)
   }, [root, readPosition])
 
-  /** 阅读判定直接读取当前布局，避免使用上一帧的位置状态。 */
+  /** 根据当前布局判断消息阅读位置。 */
   const getAtBottom = useCallback(() => {
     const viewport = conversationViewport(root.current)
     return Boolean(viewport && isAtBottom(viewport))

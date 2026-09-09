@@ -138,7 +138,7 @@ func TestConversationUnreadMark(t *testing.T) {
 	}
 }
 
-// TestInboxUnreadUsesCanonicalDirect 验证单聊列表与总数共用身份对来源，避免隐藏会话留下红点。
+// TestInboxUnreadUsesCanonicalDirect 验证单聊列表与未读总数使用同一身份对来源。
 func TestInboxUnreadUsesCanonicalDirect(t *testing.T) {
 	f := newNavigationFixture(t)
 	ctx := context.Background()

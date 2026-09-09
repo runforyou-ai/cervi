@@ -52,15 +52,15 @@ const (
 	ConflictReasonServiceSessionAlreadyOpen = "service_session_already_open"
 	// ConflictReasonGroupMemberAlreadyActive 表示成员已经在群聊中。
 	ConflictReasonGroupMemberAlreadyActive = "group_member_already_active"
-	// ConflictReasonGroupMemberNotActive 表示目标不是当前有效群成员。
+	// ConflictReasonGroupMemberNotActive 表示目标群成员资格已失效。
 	ConflictReasonGroupMemberNotActive = "group_member_not_active"
-	// ConflictReasonGroupOwnerCannotBeRemoved 表示群主不能通过移除成员操作退出。
+	// ConflictReasonGroupOwnerCannotBeRemoved 表示移除操作的目标为群主。
 	ConflictReasonGroupOwnerCannotBeRemoved = "group_owner_cannot_be_removed"
 	// ConflictReasonGroupOwnerCannotLeave 表示群主必须先转让后退出。
 	ConflictReasonGroupOwnerCannotLeave = "group_owner_cannot_leave"
-	// ConflictReasonReplyTargetInvalid 表示引用目标不是当前会话中的有效文本或附件消息。
+	// ConflictReasonReplyTargetInvalid 表示当前会话的引用消息校验失败。
 	ConflictReasonReplyTargetInvalid = "reply_target_invalid"
-	// ConflictReasonGroupMentionTargetInvalid 表示提醒目标不是当前群聊中的有效参与者。
+	// ConflictReasonGroupMentionTargetInvalid 表示当前群聊的提醒目标校验失败。
 	ConflictReasonGroupMentionTargetInvalid = "group_mention_target_invalid"
 )
 

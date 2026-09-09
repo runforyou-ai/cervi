@@ -394,7 +394,7 @@ export function WorkspaceTabs({
     pinnedIds: [],
   })
 
-  /** 仅在地址变化时同步标签，避免关闭操作被旧地址反向恢复。 */
+  /** 地址变化时同步标签。 */
   useLayoutEffect(() => {
     const activatingExisting = pendingActivationRef.current === currentTab.id
     if (activatingExisting) {
@@ -491,7 +491,7 @@ export function WorkspaceTabs({
   /** 重新挂载指定标签并失效查询缓存，保留其他标签的页面实例。 */
   async function reloadTab(id: string) {
     if (unsavedChanges && !(await unsavedChanges.confirmTabs([id]))) return
-    /* 缓存默认永久新鲜，重挂载不会自动重取，这里显式失效全部查询。 */
+    /* 显式失效全部查询并刷新页面数据。 */
     void resourceClient.invalidateQueries()
     setReloadRevisionById((current) => ({
       ...current,

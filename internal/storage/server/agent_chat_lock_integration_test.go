@@ -141,7 +141,7 @@ func assertAgentLockResult(t *testing.T, ctx context.Context, db *bun.DB, run se
 	}
 }
 
-// testAgentWaitsForSender 验证 Agent 在真人发送持锁期间不能先锁输入状态。
+// testAgentWaitsForSender 验证 Agent 按真人发送事务、输入状态的顺序取锁。
 func testAgentWaitsForSender(t *testing.T, db *bun.DB, identity *servermodels.Identity, agentID string, tasks *servertask.Runtime) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()

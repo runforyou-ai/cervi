@@ -72,7 +72,7 @@ func replaceMethods(ctx context.Context, tx bun.Tx, organizationID, contactID st
 		}
 	}
 
-	// 先取消旧主要项，避免切换主要联系方式时触发唯一索引冲突。
+	// 切换主要联系方式前取消原主要项。
 	for recordKey, record := range existingByKey {
 		if record.IsPrimary && !desired[recordKey].IsPrimary {
 			if _, err := tx.NewUpdate().

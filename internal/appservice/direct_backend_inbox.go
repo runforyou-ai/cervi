@@ -141,7 +141,7 @@ func inboxConversationFromAction(summary inboxaction.ConversationSummary, avatar
 	return conversation
 }
 
-// GetInboxConversation 独立读取当前用户可见的会话，不依赖列表筛选或分页。
+// GetInboxConversation 按编号读取当前用户可见的独立会话摘要。
 func (b *DirectBackend) GetInboxConversation(ctx context.Context, meta RequestMeta, conversationID string) (InboxConversation, error) {
 	identity, err := b.authenticate(ctx, meta)
 	if err != nil {

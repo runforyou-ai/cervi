@@ -181,7 +181,7 @@ func websiteVisitorMeta(c *gin.Context) appservice.WebsiteVisitorMeta {
 	return appservice.WebsiteVisitorMeta{Locale: appservice.Locale(c.GetHeader("Accept-Language"))}
 }
 
-// websiteVisitorRequestMeta 构造仅用于本地化公开错误的应用元信息。
+// websiteVisitorRequestMeta 构造公开错误本地化所需的应用元信息。
 func websiteVisitorRequestMeta(c *gin.Context) appservice.RequestMeta {
 	return appservice.RequestMeta{Locale: appservice.Locale(c.GetHeader("Accept-Language"))}
 }

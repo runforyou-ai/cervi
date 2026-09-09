@@ -948,7 +948,7 @@ function ConversationThread({
     )
       return
     let current = true
-    // 每次进入都清除服务端标记，避免旧缓存掩盖另一端新设的标记。
+    // 每次进入会话时清除服务端未读标记。
     void updateConversationUnreadMark(conversationID, { markedUnread: false })
       .then(() => invalidate(resourceKeys.inbox()))
       .catch((error: unknown) => {
@@ -1095,7 +1095,7 @@ function ConversationThread({
                 void invalidate(
                   resourceKeys.conversationMessages(result.conversation.id),
                 )
-                // 离开原线程后只刷新列表，不改变当前选择。
+                // 离开原线程后刷新列表并保留当前选择。
                 if (aliveRef.current) {
                   onChatStarted(result.conversation)
                 } else {
@@ -1142,7 +1142,7 @@ export function InboxPage({
   }) => void
 }) {
   const { conversations, attentionUnreadCount } = list
-  // 空窗口或尚未完成首次读取时，不把整个筛选解释为没有会话。
+  // 根据当前窗口、前后分页资格和首次读取状态判断会话列表是否有效。
   const hasConversations = conversations.length > 0 || list.hasBefore || list.hasAfter || list.revision === 0
   const { t } = useTranslation(["inbox", "common"])
   const { identity } = useWorkspace()

@@ -361,7 +361,7 @@ body,
   background: var(--border);
 }
 
-/* 激活和悬停标签两侧以及行尾不显示分隔线。 */
+/* 隐藏激活标签、悬停标签两侧及行尾的分隔线。 */
 .cervi-workspace-tab[data-active="false"]:hover::after,
 .cervi-workspace-tabs [role="tablist"]
   > :last-child

@@ -46,7 +46,7 @@ func (b *DirectBackend) GetInboxContext(ctx context.Context, meta RequestMeta, i
 	}}, nil
 }
 
-// ReadInboxWindow 认证后按原始边界重读完整连续范围，不按首页大小截断。
+// ReadInboxWindow 认证后按原始边界重读完整连续范围。
 func (b *DirectBackend) ReadInboxWindow(ctx context.Context, meta RequestMeta, input InboxWindowInput) (InboxWindow, error) {
 	identity, err := b.authenticate(ctx, meta)
 	if err != nil {

@@ -96,7 +96,7 @@ func TestCustomerReplies(t *testing.T) {
 	}
 }
 
-// TestCustomerReplyBoundaries 验证无效引用不领取会话，关闭和他人负责时不能发送。
+// TestCustomerReplyBoundaries 验证无效引用的事务回滚及会话发送资格校验。
 func TestCustomerReplyBoundaries(t *testing.T) {
 	f := newCustomerReadFixture(t)
 	foreign := newCustomerReadFixture(t)
@@ -168,7 +168,7 @@ func TestCustomerReplyBoundaries(t *testing.T) {
 	}
 }
 
-// TestCustomerReplyEarlierSession 验证跨客服周期引用和窗口外定位不会改变个人阅读状态。
+// TestCustomerReplyEarlierSession 验证跨客服周期引用和窗口外定位后保留个人阅读状态。
 func TestCustomerReplyEarlierSession(t *testing.T) {
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()

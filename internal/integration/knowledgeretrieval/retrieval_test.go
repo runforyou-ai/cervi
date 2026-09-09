@@ -62,7 +62,7 @@ func TestSearchReadsCursorContext(t *testing.T) {
 	}
 }
 
-// TestSearchRejectsQueriesWithCursor 验证关键词和游标不能在同一次查询中混用。
+// TestSearchRejectsQueriesWithCursor 验证关键词与游标的互斥约束。
 func TestSearchRejectsQueriesWithCursor(t *testing.T) {
 	cursor := &Cursor{KnowledgeBaseID: " base-a ", DocumentID: " document-1 ", SegmentID: " segment-2 ", Position: 2}
 	_, err := Search(context.Background(), nil, Request{Queries: []string{"查询"}, Cursor: cursor})

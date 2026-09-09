@@ -10,7 +10,7 @@ import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { mergeConversationPage } from "./conversation-window"
 import { memberChatPollingInterval } from "./use-member-chat-polling"
 
-/** 在统一资源缓存上拼装当前连续窗口，过期读取不影响新窗口。 */
+/** 在统一资源缓存上拼装当前连续窗口并丢弃过期读取结果。 */
 export function useConversationTimeline(
   conversationID: string,
   pollingActive: boolean,

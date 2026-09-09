@@ -1479,7 +1479,7 @@ export interface InboxContextInput {
  */
 export interface InboxConversation {
     /**
-     * PositionCursor 仅在列表窗口和匹配的锚点中返回，独立摘要不携带查询位置。
+     * PositionCursor 保存列表窗口和匹配锚点的查询位置。
      */
     "positionCursor": string;
     "lastActivityAt": string | null;
@@ -1513,7 +1513,7 @@ export enum InboxConversationAvailability {
 };
 
 /**
- * InboxConversationResult 不可用时仅保留请求 ID 和资格，不返回实体信息。
+ * InboxConversationResult 返回匹配状态，不可用时保留请求 ID 和资格。
  */
 export interface InboxConversationResult {
     "id": string;

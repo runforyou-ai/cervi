@@ -60,7 +60,7 @@ func TestDissolveGroupPreservesMembers(t *testing.T) {
 	}
 }
 
-// TestDissolveDoesNotRestoreFormerMember 验证退出成员不会因解散重新获得历史访问权。
+// TestDissolveDoesNotRestoreFormerMember 验证群聊解散后退出成员的历史访问限制。
 func TestDissolveDoesNotRestoreFormerMember(t *testing.T) {
 	f := newNavigationFixture(t)
 	ctx := context.Background()

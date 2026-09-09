@@ -214,7 +214,7 @@ func TestKnowledgeQAIsolation(t *testing.T) {
 	}
 	input.GroupID = base.Groups[0].ID
 	input.SimilarQuestions = entry.SimilarQuestions
-	// 新条目不得复用已有条目的内容编号，失败后也不留下空条目。
+	// 核验内容编号的条目归属及失败后的事务回滚。
 	if _, err := save.Execute(ctx, identity, base.ID, "", input); err == nil {
 		t.Fatal("accepted content from another entry")
 	}

@@ -176,7 +176,7 @@ func (s *Service) ServerURL(ctx context.Context, meta RequestMeta) (string, erro
 	return connector.ServerURL(ctx, meta)
 }
 
-// ProbeServer 检测企业服务器并返回公开企业名称，不保存地址。
+// ProbeServer 检测企业服务器并返回公开企业名称。
 func (s *Service) ProbeServer(ctx context.Context, meta RequestMeta, serverURL string) (InstallationStatus, error) {
 	connector, ok := s.backend.(ServerConnector)
 	if !ok {

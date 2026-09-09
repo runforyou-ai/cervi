@@ -58,7 +58,7 @@ export function MobileContactsPage() {
   )
 }
 
-/** 明确提示分类尚未开放，不把未实现功能显示为空目录。 */
+/** 显示分类功能尚未开放的提示。 */
 export function MobileContactCategoryPage() {
   const { t } = useTranslation("mobile")
   const { category } = useParams()

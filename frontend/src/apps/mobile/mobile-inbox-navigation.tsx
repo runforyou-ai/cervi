@@ -63,7 +63,7 @@ export function useMobileInboxQuery() {
       : ""
   const query = { scope, customerView, assigneeIdentityId }
 
-  /** 更换筛选时替换当前列表地址，不增加返回层级。 */
+  /** 更换筛选时替换当前列表地址并保留导航层级。 */
   function changeQuery(changes: LoadInboxQuery) {
     const next = { ...query, ...changes }
     const search = new URLSearchParams()
@@ -116,7 +116,7 @@ export function MobileInboxScopes({
   )
 }
 
-/** 按需加载可选同事，使用原生选择控件避免叠加业务面板。 */
+/** 按需加载可选同事并通过原生选择控件切换。 */
 function MobileCustomerAssignee({
   value,
   onChange,

@@ -454,7 +454,7 @@ func (b *DirectBackend) MarkConversationRead(ctx context.Context, meta RequestMe
 	return ConversationReadState{ReadSeq: strconv.FormatInt(state.ReadSeq, 10), LastReadMessageID: state.LastReadMessageID, LastReadAt: state.LastReadAt}, nil
 }
 
-// UpdateConversationUnreadMark 保存个人未读标记，不改变已读和提及查看水位。
+// UpdateConversationUnreadMark 保存个人未读标记并保留已读和提及查看水位。
 func (b *DirectBackend) UpdateConversationUnreadMark(ctx context.Context, meta RequestMeta, conversationID string, input ConversationUnreadMarkInput) error {
 	identity, err := b.authenticate(ctx, meta)
 	if err != nil {

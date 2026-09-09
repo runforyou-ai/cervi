@@ -47,7 +47,7 @@ func (chatQueryHook) AfterQuery(ctx context.Context, event *bun.QueryEvent) {
 	}
 }
 
-// pause 用查询屏障控制事务交错，不依赖固定等待时间。
+// pause 用查询屏障控制事务交错。
 func (g *chatQueryGate) pause(ctx context.Context, event *bun.QueryEvent, before bool) {
 	if before != g.before || !g.match(event) {
 		return
@@ -321,7 +321,7 @@ func TestDirectSendAcceptedBeforeTargetDisabled(t *testing.T) {
 	if err := waitChatResult(t, ctx, done); err != nil {
 		t.Fatal(err)
 	}
-	// 已保存的消息也不能绕过停用后的发送授权进行重放。
+	// 核验消息重放时的账号发送资格校验。
 	if _, err := send.Execute(ctx, f.owner, input); !errors.Is(err, conversationaction.ErrConversationNotFound) {
 		t.Fatalf("replay after disabled=%v", err)
 	}

@@ -27,7 +27,7 @@ type MobileAgentLocationState = {
   agentDirectory?: boolean
 }
 
-/** 打开草稿前确定会话地址，首发成功时无需切换页面。 */
+/** 打开草稿前确定会话地址，首发成功后在当前页面展示会话。 */
 export function MobileAgentChatPage() {
   const { agentID = "" } = useParams()
   const location = useLocation()
@@ -81,7 +81,7 @@ function MobileAgentConversation({ conversationID }: { conversationID: string })
   const ready = persisted ? Boolean(conversation) : Boolean(draftAgent)
 
   useEffect(() => {
-    // 完成本次账号校验后固定草稿目标，后续查询变化不替换输入区。
+    // 账号校验完成后固定草稿目标和输入区。
     if (
       !draftAgent &&
       agent.data?.status === UserStatus.UserStatusActive &&

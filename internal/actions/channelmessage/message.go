@@ -60,7 +60,7 @@ func RecordInbound(ctx context.Context, db bun.IDB, channelID string, message *m
 	return Record(ctx, db, record)
 }
 
-// MatchesInbound 按稳定平台身份核对重放，不依赖后来补齐的本地引用编号或可变原文。
+// MatchesInbound 按稳定的平台身份核对入站消息重放。
 func MatchesInbound(ctx context.Context, db bun.IDB, message *models.Message, channelID string, input *Inbound) (bool, error) {
 	var record models.ChannelMessage
 	if err := db.NewSelect().Model(&record).Where("cm.message_id = ? AND cm.organization_id = ?", message.ID, message.OrganizationID).Scan(ctx); err != nil {

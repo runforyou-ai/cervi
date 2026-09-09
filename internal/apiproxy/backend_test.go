@@ -74,7 +74,7 @@ func TestBackendRequiresEnterpriseServer(t *testing.T) {
 	}
 }
 
-// TestBackendPreservesCancellation 验证远程请求取消不会转换为连接错误。
+// TestBackendPreservesCancellation 验证远程请求取消原因的透传。
 func TestBackendPreservesCancellation(t *testing.T) {
 	backend, err := newTestBackend(&memoryStore{serverURL: "http://127.0.0.1:1"})
 	if err != nil {
@@ -302,7 +302,7 @@ func TestBackendClearsCredentialWhenChangingServer(t *testing.T) {
 	}
 }
 
-// TestBackendRejectsUninitializedServer 验证原生端不会保存尚未初始化的企业服务器。
+// TestBackendRejectsUninitializedServer 验证原生端连接时的企业初始化校验。
 func TestBackendRejectsUninitializedServer(t *testing.T) {
 	remote := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.URL.Path != "/api/installation/status" {

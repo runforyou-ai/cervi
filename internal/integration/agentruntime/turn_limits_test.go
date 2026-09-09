@@ -14,7 +14,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
-// TestRunFollowUpsDoNotConsumeIterationBudget 验证连续补充不受单轮迭代上限限制，且历史中间正文持续保留。
+// TestRunFollowUpsDoNotConsumeIterationBudget 验证连续补充使用独立迭代预算并保留历史中间正文。
 func TestRunFollowUpsDoNotConsumeIterationBudget(t *testing.T) {
 	for _, maxTurns := range []int{0, 3} {
 		t.Run(fmt.Sprintf("max-turns-%d", maxTurns), func(t *testing.T) {
@@ -52,7 +52,7 @@ func TestRunFollowUpsDoNotConsumeIterationBudget(t *testing.T) {
 	}
 }
 
-// TestRunRetainsToolsAcrossRepeatedPreemption 验证连续工具抢占保留历次结果，单轮迭代预算不会限制新输入轮次。
+// TestRunRetainsToolsAcrossRepeatedPreemption 验证连续工具抢占的结果保留及各轮输入的独立迭代预算。
 func TestRunRetainsToolsAcrossRepeatedPreemption(t *testing.T) {
 	runtime, err := New()
 	if err != nil {

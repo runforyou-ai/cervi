@@ -83,7 +83,7 @@ function MobileGroupConversation({
     else void navigate(inboxURL, { replace: true })
   }, [inboxURL, invalidate, navigate, returnDepth, t])
 
-  /** 主动退出后返回来源列表，不再提示访问失效。 */
+  /** 主动退出后结束访问检测并返回来源列表。 */
   function handleLeft() {
     leaving.current = true
     if (returnDepth > 0) void navigate(-returnDepth)
@@ -96,7 +96,7 @@ function MobileGroupConversation({
   }, [unavailable, leavePending, handleUnavailable])
 
   useEffect(() => {
-    // 恢复前台立即校验群状态，不等待下一个轮询周期。
+    // 恢复前台时立即校验群状态。
     if (pollingActive && !previousPollingActive.current && !leavePending)
       void refresh()
     previousPollingActive.current = pollingActive

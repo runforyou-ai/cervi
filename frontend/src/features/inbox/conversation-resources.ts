@@ -27,7 +27,7 @@ export function clearConversationResources(client: QueryClient, conversationID: 
   void client.invalidateQueries({ queryKey: resourceKeys.inboxConversations(), refetchType: "none" })
   client.removeQueries({ queryKey: resourceKeys.inboxContext() })
   client.removeQueries({ queryKey: resourceKeys.inboxWindow() })
-  // 窗口控制器的禁用首页观察器自行串行重读，不打断刚开始的失权恢复。
+  // 由窗口控制器串行重读首页并完成失权恢复。
   void client.resetQueries({ queryKey: resourceKeys.inbox(), predicate: (query) => query.isActive() || query.getObserversCount() === 0 })
   void client.invalidateQueries({ queryKey: resourceKeys.inbox(), refetchType: "none" })
 }

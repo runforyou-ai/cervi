@@ -28,7 +28,7 @@ export function KnowledgeDocumentPreview({
   const preview = useResource(
     resourceKeys.knowledgeDocumentFile(knowledgeBaseId, documentId),
     async (signal) => {
-      // 没有预览器的格式不读取原件，避免无意义的大文件传输。
+      // PPTX 返回格式暂不支持预览的状态。
       if (name.toLowerCase().endsWith(".pptx")) return { kind: "unsupported" } as const
       return parseDocumentPreview(name, await readKnowledgeDocumentPreview(knowledgeBaseId, documentId, signal))
     },

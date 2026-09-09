@@ -46,7 +46,7 @@ export function ConversationTargetPickerDialog({
         ref={dialogRef}
         className="grid max-h-[min(42rem,calc(100svh-2rem))] grid-rows-[auto_minmax(0,1fr)] overflow-hidden outline-none"
         onOpenAutoFocus={(event) => {
-          // 选择器打开时聚焦弹窗容器，保留键盘导航且不选中任何操作。
+          // 选择器打开时聚焦弹窗容器并启用键盘导航。
           event.preventDefault()
           dialogRef.current?.focus()
         }}

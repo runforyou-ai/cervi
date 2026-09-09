@@ -1,4 +1,4 @@
-/** 集中定义 TanStack Query 查询 key 工厂，页面统一从这里取 key，避免手写数组导致同 key 冲突或漏失效。 */
+/** 集中定义 TanStack Query 查询 key 工厂。 */
 
 /** 参与 key 组成的列表查询参数对象。 */
 type KeyParameters = Record<string, unknown>
@@ -24,7 +24,7 @@ function scopedListKey(
 }
 
 export const resourceKeys = {
-  /** 不依赖列表筛选的会话摘要。 */
+  /** 按会话编号读取的独立摘要。 */
   conversationSummary: (conversationId?: string) => itemKey("conversation-summary", conversationId),
   /** 指定会话的列表资格。 */
   inboxConversations: (parameters?: KeyParameters) => listKey("inbox-conversations", parameters),

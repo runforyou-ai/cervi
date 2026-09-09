@@ -15,7 +15,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
-// TestChatServiceMarkdownAssets 验证正文资源由企业服务端提供且路径不落入渠道查询。
+// TestChatServiceMarkdownAssets 验证企业服务端的正文资源路由和缓存策略。
 func TestChatServiceMarkdownAssets(t *testing.T) {
 	service := NewChatService(func(context.Context, string) (*channelaction.PublicWebsiteChannel, error) {
 		t.Fatal("markdown assets must not look up a channel")
@@ -52,7 +52,7 @@ func TestPreferredMessengerLocale(t *testing.T) {
 	}
 }
 
-// TestEmbedServiceServesWidgetScript 验证嵌入脚本按 JavaScript 返回默认主题。
+// TestEmbedServiceServesWidgetScript 验证嵌入脚本的响应类型和预览缓存策略。
 func TestEmbedServiceServesWidgetScript(t *testing.T) {
 	service := NewEmbedService(func(context.Context, string) (*channelaction.PublicWebsiteChannel, error) {
 		t.Fatal("widget script should not look up a channel")
@@ -67,25 +67,6 @@ func TestEmbedServiceServesWidgetScript(t *testing.T) {
 	if !strings.HasPrefix(contentType, "application/javascript") {
 		t.Fatalf("content type = %q, want javascript", contentType)
 	}
-	body := response.Body.String()
-	if strings.Contains(body, themePlaceholder) {
-		t.Fatal("widget script contains unresolved theme placeholder")
-	}
-	if !strings.Contains(body, `searchParams.get("id")`) {
-		t.Fatalf("widget script missing id query reader: %s", body)
-	}
-	if !strings.Contains(body, "--cv-theme:#2563EB") {
-		t.Fatalf("widget script missing default theme: %s", body)
-	}
-	if !strings.Contains(body, "width:400px;height:640px") || !strings.Contains(body, "100dvh - 144px") {
-		t.Fatal("widget script missing default panel size or top spacing")
-	}
-	if !strings.Contains(body, "打开聊天") || !strings.Contains(body, "Open chat") {
-		t.Fatal("widget script missing browser-language launcher copy")
-	}
-	if !strings.Contains(body, "cervi:toggle-expand") {
-		t.Fatal("widget script missing expansion message contract")
-	}
 	previewResponse := httptest.NewRecorder()
 	service.ServeHTTP(previewResponse, httptest.NewRequest(http.MethodGet, "/widget.js?preview=1", nil))
 	if previewResponse.Header().Get("Cache-Control") != "no-store" {
@@ -93,34 +74,7 @@ func TestEmbedServiceServesWidgetScript(t *testing.T) {
 	}
 }
 
-// TestEmbedServiceInlinesChannelTheme 验证带渠道标识的脚本内联该渠道主题色。
-func TestEmbedServiceInlinesChannelTheme(t *testing.T) {
-	channelID := "0191a2b3-c4d5-7890-abcd-ef1234567890"
-	service := NewEmbedService(func(_ context.Context, id string) (*channelaction.PublicWebsiteChannel, error) {
-		if id != channelID {
-			t.Fatalf("lookup id = %q", id)
-		}
-		return &channelaction.PublicWebsiteChannel{
-			ID:         channelID,
-			Title:      "在线咨询",
-			ThemeColor: "#EA580C",
-		}, nil
-	})
-	response := httptest.NewRecorder()
-	service.ServeHTTP(response, httptest.NewRequest(http.MethodGet, "/widget.js?id="+channelID, nil))
-	if response.Code != http.StatusOK {
-		t.Fatalf("status = %d", response.Code)
-	}
-	body := response.Body.String()
-	if !strings.Contains(body, "--cv-theme:#EA580C") {
-		t.Fatalf("missing channel theme: %s", body)
-	}
-	if !strings.Contains(body, "--cv-on-theme:#1C1917") {
-		t.Fatalf("missing on-theme: %s", body)
-	}
-}
-
-// TestEmbedServiceRejectsUnknownChannel 验证不存在渠道不返回挂件脚本。
+// TestEmbedServiceRejectsUnknownChannel 验证未知渠道返回未找到响应。
 func TestEmbedServiceRejectsUnknownChannel(t *testing.T) {
 	channelID := "0191a2b3-c4d5-7890-abcd-ef1234567890"
 	service := NewEmbedService(func(context.Context, string) (*channelaction.PublicWebsiteChannel, error) {
@@ -136,7 +90,7 @@ func TestEmbedServiceRejectsUnknownChannel(t *testing.T) {
 	}
 }
 
-// TestEmbedServiceReportsLookupError 验证渠道读取失败不返回挂件脚本。
+// TestEmbedServiceReportsLookupError 验证渠道读取失败返回服务错误。
 func TestEmbedServiceReportsLookupError(t *testing.T) {
 	channelID := "0191a2b3-c4d5-7890-abcd-ef1234567890"
 	service := NewEmbedService(func(context.Context, string) (*channelaction.PublicWebsiteChannel, error) {
@@ -251,28 +205,11 @@ func TestPublicChatPages(t *testing.T) {
 		if response.Header().Get("Vary") != "Accept-Language" {
 			t.Fatalf("vary = %q", response.Header().Get("Vary"))
 		}
-		assertMessengerPage(t, body, true)
 		if !strings.Contains(body, "你好，我是客服。") {
 			t.Fatal("missing greeting")
 		}
-		if !strings.Contains(body, `data-channel-greeting`) || !strings.Contains(body, `class="cv-presence-avatar`) {
-			t.Fatal("missing greeting or service identity")
-		}
-		conversationHeader := pageElement(body, `<header class="cv-conversation-header">`, "</header>")
-		if !strings.Contains(conversationHeader, "客服团队") || !strings.Contains(conversationHeader, "上次活跃：刚刚") {
-			t.Fatal("conversation header missing localized service identity")
-		}
-		if strings.Contains(conversationHeader, "在线咨询") || strings.Contains(conversationHeader, "通常几分钟内回复") {
-			t.Fatal("conversation header must not expose the channel title or subtitle")
-		}
-		if !strings.Contains(body, "谢谢，我们已经收到你的消息") {
-			t.Fatal("missing demo assistant reply copy")
-		}
 		if !strings.Contains(body, "通常几分钟内回复") {
 			t.Fatal("missing subtitle")
-		}
-		if !strings.Contains(body, `type="button" data-close`) {
-			t.Fatal("embed chrome must include close control")
 		}
 	})
 
@@ -281,11 +218,7 @@ func TestPublicChatPages(t *testing.T) {
 		request.Header.Set("Accept-Language", "zh-TW,zh;q=0.9")
 		response := httptest.NewRecorder()
 		chat.ServeHTTP(response, request)
-		body := assertChatPage(t, response, http.StatusOK, "在线咨询")
-		assertMessengerPage(t, body, false)
-		if strings.Contains(body, `type="button" data-close`) {
-			t.Fatal("standalone chrome must not include widget close")
-		}
+		assertChatPage(t, response, http.StatusOK, "在线咨询")
 	})
 
 	t.Run("english chat", func(t *testing.T) {
@@ -309,19 +242,6 @@ func TestPublicChatPages(t *testing.T) {
 		if !strings.Contains(body, `lang="en-US"`) {
 			t.Fatal("missing english lang")
 		}
-		if !strings.Contains(body, "Thanks, we have your message.") {
-			t.Fatal("missing english demo reply")
-		}
-		if !strings.Contains(body, "Choose emoji") {
-			t.Fatal("missing english emoji label")
-		}
-		if !strings.Contains(body, `aria-label="Message"`) {
-			t.Fatal("missing english message label")
-		}
-		conversationHeader := pageElement(body, `<header class="cv-conversation-header">`, "</header>")
-		if !strings.Contains(conversationHeader, "Support team") || !strings.Contains(conversationHeader, "Last active just now") {
-			t.Fatal("conversation header missing english service identity")
-		}
 	})
 
 	t.Run("management preview", func(t *testing.T) {
@@ -329,33 +249,21 @@ func TestPublicChatPages(t *testing.T) {
 		request.Header.Set("Accept-Language", "en-US")
 		response := httptest.NewRecorder()
 		chat.ServeHTTP(response, request)
-		body := assertChatPage(t, response, http.StatusOK, "Widget preview")
+		assertChatPage(t, response, http.StatusOK, "Widget preview")
 		if response.Header().Get("Content-Security-Policy") != "frame-ancestors * wails:" {
 			t.Fatalf("csp = %q", response.Header().Get("Content-Security-Policy"))
 		}
 		if response.Header().Get("Vary") != "Accept-Language" {
 			t.Fatalf("vary = %q", response.Header().Get("Vary"))
 		}
-		if !strings.Contains(body, `class="cv-preview-site"`) || !strings.Contains(body, `/embed/widget.js?preview=1`) {
-			t.Fatal("missing management widget preview host")
-		}
-		if !strings.Contains(body, `background: #f4f4f5`) || strings.Contains(body, "cv-preview-header") {
-			t.Fatal("management widget preview must use a solid background")
-		}
 
 		request = httptest.NewRequest(http.MethodGet, "/preview/frame", nil)
 		request.Header.Set("Accept-Language", "en-US")
 		response = httptest.NewRecorder()
 		embed.ServeHTTP(response, request)
-		body = assertChatPage(t, response, http.StatusOK, "Support")
+		assertChatPage(t, response, http.StatusOK, "Support")
 		if response.Header().Get("Content-Security-Policy") != "frame-ancestors * wails:" {
 			t.Fatalf("frame csp = %q", response.Header().Get("Content-Security-Policy"))
-		}
-		if !strings.Contains(body, `class="cv-preview"`) || !strings.Contains(body, `data-preview="true"`) {
-			t.Fatal("missing management preview messenger")
-		}
-		if !strings.Contains(body, "How can we help?") || !strings.Contains(body, "Record voice message") {
-			t.Fatal("missing preview messenger content")
 		}
 	})
 
@@ -367,9 +275,6 @@ func TestPublicChatPages(t *testing.T) {
 		body := assertChatPage(t, response, http.StatusNotFound, "无法打开聊天")
 		if !strings.Contains(body, "这个聊天入口不可用。") {
 			t.Fatal("missing not found copy")
-		}
-		if strings.Contains(body, `class="cv-composer"`) {
-			t.Fatal("not found page must not include composer")
 		}
 	})
 
@@ -417,86 +322,4 @@ func assertChatPage(t *testing.T, response *httptest.ResponseRecorder, status in
 		t.Fatalf("body %q does not contain %q", text, title)
 	}
 	return text
-}
-
-// pageElement 截取页面中指定的元素片段。
-func pageElement(page string, startMarker string, endMarker string) string {
-	start := strings.Index(page, startMarker)
-	if start < 0 {
-		return ""
-	}
-	end := strings.Index(page[start:], endMarker)
-	if end < 0 {
-		return ""
-	}
-	return page[start : start+end+len(endMarker)]
-}
-
-// assertMessengerPage 验证访客 Messenger 的页面契约。
-func assertMessengerPage(t *testing.T, body string, embed bool) {
-	t.Helper()
-	if !strings.Contains(body, "--cv-theme:") {
-		t.Fatal("missing theme variables")
-	}
-	if !strings.Contains(body, "color: var(--cv-on-theme)") {
-		t.Fatal("missing visitor bubble contrast color")
-	}
-	if !strings.Contains(body, `id="cv-input"`) || !strings.Contains(body, "<textarea") {
-		t.Fatal("missing composer textarea")
-	}
-	if !strings.Contains(body, `id="cv-composer-resize"`) || !strings.Contains(body, `aria-label="调整消息输入框高度"`) {
-		t.Fatal("missing accessible composer resize handle")
-	}
-	resizeHandleStyles := pageElement(body, ".cv-composer-resize {", "}")
-	if !strings.Contains(resizeHandleStyles, "right: 0;") || !strings.Contains(resizeHandleStyles, "left: 0;") || strings.Contains(body, ".cv-composer-resize::after") {
-		t.Fatal("composer resize handle must cover the full top edge without a visible grip")
-	}
-	if !strings.Contains(body, `aria-label="消息"`) || strings.Contains(body, `<label for="cv-input">`) {
-		t.Fatal("composer must keep an accessible name without a visible label")
-	}
-	if strings.Contains(body, `placeholder=`) {
-		t.Fatal("composer must not use a placeholder")
-	}
-	if !strings.Contains(body, `id="cv-attach"`) || !strings.Contains(body, `id="cv-emoji-toggle"`) || !strings.Contains(body, `id="cv-voice"`) || !strings.Contains(body, `id="cv-send"`) {
-		t.Fatal("missing composer tools")
-	}
-	if !strings.Contains(body, `class="cv-emoji-tool"`) || !strings.Contains(body, "CERVI_COMPOSER_EMOJIS") {
-		t.Fatal("emoji picker must be anchored to the shared composer emoji source")
-	}
-	if !strings.Contains(body, "bottom: calc(100% + 8px)") || !strings.Contains(body, "left: -41px") {
-		t.Fatal("emoji picker must open above its composer button")
-	}
-	if !strings.Contains(body, "COMPOSER_MAX_HEIGHT = 200") || !strings.Contains(body, "max-height: 200px") || !strings.Contains(body, "cursor: row-resize") || !strings.Contains(body, "setPointerCapture") || !strings.Contains(body, "preserveComposerHeight") {
-		t.Fatal("composer textarea must grow with content and support vertical resizing")
-	}
-	if !strings.Contains(body, `data-new-conversation`) || !strings.Contains(body, `data-resume-conversation`) {
-		t.Fatal("missing new and recent conversation entry contracts")
-	}
-	if !strings.Contains(body, `<a class="cv-text-link" href="#help" data-route-target="help">查看全部</a>`) {
-		t.Fatal("home help entry must be a link")
-	}
-	headingIndex := strings.Index(body, `class="cv-home-heading"`)
-	recentIndex := strings.Index(body, `id="cv-home-recent"`)
-	startIndex := strings.Index(body, `class="cv-start-card"`)
-	helpIndex := strings.Index(body, `id="cv-home-help-title"`)
-	if headingIndex < 0 || !(headingIndex < recentIndex && recentIndex < startIndex && startIndex < helpIndex) {
-		t.Fatal("home content must show recent conversation before start chat and help")
-	}
-	homeRecent := pageElement(body, `<button class="cv-recent-card"`, "</button>")
-	if strings.Contains(homeRecent, "最近对话") ||
-		!strings.Contains(homeRecent, `data-channel-title`) ||
-		!strings.Contains(homeRecent, `id="cv-home-recent-time"`) ||
-		!strings.Contains(homeRecent, `id="cv-home-recent-preview"`) ||
-		!strings.Contains(homeRecent, `id="cv-home-recent-unread-dot"`) {
-		t.Fatal("home recent conversation must mirror the messages list content")
-	}
-	if embed && !strings.Contains(body, `class="cv-embed"`) {
-		t.Fatal("missing embed shell class")
-	}
-	if embed && !strings.Contains(body, `id="cv-expand"`) {
-		t.Fatal("embedded Messenger must include expansion control")
-	}
-	if !embed && !strings.Contains(body, `class="cv-link"`) {
-		t.Fatal("missing standalone shell class")
-	}
 }

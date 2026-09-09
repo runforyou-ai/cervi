@@ -55,7 +55,7 @@ func TestAgentCallbacksFenceTaskAttempts(t *testing.T) {
 		}
 		assertAgentExecutionUnchanged(t, ctx, db, run)
 	}
-	// Worker 和尝试仍匹配时，过期的普通执行也不能开始或写回。
+	// 核验 Worker 和尝试匹配但租约过期时的执行限制。
 	if _, err := db.NewUpdate().Model((*servermodels.TaskRun)(nil)).Set("lease_expires_at = now() - interval '1 second'").Where("id = ?", taskID).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -96,7 +96,7 @@ func TestAgentCallbacksFenceTaskAttempts(t *testing.T) {
 	}
 }
 
-// seedAgentExecution 构造无需模型调用的 AI 会话、参与关系和单条待消费输入。
+// seedAgentExecution 构造 AI 会话、参与关系和单条待消费输入。
 func seedAgentExecution(t *testing.T, ctx context.Context, db *bun.DB) servermodels.AgentRun {
 	t.Helper()
 	organizationID, userID, agentID, conversationID := uuid.NewV7().String(), uuid.NewV7().String(), uuid.NewV7().String(), uuid.NewV7().String()

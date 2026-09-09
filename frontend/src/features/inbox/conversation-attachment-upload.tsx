@@ -86,7 +86,7 @@ export function ConversationAttachmentUpload({
     setSelected(items)
   }
 
-  /** 只读取本地图片尺寸和预览，不创建上传请求。 */
+  /** 读取本地图片尺寸并生成预览。 */
   async function add(files: File[]) {
     if (selectingRef.current) return
     if (selectedRef.current.length + files.length > 100) {
@@ -193,7 +193,7 @@ export function ConversationAttachmentUpload({
           aria-describedby={undefined}
           onInteractOutside={(event) => event.preventDefault()}
           onOpenAutoFocus={(event) => {
-            // 聚焦弹窗，避免首个附件的删除按钮把列表带回顶部。
+            // 聚焦弹窗容器并保持附件列表滚动位置。
             event.preventDefault()
             dialogRef.current?.focus({ preventScroll: true })
             if (listRef.current) {

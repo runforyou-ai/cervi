@@ -179,7 +179,7 @@ func TestMCPToolsUpdates(t *testing.T) {
 	if err != nil || record.ToolsUpdating || len(record.Tools) != 2 || record.ToolsUpdatedAt == nil {
 		t.Fatalf("first refresh: %+v, %v", record, err)
 	}
-	// 每次保存均提交新任务，旧任务的成功和失败都不得覆盖新批次。
+	// 核验每次保存的新任务标识及旧任务回调的批次校验。
 	input.Name = "Renamed"
 	record, err = update.Execute(ctx, identity, record.ID, input)
 	if err != nil || !record.ToolsUpdating {

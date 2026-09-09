@@ -1,4 +1,4 @@
-/** shadcn 多行输入框，小屏使用 16px 字号避免 iOS 聚焦时自动放大。 */
+/** shadcn 多行输入框，小屏字号为 16px。 */
 import * as React from "react"
 
 import { cn } from "@/lib/utils"

@@ -6,7 +6,7 @@ import (
 	"strings"
 )
 
-// LoadStartup 返回初始化或服务器连接入口，不读取登录状态。
+// LoadStartup 根据企业初始化状态返回初始化或服务器连接入口。
 func (s *Service) LoadStartup(ctx context.Context, meta RequestMeta) (Startup, error) {
 	var startup Startup
 	var err error

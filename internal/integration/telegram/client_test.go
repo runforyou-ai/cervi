@@ -150,7 +150,7 @@ func TestDownloadPhotoRejectsUnsafeContent(t *testing.T) {
 	}
 }
 
-// TestDownloadPhotoErrorDoesNotLeakTokenURL 验证头像传输错误不会暴露下载地址。
+// TestDownloadPhotoErrorDoesNotLeakTokenURL 验证头像传输错误的地址脱敏。
 func TestDownloadPhotoErrorDoesNotLeakTokenURL(t *testing.T) {
 	client := NewClient(httpDoerFunc(func(request *http.Request) (*http.Response, error) {
 		if request.URL.Path == "/bot"+testBotToken+"/getFile" {
@@ -228,7 +228,7 @@ func TestGetMeResponseFailures(t *testing.T) {
 	}
 }
 
-// TestClientRejectsInvalidTokenBeforeRequest 验证非法 Token 不会发起网络请求。
+// TestClientRejectsInvalidTokenBeforeRequest 验证发起请求前的 Token 格式校验。
 func TestClientRejectsInvalidTokenBeforeRequest(t *testing.T) {
 	called := false
 	client := NewClient(httpDoerFunc(func(*http.Request) (*http.Response, error) {

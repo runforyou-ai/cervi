@@ -55,7 +55,7 @@ function MarkdownCodeBlock({ children }: ComponentProps<"pre"> & ExtraProps) {
   </div>
 }
 
-// 元素样式由共享 CSS 管理，访客页面不需要加载管理端的 Tailwind 样式。
+// 管理端和访客页面共用 Markdown 元素样式。
 const components: Components = {
   ...Object.fromEntries(["p", "h1", "h2", "h3", "h4", "h5", "h6", "ul", "ol", "li", "blockquote", "hr", "strong", "em", "del", "thead", "tbody", "tr", "th", "td", "input"].map((tag) => [tag, ({ node, ...props }: { node?: unknown }) => createElement(tag, props)])),
   a: MarkdownLink,
@@ -70,7 +70,7 @@ export const MessageMarkdown = memo(function MessageMarkdown({ children, streami
   const id = useId()
   const context = useMemo(() => ({ copy: locale.startsWith("zh") ? chineseCopy : englishCopy, onOpenLink }), [locale, onOpenLink])
   const remarkRehypeOptions = useMemo(() => ({ clobberPrefix: `message-${id}-` }), [id])
-  // 链接只允许网页、邮件和消息内锚点，避免触发 WebView 应用指令。
+  // 链接协议限定为网页、邮件和消息内锚点。
   return <MarkdownContext.Provider value={context}>
     <Streamdown className="message-markdown" mode="streaming"
       isAnimating={streaming} parseIncompleteMarkdown={streaming} skipHtml

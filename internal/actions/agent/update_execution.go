@@ -43,7 +43,7 @@ func (a *UpdateExecutionAction) Execute(ctx context.Context, identity *servermod
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		// 保存与删除均先锁服务、再锁员工，避免反向取锁。
+		// 保存与删除均按服务、员工的顺序取锁。
 		mcpServerIDs, err := validateAndLockMCPServers(ctx, tx, identity.Organization.ID, input.MCPServerIDs)
 		if err != nil {
 			return err

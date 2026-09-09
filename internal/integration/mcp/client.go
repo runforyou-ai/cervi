@@ -78,7 +78,7 @@ type authenticatedTransport struct {
 	deadline time.Time
 }
 
-// RoundTrip 发送带认证的请求，不向错误信息复制远端响应正文。
+// RoundTrip 发送带认证的请求并归一化传输错误。
 func (t *authenticatedTransport) RoundTrip(request *http.Request) (*http.Response, error) {
 	// 将初始化、分页与关闭会话的 HTTP 请求限制在同一次探测期限内。
 	ctx, cancel := context.WithDeadline(request.Context(), t.deadline)

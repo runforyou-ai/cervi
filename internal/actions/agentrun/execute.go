@@ -91,8 +91,8 @@ func (a *ExecuteAction) Execute(ctx context.Context, input RunInput) error {
 	feed := &databaseInputFeed{db: a.db, execution: execution, policy: policy}
 	var customerHistorySearch agentruntime.CustomerHistorySearch
 	if domain.AgentTriggerType(execution.Run.TriggerType) == domain.AgentTriggerTypeCustomerAuto {
-		// TODO：全文检索方案确定后接入历史查询，范围限定为本企业、本 Conversation 内已关闭的 ServiceSession。
-		// 占位结果明确表示功能不可用，不能让模型据此断言没有历史记录。
+		// TODO：接入本企业、本 Conversation 内已关闭 ServiceSession 的全文历史查询。
+		// 向模型返回历史查询功能不可用的占位结果。
 		customerHistorySearch = func(context.Context, string) (agentruntime.CustomerHistoryResult, error) {
 			return agentruntime.CustomerHistoryResult{
 				Available: false,
@@ -265,7 +265,7 @@ func (a *ExecuteAction) complete(ctx context.Context, execution executionContext
 		return fmt.Errorf("encode agent run usage: %w", err)
 	}
 	messageID := uuid.NewV7().String()
-	// 成功内容与最终消息共享事务，失败或取消不写入内容块。
+	// 在最终消息事务中写入成功运行的内容块。
 	blocks := make([]servermodels.AgentRunBlock, 0, len(result.Blocks))
 	for _, block := range result.Blocks {
 		payload, err := json.Marshal(block.Payload)

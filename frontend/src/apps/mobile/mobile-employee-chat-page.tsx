@@ -17,13 +17,13 @@ import { LoadingIndicator } from "@/components/loading-indicator"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 
-/** 按成员隔离草稿生命周期，旧发送结果不改变新页面。 */
+/** 按成员隔离草稿生命周期和发送结果。 */
 export function MobileEmployeeChatPage() {
   const { userID = "" } = useParams()
   return <MobileEmployeeChat key={userID} userID={userID} />
 }
 
-/** 草稿建立后卸载入口查询，网络重连和缓存刷新不再替换输入区。 */
+/** 草稿建立后卸载入口查询并固定输入区。 */
 function MobileEmployeeChat({ userID }: { userID: string }) {
   const [draftUser, setDraftUser] = useState<UserData | null>(null)
   if (!draftUser) {
@@ -40,7 +40,7 @@ function MobileEmployeeChat({ userID }: { userID: string }) {
   )
 }
 
-/** 确认成员有效并只读查找已有单聊，首次发送前不创建会话。 */
+/** 确认成员有效并查找已有单聊。 */
 function MobileEmployeeChatLookup({
   userID,
   onDraft,

@@ -121,7 +121,7 @@ func (a *TransferServiceSessionAction) Execute(ctx context.Context, identity *se
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		// 转交目标身份先于会话锁定，避免与身份资料和路由变更反向等待。
+		// 按转交目标身份、会话的顺序取锁。
 		target, err := identityaction.LockActiveCustomerServiceIdentity(ctx, tx, identity.Organization.ID, input.AssigneeIdentityID)
 		if errors.Is(err, sql.ErrNoRows) {
 			return &ValidationError{Fields: map[string]ValidationCode{"assigneeIdentityId": ValidationTargetIdentityIDInvalid}}

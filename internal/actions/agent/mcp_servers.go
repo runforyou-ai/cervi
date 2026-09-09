@@ -36,7 +36,7 @@ func (q *ListMCPServerOptionsQuery) Execute(ctx context.Context, identity *serve
 	return options, err
 }
 
-// validateAndLockMCPServers 规范化并锁定企业服务，保证新版本不会引用已删除的服务。
+// validateAndLockMCPServers 规范化、校验并锁定企业服务。
 func validateAndLockMCPServers(ctx context.Context, tx bun.Tx, organizationID string, values []string) ([]string, error) {
 	ids, valid := common.NormalizeUUIDs(values)
 	if !valid {

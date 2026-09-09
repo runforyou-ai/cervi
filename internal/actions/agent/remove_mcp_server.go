@@ -28,7 +28,7 @@ func RemoveMCPServerFromRevisions(ctx context.Context, tx bun.Tx, identity *serv
 	if len(agentIDs) == 0 {
 		return 0, nil
 	}
-	// 锁定条件只使用员工编号，避免等待期间版本变化使候选员工被漏掉。
+	// 按员工编号锁定候选员工。
 	if err := tx.NewSelect().Model((*servermodels.Agent)(nil)).Column("id").
 		Where("a.organization_id = ?", identity.Organization.ID).Where("a.id IN (?)", bun.In(agentIDs)).
 		OrderExpr("a.id ASC").For("UPDATE").Scan(ctx, &agentIDs); err != nil {

@@ -5,7 +5,7 @@ import (
 	"testing"
 )
 
-// TestAppendPathPreservesEscapedSegments 验证外部资源编号不会越过路径段边界。
+// TestAppendPathPreservesEscapedSegments 验证外部资源编号按单个路径段编码。
 func TestAppendPathPreservesEscapedSegments(t *testing.T) {
 	requestURL, err := AppendPath(
 		"https://example.com/custom/v1",

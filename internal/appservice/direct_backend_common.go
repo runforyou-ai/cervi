@@ -33,7 +33,7 @@ func organizationFromModel(organization servermodels.Organization) Organization 
 
 // currentUserFromIdentity 把存储身份转换为当前用户契约并补齐头像地址。
 func (b *DirectBackend) currentUserFromIdentity(ctx context.Context, identity *servermodels.Identity) (CurrentUser, error) {
-	// 执行不访问存储的当前用户契约转换。
+	// 将当前用户信息转换为应用服务契约。
 	storedUser := identity.User
 	organizationIdentity := identity.OrganizationIdentity
 	user := CurrentUser{

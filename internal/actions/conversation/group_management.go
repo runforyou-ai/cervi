@@ -200,7 +200,7 @@ func (a *AddGroupConversationMembersAction) Execute(ctx context.Context, identit
 		if err != nil {
 			return err
 		}
-		// 新成员从本轮加入事件开始记录已读，离开期间的历史不形成未读。
+		// 新成员以本轮加入事件为已读基线。
 		if _, err := tx.ExecContext(ctx, `
 				INSERT INTO conversation_user_states (organization_id, conversation_id, user_id, last_read_message_id, last_read_at, last_reviewed_mention_message_id, read_seq)
 				SELECT u.organization_id, cv.id, u.id, ?::uuid, now(), ?::uuid, ?
@@ -212,7 +212,7 @@ func (a *AddGroupConversationMembersAction) Execute(ctx context.Context, identit
 			`, eventMessage.ID, eventMessage.ID, eventMessage.MessageSeq, conversationID, identity.Organization.ID, bun.In(memberIDs)); err != nil {
 			return fmt.Errorf("initialize added group member read states: %w", err)
 		}
-		// 本轮入群基线已覆盖此前查看记录。
+		// 按本轮入群基线清理已覆盖的查看记录。
 		if _, err := tx.NewDelete().Model((*servermodels.ConversationMentionReview)(nil)).
 			Where("organization_id = ? AND conversation_id = ?", identity.Organization.ID, conversationID).
 			Where("user_id IN (SELECT id FROM users WHERE organization_id = ? AND identity_id IN (?))", identity.Organization.ID, bun.In(memberIDs)).Exec(ctx); err != nil {
@@ -348,7 +348,7 @@ func (a *DissolveGroupConversationAction) Execute(ctx context.Context, identity 
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		// 已解散群仍需校验群主身份，重复请求不再写入系统消息。
+		// 已解散群校验群主身份后返回幂等结果。
 		group, err := chatstate.LockGroup(ctx, tx, identity, conversationID, chatstate.GroupReadable)
 		if err != nil {
 			return err

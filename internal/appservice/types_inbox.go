@@ -135,7 +135,7 @@ type GroupInboxConversation struct {
 
 // InboxConversation 定义成员统一收件箱列表项。
 type InboxConversation struct {
-	// PositionCursor 仅在列表窗口和匹配的锚点中返回，独立摘要不携带查询位置。
+	// PositionCursor 保存列表窗口和匹配锚点的查询位置。
 	PositionCursor       string                     `json:"positionCursor"`
 	LastActivityAt       *time.Time                 `json:"lastActivityAt"`
 	LastMessageType      *MessageType               `json:"lastMessageType"`
@@ -180,7 +180,7 @@ type ReadInboxConversationsInput struct {
 	Query           InboxQuery `json:"query"`
 }
 
-// InboxConversationResult 不可用时仅保留请求 ID 和资格，不返回实体信息。
+// InboxConversationResult 返回匹配状态，不可用时保留请求 ID 和资格。
 type InboxConversationResult struct {
 	ID           string                        `json:"id"`
 	Availability InboxConversationAvailability `json:"availability"`

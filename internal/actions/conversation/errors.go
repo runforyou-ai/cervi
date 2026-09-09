@@ -14,7 +14,7 @@ var (
 	ErrAgentTargetNotFound = errors.New("AI conversation target not found")
 	// ErrMessageUnavailable 表示目标消息不存在或已经删除。
 	ErrMessageUnavailable = errors.New("conversation message unavailable")
-	// ErrMentionTargetInvalid 表示目标不是当前用户的提及。
+	// ErrMentionTargetInvalid 表示当前用户的提及目标校验失败。
 	ErrMentionTargetInvalid = errors.New("conversation mention target invalid")
 	// ErrChannelNotFound 表示网站渠道不存在或不可用。
 	ErrChannelNotFound = errors.New("website channel not found")
@@ -26,7 +26,7 @@ var (
 	ErrGroupMemberNotFound = errors.New("group conversation member not found")
 	// ErrGroupImageFileNotFound 表示群聊图片文件不可关联。
 	ErrGroupImageFileNotFound = errors.New("group conversation image file not found")
-	// ErrGroupOwnerRequired 表示当前成员不是群主。
+	// ErrGroupOwnerRequired 表示群主身份校验失败。
 	ErrGroupOwnerRequired = chatstate.ErrGroupOwnerRequired
 	// ErrDataInvariant 表示聊天持久关系不完整或互相矛盾。
 	ErrDataInvariant = chatstate.ErrDataInvariant

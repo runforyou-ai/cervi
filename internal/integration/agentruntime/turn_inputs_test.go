@@ -37,7 +37,7 @@ func (f *gatedInputFeed) Peek(ctx context.Context, _ int64) ([]Trigger, error) {
 	return nil, nil
 }
 
-// TestTurnInputsOrdersPollingAndFinish 验证已投递输入阻止收尾，收尾后返回的查询不再推进投递序号。
+// TestTurnInputsOrdersPollingAndFinish 验证输入投递与收尾顺序，以及收尾后的投递序号稳定性。
 func TestTurnInputsOrdersPollingAndFinish(t *testing.T) {
 	for _, late := range []bool{false, true} {
 		name := "input-before-finish"

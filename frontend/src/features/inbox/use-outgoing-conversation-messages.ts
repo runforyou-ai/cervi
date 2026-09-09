@@ -27,7 +27,7 @@ export type OutgoingConversationMessage = OutgoingConversationDraft & {
   saved: ConversationMessageData | null
 }
 
-/** 保存当前页面的即时发送状态，不执行重试。 */
+/** 保存当前页面的单次发送状态。 */
 export function useOutgoingConversationMessages() {
   const [messages, setMessages] = useState<OutgoingConversationMessage[]>([])
   const delayTimersRef = useRef(new Map<string, number>())

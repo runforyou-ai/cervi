@@ -17,7 +17,7 @@ type response struct {
 	Status string `json:"status"`
 }
 
-// Liveness 提供不依赖外部资源的进程存活探针。
+// Liveness 提供进程存活探针。
 type Liveness struct{}
 
 // NewLiveness 创建进程存活探针。
