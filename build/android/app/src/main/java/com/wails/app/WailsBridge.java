@@ -88,13 +88,15 @@ public class WailsBridge {
     private SharedPreferences cachedSecurePrefs;
     private boolean securePrefsResolved = false;
 
-    // 保存传感器监听器、语音引擎和键盘监听器，按需注册与释放。
+    // Phase D state: sensor listeners, speech engine and keyboard watcher are
+    // retained so they can be registered and torn down on demand.
     private SensorEventListener accelListener;
     private SensorEventListener proximityListener;
     private long lastMotionEmit = 0;
     private TextToSpeech tts;
     private View.OnApplyWindowInsetsListener keyboardListener;
-    // 保存传感器启用意图，应用恢复前台时按记录重新启用。
+    // Battery: remember the user's intent so sensors paused while the app is
+    // backgrounded can be restored on foreground; the torch is switched off.
     private boolean motionWanted = false;
     private boolean proximityWanted = false;
     private boolean torchOn = false;
@@ -418,7 +420,7 @@ public class WailsBridge {
         }
     }
 
-    // MARK: - 系统分享与设备开关
+    // MARK: - Mobile features (Phase A)
 
     /**
      * Present the Android share chooser. json: {"text": "...", "url": "..."}.
@@ -509,7 +511,7 @@ public class WailsBridge {
         });
     }
 
-    // MARK: - 窗口与应用信息
+    // MARK: - Mobile features (Phase B)
 
     /**
      * System-bar insets as JSON {"top","bottom","left","right"} in px.
@@ -651,7 +653,7 @@ public class WailsBridge {
         });
     }
 
-    // MARK: - 身份认证、通知与安全存储
+    // MARK: - Mobile features (Phase C)
 
     private void emitBiometric(boolean ok, String error) {
         try {
@@ -815,7 +817,7 @@ public class WailsBridge {
                 return "{\"ok\":true,\"found\":false}";
             }
             String value = prefs.getString(key, "");
-            // 将回调值编码为 JSON 字符串。
+            // JSON-encode value to prevent injection.
             JSONObject result = new JSONObject();
             result.put("ok", true);
             result.put("found", true);
@@ -846,7 +848,7 @@ public class WailsBridge {
         }
     }
 
-    // MARK: - 传感器与硬件
+    // MARK: - Mobile features (Phase D: sensors & hardware)
 
     /**
      * Play a haptic pattern via the Vibrator. type: impact-light|impact-medium|
@@ -1033,7 +1035,10 @@ public class WailsBridge {
     }
 
     /**
-     * onStop 时暂停加速度和距离传感器、关闭手电筒，并保留传感器启用意图。
+     * Called when the activity leaves the foreground (onStop): stop the
+     * accelerometer and proximity sensor and switch the torch off so none of
+     * them drain the battery while the app isn't visible. The "wanted" flags are
+     * kept so foregrounding can restore the sensors.
      */
     private void pauseFeaturesForBackground() {
         mainHandler.post(() -> {
@@ -1202,7 +1207,7 @@ public class WailsBridge {
         });
     }
 
-    // MARK: - 相机与后台服务
+    // MARK: - Mobile features (Phase E: camera & background)
 
     /** Capture a photo with the system camera. Result → "common:capture" event. */
     public void capturePhoto(final String json) {

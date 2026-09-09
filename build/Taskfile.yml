@@ -4,7 +4,7 @@ tasks:
   go:mod:tidy:
     summary: Runs `go mod tidy`
     internal: true
-    # 多架构构建共用一次 go.mod 整理任务。
+    # 多架构构建会并发依赖此任务；只运行一次可避免同时写入 go.mod。
     run: once
     cmds:
       - go mod tidy
@@ -71,7 +71,7 @@ tasks:
   build:frontend:
     label: build:frontend (DEV={{.DEV}} RUNNER={{.PACKAGE_MANAGER}})
     summary: Build the frontend project
-    # 多架构构建共用一次绑定生成任务。
+    # 多架构构建共享绑定目录；只运行一次可避免生成器与打包器并发读写。
     run: once
     dir: frontend
     sources:
@@ -155,7 +155,7 @@ tasks:
     summary: Generates application icons for Windows and macOS
     run: once
     dir: build
-    # 每次构建生成 Assets.car 等图标资源。
+    # 每次构建重新生成，确保未纳入版本管理的 Assets.car 不会因缓存而缺失。
     cmds:
       - wails3 generate icons -input appicon.png -macfilename darwin/icons.icns -windowsfilename windows/icon.ico -iconcomposerinput appicon.icon -macassetdir darwin
 
@@ -250,7 +250,10 @@ tasks:
       For CGO apps, set CGO_ENABLED=1 with libc-compatible builder/runtime images, e.g.:
         task build:docker CGO_ENABLED=1 GO_IMAGE=golang:1.27-bookworm RUNTIME_IMAGE=gcr.io/distroless/base-debian12
     deps:
-      # 生成镜像内嵌的生产前端资源，绑定与镜像共用 server,production 构建标签。
+      # Build the production frontend so frontend/dist (embedded by the Go build
+      # inside the image) is present and current in the Docker build context.
+      # Pass the server,production tags so binding generation analyses the same
+      # build the Docker image compiles, not the default-tag build.
       - task: build:frontend
         vars:
           BUILD_FLAGS: "-tags server,production"

@@ -1,7 +1,11 @@
 Unicode true
 
 ####
-## 安装参数使用此文件中的定义，缺省值由 wails_tools.nsh 提供。
+## Please note: Template replacements don't work in this file. They are provided with default defines like
+## mentioned underneath.
+## If the keyword is not defined, "wails_tools.nsh" will populate them.
+## If they are defined here, "wails_tools.nsh" will not touch them. This allows you to use this project.nsi manually
+## from outside of Wails for debugging and development of the installer.
 ## 
 ## For development first make a wails nsis build to populate the "wails_tools.nsh":
 ## > wails build --target windows/amd64 --nsis

@@ -53,7 +53,7 @@ public class WailsJSBridge {
     public void invokeAsync(final String callbackId, final String payload) {
         if (DEBUG) Log.d(TAG, "InvokeAsync called: " + payload);
 
-        // 在后台线程处理桥接调用。
+        // Handle off the JS thread so we don't block the WebView.
         executor.execute(() -> {
             try {
                 String response = bridge.handleRuntimeCall(payload);
@@ -143,7 +143,8 @@ public class WailsJSBridge {
                 .replace("'", "\\'")
                 .replace("\n", "\\n")
                 .replace("\r", "\\r")
-                // 按字符值构造并转义 JavaScript 行终止符 U+2028 和 U+2029。
+                // JS line terminators (U+2028/U+2029) must be escaped too; built via
+                // (char) casts so the Java lexer does not reinterpret them as newlines.
                 .replace(String.valueOf((char) 0x2028), "\\u2028")
                 .replace(String.valueOf((char) 0x2029), "\\u2029");
     }
