@@ -249,7 +249,8 @@ func testAgentConversationAccess(t *testing.T, db *bun.DB, identity *servermodel
 	if err := unreadMark.Execute(ctx, identity, first.Conversation.ID, true); err != nil {
 		t.Fatal(err)
 	}
-	rows, _, err := inboxaction.NewLoadInboxQuery(db).Execute(ctx, identity, inboxaction.LoadInput{Scope: domain.InboxScopeInternal})
+	rowsPage, _, err := inboxaction.NewLoadInboxQuery(db).Execute(ctx, identity, inboxaction.LoadInput{Scope: domain.InboxScopeInternal})
+	rows := rowsPage.Conversations
 	if err != nil {
 		t.Fatal(err)
 	}

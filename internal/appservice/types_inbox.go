@@ -44,11 +44,20 @@ const (
 	CustomerInboxViewClosed    CustomerInboxView = CustomerInboxView(domain.CustomerInboxViewClosed)
 )
 
-// LoadInboxInput 定义统一收件箱查询条件。
+// InboxQuery 定义与分页边界无关的会话筛选。
+type InboxQuery struct {
+	Scope              InboxScope        `json:"scope" query:"scope"`
+	CustomerView       CustomerInboxView `json:"customerView" query:"customerView"`
+	AssigneeIdentityID string            `json:"assigneeIdentityId" query:"assigneeIdentityId"`
+}
+
+// LoadInboxInput 定义统一收件箱筛选和分页边界。
 type LoadInboxInput struct {
 	Scope              InboxScope        `json:"scope" query:"scope"`
 	CustomerView       CustomerInboxView `json:"customerView" query:"customerView"`
 	AssigneeIdentityID string            `json:"assigneeIdentityId" query:"assigneeIdentityId"`
+	Cursor             string            `json:"cursor" query:"cursor"`
+	Limit              int               `json:"limit" query:"limit,default=50"`
 }
 
 // InboxAssignee 定义客户会话负责人摘要。
@@ -144,6 +153,8 @@ type InboxConversation struct {
 // Inbox 定义成员收件箱查询结果。
 type Inbox struct {
 	Conversations        []InboxConversation `json:"conversations"`
+	NextCursor           string              `json:"nextCursor"`
+	HasMore              bool                `json:"hasMore"`
 	UnreadCount          int                 `json:"unreadCount"`
 	AttentionUnreadCount int                 `json:"attentionUnreadCount"`
 }
@@ -159,8 +170,8 @@ const (
 
 // ReadInboxConversationsInput 指定待核对的会话及完整列表筛选。
 type ReadInboxConversationsInput struct {
-	ConversationIDs []string       `json:"conversationIds"`
-	Query           LoadInboxInput `json:"query"`
+	ConversationIDs []string   `json:"conversationIds"`
+	Query           InboxQuery `json:"query"`
 }
 
 // InboxConversationResult 不可用时仅保留请求 ID 和资格，不返回实体信息。

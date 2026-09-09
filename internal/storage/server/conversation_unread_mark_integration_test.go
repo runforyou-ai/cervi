@@ -64,7 +64,8 @@ func TestConversationUnreadMark(t *testing.T) {
 	if !state.MarkedUnread || *state.LastReadMessageID != *before.LastReadMessageID || !state.LastReadAt.Equal(*before.LastReadAt) || *state.LastReviewedMentionMessageID != *before.LastReviewedMentionMessageID {
 		t.Fatalf("mark changed read facts: %#v", state)
 	}
-	rows, counts, err := inbox.Execute(ctx, f.member, inboxaction.LoadInput{Scope: domain.InboxScopeInternal})
+	rowsPage, counts, err := inbox.Execute(ctx, f.member, inboxaction.LoadInput{Scope: domain.InboxScopeInternal})
+	rows := rowsPage.Conversations
 	if err != nil || len(rows) != 1 || !rows[0].MarkedUnread || counts.Unread != 0 || counts.Attention != 1 {
 		t.Fatalf("marked inbox = %#v %#v %v", rows, counts, err)
 	}
@@ -172,7 +173,8 @@ func TestInboxUnreadUsesCanonicalDirect(t *testing.T) {
 	if _, err = f.db.NewDelete().Table("conversation_user_states").Where("organization_id = ? AND conversation_id = ?", f.owner.Organization.ID, sent.Conversation.ID).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
-	rows, counts, err := inbox.Execute(ctx, f.member, inboxaction.LoadInput{})
+	rowsPage, counts, err := inbox.Execute(ctx, f.member, inboxaction.LoadInput{})
+	rows := rowsPage.Conversations
 	if err != nil || len(rows) != 1 || rows[0].ID != f.groupID || counts.Unread != 0 || counts.Attention != 0 {
 		t.Fatalf("hidden direct leaked unread: %#v %#v %v", rows, counts, err)
 	}
@@ -204,11 +206,13 @@ func TestEmptyConversationUnreadMarksIgnoreListLimit(t *testing.T) {
 		}
 	}
 	inbox := inboxaction.NewLoadInboxQuery(f.db)
-	rows, counts, err := inbox.Execute(ctx, f.member, inboxaction.LoadInput{Scope: domain.InboxScopeInternal})
+	rowsPage, counts, err := inbox.Execute(ctx, f.member, inboxaction.LoadInput{Scope: domain.InboxScopeInternal})
+	rows := rowsPage.Conversations
 	if err != nil || len(rows) != 50 || counts.Unread != 0 || counts.Attention != 51 {
 		t.Fatalf("limited list changed total: %d %#v %v", len(rows), counts, err)
 	}
-	rows, counts, err = inbox.Execute(ctx, f.member, inboxaction.LoadInput{Scope: domain.InboxScopeCustomer})
+	rowsPage, counts, err = inbox.Execute(ctx, f.member, inboxaction.LoadInput{Scope: domain.InboxScopeCustomer})
+	rows = rowsPage.Conversations
 	if err != nil || len(rows) != 0 || counts.Attention != 51 {
 		t.Fatalf("customer scope changed total: %d %#v %v", len(rows), counts, err)
 	}

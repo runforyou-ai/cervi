@@ -62,7 +62,8 @@ func newCustomerReadFixture(t *testing.T) customerReadFixture {
 // inboxRow 读取指定客服视图并核对内部提醒总数没有被客户消息改变。
 func (f customerReadFixture) inboxRow(t *testing.T, identity *servermodels.Identity, view domain.CustomerInboxView) inboxaction.ConversationSummary {
 	t.Helper()
-	rows, counts, err := inboxaction.NewLoadInboxQuery(f.db).Execute(context.Background(), identity, inboxaction.LoadInput{Scope: domain.InboxScopeCustomer, CustomerView: view})
+	rowsPage, counts, err := inboxaction.NewLoadInboxQuery(f.db).Execute(context.Background(), identity, inboxaction.LoadInput{Scope: domain.InboxScopeCustomer, CustomerView: view})
+	rows := rowsPage.Conversations
 	if err != nil {
 		t.Fatal(err)
 	}

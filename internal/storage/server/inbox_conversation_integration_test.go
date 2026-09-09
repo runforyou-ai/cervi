@@ -39,7 +39,7 @@ func TestInboxIndependentConversation(t *testing.T) {
 	backend := appservice.NewDirectBackend(f.db, nil, NewTenantResolver(f.db), nil, nil, nil)
 	meta := appservice.RequestMeta{Token: login.Token}
 	inbox, err := backend.LoadInbox(ctx, meta, appservice.LoadInboxInput{Scope: appservice.InboxScopeInternal})
-	if err != nil || len(inbox.Conversations) != 50 {
+	if err != nil || len(inbox.Conversations) != 50 || !inbox.HasMore || inbox.NextCursor == "" {
 		t.Fatalf("inbox=%+v err=%v", inbox, err)
 	}
 	for _, item := range inbox.Conversations {
@@ -47,13 +47,18 @@ func TestInboxIndependentConversation(t *testing.T) {
 			t.Fatal("oldest group unexpectedly in first page")
 		}
 	}
+	second, err := backend.LoadInbox(ctx, meta, appservice.LoadInboxInput{Scope: appservice.InboxScopeInternal, Cursor: inbox.NextCursor})
+	if err != nil || len(second.Conversations) != 30 || second.HasMore || second.NextCursor != "" || second.Conversations[29].ID != f.groupID {
+		t.Fatalf("second page=%+v err=%v", second, err)
+	}
+
 	summary, err := backend.GetInboxConversation(ctx, meta, f.groupID)
 	if err != nil || summary.ID != f.groupID || summary.Group == nil {
 		t.Fatalf("deep link=%+v err=%v", summary, err)
 	}
 	missing := uuid.NewV7().String()
 	foreign := newNavigationFixture(t)
-	request := appservice.ReadInboxConversationsInput{ConversationIDs: []string{f.groupID, missing, foreign.groupID, f.groupID}, Query: appservice.LoadInboxInput{Scope: appservice.InboxScopeCustomer}}
+	request := appservice.ReadInboxConversationsInput{ConversationIDs: []string{f.groupID, missing, foreign.groupID, f.groupID}, Query: appservice.InboxQuery{Scope: appservice.InboxScopeCustomer}}
 	batch, err := backend.ReadInboxConversations(ctx, meta, request)
 	if err != nil || len(batch.Results) != 4 {
 		t.Fatalf("batch=%+v err=%v", batch, err)

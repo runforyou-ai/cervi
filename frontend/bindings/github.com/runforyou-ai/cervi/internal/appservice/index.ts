@@ -167,6 +167,7 @@ export type {
     InboxConversation,
     InboxConversationResult,
     InboxConversationResults,
+    InboxQuery,
     InstallWorkspaceInput,
     InstallationStatus,
     KnowledgeBase,

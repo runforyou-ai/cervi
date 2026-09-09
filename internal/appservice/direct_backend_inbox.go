@@ -19,10 +19,13 @@ func (b *DirectBackend) LoadInbox(ctx context.Context, meta RequestMeta, input L
 	if err != nil {
 		return Inbox{}, err
 	}
-	summaries, unreadCounts, err := b.loadInbox.Execute(ctx, identity, inboxaction.LoadInput{Scope: domain.InboxScope(input.Scope), CustomerView: domain.CustomerInboxView(input.CustomerView), AssigneeIdentityID: input.AssigneeIdentityID})
+	page, unreadCounts, err := b.loadInbox.Execute(ctx, identity, inboxaction.LoadInput{Scope: domain.InboxScope(input.Scope), CustomerView: domain.CustomerInboxView(input.CustomerView), AssigneeIdentityID: input.AssigneeIdentityID, Cursor: input.Cursor, Limit: input.Limit})
 	if err != nil {
 		if ctx.Err() != nil {
 			return Inbox{}, ctx.Err()
+		}
+		if errors.Is(err, inboxaction.ErrCursorInvalid) {
+			return Inbox{}, InvalidError(meta, cervii18n.ErrorInboxCursorInvalid, nil).WithReason("inbox_cursor_invalid")
 		}
 		if errors.Is(err, inboxaction.ErrQueryInvalid) {
 			return Inbox{}, InvalidError(meta, cervii18n.ErrorValidationFailed, nil)
@@ -30,11 +33,11 @@ func (b *DirectBackend) LoadInbox(ctx context.Context, meta RequestMeta, input L
 		slog.Warn("读取收件箱会话列表失败", "organization_id", identity.Organization.ID, "error", err)
 		return Inbox{}, FailedError(meta, cervii18n.ErrorInboxLoadFailed)
 	}
-	conversations, err := b.inboxConversationsFromActions(ctx, meta, identity, summaries)
+	conversations, err := b.inboxConversationsFromActions(ctx, meta, identity, page.Conversations)
 	if err != nil {
 		return Inbox{}, err
 	}
-	return Inbox{Conversations: conversations, UnreadCount: unreadCounts.Unread, AttentionUnreadCount: unreadCounts.Attention}, nil
+	return Inbox{Conversations: conversations, NextCursor: page.NextCursor, HasMore: page.HasMore, UnreadCount: unreadCounts.Unread, AttentionUnreadCount: unreadCounts.Attention}, nil
 }
 
 // inboxConversationsFromActions 为会话摘要统一解析头像并转换传输契约。

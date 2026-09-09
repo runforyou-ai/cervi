@@ -73,6 +73,7 @@ import type {
   ReadInboxConversationsInput,
   InboxConversation,
   LoadInboxInput,
+  InboxQuery,
   MarkConversationReadInput,
   TransferServiceSessionInput,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
@@ -182,7 +183,7 @@ const transferServiceSessionBound = bind(TransferServiceSession)
 const closeServiceSessionBound = bind(CloseServiceSession)
 const reopenServiceSessionBound = bind(ReopenServiceSession)
 
-export type LoadInboxQuery = Partial<LoadInboxInput>
+export type LoadInboxQuery = Partial<InboxQuery>
 
 const updateConversationUnreadMarkBound = bind(UpdateConversationUnreadMark)
 
@@ -264,13 +265,15 @@ export function isGroupInboxConversation(
 
 /** 读取成员统一收件箱会话列表。 */
 export async function loadInbox(
-  query: LoadInboxQuery = {},
+  query: Partial<LoadInboxInput> = {},
 ): Promise<InboxData> {
   const inbox = await loadInboxBound({
     scope: query.scope ?? InboxScope.InboxScopeAll,
     customerView:
       query.customerView ?? CustomerInboxView.CustomerInboxViewQueue,
     assigneeIdentityId: query.assigneeIdentityId ?? "",
+    cursor: query.cursor ?? "",
+    limit: query.limit ?? 50,
   })
   return {
     ...inbox,
