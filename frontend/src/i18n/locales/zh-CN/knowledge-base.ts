@@ -1,6 +1,7 @@
 /** 简体中文·知识库文案。 */
 const knowledgeBase = {
   documents: {
+    retryFailed: "提交文档重试失败，请重试。",
     title: "文档",
     more: "{{name}}的更多操作",
     search: "搜索文档名称",
@@ -14,7 +15,12 @@ const knowledgeBase = {
     deleteDescription: "确定删除“{{name}}”？此操作无法撤销。",
     operationFailed: "操作失败，请重试",
     status: {
-      initial: "初始",
+      initial: "未处理",
+      queued: "排队中",
+      running: "处理中",
+      succeeded: "已完成",
+      failed: "处理失败",
+      cancelled: "已取消",
     },
     columns: {
       name: "名称",
@@ -40,6 +46,17 @@ const knowledgeBase = {
     },
   },
   documentDetail: {
+    segments: {
+      position: "第 {{position}} 段",
+      matched: "命中分段",
+      characters: "{{count}} 字符",
+      page: "第 {{number}} 页",
+      total: "共 {{count}} 段",
+      error: "读取分段失败，请重试。",
+      retryPrevious: "重试加载上一页",
+      retryNext: "重试加载下一页",
+      empty: "暂无分段",
+    },
     viewSegments: "查看分段",
     preview: "文档预览",
     previewLoading: "正在下载并准备文档预览…",
@@ -104,8 +121,8 @@ const knowledgeBase = {
   form: {
     embeddingModel: "向量模型",
     embeddingDimension: "向量维度",
-    chunkLength: "分段长度",
-    chunkOverlap: "分段重叠",
+    chunkLength: "分段长度（字符）",
+    chunkOverlap: "分段重叠（字符）",
     retrievalCount: "召回数量",
     rerankModel: "重排模型",
     selectEmbeddingModel: "请选择向量模型",

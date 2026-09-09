@@ -118,6 +118,8 @@ export const resourceKeys = {
   knowledgeDocuments: (baseId?: string, parameters?: KeyParameters) => scopedListKey("knowledge-documents", baseId, parameters),
   /** 单个文档详情。 */
   knowledgeDocument: (baseId: string, documentId: string) => ["knowledge-document", baseId, documentId],
+  /** 指定文档批次和首次阅读锚点的分段列表。 */
+  knowledgeDocumentSegments: (baseId: string, documentId: string, batchId: string, anchorSegmentId = "") => ["knowledge-document-segments", baseId, documentId, batchId, anchorSegmentId],
   /** 文档原件的客户端预览。 */
   knowledgeDocumentFile: (baseId: string, documentId: string) => ["knowledge-document-file", baseId, documentId],
   /** 角色列表。 */

@@ -1,5 +1,7 @@
 /** 企业知识库调用与归一化。 */
 import {
+  RetryKnowledgeDocument,
+  ListKnowledgeDocumentSegments,
   ListKnowledgeDocuments,
   GetKnowledgeDocument,
   CreateKnowledgeDocuments,
@@ -21,6 +23,8 @@ import {
   UpdateKnowledgeGroup,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import {
+  type KnowledgeDocumentSegmentInput,
+  type KnowledgeDocumentSegmentPage,
   KnowledgeDocumentStatus,
   type KnowledgeDocumentList,
   type KnowledgeDocumentListInput,
@@ -295,4 +299,18 @@ export async function readKnowledgeDocumentPreview(
   const response = await fetch(request.url, { headers, signal, cache: "no-store" })
   if (!response.ok) throw new Error(`Document preview failed: ${response.status}`)
   return new Uint8Array(await response.arrayBuffer())
+}
+
+/** 按当前配置重新处理文档。 */
+export const retryKnowledgeDocument = bind(RetryKnowledgeDocument)
+
+export type KnowledgeDocumentSegmentPageData = Omit<KnowledgeDocumentSegmentPage, "segments"> & {
+  segments: NonNullable<KnowledgeDocumentSegmentPage["segments"]>
+}
+const listKnowledgeDocumentSegmentsBound = bind(ListKnowledgeDocumentSegments)
+
+/** 读取固定批次的一页分段或锚点所在页。 */
+export async function listKnowledgeDocumentSegments(baseId: string, documentId: string, input: KnowledgeDocumentSegmentInput, signal?: AbortSignal): Promise<KnowledgeDocumentSegmentPageData> {
+  const result = await listKnowledgeDocumentSegmentsBound(baseId, documentId, input, signal)
+  return { ...result, segments: asList(result.segments) }
 }

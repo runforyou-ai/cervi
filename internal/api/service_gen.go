@@ -107,6 +107,8 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.GET("/teams/:teamID/member-candidates", s.listTeamMemberCandidates)
 	router.POST("/teams/:teamID/members", s.addTeamMembers)
 	router.POST("/teams/:teamID/members/remove", s.removeTeamMembers)
+	router.POST("/knowledge-bases/:knowledgeBaseID/documents/:documentID/retry", s.retryKnowledgeDocument)
+	router.GET("/knowledge-bases/:knowledgeBaseID/documents/:documentID/segments", s.listKnowledgeDocumentSegments)
 	router.GET("/knowledge-bases/:knowledgeBaseID/documents", s.listKnowledgeDocuments)
 	router.GET("/knowledge-bases/:knowledgeBaseID/documents/:documentID", s.getKnowledgeDocument)
 	router.POST("/knowledge-bases/:knowledgeBaseID/documents", s.createKnowledgeDocuments)
@@ -943,6 +945,21 @@ func (s *Service) removeTeamMembers(c *gin.Context) {
 	writeResult(c, http.StatusOK, output, err)
 }
 
+// retryKnowledgeDocument 按当前配置重新处理文档。
+func (s *Service) retryKnowledgeDocument(c *gin.Context) {
+	writeEmpty(c, s.application.RetryKnowledgeDocument(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), c.Param("documentID")))
+}
+
+// listKnowledgeDocumentSegments 返回固定批次的分段页或锚点所在页。
+func (s *Service) listKnowledgeDocumentSegments(c *gin.Context) {
+	input, ok := bindKnowledgeDocumentSegmentInputQuery(c)
+	if !ok {
+		return
+	}
+	output, err := s.application.ListKnowledgeDocumentSegments(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), c.Param("documentID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
 // listKnowledgeDocuments 返回当前分组的文档列表。
 func (s *Service) listKnowledgeDocuments(c *gin.Context) {
 	input, ok := bindKnowledgeDocumentListInputQuery(c)
@@ -1409,6 +1426,24 @@ func bindKnowledgeDocumentListInputQuery(c *gin.Context) (appservice.KnowledgeDo
 		Keyword:  c.Query("keyword"),
 		Page:     page,
 		PageSize: pageSize,
+	}, true
+}
+
+// bindKnowledgeDocumentSegmentInputQuery 从查询参数解析 appservice.KnowledgeDocumentSegmentInput。
+func bindKnowledgeDocumentSegmentInputQuery(c *gin.Context) (appservice.KnowledgeDocumentSegmentInput, bool) {
+	page, ok := positiveQueryInteger(c, "page", 0)
+	if !ok {
+		return appservice.KnowledgeDocumentSegmentInput{}, false
+	}
+	pageSize, ok := positiveQueryInteger(c, "pageSize", 20)
+	if !ok {
+		return appservice.KnowledgeDocumentSegmentInput{}, false
+	}
+	return appservice.KnowledgeDocumentSegmentInput{
+		SegmentBatchID:  c.Query("segmentBatchId"),
+		AnchorSegmentID: c.Query("anchorSegmentId"),
+		Page:            page,
+		PageSize:        pageSize,
 	}, true
 }
 

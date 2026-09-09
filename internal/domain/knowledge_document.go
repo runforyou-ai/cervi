@@ -5,10 +5,34 @@ import (
 	"strings"
 )
 
-// KnowledgeDocumentStatus 表示知识文档的处理状态。
+// KnowledgeDocumentStatus 表示文档处理流程的执行状态。
 type KnowledgeDocumentStatus string
 
-const KnowledgeDocumentInitial KnowledgeDocumentStatus = "initial"
+const (
+	KnowledgeDocumentInitial     KnowledgeDocumentStatus = "initial"
+	KnowledgeDocumentQueued      KnowledgeDocumentStatus = "queued"
+	KnowledgeDocumentFetching    KnowledgeDocumentStatus = "fetching"
+	KnowledgeDocumentConverting  KnowledgeDocumentStatus = "converting"
+	KnowledgeDocumentExtracting  KnowledgeDocumentStatus = "extracting"
+	KnowledgeDocumentRecognizing KnowledgeDocumentStatus = "recognizing"
+	KnowledgeDocumentSplitting   KnowledgeDocumentStatus = "splitting"
+	KnowledgeDocumentEmbedding   KnowledgeDocumentStatus = "embedding"
+	KnowledgeDocumentIndexing    KnowledgeDocumentStatus = "indexing"
+	KnowledgeDocumentPublishing  KnowledgeDocumentStatus = "publishing"
+	KnowledgeDocumentSucceeded   KnowledgeDocumentStatus = "succeeded"
+	KnowledgeDocumentFailed      KnowledgeDocumentStatus = "failed"
+	KnowledgeDocumentCancelled   KnowledgeDocumentStatus = "cancelled"
+)
+
+// IsProcessing 判断文档是否处于待处理或执行中的状态。
+func (status KnowledgeDocumentStatus) IsProcessing() bool {
+	switch status {
+	case KnowledgeDocumentQueued, KnowledgeDocumentFetching, KnowledgeDocumentConverting, KnowledgeDocumentExtracting, KnowledgeDocumentRecognizing, KnowledgeDocumentSplitting, KnowledgeDocumentEmbedding, KnowledgeDocumentIndexing, KnowledgeDocumentPublishing:
+		return true
+	default:
+		return false
+	}
+}
 
 // KnowledgeDocumentFormat 表示 Haystack 内置转换器支持的文件扩展名。
 type KnowledgeDocumentFormat string

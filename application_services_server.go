@@ -4,6 +4,8 @@ package main
 
 import (
 	"context"
+	knowledgeaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
+	"github.com/runforyou-ai/cervi/internal/integration/knowledgeprocessing"
 
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
@@ -45,6 +47,13 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	// 创建各业务共用的可靠任务运行时，由服务生命周期统一启停。
 	tasks := servertask.New(appStorage.DB(), config.NATS)
 
+	// 注册文档处理任务及最终失败时的状态处理。
+	knowledgeClient := knowledgeprocessing.NewClient(config.HaystackURL)
+	processDocument := knowledgeaction.NewProcessDocumentAction(appStorage.DB(), knowledgeClient, serverfilecontent.NewReader(localFiles, resolveFileS3))
+	if err := tasks.Registry().RegisterJSONWithTerminalFailure(knowledgeaction.ProcessDocumentActionName, processDocument.Execute, processDocument.FinalizeFailure); err != nil {
+		return nil, err
+	}
+
 	// 注册 MCP 工具目录更新任务及最终失败时的状态处理。
 	updateMCPTools := mcpserveraction.NewUpdateToolsAction(appStorage.DB(), mcpintegration.NewClient())
 	if err := tasks.Registry().RegisterJSONWithTerminalFailure(mcpserveraction.RefreshToolsActionName, updateMCPTools.Execute, updateMCPTools.FinalizeFailure); err != nil {
@@ -79,6 +88,7 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 
 	// 组装企业成员与网站匿名访客各自的业务入口。
 	directBackend := appservice.NewDirectBackend(appStorage.DB(), localFiles, tenantResolver, agentRunScheduler, executeAgentRun, tasks)
+	directBackend.SetKnowledgeProcessor(knowledgeClient)
 	boundService := appservice.New(directBackend)
 	websiteVisitorBackend := appservice.NewWebsiteVisitorDirectBackend(appStorage.DB(), agentRunScheduler)
 	websiteVisitorService := appservice.NewWebsiteVisitorService(websiteVisitorBackend)

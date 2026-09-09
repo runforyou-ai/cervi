@@ -55,6 +55,13 @@ func (a *DeleteDocumentAction) Execute(ctx context.Context, identity *servermode
 		if _, err := loadDocumentRecord(ctx, tx, baseID, documentID); err != nil {
 			return err
 		}
+		var locked servermodels.KnowledgeDocument
+		if err := tx.NewSelect().Model(&locked).Where("kd.id = ?", documentID).For("UPDATE").Scan(ctx); err != nil {
+			return err
+		}
+		if _, err := tx.NewDelete().TableExpr("public.knowledge_segments").Where("meta->>'document_id' = ?", documentID).Exec(ctx); err != nil {
+			return err
+		}
 		if _, err := tx.NewUpdate().Model((*servermodels.File)(nil)).Set("status = ?", domain.FileStatusDeleting).Set("expires_at = now()").Set("updated_at = now()").Where("id IN (SELECT file_id FROM knowledge_documents WHERE id = ?)", documentID).Exec(ctx); err != nil {
 			return err
 		}

@@ -161,6 +161,16 @@ func (b *DirectBackend) knowledgeBaseError(ctx context.Context, meta RequestMeta
 	if errors.Is(err, fileaction.ErrFileNotFound) {
 		return NotFoundError(meta, cervii18n.ErrorFileNotFound)
 	}
+
+	if errors.Is(err, knowledgebaseaction.ErrSegmentsNotReady) {
+		return ConflictError(meta, cervii18n.ErrorKnowledgeSegmentsNotReady, "segments_not_ready")
+	}
+	if errors.Is(err, knowledgebaseaction.ErrSegmentStale) {
+		return ConflictError(meta, cervii18n.ErrorKnowledgeSegmentStale, "segment_stale")
+	}
+	if errors.Is(err, knowledgebaseaction.ErrSegmentQueryInvalid) {
+		return InvalidError(meta, cervii18n.ErrorValidationFailed, nil)
+	}
 	if errors.Is(err, knowledgebaseaction.ErrDocumentNotFound) {
 		return NotFoundError(meta, cervii18n.ErrorKnowledgeDocumentNotFound)
 	}

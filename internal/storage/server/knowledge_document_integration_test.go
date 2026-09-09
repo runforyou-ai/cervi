@@ -21,9 +21,12 @@ import (
 	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
 	"github.com/runforyou-ai/cervi/internal/api"
 	"github.com/runforyou-ai/cervi/internal/appservice"
+	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/integration/knowledgeprocessing"
 	filecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/runforyou-ai/cervi/internal/tenant"
 	"github.com/uptrace/bun"
 )
@@ -72,7 +75,7 @@ func TestKnowledgeDocumentLifecycle(t *testing.T) {
 	identity := installed.Identity
 	first := uploadedDocumentFile(t, db, identity, "报表100%.XLSX")
 	second := uploadedDocumentFile(t, db, identity, "说明.pdf")
-	create := knowledgeaction.NewCreateDocumentsAction(db)
+	create := knowledgeaction.NewCreateDocumentsAction(db, newDocumentTasks(t, db))
 	query := knowledgeaction.NewDocumentQuery(db)
 	docs, err := create.Execute(ctx, identity, base.ID, base.Groups[0].ID, []string{first.ID, second.ID})
 	if err != nil || len(docs) != 2 {
@@ -92,8 +95,8 @@ func TestKnowledgeDocumentLifecycle(t *testing.T) {
 			t.Fatalf("search %s=%+v %v", keyword, result, err)
 		}
 	}
-	if docs[0].Status != domain.KnowledgeDocumentInitial {
-		t.Fatal("new document not initial")
+	if docs[0].Status != domain.KnowledgeDocumentQueued {
+		t.Fatal("new document not queued")
 	}
 	grouped, err := knowledgeaction.NewCreateKnowledgeGroupAction(db).Execute(ctx, identity, base.ID, knowledgeaction.GroupInput{Name: "归档"})
 	if err != nil {
@@ -145,7 +148,7 @@ func TestKnowledgeDocumentBatchIsolation(t *testing.T) {
 	db := store.DB()
 	owner, base := newDocumentFixture(t, db)
 	other, otherBase := newDocumentFixture(t, db)
-	create := knowledgeaction.NewCreateDocumentsAction(db)
+	create := knowledgeaction.NewCreateDocumentsAction(db, newDocumentTasks(t, db))
 	first := uploadedDocumentFile(t, db, owner.Identity, "same.txt")
 	foreign := uploadedDocumentFile(t, db, other.Identity, "foreign.txt")
 	if _, err := create.Execute(ctx, owner.Identity, base.ID, base.Groups[0].ID, []string{first.ID, foreign.ID}); !errors.Is(err, fileaction.ErrFileNotFound) {
@@ -219,7 +222,7 @@ func TestKnowledgeDocumentLocalPreview(t *testing.T) {
 	owner, base := newDocumentFixture(t, db)
 	other, _ := newDocumentFixture(t, db)
 	file := uploadedDocumentFile(t, db, owner.Identity, "preview.txt")
-	docs, err := knowledgeaction.NewCreateDocumentsAction(db).Execute(ctx, owner.Identity, base.ID, base.Groups[0].ID, []string{file.ID})
+	docs, err := knowledgeaction.NewCreateDocumentsAction(db, newDocumentTasks(t, db)).Execute(ctx, owner.Identity, base.ID, base.Groups[0].ID, []string{file.ID})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -312,7 +315,7 @@ func TestKnowledgeDocumentS3Preview(t *testing.T) {
 		}
 		objects["/cervi/"+record.StorageKey] = true
 	}
-	docs, err := knowledgeaction.NewCreateDocumentsAction(db).Execute(ctx, owner.Identity, base.ID, base.Groups[0].ID, []string{files[0].ID, files[1].ID})
+	docs, err := knowledgeaction.NewCreateDocumentsAction(db, newDocumentTasks(t, db)).Execute(ctx, owner.Identity, base.ID, base.Groups[0].ID, []string{files[0].ID, files[1].ID})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -374,4 +377,14 @@ func TestKnowledgeDocumentS3Preview(t *testing.T) {
 			t.Fatal("cleaned metadata retained", err)
 		}
 	}
+}
+
+// newDocumentTasks 创建可持久化文档任务的测试运行时。
+func newDocumentTasks(t *testing.T, db *bun.DB) *servertask.Runtime {
+	t.Helper()
+	tasks := servertask.New(db, serverconfig.NATSConfig{})
+	if err := tasks.Registry().RegisterJSON(knowledgeaction.ProcessDocumentActionName, func(context.Context, knowledgeprocessing.ProcessInput) error { return nil }); err != nil {
+		t.Fatal(err)
+	}
+	return tasks
 }

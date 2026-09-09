@@ -15,10 +15,16 @@ import (
 )
 
 // DocumentQuery 读取当前企业中的文档和可预览原件。
-type DocumentQuery struct{ db *bun.DB }
+type DocumentQuery struct {
+	db       *bun.DB
+	segments segmentReader
+}
 
 // NewDocumentQuery 创建知识文档查询。
 func NewDocumentQuery(db *bun.DB) *DocumentQuery { return &DocumentQuery{db: db} }
+
+// SetSegmentReader 注入分段存储的读取接口。
+func (q *DocumentQuery) SetSegmentReader(reader segmentReader) { q.segments = reader }
 
 // List 按创建时间倒序返回分组文档。
 func (q *DocumentQuery) List(ctx context.Context, identity *servermodels.Identity, baseID string, input DocumentListInput) (DocumentListOutput, error) {
@@ -72,7 +78,7 @@ func (q *DocumentQuery) File(ctx context.Context, identity *servermodels.Identit
 
 // documentSelect 联结原件元数据，不在文档中重复保存文件属性。
 func documentSelect(db bun.IDB) *bun.SelectQuery {
-	return db.NewSelect().TableExpr("knowledge_documents AS kd").ColumnExpr("kd.id, kd.group_id, kd.status, kd.created_at, f.original_name AS name, f.content_type, f.byte_size").Join("JOIN files f ON f.id = kd.file_id")
+	return db.NewSelect().TableExpr("knowledge_documents AS kd").ColumnExpr("kd.id, kd.group_id, kd.status, kd.segment_batch_id, kd.segment_count, kd.failure_code, kd.created_at, f.original_name AS name, f.content_type, f.byte_size").Join("JOIN files f ON f.id = kd.file_id")
 }
 
 // loadDocumentRecord 读取指定知识库下的一条文档。

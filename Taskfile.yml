@@ -92,7 +92,7 @@ tasks:
 
   db:ensure:
     silent: true
-    summary: 确保当前工作区数据库和 haystack schema 已创建
+    summary: 确保当前工作区数据库已创建
     deps:
       - env:check:database
     preconditions:
@@ -111,9 +111,6 @@ tasks:
             createdb -U "{{.POSTGRES_USER}}" "{{.POSTGRES_DB}}"
           echo "已创建数据库 {{.POSTGRES_DB}}"
         fi
-        docker compose exec -T postgres \
-          psql -v ON_ERROR_STOP=1 -U "{{.POSTGRES_USER}}" -d "{{.POSTGRES_DB}}" \
-          -c 'CREATE SCHEMA IF NOT EXISTS haystack'
 
   db:test:reset:
     internal: true
@@ -164,8 +161,25 @@ tasks:
     cmds:
       - task: common:run:server
 
+  generate:appservice:
+    summary: 生成应用服务、HTTP 和代理适配层
+    cmds:
+      - go generate ./internal/appservice
+
+  test:haystack:
+    summary: 验证文档解析、字符分段和分段存储
+    cmds:
+      - uv run --script haystack/run.py --test
+    env:
+      TEST_POSTGRES_HOST: "{{.POSTGRES_HOST}}"
+      TEST_POSTGRES_PORT: "{{.POSTGRES_PORT}}"
+      TEST_POSTGRES_USER: "{{.POSTGRES_USER}}"
+      TEST_POSTGRES_PASSWORD: "{{.POSTGRES_PASSWORD}}"
+      TEST_POSTGRES_DB: "{{.POSTGRES_DB}}_test"
+      TEST_POSTGRES_SSLMODE: "{{.POSTGRES_SSLMODE}}"
+
   run:haystack:
-    summary: 运行当前工作区的 Haystack 向量验证脚本
+    summary: 运行当前工作区的 Haystack 文档处理服务
     deps:
       - db:ensure
     preconditions:

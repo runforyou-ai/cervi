@@ -31,6 +31,13 @@ func (a *DeleteKnowledgeBaseAction) Execute(ctx context.Context, identity *serve
 		if _, err := lockKnowledgeBase(ctx, tx, identity.Organization.ID, knowledgeBaseID); err != nil {
 			return err
 		}
+		var locked []servermodels.KnowledgeDocument
+		if err := tx.NewSelect().Model(&locked).Where("kd.knowledge_base_id = ?", knowledgeBaseID).Order("kd.id").For("UPDATE").Scan(ctx); err != nil {
+			return err
+		}
+		if _, err := tx.NewDelete().TableExpr("public.knowledge_segments").Where("meta->>'knowledge_base_id' = ?", knowledgeBaseID).Exec(ctx); err != nil {
+			return err
+		}
 		// 文档原件在事务中释放，后台文件任务负责实际清理。
 		if _, err := tx.NewUpdate().Model((*servermodels.File)(nil)).Set("status = ?", domain.FileStatusDeleting).Set("expires_at = now()").Set("updated_at = now()").Where("id IN (SELECT file_id FROM knowledge_documents WHERE knowledge_base_id = ?)", knowledgeBaseID).Exec(ctx); err != nil {
 			return err

@@ -34,7 +34,7 @@ function KnowledgeDocumentGroupList({ baseId, groupId }: { baseId: string; group
   const list = useResource(
     resourceKeys.knowledgeDocuments(baseId, parameters),
     (signal) => listKnowledgeDocuments(baseId, parameters, signal),
-    { staleTime: 0, keepPreviousData: true },
+    { staleTime: 0, keepPreviousData: true, refetchInterval: (data) => data?.documents.some((document) => document.status === "queued" || document.status === "running") ? 2000 : false },
   )
   const groups = base.data?.groups.flatMap((group) => [group, ...group.children]) ?? []
   const group = groups.find((item) => item.id === groupId)
@@ -88,7 +88,7 @@ function KnowledgeDocumentGroupList({ baseId, groupId }: { baseId: string; group
           if (restored.current === scrollKey) documentListScrollPositions.set(scrollKey, event.currentTarget.scrollTop)
         }}
       >
-        {base.error || list.error || !base.data || !list.data ? (
+        {!base.data || !list.data ? (
           <KnowledgeQAFeedback
             error={base.error ?? list.error}
             retry={() => void (base.error ? base.refresh() : list.refresh())}
@@ -99,7 +99,7 @@ function KnowledgeDocumentGroupList({ baseId, groupId }: { baseId: string; group
             listPath={listPath}
             search={location.search}
             filtered={Boolean(query)}
-            refreshing={list.isPlaceholderData || list.refreshing}
+            refreshing={list.isPlaceholderData}
             canMove={groups.length > 1}
             onAction={setAction}
             onPage={(value) => setParameters({ page: value === 1 ? null : String(value) })}

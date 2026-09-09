@@ -136,6 +136,10 @@ func (b *Backend) normalizeOutput(output any) {
 		for i := range value.MCPServers {
 			b.normalizeOutput(&value.MCPServers[i])
 		}
+	case *appservice.KnowledgeDocumentSegmentPage:
+		if value.Segments == nil {
+			value.Segments = []appservice.KnowledgeDocumentSegment{}
+		}
 	case *appservice.KnowledgeDocumentList:
 		if value.Documents == nil {
 			value.Documents = []appservice.KnowledgeDocument{}

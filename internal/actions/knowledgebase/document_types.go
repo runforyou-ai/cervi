@@ -17,13 +17,16 @@ var (
 
 // DocumentRecord 汇总文档归属与原件元数据。
 type DocumentRecord struct {
-	ID          string                         `bun:"id"`
-	GroupID     string                         `bun:"group_id"`
-	Name        string                         `bun:"name"`
-	ContentType string                         `bun:"content_type"`
-	ByteSize    int64                          `bun:"byte_size"`
-	Status      domain.KnowledgeDocumentStatus `bun:"status"`
-	CreatedAt   time.Time                      `bun:"created_at"`
+	ID             string                         `bun:"id"`
+	GroupID        string                         `bun:"group_id"`
+	Name           string                         `bun:"name"`
+	ContentType    string                         `bun:"content_type"`
+	ByteSize       int64                          `bun:"byte_size"`
+	Status         domain.KnowledgeDocumentStatus `bun:"status"`
+	SegmentBatchID string                         `bun:"segment_batch_id"`
+	SegmentCount   int                            `bun:"segment_count"`
+	FailureCode    string                         `bun:"failure_code"`
+	CreatedAt      time.Time                      `bun:"created_at"`
 }
 
 // DocumentListInput 定义分组文档的分页查询条件。

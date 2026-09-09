@@ -15,6 +15,8 @@ const (
 	TriggerSchedule = "schedule"
 	// QueueAgent 隔离可能长时间运行的 Agent 任务。
 	QueueAgent = "agent"
+	// QueueKnowledge 隔离文件解析和知识索引任务。
+	QueueKnowledge = "knowledge"
 )
 
 // EnqueueOptions 定义一次服务端异步 Action 投递参数。

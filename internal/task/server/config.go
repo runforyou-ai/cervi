@@ -17,9 +17,11 @@ const (
 	taskReplicas          = 1
 	standardTaskWorkers   = 4
 	agentTaskWorkers      = 2
+	knowledgeTaskWorkers  = 2
 	taskPoolMaxAckPending = 1024
 	workerPoolStandard    = "standard"
 	workerPoolAgent       = "agent"
+	workerPoolKnowledge   = "knowledge"
 )
 
 // workerPoolConfig 定义一组相互隔离的任务 Worker。
@@ -52,6 +54,7 @@ func newConfig(nats serverconfig.NATSConfig) runtimeConfig {
 		WorkerPools: []workerPoolConfig{
 			{Name: workerPoolStandard, Workers: standardTaskWorkers, MaxAckPending: taskPoolMaxAckPending},
 			{Name: workerPoolAgent, Workers: agentTaskWorkers, MaxAckPending: taskPoolMaxAckPending},
+			{Name: workerPoolKnowledge, Workers: knowledgeTaskWorkers, MaxAckPending: taskPoolMaxAckPending},
 		},
 	}
 }
@@ -80,6 +83,9 @@ func (c runtimeConfig) filterSubject(pool string) string {
 func (c runtimeConfig) taskSubject(queue string) string {
 	// 返回逻辑队列所属的 Worker Pool。
 	pool := workerPoolStandard
+	if queue == QueueKnowledge {
+		pool = workerPoolKnowledge
+	}
 	if queue == QueueAgent {
 		pool = workerPoolAgent
 	}

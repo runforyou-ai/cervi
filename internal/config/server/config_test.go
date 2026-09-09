@@ -140,3 +140,21 @@ func validTestConfig() Config {
 	config.NATS.Namespace = "cervi"
 	return config
 }
+
+// TestKnowledgeServiceURL 验证可选知识服务地址及无效协议。
+func TestKnowledgeServiceURL(t *testing.T) {
+	for _, address := range []string{"", "http://127.0.0.1:1419", "https://knowledge.example/internal"} {
+		config := validTestConfig()
+		config.HaystackURL = address
+		if err := config.validate(); err != nil {
+			t.Fatalf("url=%q %v", address, err)
+		}
+	}
+	for _, address := range []string{"file:///tmp/knowledge", "relative", "http://user:secret@example.com", "http://example.com?query=1"} {
+		config := validTestConfig()
+		config.HaystackURL = address
+		if err := config.validate(); err == nil {
+			t.Fatalf("accepted %q", address)
+		}
+	}
+}
