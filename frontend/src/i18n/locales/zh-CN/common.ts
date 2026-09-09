@@ -3,6 +3,8 @@ const common = {
   notifications: "通知",
   closeNotification: "关闭通知",
   actions: {
+    refresh: "刷新",
+    loadMore: "加载更多",
     close: "关闭",
     back: "返回",
     edit: "编辑",

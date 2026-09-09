@@ -1,30 +1,18 @@
 /** 消息列表路由。 */
-import { useEffect, useRef } from "react"
+import { useRef } from "react"
 import { useSearchParams } from "react-router"
 
 import {
   CustomerInboxView,
   InboxScope,
-  loadInbox,
-  type InboxConversation,
 } from "@/api"
 import { InboxPage } from "@/features/inbox/inbox-page"
-import {
-  memberChatPollingInterval,
-  useMemberChatPollingActive,
-} from "@/features/inbox/use-member-chat-polling"
-import { useWorkspace } from "@/contexts/workspace-context"
-import { resourceKeys } from "@/hooks/resource-keys"
-import { useResource } from "@/hooks/use-resource"
+import { useInboxList } from "./use-inbox-list"
+import { useInboxListViewport } from "./use-inbox-list-viewport"
 import { optionalWailsEnum } from "@/lib/wails-enum"
-
-const emptyConversations: InboxConversation[] = []
 
 /** 加载并显示消息页。 */
 export function InboxRoute() {
-  const { applyUnreadSnapshot, beginUnreadSnapshot } = useWorkspace()
-  const pollingActive = useMemberChatPollingActive()
-  const previousPollingActiveRef = useRef(pollingActive)
   const selections = useRef(new Map<string, string>())
   const [searchParams, setSearchParams] = useSearchParams()
   const selectedConversationId = searchParams.get("conversation") ?? ""
@@ -40,32 +28,9 @@ export function InboxRoute() {
       ? (searchParams.get("assignee") ?? "")
       : ""
   const query = { scope, customerView, assigneeIdentityId }
-  const { data, loading, error, refresh } = useResource(
-    resourceKeys.inbox(query),
-    () => loadInbox(query),
-    {
-      refetchInterval: pollingActive ? memberChatPollingInterval : false,
-      refetchOnWindowFocus: false,
-    },
-  )
-  const showLoading = loading && !data
-
-  useEffect(() => {
-    if (pollingActive && !previousPollingActiveRef.current && data) {
-      void refresh()
-    }
-    previousPollingActiveRef.current = pollingActive
-  }, [data, pollingActive, refresh])
-
-  /** 数据就绪或更新后同步未读快照；命中缓存的重新挂载同样生效。 */
-  useEffect(() => {
-    if (!data) return
-    const unreadRevision = beginUnreadSnapshot()
-    applyUnreadSnapshot(data.attentionUnreadCount, unreadRevision)
-    console.info("消息已加载", {
-      conversation_count: data.conversations.length,
-    })
-  }, [applyUnreadSnapshot, beginUnreadSnapshot, data])
+  const viewport = useInboxListViewport()
+  const list = useInboxList(query, viewport)
+  viewport.positions.current = list.positions
 
   /** 更新收件箱范围和客户视图查询参数。 */
   function updateQuery(changes: {
@@ -121,11 +86,8 @@ export function InboxRoute() {
 
   return (
     <InboxPage
-      conversations={data?.conversations ?? emptyConversations}
-      attentionUnreadCount={data?.attentionUnreadCount ?? 0}
-      listLoading={showLoading}
-      listError={Boolean(error)}
-      onListRefresh={() => void refresh()}
+      list={list}
+      listViewport={viewport}
       scope={scope}
       customerView={customerView}
       assigneeIdentityId={assigneeIdentityId}
