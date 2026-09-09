@@ -206,7 +206,7 @@ func TestEinoRuntimeSteersBeforeNextModelCall(t *testing.T) {
 	}
 }
 
-// TestEinoRuntimeIgnoresWatcherCancellationAfterSuccess 验证成功停止不会被 watcher 的协作取消改写为失败。
+// TestEinoRuntimeIgnoresWatcherCancellationAfterSuccess 验证 watcher 协作取消后保留成功停止结果。
 func TestEinoRuntimeIgnoresWatcherCancellationAfterSuccess(t *testing.T) {
 	feed := &cancelRaceInputFeed{blockingPeekStarted: make(chan struct{})}
 	chatModel := &finalAfterWatcherModel{watcherStarted: feed.blockingPeekStarted}

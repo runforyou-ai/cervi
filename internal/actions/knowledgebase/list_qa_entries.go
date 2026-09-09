@@ -43,7 +43,7 @@ func (q *ListQAEntriesQuery) Execute(ctx context.Context, identity *servermodels
 		Join("JOIN knowledge_qa_contents AS answer_content ON answer_content.entry_id = kqe.id AND answer_content.kind = ?", domain.KnowledgeQAContentAnswer).
 		Where("kqe.knowledge_base_id = ?", knowledgeBaseID).Where("kqe.group_id = ?", input.GroupID)
 	if keyword := strings.TrimSpace(input.Keyword); keyword != "" {
-		// 按字面匹配问题文本，避免通配符改变用户输入的含义。
+		// 将用户输入中的通配符按字面字符匹配。
 		pattern := "%" + strings.NewReplacer("\\", "\\\\", "%", "\\%", "_", "\\_").Replace(keyword) + "%"
 		query = query.Where("EXISTS (SELECT 1 FROM knowledge_qa_contents AS matched WHERE matched.entry_id = kqe.id AND matched.kind IN (?, ?) AND matched.content ILIKE ?)", domain.KnowledgeQAContentPrimaryQuestion, domain.KnowledgeQAContentSimilarQuestion, pattern)
 	}

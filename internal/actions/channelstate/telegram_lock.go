@@ -17,7 +17,7 @@ func WithTelegramLock(ctx context.Context, db *bun.DB, channelID string, execute
 	return withTelegramLock(ctx, db, channelID, true, execute)
 }
 
-// TryTelegramLock 跳过正在配置或发送的渠道，避免占满任务 Worker。
+// TryTelegramLock 尝试获取渠道锁，渠道正在配置或发送时返回未取得锁。
 func TryTelegramLock(ctx context.Context, db *bun.DB, channelID string, execute func(bun.Conn) error) error {
 	return withTelegramLock(ctx, db, channelID, false, execute)
 }
@@ -43,7 +43,7 @@ func withTelegramLock(ctx context.Context, db *bun.DB, channelID string, wait bo
 		}
 	}
 	defer func(conn bun.Conn, channelID string) {
-		// 释放会话锁，失败时丢弃底层连接避免锁泄漏进连接池。
+		// 释放会话锁，释放失败时丢弃底层连接。
 		releaseCtx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 		defer cancel()
 		if _, err := conn.ExecContext(releaseCtx, "SELECT pg_advisory_unlock(hashtextextended(?, 0))", channelID); err == nil {

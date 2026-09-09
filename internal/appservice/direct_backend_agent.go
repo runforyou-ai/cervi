@@ -48,7 +48,7 @@ func (b *DirectBackend) CreateAgent(ctx context.Context, meta RequestMeta, input
 	return agentFromAction(*created), nil
 }
 
-// ListAgentMCPServerOptions 读取企业 MCP 服务摘要，不测试连接。
+// ListAgentMCPServerOptions 读取企业 MCP 服务摘要。
 func (b *DirectBackend) ListAgentMCPServerOptions(ctx context.Context, meta RequestMeta) (AgentMCPServerOptionList, error) {
 	identity, err := b.authenticate(ctx, meta)
 	if err != nil {

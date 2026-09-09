@@ -152,7 +152,7 @@ func TestEnqueueInKeepsActiveIdempotency(t *testing.T) {
 	}
 }
 
-// TestEnqueueInRejectsInvalidInputBeforeWriting 验证无效投递不会污染调用方事务。
+// TestEnqueueInRejectsInvalidInputBeforeWriting 验证无效投递在写入前返回校验错误。
 func TestEnqueueInRejectsInvalidInputBeforeWriting(t *testing.T) {
 	ctx, db, runtime := newEnqueueTestRuntime(t)
 	actionName := registerEnqueueTestAction(t, runtime)
@@ -219,7 +219,7 @@ func newEnqueueTestRuntime(t *testing.T) (context.Context, *bun.DB, *Runtime) {
 	return ctx, db, New(db, serverconfig.NATSConfig{})
 }
 
-// registerEnqueueTestAction 注册一个不会实际执行的测试 Action。
+// registerEnqueueTestAction 注册空实现的测试 Action。
 func registerEnqueueTestAction(t *testing.T, runtime *Runtime) string {
 	t.Helper()
 	actionName := "test.enqueue." + uuid.New().String()

@@ -76,7 +76,7 @@ func (a *ImportAction) Execute(ctx context.Context, input ImportInput) (*serverm
 		OriginalName: metadata.FileName, ContentType: metadata.ContentType, ByteSize: metadata.ByteSize,
 		Status: string(domain.FileStatusPending),
 	}
-	// pending 必须先独立提交，确保后续写入成功但数据库操作失败时仍可被清理任务发现。
+	// 独立提交带过期时间的 pending 元数据后写入文件内容。
 	if _, err := a.db.NewInsert().Model(record).
 		Value("expires_at", "now() + make_interval(secs => ?)", temporaryFileLifetime.Seconds()).
 		Returning("expires_at").Exec(ctx); err != nil {

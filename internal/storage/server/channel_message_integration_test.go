@@ -22,7 +22,7 @@ func TestChannelMessageOpaqueIdentifiers(t *testing.T) {
 	if err := f.db.NewSelect().Model(channel).Where("c.id = ?", f.channelID).Scan(ctx); err != nil {
 		t.Fatal(err)
 	}
-	// 直接使用渠道通用入站契约，验证编号不经过 Telegram 数字转换。
+	// 使用渠道通用入站契约核验平台消息编号原值。
 	receive := func(input channelmessage.Inbound, body string) (conversationaction.InboundCustomerTextMessageResult, error) {
 		var result conversationaction.InboundCustomerTextMessageResult
 		err := f.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {

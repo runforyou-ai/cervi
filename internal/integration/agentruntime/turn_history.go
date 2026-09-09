@@ -42,7 +42,7 @@ func (h *turnHistory) appendOutput(messages []*schema.Message) {
 			h.messages = append(h.messages, message)
 			continue
 		}
-		// 复制调用列表，不改变 SDK 事件持有的原始消息。
+		// 复制 SDK 事件中的工具调用列表。
 		retained := *message
 		retained.ToolCalls = nil
 		for _, call := range message.ToolCalls {
@@ -50,7 +50,7 @@ func (h *turnHistory) appendOutput(messages []*schema.Message) {
 				retained.ToolCalls = append(retained.ToolCalls, call)
 			}
 		}
-		// 思考内容不能独立构成 assistant 消息，仍由过程记录器保留用于展示。
+		// 过程记录器保存思考内容，assistant 历史消息由正文和工具调用构成。
 		if len(retained.ToolCalls) > 0 || retained.Content != "" {
 			h.messages = append(h.messages, &retained)
 		}

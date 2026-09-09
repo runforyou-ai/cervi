@@ -162,7 +162,7 @@ func (a *SendCustomerTextMessageAction) executeTransaction(ctx context.Context, 
 			route.ReplyProviderMessageID = &providerID
 		}
 	}
-	// 取得客服周期锁后生成消息时间，避免等待期间的消息落到已读水位之前。
+	// 取得客服周期锁后生成消息时间。
 	originatedAt := time.Now().UTC()
 	// 计算成员回复对应的客服周期状态迁移。
 	status := domain.ServiceSessionStatus(session.Status)

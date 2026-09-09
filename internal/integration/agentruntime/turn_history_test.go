@@ -9,7 +9,7 @@ import (
 	"github.com/cloudwego/eino/schema"
 )
 
-// TestTurnHistoryRetainsOutputsAcrossSlidingInput 验证滑动历史和重复正文不会丢失或重复执行上下文。
+// TestTurnHistoryRetainsOutputsAcrossSlidingInput 验证滑动历史和重复正文下执行上下文的完整性与去重。
 func TestTurnHistoryRetainsOutputsAcrossSlidingInput(t *testing.T) {
 	history := &turnHistory{}
 	first := Message{ID: "1", Role: MessageRoleUser, Content: "继续"}
@@ -28,7 +28,7 @@ func TestTurnHistoryRetainsOutputsAcrossSlidingInput(t *testing.T) {
 	}
 }
 
-// TestTurnHistoryDropsEmptyAssistantOutputs 验证空输出和仅思考输出不会成为下一轮消息，空工具结果仍保留。
+// TestTurnHistoryDropsEmptyAssistantOutputs 验证 assistant 历史保留有效正文或工具调用，工具历史保留空结果。
 func TestTurnHistoryDropsEmptyAssistantOutputs(t *testing.T) {
 	history := &turnHistory{}
 	reasoning := schema.AssistantMessage("", nil)
@@ -47,7 +47,7 @@ func TestTurnHistoryDropsEmptyAssistantOutputs(t *testing.T) {
 	}
 }
 
-// TestTurnHistoryDropsUnansweredCalls 验证抢占后只保留有结果的调用，保留说明且不修改原事件。
+// TestTurnHistoryDropsUnansweredCalls 验证抢占后保留已完成调用和说明，原事件保持原值。
 func TestTurnHistoryDropsUnansweredCalls(t *testing.T) {
 	history := &turnHistory{}
 	call := schema.AssistantMessage("准备查询", []schema.ToolCall{{ID: "done"}, {ID: "skipped"}})

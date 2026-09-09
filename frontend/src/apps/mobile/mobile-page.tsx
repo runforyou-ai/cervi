@@ -33,7 +33,7 @@ export function MobilePageHeader({
     const end = endRef.current
     if (!header || !start || !end) return
 
-    /** 按较宽一侧预留空间，让标题居中且不遮挡操作。 */
+    /** 按两侧操作区的最大宽度预留标题空间。 */
     const updateSideWidth = () => {
       header.style.setProperty(
         "--mobile-header-side-width",

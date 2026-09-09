@@ -24,7 +24,7 @@ func TestConversationMessageCursorRoundTrip(t *testing.T) {
 	}
 }
 
-// TestConversationMessageCursorRejectsAnotherConversation 验证游标不能跨会话复用。
+// TestConversationMessageCursorRejectsAnotherConversation 验证消息游标的会话归属校验。
 func TestConversationMessageCursorRejectsAnotherConversation(t *testing.T) {
 	point := conversationaction.MessageCursorPoint{
 		MessageSeq: 9007199254740993,

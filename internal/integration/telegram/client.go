@@ -74,7 +74,7 @@ func WithBaseURL(baseURL string) Option {
 	}
 }
 
-// Client 调用 Telegram Bot API，且不会在错误中暴露包含 Token 的 URL。
+// Client 调用 Telegram Bot API 并将传输错误转换为业务错误。
 type Client struct {
 	httpClient     connectiontest.HTTPDoer
 	downloadClient connectiontest.HTTPDoer

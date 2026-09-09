@@ -77,7 +77,7 @@ func (w *Worker) Execute(ctx context.Context, input Input) error {
 		sendCtx, cancel := context.WithTimeout(ctx, sendTimeout)
 		messageID, sendErr := w.sender.SendText(sendCtx, token, telegram.TextMessage{ChatID: recipient, Body: body, ReplyMessageID: delivery.ReplyProviderMessageID})
 		cancel()
-		// 请求结束或服务关闭后仍尝试落下平台结果，避免成功结果仅留在内存。
+		// 请求结束或服务关闭后使用独立上下文保存平台结果。
 		saveCtx, saveCancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		defer saveCancel()
 		return w.finish(saveCtx, conn, delivery, recipient, messageID, sendErr)

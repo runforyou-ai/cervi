@@ -105,7 +105,7 @@ func TestCustomerConversationPersonalRead(t *testing.T) {
 	if row := f.inboxRow(t, f.member, domain.CustomerInboxViewQueue); row.UnreadCount != 1 {
 		t.Fatalf("reading changed coworker: %+v", row)
 	}
-	// 阅读不会把旁观客服加入参与者或领取公共队列。
+	// 核验旁观客服阅读后参与关系和队列归属保持原值。
 	count, err := f.db.NewSelect().Table("conversation_participants").Where("conversation_id = ?", f.conversationID).Count(ctx)
 	if err != nil || count != 1 {
 		t.Fatalf("reading created participant: %d %v", count, err)

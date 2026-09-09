@@ -71,7 +71,7 @@ export function TabScopedRouter({
     () => ({ ...navigationContext, navigator: scopedNavigator }),
     [navigationContext, scopedNavigator],
   )
-  /** 面板内页面只感知本标签的地址，避免切换标签时其他页面重新请求数据。 */
+  /** 为面板内页面提供当前标签的路由地址。 */
   const scopedLocationContext = useMemo(() => {
     const parsed = parsePath(href)
     return {

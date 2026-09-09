@@ -105,7 +105,7 @@ export function CreateGroupConversationDialog({
         imageFileId,
         memberIdentityIds: values.members,
       })
-      // 关闭表单或离开页面后忽略迟到结果，不重新打开已放弃的会话。
+      // 关闭表单或离开页面后丢弃迟到结果。
       if (requestID !== createRequestID.current) {
         void invalidate(resourceKeys.inbox())
         return

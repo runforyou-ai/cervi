@@ -112,7 +112,7 @@ function AgentMCPDialog({
       <div className="flex justify-end gap-2">
         <Button type="button" variant="outline" onClick={onCancel}>{t("common:actions.cancel")}</Button>
         <Button type="button" disabled={resource.loading || Boolean(resource.error) || resource.refreshing} onClick={() => {
-          // 确认当前目录中的选择，已删除的服务不会重新带回表单。
+          // 将当前目录中选中的服务写入表单。
           onConfirm(services.filter((service) => selected.includes(service.id)).map((service) => service.id).sort())
         }}>{t("common:actions.confirm")}</Button>
       </div>

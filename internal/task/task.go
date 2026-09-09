@@ -21,7 +21,7 @@ func (e *PermanentError) Error() string { return e.err.Error() }
 // Unwrap 返回原始错误。
 func (e *PermanentError) Unwrap() error { return e.err }
 
-// Permanent 将 Action 错误标记为无需重试。
+// Permanent 将 Action 错误标记为永久失败。
 func Permanent(err error) error {
 	if err == nil {
 		return nil
@@ -29,7 +29,7 @@ func Permanent(err error) error {
 	return &PermanentError{err: err}
 }
 
-// IsPermanent 判断 Action 错误是否无需重试。
+// IsPermanent 判断 Action 错误是否为永久失败。
 func IsPermanent(err error) bool {
 	var target *PermanentError
 	return errors.As(err, &target)

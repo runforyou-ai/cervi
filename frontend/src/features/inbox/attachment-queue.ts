@@ -1,4 +1,4 @@
-/** 保存工作台中的有序附件消息，切换聊天不影响当前上传。 */
+/** 在工作台维护有序附件消息和持续上传任务。 */
 import {
   AttachmentUploadStatus,
   FileTransfer,
@@ -364,7 +364,7 @@ export class AttachmentQueue {
     this.emit()
   }
 
-  /** 释放本页面的文件内容，关闭或重启后不续传。 */
+  /** 页面关闭时释放本轮上传的文件内容。 */
   dispose() {
     this.disposed = true
     clearInterval(this.heartbeat)

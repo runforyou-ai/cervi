@@ -10,7 +10,7 @@ import (
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 )
 
-// TestDirectBackendPreservesCancellation 验证请求取消不会转换为业务错误。
+// TestDirectBackendPreservesCancellation 验证请求取消原因的透传。
 func TestDirectBackendPreservesCancellation(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	cancel()

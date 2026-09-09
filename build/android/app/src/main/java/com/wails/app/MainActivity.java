@@ -57,9 +57,7 @@ public class MainActivity extends AppCompatActivity {
 
     private WebView webView;
     private WailsBridge bridge;
-    // Battery: system-event receivers are registered only while the activity is
-    // in the foreground (onStart) and torn down in onStop, so background battery/
-    // network/screen broadcasts don't wake the app.
+    // 系统事件接收器在 onStart 注册，在 onStop 注销。
     private boolean systemReceiversRegistered = false;
     private WebViewAssetLoader assetLoader;
 
@@ -131,9 +129,7 @@ public class MainActivity extends AppCompatActivity {
                 if (request.getUrl().getHost() != null &&
                         request.getUrl().getHost().equals(WAILS_HOST)) {
 
-                    // For wails API calls (runtime, capabilities, etc.) pass the
-                    // full URL including the query string, because
-                    // WebViewAssetLoader.PathHandler strips query params
+                    // Wails API 请求保留完整路径和查询参数。
                     String path = request.getUrl().getPath();
                     if (path != null && path.startsWith("/wails/")) {
                         String fullPath = path;
@@ -261,8 +257,7 @@ public class MainActivity extends AppCompatActivity {
             bridge.emitEvent("common:capture", "{\"cancelled\":true}");
             return;
         }
-        // Some camera apps (commonly for video) ignore EXTRA_OUTPUT and instead
-        // return a content URI in the result data; copy that into our cache.
+        // 拍摄文件为空且结果包含内容 URI 时，将 URI 内容复制到缓存。
         if ((file == null || !file.exists() || file.length() == 0)
                 && data != null && data.getData() != null) {
             String copied = copyUriToCache(data.getData());
@@ -744,8 +739,7 @@ public class MainActivity extends AppCompatActivity {
     @Override
     public void onConfigurationChanged(Configuration newConfig) {
         super.onConfigurationChanged(newConfig);
-        // Fires for light/dark switches because the manifest lists uiMode in
-        // android:configChanges (otherwise the activity would be recreated).
+        // 接收清单中 uiMode 配置变更触发的主题切换。
         emitTheme();
     }
 

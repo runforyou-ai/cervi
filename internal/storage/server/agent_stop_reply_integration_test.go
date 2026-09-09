@@ -37,7 +37,7 @@ func testAgentReplyStopping(t *testing.T, db *bun.DB, identity *servermodels.Ide
 		}
 	}
 	stopped := assertStoppedAgentReply(t, ctx, db, run.ID, 2)
-	// 已停止任务无需模型即可确认重放，失败回调也不能覆盖结果。
+	// 核验已停止任务的重放结果和失败回调幂等性。
 	if err := executor.Execute(ctx, agentrunaction.RunInput{RunID: run.ID}); err != nil {
 		t.Fatal(err)
 	}

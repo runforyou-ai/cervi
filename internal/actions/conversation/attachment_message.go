@@ -252,7 +252,7 @@ func (q *ListConversationMessagesQuery) GetAttachmentFile(ctx context.Context, i
 	return record, err
 }
 
-// AttachmentStates 读取已有附件消息的状态，不依赖新增消息游标。
+// AttachmentStates 按已有附件消息编号读取状态。
 func (q *ListConversationMessagesQuery) AttachmentStates(ctx context.Context, identity *servermodels.Identity, conversationID string, ids []string) ([]AttachmentMessageState, error) {
 	if !common.ValidUUID(conversationID) {
 		return nil, ErrConversationNotFound

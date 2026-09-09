@@ -57,7 +57,7 @@ const (
 	FailureUnavailable   FailureKind = "unavailable"
 )
 
-// Target 描述可安全记录的连接探测目标，不得放入地址或凭据。
+// Target 定义连接探测的类别、适配器和调用位置。
 type Target struct {
 	Category Category
 	Adapter  string
@@ -177,7 +177,7 @@ func NewRunner(timeout time.Duration) *Runner {
 	return &Runner{timeout: timeout}
 }
 
-// Run 执行一次不重试的连接探测。
+// Run 执行单次连接探测。
 func (r *Runner) Run(ctx context.Context, target Target, probe Probe) error {
 	startedAt := time.Now()
 	testCtx, cancel := context.WithTimeout(ctx, r.timeout)

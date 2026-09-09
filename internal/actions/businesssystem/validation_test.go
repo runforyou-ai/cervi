@@ -24,7 +24,7 @@ func TestNormalizeInputAcceptsBusinessURLs(t *testing.T) {
 	}
 }
 
-// TestNormalizeInputRejectsInvalidBusinessURLs 验证业务系统地址必须完整且不能携带认证信息。
+// TestNormalizeInputRejectsInvalidBusinessURLs 验证业务系统地址的完整性和认证信息限制。
 func TestNormalizeInputRejectsInvalidBusinessURLs(t *testing.T) {
 	for _, address := range []string{
 		"erp.example.com",

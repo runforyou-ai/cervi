@@ -45,7 +45,7 @@ func testAgentKnowledgeScopes(t *testing.T, db *bun.DB, identity *servermodels.I
 	if err != nil {
 		t.Fatal(err)
 	}
-	// 其他企业和不存在的知识库都不能通过创建或编辑写入配置。
+	// 核验创建和编辑配置时的知识库归属及存在性。
 	for _, id := range []string{foreign.ID, uuid.NewV7().String()} {
 		input.Managed.KnowledgeBaseIDs = []string{id}
 		var fields *common.FieldError
@@ -69,7 +69,7 @@ func testAgentKnowledgeScopes(t *testing.T, db *bun.DB, identity *servermodels.I
 	if err != nil || updated.Execution.RevisionID == originalRevisionID || !slices.Equal(updated.Execution.Managed.KnowledgeBaseIDs, bases) {
 		t.Fatalf("update=%+v err=%v", updated, err)
 	}
-	// 新配置不能改写旧 Revision 中已经保存的知识库范围。
+	// 核验保存新配置后旧 Revision 的知识库范围保持原值。
 	var revision servermodels.AgentRevision
 	if err := db.NewSelect().Model(&revision).Where("id = ?", originalRevisionID).Scan(ctx); err != nil {
 		t.Fatal(err)

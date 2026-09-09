@@ -22,7 +22,7 @@ type Block struct {
 	Payload     BlockPayload             `json:"payload"`
 }
 
-// BlockPayload 保存文本或工具调用内容，不截断原始参数和结果。
+// BlockPayload 完整保存文本、工具调用参数和结果。
 type BlockPayload struct {
 	Text     string    `json:"text,omitempty"`
 	ToolCall *ToolCall `json:"toolCall,omitempty"`
@@ -137,7 +137,7 @@ func (r *processRecorder) publishLocked() {
 	}
 }
 
-// Clone 复制临时快照，使订阅者不能修改执行中的缓冲。
+// Clone 深拷贝临时快照供订阅者读取。
 func (p Progress) Clone() Progress {
 	blocks := make([]Block, len(p.Blocks))
 	for i, block := range p.Blocks {
@@ -167,7 +167,7 @@ func (p Progress) Clone() Progress {
 	return p
 }
 
-// blocks 返回成功时应持久化的中间内容，不包含最终正文。
+// blocks 返回成功时应持久化的中间内容。
 func (r *processRecorder) blocks() []Block {
 	r.mu.Lock()
 	defer r.mu.Unlock()

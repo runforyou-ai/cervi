@@ -283,7 +283,7 @@ func (a *ReceiveTelegramWebhookAction) applyTelegramContactAvatar(
 			return nil
 		}
 
-		// 新旧文件按编号锁定，避免不同渠道身份交换共享头像时反向等待。
+		// 按编号顺序锁定新旧头像文件。
 		fileIDs := make([]string, 0, 2)
 		if next != nil {
 			fileIDs = append(fileIDs, next.ID)

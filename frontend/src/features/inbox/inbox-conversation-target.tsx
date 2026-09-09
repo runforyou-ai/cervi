@@ -55,7 +55,7 @@ export function InboxConversationTarget({
       !error && member && identityId !== currentIdentityId && direct &&
       lookup.data === undefined
     ) return
-    // 同一入口只落地一次，查询刷新和重复 effect 不再重建草稿。
+    // 记录已落地的入口并复用对应草稿。
     completedRef.current = true
     if (error) {
       if (isApiError(error) && sessionPath(error.state)) return

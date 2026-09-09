@@ -31,7 +31,7 @@ const (
 	modeAuto     = tlsMode("auto")
 	modeExternal = tlsMode("external")
 	modeOff      = tlsMode("off")
-	// maxAllowedHostEntries 限制已确认公网域名缓存的条目数，防止恶意 Host 头刷量造成内存无界增长。
+	// maxAllowedHostEntries 定义已确认公网域名缓存的容量上限。
 	maxAllowedHostEntries = 1024
 	// certificateRequestLimit 为 autocert 的双挑战、双密钥签发路径预留 Let's Encrypt 订单额度。
 	certificateRequestLimit       = 40
@@ -266,7 +266,7 @@ func (s *HTTPSEntry) serveHTTP(writer http.ResponseWriter, request *http.Request
 	http.Redirect(writer, request, target.String(), http.StatusTemporaryRedirect)
 }
 
-// rememberAllowedHost 缓存已确认的公网域名；达到上限时整体清空重建，避免恶意 Host 头刷量挤掉合法新域名的签发授权。
+// rememberAllowedHost 缓存已确认的公网域名，达到容量上限时清空并重建缓存。
 func (s *HTTPSEntry) rememberAllowedHost(host string) {
 	s.allowedMutex.Lock()
 	defer s.allowedMutex.Unlock()

@@ -42,7 +42,7 @@ export function useKnowledgeDocumentUpload({ baseId, groupId }: { baseId: string
     return () => {
       mounted.current = false
       for (const item of items.current) {
-        // 已发出的保存命令等待事务结果，避免取消正在激活的原件。
+        // 等待已提交保存命令的事务结果。
         if (item.stage === "saving" || item.stage === "saved") continue
         item.controller.abort()
         if (item.transfer.upload) void cancelFileUpload(item.transfer.upload.file.id).catch(() => {})

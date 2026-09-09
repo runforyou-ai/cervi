@@ -134,7 +134,7 @@ func TestRunRecordsToolCorrection(t *testing.T) {
 	if !outOfOrder || snapshots[len(snapshots)-1].CandidateContent != result.Content {
 		t.Fatal("missing out-of-order tool snapshot or final candidate")
 	}
-	// 修改已发出的快照不能改变成功结果，失败调用的错误指针也必须隔离。
+	// 核验已发出快照、成功结果及失败错误对象的独立性。
 	*snapshots[len(snapshots)-1].Blocks[3].Payload.ToolCall.Error = "changed"
 	if *failed.Error == "changed" {
 		t.Fatal("snapshot modified final blocks")

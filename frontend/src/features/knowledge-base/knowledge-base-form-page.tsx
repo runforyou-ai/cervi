@@ -161,7 +161,7 @@ export function KnowledgeBaseFormPage({
   async function save(values: KnowledgeBaseFormValues) {
     try {
       let knowledgeBase: KnowledgeBaseData
-      // 模型选择同时携带供应商与模型标识，问答库不提交分段配置。
+      // 保存供应商与模型标识，并按知识库类型提交分段配置。
       const [embeddingProviderId, embeddingModelIdentifier] = JSON.parse(values.embeddingModel) as [string, string]
       const [rerankProviderId, rerankModelIdentifier] = values.rerankModel ? JSON.parse(values.rerankModel) as [string, string] : ["", ""]
       const input = {

@@ -53,7 +53,7 @@ func Prepare(ctx context.Context, db bun.IDB, organizationID, conversationID str
 		return route, err
 	}
 	if route.ChannelType == domain.ChannelTypeTelegram {
-		// 配置操作先锁渠道；共享锁保证入队期间机器人不会切换。
+		// 持有渠道共享锁直至入队完成。
 		if err := query.For("SHARE OF ch").Scan(ctx, &route); err != nil {
 			return route, err
 		}

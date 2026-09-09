@@ -125,7 +125,7 @@ func TestInboxContextDeepWindow(t *testing.T) {
 		t.Fatalf("removed anchor=%+v err=%v", removed, err)
 	}
 	assertInboxWindowIDs(t, removed.Window.Conversations, expected)
-	// 边界会话已物理删除仍使用原值恢复，不依赖该行继续存在。
+	// 删除边界会话后按游标中的原始边界恢复窗口。
 	if _, err := f.db.NewDelete().Model((*servermodels.Conversation)(nil)).Where("id = ?", anchor.ID).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
@@ -260,7 +260,7 @@ func TestInboxContextUnavailable(t *testing.T) {
 	assertInboxWindowIDs(t, window.Conversations, nil)
 }
 
-// TestInboxContextSnapshot 验证锚点、邻域和前后资格不会混入读取中途提交的变化。
+// TestInboxContextSnapshot 验证锚点、邻域和前后资格使用同一读取快照。
 func TestInboxContextSnapshot(t *testing.T) {
 	f := newNavigationFixture(t)
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
@@ -325,7 +325,7 @@ func TestInboxContextCustomerTransition(t *testing.T) {
 	if err != nil || withoutPosition.Anchor.Conversation == nil || len(withoutPosition.Window.Conversations) != 0 || withoutPosition.Window.StartCursor != "" {
 		t.Fatalf("unlocated readable anchor=%+v err=%v", withoutPosition, err)
 	}
-	// 倒置区间和跨查询边界必须拒绝，不能静默返回伪空结果。
+	// 核验倒置区间和跨查询边界的校验错误。
 	for _, input := range []inboxaction.ReadWindowInput{
 		{Query: filter, StartCursor: page.EndCursor, EndCursor: page.StartCursor},
 		{Query: inboxaction.LoadInput{Scope: domain.InboxScopeInternal}, StartCursor: page.StartCursor, EndCursor: page.EndCursor},

@@ -54,7 +54,7 @@ export async function install(
   return identity
 }
 
-/** 检测企业服务器并返回公开企业名称，不保存地址。 */
+/** 检测企业服务器并返回公开企业名称。 */
 export const probeServer = bind(ProbeServer)
 
 /** 验证并保存企业服务器地址。 */

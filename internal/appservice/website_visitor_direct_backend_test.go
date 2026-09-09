@@ -22,7 +22,7 @@ func TestWebsiteMessageCursorRoundTrip(t *testing.T) {
 	}
 }
 
-// TestWebsiteMessageCursorRejectsAnotherConversation 验证消息游标不能跨 Conversation 使用。
+// TestWebsiteMessageCursorRejectsAnotherConversation 验证访客消息游标的会话归属校验。
 func TestWebsiteMessageCursorRejectsAnotherConversation(t *testing.T) {
 	point := conversationaction.MessageCursorPoint{
 		MessageSeq: 9007199254740993,

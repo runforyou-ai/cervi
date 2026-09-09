@@ -111,7 +111,7 @@ func newInboxPaginationFixture(t *testing.T) inboxPaginationFixture {
 			t.Fatal(err)
 		}
 	}
-	// 批量造数后刷新统计信息，避免查询计划依赖自动分析的执行时机。
+	// 批量造数后刷新数据库统计信息。
 	if _, err := f.db.ExecContext(ctx, "ANALYZE"); err != nil {
 		t.Fatal(err)
 	}
@@ -233,7 +233,7 @@ func TestInboxPaginationBoundaries(t *testing.T) {
 				t.Fatalf("first page=%+v err=%v", page, err)
 			}
 			input.Cursor = page.NextCursor
-			// 时间和空时间边界均携带原值，边界会话已删除也不重查该行。
+			// 核验时间与空时间边界在会话删除后仍保留原始值。
 			if _, err := f.db.NewDelete().Model((*servermodels.Conversation)(nil)).Where("id = ?", page.Conversations[1].ID).Exec(ctx); err != nil {
 				t.Fatal(err)
 			}

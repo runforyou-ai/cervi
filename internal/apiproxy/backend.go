@@ -42,7 +42,7 @@ func NewBackend(store Store, sessions *clientsession.Manager) (*Backend, error) 
 	return &Backend{connection: remoteConnection, sessions: sessions}, nil
 }
 
-// InstallationStatus 不读取登录凭据并返回远程初始化状态。
+// InstallationStatus 通过公开接口读取远程初始化状态。
 func (b *Backend) InstallationStatus(ctx context.Context, meta appservice.RequestMeta) (appservice.InstallationStatus, error) {
 	state := b.connection.currentState()
 	if state == nil {
@@ -328,7 +328,7 @@ func (b *Backend) ServerURL(_ context.Context, _ appservice.RequestMeta) (string
 	return state.baseURL.String(), nil
 }
 
-// ProbeServer 检测企业服务器并返回公开企业名称，不保存地址。
+// ProbeServer 检测企业服务器并返回公开企业名称。
 func (b *Backend) ProbeServer(ctx context.Context, meta appservice.RequestMeta, serverURL string) (appservice.InstallationStatus, error) {
 	state, status, err := b.inspectServer(ctx, meta, serverURL)
 	if err != nil {
@@ -368,7 +368,7 @@ func (b *Backend) ConnectServer(ctx context.Context, meta appservice.RequestMeta
 	return nil
 }
 
-// inspectServer 校验地址并读取远程初始化状态，不保存配置。
+// inspectServer 校验地址并读取远程初始化状态。
 func (b *Backend) inspectServer(ctx context.Context, meta appservice.RequestMeta, serverURL string) (*remoteState, appservice.InstallationStatus, error) {
 	parsed, err := parseServerURL(serverURL)
 	if err != nil {

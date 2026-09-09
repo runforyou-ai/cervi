@@ -40,7 +40,7 @@ func TestInboxCursor(t *testing.T) {
 		if err != nil || canonical.ID != point.ID {
 			t.Fatalf("uppercase cursor=%+v err=%v", canonical, err)
 		}
-		// 页大小不属于筛选身份，续页可调整条数而不改变边界。
+		// 续页使用相同筛选条件和边界，页大小可独立调整。
 		resized := input
 		resized.Limit = 1
 		if _, err := decodeInboxCursor(encoded, identity, resized); err != nil {

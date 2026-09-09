@@ -1,7 +1,4 @@
-# Feel free to remove those if you don't want/need to use them.
-# Make sure to check the documentation at https://nfpm.goreleaser.com
-#
-# The lines below are called `modelines`. See `:help modeline`
+# Linux 安装包配置：https://nfpm.goreleaser.com
 
 name: "cervi"
 arch: ${GOARCH}
@@ -50,8 +47,7 @@ scripts:
   # preremove: "./build/linux/nfpm/scripts/preremove.sh"
   # postremove: "./build/linux/nfpm/scripts/postremove.sh"
 
-# If you build your app with -tags gtk3 (legacy WebKit2GTK 4.1 stack — supported through v3.0.x, removed in v3.1),
-# replace the depends/overrides above with these:
+# 使用 -tags gtk3 构建时的依赖配置（Wails v3.0.x 支持 WebKit2GTK 4.1）：
 #
 # depends:
 #   - libgtk-3-0

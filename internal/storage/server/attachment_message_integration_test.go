@@ -217,7 +217,7 @@ func TestAttachmentBatchLifecycle(t *testing.T) {
 
 	first := result.Messages[0].Attachment.ID
 	second := result.Messages[1].Attachment.ID
-	// 通用临时文件取消接口不能绕过消息状态撤去已入库附件。
+	// 核验通用临时文件取消接口对已入库附件的保护。
 	if err := filemaintenance.NewCancelUploadAction(f.db).Execute(ctx, f.owner, first); err != nil {
 		t.Fatal(err)
 	}
@@ -295,7 +295,7 @@ func TestAttachmentBatchLifecycle(t *testing.T) {
 	if summary.LastMessageID == nil || *summary.LastMessageID != result.Messages[0].ID {
 		t.Fatalf("cancelled last attachment did not restore previous summary: %+v", summary)
 	}
-	// 完成先提交时，随后到达的取消仍须撤去消息，迟到完成不能恢复它。
+	// 核验完成后取消及迟到完成请求均收敛为取消状态。
 	if err := send.UpdateUploads(ctx, f.owner, []string{first}, domain.AttachmentCancelled); err != nil {
 		t.Fatal(err)
 	}
@@ -431,7 +431,7 @@ func TestAttachmentMessageReplies(t *testing.T) {
 			if err != nil || replayed.ID != reply.ID || replayed.ReplyTo == nil || replayed.ReplyTo.Body != expected {
 				t.Fatalf("replayed=%+v err=%v", replayed, err)
 			}
-			// 群聊不能引用同企业另一条单聊中的附件。
+			// 核验群聊附件引用的会话归属。
 			_, err = conversationaction.NewSendGroupTextMessageAction(f.db).Execute(ctx, f.member, conversationaction.GroupTextMessageInput{ConversationID: f.groupID, ClientMessageID: uuid.NewV7().String(), Body: "跨会话引用", ReplyToMessageID: target.ID})
 			var conflict *conversationaction.ConflictError
 			if !errors.As(err, &conflict) || conflict.Reason != conversationaction.ConflictReasonReplyTargetInvalid {

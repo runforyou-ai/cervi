@@ -174,7 +174,7 @@ func testAgentDirectReplies(t *testing.T, db *bun.DB, identity *servermodels.Ide
 		t.Fatalf("replayed trigger count=%d err=%v", triggerCount, err)
 	}
 	runNext()
-	// 已保存的引用在执行前被删除时，不再向模型提供被删除正文。
+	// 核验执行前已删除的引用以失效状态传入模型。
 	input.ClientMessageID = uuid.NewV7().String()
 	if _, err := send.Execute(ctx, identity, input); err != nil {
 		t.Fatal(err)

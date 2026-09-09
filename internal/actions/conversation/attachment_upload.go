@@ -77,7 +77,7 @@ func updateAttachmentUpload(ctx context.Context, tx bun.Tx, identity *servermode
 	if err := tx.NewSelect().Table("message_attachments").Column("upload_status").Where("message_id = ?", row.MessageID).Scan(ctx, &current); err != nil {
 		return err
 	}
-	// 取消优先于并发完成，迟到的进度或完成请求不能恢复已取消的消息。
+	// 并发取消与完成按取消结果收敛，已取消消息保持取消状态。
 	if current == domain.AttachmentCancelled || (current == domain.AttachmentReady && status != domain.AttachmentCancelled) {
 		return nil
 	}

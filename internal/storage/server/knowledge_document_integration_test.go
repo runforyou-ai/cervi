@@ -273,7 +273,7 @@ func TestKnowledgeDocumentS3Preview(t *testing.T) {
 	db := store.DB()
 	owner, base := newDocumentFixture(t, db)
 	ctx = tenant.WithAccessHost(ctx, owner.Identity.Organization.AccessHost)
-	// HTTP 测试端点只记录客户端读取与清理请求，不启动独立对象存储服务。
+	// HTTP 测试端点记录客户端读取与清理请求。
 	var mu sync.Mutex
 	objects := map[string]bool{}
 	endpoint := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {

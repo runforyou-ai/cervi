@@ -48,7 +48,7 @@ type inboxCursor struct {
 	AssigneeIdentityID string                   `json:"assigneeIdentityId"`
 }
 
-// encodeInboxCursor 无损编码活动时间，不依赖边界会话继续存在。
+// encodeInboxCursor 编码原始活动边界、身份范围和排序版本。
 func encodeInboxCursor(identity *servermodels.Identity, input LoadInput, point inboxCursorPoint) (string, error) {
 	data, err := json.Marshal(inboxCursor{
 		inboxCursorPoint: point, Version: inboxSortVersion,

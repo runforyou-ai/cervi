@@ -113,7 +113,7 @@ func TestMemberClientMessageAssociation(t *testing.T) {
 		t.Fatalf("other sender=%+v err=%v", other, err)
 	}
 	assertMemberClientAssociation(t, f.db, f.member, f.groupID, other.ID, clientID, f.owner)
-	// 同一成员的编号不能用于另一会话。
+	// 核验成员消息编号的会话归属。
 	_, err = conversationaction.NewSendFirstDirectTextMessageAction(f.db).Execute(ctx, f.owner, conversationaction.FirstDirectTextMessageInput{TargetIdentityID: f.member.OrganizationIdentity.ID, ClientMessageID: clientID, Body: input.Body})
 	var conflict *conversationaction.ConflictError
 	if !errors.As(err, &conflict) || conflict.Reason != conversationaction.ConflictReasonIdempotencyMismatch {
@@ -181,7 +181,7 @@ func TestWebsiteClientMessageAssociation(t *testing.T) {
 	if count, err := f.db.NewSelect().Model((*servermodels.Message)(nil)).Where("conversation_id = ?", first.Conversation.ID).Count(ctx); err != nil || count != 1 {
 		t.Fatalf("replay count=%d err=%v", count, err)
 	}
-	// 同一个编号在当前访客的另一个线程中也不能改变原始发送意图。
+	// 核验跨访客线程重用编号时的原始发送意图校验。
 	threadInput := appservice.WebsiteVisitorTextMessageInput{ClientMessageID: uuid.NewV7().String(), Body: "另一线程"}
 	thread, err := visitor.SendTextMessage(ctx, appservice.WebsiteVisitorMeta{}, f.channelID, visitorA, threadInput)
 	if err != nil {

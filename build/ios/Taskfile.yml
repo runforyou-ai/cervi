@@ -9,8 +9,7 @@ includes:
 #        [PROVISIONING_PROFILE=path.mobileprovision]
 #                                             -> device bundle (real signing)
 #   task ios:package:ipa IOS_PLATFORM=device ... -> .ipa for distribution/install
-# For automatically managed signing & provisioning, use `task ios:xcode` and
-# build from the generated Xcode project instead.
+# 自动签名和描述文件管理通过 `task ios:xcode` 生成的 Xcode 项目构建。
 vars:
   BUNDLE_ID: '{{.BUNDLE_ID | default "com.wails.app"}}'
   IOS_PLATFORM: '{{.IOS_PLATFORM | default "simulator"}}'
@@ -35,9 +34,7 @@ tasks:
       TASK_FORCE_YES: '{{if .YES}}true{{else}}false{{end}}'
     prompt: This will check and install iOS development dependencies. Continue?
 
-  # Note: Bindings generation may show CGO warnings for iOS C imports.
-  # These warnings are harmless and don't affect the generated bindings,
-  # as the generator only needs to parse Go types, not C implementations.
+  # 绑定生成器解析 Go 类型，iOS C 导入可能产生 CGO 警告。
   build:
     summary: Creates a build of the application for iOS
     deps:
@@ -153,10 +150,7 @@ tasks:
           fi
         fi
       - |
-        # Sign the bundle. Ad-hoc ("-") works on the simulator only; device
-        # builds need a real identity (and usually entitlements + profile).
-        # Entitlements are only applied to device builds - simulator bundles
-        # must not carry them (SpringBoard refuses to launch the app).
+        # 模拟器使用 ad-hoc 签名，真机使用开发者身份并按配置附加 entitlements。
         if [ "{{.IOS_PLATFORM}}" = "device" ] && [ -f "{{.ENTITLEMENTS_FILE}}" ]; then
           codesign --force --sign "{{.CODESIGN_IDENTITY}}" --entitlements "{{.ENTITLEMENTS_FILE}}" "{{.BIN_DIR}}/{{.APP_NAME}}.app"
         else
@@ -168,8 +162,7 @@ tasks:
     deps: [package]
     cmds:
       - |
-        # Read the real bundle id from the built bundle (it comes from
-        # build/config.yml, not the BUNDLE_ID var, so it varies per project).
+        # 从构建产物读取应用 Bundle ID。
         APP="{{.BIN_DIR}}/{{.APP_NAME}}.app"
         BUNDLE_ID=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$APP/Info.plist")
         xcrun simctl terminate booted "$BUNDLE_ID" 2>/dev/null || true
@@ -321,9 +314,7 @@ tasks:
         fi
       - codesign --force --sign - "{{.BIN_DIR}}/{{.APP_NAME}}.dev.app"
       - |
-        # The dev bundle id comes from build/ios/Info.dev.plist (derived from
-        # build/config.yml), so read it from the built bundle rather than
-        # assuming a com.wails.* prefix.
+        # 从开发构建产物读取应用 Bundle ID。
         DEV_APP="{{.BIN_DIR}}/{{.APP_NAME}}.dev.app"
         BUNDLE_ID=$(/usr/libexec/PlistBuddy -c 'Print :CFBundleIdentifier' "$DEV_APP/Info.plist")
         xcrun simctl terminate booted "$BUNDLE_ID" 2>/dev/null || true

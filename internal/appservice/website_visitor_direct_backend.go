@@ -128,7 +128,7 @@ func websiteVisitorError(ctx context.Context, meta WebsiteVisitorMeta, err error
 		}
 		return ConflictError(requestMeta, cervii18n.ErrorMessageConflict, conflict.Reason)
 	}
-	// 请求被取消不属于业务失败，不产生告警日志。
+	// 请求上下文有效时记录操作失败告警。
 	if ctx.Err() == nil {
 		logAttributes := []any{"operation", operation}
 		logAttributes = append(logAttributes, attributes...)

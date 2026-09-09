@@ -1,4 +1,4 @@
-/** 延迟展示异步读取提示，避免快速请求产生 loading 闪烁。 */
+/** 延迟展示异步读取的加载提示。 */
 import { useEffect, useState, type ReactNode } from "react"
 import { LoaderCircleIcon } from "lucide-react"
 

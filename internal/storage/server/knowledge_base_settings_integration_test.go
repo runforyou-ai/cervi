@@ -103,7 +103,7 @@ func TestKnowledgeBaseSettings(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// 按标识移除被引用模型，避免依赖目录的返回顺序。
+	// 按标识移除被引用模型。
 	provider.Models = slices.DeleteFunc(provider.Models, func(model aiprovideraction.Model) bool {
 		return model.Identifier == "embedding-b"
 	})

@@ -46,7 +46,7 @@ export type InboxListPorts = {
   unread: (count: number) => void
 }
 
-/** 管理一个页面查询的读取队列，查询切换后丢弃旧结果但不取消业务调用。 */
+/** 管理页面查询的读取队列，查询切换后丢弃旧结果。 */
 export class InboxListController {
   private state: InboxListState = {
     ids: [], positions: [], rowIds: [], unavailableIds: [], startCursor: "", endCursor: "",
@@ -87,7 +87,7 @@ export class InboxListController {
     this.applyWindow(next, false)
   }
 
-  /** 以原后继、前驱替代已移动的锚点，不跟随活跃会话上浮。 */
+  /** 以原后继、前驱替代已移动的锚点并保持阅读位置。 */
   private applyWindow(next: InboxListState, initial: boolean) {
     const positions = new Map(next.positions.map((row) => [row.id, row]))
     const moved = new Set(this.state.positions.filter((row) => positions.get(row.id)?.lastActivityAt !== row.lastActivityAt).map((row) => row.id))
@@ -122,7 +122,7 @@ export class InboxListController {
     this.publish({ operation: null })
   }
 
-  /** 独立详情先确认失权时立即移除该行，旧批量响应不能恢复它。 */
+  /** 独立详情确认失权后移除对应行，并校验批量响应的有效性。 */
   removeUnavailable(id: string) {
     if (!this.state.rowIds.includes(id) || this.state.unavailableIds.includes(id)) return
     this.generation++
@@ -150,7 +150,7 @@ export class InboxListController {
   /** 轮询失败时主动重读原窗口，其余失败重试原操作。 */
   retry = () => this.request(this.state.error === "poll" ? "refresh" : this.state.error ?? "refresh")
 
-  /** 等待补页收尾后才捕获刷新范围，失败不修改已确认的窗口。 */
+  /** 补页收尾后捕获刷新范围，失败时保留已确认的窗口。 */
   private async drain() {
     if (this.running) return
     this.running = true
@@ -204,7 +204,7 @@ export class InboxListController {
       window = !base.startCursor
         ? { ...head, hasAfter: head.hasMore }
         : await this.ports.window(base.startCursor, base.endCursor)
-      // 已覆盖顶部的窗口在深处也纳入新会话，并读取中间范围以免跨页遗漏。
+      // 将原先覆盖顶部的窗口扩展到最新首页，并重读完整连续范围。
       if (base.startCursor && !base.hasBefore && window.hasBefore && head.startCursor) {
         window = await this.ports.window(head.startCursor, base.endCursor)
       }
@@ -234,7 +234,7 @@ export class InboxListController {
       this.deferred = next
       const removed = new Set(this.state.ids.filter((id) => !matching.has(id)))
       if (removed.size) this.ports.restore(this.ports.capture(), removed, false)
-      // 向下补页只在尾部追加新行，不等待松手，也不移动当前可见内容。
+      // 向下补页时立即在尾部追加新行并保持当前可见内容的位置。
       const tail = next.positions.filter((row) => appendIds.includes(row.id) && !this.state.ids.includes(row.id))
       this.publish({
         ids: [...this.state.ids.filter((id) => matching.has(id)), ...tail.map((row) => row.id)],
@@ -253,7 +253,7 @@ export class InboxListController {
 
 }
 
-/** 规范化查询身份，内部与全部范围不携带客户筛选。 */
+/** 规范化查询身份，仅客户范围携带客户筛选。 */
 export function normalizeInboxListQuery(query: InboxQuery): InboxQuery {
   return {
     scope: query.scope,

@@ -46,7 +46,7 @@ export function createChannelReceptionFields(
   }
 }
 
-/** 校验接待失败目标不会指回同一成员或团队。 */
+/** 校验接待失败目标与当前成员或团队的互异性。 */
 export function validateChannelReceptionFallback(
   value: ChannelReceptionValues,
   context: z.RefinementCtx,

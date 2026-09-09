@@ -27,9 +27,7 @@ android {
     def hasKeystore = keystoreFile != null && !keystoreFile.trim().isEmpty()
 
     signingConfigs {
-        // A real keystore can be provided via environment variables; without
-        // one, release builds are signed with the debug keystore so they can
-        // be installed for testing (not suitable for Play Store uploads).
+        // 使用环境变量指定的发布密钥签名，未配置时使用调试密钥生成测试包。
         release {
             if (hasKeystore) {
                 storeFile file(keystoreFile)

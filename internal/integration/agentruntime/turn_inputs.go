@@ -48,7 +48,7 @@ func (i *turnInputs) run(ctx context.Context) error {
 	return exit.ExitReason
 }
 
-// watch 定期投递后续输入，收尾后的查询取消不改变运行结果。
+// watch 定期投递新增输入并在收尾后保留运行结果。
 func (i *turnInputs) watch(ctx context.Context) error {
 	ticker := time.NewTicker(triggerPollInterval)
 	defer ticker.Stop()

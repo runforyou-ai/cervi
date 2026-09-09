@@ -12,7 +12,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/task"
 )
 
-// TestRegisterJSONMarksInvalidPayloadPermanent 验证损坏的任务输入不会无效重试。
+// TestRegisterJSONMarksInvalidPayloadPermanent 验证损坏的任务输入被标记为永久失败。
 func TestRegisterJSONMarksInvalidPayloadPermanent(t *testing.T) {
 	type input struct {
 		Value string `json:"value"`
@@ -67,7 +67,7 @@ func TestRegisterJSONWithTerminalFailure(t *testing.T) {
 	}
 }
 
-// TestExecuteHandlerRecoversPanic 验证单个 Action panic 不会终止 Worker 进程。
+// TestExecuteHandlerRecoversPanic 验证 Worker 捕获单个 Action 的 panic 并继续运行。
 func TestExecuteHandlerRecoversPanic(t *testing.T) {
 	err := executeHandler(context.Background(), func(context.Context, json.RawMessage) error {
 		panic("broken action")
@@ -88,7 +88,7 @@ func TestTaskFinalizationContextIgnoresCancellation(t *testing.T) {
 	}
 }
 
-// TestResolveExecutionErrorPreservesHandlerResult 验证心跳错误不会覆盖已经完成的 Action 结果。
+// TestResolveExecutionErrorPreservesHandlerResult 验证 Action 完成后保留其执行结果。
 func TestResolveExecutionErrorPreservesHandlerResult(t *testing.T) {
 	heartbeatErr := errors.New("lease lost")
 	if err := resolveExecutionError(nil, heartbeatErr); err != nil {

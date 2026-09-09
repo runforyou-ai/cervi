@@ -33,7 +33,7 @@ func (a *UpdateConversationUnreadMarkAction) Execute(ctx context.Context, identi
 		if _, err := chatstate.LockMember(ctx, tx, identity, conversationID); err != nil {
 			return err
 		}
-		// 进入会话只清除已有标记，不为没有标记的会话创建个人状态。
+		// 进入会话时清除已有个人状态中的未读标记。
 		if !markedUnread {
 			_, err := tx.NewUpdate().Model((*servermodels.ConversationUserState)(nil)).
 				Set("marked_unread = false").Set("updated_at = now()").

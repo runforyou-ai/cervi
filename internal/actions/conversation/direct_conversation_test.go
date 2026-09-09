@@ -32,7 +32,7 @@ func TestNormalizeInternalTextMessageInput(t *testing.T) {
 	}
 }
 
-// TestNormalizeDirectReplyTarget 验证引用编号可省略但不能携带非法值。
+// TestNormalizeDirectReplyTarget 验证引用编号的选填规则和格式。
 func TestNormalizeDirectReplyTarget(t *testing.T) {
 	for _, reference := range []string{"", "invalid"} {
 		_, fields := normalizeInternalMessageInput(InternalTextMessageInput{

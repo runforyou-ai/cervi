@@ -39,7 +39,7 @@ func (r fixedTenantResolver) Resolve(_ context.Context, accessHost string) (tena
 	return tenant.Scope{}, tenant.ErrNotFound
 }
 
-// TestRequestHostKeepsLocalAddressesOnHTTP 验证本地和内网地址不会申请公网证书。
+// TestRequestHostKeepsLocalAddressesOnHTTP 验证本地和内网地址使用 HTTP。
 func TestRequestHostKeepsLocalAddressesOnHTTP(t *testing.T) {
 	tests := []struct {
 		value string
@@ -82,7 +82,7 @@ func TestAllowCertificateRequiresHTTPEntry(t *testing.T) {
 	}
 }
 
-// TestNewHTTPSEntryExternalDoesNotCreateListeners 验证外部模式不会创建自动 HTTPS 监听器。
+// TestNewHTTPSEntryExternalDoesNotCreateListeners 验证外部模式使用外部 HTTPS 入口。
 func TestNewHTTPSEntryExternalDoesNotCreateListeners(t *testing.T) {
 	service := NewHTTPSEntry(
 		serverconfig.TLSConfig{Mode: "external"},
@@ -197,7 +197,7 @@ func TestAllowCertificateRestoresCachedDomain(t *testing.T) {
 	}
 }
 
-// TestAllowCertificateRejectsExpiredCachedDomain 验证过期缓存不会绕过新证书限制。
+// TestAllowCertificateRejectsExpiredCachedDomain 验证域名缓存到期后重新执行证书资格校验。
 func TestAllowCertificateRejectsExpiredCachedDomain(t *testing.T) {
 	const host = "expired.runforyou.app"
 	cache := autocert.DirCache(t.TempDir())

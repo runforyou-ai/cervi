@@ -98,7 +98,7 @@ export function useInboxList(input: InboxQuery, viewport: InboxListViewport, opt
     if (event.type === "updated" && key[0] === resourceKeys.conversationSummary()[0] && event.query.state.data === null) {
       controller.removeUnavailable(String(key[1]))
     }
-    // 新批次接管展示后移除含失权摘要的旧缓存，避免其再次被页签复用。
+    // 新批次接管展示后移除含失权摘要的旧缓存。
     if (event.type === "observerRemoved" && key[0] === resourceKeys.inboxConversations()[0] && event.query.getObserversCount() === 0) {
       const results = (event.query.state.data as InboxConversationResults | undefined)?.results
       if (results?.some((row) => row.conversation && controller.getSnapshot().unavailableIds.includes(row.id))) client.removeQueries({ queryKey: key, exact: true })

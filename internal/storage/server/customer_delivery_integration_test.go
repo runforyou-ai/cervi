@@ -274,7 +274,7 @@ func TestCustomerDeliveryScanAndManualConfirmation(t *testing.T) {
 	f := newCustomerDeliveryFixture(t)
 	ctx := context.Background()
 	first := f.send(t, "扫描恢复", uuid.NewV7().String())
-	// 用数据库时间显式设置到期，避免宿主和容器的毫秒级时钟差。
+	// 按数据库当前时间设置到期时间。
 	if _, err := f.db.ExecContext(ctx, "UPDATE customer_message_deliveries SET available_at = now() - interval '1 second' WHERE id = ?", first.ID); err != nil {
 		t.Fatal(err)
 	}
@@ -383,7 +383,7 @@ func TestCustomerDeliveryAtomicEnqueue(t *testing.T) {
 	}
 }
 
-// TestCustomerDeliveryBotMessageNamespace 验证换 Bot 后相同平台消息编号不会冲突。
+// TestCustomerDeliveryBotMessageNamespace 验证平台消息编号按机器人隔离。
 func TestCustomerDeliveryBotMessageNamespace(t *testing.T) {
 	f := newCustomerDeliveryFixture(t)
 	ctx := context.Background()

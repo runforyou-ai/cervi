@@ -180,7 +180,7 @@ func TestGroupMentionNavigation(t *testing.T) {
 	if err != nil || result.Outcome != "reviewed" {
 		t.Fatalf("archived review=%+v err=%v", result, err)
 	}
-	// 另一企业的有效身份不能读取或确认当前企业的群聊。
+	// 核验群聊读取和确认操作的企业隔离。
 	other := newNavigationFixture(t)
 	if _, err := pending.Execute(ctx, other.member, f.groupID); !errors.Is(err, conversationaction.ErrConversationNotFound) {
 		t.Fatalf("cross-tenant queue: %v", err)
@@ -266,7 +266,7 @@ func TestGroupMessageContextAndOrder(t *testing.T) {
 			t.Fatalf("sequence[%d]=%d", index, sequence)
 		}
 	}
-	// 改变来源时间不会改变群聊最新页、游标和普通已读的顺序。
+	// 核验群聊最新页、游标和已读水位均按序号排序。
 	if _, err := f.db.NewUpdate().Model((*servermodels.Message)(nil)).Set("originated_at = ?", time.Now().Add(24*time.Hour)).Where("id = ?", messages[0].ID).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}

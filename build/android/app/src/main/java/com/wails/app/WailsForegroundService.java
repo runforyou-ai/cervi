@@ -13,10 +13,8 @@ import androidx.annotation.Nullable;
 import androidx.core.app.NotificationCompat;
 
 /**
- * A minimal started foreground service. It does no work of its own — its purpose
- * is to keep the app's process alive (with the required ongoing notification) so
- * the developer's Go goroutines keep running while the app is backgrounded,
- * which Android would otherwise be free to kill. Start it from
+ * 通过常驻通知维持应用进程和后台 Go goroutine 的前台服务。
+ * Start it from
  * {@link WailsBridge#startForegroundService(String)} and stop it with
  * {@link WailsBridge#stopForegroundService()}.
  */

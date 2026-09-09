@@ -24,7 +24,7 @@ func (m *customerHistoryChatModel) Generate(ctx context.Context, input []*schema
 	return m.processChatModel.Generate(ctx, input, opts...)
 }
 
-// TestCustomerHistoryTool 验证占位结果到达模型，且工具不会泄漏到后续单聊运行。
+// TestCustomerHistoryTool 验证模型收到历史占位结果及工具的运行范围隔离。
 func TestCustomerHistoryTool(t *testing.T) {
 	runtime, err := New()
 	if err != nil {

@@ -244,7 +244,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		createdMember          *useraction.User
 		resolvedAfterUpdate    *servermodels.Identity
 	)
-	// runStep 在子测试失败时终止整个测试，避免后续子测试解引用未赋值的共享变量。
+	// runStep 在子测试失败时立即终止整个测试。
 	runStep := func(name string, step func(t *testing.T)) {
 		t.Helper()
 		if !t.Run(name, step) {
@@ -1614,7 +1614,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil || agent.DisplayName != "售前智能体" || agent.WorkStatus != domain.WorkStatusAway {
 			t.Fatalf("agent detail = %#v, error = %v", agent, err)
 		}
-		// 无效工作状态不能保存同一次提交中的资料修改。
+		// 核验无效工作状态触发整次资料提交回滚。
 		if _, err := agentaction.NewUpdateAgentAction(db).Execute(context.Background(), loggedIn.Identity, createdAgent.ID, agentaction.UpdateInput{
 			DisplayName: "不应保存的名称", RoleID: customerServiceRole.ID, TeamIDs: []string{team.ID}, WorkStatus: "invalid",
 		}); err == nil {

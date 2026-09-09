@@ -58,7 +58,7 @@ func (s *LocalObjectService) ServeHTTP(writer http.ResponseWriter, request *http
 			s.previewKnowledgeObject(writer, request, storageKey)
 			return
 		}
-		// 内嵌图片按文件元数据返回内容类型，不依赖存储键的扩展名。
+		// 按文件元数据设置内嵌图片的响应内容类型。
 		if request.URL.Query().Get("inline") == "1" {
 			scope, err := s.resolveTenant.Resolve(request.Context(), tenant.AccessHost(request.Context()))
 			if err != nil {

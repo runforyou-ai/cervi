@@ -86,7 +86,7 @@ func NewService(application *appservice.Service, options ...ServiceOption) *Serv
 		service.writeContactList(c, true)
 	})
 	service.registerWebsiteVisitorRoutes(router)
-	// 注册无需 Bearer Token 的 Telegram 回调。
+	// 注册通过渠道密钥认证的 Telegram 回调。
 	if service.telegramWebhook != nil {
 		router.POST("/public/telegram-channels/:channelID/webhook", service.receiveTelegramWebhook)
 	}

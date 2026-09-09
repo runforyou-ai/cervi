@@ -75,7 +75,7 @@ func TestInboxIndependentConversation(t *testing.T) {
 			t.Fatalf("invisible entity leaked=%+v", item)
 		}
 	}
-	// 不存在和跨企业会话使用相同错误，不提供可枚举的存在性信息。
+	// 核验不存在和跨企业会话返回相同错误。
 	for _, id := range []string{missing, foreign.groupID} {
 		_, err := backend.GetInboxConversation(ctx, meta, id)
 		var apiError *appservice.Error

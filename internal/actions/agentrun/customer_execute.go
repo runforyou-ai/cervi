@@ -83,13 +83,13 @@ func (p customerRunPolicy) persistMessage(ctx context.Context, db bun.IDB, polic
 	if err != nil || !inserted {
 		return err
 	}
-	// 正常回复与持久投递共享事务，内部失败消息不发送给客户。
+	// 在回复事务中为正常回复安排持久投递。
 	if messageType == domain.MessageTypeText && policyContext.DeliveryRoute.ChannelType == domain.ChannelTypeTelegram {
 		if err := deliveryaction.Enqueue(ctx, db, p.enqueuer, policyContext.DeliveryRoute, message); err != nil {
 			return err
 		}
 	}
-	// 只有推进周期摘要的正常回复记录首响，失败消息不计入首响。
+	// 为推进周期摘要的正常回复记录首响。
 	if message.Type == string(domain.MessageTypeText) {
 		if _, err := db.NewUpdate().Model(policyContext.ServiceSession).
 			Set("first_response_at = COALESCE(first_response_at, ?)", message.OriginatedAt).
@@ -193,7 +193,7 @@ func loadClaimedCustomerMessages(ctx context.Context, db bun.IDB, run *servermod
 			role = agentruntime.MessageRoleUser
 		}
 		content := row.Body
-		// 引用保留一层原文和真实主体类型，不增加模型对话角色。
+		// 在同一模型消息中保留一层引用原文和主体类型。
 		if row.ReplyToMessageID != nil || row.ExternalReplyID != nil {
 			reference := customerMessageReference{Deleted: row.ReplyDeleted}
 			if row.ReplyToMessageID != nil {

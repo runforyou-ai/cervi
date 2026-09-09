@@ -57,7 +57,7 @@ export function isNotFoundApiError(error: unknown): error is ApiError {
   return isApiError(error) && error.kind === "not_found"
 }
 
-/** 注入认证和语言后调用应用服务。卸载时忽略结果，不取消绑定。 */
+/** 注入认证和语言后调用应用服务，卸载时丢弃过期结果。 */
 export async function call<T>(
   operation: (meta: RequestMeta) => CancellablePromise<T>,
   signal?: AbortSignal,

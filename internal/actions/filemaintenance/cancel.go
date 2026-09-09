@@ -24,7 +24,7 @@ func (a *CancelUploadAction) Execute(ctx context.Context, identity *servermodels
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		// 已关联消息的文件由附件状态接口管理，不能直接清理。
+		// 已关联消息的文件由附件状态接口管理。
 		_, err := tx.NewUpdate().Model((*servermodels.File)(nil)).
 			Set("status = ?", domain.FileStatusDeleting).Set("expires_at = now()").Set("updated_at = now()").
 			Where("id = ? AND organization_id = ? AND created_by_user_id = ?", fileID, identity.Organization.ID, identity.User.ID).

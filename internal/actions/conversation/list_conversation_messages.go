@@ -364,7 +364,7 @@ func buildConversationMessageHistory(rows []conversationMessageRow) (Conversatio
 	return result, nil
 }
 
-// ListReferences 在同一读取快照中刷新指定消息的引用关系，不改变消息窗口。
+// ListReferences 在同一读取快照中刷新指定消息的引用关系并保持消息窗口。
 func (q *ListConversationMessagesQuery) ListReferences(ctx context.Context, identity *servermodels.Identity, conversationID string, ids []string) ([]ConversationMessage, error) {
 	var messages []ConversationMessage
 	err := q.db.RunInTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true}, func(ctx context.Context, tx bun.Tx) error {

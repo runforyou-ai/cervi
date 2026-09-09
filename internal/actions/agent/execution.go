@@ -168,7 +168,7 @@ func managedExecutionModelQuery(db bun.IDB, organizationID, providerID, modelIde
 
 // insertExecutionRevision 创建 AI 员工执行配置版本。
 func insertExecutionRevision(ctx context.Context, db bun.IDB, identity *servermodels.Identity, agentID, revisionID string, input ExecutionInput, model ModelOption, mcpServerIDs []string) (Execution, error) {
-	// 锁定绑定记录，保证校验与版本写入之间知识库不会被删除。
+	// 锁定知识库绑定记录直至配置版本写入完成。
 	if len(input.Managed.KnowledgeBaseIDs) > 0 {
 		ids := make([]string, 0, len(input.Managed.KnowledgeBaseIDs))
 		if err := db.NewSelect().Model((*servermodels.KnowledgeBase)(nil)).

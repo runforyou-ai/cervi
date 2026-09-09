@@ -12,7 +12,7 @@ import (
 	"testing"
 )
 
-// TestKeyConstantsMatchLocaleFiles 验证包内全部 Key 常量与各语言词条键集合双向一致：常量必须都有词条，词条不得有多余键；由此同时保证各语言文件包含相同的文案键。
+// TestKeyConstantsMatchLocaleFiles 验证 Key 常量与各语言词条键集合一致。
 func TestKeyConstantsMatchLocaleFiles(t *testing.T) {
 	constants := collectKeyConstants(t)
 	if len(constants) == 0 {

@@ -673,7 +673,7 @@ export function LoadInbox(meta: $models.RequestMeta, input: $models.LoadInboxInp
 }
 
 /**
- * LoadStartup 返回初始化或服务器连接入口，不读取登录状态。
+ * LoadStartup 根据企业初始化状态返回初始化或服务器连接入口。
  */
 export function LoadStartup(meta: $models.RequestMeta): $CancellablePromise<$models.Startup> {
     return $Call.ByID(3512506751, meta);
@@ -729,7 +729,7 @@ export function PrepareFileUpload(meta: $models.RequestMeta, fileID: string): $C
 }
 
 /**
- * ProbeServer 检测企业服务器并返回公开企业名称，不保存地址。
+ * ProbeServer 检测企业服务器并返回公开企业名称。
  */
 export function ProbeServer(meta: $models.RequestMeta, serverURL: string): $CancellablePromise<$models.InstallationStatus> {
     return $Call.ByID(885726575, meta, serverURL);

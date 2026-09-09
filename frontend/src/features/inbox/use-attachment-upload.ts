@@ -116,7 +116,7 @@ export function useAttachmentUpload() {
     }
   }
 
-  /** 标记消息命令已发出，避免页面离开时取消同一个文件。 */
+  /** 标记已提交的消息命令并转交文件管理权。 */
   function markSending(sending: boolean) {
     if (sessionRef.current) sessionRef.current.sending = sending
   }

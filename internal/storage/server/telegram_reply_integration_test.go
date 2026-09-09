@@ -114,7 +114,7 @@ func TestTelegramReplyLateMapping(t *testing.T) {
 	if history[len(history)-1].ReplyTo.ID != delivery.MessageID {
 		t.Fatal("late receipt not linked")
 	}
-	// 重放的引用目标变化不能覆盖首次接收的平台事实。
+	// 核验重放时保留首次接收的平台引用信息。
 	f.receiveReply(t, 10, "原消息后到", &channelaction.TelegramWebhookReply{MessageID: 1})
 	history = f.replyHistory(t)
 	if history[1].ReplyTo.ID != history[2].ID {
@@ -160,7 +160,7 @@ func TestTelegramReplyTargetBoundaries(t *testing.T) {
 			t.Fatal("old bot remains replyable")
 		}
 	}
-	// 新机器人相同编号不能连接到旧机器人的原消息。
+	// 核验引用消息的平台机器人归属。
 	f.receiveReply(t, 3, "新机器人的引用", &channelaction.TelegramWebhookReply{MessageID: 2, Body: "新机器人原文"})
 	history = f.replyHistory(t)
 	if history[len(history)-1].ReplyTo.ID != "" {
@@ -168,7 +168,7 @@ func TestTelegramReplyTargetBoundaries(t *testing.T) {
 	}
 }
 
-// TestTelegramReplyDeliveryFailures 验证限流重试保留引用，平台拒绝不会退化为普通发送。
+// TestTelegramReplyDeliveryFailures 验证限流重试保留引用及平台拒绝时的发送失败状态。
 func TestTelegramReplyDeliveryFailures(t *testing.T) {
 	f := newCustomerDeliveryFixture(t)
 	delivery := f.sendReply(t, f.replyHistory(t)[0].ID)

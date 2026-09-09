@@ -178,7 +178,7 @@ func (r *repository) releaseOutbox(ctx context.Context, record *servermodels.Tas
 	return nil
 }
 
-// claimRun 以数据库租约认领任务，确保重复消息不会并发执行同一次运行。
+// claimRun 通过数据库租约串行认领单次任务运行。
 func (r *repository) claimRun(ctx context.Context, runID, workerID string) (*servermodels.TaskRun, error) {
 	now := time.Now().UTC()
 	var record servermodels.TaskRun
@@ -406,7 +406,7 @@ func retryDelay(attempt int) time.Duration {
 	return min(delay, retryDelayMax)
 }
 
-// truncateError 限制持久化错误长度，按 rune 截断避免切断 UTF-8 字符。
+// truncateError 按 Unicode 字符截断持久化错误信息。
 func truncateError(err error) string {
 	if err == nil {
 		return ""

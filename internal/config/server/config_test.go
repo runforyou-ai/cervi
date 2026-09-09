@@ -115,7 +115,7 @@ func clearServerEnvironment(t *testing.T) {
 	}
 }
 
-// TestValidationRejectsAutoTLSPortConflict 验证 TLS 自动模式端口不会与服务监听器冲突。
+// TestValidationRejectsAutoTLSPortConflict 验证 TLS 自动模式与服务监听端口的互异性。
 func TestValidationRejectsAutoTLSPortConflict(t *testing.T) {
 	config := validTestConfig()
 	config.Server.Port = 443

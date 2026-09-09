@@ -15,7 +15,7 @@ import (
 
 // AppendMessage 在调用方事务和会话锁内追加消息并维护摘要；调用方负责授权及完整发送意图校验。
 func AppendMessage(ctx context.Context, db bun.IDB, conversation *servermodels.Conversation, message *servermodels.Message) (*servermodels.Message, bool, error) {
-	// 幂等重放返回既有消息，不再次分配序号或更新摘要。
+	// 幂等重放返回既有消息并保留序号和摘要。
 	if message.IdempotencyKey != nil {
 		existing := &servermodels.Message{}
 		err := db.NewSelect().Model(existing).

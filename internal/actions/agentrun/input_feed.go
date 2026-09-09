@@ -322,7 +322,7 @@ func loadClaimedConversationMessages(ctx context.Context, db bun.IDB, run *serve
 			role = agentruntime.MessageRoleAssistant
 		}
 		content := row.Body
-		// 以结构化正文携带一层引用，原消息不占用新的对话角色。
+		// 在同一对话消息的结构化正文中携带一层引用。
 		if row.ReplyToMessageID != nil {
 			reference := claimedMessageReference{MessageID: *row.ReplyToMessageID, Deleted: row.ReplyDeleted}
 			if !row.ReplyDeleted {

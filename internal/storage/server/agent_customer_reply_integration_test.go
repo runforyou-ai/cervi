@@ -157,7 +157,7 @@ func testAgentCustomerReplies(t *testing.T, db *bun.DB, identity *servermodels.I
 						t.Fatal("reference target should be outside history window")
 					}
 				}
-				// 后续 Claim 仍按同一客服周期构造上下文，不重新混入已结束周期。
+				// 核验连续 Claim 按同一客服周期构造上下文。
 				input.ClientMessageID, input.Body = uuid.NewV7().String(), "本轮补充信息"
 				if _, err := receive.Execute(ctx, input); err != nil {
 					return agentruntime.RunResult{}, err
