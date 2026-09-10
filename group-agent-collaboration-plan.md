@@ -273,7 +273,7 @@ PR-A 收窄互斥粒度时同步改写这两处：不变量表述为「同一执
 | D | 类型化结束工具：`outcome`、`silent`、`mentions`、`handoff` 输入、`depth` 上限 | `A → B → A` 接力保留来源；超过上限的接力被拒绝且不留下 `@`；真人消息重置链条；`silent` 不写消息但推进轮转 |
 | E | 话题 / 结构化协作 | 按真实需求启动 |
 
-A 是纯重构，代价是一次高触达的表与列改名，收益是范围键收敛与查询简化。B 与 C 可以合并交付。`silent` 依赖结束工具，与接力一起在 D 落地，B 阶段被 `@` 的 Agent 一定回复。
+A 是纯重构，改动集中在 `internal/actions/agentrun`、三个存储模型和四处调度调用方，测试为机械替换，清单见附录 A。B 与 C 可以合并交付。`silent` 依赖结束工具，与接力一起在 D 落地，B 阶段被 `@` 的 Agent 一定回复。
 
 `internal/integrationtest/agent_group_integration_test.go` 现在断言群内 `@Agent` 返回 `GroupMentionTargetInvalid` 且不产生 Agent 记录，这是当前契约。B 需要改写这条用例。
 
@@ -292,3 +292,167 @@ A 是纯重构，代价是一次高触达的表与列改名，收益是范围键
 - 不引入策略快照版本、控制版本代次和成员代次；资格在事务中按当前事实校验。
 - 不引入展示裁剪策略层；群成员读取公开消息与现有运行过程，权限统一在角色体系建设时处理。
 - 不为群聊单独建立实时协议；沿用现有轮询，统一实时按 `chat-roadmap.md` 阶段 2E 交付。
+
+## 附录 A：PR-A 实施清单
+
+PR-A 只做模型收敛，不引入群聊行为。完成后三条已上线链路的产品行为不变，输入序号按客服周期重新编号。
+
+### A.1 迁移
+
+四个文件，时间戳由 `wails3 task make:migration` 生成。
+
+**1. `create_agent_lanes_table`**
+
+```sql
+CREATE TABLE agent_lanes (
+    id                 uuid PRIMARY KEY DEFAULT uuidv7(),
+    created_at         timestamptz NOT NULL DEFAULT now(),
+    updated_at         timestamptz NOT NULL DEFAULT now(),
+    organization_id    uuid NOT NULL,
+    conversation_id    uuid NOT NULL,
+    agent_identity_id  uuid NOT NULL,
+    scope_kind         text NOT NULL,
+    scope_id           uuid NOT NULL,
+    desired_seq        bigint NOT NULL DEFAULT 0,
+    processed_seq      bigint NOT NULL DEFAULT 0
+);
+
+CREATE UNIQUE INDEX agent_lanes_scope_agent_unique
+    ON agent_lanes (organization_id, scope_kind, scope_id, agent_identity_id);
+```
+
+**2. `create_agent_inputs_table`**
+
+```sql
+CREATE TABLE agent_inputs (
+    id                 uuid PRIMARY KEY DEFAULT uuidv7(),
+    created_at         timestamptz NOT NULL DEFAULT now(),
+    organization_id    uuid NOT NULL,
+    lane_id            uuid NOT NULL,
+    input_seq          bigint NOT NULL,
+    kind               text NOT NULL,
+    source_message_id  uuid NOT NULL,
+    source_subject_id  uuid NOT NULL,
+    source_ordinal     integer NOT NULL DEFAULT 0,
+    depth              integer NOT NULL DEFAULT 0,
+    agent_run_id       uuid
+);
+
+CREATE UNIQUE INDEX agent_inputs_lane_seq_unique
+    ON agent_inputs (lane_id, input_seq);
+```
+
+按目标结构一次建全。PR-A 写入 `kind`、`source_message_id` 与 `source_subject_id`；`source_ordinal` 与 `depth` 保持默认值，分别由 PR-C 与 PR-D 开始写入。
+
+**3. `switch_agent_runs_to_execution_scope`**
+
+先清空 `agent_runs` 与 `agent_run_blocks`，再变更结构。运行记录是执行事实，不做回填；本地开发库中已有 AI 回复的过程展开随之清空，消息本身保留。
+
+```sql
+TRUNCATE agent_run_blocks, agent_runs;
+
+ALTER TABLE agent_runs
+    ADD COLUMN lane_id uuid NOT NULL,
+    ADD COLUMN scope_kind text NOT NULL,
+    ADD COLUMN scope_id uuid NOT NULL,
+    ADD COLUMN outcome text,
+    DROP COLUMN trigger_type,
+    DROP COLUMN service_session_id;
+
+ALTER TABLE agent_runs RENAME COLUMN trigger_start_seq TO input_start_seq;
+ALTER TABLE agent_runs RENAME COLUMN trigger_end_seq TO input_end_seq;
+
+DROP INDEX agent_runs_conversation_active_unique;
+
+CREATE UNIQUE INDEX agent_runs_active_scope_unique
+    ON agent_runs (organization_id, scope_kind, scope_id)
+    WHERE status IN ('queued', 'running');
+```
+
+`conversation_id` 与 `agent_identity_id` 保留，收件箱与运行过程查询不受影响。
+
+**4. `drop_conversation_agent_tables`**
+
+删除 `conversation_agent_triggers` 与 `conversation_agent_states`。Down 迁移恢复两张表的结构，不恢复数据。
+
+### A.2 领域值
+
+| 文件 | 改动 |
+| --- | --- |
+| `internal/domain/agent_run.go` | `AgentTriggerType` 更名为 `AgentInputKind`，取值保留 `agent_direct` 与 `customer_auto`；新增 `AgentExecutionScopeKind`，取值 `conversation` 与 `service_session` |
+
+### A.3 存储模型
+
+| 文件 | 改动 |
+| --- | --- |
+| `models/conversation_agent_state.go` | 删除，由 `models/agent_lane.go` 取代 |
+| `models/conversation_agent_trigger.go` | 删除，由 `models/agent_input.go` 取代 |
+| `models/agent_run.go` | 增加 `LaneID`、`ScopeKind`、`ScopeID`、`Outcome`；`TriggerStartSeq` / `TriggerEndSeq` 更名为 `InputStartSeq` / `InputEndSeq`；删除 `TriggerType` 与 `ServiceSessionID` |
+
+新模型别名沿用现有风格：`agent_lanes AS al`、`agent_inputs AS ai`。
+
+### A.4 执行链路
+
+| 文件 | 改动 |
+| --- | --- |
+| `agentrun/input_feed.go` | 删除 `agentRunScope`、`agentRunScopeFor`、`validateAgentRunScope` 与 `applySelect`；`Peek` 与 `Claim` 按 `lane_id` 过滤；`assignAgentTriggers` 改为按 `lane_id` 认领输入；`lockAgentRun` 按 `run.LaneID` 锁 Lane |
+| `agentrun/schedule.go` | `advanceAgentSequence` 改为按 scope 建立或锁定 Lane 并分配序号，返回 Lane 编号与水位；`agentRunSpec` 携带 scope 与来源主体；`insertAndEnqueueRun` 写入 `lane_id`、`scope_kind`、`scope_id` |
+| `agentrun/customer_schedule.go` | 输入范围改为 `service_session` scope |
+| `agentrun/execute.go` | `policyForRun` 依据 `scope_kind` 选择实现；完成与失败事务改用输入边界新列名 |
+| `agentrun/cancellation.go` | `cancelServiceSessionRuns` 按 `service_session` scope 定位 Lane |
+| `agentrun/stop_agent_reply.go` | 按 Lane 定位运行与水位 |
+| `agentrun/agent_chat_execute.go`、`agentrun/customer_execute.go` | `enqueueNext` 的运行规格携带 scope |
+
+`policyForRun` 在 PR-A 只按 `scope_kind` 分支。PR-B 引入群聊后，`conversation` scope 需要再按会话类型区分 AI 聊天与群聊，会话类型由 `begin` 已有的查询一并读出。
+
+跨 Lane 的轮转选择在 PR-B 落地。PR-A 的每个执行范围内只有一条 Lane，续跑行为与现有 `enqueueNext` 一致。
+
+### A.5 调用方
+
+以下四处需要向调度入口传入发送者主体编号，用于填充 `source_subject_id`：
+
+| 文件 | 入口 |
+| --- | --- |
+| `actions/conversation/internal_text_message.go` | `Scheduler.Schedule` |
+| `actions/conversation/receive_website_customer_text_message.go` | `ScheduleCustomerAuto` |
+| `actions/conversation/manage_service_session.go` | `ScheduleCustomerAuto` |
+| `actions/channel/receive_telegram_webhook.go` | `ScheduleCustomerAuto` |
+
+`actions/conversation/agent_process.go` 与 `actions/inbox/load_inbox.go` 只使用 `agent_runs` 的保留列，无需改动。
+
+### A.6 测试
+
+现有断言引用旧表名与旧列名，分布在 11 个文件共 26 处，改动为机械替换：
+
+```text
+internal/integrationtest/agent_chat_lock_integration_test.go
+internal/integrationtest/agent_conversation_integration_test.go
+internal/integrationtest/agent_customer_reply_integration_test.go
+internal/integrationtest/agent_direct_reply_integration_test.go
+internal/integrationtest/agent_error_message_integration_test.go
+internal/integrationtest/agent_group_integration_test.go
+internal/integrationtest/agent_stop_reply_integration_test.go
+internal/integrationtest/agent_telegram_integration_test.go
+internal/integrationtest/chat_message_append_integration_test.go
+internal/integrationtest/customer_lock_integration_test.go
+internal/integrationtest/server_actions_integration_test.go
+internal/task/server/agent_execution_integration_test.go
+```
+
+新增用例：
+
+- 客服转交、认领与关闭三条路径各自不产生重叠的活动运行。
+- 同一会话内先后两个客服周期，第二个周期的输入序号从 1 开始，且第一个周期的水位已结算。
+- 同一执行范围内并发建立运行时，唯一索引拒绝第二次插入。
+
+### A.7 路线图同步
+
+改写 `agent-roadmap.md` 不变量 5 与第 6.3 节，表述改为「同一执行范围内最多一个在途 Run，运行期间到达的新输入不得丢失，执行范围由 `scope_kind` 与 `scope_id` 表达」，并补充扩展条件：引入新的执行范围取值时，不同范围的执行所读取的历史与写回的结果必须互不重叠。第 6.1 节的 `conversation_agent_states` 与第 6.2 节的 `conversation_agent_triggers` 结构说明同步替换为 Lane 与 Input。
+
+### A.8 验收
+
+- `wails3 task test:server` 全量通过。
+- 独立 AI 聊天、网站 AI 客服与 Telegram AI 客服的收发、抢占、停止与转交行为不变。
+- 数据库中不再存在 `conversation_agent_states` 与 `conversation_agent_triggers`。
+- 代码中不再出现 `service_session_id IS NOT DISTINCT FROM`。
+- 无新增前端改动，无新增 appservice 方法。
