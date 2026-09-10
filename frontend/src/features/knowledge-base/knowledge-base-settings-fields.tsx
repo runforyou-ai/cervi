@@ -5,7 +5,7 @@ import { AIModelType, type AIProviderSummaryData } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field"
 import { NativeSelect } from "@/components/ui/native-select"
-import type { KnowledgeBaseFormValues } from "./knowledge-base-schema"
+import { knowledgeEmbeddingDimensions, type KnowledgeBaseFormValues } from "./knowledge-base-schema"
 
 /** 渲染向量模型、数值参数和可清空的重排模型选择。 */
 export function KnowledgeBaseSettingsFields({ control, isQA, providers }: {
@@ -17,7 +17,17 @@ export function KnowledgeBaseSettingsFields({ control, isQA, providers }: {
   return (
     <>
       <KnowledgeModelField control={control} name="embeddingModel" providers={providers} />
-      <FormInputField control={control} name="embeddingDimension" label={t("form.embeddingDimension")} type="number" min={1} step={1} />
+      <Controller control={control} name="embeddingDimension" render={({ field, fieldState }) => (
+        <Field data-invalid={fieldState.invalid}>
+          <FieldLabel htmlFor="embeddingDimension" required>{t("form.embeddingDimension")}</FieldLabel>
+          <NativeSelect {...field} id="embeddingDimension" required aria-invalid={fieldState.invalid}>
+            <option value="">{t("form.selectEmbeddingDimension")}</option>
+            {knowledgeEmbeddingDimensions.map((dimension) => (
+              <option key={dimension} value={dimension}>{dimension}</option>
+            ))}
+          </NativeSelect>
+        </Field>
+      )} />
       {!isQA && (
         <>
           <FormInputField control={control} name="chunkLength" label={t("form.chunkLength")} type="number" min={256} max={2048} step={1} />

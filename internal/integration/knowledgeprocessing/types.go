@@ -3,14 +3,23 @@ package knowledgeprocessing
 
 import "github.com/runforyou-ai/cervi/internal/domain"
 
-// ProcessInput 固定本次文档任务的来源和分段参数。
+// ProcessInput 固定本次文档任务的来源、分段和向量参数。
 type ProcessInput struct {
-	OrganizationID  string `json:"organizationId"`
-	KnowledgeBaseID string `json:"knowledgeBaseId"`
-	DocumentID      string `json:"documentId"`
-	ProcessingID    string `json:"processingId"`
-	ChunkLength     int    `json:"chunkLength"`
-	ChunkOverlap    int    `json:"chunkOverlap"`
+	OrganizationID           string `json:"organizationId"`
+	KnowledgeBaseID          string `json:"knowledgeBaseId"`
+	DocumentID               string `json:"documentId"`
+	ProcessingID             string `json:"processingId"`
+	ChunkLength              int    `json:"chunkLength"`
+	ChunkOverlap             int    `json:"chunkOverlap"`
+	EmbeddingProviderID      string `json:"embeddingProviderId"`
+	EmbeddingModelIdentifier string `json:"embeddingModelIdentifier"`
+	EmbeddingDimension       int    `json:"embeddingDimension"`
+}
+
+// EmbeddingCredential 提供访问向量模型所需的凭据，只在执行任务时传递。
+type EmbeddingCredential struct {
+	BaseURL string `json:"baseUrl"`
+	APIKey  string `json:"apiKey"`
 }
 
 // ProcessResult 返回实际持久化的分段数量。

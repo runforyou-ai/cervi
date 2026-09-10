@@ -2,6 +2,8 @@
 
 import os
 import unittest
+from dataclasses import replace
+from unittest.mock import patch
 from uuid import uuid4, uuid5
 
 import psycopg
@@ -10,6 +12,18 @@ from fastapi.testclient import TestClient
 from psycopg.conninfo import make_conninfo
 
 from knowledge import ProcessInput, SegmentInput, list_segments, router, save_segments
+
+DIMENSION = 384
+
+
+class StubEmbedder:
+    """返回固定维度向量，替代真实向量模型调用。"""
+
+    def __init__(self, **kwargs):
+        self.kwargs = kwargs
+
+    def run(self, documents):
+        return {"documents": [replace(document, embedding=[0.01] * DIMENSION) for document in documents]}
 
 
 class StorageTests(unittest.TestCase):
@@ -23,8 +37,8 @@ class StorageTests(unittest.TestCase):
             dbname=os.environ["TEST_POSTGRES_DB"], sslmode=os.environ["TEST_POSTGRES_SSLMODE"],
         )
         os.environ["PG_CONN_STR"] = self.connection_string
-        self.input = ProcessInput(organizationId=uuid4(), knowledgeBaseId=uuid4(), documentId=uuid4(), processingId=uuid4(), chunkLength=512, chunkOverlap=50)
-        self.segments = [{"position": i, "content": f"分段 {i}", "character_count": len(f"分段 {i}"), "page_number": None, "source_label": ""} for i in range(1, 106)]
+        self.input = ProcessInput(organizationId=uuid4(), knowledgeBaseId=uuid4(), documentId=uuid4(), processingId=uuid4(), chunkLength=512, chunkOverlap=50, embeddingModelIdentifier="embedding-test", embeddingDimension=DIMENSION, embedding={"baseUrl": "https://models.test/v1", "apiKey": "test-key"})
+        self.segments = [{"position": i, "content": f"分段 {i}", "character_count": len(f"分段 {i}"), "page_number": None, "source_label": "", "embedding": [0.01] * DIMENSION} for i in range(1, 106)]
         with psycopg.connect(self.connection_string) as connection:
             connection.execute("INSERT INTO knowledge_bases(id,organization_id,created_by_user_id,name,category) VALUES (%s,%s,%s,%s,'standard')", (self.input.knowledgeBaseId,self.input.organizationId,uuid4(),str(uuid4())))
             connection.execute("INSERT INTO knowledge_documents(id,knowledge_base_id,group_id,file_id,created_by_user_id,status,processing_id) VALUES (%s,%s,%s,%s,%s,'fetching',%s)", (self.input.documentId,self.input.knowledgeBaseId,uuid4(),uuid4(),uuid4(),self.input.processingId))
@@ -86,10 +100,14 @@ class StorageTests(unittest.TestCase):
         app.include_router(router)
         with TestClient(app) as client:
             text="合同金额 1,234.50 元，不得退款。\n"*1500
-            response=client.post("/knowledge/process",data={"metadata":self.input.model_dump_json()},files={"file":("合同.txt",text.encode(),"text/plain")})
+            with patch("knowledge.OpenAIDocumentEmbedder", StubEmbedder):
+                response=client.post("/knowledge/process",data={"metadata":self.input.model_dump_json()},files={"file":("合同.txt",text.encode(),"text/plain")})
             self.assertEqual(response.status_code,200,response.text)
             count=response.json()["segmentCount"]
             self.assertGreater(count,20)
+            with psycopg.connect(self.connection_string) as connection:
+                stored=connection.execute("SELECT count(*) FROM public.knowledge_segments WHERE meta->>'document_id'=%s AND embedding_dimension=%s AND embedding IS NOT NULL",(str(self.input.documentId),DIMENSION)).fetchone()[0]
+            self.assertEqual(stored,count)
             with psycopg.connect(self.connection_string) as connection:
                 connection.execute("UPDATE knowledge_documents SET status='succeeded',segment_batch_id=%s,segment_count=%s WHERE id=%s",(self.input.processingId,count,self.input.documentId))
             page=client.post("/knowledge/segments",json=self.query(page=1).model_dump(mode="json"))

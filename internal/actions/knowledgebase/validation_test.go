@@ -75,6 +75,11 @@ func TestKnowledgeSettingsBounds(t *testing.T) {
 		t.Fatalf("required fields=%+v", fields)
 	}
 	input = valid
+	input.EmbeddingDimension = 1000
+	if _, fields := normalizeInput(input); fields["embeddingDimension"] != ValidationEmbeddingDimensionInvalid {
+		t.Fatalf("dimension fields=%+v", fields)
+	}
+	input = valid
 	input.RerankProviderID = valid.EmbeddingProviderID
 	_, fields = normalizeInput(input)
 	if fields["rerankModelIdentifier"] != ValidationRerankModelInvalid {

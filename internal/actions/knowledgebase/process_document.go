@@ -10,6 +10,7 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/knowledgeprocessing"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -18,13 +19,13 @@ import (
 )
 
 type documentProcessor interface {
-	Process(context.Context, knowledgeprocessing.ProcessInput, string, io.Reader) (knowledgeprocessing.ProcessResult, error)
+	Process(context.Context, knowledgeprocessing.ProcessInput, knowledgeprocessing.EmbeddingCredential, string, io.Reader) (knowledgeprocessing.ProcessResult, error)
 }
 type documentFileReader interface {
 	Open(context.Context, *servermodels.File) (io.ReadCloser, error)
 }
 
-// ProcessDocumentAction 执行原件读取、远端分段与结果发布。
+// ProcessDocumentAction 执行原件读取、远端分段向量化与结果发布。
 type ProcessDocumentAction struct {
 	db        *bun.DB
 	processor documentProcessor
@@ -56,12 +57,25 @@ func (a *ProcessDocumentAction) Execute(ctx context.Context, input knowledgeproc
 	if err != nil {
 		return err
 	}
+	// 按任务快照读取供应商并解析 OpenAI 兼容入口。
+	provider := &servermodels.AIProvider{}
+	err = a.db.NewSelect().Model(provider).Where("id = ? AND organization_id = ?", input.EmbeddingProviderID, input.OrganizationID).Scan(ctx)
+	if errors.Is(err, sql.ErrNoRows) {
+		return &knowledgeprocessing.Error{Code: "embedding_model_unavailable", Stage: domain.KnowledgeDocumentEmbedding}
+	}
+	if err != nil {
+		return err
+	}
+	baseURL, err := common.CompatibleModelBaseURL(provider.Brand, provider.APIURL)
+	if err != nil {
+		return &knowledgeprocessing.Error{Code: "embedding_model_unavailable", Stage: domain.KnowledgeDocumentEmbedding}
+	}
 	source, err := a.files.Open(ctx, file)
 	if err != nil {
 		return &knowledgeprocessing.Error{Code: "file_read_failed", Stage: domain.KnowledgeDocumentFetching}
 	}
 	defer source.Close()
-	output, err := a.processor.Process(ctx, input, file.OriginalName, source)
+	output, err := a.processor.Process(ctx, input, knowledgeprocessing.EmbeddingCredential{BaseURL: baseURL, APIKey: provider.APIKey}, file.OriginalName, source)
 	if err != nil {
 		return err
 	}
@@ -102,7 +116,7 @@ func (a *ProcessDocumentAction) Execute(ctx context.Context, input knowledgeproc
 		return nil
 	})
 	if err == nil && published {
-		slog.Info("知识文档分段完成", "document_id", input.DocumentID, "processing_id", input.ProcessingID, "segment_count", output.SegmentCount, "duration_ms", time.Since(started).Milliseconds())
+		slog.Info("知识文档分段与向量完成", "document_id", input.DocumentID, "processing_id", input.ProcessingID, "segment_count", output.SegmentCount, "embedding_dimension", input.EmbeddingDimension, "duration_ms", time.Since(started).Milliseconds())
 	}
 	return err
 }

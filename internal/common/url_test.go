@@ -47,3 +47,11 @@ func TestValidHTTPURL(t *testing.T) {
 		})
 	}
 }
+
+// TestCompatibleModelBaseURL 验证百炼地址使用 OpenAI 兼容入口。
+func TestCompatibleModelBaseURL(t *testing.T) {
+	got, err := CompatibleModelBaseURL("alibaba", "https://dashscope.aliyuncs.com")
+	if err != nil || got != "https://dashscope.aliyuncs.com/compatible-mode/v1" {
+		t.Fatalf("base URL = %q, error = %v", got, err)
+	}
+}

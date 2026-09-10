@@ -3,7 +3,10 @@
 import json
 import tempfile
 import unittest
+from dataclasses import replace
 from pathlib import Path
+from unittest.mock import patch
+from uuid import uuid4
 
 from docx import Document as WordDocument
 from fastapi import HTTPException
@@ -12,7 +15,7 @@ from pptx import Presentation
 from pptx.util import Inches
 from pypdf import PdfWriter
 
-from knowledge import convert_file, split_documents
+from knowledge import ProcessInput, convert_file, embed_segments, split_documents
 from haystack import Document
 
 
@@ -105,3 +108,60 @@ class ProcessingTests(unittest.TestCase):
             path.write_text("{broken")
             with self.assertRaises(ValueError):
                 convert_file(path)
+
+
+class EmbeddingTests(unittest.TestCase):
+    """检查分段向量生成的维度校验和失败原因。"""
+
+    def setUp(self):
+        """构造带向量配置的处理任务和固定分段。"""
+        self.input = ProcessInput(
+            organizationId=uuid4(), knowledgeBaseId=uuid4(), documentId=uuid4(), processingId=uuid4(),
+            chunkLength=512, chunkOverlap=50, embeddingModelIdentifier="embedding-test", embeddingDimension=1024,
+            embedding={"baseUrl": "https://models.test/v1", "apiKey": "test-key"},
+        )
+        self.segments = [{"position": 1, "content": "合同金额 1234.50 元。"}]
+
+    def embedder(self, run):
+        """构造记录构造参数并替换真实调用的向量组件工厂。"""
+        captured = {}
+
+        def factory(**kwargs):
+            captured.update(kwargs)
+            return type("Embedder", (), {"run": staticmethod(run)})()
+
+        return factory, captured
+
+    def test_dimension_and_failure(self):
+        """维度不符和调用失败分别返回对应原因码。"""
+        def mismatched(documents):
+            return {"documents": [replace(document, embedding=[0.1] * 768) for document in documents]}
+
+        with patch("knowledge.OpenAIDocumentEmbedder", self.embedder(mismatched)[0]):
+            with self.assertRaises(HTTPException) as mismatch:
+                embed_segments(self.input, self.segments)
+        self.assertEqual(mismatch.exception.detail["code"], "embedding_dimension_mismatch")
+        self.assertEqual(mismatch.exception.detail["stage"], "embedding")
+
+        def failing(documents):
+            raise RuntimeError("model unavailable")
+
+        with patch("knowledge.OpenAIDocumentEmbedder", self.embedder(failing)[0]):
+            with self.assertRaises(HTTPException) as failure:
+                embed_segments(self.input, self.segments)
+        self.assertEqual(failure.exception.detail["code"], "embedding_failed")
+        self.assertEqual(failure.exception.detail["stage"], "embedding")
+
+    def test_embedding_attached(self):
+        """成功生成的向量按分段顺序写回。"""
+        def embedded(documents):
+            return {"documents": [replace(document, embedding=[float(index)] * 1024) for index, document in enumerate(documents)]}
+
+        factory, captured = self.embedder(embedded)
+        with patch("knowledge.OpenAIDocumentEmbedder", factory):
+            embed_segments(self.input, self.segments)
+        self.assertEqual(len(self.segments[0]["embedding"]), 1024)
+        self.assertEqual(captured["model"], "embedding-test")
+        self.assertEqual(captured["dimensions"], 1024)
+        self.assertEqual(captured["batch_size"], 20)
+        self.assertTrue(captured["raise_on_failure"])

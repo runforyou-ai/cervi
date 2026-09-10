@@ -126,6 +126,7 @@ const knowledgeBase = {
     retrievalCount: "Retrieval count",
     rerankModel: "Rerank model",
     selectEmbeddingModel: "Select an embedding model",
+    selectEmbeddingDimension: "Select a vector dimension",
     noRerank: "No reranking",
     noEmbeddingModels: "Configure an embedding model in model services first.",
     noRerankModels: "No rerank models are configured.",
@@ -145,7 +146,7 @@ const knowledgeBase = {
   },
   validation: {
     embeddingModelRequired: "Select an embedding model.",
-    embeddingDimensionInvalid: "Embedding dimension must be a positive integer.",
+    embeddingDimensionInvalid: "Select a vector dimension supported by knowledge bases.",
     chunkLengthInvalid: "Chunk length must be an integer between 256 and 2048.",
     chunkOverlapInvalid: "Chunk overlap must be an integer between 0 and 200.",
     retrievalCountInvalid: "Retrieval count must be an integer between 1 and 20.",

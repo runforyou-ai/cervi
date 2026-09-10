@@ -52,13 +52,16 @@ func (c *Client) CheckConnection(ctx context.Context) error {
 }
 
 // Process 流式提交原件并读取分段处理结果。
-func (c *Client) Process(ctx context.Context, input ProcessInput, name string, source io.Reader) (ProcessResult, error) {
+func (c *Client) Process(ctx context.Context, input ProcessInput, credential EmbeddingCredential, name string, source io.Reader) (ProcessResult, error) {
 	var output ProcessResult
 	reader, writer := io.Pipe()
 	multipartWriter := multipart.NewWriter(writer)
 	done := make(chan error, 1)
 	go func() {
-		metadata, err := json.Marshal(input)
+		metadata, err := json.Marshal(struct {
+			ProcessInput
+			Embedding EmbeddingCredential `json:"embedding"`
+		}{ProcessInput: input, Embedding: credential})
 		if err == nil {
 			err = multipartWriter.WriteField("metadata", string(metadata))
 		}

@@ -3,6 +3,7 @@
 package knowledgebase
 
 import (
+	"slices"
 	"strings"
 	"unicode/utf8"
 
@@ -56,7 +57,7 @@ func normalizeInput(input Input) (Input, map[string]common.FieldCode) {
 	if !common.ValidUUID(input.EmbeddingProviderID) || input.EmbeddingModelIdentifier == "" {
 		fields["embeddingModelIdentifier"] = ValidationEmbeddingModelInvalid
 	}
-	if input.EmbeddingDimension <= 0 {
+	if !slices.Contains(domain.KnowledgeEmbeddingDimensions, input.EmbeddingDimension) {
 		fields["embeddingDimension"] = ValidationEmbeddingDimensionInvalid
 	}
 	if input.Category == domain.KnowledgeBaseCategoryQA {
