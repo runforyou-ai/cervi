@@ -5,14 +5,21 @@ import { useSearchParams } from "react-router"
 import {
   CustomerInboxView,
   InboxScope,
+  type InboxQuery,
 } from "@/api"
 import { useWorkspace } from "@/contexts/workspace-context"
 import { useAttachmentQueue } from "./attachment-queue-context"
 import { useMemberChatPollingActive } from "./use-member-chat-polling"
 import { InboxPage } from "@/features/inbox/inbox-page"
+import { normalizeInboxListQuery } from "./inbox-list-controller"
 import { useInboxList } from "./use-inbox-list"
 import { useInboxListViewport } from "./use-inbox-list-viewport"
 import { optionalWailsEnum } from "@/lib/wails-enum"
+
+/** 以规范化查询作为选择历史的保存键。 */
+function browseKey(query: InboxQuery) {
+  return JSON.stringify(normalizeInboxListQuery(query))
+}
 
 /** 加载并显示消息页。 */
 export function InboxRoute() {
@@ -36,7 +43,7 @@ export function InboxRoute() {
   const { queue } = useAttachmentQueue()
   const active = useMemberChatPollingActive()
   const list = useInboxList(query, viewport, {
-    identity, active,
+    identity, active, selectedConversationId,
     unread: (count) => applyUnreadSnapshot(count, beginUnreadSnapshot()),
     unavailable: (id) => queue?.forgetConversation(id),
   })
@@ -52,11 +59,11 @@ export function InboxRoute() {
     const nextScope = changes.scope ?? scope
     const nextView = changes.customerView ?? customerView
     const nextAssignee = changes.assigneeIdentityId ?? assigneeIdentityId
-    const queryIdentity = `${scope}/${customerView}/${assigneeIdentityId}`
-    const nextQueryIdentity = `${nextScope}/${nextScope === InboxScope.InboxScopeCustomer ? nextView : CustomerInboxView.CustomerInboxViewQueue}/${nextScope === InboxScope.InboxScopeCustomer && nextView === CustomerInboxView.CustomerInboxViewCoworkers ? nextAssignee : ""}`
+    const currentKey = browseKey(query)
+    const nextKey = browseKey({ scope: nextScope, customerView: nextView, assigneeIdentityId: nextAssignee })
     // 切换筛选时保存当前选择，恢复目标筛选的上次选择，无记录则保持未选中。
-    selections.current.set(queryIdentity, selectedConversationId)
-    const nextSelection = changes.conversationId ?? (nextQueryIdentity === queryIdentity ? selectedConversationId : selections.current.get(nextQueryIdentity) ?? "")
+    selections.current.set(currentKey, selectedConversationId)
+    const nextSelection = changes.conversationId ?? (nextKey === currentKey ? selectedConversationId : selections.current.get(nextKey) ?? "")
     setSearchParams((current) => {
       const next = new URLSearchParams(current)
       next.delete("target")

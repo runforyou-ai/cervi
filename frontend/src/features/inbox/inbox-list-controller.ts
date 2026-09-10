@@ -63,11 +63,12 @@ export class InboxListController {
   private ports: InboxListPorts
   private query: InboxQuery
 
-  /** 绑定当前页面的读取和视口适配器。 */
-  constructor(ports: InboxListPorts, query: InboxQuery, bookmark?: InboxListBookmark, cached = false) {
+  /** 绑定当前页面的读取和视口适配器，locateId 指定进入列表时定位的会话。 */
+  constructor(ports: InboxListPorts, query: InboxQuery, bookmark?: InboxListBookmark, cached = false, locateId: string | null = null) {
     this.ports = ports
     this.query = query
-    this.returnAnchor = bookmark?.anchor ?? null
+    // 定位锚点没有原位置，按邻居补偿把该会话对齐到窗口顶部。
+    this.returnAnchor = bookmark?.anchor ?? (locateId ? { id: locateId, cursor: "", width: 0, height: 0, neighbors: [{ id: locateId, offset: 0 }] } : null)
     if (bookmark && cached) {
       this.state = { ...bookmark.state, operation: null, error: null, status: "ready" }
       this.ports.restore(this.returnAnchor, new Set(), !this.returnAnchor)
@@ -92,7 +93,7 @@ export class InboxListController {
     const positions = new Map(next.positions.map((row) => [row.id, row]))
     const moved = new Set(this.state.positions.filter((row) => positions.get(row.id)?.lastActivityAt !== row.lastActivityAt).map((row) => row.id))
     const anchor = initial ? this.returnAnchor : this.ports.capture()
-    if (anchor && positions.has(anchor.id) && positions.get(anchor.id)!.positionCursor !== anchor.cursor) moved.add(anchor.id)
+    if (anchor?.cursor && positions.has(anchor.id) && positions.get(anchor.id)!.positionCursor !== anchor.cursor) moved.add(anchor.id)
     const top = initial ? !anchor : !this.state.hasBefore && this.ports.atTop()
     this.ports.restore(anchor, moved, top)
     this.publish({ ...next, status: this.state.status, operation: this.state.operation, error: this.state.error, revision: this.state.revision + 1 })
@@ -191,6 +192,12 @@ export class InboxListController {
     let window: Window
     if (initial && this.returnAnchor) {
       window = await this.ports.context(this.returnAnchor)
+      // 定位锚点无法定位时读取首页，并从顶部展示；带原位置的锚点保留空邻域。
+      if (!window.conversations.length && !this.returnAnchor.cursor) {
+        this.returnAnchor = null
+        head = await this.ports.page()
+        window = { ...head, hasAfter: head.hasMore }
+      }
     } else if (pagination) {
       const page = await this.ports.page(operation === "after" ? base.endCursor : "", operation === "before" ? base.startCursor : "")
       if (operation === "after") appendIds = page.conversations.map((row) => row.id)
@@ -209,7 +216,8 @@ export class InboxListController {
         window = await this.ports.window(head.startCursor, base.endCursor)
       }
     }
-    if (!initial && !window.conversations.length && anchor) window = await this.ports.context(anchor)
+    // 空区间只按本窗口内的锚点恢复。
+    if (!initial && !window.conversations.length && anchor && base.positions.some((row) => row.id === anchor.id)) window = await this.ports.context(anchor)
     if (generation !== this.generation) return
     const rowIds = [...new Set([...this.state.ids, ...window.conversations.map((row) => row.id)])].sort()
     const rows = await this.ports.rows(rowIds)
