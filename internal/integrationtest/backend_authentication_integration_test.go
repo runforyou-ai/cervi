@@ -24,11 +24,7 @@ var publicBackendMethods = map[string]bool{
 }
 
 // TestBackendMethodsRequireAuthentication 验证除公开方法外，
-// 每个 Backend 方法在无令牌时都被挡回登录入口。
-//
-// member 方法漏掉认证通常先编译失败，因为业务实现要求 identity。
-// 本测试锁定编译期覆盖不到的三种情况：生成器认证分发回归、
-// 方法被误标 auth=public、以及 sessionGuard 的运行时接线断开。
+// 每个 Backend 方法在无令牌时都被挡回登录入口，且公开方法名单与接口闭合。
 func TestBackendMethodsRequireAuthentication(t *testing.T) {
 	ctx := context.Background()
 	store, err := serverstorage.Open(ctx, servertest.DatabaseConfig(t))
@@ -74,7 +70,6 @@ func TestBackendMethodsRequireAuthentication(t *testing.T) {
 		}
 		checked++
 	}
-	// 公开名单与接口闭合，防止名字写错或过期后静默跳过方法。
 	for name := range publicBackendMethods {
 		if _, exists := backendInterface.MethodByName(name); !exists {
 			t.Errorf("公开方法名单中的 %s 已不在 Backend 接口上", name)
@@ -84,5 +79,4 @@ func TestBackendMethodsRequireAuthentication(t *testing.T) {
 		t.Fatalf("已校验 %d 个方法加 %d 个公开方法 = %d，Backend 接口共 %d 个方法",
 			checked, len(publicBackendMethods), total, backendInterface.NumMethod())
 	}
-	t.Logf("已验证 %d 个 Backend 方法要求认证", checked)
 }
