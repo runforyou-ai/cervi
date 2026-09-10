@@ -18,7 +18,6 @@ import {
   type CurrentUser,
   type ConversationMessageData,
   type ConversationMessageReference,
-  type ConversationSystemEvent,
   type ConversationSystemEventParticipant,
   type GroupParticipant,
   listAttachmentStates,
@@ -523,7 +522,9 @@ function ConversationTimelineContent({
   }
 
   /** 将类型化群聊系统事件转换为当前语言的时间线文案。 */
-  function formatGroupSystemEvent(event: ConversationSystemEvent) {
+  function formatGroupSystemEvent(
+    event: NonNullable<ConversationMessageData["systemEvent"]>,
+  ) {
     const participantName = (
       participant: ConversationSystemEventParticipant,
     ) =>
@@ -532,7 +533,7 @@ function ConversationTimelineContent({
         : participant.displayName
     const actor = participantName(event.actor)
     const targets = formatGroupParticipantNames(
-      (event.targets ?? []).map(participantName),
+      event.targets.map(participantName),
     )
     switch (event.type) {
       case ConversationSystemEventType.ConversationSystemEventGroupRenamed:

@@ -11,7 +11,11 @@ import {
   type ConversationMessageListData,
 } from "@/api"
 import { resourceKeys } from "@/hooks/resource-keys"
-import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
+import {
+  useResource,
+  useResourceInvalidator,
+  useResourceReader,
+} from "@/hooks/use-resource"
 import { useVisibleConversationMentions } from "./use-visible-conversation-mentions"
 import { memberChatPollingInterval } from "./use-member-chat-polling"
 
@@ -86,7 +90,7 @@ export function useConversationMentionNavigation({
       if (active.ids[active.index] === id) setNeedsResume(false)
     },
   })
-  const { read } = state
+  const read = useResourceReader()
 
   /** 结束本轮但保留时间线位置。 */
   const close = useCallback(() => {

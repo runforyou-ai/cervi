@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useSyncExternalStore } fro
 import { useQueryClient } from "@tanstack/react-query"
 import { getInboxContext, loadInbox, readInboxConversations, readInboxWindow, type InboxQuery, type Identity, type InboxConversationResults } from "@/api"
 import { resourceKeys } from "@/hooks/resource-keys"
-import { useResource } from "@/hooks/use-resource"
+import { useResource, useResourceReader } from "@/hooks/use-resource"
 import { clearConversationResources } from "./conversation-resources"
 import { InboxListController, normalizeInboxListQuery, type InboxListBookmark } from "./inbox-list-controller"
 import { memberChatPollingInterval } from "./use-member-chat-polling"
@@ -17,6 +17,7 @@ type InboxListOptions = {
   unread?: (count: number) => void
   unavailable?: (id: string) => void
   history?: Map<string, InboxListBookmark>
+  selectedConversationId?: string
 }
 
 /** 每个查询持有独立浏览状态，业务摘要仅从当前批量 Query 读取。 */
@@ -27,14 +28,17 @@ export function useInboxList(input: InboxQuery, viewport: InboxListViewport, opt
   const query = useMemo(() => scope, [scope.scope, scope.customerView, scope.assigneeIdentityId])
   const owner = useMemo(() => ({ organizationId: identity.organization.id, userId: identity.user.id }), [identity.organization.id, identity.user.id])
   const headKey = resourceKeys.inbox({ ...owner, ...query })
-  const resource = useResource(headKey, () => loadInbox(query), { enabled: false })
-  const { read } = resource
+  // 为首页查询登记观察者，让会话资源清理按已挂载列表处理该 key。
+  useResource(headKey, () => loadInbox(query), { enabled: false })
+  const read = useResourceReader()
   const historyKey = JSON.stringify({ ...owner, ...query })
   const callbacks = useRef({ viewport, options })
   callbacks.current = { viewport, options }
   const controller = useMemo(() => {
     const bookmark = history?.get(historyKey)
     const cached = bookmark && client.getQueryData(resourceKeys.inboxConversations({ ...owner, query, conversationIds: bookmark.state.rowIds })) !== undefined
+    // 选中会话只在控制器创建时读取，作为进入列表时的定位目标。
+    const locateId = callbacks.current.options.selectedConversationId || null
     return new InboxListController({
     page: (cursor = "", beforeCursor = "") => read(
       resourceKeys.inbox({ ...owner, ...query, ...(cursor || beforeCursor ? { cursor, beforeCursor } : {}) }),
@@ -66,7 +70,7 @@ export function useInboxList(input: InboxQuery, viewport: InboxListViewport, opt
     unread: (count) => {
       callbacks.current.options.unread?.(count)
     },
-  }, query, bookmark, cached)
+  }, query, bookmark, cached, locateId)
   }, [client, owner, query, read, history, historyKey])
   const state = useSyncExternalStore(controller.subscribe, controller.getSnapshot)
   const rows = useResource(

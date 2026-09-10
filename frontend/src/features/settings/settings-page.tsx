@@ -20,7 +20,7 @@ export function PersonalSettingsPage({
   section: "profile" | "security" | "preferences"
 }) {
   const { t } = useTranslation("settings")
-  const { identity, updateUser } = useWorkspace()
+  const { identity } = useWorkspace()
   const title = t(`${section}.title`)
 
   return (
@@ -47,11 +47,11 @@ export function PersonalSettingsPage({
       <PageHeader title={title} />
       <PageContent>
         {section === "profile" ? (
-          <ProfileSettingsForm user={identity.user} onUpdated={updateUser} />
+          <ProfileSettingsForm user={identity.user} />
         ) : section === "security" ? (
           <ChangePasswordForm />
         ) : (
-          <UserPreferencesForm user={identity.user} onUpdated={updateUser} />
+          <UserPreferencesForm user={identity.user} />
         )}
       </PageContent>
     </PageSplit>
@@ -67,7 +67,7 @@ export function SystemSettingsPage({
   children?: ReactNode
 }) {
   const { t } = useTranslation("settings")
-  const { identity, updateOrganization } = useWorkspace()
+  const { identity } = useWorkspace()
   const title = t(`${section}.title`)
 
   return (
@@ -98,10 +98,7 @@ export function SystemSettingsPage({
           <PageHeader title={title} />
           <PageContent>
             {section === "general" ? (
-              <GeneralSettingsForm
-                organization={identity.organization}
-                onUpdated={updateOrganization}
-              />
+              <GeneralSettingsForm organization={identity.organization} />
             ) : (
               <StorageSettingsForm />
             )}

@@ -23,6 +23,7 @@ import {
   ListToolbarSearch,
 } from "@/components/list-toolbar"
 import { PageHeader } from "@/components/page-header"
+import { ResourceTable } from "@/components/resource-table"
 import { Button } from "@/components/ui/button"
 import {
   AlertDialog,
@@ -47,14 +48,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
 import { WorkStatusBadge, workStatusLabel } from "@/components/work-status"
 import { useWorkspace } from "@/contexts/workspace-context"
 import { ContactCreateDialogs } from "@/features/contacts/contact-create-dialogs"
@@ -135,7 +128,7 @@ export function TeamPanel({
     void invalidate(resourceKeys.agent())
   }
 
-  /** 当前用户使用工作台中的即时状态，其他团队成员使用列表结果。 */
+  /** 返回团队成员行显示的工作状态。 */
   function identityWorkStatus(member: TeamMember) {
     return member.identityType ===
       OrganizationIdentityType.OrganizationIdentityTypeUser &&
@@ -353,10 +346,12 @@ export function TeamPanel({
             setParameters({ page: String(number), selected: null })
           }
         >
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead className="w-10">
+          <ResourceTable
+            columns={[
+              {
+                key: "select",
+                headerClassName: "w-10",
+                header: (
                   <input
                     type="checkbox"
                     className="size-4 accent-primary"
@@ -366,90 +361,68 @@ export function TeamPanel({
                       toggleAllVisibleTeamMembers(event.target.checked)
                     }
                   />
-                </TableHead>
-                <TableHead>{t("columns.memberName")}</TableHead>
-                <TableHead>{t("columns.type")}</TableHead>
-                <TableHead>{t("columns.workStatus")}</TableHead>
-                <TableHead>{t("columns.joinedAt")}</TableHead>
-                <TableHead className="w-px">
-                  {tCommon("table.actions")}
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {teamMembers.map((member) => (
-                <TableRow key={member.identityId}>
-                  <TableCell>
-                    <input
-                      type="checkbox"
-                      className="size-4 accent-primary"
-                      aria-label={t("teams.members.selectMember", {
-                        name: member.displayName,
-                      })}
-                      checked={selectedTeamMemberIdentityIDs.has(
-                        member.identityId,
-                      )}
-                      onChange={(event) =>
-                        toggleTeamMember(
-                          member.identityId,
-                          event.target.checked,
-                        )
-                      }
-                    />
-                  </TableCell>
-                  <TableCell className="font-medium">
-                    {member.displayName}
-                  </TableCell>
-                  <TableCell>
-                    {t(
-                      member.identityType ===
-                        OrganizationIdentityType.OrganizationIdentityTypeAgent
-                        ? "identityCategories.agent"
-                        : "identityCategories.user",
+                ),
+                cell: (member) => (
+                  <input
+                    type="checkbox"
+                    className="size-4 accent-primary"
+                    aria-label={t("teams.members.selectMember", {
+                      name: member.displayName,
+                    })}
+                    checked={selectedTeamMemberIdentityIDs.has(
+                      member.identityId,
                     )}
-                  </TableCell>
-                  <TableCell>
-                    <WorkStatusBadge status={identityWorkStatus(member)} />
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap text-muted-foreground">
-                    {formatDateTime(member.joinedAt)}
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap">
-                    <DropdownMenu>
-                      <DropdownMenuTrigger asChild>
-                        <Button
-                          variant="ghost"
-                          size="icon-sm"
-                          aria-label={tCommon("actions.more")}
-                          title={tCommon("actions.more")}
-                        >
-                          <MoreHorizontalIcon />
-                        </Button>
-                      </DropdownMenuTrigger>
-                      <DropdownMenuContent align="end">
-                        <DropdownMenuItem
-                          destructive
-                          onSelect={() => setRemovingTeamMembers([member])}
-                        >
-                          {t("teams.members.remove")}
-                        </DropdownMenuItem>
-                      </DropdownMenuContent>
-                    </DropdownMenu>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {teamMembers.length === 0 ? (
-                <TableRow className="hover:bg-transparent">
-                  <TableCell
-                    colSpan={6}
-                    className="h-32 text-center text-muted-foreground"
-                  >
-                    {t("list.empty")}
-                  </TableCell>
-                </TableRow>
-              ) : null}
-            </TableBody>
-          </Table>
+                    onChange={(event) =>
+                      toggleTeamMember(member.identityId, event.target.checked)
+                    }
+                  />
+                ),
+              },
+              {
+                key: "memberName",
+                header: t("columns.memberName"),
+                cellClassName: "font-medium",
+                cell: (member) => member.displayName,
+              },
+              {
+                key: "type",
+                header: t("columns.type"),
+                cell: (member) =>
+                  t(
+                    member.identityType ===
+                      OrganizationIdentityType.OrganizationIdentityTypeAgent
+                      ? "identityCategories.agent"
+                      : "identityCategories.user",
+                  ),
+              },
+              {
+                key: "workStatus",
+                header: t("columns.workStatus"),
+                cell: (member) => (
+                  <WorkStatusBadge status={identityWorkStatus(member)} />
+                ),
+              },
+              {
+                key: "joinedAt",
+                header: t("columns.joinedAt"),
+                cellClassName: "whitespace-nowrap text-muted-foreground",
+                cell: (member) => formatDateTime(member.joinedAt),
+              },
+            ]}
+            rows={teamMembers}
+            rowKey={(member) => member.identityId}
+            empty={t("list.empty")}
+            actions={(member) => ({
+              menu: (
+                <DropdownMenuItem
+                  destructive
+                  onSelect={() => setRemovingTeamMembers([member])}
+                >
+                  {t("teams.members.remove")}
+                </DropdownMenuItem>
+              ),
+            })}
+          />
         </ContactListLayout>
       </section>
 

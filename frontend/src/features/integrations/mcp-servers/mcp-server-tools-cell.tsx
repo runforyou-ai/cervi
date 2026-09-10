@@ -2,13 +2,13 @@
 import { LoaderCircleIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
-import type { MCPServer } from "@/api"
+import type { MCPServerData } from "@/api"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
 /** 在固定宽度内显示数量、更新状态及工具目录。 */
-export function MCPServerToolsCell({ server }: { server: MCPServer }) {
+export function MCPServerToolsCell({ server }: { server: MCPServerData }) {
   const { t, i18n } = useTranslation("integrations")
-  const tools = server.tools ?? []
+  const tools = server.tools
   const label = server.toolsUpdating
     ? t("mcpServer.tools.updating")
     : server.toolsError || (server.toolsUpdatedAt

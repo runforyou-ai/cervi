@@ -1,4 +1,4 @@
-/** 消息渠道及类型扩展调用与归一化。 */
+/** 消息渠道及类型扩展调用。 */
 import {
   ActivateMessageChannel,
   CreateMessageChannel,
@@ -17,49 +17,26 @@ import {
 import type {
   WebsiteChannel as GeneratedWebsiteChannel,
   WebsiteChannelAccess as GeneratedWebsiteChannelAccess,
-  WebsiteChannelAccessInput,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import { bind, isApiError } from "@/api/client"
-import { asList } from "@/api/normalize"
+import type { NonNullArrays } from "@/api/normalize"
 
-export type WebsiteChannelAccessData = Omit<
-  GeneratedWebsiteChannelAccess,
-  "allowedHosts"
-> & {
-  allowedHosts: string[]
-}
+export type WebsiteChannelAccessData =
+  NonNullArrays<GeneratedWebsiteChannelAccess>
 
-export type WebsiteChannelData = Omit<GeneratedWebsiteChannel, "access"> & {
-  access: WebsiteChannelAccessData
-}
+export type WebsiteChannelData = NonNullArrays<GeneratedWebsiteChannel>
 
-const getWebsiteChannelBound = bind(GetWebsiteChannel)
-const getTelegramChannelBound = bind(GetTelegramChannel)
-const getMessageChannelBound = bind(GetMessageChannel)
-const updateWebsiteChannelAccessBound = bind(UpdateWebsiteChannelAccess)
 const listChannelOptionsBound = bind(ListChannelOptions)
 const listMessageChannelsBound = bind(ListMessageChannels)
 
 /** 读取网站渠道详情。 */
-export function getWebsiteChannel(channelId: string, signal?: AbortSignal) {
-  return getWebsiteChannelBound(channelId, signal).then(
-    (channel): WebsiteChannelData => ({
-      // 归一化网站渠道详情。
-      ...channel,
-      access: normalizeWebsiteChannelAccess(channel.access),
-    }),
-  )
-}
+export const getWebsiteChannel = bind(GetWebsiteChannel)
 
 /** 读取消息渠道基础信息。 */
-export function getMessageChannel(channelId: string, signal?: AbortSignal) {
-  return getMessageChannelBound(channelId, signal)
-}
+export const getMessageChannel = bind(GetMessageChannel)
 
 /** 读取 Telegram 渠道详情。 */
-export function getTelegramChannel(channelId: string, signal?: AbortSignal) {
-  return getTelegramChannelBound(channelId, signal)
-}
+export const getTelegramChannel = bind(GetTelegramChannel)
 
 /** 创建消息渠道。 */
 export const createMessageChannel = bind(CreateMessageChannel)
@@ -92,14 +69,7 @@ export const updateWebsiteChannelChatInterface = bind(
 )
 
 /** 修改网站渠道允许使用的网站。 */
-export function updateWebsiteChannelAccess(
-  channelId: string,
-  input: WebsiteChannelAccessInput,
-) {
-  return updateWebsiteChannelAccessBound(channelId, input).then(
-    normalizeWebsiteChannelAccess,
-  )
-}
+export const updateWebsiteChannelAccess = bind(UpdateWebsiteChannelAccess)
 
 /** 停用消息渠道。 */
 export const deactivateMessageChannel = bind(DeactivateMessageChannel)
@@ -109,17 +79,10 @@ export const activateMessageChannel = bind(ActivateMessageChannel)
 
 /** 读取当前企业的渠道选择项。 */
 export function listChannelOptions(signal?: AbortSignal) {
-  return listChannelOptionsBound(signal).then((list) => asList(list.channels))
+  return listChannelOptionsBound(signal).then((list) => list.channels)
 }
 
 /** 读取消息渠道列表。 */
 export function listMessageChannels() {
-  return listMessageChannelsBound().then((list) => asList(list.channels))
-}
-
-/** 归一化网站渠道允许使用的网站。 */
-function normalizeWebsiteChannelAccess(
-  access: GeneratedWebsiteChannelAccess,
-): WebsiteChannelAccessData {
-  return { ...access, allowedHosts: asList(access.allowedHosts) }
+  return listMessageChannelsBound().then((list) => list.channels)
 }

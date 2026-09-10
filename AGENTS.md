@@ -97,6 +97,8 @@ cervi/
 
 - 提交 PR 前，必须调用 Pi CLI 审核并处理反馈，每一次小的改动不需要审核，最终审核 pr 时主要是检查是否有更优雅的实现方式，以及针对本次改动，是否有啰嗦的注释、反向引用、无必要的防御性逻辑和历史兼容逻辑、注释与实现不一致的问题，以及是否要加上必要的直述型注释和 `INFO`、`WARN` 等日志。
 - Pi CLI 已配置默认模型，无需指定；运行可能较慢，必须耐心等待完整结果。
+- 调用固定为 `pi -p --offline -- "<审核要求>"`。`-p`（`--print`）是非交互模式，缺少它会启动交互式 TUI 并一直等待标准输入；`--offline` 跳过启动时的网络操作。审核要求写入文件后用 `"$(cat <文件>)"` 传入，输出重定向到文件，不经 `tail` 等缓冲整段输出的管道，以便随时查看进度。
+- 长时间没有输出时先判断是在执行还是已挂起：进程 CPU 时间几乎为零且没有网络连接即为挂起，应终止并检查调用方式，不按「运行较慢」继续等待。
 
 ## 前端开发约定
 
@@ -161,8 +163,9 @@ frontend/
 
 - `appservice` 契约是前端业务 DTO 的唯一来源。前端不得重复声明渠道、联系人、用户、收件箱、设置等业务模型和枚举，也不要提交 Wails `$zero`。
 - `frontend/bindings` 使用 `wails3 generate bindings -clean=true -ts -i` 生成，禁止手工修改，也不得用不同格式覆盖。
-- 页面只通过 `src/api` 调用绑定：`client` 注入认证与错误，`service` 绑定方法并归一化可空切片。页面不直接引用 `frontend/bindings`。
-- 前端只保留表单值、组件 Props、页面状态、查询参数派生类型，以及对生成类型中可空切片的边界归一化类型。
+- 页面只通过 `src/api` 调用绑定：`client` 注入认证与错误并按 `NonNullArrays` 声明结果，`service` 绑定方法。页面不直接引用 `frontend/bindings`。
+- 生成类型中的可空切片由服务端保证为数组，前端不再逐个字段归一化；只有枚举 `$zero` 收敛和判别式联合仍在 `src/api` 中显式声明。
+- 前端只保留表单值、组件 Props、页面状态和查询参数派生类型。
 - 页面卸载时忽略过期结果，不要取消 Wails 绑定调用。
 
 ### 数据读取
@@ -286,8 +289,9 @@ internal/
 ### 分层
 
 - `appservice.Service` 是统一业务入口。Gin 只做对外 HTTP API 适配，输出 Backend 给出的状态和错误体，不定义前端业务类型和主要调用契约。
+- `Service` 的每个带结果方法都对结果调用 `normalizeSlices`，nil 切片一律输出为空数组；`manual=service` 的手写方法同样遵守，前端据此把生成类型中的切片字段当作数组。
 - `appservice/backend.go` 中的 `Backend` 接口是业务调用的唯一契约源：每个方法必须携带 `cervi:route` 指令；`Service` 委托、服务端认证分发、Gin 路由与 Handler、API Proxy 转发由 `go generate ./internal/appservice` 统一生成到各包的 `*_gen.go`，禁止手改生成文件。
-- 新增业务方法的步骤：在 `Backend` 接口补方法与指令（GET 的查询结构体在 `types.go` 为每个字段显式加 `query` 标签，不传输的字段使用 `query:"-"`），运行生成器，然后只手写 `directOperations` 实现和 Action。无法按统一模式生成的层用 `manual=service,api,proxy` 标记并在对应包手写；API Proxy 的响应归一化在 `normalizeOutput` 中按类型补分支。
+- 新增业务方法的步骤：在 `Backend` 接口补方法与指令（GET 的查询结构体在 `types.go` 为每个字段显式加 `query` 标签，不传输的字段使用 `query:"-"`），运行生成器，然后只手写 `directOperations` 实现和 Action。无法按统一模式生成的层用 `manual=service,api,proxy` 标记并在对应包手写；API Proxy 的 `normalizeOutput` 只按响应类型补全企业服务器文件地址，切片归一化不在此处重复。
 - 认证由 `direct_backend_gen.go` 中生成的分发层统一处理：`auth` 默认为 `member`，分发层先解析登录身份再调用业务实现；无需登录身份的方法在指令中标记 `auth=public`。
 - `directOperations` 中的业务实现直接接收已解析的 `identity`，不重复处理认证，只负责把 Action 返回的语言无关错误码转成结构化、本地化错误，再调用 Action。其 Action 与 Query 字段按业务域分组在 `<域>Ops` 结构体中，新增依赖只改对应实现文件。
 - 只读 Query 信任分发层已解析的当前身份，不重复查询用户状态；写 Action 在事务开始时通过 `actions/identity.LockActiveUser` 校验并锁定活跃用户账号。

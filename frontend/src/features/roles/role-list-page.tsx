@@ -1,6 +1,5 @@
 /** 角色与权限列表页。 */
 import { useEffect, useRef, useState } from "react"
-import { MoreHorizontalIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Link, useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -16,7 +15,7 @@ import {
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
-import { SelectableText } from "@/components/selectable-text"
+import { ResourceTable } from "@/components/resource-table"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -28,25 +27,12 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import {
   permissionDefinitionLabel,
   roleDescription,
   roleDisplayName,
-} from "@/features/roles/role-labels"
+} from "@/lib/role-labels"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { recoverSession } from "@/lib/session-navigation"
@@ -159,87 +145,64 @@ export function RoleListPage() {
           </div>
         ) : (
           <div className="@container overflow-hidden rounded-lg border bg-card">
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead>{t("roles.list.columns.name")}</TableHead>
-                  <TableHead className="hidden w-64 @3xl:table-cell">
-                    {t("roles.list.columns.description")}
-                  </TableHead>
-                  <TableHead>{t("roles.list.columns.memberCount")}</TableHead>
-                  <TableHead className="hidden @3xl:table-cell">
-                    {t("roles.list.columns.permissions")}
-                  </TableHead>
-                  <TableHead className="w-px">
-                    {tCommon("table.actions")}
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {roles.length === 0 ? (
-                  <TableRow className="hover:bg-transparent">
-                    <TableCell
-                      colSpan={5}
-                      className="h-32 text-center text-muted-foreground"
-                    >
-                      {t("roles.list.empty")}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  roles.map((role) => {
+            <ResourceTable
+              columns={[
+                {
+                  key: "name",
+                  header: t("roles.list.columns.name"),
+                  cellClassName: "font-medium",
+                  cell: (role) => roleDisplayName(role, tCommon),
+                },
+                {
+                  key: "description",
+                  header: t("roles.list.columns.description"),
+                  className: "hidden @3xl:table-cell",
+                  headerClassName: "w-64",
+                  cellClassName: "max-w-64 text-muted-foreground",
+                  cell: (role) => {
                     const description = roleDescription(role, t)
                     return (
-                      <TableRow key={role.id}>
-                        <TableCell className="font-medium">
-                          <SelectableText>
-                            {roleDisplayName(role, tCommon)}
-                          </SelectableText>
-                        </TableCell>
-                        <TableCell className="hidden max-w-64 text-muted-foreground @3xl:table-cell">
-                          <span className="block truncate" title={description}>
-                            {description}
-                          </span>
-                        </TableCell>
-                        <TableCell>{role.memberCount}</TableCell>
-                        <TableCell className="hidden text-muted-foreground @3xl:table-cell">
-                          {permissionSummary(role, permissions, t)}
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap">
-                          <div className="inline-flex gap-2">
-                            <Button variant="outline" size="sm" asChild>
-                              <Link to={`/settings/roles/${role.id}`}>
-                                {tCommon("actions.view")}
-                              </Link>
-                            </Button>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon-sm"
-                                  aria-label={tCommon("actions.more")}
-                                  title={tCommon("actions.more")}
-                                >
-                                  <MoreHorizontalIcon />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem
-                                  disabled={role.kind !== RoleKind.RoleKindCustom}
-                                  className="text-destructive focus:text-destructive"
-                                  onSelect={() => setDeletingRole(role)}
-                                >
-                                  {tCommon("actions.delete")}
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                        </TableCell>
-                      </TableRow>
+                      <span className="block truncate" title={description}>
+                        {description}
+                      </span>
                     )
-                  })
-                )}
-              </TableBody>
-            </Table>
+                  },
+                },
+                {
+                  key: "memberCount",
+                  header: t("roles.list.columns.memberCount"),
+                  cell: (role) => role.memberCount,
+                },
+                {
+                  key: "permissions",
+                  header: t("roles.list.columns.permissions"),
+                  className: "hidden @3xl:table-cell",
+                  cellClassName: "text-muted-foreground",
+                  cell: (role) => permissionSummary(role, permissions, t),
+                },
+              ]}
+              rows={roles}
+              rowKey={(role) => role.id}
+              empty={t("roles.list.empty")}
+              actions={(role) => ({
+                primary: (
+                  <Button variant="outline" size="sm" asChild>
+                    <Link to={`/settings/roles/${role.id}`}>
+                      {tCommon("actions.view")}
+                    </Link>
+                  </Button>
+                ),
+                menu: (
+                  <DropdownMenuItem
+                    destructive
+                    disabled={role.kind !== RoleKind.RoleKindCustom}
+                    onSelect={() => setDeletingRole(role)}
+                  >
+                    {tCommon("actions.delete")}
+                  </DropdownMenuItem>
+                ),
+              })}
+            />
           </div>
         )}
       </PageContent>

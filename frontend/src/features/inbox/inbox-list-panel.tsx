@@ -23,20 +23,26 @@ export function InboxListPanel({ list, viewport, detailError = false, retryDetai
     // 内容不足一屏时自动补齐，恢复的深处窗口仍优先保持原邻域。
     if (!busy && !list.error && list.hasAfter && container.clientHeight > 0 && container.scrollHeight <= container.clientHeight + 120) void list.request("after")
   }, [busy, list.error, list.hasAfter, list.request, list.revision, viewport])
+  // 页脚在可向前翻页、分页出错和空列表加载时占位，有数据时的轮询不占位。
+  const previous = !list.conversations.length && list.hasBefore
+  const pageError = list.error === "before" || list.error === "after"
+  const showFooter = previous || pageError || (busy && !list.conversations.length)
   const content = (
     <div className="grid min-w-0 pb-1.5">
       {children}
       {!list.conversations.length && (list.hasBefore || list.hasAfter) && list.revision > 0 ? (
         <p className="px-3 py-6 text-center text-sm text-muted-foreground">{t("listWindowEmpty")}</p>
       ) : null}
-      <div className="flex h-11 items-center justify-center gap-2 text-xs text-muted-foreground" data-slot="inbox-list-footer" role="status">
-        {!list.conversations.length && list.hasBefore ? (
-          <Button variant="outline" size="sm" onClick={() => void list.request("before")}>{t("common:pagination.previous")}</Button>
-        ) : null}
-        {list.error === "before" || list.error === "after" ? (
-          <Button variant="outline" size="sm" onClick={() => void list.retry()}>{t("common:actions.retry")}</Button>
-        ) : busy ? t("common:status.loading") : null}
-      </div>
+      {showFooter ? (
+        <div className="flex h-11 items-center justify-center gap-2 text-xs text-muted-foreground" data-slot="inbox-list-footer" role="status">
+          {previous ? (
+            <Button variant="outline" size="sm" onClick={() => void list.request("before")}>{t("common:pagination.previous")}</Button>
+          ) : null}
+          {pageError ? (
+            <Button variant="outline" size="sm" onClick={() => void list.retry()}>{t("common:actions.retry")}</Button>
+          ) : busy ? t("common:status.loading") : null}
+        </div>
+      ) : null}
     </div>
   )
   return (

@@ -40,7 +40,7 @@ import {
   permissionResourceLabel,
   roleDescription,
   roleDisplayName,
-} from "@/features/roles/role-labels"
+} from "@/lib/role-labels"
 import {
   createRoleSettingsSchema,
   roleNameMaxLength,

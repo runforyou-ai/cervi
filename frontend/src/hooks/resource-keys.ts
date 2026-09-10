@@ -24,6 +24,8 @@ function scopedListKey(
 }
 
 export const resourceKeys = {
+  /** 当前登录身份、所属企业和用户偏好。 */
+  identity: () => ["identity"],
   /** 按会话编号读取的独立摘要。 */
   conversationSummary: (conversationId?: string) => itemKey("conversation-summary", conversationId),
   /** 指定会话的列表资格。 */

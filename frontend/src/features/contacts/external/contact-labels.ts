@@ -2,7 +2,7 @@
 import type { TFunction } from "i18next"
 
 import { UserStatus, type ChannelType } from "@/api"
-import { messageChannelTypeDefinition } from "@/features/channels/message-channel-types"
+import { messageChannelTypeDefinition } from "@/lib/message-channel-types"
 
 /** 渠道类型文案。 */
 export function channelTypeLabel(

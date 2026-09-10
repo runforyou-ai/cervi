@@ -1,6 +1,5 @@
 /** 消息渠道列表页，统一展示当前支持的渠道。 */
 import { useMemo, useState } from "react"
-import { MoreHorizontalIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Link, useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -21,7 +20,7 @@ import {
 } from "@/components/list-toolbar"
 import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
-import { SelectableText } from "@/components/selectable-text"
+import { ResourceTable } from "@/components/resource-table"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -33,97 +32,17 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import {
   messageChannelTypeDefinition,
   messageChannelTypeDefinitions,
-} from "@/features/channels/message-channel-types"
+} from "@/lib/message-channel-types"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
 type ChannelEnabledStatus = "enabled" | "disabled"
-
-/** 消息渠道列表中的一行。 */
-function MessageChannelRow({
-  channel,
-  updating,
-  onStatusChange,
-}: {
-  channel: MessageChannelSummary
-  updating: boolean
-  onStatusChange: (channel: MessageChannelSummary) => void
-}) {
-  const { t } = useTranslation(["channels", "common"])
-  const typeDefinition = messageChannelTypeDefinition(channel.type)
-  if (!typeDefinition) {
-    console.warn("未知的消息渠道类型", channel.type)
-  }
-
-  return (
-    <TableRow>
-      <TableCell className="min-w-44 font-medium">
-        <SelectableText>{channel.name}</SelectableText>
-      </TableCell>
-      <TableCell className="whitespace-nowrap">
-        {typeDefinition ? t(`types.${typeDefinition.translationKey}`) : ""}
-      </TableCell>
-      <TableCell className="whitespace-nowrap">
-        {t(
-          `locales.${channel.defaultLocale === "zh-CN" ? "zhCN" : "enUS"}`
-        )}
-      </TableCell>
-      <TableCell className="whitespace-nowrap">
-        <div className="inline-flex gap-2">
-          <Button variant="outline" size="sm" asChild>
-            <Link to={`/integrations/channels/${channel.type}/${channel.id}`}>
-              {t("common:actions.edit")}
-            </Link>
-          </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label={t("common:actions.more")}
-                title={t("common:actions.more")}
-              >
-                <MoreHorizontalIcon />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                className={
-                  channel.enabled
-                    ? "text-destructive focus:text-destructive"
-                    : undefined
-                }
-                disabled={updating}
-                onSelect={() => onStatusChange(channel)}
-              >
-                {channel.enabled ? t("list.deactivate") : t("list.activate")}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </TableCell>
-    </TableRow>
-  )
-}
 
 /** 加载并管理消息渠道列表。 */
 export function MessageChannelListPage() {
@@ -266,41 +185,69 @@ export function MessageChannelListPage() {
           </div>
         ) : (
           <div className="overflow-hidden rounded-lg border bg-card">
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead>{t("list.columns.name")}</TableHead>
-                  <TableHead>{t("list.columns.category")}</TableHead>
-                  <TableHead>{t("list.columns.language")}</TableHead>
-                  <TableHead className="w-px">
-                    {t("common:table.actions")}
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {filteredChannels.length === 0 ? (
-                  <TableRow className="hover:bg-transparent">
-                    <TableCell
-                      colSpan={4}
-                      className="h-32 text-center text-muted-foreground"
+            <ResourceTable
+              columns={[
+                {
+                  key: "name",
+                  header: t("list.columns.name"),
+                  cellClassName: "min-w-44 font-medium",
+                  cell: (channel) => channel.name,
+                },
+                {
+                  key: "category",
+                  header: t("list.columns.category"),
+                  cellClassName: "whitespace-nowrap",
+                  cell: (channel) => {
+                    const typeDefinition = messageChannelTypeDefinition(
+                      channel.type,
+                    )
+                    if (!typeDefinition) {
+                      console.warn("未知的消息渠道类型", channel.type)
+                      return ""
+                    }
+                    return t(`types.${typeDefinition.translationKey}`)
+                  },
+                },
+                {
+                  key: "language",
+                  header: t("list.columns.language"),
+                  cellClassName: "whitespace-nowrap",
+                  cell: (channel) =>
+                    t(
+                      `locales.${channel.defaultLocale === "zh-CN" ? "zhCN" : "enUS"}`,
+                    ),
+                },
+              ]}
+              rows={filteredChannels}
+              rowKey={(channel) => channel.id}
+              empty={
+                channels.length === 0
+                  ? t("list.emptyTitle")
+                  : t("list.emptyFiltered")
+              }
+              actions={(channel) => ({
+                primary: (
+                  <Button variant="outline" size="sm" asChild>
+                    <Link
+                      to={`/integrations/channels/${channel.type}/${channel.id}`}
                     >
-                      {channels.length === 0
-                        ? t("list.emptyTitle")
-                        : t("list.emptyFiltered")}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  filteredChannels.map((channel) => (
-                    <MessageChannelRow
-                      key={channel.id}
-                      channel={channel}
-                      updating={updatingChannelId === channel.id}
-                      onStatusChange={requestStatusChange}
-                    />
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                      {t("common:actions.edit")}
+                    </Link>
+                  </Button>
+                ),
+                menu: (
+                  <DropdownMenuItem
+                    destructive={channel.enabled}
+                    disabled={updatingChannelId === channel.id}
+                    onSelect={() => requestStatusChange(channel)}
+                  >
+                    {channel.enabled
+                      ? t("list.deactivate")
+                      : t("list.activate")}
+                  </DropdownMenuItem>
+                ),
+              })}
+            />
           </div>
         )}
       </PageContent>

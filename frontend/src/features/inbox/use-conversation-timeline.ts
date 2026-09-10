@@ -6,7 +6,11 @@ import {
   type ConversationMessageListData,
 } from "@/api"
 import { resourceKeys } from "@/hooks/resource-keys"
-import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
+import {
+  useResource,
+  useResourceInvalidator,
+  useResourceReader,
+} from "@/hooks/use-resource"
 import { mergeConversationPage } from "./conversation-window"
 import { memberChatPollingInterval } from "./use-member-chat-polling"
 
@@ -34,7 +38,7 @@ export function useConversationTimeline(
     (signal) => listConversationMessages(conversationID, undefined, signal),
     { enabled, refetchOnWindowFocus: false, staleTime: 0 },
   )
-  const { read } = initial
+  const read = useResourceReader()
   const after = page?.after ?? ""
   const incoming = useResource(
     resourceKeys.conversationMessagePage(conversationID, { before: "", after }),

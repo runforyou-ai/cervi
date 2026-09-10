@@ -1,5 +1,4 @@
 /** 模型服务供应商列表页。 */
-import { MoreHorizontalIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Link, useNavigate } from "react-router"
 
@@ -10,25 +9,12 @@ import {
   type AIProviderSummaryData,
 } from "@/api"
 import { ResourceContent } from "@/components/resource-content"
+import { ResourceTable } from "@/components/resource-table"
 import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
-import { SelectableText } from "@/components/selectable-text"
 import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
 import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { aiProviderBrandConfigs } from "@/features/integrations/model-services/model-provider-brands"
@@ -137,83 +123,64 @@ export function ModelProviderListPage({ section }: { section: ModelServiceSectio
             onRetry={() => void refresh()}
           >
             <div className="overflow-hidden rounded-lg border bg-card">
-              <Table>
-                <TableHeader>
-                  <TableRow className="hover:bg-transparent">
-                    <TableHead>{t("modelServices.list.columns.brand")}</TableHead>
-                    <TableHead>{t("modelServices.list.columns.name")}</TableHead>
-                    <TableHead>{t("modelServices.list.columns.models")}</TableHead>
-                    <TableHead>{t("modelServices.list.columns.apiUrl")}</TableHead>
-                    <TableHead className="w-px">{t("common:table.actions")}</TableHead>
-                  </TableRow>
-                </TableHeader>
-                <TableBody>
-                  {visibleProviders.length === 0 ? (
-                    <TableRow className="hover:bg-transparent">
-                      <TableCell
-                        colSpan={5}
-                        className="h-32 text-center text-muted-foreground"
+              <ResourceTable
+                columns={[
+                  {
+                    key: "brand",
+                    header: t("modelServices.list.columns.brand"),
+                    cell: (provider) =>
+                      t(aiProviderBrandConfigs[provider.brand].nameKey),
+                  },
+                  {
+                    key: "name",
+                    header: t("modelServices.list.columns.name"),
+                    cellClassName: "font-medium",
+                    cell: (provider) => provider.name,
+                  },
+                  {
+                    key: "models",
+                    header: t("modelServices.list.columns.models"),
+                    cellClassName: "text-muted-foreground",
+                    cell: (provider) => (
+                      <ProviderModelsCell
+                        models={provider.models.filter(
+                          (model) => model.type === sectionConfig.modelType,
+                        )}
+                      />
+                    ),
+                  },
+                  {
+                    key: "apiUrl",
+                    header: t("modelServices.list.columns.apiUrl"),
+                    cellClassName: "text-muted-foreground",
+                    cell: (provider) => provider.apiUrl,
+                  },
+                ]}
+                rows={visibleProviders}
+                rowKey={(provider) => provider.id}
+                empty={t("modelServices.list.empty", {
+                  type: t(sectionConfig.nameKey),
+                })}
+                actions={(provider) => ({
+                  primary: (
+                    <Button variant="outline" size="sm" asChild>
+                      <Link
+                        to={`/integrations/model-services/${section}/${provider.id}`}
                       >
-                        {t("modelServices.list.empty", {
-                          type: t(sectionConfig.nameKey),
-                        })}
-                      </TableCell>
-                    </TableRow>
-                  ) : (
-                    visibleProviders.map((provider) => (
-                      <TableRow key={provider.id}>
-                        <TableCell>
-                          {t(aiProviderBrandConfigs[provider.brand].nameKey)}
-                        </TableCell>
-                        <TableCell className="font-medium">
-                          <SelectableText>{provider.name}</SelectableText>
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          <ProviderModelsCell
-                            models={provider.models.filter(
-                              (model) => model.type === sectionConfig.modelType,
-                            )}
-                          />
-                        </TableCell>
-                        <TableCell className="text-muted-foreground">
-                          <SelectableText>{provider.apiUrl}</SelectableText>
-                        </TableCell>
-                        <TableCell className="whitespace-nowrap">
-                          <div className="inline-flex gap-2">
-                            <Button variant="outline" size="sm" asChild>
-                              <Link
-                                to={`/integrations/model-services/${section}/${provider.id}`}
-                              >
-                                {t("common:actions.edit")}
-                              </Link>
-                            </Button>
-                            <DropdownMenu>
-                              <DropdownMenuTrigger asChild>
-                                <Button
-                                  variant="ghost"
-                                  size="icon-sm"
-                                  aria-label={t("common:actions.more")}
-                                  title={t("common:actions.more")}
-                                >
-                                  <MoreHorizontalIcon />
-                                </Button>
-                              </DropdownMenuTrigger>
-                              <DropdownMenuContent align="end">
-                                <DropdownMenuItem
-                                  className="text-destructive focus:text-destructive"
-                                  onSelect={() => deletion.select(provider)}
-                                >
-                                  {t("common:actions.delete")}
-                                </DropdownMenuItem>
-                              </DropdownMenuContent>
-                            </DropdownMenu>
-                          </div>
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
+                        {t("common:actions.edit")}
+                      </Link>
+                    </Button>
+                  ),
+                  menu: (
+                    <DropdownMenuItem
+                      destructive
+                      onSelect={() => deletion.select(provider)}
+                    >
+                      {t("common:actions.delete")}
+                    </DropdownMenuItem>
+                  ),
+                })}
+              />
             </div>
           </ResourceContent>
         </div>

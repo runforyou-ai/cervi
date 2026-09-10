@@ -1,6 +1,5 @@
 /** 外部联系人列表、筛选、详情和回收站面板。 */
 import { useEffect, useState } from "react"
-import { MoreHorizontalIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -28,6 +27,7 @@ import {
   ListToolbarSearch,
 } from "@/components/list-toolbar"
 import { PageHeader } from "@/components/page-header"
+import { ResourceTable } from "@/components/resource-table"
 import { SelectableText } from "@/components/selectable-text"
 import { Button } from "@/components/ui/button"
 import {
@@ -40,20 +40,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import { ContactCreateDialogs } from "@/features/contacts/contact-create-dialogs"
 import { ContactDetailSheet } from "@/features/contacts/contact-detail-sheet"
 import { ContactListLayout } from "@/features/contacts/contact-list-layout"
@@ -350,47 +337,55 @@ export function ExternalContactsPanel({
             setParameters({ page: String(number), selected: null })
           }
         >
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead>{t("columns.name")}</TableHead>
-                <TableHead>{t("columns.stage")}</TableHead>
-                <TableHead>{t("columns.email")}</TableHead>
-                <TableHead>{t("columns.phone")}</TableHead>
-                <TableHead>{t("columns.channels")}</TableHead>
-                <TableHead>
-                  {deleted ? t("columns.deletedAt") : t("columns.addedAt")}
-                </TableHead>
-                <TableHead className="w-px">
-                  {t("common:table.actions")}
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {contacts.map((contact) => (
-                <TableRow key={contact.id}>
-                  <TableCell className="font-medium">
-                    {contact.displayName || t("anonymous")}
-                  </TableCell>
-                  <TableCell>
-                    <StageLabel stage={contact.stage} />
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {contact.primaryEmail || "—"}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {contact.primaryPhone || "—"}
-                  </TableCell>
-                  <TableCell>{contact.sourceChannelName}</TableCell>
-                  <TableCell className="whitespace-nowrap text-muted-foreground">
-                    {formatDateTime(
-                      deleted && contact.deletedAt
-                        ? contact.deletedAt
-                        : contact.createdAt,
-                    )}
-                  </TableCell>
-                  {deleted ? (
-                    <TableCell className="whitespace-nowrap">
+          <ResourceTable
+            columns={[
+              {
+                key: "name",
+                header: t("columns.name"),
+                cellClassName: "font-medium",
+                cell: (contact) => contact.displayName || t("anonymous"),
+              },
+              {
+                key: "stage",
+                header: t("columns.stage"),
+                cell: (contact) => <StageLabel stage={contact.stage} />,
+              },
+              {
+                key: "email",
+                header: t("columns.email"),
+                cellClassName: "text-muted-foreground",
+                cell: (contact) => contact.primaryEmail || "—",
+              },
+              {
+                key: "phone",
+                header: t("columns.phone"),
+                cellClassName: "text-muted-foreground",
+                cell: (contact) => contact.primaryPhone || "—",
+              },
+              {
+                key: "channels",
+                header: t("columns.channels"),
+                cell: (contact) => contact.sourceChannelName,
+              },
+              {
+                key: "time",
+                header: deleted ? t("columns.deletedAt") : t("columns.addedAt"),
+                cellClassName: "whitespace-nowrap text-muted-foreground",
+                cell: (contact) =>
+                  formatDateTime(
+                    deleted && contact.deletedAt
+                      ? contact.deletedAt
+                      : contact.createdAt,
+                  ),
+              },
+            ]}
+            rows={contacts}
+            rowKey={(contact) => contact.id}
+            empty={deleted ? t("trash.empty") : t("list.empty")}
+            actions={(contact) =>
+              deleted
+                ? {
+                    primary: (
                       <Button
                         variant="outline"
                         size="sm"
@@ -398,56 +393,29 @@ export function ExternalContactsPanel({
                       >
                         {t("trash.restore")}
                       </Button>
-                    </TableCell>
-                  ) : (
-                    <TableCell className="whitespace-nowrap">
-                      <div className="inline-flex gap-2">
-                        <Button
-                          variant="outline"
-                          size="sm"
-                          onClick={() =>
-                            setParameters({ selected: contact.id })
-                          }
-                        >
-                          {t("common:actions.view")}
-                        </Button>
-                        <DropdownMenu>
-                          <DropdownMenuTrigger asChild>
-                            <Button
-                              variant="ghost"
-                              size="icon-sm"
-                              aria-label={t("common:actions.more")}
-                              title={t("common:actions.more")}
-                            >
-                              <MoreHorizontalIcon />
-                            </Button>
-                          </DropdownMenuTrigger>
-                          <DropdownMenuContent align="end">
-                            <DropdownMenuItem
-                              destructive
-                              onSelect={() => setDeletingContact(contact)}
-                            >
-                              {t("common:actions.delete")}
-                            </DropdownMenuItem>
-                          </DropdownMenuContent>
-                        </DropdownMenu>
-                      </div>
-                    </TableCell>
-                  )}
-                </TableRow>
-              ))}
-              {contacts.length === 0 ? (
-                <TableRow className="hover:bg-transparent">
-                  <TableCell
-                    colSpan={7}
-                    className="h-32 text-center text-muted-foreground"
-                  >
-                    {deleted ? t("trash.empty") : t("list.empty")}
-                  </TableCell>
-                </TableRow>
-              ) : null}
-            </TableBody>
-          </Table>
+                    ),
+                  }
+                : {
+                    primary: (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setParameters({ selected: contact.id })}
+                      >
+                        {t("common:actions.view")}
+                      </Button>
+                    ),
+                    menu: (
+                      <DropdownMenuItem
+                        destructive
+                        onSelect={() => setDeletingContact(contact)}
+                      >
+                        {t("common:actions.delete")}
+                      </DropdownMenuItem>
+                    ),
+                  }
+            }
+          />
         </ContactListLayout>
       </section>
 

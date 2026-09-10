@@ -36,6 +36,8 @@ export function MobileMePage() {
   /** 退出登录并回到登录页。 */
   async function handleLogout() {
     setLoggingOut(true)
+    // 先离开工作区，登出清空查询缓存时外壳已经卸载。
+    navigate("/login", { replace: true })
     try {
       await logout()
       console.info("用户退出登录")
@@ -44,7 +46,6 @@ export function MobileMePage() {
       toast.error(t("logoutError"))
     } finally {
       setLoggingOut(false)
-      navigate("/login", { replace: true })
     }
   }
 

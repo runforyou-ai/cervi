@@ -4,13 +4,7 @@ import { useTranslation } from "react-i18next"
 import { Navigate, useLocation, useNavigate } from "react-router"
 import { toast } from "sonner"
 
-import {
-  logout,
-  WorkStatus,
-  type Identity,
-  type Organization,
-  type CurrentUser,
-} from "@/api"
+import { logout, WorkStatus } from "@/api"
 import { AttachmentQueueProvider } from "@/features/inbox/attachment-queue-context"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { UserPreferencesProvider } from "@/contexts/user-preferences"
@@ -64,14 +58,13 @@ export function WorkspaceLayout() {
   const location = useLocation()
   const { t } = useTranslation(["workspace", "common"])
   const navigate = useNavigate()
-  const [identity, setIdentity] = useState<Identity | null>(null)
   const [loggingOut, setLoggingOut] = useState(false)
   const [unreadState, setUnreadState] = useState<WorkspaceUnreadState>({
     count: 0,
     attentionPending: false,
   })
   const unreadRevisionRef = useRef(0)
-  const { status, identity: loadedIdentity, redirectPath } = useIdentityLoader()
+  const { status, identity, redirectPath } = useIdentityLoader()
   const workspaceLocation = resolveWorkspaceLocation(location)
   const fallbackTabRef = useRef<ResolvedWorkspaceTab>(defaultWorkspaceTab)
   const currentHref = `${location.pathname}${location.search}${location.hash}`
@@ -82,10 +75,15 @@ export function WorkspaceLayout() {
     fallbackTabRef.current = workspaceLocation.tab
   }
 
+  const organizationId = identity?.user.organizationId
+  const userId = identity?.user.id
+  const messageNotificationsEnabled = identity?.user.messageNotificationsEnabled
+  const workStatus = identity?.user.workStatus
+
   /** 修正规范工作台地址。 */
   useLayoutEffect(() => {
     if (
-      !identity ||
+      !userId ||
       (workspaceLocation.tab && workspaceLocation.canonicalHref === currentHref)
     ) {
       return
@@ -93,7 +91,7 @@ export function WorkspaceLayout() {
     navigate(workspaceLocation.canonicalHref, { replace: true })
   }, [
     currentHref,
-    identity,
+    userId,
     navigate,
     workspaceLocation.canonicalHref,
     workspaceLocation.tab,
@@ -101,38 +99,31 @@ export function WorkspaceLayout() {
 
   /** 同步当前用户的新消息通知策略。 */
   useLayoutEffect(() => {
-    if (!identity) {
+    if (
+      !organizationId ||
+      !userId ||
+      messageNotificationsEnabled === undefined ||
+      workStatus === undefined
+    ) {
       return
     }
     return activateNotificationPolicy(
-      {
-        organizationId: identity.user.organizationId,
-        userId: identity.user.id,
-      },
-      identity.user.messageNotificationsEnabled,
-      identity.user.workStatus,
+      { organizationId, userId },
+      messageNotificationsEnabled,
+      workStatus,
     )
-  }, [identity])
+  }, [organizationId, userId, messageNotificationsEnabled, workStatus])
 
-  /** 身份加载完成后同步工作台状态。 */
-  useEffect(() => {
-    if (loadedIdentity) {
-      setIdentity(loadedIdentity)
-      console.info("工作台身份已加载", {
-        organization: loadedIdentity.organization.name,
-      })
-    }
-  }, [loadedIdentity])
+  const attentionEnabled =
+    Boolean(messageNotificationsEnabled) &&
+    workStatus === WorkStatus.WorkStatusWorking
 
   /** 同步桌面端未读数和提醒状态。 */
   useEffect(() => {
-    if (!identity || resolveAppPlatform() !== "desktop") {
+    if (!userId || resolveAppPlatform() !== "desktop") {
       return
     }
 
-    const attentionEnabled =
-      identity.user.messageNotificationsEnabled &&
-      identity.user.workStatus === WorkStatus.WorkStatusWorking
     if (!attentionEnabled && unreadState.attentionPending) {
       setUnreadState((current) => ({
         ...current,
@@ -152,7 +143,7 @@ export function WorkspaceLayout() {
         error,
       })
     })
-  }, [identity, unreadState])
+  }, [userId, attentionEnabled, unreadState.count, unreadState.attentionPending])
 
   /** 用户重新查看应用时停止托盘闪烁。 */
   useEffect(() => {
@@ -212,6 +203,8 @@ export function WorkspaceLayout() {
     deactivateNotificationPolicy()
     unreadRevisionRef.current += 1
     setUnreadState({ count: 0, attentionPending: false })
+    // 先离开工作台，登出清空查询缓存时外壳已经卸载。
+    navigate("/login", { replace: true })
     try {
       await logout()
       console.info("用户退出登录")
@@ -220,18 +213,7 @@ export function WorkspaceLayout() {
       toast.error(t("logoutError"))
     } finally {
       setLoggingOut(false)
-      navigate("/login", { replace: true })
     }
-  }
-
-  /** 把保存后的用户资料同步到工作台导航。 */
-  function updateUser(user: CurrentUser) {
-    setIdentity((current) => (current ? { ...current, user } : current))
-  }
-
-  /** 同步工作台中的最新企业设置。 */
-  function updateOrganization(organization: Organization) {
-    setIdentity((current) => (current ? { ...current, organization } : current))
   }
 
   /** 返回当前未读状态修订号。 */
@@ -259,15 +241,12 @@ export function WorkspaceLayout() {
   const notifyNewMessage = useCallback(async function notifyNewMessage(
     notification: WorkspaceNewMessageNotification,
   ) {
-    if (!identity) {
+    if (!organizationId || !userId) {
       return false
     }
 
     unreadRevisionRef.current += 1
     const unreadCount = Math.max(0, notification.unreadCount)
-    const attentionEnabled =
-      identity.user.messageNotificationsEnabled &&
-      identity.user.workStatus === WorkStatus.WorkStatusWorking
     const alreadyVisible =
       document.visibilityState === "visible" && document.hasFocus()
     setUnreadState({
@@ -284,12 +263,9 @@ export function WorkspaceLayout() {
       id: notification.id,
       title: notification.title,
       body: notification.body,
-      scope: {
-        organizationId: identity.user.organizationId,
-        userId: identity.user.id,
-      },
+      scope: { organizationId, userId },
     })
-  }, [identity])
+  }, [organizationId, userId, attentionEnabled])
 
   if (status === "anonymous") return <Navigate to="/login" replace />
   if (status === "redirect" && redirectPath) {
@@ -314,8 +290,6 @@ export function WorkspaceLayout() {
     beginUnreadSnapshot,
     applyUnreadSnapshot,
     notifyNewMessage,
-    updateOrganization,
-    updateUser,
   } satisfies WorkspaceOutletContext
   const currentTab = workspaceLocation.tab ?? fallbackTabRef.current
 
@@ -328,7 +302,6 @@ export function WorkspaceLayout() {
           <div className="cervi-workspace-shell relative flex h-svh min-h-0 w-full overflow-hidden">
             <WorkspaceNavigation
               identity={identity}
-              onUserUpdated={updateUser}
               onLogout={handleLogout}
               loggingOut={loggingOut}
             />

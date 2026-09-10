@@ -6,6 +6,7 @@ import {
   type Auth,
   type RequestMeta,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
+import type { NonNullArrays } from "@/api/normalize"
 import { i18n } from "@/i18n"
 import { fallbackLanguage } from "@/i18n/resources"
 import { resolveAppPlatform } from "@/platform/app-platform"
@@ -57,11 +58,14 @@ export function isNotFoundApiError(error: unknown): error is ApiError {
   return isApiError(error) && error.kind === "not_found"
 }
 
-/** 注入认证和语言后调用应用服务，卸载时丢弃过期结果。 */
+/**
+ * 注入认证和语言后调用应用服务，卸载时丢弃过期结果。
+ * 结果按服务端保证的非空切片声明类型。
+ */
 export async function call<T>(
   operation: (meta: RequestMeta) => CancellablePromise<T>,
   signal?: AbortSignal,
-): Promise<T> {
+): Promise<NonNullArrays<T>> {
   try {
     // Web 端从本地存储读取未过期令牌。
     let token = ""
@@ -87,7 +91,7 @@ export async function call<T>(
     if (signal?.aborted) {
       throw abortError()
     }
-    return result
+    return result as NonNullArrays<T>
   } catch (error) {
     if (signal?.aborted) {
       throw abortError()

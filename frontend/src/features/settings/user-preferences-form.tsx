@@ -34,6 +34,8 @@ import {
   createUserPreferencesSchema,
   type UserPreferencesFormValues,
 } from "@/features/settings/user-preferences-schema"
+import { resourceKeys } from "@/hooks/resource-keys"
+import { useResourceInvalidator } from "@/hooks/use-resource"
 import { changeAppLanguage } from "@/i18n"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { supportedTimeZones } from "@/lib/time-zones"
@@ -44,15 +46,10 @@ import {
 } from "@/platform/notifications"
 
 /** 修改当前用户偏好设置。 */
-export function UserPreferencesForm({
-  user,
-  onUpdated,
-}: {
-  user: CurrentUser
-  onUpdated: (user: CurrentUser) => void
-}) {
+export function UserPreferencesForm({ user }: { user: CurrentUser }) {
   const { t } = useTranslation(["settings", "common"])
   const navigate = useNavigate()
+  const invalidate = useResourceInvalidator()
   const { theme, setTheme } = useTheme()
   const notificationScope = useMemo<NotificationDeviceScope>(
     () => ({ organizationId: user.organizationId, userId: user.id }),
@@ -107,7 +104,7 @@ export function UserPreferencesForm({
         messageNotificationsEnabled: updated.messageNotificationsEnabled,
         notificationSoundEnabled: values.notificationSoundEnabled,
       })
-      onUpdated(updated)
+      void invalidate(resourceKeys.identity())
       await changeAppLanguage(updated.locale)
       console.info("偏好设置已保存", {
         user_id: updated.id,
