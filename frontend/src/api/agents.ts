@@ -1,4 +1,4 @@
-/** 企业 AI 员工调用与归一化。 */
+/** 企业 AI 员工调用。 */
 import {
   CreateAgent,
   DeactivateAgent,
@@ -21,45 +21,35 @@ import {
   type UpdateAgentInput,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import { bind } from "@/api/client"
-import { asList } from "@/api/normalize"
+import type { NonNullArrays } from "@/api/normalize"
 
 export type AgentListQuery = Partial<AgentListInput>
 
 export type ManagedAgentExecutionData = Omit<
-  Agent["execution"],
-  "mode" | "managed" | "mcpServerIds"
-> & {
-  mcpServerIds: NonNullable<Agent["execution"]["mcpServerIds"]>
-  mode: AgentExecutionMode.AgentExecutionModeManaged
-  managed: Omit<
-    NonNullable<Agent["execution"]["managed"]>,
-    "knowledgeBaseIds"
-  > & {
-    knowledgeBaseIds: NonNullable<
-      NonNullable<Agent["execution"]["managed"]>["knowledgeBaseIds"]
-    >
-  }
-}
-
-export type ManagedAgentExecutionSummaryData = Omit<
-  AgentListItem["execution"],
+  NonNullArrays<Agent>["execution"],
   "mode" | "managed"
 > & {
   mode: AgentExecutionMode.AgentExecutionModeManaged
-  managed: NonNullable<AgentListItem["execution"]["managed"]>
+  managed: NonNullable<NonNullArrays<Agent>["execution"]["managed"]>
 }
 
-export type AgentData = Omit<Agent, "teams" | "execution"> & {
-  teams: NonNullable<Agent["teams"]>
+export type ManagedAgentExecutionSummaryData = Omit<
+  NonNullArrays<AgentListItem>["execution"],
+  "mode" | "managed"
+> & {
+  mode: AgentExecutionMode.AgentExecutionModeManaged
+  managed: NonNullable<NonNullArrays<AgentListItem>["execution"]["managed"]>
+}
+
+export type AgentData = Omit<NonNullArrays<Agent>, "execution"> & {
   execution: ManagedAgentExecutionData
 }
 
-export type AgentListItemData = Omit<AgentListItem, "teams" | "execution"> & {
-  teams: NonNullable<AgentListItem["teams"]>
+export type AgentListItemData = Omit<NonNullArrays<AgentListItem>, "execution"> & {
   execution: ManagedAgentExecutionSummaryData
 }
 
-export type AgentListData = Omit<AgentList, "agents"> & {
+export type AgentListData = Omit<NonNullArrays<AgentList>, "agents"> & {
   agents: AgentListItemData[]
 }
 
@@ -75,27 +65,27 @@ const reactivateAgentBound = bind(ReactivateAgent)
 
 /** 创建企业 AI 员工。 */
 export function createAgent(input: CreateAgentInput) {
-  return createAgentBound(input).then(normalizeAgent)
+  return createAgentBound(input).then(asManagedAgent)
 }
 
 /** 读取企业 AI 员工可使用的对话模型。 */
 export function listAgentModelOptions() {
-  return listAgentModelOptionsBound().then((output) => asList(output.models))
+  return listAgentModelOptionsBound().then((output) => output.models)
 }
 
 /** 读取企业 MCP 服务的配置选项。 */
 export function listAgentMCPServerOptions() {
-  return listAgentMCPServerOptionsBound().then((output) => asList(output.mcpServers))
+  return listAgentMCPServerOptionsBound().then((output) => output.mcpServers)
 }
 
 /** 读取企业 AI 员工详情。 */
 export function getAgent(agentId: string, signal?: AbortSignal) {
-  return getAgentBound(agentId, signal).then(normalizeAgent)
+  return getAgentBound(agentId, signal).then(asManagedAgent)
 }
 
 /** 修改企业 AI 员工。 */
 export function updateAgent(agentId: string, input: UpdateAgentInput) {
-  return updateAgentBound(agentId, input).then(normalizeAgent)
+  return updateAgentBound(agentId, input).then(asManagedAgent)
 }
 
 /** 修改企业 AI 员工的执行配置。 */
@@ -103,21 +93,24 @@ export function updateAgentExecution(
   agentId: string,
   input: UpdateAgentExecutionInput,
 ) {
-  return updateAgentExecutionBound(agentId, input).then(normalizeAgent)
+  return updateAgentExecutionBound(agentId, input).then(asManagedAgent)
 }
 
 /** 禁用企业 AI 员工账号。 */
 export function deactivateAgent(agentId: string) {
-  return deactivateAgentBound(agentId).then(normalizeAgent)
+  return deactivateAgentBound(agentId).then(asManagedAgent)
 }
 
 /** 将企业 AI 员工恢复为正常状态。 */
 export function reactivateAgent(agentId: string) {
-  return reactivateAgentBound(agentId).then(normalizeAgent)
+  return reactivateAgentBound(agentId).then(asManagedAgent)
 }
 
 /** 读取企业 AI 员工目录。 */
-export function listAgents(query: AgentListQuery, signal?: AbortSignal) {
+export function listAgents(
+  query: AgentListQuery,
+  signal?: AbortSignal,
+): Promise<AgentListData> {
   return listAgentsBound(
     {
       query: query.query ?? "",
@@ -126,54 +119,27 @@ export function listAgents(query: AgentListQuery, signal?: AbortSignal) {
       pageSize: query.pageSize ?? 50,
     },
     signal,
-  ).then((output): AgentListData => ({
-    ...output,
-    agents: asList(output.agents).map((agent): AgentListItemData => {
-      // 归一化 AI 员工目录项所属团队和执行配置。
-      const execution = agent.execution
-      // 归一化 AI 员工平台托管执行配置摘要。
-      if (
-        execution.mode !== AgentExecutionMode.AgentExecutionModeManaged ||
-        execution.managed === undefined ||
-        execution.managed === null
-      ) {
-        throw new Error(`Unsupported agent execution mode: ${execution.mode}`)
-      }
-      return {
-        ...agent,
-        teams: asList(agent.teams),
-        execution: {
-          ...execution,
-          mode: execution.mode,
-          managed: execution.managed,
-        },
-      }
-    }),
-  }))
+  ).then((output) => {
+    for (const agent of output.agents) assertManagedExecution(agent.execution)
+    return output as AgentListData
+  })
 }
 
-/** 归一化 AI 员工所属团队和执行配置。 */
-function normalizeAgent(agent: Agent): AgentData {
-  // 归一化 AI 员工平台托管执行配置。
-  const execution = agent.execution
+/** 校验 AI 员工使用平台托管执行配置。 */
+function assertManagedExecution(execution: {
+  mode: AgentExecutionMode
+  managed?: unknown
+}) {
   if (
     execution.mode !== AgentExecutionMode.AgentExecutionModeManaged ||
-    execution.managed === undefined ||
-    execution.managed === null
+    !execution.managed
   ) {
     throw new Error(`Unsupported agent execution mode: ${execution.mode}`)
   }
-  return {
-    ...agent,
-    teams: asList(agent.teams),
-    execution: {
-      ...execution,
-      mode: execution.mode,
-      mcpServerIds: asList(execution.mcpServerIds),
-      managed: {
-        ...execution.managed,
-        knowledgeBaseIds: asList(execution.managed.knowledgeBaseIds),
-      },
-    },
-  }
+}
+
+/** 断言 AI 员工使用平台托管执行配置。 */
+function asManagedAgent(agent: NonNullArrays<Agent>): AgentData {
+  assertManagedExecution(agent.execution)
+  return agent as AgentData
 }

@@ -1,4 +1,4 @@
-/** MCP 服务调用与归一化。 */
+/** MCP 服务调用。 */
 import {
   CreateMCPServer,
   DeleteMCPServer,
@@ -14,26 +14,14 @@ import type {
   MCPServerList,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import { bind } from "@/api/client"
-import { asList } from "@/api/normalize"
+import type { NonNullArrays } from "@/api/normalize"
 
-export type MCPServerListData = Omit<
-  MCPServerList,
-  "mcpServers"
-> & {
-  mcpServers: MCPServer[]
-}
+export type MCPServerData = NonNullArrays<MCPServer>
 
-const listMCPServersBound = bind(ListMCPServers)
+export type MCPServerListData = NonNullArrays<MCPServerList>
 
 /** 读取当前企业的 MCP 服务列表。 */
-export function listMCPServers() {
-  return listMCPServersBound().then(
-    (output): MCPServerListData => ({
-      ...output,
-      mcpServers: asList(output.mcpServers).map((server) => ({ ...server, tools: asList(server.tools) })),
-    }),
-  )
-}
+export const listMCPServers = bind(ListMCPServers)
 
 /** 读取 MCP 服务详情。 */
 export const getMCPServer = bind(GetMCPServer)

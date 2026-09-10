@@ -26,19 +26,20 @@ import {
   createGeneralSettingsSchema,
   type GeneralSettingsFormValues,
 } from "@/features/settings/general-settings-schema"
+import { resourceKeys } from "@/hooks/resource-keys"
+import { useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
 /** 显示并修改当前企业通用设置。 */
 export function GeneralSettingsForm({
   organization,
-  onUpdated,
 }: {
   organization: Organization
-  onUpdated: (organization: Organization) => void
 }) {
   const { t } = useTranslation(["settings", "common"])
   const navigate = useNavigate()
+  const invalidate = useResourceInvalidator()
   const mounted = useRef(true)
   const [confirmingArbitraryURL, setConfirmingArbitraryURL] = useState(false)
   const schema = useMemo(
@@ -68,12 +69,12 @@ export function GeneralSettingsForm({
   async function save(values: GeneralSettingsFormValues) {
     try {
       const organization = await updateOrganization(values)
+      void invalidate(resourceKeys.identity())
       if (!mounted.current) return
       form.reset({
         name: organization.name,
         allowArbitraryUrl: organization.allowArbitraryUrl,
       })
-      onUpdated(organization)
       console.info("企业通用设置已更新", {
         organization_id: organization.id,
         allow_arbitrary_url: organization.allowArbitraryUrl,

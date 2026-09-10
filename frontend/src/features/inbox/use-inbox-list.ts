@@ -3,7 +3,7 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useSyncExternalStore } fro
 import { useQueryClient } from "@tanstack/react-query"
 import { getInboxContext, loadInbox, readInboxConversations, readInboxWindow, type InboxQuery, type Identity, type InboxConversationResults } from "@/api"
 import { resourceKeys } from "@/hooks/resource-keys"
-import { useResource } from "@/hooks/use-resource"
+import { useResource, useResourceReader } from "@/hooks/use-resource"
 import { clearConversationResources } from "./conversation-resources"
 import { InboxListController, normalizeInboxListQuery, type InboxListBookmark } from "./inbox-list-controller"
 import { memberChatPollingInterval } from "./use-member-chat-polling"
@@ -28,8 +28,9 @@ export function useInboxList(input: InboxQuery, viewport: InboxListViewport, opt
   const query = useMemo(() => scope, [scope.scope, scope.customerView, scope.assigneeIdentityId])
   const owner = useMemo(() => ({ organizationId: identity.organization.id, userId: identity.user.id }), [identity.organization.id, identity.user.id])
   const headKey = resourceKeys.inbox({ ...owner, ...query })
-  const resource = useResource(headKey, () => loadInbox(query), { enabled: false })
-  const { read } = resource
+  // 为首页查询登记观察者，让会话资源清理按已挂载列表处理该 key。
+  useResource(headKey, () => loadInbox(query), { enabled: false })
+  const read = useResourceReader()
   const historyKey = JSON.stringify({ ...owner, ...query })
   const callbacks = useRef({ viewport, options })
   callbacks.current = { viewport, options }

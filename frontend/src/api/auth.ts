@@ -23,8 +23,10 @@ export const getServerURL = bind(ServerURL)
 /** 登录并建立当前平台会话，同时清空上一会话的查询缓存。 */
 export async function login(input: LoginInput) {
   const auth = await call((meta) => Login(meta, input))
+  const identity =
+    resolveAppPlatform() === "web" ? storeWebToken(auth) : auth.identity
   resetResourceCache()
-  return resolveAppPlatform() === "web" ? storeWebToken(auth) : auth.identity
+  return identity
 }
 
 /** 退出登录，清除 Web 端令牌和当前会话的查询缓存。 */

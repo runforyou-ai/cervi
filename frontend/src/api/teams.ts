@@ -1,4 +1,4 @@
-/** 企业团队与成员分配调用与归一化。 */
+/** 企业团队与成员分配调用。 */
 import {
   AddTeamMembers,
   CreateTeam,
@@ -11,17 +11,15 @@ import {
   UpdateTeam,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import type {
-  MemberOption,
   MemberOptionList,
   MemberOptionListInput,
   TeamListInput,
-  TeamMemberCandidate,
   TeamMemberCandidateInput,
   TeamMemberCandidateList,
   TeamMemberListInput,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import { bind } from "@/api/client"
-import { asList } from "@/api/normalize"
+import type { NonNullArrays } from "@/api/normalize"
 
 export type TeamListQuery = Partial<TeamListInput>
 
@@ -31,13 +29,9 @@ export type TeamMemberListQuery = Partial<TeamMemberListInput>
 
 export type MemberOptionListQuery = Partial<MemberOptionListInput>
 
-export type MemberOptionListData = Omit<MemberOptionList, "members"> & {
-  members: MemberOption[]
-}
+export type MemberOptionListData = NonNullArrays<MemberOptionList>
 
-export type TeamMemberCandidateListData = Omit<TeamMemberCandidateList, "members"> & {
-  members: TeamMemberCandidate[]
-}
+export type TeamMemberCandidateListData = NonNullArrays<TeamMemberCandidateList>
 
 const listTeamsBound = bind(ListTeams)
 const listMemberOptionsBound = bind(ListMemberOptions)
@@ -64,7 +58,7 @@ export function listTeamMemberCandidates(
   teamId: string,
   query: TeamMemberCandidateQuery = {},
   signal?: AbortSignal,
-): Promise<TeamMemberCandidateListData> {
+) {
   return listTeamMemberCandidatesBound(
     teamId,
     {
@@ -73,10 +67,7 @@ export function listTeamMemberCandidates(
       pageSize: query.pageSize ?? 50,
     },
     signal,
-  ).then((output) => ({
-    ...output,
-    members: asList(output.members),
-  }))
+  )
 }
 
 /** 读取团队成员列表。 */
@@ -94,10 +85,7 @@ export function listTeamMembers(
       pageSize: query.pageSize ?? 50,
     },
     signal,
-  ).then((output) => ({
-    ...output,
-    members: asList(output.members),
-  }))
+  )
 }
 
 /** 读取企业团队列表。 */
@@ -109,14 +97,14 @@ export function listTeams(query: TeamListQuery = {}, signal?: AbortSignal) {
       pageSize: query.pageSize ?? 50,
     },
     signal,
-  ).then((output) => ({ ...output, teams: asList(output.teams) }))
+  )
 }
 
 /** 读取可分配的企业成员和 AI 员工。 */
 export function listMemberOptions(
   query: MemberOptionListQuery = {},
   signal?: AbortSignal,
-): Promise<MemberOptionListData> {
+) {
   return listMemberOptionsBound(
     {
       query: query.query ?? "",
@@ -124,5 +112,5 @@ export function listMemberOptions(
       pageSize: query.pageSize ?? 50,
     },
     signal,
-  ).then((output) => ({ ...output, members: asList(output.members) }))
+  )
 }

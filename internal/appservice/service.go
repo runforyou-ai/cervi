@@ -9,6 +9,8 @@ import (
 )
 
 // Service 将跨平台业务调用转发给当前运行平台的 Backend。
+//
+// Service 是各端业务调用的统一出口，每个带结果的方法都归一化结果中的 nil 切片。
 type Service struct {
 	backend             Backend
 	imageSelector       ImageSelector
@@ -71,7 +73,7 @@ func (s *Service) InstallWorkspace(ctx context.Context, meta RequestMeta, input 
 	if !ok {
 		return Auth{}, methodNotAllowedError(meta, "InstallWorkspace")
 	}
-	return installer.InstallWorkspace(ctx, meta, input)
+	return withNormalizedSlices(installer.InstallWorkspace(ctx, meta, input))
 }
 
 // Login 校验账号密码并建立登录会话。
@@ -81,7 +83,7 @@ func (s *Service) Login(ctx context.Context, meta RequestMeta, input LoginInput)
 		return Auth{}, err
 	}
 	s.setNativeLocale(auth.Identity.User.Locale)
-	return auth, nil
+	return withNormalizedSlices(auth, nil)
 }
 
 // LoadIdentity 返回当前登录身份。
@@ -91,7 +93,7 @@ func (s *Service) LoadIdentity(ctx context.Context, meta RequestMeta) (Identity,
 		return Identity{}, err
 	}
 	s.setNativeLocale(identity.User.Locale)
-	return identity, nil
+	return withNormalizedSlices(identity, nil)
 }
 
 // UpdateUserPreferences 保存当前用户的偏好设置。
@@ -101,7 +103,7 @@ func (s *Service) UpdateUserPreferences(ctx context.Context, meta RequestMeta, i
 		return CurrentUser{}, err
 	}
 	s.setNativeLocale(user.Locale)
-	return user, nil
+	return withNormalizedSlices(user, nil)
 }
 
 // setNativeLocale 在当前平台支持时同步原生界面语言。
@@ -116,7 +118,7 @@ func (s *Service) SelectImage(ctx context.Context, meta RequestMeta) (ImageFile,
 	if s.imageSelector == nil {
 		return ImageFile{}, methodNotAllowedError(meta, "SelectImage")
 	}
-	return s.imageSelector.SelectImage(ctx, meta)
+	return withNormalizedSlices(s.imageSelector.SelectImage(ctx, meta))
 }
 
 // OpenExternalPage 在原生端应用内新窗口打开外部页面。
@@ -182,7 +184,7 @@ func (s *Service) ProbeServer(ctx context.Context, meta RequestMeta, serverURL s
 	if !ok {
 		return InstallationStatus{}, methodNotAllowedError(meta, "ProbeServer")
 	}
-	return connector.ProbeServer(ctx, meta, serverURL)
+	return withNormalizedSlices(connector.ProbeServer(ctx, meta, serverURL))
 }
 
 // ConnectServer 验证并保存原生端企业服务器地址。

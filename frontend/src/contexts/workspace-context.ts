@@ -1,12 +1,7 @@
 /** 提供工作台页面共享数据。 */
 import { createContext, createElement, useContext, type ReactNode } from "react"
 
-import type {
-  Identity,
-  MessageNotificationInput,
-  Organization,
-  CurrentUser,
-} from "@/api"
+import type { Identity, MessageNotificationInput } from "@/api"
 
 /** 工作台实时消息入口需要的通知内容和最新未读数。 */
 export type WorkspaceNewMessageNotification = Omit<
@@ -16,8 +11,6 @@ export type WorkspaceNewMessageNotification = Omit<
 
 export type WorkspaceOutletContext = {
   identity: Identity
-  updateOrganization: (organization: Organization) => void
-  updateUser: (user: CurrentUser) => void
   beginUnreadSnapshot: () => number
   applyUnreadSnapshot: (count: number, revision: number) => void
   notifyNewMessage: (

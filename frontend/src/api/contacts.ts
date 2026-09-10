@@ -1,4 +1,4 @@
-/** 外部联系人调用与归一化。 */
+/** 外部联系人调用。 */
 import {
   CreateContact,
   DeleteContact,
@@ -10,52 +10,34 @@ import {
 import {
   ContactSort,
   type Contact,
-  type ContactInput,
   type ContactList,
   type ContactListInput,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import { bind } from "@/api/client"
-import { asList } from "@/api/normalize"
+import type { NonNullArrays } from "@/api/normalize"
 
-export type ContactDetail = Omit<Contact, "methods" | "channelIdentities"> & {
-  methods: NonNullable<Contact["methods"]>
-  channelIdentities: NonNullable<Contact["channelIdentities"]>
-}
+export type ContactDetail = NonNullArrays<Contact>
 
-export type ContactListResponse = Omit<ContactList, "contacts"> & {
-  contacts: NonNullable<ContactList["contacts"]>
-}
+export type ContactListResponse = NonNullArrays<ContactList>
 
 export type ContactListQuery = Omit<Partial<ContactListInput>, "deleted">
 
 const listContactsBound = bind(ListContacts)
-const getContactBound = bind(GetContact)
-const createContactBound = bind(CreateContact)
-const updateContactBound = bind(UpdateContact)
-const restoreContactBound = bind(RestoreContact)
 
 /** 将联系人移入回收站。 */
 export const deleteContact = bind(DeleteContact)
 
 /** 读取联系人详情。 */
-export function getContact(contactId: string, signal?: AbortSignal) {
-  return getContactBound(contactId, signal).then(normalizeContact)
-}
+export const getContact = bind(GetContact)
 
 /** 创建联系人。 */
-export function createContact(input: ContactInput) {
-  return createContactBound(input).then(normalizeContact)
-}
+export const createContact = bind(CreateContact)
 
 /** 修改联系人。 */
-export function updateContact(contactId: string, input: ContactInput) {
-  return updateContactBound(contactId, input).then(normalizeContact)
-}
+export const updateContact = bind(UpdateContact)
 
 /** 恢复联系人。 */
-export function restoreContact(contactId: string) {
-  return restoreContactBound(contactId).then(normalizeContact)
-}
+export const restoreContact = bind(RestoreContact)
 
 /** 读取联系人列表。 */
 export function listContacts(query: ContactListQuery, signal?: AbortSignal) {
@@ -71,12 +53,12 @@ export function listDeletedContacts(
 }
 
 /** 按是否回收站读取联系人列表。 */
-async function listContactsByDeleted(
+function listContactsByDeleted(
   query: ContactListQuery,
   deleted: boolean,
   signal?: AbortSignal,
 ) {
-  const output = await listContactsBound(
+  return listContactsBound(
     {
       query: query.query ?? "",
       stage: query.stage ?? null,
@@ -89,17 +71,4 @@ async function listContactsByDeleted(
     },
     signal,
   )
-  return {
-    ...output,
-    contacts: asList(output.contacts),
-  } satisfies ContactListResponse
-}
-
-/** 把联系人详情中的可空切片转换为空数组。 */
-function normalizeContact(contact: Contact): ContactDetail {
-  return {
-    ...contact,
-    methods: asList(contact.methods),
-    channelIdentities: asList(contact.channelIdentities),
-  }
 }

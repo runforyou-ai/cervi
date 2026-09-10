@@ -12,7 +12,7 @@ import { useTranslation } from "react-i18next"
 import { useLocation, useNavigate } from "react-router"
 
 import { ChannelType, type ChannelOption, type Team } from "@/api"
-import { messageChannelTypeDefinition } from "@/features/channels/message-channel-types"
+import { messageChannelTypeDefinition } from "@/lib/message-channel-types"
 import { PagePaneNav } from "@/components/page-split"
 import { Button } from "@/components/ui/button"
 import {

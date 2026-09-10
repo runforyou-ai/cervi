@@ -1,6 +1,8 @@
-/** 生成类型的边界归一化公共工具。 */
+/** 生成类型的可空切片边界声明。 */
 
-/** 把可空切片转换为空数组。 */
-export function asList<T>(value: T[] | null | undefined): T[] {
-  return value ?? []
-}
+/** 递归把生成类型中的可空切片视为数组。 */
+export type NonNullArrays<T> = [NonNullable<T>] extends [readonly (infer Element)[]]
+  ? NonNullArrays<Element>[]
+  : T extends object
+    ? { [Key in keyof T]: NonNullArrays<T[Key]> }
+    : T

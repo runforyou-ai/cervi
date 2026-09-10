@@ -6,7 +6,7 @@ import "context"
 
 // InstallationStatus 返回服务端初始化状态和公开企业名称。
 func (s *Service) InstallationStatus(ctx context.Context, meta RequestMeta) (InstallationStatus, error) {
-	return s.backend.InstallationStatus(ctx, meta)
+	return withNormalizedSlices(s.backend.InstallationStatus(ctx, meta))
 }
 
 // Logout 退出当前登录会话。
@@ -16,27 +16,27 @@ func (s *Service) Logout(ctx context.Context, meta RequestMeta) error {
 
 // UpdateProfile 修改当前用户的头像、姓名和邮箱。
 func (s *Service) UpdateProfile(ctx context.Context, meta RequestMeta, input ProfileInput) (CurrentUser, error) {
-	return s.backend.UpdateProfile(ctx, meta, input)
+	return withNormalizedSlices(s.backend.UpdateProfile(ctx, meta, input))
 }
 
 // CreateFileUpload 创建文件上传请求。
 func (s *Service) CreateFileUpload(ctx context.Context, meta RequestMeta, input FileUploadInput) (FileUpload, error) {
-	return s.backend.CreateFileUpload(ctx, meta, input)
+	return withNormalizedSlices(s.backend.CreateFileUpload(ctx, meta, input))
 }
 
 // CompleteFileUpload 核验并完成文件上传。
 func (s *Service) CompleteFileUpload(ctx context.Context, meta RequestMeta, fileID string) (File, error) {
-	return s.backend.CompleteFileUpload(ctx, meta, fileID)
+	return withNormalizedSlices(s.backend.CompleteFileUpload(ctx, meta, fileID))
 }
 
 // CreateFilePartUpload 创建一个分片的直传请求。
 func (s *Service) CreateFilePartUpload(ctx context.Context, meta RequestMeta, fileID string, input FilePartUploadInput) (FileUploadRequest, error) {
-	return s.backend.CreateFilePartUpload(ctx, meta, fileID, input)
+	return withNormalizedSlices(s.backend.CreateFilePartUpload(ctx, meta, fileID, input))
 }
 
 // PrepareFileUpload 为已有文件记录准备直传请求。
 func (s *Service) PrepareFileUpload(ctx context.Context, meta RequestMeta, fileID string) (FileUpload, error) {
-	return s.backend.PrepareFileUpload(ctx, meta, fileID)
+	return withNormalizedSlices(s.backend.PrepareFileUpload(ctx, meta, fileID))
 }
 
 // CompleteAttachmentUpload 完成文件上传并激活原附件消息。
@@ -51,12 +51,12 @@ func (s *Service) CancelFileUpload(ctx context.Context, meta RequestMeta, fileID
 
 // SendAttachmentMessage 发送内部单聊或群聊附件消息。
 func (s *Service) SendAttachmentMessage(ctx context.Context, meta RequestMeta, input AttachmentMessageInput) (AttachmentMessageResult, error) {
-	return s.backend.SendAttachmentMessage(ctx, meta, input)
+	return withNormalizedSlices(s.backend.SendAttachmentMessage(ctx, meta, input))
 }
 
 // SendAttachmentBatch 按选择顺序保存可带说明的单聊附件消息。
 func (s *Service) SendAttachmentBatch(ctx context.Context, meta RequestMeta, input AttachmentBatchInput) (AttachmentBatchResult, error) {
-	return s.backend.SendAttachmentBatch(ctx, meta, input)
+	return withNormalizedSlices(s.backend.SendAttachmentBatch(ctx, meta, input))
 }
 
 // UpdateAttachmentUploads 更新附件上传状态或取消尚未完成的消息。
@@ -66,12 +66,12 @@ func (s *Service) UpdateAttachmentUploads(ctx context.Context, meta RequestMeta,
 
 // ListAttachmentStates 读取窗口内已存在附件消息的最新状态。
 func (s *Service) ListAttachmentStates(ctx context.Context, meta RequestMeta, conversationID string, input AttachmentStateListInput) (AttachmentStateList, error) {
-	return s.backend.ListAttachmentStates(ctx, meta, conversationID, input)
+	return withNormalizedSlices(s.backend.ListAttachmentStates(ctx, meta, conversationID, input))
 }
 
 // GetAttachmentDownload 签发当前成员可见消息附件的下载地址。
 func (s *Service) GetAttachmentDownload(ctx context.Context, meta RequestMeta, conversationID string, messageID string) (FileDownload, error) {
-	return s.backend.GetAttachmentDownload(ctx, meta, conversationID, messageID)
+	return withNormalizedSlices(s.backend.GetAttachmentDownload(ctx, meta, conversationID, messageID))
 }
 
 // ChangePassword 核验当前密码并保存新密码。
@@ -81,72 +81,72 @@ func (s *Service) ChangePassword(ctx context.Context, meta RequestMeta, input Ch
 
 // UpdateUserWorkStatus 保存当前用户主动设置的工作状态。
 func (s *Service) UpdateUserWorkStatus(ctx context.Context, meta RequestMeta, input UserWorkStatusInput) (CurrentUser, error) {
-	return s.backend.UpdateUserWorkStatus(ctx, meta, input)
+	return withNormalizedSlices(s.backend.UpdateUserWorkStatus(ctx, meta, input))
 }
 
 // LoadInbox 返回当前用户的统一收件箱。
 func (s *Service) LoadInbox(ctx context.Context, meta RequestMeta, input LoadInboxInput) (Inbox, error) {
-	return s.backend.LoadInbox(ctx, meta, input)
+	return withNormalizedSlices(s.backend.LoadInbox(ctx, meta, input))
 }
 
 // GetInboxContext 返回会话锚点的当前资格和原位置邻域。
 func (s *Service) GetInboxContext(ctx context.Context, meta RequestMeta, input InboxContextInput) (InboxContext, error) {
-	return s.backend.GetInboxContext(ctx, meta, input)
+	return withNormalizedSlices(s.backend.GetInboxContext(ctx, meta, input))
 }
 
 // ReadInboxWindow 重读已加载双向边界之间的完整列表范围。
 func (s *Service) ReadInboxWindow(ctx context.Context, meta RequestMeta, input InboxWindowInput) (InboxWindow, error) {
-	return s.backend.ReadInboxWindow(ctx, meta, input)
+	return withNormalizedSlices(s.backend.ReadInboxWindow(ctx, meta, input))
 }
 
 // GetInboxConversation 返回当前用户有权阅读的独立会话摘要。
 func (s *Service) GetInboxConversation(ctx context.Context, meta RequestMeta, conversationID string) (InboxConversation, error) {
-	return s.backend.GetInboxConversation(ctx, meta, conversationID)
+	return withNormalizedSlices(s.backend.GetInboxConversation(ctx, meta, conversationID))
 }
 
 // ReadInboxConversations 按 ID 批量返回会话摘要及当前筛选资格。
 func (s *Service) ReadInboxConversations(ctx context.Context, meta RequestMeta, input ReadInboxConversationsInput) (InboxConversationResults, error) {
-	return s.backend.ReadInboxConversations(ctx, meta, input)
+	return withNormalizedSlices(s.backend.ReadInboxConversations(ctx, meta, input))
 }
 
 // ListCustomerServiceAssignees 返回有效真人和 AI 客服。
 func (s *Service) ListCustomerServiceAssignees(ctx context.Context, meta RequestMeta) (CustomerServiceAssigneeList, error) {
-	return s.backend.ListCustomerServiceAssignees(ctx, meta)
+	return withNormalizedSlices(s.backend.ListCustomerServiceAssignees(ctx, meta))
 }
 
 // ListConversationMessages 返回成员可见的会话消息。
 func (s *Service) ListConversationMessages(ctx context.Context, meta RequestMeta, conversationID string, input ConversationMessageListInput) (ConversationMessageList, error) {
-	return s.backend.ListConversationMessages(ctx, meta, conversationID, input)
+	return withNormalizedSlices(s.backend.ListConversationMessages(ctx, meta, conversationID, input))
 }
 
 // ListConversationMessageReferences 读取当前窗口的引用摘要和回复可用状态。
 func (s *Service) ListConversationMessageReferences(ctx context.Context, meta RequestMeta, conversationID string, input ConversationMessageReferenceListInput) (ConversationMessageReferenceList, error) {
-	return s.backend.ListConversationMessageReferences(ctx, meta, conversationID, input)
+	return withNormalizedSlices(s.backend.ListConversationMessageReferences(ctx, meta, conversationID, input))
 }
 
 // GetConversationMessageContext 返回目标消息及其前后上下文。
 func (s *Service) GetConversationMessageContext(ctx context.Context, meta RequestMeta, conversationID string, messageID string) (ConversationMessageList, error) {
-	return s.backend.GetConversationMessageContext(ctx, meta, conversationID, messageID)
+	return withNormalizedSlices(s.backend.GetConversationMessageContext(ctx, meta, conversationID, messageID))
 }
 
 // GetConversationNavigationState 返回群聊提及进度和最新可见消息。
 func (s *Service) GetConversationNavigationState(ctx context.Context, meta RequestMeta, conversationID string) (ConversationNavigationState, error) {
-	return s.backend.GetConversationNavigationState(ctx, meta, conversationID)
+	return withNormalizedSlices(s.backend.GetConversationNavigationState(ctx, meta, conversationID))
 }
 
 // ListPendingConversationMentions 返回本轮待查看提及目标。
 func (s *Service) ListPendingConversationMentions(ctx context.Context, meta RequestMeta, conversationID string) (PendingConversationMentions, error) {
-	return s.backend.ListPendingConversationMentions(ctx, meta, conversationID)
+	return withNormalizedSlices(s.backend.ListPendingConversationMentions(ctx, meta, conversationID))
 }
 
 // MarkConversationMentionReviewed 确认已查看的群聊提及。
 func (s *Service) MarkConversationMentionReviewed(ctx context.Context, meta RequestMeta, conversationID string, input MarkConversationMentionReviewedInput) (ConversationMentionReview, error) {
-	return s.backend.MarkConversationMentionReviewed(ctx, meta, conversationID, input)
+	return withNormalizedSlices(s.backend.MarkConversationMentionReviewed(ctx, meta, conversationID, input))
 }
 
 // MarkConversationRead 单调推进当前用户的会话已读水位。
 func (s *Service) MarkConversationRead(ctx context.Context, meta RequestMeta, conversationID string, input MarkConversationReadInput) (ConversationReadState, error) {
-	return s.backend.MarkConversationRead(ctx, meta, conversationID, input)
+	return withNormalizedSlices(s.backend.MarkConversationRead(ctx, meta, conversationID, input))
 }
 
 // UpdateConversationUnreadMark 保存当前用户独立于阅读水位的未读标记。
@@ -156,17 +156,17 @@ func (s *Service) UpdateConversationUnreadMark(ctx context.Context, meta Request
 
 // UpdateConversationNotificationSettings 保存当前用户的原生会话提醒设置。
 func (s *Service) UpdateConversationNotificationSettings(ctx context.Context, meta RequestMeta, conversationID string, input ConversationNotificationSettingsInput) (ConversationNotificationSettings, error) {
-	return s.backend.UpdateConversationNotificationSettings(ctx, meta, conversationID, input)
+	return withNormalizedSlices(s.backend.UpdateConversationNotificationSettings(ctx, meta, conversationID, input))
 }
 
 // SendCustomerTextMessage 发送客户会话文本消息。
 func (s *Service) SendCustomerTextMessage(ctx context.Context, meta RequestMeta, conversationID string, input CustomerTextMessageInput) (ConversationMessage, error) {
-	return s.backend.SendCustomerTextMessage(ctx, meta, conversationID, input)
+	return withNormalizedSlices(s.backend.SendCustomerTextMessage(ctx, meta, conversationID, input))
 }
 
 // ListCustomerMessageDeliveries 读取当前窗口的外部投递状态。
 func (s *Service) ListCustomerMessageDeliveries(ctx context.Context, meta RequestMeta, conversationID string, input CustomerDeliveryListInput) (CustomerDeliveryList, error) {
-	return s.backend.ListCustomerMessageDeliveries(ctx, meta, conversationID, input)
+	return withNormalizedSlices(s.backend.ListCustomerMessageDeliveries(ctx, meta, conversationID, input))
 }
 
 // ResolveCustomerMessageDelivery 人工处理失败或待确认的投递。
@@ -176,82 +176,82 @@ func (s *Service) ResolveCustomerMessageDelivery(ctx context.Context, meta Reque
 
 // ClaimServiceSession 领取或接管客户会话最新处理周期。
 func (s *Service) ClaimServiceSession(ctx context.Context, meta RequestMeta, conversationID string) (CustomerServiceSession, error) {
-	return s.backend.ClaimServiceSession(ctx, meta, conversationID)
+	return withNormalizedSlices(s.backend.ClaimServiceSession(ctx, meta, conversationID))
 }
 
 // TransferServiceSession 把当前负责的处理周期转给另一位客服。
 func (s *Service) TransferServiceSession(ctx context.Context, meta RequestMeta, conversationID string, input TransferServiceSessionInput) (CustomerServiceSession, error) {
-	return s.backend.TransferServiceSession(ctx, meta, conversationID, input)
+	return withNormalizedSlices(s.backend.TransferServiceSession(ctx, meta, conversationID, input))
 }
 
 // CloseServiceSession 关闭客户会话最新处理周期。
 func (s *Service) CloseServiceSession(ctx context.Context, meta RequestMeta, conversationID string) (CustomerServiceSession, error) {
-	return s.backend.CloseServiceSession(ctx, meta, conversationID)
+	return withNormalizedSlices(s.backend.CloseServiceSession(ctx, meta, conversationID))
 }
 
 // ReopenServiceSession 重新打开客户会话最新处理周期并分配给当前身份。
 func (s *Service) ReopenServiceSession(ctx context.Context, meta RequestMeta, conversationID string) (CustomerServiceSession, error) {
-	return s.backend.ReopenServiceSession(ctx, meta, conversationID)
+	return withNormalizedSlices(s.backend.ReopenServiceSession(ctx, meta, conversationID))
 }
 
 // SendFirstDirectTextMessage 向目标身份发送首条单聊消息并按需创建长期会话。
 func (s *Service) SendFirstDirectTextMessage(ctx context.Context, meta RequestMeta, input FirstDirectTextMessageInput) (FirstDirectTextMessageResult, error) {
-	return s.backend.SendFirstDirectTextMessage(ctx, meta, input)
+	return withNormalizedSlices(s.backend.SendFirstDirectTextMessage(ctx, meta, input))
 }
 
 // SendFirstAgentTextMessage 在首次发送时创建独立 AI 聊天。
 func (s *Service) SendFirstAgentTextMessage(ctx context.Context, meta RequestMeta, input FirstAgentTextMessageInput) (FirstAgentTextMessageResult, error) {
-	return s.backend.SendFirstAgentTextMessage(ctx, meta, input)
+	return withNormalizedSlices(s.backend.SendFirstAgentTextMessage(ctx, meta, input))
 }
 
 // SendAgentTextMessage 向已有 AI 会话发送文本消息。
 func (s *Service) SendAgentTextMessage(ctx context.Context, meta RequestMeta, conversationID string, input AgentTextMessageInput) (ConversationMessage, error) {
-	return s.backend.SendAgentTextMessage(ctx, meta, conversationID, input)
+	return withNormalizedSlices(s.backend.SendAgentTextMessage(ctx, meta, conversationID, input))
 }
 
 // StopAgentReply 停止独立 AI 会话中指定的回复并返回实际运行状态。
 func (s *Service) StopAgentReply(ctx context.Context, meta RequestMeta, conversationID string, runID string) (AgentRunStatus, error) {
-	return s.backend.StopAgentReply(ctx, meta, conversationID, runID)
+	return withNormalizedSlices(s.backend.StopAgentReply(ctx, meta, conversationID, runID))
 }
 
 // FindDirectConversation 按目标身份查找当前成员的活跃单聊。
 func (s *Service) FindDirectConversation(ctx context.Context, meta RequestMeta, targetIdentityID string) (DirectConversationLookup, error) {
-	return s.backend.FindDirectConversation(ctx, meta, targetIdentityID)
+	return withNormalizedSlices(s.backend.FindDirectConversation(ctx, meta, targetIdentityID))
 }
 
 // SendDirectTextMessage 发送内部单聊文本消息。
 func (s *Service) SendDirectTextMessage(ctx context.Context, meta RequestMeta, conversationID string, input DirectTextMessageInput) (ConversationMessage, error) {
-	return s.backend.SendDirectTextMessage(ctx, meta, conversationID, input)
+	return withNormalizedSlices(s.backend.SendDirectTextMessage(ctx, meta, conversationID, input))
 }
 
 // CreateGroupConversation 创建企业内部群聊。
 func (s *Service) CreateGroupConversation(ctx context.Context, meta RequestMeta, input GroupConversationInput) (InboxConversation, error) {
-	return s.backend.CreateGroupConversation(ctx, meta, input)
+	return withNormalizedSlices(s.backend.CreateGroupConversation(ctx, meta, input))
 }
 
 // GetGroupConversation 返回当前成员可见的群聊资料。
 func (s *Service) GetGroupConversation(ctx context.Context, meta RequestMeta, conversationID string) (GroupConversation, error) {
-	return s.backend.GetGroupConversation(ctx, meta, conversationID)
+	return withNormalizedSlices(s.backend.GetGroupConversation(ctx, meta, conversationID))
 }
 
 // UpdateGroupConversation 修改群聊资料。
 func (s *Service) UpdateGroupConversation(ctx context.Context, meta RequestMeta, conversationID string, input GroupConversationProfileInput) (GroupConversation, error) {
-	return s.backend.UpdateGroupConversation(ctx, meta, conversationID, input)
+	return withNormalizedSlices(s.backend.UpdateGroupConversation(ctx, meta, conversationID, input))
 }
 
 // AddGroupConversationMembers 批量增加群聊成员。
 func (s *Service) AddGroupConversationMembers(ctx context.Context, meta RequestMeta, conversationID string, input GroupConversationMembersInput) (GroupConversation, error) {
-	return s.backend.AddGroupConversationMembers(ctx, meta, conversationID, input)
+	return withNormalizedSlices(s.backend.AddGroupConversationMembers(ctx, meta, conversationID, input))
 }
 
 // RemoveGroupConversationMember 移除单个群聊成员。
 func (s *Service) RemoveGroupConversationMember(ctx context.Context, meta RequestMeta, conversationID string, input GroupConversationMemberInput) (GroupConversation, error) {
-	return s.backend.RemoveGroupConversationMember(ctx, meta, conversationID, input)
+	return withNormalizedSlices(s.backend.RemoveGroupConversationMember(ctx, meta, conversationID, input))
 }
 
 // TransferGroupConversationOwner 转让群主。
 func (s *Service) TransferGroupConversationOwner(ctx context.Context, meta RequestMeta, conversationID string, input GroupConversationOwnerInput) (GroupConversation, error) {
-	return s.backend.TransferGroupConversationOwner(ctx, meta, conversationID, input)
+	return withNormalizedSlices(s.backend.TransferGroupConversationOwner(ctx, meta, conversationID, input))
 }
 
 // LeaveGroupConversation 退出普通成员参与的群聊。
@@ -261,27 +261,27 @@ func (s *Service) LeaveGroupConversation(ctx context.Context, meta RequestMeta, 
 
 // DissolveGroupConversation 解散群聊并保留当前成员的只读历史。
 func (s *Service) DissolveGroupConversation(ctx context.Context, meta RequestMeta, conversationID string) (GroupConversation, error) {
-	return s.backend.DissolveGroupConversation(ctx, meta, conversationID)
+	return withNormalizedSlices(s.backend.DissolveGroupConversation(ctx, meta, conversationID))
 }
 
 // SendGroupTextMessage 发送企业内部群聊文本消息。
 func (s *Service) SendGroupTextMessage(ctx context.Context, meta RequestMeta, conversationID string, input GroupTextMessageInput) (ConversationMessage, error) {
-	return s.backend.SendGroupTextMessage(ctx, meta, conversationID, input)
+	return withNormalizedSlices(s.backend.SendGroupTextMessage(ctx, meta, conversationID, input))
 }
 
 // ListMessageChannels 返回消息渠道列表。
 func (s *Service) ListMessageChannels(ctx context.Context, meta RequestMeta) (MessageChannelList, error) {
-	return s.backend.ListMessageChannels(ctx, meta)
+	return withNormalizedSlices(s.backend.ListMessageChannels(ctx, meta))
 }
 
 // GetWebsiteChannel 返回网站渠道详情。
 func (s *Service) GetWebsiteChannel(ctx context.Context, meta RequestMeta, channelID string) (WebsiteChannel, error) {
-	return s.backend.GetWebsiteChannel(ctx, meta, channelID)
+	return withNormalizedSlices(s.backend.GetWebsiteChannel(ctx, meta, channelID))
 }
 
 // GetTelegramChannel 返回 Telegram 渠道详情。
 func (s *Service) GetTelegramChannel(ctx context.Context, meta RequestMeta, channelID string) (TelegramChannel, error) {
-	return s.backend.GetTelegramChannel(ctx, meta, channelID)
+	return withNormalizedSlices(s.backend.GetTelegramChannel(ctx, meta, channelID))
 }
 
 // TestTelegramChannelConnection 测试 Telegram 草稿 Token。
@@ -291,117 +291,117 @@ func (s *Service) TestTelegramChannelConnection(ctx context.Context, meta Reques
 
 // SaveTelegramChannelConnection 保存 Telegram 机器人和 Webhook 设置。
 func (s *Service) SaveTelegramChannelConnection(ctx context.Context, meta RequestMeta, channelID string, input TelegramChannelConnectionInput) (TelegramChannel, error) {
-	return s.backend.SaveTelegramChannelConnection(ctx, meta, channelID, input)
+	return withNormalizedSlices(s.backend.SaveTelegramChannelConnection(ctx, meta, channelID, input))
 }
 
 // GetMessageChannel 返回消息渠道基础信息。
 func (s *Service) GetMessageChannel(ctx context.Context, meta RequestMeta, channelID string) (MessageChannelSummary, error) {
-	return s.backend.GetMessageChannel(ctx, meta, channelID)
+	return withNormalizedSlices(s.backend.GetMessageChannel(ctx, meta, channelID))
 }
 
 // CreateMessageChannel 创建消息渠道。
 func (s *Service) CreateMessageChannel(ctx context.Context, meta RequestMeta, input CreateMessageChannelInput) (MessageChannelSummary, error) {
-	return s.backend.CreateMessageChannel(ctx, meta, input)
+	return withNormalizedSlices(s.backend.CreateMessageChannel(ctx, meta, input))
 }
 
 // UpdateMessageChannel 修改消息渠道基础信息。
 func (s *Service) UpdateMessageChannel(ctx context.Context, meta RequestMeta, channelID string, input MessageChannelInput) (MessageChannelSummary, error) {
-	return s.backend.UpdateMessageChannel(ctx, meta, channelID, input)
+	return withNormalizedSlices(s.backend.UpdateMessageChannel(ctx, meta, channelID, input))
 }
 
 // UpdateWebsiteChannelChatInterface 修改网站渠道聊天界面。
 func (s *Service) UpdateWebsiteChannelChatInterface(ctx context.Context, meta RequestMeta, channelID string, input WebsiteChannelChatInterfaceInput) (WebsiteChannelChatInterface, error) {
-	return s.backend.UpdateWebsiteChannelChatInterface(ctx, meta, channelID, input)
+	return withNormalizedSlices(s.backend.UpdateWebsiteChannelChatInterface(ctx, meta, channelID, input))
 }
 
 // UpdateWebsiteChannelAccess 修改网站渠道允许使用的网站。
 func (s *Service) UpdateWebsiteChannelAccess(ctx context.Context, meta RequestMeta, channelID string, input WebsiteChannelAccessInput) (WebsiteChannelAccess, error) {
-	return s.backend.UpdateWebsiteChannelAccess(ctx, meta, channelID, input)
+	return withNormalizedSlices(s.backend.UpdateWebsiteChannelAccess(ctx, meta, channelID, input))
 }
 
 // DeactivateMessageChannel 停用消息渠道。
 func (s *Service) DeactivateMessageChannel(ctx context.Context, meta RequestMeta, channelID string) (MessageChannelSummary, error) {
-	return s.backend.DeactivateMessageChannel(ctx, meta, channelID)
+	return withNormalizedSlices(s.backend.DeactivateMessageChannel(ctx, meta, channelID))
 }
 
 // ActivateMessageChannel 启用消息渠道。
 func (s *Service) ActivateMessageChannel(ctx context.Context, meta RequestMeta, channelID string) (MessageChannelSummary, error) {
-	return s.backend.ActivateMessageChannel(ctx, meta, channelID)
+	return withNormalizedSlices(s.backend.ActivateMessageChannel(ctx, meta, channelID))
 }
 
 // ListChannelOptions 返回当前企业的渠道选择项。
 func (s *Service) ListChannelOptions(ctx context.Context, meta RequestMeta) (ChannelOptionList, error) {
-	return s.backend.ListChannelOptions(ctx, meta)
+	return withNormalizedSlices(s.backend.ListChannelOptions(ctx, meta))
 }
 
 // ListMemberOptions 返回可分配的企业成员和 AI 员工。
 func (s *Service) ListMemberOptions(ctx context.Context, meta RequestMeta, input MemberOptionListInput) (MemberOptionList, error) {
-	return s.backend.ListMemberOptions(ctx, meta, input)
+	return withNormalizedSlices(s.backend.ListMemberOptions(ctx, meta, input))
 }
 
 // ListAgentMCPServerOptions 返回当前企业可配置的 MCP 服务。
 func (s *Service) ListAgentMCPServerOptions(ctx context.Context, meta RequestMeta) (AgentMCPServerOptionList, error) {
-	return s.backend.ListAgentMCPServerOptions(ctx, meta)
+	return withNormalizedSlices(s.backend.ListAgentMCPServerOptions(ctx, meta))
 }
 
 // ListAgentModelOptions 返回 AI 员工可使用的对话模型。
 func (s *Service) ListAgentModelOptions(ctx context.Context, meta RequestMeta) (AgentModelOptionList, error) {
-	return s.backend.ListAgentModelOptions(ctx, meta)
+	return withNormalizedSlices(s.backend.ListAgentModelOptions(ctx, meta))
 }
 
 // CreateAgent 创建企业 AI 员工。
 func (s *Service) CreateAgent(ctx context.Context, meta RequestMeta, input CreateAgentInput) (Agent, error) {
-	return s.backend.CreateAgent(ctx, meta, input)
+	return withNormalizedSlices(s.backend.CreateAgent(ctx, meta, input))
 }
 
 // ListAgents 返回企业 AI 员工目录。
 func (s *Service) ListAgents(ctx context.Context, meta RequestMeta, input AgentListInput) (AgentList, error) {
-	return s.backend.ListAgents(ctx, meta, input)
+	return withNormalizedSlices(s.backend.ListAgents(ctx, meta, input))
 }
 
 // GetAgent 返回企业 AI 员工详情。
 func (s *Service) GetAgent(ctx context.Context, meta RequestMeta, agentID string) (Agent, error) {
-	return s.backend.GetAgent(ctx, meta, agentID)
+	return withNormalizedSlices(s.backend.GetAgent(ctx, meta, agentID))
 }
 
 // UpdateAgent 修改企业 AI 员工。
 func (s *Service) UpdateAgent(ctx context.Context, meta RequestMeta, agentID string, input UpdateAgentInput) (Agent, error) {
-	return s.backend.UpdateAgent(ctx, meta, agentID, input)
+	return withNormalizedSlices(s.backend.UpdateAgent(ctx, meta, agentID, input))
 }
 
 // UpdateAgentExecution 修改企业 AI 员工的执行配置。
 func (s *Service) UpdateAgentExecution(ctx context.Context, meta RequestMeta, agentID string, input UpdateAgentExecutionInput) (Agent, error) {
-	return s.backend.UpdateAgentExecution(ctx, meta, agentID, input)
+	return withNormalizedSlices(s.backend.UpdateAgentExecution(ctx, meta, agentID, input))
 }
 
 // DeactivateAgent 禁用企业 AI 员工账号。
 func (s *Service) DeactivateAgent(ctx context.Context, meta RequestMeta, agentID string) (Agent, error) {
-	return s.backend.DeactivateAgent(ctx, meta, agentID)
+	return withNormalizedSlices(s.backend.DeactivateAgent(ctx, meta, agentID))
 }
 
 // ReactivateAgent 恢复企业 AI 员工。
 func (s *Service) ReactivateAgent(ctx context.Context, meta RequestMeta, agentID string) (Agent, error) {
-	return s.backend.ReactivateAgent(ctx, meta, agentID)
+	return withNormalizedSlices(s.backend.ReactivateAgent(ctx, meta, agentID))
 }
 
 // ListUsers 返回企业成员列表。
 func (s *Service) ListUsers(ctx context.Context, meta RequestMeta, input UserListInput) (UserList, error) {
-	return s.backend.ListUsers(ctx, meta, input)
+	return withNormalizedSlices(s.backend.ListUsers(ctx, meta, input))
 }
 
 // GetUser 返回企业成员详情。
 func (s *Service) GetUser(ctx context.Context, meta RequestMeta, userID string) (User, error) {
-	return s.backend.GetUser(ctx, meta, userID)
+	return withNormalizedSlices(s.backend.GetUser(ctx, meta, userID))
 }
 
 // CreateUser 创建企业成员账号。
 func (s *Service) CreateUser(ctx context.Context, meta RequestMeta, input CreateUserInput) (User, error) {
-	return s.backend.CreateUser(ctx, meta, input)
+	return withNormalizedSlices(s.backend.CreateUser(ctx, meta, input))
 }
 
 // UpdateUser 修改企业成员资料、角色和所属团队。
 func (s *Service) UpdateUser(ctx context.Context, meta RequestMeta, userID string, input UpdateUserInput) (User, error) {
-	return s.backend.UpdateUser(ctx, meta, userID, input)
+	return withNormalizedSlices(s.backend.UpdateUser(ctx, meta, userID, input))
 }
 
 // UpdateRoleAssignments 在一个事务中批量调整真人和 AI 员工角色。
@@ -411,27 +411,27 @@ func (s *Service) UpdateRoleAssignments(ctx context.Context, meta RequestMeta, i
 
 // DeactivateUser 禁用企业成员账号。
 func (s *Service) DeactivateUser(ctx context.Context, meta RequestMeta, userID string) (User, error) {
-	return s.backend.DeactivateUser(ctx, meta, userID)
+	return withNormalizedSlices(s.backend.DeactivateUser(ctx, meta, userID))
 }
 
 // ReactivateUser 恢复企业成员账号。
 func (s *Service) ReactivateUser(ctx context.Context, meta RequestMeta, userID string) (User, error) {
-	return s.backend.ReactivateUser(ctx, meta, userID)
+	return withNormalizedSlices(s.backend.ReactivateUser(ctx, meta, userID))
 }
 
 // ListTeams 返回企业团队列表。
 func (s *Service) ListTeams(ctx context.Context, meta RequestMeta, input TeamListInput) (TeamList, error) {
-	return s.backend.ListTeams(ctx, meta, input)
+	return withNormalizedSlices(s.backend.ListTeams(ctx, meta, input))
 }
 
 // CreateTeam 创建企业团队。
 func (s *Service) CreateTeam(ctx context.Context, meta RequestMeta, input TeamInput) (Team, error) {
-	return s.backend.CreateTeam(ctx, meta, input)
+	return withNormalizedSlices(s.backend.CreateTeam(ctx, meta, input))
 }
 
 // UpdateTeam 修改企业团队。
 func (s *Service) UpdateTeam(ctx context.Context, meta RequestMeta, teamID string, input TeamInput) (Team, error) {
-	return s.backend.UpdateTeam(ctx, meta, teamID, input)
+	return withNormalizedSlices(s.backend.UpdateTeam(ctx, meta, teamID, input))
 }
 
 // DeleteTeam 删除企业团队及其成员关系。
@@ -441,22 +441,22 @@ func (s *Service) DeleteTeam(ctx context.Context, meta RequestMeta, teamID strin
 
 // ListTeamMembers 返回团队成员列表。
 func (s *Service) ListTeamMembers(ctx context.Context, meta RequestMeta, teamID string, input TeamMemberListInput) (TeamMemberList, error) {
-	return s.backend.ListTeamMembers(ctx, meta, teamID, input)
+	return withNormalizedSlices(s.backend.ListTeamMembers(ctx, meta, teamID, input))
 }
 
 // ListTeamMemberCandidates 返回尚未加入团队的企业身份。
 func (s *Service) ListTeamMemberCandidates(ctx context.Context, meta RequestMeta, teamID string, input TeamMemberCandidateInput) (TeamMemberCandidateList, error) {
-	return s.backend.ListTeamMemberCandidates(ctx, meta, teamID, input)
+	return withNormalizedSlices(s.backend.ListTeamMemberCandidates(ctx, meta, teamID, input))
 }
 
 // AddTeamMembers 将企业身份批量加入团队。
 func (s *Service) AddTeamMembers(ctx context.Context, meta RequestMeta, teamID string, input TeamMemberInput) (Team, error) {
-	return s.backend.AddTeamMembers(ctx, meta, teamID, input)
+	return withNormalizedSlices(s.backend.AddTeamMembers(ctx, meta, teamID, input))
 }
 
 // RemoveTeamMembers 将企业身份批量移出团队。
 func (s *Service) RemoveTeamMembers(ctx context.Context, meta RequestMeta, teamID string, input TeamMemberInput) (Team, error) {
-	return s.backend.RemoveTeamMembers(ctx, meta, teamID, input)
+	return withNormalizedSlices(s.backend.RemoveTeamMembers(ctx, meta, teamID, input))
 }
 
 // RetryKnowledgeDocument 按当前配置重新处理文档。
@@ -466,22 +466,22 @@ func (s *Service) RetryKnowledgeDocument(ctx context.Context, meta RequestMeta, 
 
 // ListKnowledgeDocumentSegments 返回固定批次的分段页或锚点所在页。
 func (s *Service) ListKnowledgeDocumentSegments(ctx context.Context, meta RequestMeta, knowledgeBaseID string, documentID string, input KnowledgeDocumentSegmentInput) (KnowledgeDocumentSegmentPage, error) {
-	return s.backend.ListKnowledgeDocumentSegments(ctx, meta, knowledgeBaseID, documentID, input)
+	return withNormalizedSlices(s.backend.ListKnowledgeDocumentSegments(ctx, meta, knowledgeBaseID, documentID, input))
 }
 
 // ListKnowledgeDocuments 返回当前分组的文档列表。
 func (s *Service) ListKnowledgeDocuments(ctx context.Context, meta RequestMeta, knowledgeBaseID string, input KnowledgeDocumentListInput) (KnowledgeDocumentList, error) {
-	return s.backend.ListKnowledgeDocuments(ctx, meta, knowledgeBaseID, input)
+	return withNormalizedSlices(s.backend.ListKnowledgeDocuments(ctx, meta, knowledgeBaseID, input))
 }
 
 // GetKnowledgeDocument 返回文档详情。
 func (s *Service) GetKnowledgeDocument(ctx context.Context, meta RequestMeta, knowledgeBaseID string, documentID string) (KnowledgeDocument, error) {
-	return s.backend.GetKnowledgeDocument(ctx, meta, knowledgeBaseID, documentID)
+	return withNormalizedSlices(s.backend.GetKnowledgeDocument(ctx, meta, knowledgeBaseID, documentID))
 }
 
 // CreateKnowledgeDocuments 保存最多十个已上传的文档原件。
 func (s *Service) CreateKnowledgeDocuments(ctx context.Context, meta RequestMeta, knowledgeBaseID string, input KnowledgeDocumentBatchInput) (KnowledgeDocumentBatch, error) {
-	return s.backend.CreateKnowledgeDocuments(ctx, meta, knowledgeBaseID, input)
+	return withNormalizedSlices(s.backend.CreateKnowledgeDocuments(ctx, meta, knowledgeBaseID, input))
 }
 
 // MoveKnowledgeDocument 移动文档到同库分组。
@@ -496,27 +496,27 @@ func (s *Service) DeleteKnowledgeDocument(ctx context.Context, meta RequestMeta,
 
 // GetKnowledgeDocumentPreview 签发当前文档的原件预览请求。
 func (s *Service) GetKnowledgeDocumentPreview(ctx context.Context, meta RequestMeta, knowledgeBaseID string, documentID string) (KnowledgeDocumentPreviewRequest, error) {
-	return s.backend.GetKnowledgeDocumentPreview(ctx, meta, knowledgeBaseID, documentID)
+	return withNormalizedSlices(s.backend.GetKnowledgeDocumentPreview(ctx, meta, knowledgeBaseID, documentID))
 }
 
 // ListKnowledgeQAEntries 返回分组中的本地问答列表。
 func (s *Service) ListKnowledgeQAEntries(ctx context.Context, meta RequestMeta, knowledgeBaseID string, input KnowledgeQAListInput) (KnowledgeQAList, error) {
-	return s.backend.ListKnowledgeQAEntries(ctx, meta, knowledgeBaseID, input)
+	return withNormalizedSlices(s.backend.ListKnowledgeQAEntries(ctx, meta, knowledgeBaseID, input))
 }
 
 // GetKnowledgeQAEntry 返回完整的本地问答。
 func (s *Service) GetKnowledgeQAEntry(ctx context.Context, meta RequestMeta, knowledgeBaseID string, entryID string) (KnowledgeQAEntry, error) {
-	return s.backend.GetKnowledgeQAEntry(ctx, meta, knowledgeBaseID, entryID)
+	return withNormalizedSlices(s.backend.GetKnowledgeQAEntry(ctx, meta, knowledgeBaseID, entryID))
 }
 
 // CreateKnowledgeQAEntry 创建本地问答。
 func (s *Service) CreateKnowledgeQAEntry(ctx context.Context, meta RequestMeta, knowledgeBaseID string, input KnowledgeQAInput) (KnowledgeQAEntry, error) {
-	return s.backend.CreateKnowledgeQAEntry(ctx, meta, knowledgeBaseID, input)
+	return withNormalizedSlices(s.backend.CreateKnowledgeQAEntry(ctx, meta, knowledgeBaseID, input))
 }
 
 // UpdateKnowledgeQAEntry 修改本地问答。
 func (s *Service) UpdateKnowledgeQAEntry(ctx context.Context, meta RequestMeta, knowledgeBaseID string, entryID string, input KnowledgeQAInput) (KnowledgeQAEntry, error) {
-	return s.backend.UpdateKnowledgeQAEntry(ctx, meta, knowledgeBaseID, entryID, input)
+	return withNormalizedSlices(s.backend.UpdateKnowledgeQAEntry(ctx, meta, knowledgeBaseID, entryID, input))
 }
 
 // DeleteKnowledgeQAEntry 删除本地问答。
@@ -526,22 +526,22 @@ func (s *Service) DeleteKnowledgeQAEntry(ctx context.Context, meta RequestMeta, 
 
 // ListKnowledgeBases 返回当前企业的知识库列表。
 func (s *Service) ListKnowledgeBases(ctx context.Context, meta RequestMeta) (KnowledgeBaseList, error) {
-	return s.backend.ListKnowledgeBases(ctx, meta)
+	return withNormalizedSlices(s.backend.ListKnowledgeBases(ctx, meta))
 }
 
 // GetKnowledgeBase 返回当前企业中的知识库详情。
 func (s *Service) GetKnowledgeBase(ctx context.Context, meta RequestMeta, knowledgeBaseID string) (KnowledgeBase, error) {
-	return s.backend.GetKnowledgeBase(ctx, meta, knowledgeBaseID)
+	return withNormalizedSlices(s.backend.GetKnowledgeBase(ctx, meta, knowledgeBaseID))
 }
 
 // CreateKnowledgeBase 创建企业知识库。
 func (s *Service) CreateKnowledgeBase(ctx context.Context, meta RequestMeta, input KnowledgeBaseInput) (KnowledgeBase, error) {
-	return s.backend.CreateKnowledgeBase(ctx, meta, input)
+	return withNormalizedSlices(s.backend.CreateKnowledgeBase(ctx, meta, input))
 }
 
 // UpdateKnowledgeBase 修改企业知识库。
 func (s *Service) UpdateKnowledgeBase(ctx context.Context, meta RequestMeta, knowledgeBaseID string, input KnowledgeBaseInput) (KnowledgeBase, error) {
-	return s.backend.UpdateKnowledgeBase(ctx, meta, knowledgeBaseID, input)
+	return withNormalizedSlices(s.backend.UpdateKnowledgeBase(ctx, meta, knowledgeBaseID, input))
 }
 
 // DeleteKnowledgeBase 删除企业知识库。
@@ -551,37 +551,37 @@ func (s *Service) DeleteKnowledgeBase(ctx context.Context, meta RequestMeta, kno
 
 // CreateKnowledgeGroup 创建知识库分组。
 func (s *Service) CreateKnowledgeGroup(ctx context.Context, meta RequestMeta, knowledgeBaseID string, input KnowledgeGroupInput) (KnowledgeBase, error) {
-	return s.backend.CreateKnowledgeGroup(ctx, meta, knowledgeBaseID, input)
+	return withNormalizedSlices(s.backend.CreateKnowledgeGroup(ctx, meta, knowledgeBaseID, input))
 }
 
 // UpdateKnowledgeGroup 修改知识库分组。
 func (s *Service) UpdateKnowledgeGroup(ctx context.Context, meta RequestMeta, knowledgeBaseID string, groupID string, input KnowledgeGroupInput) (KnowledgeBase, error) {
-	return s.backend.UpdateKnowledgeGroup(ctx, meta, knowledgeBaseID, groupID, input)
+	return withNormalizedSlices(s.backend.UpdateKnowledgeGroup(ctx, meta, knowledgeBaseID, groupID, input))
 }
 
 // DeleteKnowledgeGroup 删除不含子分组和问答的知识库分组。
 func (s *Service) DeleteKnowledgeGroup(ctx context.Context, meta RequestMeta, knowledgeBaseID string, groupID string) (KnowledgeBase, error) {
-	return s.backend.DeleteKnowledgeGroup(ctx, meta, knowledgeBaseID, groupID)
+	return withNormalizedSlices(s.backend.DeleteKnowledgeGroup(ctx, meta, knowledgeBaseID, groupID))
 }
 
 // ListContacts 返回联系人列表。
 func (s *Service) ListContacts(ctx context.Context, meta RequestMeta, input ContactListInput) (ContactList, error) {
-	return s.backend.ListContacts(ctx, meta, input)
+	return withNormalizedSlices(s.backend.ListContacts(ctx, meta, input))
 }
 
 // GetContact 返回联系人详情。
 func (s *Service) GetContact(ctx context.Context, meta RequestMeta, contactID string) (Contact, error) {
-	return s.backend.GetContact(ctx, meta, contactID)
+	return withNormalizedSlices(s.backend.GetContact(ctx, meta, contactID))
 }
 
 // CreateContact 创建联系人。
 func (s *Service) CreateContact(ctx context.Context, meta RequestMeta, input ContactInput) (Contact, error) {
-	return s.backend.CreateContact(ctx, meta, input)
+	return withNormalizedSlices(s.backend.CreateContact(ctx, meta, input))
 }
 
 // UpdateContact 修改联系人。
 func (s *Service) UpdateContact(ctx context.Context, meta RequestMeta, contactID string, input ContactInput) (Contact, error) {
-	return s.backend.UpdateContact(ctx, meta, contactID, input)
+	return withNormalizedSlices(s.backend.UpdateContact(ctx, meta, contactID, input))
 }
 
 // DeleteContact 将联系人移入回收站。
@@ -591,27 +591,27 @@ func (s *Service) DeleteContact(ctx context.Context, meta RequestMeta, contactID
 
 // RestoreContact 恢复联系人。
 func (s *Service) RestoreContact(ctx context.Context, meta RequestMeta, contactID string) (Contact, error) {
-	return s.backend.RestoreContact(ctx, meta, contactID)
+	return withNormalizedSlices(s.backend.RestoreContact(ctx, meta, contactID))
 }
 
 // ListRoles 返回当前企业的角色和预定义权限目录。
 func (s *Service) ListRoles(ctx context.Context, meta RequestMeta) (RoleList, error) {
-	return s.backend.ListRoles(ctx, meta)
+	return withNormalizedSlices(s.backend.ListRoles(ctx, meta))
 }
 
 // GetRole 返回当前企业的角色详情。
 func (s *Service) GetRole(ctx context.Context, meta RequestMeta, roleID string) (Role, error) {
-	return s.backend.GetRole(ctx, meta, roleID)
+	return withNormalizedSlices(s.backend.GetRole(ctx, meta, roleID))
 }
 
 // CreateRole 创建自定义角色。
 func (s *Service) CreateRole(ctx context.Context, meta RequestMeta, input RoleInput) (Role, error) {
-	return s.backend.CreateRole(ctx, meta, input)
+	return withNormalizedSlices(s.backend.CreateRole(ctx, meta, input))
 }
 
 // UpdateRole 修改角色信息和权限。
 func (s *Service) UpdateRole(ctx context.Context, meta RequestMeta, roleID string, input RoleInput) (Role, error) {
-	return s.backend.UpdateRole(ctx, meta, roleID, input)
+	return withNormalizedSlices(s.backend.UpdateRole(ctx, meta, roleID, input))
 }
 
 // DeleteRole 删除自定义角色。
@@ -621,17 +621,17 @@ func (s *Service) DeleteRole(ctx context.Context, meta RequestMeta, roleID strin
 
 // ListAIProviders 返回当前企业的模型服务供应商列表。
 func (s *Service) ListAIProviders(ctx context.Context, meta RequestMeta) (AIProviderList, error) {
-	return s.backend.ListAIProviders(ctx, meta)
+	return withNormalizedSlices(s.backend.ListAIProviders(ctx, meta))
 }
 
 // GetAIProvider 返回当前企业中的模型服务供应商详情。
 func (s *Service) GetAIProvider(ctx context.Context, meta RequestMeta, providerID string) (AIProvider, error) {
-	return s.backend.GetAIProvider(ctx, meta, providerID)
+	return withNormalizedSlices(s.backend.GetAIProvider(ctx, meta, providerID))
 }
 
 // ListAvailableAIModels 返回指定品牌的预设模型目录。
 func (s *Service) ListAvailableAIModels(ctx context.Context, meta RequestMeta, brand AIProviderBrand) (AIProviderModelList, error) {
-	return s.backend.ListAvailableAIModels(ctx, meta, brand)
+	return withNormalizedSlices(s.backend.ListAvailableAIModels(ctx, meta, brand))
 }
 
 // TestAIProviderConnection 测试模型服务供应商草稿配置。
@@ -641,12 +641,12 @@ func (s *Service) TestAIProviderConnection(ctx context.Context, meta RequestMeta
 
 // CreateAIProvider 创建模型服务供应商。
 func (s *Service) CreateAIProvider(ctx context.Context, meta RequestMeta, input AIProviderInput) (AIProvider, error) {
-	return s.backend.CreateAIProvider(ctx, meta, input)
+	return withNormalizedSlices(s.backend.CreateAIProvider(ctx, meta, input))
 }
 
 // UpdateAIProvider 修改模型服务供应商。
 func (s *Service) UpdateAIProvider(ctx context.Context, meta RequestMeta, providerID string, input AIProviderInput) (AIProvider, error) {
-	return s.backend.UpdateAIProvider(ctx, meta, providerID, input)
+	return withNormalizedSlices(s.backend.UpdateAIProvider(ctx, meta, providerID, input))
 }
 
 // DeleteAIProvider 删除模型服务供应商。
@@ -656,22 +656,22 @@ func (s *Service) DeleteAIProvider(ctx context.Context, meta RequestMeta, provid
 
 // ListBusinessSystems 返回当前企业配置的业务系统。
 func (s *Service) ListBusinessSystems(ctx context.Context, meta RequestMeta) (BusinessSystemList, error) {
-	return s.backend.ListBusinessSystems(ctx, meta)
+	return withNormalizedSlices(s.backend.ListBusinessSystems(ctx, meta))
 }
 
 // GetBusinessSystem 返回当前企业中的业务系统详情。
 func (s *Service) GetBusinessSystem(ctx context.Context, meta RequestMeta, businessSystemID string) (BusinessSystem, error) {
-	return s.backend.GetBusinessSystem(ctx, meta, businessSystemID)
+	return withNormalizedSlices(s.backend.GetBusinessSystem(ctx, meta, businessSystemID))
 }
 
 // CreateBusinessSystem 创建业务系统。
 func (s *Service) CreateBusinessSystem(ctx context.Context, meta RequestMeta, input BusinessSystemInput) (BusinessSystem, error) {
-	return s.backend.CreateBusinessSystem(ctx, meta, input)
+	return withNormalizedSlices(s.backend.CreateBusinessSystem(ctx, meta, input))
 }
 
 // UpdateBusinessSystem 修改业务系统。
 func (s *Service) UpdateBusinessSystem(ctx context.Context, meta RequestMeta, businessSystemID string, input BusinessSystemInput) (BusinessSystem, error) {
-	return s.backend.UpdateBusinessSystem(ctx, meta, businessSystemID, input)
+	return withNormalizedSlices(s.backend.UpdateBusinessSystem(ctx, meta, businessSystemID, input))
 }
 
 // DeleteBusinessSystem 删除业务系统。
@@ -681,12 +681,12 @@ func (s *Service) DeleteBusinessSystem(ctx context.Context, meta RequestMeta, bu
 
 // ListMCPServers 返回当前企业配置的 MCP 服务。
 func (s *Service) ListMCPServers(ctx context.Context, meta RequestMeta) (MCPServerList, error) {
-	return s.backend.ListMCPServers(ctx, meta)
+	return withNormalizedSlices(s.backend.ListMCPServers(ctx, meta))
 }
 
 // GetMCPServer 返回当前企业中的 MCP 服务详情。
 func (s *Service) GetMCPServer(ctx context.Context, meta RequestMeta, mcpServerID string) (MCPServer, error) {
-	return s.backend.GetMCPServer(ctx, meta, mcpServerID)
+	return withNormalizedSlices(s.backend.GetMCPServer(ctx, meta, mcpServerID))
 }
 
 // TestMCPServerConnection 测试 MCP 草稿连接配置。
@@ -706,12 +706,12 @@ func (s *Service) RefreshMCPServerTools(ctx context.Context, meta RequestMeta) e
 
 // CreateMCPServer 创建 MCP 服务。
 func (s *Service) CreateMCPServer(ctx context.Context, meta RequestMeta, input MCPServerInput) (MCPServer, error) {
-	return s.backend.CreateMCPServer(ctx, meta, input)
+	return withNormalizedSlices(s.backend.CreateMCPServer(ctx, meta, input))
 }
 
 // UpdateMCPServer 修改 MCP 服务。
 func (s *Service) UpdateMCPServer(ctx context.Context, meta RequestMeta, mcpServerID string, input MCPServerInput) (MCPServer, error) {
-	return s.backend.UpdateMCPServer(ctx, meta, mcpServerID, input)
+	return withNormalizedSlices(s.backend.UpdateMCPServer(ctx, meta, mcpServerID, input))
 }
 
 // DeleteMCPServer 删除 MCP 服务。
@@ -721,17 +721,17 @@ func (s *Service) DeleteMCPServer(ctx context.Context, meta RequestMeta, mcpServ
 
 // UpdateOrganization 修改当前企业通用设置。
 func (s *Service) UpdateOrganization(ctx context.Context, meta RequestMeta, input OrganizationInput) (Organization, error) {
-	return s.backend.UpdateOrganization(ctx, meta, input)
+	return withNormalizedSlices(s.backend.UpdateOrganization(ctx, meta, input))
 }
 
 // GetS3Setting 返回当前企业的对象存储设置。
 func (s *Service) GetS3Setting(ctx context.Context, meta RequestMeta) (S3Setting, error) {
-	return s.backend.GetS3Setting(ctx, meta)
+	return withNormalizedSlices(s.backend.GetS3Setting(ctx, meta))
 }
 
 // SaveS3Setting 保存当前企业的对象存储设置。
 func (s *Service) SaveS3Setting(ctx context.Context, meta RequestMeta, input S3SettingInput) (S3Setting, error) {
-	return s.backend.SaveS3Setting(ctx, meta, input)
+	return withNormalizedSlices(s.backend.SaveS3Setting(ctx, meta, input))
 }
 
 // TestS3Setting 测试对象存储连接。
