@@ -15,11 +15,7 @@ import {
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
-import {
-  ResourceTable,
-  ResourceTableActions,
-} from "@/components/resource-table"
-import { SelectableText } from "@/components/selectable-text"
+import { ResourceTable } from "@/components/resource-table"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -32,7 +28,6 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
-import { TableCell } from "@/components/ui/table"
 import {
   permissionDefinitionLabel,
   roleDescription,
@@ -152,70 +147,62 @@ export function RoleListPage() {
           <div className="@container overflow-hidden rounded-lg border bg-card">
             <ResourceTable
               columns={[
-                { key: "name", header: t("roles.list.columns.name") },
+                {
+                  key: "name",
+                  header: t("roles.list.columns.name"),
+                  cellClassName: "font-medium",
+                  cell: (role) => roleDisplayName(role, tCommon),
+                },
                 {
                   key: "description",
                   header: t("roles.list.columns.description"),
-                  className: "hidden w-64 @3xl:table-cell",
+                  className: "hidden @3xl:table-cell",
+                  headerClassName: "w-64",
+                  cellClassName: "max-w-64 text-muted-foreground",
+                  cell: (role) => {
+                    const description = roleDescription(role, t)
+                    return (
+                      <span className="block truncate" title={description}>
+                        {description}
+                      </span>
+                    )
+                  },
                 },
                 {
                   key: "memberCount",
                   header: t("roles.list.columns.memberCount"),
+                  cell: (role) => role.memberCount,
                 },
                 {
                   key: "permissions",
                   header: t("roles.list.columns.permissions"),
                   className: "hidden @3xl:table-cell",
-                },
-                {
-                  key: "actions",
-                  header: tCommon("table.actions"),
-                  className: "w-px",
+                  cellClassName: "text-muted-foreground",
+                  cell: (role) => permissionSummary(role, permissions, t),
                 },
               ]}
               rows={roles}
               rowKey={(role) => role.id}
               empty={t("roles.list.empty")}
-            >
-              {(role) => {
-                const description = roleDescription(role, t)
-                return (
-                  <>
-                    <TableCell className="font-medium">
-                      <SelectableText>
-                        {roleDisplayName(role, tCommon)}
-                      </SelectableText>
-                    </TableCell>
-                    <TableCell className="hidden max-w-64 text-muted-foreground @3xl:table-cell">
-                      <span className="block truncate" title={description}>
-                        {description}
-                      </span>
-                    </TableCell>
-                    <TableCell>{role.memberCount}</TableCell>
-                    <TableCell className="hidden text-muted-foreground @3xl:table-cell">
-                      {permissionSummary(role, permissions, t)}
-                    </TableCell>
-                    <ResourceTableActions
-                      menu={
-                        <DropdownMenuItem
-                          destructive
-                          disabled={role.kind !== RoleKind.RoleKindCustom}
-                          onSelect={() => setDeletingRole(role)}
-                        >
-                          {tCommon("actions.delete")}
-                        </DropdownMenuItem>
-                      }
-                    >
-                      <Button variant="outline" size="sm" asChild>
-                        <Link to={`/settings/roles/${role.id}`}>
-                          {tCommon("actions.view")}
-                        </Link>
-                      </Button>
-                    </ResourceTableActions>
-                  </>
-                )
-              }}
-            </ResourceTable>
+              actions={(role) => ({
+                primary: (
+                  <Button variant="outline" size="sm" asChild>
+                    <Link to={`/settings/roles/${role.id}`}>
+                      {tCommon("actions.view")}
+                    </Link>
+                  </Button>
+                ),
+                menu: (
+                  <DropdownMenuItem
+                    destructive
+                    disabled={role.kind !== RoleKind.RoleKindCustom}
+                    onSelect={() => setDeletingRole(role)}
+                  >
+                    {tCommon("actions.delete")}
+                  </DropdownMenuItem>
+                ),
+              })}
+            />
           </div>
         )}
       </PageContent>

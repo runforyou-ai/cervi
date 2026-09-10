@@ -20,11 +20,7 @@ import {
 } from "@/components/list-toolbar"
 import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
-import {
-  ResourceTable,
-  ResourceTableActions,
-} from "@/components/resource-table"
-import { SelectableText } from "@/components/selectable-text"
+import { ResourceTable } from "@/components/resource-table"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -37,7 +33,6 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
-import { TableCell } from "@/components/ui/table"
 import {
   messageChannelTypeDefinition,
   messageChannelTypeDefinitions,
@@ -48,54 +43,6 @@ import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
 type ChannelEnabledStatus = "enabled" | "disabled"
-
-/** 消息渠道列表中一行的各列内容。 */
-function MessageChannelRow({
-  channel,
-  updating,
-  onStatusChange,
-}: {
-  channel: MessageChannelSummary
-  updating: boolean
-  onStatusChange: (channel: MessageChannelSummary) => void
-}) {
-  const { t } = useTranslation(["channels", "common"])
-  const typeDefinition = messageChannelTypeDefinition(channel.type)
-  if (!typeDefinition) {
-    console.warn("未知的消息渠道类型", channel.type)
-  }
-
-  return (
-    <>
-      <TableCell className="min-w-44 font-medium">
-        <SelectableText>{channel.name}</SelectableText>
-      </TableCell>
-      <TableCell className="whitespace-nowrap">
-        {typeDefinition ? t(`types.${typeDefinition.translationKey}`) : ""}
-      </TableCell>
-      <TableCell className="whitespace-nowrap">
-        {t(`locales.${channel.defaultLocale === "zh-CN" ? "zhCN" : "enUS"}`)}
-      </TableCell>
-      <ResourceTableActions
-        menu={
-          <DropdownMenuItem
-            destructive={channel.enabled}
-            disabled={updating}
-            onSelect={() => onStatusChange(channel)}
-          >
-            {channel.enabled ? t("list.deactivate") : t("list.activate")}
-          </DropdownMenuItem>
-        }
-      >
-        <Button variant="outline" size="sm" asChild>
-          <Link to={`/integrations/channels/${channel.type}/${channel.id}`}>
-            {t("common:actions.edit")}
-          </Link>
-        </Button>
-      </ResourceTableActions>
-    </>
-  )
-}
 
 /** 加载并管理消息渠道列表。 */
 export function MessageChannelListPage() {
@@ -240,13 +187,35 @@ export function MessageChannelListPage() {
           <div className="overflow-hidden rounded-lg border bg-card">
             <ResourceTable
               columns={[
-                { key: "name", header: t("list.columns.name") },
-                { key: "category", header: t("list.columns.category") },
-                { key: "language", header: t("list.columns.language") },
                 {
-                  key: "actions",
-                  header: t("common:table.actions"),
-                  className: "w-px",
+                  key: "name",
+                  header: t("list.columns.name"),
+                  cellClassName: "min-w-44 font-medium",
+                  cell: (channel) => channel.name,
+                },
+                {
+                  key: "category",
+                  header: t("list.columns.category"),
+                  cellClassName: "whitespace-nowrap",
+                  cell: (channel) => {
+                    const typeDefinition = messageChannelTypeDefinition(
+                      channel.type,
+                    )
+                    if (!typeDefinition) {
+                      console.warn("未知的消息渠道类型", channel.type)
+                      return ""
+                    }
+                    return t(`types.${typeDefinition.translationKey}`)
+                  },
+                },
+                {
+                  key: "language",
+                  header: t("list.columns.language"),
+                  cellClassName: "whitespace-nowrap",
+                  cell: (channel) =>
+                    t(
+                      `locales.${channel.defaultLocale === "zh-CN" ? "zhCN" : "enUS"}`,
+                    ),
                 },
               ]}
               rows={filteredChannels}
@@ -256,15 +225,29 @@ export function MessageChannelListPage() {
                   ? t("list.emptyTitle")
                   : t("list.emptyFiltered")
               }
-            >
-              {(channel) => (
-                <MessageChannelRow
-                  channel={channel}
-                  updating={updatingChannelId === channel.id}
-                  onStatusChange={requestStatusChange}
-                />
-              )}
-            </ResourceTable>
+              actions={(channel) => ({
+                primary: (
+                  <Button variant="outline" size="sm" asChild>
+                    <Link
+                      to={`/integrations/channels/${channel.type}/${channel.id}`}
+                    >
+                      {t("common:actions.edit")}
+                    </Link>
+                  </Button>
+                ),
+                menu: (
+                  <DropdownMenuItem
+                    destructive={channel.enabled}
+                    disabled={updatingChannelId === channel.id}
+                    onSelect={() => requestStatusChange(channel)}
+                  >
+                    {channel.enabled
+                      ? t("list.deactivate")
+                      : t("list.activate")}
+                  </DropdownMenuItem>
+                ),
+              })}
+            />
           </div>
         )}
       </PageContent>

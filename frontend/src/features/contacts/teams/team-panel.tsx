@@ -23,10 +23,7 @@ import {
   ListToolbarSearch,
 } from "@/components/list-toolbar"
 import { PageHeader } from "@/components/page-header"
-import {
-  ResourceTable,
-  ResourceTableActions,
-} from "@/components/resource-table"
+import { ResourceTable } from "@/components/resource-table"
 import { Button } from "@/components/ui/button"
 import {
   AlertDialog,
@@ -51,7 +48,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { TableCell } from "@/components/ui/table"
 import { WorkStatusBadge, workStatusLabel } from "@/components/work-status"
 import { useWorkspace } from "@/contexts/workspace-context"
 import { ContactCreateDialogs } from "@/features/contacts/contact-create-dialogs"
@@ -354,7 +350,7 @@ export function TeamPanel({
             columns={[
               {
                 key: "select",
-                className: "w-10",
+                headerClassName: "w-10",
                 header: (
                   <input
                     type="checkbox"
@@ -366,24 +362,7 @@ export function TeamPanel({
                     }
                   />
                 ),
-              },
-              { key: "memberName", header: t("columns.memberName") },
-              { key: "type", header: t("columns.type") },
-              { key: "workStatus", header: t("columns.workStatus") },
-              { key: "joinedAt", header: t("columns.joinedAt") },
-              {
-                key: "actions",
-                header: tCommon("table.actions"),
-                className: "w-px",
-              },
-            ]}
-            rows={teamMembers}
-            rowKey={(member) => member.identityId}
-            empty={t("list.empty")}
-          >
-            {(member) => (
-              <>
-                <TableCell>
+                cell: (member) => (
                   <input
                     type="checkbox"
                     className="size-4 accent-primary"
@@ -397,37 +376,53 @@ export function TeamPanel({
                       toggleTeamMember(member.identityId, event.target.checked)
                     }
                   />
-                </TableCell>
-                <TableCell className="font-medium">
-                  {member.displayName}
-                </TableCell>
-                <TableCell>
-                  {t(
+                ),
+              },
+              {
+                key: "memberName",
+                header: t("columns.memberName"),
+                cellClassName: "font-medium",
+                cell: (member) => member.displayName,
+              },
+              {
+                key: "type",
+                header: t("columns.type"),
+                cell: (member) =>
+                  t(
                     member.identityType ===
                       OrganizationIdentityType.OrganizationIdentityTypeAgent
                       ? "identityCategories.agent"
                       : "identityCategories.user",
-                  )}
-                </TableCell>
-                <TableCell>
+                  ),
+              },
+              {
+                key: "workStatus",
+                header: t("columns.workStatus"),
+                cell: (member) => (
                   <WorkStatusBadge status={identityWorkStatus(member)} />
-                </TableCell>
-                <TableCell className="whitespace-nowrap text-muted-foreground">
-                  {formatDateTime(member.joinedAt)}
-                </TableCell>
-                <ResourceTableActions
-                  menu={
-                    <DropdownMenuItem
-                      destructive
-                      onSelect={() => setRemovingTeamMembers([member])}
-                    >
-                      {t("teams.members.remove")}
-                    </DropdownMenuItem>
-                  }
-                />
-              </>
-            )}
-          </ResourceTable>
+                ),
+              },
+              {
+                key: "joinedAt",
+                header: t("columns.joinedAt"),
+                cellClassName: "whitespace-nowrap text-muted-foreground",
+                cell: (member) => formatDateTime(member.joinedAt),
+              },
+            ]}
+            rows={teamMembers}
+            rowKey={(member) => member.identityId}
+            empty={t("list.empty")}
+            actions={(member) => ({
+              menu: (
+                <DropdownMenuItem
+                  destructive
+                  onSelect={() => setRemovingTeamMembers([member])}
+                >
+                  {t("teams.members.remove")}
+                </DropdownMenuItem>
+              ),
+            })}
+          />
         </ContactListLayout>
       </section>
 
