@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"log/slog"
 	"strings"
 
 	"github.com/cloudwego/eino/adk"
@@ -14,7 +15,11 @@ import (
 	"github.com/cloudwego/eino/schema"
 )
 
-const defaultMaxIterations = 8
+const (
+	defaultMaxIterations = 8
+	// emptyResponseRetryLimit 限制空正文的重新执行次数，避免对同一输入无界重算。
+	emptyResponseRetryLimit = 1
+)
 
 type runIDContextKey struct{}
 
@@ -75,25 +80,40 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 		return RunResult{}, fmt.Errorf("create Eino chat model agent: %w", err)
 	}
 
-	execution := &einoExecution{
-		inputs: &turnInputs{feed: feed}, recorder: recorder, maxTurns: request.MaxTurns,
+	// 模型偶发只产出推理内容而没有正文，按有界次数重新执行本次输入。
+	var carriedUsage Usage
+	for attempt := 0; ; attempt++ {
+		execution := &einoExecution{
+			inputs: &turnInputs{feed: feed}, recorder: recorder, maxTurns: request.MaxTurns,
+		}
+		execution.inputs.loop = adk.NewTurnLoop(adk.TurnLoopConfig[Trigger, *schema.Message]{
+			GenInput: execution.genInput,
+			PrepareAgent: func(context.Context, *adk.TurnLoop[Trigger, *schema.Message], []Trigger) (adk.Agent, error) {
+				return agent, nil
+			},
+			OnAgentEvents: execution.onAgentEvents,
+		})
+		err := execution.inputs.run(ctx)
+		carriedUsage.PromptTokens += execution.result.Usage.PromptTokens
+		carriedUsage.CompletionTokens += execution.result.Usage.CompletionTokens
+		carriedUsage.TotalTokens += execution.result.Usage.TotalTokens
+		if errors.Is(err, errEmptyFinalResponse) && attempt < emptyResponseRetryLimit && ctx.Err() == nil {
+			slog.Warn("模型未产出正文，重新执行本次输入",
+				"agent_run_id", request.RunID, "attempt", attempt+1, "retry_limit", emptyResponseRetryLimit)
+			recorder.reset()
+			continue
+		}
+		if err != nil {
+			return RunResult{}, err
+		}
+		if execution.result.Content == "" || execution.inputs.claimedSeq <= 0 {
+			return RunResult{}, errors.New("agent run stopped without a stable response")
+		}
+		execution.result.Usage = carriedUsage
+		execution.result.EndSeq = execution.inputs.claimedSeq
+		execution.result.Blocks = recorder.blocks()
+		return execution.result, nil
 	}
-	execution.inputs.loop = adk.NewTurnLoop(adk.TurnLoopConfig[Trigger, *schema.Message]{
-		GenInput: execution.genInput,
-		PrepareAgent: func(context.Context, *adk.TurnLoop[Trigger, *schema.Message], []Trigger) (adk.Agent, error) {
-			return agent, nil
-		},
-		OnAgentEvents: execution.onAgentEvents,
-	})
-	if err := execution.inputs.run(ctx); err != nil {
-		return RunResult{}, err
-	}
-	if execution.result.Content == "" || execution.inputs.claimedSeq <= 0 {
-		return RunResult{}, errors.New("agent run stopped without a stable response")
-	}
-	execution.result.EndSeq = execution.inputs.claimedSeq
-	execution.result.Blocks = recorder.blocks()
-	return execution.result, nil
 }
 
 // einoExecution 保存单次运行的上下文、轮次和结果，回调按轮次顺序访问。

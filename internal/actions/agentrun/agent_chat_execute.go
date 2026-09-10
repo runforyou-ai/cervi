@@ -55,6 +55,11 @@ func (p agentChatRunPolicy) persistMessage(ctx context.Context, db bun.IDB, poli
 	return err
 }
 
+// instruction 沿用 AI 会话配置的系统提示词。
+func (p agentChatRunPolicy) instruction(_ context.Context, _ bun.IDB, execution executionContext) (string, error) {
+	return execution.Instruction, nil
+}
+
 // laneRevision 读取 AI 聊天 Agent 当前生效的配置版本。
 func (p agentChatRunPolicy) laneRevision(ctx context.Context, db bun.IDB, _ agentRunPolicyContext, lane *servermodels.AgentLane) (string, bool, error) {
 	var revisionID string

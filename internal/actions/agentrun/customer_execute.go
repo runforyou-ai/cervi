@@ -101,6 +101,11 @@ func (p customerRunPolicy) persistMessage(ctx context.Context, db bun.IDB, polic
 	return nil
 }
 
+// instruction 沿用客服会话配置的系统提示词。
+func (p customerRunPolicy) instruction(_ context.Context, _ bun.IDB, execution executionContext) (string, error) {
+	return execution.Instruction, nil
+}
+
 // laneRevision 在当前负责人仍合格时返回客户 Agent 的配置版本。
 func (p customerRunPolicy) laneRevision(ctx context.Context, db bun.IDB, policyContext agentRunPolicyContext, lane *servermodels.AgentLane) (string, bool, error) {
 	if policyContext.ServiceSession.AssigneeIdentityID == nil || *policyContext.ServiceSession.AssigneeIdentityID != lane.AgentIdentityID {

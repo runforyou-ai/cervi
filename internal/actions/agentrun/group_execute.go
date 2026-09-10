@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log/slog"
 	"slices"
+	"strings"
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -18,6 +19,10 @@ import (
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
+
+const groupInstructionPreamble = `你是企业 AI 员工「%s」，当前在群聊「%s」中与其他成员一起工作。
+群内其他成员的发言以 JSON 提供：sender.name 是发送者名称，sender.kind 为 user 表示真人、为 agent 表示另一位 AI 员工，replyTo 是被引用的原消息；你自己的历史发言是纯文本。
+成员点名你或回复你的消息时才轮到你发言。回复直接输出发到群里的正文。`
 
 type groupMentionRunPolicy struct{}
 
@@ -69,6 +74,22 @@ func (p groupMentionRunPolicy) loadMessages(ctx context.Context, db bun.IDB, run
 func (p groupMentionRunPolicy) persistMessage(ctx context.Context, db bun.IDB, policyContext agentRunPolicyContext, run *servermodels.AgentRun, messageID string, messageType domain.MessageType, content string) error {
 	_, _, err := appendAgentMessage(ctx, db, policyContext.Conversation, run, messageID, policyContext.AgentParticipantID, messageType, content, nil)
 	return err
+}
+
+// instruction 在配置指令前补充本次运行的身份与群聊场景说明。
+func (p groupMentionRunPolicy) instruction(ctx context.Context, db bun.IDB, execution executionContext) (string, error) {
+	title := ""
+	if err := db.NewSelect().Model((*servermodels.Conversation)(nil)).
+		ColumnExpr("COALESCE(cv.title, '')").
+		Where("cv.organization_id = ? AND cv.id = ?", execution.Run.OrganizationID, execution.Run.ConversationID).
+		Scan(ctx, &title); err != nil {
+		return "", fmt.Errorf("load group title for instruction: %w", err)
+	}
+	preamble := fmt.Sprintf(groupInstructionPreamble, execution.AgentName, title)
+	if strings.TrimSpace(execution.Instruction) == "" {
+		return preamble, nil
+	}
+	return preamble + "\n\n" + execution.Instruction, nil
 }
 
 // laneRevision 在目标 Agent 仍是有效群成员时返回其配置版本。

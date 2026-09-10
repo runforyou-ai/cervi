@@ -238,6 +238,33 @@ func testGroupAgentMentionReplies(t *testing.T, db *bun.DB, identity *servermode
 		}
 	})
 
+	t.Run("系统提示词包含身份与群聊场景", func(t *testing.T) {
+		f := newGroupAgentFixture(t, db, identity, agents)
+		f.post(t, "请帮忙看一下", []string{f.agents[0].IdentityID}, "")
+		run := f.activeRun(t)
+		captured := ""
+		runtime := testAgentRuntime{run: func(ctx context.Context, request agentruntime.RunRequest, feed agentruntime.InputFeed) (agentruntime.RunResult, error) {
+			captured = request.Instruction
+			triggers, err := feed.Peek(ctx, 0)
+			if err != nil {
+				return agentruntime.RunResult{}, err
+			}
+			claimed, err := feed.Claim(ctx, triggers[len(triggers)-1].Seq)
+			if err != nil {
+				return agentruntime.RunResult{}, err
+			}
+			return agentruntime.RunResult{Content: "收到", EndSeq: claimed.EndSeq}, nil
+		}}
+		if err := agentrunaction.NewExecuteAction(db, f.tasks, runtime).Execute(ctx, agentrunaction.RunInput{RunID: run.ID}); err != nil {
+			t.Fatal(err)
+		}
+		for _, fragment := range []string{f.agents[0].DisplayName, "AI 协作群", "sender.name", "协助群内成员"} {
+			if !strings.Contains(captured, fragment) {
+				t.Fatalf("系统提示词缺少 %q：%q", fragment, captured)
+			}
+		}
+	})
+
 	t.Run("引用回复等价于点名", func(t *testing.T) {
 		f := newGroupAgentFixture(t, db, identity, agents)
 		f.post(t, "第一次提问", []string{f.agents[0].IdentityID}, "")

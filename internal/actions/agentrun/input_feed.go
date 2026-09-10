@@ -34,6 +34,7 @@ type agentRunPolicy interface {
 	loadMessages(context.Context, bun.IDB, *servermodels.AgentRun, int64) ([]agentruntime.Message, error)
 	persistMessage(context.Context, bun.IDB, agentRunPolicyContext, *servermodels.AgentRun, string, domain.MessageType, string) error
 	laneRevision(context.Context, bun.IDB, agentRunPolicyContext, *servermodels.AgentLane) (string, bool, error)
+	instruction(context.Context, bun.IDB, executionContext) (string, error)
 }
 
 type lockedAgentRun struct {

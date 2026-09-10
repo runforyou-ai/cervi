@@ -100,8 +100,12 @@ func (a *ExecuteAction) Execute(ctx context.Context, input RunInput) error {
 			}, nil
 		}
 	}
+	instruction, err := policy.instruction(ctx, a.db, execution)
+	if err != nil {
+		return fmt.Errorf("build agent run instruction: %w", err)
+	}
 	result, err := a.runtime.Run(runCtx, agentruntime.RunRequest{
-		RunID: execution.Run.ID, Name: execution.AgentName, Instruction: execution.Instruction,
+		RunID: execution.Run.ID, Name: execution.AgentName, Instruction: instruction,
 		Model: agentruntime.ModelConfig{
 			Brand: execution.Brand, APIKey: execution.APIKey, BaseURL: execution.APIURL,
 			Identifier: execution.ModelIdentifier, MaxOutputTokens: maxOutputTokens,
