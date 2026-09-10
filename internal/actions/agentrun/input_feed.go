@@ -36,14 +36,9 @@ type agentRunPolicy interface {
 	enqueueNext(context.Context, bun.IDB, agentRunPolicyContext, *servermodels.AgentRun, int64) error
 }
 
-type agentRunScope struct {
-	TriggerType      domain.AgentTriggerType
-	ServiceSessionID *string
-}
-
 type lockedAgentRun struct {
 	PolicyContext agentRunPolicyContext
-	State         *servermodels.ConversationAgentState
+	Lane          *servermodels.AgentLane
 	Run           *servermodels.AgentRun
 }
 
@@ -55,23 +50,16 @@ type databaseInputFeed struct {
 
 // Peek 返回尚未进入 TurnLoop 缓冲区的连续输入信号。
 func (f *databaseInputFeed) Peek(ctx context.Context, afterSeq int64) ([]agentruntime.Trigger, error) {
-	scope, err := agentRunScopeFor(&f.execution.Run)
-	if err != nil {
-		return nil, err
-	}
 	triggers := make([]agentruntime.Trigger, 0)
-	query := f.db.NewSelect().TableExpr("conversation_agent_triggers AS cat").
-		ColumnExpr("cat.trigger_seq AS seq").
-		Join("JOIN conversation_agent_states AS cas ON cas.conversation_id = cat.conversation_id AND cas.organization_id = cat.organization_id AND cas.agent_identity_id = cat.agent_identity_id").
-		Where("cat.organization_id = ?", f.execution.Run.OrganizationID).
-		Where("cat.conversation_id = ?", f.execution.Run.ConversationID).
-		Where("cat.agent_identity_id = ?", f.execution.Run.AgentIdentityID).
-		Where("cat.trigger_seq > cas.processed_seq").
-		Where("cat.trigger_seq > ?", afterSeq).
-		OrderExpr("cat.trigger_seq ASC")
-	scope.applySelect(query)
-	if err := query.Scan(ctx, &triggers); err != nil {
-		return nil, fmt.Errorf("peek agent triggers: %w", err)
+	if err := f.db.NewSelect().TableExpr("agent_inputs AS ai").
+		ColumnExpr("ai.input_seq AS seq").
+		Join("JOIN agent_lanes AS al ON al.id = ai.lane_id").
+		Where("ai.lane_id = ?", f.execution.Run.LaneID).
+		Where("ai.input_seq > al.processed_seq").
+		Where("ai.input_seq > ?", afterSeq).
+		OrderExpr("ai.input_seq ASC").
+		Scan(ctx, &triggers); err != nil {
+		return nil, fmt.Errorf("peek agent inputs: %w", err)
 	}
 	return triggers, nil
 }
@@ -79,21 +67,17 @@ func (f *databaseInputFeed) Peek(ctx context.Context, afterSeq int64) ([]agentru
 // Claim 绑定当前所有已持久化输入，并按运行策略重建截至该边界的会话上下文。
 func (f *databaseInputFeed) Claim(ctx context.Context, throughSeq int64) (agentruntime.ClaimedInput, error) {
 	if throughSeq <= 0 {
-		return agentruntime.ClaimedInput{}, errors.New("agent trigger sequence is invalid")
-	}
-	scope, err := agentRunScopeFor(&f.execution.Run)
-	if err != nil {
-		return agentruntime.ClaimedInput{}, err
+		return agentruntime.ClaimedInput{}, errors.New("agent input sequence is invalid")
 	}
 	var output agentruntime.ClaimedInput
 	var previousEndSeq int64
 	suppressed := false
-	err = f.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err := f.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		locked, err := lockAgentRun(ctx, tx, f.policy, &f.execution.Run)
 		if err != nil {
 			return fmt.Errorf("lock agent input: %w", err)
 		}
-		policyContext, state, run := locked.PolicyContext, locked.State, locked.Run
+		policyContext, lane, run := locked.PolicyContext, locked.Lane, locked.Run
 		if agentRunStatusTerminal(run.Status) {
 			suppressed = true
 			return nil
@@ -106,29 +90,29 @@ func (f *databaseInputFeed) Claim(ctx context.Context, throughSeq int64) (agentr
 			suppressed = true
 			return nil
 		}
-		if run.Status != string(domain.AgentRunStatusRunning) || state.DesiredSeq <= state.ProcessedSeq {
+		if run.Status != string(domain.AgentRunStatusRunning) || lane.DesiredSeq <= lane.ProcessedSeq {
 			return errors.New("agent run has no claimable input")
 		}
-		if run.TriggerEndSeq != nil {
-			previousEndSeq = *run.TriggerEndSeq
+		if run.InputEndSeq != nil {
+			previousEndSeq = *run.InputEndSeq
 		}
-		claimEnd := min(throughSeq, state.DesiredSeq)
-		if claimEnd <= state.ProcessedSeq || claimEnd < run.TriggerStartSeq {
+		claimEnd := min(throughSeq, lane.DesiredSeq)
+		if claimEnd <= lane.ProcessedSeq || claimEnd < run.InputStartSeq {
 			return errors.New("agent run input boundary is not claimable")
 		}
-		claimedSeqs, err := assignAgentTriggers(ctx, tx, run, scope, state.ProcessedSeq, claimEnd)
+		claimedSeqs, err := claimLaneInputs(ctx, tx, run, lane.ProcessedSeq, claimEnd)
 		if err != nil {
-			return fmt.Errorf("claim agent triggers: %w", err)
+			return fmt.Errorf("claim agent inputs: %w", err)
 		}
-		if int64(len(claimedSeqs)) != claimEnd-state.ProcessedSeq {
-			return errors.New("agent trigger sequence is not contiguous")
+		if int64(len(claimedSeqs)) != claimEnd-lane.ProcessedSeq {
+			return errors.New("agent input sequence is not contiguous")
 		}
 		if _, err := tx.NewUpdate().Model(run).
-			Set("trigger_start_seq = LEAST(trigger_start_seq, ?)", state.ProcessedSeq+1).
-			Set("trigger_end_seq = ?", claimEnd).
+			Set("input_start_seq = LEAST(input_start_seq, ?)", lane.ProcessedSeq+1).
+			Set("input_end_seq = ?", claimEnd).
 			Set("updated_at = now()").
 			WherePK().Exec(ctx); err != nil {
-			return fmt.Errorf("update agent run trigger boundary: %w", err)
+			return fmt.Errorf("update agent run input boundary: %w", err)
 		}
 		messages, err := f.policy.loadMessages(ctx, tx, run, claimEnd)
 		if err != nil {
@@ -143,69 +127,32 @@ func (f *databaseInputFeed) Claim(ctx context.Context, throughSeq int64) (agentr
 	if suppressed {
 		return agentruntime.ClaimedInput{}, errAgentRunSuppressed
 	}
-	if scope.TriggerType == domain.AgentTriggerTypeCustomerAuto {
+	if domain.AgentExecutionScopeKind(f.execution.Run.ScopeKind) == domain.AgentExecutionScopeServiceSession {
 		slog.Info("客户 Agent 输入已认领",
 			"agent_run_id", f.execution.Run.ID,
 			"conversation_id", f.execution.Run.ConversationID,
-			"service_session_id", *scope.ServiceSessionID,
-			"trigger_start_seq", f.execution.Run.TriggerStartSeq,
+			"service_session_id", f.execution.Run.ScopeID,
+			"input_start_seq", f.execution.Run.InputStartSeq,
 			"previous_end_seq", previousEndSeq,
-			"trigger_end_seq", output.EndSeq,
+			"input_end_seq", output.EndSeq,
 			"context_message_count", len(output.Messages),
 		)
 	}
 	return output, nil
 }
 
-// agentRunScopeFor 从运行记录构造严格的 Trigger 查询范围。
-func agentRunScopeFor(run *servermodels.AgentRun) (agentRunScope, error) {
-	scope := agentRunScope{
-		TriggerType:      domain.AgentTriggerType(run.TriggerType),
-		ServiceSessionID: run.ServiceSessionID,
-	}
-	if err := validateAgentRunScope(scope.TriggerType, scope.ServiceSessionID); err != nil {
-		return agentRunScope{}, err
-	}
-	return scope, nil
-}
-
-// validateAgentRunScope 校验运行类型和客服周期字段保持一致。
-func validateAgentRunScope(triggerType domain.AgentTriggerType, serviceSessionID *string) error {
-	switch triggerType {
-	case domain.AgentTriggerTypeDirect:
-		if serviceSessionID != nil {
-			return errors.New("direct agent run cannot belong to a service session")
-		}
-	case domain.AgentTriggerTypeCustomerAuto:
-		if serviceSessionID == nil {
-			return errors.New("customer agent run requires a service session")
-		}
-	default:
-		return fmt.Errorf("unsupported agent trigger type %q", triggerType)
-	}
-	return nil
-}
-
-// applySelect 把运行类型和客服周期加入 Trigger 查询。
-func (s agentRunScope) applySelect(query *bun.SelectQuery) {
-	query.Where("cat.trigger_type = ?", s.TriggerType).
-		Where("cat.service_session_id IS NOT DISTINCT FROM ?", s.ServiceSessionID)
-}
-
-// lockAgentRun 按策略会话上下文、输入状态、运行记录和任务租约的顺序取得事务锁。
+// lockAgentRun 按策略会话上下文、输入队列、运行记录和任务租约的顺序取得事务锁。
 func lockAgentRun(ctx context.Context, db bun.IDB, policy agentRunPolicy, initial *servermodels.AgentRun) (lockedAgentRun, error) {
 	policyContext, err := policy.lockContext(ctx, db, initial)
 	if err != nil {
 		return lockedAgentRun{}, err
 	}
-	state := &servermodels.ConversationAgentState{}
-	// 锁定一次运行对应的会话输入状态。
-	if err := db.NewSelect().Model(state).
-		Where("cas.conversation_id = ?", initial.ConversationID).
-		Where("cas.organization_id = ?", initial.OrganizationID).
-		Where("cas.agent_identity_id = ?", initial.AgentIdentityID).
+	lane := &servermodels.AgentLane{}
+	if err := db.NewSelect().Model(lane).
+		Where("al.id = ?", initial.LaneID).
+		Where("al.organization_id = ?", initial.OrganizationID).
 		For("UPDATE").Scan(ctx); err != nil {
-		return lockedAgentRun{}, err
+		return lockedAgentRun{}, fmt.Errorf("lock agent lane: %w", err)
 	}
 	run := &servermodels.AgentRun{}
 	if err := db.NewSelect().Model(run).Where("agr.id = ?", initial.ID).For("UPDATE").Scan(ctx); err != nil {
@@ -216,26 +163,20 @@ func lockAgentRun(ctx context.Context, db bun.IDB, policy agentRunPolicy, initia
 			return lockedAgentRun{}, err
 		}
 	}
-	return lockedAgentRun{PolicyContext: policyContext, State: state, Run: run}, nil
+	return lockedAgentRun{PolicyContext: policyContext, Lane: lane, Run: run}, nil
 }
 
-// assignAgentTriggers 把连续范围内且属于当前策略的 Trigger 绑定到运行。
-func assignAgentTriggers(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, scope agentRunScope, afterSeq, throughSeq int64) ([]int64, error) {
+// claimLaneInputs 把连续范围内的队列输入绑定到运行。
+func claimLaneInputs(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, afterSeq, throughSeq int64) ([]int64, error) {
 	claimedSeqs := make([]int64, 0, throughSeq-afterSeq)
 	err := db.NewRaw(`
-		UPDATE conversation_agent_triggers
+		UPDATE agent_inputs
 		SET agent_run_id = ?
-		WHERE organization_id = ?
-			AND conversation_id = ?
-			AND agent_identity_id = ?
-			AND trigger_type = ?
-			AND service_session_id IS NOT DISTINCT FROM ?
-			AND trigger_seq > ?
-			AND trigger_seq <= ?
-		RETURNING trigger_seq
-	`, run.ID, run.OrganizationID, run.ConversationID, run.AgentIdentityID,
-		scope.TriggerType, scope.ServiceSessionID, afterSeq, throughSeq,
-	).Scan(ctx, &claimedSeqs)
+		WHERE lane_id = ?
+			AND input_seq > ?
+			AND input_seq <= ?
+		RETURNING input_seq
+	`, run.ID, run.LaneID, afterSeq, throughSeq).Scan(ctx, &claimedSeqs)
 	return claimedSeqs, err
 }
 
@@ -245,20 +186,13 @@ type messageBoundary struct {
 
 // loadClaimedMessageBoundary 读取一次已认领输入对应的稳定消息边界。
 func loadClaimedMessageBoundary(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, endSeq int64) (messageBoundary, error) {
-	scope, err := agentRunScopeFor(run)
-	if err != nil {
-		return messageBoundary{}, err
-	}
 	boundary := messageBoundary{}
-	query := db.NewSelect().TableExpr("conversation_agent_triggers AS cat").
+	if err := db.NewSelect().TableExpr("agent_inputs AS ai").
 		ColumnExpr("msg.message_seq").
-		Join("JOIN messages AS msg ON msg.id = cat.trigger_message_id AND msg.organization_id = cat.organization_id AND msg.conversation_id = cat.conversation_id").
-		Where("cat.organization_id = ?", run.OrganizationID).
-		Where("cat.conversation_id = ?", run.ConversationID).
-		Where("cat.agent_identity_id = ?", run.AgentIdentityID).
-		Where("cat.trigger_seq = ?", endSeq)
-	scope.applySelect(query)
-	if err := query.Scan(ctx, &boundary); err != nil {
+		Join("JOIN messages AS msg ON msg.id = ai.source_message_id AND msg.organization_id = ai.organization_id").
+		Where("ai.lane_id = ?", run.LaneID).
+		Where("ai.input_seq = ?", endSeq).
+		Scan(ctx, &boundary); err != nil {
 		return messageBoundary{}, fmt.Errorf("load claimed input boundary: %w", err)
 	}
 	return boundary, nil
@@ -283,7 +217,7 @@ type claimedMessageReference struct {
 	Deleted    bool   `json:"deleted,omitempty"`
 }
 
-// loadClaimedConversationMessages 读取不越过已认领 Trigger 的最近会话上下文。
+// loadClaimedConversationMessages 读取不越过已认领输入的最近会话上下文。
 func loadClaimedConversationMessages(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, endSeq int64) ([]agentruntime.Message, error) {
 	boundary, err := loadClaimedMessageBoundary(ctx, db, run, endSeq)
 	if err != nil {

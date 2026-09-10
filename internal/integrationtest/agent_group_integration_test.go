@@ -103,11 +103,17 @@ func testGroupAgentMessages(t *testing.T, db *bun.DB, identity *servermodels.Ide
 			t.Fatal(err)
 		}
 	}
-	for _, table := range []string{"agent_runs", "conversation_agent_triggers", "conversation_agent_states"} {
+	for _, table := range []string{"agent_runs", "agent_lanes"} {
 		count, err := db.NewSelect().Table(table).Where("conversation_id = ?", groupID).Count(ctx)
 		if err != nil || count != 0 {
 			t.Fatalf("%s count=%d err=%v", table, count, err)
 		}
+	}
+	inputCount, err := db.NewSelect().TableExpr("agent_inputs AS ai").
+		Join("JOIN agent_lanes AS al ON al.id = ai.lane_id").
+		Where("al.conversation_id = ?", groupID).Count(ctx)
+	if err != nil || inputCount != 0 {
+		t.Fatalf("agent_inputs count=%d err=%v", inputCount, err)
 	}
 }
 

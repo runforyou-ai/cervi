@@ -48,7 +48,7 @@ func (p customerRunPolicy) prepareLocked(ctx context.Context, db bun.IDB, policy
 	// 校验运行仍属于当前开放周期和有效 AI 客服。
 	session := policyContext.ServiceSession
 	eligible := false
-	if run.ServiceSessionID != nil && *run.ServiceSessionID == session.ID &&
+	if run.ScopeID == session.ID &&
 		domain.ServiceSessionStatus(session.Status) == domain.ServiceSessionStatusOpen &&
 		session.AssigneeIdentityID != nil && *session.AssigneeIdentityID == run.AgentIdentityID {
 		_, current, err := loadCustomerAgentEligibility(ctx, db, session, run.AgentRevisionID)
@@ -113,9 +113,8 @@ func (p customerRunPolicy) enqueueNext(ctx context.Context, db bun.IDB, policyCo
 	_, err = insertAndEnqueueRun(ctx, db, p.enqueuer, agentRunSpec{
 		OrganizationID: run.OrganizationID, ConversationID: run.ConversationID,
 		AgentIdentityID: run.AgentIdentityID, RevisionID: eligibility.RevisionID,
-		TriggerType:      domain.AgentTriggerTypeCustomerAuto,
-		ServiceSessionID: &policyContext.ServiceSession.ID,
-	}, startSeq)
+		ScopeKind: domain.AgentExecutionScopeServiceSession, ScopeID: policyContext.ServiceSession.ID,
+	}, run.LaneID, startSeq)
 	return err
 }
 
@@ -146,7 +145,7 @@ type customerMessageReference struct {
 	Body           string `json:"body,omitempty"`
 }
 
-// loadClaimedCustomerMessages 读取本轮客服周期内不越过已认领 Trigger 的消息。
+// loadClaimedCustomerMessages 读取本轮客服周期内不越过已认领输入的消息。
 func loadClaimedCustomerMessages(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, endSeq int64) ([]agentruntime.Message, error) {
 	boundary, err := loadClaimedMessageBoundary(ctx, db, run, endSeq)
 	if err != nil {
@@ -175,7 +174,7 @@ func loadClaimedCustomerMessages(ctx context.Context, db bun.IDB, run *servermod
 		Join("LEFT JOIN contacts AS reply_c ON reply_c.id = reply_cs.source_id AND reply_c.organization_id = reply_cs.organization_id AND reply_cs.kind = ?", domain.ChatSubjectKindContact).
 		Where("msg.organization_id = ?", run.OrganizationID).
 		Where("msg.conversation_id = ?", run.ConversationID).
-		Where("msg.service_session_id = ?", run.ServiceSessionID).
+		Where("msg.service_session_id = ?", run.ScopeID).
 		Where("msg.type = ?", domain.MessageTypeText).
 		Where("msg.deleted_at IS NULL").
 		Where("cs.kind IN (?, ?)", domain.ChatSubjectKindContact, domain.ChatSubjectKindOrganizationIdentity).
@@ -226,7 +225,7 @@ func suppressCustomerRun(ctx context.Context, db bun.IDB, run *servermodels.Agen
 	case domain.ServiceSessionStatus(session.Status) != domain.ServiceSessionStatusOpen:
 		errorCode = domain.AgentRunErrorCodeSessionClosed
 		lastError = "customer service session closed"
-	case run.ServiceSessionID == nil || *run.ServiceSessionID != session.ID ||
+	case run.ScopeID != session.ID ||
 		session.AssigneeIdentityID == nil || *session.AssigneeIdentityID != run.AgentIdentityID:
 		errorCode = domain.AgentRunErrorCodeAssigneeChanged
 		lastError = "customer service assignee changed"

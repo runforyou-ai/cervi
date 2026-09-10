@@ -24,52 +24,41 @@ type runningAgentRun struct {
 }
 
 // CancelForServiceSession 在客服事务内取消原负责人尚未结束的运行。
-func (a *ExecuteAction) CancelForServiceSession(ctx context.Context, db bun.IDB, organizationID, conversationID, agentIdentityID string, reason domain.AgentRunErrorCode) ([]string, error) {
-	return cancelServiceSessionRuns(ctx, db, organizationID, conversationID, agentIdentityID, reason)
+func (a *ExecuteAction) CancelForServiceSession(ctx context.Context, db bun.IDB, organizationID, serviceSessionID, agentIdentityID string, reason domain.AgentRunErrorCode) ([]string, error) {
+	return cancelServiceSessionRuns(ctx, db, organizationID, serviceSessionID, agentIdentityID, reason)
 }
 
-// cancelServiceSessionRuns 取消客服负责人的在途运行并推进已提交输入水位。
-func cancelServiceSessionRuns(ctx context.Context, db bun.IDB, organizationID, conversationID, agentIdentityID string, reason domain.AgentRunErrorCode) ([]string, error) {
-	agent, err := db.NewSelect().Model((*servermodels.Agent)(nil)).
-		Where("a.organization_id = ?", organizationID).
-		Where("a.identity_id = ?", agentIdentityID).
-		Exists(ctx)
-	if err != nil || !agent {
-		return nil, err
-	}
-	state := &servermodels.ConversationAgentState{}
-	stateExists := true
-	if err := db.NewSelect().Model(state).
-		Where("cas.organization_id = ?", organizationID).
-		Where("cas.conversation_id = ?", conversationID).
-		Where("cas.agent_identity_id = ?", agentIdentityID).
+// cancelServiceSessionRuns 取消客服周期内负责人的在途运行并结算其输入队列。
+func cancelServiceSessionRuns(ctx context.Context, db bun.IDB, organizationID, serviceSessionID, agentIdentityID string, reason domain.AgentRunErrorCode) ([]string, error) {
+	lane := &servermodels.AgentLane{}
+	err := db.NewSelect().Model(lane).
+		Where("al.organization_id = ?", organizationID).
+		Where("al.scope_kind = ? AND al.scope_id = ?", domain.AgentExecutionScopeServiceSession, serviceSessionID).
+		Where("al.agent_identity_id = ?", agentIdentityID).
 		For("UPDATE").
-		Scan(ctx); errors.Is(err, sql.ErrNoRows) {
-		stateExists = false
-	} else if err != nil {
-		return nil, fmt.Errorf("lock assigned agent state: %w", err)
+		Scan(ctx)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, nil
+	}
+	if err != nil {
+		return nil, fmt.Errorf("lock assigned agent lane: %w", err)
 	}
 	runIDs := make([]string, 0)
 	if err := db.NewRaw(`
 		UPDATE agent_runs
 		SET status = ?, error_code = ?, completed_at = now(), updated_at = now()
-		WHERE organization_id = ?
-			AND conversation_id = ?
-			AND agent_identity_id = ?
+		WHERE lane_id = ?
 			AND status IN (?, ?)
 		RETURNING id
-	`, domain.AgentRunStatusCancelled, reason, organizationID, conversationID, agentIdentityID, domain.AgentRunStatusQueued, domain.AgentRunStatusRunning).
+	`, domain.AgentRunStatusCancelled, reason, lane.ID, domain.AgentRunStatusQueued, domain.AgentRunStatusRunning).
 		Scan(ctx, &runIDs); err != nil {
 		return nil, fmt.Errorf("cancel assigned agent runs: %w", err)
 	}
-	if stateExists {
-		if _, err := db.NewUpdate().Model(state).
-			Set("processed_seq = ?", state.DesiredSeq).
-			Set("updated_at = now()").
-			WherePK().
-			Exec(ctx); err != nil {
-			return nil, fmt.Errorf("advance cancelled agent state: %w", err)
-		}
+	if _, err := db.NewUpdate().Model(lane).
+		Set("processed_seq = desired_seq").
+		Set("updated_at = now()").
+		WherePK().Exec(ctx); err != nil {
+		return nil, fmt.Errorf("advance cancelled agent lane: %w", err)
 	}
 	return runIDs, nil
 }
@@ -91,7 +80,7 @@ func CancelTelegramChannelRuns(ctx context.Context, db bun.IDB, organizationID, 
 			return 0, err
 		}
 		if session.AssigneeIdentityID != nil {
-			runIDs, err := cancelServiceSessionRuns(ctx, db, organizationID, conversationID, *session.AssigneeIdentityID, domain.AgentRunErrorCodeBotChanged)
+			runIDs, err := cancelServiceSessionRuns(ctx, db, organizationID, session.ID, *session.AssigneeIdentityID, domain.AgentRunErrorCodeBotChanged)
 			if err != nil {
 				return 0, err
 			}

@@ -53,7 +53,7 @@ func testAgentChatLocking(t *testing.T, db *bun.DB, identity *servermodels.Ident
 			defer cancel()
 			first, run := createAgentLockChat(t, ctx, db, identity, agentIdentityID, tasks)
 			gate := newChatQueryGate(t, false, phase.occurrence, func(event *bun.QueryEvent) bool {
-				return event.Operation() == "SELECT" && strings.Contains(event.Query, `"conversation_agent_states"`) && strings.Contains(event.Query, "FOR UPDATE")
+				return event.Operation() == "SELECT" && strings.Contains(event.Query, `"agent_lanes"`) && strings.Contains(event.Query, "FOR UPDATE")
 			})
 			runtime := testAgentRuntime{run: func(ctx context.Context, _ agentruntime.RunRequest, feed agentruntime.InputFeed) (agentruntime.RunResult, error) {
 				claimed, err := feed.Claim(ctx, 1)
@@ -119,11 +119,11 @@ func assertAgentLockResult(t *testing.T, ctx context.Context, db *bun.DB, run se
 	if err := db.NewSelect().Model(&message).Where("msg.id = ?", *run.ResponseMessageID).Scan(ctx); err != nil || message.ConversationID != run.ConversationID || message.Type != string(wantType) {
 		t.Fatalf("result=%+v err=%v", message, err)
 	}
-	var state servermodels.ConversationAgentState
-	if err := db.NewSelect().Model(&state).Where("cas.conversation_id = ?", run.ConversationID).Scan(ctx); err != nil || state.DesiredSeq != 2 || state.ProcessedSeq != 1 {
+	var state servermodels.AgentLane
+	if err := db.NewSelect().Model(&state).Where("al.conversation_id = ?", run.ConversationID).Scan(ctx); err != nil || state.DesiredSeq != 2 || state.ProcessedSeq != 1 {
 		t.Fatalf("input state=%+v err=%v", state, err)
 	}
-	count, err := db.NewSelect().Model((*servermodels.AgentRun)(nil)).Where("agr.conversation_id = ? AND agr.status = ? AND agr.trigger_start_seq = 2", run.ConversationID, domain.AgentRunStatusQueued).Count(ctx)
+	count, err := db.NewSelect().Model((*servermodels.AgentRun)(nil)).Where("agr.conversation_id = ? AND agr.status = ? AND agr.input_start_seq = 2", run.ConversationID, domain.AgentRunStatusQueued).Count(ctx)
 	if err != nil || count != 1 {
 		t.Fatalf("next runs=%d err=%v", count, err)
 	}
@@ -243,8 +243,8 @@ func testAgentAcceptedInputs(t *testing.T, db *bun.DB, identity *servermodels.Id
 				if err := executor.Execute(ctx, agentrunaction.RunInput{RunID: next.ID}); err != nil {
 					t.Fatal(err)
 				}
-				var state servermodels.ConversationAgentState
-				if err := db.NewSelect().Model(&state).Where("cas.conversation_id = ?", first.Conversation.ID).Scan(ctx); err != nil || state.ProcessedSeq != 2 {
+				var state servermodels.AgentLane
+				if err := db.NewSelect().Model(&state).Where("al.conversation_id = ?", first.Conversation.ID).Scan(ctx); err != nil || state.ProcessedSeq != 2 {
 					t.Fatalf("accepted inputs not consumed: %+v err=%v", state, err)
 				}
 			})
@@ -259,7 +259,7 @@ func testAgentParallelConversations(t *testing.T, db *bun.DB, identity *servermo
 	first, firstRun := createAgentLockChat(t, ctx, db, identity, agentID, tasks)
 	second, secondRun := createAgentLockChat(t, ctx, db, identity, agentID, tasks)
 	gate := newChatQueryGate(t, false, 1, func(event *bun.QueryEvent) bool {
-		return event.Operation() == "SELECT" && strings.Contains(event.Query, `"conversation_agent_states"`) && strings.Contains(event.Query, "FOR UPDATE")
+		return event.Operation() == "SELECT" && strings.Contains(event.Query, `"agent_lanes"`) && strings.Contains(event.Query, "FOR UPDATE")
 	})
 	runtime := testAgentRuntime{run: func(ctx context.Context, request agentruntime.RunRequest, feed agentruntime.InputFeed) (agentruntime.RunResult, error) {
 		claimed, err := feed.Claim(ctx, 1)

@@ -70,7 +70,7 @@ func testAgentReplyStopping(t *testing.T, db *bun.DB, identity *servermodels.Ide
 		t.Fatal(err)
 	}
 	var next servermodels.AgentRun
-	if err := db.NewSelect().Model(&next).Where("agr.conversation_id = ? AND agr.status = ?", run.ConversationID, domain.AgentRunStatusQueued).Scan(ctx); err != nil || next.TriggerStartSeq != 3 {
+	if err := db.NewSelect().Model(&next).Where("agr.conversation_id = ? AND agr.status = ?", run.ConversationID, domain.AgentRunStatusQueued).Scan(ctx); err != nil || next.InputStartSeq != 3 {
 		t.Fatalf("next run=%+v %v", next, err)
 	}
 	if _, err := executor.StopAgentReply(ctx, identity, run.ConversationID, run.ID); err != nil {
@@ -137,7 +137,7 @@ func assertStoppedAgentReply(t *testing.T, ctx context.Context, db *bun.DB, runI
 	if err := db.NewSelect().Model(&run).Where("agr.id = ?", runID).Scan(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if run.Status != string(domain.AgentRunStatusCancelled) || run.ErrorCode == nil || *run.ErrorCode != string(domain.AgentRunErrorCodeUserCancelled) || run.TriggerEndSeq == nil || *run.TriggerEndSeq != end || run.ResponseMessageID == nil {
+	if run.Status != string(domain.AgentRunStatusCancelled) || run.ErrorCode == nil || *run.ErrorCode != string(domain.AgentRunErrorCodeUserCancelled) || run.InputEndSeq == nil || *run.InputEndSeq != end || run.ResponseMessageID == nil {
 		t.Fatalf("stopped run=%+v", run)
 	}
 	var messages []servermodels.Message
@@ -148,8 +148,8 @@ func assertStoppedAgentReply(t *testing.T, ctx context.Context, db *bun.DB, runI
 	if message.ID != *run.ResponseMessageID || message.Type != string(domain.MessageTypeAgentCancelled) || message.Body != "" || message.SenderParticipantID == nil {
 		t.Fatalf("stopped message=%+v", message)
 	}
-	count, err := db.NewSelect().Model((*servermodels.ConversationAgentTrigger)(nil)).Where("cat.agent_run_id = ?", runID).Count(ctx)
-	if err != nil || int64(count) != end-run.TriggerStartSeq+1 {
+	count, err := db.NewSelect().Model((*servermodels.AgentInput)(nil)).Where("ai.agent_run_id = ?", runID).Count(ctx)
+	if err != nil || int64(count) != end-run.InputStartSeq+1 {
 		t.Fatalf("trigger count=%d %v", count, err)
 	}
 	count, err = db.NewSelect().Model((*servermodels.AgentRunBlock)(nil)).Where("arb.agent_run_id = ?", runID).Count(ctx)
@@ -200,7 +200,7 @@ func testStopAgentReplyWithSend(t *testing.T, db *bun.DB, identity *servermodels
 		_, run := createAgentLockChat(t, ctx, db, identity, agentIdentityID, tasks)
 		executor := agentrunaction.NewExecuteAction(db, tasks, nil)
 		gate := newChatQueryGate(t, true, 1, func(event *bun.QueryEvent) bool {
-			return strings.Contains(event.Query, "conversation_agent_states")
+			return strings.Contains(event.Query, "agent_lanes")
 		})
 		first, second := make(chan error, 1), make(chan error, 1)
 		stop := func(ctx context.Context) error {
@@ -230,8 +230,8 @@ func testStopAgentReplyWithSend(t *testing.T, db *bun.DB, identity *servermodels
 			end = 2
 		}
 		assertStoppedAgentReply(t, ctx, db, run.ID, end)
-		var state servermodels.ConversationAgentState
-		if err := db.NewSelect().Model(&state).Where("cas.conversation_id = ?", run.ConversationID).Scan(ctx); err != nil || state.ProcessedSeq != end || state.DesiredSeq != 2 {
+		var state servermodels.AgentLane
+		if err := db.NewSelect().Model(&state).Where("al.conversation_id = ?", run.ConversationID).Scan(ctx); err != nil || state.ProcessedSeq != end || state.DesiredSeq != 2 {
 			t.Fatalf("stop/send state=%+v %v", state, err)
 		}
 		count, err := db.NewSelect().Model((*servermodels.AgentRun)(nil)).Where("agr.conversation_id = ? AND agr.status = ?", run.ConversationID, domain.AgentRunStatusQueued).Count(ctx)

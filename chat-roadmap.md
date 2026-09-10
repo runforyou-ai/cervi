@@ -266,7 +266,7 @@ Ticket ── TicketConversationLink ── Conversation / Message 范围
 
 - Cervi 原生用户视图：已使用 `conversation_user_states` 保存阅读、静音和手动未读；个人置顶 rank 与本人成员身份行上的顺序版本由 PR40 增加。
 - 第三方账号视图：未来使用 `conversation_account_states`。
-- AI 处理进度：单聊与网站客服已使用 `conversation_agent_states`；群聊尚无 Agent Trigger／Run。
+- AI 处理进度：单聊与网站客服已使用 `agent_lanes`；群聊尚无 Agent 输入与 Run。
 
 三者不能共用一个 `last_read_message_id`。
 
@@ -390,15 +390,15 @@ Agent 已可加入单聊、群聊和网站客户会话，并在单聊与网站�
 
 ### 7.2 运行状态与聊天状态分离
 
-AI 调用不能依赖用户已读状态，也不能把模型请求、工具步骤和令牌消耗塞入消息表。`agent_revisions`、`conversation_agent_policies`、`conversation_agent_states`、`conversation_agent_triggers`、`agent_runs`、`agent_run_steps` 和 `agent_tool_invocations` 的表结构、Revision 与快照语义、步骤与工具事实由 [agent-roadmap.md](agent-roadmap.md) 唯一定义，本文档不复制字段清单。本章只固定聊天域必须遵守的不变量：
+AI 调用不能依赖用户已读状态，也不能把模型请求、工具步骤和令牌消耗塞入消息表。`agent_revisions`、`conversation_agent_policies`、`agent_lanes`、`agent_inputs`、`agent_runs`、`agent_run_steps` 和 `agent_tool_invocations` 的表结构、Revision 与快照语义、步骤与工具事实由 [agent-roadmap.md](agent-roadmap.md) 唯一定义，本文档不复制字段清单。本章只固定聊天域必须遵守的不变量：
 
-- 独立 `message_mentions` 关系记录 @ 事实；符合策略且首次持久化的消息在同一事务写入 `conversation_agent_triggers`。
-- 同一“会话 + 智能体”的 `trigger_seq` 由服务端锁定状态后单调分配，`desired_*` 与 `processed_*` 使用该序号；对应 Message 编号只作审计指针。`originated_at` 只用于来源时间展示和诊断；`message_seq` 决定本地时间线、分页和阅读位置，Trigger 水位独立。迟到的历史补拉默认不创建 Trigger，需要时通过独立总结或人工回放命令处理。
-- 每个“会话 + 智能体”同时最多存在一个排队中或运行中的 Run。新消息在已有 Run 执行期间只推进 `desired_*`；Run 结束时原子推进 `processed_*`，仍有差距则在同一事务创建下一 Run 并通过 `TxEnqueuer.EnqueueIn` 唤醒，不能因活动任务幂等丢失后续处理。
+- 独立 `message_mentions` 关系记录 @ 事实；符合策略且首次持久化的消息在同一事务写入 `agent_inputs`。
+- `input_seq` 由服务端锁定所属 Lane 后单调分配，`desired_seq` 与 `processed_seq` 使用该序号；对应 Message 编号只作审计指针。`originated_at` 只用于来源时间展示和诊断；`message_seq` 决定本地时间线、分页和阅读位置，输入水位独立。迟到的历史补拉默认不创建输入，需要时通过独立总结或人工回放命令处理。
+- 每个执行范围同时最多存在一个排队中或运行中的 Run，执行范围由 `scope_kind` 与 `scope_id` 表达。新消息在已有 Run 执行期间只推进 `desired_seq`；Run 结束时原子推进 `processed_seq`，仍有差距则在同一事务创建下一 Run 并通过 `TxEnqueuer.EnqueueIn` 唤醒，不能因活动任务幂等丢失后续处理。
 - `agents.status` 表示智能体全局停用，`conversation_participants.left_at` 表示退出会话。P1b 网站 AI 客服只以 ServiceSession 的 `open/closed + assignee_identity_id` 表达当前客服状态，不增加 Agent 专属暂停状态；完整 P1 如引入通用会话响应策略，再定义其状态。`agent_identity_id` 统一指向 `organization_identities.id`。
 - 自动响应记录触发消息、精确输入快照、配置版本与快照、语义步骤、工具调用、输出消息、费用、失败、取消和人工接管，保证可审计和可恢复。
 
-首轮 Agent Direct 和网站 AI 客服都允许同一 Run 在 Eino 安全点吸收连续 Trigger，并只持久化一条最终文本 Message，不依赖流式实时能力。开发期 calculator 是可配置延时、且不创建 Tool Invocation 的临时纯函数测试 Tool，用于验证 Tool 完成后下一 Turn 读取最新输入，正式发布前删除；任何业务、设备或副作用 Tool 仍须先落完整审计。最终 Message 使用 `agent:<agent_run_id>` 业务幂等键；输出消息、Run 终态与 `processed_*` 在同一事务提交。`task_runs` 只负责至少一次唤醒与租约，不承担 Agent Run 或工具调用账本。
+首轮 Agent Direct 和网站 AI 客服都允许同一 Run 在 Eino 安全点吸收连续输入，并只持久化一条最终文本 Message，不依赖流式实时能力。开发期 calculator 是可配置延时、且不创建 Tool Invocation 的临时纯函数测试 Tool，用于验证 Tool 完成后下一 Turn 读取最新输入，正式发布前删除；任何业务、设备或副作用 Tool 仍须先落完整审计。最终 Message 使用 `agent:<agent_run_id>` 业务幂等键；输出消息、Run 终态与 `processed_seq` 在同一事务提交。`task_runs` 只负责至少一次唤醒与租约，不承担 Agent Run 或工具调用账本。
 
 ## 8. 第三方用户消息账号接入预留
 
@@ -1335,7 +1335,7 @@ PR03 的停用生效边界已确认：目标停用只拒绝之后资格校验的
 - Agent 作为普通聊天主体加入内部单聊，发给活跃 Agent 的新文本自动触发，并生成一条最终文本 Message；群聊 @Agent 在基础群聊和提醒事实完成后接入。
 - 首个 Runtime 精确锁定 Eino v0.10 Alpha，并用纯函数计算器验证 Tool 闭环；运行中到达的新消息必须在下一次 Tool 或模型规划前通过持久 Trigger 补入。
 - 客户端通过业务查询和轮询读取最终消息，本子阶段不依赖统一实时或 AI 流。
-- 本子阶段验收 Agent Participant、Trigger 水位、Run 幂等、最终 Message 和访问边界；Runtime 由 `agent-roadmap.md` 定义。
+- 本子阶段验收 Agent Participant、输入水位、Run 幂等、最终 Message 和访问边界；Runtime 由 `agent-roadmap.md` 定义。
 
 #### 阶段 2D：网站 AI 客服
 

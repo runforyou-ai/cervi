@@ -132,7 +132,7 @@ func testCustomerFailureMessage(t *testing.T, db *bun.DB, identity *servermodels
 		t.Fatal(err)
 	}
 	var session servermodels.ServiceSession
-	if err := db.NewSelect().Model(&session).Where("ss.id = ?", *run.ServiceSessionID).Scan(ctx); err != nil {
+	if err := db.NewSelect().Model(&session).Where("ss.id = ?", run.ScopeID).Scan(ctx); err != nil {
 		t.Fatal(err)
 	}
 	if session.FirstResponseAt != nil {

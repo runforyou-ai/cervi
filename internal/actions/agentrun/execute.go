@@ -84,13 +84,13 @@ func (a *ExecuteAction) Execute(ctx context.Context, input RunInput) error {
 	if execution.MaxOutputTokens > 0 && execution.MaxOutputTokens < int64(maxOutputTokens) {
 		maxOutputTokens = int(execution.MaxOutputTokens)
 	}
-	policy, _, err := a.policyForRun(&execution.Run)
+	policy, err := a.policyForRun(&execution.Run)
 	if err != nil {
 		return task.Permanent(err)
 	}
 	feed := &databaseInputFeed{db: a.db, execution: execution, policy: policy}
 	var customerHistorySearch agentruntime.CustomerHistorySearch
-	if domain.AgentTriggerType(execution.Run.TriggerType) == domain.AgentTriggerTypeCustomerAuto {
+	if domain.AgentExecutionScopeKind(execution.Run.ScopeKind) == domain.AgentExecutionScopeServiceSession {
 		// TODO：接入本企业、本 Conversation 内已关闭 ServiceSession 的全文历史查询。
 		// 向模型返回历史查询功能不可用的占位结果。
 		customerHistorySearch = func(context.Context, string) (agentruntime.CustomerHistoryResult, error) {
@@ -153,7 +153,7 @@ func (a *ExecuteAction) begin(ctx context.Context, runID string) (executionConte
 	if agentRunStatusTerminal(initial.Status) {
 		return executionContext{}, true, nil
 	}
-	policy, _, err := a.policyForRun(initial)
+	policy, err := a.policyForRun(initial)
 	if err != nil {
 		return executionContext{}, false, task.Permanent(err)
 	}
@@ -226,19 +226,15 @@ func agentRunStatusTerminal(status string) bool {
 		status == string(domain.AgentRunStatusCancelled)
 }
 
-// policyForRun 根据持久化触发类型选择运行策略和输入范围。
-func (a *ExecuteAction) policyForRun(run *servermodels.AgentRun) (agentRunPolicy, agentRunScope, error) {
-	scope, err := agentRunScopeFor(run)
-	if err != nil {
-		return nil, agentRunScope{}, err
-	}
-	switch domain.AgentTriggerType(run.TriggerType) {
-	case domain.AgentTriggerTypeDirect:
-		return agentChatRunPolicy{enqueuer: a.enqueuer}, scope, nil
-	case domain.AgentTriggerTypeCustomerAuto:
-		return customerRunPolicy{enqueuer: a.enqueuer}, scope, nil
+// policyForRun 根据执行范围类型选择运行策略。
+func (a *ExecuteAction) policyForRun(run *servermodels.AgentRun) (agentRunPolicy, error) {
+	switch domain.AgentExecutionScopeKind(run.ScopeKind) {
+	case domain.AgentExecutionScopeConversation:
+		return agentChatRunPolicy{enqueuer: a.enqueuer}, nil
+	case domain.AgentExecutionScopeServiceSession:
+		return customerRunPolicy{enqueuer: a.enqueuer}, nil
 	default:
-		return nil, agentRunScope{}, fmt.Errorf("unsupported agent trigger type %q", run.TriggerType)
+		return nil, fmt.Errorf("unsupported agent execution scope %q", run.ScopeKind)
 	}
 }
 
@@ -284,7 +280,7 @@ func (a *ExecuteAction) complete(ctx context.Context, execution executionContext
 		if err != nil {
 			return fmt.Errorf("lock agent run for completion: %w", err)
 		}
-		policyContext, state, run := locked.PolicyContext, locked.State, locked.Run
+		policyContext, lane, run := locked.PolicyContext, locked.Lane, locked.Run
 		if agentRunStatusTerminal(run.Status) {
 			return nil
 		}
@@ -296,8 +292,8 @@ func (a *ExecuteAction) complete(ctx context.Context, execution executionContext
 			suppressed = true
 			return nil
 		}
-		if run.Status != string(domain.AgentRunStatusRunning) || run.TriggerEndSeq == nil ||
-			*run.TriggerEndSeq != result.EndSeq || run.TriggerStartSeq != state.ProcessedSeq+1 {
+		if run.Status != string(domain.AgentRunStatusRunning) || run.InputEndSeq == nil ||
+			*run.InputEndSeq != result.EndSeq || run.InputStartSeq != lane.ProcessedSeq+1 {
 			return errors.New("agent run completion boundary is inconsistent")
 		}
 		if err := policy.persistMessage(ctx, tx, policyContext, run, messageID, domain.MessageTypeText, content); err != nil {
@@ -319,13 +315,13 @@ func (a *ExecuteAction) complete(ctx context.Context, execution executionContext
 			WherePK().Exec(ctx); err != nil {
 			return fmt.Errorf("complete agent run: %w", err)
 		}
-		if _, err := tx.NewUpdate().Model(state).
+		if _, err := tx.NewUpdate().Model(lane).
 			Set("processed_seq = ?", result.EndSeq).
 			Set("updated_at = now()").
 			WherePK().Exec(ctx); err != nil {
 			return fmt.Errorf("advance processed agent input sequence: %w", err)
 		}
-		if state.DesiredSeq > result.EndSeq {
+		if lane.DesiredSeq > result.EndSeq {
 			if err := policy.enqueueNext(ctx, tx, policyContext, run, result.EndSeq+1); err != nil {
 				return err
 			}
@@ -336,7 +332,7 @@ func (a *ExecuteAction) complete(ctx context.Context, execution executionContext
 	if err != nil {
 		return err
 	}
-	if suppressed && execution.Run.ServiceSessionID != nil {
+	if suppressed && domain.AgentExecutionScopeKind(execution.Run.ScopeKind) == domain.AgentExecutionScopeServiceSession {
 		// 记录客服门禁抑制的迟到结果。
 		slog.Warn("客户 Agent 迟到结果已抑制",
 			"agent_run_id", execution.Run.ID,
@@ -351,15 +347,15 @@ func (a *ExecuteAction) complete(ctx context.Context, execution executionContext
 
 // logCompletedRun 记录关联客服周期的 Agent 完成结果。
 func logCompletedRun(execution executionContext, endSeq int64, messageID string) {
-	if execution.Run.ServiceSessionID == nil {
+	if domain.AgentExecutionScopeKind(execution.Run.ScopeKind) != domain.AgentExecutionScopeServiceSession {
 		return
 	}
 	slog.Info("客户 Agent 运行完成",
 		"agent_run_id", execution.Run.ID,
 		"conversation_id", execution.Run.ConversationID,
-		"service_session_id", *execution.Run.ServiceSessionID,
-		"trigger_start_seq", execution.Run.TriggerStartSeq,
-		"trigger_end_seq", endSeq,
+		"service_session_id", execution.Run.ScopeID,
+		"input_start_seq", execution.Run.InputStartSeq,
+		"input_end_seq", endSeq,
 		"response_message_id", messageID,
 	)
 }
@@ -382,7 +378,7 @@ func (a *ExecuteAction) fail(ctx context.Context, runID string, runErr error) (b
 	if agentRunStatusTerminal(initial.Status) {
 		return true, nil
 	}
-	policy, scope, err := a.policyForRun(initial)
+	policy, err := a.policyForRun(initial)
 	if err != nil {
 		return false, err
 	}
@@ -392,7 +388,7 @@ func (a *ExecuteAction) fail(ctx context.Context, runID string, runErr error) (b
 		if err != nil {
 			return fmt.Errorf("lock agent run for failure: %w", err)
 		}
-		policyContext, state, run := locked.PolicyContext, locked.State, locked.Run
+		policyContext, lane, run := locked.PolicyContext, locked.Lane, locked.Run
 		if agentRunStatusTerminal(run.Status) {
 			terminal = true
 			return nil
@@ -408,19 +404,19 @@ func (a *ExecuteAction) fail(ctx context.Context, runID string, runErr error) (b
 		if run.Status != string(domain.AgentRunStatusQueued) && run.Status != string(domain.AgentRunStatusRunning) {
 			return fmt.Errorf("cannot fail agent run in status %q", run.Status)
 		}
-		failureEnd := run.TriggerStartSeq
-		if run.TriggerEndSeq != nil {
-			failureEnd = *run.TriggerEndSeq
+		failureEnd := run.InputStartSeq
+		if run.InputEndSeq != nil {
+			failureEnd = *run.InputEndSeq
 		}
-		if run.TriggerStartSeq != state.ProcessedSeq+1 || failureEnd < run.TriggerStartSeq || failureEnd > state.DesiredSeq {
+		if run.InputStartSeq != lane.ProcessedSeq+1 || failureEnd < run.InputStartSeq || failureEnd > lane.DesiredSeq {
 			return errors.New("agent run failure boundary is inconsistent")
 		}
-		failedSeqs, err := assignAgentTriggers(ctx, tx, run, scope, state.ProcessedSeq, failureEnd)
+		failedSeqs, err := claimLaneInputs(ctx, tx, run, lane.ProcessedSeq, failureEnd)
 		if err != nil {
 			return err
 		}
-		if int64(len(failedSeqs)) != failureEnd-state.ProcessedSeq {
-			return errors.New("failed agent trigger sequence is not contiguous")
+		if int64(len(failedSeqs)) != failureEnd-lane.ProcessedSeq {
+			return errors.New("failed agent input sequence is not contiguous")
 		}
 		messageID := uuid.NewV7().String()
 		if err := policy.persistMessage(ctx, tx, policyContext, run, messageID, domain.MessageTypeAgentError, ""); err != nil {
@@ -429,7 +425,7 @@ func (a *ExecuteAction) fail(ctx context.Context, runID string, runErr error) (b
 		if _, err := tx.NewUpdate().Model(run).
 			Set("status = ?", domain.AgentRunStatusFailed).
 			Set("response_message_id = ?", messageID).
-			Set("trigger_end_seq = ?", failureEnd).
+			Set("input_end_seq = ?", failureEnd).
 			Set("last_error = ?", message).
 			Set("error_code = NULL").
 			Set("completed_at = now()").
@@ -438,13 +434,13 @@ func (a *ExecuteAction) fail(ctx context.Context, runID string, runErr error) (b
 			Exec(ctx); err != nil {
 			return err
 		}
-		if _, err := tx.NewUpdate().Model(state).
+		if _, err := tx.NewUpdate().Model(lane).
 			Set("processed_seq = ?", failureEnd).
 			Set("updated_at = now()").
 			WherePK().Exec(ctx); err != nil {
 			return err
 		}
-		if state.DesiredSeq > failureEnd {
+		if lane.DesiredSeq > failureEnd {
 			if err := policy.enqueueNext(ctx, tx, policyContext, run, failureEnd+1); err != nil {
 				return err
 			}
