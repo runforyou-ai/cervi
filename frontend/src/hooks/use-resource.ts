@@ -14,6 +14,7 @@ import { recoverSession } from "@/lib/session-navigation"
 /**
  * 读取一份以 key 标识的页面数据。
  * key 相同的调用在多标签间共享缓存；load 收到的 signal 用于丢弃过期结果，绑定调用持续至完成。
+ * 交互触发的一次性读取使用 useResourceReader。
  * 带会话状态的读取错误统一导航回对应入口。
  * 跨业务域的选项类数据用 staleTime: 0 让每次挂载都重新读取。
  */
@@ -30,7 +31,6 @@ export function useResource<T>(
   } = {},
 ) {
   const navigate = useNavigate()
-  const client = useQueryClient()
   const refetchInterval = options.refetchInterval
   const query = useQuery({
     queryKey: key,
@@ -52,16 +52,30 @@ export function useResource<T>(
     }
   }, [sessionError, navigate])
 
-  /** 按统一资源 key 执行交互触发的读取，共享缓存及会话错误恢复。 */
-  const read = useCallback(
+  return {
+    data: query.data,
+    dataUpdatedAt: query.dataUpdatedAt,
+    isPlaceholderData: query.isPlaceholderData,
+    loading: query.isPending && query.isFetching,
+    refreshing: query.isFetching && !query.isPending,
+    error: query.error,
+    refresh: query.refetch,
+  }
+}
+
+/** 返回按统一资源 key 执行交互触发读取的函数，共享缓存及会话错误恢复。 */
+export function useResourceReader() {
+  const navigate = useNavigate()
+  const client = useQueryClient()
+  return useCallback(
     async <R>(
-      resourceKey: QueryKey,
-      loader: (signal: AbortSignal) => Promise<R>,
+      key: QueryKey,
+      load: (signal: AbortSignal) => Promise<R>,
     ) => {
       try {
         return await client.fetchQuery({
-          queryKey: resourceKey,
-          queryFn: ({ signal }) => loader(signal),
+          queryKey: key,
+          queryFn: ({ signal }) => load(signal),
           staleTime: 0,
         })
       } catch (error) {
@@ -71,17 +85,6 @@ export function useResource<T>(
     },
     [client, navigate],
   )
-
-  return {
-    data: query.data,
-    dataUpdatedAt: query.dataUpdatedAt,
-    isPlaceholderData: query.isPlaceholderData,
-    loading: query.isPending && query.isFetching,
-    refreshing: query.isFetching && !query.isPending,
-    error: query.error,
-    refresh: query.refetch,
-    read,
-  }
 }
 
 type ResourceInvalidationOptions = {

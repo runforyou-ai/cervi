@@ -1,6 +1,5 @@
 /** AI 员工列表、筛选、配置入口和状态管理面板。 */
 import { useState } from "react"
-import { MoreHorizontalIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useLocation, useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -22,6 +21,10 @@ import {
   ListToolbarSearch,
 } from "@/components/list-toolbar"
 import { PageHeader } from "@/components/page-header"
+import {
+  ResourceTable,
+  ResourceTableActions,
+} from "@/components/resource-table"
 import { Button } from "@/components/ui/button"
 import {
   AlertDialog,
@@ -33,20 +36,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
+import { TableCell } from "@/components/ui/table"
 import { WorkStatusBadge } from "@/components/work-status"
 import { ContactCreateDialogs } from "@/features/contacts/contact-create-dialogs"
 import { ContactListLayout } from "@/features/contacts/contact-list-layout"
@@ -55,7 +46,7 @@ import { userStatusLabel } from "@/features/contacts/external/contact-labels"
 import { JoinedTeamsCell } from "@/features/contacts/joined-teams-cell"
 import { useContactSearch } from "@/features/contacts/use-contact-search"
 import { UserStatusBadge } from "@/features/contacts/user-status-badge"
-import { roleDisplayName } from "@/features/roles/role-labels"
+import { roleDisplayName } from "@/lib/role-labels"
 import { useDateTime } from "@/hooks/use-date-time"
 import { useContactInvalidator } from "@/features/contacts/use-contact-invalidator"
 import { resourceKeys } from "@/hooks/resource-keys"
@@ -197,115 +188,94 @@ export function AgentsPanel({
             setParameters({ page: String(number), selected: null })
           }
         >
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead>{t("columns.name")}</TableHead>
-                <TableHead>{t("columns.role")}</TableHead>
-                <TableHead>{t("columns.joinedTeams")}</TableHead>
-                <TableHead>{t("columns.model")}</TableHead>
-                <TableHead>{t("columns.accountStatus")}</TableHead>
-                <TableHead>{t("columns.workStatus")}</TableHead>
-                <TableHead>{t("columns.createdAt")}</TableHead>
-                <TableHead className="w-px">
-                  {tCommon("table.actions")}
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {agents.map((agent) => (
-                <TableRow key={agent.id}>
-                  <TableCell className="font-medium">
-                    {agent.displayName}
-                  </TableCell>
-                  <TableCell>{roleDisplayName(agent.role, tCommon)}</TableCell>
-                  <TableCell className="max-w-xs">
-                    <JoinedTeamsCell teams={agent.teams} />
-                  </TableCell>
-                  <TableCell className="max-w-xs">
-                    <span className="block truncate">
-                      {agent.execution.managed.providerName} ·{" "}
-                      {agent.execution.managed.modelName}
-                    </span>
-                  </TableCell>
-                  <TableCell>
-                    <UserStatusBadge
-                      status={agent.status}
-                      label={userStatusLabel(agent.status, t)}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <WorkStatusBadge status={agent.workStatus} />
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap text-muted-foreground">
-                    {formatDateTime(agent.createdAt)}
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap">
-                    <div className="inline-flex gap-2">
-                      <Button
-                        size="sm"
-                        disabled={agent.status !== UserStatus.UserStatusActive}
-                        onClick={() =>
-                          navigate(
-                            `/inbox?scope=internal&target=${agent.identityId}`,
-                          )
-                        }
-                      >
-                        {t("sendMessage")}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() =>
-                          navigate(
-                            `/contacts/ai-employees/${agent.id}?tab=basic&returnTo=${encodeURIComponent(location.pathname + location.search)}`,
-                          )
-                        }
-                      >
-                        {t("agents.configure")}
-                      </Button>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            aria-label={tCommon("actions.more")}
-                            title={tCommon("actions.more")}
-                          >
-                            <MoreHorizontalIcon />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            destructive={
-                              agent.status === UserStatus.UserStatusActive
-                            }
-                            onSelect={() => setChangingAgentStatus(agent)}
-                          >
-                            {t(
-                              agent.status === UserStatus.UserStatusActive
-                                ? "agents.status.deactivate"
-                                : "agents.status.reactivate",
-                            )}
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {agents.length === 0 ? (
-                <TableRow className="hover:bg-transparent">
-                  <TableCell
-                    colSpan={8}
-                    className="h-32 text-center text-muted-foreground"
+          <ResourceTable
+            columns={[
+              { key: "name", header: t("columns.name") },
+              { key: "role", header: t("columns.role") },
+              { key: "joinedTeams", header: t("columns.joinedTeams") },
+              { key: "model", header: t("columns.model") },
+              { key: "accountStatus", header: t("columns.accountStatus") },
+              { key: "workStatus", header: t("columns.workStatus") },
+              { key: "createdAt", header: t("columns.createdAt") },
+              {
+                key: "actions",
+                header: tCommon("table.actions"),
+                className: "w-px",
+              },
+            ]}
+            rows={agents}
+            rowKey={(agent) => agent.id}
+            empty={t("list.empty")}
+          >
+            {(agent) => (
+              <>
+                <TableCell className="font-medium">
+                  {agent.displayName}
+                </TableCell>
+                <TableCell>{roleDisplayName(agent.role, tCommon)}</TableCell>
+                <TableCell className="max-w-xs">
+                  <JoinedTeamsCell teams={agent.teams} />
+                </TableCell>
+                <TableCell className="max-w-xs">
+                  <span className="block truncate">
+                    {agent.execution.managed.providerName} ·{" "}
+                    {agent.execution.managed.modelName}
+                  </span>
+                </TableCell>
+                <TableCell>
+                  <UserStatusBadge
+                    status={agent.status}
+                    label={userStatusLabel(agent.status, t)}
+                  />
+                </TableCell>
+                <TableCell>
+                  <WorkStatusBadge status={agent.workStatus} />
+                </TableCell>
+                <TableCell className="whitespace-nowrap text-muted-foreground">
+                  {formatDateTime(agent.createdAt)}
+                </TableCell>
+                <ResourceTableActions
+                  menu={
+                    <DropdownMenuItem
+                      destructive={
+                        agent.status === UserStatus.UserStatusActive
+                      }
+                      onSelect={() => setChangingAgentStatus(agent)}
+                    >
+                      {t(
+                        agent.status === UserStatus.UserStatusActive
+                          ? "agents.status.deactivate"
+                          : "agents.status.reactivate",
+                      )}
+                    </DropdownMenuItem>
+                  }
+                >
+                  <Button
+                    size="sm"
+                    disabled={agent.status !== UserStatus.UserStatusActive}
+                    onClick={() =>
+                      navigate(
+                        `/inbox?scope=internal&target=${agent.identityId}`,
+                      )
+                    }
                   >
-                    {t("list.empty")}
-                  </TableCell>
-                </TableRow>
-              ) : null}
-            </TableBody>
-          </Table>
+                    {t("sendMessage")}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() =>
+                      navigate(
+                        `/contacts/ai-employees/${agent.id}?tab=basic&returnTo=${encodeURIComponent(location.pathname + location.search)}`,
+                      )
+                    }
+                  >
+                    {t("agents.configure")}
+                  </Button>
+                </ResourceTableActions>
+              </>
+            )}
+          </ResourceTable>
         </ContactListLayout>
       </section>
 

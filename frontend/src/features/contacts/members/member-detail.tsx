@@ -28,7 +28,7 @@ import {
   createMemberSchema,
   type MemberFormValues,
 } from "@/features/contacts/members/member-schema"
-import { roleDisplayName } from "@/features/roles/role-labels"
+import { roleDisplayName } from "@/lib/role-labels"
 import { useDateTime } from "@/hooks/use-date-time"
 import { sameIDs, useImmediateSave } from "@/hooks/use-immediate-save"
 import { apiErrorMessage } from "@/lib/form-errors"

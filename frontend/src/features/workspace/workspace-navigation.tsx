@@ -18,11 +18,12 @@ import { toast } from "sonner"
 
 import {
   updateUserWorkStatus,
-  type CurrentUser,
   type Identity,
   type WorkStatus,
 } from "@/api"
 import { useUnsavedChangesContext } from "@/contexts/unsaved-changes-context"
+import { resourceKeys } from "@/hooks/resource-keys"
+import { useResourceInvalidator } from "@/hooks/use-resource"
 import { recoverSession } from "@/lib/session-navigation"
 import {
   DropdownMenu,
@@ -133,12 +134,10 @@ function WorkspaceMenu({
 /** 渲染模块轨和用户菜单。 */
 export function WorkspaceNavigation({
   identity,
-  onUserUpdated,
   onLogout,
   loggingOut,
 }: {
   identity: Identity
-  onUserUpdated: (user: CurrentUser) => void
   onLogout: () => void
   loggingOut: boolean
 }) {
@@ -146,6 +145,7 @@ export function WorkspaceNavigation({
   const { t: tCommon } = useTranslation("common")
   const navigate = useNavigate()
   const unsavedChanges = useUnsavedChangesContext()
+  const invalidate = useResourceInvalidator()
   const [userMenuOpen, setUserMenuOpen] = useState(false)
   const changingWorkStatusRef = useRef(false)
   const userMenuTriggerRef = useRef<HTMLButtonElement>(null)
@@ -177,7 +177,7 @@ export function WorkspaceNavigation({
       })
   }
 
-  /** 立即保存工作状态，并在失败时恢复原状态。 */
+  /** 保存工作状态并刷新当前身份。 */
   async function changeWorkStatus(workStatus: WorkStatus) {
     if (
       workStatus === identity.user.workStatus ||
@@ -186,15 +186,12 @@ export function WorkspaceNavigation({
       return
     }
 
-    const previous = identity.user
     changingWorkStatusRef.current = true
-    onUserUpdated({ ...previous, workStatus })
     try {
-      const updated = await updateUserWorkStatus({ workStatus })
-      onUserUpdated(updated)
+      await updateUserWorkStatus({ workStatus })
       console.info("工作状态已切换", { work_status: workStatus })
+      void invalidate(resourceKeys.identity())
     } catch (error) {
-      onUserUpdated(previous)
       if (!recoverSession(error, navigate)) {
         console.warn("切换工作状态失败", error)
         toast.error(t("workStatusUpdateError"))

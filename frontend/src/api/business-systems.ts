@@ -1,4 +1,4 @@
-/** 业务系统调用与归一化。 */
+/** 业务系统调用。 */
 import {
   CreateBusinessSystem,
   DeleteBusinessSystem,
@@ -6,31 +6,14 @@ import {
   ListBusinessSystems,
   UpdateBusinessSystem,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
-import type {
-  BusinessSystem,
-  BusinessSystemList,
-} from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
+import type { BusinessSystemList } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import { bind } from "@/api/client"
-import { asList } from "@/api/normalize"
+import type { NonNullArrays } from "@/api/normalize"
 
-export type BusinessSystemListData = Omit<
-  BusinessSystemList,
-  "businessSystems"
-> & {
-  businessSystems: BusinessSystem[]
-}
-
-const listBusinessSystemsBound = bind(ListBusinessSystems)
+export type BusinessSystemListData = NonNullArrays<BusinessSystemList>
 
 /** 读取当前企业的业务系统列表。 */
-export function listBusinessSystems() {
-  return listBusinessSystemsBound().then(
-    (output): BusinessSystemListData => ({
-      ...output,
-      businessSystems: asList(output.businessSystems),
-    }),
-  )
-}
+export const listBusinessSystems = bind(ListBusinessSystems)
 
 /** 读取业务系统详情。 */
 export const getBusinessSystem = bind(GetBusinessSystem)

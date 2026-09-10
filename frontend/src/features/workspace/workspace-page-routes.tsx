@@ -1,5 +1,6 @@
 /** 定义工作台页面路由和多标签分组。 */
-import { Route, Routes, matchPath, type Location } from "react-router"
+import type { ReactElement } from "react"
+import { matchRoutes, useRoutes, type Location, type RouteObject } from "react-router"
 
 import { MessageChannelFormPage } from "@/features/channels/message-channel-form-page"
 import { MessageChannelListPage } from "@/features/channels/message-channel-list-page"
@@ -27,156 +28,304 @@ import {
   SystemSettingsPage,
 } from "@/features/settings/settings-page"
 
-/** 可标签化的工作台路由；tabPath 把同一功能模块的页面归入同一个标签。 */
+/** 需要公共外壳的路由前缀，同一前缀下的页面渲染在对应布局内。 */
+const workspaceRouteLayouts = [
+  { prefix: "/knowledge-bases", element: <KnowledgeBaseLayout /> },
+  { prefix: "/integrations", element: <IntegrationsLayout /> },
+]
+
+/**
+ * 工作台路由清单，标签解析与页面渲染共用同一份定义。
+ * tabPath 把同一功能模块的页面归入同一个标签。
+ */
 const workspaceRouteDefinitions = [
-  { path: "/inbox", titleKey: "tabs.routes.inbox" },
-  { path: "/account/profile", titleKey: "tabs.routes.profile" },
-  { path: "/account/security", titleKey: "tabs.routes.security" },
-  { path: "/account/preferences", titleKey: "tabs.routes.preferences" },
+  { path: "/inbox", titleKey: "tabs.routes.inbox", element: <InboxRoute /> },
+  {
+    path: "/account/profile",
+    titleKey: "tabs.routes.profile",
+    element: <PersonalSettingsPage section="profile" />,
+  },
+  {
+    path: "/account/security",
+    titleKey: "tabs.routes.security",
+    element: <PersonalSettingsPage section="security" />,
+  },
+  {
+    path: "/account/preferences",
+    titleKey: "tabs.routes.preferences",
+    element: <PersonalSettingsPage section="preferences" />,
+  },
   {
     path: "/settings/general",
     titleKey: "tabs.routes.general",
+    element: <SystemSettingsPage section="general" />,
   },
   {
     path: "/settings/roles/new",
     tabPath: "/settings/roles",
     titleKey: "tabs.routes.roles",
+    element: (
+      <SystemSettingsPage section="roles">
+        <RoleFormPage mode="create" />
+      </SystemSettingsPage>
+    ),
   },
   {
     path: "/settings/roles/:roleId",
     tabPath: "/settings/roles",
     titleKey: "tabs.routes.roles",
+    element: (
+      <SystemSettingsPage section="roles">
+        <RoleFormPage mode="detail" />
+      </SystemSettingsPage>
+    ),
   },
-  { path: "/settings/roles", titleKey: "tabs.routes.roles" },
-  { path: "/settings/storage", titleKey: "tabs.routes.storage" },
-  { path: "/contacts/employees", titleKey: "tabs.routes.employees" },
-  { path: "/contacts/ai-employees", titleKey: "tabs.routes.aiEmployees" },
+  {
+    path: "/settings/roles",
+    titleKey: "tabs.routes.roles",
+    element: <SystemSettingsPage section="roles" />,
+  },
+  {
+    path: "/settings/storage",
+    titleKey: "tabs.routes.storage",
+    element: <SystemSettingsPage section="storage" />,
+  },
+  {
+    path: "/contacts/employees",
+    titleKey: "tabs.routes.employees",
+    element: <ContactsPage scope="employees" />,
+  },
+  {
+    path: "/contacts/ai-employees",
+    titleKey: "tabs.routes.aiEmployees",
+    element: <ContactsPage scope="agents" />,
+  },
   {
     path: "/contacts/ai-employees/new",
     tabPath: "/contacts/ai-employees",
     titleKey: "tabs.routes.aiEmployees",
+    element: (
+      <ContactsPage scope="agents">
+        <AgentFormPage mode="create" />
+      </ContactsPage>
+    ),
   },
   {
     path: "/contacts/ai-employees/:agentId",
     tabPath: "/contacts/ai-employees",
     titleKey: "tabs.routes.aiEmployees",
+    element: (
+      <ContactsPage scope="agents">
+        <AgentFormPage mode="edit" />
+      </ContactsPage>
+    ),
   },
-  { path: "/contacts/teams/:teamId", titleKey: "tabs.routes.team" },
-  { path: "/contacts/external", titleKey: "tabs.routes.externalContacts" },
+  {
+    path: "/contacts/teams/:teamId",
+    titleKey: "tabs.routes.team",
+    element: <ContactsPage scope="team" />,
+  },
+  {
+    path: "/contacts/external",
+    titleKey: "tabs.routes.externalContacts",
+    element: <ContactsPage scope="external" />,
+  },
   {
     path: "/knowledge-bases/new",
     tabPath: "/knowledge-bases",
     titleKey: "tabs.routes.knowledgeBases",
+    element: <KnowledgeBaseFormPage mode="create" />,
   },
   {
     path: "/knowledge-bases/:knowledgeBaseId",
     tabPath: "/knowledge-bases",
     titleKey: "tabs.routes.knowledgeBases",
+    element: <KnowledgeBaseFormPage mode="edit" />,
   },
   {
     path: "/knowledge-bases/:knowledgeBaseId/groups/:groupId/qa/new",
     tabPath: "/knowledge-bases",
     titleKey: "tabs.routes.knowledgeBases",
+    element: <KnowledgeQAFormPage mode="create" />,
   },
   {
     path: "/knowledge-bases/:knowledgeBaseId/groups/:groupId/qa/:entryId/edit",
     tabPath: "/knowledge-bases",
     titleKey: "tabs.routes.knowledgeBases",
+    element: <KnowledgeQAFormPage mode="edit" />,
   },
   {
     path: "/knowledge-bases/:knowledgeBaseId/groups/:groupId/qa",
     tabPath: "/knowledge-bases",
     titleKey: "tabs.routes.knowledgeBases",
+    element: <KnowledgeQAListPage />,
   },
-  { path: "/knowledge-bases/:knowledgeBaseId/groups/:groupId/documents/:documentId", tabPath: "/knowledge-bases", titleKey: "tabs.routes.knowledgeBases" },
-  { path: "/knowledge-bases/:knowledgeBaseId/groups/:groupId/documents", tabPath: "/knowledge-bases", titleKey: "tabs.routes.knowledgeBases" },
-  { path: "/knowledge-bases", titleKey: "tabs.routes.knowledgeBases" },
-  { path: "/apps", titleKey: "tabs.routes.apps" },
+  {
+    path: "/knowledge-bases/:knowledgeBaseId/groups/:groupId/documents/:documentId",
+    tabPath: "/knowledge-bases",
+    titleKey: "tabs.routes.knowledgeBases",
+    element: <KnowledgeDocumentPage />,
+  },
+  {
+    path: "/knowledge-bases/:knowledgeBaseId/groups/:groupId/documents",
+    tabPath: "/knowledge-bases",
+    titleKey: "tabs.routes.knowledgeBases",
+    element: <KnowledgeDocumentListPage />,
+  },
+  {
+    path: "/knowledge-bases",
+    titleKey: "tabs.routes.knowledgeBases",
+    element: <KnowledgeBaseIndexPage />,
+  },
+  { path: "/apps", titleKey: "tabs.routes.apps", element: <AppsPage /> },
   {
     path: "/integrations/channels/new",
     tabPath: "/integrations/channels",
     titleKey: "tabs.routes.channels",
+    element: <MessageChannelFormPage mode="create" />,
   },
   {
     path: "/integrations/channels/:channelType/:channelId",
     tabPath: "/integrations/channels",
     titleKey: "tabs.routes.channels",
+    element: <MessageChannelFormPage mode="edit" />,
   },
-  { path: "/integrations/channels", titleKey: "tabs.routes.channels" },
+  {
+    path: "/integrations/channels",
+    titleKey: "tabs.routes.channels",
+    element: <MessageChannelListPage />,
+  },
   {
     path: "/integrations/business-systems/new",
     tabPath: "/integrations/business-systems",
     titleKey: "tabs.routes.businessSystems",
+    element: <BusinessSystemFormPage mode="create" />,
   },
   {
     path: "/integrations/business-systems/:businessSystemId",
     tabPath: "/integrations/business-systems",
     titleKey: "tabs.routes.businessSystems",
+    element: <BusinessSystemFormPage mode="edit" />,
   },
   {
     path: "/integrations/business-systems",
     titleKey: "tabs.routes.businessSystems",
+    element: <BusinessSystemListPage />,
   },
   {
     path: "/integrations/mcp-servers/new",
     tabPath: "/integrations/mcp-servers",
     titleKey: "tabs.routes.mcpServers",
+    element: <MCPServerFormPage mode="create" />,
   },
   {
     path: "/integrations/mcp-servers/:mcpServerId",
     tabPath: "/integrations/mcp-servers",
     titleKey: "tabs.routes.mcpServers",
+    element: <MCPServerFormPage mode="edit" />,
   },
   {
     path: "/integrations/mcp-servers",
     titleKey: "tabs.routes.mcpServers",
+    element: <MCPServerListPage />,
   },
   {
     path: "/integrations/model-services/chat/new",
     tabPath: "/integrations/model-services",
     titleKey: "tabs.routes.modelServices",
+    element: <ModelProviderFormPage mode="create" returnSection="chat" />,
   },
   {
     path: "/integrations/model-services/chat/:providerId",
     tabPath: "/integrations/model-services",
     titleKey: "tabs.routes.modelServices",
+    element: <ModelProviderFormPage mode="edit" returnSection="chat" />,
   },
   {
     path: "/integrations/model-services/chat",
     tabPath: "/integrations/model-services",
     titleKey: "tabs.routes.modelServices",
+    element: <ModelProviderListPage section="chat" />,
   },
   {
     path: "/integrations/model-services/embedding/new",
     tabPath: "/integrations/model-services",
     titleKey: "tabs.routes.modelServices",
+    element: <ModelProviderFormPage mode="create" returnSection="embedding" />,
   },
   {
     path: "/integrations/model-services/embedding/:providerId",
     tabPath: "/integrations/model-services",
     titleKey: "tabs.routes.modelServices",
+    element: <ModelProviderFormPage mode="edit" returnSection="embedding" />,
   },
   {
     path: "/integrations/model-services/embedding",
     tabPath: "/integrations/model-services",
     titleKey: "tabs.routes.modelServices",
+    element: <ModelProviderListPage section="embedding" />,
   },
   {
     path: "/integrations/model-services/rerank/new",
     tabPath: "/integrations/model-services",
     titleKey: "tabs.routes.modelServices",
+    element: <ModelProviderFormPage mode="create" returnSection="rerank" />,
   },
   {
     path: "/integrations/model-services/rerank/:providerId",
     tabPath: "/integrations/model-services",
     titleKey: "tabs.routes.modelServices",
+    element: <ModelProviderFormPage mode="edit" returnSection="rerank" />,
   },
   {
     path: "/integrations/model-services/rerank",
     tabPath: "/integrations/model-services",
     titleKey: "tabs.routes.modelServices",
+    element: <ModelProviderListPage section="rerank" />,
   },
-] as const
+] as const satisfies readonly {
+  path: string
+  tabPath?: string
+  titleKey: string
+  element: ReactElement
+}[]
+
+type WorkspaceRouteDefinition = (typeof workspaceRouteDefinitions)[number]
+
+/** 返回路由所属的外壳，无匹配前缀时在顶层渲染。 */
+function layoutOf(path: string) {
+  return workspaceRouteLayouts.find(
+    (layout) => path === layout.prefix || path.startsWith(`${layout.prefix}/`),
+  )
+}
+
+/**
+ * 由清单生成的路由树，标签解析与页面渲染共用。
+ * 匹配按 react-router 的路径评分决定，与清单顺序无关。
+ */
+const workspaceRouteObjects: RouteObject[] = [
+  ...workspaceRouteDefinitions
+    .filter((definition) => !layoutOf(definition.path))
+    .map((definition) => ({
+      path: definition.path,
+      element: definition.element,
+      handle: definition,
+    })),
+  ...workspaceRouteLayouts.map((layout) => ({
+    path: layout.prefix,
+    element: layout.element,
+    children: workspaceRouteDefinitions
+      .filter((definition) => layoutOf(definition.path) === layout)
+      .map((definition) => {
+        const relative = definition.path.slice(layout.prefix.length + 1)
+        return {
+          ...(relative ? { path: relative } : { index: true as const }),
+          element: definition.element,
+          handle: definition,
+        }
+      }),
+  })),
+]
 
 const workspaceRedirects: Readonly<Record<string, string>> = {
   "/account": "/account/profile",
@@ -206,11 +355,11 @@ export const defaultWorkspaceTab = {
   titleKey: "tabs.routes.inbox",
 } satisfies ResolvedWorkspaceTab
 
-/** 把当前地址解析为规范标签；未知地址回到消息页。 */
+/** 把当前地址解析为规范标签；别名地址给出跳转目标，未知地址回到消息页。 */
 export function resolveWorkspaceLocation(
   location: Pick<Location, "pathname" | "search" | "hash">,
 ): ResolvedWorkspaceLocation {
-  // 规范化工作台路径并复用对应标签。
+  // 去掉非根路径的尾部斜杠。
   const pathname =
     location.pathname === "/"
       ? location.pathname
@@ -223,9 +372,10 @@ export function resolveWorkspaceLocation(
     }
   }
 
-  const definition = workspaceRouteDefinitions.find(({ path }) =>
-    matchPath({ path, end: true }, pathname),
-  )
+  const matches = matchRoutes(workspaceRouteObjects, pathname)
+  const definition = matches?.[matches.length - 1].route.handle as
+    | WorkspaceRouteDefinition
+    | undefined
   if (!definition) {
     return { canonicalHref: defaultWorkspaceTab.href, tab: null }
   }
@@ -243,188 +393,5 @@ export function resolveWorkspaceLocation(
 
 /** 按指定地址渲染一份工作台页面树。 */
 export function WorkspacePageRoutes({ location }: { location: string }) {
-  return (
-    <Routes location={location}>
-      <Route path="/inbox" element={<InboxRoute />} />
-      <Route
-        path="/account/profile"
-        element={<PersonalSettingsPage section="profile" />}
-      />
-      <Route
-        path="/account/security"
-        element={<PersonalSettingsPage section="security" />}
-      />
-      <Route
-        path="/account/preferences"
-        element={<PersonalSettingsPage section="preferences" />}
-      />
-      <Route
-        path="/settings/general"
-        element={<SystemSettingsPage section="general" />}
-      />
-      <Route
-        path="/settings/roles"
-        element={<SystemSettingsPage section="roles" />}
-      />
-      <Route
-        path="/settings/roles/new"
-        element={
-          <SystemSettingsPage section="roles">
-            <RoleFormPage mode="create" />
-          </SystemSettingsPage>
-        }
-      />
-      <Route
-        path="/settings/roles/:roleId"
-        element={
-          <SystemSettingsPage section="roles">
-            <RoleFormPage mode="detail" />
-          </SystemSettingsPage>
-        }
-      />
-      <Route
-        path="/settings/storage"
-        element={<SystemSettingsPage section="storage" />}
-      />
-      <Route
-        path="/contacts/employees"
-        element={<ContactsPage scope="employees" />}
-      />
-      <Route
-        path="/contacts/ai-employees"
-        element={<ContactsPage scope="agents" />}
-      />
-
-      <Route
-        path="/contacts/ai-employees/new"
-        element={
-          <ContactsPage scope="agents">
-            <AgentFormPage mode="create" />
-          </ContactsPage>
-        }
-      />
-      <Route
-        path="/contacts/ai-employees/:agentId"
-        element={
-          <ContactsPage scope="agents">
-            <AgentFormPage mode="edit" />
-          </ContactsPage>
-        }
-      />
-      <Route
-        path="/contacts/teams/:teamId"
-        element={<ContactsPage scope="team" />}
-      />
-      <Route
-        path="/contacts/external"
-        element={<ContactsPage scope="external" />}
-      />
-      <Route path="/apps" element={<AppsPage />} />
-      <Route path="/knowledge-bases" element={<KnowledgeBaseLayout />}>
-        <Route index element={<KnowledgeBaseIndexPage />} />
-        <Route path=":knowledgeBaseId/groups/:groupId/documents" element={<KnowledgeDocumentListPage />} />
-        <Route path=":knowledgeBaseId/groups/:groupId/documents/:documentId" element={<KnowledgeDocumentPage />} />
-        <Route
-          path=":knowledgeBaseId/groups/:groupId/qa"
-          element={<KnowledgeQAListPage />}
-        />
-        <Route
-          path=":knowledgeBaseId/groups/:groupId/qa/new"
-          element={<KnowledgeQAFormPage mode="create" />}
-        />
-        <Route
-          path=":knowledgeBaseId/groups/:groupId/qa/:entryId/edit"
-          element={<KnowledgeQAFormPage mode="edit" />}
-        />
-        <Route path="new" element={<KnowledgeBaseFormPage mode="create" />} />
-        <Route
-          path=":knowledgeBaseId"
-          element={<KnowledgeBaseFormPage mode="edit" />}
-        />
-      </Route>
-      <Route path="/integrations" element={<IntegrationsLayout />}>
-        <Route path="channels" element={<MessageChannelListPage />} />
-        <Route
-          path="channels/new"
-          element={<MessageChannelFormPage mode="create" />}
-        />
-        <Route
-          path="channels/:channelType/:channelId"
-          element={<MessageChannelFormPage mode="edit" />}
-        />
-        <Route
-          path="business-systems"
-          element={<BusinessSystemListPage />}
-        />
-        <Route
-          path="business-systems/new"
-          element={<BusinessSystemFormPage mode="create" />}
-        />
-        <Route
-          path="business-systems/:businessSystemId"
-          element={<BusinessSystemFormPage mode="edit" />}
-        />
-        <Route
-          path="mcp-servers"
-          element={<MCPServerListPage />}
-        />
-        <Route
-          path="mcp-servers/new"
-          element={<MCPServerFormPage mode="create" />}
-        />
-        <Route
-          path="mcp-servers/:mcpServerId"
-          element={<MCPServerFormPage mode="edit" />}
-        />
-        <Route
-          path="model-services/chat"
-          element={<ModelProviderListPage section="chat" />}
-        />
-        <Route
-          path="model-services/chat/new"
-          element={
-            <ModelProviderFormPage mode="create" returnSection="chat" />
-          }
-        />
-        <Route
-          path="model-services/chat/:providerId"
-          element={
-            <ModelProviderFormPage mode="edit" returnSection="chat" />
-          }
-        />
-        <Route
-          path="model-services/embedding"
-          element={<ModelProviderListPage section="embedding" />}
-        />
-        <Route
-          path="model-services/embedding/new"
-          element={
-            <ModelProviderFormPage mode="create" returnSection="embedding" />
-          }
-        />
-        <Route
-          path="model-services/embedding/:providerId"
-          element={
-            <ModelProviderFormPage mode="edit" returnSection="embedding" />
-          }
-        />
-        <Route
-          path="model-services/rerank"
-          element={<ModelProviderListPage section="rerank" />}
-        />
-        <Route
-          path="model-services/rerank/new"
-          element={
-            <ModelProviderFormPage mode="create" returnSection="rerank" />
-          }
-        />
-        <Route
-          path="model-services/rerank/:providerId"
-          element={
-            <ModelProviderFormPage mode="edit" returnSection="rerank" />
-          }
-        />
-      </Route>
-    </Routes>
-  )
+  return useRoutes(workspaceRouteObjects, location)
 }

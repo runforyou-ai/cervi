@@ -117,56 +117,8 @@ func (b *Backend) ListContacts(ctx context.Context, meta appservice.RequestMeta,
 // normalizeOutput 按响应类型将远程响应中的相对文件地址转换为企业服务器绝对地址。
 func (b *Backend) normalizeOutput(output any) {
 	switch value := output.(type) {
-	case *appservice.Agent:
-		if value.Execution.MCPServerIDs == nil {
-			value.Execution.MCPServerIDs = []string{}
-		}
-	case *appservice.AgentMCPServerOptionList:
-		if value.MCPServers == nil {
-			value.MCPServers = []appservice.AgentMCPServerOption{}
-		}
-	case *appservice.MCPServer:
-		if value.Tools == nil {
-			value.Tools = []appservice.MCPTool{}
-		}
-	case *appservice.MCPServerList:
-		if value.MCPServers == nil {
-			value.MCPServers = []appservice.MCPServer{}
-		}
-		for i := range value.MCPServers {
-			b.normalizeOutput(&value.MCPServers[i])
-		}
-	case *appservice.KnowledgeDocumentSegmentPage:
-		if value.Segments == nil {
-			value.Segments = []appservice.KnowledgeDocumentSegment{}
-		}
-	case *appservice.KnowledgeDocumentList:
-		if value.Documents == nil {
-			value.Documents = []appservice.KnowledgeDocument{}
-		}
-	case *appservice.KnowledgeDocumentBatch:
-		if value.Documents == nil {
-			value.Documents = []appservice.KnowledgeDocument{}
-		}
 	case *appservice.KnowledgeDocumentPreviewRequest:
 		value.URL = b.absoluteContentURL(value.URL)
-	case *appservice.KnowledgeQAEntry:
-		if value.SimilarQuestions == nil {
-			value.SimilarQuestions = []appservice.KnowledgeQASimilarQuestion{}
-		}
-	case *appservice.KnowledgeQAList:
-		if value.Entries == nil {
-			value.Entries = []appservice.KnowledgeQASummary{}
-		}
-		for i := range value.Entries {
-			if value.Entries[i].SimilarQuestions == nil {
-				value.Entries[i].SimilarQuestions = []string{}
-			}
-		}
-	case *appservice.PendingConversationMentions:
-		if value.MessageIDs == nil {
-			value.MessageIDs = []string{}
-		}
 	case *appservice.Identity:
 		b.normalizeUser(&value.User)
 	case *appservice.CurrentUser:
@@ -235,17 +187,10 @@ func (b *Backend) normalizeOutput(output any) {
 	case *appservice.ConversationMessage:
 		b.normalizeConversationMessage(value)
 	case *appservice.ConversationMessageReferenceList:
-		if value.States == nil {
-			value.States = []appservice.ConversationMessageReferenceState{}
-		}
 		for index := range value.States {
 			if reply := value.States[index].ReplyTo; reply != nil && reply.Sender != nil {
 				reply.Sender.AvatarURL = b.absoluteContentURL(reply.Sender.AvatarURL)
 			}
-		}
-	case *appservice.CustomerDeliveryList:
-		if value.Deliveries == nil {
-			value.Deliveries = []appservice.CustomerMessageDelivery{}
 		}
 	case *appservice.ConversationMessageList:
 		for index := range value.Messages {

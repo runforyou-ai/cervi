@@ -1,6 +1,5 @@
 /** 企业成员列表、筛选、详情和账号状态管理面板。 */
 import { useEffect, useState } from "react"
-import { MoreHorizontalIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -25,6 +24,10 @@ import {
   ListToolbarSearch,
 } from "@/components/list-toolbar"
 import { PageHeader } from "@/components/page-header"
+import {
+  ResourceTable,
+  ResourceTableActions,
+} from "@/components/resource-table"
 import { Button } from "@/components/ui/button"
 import {
   AlertDialog,
@@ -36,20 +39,8 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
+import { TableCell } from "@/components/ui/table"
 import { WorkStatusBadge } from "@/components/work-status"
 import { useWorkspace } from "@/contexts/workspace-context"
 import { ContactCreateDialogs } from "@/features/contacts/contact-create-dialogs"
@@ -61,11 +52,11 @@ import { JoinedTeamsCell } from "@/features/contacts/joined-teams-cell"
 import { MemberDetailView } from "@/features/contacts/members/member-detail"
 import { useContactSearch } from "@/features/contacts/use-contact-search"
 import { UserStatusBadge } from "@/features/contacts/user-status-badge"
-import { roleDisplayName } from "@/features/roles/role-labels"
+import { roleDisplayName } from "@/lib/role-labels"
 import { useDateTime } from "@/hooks/use-date-time"
 import { useContactInvalidator } from "@/features/contacts/use-contact-invalidator"
 import { resourceKeys } from "@/hooks/resource-keys"
-import { useResource } from "@/hooks/use-resource"
+import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { recoverSession } from "@/lib/session-navigation"
 import { optionalWailsEnum } from "@/lib/wails-enum"
 
@@ -81,10 +72,11 @@ export function MembersPanel({
 }) {
   const { t } = useTranslation("contacts")
   const { t: tCommon } = useTranslation("common")
-  const { identity, updateUser: updateWorkspaceUser } = useWorkspace()
+  const { identity } = useWorkspace()
   const navigate = useNavigate()
   const { formatDateTime } = useDateTime()
   const invalidateContact = useContactInvalidator()
+  const invalidate = useResourceInvalidator()
   const {
     searchParams,
     setParameters,
@@ -123,7 +115,7 @@ export function MembersPanel({
     setParameters({ selected: null })
   }, [detailError, selected, setParameters, t])
 
-  /** 当前用户使用工作台中的即时状态，其他成员使用目录查询结果。 */
+  /** 返回成员行显示的工作状态。 */
   function memberWorkStatus(user: UserData) {
     return user.id === identity.user.id
       ? identity.user.workStatus
@@ -164,6 +156,7 @@ export function MembersPanel({
       )
       setChangingUserStatus(null)
       void invalidateContact("user", saved.id)
+      if (saved.id === identity.user.id) void invalidate(resourceKeys.identity())
     } catch (error) {
       if (recoverSession(error, navigate)) return
       console.warn("修改企业成员账号状态失败", {
@@ -263,107 +256,88 @@ export function MembersPanel({
             setParameters({ page: String(number), selected: null })
           }
         >
-          <Table>
-            <TableHeader>
-              <TableRow className="hover:bg-transparent">
-                <TableHead>{t("columns.employeeName")}</TableHead>
-                <TableHead>{t("columns.email")}</TableHead>
-                <TableHead>{t("columns.joinedTeams")}</TableHead>
-                <TableHead>{t("columns.role")}</TableHead>
-                <TableHead>{t("columns.accountStatus")}</TableHead>
-                <TableHead>{t("columns.workStatus")}</TableHead>
-                <TableHead>{t("columns.createdAt")}</TableHead>
-                <TableHead className="w-px">
-                  {tCommon("table.actions")}
-                </TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {users.map((user) => (
-                <TableRow key={user.id}>
-                  <TableCell className="font-medium">
-                    {user.displayName}
-                  </TableCell>
-                  <TableCell className="text-muted-foreground">
-                    {user.email}
-                  </TableCell>
-                  <TableCell className="max-w-xs">
-                    <JoinedTeamsCell teams={user.teams} />
-                  </TableCell>
-                  <TableCell>{roleDisplayName(user.role, tCommon)}</TableCell>
-                  <TableCell>
-                    <UserStatusBadge
-                      status={user.status}
-                      label={userStatusLabel(user.status, t)}
-                    />
-                  </TableCell>
-                  <TableCell>
-                    <WorkStatusBadge status={memberWorkStatus(user)} />
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap text-muted-foreground">
-                    {formatDateTime(user.createdAt)}
-                  </TableCell>
-                  <TableCell className="whitespace-nowrap">
-                    <div className="inline-flex gap-2">
-                      <Button
-                        size="sm"
-                        disabled={
-                          user.status !== UserStatus.UserStatusActive ||
-                          user.identityId === identity.user.identityId
-                        }
-                        onClick={() => navigate(`/inbox?scope=internal&target=${user.identityId}`)}
-                      >
-                        {t("sendMessage")}
-                      </Button>
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        onClick={() => setParameters({ selected: user.id })}
-                      >
-                        {tCommon("actions.view")}
-                      </Button>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon-sm"
-                            aria-label={tCommon("actions.more")}
-                            title={tCommon("actions.more")}
-                          >
-                            <MoreHorizontalIcon />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            destructive={
-                              user.status === UserStatus.UserStatusActive
-                            }
-                            onSelect={() => setChangingUserStatus(user)}
-                          >
-                            {t(
-                              user.status === UserStatus.UserStatusActive
-                                ? "members.status.deactivate"
-                                : "members.status.reactivate",
-                            )}
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </div>
-                  </TableCell>
-                </TableRow>
-              ))}
-              {users.length === 0 ? (
-                <TableRow className="hover:bg-transparent">
-                  <TableCell
-                    colSpan={8}
-                    className="h-32 text-center text-muted-foreground"
+          <ResourceTable
+            columns={[
+              { key: "employeeName", header: t("columns.employeeName") },
+              { key: "email", header: t("columns.email") },
+              { key: "joinedTeams", header: t("columns.joinedTeams") },
+              { key: "role", header: t("columns.role") },
+              { key: "accountStatus", header: t("columns.accountStatus") },
+              { key: "workStatus", header: t("columns.workStatus") },
+              { key: "createdAt", header: t("columns.createdAt") },
+              {
+                key: "actions",
+                header: tCommon("table.actions"),
+                className: "w-px",
+              },
+            ]}
+            rows={users}
+            rowKey={(user) => user.id}
+            empty={t("list.empty")}
+          >
+            {(user) => (
+              <>
+                <TableCell className="font-medium">
+                  {user.displayName}
+                </TableCell>
+                <TableCell className="text-muted-foreground">
+                  {user.email}
+                </TableCell>
+                <TableCell className="max-w-xs">
+                  <JoinedTeamsCell teams={user.teams} />
+                </TableCell>
+                <TableCell>{roleDisplayName(user.role, tCommon)}</TableCell>
+                <TableCell>
+                  <UserStatusBadge
+                    status={user.status}
+                    label={userStatusLabel(user.status, t)}
+                  />
+                </TableCell>
+                <TableCell>
+                  <WorkStatusBadge status={memberWorkStatus(user)} />
+                </TableCell>
+                <TableCell className="whitespace-nowrap text-muted-foreground">
+                  {formatDateTime(user.createdAt)}
+                </TableCell>
+                <ResourceTableActions
+                  menu={
+                    <DropdownMenuItem
+                      destructive={user.status === UserStatus.UserStatusActive}
+                      onSelect={() => setChangingUserStatus(user)}
+                    >
+                      {t(
+                        user.status === UserStatus.UserStatusActive
+                          ? "members.status.deactivate"
+                          : "members.status.reactivate",
+                      )}
+                    </DropdownMenuItem>
+                  }
+                >
+                  <Button
+                    size="sm"
+                    disabled={
+                      user.status !== UserStatus.UserStatusActive ||
+                      user.identityId === identity.user.identityId
+                    }
+                    onClick={() =>
+                      navigate(
+                        `/inbox?scope=internal&target=${user.identityId}`,
+                      )
+                    }
                   >
-                    {t("list.empty")}
-                  </TableCell>
-                </TableRow>
-              ) : null}
-            </TableBody>
-          </Table>
+                    {t("sendMessage")}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    size="sm"
+                    onClick={() => setParameters({ selected: user.id })}
+                  >
+                    {tCommon("actions.view")}
+                  </Button>
+                </ResourceTableActions>
+              </>
+            )}
+          </ResourceTable>
         </ContactListLayout>
       </section>
 
@@ -384,13 +358,7 @@ export function MembersPanel({
             onSaved={(saved) => {
               void invalidateContact("user", saved.id)
               if (saved.id === identity.user.id) {
-                updateWorkspaceUser({
-                  ...identity.user,
-                  displayName: saved.displayName,
-                  email: saved.email,
-                  roleId: saved.role.id,
-                  status: saved.status,
-                })
+                void invalidate(resourceKeys.identity())
               }
             }}
             onNotFound={refreshAndClose}

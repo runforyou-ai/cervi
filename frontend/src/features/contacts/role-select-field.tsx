@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next"
 import type { RoleData } from "@/api"
 import { Field, FieldLabel } from "@/components/ui/field"
 import { NativeSelect } from "@/components/ui/native-select"
-import { roleDisplayName } from "@/features/roles/role-labels"
+import { roleDisplayName } from "@/lib/role-labels"
 
 /** 展示调用方允许选择的角色并保留原生表单校验。 */
 export function RoleSelectField({

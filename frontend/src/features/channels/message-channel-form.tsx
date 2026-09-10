@@ -26,7 +26,7 @@ import {
   createMessageChannelSchema,
   type MessageChannelFormValues,
 } from "@/features/channels/message-channel-schema"
-import { messageChannelTypeDefinitions } from "@/features/channels/message-channel-types"
+import { messageChannelTypeDefinitions } from "@/lib/message-channel-types"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"

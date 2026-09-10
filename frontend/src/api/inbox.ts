@@ -1,4 +1,4 @@
-/** 成员收件箱与会话消息调用归一化。 */
+/** 成员收件箱与会话消息调用。 */
 import {
   ListCustomerMessageDeliveries,
   ListConversationMessageReferences,
@@ -45,8 +45,6 @@ import {
   UpdateConversationUnreadMark,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import type {
-  AttachmentMessageInput,
-  AttachmentBatchInput,
   CustomerInboxConversation,
   ConversationMessage,
   ConversationAgentProcess,
@@ -69,7 +67,6 @@ import type {
   GroupConversationOwnerInput,
   GroupConversationProfileInput,
   GroupInboxConversation,
-  GroupParticipant,
   GroupTextMessageInput,
   Inbox,
   ReadInboxConversationsInput,
@@ -88,35 +85,18 @@ import {
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import { bind } from "@/api/client"
 import { enqueueConversationUnreadChange } from "@/api/conversation-read-queue"
-import { asList } from "@/api/normalize"
+import type { NonNullArrays } from "@/api/normalize"
 
-export type InboxData = Omit<Inbox, "conversations"> & {
-  conversations: InboxConversation[]
-}
+export type InboxData = NonNullArrays<Inbox>
 
-export type ConversationMessageListData = Omit<
-  ConversationMessageList,
-  "messages"
-> & {
-  messages: ConversationMessageData[]
-}
+export type ConversationMessageListData = NonNullArrays<ConversationMessageList>
 
-export type ConversationAgentProcessData = Omit<
-  ConversationAgentProcess,
-  "blocks"
-> & {
-  blocks: NonNullable<ConversationAgentProcess["blocks"]>
-}
+export type ConversationAgentProcessData =
+  NonNullArrays<ConversationAgentProcess>
 
-export type ConversationMessageData = Omit<
-  ConversationMessage,
-  "mentions" | "agentProcess"
-> & {
-  mentions: NonNullable<ConversationMessage["mentions"]>
-  agentProcess: ConversationAgentProcessData | null
-}
+export type ConversationMessageData = NonNullArrays<ConversationMessage>
 
-export type CustomerInboxConversationData = InboxConversation & {
+export type CustomerInboxConversationData = NonNullArrays<InboxConversation> & {
   type: ConversationType.ConversationTypeCustomer
   customer: CustomerInboxConversation
   direct: null
@@ -124,7 +104,7 @@ export type CustomerInboxConversationData = InboxConversation & {
   agent: null
 }
 
-export type DirectInboxConversationData = InboxConversation & {
+export type DirectInboxConversationData = NonNullArrays<InboxConversation> & {
   type: ConversationType.ConversationTypeDirect
   customer: null
   direct: DirectInboxConversation
@@ -132,7 +112,7 @@ export type DirectInboxConversationData = InboxConversation & {
   agent: null
 }
 
-export type GroupInboxConversationData = InboxConversation & {
+export type GroupInboxConversationData = NonNullArrays<InboxConversation> & {
   type: ConversationType.ConversationTypeGroup
   customer: null
   direct: null
@@ -140,7 +120,7 @@ export type GroupInboxConversationData = InboxConversation & {
   agent: null
 }
 
-export type AgentInboxConversationData = InboxConversation & {
+export type AgentInboxConversationData = NonNullArrays<InboxConversation> & {
   type: ConversationType.ConversationTypeAgent
   customer: null
   direct: null
@@ -148,9 +128,7 @@ export type AgentInboxConversationData = InboxConversation & {
   agent: AgentInboxConversation
 }
 
-export type GroupConversationData = Omit<GroupConversation, "participants"> & {
-  participants: GroupParticipant[]
-}
+export type GroupConversationData = NonNullArrays<GroupConversation>
 
 const loadInboxBound = bind(LoadInbox)
 const listConversationMessagesBound = bind(ListConversationMessages)
@@ -209,25 +187,6 @@ export function updateConversationNotificationSettings(
   return updateConversationNotificationSettingsBound(conversationID, input)
 }
 
-/** 归一化消息中的提醒和系统事件成员列表。 */
-function normalizeConversationMessage(
-  message: ConversationMessage,
-): ConversationMessageData {
-  return {
-    ...message,
-    mentions: asList(message.mentions),
-    agentProcess: message.agentProcess
-      ? { ...message.agentProcess, blocks: asList(message.agentProcess.blocks) }
-      : null,
-    systemEvent: message.systemEvent
-      ? {
-          ...message.systemEvent,
-          targets: asList(message.systemEvent.targets),
-        }
-      : null,
-  }
-}
-
 /** 判断统一收件箱项是否为结构完整的客户会话。 */
 export function isCustomerInboxConversation(
   conversation: InboxConversation,
@@ -280,16 +239,13 @@ export async function loadInbox(
     beforeCursor: query.beforeCursor ?? "",
     limit: query.limit ?? 50,
   })
-  return {
-    ...inbox,
-    conversations: asList(inbox.conversations),
-  }
+  return inbox
 }
 
 /** 读取有效真人和 AI 客服筛选项。 */
 export async function listCustomerServiceAssignees() {
   const output = await listCustomerServiceAssigneesBound()
-  return asList(output.assignees)
+  return output.assignees
 }
 
 /** 领取或接管客户会话最新处理周期。 */
@@ -316,20 +272,12 @@ export function reopenServiceSession(conversationId: string) {
 }
 
 /** 分页读取成员可见的会话消息。 */
-export async function listConversationMessages(
+export function listConversationMessages(
   conversationID: string,
   input: ConversationMessageListInput = { before: "", after: "" },
   signal?: AbortSignal,
-): Promise<ConversationMessageListData> {
-  const result = await listConversationMessagesBound(
-    conversationID,
-    input,
-    signal,
-  )
-  return {
-    ...result,
-    messages: asList(result.messages).map(normalizeConversationMessage),
-  }
+) {
+  return listConversationMessagesBound(conversationID, input, signal)
 }
 
 /** 单调推进当前用户的会话已读水位。 */
@@ -346,12 +294,8 @@ export function markConversationRead(
 }
 
 /** 发送成员客户会话文本消息。 */
-export async function sendCustomerTextMessage(
-  conversationID: string,
-  input: CustomerTextMessageInput,
-) {
-  const message = await sendCustomerTextMessageBound(conversationID, input)
-  return normalizeConversationMessage(message)
+export function sendCustomerTextMessage(conversationID: string, input: CustomerTextMessageInput) {
+  return sendCustomerTextMessageBound(conversationID, input)
 }
 
 /** 发送首条单聊消息并返回最终会话。 */
@@ -362,7 +306,6 @@ export async function sendFirstDirectTextMessage(
   return {
     ...result,
     conversation: result.conversation as DirectInboxConversationData,
-    message: normalizeConversationMessage(result.message),
   }
 }
 
@@ -373,12 +316,8 @@ export async function findDirectConversation(targetIdentityID: string) {
 }
 
 /** 发送企业成员内部单聊文本消息。 */
-export async function sendDirectTextMessage(
-  conversationID: string,
-  input: DirectTextMessageInput,
-) {
-  const message = await sendDirectTextMessageBound(conversationID, input)
-  return normalizeConversationMessage(message)
+export function sendDirectTextMessage(conversationID: string, input: DirectTextMessageInput) {
+  return sendDirectTextMessageBound(conversationID, input)
 }
 
 /** 创建企业内部群聊。 */
@@ -390,8 +329,7 @@ export function createGroupConversation(input: GroupConversationInput) {
 export async function getGroupConversation(
   conversationID: string,
 ): Promise<GroupConversationData> {
-  const result = await getGroupConversationBound(conversationID)
-  return { ...result, participants: asList(result.participants) }
+  return getGroupConversationBound(conversationID)
 }
 
 /** 修改企业内部群聊资料。 */
@@ -399,8 +337,7 @@ export async function updateGroupConversation(
   conversationID: string,
   input: GroupConversationProfileInput,
 ): Promise<GroupConversationData> {
-  const result = await updateGroupConversationBound(conversationID, input)
-  return { ...result, participants: asList(result.participants) }
+  return updateGroupConversationBound(conversationID, input)
 }
 
 /** 批量增加企业内部群聊成员。 */
@@ -408,8 +345,7 @@ export async function addGroupConversationMembers(
   conversationID: string,
   input: GroupConversationMembersInput,
 ): Promise<GroupConversationData> {
-  const result = await addGroupConversationMembersBound(conversationID, input)
-  return { ...result, participants: asList(result.participants) }
+  return addGroupConversationMembersBound(conversationID, input)
 }
 
 /** 移除企业内部群聊成员。 */
@@ -417,8 +353,7 @@ export async function removeGroupConversationMember(
   conversationID: string,
   input: GroupConversationMemberInput,
 ): Promise<GroupConversationData> {
-  const result = await removeGroupConversationMemberBound(conversationID, input)
-  return { ...result, participants: asList(result.participants) }
+  return removeGroupConversationMemberBound(conversationID, input)
 }
 
 /** 转让企业内部群聊群主。 */
@@ -426,11 +361,10 @@ export async function transferGroupConversationOwner(
   conversationID: string,
   input: GroupConversationOwnerInput,
 ): Promise<GroupConversationData> {
-  const result = await transferGroupConversationOwnerBound(
+  return transferGroupConversationOwnerBound(
     conversationID,
     input,
   )
-  return { ...result, participants: asList(result.participants) }
 }
 
 /** 退出企业内部群聊。 */
@@ -442,34 +376,21 @@ export function leaveGroupConversation(
 
 /** 解散群聊并归一化保留的成员列表。 */
 export async function dissolveGroupConversation(conversationID: string) {
-  const result = await dissolveGroupConversationBound(conversationID)
-  return { ...result, participants: asList(result.participants) }
+  return dissolveGroupConversationBound(conversationID)
 }
 
 /** 发送企业内部群聊文本消息。 */
-export async function sendGroupTextMessage(
-  conversationID: string,
-  input: GroupTextMessageInput,
-) {
-  const message = await sendGroupTextMessageBound(conversationID, input)
-  return normalizeConversationMessage(message)
+export function sendGroupTextMessage(conversationID: string, input: GroupTextMessageInput) {
+  return sendGroupTextMessageBound(conversationID, input)
 }
 
 /** 读取目标消息周围的连续上下文。 */
-export async function getConversationMessageContext(
+export function getConversationMessageContext(
   conversationID: string,
   messageID: string,
   signal?: AbortSignal,
-): Promise<ConversationMessageListData> {
-  const result = await getConversationMessageContextBound(
-    conversationID,
-    messageID,
-    signal,
-  )
-  return {
-    ...result,
-    messages: asList(result.messages).map(normalizeConversationMessage),
-  }
+) {
+  return getConversationMessageContextBound(conversationID, messageID, signal)
 }
 
 /** 读取群聊待查看数量及最新可见消息。 */
@@ -481,15 +402,11 @@ export function getConversationNavigationState(
 }
 
 /** 获取本轮固定的提及目标列表。 */
-export async function listPendingConversationMentions(
+export function listPendingConversationMentions(
   conversationID: string,
   signal?: AbortSignal,
 ) {
-  const result = await listPendingConversationMentionsBound(
-    conversationID,
-    signal,
-  )
-  return { ...result, messageIds: asList(result.messageIds) }
+  return listPendingConversationMentionsBound(conversationID, signal)
 }
 
 /** 确认一条实际查看的提及目标。 */
@@ -523,50 +440,40 @@ export async function sendFirstAgentTextMessage(
   return {
     ...result,
     conversation: result.conversation as AgentInboxConversationData,
-    message: normalizeConversationMessage(result.message),
   }
 }
 
 /** 向指定 AI 会话发送成员消息。 */
-export async function sendAgentTextMessage(
+export function sendAgentTextMessage(
   conversationID: string,
   input: AgentTextMessageInput,
 ) {
-  const result = await sendAgentTextMessageBound(conversationID, input)
-  return normalizeConversationMessage(result)
+  return sendAgentTextMessageBound(conversationID, input)
 }
 
 /** 读取当前窗口的客户消息投递状态。 */
 const listCustomerMessageDeliveriesBound = bind(ListCustomerMessageDeliveries)
-/** 归一化当前消息窗口的投递集合。 */
-export async function listCustomerMessageDeliveries(conversationID: string, messageIds: string) {
-  const result = await listCustomerMessageDeliveriesBound(conversationID, { messageIds })
-  return { ...result, deliveries: asList(result.deliveries) }
+/** 读取当前消息窗口的投递集合。 */
+export function listCustomerMessageDeliveries(conversationID: string, messageIds: string) {
+  return listCustomerMessageDeliveriesBound(conversationID, { messageIds })
 }
 /** 人工确认或重试一条客户消息投递。 */
 export const resolveCustomerMessageDelivery = bind(ResolveCustomerMessageDelivery)
 
-/** 发送附件消息并归一化发送结果。 */
-export async function sendAttachmentMessage(input: AttachmentMessageInput) {
-  const result = await bind(SendAttachmentMessage)(input)
-  return { ...result, message: normalizeConversationMessage(result.message) }
-}
+/** 发送附件消息。 */
+export const sendAttachmentMessage = bind(SendAttachmentMessage)
 
 /** 获取当前可见附件的下载请求。 */
 export const getAttachmentDownload = bind(GetAttachmentDownload)
 
 /** 保存一批按顺序发送的单聊附件和说明。 */
-export async function sendAttachmentBatch(input: AttachmentBatchInput) {
- const result = await bind(SendAttachmentBatch)(input)
- return { ...result, messages: asList(result.messages).map(normalizeConversationMessage) }
-}
+export const sendAttachmentBatch = bind(SendAttachmentBatch)
 /** 更新上传状态、续期当前上传或取消未完成的附件。 */
 export const updateAttachmentUploads = bind(UpdateAttachmentUploads)
 
 /** 读取窗口内已经存在的附件消息状态。 */
-export async function listAttachmentStates(conversationID: string, messageIDs: string) {
- const result = await bind(ListAttachmentStates)(conversationID, { messageIds: messageIDs })
- return { states: asList(result.states) }
+export function listAttachmentStates(conversationID: string, messageIDs: string) {
+  return bind(ListAttachmentStates)(conversationID, { messageIds: messageIDs })
 }
 
 /** 完成上传并激活原附件消息。 */
@@ -579,26 +486,22 @@ export const stopAgentReply = bind(StopAgentReply)
 export const getInboxConversation = bind(GetInboxConversation)
 
 /** 批量核对指定会话的阅读和列表资格。 */
-export async function readInboxConversations(input: ReadInboxConversationsInput, signal?: AbortSignal) {
-  const output = await bind(ReadInboxConversations)(input, signal)
-  return { ...output, results: asList(output.results) }
+export function readInboxConversations(input: ReadInboxConversationsInput, signal?: AbortSignal) {
+  return bind(ReadInboxConversations)(input, signal)
 }
 
 const listConversationMessageReferencesBound = bind(ListConversationMessageReferences)
 /** 读取当前窗口消息的最新引用和回复可用状态。 */
-export async function listConversationMessageReferences(conversationID: string, messageIds: string) {
-  const result = await listConversationMessageReferencesBound(conversationID, { messageIds })
-  return { ...result, states: result.states ?? [] }
+export function listConversationMessageReferences(conversationID: string, messageIds: string) {
+  return listConversationMessageReferencesBound(conversationID, { messageIds })
 }
 
 /** 读取会话原位置附近的列表窗口及当前资格。 */
-export async function getInboxContext(input: InboxContextInput) {
-  const output = await bind(GetInboxContext)(input)
-  return { ...output, window: { ...output.window, conversations: asList(output.window.conversations) } }
+export function getInboxContext(input: InboxContextInput) {
+  return bind(GetInboxContext)(input)
 }
 
 /** 重读已加载首尾边界之间的完整列表范围。 */
-export async function readInboxWindow(input: InboxWindowInput) {
-  const output = await bind(ReadInboxWindow)(input)
-  return { ...output, conversations: asList(output.conversations) }
+export function readInboxWindow(input: InboxWindowInput) {
+  return bind(ReadInboxWindow)(input)
 }

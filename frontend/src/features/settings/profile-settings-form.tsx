@@ -14,7 +14,9 @@ import {
   updateProfile,
   type CurrentUser,
 } from "@/api"
+import { resourceKeys } from "@/hooks/resource-keys"
 import { usePendingImageUpload } from "@/hooks/use-pending-image-upload"
+import { useResourceInvalidator } from "@/hooks/use-resource"
 import { recoverSession } from "@/lib/session-navigation"
 import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
@@ -32,15 +34,10 @@ const maxAvatarByteSize = 5 * 1024 * 1024
 const avatarFileAccept = ".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
 
 /** 修改当前用户的头像、姓名和邮箱。 */
-export function ProfileSettingsForm({
-  user,
-  onUpdated,
-}: {
-  user: CurrentUser
-  onUpdated: (user: CurrentUser) => void
-}) {
+export function ProfileSettingsForm({ user }: { user: CurrentUser }) {
   const { t } = useTranslation(["settings", "common"])
   const navigate = useNavigate()
+  const invalidate = useResourceInvalidator()
   const fileInputRef = useRef<HTMLInputElement>(null)
   const avatar = usePendingImageUpload({
     purpose: FilePurpose.FilePurposeUserAvatar,
@@ -110,7 +107,7 @@ export function ProfileSettingsForm({
     }
   }
 
-  /** 保存个人资料并同步工作台中的当前用户。 */
+  /** 保存个人资料并刷新当前身份。 */
   async function save(values: ProfileSettingsFormValues) {
     let uploadingAvatar = false
     try {
@@ -123,8 +120,8 @@ export function ProfileSettingsForm({
         email: updated.email,
       })
       avatar.clear()
-      onUpdated(updated)
       console.info("个人资料已保存", { user_id: updated.id })
+      void invalidate(resourceKeys.identity())
       toast.success(t("profile.saveSuccess"))
     } catch (error) {
       // 上传失败已由共享上传回调提示，保存只处理资料提交错误。

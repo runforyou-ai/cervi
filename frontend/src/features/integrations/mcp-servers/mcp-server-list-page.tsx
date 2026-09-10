@@ -1,6 +1,5 @@
 /** MCP 服务列表页。 */
 import { useEffect, useRef, useState } from "react"
-import { MoreHorizontalIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Link, useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -10,28 +9,20 @@ import {
   isApiError,
   listMCPServers,
   refreshMCPServerTools,
-  type MCPServer,
+  type MCPServerData,
 } from "@/api"
 import { ResourceContent } from "@/components/resource-content"
+import {
+  ResourceTable,
+  ResourceTableActions,
+} from "@/components/resource-table"
 import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
 import { SelectableText } from "@/components/selectable-text"
 import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
 import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
+import { TableCell } from "@/components/ui/table"
 import { MCPServerToolsCell } from "@/features/integrations/mcp-servers/mcp-server-tools-cell"
 import { MCPServerTestButton } from "@/features/integrations/mcp-servers/mcp-server-test-button"
 import { resourceKeys } from "@/hooks/resource-keys"
@@ -82,7 +73,7 @@ export function MCPServerListPage() {
     }
   }
 
-  const deletion = useIntegrationDeletion<MCPServer>({
+  const deletion = useIntegrationDeletion<MCPServerData>({
     deleteItem: deleteMCPServer,
     listKey: resourceKeys.mcpServers(),
     detailKey: resourceKeys.mcpServer,
@@ -115,76 +106,63 @@ export function MCPServerListPage() {
           onRetry={() => void refresh()}
         >
           <div className="overflow-hidden rounded-lg border bg-card">
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead>{t("mcpServer.list.columns.name")}</TableHead>
-                  <TableHead>{t("mcpServer.list.columns.serverType")}</TableHead>
-                  <TableHead>{t("mcpServer.list.columns.url")}</TableHead>
-                  <TableHead className="w-20">{t("mcpServer.list.columns.tools")}</TableHead>
-                  <TableHead className="w-px">
-                    {t("common:table.actions")}
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {mcpServers.length === 0 ? (
-                  <TableRow className="hover:bg-transparent">
-                    <TableCell
-                      colSpan={5}
-                      className="h-32 text-center text-muted-foreground"
-                    >
-                      {t("mcpServer.list.empty")}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  mcpServers.map((mcpServer) => (
-                    <TableRow key={mcpServer.id}>
-                      <TableCell className="font-medium">
-                        <SelectableText>{mcpServer.name}</SelectableText>
-                      </TableCell>
-                      <TableCell>
-                        <SelectableText>{mcpServer.serverType}</SelectableText>
-                      </TableCell>
-                      <TableCell className="max-w-xl text-muted-foreground">
-                        <SelectableText>{mcpServer.url}</SelectableText>
-                      </TableCell>
-                      <TableCell><MCPServerToolsCell server={mcpServer} /></TableCell>
-                      <TableCell className="whitespace-nowrap">
-                        <div className="inline-flex gap-2">
-                          <MCPServerTestButton serverId={mcpServer.id} />
-                          <Button variant="outline" size="sm" asChild>
-                            <Link to={`/integrations/mcp-servers/${mcpServer.id}`}>
-                              {t("common:actions.edit")}
-                            </Link>
-                          </Button>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon-sm"
-                                aria-label={t("common:actions.more")}
-                                title={t("common:actions.more")}
-                              >
-                                <MoreHorizontalIcon />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                destructive
-                                onSelect={() => deletion.select(mcpServer)}
-                              >
-                                {t("common:actions.delete")}
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+            <ResourceTable
+              columns={[
+                { key: "name", header: t("mcpServer.list.columns.name") },
+                {
+                  key: "serverType",
+                  header: t("mcpServer.list.columns.serverType"),
+                },
+                { key: "url", header: t("mcpServer.list.columns.url") },
+                {
+                  key: "tools",
+                  header: t("mcpServer.list.columns.tools"),
+                  className: "w-20",
+                },
+                {
+                  key: "actions",
+                  header: t("common:table.actions"),
+                  className: "w-px",
+                },
+              ]}
+              rows={mcpServers}
+              rowKey={(mcpServer) => mcpServer.id}
+              empty={t("mcpServer.list.empty")}
+            >
+              {(mcpServer) => (
+                <>
+                  <TableCell className="font-medium">
+                    <SelectableText>{mcpServer.name}</SelectableText>
+                  </TableCell>
+                  <TableCell>
+                    <SelectableText>{mcpServer.serverType}</SelectableText>
+                  </TableCell>
+                  <TableCell className="max-w-xl text-muted-foreground">
+                    <SelectableText>{mcpServer.url}</SelectableText>
+                  </TableCell>
+                  <TableCell>
+                    <MCPServerToolsCell server={mcpServer} />
+                  </TableCell>
+                  <ResourceTableActions
+                    menu={
+                      <DropdownMenuItem
+                        destructive
+                        onSelect={() => deletion.select(mcpServer)}
+                      >
+                        {t("common:actions.delete")}
+                      </DropdownMenuItem>
+                    }
+                  >
+                    <MCPServerTestButton serverId={mcpServer.id} />
+                    <Button variant="outline" size="sm" asChild>
+                      <Link to={`/integrations/mcp-servers/${mcpServer.id}`}>
+                        {t("common:actions.edit")}
+                      </Link>
+                    </Button>
+                  </ResourceTableActions>
+                </>
+              )}
+            </ResourceTable>
           </div>
         </ResourceContent>
       </PageContent>

@@ -1,30 +1,21 @@
 /** 业务系统列表页。 */
-import { MoreHorizontalIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Link } from "react-router"
 
 import { deleteBusinessSystem, listBusinessSystems, type BusinessSystem } from "@/api"
 import { ResourceContent } from "@/components/resource-content"
+import {
+  ResourceTable,
+  ResourceTableActions,
+} from "@/components/resource-table"
 import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
 import { SelectableText } from "@/components/selectable-text"
 import { StatusBadge } from "@/components/status-badge"
 import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
 import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
+import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
+import { TableCell } from "@/components/ui/table"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 import { useIntegrationDeletion } from "@/features/integrations/use-integration-deletion"
@@ -68,80 +59,63 @@ export function BusinessSystemListPage() {
           onRetry={() => void refresh()}
         >
           <div className="overflow-hidden rounded-lg border bg-card">
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead>{t("businessSystem.list.columns.name")}</TableHead>
-                  <TableHead>{t("businessSystem.list.columns.url")}</TableHead>
-                  <TableHead>{t("businessSystem.list.columns.status")}</TableHead>
-                  <TableHead className="w-px">{t("common:table.actions")}</TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {businessSystems.length === 0 ? (
-                  <TableRow className="hover:bg-transparent">
-                    <TableCell
-                      colSpan={4}
-                      className="h-32 text-center text-muted-foreground"
+            <ResourceTable
+              columns={[
+                { key: "name", header: t("businessSystem.list.columns.name") },
+                { key: "url", header: t("businessSystem.list.columns.url") },
+                {
+                  key: "status",
+                  header: t("businessSystem.list.columns.status"),
+                },
+                {
+                  key: "actions",
+                  header: t("common:table.actions"),
+                  className: "w-px",
+                },
+              ]}
+              rows={businessSystems}
+              rowKey={(businessSystem) => businessSystem.id}
+              empty={t("businessSystem.list.empty")}
+            >
+              {(businessSystem) => (
+                <>
+                  <TableCell className="font-medium">
+                    <SelectableText>{businessSystem.name}</SelectableText>
+                  </TableCell>
+                  <TableCell className="max-w-xl text-muted-foreground">
+                    <SelectableText>{businessSystem.url}</SelectableText>
+                  </TableCell>
+                  <TableCell>
+                    <StatusBadge
+                      variant={businessSystem.enabled ? "success" : "muted"}
+                      showDot={false}
                     >
-                      {t("businessSystem.list.empty")}
-                    </TableCell>
-                  </TableRow>
-                ) : (
-                  businessSystems.map((businessSystem) => (
-                    <TableRow key={businessSystem.id}>
-                      <TableCell className="font-medium">
-                        <SelectableText>{businessSystem.name}</SelectableText>
-                      </TableCell>
-                      <TableCell className="max-w-xl text-muted-foreground">
-                        <SelectableText>{businessSystem.url}</SelectableText>
-                      </TableCell>
-                      <TableCell>
-                        <StatusBadge
-                          variant={businessSystem.enabled ? "success" : "muted"}
-                          showDot={false}
-                        >
-                          {businessSystem.enabled
-                            ? t("businessSystem.status.enabled")
-                            : t("businessSystem.status.disabled")}
-                        </StatusBadge>
-                      </TableCell>
-                      <TableCell className="whitespace-nowrap">
-                        <div className="inline-flex gap-2">
-                          <Button variant="outline" size="sm" asChild>
-                            <Link
-                              to={`/integrations/business-systems/${businessSystem.id}`}
-                            >
-                              {t("common:actions.edit")}
-                            </Link>
-                          </Button>
-                          <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="icon-sm"
-                                aria-label={t("common:actions.more")}
-                                title={t("common:actions.more")}
-                              >
-                                <MoreHorizontalIcon />
-                              </Button>
-                            </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end">
-                              <DropdownMenuItem
-                                destructive
-                                onSelect={() => deletion.select(businessSystem)}
-                              >
-                                {t("common:actions.delete")}
-                              </DropdownMenuItem>
-                            </DropdownMenuContent>
-                          </DropdownMenu>
-                        </div>
-                      </TableCell>
-                    </TableRow>
-                  ))
-                )}
-              </TableBody>
-            </Table>
+                      {businessSystem.enabled
+                        ? t("businessSystem.status.enabled")
+                        : t("businessSystem.status.disabled")}
+                    </StatusBadge>
+                  </TableCell>
+                  <ResourceTableActions
+                    menu={
+                      <DropdownMenuItem
+                        destructive
+                        onSelect={() => deletion.select(businessSystem)}
+                      >
+                        {t("common:actions.delete")}
+                      </DropdownMenuItem>
+                    }
+                  >
+                    <Button variant="outline" size="sm" asChild>
+                      <Link
+                        to={`/integrations/business-systems/${businessSystem.id}`}
+                      >
+                        {t("common:actions.edit")}
+                      </Link>
+                    </Button>
+                  </ResourceTableActions>
+                </>
+              )}
+            </ResourceTable>
           </div>
         </ResourceContent>
       </PageContent>

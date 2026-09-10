@@ -29,7 +29,7 @@ import { MessageChannelForm } from "@/features/channels/message-channel-form"
 import {
   isMessageChannelType,
   messageChannelTypeDefinition,
-} from "@/features/channels/message-channel-types"
+} from "@/lib/message-channel-types"
 import { TelegramChannelConnectionForm } from "@/features/channels/telegram/telegram-channel-connection-form"
 import { TelegramChannelInfoPanel } from "@/features/channels/telegram/telegram-channel-info-panel"
 import { WebsiteChannelChatInterfaceForm } from "@/features/channels/website/website-channel-chat-interface-form"

@@ -11,8 +11,9 @@ import { Link, useNavigate, useParams } from "react-router"
 import { useTranslation } from "react-i18next"
 import type { KnowledgeDocumentData, KnowledgeDocumentListData } from "@/api"
 import { PageControls } from "@/components/page-controls"
+import { ResourceTable } from "@/components/resource-table"
 import { Button } from "@/components/ui/button"
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
+import { TableCell } from "@/components/ui/table"
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu"
 import { useDateTime } from "@/hooks/use-date-time"
 import { formatFileSize } from "@/lib/file-size"
@@ -42,44 +43,39 @@ export function KnowledgeDocumentTable({
   const { t } = useTranslation(["knowledgeBase", "common"])
   return (
     <div className="overflow-hidden rounded-lg border bg-card" aria-busy={refreshing}>
-      <Table>
-        <TableHeader>
-          <TableRow>
-            <TableHead>{t("documents.columns.name")}</TableHead>
-            <TableHead>{t("documents.columns.type")}</TableHead>
-            <TableHead>{t("documents.columns.size")}</TableHead>
-            <TableHead>{t("documents.columns.status")}</TableHead>
-            <TableHead>{t("documents.columns.createdAt")}</TableHead>
-            <TableHead className="w-px">{t("common:table.actions")}</TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {!data.documents.length ? (
-            <TableRow>
-              <TableCell colSpan={6} className="h-32 text-center text-muted-foreground">
-                {t(filtered ? "documents.filteredEmpty" : "documents.empty")}
-              </TableCell>
-            </TableRow>
-          ) : (
-            data.documents.map((document: KnowledgeDocumentData) => (
-              <KnowledgeDocumentRow
-                key={document.id}
-                document={document}
-                listPath={listPath}
-                search={search}
-                canMove={canMove}
-                onAction={onAction}
-              />
-            ))
-          )}
-        </TableBody>
-      </Table>
+      <ResourceTable
+        columns={[
+          { key: "name", header: t("documents.columns.name") },
+          { key: "type", header: t("documents.columns.type") },
+          { key: "size", header: t("documents.columns.size") },
+          { key: "status", header: t("documents.columns.status") },
+          { key: "createdAt", header: t("documents.columns.createdAt") },
+          {
+            key: "actions",
+            header: t("common:table.actions"),
+            className: "w-px",
+          },
+        ]}
+        rows={data.documents}
+        rowKey={(document) => document.id}
+        empty={t(filtered ? "documents.filteredEmpty" : "documents.empty")}
+      >
+        {(document: KnowledgeDocumentData) => (
+          <KnowledgeDocumentRow
+            document={document}
+            listPath={listPath}
+            search={search}
+            canMove={canMove}
+            onAction={onAction}
+          />
+        )}
+      </ResourceTable>
       <PageControls page={data.page} disabled={refreshing} onPageChange={onPage} />
     </div>
   )
 }
 
-/** 保留每行菜单触发点，关闭对话框后恢复键盘焦点。 */
+/** 渲染一行文档的各列，保留菜单触发点以便关闭对话框后恢复键盘焦点。 */
 function KnowledgeDocumentRow({
   document,
   listPath,
@@ -118,7 +114,7 @@ function KnowledgeDocumentRow({
     }
   }
   return (
-    <TableRow>
+    <>
       <TableCell className="max-w-80 truncate font-medium" title={document.name}>
         {document.name}
       </TableCell>
@@ -164,6 +160,6 @@ function KnowledgeDocumentRow({
           </DropdownMenu>
         </div>
       </TableCell>
-    </TableRow>
+    </>
   )
 }
