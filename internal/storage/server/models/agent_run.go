@@ -18,11 +18,13 @@ type AgentRun struct {
 	ConversationID    string          `bun:"conversation_id"`
 	AgentIdentityID   string          `bun:"agent_identity_id"`
 	AgentRevisionID   string          `bun:"agent_revision_id"`
-	TriggerType       string          `bun:"trigger_type"`
-	ServiceSessionID  *string         `bun:"service_session_id"`
+	LaneID            string          `bun:"lane_id"`
+	ScopeKind         string          `bun:"scope_kind"`
+	ScopeID           string          `bun:"scope_id"`
 	Status            string          `bun:"status"`
-	TriggerStartSeq   int64           `bun:"trigger_start_seq"`
-	TriggerEndSeq     *int64          `bun:"trigger_end_seq"`
+	Outcome           *string         `bun:"outcome"`
+	InputStartSeq     int64           `bun:"input_start_seq"`
+	InputEndSeq       *int64          `bun:"input_end_seq"`
 	ResponseMessageID *string         `bun:"response_message_id"`
 	Usage             json.RawMessage `bun:"usage,type:jsonb"`
 	LastError         *string         `bun:"last_error"`

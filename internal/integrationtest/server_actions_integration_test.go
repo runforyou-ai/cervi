@@ -1791,8 +1791,9 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatal(err)
 		}
 		assertInboxConversationPresence(t, coworkerInboxBeforeWebsiteClaim, websiteInbound.Conversation.ID, true)
-		websiteTriggerCount, err := db.NewSelect().Model((*servermodels.ConversationAgentTrigger)(nil)).
-			Where("cat.conversation_id = ?", websiteInbound.Conversation.ID).
+		websiteTriggerCount, err := db.NewSelect().Model((*servermodels.AgentInput)(nil)).
+			Join("JOIN agent_lanes al ON al.id = ai.lane_id").
+			Where("al.conversation_id = ?", websiteInbound.Conversation.ID).
 			Count(context.Background())
 		if err != nil {
 			t.Fatal(err)
@@ -1810,7 +1811,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			Scan(context.Background()); err != nil {
 			t.Fatal(err)
 		}
-		if initialWebsiteRun.TriggerType != string(domain.AgentTriggerTypeCustomerAuto) || initialWebsiteRun.ServiceSessionID == nil || *initialWebsiteRun.ServiceSessionID != websiteSession.ID || initialWebsiteRun.TriggerStartSeq != 1 || initialWebsiteRun.TriggerEndSeq != nil {
+		if initialWebsiteRun.ScopeKind != string(domain.AgentExecutionScopeServiceSession) || initialWebsiteRun.ScopeID != websiteSession.ID || initialWebsiteRun.InputStartSeq != 1 || initialWebsiteRun.InputEndSeq != nil {
 			t.Fatalf("initial website agent run = %#v", initialWebsiteRun)
 		}
 		claimedWebsite, err := claimServiceSession.Execute(context.Background(), loggedIn.Identity, websiteInbound.Conversation.ID)
@@ -1918,11 +1919,11 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatal(err)
 		}
 
-		state := &servermodels.ConversationAgentState{}
-		if err := db.NewSelect().Model(state).Where("cas.conversation_id = ?", agentConversation.ID).Scan(context.Background()); err != nil {
+		state := &servermodels.AgentLane{}
+		if err := db.NewSelect().Model(state).Where("al.conversation_id = ?", agentConversation.ID).Scan(context.Background()); err != nil {
 			t.Fatal(err)
 		}
-		triggerCount, err := db.NewSelect().Model((*servermodels.ConversationAgentTrigger)(nil)).Where("cat.conversation_id = ?", agentConversation.ID).Count(context.Background())
+		triggerCount, err := db.NewSelect().Model((*servermodels.AgentInput)(nil)).Join("JOIN agent_lanes al ON al.id = ai.lane_id").Where("al.conversation_id = ?", agentConversation.ID).Count(context.Background())
 		if err != nil || state.DesiredSeq != 2 || state.ProcessedSeq != 0 || triggerCount != 2 {
 			t.Fatalf("scheduled agent input state = %#v, triggers = %d, error = %v", state, triggerCount, err)
 		}
@@ -1930,8 +1931,8 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err := db.NewSelect().Model(run).Where("agr.conversation_id = ?", agentConversation.ID).Scan(context.Background()); err != nil {
 			t.Fatal(err)
 		}
-		if run.TriggerType != string(domain.AgentTriggerTypeDirect) || run.ServiceSessionID != nil {
-			t.Fatalf("direct run trigger fields = %#v", run)
+		if run.ScopeKind != string(domain.AgentExecutionScopeConversation) || run.ScopeID != agentConversation.ID {
+			t.Fatalf("direct run scope fields = %#v", run)
 		}
 		websiteConversationID := websiteInbound.Conversation.ID
 		if _, err := conversationaction.NewReceiveWebsiteCustomerTextMessageAction(db, scheduler).Execute(context.Background(), conversationaction.WebsiteCustomerTextMessageInput{
@@ -1940,10 +1941,10 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		}); err != nil {
 			t.Fatal(err)
 		}
-		customerState := &servermodels.ConversationAgentState{}
+		customerState := &servermodels.AgentLane{}
 		if err := db.NewSelect().Model(customerState).
-			Where("cas.conversation_id = ?", websiteInbound.Conversation.ID).
-			Where("cas.agent_identity_id = ?", createdAgent.IdentityID).
+			Where("al.conversation_id = ?", websiteInbound.Conversation.ID).
+			Where("al.agent_identity_id = ?", createdAgent.IdentityID).
 			Scan(context.Background()); err != nil {
 			t.Fatal(err)
 		}
@@ -1955,7 +1956,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			Scan(context.Background()); err != nil {
 			t.Fatal(err)
 		}
-		if customerState.DesiredSeq != 3 || customerState.ProcessedSeq != 2 || customerRun.TriggerStartSeq != 3 || customerRun.TriggerEndSeq != nil {
+		if customerState.DesiredSeq != 3 || customerState.ProcessedSeq != 2 || customerRun.InputStartSeq != 3 || customerRun.InputEndSeq != nil {
 			t.Fatalf("scheduled customer follow-up run = %#v, state = %#v", customerRun, customerState)
 		}
 		_, err = closeServiceSession.Execute(context.Background(), loggedIn.Identity, websiteInbound.Conversation.ID)
@@ -1977,8 +1978,8 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatal(err)
 		}
 		if err := db.NewSelect().Model(customerState).
-			Where("cas.conversation_id = ?", customerState.ConversationID).
-			Where("cas.agent_identity_id = ?", customerState.AgentIdentityID).
+			Where("al.conversation_id = ?", customerState.ConversationID).
+			Where("al.agent_identity_id = ?", customerState.AgentIdentityID).
 			Scan(context.Background()); err != nil {
 			t.Fatal(err)
 		}
@@ -2049,8 +2050,8 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatal(err)
 		}
 		if err := db.NewSelect().Model(customerState).
-			Where("cas.conversation_id = ?", customerState.ConversationID).
-			Where("cas.agent_identity_id = ?", customerState.AgentIdentityID).
+			Where("al.conversation_id = ?", customerState.ConversationID).
+			Where("al.agent_identity_id = ?", customerState.AgentIdentityID).
 			Scan(context.Background()); err != nil {
 			t.Fatal(err)
 		}
@@ -2058,7 +2059,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			Where("agr.conversation_id = ?", websiteInbound.Conversation.ID).
 			Where("agr.status IN (?, ?)", domain.AgentRunStatusQueued, domain.AgentRunStatusRunning).
 			Count(context.Background())
-		if err != nil || absorbingCustomerRun.Status != string(domain.AgentRunStatusSucceeded) || absorbingCustomerRun.TriggerStartSeq != 4 || absorbingCustomerRun.TriggerEndSeq == nil || *absorbingCustomerRun.TriggerEndSeq != 5 || customerState.DesiredSeq != 5 || customerState.ProcessedSeq != 5 || queuedCustomerRuns != 0 {
+		if err != nil || absorbingCustomerRun.Status != string(domain.AgentRunStatusSucceeded) || absorbingCustomerRun.InputStartSeq != 4 || absorbingCustomerRun.InputEndSeq == nil || *absorbingCustomerRun.InputEndSeq != 5 || customerState.DesiredSeq != 5 || customerState.ProcessedSeq != 5 || queuedCustomerRuns != 0 {
 			t.Fatalf("absorbed customer run = %#v, state = %#v, active runs = %d, error = %v", absorbingCustomerRun, customerState, queuedCustomerRuns, err)
 		}
 		websiteMessages, err := conversationaction.NewListWebsiteMessagesQuery(db).Execute(context.Background(), conversationaction.MessageHistoryInput{
@@ -2136,7 +2137,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if persistenceErr == nil || task.IsPermanent(persistenceErr) {
 			t.Fatalf("agent completion persistence error = %#v", persistenceErr)
 		}
-		if err := db.NewSelect().Model(state).Where("cas.conversation_id = ?", agentConversation.ID).Scan(context.Background()); err != nil {
+		if err := db.NewSelect().Model(state).Where("al.conversation_id = ?", agentConversation.ID).Scan(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 		if err := db.NewSelect().Model(run).Where("agr.id = ?", run.ID).Scan(context.Background()); err != nil {
@@ -2158,7 +2159,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err := executeAgentRun.Execute(context.Background(), agentrunaction.RunInput{RunID: run.ID}); err != nil {
 			t.Fatal(err)
 		}
-		if err := db.NewSelect().Model(state).Where("cas.conversation_id = ?", agentConversation.ID).Scan(context.Background()); err != nil {
+		if err := db.NewSelect().Model(state).Where("al.conversation_id = ?", agentConversation.ID).Scan(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 		if err := db.NewSelect().Model(run).Where("agr.id = ?", run.ID).Scan(context.Background()); err != nil {
@@ -2240,13 +2241,13 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err := agentrunaction.NewExecuteAction(db, taskRuntime, failingRuntime).Execute(context.Background(), agentrunaction.RunInput{RunID: failedRun.ID}); err == nil {
 			t.Fatal("failing agent run succeeded")
 		}
-		if err := db.NewSelect().Model(state).Where("cas.conversation_id = ?", agentConversation.ID).Scan(context.Background()); err != nil {
+		if err := db.NewSelect().Model(state).Where("al.conversation_id = ?", agentConversation.ID).Scan(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 		if err := db.NewSelect().Model(failedRun).Where("agr.id = ?", failedRun.ID).Scan(context.Background()); err != nil {
 			t.Fatal(err)
 		}
-		if state.ProcessedSeq != 3 || failedRun.Status != string(domain.AgentRunStatusFailed) || failedRun.TriggerEndSeq == nil || *failedRun.TriggerEndSeq != 3 {
+		if state.ProcessedSeq != 3 || failedRun.Status != string(domain.AgentRunStatusFailed) || failedRun.InputEndSeq == nil || *failedRun.InputEndSeq != 3 {
 			t.Fatalf("failed claimed agent run = %#v, state = %#v", failedRun, state)
 		}
 		failedHistory, err := conversationaction.NewListConversationMessagesQuery(db).Execute(context.Background(), loggedIn.Identity, conversationaction.ConversationMessageHistoryInput{ConversationID: agentConversation.ID})
@@ -2266,20 +2267,20 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			Scan(context.Background()); err != nil {
 			t.Fatal(err)
 		}
-		if exhaustedRun.TriggerStartSeq != 4 {
-			t.Fatalf("agent run after failure starts at %d, want 4", exhaustedRun.TriggerStartSeq)
+		if exhaustedRun.InputStartSeq != 4 {
+			t.Fatalf("agent run after failure starts at %d, want 4", exhaustedRun.InputStartSeq)
 		}
 		finalizer := agentrunaction.NewExecuteAction(db, taskRuntime, failingRuntime)
 		if err := finalizer.FinalizeFailure(context.Background(), agentrunaction.RunInput{RunID: exhaustedRun.ID}, errors.New("task attempts exhausted")); err != nil {
 			t.Fatal(err)
 		}
-		if err := db.NewSelect().Model(state).Where("cas.conversation_id = ?", agentConversation.ID).Scan(context.Background()); err != nil {
+		if err := db.NewSelect().Model(state).Where("al.conversation_id = ?", agentConversation.ID).Scan(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 		if err := db.NewSelect().Model(exhaustedRun).Where("agr.id = ?", exhaustedRun.ID).Scan(context.Background()); err != nil {
 			t.Fatal(err)
 		}
-		if state.ProcessedSeq != 4 || exhaustedRun.Status != string(domain.AgentRunStatusFailed) || exhaustedRun.TriggerEndSeq == nil || *exhaustedRun.TriggerEndSeq != 4 {
+		if state.ProcessedSeq != 4 || exhaustedRun.Status != string(domain.AgentRunStatusFailed) || exhaustedRun.InputEndSeq == nil || *exhaustedRun.InputEndSeq != 4 {
 			t.Fatalf("exhausted agent run = %#v, state = %#v", exhaustedRun, state)
 		}
 		if _, err := sendAgentMessage.Execute(context.Background(), loggedIn.Identity, conversationaction.InternalTextMessageInput{
@@ -2291,7 +2292,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err := db.NewSelect().Model(nextRun).
 			Where("agr.conversation_id = ?", agentConversation.ID).
 			Where("agr.status = ?", domain.AgentRunStatusQueued).
-			Scan(context.Background()); err != nil || nextRun.TriggerStartSeq != 5 {
+			Scan(context.Background()); err != nil || nextRun.InputStartSeq != 5 {
 			t.Fatalf("agent run after exhausted task = %#v, error = %v", nextRun, err)
 		}
 

@@ -201,7 +201,7 @@ func testAgentTelegramReplies(t *testing.T, db *bun.DB, identity *models.Identit
 			}
 		}
 		f.reload(t)
-		if calls != 1 || f.run.Status != string(domain.AgentRunStatusSucceeded) || f.run.ResponseMessageID == nil || f.run.TriggerEndSeq == nil || *f.run.TriggerEndSeq != 2 {
+		if calls != 1 || f.run.Status != string(domain.AgentRunStatusSucceeded) || f.run.ResponseMessageID == nil || f.run.InputEndSeq == nil || *f.run.InputEndSeq != 2 {
 			t.Fatalf("calls=%d run=%+v", calls, f.run)
 		}
 		var deliveries []models.CustomerMessageDelivery
@@ -318,8 +318,8 @@ func testAgentTelegramReplies(t *testing.T, db *bun.DB, identity *models.Identit
 					t.Fatalf("run=%+v", f.run)
 				}
 				f.receiveNext(t)
-				var state models.ConversationAgentState
-				if err := db.NewSelect().Model(&state).Where("cas.conversation_id = ?", f.run.ConversationID).Scan(ctx); err != nil {
+				var state models.AgentLane
+				if err := db.NewSelect().Model(&state).Where("al.conversation_id = ?", f.run.ConversationID).Scan(ctx); err != nil {
 					t.Fatal(err)
 				}
 				if state.ProcessedSeq != 1 || state.DesiredSeq != 2 {

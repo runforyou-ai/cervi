@@ -41,7 +41,7 @@ func (a *ExecuteAction) StopAgentReply(ctx context.Context, identity *servermode
 		err = tx.NewSelect().Model(initial).
 			Join("JOIN agent_conversations AS ac ON ac.organization_id = agr.organization_id AND ac.conversation_id = agr.conversation_id AND ac.agent_identity_id = agr.agent_identity_id").
 			Where("agr.organization_id = ? AND agr.conversation_id = ? AND agr.id = ?", identity.Organization.ID, conversationID, runID).
-			Where("ac.user_identity_id = ? AND agr.trigger_type = ? AND agr.service_session_id IS NULL", identity.OrganizationIdentity.ID, domain.AgentTriggerTypeDirect).
+			Where("ac.user_identity_id = ? AND agr.scope_kind = ?", identity.OrganizationIdentity.ID, domain.AgentExecutionScopeConversation).
 			Scan(ctx)
 		if errors.Is(err, sql.ErrNoRows) {
 			return chatstate.ErrConversationNotFound
@@ -54,21 +54,21 @@ func (a *ExecuteAction) StopAgentReply(ctx context.Context, identity *servermode
 		if err != nil {
 			return err
 		}
-		run, state := locked.Run, locked.State
+		run, lane := locked.Run, locked.Lane
 		status = domain.AgentRunStatus(run.Status)
 		if agentRunStatusTerminal(run.Status) {
 			return nil
 		}
 		// 停止边界包含已提交但尚未被模型认领的输入，后到消息另起运行。
-		if run.TriggerStartSeq != state.ProcessedSeq+1 || state.DesiredSeq < run.TriggerStartSeq {
+		if run.InputStartSeq != lane.ProcessedSeq+1 || lane.DesiredSeq < run.InputStartSeq {
 			return errors.New("stopped agent run boundary is inconsistent")
 		}
-		seqs, err := assignAgentTriggers(ctx, tx, run, agentRunScope{TriggerType: domain.AgentTriggerTypeDirect}, state.ProcessedSeq, state.DesiredSeq)
+		seqs, err := claimLaneInputs(ctx, tx, run, lane.ProcessedSeq, lane.DesiredSeq)
 		if err != nil {
 			return err
 		}
-		if int64(len(seqs)) != state.DesiredSeq-state.ProcessedSeq {
-			return errors.New("stopped agent trigger sequence is not contiguous")
+		if int64(len(seqs)) != lane.DesiredSeq-lane.ProcessedSeq {
+			return errors.New("stopped agent input sequence is not contiguous")
 		}
 		messageID := uuid.NewV7().String()
 		if err := policy.persistMessage(ctx, tx, locked.PolicyContext, run, messageID, domain.MessageTypeAgentCancelled, ""); err != nil {
@@ -78,12 +78,12 @@ func (a *ExecuteAction) StopAgentReply(ctx context.Context, identity *servermode
 			Set("status = ?", domain.AgentRunStatusCancelled).
 			Set("error_code = ?", domain.AgentRunErrorCodeUserCancelled).
 			Set("response_message_id = ?", messageID).
-			Set("trigger_end_seq = ?", state.DesiredSeq).
+			Set("input_end_seq = ?", lane.DesiredSeq).
 			Set("completed_at = now()").Set("updated_at = now()").WherePK().Exec(ctx); err != nil {
 			return err
 		}
-		if _, err := tx.NewUpdate().Model(state).
-			Set("processed_seq = ?", state.DesiredSeq).
+		if _, err := tx.NewUpdate().Model(lane).
+			Set("processed_seq = ?", lane.DesiredSeq).
 			Set("updated_at = now()").WherePK().Exec(ctx); err != nil {
 			return err
 		}

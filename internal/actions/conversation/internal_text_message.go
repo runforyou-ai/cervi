@@ -54,7 +54,7 @@ func saveInternalTextMessage(ctx context.Context, db bun.IDB, identity *servermo
 		if agentScheduler == nil || sendContext.AgentRevisionID == nil {
 			return ConversationMessage{}, ErrDataInvariant
 		}
-		if err := agentScheduler.Schedule(ctx, db, identity.Organization.ID, input.ConversationID, sendContext.AgentIdentityID, *sendContext.AgentRevisionID, message.ID); err != nil {
+		if err := agentScheduler.Schedule(ctx, db, identity.Organization.ID, input.ConversationID, sendContext.AgentIdentityID, *sendContext.AgentRevisionID, message.ID, sendContext.SubjectID); err != nil {
 			return ConversationMessage{}, fmt.Errorf("schedule AI chat message: %w", err)
 		}
 	}
@@ -65,7 +65,7 @@ func saveInternalTextMessage(ctx context.Context, db bun.IDB, identity *servermo
 
 // AgentChatMessageScheduler 把 AI 聊天成员消息加入持久化输入流。
 type AgentChatMessageScheduler interface {
-	Schedule(context.Context, bun.IDB, string, string, string, string, string) error
+	Schedule(context.Context, bun.IDB, string, string, string, string, string, string) error
 }
 
 type internalMessageContext struct {

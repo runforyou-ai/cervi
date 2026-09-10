@@ -11,12 +11,20 @@ const (
 	AgentRunStatusCancelled AgentRunStatus = "cancelled"
 )
 
-// AgentTriggerType 定义 Agent 运行的业务触发入口。
-type AgentTriggerType string
+// AgentExecutionScopeKind 定义 Agent 执行范围的类型。
+type AgentExecutionScopeKind string
 
 const (
-	AgentTriggerTypeDirect       AgentTriggerType = "agent_direct"
-	AgentTriggerTypeCustomerAuto AgentTriggerType = "customer_auto"
+	AgentExecutionScopeConversation   AgentExecutionScopeKind = "conversation"
+	AgentExecutionScopeServiceSession AgentExecutionScopeKind = "service_session"
+)
+
+// AgentInputKind 定义 Agent 持久输入的业务入口。
+type AgentInputKind string
+
+const (
+	AgentInputKindAgentDirect  AgentInputKind = "agent_direct"
+	AgentInputKindCustomerAuto AgentInputKind = "customer_auto"
 )
 
 // AgentRunErrorCode 定义 Agent 运行取消或失败的稳定原因。

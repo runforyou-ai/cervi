@@ -54,8 +54,8 @@ type failingMessageScheduler struct {
 }
 
 // Schedule 在真实输入和任务创建后返回失败以验证整个首发事务回滚。
-func (s *failingMessageScheduler) Schedule(ctx context.Context, db bun.IDB, organizationID, conversationID, agentID, revisionID, messageID string) error {
-	if err := s.inner.Schedule(ctx, db, organizationID, conversationID, agentID, revisionID, messageID); err != nil {
+func (s *failingMessageScheduler) Schedule(ctx context.Context, db bun.IDB, organizationID, conversationID, agentID, revisionID, messageID, senderSubjectID string) error {
+	if err := s.inner.Schedule(ctx, db, organizationID, conversationID, agentID, revisionID, messageID, senderSubjectID); err != nil {
 		return err
 	}
 	return s.failAfterSchedule(ctx, db, conversationID, messageID)
@@ -76,11 +76,11 @@ func (s *failingMessageScheduler) failAfterSchedule(ctx context.Context, db bun.
 	if err := db.NewSelect().TableExpr("task_runs tr").ColumnExpr("tr.id").
 		Join("JOIN task_outbox tob ON tob.task_run_id = tr.id").
 		Join("JOIN agent_runs agr ON tr.idempotency_key = 'agent:' || agr.id::text").
-		Join("JOIN conversation_agent_triggers cat ON cat.conversation_id = agr.conversation_id AND cat.organization_id = agr.organization_id").
-		Join("JOIN conversations cv ON cv.id = cat.conversation_id AND cv.last_message_id = cat.trigger_message_id").
-		Join("LEFT JOIN service_sessions ss ON ss.id = cat.service_session_id AND ss.organization_id = cat.organization_id").
-		Where("cat.service_session_id IS NULL OR ss.last_message_id = cat.trigger_message_id").
-		Where("agr.conversation_id = ? AND cat.trigger_message_id = ?", conversationID, messageID).Scan(ctx, &s.taskIDs); err != nil {
+		Join("JOIN agent_inputs ai ON ai.lane_id = agr.lane_id AND ai.organization_id = agr.organization_id").
+		Join("JOIN conversations cv ON cv.id = agr.conversation_id AND cv.last_message_id = ai.source_message_id").
+		Join("LEFT JOIN service_sessions ss ON ss.id = agr.scope_id AND ss.organization_id = agr.organization_id AND agr.scope_kind = ?", domain.AgentExecutionScopeServiceSession).
+		Where("agr.scope_kind = ? OR ss.last_message_id = ai.source_message_id", domain.AgentExecutionScopeConversation).
+		Where("agr.conversation_id = ? AND ai.source_message_id = ?", conversationID, messageID).Scan(ctx, &s.taskIDs); err != nil {
 		return err
 	}
 	return s.failure
@@ -129,11 +129,17 @@ func testAgentConversations(t *testing.T, db *bun.DB, identity *servermodels.Ide
 		t.Fatal(err)
 	}
 	for _, id := range []string{first.Conversation.ID, second.Conversation.ID} {
-		for _, table := range []string{"messages", "conversation_agent_triggers", "agent_runs", "agent_conversations"} {
+		for _, table := range []string{"messages", "agent_runs", "agent_conversations"} {
 			count, err := db.NewSelect().TableExpr(table).Where("conversation_id = ?", id).Count(ctx)
 			if err != nil || count != 1 {
 				t.Fatalf("%s rows=%d err=%v", table, count, err)
 			}
+		}
+		inputCount, err := db.NewSelect().TableExpr("agent_inputs AS ai").
+			Join("JOIN agent_lanes AS al ON al.id = ai.lane_id").
+			Where("al.conversation_id = ?", id).Count(ctx)
+		if err != nil || inputCount != 1 {
+			t.Fatalf("agent_inputs rows=%d err=%v", inputCount, err)
 		}
 	}
 	altered := firstInput
@@ -195,11 +201,17 @@ func testAgentConversations(t *testing.T, db *bun.DB, identity *servermodels.Ide
 	if _, err := conversationaction.NewSendFirstAgentTextMessageAction(db, failing).Execute(ctx, identity, rollbackInput); !errors.Is(err, failing.failure) {
 		t.Fatalf("expected scheduling failure: %v", err)
 	}
-	for _, table := range []string{"agent_conversations", "conversation_participants", "messages", "conversation_agent_states", "conversation_agent_triggers", "agent_runs"} {
+	for _, table := range []string{"agent_conversations", "conversation_participants", "messages", "agent_lanes", "agent_runs"} {
 		count, err := db.NewSelect().TableExpr(table).Where("conversation_id = ?", rollbackInput.ConversationID).Count(ctx)
 		if err != nil || count != 0 {
 			t.Fatalf("rollback %s rows=%d err=%v", table, count, err)
 		}
+	}
+	inputCount, err := db.NewSelect().TableExpr("agent_inputs AS ai").
+		Join("JOIN agent_lanes AS al ON al.id = ai.lane_id").
+		Where("al.conversation_id = ?", rollbackInput.ConversationID).Count(ctx)
+	if err != nil || inputCount != 0 {
+		t.Fatalf("rollback agent_inputs rows=%d err=%v", inputCount, err)
 	}
 	if exists, err := db.NewSelect().Model((*servermodels.Conversation)(nil)).Where("id = ?", rollbackInput.ConversationID).Exists(ctx); err != nil || exists {
 		t.Fatalf("empty conversation survived rollback: %v %v", exists, err)

@@ -35,12 +35,12 @@ func (s *Scheduler) ScheduleCustomerAuto(ctx context.Context, db bun.IDB, organi
 	if domain.ServiceSessionStatus(session.Status) != domain.ServiceSessionStatusOpen || session.AssigneeIdentityID == nil {
 		return false, nil
 	}
-	messageMatches, err := customerTriggerMessageMatches(ctx, db, session, messageID)
+	senderSubjectID, err := loadCustomerInputSender(ctx, db, session, messageID)
 	if err != nil {
 		return false, err
 	}
-	if !messageMatches {
-		return false, errors.New("customer agent trigger message is invalid")
+	if senderSubjectID == "" {
+		return false, errors.New("customer agent input message is invalid")
 	}
 	assigneeType, err := loadCustomerAssigneeType(ctx, db, session)
 	if err != nil {
@@ -66,7 +66,8 @@ func (s *Scheduler) ScheduleCustomerAuto(ctx context.Context, db bun.IDB, organi
 	if err := s.scheduleInput(ctx, db, agentRunSpec{
 		OrganizationID: organizationID, ConversationID: conversationID,
 		AgentIdentityID: *session.AssigneeIdentityID, RevisionID: eligibility.RevisionID,
-		TriggerType: domain.AgentTriggerTypeCustomerAuto, ServiceSessionID: &session.ID,
+		ScopeKind: domain.AgentExecutionScopeServiceSession, ScopeID: session.ID,
+		Kind: domain.AgentInputKindCustomerAuto, SourceSubjectID: senderSubjectID,
 	}, messageID); err != nil {
 		return false, err
 	}
@@ -89,10 +90,12 @@ func loadCustomerAssigneeType(ctx context.Context, db bun.IDB, session *servermo
 	return domain.OrganizationIdentityType(identityType), nil
 }
 
-// customerTriggerMessageMatches 校验触发消息属于当前周期且来自客户。
-func customerTriggerMessageMatches(ctx context.Context, db bun.IDB, session *servermodels.ServiceSession, messageID string) (bool, error) {
-	matched, err := db.NewSelect().
+// loadCustomerInputSender 校验来源消息属于当前周期且来自客户，并返回其聊天主体。
+func loadCustomerInputSender(ctx context.Context, db bun.IDB, session *servermodels.ServiceSession, messageID string) (string, error) {
+	var subjectID string
+	err := db.NewSelect().
 		TableExpr("messages AS msg").
+		ColumnExpr("cs.id").
 		Join("JOIN conversation_participants AS cp ON cp.id = msg.sender_participant_id AND cp.organization_id = msg.organization_id AND cp.conversation_id = msg.conversation_id").
 		Join("JOIN chat_subjects AS cs ON cs.id = cp.subject_id AND cs.organization_id = cp.organization_id").
 		Where("msg.id = ?", messageID).
@@ -102,11 +105,14 @@ func customerTriggerMessageMatches(ctx context.Context, db bun.IDB, session *ser
 		Where("msg.type = ?", domain.MessageTypeText).
 		Where("msg.deleted_at IS NULL").
 		Where("cs.kind = ?", domain.ChatSubjectKindContact).
-		Exists(ctx)
-	if err != nil {
-		return false, fmt.Errorf("validate customer agent trigger message: %w", err)
+		Scan(ctx, &subjectID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", nil
 	}
-	return matched, nil
+	if err != nil {
+		return "", fmt.Errorf("load customer agent input sender: %w", err)
+	}
+	return subjectID, nil
 }
 
 // loadCustomerAgentEligibility 校验当前负责人及指定运行 Revision 可以执行渠道客服会话。

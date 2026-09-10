@@ -57,7 +57,7 @@ func (a *ClaimServiceSessionAction) Execute(ctx context.Context, identity *serve
 		if session.AssigneeIdentityID == nil || *session.AssigneeIdentityID != identity.OrganizationIdentity.ID {
 			if session.AssigneeIdentityID != nil {
 				cancelledRunIDs, err = a.coordinator.CancelForServiceSession(
-					ctx, tx, session.OrganizationID, session.ConversationID,
+					ctx, tx, session.OrganizationID, session.ID,
 					*session.AssigneeIdentityID, domain.AgentRunErrorCodeAssigneeChanged,
 				)
 				if err != nil {
@@ -150,7 +150,7 @@ func (a *TransferServiceSessionAction) Execute(ctx context.Context, identity *se
 			return &ValidationError{Fields: map[string]ValidationCode{"assigneeIdentityId": ValidationTargetIdentityIDInvalid}}
 		}
 		cancelledRunIDs, err = a.coordinator.CancelForServiceSession(
-			ctx, tx, session.OrganizationID, session.ConversationID,
+			ctx, tx, session.OrganizationID, session.ID,
 			*session.AssigneeIdentityID, domain.AgentRunErrorCodeAssigneeChanged,
 		)
 		if err != nil {
@@ -257,7 +257,7 @@ func (a *CloseServiceSessionAction) Execute(ctx context.Context, identity *serve
 		}
 		if session.AssigneeIdentityID != nil {
 			cancelledRunIDs, err = a.coordinator.CancelForServiceSession(
-				ctx, tx, session.OrganizationID, session.ConversationID,
+				ctx, tx, session.OrganizationID, session.ID,
 				*session.AssigneeIdentityID, domain.AgentRunErrorCodeSessionClosed,
 			)
 			if err != nil {

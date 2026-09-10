@@ -71,7 +71,7 @@ func (p agentChatRunPolicy) enqueueNext(ctx context.Context, db bun.IDB, _ agent
 	_, err := insertAndEnqueueRun(ctx, db, p.enqueuer, agentRunSpec{
 		OrganizationID: run.OrganizationID, ConversationID: run.ConversationID,
 		AgentIdentityID: run.AgentIdentityID, RevisionID: revisionID,
-		TriggerType: domain.AgentTriggerTypeDirect,
-	}, startSeq)
+		ScopeKind: domain.AgentExecutionScopeConversation, ScopeID: run.ScopeID,
+	}, run.LaneID, startSeq)
 	return err
 }

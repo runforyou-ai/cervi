@@ -86,8 +86,8 @@ func TestAgentCallbacksFenceTaskAttempts(t *testing.T) {
 	if err := db.NewSelect().Model(&message).Where("msg.id = ?", *run.ResponseMessageID).Scan(ctx); err != nil || message.Type != string(domain.MessageTypeAgentError) || message.ConversationID != run.ConversationID {
 		t.Fatalf("result message=%+v err=%v", message, err)
 	}
-	var state servermodels.ConversationAgentState
-	if err := db.NewSelect().Model(&state).Where("cas.conversation_id = ?", run.ConversationID).Scan(ctx); err != nil || state.ProcessedSeq != 1 {
+	var state servermodels.AgentLane
+	if err := db.NewSelect().Model(&state).Where("al.conversation_id = ?", run.ConversationID).Scan(ctx); err != nil || state.ProcessedSeq != 1 {
 		t.Fatalf("consumed state=%+v err=%v", state, err)
 	}
 	count, err := db.NewSelect().Model((*servermodels.Message)(nil)).Where("msg.idempotency_key = ?", "agent:"+run.ID).Count(ctx)
@@ -100,9 +100,10 @@ func TestAgentCallbacksFenceTaskAttempts(t *testing.T) {
 func seedAgentExecution(t *testing.T, ctx context.Context, db *bun.DB) servermodels.AgentRun {
 	t.Helper()
 	organizationID, userID, agentID, conversationID := uuid.NewV7().String(), uuid.NewV7().String(), uuid.NewV7().String(), uuid.NewV7().String()
-	run := servermodels.AgentRun{ID: uuid.NewV7().String(), OrganizationID: organizationID, ConversationID: conversationID, AgentIdentityID: agentID, AgentRevisionID: uuid.NewV7().String(), TriggerType: string(domain.AgentTriggerTypeDirect), Status: string(domain.AgentRunStatusQueued), TriggerStartSeq: 1}
+	laneID := uuid.NewV7().String()
+	run := servermodels.AgentRun{ID: uuid.NewV7().String(), OrganizationID: organizationID, ConversationID: conversationID, AgentIdentityID: agentID, AgentRevisionID: uuid.NewV7().String(), LaneID: laneID, ScopeKind: string(domain.AgentExecutionScopeConversation), ScopeID: conversationID, Status: string(domain.AgentRunStatusQueued), InputStartSeq: 1}
 	t.Cleanup(func() {
-		for _, table := range []string{"messages", "conversation_agent_triggers", "agent_runs", "conversation_agent_states", "conversation_participants", "agent_conversations", "conversations", "chat_subjects"} {
+		for _, table := range []string{"messages", "agent_inputs", "agent_runs", "agent_lanes", "conversation_participants", "agent_conversations", "conversations", "chat_subjects"} {
 			if _, err := db.NewDelete().TableExpr(table).Where("organization_id = ?", organizationID).Exec(context.Background()); err != nil {
 				t.Error(err)
 			}
@@ -135,15 +136,15 @@ func seedAgentExecution(t *testing.T, ctx context.Context, db *bun.DB) servermod
 		if _, _, err := chatstate.AppendMessage(ctx, tx, cv, message); err != nil {
 			return err
 		}
-		state := &servermodels.ConversationAgentState{ConversationID: conversationID, OrganizationID: organizationID, AgentIdentityID: agentID, DesiredSeq: 1}
-		if _, err := tx.NewInsert().Model(state).Column("conversation_id", "organization_id", "agent_identity_id", "desired_seq", "processed_seq").Exec(ctx); err != nil {
+		lane := &servermodels.AgentLane{ID: laneID, OrganizationID: organizationID, ConversationID: conversationID, AgentIdentityID: agentID, ScopeKind: string(domain.AgentExecutionScopeConversation), ScopeID: conversationID, DesiredSeq: 1}
+		if _, err := tx.NewInsert().Model(lane).Column("id", "organization_id", "conversation_id", "agent_identity_id", "scope_kind", "scope_id", "desired_seq", "processed_seq").Exec(ctx); err != nil {
 			return err
 		}
-		trigger := &servermodels.ConversationAgentTrigger{ID: uuid.NewV7().String(), OrganizationID: organizationID, ConversationID: conversationID, AgentIdentityID: agentID, TriggerType: string(domain.AgentTriggerTypeDirect), TriggerSeq: 1, TriggerMessageID: message.ID}
-		if _, err := tx.NewInsert().Model(trigger).Column("id", "organization_id", "conversation_id", "agent_identity_id", "trigger_type", "trigger_seq", "trigger_message_id").Exec(ctx); err != nil {
+		input := &servermodels.AgentInput{ID: uuid.NewV7().String(), OrganizationID: organizationID, LaneID: laneID, InputSeq: 1, Kind: string(domain.AgentInputKindAgentDirect), SourceMessageID: message.ID, SourceSubjectID: uuid.NewV7().String()}
+		if _, err := tx.NewInsert().Model(input).Column("id", "organization_id", "lane_id", "input_seq", "kind", "source_message_id", "source_subject_id").Exec(ctx); err != nil {
 			return err
 		}
-		_, err := tx.NewInsert().Model(&run).Column("id", "organization_id", "conversation_id", "agent_identity_id", "agent_revision_id", "trigger_type", "status", "trigger_start_seq").Exec(ctx)
+		_, err := tx.NewInsert().Model(&run).Column("id", "organization_id", "conversation_id", "agent_identity_id", "agent_revision_id", "lane_id", "scope_kind", "scope_id", "status", "input_start_seq").Exec(ctx)
 		return err
 	})
 	if err != nil {
@@ -158,8 +159,8 @@ func assertAgentExecutionUnchanged(t *testing.T, ctx context.Context, db *bun.DB
 	if err := db.NewSelect().Model(&run).WherePK().Scan(ctx); err != nil || run.Status != string(domain.AgentRunStatusQueued) || run.StartedAt != nil || run.ResponseMessageID != nil {
 		t.Fatalf("run changed after rejected callback: %+v err=%v", run, err)
 	}
-	var state servermodels.ConversationAgentState
-	if err := db.NewSelect().Model(&state).Where("cas.conversation_id = ?", run.ConversationID).Scan(ctx); err != nil || state.ProcessedSeq != 0 {
+	var state servermodels.AgentLane
+	if err := db.NewSelect().Model(&state).Where("al.conversation_id = ?", run.ConversationID).Scan(ctx); err != nil || state.ProcessedSeq != 0 {
 		t.Fatalf("state changed after rejected callback: %+v err=%v", state, err)
 	}
 	count, err := db.NewSelect().Model((*servermodels.Message)(nil)).Where("msg.idempotency_key = ?", "agent:"+run.ID).Count(ctx)
@@ -198,7 +199,7 @@ func TestCustomerCallbacksFenceTaskAttempts(t *testing.T) {
  SELECT ?, organization_id, conversation_id, ?, 1, 'closed', id, id, originated_at, now() FROM messages WHERE conversation_id = ?`, sessionID, identityID, run.ConversationID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.ExecContext(ctx, "UPDATE agent_runs SET trigger_type = ?, service_session_id = ? WHERE id = ?", domain.AgentTriggerTypeCustomerAuto, sessionID, run.ID); err != nil {
+	if _, err := db.ExecContext(ctx, "UPDATE agent_runs SET scope_kind = ?, scope_id = ? WHERE id = ?", domain.AgentExecutionScopeServiceSession, sessionID, run.ID); err != nil {
 		t.Fatal(err)
 	}
 	if err := tasks.Registry().RegisterJSON(agentrunaction.RunActionName, func(context.Context, agentrunaction.RunInput) error { return nil }); err != nil {

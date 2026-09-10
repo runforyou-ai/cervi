@@ -169,7 +169,7 @@ func testAgentDirectReplies(t *testing.T, db *bun.DB, identity *servermodels.Ide
 	if replay, err := send.Execute(ctx, identity, input); err != nil || replay.ID != reply.ID {
 		t.Fatalf("replay=%+v err=%v", replay, err)
 	}
-	triggerCount, err := db.NewSelect().Model((*servermodels.ConversationAgentTrigger)(nil)).Where("cat.trigger_message_id = ?", reply.ID).Count(ctx)
+	triggerCount, err := db.NewSelect().Model((*servermodels.AgentInput)(nil)).Where("ai.source_message_id = ?", reply.ID).Count(ctx)
 	if err != nil || triggerCount != 1 {
 		t.Fatalf("replayed trigger count=%d err=%v", triggerCount, err)
 	}

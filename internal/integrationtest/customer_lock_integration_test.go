@@ -64,7 +64,7 @@ func testCustomerAgentLocking(t *testing.T, db *bun.DB, identity *models.Identit
 			defer cancel()
 			first, input, run := createCustomerLockRun(t, ctx, db, identity, agentID, tasks)
 			gate := newChatQueryGate(t, false, phase.occurrence, func(event *bun.QueryEvent) bool {
-				return event.Operation() == "SELECT" && strings.Contains(event.Query, `"conversation_agent_states"`) && strings.Contains(event.Query, "FOR UPDATE")
+				return event.Operation() == "SELECT" && strings.Contains(event.Query, `"agent_lanes"`) && strings.Contains(event.Query, "FOR UPDATE")
 			})
 			model := testAgentRuntime{run: func(ctx context.Context, _ agentruntime.RunRequest, feed agentruntime.InputFeed) (agentruntime.RunResult, error) {
 				claim, err := feed.Claim(ctx, 1)

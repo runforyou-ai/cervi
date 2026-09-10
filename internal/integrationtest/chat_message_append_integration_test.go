@@ -180,13 +180,19 @@ func testWebsiteAppendRollback(t *testing.T, db *bun.DB, identity *servermodels.
 	}
 	for table, column := range map[string]string{
 		"conversations": "id", "customer_conversations": "conversation_id", "service_sessions": "conversation_id",
-		"messages": "conversation_id", "conversation_participants": "conversation_id", "conversation_agent_states": "conversation_id",
-		"conversation_agent_triggers": "conversation_id", "agent_runs": "conversation_id",
+		"messages": "conversation_id", "conversation_participants": "conversation_id", "agent_lanes": "conversation_id",
+		"agent_runs": "conversation_id",
 	} {
 		count, err := db.NewSelect().TableExpr(table).Where("? = ?", bun.Ident(column), failing.conversationID).Count(ctx)
 		if err != nil || count != 0 {
 			t.Fatalf("rollback %s rows=%d err=%v", table, count, err)
 		}
+	}
+	inputCount, err := db.NewSelect().TableExpr("agent_inputs AS ai").
+		Join("JOIN agent_lanes AS al ON al.id = ai.lane_id").
+		Where("al.conversation_id = ?", failing.conversationID).Count(ctx)
+	if err != nil || inputCount != 0 {
+		t.Fatalf("rollback agent_inputs rows=%d err=%v", inputCount, err)
 	}
 	for table, column := range map[string]string{"task_runs": "id", "task_outbox": "task_run_id"} {
 		count, err := db.NewSelect().TableExpr(table).Where("? IN (?)", bun.Ident(column), bun.In(failing.taskIDs)).Count(ctx)
