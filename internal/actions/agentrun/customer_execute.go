@@ -101,21 +101,16 @@ func (p customerRunPolicy) persistMessage(ctx context.Context, db bun.IDB, polic
 	return nil
 }
 
-// enqueueNext 在当前负责人仍合格时投递客户 Agent 的剩余输入。
-func (p customerRunPolicy) enqueueNext(ctx context.Context, db bun.IDB, policyContext agentRunPolicyContext, run *servermodels.AgentRun, startSeq int64) error {
+// laneRevision 在当前负责人仍合格时返回客户 Agent 的配置版本。
+func (p customerRunPolicy) laneRevision(ctx context.Context, db bun.IDB, policyContext agentRunPolicyContext, lane *servermodels.AgentLane) (string, bool, error) {
+	if policyContext.ServiceSession.AssigneeIdentityID == nil || *policyContext.ServiceSession.AssigneeIdentityID != lane.AgentIdentityID {
+		return "", false, nil
+	}
 	eligibility, eligible, err := loadCustomerAgentEligibility(ctx, db, policyContext.ServiceSession, "")
-	if err != nil {
-		return err
+	if err != nil || !eligible {
+		return "", false, err
 	}
-	if !eligible {
-		return nil
-	}
-	_, err = insertAndEnqueueRun(ctx, db, p.enqueuer, agentRunSpec{
-		OrganizationID: run.OrganizationID, ConversationID: run.ConversationID,
-		AgentIdentityID: run.AgentIdentityID, RevisionID: eligibility.RevisionID,
-		ScopeKind: domain.AgentExecutionScopeServiceSession, ScopeID: policyContext.ServiceSession.ID,
-	}, run.LaneID, startSeq)
-	return err
+	return eligibility.RevisionID, true, nil
 }
 
 type customerMessageRow struct {

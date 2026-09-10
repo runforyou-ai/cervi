@@ -1210,7 +1210,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			}
 		}
 
-		send := conversationaction.NewSendGroupTextMessageAction(db)
+		send := newGroupSendAction(db)
 		input := conversationaction.GroupTextMessageInput{
 			ConversationID:  group.ID,
 			ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f67",
@@ -1440,13 +1440,13 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		remainingGroup, err := conversationaction.NewRemoveGroupConversationMemberAction(db).Execute(context.Background(), loggedIn.Identity, conversationaction.GroupConversationMemberInput{
+		remainingGroup, err := conversationaction.NewRemoveGroupConversationMemberAction(db, newGroupAgentCoordinator(db)).Execute(context.Background(), loggedIn.Identity, conversationaction.GroupConversationMemberInput{
 			ConversationID: dissolvedGroup.ID, MemberIdentityID: memberLogin.Identity.OrganizationIdentity.ID,
 		})
 		if err != nil || len(remainingGroup.Participants) != 1 {
 			t.Fatalf("remaining group = %#v, error = %v", remainingGroup, err)
 		}
-		if _, err := conversationaction.NewDissolveGroupConversationAction(db).Execute(context.Background(), loggedIn.Identity, dissolvedGroup.ID); err != nil {
+		if _, err := conversationaction.NewDissolveGroupConversationAction(db, newGroupAgentCoordinator(db)).Execute(context.Background(), loggedIn.Identity, dissolvedGroup.ID); err != nil {
 			t.Fatal(err)
 		}
 		dissolvedDetail, err := get.Execute(context.Background(), loggedIn.Identity, dissolvedGroup.ID)
@@ -2300,6 +2300,10 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 
 		t.Run("Agent 群聊成员", func(t *testing.T) {
 			testGroupAgentMembership(t, db, loggedIn.Identity, customerServiceRole.ID, provider.ID, model.Identifier)
+		})
+
+		t.Run("Agent 群内点名", func(t *testing.T) {
+			testGroupAgentMentionReplies(t, db, loggedIn.Identity, customerServiceRole.ID, provider.ID, model.Identifier)
 		})
 
 		t.Run("Agent 单聊引用", func(t *testing.T) {

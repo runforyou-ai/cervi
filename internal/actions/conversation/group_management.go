@@ -29,7 +29,10 @@ type UpdateGroupConversationAction struct{ db *bun.DB }
 type AddGroupConversationMembersAction struct{ db *bun.DB }
 
 // RemoveGroupConversationMemberAction 移除单个群聊成员。
-type RemoveGroupConversationMemberAction struct{ db *bun.DB }
+type RemoveGroupConversationMemberAction struct {
+	db          *bun.DB
+	coordinator GroupAgentRunCoordinator
+}
 
 // TransferGroupConversationOwnerAction 转让群主。
 type TransferGroupConversationOwnerAction struct{ db *bun.DB }
@@ -38,7 +41,17 @@ type TransferGroupConversationOwnerAction struct{ db *bun.DB }
 type LeaveGroupConversationAction struct{ db *bun.DB }
 
 // DissolveGroupConversationAction 解散群聊并保留当前成员的只读历史。
-type DissolveGroupConversationAction struct{ db *bun.DB }
+type DissolveGroupConversationAction struct {
+	db          *bun.DB
+	coordinator GroupAgentRunCoordinator
+}
+
+// GroupAgentRunCoordinator 在群成员变化事务内收敛受影响 AI 员工的执行。
+type GroupAgentRunCoordinator interface {
+	CancelForGroupAgent(context.Context, bun.IDB, string, string, string) ([]string, error)
+	CancelForGroupConversation(context.Context, bun.IDB, string, string) ([]string, error)
+	CancelRunContexts([]string)
+}
 
 type activeGroupParticipantRow struct {
 	ParticipantID string `bun:"participant_id"`
@@ -58,8 +71,8 @@ func NewAddGroupConversationMembersAction(db *bun.DB) *AddGroupConversationMembe
 }
 
 // NewRemoveGroupConversationMemberAction 创建群聊成员移除操作。
-func NewRemoveGroupConversationMemberAction(db *bun.DB) *RemoveGroupConversationMemberAction {
-	return &RemoveGroupConversationMemberAction{db: db}
+func NewRemoveGroupConversationMemberAction(db *bun.DB, coordinator GroupAgentRunCoordinator) *RemoveGroupConversationMemberAction {
+	return &RemoveGroupConversationMemberAction{db: db, coordinator: coordinator}
 }
 
 // NewTransferGroupConversationOwnerAction 创建群主转让操作。
@@ -73,8 +86,8 @@ func NewLeaveGroupConversationAction(db *bun.DB) *LeaveGroupConversationAction {
 }
 
 // NewDissolveGroupConversationAction 创建群聊解散操作。
-func NewDissolveGroupConversationAction(db *bun.DB) *DissolveGroupConversationAction {
-	return &DissolveGroupConversationAction{db: db}
+func NewDissolveGroupConversationAction(db *bun.DB, coordinator GroupAgentRunCoordinator) *DissolveGroupConversationAction {
+	return &DissolveGroupConversationAction{db: db, coordinator: coordinator}
 }
 
 // Execute 修改群聊资料，并在名称变化时记录系统事件。
@@ -234,6 +247,7 @@ func (a *RemoveGroupConversationMemberAction) Execute(ctx context.Context, ident
 		return GroupConversation{}, &ValidationError{Fields: fields}
 	}
 	var result GroupConversation
+	var cancelledRunIDs []string
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
@@ -252,6 +266,10 @@ func (a *RemoveGroupConversationMemberAction) Execute(ctx context.Context, ident
 		if err := leaveGroupParticipant(ctx, tx, identity.Organization.ID, target.ParticipantID); err != nil {
 			return err
 		}
+		cancelledRunIDs, err = a.coordinator.CancelForGroupAgent(ctx, tx, identity.Organization.ID, conversationID, memberID)
+		if err != nil {
+			return err
+		}
 		if _, err := createGroupSystemEvent(ctx, tx, identity, group.Conversation, ConversationSystemEvent{
 			Type: domain.ConversationSystemEventGroupMemberRemoved, Actor: groupActorSnapshot(identity), Targets: []ConversationSystemEventParticipant{groupParticipantSnapshot(target)},
 		}); err != nil {
@@ -262,6 +280,9 @@ func (a *RemoveGroupConversationMemberAction) Execute(ctx context.Context, ident
 	})
 	if err != nil {
 		return GroupConversation{}, fmt.Errorf("remove group conversation member: %w", err)
+	}
+	if len(cancelledRunIDs) > 0 {
+		a.coordinator.CancelRunContexts(cancelledRunIDs)
 	}
 	return result, nil
 }
@@ -344,6 +365,7 @@ func (a *DissolveGroupConversationAction) Execute(ctx context.Context, identity 
 		return GroupConversation{}, &ValidationError{Fields: map[string]ValidationCode{"conversationId": ValidationConversationIDInvalid}}
 	}
 	var result GroupConversation
+	var cancelledRunIDs []string
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
@@ -357,6 +379,10 @@ func (a *DissolveGroupConversationAction) Execute(ctx context.Context, identity 
 			return chatstate.ErrGroupOwnerRequired
 		}
 		if group.Conversation.Status == string(domain.ConversationStatusActive) {
+			cancelledRunIDs, err = a.coordinator.CancelForGroupConversation(ctx, tx, identity.Organization.ID, conversationID)
+			if err != nil {
+				return err
+			}
 			if _, err := createGroupSystemEvent(ctx, tx, identity, group.Conversation, ConversationSystemEvent{
 				Type: domain.ConversationSystemEventGroupDissolved, Actor: groupActorSnapshot(identity),
 			}); err != nil {
@@ -373,6 +399,9 @@ func (a *DissolveGroupConversationAction) Execute(ctx context.Context, identity 
 	})
 	if err != nil {
 		return GroupConversation{}, fmt.Errorf("dissolve group conversation: %w", err)
+	}
+	if len(cancelledRunIDs) > 0 {
+		a.coordinator.CancelRunContexts(cancelledRunIDs)
 	}
 	return result, nil
 }

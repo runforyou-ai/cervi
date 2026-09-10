@@ -918,6 +918,13 @@ export function StopAgentReply(meta: $models.RequestMeta, conversationID: string
 }
 
 /**
+ * StopGroupAgentReply 停止群聊中指定的 AI 员工回复并返回实际运行状态。
+ */
+export function StopGroupAgentReply(meta: $models.RequestMeta, conversationID: string, runID: string): $CancellablePromise<$models.AgentRunStatus> {
+    return $Call.ByID(4078297554, meta, conversationID, runID);
+}
+
+/**
  * TestAIProviderConnection 测试模型服务供应商草稿配置。
  */
 export function TestAIProviderConnection(meta: $models.RequestMeta, input: $models.AIProviderConnectionInput): $CancellablePromise<void> {

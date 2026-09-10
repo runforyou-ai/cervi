@@ -76,11 +76,11 @@ func newConversationOps(db *bun.DB, agentScheduler conversationaction.AgentMessa
 		getGroupConversation:            conversationaction.NewGetGroupConversationQuery(db),
 		updateGroupConversation:         conversationaction.NewUpdateGroupConversationAction(db),
 		addGroupConversationMembers:     conversationaction.NewAddGroupConversationMembersAction(db),
-		removeGroupConversationMember:   conversationaction.NewRemoveGroupConversationMemberAction(db),
+		removeGroupConversationMember:   conversationaction.NewRemoveGroupConversationMemberAction(db, agentCoordinator),
 		transferGroupConversationOwner:  conversationaction.NewTransferGroupConversationOwnerAction(db),
 		leaveGroupConversation:          conversationaction.NewLeaveGroupConversationAction(db),
-		dissolveGroupConversation:       conversationaction.NewDissolveGroupConversationAction(db),
-		sendGroupTextMessage:            conversationaction.NewSendGroupTextMessageAction(db),
+		dissolveGroupConversation:       conversationaction.NewDissolveGroupConversationAction(db, agentCoordinator),
+		sendGroupTextMessage:            conversationaction.NewSendGroupTextMessageAction(db, agentScheduler),
 	}
 }
 
@@ -757,17 +757,26 @@ var conversationMessageValidationKeys = map[conversationaction.ValidationCode]ce
 
 // conversationMessageListFromAction 共用成员消息窗口及游标转换。
 func (o *directOperations) conversationMessageListFromAction(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, history conversationaction.ConversationMessageHistory) (ConversationMessageList, error) {
-	var agentAvatarFileID *string
+	agentAvatarFileIDs := make([]*string, 0, len(history.PendingAgents)+1)
 	if history.LatestAgentRun != nil {
-		agentAvatarFileID = history.LatestAgentRun.AgentAvatarFileID
+		agentAvatarFileIDs = append(agentAvatarFileIDs, history.LatestAgentRun.AgentAvatarFileID)
 	}
-	avatarURLs, err := o.conversationAvatarURLs(ctx, identity, history.Messages, agentAvatarFileID)
+	for _, agent := range history.PendingAgents {
+		agentAvatarFileIDs = append(agentAvatarFileIDs, agent.AvatarFileID)
+	}
+	avatarURLs, err := o.conversationAvatarURLs(ctx, identity, history.Messages, agentAvatarFileIDs...)
 	if err != nil {
 		return ConversationMessageList{}, conversationMessageError(ctx, meta, err, identity.Organization.ID, conversationID)
 	}
 	result := ConversationMessageList{HasEarlier: history.HasEarlier, HasLater: history.HasLater, Messages: make([]ConversationMessage, 0, len(history.Messages))}
 	if run := history.LatestAgentRun; run != nil {
 		result.LatestAgentRun = &ConversationAgentRun{ID: run.ID, AgentName: run.AgentName, AgentAvatarURL: optionalFileURL(avatarURLs, run.AgentAvatarFileID), Status: AgentRunStatus(run.Status), ErrorCode: run.ErrorCode, LastError: run.LastError}
+	}
+	result.PendingAgents = make([]ConversationPendingAgent, 0, len(history.PendingAgents))
+	for _, agent := range history.PendingAgents {
+		result.PendingAgents = append(result.PendingAgents, ConversationPendingAgent{
+			IdentityID: agent.IdentityID, DisplayName: agent.DisplayName, AvatarURL: optionalFileURL(avatarURLs, agent.AvatarFileID),
+		})
 	}
 	for _, message := range history.Messages {
 		result.Messages = append(result.Messages, conversationMessageFromAction(message, avatarURLs))

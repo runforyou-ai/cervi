@@ -33,7 +33,7 @@ type agentRunPolicy interface {
 	prepareLocked(context.Context, bun.IDB, agentRunPolicyContext, *servermodels.AgentRun) (bool, error)
 	loadMessages(context.Context, bun.IDB, *servermodels.AgentRun, int64) ([]agentruntime.Message, error)
 	persistMessage(context.Context, bun.IDB, agentRunPolicyContext, *servermodels.AgentRun, string, domain.MessageType, string) error
-	enqueueNext(context.Context, bun.IDB, agentRunPolicyContext, *servermodels.AgentRun, int64) error
+	laneRevision(context.Context, bun.IDB, agentRunPolicyContext, *servermodels.AgentLane) (string, bool, error)
 }
 
 type lockedAgentRun struct {
@@ -44,6 +44,7 @@ type lockedAgentRun struct {
 
 type databaseInputFeed struct {
 	db        *bun.DB
+	enqueuer  servertask.TxEnqueuer
 	execution executionContext
 	policy    agentRunPolicy
 }
@@ -88,7 +89,7 @@ func (f *databaseInputFeed) Claim(ctx context.Context, throughSeq int64) (agentr
 		}
 		if !allowed {
 			suppressed = true
-			return nil
+			return scheduleNextRun(ctx, tx, f.enqueuer, f.policy, policyContext, run.OrganizationID, domain.AgentExecutionScopeKind(run.ScopeKind), run.ScopeID)
 		}
 		if run.Status != string(domain.AgentRunStatusRunning) || lane.DesiredSeq <= lane.ProcessedSeq {
 			return errors.New("agent run has no claimable input")

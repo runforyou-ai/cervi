@@ -60,7 +60,7 @@ import { useConversationReading } from "./use-conversation-reading"
 import { useConversationMessageNavigation } from "./use-conversation-message-navigation"
 import { useConversationMentionNavigation } from "./use-conversation-mention-navigation"
 import { ConversationMentionNavigator } from "./conversation-mention-navigator"
-import { AgentProcess, AgentProcessUsage, AgentRunState } from "./agent-process"
+import { AgentProcess, AgentProcessUsage, AgentQueueState, AgentRunState } from "./agent-process"
 
 type TimelineMessage = Pick<
   ConversationMessageData,
@@ -992,7 +992,19 @@ function ConversationTimelineContent({
               key={currentPage.latestAgentRun.id}
               run={currentPage.latestAgentRun}
               onStopped={timeline.poll}
-              conversationID={conversationType === ConversationType.ConversationTypeAgent ? conversationID : undefined}
+              conversationID={
+                conversationType === ConversationType.ConversationTypeAgent ||
+                conversationType === ConversationType.ConversationTypeGroup
+                  ? conversationID
+                  : undefined
+              }
+              group={conversationType === ConversationType.ConversationTypeGroup}
+              incoming={conversationType !== ConversationType.ConversationTypeCustomer}
+            />
+          ) : null}
+          {timeline.mode === "latest" && !currentPage?.hasLater ? (
+            <AgentQueueState
+              agents={currentPage?.pendingAgents ?? []}
               incoming={conversationType !== ConversationType.ConversationTypeCustomer}
             />
           ) : null}

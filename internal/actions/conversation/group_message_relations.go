@@ -18,6 +18,7 @@ type groupMentionTargetRow struct {
 	Kind          string  `bun:"kind"`
 	SourceID      string  `bun:"source_id"`
 	DisplayName   *string `bun:"display_name"`
+	IdentityType  string  `bun:"identity_type"`
 }
 
 // loadConversationMessageMentions 批量补充一页消息的提醒主体。
@@ -61,7 +62,7 @@ func loadConversationMessageMentions(ctx context.Context, db bun.IDB, organizati
 	return nil
 }
 
-// loadGroupMentionTargets 校验提醒目标是当前群聊中的真人参与者。
+// loadGroupMentionTargets 校验提醒目标是当前群聊中的有效参与者。
 func loadGroupMentionTargets(ctx context.Context, db bun.IDB, organizationID, conversationID, senderSubjectID string, subjectIDs []string) ([]ConversationMessageMention, error) {
 	if len(subjectIDs) == 0 {
 		return []ConversationMessageMention{}, nil
@@ -73,12 +74,12 @@ func loadGroupMentionTargets(ctx context.Context, db bun.IDB, organizationID, co
 		ColumnExpr("cs.kind AS kind").
 		ColumnExpr("cs.source_id AS source_id").
 		ColumnExpr("oi.display_name AS display_name").
+		ColumnExpr("oi.type AS identity_type").
 		Join("JOIN chat_subjects AS cs ON cs.organization_id = cp.organization_id AND cs.id = cp.subject_id AND cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
 		Join("JOIN organization_identities AS oi ON oi.organization_id = cs.organization_id AND oi.id = cs.source_id").
 		Where("cp.organization_id = ?", organizationID).
 		Where("cp.conversation_id = ?", conversationID).
 		Where("cp.left_at IS NULL").
-		Where("oi.type = ?", domain.OrganizationIdentityTypeUser).
 		Where("cp.subject_id IN (?)", bun.In(subjectIDs)).
 		OrderExpr("cp.subject_id ASC").
 		Scan(ctx, &rows); err != nil {
@@ -95,6 +96,7 @@ func loadGroupMentionTargets(ctx context.Context, db bun.IDB, organizationID, co
 		mentions = append(mentions, ConversationMessageMention{
 			ChatSubjectID: row.ChatSubjectID, Kind: domain.ChatSubjectKind(row.Kind),
 			SourceID: row.SourceID, DisplayName: row.DisplayName,
+			IdentityType: domain.OrganizationIdentityType(row.IdentityType),
 		})
 	}
 	return mentions, nil

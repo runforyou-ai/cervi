@@ -16,12 +16,14 @@ import { Popover } from "radix-ui"
 import {
   isApiError,
   stopAgentReply,
+  stopGroupAgentReply,
   AgentRunBlockKind,
   AgentRunStatus,
   AgentToolCallStatus,
   type AgentToolCall,
   type ConversationAgentProcessData,
   type ConversationAgentRun,
+  type ConversationPendingAgent,
 } from "@/api"
 import {
   Collapsible,
@@ -188,7 +190,7 @@ export function AgentProcessUsage({ process, incoming }: { process: Conversation
 }
 
 /** 显示最近一次运行的等待、思考或取消状态。 */
-export function AgentRunState({ run, incoming, conversationID, onStopped }: { run: ConversationAgentRun; incoming: boolean; conversationID?: string; onStopped: () => Promise<unknown> }) {
+export function AgentRunState({ run, incoming, conversationID, group, onStopped }: { run: ConversationAgentRun; incoming: boolean; conversationID?: string; group?: boolean; onStopped: () => Promise<unknown> }) {
   const { t } = useTranslation("inbox")
   if (run.status === AgentRunStatus.AgentRunStatusSucceeded || run.status === AgentRunStatus.AgentRunStatusFailed ||
     (run.status === AgentRunStatus.AgentRunStatusCancelled && run.errorCode === "user_cancelled")) return null
@@ -206,7 +208,9 @@ export function AgentRunState({ run, incoming, conversationID, onStopped }: { ru
       ? t("agentRunSessionClosed")
       : run.errorCode === "bot_changed"
         ? t("agentRunBotChanged")
-        : run.lastError
+        : run.errorCode === "agent_removed"
+          ? t("agentRunAgentRemoved")
+          : run.lastError
   return (
     <div
       className={cn("mt-3 flex min-w-0 text-xs text-muted-foreground", incoming ? "justify-start" : "justify-end")}
@@ -227,7 +231,7 @@ export function AgentRunState({ run, incoming, conversationID, onStopped }: { ru
         <div className="flex items-center gap-1.5">
           {cancelled ? <BrainIcon aria-hidden className="size-4" /> : null}
           <span>{label}</span>
-          {conversationID && !cancelled ? <AgentReplyStopButton conversationID={conversationID} runID={run.id} onStopped={onStopped} /> : null}
+          {conversationID && !cancelled ? <AgentReplyStopButton conversationID={conversationID} runID={run.id} group={group} onStopped={onStopped} /> : null}
         </div>
         {cancelled && reason ? (
           <p className="mt-1 whitespace-pre-wrap break-all">{reason}</p>
@@ -237,8 +241,25 @@ export function AgentRunState({ run, incoming, conversationID, onStopped }: { ru
   )
 }
 
+/** 展示已收到点名、等待轮转发言的 AI 员工。 */
+export function AgentQueueState({ agents, incoming }: { agents: ConversationPendingAgent[]; incoming: boolean }) {
+  const { t } = useTranslation("inbox")
+  if (!agents.length) return null
+  const names = agents.map((agent) => agent.displayName.trim() || t("unknownSender")).join("、")
+  return (
+    <div
+      className={cn("mt-2 flex min-w-0 text-xs text-muted-foreground", incoming ? "justify-start" : "justify-end")}
+      role="status"
+    >
+      <span className={cn("max-w-[75%] break-all", incoming ? "ml-10" : "mr-10")}>
+        {t("agentRunWaiting", { names })}
+      </span>
+    </div>
+  )
+}
+
 /** 停止指定运行后刷新原会话资源，卸载后忽略交互结果。 */
-function AgentReplyStopButton({ conversationID, runID, onStopped }: { conversationID: string; runID: string; onStopped: () => Promise<unknown> }) {
+function AgentReplyStopButton({ conversationID, runID, group, onStopped }: { conversationID: string; runID: string; group?: boolean; onStopped: () => Promise<unknown> }) {
   const { t } = useTranslation("inbox")
   const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
@@ -253,7 +274,7 @@ function AgentReplyStopButton({ conversationID, runID, onStopped }: { conversati
   async function stop() {
     setStopping(true)
     try {
-      await stopAgentReply(conversationID, runID)
+      await (group ? stopGroupAgentReply(conversationID, runID) : stopAgentReply(conversationID, runID))
       await Promise.all([
         invalidate(resourceKeys.conversationMessages(conversationID)),
         invalidate(resourceKeys.conversationMessagePage(conversationID)),

@@ -18,8 +18,57 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// StopAgentReply 按成员归属停止指定运行，并在提交后尽力中断模型调用。
+// StopAgentReply 按成员归属停止独立 AI 会话中的运行，并在提交后尽力中断模型调用。
 func (a *ExecuteAction) StopAgentReply(ctx context.Context, identity *servermodels.Identity, conversationID, runID string) (domain.AgentRunStatus, error) {
+	return a.stopReply(ctx, identity, conversationID, runID, func(ctx context.Context, tx bun.Tx) (agentRunPolicy, *servermodels.AgentRun, error) {
+		member, err := chatstate.LockMember(ctx, tx, identity, conversationID)
+		if err != nil {
+			return nil, nil, err
+		}
+		if member.Conversation.Type != string(domain.ConversationTypeAgent) {
+			return nil, nil, chatstate.ErrConversationNotFound
+		}
+		// 读取权限与新消息发送资格分离，禁用 Agent 后仍可停止自己的运行。
+		run := &servermodels.AgentRun{}
+		err = tx.NewSelect().Model(run).
+			Join("JOIN agent_conversations AS ac ON ac.organization_id = agr.organization_id AND ac.conversation_id = agr.conversation_id AND ac.agent_identity_id = agr.agent_identity_id").
+			Where("agr.organization_id = ? AND agr.conversation_id = ? AND agr.id = ?", identity.Organization.ID, conversationID, runID).
+			Where("ac.user_identity_id = ? AND agr.scope_kind = ?", identity.OrganizationIdentity.ID, domain.AgentExecutionScopeConversation).
+			Scan(ctx)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil, chatstate.ErrConversationNotFound
+		}
+		if err != nil {
+			return nil, nil, err
+		}
+		return agentChatRunPolicy{}, run, nil
+	})
+}
+
+// StopGroupAgentReply 由群内有效成员停止本群在途的 AI 员工运行。
+func (a *ExecuteAction) StopGroupAgentReply(ctx context.Context, identity *servermodels.Identity, conversationID, runID string) (domain.AgentRunStatus, error) {
+	return a.stopReply(ctx, identity, conversationID, runID, func(ctx context.Context, tx bun.Tx) (agentRunPolicy, *servermodels.AgentRun, error) {
+		if _, err := chatstate.LockGroup(ctx, tx, identity, conversationID, chatstate.GroupSendable); err != nil {
+			return nil, nil, err
+		}
+		run := &servermodels.AgentRun{}
+		err := tx.NewSelect().Model(run).
+			Where("agr.organization_id = ? AND agr.conversation_id = ? AND agr.id = ?", identity.Organization.ID, conversationID, runID).
+			Where("agr.scope_kind = ?", domain.AgentExecutionScopeConversation).
+			Scan(ctx)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil, chatstate.ErrConversationNotFound
+		}
+		if err != nil {
+			return nil, nil, err
+		}
+		return groupMentionRunPolicy{}, run, nil
+	})
+}
+
+// stopReply 在调用方给出的访问守卫内结束一次运行，并安排执行范围内的下一次运行。
+func (a *ExecuteAction) stopReply(ctx context.Context, identity *servermodels.Identity, conversationID, runID string,
+	authorize func(context.Context, bun.Tx) (agentRunPolicy, *servermodels.AgentRun, error)) (domain.AgentRunStatus, error) {
 	if !common.ValidUUID(conversationID) || !common.ValidUUID(runID) {
 		return "", chatstate.ErrConversationNotFound
 	}
@@ -29,27 +78,10 @@ func (a *ExecuteAction) StopAgentReply(ctx context.Context, identity *servermode
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		member, err := chatstate.LockMember(ctx, tx, identity, conversationID)
+		policy, initial, err := authorize(ctx, tx)
 		if err != nil {
 			return err
 		}
-		if member.Conversation.Type != string(domain.ConversationTypeAgent) {
-			return chatstate.ErrConversationNotFound
-		}
-		// 读取权限与新消息发送资格分离，禁用 Agent 后仍可停止自己的运行。
-		initial := &servermodels.AgentRun{}
-		err = tx.NewSelect().Model(initial).
-			Join("JOIN agent_conversations AS ac ON ac.organization_id = agr.organization_id AND ac.conversation_id = agr.conversation_id AND ac.agent_identity_id = agr.agent_identity_id").
-			Where("agr.organization_id = ? AND agr.conversation_id = ? AND agr.id = ?", identity.Organization.ID, conversationID, runID).
-			Where("ac.user_identity_id = ? AND agr.scope_kind = ?", identity.OrganizationIdentity.ID, domain.AgentExecutionScopeConversation).
-			Scan(ctx)
-		if errors.Is(err, sql.ErrNoRows) {
-			return chatstate.ErrConversationNotFound
-		}
-		if err != nil {
-			return err
-		}
-		policy := agentChatRunPolicy{enqueuer: a.enqueuer}
 		locked, err := lockAgentRun(ctx, tx, policy, initial)
 		if err != nil {
 			return err
@@ -85,6 +117,9 @@ func (a *ExecuteAction) StopAgentReply(ctx context.Context, identity *servermode
 		if _, err := tx.NewUpdate().Model(lane).
 			Set("processed_seq = ?", lane.DesiredSeq).
 			Set("updated_at = now()").WherePK().Exec(ctx); err != nil {
+			return err
+		}
+		if err := scheduleNextRun(ctx, tx, a.enqueuer, policy, locked.PolicyContext, run.OrganizationID, domain.AgentExecutionScopeKind(run.ScopeKind), run.ScopeID); err != nil {
 			return err
 		}
 		status, stopped = domain.AgentRunStatusCancelled, true

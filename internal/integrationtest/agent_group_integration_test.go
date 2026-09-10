@@ -73,7 +73,7 @@ func testGroupAgentMembership(t *testing.T, db *bun.DB, identity *servermodels.I
 		t.Fatalf("agent owner error=%v", err)
 	}
 	// 最后一位真人可直接解散含有 Agent 的群聊。
-	if _, err := conversationaction.NewDissolveGroupConversationAction(db).Execute(ctx, identity, group.ID); err != nil {
+	if _, err := conversationaction.NewDissolveGroupConversationAction(db, newGroupAgentCoordinator(db)).Execute(ctx, identity, group.ID); err != nil {
 		t.Fatal(err)
 	}
 	var stored servermodels.Conversation
@@ -85,16 +85,31 @@ func testGroupAgentMembership(t *testing.T, db *bun.DB, identity *servermodels.I
 	}
 }
 
-// testGroupAgentMessages 验证群内消息不触发 Agent，结构化提醒仅接受真人。
+// testGroupAgentMessages 验证群内提醒接受 AI 员工，普通消息与 @所有人 不触发执行。
 func testGroupAgentMessages(t *testing.T, db *bun.DB, identity *servermodels.Identity, groupID, agentSubjectID string) {
 	ctx := context.Background()
-	send := conversationaction.NewSendGroupTextMessageAction(db)
-	_, err := send.Execute(ctx, identity, conversationaction.GroupTextMessageInput{
+	send := newGroupSendAction(db)
+	mentioned, err := send.Execute(ctx, identity, conversationaction.GroupTextMessageInput{
 		ConversationID: groupID, ClientMessageID: uuid.NewV7().String(), Body: "提醒 Agent", MentionSubjectIDs: []string{agentSubjectID},
 	})
-	var conflict *conversationaction.ConflictError
-	if !errors.As(err, &conflict) || conflict.Reason != conversationaction.ConflictReasonGroupMentionTargetInvalid {
+	if err != nil {
 		t.Fatalf("agent mention error=%v", err)
+	}
+	if len(mentioned.Mentions) != 1 || mentioned.Mentions[0].ChatSubjectID != agentSubjectID {
+		t.Fatalf("agent mention relations=%+v", mentioned.Mentions)
+	}
+	inputCount := func() int {
+		t.Helper()
+		count, err := db.NewSelect().TableExpr("agent_inputs AS ai").
+			Join("JOIN agent_lanes AS al ON al.id = ai.lane_id").
+			Where("al.conversation_id = ?", groupID).Count(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		return count
+	}
+	if inputCount() != 1 {
+		t.Fatalf("点名后的输入数量 = %d，期望 1", inputCount())
 	}
 	for _, all := range []bool{false, true} {
 		if _, err := send.Execute(ctx, identity, conversationaction.GroupTextMessageInput{
@@ -103,24 +118,19 @@ func testGroupAgentMessages(t *testing.T, db *bun.DB, identity *servermodels.Ide
 			t.Fatal(err)
 		}
 	}
-	for _, table := range []string{"agent_runs", "agent_lanes"} {
-		count, err := db.NewSelect().Table(table).Where("conversation_id = ?", groupID).Count(ctx)
-		if err != nil || count != 0 {
-			t.Fatalf("%s count=%d err=%v", table, count, err)
-		}
+	if inputCount() != 1 {
+		t.Fatalf("普通消息与 @所有人 追加了输入，数量 = %d", inputCount())
 	}
-	inputCount, err := db.NewSelect().TableExpr("agent_inputs AS ai").
-		Join("JOIN agent_lanes AS al ON al.id = ai.lane_id").
-		Where("al.conversation_id = ?", groupID).Count(ctx)
-	if err != nil || inputCount != 0 {
-		t.Fatalf("agent_inputs count=%d err=%v", inputCount, err)
+	runCount, err := db.NewSelect().Table("agent_runs").Where("conversation_id = ?", groupID).Count(ctx)
+	if err != nil || runCount != 1 {
+		t.Fatalf("群内运行数量 = %d，期望 1，error = %v", runCount, err)
 	}
 }
 
 // testGroupAgentEligibility 验证重新添加、停用状态和企业隔离。
 func testGroupAgentEligibility(t *testing.T, db *bun.DB, identity *servermodels.Identity, groupID string, agent *agentaction.Agent) {
 	ctx := context.Background()
-	remove := conversationaction.NewRemoveGroupConversationMemberAction(db)
+	remove := conversationaction.NewRemoveGroupConversationMemberAction(db, newGroupAgentCoordinator(db))
 	add := conversationaction.NewAddGroupConversationMembersAction(db)
 	for _, active := range []bool{true, false} {
 		if _, err := remove.Execute(ctx, identity, conversationaction.GroupConversationMemberInput{ConversationID: groupID, MemberIdentityID: agent.IdentityID}); err != nil {

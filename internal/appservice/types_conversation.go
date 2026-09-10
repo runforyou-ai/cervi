@@ -154,12 +154,20 @@ type ConversationMessage struct {
 
 // ConversationMessageList 定义成员消息页。
 type ConversationMessageList struct {
-	LatestAgentRun *ConversationAgentRun `json:"latestAgentRun"`
-	HasEarlier     bool                  `json:"hasEarlier"`
-	HasLater       bool                  `json:"hasLater"`
-	Messages       []ConversationMessage `json:"messages"`
-	Before         *string               `json:"before"`
-	After          *string               `json:"after"`
+	LatestAgentRun *ConversationAgentRun      `json:"latestAgentRun"`
+	PendingAgents  []ConversationPendingAgent `json:"pendingAgents"`
+	HasEarlier     bool                       `json:"hasEarlier"`
+	HasLater       bool                       `json:"hasLater"`
+	Messages       []ConversationMessage      `json:"messages"`
+	Before         *string                    `json:"before"`
+	After          *string                    `json:"after"`
+}
+
+// ConversationPendingAgent 定义已收到输入、等待轮转执行的 AI 员工。
+type ConversationPendingAgent struct {
+	IdentityID  string `json:"identityId"`
+	DisplayName string `json:"displayName"`
+	AvatarURL   string `json:"avatarUrl"`
 }
 
 // MarkConversationReadInput 定义用户确认已读的消息水位。

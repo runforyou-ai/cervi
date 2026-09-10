@@ -84,11 +84,11 @@ func (a *ExecuteAction) Execute(ctx context.Context, input RunInput) error {
 	if execution.MaxOutputTokens > 0 && execution.MaxOutputTokens < int64(maxOutputTokens) {
 		maxOutputTokens = int(execution.MaxOutputTokens)
 	}
-	policy, err := a.policyForRun(&execution.Run)
+	policy, err := a.policyForRun(ctx, &execution.Run)
 	if err != nil {
 		return task.Permanent(err)
 	}
-	feed := &databaseInputFeed{db: a.db, execution: execution, policy: policy}
+	feed := &databaseInputFeed{db: a.db, enqueuer: a.enqueuer, execution: execution, policy: policy}
 	var customerHistorySearch agentruntime.CustomerHistorySearch
 	if domain.AgentExecutionScopeKind(execution.Run.ScopeKind) == domain.AgentExecutionScopeServiceSession {
 		// TODO：接入本企业、本 Conversation 内已关闭 ServiceSession 的全文历史查询。
@@ -153,7 +153,7 @@ func (a *ExecuteAction) begin(ctx context.Context, runID string) (executionConte
 	if agentRunStatusTerminal(initial.Status) {
 		return executionContext{}, true, nil
 	}
-	policy, err := a.policyForRun(initial)
+	policy, err := a.policyForRun(ctx, initial)
 	if err != nil {
 		return executionContext{}, false, task.Permanent(err)
 	}
@@ -226,13 +226,23 @@ func agentRunStatusTerminal(status string) bool {
 		status == string(domain.AgentRunStatusCancelled)
 }
 
-// policyForRun 根据执行范围类型选择运行策略。
-func (a *ExecuteAction) policyForRun(run *servermodels.AgentRun) (agentRunPolicy, error) {
+// policyForRun 根据执行范围类型和会话形态选择运行策略。
+func (a *ExecuteAction) policyForRun(ctx context.Context, run *servermodels.AgentRun) (agentRunPolicy, error) {
 	switch domain.AgentExecutionScopeKind(run.ScopeKind) {
-	case domain.AgentExecutionScopeConversation:
-		return agentChatRunPolicy{enqueuer: a.enqueuer}, nil
 	case domain.AgentExecutionScopeServiceSession:
 		return customerRunPolicy{enqueuer: a.enqueuer}, nil
+	case domain.AgentExecutionScopeConversation:
+		var conversationType string
+		if err := a.db.NewSelect().Model((*servermodels.Conversation)(nil)).
+			Column("type").
+			Where("cv.organization_id = ? AND cv.id = ?", run.OrganizationID, run.ConversationID).
+			Scan(ctx, &conversationType); err != nil {
+			return nil, fmt.Errorf("load agent run conversation type: %w", err)
+		}
+		if domain.ConversationType(conversationType) == domain.ConversationTypeGroup {
+			return groupMentionRunPolicy{}, nil
+		}
+		return agentChatRunPolicy{}, nil
 	default:
 		return nil, fmt.Errorf("unsupported agent execution scope %q", run.ScopeKind)
 	}
@@ -290,7 +300,7 @@ func (a *ExecuteAction) complete(ctx context.Context, execution executionContext
 		}
 		if !allowed {
 			suppressed = true
-			return nil
+			return scheduleNextRun(ctx, tx, a.enqueuer, policy, policyContext, run.OrganizationID, domain.AgentExecutionScopeKind(run.ScopeKind), run.ScopeID)
 		}
 		if run.Status != string(domain.AgentRunStatusRunning) || run.InputEndSeq == nil ||
 			*run.InputEndSeq != result.EndSeq || run.InputStartSeq != lane.ProcessedSeq+1 {
@@ -321,10 +331,8 @@ func (a *ExecuteAction) complete(ctx context.Context, execution executionContext
 			WherePK().Exec(ctx); err != nil {
 			return fmt.Errorf("advance processed agent input sequence: %w", err)
 		}
-		if lane.DesiredSeq > result.EndSeq {
-			if err := policy.enqueueNext(ctx, tx, policyContext, run, result.EndSeq+1); err != nil {
-				return err
-			}
+		if err := scheduleNextRun(ctx, tx, a.enqueuer, policy, policyContext, run.OrganizationID, domain.AgentExecutionScopeKind(run.ScopeKind), run.ScopeID); err != nil {
+			return err
 		}
 		completed = true
 		return nil
@@ -378,7 +386,7 @@ func (a *ExecuteAction) fail(ctx context.Context, runID string, runErr error) (b
 	if agentRunStatusTerminal(initial.Status) {
 		return true, nil
 	}
-	policy, err := a.policyForRun(initial)
+	policy, err := a.policyForRun(ctx, initial)
 	if err != nil {
 		return false, err
 	}
@@ -399,7 +407,7 @@ func (a *ExecuteAction) fail(ctx context.Context, runID string, runErr error) (b
 		}
 		if !allowed {
 			terminal = true
-			return nil
+			return scheduleNextRun(ctx, tx, a.enqueuer, policy, policyContext, run.OrganizationID, domain.AgentExecutionScopeKind(run.ScopeKind), run.ScopeID)
 		}
 		if run.Status != string(domain.AgentRunStatusQueued) && run.Status != string(domain.AgentRunStatusRunning) {
 			return fmt.Errorf("cannot fail agent run in status %q", run.Status)
@@ -440,12 +448,7 @@ func (a *ExecuteAction) fail(ctx context.Context, runID string, runErr error) (b
 			WherePK().Exec(ctx); err != nil {
 			return err
 		}
-		if lane.DesiredSeq > failureEnd {
-			if err := policy.enqueueNext(ctx, tx, policyContext, run, failureEnd+1); err != nil {
-				return err
-			}
-		}
-		return nil
+		return scheduleNextRun(ctx, tx, a.enqueuer, policy, policyContext, run.OrganizationID, domain.AgentExecutionScopeKind(run.ScopeKind), run.ScopeID)
 	})
 	return terminal, err
 }

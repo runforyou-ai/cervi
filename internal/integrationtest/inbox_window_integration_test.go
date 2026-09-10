@@ -104,7 +104,7 @@ func TestInboxContextDeepWindow(t *testing.T) {
 
 	anchor := all.Conversations[199]
 	request := appservice.InboxContextInput{Query: filter, AnchorID: anchor.ID, AnchorCursor: anchor.PositionCursor, BeforeLimit: 3, AfterLimit: 4}
-	if _, err := conversationaction.NewSendGroupTextMessageAction(f.db).Execute(ctx, f.owner, conversationaction.GroupTextMessageInput{ConversationID: anchor.ID, ClientMessageID: uuid.NewV7().String(), Body: "锚点上浮"}); err != nil {
+	if _, err := newGroupSendAction(f.db).Execute(ctx, f.owner, conversationaction.GroupTextMessageInput{ConversationID: anchor.ID, ClientMessageID: uuid.NewV7().String(), Body: "锚点上浮"}); err != nil {
 		t.Fatal(err)
 	}
 	moved, err := backend.GetInboxContext(ctx, meta, request)
@@ -118,7 +118,7 @@ func TestInboxContextDeepWindow(t *testing.T) {
 		t.Fatalf("current anchor=%+v err=%v", current, err)
 	}
 
-	if _, err := conversationaction.NewRemoveGroupConversationMemberAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationMemberInput{ConversationID: anchor.ID, MemberIdentityID: f.member.OrganizationIdentity.ID}); err != nil {
+	if _, err := conversationaction.NewRemoveGroupConversationMemberAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, conversationaction.GroupConversationMemberInput{ConversationID: anchor.ID, MemberIdentityID: f.member.OrganizationIdentity.ID}); err != nil {
 		t.Fatal(err)
 	}
 	removed, err := backend.GetInboxContext(ctx, meta, request)
@@ -245,7 +245,7 @@ func TestInboxContextUnavailable(t *testing.T) {
 			t.Fatalf("accepted foreign cursor: %v", err)
 		}
 	}
-	if _, err := conversationaction.NewRemoveGroupConversationMemberAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationMemberInput{ConversationID: f.groupID, MemberIdentityID: f.member.OrganizationIdentity.ID}); err != nil {
+	if _, err := conversationaction.NewRemoveGroupConversationMemberAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, conversationaction.GroupConversationMemberInput{ConversationID: f.groupID, MemberIdentityID: f.member.OrganizationIdentity.ID}); err != nil {
 		t.Fatal(err)
 	}
 	request := appservice.InboxContextInput{Query: filter, AnchorID: f.groupID, AnchorCursor: oldCursor}
@@ -279,7 +279,7 @@ func TestInboxContextSnapshot(t *testing.T) {
 		done <- err
 	}()
 	waitChatSignal(t, ctx, gate.reached)
-	if _, err := conversationaction.NewRemoveGroupConversationMemberAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationMemberInput{ConversationID: f.groupID, MemberIdentityID: f.member.OrganizationIdentity.ID}); err != nil {
+	if _, err := conversationaction.NewRemoveGroupConversationMemberAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, conversationaction.GroupConversationMemberInput{ConversationID: f.groupID, MemberIdentityID: f.member.OrganizationIdentity.ID}); err != nil {
 		t.Fatal(err)
 	}
 	gate.open()
@@ -367,7 +367,7 @@ func TestInboxWindowSnapshot(t *testing.T) {
 		done <- err
 	}()
 	waitChatSignal(t, ctx, gate.reached)
-	if _, err := conversationaction.NewRemoveGroupConversationMemberAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationMemberInput{ConversationID: f.groupID, MemberIdentityID: f.member.OrganizationIdentity.ID}); err != nil {
+	if _, err := conversationaction.NewRemoveGroupConversationMemberAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, conversationaction.GroupConversationMemberInput{ConversationID: f.groupID, MemberIdentityID: f.member.OrganizationIdentity.ID}); err != nil {
 		t.Fatal(err)
 	}
 	gate.open()

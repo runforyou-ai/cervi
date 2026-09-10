@@ -40,7 +40,8 @@ type GetGroupConversationQuery struct {
 
 // SendGroupTextMessageAction 持久化企业内部群聊文本消息。
 type SendGroupTextMessageAction struct {
-	db *bun.DB
+	db             *bun.DB
+	agentScheduler GroupAgentMessageScheduler
 }
 
 type groupMemberRow struct {
@@ -69,8 +70,8 @@ func NewGetGroupConversationQuery(db *bun.DB) *GetGroupConversationQuery {
 }
 
 // NewSendGroupTextMessageAction 创建群聊文本发送操作。
-func NewSendGroupTextMessageAction(db *bun.DB) *SendGroupTextMessageAction {
-	return &SendGroupTextMessageAction{db: db}
+func NewSendGroupTextMessageAction(db *bun.DB, agentScheduler GroupAgentMessageScheduler) *SendGroupTextMessageAction {
+	return &SendGroupTextMessageAction{db: db, agentScheduler: agentScheduler}
 }
 
 // Execute 创建包含有效企业成员的企业内部群聊。
@@ -270,6 +271,9 @@ func (a *SendGroupTextMessageAction) Execute(ctx context.Context, identity *serv
 		if err := createMessageMentions(ctx, tx, identity.Organization.ID, message.ID, mentions); err != nil {
 			return err
 		}
+		if err := a.scheduleGroupAgents(ctx, tx, identity.Organization.ID, normalized.ConversationID, message.ID, sendContext.SubjectID, reply, mentions); err != nil {
+			return err
+		}
 		if err := advanceConversationUserReadState(ctx, tx, &servermodels.ConversationUserState{
 			OrganizationID: identity.Organization.ID, ConversationID: normalized.ConversationID,
 			UserID: identity.User.ID, LastReadMessageID: &message.ID,
@@ -388,4 +392,38 @@ func loadActiveGroupMembers(ctx context.Context, db bun.IDB, organizationID stri
 		return nil, ErrGroupMemberNotFound
 	}
 	return rows, nil
+}
+
+// scheduleGroupAgents 按引用目标优先、提醒顺序在后的次序为群内 AI 员工追加输入。
+func (a *SendGroupTextMessageAction) scheduleGroupAgents(ctx context.Context, db bun.IDB, organizationID, conversationID, messageID, senderSubjectID string, reply *ConversationMessageReference, mentions []ConversationMessageMention) error {
+	agentIdentityIDs := make([]string, 0, len(mentions)+1)
+	seen := make(map[string]struct{}, len(mentions)+1)
+	// 回复 AI 员工的文本消息与显式点名等价，作为首个执行目标。
+	if reply != nil && reply.Sender != nil && reply.Sender.IdentityType != nil &&
+		*reply.Sender.IdentityType == domain.OrganizationIdentityTypeAgent {
+		agentIdentityIDs = append(agentIdentityIDs, reply.Sender.SourceID)
+		seen[reply.Sender.SourceID] = struct{}{}
+	}
+	for _, mention := range mentions {
+		if mention.IdentityType != domain.OrganizationIdentityTypeAgent {
+			continue
+		}
+		if _, duplicate := seen[mention.SourceID]; duplicate {
+			continue
+		}
+		seen[mention.SourceID] = struct{}{}
+		agentIdentityIDs = append(agentIdentityIDs, mention.SourceID)
+	}
+	if len(agentIdentityIDs) == 0 {
+		return nil
+	}
+	if err := a.agentScheduler.ScheduleGroupMentions(ctx, db, organizationID, conversationID, messageID, senderSubjectID, agentIdentityIDs); err != nil {
+		return fmt.Errorf("schedule group agent mentions: %w", err)
+	}
+	return nil
+}
+
+// GroupAgentMessageScheduler 把群内点名的 AI 员工消息加入持久化输入流。
+type GroupAgentMessageScheduler interface {
+	ScheduleGroupMentions(context.Context, bun.IDB, string, string, string, string, []string) error
 }

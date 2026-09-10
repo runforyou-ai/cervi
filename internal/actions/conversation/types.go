@@ -187,6 +187,7 @@ type ConversationMessageMention struct {
 	Kind          domain.ChatSubjectKind
 	SourceID      string
 	DisplayName   *string
+	IdentityType  domain.OrganizationIdentityType
 }
 
 // ConversationMessageSessionStart 定义客服处理周期开始标记。
@@ -243,11 +244,19 @@ type ConversationMessageHistoryInput struct {
 // ConversationMessageHistory 定义成员消息历史和下一页边界。
 type ConversationMessageHistory struct {
 	LatestAgentRun *ConversationAgentRun
+	PendingAgents  []ConversationPendingAgent
 	HasEarlier     bool
 	HasLater       bool
 	Messages       []ConversationMessage
 	Before         *MessageCursorPoint
 	After          *MessageCursorPoint
+}
+
+// ConversationPendingAgent 定义已收到输入、等待轮转执行的 AI 员工。
+type ConversationPendingAgent struct {
+	IdentityID   string
+	DisplayName  string
+	AvatarFileID *string
 }
 
 // ConversationAgentProcess 定义成功回复的完整过程和模型用量。

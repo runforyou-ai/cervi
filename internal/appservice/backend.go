@@ -185,6 +185,9 @@ type Backend interface {
 	// SendGroupTextMessage 发送企业内部群聊文本消息。
 	//cervi:route POST /group-conversations/:conversationID/messages
 	SendGroupTextMessage(context.Context, RequestMeta, string, GroupTextMessageInput) (ConversationMessage, error)
+	// StopGroupAgentReply 停止群聊中指定的 AI 员工回复并返回实际运行状态。
+	//cervi:route POST /group-conversations/:conversationID/runs/:runID/stop
+	StopGroupAgentReply(context.Context, RequestMeta, string, string) (AgentRunStatus, error)
 	// ListMessageChannels 返回消息渠道列表。
 	//cervi:route GET /channels
 	ListMessageChannels(context.Context, RequestMeta) (MessageChannelList, error)
