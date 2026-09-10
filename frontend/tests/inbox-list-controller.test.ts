@@ -18,7 +18,7 @@ function windowPage(start: number, end: number) {
 }
 
 /** 创建可替换响应的真实控制器与读取适配器。 */
-function fixture() {
+function fixture(locateId: string | null = null) {
   const trace: string[] = []
   const records = new Map(Array.from({ length: 220 }, (_, i) => [String(i + 1), row(i + 1)]))
   let top = true
@@ -42,7 +42,7 @@ function fixture() {
     unavailable: (ids) => { unavailable.push(...ids) },
     unread: () => {},
   }
-  const controller = new InboxListController(ports, { scope: "all", customerView: "queue", assigneeIdentityId: "" } as InboxQuery)
+  const controller = new InboxListController(ports, { scope: "all", customerView: "queue", assigneeIdentityId: "" } as InboxQuery, undefined, false, locateId)
   return { controller, ports, trace, records, unavailable, top: (value: boolean) => { top = value }, interact: (value: boolean) => { interacting = value }, restored: () => restored }
 }
 
@@ -145,6 +145,53 @@ test("空区间恢复原邻域，失权立即移除并清理详情", async () =>
   assert.deepEqual(f.unavailable, ["80"])
   assert.equal(f.controller.getSnapshot().ids[0], "81")
   assert.equal(f.controller.getSnapshot().hasBefore, true)
+})
+
+test("切换查询后残留的锚点不参与空区间恢复", async () => {
+  const f = fixture()
+  // 新查询首屏为空，视口仍持有上一个查询滚动到的第 80 条锚点。
+  f.ports.page = async () => ({ ...windowPage(1, 0), startCursor: "", endCursor: "", hasBefore: false, hasAfter: false, hasMore: false, nextCursor: "", unreadCount: 0, attentionUnreadCount: 0 })
+  await f.controller.request("initial")
+  await f.controller.request("refresh")
+  assert.equal(f.trace.includes("context"), false)
+  assert.equal(f.controller.getSnapshot().ids.length, 0)
+  assert.equal(f.controller.getSnapshot().error, null)
+})
+
+test("带选中会话进入列表时读取该会话邻域并定位到它", async () => {
+  const f = fixture("100")
+  await f.controller.request("initial")
+  assert.ok(f.trace.includes("context"))
+  assert.equal(f.trace.includes("page::"), false)
+  assert.equal(f.controller.getSnapshot().ids[0], "81")
+  assert.equal(f.restored()![0]!.id, "100")
+  assert.deepEqual(f.restored()![0]!.neighbors, [{ id: "100", offset: 0 }])
+  assert.equal(f.restored()![1].has("100"), false)
+  assert.equal(f.restored()![2], false)
+})
+
+test("选中会话不属于当前筛选时读取首页并回到顶部", async () => {
+  const f = fixture("100")
+  f.ports.context = async () => { f.trace.push("context"); return { conversations: [], startCursor: "", endCursor: "", hasBefore: false, hasAfter: false } }
+  await f.controller.request("initial")
+  assert.ok(f.trace.includes("context"))
+  assert.ok(f.trace.includes("page::"))
+  assert.equal(f.controller.getSnapshot().ids[0], "1")
+  assert.equal(f.restored()![0], null)
+  assert.equal(f.restored()![2], true)
+})
+
+test("带原位置的书签锚点读到空邻域时保留空窗口，不回落首页", async () => {
+  const anchor = { id: "80", cursor: "p80", width: 390, height: 844, neighbors: [{ id: "80", offset: -10 }] }
+  const f = fixture()
+  const bookmark = { state: { ...f.controller.getSnapshot() }, anchor }
+  const controller = new InboxListController(f.ports, { scope: "all", customerView: "queue", assigneeIdentityId: "" } as InboxQuery, bookmark)
+  f.ports.context = async () => { f.trace.push("context"); return { conversations: [], startCursor: "", endCursor: "", hasBefore: true, hasAfter: true } }
+  await controller.request("initial")
+  assert.ok(f.trace.includes("context"))
+  assert.equal(f.trace.includes("page::"), false)
+  assert.equal(controller.getSnapshot().ids.length, 0)
+  assert.equal(controller.getSnapshot().hasBefore, true)
 })
 
 test("读取期间用户离开顶部或操作菜单时不自动回顶重排", async () => {

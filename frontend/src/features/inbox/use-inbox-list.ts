@@ -17,6 +17,7 @@ type InboxListOptions = {
   unread?: (count: number) => void
   unavailable?: (id: string) => void
   history?: Map<string, InboxListBookmark>
+  selectedConversationId?: string
 }
 
 /** 每个查询持有独立浏览状态，业务摘要仅从当前批量 Query 读取。 */
@@ -35,6 +36,8 @@ export function useInboxList(input: InboxQuery, viewport: InboxListViewport, opt
   const controller = useMemo(() => {
     const bookmark = history?.get(historyKey)
     const cached = bookmark && client.getQueryData(resourceKeys.inboxConversations({ ...owner, query, conversationIds: bookmark.state.rowIds })) !== undefined
+    // 选中会话只在控制器创建时读取，作为进入列表时的定位目标。
+    const locateId = callbacks.current.options.selectedConversationId || null
     return new InboxListController({
     page: (cursor = "", beforeCursor = "") => read(
       resourceKeys.inbox({ ...owner, ...query, ...(cursor || beforeCursor ? { cursor, beforeCursor } : {}) }),
@@ -66,7 +69,7 @@ export function useInboxList(input: InboxQuery, viewport: InboxListViewport, opt
     unread: (count) => {
       callbacks.current.options.unread?.(count)
     },
-  }, query, bookmark, cached)
+  }, query, bookmark, cached, locateId)
   }, [client, owner, query, read, history, historyKey])
   const state = useSyncExternalStore(controller.subscribe, controller.getSnapshot)
   const rows = useResource(
