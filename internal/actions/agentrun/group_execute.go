@@ -22,7 +22,7 @@ import (
 
 const groupInstructionSuffix = `你是企业 AI 员工「%s」，当前在群聊「%s」中与其他成员一起工作。
 群内其他成员的发言以 JSON 提供：sender.name 是发送者名称，sender.kind 为 user 表示真人、为 agent 表示另一位 AI 员工，mentions 是这条消息点名的成员，replyTo 是被引用的原消息；你自己的历史发言是纯文本。
-成员点名你或回复你的消息时才轮到你发言。`
+addressedToYou 为 true 的消息是本次需要你处理的请求，其余消息是群内上下文。`
 
 type groupMentionRunPolicy struct{}
 
@@ -160,11 +160,12 @@ type groupMessageSender struct {
 }
 
 type groupMessageEnvelope struct {
-	Sender     groupMessageSender       `json:"sender"`
-	Body       string                   `json:"body"`
-	Mentions   []groupMessageSender     `json:"mentions,omitempty"`
-	MentionAll bool                     `json:"mentionAll,omitempty"`
-	ReplyTo    *claimedMessageReference `json:"replyTo,omitempty"`
+	Sender         groupMessageSender       `json:"sender"`
+	Body           string                   `json:"body"`
+	AddressedToYou bool                     `json:"addressedToYou,omitempty"`
+	Mentions       []groupMessageSender     `json:"mentions,omitempty"`
+	MentionAll     bool                     `json:"mentionAll,omitempty"`
+	ReplyTo        *claimedMessageReference `json:"replyTo,omitempty"`
 }
 
 // loadClaimedGroupMessages 读取带发送者标识的群聊上下文，自己的发言投影为助手消息。
@@ -210,6 +211,10 @@ func loadClaimedGroupMessages(ctx context.Context, db bun.IDB, run *servermodels
 	if err != nil {
 		return nil, err
 	}
+	addressed, err := loadClaimedInputMessages(ctx, db, run, endSeq)
+	if err != nil {
+		return nil, err
+	}
 	messages := make([]agentruntime.Message, 0, len(rows))
 	for _, row := range rows {
 		// 自己的历史发言保持纯文本，其余成员的发言携带发送者标识与一层引用。
@@ -218,10 +223,11 @@ func loadClaimedGroupMessages(ctx context.Context, db bun.IDB, run *servermodels
 			continue
 		}
 		envelope := groupMessageEnvelope{
-			Sender:     groupMessageSender{Name: row.SenderName, Kind: string(domain.OrganizationIdentityTypeUser)},
-			Body:       row.Body,
-			Mentions:   mentions[row.ID],
-			MentionAll: row.MentionAll,
+			Sender:         groupMessageSender{Name: row.SenderName, Kind: string(domain.OrganizationIdentityTypeUser)},
+			Body:           row.Body,
+			Mentions:       mentions[row.ID],
+			MentionAll:     row.MentionAll,
+			AddressedToYou: addressed[row.ID],
 		}
 		if row.SenderIsAgent {
 			envelope.Sender.Kind = string(domain.OrganizationIdentityTypeAgent)
@@ -269,4 +275,21 @@ func loadGroupMessageMentions(ctx context.Context, db bun.IDB, organizationID st
 		mentions[row.MessageID] = append(mentions[row.MessageID], groupMessageSender{Name: row.DisplayName, Kind: row.IdentityType})
 	}
 	return mentions, nil
+}
+
+// loadClaimedInputMessages 标记本次运行认领的输入各自来自哪条消息。
+func loadClaimedInputMessages(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, endSeq int64) (map[string]bool, error) {
+	sourceIDs := make([]string, 0)
+	if err := db.NewSelect().Model((*servermodels.AgentInput)(nil)).
+		ColumnExpr("ai.source_message_id").
+		Where("ai.lane_id = ?", run.LaneID).
+		Where("ai.input_seq BETWEEN ? AND ?", run.InputStartSeq, endSeq).
+		Scan(ctx, &sourceIDs); err != nil {
+		return nil, fmt.Errorf("load claimed input messages: %w", err)
+	}
+	addressed := make(map[string]bool, len(sourceIDs))
+	for _, sourceID := range sourceIDs {
+		addressed[sourceID] = true
+	}
+	return addressed, nil
 }

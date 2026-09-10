@@ -258,7 +258,7 @@ func testGroupAgentMentionReplies(t *testing.T, db *bun.DB, identity *servermode
 		if err := agentrunaction.NewExecuteAction(db, f.tasks, runtime).Execute(ctx, agentrunaction.RunInput{RunID: run.ID}); err != nil {
 			t.Fatal(err)
 		}
-		for _, fragment := range []string{f.agents[0].DisplayName, "AI 协作群", "sender.name", "协助群内成员"} {
+		for _, fragment := range []string{f.agents[0].DisplayName, "AI 协作群", "sender.name", "addressedToYou", "协助群内成员"} {
 			if !strings.Contains(captured, fragment) {
 				t.Fatalf("系统提示词缺少 %q：%q", fragment, captured)
 			}
@@ -294,15 +294,24 @@ func testGroupAgentMentionReplies(t *testing.T, db *bun.DB, identity *servermode
 			}
 		})
 		second := f.runNext(t, "第二位的意见", func(claimed agentruntime.ClaimedInput) {
-			// 串行执行下，后发言者读到前一位已提交的回复。
-			seen := false
+			// 串行执行下，后发言者读到前一位已提交的回复，且能区分本次要处理的请求。
+			seen, addressed := false, 0
 			for _, message := range claimed.Messages {
 				if strings.Contains(message.Content, "第一位的意见") {
 					seen = true
+					if strings.Contains(message.Content, "addressedToYou") {
+						t.Fatalf("其他 AI 员工的发言不应标记为本次请求：%q", message.Content)
+					}
+				}
+				if strings.Contains(message.Content, `"addressedToYou":true`) {
+					addressed++
 				}
 			}
 			if !seen {
 				t.Fatalf("后发言者上下文缺少前一位的回复：%+v", claimed.Messages)
+			}
+			if addressed != 1 {
+				t.Fatalf("本次需要处理的消息数量 = %d，期望 1", addressed)
 			}
 		})
 		if first == second {
