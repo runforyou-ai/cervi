@@ -27,10 +27,7 @@ import {
   ListToolbarSearch,
 } from "@/components/list-toolbar"
 import { PageHeader } from "@/components/page-header"
-import {
-  ResourceTable,
-  ResourceTableActions,
-} from "@/components/resource-table"
+import { ResourceTable } from "@/components/resource-table"
 import { SelectableText } from "@/components/selectable-text"
 import { Button } from "@/components/ui/button"
 import {
@@ -44,7 +41,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
-import { TableCell } from "@/components/ui/table"
 import { ContactCreateDialogs } from "@/features/contacts/contact-create-dialogs"
 import { ContactDetailSheet } from "@/features/contacts/contact-detail-sheet"
 import { ContactListLayout } from "@/features/contacts/contact-list-layout"
@@ -343,80 +339,83 @@ export function ExternalContactsPanel({
         >
           <ResourceTable
             columns={[
-              { key: "name", header: t("columns.name") },
-              { key: "stage", header: t("columns.stage") },
-              { key: "email", header: t("columns.email") },
-              { key: "phone", header: t("columns.phone") },
-              { key: "channels", header: t("columns.channels") },
+              {
+                key: "name",
+                header: t("columns.name"),
+                cellClassName: "font-medium",
+                cell: (contact) => contact.displayName || t("anonymous"),
+              },
+              {
+                key: "stage",
+                header: t("columns.stage"),
+                cell: (contact) => <StageLabel stage={contact.stage} />,
+              },
+              {
+                key: "email",
+                header: t("columns.email"),
+                cellClassName: "text-muted-foreground",
+                cell: (contact) => contact.primaryEmail || "—",
+              },
+              {
+                key: "phone",
+                header: t("columns.phone"),
+                cellClassName: "text-muted-foreground",
+                cell: (contact) => contact.primaryPhone || "—",
+              },
+              {
+                key: "channels",
+                header: t("columns.channels"),
+                cell: (contact) => contact.sourceChannelName,
+              },
               {
                 key: "time",
                 header: deleted ? t("columns.deletedAt") : t("columns.addedAt"),
-              },
-              {
-                key: "actions",
-                header: t("common:table.actions"),
-                className: "w-px",
+                cellClassName: "whitespace-nowrap text-muted-foreground",
+                cell: (contact) =>
+                  formatDateTime(
+                    deleted && contact.deletedAt
+                      ? contact.deletedAt
+                      : contact.createdAt,
+                  ),
               },
             ]}
             rows={contacts}
             rowKey={(contact) => contact.id}
             empty={deleted ? t("trash.empty") : t("list.empty")}
-          >
-            {(contact) => (
-              <>
-                <TableCell className="font-medium">
-                  {contact.displayName || t("anonymous")}
-                </TableCell>
-                <TableCell>
-                  <StageLabel stage={contact.stage} />
-                </TableCell>
-                <TableCell className="text-muted-foreground">
-                  {contact.primaryEmail || "—"}
-                </TableCell>
-                <TableCell className="text-muted-foreground">
-                  {contact.primaryPhone || "—"}
-                </TableCell>
-                <TableCell>{contact.sourceChannelName}</TableCell>
-                <TableCell className="whitespace-nowrap text-muted-foreground">
-                  {formatDateTime(
-                    deleted && contact.deletedAt
-                      ? contact.deletedAt
-                      : contact.createdAt,
-                  )}
-                </TableCell>
-                {deleted ? (
-                  <ResourceTableActions>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setRestoringContact(contact)}
-                    >
-                      {t("trash.restore")}
-                    </Button>
-                  </ResourceTableActions>
-                ) : (
-                  <ResourceTableActions
-                    menu={
+            actions={(contact) =>
+              deleted
+                ? {
+                    primary: (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setRestoringContact(contact)}
+                      >
+                        {t("trash.restore")}
+                      </Button>
+                    ),
+                  }
+                : {
+                    primary: (
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => setParameters({ selected: contact.id })}
+                      >
+                        {t("common:actions.view")}
+                      </Button>
+                    ),
+                    menu: (
                       <DropdownMenuItem
                         destructive
                         onSelect={() => setDeletingContact(contact)}
                       >
                         {t("common:actions.delete")}
                       </DropdownMenuItem>
-                    }
-                  >
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={() => setParameters({ selected: contact.id })}
-                    >
-                      {t("common:actions.view")}
-                    </Button>
-                  </ResourceTableActions>
-                )}
-              </>
-            )}
-          </ResourceTable>
+                    ),
+                  }
+            }
+          />
         </ContactListLayout>
       </section>
 

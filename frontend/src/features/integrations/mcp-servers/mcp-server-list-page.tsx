@@ -12,17 +12,12 @@ import {
   type MCPServerData,
 } from "@/api"
 import { ResourceContent } from "@/components/resource-content"
-import {
-  ResourceTable,
-  ResourceTableActions,
-} from "@/components/resource-table"
+import { ResourceTable } from "@/components/resource-table"
 import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
-import { SelectableText } from "@/components/selectable-text"
 import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
 import { Button } from "@/components/ui/button"
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
-import { TableCell } from "@/components/ui/table"
 import { MCPServerToolsCell } from "@/features/integrations/mcp-servers/mcp-server-tools-cell"
 import { MCPServerTestButton } from "@/features/integrations/mcp-servers/mcp-server-test-button"
 import { resourceKeys } from "@/hooks/resource-keys"
@@ -108,61 +103,54 @@ export function MCPServerListPage() {
           <div className="overflow-hidden rounded-lg border bg-card">
             <ResourceTable
               columns={[
-                { key: "name", header: t("mcpServer.list.columns.name") },
+                {
+                  key: "name",
+                  header: t("mcpServer.list.columns.name"),
+                  cellClassName: "font-medium",
+                  cell: (mcpServer) => mcpServer.name,
+                },
                 {
                   key: "serverType",
                   header: t("mcpServer.list.columns.serverType"),
+                  cell: (mcpServer) => mcpServer.serverType,
                 },
-                { key: "url", header: t("mcpServer.list.columns.url") },
+                {
+                  key: "url",
+                  header: t("mcpServer.list.columns.url"),
+                  cellClassName: "max-w-xl text-muted-foreground",
+                  cell: (mcpServer) => mcpServer.url,
+                },
                 {
                   key: "tools",
                   header: t("mcpServer.list.columns.tools"),
-                  className: "w-20",
-                },
-                {
-                  key: "actions",
-                  header: t("common:table.actions"),
-                  className: "w-px",
+                  headerClassName: "w-20",
+                  cell: (mcpServer) => <MCPServerToolsCell server={mcpServer} />,
                 },
               ]}
               rows={mcpServers}
               rowKey={(mcpServer) => mcpServer.id}
               empty={t("mcpServer.list.empty")}
-            >
-              {(mcpServer) => (
-                <>
-                  <TableCell className="font-medium">
-                    <SelectableText>{mcpServer.name}</SelectableText>
-                  </TableCell>
-                  <TableCell>
-                    <SelectableText>{mcpServer.serverType}</SelectableText>
-                  </TableCell>
-                  <TableCell className="max-w-xl text-muted-foreground">
-                    <SelectableText>{mcpServer.url}</SelectableText>
-                  </TableCell>
-                  <TableCell>
-                    <MCPServerToolsCell server={mcpServer} />
-                  </TableCell>
-                  <ResourceTableActions
-                    menu={
-                      <DropdownMenuItem
-                        destructive
-                        onSelect={() => deletion.select(mcpServer)}
-                      >
-                        {t("common:actions.delete")}
-                      </DropdownMenuItem>
-                    }
-                  >
+              actions={(mcpServer) => ({
+                primary: (
+                  <>
                     <MCPServerTestButton serverId={mcpServer.id} />
                     <Button variant="outline" size="sm" asChild>
                       <Link to={`/integrations/mcp-servers/${mcpServer.id}`}>
                         {t("common:actions.edit")}
                       </Link>
                     </Button>
-                  </ResourceTableActions>
-                </>
-              )}
-            </ResourceTable>
+                  </>
+                ),
+                menu: (
+                  <DropdownMenuItem
+                    destructive
+                    onSelect={() => deletion.select(mcpServer)}
+                  >
+                    {t("common:actions.delete")}
+                  </DropdownMenuItem>
+                ),
+              })}
+            />
           </div>
         </ResourceContent>
       </PageContent>

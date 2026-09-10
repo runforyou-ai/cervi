@@ -4,18 +4,13 @@ import { Link } from "react-router"
 
 import { deleteBusinessSystem, listBusinessSystems, type BusinessSystem } from "@/api"
 import { ResourceContent } from "@/components/resource-content"
-import {
-  ResourceTable,
-  ResourceTableActions,
-} from "@/components/resource-table"
+import { ResourceTable } from "@/components/resource-table"
 import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
-import { SelectableText } from "@/components/selectable-text"
 import { StatusBadge } from "@/components/status-badge"
 import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
 import { Button } from "@/components/ui/button"
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
-import { TableCell } from "@/components/ui/table"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 import { useIntegrationDeletion } from "@/features/integrations/use-integration-deletion"
@@ -61,31 +56,22 @@ export function BusinessSystemListPage() {
           <div className="overflow-hidden rounded-lg border bg-card">
             <ResourceTable
               columns={[
-                { key: "name", header: t("businessSystem.list.columns.name") },
-                { key: "url", header: t("businessSystem.list.columns.url") },
+                {
+                  key: "name",
+                  header: t("businessSystem.list.columns.name"),
+                  cellClassName: "font-medium",
+                  cell: (businessSystem) => businessSystem.name,
+                },
+                {
+                  key: "url",
+                  header: t("businessSystem.list.columns.url"),
+                  cellClassName: "max-w-xl text-muted-foreground",
+                  cell: (businessSystem) => businessSystem.url,
+                },
                 {
                   key: "status",
                   header: t("businessSystem.list.columns.status"),
-                },
-                {
-                  key: "actions",
-                  header: t("common:table.actions"),
-                  className: "w-px",
-                },
-              ]}
-              rows={businessSystems}
-              rowKey={(businessSystem) => businessSystem.id}
-              empty={t("businessSystem.list.empty")}
-            >
-              {(businessSystem) => (
-                <>
-                  <TableCell className="font-medium">
-                    <SelectableText>{businessSystem.name}</SelectableText>
-                  </TableCell>
-                  <TableCell className="max-w-xl text-muted-foreground">
-                    <SelectableText>{businessSystem.url}</SelectableText>
-                  </TableCell>
-                  <TableCell>
+                  cell: (businessSystem) => (
                     <StatusBadge
                       variant={businessSystem.enabled ? "success" : "muted"}
                       showDot={false}
@@ -94,28 +80,32 @@ export function BusinessSystemListPage() {
                         ? t("businessSystem.status.enabled")
                         : t("businessSystem.status.disabled")}
                     </StatusBadge>
-                  </TableCell>
-                  <ResourceTableActions
-                    menu={
-                      <DropdownMenuItem
-                        destructive
-                        onSelect={() => deletion.select(businessSystem)}
-                      >
-                        {t("common:actions.delete")}
-                      </DropdownMenuItem>
-                    }
+                  ),
+                },
+              ]}
+              rows={businessSystems}
+              rowKey={(businessSystem) => businessSystem.id}
+              empty={t("businessSystem.list.empty")}
+              actions={(businessSystem) => ({
+                primary: (
+                  <Button variant="outline" size="sm" asChild>
+                    <Link
+                      to={`/integrations/business-systems/${businessSystem.id}`}
+                    >
+                      {t("common:actions.edit")}
+                    </Link>
+                  </Button>
+                ),
+                menu: (
+                  <DropdownMenuItem
+                    destructive
+                    onSelect={() => deletion.select(businessSystem)}
                   >
-                    <Button variant="outline" size="sm" asChild>
-                      <Link
-                        to={`/integrations/business-systems/${businessSystem.id}`}
-                      >
-                        {t("common:actions.edit")}
-                      </Link>
-                    </Button>
-                  </ResourceTableActions>
-                </>
-              )}
-            </ResourceTable>
+                    {t("common:actions.delete")}
+                  </DropdownMenuItem>
+                ),
+              })}
+            />
           </div>
         </ResourceContent>
       </PageContent>

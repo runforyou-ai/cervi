@@ -21,10 +21,7 @@ import {
   ListToolbarSearch,
 } from "@/components/list-toolbar"
 import { PageHeader } from "@/components/page-header"
-import {
-  ResourceTable,
-  ResourceTableActions,
-} from "@/components/resource-table"
+import { ResourceTable } from "@/components/resource-table"
 import { Button } from "@/components/ui/button"
 import {
   AlertDialog,
@@ -37,7 +34,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
-import { TableCell } from "@/components/ui/table"
 import { WorkStatusBadge } from "@/components/work-status"
 import { ContactCreateDialogs } from "@/features/contacts/contact-create-dialogs"
 import { ContactListLayout } from "@/features/contacts/contact-list-layout"
@@ -190,73 +186,67 @@ export function AgentsPanel({
         >
           <ResourceTable
             columns={[
-              { key: "name", header: t("columns.name") },
-              { key: "role", header: t("columns.role") },
-              { key: "joinedTeams", header: t("columns.joinedTeams") },
-              { key: "model", header: t("columns.model") },
-              { key: "accountStatus", header: t("columns.accountStatus") },
-              { key: "workStatus", header: t("columns.workStatus") },
-              { key: "createdAt", header: t("columns.createdAt") },
               {
-                key: "actions",
-                header: tCommon("table.actions"),
-                className: "w-px",
+                key: "name",
+                header: t("columns.name"),
+                cellClassName: "font-medium",
+                cell: (agent) => agent.displayName,
+              },
+              {
+                key: "role",
+                header: t("columns.role"),
+                cell: (agent) => roleDisplayName(agent.role, tCommon),
+              },
+              {
+                key: "joinedTeams",
+                header: t("columns.joinedTeams"),
+                cellClassName: "max-w-xs",
+                cell: (agent) => <JoinedTeamsCell teams={agent.teams} />,
+              },
+              {
+                key: "model",
+                header: t("columns.model"),
+                cellClassName: "max-w-xs",
+                cell: (agent) => (
+                  <span className="block truncate">
+                    {agent.execution.managed.providerName} ·{" "}
+                    {agent.execution.managed.modelName}
+                  </span>
+                ),
+              },
+              {
+                key: "accountStatus",
+                header: t("columns.accountStatus"),
+                cell: (agent) => (
+                  <UserStatusBadge
+                    status={agent.status}
+                    label={userStatusLabel(agent.status, t)}
+                  />
+                ),
+              },
+              {
+                key: "workStatus",
+                header: t("columns.workStatus"),
+                cell: (agent) => <WorkStatusBadge status={agent.workStatus} />,
+              },
+              {
+                key: "createdAt",
+                header: t("columns.createdAt"),
+                cellClassName: "whitespace-nowrap text-muted-foreground",
+                cell: (agent) => formatDateTime(agent.createdAt),
               },
             ]}
             rows={agents}
             rowKey={(agent) => agent.id}
             empty={t("list.empty")}
-          >
-            {(agent) => (
-              <>
-                <TableCell className="font-medium">
-                  {agent.displayName}
-                </TableCell>
-                <TableCell>{roleDisplayName(agent.role, tCommon)}</TableCell>
-                <TableCell className="max-w-xs">
-                  <JoinedTeamsCell teams={agent.teams} />
-                </TableCell>
-                <TableCell className="max-w-xs">
-                  <span className="block truncate">
-                    {agent.execution.managed.providerName} ·{" "}
-                    {agent.execution.managed.modelName}
-                  </span>
-                </TableCell>
-                <TableCell>
-                  <UserStatusBadge
-                    status={agent.status}
-                    label={userStatusLabel(agent.status, t)}
-                  />
-                </TableCell>
-                <TableCell>
-                  <WorkStatusBadge status={agent.workStatus} />
-                </TableCell>
-                <TableCell className="whitespace-nowrap text-muted-foreground">
-                  {formatDateTime(agent.createdAt)}
-                </TableCell>
-                <ResourceTableActions
-                  menu={
-                    <DropdownMenuItem
-                      destructive={
-                        agent.status === UserStatus.UserStatusActive
-                      }
-                      onSelect={() => setChangingAgentStatus(agent)}
-                    >
-                      {t(
-                        agent.status === UserStatus.UserStatusActive
-                          ? "agents.status.deactivate"
-                          : "agents.status.reactivate",
-                      )}
-                    </DropdownMenuItem>
-                  }
-                >
+            actions={(agent) => ({
+              primary: (
+                <>
                   <Button
                     size="sm"
                     disabled={agent.status !== UserStatus.UserStatusActive}
                     onClick={() =>
-                      navigate(
-                        `/inbox?scope=internal&target=${agent.identityId}`,
-                      )
+                      navigate(`/inbox?scope=internal&target=${agent.identityId}`)
                     }
                   >
                     {t("sendMessage")}
@@ -272,10 +262,22 @@ export function AgentsPanel({
                   >
                     {t("agents.configure")}
                   </Button>
-                </ResourceTableActions>
-              </>
-            )}
-          </ResourceTable>
+                </>
+              ),
+              menu: (
+                <DropdownMenuItem
+                  destructive={agent.status === UserStatus.UserStatusActive}
+                  onSelect={() => setChangingAgentStatus(agent)}
+                >
+                  {t(
+                    agent.status === UserStatus.UserStatusActive
+                      ? "agents.status.deactivate"
+                      : "agents.status.reactivate",
+                  )}
+                </DropdownMenuItem>
+              ),
+            })}
+          />
         </ContactListLayout>
       </section>
 

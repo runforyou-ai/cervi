@@ -24,10 +24,7 @@ import {
   ListToolbarSearch,
 } from "@/components/list-toolbar"
 import { PageHeader } from "@/components/page-header"
-import {
-  ResourceTable,
-  ResourceTableActions,
-} from "@/components/resource-table"
+import { ResourceTable } from "@/components/resource-table"
 import { Button } from "@/components/ui/button"
 import {
   AlertDialog,
@@ -40,7 +37,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
-import { TableCell } from "@/components/ui/table"
 import { WorkStatusBadge } from "@/components/work-status"
 import { useWorkspace } from "@/contexts/workspace-context"
 import { ContactCreateDialogs } from "@/features/contacts/contact-create-dialogs"
@@ -258,61 +254,59 @@ export function MembersPanel({
         >
           <ResourceTable
             columns={[
-              { key: "employeeName", header: t("columns.employeeName") },
-              { key: "email", header: t("columns.email") },
-              { key: "joinedTeams", header: t("columns.joinedTeams") },
-              { key: "role", header: t("columns.role") },
-              { key: "accountStatus", header: t("columns.accountStatus") },
-              { key: "workStatus", header: t("columns.workStatus") },
-              { key: "createdAt", header: t("columns.createdAt") },
               {
-                key: "actions",
-                header: tCommon("table.actions"),
-                className: "w-px",
+                key: "employeeName",
+                header: t("columns.employeeName"),
+                cellClassName: "font-medium",
+                cell: (user) => user.displayName,
+              },
+              {
+                key: "email",
+                header: t("columns.email"),
+                cellClassName: "text-muted-foreground",
+                cell: (user) => user.email,
+              },
+              {
+                key: "joinedTeams",
+                header: t("columns.joinedTeams"),
+                cellClassName: "max-w-xs",
+                cell: (user) => <JoinedTeamsCell teams={user.teams} />,
+              },
+              {
+                key: "role",
+                header: t("columns.role"),
+                cell: (user) => roleDisplayName(user.role, tCommon),
+              },
+              {
+                key: "accountStatus",
+                header: t("columns.accountStatus"),
+                cell: (user) => (
+                  <UserStatusBadge
+                    status={user.status}
+                    label={userStatusLabel(user.status, t)}
+                  />
+                ),
+              },
+              {
+                key: "workStatus",
+                header: t("columns.workStatus"),
+                cell: (user) => (
+                  <WorkStatusBadge status={memberWorkStatus(user)} />
+                ),
+              },
+              {
+                key: "createdAt",
+                header: t("columns.createdAt"),
+                cellClassName: "whitespace-nowrap text-muted-foreground",
+                cell: (user) => formatDateTime(user.createdAt),
               },
             ]}
             rows={users}
             rowKey={(user) => user.id}
             empty={t("list.empty")}
-          >
-            {(user) => (
-              <>
-                <TableCell className="font-medium">
-                  {user.displayName}
-                </TableCell>
-                <TableCell className="text-muted-foreground">
-                  {user.email}
-                </TableCell>
-                <TableCell className="max-w-xs">
-                  <JoinedTeamsCell teams={user.teams} />
-                </TableCell>
-                <TableCell>{roleDisplayName(user.role, tCommon)}</TableCell>
-                <TableCell>
-                  <UserStatusBadge
-                    status={user.status}
-                    label={userStatusLabel(user.status, t)}
-                  />
-                </TableCell>
-                <TableCell>
-                  <WorkStatusBadge status={memberWorkStatus(user)} />
-                </TableCell>
-                <TableCell className="whitespace-nowrap text-muted-foreground">
-                  {formatDateTime(user.createdAt)}
-                </TableCell>
-                <ResourceTableActions
-                  menu={
-                    <DropdownMenuItem
-                      destructive={user.status === UserStatus.UserStatusActive}
-                      onSelect={() => setChangingUserStatus(user)}
-                    >
-                      {t(
-                        user.status === UserStatus.UserStatusActive
-                          ? "members.status.deactivate"
-                          : "members.status.reactivate",
-                      )}
-                    </DropdownMenuItem>
-                  }
-                >
+            actions={(user) => ({
+              primary: (
+                <>
                   <Button
                     size="sm"
                     disabled={
@@ -320,9 +314,7 @@ export function MembersPanel({
                       user.identityId === identity.user.identityId
                     }
                     onClick={() =>
-                      navigate(
-                        `/inbox?scope=internal&target=${user.identityId}`,
-                      )
+                      navigate(`/inbox?scope=internal&target=${user.identityId}`)
                     }
                   >
                     {t("sendMessage")}
@@ -334,10 +326,22 @@ export function MembersPanel({
                   >
                     {tCommon("actions.view")}
                   </Button>
-                </ResourceTableActions>
-              </>
-            )}
-          </ResourceTable>
+                </>
+              ),
+              menu: (
+                <DropdownMenuItem
+                  destructive={user.status === UserStatus.UserStatusActive}
+                  onSelect={() => setChangingUserStatus(user)}
+                >
+                  {t(
+                    user.status === UserStatus.UserStatusActive
+                      ? "members.status.deactivate"
+                      : "members.status.reactivate",
+                  )}
+                </DropdownMenuItem>
+              ),
+            })}
+          />
         </ContactListLayout>
       </section>
 

@@ -9,17 +9,12 @@ import {
   type AIProviderSummaryData,
 } from "@/api"
 import { ResourceContent } from "@/components/resource-content"
-import {
-  ResourceTable,
-  ResourceTableActions,
-} from "@/components/resource-table"
+import { ResourceTable } from "@/components/resource-table"
 import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
-import { SelectableText } from "@/components/selectable-text"
 import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
 import { Button } from "@/components/ui/button"
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
-import { TableCell } from "@/components/ui/table"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { aiProviderBrandConfigs } from "@/features/integrations/model-services/model-provider-brands"
@@ -130,20 +125,35 @@ export function ModelProviderListPage({ section }: { section: ModelServiceSectio
             <div className="overflow-hidden rounded-lg border bg-card">
               <ResourceTable
                 columns={[
-                  { key: "brand", header: t("modelServices.list.columns.brand") },
-                  { key: "name", header: t("modelServices.list.columns.name") },
+                  {
+                    key: "brand",
+                    header: t("modelServices.list.columns.brand"),
+                    cell: (provider) =>
+                      t(aiProviderBrandConfigs[provider.brand].nameKey),
+                  },
+                  {
+                    key: "name",
+                    header: t("modelServices.list.columns.name"),
+                    cellClassName: "font-medium",
+                    cell: (provider) => provider.name,
+                  },
                   {
                     key: "models",
                     header: t("modelServices.list.columns.models"),
+                    cellClassName: "text-muted-foreground",
+                    cell: (provider) => (
+                      <ProviderModelsCell
+                        models={provider.models.filter(
+                          (model) => model.type === sectionConfig.modelType,
+                        )}
+                      />
+                    ),
                   },
                   {
                     key: "apiUrl",
                     header: t("modelServices.list.columns.apiUrl"),
-                  },
-                  {
-                    key: "actions",
-                    header: t("common:table.actions"),
-                    className: "w-px",
+                    cellClassName: "text-muted-foreground",
+                    cell: (provider) => provider.apiUrl,
                   },
                 ]}
                 rows={visibleProviders}
@@ -151,46 +161,26 @@ export function ModelProviderListPage({ section }: { section: ModelServiceSectio
                 empty={t("modelServices.list.empty", {
                   type: t(sectionConfig.nameKey),
                 })}
-              >
-                {(provider) => (
-                  <>
-                    <TableCell>
-                      {t(aiProviderBrandConfigs[provider.brand].nameKey)}
-                    </TableCell>
-                    <TableCell className="font-medium">
-                      <SelectableText>{provider.name}</SelectableText>
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      <ProviderModelsCell
-                        models={provider.models.filter(
-                          (model) => model.type === sectionConfig.modelType,
-                        )}
-                      />
-                    </TableCell>
-                    <TableCell className="text-muted-foreground">
-                      <SelectableText>{provider.apiUrl}</SelectableText>
-                    </TableCell>
-                    <ResourceTableActions
-                      menu={
-                        <DropdownMenuItem
-                          destructive
-                          onSelect={() => deletion.select(provider)}
-                        >
-                          {t("common:actions.delete")}
-                        </DropdownMenuItem>
-                      }
+                actions={(provider) => ({
+                  primary: (
+                    <Button variant="outline" size="sm" asChild>
+                      <Link
+                        to={`/integrations/model-services/${section}/${provider.id}`}
+                      >
+                        {t("common:actions.edit")}
+                      </Link>
+                    </Button>
+                  ),
+                  menu: (
+                    <DropdownMenuItem
+                      destructive
+                      onSelect={() => deletion.select(provider)}
                     >
-                      <Button variant="outline" size="sm" asChild>
-                        <Link
-                          to={`/integrations/model-services/${section}/${provider.id}`}
-                        >
-                          {t("common:actions.edit")}
-                        </Link>
-                      </Button>
-                    </ResourceTableActions>
-                  </>
-                )}
-              </ResourceTable>
+                      {t("common:actions.delete")}
+                    </DropdownMenuItem>
+                  ),
+                })}
+              />
             </div>
           </ResourceContent>
         </div>
