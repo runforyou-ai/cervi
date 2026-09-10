@@ -264,11 +264,13 @@ conversation_agent_states
 
 | 模式 | 长期语义 | 首轮安排 |
 | --- | --- | --- |
-| `mention` | 内部单聊或群聊只有显式 @Agent 的新消息触发 | 基础群聊与提醒事实完成后启用 |
+| `mention` | 内部单聊或群聊只有显式 @Agent 的新消息触发；客户会话由内部备注中的 @Agent 触发 | 基础群聊与提醒事实完成后启用 |
 | `agent_direct` | 独立 AI 聊天的成员消息自动触发，群聊仍需 @ | P1a 固定使用，作为内部 AI 员工验证入口 |
 | `customer_auto` | 符合客户路由和会话策略的新客户消息自动触发 | P1b 先用于网站客户；第三方渠道仍需对应 Delivery |
 
 首轮启用 P1a 的 `agent_direct` 和 P1b 的 `customer_auto`，两者都固定支持运行中连续消息在下一个 Eino 安全点补入同一 Run；`mention` 和通用 `response_policy` 在基础群聊与完整 P1 中实现。
+
+客户会话中的 `mention` 由客服在内部备注里 @Agent 触发，最终结果写为内部备注，不进入客户可见时间线，也不创建渠道投递；客户会话的可见性语义见 `chat-roadmap.md` 第 3.7 节。
 
 ### 6.2 服务端持久触发事实
 
