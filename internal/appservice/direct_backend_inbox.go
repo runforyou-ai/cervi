@@ -7,23 +7,38 @@ import (
 	"errors"
 	"log/slog"
 
+	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	servertask "github.com/runforyou-ai/cervi/internal/task/server"
+	"github.com/uptrace/bun"
 )
 
-// LoadInbox 返回当前企业的统一会话工作队列。
-func (b *DirectBackend) LoadInbox(ctx context.Context, meta RequestMeta, input LoadInboxInput) (Inbox, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return Inbox{}, err
+// inboxOps 持有收件箱与客户投递的 Action 和 Query。
+type inboxOps struct {
+	customerDeliveries           *deliveryaction.Manager
+	loadInbox                    *inboxaction.LoadInboxQuery
+	listCustomerServiceAssignees *inboxaction.ListCustomerServiceAssigneesQuery
+}
+
+// newInboxOps 创建收件箱与客户投递的业务实现依赖。
+func newInboxOps(db *bun.DB, taskEnqueuer servertask.TxEnqueuer) inboxOps {
+	return inboxOps{
+		customerDeliveries:           deliveryaction.NewManager(db, taskEnqueuer),
+		loadInbox:                    inboxaction.NewLoadInboxQuery(db),
+		listCustomerServiceAssignees: inboxaction.NewListCustomerServiceAssigneesQuery(db),
 	}
-	page, unreadCounts, err := b.loadInbox.Execute(ctx, identity, inboxaction.LoadInput{Scope: domain.InboxScope(input.Scope), CustomerView: domain.CustomerInboxView(input.CustomerView), AssigneeIdentityID: input.AssigneeIdentityID, Cursor: input.Cursor, BeforeCursor: input.BeforeCursor, Limit: input.Limit})
+}
+
+// LoadInbox 返回当前企业的统一会话工作队列。
+func (o *directOperations) LoadInbox(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input LoadInboxInput) (Inbox, error) {
+	page, unreadCounts, err := o.loadInbox.Execute(ctx, identity, inboxaction.LoadInput{Scope: domain.InboxScope(input.Scope), CustomerView: domain.CustomerInboxView(input.CustomerView), AssigneeIdentityID: input.AssigneeIdentityID, Cursor: input.Cursor, BeforeCursor: input.BeforeCursor, Limit: input.Limit})
 	if err != nil {
 		return Inbox{}, inboxReadError(ctx, meta, identity.Organization.ID, "列表", err)
 	}
-	conversations, err := b.inboxConversationsFromActions(ctx, meta, identity, page.Conversations)
+	conversations, err := o.inboxConversationsFromActions(ctx, meta, identity, page.Conversations)
 	if err != nil {
 		return Inbox{}, err
 	}
@@ -31,7 +46,7 @@ func (b *DirectBackend) LoadInbox(ctx context.Context, meta RequestMeta, input L
 }
 
 // inboxConversationsFromActions 为会话摘要统一解析头像并转换传输契约。
-func (b *DirectBackend) inboxConversationsFromActions(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, summaries []inboxaction.ConversationSummary) ([]InboxConversation, error) {
+func (o *directOperations) inboxConversationsFromActions(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, summaries []inboxaction.ConversationSummary) ([]InboxConversation, error) {
 	avatarFileIDs := make([]string, 0, len(summaries))
 	for _, summary := range summaries {
 		if summary.Group != nil && summary.Group.ImageFileID != nil {
@@ -53,7 +68,7 @@ func (b *DirectBackend) inboxConversationsFromActions(ctx context.Context, meta 
 			avatarFileIDs = append(avatarFileIDs, *summary.Customer.Assignee.AvatarFileID)
 		}
 	}
-	avatarURLs, err := b.activeFileURLs(ctx, identity, avatarFileIDs)
+	avatarURLs, err := o.activeFileURLs(ctx, identity, avatarFileIDs)
 	if err != nil {
 		slog.Warn("读取收件箱会话图片失败", "organization_id", identity.Organization.ID, "error", err)
 		return nil, FailedError(meta, cervii18n.ErrorInboxLoadFailed)
@@ -67,12 +82,8 @@ func (b *DirectBackend) inboxConversationsFromActions(ctx context.Context, meta 
 }
 
 // ListCustomerServiceAssignees 返回有效真人和 AI 客服。
-func (b *DirectBackend) ListCustomerServiceAssignees(ctx context.Context, meta RequestMeta) (CustomerServiceAssigneeList, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return CustomerServiceAssigneeList{}, err
-	}
-	items, err := b.listCustomerServiceAssignees.Execute(ctx, identity)
+func (o *directOperations) ListCustomerServiceAssignees(ctx context.Context, meta RequestMeta, identity *servermodels.Identity) (CustomerServiceAssigneeList, error) {
+	items, err := o.listCustomerServiceAssignees.Execute(ctx, identity)
 	if err != nil {
 		if ctx.Err() != nil {
 			return CustomerServiceAssigneeList{}, ctx.Err()
@@ -86,7 +97,7 @@ func (b *DirectBackend) ListCustomerServiceAssignees(ctx context.Context, meta R
 			avatarFileIDs = append(avatarFileIDs, *item.AvatarFileID)
 		}
 	}
-	avatarURLs, err := b.activeFileURLs(ctx, identity, avatarFileIDs)
+	avatarURLs, err := o.activeFileURLs(ctx, identity, avatarFileIDs)
 	if err != nil {
 		slog.Warn("读取客服候选头像失败", "organization_id", identity.Organization.ID, "error", err)
 		return CustomerServiceAssigneeList{}, FailedError(meta, cervii18n.ErrorUserListFailed)
@@ -142,19 +153,15 @@ func inboxConversationFromAction(summary inboxaction.ConversationSummary, avatar
 }
 
 // GetInboxConversation 按编号读取当前用户可见的独立会话摘要。
-func (b *DirectBackend) GetInboxConversation(ctx context.Context, meta RequestMeta, conversationID string) (InboxConversation, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return InboxConversation{}, err
-	}
-	results, err := b.loadInbox.ReadByIDs(ctx, identity, []string{conversationID}, nil)
+func (o *directOperations) GetInboxConversation(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string) (InboxConversation, error) {
+	results, err := o.loadInbox.ReadByIDs(ctx, identity, []string{conversationID}, nil)
 	if err != nil {
 		return InboxConversation{}, inboxReadError(ctx, meta, identity.Organization.ID, "独立摘要", err)
 	}
 	if results[0].Conversation == nil {
 		return InboxConversation{}, NotFoundError(meta, cervii18n.ErrorConversationNotFound).WithReason("conversation_unavailable")
 	}
-	conversations, err := b.inboxConversationsFromActions(ctx, meta, identity, []inboxaction.ConversationSummary{*results[0].Conversation})
+	conversations, err := o.inboxConversationsFromActions(ctx, meta, identity, []inboxaction.ConversationSummary{*results[0].Conversation})
 	if err != nil {
 		return InboxConversation{}, err
 	}
@@ -162,12 +169,8 @@ func (b *DirectBackend) GetInboxConversation(ctx context.Context, meta RequestMe
 }
 
 // ReadInboxConversations 在每项中区分匹配、筛选外可读及不可用的会话。
-func (b *DirectBackend) ReadInboxConversations(ctx context.Context, meta RequestMeta, input ReadInboxConversationsInput) (InboxConversationResults, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return InboxConversationResults{}, err
-	}
-	results, err := b.loadInbox.ReadByIDs(ctx, identity, input.ConversationIDs, &inboxaction.LoadInput{Scope: domain.InboxScope(input.Query.Scope), CustomerView: domain.CustomerInboxView(input.Query.CustomerView), AssigneeIdentityID: input.Query.AssigneeIdentityID})
+func (o *directOperations) ReadInboxConversations(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input ReadInboxConversationsInput) (InboxConversationResults, error) {
+	results, err := o.loadInbox.ReadByIDs(ctx, identity, input.ConversationIDs, &inboxaction.LoadInput{Scope: domain.InboxScope(input.Query.Scope), CustomerView: domain.CustomerInboxView(input.Query.CustomerView), AssigneeIdentityID: input.Query.AssigneeIdentityID})
 	if err != nil {
 		return InboxConversationResults{}, inboxReadError(ctx, meta, identity.Organization.ID, "批量摘要", err)
 	}
@@ -177,7 +180,7 @@ func (b *DirectBackend) ReadInboxConversations(ctx context.Context, meta Request
 			summaries = append(summaries, *result.Conversation)
 		}
 	}
-	conversations, err := b.inboxConversationsFromActions(ctx, meta, identity, summaries)
+	conversations, err := o.inboxConversationsFromActions(ctx, meta, identity, summaries)
 	if err != nil {
 		return InboxConversationResults{}, err
 	}

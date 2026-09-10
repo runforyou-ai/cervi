@@ -7,28 +7,21 @@ import (
 	"strconv"
 
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
 // GetConversationMessageContext 返回已授权消息周围的连续窗口。
-func (b *DirectBackend) GetConversationMessageContext(ctx context.Context, meta RequestMeta, conversationID, messageID string) (ConversationMessageList, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return ConversationMessageList{}, err
-	}
-	history, err := b.listConversationMessages.Execute(ctx, identity, conversationaction.ConversationMessageHistoryInput{ConversationID: conversationID, AroundMessageID: messageID})
+func (o *directOperations) GetConversationMessageContext(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID, messageID string) (ConversationMessageList, error) {
+	history, err := o.listConversationMessages.Execute(ctx, identity, conversationaction.ConversationMessageHistoryInput{ConversationID: conversationID, AroundMessageID: messageID})
 	if err != nil {
 		return ConversationMessageList{}, conversationMessageError(ctx, meta, err, identity.Organization.ID, conversationID)
 	}
-	return b.conversationMessageListFromAction(ctx, meta, identity, conversationID, history)
+	return o.conversationMessageListFromAction(ctx, meta, identity, conversationID, history)
 }
 
 // GetConversationNavigationState 返回当前群聊的待查看数量和可见尾端。
-func (b *DirectBackend) GetConversationNavigationState(ctx context.Context, meta RequestMeta, conversationID string) (ConversationNavigationState, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return ConversationNavigationState{}, err
-	}
-	state, err := b.conversationNavigation.Execute(ctx, identity, conversationID)
+func (o *directOperations) GetConversationNavigationState(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string) (ConversationNavigationState, error) {
+	state, err := o.conversationNavigation.Execute(ctx, identity, conversationID)
 	if err != nil {
 		return ConversationNavigationState{}, conversationMessageError(ctx, meta, err, identity.Organization.ID, conversationID)
 	}
@@ -36,12 +29,8 @@ func (b *DirectBackend) GetConversationNavigationState(ctx context.Context, meta
 }
 
 // ListPendingConversationMentions 返回本轮固定的目标序列。
-func (b *DirectBackend) ListPendingConversationMentions(ctx context.Context, meta RequestMeta, conversationID string) (PendingConversationMentions, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return PendingConversationMentions{}, err
-	}
-	pending, err := b.pendingConversationMentions.Execute(ctx, identity, conversationID)
+func (o *directOperations) ListPendingConversationMentions(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string) (PendingConversationMentions, error) {
+	pending, err := o.pendingConversationMentions.Execute(ctx, identity, conversationID)
 	if err != nil {
 		return PendingConversationMentions{}, conversationMessageError(ctx, meta, err, identity.Organization.ID, conversationID)
 	}
@@ -49,12 +38,8 @@ func (b *DirectBackend) ListPendingConversationMentions(ctx context.Context, met
 }
 
 // MarkConversationMentionReviewed 确认已查看的提及并返回连续水位。
-func (b *DirectBackend) MarkConversationMentionReviewed(ctx context.Context, meta RequestMeta, conversationID string, input MarkConversationMentionReviewedInput) (ConversationMentionReview, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return ConversationMentionReview{}, err
-	}
-	result, err := b.reviewConversationMention.Execute(ctx, identity, conversationID, input.MessageID)
+func (o *directOperations) MarkConversationMentionReviewed(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, input MarkConversationMentionReviewedInput) (ConversationMentionReview, error) {
+	result, err := o.reviewConversationMention.Execute(ctx, identity, conversationID, input.MessageID)
 	if err != nil {
 		return ConversationMentionReview{}, conversationMessageError(ctx, meta, err, identity.Organization.ID, conversationID)
 	}

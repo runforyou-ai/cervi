@@ -9,6 +9,7 @@ import (
 	"uuid"
 
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
+	"github.com/runforyou-ai/cervi/internal/servertest"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -210,7 +211,7 @@ func TestEnqueueStillOwnsItsTransaction(t *testing.T) {
 func newEnqueueTestRuntime(t *testing.T) (context.Context, *bun.DB, *Runtime) {
 	t.Helper()
 	ctx := context.Background()
-	store, err := serverstorage.Open(ctx, testDatabaseConfig(t))
+	store, err := serverstorage.Open(ctx, servertest.DatabaseConfig(t))
 	if err != nil {
 		t.Fatal(err)
 	}

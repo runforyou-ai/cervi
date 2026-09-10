@@ -62,7 +62,7 @@ func (a *SaveTelegramConnectionAction) Execute(ctx context.Context, identity *se
 			botIDs = append(botIDs, *current.Connection.BotID)
 		}
 
-		return withTelegramBotLocks(ctx, conn, botIDs, func() error {
+		return withTelegramBotLocks(ctx, conn, identity.Organization.ID, botIDs, func() error {
 			var oldToken string
 			var oldBotID *int64
 			var oldBotUsedByOtherChannel bool
@@ -92,7 +92,7 @@ func (a *SaveTelegramConnectionAction) Execute(ctx context.Context, identity *se
 					Scan(ctx); err != nil {
 					return normalizeTelegramChannelNotFound(err)
 				}
-				botAlreadyUsed, err := telegramBotUsedByOtherChannel(ctx, tx, bot.ID, channelID)
+				botAlreadyUsed, err := telegramBotUsedByOtherChannel(ctx, tx, identity.Organization.ID, bot.ID, channelID)
 				if err != nil {
 					return err
 				}
@@ -111,7 +111,7 @@ func (a *SaveTelegramConnectionAction) Execute(ctx context.Context, identity *se
 					if _, err := tx.ExecContext(ctx, "UPDATE customer_message_deliveries SET status = 'failed', last_error = 'bot_changed', updated_at = now() WHERE channel_id = ? AND organization_id = ? AND status IN ('pending', 'retry_wait')", channelID, identity.Organization.ID); err != nil {
 						return err
 					}
-					oldBotUsedByOtherChannel, err = telegramBotUsedByOtherChannel(ctx, tx, *oldBotID, channelID)
+					oldBotUsedByOtherChannel, err = telegramBotUsedByOtherChannel(ctx, tx, identity.Organization.ID, *oldBotID, channelID)
 					if err != nil {
 						return err
 					}

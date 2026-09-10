@@ -10,19 +10,16 @@ import (
 	organizationaction "github.com/runforyou-ai/cervi/internal/actions/organization"
 	"github.com/runforyou-ai/cervi/internal/common"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
 // UpdateOrganization 修改企业通用设置。
-func (b *DirectBackend) UpdateOrganization(ctx context.Context, meta RequestMeta, input OrganizationInput) (Organization, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return Organization{}, err
-	}
-	organization, err := b.updateOrganization.Execute(ctx, identity, organizationaction.Input{
+func (o *directOperations) UpdateOrganization(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input OrganizationInput) (Organization, error) {
+	organization, err := o.updateOrganization.Execute(ctx, identity, organizationaction.Input{
 		Name: input.Name, AllowArbitraryURL: input.AllowArbitraryURL,
 	})
 	if err != nil {
-		return Organization{}, b.organizationMutationError(ctx, meta, err, cervii18n.ErrorOrganizationUpdateFailed, identity.Organization.ID)
+		return Organization{}, o.organizationMutationError(ctx, meta, err, cervii18n.ErrorOrganizationUpdateFailed, identity.Organization.ID)
 	}
 	slog.Info(
 		"企业通用设置更新成功",
@@ -33,7 +30,7 @@ func (b *DirectBackend) UpdateOrganization(ctx context.Context, meta RequestMeta
 }
 
 // organizationMutationError 转换企业设置写入错误。
-func (b *DirectBackend) organizationMutationError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key, organizationID string) error {
+func (o *directOperations) organizationMutationError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key, organizationID string) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}

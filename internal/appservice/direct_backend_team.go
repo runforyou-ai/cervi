@@ -11,17 +11,14 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
 // ListTeams 返回企业团队列表。
-func (b *DirectBackend) ListTeams(ctx context.Context, meta RequestMeta, input TeamListInput) (TeamList, error) {
-	identity, err := b.authenticate(ctx, meta)
+func (o *directOperations) ListTeams(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input TeamListInput) (TeamList, error) {
+	output, err := o.listTeams.Execute(ctx, identity, teamaction.ListInput{Query: input.Query, Page: input.Page, PageSize: input.PageSize})
 	if err != nil {
-		return TeamList{}, err
-	}
-	output, err := b.listTeams.Execute(ctx, identity, teamaction.ListInput{Query: input.Query, Page: input.Page, PageSize: input.PageSize})
-	if err != nil {
-		return TeamList{}, b.teamError(ctx, meta, err, cervii18n.ErrorTeamListFailed, identity.Organization.ID, "")
+		return TeamList{}, o.teamError(ctx, meta, err, cervii18n.ErrorTeamListFailed, identity.Organization.ID, "")
 	}
 	teams := make([]Team, 0, len(output.Teams))
 	for _, team := range output.Teams {
@@ -31,57 +28,41 @@ func (b *DirectBackend) ListTeams(ctx context.Context, meta RequestMeta, input T
 }
 
 // CreateTeam 创建企业团队。
-func (b *DirectBackend) CreateTeam(ctx context.Context, meta RequestMeta, input TeamInput) (Team, error) {
-	identity, err := b.authenticate(ctx, meta)
+func (o *directOperations) CreateTeam(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input TeamInput) (Team, error) {
+	team, err := o.createTeam.Execute(ctx, identity, teamaction.Input{Name: input.Name, Description: input.Description})
 	if err != nil {
-		return Team{}, err
-	}
-	team, err := b.createTeam.Execute(ctx, identity, teamaction.Input{Name: input.Name, Description: input.Description})
-	if err != nil {
-		return Team{}, b.teamError(ctx, meta, err, cervii18n.ErrorTeamCreateFailed, identity.Organization.ID, "")
+		return Team{}, o.teamError(ctx, meta, err, cervii18n.ErrorTeamCreateFailed, identity.Organization.ID, "")
 	}
 	slog.Info("团队创建成功", "organization_id", identity.Organization.ID, "team_id", team.ID)
 	return teamFromAction(*team), nil
 }
 
 // UpdateTeam 修改企业团队。
-func (b *DirectBackend) UpdateTeam(ctx context.Context, meta RequestMeta, teamID string, input TeamInput) (Team, error) {
-	identity, err := b.authenticate(ctx, meta)
+func (o *directOperations) UpdateTeam(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, teamID string, input TeamInput) (Team, error) {
+	team, err := o.updateTeam.Execute(ctx, identity, teamID, teamaction.Input{Name: input.Name, Description: input.Description})
 	if err != nil {
-		return Team{}, err
-	}
-	team, err := b.updateTeam.Execute(ctx, identity, teamID, teamaction.Input{Name: input.Name, Description: input.Description})
-	if err != nil {
-		return Team{}, b.teamError(ctx, meta, err, cervii18n.ErrorTeamUpdateFailed, identity.Organization.ID, teamID)
+		return Team{}, o.teamError(ctx, meta, err, cervii18n.ErrorTeamUpdateFailed, identity.Organization.ID, teamID)
 	}
 	slog.Info("团队更新成功", "organization_id", identity.Organization.ID, "team_id", teamID)
 	return teamFromAction(*team), nil
 }
 
 // DeleteTeam 删除企业团队及其成员关系。
-func (b *DirectBackend) DeleteTeam(ctx context.Context, meta RequestMeta, teamID string) error {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return err
-	}
-	if err := b.deleteTeam.Execute(ctx, identity, teamID); err != nil {
-		return b.teamError(ctx, meta, err, cervii18n.ErrorTeamDeleteFailed, identity.Organization.ID, teamID)
+func (o *directOperations) DeleteTeam(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, teamID string) error {
+	if err := o.deleteTeam.Execute(ctx, identity, teamID); err != nil {
+		return o.teamError(ctx, meta, err, cervii18n.ErrorTeamDeleteFailed, identity.Organization.ID, teamID)
 	}
 	slog.Info("团队删除成功", "organization_id", identity.Organization.ID, "team_id", teamID)
 	return nil
 }
 
 // ListTeamMembers 返回团队成员列表。
-func (b *DirectBackend) ListTeamMembers(ctx context.Context, meta RequestMeta, teamID string, input TeamMemberListInput) (TeamMemberList, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return TeamMemberList{}, err
-	}
-	output, err := b.listTeamMembers.Execute(ctx, identity, teamID, teamaction.MemberListInput{
+func (o *directOperations) ListTeamMembers(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, teamID string, input TeamMemberListInput) (TeamMemberList, error) {
+	output, err := o.listTeamMembers.Execute(ctx, identity, teamID, teamaction.MemberListInput{
 		Query: input.Query, WorkStatus: optionalDomain[WorkStatus, domain.WorkStatus](input.WorkStatus), Page: input.Page, PageSize: input.PageSize,
 	})
 	if err != nil {
-		return TeamMemberList{}, b.teamError(ctx, meta, err, cervii18n.ErrorTeamMemberListFailed, identity.Organization.ID, teamID)
+		return TeamMemberList{}, o.teamError(ctx, meta, err, cervii18n.ErrorTeamMemberListFailed, identity.Organization.ID, teamID)
 	}
 	members := make([]TeamMember, 0, len(output.Members))
 	for _, member := range output.Members {
@@ -94,14 +75,10 @@ func (b *DirectBackend) ListTeamMembers(ctx context.Context, meta RequestMeta, t
 }
 
 // ListTeamMemberCandidates 返回尚未加入团队的企业身份。
-func (b *DirectBackend) ListTeamMemberCandidates(ctx context.Context, meta RequestMeta, teamID string, input TeamMemberCandidateInput) (TeamMemberCandidateList, error) {
-	identity, err := b.authenticate(ctx, meta)
+func (o *directOperations) ListTeamMemberCandidates(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, teamID string, input TeamMemberCandidateInput) (TeamMemberCandidateList, error) {
+	output, err := o.listTeamMemberCandidates.Execute(ctx, identity, teamID, teamaction.MemberCandidateInput{Query: input.Query, Page: input.Page, PageSize: input.PageSize})
 	if err != nil {
-		return TeamMemberCandidateList{}, err
-	}
-	output, err := b.listTeamMemberCandidates.Execute(ctx, identity, teamID, teamaction.MemberCandidateInput{Query: input.Query, Page: input.Page, PageSize: input.PageSize})
-	if err != nil {
-		return TeamMemberCandidateList{}, b.teamError(ctx, meta, err, cervii18n.ErrorTeamMemberListFailed, identity.Organization.ID, teamID)
+		return TeamMemberCandidateList{}, o.teamError(ctx, meta, err, cervii18n.ErrorTeamMemberListFailed, identity.Organization.ID, teamID)
 	}
 	avatarFileIDs := make([]string, 0, len(output.Members))
 	for _, member := range output.Members {
@@ -109,9 +86,9 @@ func (b *DirectBackend) ListTeamMemberCandidates(ctx context.Context, meta Reque
 			avatarFileIDs = append(avatarFileIDs, *member.AvatarFileID)
 		}
 	}
-	avatarURLs, err := b.activeFileURLs(ctx, identity, avatarFileIDs)
+	avatarURLs, err := o.activeFileURLs(ctx, identity, avatarFileIDs)
 	if err != nil {
-		return TeamMemberCandidateList{}, b.teamError(ctx, meta, err, cervii18n.ErrorTeamMemberListFailed, identity.Organization.ID, teamID)
+		return TeamMemberCandidateList{}, o.teamError(ctx, meta, err, cervii18n.ErrorTeamMemberListFailed, identity.Organization.ID, teamID)
 	}
 	members := make([]TeamMemberCandidate, 0, len(output.Members))
 	for _, member := range output.Members {
@@ -124,43 +101,35 @@ func (b *DirectBackend) ListTeamMemberCandidates(ctx context.Context, meta Reque
 }
 
 // AddTeamMembers 将企业身份批量加入团队。
-func (b *DirectBackend) AddTeamMembers(ctx context.Context, meta RequestMeta, teamID string, input TeamMemberInput) (Team, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return Team{}, err
-	}
+func (o *directOperations) AddTeamMembers(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, teamID string, input TeamMemberInput) (Team, error) {
 	members := make([]teamaction.MemberIdentity, 0, len(input.Members))
 	for _, member := range input.Members {
 		members = append(members, teamaction.MemberIdentity{IdentityType: domain.OrganizationIdentityType(member.IdentityType), IdentityID: member.IdentityID})
 	}
-	team, err := b.addTeamMembers.Execute(ctx, identity, teamID, members)
+	team, err := o.addTeamMembers.Execute(ctx, identity, teamID, members)
 	if err != nil {
-		return Team{}, b.teamError(ctx, meta, err, cervii18n.ErrorTeamMemberAddFailed, identity.Organization.ID, teamID)
+		return Team{}, o.teamError(ctx, meta, err, cervii18n.ErrorTeamMemberAddFailed, identity.Organization.ID, teamID)
 	}
 	slog.Info("团队成员添加成功", "organization_id", identity.Organization.ID, "team_id", teamID, "requested_member_count", len(members))
 	return teamFromAction(*team), nil
 }
 
 // RemoveTeamMembers 将企业身份批量移出团队。
-func (b *DirectBackend) RemoveTeamMembers(ctx context.Context, meta RequestMeta, teamID string, input TeamMemberInput) (Team, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return Team{}, err
-	}
+func (o *directOperations) RemoveTeamMembers(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, teamID string, input TeamMemberInput) (Team, error) {
 	members := make([]teamaction.MemberIdentity, 0, len(input.Members))
 	for _, member := range input.Members {
 		members = append(members, teamaction.MemberIdentity{IdentityType: domain.OrganizationIdentityType(member.IdentityType), IdentityID: member.IdentityID})
 	}
-	team, err := b.removeTeamMembers.Execute(ctx, identity, teamID, members)
+	team, err := o.removeTeamMembers.Execute(ctx, identity, teamID, members)
 	if err != nil {
-		return Team{}, b.teamError(ctx, meta, err, cervii18n.ErrorTeamMemberRemoveFailed, identity.Organization.ID, teamID)
+		return Team{}, o.teamError(ctx, meta, err, cervii18n.ErrorTeamMemberRemoveFailed, identity.Organization.ID, teamID)
 	}
 	slog.Info("团队成员移出成功", "organization_id", identity.Organization.ID, "team_id", teamID, "requested_member_count", len(members))
 	return teamFromAction(*team), nil
 }
 
 // teamError 转换团队领域错误。
-func (b *DirectBackend) teamError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key, organizationID, teamID string) error {
+func (o *directOperations) teamError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key, organizationID, teamID string) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}

@@ -12,14 +12,11 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
 // ListCustomerMessageDeliveries 读取已登录成员当前窗口的投递状态。
-func (b *DirectBackend) ListCustomerMessageDeliveries(ctx context.Context, meta RequestMeta, conversationID string, input CustomerDeliveryListInput) (CustomerDeliveryList, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return CustomerDeliveryList{}, err
-	}
+func (o *directOperations) ListCustomerMessageDeliveries(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, input CustomerDeliveryListInput) (CustomerDeliveryList, error) {
 	if !common.ValidUUID(conversationID) {
 		return CustomerDeliveryList{}, NotFoundError(meta, cervii18n.ErrorConversationNotFound)
 	}
@@ -32,7 +29,7 @@ func (b *DirectBackend) ListCustomerMessageDeliveries(ctx context.Context, meta 
 			}
 		}
 	}
-	rows, err := b.customerDeliveries.List(ctx, identity.Organization.ID, conversationID, ids)
+	rows, err := o.customerDeliveries.List(ctx, identity.Organization.ID, conversationID, ids)
 	if err != nil {
 		return CustomerDeliveryList{}, customerDeliveryError(meta, err)
 	}
@@ -43,16 +40,12 @@ func (b *DirectBackend) ListCustomerMessageDeliveries(ctx context.Context, meta 
 	return CustomerDeliveryList{Deliveries: result}, nil
 }
 
-// ResolveCustomerMessageDelivery 认证成员后重新校验投递处理意图。
-func (b *DirectBackend) ResolveCustomerMessageDelivery(ctx context.Context, meta RequestMeta, conversationID, deliveryID string, input CustomerDeliveryResolveInput) error {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return err
-	}
+// ResolveCustomerMessageDelivery 重新校验投递处理意图。
+func (o *directOperations) ResolveCustomerMessageDelivery(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID, deliveryID string, input CustomerDeliveryResolveInput) error {
 	if !common.ValidUUID(conversationID) || !common.ValidUUID(deliveryID) {
 		return NotFoundError(meta, cervii18n.ErrorConversationNotFound)
 	}
-	return customerDeliveryError(meta, b.customerDeliveries.Resolve(ctx, identity, conversationID, deliveryID, domain.CustomerDeliveryResolution(input.Resolution), input.ConfirmDuplicateRisk))
+	return customerDeliveryError(meta, o.customerDeliveries.Resolve(ctx, identity, conversationID, deliveryID, domain.CustomerDeliveryResolution(input.Resolution), input.ConfirmDuplicateRisk))
 }
 
 // customerDeliveryError 转换投递管理错误并保留会话恢复语义。

@@ -45,7 +45,7 @@ func (a *UpdateTelegramChannelStatusAction) Execute(ctx context.Context, identit
 			botIDs = append(botIDs, *current.Connection.BotID)
 		}
 
-		return withTelegramBotLocks(ctx, conn, botIDs, func() error {
+		return withTelegramBotLocks(ctx, conn, identity.Organization.ID, botIDs, func() error {
 			var token string
 			var botUsedByOtherChannel bool
 			var webhookURL string
@@ -60,7 +60,7 @@ func (a *UpdateTelegramChannelStatusAction) Execute(ctx context.Context, identit
 				}
 				token = detail.Connection.BotToken
 				if !enabled && detail.Connection.BotID != nil {
-					botUsedByOtherChannel, err = telegramBotUsedByOtherChannel(ctx, tx, *detail.Connection.BotID, channelID)
+					botUsedByOtherChannel, err = telegramBotUsedByOtherChannel(ctx, tx, identity.Organization.ID, *detail.Connection.BotID, channelID)
 					if err != nil {
 						return err
 					}

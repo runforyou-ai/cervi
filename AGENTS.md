@@ -268,7 +268,9 @@ internal/
 ├── integration/
 │   ├── connectiontest/             # 外部连接探测的通用执行语义
 │   └── modelprovider/              # 模型服务供应商连接探测适配器
+├── integrationtest/                # 跨 Action、应用服务和存储的真实数据库集成测试
 ├── publicweb/                      # 网站渠道公开嵌入脚本和访客聊天页
+├── servertest/                     # 服务端集成测试共用的测试数据库配置
 ├── storage/
 │   ├── server/                     # PostgreSQL 连接、迁移、服务端模型和存储适配器
 │   ├── desktop/                    # 桌面端 SQLite 存储、迁移和模型
@@ -278,16 +280,17 @@ internal/
 │   ├── client/                     # 客户端 SQLite 可靠任务方案与实现
 │   └── server/                     # 服务端 PostgreSQL、NATS 与 Cron 实现
 └── tools/
-    └── appservicegen/              # 从 Backend 接口生成三层适配样板
+    └── appservicegen/              # 从 Backend 接口生成各层适配样板
 ```
 
 ### 分层
 
 - `appservice.Service` 是统一业务入口。Gin 只做对外 HTTP API 适配，输出 Backend 给出的状态和错误体，不定义前端业务类型和主要调用契约。
-- `appservice/backend.go` 中的 `Backend` 接口是业务调用的唯一契约源：每个方法必须携带 `cervi:route` 指令；`Service` 委托、Gin 路由与 Handler、API Proxy 转发由 `go generate ./internal/appservice` 统一生成到各包的 `*_gen.go`，禁止手改生成文件。
-- 新增业务方法的步骤：在 `Backend` 接口补方法与指令（GET 的查询结构体在 `types.go` 为每个字段显式加 `query` 标签，不传输的字段使用 `query:"-"`），运行生成器，然后只手写 `DirectBackend` 实现和 Action。无法按统一模式生成的层用 `manual=service,api,proxy` 标记并在对应包手写；API Proxy 的响应归一化在 `normalizeOutput` 中按类型补分支。
-- `DirectBackend` 负责认证，并把 Action 返回的语言无关错误码转成结构化、本地化错误，再调用 Action。
-- 只读 Query 信任 `DirectBackend` 已解析的当前身份，不重复查询用户状态；写 Action 在事务开始时通过 `actions/identity.LockActiveUser` 校验并锁定活跃用户账号。
+- `appservice/backend.go` 中的 `Backend` 接口是业务调用的唯一契约源：每个方法必须携带 `cervi:route` 指令；`Service` 委托、服务端认证分发、Gin 路由与 Handler、API Proxy 转发由 `go generate ./internal/appservice` 统一生成到各包的 `*_gen.go`，禁止手改生成文件。
+- 新增业务方法的步骤：在 `Backend` 接口补方法与指令（GET 的查询结构体在 `types.go` 为每个字段显式加 `query` 标签，不传输的字段使用 `query:"-"`），运行生成器，然后只手写 `directOperations` 实现和 Action。无法按统一模式生成的层用 `manual=service,api,proxy` 标记并在对应包手写；API Proxy 的响应归一化在 `normalizeOutput` 中按类型补分支。
+- 认证由 `direct_backend_gen.go` 中生成的分发层统一处理：`auth` 默认为 `member`，分发层先解析登录身份再调用业务实现；无需登录身份的方法在指令中标记 `auth=public`。
+- `directOperations` 中的业务实现直接接收已解析的 `identity`，不重复处理认证，只负责把 Action 返回的语言无关错误码转成结构化、本地化错误，再调用 Action。其 Action 与 Query 字段按业务域分组在 `<域>Ops` 结构体中，新增依赖只改对应实现文件。
+- 只读 Query 信任分发层已解析的当前身份，不重复查询用户状态；写 Action 在事务开始时通过 `actions/identity.LockActiveUser` 校验并锁定活跃用户账号。
 - Action 直接使用 Bun，按需调用 `common`；记录关联、组织边界和业务规则在事务中显式校验和维护。
 - `common` 只放无数据库、无传输层、无平台依赖的通用能力。小函数和错误放在包内，完整能力使用子包。
 - `domain` 只放各层共用的领域值，按概念拆文件，不放数据库、传输层和平台逻辑。

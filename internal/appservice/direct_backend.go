@@ -8,27 +8,11 @@ import (
 	"log/slog"
 	"time"
 
-	agentaction "github.com/runforyou-ai/cervi/internal/actions/agent"
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
-	aiprovideraction "github.com/runforyou-ai/cervi/internal/actions/aiprovider"
 	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
-	businesssystemaction "github.com/runforyou-ai/cervi/internal/actions/businesssystem"
-	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
-	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
-	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
-	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
-	"github.com/runforyou-ai/cervi/internal/actions/filemaintenance"
-	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
-	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
 	knowledgebaseaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
 	mcpserveraction "github.com/runforyou-ai/cervi/internal/actions/mcpserver"
-	memberaction "github.com/runforyou-ai/cervi/internal/actions/member"
-	organizationaction "github.com/runforyou-ai/cervi/internal/actions/organization"
-	roleaction "github.com/runforyou-ai/cervi/internal/actions/role"
-	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
-	teamaction "github.com/runforyou-ai/cervi/internal/actions/team"
-	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
 	"github.com/runforyou-ai/cervi/internal/integration/knowledgeprocessing"
@@ -47,289 +31,70 @@ var (
 	_ WorkspaceInstaller = (*DirectBackend)(nil)
 )
 
-// DirectBackend 在服务端进程内直接调用 Action 和 Query。
+// sessionGuard 解析请求所属企业并校验登录令牌。
+type sessionGuard struct {
+	resolveTenant   tenant.Resolver
+	resolveIdentity *authaction.ResolveIdentityQuery
+}
+
+// DirectBackend 解析登录身份并把业务调用分发给已认证实现。
+//
+// 各 Backend 方法的认证分发由 appservicegen 生成到 direct_backend_gen.go；
+// auth=public 的方法不解析身份，其余方法在调用实现前必须拿到当前身份。
 type DirectBackend struct {
-	sendAttachmentMessage             *conversationaction.SendAttachmentMessageAction
-	agentCoordinator                  *agentrunaction.ExecuteAction
-	customerDeliveries                *deliveryaction.Manager
-	installWorkspace                  *installationaction.InstallWorkspaceAction
-	login                             *authaction.LoginAction
-	logout                            *authaction.LogoutAction
-	resolveIdentity                   *authaction.ResolveIdentityQuery
-	resolveTenant                     tenant.Resolver
-	loadInbox                         *inboxaction.LoadInboxQuery
-	listCustomerServiceAssignees      *inboxaction.ListCustomerServiceAssigneesQuery
-	listConversationMessages          *conversationaction.ListConversationMessagesQuery
-	updateConversationUnreadMark      *conversationaction.UpdateConversationUnreadMarkAction
-	markConversationRead              *conversationaction.MarkConversationReadAction
-	conversationNavigation            *conversationaction.GetConversationNavigationStateQuery
-	pendingConversationMentions       *conversationaction.ListPendingConversationMentionsQuery
-	reviewConversationMention         *conversationaction.MarkConversationMentionReviewedAction
-	updateConversationNotifications   *conversationaction.UpdateConversationNotificationSettingsAction
-	sendCustomerTextMessage           *conversationaction.SendCustomerTextMessageAction
-	claimServiceSession               *conversationaction.ClaimServiceSessionAction
-	transferServiceSession            *conversationaction.TransferServiceSessionAction
-	closeServiceSession               *conversationaction.CloseServiceSessionAction
-	reopenServiceSession              *conversationaction.ReopenServiceSessionAction
-	sendFirstAgentTextMessage         *conversationaction.SendFirstAgentTextMessageAction
-	sendAgentTextMessage              *conversationaction.SendAgentTextMessageAction
-	sendFirstDirectTextMessage        *conversationaction.SendFirstDirectTextMessageAction
-	findDirectConversation            *conversationaction.FindDirectConversationQuery
-	sendDirectTextMessage             *conversationaction.SendDirectTextMessageAction
-	createGroupConversation           *conversationaction.CreateGroupConversationAction
-	getGroupConversation              *conversationaction.GetGroupConversationQuery
-	updateGroupConversation           *conversationaction.UpdateGroupConversationAction
-	addGroupConversationMembers       *conversationaction.AddGroupConversationMembersAction
-	removeGroupConversationMember     *conversationaction.RemoveGroupConversationMemberAction
-	transferGroupConversationOwner    *conversationaction.TransferGroupConversationOwnerAction
-	leaveGroupConversation            *conversationaction.LeaveGroupConversationAction
-	dissolveGroupConversation         *conversationaction.DissolveGroupConversationAction
-	sendGroupTextMessage              *conversationaction.SendGroupTextMessageAction
-	listMessageChannels               *channelaction.ListMessageChannelsQuery
-	getWebsiteChannel                 *channelaction.GetWebsiteChannelQuery
-	getTelegramChannel                *channelaction.GetTelegramChannelQuery
-	getMessageChannel                 *channelaction.GetMessageChannelQuery
-	createMessageChannel              *channelaction.CreateMessageChannelAction
-	updateMessageChannel              *channelaction.UpdateMessageChannelAction
-	updateWebsiteChannelChatInterface *channelaction.UpdateWebsiteChannelChatInterfaceAction
-	updateWebsiteChannelAccess        *channelaction.UpdateWebsiteChannelAccessAction
-	testTelegramConnection            *channelaction.TestTelegramConnectionAction
-	saveTelegramConnection            *channelaction.SaveTelegramConnectionAction
-	updateTelegramChannelStatus       *channelaction.UpdateTelegramChannelStatusAction
-	updateMessageChannelStatus        *channelaction.UpdateMessageChannelStatusAction
-	listChannelOptions                *channelaction.ListChannelOptionsQuery
-	listMemberOptions                 *memberaction.ListOptionsQuery
-	listAgentMCPServerOptions         *agentaction.ListMCPServerOptionsQuery
-	listAgentModelOptions             *agentaction.ListModelOptionsQuery
-	createAgent                       *agentaction.CreateAgentAction
-	listAgents                        *agentaction.ListAgentsQuery
-	getAgent                          *agentaction.GetAgentQuery
-	updateAgent                       *agentaction.UpdateAgentAction
-	updateAgentExecution              *agentaction.UpdateExecutionAction
-	updateAgentStatus                 *agentaction.UpdateStatusAction
-	listUsers                         *useraction.ListUsersQuery
-	getUser                           *useraction.GetUserQuery
-	createUser                        *useraction.CreateUserAction
-	updateUser                        *useraction.UpdateUserAction
-	updateRoleAssignments             *roleaction.UpdateAssignmentsAction
-	updateUserStatus                  *useraction.UpdateStatusAction
-	listTeams                         *teamaction.ListTeamsQuery
-	createTeam                        *teamaction.CreateTeamAction
-	updateTeam                        *teamaction.UpdateTeamAction
-	deleteTeam                        *teamaction.DeleteTeamAction
-	documentQuery                     *knowledgebaseaction.DocumentQuery
-	createDocuments                   *knowledgebaseaction.CreateDocumentsAction
-	documentProcessing                *knowledgebaseaction.DocumentProcessing
-	knowledgeProcessor                *knowledgeprocessing.Client
-	moveDocument                      *knowledgebaseaction.MoveDocumentAction
-	deleteDocument                    *knowledgebaseaction.DeleteDocumentAction
-	listQAEntries                     *knowledgebaseaction.ListQAEntriesQuery
-	getQAEntry                        *knowledgebaseaction.GetQAEntryQuery
-	saveQAEntry                       *knowledgebaseaction.SaveQAEntryAction
-	deleteQAEntry                     *knowledgebaseaction.DeleteQAEntryAction
-	listKnowledgeBases                *knowledgebaseaction.ListKnowledgeBasesQuery
-	getKnowledgeBase                  *knowledgebaseaction.GetKnowledgeBaseQuery
-	createKnowledgeBase               *knowledgebaseaction.CreateKnowledgeBaseAction
-	updateKnowledgeBase               *knowledgebaseaction.UpdateKnowledgeBaseAction
-	deleteKnowledgeBase               *knowledgebaseaction.DeleteKnowledgeBaseAction
-	createKnowledgeGroup              *knowledgebaseaction.CreateKnowledgeGroupAction
-	updateKnowledgeGroup              *knowledgebaseaction.UpdateKnowledgeGroupAction
-	deleteKnowledgeGroup              *knowledgebaseaction.DeleteKnowledgeGroupAction
-	listTeamMembers                   *teamaction.ListMembersQuery
-	listTeamMemberCandidates          *teamaction.ListMemberCandidatesQuery
-	addTeamMembers                    *teamaction.AddMembersAction
-	removeTeamMembers                 *teamaction.RemoveMembersAction
-	updateProfile                     *useraction.UpdateProfileAction
-	changePassword                    *useraction.ChangePasswordAction
-	updateUserPreferences             *useraction.UpdatePreferencesAction
-	updateUserWorkStatus              *useraction.UpdateWorkStatusAction
-	listContacts                      *contactaction.ListContactsQuery
-	getContact                        *contactaction.GetContactQuery
-	createContact                     *contactaction.CreateContactAction
-	updateContact                     *contactaction.UpdateContactAction
-	deleteContact                     *contactaction.DeleteContactAction
-	restoreContact                    *contactaction.RestoreContactAction
-	listRoles                         *roleaction.ListRolesQuery
-	getRole                           *roleaction.GetRoleQuery
-	createRole                        *roleaction.CreateRoleAction
-	updateRole                        *roleaction.UpdateRoleAction
-	deleteRole                        *roleaction.DeleteRoleAction
-	listAIProviders                   *aiprovideraction.ListAIProvidersQuery
-	getAIProvider                     *aiprovideraction.GetAIProviderQuery
-	testAIProviderConnection          *aiprovideraction.TestConnectionAction
-	createAIProvider                  *aiprovideraction.CreateAIProviderAction
-	updateAIProvider                  *aiprovideraction.UpdateAIProviderAction
-	deleteAIProvider                  *aiprovideraction.DeleteAIProviderAction
-	listBusinessSystems               *businesssystemaction.ListBusinessSystemsQuery
-	getBusinessSystem                 *businesssystemaction.GetBusinessSystemQuery
-	createBusinessSystem              *businesssystemaction.CreateBusinessSystemAction
-	updateBusinessSystem              *businesssystemaction.UpdateBusinessSystemAction
-	deleteBusinessSystem              *businesssystemaction.DeleteBusinessSystemAction
-	listMCPServers                    *mcpserveraction.ListMCPServersQuery
-	getMCPServer                      *mcpserveraction.GetMCPServerQuery
-	createMCPServer                   *mcpserveraction.CreateMCPServerAction
-	updateMCPServer                   *mcpserveraction.UpdateMCPServerAction
-	deleteMCPServer                   *mcpserveraction.DeleteMCPServerAction
-	testMCPServerConnection           *mcpserveraction.TestConnectionAction
-	refreshMCPServerTools             *mcpserveraction.RefreshToolsAction
-	updateOrganization                *organizationaction.UpdateOrganizationAction
-	getS3Setting                      *settingaction.GetS3SettingQuery
-	saveS3Setting                     *settingaction.SaveS3SettingAction
-	testS3Setting                     *settingaction.TestS3SettingAction
-	createFileUpload                  *fileaction.CreateUploadAction
-	cancelFileUpload                  *filemaintenance.CancelUploadAction
-	completeFileUpload                *fileaction.CompleteUploadAction
-	getFile                           *fileaction.GetQuery
-	localFiles                        *serverfilecontent.LocalStore
+	ops *directOperations
+}
+
+// directOperations 持有已认证业务实现所需的 Action 和 Query。
+type directOperations struct {
+	sessionGuard
+	authOps
+	conversationOps
+	inboxOps
+	channelOps
+	contactOps
+	directoryOps
+	agentOps
+	knowledgeOps
+	integrationOps
+	fileOps
 }
 
 // NewDirectBackend 创建直接访问服务端存储的应用后端。
-func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tenantResolver tenant.Resolver, agentScheduler conversationaction.AgentMessageScheduler, agentCoordinator *agentrunaction.ExecuteAction, taskEnqueuer servertask.TxEnqueuer) *DirectBackend {
+func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tenantResolver tenant.Resolver, agentScheduler conversationaction.AgentMessageScheduler, agentCoordinator *agentrunaction.ExecuteAction, taskEnqueuer servertask.TxEnqueuer, knowledgeProcessor *knowledgeprocessing.Client) *DirectBackend {
 	connectionRunner := connectiontest.NewRunner(10 * time.Second)
 	connectionClient := connectiontest.NewHTTPClient()
 	modelProviderRegistry := modelprovider.NewRegistry(connectionClient)
 	telegramAPI := telegram.NewClient(connectionClient)
 	mcpTest := mcpserveraction.NewTestConnectionAction(mcpintegration.NewClient())
 	mcpScheduler := mcpserveraction.NewToolsScheduler(taskEnqueuer)
-	return &DirectBackend{
-		agentCoordinator:                  agentCoordinator,
-		customerDeliveries:                deliveryaction.NewManager(db, taskEnqueuer),
-		installWorkspace:                  installationaction.NewInstallWorkspaceAction(db),
-		login:                             authaction.NewLoginAction(db),
-		logout:                            authaction.NewLogoutAction(db),
-		resolveIdentity:                   authaction.NewResolveIdentityQuery(db),
-		resolveTenant:                     tenantResolver,
-		loadInbox:                         inboxaction.NewLoadInboxQuery(db),
-		listCustomerServiceAssignees:      inboxaction.NewListCustomerServiceAssigneesQuery(db),
-		listConversationMessages:          conversationaction.NewListConversationMessagesQuery(db),
-		updateConversationUnreadMark:      conversationaction.NewUpdateConversationUnreadMarkAction(db),
-		markConversationRead:              conversationaction.NewMarkConversationReadAction(db),
-		conversationNavigation:            conversationaction.NewGetConversationNavigationStateQuery(db),
-		pendingConversationMentions:       conversationaction.NewListPendingConversationMentionsQuery(db),
-		reviewConversationMention:         conversationaction.NewMarkConversationMentionReviewedAction(db),
-		updateConversationNotifications:   conversationaction.NewUpdateConversationNotificationSettingsAction(db),
-		sendCustomerTextMessage:           conversationaction.NewSendCustomerTextMessageAction(db, taskEnqueuer),
-		claimServiceSession:               conversationaction.NewClaimServiceSessionAction(db, agentCoordinator),
-		transferServiceSession:            conversationaction.NewTransferServiceSessionAction(db, agentCoordinator, agentScheduler),
-		closeServiceSession:               conversationaction.NewCloseServiceSessionAction(db, agentCoordinator),
-		reopenServiceSession:              conversationaction.NewReopenServiceSessionAction(db),
-		sendFirstAgentTextMessage:         conversationaction.NewSendFirstAgentTextMessageAction(db, agentScheduler),
-		sendAgentTextMessage:              conversationaction.NewSendAgentTextMessageAction(db, agentScheduler),
-		sendFirstDirectTextMessage:        conversationaction.NewSendFirstDirectTextMessageAction(db),
-		findDirectConversation:            conversationaction.NewFindDirectConversationQuery(db),
-		sendDirectTextMessage:             conversationaction.NewSendDirectTextMessageAction(db),
-		createGroupConversation:           conversationaction.NewCreateGroupConversationAction(db),
-		getGroupConversation:              conversationaction.NewGetGroupConversationQuery(db),
-		updateGroupConversation:           conversationaction.NewUpdateGroupConversationAction(db),
-		addGroupConversationMembers:       conversationaction.NewAddGroupConversationMembersAction(db),
-		removeGroupConversationMember:     conversationaction.NewRemoveGroupConversationMemberAction(db),
-		transferGroupConversationOwner:    conversationaction.NewTransferGroupConversationOwnerAction(db),
-		leaveGroupConversation:            conversationaction.NewLeaveGroupConversationAction(db),
-		dissolveGroupConversation:         conversationaction.NewDissolveGroupConversationAction(db),
-		sendGroupTextMessage:              conversationaction.NewSendGroupTextMessageAction(db),
-		listMessageChannels:               channelaction.NewListMessageChannelsQuery(db),
-		getWebsiteChannel:                 channelaction.NewGetWebsiteChannelQuery(db),
-		getTelegramChannel:                channelaction.NewGetTelegramChannelQuery(db),
-		getMessageChannel:                 channelaction.NewGetMessageChannelQuery(db),
-		createMessageChannel:              channelaction.NewCreateMessageChannelAction(db),
-		updateMessageChannel:              channelaction.NewUpdateMessageChannelAction(db),
-		updateWebsiteChannelChatInterface: channelaction.NewUpdateWebsiteChannelChatInterfaceAction(db),
-		updateWebsiteChannelAccess:        channelaction.NewUpdateWebsiteChannelAccessAction(db),
-		testTelegramConnection:            channelaction.NewTestTelegramConnectionAction(db, connectionRunner, telegramAPI),
-		saveTelegramConnection:            channelaction.NewSaveTelegramConnectionAction(db, connectionRunner, telegramAPI),
-		updateTelegramChannelStatus:       channelaction.NewUpdateTelegramChannelStatusAction(db, connectionRunner, telegramAPI),
-		updateMessageChannelStatus:        channelaction.NewUpdateMessageChannelStatusAction(db),
-		listChannelOptions:                channelaction.NewListChannelOptionsQuery(db),
-		listMemberOptions:                 memberaction.NewListOptionsQuery(db),
-		listAgentMCPServerOptions:         agentaction.NewListMCPServerOptionsQuery(db),
-		listAgentModelOptions:             agentaction.NewListModelOptionsQuery(db),
-		createAgent:                       agentaction.NewCreateAgentAction(db),
-		listAgents:                        agentaction.NewListAgentsQuery(db),
-		getAgent:                          agentaction.NewGetAgentQuery(db),
-		updateAgent:                       agentaction.NewUpdateAgentAction(db),
-		updateAgentExecution:              agentaction.NewUpdateExecutionAction(db),
-		updateAgentStatus:                 agentaction.NewUpdateStatusAction(db),
-		listUsers:                         useraction.NewListUsersQuery(db),
-		getUser:                           useraction.NewGetUserQuery(db),
-		createUser:                        useraction.NewCreateUserAction(db),
-		updateUser:                        useraction.NewUpdateUserAction(db),
-		updateRoleAssignments:             roleaction.NewUpdateAssignmentsAction(db),
-		updateUserStatus:                  useraction.NewUpdateStatusAction(db),
-		listTeams:                         teamaction.NewListTeamsQuery(db),
-		createTeam:                        teamaction.NewCreateTeamAction(db),
-		updateTeam:                        teamaction.NewUpdateTeamAction(db),
-		deleteTeam:                        teamaction.NewDeleteTeamAction(db),
-		documentQuery:                     knowledgebaseaction.NewDocumentQuery(db),
-		documentProcessing:                knowledgebaseaction.NewDocumentProcessing(db, taskEnqueuer),
-		knowledgeProcessor:                knowledgeprocessing.NewClient(""),
-		createDocuments:                   knowledgebaseaction.NewCreateDocumentsAction(db, taskEnqueuer),
-		moveDocument:                      knowledgebaseaction.NewMoveDocumentAction(db),
-		deleteDocument:                    knowledgebaseaction.NewDeleteDocumentAction(db),
-		listQAEntries:                     knowledgebaseaction.NewListQAEntriesQuery(db),
-		getQAEntry:                        knowledgebaseaction.NewGetQAEntryQuery(db),
-		saveQAEntry:                       knowledgebaseaction.NewSaveQAEntryAction(db),
-		deleteQAEntry:                     knowledgebaseaction.NewDeleteQAEntryAction(db),
-		listKnowledgeBases:                knowledgebaseaction.NewListKnowledgeBasesQuery(db),
-		getKnowledgeBase:                  knowledgebaseaction.NewGetKnowledgeBaseQuery(db),
-		createKnowledgeBase:               knowledgebaseaction.NewCreateKnowledgeBaseAction(db),
-		updateKnowledgeBase:               knowledgebaseaction.NewUpdateKnowledgeBaseAction(db),
-		deleteKnowledgeBase:               knowledgebaseaction.NewDeleteKnowledgeBaseAction(db),
-		createKnowledgeGroup:              knowledgebaseaction.NewCreateKnowledgeGroupAction(db),
-		updateKnowledgeGroup:              knowledgebaseaction.NewUpdateKnowledgeGroupAction(db),
-		deleteKnowledgeGroup:              knowledgebaseaction.NewDeleteKnowledgeGroupAction(db),
-		listTeamMembers:                   teamaction.NewListMembersQuery(db),
-		listTeamMemberCandidates:          teamaction.NewListMemberCandidatesQuery(db),
-		addTeamMembers:                    teamaction.NewAddMembersAction(db),
-		removeTeamMembers:                 teamaction.NewRemoveMembersAction(db),
-		updateProfile:                     useraction.NewUpdateProfileAction(db),
-		changePassword:                    useraction.NewChangePasswordAction(db),
-		updateUserPreferences:             useraction.NewUpdatePreferencesAction(db),
-		updateUserWorkStatus:              useraction.NewUpdateWorkStatusAction(db),
-		listContacts:                      contactaction.NewListContactsQuery(db),
-		getContact:                        contactaction.NewGetContactQuery(db),
-		createContact:                     contactaction.NewCreateContactAction(db),
-		updateContact:                     contactaction.NewUpdateContactAction(db),
-		deleteContact:                     contactaction.NewDeleteContactAction(db),
-		restoreContact:                    contactaction.NewRestoreContactAction(db),
-		listRoles:                         roleaction.NewListRolesQuery(db),
-		getRole:                           roleaction.NewGetRoleQuery(db),
-		createRole:                        roleaction.NewCreateRoleAction(db),
-		updateRole:                        roleaction.NewUpdateRoleAction(db),
-		deleteRole:                        roleaction.NewDeleteRoleAction(db),
-		listAIProviders:                   aiprovideraction.NewListAIProvidersQuery(db),
-		getAIProvider:                     aiprovideraction.NewGetAIProviderQuery(db),
-		testAIProviderConnection:          aiprovideraction.NewTestConnectionAction(connectionRunner, modelProviderRegistry),
-		createAIProvider:                  aiprovideraction.NewCreateAIProviderAction(db),
-		updateAIProvider:                  aiprovideraction.NewUpdateAIProviderAction(db),
-		deleteAIProvider:                  aiprovideraction.NewDeleteAIProviderAction(db),
-		listBusinessSystems:               businesssystemaction.NewListBusinessSystemsQuery(db),
-		getBusinessSystem:                 businesssystemaction.NewGetBusinessSystemQuery(db),
-		createBusinessSystem:              businesssystemaction.NewCreateBusinessSystemAction(db),
-		updateBusinessSystem:              businesssystemaction.NewUpdateBusinessSystemAction(db),
-		deleteBusinessSystem:              businesssystemaction.NewDeleteBusinessSystemAction(db),
-		listMCPServers:                    mcpserveraction.NewListMCPServersQuery(db),
-		getMCPServer:                      mcpserveraction.NewGetMCPServerQuery(db),
-		createMCPServer:                   mcpserveraction.NewCreateMCPServerAction(db, mcpTest, mcpScheduler),
-		updateMCPServer:                   mcpserveraction.NewUpdateMCPServerAction(db, mcpTest, mcpScheduler),
-		deleteMCPServer:                   mcpserveraction.NewDeleteMCPServerAction(db),
-		testMCPServerConnection:           mcpTest,
-		refreshMCPServerTools:             mcpserveraction.NewRefreshToolsAction(db, mcpScheduler),
-		updateOrganization:                organizationaction.NewUpdateOrganizationAction(db),
-		getS3Setting:                      settingaction.NewGetS3SettingQuery(db),
-		saveS3Setting:                     settingaction.NewSaveS3SettingAction(db),
-		testS3Setting:                     settingaction.NewTestS3SettingAction(connectionRunner),
-		createFileUpload:                  fileaction.NewCreateUploadAction(db),
-		cancelFileUpload:                  filemaintenance.NewCancelUploadAction(db),
-		sendAttachmentMessage:             conversationaction.NewSendAttachmentMessageAction(db),
-		completeFileUpload:                fileaction.NewCompleteUploadAction(db),
-		getFile:                           fileaction.NewGetQuery(db),
-		localFiles:                        localFiles,
+	guard := sessionGuard{resolveTenant: tenantResolver, resolveIdentity: authaction.NewResolveIdentityQuery(db)}
+	documentQuery := knowledgebaseaction.NewDocumentQuery(db)
+	documentQuery.SetSegmentReader(knowledgeProcessor)
+	ops := &directOperations{
+		sessionGuard:    guard,
+		authOps:         newAuthOps(db),
+		conversationOps: newConversationOps(db, agentScheduler, agentCoordinator, taskEnqueuer),
+		inboxOps:        newInboxOps(db, taskEnqueuer),
+		channelOps:      newChannelOps(db, connectionRunner, telegramAPI),
+		contactOps:      newContactOps(db),
+		directoryOps:    newDirectoryOps(db),
+		agentOps:        newAgentOps(db, agentCoordinator),
+		knowledgeOps:    newKnowledgeOps(db, taskEnqueuer, documentQuery, knowledgeProcessor),
+		integrationOps:  newIntegrationOps(db, connectionRunner, modelProviderRegistry, mcpTest, mcpScheduler),
+		fileOps:         newFileOps(db, connectionRunner, localFiles),
 	}
+	return &DirectBackend{ops: ops}
+}
+
+// InstallWorkspace 创建企业管理员并返回登录令牌。
+func (b *DirectBackend) InstallWorkspace(ctx context.Context, meta RequestMeta, input InstallWorkspaceInput) (Auth, error) {
+	return b.ops.InstallWorkspace(ctx, meta, input)
 }
 
 // requireInitialized 解析当前请求的企业范围，并校验该企业是否已完成初始化。
-func (b *DirectBackend) requireInitialized(ctx context.Context, meta RequestMeta) (tenant.Scope, error) {
-	scope, err := b.resolveTenant.Resolve(ctx, tenant.AccessHost(ctx))
+func (g sessionGuard) requireInitialized(ctx context.Context, meta RequestMeta) (tenant.Scope, error) {
+	scope, err := g.resolveTenant.Resolve(ctx, tenant.AccessHost(ctx))
 	if errors.Is(err, tenant.ErrNotFound) {
 		return tenant.Scope{}, SessionError(meta, SessionStateSetup, cervii18n.ErrorInstallationRequired)
 	}
@@ -344,15 +109,15 @@ func (b *DirectBackend) requireInitialized(ctx context.Context, meta RequestMeta
 }
 
 // authenticate 校验登录令牌并返回当前身份。
-func (b *DirectBackend) authenticate(ctx context.Context, meta RequestMeta) (*servermodels.Identity, error) {
-	scope, err := b.requireInitialized(ctx, meta)
+func (g sessionGuard) authenticate(ctx context.Context, meta RequestMeta) (*servermodels.Identity, error) {
+	scope, err := g.requireInitialized(ctx, meta)
 	if err != nil {
 		return nil, err
 	}
 	if meta.Token == "" {
 		return nil, SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
 	}
-	identity, err := b.resolveIdentity.Execute(ctx, scope.OrganizationID, meta.Token)
+	identity, err := g.resolveIdentity.Execute(ctx, scope.OrganizationID, meta.Token)
 	if errors.Is(err, authaction.ErrIdentityNotFound) {
 		slog.Info("登录令牌无效")
 		return nil, SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)

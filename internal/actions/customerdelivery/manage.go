@@ -87,7 +87,7 @@ func (m *Manager) Resolve(ctx context.Context, identity *models.Identity, conver
 				return ErrConflict
 			}
 			if err := tx.NewSelect().TableExpr("customer_message_deliveries").ColumnExpr("MAX(position) + 1").
-				Where("channel_id = ? AND contact_channel_identity_id = ?", delivery.ChannelID, delivery.ContactChannelIdentityID).Scan(ctx, &delivery.Position); err != nil {
+				Where("organization_id = ? AND channel_id = ? AND contact_channel_identity_id = ?", delivery.OrganizationID, delivery.ChannelID, delivery.ContactChannelIdentityID).Scan(ctx, &delivery.Position); err != nil {
 				return err
 			}
 			delivery.Status, delivery.AvailableAt = domain.CustomerDeliveryPending, now

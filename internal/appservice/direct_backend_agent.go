@@ -8,23 +8,50 @@ import (
 	"log/slog"
 
 	agentaction "github.com/runforyou-ai/cervi/internal/actions/agent"
+	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	"github.com/uptrace/bun"
 )
 
-// CreateAgent 创建企业 AI 员工。
-func (b *DirectBackend) CreateAgent(ctx context.Context, meta RequestMeta, input CreateAgentInput) (Agent, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return Agent{}, err
+// agentOps 持有 AI 员工与运行的 Action 和 Query。
+type agentOps struct {
+	agentCoordinator          *agentrunaction.ExecuteAction
+	listAgentMCPServerOptions *agentaction.ListMCPServerOptionsQuery
+	listAgentModelOptions     *agentaction.ListModelOptionsQuery
+	createAgent               *agentaction.CreateAgentAction
+	listAgents                *agentaction.ListAgentsQuery
+	getAgent                  *agentaction.GetAgentQuery
+	updateAgent               *agentaction.UpdateAgentAction
+	updateAgentExecution      *agentaction.UpdateExecutionAction
+	updateAgentStatus         *agentaction.UpdateStatusAction
+}
+
+// newAgentOps 创建 AI 员工与运行的业务实现依赖。
+func newAgentOps(db *bun.DB, agentCoordinator *agentrunaction.ExecuteAction) agentOps {
+	return agentOps{
+		agentCoordinator:          agentCoordinator,
+		listAgentMCPServerOptions: agentaction.NewListMCPServerOptionsQuery(db),
+		listAgentModelOptions:     agentaction.NewListModelOptionsQuery(db),
+		createAgent:               agentaction.NewCreateAgentAction(db),
+		listAgents:                agentaction.NewListAgentsQuery(db),
+		getAgent:                  agentaction.NewGetAgentQuery(db),
+		updateAgent:               agentaction.NewUpdateAgentAction(db),
+		updateAgentExecution:      agentaction.NewUpdateExecutionAction(db),
+		updateAgentStatus:         agentaction.NewUpdateStatusAction(db),
 	}
-	created, err := b.createAgent.Execute(ctx, identity, agentaction.CreateInput{
+}
+
+// CreateAgent 创建企业 AI 员工。
+func (o *directOperations) CreateAgent(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input CreateAgentInput) (Agent, error) {
+	created, err := o.createAgent.Execute(ctx, identity, agentaction.CreateInput{
 		DisplayName: input.DisplayName, RoleID: input.RoleID, TeamIDs: input.TeamIDs,
 		Execution: agentExecutionInput(input.Execution),
 	})
 	if err != nil {
-		return Agent{}, b.agentError(ctx, meta, err, cervii18n.ErrorAgentCreateFailed, identity.Organization.ID, "", map[common.FieldCode]cervii18n.Key{
+		return Agent{}, o.agentError(ctx, meta, err, cervii18n.ErrorAgentCreateFailed, identity.Organization.ID, "", map[common.FieldCode]cervii18n.Key{
 			agentaction.ValidationDisplayNameRequired:       cervii18n.FieldAgentNameRequired,
 			agentaction.ValidationRoleInvalid:               cervii18n.FieldMemberRoleInvalid,
 			agentaction.ValidationTeamInvalid:               cervii18n.FieldTeamInvalid,
@@ -49,14 +76,10 @@ func (b *DirectBackend) CreateAgent(ctx context.Context, meta RequestMeta, input
 }
 
 // ListAgentMCPServerOptions 读取企业 MCP 服务摘要。
-func (b *DirectBackend) ListAgentMCPServerOptions(ctx context.Context, meta RequestMeta) (AgentMCPServerOptionList, error) {
-	identity, err := b.authenticate(ctx, meta)
+func (o *directOperations) ListAgentMCPServerOptions(ctx context.Context, meta RequestMeta, identity *servermodels.Identity) (AgentMCPServerOptionList, error) {
+	options, err := o.listAgentMCPServerOptions.Execute(ctx, identity)
 	if err != nil {
-		return AgentMCPServerOptionList{}, err
-	}
-	options, err := b.listAgentMCPServerOptions.Execute(ctx, identity)
-	if err != nil {
-		return AgentMCPServerOptionList{}, b.agentError(ctx, meta, err, cervii18n.ErrorMCPServerListFailed, identity.Organization.ID, "", nil)
+		return AgentMCPServerOptionList{}, o.agentError(ctx, meta, err, cervii18n.ErrorMCPServerListFailed, identity.Organization.ID, "", nil)
 	}
 	output := make([]AgentMCPServerOption, 0, len(options))
 	for _, option := range options {
@@ -66,14 +89,10 @@ func (b *DirectBackend) ListAgentMCPServerOptions(ctx context.Context, meta Requ
 }
 
 // ListAgentModelOptions 返回企业 AI 员工可使用的对话模型。
-func (b *DirectBackend) ListAgentModelOptions(ctx context.Context, meta RequestMeta) (AgentModelOptionList, error) {
-	identity, err := b.authenticate(ctx, meta)
+func (o *directOperations) ListAgentModelOptions(ctx context.Context, meta RequestMeta, identity *servermodels.Identity) (AgentModelOptionList, error) {
+	models, err := o.listAgentModelOptions.Execute(ctx, identity)
 	if err != nil {
-		return AgentModelOptionList{}, err
-	}
-	models, err := b.listAgentModelOptions.Execute(ctx, identity)
-	if err != nil {
-		return AgentModelOptionList{}, b.agentError(ctx, meta, err, cervii18n.ErrorAgentModelListFailed, identity.Organization.ID, "", nil)
+		return AgentModelOptionList{}, o.agentError(ctx, meta, err, cervii18n.ErrorAgentModelListFailed, identity.Organization.ID, "", nil)
 	}
 	output := make([]AgentModelOption, 0, len(models))
 	for _, model := range models {
@@ -86,19 +105,15 @@ func (b *DirectBackend) ListAgentModelOptions(ctx context.Context, meta RequestM
 }
 
 // ListAgents 返回企业 AI 员工目录。
-func (b *DirectBackend) ListAgents(ctx context.Context, meta RequestMeta, input AgentListInput) (AgentList, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return AgentList{}, err
-	}
-	output, err := b.listAgents.Execute(ctx, identity, agentaction.ListInput{
+func (o *directOperations) ListAgents(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input AgentListInput) (AgentList, error) {
+	output, err := o.listAgents.Execute(ctx, identity, agentaction.ListInput{
 		Query: input.Query, Status: optionalDomain[UserStatus, domain.UserStatus](input.Status), Page: input.Page, PageSize: input.PageSize,
 	})
 	if errors.Is(err, agentaction.ErrQueryInvalid) {
 		return AgentList{}, InvalidError(meta, cervii18n.ErrorValidationFailed, nil)
 	}
 	if err != nil {
-		return AgentList{}, b.agentError(ctx, meta, err, cervii18n.ErrorAgentListFailed, identity.Organization.ID, "", nil)
+		return AgentList{}, o.agentError(ctx, meta, err, cervii18n.ErrorAgentListFailed, identity.Organization.ID, "", nil)
 	}
 	agents := make([]AgentListItem, 0, len(output.Agents))
 	for _, agent := range output.Agents {
@@ -122,27 +137,19 @@ func (b *DirectBackend) ListAgents(ctx context.Context, meta RequestMeta, input 
 }
 
 // GetAgent 返回企业 AI 员工详情。
-func (b *DirectBackend) GetAgent(ctx context.Context, meta RequestMeta, agentID string) (Agent, error) {
-	identity, err := b.authenticate(ctx, meta)
+func (o *directOperations) GetAgent(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, agentID string) (Agent, error) {
+	agent, err := o.getAgent.Execute(ctx, identity, agentID)
 	if err != nil {
-		return Agent{}, err
-	}
-	agent, err := b.getAgent.Execute(ctx, identity, agentID)
-	if err != nil {
-		return Agent{}, b.agentError(ctx, meta, err, cervii18n.ErrorAgentReadFailed, identity.Organization.ID, agentID, nil)
+		return Agent{}, o.agentError(ctx, meta, err, cervii18n.ErrorAgentReadFailed, identity.Organization.ID, agentID, nil)
 	}
 	return agentFromAction(*agent), nil
 }
 
 // UpdateAgent 保存企业 AI 员工基本资料和工作状态。
-func (b *DirectBackend) UpdateAgent(ctx context.Context, meta RequestMeta, agentID string, input UpdateAgentInput) (Agent, error) {
-	identity, err := b.authenticate(ctx, meta)
+func (o *directOperations) UpdateAgent(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, agentID string, input UpdateAgentInput) (Agent, error) {
+	agent, err := o.updateAgent.Execute(ctx, identity, agentID, agentaction.UpdateInput{DisplayName: input.DisplayName, RoleID: input.RoleID, TeamIDs: input.TeamIDs, WorkStatus: domain.WorkStatus(input.WorkStatus)})
 	if err != nil {
-		return Agent{}, err
-	}
-	agent, err := b.updateAgent.Execute(ctx, identity, agentID, agentaction.UpdateInput{DisplayName: input.DisplayName, RoleID: input.RoleID, TeamIDs: input.TeamIDs, WorkStatus: domain.WorkStatus(input.WorkStatus)})
-	if err != nil {
-		return Agent{}, b.agentError(ctx, meta, err, cervii18n.ErrorAgentUpdateFailed, identity.Organization.ID, agentID, map[common.FieldCode]cervii18n.Key{
+		return Agent{}, o.agentError(ctx, meta, err, cervii18n.ErrorAgentUpdateFailed, identity.Organization.ID, agentID, map[common.FieldCode]cervii18n.Key{
 			agentaction.ValidationDisplayNameRequired:   cervii18n.FieldAgentNameRequired,
 			agentaction.ValidationRoleInvalid:           cervii18n.FieldMemberRoleInvalid,
 			agentaction.ValidationTeamInvalid:           cervii18n.FieldTeamInvalid,
@@ -155,17 +162,13 @@ func (b *DirectBackend) UpdateAgent(ctx context.Context, meta RequestMeta, agent
 }
 
 // UpdateAgentExecution 修改企业 AI 员工的执行配置。
-func (b *DirectBackend) UpdateAgentExecution(ctx context.Context, meta RequestMeta, agentID string, input UpdateAgentExecutionInput) (Agent, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return Agent{}, err
-	}
-	agent, err := b.updateAgentExecution.Execute(ctx, identity, agentID, agentaction.UpdateExecutionInput{
+func (o *directOperations) UpdateAgentExecution(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, agentID string, input UpdateAgentExecutionInput) (Agent, error) {
+	agent, err := o.updateAgentExecution.Execute(ctx, identity, agentID, agentaction.UpdateExecutionInput{
 		ExecutionInput: agentExecutionInput(AgentExecutionInput{Mode: input.Mode, Managed: input.Managed}),
 		MCPServerIDs:   input.MCPServerIDs,
 	})
 	if err != nil {
-		return Agent{}, b.agentError(ctx, meta, err, cervii18n.ErrorAgentExecutionUpdateFailed, identity.Organization.ID, agentID, map[common.FieldCode]cervii18n.Key{
+		return Agent{}, o.agentError(ctx, meta, err, cervii18n.ErrorAgentExecutionUpdateFailed, identity.Organization.ID, agentID, map[common.FieldCode]cervii18n.Key{
 			agentaction.ValidationMCPServerInvalid:          cervii18n.FieldAgentMCPServerInvalid,
 			agentaction.ValidationExecutionInvalid:          cervii18n.FieldAgentExecutionInvalid,
 			agentaction.ValidationKnowledgeBaseInvalid:      cervii18n.FieldAgentKnowledgeBaseInvalid,
@@ -189,24 +192,20 @@ func (b *DirectBackend) UpdateAgentExecution(ctx context.Context, meta RequestMe
 }
 
 // DeactivateAgent 禁用企业 AI 员工账号。
-func (b *DirectBackend) DeactivateAgent(ctx context.Context, meta RequestMeta, agentID string) (Agent, error) {
-	return b.changeAgentStatus(ctx, meta, agentID, domain.UserStatusInactive)
+func (o *directOperations) DeactivateAgent(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, agentID string) (Agent, error) {
+	return o.changeAgentStatus(ctx, meta, identity, agentID, domain.UserStatusInactive)
 }
 
 // ReactivateAgent 恢复企业 AI 员工。
-func (b *DirectBackend) ReactivateAgent(ctx context.Context, meta RequestMeta, agentID string) (Agent, error) {
-	return b.changeAgentStatus(ctx, meta, agentID, domain.UserStatusActive)
+func (o *directOperations) ReactivateAgent(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, agentID string) (Agent, error) {
+	return o.changeAgentStatus(ctx, meta, identity, agentID, domain.UserStatusActive)
 }
 
 // changeAgentStatus 修改企业 AI 员工账号状态。
-func (b *DirectBackend) changeAgentStatus(ctx context.Context, meta RequestMeta, agentID string, status domain.UserStatus) (Agent, error) {
-	identity, err := b.authenticate(ctx, meta)
+func (o *directOperations) changeAgentStatus(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, agentID string, status domain.UserStatus) (Agent, error) {
+	agent, err := o.updateAgentStatus.Execute(ctx, identity, agentID, status)
 	if err != nil {
-		return Agent{}, err
-	}
-	agent, err := b.updateAgentStatus.Execute(ctx, identity, agentID, status)
-	if err != nil {
-		return Agent{}, b.agentError(ctx, meta, err, cervii18n.ErrorAgentStatusUpdateFailed, identity.Organization.ID, agentID, map[common.FieldCode]cervii18n.Key{
+		return Agent{}, o.agentError(ctx, meta, err, cervii18n.ErrorAgentStatusUpdateFailed, identity.Organization.ID, agentID, map[common.FieldCode]cervii18n.Key{
 			agentaction.ValidationStatusInvalid: cervii18n.FieldUserStatusInvalid,
 		})
 	}
@@ -248,7 +247,7 @@ func agentExecutionInput(input AgentExecutionInput) agentaction.ExecutionInput {
 }
 
 // agentError 转换 AI 员工领域错误并记录未处理故障。
-func (b *DirectBackend) agentError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key, organizationID, agentID string, fieldKeys map[common.FieldCode]cervii18n.Key) error {
+func (o *directOperations) agentError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key, organizationID, agentID string, fieldKeys map[common.FieldCode]cervii18n.Key) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}

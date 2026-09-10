@@ -23,8 +23,8 @@ import (
 
 const telegramAdapterName = "telegram_bot_api"
 
-// withTelegramBotLocks 按固定顺序锁定 Bot，串行化跨渠道的 Webhook 生命周期。
-func withTelegramBotLocks(ctx context.Context, conn bun.Conn, botIDs []int64, execute func() error) error {
+// withTelegramBotLocks 按固定顺序锁定 Bot，串行化本企业内跨渠道的 Webhook 生命周期。
+func withTelegramBotLocks(ctx context.Context, conn bun.Conn, organizationID string, botIDs []int64, execute func() error) error {
 	unique := make(map[int64]struct{}, len(botIDs))
 	ordered := make([]int64, 0, len(botIDs))
 	for _, botID := range botIDs {
@@ -39,24 +39,27 @@ func withTelegramBotLocks(ctx context.Context, conn bun.Conn, botIDs []int64, ex
 	}
 	sort.Slice(ordered, func(left, right int) bool { return ordered[left] < ordered[right] })
 	for index, botID := range ordered {
-		key := strconv.FormatInt(botID, 10)
-		if _, err := conn.ExecContext(ctx, "SELECT pg_advisory_lock(hashtextextended(?, 1))", key); err != nil {
-			releaseTelegramBotLocks(conn, ordered[:index])
+		if _, err := conn.ExecContext(ctx, "SELECT pg_advisory_lock(hashtextextended(?, 1))", telegramBotLockKey(organizationID, botID)); err != nil {
+			releaseTelegramBotLocks(conn, organizationID, ordered[:index])
 			return fmt.Errorf("lock Telegram bot: %w", err)
 		}
 	}
-	defer releaseTelegramBotLocks(conn, ordered)
+	defer releaseTelegramBotLocks(conn, organizationID, ordered)
 	return execute()
 }
 
+// telegramBotLockKey 返回按企业隔离的 Bot 锁键。
+func telegramBotLockKey(organizationID string, botID int64) string {
+	return organizationID + ":" + strconv.FormatInt(botID, 10)
+}
+
 // releaseTelegramBotLocks 逆序释放 Bot 会话锁，失败时丢弃底层连接。
-func releaseTelegramBotLocks(conn bun.Conn, botIDs []int64) {
+func releaseTelegramBotLocks(conn bun.Conn, organizationID string, botIDs []int64) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	for _, botID := range slices.Backward(botIDs) {
-		key := strconv.FormatInt(botID, 10)
-		if _, err := conn.ExecContext(ctx, "SELECT pg_advisory_unlock(hashtextextended(?, 1))", key); err != nil {
-			slog.Error("释放 Telegram Bot 锁失败", "bot_id", botID)
+		if _, err := conn.ExecContext(ctx, "SELECT pg_advisory_unlock(hashtextextended(?, 1))", telegramBotLockKey(organizationID, botID)); err != nil {
+			slog.Error("释放 Telegram Bot 锁失败", "organization_id", organizationID, "bot_id", botID)
 			_ = conn.Raw(func(any) error { return driver.ErrBadConn })
 			return
 		}
@@ -106,10 +109,11 @@ func newTelegramWebhookSecret() (string, error) {
 	return hex.EncodeToString(bytes), nil
 }
 
-// telegramBotUsedByOtherChannel 判断 Bot 是否仍被另一个渠道引用。
-func telegramBotUsedByOtherChannel(ctx context.Context, db bun.IDB, botID int64, channelID string) (bool, error) {
+// telegramBotUsedByOtherChannel 判断当前企业内是否仍有其它渠道引用该 Bot。
+func telegramBotUsedByOtherChannel(ctx context.Context, db bun.IDB, organizationID string, botID int64, channelID string) (bool, error) {
 	used, err := db.NewSelect().
 		Model((*servermodels.TelegramChannelSetting)(nil)).
+		Where("tcs.organization_id = ?", organizationID).
 		Where("tcs.bot_id = ?", botID).
 		Where("tcs.channel_id <> ?", channelID).
 		Exists(ctx)

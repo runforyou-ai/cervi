@@ -71,7 +71,7 @@ type Input struct {
 func Enqueue(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer, route Route, message *models.Message) error {
 	var position int64
 	if err := db.NewSelect().TableExpr("customer_message_deliveries").ColumnExpr("COALESCE(MAX(position), 0) + 1").
-		Where("channel_id = ? AND contact_channel_identity_id = ?", route.ChannelID, route.IdentityID).Scan(ctx, &position); err != nil {
+		Where("organization_id = ? AND channel_id = ? AND contact_channel_identity_id = ?", message.OrganizationID, route.ChannelID, route.IdentityID).Scan(ctx, &position); err != nil {
 		return err
 	}
 	now := time.Now().UTC()

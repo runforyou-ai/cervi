@@ -14,17 +14,14 @@ import (
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	"github.com/runforyou-ai/cervi/internal/integration/knowledgeprocessing"
 	filecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
+	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
 // ListKnowledgeDocuments 返回当前企业分组中的文档。
-func (b *DirectBackend) ListKnowledgeDocuments(ctx context.Context, meta RequestMeta, baseID string, input KnowledgeDocumentListInput) (KnowledgeDocumentList, error) {
-	identity, err := b.authenticate(ctx, meta)
+func (o *directOperations) ListKnowledgeDocuments(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, baseID string, input KnowledgeDocumentListInput) (KnowledgeDocumentList, error) {
+	result, err := o.documentQuery.List(ctx, identity, baseID, knowledgeaction.DocumentListInput{GroupID: input.GroupID, Keyword: input.Keyword, Page: input.Page, PageSize: input.PageSize})
 	if err != nil {
-		return KnowledgeDocumentList{}, err
-	}
-	result, err := b.documentQuery.List(ctx, identity, baseID, knowledgeaction.DocumentListInput{GroupID: input.GroupID, Keyword: input.Keyword, Page: input.Page, PageSize: input.PageSize})
-	if err != nil {
-		return KnowledgeDocumentList{}, b.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeDocumentReadFailed, identity.Organization.ID, baseID)
+		return KnowledgeDocumentList{}, o.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeDocumentReadFailed, identity.Organization.ID, baseID)
 	}
 	output := KnowledgeDocumentList{Documents: make([]KnowledgeDocument, 0, len(result.Documents)), Page: PageInfo{Number: result.Page, Size: result.PageSize, Total: result.Total}}
 	for _, record := range result.Documents {
@@ -34,27 +31,19 @@ func (b *DirectBackend) ListKnowledgeDocuments(ctx context.Context, meta Request
 }
 
 // GetKnowledgeDocument 返回文档详情。
-func (b *DirectBackend) GetKnowledgeDocument(ctx context.Context, meta RequestMeta, baseID, documentID string) (KnowledgeDocument, error) {
-	identity, err := b.authenticate(ctx, meta)
+func (o *directOperations) GetKnowledgeDocument(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, baseID, documentID string) (KnowledgeDocument, error) {
+	record, err := o.documentQuery.Get(ctx, identity, baseID, documentID)
 	if err != nil {
-		return KnowledgeDocument{}, err
-	}
-	record, err := b.documentQuery.Get(ctx, identity, baseID, documentID)
-	if err != nil {
-		return KnowledgeDocument{}, b.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeDocumentReadFailed, identity.Organization.ID, baseID)
+		return KnowledgeDocument{}, o.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeDocumentReadFailed, identity.Organization.ID, baseID)
 	}
 	return knowledgeDocumentFromAction(meta, *record), nil
 }
 
 // CreateKnowledgeDocuments 在事务中创建文档并激活已上传原件。
-func (b *DirectBackend) CreateKnowledgeDocuments(ctx context.Context, meta RequestMeta, baseID string, input KnowledgeDocumentBatchInput) (KnowledgeDocumentBatch, error) {
-	identity, err := b.authenticate(ctx, meta)
+func (o *directOperations) CreateKnowledgeDocuments(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, baseID string, input KnowledgeDocumentBatchInput) (KnowledgeDocumentBatch, error) {
+	records, err := o.createDocuments.Execute(ctx, identity, baseID, input.GroupID, input.FileIDs)
 	if err != nil {
-		return KnowledgeDocumentBatch{}, err
-	}
-	records, err := b.createDocuments.Execute(ctx, identity, baseID, input.GroupID, input.FileIDs)
-	if err != nil {
-		return KnowledgeDocumentBatch{}, b.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeDocumentSaveFailed, identity.Organization.ID, baseID)
+		return KnowledgeDocumentBatch{}, o.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeDocumentSaveFailed, identity.Organization.ID, baseID)
 	}
 	output := KnowledgeDocumentBatch{Documents: make([]KnowledgeDocument, 0, len(records))}
 	for _, record := range records {
@@ -65,55 +54,43 @@ func (b *DirectBackend) CreateKnowledgeDocuments(ctx context.Context, meta Reque
 }
 
 // MoveKnowledgeDocument 修改文档的分组归属。
-func (b *DirectBackend) MoveKnowledgeDocument(ctx context.Context, meta RequestMeta, baseID, documentID string, input KnowledgeDocumentMoveInput) error {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return err
-	}
-	if err := b.moveDocument.Execute(ctx, identity, baseID, documentID, input.GroupID); err != nil {
-		return b.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeDocumentSaveFailed, identity.Organization.ID, baseID)
+func (o *directOperations) MoveKnowledgeDocument(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, baseID, documentID string, input KnowledgeDocumentMoveInput) error {
+	if err := o.moveDocument.Execute(ctx, identity, baseID, documentID, input.GroupID); err != nil {
+		return o.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeDocumentSaveFailed, identity.Organization.ID, baseID)
 	}
 	slog.Info("知识文档已移动", "knowledge_base_id", baseID, "document_id", documentID, "group_id", input.GroupID)
 	return nil
 }
 
 // DeleteKnowledgeDocument 删除文档并安排原件清理。
-func (b *DirectBackend) DeleteKnowledgeDocument(ctx context.Context, meta RequestMeta, baseID, documentID string) error {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return err
-	}
-	if err := b.deleteDocument.Execute(ctx, identity, baseID, documentID); err != nil {
-		return b.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeDocumentDeleteFailed, identity.Organization.ID, baseID)
+func (o *directOperations) DeleteKnowledgeDocument(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, baseID, documentID string) error {
+	if err := o.deleteDocument.Execute(ctx, identity, baseID, documentID); err != nil {
+		return o.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeDocumentDeleteFailed, identity.Organization.ID, baseID)
 	}
 	slog.Info("知识文档已删除", "knowledge_base_id", baseID, "document_id", documentID)
 	return nil
 }
 
 // GetKnowledgeDocumentPreview 按原件实际存储类型返回受控读取请求。
-func (b *DirectBackend) GetKnowledgeDocumentPreview(ctx context.Context, meta RequestMeta, baseID, documentID string) (KnowledgeDocumentPreviewRequest, error) {
-	identity, err := b.authenticate(ctx, meta)
+func (o *directOperations) GetKnowledgeDocumentPreview(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, baseID, documentID string) (KnowledgeDocumentPreviewRequest, error) {
+	record, err := o.documentQuery.File(ctx, identity, baseID, documentID)
 	if err != nil {
-		return KnowledgeDocumentPreviewRequest{}, err
-	}
-	record, err := b.documentQuery.File(ctx, identity, baseID, documentID)
-	if err != nil {
-		return KnowledgeDocumentPreviewRequest{}, b.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeDocumentReadFailed, identity.Organization.ID, baseID)
+		return KnowledgeDocumentPreviewRequest{}, o.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeDocumentReadFailed, identity.Organization.ID, baseID)
 	}
 	if record.StorageBackend == string(domain.FileStorageBackendLocal) {
 		url, err := fileContentURL(domain.FileStorageBackendLocal, record.StorageKey, "")
 		if err != nil {
-			return KnowledgeDocumentPreviewRequest{}, b.fileOperationError(ctx, meta, err, cervii18n.ErrorKnowledgeDocumentReadFailed)
+			return KnowledgeDocumentPreviewRequest{}, o.fileOperationError(ctx, meta, err, cervii18n.ErrorKnowledgeDocumentReadFailed)
 		}
 		return KnowledgeDocumentPreviewRequest{URL: url, Headers: map[string]string{"Authorization": "Bearer " + meta.Token}}, nil
 	}
-	setting, err := b.getS3Setting.ExecuteForOrganization(ctx, record.OrganizationID)
+	setting, err := o.getS3Setting.ExecuteForOrganization(ctx, record.OrganizationID)
 	if err != nil {
-		return KnowledgeDocumentPreviewRequest{}, b.fileOperationError(ctx, meta, err, cervii18n.ErrorKnowledgeDocumentReadFailed)
+		return KnowledgeDocumentPreviewRequest{}, o.fileOperationError(ctx, meta, err, cervii18n.ErrorKnowledgeDocumentReadFailed)
 	}
 	request, err := filecontent.PresignDownload(ctx, s3FileConfig(setting), record.StorageKey, "inline")
 	if err != nil {
-		return KnowledgeDocumentPreviewRequest{}, b.fileOperationError(ctx, meta, err, cervii18n.ErrorKnowledgeDocumentReadFailed)
+		return KnowledgeDocumentPreviewRequest{}, o.fileOperationError(ctx, meta, err, cervii18n.ErrorKnowledgeDocumentReadFailed)
 	}
 	return KnowledgeDocumentPreviewRequest{URL: request.URL, Headers: map[string]string{}}, nil
 }
@@ -160,19 +137,9 @@ func knowledgeDocumentFromAction(meta RequestMeta, record knowledgeaction.Docume
 	return KnowledgeDocument{ProcessingStatus: KnowledgeDocumentProcessingStatus(record.Status), SegmentBatchID: record.SegmentBatchID, SegmentCount: record.SegmentCount, FailureMessage: message, Format: KnowledgeDocumentFormat(strings.ToLower(filepath.Ext(record.Name))), ID: record.ID, GroupID: record.GroupID, Name: record.Name, ContentType: record.ContentType, ByteSize: record.ByteSize, Status: status, CreatedAt: record.CreatedAt}
 }
 
-// SetKnowledgeProcessor 注入文档处理连接检查与分段查询服务。
-func (b *DirectBackend) SetKnowledgeProcessor(client *knowledgeprocessing.Client) {
-	b.knowledgeProcessor = client
-	b.documentQuery.SetSegmentReader(client)
-}
-
 // RetryKnowledgeDocument 按当前配置为文档安排新的处理任务。
-func (b *DirectBackend) RetryKnowledgeDocument(ctx context.Context, meta RequestMeta, baseID, documentID string) error {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return err
-	}
-	if err := b.documentProcessing.Retry(ctx, identity, baseID, documentID, b.knowledgeProcessor.CheckConnection); err != nil {
+func (o *directOperations) RetryKnowledgeDocument(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, baseID, documentID string) error {
+	if err := o.documentProcessing.Retry(ctx, identity, baseID, documentID, o.knowledgeProcessor.CheckConnection); err != nil {
 		var failure *knowledgeprocessing.Error
 		if errors.As(err, &failure) {
 			key := cervii18n.ErrorKnowledgeProcessingUnavailable
@@ -181,21 +148,17 @@ func (b *DirectBackend) RetryKnowledgeDocument(ctx context.Context, meta Request
 			}
 			return FailedError(meta, key)
 		}
-		return b.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeDocumentRetryFailed, identity.Organization.ID, baseID)
+		return o.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeDocumentRetryFailed, identity.Organization.ID, baseID)
 	}
 	slog.Info("知识文档已提交重试", "knowledge_base_id", baseID, "document_id", documentID)
 	return nil
 }
 
 // ListKnowledgeDocumentSegments 返回可连续阅读的一页分段。
-func (b *DirectBackend) ListKnowledgeDocumentSegments(ctx context.Context, meta RequestMeta, baseID, documentID string, input KnowledgeDocumentSegmentInput) (KnowledgeDocumentSegmentPage, error) {
-	identity, err := b.authenticate(ctx, meta)
+func (o *directOperations) ListKnowledgeDocumentSegments(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, baseID, documentID string, input KnowledgeDocumentSegmentInput) (KnowledgeDocumentSegmentPage, error) {
+	page, err := o.documentQuery.Segments(ctx, identity, baseID, documentID, knowledgeprocessing.ListInput{Page: input.Page, PageSize: input.PageSize, SegmentBatchID: input.SegmentBatchID, AnchorSegmentID: input.AnchorSegmentID})
 	if err != nil {
-		return KnowledgeDocumentSegmentPage{}, err
-	}
-	page, err := b.documentQuery.Segments(ctx, identity, baseID, documentID, knowledgeprocessing.ListInput{Page: input.Page, PageSize: input.PageSize, SegmentBatchID: input.SegmentBatchID, AnchorSegmentID: input.AnchorSegmentID})
-	if err != nil {
-		return KnowledgeDocumentSegmentPage{}, b.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeDocumentReadFailed, identity.Organization.ID, baseID)
+		return KnowledgeDocumentSegmentPage{}, o.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeDocumentReadFailed, identity.Organization.ID, baseID)
 	}
 	output := KnowledgeDocumentSegmentPage{SegmentBatchID: page.SegmentBatchID, Page: PageInfo{Number: page.Page, Size: page.PageSize, Total: page.Total}, AnchorSegmentID: page.AnchorSegmentID, AnchorPosition: page.AnchorPosition, Segments: make([]KnowledgeDocumentSegment, 0, len(page.Segments))}
 	for _, segment := range page.Segments {

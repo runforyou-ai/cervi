@@ -12,17 +12,14 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
+	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
 // ListAIProviders 返回当前企业的模型服务供应商列表。
-func (b *DirectBackend) ListAIProviders(ctx context.Context, meta RequestMeta) (AIProviderList, error) {
-	identity, err := b.authenticate(ctx, meta)
+func (o *directOperations) ListAIProviders(ctx context.Context, meta RequestMeta, identity *servermodels.Identity) (AIProviderList, error) {
+	providers, err := o.listAIProviders.Execute(ctx, identity)
 	if err != nil {
-		return AIProviderList{}, err
-	}
-	providers, err := b.listAIProviders.Execute(ctx, identity)
-	if err != nil {
-		return AIProviderList{}, b.aiProviderError(ctx, meta, err, cervii18n.ErrorAIProviderListFailed, identity.Organization.ID)
+		return AIProviderList{}, o.aiProviderError(ctx, meta, err, cervii18n.ErrorAIProviderListFailed, identity.Organization.ID)
 	}
 	output := make([]AIProviderSummary, 0, len(providers))
 	for _, provider := range providers {
@@ -43,23 +40,16 @@ func (b *DirectBackend) ListAIProviders(ctx context.Context, meta RequestMeta) (
 }
 
 // GetAIProvider 返回当前企业中的模型服务供应商详情。
-func (b *DirectBackend) GetAIProvider(ctx context.Context, meta RequestMeta, providerID string) (AIProvider, error) {
-	identity, err := b.authenticate(ctx, meta)
+func (o *directOperations) GetAIProvider(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, providerID string) (AIProvider, error) {
+	provider, err := o.getAIProvider.Execute(ctx, identity, providerID)
 	if err != nil {
-		return AIProvider{}, err
-	}
-	provider, err := b.getAIProvider.Execute(ctx, identity, providerID)
-	if err != nil {
-		return AIProvider{}, b.aiProviderError(ctx, meta, err, cervii18n.ErrorAIProviderReadFailed, identity.Organization.ID, "provider_id", providerID)
+		return AIProvider{}, o.aiProviderError(ctx, meta, err, cervii18n.ErrorAIProviderReadFailed, identity.Organization.ID, "provider_id", providerID)
 	}
 	return aiProviderFromAction(*provider), nil
 }
 
 // ListAvailableAIModels 返回指定品牌的预设模型目录。
-func (b *DirectBackend) ListAvailableAIModels(ctx context.Context, meta RequestMeta, brand AIProviderBrand) (AIProviderModelList, error) {
-	if _, err := b.authenticate(ctx, meta); err != nil {
-		return AIProviderModelList{}, err
-	}
+func (o *directOperations) ListAvailableAIModels(ctx context.Context, meta RequestMeta, _ *servermodels.Identity, brand AIProviderBrand) (AIProviderModelList, error) {
 	models := aiprovideraction.AvailableModels(domain.AIProviderBrand(brand))
 	if len(models) == 0 {
 		fields := map[string]cervii18n.Key{"brand": cervii18n.FieldAIProviderBrandInvalid}
@@ -69,11 +59,8 @@ func (b *DirectBackend) ListAvailableAIModels(ctx context.Context, meta RequestM
 }
 
 // TestAIProviderConnection 测试模型服务供应商草稿配置。
-func (b *DirectBackend) TestAIProviderConnection(ctx context.Context, meta RequestMeta, input AIProviderConnectionInput) error {
-	if _, err := b.authenticate(ctx, meta); err != nil {
-		return err
-	}
-	err := b.testAIProviderConnection.Execute(ctx, aiprovideraction.ConnectionInput{
+func (o *directOperations) TestAIProviderConnection(ctx context.Context, meta RequestMeta, _ *servermodels.Identity, input AIProviderConnectionInput) error {
+	err := o.testAIProviderConnection.Execute(ctx, aiprovideraction.ConnectionInput{
 		Brand: domain.AIProviderBrand(input.Brand), APIKey: input.APIKey, APIURL: input.APIURL,
 	})
 	if err == nil {
@@ -103,56 +90,44 @@ func (b *DirectBackend) TestAIProviderConnection(ctx context.Context, meta Reque
 }
 
 // CreateAIProvider 创建模型服务供应商。
-func (b *DirectBackend) CreateAIProvider(ctx context.Context, meta RequestMeta, input AIProviderInput) (AIProvider, error) {
-	identity, err := b.authenticate(ctx, meta)
+func (o *directOperations) CreateAIProvider(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input AIProviderInput) (AIProvider, error) {
+	provider, err := o.createAIProvider.Execute(ctx, identity, aiProviderInput(input))
 	if err != nil {
-		return AIProvider{}, err
-	}
-	provider, err := b.createAIProvider.Execute(ctx, identity, aiProviderInput(input))
-	if err != nil {
-		return AIProvider{}, b.aiProviderMutationError(ctx, meta, err, cervii18n.ErrorAIProviderCreateFailed, identity.Organization.ID)
+		return AIProvider{}, o.aiProviderMutationError(ctx, meta, err, cervii18n.ErrorAIProviderCreateFailed, identity.Organization.ID)
 	}
 	slog.Info("模型服务供应商创建成功", "organization_id", identity.Organization.ID, "provider_id", provider.ID, "brand", provider.Brand, "model_count", len(provider.Models))
 	return aiProviderFromAction(*provider), nil
 }
 
 // UpdateAIProvider 修改模型服务供应商。
-func (b *DirectBackend) UpdateAIProvider(ctx context.Context, meta RequestMeta, providerID string, input AIProviderInput) (AIProvider, error) {
-	identity, err := b.authenticate(ctx, meta)
+func (o *directOperations) UpdateAIProvider(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, providerID string, input AIProviderInput) (AIProvider, error) {
+	provider, err := o.updateAIProvider.Execute(ctx, identity, providerID, aiProviderInput(input))
 	if err != nil {
-		return AIProvider{}, err
-	}
-	provider, err := b.updateAIProvider.Execute(ctx, identity, providerID, aiProviderInput(input))
-	if err != nil {
-		return AIProvider{}, b.aiProviderMutationError(ctx, meta, err, cervii18n.ErrorAIProviderUpdateFailed, identity.Organization.ID, "provider_id", providerID)
+		return AIProvider{}, o.aiProviderMutationError(ctx, meta, err, cervii18n.ErrorAIProviderUpdateFailed, identity.Organization.ID, "provider_id", providerID)
 	}
 	slog.Info("模型服务供应商保存成功", "organization_id", identity.Organization.ID, "provider_id", provider.ID, "brand", provider.Brand, "model_count", len(provider.Models))
 	return aiProviderFromAction(*provider), nil
 }
 
 // DeleteAIProvider 删除模型服务供应商。
-func (b *DirectBackend) DeleteAIProvider(ctx context.Context, meta RequestMeta, providerID string) error {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return err
-	}
-	if err := b.deleteAIProvider.Execute(ctx, identity, providerID); err != nil {
-		return b.aiProviderError(ctx, meta, err, cervii18n.ErrorAIProviderDeleteFailed, identity.Organization.ID, "provider_id", providerID)
+func (o *directOperations) DeleteAIProvider(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, providerID string) error {
+	if err := o.deleteAIProvider.Execute(ctx, identity, providerID); err != nil {
+		return o.aiProviderError(ctx, meta, err, cervii18n.ErrorAIProviderDeleteFailed, identity.Organization.ID, "provider_id", providerID)
 	}
 	slog.Info("模型服务供应商删除成功", "organization_id", identity.Organization.ID, "provider_id", providerID)
 	return nil
 }
 
 // aiProviderMutationError 转换模型服务供应商写入错误。
-func (b *DirectBackend) aiProviderMutationError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key, organizationID string, attributes ...any) error {
+func (o *directOperations) aiProviderMutationError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key, organizationID string, attributes ...any) error {
 	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
 		return InvalidError(meta, cervii18n.ErrorValidationFailed, aiProviderFieldKeys(validationError.Fields))
 	}
-	return b.aiProviderError(ctx, meta, err, failureKey, organizationID, attributes...)
+	return o.aiProviderError(ctx, meta, err, failureKey, organizationID, attributes...)
 }
 
 // aiProviderError 转换模型服务供应商操作错误。
-func (b *DirectBackend) aiProviderError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key, organizationID string, attributes ...any) error {
+func (o *directOperations) aiProviderError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key, organizationID string, attributes ...any) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}

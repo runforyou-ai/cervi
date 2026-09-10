@@ -16,8 +16,8 @@ import (
 const localObjectBaseURL = "/storage"
 
 // identityFromModel 把存储身份转换为应用契约并补齐文件地址。
-func (b *DirectBackend) identityFromModel(ctx context.Context, identity *servermodels.Identity) (Identity, error) {
-	user, err := b.currentUserFromIdentity(ctx, identity)
+func (o *directOperations) identityFromModel(ctx context.Context, identity *servermodels.Identity) (Identity, error) {
+	user, err := o.currentUserFromIdentity(ctx, identity)
 	if err != nil {
 		return Identity{}, err
 	}
@@ -32,7 +32,7 @@ func organizationFromModel(organization servermodels.Organization) Organization 
 }
 
 // currentUserFromIdentity 把存储身份转换为当前用户契约并补齐头像地址。
-func (b *DirectBackend) currentUserFromIdentity(ctx context.Context, identity *servermodels.Identity) (CurrentUser, error) {
+func (o *directOperations) currentUserFromIdentity(ctx context.Context, identity *servermodels.Identity) (CurrentUser, error) {
 	// 将当前用户信息转换为应用服务契约。
 	storedUser := identity.User
 	organizationIdentity := identity.OrganizationIdentity
@@ -45,7 +45,7 @@ func (b *DirectBackend) currentUserFromIdentity(ctx context.Context, identity *s
 	if fileID == nil || *fileID == "" {
 		return user, nil
 	}
-	urls, err := b.activeFileURLs(ctx, identity, []string{*fileID})
+	urls, err := o.activeFileURLs(ctx, identity, []string{*fileID})
 	if err != nil {
 		return CurrentUser{}, err
 	}
@@ -54,15 +54,15 @@ func (b *DirectBackend) currentUserFromIdentity(ctx context.Context, identity *s
 }
 
 // activeFileURLs 批量解析当前企业已关联文件的公开地址。
-func (b *DirectBackend) activeFileURLs(ctx context.Context, identity *servermodels.Identity, fileIDs []string) (map[string]string, error) {
-	locations, err := b.getFile.ListActiveLocations(ctx, identity, fileIDs)
+func (o *directOperations) activeFileURLs(ctx context.Context, identity *servermodels.Identity, fileIDs []string) (map[string]string, error) {
+	locations, err := o.getFile.ListActiveLocations(ctx, identity, fileIDs)
 	if err != nil {
 		return nil, err
 	}
 	publicBaseURL := ""
 	for _, location := range locations {
 		if location.StorageBackend == domain.FileStorageBackendS3 {
-			setting, err := b.getS3Setting.Execute(ctx, identity)
+			setting, err := o.getS3Setting.Execute(ctx, identity)
 			if err != nil {
 				return nil, err
 			}

@@ -8,12 +8,13 @@ import (
 	"errors"
 	"testing"
 
+	servertest "github.com/runforyou-ai/cervi/internal/servertest"
 	"golang.org/x/crypto/acme/autocert"
 )
 
 // TestACMECacheWithPostgreSQL 验证自动 TLS 缓存可以跨实例读写和删除。
 func TestACMECacheWithPostgreSQL(t *testing.T) {
-	store, err := Open(context.Background(), testDatabaseConfig(t))
+	store, err := Open(context.Background(), servertest.DatabaseConfig(t))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -11,15 +11,35 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	"github.com/uptrace/bun"
 )
 
-// ListContacts 返回联系人列表。
-func (b *DirectBackend) ListContacts(ctx context.Context, meta RequestMeta, input ContactListInput) (ContactList, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return ContactList{}, err
+// contactOps 持有联系人的 Action 和 Query。
+type contactOps struct {
+	listContacts   *contactaction.ListContactsQuery
+	getContact     *contactaction.GetContactQuery
+	createContact  *contactaction.CreateContactAction
+	updateContact  *contactaction.UpdateContactAction
+	deleteContact  *contactaction.DeleteContactAction
+	restoreContact *contactaction.RestoreContactAction
+}
+
+// newContactOps 创建联系人的业务实现依赖。
+func newContactOps(db *bun.DB) contactOps {
+	return contactOps{
+		listContacts:   contactaction.NewListContactsQuery(db),
+		getContact:     contactaction.NewGetContactQuery(db),
+		createContact:  contactaction.NewCreateContactAction(db),
+		updateContact:  contactaction.NewUpdateContactAction(db),
+		deleteContact:  contactaction.NewDeleteContactAction(db),
+		restoreContact: contactaction.NewRestoreContactAction(db),
 	}
-	output, err := b.listContacts.Execute(ctx, identity, contactaction.ListInput{
+}
+
+// ListContacts 返回联系人列表。
+func (o *directOperations) ListContacts(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input ContactListInput) (ContactList, error) {
+	output, err := o.listContacts.Execute(ctx, identity, contactaction.ListInput{
 		Query: input.Query, Stage: optionalDomain[ContactStage, domain.ContactStage](input.Stage), ChannelID: input.ChannelID, MethodType: optionalDomain[ContactMethodType, domain.ContactMethodType](input.MethodType),
 		Sort: domain.ContactSort(input.Sort), Page: input.Page, PageSize: input.PageSize, Deleted: input.Deleted,
 	})
@@ -27,7 +47,7 @@ func (b *DirectBackend) ListContacts(ctx context.Context, meta RequestMeta, inpu
 		return ContactList{}, InvalidError(meta, cervii18n.ErrorValidationFailed, contactFieldKeys(validationError.Fields))
 	}
 	if err != nil {
-		return ContactList{}, b.contactError(ctx, meta, err, cervii18n.ErrorContactListFailed)
+		return ContactList{}, o.contactError(ctx, meta, err, cervii18n.ErrorContactListFailed)
 	}
 	contacts := make([]ContactSummary, 0, len(output.Contacts))
 	for _, contact := range output.Contacts {
@@ -40,86 +60,66 @@ func (b *DirectBackend) ListContacts(ctx context.Context, meta RequestMeta, inpu
 }
 
 // GetContact 返回联系人详情。
-func (b *DirectBackend) GetContact(ctx context.Context, meta RequestMeta, contactID string) (Contact, error) {
-	identity, err := b.authenticate(ctx, meta)
+func (o *directOperations) GetContact(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, contactID string) (Contact, error) {
+	contact, err := o.getContact.Execute(ctx, identity, contactID)
 	if err != nil {
-		return Contact{}, err
-	}
-	contact, err := b.getContact.Execute(ctx, identity, contactID)
-	if err != nil {
-		return Contact{}, b.contactError(ctx, meta, err, cervii18n.ErrorContactReadFailed)
+		return Contact{}, o.contactError(ctx, meta, err, cervii18n.ErrorContactReadFailed)
 	}
 	return contactFromAction(contact), nil
 }
 
 // CreateContact 创建联系人。
-func (b *DirectBackend) CreateContact(ctx context.Context, meta RequestMeta, input ContactInput) (Contact, error) {
-	identity, err := b.authenticate(ctx, meta)
+func (o *directOperations) CreateContact(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input ContactInput) (Contact, error) {
+	contact, err := o.createContact.Execute(ctx, identity, contactInput(input))
 	if err != nil {
-		return Contact{}, err
-	}
-	contact, err := b.createContact.Execute(ctx, identity, contactInput(input))
-	if err != nil {
-		return Contact{}, b.contactMutationError(ctx, meta, err, cervii18n.ErrorContactCreateFailed)
+		return Contact{}, o.contactMutationError(ctx, meta, err, cervii18n.ErrorContactCreateFailed)
 	}
 	slog.Info("联系人创建成功", "organization_id", identity.Organization.ID, "contact_id", contact.Contact.ID)
 	return contactFromAction(contact), nil
 }
 
 // UpdateContact 修改联系人。
-func (b *DirectBackend) UpdateContact(ctx context.Context, meta RequestMeta, contactID string, input ContactInput) (Contact, error) {
-	identity, err := b.authenticate(ctx, meta)
+func (o *directOperations) UpdateContact(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, contactID string, input ContactInput) (Contact, error) {
+	contact, err := o.updateContact.Execute(ctx, identity, contactID, contactInput(input))
 	if err != nil {
-		return Contact{}, err
-	}
-	contact, err := b.updateContact.Execute(ctx, identity, contactID, contactInput(input))
-	if err != nil {
-		return Contact{}, b.contactMutationError(ctx, meta, err, cervii18n.ErrorContactUpdateFailed)
+		return Contact{}, o.contactMutationError(ctx, meta, err, cervii18n.ErrorContactUpdateFailed)
 	}
 	slog.Info("联系人更新成功", "organization_id", identity.Organization.ID, "contact_id", contact.Contact.ID)
 	return contactFromAction(contact), nil
 }
 
 // DeleteContact 将联系人移入回收站。
-func (b *DirectBackend) DeleteContact(ctx context.Context, meta RequestMeta, contactID string) error {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return err
-	}
-	if err := b.deleteContact.Execute(ctx, identity, contactID); err != nil {
-		return b.contactError(ctx, meta, err, cervii18n.ErrorContactDeleteFailed)
+func (o *directOperations) DeleteContact(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, contactID string) error {
+	if err := o.deleteContact.Execute(ctx, identity, contactID); err != nil {
+		return o.contactError(ctx, meta, err, cervii18n.ErrorContactDeleteFailed)
 	}
 	slog.Info("联系人移入回收站", "organization_id", identity.Organization.ID, "contact_id", contactID)
 	return nil
 }
 
 // RestoreContact 恢复联系人。
-func (b *DirectBackend) RestoreContact(ctx context.Context, meta RequestMeta, contactID string) (Contact, error) {
-	identity, err := b.authenticate(ctx, meta)
+func (o *directOperations) RestoreContact(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, contactID string) (Contact, error) {
+	contact, err := o.restoreContact.Execute(ctx, identity, contactID)
 	if err != nil {
-		return Contact{}, err
-	}
-	contact, err := b.restoreContact.Execute(ctx, identity, contactID)
-	if err != nil {
-		return Contact{}, b.contactError(ctx, meta, err, cervii18n.ErrorContactRestoreFailed)
+		return Contact{}, o.contactError(ctx, meta, err, cervii18n.ErrorContactRestoreFailed)
 	}
 	slog.Info("联系人恢复成功", "organization_id", identity.Organization.ID, "contact_id", contact.Contact.ID)
 	return contactFromAction(contact), nil
 }
 
 // contactMutationError 转换联系人写入校验和操作错误。
-func (b *DirectBackend) contactMutationError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key) error {
+func (o *directOperations) contactMutationError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
 	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
 		return InvalidError(meta, cervii18n.ErrorValidationFailed, contactFieldKeys(validationError.Fields))
 	}
-	return b.contactError(ctx, meta, err, failureKey)
+	return o.contactError(ctx, meta, err, failureKey)
 }
 
 // contactError 转换联系人读取和删除错误。
-func (b *DirectBackend) contactError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key) error {
+func (o *directOperations) contactError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}

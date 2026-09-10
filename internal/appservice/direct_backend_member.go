@@ -8,15 +8,12 @@ import (
 
 	memberaction "github.com/runforyou-ai/cervi/internal/actions/member"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
 // ListMemberOptions 返回可分配的企业身份。
-func (b *DirectBackend) ListMemberOptions(ctx context.Context, meta RequestMeta, input MemberOptionListInput) (MemberOptionList, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return MemberOptionList{}, err
-	}
-	output, err := b.listMemberOptions.Execute(ctx, identity, memberaction.ListOptionsInput{Query: input.Query, Page: input.Page, PageSize: input.PageSize})
+func (o *directOperations) ListMemberOptions(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input MemberOptionListInput) (MemberOptionList, error) {
+	output, err := o.listMemberOptions.Execute(ctx, identity, memberaction.ListOptionsInput{Query: input.Query, Page: input.Page, PageSize: input.PageSize})
 	if err != nil {
 		if ctx.Err() != nil {
 			return MemberOptionList{}, ctx.Err()
@@ -30,7 +27,7 @@ func (b *DirectBackend) ListMemberOptions(ctx context.Context, meta RequestMeta,
 			avatarFileIDs = append(avatarFileIDs, *member.AvatarFileID)
 		}
 	}
-	avatarURLs, err := b.activeFileURLs(ctx, identity, avatarFileIDs)
+	avatarURLs, err := o.activeFileURLs(ctx, identity, avatarFileIDs)
 	if err != nil {
 		slog.Warn("读取企业身份头像失败", "organization_id", identity.Organization.ID, "error", err)
 		return MemberOptionList{}, FailedError(meta, cervii18n.ErrorUserListFailed)

@@ -12,15 +12,12 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
+	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
 // GetS3Setting 返回当前企业的对象存储设置。
-func (b *DirectBackend) GetS3Setting(ctx context.Context, meta RequestMeta) (S3Setting, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return S3Setting{}, err
-	}
-	setting, err := b.getS3Setting.Execute(ctx, identity)
+func (o *directOperations) GetS3Setting(ctx context.Context, meta RequestMeta, identity *servermodels.Identity) (S3Setting, error) {
+	setting, err := o.getS3Setting.Execute(ctx, identity)
 	if err != nil {
 		if ctx.Err() != nil {
 			return S3Setting{}, ctx.Err()
@@ -32,33 +29,25 @@ func (b *DirectBackend) GetS3Setting(ctx context.Context, meta RequestMeta) (S3S
 }
 
 // SaveS3Setting 保存当前企业的对象存储设置。
-func (b *DirectBackend) SaveS3Setting(ctx context.Context, meta RequestMeta, input S3SettingInput) (S3Setting, error) {
-	identity, err := b.authenticate(ctx, meta)
+func (o *directOperations) SaveS3Setting(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input S3SettingInput) (S3Setting, error) {
+	setting, err := o.saveS3Setting.Execute(ctx, identity, s3SettingToAction(input))
 	if err != nil {
-		return S3Setting{}, err
-	}
-	setting, err := b.saveS3Setting.Execute(ctx, identity, s3SettingToAction(input))
-	if err != nil {
-		return S3Setting{}, b.s3SettingError(ctx, meta, err, cervii18n.ErrorS3SettingSaveFailed)
+		return S3Setting{}, o.s3SettingError(ctx, meta, err, cervii18n.ErrorS3SettingSaveFailed)
 	}
 	slog.Info("对象存储设置保存成功", "organization_id", identity.Organization.ID, "provider", setting.Provider, "enabled", setting.Enabled)
 	return s3SettingFromAction(setting), nil
 }
 
 // TestS3Setting 测试对象存储连接。
-func (b *DirectBackend) TestS3Setting(ctx context.Context, meta RequestMeta, input S3SettingInput) error {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return err
-	}
-	if err := b.testS3Setting.Execute(ctx, identity.Organization.ID, s3SettingToAction(input)); err != nil {
-		return b.s3SettingError(ctx, meta, err, cervii18n.ErrorS3ConnectionTestFailed)
+func (o *directOperations) TestS3Setting(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input S3SettingInput) error {
+	if err := o.testS3Setting.Execute(ctx, identity.Organization.ID, s3SettingToAction(input)); err != nil {
+		return o.s3SettingError(ctx, meta, err, cervii18n.ErrorS3ConnectionTestFailed)
 	}
 	return nil
 }
 
 // s3SettingError 转换对象存储校验和操作错误。
-func (b *DirectBackend) s3SettingError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key) error {
+func (o *directOperations) s3SettingError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
