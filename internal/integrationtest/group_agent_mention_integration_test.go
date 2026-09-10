@@ -284,8 +284,27 @@ func testGroupAgentMentionReplies(t *testing.T, db *bun.DB, identity *servermode
 	t.Run("多个目标按顺序轮转", func(t *testing.T) {
 		f := newGroupAgentFixture(t, db, identity, agents)
 		f.post(t, "两位一起看下", []string{f.agents[0].IdentityID, f.agents[1].IdentityID}, "")
-		first := f.runNext(t, "第一位的意见", nil)
-		second := f.runNext(t, "第二位的意见", nil)
+		first := f.runNext(t, "第一位的意见", func(claimed agentruntime.ClaimedInput) {
+			// 同一条消息点名多位时，各方都应知道本轮还有谁参与。
+			last := claimed.Messages[len(claimed.Messages)-1]
+			for _, agent := range agents {
+				if !strings.Contains(last.Content, agent.DisplayName) {
+					t.Fatalf("上下文缺少同轮被点名成员 %q：%q", agent.DisplayName, last.Content)
+				}
+			}
+		})
+		second := f.runNext(t, "第二位的意见", func(claimed agentruntime.ClaimedInput) {
+			// 串行执行下，后发言者读到前一位已提交的回复。
+			seen := false
+			for _, message := range claimed.Messages {
+				if strings.Contains(message.Content, "第一位的意见") {
+					seen = true
+				}
+			}
+			if !seen {
+				t.Fatalf("后发言者上下文缺少前一位的回复：%+v", claimed.Messages)
+			}
+		})
 		if first == second {
 			t.Fatalf("两次运行属于同一 Agent：%s", first)
 		}

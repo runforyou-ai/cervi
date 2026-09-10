@@ -186,15 +186,24 @@ type messageBoundary struct {
 	MessageSeq int64 `bun:"message_seq"`
 }
 
-// loadClaimedMessageBoundary 读取一次已认领输入对应的稳定消息边界。
+// loadClaimedMessageBoundary 读取本次认领可见的消息上界：取会话当前最新消息，且不越过本队列尚未认领的输入。
 func loadClaimedMessageBoundary(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, endSeq int64) (messageBoundary, error) {
 	boundary := messageBoundary{}
-	if err := db.NewSelect().TableExpr("agent_inputs AS ai").
-		ColumnExpr("msg.message_seq").
-		Join("JOIN messages AS msg ON msg.id = ai.source_message_id AND msg.organization_id = ai.organization_id").
-		Where("ai.lane_id = ?", run.LaneID).
-		Where("ai.input_seq = ?", endSeq).
-		Scan(ctx, &boundary); err != nil {
+	if err := db.NewRaw(`
+		SELECT COALESCE(
+			(
+				SELECT MIN(pending_msg.message_seq) - 1
+				FROM agent_inputs AS pending
+				JOIN messages AS pending_msg ON pending_msg.id = pending.source_message_id AND pending_msg.organization_id = pending.organization_id
+				WHERE pending.lane_id = ? AND pending.input_seq > ?
+			),
+			(
+				SELECT MAX(latest.message_seq)
+				FROM messages AS latest
+				WHERE latest.organization_id = ? AND latest.conversation_id = ?
+			)
+		) AS message_seq
+	`, run.LaneID, endSeq, run.OrganizationID, run.ConversationID).Scan(ctx, &boundary); err != nil {
 		return messageBoundary{}, fmt.Errorf("load claimed input boundary: %w", err)
 	}
 	return boundary, nil

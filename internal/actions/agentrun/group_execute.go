@@ -20,9 +20,9 @@ import (
 	"github.com/uptrace/bun"
 )
 
-const groupInstructionPreamble = `你是企业 AI 员工「%s」，当前在群聊「%s」中与其他成员一起工作。
-群内其他成员的发言以 JSON 提供：sender.name 是发送者名称，sender.kind 为 user 表示真人、为 agent 表示另一位 AI 员工，replyTo 是被引用的原消息；你自己的历史发言是纯文本。
-成员点名你或回复你的消息时才轮到你发言。回复直接输出发到群里的正文。`
+const groupInstructionSuffix = `你是企业 AI 员工「%s」，当前在群聊「%s」中与其他成员一起工作。
+群内其他成员的发言以 JSON 提供：sender.name 是发送者名称，sender.kind 为 user 表示真人、为 agent 表示另一位 AI 员工，mentions 是这条消息点名的成员，replyTo 是被引用的原消息；你自己的历史发言是纯文本。
+成员点名你或回复你的消息时才轮到你发言。`
 
 type groupMentionRunPolicy struct{}
 
@@ -76,7 +76,7 @@ func (p groupMentionRunPolicy) persistMessage(ctx context.Context, db bun.IDB, p
 	return err
 }
 
-// instruction 在配置指令前补充本次运行的身份与群聊场景说明。
+// instruction 在配置指令后补充本次运行的身份与群聊场景说明。
 func (p groupMentionRunPolicy) instruction(ctx context.Context, db bun.IDB, execution executionContext) (string, error) {
 	title := ""
 	if err := db.NewSelect().Model((*servermodels.Conversation)(nil)).
@@ -85,11 +85,11 @@ func (p groupMentionRunPolicy) instruction(ctx context.Context, db bun.IDB, exec
 		Scan(ctx, &title); err != nil {
 		return "", fmt.Errorf("load group title for instruction: %w", err)
 	}
-	preamble := fmt.Sprintf(groupInstructionPreamble, execution.AgentName, title)
+	suffix := fmt.Sprintf(groupInstructionSuffix, execution.AgentName, title)
 	if strings.TrimSpace(execution.Instruction) == "" {
-		return preamble, nil
+		return suffix, nil
 	}
-	return preamble + "\n\n" + execution.Instruction, nil
+	return execution.Instruction + "\n\n" + suffix, nil
 }
 
 // laneRevision 在目标 Agent 仍是有效群成员时返回其配置版本。
@@ -147,6 +147,7 @@ type groupMessageRow struct {
 	SenderSourceID   string  `bun:"sender_source_id"`
 	SenderName       string  `bun:"sender_name"`
 	SenderIsAgent    bool    `bun:"sender_is_agent"`
+	MentionAll       bool    `bun:"mention_all"`
 	ReplyToMessageID *string `bun:"reply_to_message_id"`
 	ReplyBody        string  `bun:"reply_body"`
 	ReplySenderName  string  `bun:"reply_sender_name"`
@@ -159,9 +160,11 @@ type groupMessageSender struct {
 }
 
 type groupMessageEnvelope struct {
-	Sender  groupMessageSender       `json:"sender"`
-	Body    string                   `json:"body"`
-	ReplyTo *claimedMessageReference `json:"replyTo,omitempty"`
+	Sender     groupMessageSender       `json:"sender"`
+	Body       string                   `json:"body"`
+	Mentions   []groupMessageSender     `json:"mentions,omitempty"`
+	MentionAll bool                     `json:"mentionAll,omitempty"`
+	ReplyTo    *claimedMessageReference `json:"replyTo,omitempty"`
 }
 
 // loadClaimedGroupMessages 读取带发送者标识的群聊上下文，自己的发言投影为助手消息。
@@ -176,6 +179,7 @@ func loadClaimedGroupMessages(ctx context.Context, db bun.IDB, run *servermodels
 		ColumnExpr("cs.source_id AS sender_source_id").
 		ColumnExpr("oi.display_name AS sender_name").
 		ColumnExpr("oi.type = ? AS sender_is_agent", domain.OrganizationIdentityTypeAgent).
+		ColumnExpr("msg.mention_all").
 		ColumnExpr("msg.reply_to_message_id").
 		ColumnExpr("? AS reply_body", messagequery.Summary("reply")).
 		ColumnExpr("COALESCE(reply_oi.display_name, '') AS reply_sender_name").
@@ -198,6 +202,14 @@ func loadClaimedGroupMessages(ctx context.Context, db bun.IDB, run *servermodels
 		return nil, fmt.Errorf("load claimed group conversation context: %w", err)
 	}
 	slices.Reverse(rows)
+	messageIDs := make([]string, 0, len(rows))
+	for _, row := range rows {
+		messageIDs = append(messageIDs, row.ID)
+	}
+	mentions, err := loadGroupMessageMentions(ctx, db, run.OrganizationID, messageIDs)
+	if err != nil {
+		return nil, err
+	}
 	messages := make([]agentruntime.Message, 0, len(rows))
 	for _, row := range rows {
 		// 自己的历史发言保持纯文本，其余成员的发言携带发送者标识与一层引用。
@@ -206,8 +218,10 @@ func loadClaimedGroupMessages(ctx context.Context, db bun.IDB, run *servermodels
 			continue
 		}
 		envelope := groupMessageEnvelope{
-			Sender: groupMessageSender{Name: row.SenderName, Kind: string(domain.OrganizationIdentityTypeUser)},
-			Body:   row.Body,
+			Sender:     groupMessageSender{Name: row.SenderName, Kind: string(domain.OrganizationIdentityTypeUser)},
+			Body:       row.Body,
+			Mentions:   mentions[row.ID],
+			MentionAll: row.MentionAll,
 		}
 		if row.SenderIsAgent {
 			envelope.Sender.Kind = string(domain.OrganizationIdentityTypeAgent)
@@ -226,4 +240,33 @@ func loadClaimedGroupMessages(ctx context.Context, db bun.IDB, run *servermodels
 		messages = append(messages, agentruntime.Message{ID: row.ID, Role: agentruntime.MessageRoleUser, Content: string(encoded)})
 	}
 	return messages, nil
+}
+
+// loadGroupMessageMentions 按消息读取被点名成员，供上下文说明本轮参与者。
+func loadGroupMessageMentions(ctx context.Context, db bun.IDB, organizationID string, messageIDs []string) (map[string][]groupMessageSender, error) {
+	mentions := make(map[string][]groupMessageSender, len(messageIDs))
+	if len(messageIDs) == 0 {
+		return mentions, nil
+	}
+	rows := make([]struct {
+		MessageID    string `bun:"message_id"`
+		DisplayName  string `bun:"display_name"`
+		IdentityType string `bun:"identity_type"`
+	}, 0)
+	if err := db.NewSelect().TableExpr("message_mentions AS mm").
+		ColumnExpr("mm.message_id").
+		ColumnExpr("oi.display_name").
+		ColumnExpr("oi.type AS identity_type").
+		Join("JOIN chat_subjects AS cs ON cs.id = mm.subject_id AND cs.organization_id = mm.organization_id AND cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
+		Join("JOIN organization_identities AS oi ON oi.id = cs.source_id AND oi.organization_id = cs.organization_id").
+		Where("mm.organization_id = ?", organizationID).
+		Where("mm.message_id IN (?)", bun.In(messageIDs)).
+		OrderExpr("mm.message_id ASC, oi.display_name ASC").
+		Scan(ctx, &rows); err != nil {
+		return nil, fmt.Errorf("load group message mentions: %w", err)
+	}
+	for _, row := range rows {
+		mentions[row.MessageID] = append(mentions[row.MessageID], groupMessageSender{Name: row.DisplayName, Kind: row.IdentityType})
+	}
+	return mentions, nil
 }
