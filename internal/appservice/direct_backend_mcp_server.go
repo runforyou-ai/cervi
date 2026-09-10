@@ -7,22 +7,69 @@ import (
 	"errors"
 	"log/slog"
 
+	aiprovideraction "github.com/runforyou-ai/cervi/internal/actions/aiprovider"
+	businesssystemaction "github.com/runforyou-ai/cervi/internal/actions/businesssystem"
 	mcpserveraction "github.com/runforyou-ai/cervi/internal/actions/mcpserver"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
+	"github.com/runforyou-ai/cervi/internal/integration/modelprovider"
+	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	"github.com/uptrace/bun"
 )
 
-// ListMCPServers 返回当前企业配置的 MCP 服务。
-func (b *DirectBackend) ListMCPServers(ctx context.Context, meta RequestMeta) (MCPServerList, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return MCPServerList{}, err
+// integrationOps 持有模型服务、业务系统与 MCP 的 Action 和 Query。
+type integrationOps struct {
+	listAIProviders          *aiprovideraction.ListAIProvidersQuery
+	getAIProvider            *aiprovideraction.GetAIProviderQuery
+	testAIProviderConnection *aiprovideraction.TestConnectionAction
+	createAIProvider         *aiprovideraction.CreateAIProviderAction
+	updateAIProvider         *aiprovideraction.UpdateAIProviderAction
+	deleteAIProvider         *aiprovideraction.DeleteAIProviderAction
+	listBusinessSystems      *businesssystemaction.ListBusinessSystemsQuery
+	getBusinessSystem        *businesssystemaction.GetBusinessSystemQuery
+	createBusinessSystem     *businesssystemaction.CreateBusinessSystemAction
+	updateBusinessSystem     *businesssystemaction.UpdateBusinessSystemAction
+	deleteBusinessSystem     *businesssystemaction.DeleteBusinessSystemAction
+	listMCPServers           *mcpserveraction.ListMCPServersQuery
+	getMCPServer             *mcpserveraction.GetMCPServerQuery
+	createMCPServer          *mcpserveraction.CreateMCPServerAction
+	updateMCPServer          *mcpserveraction.UpdateMCPServerAction
+	deleteMCPServer          *mcpserveraction.DeleteMCPServerAction
+	testMCPServerConnection  *mcpserveraction.TestConnectionAction
+	refreshMCPServerTools    *mcpserveraction.RefreshToolsAction
+}
+
+// newIntegrationOps 创建模型服务、业务系统与 MCP 的业务实现依赖。
+func newIntegrationOps(db *bun.DB, connectionRunner *connectiontest.Runner, modelProviderRegistry *modelprovider.Registry, mcpTest *mcpserveraction.TestConnectionAction, mcpScheduler *mcpserveraction.ToolsScheduler) integrationOps {
+	return integrationOps{
+		listAIProviders:          aiprovideraction.NewListAIProvidersQuery(db),
+		getAIProvider:            aiprovideraction.NewGetAIProviderQuery(db),
+		testAIProviderConnection: aiprovideraction.NewTestConnectionAction(connectionRunner, modelProviderRegistry),
+		createAIProvider:         aiprovideraction.NewCreateAIProviderAction(db),
+		updateAIProvider:         aiprovideraction.NewUpdateAIProviderAction(db),
+		deleteAIProvider:         aiprovideraction.NewDeleteAIProviderAction(db),
+		listBusinessSystems:      businesssystemaction.NewListBusinessSystemsQuery(db),
+		getBusinessSystem:        businesssystemaction.NewGetBusinessSystemQuery(db),
+		createBusinessSystem:     businesssystemaction.NewCreateBusinessSystemAction(db),
+		updateBusinessSystem:     businesssystemaction.NewUpdateBusinessSystemAction(db),
+		deleteBusinessSystem:     businesssystemaction.NewDeleteBusinessSystemAction(db),
+		listMCPServers:           mcpserveraction.NewListMCPServersQuery(db),
+		getMCPServer:             mcpserveraction.NewGetMCPServerQuery(db),
+		createMCPServer:          mcpserveraction.NewCreateMCPServerAction(db, mcpTest, mcpScheduler),
+		updateMCPServer:          mcpserveraction.NewUpdateMCPServerAction(db, mcpTest, mcpScheduler),
+		deleteMCPServer:          mcpserveraction.NewDeleteMCPServerAction(db),
+		testMCPServerConnection:  mcpTest,
+		refreshMCPServerTools:    mcpserveraction.NewRefreshToolsAction(db, mcpScheduler),
 	}
-	records, err := b.listMCPServers.Execute(ctx, identity)
+}
+
+// ListMCPServers 返回当前企业配置的 MCP 服务。
+func (o *directOperations) ListMCPServers(ctx context.Context, meta RequestMeta, identity *servermodels.Identity) (MCPServerList, error) {
+	records, err := o.listMCPServers.Execute(ctx, identity)
 	if err != nil {
-		return MCPServerList{}, b.mcpServerError(ctx, meta, err, cervii18n.ErrorMCPServerListFailed, identity.Organization.ID)
+		return MCPServerList{}, o.mcpServerError(ctx, meta, err, cervii18n.ErrorMCPServerListFailed, identity.Organization.ID)
 	}
 	mcpServers := make([]MCPServer, 0, len(records))
 	for _, record := range records {
@@ -32,14 +79,10 @@ func (b *DirectBackend) ListMCPServers(ctx context.Context, meta RequestMeta) (M
 }
 
 // GetMCPServer 返回当前企业中的 MCP 服务详情。
-func (b *DirectBackend) GetMCPServer(ctx context.Context, meta RequestMeta, mcpServerID string) (MCPServer, error) {
-	identity, err := b.authenticate(ctx, meta)
+func (o *directOperations) GetMCPServer(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, mcpServerID string) (MCPServer, error) {
+	record, err := o.getMCPServer.Execute(ctx, identity, mcpServerID)
 	if err != nil {
-		return MCPServer{}, err
-	}
-	record, err := b.getMCPServer.Execute(ctx, identity, mcpServerID)
-	if err != nil {
-		return MCPServer{}, b.mcpServerError(
+		return MCPServer{}, o.mcpServerError(
 			ctx, meta, err, cervii18n.ErrorMCPServerReadFailed, identity.Organization.ID,
 			"mcp_server_id", mcpServerID,
 		)
@@ -48,14 +91,10 @@ func (b *DirectBackend) GetMCPServer(ctx context.Context, meta RequestMeta, mcpS
 }
 
 // CreateMCPServer 创建 MCP 服务。
-func (b *DirectBackend) CreateMCPServer(ctx context.Context, meta RequestMeta, input MCPServerInput) (MCPServer, error) {
-	identity, err := b.authenticate(ctx, meta)
+func (o *directOperations) CreateMCPServer(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input MCPServerInput) (MCPServer, error) {
+	record, err := o.createMCPServer.Execute(ctx, identity, mcpServerInput(input))
 	if err != nil {
-		return MCPServer{}, err
-	}
-	record, err := b.createMCPServer.Execute(ctx, identity, mcpServerInput(input))
-	if err != nil {
-		return MCPServer{}, b.mcpServerMutationError(
+		return MCPServer{}, o.mcpServerMutationError(
 			ctx, meta, err, cervii18n.ErrorMCPServerCreateFailed, identity.Organization.ID,
 		)
 	}
@@ -69,14 +108,10 @@ func (b *DirectBackend) CreateMCPServer(ctx context.Context, meta RequestMeta, i
 }
 
 // UpdateMCPServer 修改 MCP 服务。
-func (b *DirectBackend) UpdateMCPServer(ctx context.Context, meta RequestMeta, mcpServerID string, input MCPServerInput) (MCPServer, error) {
-	identity, err := b.authenticate(ctx, meta)
+func (o *directOperations) UpdateMCPServer(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, mcpServerID string, input MCPServerInput) (MCPServer, error) {
+	record, err := o.updateMCPServer.Execute(ctx, identity, mcpServerID, mcpServerInput(input))
 	if err != nil {
-		return MCPServer{}, err
-	}
-	record, err := b.updateMCPServer.Execute(ctx, identity, mcpServerID, mcpServerInput(input))
-	if err != nil {
-		return MCPServer{}, b.mcpServerMutationError(
+		return MCPServer{}, o.mcpServerMutationError(
 			ctx, meta, err, cervii18n.ErrorMCPServerUpdateFailed, identity.Organization.ID,
 			"mcp_server_id", mcpServerID,
 		)
@@ -91,13 +126,9 @@ func (b *DirectBackend) UpdateMCPServer(ctx context.Context, meta RequestMeta, m
 }
 
 // DeleteMCPServer 删除 MCP 服务。
-func (b *DirectBackend) DeleteMCPServer(ctx context.Context, meta RequestMeta, mcpServerID string) error {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return err
-	}
-	if err := b.deleteMCPServer.Execute(ctx, identity, mcpServerID); err != nil {
-		return b.mcpServerError(
+func (o *directOperations) DeleteMCPServer(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, mcpServerID string) error {
+	if err := o.deleteMCPServer.Execute(ctx, identity, mcpServerID); err != nil {
+		return o.mcpServerError(
 			ctx, meta, err, cervii18n.ErrorMCPServerDeleteFailed, identity.Organization.ID,
 			"mcp_server_id", mcpServerID,
 		)
@@ -106,7 +137,7 @@ func (b *DirectBackend) DeleteMCPServer(ctx context.Context, meta RequestMeta, m
 }
 
 // mcpServerMutationError 转换 MCP 服务写入错误。
-func (b *DirectBackend) mcpServerMutationError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key, organizationID string, attributes ...any) error {
+func (o *directOperations) mcpServerMutationError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key, organizationID string, attributes ...any) error {
 	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
 		// 映射 MCP 服务校验错误。
 		keys := map[common.FieldCode]cervii18n.Key{
@@ -120,11 +151,11 @@ func (b *DirectBackend) mcpServerMutationError(ctx context.Context, meta Request
 		}
 		return InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, keys))
 	}
-	return b.mcpServerError(ctx, meta, err, failureKey, organizationID, attributes...)
+	return o.mcpServerError(ctx, meta, err, failureKey, organizationID, attributes...)
 }
 
 // mcpServerError 转换 MCP 服务操作错误。
-func (b *DirectBackend) mcpServerError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key, organizationID string, attributes ...any) error {
+func (o *directOperations) mcpServerError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key, organizationID string, attributes ...any) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
@@ -167,42 +198,30 @@ func mcpServerFromAction(meta RequestMeta, input mcpserveraction.Record) MCPServ
 }
 
 // TestMCPServerConnection 测试未保存的 MCP 连接配置。
-func (b *DirectBackend) TestMCPServerConnection(ctx context.Context, meta RequestMeta, input MCPServerConnectionInput) error {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return err
-	}
-	err = b.testMCPServerConnection.Execute(ctx, mcpserveraction.ConnectionInput{URL: input.URL, ServerType: domain.MCPServerType(input.ServerType), AuthorizationToken: input.AuthorizationToken})
+func (o *directOperations) TestMCPServerConnection(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input MCPServerConnectionInput) error {
+	err := o.testMCPServerConnection.Execute(ctx, mcpserveraction.ConnectionInput{URL: input.URL, ServerType: domain.MCPServerType(input.ServerType), AuthorizationToken: input.AuthorizationToken})
 	if err == nil {
 		return nil
 	}
-	return b.mcpServerMutationError(ctx, meta, err, cervii18n.ErrorMCPConnectionFailed, identity.Organization.ID)
+	return o.mcpServerMutationError(ctx, meta, err, cervii18n.ErrorMCPConnectionFailed, identity.Organization.ID)
 }
 
 // TestSavedMCPServerConnection 测试当前企业中已保存的 MCP 服务。
-func (b *DirectBackend) TestSavedMCPServerConnection(ctx context.Context, meta RequestMeta, mcpServerID string) error {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return err
-	}
-	record, err := b.getMCPServer.Execute(ctx, identity, mcpServerID)
+func (o *directOperations) TestSavedMCPServerConnection(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, mcpServerID string) error {
+	record, err := o.getMCPServer.Execute(ctx, identity, mcpServerID)
 	if err == nil {
-		err = b.testMCPServerConnection.Execute(ctx, mcpserveraction.ConnectionInput{URL: record.URL, ServerType: record.ServerType, AuthorizationToken: record.AuthorizationToken})
+		err = o.testMCPServerConnection.Execute(ctx, mcpserveraction.ConnectionInput{URL: record.URL, ServerType: record.ServerType, AuthorizationToken: record.AuthorizationToken})
 	}
 	if err == nil {
 		return nil
 	}
-	return b.mcpServerMutationError(ctx, meta, err, cervii18n.ErrorMCPConnectionFailed, identity.Organization.ID, "mcp_server_id", mcpServerID)
+	return o.mcpServerMutationError(ctx, meta, err, cervii18n.ErrorMCPConnectionFailed, identity.Organization.ID, "mcp_server_id", mcpServerID)
 }
 
 // RefreshMCPServerTools 提交当前企业全部 MCP 服务的工具更新任务。
-func (b *DirectBackend) RefreshMCPServerTools(ctx context.Context, meta RequestMeta) error {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return err
-	}
-	if err := b.refreshMCPServerTools.Execute(ctx, identity); err != nil {
-		return b.mcpServerError(ctx, meta, err, cervii18n.ErrorMCPToolsRefreshFailed, identity.Organization.ID)
+func (o *directOperations) RefreshMCPServerTools(ctx context.Context, meta RequestMeta, identity *servermodels.Identity) error {
+	if err := o.refreshMCPServerTools.Execute(ctx, identity); err != nil {
+		return o.mcpServerError(ctx, meta, err, cervii18n.ErrorMCPToolsRefreshFailed, identity.Organization.ID)
 	}
 	return nil
 }

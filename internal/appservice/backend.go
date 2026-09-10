@@ -8,17 +8,20 @@ import "context"
 //
 // 每个方法必须携带一条 cervi:route 指令，格式为：
 //
-//	cervi:route <HTTP方法> <路径> [status=201] [query=<参数名>] [manual=service,api,proxy]
+//	cervi:route <HTTP方法> <路径> [status=201] [query=<参数名>] [auth=public] [manual=service,api,proxy]
 //
-// appservicegen 按指令生成 Service 委托、Gin 路由和 API Proxy 转发；
+// appservicegen 按指令生成 Service 委托、Gin 路由、API Proxy 转发和服务端认证分发；
 // manual 标记的层由对应包手写实现。路径中的 :参数 依次对应签名中的 string 参数，
 // GET 方法的结构体参数按 query 标签绑定查询参数，其余方法的结构体参数绑定 JSON 请求体。
+//
+// auth 默认为 member：服务端分发层先解析登录身份，再把身份交给业务实现，
+// 业务实现不重复处理认证。无需登录身份的方法标记 auth=public。
 type Backend interface {
 	// InstallationStatus 返回服务端初始化状态和公开企业名称。
-	//cervi:route GET /installation/status manual=proxy
+	//cervi:route GET /installation/status auth=public manual=proxy
 	InstallationStatus(context.Context, RequestMeta) (InstallationStatus, error)
 	// Login 校验账号密码并建立登录会话。
-	//cervi:route POST /auth/login manual=service,proxy
+	//cervi:route POST /auth/login auth=public manual=service,proxy
 	Login(context.Context, RequestMeta, LoginInput) (Auth, error)
 	// Logout 退出当前登录会话。
 	//cervi:route POST /auth/logout manual=proxy

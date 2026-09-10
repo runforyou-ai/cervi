@@ -12,17 +12,63 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/integration/knowledgeprocessing"
+	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	servertask "github.com/runforyou-ai/cervi/internal/task/server"
+	"github.com/uptrace/bun"
 )
 
-// ListKnowledgeBases 返回当前企业的知识库列表。
-func (b *DirectBackend) ListKnowledgeBases(ctx context.Context, meta RequestMeta) (KnowledgeBaseList, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return KnowledgeBaseList{}, err
+// knowledgeOps 持有知识库的 Action 和 Query。
+type knowledgeOps struct {
+	documentQuery        *knowledgebaseaction.DocumentQuery
+	createDocuments      *knowledgebaseaction.CreateDocumentsAction
+	documentProcessing   *knowledgebaseaction.DocumentProcessing
+	knowledgeProcessor   *knowledgeprocessing.Client
+	moveDocument         *knowledgebaseaction.MoveDocumentAction
+	deleteDocument       *knowledgebaseaction.DeleteDocumentAction
+	listQAEntries        *knowledgebaseaction.ListQAEntriesQuery
+	getQAEntry           *knowledgebaseaction.GetQAEntryQuery
+	saveQAEntry          *knowledgebaseaction.SaveQAEntryAction
+	deleteQAEntry        *knowledgebaseaction.DeleteQAEntryAction
+	listKnowledgeBases   *knowledgebaseaction.ListKnowledgeBasesQuery
+	getKnowledgeBase     *knowledgebaseaction.GetKnowledgeBaseQuery
+	createKnowledgeBase  *knowledgebaseaction.CreateKnowledgeBaseAction
+	updateKnowledgeBase  *knowledgebaseaction.UpdateKnowledgeBaseAction
+	deleteKnowledgeBase  *knowledgebaseaction.DeleteKnowledgeBaseAction
+	createKnowledgeGroup *knowledgebaseaction.CreateKnowledgeGroupAction
+	updateKnowledgeGroup *knowledgebaseaction.UpdateKnowledgeGroupAction
+	deleteKnowledgeGroup *knowledgebaseaction.DeleteKnowledgeGroupAction
+}
+
+// newKnowledgeOps 创建知识库的业务实现依赖。
+func newKnowledgeOps(db *bun.DB, taskEnqueuer servertask.TxEnqueuer, documentQuery *knowledgebaseaction.DocumentQuery, knowledgeProcessor *knowledgeprocessing.Client) knowledgeOps {
+	return knowledgeOps{
+		documentQuery:        documentQuery,
+		createDocuments:      knowledgebaseaction.NewCreateDocumentsAction(db, taskEnqueuer),
+		documentProcessing:   knowledgebaseaction.NewDocumentProcessing(db, taskEnqueuer),
+		knowledgeProcessor:   knowledgeProcessor,
+		moveDocument:         knowledgebaseaction.NewMoveDocumentAction(db),
+		deleteDocument:       knowledgebaseaction.NewDeleteDocumentAction(db),
+		listQAEntries:        knowledgebaseaction.NewListQAEntriesQuery(db),
+		getQAEntry:           knowledgebaseaction.NewGetQAEntryQuery(db),
+		saveQAEntry:          knowledgebaseaction.NewSaveQAEntryAction(db),
+		deleteQAEntry:        knowledgebaseaction.NewDeleteQAEntryAction(db),
+		listKnowledgeBases:   knowledgebaseaction.NewListKnowledgeBasesQuery(db),
+		getKnowledgeBase:     knowledgebaseaction.NewGetKnowledgeBaseQuery(db),
+		createKnowledgeBase:  knowledgebaseaction.NewCreateKnowledgeBaseAction(db),
+		updateKnowledgeBase:  knowledgebaseaction.NewUpdateKnowledgeBaseAction(db),
+		deleteKnowledgeBase:  knowledgebaseaction.NewDeleteKnowledgeBaseAction(db),
+		createKnowledgeGroup: knowledgebaseaction.NewCreateKnowledgeGroupAction(db),
+		updateKnowledgeGroup: knowledgebaseaction.NewUpdateKnowledgeGroupAction(db),
+		deleteKnowledgeGroup: knowledgebaseaction.NewDeleteKnowledgeGroupAction(db),
 	}
-	records, err := b.listKnowledgeBases.Execute(ctx, identity)
+}
+
+// ListKnowledgeBases 返回当前企业的知识库列表。
+func (o *directOperations) ListKnowledgeBases(ctx context.Context, meta RequestMeta, identity *servermodels.Identity) (KnowledgeBaseList, error) {
+	records, err := o.listKnowledgeBases.Execute(ctx, identity)
 	if err != nil {
-		return KnowledgeBaseList{}, b.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeBaseListFailed, identity.Organization.ID, "")
+		return KnowledgeBaseList{}, o.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeBaseListFailed, identity.Organization.ID, "")
 	}
 	knowledgeBases := make([]KnowledgeBase, 0, len(records))
 	for _, record := range records {
@@ -32,25 +78,17 @@ func (b *DirectBackend) ListKnowledgeBases(ctx context.Context, meta RequestMeta
 }
 
 // GetKnowledgeBase 返回当前企业中的知识库详情。
-func (b *DirectBackend) GetKnowledgeBase(ctx context.Context, meta RequestMeta, knowledgeBaseID string) (KnowledgeBase, error) {
-	identity, err := b.authenticate(ctx, meta)
+func (o *directOperations) GetKnowledgeBase(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, knowledgeBaseID string) (KnowledgeBase, error) {
+	record, err := o.getKnowledgeBase.Execute(ctx, identity, knowledgeBaseID)
 	if err != nil {
-		return KnowledgeBase{}, err
-	}
-	record, err := b.getKnowledgeBase.Execute(ctx, identity, knowledgeBaseID)
-	if err != nil {
-		return KnowledgeBase{}, b.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeBaseReadFailed, identity.Organization.ID, knowledgeBaseID)
+		return KnowledgeBase{}, o.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeBaseReadFailed, identity.Organization.ID, knowledgeBaseID)
 	}
 	return knowledgeBaseFromAction(*record), nil
 }
 
 // CreateKnowledgeBase 创建企业知识库。
-func (b *DirectBackend) CreateKnowledgeBase(ctx context.Context, meta RequestMeta, input KnowledgeBaseInput) (KnowledgeBase, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return KnowledgeBase{}, err
-	}
-	record, err := b.createKnowledgeBase.Execute(ctx, identity, knowledgebaseaction.Input{
+func (o *directOperations) CreateKnowledgeBase(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input KnowledgeBaseInput) (KnowledgeBase, error) {
+	record, err := o.createKnowledgeBase.Execute(ctx, identity, knowledgebaseaction.Input{
 		Name: input.Name, Category: domain.KnowledgeBaseCategory(input.Category), Description: input.Description,
 		EmbeddingProviderID:      input.EmbeddingProviderID,
 		EmbeddingModelIdentifier: input.EmbeddingModelIdentifier,
@@ -62,19 +100,15 @@ func (b *DirectBackend) CreateKnowledgeBase(ctx context.Context, meta RequestMet
 		RerankModelIdentifier:    input.RerankModelIdentifier,
 	})
 	if err != nil {
-		return KnowledgeBase{}, b.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeBaseCreateFailed, identity.Organization.ID, "")
+		return KnowledgeBase{}, o.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeBaseCreateFailed, identity.Organization.ID, "")
 	}
 	slog.Info("知识库创建成功", "organization_id", identity.Organization.ID, "knowledge_base_id", record.ID, "category", record.Category)
 	return knowledgeBaseFromAction(*record), nil
 }
 
 // UpdateKnowledgeBase 修改企业知识库。
-func (b *DirectBackend) UpdateKnowledgeBase(ctx context.Context, meta RequestMeta, knowledgeBaseID string, input KnowledgeBaseInput) (KnowledgeBase, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return KnowledgeBase{}, err
-	}
-	record, err := b.updateKnowledgeBase.Execute(ctx, identity, knowledgeBaseID, knowledgebaseaction.Input{
+func (o *directOperations) UpdateKnowledgeBase(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, knowledgeBaseID string, input KnowledgeBaseInput) (KnowledgeBase, error) {
+	record, err := o.updateKnowledgeBase.Execute(ctx, identity, knowledgeBaseID, knowledgebaseaction.Input{
 		Name: input.Name, Category: domain.KnowledgeBaseCategory(input.Category), Description: input.Description,
 		EmbeddingProviderID:      input.EmbeddingProviderID,
 		EmbeddingModelIdentifier: input.EmbeddingModelIdentifier,
@@ -86,69 +120,53 @@ func (b *DirectBackend) UpdateKnowledgeBase(ctx context.Context, meta RequestMet
 		RerankModelIdentifier:    input.RerankModelIdentifier,
 	})
 	if err != nil {
-		return KnowledgeBase{}, b.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeBaseUpdateFailed, identity.Organization.ID, knowledgeBaseID)
+		return KnowledgeBase{}, o.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeBaseUpdateFailed, identity.Organization.ID, knowledgeBaseID)
 	}
 	slog.Info("知识库保存成功", "organization_id", identity.Organization.ID, "knowledge_base_id", record.ID, "category", record.Category)
 	return knowledgeBaseFromAction(*record), nil
 }
 
 // DeleteKnowledgeBase 删除企业知识库。
-func (b *DirectBackend) DeleteKnowledgeBase(ctx context.Context, meta RequestMeta, knowledgeBaseID string) error {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return err
-	}
-	if err := b.deleteKnowledgeBase.Execute(ctx, identity, knowledgeBaseID); err != nil {
-		return b.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeBaseDeleteFailed, identity.Organization.ID, knowledgeBaseID)
+func (o *directOperations) DeleteKnowledgeBase(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, knowledgeBaseID string) error {
+	if err := o.deleteKnowledgeBase.Execute(ctx, identity, knowledgeBaseID); err != nil {
+		return o.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeBaseDeleteFailed, identity.Organization.ID, knowledgeBaseID)
 	}
 	slog.Info("知识库删除成功", "organization_id", identity.Organization.ID, "knowledge_base_id", knowledgeBaseID)
 	return nil
 }
 
 // CreateKnowledgeGroup 创建知识库分组。
-func (b *DirectBackend) CreateKnowledgeGroup(ctx context.Context, meta RequestMeta, knowledgeBaseID string, input KnowledgeGroupInput) (KnowledgeBase, error) {
-	identity, err := b.authenticate(ctx, meta)
+func (o *directOperations) CreateKnowledgeGroup(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, knowledgeBaseID string, input KnowledgeGroupInput) (KnowledgeBase, error) {
+	record, err := o.createKnowledgeGroup.Execute(ctx, identity, knowledgeBaseID, knowledgebaseaction.GroupInput{Name: input.Name, ParentID: input.ParentID})
 	if err != nil {
-		return KnowledgeBase{}, err
-	}
-	record, err := b.createKnowledgeGroup.Execute(ctx, identity, knowledgeBaseID, knowledgebaseaction.GroupInput{Name: input.Name, ParentID: input.ParentID})
-	if err != nil {
-		return KnowledgeBase{}, b.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeGroupCreateFailed, identity.Organization.ID, knowledgeBaseID)
+		return KnowledgeBase{}, o.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeGroupCreateFailed, identity.Organization.ID, knowledgeBaseID)
 	}
 	slog.Info("知识库分组创建成功", "organization_id", identity.Organization.ID, "knowledge_base_id", knowledgeBaseID, "parent_group_id", input.ParentID)
 	return knowledgeBaseFromAction(*record), nil
 }
 
 // UpdateKnowledgeGroup 修改知识库分组。
-func (b *DirectBackend) UpdateKnowledgeGroup(ctx context.Context, meta RequestMeta, knowledgeBaseID, groupID string, input KnowledgeGroupInput) (KnowledgeBase, error) {
-	identity, err := b.authenticate(ctx, meta)
+func (o *directOperations) UpdateKnowledgeGroup(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, knowledgeBaseID, groupID string, input KnowledgeGroupInput) (KnowledgeBase, error) {
+	record, err := o.updateKnowledgeGroup.Execute(ctx, identity, knowledgeBaseID, groupID, knowledgebaseaction.GroupInput{Name: input.Name, ParentID: input.ParentID})
 	if err != nil {
-		return KnowledgeBase{}, err
-	}
-	record, err := b.updateKnowledgeGroup.Execute(ctx, identity, knowledgeBaseID, groupID, knowledgebaseaction.GroupInput{Name: input.Name, ParentID: input.ParentID})
-	if err != nil {
-		return KnowledgeBase{}, b.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeGroupUpdateFailed, identity.Organization.ID, knowledgeBaseID)
+		return KnowledgeBase{}, o.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeGroupUpdateFailed, identity.Organization.ID, knowledgeBaseID)
 	}
 	slog.Info("知识库分组保存成功", "organization_id", identity.Organization.ID, "knowledge_base_id", knowledgeBaseID, "group_id", groupID)
 	return knowledgeBaseFromAction(*record), nil
 }
 
 // DeleteKnowledgeGroup 删除不含子分组和问答的知识库分组。
-func (b *DirectBackend) DeleteKnowledgeGroup(ctx context.Context, meta RequestMeta, knowledgeBaseID, groupID string) (KnowledgeBase, error) {
-	identity, err := b.authenticate(ctx, meta)
+func (o *directOperations) DeleteKnowledgeGroup(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, knowledgeBaseID, groupID string) (KnowledgeBase, error) {
+	record, err := o.deleteKnowledgeGroup.Execute(ctx, identity, knowledgeBaseID, groupID)
 	if err != nil {
-		return KnowledgeBase{}, err
-	}
-	record, err := b.deleteKnowledgeGroup.Execute(ctx, identity, knowledgeBaseID, groupID)
-	if err != nil {
-		return KnowledgeBase{}, b.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeGroupDeleteFailed, identity.Organization.ID, knowledgeBaseID)
+		return KnowledgeBase{}, o.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeGroupDeleteFailed, identity.Organization.ID, knowledgeBaseID)
 	}
 	slog.Info("知识库分组删除成功", "organization_id", identity.Organization.ID, "knowledge_base_id", knowledgeBaseID, "group_id", groupID)
 	return knowledgeBaseFromAction(*record), nil
 }
 
 // knowledgeBaseError 转换知识库领域错误。
-func (b *DirectBackend) knowledgeBaseError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key, organizationID, knowledgeBaseID string) error {
+func (o *directOperations) knowledgeBaseError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key, organizationID, knowledgeBaseID string) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}

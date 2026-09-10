@@ -7,15 +7,12 @@ import (
 
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
-// GetInboxContext 认证后读取锚点当前资格与同一快照内的列表邻域。
-func (b *DirectBackend) GetInboxContext(ctx context.Context, meta RequestMeta, input InboxContextInput) (InboxContext, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return InboxContext{}, err
-	}
-	result, err := b.loadInbox.ReadContext(ctx, identity, inboxaction.ContextInput{
+// GetInboxContext 读取锚点当前资格与同一快照内的列表邻域。
+func (o *directOperations) GetInboxContext(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input InboxContextInput) (InboxContext, error) {
+	result, err := o.loadInbox.ReadContext(ctx, identity, inboxaction.ContextInput{
 		Query:    inboxaction.LoadInput{Scope: domain.InboxScope(input.Query.Scope), CustomerView: domain.CustomerInboxView(input.Query.CustomerView), AssigneeIdentityID: input.Query.AssigneeIdentityID},
 		AnchorID: input.AnchorID, AnchorCursor: input.AnchorCursor, BeforeLimit: input.BeforeLimit, AfterLimit: input.AfterLimit,
 	})
@@ -27,7 +24,7 @@ func (b *DirectBackend) GetInboxContext(ctx context.Context, meta RequestMeta, i
 	if result.Anchor.Conversation != nil {
 		summaries = append(summaries, *result.Anchor.Conversation)
 	}
-	conversations, err := b.inboxConversationsFromActions(ctx, meta, identity, summaries)
+	conversations, err := o.inboxConversationsFromActions(ctx, meta, identity, summaries)
 	if err != nil {
 		return InboxContext{}, err
 	}
@@ -46,20 +43,16 @@ func (b *DirectBackend) GetInboxContext(ctx context.Context, meta RequestMeta, i
 	}}, nil
 }
 
-// ReadInboxWindow 认证后按原始边界重读完整连续范围。
-func (b *DirectBackend) ReadInboxWindow(ctx context.Context, meta RequestMeta, input InboxWindowInput) (InboxWindow, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return InboxWindow{}, err
-	}
-	window, err := b.loadInbox.ReadWindow(ctx, identity, inboxaction.ReadWindowInput{
+// ReadInboxWindow 按原始边界重读完整连续范围。
+func (o *directOperations) ReadInboxWindow(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input InboxWindowInput) (InboxWindow, error) {
+	window, err := o.loadInbox.ReadWindow(ctx, identity, inboxaction.ReadWindowInput{
 		Query:       inboxaction.LoadInput{Scope: domain.InboxScope(input.Query.Scope), CustomerView: domain.CustomerInboxView(input.Query.CustomerView), AssigneeIdentityID: input.Query.AssigneeIdentityID},
 		StartCursor: input.StartCursor, EndCursor: input.EndCursor,
 	})
 	if err != nil {
 		return InboxWindow{}, inboxReadError(ctx, meta, identity.Organization.ID, "列表区间", err)
 	}
-	conversations, err := b.inboxConversationsFromActions(ctx, meta, identity, window.Conversations)
+	conversations, err := o.inboxConversationsFromActions(ctx, meta, identity, window.Conversations)
 	if err != nil {
 		return InboxWindow{}, err
 	}

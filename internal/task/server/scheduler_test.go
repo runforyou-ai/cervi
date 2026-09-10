@@ -5,14 +5,12 @@ package server
 import (
 	"context"
 	"encoding/json"
-	"os"
-	"strconv"
-	"strings"
 	"testing"
 	"time"
 	"uuid"
 
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
+	"github.com/runforyou-ai/cervi/internal/servertest"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
@@ -20,7 +18,7 @@ import (
 // TestSyncScheduleWithPostgreSQL 验证计划同步的时间类型和下一执行时间保留规则。
 func TestSyncScheduleWithPostgreSQL(t *testing.T) {
 	ctx := context.Background()
-	databaseConfig := testDatabaseConfig(t)
+	databaseConfig := servertest.DatabaseConfig(t)
 	store, err := serverstorage.Open(ctx, databaseConfig)
 	if err != nil {
 		t.Fatal(err)
@@ -88,30 +86,5 @@ func TestSyncScheduleWithPostgreSQL(t *testing.T) {
 	reenabled := readSchedule()
 	if reenabled.NextRunAt.Before(reenabledAt.Add(-time.Second)) || reenabled.NextRunAt.After(time.Now().UTC().Add(time.Second)) {
 		t.Fatalf("重新启用计划的立即执行时间 = %s", reenabled.NextRunAt)
-	}
-}
-
-// testDatabaseConfig 从测试专用的 PostgreSQL 分项环境变量读取连接配置。
-func testDatabaseConfig(t *testing.T) serverconfig.DatabaseConfig {
-	t.Helper()
-	host := os.Getenv("TEST_POSTGRES_HOST")
-	if host == "" {
-		t.Skip("TEST_POSTGRES_HOST is not set")
-	}
-	port, err := strconv.Atoi(os.Getenv("TEST_POSTGRES_PORT"))
-	if err != nil {
-		t.Fatalf("TEST_POSTGRES_PORT is invalid: %v", err)
-	}
-	databaseName := os.Getenv("TEST_POSTGRES_DB")
-	if !strings.HasSuffix(databaseName, "_test") {
-		t.Fatalf("TEST_POSTGRES_DB must end with _test")
-	}
-	return serverconfig.DatabaseConfig{
-		Host:     host,
-		Port:     port,
-		User:     os.Getenv("TEST_POSTGRES_USER"),
-		Password: os.Getenv("TEST_POSTGRES_PASSWORD"),
-		Name:     databaseName,
-		SSLMode:  os.Getenv("TEST_POSTGRES_SSLMODE"),
 	}
 }

@@ -13,12 +13,30 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/runforyou-ai/cervi/internal/tenant"
+	"github.com/uptrace/bun"
 )
 
+// authOps 持有企业初始化与登录会话的 Action 和 Query。
+type authOps struct {
+	installWorkspace *installationaction.InstallWorkspaceAction
+	login            *authaction.LoginAction
+	logout           *authaction.LogoutAction
+}
+
+// newAuthOps 创建企业初始化与登录会话的业务实现依赖。
+func newAuthOps(db *bun.DB) authOps {
+	return authOps{
+		installWorkspace: installationaction.NewInstallWorkspaceAction(db),
+		login:            authaction.NewLoginAction(db),
+		logout:           authaction.NewLogoutAction(db),
+	}
+}
+
 // InstallationStatus 返回服务端初始化状态和公开企业名称。
-func (b *DirectBackend) InstallationStatus(ctx context.Context, meta RequestMeta) (InstallationStatus, error) {
-	scope, err := b.resolveTenant.Resolve(ctx, tenant.AccessHost(ctx))
+func (o *directOperations) InstallationStatus(ctx context.Context, meta RequestMeta) (InstallationStatus, error) {
+	scope, err := o.resolveTenant.Resolve(ctx, tenant.AccessHost(ctx))
 	if errors.Is(err, tenant.ErrNotFound) {
 		return InstallationStatus{}, nil
 	}
@@ -33,8 +51,8 @@ func (b *DirectBackend) InstallationStatus(ctx context.Context, meta RequestMeta
 }
 
 // InstallWorkspace 创建企业管理员并返回登录令牌。
-func (b *DirectBackend) InstallWorkspace(ctx context.Context, meta RequestMeta, input InstallWorkspaceInput) (Auth, error) {
-	status, err := b.InstallationStatus(ctx, meta)
+func (o *directOperations) InstallWorkspace(ctx context.Context, meta RequestMeta, input InstallWorkspaceInput) (Auth, error) {
+	status, err := o.InstallationStatus(ctx, meta)
 	if err != nil {
 		return Auth{}, err
 	}
@@ -42,7 +60,7 @@ func (b *DirectBackend) InstallWorkspace(ctx context.Context, meta RequestMeta, 
 		slog.Info("企业已初始化")
 		return Auth{}, SessionError(meta, SessionStateLogin, cervii18n.ErrorAlreadyInitialized).WithStatus(http.StatusConflict)
 	}
-	output, err := b.installWorkspace.Execute(ctx, installationaction.InstallWorkspaceInput{
+	output, err := o.installWorkspace.Execute(ctx, installationaction.InstallWorkspaceInput{
 		AccessHost:       tenant.AccessHost(ctx),
 		OrganizationName: input.OrganizationName,
 		DisplayName:      input.DisplayName,
@@ -66,7 +84,7 @@ func (b *DirectBackend) InstallWorkspace(ctx context.Context, meta RequestMeta, 
 		return Auth{}, FailedError(meta, cervii18n.ErrorInstallationFailed)
 	}
 	slog.Info("企业初始化完成", "organization_id", output.Identity.Organization.ID, "admin_id", output.Identity.User.ID)
-	identity, err := b.identityFromModel(ctx, output.Identity)
+	identity, err := o.identityFromModel(ctx, output.Identity)
 	if err != nil {
 		slog.Warn("读取初始化用户头像失败", "organization_id", output.Identity.Organization.ID, "error", err)
 		return Auth{}, FailedError(meta, cervii18n.ErrorInstallationFailed)
@@ -75,12 +93,12 @@ func (b *DirectBackend) InstallWorkspace(ctx context.Context, meta RequestMeta, 
 }
 
 // Login 校验账号密码并返回登录令牌。
-func (b *DirectBackend) Login(ctx context.Context, meta RequestMeta, input LoginInput) (Auth, error) {
-	scope, err := b.requireInitialized(ctx, meta)
+func (o *directOperations) Login(ctx context.Context, meta RequestMeta, input LoginInput) (Auth, error) {
+	scope, err := o.requireInitialized(ctx, meta)
 	if err != nil {
 		return Auth{}, err
 	}
-	output, err := b.login.Execute(ctx, authaction.LoginInput{OrganizationID: scope.OrganizationID, Email: input.Email, Password: input.Password})
+	output, err := o.login.Execute(ctx, authaction.LoginInput{OrganizationID: scope.OrganizationID, Email: input.Email, Password: input.Password})
 	if errors.Is(err, authaction.ErrInvalidCredentials) {
 		return Auth{}, InvalidError(meta, cervii18n.ErrorInvalidCredentials, nil)
 	}
@@ -92,7 +110,7 @@ func (b *DirectBackend) Login(ctx context.Context, meta RequestMeta, input Login
 		return Auth{}, FailedError(meta, cervii18n.ErrorLoginFailed)
 	}
 	slog.Info("用户登录成功", "organization_id", output.Identity.Organization.ID, "user_id", output.Identity.User.ID, "work_status", domain.WorkStatusWorking)
-	identity, err := b.identityFromModel(ctx, output.Identity)
+	identity, err := o.identityFromModel(ctx, output.Identity)
 	if err != nil {
 		slog.Warn("读取登录用户头像失败", "organization_id", output.Identity.Organization.ID, "user_id", output.Identity.User.ID, "error", err)
 		return Auth{}, FailedError(meta, cervii18n.ErrorLoginFailed)
@@ -101,12 +119,8 @@ func (b *DirectBackend) Login(ctx context.Context, meta RequestMeta, input Login
 }
 
 // Logout 删除当前登录令牌。
-func (b *DirectBackend) Logout(ctx context.Context, meta RequestMeta) error {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return err
-	}
-	if err := b.logout.Execute(ctx, identity.Organization.ID, meta.Token); err != nil {
+func (o *directOperations) Logout(ctx context.Context, meta RequestMeta, identity *servermodels.Identity) error {
+	if err := o.logout.Execute(ctx, identity.Organization.ID, meta.Token); err != nil {
 		if ctx.Err() != nil {
 			return ctx.Err()
 		}
@@ -118,12 +132,8 @@ func (b *DirectBackend) Logout(ctx context.Context, meta RequestMeta) error {
 }
 
 // LoadIdentity 返回令牌对应的当前身份。
-func (b *DirectBackend) LoadIdentity(ctx context.Context, meta RequestMeta) (Identity, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return Identity{}, err
-	}
-	output, err := b.identityFromModel(ctx, identity)
+func (o *directOperations) LoadIdentity(ctx context.Context, meta RequestMeta, identity *servermodels.Identity) (Identity, error) {
+	output, err := o.identityFromModel(ctx, identity)
 	if err != nil {
 		slog.Warn("读取当前用户头像失败", "organization_id", identity.Organization.ID, "user_id", identity.User.ID, "error", err)
 		return Identity{}, FailedError(meta, cervii18n.ErrorUserReadFailed)

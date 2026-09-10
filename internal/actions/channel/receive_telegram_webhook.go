@@ -150,6 +150,7 @@ func (a *ReceiveTelegramWebhookAction) Execute(ctx context.Context, channelID st
 			Set("webhook_status = ?", domain.TelegramWebhookStatusNormal).
 			Set("webhook_connected_at = now()").
 			Set("updated_at = now()").
+			Where("organization_id = ?", setting.OrganizationID).
 			Where("channel_id = ?", channelID).
 			Where("webhook_secret = ?", input.Secret).
 			Exec(ctx)
@@ -359,11 +360,13 @@ func (a *ReceiveTelegramWebhookAction) applyTelegramContactAvatar(
 }
 
 // loadActiveTelegramWebhookSetting 读取启用渠道当前可接收回调的设置。
+//
+// 所属企业由本次查询结果确定，调用方随后按 setting.OrganizationID 限定企业。
 func loadActiveTelegramWebhookSetting(ctx context.Context, db bun.IDB, channelID string, lock bool) (*servermodels.TelegramChannelSetting, error) {
 	setting := &servermodels.TelegramChannelSetting{}
 	query := db.NewSelect().
 		Model(setting).
-		Join("JOIN channels AS c ON c.id = tcs.channel_id").
+		Join("JOIN channels AS c ON c.id = tcs.channel_id AND c.organization_id = tcs.organization_id").
 		Where("tcs.channel_id = ?", channelID).
 		Where("c.type = ?", domain.ChannelTypeTelegram).
 		Where("c.enabled = TRUE").

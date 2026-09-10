@@ -15,6 +15,7 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/nats-io/nats.go/jetstream"
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
+	"github.com/runforyou-ai/cervi/internal/servertest"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 )
 
@@ -22,7 +23,7 @@ import (
 func TestWorkerPoolsIsolateAgentTasks(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
-	store, err := serverstorage.Open(ctx, testDatabaseConfig(t))
+	store, err := serverstorage.Open(ctx, servertest.DatabaseConfig(t))
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -11,17 +11,14 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
 // ListRoles 返回当前企业的角色和预定义权限目录。
-func (b *DirectBackend) ListRoles(ctx context.Context, meta RequestMeta) (RoleList, error) {
-	identity, err := b.authenticate(ctx, meta)
+func (o *directOperations) ListRoles(ctx context.Context, meta RequestMeta, identity *servermodels.Identity) (RoleList, error) {
+	output, err := o.listRoles.Execute(ctx, identity)
 	if err != nil {
-		return RoleList{}, err
-	}
-	output, err := b.listRoles.Execute(ctx, identity)
-	if err != nil {
-		return RoleList{}, b.roleError(ctx, meta, err, cervii18n.ErrorRoleListFailed, identity.Organization.ID)
+		return RoleList{}, o.roleError(ctx, meta, err, cervii18n.ErrorRoleListFailed, identity.Organization.ID)
 	}
 	roles := make([]Role, 0, len(output.Roles))
 	for _, role := range output.Roles {
@@ -37,87 +34,67 @@ func (b *DirectBackend) ListRoles(ctx context.Context, meta RequestMeta) (RoleLi
 }
 
 // GetRole 返回当前企业的角色详情。
-func (b *DirectBackend) GetRole(ctx context.Context, meta RequestMeta, roleID string) (Role, error) {
-	identity, err := b.authenticate(ctx, meta)
+func (o *directOperations) GetRole(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, roleID string) (Role, error) {
+	role, err := o.getRole.Execute(ctx, identity, roleID)
 	if err != nil {
-		return Role{}, err
-	}
-	role, err := b.getRole.Execute(ctx, identity, roleID)
-	if err != nil {
-		return Role{}, b.roleError(ctx, meta, err, cervii18n.ErrorRoleReadFailed, identity.Organization.ID, "role_id", roleID)
+		return Role{}, o.roleError(ctx, meta, err, cervii18n.ErrorRoleReadFailed, identity.Organization.ID, "role_id", roleID)
 	}
 	return roleFromAction(*role), nil
 }
 
 // CreateRole 创建自定义角色。
-func (b *DirectBackend) CreateRole(ctx context.Context, meta RequestMeta, input RoleInput) (Role, error) {
-	identity, err := b.authenticate(ctx, meta)
+func (o *directOperations) CreateRole(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input RoleInput) (Role, error) {
+	role, err := o.createRole.Execute(ctx, identity, roleInput(input))
 	if err != nil {
-		return Role{}, err
-	}
-	role, err := b.createRole.Execute(ctx, identity, roleInput(input))
-	if err != nil {
-		return Role{}, b.roleMutationError(ctx, meta, err, cervii18n.ErrorRoleCreateFailed, identity.Organization.ID)
+		return Role{}, o.roleMutationError(ctx, meta, err, cervii18n.ErrorRoleCreateFailed, identity.Organization.ID)
 	}
 	slog.Info("角色创建成功", "organization_id", identity.Organization.ID, "role_id", role.ID, "permission_count", len(role.Permissions))
 	return roleFromAction(*role), nil
 }
 
 // UpdateRole 修改角色信息和权限。
-func (b *DirectBackend) UpdateRole(ctx context.Context, meta RequestMeta, roleID string, input RoleInput) (Role, error) {
-	identity, err := b.authenticate(ctx, meta)
+func (o *directOperations) UpdateRole(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, roleID string, input RoleInput) (Role, error) {
+	role, err := o.updateRole.Execute(ctx, identity, roleID, roleInput(input))
 	if err != nil {
-		return Role{}, err
-	}
-	role, err := b.updateRole.Execute(ctx, identity, roleID, roleInput(input))
-	if err != nil {
-		return Role{}, b.roleMutationError(ctx, meta, err, cervii18n.ErrorRoleUpdateFailed, identity.Organization.ID, "role_id", roleID)
+		return Role{}, o.roleMutationError(ctx, meta, err, cervii18n.ErrorRoleUpdateFailed, identity.Organization.ID, "role_id", roleID)
 	}
 	slog.Info("角色保存成功", "organization_id", identity.Organization.ID, "role_id", role.ID, "role_kind", role.Kind, "permission_count", len(role.Permissions))
 	return roleFromAction(*role), nil
 }
 
 // DeleteRole 删除自定义角色。
-func (b *DirectBackend) DeleteRole(ctx context.Context, meta RequestMeta, roleID string) error {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return err
-	}
-	if err := b.deleteRole.Execute(ctx, identity, roleID); err != nil {
+func (o *directOperations) DeleteRole(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, roleID string) error {
+	if err := o.deleteRole.Execute(ctx, identity, roleID); err != nil {
 		if errors.Is(err, roleaction.ErrBuiltInDeleteForbidden) {
 			return InvalidError(meta, cervii18n.ErrorRoleBuiltInDeleteForbidden, nil)
 		}
-		return b.roleError(ctx, meta, err, cervii18n.ErrorRoleDeleteFailed, identity.Organization.ID, "role_id", roleID)
+		return o.roleError(ctx, meta, err, cervii18n.ErrorRoleDeleteFailed, identity.Organization.ID, "role_id", roleID)
 	}
 	slog.Info("角色删除成功", "organization_id", identity.Organization.ID, "role_id", roleID)
 	return nil
 }
 
 // UpdateRoleAssignments 在一个事务中批量调整真人和 AI 员工角色。
-func (b *DirectBackend) UpdateRoleAssignments(ctx context.Context, meta RequestMeta, input RoleAssignmentsInput) error {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return err
-	}
+func (o *directOperations) UpdateRoleAssignments(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input RoleAssignmentsInput) error {
 	assignments := make([]roleaction.AssignmentInput, 0, len(input.Assignments))
 	for _, assignment := range input.Assignments {
 		assignments = append(assignments, roleaction.AssignmentInput{IdentityID: assignment.IdentityID, RoleID: assignment.RoleID})
 	}
-	if err := b.updateRoleAssignments.Execute(ctx, identity, assignments); err != nil {
+	if err := o.updateRoleAssignments.Execute(ctx, identity, assignments); err != nil {
 		if errors.Is(err, roleaction.ErrAssignmentInvalid) || errors.Is(err, roleaction.ErrAgentAdministrator) {
 			return InvalidError(meta, cervii18n.ErrorValidationFailed, nil)
 		}
 		if errors.Is(err, roleaction.ErrLastActiveAdministrator) {
 			return InvalidError(meta, cervii18n.ErrorUserLastActiveAdministrator, nil)
 		}
-		return b.roleError(ctx, meta, err, cervii18n.ErrorRoleUpdateFailed, identity.Organization.ID)
+		return o.roleError(ctx, meta, err, cervii18n.ErrorRoleUpdateFailed, identity.Organization.ID)
 	}
 	slog.Info("企业身份角色批量调整成功", "organization_id", identity.Organization.ID, "assignment_count", len(assignments))
 	return nil
 }
 
 // roleMutationError 转换角色写入校验和操作错误。
-func (b *DirectBackend) roleMutationError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key, organizationID string, attributes ...any) error {
+func (o *directOperations) roleMutationError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key, organizationID string, attributes ...any) error {
 	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
 		// 把角色校验错误码映射为本地化文案键。
 		keys := map[common.FieldCode]cervii18n.Key{
@@ -133,11 +110,11 @@ func (b *DirectBackend) roleMutationError(ctx context.Context, meta RequestMeta,
 	if errors.Is(err, roleaction.ErrLimitReached) {
 		return InvalidError(meta, cervii18n.ErrorRoleLimitReached, nil)
 	}
-	return b.roleError(ctx, meta, err, failureKey, organizationID, attributes...)
+	return o.roleError(ctx, meta, err, failureKey, organizationID, attributes...)
 }
 
 // roleError 转换角色通用操作错误。
-func (b *DirectBackend) roleError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key, organizationID string, attributes ...any) error {
+func (o *directOperations) roleError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key, organizationID string, attributes ...any) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}

@@ -7,46 +7,104 @@ import (
 	"errors"
 	"log/slog"
 
+	memberaction "github.com/runforyou-ai/cervi/internal/actions/member"
+	organizationaction "github.com/runforyou-ai/cervi/internal/actions/organization"
+	roleaction "github.com/runforyou-ai/cervi/internal/actions/role"
+	teamaction "github.com/runforyou-ai/cervi/internal/actions/team"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	"github.com/uptrace/bun"
 )
 
-// UpdateProfile 修改当前用户的头像、姓名和邮箱。
-func (b *DirectBackend) UpdateProfile(ctx context.Context, meta RequestMeta, input ProfileInput) (CurrentUser, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return CurrentUser{}, err
+// directoryOps 持有企业成员、团队、角色与组织的 Action 和 Query。
+type directoryOps struct {
+	listMemberOptions        *memberaction.ListOptionsQuery
+	listUsers                *useraction.ListUsersQuery
+	getUser                  *useraction.GetUserQuery
+	createUser               *useraction.CreateUserAction
+	updateUser               *useraction.UpdateUserAction
+	updateRoleAssignments    *roleaction.UpdateAssignmentsAction
+	updateUserStatus         *useraction.UpdateStatusAction
+	listTeams                *teamaction.ListTeamsQuery
+	createTeam               *teamaction.CreateTeamAction
+	updateTeam               *teamaction.UpdateTeamAction
+	deleteTeam               *teamaction.DeleteTeamAction
+	listTeamMembers          *teamaction.ListMembersQuery
+	listTeamMemberCandidates *teamaction.ListMemberCandidatesQuery
+	addTeamMembers           *teamaction.AddMembersAction
+	removeTeamMembers        *teamaction.RemoveMembersAction
+	updateProfile            *useraction.UpdateProfileAction
+	changePassword           *useraction.ChangePasswordAction
+	updateUserPreferences    *useraction.UpdatePreferencesAction
+	updateUserWorkStatus     *useraction.UpdateWorkStatusAction
+	listRoles                *roleaction.ListRolesQuery
+	getRole                  *roleaction.GetRoleQuery
+	createRole               *roleaction.CreateRoleAction
+	updateRole               *roleaction.UpdateRoleAction
+	deleteRole               *roleaction.DeleteRoleAction
+	updateOrganization       *organizationaction.UpdateOrganizationAction
+}
+
+// newDirectoryOps 创建企业成员、团队、角色与组织的业务实现依赖。
+func newDirectoryOps(db *bun.DB) directoryOps {
+	return directoryOps{
+		listMemberOptions:        memberaction.NewListOptionsQuery(db),
+		listUsers:                useraction.NewListUsersQuery(db),
+		getUser:                  useraction.NewGetUserQuery(db),
+		createUser:               useraction.NewCreateUserAction(db),
+		updateUser:               useraction.NewUpdateUserAction(db),
+		updateRoleAssignments:    roleaction.NewUpdateAssignmentsAction(db),
+		updateUserStatus:         useraction.NewUpdateStatusAction(db),
+		listTeams:                teamaction.NewListTeamsQuery(db),
+		createTeam:               teamaction.NewCreateTeamAction(db),
+		updateTeam:               teamaction.NewUpdateTeamAction(db),
+		deleteTeam:               teamaction.NewDeleteTeamAction(db),
+		listTeamMembers:          teamaction.NewListMembersQuery(db),
+		listTeamMemberCandidates: teamaction.NewListMemberCandidatesQuery(db),
+		addTeamMembers:           teamaction.NewAddMembersAction(db),
+		removeTeamMembers:        teamaction.NewRemoveMembersAction(db),
+		updateProfile:            useraction.NewUpdateProfileAction(db),
+		changePassword:           useraction.NewChangePasswordAction(db),
+		updateUserPreferences:    useraction.NewUpdatePreferencesAction(db),
+		updateUserWorkStatus:     useraction.NewUpdateWorkStatusAction(db),
+		listRoles:                roleaction.NewListRolesQuery(db),
+		getRole:                  roleaction.NewGetRoleQuery(db),
+		createRole:               roleaction.NewCreateRoleAction(db),
+		updateRole:               roleaction.NewUpdateRoleAction(db),
+		deleteRole:               roleaction.NewDeleteRoleAction(db),
+		updateOrganization:       organizationaction.NewUpdateOrganizationAction(db),
 	}
-	updatedIdentity, err := b.updateProfile.Execute(ctx, identity, useraction.ProfileInput{
+}
+
+// UpdateProfile 修改当前用户的头像、姓名和邮箱。
+func (o *directOperations) UpdateProfile(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input ProfileInput) (CurrentUser, error) {
+	updatedIdentity, err := o.updateProfile.Execute(ctx, identity, useraction.ProfileInput{
 		DisplayName:  input.DisplayName,
 		Email:        input.Email,
 		AvatarFileID: input.AvatarFileID,
 	})
 	if err != nil {
-		return CurrentUser{}, b.currentUserError(ctx, meta, err, cervii18n.ErrorProfileUpdateFailed, profileFieldKeys, identity.Organization.ID, identity.User.ID)
+		return CurrentUser{}, o.currentUserError(ctx, meta, err, cervii18n.ErrorProfileUpdateFailed, profileFieldKeys, identity.Organization.ID, identity.User.ID)
 	}
 	slog.Info("个人资料保存成功", "organization_id", identity.Organization.ID, "identity_id", identity.User.IdentityID, "user_id", identity.User.ID)
-	user, err := b.currentUserFromIdentity(ctx, updatedIdentity)
+	user, err := o.currentUserFromIdentity(ctx, updatedIdentity)
 	if err != nil {
-		return CurrentUser{}, b.currentUserError(ctx, meta, err, cervii18n.ErrorProfileUpdateFailed, profileFieldKeys, identity.Organization.ID, identity.User.ID)
+		return CurrentUser{}, o.currentUserError(ctx, meta, err, cervii18n.ErrorProfileUpdateFailed, profileFieldKeys, identity.Organization.ID, identity.User.ID)
 	}
 	return user, nil
 }
 
 // ChangePassword 核验当前密码并保存新密码。
-func (b *DirectBackend) ChangePassword(ctx context.Context, meta RequestMeta, input ChangePasswordInput) error {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return err
-	}
-	err = b.changePassword.Execute(ctx, identity, useraction.ChangePasswordInput{
+func (o *directOperations) ChangePassword(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input ChangePasswordInput) error {
+	err := o.changePassword.Execute(ctx, identity, useraction.ChangePasswordInput{
 		CurrentPassword: input.CurrentPassword,
 		NewPassword:     input.NewPassword,
 	})
 	if err != nil {
-		return b.currentUserError(ctx, meta, err, cervii18n.ErrorPasswordUpdateFailed,
+		return o.currentUserError(ctx, meta, err, cervii18n.ErrorPasswordUpdateFailed,
 			// 把密码校验错误码映射为本地化文案键。
 			func(fields map[string]common.FieldCode) map[string]cervii18n.Key {
 				keys := map[common.FieldCode]cervii18n.Key{
@@ -62,19 +120,15 @@ func (b *DirectBackend) ChangePassword(ctx context.Context, meta RequestMeta, in
 }
 
 // UpdateUserPreferences 保存当前用户的偏好设置。
-func (b *DirectBackend) UpdateUserPreferences(ctx context.Context, meta RequestMeta, input UserPreferencesInput) (CurrentUser, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return CurrentUser{}, err
-	}
-	updatedIdentity, err := b.updateUserPreferences.Execute(ctx, identity, useraction.PreferencesInput{
+func (o *directOperations) UpdateUserPreferences(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input UserPreferencesInput) (CurrentUser, error) {
+	updatedIdentity, err := o.updateUserPreferences.Execute(ctx, identity, useraction.PreferencesInput{
 		Locale:                      domain.Locale(input.Locale),
 		TimeZone:                    input.TimeZone,
 		MessageNotificationsEnabled: input.MessageNotificationsEnabled,
 		WorkspaceTabsEnabled:        input.WorkspaceTabsEnabled,
 	})
 	if err != nil {
-		return CurrentUser{}, b.currentUserError(ctx, meta, err, cervii18n.ErrorPreferencesUpdateFailed, preferencesFieldKeys, identity.Organization.ID, identity.User.ID)
+		return CurrentUser{}, o.currentUserError(ctx, meta, err, cervii18n.ErrorPreferencesUpdateFailed, preferencesFieldKeys, identity.Organization.ID, identity.User.ID)
 	}
 	slog.Info("用户偏好保存成功",
 		"organization_id", identity.Organization.ID,
@@ -84,40 +138,32 @@ func (b *DirectBackend) UpdateUserPreferences(ctx context.Context, meta RequestM
 		"message_notifications_enabled", input.MessageNotificationsEnabled,
 		"workspace_tabs_enabled", input.WorkspaceTabsEnabled,
 	)
-	user, err := b.currentUserFromIdentity(ctx, updatedIdentity)
+	user, err := o.currentUserFromIdentity(ctx, updatedIdentity)
 	if err != nil {
-		return CurrentUser{}, b.currentUserError(ctx, meta, err, cervii18n.ErrorPreferencesUpdateFailed, preferencesFieldKeys, identity.Organization.ID, identity.User.ID)
+		return CurrentUser{}, o.currentUserError(ctx, meta, err, cervii18n.ErrorPreferencesUpdateFailed, preferencesFieldKeys, identity.Organization.ID, identity.User.ID)
 	}
 	return user, nil
 }
 
 // UpdateUserWorkStatus 保存当前用户主动设置的工作状态。
-func (b *DirectBackend) UpdateUserWorkStatus(ctx context.Context, meta RequestMeta, input UserWorkStatusInput) (CurrentUser, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return CurrentUser{}, err
-	}
-	updatedIdentity, err := b.updateUserWorkStatus.Execute(ctx, identity, useraction.WorkStatusInput{
+func (o *directOperations) UpdateUserWorkStatus(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input UserWorkStatusInput) (CurrentUser, error) {
+	updatedIdentity, err := o.updateUserWorkStatus.Execute(ctx, identity, useraction.WorkStatusInput{
 		WorkStatus: domain.WorkStatus(input.WorkStatus),
 	})
 	if err != nil {
-		return CurrentUser{}, b.currentUserError(ctx, meta, err, cervii18n.ErrorWorkStatusUpdateFailed, workStatusFieldKeys, identity.Organization.ID, identity.User.ID)
+		return CurrentUser{}, o.currentUserError(ctx, meta, err, cervii18n.ErrorWorkStatusUpdateFailed, workStatusFieldKeys, identity.Organization.ID, identity.User.ID)
 	}
 	slog.Info("工作状态保存成功", "organization_id", identity.Organization.ID, "identity_id", identity.User.IdentityID, "user_id", identity.User.ID, "work_status", input.WorkStatus)
-	user, err := b.currentUserFromIdentity(ctx, updatedIdentity)
+	user, err := o.currentUserFromIdentity(ctx, updatedIdentity)
 	if err != nil {
-		return CurrentUser{}, b.currentUserError(ctx, meta, err, cervii18n.ErrorWorkStatusUpdateFailed, workStatusFieldKeys, identity.Organization.ID, identity.User.ID)
+		return CurrentUser{}, o.currentUserError(ctx, meta, err, cervii18n.ErrorWorkStatusUpdateFailed, workStatusFieldKeys, identity.Organization.ID, identity.User.ID)
 	}
 	return user, nil
 }
 
 // ListUsers 返回企业成员列表。
-func (b *DirectBackend) ListUsers(ctx context.Context, meta RequestMeta, input UserListInput) (UserList, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return UserList{}, err
-	}
-	output, err := b.listUsers.Execute(ctx, identity, useraction.ListInput{
+func (o *directOperations) ListUsers(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input UserListInput) (UserList, error) {
+	output, err := o.listUsers.Execute(ctx, identity, useraction.ListInput{
 		Query: input.Query, Status: optionalDomain[UserStatus, domain.UserStatus](input.Status), RoleID: input.RoleID, TeamID: input.TeamID, Page: input.Page, PageSize: input.PageSize,
 	})
 	if err != nil {
@@ -138,12 +184,8 @@ func (b *DirectBackend) ListUsers(ctx context.Context, meta RequestMeta, input U
 }
 
 // GetUser 返回企业成员详情。
-func (b *DirectBackend) GetUser(ctx context.Context, meta RequestMeta, userID string) (User, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return User{}, err
-	}
-	user, err := b.getUser.Execute(ctx, identity, userID)
+func (o *directOperations) GetUser(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, userID string) (User, error) {
+	user, err := o.getUser.Execute(ctx, identity, userID)
 	if err != nil {
 		if ctx.Err() != nil {
 			return User{}, ctx.Err()
@@ -158,59 +200,47 @@ func (b *DirectBackend) GetUser(ctx context.Context, meta RequestMeta, userID st
 }
 
 // CreateUser 创建企业成员账号。
-func (b *DirectBackend) CreateUser(ctx context.Context, meta RequestMeta, input CreateUserInput) (User, error) {
-	identity, err := b.authenticate(ctx, meta)
+func (o *directOperations) CreateUser(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input CreateUserInput) (User, error) {
+	user, err := o.createUser.Execute(ctx, identity, useraction.CreateInput{DisplayName: input.DisplayName, Email: input.Email, Password: input.Password, RoleID: input.RoleID, TeamIDs: input.TeamIDs})
 	if err != nil {
-		return User{}, err
-	}
-	user, err := b.createUser.Execute(ctx, identity, useraction.CreateInput{DisplayName: input.DisplayName, Email: input.Email, Password: input.Password, RoleID: input.RoleID, TeamIDs: input.TeamIDs})
-	if err != nil {
-		return User{}, b.userMutationError(ctx, meta, err, cervii18n.ErrorUserCreateFailed, identity.Organization.ID, "")
+		return User{}, o.userMutationError(ctx, meta, err, cervii18n.ErrorUserCreateFailed, identity.Organization.ID, "")
 	}
 	slog.Info("企业成员创建成功", "organization_id", identity.Organization.ID, "identity_id", user.IdentityID, "user_id", user.ID, "role_id", user.RoleID)
 	return userFromAction(*user), nil
 }
 
 // UpdateUser 修改企业成员资料、角色和所属团队。
-func (b *DirectBackend) UpdateUser(ctx context.Context, meta RequestMeta, userID string, input UpdateUserInput) (User, error) {
-	identity, err := b.authenticate(ctx, meta)
+func (o *directOperations) UpdateUser(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, userID string, input UpdateUserInput) (User, error) {
+	user, err := o.updateUser.Execute(ctx, identity, userID, useraction.UpdateInput{DisplayName: input.DisplayName, Email: input.Email, RoleID: input.RoleID, TeamIDs: input.TeamIDs})
 	if err != nil {
-		return User{}, err
-	}
-	user, err := b.updateUser.Execute(ctx, identity, userID, useraction.UpdateInput{DisplayName: input.DisplayName, Email: input.Email, RoleID: input.RoleID, TeamIDs: input.TeamIDs})
-	if err != nil {
-		return User{}, b.userMutationError(ctx, meta, err, cervii18n.ErrorUserUpdateFailed, identity.Organization.ID, userID)
+		return User{}, o.userMutationError(ctx, meta, err, cervii18n.ErrorUserUpdateFailed, identity.Organization.ID, userID)
 	}
 	slog.Info("企业成员更新成功", "organization_id", identity.Organization.ID, "identity_id", user.IdentityID, "user_id", userID, "role_id", user.RoleID)
 	return userFromAction(*user), nil
 }
 
 // DeactivateUser 禁用企业成员账号。
-func (b *DirectBackend) DeactivateUser(ctx context.Context, meta RequestMeta, userID string) (User, error) {
-	return b.changeUserStatus(ctx, meta, userID, domain.UserStatusInactive)
+func (o *directOperations) DeactivateUser(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, userID string) (User, error) {
+	return o.changeUserStatus(ctx, meta, identity, userID, domain.UserStatusInactive)
 }
 
 // ReactivateUser 恢复企业成员账号。
-func (b *DirectBackend) ReactivateUser(ctx context.Context, meta RequestMeta, userID string) (User, error) {
-	return b.changeUserStatus(ctx, meta, userID, domain.UserStatusActive)
+func (o *directOperations) ReactivateUser(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, userID string) (User, error) {
+	return o.changeUserStatus(ctx, meta, identity, userID, domain.UserStatusActive)
 }
 
 // changeUserStatus 修改企业成员账号状态。
-func (b *DirectBackend) changeUserStatus(ctx context.Context, meta RequestMeta, userID string, status domain.UserStatus) (User, error) {
-	identity, err := b.authenticate(ctx, meta)
+func (o *directOperations) changeUserStatus(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, userID string, status domain.UserStatus) (User, error) {
+	user, err := o.updateUserStatus.Execute(ctx, identity, userID, status)
 	if err != nil {
-		return User{}, err
-	}
-	user, err := b.updateUserStatus.Execute(ctx, identity, userID, status)
-	if err != nil {
-		return User{}, b.userMutationError(ctx, meta, err, cervii18n.ErrorUserStatusUpdateFailed, identity.Organization.ID, userID)
+		return User{}, o.userMutationError(ctx, meta, err, cervii18n.ErrorUserStatusUpdateFailed, identity.Organization.ID, userID)
 	}
 	slog.Info("企业成员账号状态已修改", "organization_id", identity.Organization.ID, "identity_id", user.IdentityID, "user_id", userID, "status", status)
 	return userFromAction(*user), nil
 }
 
 // currentUserError 转换当前用户资料、密码、偏好和工作状态操作错误。
-func (b *DirectBackend) currentUserError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key, fieldKeys func(map[string]common.FieldCode) map[string]cervii18n.Key, organizationID, userID string) error {
+func (o *directOperations) currentUserError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key, fieldKeys func(map[string]common.FieldCode) map[string]cervii18n.Key, organizationID, userID string) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
@@ -228,7 +258,7 @@ func (b *DirectBackend) currentUserError(ctx context.Context, meta RequestMeta, 
 }
 
 // userMutationError 转换企业成员写入错误。
-func (b *DirectBackend) userMutationError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key, organizationID, userID string) error {
+func (o *directOperations) userMutationError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key, organizationID, userID string) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}

@@ -4,14 +4,13 @@ package main
 
 import (
 	"context"
-	knowledgeaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
-	"github.com/runforyou-ai/cervi/internal/integration/knowledgeprocessing"
 
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	"github.com/runforyou-ai/cervi/internal/actions/filemaintenance"
+	knowledgeaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
 	mcpserveraction "github.com/runforyou-ai/cervi/internal/actions/mcpserver"
 	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
 	"github.com/runforyou-ai/cervi/internal/api"
@@ -21,6 +20,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/ingress"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
+	"github.com/runforyou-ai/cervi/internal/integration/knowledgeprocessing"
 	mcpintegration "github.com/runforyou-ai/cervi/internal/integration/mcp"
 	telegramintegration "github.com/runforyou-ai/cervi/internal/integration/telegram"
 	"github.com/runforyou-ai/cervi/internal/publicweb"
@@ -87,8 +87,7 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	})
 
 	// 组装企业成员与网站匿名访客各自的业务入口。
-	directBackend := appservice.NewDirectBackend(appStorage.DB(), localFiles, tenantResolver, agentRunScheduler, executeAgentRun, tasks)
-	directBackend.SetKnowledgeProcessor(knowledgeClient)
+	directBackend := appservice.NewDirectBackend(appStorage.DB(), localFiles, tenantResolver, agentRunScheduler, executeAgentRun, tasks, knowledgeClient)
 	boundService := appservice.New(directBackend)
 	websiteVisitorBackend := appservice.NewWebsiteVisitorDirectBackend(appStorage.DB(), agentRunScheduler)
 	websiteVisitorService := appservice.NewWebsiteVisitorService(websiteVisitorBackend)

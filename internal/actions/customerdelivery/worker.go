@@ -42,8 +42,8 @@ func (w *Worker) Scan(ctx context.Context, _ struct{}) error {
 	err := w.db.NewSelect().TableExpr("customer_message_deliveries AS d").Column("d.id").
 		Join("JOIN channels AS ch ON ch.id = d.channel_id AND ch.organization_id = d.organization_id").
 		Where("(d.status IN ('pending','retry_wait') AND d.available_at <= now()) OR (d.status = 'sending' AND d.lease_expires_at <= now()) OR (d.status = 'uncertain' AND d.uncertain_until <= now())").
-		Where("d.status IN ('sending', 'uncertain') OR (ch.enabled AND NOT EXISTS (SELECT 1 FROM customer_channel_send_gates AS gate WHERE gate.channel_id = d.channel_id AND gate.flood_wait_until > now()))").
-		Where("NOT EXISTS (SELECT 1 FROM customer_message_deliveries AS earlier WHERE earlier.channel_id = d.channel_id AND earlier.contact_channel_identity_id = d.contact_channel_identity_id AND earlier.position < d.position AND earlier.status IN ('pending','retry_wait','sending','uncertain'))").
+		Where("d.status IN ('sending', 'uncertain') OR (ch.enabled AND NOT EXISTS (SELECT 1 FROM customer_channel_send_gates AS gate WHERE gate.organization_id = d.organization_id AND gate.channel_id = d.channel_id AND gate.flood_wait_until > now()))").
+		Where("NOT EXISTS (SELECT 1 FROM customer_message_deliveries AS earlier WHERE earlier.organization_id = d.organization_id AND earlier.channel_id = d.channel_id AND earlier.contact_channel_identity_id = d.contact_channel_identity_id AND earlier.position < d.position AND earlier.status IN ('pending','retry_wait','sending','uncertain'))").
 		OrderExpr("d.updated_at, d.id").Limit(100).Scan(ctx, &ids)
 	if err != nil {
 		return err
@@ -60,6 +60,8 @@ func (w *Worker) Scan(ctx context.Context, _ struct{}) error {
 }
 
 // Execute 串行化配置与投递，在短事务之外调用 Telegram。
+//
+// 所属企业由投递记录确定，认领之后的查询都按该企业限定。
 func (w *Worker) Execute(ctx context.Context, input Input) error {
 	var channelID string
 	err := w.db.NewSelect().Model((*models.CustomerMessageDelivery)(nil)).Column("channel_id").Where("id = ?", input.DeliveryID).Scan(ctx, &channelID)
@@ -97,7 +99,7 @@ func (w *Worker) claim(ctx context.Context, conn bun.Conn, id string) (*models.C
 		if _, err := tx.ExecContext(ctx, "SELECT id FROM contact_channel_identities WHERE id = ? AND organization_id = ? FOR UPDATE", delivery.ContactChannelIdentityID, delivery.OrganizationID); err != nil {
 			return err
 		}
-		if err := tx.NewSelect().Model(delivery).WherePK().For("UPDATE").Scan(ctx); err != nil {
+		if err := tx.NewSelect().Model(delivery).WherePK().Where("cmd.organization_id = ?", delivery.OrganizationID).For("UPDATE").Scan(ctx); err != nil {
 			return err
 		}
 		now := time.Now().UTC()
@@ -125,7 +127,7 @@ func (w *Worker) claim(ctx context.Context, conn bun.Conn, id string) (*models.C
 			return nil
 		}
 		blocked, err := tx.NewSelect().TableExpr("customer_message_deliveries").
-			Where("channel_id = ? AND contact_channel_identity_id = ? AND position < ?", delivery.ChannelID, delivery.ContactChannelIdentityID, delivery.Position).
+			Where("organization_id = ? AND channel_id = ? AND contact_channel_identity_id = ? AND position < ?", delivery.OrganizationID, delivery.ChannelID, delivery.ContactChannelIdentityID, delivery.Position).
 			Where("status IN ('pending','retry_wait','sending','uncertain')").Exists(ctx)
 		if err != nil || blocked {
 			return err
@@ -161,11 +163,11 @@ func (w *Worker) claim(ctx context.Context, conn bun.Conn, id string) (*models.C
 			slog.Warn("客户消息因缺少机器人凭据停止投递", "delivery_id", delivery.ID, "channel_id", delivery.ChannelID)
 			return saveDelivery(ctx, tx, delivery)
 		}
-		blocked, err = tx.NewSelect().TableExpr("customer_channel_send_gates").Where("channel_id = ? AND flood_wait_until > now()", delivery.ChannelID).Exists(ctx)
+		blocked, err = tx.NewSelect().TableExpr("customer_channel_send_gates").Where("organization_id = ? AND channel_id = ? AND flood_wait_until > now()", delivery.OrganizationID, delivery.ChannelID).Exists(ctx)
 		if err != nil || blocked {
 			return err
 		}
-		blocked, err = tx.NewSelect().TableExpr("customer_message_deliveries").Where("channel_id = ? AND status = 'sending'", delivery.ChannelID).Exists(ctx)
+		blocked, err = tx.NewSelect().TableExpr("customer_message_deliveries").Where("organization_id = ? AND channel_id = ? AND status = 'sending'", delivery.OrganizationID, delivery.ChannelID).Exists(ctx)
 		if err != nil || blocked {
 			return err
 		}
@@ -191,7 +193,7 @@ func (w *Worker) finish(ctx context.Context, conn bun.Conn, delivery *models.Cus
 		}
 		worker := delivery.LeaseWorker
 		current := &models.CustomerMessageDelivery{}
-		if err := tx.NewSelect().Model(current).Where("cmd.id = ?", delivery.ID).For("UPDATE").Scan(ctx); err != nil {
+		if err := tx.NewSelect().Model(current).Where("cmd.organization_id = ? AND cmd.id = ?", delivery.OrganizationID, delivery.ID).For("UPDATE").Scan(ctx); err != nil {
 			return err
 		}
 		if current.Status != domain.CustomerDeliverySending || current.LeaseWorker == nil || worker == nil || *current.LeaseWorker != *worker {
@@ -240,6 +242,6 @@ func (w *Worker) finish(ctx context.Context, conn bun.Conn, delivery *models.Cus
 // saveDelivery 更新投递状态与运行字段。
 func saveDelivery(ctx context.Context, db bun.IDB, delivery *models.CustomerMessageDelivery) error {
 	delivery.UpdatedAt = time.Now().UTC()
-	_, err := db.NewUpdate().Model(delivery).WherePK().Exec(ctx)
+	_, err := db.NewUpdate().Model(delivery).WherePK().Where("organization_id = ?", delivery.OrganizationID).Exec(ctx)
 	return err
 }

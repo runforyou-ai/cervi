@@ -10,20 +10,83 @@ import (
 	"strconv"
 	"strings"
 
+	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	servertask "github.com/runforyou-ai/cervi/internal/task/server"
+	"github.com/uptrace/bun"
 )
 
-// SendCustomerTextMessage 发送成员客户会话文本消息。
-func (b *DirectBackend) SendCustomerTextMessage(ctx context.Context, meta RequestMeta, conversationID string, input CustomerTextMessageInput) (ConversationMessage, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return ConversationMessage{}, err
+// conversationOps 持有会话与消息的 Action 和 Query。
+type conversationOps struct {
+	sendAttachmentMessage           *conversationaction.SendAttachmentMessageAction
+	listConversationMessages        *conversationaction.ListConversationMessagesQuery
+	updateConversationUnreadMark    *conversationaction.UpdateConversationUnreadMarkAction
+	markConversationRead            *conversationaction.MarkConversationReadAction
+	conversationNavigation          *conversationaction.GetConversationNavigationStateQuery
+	pendingConversationMentions     *conversationaction.ListPendingConversationMentionsQuery
+	reviewConversationMention       *conversationaction.MarkConversationMentionReviewedAction
+	updateConversationNotifications *conversationaction.UpdateConversationNotificationSettingsAction
+	sendCustomerTextMessage         *conversationaction.SendCustomerTextMessageAction
+	claimServiceSession             *conversationaction.ClaimServiceSessionAction
+	transferServiceSession          *conversationaction.TransferServiceSessionAction
+	closeServiceSession             *conversationaction.CloseServiceSessionAction
+	reopenServiceSession            *conversationaction.ReopenServiceSessionAction
+	sendFirstAgentTextMessage       *conversationaction.SendFirstAgentTextMessageAction
+	sendAgentTextMessage            *conversationaction.SendAgentTextMessageAction
+	sendFirstDirectTextMessage      *conversationaction.SendFirstDirectTextMessageAction
+	findDirectConversation          *conversationaction.FindDirectConversationQuery
+	sendDirectTextMessage           *conversationaction.SendDirectTextMessageAction
+	createGroupConversation         *conversationaction.CreateGroupConversationAction
+	getGroupConversation            *conversationaction.GetGroupConversationQuery
+	updateGroupConversation         *conversationaction.UpdateGroupConversationAction
+	addGroupConversationMembers     *conversationaction.AddGroupConversationMembersAction
+	removeGroupConversationMember   *conversationaction.RemoveGroupConversationMemberAction
+	transferGroupConversationOwner  *conversationaction.TransferGroupConversationOwnerAction
+	leaveGroupConversation          *conversationaction.LeaveGroupConversationAction
+	dissolveGroupConversation       *conversationaction.DissolveGroupConversationAction
+	sendGroupTextMessage            *conversationaction.SendGroupTextMessageAction
+}
+
+// newConversationOps 创建会话与消息的业务实现依赖。
+func newConversationOps(db *bun.DB, agentScheduler conversationaction.AgentMessageScheduler, agentCoordinator *agentrunaction.ExecuteAction, taskEnqueuer servertask.TxEnqueuer) conversationOps {
+	return conversationOps{
+		sendAttachmentMessage:           conversationaction.NewSendAttachmentMessageAction(db),
+		listConversationMessages:        conversationaction.NewListConversationMessagesQuery(db),
+		updateConversationUnreadMark:    conversationaction.NewUpdateConversationUnreadMarkAction(db),
+		markConversationRead:            conversationaction.NewMarkConversationReadAction(db),
+		conversationNavigation:          conversationaction.NewGetConversationNavigationStateQuery(db),
+		pendingConversationMentions:     conversationaction.NewListPendingConversationMentionsQuery(db),
+		reviewConversationMention:       conversationaction.NewMarkConversationMentionReviewedAction(db),
+		updateConversationNotifications: conversationaction.NewUpdateConversationNotificationSettingsAction(db),
+		sendCustomerTextMessage:         conversationaction.NewSendCustomerTextMessageAction(db, taskEnqueuer),
+		claimServiceSession:             conversationaction.NewClaimServiceSessionAction(db, agentCoordinator),
+		transferServiceSession:          conversationaction.NewTransferServiceSessionAction(db, agentCoordinator, agentScheduler),
+		closeServiceSession:             conversationaction.NewCloseServiceSessionAction(db, agentCoordinator),
+		reopenServiceSession:            conversationaction.NewReopenServiceSessionAction(db),
+		sendFirstAgentTextMessage:       conversationaction.NewSendFirstAgentTextMessageAction(db, agentScheduler),
+		sendAgentTextMessage:            conversationaction.NewSendAgentTextMessageAction(db, agentScheduler),
+		sendFirstDirectTextMessage:      conversationaction.NewSendFirstDirectTextMessageAction(db),
+		findDirectConversation:          conversationaction.NewFindDirectConversationQuery(db),
+		sendDirectTextMessage:           conversationaction.NewSendDirectTextMessageAction(db),
+		createGroupConversation:         conversationaction.NewCreateGroupConversationAction(db),
+		getGroupConversation:            conversationaction.NewGetGroupConversationQuery(db),
+		updateGroupConversation:         conversationaction.NewUpdateGroupConversationAction(db),
+		addGroupConversationMembers:     conversationaction.NewAddGroupConversationMembersAction(db),
+		removeGroupConversationMember:   conversationaction.NewRemoveGroupConversationMemberAction(db),
+		transferGroupConversationOwner:  conversationaction.NewTransferGroupConversationOwnerAction(db),
+		leaveGroupConversation:          conversationaction.NewLeaveGroupConversationAction(db),
+		dissolveGroupConversation:       conversationaction.NewDissolveGroupConversationAction(db),
+		sendGroupTextMessage:            conversationaction.NewSendGroupTextMessageAction(db),
 	}
-	message, err := b.sendCustomerTextMessage.Execute(ctx, identity, conversationaction.CustomerTextMessageInput{
+}
+
+// SendCustomerTextMessage 发送成员客户会话文本消息。
+func (o *directOperations) SendCustomerTextMessage(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, input CustomerTextMessageInput) (ConversationMessage, error) {
+	message, err := o.sendCustomerTextMessage.Execute(ctx, identity, conversationaction.CustomerTextMessageInput{
 		ConversationID: conversationID, ClientMessageID: input.ClientMessageID, Body: input.Body, ReplyToMessageID: input.ReplyToMessageID,
 	})
 	if err != nil {
@@ -35,16 +98,12 @@ func (b *DirectBackend) SendCustomerTextMessage(ctx context.Context, meta Reques
 		"message_id", message.ID,
 		"sender_identity_id", identity.OrganizationIdentity.ID,
 	)
-	return b.conversationMessageWithAvatar(ctx, identity, message), nil
+	return o.conversationMessageWithAvatar(ctx, identity, message), nil
 }
 
 // ClaimServiceSession 领取或接管客户会话最新处理周期。
-func (b *DirectBackend) ClaimServiceSession(ctx context.Context, meta RequestMeta, conversationID string) (CustomerServiceSession, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return CustomerServiceSession{}, err
-	}
-	result, err := b.claimServiceSession.Execute(ctx, identity, conversationID)
+func (o *directOperations) ClaimServiceSession(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string) (CustomerServiceSession, error) {
+	result, err := o.claimServiceSession.Execute(ctx, identity, conversationID)
 	if err != nil {
 		return CustomerServiceSession{}, serviceSessionMutationError(ctx, meta, err, identity.Organization.ID, conversationID)
 	}
@@ -52,12 +111,8 @@ func (b *DirectBackend) ClaimServiceSession(ctx context.Context, meta RequestMet
 }
 
 // TransferServiceSession 把当前负责的处理周期转给另一位客服。
-func (b *DirectBackend) TransferServiceSession(ctx context.Context, meta RequestMeta, conversationID string, input TransferServiceSessionInput) (CustomerServiceSession, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return CustomerServiceSession{}, err
-	}
-	result, err := b.transferServiceSession.Execute(ctx, identity, conversationaction.TransferServiceSessionInput{ConversationID: conversationID, AssigneeIdentityID: input.AssigneeIdentityID})
+func (o *directOperations) TransferServiceSession(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, input TransferServiceSessionInput) (CustomerServiceSession, error) {
+	result, err := o.transferServiceSession.Execute(ctx, identity, conversationaction.TransferServiceSessionInput{ConversationID: conversationID, AssigneeIdentityID: input.AssigneeIdentityID})
 	if err != nil {
 		return CustomerServiceSession{}, serviceSessionMutationError(ctx, meta, err, identity.Organization.ID, conversationID)
 	}
@@ -65,12 +120,8 @@ func (b *DirectBackend) TransferServiceSession(ctx context.Context, meta Request
 }
 
 // CloseServiceSession 关闭客户会话最新处理周期。
-func (b *DirectBackend) CloseServiceSession(ctx context.Context, meta RequestMeta, conversationID string) (CustomerServiceSession, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return CustomerServiceSession{}, err
-	}
-	result, err := b.closeServiceSession.Execute(ctx, identity, conversationID)
+func (o *directOperations) CloseServiceSession(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string) (CustomerServiceSession, error) {
+	result, err := o.closeServiceSession.Execute(ctx, identity, conversationID)
 	if err != nil {
 		return CustomerServiceSession{}, serviceSessionMutationError(ctx, meta, err, identity.Organization.ID, conversationID)
 	}
@@ -78,12 +129,8 @@ func (b *DirectBackend) CloseServiceSession(ctx context.Context, meta RequestMet
 }
 
 // ReopenServiceSession 重新打开客户会话最新处理周期并分配给当前身份。
-func (b *DirectBackend) ReopenServiceSession(ctx context.Context, meta RequestMeta, conversationID string) (CustomerServiceSession, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return CustomerServiceSession{}, err
-	}
-	result, err := b.reopenServiceSession.Execute(ctx, identity, conversationID)
+func (o *directOperations) ReopenServiceSession(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string) (CustomerServiceSession, error) {
+	result, err := o.reopenServiceSession.Execute(ctx, identity, conversationID)
 	if err != nil {
 		return CustomerServiceSession{}, serviceSessionMutationError(ctx, meta, err, identity.Organization.ID, conversationID)
 	}
@@ -128,12 +175,8 @@ func serviceSessionMutationError(ctx context.Context, meta RequestMeta, err erro
 }
 
 // SendFirstDirectTextMessage 发送首条单聊消息并按需创建长期会话。
-func (b *DirectBackend) SendFirstDirectTextMessage(ctx context.Context, meta RequestMeta, input FirstDirectTextMessageInput) (FirstDirectTextMessageResult, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return FirstDirectTextMessageResult{}, err
-	}
-	result, err := b.sendFirstDirectTextMessage.Execute(ctx, identity, conversationaction.FirstDirectTextMessageInput{
+func (o *directOperations) SendFirstDirectTextMessage(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input FirstDirectTextMessageInput) (FirstDirectTextMessageResult, error) {
+	result, err := o.sendFirstDirectTextMessage.Execute(ctx, identity, conversationaction.FirstDirectTextMessageInput{
 		TargetIdentityID: input.TargetIdentityID, ClientMessageID: input.ClientMessageID, Body: input.Body,
 	})
 	if err != nil {
@@ -145,7 +188,7 @@ func (b *DirectBackend) SendFirstDirectTextMessage(ctx context.Context, meta Req
 		"target_identity_id", result.Conversation.PeerIdentityID,
 		"message_id", result.Message.ID,
 	)
-	avatarURLs, err := b.conversationAvatarURLs(ctx, identity, []conversationaction.ConversationMessage{result.Message}, result.Conversation.PeerAvatarFileID)
+	avatarURLs, err := o.conversationAvatarURLs(ctx, identity, []conversationaction.ConversationMessage{result.Message}, result.Conversation.PeerAvatarFileID)
 	if err != nil {
 		slog.Warn("读取已保存单聊首条消息头像失败", "organization_id", identity.Organization.ID, "conversation_id", result.Conversation.ID, "message_id", result.Message.ID, "error", err)
 	}
@@ -156,19 +199,15 @@ func (b *DirectBackend) SendFirstDirectTextMessage(ctx context.Context, meta Req
 }
 
 // FindDirectConversation 按目标身份查找当前成员的活跃单聊。
-func (b *DirectBackend) FindDirectConversation(ctx context.Context, meta RequestMeta, targetIdentityID string) (DirectConversationLookup, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return DirectConversationLookup{}, err
-	}
-	summary, err := b.findDirectConversation.Execute(ctx, identity, targetIdentityID)
+func (o *directOperations) FindDirectConversation(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, targetIdentityID string) (DirectConversationLookup, error) {
+	summary, err := o.findDirectConversation.Execute(ctx, identity, targetIdentityID)
 	if err != nil {
 		return DirectConversationLookup{}, individualConversationError(ctx, meta, err, identity.Organization.ID, targetIdentityID, "find")
 	}
 	if summary == nil {
 		return DirectConversationLookup{}, nil
 	}
-	avatarURLs, err := b.conversationAvatarURLs(ctx, identity, nil, summary.PeerAvatarFileID)
+	avatarURLs, err := o.conversationAvatarURLs(ctx, identity, nil, summary.PeerAvatarFileID)
 	if err != nil {
 		return DirectConversationLookup{}, individualConversationError(ctx, meta, err, identity.Organization.ID, targetIdentityID, "find")
 	}
@@ -188,12 +227,8 @@ func directInboxConversationFromSummary(summary conversationaction.DirectConvers
 }
 
 // SendDirectTextMessage 发送内部单聊文本消息。
-func (b *DirectBackend) SendDirectTextMessage(ctx context.Context, meta RequestMeta, conversationID string, input DirectTextMessageInput) (ConversationMessage, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return ConversationMessage{}, err
-	}
-	message, err := b.sendDirectTextMessage.Execute(ctx, identity, conversationaction.InternalTextMessageInput{
+func (o *directOperations) SendDirectTextMessage(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, input DirectTextMessageInput) (ConversationMessage, error) {
+	message, err := o.sendDirectTextMessage.Execute(ctx, identity, conversationaction.InternalTextMessageInput{
 		ConversationID: conversationID, ClientMessageID: input.ClientMessageID, Body: input.Body, ReplyToMessageID: input.ReplyToMessageID,
 	})
 	if err != nil {
@@ -205,16 +240,12 @@ func (b *DirectBackend) SendDirectTextMessage(ctx context.Context, meta RequestM
 		"message_id", message.ID,
 		"sender_identity_id", identity.OrganizationIdentity.ID,
 	)
-	return b.conversationMessageWithAvatar(ctx, identity, message), nil
+	return o.conversationMessageWithAvatar(ctx, identity, message), nil
 }
 
 // CreateGroupConversation 创建包含有效企业成员的企业内部群聊。
-func (b *DirectBackend) CreateGroupConversation(ctx context.Context, meta RequestMeta, input GroupConversationInput) (InboxConversation, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return InboxConversation{}, err
-	}
-	summary, err := b.createGroupConversation.Execute(ctx, identity, conversationaction.GroupConversationInput{
+func (o *directOperations) CreateGroupConversation(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input GroupConversationInput) (InboxConversation, error) {
+	summary, err := o.createGroupConversation.Execute(ctx, identity, conversationaction.GroupConversationInput{
 		Title: input.Title, Description: input.Description, ImageFileID: input.ImageFileID,
 		MemberIdentityIDs: input.MemberIdentityIDs,
 	})
@@ -230,7 +261,7 @@ func (b *DirectBackend) CreateGroupConversation(ctx context.Context, meta Reques
 	if summary.ImageFileID != nil {
 		imageFileIDs = append(imageFileIDs, *summary.ImageFileID)
 	}
-	imageURLs, imageErr := b.activeFileURLs(ctx, identity, imageFileIDs)
+	imageURLs, imageErr := o.activeFileURLs(ctx, identity, imageFileIDs)
 	if imageErr != nil {
 		slog.Warn("读取新建群聊图片失败", "organization_id", identity.Organization.ID, "conversation_id", summary.ID, "error", imageErr)
 	}
@@ -244,16 +275,12 @@ func (b *DirectBackend) CreateGroupConversation(ctx context.Context, meta Reques
 }
 
 // GetGroupConversation 返回当前成员可见的群聊资料和有效成员。
-func (b *DirectBackend) GetGroupConversation(ctx context.Context, meta RequestMeta, conversationID string) (GroupConversation, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return GroupConversation{}, err
-	}
-	record, err := b.getGroupConversation.Execute(ctx, identity, conversationID)
+func (o *directOperations) GetGroupConversation(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string) (GroupConversation, error) {
+	record, err := o.getGroupConversation.Execute(ctx, identity, conversationID)
 	if err != nil {
 		return GroupConversation{}, groupConversationError(ctx, meta, err, identity.Organization.ID, conversationID, "get")
 	}
-	result, err := b.groupConversationFromAction(ctx, identity, record)
+	result, err := o.groupConversationFromAction(ctx, identity, record)
 	if err != nil {
 		slog.Warn("读取群聊图片或成员头像失败", "organization_id", identity.Organization.ID, "conversation_id", conversationID, "error", err)
 		return GroupConversation{}, FailedError(meta, cervii18n.ErrorGroupConversationReadFailed)
@@ -262,70 +289,50 @@ func (b *DirectBackend) GetGroupConversation(ctx context.Context, meta RequestMe
 }
 
 // UpdateGroupConversation 修改群聊资料。
-func (b *DirectBackend) UpdateGroupConversation(ctx context.Context, meta RequestMeta, conversationID string, input GroupConversationProfileInput) (GroupConversation, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return GroupConversation{}, err
-	}
-	record, err := b.updateGroupConversation.Execute(ctx, identity, conversationaction.GroupConversationProfileInput{
+func (o *directOperations) UpdateGroupConversation(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, input GroupConversationProfileInput) (GroupConversation, error) {
+	record, err := o.updateGroupConversation.Execute(ctx, identity, conversationaction.GroupConversationProfileInput{
 		ConversationID: conversationID, Title: input.Title, Description: input.Description, ImageFileID: input.ImageFileID,
 	})
 	if err != nil {
 		return GroupConversation{}, groupConversationError(ctx, meta, err, identity.Organization.ID, conversationID, "update")
 	}
 	slog.Info("企业群聊资料已修改", "organization_id", identity.Organization.ID, "conversation_id", conversationID, "operator_identity_id", identity.OrganizationIdentity.ID)
-	return b.groupConversationMutationResult(ctx, meta, identity, record, conversationID)
+	return o.groupConversationMutationResult(ctx, meta, identity, record, conversationID)
 }
 
 // AddGroupConversationMembers 批量增加群聊成员。
-func (b *DirectBackend) AddGroupConversationMembers(ctx context.Context, meta RequestMeta, conversationID string, input GroupConversationMembersInput) (GroupConversation, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return GroupConversation{}, err
-	}
-	record, err := b.addGroupConversationMembers.Execute(ctx, identity, conversationaction.GroupConversationMembersInput{ConversationID: conversationID, MemberIdentityIDs: input.MemberIdentityIDs})
+func (o *directOperations) AddGroupConversationMembers(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, input GroupConversationMembersInput) (GroupConversation, error) {
+	record, err := o.addGroupConversationMembers.Execute(ctx, identity, conversationaction.GroupConversationMembersInput{ConversationID: conversationID, MemberIdentityIDs: input.MemberIdentityIDs})
 	if err != nil {
 		return GroupConversation{}, groupConversationError(ctx, meta, err, identity.Organization.ID, conversationID, "add_members")
 	}
 	slog.Info("企业群聊成员已增加", "organization_id", identity.Organization.ID, "conversation_id", conversationID, "operator_identity_id", identity.OrganizationIdentity.ID, "added_count", len(input.MemberIdentityIDs))
-	return b.groupConversationMutationResult(ctx, meta, identity, record, conversationID)
+	return o.groupConversationMutationResult(ctx, meta, identity, record, conversationID)
 }
 
 // RemoveGroupConversationMember 移除单个群聊成员。
-func (b *DirectBackend) RemoveGroupConversationMember(ctx context.Context, meta RequestMeta, conversationID string, input GroupConversationMemberInput) (GroupConversation, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return GroupConversation{}, err
-	}
-	record, err := b.removeGroupConversationMember.Execute(ctx, identity, conversationaction.GroupConversationMemberInput{ConversationID: conversationID, MemberIdentityID: input.MemberIdentityID})
+func (o *directOperations) RemoveGroupConversationMember(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, input GroupConversationMemberInput) (GroupConversation, error) {
+	record, err := o.removeGroupConversationMember.Execute(ctx, identity, conversationaction.GroupConversationMemberInput{ConversationID: conversationID, MemberIdentityID: input.MemberIdentityID})
 	if err != nil {
 		return GroupConversation{}, groupConversationError(ctx, meta, err, identity.Organization.ID, conversationID, "remove_member")
 	}
 	slog.Info("企业群聊成员已移除", "organization_id", identity.Organization.ID, "conversation_id", conversationID, "operator_identity_id", identity.OrganizationIdentity.ID, "member_identity_id", input.MemberIdentityID)
-	return b.groupConversationMutationResult(ctx, meta, identity, record, conversationID)
+	return o.groupConversationMutationResult(ctx, meta, identity, record, conversationID)
 }
 
 // TransferGroupConversationOwner 转让群主。
-func (b *DirectBackend) TransferGroupConversationOwner(ctx context.Context, meta RequestMeta, conversationID string, input GroupConversationOwnerInput) (GroupConversation, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return GroupConversation{}, err
-	}
-	record, err := b.transferGroupConversationOwner.Execute(ctx, identity, conversationaction.GroupConversationOwnerInput{ConversationID: conversationID, OwnerIdentityID: input.OwnerIdentityID})
+func (o *directOperations) TransferGroupConversationOwner(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, input GroupConversationOwnerInput) (GroupConversation, error) {
+	record, err := o.transferGroupConversationOwner.Execute(ctx, identity, conversationaction.GroupConversationOwnerInput{ConversationID: conversationID, OwnerIdentityID: input.OwnerIdentityID})
 	if err != nil {
 		return GroupConversation{}, groupConversationError(ctx, meta, err, identity.Organization.ID, conversationID, "transfer_owner")
 	}
 	slog.Info("企业群聊群主已转让", "organization_id", identity.Organization.ID, "conversation_id", conversationID, "operator_identity_id", identity.OrganizationIdentity.ID, "owner_identity_id", input.OwnerIdentityID)
-	return b.groupConversationMutationResult(ctx, meta, identity, record, conversationID)
+	return o.groupConversationMutationResult(ctx, meta, identity, record, conversationID)
 }
 
 // LeaveGroupConversation 退出普通成员参与的群聊。
-func (b *DirectBackend) LeaveGroupConversation(ctx context.Context, meta RequestMeta, conversationID string) error {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return err
-	}
-	err = b.leaveGroupConversation.Execute(ctx, identity, conversationID)
+func (o *directOperations) LeaveGroupConversation(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string) error {
+	err := o.leaveGroupConversation.Execute(ctx, identity, conversationID)
 	if err != nil {
 		return groupConversationError(ctx, meta, err, identity.Organization.ID, conversationID, "leave")
 	}
@@ -334,22 +341,18 @@ func (b *DirectBackend) LeaveGroupConversation(ctx context.Context, meta Request
 }
 
 // DissolveGroupConversation 解散群聊并返回只读资料。
-func (b *DirectBackend) DissolveGroupConversation(ctx context.Context, meta RequestMeta, conversationID string) (GroupConversation, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return GroupConversation{}, err
-	}
-	record, err := b.dissolveGroupConversation.Execute(ctx, identity, conversationID)
+func (o *directOperations) DissolveGroupConversation(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string) (GroupConversation, error) {
+	record, err := o.dissolveGroupConversation.Execute(ctx, identity, conversationID)
 	if err != nil {
 		return GroupConversation{}, groupConversationError(ctx, meta, err, identity.Organization.ID, conversationID, "dissolve")
 	}
 	slog.Info("企业群聊解散操作已完成", "organization_id", identity.Organization.ID, "conversation_id", conversationID, "operator_identity_id", identity.OrganizationIdentity.ID)
-	return b.groupConversationMutationResult(ctx, meta, identity, record, conversationID)
+	return o.groupConversationMutationResult(ctx, meta, identity, record, conversationID)
 }
 
 // groupConversationMutationResult 转换群聊管理命令结果。
-func (b *DirectBackend) groupConversationMutationResult(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, record conversationaction.GroupConversation, conversationID string) (GroupConversation, error) {
-	result, err := b.groupConversationFromAction(ctx, identity, record)
+func (o *directOperations) groupConversationMutationResult(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, record conversationaction.GroupConversation, conversationID string) (GroupConversation, error) {
+	result, err := o.groupConversationFromAction(ctx, identity, record)
 	if err != nil {
 		slog.Warn("读取群聊管理结果图片失败", "organization_id", identity.Organization.ID, "conversation_id", conversationID, "error", err)
 		return GroupConversation{}, FailedError(meta, cervii18n.ErrorGroupConversationReadFailed)
@@ -358,7 +361,7 @@ func (b *DirectBackend) groupConversationMutationResult(ctx context.Context, met
 }
 
 // groupConversationFromAction 转换群聊资料并生成群图片和成员头像地址。
-func (b *DirectBackend) groupConversationFromAction(ctx context.Context, identity *servermodels.Identity, record conversationaction.GroupConversation) (GroupConversation, error) {
+func (o *directOperations) groupConversationFromAction(ctx context.Context, identity *servermodels.Identity, record conversationaction.GroupConversation) (GroupConversation, error) {
 	avatarFileIDs := make([]string, 0, len(record.Participants)+1)
 	if record.ImageFileID != nil {
 		avatarFileIDs = append(avatarFileIDs, *record.ImageFileID)
@@ -368,7 +371,7 @@ func (b *DirectBackend) groupConversationFromAction(ctx context.Context, identit
 			avatarFileIDs = append(avatarFileIDs, *participant.AvatarFileID)
 		}
 	}
-	avatarURLs, err := b.activeFileURLs(ctx, identity, avatarFileIDs)
+	avatarURLs, err := o.activeFileURLs(ctx, identity, avatarFileIDs)
 	if err != nil {
 		return GroupConversation{}, err
 	}
@@ -388,12 +391,8 @@ func (b *DirectBackend) groupConversationFromAction(ctx context.Context, identit
 }
 
 // SendGroupTextMessage 发送企业内部群聊文本消息。
-func (b *DirectBackend) SendGroupTextMessage(ctx context.Context, meta RequestMeta, conversationID string, input GroupTextMessageInput) (ConversationMessage, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return ConversationMessage{}, err
-	}
-	message, err := b.sendGroupTextMessage.Execute(ctx, identity, conversationaction.GroupTextMessageInput{
+func (o *directOperations) SendGroupTextMessage(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, input GroupTextMessageInput) (ConversationMessage, error) {
+	message, err := o.sendGroupTextMessage.Execute(ctx, identity, conversationaction.GroupTextMessageInput{
 		ConversationID: conversationID, ClientMessageID: input.ClientMessageID, Body: input.Body,
 		ReplyToMessageID: input.ReplyToMessageID, MentionSubjectIDs: input.MentionSubjectIDs, MentionAll: input.MentionAll,
 	})
@@ -406,15 +405,11 @@ func (b *DirectBackend) SendGroupTextMessage(ctx context.Context, meta RequestMe
 		"message_id", message.ID,
 		"sender_identity_id", identity.OrganizationIdentity.ID,
 	)
-	return b.conversationMessageWithAvatar(ctx, identity, message), nil
+	return o.conversationMessageWithAvatar(ctx, identity, message), nil
 }
 
 // ListConversationMessages 返回成员可见的会话消息。
-func (b *DirectBackend) ListConversationMessages(ctx context.Context, meta RequestMeta, conversationID string, input ConversationMessageListInput) (ConversationMessageList, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return ConversationMessageList{}, err
-	}
+func (o *directOperations) ListConversationMessages(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, input ConversationMessageListInput) (ConversationMessageList, error) {
 	actionInput := conversationaction.ConversationMessageHistoryInput{ConversationID: conversationID}
 	if input.Before != "" && input.After != "" {
 		return ConversationMessageList{}, InvalidError(meta, cervii18n.ErrorValidationFailed, map[string]cervii18n.Key{"cursor": cervii18n.FieldMessageCursorInvalid})
@@ -434,20 +429,16 @@ func (b *DirectBackend) ListConversationMessages(ctx context.Context, meta Reque
 		actionInput.After = &point
 	}
 
-	history, err := b.listConversationMessages.Execute(ctx, identity, actionInput)
+	history, err := o.listConversationMessages.Execute(ctx, identity, actionInput)
 	if err != nil {
 		return ConversationMessageList{}, conversationMessageError(ctx, meta, err, identity.Organization.ID, conversationID)
 	}
-	return b.conversationMessageListFromAction(ctx, meta, identity, conversationID, history)
+	return o.conversationMessageListFromAction(ctx, meta, identity, conversationID, history)
 }
 
 // MarkConversationRead 单调推进当前用户的会话已读水位。
-func (b *DirectBackend) MarkConversationRead(ctx context.Context, meta RequestMeta, conversationID string, input MarkConversationReadInput) (ConversationReadState, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return ConversationReadState{}, err
-	}
-	state, err := b.markConversationRead.Execute(ctx, identity, conversationID, input.LastReadMessageID, input.ClearUnreadMark)
+func (o *directOperations) MarkConversationRead(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, input MarkConversationReadInput) (ConversationReadState, error) {
+	state, err := o.markConversationRead.Execute(ctx, identity, conversationID, input.LastReadMessageID, input.ClearUnreadMark)
 	if err != nil {
 		return ConversationReadState{}, conversationReadError(ctx, meta, err, identity.Organization.ID, conversationID)
 	}
@@ -455,12 +446,8 @@ func (b *DirectBackend) MarkConversationRead(ctx context.Context, meta RequestMe
 }
 
 // UpdateConversationUnreadMark 保存个人未读标记并保留已读和提及查看水位。
-func (b *DirectBackend) UpdateConversationUnreadMark(ctx context.Context, meta RequestMeta, conversationID string, input ConversationUnreadMarkInput) error {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return err
-	}
-	if err := b.updateConversationUnreadMark.Execute(ctx, identity, conversationID, input.MarkedUnread); err != nil {
+func (o *directOperations) UpdateConversationUnreadMark(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, input ConversationUnreadMarkInput) error {
+	if err := o.updateConversationUnreadMark.Execute(ctx, identity, conversationID, input.MarkedUnread); err != nil {
 		return conversationReadError(ctx, meta, err, identity.Organization.ID, conversationID)
 	}
 	if input.MarkedUnread {
@@ -470,12 +457,8 @@ func (b *DirectBackend) UpdateConversationUnreadMark(ctx context.Context, meta R
 }
 
 // UpdateConversationNotificationSettings 保存当前用户的原生会话提醒设置。
-func (b *DirectBackend) UpdateConversationNotificationSettings(ctx context.Context, meta RequestMeta, conversationID string, input ConversationNotificationSettingsInput) (ConversationNotificationSettings, error) {
-	identity, err := b.authenticate(ctx, meta)
-	if err != nil {
-		return ConversationNotificationSettings{}, err
-	}
-	settings, err := b.updateConversationNotifications.Execute(ctx, identity, conversationID, input.Muted)
+func (o *directOperations) UpdateConversationNotificationSettings(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, input ConversationNotificationSettingsInput) (ConversationNotificationSettings, error) {
+	settings, err := o.updateConversationNotifications.Execute(ctx, identity, conversationID, input.Muted)
 	if err != nil {
 		return ConversationNotificationSettings{}, conversationNotificationSettingsError(ctx, meta, err, identity.Organization.ID, conversationID)
 	}
@@ -773,12 +756,12 @@ var conversationMessageValidationKeys = map[conversationaction.ValidationCode]ce
 }
 
 // conversationMessageListFromAction 共用成员消息窗口及游标转换。
-func (b *DirectBackend) conversationMessageListFromAction(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, history conversationaction.ConversationMessageHistory) (ConversationMessageList, error) {
+func (o *directOperations) conversationMessageListFromAction(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, history conversationaction.ConversationMessageHistory) (ConversationMessageList, error) {
 	var agentAvatarFileID *string
 	if history.LatestAgentRun != nil {
 		agentAvatarFileID = history.LatestAgentRun.AgentAvatarFileID
 	}
-	avatarURLs, err := b.conversationAvatarURLs(ctx, identity, history.Messages, agentAvatarFileID)
+	avatarURLs, err := o.conversationAvatarURLs(ctx, identity, history.Messages, agentAvatarFileID)
 	if err != nil {
 		return ConversationMessageList{}, conversationMessageError(ctx, meta, err, identity.Organization.ID, conversationID)
 	}
@@ -801,7 +784,7 @@ func (b *DirectBackend) conversationMessageListFromAction(ctx context.Context, m
 }
 
 // conversationAvatarURLs 批量解析消息发送者、引用发送者、单聊目标和运行中 Agent 的头像。
-func (b *DirectBackend) conversationAvatarURLs(ctx context.Context, identity *servermodels.Identity, messages []conversationaction.ConversationMessage, extraFileIDs ...*string) (map[string]string, error) {
+func (o *directOperations) conversationAvatarURLs(ctx context.Context, identity *servermodels.Identity, messages []conversationaction.ConversationMessage, extraFileIDs ...*string) (map[string]string, error) {
 	fileIDs := make([]string, 0, len(messages)+len(extraFileIDs))
 	for _, fileID := range extraFileIDs {
 		if fileID != nil {
@@ -816,12 +799,12 @@ func (b *DirectBackend) conversationAvatarURLs(ctx context.Context, identity *se
 			fileIDs = append(fileIDs, *message.ReplyTo.Sender.AvatarFileID)
 		}
 	}
-	return b.activeFileURLs(ctx, identity, fileIDs)
+	return o.activeFileURLs(ctx, identity, fileIDs)
 }
 
 // conversationMessageWithAvatar 转换发送结果并补充头像地址。
-func (b *DirectBackend) conversationMessageWithAvatar(ctx context.Context, identity *servermodels.Identity, message conversationaction.ConversationMessage) ConversationMessage {
-	urls, err := b.conversationAvatarURLs(ctx, identity, []conversationaction.ConversationMessage{message})
+func (o *directOperations) conversationMessageWithAvatar(ctx context.Context, identity *servermodels.Identity, message conversationaction.ConversationMessage) ConversationMessage {
+	urls, err := o.conversationAvatarURLs(ctx, identity, []conversationaction.ConversationMessage{message})
 	if err != nil {
 		slog.Warn("读取已保存消息头像失败", "organization_id", identity.Organization.ID, "message_id", message.ID, "error", err)
 	}
