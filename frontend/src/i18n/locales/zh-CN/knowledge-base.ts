@@ -126,6 +126,7 @@ const knowledgeBase = {
     retrievalCount: "召回数量",
     rerankModel: "重排模型",
     selectEmbeddingModel: "请选择向量模型",
+    selectEmbeddingDimension: "请选择向量维度",
     noRerank: "不启用重排",
     noEmbeddingModels: "请先在模型服务中配置向量模型。",
     noRerankModels: "尚未配置重排模型。",
@@ -145,7 +146,7 @@ const knowledgeBase = {
   },
   validation: {
     embeddingModelRequired: "请选择向量模型。",
-    embeddingDimensionInvalid: "向量维度必须是正整数。",
+    embeddingDimensionInvalid: "请选择知识库支持的向量维度。",
     chunkLengthInvalid: "分段长度必须是 256 至 2048 的整数。",
     chunkOverlapInvalid: "分段重叠必须是 0 至 200 的整数。",
     retrievalCountInvalid: "召回数量必须是 1 至 20 的整数。",

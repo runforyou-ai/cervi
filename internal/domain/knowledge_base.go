@@ -11,6 +11,9 @@ const (
 	KnowledgeRetrievalQueryMaxLength = 250
 )
 
+// KnowledgeEmbeddingDimensions 是知识库可选的向量维度。
+var KnowledgeEmbeddingDimensions = []int{384, 512, 768, 1024, 1536, 2048, 3072}
+
 // KnowledgeBaseCategory 表示知识库内容类型。
 type KnowledgeBaseCategory string
 

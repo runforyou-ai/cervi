@@ -18,8 +18,9 @@ test("文档库必填数值接收边界整数，拒绝空值、小数和越界�
   assert.equal(schema.safeParse(valid).success, true)
   assert.equal(schema.safeParse({ ...valid, chunkLength: "256", chunkOverlap: "0", retrievalCount: "1" }).success, true)
   assert.equal(schema.safeParse({ ...valid, chunkLength: "2048", chunkOverlap: "200", retrievalCount: "20" }).success, true)
+  assert.equal(schema.safeParse({ ...valid, embeddingDimension: "3072" }).success, true)
   for (const [field, values] of Object.entries({
-    embeddingDimension: ["", "0", "-1", "1.5"],
+    embeddingDimension: ["", "0", "-1", "1.5", "1000", "4096"],
     chunkLength: ["", "255", "2049", "512.5"],
     chunkOverlap: ["", "-1", "201", "0.5"],
     retrievalCount: ["", "0", "21", "3.5"],

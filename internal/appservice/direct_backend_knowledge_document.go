@@ -117,6 +117,12 @@ func knowledgeDocumentFromAction(meta RequestMeta, record knowledgeaction.Docume
 			key = cervii18n.ErrorKnowledgeFileEncrypted
 		case "parse_failed", "unsupported_file":
 			key = cervii18n.ErrorKnowledgeParseFailed
+		case "embedding_model_unavailable":
+			key = cervii18n.ErrorKnowledgeEmbeddingUnavailable
+		case "embedding_failed":
+			key = cervii18n.ErrorKnowledgeEmbeddingFailed
+		case "embedding_dimension_mismatch":
+			key = cervii18n.ErrorKnowledgeEmbeddingDimension
 		}
 		message, _ = cervii18n.Localize(string(meta.Locale), key)
 	}

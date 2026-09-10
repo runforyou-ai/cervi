@@ -36,12 +36,13 @@ func NewDocumentProcessing(db *bun.DB, tasks servertask.TxEnqueuer) *DocumentPro
 	return &DocumentProcessing{db: db, tasks: tasks}
 }
 
-// enqueue 固定当前分段参数，并在业务事务中投递处理任务。
+// enqueue 固定当前分段和向量参数，并在业务事务中投递处理任务。
 func (p *DocumentProcessing) enqueue(ctx context.Context, tx bun.IDB, organizationID string, base *servermodels.KnowledgeBase, document *servermodels.KnowledgeDocument) error {
 	document.ProcessingID = uuid.NewV7().String()
 	document.ChunkLength, document.ChunkOverlap = *base.ChunkLength, *base.ChunkOverlap
+	document.EmbeddingProviderID, document.EmbeddingModelIdentifier, document.EmbeddingDimension = base.EmbeddingProviderID, base.EmbeddingModelIdentifier, base.EmbeddingDimension
 	document.Status, document.FailureCode = domain.KnowledgeDocumentQueued, ""
-	if _, err := tx.NewUpdate().Model(document).Column("processing_id", "chunk_length", "chunk_overlap", "status", "failure_code").Set("updated_at = now()").WherePK().Exec(ctx); err != nil {
+	if _, err := tx.NewUpdate().Model(document).Column("processing_id", "chunk_length", "chunk_overlap", "embedding_provider_id", "embedding_model_identifier", "embedding_dimension", "status", "failure_code").Set("updated_at = now()").WherePK().Exec(ctx); err != nil {
 		return err
 	}
 	// 保留已发布分段，清理被新任务替代但尚未发布的批次。
@@ -49,7 +50,9 @@ func (p *DocumentProcessing) enqueue(ctx context.Context, tx bun.IDB, organizati
 		return err
 	}
 	_, err := p.tasks.EnqueueIn(ctx, tx, ProcessDocumentActionName, knowledgeprocessing.ProcessInput{
-		OrganizationID: organizationID, KnowledgeBaseID: base.ID, DocumentID: document.ID, ProcessingID: document.ProcessingID, ChunkLength: document.ChunkLength, ChunkOverlap: document.ChunkOverlap,
+		OrganizationID: organizationID, KnowledgeBaseID: base.ID, DocumentID: document.ID, ProcessingID: document.ProcessingID,
+		ChunkLength: document.ChunkLength, ChunkOverlap: document.ChunkOverlap,
+		EmbeddingProviderID: document.EmbeddingProviderID, EmbeddingModelIdentifier: document.EmbeddingModelIdentifier, EmbeddingDimension: document.EmbeddingDimension,
 	}, servertask.EnqueueOptions{Queue: servertask.QueueKnowledge, MaxAttempts: 1, IdempotencyKey: document.ProcessingID, TriggerType: servertask.TriggerBusiness})
 	return err
 }

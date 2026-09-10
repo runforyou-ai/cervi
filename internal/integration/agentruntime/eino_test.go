@@ -251,11 +251,3 @@ func TestCalculate(t *testing.T) {
 		t.Fatalf("cancelled calculator error = %v", err)
 	}
 }
-
-// TestCompatibleBaseURL 验证百炼地址使用 OpenAI 兼容入口。
-func TestCompatibleBaseURL(t *testing.T) {
-	got, err := compatibleBaseURL("alibaba", "https://dashscope.aliyuncs.com")
-	if err != nil || got != "https://dashscope.aliyuncs.com/compatible-mode/v1" {
-		t.Fatalf("base URL = %q, error = %v", got, err)
-	}
-}

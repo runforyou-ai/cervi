@@ -27,11 +27,14 @@ func TestClientStreamsOriginalAndReadsAnchor(t *testing.T) {
 			defer file.Close()
 			defer r.MultipartForm.RemoveAll()
 			content, _ := io.ReadAll(file)
-			var input ProcessInput
+			var input struct {
+				ProcessInput
+				Embedding EmbeddingCredential `json:"embedding"`
+			}
 			if err := json.Unmarshal([]byte(r.FormValue("metadata")), &input); err != nil {
 				t.Error(err)
 			}
-			if header.Filename != "资料.txt" || string(content) != "合同正文" || input.ChunkLength != 512 {
+			if header.Filename != "资料.txt" || string(content) != "合同正文" || input.ChunkLength != 512 || input.Embedding.BaseURL != "https://models.test/v1" || input.Embedding.APIKey != "test-key" {
 				t.Errorf("unexpected upload: %+v %q", input, content)
 			}
 			_, _ = w.Write([]byte(`{"segmentCount":2,"stale":false}`))
@@ -48,7 +51,7 @@ func TestClientStreamsOriginalAndReadsAnchor(t *testing.T) {
 	}))
 	defer server.Close()
 	client := NewClient(server.URL)
-	result, err := client.Process(context.Background(), ProcessInput{ChunkLength: 512}, "资料.txt", strings.NewReader("合同正文"))
+	result, err := client.Process(context.Background(), ProcessInput{ChunkLength: 512}, EmbeddingCredential{BaseURL: "https://models.test/v1", APIKey: "test-key"}, "资料.txt", strings.NewReader("合同正文"))
 	if err != nil || result.SegmentCount != 2 {
 		t.Fatalf("process=%+v %v", result, err)
 	}
@@ -70,7 +73,7 @@ func TestClientFailureDoesNotExposeRemoteBody(t *testing.T) {
 	if !errors.As(err, &failure) || failure.Code != "service_failed" || strings.Contains(err.Error(), "secret") {
 		t.Fatalf("error=%v", err)
 	}
-	_, err = NewClient("").Process(context.Background(), ProcessInput{}, "sample.txt", strings.NewReader("text"))
+	_, err = NewClient("").Process(context.Background(), ProcessInput{}, EmbeddingCredential{}, "sample.txt", strings.NewReader("text"))
 	if !errors.As(err, &failure) || failure.Code != "unavailable" {
 		t.Fatalf("error=%v", err)
 	}
@@ -137,7 +140,7 @@ func TestClientProcessingTimeout(t *testing.T) {
 	defer server.Close()
 	client := NewClient(server.URL)
 	client.http.Timeout = 50 * time.Millisecond
-	_, err := client.Process(context.Background(), ProcessInput{}, "text.txt", strings.NewReader("正文"))
+	_, err := client.Process(context.Background(), ProcessInput{}, EmbeddingCredential{}, "text.txt", strings.NewReader("正文"))
 	var failure *Error
 	if !errors.As(err, &failure) || failure.Code != "request_timeout" {
 		t.Fatalf("failure=%v", err)

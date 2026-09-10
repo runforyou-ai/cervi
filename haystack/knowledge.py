@@ -1,4 +1,4 @@
-"""提供原件解析、分段持久化和固定批次的分页阅读接口。"""
+"""提供原件解析、分段向量化、持久化和固定批次的分页阅读接口。"""
 
 import json
 import logging
@@ -12,7 +12,9 @@ import psycopg
 from fastapi import APIRouter, File, Form, HTTPException, UploadFile
 from haystack import Document
 from haystack.components.converters import MultiFileConverter, XLSXToDocument
+from haystack.components.embedders import OpenAIDocumentEmbedder
 from haystack.components.preprocessors import RecursiveDocumentSplitter
+from haystack.utils import Secret
 from psycopg.rows import dict_row
 from psycopg.types.json import Jsonb
 from pydantic import BaseModel, Field
@@ -21,9 +23,19 @@ from pypdf import PdfReader
 router = APIRouter(prefix="/knowledge")
 logger = logging.getLogger(__name__)
 
+# 每次向量请求的输入条数，取供应商兼容接口允许的最小批量。
+EMBEDDING_BATCH_SIZE = 20
+
+
+class EmbeddingInput(BaseModel):
+    """固定调用向量模型的兼容入口和访问凭据。"""
+
+    baseUrl: str
+    apiKey: str
+
 
 class ProcessInput(BaseModel):
-    """固定当前任务的业务归属和字符分段参数。"""
+    """固定当前任务的业务归属、字符分段和向量参数。"""
 
     organizationId: UUID
     knowledgeBaseId: UUID
@@ -31,6 +43,9 @@ class ProcessInput(BaseModel):
     processingId: UUID
     chunkLength: int = Field(ge=256, le=2048)
     chunkOverlap: int = Field(ge=0, le=200)
+    embeddingModelIdentifier: str
+    embeddingDimension: int = Field(ge=1, le=4000)
+    embedding: EmbeddingInput
 
 
 class SegmentInput(BaseModel):
@@ -129,6 +144,24 @@ def split_documents(documents: list[Document], length: int, overlap: int) -> lis
     return segments
 
 
+# 按知识库配置的向量模型生成分段向量。
+def embed_segments(input: ProcessInput, segments: list[dict]) -> None:
+    embedder = OpenAIDocumentEmbedder(
+        api_key=Secret.from_token(input.embedding.apiKey), api_base_url=input.embedding.baseUrl,
+        model=input.embeddingModelIdentifier, dimensions=input.embeddingDimension,
+        batch_size=EMBEDDING_BATCH_SIZE, raise_on_failure=True, progress_bar=False,
+    )
+    try:
+        embedded = embedder.run([Document(content=segment["content"]) for segment in segments])["documents"]
+    except Exception:
+        logger.warning("知识分段向量生成失败 document_id=%s model=%s", input.documentId, input.embeddingModelIdentifier, exc_info=True)
+        raise HTTPException(502, detail={"code": "embedding_failed", "stage": "embedding"}) from None
+    for segment, document in zip(segments, embedded):
+        if len(document.embedding or []) != input.embeddingDimension:
+            raise HTTPException(422, detail={"code": "embedding_dimension_mismatch", "stage": "embedding"})
+        segment["embedding"] = document.embedding
+
+
 # 锁定文档并校验当前任务后写入完整分段批次。
 def save_segments(input: ProcessInput, segments: list[dict]) -> dict:
     with psycopg.connect(os.environ["PG_CONN_STR"]) as connection:
@@ -146,19 +179,23 @@ def save_segments(input: ProcessInput, segments: list[dict]) -> dict:
         )
         records = []
         for segment in segments:
-            metadata = {key: value for key, value in segment.items() if key != "content"}
+            metadata = {key: value for key, value in segment.items() if key not in ("content", "embedding")}
             metadata.update({
                 "organization_id": str(input.organizationId), "knowledge_base_id": str(input.knowledgeBaseId),
                 "document_id": str(input.documentId), "batch_id": str(input.processingId),
             })
-            records.append((str(uuid5(input.processingId, str(segment["position"]))), segment["content"], Jsonb(metadata)))
+            vector = "[" + ",".join(str(value) for value in segment["embedding"]) + "]"
+            records.append((str(uuid5(input.processingId, str(segment["position"]))), segment["content"], Jsonb(metadata), vector, input.embeddingDimension))
         with connection.cursor() as cursor:
-            cursor.executemany("INSERT INTO public.knowledge_segments (id,content,meta) VALUES (%s,%s,%s)", records)
+            cursor.executemany(
+                "INSERT INTO public.knowledge_segments (id,content,meta,embedding,embedding_dimension) VALUES (%s,%s,%s,%s::vector,%s)",
+                records,
+            )
     return {"segmentCount": len(segments), "stale": False}
 
 
 @router.post("/process")
-# 接收上传原件并在临时目录中完成解析和分段。
+# 接收上传原件并在临时目录中完成解析、分段和向量化。
 def process_file(metadata: str = Form(), file: UploadFile = File()) -> dict:
     try:
         input = ProcessInput.model_validate_json(metadata)
@@ -176,6 +213,9 @@ def process_file(metadata: str = Form(), file: UploadFile = File()) -> dict:
             stage = "splitting"
             set_stage(input, stage)
             segments = split_documents(documents, input.chunkLength, input.chunkOverlap)
+            stage = "embedding"
+            set_stage(input, stage)
+            embed_segments(input, segments)
             stage = "publishing"
             set_stage(input, stage)
             return save_segments(input, segments)

@@ -3,6 +3,7 @@ import { z } from "zod"
 
 export const knowledgeBaseNameMaxLength = 120
 export const knowledgeBaseDescriptionMaxLength = 1000
+export const knowledgeEmbeddingDimensions = [384, 512, 768, 1024, 1536, 2048, 3072]
 
 /** 校验数字输入框中的必填整数与取值范围。 */
 function integerField(message: string, min: number, max = Number.MAX_SAFE_INTEGER) {
@@ -30,7 +31,7 @@ export function createKnowledgeBaseSchema(
     name: z.string().trim().min(1, messages.nameRequired).max(knowledgeBaseNameMaxLength, messages.nameTooLong),
     description: z.string().trim().max(knowledgeBaseDescriptionMaxLength, messages.descriptionTooLong),
     embeddingModel: z.string().min(1, messages.embeddingModelRequired),
-    embeddingDimension: integerField(messages.embeddingDimensionInvalid, 1),
+    embeddingDimension: z.string().refine((value) => knowledgeEmbeddingDimensions.includes(Number(value)), messages.embeddingDimensionInvalid),
     chunkLength: isQA ? z.string() : integerField(messages.chunkLengthInvalid, 256, 2048),
     chunkOverlap: isQA ? z.string() : integerField(messages.chunkOverlapInvalid, 0, 200),
     retrievalCount: integerField(messages.retrievalCountInvalid, 1, 20),
