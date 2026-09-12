@@ -45,10 +45,13 @@ import { previousDayKey } from "@/features/inbox/calendar"
 import { mentionTokenPattern } from "@/features/inbox/mention-token"
 import { resources, supportedLanguages } from "@/i18n/resources"
 import { useMemberChatPollingActive } from "@/features/inbox/use-member-chat-polling"
-import type {
-  OutgoingConversationDraft,
-  OutgoingConversationMessage,
-} from "@/features/inbox/use-outgoing-conversation-messages"
+import { useOutgoingMessageStore } from "@/features/inbox/outgoing-message-context"
+import {
+  coveredByWindow,
+  windowCoverage,
+  type OutgoingConversationDraft,
+  type OutgoingConversationMessage,
+} from "@/features/inbox/outgoing-message-store"
 import { recoverSession } from "@/lib/session-navigation"
 import { cn } from "@/lib/utils"
 
@@ -123,12 +126,10 @@ function mergeTimelineMessages(
     local: false,
     deliveryStatus: null,
   }))
+  const coverage = windowCoverage(current)
   for (const message of outgoing) {
-    if (
-      message.saved &&
-      current.some((saved) => saved.id === message.saved?.id)
-    )
-      continue
+    // 窗口已收录的发送项不插入本地气泡。
+    if (coveredByWindow(message, coverage)) continue
     messages.push({
       id: `local:${message.clientMessageID}`,
       persistedMessageID: message.saved?.id ?? null,
@@ -257,6 +258,12 @@ function ConversationTimelineContent({
   )
   const currentPage = timeline.page
   const { loading, error, refresh } = timeline
+  const outgoingStore = useOutgoingMessageStore()
+  useEffect(() => {
+    if (!currentPage) return
+    // 窗口已收录的发送项从发送状态中删除。
+    outgoingStore.reconcile(conversationID, currentPage.messages)
+  }, [conversationID, currentPage, outgoingStore])
   const combinedMessages = mergeTimelineMessages(
     currentPage?.messages ?? [],
     timeline.mode === "latest" ? outgoingMessages : [],

@@ -31,6 +31,7 @@ import {
 } from "@/components/ui/sheet"
 import { useWorkspace } from "@/contexts/workspace-context"
 import { useAttachmentQueue } from "@/features/inbox/attachment-queue-context"
+import { useOutgoingMessageStore } from "@/features/inbox/outgoing-message-context"
 import { ConversationMain } from "@/features/inbox/conversation-main"
 import { clearConversationResources } from "@/features/inbox/conversation-resources"
 import { ConversationTargetPickerDialog } from "@/features/inbox/conversation-target-picker-dialog"
@@ -117,6 +118,7 @@ export function InboxPage({
   const readResource = useResourceReader()
   const queryClient = useQueryClient()
   const { queue } = useAttachmentQueue()
+  const outgoingStore = useOutgoingMessageStore()
   const [railCollapsed, setRailCollapsed] = useState(false)
   const [chatDraft, setChatDraft] = useState<ChatDraft | null>(null)
   const [isNarrowDetailOpen, setIsNarrowDetailOpen] = useState(false)
@@ -224,6 +226,7 @@ export function InboxPage({
   /** 主动退群后清空选择并关闭窄屏详情，不打开其他会话。 */
   function showConversationAfterGroupLeft(conversationID: string) {
     queue?.forgetConversation(conversationID)
+    outgoingStore.forgetConversation(conversationID)
     clearConversationResources(queryClient, conversationID)
     void queryClient.resetQueries({ queryKey: resourceKeys.conversationSummary(conversationID) })
     setChatDraft(null)

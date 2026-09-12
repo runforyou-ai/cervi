@@ -97,6 +97,7 @@ export function MobileIndividualConversationPage({
           key={conversationID}
           conversationID={conversationID}
           conversationType={conversationType}
+          peerIdentityID={conversation.direct?.peerIdentityId ?? ""}
         />
       )}
     </section>

@@ -156,6 +156,7 @@ function MobileEmployeeDraft({ user }: { user: UserData }) {
   return (
     <MobileIndividualThread
       conversationID=""
+      peerIdentityID={user.identityId}
       sendIndividualMessage={async (input) => {
         const result = await sendFirstDirectTextMessage({
           targetIdentityId: user.identityId,

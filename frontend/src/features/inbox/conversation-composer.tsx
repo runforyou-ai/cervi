@@ -47,7 +47,7 @@ import {
 import {
   conversationSendingIndicatorDelay,
   type OutgoingConversationDraft,
-} from "@/features/inbox/use-outgoing-conversation-messages"
+} from "@/features/inbox/outgoing-message-store"
 import { useMemberChatPollingActive } from "./use-member-chat-polling"
 import { GroupAttachmentUpload } from "./group-attachment-upload"
 import { ConversationAttachmentUpload } from "./conversation-attachment-upload"
@@ -405,6 +405,8 @@ export function ConversationComposer({
           throw new Error("不支持的会话类型")
       }
       onSucceeded()
+      // 按发送逻辑编号写入发送结果。
+      onSent(clientMessageID, message)
       if (!aliveRef.current) return
       setMentionSubjectIDs([])
       setMentionAllToken(null)
@@ -413,14 +415,14 @@ export function ConversationComposer({
         onReplyToChange?.(null)
       }
       refocusPendingRef.current = refocusAfterSubmit
-      onSent(clientMessageID, message)
     } catch (error) {
       if (recoverSession(error, navigate)) return
-      if (!aliveRef.current) return
       console.warn("发送成员会话消息失败", {
         conversationId: conversationID,
         error,
       })
+      onFailed(clientMessageID)
+      if (!aliveRef.current) return
       toast.error(
         isApiError(error)
           ? apiErrorMessage(error, [
@@ -437,7 +439,6 @@ export function ConversationComposer({
         resizeComposerInput(inputRef.current, manualInputHeightRef.current)
       }
       refocusPendingRef.current = refocusAfterSubmit
-      onFailed(clientMessageID)
     }
   }
 

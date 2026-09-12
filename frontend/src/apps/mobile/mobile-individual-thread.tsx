@@ -9,10 +9,8 @@ import {
 import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
 import { ConversationComposer } from "@/features/inbox/conversation-composer"
 import { ConversationTimeline } from "@/features/inbox/conversation-timeline"
-import {
-  useOutgoingConversationMessages,
-  type OutgoingConversationDraft,
-} from "@/features/inbox/use-outgoing-conversation-messages"
+import { useOutgoingMessages } from "@/features/inbox/outgoing-message-context"
+import type { OutgoingConversationDraft } from "@/features/inbox/outgoing-message-store"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
 
@@ -20,11 +18,13 @@ import { useResourceInvalidator } from "@/hooks/use-resource"
 export function MobileIndividualThread({
   conversationID,
   conversationType = ConversationType.ConversationTypeDirect,
+  peerIdentityID = "",
   sendIndividualMessage,
   enabled = Boolean(conversationID),
 }: {
   conversationID: string
   conversationType?: ConversationType
+  peerIdentityID?: string
   enabled?: boolean
   sendIndividualMessage?: (
     input: DirectTextMessageInput,
@@ -32,7 +32,11 @@ export function MobileIndividualThread({
 }) {
   const { identity } = useMobileWorkspace()
   const invalidate = useResourceInvalidator()
-  const outgoing = useOutgoingConversationMessages()
+  // 真人草稿尚无会话编号，发送状态按对端身份分组。
+  const outgoing = useOutgoingMessages(
+    conversationID,
+    peerIdentityID ? `draft:${peerIdentityID}` : "",
+  )
   const [retryDraft, setRetryDraft] =
     useState<OutgoingConversationDraft | null>(null)
 

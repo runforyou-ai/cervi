@@ -8,7 +8,7 @@ import {
   updateAttachmentUploads,
   type InboxConversation,
 } from "@/api"
-import type { OutgoingConversationMessage } from "./use-outgoing-conversation-messages"
+import type { OutgoingConversationMessage } from "./outgoing-message-store"
 
 export type SelectedAttachment = {
   id: string
