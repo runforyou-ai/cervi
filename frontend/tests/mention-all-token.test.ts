@@ -1,7 +1,7 @@
 /** 验证正文编辑只保留从候选选择的所有人提醒。 */
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { reconcileMentionAllToken } from "../src/features/inbox/mention-token.ts"
+import { reconcileMentionAllToken } from "../src/lib/mention-token.ts"
 
 test("手写与粘贴同名文本不能建立提醒", () => {
   assert.equal(reconcileMentionAllToken(null, "", "@所有人 ", 5), null)

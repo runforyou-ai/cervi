@@ -3,14 +3,17 @@ import { createContext, createElement, memo, useContext, useId, useMemo, useRef,
 import { Streamdown, defaultRehypePlugins, type Components, type ExtraProps } from "streamdown"
 import chineseCopy from "../i18n/locales/zh-CN/markdown"
 import englishCopy from "../i18n/locales/en-US/markdown"
+import { highlightMentions } from "@/lib/mention-highlight"
 import "./message-markdown.css"
 
 type MessageMarkdownProps = {
   children: string
   streaming?: boolean
   locale?: string
+  mentions?: string[]
   onOpenLink?: (url: string) => void | Promise<void>
 }
+
 
 const MarkdownContext = createContext<{ copy: typeof englishCopy; onOpenLink?: MessageMarkdownProps["onOpenLink"] }>({ copy: chineseCopy })
 // 禁用原始 HTML 解析，保留标签和 URL 的清理规则。
@@ -66,15 +69,19 @@ const components: Components = {
 }
 
 /** 保持正文分块结构，仅在生成中修复未闭合语法，结束时保留已有 DOM。 */
-export const MessageMarkdown = memo(function MessageMarkdown({ children, streaming = false, locale = "zh-CN", onOpenLink }: MessageMarkdownProps) {
+export const MessageMarkdown = memo(function MessageMarkdown({ children, streaming = false, locale = "zh-CN", mentions, onOpenLink }: MessageMarkdownProps) {
   const id = useId()
   const context = useMemo(() => ({ copy: locale.startsWith("zh") ? chineseCopy : englishCopy, onOpenLink }), [locale, onOpenLink])
   const remarkRehypeOptions = useMemo(() => ({ clobberPrefix: `message-${id}-` }), [id])
+  const plugins = useMemo(
+    () => (mentions?.length ? [...rehypePlugins, highlightMentions(mentions)] : rehypePlugins),
+    [mentions],
+  )
   // 链接协议限定为网页、邮件和消息内锚点。
   return <MarkdownContext.Provider value={context}>
     <Streamdown className="message-markdown" mode="streaming"
       isAnimating={streaming} parseIncompleteMarkdown={streaming} skipHtml
-      rehypePlugins={rehypePlugins} components={components}
+      rehypePlugins={plugins} components={components}
       urlTransform={(url) => /^(https?:\/\/|mailto:|#)/i.test(url) ? url : ""}
       remarkRehypeOptions={remarkRehypeOptions}
       controls={false}>

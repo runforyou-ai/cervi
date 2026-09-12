@@ -31,7 +31,7 @@ func (s *Scheduler) ScheduleGroupMentions(ctx context.Context, db bun.IDB, organ
 			)
 			continue
 		}
-		if err := s.scheduleInput(ctx, db, agentRunSpec{
+		if err := s.appendInput(ctx, db, agentRunSpec{
 			OrganizationID: organizationID, ConversationID: conversationID,
 			AgentIdentityID: agentIdentityID, RevisionID: revisionID,
 			ScopeKind: domain.AgentExecutionScopeConversation, ScopeID: conversationID,
@@ -61,7 +61,7 @@ func (a *ExecuteAction) rotateGroupScope(ctx context.Context, db bun.IDB, organi
 	if err != nil {
 		return err
 	}
-	policy := groupMentionRunPolicy{}
+	policy := groupMentionRunPolicy{scheduler: NewScheduler(a.enqueuer)}
 	return scheduleNextRun(ctx, db, a.enqueuer, policy, agentRunPolicyContext{Conversation: conversation},
 		organizationID, domain.AgentExecutionScopeConversation, conversationID)
 }

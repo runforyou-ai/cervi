@@ -43,7 +43,7 @@ import {
   mentionTokenPattern,
   reconcileMentionAllToken,
   type MentionAllToken,
-} from "@/features/inbox/mention-token"
+} from "@/lib/mention-token"
 import {
   conversationSendingIndicatorDelay,
   type OutgoingConversationDraft,
@@ -344,7 +344,22 @@ export function ConversationComposer({
     const draftMentionAllToken = mentionAllToken
       ? { ...mentionAllToken, start: mentionAllToken.start - leadingWhitespace }
       : null
-    const normalizedMentionSubjectIDs = [...mentionSubjectIDs].sort()
+    // 提醒顺序决定被点名 AI 员工的发言先后，按正文中标记出现的位置排序。
+    const mentionPositions = new Map(
+      mentionSubjectIDs.map((subjectID) => {
+        const participant = groupParticipants?.find(
+          (candidate) => candidate.chatSubjectId === subjectID,
+        )
+        const match = participant
+          ? body.match(new RegExp(mentionTokenPattern([participant.displayName]), "u"))
+          : null
+        return [subjectID, match?.index ?? Number.MAX_SAFE_INTEGER] as const
+      }),
+    )
+    const normalizedMentionSubjectIDs = [...mentionSubjectIDs].sort(
+      (left, right) =>
+        (mentionPositions.get(left) ?? 0) - (mentionPositions.get(right) ?? 0),
+    )
     const retry =
       retryFailedMessage &&
       retryRef.current?.body === body &&
