@@ -48,6 +48,7 @@ type ModelConfig struct {
 	BaseURL         string
 	Identifier      string
 	MaxOutputTokens int
+	ContextWindow   int
 }
 
 // KnowledgeSearch 检索本次 Agent Run 获准使用的知识库。

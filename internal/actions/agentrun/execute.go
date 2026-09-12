@@ -48,6 +48,7 @@ type executionContext struct {
 	APIURL          string                `bun:"api_url"`
 	ModelIdentifier string                `bun:"model_identifier"`
 	MaxOutputTokens int64                 `bun:"max_output_tokens"`
+	ContextWindow   int64                 `bun:"context_window"`
 	Instruction     string                `bun:"instruction"`
 }
 
@@ -119,7 +120,7 @@ func (a *ExecuteAction) Execute(ctx context.Context, input RunInput) error {
 		RunID: execution.Run.ID, Name: execution.AgentName, Instruction: instruction,
 		Model: agentruntime.ModelConfig{
 			Brand: execution.Brand, APIKey: execution.APIKey, BaseURL: execution.APIURL,
-			Identifier: execution.ModelIdentifier, MaxOutputTokens: maxOutputTokens,
+			Identifier: execution.ModelIdentifier, MaxOutputTokens: maxOutputTokens, ContextWindow: int(execution.ContextWindow),
 		},
 		CustomerHistorySearch: customerHistorySearch,
 		MCPServers:            mcpServers,
@@ -207,7 +208,7 @@ func (a *ExecuteAction) begin(ctx context.Context, runID string) (executionConte
 		ColumnExpr("oi.display_name AS agent_name").
 		ColumnExpr("aip.brand AS brand, aip.api_key AS api_key, aip.api_url AS api_url").
 		ColumnExpr("ar.configuration->'model'->>'identifier' AS model_identifier").
-		ColumnExpr("aipm.max_output_tokens AS max_output_tokens").
+		ColumnExpr("aipm.max_output_tokens AS max_output_tokens, aipm.context_window AS context_window").
 		ColumnExpr("ar.configuration->>'systemInstruction' AS instruction").
 		Join("JOIN agents AS a ON a.identity_id = agr.agent_identity_id AND a.organization_id = agr.organization_id").
 		Join("JOIN organization_identities AS oi ON oi.id = a.identity_id AND oi.organization_id = a.organization_id").

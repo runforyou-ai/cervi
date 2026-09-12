@@ -16,11 +16,6 @@ import (
 	"github.com/runforyou-ai/cervi/internal/integration/mcp"
 )
 
-const (
-	mcpResultMaxRunes  = 20000
-	mcpResultTruncated = "\n[结果过长，已截断]"
-)
-
 // mcpHandshakeTimeout 限制建立会话和读取工具目录的时间。
 var mcpHandshakeTimeout = 15 * time.Second
 
@@ -150,7 +145,7 @@ type mcpTool struct {
 // Info 返回远程工具目录中的名称、描述和参数定义。
 func (t *mcpTool) Info(context.Context) (*schema.ToolInfo, error) { return t.info, nil }
 
-// InvokableRun 调用远程工具并返回有长度上限的文本结果。
+// InvokableRun 调用远程工具并返回文本结果。
 func (t *mcpTool) InvokableRun(ctx context.Context, argumentsInJSON string, _ ...tool.Option) (string, error) {
 	arguments := json.RawMessage(argumentsInJSON)
 	if !json.Valid(arguments) {
@@ -159,12 +154,6 @@ func (t *mcpTool) InvokableRun(ctx context.Context, argumentsInJSON string, _ ..
 	result, err := t.session.Call(ctx, t.info.Name, arguments)
 	if err != nil {
 		return "", fmt.Errorf("call tool %q on MCP server %q: %w", t.info.Name, t.server, err)
-	}
-	runes := []rune(result)
-	if len(runes) > mcpResultMaxRunes {
-		slog.Warn("MCP 工具结果超过上限，已截断",
-			"agent_run_id", runIDFromContext(ctx), "mcp_server", t.server, "tool_name", t.info.Name, "result_runes", len(runes))
-		return string(runes[:mcpResultMaxRunes]) + mcpResultTruncated, nil
 	}
 	return result, nil
 }

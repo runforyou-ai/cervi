@@ -31,6 +31,10 @@ type EinoRuntime struct {
 
 // New 创建带计算器 Tool 的 Eino Runtime。
 func New() (*EinoRuntime, error) {
+	// 框架内置提示与本项目面向模型的提示统一使用中文。
+	if err := adk.SetLanguage(adk.LanguageChinese); err != nil {
+		return nil, fmt.Errorf("set agent runtime language: %w", err)
+	}
 	calculator, err := newCalculatorTool()
 	if err != nil {
 		return nil, fmt.Errorf("create calculator tool: %w", err)
@@ -75,7 +79,7 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 	}
 	if len(request.MCPServers) > 0 {
 		// 收齐本次运行的内置工具名称，远程工具重名时由 openMCPTools 跳过。
-		registered := make(map[string]struct{}, len(tools))
+		registered := map[string]struct{}{offloadedResultToolName: {}}
 		for _, existing := range tools {
 			info, infoErr := existing.Info(ctx)
 			if infoErr != nil {
@@ -87,12 +91,17 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 		defer releaseSessions()
 		tools = append(tools, mcpTools...)
 	}
+	reductionHandlers, err := newContextReductionHandlers(ctx, request.Model)
+	if err != nil {
+		return RunResult{}, err
+	}
+	handlers := append([]adk.ChatModelAgentMiddleware{recorder, newFinalIterationGuard(maxIterations, groupReply != nil)}, reductionHandlers...)
 	agent, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
 		Name: request.Name, Instruction: request.Instruction, Model: chatModel,
 		ToolsConfig: adk.ToolsConfig{ToolsNodeConfig: compose.ToolsNodeConfig{
 			Tools: tools, ToolCallMiddlewares: []compose.ToolMiddleware{toolExecutionMiddleware(recorder)},
 		}},
-		Handlers:      []adk.ChatModelAgentMiddleware{recorder, newFinalIterationGuard(maxIterations, groupReply != nil)},
+		Handlers:      handlers,
 		MaxIterations: maxIterations,
 	})
 	if err != nil {

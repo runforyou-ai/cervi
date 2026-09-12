@@ -95,7 +95,8 @@ func TestFinalIterationAnswersWithoutTools(t *testing.T) {
 	}
 	chatModel.mu.Lock()
 	defer chatModel.mu.Unlock()
-	if len(chatModel.toolsByCall) != 3 || len(chatModel.toolsByCall[1]) != 1 || len(chatModel.toolsByCall[2]) != 0 {
+	if len(chatModel.toolsByCall) != 3 || !slices.Contains(chatModel.toolsByCall[1], "calculator") ||
+		len(chatModel.toolsByCall[2]) != 0 {
 		t.Fatalf("tools by iteration = %v", chatModel.toolsByCall)
 	}
 	if chatModel.lastUserText != "工具调用次数已达本轮上限，请基于已获得的信息给出最终回答。" {

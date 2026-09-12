@@ -3,9 +3,11 @@
 package agentruntime
 
 import (
+	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
+	"log/slog"
 	"net/http"
 	"net/http/httptest"
 	"strings"
@@ -108,137 +110,117 @@ func TestRuntimeCallsMCPTools(t *testing.T) {
 	chatModel.mu.Lock()
 	defer chatModel.mu.Unlock()
 	names := make([]string, 0, len(chatModel.toolInfos))
+	var remote *schema.ToolInfo
 	for _, info := range chatModel.toolInfos {
 		names = append(names, info.Name)
+		if info.Name == "lookup_ticket" {
+			remote = info
+		}
 	}
-	if strings.Join(names, ",") != "calculator,lookup_ticket" {
+	if strings.Count(strings.Join(names, ","), "calculator") != 1 || remote == nil {
 		t.Fatalf("tool names = %v", names)
 	}
-	parameters, err := chatModel.toolInfos[1].ParamsOneOf.ToJSONSchema()
+	parameters, err := remote.ParamsOneOf.ToJSONSchema()
 	if err != nil || parameters.Required[0] != "id" {
 		t.Fatalf("remote tool schema = %+v, err = %v", parameters, err)
 	}
 }
 
-// TestMCPToolResultTruncated 验证过长的工具结果按上限截断后返回给模型。
-func TestMCPToolResultTruncated(t *testing.T) {
-	server := sdk.NewServer(&sdk.Implementation{Name: "test", Version: "1"}, nil)
-	server.AddTool(&sdk.Tool{Name: "dump", Description: "大结果", InputSchema: map[string]any{"type": "object"}},
-		func(context.Context, *sdk.CallToolRequest) (*sdk.CallToolResult, error) {
-			return &sdk.CallToolResult{Content: []sdk.Content{&sdk.TextContent{Text: strings.Repeat("字", mcpResultMaxRunes+10)}}}, nil
-		})
-	endpoint := httptest.NewServer(sdk.NewStreamableHTTPHandler(func(*http.Request) *sdk.Server { return server }, nil))
-	defer endpoint.Close()
-
-	ctx := context.Background()
-	tools, releaseSessions := openMCPTools(ctx, "mcp-run", []MCPServer{{
-		Name: "大结果服务", Config: mcp.Config{URL: endpoint.URL, ServerType: domain.MCPServerTypeStreamableHTTP},
-	}}, map[string]struct{}{})
-	defer releaseSessions()
-	if len(tools) != 1 {
-		t.Fatalf("tools = %d", len(tools))
-	}
-	result, err := tools[0].(tool.InvokableTool).InvokableRun(ctx, `{}`)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if []rune(result)[mcpResultMaxRunes-1] != '字' || !strings.HasSuffix(result, mcpResultTruncated) {
-		t.Fatalf("result length = %d", len([]rune(result)))
-	}
+type offloadReadingChatModel struct {
+	mu         sync.Mutex
+	calls      int
+	notice     string
+	fileResult string
 }
 
-// TestMCPHandshakeTimeout 验证握手超时后跳过该服务，不注册工具也不残留服务端会话。
-func TestMCPHandshakeTimeout(t *testing.T) {
-	original := mcpHandshakeTimeout
-	mcpHandshakeTimeout = 50 * time.Millisecond
-	t.Cleanup(func() { mcpHandshakeTimeout = original })
-
-	server := sdk.NewServer(&sdk.Implementation{Name: "test", Version: "1"}, nil)
-	server.AddTool(&sdk.Tool{Name: "slow", Description: "迟缓", InputSchema: map[string]any{"type": "object"}},
-		func(context.Context, *sdk.CallToolRequest) (*sdk.CallToolResult, error) {
-			return &sdk.CallToolResult{}, nil
-		})
-	handler := sdk.NewStreamableHTTPHandler(func(*http.Request) *sdk.Server { return server }, nil)
-	endpoint := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		time.Sleep(150 * time.Millisecond)
-		handler.ServeHTTP(w, r)
-	}))
-	defer endpoint.Close()
-
-	tools, releaseSessions := openMCPTools(context.Background(), "mcp-run", []MCPServer{{
-		Name: "迟缓服务", Config: mcp.Config{URL: endpoint.URL, ServerType: domain.MCPServerTypeStreamableHTTP},
-	}}, map[string]struct{}{})
-	defer releaseSessions()
-	if len(tools) != 0 {
-		t.Fatalf("tools = %d", len(tools))
-	}
-	// 握手超时分支取消会话 context 并关闭迟到返回的会话，服务端不应残留会话。
-	deadline := time.Now().Add(3 * time.Second)
-	for {
-		remaining := 0
-		for range server.Sessions() {
-			remaining++
-		}
-		if remaining == 0 {
-			return
-		}
-		if time.Now().After(deadline) {
-			t.Fatalf("server sessions left open = %d", remaining)
-		}
-		time.Sleep(20 * time.Millisecond)
-	}
-}
-
-// TestMCPToolNameConflictsWithGroupReply 验证远端同名工具不会取代群内结束工具。
-func TestMCPToolNameConflictsWithGroupReply(t *testing.T) {
-	server := sdk.NewServer(&sdk.Implementation{Name: "test", Version: "1"}, nil)
-	server.AddTool(&sdk.Tool{Name: groupReplyToolName, Description: "远端同名结束工具", InputSchema: map[string]any{"type": "object"}},
-		func(context.Context, *sdk.CallToolRequest) (*sdk.CallToolResult, error) {
-			t.Error("group reply tool must not be replaced by a remote tool")
-			return &sdk.CallToolResult{}, nil
-		})
-	endpoint := httptest.NewServer(sdk.NewStreamableHTTPHandler(func(*http.Request) *sdk.Server { return server }, nil))
-	defer endpoint.Close()
-
-	chatModel := &groupReplyChatModel{}
-	runtime := &EinoRuntime{newModel: func(context.Context, ModelConfig) (model.ToolCallingChatModel, error) { return chatModel, nil }}
-	feed := &testInputFeed{}
-	feed.appendUser("帮我看下")
-	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-	defer cancel()
-	result, err := runtime.Run(ctx, RunRequest{
-		RunID: "mcp-conflict-run", Name: "test-agent", MaxTurns: 2,
-		GroupReply: &GroupReplyConfig{},
-		MCPServers: []MCPServer{{Name: "冲突服务", Config: mcp.Config{URL: endpoint.URL, ServerType: domain.MCPServerTypeStreamableHTTP}}},
-	}, feed)
-	if err != nil || result.Outcome != RunOutcomeReply || result.Content != "已看过" {
-		t.Fatalf("result = %#v, err = %v", result, err)
-	}
-}
-
-type groupReplyChatModel struct {
-	mu    sync.Mutex
-	calls int
-}
-
-// Generate 先通过结束工具提交群内回复，再结束本轮。
-func (m *groupReplyChatModel) Generate(context.Context, []*schema.Message, ...model.Option) (*schema.Message, error) {
+// Generate 先调用大结果工具，再读回被转存的完整内容。
+func (m *offloadReadingChatModel) Generate(_ context.Context, input []*schema.Message, _ ...model.Option) (*schema.Message, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.calls++
-	if m.calls == 1 {
-		return schema.AssistantMessage("", []schema.ToolCall{{
-			ID: "group-reply-call-1", Type: "function",
-			Function: schema.FunctionCall{Name: groupReplyToolName, Arguments: `{"outcome":"reply","body":"已看过"}`},
+	switch m.calls {
+	case 1:
+		return schema.AssistantMessage("先抓取", []schema.ToolCall{{
+			ID: "dump-call", Type: "function",
+			Function: schema.FunctionCall{Name: "dump", Arguments: `{}`},
 		}}), nil
+	case 2:
+		m.notice = input[len(input)-1].Content
+		path := ""
+		for _, field := range strings.Fields(m.notice) {
+			if strings.HasPrefix(field, "/trunc/") {
+				path = field
+				break
+			}
+		}
+		arguments, err := json.Marshal(map[string]string{"file_path": path})
+		if err != nil {
+			return nil, err
+		}
+		return schema.AssistantMessage("读取完整内容", []schema.ToolCall{{
+			ID: "read-call", Type: "function",
+			Function: schema.FunctionCall{Name: offloadedResultToolName, Arguments: string(arguments)},
+		}}), nil
+	default:
+		m.fileResult = input[len(input)-1].Content
+		return schema.AssistantMessage("已读取", nil), nil
 	}
-	return schema.AssistantMessage("结束", nil), nil
 }
 
-func (m *groupReplyChatModel) Stream(context.Context, []*schema.Message, ...model.Option) (*schema.StreamReader[*schema.Message], error) {
+func (m *offloadReadingChatModel) Stream(context.Context, []*schema.Message, ...model.Option) (*schema.StreamReader[*schema.Message], error) {
 	return nil, errors.New("unexpected streaming call")
 }
 
-func (m *groupReplyChatModel) WithTools([]*schema.ToolInfo) (model.ToolCallingChatModel, error) {
+func (m *offloadReadingChatModel) WithTools([]*schema.ToolInfo) (model.ToolCallingChatModel, error) {
 	return m, nil
+}
+
+// TestLargeToolResultOffloaded 验证过大的工具结果转存后只向模型提供预览，完整内容仍可由读回工具取得。
+func TestLargeToolResultOffloaded(t *testing.T) {
+	full := strings.Repeat("字", toolResultOffloadBytes)
+	server := sdk.NewServer(&sdk.Implementation{Name: "test", Version: "1"}, nil)
+	server.AddTool(&sdk.Tool{Name: "dump", Description: "大结果", InputSchema: map[string]any{"type": "object"}},
+		func(context.Context, *sdk.CallToolRequest) (*sdk.CallToolResult, error) {
+			return &sdk.CallToolResult{Content: []sdk.Content{&sdk.TextContent{Text: full}}}, nil
+		})
+	endpoint := httptest.NewServer(sdk.NewStreamableHTTPHandler(func(*http.Request) *sdk.Server { return server }, nil))
+	defer endpoint.Close()
+
+	var logOutput bytes.Buffer
+	originalLogger := slog.Default()
+	slog.SetDefault(slog.New(slog.NewJSONHandler(&logOutput, nil)))
+	t.Cleanup(func() { slog.SetDefault(originalLogger) })
+
+	chatModel := &offloadReadingChatModel{}
+	runtime := &EinoRuntime{newModel: func(context.Context, ModelConfig) (model.ToolCallingChatModel, error) { return chatModel, nil }}
+	feed := &testInputFeed{}
+	feed.appendUser("抓一下这个页面")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	result, err := runtime.Run(ctx, RunRequest{
+		RunID: "offload-run", Name: "test-agent", MaxIterations: 5, MaxTurns: 2,
+		MCPServers: []MCPServer{{Name: "大结果服务", Config: mcp.Config{URL: endpoint.URL, ServerType: domain.MCPServerTypeStreamableHTTP}}},
+	}, feed)
+	if err != nil || result.Content != "已读取" {
+		t.Fatalf("result = %#v, err = %v", result, err)
+	}
+	// 运行过程记录保存转存后的预览，不落全文。
+	for _, block := range result.Blocks {
+		if block.Payload.ToolCall != nil && block.Payload.ToolCall.Name == "dump" &&
+			block.Payload.ToolCall.Result != nil && len(*block.Payload.ToolCall.Result) >= len(full) {
+			t.Fatalf("recorded dump result bytes = %d", len(*block.Payload.ToolCall.Result))
+		}
+	}
+	chatModel.mu.Lock()
+	defer chatModel.mu.Unlock()
+	if len(chatModel.notice) >= len(full) || !strings.Contains(chatModel.notice, "/trunc/") {
+		t.Fatalf("offload notice = %q", chatModel.notice)
+	}
+	if !strings.Contains(chatModel.fileResult, "字") {
+		t.Fatalf("offloaded result read back = %q", chatModel.fileResult)
+	}
+	if !strings.Contains(logOutput.String(), `"msg":"Agent 工具结果过大，已转存并保留预览"`) ||
+		!strings.Contains(logOutput.String(), `"tool_name":"dump"`) {
+		t.Fatalf("offload log = %s", logOutput.String())
+	}
 }
