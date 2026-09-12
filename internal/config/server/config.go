@@ -19,12 +19,13 @@ var natsNamespacePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*$`)
 
 // Config 定义服务端运行配置。
 type Config struct {
-	HaystackURL string         `yaml:"haystackURL"`
-	Server      ServerConfig   `yaml:"server"`
-	Database    DatabaseConfig `yaml:"database"`
-	NATS        NATSConfig     `yaml:"nats"`
-	TLS         TLSConfig      `yaml:"tls"`
-	Storage     StorageConfig  `yaml:"storage"`
+	HaystackURL   string         `yaml:"haystackURL"`
+	MarkitdownURL string         `yaml:"markitdownURL"`
+	Server        ServerConfig   `yaml:"server"`
+	Database      DatabaseConfig `yaml:"database"`
+	NATS          NATSConfig     `yaml:"nats"`
+	TLS           TLSConfig      `yaml:"tls"`
+	Storage       StorageConfig  `yaml:"storage"`
 }
 
 // ServerConfig 定义 HTTP 服务监听配置。
@@ -85,6 +86,7 @@ func Load(path string) (Config, error) {
 // normalize 统一配置中的枚举和空白字符。
 func (config *Config) normalize() {
 	config.HaystackURL = strings.TrimRight(strings.TrimSpace(config.HaystackURL), "/")
+	config.MarkitdownURL = strings.TrimRight(strings.TrimSpace(config.MarkitdownURL), "/")
 	config.Server.Host = strings.TrimSpace(config.Server.Host)
 	config.Database.Host = strings.TrimSpace(config.Database.Host)
 	config.Database.User = strings.TrimSpace(config.Database.User)
@@ -115,6 +117,7 @@ func defaultConfig() Config {
 // applyEnvironment 使用已设置的环境变量覆盖文件配置。
 func applyEnvironment(config *Config) error {
 	applyStringEnvironment("HAYSTACK_URL", &config.HaystackURL)
+	applyStringEnvironment("MARKITDOWN_URL", &config.MarkitdownURL)
 	applyStringEnvironment("WAILS_SERVER_HOST", &config.Server.Host)
 	applyStringEnvironment("TLS_MODE", &config.TLS.Mode)
 	applyStringEnvironment("TLS_ACME_EMAIL", &config.TLS.ACMEEmail)
@@ -140,13 +143,20 @@ func applyEnvironment(config *Config) error {
 	return nil
 }
 
+// validServiceURL 判断内部服务地址是否为不带凭据、查询和片段的 HTTP 地址。
+func validServiceURL(address string) bool {
+	parsed, err := url.Parse(address)
+	return err == nil && parsed.Host != "" && (parsed.Scheme == "http" || parsed.Scheme == "https") &&
+		parsed.User == nil && parsed.RawQuery == "" && parsed.Fragment == ""
+}
+
 // validate 校验服务端配置。
 func (config Config) validate() error {
-	if config.HaystackURL != "" {
-		address, err := url.Parse(config.HaystackURL)
-		if err != nil || address.Host == "" || (address.Scheme != "http" && address.Scheme != "https") || address.User != nil || address.RawQuery != "" || address.Fragment != "" {
-			return fmt.Errorf("Haystack 服务地址无效")
-		}
+	if config.HaystackURL != "" && !validServiceURL(config.HaystackURL) {
+		return fmt.Errorf("Haystack 服务地址无效")
+	}
+	if config.MarkitdownURL != "" && !validServiceURL(config.MarkitdownURL) {
+		return fmt.Errorf("markitdown 服务地址无效")
 	}
 	// 校验监听主机名、IPv4 地址和带方括号的 IPv6 地址。
 	host := config.Server.Host

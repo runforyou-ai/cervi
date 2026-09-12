@@ -39,13 +39,19 @@ markitdown 为 MIT 许可，无 CGO 和 AGPL 约束，同时解决了纯 Go PDF 
 
 ## 3. 已确认的能力变化
 
-以下三项从 markitdown 源码确认，是本次接入的既定代价：
+以下三项已用中文样本在 markitdown 0.1.7 容器上实测确认，是本次接入的既定代价：
 
-**PDF 页码丢失。** `_pdf_converter.py` 逐页抽取后以 `"\n\n".join(markdown_chunks)` 合并，输出不含任何页边界标记。`knowledge_segments.meta.page_number` 对 PDF 无法填充，roadmap 中"页级引用使用解析器提供的真实页码"推后。
+**PDF 页码不可靠。** `_pdf_converter.py` 有两条输出路径：所有页都未被识别为表单式版面时（`form_page_count == 0`）走 `pdfminer.high_level.extract_text`，页与页之间保留换页符 `\f`；只要有任一页被识别为表单式版面，就改为 `"\n\n".join(markdown_chunks)`，且正文为空的页直接跳过。
 
-**XLSX 前导零丢失。** `_xlsx_converter.py` 使用 `pd.read_excel(..., engine="openpyxl")`，pandas 类型推断会把 `007` 读成 `7`。现行实现中 `dtype=str, keep_default_na=False` 的防护不再存在。
+实测中文纯文本 PDF 和标签取值分列的表单式 PDF 均走 pdfminer 路径：三页 PDF（含一页空白）按 `\f` 切分得到正好三段，空白页对应空段。未能构造出触发表单式分支的样本，该分支行为按源码判定。
 
-**来源标记只保留在正文内。** XLSX 输出 `## 工作表名` 标题，PPTX 每页输出 `<!-- Slide number: N -->` 注释，PDF 无任何标记。这些信息进入分段正文，不再单独成列。将来若要恢复页级引用，PPTX 和 XLSX 的序号可从正文标记还原，PDF 需要第 9 节之外的单独方案。
+因此按 `\f` 计算页码对多数 PDF 成立，但响应中没有任何字段标明本次走的是哪条路径：一旦命中表单式分支，分隔符和页序对应关系同时失效，页码会静默错位而非缺失。`knowledge_segments.meta.page_number` 不按此实现，roadmap 中"页级引用使用解析器提供的真实页码"推后到能够稳定判定页边界时。中文正文本身无乱码。
+
+**XLSX 数值被类型推断改写。** `_xlsx_converter.py` 使用 `pd.read_excel(..., engine="openpyxl")`，pandas 按数值读取单元格。实测编号 `0012` 输出为 `12`，金额 `1234.50` 输出为 `1234.5`：前导零和小数尾零都会丢失。现行实现中 `dtype=str, keep_default_na=False` 的防护不再存在。金额与编号类字段的检索和引用按改写后的字面值进行。
+
+**来源标记只保留在正文内。** XLSX 输出 `## 工作表名` 标题，PPTX 每页输出 `<!-- Slide number: N -->` 注释，PDF 在 pdfminer 路径下输出 `\f`，均经实测确认。这些信息进入分段正文，不再单独成列。将来若要恢复页级引用，PPTX 和 XLSX 的序号可从正文标记还原，PDF 需要第 9 节之外的单独方案。
+
+若后续认定 XLSX 的数值改写不可接受，把该格式的分派改回 Go 侧的 excelize 只影响 `ProcessDocumentAction` 中一处按扩展名的分派，不动其余链路。
 
 据此删除 `knowledge_segments.meta` 的 `page_number` 和 `source_label`，以及 `knowledgeprocessing.Segment` 的 `PageNumber`、`SourceLabel` 字段和前端对应展示。不为单个格式保留只在该格式生效的兜底字段。
 
@@ -110,7 +116,7 @@ docker compose up -d postgres nats markitdown
 
 - **URL 与 YouTube 来源**：对应转换器只接受 URI，而包装服务只接受上传的字节。若要支持，需在包装中单开接口并明确出网边界。
 - **Azure Document Intelligence 与 Content Understanding**：需要 Azure endpoint 与凭据，且会把原件送往 Azure，与私有化部署定位冲突。
-- **音频转写**：`_transcribe_audio.py` 调用的是 `recognizer.recognize_google(audio)`，音频会发送到 Google 的识别服务。**扩展音频能力时不得启用 markitdown 的音频转换器**，须改为自托管 ASR，与 roadmap 第 6 节"先确定本地或外部 ASR"一致。
+- **音频转写**：`_transcribe_audio.py` 调用的是 `recognizer.recognize_google(audio)`，音频会发送到 Google 的识别服务。包装服务按音频转换器声明的 `.wav`、`.mp3`、`.m4a`、`.mp4` 四个后缀直接返回 `unsupported_file`，使该路径在装有全部依赖的镜像上不可达。扩展音频能力时改为自托管 ASR，与 roadmap 第 6 节"先确定本地或外部 ASR"一致。
 
 ## 6. PR 1：Go 字符分段
 

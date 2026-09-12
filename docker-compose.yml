@@ -40,6 +40,19 @@ services:
       timeout: 5s
       retries: 15
 
+  markitdown:
+    container_name: cervi-markitdown
+    image: cervi-markitdown:0.1.7
+    build:
+      context: markitdown
+    ports:
+      - "1430:8000"
+    healthcheck:
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8000/status')"]
+      interval: 2s
+      timeout: 5s
+      retries: 15
+
 volumes:
   cervi-postgres-data:
   cervi-nats-data:
