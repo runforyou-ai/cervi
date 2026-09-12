@@ -89,8 +89,10 @@ export function useKnowledgeDocumentUpload({ baseId, groupId }: { baseId: string
     if (saved) await invalidate(resourceKeys.knowledgeDocuments(baseId))
     if (!mounted.current) return
     setBusy(false)
+    // 整批保存成功后收起对话框，无未保存的临时文件需要清理。
     if (items.current.every((item) => item.stage === "saved")) {
       toast.success(t("documents.upload.success", { count: items.current.length }))
+      setOpen(false)
     }
   }
 
