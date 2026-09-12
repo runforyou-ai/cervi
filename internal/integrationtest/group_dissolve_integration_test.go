@@ -18,7 +18,7 @@ import (
 func TestDissolveGroupPreservesMembers(t *testing.T) {
 	f := newNavigationFixture(t)
 	ctx := context.Background()
-	dissolve := conversationaction.NewDissolveGroupConversationAction(f.db)
+	dissolve := conversationaction.NewDissolveGroupConversationAction(f.db, newGroupAgentCoordinator(f.db))
 	if _, err := dissolve.Execute(ctx, f.member, f.groupID); !errors.Is(err, conversationaction.ErrGroupOwnerRequired) {
 		t.Fatalf("member dissolve=%v", err)
 	}
@@ -72,7 +72,7 @@ func TestDissolveDoesNotRestoreFormerMember(t *testing.T) {
 	if err := leave.Execute(ctx, f.owner, f.groupID); !errors.As(err, &conflict) || conflict.Reason != conversationaction.ConflictReasonGroupOwnerCannotLeave {
 		t.Fatalf("last owner leave=%v", err)
 	}
-	if _, err := conversationaction.NewDissolveGroupConversationAction(f.db).Execute(ctx, f.owner, f.groupID); err != nil {
+	if _, err := conversationaction.NewDissolveGroupConversationAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, f.groupID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := conversationaction.NewGetGroupConversationQuery(f.db).Execute(ctx, f.member, f.groupID); !errors.Is(err, conversationaction.ErrConversationNotFound) {
@@ -97,7 +97,7 @@ func TestDissolveSerializesWithGroupWrites(t *testing.T) {
 				if operation == "transfer_first" {
 					_, err = conversationaction.NewTransferGroupConversationOwnerAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationOwnerInput{ConversationID: f.groupID, OwnerIdentityID: f.member.OrganizationIdentity.ID})
 				} else {
-					_, err = conversationaction.NewDissolveGroupConversationAction(f.db).Execute(ctx, f.owner, f.groupID)
+					_, err = conversationaction.NewDissolveGroupConversationAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, f.groupID)
 				}
 				dissolved <- err
 			}()
@@ -114,7 +114,7 @@ func TestDissolveSerializesWithGroupWrites(t *testing.T) {
 				case "transfer":
 					_, err = conversationaction.NewTransferGroupConversationOwnerAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationOwnerInput{ConversationID: f.groupID, OwnerIdentityID: f.member.OrganizationIdentity.ID})
 				case "dissolve", "transfer_first":
-					_, err = conversationaction.NewDissolveGroupConversationAction(f.db).Execute(ctx, f.owner, f.groupID)
+					_, err = conversationaction.NewDissolveGroupConversationAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, f.groupID)
 				}
 				written <- err
 			}()

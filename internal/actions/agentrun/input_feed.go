@@ -33,7 +33,8 @@ type agentRunPolicy interface {
 	prepareLocked(context.Context, bun.IDB, agentRunPolicyContext, *servermodels.AgentRun) (bool, error)
 	loadMessages(context.Context, bun.IDB, *servermodels.AgentRun, int64) ([]agentruntime.Message, error)
 	persistMessage(context.Context, bun.IDB, agentRunPolicyContext, *servermodels.AgentRun, string, domain.MessageType, string) error
-	enqueueNext(context.Context, bun.IDB, agentRunPolicyContext, *servermodels.AgentRun, int64) error
+	laneRevision(context.Context, bun.IDB, agentRunPolicyContext, *servermodels.AgentLane) (string, bool, error)
+	instruction(context.Context, bun.IDB, executionContext) (string, error)
 }
 
 type lockedAgentRun struct {
@@ -44,6 +45,7 @@ type lockedAgentRun struct {
 
 type databaseInputFeed struct {
 	db        *bun.DB
+	enqueuer  servertask.TxEnqueuer
 	execution executionContext
 	policy    agentRunPolicy
 }
@@ -88,7 +90,7 @@ func (f *databaseInputFeed) Claim(ctx context.Context, throughSeq int64) (agentr
 		}
 		if !allowed {
 			suppressed = true
-			return nil
+			return scheduleNextRun(ctx, tx, f.enqueuer, f.policy, policyContext, run.OrganizationID, domain.AgentExecutionScopeKind(run.ScopeKind), run.ScopeID)
 		}
 		if run.Status != string(domain.AgentRunStatusRunning) || lane.DesiredSeq <= lane.ProcessedSeq {
 			return errors.New("agent run has no claimable input")
@@ -184,15 +186,24 @@ type messageBoundary struct {
 	MessageSeq int64 `bun:"message_seq"`
 }
 
-// loadClaimedMessageBoundary 读取一次已认领输入对应的稳定消息边界。
+// loadClaimedMessageBoundary 读取本次认领可见的消息上界：取会话当前最新消息，且不越过本队列尚未认领的输入。
 func loadClaimedMessageBoundary(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, endSeq int64) (messageBoundary, error) {
 	boundary := messageBoundary{}
-	if err := db.NewSelect().TableExpr("agent_inputs AS ai").
-		ColumnExpr("msg.message_seq").
-		Join("JOIN messages AS msg ON msg.id = ai.source_message_id AND msg.organization_id = ai.organization_id").
-		Where("ai.lane_id = ?", run.LaneID).
-		Where("ai.input_seq = ?", endSeq).
-		Scan(ctx, &boundary); err != nil {
+	if err := db.NewRaw(`
+		SELECT COALESCE(
+			(
+				SELECT MIN(pending_msg.message_seq) - 1
+				FROM agent_inputs AS pending
+				JOIN messages AS pending_msg ON pending_msg.id = pending.source_message_id AND pending_msg.organization_id = pending.organization_id
+				WHERE pending.lane_id = ? AND pending.input_seq > ?
+			),
+			(
+				SELECT MAX(latest.message_seq)
+				FROM messages AS latest
+				WHERE latest.organization_id = ? AND latest.conversation_id = ?
+			)
+		) AS message_seq
+	`, run.LaneID, endSeq, run.OrganizationID, run.ConversationID).Scan(ctx, &boundary); err != nil {
 		return messageBoundary{}, fmt.Errorf("load claimed input boundary: %w", err)
 	}
 	return boundary, nil

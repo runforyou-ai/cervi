@@ -26,7 +26,7 @@ type groupAccessWrite struct {
 func groupAccessWrites() []groupAccessWrite {
 	return []groupAccessWrite{
 		{"send", func(ctx context.Context, f navigationFixture, _ string) error {
-			_, err := conversationaction.NewSendGroupTextMessageAction(f.db).Execute(ctx, f.member, conversationaction.GroupTextMessageInput{ConversationID: f.groupID, ClientMessageID: uuid.NewV7().String(), Body: "等待后发送"})
+			_, err := newGroupSendAction(f.db).Execute(ctx, f.member, conversationaction.GroupTextMessageInput{ConversationID: f.groupID, ClientMessageID: uuid.NewV7().String(), Body: "等待后发送"})
 			return err
 		}},
 		{"mute", func(ctx context.Context, f navigationFixture, _ string) error {
@@ -66,7 +66,7 @@ func TestRemovedMemberCannotWriteAfterWaiting(t *testing.T) {
 			defer release.Do(func() { close(barrier.release) })
 			removed, written := make(chan error, 1), make(chan error, 1)
 			go func() {
-				_, err := conversationaction.NewRemoveGroupConversationMemberAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationMemberInput{ConversationID: f.groupID, MemberIdentityID: f.member.OrganizationIdentity.ID})
+				_, err := conversationaction.NewRemoveGroupConversationMemberAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, conversationaction.GroupConversationMemberInput{ConversationID: f.groupID, MemberIdentityID: f.member.OrganizationIdentity.ID})
 				removed <- err
 			}()
 			select {
@@ -159,7 +159,7 @@ func TestGroupSettingsCommitBeforeRemoval(t *testing.T) {
 		t.Fatal(ctx.Err())
 	}
 	go func() {
-		_, err := conversationaction.NewRemoveGroupConversationMemberAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationMemberInput{ConversationID: f.groupID, MemberIdentityID: f.member.OrganizationIdentity.ID})
+		_, err := conversationaction.NewRemoveGroupConversationMemberAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, conversationaction.GroupConversationMemberInput{ConversationID: f.groupID, MemberIdentityID: f.member.OrganizationIdentity.ID})
 		removed <- err
 	}()
 	waitForNavigationLock(t, ctx, f.db, f.groupID)
@@ -200,7 +200,7 @@ func TestGroupOwnerTransferAndLeave(t *testing.T) {
 	if err := conversationaction.NewLeaveGroupConversationAction(f.db).Execute(ctx, f.owner, f.groupID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conversationaction.NewDissolveGroupConversationAction(f.db).Execute(ctx, f.member, f.groupID); err != nil {
+	if _, err := conversationaction.NewDissolveGroupConversationAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.member, f.groupID); err != nil {
 		t.Fatal(err)
 	}
 	detail, err := conversationaction.NewGetGroupConversationQuery(f.db).Execute(ctx, f.member, f.groupID)

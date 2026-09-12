@@ -35,6 +35,7 @@ import {
   SendFirstAgentTextMessage,
   SendAgentTextMessage,
   StopAgentReply,
+  StopGroupAgentReply,
   SendFirstDirectTextMessage,
   SendDirectTextMessage,
   SendGroupTextMessage,
@@ -481,6 +482,7 @@ export const completeAttachmentUpload = bind(CompleteAttachmentUpload)
 
 /** 停止指定 AI 回复并读取实际运行状态。 */
 export const stopAgentReply = bind(StopAgentReply)
+export const stopGroupAgentReply = bind(StopGroupAgentReply)
 
 /** 独立读取当前用户可见的会话摘要。 */
 export const getInboxConversation = bind(GetInboxConversation)

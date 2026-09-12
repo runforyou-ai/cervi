@@ -243,7 +243,7 @@ func TestInboxPaginationBoundaries(t *testing.T) {
 				t.Fatalf("deleted boundary=%+v err=%v", next, err)
 			}
 			for _, row := range next.Conversations {
-				if _, err := conversationaction.NewRemoveGroupConversationMemberAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationMemberInput{ConversationID: row.ID, MemberIdentityID: f.member.OrganizationIdentity.ID}); err != nil {
+				if _, err := conversationaction.NewRemoveGroupConversationMemberAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, conversationaction.GroupConversationMemberInput{ConversationID: row.ID, MemberIdentityID: f.member.OrganizationIdentity.ID}); err != nil {
 					t.Fatal(err)
 				}
 			}

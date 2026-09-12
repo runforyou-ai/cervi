@@ -11,13 +11,10 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
 )
 
-type agentChatRunPolicy struct {
-	enqueuer servertask.TxEnqueuer
-}
+type agentChatRunPolicy struct{}
 
 // lockContext 锁定 AI 会话及其固定 Agent 的有效参与关系。
 func (p agentChatRunPolicy) lockContext(ctx context.Context, db bun.IDB, run *servermodels.AgentRun) (agentRunPolicyContext, error) {
@@ -58,20 +55,20 @@ func (p agentChatRunPolicy) persistMessage(ctx context.Context, db bun.IDB, poli
 	return err
 }
 
-// enqueueNext 为 AI 聊天 Agent 的剩余输入创建下一次运行。
-func (p agentChatRunPolicy) enqueueNext(ctx context.Context, db bun.IDB, _ agentRunPolicyContext, run *servermodels.AgentRun, startSeq int64) error {
+// instruction 沿用 AI 会话配置的系统提示词。
+func (p agentChatRunPolicy) instruction(_ context.Context, _ bun.IDB, execution executionContext) (string, error) {
+	return execution.Instruction, nil
+}
+
+// laneRevision 读取 AI 聊天 Agent 当前生效的配置版本。
+func (p agentChatRunPolicy) laneRevision(ctx context.Context, db bun.IDB, _ agentRunPolicyContext, lane *servermodels.AgentLane) (string, bool, error) {
 	var revisionID string
 	if err := db.NewSelect().Model((*servermodels.Agent)(nil)).
 		Column("active_revision_id").
-		Where("a.identity_id = ?", run.AgentIdentityID).
-		Where("a.organization_id = ?", run.OrganizationID).
+		Where("a.identity_id = ?", lane.AgentIdentityID).
+		Where("a.organization_id = ?", lane.OrganizationID).
 		Scan(ctx, &revisionID); err != nil {
-		return fmt.Errorf("load next agent run revision: %w", err)
+		return "", false, fmt.Errorf("load next agent run revision: %w", err)
 	}
-	_, err := insertAndEnqueueRun(ctx, db, p.enqueuer, agentRunSpec{
-		OrganizationID: run.OrganizationID, ConversationID: run.ConversationID,
-		AgentIdentityID: run.AgentIdentityID, RevisionID: revisionID,
-		ScopeKind: domain.AgentExecutionScopeConversation, ScopeID: run.ScopeID,
-	}, run.LaneID, startSeq)
-	return err
+	return revisionID, true, nil
 }

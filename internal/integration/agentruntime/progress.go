@@ -112,6 +112,16 @@ func (r *processRecorder) updateTool(callID string, update func(*ToolCall)) erro
 	return nil
 }
 
+// reset 在重新执行本次输入前清空已记录的过程内容。
+func (r *processRecorder) reset() {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	r.progress.CandidateContent = ""
+	r.progress.Blocks = nil
+	r.toolPositions = make(map[string]int)
+	r.publishLocked()
+}
+
 // resetCandidate 在安全点补入新消息时丢弃候选正文和被跳过的工具。
 func (r *processRecorder) resetCandidate() {
 	r.mu.Lock()

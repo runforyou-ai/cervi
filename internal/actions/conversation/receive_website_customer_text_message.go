@@ -51,6 +51,7 @@ type CustomerAgentMessageScheduler interface {
 type AgentMessageScheduler interface {
 	AgentChatMessageScheduler
 	CustomerAgentMessageScheduler
+	GroupAgentMessageScheduler
 }
 
 type generatedIDs struct {

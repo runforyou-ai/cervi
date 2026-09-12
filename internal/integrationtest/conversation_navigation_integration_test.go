@@ -74,7 +74,7 @@ func newNavigationFixture(t *testing.T) navigationFixture {
 // send 通过真实发送命令写入测试消息。
 func (f navigationFixture) send(t *testing.T, identity *servermodels.Identity, body string, all bool, subjects ...string) conversationaction.ConversationMessage {
 	t.Helper()
-	message, err := conversationaction.NewSendGroupTextMessageAction(f.db).Execute(context.Background(), identity, conversationaction.GroupTextMessageInput{ConversationID: f.groupID, ClientMessageID: uuid.NewV7().String(), Body: body, MentionAll: all, MentionSubjectIDs: subjects})
+	message, err := newGroupSendAction(f.db).Execute(context.Background(), identity, conversationaction.GroupTextMessageInput{ConversationID: f.groupID, ClientMessageID: uuid.NewV7().String(), Body: body, MentionAll: all, MentionSubjectIDs: subjects})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -151,7 +151,7 @@ func TestGroupMentionNavigation(t *testing.T) {
 		t.Fatal(err)
 	}
 	f.send(t, f.owner, "离群前未查看", true)
-	if _, err := conversationaction.NewRemoveGroupConversationMemberAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationMemberInput{ConversationID: f.groupID, MemberIdentityID: f.member.OrganizationIdentity.ID}); err != nil {
+	if _, err := conversationaction.NewRemoveGroupConversationMemberAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, conversationaction.GroupConversationMemberInput{ConversationID: f.groupID, MemberIdentityID: f.member.OrganizationIdentity.ID}); err != nil {
 		t.Fatal(err)
 	}
 	for _, readQuery := range []func() error{
@@ -196,7 +196,7 @@ func TestGroupMentionNavigation(t *testing.T) {
 func TestGroupMessageContextAndOrder(t *testing.T) {
 	f := newNavigationFixture(t)
 	ctx := context.Background()
-	send := conversationaction.NewSendGroupTextMessageAction(f.db)
+	send := newGroupSendAction(f.db)
 	messages := make([]conversationaction.ConversationMessage, 70)
 	for index := range messages {
 		messages[index] = f.send(t, f.owner, fmt.Sprintf("消息 %d", index), index == 30)
@@ -322,7 +322,7 @@ func TestGroupSequenceCommitBarrier(t *testing.T) {
 		err     error
 	}
 	firstDone, secondDone := make(chan sent, 1), make(chan sent, 1)
-	send := conversationaction.NewSendGroupTextMessageAction(f.db)
+	send := newGroupSendAction(f.db)
 	go func() {
 		message, err := send.Execute(ctx, f.owner, conversationaction.GroupTextMessageInput{ConversationID: f.groupID, ClientMessageID: uuid.NewV7().String(), Body: barrier.body, MentionAll: true})
 		firstDone <- sent{message, err}
@@ -452,7 +452,7 @@ func TestVisibleMentionsCanBeReviewedOutOfOrder(t *testing.T) {
 	if _, err := review.Execute(ctx, f.member, f.groupID, last.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conversationaction.NewRemoveGroupConversationMemberAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationMemberInput{ConversationID: f.groupID, MemberIdentityID: f.member.OrganizationIdentity.ID}); err != nil {
+	if _, err := conversationaction.NewRemoveGroupConversationMemberAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, conversationaction.GroupConversationMemberInput{ConversationID: f.groupID, MemberIdentityID: f.member.OrganizationIdentity.ID}); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := conversationaction.NewAddGroupConversationMembersAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationMembersInput{ConversationID: f.groupID, MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID}}); err != nil {

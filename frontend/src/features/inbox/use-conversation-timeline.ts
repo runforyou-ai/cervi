@@ -83,7 +83,8 @@ export function useConversationTimeline(
       if (
         !incomingPage.messages.length &&
         !current.hasLater &&
-        JSON.stringify(current.latestAgentRun) === JSON.stringify(incomingPage.latestAgentRun)
+        JSON.stringify(current.latestAgentRun) === JSON.stringify(incomingPage.latestAgentRun) &&
+        JSON.stringify(current.pendingAgents) === JSON.stringify(incomingPage.pendingAgents)
       ) return current
       return mergeConversationPage(current, incomingPage, "after")
     })

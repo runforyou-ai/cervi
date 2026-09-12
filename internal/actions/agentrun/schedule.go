@@ -34,6 +34,7 @@ type agentRunSpec struct {
 	ScopeID         string
 	Kind            domain.AgentInputKind
 	SourceSubjectID string
+	SourceOrdinal   int
 }
 
 // NewScheduler 创建 Agent 运行调度器。
@@ -63,10 +64,10 @@ func (s *Scheduler) scheduleInput(ctx context.Context, db bun.IDB, spec agentRun
 	input := &servermodels.AgentInput{
 		ID: uuid.NewV7().String(), OrganizationID: spec.OrganizationID, LaneID: sequence.LaneID,
 		InputSeq: sequence.DesiredSeq, Kind: string(spec.Kind),
-		SourceMessageID: messageID, SourceSubjectID: spec.SourceSubjectID,
+		SourceMessageID: messageID, SourceSubjectID: spec.SourceSubjectID, SourceOrdinal: spec.SourceOrdinal,
 	}
 	if _, err := db.NewInsert().Model(input).
-		Column("id", "organization_id", "lane_id", "input_seq", "kind", "source_message_id", "source_subject_id").
+		Column("id", "organization_id", "lane_id", "input_seq", "kind", "source_message_id", "source_subject_id", "source_ordinal").
 		Exec(ctx); err != nil {
 		return fmt.Errorf("create agent input: %w", err)
 	}

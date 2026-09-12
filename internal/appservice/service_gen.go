@@ -269,6 +269,11 @@ func (s *Service) SendGroupTextMessage(ctx context.Context, meta RequestMeta, co
 	return withNormalizedSlices(s.backend.SendGroupTextMessage(ctx, meta, conversationID, input))
 }
 
+// StopGroupAgentReply 停止群聊中指定的 AI 员工回复并返回实际运行状态。
+func (s *Service) StopGroupAgentReply(ctx context.Context, meta RequestMeta, conversationID string, runID string) (AgentRunStatus, error) {
+	return withNormalizedSlices(s.backend.StopGroupAgentReply(ctx, meta, conversationID, runID))
+}
+
 // ListMessageChannels 返回消息渠道列表。
 func (s *Service) ListMessageChannels(ctx context.Context, meta RequestMeta) (MessageChannelList, error) {
 	return withNormalizedSlices(s.backend.ListMessageChannels(ctx, meta))

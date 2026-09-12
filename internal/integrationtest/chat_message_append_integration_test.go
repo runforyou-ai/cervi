@@ -26,7 +26,7 @@ func TestChatMessageAppendReplay(t *testing.T) {
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	input := conversationaction.GroupTextMessageInput{ConversationID: f.groupID, ClientMessageID: uuid.NewV7().String(), Body: "第一条"}
-	first, err := conversationaction.NewSendGroupTextMessageAction(f.db).Execute(ctx, f.owner, input)
+	first, err := newGroupSendAction(f.db).Execute(ctx, f.owner, input)
 	if err != nil {
 		t.Fatal(err)
 	}

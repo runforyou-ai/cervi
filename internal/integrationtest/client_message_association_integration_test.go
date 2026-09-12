@@ -66,7 +66,7 @@ func assertMemberClientAssociation(t *testing.T, db *bun.DB, sender *servermodel
 func TestMemberClientMessageAssociation(t *testing.T) {
 	f := newNavigationFixture(t)
 	ctx := context.Background()
-	send := conversationaction.NewSendGroupTextMessageAction(f.db)
+	send := newGroupSendAction(f.db)
 	original := f.send(t, f.member, "被引用的消息", false)
 	clientID := uuid.NewV7().String()
 	input := conversationaction.GroupTextMessageInput{ConversationID: f.groupID, ClientMessageID: strings.ToUpper(clientID), Body: "相同正文", ReplyToMessageID: original.ID, MentionSubjectIDs: []string{f.subjectID}}

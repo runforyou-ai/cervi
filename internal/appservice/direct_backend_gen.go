@@ -548,6 +548,16 @@ func (b *DirectBackend) SendGroupTextMessage(ctx context.Context, meta RequestMe
 	return b.ops.SendGroupTextMessage(ctx, meta, identity, conversationID, input)
 }
 
+// StopGroupAgentReply 停止群聊中指定的 AI 员工回复并返回实际运行状态。
+func (b *DirectBackend) StopGroupAgentReply(ctx context.Context, meta RequestMeta, conversationID string, runID string) (AgentRunStatus, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero AgentRunStatus
+		return zero, err
+	}
+	return b.ops.StopGroupAgentReply(ctx, meta, identity, conversationID, runID)
+}
+
 // ListMessageChannels 返回消息渠道列表。
 func (b *DirectBackend) ListMessageChannels(ctx context.Context, meta RequestMeta) (MessageChannelList, error) {
 	identity, err := b.ops.authenticate(ctx, meta)

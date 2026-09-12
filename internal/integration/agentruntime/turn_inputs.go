@@ -14,6 +14,9 @@ import (
 
 const triggerPollInterval = 200 * time.Millisecond
 
+// errEmptyFinalResponse 表示模型本轮没有产出可发布的正文。
+var errEmptyFinalResponse = errors.New("agent returned an empty final response")
+
 // turnInputs 统一管理持久输入的投递、认领边界和循环停止决策。
 type turnInputs struct {
 	feed InputFeed
@@ -142,7 +145,7 @@ func (i *turnInputs) finish(ctx context.Context, turn *adk.TurnContext[Trigger, 
 		return false, nil
 	}
 	if candidate == "" {
-		return false, errors.New("agent returned an empty final response")
+		return false, errEmptyFinalResponse
 	}
 	i.closed = true
 	i.loop.Stop()

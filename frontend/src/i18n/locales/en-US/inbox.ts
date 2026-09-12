@@ -168,6 +168,8 @@ const inbox = {
   agentRunAssigneeChanged: "Conversation reassigned",
   agentRunSessionClosed: "Conversation closed",
   agentRunBotChanged: "Bot replaced",
+  agentRunAgentRemoved: "The AI teammate left the group",
+  agentRunWaiting: "Waiting to reply: {{names}}",
   agentThoughtRunning: "Thinking",
   agentThoughtCompleted: "Thought for {{seconds}}s",
   agentToolQueued: "Queued",

@@ -165,6 +165,8 @@ const inbox = {
   agentRunAssigneeChanged: "会话已转交",
   agentRunSessionClosed: "会话已关闭",
   agentRunBotChanged: "机器人已更换",
+  agentRunAgentRemoved: "AI 员工已退出群聊",
+  agentRunWaiting: "等待发言：{{names}}",
   agentThoughtRunning: "思考中",
   agentThoughtCompleted: "已思考（用时{{seconds}}秒）",
   agentToolQueued: "等待执行",

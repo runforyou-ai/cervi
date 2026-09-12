@@ -32,6 +32,25 @@ func (o *directOperations) StopAgentReply(ctx context.Context, meta RequestMeta,
 	return "", FailedError(meta, cervii18n.ErrorAgentReplyStopFailed)
 }
 
+// StopGroupAgentReply 停止群聊中指定 AI 员工的回复。
+func (o *directOperations) StopGroupAgentReply(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID, runID string) (AgentRunStatus, error) {
+	status, err := o.agentCoordinator.StopGroupAgentReply(ctx, identity, conversationID, runID)
+	if err == nil {
+		return AgentRunStatus(status), nil
+	}
+	if ctx.Err() != nil {
+		return "", ctx.Err()
+	}
+	if errors.Is(err, common.ErrIdentityInvalid) {
+		return "", SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+	}
+	if errors.Is(err, conversationaction.ErrConversationNotFound) {
+		return "", NotFoundError(meta, cervii18n.ErrorConversationNotFound)
+	}
+	slog.Warn("停止群内 AI 回复失败", "organization_id", identity.Organization.ID, "conversation_id", conversationID, "agent_run_id", runID, "error", err)
+	return "", FailedError(meta, cervii18n.ErrorAgentReplyStopFailed)
+}
+
 // SendFirstAgentTextMessage 保存 AI 聊天首条消息并确认草稿对应的会话。
 func (o *directOperations) SendFirstAgentTextMessage(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input FirstAgentTextMessageInput) (FirstAgentTextMessageResult, error) {
 	result, err := o.sendFirstAgentTextMessage.Execute(ctx, identity, conversationaction.FirstAgentTextMessageInput{ConversationID: input.ConversationID, AgentIdentityID: input.AgentIdentityID, ClientMessageID: input.ClientMessageID, Body: input.Body})

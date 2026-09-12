@@ -109,7 +109,7 @@ func TestAttachmentMessages(t *testing.T) {
 		// 已完成附件在单聊和群聊中均可按文件名引用。
 		var reply conversationaction.ConversationMessage
 		if target == "group" {
-			reply, err = conversationaction.NewSendGroupTextMessageAction(f.db).Execute(ctx, f.member, conversationaction.GroupTextMessageInput{ConversationID: result.ConversationID, ClientMessageID: uuid.NewV7().String(), Body: "收到附件", ReplyToMessageID: result.Message.ID})
+			reply, err = newGroupSendAction(f.db).Execute(ctx, f.member, conversationaction.GroupTextMessageInput{ConversationID: result.ConversationID, ClientMessageID: uuid.NewV7().String(), Body: "收到附件", ReplyToMessageID: result.Message.ID})
 		} else {
 			reply, err = conversationaction.NewSendDirectTextMessageAction(f.db).Execute(ctx, f.member, conversationaction.InternalTextMessageInput{ConversationID: result.ConversationID, ClientMessageID: uuid.NewV7().String(), Body: "收到附件", ReplyToMessageID: result.Message.ID})
 		}
@@ -432,7 +432,7 @@ func TestAttachmentMessageReplies(t *testing.T) {
 				t.Fatalf("replayed=%+v err=%v", replayed, err)
 			}
 			// 核验群聊附件引用的会话归属。
-			_, err = conversationaction.NewSendGroupTextMessageAction(f.db).Execute(ctx, f.member, conversationaction.GroupTextMessageInput{ConversationID: f.groupID, ClientMessageID: uuid.NewV7().String(), Body: "跨会话引用", ReplyToMessageID: target.ID})
+			_, err = newGroupSendAction(f.db).Execute(ctx, f.member, conversationaction.GroupTextMessageInput{ConversationID: f.groupID, ClientMessageID: uuid.NewV7().String(), Body: "跨会话引用", ReplyToMessageID: target.ID})
 			var conflict *conversationaction.ConflictError
 			if !errors.As(err, &conflict) || conflict.Reason != conversationaction.ConflictReasonReplyTargetInvalid {
 				t.Fatalf("cross-conversation reference=%v", err)

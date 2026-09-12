@@ -23,6 +23,7 @@ const (
 type AgentInputKind string
 
 const (
+	AgentInputKindMention      AgentInputKind = "mention"
 	AgentInputKindAgentDirect  AgentInputKind = "agent_direct"
 	AgentInputKindCustomerAuto AgentInputKind = "customer_auto"
 )
@@ -35,4 +36,5 @@ const (
 	AgentRunErrorCodeSessionClosed   AgentRunErrorCode = "session_closed"
 	AgentRunErrorCodeUserCancelled   AgentRunErrorCode = "user_cancelled"
 	AgentRunErrorCodeBotChanged      AgentRunErrorCode = "bot_changed"
+	AgentRunErrorCodeAgentRemoved    AgentRunErrorCode = "agent_removed"
 )

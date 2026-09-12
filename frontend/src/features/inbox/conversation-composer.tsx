@@ -30,7 +30,6 @@ import {
   type ConversationMessageData,
   type ConversationMessageReference,
   type DirectTextMessageInput,
-  OrganizationIdentityType,
   type GroupParticipant,
   type InboxConversation,
 } from "@/api"
@@ -228,7 +227,6 @@ export function ConversationComposer({
       ...groupParticipants
         .filter(
           (participant) =>
-            participant.identityType === OrganizationIdentityType.OrganizationIdentityTypeUser &&
             participant.identityId !== currentIdentityID &&
             !mentionSubjectIDs.includes(participant.chatSubjectId) &&
             participant.displayName.toLocaleLowerCase().includes(query),

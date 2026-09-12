@@ -801,6 +801,7 @@ export interface ConversationMessage {
  */
 export interface ConversationMessageList {
     "latestAgentRun": ConversationAgentRun | null;
+    "pendingAgents": ConversationPendingAgent[] | null;
     "hasEarlier": boolean;
     "hasLater": boolean;
     "messages": ConversationMessage[] | null;
@@ -908,6 +909,15 @@ export interface ConversationNotificationSettings {
  */
 export interface ConversationNotificationSettingsInput {
     "muted": boolean;
+}
+
+/**
+ * ConversationPendingAgent 定义已收到输入、等待轮转执行的 AI 员工。
+ */
+export interface ConversationPendingAgent {
+    "identityId": string;
+    "displayName": string;
+    "avatarUrl": string;
 }
 
 /**

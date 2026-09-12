@@ -415,6 +415,14 @@ func (b *Backend) SendGroupTextMessage(ctx context.Context, meta appservice.Requ
 	return output, err
 }
 
+// StopGroupAgentReply 停止群聊中指定的 AI 员工回复并返回实际运行状态。
+func (b *Backend) StopGroupAgentReply(ctx context.Context, meta appservice.RequestMeta, conversationID string, runID string) (appservice.AgentRunStatus, error) {
+	var output appservice.AgentRunStatus
+	err := b.do(ctx, meta, http.MethodPost, "/group-conversations/"+url.PathEscape(conversationID)+"/runs/"+url.PathEscape(runID)+"/stop", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // ListMessageChannels 返回消息渠道列表。
 func (b *Backend) ListMessageChannels(ctx context.Context, meta appservice.RequestMeta) (appservice.MessageChannelList, error) {
 	var output appservice.MessageChannelList

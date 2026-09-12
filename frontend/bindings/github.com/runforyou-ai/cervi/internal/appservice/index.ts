@@ -123,6 +123,7 @@ export type {
     ConversationNavigationState,
     ConversationNotificationSettings,
     ConversationNotificationSettingsInput,
+    ConversationPendingAgent,
     ConversationReadState,
     ConversationSystemEvent,
     ConversationSystemEventParticipant,

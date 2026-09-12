@@ -84,7 +84,7 @@ func TestInboxIndependentConversation(t *testing.T) {
 			t.Fatalf("unavailable error=%v", err)
 		}
 	}
-	if _, err := conversationaction.NewRemoveGroupConversationMemberAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationMemberInput{ConversationID: f.groupID, MemberIdentityID: f.member.OrganizationIdentity.ID}); err != nil {
+	if _, err := conversationaction.NewRemoveGroupConversationMemberAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, conversationaction.GroupConversationMemberInput{ConversationID: f.groupID, MemberIdentityID: f.member.OrganizationIdentity.ID}); err != nil {
 		t.Fatal(err)
 	}
 	request.Query.Scope = appservice.InboxScopeInternal
@@ -95,7 +95,7 @@ func TestInboxIndependentConversation(t *testing.T) {
 	if _, err := conversationaction.NewAddGroupConversationMembersAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationMembersInput{ConversationID: f.groupID, MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID}}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conversationaction.NewDissolveGroupConversationAction(f.db).Execute(ctx, f.owner, f.groupID); err != nil {
+	if _, err := conversationaction.NewDissolveGroupConversationAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, f.groupID); err != nil {
 		t.Fatal(err)
 	}
 	summary, err = backend.GetInboxConversation(ctx, meta, f.groupID)
