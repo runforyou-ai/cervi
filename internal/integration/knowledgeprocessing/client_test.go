@@ -13,8 +13,8 @@ import (
 	"time"
 )
 
-// TestClientStreamsOriginalAndReadsAnchor 验证流式原件与锚点请求的内部契约。
-func TestClientStreamsOriginalAndReadsAnchor(t *testing.T) {
+// TestClientStreamsOriginal 验证流式提交原件与处理参数的内部契约。
+func TestClientStreamsOriginal(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		switch r.URL.Path {
 		case "/knowledge/process":
@@ -38,13 +38,6 @@ func TestClientStreamsOriginalAndReadsAnchor(t *testing.T) {
 				t.Errorf("unexpected upload: %+v %q", input, content)
 			}
 			_, _ = w.Write([]byte(`{"segmentCount":2,"stale":false}`))
-		case "/knowledge/segments":
-			var input map[string]any
-			_ = json.NewDecoder(r.Body).Decode(&input)
-			if _, exists := input["anchorSegmentId"]; exists {
-				t.Error("empty anchor must be omitted")
-			}
-			_, _ = w.Write([]byte(`{"segmentBatchId":"batch","page":1,"pageSize":20,"total":2,"segments":[]}`))
 		default:
 			t.Errorf("unexpected path %s", r.URL.Path)
 		}
@@ -55,10 +48,6 @@ func TestClientStreamsOriginalAndReadsAnchor(t *testing.T) {
 	if err != nil || result.SegmentCount != 2 {
 		t.Fatalf("process=%+v %v", result, err)
 	}
-	page, err := client.List(context.Background(), ListInput{Page: 1, PageSize: 20})
-	if err != nil || page.Total != 2 {
-		t.Fatalf("page=%+v %v", page, err)
-	}
 }
 
 // TestClientFailureDoesNotExposeRemoteBody 验证未知错误响应映射为服务失败原因码。
@@ -68,7 +57,7 @@ func TestClientFailureDoesNotExposeRemoteBody(t *testing.T) {
 		_, _ = w.Write([]byte("secret document body"))
 	}))
 	defer server.Close()
-	_, err := NewClient(server.URL).List(context.Background(), ListInput{})
+	_, err := NewClient(server.URL).Process(context.Background(), ProcessInput{}, EmbeddingCredential{}, "sample.txt", strings.NewReader("text"))
 	var failure *Error
 	if !errors.As(err, &failure) || failure.Code != "service_failed" || strings.Contains(err.Error(), "secret") {
 		t.Fatalf("error=%v", err)

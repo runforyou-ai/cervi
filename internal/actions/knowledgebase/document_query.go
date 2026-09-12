@@ -14,17 +14,11 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// DocumentQuery 读取当前企业中的文档和可预览原件。
-type DocumentQuery struct {
-	db       *bun.DB
-	segments segmentReader
-}
+// DocumentQuery 读取当前企业中的文档、分段和可预览原件。
+type DocumentQuery struct{ db *bun.DB }
 
 // NewDocumentQuery 创建知识文档查询。
 func NewDocumentQuery(db *bun.DB) *DocumentQuery { return &DocumentQuery{db: db} }
-
-// SetSegmentReader 注入分段存储的读取接口。
-func (q *DocumentQuery) SetSegmentReader(reader segmentReader) { q.segments = reader }
 
 // List 按创建时间倒序返回分组文档。
 func (q *DocumentQuery) List(ctx context.Context, identity *servermodels.Identity, baseID string, input DocumentListInput) (DocumentListOutput, error) {

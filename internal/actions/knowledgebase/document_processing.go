@@ -19,12 +19,6 @@ import (
 
 const ProcessDocumentActionName = "knowledge.document.process"
 
-var (
-	ErrSegmentsNotReady    = errors.New("knowledge document segments are not ready")
-	ErrSegmentStale        = errors.New("knowledge document segment is stale")
-	ErrSegmentQueryInvalid = errors.New("knowledge segment query is invalid")
-)
-
 // DocumentProcessing 安排文档处理和重新处理。
 type DocumentProcessing struct {
 	db    *bun.DB
