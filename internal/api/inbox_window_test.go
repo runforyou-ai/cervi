@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"testing"
 
 	"github.com/runforyou-ai/cervi/internal/appservice"
@@ -35,13 +36,16 @@ func TestInboxWindowHTTP(t *testing.T) {
 	backend := &inboxWindowBackend{}
 	server := httptest.NewServer(NewService(appservice.New(backend)))
 	defer server.Close()
-	filter := appservice.InboxQuery{Scope: appservice.InboxScopeCustomer, CustomerView: appservice.CustomerInboxViewCoworkers, AssigneeIdentityID: "peer"}
+	filter := appservice.InboxQuery{
+		Scope: appservice.InboxScopeCustomer, CustomerView: appservice.CustomerInboxViewCoworkers, AssigneeIdentityID: "peer",
+		ChannelID: "channel", ServiceStatus: appservice.ServiceSessionStatusClosed, Kinds: []appservice.ConversationType{appservice.ConversationTypeCustomer},
+	}
 	contextInput := appservice.InboxContextInput{Query: filter, AnchorID: "anchor", AnchorCursor: "original", BeforeLimit: 7, AfterLimit: 9}
 	response := doJSON(t, http.MethodPost, server.URL+"/inbox/context/query", contextInput, "token")
 	var located appservice.InboxContext
 	err := json.NewDecoder(response.Body).Decode(&located)
 	response.Body.Close()
-	if response.StatusCode != http.StatusOK || err != nil || backend.contextInput != contextInput || located.Anchor.Conversation != nil || located.Anchor.Availability != appservice.InboxConversationUnavailable || !located.Window.HasBefore || !located.Window.HasAfter || located.Window.StartCursor != "first" || located.Window.EndCursor != "last" || located.Window.Conversations == nil {
+	if response.StatusCode != http.StatusOK || err != nil || !reflect.DeepEqual(backend.contextInput, contextInput) || located.Anchor.Conversation != nil || located.Anchor.Availability != appservice.InboxConversationUnavailable || !located.Window.HasBefore || !located.Window.HasAfter || located.Window.StartCursor != "first" || located.Window.EndCursor != "last" || located.Window.Conversations == nil {
 		t.Fatalf("context=%+v request=%+v err=%v", located, backend.contextInput, err)
 	}
 	windowInput := appservice.InboxWindowInput{Query: filter, StartCursor: "start", EndCursor: "end"}
@@ -49,7 +53,7 @@ func TestInboxWindowHTTP(t *testing.T) {
 	var window appservice.InboxWindow
 	err = json.NewDecoder(response.Body).Decode(&window)
 	response.Body.Close()
-	if response.StatusCode != http.StatusOK || err != nil || backend.windowInput != windowInput || window.StartCursor != "start" || window.EndCursor != "end" || !window.HasBefore || window.HasAfter || window.Conversations == nil {
+	if response.StatusCode != http.StatusOK || err != nil || !reflect.DeepEqual(backend.windowInput, windowInput) || window.StartCursor != "start" || window.EndCursor != "end" || !window.HasBefore || window.HasAfter || window.Conversations == nil {
 		t.Fatalf("window=%+v request=%+v err=%v", window, backend.windowInput, err)
 	}
 }

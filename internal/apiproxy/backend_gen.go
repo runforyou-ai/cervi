@@ -176,6 +176,14 @@ func (b *Backend) ListCustomerServiceAssignees(ctx context.Context, meta appserv
 	return output, err
 }
 
+// ListInboxChannels 返回收件箱渠道筛选候选，含已停用渠道。
+func (b *Backend) ListInboxChannels(ctx context.Context, meta appservice.RequestMeta) (appservice.InboxChannelList, error) {
+	var output appservice.InboxChannelList
+	err := b.do(ctx, meta, http.MethodGet, "/inbox/channels", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // ListConversationMessages 返回成员可见的会话消息。
 func (b *Backend) ListConversationMessages(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.ConversationMessageListInput) (appservice.ConversationMessageList, error) {
 	var output appservice.ConversationMessageList
@@ -1190,6 +1198,9 @@ func encodeLoadInboxInputQuery(input appservice.LoadInboxInput) url.Values {
 	setQuery(query, "scope", string(input.Scope))
 	setQuery(query, "customerView", string(input.CustomerView))
 	setQuery(query, "assigneeIdentityId", input.AssigneeIdentityID)
+	setQuery(query, "channelId", input.ChannelID)
+	setQuery(query, "serviceStatus", string(input.ServiceStatus))
+	setListQuery(query, "kinds", input.Kinds)
 	setQuery(query, "cursor", input.Cursor)
 	setQuery(query, "beforeCursor", input.BeforeCursor)
 	setPositiveQuery(query, "limit", input.Limit)

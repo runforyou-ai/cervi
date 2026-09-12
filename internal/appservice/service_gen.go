@@ -114,6 +114,11 @@ func (s *Service) ListCustomerServiceAssignees(ctx context.Context, meta Request
 	return withNormalizedSlices(s.backend.ListCustomerServiceAssignees(ctx, meta))
 }
 
+// ListInboxChannels 返回收件箱渠道筛选候选，含已停用渠道。
+func (s *Service) ListInboxChannels(ctx context.Context, meta RequestMeta) (InboxChannelList, error) {
+	return withNormalizedSlices(s.backend.ListInboxChannels(ctx, meta))
+}
+
 // ListConversationMessages 返回成员可见的会话消息。
 func (s *Service) ListConversationMessages(ctx context.Context, meta RequestMeta, conversationID string, input ConversationMessageListInput) (ConversationMessageList, error) {
 	return withNormalizedSlices(s.backend.ListConversationMessages(ctx, meta, conversationID, input))

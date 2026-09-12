@@ -1,7 +1,7 @@
 /** 用可控响应顺序验证分页、窗口刷新与查询代次隔离。 */
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { InboxListController, normalizeInboxListQuery, type InboxListPorts } from "../src/features/inbox/inbox-list-controller.ts"
+import { InboxListController, type InboxListPorts } from "../src/features/inbox/inbox-list-controller.ts"
 import type { InboxConversation, InboxQuery } from "../src/api/index.ts"
 
 /** 构造保持服务端精度的排序位置。 */
@@ -211,10 +211,6 @@ test("读取期间用户离开顶部或操作菜单时不自动回顶重排", as
   await f.controller.request("refresh")
   assert.equal(f.restored()![2], true)
   assert.equal(f.controller.getSnapshot().attentionUnreadCount, 88)
-})
-
-test("无关客户参数不产生不同内部查询身份", () => {
-  assert.deepEqual(normalizeInboxListQuery({ scope: "internal", customerView: "coworkers", assigneeIdentityId: "someone" } as InboxQuery), { scope: "internal", customerView: "queue", assigneeIdentityId: "" })
 })
 
 test("独立详情先失权时仅移除该行，并阻止旧窗口读取恢复它", async () => {

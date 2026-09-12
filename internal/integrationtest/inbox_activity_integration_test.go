@@ -320,7 +320,7 @@ func TestInboxTelegramActivity(t *testing.T) {
 	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, coordinator).Execute(ctx, f.owner, telegram.ID); err != nil {
 		t.Fatal(err)
 	}
-	closedPage, counts, err := query.Execute(ctx, f.owner, inboxaction.LoadInput{Scope: domain.InboxScopeCustomer, CustomerView: domain.CustomerInboxViewClosed})
+	closedPage, counts, err := query.Execute(ctx, f.owner, inboxaction.LoadInput{Scope: domain.InboxScopeCustomer, CustomerView: domain.CustomerInboxViewQueue, ServiceStatus: domain.ServiceSessionStatusClosed})
 	closed := closedPage.Conversations
 	if err != nil || len(closed) != 1 || !closed[0].LastActivityAt.Equal(*telegram.LastActivityAt) || closed[0].UnreadCount != 0 || counts.Attention != 0 {
 		t.Fatalf("closed=%+v counts=%+v err=%v", closed, counts, err)

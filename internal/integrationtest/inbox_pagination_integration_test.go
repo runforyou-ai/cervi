@@ -29,16 +29,32 @@ import (
 	"github.com/uptrace/bun"
 )
 
+// customerInboxFilter 描述一组客户会话筛选及其固定名称。
+type customerInboxFilter struct {
+	name  string
+	input inboxaction.LoadInput
+}
+
+// customerInboxFilters 返回覆盖处理归属与服务状态组合的客户会话筛选。
+func customerInboxFilters() []customerInboxFilter {
+	return []customerInboxFilter{
+		{"queue", inboxaction.LoadInput{Scope: domain.InboxScopeCustomer, CustomerView: domain.CustomerInboxViewQueue}},
+		{"mine", inboxaction.LoadInput{Scope: domain.InboxScopeCustomer, CustomerView: domain.CustomerInboxViewMine}},
+		{"coworkers", inboxaction.LoadInput{Scope: domain.InboxScopeCustomer, CustomerView: domain.CustomerInboxViewCoworkers}},
+		{"closed", inboxaction.LoadInput{Scope: domain.InboxScopeCustomer, CustomerView: domain.CustomerInboxViewMine, ServiceStatus: domain.ServiceSessionStatusClosed}},
+	}
+}
+
 type inboxPaginationFixture struct {
 	customerReadFixture
 	internalIDs []string
-	customerIDs map[domain.CustomerInboxView][]string
+	customerIDs map[string][]string
 }
 
 // newInboxPaginationFixture 用真实创建和发送入口建立四类各六十条会话。
 func newInboxPaginationFixture(t *testing.T) inboxPaginationFixture {
 	t.Helper()
-	f := inboxPaginationFixture{customerReadFixture: newCustomerReadFixture(t), customerIDs: make(map[domain.CustomerInboxView][]string)}
+	f := inboxPaginationFixture{customerReadFixture: newCustomerReadFixture(t), customerIDs: make(map[string][]string)}
 	ctx := context.Background()
 	provider := &servermodels.AIProvider{OrganizationID: f.owner.Organization.ID, Brand: "openai", Name: "分页模型", APIKey: "test", APIURL: "https://example.com/v1"}
 	if _, err := f.db.NewInsert().Model(provider).Column("organization_id", "brand", "name", "api_key", "api_url").Returning("id").Exec(ctx); err != nil {
@@ -57,7 +73,7 @@ func newInboxPaginationFixture(t *testing.T) inboxPaginationFixture {
 		t.Fatal(err)
 	}
 	startAgent := conversationaction.NewSendFirstAgentTextMessageAction(f.db, agentrunaction.NewScheduler(tasks))
-	views := []domain.CustomerInboxView{domain.CustomerInboxViewQueue, domain.CustomerInboxViewMine, domain.CustomerInboxViewCoworkers, domain.CustomerInboxViewClosed}
+	buckets := []string{"queue", "mine", "coworkers", "closed"}
 	for index := range 60 {
 		peer, err := useraction.NewCreateUserAction(f.db).Execute(ctx, f.owner, useraction.CreateInput{DisplayName: fmt.Sprintf("分页成员 %d", index), Email: fmt.Sprintf("page%d@test.example", index), Password: "password123", RoleID: f.member.OrganizationIdentity.RoleID})
 		if err != nil {
@@ -85,23 +101,23 @@ func newInboxPaginationFixture(t *testing.T) inboxPaginationFixture {
 			}
 			customerID = customer.Conversation.ID
 		}
-		view := views[index%len(views)]
-		if view != domain.CustomerInboxViewQueue {
+		bucket := buckets[index%len(buckets)]
+		if bucket != "queue" {
 			assignee := f.owner
-			if view == domain.CustomerInboxViewCoworkers {
+			if bucket == "coworkers" {
 				assignee = f.member
 			}
 			if _, err := conversationaction.NewClaimServiceSessionAction(f.db, nil).Execute(ctx, assignee, customerID); err != nil {
 				t.Fatal(err)
 			}
-			if view == domain.CustomerInboxViewClosed {
+			if bucket == "closed" {
 				if _, err := conversationaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil)).Execute(ctx, assignee, customerID); err != nil {
 					t.Fatal(err)
 				}
 			}
 		}
 		f.internalIDs = append(f.internalIDs, direct.Conversation.ID, ai.Conversation.ID, groupID)
-		f.customerIDs[view] = append(f.customerIDs[view], customerID)
+		f.customerIDs[bucket] = append(f.customerIDs[bucket], customerID)
 		// 每批四种类型共享微秒时间，定期插入空时间以覆盖完整空值分区。
 		var activity *time.Time
 		if index%7 != 0 {
@@ -133,21 +149,22 @@ func TestInboxPagination(t *testing.T) {
 		input inboxaction.LoadInput
 		ids   []string
 	}{
-		{"all", inboxaction.LoadInput{}, append(slices.Clone(f.internalIDs), f.customerIDs[domain.CustomerInboxViewMine]...)},
+		{"all", inboxaction.LoadInput{}, append(slices.Clone(f.internalIDs), f.customerIDs["mine"]...)},
 		{"internal", inboxaction.LoadInput{Scope: domain.InboxScopeInternal, Limit: 17}, f.internalIDs},
 	}
-	for _, view := range []domain.CustomerInboxView{domain.CustomerInboxViewQueue, domain.CustomerInboxViewMine, domain.CustomerInboxViewCoworkers, domain.CustomerInboxViewClosed} {
+	for _, filter := range customerInboxFilters() {
+		filter.input.Limit = 4
 		cases = append(cases, struct {
 			name  string
 			input inboxaction.LoadInput
 			ids   []string
-		}{string(view), inboxaction.LoadInput{Scope: domain.InboxScopeCustomer, CustomerView: view, Limit: 4}, f.customerIDs[view]})
+		}{filter.name, filter.input, f.customerIDs[filter.name]})
 	}
 	cases = append(cases, struct {
 		name  string
 		input inboxaction.LoadInput
 		ids   []string
-	}{"assignee", inboxaction.LoadInput{Scope: domain.InboxScopeCustomer, CustomerView: domain.CustomerInboxViewCoworkers, AssigneeIdentityID: f.member.OrganizationIdentity.ID, Limit: 3}, f.customerIDs[domain.CustomerInboxViewCoworkers]})
+	}{"assignee", inboxaction.LoadInput{Scope: domain.InboxScopeCustomer, CustomerView: domain.CustomerInboxViewCoworkers, AssigneeIdentityID: f.member.OrganizationIdentity.ID, Limit: 3}, f.customerIDs["coworkers"]})
 	cases = append(cases, struct {
 		name  string
 		input inboxaction.LoadInput

@@ -5,6 +5,7 @@ package inbox
 import (
 	"encoding/base64"
 	"encoding/json"
+	"slices"
 	"strings"
 	"time"
 
@@ -40,12 +41,15 @@ type inboxCursorPoint struct {
 // inboxCursor 将排序边界绑定到当前企业、用户和规范化筛选。
 type inboxCursor struct {
 	inboxCursorPoint
-	Version            int                      `json:"version"`
-	OrganizationID     string                   `json:"organizationId"`
-	UserID             string                   `json:"userId"`
-	Scope              domain.InboxScope        `json:"scope"`
-	CustomerView       domain.CustomerInboxView `json:"customerView"`
-	AssigneeIdentityID string                   `json:"assigneeIdentityId"`
+	Version            int                         `json:"version"`
+	OrganizationID     string                      `json:"organizationId"`
+	UserID             string                      `json:"userId"`
+	Scope              domain.InboxScope           `json:"scope"`
+	CustomerView       domain.CustomerInboxView    `json:"customerView"`
+	AssigneeIdentityID string                      `json:"assigneeIdentityId"`
+	ChannelID          string                      `json:"channelId"`
+	ServiceStatus      domain.ServiceSessionStatus `json:"serviceStatus"`
+	Kinds              []domain.ConversationType   `json:"kinds"`
 }
 
 // encodeInboxCursor 编码原始活动边界、身份范围和排序版本。
@@ -54,6 +58,7 @@ func encodeInboxCursor(identity *servermodels.Identity, input LoadInput, point i
 		inboxCursorPoint: point, Version: inboxSortVersion,
 		OrganizationID: identity.Organization.ID, UserID: identity.User.ID,
 		Scope: input.Scope, CustomerView: input.CustomerView, AssigneeIdentityID: input.AssigneeIdentityID,
+		ChannelID: input.ChannelID, ServiceStatus: input.ServiceStatus, Kinds: input.Kinds,
 	})
 	if err != nil {
 		return "", err
@@ -71,6 +76,7 @@ func decodeInboxCursor(value string, identity *servermodels.Identity, input Load
 	if json.Unmarshal(data, &cursor) != nil || cursor.Version != inboxSortVersion ||
 		cursor.OrganizationID != identity.Organization.ID || cursor.UserID != identity.User.ID ||
 		cursor.Scope != input.Scope || cursor.CustomerView != input.CustomerView || cursor.AssigneeIdentityID != input.AssigneeIdentityID ||
+		cursor.ChannelID != input.ChannelID || cursor.ServiceStatus != input.ServiceStatus || !slices.Equal(cursor.Kinds, input.Kinds) ||
 		!common.ValidUUID(cursor.ID) {
 		return nil, ErrCursorInvalid
 	}

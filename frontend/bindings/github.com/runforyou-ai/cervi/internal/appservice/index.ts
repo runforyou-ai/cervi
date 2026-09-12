@@ -167,6 +167,8 @@ export type {
     ImageFile,
     Inbox,
     InboxAssignee,
+    InboxChannel,
+    InboxChannelList,
     InboxContext,
     InboxContextInput,
     InboxConversation,

@@ -241,6 +241,16 @@ func (b *DirectBackend) ListCustomerServiceAssignees(ctx context.Context, meta R
 	return b.ops.ListCustomerServiceAssignees(ctx, meta, identity)
 }
 
+// ListInboxChannels 返回收件箱渠道筛选候选，含已停用渠道。
+func (b *DirectBackend) ListInboxChannels(ctx context.Context, meta RequestMeta) (InboxChannelList, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero InboxChannelList
+		return zero, err
+	}
+	return b.ops.ListInboxChannels(ctx, meta, identity)
+}
+
 // ListConversationMessages 返回成员可见的会话消息。
 func (b *DirectBackend) ListConversationMessages(ctx context.Context, meta RequestMeta, conversationID string, input ConversationMessageListInput) (ConversationMessageList, error) {
 	identity, err := b.ops.authenticate(ctx, meta)

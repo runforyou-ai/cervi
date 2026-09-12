@@ -7,6 +7,7 @@ import (
 	"context"
 	"database/sql"
 	"fmt"
+	"slices"
 	"strings"
 	"time"
 
@@ -27,6 +28,14 @@ type LoadInput struct {
 	Scope              domain.InboxScope
 	CustomerView       domain.CustomerInboxView
 	AssigneeIdentityID string
+	ChannelID          string
+	ServiceStatus      domain.ServiceSessionStatus
+	Kinds              []domain.ConversationType
+}
+
+// includesKind 判断会话类型是否属于当前筛选，未选类型表示不限类型。
+func (input LoadInput) includesKind(kind domain.ConversationType) bool {
+	return len(input.Kinds) == 0 || slices.Contains(input.Kinds, kind)
 }
 
 // AssigneeSummary 定义客户会话负责人摘要。
@@ -310,6 +319,9 @@ func (q *LoadInboxQuery) customerConversationDetailsQuery(organizationID, curren
 // filterCustomerInbox 为客户摘要追加当前列表的筛选条件。
 func filterCustomerInbox(query *bun.SelectQuery, currentIdentityID string, input LoadInput) *bun.SelectQuery {
 	query = query.Where("msg.id IS NOT NULL")
+	if input.ChannelID != "" {
+		query = query.Where("cci.channel_id = ?", input.ChannelID)
+	}
 	if input.Scope == domain.InboxScopeAll {
 		query = query.
 			Where("current.status = ?", domain.ServiceSessionStatusOpen).
@@ -328,20 +340,19 @@ func filterCustomerInbox(query *bun.SelectQuery, currentIdentityID string, input
 				)
 			)`, currentIdentityID, domain.ChatSubjectKindOrganizationIdentity, currentIdentityID)
 	} else {
+		// 服务状态与处理归属是两个正交条件，同时收窄同一批客户会话。
+		query = query.Where("current.status = ?", input.ServiceStatus)
 		switch input.CustomerView {
 		case domain.CustomerInboxViewQueue:
-			query = query.Where("current.status = ?", domain.ServiceSessionStatusOpen).Where("current.assignee_identity_id IS NULL")
+			query = query.Where("current.assignee_identity_id IS NULL")
 		case domain.CustomerInboxViewMine:
-			query = query.Where("current.status = ?", domain.ServiceSessionStatusOpen).Where("current.assignee_identity_id = ?", currentIdentityID)
+			query = query.Where("current.assignee_identity_id = ?", currentIdentityID)
 		case domain.CustomerInboxViewCoworkers:
-			query = query.Where("current.status = ?", domain.ServiceSessionStatusOpen).
-				Where("current.assignee_identity_id IS NOT NULL").
+			query = query.Where("current.assignee_identity_id IS NOT NULL").
 				Where("current.assignee_identity_id <> ?", currentIdentityID)
 			if input.AssigneeIdentityID != "" {
 				query = query.Where("current.assignee_identity_id = ?", input.AssigneeIdentityID)
 			}
-		case domain.CustomerInboxViewClosed:
-			query = query.Where("current.status = ?", domain.ServiceSessionStatusClosed)
 		}
 	}
 	return query
@@ -513,25 +524,77 @@ func (row groupConversationRow) summary() ConversationSummary {
 	}
 }
 
+// inboxKindsForScope 返回当前范围内可筛选的会话类型，顺序用于规范化筛选值。
+func inboxKindsForScope(scope domain.InboxScope) []domain.ConversationType {
+	switch scope {
+	case domain.InboxScopeCustomer:
+		return []domain.ConversationType{domain.ConversationTypeCustomer}
+	case domain.InboxScopeInternal:
+		return []domain.ConversationType{domain.ConversationTypeDirect, domain.ConversationTypeGroup, domain.ConversationTypeAgent}
+	default:
+		return []domain.ConversationType{domain.ConversationTypeCustomer, domain.ConversationTypeDirect, domain.ConversationTypeGroup, domain.ConversationTypeAgent}
+	}
+}
+
+// normalizeInboxKinds 校验会话类型属于当前范围，并按固定顺序去重；覆盖全部类型等同不限类型。
+func normalizeInboxKinds(scope domain.InboxScope, kinds []domain.ConversationType) ([]domain.ConversationType, error) {
+	if len(kinds) == 0 {
+		return nil, nil
+	}
+	available := inboxKindsForScope(scope)
+	selected := make(map[domain.ConversationType]bool, len(kinds))
+	for _, kind := range kinds {
+		if !slices.Contains(available, kind) {
+			return nil, ErrQueryInvalid
+		}
+		selected[kind] = true
+	}
+	if len(selected) == len(available) {
+		return nil, nil
+	}
+	normalized := make([]domain.ConversationType, 0, len(selected))
+	for _, kind := range available {
+		if selected[kind] {
+			normalized = append(normalized, kind)
+		}
+	}
+	return normalized, nil
+}
+
 // normalizeLoadInput 规范化并校验收件箱筛选。
 func normalizeLoadInput(input LoadInput) (LoadInput, error) {
 	input.Scope = domain.InboxScope(strings.TrimSpace(string(input.Scope)))
 	input.CustomerView = domain.CustomerInboxView(strings.TrimSpace(string(input.CustomerView)))
+	input.ServiceStatus = domain.ServiceSessionStatus(strings.TrimSpace(string(input.ServiceStatus)))
 	input.AssigneeIdentityID = strings.TrimSpace(input.AssigneeIdentityID)
+	input.ChannelID = strings.TrimSpace(input.ChannelID)
 	if input.Scope == "" {
 		input.Scope = domain.InboxScopeAll
 	}
-	if input.Scope == domain.InboxScopeCustomer && input.CustomerView == "" {
-		input.CustomerView = domain.CustomerInboxViewQueue
-	}
-	if (input.Scope != domain.InboxScopeAll && input.Scope != domain.InboxScopeCustomer && input.Scope != domain.InboxScopeInternal) ||
-		(input.Scope == domain.InboxScopeCustomer && input.CustomerView != domain.CustomerInboxViewQueue && input.CustomerView != domain.CustomerInboxViewMine && input.CustomerView != domain.CustomerInboxViewCoworkers && input.CustomerView != domain.CustomerInboxViewClosed) ||
-		(input.AssigneeIdentityID != "" && (input.Scope != domain.InboxScopeCustomer || input.CustomerView != domain.CustomerInboxViewCoworkers || !common.ValidUUID(input.AssigneeIdentityID))) {
+	if input.Scope != domain.InboxScopeAll && input.Scope != domain.InboxScopeCustomer && input.Scope != domain.InboxScopeInternal {
 		return input, ErrQueryInvalid
 	}
-
+	kinds, err := normalizeInboxKinds(input.Scope, input.Kinds)
+	if err != nil {
+		return input, err
+	}
+	input.Kinds = kinds
 	if input.Scope != domain.InboxScopeCustomer {
+		// 处理归属、渠道和服务状态只描述客户队列，其他范围一律按空条件读取。
+		input.CustomerView, input.AssigneeIdentityID, input.ChannelID, input.ServiceStatus = "", "", "", ""
+		return input, nil
+	}
+	if input.CustomerView == "" {
 		input.CustomerView = domain.CustomerInboxViewQueue
+	}
+	if input.ServiceStatus == "" {
+		input.ServiceStatus = domain.ServiceSessionStatusOpen
+	}
+	if (input.CustomerView != domain.CustomerInboxViewQueue && input.CustomerView != domain.CustomerInboxViewMine && input.CustomerView != domain.CustomerInboxViewCoworkers) ||
+		(input.ServiceStatus != domain.ServiceSessionStatusOpen && input.ServiceStatus != domain.ServiceSessionStatusClosed) ||
+		(input.ChannelID != "" && !common.ValidUUID(input.ChannelID)) ||
+		(input.AssigneeIdentityID != "" && (input.CustomerView != domain.CustomerInboxViewCoworkers || !common.ValidUUID(input.AssigneeIdentityID))) {
+		return input, ErrQueryInvalid
 	}
 	return input, nil
 }

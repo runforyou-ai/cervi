@@ -5,10 +5,13 @@ import { MessagesSquareIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
 import {
+  ConversationType,
   CustomerInboxView,
   InboxScope,
   OrganizationIdentityType,
+  ServiceSessionStatus,
   listCustomerServiceAssignees,
+  listInboxChannels,
   markConversationRead,
   type AgentInboxConversationData,
   type DirectInboxConversationData,
@@ -35,6 +38,7 @@ import { CreateGroupConversationDialog } from "@/features/inbox/create-group-con
 import { InboxConversationList } from "@/features/inbox/inbox-conversation-list"
 import { InboxConversationTarget } from "@/features/inbox/inbox-conversation-target"
 import { InboxCustomerQueueFilter } from "@/features/inbox/inbox-customer-queue-filter"
+import { InboxFilter } from "@/features/inbox/inbox-filter"
 import { InboxListPanel } from "@/features/inbox/inbox-list-panel"
 import { InboxPaneTop } from "@/features/inbox/inbox-pane-top"
 import { InboxScopeRail } from "@/features/inbox/inbox-scope-rail"
@@ -70,6 +74,9 @@ export function InboxPage({
   scope,
   customerView,
   assigneeIdentityId,
+  channelId,
+  serviceStatus,
+  kinds,
   selectedConversationId,
   targetIdentityId,
   onSelectedConversationChange,
@@ -80,6 +87,9 @@ export function InboxPage({
   scope: InboxScope
   customerView: CustomerInboxView
   assigneeIdentityId: string
+  channelId: string
+  serviceStatus: ServiceSessionStatus
+  kinds: ConversationType[]
   selectedConversationId: string
   targetIdentityId: string
   onSelectedConversationChange: (
@@ -90,6 +100,9 @@ export function InboxPage({
     scope?: InboxScope
     customerView?: CustomerInboxView
     assigneeIdentityId?: string
+    channelId?: string
+    serviceStatus?: ServiceSessionStatus
+    kinds?: ConversationType[]
     conversationId?: string
     replace?: boolean
   }) => void
@@ -127,6 +140,11 @@ export function InboxPage({
   const { data: customerServiceAssignees = [] } = useResource(
     resourceKeys.customerServiceAssignees(),
     () => listCustomerServiceAssignees(),
+    { enabled: scope === InboxScope.InboxScopeCustomer },
+  )
+  const { data: channels = [] } = useResource(
+    resourceKeys.inboxChannels(),
+    () => listInboxChannels(),
     { enabled: scope === InboxScope.InboxScopeCustomer },
   )
 
@@ -231,49 +249,55 @@ export function InboxPage({
   ) : null
 
   const pane = (
-    <div className="flex min-h-0 flex-1 flex-col">
-      <InboxPaneTop
-        railCollapsed={railCollapsed}
-        onRailToggle={() => setRailCollapsed((collapsed) => !collapsed)}
-        onCreateGroup={() => setGroupDialogOpen(true)}
-        onCreateAgent={() => setAgentDialogOpen(true)}
-      />
-      <div className="flex min-h-0 flex-1">
-        {railCollapsed ? null : (
-          <InboxScopeRail
-            scope={scope}
-            attentionUnreadCount={attentionUnreadCount}
-            onScopeChange={(nextScope) => {
-              setChatDraft(null)
-              onQueryChange({ scope: nextScope })
-            }}
+    <div className="flex min-h-0 flex-1">
+      {railCollapsed ? null : (
+        <InboxScopeRail
+          scope={scope}
+          attentionUnreadCount={attentionUnreadCount}
+          onScopeChange={(nextScope) => {
+            setChatDraft(null)
+            onQueryChange({ scope: nextScope })
+          }}
+        />
+      )}
+      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+        <InboxPaneTop
+          railCollapsed={railCollapsed}
+          onRailToggle={() => setRailCollapsed((collapsed) => !collapsed)}
+          onCreateGroup={() => setGroupDialogOpen(true)}
+          onCreateAgent={() => setAgentDialogOpen(true)}
+          filter={
+            <InboxFilter
+              scope={scope}
+              value={{ channelId, serviceStatus, kinds }}
+              channels={channels}
+              onChange={onQueryChange}
+            />
+          }
+        />
+        {scope === InboxScope.InboxScopeCustomer ? (
+          <InboxCustomerQueueFilter
+            view={customerView}
+            assigneeIdentityId={assigneeIdentityId}
+            assignees={customerServiceAssignees}
+            currentIdentityId={identity.user.identityId}
+            onChange={(nextView, nextAssigneeIdentityId = "") =>
+              onQueryChange({
+                customerView: nextView,
+                assigneeIdentityId: nextAssigneeIdentityId,
+              })
+            }
           />
-        )}
-        <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-          {scope === InboxScope.InboxScopeCustomer ? (
-            <InboxCustomerQueueFilter
-              view={customerView}
-              assigneeIdentityId={assigneeIdentityId}
-              assignees={customerServiceAssignees}
-              currentIdentityId={identity.user.identityId}
-              onChange={(nextView, nextAssigneeIdentityId = "") =>
-                onQueryChange({
-                  customerView: nextView,
-                  assigneeIdentityId: nextAssigneeIdentityId,
-                })
-              }
-            />
-          ) : null}
-          <InboxListPanel list={list} viewport={listViewport} detailError={Boolean(summary.error)} retryDetail={() => void summary.refresh()}>
-            <InboxConversationList
-              conversations={conversations}
-              onMenuChange={listViewport.setMenu}
-              selectedId={selectedConversation?.id}
-              onSelect={selectConversation}
-              onMarkRead={markConversationAsRead}
-            />
-          </InboxListPanel>
-        </div>
+        ) : null}
+        <InboxListPanel list={list} viewport={listViewport} detailError={Boolean(summary.error)} retryDetail={() => void summary.refresh()}>
+          <InboxConversationList
+            conversations={conversations}
+            onMenuChange={listViewport.setMenu}
+            selectedId={selectedConversation?.id}
+            onSelect={selectConversation}
+            onMarkRead={markConversationAsRead}
+          />
+        </InboxListPanel>
       </div>
     </div>
   )

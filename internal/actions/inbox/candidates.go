@@ -71,11 +71,19 @@ func (q *LoadInboxQuery) agentConversationsQuery(organizationID, identityID stri
 func (q *LoadInboxQuery) listCandidates(identity *servermodels.Identity, input LoadInput) *bun.SelectQuery {
 	organizationID, identityID := identity.Organization.ID, identity.OrganizationIdentity.ID
 	queries := make([]*bun.SelectQuery, 0, 4)
-	if input.Scope != domain.InboxScopeInternal {
+	if input.Scope != domain.InboxScopeInternal && input.includesKind(domain.ConversationTypeCustomer) {
 		queries = append(queries, filterCustomerInbox(q.customerConversationAccessQuery(organizationID), identityID, input))
 	}
 	if input.Scope != domain.InboxScopeCustomer {
-		queries = append(queries, q.directConversationsQuery(organizationID, identityID), q.agentConversationsQuery(organizationID, identityID), q.groupConversationAccessQuery(organizationID, identityID))
+		if input.includesKind(domain.ConversationTypeDirect) {
+			queries = append(queries, q.directConversationsQuery(organizationID, identityID))
+		}
+		if input.includesKind(domain.ConversationTypeAgent) {
+			queries = append(queries, q.agentConversationsQuery(organizationID, identityID))
+		}
+		if input.includesKind(domain.ConversationTypeGroup) {
+			queries = append(queries, q.groupConversationAccessQuery(organizationID, identityID))
+		}
 	}
 	candidate := queries[0]
 	for _, query := range queries[1:] {

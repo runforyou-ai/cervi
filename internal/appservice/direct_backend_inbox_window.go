@@ -6,14 +6,13 @@ import (
 	"context"
 
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
-	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
 // GetInboxContext 读取锚点当前资格与同一快照内的列表邻域。
 func (o *directOperations) GetInboxContext(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input InboxContextInput) (InboxContext, error) {
 	result, err := o.loadInbox.ReadContext(ctx, identity, inboxaction.ContextInput{
-		Query:    inboxaction.LoadInput{Scope: domain.InboxScope(input.Query.Scope), CustomerView: domain.CustomerInboxView(input.Query.CustomerView), AssigneeIdentityID: input.Query.AssigneeIdentityID},
+		Query:    inboxLoadInput(input.Query),
 		AnchorID: input.AnchorID, AnchorCursor: input.AnchorCursor, BeforeLimit: input.BeforeLimit, AfterLimit: input.AfterLimit,
 	})
 	if err != nil {
@@ -46,7 +45,7 @@ func (o *directOperations) GetInboxContext(ctx context.Context, meta RequestMeta
 // ReadInboxWindow 按原始边界重读完整连续范围。
 func (o *directOperations) ReadInboxWindow(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input InboxWindowInput) (InboxWindow, error) {
 	window, err := o.loadInbox.ReadWindow(ctx, identity, inboxaction.ReadWindowInput{
-		Query:       inboxaction.LoadInput{Scope: domain.InboxScope(input.Query.Scope), CustomerView: domain.CustomerInboxView(input.Query.CustomerView), AssigneeIdentityID: input.Query.AssigneeIdentityID},
+		Query:       inboxLoadInput(input.Query),
 		StartCursor: input.StartCursor, EndCursor: input.EndCursor,
 	})
 	if err != nil {

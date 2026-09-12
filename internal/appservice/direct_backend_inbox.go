@@ -6,6 +6,8 @@ import (
 	"context"
 	"errors"
 	"log/slog"
+	"slices"
+	"strings"
 
 	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
@@ -32,9 +34,24 @@ func newInboxOps(db *bun.DB, taskEnqueuer servertask.TxEnqueuer) inboxOps {
 	}
 }
 
+// inboxLoadInput 把传输契约中的会话筛选转换为收件箱查询条件。
+func inboxLoadInput(query InboxQuery) inboxaction.LoadInput {
+	kinds := make([]domain.ConversationType, 0, len(query.Kinds))
+	for _, kind := range query.Kinds {
+		kinds = append(kinds, domain.ConversationType(kind))
+	}
+	return inboxaction.LoadInput{
+		Scope: domain.InboxScope(query.Scope), CustomerView: domain.CustomerInboxView(query.CustomerView),
+		AssigneeIdentityID: query.AssigneeIdentityID, ChannelID: query.ChannelID,
+		ServiceStatus: domain.ServiceSessionStatus(query.ServiceStatus), Kinds: kinds,
+	}
+}
+
 // LoadInbox 返回当前企业的统一会话工作队列。
 func (o *directOperations) LoadInbox(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input LoadInboxInput) (Inbox, error) {
-	page, unreadCounts, err := o.loadInbox.Execute(ctx, identity, inboxaction.LoadInput{Scope: domain.InboxScope(input.Scope), CustomerView: domain.CustomerInboxView(input.CustomerView), AssigneeIdentityID: input.AssigneeIdentityID, Cursor: input.Cursor, BeforeCursor: input.BeforeCursor, Limit: input.Limit})
+	loadInput := inboxLoadInput(input.query())
+	loadInput.Cursor, loadInput.BeforeCursor, loadInput.Limit = input.Cursor, input.BeforeCursor, input.Limit
+	page, unreadCounts, err := o.loadInbox.Execute(ctx, identity, loadInput)
 	if err != nil {
 		return Inbox{}, inboxReadError(ctx, meta, identity.Organization.ID, "列表", err)
 	}
@@ -170,7 +187,8 @@ func (o *directOperations) GetInboxConversation(ctx context.Context, meta Reques
 
 // ReadInboxConversations 在每项中区分匹配、筛选外可读及不可用的会话。
 func (o *directOperations) ReadInboxConversations(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input ReadInboxConversationsInput) (InboxConversationResults, error) {
-	results, err := o.loadInbox.ReadByIDs(ctx, identity, input.ConversationIDs, &inboxaction.LoadInput{Scope: domain.InboxScope(input.Query.Scope), CustomerView: domain.CustomerInboxView(input.Query.CustomerView), AssigneeIdentityID: input.Query.AssigneeIdentityID})
+	query := inboxLoadInput(input.Query)
+	results, err := o.loadInbox.ReadByIDs(ctx, identity, input.ConversationIDs, &query)
 	if err != nil {
 		return InboxConversationResults{}, inboxReadError(ctx, meta, identity.Organization.ID, "批量摘要", err)
 	}
@@ -199,6 +217,31 @@ func (o *directOperations) ReadInboxConversations(ctx context.Context, meta Requ
 		output.Results = append(output.Results, item)
 	}
 	return output, nil
+}
+
+// ListInboxChannels 返回渠道筛选候选，包含已停用渠道。
+func (o *directOperations) ListInboxChannels(ctx context.Context, meta RequestMeta, identity *servermodels.Identity) (InboxChannelList, error) {
+	records, err := o.listMessageChannels.Execute(ctx, identity)
+	if err != nil {
+		if ctx.Err() != nil {
+			return InboxChannelList{}, ctx.Err()
+		}
+		slog.Warn("读取收件箱渠道候选失败", "organization_id", identity.Organization.ID, "error", err)
+		return InboxChannelList{}, FailedError(meta, cervii18n.ErrorChannelListFailed)
+	}
+	channels := make([]InboxChannel, 0, len(records))
+	for _, record := range records {
+		channels = append(channels, InboxChannel{ID: record.ID, Type: ChannelType(record.Type), Name: record.Name, Enabled: record.Enabled})
+	}
+	// 候选按渠道类型的既定顺序排列，同类型内按名称排序。
+	order := domain.MessageChannelTypes()
+	slices.SortStableFunc(channels, func(left, right InboxChannel) int {
+		if position := slices.Index(order, domain.ChannelType(left.Type)) - slices.Index(order, domain.ChannelType(right.Type)); position != 0 {
+			return position
+		}
+		return strings.Compare(left.Name, right.Name)
+	})
+	return InboxChannelList{Channels: channels}, nil
 }
 
 // inboxReadError 统一转换收件箱读取错误，并记录失败的查询入口。

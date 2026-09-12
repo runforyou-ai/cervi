@@ -18,6 +18,7 @@ import {
   ListConversationMessages,
   MarkConversationRead,
   ListCustomerServiceAssignees,
+  ListInboxChannels,
   LoadInbox,
   GetInboxContext,
   ReadInboxWindow,
@@ -70,6 +71,7 @@ import type {
   GroupInboxConversation,
   GroupTextMessageInput,
   Inbox,
+  InboxChannel,
   ReadInboxConversationsInput,
   InboxConversation,
   LoadInboxInput,
@@ -83,6 +85,7 @@ import {
   ConversationType,
   CustomerInboxView,
   InboxScope,
+  ServiceSessionStatus,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import { bind } from "@/api/client"
 import { enqueueConversationUnreadChange } from "@/api/conversation-read-queue"
@@ -161,6 +164,7 @@ const leaveGroupConversationBound = bind(LeaveGroupConversation)
 const dissolveGroupConversationBound = bind(DissolveGroupConversation)
 const sendGroupTextMessageBound = bind(SendGroupTextMessage)
 const listCustomerServiceAssigneesBound = bind(ListCustomerServiceAssignees)
+const listInboxChannelsBound = bind(ListInboxChannels)
 const claimServiceSessionBound = bind(ClaimServiceSession)
 const transferServiceSessionBound = bind(TransferServiceSession)
 const closeServiceSessionBound = bind(CloseServiceSession)
@@ -236,6 +240,9 @@ export async function loadInbox(
     customerView:
       query.customerView ?? CustomerInboxView.CustomerInboxViewQueue,
     assigneeIdentityId: query.assigneeIdentityId ?? "",
+    channelId: query.channelId ?? "",
+    serviceStatus: query.serviceStatus ?? ServiceSessionStatus.ServiceSessionStatusOpen,
+    kinds: query.kinds ?? [],
     cursor: query.cursor ?? "",
     beforeCursor: query.beforeCursor ?? "",
     limit: query.limit ?? 50,
@@ -247,6 +254,12 @@ export async function loadInbox(
 export async function listCustomerServiceAssignees() {
   const output = await listCustomerServiceAssigneesBound()
   return output.assignees
+}
+
+/** 读取渠道筛选候选，含已停用渠道。 */
+export async function listInboxChannels(): Promise<InboxChannel[]> {
+  const output = await listInboxChannelsBound()
+  return output.channels
 }
 
 /** 领取或接管客户会话最新处理周期。 */

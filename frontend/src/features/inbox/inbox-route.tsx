@@ -3,22 +3,27 @@ import { useRef } from "react"
 import { useSearchParams } from "react-router"
 
 import {
+  ConversationType,
   CustomerInboxView,
   InboxScope,
+  ServiceSessionStatus,
   type InboxQuery,
 } from "@/api"
 import { useWorkspace } from "@/contexts/workspace-context"
 import { useAttachmentQueue } from "./attachment-queue-context"
 import { useMemberChatPollingActive } from "./use-member-chat-polling"
 import { InboxPage } from "@/features/inbox/inbox-page"
-import { normalizeInboxListQuery } from "./inbox-list-controller"
+import {
+  inboxQueryFromSearch,
+  normalizeInboxQuery,
+  writeInboxQuerySearch,
+} from "./inbox-query"
 import { useInboxList } from "./use-inbox-list"
 import { useInboxListViewport } from "./use-inbox-list-viewport"
-import { optionalWailsEnum } from "@/lib/wails-enum"
 
 /** 以规范化查询作为选择历史的保存键。 */
 function browseKey(query: InboxQuery) {
-  return JSON.stringify(normalizeInboxListQuery(query))
+  return JSON.stringify(query)
 }
 
 /** 加载并显示消息页。 */
@@ -26,18 +31,7 @@ export function InboxRoute() {
   const selections = useRef(new Map<string, string>())
   const [searchParams, setSearchParams] = useSearchParams()
   const selectedConversationId = searchParams.get("conversation") ?? ""
-  const scope =
-    optionalWailsEnum(InboxScope, searchParams.get("scope")) ??
-    InboxScope.InboxScopeAll
-  const customerView =
-    optionalWailsEnum(CustomerInboxView, searchParams.get("view")) ??
-    CustomerInboxView.CustomerInboxViewQueue
-  const assigneeIdentityId =
-    scope === InboxScope.InboxScopeCustomer &&
-    customerView === CustomerInboxView.CustomerInboxViewCoworkers
-      ? (searchParams.get("assignee") ?? "")
-      : ""
-  const query = { scope, customerView, assigneeIdentityId }
+  const query = inboxQueryFromSearch(searchParams)
   const viewport = useInboxListViewport()
   const { identity, beginUnreadSnapshot, applyUnreadSnapshot } = useWorkspace()
   const { queue } = useAttachmentQueue()
@@ -53,39 +47,25 @@ export function InboxRoute() {
     scope?: InboxScope
     customerView?: CustomerInboxView
     assigneeIdentityId?: string
+    channelId?: string
+    serviceStatus?: ServiceSessionStatus
+    kinds?: ConversationType[]
     conversationId?: string
     replace?: boolean
   }) {
-    const nextScope = changes.scope ?? scope
-    const nextView = changes.customerView ?? customerView
-    const nextAssignee = changes.assigneeIdentityId ?? assigneeIdentityId
+    const next = normalizeInboxQuery({ ...query, ...changes })
     const currentKey = browseKey(query)
-    const nextKey = browseKey({ scope: nextScope, customerView: nextView, assigneeIdentityId: nextAssignee })
+    const nextKey = browseKey(next)
     // 切换筛选时保存当前选择，恢复目标筛选的上次选择，无记录则保持未选中。
     selections.current.set(currentKey, selectedConversationId)
     const nextSelection = changes.conversationId ?? (nextKey === currentKey ? selectedConversationId : selections.current.get(nextKey) ?? "")
     setSearchParams((current) => {
-      const next = new URLSearchParams(current)
-      next.delete("target")
-      if (nextScope === InboxScope.InboxScopeAll) next.delete("scope")
-      else next.set("scope", nextScope)
-      if (nextScope === InboxScope.InboxScopeCustomer) {
-        if (nextView === CustomerInboxView.CustomerInboxViewQueue)
-          next.delete("view")
-        else next.set("view", nextView)
-        if (
-          nextView === CustomerInboxView.CustomerInboxViewCoworkers &&
-          nextAssignee
-        )
-          next.set("assignee", nextAssignee)
-        else next.delete("assignee")
-      } else {
-        next.delete("view")
-        next.delete("assignee")
-      }
-      if (nextSelection) next.set("conversation", nextSelection)
-      else next.delete("conversation")
-      return next
+      const params = new URLSearchParams(current)
+      params.delete("target")
+      writeInboxQuerySearch(params, next)
+      if (nextSelection) params.set("conversation", nextSelection)
+      else params.delete("conversation")
+      return params
     }, { replace: changes.replace ?? true })
   }
 
@@ -104,9 +84,12 @@ export function InboxRoute() {
     <InboxPage
       list={list}
       listViewport={viewport}
-      scope={scope}
-      customerView={customerView}
-      assigneeIdentityId={assigneeIdentityId}
+      scope={query.scope}
+      customerView={query.customerView}
+      assigneeIdentityId={query.assigneeIdentityId}
+      channelId={query.channelId}
+      serviceStatus={query.serviceStatus}
+      kinds={query.kinds}
       selectedConversationId={selectedConversationId}
       targetIdentityId={searchParams.get("target") ?? ""}
       onSelectedConversationChange={selectConversation}

@@ -126,6 +126,15 @@ func optionalEnum[T ~string](value string) *T {
 	return &typed
 }
 
+// enumList 把重复查询参数转换成枚举切片，缺省时返回空切片。
+func enumList[T ~string](values []string) []T {
+	list := make([]T, 0, len(values))
+	for _, value := range values {
+		list = append(list, T(value))
+	}
+	return list
+}
+
 // requestMeta 从请求头提取令牌和语言，构造应用服务请求元数据。
 func requestMeta(c *gin.Context) appservice.RequestMeta {
 	return appservice.RequestMeta{Token: bearerToken(c.GetHeader("Authorization")), Locale: appservice.Locale(c.GetHeader("Accept-Language"))}

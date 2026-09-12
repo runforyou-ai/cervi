@@ -38,6 +38,7 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.GET("/conversations/:conversationID/summary", s.getInboxConversation)
 	router.POST("/inbox/conversations/query", s.readInboxConversations)
 	router.GET("/inbox/assignees", s.listCustomerServiceAssignees)
+	router.GET("/inbox/channels", s.listInboxChannels)
 	router.GET("/conversations/:conversationID/messages", s.listConversationMessages)
 	router.GET("/conversations/:conversationID/message-references", s.listConversationMessageReferences)
 	router.GET("/conversations/:conversationID/messages/:messageID/context", s.getConversationMessageContext)
@@ -367,6 +368,12 @@ func (s *Service) readInboxConversations(c *gin.Context) {
 // listCustomerServiceAssignees 返回有效真人和 AI 客服。
 func (s *Service) listCustomerServiceAssignees(c *gin.Context) {
 	output, err := s.application.ListCustomerServiceAssignees(c.Request.Context(), requestMeta(c))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// listInboxChannels 返回收件箱渠道筛选候选，含已停用渠道。
+func (s *Service) listInboxChannels(c *gin.Context) {
+	output, err := s.application.ListInboxChannels(c.Request.Context(), requestMeta(c))
 	writeResult(c, http.StatusOK, output, err)
 }
 
@@ -1482,6 +1489,9 @@ func bindLoadInboxInputQuery(c *gin.Context) (appservice.LoadInboxInput, bool) {
 		Scope:              appservice.InboxScope(c.Query("scope")),
 		CustomerView:       appservice.CustomerInboxView(c.Query("customerView")),
 		AssigneeIdentityID: c.Query("assigneeIdentityId"),
+		ChannelID:          c.Query("channelId"),
+		ServiceStatus:      appservice.ServiceSessionStatus(c.Query("serviceStatus")),
+		Kinds:              enumList[appservice.ConversationType](c.QueryArray("kinds")),
 		Cursor:             c.Query("cursor"),
 		BeforeCursor:       c.Query("beforeCursor"),
 		Limit:              limit,

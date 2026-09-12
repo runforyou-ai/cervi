@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"reflect"
 	"testing"
 	"time"
 
@@ -16,7 +17,10 @@ import (
 
 // TestBackendInboxWindow 验证原生端窗口请求、原边界和独立锚点头像归一化。
 func TestBackendInboxWindow(t *testing.T) {
-	filter := appservice.InboxQuery{Scope: appservice.InboxScopeCustomer, CustomerView: appservice.CustomerInboxViewCoworkers, AssigneeIdentityID: "peer"}
+	filter := appservice.InboxQuery{
+		Scope: appservice.InboxScopeCustomer, CustomerView: appservice.CustomerInboxViewCoworkers, AssigneeIdentityID: "peer",
+		ChannelID: "channel", ServiceStatus: appservice.ServiceSessionStatusClosed, Kinds: []appservice.ConversationType{appservice.ConversationTypeCustomer},
+	}
 	contextInput := appservice.InboxContextInput{Query: filter, AnchorID: "anchor", AnchorCursor: "old", BeforeLimit: 3, AfterLimit: 5}
 	windowInput := appservice.InboxWindowInput{Query: filter, StartCursor: "start", EndCursor: "end"}
 	row := appservice.InboxConversation{ID: "anchor", PositionCursor: "new", Direct: &appservice.DirectInboxConversation{PeerAvatarURL: "/files/avatar"}}
@@ -28,13 +32,13 @@ func TestBackendInboxWindow(t *testing.T) {
 		switch request.URL.Path {
 		case "/api/inbox/context/query":
 			var input appservice.InboxContextInput
-			if err := json.NewDecoder(request.Body).Decode(&input); err != nil || input != contextInput {
+			if err := json.NewDecoder(request.Body).Decode(&input); err != nil || !reflect.DeepEqual(input, contextInput) {
 				t.Errorf("context input=%+v err=%v", input, err)
 			}
 			_ = json.NewEncoder(writer).Encode(appservice.InboxContext{Anchor: appservice.InboxConversationResult{ID: "anchor", Availability: appservice.InboxConversationMatching, Conversation: &row}, Window: window})
 		case "/api/inbox/window/query":
 			var input appservice.InboxWindowInput
-			if err := json.NewDecoder(request.Body).Decode(&input); err != nil || input != windowInput {
+			if err := json.NewDecoder(request.Body).Decode(&input); err != nil || !reflect.DeepEqual(input, windowInput) {
 				t.Errorf("window input=%+v err=%v", input, err)
 			}
 			_ = json.NewEncoder(writer).Encode(window)

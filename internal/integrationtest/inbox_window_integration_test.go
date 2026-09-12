@@ -168,8 +168,8 @@ func TestInboxContextFilters(t *testing.T) {
 	ctx := context.Background()
 	query := inboxaction.NewLoadInboxQuery(f.db)
 	filters := []inboxaction.LoadInput{{}, {Scope: domain.InboxScopeInternal}}
-	for _, view := range []domain.CustomerInboxView{domain.CustomerInboxViewQueue, domain.CustomerInboxViewMine, domain.CustomerInboxViewCoworkers, domain.CustomerInboxViewClosed} {
-		filters = append(filters, inboxaction.LoadInput{Scope: domain.InboxScopeCustomer, CustomerView: view})
+	for _, filter := range customerInboxFilters() {
+		filters = append(filters, filter.input)
 	}
 	filters = append(filters, inboxaction.LoadInput{Scope: domain.InboxScopeCustomer, CustomerView: domain.CustomerInboxViewCoworkers, AssigneeIdentityID: f.member.OrganizationIdentity.ID})
 	for _, filter := range filters {
