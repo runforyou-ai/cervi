@@ -34,7 +34,7 @@ import {
   type InboxConversation,
 } from "@/api"
 import { Button } from "@/components/ui/button"
-import { ConversationComposerInput } from "./conversation-composer-input"
+import { Textarea } from "@/components/ui/textarea"
 import {
   createConversationComposerSchema,
   type ConversationComposerValues,
@@ -622,7 +622,7 @@ export function ConversationComposer({
               </button>
             </div>
           ) : null}
-          <ConversationComposerInput
+          <Textarea
             {...bodyField}
             ref={(input) => {
               bodyField.ref(input)
@@ -635,7 +635,7 @@ export function ConversationComposer({
             aria-label={t("replyLabel")}
             aria-describedby={disabledReason ? `${inputID}-reason` : undefined}
             aria-invalid={form.formState.errors.body ? true : undefined}
-            className="min-h-20 max-h-[200px] resize-none rounded-none border-0 bg-transparent py-2 shadow-none focus-visible:ring-0 dark:bg-transparent"
+            className="min-h-20 max-h-[200px] resize-none rounded-none border-0 bg-transparent py-2 shadow-none caret-primary focus-visible:ring-0 dark:bg-transparent"
             onInput={(event) => {
               resizeComposerInput(
                 event.currentTarget,
