@@ -162,7 +162,7 @@ func (o *directOperations) RetryKnowledgeDocument(ctx context.Context, meta Requ
 
 // ListKnowledgeDocumentSegments 返回可连续阅读的一页分段。
 func (o *directOperations) ListKnowledgeDocumentSegments(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, baseID, documentID string, input KnowledgeDocumentSegmentInput) (KnowledgeDocumentSegmentPage, error) {
-	page, err := o.documentQuery.Segments(ctx, identity, baseID, documentID, knowledgeprocessing.ListInput{Page: input.Page, PageSize: input.PageSize, SegmentBatchID: input.SegmentBatchID, AnchorSegmentID: input.AnchorSegmentID})
+	page, err := o.documentQuery.Segments(ctx, identity, baseID, documentID, knowledgeaction.SegmentQueryInput{Page: input.Page, PageSize: input.PageSize, SegmentBatchID: input.SegmentBatchID, AnchorSegmentID: input.AnchorSegmentID})
 	if err != nil {
 		return KnowledgeDocumentSegmentPage{}, o.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeDocumentReadFailed, identity.Organization.ID, baseID)
 	}

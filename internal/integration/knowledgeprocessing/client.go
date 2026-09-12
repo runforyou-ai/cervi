@@ -1,7 +1,6 @@
 package knowledgeprocessing
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -14,7 +13,7 @@ import (
 	"time"
 )
 
-// Client 通过内部 HTTP 接口处理原件和读取分段。
+// Client 通过内部 HTTP 接口处理原件。
 type Client struct {
 	url  string
 	http *http.Client
@@ -85,19 +84,6 @@ func (c *Client) Process(ctx context.Context, input ProcessInput, credential Emb
 		return output, err
 	}
 	return output, writeErr
-}
-
-// List 返回文档分段的一页内容。
-func (c *Client) List(ctx context.Context, input ListInput) (SegmentPage, error) {
-	var output SegmentPage
-	body, err := json.Marshal(input)
-	if err != nil {
-		return output, err
-	}
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-	err = c.call(ctx, "/knowledge/segments", "application/json", bytes.NewReader(body), &output)
-	return output, err
 }
 
 // call 发送内部请求并仅接收约定的错误码。

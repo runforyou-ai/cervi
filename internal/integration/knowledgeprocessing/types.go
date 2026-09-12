@@ -28,38 +28,6 @@ type ProcessResult struct {
 	Stale        bool `json:"stale"`
 }
 
-// Segment 定义按来源顺序阅读的一段正文。
-type Segment struct {
-	ID             string `json:"id"`
-	Position       int    `json:"position"`
-	Content        string `json:"content"`
-	CharacterCount int    `json:"characterCount"`
-	PageNumber     *int   `json:"pageNumber"`
-	SourceLabel    string `json:"sourceLabel"`
-}
-
-// ListInput 定义同一批次中的分页或锚点查询。
-type ListInput struct {
-	OrganizationID  string `json:"organizationId"`
-	KnowledgeBaseID string `json:"knowledgeBaseId"`
-	DocumentID      string `json:"documentId"`
-	SegmentBatchID  string `json:"segmentBatchId"`
-	AnchorSegmentID string `json:"anchorSegmentId,omitempty"`
-	Page            int    `json:"page"`
-	PageSize        int    `json:"pageSize"`
-}
-
-// SegmentPage 返回目标页和经服务端核验的锚点。
-type SegmentPage struct {
-	SegmentBatchID  string    `json:"segmentBatchId"`
-	Segments        []Segment `json:"segments"`
-	Page            int       `json:"page"`
-	PageSize        int       `json:"pageSize"`
-	Total           int       `json:"total"`
-	AnchorSegmentID string    `json:"anchorSegmentId"`
-	AnchorPosition  int       `json:"anchorPosition"`
-}
-
 // Error 定义文档处理的失败原因码和执行阶段。
 type Error struct {
 	Code  string                         `json:"code"`

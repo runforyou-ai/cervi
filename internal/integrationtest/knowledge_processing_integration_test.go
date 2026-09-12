@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"strings"
 	"sync"
@@ -155,11 +156,6 @@ func TestKnowledgeProcessingRetryAndPublication(t *testing.T) {
 	}
 }
 
-type segmentReaderProbe struct {
-	page  knowledgeprocessing.SegmentPage
-	calls int
-}
-
 // TestKnowledgeRetryAllStates 验证所有状态可按新配置重试，旧任务失效且已发布内容持续可读。
 func TestKnowledgeRetryAllStates(t *testing.T) {
 	ctx := context.Background()
@@ -284,13 +280,35 @@ func TestKnowledgeProcessingMissingFile(t *testing.T) {
 	}
 }
 
-// List 返回预设的远端分页响应。
-func (p *segmentReaderProbe) List(context.Context, knowledgeprocessing.ListInput) (knowledgeprocessing.SegmentPage, error) {
-	p.calls++
-	return p.page, nil
+// insertSegments 按固定批次写入连续编号的分段记录。
+func insertSegments(t *testing.T, db *bun.DB, organizationID, baseID, documentID, batchID string, count int) []string {
+	t.Helper()
+	ids := make([]string, 0, count)
+	for position := 1; position <= count; position++ {
+		id := uuid.NewV7().String()
+		fields := map[string]any{
+			"organization_id": organizationID, "knowledge_base_id": baseID, "document_id": documentID, "batch_id": batchID,
+			"position": position, "character_count": 4, "page_number": position, "source_label": "合同",
+		}
+		// 末段页码为空且不带来源标记。
+		if position == count {
+			fields["page_number"] = nil
+			delete(fields, "source_label")
+		}
+		meta, err := json.Marshal(fields)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, err = db.ExecContext(context.Background(), "INSERT INTO public.knowledge_segments(id,content,meta) VALUES (?, ?, ?::jsonb)", id, fmt.Sprintf("第%d段正文", position), string(meta))
+		if err != nil {
+			t.Fatal(err)
+		}
+		ids = append(ids, id)
+	}
+	return ids
 }
 
-// TestKnowledgeSegmentsScopeAndBatch 验证查询前后企业与批次校验。
+// TestKnowledgeSegmentsScopeAndBatch 验证企业与批次校验、分页边界和锚点定位。
 func TestKnowledgeSegmentsScopeAndBatch(t *testing.T) {
 	ctx := context.Background()
 	store, err := serverstorage.Open(ctx, servertest.DatabaseConfig(t))
@@ -304,33 +322,77 @@ func TestKnowledgeSegmentsScopeAndBatch(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
+	document := docs[0]
+	query := knowledgeaction.NewDocumentQuery(db)
+	// 未发布批次的文档不提供分段。
+	if _, err := query.Segments(ctx, owner.Identity, base.ID, document.ID, knowledgeaction.SegmentQueryInput{}); !errors.Is(err, knowledgeaction.ErrSegmentsNotReady) {
+		t.Fatalf("not ready=%v", err)
+	}
 	batch := uuid.NewV7().String()
-	_, err = db.NewUpdate().Model((*servermodels.KnowledgeDocument)(nil)).Set("segment_batch_id = ?", batch).Set("segment_count = 1").Where("id = ?", docs[0].ID).Exec(ctx)
+	if _, err := db.NewUpdate().Model((*servermodels.KnowledgeDocument)(nil)).Set("segment_batch_id = ?", batch).Set("segment_count = 25").Where("id = ?", document.ID).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	ids := insertSegments(t, db, owner.Identity.Organization.ID, base.ID, document.ID, batch, 25)
+	// 旧批次的残留分段不得混入当前批次的读取结果。
+	insertSegments(t, db, owner.Identity.Organization.ID, base.ID, document.ID, uuid.NewV7().String(), 25)
+
+	if _, err := query.Segments(ctx, owner.Identity, base.ID, document.ID, knowledgeaction.SegmentQueryInput{SegmentBatchID: uuid.NewV7().String()}); !errors.Is(err, knowledgeaction.ErrSegmentStale) {
+		t.Fatalf("stale=%v", err)
+	}
+	other, _ := newDocumentFixture(t, db)
+	if _, err := query.Segments(ctx, other.Identity, base.ID, document.ID, knowledgeaction.SegmentQueryInput{}); err == nil {
+		t.Fatal("foreign query allowed")
+	}
+	for _, input := range []knowledgeaction.SegmentQueryInput{
+		{SegmentBatchID: batch, AnchorSegmentID: ids[0], Page: 2},
+		{AnchorSegmentID: ids[0]},
+		{SegmentBatchID: batch, AnchorSegmentID: "not-a-uuid"},
+		{PageSize: 101},
+		{Page: -1},
+	} {
+		if _, err := query.Segments(ctx, owner.Identity, base.ID, document.ID, input); !errors.Is(err, knowledgeaction.ErrSegmentQueryInvalid) {
+			t.Fatalf("invalid input %+v = %v", input, err)
+		}
+	}
+	if _, err := query.Segments(ctx, owner.Identity, base.ID, document.ID, knowledgeaction.SegmentQueryInput{SegmentBatchID: batch, AnchorSegmentID: uuid.NewV7().String()}); !errors.Is(err, knowledgeaction.ErrSegmentStale) {
+		t.Fatalf("missing anchor=%v", err)
+	}
+
+	// 默认读取首页，并核对正文与来源信息。
+	page, err := query.Segments(ctx, owner.Identity, base.ID, document.ID, knowledgeaction.SegmentQueryInput{})
 	if err != nil {
 		t.Fatal(err)
 	}
-	reader := &segmentReaderProbe{page: knowledgeprocessing.SegmentPage{SegmentBatchID: batch, Page: 1, PageSize: 20, Total: 1}}
-	query := knowledgeaction.NewDocumentQuery(db)
-	query.SetSegmentReader(reader)
-	if _, err := query.Segments(ctx, owner.Identity, base.ID, docs[0].ID, knowledgeprocessing.ListInput{SegmentBatchID: uuid.NewV7().String()}); !errors.Is(err, knowledgeaction.ErrSegmentStale) {
-		t.Fatalf("stale=%v", err)
+	if page.SegmentBatchID != batch || page.Page != 1 || page.PageSize != 20 || page.Total != 25 || len(page.Segments) != 20 {
+		t.Fatalf("page=%+v", page)
 	}
-	if reader.calls != 0 {
-		t.Fatal("stale query reached remote")
+	first := page.Segments[0]
+	if first.ID != ids[0] || first.Position != 1 || first.Content != "第1段正文" || first.CharacterCount != 4 || first.SourceLabel != "合同" || first.PageNumber == nil || *first.PageNumber != 1 {
+		t.Fatalf("segment=%+v", first)
 	}
-	other, _ := newDocumentFixture(t, db)
-	if _, err := query.Segments(ctx, other.Identity, base.ID, docs[0].ID, knowledgeprocessing.ListInput{}); err == nil {
-		t.Fatal("foreign query allowed")
+	if page.Segments[19].Position != 20 {
+		t.Fatalf("last=%+v", page.Segments[19])
 	}
-	if reader.calls != 0 {
-		t.Fatal("foreign query reached remote")
-	}
-	if _, err := query.Segments(ctx, owner.Identity, base.ID, docs[0].ID, knowledgeprocessing.ListInput{}); err != nil {
+
+	// 末页只返回剩余分段。
+	page, err = query.Segments(ctx, owner.Identity, base.ID, document.ID, knowledgeaction.SegmentQueryInput{Page: 2})
+	if err != nil {
 		t.Fatal(err)
 	}
-	reader.page.SegmentBatchID = uuid.NewV7().String()
-	if _, err := query.Segments(ctx, owner.Identity, base.ID, docs[0].ID, knowledgeprocessing.ListInput{}); !errors.Is(err, knowledgeaction.ErrSegmentStale) {
-		t.Fatalf("remote stale=%v", err)
+	if page.Page != 2 || len(page.Segments) != 5 || page.Segments[0].Position != 21 {
+		t.Fatalf("page=%+v", page)
+	}
+	if last := page.Segments[4]; last.Position != 25 || last.PageNumber != nil || last.SourceLabel != "" {
+		t.Fatalf("last segment=%+v", last)
+	}
+
+	// 锚点按其之前的分段数量落到第二页。
+	page, err = query.Segments(ctx, owner.Identity, base.ID, document.ID, knowledgeaction.SegmentQueryInput{SegmentBatchID: batch, AnchorSegmentID: ids[20]})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if page.Page != 2 || page.AnchorSegmentID != ids[20] || page.AnchorPosition != 21 || page.Segments[0].ID != ids[20] {
+		t.Fatalf("anchor page=%+v", page)
 	}
 }
 

@@ -70,7 +70,6 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tena
 	mcpScheduler := mcpserveraction.NewToolsScheduler(taskEnqueuer)
 	guard := sessionGuard{resolveTenant: tenantResolver, resolveIdentity: authaction.NewResolveIdentityQuery(db)}
 	documentQuery := knowledgebaseaction.NewDocumentQuery(db)
-	documentQuery.SetSegmentReader(knowledgeProcessor)
 	ops := &directOperations{
 		sessionGuard:    guard,
 		authOps:         newAuthOps(db),
