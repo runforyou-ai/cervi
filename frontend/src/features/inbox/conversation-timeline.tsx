@@ -128,7 +128,7 @@ function mergeTimelineMessages(
   }))
   const coverage = windowCoverage(current)
   for (const message of outgoing) {
-    // 窗口已收录的发送项不插入本地气泡。
+    // 只为窗口之外的发送项生成本地气泡。
     if (coveredByWindow(message, coverage)) continue
     messages.push({
       id: `local:${message.clientMessageID}`,

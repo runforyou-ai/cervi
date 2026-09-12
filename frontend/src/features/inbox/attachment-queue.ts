@@ -60,7 +60,7 @@ export class AttachmentQueue {
   private refresh: (conversationID: string) => void
   private reportError: (error: unknown) => void
 
-  /** 保存发送状态存储、查询刷新和发送错误提示的回调。 */
+  /** 保存发送状态存储、查询刷新回调和发送错误回调。 */
   constructor(
     outgoing: OutgoingMessageStore,
     refresh: (conversationID: string) => void,
@@ -111,7 +111,7 @@ export class AttachmentQueue {
   ) {
     const batchID = crypto.randomUUID()
     const now = Date.now()
-    // 草稿尚无会话编号，发送项按对端身份分组，与文本发送共用同一个分组规则。
+    // 草稿尚无会话编号，发送项按对端身份分组。
     const scopeID =
       conversationID || (targetIdentityID ? `draft:${targetIdentityID}` : "")
     const jobs: AttachmentJob[] = files.map((selected, index) => {
@@ -201,7 +201,8 @@ export class AttachmentQueue {
         item.fileID = saved.attachment!.id
         item.messageID = saved.id
         item.attachment = saved.attachment!
-        this.outgoing.succeed(item.id, saved)
+        if (this.disposed) this.outgoing.fail(item.id)
+        else this.outgoing.succeed(item.id, saved)
       }
       for (const job of batch.jobs) {
         const status = job.attachment.uploadStatus
@@ -327,7 +328,8 @@ export class AttachmentQueue {
     job.cancelRequested = true
     job.stage = "cancelled"
     job.controller.abort()
-    this.outgoing.discard(job.id)
+    // 尚未入库的附件直接丢弃发送项，已入库的等取消请求成功后再丢弃。
+    if (!job.fileID) this.outgoing.discard(job.id)
     this.emit()
     try {
       if (job.fileID) {
@@ -335,10 +337,12 @@ export class AttachmentQueue {
           fileIds: [job.fileID],
           status: AttachmentUploadStatus.AttachmentCancelled,
         })
+        this.outgoing.discard(job.id)
         this.refresh(job.conversationID)
       }
     } catch (error) {
       job.stage = "failed"
+      this.outgoing.fail(job.id)
       throw error
     } finally {
       if (job.previewURL) URL.revokeObjectURL(job.previewURL)
@@ -384,6 +388,9 @@ export class AttachmentQueue {
       job.previewURL = ""
       job.selected = null
       job.transfer = null
+      // 未完成的附件在服务端标记失败，发送状态同步为失败。
+      if (job.stage !== "ready" && !job.cancelRequested)
+        this.outgoing.fail(job.id)
     }
     void this.abandon()
   }

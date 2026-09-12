@@ -155,3 +155,19 @@ test("窗口覆盖判定同时认本人逻辑编号和已确认的服务端编�
   assert.equal(coveredByWindow(confirmed, coverage), true)
   assert.equal(coveredByWindow(outside, coverage), false)
 })
+
+test("丢弃只移除指定发送项，迟到的结果不写回", () => {
+  const store = new OutgoingMessageStore()
+  store.start("c1", draft("m1"))
+  store.start("c1", draft("m2"))
+  store.discard("m1")
+  assert.equal(
+    thread(store, "c1").map((item: any) => item.clientMessageID).join(","),
+    "m2",
+  )
+  store.succeed("m1", saved("s1", "m1"))
+  assert.equal(thread(store, "c1").length, 1)
+  store.discard("m2")
+  assert.equal(store.snapshot().has("c1"), false)
+  store.dispose()
+})
