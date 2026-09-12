@@ -42,7 +42,7 @@ import {
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { useUserTimeZone } from "@/contexts/user-preferences"
 import { previousDayKey } from "@/features/inbox/calendar"
-import { mentionTokenPattern } from "@/features/inbox/mention-token"
+import { mentionTokenPattern } from "@/lib/mention-token"
 import { resources, supportedLanguages } from "@/i18n/resources"
 import { useMemberChatPollingActive } from "@/features/inbox/use-member-chat-polling"
 import { useOutgoingMessageStore } from "@/features/inbox/outgoing-message-context"
@@ -173,14 +173,19 @@ function mergeTimelineMessages(
   return messages
 }
 
-/** 在消息正文中强调结构化提醒。 */
-function renderMessageBody(message: TimelineMessage) {
-  const names = [
+/** 收集一条消息中结构化提醒的成员名称，长名称优先匹配。 */
+function messageMentionNames(message: TimelineMessage) {
+  return [
     ...message.mentions.map((mention) => mention.displayName?.trim() ?? ""),
     ...(message.mentionAll ? mentionAllNames : []),
   ]
     .filter((name, index, values) => name && values.indexOf(name) === index)
     .sort((left, right) => right.length - left.length)
+}
+
+/** 在消息正文中强调结构化提醒。 */
+function renderMessageBody(message: TimelineMessage) {
+  const names = messageMentionNames(message)
   if (names.length === 0) return message.body
   const mentioned = new Set(names.map((name) => `@${name}`))
   const parts = message.body.split(
@@ -908,7 +913,7 @@ function ConversationTimelineContent({
                                         originatedAt={message.originatedAt} timeLabel={dateFormatters.clock.format(date)} timeTitle={dateFormatters.full.format(date)} incoming={incoming} />
                                     ) : message.sender?.identityType === OrganizationIdentityType.OrganizationIdentityTypeAgent ? (
                                       <div className="min-w-0 flex-1">
-                                        <MessageMarkdown locale={i18n.language} onOpenLink={openExternalURL}>{message.body}</MessageMarkdown>
+                                        <MessageMarkdown locale={i18n.language} mentions={messageMentionNames(message)} onOpenLink={openExternalURL}>{message.body}</MessageMarkdown>
                                       </div>
                                     ) : (
                                       <span className="min-w-0 whitespace-pre-wrap">{renderMessageBody(message)}</span>

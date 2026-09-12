@@ -104,6 +104,13 @@ func (a *ExecuteAction) Execute(ctx context.Context, input RunInput) error {
 	if err != nil {
 		return fmt.Errorf("build agent run instruction: %w", err)
 	}
+	var groupReply *agentruntime.GroupReplyConfig
+	if structured, ok := policy.(structuredReplyPolicy); ok {
+		groupReply, err = structured.groupReply(ctx, a.db, execution)
+		if err != nil {
+			return fmt.Errorf("build agent run reply options: %w", err)
+		}
+	}
 	result, err := a.runtime.Run(runCtx, agentruntime.RunRequest{
 		RunID: execution.Run.ID, Name: execution.AgentName, Instruction: instruction,
 		Model: agentruntime.ModelConfig{
@@ -111,6 +118,7 @@ func (a *ExecuteAction) Execute(ctx context.Context, input RunInput) error {
 			Identifier: execution.ModelIdentifier, MaxOutputTokens: maxOutputTokens,
 		},
 		CustomerHistorySearch: customerHistorySearch,
+		GroupReply:            groupReply,
 		StreamID:              running.progress.StreamID,
 		Attempt:               running.attempt,
 		OnProgress: func(progress agentruntime.Progress) {
@@ -244,7 +252,7 @@ func (a *ExecuteAction) policyForRun(ctx context.Context, run *servermodels.Agen
 			return nil, fmt.Errorf("load agent run conversation type: %w", err)
 		}
 		if domain.ConversationType(conversationType) == domain.ConversationTypeGroup {
-			return groupMentionRunPolicy{}, nil
+			return groupMentionRunPolicy{scheduler: NewScheduler(a.enqueuer)}, nil
 		}
 		return agentChatRunPolicy{}, nil
 	default:
@@ -267,7 +275,8 @@ func appendAgentMessage(ctx context.Context, db bun.IDB, conversation *servermod
 // complete 按运行策略抑制失效结果或原子写入回复并推进消费序号。
 func (a *ExecuteAction) complete(ctx context.Context, execution executionContext, policy agentRunPolicy, result agentruntime.RunResult) error {
 	content := strings.TrimSpace(result.Content)
-	if content == "" || result.EndSeq <= 0 {
+	silent := result.Outcome == agentruntime.RunOutcomeSilent
+	if (content == "" && !silent) || result.EndSeq <= 0 {
 		return errors.New("agent runtime returned an invalid result")
 	}
 	usage, err := json.Marshal(result.Usage)
@@ -275,6 +284,10 @@ func (a *ExecuteAction) complete(ctx context.Context, execution executionContext
 		return fmt.Errorf("encode agent run usage: %w", err)
 	}
 	messageID := uuid.NewV7().String()
+	outcome := domain.AgentRunOutcomeReply
+	if silent {
+		outcome = domain.AgentRunOutcomeSilent
+	}
 	// 在最终消息事务中写入成功运行的内容块。
 	blocks := make([]servermodels.AgentRunBlock, 0, len(result.Blocks))
 	for _, block := range result.Blocks {
@@ -310,17 +323,29 @@ func (a *ExecuteAction) complete(ctx context.Context, execution executionContext
 			*run.InputEndSeq != result.EndSeq || run.InputStartSeq != lane.ProcessedSeq+1 {
 			return errors.New("agent run completion boundary is inconsistent")
 		}
-		if err := policy.persistMessage(ctx, tx, policyContext, run, messageID, domain.MessageTypeText, content); err != nil {
-			return err
+		if !silent {
+			if err := policy.persistMessage(ctx, tx, policyContext, run, messageID, domain.MessageTypeText, content); err != nil {
+				return err
+			}
+			if structured, ok := policy.(structuredReplyPolicy); ok {
+				if err := structured.applyMentions(ctx, tx, policyContext, run, messageID, result.Mentions); err != nil {
+					return err
+				}
+			}
 		}
 		if len(blocks) > 0 {
 			if _, err := tx.NewInsert().Model(&blocks).Exec(ctx); err != nil {
 				return fmt.Errorf("persist agent run blocks: %w", err)
 			}
 		}
+		responseMessageID := any(messageID)
+		if silent {
+			responseMessageID = nil
+		}
 		if _, err := tx.NewUpdate().Model(run).
 			Set("status = ?", domain.AgentRunStatusSucceeded).
-			Set("response_message_id = ?", messageID).
+			Set("outcome = ?", outcome).
+			Set("response_message_id = ?", responseMessageID).
 			Set("usage = ?::jsonb", string(usage)).
 			Set("last_error = NULL").
 			Set("error_code = NULL").
