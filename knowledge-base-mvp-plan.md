@@ -1,6 +1,8 @@
 # 知识库最小 MVP 开发顺序
 
-状态：PR 1、PR 2 已实现；当前先交付自动解析、分段、分段查看和失败重试，向量处理及召回后续接入。当前实现契约见 [Haystack 知识文档处理](haystack/README.md)。下述 PR 3、PR 4 中的索引与召回范围仍待开发。
+**本文已被 [知识文档处理管线 Go 化与 Haystack 移除方案](knowledge-go-pipeline-plan.md) 取代。** 原件转换由 markitdown 独立容器承担，分段、向量化、分段存储与召回编排均在 Go 服务端进程内实现，Haystack 与 Hayhooks 已从仓库移除。以下内容保留作为选型实验与评测依据。
+
+状态：PR 1、PR 2 已实现；PR 3 及之后的 Haystack 相关范围不再执行，实际实施顺序见上述 Go 化方案。
 
 ## 1. 目标与职责
 

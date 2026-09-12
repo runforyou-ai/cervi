@@ -200,6 +200,7 @@ func (o *directOperations) fileOperationError(ctx context.Context, meta RequestM
 			fileaction.ValidationFileNameRequired:   cervii18n.FieldFileNameRequired,
 			fileaction.ValidationContentTypeInvalid: cervii18n.FieldFileContentTypeInvalid,
 			fileaction.ValidationByteSizeInvalid:    cervii18n.FieldFileByteSizeInvalid,
+			fileaction.ValidationDocumentTooLarge:   cervii18n.FieldKnowledgeDocumentTooLarge,
 			fileaction.ValidationPurposeInvalid:     cervii18n.FieldFilePurposeInvalid,
 		}
 		return InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, keys))

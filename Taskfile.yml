@@ -166,36 +166,6 @@ tasks:
     cmds:
       - go generate ./internal/appservice
 
-  test:haystack:
-    summary: 验证文档解析、字符分段和分段存储
-    cmds:
-      - uv run --script haystack/run.py --test
-    env:
-      TEST_POSTGRES_HOST: "{{.POSTGRES_HOST}}"
-      TEST_POSTGRES_PORT: "{{.POSTGRES_PORT}}"
-      TEST_POSTGRES_USER: "{{.POSTGRES_USER}}"
-      TEST_POSTGRES_PASSWORD: "{{.POSTGRES_PASSWORD}}"
-      TEST_POSTGRES_DB: "{{.POSTGRES_DB}}_test"
-      TEST_POSTGRES_SSLMODE: "{{.POSTGRES_SSLMODE}}"
-
-  run:haystack:
-    summary: 运行当前工作区的 Haystack 文档处理服务
-    deps:
-      - db:ensure
-    preconditions:
-      - sh: '{{if .HAYSTACK_PORT}}true{{else}}false{{end}}'
-        msg: "请在 .env 中配置 HAYSTACK_PORT"
-    cmds:
-      - uv run haystack/run.py
-    env:
-      POSTGRES_HOST: "{{.POSTGRES_HOST}}"
-      POSTGRES_PORT: "{{.POSTGRES_PORT}}"
-      POSTGRES_USER: "{{.POSTGRES_USER}}"
-      POSTGRES_PASSWORD: "{{.POSTGRES_PASSWORD}}"
-      POSTGRES_DB: "{{.POSTGRES_DB}}"
-      POSTGRES_SSLMODE: "{{.POSTGRES_SSLMODE}}"
-      HAYSTACK_PORT: "{{.HAYSTACK_PORT}}"
-
   build:docker:
     summary: Builds a Docker image for server mode deployment
     cmds:

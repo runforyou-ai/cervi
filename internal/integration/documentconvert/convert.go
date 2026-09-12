@@ -1,7 +1,9 @@
-package knowledgeprocessing
+//go:build server
+
+// Package documentconvert 通过 markitdown 服务把原件转换为 Markdown 正文。
+package documentconvert
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"errors"
@@ -14,18 +16,26 @@ import (
 	"time"
 )
 
-// Client 通过内部 HTTP 接口处理原件和读取分段。
+// Error 定义原件转换的语言无关失败原因码。
+type Error struct {
+	Code string `json:"code"`
+}
+
+// Error 返回语言无关的失败原因。
+func (e *Error) Error() string { return "document convert: " + e.Code }
+
+// Client 通过内部 HTTP 接口把原件转换为 Markdown 正文。
 type Client struct {
 	url  string
 	http *http.Client
 }
 
-// NewClient 创建知识文档处理客户端。
+// NewClient 创建原件转换客户端。
 func NewClient(url string) *Client {
 	return &Client{url: strings.TrimRight(url, "/"), http: &http.Client{Timeout: 15 * time.Minute}}
 }
 
-// CheckConnection 在三秒内执行一次处理服务连接检查。
+// CheckConnection 在三秒内执行一次转换服务连接检查。
 func (c *Client) CheckConnection(ctx context.Context) error {
 	if c.url == "" {
 		return &Error{Code: "unavailable"}
@@ -51,26 +61,18 @@ func (c *Client) CheckConnection(ctx context.Context) error {
 	return nil
 }
 
-// Process 流式提交原件并读取分段处理结果。
-func (c *Client) Process(ctx context.Context, input ProcessInput, credential EmbeddingCredential, name string, source io.Reader) (ProcessResult, error) {
-	var output ProcessResult
+// Convert 流式提交原件并返回转换后的 Markdown 正文。
+func (c *Client) Convert(ctx context.Context, name string, source io.Reader) (string, error) {
+	if c.url == "" {
+		return "", &Error{Code: "unavailable"}
+	}
 	reader, writer := io.Pipe()
 	multipartWriter := multipart.NewWriter(writer)
 	done := make(chan error, 1)
 	go func() {
-		metadata, err := json.Marshal(struct {
-			ProcessInput
-			Embedding EmbeddingCredential `json:"embedding"`
-		}{ProcessInput: input, Embedding: credential})
+		part, err := multipartWriter.CreateFormFile("file", name)
 		if err == nil {
-			err = multipartWriter.WriteField("metadata", string(metadata))
-		}
-		if err == nil {
-			var part io.Writer
-			part, err = multipartWriter.CreateFormFile("file", name)
-			if err == nil {
-				_, err = io.Copy(part, source)
-			}
+			_, err = io.Copy(part, source)
 		}
 		if err == nil {
 			err = multipartWriter.Close()
@@ -78,34 +80,21 @@ func (c *Client) Process(ctx context.Context, input ProcessInput, credential Emb
 		_ = writer.CloseWithError(err)
 		done <- err
 	}()
-	err := c.call(ctx, "/knowledge/process", multipartWriter.FormDataContentType(), reader, &output)
+	var output struct {
+		Markdown string `json:"markdown"`
+	}
+	err := c.call(ctx, multipartWriter.FormDataContentType(), reader, &output)
 	_ = reader.CloseWithError(err)
 	writeErr := <-done
 	if err != nil {
-		return output, err
+		return "", err
 	}
-	return output, writeErr
+	return output.Markdown, writeErr
 }
 
-// List 返回文档分段的一页内容。
-func (c *Client) List(ctx context.Context, input ListInput) (SegmentPage, error) {
-	var output SegmentPage
-	body, err := json.Marshal(input)
-	if err != nil {
-		return output, err
-	}
-	ctx, cancel := context.WithTimeout(ctx, 30*time.Second)
-	defer cancel()
-	err = c.call(ctx, "/knowledge/segments", "application/json", bytes.NewReader(body), &output)
-	return output, err
-}
-
-// call 发送内部请求并仅接收约定的错误码。
-func (c *Client) call(ctx context.Context, path, contentType string, body io.Reader, output any) error {
-	if c.url == "" {
-		return &Error{Code: "unavailable"}
-	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url+path, body)
+// call 发送转换请求，非 200 时只取出响应中的原因码。
+func (c *Client) call(ctx context.Context, contentType string, body io.Reader, output any) error {
+	request, err := http.NewRequestWithContext(ctx, http.MethodPost, c.url+"/convert", body)
 	if err != nil {
 		return &Error{Code: "unavailable"}
 	}
@@ -132,7 +121,7 @@ func (c *Client) call(ctx context.Context, path, contentType string, body io.Rea
 		return &Error{Code: "service_failed"}
 	}
 	if err := json.NewDecoder(response.Body).Decode(output); err != nil {
-		return fmt.Errorf("decode knowledge response: %w", err)
+		return fmt.Errorf("decode convert response: %w", err)
 	}
 	return nil
 }

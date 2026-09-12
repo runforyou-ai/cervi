@@ -16,6 +16,8 @@ import (
 const (
 	// maxImageByteSize 是图片文件的最大字节数。
 	maxImageByteSize int64 = 5 * 1024 * 1024
+	// maxKnowledgeDocumentByteSize 是知识文档原件的最大字节数。
+	maxKnowledgeDocumentByteSize int64 = 20 * 1024 * 1024
 	// maxFileNameLength 是文件名的最大字符数。
 	maxFileNameLength = 255
 )
@@ -27,6 +29,7 @@ const (
 	ValidationFileNameRequired   ValidationCode = "FILE_NAME_REQUIRED"
 	ValidationContentTypeInvalid ValidationCode = "CONTENT_TYPE_INVALID"
 	ValidationByteSizeInvalid    ValidationCode = "BYTE_SIZE_INVALID"
+	ValidationDocumentTooLarge   ValidationCode = "DOCUMENT_TOO_LARGE"
 	ValidationPurposeInvalid     ValidationCode = "PURPOSE_INVALID"
 )
 
@@ -89,7 +92,13 @@ func normalizeFileInput(input UploadInput, purpose domain.FilePurpose) (UploadIn
 	if _, exists := imageFileExtensions[input.ContentType]; !exists && purpose != domain.FilePurposeMessageAttachment && purpose != domain.FilePurposeKnowledgeDocument {
 		fields["contentType"] = ValidationContentTypeInvalid
 	}
-	if input.ByteSize < 0 || (purpose != domain.FilePurposeMessageAttachment && purpose != domain.FilePurposeKnowledgeDocument && (input.ByteSize == 0 || input.ByteSize > maxImageByteSize)) {
+	switch {
+	case input.ByteSize < 0:
+		fields["byteSize"] = ValidationByteSizeInvalid
+	case purpose == domain.FilePurposeKnowledgeDocument && input.ByteSize > maxKnowledgeDocumentByteSize:
+		fields["byteSize"] = ValidationDocumentTooLarge
+	case purpose != domain.FilePurposeMessageAttachment && purpose != domain.FilePurposeKnowledgeDocument &&
+		(input.ByteSize == 0 || input.ByteSize > maxImageByteSize):
 		fields["byteSize"] = ValidationByteSizeInvalid
 	}
 	return input, fields

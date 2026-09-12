@@ -15,6 +15,28 @@ var (
 	ErrDocumentBatchInvalid = errors.New("knowledge document batch must contain 1 to 10 distinct files")
 )
 
+// ProcessInput 固定本次文档任务的来源、分段和向量参数。
+type ProcessInput struct {
+	OrganizationID           string `json:"organizationId"`
+	KnowledgeBaseID          string `json:"knowledgeBaseId"`
+	DocumentID               string `json:"documentId"`
+	ProcessingID             string `json:"processingId"`
+	ChunkLength              int    `json:"chunkLength"`
+	ChunkOverlap             int    `json:"chunkOverlap"`
+	EmbeddingProviderID      string `json:"embeddingProviderId"`
+	EmbeddingModelIdentifier string `json:"embeddingModelIdentifier"`
+	EmbeddingDimension       int    `json:"embeddingDimension"`
+}
+
+// ProcessError 定义文档处理的失败原因码和执行阶段。
+type ProcessError struct {
+	Code  string
+	Stage domain.KnowledgeDocumentStatus
+}
+
+// Error 返回语言无关的失败原因。
+func (e *ProcessError) Error() string { return "knowledge processing: " + e.Code }
+
 // DocumentRecord 汇总文档归属与原件元数据。
 type DocumentRecord struct {
 	ID             string                         `bun:"id"`

@@ -4,7 +4,7 @@ import type { KnowledgeDocumentData } from "@/api"
 import { StatusBadge } from "@/components/status-badge"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
-/** 在列表和详情页统一显示状态，悬停或聚焦失败状态时展示原因。 */
+/** 在文档列表中显示状态，悬停或聚焦失败状态时展示原因。 */
 export function KnowledgeDocumentStatus({ document }: { document: Pick<KnowledgeDocumentData, "status" | "failureMessage"> }) {
   const { t } = useTranslation("knowledgeBase")
   const showFailure = document.status === "failed" && Boolean(document.failureMessage)

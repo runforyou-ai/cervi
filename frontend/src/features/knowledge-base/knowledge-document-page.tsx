@@ -11,7 +11,6 @@ import { useResource } from "@/hooks/use-resource"
 import { KnowledgeQAFeedback } from "./knowledge-qa-feedback"
 import { KnowledgeSegmentsDialog } from "./knowledge-segments-dialog"
 import { KnowledgeDocumentPreview } from "./knowledge-document-preview"
-import { KnowledgeDocumentStatus } from "./knowledge-document-status"
 
 /** 显示原件预览和固定批次的分段阅读入口。 */
 export function KnowledgeDocumentPage() {
@@ -40,9 +39,6 @@ export function KnowledgeDocumentPage() {
           </Link>
         </Button>
       </PageHeader>
-      <div className="flex min-h-10 shrink-0 items-center gap-3 px-6 text-sm text-muted-foreground" role="status">
-        {document.data && <KnowledgeDocumentStatus document={document.data} />}
-      </div>
       <PageContent className="overflow-hidden">
         {!document.data ? (
           <KnowledgeQAFeedback error={document.error} retry={() => void document.refresh()} />

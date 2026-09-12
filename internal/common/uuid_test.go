@@ -3,6 +3,8 @@ package common
 import (
 	"slices"
 	"testing"
+
+	"uuid"
 )
 
 // TestValidUUID 验证只接受规范 UUID。
@@ -45,5 +47,20 @@ func TestNormalizeUUIDs(t *testing.T) {
 	}
 	if _, valid = NormalizeUUIDs([]string{"invalid"}); valid {
 		t.Fatal("list containing invalid UUID should not be accepted")
+	}
+}
+
+// TestNewUUIDv5 验证命名空间内的确定性 UUID 与 RFC 9562 §5.5 一致。
+func TestNewUUIDv5(t *testing.T) {
+	namespace := uuid.MustParse("6ba7b810-9dad-11d1-80b4-00c04fd430c8")
+	first := NewUUIDv5(namespace, "1")
+	if first.String() != "b04965e6-a9bb-591f-8f8a-1adcb2c8dc39" {
+		t.Fatalf("NewUUIDv5() = %s", first)
+	}
+	if NewUUIDv5(namespace, "1") != first {
+		t.Fatal("相同输入必须产生相同结果")
+	}
+	if second := NewUUIDv5(namespace, "2"); second.String() != "4b166dbe-d99d-5091-abdd-95b83330ed3a" {
+		t.Fatalf("NewUUIDv5() = %s", second)
 	}
 }

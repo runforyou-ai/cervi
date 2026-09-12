@@ -108,8 +108,6 @@ export function KnowledgeSegmentsDialog({ knowledgeBaseId, documentId, documentN
             <div className="w-20 shrink-0 text-xs leading-7 text-muted-foreground">
               <span className="whitespace-nowrap">{t("documentDetail.segments.position", { position: segment.position })}</span>
               <span className="block">{t("documentDetail.segments.characters", { count: segment.characterCount })}</span>
-              {segment.pageNumber != null && <span className="block">{t("documentDetail.segments.page", { number: segment.pageNumber })}</span>}
-              {segment.sourceLabel && <span className="block break-words">{segment.sourceLabel}</span>}
               {segment.id === segmentId && <span className="block text-primary">{t("documentDetail.segments.matched")}</span>}
             </div>
             <div className="min-w-0 flex-1">

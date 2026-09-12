@@ -41,16 +41,28 @@ func TestNormalizeUploadInput(t *testing.T) {
 	}
 }
 
-// TestKnowledgeDocumentUploadFormats 验证允许格式、内容类型归一化和大文件不受头像上限限制。
+// TestKnowledgeDocumentUploadFormats 验证允许格式、内容类型归一化和文档大小上限。
 func TestKnowledgeDocumentUploadFormats(t *testing.T) {
 	for _, name := range []string{"a.txt", "a.md", "a.markdown", "a.htm", "a.html", "a.PDF", "a.docx", "a.pptx", "a.xlsx", "a.csv", "a.json"} {
-		input, fields := NormalizeUploadInput(UploadInput{Purpose: domain.FilePurposeKnowledgeDocument, FileName: name, ContentType: "application/octet-stream", ByteSize: 1 << 40})
+		input, fields := NormalizeUploadInput(UploadInput{Purpose: domain.FilePurposeKnowledgeDocument, FileName: name, ContentType: "application/octet-stream", ByteSize: maxKnowledgeDocumentByteSize})
 		if len(fields) != 0 || input.ContentType == "" || input.ContentType == "application/octet-stream" {
 			t.Fatalf("%s: %+v %+v", name, input, fields)
 		}
 	}
+	_, fields := NormalizeUploadInput(UploadInput{Purpose: domain.FilePurposeKnowledgeDocument, FileName: "a.pdf", ByteSize: maxImageByteSize + 1})
+	if len(fields) != 0 {
+		t.Fatalf("5MB+1 的文档 fields = %#v", fields)
+	}
+	_, fields = NormalizeUploadInput(UploadInput{Purpose: domain.FilePurposeKnowledgeDocument, FileName: "a.pdf", ByteSize: maxKnowledgeDocumentByteSize + 1})
+	if fields["byteSize"] != ValidationDocumentTooLarge {
+		t.Fatalf("超限文档 fields = %#v", fields)
+	}
+	_, fields = NormalizeUploadInput(UploadInput{Purpose: domain.FilePurposeMessageAttachment, FileName: "a.bin", ByteSize: maxKnowledgeDocumentByteSize + 1})
+	if len(fields) != 0 {
+		t.Fatalf("消息附件不限制大小，fields = %#v", fields)
+	}
 	for _, name := range []string{"a.doc", "a.xls", "a.ppt", "a.exe", "a.pdf.exe", "a"} {
-		_, fields := NormalizeUploadInput(UploadInput{Purpose: domain.FilePurposeKnowledgeDocument, FileName: name, ByteSize: 12})
+		_, fields = NormalizeUploadInput(UploadInput{Purpose: domain.FilePurposeKnowledgeDocument, FileName: name, ByteSize: 12})
 		if fields["contentType"] != ValidationContentTypeInvalid {
 			t.Fatalf("accepted %s", name)
 		}
