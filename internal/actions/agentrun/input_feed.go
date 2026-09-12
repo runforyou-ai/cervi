@@ -25,6 +25,7 @@ type agentRunPolicyContext struct {
 	Conversation       *servermodels.Conversation
 	ServiceSession     *servermodels.ServiceSession
 	AgentParticipantID string
+	AgentSubjectID     string
 	DeliveryRoute      deliveryaction.Route
 }
 
@@ -35,6 +36,12 @@ type agentRunPolicy interface {
 	persistMessage(context.Context, bun.IDB, agentRunPolicyContext, *servermodels.AgentRun, string, domain.MessageType, string) error
 	laneRevision(context.Context, bun.IDB, agentRunPolicyContext, *servermodels.AgentLane) (string, bool, error)
 	instruction(context.Context, bun.IDB, executionContext) (string, error)
+}
+
+// structuredReplyPolicy 由以结构化结果结束运行的执行范围实现。
+type structuredReplyPolicy interface {
+	groupReply(context.Context, bun.IDB, executionContext) (*agentruntime.GroupReplyConfig, error)
+	applyMentions(context.Context, bun.IDB, agentRunPolicyContext, *servermodels.AgentRun, string, []string) error
 }
 
 type lockedAgentRun struct {

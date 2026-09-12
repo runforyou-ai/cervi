@@ -68,6 +68,11 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 		}
 		tools = append(tools, historyTool)
 	}
+	var groupReply *groupReplyTool
+	if request.GroupReply != nil {
+		groupReply = newGroupReplyTool(*request.GroupReply)
+		tools = append(tools, groupReply)
+	}
 	agent, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
 		Name: request.Name, Instruction: request.Instruction, Model: chatModel,
 		ToolsConfig: adk.ToolsConfig{ToolsNodeConfig: compose.ToolsNodeConfig{
@@ -84,7 +89,7 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 	var carriedUsage Usage
 	for attempt := 0; ; attempt++ {
 		execution := &einoExecution{
-			inputs: &turnInputs{feed: feed}, recorder: recorder, maxTurns: request.MaxTurns,
+			inputs: &turnInputs{feed: feed}, recorder: recorder, maxTurns: request.MaxTurns, groupReply: groupReply,
 		}
 		execution.inputs.loop = adk.NewTurnLoop(adk.TurnLoopConfig[Trigger, *schema.Message]{
 			GenInput: execution.genInput,
@@ -106,7 +111,7 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 		if err != nil {
 			return RunResult{}, err
 		}
-		if execution.result.Content == "" || execution.inputs.claimedSeq <= 0 {
+		if (execution.result.Content == "" && execution.result.Outcome != RunOutcomeSilent) || execution.inputs.claimedSeq <= 0 {
 			return RunResult{}, errors.New("agent run stopped without a stable response")
 		}
 		execution.result.Usage = carriedUsage
@@ -118,12 +123,13 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 
 // einoExecution 保存单次运行的上下文、轮次和结果，回调按轮次顺序访问。
 type einoExecution struct {
-	inputs   *turnInputs
-	history  turnHistory
-	recorder *processRecorder
-	maxTurns int
-	turns    int
-	result   RunResult
+	inputs     *turnInputs
+	history    turnHistory
+	recorder   *processRecorder
+	groupReply *groupReplyTool
+	maxTurns   int
+	turns      int
+	result     RunResult
 }
 
 // genInput 认领新输入，并在已有执行上下文后追加尚未消费的会话消息。
@@ -191,12 +197,27 @@ func (e *einoExecution) onAgentEvents(ctx context.Context, turn *adk.TurnContext
 		}
 	}
 	e.history.appendOutput(intermediates)
-	finished, err := e.inputs.finish(ctx, turn, candidate)
+	outcome := RunOutcomeReply
+	var mentions []string
+	// 群内最终结果以结束工具提交的内容为准。
+	submission, submitted := groupReplySubmission{}, false
+	if e.groupReply != nil {
+		submission, submitted = e.groupReply.peek()
+		candidate = ""
+		if submitted {
+			outcome, candidate, mentions = submission.Outcome, submission.Body, submission.Mentions
+		}
+	}
+	finished, err := e.inputs.finish(ctx, turn, candidate, submitted && outcome == RunOutcomeSilent)
 	if err != nil {
 		return err
 	}
+	// 本轮补入新输入时作废已提交结果，由下一轮重新提交。
+	if e.groupReply != nil {
+		e.groupReply.clear()
+	}
 	if finished {
-		e.result.Content = candidate
+		e.result.Outcome, e.result.Content, e.result.Mentions = outcome, candidate, mentions
 	}
 	return nil
 }

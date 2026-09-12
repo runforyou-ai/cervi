@@ -7,7 +7,6 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
-	"slices"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -323,7 +322,7 @@ func normalizeGroupTextMessageInput(input GroupTextMessageInput) (GroupTextMessa
 		seen[normalized] = struct{}{}
 		mentionSubjectIDs = append(mentionSubjectIDs, normalized)
 	}
-	slices.Sort(mentionSubjectIDs)
+	// 提醒顺序决定被点名 AI 员工的发言先后，按发送时的顺序保留。
 	input.MentionSubjectIDs = mentionSubjectIDs
 	return input, fields
 }

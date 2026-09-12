@@ -35,6 +35,7 @@ type agentRunSpec struct {
 	Kind            domain.AgentInputKind
 	SourceSubjectID string
 	SourceOrdinal   int
+	Depth           int
 }
 
 // NewScheduler 创建 Agent 运行调度器。
@@ -44,7 +45,7 @@ func NewScheduler(enqueuer servertask.TxEnqueuer) *Scheduler {
 
 // Schedule 在调用方已锁定会话并保存个人状态的事务内追加 AI 聊天输入。
 func (s *Scheduler) Schedule(ctx context.Context, db bun.IDB, organizationID, conversationID, agentIdentityID, revisionID, messageID, senderSubjectID string) error {
-	return s.scheduleInput(ctx, db, agentRunSpec{
+	return s.appendInput(ctx, db, agentRunSpec{
 		OrganizationID: organizationID, ConversationID: conversationID,
 		AgentIdentityID: agentIdentityID, RevisionID: revisionID,
 		ScopeKind: domain.AgentExecutionScopeConversation, ScopeID: conversationID,
@@ -52,8 +53,8 @@ func (s *Scheduler) Schedule(ctx context.Context, db bun.IDB, organizationID, co
 	}, messageID)
 }
 
-// scheduleInput 追加一条持久输入并确保对应执行范围已有在途运行。
-func (s *Scheduler) scheduleInput(ctx context.Context, db bun.IDB, spec agentRunSpec, messageID string) error {
+// appendInput 追加一条持久输入并确保对应执行范围已有在途运行。
+func (s *Scheduler) appendInput(ctx context.Context, db bun.IDB, spec agentRunSpec, messageID string) error {
 	if s == nil || s.enqueuer == nil {
 		return errors.New("agent run scheduler is unavailable")
 	}
@@ -64,10 +65,10 @@ func (s *Scheduler) scheduleInput(ctx context.Context, db bun.IDB, spec agentRun
 	input := &servermodels.AgentInput{
 		ID: uuid.NewV7().String(), OrganizationID: spec.OrganizationID, LaneID: sequence.LaneID,
 		InputSeq: sequence.DesiredSeq, Kind: string(spec.Kind),
-		SourceMessageID: messageID, SourceSubjectID: spec.SourceSubjectID, SourceOrdinal: spec.SourceOrdinal,
+		SourceMessageID: messageID, SourceSubjectID: spec.SourceSubjectID, SourceOrdinal: spec.SourceOrdinal, Depth: spec.Depth,
 	}
 	if _, err := db.NewInsert().Model(input).
-		Column("id", "organization_id", "lane_id", "input_seq", "kind", "source_message_id", "source_subject_id", "source_ordinal").
+		Column("id", "organization_id", "lane_id", "input_seq", "kind", "source_message_id", "source_subject_id", "source_ordinal", "depth").
 		Exec(ctx); err != nil {
 		return fmt.Errorf("create agent input: %w", err)
 	}

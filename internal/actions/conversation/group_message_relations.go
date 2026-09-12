@@ -81,18 +81,23 @@ func loadGroupMentionTargets(ctx context.Context, db bun.IDB, organizationID, co
 		Where("cp.conversation_id = ?", conversationID).
 		Where("cp.left_at IS NULL").
 		Where("cp.subject_id IN (?)", bun.In(subjectIDs)).
-		OrderExpr("cp.subject_id ASC").
 		Scan(ctx, &rows); err != nil {
 		return nil, fmt.Errorf("load group mention targets: %w", err)
 	}
 	if len(rows) != len(subjectIDs) {
 		return nil, &ConflictError{Reason: ConflictReasonGroupMentionTargetInvalid}
 	}
-	mentions := make([]ConversationMessageMention, 0, len(rows))
+	// 按发送时的提醒顺序返回，供被点名 AI 员工的发言先后使用。
+	targets := make(map[string]groupMentionTargetRow, len(rows))
 	for _, row := range rows {
 		if row.ChatSubjectID == senderSubjectID {
 			return nil, &ConflictError{Reason: ConflictReasonGroupMentionTargetInvalid}
 		}
+		targets[row.ChatSubjectID] = row
+	}
+	mentions := make([]ConversationMessageMention, 0, len(rows))
+	for _, subjectID := range subjectIDs {
+		row := targets[subjectID]
 		mentions = append(mentions, ConversationMessageMention{
 			ChatSubjectID: row.ChatSubjectID, Kind: domain.ChatSubjectKind(row.Kind),
 			SourceID: row.SourceID, DisplayName: row.DisplayName,
@@ -148,7 +153,9 @@ func loadIdempotentGroupMessage(ctx context.Context, db bun.IDB, identity *serve
 		Scan(ctx, &storedMentionSubjectIDs); err != nil {
 		return ConversationMessage{}, true, fmt.Errorf("load idempotent group mentions: %w", err)
 	}
-	if stored.MentionAll != input.MentionAll || !slices.Equal(storedMentionSubjectIDs, input.MentionSubjectIDs) {
+	sentMentionSubjectIDs := append([]string(nil), input.MentionSubjectIDs...)
+	slices.Sort(sentMentionSubjectIDs)
+	if stored.MentionAll != input.MentionAll || !slices.Equal(storedMentionSubjectIDs, sentMentionSubjectIDs) {
 		return ConversationMessage{}, true, &ConflictError{Reason: ConflictReasonIdempotencyMismatch}
 	}
 	saved.Mentions, err = loadPersistedMessageMentions(ctx, db, identity.Organization.ID, saved.ID)

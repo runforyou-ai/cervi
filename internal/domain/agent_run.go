@@ -19,11 +19,20 @@ const (
 	AgentExecutionScopeServiceSession AgentExecutionScopeKind = "service_session"
 )
 
+// AgentRunOutcome 定义一次运行的公开发言形式。
+type AgentRunOutcome string
+
+const (
+	AgentRunOutcomeReply  AgentRunOutcome = "reply"
+	AgentRunOutcomeSilent AgentRunOutcome = "silent"
+)
+
 // AgentInputKind 定义 Agent 持久输入的业务入口。
 type AgentInputKind string
 
 const (
 	AgentInputKindMention      AgentInputKind = "mention"
+	AgentInputKindHandoff      AgentInputKind = "handoff"
 	AgentInputKindAgentDirect  AgentInputKind = "agent_direct"
 	AgentInputKindCustomerAuto AgentInputKind = "customer_auto"
 )

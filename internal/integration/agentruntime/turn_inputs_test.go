@@ -65,7 +65,7 @@ func TestTurnInputsOrdersPollingAndFinish(t *testing.T) {
 					done <- inputs.poll(ctx, false)
 				} else {
 					var err error
-					finished, err = inputs.finish(ctx, turn, "旧回答")
+					finished, err = inputs.finish(ctx, turn, "旧回答", false)
 					done <- err
 				}
 			}()
@@ -76,7 +76,7 @@ func TestTurnInputsOrdersPollingAndFinish(t *testing.T) {
 			}
 			var err error
 			if late {
-				finished, err = inputs.finish(ctx, turn, "旧回答")
+				finished, err = inputs.finish(ctx, turn, "旧回答", false)
 			} else {
 				err = inputs.poll(ctx, false)
 			}
