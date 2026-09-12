@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"testing"
 
 	"github.com/runforyou-ai/cervi/internal/appservice"
@@ -35,7 +36,8 @@ func TestInboxPaginationHTTP(t *testing.T) {
 		before string
 	}{
 		{"", 50, "", ""},
-		{"?scope=customer&customerView=coworkers&assigneeIdentityId=peer&limit=7&cursor=original-boundary", 7, "original-boundary", ""},
+		{"?scope=customer&customerView=coworkers&assigneeIdentityId=peer&channelId=channel&serviceStatus=closed&limit=7&cursor=original-boundary", 7, "original-boundary", ""},
+		{"?scope=internal&kinds=group&kinds=direct&limit=9", 9, "", ""},
 		{"?scope=internal&beforeCursor=previous-boundary&limit=8", 8, "", "previous-boundary"},
 	} {
 		response := doJSON(t, http.MethodGet, server.URL+"/inbox"+test.query, nil, "token")
@@ -45,8 +47,12 @@ func TestInboxPaginationHTTP(t *testing.T) {
 		if response.StatusCode != http.StatusOK || err != nil || backend.input.Limit != test.limit || backend.input.Cursor != test.cursor || backend.input.BeforeCursor != test.before || page.StartCursor != "first" || page.EndCursor != "last" || !page.HasBefore || !page.HasMore || page.NextCursor != "next-page" || page.UnreadCount != 80 || page.AttentionUnreadCount != 70 {
 			t.Fatalf("input=%+v response=%+v err=%v", backend.input, page, err)
 		}
-		if test.cursor != "" && (backend.input.Scope != appservice.InboxScopeCustomer || backend.input.CustomerView != appservice.CustomerInboxViewCoworkers || backend.input.AssigneeIdentityID != "peer") {
+		if test.cursor != "" && (backend.input.Scope != appservice.InboxScopeCustomer || backend.input.CustomerView != appservice.CustomerInboxViewCoworkers ||
+			backend.input.AssigneeIdentityID != "peer" || backend.input.ChannelID != "channel" || backend.input.ServiceStatus != appservice.ServiceSessionStatusClosed) {
 			t.Fatalf("filters lost=%+v", backend.input)
+		}
+		if test.limit == 9 && !slices.Equal(backend.input.Kinds, []appservice.ConversationType{appservice.ConversationTypeGroup, appservice.ConversationTypeDirect}) {
+			t.Fatalf("kinds lost=%+v", backend.input)
 		}
 	}
 	for _, value := range []string{"0", "-1", "abc"} {

@@ -1114,7 +1114,7 @@ export interface CustomerInboxConversation {
 }
 
 /**
- * CustomerInboxView 表示客户会话队列视图。
+ * CustomerInboxView 表示客户会话的处理归属视图。
  */
 export enum CustomerInboxView {
     /**
@@ -1125,7 +1125,6 @@ export enum CustomerInboxView {
     CustomerInboxViewQueue = "queue",
     CustomerInboxViewMine = "mine",
     CustomerInboxViewCoworkers = "coworkers",
-    CustomerInboxViewClosed = "closed",
 };
 
 /**
@@ -1456,6 +1455,23 @@ export interface InboxAssignee {
 }
 
 /**
+ * InboxChannel 定义收件箱渠道筛选候选。
+ */
+export interface InboxChannel {
+    "id": string;
+    "type": ChannelType;
+    "name": string;
+    "enabled": boolean;
+}
+
+/**
+ * InboxChannelList 定义收件箱渠道筛选候选列表。
+ */
+export interface InboxChannelList {
+    "channels": InboxChannel[] | null;
+}
+
+/**
  * InboxContext 独立返回锚点资格，列表只渲染 Window，Anchor 可与窗口行重叠。
  */
 export interface InboxContext {
@@ -1535,6 +1551,9 @@ export interface InboxQuery {
     "scope": InboxScope;
     "customerView": CustomerInboxView;
     "assigneeIdentityId": string;
+    "channelId": string;
+    "serviceStatus": ServiceSessionStatus;
+    "kinds": ConversationType[] | null;
 }
 
 /**
@@ -1898,6 +1917,9 @@ export interface LoadInboxInput {
     "scope": InboxScope;
     "customerView": CustomerInboxView;
     "assigneeIdentityId": string;
+    "channelId": string;
+    "serviceStatus": ServiceSessionStatus;
+    "kinds": ConversationType[] | null;
     "cursor": string;
     "beforeCursor": string;
     "limit": number;

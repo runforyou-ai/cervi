@@ -9,7 +9,6 @@ import {
   isAgentInboxConversation,
   isDirectInboxConversation,
   isGroupInboxConversation,
-  InboxScope,
   ConversationStatus,
   MessageType,
   ServiceSessionStatus,
@@ -20,7 +19,7 @@ import {
   type GroupInboxConversationData,
 } from "@/api"
 import {
-  MobileCustomerFilter,
+  MobileInboxFilter,
   MobileInboxScopes,
   useMobileInboxQuery,
 } from "@/apps/mobile/mobile-inbox-navigation"
@@ -265,11 +264,9 @@ function MobileInboxList({ query, changeQuery }: ReturnType<typeof useMobileInbo
         }
       />
       <MobileInboxScopes scope={query.scope} onChange={changeQuery} />
-      {query.scope === InboxScope.InboxScopeCustomer ? (
-        <div className="flex h-11 shrink-0 items-center border-b">
-          <MobileCustomerFilter query={query} onChange={changeQuery} onOpenChange={viewport.setMenu} />
-        </div>
-      ) : null}
+      <div className="flex h-11 shrink-0 items-center border-b">
+        <MobileInboxFilter query={query} onChange={changeQuery} onOpenChange={viewport.setMenu} />
+      </div>
       <InboxListPanel list={list} viewport={viewport} mobile>
         {initial && !list.error ? (
           <LoadingIndicator className="min-h-64 flex-1 justify-center">

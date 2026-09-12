@@ -1,4 +1,5 @@
-/** 消息页中栏顶部操作行。 */
+/** 会话列表列的顶部操作行。 */
+import type { ReactNode } from "react"
 import { PanelLeftIcon, PlusIcon, SearchIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
@@ -10,17 +11,19 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 
-/** 顶部操作行：收纳范围栏、搜索占位和发起会话菜单。 */
+/** 顶部操作行：收纳范围栏、搜索占位、当前范围筛选和发起会话菜单。 */
 export function InboxPaneTop({
   railCollapsed,
   onRailToggle,
   onCreateGroup,
   onCreateAgent,
+  filter,
 }: {
   railCollapsed: boolean
   onRailToggle: () => void
   onCreateGroup: () => void
   onCreateAgent: () => void
+  filter: ReactNode
 }) {
   const { t } = useTranslation("inbox")
 
@@ -51,6 +54,7 @@ export function InboxPaneTop({
           className="h-9 w-full rounded-md border border-transparent bg-muted px-8 text-sm text-foreground opacity-50"
         />
       </div>
+      {filter}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <Button

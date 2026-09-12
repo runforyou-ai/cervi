@@ -2337,7 +2337,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		}
 		assertInboxConversationPresence(t, allAfterWebsiteClose, websiteInbound.Conversation.ID, false)
 		closedInboxPage, _, err := inboxQuery.Execute(context.Background(), loggedIn.Identity, inboxaction.LoadInput{
-			Scope: domain.InboxScopeCustomer, CustomerView: domain.CustomerInboxViewClosed,
+			Scope: domain.InboxScopeCustomer, CustomerView: domain.CustomerInboxViewMine, ServiceStatus: domain.ServiceSessionStatusClosed,
 		})
 		closedInbox := closedInboxPage.Conversations
 		if err != nil {

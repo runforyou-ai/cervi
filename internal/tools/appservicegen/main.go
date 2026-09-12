@@ -65,6 +65,7 @@ const (
 	queryInt
 	queryOptionalEnum
 	queryNamedString
+	queryEnumList
 )
 
 // queryField 描述查询结构体中的一个字段。
@@ -451,6 +452,13 @@ func parseQueryFields(structType *ast.StructType) (queryStruct, error) {
 			}
 			entry.kind = queryOptionalEnum
 			entry.enumType = ident.Name
+		case *ast.ArrayType:
+			ident, ok := fieldType.Elt.(*ast.Ident)
+			if !ok || ident.Name == "string" {
+				return queryStruct{}, fmt.Errorf("field %s: unsupported slice element type", entry.fieldName)
+			}
+			entry.kind = queryEnumList
+			entry.enumType = ident.Name
 		default:
 			return queryStruct{}, fmt.Errorf("field %s: unsupported query field type", entry.fieldName)
 		}
@@ -672,6 +680,8 @@ func generateAPI(methods []method, queryStructs map[string]queryStruct) []byte {
 				fmt.Fprintf(builder, "\t\t%s: appservice.%s(c.Query(%q)),\n", field.fieldName, field.enumType, field.queryName)
 			case queryOptionalEnum:
 				fmt.Fprintf(builder, "\t\t%s: optionalEnum[appservice.%s](c.Query(%q)),\n", field.fieldName, field.enumType, field.queryName)
+			case queryEnumList:
+				fmt.Fprintf(builder, "\t\t%s: enumList[appservice.%s](c.QueryArray(%q)),\n", field.fieldName, field.enumType, field.queryName)
 			case queryInt:
 				fmt.Fprintf(builder, "\t\t%s: %s,\n", field.fieldName, lowerFirst(field.fieldName))
 			}
@@ -754,6 +764,8 @@ func generateProxy(methods []method, queryStructs map[string]queryStruct) []byte
 				fmt.Fprintf(builder, "\tsetQuery(query, %q, string(input.%s))\n", field.queryName, field.fieldName)
 			case queryOptionalEnum:
 				fmt.Fprintf(builder, "\tsetOptionalQuery(query, %q, input.%s)\n", field.queryName, field.fieldName)
+			case queryEnumList:
+				fmt.Fprintf(builder, "\tsetListQuery(query, %q, input.%s)\n", field.queryName, field.fieldName)
 			case queryInt:
 				fmt.Fprintf(builder, "\tsetPositiveQuery(query, %q, input.%s)\n", field.queryName, field.fieldName)
 			}

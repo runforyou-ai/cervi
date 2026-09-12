@@ -1,4 +1,4 @@
-/** 客户范围的服务视图筛选。 */
+/** 客户范围的处理归属视图切换。 */
 import { CheckIcon, ChevronDownIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
@@ -15,7 +15,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import { cn } from "@/lib/utils"
 
-/** 客户范围的四个服务视图；同事视图在下拉中继续选择具体客服。 */
+/** 客户范围的处理归属视图；同事视图在下拉中继续选择具体客服。 */
 export function InboxCustomerQueueFilter({
   view,
   assigneeIdentityId,
@@ -49,7 +49,7 @@ export function InboxCustomerQueueFilter({
 
   function tabClass(active: boolean) {
     return cn(
-      "relative h-9 min-w-0 flex-1 rounded-md px-1 text-center text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring",
+      "relative h-9 min-w-0 flex-1 rounded-md px-1 text-center text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50",
       active
         ? "text-foreground"
         : "text-muted-foreground hover:text-foreground",
@@ -87,6 +87,9 @@ export function InboxCustomerQueueFilter({
           </button>
         )
       })}
+      <button type="button" role="tab" aria-selected={false} disabled className={tabClass(false)}>
+        <span className="block truncate">{t("queueFilterMentions")}</span>
+      </button>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button
@@ -158,16 +161,6 @@ export function InboxCustomerQueueFilter({
           ))}
         </DropdownMenuContent>
       </DropdownMenu>
-      <button
-        type="button"
-        role="tab"
-        aria-selected={view === CustomerInboxView.CustomerInboxViewClosed}
-        className={tabClass(view === CustomerInboxView.CustomerInboxViewClosed)}
-        onClick={() => onChange(CustomerInboxView.CustomerInboxViewClosed)}
-      >
-        <span className="block truncate">{t("queueFilterClosed")}</span>
-        {activeIndicator(view === CustomerInboxView.CustomerInboxViewClosed)}
-      </button>
     </div>
   )
 }

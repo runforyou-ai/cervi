@@ -9,12 +9,11 @@ const (
 	InboxScopeInternal InboxScope = "internal"
 )
 
-// CustomerInboxView 定义客户会话队列视图。
+// CustomerInboxView 定义客户会话的处理归属视图。
 type CustomerInboxView string
 
 const (
 	CustomerInboxViewQueue     CustomerInboxView = "queue"
 	CustomerInboxViewMine      CustomerInboxView = "mine"
 	CustomerInboxViewCoworkers CustomerInboxView = "coworkers"
-	CustomerInboxViewClosed    CustomerInboxView = "closed"
 )

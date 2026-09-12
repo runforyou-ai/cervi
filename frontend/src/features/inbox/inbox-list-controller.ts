@@ -261,11 +261,3 @@ export class InboxListController {
 
 }
 
-/** 规范化查询身份，仅客户范围携带客户筛选。 */
-export function normalizeInboxListQuery(query: InboxQuery): InboxQuery {
-  return {
-    scope: query.scope,
-    customerView: query.scope === "customer" ? query.customerView : "queue" as InboxQuery["customerView"],
-    assigneeIdentityId: query.scope === "customer" && query.customerView === "coworkers" ? query.assigneeIdentityId : "",
-  }
-}

@@ -34,31 +34,44 @@ const (
 	InboxScopeInternal InboxScope = InboxScope(domain.InboxScopeInternal)
 )
 
-// CustomerInboxView 表示客户会话队列视图。
+// CustomerInboxView 表示客户会话的处理归属视图。
 type CustomerInboxView string
 
 const (
 	CustomerInboxViewQueue     CustomerInboxView = CustomerInboxView(domain.CustomerInboxViewQueue)
 	CustomerInboxViewMine      CustomerInboxView = CustomerInboxView(domain.CustomerInboxViewMine)
 	CustomerInboxViewCoworkers CustomerInboxView = CustomerInboxView(domain.CustomerInboxViewCoworkers)
-	CustomerInboxViewClosed    CustomerInboxView = CustomerInboxView(domain.CustomerInboxViewClosed)
 )
 
 // InboxQuery 定义与分页边界无关的会话筛选。
 type InboxQuery struct {
-	Scope              InboxScope        `json:"scope" query:"scope"`
-	CustomerView       CustomerInboxView `json:"customerView" query:"customerView"`
-	AssigneeIdentityID string            `json:"assigneeIdentityId" query:"assigneeIdentityId"`
+	Scope              InboxScope           `json:"scope" query:"scope"`
+	CustomerView       CustomerInboxView    `json:"customerView" query:"customerView"`
+	AssigneeIdentityID string               `json:"assigneeIdentityId" query:"assigneeIdentityId"`
+	ChannelID          string               `json:"channelId" query:"channelId"`
+	ServiceStatus      ServiceSessionStatus `json:"serviceStatus" query:"serviceStatus"`
+	Kinds              []ConversationType   `json:"kinds" query:"kinds"`
 }
 
 // LoadInboxInput 定义统一收件箱筛选和分页边界。
 type LoadInboxInput struct {
-	Scope              InboxScope        `json:"scope" query:"scope"`
-	CustomerView       CustomerInboxView `json:"customerView" query:"customerView"`
-	AssigneeIdentityID string            `json:"assigneeIdentityId" query:"assigneeIdentityId"`
-	Cursor             string            `json:"cursor" query:"cursor"`
-	BeforeCursor       string            `json:"beforeCursor" query:"beforeCursor"`
-	Limit              int               `json:"limit" query:"limit,default=50"`
+	Scope              InboxScope           `json:"scope" query:"scope"`
+	CustomerView       CustomerInboxView    `json:"customerView" query:"customerView"`
+	AssigneeIdentityID string               `json:"assigneeIdentityId" query:"assigneeIdentityId"`
+	ChannelID          string               `json:"channelId" query:"channelId"`
+	ServiceStatus      ServiceSessionStatus `json:"serviceStatus" query:"serviceStatus"`
+	Kinds              []ConversationType   `json:"kinds" query:"kinds"`
+	Cursor             string               `json:"cursor" query:"cursor"`
+	BeforeCursor       string               `json:"beforeCursor" query:"beforeCursor"`
+	Limit              int                  `json:"limit" query:"limit,default=50"`
+}
+
+// query 返回不含分页边界的会话筛选。
+func (input LoadInboxInput) query() InboxQuery {
+	return InboxQuery{
+		Scope: input.Scope, CustomerView: input.CustomerView, AssigneeIdentityID: input.AssigneeIdentityID,
+		ChannelID: input.ChannelID, ServiceStatus: input.ServiceStatus, Kinds: input.Kinds,
+	}
 }
 
 // InboxAssignee 定义客户会话负责人摘要。
@@ -72,6 +85,19 @@ type InboxAssignee struct {
 // CustomerServiceAssigneeList 定义客服筛选候选列表。
 type CustomerServiceAssigneeList struct {
 	Assignees []InboxAssignee `json:"assignees"`
+}
+
+// InboxChannel 定义收件箱渠道筛选候选。
+type InboxChannel struct {
+	ID      string      `json:"id"`
+	Type    ChannelType `json:"type"`
+	Name    string      `json:"name"`
+	Enabled bool        `json:"enabled"`
+}
+
+// InboxChannelList 定义收件箱渠道筛选候选列表。
+type InboxChannelList struct {
+	Channels []InboxChannel `json:"channels"`
 }
 
 // ConversationType 表示统一收件箱会话类型。

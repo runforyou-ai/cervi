@@ -147,7 +147,7 @@ func TestMessageSequenceLargeReadAndWindows(t *testing.T) {
 	if _, err := f.db.NewUpdate().Model((*servermodels.Message)(nil)).Set("deleted_at = now()").Where("id = ?", sent[1].ID).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if row := f.inboxRow(t, f.owner, domain.CustomerInboxViewQueue); row.UnreadCount != 1 {
+	if row := f.inboxRow(t, f.owner, domain.CustomerInboxViewQueue, domain.ServiceSessionStatusOpen); row.UnreadCount != 1 {
 		t.Fatalf("deleted read baseline=%+v", row)
 	}
 	result, err := read.Execute(ctx, f.owner, f.conversationID, sent[2].ID, false)

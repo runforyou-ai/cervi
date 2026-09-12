@@ -17,7 +17,11 @@ import (
 // TestInboxCursor 验证微秒与空时间无损往返，并拒绝失效排序版本和筛选。
 func TestInboxCursor(t *testing.T) {
 	identity := &servermodels.Identity{Organization: servermodels.Organization{ID: "organization"}, User: servermodels.User{ID: "user"}}
-	input := LoadInput{Scope: domain.InboxScopeCustomer, CustomerView: domain.CustomerInboxViewCoworkers, AssigneeIdentityID: "019d4e1c-40a5-77dd-82e6-6951f9957ba5"}
+	input := LoadInput{
+		Scope: domain.InboxScopeCustomer, CustomerView: domain.CustomerInboxViewCoworkers,
+		AssigneeIdentityID: "019d4e1c-40a5-77dd-82e6-6951f9957ba5", ChannelID: "019d4e1c-40a5-77dd-82e6-6951f9957ba7",
+		ServiceStatus: domain.ServiceSessionStatusClosed,
+	}
 	activity := time.Date(2026, 9, 9, 0, 0, 0, 123456000, time.UTC)
 	for _, value := range []*time.Time{nil, &activity} {
 		point := inboxCursorPoint{ID: "019d4e1c-40a5-77dd-82e6-6951f9957ba6", LastActivityAt: value}
@@ -53,6 +57,9 @@ func TestInboxCursor(t *testing.T) {
 			func(c *inboxCursor) { c.Scope = domain.InboxScopeAll },
 			func(c *inboxCursor) { c.CustomerView = domain.CustomerInboxViewMine },
 			func(c *inboxCursor) { c.AssigneeIdentityID = "" },
+			func(c *inboxCursor) { c.ChannelID = "" },
+			func(c *inboxCursor) { c.ServiceStatus = domain.ServiceSessionStatusOpen },
+			func(c *inboxCursor) { c.Kinds = []domain.ConversationType{domain.ConversationTypeGroup} },
 			func(c *inboxCursor) { c.ID = "bad" },
 		} {
 			changed := *decoded

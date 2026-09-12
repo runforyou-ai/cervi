@@ -152,7 +152,7 @@ func TestInboxCustomerDetailSnapshot(t *testing.T) {
 	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil)).Execute(ctx, f.member, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
-	closed := inboxaction.LoadInput{Scope: domain.InboxScopeCustomer, CustomerView: domain.CustomerInboxViewClosed}
+	closed := inboxaction.LoadInput{Scope: domain.InboxScopeCustomer, CustomerView: domain.CustomerInboxViewCoworkers, ServiceStatus: domain.ServiceSessionStatusClosed}
 	current, err = query.ReadByIDs(ctx, f.owner, ids, &closed)
 	if err != nil || !current[0].MatchesQuery || current[0].Conversation.Customer.ServiceSessionStatus != domain.ServiceSessionStatusClosed {
 		t.Fatalf("closed=%+v err=%v", current, err)

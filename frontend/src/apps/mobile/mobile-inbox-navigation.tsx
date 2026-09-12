@@ -1,12 +1,15 @@
-/** 移动端消息分类、地址查询和客户筛选面板。 */
+/** 移动端消息分类、地址查询和范围筛选面板。 */
 import { useState } from "react"
 import { useTranslation } from "react-i18next"
 import { useSearchParams } from "react-router"
 
 import {
+  ConversationType,
   CustomerInboxView,
   InboxScope,
+  ServiceSessionStatus,
   listCustomerServiceAssignees,
+  listInboxChannels,
   type LoadInboxQuery,
 } from "@/api"
 import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
@@ -19,9 +22,15 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
+import {
+  inboxKindOptionsForScope,
+  inboxQueryFromSearch,
+  normalizeInboxQuery,
+  toggleInboxKinds,
+  writeInboxQuerySearch,
+} from "@/features/inbox/inbox-query"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
-import { optionalWailsEnum } from "@/lib/wails-enum"
 import { cn } from "@/lib/utils"
 
 const scopes = [
@@ -40,47 +49,24 @@ const customerViews = [
     value: CustomerInboxView.CustomerInboxViewCoworkers,
     label: "queueFilterColleague",
   },
-  {
-    value: CustomerInboxView.CustomerInboxViewClosed,
-    label: "queueFilterClosed",
-  },
 ] as const
 
 /** 从地址派生与服务端及桌面端一致的完整消息查询。 */
 export function useMobileInboxQuery() {
   const [params, setParams] = useSearchParams()
-  const scope =
-    optionalWailsEnum(InboxScope, params.get("scope")) ??
-    InboxScope.InboxScopeAll
-  const customerView =
-    scope === InboxScope.InboxScopeCustomer
-      ? (optionalWailsEnum(CustomerInboxView, params.get("view")) ??
-        CustomerInboxView.CustomerInboxViewQueue)
-      : CustomerInboxView.CustomerInboxViewQueue
-  const assigneeIdentityId =
-    customerView === CustomerInboxView.CustomerInboxViewCoworkers
-      ? (params.get("assignee") ?? "")
-      : ""
-  const query = { scope, customerView, assigneeIdentityId }
+  const query = inboxQueryFromSearch(params)
 
   /** 更换筛选时替换当前列表地址并保留导航层级。 */
   function changeQuery(changes: LoadInboxQuery) {
-    const next = { ...query, ...changes }
     const search = new URLSearchParams()
-    if (next.scope !== InboxScope.InboxScopeAll) search.set("scope", next.scope)
-    if (next.scope === InboxScope.InboxScopeCustomer) {
-      if (next.customerView !== CustomerInboxView.CustomerInboxViewQueue)
-        search.set("view", next.customerView)
-      if (
-        next.customerView === CustomerInboxView.CustomerInboxViewCoworkers &&
-        next.assigneeIdentityId
-      )
-        search.set("assignee", next.assigneeIdentityId)
-    }
+    writeInboxQuerySearch(search, normalizeInboxQuery({ ...query, ...changes }))
     setParams(search, { replace: true })
   }
   return { query, changeQuery }
 }
+
+/** 移动端当前列表的完整筛选。 */
+export type MobileInboxQuery = ReturnType<typeof useMobileInboxQuery>["query"]
 
 /** 展示三个业务范围，内部同时包含单聊和群聊。 */
 export function MobileInboxScopes({
@@ -174,32 +160,61 @@ function MobileCustomerAssignee({
   )
 }
 
-/** 在底部面板中选择客户视图与负责人，取消时保留原筛选。 */
-export function MobileCustomerFilter({
+/** 在底部面板中按当前范围选择筛选条件，取消时保留原筛选。 */
+export function MobileInboxFilter({
   query,
   onChange,
   onOpenChange,
 }: {
-  query: Required<LoadInboxQuery>
+  query: MobileInboxQuery
   onChange: (query: LoadInboxQuery) => void
   onOpenChange: (open: boolean) => void
 }) {
   const { t } = useTranslation("inbox")
   const { t: tMobile } = useTranslation(["mobile", "common"])
+  const customer = query.scope === InboxScope.InboxScopeCustomer
   const [open, setOpen] = useState(false)
   const [view, setView] = useState(query.customerView)
   const [assignee, setAssignee] = useState(query.assigneeIdentityId)
+  const [channel, setChannel] = useState(query.channelId)
+  const [status, setStatus] = useState(query.serviceStatus)
+  const [kinds, setKinds] = useState<ConversationType[]>(query.kinds)
   const { data } = useResource(
     resourceKeys.customerServiceAssignees(),
     listCustomerServiceAssignees,
     { enabled: Boolean(query.assigneeIdentityId), staleTime: 0 },
   )
+  const { data: channels = [] } = useResource(
+    resourceKeys.inboxChannels(),
+    listInboxChannels,
+    { enabled: customer, staleTime: 0 },
+  )
   const selected = data?.find(
     (item) => item.identityId === query.assigneeIdentityId,
   )
+  const options = inboxKindOptionsForScope(query.scope)
   const viewLabel = customerViews.find(
     (item) => item.value === query.customerView,
   )!.label
+  const summary = customer
+    ? [
+        t(viewLabel),
+        query.assigneeIdentityId
+          ? (selected?.displayName ?? tMobile("inbox.selectedAssignee"))
+          : "",
+        channels.find((item) => item.id === query.channelId)?.name ?? "",
+        query.serviceStatus === ServiceSessionStatus.ServiceSessionStatusClosed
+          ? t("filterServiceStatusClosed")
+          : "",
+      ]
+    : [
+        query.kinds.length
+          ? options
+              .filter((option) => query.kinds.includes(option.kind))
+              .map((option) => t(option.label))
+              .join("、")
+          : t("filterKind"),
+      ]
   return (
     <Sheet
       open={open}
@@ -207,6 +222,9 @@ export function MobileCustomerFilter({
         if (next) {
           setView(query.customerView)
           setAssignee(query.assigneeIdentityId)
+          setChannel(query.channelId)
+          setStatus(query.serviceStatus)
+          setKinds(query.kinds)
         }
         setOpen(next)
         onOpenChange(next)
@@ -220,10 +238,7 @@ export function MobileCustomerFilter({
           <span className="min-w-0 truncate">
             {tMobile("inbox.filter")}
             {"："}
-            {t(viewLabel)}
-            {query.assigneeIdentityId
-              ? ` · ${selected?.displayName ?? tMobile("inbox.selectedAssignee")}`
-              : ""}
+            {summary.filter(Boolean).join(" · ")}
           </span>
         </Button>
       </SheetTrigger>
@@ -234,7 +249,7 @@ export function MobileCustomerFilter({
         className="max-h-[calc(100dvh-env(safe-area-inset-top)-1rem)] gap-0 rounded-t-2xl pb-[env(safe-area-inset-bottom)]"
       >
         <SheetHeader className="flex-row items-center border-b">
-          <SheetTitle className="flex-1">{t("queueFilterLabel")}</SheetTitle>
+          <SheetTitle className="flex-1">{t("filterLabel")}</SheetTitle>
           <SheetClose asChild>
             <Button variant="ghost" className="min-h-11">
               {tMobile("common:actions.cancel")}
@@ -242,38 +257,102 @@ export function MobileCustomerFilter({
           </SheetClose>
         </SheetHeader>
         <div className="overflow-y-auto p-4 space-y-9">
-          <div className="space-y-4">
-            <div
-              role="group"
-              aria-label={t("queueFilterLabel")}
-              className="grid grid-cols-2 gap-2"
-            >
-              {customerViews.map((item) => (
-                <Button
-                  key={item.value}
-                  variant={view === item.value ? "default" : "outline"}
-                  className="min-h-11"
-                  aria-pressed={view === item.value}
-                  onClick={() => setView(item.value)}
-                >
-                  {t(item.label)}
+          {customer ? (
+            <div className="space-y-4">
+              <div
+                role="group"
+                aria-label={t("queueFilterLabel")}
+                className="grid grid-cols-2 gap-2"
+              >
+                {customerViews.map((item) => (
+                  <Button
+                    key={item.value}
+                    variant={view === item.value ? "default" : "outline"}
+                    className="min-h-11"
+                    aria-pressed={view === item.value}
+                    onClick={() => setView(item.value)}
+                  >
+                    {t(item.label)}
+                  </Button>
+                ))}
+                <Button variant="outline" className="min-h-11" disabled>
+                  {t("queueFilterMentions")}
                 </Button>
-              ))}
+              </div>
+              {view === CustomerInboxView.CustomerInboxViewCoworkers ? (
+                <MobileCustomerAssignee value={assignee} onChange={setAssignee} />
+              ) : null}
+              <div className="space-y-2">
+                <label className="block text-sm font-medium" htmlFor="mobile-inbox-channel">
+                  {t("filterChannel")}
+                </label>
+                <select
+                  id="mobile-inbox-channel"
+                  className="h-11 w-full rounded-md border bg-background px-3 text-sm"
+                  value={channel}
+                  onChange={(event) => setChannel(event.target.value)}
+                >
+                  <option value="">{t("filterAllChannels")}</option>
+                  {channels.map((item) => (
+                    <option key={item.id} value={item.id}>
+                      {item.enabled
+                        ? item.name
+                        : `${item.name}（${t("filterChannelDisabled")}）`}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="space-y-2">
+                <label className="block text-sm font-medium" htmlFor="mobile-inbox-status">
+                  {t("filterServiceStatus")}
+                </label>
+                <select
+                  id="mobile-inbox-status"
+                  className="h-11 w-full rounded-md border bg-background px-3 text-sm"
+                  value={status}
+                  onChange={(event) => setStatus(event.target.value as ServiceSessionStatus)}
+                >
+                  <option value={ServiceSessionStatus.ServiceSessionStatusOpen}>
+                    {t("filterServiceStatusOpen")}
+                  </option>
+                  <option value={ServiceSessionStatus.ServiceSessionStatusClosed}>
+                    {t("filterServiceStatusClosed")}
+                  </option>
+                </select>
+              </div>
             </div>
-            {view === CustomerInboxView.CustomerInboxViewCoworkers ? (
-              <MobileCustomerAssignee value={assignee} onChange={setAssignee} />
-            ) : null}
-          </div>
+          ) : (
+            <fieldset className="space-y-2">
+              <legend className="pb-2 text-sm font-medium">{t("filterKind")}</legend>
+              {options.map((option) => (
+                <label key={option.kind} className="flex min-h-11 items-center gap-3 text-sm">
+                  <input
+                    type="checkbox"
+                    className="size-4 accent-primary"
+                    checked={kinds.includes(option.kind)}
+                    onChange={(event) =>
+                      setKinds(toggleInboxKinds(query.scope, kinds, option.kind, event.target.checked))
+                    }
+                  />
+                  <span>{t(option.label)}</span>
+                </label>
+              ))}
+            </fieldset>
+          )}
           <Button
             className="min-h-11 w-full"
             onClick={() => {
-              onChange({
-                customerView: view,
-                assigneeIdentityId:
-                  view === CustomerInboxView.CustomerInboxViewCoworkers
-                    ? assignee
-                    : "",
-              })
+              onChange(
+                customer
+                  ? {
+                      customerView: view,
+                      assigneeIdentityId:
+                        view === CustomerInboxView.CustomerInboxViewCoworkers ? assignee : "",
+                      channelId: channel,
+                      serviceStatus: status,
+                    }
+                  : { kinds },
+              )
               setOpen(false)
               onOpenChange(false)
             }}

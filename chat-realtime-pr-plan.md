@@ -120,15 +120,15 @@ PR01–PR13 已交付以下能力，后续 PR 直接依赖，不重复定义。
 - **验收：** 带选中会话进入列表时该会话停在窗口顶部，无选中时停在顶部；选中会话不属于当前筛选时读取首页并回到顶部；从已滚动的非空筛选切到空筛选不报错；末页最后一条会话贴到底部，有数据时的轮询不改变列表高度。
 - **验证步骤：** 深处选中会话后切换筛选再切回，核对该会话距容器顶为零；带会话参数刷新地址，核对同样定位。滚到末页测量最后一行到容器底的距离。从已滚动的非空筛选切到空筛选，核对无报错且服务端无游标失效日志。
 
-### PR14A：客服会话按渠道筛选
+### PR14A：收件箱导航重排与范围筛选
 
 - **依赖：** PR14。
-- **范围：** 客户范围新增与队列视图正交的渠道筛选，公共、我的、同事和已关闭四个视图共用同一个渠道条件；单选一个渠道实例，`all` 与 `internal` 范围不提供该筛选。新增收件箱渠道候选查询，包含已停用渠道。
-- **落点：** `actions/inbox/load_inbox.go` 的 `LoadInput` 与 `filterCustomerInbox`、`actions/inbox/cursor.go`、新增 `actions/inbox/list_channels.go`、appservice `types_inbox.go` 与 `Backend`、`inbox-route.tsx`、`inbox-page.tsx`、`inbox-list-controller.ts`、`resource-keys.ts`、`mobile-inbox-navigation.tsx`。
-- **实施：** `filterCustomerInbox` 在既有 `cci` 关联上追加渠道条件，不新增 JOIN；`inboxCursor` 携带渠道并在解码时校验，排序版本不变。渠道候选返回本企业全部消息渠道并按类型和名称排序，不按是否产生过会话收敛。前端把筛选维度整体参与查询 key、游标和请求代次，`scope` 离开 `customer` 时清空渠道参数。
-- **边界：** 本条不新增渠道多选、按渠道类型聚合的筛选，也不改变各视图的资格判断规则。
-- **验收：** 四个客户视图下渠道筛选都生效；停用渠道的历史会话仍可筛出且候选列表保留该渠道；切换渠道使旧游标失效且不串页；`ReadByIDs` 的资格判断随渠道条件收敛；跨企业读不到其他企业渠道。
-- **验证步骤：** 同一联系人在两个渠道各有会话，逐个视图切换渠道核对结果集；翻到第二页后切换渠道，断言不出现上一渠道的尾页；停用一个渠道后其历史会话仍在筛选结果中；切到「全部」和「内部」时 URL 与请求都不带渠道参数。覆盖 Web／桌面端及移动端，运行契约生成、前端与服务端测试和构建。
+- **范围：** 会话范围纵栏延伸到中栏顶端，搜索、筛选和新建归入会话列表列头部；客户视图收敛为「排队中、我负责的、@我的、同事」，@我的按阶段 1E 交付前保持禁用占位。新增按当前范围提供条件的筛选浮层：客户范围为渠道加服务状态，全部与内部范围为会话类型多选。`CustomerInboxView` 去掉 `closed`，已关闭改由服务状态条件表达。新增收件箱渠道候选查询，包含已停用渠道。
+- **落点：** `domain/inbox.go`、`actions/inbox/load_inbox.go` 的 `LoadInput` 与 `filterCustomerInbox`、`actions/inbox/candidates.go`、`actions/inbox/cursor.go`、appservice `types_inbox.go`、`backend.go` 与 `direct_backend_inbox.go`、`tools/appservicegen`、新增 `components/ui/popover.tsx` 与 `features/inbox/inbox-filter.tsx`、`inbox-page.tsx`、`inbox-pane-top.tsx`、`inbox-customer-queue-filter.tsx`、`inbox-route.tsx`、`inbox-list-controller.ts`、`resource-keys.ts`、`mobile-inbox-navigation.tsx`、`mobile-inbox-page.tsx`。
+- **实施：** `filterCustomerInbox` 在既有 `cci` 关联上追加渠道条件并按输入的服务状态取值，不新增 JOIN；`listCandidates` 按选中的会话类型决定参与 UNION 的分支，勾满全部类型归一化为不限类型。客户队列条件只在客户范围解释，其他范围一律按空条件读取。`inboxCursor` 携带渠道、服务状态和类型并在解码时校验，排序版本不变。渠道候选复用消息渠道查询，返回本企业全部渠道并按类型和名称排序。生成器新增枚举切片查询参数支持，`kinds` 以重复查询参数传输。筛选触发按钮为固定宽度图标，已设置条件只用角标表示，不改变相邻搜索框宽度。
+- **边界：** 本条不实现 @我的 视图本身、不新增渠道多选、不提供已读或未读筛选，也不改变各视图的资格判断规则。
+- **验收：** 三个客户视图与两种服务状态的组合都按字面查询，无结果即空列表；停用渠道的历史会话仍可筛出且候选列表保留该渠道；切换任一筛选维度使旧游标失效且不串页；`ReadByIDs` 的资格判断随渠道和类型条件收敛；范围外条件被规范化清空，跨范围类型和非法渠道编号返回校验错误。
+- **验证步骤：** 同一联系人在两个渠道各有会话，逐个视图切换渠道核对结果集；关闭一条本人负责的会话，在「我负责的 + 已关闭」中查到；内部范围只勾群聊时仅返回群聊；切到「全部」和「内部」时 URL 与请求都不带渠道和状态参数。覆盖 Web／桌面端及移动端，运行契约生成、前端与服务端测试和构建。
 
 ### PR15：成员发送气泡与查询结果收敛
 

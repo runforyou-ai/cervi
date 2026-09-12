@@ -570,6 +570,13 @@ export function ListCustomerServiceAssignees(meta: $models.RequestMeta): $Cancel
 }
 
 /**
+ * ListInboxChannels 返回收件箱渠道筛选候选，含已停用渠道。
+ */
+export function ListInboxChannels(meta: $models.RequestMeta): $CancellablePromise<$models.InboxChannelList> {
+    return $Call.ByID(2469961758, meta);
+}
+
+/**
  * ListKnowledgeBases 返回当前企业的知识库列表。
  */
 export function ListKnowledgeBases(meta: $models.RequestMeta): $CancellablePromise<$models.KnowledgeBaseList> {

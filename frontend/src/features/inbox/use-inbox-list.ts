@@ -5,7 +5,7 @@ import { getInboxContext, loadInbox, readInboxConversations, readInboxWindow, ty
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceReader } from "@/hooks/use-resource"
 import { clearConversationResources } from "./conversation-resources"
-import { InboxListController, normalizeInboxListQuery, type InboxListBookmark } from "./inbox-list-controller"
+import { InboxListController, type InboxListBookmark } from "./inbox-list-controller"
 import { memberChatPollingInterval } from "./use-member-chat-polling"
 
 import type { useInboxListViewport } from "./use-inbox-list-viewport"
@@ -24,8 +24,7 @@ type InboxListOptions = {
 export function useInboxList(input: InboxQuery, viewport: InboxListViewport, options: InboxListOptions) {
   const { identity, active, history } = options
   const client = useQueryClient()
-  const scope = normalizeInboxListQuery(input)
-  const query = useMemo(() => scope, [scope.scope, scope.customerView, scope.assigneeIdentityId])
+  const query = useMemo(() => input, [input.scope, input.customerView, input.assigneeIdentityId, input.channelId, input.serviceStatus, input.kinds?.join(",")])
   const owner = useMemo(() => ({ organizationId: identity.organization.id, userId: identity.user.id }), [identity.organization.id, identity.user.id])
   const headKey = resourceKeys.inbox({ ...owner, ...query })
   // 为首页查询登记观察者，让会话资源清理按已挂载列表处理该 key。

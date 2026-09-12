@@ -423,6 +423,13 @@ func setOptionalQuery[T ~string](query url.Values, name string, value *T) {
 	}
 }
 
+// setListQuery 按顺序写入重复查询参数。
+func setListQuery[T ~string](query url.Values, name string, values []T) {
+	for _, value := range values {
+		query.Add(name, string(value))
+	}
+}
+
 // setPositiveQuery 在值为正数时写入查询参数。
 func setPositiveQuery(query url.Values, name string, value int) {
 	if value > 0 {

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"net/http"
 	"net/http/httptest"
+	"slices"
 	"strings"
 	"testing"
 	"time"
@@ -431,7 +432,9 @@ func TestFileRequestURLs(t *testing.T) {
 func TestBackendInboxPagination(t *testing.T) {
 	remote := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		query := request.URL.Query()
-		if request.URL.Path != "/api/inbox" || query.Get("scope") != "customer" || query.Get("customerView") != "coworkers" || query.Get("assigneeIdentityId") != "peer" || (query.Get("cursor") != "boundary-value" || query.Get("beforeCursor") != "") && (query.Get("beforeCursor") != "boundary-value" || query.Get("cursor") != "") || query.Get("limit") != "7" || request.Header.Get("Authorization") != "Bearer page-token" {
+		if request.URL.Path != "/api/inbox" || query.Get("scope") != "customer" || query.Get("customerView") != "coworkers" || query.Get("assigneeIdentityId") != "peer" ||
+			query.Get("channelId") != "channel" || query.Get("serviceStatus") != "closed" || !slices.Equal(query["kinds"], []string{"customer"}) ||
+			(query.Get("cursor") != "boundary-value" || query.Get("beforeCursor") != "") && (query.Get("beforeCursor") != "boundary-value" || query.Get("cursor") != "") || query.Get("limit") != "7" || request.Header.Get("Authorization") != "Bearer page-token" {
 			t.Errorf("request=%s authorization=%s", request.URL, request.Header.Get("Authorization"))
 		}
 		_ = json.NewEncoder(writer).Encode(appservice.Inbox{Conversations: []appservice.InboxConversation{}, StartCursor: "first", EndCursor: "last", HasBefore: true, NextCursor: "next-boundary", HasMore: true, UnreadCount: 80, AttentionUnreadCount: 70})
@@ -442,7 +445,11 @@ func TestBackendInboxPagination(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, before := range []bool{false, true} {
-		input := appservice.LoadInboxInput{Scope: appservice.InboxScopeCustomer, CustomerView: appservice.CustomerInboxViewCoworkers, AssigneeIdentityID: "peer", Cursor: "boundary-value", Limit: 7}
+		input := appservice.LoadInboxInput{
+			Scope: appservice.InboxScopeCustomer, CustomerView: appservice.CustomerInboxViewCoworkers, AssigneeIdentityID: "peer",
+			ChannelID: "channel", ServiceStatus: appservice.ServiceSessionStatusClosed, Kinds: []appservice.ConversationType{appservice.ConversationTypeCustomer},
+			Cursor: "boundary-value", Limit: 7,
+		}
 		if before {
 			input.Cursor, input.BeforeCursor = "", "boundary-value"
 		}
