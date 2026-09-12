@@ -136,20 +136,29 @@ function AgentTool({ call }: { call: AgentToolCall }) {
   )
 }
 
-/** 沿头像侧对齐思考标题，按服务端块顺序展开思考过程。 */
+/** 沿头像侧对齐思考标题、右上角显示本次模型用量，按服务端块顺序展开思考过程。 */
 export function AgentProcess({ process, incoming }: { process: ConversationAgentProcessData; incoming: boolean }) {
   const { t, i18n } = useTranslation("inbox")
   const seconds = Math.max(0, Math.round(process.durationMilliseconds / 1000))
   return (
     <Collapsible className="mb-3 min-w-0">
-      <CollapsibleTrigger className={cn(
-        "group flex w-full cursor-pointer items-center gap-1.5 rounded-sm py-1 text-left text-xs focus-visible:outline focus-visible:outline-ring",
-        incoming ? "justify-start text-muted-foreground" : "justify-end text-primary-foreground/75",
-      )}>
-        <LightbulbIcon aria-hidden className="size-4 shrink-0 text-yellow-400 dark:text-yellow-300" />
-        <span>{t("agentThoughtCompleted", { seconds })}</span>
-        <ChevronDownIcon aria-hidden className="size-3.5 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
-      </CollapsibleTrigger>
+      <div className="flex items-center gap-3">
+        <CollapsibleTrigger className={cn(
+          "group flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-sm py-1 text-left text-xs focus-visible:outline focus-visible:outline-ring",
+          incoming ? "justify-start text-muted-foreground" : "justify-end text-primary-foreground/75",
+        )}>
+          <LightbulbIcon aria-hidden className="size-4 shrink-0 text-yellow-400 dark:text-yellow-300" />
+          <span className="truncate">{t("agentThoughtCompleted", { seconds })}</span>
+          <ChevronDownIcon aria-hidden className="size-3.5 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
+        </CollapsibleTrigger>
+        <div className={cn(
+          "flex shrink-0 gap-2 text-[11px]",
+          incoming ? "text-muted-foreground" : "text-primary-foreground/75",
+        )}>
+          <span>{t("agentUsageInput", { count: process.inputTokens })}</span>
+          <span>{t("agentUsageOutput", { count: process.outputTokens })}</span>
+        </div>
+      </div>
       <CollapsibleContent className={cn(
         "mt-2 space-y-3 text-left text-sm",
         incoming ? "border-l border-border pl-3" : "border-r border-primary-foreground/30 pr-3",
@@ -172,20 +181,6 @@ export function AgentProcess({ process, incoming }: { process: ConversationAgent
         )}
       </CollapsibleContent>
     </Collapsible>
-  )
-}
-
-/** 在最终正文下方显示本次模型输入和输出用量。 */
-export function AgentProcessUsage({ process, incoming }: { process: ConversationAgentProcessData; incoming: boolean }) {
-  const { t } = useTranslation("inbox")
-  return (
-    <div className={cn(
-      "mt-2 flex gap-4 text-[11px]",
-      incoming ? "justify-start text-muted-foreground" : "justify-end text-primary-foreground/75",
-    )}>
-      <span>{t("agentUsageInput", { count: process.inputTokens })}</span>
-      <span>{t("agentUsageOutput", { count: process.outputTokens })}</span>
-    </div>
   )
 }
 
@@ -228,6 +223,9 @@ export function AgentRunState({ run, incoming, conversationID, group, onStopped 
             incoming ? "right-full mr-2" : "left-full ml-2",
           )}
         />
+        {group && incoming ? (
+          <span className="mb-1 max-w-full truncate text-xs font-medium text-foreground">{senderName}</span>
+        ) : null}
         <div className="flex items-center gap-1.5">
           {cancelled ? <BrainIcon aria-hidden className="size-4" /> : null}
           <span>{label}</span>

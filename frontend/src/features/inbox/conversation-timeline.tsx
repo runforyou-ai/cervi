@@ -59,7 +59,7 @@ import { useConversationReading } from "./use-conversation-reading"
 import { useConversationMessageNavigation } from "./use-conversation-message-navigation"
 import { useConversationMentionNavigation } from "./use-conversation-mention-navigation"
 import { ConversationMentionNavigator } from "./conversation-mention-navigator"
-import { AgentProcess, AgentProcessUsage, AgentQueueState, AgentRunState } from "./agent-process"
+import { AgentProcess, AgentQueueState, AgentRunState } from "./agent-process"
 
 type TimelineMessage = Pick<
   ConversationMessageData,
@@ -950,9 +950,6 @@ function ConversationTimelineContent({
                                       ) : null}
                                     </div> : null}
                                   </div>
-                                  {message.agentProcess ? (
-                                    <AgentProcessUsage process={message.agentProcess} incoming={incoming} />
-                                  ) : null}
                                 </div>
                               </div>
                             </ContextMenuTrigger>

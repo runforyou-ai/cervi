@@ -127,6 +127,8 @@ wails3 task common:build:frontend
 
 需要使用桌面 MCP 时通过 `wails3 task dev:mcp` 启动；普通 `dev` 不启用 MCP。
 
+前端构建和类型检查统一走 Task，不直接调用 `npx vite build` 等底层工具。Wails 的 Vite 插件会在构建时按当前注册的服务重写 `frontend/bindings`，脱离 Task 环境执行会删除属于其他构建目标的绑定文件；误删后用 `git checkout -- frontend/bindings` 还原，不得提交。
+
 ### 代码组织
 
 ```text

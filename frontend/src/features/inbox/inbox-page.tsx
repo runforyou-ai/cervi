@@ -118,6 +118,8 @@ export function InboxPage({
   const queryClient = useQueryClient()
   const { queue } = useAttachmentQueue()
   const [railCollapsed, setRailCollapsed] = useState(false)
+  const paneRef = useRef<HTMLDivElement>(null)
+  const railToggledRef = useRef(false)
   const [chatDraft, setChatDraft] = useState<ChatDraft | null>(null)
   const [isNarrowDetailOpen, setIsNarrowDetailOpen] = useState(false)
   const [agentDialogOpen, setAgentDialogOpen] = useState(false)
@@ -248,8 +250,23 @@ export function InboxPage({
     </div>
   ) : null
 
+  // 收起和展开由两个位置的按钮分别承担，切换后把焦点交给新出现的那个。
+  useEffect(() => {
+    if (!railToggledRef.current) return
+    railToggledRef.current = false
+    paneRef.current
+      ?.querySelector<HTMLButtonElement>("[data-slot=rail-toggle]")
+      ?.focus()
+  }, [railCollapsed])
+
+  /** 切换范围栏并标记本次由用户操作触发。 */
+  function toggleRail(collapsed: boolean) {
+    railToggledRef.current = true
+    setRailCollapsed(collapsed)
+  }
+
   const pane = (
-    <div className="flex min-h-0 flex-1">
+    <div ref={paneRef} className="flex min-h-0 flex-1">
       {railCollapsed ? null : (
         <InboxScopeRail
           scope={scope}
@@ -258,12 +275,13 @@ export function InboxPage({
             setChatDraft(null)
             onQueryChange({ scope: nextScope })
           }}
+          onCollapse={() => toggleRail(true)}
         />
       )}
       <div className="flex min-h-0 min-w-0 flex-1 flex-col">
         <InboxPaneTop
           railCollapsed={railCollapsed}
-          onRailToggle={() => setRailCollapsed((collapsed) => !collapsed)}
+          onRailExpand={() => toggleRail(false)}
           onCreateGroup={() => setGroupDialogOpen(true)}
           onCreateAgent={() => setAgentDialogOpen(true)}
           filter={
