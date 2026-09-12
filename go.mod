@@ -6,7 +6,7 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.46.0
 	github.com/aws/aws-sdk-go-v2/credentials v1.20.3
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.111.0
-	github.com/cloudwego/eino v0.10.0-alpha.31
+	github.com/cloudwego/eino v0.10.0-alpha.32
 	github.com/cloudwego/eino-ext/components/model/openai v0.1.13
 	github.com/eino-contrib/jsonschema v1.0.3
 	github.com/gin-gonic/gin v1.12.0

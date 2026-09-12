@@ -92,7 +92,7 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 		ToolsConfig: adk.ToolsConfig{ToolsNodeConfig: compose.ToolsNodeConfig{
 			Tools: tools, ToolCallMiddlewares: []compose.ToolMiddleware{toolExecutionMiddleware(recorder)},
 		}},
-		Handlers:      []adk.ChatModelAgentMiddleware{recorder, newFinalIterationGuard(maxIterations, groupReply)},
+		Handlers:      []adk.ChatModelAgentMiddleware{recorder, newFinalIterationGuard(maxIterations, groupReply != nil)},
 		MaxIterations: maxIterations,
 	})
 	if err != nil {
@@ -184,12 +184,6 @@ func (e *einoExecution) onAgentEvents(ctx context.Context, turn *adk.TurnContext
 		if event.Err != nil {
 			if _, ok := errors.AsType[*adk.CancelError](event.Err); ok {
 				continue
-			}
-			// 结束工具已提交且迭代预算耗尽时，按已提交结果收尾。
-			if errors.Is(event.Err, adk.ErrExceedMaxIterations) && e.groupReply != nil {
-				if _, submitted := e.groupReply.peek(); submitted {
-					break
-				}
 			}
 			return event.Err
 		}

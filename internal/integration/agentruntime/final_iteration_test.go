@@ -5,7 +5,9 @@ package agentruntime
 import (
 	"context"
 	"errors"
+	"fmt"
 	"slices"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -118,7 +120,7 @@ func TestFinalIterationKeepsGroupReplyTool(t *testing.T) {
 	}
 }
 
-// TestFinalIterationStopsAfterGroupSubmission 验证群内结果提交后移除全部工具，本轮在预算内正常结束。
+// TestFinalIterationStopsAfterGroupSubmission 验证群内结果提交后本轮直接结束，不再规划。
 func TestFinalIterationStopsAfterGroupSubmission(t *testing.T) {
 	chatModel := &toolHungryChatModel{preferGroupReply: true}
 	result := runToolHungryAgent(t, chatModel, RunRequest{
@@ -129,10 +131,68 @@ func TestFinalIterationStopsAfterGroupSubmission(t *testing.T) {
 	}
 	chatModel.mu.Lock()
 	defer chatModel.mu.Unlock()
-	if len(chatModel.toolsByCall) != 2 || len(chatModel.toolsByCall[1]) != 0 {
+	if len(chatModel.toolsByCall) != 1 {
 		t.Fatalf("tools by iteration = %v", chatModel.toolsByCall)
 	}
-	if chatModel.lastUserText != "本轮结果已提交，请直接结束。" {
-		t.Fatalf("final iteration hint = %q", chatModel.lastUserText)
+}
+
+type invalidThenValidChatModel struct {
+	mu    sync.Mutex
+	calls int
+	retry string
+}
+
+// Generate 先提交不合法的点名，再按工具返回的原因重新提交。
+func (m *invalidThenValidChatModel) Generate(_ context.Context, input []*schema.Message, _ ...model.Option) (*schema.Message, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.calls++
+	arguments := `{"outcome":"reply","body":"按已有资料回答"}`
+	if m.calls == 1 {
+		arguments = `{"outcome":"reply","body":"按已有资料回答","mentions":["查无此人"]}`
+	} else {
+		m.retry = input[len(input)-1].Content
+	}
+	return schema.AssistantMessage("", []schema.ToolCall{{
+		ID: fmt.Sprintf("group-reply-call-%d", m.calls), Type: "function",
+		Function: schema.FunctionCall{Name: groupReplyToolName, Arguments: arguments},
+	}}), nil
+}
+
+func (m *invalidThenValidChatModel) Stream(context.Context, []*schema.Message, ...model.Option) (*schema.StreamReader[*schema.Message], error) {
+	return nil, errors.New("unexpected streaming call")
+}
+
+func (m *invalidThenValidChatModel) WithTools([]*schema.ToolInfo) (model.ToolCallingChatModel, error) {
+	return m, nil
+}
+
+// TestGroupReplyRetriesInvalidSubmission 验证提交校验不通过时本轮继续，模型按返回的原因重新提交。
+func TestGroupReplyRetriesInvalidSubmission(t *testing.T) {
+	chatModel := &invalidThenValidChatModel{}
+	runtime := &EinoRuntime{
+		newModel: func(context.Context, ModelConfig) (model.ToolCallingChatModel, error) { return chatModel, nil },
+	}
+	feed := &testInputFeed{}
+	feed.appendUser("帮我看下")
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
+	defer cancel()
+	result, err := runtime.Run(ctx, RunRequest{
+		RunID: "invalid-submission-run", Name: "test-agent", MaxIterations: 5, MaxTurns: 2,
+		GroupReply: &GroupReplyConfig{MentionCandidates: []string{"产品经理"}},
+	}, feed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if result.Outcome != RunOutcomeReply || result.Content != "按已有资料回答" || len(result.Mentions) != 0 {
+		t.Fatalf("result = %#v", result)
+	}
+	chatModel.mu.Lock()
+	defer chatModel.mu.Unlock()
+	if chatModel.calls != 2 {
+		t.Fatalf("model calls = %d, want 2", chatModel.calls)
+	}
+	if !strings.Contains(chatModel.retry, "不在可点名范围内") {
+		t.Fatalf("retry hint = %q", chatModel.retry)
 	}
 }
