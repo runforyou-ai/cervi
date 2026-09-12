@@ -6,7 +6,7 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.46.0
 	github.com/aws/aws-sdk-go-v2/credentials v1.20.3
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.111.0
-	github.com/cloudwego/eino v0.10.0-alpha.29
+	github.com/cloudwego/eino v0.10.0-alpha.31
 	github.com/cloudwego/eino-ext/components/model/openai v0.1.13
 	github.com/gin-gonic/gin v1.12.0
 	github.com/goccy/go-yaml v1.19.2
@@ -20,7 +20,7 @@ require (
 	github.com/uptrace/bun/dialect/pgdialect v1.2.18
 	github.com/uptrace/bun/dialect/sqlitedialect v1.2.18
 	github.com/uptrace/bun/driver/pgdriver v1.2.18
-	github.com/wailsapp/wails/v3 v3.0.0-beta.18
+	github.com/wailsapp/wails/v3 v3.0.0-beta.20
 	golang.org/x/crypto v0.56.0
 	golang.org/x/text v0.41.0
 )
@@ -60,7 +60,6 @@ require (
 	github.com/google/jsonschema-go v0.4.3 // indirect
 	github.com/google/uuid v1.6.0 // indirect
 	github.com/goph/emperror v0.17.2 // indirect
-	github.com/jchv/go-winloader v0.0.0-20250406163304-c1995be93bd1 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
 	github.com/klauspost/compress v1.19.2 // indirect
