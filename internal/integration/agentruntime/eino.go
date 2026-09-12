@@ -73,6 +73,20 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 		groupReply = newGroupReplyTool(*request.GroupReply)
 		tools = append(tools, groupReply)
 	}
+	if len(request.MCPServers) > 0 {
+		// 收齐本次运行的内置工具名称，远程工具重名时由 openMCPTools 跳过。
+		registered := make(map[string]struct{}, len(tools))
+		for _, existing := range tools {
+			info, infoErr := existing.Info(ctx)
+			if infoErr != nil {
+				return RunResult{}, fmt.Errorf("read registered tool info: %w", infoErr)
+			}
+			registered[info.Name] = struct{}{}
+		}
+		mcpTools, releaseSessions := openMCPTools(ctx, request.RunID, request.MCPServers, registered)
+		defer releaseSessions()
+		tools = append(tools, mcpTools...)
+	}
 	agent, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
 		Name: request.Name, Instruction: request.Instruction, Model: chatModel,
 		ToolsConfig: adk.ToolsConfig{ToolsNodeConfig: compose.ToolsNodeConfig{

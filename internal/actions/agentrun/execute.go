@@ -104,6 +104,10 @@ func (a *ExecuteAction) Execute(ctx context.Context, input RunInput) error {
 	if err != nil {
 		return fmt.Errorf("build agent run instruction: %w", err)
 	}
+	mcpServers, err := loadRunMCPServers(ctx, a.db, &execution.Run)
+	if err != nil {
+		return fmt.Errorf("load agent run mcp servers: %w", err)
+	}
 	var groupReply *agentruntime.GroupReplyConfig
 	if structured, ok := policy.(structuredReplyPolicy); ok {
 		groupReply, err = structured.groupReply(ctx, a.db, execution)
@@ -118,6 +122,7 @@ func (a *ExecuteAction) Execute(ctx context.Context, input RunInput) error {
 			Identifier: execution.ModelIdentifier, MaxOutputTokens: maxOutputTokens,
 		},
 		CustomerHistorySearch: customerHistorySearch,
+		MCPServers:            mcpServers,
 		GroupReply:            groupReply,
 		StreamID:              running.progress.StreamID,
 		Attempt:               running.attempt,
