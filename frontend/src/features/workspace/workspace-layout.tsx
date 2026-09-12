@@ -6,6 +6,7 @@ import { toast } from "sonner"
 
 import { logout, WorkStatus } from "@/api"
 import { AttachmentQueueProvider } from "@/features/inbox/attachment-queue-context"
+import { OutgoingMessageProvider } from "@/features/inbox/outgoing-message-context"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { UserPreferencesProvider } from "@/contexts/user-preferences"
 import {
@@ -298,32 +299,34 @@ export function WorkspaceLayout() {
       <WorkspaceNavigationGuard
         tabsEnabled={identity.user.workspaceTabsEnabled}
       >
-        <AttachmentQueueProvider key={identity.user.id}>
-          <div className="cervi-workspace-shell relative flex h-svh min-h-0 w-full overflow-hidden">
-            <WorkspaceNavigation
-              identity={identity}
-              onLogout={handleLogout}
-              loggingOut={loggingOut}
-            />
-            <div
-              aria-hidden="true"
-              className="cervi-workspace-top-drag-region"
-            />
-            <div className="cervi-workspace-content-frame flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl bg-background shadow-sm">
-              {identity.user.workspaceTabsEnabled ? (
-                <WorkspaceTabs
-                  currentTab={currentTab}
-                  context={workspaceContext}
-                />
-              ) : (
-                <WorkspaceSinglePage
-                  href={currentTab.href}
-                  context={workspaceContext}
-                />
-              )}
+        <OutgoingMessageProvider key={identity.user.id}>
+          <AttachmentQueueProvider key={identity.user.id}>
+            <div className="cervi-workspace-shell relative flex h-svh min-h-0 w-full overflow-hidden">
+              <WorkspaceNavigation
+                identity={identity}
+                onLogout={handleLogout}
+                loggingOut={loggingOut}
+              />
+              <div
+                aria-hidden="true"
+                className="cervi-workspace-top-drag-region"
+              />
+              <div className="cervi-workspace-content-frame flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl bg-background shadow-sm">
+                {identity.user.workspaceTabsEnabled ? (
+                  <WorkspaceTabs
+                    currentTab={currentTab}
+                    context={workspaceContext}
+                  />
+                ) : (
+                  <WorkspaceSinglePage
+                    href={currentTab.href}
+                    context={workspaceContext}
+                  />
+                )}
+              </div>
             </div>
-          </div>
-        </AttachmentQueueProvider>
+          </AttachmentQueueProvider>
+        </OutgoingMessageProvider>
       </WorkspaceNavigationGuard>
     </UserPreferencesProvider>
   )

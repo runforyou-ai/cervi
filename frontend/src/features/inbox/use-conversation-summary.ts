@@ -5,6 +5,7 @@ import { getInboxConversation, isNotFoundApiError } from "@/api"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 import { useAttachmentQueue } from "./attachment-queue-context"
+import { useOutgoingMessageStore } from "./outgoing-message-context"
 import { clearConversationResources } from "./conversation-resources"
 import {
   memberChatPollingInterval,
@@ -25,6 +26,7 @@ export async function readConversationSummary(conversationID: string, signal?: A
 export function useConversationSummary(conversationID: string, requireWindowFocus = true) {
   const client = useQueryClient()
   const { queue } = useAttachmentQueue()
+  const outgoingStore = useOutgoingMessageStore()
   const active = useMemberChatPollingActive({ requireWindowFocus })
   const previousActive = useRef(active)
   // 不可用时继续轮询，重新获得阅读资格后自动恢复详情。
@@ -46,7 +48,8 @@ export function useConversationSummary(conversationID: string, requireWindowFocu
   useEffect(() => {
     if (data !== null || !conversationID) return
     queue?.forgetConversation(conversationID)
+    outgoingStore.forgetConversation(conversationID)
     clearConversationResources(client, conversationID)
-  }, [client, conversationID, data, queue])
+  }, [client, conversationID, data, queue, outgoingStore])
   return resource
 }

@@ -17,6 +17,13 @@ const queueCode =
     )
     .replace("export class AttachmentQueue", "class AttachmentQueue") +
   "\nexports.AttachmentQueue = AttachmentQueue;"
+const storeSource = readFileSync(
+  new URL("../src/features/inbox/outgoing-message-store.ts", import.meta.url),
+  "utf8",
+)
+const storeCode =
+  stripTypeScriptTypes(storeSource).replace(/^export /gm, "") +
+  "\nexports.OutgoingMessageStore = OutgoingMessageStore;"
 const uploadSource = readFileSync(
   new URL("../src/api/uploads.ts", import.meta.url),
   "utf8",
@@ -94,7 +101,17 @@ function host(overrides: Record<string, (...args: any[]) => any> = {}) {
     clearInterval,
     console: { warn() {} },
   })
+  const storeExports: Record<string, any> = {}
+  runInNewContext(storeCode, {
+    exports: storeExports,
+    setTimeout,
+    clearTimeout,
+    Map,
+    Set,
+  })
+  const outgoing = new storeExports.OutgoingMessageStore()
   const queue = new exports.AttachmentQueue(
+    outgoing,
     () => {},
     (error: unknown) => errors.push(error),
   )
@@ -108,6 +125,10 @@ function host(overrides: Record<string, (...args: any[]) => any> = {}) {
   }))
   return {
     queue,
+    outgoing,
+    /** 返回当前会话分组内的发送项。 */
+    sent: (conversationID = "conversation") =>
+      outgoing.snapshot().get(conversationID) ?? [],
     files,
     updates,
     errors,
@@ -141,9 +162,10 @@ test("消息尚未入库时不准备上传，会在返回后继续执行单个�
   gate.resolve()
   await settled(() => q.queue.snapshot()[1].stage === "ready")
   assert.equal(q.queue.snapshot().length, 2)
-  assert.equal(q.queue.snapshot()[0].message.body, "")
-  assert.equal(q.queue.snapshot()[1].message.body, "说明")
-  assert.equal(q.queue.snapshot()[1].message.saved.body, "说明")
+  // 取消的附件从发送状态中移除，保留的那条继续入库。
+  assert.equal(q.sent().length, 1)
+  assert.equal(q.sent()[0].body, "说明")
+  assert.equal(q.sent()[0].saved.body, "说明")
   assert.equal(q.queue.snapshot()[0].stage, "cancelled")
   assert.equal(q.counts().prepared, 1)
   assert.equal(q.counts().transfers, 1)
@@ -155,10 +177,10 @@ test("单个附件的说明在本地和保存后始终属于同一条消息", as
   const file = { ...h.files[0], body: "  单个附件说明\n第二行  " }
   h.queue.enqueue([file], "conversation", "", () => {})
   assert.equal(h.queue.snapshot().length, 1)
-  assert.equal(h.queue.snapshot()[0].message.body, "单个附件说明\n第二行")
+  assert.equal(h.sent()[0].body, "单个附件说明\n第二行")
   await settled(() => h.queue.snapshot()[0].stage === "ready")
   assert.equal(h.queue.snapshot().length, 1)
-  assert.equal(h.queue.snapshot()[0].message.saved.body, "单个附件说明\n第二行")
+  assert.equal(h.sent()[0].saved.body, "单个附件说明\n第二行")
 })
 
 test("完成请求期间取消会释放文件，迟到的完成响应不能恢复本地消息", async () => {
@@ -178,6 +200,32 @@ test("完成请求期间取消会释放文件，迟到的完成响应不能恢�
   assert.equal(h.queue.snapshot()[0].stage, "cancelled")
   assert.equal(h.queue.snapshot()[0].selected, null)
   assert.equal(h.queue.snapshot()[0].transfer, null)
+  // 取消成功后发送项随之丢弃，展示交给窗口消息。
+  assert.equal(h.sent().length, 0)
+})
+
+test("取消请求失败时保留失败的发送项与重试入口", async () => {
+  const gate = Promise.withResolvers<void>()
+  let entered = false
+  const updates: any[] = []
+  const h = host({
+    completeAttachmentUpload: async () => {
+      entered = true
+      await gate.promise
+    },
+    updateAttachmentUploads: async (input: any) => {
+      updates.push(input)
+      if (input.status === "cancelled") throw new Error("取消失败")
+    },
+  })
+  h.queue.enqueue(h.files.slice(0, 1), "conversation", "", () => {})
+  await settled(() => entered)
+  await assert.rejects(() => h.queue.cancel("message-1"))
+  gate.resolve()
+  assert.equal(h.queue.snapshot()[0].stage, "failed")
+  // 取消未落地，发送项回到失败态，气泡与重试入口保留。
+  assert.equal(h.sent().length, 1)
+  assert.equal(h.sent()[0].status, "failed")
 })
 
 test("离开页面后入库响应才返回，附件标记失败且不会开始上传", async () => {
@@ -199,6 +247,11 @@ test("离开页面后入库响应才返回，附件标记失败且不会开始�
   )
   assert.equal(q.counts().prepared, 0)
   assert.equal(q.counts().transfers, 0)
+  // 服务端把附件标记失败，发送状态取相同结果。
+  assert.equal(
+    q.sent().map((item: any) => item.status).join(","),
+    "failed,failed",
+  )
 })
 
 test("完成失败后重试复用成功分片，仅重新确认完成", async () => {
@@ -238,7 +291,7 @@ test("入库响应丢失后重试沿用带说明附件的消息编号", async ()
   await settled(() => q.queue.snapshot()[1].stage === "ready")
   assert.equal(JSON.stringify(requests[0]), JSON.stringify(requests[1]))
   assert.equal(q.queue.snapshot()[1].stage, "ready")
-  assert.equal(q.queue.snapshot()[1].message.saved.body, "说明")
+  assert.equal(q.sent()[1].saved.body, "说明")
   assert.equal(requests[0].attachments.length, 2)
   assert.equal(requests[0].attachments[0].body, "")
   assert.equal(requests[0].attachments[1].body, "说明")
@@ -284,10 +337,12 @@ test("失权时清除排队附件，迟到的保存结果不能恢复队列或�
   q.queue.enqueue(q.files, "removed", "", () => { opened++ })
   q.queue.forgetConversation("removed")
   assert.equal(q.queue.snapshot().length, 0)
+  assert.equal(q.sent("removed").length, 0)
   gate.resolve()
   await settled(() => h.counts().batches === 1)
   await new Promise((resolve) => setImmediate(resolve))
   assert.equal(q.queue.snapshot().length, 0)
+  assert.equal(q.sent("removed").length, 0)
   assert.equal(opened, 0)
   assert.equal(q.counts().transfers, 0)
   assert.equal(q.errors.length, 0)

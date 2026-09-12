@@ -7,8 +7,9 @@ import {
   sendAttachmentBatch,
   updateAttachmentUploads,
   type InboxConversation,
+  type MessageAttachment,
 } from "@/api"
-import type { OutgoingConversationMessage } from "./use-outgoing-conversation-messages"
+import type { OutgoingMessageStore } from "./outgoing-message-store"
 
 export type SelectedAttachment = {
   id: string
@@ -23,7 +24,10 @@ export type AttachmentJob = {
   batchID: string
   conversationID: string
   targetIdentityID: string
-  message: OutgoingConversationMessage
+  body: string
+  attachment: MessageAttachment
+  fileID: string
+  messageID: string
   stage: "preparing" | "queued" | "uploading" | "ready" | "failed" | "cancelled"
   selected: SelectedAttachment | null
   previewURL: string
@@ -52,14 +56,17 @@ export class AttachmentQueue {
   private preparingBatch = false
   private disposed = false
   private heartbeat: ReturnType<typeof setInterval> | undefined
+  private outgoing: OutgoingMessageStore
   private refresh: (conversationID: string) => void
   private reportError: (error: unknown) => void
 
-  /** 保存查询刷新和发送错误提示的回调。 */
+  /** 保存发送状态存储、查询刷新回调和发送错误回调。 */
   constructor(
+    outgoing: OutgoingMessageStore,
     refresh: (conversationID: string) => void,
     reportError: (error: unknown) => void,
   ) {
+    this.outgoing = outgoing
     this.refresh = refresh
     this.reportError = reportError
   }
@@ -85,7 +92,7 @@ export class AttachmentQueue {
     this.heartbeat = setInterval(() => {
       const ids = this.jobs
         .filter((job) => job.stage === "queued" || job.stage === "uploading")
-        .map((job) => job.message.saved!.attachment!.id)
+        .map((job) => job.fileID)
       for (let index = 0; index < ids.length; index += 100) {
         void updateAttachmentUploads({
           fileIds: ids.slice(index, index + 100),
@@ -104,41 +111,48 @@ export class AttachmentQueue {
   ) {
     const batchID = crypto.randomUUID()
     const now = Date.now()
-    const jobs: AttachmentJob[] = files.map((selected, index) => ({
-      id: selected.id,
-      batchID,
-      conversationID,
-      targetIdentityID,
-      selected,
-      previewURL: selected.previewURL,
-      transfer: null,
-      bytes: 0,
-      controller: new AbortController(),
-      cancelRequested: false,
-      stage: "preparing",
-      message: {
+    // 草稿尚无会话编号，发送项按对端身份分组。
+    const scopeID =
+      conversationID || (targetIdentityID ? `draft:${targetIdentityID}` : "")
+    const jobs: AttachmentJob[] = files.map((selected, index) => {
+      const attachment: MessageAttachment = {
+        id: selected.id,
+        name: selected.file.name,
+        contentType: selected.file.type,
+        byteSize: selected.file.size,
+        contentUrl: "",
+        uploadStatus: AttachmentUploadStatus.AttachmentUploading,
+        imageWidth: selected.imageWidth,
+        imageHeight: selected.imageHeight,
+      }
+      this.outgoing.start(scopeID, {
         clientMessageID: selected.id,
+        attachment,
         body: selected.body.trim(),
         originatedAt: new Date(now + index).toISOString(),
         replyTo: null,
         mentionSubjectIDs: [],
         mentionAll: false,
         mentionAllToken: null,
-        status: "sending",
-        showSending: true,
-        saved: null,
-        attachment: {
-          id: selected.id,
-          name: selected.file.name,
-          contentType: selected.file.type,
-          byteSize: selected.file.size,
-          contentUrl: "",
-          uploadStatus: AttachmentUploadStatus.AttachmentUploading,
-          imageWidth: selected.imageWidth,
-          imageHeight: selected.imageHeight,
-        },
-      },
-    }))
+      })
+      return {
+        id: selected.id,
+        batchID,
+        conversationID,
+        targetIdentityID,
+        body: selected.body.trim(),
+        attachment,
+        fileID: "",
+        messageID: "",
+        selected,
+        previewURL: selected.previewURL,
+        transfer: null,
+        bytes: 0,
+        controller: new AbortController(),
+        cancelRequested: false,
+        stage: "preparing",
+      }
+    })
     const batch: Batch = {
       id: batchID,
       conversationID,
@@ -160,41 +174,38 @@ export class AttachmentQueue {
     this.preparingBatch = true
     batch.preparing = true
     for (const item of batch.jobs) {
-      if (item.stage !== "cancelled") {
-        item.stage = "preparing"
-        item.message.status = "sending"
-      }
+      if (item.stage !== "cancelled") item.stage = "preparing"
     }
     this.emit()
     try {
       const result = await sendAttachmentBatch({
         conversationId: batch.targetIdentityID ? "" : batch.conversationID,
         targetIdentityId: batch.targetIdentityID,
-        attachments: batch.jobs.map((job) => {
-          const attachment = job.message.attachment!
-          return {
-            clientMessageId: job.id,
-            body: job.message.body,
-            fileName: attachment.name,
-            contentType: attachment.contentType,
-            byteSize: attachment.byteSize,
-            imageWidth: attachment.imageWidth,
-            imageHeight: attachment.imageHeight,
-          }
-        }),
+        attachments: batch.jobs.map((job) => ({
+          clientMessageId: job.id,
+          body: job.body,
+          fileName: job.attachment.name,
+          contentType: job.attachment.contentType,
+          byteSize: job.attachment.byteSize,
+          imageWidth: job.attachment.imageWidth,
+          imageHeight: job.attachment.imageHeight,
+        })),
       })
       if (!this.batches.has(batch.id)) return
       batch.saved = true
       batch.conversationID = result.conversationId
       for (let index = 0; index < batch.jobs.length; index++) {
         const item = batch.jobs[index]
+        const saved = result.messages[index]
         item.conversationID = result.conversationId
-        item.message.saved = result.messages[index]
-        item.message.originatedAt = result.messages[index].originatedAt
-        item.message.status = "sent"
+        item.fileID = saved.attachment!.id
+        item.messageID = saved.id
+        item.attachment = saved.attachment!
+        if (this.disposed) this.outgoing.fail(item.id)
+        else this.outgoing.succeed(item.id, saved)
       }
       for (const job of batch.jobs) {
-        const status = job.message.saved!.attachment!.uploadStatus
+        const status = job.attachment.uploadStatus
         if (
           job.cancelRequested ||
           status === AttachmentUploadStatus.AttachmentCancelled
@@ -222,7 +233,7 @@ export class AttachmentQueue {
       for (const item of batch.jobs) {
         if (item.stage !== "cancelled") {
           item.stage = "failed"
-          item.message.status = "failed"
+          this.outgoing.fail(item.id)
         }
       }
     } finally {
@@ -255,7 +266,7 @@ export class AttachmentQueue {
 
   /** 上传文件后由服务端完成原附件消息，失败时保留执行器供手动重试。 */
   private async upload(job: AttachmentJob) {
-    const fileID = job.message.saved!.attachment!.id
+    const fileID = job.fileID
     try {
       await updateAttachmentUploads({
         fileIds: [fileID],
@@ -277,8 +288,6 @@ export class AttachmentQueue {
       job.stage = "ready"
       job.selected = null
       job.transfer = null
-      job.message.saved!.attachment!.uploadStatus =
-        AttachmentUploadStatus.AttachmentReady
       this.refresh(job.conversationID)
     } catch (error) {
       if (job.cancelRequested || this.disposed || !this.batches.has(job.batchID)) return
@@ -319,17 +328,21 @@ export class AttachmentQueue {
     job.cancelRequested = true
     job.stage = "cancelled"
     job.controller.abort()
+    // 尚未入库的附件直接丢弃发送项，已入库的等取消请求成功后再丢弃。
+    if (!job.fileID) this.outgoing.discard(job.id)
     this.emit()
     try {
-      if (job.message.saved?.attachment?.id) {
+      if (job.fileID) {
         await updateAttachmentUploads({
-          fileIds: [job.message.saved.attachment.id],
+          fileIds: [job.fileID],
           status: AttachmentUploadStatus.AttachmentCancelled,
         })
+        this.outgoing.discard(job.id)
         this.refresh(job.conversationID)
       }
     } catch (error) {
       job.stage = "failed"
+      this.outgoing.fail(job.id)
       throw error
     } finally {
       if (job.previewURL) URL.revokeObjectURL(job.previewURL)
@@ -358,6 +371,7 @@ export class AttachmentQueue {
       job.previewURL = ""
       job.selected = null
       job.transfer = null
+      this.outgoing.discard(job.id)
       this.batches.delete(job.batchID)
     }
     this.jobs = this.jobs.filter((job) => job.conversationID !== conversationID)
@@ -374,6 +388,9 @@ export class AttachmentQueue {
       job.previewURL = ""
       job.selected = null
       job.transfer = null
+      // 未完成的附件在服务端标记失败，发送状态同步为失败。
+      if (job.stage !== "ready" && !job.cancelRequested)
+        this.outgoing.fail(job.id)
     }
     void this.abandon()
   }
@@ -382,12 +399,9 @@ export class AttachmentQueue {
   private async abandon() {
     const ids = this.jobs
       .filter(
-        (job) =>
-          job.message.saved?.attachment?.id &&
-          job.stage !== "ready" &&
-          !job.cancelRequested,
+        (job) => job.fileID && job.stage !== "ready" && !job.cancelRequested,
       )
-      .map((job) => job.message.saved!.attachment!.id)
+      .map((job) => job.fileID)
     for (let index = 0; index < ids.length; index += 100) {
       await updateAttachmentUploads({
         fileIds: ids.slice(index, index + 100),

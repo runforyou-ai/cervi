@@ -11,6 +11,7 @@ import {
 } from "@/api"
 import { useWorkspace } from "@/contexts/workspace-context"
 import { useAttachmentQueue } from "./attachment-queue-context"
+import { useOutgoingMessageStore } from "./outgoing-message-context"
 import { useMemberChatPollingActive } from "./use-member-chat-polling"
 import { InboxPage } from "@/features/inbox/inbox-page"
 import {
@@ -35,11 +36,15 @@ export function InboxRoute() {
   const viewport = useInboxListViewport()
   const { identity, beginUnreadSnapshot, applyUnreadSnapshot } = useWorkspace()
   const { queue } = useAttachmentQueue()
+  const outgoingStore = useOutgoingMessageStore()
   const active = useMemberChatPollingActive()
   const list = useInboxList(query, viewport, {
     identity, active, selectedConversationId,
     unread: (count) => applyUnreadSnapshot(count, beginUnreadSnapshot()),
-    unavailable: (id) => queue?.forgetConversation(id),
+    unavailable: (id) => {
+      queue?.forgetConversation(id)
+      outgoingStore.forgetConversation(id)
+    },
   })
 
   /** 更新收件箱范围和客户视图查询参数。 */

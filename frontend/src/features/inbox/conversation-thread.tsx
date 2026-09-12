@@ -27,10 +27,8 @@ import { useWorkspace } from "@/contexts/workspace-context"
 import { useAttachmentQueue } from "@/features/inbox/attachment-queue-context"
 import { ConversationComposer } from "@/features/inbox/conversation-composer"
 import { ConversationTimeline } from "@/features/inbox/conversation-timeline"
-import {
-  useOutgoingConversationMessages,
-  type OutgoingConversationDraft,
-} from "@/features/inbox/use-outgoing-conversation-messages"
+import { useOutgoingMessages } from "@/features/inbox/outgoing-message-context"
+import type { OutgoingConversationDraft } from "@/features/inbox/outgoing-message-store"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
 import { recoverSession } from "@/lib/session-navigation"
@@ -65,11 +63,20 @@ export function ConversationThread({
   const navigate = useNavigate()
   const pageActive = usePortalContainer()?.active ?? true
   const { identity } = useWorkspace()
-  const outgoing = useOutgoingConversationMessages()
   const { queue: attachmentQueue, jobs: attachmentJobs } = useAttachmentQueue()
   const invalidate = useResourceInvalidator()
   const aliveRef = useRef(true)
   const conversationID = conversation?.id ?? ""
+  // 真人草稿尚无会话编号，发送状态按对端身份分组。
+  const directPeerIdentityID =
+    directTarget?.id ??
+    (conversation && isDirectInboxConversation(conversation)
+      ? conversation.direct.peerIdentityId
+      : "")
+  const outgoing = useOutgoingMessages(
+    conversationID || agentDraftID,
+    directPeerIdentityID ? `draft:${directPeerIdentityID}` : "",
+  )
   const conversationType =
     conversation?.type ??
     (agentDraftID
@@ -163,8 +170,7 @@ export function ConversationThread({
         conversationID={conversationID}
         conversationType={conversationType}
         currentUser={identity.user}
-        // 合并发送中的文本消息与当前会话的附件任务。
-        outgoingMessages={[...outgoing.messages, ...attachmentJobs.filter(job => job.stage !== "cancelled" && (conversationID ? job.conversationID === conversationID : directTarget && job.targetIdentityID === directTarget.id)).map(job => job.message)]}
+        outgoingMessages={outgoing.messages}
         onRetryFailedMessage={(draft) => {
           if (attachmentJobs.some(job => job.id === draft.clientMessageID)) attachmentQueue?.retry(draft.clientMessageID)
           else setRetryDraft(draft)

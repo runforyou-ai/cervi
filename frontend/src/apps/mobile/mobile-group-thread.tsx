@@ -10,10 +10,8 @@ import {
 import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
 import { ConversationComposer } from "@/features/inbox/conversation-composer"
 import { ConversationTimeline } from "@/features/inbox/conversation-timeline"
-import {
-  useOutgoingConversationMessages,
-  type OutgoingConversationDraft,
-} from "@/features/inbox/use-outgoing-conversation-messages"
+import { useOutgoingMessages } from "@/features/inbox/outgoing-message-context"
+import type { OutgoingConversationDraft } from "@/features/inbox/outgoing-message-store"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
 
@@ -30,7 +28,7 @@ export function MobileGroupThread({
   const { t } = useTranslation("mobile")
   const { identity } = useMobileWorkspace()
   const invalidate = useResourceInvalidator()
-  const outgoing = useOutgoingConversationMessages()
+  const outgoing = useOutgoingMessages(conversation.id)
   const [retryDraft, setRetryDraft] =
     useState<OutgoingConversationDraft | null>(null)
   const prepareSendRef = useRef<(() => Promise<boolean>) | null>(null)

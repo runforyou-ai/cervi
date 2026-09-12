@@ -17,6 +17,7 @@ import { MobileGroupThread } from "@/apps/mobile/mobile-group-thread"
 import { useMobileNavigation } from "@/apps/mobile/mobile-navigation"
 import { MobilePageHeader, MobilePageState } from "@/apps/mobile/mobile-page"
 import { LoadingIndicator } from "@/components/loading-indicator"
+import { useOutgoingMessageStore } from "@/features/inbox/outgoing-message-context"
 import { Button } from "@/components/ui/button"
 import {
   memberChatPollingInterval,
@@ -44,6 +45,7 @@ function MobileGroupConversation({
 }) {
   const { t } = useTranslation(["mobile", "inbox", "common"])
   const navigate = useNavigate()
+  const outgoingStore = useOutgoingMessageStore()
   const location = useLocation()
   const navigationState = location.state as {
     mobileBack?: boolean
@@ -77,15 +79,17 @@ function MobileGroupConversation({
   const handleUnavailable = useCallback(() => {
     if (leaving.current) return
     leaving.current = true
+    outgoingStore.forgetConversation(conversationID)
     toast.message(t("group.unavailable"))
     void invalidate(resourceKeys.inbox())
     if (returnDepth > 0) void navigate(-returnDepth)
     else void navigate(inboxURL, { replace: true })
-  }, [inboxURL, invalidate, navigate, returnDepth, t])
+  }, [conversationID, inboxURL, invalidate, navigate, outgoingStore, returnDepth, t])
 
   /** 主动退出后结束访问检测并返回来源列表。 */
   function handleLeft() {
     leaving.current = true
+    outgoingStore.forgetConversation(conversationID)
     if (returnDepth > 0) void navigate(-returnDepth)
     else void navigate(inboxURL, { replace: true })
   }
