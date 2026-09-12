@@ -14,7 +14,6 @@ import (
 type localizedApplicationMenu struct {
 	menu      *application.Menu
 	roleItems map[application.Role]*application.MenuItem
-	learnMore *application.MenuItem
 }
 
 var applicationMenuMessageKeys = map[application.Role]cervii18n.Key{
@@ -23,7 +22,6 @@ var applicationMenuMessageKeys = map[application.Role]cervii18n.Key{
 	application.EditMenu:           cervii18n.AppMenuEdit,
 	application.ViewMenu:           cervii18n.AppMenuView,
 	application.WindowMenu:         cervii18n.AppMenuWindow,
-	application.HelpMenu:           cervii18n.AppMenuHelp,
 	application.About:              cervii18n.AppMenuAbout,
 	application.ServicesMenu:       cervii18n.AppMenuServices,
 	application.Hide:               cervii18n.AppMenuHide,
@@ -44,7 +42,6 @@ var applicationMenuMessageKeys = map[application.Role]cervii18n.Key{
 	application.StopSpeaking:       cervii18n.AppMenuStopSpeaking,
 	application.Reload:             cervii18n.AppMenuReload,
 	application.ForceReload:        cervii18n.AppMenuForceReload,
-	application.OpenDevTools:       cervii18n.AppMenuOpenDevTools,
 	application.ResetZoom:          cervii18n.AppMenuActualSize,
 	application.ZoomIn:             cervii18n.AppMenuZoomIn,
 	application.ZoomOut:            cervii18n.AppMenuZoomOut,
@@ -54,17 +51,28 @@ var applicationMenuMessageKeys = map[application.Role]cervii18n.Key{
 	application.Front:              cervii18n.AppMenuBringAllToFront,
 }
 
+// newApplicationMenu 创建 macOS 应用菜单，含应用、文件、编辑、显示和窗口菜单，不含开发者工具项。
+func newApplicationMenu() *application.Menu {
+	menu := application.NewMenu()
+	menu.AddRole(application.AppMenu)
+	menu.AddRole(application.FileMenu)
+	menu.AddRole(application.EditMenu)
+	menu.AddRole(application.ViewMenu)
+	menu.AddRole(application.WindowMenu)
+	menu.RemoveMenuItem(menu.FindByRole(application.OpenDevTools))
+	return menu
+}
+
 // newLocalizedApplicationMenu 按指定语言创建保留原生角色和快捷键的 macOS 应用菜单。
 func newLocalizedApplicationMenu(app *application.App, locale appservice.Locale) *localizedApplicationMenu {
 	if runtime.GOOS != "darwin" {
 		return nil
 	}
 
-	menu := application.DefaultApplicationMenu()
+	menu := newApplicationMenu()
 	controller := &localizedApplicationMenu{
 		menu:      menu,
 		roleItems: make(map[application.Role]*application.MenuItem, len(applicationMenuMessageKeys)),
-		learnMore: menu.FindByLabel("Learn More"),
 	}
 	for role := range applicationMenuMessageKeys {
 		controller.roleItems[role] = menu.FindByRole(role)
@@ -80,6 +88,4 @@ func (m *localizedApplicationMenu) applyLocale(locale appservice.Locale) {
 	for role, item := range m.roleItems {
 		item.SetLabel(labels[role])
 	}
-	learnMore, _ := cervii18n.Localize(string(locale), cervii18n.AppMenuLearnMore)
-	m.learnMore.SetLabel(learnMore)
 }
