@@ -22,19 +22,16 @@ const (
 type KnowledgeDocumentProcessingStatus string
 
 const (
-	KnowledgeProcessingInitial     KnowledgeDocumentProcessingStatus = KnowledgeDocumentProcessingStatus(domain.KnowledgeDocumentInitial)
-	KnowledgeProcessingQueued      KnowledgeDocumentProcessingStatus = KnowledgeDocumentProcessingStatus(domain.KnowledgeDocumentQueued)
-	KnowledgeProcessingFetching    KnowledgeDocumentProcessingStatus = KnowledgeDocumentProcessingStatus(domain.KnowledgeDocumentFetching)
-	KnowledgeProcessingConverting  KnowledgeDocumentProcessingStatus = KnowledgeDocumentProcessingStatus(domain.KnowledgeDocumentConverting)
-	KnowledgeProcessingExtracting  KnowledgeDocumentProcessingStatus = KnowledgeDocumentProcessingStatus(domain.KnowledgeDocumentExtracting)
-	KnowledgeProcessingRecognizing KnowledgeDocumentProcessingStatus = KnowledgeDocumentProcessingStatus(domain.KnowledgeDocumentRecognizing)
-	KnowledgeProcessingSplitting   KnowledgeDocumentProcessingStatus = KnowledgeDocumentProcessingStatus(domain.KnowledgeDocumentSplitting)
-	KnowledgeProcessingEmbedding   KnowledgeDocumentProcessingStatus = KnowledgeDocumentProcessingStatus(domain.KnowledgeDocumentEmbedding)
-	KnowledgeProcessingIndexing    KnowledgeDocumentProcessingStatus = KnowledgeDocumentProcessingStatus(domain.KnowledgeDocumentIndexing)
-	KnowledgeProcessingPublishing  KnowledgeDocumentProcessingStatus = KnowledgeDocumentProcessingStatus(domain.KnowledgeDocumentPublishing)
-	KnowledgeProcessingSucceeded   KnowledgeDocumentProcessingStatus = KnowledgeDocumentProcessingStatus(domain.KnowledgeDocumentSucceeded)
-	KnowledgeProcessingFailed      KnowledgeDocumentProcessingStatus = KnowledgeDocumentProcessingStatus(domain.KnowledgeDocumentFailed)
-	KnowledgeProcessingCancelled   KnowledgeDocumentProcessingStatus = KnowledgeDocumentProcessingStatus(domain.KnowledgeDocumentCancelled)
+	KnowledgeProcessingInitial    KnowledgeDocumentProcessingStatus = KnowledgeDocumentProcessingStatus(domain.KnowledgeDocumentInitial)
+	KnowledgeProcessingQueued     KnowledgeDocumentProcessingStatus = KnowledgeDocumentProcessingStatus(domain.KnowledgeDocumentQueued)
+	KnowledgeProcessingFetching   KnowledgeDocumentProcessingStatus = KnowledgeDocumentProcessingStatus(domain.KnowledgeDocumentFetching)
+	KnowledgeProcessingConverting KnowledgeDocumentProcessingStatus = KnowledgeDocumentProcessingStatus(domain.KnowledgeDocumentConverting)
+	KnowledgeProcessingSplitting  KnowledgeDocumentProcessingStatus = KnowledgeDocumentProcessingStatus(domain.KnowledgeDocumentSplitting)
+	KnowledgeProcessingEmbedding  KnowledgeDocumentProcessingStatus = KnowledgeDocumentProcessingStatus(domain.KnowledgeDocumentEmbedding)
+	KnowledgeProcessingPublishing KnowledgeDocumentProcessingStatus = KnowledgeDocumentProcessingStatus(domain.KnowledgeDocumentPublishing)
+	KnowledgeProcessingSucceeded  KnowledgeDocumentProcessingStatus = KnowledgeDocumentProcessingStatus(domain.KnowledgeDocumentSucceeded)
+	KnowledgeProcessingFailed     KnowledgeDocumentProcessingStatus = KnowledgeDocumentProcessingStatus(domain.KnowledgeDocumentFailed)
+	KnowledgeProcessingCancelled  KnowledgeDocumentProcessingStatus = KnowledgeDocumentProcessingStatus(domain.KnowledgeDocumentCancelled)
 )
 
 // KnowledgeDocumentFormat 定义允许上传的文档扩展名。
@@ -120,8 +117,6 @@ type KnowledgeDocumentSegment struct {
 	Position       int    `json:"position"`
 	Content        string `json:"content"`
 	CharacterCount int    `json:"characterCount"`
-	PageNumber     *int   `json:"pageNumber"`
-	SourceLabel    string `json:"sourceLabel"`
 }
 
 // KnowledgeDocumentSegmentPage 返回一页分段及锚点位置。

@@ -11,7 +11,7 @@ import (
 
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	"github.com/runforyou-ai/cervi/internal/integration/knowledgeprocessing"
+	"github.com/runforyou-ai/cervi/internal/integration/documentconvert"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
@@ -39,11 +39,7 @@ func (p *DocumentProcessing) enqueue(ctx context.Context, tx bun.IDB, organizati
 	if _, err := tx.NewUpdate().Model(document).Column("processing_id", "chunk_length", "chunk_overlap", "embedding_provider_id", "embedding_model_identifier", "embedding_dimension", "status", "failure_code").Set("updated_at = now()").WherePK().Exec(ctx); err != nil {
 		return err
 	}
-	// 保留已发布分段，清理被新任务替代但尚未发布的批次。
-	if _, err := tx.NewDelete().TableExpr("public.knowledge_segments").Where("meta->>'document_id' = ? AND meta->>'batch_id' <> ?", document.ID, document.SegmentBatchID).Exec(ctx); err != nil {
-		return err
-	}
-	_, err := p.tasks.EnqueueIn(ctx, tx, ProcessDocumentActionName, knowledgeprocessing.ProcessInput{
+	_, err := p.tasks.EnqueueIn(ctx, tx, ProcessDocumentActionName, ProcessInput{
 		OrganizationID: organizationID, KnowledgeBaseID: base.ID, DocumentID: document.ID, ProcessingID: document.ProcessingID,
 		ChunkLength: document.ChunkLength, ChunkOverlap: document.ChunkOverlap,
 		EmbeddingProviderID: document.EmbeddingProviderID, EmbeddingModelIdentifier: document.EmbeddingModelIdentifier, EmbeddingDimension: document.EmbeddingDimension,
@@ -73,7 +69,7 @@ func (p *DocumentProcessing) Retry(ctx context.Context, identity *servermodels.I
 		connectionErr = checkConnection(ctx)
 		if connectionErr != nil {
 			code := "unavailable"
-			var failure *knowledgeprocessing.Error
+			var failure *documentconvert.Error
 			if errors.As(connectionErr, &failure) {
 				code = failure.Code
 			}

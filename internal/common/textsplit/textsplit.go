@@ -11,10 +11,11 @@ type Segment struct {
 }
 
 // Split 按长度上限切分正文，长度和重叠均按 Unicode 字符计数。
-// 分段正文是规整换行后原文的连续区间，去除重叠后可逐字符还原；正文为空白时返回空结果。
+// 分段正文是规整换行后原文的连续区间，去除重叠后可逐字符还原。
+// 正文为空白，或长度上限不大于重叠导致分段无法前进时，返回空结果。
 func Split(text string, length, overlap int) []Segment {
 	normalized := strings.ReplaceAll(strings.ReplaceAll(text, "\r\n", "\n"), "\r", "\n")
-	if strings.TrimSpace(normalized) == "" {
+	if length <= overlap || strings.TrimSpace(normalized) == "" {
 		return nil
 	}
 	runes := []rune(normalized)

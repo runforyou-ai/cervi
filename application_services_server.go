@@ -20,7 +20,8 @@ import (
 	"github.com/runforyou-ai/cervi/internal/ingress"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
-	"github.com/runforyou-ai/cervi/internal/integration/knowledgeprocessing"
+	"github.com/runforyou-ai/cervi/internal/integration/documentconvert"
+	"github.com/runforyou-ai/cervi/internal/integration/embedding"
 	mcpintegration "github.com/runforyou-ai/cervi/internal/integration/mcp"
 	telegramintegration "github.com/runforyou-ai/cervi/internal/integration/telegram"
 	"github.com/runforyou-ai/cervi/internal/publicweb"
@@ -48,8 +49,8 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	tasks := servertask.New(appStorage.DB(), config.NATS)
 
 	// 注册文档处理任务及最终失败时的状态处理。
-	knowledgeClient := knowledgeprocessing.NewClient(config.HaystackURL)
-	processDocument := knowledgeaction.NewProcessDocumentAction(appStorage.DB(), knowledgeClient, serverfilecontent.NewReader(localFiles, resolveFileS3))
+	documentConverter := documentconvert.NewClient(config.MarkitdownURL)
+	processDocument := knowledgeaction.NewProcessDocumentAction(appStorage.DB(), documentConverter, embedding.NewClient(), serverfilecontent.NewReader(localFiles, resolveFileS3))
 	if err := tasks.Registry().RegisterJSONWithTerminalFailure(knowledgeaction.ProcessDocumentActionName, processDocument.Execute, processDocument.FinalizeFailure); err != nil {
 		return nil, err
 	}
@@ -87,7 +88,7 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	})
 
 	// 组装企业成员与网站匿名访客各自的业务入口。
-	directBackend := appservice.NewDirectBackend(appStorage.DB(), localFiles, tenantResolver, agentRunScheduler, executeAgentRun, tasks, knowledgeClient)
+	directBackend := appservice.NewDirectBackend(appStorage.DB(), localFiles, tenantResolver, agentRunScheduler, executeAgentRun, tasks, documentConverter)
 	boundService := appservice.New(directBackend)
 	websiteVisitorBackend := appservice.NewWebsiteVisitorDirectBackend(appStorage.DB(), agentRunScheduler)
 	websiteVisitorService := appservice.NewWebsiteVisitorService(websiteVisitorBackend)

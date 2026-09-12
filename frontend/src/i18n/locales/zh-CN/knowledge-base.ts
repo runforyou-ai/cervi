@@ -50,7 +50,6 @@ const knowledgeBase = {
       position: "第 {{position}} 段",
       matched: "命中分段",
       characters: "{{count}} 字符",
-      page: "第 {{number}} 页",
       total: "共 {{count}} 段",
       error: "读取分段失败，请重试。",
       retryPrevious: "重试加载上一页",

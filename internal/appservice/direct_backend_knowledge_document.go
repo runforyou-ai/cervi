@@ -12,7 +12,7 @@ import (
 	knowledgeaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
-	"github.com/runforyou-ai/cervi/internal/integration/knowledgeprocessing"
+	"github.com/runforyou-ai/cervi/internal/integration/documentconvert"
 	filecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
@@ -111,10 +111,6 @@ func knowledgeDocumentFromAction(meta RequestMeta, record knowledgeaction.Docume
 			key = cervii18n.ErrorKnowledgeOriginalReadFailed
 		case "empty_content":
 			key = cervii18n.ErrorKnowledgeContentEmpty
-		case "recognition_required":
-			key = cervii18n.ErrorKnowledgeRecognitionRequired
-		case "encrypted_file":
-			key = cervii18n.ErrorKnowledgeFileEncrypted
 		case "parse_failed", "unsupported_file":
 			key = cervii18n.ErrorKnowledgeParseFailed
 		case "embedding_model_unavailable":
@@ -145,8 +141,8 @@ func knowledgeDocumentFromAction(meta RequestMeta, record knowledgeaction.Docume
 
 // RetryKnowledgeDocument 按当前配置为文档安排新的处理任务。
 func (o *directOperations) RetryKnowledgeDocument(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, baseID, documentID string) error {
-	if err := o.documentProcessing.Retry(ctx, identity, baseID, documentID, o.knowledgeProcessor.CheckConnection); err != nil {
-		var failure *knowledgeprocessing.Error
+	if err := o.documentProcessing.Retry(ctx, identity, baseID, documentID, o.documentConverter.CheckConnection); err != nil {
+		var failure *documentconvert.Error
 		if errors.As(err, &failure) {
 			key := cervii18n.ErrorKnowledgeProcessingUnavailable
 			if failure.Code == "connection_timeout" {
@@ -168,7 +164,7 @@ func (o *directOperations) ListKnowledgeDocumentSegments(ctx context.Context, me
 	}
 	output := KnowledgeDocumentSegmentPage{SegmentBatchID: page.SegmentBatchID, Page: PageInfo{Number: page.Page, Size: page.PageSize, Total: page.Total}, AnchorSegmentID: page.AnchorSegmentID, AnchorPosition: page.AnchorPosition, Segments: make([]KnowledgeDocumentSegment, 0, len(page.Segments))}
 	for _, segment := range page.Segments {
-		output.Segments = append(output.Segments, KnowledgeDocumentSegment{ID: segment.ID, Position: segment.Position, Content: segment.Content, CharacterCount: segment.CharacterCount, PageNumber: segment.PageNumber, SourceLabel: segment.SourceLabel})
+		output.Segments = append(output.Segments, KnowledgeDocumentSegment{ID: segment.ID, Position: segment.Position, Content: segment.Content, CharacterCount: segment.CharacterCount})
 	}
 	return output, nil
 }

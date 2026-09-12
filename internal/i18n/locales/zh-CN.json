@@ -8,8 +8,6 @@
   "error.knowledge_request_timeout": "文档处理服务响应超时，请重试。",
   "error.knowledge_original_read_failed": "无法读取文档原件，请检查文件存储后重试。",
   "error.knowledge_content_empty": "文档未提取到可用文字。",
-  "error.knowledge_recognition_required": "文档包含需要文字识别的扫描页，暂不支持处理。",
-  "error.knowledge_file_encrypted": "暂不支持处理加密文档，请上传未加密的原件。",
   "error.knowledge_parse_failed": "无法解析文档，请检查文件格式和内容。",
   "error.knowledge_embedding_unavailable": "知识库的向量模型不可用，请检查模型服务配置后重试。",
   "error.knowledge_embedding_failed": "生成文档向量失败，请检查模型服务后重试。",

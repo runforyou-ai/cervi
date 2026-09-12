@@ -1,10 +1,21 @@
 package common
 
 import (
+	"crypto/sha1"
 	"strings"
 
 	"uuid"
 )
+
+// NewUUIDv5 按 RFC 9562 §5.5 生成命名空间内由名称确定的 UUID。
+func NewUUIDv5(namespace uuid.UUID, name string) uuid.UUID {
+	sum := sha1.Sum(append(namespace[:], name...))
+	var result uuid.UUID
+	copy(result[:], sum[:])
+	result[6] = result[6]&0x0f | 0x50
+	result[8] = result[8]&0x3f | 0x80
+	return result
+}
 
 // ValidUUID 判断记录标识是否为规范 UUID。
 func ValidUUID(value string) bool {

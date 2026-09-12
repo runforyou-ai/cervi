@@ -50,7 +50,6 @@ const knowledgeBase = {
       position: "Segment {{position}}",
       matched: "Match",
       characters: "{{count}} characters",
-      page: "Page {{number}}",
       total: "{{count}} segments",
       error: "Could not load segments. Please try again.",
       retryPrevious: "Retry previous page",

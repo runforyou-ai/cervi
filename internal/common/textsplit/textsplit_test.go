@@ -87,9 +87,14 @@ func TestSplitNormalizesNewlines(t *testing.T) {
 	}
 }
 
-// TestSplitBlankContent 验证空白正文返回空结果。
-func TestSplitBlankContent(t *testing.T) {
+// TestSplitEmptyResult 验证空白正文和无法前进的长度组合都返回空结果。
+func TestSplitEmptyResult(t *testing.T) {
 	if segments := Split(" \n\t", 256, 50); segments != nil {
-		t.Fatalf("Split(\" \\n\\t\", 256, 50) = %+v", segments)
+		t.Fatalf("空白正文 = %+v", segments)
+	}
+	for _, parameter := range []struct{ length, overlap int }{{0, 0}, {50, 50}, {50, 200}} {
+		if segments := Split(strings.Repeat("正文", 500), parameter.length, parameter.overlap); segments != nil {
+			t.Fatalf("Split(text, %d, %d) = %d 段", parameter.length, parameter.overlap, len(segments))
+		}
 	}
 }

@@ -22,8 +22,6 @@ const (
 	ErrorKnowledgeRequestTimeout        Key = "error.knowledge_request_timeout"
 	ErrorKnowledgeOriginalReadFailed    Key = "error.knowledge_original_read_failed"
 	ErrorKnowledgeContentEmpty          Key = "error.knowledge_content_empty"
-	ErrorKnowledgeRecognitionRequired   Key = "error.knowledge_recognition_required"
-	ErrorKnowledgeFileEncrypted         Key = "error.knowledge_file_encrypted"
 	ErrorKnowledgeParseFailed           Key = "error.knowledge_parse_failed"
 	ErrorKnowledgeEmbeddingUnavailable  Key = "error.knowledge_embedding_unavailable"
 	ErrorKnowledgeEmbeddingFailed       Key = "error.knowledge_embedding_failed"

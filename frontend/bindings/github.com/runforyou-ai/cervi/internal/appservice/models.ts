@@ -1779,11 +1779,8 @@ export enum KnowledgeDocumentProcessingStatus {
     KnowledgeProcessingQueued = "queued",
     KnowledgeProcessingFetching = "fetching",
     KnowledgeProcessingConverting = "converting",
-    KnowledgeProcessingExtracting = "extracting",
-    KnowledgeProcessingRecognizing = "recognizing",
     KnowledgeProcessingSplitting = "splitting",
     KnowledgeProcessingEmbedding = "embedding",
-    KnowledgeProcessingIndexing = "indexing",
     KnowledgeProcessingPublishing = "publishing",
     KnowledgeProcessingSucceeded = "succeeded",
     KnowledgeProcessingFailed = "failed",
@@ -1798,8 +1795,6 @@ export interface KnowledgeDocumentSegment {
     "position": number;
     "content": string;
     "characterCount": number;
-    "pageNumber": number | null;
-    "sourceLabel": string;
 }
 
 /**

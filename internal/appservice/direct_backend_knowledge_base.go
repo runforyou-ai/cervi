@@ -12,7 +12,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
-	"github.com/runforyou-ai/cervi/internal/integration/knowledgeprocessing"
+	"github.com/runforyou-ai/cervi/internal/integration/documentconvert"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
@@ -23,7 +23,7 @@ type knowledgeOps struct {
 	documentQuery        *knowledgebaseaction.DocumentQuery
 	createDocuments      *knowledgebaseaction.CreateDocumentsAction
 	documentProcessing   *knowledgebaseaction.DocumentProcessing
-	knowledgeProcessor   *knowledgeprocessing.Client
+	documentConverter    *documentconvert.Client
 	moveDocument         *knowledgebaseaction.MoveDocumentAction
 	deleteDocument       *knowledgebaseaction.DeleteDocumentAction
 	listQAEntries        *knowledgebaseaction.ListQAEntriesQuery
@@ -41,12 +41,12 @@ type knowledgeOps struct {
 }
 
 // newKnowledgeOps 创建知识库的业务实现依赖。
-func newKnowledgeOps(db *bun.DB, taskEnqueuer servertask.TxEnqueuer, documentQuery *knowledgebaseaction.DocumentQuery, knowledgeProcessor *knowledgeprocessing.Client) knowledgeOps {
+func newKnowledgeOps(db *bun.DB, taskEnqueuer servertask.TxEnqueuer, documentQuery *knowledgebaseaction.DocumentQuery, documentConverter *documentconvert.Client) knowledgeOps {
 	return knowledgeOps{
 		documentQuery:        documentQuery,
 		createDocuments:      knowledgebaseaction.NewCreateDocumentsAction(db, taskEnqueuer),
 		documentProcessing:   knowledgebaseaction.NewDocumentProcessing(db, taskEnqueuer),
-		knowledgeProcessor:   knowledgeProcessor,
+		documentConverter:    documentConverter,
 		moveDocument:         knowledgebaseaction.NewMoveDocumentAction(db),
 		deleteDocument:       knowledgebaseaction.NewDeleteDocumentAction(db),
 		listQAEntries:        knowledgebaseaction.NewListQAEntriesQuery(db),

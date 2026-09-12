@@ -8,14 +8,18 @@ import (
 	"errors"
 	"fmt"
 	"io"
+	"strconv"
 	"strings"
 	"sync"
 	"testing"
 	"uuid"
 
 	knowledgeaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
+	"github.com/runforyou-ai/cervi/internal/common"
+	"github.com/runforyou-ai/cervi/internal/common/textsplit"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	"github.com/runforyou-ai/cervi/internal/integration/knowledgeprocessing"
+	"github.com/runforyou-ai/cervi/internal/integration/documentconvert"
+	"github.com/runforyou-ai/cervi/internal/integration/embedding"
 	servertest "github.com/runforyou-ai/cervi/internal/servertest"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -23,10 +27,10 @@ import (
 )
 
 type processingProbe struct {
-	db            *bun.DB
 	fail          bool
 	connectionErr error
-	credential    knowledgeprocessing.EmbeddingCredential
+	credential    embedding.Credential
+	markdown      string
 }
 
 // CheckConnection 返回预设的连接检查结果。
@@ -39,16 +43,25 @@ func (p *processingProbe) Open(context.Context, *servermodels.File) (io.ReadClos
 	return io.NopCloser(strings.NewReader("原件")), nil
 }
 
-// Process 模拟远端持久化，同时验证发布所需的实际分段数量。
-func (p *processingProbe) Process(ctx context.Context, input knowledgeprocessing.ProcessInput, credential knowledgeprocessing.EmbeddingCredential, _ string, _ io.Reader) (knowledgeprocessing.ProcessResult, error) {
-	p.credential = credential
+// Convert 返回预设正文，或按需模拟转换失败。
+func (p *processingProbe) Convert(context.Context, string, io.Reader) (string, error) {
 	if p.fail {
-		return knowledgeprocessing.ProcessResult{}, &knowledgeprocessing.Error{Code: "parse_failed", Stage: domain.KnowledgeDocumentExtracting}
+		return "", &documentconvert.Error{Code: "parse_failed"}
 	}
-	meta, _ := json.Marshal(map[string]any{"document_id": input.DocumentID, "batch_id": input.ProcessingID, "position": 1})
-	vector := "[" + strings.TrimSuffix(strings.Repeat("0.1,", input.EmbeddingDimension), ",") + "]"
-	_, err := p.db.ExecContext(ctx, "INSERT INTO public.knowledge_segments(id,content,meta,embedding,embedding_dimension) VALUES (?, ?, ?::jsonb, ?::vector, ?) ON CONFLICT(id) DO NOTHING", input.ProcessingID, "正文", string(meta), vector, input.EmbeddingDimension)
-	return knowledgeprocessing.ProcessResult{SegmentCount: 1}, err
+	if p.markdown != "" {
+		return p.markdown, nil
+	}
+	return "正文", nil
+}
+
+// Embed 记录本次凭据并按维度返回定长向量。
+func (p *processingProbe) Embed(_ context.Context, credential embedding.Credential, _ string, dimension int, inputs []string) ([][]float32, error) {
+	p.credential = credential
+	vectors := make([][]float32, len(inputs))
+	for index := range vectors {
+		vectors[index] = make([]float32, dimension)
+	}
+	return vectors, nil
 }
 
 // TestKnowledgeProcessingRetryAndPublication 验证上传投递、失败重试幂等、参数快照与完整发布。
@@ -75,9 +88,9 @@ func TestKnowledgeProcessingRetryAndPublication(t *testing.T) {
 	if document.Status != domain.KnowledgeDocumentQueued || document.ChunkLength != 512 || document.ProcessingID == "" {
 		t.Fatalf("document=%+v", document)
 	}
-	input := knowledgeprocessing.ProcessInput{OrganizationID: installed.Identity.Organization.ID, KnowledgeBaseID: base.ID, DocumentID: documentID, ProcessingID: document.ProcessingID, ChunkLength: document.ChunkLength, ChunkOverlap: document.ChunkOverlap, EmbeddingProviderID: document.EmbeddingProviderID, EmbeddingModelIdentifier: document.EmbeddingModelIdentifier, EmbeddingDimension: document.EmbeddingDimension}
-	probe := &processingProbe{db: db, fail: true}
-	worker := knowledgeaction.NewProcessDocumentAction(db, probe, probe)
+	input := knowledgeaction.ProcessInput{OrganizationID: installed.Identity.Organization.ID, KnowledgeBaseID: base.ID, DocumentID: documentID, ProcessingID: document.ProcessingID, ChunkLength: document.ChunkLength, ChunkOverlap: document.ChunkOverlap, EmbeddingProviderID: document.EmbeddingProviderID, EmbeddingModelIdentifier: document.EmbeddingModelIdentifier, EmbeddingDimension: document.EmbeddingDimension}
+	probe := &processingProbe{fail: true}
+	worker := knowledgeaction.NewProcessDocumentAction(db, probe, probe, probe)
 	err = worker.Execute(ctx, input)
 	if err == nil {
 		t.Fatalf("failure=%v", err)
@@ -175,9 +188,9 @@ func TestKnowledgeRetryAllStates(t *testing.T) {
 	if err := db.NewSelect().Model(&document).Where("kd.id = ?", docs[0].ID).Scan(ctx); err != nil {
 		t.Fatal(err)
 	}
-	input := knowledgeprocessing.ProcessInput{OrganizationID: owner.Identity.Organization.ID, KnowledgeBaseID: base.ID, DocumentID: document.ID, ProcessingID: document.ProcessingID, ChunkLength: 512, ChunkOverlap: 50, EmbeddingProviderID: document.EmbeddingProviderID, EmbeddingModelIdentifier: document.EmbeddingModelIdentifier, EmbeddingDimension: document.EmbeddingDimension}
-	probe := &processingProbe{db: db}
-	worker := knowledgeaction.NewProcessDocumentAction(db, probe, probe)
+	input := knowledgeaction.ProcessInput{OrganizationID: owner.Identity.Organization.ID, KnowledgeBaseID: base.ID, DocumentID: document.ID, ProcessingID: document.ProcessingID, ChunkLength: 512, ChunkOverlap: 50, EmbeddingProviderID: document.EmbeddingProviderID, EmbeddingModelIdentifier: document.EmbeddingModelIdentifier, EmbeddingDimension: document.EmbeddingDimension}
+	probe := &processingProbe{}
+	worker := knowledgeaction.NewProcessDocumentAction(db, probe, probe, probe)
 	if err := worker.Execute(ctx, input); err != nil {
 		t.Fatal(err)
 	}
@@ -186,7 +199,7 @@ func TestKnowledgeRetryAllStates(t *testing.T) {
 		t.Fatal(err)
 	}
 	retry := knowledgeaction.NewDocumentProcessing(db, tasks)
-	states := []domain.KnowledgeDocumentStatus{domain.KnowledgeDocumentInitial, domain.KnowledgeDocumentQueued, domain.KnowledgeDocumentFetching, domain.KnowledgeDocumentConverting, domain.KnowledgeDocumentExtracting, domain.KnowledgeDocumentRecognizing, domain.KnowledgeDocumentSplitting, domain.KnowledgeDocumentEmbedding, domain.KnowledgeDocumentIndexing, domain.KnowledgeDocumentPublishing, domain.KnowledgeDocumentSucceeded, domain.KnowledgeDocumentFailed, domain.KnowledgeDocumentCancelled}
+	states := []domain.KnowledgeDocumentStatus{domain.KnowledgeDocumentInitial, domain.KnowledgeDocumentQueued, domain.KnowledgeDocumentFetching, domain.KnowledgeDocumentConverting, domain.KnowledgeDocumentSplitting, domain.KnowledgeDocumentEmbedding, domain.KnowledgeDocumentPublishing, domain.KnowledgeDocumentSucceeded, domain.KnowledgeDocumentFailed, domain.KnowledgeDocumentCancelled}
 	for _, state := range states {
 		if _, err := db.NewUpdate().Model(&document).Set("status = ?", state).WherePK().Exec(ctx); err != nil {
 			t.Fatal(err)
@@ -262,9 +275,9 @@ func TestKnowledgeProcessingMissingFile(t *testing.T) {
 	if _, err := db.NewDelete().Model(file).WherePK().Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
-	probe := &processingProbe{db: db}
-	worker := knowledgeaction.NewProcessDocumentAction(db, probe, probe)
-	input := knowledgeprocessing.ProcessInput{OrganizationID: owner.Identity.Organization.ID, KnowledgeBaseID: base.ID, DocumentID: document.ID, ProcessingID: document.ProcessingID, EmbeddingProviderID: document.EmbeddingProviderID, EmbeddingModelIdentifier: document.EmbeddingModelIdentifier, EmbeddingDimension: document.EmbeddingDimension}
+	probe := &processingProbe{}
+	worker := knowledgeaction.NewProcessDocumentAction(db, probe, probe, probe)
+	input := knowledgeaction.ProcessInput{OrganizationID: owner.Identity.Organization.ID, KnowledgeBaseID: base.ID, DocumentID: document.ID, ProcessingID: document.ProcessingID, ChunkLength: 512, ChunkOverlap: 50, EmbeddingProviderID: document.EmbeddingProviderID, EmbeddingModelIdentifier: document.EmbeddingModelIdentifier, EmbeddingDimension: document.EmbeddingDimension}
 	err = worker.Execute(ctx, input)
 	if err == nil {
 		t.Fatalf("failure=%v", err)
@@ -288,12 +301,7 @@ func insertSegments(t *testing.T, db *bun.DB, organizationID, baseID, documentID
 		id := uuid.NewV7().String()
 		fields := map[string]any{
 			"organization_id": organizationID, "knowledge_base_id": baseID, "document_id": documentID, "batch_id": batchID,
-			"position": position, "character_count": 4, "page_number": position, "source_label": "合同",
-		}
-		// 末段页码为空且不带来源标记。
-		if position == count {
-			fields["page_number"] = nil
-			delete(fields, "source_label")
+			"position": position, "character_count": 4,
 		}
 		meta, err := json.Marshal(fields)
 		if err != nil {
@@ -306,6 +314,87 @@ func insertSegments(t *testing.T, db *bun.DB, organizationID, baseID, documentID
 		ids = append(ids, id)
 	}
 	return ids
+}
+
+// TestKnowledgeProcessingPublishesSegments 验证多段发布后的正文、序号、确定性编号和空正文失败。
+func TestKnowledgeProcessingPublishesSegments(t *testing.T) {
+	ctx := context.Background()
+	store, err := serverstorage.Open(ctx, servertest.DatabaseConfig(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	db := store.DB()
+	owner, base := newDocumentFixture(t, db)
+	docs, err := knowledgeaction.NewCreateDocumentsAction(db, newDocumentTasks(t, db)).Execute(ctx, owner.Identity, base.ID, base.Groups[0].ID, []string{uploadedDocumentFile(t, db, owner.Identity, "多段.txt").ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	document := &servermodels.KnowledgeDocument{}
+	if err := db.NewSelect().Model(document).Where("kd.id = ?", docs[0].ID).Scan(ctx); err != nil {
+		t.Fatal(err)
+	}
+	markdown := strings.Repeat("合同正文。", 400)
+	probe := &processingProbe{markdown: markdown}
+	input := knowledgeaction.ProcessInput{
+		OrganizationID: owner.Identity.Organization.ID, KnowledgeBaseID: base.ID, DocumentID: document.ID,
+		ProcessingID: document.ProcessingID, ChunkLength: 256, ChunkOverlap: 50,
+		EmbeddingProviderID: document.EmbeddingProviderID, EmbeddingModelIdentifier: document.EmbeddingModelIdentifier,
+		EmbeddingDimension: document.EmbeddingDimension,
+	}
+	action := knowledgeaction.NewProcessDocumentAction(db, probe, probe, probe)
+	if err := action.Execute(ctx, input); err != nil {
+		t.Fatal(err)
+	}
+	expected := textsplit.Split(markdown, input.ChunkLength, input.ChunkOverlap)
+	if len(expected) < 2 {
+		t.Fatalf("样本应切出多段，实际 %d", len(expected))
+	}
+	if err := db.NewSelect().Model(document).Where("kd.id = ?", document.ID).Scan(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if document.Status != domain.KnowledgeDocumentSucceeded || document.SegmentBatchID != input.ProcessingID || document.SegmentCount != len(expected) {
+		t.Fatalf("document=%+v 期望 %d 段", document, len(expected))
+	}
+	// 读回发布批次，核对正文、序号与按任务标识确定的分段编号。
+	page, err := knowledgeaction.NewDocumentQuery(db).Segments(ctx, owner.Identity, base.ID, document.ID, knowledgeaction.SegmentQueryInput{PageSize: 100})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(page.Segments) != len(expected) || page.Total != len(expected) {
+		t.Fatalf("page=%d 段，总数 %d", len(page.Segments), page.Total)
+	}
+	namespace := uuid.MustParse(input.ProcessingID)
+	for index, segment := range page.Segments {
+		want := expected[index]
+		if segment.Position != want.Position || segment.Content != want.Content || segment.CharacterCount != want.CharacterCount {
+			t.Fatalf("分段 %d = %+v，期望 %+v", index+1, segment, want)
+		}
+		if segment.ID != common.NewUUIDv5(namespace, strconv.Itoa(want.Position)).String() {
+			t.Fatalf("分段 %d 编号 = %s", index+1, segment.ID)
+		}
+	}
+	// 转换结果为空白时按空正文失败，并保留上次成功的批次。
+	empty := input
+	empty.ProcessingID = uuid.NewV7().String()
+	if _, err := db.NewUpdate().Model(document).Set("processing_id = ?", empty.ProcessingID).Set("status = ?", domain.KnowledgeDocumentQueued).WherePK().Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	probe.markdown = " \n\t"
+	runErr := action.Execute(ctx, empty)
+	var failure *knowledgeaction.ProcessError
+	if !errors.As(runErr, &failure) || failure.Code != "empty_content" || failure.Stage != domain.KnowledgeDocumentSplitting {
+		t.Fatalf("empty=%v", runErr)
+	}
+	if err := action.FinalizeFailure(ctx, empty, runErr); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.NewSelect().Model(document).Where("kd.id = ?", document.ID).Scan(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if document.Status != domain.KnowledgeDocumentFailed || document.FailureCode != "empty_content" || document.SegmentBatchID != input.ProcessingID {
+		t.Fatalf("失败后 document=%+v", document)
+	}
 }
 
 // TestKnowledgeSegmentsScopeAndBatch 验证企业与批次校验、分页边界和锚点定位。
@@ -367,7 +456,7 @@ func TestKnowledgeSegmentsScopeAndBatch(t *testing.T) {
 		t.Fatalf("page=%+v", page)
 	}
 	first := page.Segments[0]
-	if first.ID != ids[0] || first.Position != 1 || first.Content != "第1段正文" || first.CharacterCount != 4 || first.SourceLabel != "合同" || first.PageNumber == nil || *first.PageNumber != 1 {
+	if first.ID != ids[0] || first.Position != 1 || first.Content != "第1段正文" || first.CharacterCount != 4 {
 		t.Fatalf("segment=%+v", first)
 	}
 	if page.Segments[19].Position != 20 {
@@ -381,9 +470,6 @@ func TestKnowledgeSegmentsScopeAndBatch(t *testing.T) {
 	}
 	if page.Page != 2 || len(page.Segments) != 5 || page.Segments[0].Position != 21 {
 		t.Fatalf("page=%+v", page)
-	}
-	if last := page.Segments[4]; last.Position != 25 || last.PageNumber != nil || last.SourceLabel != "" {
-		t.Fatalf("last segment=%+v", last)
 	}
 
 	// 锚点按其之前的分段数量落到第二页。
@@ -415,16 +501,16 @@ func TestKnowledgeConnectionFailureSkipsTask(t *testing.T) {
 	if err := db.NewSelect().Model(&document).Where("kd.id = ?", docs[0].ID).Scan(ctx); err != nil {
 		t.Fatal(err)
 	}
-	input := knowledgeprocessing.ProcessInput{OrganizationID: owner.Identity.Organization.ID, KnowledgeBaseID: base.ID, DocumentID: document.ID, ProcessingID: document.ProcessingID, EmbeddingProviderID: document.EmbeddingProviderID, EmbeddingModelIdentifier: document.EmbeddingModelIdentifier, EmbeddingDimension: document.EmbeddingDimension}
-	probe := &processingProbe{db: db}
-	worker := knowledgeaction.NewProcessDocumentAction(db, probe, probe)
+	input := knowledgeaction.ProcessInput{OrganizationID: owner.Identity.Organization.ID, KnowledgeBaseID: base.ID, DocumentID: document.ID, ProcessingID: document.ProcessingID, ChunkLength: 512, ChunkOverlap: 50, EmbeddingProviderID: document.EmbeddingProviderID, EmbeddingModelIdentifier: document.EmbeddingModelIdentifier, EmbeddingDimension: document.EmbeddingDimension}
+	probe := &processingProbe{}
+	worker := knowledgeaction.NewProcessDocumentAction(db, probe, probe, probe)
 	if err := worker.Execute(ctx, input); err != nil {
 		t.Fatal(err)
 	}
 	published := input.ProcessingID
 	retry := knowledgeaction.NewDocumentProcessing(db, tasks)
 	for _, code := range []string{"unavailable", "connection_timeout"} {
-		probe.connectionErr = &knowledgeprocessing.Error{Code: code}
+		probe.connectionErr = &documentconvert.Error{Code: code}
 		if err := retry.Retry(ctx, owner.Identity, base.ID, document.ID, probe.CheckConnection); !errors.Is(err, probe.connectionErr) {
 			t.Fatalf("failure=%v", err)
 		}

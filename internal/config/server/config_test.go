@@ -141,25 +141,20 @@ func validTestConfig() Config {
 	return config
 }
 
-// TestKnowledgeServiceURL 验证可选知识服务地址及无效协议。
-func TestKnowledgeServiceURL(t *testing.T) {
-	for _, assign := range []func(*Config, string){
-		func(config *Config, address string) { config.HaystackURL = address },
-		func(config *Config, address string) { config.MarkitdownURL = address },
-	} {
-		for _, address := range []string{"", "http://127.0.0.1:1419", "https://knowledge.example/internal"} {
-			config := validTestConfig()
-			assign(&config, address)
-			if err := config.validate(); err != nil {
-				t.Fatalf("url=%q %v", address, err)
-			}
+// TestMarkitdownServiceURL 验证可选转换服务地址及无效协议。
+func TestMarkitdownServiceURL(t *testing.T) {
+	for _, address := range []string{"", "http://127.0.0.1:1419", "https://knowledge.example/internal"} {
+		config := validTestConfig()
+		config.MarkitdownURL = address
+		if err := config.validate(); err != nil {
+			t.Fatalf("url=%q %v", address, err)
 		}
-		for _, address := range []string{"file:///tmp/knowledge", "relative", "http://user:secret@example.com", "http://example.com?query=1"} {
-			config := validTestConfig()
-			assign(&config, address)
-			if err := config.validate(); err == nil {
-				t.Fatalf("accepted %q", address)
-			}
+	}
+	for _, address := range []string{"file:///tmp/knowledge", "relative", "http://user:secret@example.com", "http://example.com?query=1"} {
+		config := validTestConfig()
+		config.MarkitdownURL = address
+		if err := config.validate(); err == nil {
+			t.Fatalf("accepted %q", address)
 		}
 	}
 }

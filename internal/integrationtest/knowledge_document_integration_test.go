@@ -23,7 +23,6 @@ import (
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	"github.com/runforyou-ai/cervi/internal/integration/knowledgeprocessing"
 	servertest "github.com/runforyou-ai/cervi/internal/servertest"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	filecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
@@ -385,7 +384,7 @@ func TestKnowledgeDocumentS3Preview(t *testing.T) {
 func newDocumentTasks(t *testing.T, db *bun.DB) *servertask.Runtime {
 	t.Helper()
 	tasks := servertask.New(db, serverconfig.NATSConfig{})
-	if err := tasks.Registry().RegisterJSON(knowledgeaction.ProcessDocumentActionName, func(context.Context, knowledgeprocessing.ProcessInput) error { return nil }); err != nil {
+	if err := tasks.Registry().RegisterJSON(knowledgeaction.ProcessDocumentActionName, func(context.Context, knowledgeaction.ProcessInput) error { return nil }); err != nil {
 		t.Fatal(err)
 	}
 	return tasks

@@ -31,8 +31,6 @@ type Segment struct {
 	Position       int    `bun:"position"`
 	Content        string `bun:"content"`
 	CharacterCount int    `bun:"character_count"`
-	PageNumber     *int   `bun:"page_number"`
-	SourceLabel    string `bun:"source_label"`
 }
 
 // SegmentPage 返回目标页和经核验的锚点。
@@ -101,8 +99,6 @@ func (q *DocumentQuery) Segments(ctx context.Context, identity *servermodels.Ide
 			ColumnExpr("id, content").
 			ColumnExpr("(meta->>'position')::integer AS position").
 			ColumnExpr("(meta->>'character_count')::integer AS character_count").
-			ColumnExpr("(meta->>'page_number')::integer AS page_number").
-			ColumnExpr("coalesce(meta->>'source_label', '') AS source_label").
 			Where(condition, scope...).OrderExpr("(meta->>'position')::integer, id").
 			Limit(input.PageSize).Offset((page-1)*input.PageSize).Scan(ctx, &segments)
 		if err != nil {

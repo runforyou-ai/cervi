@@ -19,7 +19,6 @@ var natsNamespacePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*$`)
 
 // Config 定义服务端运行配置。
 type Config struct {
-	HaystackURL   string         `yaml:"haystackURL"`
 	MarkitdownURL string         `yaml:"markitdownURL"`
 	Server        ServerConfig   `yaml:"server"`
 	Database      DatabaseConfig `yaml:"database"`
@@ -85,7 +84,6 @@ func Load(path string) (Config, error) {
 
 // normalize 统一配置中的枚举和空白字符。
 func (config *Config) normalize() {
-	config.HaystackURL = strings.TrimRight(strings.TrimSpace(config.HaystackURL), "/")
 	config.MarkitdownURL = strings.TrimRight(strings.TrimSpace(config.MarkitdownURL), "/")
 	config.Server.Host = strings.TrimSpace(config.Server.Host)
 	config.Database.Host = strings.TrimSpace(config.Database.Host)
@@ -116,7 +114,6 @@ func defaultConfig() Config {
 
 // applyEnvironment 使用已设置的环境变量覆盖文件配置。
 func applyEnvironment(config *Config) error {
-	applyStringEnvironment("HAYSTACK_URL", &config.HaystackURL)
 	applyStringEnvironment("MARKITDOWN_URL", &config.MarkitdownURL)
 	applyStringEnvironment("WAILS_SERVER_HOST", &config.Server.Host)
 	applyStringEnvironment("TLS_MODE", &config.TLS.Mode)
@@ -152,9 +149,6 @@ func validServiceURL(address string) bool {
 
 // validate 校验服务端配置。
 func (config Config) validate() error {
-	if config.HaystackURL != "" && !validServiceURL(config.HaystackURL) {
-		return fmt.Errorf("Haystack 服务地址无效")
-	}
 	if config.MarkitdownURL != "" && !validServiceURL(config.MarkitdownURL) {
 		return fmt.Errorf("markitdown 服务地址无效")
 	}
