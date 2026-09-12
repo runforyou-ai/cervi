@@ -52,7 +52,8 @@ func TestNormalizeGroupTextMessageInput(t *testing.T) {
 		Body:            "  测试消息  ", ReplyToMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f68",
 		MentionSubjectIDs: []string{firstSubjectID, secondSubjectID},
 	})
-	if len(fields) != 0 || normalized.Body != "测试消息" || normalized.MentionSubjectIDs[0] != secondSubjectID || normalized.MentionSubjectIDs[1] != firstSubjectID {
+	// 提醒顺序决定被点名 AI 员工的发言先后，归一化保留发送时的顺序。
+	if len(fields) != 0 || normalized.Body != "测试消息" || normalized.MentionSubjectIDs[0] != firstSubjectID || normalized.MentionSubjectIDs[1] != secondSubjectID {
 		t.Fatalf("normalized = %#v, fields = %#v", normalized, fields)
 	}
 	_, fields = normalizeGroupTextMessageInput(GroupTextMessageInput{

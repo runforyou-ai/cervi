@@ -62,7 +62,7 @@ func (a *ExecuteAction) StopGroupAgentReply(ctx context.Context, identity *serve
 		if err != nil {
 			return nil, nil, err
 		}
-		return groupMentionRunPolicy{}, run, nil
+		return groupMentionRunPolicy{scheduler: NewScheduler(a.enqueuer)}, run, nil
 	})
 }
 

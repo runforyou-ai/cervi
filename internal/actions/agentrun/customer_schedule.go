@@ -63,7 +63,7 @@ func (s *Scheduler) ScheduleCustomerAuto(ctx context.Context, db bun.IDB, organi
 		return false, nil
 	}
 
-	if err := s.scheduleInput(ctx, db, agentRunSpec{
+	if err := s.appendInput(ctx, db, agentRunSpec{
 		OrganizationID: organizationID, ConversationID: conversationID,
 		AgentIdentityID: *session.AssigneeIdentityID, RevisionID: eligibility.RevisionID,
 		ScopeKind: domain.AgentExecutionScopeServiceSession, ScopeID: session.ID,

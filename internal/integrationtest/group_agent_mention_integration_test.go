@@ -328,6 +328,28 @@ func testGroupAgentMentionReplies(t *testing.T, db *bun.DB, identity *servermode
 		}
 	})
 
+	t.Run("发言顺序取发送时的点名顺序", func(t *testing.T) {
+		f := newGroupAgentFixture(t, db, identity, agents)
+		// 构造与 chat subject 排序相反的点名顺序，确认发言先后取决于发送顺序。
+		ordered := []string{f.agents[0].IdentityID, f.agents[1].IdentityID}
+		if f.subjectID[ordered[0]] < f.subjectID[ordered[1]] {
+			ordered[0], ordered[1] = ordered[1], ordered[0]
+		}
+		f.post(t, "两位一起看下", ordered, "")
+		run := f.activeRun(t)
+		if run == nil || run.AgentIdentityID != ordered[0] {
+			t.Fatalf("首个执行者 = %+v，期望点名顺序中的第一位", run)
+		}
+		if input := f.latestInput(t, run.LaneID); input.SourceOrdinal != 0 {
+			t.Fatalf("首个目标的顺序号 = %d，期望 0", input.SourceOrdinal)
+		}
+		first := f.runNext(t, "第一位的意见", nil)
+		second := f.activeRun(t)
+		if second == nil || second.AgentIdentityID != ordered[1] || first != ordered[0] {
+			t.Fatalf("轮转顺序与点名顺序不一致：first=%s next=%+v", first, second)
+		}
+	})
+
 	t.Run("停止后轮转继续", func(t *testing.T) {
 		f := newGroupAgentFixture(t, db, identity, agents)
 		f.post(t, "两位一起看下", []string{f.agents[0].IdentityID, f.agents[1].IdentityID}, "")

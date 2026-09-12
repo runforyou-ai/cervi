@@ -2306,6 +2306,10 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			testGroupAgentMentionReplies(t, db, loggedIn.Identity, customerServiceRole.ID, provider.ID, model.Identifier)
 		})
 
+		t.Run("Agent 群内接力", func(t *testing.T) {
+			testGroupAgentHandoff(t, db, loggedIn.Identity, customerServiceRole.ID, provider.ID, model.Identifier)
+		})
+
 		t.Run("Agent 单聊引用", func(t *testing.T) {
 			testAgentDirectReplies(t, db, loggedIn.Identity, customerServiceRole.ID, provider.ID, model.Identifier)
 		})

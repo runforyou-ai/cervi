@@ -130,7 +130,7 @@ func (i *turnInputs) claim(ctx context.Context, throughSeq int64) (ClaimedInput,
 }
 
 // finish 在锁内根据已投递序号决定是否收尾。
-func (i *turnInputs) finish(ctx context.Context, turn *adk.TurnContext[Trigger, *schema.Message], candidate string) (bool, error) {
+func (i *turnInputs) finish(ctx context.Context, turn *adk.TurnContext[Trigger, *schema.Message], candidate string, silent bool) (bool, error) {
 	select {
 	case <-turn.Preempted:
 		return false, nil
@@ -144,7 +144,7 @@ func (i *turnInputs) finish(ctx context.Context, turn *adk.TurnContext[Trigger, 
 	if i.closed || i.maxPushedSeq > i.claimedSeq {
 		return false, nil
 	}
-	if candidate == "" {
+	if candidate == "" && !silent {
 		return false, errEmptyFinalResponse
 	}
 	i.closed = true

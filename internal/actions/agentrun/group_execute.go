@@ -22,9 +22,15 @@ import (
 
 const groupInstructionSuffix = `你是企业 AI 员工「%s」，当前在群聊「%s」中与其他成员一起工作。
 群内其他成员的发言以 JSON 提供：sender.name 是发送者名称，sender.kind 为 user 表示真人、为 agent 表示另一位 AI 员工，mentions 是这条消息点名的成员，replyTo 是被引用的原消息；你自己的历史发言是纯文本。
-addressedToYou 为 true 的消息是本次需要你处理的请求，其余消息是群内上下文。`
+addressedToYou 为 true 的消息是本次需要你处理的请求，其余消息是群内上下文。
+结束本轮时调用 submit_group_reply 提交结果：outcome 为 reply 时在 body 写要发到群里的正文，需要点名成员时填 mentions；无需回应时 outcome 填 silent。`
 
-type groupMentionRunPolicy struct{}
+// handoffDepthLimit 限制 AI 员工之间的连续接力深度，真人消息深度为零。
+const handoffDepthLimit = 3
+
+type groupMentionRunPolicy struct {
+	scheduler *Scheduler
+}
 
 // lockContext 锁定群聊会话并读取执行 Agent 当前的成员关系。
 func (p groupMentionRunPolicy) lockContext(ctx context.Context, db bun.IDB, run *servermodels.AgentRun) (agentRunPolicyContext, error) {
@@ -35,11 +41,11 @@ func (p groupMentionRunPolicy) lockContext(ctx context.Context, db bun.IDB, run 
 	if conversation.Type != string(domain.ConversationTypeGroup) {
 		return agentRunPolicyContext{}, errors.New("agent run does not belong to a group conversation")
 	}
-	participantID, err := lockGroupAgentParticipant(ctx, db, run.OrganizationID, run.ConversationID, run.AgentIdentityID)
+	participantID, subjectID, err := lockGroupAgentParticipant(ctx, db, run.OrganizationID, run.ConversationID, run.AgentIdentityID)
 	if err != nil {
 		return agentRunPolicyContext{}, err
 	}
-	return agentRunPolicyContext{Conversation: conversation, AgentParticipantID: participantID}, nil
+	return agentRunPolicyContext{Conversation: conversation, AgentParticipantID: participantID, AgentSubjectID: subjectID}, nil
 }
 
 // prepareLocked 校验群仍在使用且执行 Agent 仍是有效成员，失效时收敛本次运行。
@@ -101,21 +107,25 @@ func (p groupMentionRunPolicy) laneRevision(ctx context.Context, db bun.IDB, pol
 }
 
 // lockGroupAgentParticipant 锁定 Agent 在群内的成员关系，已退出时返回空编号。
-func lockGroupAgentParticipant(ctx context.Context, db bun.IDB, organizationID, conversationID, agentIdentityID string) (string, error) {
-	var participantID string
+func lockGroupAgentParticipant(ctx context.Context, db bun.IDB, organizationID, conversationID, agentIdentityID string) (string, string, error) {
+	var row struct {
+		ParticipantID string `bun:"participant_id"`
+		SubjectID     string `bun:"subject_id"`
+	}
 	err := db.NewSelect().TableExpr("conversation_participants AS cp").
-		ColumnExpr("cp.id").
+		ColumnExpr("cp.id AS participant_id").
+		ColumnExpr("cs.id AS subject_id").
 		Join("JOIN chat_subjects AS cs ON cs.id = cp.subject_id AND cs.organization_id = cp.organization_id AND cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
 		Where("cp.organization_id = ? AND cp.conversation_id = ?", organizationID, conversationID).
 		Where("cs.source_id = ? AND cp.left_at IS NULL", agentIdentityID).
-		For("UPDATE OF cp").Scan(ctx, &participantID)
+		For("UPDATE OF cp").Scan(ctx, &row)
 	if errors.Is(err, sql.ErrNoRows) {
-		return "", nil
+		return "", "", nil
 	}
 	if err != nil {
-		return "", fmt.Errorf("lock group agent participant: %w", err)
+		return "", "", fmt.Errorf("lock group agent participant: %w", err)
 	}
-	return participantID, nil
+	return row.ParticipantID, row.SubjectID, nil
 }
 
 // loadGroupAgentRevision 读取仍是有效群成员的 Agent 的当前配置版本，requireActive 表示同时要求企业启用状态。
@@ -292,4 +302,135 @@ func loadClaimedInputMessages(ctx context.Context, db bun.IDB, run *servermodels
 		addressed[sourceID] = true
 	}
 	return addressed, nil
+}
+
+// groupReply 声明本次运行以结构化群聊结果结束，并限定可唯一解析的点名成员。
+func (p groupMentionRunPolicy) groupReply(ctx context.Context, db bun.IDB, execution executionContext) (*agentruntime.GroupReplyConfig, error) {
+	participants, err := loadGroupMentionParticipants(ctx, db, execution.Run.OrganizationID, execution.Run.ConversationID, execution.Run.AgentIdentityID)
+	if err != nil {
+		return nil, err
+	}
+	candidates := make([]string, 0, len(participants))
+	for name, matched := range participants {
+		if len(matched) == 1 {
+			candidates = append(candidates, name)
+		}
+	}
+	slices.Sort(candidates)
+	return &agentruntime.GroupReplyConfig{MentionCandidates: candidates}, nil
+}
+
+// applyMentions 保存本次回复的提醒关系，并把有执行资格的 AI 员工目标追加为接力输入。
+func (p groupMentionRunPolicy) applyMentions(ctx context.Context, db bun.IDB, policyContext agentRunPolicyContext, run *servermodels.AgentRun, messageID string, mentions []string) error {
+	if len(mentions) == 0 {
+		return nil
+	}
+	participants, err := loadGroupMentionParticipants(ctx, db, run.OrganizationID, run.ConversationID, run.AgentIdentityID)
+	if err != nil {
+		return err
+	}
+	targets := make([]groupMentionTarget, 0, len(mentions))
+	for _, name := range mentions {
+		matched := participants[name]
+		if len(matched) != 1 {
+			slog.Warn("群内点名目标无效，已忽略",
+				"organization_id", run.OrganizationID, "conversation_id", run.ConversationID,
+				"agent_run_id", run.ID, "display_name", name, "matched", len(matched))
+			continue
+		}
+		targets = append(targets, matched[0])
+	}
+	if len(targets) == 0 {
+		return nil
+	}
+	rows := make([]*servermodels.MessageMention, 0, len(targets))
+	for _, target := range targets {
+		rows = append(rows, &servermodels.MessageMention{
+			OrganizationID: run.OrganizationID, MessageID: messageID, SubjectID: target.ChatSubjectID,
+		})
+	}
+	if _, err := db.NewInsert().Model(&rows).
+		Column("organization_id", "message_id", "subject_id").Exec(ctx); err != nil {
+		return fmt.Errorf("create group agent message mentions: %w", err)
+	}
+	depth, err := loadClaimedInputDepth(ctx, db, run)
+	if err != nil {
+		return err
+	}
+	ordinal := 0
+	for _, target := range targets {
+		if target.IdentityType != string(domain.OrganizationIdentityTypeAgent) {
+			continue
+		}
+		if depth+1 > handoffDepthLimit {
+			slog.Warn("接力深度超出上限，已拒绝安排执行",
+				"organization_id", run.OrganizationID, "conversation_id", run.ConversationID,
+				"agent_run_id", run.ID, "display_name", target.DisplayName, "depth", depth, "limit", handoffDepthLimit)
+			continue
+		}
+		revisionID, eligible, err := loadGroupAgentRevision(ctx, db, run.OrganizationID, run.ConversationID, target.IdentityID, true)
+		if err != nil {
+			return err
+		}
+		if !eligible {
+			slog.Warn("被接力点名的 AI 员工不满足执行资格",
+				"organization_id", run.OrganizationID, "conversation_id", run.ConversationID,
+				"agent_run_id", run.ID, "display_name", target.DisplayName)
+			continue
+		}
+		if err := p.scheduler.appendInput(ctx, db, agentRunSpec{
+			OrganizationID: run.OrganizationID, ConversationID: run.ConversationID,
+			AgentIdentityID: target.IdentityID, RevisionID: revisionID,
+			ScopeKind: domain.AgentExecutionScopeConversation, ScopeID: run.ConversationID,
+			Kind: domain.AgentInputKindHandoff, SourceSubjectID: policyContext.AgentSubjectID,
+			SourceOrdinal: ordinal, Depth: depth + 1,
+		}, messageID); err != nil {
+			return fmt.Errorf("append group handoff input: %w", err)
+		}
+		ordinal++
+	}
+	return nil
+}
+
+type groupMentionTarget struct {
+	ChatSubjectID string `bun:"chat_subject_id"`
+	IdentityID    string `bun:"identity_id"`
+	DisplayName   string `bun:"display_name"`
+	IdentityType  string `bun:"identity_type"`
+}
+
+// loadGroupMentionParticipants 按显示名归集群内除自己以外的有效参与者。
+func loadGroupMentionParticipants(ctx context.Context, db bun.IDB, organizationID, conversationID, agentIdentityID string) (map[string][]groupMentionTarget, error) {
+	rows := make([]groupMentionTarget, 0)
+	if err := db.NewSelect().TableExpr("conversation_participants AS cp").
+		ColumnExpr("cs.id AS chat_subject_id").
+		ColumnExpr("cs.source_id AS identity_id").
+		ColumnExpr("oi.display_name").
+		ColumnExpr("oi.type AS identity_type").
+		Join("JOIN chat_subjects AS cs ON cs.id = cp.subject_id AND cs.organization_id = cp.organization_id AND cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
+		Join("JOIN organization_identities AS oi ON oi.id = cs.source_id AND oi.organization_id = cs.organization_id").
+		Where("cp.organization_id = ? AND cp.conversation_id = ?", organizationID, conversationID).
+		Where("cp.left_at IS NULL").
+		Where("cs.source_id <> ?", agentIdentityID).
+		Scan(ctx, &rows); err != nil {
+		return nil, fmt.Errorf("load group mention participants: %w", err)
+	}
+	participants := make(map[string][]groupMentionTarget, len(rows))
+	for _, row := range rows {
+		participants[row.DisplayName] = append(participants[row.DisplayName], row)
+	}
+	return participants, nil
+}
+
+// loadClaimedInputDepth 读取本次运行消费的输入中最大的接力深度。
+func loadClaimedInputDepth(ctx context.Context, db bun.IDB, run *servermodels.AgentRun) (int, error) {
+	depth := 0
+	if err := db.NewSelect().Model((*servermodels.AgentInput)(nil)).
+		ColumnExpr("COALESCE(MAX(ai.depth), 0)").
+		Where("ai.lane_id = ?", run.LaneID).
+		Where("ai.input_seq BETWEEN ? AND ?", run.InputStartSeq, run.InputEndSeq).
+		Scan(ctx, &depth); err != nil {
+		return 0, fmt.Errorf("load claimed input depth: %w", err)
+	}
+	return depth, nil
 }

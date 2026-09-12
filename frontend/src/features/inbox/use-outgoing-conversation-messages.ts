@@ -6,7 +6,7 @@ import type {
   MessageAttachment,
   ConversationMessageReference,
 } from "@/api"
-import type { MentionAllToken } from "@/features/inbox/mention-token"
+import type { MentionAllToken } from "@/lib/mention-token"
 
 export const conversationSendingIndicatorDelay = 300
 
