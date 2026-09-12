@@ -299,8 +299,8 @@ export function WorkspaceLayout() {
       <WorkspaceNavigationGuard
         tabsEnabled={identity.user.workspaceTabsEnabled}
       >
-        <AttachmentQueueProvider key={identity.user.id}>
-          <OutgoingMessageProvider key={identity.user.id}>
+        <OutgoingMessageProvider key={identity.user.id}>
+          <AttachmentQueueProvider key={identity.user.id}>
             <div className="cervi-workspace-shell relative flex h-svh min-h-0 w-full overflow-hidden">
               <WorkspaceNavigation
                 identity={identity}
@@ -325,8 +325,8 @@ export function WorkspaceLayout() {
                 )}
               </div>
             </div>
-          </OutgoingMessageProvider>
-        </AttachmentQueueProvider>
+          </AttachmentQueueProvider>
+        </OutgoingMessageProvider>
       </WorkspaceNavigationGuard>
     </UserPreferencesProvider>
   )

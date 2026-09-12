@@ -113,8 +113,24 @@ export class OutgoingMessageStore {
     this.replace(clientMessageID, (message) => ({
       ...message,
       status: "sent",
+      originatedAt: saved.originatedAt,
       saved,
     }))
+  }
+
+  /** 按发送逻辑编号丢弃一条发送项。 */
+  discard(clientMessageID: string) {
+    this.clearIndicator(clientMessageID)
+    for (const [conversationID, messages] of this.threads) {
+      const remaining = messages.filter(
+        (item) => item.clientMessageID !== clientMessageID,
+      )
+      if (remaining.length === messages.length) continue
+      if (remaining.length) this.threads.set(conversationID, remaining)
+      else this.threads.delete(conversationID)
+      this.emit()
+      return
+    }
   }
 
   /** 按发送逻辑编号标记发送失败，保留正文供手动重试。 */

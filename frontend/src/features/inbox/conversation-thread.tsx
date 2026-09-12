@@ -170,8 +170,7 @@ export function ConversationThread({
         conversationID={conversationID}
         conversationType={conversationType}
         currentUser={identity.user}
-        // 合并发送中的文本消息与当前会话的附件任务。
-        outgoingMessages={[...outgoing.messages, ...attachmentJobs.filter(job => job.stage !== "cancelled" && (conversationID ? job.conversationID === conversationID : directTarget && job.targetIdentityID === directTarget.id)).map(job => job.message)]}
+        outgoingMessages={outgoing.messages}
         onRetryFailedMessage={(draft) => {
           if (attachmentJobs.some(job => job.id === draft.clientMessageID)) attachmentQueue?.retry(draft.clientMessageID)
           else setRetryDraft(draft)

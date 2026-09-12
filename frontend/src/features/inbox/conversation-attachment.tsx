@@ -43,8 +43,9 @@ export function ConversationAttachment({
   const { queue, jobs } = useAttachmentQueue()
   const job = jobs.find(
     (item) =>
-      item.message.saved?.id === messageID ||
-      item.message.attachment?.id === attachment.id,
+      (item.messageID && item.messageID === messageID) ||
+      item.id === attachment.id ||
+      (item.fileID && item.fileID === attachment.id),
   )
   const ready =
     attachment.uploadStatus === AttachmentUploadStatus.AttachmentReady ||

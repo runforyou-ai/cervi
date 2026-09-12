@@ -16,6 +16,7 @@ import { recoverSession } from "@/lib/session-navigation"
 import { useResourceInvalidator } from "@/hooks/use-resource"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { AttachmentQueue } from "./attachment-queue"
+import { useOutgoingMessageStore } from "./outgoing-message-context"
 
 const AttachmentQueueContext = createContext<AttachmentQueue | null>(null)
 
@@ -24,9 +25,11 @@ export function AttachmentQueueProvider({ children }: { children: ReactNode }) {
   const invalidate = useResourceInvalidator()
   const navigate = useNavigate()
   const { t } = useTranslation("inbox")
+  const outgoing = useOutgoingMessageStore()
   const [queue] = useState(
     () =>
       new AttachmentQueue(
+        outgoing,
         (conversationID) => {
           void invalidate(resourceKeys.conversationMessages(conversationID))
           void invalidate(resourceKeys.inbox())
