@@ -271,7 +271,7 @@ func (s *Service) SendGroupTextMessage(ctx context.Context, meta RequestMeta, co
 
 // StopGroupAgentReply 停止群聊中指定的 AI 员工回复并返回实际运行状态。
 func (s *Service) StopGroupAgentReply(ctx context.Context, meta RequestMeta, conversationID string, runID string) (AgentRunStatus, error) {
-	return s.backend.StopGroupAgentReply(ctx, meta, conversationID, runID)
+	return withNormalizedSlices(s.backend.StopGroupAgentReply(ctx, meta, conversationID, runID))
 }
 
 // ListMessageChannels 返回消息渠道列表。
