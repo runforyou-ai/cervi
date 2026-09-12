@@ -419,16 +419,6 @@ body,
   );
 }
 
-/* 聊天输入光标每秒循环，前半秒显示、后半秒隐藏。 */
-@keyframes conversation-composer-caret-blink {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0; }
-}
-
-.conversation-composer-caret {
-  animation: conversation-composer-caret-blink 1s step-end infinite;
-}
-
 @keyframes message-location-highlight {
   0%, 20% { background-color: color-mix(in oklch, var(--primary) 20%, transparent); }
   100% { background-color: transparent; }

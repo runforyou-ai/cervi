@@ -34,7 +34,7 @@ import {
   type InboxConversation,
 } from "@/api"
 import { Button } from "@/components/ui/button"
-import { ConversationComposerInput } from "./conversation-composer-input"
+import { Textarea } from "@/components/ui/textarea"
 import {
   createConversationComposerSchema,
   type ConversationComposerValues,
@@ -330,6 +330,34 @@ export function ConversationComposer({
       form.setFocus("body")
     }
   }, [form, isSubmitting, replyTo])
+
+  useEffect(() => {
+    if (disabledReason || isSubmitting) return
+    // 焦点不在输入控件上时，按下可打印字符直接转交输入框，该字符落入输入框。
+    function focusFromTyping(event: globalThis.KeyboardEvent) {
+      if (event.defaultPrevented || event.isComposing) return
+      if (event.ctrlKey || event.metaKey || event.altKey) return
+      // 空格是按钮和复选框的激活键，留给当前焦点元素。
+      if (event.key.length !== 1 || event.key === " ") return
+      const input = inputRef.current
+      if (!input || input.closest("[aria-hidden='true']")) return
+      const active = document.activeElement
+      if (
+        active instanceof HTMLElement &&
+        (active.isContentEditable ||
+          active.tagName === "INPUT" ||
+          active.tagName === "TEXTAREA" ||
+          active.tagName === "SELECT" ||
+          // 对话框和各类浮层内的按键归浮层处理。
+          active.closest("[data-radix-popper-content-wrapper],[role='dialog']"))
+      )
+        return
+      input.focus()
+      input.setSelectionRange(input.value.length, input.value.length)
+    }
+    document.addEventListener("keydown", focusFromTyping)
+    return () => document.removeEventListener("keydown", focusFromTyping)
+  }, [disabledReason, isSubmitting])
 
   /** 按会话类型发送当前成员文本消息。 */
   async function send(values: ConversationComposerValues) {
@@ -637,7 +665,7 @@ export function ConversationComposer({
               </button>
             </div>
           ) : null}
-          <ConversationComposerInput
+          <Textarea
             {...bodyField}
             ref={(input) => {
               bodyField.ref(input)
@@ -650,7 +678,7 @@ export function ConversationComposer({
             aria-label={t("replyLabel")}
             aria-describedby={disabledReason ? `${inputID}-reason` : undefined}
             aria-invalid={form.formState.errors.body ? true : undefined}
-            className="min-h-20 max-h-[200px] resize-none rounded-none border-0 bg-transparent py-2 shadow-none focus-visible:ring-0 dark:bg-transparent"
+            className="min-h-20 max-h-[200px] resize-none rounded-none border-0 bg-transparent py-2 shadow-none caret-primary focus-visible:ring-0 dark:bg-transparent"
             onInput={(event) => {
               resizeComposerInput(
                 event.currentTarget,
