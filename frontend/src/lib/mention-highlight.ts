@@ -1,5 +1,5 @@
 /** 在 Markdown 正文的文本节点中强调结构化提醒。 */
-import { mentionTokenPattern } from "@/lib/mention-token"
+import { mentionTokenPattern } from "./mention-token.ts"
 
 export type MarkdownNode = {
   type?: string
