@@ -26,6 +26,7 @@ type UploadItem = {
   bytes: number
 }
 export const knowledgeDocumentFormats = Object.values(KnowledgeDocumentFormat).filter((value) => value.startsWith("."))
+const knowledgeDocumentMaxByteSize = 20 * 1024 * 1024
 
 /** 管理批次上传、逐项重试及离开页面后的临时文件清理。 */
 export function useKnowledgeDocumentUpload({ baseId, groupId }: { baseId: string; groupId: string }) {
@@ -109,6 +110,10 @@ export function useKnowledgeDocumentUpload({ baseId, groupId }: { baseId: string
       )
     ) {
       toast.error(t("documents.upload.unsupported"))
+      return
+    }
+    if (files.some((file) => file.size > knowledgeDocumentMaxByteSize)) {
+      toast.error(t("documents.upload.tooLarge"))
       return
     }
     items.current = files.map((file) => ({

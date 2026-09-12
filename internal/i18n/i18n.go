@@ -264,6 +264,7 @@ const (
 	FieldFileNameRequired                 Key = "field.file_name_required"
 	FieldFileContentTypeInvalid           Key = "field.file_content_type_invalid"
 	FieldFileByteSizeInvalid              Key = "field.file_byte_size_invalid"
+	FieldKnowledgeDocumentTooLarge        Key = "field.knowledge_document_too_large"
 	FieldFilePurposeInvalid               Key = "field.file_purpose_invalid"
 	FieldRoleNameRequired                 Key = "field.role_name_required"
 	FieldRoleNameTooLong                  Key = "field.role_name_too_long"

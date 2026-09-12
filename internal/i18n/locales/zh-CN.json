@@ -343,6 +343,7 @@
   "field.file_name_required": "请选择有效的文件。",
   "field.file_content_type_invalid": "请选择 JPEG、PNG 或 WebP 图片。",
   "field.file_byte_size_invalid": "图片大小不能超过 5 MB。",
+  "field.knowledge_document_too_large": "文档大小不能超过 20 MB。",
   "field.file_purpose_invalid": "文件上传用途无效。",
   "field.role_name_required": "请输入角色名称。",
   "field.role_name_too_long": "角色名称不能超过 10 个字符。",
