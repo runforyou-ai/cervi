@@ -7,7 +7,7 @@
 本文与 `chat-roadmap.md` 的关系如下：
 
 - `chat-roadmap.md` 负责聊天身份、会话、参与者、消息、同步和外部投递等通用事实。
-- `chat-roadmap.md` 也是 Realtime Gateway、`realtime_outbox`、Core NATS、JSON 实时帧协议、连接认证、恢复和背压的权威设计；本文只定义 Agent 和设备能力需要增加的实时事件。
+- `chat-roadmap.md` 也是 Realtime Gateway、提交后通知发布、Core NATS、JSON 实时帧协议、连接认证、恢复和背压的权威设计；本文只定义 Agent 和设备能力需要增加的实时事件。
 - 本文负责 Agent 配置、运行、工具、审批、设备能力和 Eino 接入。
 - Agent 继续沿统一聊天路径发送消息。独立 AI 聊天使用统一 `conversations` 的 `agent` 类型及 `agent_conversations` 业务归属扩展，不创建第二套消息或执行系统。
 - 本文不提前创建尚未进入开发阶段的表和字段；文中的后续对象只在对应阶段出现首个真实场景时落地。
@@ -97,8 +97,8 @@ P1a 和 P1b 不开放产品 Tool，执行上下文只允许读取 Agent 作为�
   -> 服务端 Agent Runtime
       -> 服务端业务工具
       -> Device Capability Gateway
-          -> 持久化设备调用与 realtime_outbox
-          -> Core NATS
+          -> 持久化设备调用并登记通知
+          -> 提交后发布 Core NATS
           -> Realtime Gateway
           -> 同一 WSS 连接推送设备工作水位
           -> 客户端经 HTTP 领取并由 Capability Executor 执行
@@ -128,15 +128,15 @@ Eino Session、Checkpoint 和 BackgroundTask 若以后启用，只是某个 Run 
 
 Realtime 不参与 P1a/P1b 的正确性闭环；两阶段分别通过 appservice 业务查询和网站轮询读取最终 Message。完整 P1 和设备阶段使用以下统一实时设计。
 
-- 全产品只使用 `chat-roadmap.md` 定义的一个版本化 Realtime WebSocket 及其 JSON 帧协议，不为设备能力另建连接或 MCP Transport；AI 流使用按 runId 授权的独立 SSE。
+- 全产品只使用 `chat-roadmap.md` 定义的一个版本化 Realtime WebSocket 及其 JSON 帧协议，不为设备能力另建连接或 MCP Transport；AI 流在同一连接上按 runId 授权订阅，不另建 SSE。
 - 聊天变化通过用户、客服 Inbox 和访客目录三类受众的会话版本通知送达，客户端经 HTTP／Wails 业务 Query 重读；WebSocket 不复制完整业务 DTO。受众采用 `(namespace, organizationId, audienceKind, audienceId)`，Subject 为 `<namespace>.realtime.<organizationId>.<audienceKind>.<audienceId>`。
-- 最小协议只包含认证、Hello、心跳、变更通知、撤销、错误和下线；AI 流由 PR38 用独立 SSE 交付，不扩展本协议，设备帧到设备阶段再增加。
+- 最小协议只包含认证、Hello、心跳、变更通知、撤销、错误和下线；AI 流订阅与流帧由 PR38 在同一协议中增加，设备帧到设备阶段再增加。
 - 首版投影与游标只驻留内存，缓存丢失必须重建基线：记录 H0、按不可变 ID 扫描完整授权索引，再追赶 H0 后变化。target／applied 与实体读取版本分开，Query 失败保留 dirty；独立保存游标不能替代离线库。
 - 网站已有渠道身份才连接；首条有效消息建立身份后再连接，无身份页面仅通过恢复前台和低频无副作用检查发现其他页面建立的身份。访客先同步目录，再补所需窗口。
 - 实时接入保留列表选择和滚动锚点，深处暂存活动序移动；个人置顶由本人手动排序并跨端同步，新消息不改变顺序。收到帧或补拉完成不能推进已读；冷启动／重连不逐条补弹通知。
-- AI token 流走按 runId 授权的 SSE，事件为 started/delta/completed/failed；增量不写入 Message、不推进会话版本、不入 Outbox；最终消息和 Run 状态仍从 PostgreSQL 与 HTTP 恢复。
-- 设备调用先写入 PostgreSQL，并在同一事务写 `realtime_outbox`；Realtime Gateway 只推送设备工作水位，参数领取、进度、结果和持久取消状态走 HTTP。
-- WSS、Gateway 或 Core NATS 丢失通知后，客户端按设备工作水位和待领取列表恢复。
+- AI token 流在同一 WebSocket 上按 runId 授权订阅，事件为 started/delta/completed/failed；增量不写入 Message、不推进会话版本、不发布变更通知；最终消息和 Run 状态仍从 PostgreSQL 与 HTTP 恢复。
+- 设备调用先写入 PostgreSQL，事务提交后发布设备工作水位通知；Realtime Gateway 只推送设备工作水位，参数领取、进度、结果和持久取消状态走 HTTP。
+- 提交后发布、WSS、Gateway 或 Core NATS 丢失通知后，客户端在重连和定期兜底校验时按设备工作水位和待领取列表恢复。
 - WSS 在线只表示连接存在，不代表设备可弹审批、拥有 OS 权限或能在后台可靠执行。
 - Agent Runtime 不持有 `connection_id`，只请求某个用户或指定设备上的某项类型化能力。
 
@@ -157,7 +157,7 @@ Realtime 不参与 P1a/P1b 的正确性闭环；两阶段分别通过 appservice
 11. 大文件和大结果只传文件引用，不进入 WSS 调用载荷或模型上下文。
 12. 移动端默认是前台确认与选择器，不承担无人值守企业 Worker 职责。
 13. 不为未来本地运行提前创建第二套身份、表或空字段；真实落地时直接调整目标模型。
-14. Device Capability Gateway 复用 Realtime Gateway 的连接、认证、JSON 帧、Outbox、NATS 和背压，不建设第二套实时基础设施。
+14. Device Capability Gateway 复用 Realtime Gateway 的连接、认证、JSON 帧、通知发布、NATS 和背压，不建设第二套实时基础设施。
 15. Agent 触发资格来自消息首次持久化时写入的服务端触发事实和单调序号；`originated_at` 只用于来源时间展示，不能作为 Agent 触发水位；聊天顺序统一使用会话内 `message_seq`，与 Trigger 序号及 `conversations.version` 分开。
 16. 同一个 Run 最多持久化一条最终输出消息；Message 使用 `agent:<agent_run_id>` 业务幂等键，Task 幂等键不能替代它。
 17. 后台 Runtime 使用 `AgentExecutionContext` 显式授权，不伪造登录用户；工具、审批和设备能力只在对应阶段逐层放开。
@@ -378,7 +378,7 @@ agent_runs
 - 内容块只在 Run 成功时与最终 Message、Run 终态和消费水位原子提交。整次运行失败、取消或当前尝试退出时丢弃内存过程，不持久化半成品。
 - 运行快照包含 `runId`、任务 `attempt`、`streamId`、流内递增 `sequence`、稳定块编号及候选正文。重算建立新流并清空旧过程；未来 WebSocket 切换流时替换整个思考区，并忽略旧尝试事件。当前仅提供进程内快照，尚未接入 token 流和传输订阅。
 - 后续实时交付统一接入产品 WebSocket；各端只有通过补拉、失权和阅读回归后才移除对应轮询，不新增过程轮询接口。PR36 拆分轻量 Run 摘要集合与按 runId 读取的持久过程；PR37 增量消费模型输出并维护内存流快照。
-- PR38 用按 runId 授权的 SSE 交付成员流：连接即取快照再接增量，断线重连取新快照，忽略旧 attempt／streamId；只有事务提交后才能提示 completed，持久 Query 终态覆盖临时候选，丢失 completed 仍由会话版本收敛。PR39 在服务端构造访客专属公开正文／基础状态，内部思考、工具参数与结果不进入访客流；接管或关闭立即终止旧候选资格。
+- PR38 在同一 WebSocket 上按 runId 授权订阅交付成员流：订阅即取快照再接增量，断线或收到重订阅要求后重新订阅取新快照，忽略旧 attempt／streamId；只有事务提交后才能提示 completed，持久 Query 终态覆盖临时候选，丢失 completed 仍由会话版本收敛。PR39 在服务端构造访客专属公开正文／基础状态，内部思考、工具参数与结果不进入访客流；接管或关闭立即终止旧候选资格。
 - 当前 Web、桌面端和移动端成员消息时间线共用一个默认折叠的思考区，展开箭头紧邻状态文字；thinking 用斜体，content 正常显示，工具逐个折叠展示状态和完整参数、结果或错误。工具原文按实际布局截断，只有溢出时提供完整内容提示；最终正文下显示输入、输出用量。现有消息读取带上最近 Run 的状态，运行中显示“思考中”，实时过程和打字机效果待 WebSocket 接入。
 
 聊天内容块用于回看成功回复的过程；未来涉及外部副作用、审批和费用的审计记录另按下面的语义步骤模型建设，不能用聊天过程的丢弃规则代替业务审计。
@@ -663,7 +663,7 @@ Device Capability Gateway 与 Realtime Gateway 是两个不同职责：
 - 计算企业策略、会话类型、Agent 策略、用户授权和设备能力的交集。
 - 选择设备或返回需要用户选择。
 - 创建持久设备调用和审批。
-- 写入 `realtime_outbox` 请求设备工作水位通知，管理超时并通过 HTTP 接收结果。
+- 事务提交后发布设备工作水位通知，管理超时并通过 HTTP 接收结果。
 - 把调用状态投影到 Tool Invocation 和审计链。
 
 Gateway 不替代 Action 和 Executor 的安全校验，也不允许 Agent 直接持有连接编号。
@@ -730,8 +730,8 @@ device_invocations
 
 ```text
 服务端事务锁定 devices，分配 work_seq
-  -> 创建 device_invocation 并写 realtime_outbox
-  -> 发布用户 Subject，并携带目标 device_id 路由提示
+  -> 创建 device_invocation 并登记通知
+  -> 事务提交后发布用户 Subject，并携带目标 device_id 路由提示
   -> Realtime Gateway 只向匹配该 device_id 且声明 Executor 能力的连接推送 DeviceWorkAdvanced
   -> 前端通过 HTTP claim 领取完整调用
   -> 前端通过 Wails 绑定调用本机 Go Executor
@@ -742,7 +742,7 @@ device_invocations
 
 设备能力进入开发阶段时，在同一套实时帧定义中新增可被旧客户端忽略的 `DeviceWorkAdvanced` ServerFrame，并通过 `ClientHello` 能力协商。它属于 P1 水位通知优先级，只携带设备编号和最新 `work_seq`，不携带工具名、参数或审批内容；不增加客户端持久命令帧。首版复用用户 NATS Subject，由各 Realtime Gateway 按已认证 `device_id` 过滤，不提前增加设备 Subject。
 
-设备重连后使用现有 Realtime 认证和 Hello，再通过 HTTP 比较工作 Head、补拉或领取调用；不能依赖 Gateway 重放帧。终态设备调用按保留策略清理，长期审计仍由 Agent Tool Invocation 保存。
+设备重连后使用现有 Realtime 认证和 Hello，再通过 HTTP 比较工作 Head、补拉或领取调用；`chat-roadmap.md` 第 10.8 节的定期兜底校验同时比较工作 Head，覆盖提交后发布丢失的通知。不能依赖 Gateway 重放帧。终态设备调用按保留策略清理，长期审计仍由 Agent Tool Invocation 保存。
 
 ### 11.4 客户端 Executor
 
@@ -821,7 +821,7 @@ Cervi Gateway
 
 ### 13.4 持久调用 + WSS 唤醒
 
-相比同步 WSS RPC 多一次持久化和领取请求，但能自然处理断线、重连、多实例、审计和 `uncertain`，并直接复用现有 Realtime Gateway、`realtime_outbox`、Core NATS、JSON 帧连接与背压。采用为首选方案。
+相比同步 WSS RPC 多一次持久化和领取请求，但能自然处理断线、重连、多实例、审计和 `uncertain`，并直接复用现有 Realtime Gateway、提交后通知发布、Core NATS、JSON 帧连接与背压。采用为首选方案。
 
 ## 14. 实施阶段
 
@@ -871,8 +871,8 @@ P1a/P1b 完成后扩展为完整服务端 Agent：
 - 补齐 Policy、State、Trigger 游标、Run、Step 和 Tool Invocation。
 - 为 Agent 使用独立任务队列或 Worker 配额。
 - 扩展既有 Eino Adapter，接入 ChatModelAgent、Runner、服务端类型化 Tool、流式事件和取消。
-- 完整落地会话变更版本、受众通知、Realtime Outbox、Core NATS、Realtime Gateway、首帧认证和断线后的业务重读。
-- 合并后的临时模型增量通过按 runId 授权的 SSE 送达；发起、取消、最终消息和 Run 状态继续走 HTTP 与数据库事实。
+- 完整落地会话变更版本、受众通知提交后发布、Core NATS、Realtime Gateway、首帧认证和断线后的业务重读。
+- 合并后的临时模型增量在同一 WebSocket 上按 runId 授权订阅送达；发起、取消、最终消息和 Run 状态继续走 HTTP 与数据库事实。
 - 支持自动响应、@ 触发、费用和失败审计。
 - 工具只读或具有强业务幂等。
 
