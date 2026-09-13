@@ -16,6 +16,7 @@ export function MobileGroupInfo({
   muted,
   muteBusy,
   onEdit,
+  onTransfer,
   onLeave,
   onMute,
 }: {
@@ -26,6 +27,7 @@ export function MobileGroupInfo({
   muted: boolean
   muteBusy: boolean
   onEdit: (field: "image" | "title" | "description") => void
+  onTransfer: () => void
   onLeave: (trigger: HTMLElement | null) => void
   onMute: (muted: boolean) => void
 }) {
@@ -34,6 +36,16 @@ export function MobileGroupInfo({
   const { formatDateTime } = useDateTime()
   const owner = group.participants.find(
     (member) => member.role === GroupParticipantRole.GroupParticipantRoleOwner,
+  )
+  const ownerContent = (
+    <>
+      <span className="w-20 shrink-0 text-muted-foreground">
+        {t("groupOwner")}
+      </span>
+      <span className="min-w-0 flex-1 break-words text-right">
+        {owner?.displayName ?? "—"}
+      </span>
+    </>
   )
   return (
     <div className="px-4 pb-4">
@@ -78,14 +90,21 @@ export function MobileGroupInfo({
             </button>
           )
         })}
-        <div className="flex min-h-14 items-center gap-3 py-3">
-          <span className="w-20 shrink-0 text-muted-foreground">
-            {t("groupOwner")}
-          </span>
-          <span className="min-w-0 flex-1 break-words text-right">
-            {owner?.displayName ?? "—"}
-          </span>
-        </div>
+        {isOwner && !archived ? (
+          <button
+            type="button"
+            disabled={busy}
+            onClick={onTransfer}
+            className="flex min-h-14 w-full items-center gap-3 py-3 text-left outline-none active:bg-muted focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+          >
+            {ownerContent}
+            <ChevronRightIcon className="size-5 shrink-0 text-muted-foreground" />
+          </button>
+        ) : (
+          <div className="flex min-h-14 items-center gap-3 py-3">
+            {ownerContent}
+          </div>
+        )}
         <div className="flex min-h-14 items-center gap-3 py-3">
           <span className="w-20 shrink-0 text-muted-foreground">
             {t("groupCreatedAt")}
