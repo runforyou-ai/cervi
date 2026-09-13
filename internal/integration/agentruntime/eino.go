@@ -16,7 +16,7 @@ import (
 )
 
 const (
-	defaultMaxIterations = 8
+	defaultMaxIterations = 20
 	// emptyResponseRetryLimit 限制空正文的重新执行次数，避免对同一输入无界重算。
 	emptyResponseRetryLimit = 1
 )
@@ -31,6 +31,10 @@ type EinoRuntime struct {
 
 // New 创建带计算器 Tool 的 Eino Runtime。
 func New() (*EinoRuntime, error) {
+	// 框架内置提示与本项目面向模型的提示统一使用中文。
+	if err := adk.SetLanguage(adk.LanguageChinese); err != nil {
+		return nil, fmt.Errorf("set agent runtime language: %w", err)
+	}
 	calculator, err := newCalculatorTool()
 	if err != nil {
 		return nil, fmt.Errorf("create calculator tool: %w", err)
@@ -73,12 +77,32 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 		groupReply = newGroupReplyTool(*request.GroupReply)
 		tools = append(tools, groupReply)
 	}
+	if len(request.MCPServers) > 0 {
+		// 收齐本次运行的内置工具名称，远程工具重名时由 openMCPTools 跳过。
+		registered := map[string]struct{}{offloadedResultToolName: {}}
+		for _, existing := range tools {
+			info, infoErr := existing.Info(ctx)
+			if infoErr != nil {
+				return RunResult{}, fmt.Errorf("read registered tool info: %w", infoErr)
+			}
+			registered[info.Name] = struct{}{}
+		}
+		mcpTools, releaseSessions := openMCPTools(ctx, request.RunID, request.MCPServers, registered)
+		defer releaseSessions()
+		tools = append(tools, mcpTools...)
+	}
+	window := contextWindowTokens(request.Model)
+	reductionHandlers, err := newContextReductionHandlers(ctx, window)
+	if err != nil {
+		return RunResult{}, err
+	}
+	handlers := append([]adk.ChatModelAgentMiddleware{recorder, newFinalIterationGuard(maxIterations, groupReply != nil)}, reductionHandlers...)
 	agent, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
 		Name: request.Name, Instruction: request.Instruction, Model: chatModel,
 		ToolsConfig: adk.ToolsConfig{ToolsNodeConfig: compose.ToolsNodeConfig{
 			Tools: tools, ToolCallMiddlewares: []compose.ToolMiddleware{toolExecutionMiddleware(recorder)},
 		}},
-		Handlers:      []adk.ChatModelAgentMiddleware{recorder},
+		Handlers:      handlers,
 		MaxIterations: maxIterations,
 	})
 	if err != nil {
@@ -89,7 +113,8 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 	var carriedUsage Usage
 	for attempt := 0; ; attempt++ {
 		execution := &einoExecution{
-			inputs: &turnInputs{feed: feed}, recorder: recorder, maxTurns: request.MaxTurns, groupReply: groupReply,
+			inputs: &turnInputs{feed: feed}, recorder: recorder, maxTurns: request.MaxTurns,
+			groupReply: groupReply, contextWindow: window,
 		}
 		execution.inputs.loop = adk.NewTurnLoop(adk.TurnLoopConfig[Trigger, *schema.Message]{
 			GenInput: execution.genInput,
@@ -123,13 +148,14 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 
 // einoExecution 保存单次运行的上下文、轮次和结果，回调按轮次顺序访问。
 type einoExecution struct {
-	inputs     *turnInputs
-	history    turnHistory
-	recorder   *processRecorder
-	groupReply *groupReplyTool
-	maxTurns   int
-	turns      int
-	result     RunResult
+	inputs        *turnInputs
+	history       turnHistory
+	recorder      *processRecorder
+	groupReply    *groupReplyTool
+	maxTurns      int
+	contextWindow int
+	turns         int
+	result        RunResult
 }
 
 // genInput 认领新输入，并在已有执行上下文后追加尚未消费的会话消息。
@@ -148,7 +174,7 @@ func (e *einoExecution) genInput(ctx context.Context, _ *adk.TurnLoop[Trigger, *
 		return nil, err
 	}
 	return &adk.GenInputResult[Trigger, *schema.Message]{
-		Input: &adk.AgentInput{Messages: e.history.appendInput(claimed.Messages)},
+		Input: &adk.AgentInput{Messages: e.history.appendInput(trimClaimedHistory(ctx, claimed.Messages, e.contextWindow))},
 		RunOpts: []adk.AgentRunOption{
 			adk.WithAfterToolCallsHook(func(hookCtx context.Context) error {
 				return e.inputs.poll(hookCtx, true)

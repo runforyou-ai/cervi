@@ -60,7 +60,7 @@ func (t *groupReplyTool) Info(context.Context) (*schema.ToolInfo, error) {
 	}, nil
 }
 
-// InvokableRun 校验并保存本次结构化结果，校验不通过时把原因返回给模型重试。
+// InvokableRun 校验并保存本次结构化结果；提交成功后本轮直接结束，校验不通过时把原因返回给模型重试。
 func (t *groupReplyTool) InvokableRun(ctx context.Context, argumentsInJSON string, _ ...tool.Option) (string, error) {
 	var params struct {
 		Outcome  string   `json:"outcome"`
@@ -95,7 +95,7 @@ func (t *groupReplyTool) InvokableRun(ctx context.Context, argumentsInJSON strin
 	t.mu.Lock()
 	t.submission = &submission
 	t.mu.Unlock()
-	if err := adk.SendToolGenAction(ctx, groupReplyToolName, adk.NewExitAction()); err != nil {
+	if err := adk.SetToolReturnDirectly(ctx); err != nil {
 		return "", err
 	}
 	return "已提交。", nil

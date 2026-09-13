@@ -1,4 +1,4 @@
-// Package mcp 实现远程 MCP 服务的连接与工具发现。
+// Package mcp 实现远程 MCP 服务的连接、工具发现与工具调用。
 package mcp
 
 import (
@@ -40,21 +40,14 @@ func (c *Client) Discover(ctx context.Context, config Config) ([]domain.MCPTool,
 	err := c.runner.Run(ctx, connectiontest.Target{
 		Category: connectiontest.CategoryMCPServer, Adapter: string(config.ServerType), Location: connectiontest.LocationServer,
 	}, connectiontest.ProbeFunc(func(ctx context.Context) error {
-		client := connectiontest.NewHTTPClient()
 		deadline, _ := ctx.Deadline()
-		client.Transport = &authenticatedTransport{token: config.AuthorizationToken, deadline: deadline}
-		var transport sdk.Transport
-		switch config.ServerType {
-		case domain.MCPServerTypeSSE:
-			transport = &sdk.SSEClientTransport{Endpoint: config.URL, HTTPClient: client}
-		case domain.MCPServerTypeStreamableHTTP:
-			transport = &sdk.StreamableClientTransport{Endpoint: config.URL, HTTPClient: client, MaxRetries: -1, DisableStandaloneSSE: true}
-		default:
-			return connectiontest.NewError(connectiontest.StageConnect, connectiontest.FailureInvalidConfig, nil)
-		}
-		session, err := sdk.NewClient(&sdk.Implementation{Name: "Cervi", Version: "1.0.0"}, nil).Connect(ctx, transport, nil)
+		transport, err := newTransport(config, deadline)
 		if err != nil {
-			return classifyError(connectiontest.StageConnect, err)
+			return err
+		}
+		session, err := connect(ctx, transport)
+		if err != nil {
+			return err
 		}
 		defer session.Close()
 		for item, err := range session.Tools(ctx, nil) {
@@ -72,6 +65,28 @@ func (c *Client) Discover(ctx context.Context, config Config) ([]domain.MCPTool,
 	return tools, nil
 }
 
+// newTransport 按服务类型创建带认证的 MCP 传输，deadline 为零值时请求期限跟随调用方 context。
+func newTransport(config Config, deadline time.Time) (sdk.Transport, error) {
+	client := connectiontest.NewHTTPClient()
+	client.Transport = &authenticatedTransport{token: config.AuthorizationToken, deadline: deadline}
+	switch config.ServerType {
+	case domain.MCPServerTypeSSE:
+		return &sdk.SSEClientTransport{Endpoint: config.URL, HTTPClient: client}, nil
+	case domain.MCPServerTypeStreamableHTTP:
+		return &sdk.StreamableClientTransport{Endpoint: config.URL, HTTPClient: client, MaxRetries: -1, DisableStandaloneSSE: true}, nil
+	}
+	return nil, connectiontest.NewError(connectiontest.StageConnect, connectiontest.FailureInvalidConfig, nil)
+}
+
+// connect 完成 MCP 初始化握手。
+func connect(ctx context.Context, transport sdk.Transport) (*sdk.ClientSession, error) {
+	session, err := sdk.NewClient(&sdk.Implementation{Name: "Cervi", Version: "1.0.0"}, nil).Connect(ctx, transport, nil)
+	if err != nil {
+		return nil, classifyError(connectiontest.StageConnect, err)
+	}
+	return session, nil
+}
+
 // authenticatedTransport 为 MCP 的每个 HTTP 请求附加认证并分类状态错误。
 type authenticatedTransport struct {
 	token    string
@@ -80,8 +95,11 @@ type authenticatedTransport struct {
 
 // RoundTrip 发送带认证的请求并归一化传输错误。
 func (t *authenticatedTransport) RoundTrip(request *http.Request) (*http.Response, error) {
-	// 将初始化、分页与关闭会话的 HTTP 请求限制在同一次探测期限内。
-	ctx, cancel := context.WithDeadline(request.Context(), t.deadline)
+	ctx, cancel := request.Context(), context.CancelFunc(func() {})
+	if !t.deadline.IsZero() {
+		// 将初始化、分页与关闭会话的 HTTP 请求限制在同一次探测期限内。
+		ctx, cancel = context.WithDeadline(ctx, t.deadline)
+	}
 	request = request.Clone(ctx)
 	if t.token != "" {
 		request.Header.Set("Authorization", "Bearer "+t.token)

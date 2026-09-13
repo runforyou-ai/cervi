@@ -2330,6 +2330,10 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			testAgentMCPServices(t, db, loggedIn.Identity, customerServiceRole.ID, provider.ID, model.Identifier)
 		})
 
+		t.Run("Agent 运行期 MCP 服务", func(t *testing.T) {
+			testAgentRunMCPServices(t, db, loggedIn.Identity, customerServiceRole.ID, provider.ID, model.Identifier, taskRuntime)
+		})
+
 		t.Run("Agent 本地知识库范围", func(t *testing.T) {
 			testAgentKnowledgeScopes(t, db, loggedIn.Identity, customerServiceRole.ID, provider.ID, model.Identifier)
 		})

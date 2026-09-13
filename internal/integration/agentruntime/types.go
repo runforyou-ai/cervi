@@ -48,6 +48,7 @@ type ModelConfig struct {
 	BaseURL         string
 	Identifier      string
 	MaxOutputTokens int
+	ContextWindow   int
 }
 
 // KnowledgeSearch 检索本次 Agent Run 获准使用的知识库。
@@ -70,6 +71,7 @@ type RunRequest struct {
 	Model                 ModelConfig
 	KnowledgeSearch       KnowledgeSearch
 	CustomerHistorySearch CustomerHistorySearch
+	MCPServers            []MCPServer       // 本次运行配置版本绑定的远程 MCP 服务。
 	GroupReply            *GroupReplyConfig // 非空表示本次运行以结构化群聊结果结束。
 	MaxIterations         int               // 单轮模型与工具迭代上限，零值使用默认值。
 	MaxTurns              int               // 吸收新输入的轮次上限，零值不限制，由运行 context 控制生命周期。

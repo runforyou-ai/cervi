@@ -24,7 +24,7 @@
 - `organization_identities.type = agent` 和 `agents` 已提供企业 AI 员工身份、状态、团队关系及管理接口。
 - Web 与桌面端创建群聊和添加成员支持同企业活跃 Agent，成员列表展示 AI 员工标识。群主仍由真人担任；群聊消息不触发 Agent，群内 @Agent 与响应策略留待后续设计。
 - Agent 已保存模型选择、系统指令、知识库绑定和不可变配置版本，`agents.active_revision_id` 指向当前版本。
-- AI 员工编辑页的运行配置支持通过三列卡片模态框选择 MCP 服务，确认只回写表单，页面保存时整体提交。创建页保留必要字段。MCP 服务选择随 Revision 保存；删除服务时在同一事务为受影响员工生成移除该服务的新版本，不测试远端可用性，也不改写历史 Revision。MCP 工具调用尚未接入。
+- AI 员工编辑页的运行配置支持通过三列卡片模态框选择 MCP 服务，确认只回写表单，页面保存时整体提交。创建页保留必要字段。MCP 服务选择随 Revision 保存；删除服务时在同一事务为受影响员工生成移除该服务的新版本，不测试远端可用性，也不改写历史 Revision。Run 开始时按本次 Revision 绑定的服务建立会话、读取工具目录并把远端工具注册给模型，过大的工具结果按上下文治理规则转存；服务不可用、目录读取失败或工具名与内置工具重复时跳过该部分工具，本次运行继续执行。
 - AI Provider 和模型目录已经存在，可以保存企业配置的模型服务；模型使用现有复合键 `(provider_id, identifier)`。
 - 服务端已有 PostgreSQL、NATS JetStream、`task_runs + task_outbox`、数据库租约、心跳和至少一次任务执行能力。
 - Web、桌面端与移动端已有企业成员文本单聊、统一消息时间线和前台轮询；`direct_conversations` 已用企业内规范身份对唯一约束收敛首发，Agent 复用同一 ChatSubject、Participant 和 Message 路径。
@@ -544,11 +544,15 @@ P1a/P1b 的 Eino Adapter 只负责：
 
 - 将不可变 Revision 和已经认领的 Conversation 消息转换为 ChatModelAgent 输入。
 - 在有超时且有最大轮数的 TurnLoop 中执行，通过 `Push + AnySafePoint` 在 Tool 结束后的下一次规划前吸收新 Trigger。
+- 单轮模型规划有迭代预算；预算用尽时移除模型可用工具并要求基于已获得的信息给出最终结果，群内运行保留结束工具。结束工具提交成功后本轮直接结束，提交参数不合法时返回原因并继续本轮。
+- 运行期与模型容量相关的限额由模型配置的上下文窗口推导，不使用固定常量：单次工具结果的转存阈值、会话历史的保留预算和上下文清理阈值都按窗口比例计算，并保留下限。
+- 单次工具结果超过阈值时转存到本次运行的内存文件，上下文只保留首尾预览，模型通过专用读回工具按需取得完整内容；上下文接近模型上下文窗口时清理较早的工具调用与结果，保留最近若干轮。转存内容不落盘，随运行结束释放；收尾规划移除包括读回工具在内的全部工具，只要求给出最终结果。
 - 注册一个无副作用、可安全重放的四则运算计算器 Tool；它只验证 Eino Tool 闭环，不作为未来设备 Tool 的实现模板。
+- 注册企业在 Revision 中绑定的远程 MCP 服务工具，会话生命周期与本次 Run 一致。
 - 返回输入/输出 Token、耗时和规范化错误；不计算金额。
-- 不创建 Tool Invocation、审批、设备、MCP、Session、Checkpoint 或本地 Runtime，也不发布 token delta。
+- 不创建 Tool Invocation、审批、设备、Session、Checkpoint 或本地 Runtime，也不发布 token delta。
 
-计算器是本切片唯一允许不建 Tool Invocation 的临时纯函数验证工具，并支持可控延时以覆盖 Tool 执行期间到达新消息的安全点行为；正式发布前删除。本切片用结构化日志记录 Customer Claim 边界，由 Eino 通用 Tool Middleware 记录真实调用的名称、调用编号、结果和耗时，calculator 只补充同一调用编号的非敏感 `operation` 和 `delay_ms`，不提前增加持久 Step 或 Tool Invocation；完整调用事件持久化由后续可观测性 PR 交付。后续任何读取业务数据、调用设备或产生副作用的 Tool 必须先进入完整 P1/P1.5 的策略和审计事实。P1b 的通用接管或关闭先写持久业务状态，再对正在执行的 `context` 发出尽力取消。
+计算器是本切片唯一允许不建 Tool Invocation 的临时纯函数验证工具，并支持可控延时以覆盖 Tool 执行期间到达新消息的安全点行为；正式发布前删除。本切片用结构化日志记录 Customer Claim 边界，由 Eino 通用 Tool Middleware 记录真实调用的名称、调用编号、结果和耗时，calculator 只补充同一调用编号的非敏感 `operation` 和 `delay_ms`，不提前增加持久 Step 或 Tool Invocation；完整调用事件持久化由后续可观测性 PR 交付。远程 MCP 工具的调用记录当前同样只进入结构化日志和运行内容块；调用不设审批，副作用由企业自行选择接入的服务约束。后续任何读取业务数据、调用设备或产生副作用的服务端类型化 Tool 必须先进入完整 P1/P1.5 的策略和审计事实。P1b 的通用接管或关闭先写持久业务状态，再对正在执行的 `context` 发出尽力取消。
 
 ### 9.4 P1 最小接入集
 
@@ -771,7 +775,7 @@ device_invocations
 
 ## 12. MCP 决策
 
-完整 MCP Adapter 仅在第三方本地 MCP 工具生态出现后落地。
+本节只讨论设备能力协议。企业远程 MCP 服务已由服务端在 Run 内直接连接和调用；设备侧完整 MCP Adapter 仅在第三方本地 MCP 工具生态出现后落地。
 
 P2 不直接采用 MCP subset 作为设备主协议，优先使用 Cervi 类型化的 HTTP invocation、claim、progress、result 和 cancel 契约；实时提示只扩展现有 `ServerFrame`。
 
@@ -900,7 +904,7 @@ P1a/P1b 完成后扩展为完整服务端 Agent：
 - 支持用户明确选择多设备，不自动广播副作用。
 - 扩展类型化文件用途和大结果文件引用。
 - 移动端支持前台审批、文件和相册选择，不承诺无人值守执行。
-- 出现第三方工具生态需求后增加完整 MCP Adapter。
+- 出现第三方本地工具生态需求后增加设备侧完整 MCP Adapter。
 
 ### P4：本地 Agent Runtime
 
@@ -930,7 +934,7 @@ P1a/P1b 完成后扩展为完整服务端 Agent：
 | Automemory | 产品定义了跨 Run 的长期记忆及用户可管理语义 |
 | BackgroundTask Store | 同 Run 子代理或长工具需要框架级租约 |
 | `agent_run_events` | 必须跨断线逐事件回放，且日志系统不能满足 |
-| 完整 MCP Adapter | 出现第三方本地 MCP 工具生态需求 |
+| 设备侧完整 MCP Adapter | 出现第三方本地 MCP 工具生态需求 |
 | 客户端可靠任务 | 首个设备任务必须跨进程恢复 |
 | 独立 Device Capability Gateway 服务 | 设备业务编排需要独立扩缩容；连接扩缩容继续由 Realtime Gateway 负责 |
 | 多设备自动选择 | 产品已经定义可解释且安全的选择规则 |

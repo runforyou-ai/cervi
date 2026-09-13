@@ -13,10 +13,13 @@ import (
 	"uuid"
 
 	agentaction "github.com/runforyou-ai/cervi/internal/actions/agent"
+	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	mcpaction "github.com/runforyou-ai/cervi/internal/actions/mcpserver"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
 )
 
@@ -383,5 +386,50 @@ func testAgentMCPDeleteLatestRevision(t *testing.T, db *bun.DB, owner, colleague
 	detail, err := agentaction.NewGetAgentQuery(db).Execute(ctx, owner, agentID)
 	if err != nil || detail.Execution.RevisionID != saved.Execution.RevisionID || detail.Execution.Managed.SystemInstruction != managed.SystemInstruction || len(detail.Execution.MCPServerIDs) != 0 {
 		t.Fatalf("delete after save=%+v err=%v", detail, err)
+	}
+}
+
+// testAgentRunMCPServices 验证运行按配置版本装配同企业 MCP 服务，未绑定的服务不进入本次运行。
+func testAgentRunMCPServices(t *testing.T, db *bun.DB, owner *servermodels.Identity, roleID, providerID, modelID string, tasks *servertask.Runtime) {
+	t.Helper()
+	ctx := context.Background()
+	execution := agentaction.ExecutionInput{Mode: domain.AgentExecutionModeManaged, Managed: &agentaction.ManagedExecutionInput{
+		ProviderID: providerID, ModelIdentifier: modelID, SystemInstruction: "调用外部工具",
+	}}
+	agent, err := agentaction.NewCreateAgentAction(db).Execute(ctx, owner, agentaction.CreateInput{DisplayName: "MCP 运行助手", RoleID: roleID, Execution: execution})
+	if err != nil {
+		t.Fatal(err)
+	}
+	bound := newAgentMCPService(t, db, owner)
+	// 同企业内另一个未绑定的服务不进入本次运行。
+	newAgentMCPService(t, db, owner)
+	if _, err := db.NewUpdate().Model((*servermodels.MCPServer)(nil)).
+		Set("authorization_token = ?", "运行期令牌").Where("id = ?", bound).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := agentaction.NewUpdateExecutionAction(db).Execute(ctx, owner, agent.ID,
+		agentaction.UpdateExecutionInput{ExecutionInput: execution, MCPServerIDs: []string{bound}}); err != nil {
+		t.Fatal(err)
+	}
+	_, run := createAgentLockChat(t, ctx, db, owner, agent.IdentityID, tasks)
+	var servers []agentruntime.MCPServer
+	runtime := testAgentRuntime{run: func(ctx context.Context, request agentruntime.RunRequest, feed agentruntime.InputFeed) (agentruntime.RunResult, error) {
+		claimed, err := feed.Claim(ctx, 1)
+		if err != nil {
+			return agentruntime.RunResult{}, err
+		}
+		servers = request.MCPServers
+		return agentruntime.RunResult{Content: "已调用工具", EndSeq: claimed.EndSeq}, nil
+	}}
+	if err := agentrunaction.NewExecuteAction(db, tasks, runtime).Execute(ctx, agentrunaction.RunInput{RunID: run.ID}); err != nil {
+		t.Fatal(err)
+	}
+	var service servermodels.MCPServer
+	if err := db.NewSelect().Model(&service).Where("ms.id = ?", bound).Scan(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if len(servers) != 1 || servers[0].Name != service.Name || servers[0].Config.URL != service.URL ||
+		servers[0].Config.ServerType != service.ServerType || servers[0].Config.AuthorizationToken != "运行期令牌" {
+		t.Fatalf("run mcp services = %+v", servers)
 	}
 }
