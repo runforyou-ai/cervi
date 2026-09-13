@@ -159,6 +159,10 @@ const inbox = {
   groupDissolved: "Group dissolved",
   groupDissolvedUnavailable:
     "This group has been dissolved. Its message history is read-only.",
+  agentDisabledUnavailable:
+    "This AI employee is disabled. New messages can't be sent.",
+  directPeerDisabledUnavailable:
+    "This member is disabled. New messages can't be sent.",
   groupSystemRenamed:
     "{{actor}} renamed the group from “{{previousTitle}}” to “{{title}}”",
   groupSystemMembersAdded: "{{actor}} added {{targets}} to the group",

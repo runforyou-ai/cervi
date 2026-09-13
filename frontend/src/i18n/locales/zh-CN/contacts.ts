@@ -178,9 +178,10 @@ const contacts = {
       reactivate: "恢复正常",
       deactivateTitle: "禁用“{{name}}”？",
       reactivateTitle: "将“{{name}}”恢复正常？",
-      deactivateDescription: "该 AI 员工将无法继续工作，所属团队关系会保留。",
+      deactivateDescription:
+        "禁用后不能向该 AI 员工发送新消息，已提交的任务会继续执行；相关渠道分配将重置为公共队列，团队关系和历史会话保留。",
       reactivateDescription:
-        "恢复正常后仍保持“下班”，团队关系不变；需要时请再切换为“工作中”。",
+        "恢复正常后仍保持“下班”，团队关系不变，渠道分配需要重新配置；需要时请再切换为“工作中”。",
       saving: "正在处理…",
       deactivated: "AI 员工已禁用",
       reactivated: "AI 员工已恢复正常",

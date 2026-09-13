@@ -181,9 +181,9 @@ const contacts = {
       deactivateTitle: "Disable “{{name}}”?",
       reactivateTitle: "Restore “{{name}}”?",
       deactivateDescription:
-        "This AI employee will no longer be able to work. Team memberships will be kept.",
+        "New messages can't be sent to this AI employee. Submitted tasks keep running, related channel assignments are reset to the shared queue, and team memberships and chat history are kept.",
       reactivateDescription:
-        "Restoring the account keeps the work status Off duty and preserves team memberships. Change it to Working when needed.",
+        "Restoring the account keeps the work status Off duty and preserves team memberships. Channel assignments must be configured again. Change it to Working when needed.",
       saving: "Updating…",
       deactivated: "AI employee disabled",
       reactivated: "AI employee restored",
