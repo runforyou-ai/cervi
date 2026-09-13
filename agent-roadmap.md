@@ -131,12 +131,12 @@ Realtime 不参与 P1a/P1b 的正确性闭环；两阶段分别通过 appservice
 - 全产品只使用 `chat-roadmap.md` 定义的一个版本化 Realtime WebSocket 及其 JSON 帧协议，不为设备能力另建连接或 MCP Transport；AI 流在同一连接上按 runId 授权订阅，不另建 SSE。
 - 聊天变化通过用户、客服 Inbox 和访客目录三类受众的会话版本通知送达，客户端经 HTTP／Wails 业务 Query 重读；WebSocket 不复制完整业务 DTO。受众采用 `(namespace, organizationId, audienceKind, audienceId)`，Subject 为 `<namespace>.realtime.<organizationId>.<audienceKind>.<audienceId>`。
 - 最小协议只包含认证、Hello、心跳、变更通知、撤销、错误和下线；AI 流订阅与流帧由 PR38 在同一协议中增加，设备帧到设备阶段再增加。
-- 首版投影与游标只驻留内存，缓存丢失必须重建基线：记录 H0、按不可变 ID 扫描完整授权索引，再追赶 H0 后变化。target／applied 与实体读取版本分开，Query 失败保留 dirty；独立保存游标不能替代离线库。
+- 首版投影与版本只驻留内存，刷新、重连或缓存丢失后按兜底探针重读已加载窗口，不扫描完整授权索引。target／applied 与实体读取版本分开，Query 失败保留 dirty；独立保存游标不能替代离线库。
 - 网站已有渠道身份才连接；首条有效消息建立身份后再连接，无身份页面仅通过恢复前台和低频无副作用检查发现其他页面建立的身份。访客先同步目录，再补所需窗口。
 - 实时接入保留列表选择和滚动锚点，深处暂存活动序移动；个人置顶由本人手动排序并跨端同步，新消息不改变顺序。收到帧或补拉完成不能推进已读；冷启动／重连不逐条补弹通知。
-- AI token 流在同一 WebSocket 上按 runId 授权订阅，事件为 started/delta/completed/failed；增量不写入 Message、不推进会话版本、不发布变更通知；最终消息和 Run 状态仍从 PostgreSQL 与 HTTP 恢复。
+- AI token 流在同一 WebSocket 上按 runId 授权订阅，帧为 `RunStreamSnapshot`、`RunStreamDelta`、`RunStreamEnded`（完成、失败或取消）与 `RunStreamResubscribe`；增量不写入 Message、不推进会话版本、不发布变更通知；最终消息和 Run 状态仍从 PostgreSQL 与 HTTP 恢复。
 - 设备调用先写入 PostgreSQL，事务提交后发布设备工作水位通知；Realtime Gateway 只推送设备工作水位，参数领取、进度、结果和持久取消状态走 HTTP。
-- 提交后发布、WSS、Gateway 或 Core NATS 丢失通知后，客户端在重连和定期兜底校验时按设备工作水位和待领取列表恢复。
+- 提交后发布、WSS、Gateway 或 Core NATS 丢失通知后，设备连接在重连、前台恢复和设备自身的定期校验时经 HTTP 读取工作水位和待领取列表恢复；设备水位不进入聊天 `GetSyncHeads`。
 - WSS 在线只表示连接存在，不代表设备可弹审批、拥有 OS 权限或能在后台可靠执行。
 - Agent Runtime 不持有 `connection_id`，只请求某个用户或指定设备上的某项类型化能力。
 
@@ -523,7 +523,7 @@ Eino 实现负责：
 - 将 Cervi 配置 Revision 转成 ChatModelAgent、Tool 和 Middleware。
 - 执行 Runner 并消费流式事件。
 - 把有限语义事件投影为 Run Step 和 Tool Invocation。
-- 通过 Realtime Gateway 的内部发布接口发送合并后的 `AIStream*` 临时帧；不直接持有 WebSocket 连接或 NATS Subject。
+- 通过 Realtime Gateway 的内部发布接口发送合并后的 `RunStream*` 临时帧；不直接持有 WebSocket 连接或 NATS Subject。
 - 将 Cervi 取消请求传入 `context`。
 
 Eino 不负责：
@@ -536,7 +536,7 @@ Eino 不负责：
 
 发起、取消和人工接管 Agent Run 都是持久命令，统一经过 `appservice.Service` 和 Action。服务端 Web 使用 `DirectBackend`；桌面端和移动端经 API Proxy 与 Gin 调用服务端的 `appservice.Service(DirectBackend)`；网站请求也由 Gin 适配。Realtime WebSocket 只承载流式展示和进度。
 
-P1a 和 P1b 先使用以下有界接入集；产品 Tool、Middleware、流式事件投影和 `AIStream*` 从完整 P1 开始启用。calculator 仅是开发期测试工具。
+P1a 和 P1b 先使用以下有界接入集；产品 Tool、Middleware、流式事件投影和 `RunStream*` 从完整 P1 开始启用。calculator 仅是开发期测试工具。
 
 ### 9.3 P1a/P1b Eino 有界接入集
 
@@ -742,7 +742,7 @@ device_invocations
 
 设备能力进入开发阶段时，在同一套实时帧定义中新增可被旧客户端忽略的 `DeviceWorkAdvanced` ServerFrame，并通过 `ClientHello` 能力协商。它属于 P1 水位通知优先级，只携带设备编号和最新 `work_seq`，不携带工具名、参数或审批内容；不增加客户端持久命令帧。首版复用用户 NATS Subject，由各 Realtime Gateway 按已认证 `device_id` 过滤，不提前增加设备 Subject。
 
-设备重连后使用现有 Realtime 认证和 Hello，再通过 HTTP 比较工作 Head、补拉或领取调用；`chat-roadmap.md` 第 10.8 节的定期兜底校验同时比较工作 Head，覆盖提交后发布丢失的通知。不能依赖 Gateway 重放帧。终态设备调用按保留策略清理，长期审计仍由 Agent Tool Invocation 保存。
+设备重连后使用现有 Realtime 认证和 Hello，再通过 HTTP 比较工作 Head、补拉或领取调用；声明 Executor 能力的设备连接另按固定间隔经 HTTP 比较工作 Head，覆盖提交后发布丢失的通知；设备 Head 不进入聊天 `GetSyncHeads`。不能依赖 Gateway 重放帧。终态设备调用按保留策略清理，长期审计仍由 Agent Tool Invocation 保存。
 
 ### 11.4 客户端 Executor
 

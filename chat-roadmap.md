@@ -8,7 +8,7 @@
 
 本文档还确定客户端同步和实时传输的长期边界，包括 WebSocket、HTTP、PostgreSQL 任务 Outbox、Core NATS 与 JetStream 的分工，避免聊天开发后再用多套协议补洞。
 
-聊天重构与实时能力按 [PR 实施清单](chat-realtime-pr-plan.md) 交付。PR01 以 `707fdff` 为代码核对基线，仅对齐本文及 Agent 路线图；下文定义统一消息顺序、同步、列表和置顶规则的交付目标，第 13 章保留各次交付时的历史边界。PR06 已统一各类会话的消息序号、分页和阅读水位；PR08–11 已提供统一列表活动时间、独立摘要、游标分页和锚点窗口查询，PR12 接通 Web／桌面端列表分页与滚动锚点，PR13 接通移动端分页和返回恢复，并统一三端自动排序、自然向上浏览。当前仍使用前台轮询，完整筛选历史、实时同步和个人置顶按后续 PR 交付。PR 清单已于 2026-09-10 削减范围：删除持久受众水位表与离线重建，会话变更日志降级为 `conversations.version`，Protobuf 降级为 JSON 帧，取消一次性连接票据；2026-09-13 第二轮调整删除 `realtime_outbox` 与租约发布器，改为事务提交后直接发布 Core NATS，兜底探针改用可见会话版本的哈希和，AI 流走同一 WebSocket 按 runId 订阅，多节点验收推迟到拆分部署；已合并 PR 的原文移入 `chat-realtime-completed.md`。
+聊天重构与实时能力按 [PR 实施清单](chat-realtime-pr-plan.md) 交付。PR01 以 `707fdff` 为代码核对基线，仅对齐本文及 Agent 路线图；下文定义统一消息顺序、同步、列表和置顶规则的交付目标，第 13 章保留各次交付时的历史边界。PR06 已统一各类会话的消息序号、分页和阅读水位；PR08–11 已提供统一列表活动时间、独立摘要、游标分页和锚点窗口查询，PR12 接通 Web／桌面端列表分页与滚动锚点，PR13 接通移动端分页和返回恢复，并统一三端自动排序、自然向上浏览。当前仍使用前台轮询，完整筛选历史、实时同步和个人置顶按后续 PR 交付。PR 清单已于 2026-09-10 削减范围：删除持久受众水位表与离线重建，会话变更日志降级为 `conversations.version`，Protobuf 降级为 JSON 帧，取消一次性连接票据；2026-09-13 第二轮调整删除 `realtime_outbox` 与租约发布器，改为事务提交后直接发布 Core NATS，兜底探针改用可见会话版本与本人会话状态版本的哈希和，AI 流走同一 WebSocket 按 runId 订阅，多节点验收推迟到拆分部署；已合并 PR 的原文移入 `chat-realtime-completed.md`。
 
 第 7 至第 10 章以及后续阶段中的状态机、协议、表字段和基础设施设计，作为对应阶段的实现基线。进入实现前，结合目标平台官方能力、当前代码和容量验证做增量修正。
 
@@ -800,7 +800,7 @@ Telegram 首个 Adapter 的特定映射：
 
 `messages` 是聊天内容和时间线的业务事实来源；它不是外部平台投递状态，也不能单独表达旧记录发生的增量变化。
 
-实时通知不是聊天业务 Outbox，不落库，不保存消息正文、客户端 ACK 或长期事件。提交后、发布前进程崩溃或发布失败会丢失通知；该情况与 Gateway、NATS 或 WebSocket 丢失通知一样，由客户端按第 10.8 节的兜底校验和 HTTP 补拉恢复。
+实时通知不落库，不写入 `task_outbox`，不保存消息正文、客户端 ACK 或长期事件。提交后、发布前进程崩溃或发布失败会丢失通知；该情况与 Gateway、NATS 或 WebSocket 丢失通知一样，由客户端按第 10.8 节的兜底校验和 HTTP 补拉恢复。
 
 现有 `internal/actions/inbox` 表示工作台统一收件箱查询，与分布式系统的 Inbox Pattern 无关。技术接入表不得复用这一业务名称和包职责。
 
@@ -986,18 +986,20 @@ needs_review
 
 新消息通过 `message_seq` 的 `after` 游标补拉，更早历史通过同一顺序的 `before` 游标读取；旧消息编辑、删除、反应、参与者变化和会话设置更新发生在已有行或其他表中，单纯补拉新消息会遗漏这些变化。
 
-首版用一个每会话版本表达“这个会话有变化”，客户端据此重读权威 Query：
+首版用每会话版本表达“这个会话有变化”，用本人会话状态版本表达“我对这个会话的个人状态有变化”，客户端据此重读权威 Query：
 
 ```text
 conversations.version
+conversation_user_states.version
 ```
 
 规则：
 
-- `conversations.version` 在会话锁内随消息追加、参与者变化、会话设置变化和 Run 终态推进，与业务行同事务提交。幂等重放、摘要重算和纯读取不推进。
-- 通知只携带 conversationId 和该版本，不携带正文、姓名或未读数；客户端按版本失效对应 Query 并重读。业务实体当前状态始终从对应业务表读取。
+- `conversations.version` 在会话锁内随消息追加、参与者变化、共享会话设置变化和 Run 终态推进，与业务行同事务提交。幂等重放、摘要重算和纯读取不推进。
+- `conversation_user_states.version` 随本人已读、提及确认、静音和手动未读推进，与个人状态同事务提交，不推进 `conversations.version`；尚无个人状态行时按 0 计。
+- 通知只携带 conversationId、通知种类和对应版本，不携带正文、姓名或未读数；客户端按版本失效对应 Query 并重读。业务实体当前状态始终从对应业务表读取。
 - 本人身份资料与账户级偏好使用独立的 `identityProfileVersion`，保存在本人成员身份行上。
-- 客户端只为已加载会话保存 `appliedVersion`；未加载会话只记目标版本，打开时自然读到最新。
+- 客户端只为已加载会话分别保存会话版本与本人会话状态版本的 `appliedVersion`，不同种类的版本互不比较；未加载会话只记目标版本，打开时自然读到最新。
 - 用户被移出会话或会话删除时，仍向变更前受众发仅含会话 ID 和 removed 的通知，不返回正文或当前成员。
 - 服务端不保存每设备消费游标。各端业务投影和版本只保存在内存；刷新、退出或缓存清空后重新建立基线。真正引入离线库时再把投影与游标原子持久化，并在那时评估是否需要持久变更日志与持久受众水位。
 
@@ -1005,9 +1007,9 @@ conversations.version
 
 兜底校验：
 
-客户端每 30 秒调用 `GetSyncHeads`，返回本人可见会话数量、可见会话 `(conversationId, version)` 的 64 位哈希之和与身份资料版本；任一与本地不符即重读已加载窗口（`ReadInboxWindow` ＋ 按 ID 资格核对 ＋ 当前会话窗口）。前台恢复、网络恢复和重连各额外触发一次。哈希和只判断“有没有变”，不比较新旧，也不指出变的是哪一条；它对提交顺序不敏感，版本推进、会话加入和移出都会改变它，包括失去一个会话同时获得另一个同版本会话。
+客户端每 30 秒调用 `GetSyncHeads`，返回本人可见会话数量、可见会话 `(conversationId, conversation.version, 本人会话状态 version)` 的 64 位哈希之和（没有个人状态行的可见会话按状态版本 0 计入）、身份资料版本，以及个人置顶落地后的 `pinOrderVersion`；任一项与上次返回值不符即重读已加载窗口（`ReadInboxWindow` ＋ 按 ID 资格核对 ＋ 当前会话窗口）。前台恢复、网络恢复和重连各额外触发一次。本人会话状态版本存于 `conversation_user_states`，已读、提及确认、静音和手动未读推进。哈希和只判断“有没有变”，不比较新旧，也不指出变的是哪一条；客户端把探针各项当作不透明值保存上次返回结果，64 位哈希碰撞概率可忽略。
 
-这条兜底是丢通知后最终恢复的唯一保证，提交后发布、Gateway 订阅顺序和撤销复核只是加快恢复。若实测该聚合在真实数据量下过重，才引入持久用户水位行。
+会话、本人会话状态、身份资料和置顶顺序的通知丢失后，这条兜底是最终恢复的唯一保证，提交后发布和 Gateway 订阅顺序只是加快恢复；撤销控制丢失由服务端定期复核生效。设备工作水位由设备连接自行经 HTTP 校验，不进入 `GetSyncHeads`。若实测该聚合在真实数据量下过重，才引入持久用户水位行。
 
 同步协调器属于登录外壳，离开消息页仍工作。按会话保存 `target / applied`，合并目标后串行追赶；窗口重读失败保留 dirty，不因收到过通知就当作已应用。协调器只保存版本和失效状态，业务 DTO 由 Query 缓存持有；视图控制器保存 ID 顺序、窗口边界、锚点和交互状态。账号、企业、服务器或访客身份变化使旧 generation 全部失效，旧响应不能恢复敏感内容。
 
@@ -1030,7 +1032,7 @@ Cervi 使用一个 WebSocket 连接承载实时下行事件和临时上行控制
 | 通道 | 职责 |
 | --- | --- |
 | HTTP / Wails 绑定与 API Proxy | 登录、持久命令、业务查询、会话版本同步、快照和附件上传下载；调用统一进入 `appservice.Service` |
-| WebSocket | 会话变更与身份资料变更通知、按 runId 订阅的 AI 流式输出、输入状态、在线状态、当前焦点和 WebRTC 信令 |
+| WebSocket | 会话、本人会话状态、身份资料与置顶顺序变更通知，撤销控制，按 runId 订阅的 AI 流式输出、输入状态、在线状态、当前焦点和 WebRTC 信令 |
 | WebRTC | 音视频媒体；P2P 优先，TURN/SFU 按网络和群聊需求补充 |
 | APNs / FCM / 厂商推送 / 可选 Web Push | 应用退出或后台时的系统级唤醒，收到后通过业务查询同步权威状态 |
 
@@ -1046,7 +1048,7 @@ WebSocket 上行只接受认证、Hello、Ping/Pong、AI 流订阅与取消、�
 网站挂件或渠道回调 -> Gin -> appservice.Service(DirectBackend)
 appservice.Service -> Action
   -> 同一 PostgreSQL 事务写业务记录和 conversations.version，并登记待发通知
-  -> 事务提交后发布 Core NATS（回滚则丢弃，发布失败只记录日志）
+  -> 事务提交后异步发布 Core NATS（不等待 Flush；回滚则丢弃，发布失败只记录日志）
   -> 调用成功响应
   -> Realtime Gateway 通知本节点连接
   -> 客户端按会话版本通过业务查询重读
@@ -1058,7 +1060,7 @@ WebSocket 可以携带 conversationId 和会话版本等路由提示，但不复
 
 Realtime Gateway 第一阶段作为 Cervi Server 内的独立模块运行，共用认证和应用生命周期；连接规模或独立扩缩容需求出现后再拆成单独 Go 服务。客户端永远不直接连接 NATS。
 
-业务事务在锁内计算受众，并把通知登记到本次事务的待发集合；事务提交成功后统一发布 Core NATS，回滚则丢弃。业务事务内不访问 NATS，不在网络调用中持有事务。每条通知包含：
+业务事务在锁内计算受众，并把通知登记到本次事务的待发集合；事务提交成功后统一异步发布 Core NATS，请求响应不等待 Flush，回滚则丢弃。业务事务内不访问 NATS，不在网络调用中持有事务。每条通知包含：
 
 ```text
 RealtimeNotice
@@ -1067,10 +1069,10 @@ RealtimeNotice
 ├── audience_id
 ├── kind
 ├── conversation_id
-└── conversation_version
+└── version
 ```
 
-`kind` 区分会话变更、身份资料变更与撤销控制；`conversation_id` 和 `conversation_version` 按通知种类允许为空，撤销控制按需携带 tokenSessionId。小群为每个目标用户登记一条，客服和访客使用各自共享受众。同一事务内同一受众同一会话的多次变化合并为一条并保留最高版本；重复通知由 Gateway 和客户端按会话版本幂等处理。
+`kind` 区分会话变更、本人会话状态变更、身份资料变更、置顶顺序变更与撤销控制；`conversation_id` 和 `version` 按通知种类允许为空，撤销控制按需携带 tokenSessionId。小群为每个目标用户登记一条，客服和访客使用各自共享受众。同一事务内同一受众、同一 `kind`、同一会话的多次变化合并为一条并保留最高版本，撤销控制不参与合并；重复通知由 Gateway 和客户端按对应种类的版本幂等处理。
 
 发布失败记录 `WARN` 日志，不重试，也不影响已提交的业务事实。Core NATS 是至多一次实时传输；提交后进程崩溃、发布失败、Gateway 下线、订阅瞬断或 WebSocket 丢失通知时，正确性来自业务 Query 重读和第 10.8 节的兜底校验。实测提交后发布丢失导致的感知延迟不可接受，或兜底校验间隔需要显著拉长时，再引入事务内 `realtime_outbox` 与租约发布器。禁止为了实时扇出创建每用户 JetStream Consumer，也不能把现有工作队列语义的 `task_outbox` 改造成广播事件流。
 
@@ -1080,7 +1082,7 @@ NATS Subject 使用唯一编解码器，与通知登记、Hello 探针值、通�
 <namespace>.realtime.<organizationId>.<audienceKind>.<audienceId>
 ```
 
-`audienceKind` 仅为 `user / customer_inbox / visitor_directory`，ID 使用无点的内部规范值；禁止原始凭据或用户输入直接拼接。撤销和下线控制与变更通知共用提交后发布链路，以通知种类区分，按需携带 tokenSessionId／conversationId，不能被当成普通通知合并丢失；控制通知丢失时由服务端低频授权复核生效。
+`audienceKind` 仅为 `user / customer_inbox / visitor_directory`，ID 使用无点的内部规范值；禁止原始凭据或用户输入直接拼接。撤销和下线控制与变更通知共用提交后发布链路，以通知种类区分，按需携带 tokenSessionId／conversationId，不参与变更通知的版本合并；控制通知丢失时由服务端低频授权复核生效，复核失权时与收到控制走同一撤销路径。
 
 规则：
 
@@ -1116,7 +1118,9 @@ ServerFrame
 ├── ServerHello（连接信息与当前身份的同步探针值）
 ├── Ping / Pong
 ├── ConversationChanged（conversationId ＋ version；访客侧绑定已授权线程）
+├── ConversationStateChanged（conversationId ＋ 本人会话状态 version，仅本人受众）
 ├── IdentityProfileChanged
+├── PinOrderChanged（PR40 增加）
 ├── AccessRevoked / SessionRevoked
 ├── RunStreamSnapshot / RunStreamDelta / RunStreamEnded / RunStreamResubscribe（PR38 增加）
 ├── ServerGoingAway
@@ -1133,7 +1137,7 @@ AI 流帧由 PR38 增加，规则见本节末尾。typing、presence、任务进
 - 解码只保证结构和类型；Gateway 仍需校验帧方向、编号格式、长度、版本、连接状态、组织边界和资源权限。
 - 帧结构和两端定义必须在同一个提交更新，并由双向夹具测试守住。
 
-AI 流在同一 WebSocket 连接上按 runId 订阅：客户端展开运行过程时发送 `SubscribeRun`，Gateway 按 Run 所属会话的阅读资格授权后挂接该 Run 的内存流，首帧返回当前快照再发增量，包含开始、增量、完成和失败事件；收起时取消订阅，失去会话阅读资格时服务端移除订阅。模型 Token 按几十毫秒合并后发送，不写入消息表、不推进会话版本、不发布变更通知；完成、失败或取消时持久化最终业务状态。断线或收到 `RunStreamResubscribe` 后重新订阅取新快照，或通过 HTTP 读取已经持久化的消息，不要求服务端重放全部 Token。服务端当前为单进程内嵌 Worker Pool，Gateway 与执行在同一进程内定位 Run；拆分部署时再评估跨节点快照。
+AI 流在同一 WebSocket 连接上按 runId 订阅：客户端展开运行过程时发送 `SubscribeRun`，Gateway 按 Run 所属会话的阅读资格授权后挂接该 Run 的内存流，首帧返回 `RunStreamSnapshot` 再发 `RunStreamDelta`，结束时发 `RunStreamEnded` 并注明完成、失败或取消；收起时取消订阅，撤销控制或定期复核判定失去会话阅读资格时服务端移除订阅。快照按块分帧，单帧受大小上限约束，工具完整参数与结果经 HTTP 过程详情读取。模型 Token 按几十毫秒合并后发送，不写入消息表、不推进会话版本、不发布变更通知；完成、失败或取消时持久化最终业务状态。断线或收到 `RunStreamResubscribe` 后按退避重新订阅取新快照，或通过 HTTP 读取已经持久化的消息，不要求服务端重放全部 Token。服务端当前为单进程内嵌 Worker Pool，Gateway 与执行在同一进程内定位 Run；拆分部署时再评估跨节点快照。
 
 ### 10.12 连接认证、恢复与背压
 
@@ -1143,7 +1147,7 @@ AI 流在同一 WebSocket 连接上按 runId 订阅：客户端展开运行过�
 
 认证后 `ClientHello` 携带协议主版本、Web/桌面/移动/挂件客户端种类、应用版本和能力集合；`ServerHello` 返回连接信息与当前身份的同步探针值。服务端不允许任何客户端任意订阅会话编号；连接按已认证身份接收通知，AI 流订阅按 runId 所属会话的阅读资格逐次授权，焦点会话只用于提高临时状态和通知密度，不能改变授权。
 
-Gateway 安装订阅并 Flush 后再读取探针值，避免先读探针后订阅的空窗。成员连接到期不晚于原登录会话；登出、停用、群失权和渠道停用在事务提交后发布撤销控制，服务端低频授权复核修复控制丢失。撤销时清除未发送的受限帧、焦点与相关 AI 流订阅，不承诺撤回已进入网络的字节。NATS 恢复但 Socket 未断时也主动要求重新校验探针。
+Gateway 安装订阅并 Flush 后再读取探针值，避免先读探针后订阅的空窗。成员连接到期不晚于原登录会话；登出、停用、群失权和渠道停用在事务提交后发布撤销控制，服务端低频授权复核修复控制丢失，复核失权时与收到撤销控制走同一清理路径。撤销时清除未发送的受限帧、焦点与相关 AI 流订阅，不承诺撤回已进入网络的字节。NATS 恢复但 Socket 未断时也主动要求重新校验探针。
 
 客户端统一实现：
 
@@ -1156,15 +1160,16 @@ Gateway 安装订阅并 Flush 后再读取探针值，避免先读探针后订�
 
 Gateway 为每条连接维护单写协程和有界优先级发送队列：
 
-```text
-P0 认证结果、权限／会话撤销、错误、Ping/Pong、优雅下线
-P1 会话变更与身份资料变更通知
-P2 AI 流帧、typing、presence 等临时事件
-```
+| 优先级 | 帧 | 合并与溢出 |
+| --- | --- | --- |
+| P0 | 认证结果、权限／会话撤销、错误、Ping/Pong、优雅下线 | 撤销控制不合并；溢出以 `slow_consumer` 关闭连接 |
+| P1 | 会话、本人会话状态、身份资料与置顶顺序变更通知，`RunStreamResubscribe` | 变更通知按同一会话同一种类只保留最大版本，`RunStreamResubscribe` 按 runId 合并；溢出以 `slow_consumer` 关闭连接 |
+| P2 | AI 流帧 | 同一 Run 的待发增量合并；溢出时丢弃该 Run 的待发流帧并发送 P1 `RunStreamResubscribe`，不关闭连接，客户端按退避重新订阅 |
+| P3 | typing、presence 等临时事件 | 可直接丢弃 |
 
-同一会话的变更通知只保留最大版本，撤销控制单独保留，P2 可以丢弃；队列溢出时不能静默丢失 P0/P1，而应以 `slow_consumer` 关闭连接，让客户端重连并按探针同步。同一 Run 的待发增量在队列内合并；AI 流帧溢出时丢弃该 Run 的待发增量并以 P1 发送 `RunStreamResubscribe`，不因此关闭连接，长输出不会饿死控制帧和变更通知。浏览器客户端同时观察 `bufferedAmount`。
+`slow_consumer` 关闭后客户端重连并按探针同步。长输出只影响 P2，不会饿死控制帧和变更通知。浏览器客户端同时观察 `bufferedAmount`。
 
-首版单帧上限设为可配置的 64–256KB 范围，不通过 WebSocket 发送附件、历史列表或快照；默认不开启 `permessage-deflate`，验证 CPU 和每连接内存后再决定。服务端和部署文档必须配置反向代理 Upgrade、空闲超时、最大连接数和优雅关闭，并记录连接数、队列深度、慢消费者、认证失败、NATS 发布失败和各帧类型流量。
+首版单帧上限设为可配置的 64–256KB 范围，不通过 WebSocket 发送附件、历史列表或会话与消息快照，AI 流快照按块分帧；默认不开启 `permessage-deflate`，验证 CPU 和每连接内存后再决定。服务端和部署文档必须配置反向代理 Upgrade、空闲超时、最大连接数和优雅关闭，并记录连接数、队列深度、慢消费者、认证失败、NATS 发布失败和各帧类型流量。
 
 
 ### 10.13 列表、个人置顶与通知行为
@@ -1207,7 +1212,7 @@ PR08 的 lastActivityAt 取消息追加事务中数据库当前时间与该会�
 
 以下表初始按 `707fdff` 追踪，PR03 基于 `7c64c07` 更新真人单聊、独立 AI 聊天、共享主体和 Agent 执行入口，PR04 基于 `6dc3bdc` 并同步 `8f96135` 更新客服入站、周期管理、Agent 与 Telegram 外发交叉路径；本轮锁序、幂等、停用／归档和任务租约用例已于 2026-09-08 通过服务端全量测试，构建及界面回归记录见 PR 实施清单。当前列记录事务路径，目标列是 PR02–04、PR17–22、PR25–26、PR40 要实现的约束；变更版本与受众通知尚未接入。`U` 表示本人或有效内部真人受众，`C` 表示企业客服 Inbox，`V` 表示受影响网站渠道身份的访客目录；V 只允许公开投影。
 
-共用目标顺序：入口守卫／稳定定位 → 按 conversationId 排序锁定业务会话集合 → 每会话的 CustomerConversation／ServiceSession（客服才需要）→ 个人状态 → AgentState → Run → 任务执行记录 → 客服 Inbox 行（organizationId）→ 访客目录行（渠道身份 ID）→ 用户水位行（userId）。仅获取本次需要的锁；多 Agent 按 agentIdentityId、Run 按 runId 排序。拿到受众锁后不得回头获取业务锁。个人置顶顺序版本与本人用户水位共用一行锁，不新增独立顺序锁。
+共用目标顺序：入口守卫／稳定定位 → 按 conversationId 排序锁定业务会话集合 → 每会话的 CustomerConversation／ServiceSession（客服才需要）→ 个人状态 → AgentState → Run → 任务执行记录 → 本人成员身份行（置顶顺序版本）。仅获取本次需要的锁；多 Agent 按 agentIdentityId、Run 按 runId 排序。受众通知只在事务内登记，不取受众锁。个人置顶顺序版本在本人成员身份行上，不新增独立顺序锁。
 
 参与关系的顺序按会话路径明确：内部会话在 Conversation 后锁已有 Participant，再处理个人状态和 Agent 状态；客服会话在 Conversation → CustomerConversation → ServiceSession 后处理本次需要的个人状态／AgentState／Run／Task，最后确保回复所需 ChatSubject／Participant 并追加消息。接管不发消息时不建 Participant，AI 被抑制时不提交新的发送关系。所有已有会话的参与者写入都必须先持有同一 Conversation 锁；不得有先锁客服 Participant 再反向等待周期或 Run 的路径。首次创建主体与会话按稳定唯一键定位后进入对应路径。
 
@@ -1215,7 +1220,7 @@ PR03 的停用生效边界已确认：目标停用只拒绝之后资格校验的
 
 共享企业身份主体按身份 ID 升序创建，唯一冲突后使用独立查询读取已提交主体，不通过无变化 UPDATE 取回记录。真人／AI 首发、群创建和增员使用同一创建顺序，群内显示顺序保持原规则。已有会话先锁 Conversation，再进行参与关系和业务写入；新建会话的主体准备发生在创建新行之前。
 
-转交目标身份属于前置业务守卫：LockActiveUser 后先锁定并校验指定目标 OrganizationIdentity，再锁 Conversation／CustomerConversation／ServiceSession，锁后重验周期及转交资格，最后处理 Agent 状态。用户／Agent 停用与资料变更同样先完成身份对象守卫，再进入相关会话集合；不得从会话锁反向获取转交目标身份。渠道凭据、渠道身份及联系人恢复等前置集合按表中入口确定，拿到受众锁后不得再扩展集合。
+转交目标身份属于前置业务守卫：LockActiveUser 后先锁定并校验指定目标 OrganizationIdentity，再锁 Conversation／CustomerConversation／ServiceSession，锁后重验周期及转交资格，最后处理 Agent 状态。用户／Agent 停用与资料变更同样先完成身份对象守卫，再进入相关会话集合；不得从会话锁反向获取转交目标身份。渠道凭据、渠道身份及联系人恢复等前置集合按表中入口确定，完成业务锁后不得再扩展集合。
 
 当前用户写事务先调用 `LockActiveUser`（users 的 `NO KEY UPDATE`）。渠道回调使用渠道凭据、身份守卫，Agent 使用任务上下文与 attempt／worker／租约守卫，不伪造当前用户。任务上下文可以前置解析，但数据库 `LockExecution` 放在会话、State、Run 之后，锁后重新确认租约。Query 信任应用服务已解析身份，校验会话资格但不为读取额外加写锁。
 
