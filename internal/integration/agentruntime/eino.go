@@ -91,7 +91,8 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 		defer releaseSessions()
 		tools = append(tools, mcpTools...)
 	}
-	reductionHandlers, err := newContextReductionHandlers(ctx, request.Model)
+	window := contextWindowTokens(request.Model)
+	reductionHandlers, err := newContextReductionHandlers(ctx, window)
 	if err != nil {
 		return RunResult{}, err
 	}
@@ -112,7 +113,8 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 	var carriedUsage Usage
 	for attempt := 0; ; attempt++ {
 		execution := &einoExecution{
-			inputs: &turnInputs{feed: feed}, recorder: recorder, maxTurns: request.MaxTurns, groupReply: groupReply,
+			inputs: &turnInputs{feed: feed}, recorder: recorder, maxTurns: request.MaxTurns,
+			groupReply: groupReply, contextWindow: window,
 		}
 		execution.inputs.loop = adk.NewTurnLoop(adk.TurnLoopConfig[Trigger, *schema.Message]{
 			GenInput: execution.genInput,
@@ -146,13 +148,14 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 
 // einoExecution 保存单次运行的上下文、轮次和结果，回调按轮次顺序访问。
 type einoExecution struct {
-	inputs     *turnInputs
-	history    turnHistory
-	recorder   *processRecorder
-	groupReply *groupReplyTool
-	maxTurns   int
-	turns      int
-	result     RunResult
+	inputs        *turnInputs
+	history       turnHistory
+	recorder      *processRecorder
+	groupReply    *groupReplyTool
+	maxTurns      int
+	contextWindow int
+	turns         int
+	result        RunResult
 }
 
 // genInput 认领新输入，并在已有执行上下文后追加尚未消费的会话消息。
@@ -171,7 +174,7 @@ func (e *einoExecution) genInput(ctx context.Context, _ *adk.TurnLoop[Trigger, *
 		return nil, err
 	}
 	return &adk.GenInputResult[Trigger, *schema.Message]{
-		Input: &adk.AgentInput{Messages: e.history.appendInput(claimed.Messages)},
+		Input: &adk.AgentInput{Messages: e.history.appendInput(trimClaimedHistory(ctx, claimed.Messages, e.contextWindow))},
 		RunOpts: []adk.AgentRunOption{
 			adk.WithAfterToolCallsHook(func(hookCtx context.Context) error {
 				return e.inputs.poll(hookCtx, true)

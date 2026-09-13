@@ -65,7 +65,7 @@ func (m *repeatedToolChatModel) WithTools([]*schema.ToolInfo) (model.ToolCalling
 	return m, nil
 }
 
-// TestContextClearsOldToolResults 验证上下文超过模型窗口预算后清理较早的工具结果，并完整保留最近一轮。
+// TestContextClearsOldToolResults 验证上下文超过模型窗口预算后清理较早的工具结果，并保留最近两轮。
 func TestContextClearsOldToolResults(t *testing.T) {
 	calculator, err := newCalculatorTool()
 	if err != nil {
@@ -94,5 +94,42 @@ func TestContextClearsOldToolResults(t *testing.T) {
 	}
 	if chatModel.latestSeen != `{"result":2}` {
 		t.Fatalf("latest tool result was cleared: %q", chatModel.latestSeen)
+	}
+}
+
+// TestTrimClaimedHistory 验证会话历史按模型窗口预算保留较新的消息。
+func TestTrimClaimedHistory(t *testing.T) {
+	messages := make([]Message, 0, 4)
+	for i := range 4 {
+		messages = append(messages, Message{ID: string(rune('a' + i)), Content: strings.Repeat("字", 100)})
+	}
+	// 窗口 600 Token 的一半为预算，只容纳最近三条各一百字的消息。
+	kept := trimClaimedHistory(context.Background(), messages, 600)
+	if len(kept) != 3 || kept[0].ID != "b" {
+		t.Fatalf("kept = %+v", kept)
+	}
+	if all := trimClaimedHistory(context.Background(), messages, 4000); len(all) != 4 {
+		t.Fatalf("kept within budget = %d", len(all))
+	}
+	// 最新一条自身超出预算时仍然保留，否则本轮输入会被裁空。
+	if single := trimClaimedHistory(context.Background(), messages, 100); len(single) != 1 || single[0].ID != "d" {
+		t.Fatalf("kept oversized latest = %+v", single)
+	}
+	if zero := trimClaimedHistory(context.Background(), messages, 0); len(zero) != 1 || zero[0].ID != "d" {
+		t.Fatalf("kept with zero budget = %+v", zero)
+	}
+}
+
+// TestOffloadThresholdFollowsContextWindow 验证转存阈值随模型窗口变化并有下限。
+func TestOffloadThresholdFollowsContextWindow(t *testing.T) {
+	if bytes := offloadThresholdBytes(128000); bytes != 38400 {
+		t.Fatalf("large window offload bytes = %d", bytes)
+	}
+	if bytes := offloadThresholdBytes(4000); bytes != minToolResultOffloadBytes {
+		t.Fatalf("small window offload bytes = %d", bytes)
+	}
+	handlers, err := newContextReductionHandlers(context.Background(), contextWindowTokens(ModelConfig{ContextWindow: 128000}))
+	if err != nil || len(handlers) != 2 {
+		t.Fatalf("handlers = %d, err = %v", len(handlers), err)
 	}
 }

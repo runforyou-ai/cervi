@@ -177,7 +177,7 @@ func (m *offloadReadingChatModel) WithTools([]*schema.ToolInfo) (model.ToolCalli
 
 // TestLargeToolResultOffloaded 验证过大的工具结果转存后只向模型提供预览，完整内容仍可由读回工具取得。
 func TestLargeToolResultOffloaded(t *testing.T) {
-	full := strings.Repeat("字", toolResultOffloadBytes)
+	full := strings.Repeat("字", minToolResultOffloadBytes)
 	server := sdk.NewServer(&sdk.Implementation{Name: "test", Version: "1"}, nil)
 	server.AddTool(&sdk.Tool{Name: "dump", Description: "大结果", InputSchema: map[string]any{"type": "object"}},
 		func(context.Context, *sdk.CallToolRequest) (*sdk.CallToolResult, error) {
