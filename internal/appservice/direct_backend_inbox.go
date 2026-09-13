@@ -144,7 +144,7 @@ func inboxConversationFromAction(summary inboxaction.ConversationSummary, avatar
 	}
 	if summary.Direct != nil {
 		conversation.Direct = &DirectInboxConversation{
-			PeerIdentityID: summary.Direct.PeerIdentityID, PeerType: OrganizationIdentityType(summary.Direct.PeerType), PeerName: summary.Direct.PeerName, PeerAvatarURL: optionalFileURL(avatarURLs, summary.Direct.PeerAvatarFileID),
+			PeerIdentityID: summary.Direct.PeerIdentityID, PeerType: OrganizationIdentityType(summary.Direct.PeerType), PeerName: summary.Direct.PeerName, PeerAvatarURL: optionalFileURL(avatarURLs, summary.Direct.PeerAvatarFileID), PeerStatus: UserStatus(summary.Direct.PeerStatus),
 			Preview: summary.Direct.Preview, PreviewSenderIdentityType: (*OrganizationIdentityType)(summary.Direct.PreviewSenderIdentityType), LastMessageAt: summary.Direct.LastMessageAt,
 		}
 	}
@@ -155,7 +155,7 @@ func inboxConversationFromAction(summary inboxaction.ConversationSummary, avatar
 			agentRunStatus = &status
 		}
 		conversation.Agent = &AgentInboxConversation{
-			Title: summary.Agent.Title, AgentIdentityID: summary.Agent.AgentIdentityID, AgentName: summary.Agent.AgentName, AgentAvatarURL: optionalFileURL(avatarURLs, summary.Agent.AgentAvatarFileID),
+			Title: summary.Agent.Title, AgentIdentityID: summary.Agent.AgentIdentityID, AgentName: summary.Agent.AgentName, AgentAvatarURL: optionalFileURL(avatarURLs, summary.Agent.AgentAvatarFileID), AgentStatus: UserStatus(summary.Agent.AgentStatus),
 			Preview: summary.Agent.Preview, PreviewSenderIdentityType: (*OrganizationIdentityType)(summary.Agent.PreviewSenderIdentityType), LastMessageAt: summary.Agent.LastMessageAt, AgentRunStatus: agentRunStatus,
 		}
 	}

@@ -17,6 +17,7 @@ import { MobileIndividualHeader } from "@/apps/mobile/mobile-individual-conversa
 import { MobileIndividualThread } from "@/apps/mobile/mobile-individual-thread"
 import { MobilePageState } from "@/apps/mobile/mobile-page"
 import { LoadingIndicator } from "@/components/loading-indicator"
+import { useAccountDisabledReason } from "@/features/inbox/use-account-disabled-reason"
 import { useConversationSummary } from "@/features/inbox/use-conversation-summary"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
@@ -77,6 +78,7 @@ function MobileAgentConversation({ conversationID }: { conversationID: string })
       : summary.data && isAgentInboxConversation(summary.data)
         ? summary.data
         : null
+  const disabledReason = useAccountDisabledReason(conversation)
   const resource = persisted ? summary : agent
   const ready = persisted ? Boolean(conversation) : Boolean(draftAgent)
 
@@ -110,6 +112,7 @@ function MobileAgentConversation({ conversationID }: { conversationID: string })
           conversationID={conversationID}
           conversationType={ConversationType.ConversationTypeAgent}
           enabled={persisted}
+          disabledReason={disabledReason}
           sendIndividualMessage={!persisted && draftAgent ? async (input) => {
             console.info("发起移动端 AI 会话", {
               conversationId: conversationID,

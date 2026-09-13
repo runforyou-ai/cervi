@@ -67,6 +67,7 @@ type DirectConversationSummary struct {
 	PeerType                  domain.OrganizationIdentityType
 	PeerName                  string
 	PeerAvatarFileID          *string
+	PeerStatus                domain.UserStatus
 	Preview                   *string
 	PreviewSenderIdentityType *domain.OrganizationIdentityType
 	LastMessageAt             *time.Time
@@ -78,6 +79,7 @@ type AgentConversationSummary struct {
 	AgentIdentityID           string
 	AgentName                 string
 	AgentAvatarFileID         *string
+	AgentStatus               domain.UserStatus
 	Preview                   *string
 	PreviewSenderIdentityType *domain.OrganizationIdentityType
 	LastMessageAt             *time.Time
@@ -154,6 +156,7 @@ type directConversationRow struct {
 	PeerType                  string                           `bun:"peer_type"`
 	PeerName                  string                           `bun:"peer_name"`
 	PeerAvatarFileID          *string                          `bun:"peer_avatar_file_id"`
+	PeerStatus                domain.UserStatus                `bun:"peer_status"`
 	Preview                   *string                          `bun:"preview"`
 	PreviewSenderIdentityType *domain.OrganizationIdentityType `bun:"preview_sender_identity_type"`
 	LastMessageAt             *time.Time                       `bun:"last_message_at"`
@@ -172,6 +175,7 @@ type agentConversationRow struct {
 	AgentIdentityID           string                           `bun:"agent_identity_id"`
 	AgentName                 string                           `bun:"agent_name"`
 	AgentAvatarFileID         *string                          `bun:"agent_avatar_file_id"`
+	AgentStatus               domain.UserStatus                `bun:"agent_status"`
 	Preview                   *string                          `bun:"preview"`
 	PreviewSenderIdentityType *domain.OrganizationIdentityType `bun:"preview_sender_identity_type"`
 	LastMessageAt             *time.Time                       `bun:"last_message_at"`
@@ -389,7 +393,7 @@ func withIndividualConversationDetails(query *bun.SelectQuery, identityID, userI
 // directConversationDetailsQuery 按真人身份对及有效成员关系读取长期单聊。
 func (q *LoadInboxQuery) directConversationDetailsQuery(organizationID, identityID, userID string) *bun.SelectQuery {
 	return withIndividualConversationDetails(q.directConversationAccessQuery(organizationID, identityID), identityID, userID).
-		ColumnExpr("peer_oi.id AS peer_identity_id, peer_oi.type AS peer_type, peer_oi.display_name AS peer_name, peer_oi.avatar_file_id AS peer_avatar_file_id")
+		ColumnExpr("peer_oi.id AS peer_identity_id, peer_oi.type AS peer_type, peer_oi.display_name AS peer_name, peer_oi.avatar_file_id AS peer_avatar_file_id, peer_u.status AS peer_status")
 }
 
 // agentConversationDetailsQuery 按业务归属和有效成员关系读取独立 AI 聊天。
@@ -400,7 +404,7 @@ func (q *LoadInboxQuery) agentConversationDetailsQuery(organizationID, identityI
 // withAgentConversationDetails 为 AI 会话阅读基线追加消息摘要及当前运行状态。
 func withAgentConversationDetails(query *bun.SelectQuery, identityID, userID string) *bun.SelectQuery {
 	return withIndividualConversationDetails(query, identityID, userID).
-		ColumnExpr("cv.title, oi.id AS agent_identity_id, oi.display_name AS agent_name, oi.avatar_file_id AS agent_avatar_file_id, latest_agent_run.status AS agent_run_status").
+		ColumnExpr("cv.title, oi.id AS agent_identity_id, oi.display_name AS agent_name, oi.avatar_file_id AS agent_avatar_file_id, agent.status AS agent_status, latest_agent_run.status AS agent_run_status").
 		Join("LEFT JOIN LATERAL (SELECT agr.status FROM agent_runs AS agr WHERE agr.organization_id = cv.organization_id AND agr.conversation_id = cv.id AND agr.agent_identity_id = ac.agent_identity_id ORDER BY agr.created_at DESC, agr.id DESC LIMIT 1) AS latest_agent_run ON TRUE")
 }
 
@@ -469,7 +473,7 @@ func (row agentConversationRow) summary() ConversationSummary {
 	return ConversationSummary{
 		ID: row.ID, Type: domain.ConversationTypeAgent, UnreadCount: row.UnreadCount, Muted: row.Muted, MarkedUnread: row.MarkedUnread, LastMessageID: row.LastMessageID, LastMessageType: row.LastMessageType, LastReadMessageID: row.LastReadMessageID, LastActivityAt: row.LastActivityAt,
 		Agent: &AgentConversationSummary{
-			Title: row.Title, AgentIdentityID: row.AgentIdentityID, AgentName: row.AgentName, AgentAvatarFileID: row.AgentAvatarFileID,
+			Title: row.Title, AgentIdentityID: row.AgentIdentityID, AgentName: row.AgentName, AgentAvatarFileID: row.AgentAvatarFileID, AgentStatus: row.AgentStatus,
 			Preview: row.Preview, PreviewSenderIdentityType: row.PreviewSenderIdentityType, LastMessageAt: row.LastMessageAt, AgentRunStatus: agentRunStatus,
 		},
 	}
@@ -507,7 +511,7 @@ func (row directConversationRow) summary() ConversationSummary {
 	return ConversationSummary{
 		ID: row.ID, Type: domain.ConversationTypeDirect, UnreadCount: row.UnreadCount, Muted: row.Muted, MarkedUnread: row.MarkedUnread, LastMessageID: row.LastMessageID, LastMessageType: row.LastMessageType, LastReadMessageID: row.LastReadMessageID, LastActivityAt: row.LastActivityAt,
 		Direct: &DirectConversationSummary{
-			PeerIdentityID: row.PeerIdentityID, PeerType: domain.OrganizationIdentityType(row.PeerType), PeerName: row.PeerName, PeerAvatarFileID: row.PeerAvatarFileID,
+			PeerIdentityID: row.PeerIdentityID, PeerType: domain.OrganizationIdentityType(row.PeerType), PeerName: row.PeerName, PeerAvatarFileID: row.PeerAvatarFileID, PeerStatus: row.PeerStatus,
 			Preview: row.Preview, PreviewSenderIdentityType: row.PreviewSenderIdentityType, LastMessageAt: row.LastMessageAt,
 		},
 	}

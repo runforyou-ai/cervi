@@ -16,6 +16,7 @@ import { Button } from "@/components/ui/button"
 import { useConversationSummary } from "@/features/inbox/use-conversation-summary"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
+import { useAccountDisabledReason } from "@/features/inbox/use-account-disabled-reason"
 type MobileIndividualLocationState = {
   memberUserID?: string
   agentDirectory?: boolean
@@ -73,9 +74,10 @@ export function MobileIndividualConversationPage({
   const { inboxURL } = useMobileNavigation()
   const { conversationID = "" } = useParams()
   const summary = useConversationSummary(conversationID, false)
-  if (!conversationID) return <Navigate to={inboxURL} replace />
   const conversation = summary.data && summary.data.type === conversationType &&
     (isDirectInboxConversation(summary.data) || isAgentInboxConversation(summary.data)) ? summary.data : null
+  const disabledReason = useAccountDisabledReason(conversation)
+  if (!conversationID) return <Navigate to={inboxURL} replace />
   const peerName =
     (conversation?.agent?.title ?? conversation?.direct?.peerName)?.trim() ||
     t("unknownSender")
@@ -98,6 +100,7 @@ export function MobileIndividualConversationPage({
           conversationID={conversationID}
           conversationType={conversationType}
           peerIdentityID={conversation.direct?.peerIdentityId ?? ""}
+          disabledReason={disabledReason}
         />
       )}
     </section>

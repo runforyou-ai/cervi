@@ -19,6 +19,7 @@ import { ConversationHeader } from "@/features/inbox/conversation-header"
 import { ConversationThread } from "@/features/inbox/conversation-thread"
 import { DirectConversationDraftHeader } from "@/features/inbox/direct-conversation-draft-header"
 import { sessionStatusLabel } from "@/features/inbox/session-status-label"
+import { useAccountDisabledReason } from "@/features/inbox/use-account-disabled-reason"
 import type { ConversationSelection } from "@/features/inbox/inbox-selection"
 import { useConversationName } from "@/features/inbox/use-conversation-name"
 import {
@@ -106,6 +107,11 @@ export function ConversationMain({
     displayedConversation && isGroupInboxConversation(displayedConversation)
       ? displayedConversation
       : null
+  const agentConversation =
+    displayedConversation && isAgentInboxConversation(displayedConversation)
+      ? displayedConversation
+      : null
+  const accountDisabledReason = useAccountDisabledReason(displayedConversation)
   const sessionStatus = customerConversation
     ? sessionStatusLabel(customerConversation.customer.serviceSessionStatus, t)
     : ""
@@ -123,14 +129,12 @@ export function ConversationMain({
     : groupConversation?.group.status ===
         ConversationStatus.ConversationStatusArchived
       ? t("groupDissolvedUnavailable")
-      : null
+      : accountDisabledReason
   const validConversation =
     customerConversation ??
     directConversation ??
     groupConversation ??
-    (displayedConversation && isAgentInboxConversation(displayedConversation)
-      ? displayedConversation
-      : null)
+    agentConversation
   if (!validConversation && !directTarget) return null
   // 线程键取 AI 草稿编号、真人草稿或单聊对端身份，其余取会话编号。
   const threadKey =

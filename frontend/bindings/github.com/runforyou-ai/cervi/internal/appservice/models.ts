@@ -184,6 +184,7 @@ export interface AgentInboxConversation {
     "agentIdentityId": string;
     "agentName": string;
     "agentAvatarUrl": string;
+    "agentStatus": UserStatus;
     "preview": string | null;
     "previewSenderIdentityType": OrganizationIdentityType | null;
     "lastMessageAt": string | null;
@@ -1190,6 +1191,7 @@ export interface DirectInboxConversation {
     "peerType": OrganizationIdentityType;
     "peerName": string;
     "peerAvatarUrl": string;
+    "peerStatus": UserStatus;
     "preview": string | null;
     "previewSenderIdentityType": OrganizationIdentityType | null;
     "lastMessageAt": string | null;

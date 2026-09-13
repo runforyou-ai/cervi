@@ -229,6 +229,9 @@ func testAgentConversations(t *testing.T, db *bun.DB, identity *servermodels.Ide
 	t.Run("主动停止回复", func(t *testing.T) {
 		testAgentReplyStopping(t, db, identity, agent.ID, agent.IdentityID, tasks)
 	})
+	t.Run("禁用 AI 员工后保留会话", func(t *testing.T) {
+		testDisabledAgentConversation(t, db, identity, agent.ID, agent.IdentityID, tasks)
+	})
 	t.Run("AI 会话事务锁序", func(t *testing.T) {
 		testAgentChatLocking(t, db, identity, agent.ID, agent.IdentityID, tasks)
 	})

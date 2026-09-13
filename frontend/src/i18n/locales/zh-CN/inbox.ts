@@ -157,6 +157,8 @@ const inbox = {
   groupDissolveError: "无法解散群聊，请重试",
   groupDissolved: "群聊已解散",
   groupDissolvedUnavailable: "该群聊已解散，只能查看历史消息。",
+  agentDisabledUnavailable: "该 AI 员工已禁用，无法发送新消息。",
+  directPeerDisabledUnavailable: "该成员已禁用，无法发送新消息。",
   groupSystemRenamed:
     "{{actor}} 将群聊名称从“{{previousTitle}}”修改为“{{title}}”",
   groupSystemMembersAdded: "{{actor}} 邀请 {{targets}} 加入群聊",

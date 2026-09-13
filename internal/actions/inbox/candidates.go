@@ -57,14 +57,14 @@ func (q *LoadInboxQuery) groupConversationAccessQuery(organizationID, identityID
 	return q.memberConversationAccessQuery(organizationID, identityID).Where("cv.type = ?", domain.ConversationTypeGroup)
 }
 
-// directConversationsQuery 限定当前列表中的活跃真人单聊。
+// directConversationsQuery 限定当前列表中会话状态为活跃的真人单聊。
 func (q *LoadInboxQuery) directConversationsQuery(organizationID, identityID string) *bun.SelectQuery {
-	return q.directConversationAccessQuery(organizationID, identityID).Where("cv.status = ? AND peer_u.status = ?", domain.ConversationStatusActive, domain.UserStatusActive)
+	return q.directConversationAccessQuery(organizationID, identityID).Where("cv.status = ?", domain.ConversationStatusActive)
 }
 
-// agentConversationsQuery 限定当前列表中的活跃 AI 聊天。
+// agentConversationsQuery 限定当前列表中会话状态为活跃的 AI 聊天。
 func (q *LoadInboxQuery) agentConversationsQuery(organizationID, identityID string) *bun.SelectQuery {
-	return q.agentConversationAccessQuery(organizationID, identityID).Where("cv.status = ? AND agent.status = ?", domain.ConversationStatusActive, domain.UserStatusActive)
+	return q.agentConversationAccessQuery(organizationID, identityID).Where("cv.status = ?", domain.ConversationStatusActive)
 }
 
 // listCandidates 共用列表分页与按 ID 资格判断的最小候选投影。
