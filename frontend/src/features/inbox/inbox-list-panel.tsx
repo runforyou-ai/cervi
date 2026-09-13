@@ -28,7 +28,7 @@ export function InboxListPanel({ list, viewport, detailError = false, retryDetai
   const pageError = list.error === "before" || list.error === "after"
   const showFooter = previous || pageError || (busy && !list.conversations.length)
   const content = (
-    <div className="grid min-w-0 pb-1.5">
+    <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] pb-1.5">
       {children}
       {!list.conversations.length && (list.hasBefore || list.hasAfter) && list.revision > 0 ? (
         <p className="px-3 py-6 text-center text-sm text-muted-foreground">{t("listWindowEmpty")}</p>

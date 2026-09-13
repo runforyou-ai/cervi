@@ -166,6 +166,9 @@ export function MobileGroupDetailsPage() {
             canAdd={
               canManage && !save.saving && group.participants.length < groupMemberMaxCount
             }
+            canRemove={
+              canManage && !save.saving && group.participants.length > 1
+            }
           />
           <MobileGroupInfo
             group={group}
@@ -187,6 +190,15 @@ export function MobileGroupDetailsPage() {
                 },
               })
             }}
+            onTransfer={() =>
+              void navigate("transfer-owner", {
+                replace: returnDepth === 0,
+                state: {
+                  mobileBack: returnDepth > 0,
+                  groupReturnDepth: returnDepth > 0 ? returnDepth + 1 : 0,
+                },
+              })
+            }
             onLeave={(source) => {
               trigger.current = source
               if (isOwner) setDissolveOpen(true)
