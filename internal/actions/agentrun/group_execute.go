@@ -9,8 +9,11 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"slices"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -18,15 +21,18 @@ import (
 	"github.com/runforyou-ai/cervi/internal/storage/server/messagequery"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
+	"github.com/yuin/goldmark"
+	"github.com/yuin/goldmark/ast"
+	"github.com/yuin/goldmark/text"
 )
 
 const groupInstructionSuffix = `你是企业 AI 员工「%s」，当前在群聊「%s」中与其他成员一起工作。
 群内其他成员的发言以 JSON 提供：sender.name 是发送者名称，sender.kind 为 user 表示真人、为 agent 表示另一位 AI 员工，mentions 是这条消息点名的成员，replyTo 是被引用的原消息；你自己的历史发言是纯文本。
 addressedToYou 为 true 的消息是本次需要你处理的请求，其余消息是群内上下文。
-结束本轮时调用 submit_group_reply 提交结果：outcome 为 reply 时在 body 写要发到群里的正文，需要点名成员时填 mentions；无需回应时 outcome 填 silent。`
+你的最终回复会原样发到群里。需要某位成员回应时，在正文中写「@成员名」：@ 前留空格（位于行首时除外），成员名后接空格或标点；被点名的 AI 员工会接着发言。可点名的成员：%s。`
 
-// handoffDepthLimit 限制 AI 员工之间的连续接力深度，真人消息深度为零。
-const handoffDepthLimit = 3
+// markdownParser 按 CommonMark 语法解析回复正文，用于识别代码范围。
+var markdownParser = goldmark.DefaultParser()
 
 type groupMentionRunPolicy struct {
 	scheduler *Scheduler
@@ -91,7 +97,23 @@ func (p groupMentionRunPolicy) instruction(ctx context.Context, db bun.IDB, exec
 		Scan(ctx, &title); err != nil {
 		return "", fmt.Errorf("load group title for instruction: %w", err)
 	}
-	suffix := fmt.Sprintf(groupInstructionSuffix, execution.AgentName, title)
+	participants, err := loadGroupMentionParticipants(ctx, db, execution.Run.OrganizationID, execution.Run.ConversationID, execution.Run.AgentIdentityID)
+	if err != nil {
+		return "", err
+	}
+	// 按名称排序列出群内名称唯一的可点名成员，没有可点名成员时明确告知。
+	names := make([]string, 0, len(participants))
+	for name, matched := range participants {
+		if len(matched) == 1 {
+			names = append(names, name)
+		}
+	}
+	slices.Sort(names)
+	candidates := "无"
+	if len(names) > 0 {
+		candidates = strings.Join(names, "、")
+	}
+	suffix := fmt.Sprintf(groupInstructionSuffix, execution.AgentName, title, candidates)
 	if strings.TrimSpace(execution.Instruction) == "" {
 		return suffix, nil
 	}
@@ -304,41 +326,22 @@ func loadClaimedInputMessages(ctx context.Context, db bun.IDB, run *servermodels
 	return addressed, nil
 }
 
-// groupReply 声明本次运行以结构化群聊结果结束，并限定可唯一解析的点名成员。
-func (p groupMentionRunPolicy) groupReply(ctx context.Context, db bun.IDB, execution executionContext) (*agentruntime.GroupReplyConfig, error) {
-	participants, err := loadGroupMentionParticipants(ctx, db, execution.Run.OrganizationID, execution.Run.ConversationID, execution.Run.AgentIdentityID)
-	if err != nil {
-		return nil, err
-	}
-	candidates := make([]string, 0, len(participants))
-	for name, matched := range participants {
-		if len(matched) == 1 {
-			candidates = append(candidates, name)
-		}
-	}
-	slices.Sort(candidates)
-	return &agentruntime.GroupReplyConfig{MentionCandidates: candidates}, nil
-}
-
-// applyMentions 保存本次回复的提醒关系，并把有执行资格的 AI 员工目标追加为接力输入。
-func (p groupMentionRunPolicy) applyMentions(ctx context.Context, db bun.IDB, policyContext agentRunPolicyContext, run *servermodels.AgentRun, messageID string, mentions []string) error {
-	if len(mentions) == 0 {
-		return nil
-	}
+// applyMentions 从回复正文提取点名成员，保存提醒关系并为有执行资格的 AI 员工追加接力输入。
+func (p groupMentionRunPolicy) applyMentions(ctx context.Context, db bun.IDB, policyContext agentRunPolicyContext, run *servermodels.AgentRun, messageID, content string) error {
 	participants, err := loadGroupMentionParticipants(ctx, db, run.OrganizationID, run.ConversationID, run.AgentIdentityID)
 	if err != nil {
 		return err
 	}
-	targets := make([]groupMentionTarget, 0, len(mentions))
-	for _, name := range mentions {
-		matched := participants[name]
-		if len(matched) != 1 {
-			slog.Warn("群内点名目标无效，已忽略",
+	targets := make([]groupMentionTarget, 0)
+	for _, name := range extractMentionNames(content, slices.Collect(maps.Keys(participants))) {
+		// 重名成员无法确定点名对象，整体忽略。
+		if len(participants[name]) != 1 {
+			slog.Warn("群内点名的成员名称重复，已忽略",
 				"organization_id", run.OrganizationID, "conversation_id", run.ConversationID,
-				"agent_run_id", run.ID, "display_name", name, "matched", len(matched))
+				"agent_run_id", run.ID, "display_name", name)
 			continue
 		}
-		targets = append(targets, matched[0])
+		targets = append(targets, participants[name][0])
 	}
 	if len(targets) == 0 {
 		return nil
@@ -353,19 +356,9 @@ func (p groupMentionRunPolicy) applyMentions(ctx context.Context, db bun.IDB, po
 		Column("organization_id", "message_id", "subject_id").Exec(ctx); err != nil {
 		return fmt.Errorf("create group agent message mentions: %w", err)
 	}
-	depth, err := loadClaimedInputDepth(ctx, db, run)
-	if err != nil {
-		return err
-	}
 	ordinal := 0
 	for _, target := range targets {
 		if target.IdentityType != string(domain.OrganizationIdentityTypeAgent) {
-			continue
-		}
-		if depth+1 > handoffDepthLimit {
-			slog.Warn("接力深度超出上限，已拒绝安排执行",
-				"organization_id", run.OrganizationID, "conversation_id", run.ConversationID,
-				"agent_run_id", run.ID, "display_name", target.DisplayName, "depth", depth, "limit", handoffDepthLimit)
 			continue
 		}
 		revisionID, eligible, err := loadGroupAgentRevision(ctx, db, run.OrganizationID, run.ConversationID, target.IdentityID, true)
@@ -382,11 +375,13 @@ func (p groupMentionRunPolicy) applyMentions(ctx context.Context, db bun.IDB, po
 			OrganizationID: run.OrganizationID, ConversationID: run.ConversationID,
 			AgentIdentityID: target.IdentityID, RevisionID: revisionID,
 			ScopeKind: domain.AgentExecutionScopeConversation, ScopeID: run.ConversationID,
-			Kind: domain.AgentInputKindHandoff, SourceSubjectID: policyContext.AgentSubjectID,
-			SourceOrdinal: ordinal, Depth: depth + 1,
+			Kind: domain.AgentInputKindHandoff, SourceSubjectID: policyContext.AgentSubjectID, SourceOrdinal: ordinal,
 		}, messageID); err != nil {
 			return fmt.Errorf("append group handoff input: %w", err)
 		}
+		slog.Info("AI 员工点名接力已排队",
+			"organization_id", run.OrganizationID, "conversation_id", run.ConversationID,
+			"agent_run_id", run.ID, "target_agent_identity_id", target.IdentityID)
 		ordinal++
 	}
 	return nil
@@ -422,15 +417,65 @@ func loadGroupMentionParticipants(ctx context.Context, db bun.IDB, organizationI
 	return participants, nil
 }
 
-// loadClaimedInputDepth 读取本次运行消费的输入中最大的接力深度。
-func loadClaimedInputDepth(ctx context.Context, db bun.IDB, run *servermodels.AgentRun) (int, error) {
-	depth := 0
-	if err := db.NewSelect().Model((*servermodels.AgentInput)(nil)).
-		ColumnExpr("COALESCE(MAX(ai.depth), 0)").
-		Where("ai.lane_id = ?", run.LaneID).
-		Where("ai.input_seq BETWEEN ? AND ?", run.InputStartSeq, run.InputEndSeq).
-		Scan(ctx, &depth); err != nil {
-		return 0, fmt.Errorf("load claimed input depth: %w", err)
+// extractMentionNames 按出现顺序返回正文中去重后的点名成员，@ 须位于开头或空白之后且成员名后不紧跟字母、组合标记、数字或下划线。
+func extractMentionNames(content string, names []string) []string {
+	source := []byte(content)
+	// 代码块、围栏信息和行内代码的内容替换为空格，其中的 @ 不形成点名。
+	blank := func(segment text.Segment) {
+		for i := segment.Start; i < segment.Stop; i++ {
+			source[i] = ' '
+		}
 	}
-	return depth, nil
+	_ = ast.Walk(markdownParser.Parse(text.NewReader(source)), func(node ast.Node, entering bool) (ast.WalkStatus, error) {
+		if !entering {
+			return ast.WalkContinue, nil
+		}
+		switch code := node.(type) {
+		case *ast.FencedCodeBlock:
+			if code.Info != nil {
+				blank(code.Info.Segment)
+			}
+			for i := 0; i < code.Lines().Len(); i++ {
+				blank(code.Lines().At(i))
+			}
+		case *ast.CodeBlock:
+			for i := 0; i < code.Lines().Len(); i++ {
+				blank(code.Lines().At(i))
+			}
+		case *ast.CodeSpan:
+			for child := code.FirstChild(); child != nil; child = child.NextSibling() {
+				if span, ok := child.(*ast.Text); ok {
+					blank(span.Segment)
+				}
+			}
+			return ast.WalkSkipChildren, nil
+		}
+		return ast.WalkContinue, nil
+	})
+	plain := string(source)
+	// 较长的成员名优先匹配，前缀相同的成员按完整名称区分。
+	slices.SortFunc(names, func(a, b string) int { return len(b) - len(a) })
+	found := make([]string, 0)
+	for index, char := range plain {
+		if char != '@' {
+			continue
+		}
+		if previous, _ := utf8.DecodeLastRuneInString(plain[:index]); index > 0 && !unicode.IsSpace(previous) {
+			continue
+		}
+		rest := plain[index+1:]
+		for _, name := range names {
+			if !strings.HasPrefix(rest, name) {
+				continue
+			}
+			if next, size := utf8.DecodeRuneInString(rest[len(name):]); size > 0 && (unicode.IsLetter(next) || unicode.IsMark(next) || unicode.IsNumber(next) || next == '_') {
+				continue
+			}
+			if !slices.Contains(found, name) {
+				found = append(found, name)
+			}
+			break
+		}
+	}
+	return found
 }

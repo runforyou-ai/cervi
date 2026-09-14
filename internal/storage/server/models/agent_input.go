@@ -20,7 +20,6 @@ type AgentInput struct {
 	SourceMessageID string    `bun:"source_message_id"`
 	SourceSubjectID string    `bun:"source_subject_id"`
 	SourceOrdinal   int       `bun:"source_ordinal"`
-	Depth           int       `bun:"depth"`
 	AgentRunID      *string   `bun:"agent_run_id"`
 	CreatedAt       time.Time `bun:"created_at"`
 }

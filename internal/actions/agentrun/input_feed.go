@@ -38,10 +38,9 @@ type agentRunPolicy interface {
 	instruction(context.Context, bun.IDB, executionContext) (string, error)
 }
 
-// structuredReplyPolicy 由以结构化结果结束运行的执行范围实现。
-type structuredReplyPolicy interface {
-	groupReply(context.Context, bun.IDB, executionContext) (*agentruntime.GroupReplyConfig, error)
-	applyMentions(context.Context, bun.IDB, agentRunPolicyContext, *servermodels.AgentRun, string, []string) error
+// mentionReplyPolicy 由从回复正文提取点名成员的执行范围实现。
+type mentionReplyPolicy interface {
+	applyMentions(context.Context, bun.IDB, agentRunPolicyContext, *servermodels.AgentRun, string, string) error
 }
 
 type lockedAgentRun struct {

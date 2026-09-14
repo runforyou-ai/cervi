@@ -22,7 +22,6 @@ type AgentRun struct {
 	ScopeKind         string          `bun:"scope_kind"`
 	ScopeID           string          `bun:"scope_id"`
 	Status            string          `bun:"status"`
-	Outcome           *string         `bun:"outcome"`
 	InputStartSeq     int64           `bun:"input_start_seq"`
 	InputEndSeq       *int64          `bun:"input_end_seq"`
 	ResponseMessageID *string         `bun:"response_message_id"`
