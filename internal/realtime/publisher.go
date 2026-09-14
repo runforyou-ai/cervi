@@ -22,6 +22,7 @@ var active atomic.Pointer[Publisher]
 type Publisher struct {
 	config     serverconfig.NATSConfig
 	connection *nats.Conn
+	send       func(subject string, data []byte) error
 	queue      chan []Notification
 	stop       chan struct{}
 	done       chan struct{}
@@ -66,25 +67,34 @@ func (p *Publisher) Start() error {
 		return fmt.Errorf("connect realtime NATS: %w", err)
 	}
 	p.connection = connection
+	p.begin(connection.Publish)
+	slog.Info("实时通知发布器已启动", "namespace", p.config.Namespace)
+	return nil
+}
+
+// begin 使用指定发送函数启动发布协程，并开始接收已提交通知。
+func (p *Publisher) begin(send func(subject string, data []byte) error) {
+	p.send = send
 	p.queue = make(chan []Notification, publishQueueSize)
 	p.stop = make(chan struct{})
 	p.done = make(chan struct{})
 	go p.run()
 	active.Store(p)
-	slog.Info("实时通知发布器已启动", "namespace", p.config.Namespace)
-	return nil
 }
 
-// Stop 停止接收通知并关闭 NATS 连接，尚未发布的通知直接丢弃。
+// Stop 停止接收通知、等待发布协程退出并关闭 NATS 连接，尚未发布的通知直接丢弃。
 func (p *Publisher) Stop() error {
-	if p.connection == nil {
+	if p.stop == nil {
 		return nil
 	}
 	active.CompareAndSwap(p, nil)
 	close(p.stop)
 	<-p.done
-	p.connection.Close()
-	p.connection = nil
+	p.stop = nil
+	if p.connection != nil {
+		p.connection.Close()
+		p.connection = nil
+	}
 	slog.Info("实时通知发布器已停止", "namespace", p.config.Namespace)
 	return nil
 }
@@ -98,7 +108,7 @@ func (p *Publisher) enqueue(notifications []Notification) {
 	}
 }
 
-// run 按提交顺序逐条发布通知，直到发布器停止。
+// run 按已提交批次的入队顺序逐条发布通知，直到发布器停止；并发事务之间的通知可能乱序。
 func (p *Publisher) run() {
 	defer close(p.done)
 	for {
@@ -117,7 +127,7 @@ func (p *Publisher) run() {
 func (p *Publisher) publish(notification Notification) {
 	data, err := json.Marshal(payload{Kind: notification.Kind, ConversationID: notification.ConversationID, Version: notification.Version})
 	if err == nil {
-		err = p.connection.Publish(Subject(p.config.Namespace, notification.OrganizationID, notification.AudienceKind, notification.AudienceID), data)
+		err = p.send(Subject(p.config.Namespace, notification.OrganizationID, notification.AudienceKind, notification.AudienceID), data)
 	}
 	if err != nil {
 		slog.Warn("实时通知发布失败",
