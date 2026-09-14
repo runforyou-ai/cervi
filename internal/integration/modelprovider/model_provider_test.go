@@ -22,6 +22,12 @@ func TestRegistryUsesProviderReadOnlyEndpoints(t *testing.T) {
 		{name: "DeepSeek", brand: domain.AIProviderBrandDeepSeek, wantPath: "/models", response: `{"object":"list","data":[]}`},
 		{name: "OpenAI", brand: domain.AIProviderBrandOpenAI, basePath: "/v1", wantPath: "/v1/models", response: `{"object":"list","data":[]}`},
 		{name: "阿里云百炼", brand: domain.AIProviderBrandAlibaba, wantPath: "/api/v1/models", response: `{"success":true,"output":{"models":[]}}`},
+		{name: "月之暗面", brand: domain.AIProviderBrandMoonshot, basePath: "/v1", wantPath: "/v1/models", response: `{"object":"list","data":[]}`},
+		{name: "智谱", brand: domain.AIProviderBrandZhipu, basePath: "/api/paas/v4", wantPath: "/api/paas/v4/models", response: `{"object":"list","data":[]}`},
+		{name: "火山引擎", brand: domain.AIProviderBrandVolcengine, basePath: "/api/v3", wantPath: "/api/v3/models", response: `{"object":"list","data":[]}`},
+		{name: "MiniMax", brand: domain.AIProviderBrandMiniMax, basePath: "/v1", wantPath: "/v1/models", response: `{"object":"list","data":[]}`},
+		{name: "xAI", brand: domain.AIProviderBrandXAI, basePath: "/v1", wantPath: "/v1/models", response: `{"object":"list","data":[]}`},
+		{name: "Mistral", brand: domain.AIProviderBrandMistral, basePath: "/v1", wantPath: "/v1/models", response: `{"object":"list","data":[]}`},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {

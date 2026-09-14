@@ -6,9 +6,15 @@ import "github.com/runforyou-ai/cervi/internal/domain"
 type AIProviderBrand string
 
 const (
-	AIProviderBrandDeepSeek AIProviderBrand = AIProviderBrand(domain.AIProviderBrandDeepSeek)
-	AIProviderBrandAlibaba  AIProviderBrand = AIProviderBrand(domain.AIProviderBrandAlibaba)
-	AIProviderBrandOpenAI   AIProviderBrand = AIProviderBrand(domain.AIProviderBrandOpenAI)
+	AIProviderBrandDeepSeek   AIProviderBrand = AIProviderBrand(domain.AIProviderBrandDeepSeek)
+	AIProviderBrandAlibaba    AIProviderBrand = AIProviderBrand(domain.AIProviderBrandAlibaba)
+	AIProviderBrandOpenAI     AIProviderBrand = AIProviderBrand(domain.AIProviderBrandOpenAI)
+	AIProviderBrandMoonshot   AIProviderBrand = AIProviderBrand(domain.AIProviderBrandMoonshot)
+	AIProviderBrandZhipu      AIProviderBrand = AIProviderBrand(domain.AIProviderBrandZhipu)
+	AIProviderBrandVolcengine AIProviderBrand = AIProviderBrand(domain.AIProviderBrandVolcengine)
+	AIProviderBrandMiniMax    AIProviderBrand = AIProviderBrand(domain.AIProviderBrandMiniMax)
+	AIProviderBrandXAI        AIProviderBrand = AIProviderBrand(domain.AIProviderBrandXAI)
+	AIProviderBrandMistral    AIProviderBrand = AIProviderBrand(domain.AIProviderBrandMistral)
 )
 
 // AIModelType 表示 AI 模型用途。
