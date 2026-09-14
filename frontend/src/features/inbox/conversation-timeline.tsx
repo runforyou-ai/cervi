@@ -750,6 +750,13 @@ function ConversationTimelineContent({
                   : null
               // 回复与复制使用同一份消息摘要。
               const referenceBody = message.body || message.attachment?.name || ""
+              // 文字气泡与附件气泡共用同一套方向配色和组尾圆角。
+              const bubbleClassName = cn(
+                incoming || agentNotice
+                  ? "border bg-[#EEEEF0] text-foreground shadow-xs dark:bg-muted"
+                  : "bg-primary text-primary-foreground",
+                endsGroup && (incoming ? "rounded-bl-sm" : "rounded-br-sm"),
+              )
               const systemEvent = message.systemEvent
               const systemEventText = systemEvent
                 ? formatGroupSystemEvent(systemEvent)
@@ -875,11 +882,8 @@ function ConversationTimelineContent({
                                 ) : null}
                                 <div
                                   className={cn(
-                                    "min-w-0 max-w-full rounded-2xl px-3 py-2 text-sm break-words [overflow-wrap:anywhere]",
-                                    message.attachment ? "p-0 text-foreground" : incoming || agentNotice
-                                      ? "border bg-[#EEEEF0] text-foreground shadow-xs dark:bg-muted"
-                                      : "bg-primary text-primary-foreground",
-                                    !message.attachment && endsGroup && (incoming ? "rounded-bl-sm" : "rounded-br-sm"),
+                                    "min-w-0 max-w-full text-sm break-words [overflow-wrap:anywhere]",
+                                    !message.attachment && cn("rounded-2xl px-3 py-2", bubbleClassName),
                                   )}
                                 >
                                   {message.replyTo ? (
@@ -926,7 +930,7 @@ function ConversationTimelineContent({
                                       <span className={agentError ? "text-destructive" : "text-muted-foreground"}>{t(agentError ? "agentRunFailed" : "agentReplyStopped")}</span>
                                     ) : message.attachment ? (
                                       <ConversationAttachment body={message.body} attachment={message.attachment} conversationID={conversationID} messageID={message.persistedMessageID ?? message.id}
-                                        originatedAt={message.originatedAt} timeLabel={dateFormatters.clock.format(date)} timeTitle={dateFormatters.full.format(date)} incoming={incoming} />
+                                        originatedAt={message.originatedAt} timeLabel={dateFormatters.clock.format(date)} timeTitle={dateFormatters.full.format(date)} incoming={incoming} bubbleClassName={bubbleClassName} />
                                     ) : message.sender?.identityType === OrganizationIdentityType.OrganizationIdentityTypeAgent ? (
                                       <div className="min-w-0 flex-1">
                                         <MessageMarkdown locale={i18n.language} mentions={messageMentionNames(message)} onOpenLink={openExternalURL}>{message.body}</MessageMarkdown>
