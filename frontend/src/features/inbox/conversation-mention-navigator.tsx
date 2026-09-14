@@ -2,9 +2,11 @@
 import { ChevronDownIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Button } from "@/components/ui/button"
+import { cn } from "@/lib/utils"
+import { resolveAppPlatform } from "@/platform/app-platform"
 import type { useConversationMentionNavigation } from "./use-conversation-mention-navigation"
 
-/** 保持底部导航位置，区分本轮位置和实时待查看数量。 */
+/** 保持底部导航位置，区分本轮位置和实时待查看数量；移动端使用带底色的触屏尺寸按钮组。 */
 export function ConversationMentionNavigator({
   navigation,
   showLatest,
@@ -21,6 +23,9 @@ export function ConversationMentionNavigator({
   const { t } = useTranslation("inbox")
   const { round } = navigation
   const disabled = busy || navigation.busy
+  const mobile = resolveAppPlatform() === "mobile"
+  // 移动端按钮高度满足手指点击。
+  const buttonClassName = mobile ? "h-11 rounded-full px-4" : undefined
   const latestLabel = newCount > 0
     ? `${t("messagesBackToLatest")} · ${t("messagesNew", { count: newCount })}`
     : t("messagesBackToLatest")
@@ -37,13 +42,19 @@ export function ConversationMentionNavigator({
       aria-label={t("mentionNavigation")}
     >
       {round ? (
-        <>
+        <div
+          className={cn(
+            "flex flex-wrap items-center justify-end gap-2",
+            mobile && "rounded-full border bg-background/95 p-1 pl-2 shadow-sm backdrop-blur",
+          )}
+        >
           <span className="px-2 text-xs tabular-nums" role="status">
             @ {round.index + 1}/{round.ids.length}
           </span>
           <Button
             size="sm"
             variant="outline"
+            className={buttonClassName}
             disabled={disabled || !hasPrevious}
             onClick={() => void navigation.visit(round.index - 1, round, -1)}
           >
@@ -53,6 +64,7 @@ export function ConversationMentionNavigator({
             <Button
               size="sm"
               variant="outline"
+              className={buttonClassName}
               disabled={disabled}
               onClick={() => void navigation.visit(round.index)}
             >
@@ -62,6 +74,7 @@ export function ConversationMentionNavigator({
             <Button
               size="sm"
               variant="outline"
+              className={buttonClassName}
               disabled={
                 disabled ||
                 !hasNext ||
@@ -72,11 +85,23 @@ export function ConversationMentionNavigator({
               {t("mentionNext")}
             </Button>
           )}
-        </>
+          {showLatest ? null : (
+            <Button
+              size="sm"
+              variant="outline"
+              className={buttonClassName}
+              disabled={busy}
+              onClick={navigation.close}
+            >
+              {t("mentionClose")}
+            </Button>
+          )}
+        </div>
       ) : navigation.pendingCount > 0 ? (
         <Button
           size="sm"
           variant="outline"
+          className={buttonClassName}
           disabled={disabled}
           onClick={() => void navigation.start()}
           aria-label={t("mentionPendingCount", {
@@ -105,10 +130,6 @@ export function ConversationMentionNavigator({
               {newCount}
             </span>
           ) : null}
-        </Button>
-      ) : round ? (
-        <Button size="sm" variant="outline" disabled={busy} onClick={navigation.close}>
-          {t("mentionClose")}
         </Button>
       ) : null}
     </div>
