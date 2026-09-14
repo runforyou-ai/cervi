@@ -10,6 +10,7 @@ import (
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -30,7 +31,7 @@ func (a *UpdateConversationNotificationSettingsAction) Execute(ctx context.Conte
 		}}
 	}
 	result := ConversationNotificationSettings{Muted: muted}
-	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
@@ -49,14 +50,14 @@ func (a *UpdateConversationNotificationSettingsAction) Execute(ctx context.Conte
 		if muted {
 			state.Version = 1
 		}
-		if _, err := tx.NewInsert().Model(state).
+		if err := notifyConversationStateWrite(ctx, tx.NewInsert().Model(state).
 			Column("organization_id", "conversation_id", "user_id", "muted", "version").
 			On("CONFLICT (organization_id, conversation_id, user_id) DO UPDATE").
 			Set("muted = EXCLUDED.muted").
 			Set("version = cus.version + 1").
 			Set("updated_at = now()").
 			Where("cus.muted <> EXCLUDED.muted").
-			Exec(ctx); err != nil {
+			Returning("version"), identity.Organization.ID, conversationID, identity.User.ID); err != nil {
 			return fmt.Errorf("save conversation notification settings: %w", err)
 		}
 		return nil

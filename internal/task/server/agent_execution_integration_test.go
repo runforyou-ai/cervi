@@ -12,6 +12,7 @@ import (
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
@@ -109,7 +110,7 @@ func seedAgentExecution(t *testing.T, ctx context.Context, db *bun.DB) servermod
 			}
 		}
 	})
-	err := db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err := realtime.RunInTx(ctx, db, func(ctx context.Context, tx bun.Tx) error {
 		cv := &servermodels.Conversation{ID: conversationID, OrganizationID: organizationID, Type: string(domain.ConversationTypeAgent), Status: string(domain.ConversationStatusActive)}
 		if _, err := tx.NewInsert().Model(cv).Column("id", "organization_id", "type", "status").Exec(ctx); err != nil {
 			return err

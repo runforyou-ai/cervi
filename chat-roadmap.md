@@ -1079,7 +1079,7 @@ RealtimeNotice
 NATS Subject 使用唯一编解码器，与通知登记、Hello 探针值、通知帧及客户端追赶 key 的受众标识一致：
 
 ```text
-<namespace>.realtime.<organizationId>.<audienceKind>.<audienceId>
+cervi.<namespace>.realtime.<organizationId>.<audienceKind>.<audienceId>
 ```
 
 `audienceKind` 仅为 `user / customer_inbox / visitor_directory`，ID 使用无点的内部规范值；禁止原始凭据或用户输入直接拼接。撤销和下线控制与变更通知共用提交后发布链路，以通知种类区分，按需携带 tokenSessionId／conversationId，不参与变更通知的版本合并；控制通知丢失时由服务端低频授权复核生效，复核失权时与收到控制走同一撤销路径。
@@ -1089,7 +1089,7 @@ NATS Subject 使用唯一编解码器，与通知登记、Hello 探针值、通�
 - Gateway 只为本节点已连接用户订阅用户 Subject；只有本节点存在有权连接时才订阅对应客服 Inbox／访客目录 Subject；大群受众到对应阶段再扩展。
 - 在线扇出不能使用 Queue Group，否则同一用户连接分布在多个 Gateway 时只有一个节点收到通知。
 - 同一用户的多个标签页和设备在节点内扇出；连接注册、能力和发送队列首版只保存在进程内，不引入 Redis、NATS KV 或粘滞会话。
-- 不订阅企业级 `<namespace>.realtime.<organizationId>.>` 通配 Subject，避免把无关用户和租户流量发送给每个 Gateway。
+- 不订阅企业级 `cervi.<namespace>.realtime.<organizationId>.>` 通配 Subject，避免把无关用户和租户流量发送给每个 Gateway。
 - 服务端当前单实例部署：退出先停止接收新连接，再发送 `server_going_away` 并有界关闭连接。拆分为多实例滚动升级时，再增加随机重连延迟以及发送队列和 NATS 订阅 Drain，分散客户端重连。
 - Ping/Pong 只负责保活，不每隔十几秒查询 PostgreSQL。客户端在窗口重新聚焦和第 10.8 节的定期兜底校验时通过 HTTP 获取权威探针值，修复网关或权限异常。
 

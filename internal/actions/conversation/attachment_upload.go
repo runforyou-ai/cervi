@@ -12,6 +12,7 @@ import (
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 	"slices"
@@ -32,7 +33,7 @@ func (a *SendAttachmentMessageAction) UpdateUploads(ctx context.Context, identit
 			return fileaction.ErrFileNotFound
 		}
 	}
-	return a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	return realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
@@ -171,10 +172,13 @@ func updateAttachmentUpload(ctx context.Context, tx bun.Tx, identity *servermode
 			return member, err
 		}
 	}
-	// 附件完成或取消时推进会话版本。
+	// 附件完成或取消时推进会话版本并通知会话成员。
 	if status == domain.AttachmentReady || status == domain.AttachmentCancelled {
-		if _, err := tx.NewUpdate().Model(member.Conversation).Set("version = version + 1").WherePK().Exec(ctx); err != nil {
-			return err
+		if err := tx.NewUpdate().Model(member.Conversation).Set("version = version + 1").WherePK().Returning("version").Scan(ctx); err != nil {
+			return member, err
+		}
+		if err := chatstate.NotifyConversationMembers(ctx, tx, member.Conversation); err != nil {
+			return member, err
 		}
 	}
 	_, err = tx.NewRaw(`UPDATE message_attachments SET upload_status = ?, upload_expires_at = CASE WHEN ? = 'uploading' THEN now() + interval '2 minutes' END WHERE message_id = ?`, status, status, row.MessageID).Exec(ctx)

@@ -39,3 +39,13 @@ func DatabaseConfig(t *testing.T) serverconfig.DatabaseConfig {
 		SSLMode:  os.Getenv("TEST_POSTGRES_SSLMODE"),
 	}
 }
+
+// NATSConfig 从 TEST_NATS_URL 读取 NATS 地址并使用独立命名空间；未设置时跳过当前测试。
+func NATSConfig(t *testing.T, namespace string) serverconfig.NATSConfig {
+	t.Helper()
+	url := os.Getenv("TEST_NATS_URL")
+	if url == "" {
+		t.Skip("TEST_NATS_URL is not set")
+	}
+	return serverconfig.NATSConfig{URL: url, Namespace: namespace}
+}

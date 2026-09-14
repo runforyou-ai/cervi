@@ -1,0 +1,132 @@
+//go:build server
+
+package realtime
+
+import (
+	"encoding/json"
+	"fmt"
+	"log/slog"
+	"sync/atomic"
+
+	"github.com/nats-io/nats.go"
+	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
+)
+
+// publishQueueSize 是等待发布的已提交事务批次上限。
+const publishQueueSize = 1024
+
+// active 是当前进程接收已提交通知的发布器；未启动时通知直接丢弃，由客户端兜底探针恢复。
+var active atomic.Pointer[Publisher]
+
+// Publisher 通过 Core NATS 异步发布受众通知，发布失败只记录日志。
+type Publisher struct {
+	config     serverconfig.NATSConfig
+	connection *nats.Conn
+	queue      chan []Notification
+	stop       chan struct{}
+	done       chan struct{}
+}
+
+// payload 是 NATS 通知消息体。
+type payload struct {
+	Kind           Kind   `json:"kind"`
+	ConversationID string `json:"conversationId,omitempty"`
+	Version        int64  `json:"version,string"`
+}
+
+// NewPublisher 创建使用指定 NATS 命名空间的通知发布器。
+func NewPublisher(config serverconfig.NATSConfig) *Publisher {
+	return &Publisher{config: config}
+}
+
+// Subject 生成受众通知的 NATS Subject。
+func Subject(namespace, organizationID string, audienceKind AudienceKind, audienceID string) string {
+	return "cervi." + namespace + ".realtime." + organizationID + "." + string(audienceKind) + "." + audienceID
+}
+
+// Start 建立 NATS 连接并开始接收已提交通知；NATS 暂不可用时后台重连，不阻塞启动。
+func (p *Publisher) Start() error {
+	connection, err := nats.Connect(
+		p.config.URL,
+		nats.Name("cervi-server-realtime-"+p.config.Namespace),
+		nats.RetryOnFailedConnect(true),
+		nats.MaxReconnects(-1),
+		// 断连期间不缓存通知，发布立即失败并由兜底探针恢复。
+		nats.ReconnectBufSize(-1),
+		nats.DisconnectErrHandler(func(_ *nats.Conn, err error) {
+			if err != nil {
+				slog.Warn("实时通知 NATS 连接断开", "namespace", p.config.Namespace, "error", err)
+			}
+		}),
+		nats.ReconnectHandler(func(_ *nats.Conn) {
+			slog.Info("实时通知 NATS 已重新连接", "namespace", p.config.Namespace)
+		}),
+	)
+	if err != nil {
+		return fmt.Errorf("connect realtime NATS: %w", err)
+	}
+	p.connection = connection
+	p.queue = make(chan []Notification, publishQueueSize)
+	p.stop = make(chan struct{})
+	p.done = make(chan struct{})
+	go p.run()
+	active.Store(p)
+	slog.Info("实时通知发布器已启动", "namespace", p.config.Namespace)
+	return nil
+}
+
+// Stop 停止接收通知并关闭 NATS 连接，尚未发布的通知直接丢弃。
+func (p *Publisher) Stop() error {
+	if p.connection == nil {
+		return nil
+	}
+	active.CompareAndSwap(p, nil)
+	close(p.stop)
+	<-p.done
+	p.connection.Close()
+	p.connection = nil
+	slog.Info("实时通知发布器已停止", "namespace", p.config.Namespace)
+	return nil
+}
+
+// enqueue 把一个已提交事务的通知放入发布队列，队列已满时丢弃。
+func (p *Publisher) enqueue(notifications []Notification) {
+	select {
+	case p.queue <- notifications:
+	default:
+		slog.Warn("实时通知发布队列已满，丢弃通知", "namespace", p.config.Namespace, "count", len(notifications))
+	}
+}
+
+// run 按提交顺序逐条发布通知，直到发布器停止。
+func (p *Publisher) run() {
+	defer close(p.done)
+	for {
+		select {
+		case <-p.stop:
+			return
+		case notifications := <-p.queue:
+			for _, notification := range notifications {
+				p.publish(notification)
+			}
+		}
+	}
+}
+
+// publish 发布单条通知，失败时记录 WARN 日志。
+func (p *Publisher) publish(notification Notification) {
+	data, err := json.Marshal(payload{Kind: notification.Kind, ConversationID: notification.ConversationID, Version: notification.Version})
+	if err == nil {
+		err = p.connection.Publish(Subject(p.config.Namespace, notification.OrganizationID, notification.AudienceKind, notification.AudienceID), data)
+	}
+	if err != nil {
+		slog.Warn("实时通知发布失败",
+			"namespace", p.config.Namespace,
+			"organization_id", notification.OrganizationID,
+			"audience_kind", notification.AudienceKind,
+			"kind", notification.Kind,
+			"conversation_id", notification.ConversationID,
+			"error", err,
+		)
+	}
+}

@@ -25,6 +25,7 @@ import (
 	mcpintegration "github.com/runforyou-ai/cervi/internal/integration/mcp"
 	telegramintegration "github.com/runforyou-ai/cervi/internal/integration/telegram"
 	"github.com/runforyou-ai/cervi/internal/publicweb"
+	"github.com/runforyou-ai/cervi/internal/realtime"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
@@ -44,6 +45,9 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 		return nil, err
 	}
 	resolveFileS3 := newFileContentS3ConfigResolver(appStorage.DB())
+
+	// 创建提交后发布受众通知的实时发布器，由服务生命周期统一启停。
+	realtimePublisher := realtime.NewPublisher(config.NATS)
 
 	// 创建各业务共用的可靠任务运行时，由服务生命周期统一启停。
 	tasks := servertask.New(appStorage.DB(), config.NATS)
@@ -139,6 +143,7 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	return []application.Service{
 		application.NewServiceWithOptions(api.NewLiveness(), application.ServiceOptions{Route: "/healthz"}),
 		application.NewServiceWithOptions(api.NewReadiness(appStorage.DB()), application.ServiceOptions{Route: "/readyz"}),
+		application.NewService(&realtimeLifecycle{publisher: realtimePublisher}),
 		application.NewService(&httpsLifecycle{service: httpsEntry}),
 		application.NewServiceWithOptions(boundService, application.ServiceOptions{
 			MarshalError: appservice.MarshalError,
@@ -203,4 +208,19 @@ func (l *serverTaskLifecycle) ServiceStartup(ctx context.Context, _ application.
 // ServiceShutdown 停止服务端异步任务和 NATS 连接。
 func (l *serverTaskLifecycle) ServiceShutdown() error {
 	return l.runtime.Stop()
+}
+
+// realtimeLifecycle 将实时通知发布器接入 Wails 服务生命周期。
+type realtimeLifecycle struct {
+	publisher *realtime.Publisher
+}
+
+// ServiceStartup 连接 NATS 并开始发布已提交通知。
+func (l *realtimeLifecycle) ServiceStartup(context.Context, application.ServiceOptions) error {
+	return l.publisher.Start()
+}
+
+// ServiceShutdown 停止实时通知发布器。
+func (l *realtimeLifecycle) ServiceShutdown() error {
+	return l.publisher.Stop()
 }

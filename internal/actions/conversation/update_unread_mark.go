@@ -9,6 +9,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
+	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -26,7 +27,7 @@ func (a *UpdateConversationUnreadMarkAction) Execute(ctx context.Context, identi
 	if !common.ValidUUID(conversationID) {
 		return &ValidationError{Fields: map[string]ValidationCode{"conversationId": ValidationConversationIDInvalid}}
 	}
-	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
@@ -35,20 +36,20 @@ func (a *UpdateConversationUnreadMarkAction) Execute(ctx context.Context, identi
 		}
 		// 进入会话时清除已有个人状态中的未读标记。
 		if !markedUnread {
-			_, err := tx.NewUpdate().Model((*servermodels.ConversationUserState)(nil)).
+			return notifyConversationStateWrite(ctx, tx.NewUpdate().Model((*servermodels.ConversationUserState)(nil)).
 				Set("marked_unread = false").Set("version = version + 1").Set("updated_at = now()").
-				Where("organization_id = ? AND conversation_id = ? AND user_id = ? AND marked_unread", identity.Organization.ID, conversationID, identity.User.ID).Exec(ctx)
-			return err
+				Where("organization_id = ? AND conversation_id = ? AND user_id = ? AND marked_unread", identity.Organization.ID, conversationID, identity.User.ID).
+				Returning("version"), identity.Organization.ID, conversationID, identity.User.ID)
 		}
 		state := &servermodels.ConversationUserState{
 			OrganizationID: identity.Organization.ID, ConversationID: conversationID,
 			UserID: identity.User.ID, MarkedUnread: true, Version: 1,
 		}
-		if _, err := tx.NewInsert().Model(state).
+		if err := notifyConversationStateWrite(ctx, tx.NewInsert().Model(state).
 			Column("organization_id", "conversation_id", "user_id", "marked_unread", "version").
 			On("CONFLICT (organization_id, conversation_id, user_id) DO UPDATE").
 			Set("marked_unread = true").Set("version = cus.version + 1").Set("updated_at = now()").
-			Where("NOT cus.marked_unread").Exec(ctx); err != nil {
+			Where("NOT cus.marked_unread").Returning("version"), identity.Organization.ID, conversationID, identity.User.ID); err != nil {
 			return fmt.Errorf("save conversation unread mark: %w", err)
 		}
 		return nil

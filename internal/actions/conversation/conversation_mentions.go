@@ -11,6 +11,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
+	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -136,7 +137,7 @@ func (a *MarkConversationMentionReviewedAction) Execute(ctx context.Context, ide
 		return ConversationMentionReview{}, &ValidationError{Fields: map[string]ValidationCode{"messageId": ValidationLastReadMessageIDInvalid}}
 	}
 	var result ConversationMentionReview
-	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
@@ -186,8 +187,9 @@ func (a *MarkConversationMentionReviewedAction) Execute(ctx context.Context, ide
 		}
 		// 每次确认提及推进一次个人状态版本。
 		state := &servermodels.ConversationUserState{OrganizationID: identity.Organization.ID, ConversationID: conversationID, UserID: identity.User.ID, Version: 1}
-		if _, err := tx.NewInsert().Model(state).Column("organization_id", "conversation_id", "user_id", "version").
-			On("CONFLICT (organization_id, conversation_id, user_id) DO UPDATE").Set("version = cus.version + 1").Set("updated_at = now()").Exec(ctx); err != nil {
+		if err := notifyConversationStateWrite(ctx, tx.NewInsert().Model(state).Column("organization_id", "conversation_id", "user_id", "version").
+			On("CONFLICT (organization_id, conversation_id, user_id) DO UPDATE").Set("version = cus.version + 1").Set("updated_at = now()").
+			Returning("version"), identity.Organization.ID, conversationID, identity.User.ID); err != nil {
 			return err
 		}
 		result.Outcome = "reviewed"
