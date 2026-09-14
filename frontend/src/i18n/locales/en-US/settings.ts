@@ -28,6 +28,7 @@ const settings = {
     saveError: "Could not save the profile. Try again.",
     validation: {
       displayNameRequired: "Enter your name.",
+      displayNameInvalid: "Names can only contain letters, numbers, spaces, and · - _ . characters.",
       emailRequired: "Enter your email.",
       emailInvalid: "Enter a valid email address.",
     },

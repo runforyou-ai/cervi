@@ -9,6 +9,7 @@ const setup = {
   organizationNameRequired: "请输入企业名称。",
   organizationNameTooLong: "企业名称不能超过 32 个字符。",
   displayNameRequired: "请输入你的姓名。",
+  displayNameInvalid: "姓名只能包含文字、数字、空格和 · - _ . 符号。",
   emailRequired: "请输入邮箱。",
   emailInvalid: "请输入有效的邮箱。",
   passwordRequired: "请输入密码。",

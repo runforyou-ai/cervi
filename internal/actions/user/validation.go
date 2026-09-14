@@ -9,6 +9,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	commonemail "github.com/runforyou-ai/cervi/internal/common/email"
 	commonpassword "github.com/runforyou-ai/cervi/internal/common/password"
+	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
 // ValidationCode 标识用户字段校验结果。
@@ -16,6 +17,7 @@ type ValidationCode = common.FieldCode
 
 const (
 	ValidationDisplayNameRequired      ValidationCode = "USER_DISPLAY_NAME_REQUIRED"
+	ValidationDisplayNameInvalid       ValidationCode = "USER_DISPLAY_NAME_INVALID"
 	ValidationEmailInvalid             ValidationCode = "USER_EMAIL_INVALID"
 	ValidationEmailDuplicate           ValidationCode = "USER_EMAIL_DUPLICATE"
 	ValidationCurrentPasswordIncorrect ValidationCode = "USER_CURRENT_PASSWORD_INCORRECT"
@@ -60,6 +62,8 @@ func normalizeProfileInput(input ProfileInput) (ProfileInput, map[string]Validat
 	fields := make(map[string]ValidationCode)
 	if input.DisplayName == "" {
 		fields["displayName"] = ValidationDisplayNameRequired
+	} else if !domain.IdentityDisplayNameValid(input.DisplayName) {
+		fields["displayName"] = ValidationDisplayNameInvalid
 	}
 	if !commonemail.Valid(input.Email) {
 		fields["email"] = ValidationEmailInvalid

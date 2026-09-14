@@ -43,7 +43,7 @@ export function reconcileMentionAllToken(
   if (
     nextBody.slice(start, start + token.text.length) !== token.text ||
     /\S$/u.test(before) ||
-    /^[\p{L}\p{N}_]/u.test(after)
+    /^[\p{L}\p{M}\p{N}_]/u.test(after)
   ) {
     return null
   }
@@ -55,5 +55,5 @@ export function mentionTokenPattern(displayNames: string[]) {
   const alternatives = displayNames
     .map((name) => name.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"))
     .join("|")
-  return `(?<!\\S)@(?:${alternatives})(?![\\p{L}\\p{N}_])`
+  return `(?<!\\S)@(?:${alternatives})(?![\\p{L}\\p{M}\\p{N}_])`
 }

@@ -106,6 +106,7 @@ const contacts = {
     },
     validation: {
       nameRequired: "请输入姓名。",
+      nameInvalid: "姓名只能包含文字、数字、空格和 · - _ . 符号。",
       emailRequired: "请输入邮箱。",
       emailInvalid: "请输入有效的邮箱。",
       passwordRequired: "请输入初始密码。",
@@ -143,6 +144,7 @@ const contacts = {
     },
     validation: {
       nameRequired: "请输入 AI 员工名称。",
+      nameInvalid: "AI 员工名称只能包含文字、数字、空格和 · - _ . 符号。",
       modelRequired: "请选择对话模型。",
       instructionRequired: "请输入工作指令。",
       instructionTooLong: "工作指令不能超过 20000 个字符。",

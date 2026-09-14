@@ -1,10 +1,13 @@
 /** 企业成员表单校验规则。 */
 import { z } from "zod"
 
+import { displayNamePattern } from "@/lib/display-name"
+
 /** 创建企业成员表单校验规则。 */
 export function createMemberSchema(
   messages: {
     nameRequired: string
+    nameInvalid: string
     emailRequired: string
     emailInvalid: string
     passwordRequired: string
@@ -15,7 +18,11 @@ export function createMemberSchema(
   editing: boolean,
 ) {
   return z.object({
-    displayName: z.string().trim().min(1, messages.nameRequired),
+    displayName: z
+      .string()
+      .trim()
+      .min(1, messages.nameRequired)
+      .regex(displayNamePattern, messages.nameInvalid),
     email: z
       .string()
       .trim()

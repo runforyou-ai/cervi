@@ -51,6 +51,7 @@ export function MemberForm({
       createMemberSchema(
         {
           nameRequired: t("members.validation.nameRequired"),
+          nameInvalid: t("members.validation.nameInvalid"),
           emailRequired: t("members.validation.emailRequired"),
           emailInvalid: t("members.validation.emailInvalid"),
           passwordRequired: t("members.validation.passwordRequired"),

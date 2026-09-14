@@ -9,6 +9,7 @@ const setup = {
   organizationNameRequired: "Enter the company name.",
   organizationNameTooLong: "The company name cannot exceed 32 characters.",
   displayNameRequired: "Enter your name.",
+  displayNameInvalid: "Names can only contain letters, numbers, spaces, and · - _ . characters.",
   emailRequired: "Enter your email.",
   emailInvalid: "Enter a valid email address.",
   passwordRequired: "Enter a password.",
