@@ -193,6 +193,11 @@ func TestAttachmentMessageSequence(t *testing.T) {
 	if _, err := send.Execute(ctx, f.owner, changed); !errors.As(err, &conflict) {
 		t.Fatalf("changed intent=%v", err)
 	}
+	resized := first
+	resized.ConversationID, resized.TargetIdentityID, resized.ImageWidth = firstResult.ConversationID, "", 640
+	if _, err := send.Execute(ctx, f.owner, resized); !errors.As(err, &conflict) {
+		t.Fatalf("changed image size=%v", err)
+	}
 	// 接收方按发送顺序读取并下载附件，说明成为收件箱摘要。
 	history, err := query.Execute(ctx, f.member, conversationaction.ConversationMessageHistoryInput{ConversationID: secondResult.ConversationID})
 	if err != nil || len(history.Messages) != 2 || history.Messages[0].ID != firstResult.Message.ID || history.Messages[1].Body != "文件说明" || history.Messages[1].Attachment == nil || history.Messages[1].Attachment.Name != "spec.pdf" {

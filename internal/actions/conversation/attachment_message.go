@@ -113,7 +113,7 @@ func lockAttachmentConversation(ctx context.Context, tx bun.Tx, identity *server
 		title := input.Body
 		if title == "" {
 			err := tx.NewSelect().Model((*servermodels.File)(nil)).Column("original_name").
-				Where("f.id = ? AND f.organization_id = ? AND f.created_by_user_id = ?", input.FileID, identity.Organization.ID, identity.User.ID).Scan(ctx, &title)
+				Where("f.id = ? AND f.organization_id = ? AND f.created_by_user_id = ? AND f.purpose = ?", input.FileID, identity.Organization.ID, identity.User.ID, domain.FilePurposeMessageAttachment).Scan(ctx, &title)
 			if errors.Is(err, sql.ErrNoRows) {
 				return chatstate.Member{}, nil, fileaction.ErrFileNotFound
 			}
@@ -176,12 +176,18 @@ func saveAttachmentMessage(ctx context.Context, tx bun.Tx, identity *servermodel
 	existing := &servermodels.Message{}
 	err := tx.NewSelect().Model(existing).Where("msg.organization_id = ? AND msg.idempotency_key = ?", identity.Organization.ID, key).Scan(ctx)
 	if err == nil {
-		var fileID string
-		if err := tx.NewSelect().Table("message_attachments").Column("file_id").Where("organization_id = ? AND message_id = ?", identity.Organization.ID, existing.ID).Scan(ctx, &fileID); err != nil && !errors.Is(err, sql.ErrNoRows) {
+		var stored struct {
+			FileID      string `bun:"file_id"`
+			ImageWidth  int    `bun:"image_width"`
+			ImageHeight int    `bun:"image_height"`
+		}
+		if err := tx.NewSelect().Table("message_attachments").ColumnExpr("COALESCE(file_id::text, '') AS file_id, image_width, image_height").
+			Where("organization_id = ? AND message_id = ?", identity.Organization.ID, existing.ID).Scan(ctx, &stored); err != nil && !errors.Is(err, sql.ErrNoRows) {
 			return ConversationMessage{}, false, err
 		}
 		if existing.Type != string(domain.MessageTypeAttachment) || existing.ConversationID != member.Conversation.ID ||
-			existing.Body != input.Body || existing.SenderParticipantID == nil || *existing.SenderParticipantID != member.ParticipantID || fileID != input.FileID {
+			existing.Body != input.Body || existing.SenderParticipantID == nil || *existing.SenderParticipantID != member.ParticipantID ||
+			stored.FileID != input.FileID || stored.ImageWidth != input.ImageWidth || stored.ImageHeight != input.ImageHeight {
 			return ConversationMessage{}, false, &ConflictError{Reason: ConflictReasonIdempotencyMismatch}
 		}
 		messages := []ConversationMessage{memberConversationMessage(existing, member.SubjectID, identity.OrganizationIdentity)}
@@ -210,7 +216,6 @@ func saveAttachmentMessage(ctx context.Context, tx bun.Tx, identity *servermodel
 		SearchVector:    searchtext.Vector(input.Body, file.OriginalName),
 		ClientMessageID: &input.ClientMessageID, IdempotencyKey: &key, OriginatedAt: time.Now().UTC(),
 	}
-	// 会话锁内已完成完整幂等校验，已有附件在文件状态检查前返回。
 	message, _, err = chatstate.AppendMessage(ctx, tx, member.Conversation, message)
 	if err != nil {
 		return ConversationMessage{}, false, err

@@ -266,6 +266,9 @@ export class AttachmentQueue {
   retry(id: string) {
     const job = this.jobs.find((item) => item.id === id)
     if (!job || job.stage !== "failed") return
+    // 重试的附件移到本批末尾，成功后排在同批其余附件之后。
+    const batch = this.batches.get(job.batchID)
+    if (batch) batch.jobs = [...batch.jobs.filter((item) => item !== job), job]
     job.controller = new AbortController()
     if (job.fileID) {
       job.stage = "uploaded"
@@ -281,15 +284,9 @@ export class AttachmentQueue {
   cancel(id: string) {
     const job = this.jobs.find((item) => item.id === id)
     if (!job || job.stage === "sending" || job.stage === "sent" || job.stage === "cancelled") return
+    this.release(job)
     job.stage = "cancelled"
-    job.controller.abort()
-    const fileID = job.fileID || job.transfer?.upload?.file.id
-    if (fileID) void cancelFileUpload(fileID).catch(() => {})
     this.outgoing.discard(job.id)
-    if (job.previewURL) URL.revokeObjectURL(job.previewURL)
-    job.previewURL = ""
-    job.selected = null
-    job.transfer = null
     this.emit()
     void this.flush(job.batchID)
   }
@@ -307,12 +304,8 @@ export class AttachmentQueue {
   /** 失权后中止该会话的附件任务并清除本地气泡。 */
   forgetConversation(conversationID: string) {
     for (const job of this.jobs.filter((item) => item.conversationID === conversationID)) {
+      if (job.stage !== "cancelled") this.release(job)
       job.stage = "cancelled"
-      job.controller.abort()
-      if (job.previewURL) URL.revokeObjectURL(job.previewURL)
-      job.previewURL = ""
-      job.selected = null
-      job.transfer = null
       this.outgoing.discard(job.id)
       this.batches.delete(job.batchID)
     }
@@ -320,16 +313,29 @@ export class AttachmentQueue {
     this.emit()
   }
 
-  /** 页面关闭时中止上传，未发送的附件标记为发送失败。 */
+  /** 页面关闭时中止未发送的附件并标记为发送失败，迟到的发送结果不再改写状态。 */
   dispose() {
     this.disposed = true
     for (const job of this.jobs) {
-      job.controller.abort()
-      if (job.previewURL) URL.revokeObjectURL(job.previewURL)
-      job.previewURL = ""
-      job.selected = null
-      job.transfer = null
-      if (job.stage !== "sent" && job.stage !== "cancelled") this.outgoing.fail(job.id)
+      if (job.stage === "sent" || job.stage === "cancelled") continue
+      this.release(job)
+      job.stage = "failed"
+      this.outgoing.fail(job.id)
     }
+  }
+
+  /** 中止附件任务，释放本地预览和尚未发送的临时文件。 */
+  private release(job: AttachmentJob) {
+    job.controller.abort()
+    const fileID = job.fileID || job.transfer?.upload?.file.id
+    if (fileID && job.stage !== "sent") {
+      void cancelFileUpload(fileID).catch((error) =>
+        console.warn("附件临时文件释放失败", error),
+      )
+    }
+    if (job.previewURL) URL.revokeObjectURL(job.previewURL)
+    job.previewURL = ""
+    job.selected = null
+    job.transfer = null
   }
 }

@@ -129,6 +129,11 @@ func TestAgentAttachmentInputs(t *testing.T) {
 	if err != nil || first.ConversationID != conversationID || first.AgentConversation == nil || first.AgentConversation.ID != conversationID {
 		t.Fatalf("first=%+v err=%v", first, err)
 	}
+	// 无说明的附件首发以文件名作为会话标题。
+	var title string
+	if err := f.db.NewSelect().Table("conversations").Column("title").Where("id = ?", conversationID).Scan(ctx, &title); err != nil || title != "photo.png" {
+		t.Fatalf("title=%q err=%v", title, err)
+	}
 	documentInput := conversationaction.AttachmentMessageInput{
 		ConversationID: conversationID, ClientMessageID: uuid.NewV7().String(), Body: "请看附件",
 		FileID: uploadedAttachment(t, f.db, f.owner, "spec.pdf", "application/pdf"),

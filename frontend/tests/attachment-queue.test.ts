@@ -180,6 +180,32 @@ test("前面的附件上传失败时不阻塞后续附件，重试成功后排�
   )
 })
 
+test("同批后续附件仍在上传时重试失败的附件，重试的附件排在后续附件之后发送", async () => {
+  const gate = Promise.withResolvers<void>()
+  let failFirst = true
+  const h = host({
+    completeFileUpload: async (id: string) => {
+      if (id === "file-1.csv" && failFirst) {
+        failFirst = false
+        throw new Error("上传失败")
+      }
+      if (id === "file-2.csv") await gate.promise
+      return { id }
+    },
+  })
+  h.queue.enqueue(h.files, { conversationID: "conversation" }, () => {})
+  await settled(() => h.job("message-1").stage === "failed")
+  h.queue.retry("message-1")
+  await settled(() => h.job("message-1").stage === "uploaded")
+  assert.equal(h.sends.length, 0)
+  gate.resolve()
+  await settled(() => h.job("message-1").stage === "sent")
+  assert.deepEqual(
+    h.sends.map((item) => item.clientMessageId),
+    ["message-2", "message-1"],
+  )
+})
+
 test("发送失败后重试沿用同一发送编号和已上传的文件", async () => {
   let attempts = 0
   const q = host({
@@ -276,7 +302,7 @@ test("失权时清除附件，迟到的发送结果不能恢复队列或打开�
   h.queue.enqueue(h.files, { conversationID: "removed" }, () => {
     opened++
   })
-  await settled(() => entered)
+  await settled(() => entered && h.job("message-2").stage === "uploaded")
   h.queue.forgetConversation("removed")
   gate.resolve()
   await new Promise((resolve) => setImmediate(resolve))
@@ -284,6 +310,27 @@ test("失权时清除附件，迟到的发送结果不能恢复队列或打开�
   assert.equal(h.sent("removed").length, 0)
   assert.equal(opened, 0)
   assert.equal(h.errors.length, 0)
+  // 失权时释放尚未确认发送的临时文件。
+  assert.deepEqual([...h.cancelled].sort(), ["file-1.csv", "file-2.csv"])
+})
+
+test("发送进行中离开页面，迟到的成功结果不改写失败状态，后续附件不再发送", async () => {
+  const gate = Promise.withResolvers<void>()
+  let entered = false
+  const h = host({
+    sendAttachmentMessage: async (input: any) => {
+      entered = true
+      await gate.promise
+      return { conversationId: "conversation", conversation: null, message: { id: "saved", body: input.body, originatedAt: new Date().toISOString(), attachment: { id: input.fileId } } }
+    },
+  })
+  h.queue.enqueue(h.files, { conversationID: "conversation" }, () => {})
+  await settled(() => entered && h.job("message-2").stage === "uploaded")
+  h.queue.dispose()
+  gate.resolve()
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.equal(h.job("message-1").stage, "failed")
+  assert.equal(h.sent().map((item: any) => item.status).join(","), "failed,failed")
 })
 
 test("离开页面后未发送的附件标记失败且不再发送", async () => {
@@ -294,9 +341,11 @@ test("离开页面后未发送的附件标记失败且不再发送", async () =>
     },
   })
   h.queue.enqueue(h.files, { conversationID: "conversation" }, () => {})
+  await settled(() => h.queue.snapshot().every((item: any) => item.transfer?.upload))
   h.queue.dispose()
   gate.resolve()
   await new Promise((resolve) => setImmediate(resolve))
   assert.equal(h.sends.length, 0)
   assert.equal(h.sent().map((item: any) => item.status).join(","), "failed,failed")
+  assert.deepEqual([...h.cancelled].sort(), ["file-1.csv", "file-2.csv"])
 })
