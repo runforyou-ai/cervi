@@ -161,11 +161,11 @@ func (s *RetrievalService) sources(ctx context.Context, organizationID string, k
 			if !ok {
 				return nil, &embedding.Error{Code: "embedding_model_unavailable"}
 			}
-			baseURL, err := common.CompatibleModelBaseURL(provider.Brand, provider.APIURL)
+			credential, err := embeddingCredential(&provider)
 			if err != nil {
-				return nil, &embedding.Error{Code: "embedding_model_unavailable"}
+				return nil, err
 			}
-			source.embed = embedding.Credential{BaseURL: baseURL, APIKey: provider.APIKey}
+			source.embed = credential
 			if provider, ok = byID[base.RerankProviderID]; !ok {
 				return nil, &rerank.Error{Code: "rerank_model_unavailable"}
 			}
@@ -281,11 +281,16 @@ func (k *knowledgeSource) retrieve(ctx context.Context, query string) ([]Retriev
 	ordered = ordered[:min(len(ordered), k.base.RetrievalCount)]
 	records := make([]RetrievalRecord, 0, len(ordered))
 	for _, item := range ordered {
-		records = append(records, RetrievalRecord{
+		record := RetrievalRecord{
 			DocumentID: item.hit.SourceID, DocumentName: item.hit.SourceName,
 			SegmentID: item.hit.ID, SegmentBatchID: item.hit.SegmentBatchID, Position: item.hit.Position,
 			Content: item.hit.Content, Score: item.score, LexicalRank: item.lexicalRank, VectorRank: item.vectorRank,
-		})
+		}
+		// 问答记录以条目编号作为分段编号，位置固定为 1。
+		if qa {
+			record.SegmentID, record.Position = item.hit.SourceID, 1
+		}
+		records = append(records, record)
 	}
 	if qa {
 		if err := attachQAAnswers(ctx, k.service.db, records); err != nil {
@@ -304,18 +309,21 @@ func (k *knowledgeSource) read(ctx context.Context, sourceID, segmentID string, 
 		if !common.ValidUUID(sourceID) || sourceID != segmentID {
 			return nil, ErrSegmentStale
 		}
-		var question string
-		err := k.service.db.NewSelect().TableExpr("knowledge_qa_entries AS kqe").ColumnExpr("question.content").
+		var entry struct {
+			Question string `bun:"question"`
+			Answer   string `bun:"answer"`
+		}
+		err := k.service.db.NewSelect().TableExpr("knowledge_qa_entries AS kqe").ColumnExpr("question.content AS question, answer.content AS answer").
 			Join("JOIN knowledge_qa_contents question ON question.entry_id = kqe.id AND question.kind = ?", domain.KnowledgeQAContentPrimaryQuestion).
-			Where("kqe.id = ? AND kqe.knowledge_base_id = ? AND kqe.segment_batch_id IS NOT NULL", sourceID, k.base.ID).Scan(ctx, &question)
+			Join("JOIN knowledge_qa_contents answer ON answer.entry_id = kqe.id AND answer.kind = ?", domain.KnowledgeQAContentAnswer).
+			Where("kqe.id = ? AND kqe.knowledge_base_id = ? AND kqe.segment_batch_id IS NOT NULL", sourceID, k.base.ID).Scan(ctx, &entry)
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrSegmentStale
 		}
 		if err != nil {
 			return nil, err
 		}
-		records := []RetrievalRecord{{DocumentID: sourceID, DocumentName: question, SegmentID: sourceID, Position: 1, Content: question}}
-		return records, attachQAAnswers(ctx, k.service.db, records)
+		return []RetrievalRecord{{DocumentID: sourceID, DocumentName: entry.Question, SegmentID: sourceID, Position: 1, Content: entry.Question, Answer: entry.Answer}}, nil
 	}
 	hits, err := readSegmentWindow(ctx, k.service.db, k.base, sourceID, segmentID, before, after)
 	if err != nil {
@@ -328,7 +336,7 @@ func (k *knowledgeSource) read(ctx context.Context, sourceID, segmentID string, 
 	return records, nil
 }
 
-// attachQAAnswers 把问答记录收敛到条目编号并补上当前完整答案。
+// attachQAAnswers 为问答记录补上条目当前的完整答案。
 func attachQAAnswers(ctx context.Context, db bun.IDB, records []RetrievalRecord) error {
 	if len(records) == 0 {
 		return nil
@@ -346,7 +354,7 @@ func attachQAAnswers(ctx context.Context, db bun.IDB, records []RetrievalRecord)
 		byEntry[answer.EntryID] = answer.Content
 	}
 	for index := range records {
-		records[index].SegmentID, records[index].Position, records[index].Answer = records[index].DocumentID, 1, byEntry[records[index].DocumentID]
+		records[index].Answer = byEntry[records[index].DocumentID]
 	}
 	return nil
 }

@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next"
 import { Link, useLocation, useParams } from "react-router"
 
 import {
+  KnowledgeBaseCategory,
   getKnowledgeBase,
   listKnowledgeQAEntries,
   type KnowledgeQASummaryData,
@@ -192,6 +193,7 @@ function KnowledgeQAGroupList({
         open={retrievalOpen}
         onOpenChange={setRetrievalOpen}
         knowledgeBaseId={knowledgeBaseId}
+        category={KnowledgeBaseCategory.KnowledgeBaseCategoryQA}
         triggerRef={retrievalTrigger}
       />
     </>

@@ -52,7 +52,7 @@ func (p *QAProcessing) Retry(ctx context.Context, identity *servermodels.Identit
 		if err := validateQAKnowledgeBase(base); err != nil {
 			return err
 		}
-		entry, err := loadQAEntry(ctx, tx, baseID, entryID)
+		entry, err := lockQAEntry(ctx, tx, baseID, entryID)
 		if err != nil {
 			return err
 		}

@@ -13,7 +13,7 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// SaveQAEntryAction 创建或更新完整问答，保留既有内容编号，并在内容变化时投递索引任务。
+// SaveQAEntryAction 创建或更新完整问答并保留既有内容编号；新建、内容增删改或索引尚未成功时投递索引任务。
 type SaveQAEntryAction struct {
 	db         *bun.DB
 	processing *QAProcessing
@@ -52,7 +52,7 @@ func (a *SaveQAEntryAction) Execute(ctx context.Context, identity *servermodels.
 				return err
 			}
 		} else {
-			entry, err = loadQAEntry(ctx, tx, knowledgeBaseID, entryID)
+			entry, err = lockQAEntry(ctx, tx, knowledgeBaseID, entryID)
 			if err != nil {
 				return err
 			}
@@ -64,7 +64,7 @@ func (a *SaveQAEntryAction) Execute(ctx context.Context, identity *servermodels.
 		if err != nil {
 			return err
 		}
-		// 新建、内容变化或索引未完成时投递任务；仅移动分组保留已发布分段。
+		// 新建、主问题、相似问题或答案增删改，或索引尚未成功时投递新任务。
 		if entryID == "" || changed || entry.Status != domain.KnowledgeIndexSucceeded {
 			if err := a.processing.enqueue(ctx, tx, identity.Organization.ID, base, entry); err != nil {
 				return err
@@ -76,7 +76,7 @@ func (a *SaveQAEntryAction) Execute(ctx context.Context, identity *servermodels.
 	return output, err
 }
 
-// saveQAContents 按内容编号更新文本和顺序，删除被移除的相似问题，并返回问题或答案文本是否变化。
+// saveQAContents 按内容编号更新文本和顺序，删除被移除的相似问题，并返回主问题、相似问题或答案是否增删改。
 func saveQAContents(ctx context.Context, tx bun.Tx, entryID string, input QAInput) (bool, error) {
 	stored := make([]servermodels.KnowledgeQAContent, 0)
 	if err := tx.NewSelect().Model(&stored).Where("kqc.entry_id = ?", entryID).Scan(ctx); err != nil {

@@ -42,7 +42,7 @@ func NewProcessQAEntryAction(db *bun.DB, embedder segmentEmbedder) *ProcessQAEnt
 	return &ProcessQAEntryAction{db: db, embedder: embedder}
 }
 
-// Execute 执行当前问答任务，并在同一事务中写入分段与发布批次。
+// Execute 执行当前问答任务：切段并向量化后，在同一事务中替换分段并发布批次。
 func (a *ProcessQAEntryAction) Execute(ctx context.Context, input ProcessQAInput) error {
 	started := time.Now()
 	current, err := a.setStage(ctx, input, domain.KnowledgeIndexSplitting)

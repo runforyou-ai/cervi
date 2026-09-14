@@ -28,7 +28,7 @@ type ProcessInput struct {
 	EmbeddingDimension       int    `json:"embeddingDimension"`
 }
 
-// ProcessError 定义文档处理的失败原因码和执行阶段。
+// ProcessError 定义知识来源索引的失败原因码和执行阶段。
 type ProcessError struct {
 	Code  string
 	Stage domain.KnowledgeIndexStatus

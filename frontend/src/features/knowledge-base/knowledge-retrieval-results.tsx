@@ -2,16 +2,18 @@
 import { useMemo } from "react"
 import { useTranslation } from "react-i18next"
 
-import { type KnowledgeRetrievalResultData } from "@/api"
+import { KnowledgeBaseCategory, type KnowledgeBaseCategoryId, type KnowledgeRetrievalResultData } from "@/api"
 import { SelectableText } from "@/components/selectable-text"
 import { Button } from "@/components/ui/button"
 
 /** 按最终顺序展示命中内容；文档分段提供查看上下文入口，问答条目展示命中片段和完整答案。 */
-export function KnowledgeRetrievalResults({ records, onViewContext }: {
+export function KnowledgeRetrievalResults({ category, records, onViewContext }: {
+  category: KnowledgeBaseCategoryId
   records: KnowledgeRetrievalResultData["records"]
   onViewContext: (record: KnowledgeRetrievalResultData["records"][number], trigger: HTMLButtonElement) => void
 }) {
   const { t, i18n } = useTranslation("knowledgeBase")
+  const qa = category === KnowledgeBaseCategory.KnowledgeBaseCategoryQA
   const scoreFormatter = useMemo(
     () => new Intl.NumberFormat(i18n.resolvedLanguage, { maximumFractionDigits: 3 }),
     [i18n.resolvedLanguage],
@@ -27,7 +29,7 @@ export function KnowledgeRetrievalResults({ records, onViewContext }: {
               <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-baseline gap-x-2 gap-y-1">
                   <SelectableText className="break-all text-sm font-medium">{record.documentName}</SelectableText>
-                  {!record.answer && (
+                  {!qa && (
                     <span className="inline-flex items-baseline gap-2 text-xs text-muted-foreground">
                       <span>{t("retrieval.position", { position: record.position })}</span>
                       <Button type="button" variant="link" className="h-auto p-0 text-xs font-normal" onClick={(event) => onViewContext(record, event.currentTarget)}>
@@ -36,7 +38,7 @@ export function KnowledgeRetrievalResults({ records, onViewContext }: {
                     </span>
                   )}
                 </div>
-                {record.answer ? (
+                {qa ? (
                   <dl className="mt-3 grid gap-3 text-sm leading-6">
                     <div>
                       <dt className="text-xs text-muted-foreground">{t("retrieval.matched")}</dt>

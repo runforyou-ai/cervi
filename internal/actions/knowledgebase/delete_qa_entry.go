@@ -29,7 +29,7 @@ func (a *DeleteQAEntryAction) Execute(ctx context.Context, identity *servermodel
 		if err := validateQAKnowledgeBase(base); err != nil {
 			return err
 		}
-		entry, err := loadQAEntry(ctx, tx, knowledgeBaseID, entryID)
+		entry, err := lockQAEntry(ctx, tx, knowledgeBaseID, entryID)
 		if err != nil {
 			return err
 		}
