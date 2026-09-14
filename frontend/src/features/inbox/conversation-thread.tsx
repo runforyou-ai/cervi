@@ -1,7 +1,6 @@
 /** 会话消息线程与回复区的即时消息协调。 */
-import { useCallback, useEffect, useEffectEvent, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
-import { useNavigate } from "react-router"
 
 import {
   ChannelType,
@@ -10,10 +9,8 @@ import {
   isAgentInboxConversation,
   isDirectInboxConversation,
   isGroupInboxConversation,
-  markConversationRead,
   sendFirstAgentTextMessage,
   sendFirstDirectTextMessage,
-  updateConversationUnreadMark,
   type AgentInboxConversationData,
   type ConversationMessageReference,
   type CustomerInboxConversationData,
@@ -32,9 +29,9 @@ import {
 } from "@/features/inbox/conversation-timeline"
 import { useOutgoingMessages } from "@/features/inbox/outgoing-message-context"
 import type { OutgoingConversationDraft } from "@/features/inbox/outgoing-message-store"
+import { useConversationReadMarker } from "@/features/inbox/use-conversation-read-marker"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
-import { recoverSession } from "@/lib/session-navigation"
 
 /** 连接时间线与回复区，处理已读、发送和草稿转正会话。 */
 export function ConversationThread({
@@ -65,7 +62,6 @@ export function ConversationThread({
 }) {
   const prepareSendRef = useRef<(() => Promise<boolean>) | null>(null)
   const { t } = useTranslation("inbox")
-  const navigate = useNavigate()
   const pageActive = usePortalContainer()?.active ?? true
   const { identity } = useWorkspace()
   const { queue: attachmentQueue, jobs: attachmentJobs } = useAttachmentQueue()
@@ -87,34 +83,10 @@ export function ConversationThread({
     (agentDraftID
       ? ConversationType.ConversationTypeAgent
       : ConversationType.ConversationTypeDirect)
-
-  /** 清除未读标记失败时记录日志并恢复会话入口。 */
-  const handleUnreadMarkClearError = useEffectEvent(
-    (id: string, error: unknown) => {
-      console.warn("清除会话未读标记失败", { conversationId: id, error })
-      recoverSession(error, navigate)
-    },
+  const markRead = useConversationReadMarker(
+    conversationID,
+    pageActive && conversationType !== ConversationType.ConversationTypeCustomer,
   )
-
-  useEffect(() => {
-    if (
-      !conversationID ||
-      !pageActive ||
-      conversationType === ConversationType.ConversationTypeCustomer
-    )
-      return
-    let current = true
-    // 每次进入会话时清除服务端未读标记。
-    void updateConversationUnreadMark(conversationID, { markedUnread: false })
-      .then(() => invalidate(resourceKeys.inbox()))
-      .catch((error: unknown) => {
-        if (!current) return
-        handleUnreadMarkClearError(conversationID, error)
-      })
-    return () => {
-      current = false
-    }
-  }, [conversationID, conversationType, pageActive, invalidate])
 
   useEffect(() => {
     aliveRef.current = true
@@ -144,28 +116,6 @@ export function ConversationThread({
   )
   const groupConversation =
     conversation && isGroupInboxConversation(conversation) ? conversation : null
-
-  /** 保存当前已看到的最新消息并刷新收件箱未读摘要。 */
-  const markRead = useCallback(
-    (messageID: string) => {
-      if (!conversation) return
-      void markConversationRead(conversation.id, {
-        lastReadMessageId: messageID,
-        clearUnreadMark: false,
-      })
-        .then(() => {
-          void invalidate(resourceKeys.inbox())
-          void invalidate(resourceKeys.conversationSummary(conversation.id))
-        })
-        .catch((error: unknown) =>
-          console.warn("标记会话已读失败", {
-            conversationId: conversation.id,
-            error,
-          }),
-        )
-    },
-    [conversation, invalidate],
-  )
 
   return (
     <>

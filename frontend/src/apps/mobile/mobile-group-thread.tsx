@@ -1,4 +1,4 @@
-/** 移动端群聊历史、纯文本发送和解散后的只读状态。 */
+/** 移动端群聊历史、纯文本发送、阅读进度和解散后的只读状态。 */
 import { useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 
@@ -12,10 +12,11 @@ import { ConversationComposer } from "@/features/inbox/conversation-composer"
 import { ConversationTimeline } from "@/features/inbox/conversation-timeline"
 import { useOutgoingMessages } from "@/features/inbox/outgoing-message-context"
 import type { OutgoingConversationDraft } from "@/features/inbox/outgoing-message-store"
+import { useConversationReadMarker } from "@/features/inbox/use-conversation-read-marker"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
 
-/** 复用消息窗口和幂等重试，群聊解散后保留历史并关闭发送区。 */
+/** 复用消息窗口、已读与提及导航，群聊解散后保留历史并关闭发送区。 */
 export function MobileGroupThread({
   conversation,
   active = true,
@@ -29,6 +30,7 @@ export function MobileGroupThread({
   const { identity } = useMobileWorkspace()
   const invalidate = useResourceInvalidator()
   const outgoing = useOutgoingMessages(conversation.id)
+  const markRead = useConversationReadMarker(conversation.id, active)
   const [retryDraft, setRetryDraft] =
     useState<OutgoingConversationDraft | null>(null)
   const prepareSendRef = useRef<(() => Promise<boolean>) | null>(null)
@@ -43,8 +45,8 @@ export function MobileGroupThread({
         conversationType={ConversationType.ConversationTypeGroup}
         currentUser={identity.user}
         requireWindowFocus={false}
-        mentionNavigation={false}
         onUnavailable={onUnavailable}
+        onReadMessage={markRead}
         prepareSendRef={prepareSendRef}
         outgoingMessages={outgoing.messages}
         onRetryFailedMessage={setRetryDraft}

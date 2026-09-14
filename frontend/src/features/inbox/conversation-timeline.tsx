@@ -342,7 +342,7 @@ function ConversationTimelineContent({
     page: currentPage,
     mode: timeline.mode,
     switching: timeline.switching || location.locating,
-    readingActive: pollingActive,
+    readingActive: enabled && pollingActive,
     identityID: currentIdentityID,
     atBottom: viewport.atBottom,
     getAtBottom: viewport.getAtBottom,

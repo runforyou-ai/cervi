@@ -68,12 +68,14 @@ export function useMobileInboxQuery() {
 /** 移动端当前列表的完整筛选。 */
 export type MobileInboxQuery = ReturnType<typeof useMobileInboxQuery>["query"]
 
-/** 展示三个业务范围，内部同时包含单聊和群聊。 */
+/** 展示三个业务范围，内部同时包含单聊和群聊，并提示内部未读。 */
 export function MobileInboxScopes({
   scope,
+  attentionUnreadCount,
   onChange,
 }: {
   scope: InboxScope
+  attentionUnreadCount: number
   onChange: (query: LoadInboxQuery) => void
 }) {
   const { t } = useTranslation("inbox")
@@ -95,7 +97,18 @@ export function MobileInboxScopes({
               : "text-muted-foreground",
           )}
         >
-          {t(label)}
+          <span className="relative">
+            {t(label)}
+            {value === InboxScope.InboxScopeInternal && attentionUnreadCount > 0 ? (
+              <span
+                className="absolute -top-0.5 -right-2 size-2 rounded-full bg-destructive"
+                role="status"
+                aria-label={t("internalAttentionUnread", {
+                  count: attentionUnreadCount,
+                })}
+              />
+            ) : null}
+          </span>
         </button>
       ))}
     </nav>
