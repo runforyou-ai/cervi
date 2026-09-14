@@ -8,6 +8,7 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"sync/atomic"
 
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/components/tool"
@@ -102,10 +103,11 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 	if len(media.modalities) > 0 {
 		media.maxCount = max(1, window*mediaWindowPercent/100/mediaTokens)
 	}
+	trackedModel := &mediaTrackingModel{ToolCallingChatModel: chatModel, rejected: &atomic.Bool{}}
 	handlers := append([]adk.ChatModelAgentMiddleware{recorder, newFinalIterationGuard(maxIterations)}, reductionHandlers...)
 	handlers = append(handlers, &toolArgumentsNormalizer{})
 	agent, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
-		Name: request.Name, Instruction: request.Instruction, Model: chatModel,
+		Name: request.Name, Instruction: request.Instruction, Model: trackedModel,
 		ToolsConfig: adk.ToolsConfig{ToolsNodeConfig: compose.ToolsNodeConfig{
 			Tools: tools, ToolCallMiddlewares: []compose.ToolMiddleware{toolExecutionMiddleware(recorder)},
 		}},
@@ -116,9 +118,9 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 		return RunResult{}, fmt.Errorf("create Eino chat model agent: %w", err)
 	}
 
-	// 模型偶发只产出推理内容而没有正文，按有界次数重新执行本次输入。
+	// 模型偶发只产出推理内容而没有正文时按有界次数重新执行；携带直传附件的模型调用失败时去掉多模态内容重新执行一次。
 	var carriedUsage Usage
-	for attempt := 0; ; attempt++ {
+	for emptyRetries := 0; ; {
 		execution := &einoExecution{
 			inputs: &turnInputs{feed: feed}, recorder: recorder, maxTurns: request.MaxTurns, contextWindow: window, media: media,
 		}
@@ -133,10 +135,18 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 		carriedUsage.PromptTokens += execution.result.Usage.PromptTokens
 		carriedUsage.CompletionTokens += execution.result.Usage.CompletionTokens
 		carriedUsage.TotalTokens += execution.result.Usage.TotalTokens
-		if errors.Is(err, errEmptyFinalResponse) && attempt < emptyResponseRetryLimit && ctx.Err() == nil {
+		if errors.Is(err, errEmptyFinalResponse) && emptyRetries < emptyResponseRetryLimit && ctx.Err() == nil {
+			emptyRetries++
 			slog.Warn("模型未产出正文，重新执行本次输入",
-				"agent_run_id", request.RunID, "attempt", attempt+1, "retry_limit", emptyResponseRetryLimit)
+				"agent_run_id", request.RunID, "attempt", emptyRetries, "retry_limit", emptyResponseRetryLimit)
 			recorder.reset()
+			continue
+		}
+		if err != nil && ctx.Err() == nil && media.maxCount > 0 && trackedModel.rejected.Load() {
+			slog.Warn("模型调用拒绝直传附件，改为仅在正文提供附件链接并重新执行",
+				"agent_run_id", request.RunID, "error", err)
+			recorder.reset()
+			media = mediaInput{}
 			continue
 		}
 		if err != nil {

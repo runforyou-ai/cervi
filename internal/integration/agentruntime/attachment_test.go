@@ -6,11 +6,65 @@ import (
 	"context"
 	"encoding/base64"
 	"errors"
+	"sync"
 	"testing"
 
+	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/schema"
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
+
+type mediaRejectingChatModel struct {
+	mu         sync.Mutex
+	calls      int
+	mediaCalls int
+}
+
+func (m *mediaRejectingChatModel) Generate(_ context.Context, input []*schema.Message, _ ...model.Option) (*schema.Message, error) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+	m.calls++
+	if carriesMedia(input) {
+		m.mediaCalls++
+		return nil, errors.New("unknown variant `image_url`")
+	}
+	return schema.AssistantMessage("已按链接回答", nil), nil
+}
+
+func (m *mediaRejectingChatModel) Stream(context.Context, []*schema.Message, ...model.Option) (*schema.StreamReader[*schema.Message], error) {
+	return nil, errors.New("unexpected streaming call")
+}
+
+func (m *mediaRejectingChatModel) WithTools([]*schema.ToolInfo) (model.ToolCallingChatModel, error) {
+	return m, nil
+}
+
+// TestEinoRuntimeRetriesWithoutRejectedMedia 验证模型拒绝直传附件时去掉多模态内容重新执行一次并成功回复。
+func TestEinoRuntimeRetriesWithoutRejectedMedia(t *testing.T) {
+	chatModel := &mediaRejectingChatModel{}
+	runtime := &EinoRuntime{newModel: func(context.Context, ModelConfig) (model.ToolCallingChatModel, error) {
+		return chatModel, nil
+	}}
+	feed := &testInputFeed{desired: 1, messages: []Message{{
+		ID: "1", Role: MessageRoleUser, Content: `{"body":"看图","attachment":{"name":"photo.png"}}`,
+		Media: &Media{MIMEType: "image/png", ByteSize: 16},
+	}}}
+	result, err := runtime.Run(context.Background(), RunRequest{
+		RunID: "media-fallback", Name: "test-agent", MaxTurns: 2,
+		Model: ModelConfig{InputModalities: []domain.AIModelInputModality{domain.AIModelInputModalityText, domain.AIModelInputModalityImage}},
+		ReadAttachment: func(context.Context, string) ([]byte, error) {
+			return []byte("image"), nil
+		},
+	}, feed)
+	if err != nil || result.Content != "已按链接回答" || result.EndSeq != 1 {
+		t.Fatalf("result = %#v, err = %v", result, err)
+	}
+	chatModel.mu.Lock()
+	defer chatModel.mu.Unlock()
+	if chatModel.calls != 2 || chatModel.mediaCalls != 1 {
+		t.Fatalf("model calls = %d, media calls = %d", chatModel.calls, chatModel.mediaCalls)
+	}
+}
 
 // TestTurnHistoryInlinesRecentMedia 验证附件按模型模态由新到旧在预算内直传，其余只保留正文。
 func TestTurnHistoryInlinesRecentMedia(t *testing.T) {

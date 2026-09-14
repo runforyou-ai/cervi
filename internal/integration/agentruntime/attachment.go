@@ -6,7 +6,9 @@ import (
 	"context"
 	"encoding/base64"
 	"log/slog"
+	"sync/atomic"
 
+	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/schema"
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
@@ -43,6 +45,51 @@ type mediaInput struct {
 	read       AttachmentContent
 	modalities map[domain.AIModelInputModality]bool
 	maxCount   int
+}
+
+// mediaTrackingModel 记录携带直传附件的模型调用是否失败，运行据此改用正文链接重新执行。
+type mediaTrackingModel struct {
+	model.ToolCallingChatModel
+	rejected *atomic.Bool
+}
+
+// Generate 调用模型，携带直传附件的请求失败时记录拒绝状态。
+func (m *mediaTrackingModel) Generate(ctx context.Context, input []*schema.Message, opts ...model.Option) (*schema.Message, error) {
+	output, err := m.ToolCallingChatModel.Generate(ctx, input, opts...)
+	if err != nil && carriesMedia(input) {
+		m.rejected.Store(true)
+	}
+	return output, err
+}
+
+// Stream 以流式调用模型，携带直传附件的请求失败时记录拒绝状态。
+func (m *mediaTrackingModel) Stream(ctx context.Context, input []*schema.Message, opts ...model.Option) (*schema.StreamReader[*schema.Message], error) {
+	output, err := m.ToolCallingChatModel.Stream(ctx, input, opts...)
+	if err != nil && carriesMedia(input) {
+		m.rejected.Store(true)
+	}
+	return output, err
+}
+
+// WithTools 绑定工具并共用同一拒绝状态。
+func (m *mediaTrackingModel) WithTools(tools []*schema.ToolInfo) (model.ToolCallingChatModel, error) {
+	bound, err := m.ToolCallingChatModel.WithTools(tools)
+	if err != nil {
+		return nil, err
+	}
+	return &mediaTrackingModel{ToolCallingChatModel: bound, rejected: m.rejected}, nil
+}
+
+// carriesMedia 判断模型输入是否包含直传的图片、音频或视频内容。
+func carriesMedia(input []*schema.Message) bool {
+	for _, message := range input {
+		for _, part := range message.UserInputMultiContent {
+			if part.Image != nil || part.Audio != nil || part.Video != nil {
+				return true
+			}
+		}
+	}
+	return false
 }
 
 // mediaUserMessage 读取附件并构造正文与多模态内容并列的用户消息，读取失败或模态不可直传时返回 false。
