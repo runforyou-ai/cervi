@@ -11,6 +11,7 @@ import { MobileEmployeeProfilePage } from "@/apps/mobile/mobile-employee-profile
 import { MobileGroupConversationPage } from "@/apps/mobile/mobile-group-conversation-page"
 import { MobileGroupProfileEditor } from "@/apps/mobile/mobile-group-profile-editor"
 import { MobileGroupMembersPage } from "@/apps/mobile/mobile-group-members"
+import { MobileGroupMemberActionPage } from "@/apps/mobile/mobile-group-member-management"
 import { MobileGroupDetailsPage } from "@/apps/mobile/mobile-group-details-page"
 import { MobileDirectoryPage } from "@/apps/mobile/mobile-directory-page"
 import { MobileAgentChatPage, MobileAgentConversationPage } from "@/apps/mobile/mobile-agent-chat-page"
@@ -85,6 +86,18 @@ export default function MobileApp() {
                 <Route
                   path="add-members"
                   element={<MobileAddGroupMembersPage />}
+                />
+                <Route
+                  path="remove-members"
+                  element={
+                    <MobileGroupMemberActionPage action="remove" />
+                  }
+                />
+                <Route
+                  path="transfer-owner"
+                  element={
+                    <MobileGroupMemberActionPage action="transfer" />
+                  }
                 />
                 <Route
                   path="edit/:field"

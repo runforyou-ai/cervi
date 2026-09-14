@@ -54,6 +54,7 @@ export function AgentProfileForm({
     () =>
       createAgentProfileSchema({
         nameRequired: t("agents.validation.nameRequired"),
+        nameInvalid: t("agents.validation.nameInvalid"),
         roleRequired: t("members.validation.roleRequired"),
       }),
     [t],

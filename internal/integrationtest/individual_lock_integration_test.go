@@ -130,8 +130,9 @@ func waitChatDatabaseLock(t *testing.T, ctx context.Context, db *bun.DB, queryPa
 func newChatLockUser(t *testing.T, db *bun.DB, owner *servermodels.Identity) *servermodels.Identity {
 	t.Helper()
 	ctx := context.Background()
-	email := uuid.NewV7().String() + "@chat-lock.test"
-	_, err := useraction.NewCreateUserAction(db).Execute(ctx, owner, useraction.CreateInput{DisplayName: email, Email: email, Password: "password123", RoleID: owner.OrganizationIdentity.RoleID})
+	id := uuid.NewV7().String()
+	email := id + "@chat-lock.test"
+	_, err := useraction.NewCreateUserAction(db).Execute(ctx, owner, useraction.CreateInput{DisplayName: "锁定成员 " + id, Email: email, Password: "password123", RoleID: owner.OrganizationIdentity.RoleID})
 	if err != nil {
 		t.Fatal(err)
 	}

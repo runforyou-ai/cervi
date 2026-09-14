@@ -237,6 +237,7 @@ const (
 	FieldOrganizationNameRequired         Key = "field.organization_name_required"
 	FieldOrganizationNameTooLong          Key = "field.organization_name_too_long"
 	FieldDisplayNameRequired              Key = "field.display_name_required"
+	FieldDisplayNameInvalid               Key = "field.display_name_invalid"
 	FieldAgentNameRequired                Key = "field.agent_name_required"
 	FieldAgentExecutionInvalid            Key = "field.agent_execution_invalid"
 	FieldAgentMCPServerInvalid            Key = "field.agent_mcp_server_invalid"

@@ -30,6 +30,9 @@ func (a *UpdateAgentAction) Execute(ctx context.Context, identity *servermodels.
 	if input.DisplayName == "" {
 		return nil, &common.FieldError{Fields: map[string]common.FieldCode{"displayName": ValidationDisplayNameRequired}}
 	}
+	if !domain.IdentityDisplayNameValid(input.DisplayName) {
+		return nil, &common.FieldError{Fields: map[string]common.FieldCode{"displayName": ValidationDisplayNameInvalid}}
+	}
 	if !common.ValidUUID(agentID) {
 		return nil, ErrNotFound
 	}

@@ -21,11 +21,13 @@ export function MobileIndividualThread({
   peerIdentityID = "",
   sendIndividualMessage,
   enabled = Boolean(conversationID),
+  disabledReason = null,
 }: {
   conversationID: string
   conversationType?: ConversationType
   peerIdentityID?: string
   enabled?: boolean
+  disabledReason?: string | null
   sendIndividualMessage?: (
     input: DirectTextMessageInput,
   ) => Promise<ConversationMessageData>
@@ -50,14 +52,16 @@ export function MobileIndividualThread({
         enabled={enabled}
         outgoingMessages={outgoing.messages}
         onRetryFailedMessage={setRetryDraft}
-        retryFailedMessageDisabled={outgoing.messages.some(
-          (message) => message.status === "sending",
-        )}
+        retryFailedMessageDisabled={
+          Boolean(disabledReason) ||
+          outgoing.messages.some((message) => message.status === "sending")
+        }
       />
       <ConversationComposer
         conversationID={conversationID}
         conversationType={conversationType}
         retryFailedMessage
+        disabledReason={disabledReason}
         retryDraft={retryDraft}
         onRetryDraftHandled={() => setRetryDraft(null)}
         sendIndividualMessage={sendIndividualMessage}

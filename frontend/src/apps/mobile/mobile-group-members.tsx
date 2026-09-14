@@ -1,5 +1,5 @@
-/** 移动端群成员头像预览和独立的成员搜索列表。 */
-import { useState } from "react"
+/** 移动端群成员头像预览、成员搜索列表和成员查看页。 */
+import { useId, useState, type ReactNode } from "react"
 import { ChevronRightIcon, MinusIcon, PlusIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Link, useNavigate, useOutletContext } from "react-router"
@@ -7,23 +7,26 @@ import {
   GroupParticipantRole,
   OrganizationIdentityType,
   type GroupConversationData,
+  type GroupParticipant,
 } from "@/api"
 import type { MobileGroupDetailsContext } from "@/apps/mobile/mobile-group-context"
 import { MobilePageHeader, MobileScrollArea } from "@/apps/mobile/mobile-page"
 import { ProfileAvatar } from "@/components/profile-avatar"
 import { Input } from "@/components/ui/input"
 
-/** 展示最多两行头像、群主添加成员入口和移除占位。 */
+/** 展示最多两行头像，以及群主添加和移除成员入口。 */
 export function MobileGroupMembersPreview({
   group,
   isOwner,
   returnDepth,
   canAdd,
+  canRemove,
 }: {
   group: GroupConversationData
   isOwner: boolean
   returnDepth: number
   canAdd: boolean
+  canRemove: boolean
 }) {
   const { t } = useTranslation(["mobile", "common"])
   const navigate = useNavigate()
@@ -60,17 +63,15 @@ export function MobileGroupMembersPreview({
             <li key={action} className="min-w-0">
               <button
                 type="button"
-                disabled={action !== "add" || !canAdd}
-                onClick={
-                  action === "add"
-                    ? () => navigate("add-members", {
-                        replace: returnDepth === 0,
-                        state: {
-                          mobileBack: returnDepth > 0,
-                          groupReturnDepth: returnDepth > 0 ? returnDepth + 1 : 0,
-                        },
-                      })
-                    : undefined
+                disabled={action === "add" ? !canAdd : !canRemove}
+                onClick={() =>
+                  navigate(action === "add" ? "add-members" : "remove-members", {
+                    replace: returnDepth === 0,
+                    state: {
+                      mobileBack: returnDepth > 0,
+                      groupReturnDepth: returnDepth > 0 ? returnDepth + 1 : 0,
+                    },
+                  })
                 }
                 className="flex w-full flex-col items-center gap-1.5 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:text-muted-foreground disabled:opacity-50"
               >
@@ -107,35 +108,40 @@ export function MobileGroupMembersPreview({
   )
 }
 
-/** 在独立页面搜索和展示全部群成员及群主身份。 */
-export function MobileGroupMembersPage() {
+/** 按姓名搜索群成员，并在每行末尾渲染身份标记或操作。 */
+export function MobileGroupMemberList({
+  members,
+  storageKey,
+  emptyText,
+  trailing,
+}: {
+  members: GroupParticipant[]
+  storageKey: string
+  emptyText: string
+  trailing: (member: GroupParticipant) => ReactNode
+}) {
   const { t } = useTranslation("inbox")
-  const { group } = useOutletContext<MobileGroupDetailsContext>()
+  const searchID = useId()
   const [search, setSearch] = useState("")
-  const visible = group.participants.filter((member) =>
-    member.displayName
-      .toLocaleLowerCase()
-      .includes(search.trim().toLocaleLowerCase()),
+  const query = search.trim().toLocaleLowerCase()
+  const visible = members.filter((member) =>
+    member.displayName.toLocaleLowerCase().includes(query),
   )
   return (
-    <section className="flex h-full min-h-0 flex-col bg-background">
-      <MobilePageHeader
-        title={`${t("contextGroupMembersTab")} (${group.participants.length})`}
-        backTo={`/inbox/group/${group.id}/details`}
-      />
+    <>
       <div className="space-y-2 border-b p-4">
-        <label htmlFor="mobile-group-member-search" className="block text-sm">
+        <label htmlFor={searchID} className="block text-sm">
           {t("groupMemberSearch")}
         </label>
         <Input
-          id="mobile-group-member-search"
+          id={searchID}
           type="search"
           className="min-h-11"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
         />
       </div>
-      <MobileScrollArea storageKey={`group-members:${group.id}:${search}`}>
+      <MobileScrollArea storageKey={`${storageKey}:${search}`}>
         <ul className="divide-y">
           {visible.map((member) => (
             <li
@@ -156,21 +162,42 @@ export function MobileGroupMembersPage() {
               <span className="min-w-0 flex-1 break-words text-sm">
                 {member.displayName}
               </span>
-              {member.role ===
-              GroupParticipantRole.GroupParticipantRoleOwner ? (
-                <span className="shrink-0 text-xs text-muted-foreground">
-                  {t("groupOwner")}
-                </span>
-              ) : null}
+              {trailing(member)}
             </li>
           ))}
         </ul>
         {!visible.length ? (
           <p className="px-4 py-8 text-center text-sm text-muted-foreground">
-            {t("groupMembersNoMatches")}
+            {query ? t("groupMembersNoMatches") : emptyText}
           </p>
         ) : null}
       </MobileScrollArea>
+    </>
+  )
+}
+
+/** 在独立页面搜索和展示全部群成员及群主身份。 */
+export function MobileGroupMembersPage() {
+  const { t } = useTranslation("inbox")
+  const { group } = useOutletContext<MobileGroupDetailsContext>()
+  return (
+    <section className="flex h-full min-h-0 flex-col bg-background">
+      <MobilePageHeader
+        title={`${t("contextGroupMembersTab")} (${group.participants.length})`}
+        backTo={`/inbox/group/${group.id}/details`}
+      />
+      <MobileGroupMemberList
+        members={group.participants}
+        storageKey={`group-members:${group.id}`}
+        emptyText={t("groupMembersNoMatches")}
+        trailing={(member) =>
+          member.role === GroupParticipantRole.GroupParticipantRoleOwner ? (
+            <span className="shrink-0 text-xs text-muted-foreground">
+              {t("groupOwner")}
+            </span>
+          ) : null
+        }
+      />
     </section>
   )
 }

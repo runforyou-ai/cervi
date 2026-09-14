@@ -20,6 +20,7 @@ const (
 	ValidationOrganizationNameRequired ValidationCode = "INSTALLATION_ORGANIZATION_NAME_REQUIRED"
 	ValidationOrganizationNameTooLong  ValidationCode = "INSTALLATION_ORGANIZATION_NAME_TOO_LONG"
 	ValidationDisplayNameRequired      ValidationCode = "INSTALLATION_DISPLAY_NAME_REQUIRED"
+	ValidationDisplayNameInvalid       ValidationCode = "INSTALLATION_DISPLAY_NAME_INVALID"
 	ValidationEmailInvalid             ValidationCode = "INSTALLATION_EMAIL_INVALID"
 	ValidationPasswordTooShort         ValidationCode = "INSTALLATION_PASSWORD_TOO_SHORT"
 	ValidationPasswordTooLong          ValidationCode = "INSTALLATION_PASSWORD_TOO_LONG"
@@ -40,6 +41,8 @@ func validateInput(input InstallWorkspaceInput) map[string]ValidationCode {
 	}
 	if input.DisplayName == "" {
 		fields["displayName"] = ValidationDisplayNameRequired
+	} else if !domain.IdentityDisplayNameValid(input.DisplayName) {
+		fields["displayName"] = ValidationDisplayNameInvalid
 	}
 	if !commonemail.Valid(input.Email) {
 		fields["email"] = ValidationEmailInvalid

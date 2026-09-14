@@ -84,14 +84,13 @@ agent_inputs
 ├── source_message_id
 ├── source_ordinal         -- 同一条来源消息内的目标位置
 ├── source_subject_id      -- 造成本次输入的聊天主体
-├── depth                  -- 真人发起为 0，Agent 接力为来源 depth + 1
 ├── agent_run_id
 └── created_at
 
 UNIQUE (lane_id, input_seq)
 ```
 
-`kind` 记录输入的实际入口，用于归因与展示；`depth` 是 Agent 接力的防护机制，第 6 节说明。
+`kind` 记录输入的实际入口，用于归因与展示。
 
 跨 Lane 的发言顺序由 `(来源消息的 message_seq, source_ordinal)` 确定。`message_seq` 是会话内消息顺序的权威来源；`source_ordinal` 表达同一条消息内多个目标的先后，取值来自发送时的 `@` 顺序。输入序号与主键不参与跨 Lane 比较。
 
@@ -148,7 +147,7 @@ CREATE UNIQUE INDEX agent_runs_active_scope_unique
 | 引用回复某个 Agent 的消息 | 等同于 `@` 该 Agent |
 | `@所有人` | 只产生群提醒，不触发任何 Agent |
 | 普通消息 | 不触发，进入后续运行的上下文 |
-| Agent 发出的消息 | 不触发，接力由第 6 节的显式结果表达 |
+| Agent 发出的消息 | 不触发，接力由第 6 节从回复正文提取的点名表达 |
 | 系统消息、历史补拉、幂等重放 | 不触发 |
 
 一条消息 `@` 多个 Agent 时，为每个目标各写一条输入，按 `source_ordinal` 依次执行，各自产出独立回复。
@@ -181,36 +180,33 @@ CREATE UNIQUE INDEX agent_runs_active_scope_unique
 
 ### 6.1 结果协议
 
-`RunResult` 增加两个字段：
+群内运行与独立聊天、客服使用同一协议：最后一条不带工具调用的正文即最终回复，被 `@` 的 Agent 一定发言。群 Policy 的系统提示词列出可点名成员，模型需要某位成员回应时在正文中写 `@成员名`。
 
-```text
-RunResult
-├── outcome    -- reply | silent
-├── content
-├── mentions   -- 本次回复指向的企业身份
-├── endSeq
-├── usage
-└── blocks
-```
+服务端在完成事务中从回复正文提取点名：
 
-`outcome` 与 `mentions` 由模型通过类型化结束工具提交。结束工具只注册给群 Policy 的运行；独立聊天与客服继续使用「最后一条不带工具的正文即最终回复」的现有协议。服务端不解析正文中的 `@` 文本。
+- 企业成员与 AI 员工的显示名只允许字母、数字、空格和 `·` `-` `_` `.`，名称内不含 `@`。
+- 候选为群内除运行 Agent 自身以外的有效参与者，按全部显示名匹配；匹配到在群内重名的显示名时整体忽略，不退回匹配较短的名称。
+- 边界规则与前端提醒高亮一致：`@` 位于正文开头或空白之后，成员名后不紧跟字母、组合标记、数字或下划线；较长的成员名优先匹配。
+- 按 CommonMark 语法识别的代码块与行内代码中的 `@` 不形成点名；无法匹配候选的 `@` 文本保持普通文字。
 
-`silent` 表示本次运行成功消费输入但没有公开发言，用于群里被顺带 `@` 到、无需回应的情况。运行推进 `processed_seq` 并触发轮转，不写入消息，不携带 `mentions`。现有运行时与完成事务都拒绝空正文，`silent` 需要同时放开这两处门禁。
-
-`mentions` 的目标必须是当前群内的有效参与者，且不得是运行自身的 Agent。服务端按目标类型分流：
+提取出的目标按类型分流：
 
 - 目标是真人：写入提醒关系，产生通知。
 - 目标是 Agent：写入提醒关系，同时向该 Agent 的 Lane 追加一条 `handoff` 输入，由轮转规则安排执行。
 
 接力挂在本次公开回复上，`handoff` 输入的 `source_message_id` 即该回复消息。
 
-### 6.2 循环防护
+### 6.2 接力轮次
 
-`handoff` 输入的 `depth` 取来源运行所消费输入的最大 `depth` 加一，超过上限即拒绝该次接力。真人的任何新消息 `depth` 为 0，链条重置。
+接力不设深度上限，由 Agent 自驱推进，直到某一轮没有 Agent 点名其他 Agent。第 4.1 节按来源消息顺序轮转，使接力按轮次展开：
 
-被拒绝的接力不写入提醒关系，也不写入输入，因此群里不会出现一个永远不会执行的 `@`。运行内容块记录被拒绝的目标供排查。
+- 本轮已排队、尚未发言的 Agent 被本轮其他 Agent 点名时，新输入进入同一条 Lane，由它本轮的同一次运行一起认领，不额外增加发言。
+- 被点名的 Agent 本轮已经发言或不在本轮时，新输入的来源消息晚于本轮全部待处理输入，进入下一轮；同一 Agent 在下一轮被多次点名只发言一次。
+- 下一轮的发言顺序按来源消息顺序确定。
 
-防护无需持久计数器，也无需在控制操作时重置，对并发链条同样成立。
+例如一轮中 A8 点名 A3、A9 点名 A5、A10 点名 A3，下一轮只有 A3 与 A5 发言；下一轮中 A5 点名 A10、A3 不点名，再下一轮只有 A10。
+
+真人停止只作用于某一个 Agent 的当前发言，其余 Agent 的接力继续按轮转推进，见第 7 节。
 
 ## 7. 澄清、停止与失败
 
@@ -226,8 +222,9 @@ RunResult
 | --- | --- |
 | 建 `agent_lanes` | 取代 `conversation_agent_states` |
 | 建 `agent_inputs` | 取代 `conversation_agent_triggers` |
-| 改 `agent_runs` | 增加 `lane_id`、`scope_kind`、`scope_id`、`outcome`，更名输入边界列，删除 `trigger_type`、`service_session_id`，重建活动运行唯一索引 |
+| 改 `agent_runs` | 增加 `lane_id`、`scope_kind`、`scope_id`，更名输入边界列，删除 `trigger_type`、`service_session_id`，重建活动运行唯一索引 |
 | 删除旧表 | 直接删除，不做数据回填 |
+| 删除结构化结果列 | 删除 `agent_runs.outcome` 与 `agent_inputs.depth` |
 
 按仓库约定：每个建表迁移一个文件、只建一张表、不建外键与 `CHECK`，索引只保留主键和表达业务约束的唯一索引，时间戳由 `wails3 task make:migration` 生成，字段使用中文 `COMMENT ON`。本地开发库通过 `migrate:reset` 重建。
 
@@ -235,9 +232,9 @@ RunResult
 
 | 位置 | 改动 |
 | --- | --- |
-| `internal/actions/agentrun` | `agentRunScope` 收敛为 `lane_id`；轮转选择作为三条链路共用实现；新增 `groupMentionRunPolicy`；停止路径改为按 Lane 定位并接入轮转 |
+| `internal/actions/agentrun` | `agentRunScope` 收敛为 `lane_id`；轮转选择作为三条链路共用实现；新增 `groupMentionRunPolicy`，完成事务从回复正文提取点名并追加接力输入；停止路径改为按 Lane 定位并接入轮转 |
 | `internal/actions/conversation` | 群发送事务内判定 `@Agent` 与引用回复并写入输入，按互斥状态决定是否立即建立运行；提醒目标放开为群内有效参与者 |
-| `internal/integration/agentruntime` | `Message` 增加发送者标识；`RunResult` 增加 `outcome` 与 `mentions`；为群 Policy 注册类型化结束工具；放开空正文门禁 |
+| `internal/integration/agentruntime` | `Message` 增加发送者标识；群内运行沿用最后一条正文即最终回复的协议 |
 | `internal/appservice` | 新增群内停止运行的 Backend 方法与路由，授权为群内有效成员；新增会话级 Agent 运行摘要，返回当前运行与排队中的 Agent |
 | `frontend` | 群输入区 `@` 候选包含 Agent；按会话级摘要展示当前运行状态、排队 Agent 与停止入口 |
 
@@ -270,10 +267,10 @@ PR-A 收窄互斥粒度时同步改写这两处：不变量表述为「同一执
 | A | Lane / Input 重构与执行互斥索引收窄，同步改写 `agent-roadmap.md` 不变量 5 与第 6.3 节，三条已上线链路行为不变 | 现有服务端测试全部通过；客服转交、认领、关闭三条路径不产生重叠运行；输入序号按客服周期重新编号；无新增产品行为 |
 | B | 群内单 Agent：`@` 与引用触发、带发送者的上下文、群内回复、失败、停止 | 群内 `@` 得到回复；运行期间到达的新消息在安全点补入同一次运行；非 `@` 消息不触发；`@所有人` 不触发；幂等重放不重复触发 |
 | C | 群内多 Agent 轮转：一条消息 `@` 多个 Agent | 按 `@` 顺序依次发言，后发言者读到前面全部回复；同一时刻只有一个运行；失败、停止或目标失去资格后轮转继续 |
-| D | 类型化结束工具：`outcome`、`silent`、`mentions`、`handoff` 输入、`depth` 上限 | `A → B → A` 接力保留来源；超过上限的接力被拒绝且不留下 `@`；真人消息重置链条；`silent` 不写消息但推进轮转 |
+| D | 正文点名接力：从回复正文提取 `@` 成员、`handoff` 输入、按轮次推进 | `A → B → A` 接力保留来源；本轮尚未发言的 Agent 被点名时并入本轮发言；接力不设深度上限；代码中的 `@` 不形成点名 |
 | E | 话题 / 结构化协作 | 按真实需求启动 |
 
-A 是纯重构，代价是一次高触达的表与列改名，收益是范围键收敛与查询简化。B 与 C 可以合并交付。`silent` 依赖结束工具，与接力一起在 D 落地，B 阶段被 `@` 的 Agent 一定回复。
+A 是纯重构，代价是一次高触达的表与列改名，收益是范围键收敛与查询简化。B 与 C 可以合并交付。
 
 `internal/integrationtest/agent_group_integration_test.go` 现在断言群内 `@Agent` 返回 `GroupMentionTargetInvalid` 且不产生 Agent 记录，这是当前契约。B 需要改写这条用例。
 

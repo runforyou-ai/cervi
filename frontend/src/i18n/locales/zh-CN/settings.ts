@@ -28,6 +28,7 @@ const settings = {
     saveError: "保存个人资料失败，请重试。",
     validation: {
       displayNameRequired: "请输入姓名。",
+      displayNameInvalid: "姓名只能包含文字、数字、空格和 · - _ . 符号。",
       emailRequired: "请输入邮箱。",
       emailInvalid: "请输入有效的邮箱。",
     },

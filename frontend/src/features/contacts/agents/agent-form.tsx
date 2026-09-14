@@ -50,6 +50,7 @@ export function AgentForm({
     () =>
       createAgentSchema({
         nameRequired: t("agents.validation.nameRequired"),
+        nameInvalid: t("agents.validation.nameInvalid"),
         roleRequired: t("members.validation.roleRequired"),
         modelRequired: t("agents.validation.modelRequired"),
         instructionRequired: t("agents.validation.instructionRequired"),

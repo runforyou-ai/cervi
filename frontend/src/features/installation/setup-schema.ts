@@ -1,11 +1,14 @@
 /** 企业初始化表单校验规则。 */
 import { z } from "zod"
 
+import { displayNamePattern } from "@/lib/display-name"
+
 type SetupTranslator = (
   key:
     | "organizationNameRequired"
     | "organizationNameTooLong"
     | "displayNameRequired"
+    | "displayNameInvalid"
     | "emailRequired"
     | "emailInvalid"
     | "passwordRequired"
@@ -21,7 +24,11 @@ export function createSetupSchema(t: SetupTranslator) {
       .trim()
       .min(1, t("organizationNameRequired"))
       .max(32, t("organizationNameTooLong")),
-    displayName: z.string().trim().min(1, t("displayNameRequired")),
+    displayName: z
+      .string()
+      .trim()
+      .min(1, t("displayNameRequired"))
+      .regex(displayNamePattern, t("displayNameInvalid")),
     email: z
       .string()
       .trim()

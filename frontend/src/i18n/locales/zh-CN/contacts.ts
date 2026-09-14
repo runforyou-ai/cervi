@@ -106,6 +106,7 @@ const contacts = {
     },
     validation: {
       nameRequired: "请输入姓名。",
+      nameInvalid: "姓名只能包含文字、数字、空格和 · - _ . 符号。",
       emailRequired: "请输入邮箱。",
       emailInvalid: "请输入有效的邮箱。",
       passwordRequired: "请输入初始密码。",
@@ -143,6 +144,7 @@ const contacts = {
     },
     validation: {
       nameRequired: "请输入 AI 员工名称。",
+      nameInvalid: "AI 员工名称只能包含文字、数字、空格和 · - _ . 符号。",
       modelRequired: "请选择对话模型。",
       instructionRequired: "请输入工作指令。",
       instructionTooLong: "工作指令不能超过 20000 个字符。",
@@ -178,9 +180,10 @@ const contacts = {
       reactivate: "恢复正常",
       deactivateTitle: "禁用“{{name}}”？",
       reactivateTitle: "将“{{name}}”恢复正常？",
-      deactivateDescription: "该 AI 员工将无法继续工作，所属团队关系会保留。",
+      deactivateDescription:
+        "禁用后不能向该 AI 员工发送新消息，已提交的任务会继续执行；相关渠道分配将重置为公共队列，团队关系和历史会话保留。",
       reactivateDescription:
-        "恢复正常后仍保持“下班”，团队关系不变；需要时请再切换为“工作中”。",
+        "恢复正常后仍保持“下班”，团队关系不变，渠道分配需要重新配置；需要时请再切换为“工作中”。",
       saving: "正在处理…",
       deactivated: "AI 员工已禁用",
       reactivated: "AI 员工已恢复正常",

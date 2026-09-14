@@ -73,11 +73,6 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 		}
 		tools = append(tools, historyTool)
 	}
-	var groupReply *groupReplyTool
-	if request.GroupReply != nil {
-		groupReply = newGroupReplyTool(*request.GroupReply)
-		tools = append(tools, groupReply)
-	}
 	if len(request.MCPServers) > 0 {
 		// 收齐本次运行的内置工具名称，远程工具重名时由 openMCPTools 跳过。
 		registered := map[string]struct{}{offloadedResultToolName: {}}
@@ -107,7 +102,8 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 	if len(media.modalities) > 0 {
 		media.maxCount = max(1, window*mediaWindowPercent/100/mediaTokens)
 	}
-	handlers := append([]adk.ChatModelAgentMiddleware{recorder, newFinalIterationGuard(maxIterations, groupReply != nil)}, reductionHandlers...)
+	handlers := append([]adk.ChatModelAgentMiddleware{recorder, newFinalIterationGuard(maxIterations)}, reductionHandlers...)
+	handlers = append(handlers, &toolArgumentsNormalizer{})
 	agent, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
 		Name: request.Name, Instruction: request.Instruction, Model: chatModel,
 		ToolsConfig: adk.ToolsConfig{ToolsNodeConfig: compose.ToolsNodeConfig{
@@ -124,8 +120,7 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 	var carriedUsage Usage
 	for attempt := 0; ; attempt++ {
 		execution := &einoExecution{
-			inputs: &turnInputs{feed: feed}, recorder: recorder, maxTurns: request.MaxTurns,
-			groupReply: groupReply, contextWindow: window, media: media,
+			inputs: &turnInputs{feed: feed}, recorder: recorder, maxTurns: request.MaxTurns, contextWindow: window, media: media,
 		}
 		execution.inputs.loop = adk.NewTurnLoop(adk.TurnLoopConfig[Trigger, *schema.Message]{
 			GenInput: execution.genInput,
@@ -147,7 +142,7 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 		if err != nil {
 			return RunResult{}, err
 		}
-		if (execution.result.Content == "" && execution.result.Outcome != RunOutcomeSilent) || execution.inputs.claimedSeq <= 0 {
+		if execution.result.Content == "" || execution.inputs.claimedSeq <= 0 {
 			return RunResult{}, errors.New("agent run stopped without a stable response")
 		}
 		execution.result.Usage = carriedUsage
@@ -162,7 +157,6 @@ type einoExecution struct {
 	inputs        *turnInputs
 	history       turnHistory
 	recorder      *processRecorder
-	groupReply    *groupReplyTool
 	maxTurns      int
 	contextWindow int
 	media         mediaInput
@@ -235,27 +229,12 @@ func (e *einoExecution) onAgentEvents(ctx context.Context, turn *adk.TurnContext
 		}
 	}
 	e.history.appendOutput(intermediates)
-	outcome := RunOutcomeReply
-	var mentions []string
-	// 群内最终结果以结束工具提交的内容为准。
-	submission, submitted := groupReplySubmission{}, false
-	if e.groupReply != nil {
-		submission, submitted = e.groupReply.peek()
-		candidate = ""
-		if submitted {
-			outcome, candidate, mentions = submission.Outcome, submission.Body, submission.Mentions
-		}
-	}
-	finished, err := e.inputs.finish(ctx, turn, candidate, submitted && outcome == RunOutcomeSilent)
+	finished, err := e.inputs.finish(ctx, turn, candidate)
 	if err != nil {
 		return err
 	}
-	// 本轮补入新输入时作废已提交结果，由下一轮重新提交。
-	if e.groupReply != nil {
-		e.groupReply.clear()
-	}
 	if finished {
-		e.result.Outcome, e.result.Content, e.result.Mentions = outcome, candidate, mentions
+		e.result.Content = candidate
 	}
 	return nil
 }

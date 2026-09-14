@@ -85,10 +85,9 @@ type RunRequest struct {
 	KnowledgeSearch       KnowledgeSearch
 	CustomerHistorySearch CustomerHistorySearch
 	ReadAttachment        AttachmentContent
-	MCPServers            []MCPServer       // 本次运行配置版本绑定的远程 MCP 服务。
-	GroupReply            *GroupReplyConfig // 非空表示本次运行以结构化群聊结果结束。
-	MaxIterations         int               // 单轮模型与工具迭代上限，零值使用默认值。
-	MaxTurns              int               // 吸收新输入的轮次上限，零值不限制，由运行 context 控制生命周期。
+	MCPServers            []MCPServer // 本次运行配置版本绑定的远程 MCP 服务。
+	MaxIterations         int         // 单轮模型与工具迭代上限，零值使用默认值。
+	MaxTurns              int         // 吸收新输入的轮次上限，零值不限制，由运行 context 控制生命周期。
 	StreamID              string
 	Attempt               int
 	OnProgress            func(Progress)
@@ -103,21 +102,11 @@ type Usage struct {
 
 // RunResult 定义稳定 Agent 回复及其输入边界。
 type RunResult struct {
-	Outcome  RunOutcome
-	Content  string
-	Mentions []string
-	EndSeq   int64
-	Usage    Usage
-	Blocks   []Block
+	Content string
+	EndSeq  int64
+	Usage   Usage
+	Blocks  []Block
 }
-
-// RunOutcome 定义一次运行的公开发言形式。
-type RunOutcome string
-
-const (
-	RunOutcomeReply  RunOutcome = "reply"
-	RunOutcomeSilent RunOutcome = "silent"
-)
 
 // Runtime 执行一次可吸收后续输入的 Agent Run。
 type Runtime interface {

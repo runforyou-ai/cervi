@@ -301,6 +301,7 @@
   "field.organization_name_required": "Enter the company name.",
   "field.organization_name_too_long": "The company name cannot exceed 32 characters.",
   "field.display_name_required": "Enter your name.",
+  "field.display_name_invalid": "Names can only contain letters, numbers, spaces, and · - _ . characters.",
   "field.agent_name_required": "Enter an AI employee name.",
   "field.agent_execution_invalid": "Select a valid AI employee execution setting.",
   "field.agent_mcp_server_invalid": "A selected MCP service does not exist or has been deleted. Please select again.",
