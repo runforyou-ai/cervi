@@ -23,6 +23,7 @@ import { useKnowledgeBaseContext } from "@/features/knowledge-base/knowledge-bas
 import { KnowledgeQATable } from "@/features/knowledge-base/knowledge-qa-table"
 import { KnowledgeQADeleteDialog } from "@/features/knowledge-base/knowledge-qa-delete-dialog"
 import { KnowledgeQAFeedback } from "@/features/knowledge-base/knowledge-qa-feedback"
+import { KnowledgeRetrievalSheet } from "@/features/knowledge-base/knowledge-retrieval-sheet"
 
 /** 按分组切换列表实例，隔离删除对话框和滚动恢复状态。 */
 export function KnowledgeQAListPage() {
@@ -60,7 +61,16 @@ function KnowledgeQAGroupList({
   const list = useResource(
     resourceKeys.knowledgeQAEntries(knowledgeBaseId, parameters),
     (signal) => listKnowledgeQAEntries(knowledgeBaseId, parameters, signal),
-    { staleTime: 0, keepPreviousData: true },
+    {
+      staleTime: 0,
+      keepPreviousData: true,
+      refetchInterval: (data) =>
+        data?.entries.some(
+          (entry) => entry.status === "queued" || entry.status === "running",
+        )
+          ? 2000
+          : false,
+    },
   )
   const groups =
     base.data?.groups.flatMap((group) => [group, ...group.children]) ?? []
@@ -71,6 +81,8 @@ function KnowledgeQAGroupList({
   const scrollContainer = useRef<HTMLDivElement>(null)
   const restoredKey = useRef("")
   const [deleting, setDeleting] = useState<KnowledgeQASummaryData | null>(null)
+  const [retrievalOpen, setRetrievalOpen] = useState(false)
+  const retrievalTrigger = useRef<HTMLButtonElement>(null)
   const totalPages = Math.max(1, Math.ceil((list.data?.page.total ?? 0) / 20))
 
   // 数据就绪后恢复对应分组和筛选条件的滚动位置。
@@ -110,11 +122,21 @@ function KnowledgeQAGroupList({
         }
       >
         {list.data && !list.error ? (
-          <Button size="sm" asChild>
-            <Link to={`${listPath}/new${location.search}`}>
-              {t("qa.create")}
-            </Link>
-          </Button>
+          <>
+            <Button
+              ref={retrievalTrigger}
+              variant="outline"
+              size="sm"
+              onClick={() => setRetrievalOpen(true)}
+            >
+              {t("retrieval.action")}
+            </Button>
+            <Button size="sm" asChild>
+              <Link to={`${listPath}/new${location.search}`}>
+                {t("qa.create")}
+              </Link>
+            </Button>
+          </>
         ) : null}
       </PageHeader>
       <ListToolbar>
@@ -148,6 +170,7 @@ function KnowledgeQAGroupList({
           />
         ) : (
           <KnowledgeQATable
+            knowledgeBaseId={knowledgeBaseId}
             data={list.data}
             loading={list.isPlaceholderData || list.refreshing}
             listPath={listPath}
@@ -164,6 +187,12 @@ function KnowledgeQAGroupList({
         knowledgeBaseId={knowledgeBaseId}
         entry={deleting}
         onClose={() => setDeleting(null)}
+      />
+      <KnowledgeRetrievalSheet
+        open={retrievalOpen}
+        onOpenChange={setRetrievalOpen}
+        knowledgeBaseId={knowledgeBaseId}
+        triggerRef={retrievalTrigger}
       />
     </>
   )

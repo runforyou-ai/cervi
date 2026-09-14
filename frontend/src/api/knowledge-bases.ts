@@ -14,6 +14,7 @@ import {
   GetKnowledgeQAEntry,
   ListKnowledgeQAEntries,
   DeleteKnowledgeQAEntry,
+  RetryKnowledgeQAEntry,
   CreateKnowledgeBase,
   CreateKnowledgeGroup,
   DeleteKnowledgeBase,
@@ -138,11 +139,26 @@ export function listKnowledgeBases() {
   return listKnowledgeBasesBound() as Promise<KnowledgeBaseListData>
 }
 
+export type KnowledgeIndexStatusId = Exclude<
+  KnowledgeIndexStatus,
+  KnowledgeIndexStatus.$zero
+>
+
 export type KnowledgeQAEntryData = NonNullArrays<KnowledgeQAEntry>
 
-export type KnowledgeQASummaryData = NonNullArrays<KnowledgeQASummary>
+export type KnowledgeQASummaryData = Omit<
+  NonNullArrays<KnowledgeQASummary>,
+  "status"
+> & {
+  status: KnowledgeIndexStatusId
+}
 
-export type KnowledgeQAListData = NonNullArrays<KnowledgeQAList>
+export type KnowledgeQAListData = Omit<
+  NonNullArrays<KnowledgeQAList>,
+  "entries"
+> & {
+  entries: KnowledgeQASummaryData[]
+}
 
 const getKnowledgeQAEntryBound = bind(GetKnowledgeQAEntry)
 const createKnowledgeQAEntryBound = bind(CreateKnowledgeQAEntry)
@@ -155,7 +171,11 @@ export function listKnowledgeQAEntries(
   input: KnowledgeQAListInput,
   signal?: AbortSignal,
 ) {
-  return listKnowledgeQAEntriesBound(knowledgeBaseId, input, signal)
+  return listKnowledgeQAEntriesBound(
+    knowledgeBaseId,
+    input,
+    signal,
+  ) as Promise<KnowledgeQAListData>
 }
 
 /** 读取完整问答。 */
@@ -187,10 +207,9 @@ export function updateKnowledgeQAEntry(
 /** 删除完整问答。 */
 export const deleteKnowledgeQAEntry = bind(DeleteKnowledgeQAEntry)
 
-export type KnowledgeIndexStatusId = Exclude<
-  KnowledgeIndexStatus,
-  KnowledgeIndexStatus.$zero
->
+/** 按当前配置重新索引问答。 */
+export const retryKnowledgeQAEntry = bind(RetryKnowledgeQAEntry)
+
 export type KnowledgeDocumentData = Omit<
   NonNullArrays<KnowledgeDocument>,
   "status"
