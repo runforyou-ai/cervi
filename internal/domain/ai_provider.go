@@ -4,9 +4,15 @@ package domain
 type AIProviderBrand string
 
 const (
-	AIProviderBrandDeepSeek AIProviderBrand = "deepseek"
-	AIProviderBrandAlibaba  AIProviderBrand = "alibaba"
-	AIProviderBrandOpenAI   AIProviderBrand = "openai"
+	AIProviderBrandDeepSeek   AIProviderBrand = "deepseek"
+	AIProviderBrandAlibaba    AIProviderBrand = "alibaba"
+	AIProviderBrandOpenAI     AIProviderBrand = "openai"
+	AIProviderBrandMoonshot   AIProviderBrand = "moonshot"
+	AIProviderBrandZhipu      AIProviderBrand = "zhipu"
+	AIProviderBrandVolcengine AIProviderBrand = "volcengine"
+	AIProviderBrandMiniMax    AIProviderBrand = "minimax"
+	AIProviderBrandXAI        AIProviderBrand = "xai"
+	AIProviderBrandMistral    AIProviderBrand = "mistral"
 )
 
 // AIModelType 定义 AI 模型用途。

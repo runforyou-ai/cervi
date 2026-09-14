@@ -4,7 +4,6 @@ package integrationtest
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"fmt"
 	"io"
@@ -150,7 +149,7 @@ func TestKnowledgeProcessingRetryAndPublication(t *testing.T) {
 	if probe.credential.BaseURL != "https://models.test/v1" || probe.credential.APIKey != "test-key" {
 		t.Fatalf("credential=%+v", probe.credential)
 	}
-	stored, err := db.NewSelect().TableExpr("public.knowledge_segments").Where("meta->>'document_id' = ? AND embedding_dimension = 1024 AND embedding IS NOT NULL", documentID).Count(ctx)
+	stored, err := db.NewSelect().TableExpr("public.knowledge_segments").Where("document_id = ? AND embedding_dimension = 1024 AND embedding IS NOT NULL", documentID).Count(ctx)
 	if err != nil || stored != 1 {
 		t.Fatalf("stored=%d %v", stored, err)
 	}
@@ -160,7 +159,7 @@ func TestKnowledgeProcessingRetryAndPublication(t *testing.T) {
 	if err := knowledgeaction.NewDeleteDocumentAction(db).Execute(ctx, installed.Identity, base.ID, documentID); err != nil {
 		t.Fatal(err)
 	}
-	count, err = db.NewSelect().TableExpr("public.knowledge_segments").Where("meta->>'document_id' = ?", documentID).Count(ctx)
+	count, err = db.NewSelect().TableExpr("public.knowledge_segments").Where("document_id = ?", documentID).Count(ctx)
 	if err != nil || count != 0 {
 		t.Fatalf("remaining=%d %v", count, err)
 	}
@@ -226,7 +225,7 @@ func TestKnowledgeRetryAllStates(t *testing.T) {
 	if err := worker.FinalizeFailure(ctx, input, worker.Execute(ctx, input)); err != nil {
 		t.Fatal(err)
 	}
-	count, err := db.NewSelect().TableExpr("public.knowledge_segments").Where("meta->>'document_id' = ? AND meta->>'batch_id' = ?", document.ID, published).Count(ctx)
+	count, err := db.NewSelect().TableExpr("public.knowledge_segments").Where("document_id = ? AND segment_batch_id = ?", document.ID, published).Count(ctx)
 	if err != nil || count != 1 {
 		t.Fatalf("published=%d %v", count, err)
 	}
@@ -241,7 +240,7 @@ func TestKnowledgeRetryAllStates(t *testing.T) {
 	if err := worker.Execute(ctx, input); err != nil {
 		t.Fatal(err)
 	}
-	count, err = db.NewSelect().TableExpr("public.knowledge_segments").Where("meta->>'document_id' = ? AND meta->>'batch_id' = ?", document.ID, published).Count(ctx)
+	count, err = db.NewSelect().TableExpr("public.knowledge_segments").Where("document_id = ? AND segment_batch_id = ?", document.ID, published).Count(ctx)
 	if err != nil || count != 0 {
 		t.Fatalf("old batch=%d %v", count, err)
 	}
@@ -299,15 +298,8 @@ func insertSegments(t *testing.T, db *bun.DB, organizationID, baseID, documentID
 	ids := make([]string, 0, count)
 	for position := 1; position <= count; position++ {
 		id := uuid.NewV7().String()
-		fields := map[string]any{
-			"organization_id": organizationID, "knowledge_base_id": baseID, "document_id": documentID, "batch_id": batchID,
-			"position": position, "character_count": 4,
-		}
-		meta, err := json.Marshal(fields)
-		if err != nil {
-			t.Fatal(err)
-		}
-		_, err = db.ExecContext(context.Background(), "INSERT INTO public.knowledge_segments(id,content,meta) VALUES (?, ?, ?::jsonb)", id, fmt.Sprintf("第%d段正文", position), string(meta))
+		_, err := db.ExecContext(context.Background(), "INSERT INTO public.knowledge_segments(id, organization_id, knowledge_base_id, document_id, segment_batch_id, position, character_count, content) VALUES (?, ?, ?, ?, ?, ?, 4, ?)",
+			id, organizationID, baseID, documentID, batchID, position, fmt.Sprintf("第%d段正文", position))
 		if err != nil {
 			t.Fatal(err)
 		}

@@ -16,12 +16,10 @@ import {
   isApiError,
   listCustomerServiceAssignees,
   listInboxChannels,
-  markConversationRead,
   sessionPath,
   type AgentInboxConversationData,
   type DirectInboxConversationData,
   type GroupInboxConversationData,
-  type InboxConversation,
   type MemberOption,
 } from "@/api"
 import { LoadingIndicator } from "@/components/loading-indicator"
@@ -250,15 +248,6 @@ export function InboxPage({
     search.enter(conversationID)
   }
 
-  /** 不打开会话并把列表项推进到当前最后消息。 */
-  async function markConversationAsRead(conversation: InboxConversation) {
-    if (!conversation.lastMessageId) return
-    await markConversationRead(conversation.id, {
-      lastReadMessageId: conversation.lastMessageId,
-      clearUnreadMark: true,
-    })
-  }
-
   /** 新建后先读取权威摘要，再将草稿连续切换为正式会话。 */
   async function showStartedConversation(conversation: InternalInboxConversationData) {
     const generation = navigationGeneration.current
@@ -397,7 +386,6 @@ export function InboxPage({
               onMenuChange={listViewport.setMenu}
               selectedId={selectedConversation?.id}
               onSelect={selectConversation}
-              onMarkRead={markConversationAsRead}
             />
           </InboxListPanel>
         )}

@@ -13,6 +13,8 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	"github.com/runforyou-ai/cervi/internal/integration/documentconvert"
+	"github.com/runforyou-ai/cervi/internal/integration/embedding"
+	"github.com/runforyou-ai/cervi/internal/integration/rerank"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
@@ -38,6 +40,7 @@ type knowledgeOps struct {
 	createKnowledgeGroup *knowledgebaseaction.CreateKnowledgeGroupAction
 	updateKnowledgeGroup *knowledgebaseaction.UpdateKnowledgeGroupAction
 	deleteKnowledgeGroup *knowledgebaseaction.DeleteKnowledgeGroupAction
+	retrieval            *knowledgebaseaction.RetrievalService
 }
 
 // newKnowledgeOps 创建知识库的业务实现依赖。
@@ -61,7 +64,25 @@ func newKnowledgeOps(db *bun.DB, taskEnqueuer servertask.TxEnqueuer, documentQue
 		createKnowledgeGroup: knowledgebaseaction.NewCreateKnowledgeGroupAction(db),
 		updateKnowledgeGroup: knowledgebaseaction.NewUpdateKnowledgeGroupAction(db),
 		deleteKnowledgeGroup: knowledgebaseaction.NewDeleteKnowledgeGroupAction(db),
+		retrieval:            knowledgebaseaction.NewRetrievalService(db, embedding.NewClient(), rerank.NewClient()),
 	}
+}
+
+// RetrieveKnowledgeBase 在指定知识库中执行检索测试。
+func (o *directOperations) RetrieveKnowledgeBase(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, knowledgeBaseID string, input KnowledgeRetrievalInput) (KnowledgeRetrievalResult, error) {
+	records, err := o.retrieval.Retrieve(ctx, identity, knowledgeBaseID, input.Query)
+	if err != nil {
+		return KnowledgeRetrievalResult{}, o.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeRetrievalFailed, identity.Organization.ID, knowledgeBaseID)
+	}
+	result := KnowledgeRetrievalResult{Records: make([]KnowledgeRetrievalRecord, 0, len(records))}
+	for _, record := range records {
+		result.Records = append(result.Records, KnowledgeRetrievalRecord{
+			DocumentID: record.DocumentID, DocumentName: record.DocumentName,
+			SegmentID: record.SegmentID, SegmentBatchID: record.SegmentBatchID, Position: record.Position,
+			Content: record.Content, Score: record.Score,
+		})
+	}
+	return result, nil
 }
 
 // ListKnowledgeBases 返回当前企业的知识库列表。
@@ -180,6 +201,20 @@ func (o *directOperations) knowledgeBaseError(ctx context.Context, meta RequestM
 		return NotFoundError(meta, cervii18n.ErrorFileNotFound)
 	}
 
+	if errors.Is(err, knowledgebaseaction.ErrRetrievalQueryInvalid) {
+		return InvalidError(meta, cervii18n.ErrorValidationFailed, map[string]cervii18n.Key{"query": cervii18n.FieldKnowledgeRetrievalQueryInvalid})
+	}
+	if errors.Is(err, knowledgebaseaction.ErrRetrievalNotReady) {
+		return ConflictError(meta, cervii18n.ErrorKnowledgeRetrievalNotReady, "retrieval_not_ready")
+	}
+	if embeddingError, ok := errors.AsType[*embedding.Error](err); ok {
+		slog.Warn("知识库检索向量模型调用失败", "organization_id", organizationID, "knowledge_base_id", knowledgeBaseID, "code", embeddingError.Code)
+		return UnavailableError(meta, cervii18n.ErrorKnowledgeEmbeddingUnavailable, nil)
+	}
+	if rerankError, ok := errors.AsType[*rerank.Error](err); ok {
+		slog.Warn("知识库检索重排模型调用失败", "organization_id", organizationID, "knowledge_base_id", knowledgeBaseID, "code", rerankError.Code)
+		return UnavailableError(meta, cervii18n.ErrorKnowledgeRerankUnavailable, nil)
+	}
 	if errors.Is(err, knowledgebaseaction.ErrSegmentsNotReady) {
 		return ConflictError(meta, cervii18n.ErrorKnowledgeSegmentsNotReady, "segments_not_ready")
 	}

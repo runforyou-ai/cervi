@@ -76,9 +76,9 @@ func (q *DocumentQuery) Segments(ctx context.Context, identity *servermodels.Ide
 			page = 1
 		}
 		scope := []any{identity.Organization.ID, baseID, documentID, document.SegmentBatchID}
-		condition := "meta->>'organization_id' = ? AND meta->>'knowledge_base_id' = ? AND meta->>'document_id' = ? AND meta->>'batch_id' = ?"
+		condition := "organization_id = ? AND knowledge_base_id = ? AND document_id = ? AND segment_batch_id = ?"
 		if input.AnchorSegmentID != "" {
-			err := tx.NewSelect().TableExpr("public.knowledge_segments").ColumnExpr("(meta->>'position')::integer").
+			err := tx.NewSelect().TableExpr("public.knowledge_segments").ColumnExpr("position").
 				Where(condition, scope...).Where("id = ?", input.AnchorSegmentID).Scan(ctx, &position)
 			if errors.Is(err, sql.ErrNoRows) {
 				return ErrSegmentStale
@@ -88,7 +88,7 @@ func (q *DocumentQuery) Segments(ctx context.Context, identity *servermodels.Ide
 			}
 			// 按锚点之前的实际分段数量计算所在页。
 			preceding, err := tx.NewSelect().TableExpr("public.knowledge_segments").
-				Where(condition, scope...).Where("(meta->>'position')::integer < ?", position).Count(ctx)
+				Where(condition, scope...).Where("position < ?", position).Count(ctx)
 			if err != nil {
 				return err
 			}
@@ -96,10 +96,8 @@ func (q *DocumentQuery) Segments(ctx context.Context, identity *servermodels.Ide
 		}
 		segments := make([]Segment, 0, input.PageSize)
 		err = tx.NewSelect().TableExpr("public.knowledge_segments").
-			ColumnExpr("id, content").
-			ColumnExpr("(meta->>'position')::integer AS position").
-			ColumnExpr("(meta->>'character_count')::integer AS character_count").
-			Where(condition, scope...).OrderExpr("(meta->>'position')::integer, id").
+			ColumnExpr("id, content, position, character_count").
+			Where(condition, scope...).OrderExpr("position, id").
 			Limit(input.PageSize).Offset((page-1)*input.PageSize).Scan(ctx, &segments)
 		if err != nil {
 			return err

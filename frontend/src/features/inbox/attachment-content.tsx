@@ -16,7 +16,7 @@ export function AttachmentContent({
   detail,
   footer,
   imageFooterClassName,
-  imageClassName,
+  inverted = false,
   onOpen,
   onImageLoad,
 }: {
@@ -29,14 +29,14 @@ export function AttachmentContent({
   detail?: ReactNode
   footer?: ReactNode
   imageFooterClassName?: string
-  imageClassName?: string
+  inverted?: boolean
   onOpen?: () => void
   onImageLoad?: () => void
 }) {
   if (imageWidth > 0 && imageHeight > 0) {
     return (
       <div
-        className={cn("relative max-w-full overflow-hidden rounded-xl ring-1 ring-border", imageClassName)}
+        className="relative max-w-full overflow-hidden rounded-xl ring-1 ring-border"
         style={{
           width: Math.min(imageWidth, 320, (320 * imageWidth) / imageHeight),
           aspectRatio: `${imageWidth} / ${imageHeight}`,
@@ -72,7 +72,12 @@ export function AttachmentContent({
   }
   return (
     <div className="flex min-w-0 items-center gap-3 py-1">
-      <div className="relative flex size-12 shrink-0 items-center justify-center rounded-full bg-primary text-primary-foreground">
+      <div
+        className={cn(
+          "relative flex size-12 shrink-0 items-center justify-center rounded-full",
+          inverted ? "bg-primary-foreground/20 text-primary-foreground" : "bg-primary/15 text-primary",
+        )}
+      >
         {action ?? (
           <button
             type="button"
@@ -96,7 +101,12 @@ export function AttachmentContent({
         >
           <AttachmentName name={name} />
         </button>
-        <div className="grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2 text-xs text-muted-foreground">
+        <div
+          className={cn(
+            "grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2 text-xs",
+            inverted ? "text-primary-foreground/75" : "text-muted-foreground",
+          )}
+        >
           <span className="truncate tabular-nums">
             {detail ?? formatFileSize(byteSize)}
           </span>

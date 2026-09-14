@@ -67,3 +67,24 @@ type KnowledgeBase struct {
 type KnowledgeBaseList struct {
 	KnowledgeBases []KnowledgeBase `json:"knowledgeBases"`
 }
+
+// KnowledgeRetrievalInput 定义检索测试的查询内容。
+type KnowledgeRetrievalInput struct {
+	Query string `json:"query"`
+}
+
+// KnowledgeRetrievalRecord 定义检索测试命中的分段和重排得分。
+type KnowledgeRetrievalRecord struct {
+	DocumentID     string  `json:"documentId"`
+	DocumentName   string  `json:"documentName"`
+	SegmentID      string  `json:"segmentId"`
+	SegmentBatchID string  `json:"segmentBatchId"`
+	Position       int     `json:"position"`
+	Content        string  `json:"content"`
+	Score          float64 `json:"score"`
+}
+
+// KnowledgeRetrievalResult 定义检索测试结果。
+type KnowledgeRetrievalResult struct {
+	Records []KnowledgeRetrievalRecord `json:"records"`
+}

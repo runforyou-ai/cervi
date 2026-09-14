@@ -101,6 +101,7 @@ export function MobileIndividualConversationPage({
           conversationType={conversationType}
           peerIdentityID={conversation.direct?.peerIdentityId ?? ""}
           disabledReason={disabledReason}
+          lastReadMessageID={conversation.lastReadMessageId}
         />
       )}
     </section>

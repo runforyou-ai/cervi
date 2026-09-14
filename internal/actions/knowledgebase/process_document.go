@@ -5,12 +5,9 @@ package knowledgebase
 import (
 	"context"
 	"database/sql"
-	"encoding/json"
 	"errors"
 	"io"
 	"log/slog"
-	"strconv"
-	"strings"
 	"time"
 
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -21,11 +18,7 @@ import (
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
-	"uuid"
 )
-
-// segmentInsertSize 是单条插入语句写入的分段数量，受 PostgreSQL 绑定参数上限约束。
-const segmentInsertSize = 500
 
 type documentConverter interface {
 	Convert(context.Context, string, io.Reader) (string, error)
@@ -140,7 +133,7 @@ func (a *ProcessDocumentAction) Execute(ctx context.Context, input ProcessInput)
 		if document.ProcessingID != input.ProcessingID || !document.Status.IsProcessing() {
 			return nil
 		}
-		if _, err := tx.NewDelete().TableExpr("public.knowledge_segments").Where("meta->>'document_id' = ?", input.DocumentID).Exec(ctx); err != nil {
+		if err := deleteDocumentSegments(ctx, tx, input.DocumentID); err != nil {
 			return err
 		}
 		if err := insertSegments(ctx, tx, input, segments, vectors); err != nil {
@@ -174,42 +167,6 @@ func (a *ProcessDocumentAction) setStage(ctx context.Context, input ProcessInput
 	}
 	count, err := result.RowsAffected()
 	return count > 0, err
-}
-
-// insertSegments 按任务标识和文档内序号写入本批次分段及其向量。
-func insertSegments(ctx context.Context, tx bun.Tx, input ProcessInput, segments []textsplit.Segment, vectors [][]float32) error {
-	namespace, err := uuid.Parse(input.ProcessingID)
-	if err != nil {
-		return err
-	}
-	for start := 0; start < len(segments); start += segmentInsertSize {
-		batch := segments[start:min(start+segmentInsertSize, len(segments))]
-		placeholders := make([]string, 0, len(batch))
-		arguments := make([]any, 0, len(batch)*5)
-		for offset, segment := range batch {
-			vector := make([]string, 0, input.EmbeddingDimension)
-			for _, value := range vectors[start+offset] {
-				vector = append(vector, strconv.FormatFloat(float64(value), 'f', -1, 32))
-			}
-			meta := map[string]any{
-				"organization_id": input.OrganizationID, "knowledge_base_id": input.KnowledgeBaseID,
-				"document_id": input.DocumentID, "batch_id": input.ProcessingID,
-				"position": segment.Position, "character_count": segment.CharacterCount,
-			}
-			encoded, err := json.Marshal(meta)
-			if err != nil {
-				return err
-			}
-			placeholders = append(placeholders, "(?, ?, ?::jsonb, ?::vector, ?)")
-			arguments = append(arguments, common.NewUUIDv5(namespace, strconv.Itoa(segment.Position)).String(),
-				segment.Content, string(encoded), "["+strings.Join(vector, ",")+"]", input.EmbeddingDimension)
-		}
-		query := "INSERT INTO public.knowledge_segments (id, content, meta, embedding, embedding_dimension) VALUES " + strings.Join(placeholders, ", ")
-		if _, err := tx.ExecContext(ctx, query, arguments...); err != nil {
-			return err
-		}
-	}
-	return nil
 }
 
 // FinalizeFailure 保存当前文档任务的失败状态和原因码。

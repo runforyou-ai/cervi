@@ -946,6 +946,16 @@ func (b *DirectBackend) ListKnowledgeDocumentSegments(ctx context.Context, meta 
 	return b.ops.ListKnowledgeDocumentSegments(ctx, meta, identity, knowledgeBaseID, documentID, input)
 }
 
+// RetrieveKnowledgeBase 在指定知识库中执行检索测试，返回混合召回与重排后的分段。
+func (b *DirectBackend) RetrieveKnowledgeBase(ctx context.Context, meta RequestMeta, knowledgeBaseID string, input KnowledgeRetrievalInput) (KnowledgeRetrievalResult, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero KnowledgeRetrievalResult
+		return zero, err
+	}
+	return b.ops.RetrieveKnowledgeBase(ctx, meta, identity, knowledgeBaseID, input)
+}
+
 // ListKnowledgeDocuments 返回当前分组的文档列表。
 func (b *DirectBackend) ListKnowledgeDocuments(ctx context.Context, meta RequestMeta, knowledgeBaseID string, input KnowledgeDocumentListInput) (KnowledgeDocumentList, error) {
 	identity, err := b.ops.authenticate(ctx, meta)

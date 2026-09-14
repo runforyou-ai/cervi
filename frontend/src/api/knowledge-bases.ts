@@ -1,6 +1,7 @@
 /** 企业知识库调用。 */
 import {
   RetryKnowledgeDocument,
+  RetrieveKnowledgeBase,
   ListKnowledgeDocumentSegments,
   ListKnowledgeDocuments,
   GetKnowledgeDocument,
@@ -42,7 +43,8 @@ import {
   type KnowledgeBaseList,
   type KnowledgeGroup,
   type KnowledgeGroupInput,
-
+  type KnowledgeRetrievalInput,
+  type KnowledgeRetrievalResult,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import { bind } from "@/api/client"
 import type { NonNullArrays } from "@/api/normalize"
@@ -271,4 +273,12 @@ const listKnowledgeDocumentSegmentsBound = bind(ListKnowledgeDocumentSegments)
 /** 读取固定批次的一页分段或锚点所在页。 */
 export function listKnowledgeDocumentSegments(baseId: string, documentId: string, input: KnowledgeDocumentSegmentInput, signal?: AbortSignal) {
   return listKnowledgeDocumentSegmentsBound(baseId, documentId, input, signal)
+}
+
+export type KnowledgeRetrievalResultData = NonNullArrays<KnowledgeRetrievalResult>
+const retrieveKnowledgeBaseBound = bind(RetrieveKnowledgeBase)
+
+/** 在指定知识库中执行检索测试。 */
+export function retrieveKnowledgeBase(baseId: string, input: KnowledgeRetrievalInput) {
+  return retrieveKnowledgeBaseBound(baseId, input) as Promise<KnowledgeRetrievalResultData>
 }

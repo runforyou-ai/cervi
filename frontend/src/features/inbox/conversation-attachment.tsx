@@ -24,6 +24,7 @@ export function ConversationAttachment({
   timeLabel,
   timeTitle,
   incoming,
+  bubbleClassName,
 }: {
   attachment: MessageAttachment
   body: string
@@ -33,6 +34,7 @@ export function ConversationAttachment({
   timeLabel: string
   timeTitle: string
   incoming: boolean
+  bubbleClassName: string
 }) {
   const { t } = useTranslation("inbox")
   const navigate = useNavigate()
@@ -83,7 +85,7 @@ export function ConversationAttachment({
 
   const control = ready ? null : (
     <div
-      className={`relative flex size-12 items-center justify-center rounded-full ${image ? "bg-black/45 text-white" : "text-primary-foreground"}`}
+      className={cn("relative flex size-12 items-center justify-center rounded-full", image && "bg-black/45 text-white")}
     >
       <svg
         viewBox="0 0 48 48"
@@ -146,12 +148,15 @@ export function ConversationAttachment({
     : failed
       ? failedLabel
       : `${formatFileSize(job?.bytes ?? 0)} / ${formatFileSize(attachment.byteSize)}`
+  const bubble = cn("rounded-2xl px-3 py-2", bubbleClassName)
   return (
     <div
+      // 图片不加气泡并按收发方向对齐，非图片附件整体使用文字气泡。
       className={cn(
-        "min-w-0 max-w-full text-foreground",
-        !image && "w-80 rounded-xl border border-border bg-muted px-3 py-2",
-        image && body && "w-80 rounded-xl border border-border bg-muted",
+        "min-w-0 max-w-full",
+        image
+          ? cn("flex flex-col gap-1 text-foreground", incoming ? "items-start" : "items-end")
+          : cn("w-80", bubble),
       )}
       data-attachment-status={ready ? "ready" : failed ? "failed" : "uploading"}
     >
@@ -164,7 +169,7 @@ export function ConversationAttachment({
         action={control}
         detail={detail}
         footer={body ? undefined : footer}
-        imageClassName={body ? "mx-auto rounded-b-none ring-0" : undefined}
+        inverted={!incoming}
         imageFooterClassName={
           ready
             ? "opacity-0 group-hover/message-row:opacity-100 group-focus-within/message-row:opacity-100"
@@ -176,23 +181,24 @@ export function ConversationAttachment({
         }}
       />
       {image && failed ? (
-        <p className="mt-1 text-xs text-muted-foreground">
+        <p className="text-xs text-muted-foreground">
           {failedLabel}
         </p>
       ) : null}
       {image && preview.error ? (
         <button
           type="button"
-          className="mt-1 text-xs text-muted-foreground"
+          className="text-xs text-muted-foreground"
           onClick={() => void preview.refresh()}
         >
           {t("attachmentPreviewRetry")}
         </button>
       ) : null}
       {body ? (
-        <div className={cn("space-y-1 pt-2", image && "px-3 pb-2")}>
-          <p className="whitespace-pre-wrap [overflow-wrap:anywhere]">{body}</p>
-          <div className="flex justify-end text-muted-foreground">{footer}</div>
+        // 图片正文单独成气泡，非图片正文留在附件气泡内，时间与正文同行。
+        <div className={cn("flex min-w-0 items-end gap-2", image ? cn("max-w-80", bubble) : "justify-between pt-2")}>
+          <p className="min-w-0 whitespace-pre-wrap [overflow-wrap:anywhere]">{body}</p>
+          <div className={cn("shrink-0 translate-y-0.5", incoming ? "text-muted-foreground" : "text-primary-foreground/75")}>{footer}</div>
         </div>
       ) : null}
     </div>

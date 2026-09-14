@@ -138,7 +138,7 @@ export function ConversationAttachmentUpload({
 
   /** 把文件所有权移交工作台队列，立即关闭选择框。 */
   function send(values: { description: string }) {
-    if (!queue || selectedRef.current.length === 0) return
+    if (!queue || selectingRef.current || selectedRef.current.length === 0) return
     // 说明只随最后一个附件发送，其余附件保持独立消息。
     queue.enqueue(
       selectedRef.current.map((item, index) => ({
@@ -274,8 +274,16 @@ export function ConversationAttachmentUpload({
                   className="min-h-0 max-h-[184px] resize-none leading-6"
                   onChange={(event) => {
                     void description.onChange(event)
-                    event.currentTarget.style.height = "auto"
-                    event.currentTarget.style.height = `${Math.min(event.currentTarget.scrollHeight, 184)}px`
+                    // 按内容高度加上下边框自适应，超过上限后滚动。
+                    const input = event.currentTarget
+                    input.style.height = "auto"
+                    input.style.height = `${Math.min(input.scrollHeight + input.offsetHeight - input.clientHeight, 184)}px`
+                  }}
+                  onKeyDown={(event) => {
+                    // Enter 发送，Shift+Enter 换行，输入法组字时不发送。
+                    if (event.key !== "Enter" || event.shiftKey || event.keyCode === 229 || event.nativeEvent.isComposing) return
+                    event.preventDefault()
+                    event.currentTarget.form?.requestSubmit()
                   }}
                 />
               </div>

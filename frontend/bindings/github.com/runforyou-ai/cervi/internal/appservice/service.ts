@@ -815,6 +815,13 @@ export function RestoreContact(meta: $models.RequestMeta, contactID: string): $C
 }
 
 /**
+ * RetrieveKnowledgeBase 在指定知识库中执行检索测试，返回混合召回与重排后的分段。
+ */
+export function RetrieveKnowledgeBase(meta: $models.RequestMeta, knowledgeBaseID: string, input: $models.KnowledgeRetrievalInput): $CancellablePromise<$models.KnowledgeRetrievalResult> {
+    return $Call.ByID(720738771, meta, knowledgeBaseID, input);
+}
+
+/**
  * RetryKnowledgeDocument 按当前配置重新处理文档。
  */
 export function RetryKnowledgeDocument(meta: $models.RequestMeta, knowledgeBaseID: string, documentID: string): $CancellablePromise<void> {

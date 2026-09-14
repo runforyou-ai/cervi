@@ -231,6 +231,20 @@ export function isGroupInboxConversation(
   )
 }
 
+/** 判断统一收件箱项是否为支持静音和手动未读的内部会话。 */
+export function isInternalInboxConversation(
+  conversation: InboxConversation,
+): conversation is
+  | AgentInboxConversationData
+  | DirectInboxConversationData
+  | GroupInboxConversationData {
+  return (
+    isAgentInboxConversation(conversation) ||
+    isDirectInboxConversation(conversation) ||
+    isGroupInboxConversation(conversation)
+  )
+}
+
 /** 读取成员统一收件箱会话列表。 */
 export async function loadInbox(
   query: Partial<LoadInboxInput> = {},

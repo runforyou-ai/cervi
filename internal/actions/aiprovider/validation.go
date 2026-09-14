@@ -88,9 +88,7 @@ func normalizeConnectionInput(input ConnectionInput) (ConnectionInput, map[strin
 	fields := make(map[string]ValidationCode)
 	input.APIKey = strings.TrimSpace(input.APIKey)
 	input.APIURL = strings.TrimSpace(input.APIURL)
-	if input.Brand != domain.AIProviderBrandDeepSeek &&
-		input.Brand != domain.AIProviderBrandAlibaba &&
-		input.Brand != domain.AIProviderBrandOpenAI {
+	if len(AvailableModels(input.Brand)) == 0 {
 		fields["brand"] = ValidationBrandInvalid
 	}
 	if input.APIKey == "" {

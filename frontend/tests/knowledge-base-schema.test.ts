@@ -7,10 +7,11 @@ const messages = {
   nameRequired: "nameRequired", nameTooLong: "nameTooLong", descriptionTooLong: "descriptionTooLong",
   embeddingModelRequired: "embeddingModelRequired", embeddingDimensionInvalid: "embeddingDimensionInvalid",
   chunkLengthInvalid: "chunkLengthInvalid", chunkOverlapInvalid: "chunkOverlapInvalid", retrievalCountInvalid: "retrievalCountInvalid",
+  rerankModelRequired: "rerankModelRequired",
 }
 const valid = {
   name: "知识库", description: "", embeddingModel: '["provider","embedding"]', embeddingDimension: "1024",
-  chunkLength: "512", chunkOverlap: "50", retrievalCount: "3", rerankModel: "",
+  chunkLength: "512", chunkOverlap: "50", retrievalCount: "3", rerankModel: '["provider","rerank"]',
 }
 
 test("文档库必填数值接收边界整数，拒绝空值、小数和越界值", () => {
@@ -32,11 +33,14 @@ test("文档库必填数值接收边界整数，拒绝空值、小数和越界�
     }
   }
   assert.equal(schema.safeParse({ ...valid, embeddingModel: "" }).success, false)
+  const missingRerank = schema.safeParse({ ...valid, rerankModel: "" })
+  assert.equal(missingRerank.success, false)
+  if (!missingRerank.success) assert.equal(missingRerank.error.issues[0].message, "rerankModelRequired")
 })
 
-test("问答库无需分段参数，重排模型允许选择和清空", () => {
+test("问答库无需分段参数，重排模型同样必填", () => {
   const schema = createKnowledgeBaseSchema(messages, true)
   const input = { ...valid, chunkLength: "", chunkOverlap: "" }
   assert.equal(schema.safeParse(input).success, true)
-  assert.equal(schema.safeParse({ ...input, rerankModel: '["provider","rerank"]' }).success, true)
+  assert.equal(schema.safeParse({ ...input, rerankModel: "" }).success, false)
 })

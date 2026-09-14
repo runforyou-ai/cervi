@@ -1,5 +1,5 @@
-/** 移动端统一会话摘要列表和内部聊天入口。 */
-import { PlusIcon } from "lucide-react"
+/** 移动端统一会话摘要列表、阅读状态菜单和内部聊天入口。 */
+import { BellOffIcon, PlusIcon } from "lucide-react"
 import { messagePreview } from "@/lib/message-preview"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
@@ -28,6 +28,11 @@ import {
   MobilePageState,
 } from "@/apps/mobile/mobile-page"
 import { ConversationAvatar } from "@/features/inbox/conversation-avatar"
+import {
+  ConversationListMenu,
+  useConversationListActions,
+} from "@/features/inbox/conversation-list-menu"
+import { ConversationUnreadBadge } from "@/features/inbox/conversation-unread-badge"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -67,12 +72,16 @@ function isMobileInboxConversation(
   )
 }
 
-/** 渲染会话摘要，内部聊天进入详情，客户会话保留只读摘要。 */
+/** 渲染会话摘要和未读角标，长按打开阅读状态菜单，客户会话保留只读摘要。 */
 function MobileConversationRow({
   conversation,
+  actions,
+  onMenuChange,
   onOpen,
 }: {
   conversation: MobileInboxConversation
+  actions: ReturnType<typeof useConversationListActions>
+  onMenuChange: (open: boolean) => void
   onOpen: (
     conversation:
       | DirectInboxConversationData
@@ -140,7 +149,10 @@ function MobileConversationRow({
 
   const content = (
     <>
-      <ConversationAvatar conversation={conversation} />
+      <span className="relative shrink-0">
+        <ConversationAvatar conversation={conversation} />
+        <ConversationUnreadBadge conversation={conversation} />
+      </span>
       <div className="min-w-0 flex-1 overflow-hidden">
         <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
           <div className="flex min-w-0 items-center gap-2">
@@ -162,12 +174,20 @@ function MobileConversationRow({
             </time>
           ) : null}
         </div>
-        <p
-          title={preview}
-          className="mt-0.5 w-full min-w-0 truncate text-sm text-muted-foreground"
-        >
-          {preview}
-        </p>
+        <div className="mt-0.5 flex min-w-0 items-center gap-2">
+          <p
+            title={preview}
+            className="min-w-0 flex-1 truncate text-sm text-muted-foreground"
+          >
+            {preview}
+          </p>
+          {internalConversation?.muted ? (
+            <BellOffIcon
+              className="size-3.5 shrink-0 text-muted-foreground"
+              aria-label={t("conversationMuted")}
+            />
+          ) : null}
+        </div>
         {customerConversation ? (
           <p className="mt-1 text-xs text-muted-foreground">
             {tMobile("inbox.customerSummaryOnly")}
@@ -197,18 +217,25 @@ function MobileConversationRow({
 
   return (
     <li data-inbox-id={conversation.id} className="border-b last:border-b-0">
-      {internalConversation ? (
-        <button
-          type="button"
-          className="flex w-full min-w-0 gap-3 px-4 py-3 text-left outline-none transition-colors active:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-          aria-label={name}
-          onClick={() => onOpen(internalConversation)}
-        >
-          {content}
-        </button>
-      ) : (
-        <div className="flex min-w-0 gap-3 px-4 py-3">{content}</div>
-      )}
+      <ConversationListMenu
+        conversation={conversation}
+        actions={actions}
+        itemClassName="min-h-11"
+        onOpenChange={onMenuChange}
+      >
+        {internalConversation ? (
+          <button
+            type="button"
+            className="flex w-full min-w-0 gap-3 px-4 py-3 text-left outline-none transition-colors select-none active:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+            aria-label={name}
+            onClick={() => onOpen(internalConversation)}
+          >
+            {content}
+          </button>
+        ) : (
+          <div className="flex min-w-0 gap-3 px-4 py-3 select-none">{content}</div>
+        )}
+      </ConversationListMenu>
     </li>
   )
 }
@@ -230,6 +257,7 @@ function MobileInboxList({ query, changeQuery }: ReturnType<typeof useMobileInbo
   const { inboxWindows } = useMobileNavigation()
   const viewport = useInboxListViewport()
   const list = useInboxList(query, viewport, { identity, active: pollingActive, history: inboxWindows })
+  const actions = useConversationListActions()
   useMinuteTick()
   const conversations = list.conversations.filter(isMobileInboxConversation)
   const initial = list.revision === 0
@@ -263,7 +291,11 @@ function MobileInboxList({ query, changeQuery }: ReturnType<typeof useMobileInbo
           </DropdownMenu>
         }
       />
-      <MobileInboxScopes scope={query.scope} onChange={changeQuery} />
+      <MobileInboxScopes
+        scope={query.scope}
+        attentionUnreadCount={list.attentionUnreadCount}
+        onChange={changeQuery}
+      />
       <div className="flex h-11 shrink-0 items-center border-b">
         <MobileInboxFilter query={query} onChange={changeQuery} onOpenChange={viewport.setMenu} />
       </div>
@@ -291,6 +323,8 @@ function MobileInboxList({ query, changeQuery }: ReturnType<typeof useMobileInbo
               <MobileConversationRow
                 key={conversation.id}
                 conversation={conversation}
+                actions={actions}
+                onMenuChange={viewport.setMenu}
                 onOpen={(conversation) => {
                   const type = isAgentInboxConversation(conversation)
                     ? "agent"

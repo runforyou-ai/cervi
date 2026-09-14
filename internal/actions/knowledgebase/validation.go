@@ -73,8 +73,7 @@ func normalizeInput(input Input) (Input, map[string]common.FieldCode) {
 	if input.RetrievalCount < 1 || input.RetrievalCount > 20 {
 		fields["retrievalCount"] = ValidationRetrievalCountInvalid
 	}
-	if (input.RerankProviderID != "" || input.RerankModelIdentifier != "") &&
-		(!common.ValidUUID(input.RerankProviderID) || input.RerankModelIdentifier == "") {
+	if !common.ValidUUID(input.RerankProviderID) || input.RerankModelIdentifier == "" {
 		fields["rerankModelIdentifier"] = ValidationRerankModelInvalid
 	}
 	return input, fields

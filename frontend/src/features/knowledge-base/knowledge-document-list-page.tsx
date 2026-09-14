@@ -6,6 +6,7 @@ import { getKnowledgeBase, listKnowledgeDocuments } from "@/api"
 import { ListToolbar, ListToolbarSearch, ListToolbarReset } from "@/components/list-toolbar"
 import { PageHeader } from "@/components/page-header"
 import { PageContent } from "@/components/page-content"
+import { Button } from "@/components/ui/button"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 import { useListSearchParams } from "@/hooks/use-list-search-params"
@@ -14,6 +15,7 @@ import { useKnowledgeBaseContext } from "./knowledge-base-context"
 import { KnowledgeDocumentUpload } from "./knowledge-document-upload"
 import { KnowledgeDocumentActions, type DocumentAction } from "./knowledge-document-actions"
 import { KnowledgeDocumentTable } from "./knowledge-document-table"
+import { KnowledgeRetrievalSheet } from "./knowledge-retrieval-sheet"
 
 /** 按分组隔离上传批次、弹窗和滚动恢复状态。 */
 export function KnowledgeDocumentListPage() {
@@ -43,6 +45,8 @@ function KnowledgeDocumentGroupList({ baseId, groupId }: { baseId: string; group
   const container = useRef<HTMLDivElement>(null)
   const restored = useRef("")
   const [action, setAction] = useState<DocumentAction | null>(null)
+  const [retrievalOpen, setRetrievalOpen] = useState(false)
+  const retrievalTrigger = useRef<HTMLButtonElement>(null)
   const pages = Math.max(1, Math.ceil((list.data?.page.total ?? 0) / 20))
   useEffect(() => {
     if (list.data && !list.isPlaceholderData && page > pages)
@@ -63,7 +67,14 @@ function KnowledgeDocumentGroupList({ baseId, groupId }: { baseId: string; group
           t("documents.title")
         }
       >
-        {list.data && !list.error && <KnowledgeDocumentUpload baseId={baseId} groupId={groupId} />}
+        {list.data && !list.error && (
+          <>
+            <Button ref={retrievalTrigger} variant="outline" size="sm" onClick={() => setRetrievalOpen(true)}>
+              {t("retrieval.action")}
+            </Button>
+            <KnowledgeDocumentUpload baseId={baseId} groupId={groupId} />
+          </>
+        )}
       </PageHeader>
       <ListToolbar>
         <ListToolbarSearch
@@ -109,6 +120,7 @@ function KnowledgeDocumentGroupList({ baseId, groupId }: { baseId: string; group
       {action && base.data && (
         <KnowledgeDocumentActions base={base.data} action={action} onClose={() => setAction(null)} />
       )}
+      <KnowledgeRetrievalSheet open={retrievalOpen} onOpenChange={setRetrievalOpen} knowledgeBaseId={baseId} triggerRef={retrievalTrigger} />
     </>
   )
 }

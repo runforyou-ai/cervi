@@ -24,6 +24,7 @@ export function createKnowledgeBaseSchema(
     chunkLengthInvalid: string
     chunkOverlapInvalid: string
     retrievalCountInvalid: string
+    rerankModelRequired: string
   },
   isQA: boolean,
 ) {
@@ -35,7 +36,7 @@ export function createKnowledgeBaseSchema(
     chunkLength: isQA ? z.string() : integerField(messages.chunkLengthInvalid, 256, 2048),
     chunkOverlap: isQA ? z.string() : integerField(messages.chunkOverlapInvalid, 0, 200),
     retrievalCount: integerField(messages.retrievalCountInvalid, 1, 20),
-    rerankModel: z.string(),
+    rerankModel: z.string().min(1, messages.rerankModelRequired),
   })
 }
 

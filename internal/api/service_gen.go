@@ -109,6 +109,7 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.POST("/teams/:teamID/members/remove", s.removeTeamMembers)
 	router.POST("/knowledge-bases/:knowledgeBaseID/documents/:documentID/retry", s.retryKnowledgeDocument)
 	router.GET("/knowledge-bases/:knowledgeBaseID/documents/:documentID/segments", s.listKnowledgeDocumentSegments)
+	router.POST("/knowledge-bases/:knowledgeBaseID/retrieval", s.retrieveKnowledgeBase)
 	router.GET("/knowledge-bases/:knowledgeBaseID/documents", s.listKnowledgeDocuments)
 	router.GET("/knowledge-bases/:knowledgeBaseID/documents/:documentID", s.getKnowledgeDocument)
 	router.POST("/knowledge-bases/:knowledgeBaseID/documents", s.createKnowledgeDocuments)
@@ -951,6 +952,16 @@ func (s *Service) listKnowledgeDocumentSegments(c *gin.Context) {
 		return
 	}
 	output, err := s.application.ListKnowledgeDocumentSegments(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), c.Param("documentID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// retrieveKnowledgeBase 在指定知识库中执行检索测试，返回混合召回与重排后的分段。
+func (s *Service) retrieveKnowledgeBase(c *gin.Context) {
+	var input appservice.KnowledgeRetrievalInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.RetrieveKnowledgeBase(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), input)
 	writeResult(c, http.StatusOK, output, err)
 }
 

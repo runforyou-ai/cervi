@@ -28,6 +28,7 @@ import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { MessageMarkdown } from "@/components/message-markdown"
 import { messagePreview } from "@/lib/message-preview"
+import { resolveAppPlatform } from "@/platform/app-platform"
 import { openExternalURL } from "@/platform/external-navigation"
 import { ProfileAvatar } from "@/components/profile-avatar"
 import { LoadingIndicator } from "@/components/loading-indicator"
@@ -254,6 +255,9 @@ function ConversationTimelineContent({
   locateMessage?: ConversationLocateTarget | null
 }) {
   const currentIdentityID = currentUser.identityId
+  // 移动端气泡禁止文本选择，消息菜单项使用触屏尺寸，回复入口只通过长按菜单提供。
+  const mobile = resolveAppPlatform() === "mobile"
+  const menuItemClassName = cn(mobile && "min-h-11")
   const { t, i18n } = useTranslation(["inbox", "common"])
   const navigate = useNavigate()
   const timeZone = useUserTimeZone()
@@ -324,7 +328,7 @@ function ConversationTimelineContent({
     page: currentPage,
     mode: timeline.mode,
     switching: timeline.switching || location.locating,
-    readingActive: pollingActive,
+    readingActive: enabled && pollingActive,
     identityID: currentIdentityID,
     atBottom: viewport.atBottom,
     getAtBottom: viewport.getAtBottom,
@@ -732,6 +736,13 @@ function ConversationTimelineContent({
                   : null
               // 回复与复制使用同一份消息摘要。
               const referenceBody = message.body || message.attachment?.name || ""
+              // 文字气泡与附件气泡共用同一套方向配色和组尾圆角。
+              const bubbleClassName = cn(
+                incoming || agentNotice
+                  ? "border bg-[#EEEEF0] text-foreground shadow-xs dark:bg-muted"
+                  : "bg-primary text-primary-foreground",
+                endsGroup && (incoming ? "rounded-bl-sm" : "rounded-br-sm"),
+              )
               const systemEvent = message.systemEvent
               const systemEventText = systemEvent
                 ? formatGroupSystemEvent(systemEvent)
@@ -836,8 +847,8 @@ function ConversationTimelineContent({
                               />
                             ) : null}
                             <ContextMenuTrigger asChild>
-                              <div className="group/message relative max-w-full">
-                                {incoming && !agentNotice && onReplyMessage ? (
+                              <div className={cn("group/message relative max-w-full", mobile && "select-none")}>
+                                {incoming && !agentNotice && onReplyMessage && !mobile ? (
                                   <button
                                     type="button"
                                     disabled={!message.canReply}
@@ -857,11 +868,8 @@ function ConversationTimelineContent({
                                 ) : null}
                                 <div
                                   className={cn(
-                                    "min-w-0 max-w-full rounded-2xl px-3 py-2 text-sm break-words [overflow-wrap:anywhere]",
-                                    message.attachment ? "p-0 text-foreground" : incoming || agentNotice
-                                      ? "border bg-[#EEEEF0] text-foreground shadow-xs dark:bg-muted"
-                                      : "bg-primary text-primary-foreground",
-                                    !message.attachment && endsGroup && (incoming ? "rounded-bl-sm" : "rounded-br-sm"),
+                                    "min-w-0 max-w-full text-sm break-words [overflow-wrap:anywhere]",
+                                    !message.attachment && cn("rounded-2xl px-3 py-2", bubbleClassName),
                                   )}
                                 >
                                   {message.replyTo ? (
@@ -908,7 +916,7 @@ function ConversationTimelineContent({
                                       <span className={agentError ? "text-destructive" : "text-muted-foreground"}>{t(agentError ? "agentRunFailed" : "agentReplyStopped")}</span>
                                     ) : message.attachment ? (
                                       <ConversationAttachment body={message.body} attachment={message.attachment} conversationID={conversationID} messageID={message.persistedMessageID ?? message.id}
-                                        originatedAt={message.originatedAt} timeLabel={dateFormatters.clock.format(date)} timeTitle={dateFormatters.full.format(date)} incoming={incoming} />
+                                        originatedAt={message.originatedAt} timeLabel={dateFormatters.clock.format(date)} timeTitle={dateFormatters.full.format(date)} incoming={incoming} bubbleClassName={bubbleClassName} />
                                     ) : message.sender?.identityType === OrganizationIdentityType.OrganizationIdentityTypeAgent ? (
                                       <div className="min-w-0 flex-1">
                                         <MessageMarkdown locale={i18n.language} mentions={messageMentionNames(message)} onOpenLink={openExternalURL}>{message.body}</MessageMarkdown>
@@ -969,6 +977,7 @@ function ConversationTimelineContent({
                       <ContextMenuContent>
                         {!message.local && !agentNotice && onReplyMessage ? (
                           <ContextMenuItem
+                            className={menuItemClassName}
                             disabled={!message.canReply}
                             onSelect={() =>
                               onReplyMessage({
@@ -984,6 +993,7 @@ function ConversationTimelineContent({
                           </ContextMenuItem>
                         ) : null}
                         <ContextMenuItem
+                          className={menuItemClassName}
                           onSelect={() => void copyMessageText(agentNotice ? t(agentError ? "agentRunFailed" : "agentReplyStopped") : referenceBody)}
                         >
                           {t("messageCopyText")}

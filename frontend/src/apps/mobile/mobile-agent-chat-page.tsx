@@ -113,6 +113,7 @@ function MobileAgentConversation({ conversationID }: { conversationID: string })
           conversationType={ConversationType.ConversationTypeAgent}
           enabled={persisted}
           disabledReason={disabledReason}
+          lastReadMessageID={conversation?.lastReadMessageId}
           sendIndividualMessage={!persisted && draftAgent ? async (input) => {
             console.info("发起移动端 AI 会话", {
               conversationId: conversationID,

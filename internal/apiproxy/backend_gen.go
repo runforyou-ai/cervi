@@ -729,6 +729,14 @@ func (b *Backend) ListKnowledgeDocumentSegments(ctx context.Context, meta appser
 	return output, err
 }
 
+// RetrieveKnowledgeBase 在指定知识库中执行检索测试，返回混合召回与重排后的分段。
+func (b *Backend) RetrieveKnowledgeBase(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, input appservice.KnowledgeRetrievalInput) (appservice.KnowledgeRetrievalResult, error) {
+	var output appservice.KnowledgeRetrievalResult
+	err := b.do(ctx, meta, http.MethodPost, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/retrieval", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // ListKnowledgeDocuments 返回当前分组的文档列表。
 func (b *Backend) ListKnowledgeDocuments(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, input appservice.KnowledgeDocumentListInput) (appservice.KnowledgeDocumentList, error) {
 	var output appservice.KnowledgeDocumentList
