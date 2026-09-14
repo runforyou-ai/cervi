@@ -27,7 +27,7 @@ const (
 	KindIdentityProfileChanged   Kind = "identity_profile_changed"
 )
 
-// Notification 表示发往单个受众的变更通知，只携带会话 ID 与版本，不含业务内容。
+// Notification 表示发往单个受众的变更通知，载荷只含通知种类、会话 ID 与版本。
 type Notification struct {
 	OrganizationID string
 	AudienceKind   AudienceKind

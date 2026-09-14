@@ -73,7 +73,7 @@ func (f *realtimeFeed) notice(userID string, kind realtime.Kind, conversationID 
 	}
 }
 
-// expect 读取与期望数量相同的通知并按任意顺序比较；多余通知会在下一次读取时暴露。
+// expect 读取与期望数量相同的通知，并与期望集合按任意顺序比较。
 func (f *realtimeFeed) expect(t *testing.T, want ...receivedNotification) {
 	t.Helper()
 	got := make([]receivedNotification, 0, len(want))
@@ -169,7 +169,7 @@ func TestRealtimeConversationNotifications(t *testing.T) {
 	if version := loadConversationVersion(t, f.db, f.groupID); version != groupVersion {
 		t.Fatalf("rollback version=%d want=%d", version, groupVersion)
 	}
-	// 同一事务写两个会话各得一条通知，同会话两次变化只保留最高版本；回滚的通知若被发布会先于这批到达。
+	// 同一事务写两个会话各得一条通知，同会话两次追加只保留最高版本。
 	if err := appendMessages(false, f.groupID, second.ID, f.groupID); err != nil {
 		t.Fatal(err)
 	}
@@ -181,7 +181,7 @@ func TestRealtimeConversationNotifications(t *testing.T) {
 		feed.notice(f.owner.User.ID, realtime.KindConversationChanged, second.ID, secondVersion),
 		feed.notice(f.member.User.ID, realtime.KindConversationChanged, second.ID, secondVersion),
 	)
-	// 以本人静音结束，确认前一批没有多余通知。
+	// 以一次本人静音收尾。
 	if _, err := conversationaction.NewUpdateConversationNotificationSettingsAction(f.db).Execute(ctx, f.owner, second.ID, true); err != nil {
 		t.Fatal(err)
 	}
@@ -210,7 +210,7 @@ func TestRealtimeConversationStateNotifications(t *testing.T) {
 		{"确认提及", func() error { _, err := review.Execute(ctx, f.member, f.groupID, mention.ID); return err }},
 		{"取消静音", func() error { _, err := mute.Execute(ctx, f.member, f.groupID, false); return err }},
 	} {
-		// 首次操作通知本人，重复同一操作不发布；重复产生的通知会在下一步读取时暴露。
+		// 首次操作通知本人，重复同一操作不发布。
 		for attempt := range 2 {
 			if err := step.change(); err != nil {
 				t.Fatalf("%s%d: %v", step.name, attempt, err)
@@ -251,7 +251,7 @@ func TestRealtimeIdentityProfileNotifications(t *testing.T) {
 			return err
 		}},
 	} {
-		// 首次保存通知资料所属用户，重复保存不发布；重复产生的通知会在下一步读取时暴露。
+		// 首次保存通知资料所属用户，重复保存不发布。
 		for attempt := range 2 {
 			if err := step.change(); err != nil {
 				t.Fatalf("%s%d: %v", step.name, attempt, err)

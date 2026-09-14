@@ -51,7 +51,7 @@ func (p *Publisher) Start() error {
 		nats.Name("cervi-server-realtime-"+p.config.Namespace),
 		nats.RetryOnFailedConnect(true),
 		nats.MaxReconnects(-1),
-		// 断连期间不缓存通知，发布立即失败并由兜底探针恢复。
+		// 断连后发布立即返回错误，丢失的通知由兜底探针恢复。
 		nats.ReconnectBufSize(-1),
 		nats.DisconnectErrHandler(func(_ *nats.Conn, err error) {
 			if err != nil {
@@ -124,8 +124,10 @@ func (p *Publisher) publish(notification Notification) {
 			"namespace", p.config.Namespace,
 			"organization_id", notification.OrganizationID,
 			"audience_kind", notification.AudienceKind,
+			"audience_id", notification.AudienceID,
 			"kind", notification.Kind,
 			"conversation_id", notification.ConversationID,
+			"version", notification.Version,
 			"error", err,
 		)
 	}

@@ -20,6 +20,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/api"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/realtime"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/runforyou-ai/cervi/internal/storage/server/pgerr"
@@ -54,7 +55,7 @@ func TestMessageSequenceCommitOrder(t *testing.T) {
 				done := make(chan error, 1)
 				var second *servermodels.Message
 				go func() {
-					done <- f.db.RunInTx(ctx, nil, func(ctx context.Context, next bun.Tx) error {
+					done <- realtime.RunInTx(ctx, f.db, func(ctx context.Context, next bun.Tx) error {
 						locked := &servermodels.Conversation{ID: cv.ID}
 						if err := next.NewSelect().Model(locked).WherePK().For("UPDATE").Scan(ctx); err != nil {
 							return err
