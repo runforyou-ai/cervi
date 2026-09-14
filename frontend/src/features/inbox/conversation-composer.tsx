@@ -54,6 +54,7 @@ import { ConversationAttachmentUpload } from "./conversation-attachment-upload"
 import { resolveAppPlatform } from "@/platform/app-platform"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
+import { cn } from "@/lib/utils"
 
 const conversationComposerMaxHeight = 200
 const conversationComposerMinHeight = 80
@@ -186,6 +187,8 @@ export function ConversationComposer({
     value: string
   } | null>(null)
   const [activeMentionIndex, setActiveMentionIndex] = useState(0)
+  // 移动端的提及候选和取消引用使用触屏尺寸。
+  const mobile = resolveAppPlatform() === "mobile"
   const { isSubmitting } = form.formState
   const isBodyEmpty = !form.watch("body").trim()
   const bodyField = form.register("body")
@@ -622,7 +625,10 @@ export function ConversationComposer({
                 type="button"
                 role="option"
                 aria-selected={index === activeMentionIndex}
-                className="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-sm outline-none hover:bg-accent aria-selected:bg-accent"
+                className={cn(
+                  "flex w-full items-center rounded-sm px-2 py-1.5 text-left text-sm outline-none hover:bg-accent aria-selected:bg-accent",
+                  mobile && "min-h-11",
+                )}
                 onPointerDown={(event) => event.preventDefault()}
                 onClick={() => selectMention(candidate)}
               >
@@ -660,7 +666,10 @@ export function ConversationComposer({
               </div>
               <button
                 type="button"
-                className="shrink-0 text-muted-foreground hover:text-foreground"
+                className={cn(
+                  "shrink-0 text-muted-foreground hover:text-foreground",
+                  mobile && "-my-2 min-h-11 px-2",
+                )}
                 disabled={Boolean(disabledReason)}
                 onClick={() => onReplyToChange?.(null)}
               >
@@ -718,7 +727,7 @@ export function ConversationComposer({
           <div className="flex items-center justify-between gap-3 px-2.5 pb-2.5">
             {disabledReason ? (
               <p id={`${inputID}-reason`} className="text-xs text-muted-foreground">{disabledReason}</p>
-            ) : resolveAppPlatform() !== "mobile" &&
+            ) : !mobile &&
             (conversationType === ConversationType.ConversationTypeDirect ||
               conversationType === ConversationType.ConversationTypeAgent ||
               conversationType === ConversationType.ConversationTypeGroup) ? (

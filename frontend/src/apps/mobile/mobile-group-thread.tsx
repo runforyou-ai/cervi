@@ -1,10 +1,11 @@
-/** 移动端群聊历史、纯文本发送、阅读进度和解散后的只读状态。 */
+/** 移动端群聊历史、文本发送、引用与提及输入、阅读进度和解散后的只读状态。 */
 import { useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 
 import {
   ConversationStatus,
   ConversationType,
+  type ConversationMessageReference,
   type GroupConversationData,
 } from "@/api"
 import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
@@ -33,6 +34,8 @@ export function MobileGroupThread({
   const markRead = useConversationReadMarker(conversation.id, active)
   const [retryDraft, setRetryDraft] =
     useState<OutgoingConversationDraft | null>(null)
+  const [replyTo, setReplyTo] =
+    useState<ConversationMessageReference | null>(null)
   const prepareSendRef = useRef<(() => Promise<boolean>) | null>(null)
   const archived =
     conversation.status === ConversationStatus.ConversationStatusArchived
@@ -47,6 +50,8 @@ export function MobileGroupThread({
         requireWindowFocus={false}
         onUnavailable={onUnavailable}
         onReadMessage={markRead}
+        onReplyMessage={archived ? undefined : setReplyTo}
+        groupParticipants={conversation.participants}
         prepareSendRef={prepareSendRef}
         outgoingMessages={outgoing.messages}
         onRetryFailedMessage={setRetryDraft}
@@ -67,7 +72,11 @@ export function MobileGroupThread({
           conversationType={ConversationType.ConversationTypeGroup}
           retryFailedMessage
           retryDraft={retryDraft}
+          replyTo={replyTo}
+          groupParticipants={conversation.participants}
+          currentIdentityID={identity.user.identityId}
           onRetryDraftHandled={() => setRetryDraft(null)}
+          onReplyToChange={setReplyTo}
           onBeforeSend={() => prepareSendRef.current?.() ?? Promise.resolve(true)}
           onSucceeded={() => void invalidate(resourceKeys.inbox())}
           onSending={outgoing.start}
