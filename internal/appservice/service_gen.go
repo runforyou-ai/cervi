@@ -109,6 +109,11 @@ func (s *Service) ReadInboxConversations(ctx context.Context, meta RequestMeta, 
 	return withNormalizedSlices(s.backend.ReadInboxConversations(ctx, meta, input))
 }
 
+// SearchInbox 按范围检索会话名称、消息正文与附件文件名、成员和外部联系人。
+func (s *Service) SearchInbox(ctx context.Context, meta RequestMeta, input InboxSearchInput) (InboxSearchResult, error) {
+	return withNormalizedSlices(s.backend.SearchInbox(ctx, meta, input))
+}
+
 // ListCustomerServiceAssignees 返回有效真人和 AI 客服。
 func (s *Service) ListCustomerServiceAssignees(ctx context.Context, meta RequestMeta) (CustomerServiceAssigneeList, error) {
 	return withNormalizedSlices(s.backend.ListCustomerServiceAssignees(ctx, meta))

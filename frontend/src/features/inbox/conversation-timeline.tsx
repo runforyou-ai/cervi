@@ -1,5 +1,5 @@
 /** 展示各类会话的成员消息时间线、Agent 结果与发送状态。 */
-import { useCallback, useEffect, useMemo, useRef, type RefObject } from "react"
+import { type RefObject, useCallback, useEffect, useEffectEvent, useMemo, useRef } from "react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -213,6 +213,9 @@ function formatMessageTime(formatter: Intl.DateTimeFormat, date: Date) {
   return `${parts.month}-${parts.day} ${parts.hour}:${parts.minute}`
 }
 
+/** 外部请求定位的消息，nonce 区分对同一消息的多次请求。 */
+export type ConversationLocateTarget = { messageId: string; nonce: number }
+
 /** 展示成员可见的会话历史和当前页面已发送消息。 */
 function ConversationTimelineContent({
   conversationID,
@@ -231,6 +234,7 @@ function ConversationTimelineContent({
   mentionNavigation = true,
   onUnavailable,
   enabled = true,
+  locateMessage = null,
 }: {
   conversationID: string
   conversationType: ConversationType
@@ -248,6 +252,7 @@ function ConversationTimelineContent({
   mentionNavigation?: boolean
   onUnavailable?: () => void
   enabled?: boolean
+  locateMessage?: ConversationLocateTarget | null
 }) {
   const currentIdentityID = currentUser.identityId
   const { t, i18n } = useTranslation(["inbox", "common"])
@@ -440,6 +445,17 @@ function ConversationTimelineContent({
         )
     }
   }
+
+  // 检索结果请求定位时，等首屏窗口就绪后复用引用跳转流程，同一请求只处理一次。
+  const locatedNonceRef = useRef(0)
+  const locateRequested = useEffectEvent((messageID: string) => {
+    void followReference(messageID)
+  })
+  useEffect(() => {
+    if (!locateMessage || !currentPage || locatedNonceRef.current === locateMessage.nonce) return
+    locatedNonceRef.current = locateMessage.nonce
+    locateRequested(locateMessage.messageId)
+  }, [locateMessage, currentPage])
 
   /** 加载相邻历史页并保持可见消息位置。 */
   async function loadPage(direction: "before" | "after") {

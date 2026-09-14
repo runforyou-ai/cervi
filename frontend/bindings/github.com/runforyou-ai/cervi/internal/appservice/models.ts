@@ -1588,6 +1588,89 @@ export enum InboxScope {
 };
 
 /**
+ * InboxSearchInput 定义检索文本与范围；列表筛选只在 list 范围生效，会话编号只在 conversation 范围生效。
+ */
+export interface InboxSearchInput {
+    "query": string;
+    "range": InboxSearchRange;
+    "conversationId": string;
+    "scope": InboxScope;
+    "customerView": CustomerInboxView;
+    "assigneeIdentityId": string;
+    "channelId": string;
+    "serviceStatus": ServiceSessionStatus;
+    "kinds": ConversationType[] | null;
+}
+
+/**
+ * InboxSearchMessage 表示命中的消息、所在会话和高亮摘要。
+ */
+export interface InboxSearchMessage {
+    "id": string;
+    "type": MessageType;
+    "senderName": string | null;
+    "originatedAt": string;
+    "excerpt": InboxSearchSegment[] | null;
+    "conversation": InboxConversation;
+}
+
+/**
+ * InboxSearchPerson 表示命中的企业成员或外部联系人；外部联系人没有客户会话时 conversationId 为空。
+ */
+export interface InboxSearchPerson {
+    "kind": InboxSearchPersonKind;
+    "id": string;
+    "identityType": OrganizationIdentityType | null;
+    "displayName": string;
+    "avatarUrl": string;
+    "conversationId": string | null;
+}
+
+/**
+ * InboxSearchPersonKind 表示人员检索结果的来源。
+ */
+export enum InboxSearchPersonKind {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    InboxSearchPersonMember = "member",
+    InboxSearchPersonContact = "contact",
+};
+
+/**
+ * InboxSearchRange 表示收件箱检索范围。
+ */
+export enum InboxSearchRange {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    InboxSearchRangeList = "list",
+    InboxSearchRangeReadable = "readable",
+    InboxSearchRangeConversation = "conversation",
+};
+
+/**
+ * InboxSearchResult 返回会话、消息和人员三组检索结果，每组最多六条。
+ */
+export interface InboxSearchResult {
+    "conversations": InboxConversation[] | null;
+    "messages": InboxSearchMessage[] | null;
+    "people": InboxSearchPerson[] | null;
+}
+
+/**
+ * InboxSearchSegment 表示摘要中的一段文字及其是否命中。
+ */
+export interface InboxSearchSegment {
+    "text": string;
+    "match": boolean;
+}
+
+/**
  * InboxWindow 保存连续范围和双向续读位置，空范围仍可保留原边界。
  */
 export interface InboxWindow {
