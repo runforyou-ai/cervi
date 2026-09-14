@@ -168,6 +168,14 @@ func (b *Backend) ReadInboxConversations(ctx context.Context, meta appservice.Re
 	return output, err
 }
 
+// SearchInbox 按范围检索会话名称、消息正文与附件文件名、成员和外部联系人。
+func (b *Backend) SearchInbox(ctx context.Context, meta appservice.RequestMeta, input appservice.InboxSearchInput) (appservice.InboxSearchResult, error) {
+	var output appservice.InboxSearchResult
+	err := b.do(ctx, meta, http.MethodGet, "/inbox/search", encodeInboxSearchInputQuery(input), nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // ListCustomerServiceAssignees 返回有效真人和 AI 客服。
 func (b *Backend) ListCustomerServiceAssignees(ctx context.Context, meta appservice.RequestMeta) (appservice.CustomerServiceAssigneeList, error) {
 	var output appservice.CustomerServiceAssigneeList
@@ -1167,6 +1175,21 @@ func encodeConversationMessageReferenceListInputQuery(input appservice.Conversat
 func encodeCustomerDeliveryListInputQuery(input appservice.CustomerDeliveryListInput) url.Values {
 	query := url.Values{}
 	setQuery(query, "messageIds", input.MessageIDs)
+	return query
+}
+
+// encodeInboxSearchInputQuery 将 appservice.InboxSearchInput 编码为查询参数。
+func encodeInboxSearchInputQuery(input appservice.InboxSearchInput) url.Values {
+	query := url.Values{}
+	setQuery(query, "query", input.Query)
+	setQuery(query, "range", string(input.Range))
+	setQuery(query, "conversationId", input.ConversationID)
+	setQuery(query, "scope", string(input.Scope))
+	setQuery(query, "customerView", string(input.CustomerView))
+	setQuery(query, "assigneeIdentityId", input.AssigneeIdentityID)
+	setQuery(query, "channelId", input.ChannelID)
+	setQuery(query, "serviceStatus", string(input.ServiceStatus))
+	setListQuery(query, "kinds", input.Kinds)
 	return query
 }
 

@@ -14,6 +14,7 @@ import (
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
+	"github.com/runforyou-ai/cervi/internal/common/searchtext"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -165,6 +166,7 @@ func saveAttachmentMessage(ctx context.Context, tx bun.Tx, identity *servermodel
 	message := &servermodels.Message{
 		ID: uuid.NewV7().String(), OrganizationID: identity.Organization.ID, ConversationID: member.Conversation.ID,
 		SenderParticipantID: &member.ParticipantID, Type: string(domain.MessageTypeAttachment), Body: input.Body,
+		SearchVector:    searchtext.Vector(input.Body, file.OriginalName),
 		ClientMessageID: &input.ClientMessageID, IdempotencyKey: &key, OriginatedAt: time.Now().UTC(),
 	}
 	// 会话锁内已完成完整幂等校验，已有附件在文件状态检查前返回。

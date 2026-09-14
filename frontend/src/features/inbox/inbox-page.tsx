@@ -3,16 +3,21 @@ import { useEffect, useRef, useState } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { MessagesSquareIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
+import { toast } from "sonner"
 
 import {
   ConversationType,
   CustomerInboxView,
   InboxScope,
+  InboxSearchPersonKind,
   OrganizationIdentityType,
   ServiceSessionStatus,
+  findDirectConversation,
+  isApiError,
   listCustomerServiceAssignees,
   listInboxChannels,
   markConversationRead,
+  sessionPath,
   type AgentInboxConversationData,
   type DirectInboxConversationData,
   type GroupInboxConversationData,
@@ -33,6 +38,7 @@ import { useWorkspace } from "@/contexts/workspace-context"
 import { useAttachmentQueue } from "@/features/inbox/attachment-queue-context"
 import { useOutgoingMessageStore } from "@/features/inbox/outgoing-message-context"
 import { ConversationMain } from "@/features/inbox/conversation-main"
+import type { ConversationLocateTarget } from "@/features/inbox/conversation-timeline"
 import { clearConversationResources } from "@/features/inbox/conversation-resources"
 import { ConversationTargetPickerDialog } from "@/features/inbox/conversation-target-picker-dialog"
 import { CreateGroupConversationDialog } from "@/features/inbox/create-group-conversation-dialog"
@@ -43,6 +49,7 @@ import { InboxFilter } from "@/features/inbox/inbox-filter"
 import { InboxListPanel } from "@/features/inbox/inbox-list-panel"
 import { InboxPaneTop } from "@/features/inbox/inbox-pane-top"
 import { InboxScopeRail } from "@/features/inbox/inbox-scope-rail"
+import { InboxSearchPanel } from "@/features/inbox/inbox-search-panel"
 import type {
   ChatDraft,
   ConversationSelection,
@@ -52,7 +59,9 @@ import {
   readConversationSummary,
   useConversationSummary,
 } from "@/features/inbox/use-conversation-summary"
+import { useInboxSearch, type InboxSearchItem } from "@/features/inbox/use-inbox-search"
 import type { InboxList } from "@/features/inbox/use-inbox-list"
+import { useRecentConversations } from "@/features/inbox/use-recent-conversations"
 import type { useInboxListViewport } from "@/features/inbox/use-inbox-list-viewport"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useIsNarrowViewport } from "@/hooks/use-narrow-viewport"
@@ -61,6 +70,7 @@ import {
   useResourceInvalidator,
   useResourceReader,
 } from "@/hooks/use-resource"
+import { apiErrorMessage } from "@/lib/form-errors"
 
 /** 新建后需要切换到的内部会话。 */
 type InternalInboxConversationData =
@@ -129,6 +139,20 @@ export function InboxPage({
   const navigationGeneration = useRef(0)
   const summary = useConversationSummary(targetIdentityId ? "" : selectedConversationId)
   const selectedConversation = summary.data ?? undefined
+  const recentConversations = useRecentConversations(identity.user.identityId)
+  const recordRecentConversation = recentConversations.record
+  const openedConversationId = selectedConversation?.id
+  const locateNonce = useRef(0)
+  const [messageTarget, setMessageTarget] = useState<({ conversationId: string } & ConversationLocateTarget) | null>(null)
+  const search = useInboxSearch({
+    query: { scope, customerView, assigneeIdentityId, channelId, serviceStatus, kinds },
+    recentConversationIds: recentConversations.ids,
+    onOpen: (item) => void openSearchItem(item),
+  })
+  useEffect(() => {
+    if (openedConversationId) recordRecentConversation(openedConversationId)
+  }, [openedConversationId, recordRecentConversation])
+
   useEffect(() => {
     navigationGeneration.current++
     return () => { navigationGeneration.current++ }
@@ -167,11 +191,63 @@ export function InboxPage({
   function selectConversation(conversationId: string) {
     navigationGeneration.current++
     setChatDraft(null)
+    setMessageTarget(null)
     onSelectedConversationChange(conversationId)
 
     if (isNarrowViewport) {
       setIsNarrowDetailOpen(true)
     }
+  }
+
+  /** 打开搜索结果：消息结果保留搜索并定位原消息，其余结果退出搜索后打开会话或聊天草稿。 */
+  async function openSearchItem(item: InboxSearchItem) {
+    if (item.kind === "message") {
+      // 先切换会话再写入定位目标，切换会话会清除旧目标。
+      if (item.message.conversation.id !== selectedConversationId) selectConversation(item.message.conversation.id)
+      else if (isNarrowViewport) setIsNarrowDetailOpen(true)
+      locateNonce.current++
+      setMessageTarget({ conversationId: item.message.conversation.id, messageId: item.message.id, nonce: locateNonce.current })
+      return
+    }
+    if (item.kind === "conversation") {
+      search.exit()
+      selectConversation(item.conversation.id)
+      return
+    }
+    const { person } = item
+    if (person.kind === InboxSearchPersonKind.InboxSearchPersonContact) {
+      if (!person.conversationId) return
+      search.exit()
+      selectConversation(person.conversationId)
+      return
+    }
+    search.exit()
+    const member: MemberOption = {
+      id: person.id,
+      type: person.identityType ?? OrganizationIdentityType.OrganizationIdentityTypeUser,
+      displayName: person.displayName,
+      avatarUrl: person.avatarUrl,
+    }
+    if (member.type === OrganizationIdentityType.OrganizationIdentityTypeAgent) {
+      showChatDraft(member)
+      return
+    }
+    // 真人成员复用已有单聊，读取期间切换了导航时放弃本次打开。
+    const generation = navigationGeneration.current
+    try {
+      const existing = await readResource(resourceKeys.directConversation(member.id), () => findDirectConversation(member.id))
+      if (generation === navigationGeneration.current) showChatDraft(member, existing)
+    } catch (error) {
+      if (isApiError(error) && sessionPath(error.state)) return
+      console.warn("打开搜索成员聊天失败", { identityId: member.id, error })
+      toast.error(isApiError(error) ? apiErrorMessage(error) : t("directLookupError"))
+    }
+  }
+
+  /** 从会话头进入当前会话的搜索范围。 */
+  function searchConversation(conversationID: string) {
+    if (isNarrowViewport) setIsNarrowDetailOpen(false)
+    search.enter(conversationID)
   }
 
   /** 不打开会话并把列表项推进到当前最后消息。 */
@@ -295,8 +371,12 @@ export function InboxPage({
               onChange={onQueryChange}
             />
           }
+          search={search}
         />
-        {scope === InboxScope.InboxScopeCustomer ? (
+        {search.active ? (
+          <InboxSearchPanel search={search} scope={scope} />
+        ) : null}
+        {!search.active && scope === InboxScope.InboxScopeCustomer ? (
           <InboxCustomerQueueFilter
             view={customerView}
             assigneeIdentityId={assigneeIdentityId}
@@ -310,15 +390,17 @@ export function InboxPage({
             }
           />
         ) : null}
-        <InboxListPanel list={list} viewport={listViewport} detailError={Boolean(summary.error)} retryDetail={() => void summary.refresh()}>
-          <InboxConversationList
-            conversations={conversations}
-            onMenuChange={listViewport.setMenu}
-            selectedId={selectedConversation?.id}
-            onSelect={selectConversation}
-            onMarkRead={markConversationAsRead}
-          />
-        </InboxListPanel>
+        {search.active ? null : (
+          <InboxListPanel list={list} viewport={listViewport} detailError={Boolean(summary.error)} retryDetail={() => void summary.refresh()}>
+            <InboxConversationList
+              conversations={conversations}
+              onMenuChange={listViewport.setMenu}
+              selectedId={selectedConversation?.id}
+              onSelect={selectConversation}
+              onMarkRead={markConversationAsRead}
+            />
+          </InboxListPanel>
+        )}
       </div>
     </div>
   )
@@ -344,6 +426,8 @@ export function InboxPage({
               onConversationChanged={refreshConversationAfterMessage}
               onGroupLeft={showConversationAfterGroupLeft}
               onChatStarted={showStartedConversation}
+              onSearchConversation={searchConversation}
+              locateMessage={messageTarget}
             />
           </section>
         ) : (
@@ -374,7 +458,15 @@ export function InboxPage({
             if (!open) setChatDraft(null)
           }}
         >
-          <SheetContent className="data-[side=right]:w-full p-0 sm:max-w-lg">
+          <SheetContent
+            className="data-[side=right]:w-full p-0 sm:max-w-lg"
+            onCloseAutoFocus={(event) => {
+              // 搜索模式下关闭详情时，把焦点交给中栏搜索框。
+              if (!search.active) return
+              event.preventDefault()
+              search.inputRef.current?.focus()
+            }}
+          >
             <SheetHeader className="sr-only">
               <SheetTitle>
                 {t("conversationTitle", {
@@ -394,6 +486,8 @@ export function InboxPage({
               onConversationChanged={refreshConversationAfterMessage}
               onGroupLeft={showConversationAfterGroupLeft}
               onChatStarted={showStartedConversation}
+              onSearchConversation={searchConversation}
+              locateMessage={messageTarget}
               narrowViewport
             />
             ) : detailState}

@@ -231,6 +231,16 @@ func (b *DirectBackend) ReadInboxConversations(ctx context.Context, meta Request
 	return b.ops.ReadInboxConversations(ctx, meta, identity, input)
 }
 
+// SearchInbox 按范围检索会话名称、消息正文与附件文件名、成员和外部联系人。
+func (b *DirectBackend) SearchInbox(ctx context.Context, meta RequestMeta, input InboxSearchInput) (InboxSearchResult, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero InboxSearchResult
+		return zero, err
+	}
+	return b.ops.SearchInbox(ctx, meta, identity, input)
+}
+
 // ListCustomerServiceAssignees 返回有效真人和 AI 客服。
 func (b *DirectBackend) ListCustomerServiceAssignees(ctx context.Context, meta RequestMeta) (CustomerServiceAssigneeList, error) {
 	identity, err := b.ops.authenticate(ctx, meta)

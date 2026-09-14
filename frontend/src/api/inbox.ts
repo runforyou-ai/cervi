@@ -25,6 +25,7 @@ import {
   GetInboxConversation,
   ReadInboxConversations,
   ReopenServiceSession,
+  SearchInbox,
   RemoveGroupConversationMember,
   SendCustomerTextMessage,
   SendAttachmentMessage,
@@ -78,6 +79,8 @@ import type {
   InboxContextInput,
   InboxWindowInput,
   InboxQuery,
+  InboxSearchInput,
+  InboxSearchResult,
   MarkConversationReadInput,
   TransferServiceSessionInput,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
@@ -85,6 +88,7 @@ import {
   ConversationType,
   CustomerInboxView,
   InboxScope,
+  InboxSearchRange,
   ServiceSessionStatus,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import { bind } from "@/api/client"
@@ -503,6 +507,23 @@ export const getInboxConversation = bind(GetInboxConversation)
 /** 批量核对指定会话的阅读和列表资格。 */
 export function readInboxConversations(input: ReadInboxConversationsInput, signal?: AbortSignal) {
   return bind(ReadInboxConversations)(input, signal)
+}
+
+export type InboxSearchResultData = NonNullArrays<InboxSearchResult>
+
+/** 按范围检索会话名称、消息和人员，每组最多六条；列表筛选只在列表范围生效。 */
+export function searchInbox(input: Partial<InboxSearchInput>, signal?: AbortSignal): Promise<InboxSearchResultData> {
+  return bind(SearchInbox)({
+    query: input.query ?? "",
+    range: input.range ?? InboxSearchRange.InboxSearchRangeReadable,
+    conversationId: input.conversationId ?? "",
+    scope: input.scope ?? InboxScope.InboxScopeAll,
+    customerView: input.customerView ?? CustomerInboxView.CustomerInboxViewQueue,
+    assigneeIdentityId: input.assigneeIdentityId ?? "",
+    channelId: input.channelId ?? "",
+    serviceStatus: input.serviceStatus ?? ServiceSessionStatus.ServiceSessionStatusOpen,
+    kinds: input.kinds ?? [],
+  }, signal)
 }
 
 const listConversationMessageReferencesBound = bind(ListConversationMessageReferences)

@@ -17,6 +17,7 @@ import { useWorkspace } from "@/contexts/workspace-context"
 import { ConversationContextPane } from "@/features/inbox/conversation-context-pane"
 import { ConversationHeader } from "@/features/inbox/conversation-header"
 import { ConversationThread } from "@/features/inbox/conversation-thread"
+import type { ConversationLocateTarget } from "@/features/inbox/conversation-timeline"
 import { DirectConversationDraftHeader } from "@/features/inbox/direct-conversation-draft-header"
 import { sessionStatusLabel } from "@/features/inbox/session-status-label"
 import { useAccountDisabledReason } from "@/features/inbox/use-account-disabled-reason"
@@ -37,6 +38,8 @@ export function ConversationMain({
   onConversationChanged,
   onGroupLeft,
   onChatStarted,
+  onSearchConversation,
+  locateMessage,
   narrowViewport = false,
 }: {
   selection: ConversationSelection
@@ -46,6 +49,8 @@ export function ConversationMain({
   onChatStarted: (
     conversation: DirectInboxConversationData | AgentInboxConversationData,
   ) => void
+  onSearchConversation: (conversationID: string) => void
+  locateMessage: ({ conversationId: string } & ConversationLocateTarget) | null
   narrowViewport?: boolean
 }) {
   const conversation =
@@ -156,6 +161,7 @@ export function ConversationMain({
             onSessionChanged={() => {
               if (customerConversation) onSessionChanged(customerConversation.id)
             }}
+            onSearch={() => onSearchConversation(validConversation.id)}
             narrowViewport={narrowViewport}
           />
         ) : directTarget ? (
@@ -174,6 +180,11 @@ export function ConversationMain({
             if (validConversation) onConversationChanged(validConversation.id)
           }}
           onChatStarted={onChatStarted}
+          locateMessage={
+            locateMessage && locateMessage.conversationId === validConversation?.id
+              ? locateMessage
+              : null
+          }
         />
       </div>
       <ConversationContextPane

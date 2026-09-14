@@ -271,3 +271,74 @@ func inboxReadError(ctx context.Context, meta RequestMeta, organizationID, opera
 	slog.Warn("读取收件箱失败", "organization_id", organizationID, "operation", operation, "error", err)
 	return FailedError(meta, cervii18n.ErrorInboxLoadFailed)
 }
+
+// SearchInbox 按范围检索会话、消息和人员，并统一解析会话图片与人员头像。
+func (o *directOperations) SearchInbox(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input InboxSearchInput) (InboxSearchResult, error) {
+	list := inboxLoadInput(InboxQuery{
+		Scope: input.Scope, CustomerView: input.CustomerView, AssigneeIdentityID: input.AssigneeIdentityID,
+		ChannelID: input.ChannelID, ServiceStatus: input.ServiceStatus, Kinds: input.Kinds,
+	})
+	result, err := o.loadInbox.Search(ctx, identity, inboxaction.SearchInput{
+		Text: input.Query, Range: inboxaction.SearchRange(input.Range), List: list, ConversationID: input.ConversationID,
+	})
+	if err != nil {
+		if ctx.Err() != nil {
+			return InboxSearchResult{}, ctx.Err()
+		}
+		if errors.Is(err, inboxaction.ErrConversationUnavailable) {
+			return InboxSearchResult{}, NotFoundError(meta, cervii18n.ErrorConversationNotFound).WithReason("conversation_unavailable")
+		}
+		if errors.Is(err, inboxaction.ErrQueryInvalid) {
+			return InboxSearchResult{}, InvalidError(meta, cervii18n.ErrorValidationFailed, nil)
+		}
+		slog.Warn("检索收件箱失败", "organization_id", identity.Organization.ID, "range", input.Range, "error", err)
+		return InboxSearchResult{}, FailedError(meta, cervii18n.ErrorInboxSearchFailed)
+	}
+	// 会话结果与各条消息的所在会话共用一次图片解析，转换后按原顺序拆回。
+	summaries := slices.Clone(result.Conversations)
+	for _, message := range result.Messages {
+		summaries = append(summaries, message.Conversation)
+	}
+	conversations, err := o.inboxConversationsFromActions(ctx, meta, identity, summaries)
+	if err != nil {
+		return InboxSearchResult{}, err
+	}
+	avatarFileIDs := make([]string, 0, len(result.People))
+	for _, person := range result.People {
+		if person.AvatarFileID != nil {
+			avatarFileIDs = append(avatarFileIDs, *person.AvatarFileID)
+		}
+	}
+	avatarURLs, err := o.activeFileURLs(ctx, identity, avatarFileIDs)
+	if err != nil {
+		slog.Warn("读取检索人员头像失败", "organization_id", identity.Organization.ID, "error", err)
+		return InboxSearchResult{}, FailedError(meta, cervii18n.ErrorInboxSearchFailed)
+	}
+	output := InboxSearchResult{
+		Conversations: conversations[:len(result.Conversations)],
+		Messages:      make([]InboxSearchMessage, 0, len(result.Messages)),
+		People:        make([]InboxSearchPerson, 0, len(result.People)),
+	}
+	for index, message := range result.Messages {
+		excerpt := make([]InboxSearchSegment, 0, len(message.Excerpt))
+		for _, segment := range message.Excerpt {
+			excerpt = append(excerpt, InboxSearchSegment{Text: segment.Text, Match: segment.Match})
+		}
+		output.Messages = append(output.Messages, InboxSearchMessage{
+			ID: message.ID, Type: MessageType(message.Type), SenderName: message.SenderName, OriginatedAt: message.OriginatedAt,
+			Excerpt: excerpt, Conversation: conversations[len(result.Conversations)+index],
+		})
+	}
+	for _, person := range result.People {
+		item := InboxSearchPerson{
+			Kind: InboxSearchPersonKind(person.Kind), ID: person.ID, DisplayName: person.DisplayName,
+			AvatarURL: optionalFileURL(avatarURLs, person.AvatarFileID), ConversationID: person.ConversationID,
+		}
+		if person.Kind == inboxaction.SearchPersonMember {
+			identityType := OrganizationIdentityType(person.IdentityType)
+			item.IdentityType = &identityType
+		}
+		output.People = append(output.People, item)
+	}
+	return output, nil
+}
