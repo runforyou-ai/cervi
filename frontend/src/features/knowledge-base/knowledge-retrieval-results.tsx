@@ -1,4 +1,4 @@
-/** 展示知识检索命中分段、匹配度和两路名次。 */
+/** 展示知识检索命中分段和匹配度。 */
 import { useMemo } from "react"
 import { useTranslation } from "react-i18next"
 
@@ -36,11 +36,8 @@ export function KnowledgeRetrievalResults({ records, onViewContext }: {
                 </div>
                 <SelectableText className="mt-3 block whitespace-pre-wrap break-words text-sm leading-6">{record.content}</SelectableText>
               </div>
-              <span className="flex shrink-0 flex-col items-end gap-1 text-xs text-muted-foreground tabular-nums">
-                <span>{t("retrieval.score", { score: scoreFormatter.format(record.score) })}</span>
-                {record.rerankScore != null && <span>{t("retrieval.rerankScore", { score: scoreFormatter.format(record.rerankScore) })}</span>}
-                {record.lexicalRank > 0 && <span>{t("retrieval.lexicalRank", { rank: record.lexicalRank })}</span>}
-                {record.vectorRank > 0 && <span>{t("retrieval.vectorRank", { rank: record.vectorRank })}</span>}
+              <span className="shrink-0 text-xs text-muted-foreground tabular-nums">
+                {t("retrieval.score", { score: scoreFormatter.format(record.score) })}
               </span>
             </div>
           </li>

@@ -125,7 +125,7 @@ func TestKnowledgeHybridRetrieval(t *testing.T) {
 	if len(records) > base.RetrievalCount {
 		t.Fatalf("count=%d limit=%d", len(records), base.RetrievalCount)
 	}
-	if probe.reranked != 0 || records[0].RerankScore != nil {
+	if probe.reranked != 0 || records[0].Score >= 1 {
 		t.Fatalf("reranked=%d first=%+v", probe.reranked, records[0])
 	}
 
@@ -169,7 +169,7 @@ func TestKnowledgeHybridRetrieval(t *testing.T) {
 		t.Fatal(err)
 	}
 	records, err = service.Retrieve(ctx, identity, base.ID, "如何申请退款")
-	if err != nil || probe.reranked != 1 || len(records) != 2 || records[0].DocumentID == refundID || records[0].RerankScore == nil || *records[0].RerankScore != 1 || records[0].Score >= 1 {
+	if err != nil || probe.reranked != 1 || len(records) != 2 || records[0].DocumentID == refundID || records[0].Score != 1 {
 		t.Fatalf("records=%+v reranked=%d err=%v", records, probe.reranked, err)
 	}
 

@@ -61,9 +61,6 @@ const knowledgeBase = {
     position: "Segment {{position}}",
     viewContext: "View context",
     score: "Score {{score}}",
-    rerankScore: "Rerank {{score}}",
-    lexicalRank: "Lexical #{{rank}}",
-    vectorRank: "Vector #{{rank}}",
     validation: {
       required: "Enter a query.",
       tooLong: "The query cannot exceed {{count}} characters.",

@@ -79,7 +79,7 @@ func (o *directOperations) RetrieveKnowledgeBase(ctx context.Context, meta Reque
 		result.Records = append(result.Records, KnowledgeRetrievalRecord{
 			DocumentID: record.DocumentID, DocumentName: record.DocumentName,
 			SegmentID: record.SegmentID, SegmentBatchID: record.SegmentBatchID, Position: record.Position,
-			Content: record.Content, Score: record.Score, RerankScore: record.RerankScore, LexicalRank: record.LexicalRank, VectorRank: record.VectorRank,
+			Content: record.Content, Score: record.Score,
 		})
 	}
 	return result, nil

@@ -61,9 +61,6 @@ const knowledgeBase = {
     position: "第 {{position}} 段",
     viewContext: "查看上下文",
     score: "匹配度 {{score}}",
-    rerankScore: "重排 {{score}}",
-    lexicalRank: "词法第 {{rank}}",
-    vectorRank: "向量第 {{rank}}",
     validation: {
       required: "请输入检索内容。",
       tooLong: "检索内容不能超过 {{count}} 个字符。",

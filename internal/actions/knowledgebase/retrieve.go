@@ -40,7 +40,7 @@ type candidateReranker interface {
 	Rerank(context.Context, rerank.Credential, string, string, []string, int) ([]rerank.Score, error)
 }
 
-// RetrievalRecord 定义混合召回返回的一条分段、两路名次、融合分数和重排得分；未重排时 RerankScore 为空。
+// RetrievalRecord 定义混合召回返回的一条分段、最终分数和两路名次；开启重排时分数为重排得分，否则为融合分数。
 type RetrievalRecord struct {
 	DocumentID     string
 	DocumentName   string
@@ -49,7 +49,6 @@ type RetrievalRecord struct {
 	Position       int
 	Content        string
 	Score          float64
-	RerankScore    *float64
 	LexicalRank    int
 	VectorRank     int
 }
@@ -218,7 +217,7 @@ func (k *knowledgeSource) retrieve(ctx context.Context, query string) ([]Retriev
 	type candidate struct {
 		hit                     segmentHit
 		score                   float64
-		rerankScore             *float64
+		reranked                bool
 		lexicalRank, vectorRank int
 	}
 	fused := map[string]*candidate{}
@@ -251,7 +250,7 @@ func (k *knowledgeSource) retrieve(ctx context.Context, query string) ([]Retriev
 		}
 		return ordered[i].hit.ID < ordered[j].hit.ID
 	})
-	// 重排只决定顺序：已打分的候选按相关性降序排在前面，供应商未返回得分的候选保持融合顺序接在后面。
+	// 已打分的候选按重排得分降序排在前面，供应商未返回得分的候选保持融合顺序和融合分数接在后面。
 	if k.rerankOn && len(ordered) > 0 {
 		documents := make([]string, 0, len(ordered))
 		for _, item := range ordered {
@@ -263,15 +262,14 @@ func (k *knowledgeSource) retrieve(ctx context.Context, query string) ([]Retriev
 		}
 		reranked := make([]*candidate, 0, len(ordered))
 		for _, score := range scores {
-			if item := ordered[score.Index]; item.rerankScore == nil {
-				relevance := score.Relevance
-				item.rerankScore = &relevance
+			if item := ordered[score.Index]; !item.reranked {
+				item.score, item.reranked = score.Relevance, true
 				reranked = append(reranked, item)
 			}
 		}
-		sort.SliceStable(reranked, func(i, j int) bool { return *reranked[i].rerankScore > *reranked[j].rerankScore })
+		sort.SliceStable(reranked, func(i, j int) bool { return reranked[i].score > reranked[j].score })
 		for _, item := range ordered {
-			if item.rerankScore == nil {
+			if !item.reranked {
 				reranked = append(reranked, item)
 			}
 		}
@@ -283,7 +281,7 @@ func (k *knowledgeSource) retrieve(ctx context.Context, query string) ([]Retriev
 		records = append(records, RetrievalRecord{
 			DocumentID: item.hit.DocumentID, DocumentName: item.hit.DocumentName,
 			SegmentID: item.hit.ID, SegmentBatchID: item.hit.SegmentBatchID, Position: item.hit.Position,
-			Content: item.hit.Content, Score: item.score, RerankScore: item.rerankScore, LexicalRank: item.lexicalRank, VectorRank: item.vectorRank,
+			Content: item.hit.Content, Score: item.score, LexicalRank: item.lexicalRank, VectorRank: item.vectorRank,
 		})
 	}
 	slog.Info("知识库混合召回完成",
@@ -292,7 +290,7 @@ func (k *knowledgeSource) retrieve(ctx context.Context, query string) ([]Retriev
 	return records, nil
 }
 
-// retrievalRecords 把召回或阅读结果映射为跨知识库融合使用的统一记录，只有召回结果携带分数，重排后以重排得分为准。
+// retrievalRecords 把召回或阅读结果映射为跨知识库融合使用的统一记录，只有召回结果携带分数。
 func retrievalRecords(records []RetrievalRecord, scored bool) []knowledgeretrieval.Record {
 	output := make([]knowledgeretrieval.Record, 0, len(records))
 	for _, record := range records {
@@ -302,9 +300,6 @@ func retrievalRecords(records []RetrievalRecord, scored bool) []knowledgeretriev
 		}
 		if scored {
 			score := record.Score
-			if record.RerankScore != nil {
-				score = *record.RerankScore
-			}
 			item.Score = &score
 		}
 		output = append(output, item)

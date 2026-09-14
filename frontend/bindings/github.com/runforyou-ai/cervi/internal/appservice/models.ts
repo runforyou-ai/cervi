@@ -2013,7 +2013,7 @@ export interface KnowledgeRetrievalInput {
 }
 
 /**
- * KnowledgeRetrievalRecord 定义检索测试命中的分段、两路名次、融合分数和重排得分；名次为 0 表示该路未命中，未重排时 RerankScore 为空。
+ * KnowledgeRetrievalRecord 定义检索测试命中的分段和最终分数；开启重排时分数为重排得分，否则为融合分数。
  */
 export interface KnowledgeRetrievalRecord {
     "documentId": string;
@@ -2023,9 +2023,6 @@ export interface KnowledgeRetrievalRecord {
     "position": number;
     "content": string;
     "score": number;
-    "rerankScore": number | null;
-    "lexicalRank": number;
-    "vectorRank": number;
 }
 
 /**
