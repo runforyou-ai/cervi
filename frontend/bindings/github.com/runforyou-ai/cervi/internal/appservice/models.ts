@@ -2013,7 +2013,7 @@ export interface KnowledgeRetrievalInput {
 }
 
 /**
- * KnowledgeRetrievalRecord 定义检索测试命中的分段和最终分数；开启重排时分数为重排得分，否则为融合分数。
+ * KnowledgeRetrievalRecord 定义检索测试命中的分段和重排得分。
  */
 export interface KnowledgeRetrievalRecord {
     "documentId": string;

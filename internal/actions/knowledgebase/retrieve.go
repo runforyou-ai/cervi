@@ -40,7 +40,7 @@ type candidateReranker interface {
 	Rerank(context.Context, rerank.Credential, string, string, []string, int) ([]rerank.Score, error)
 }
 
-// RetrievalRecord 定义混合召回返回的一条分段、最终分数和两路名次；开启重排时分数为重排得分，否则为融合分数。
+// RetrievalRecord 定义混合召回返回的一条分段、重排得分和两路名次。
 type RetrievalRecord struct {
 	DocumentID     string
 	DocumentName   string
@@ -53,7 +53,7 @@ type RetrievalRecord struct {
 	VectorRank     int
 }
 
-// RetrievalService 对知识库执行词法与向量并行召回、名次融合和重排，人工检索测试与 Agent 共用。
+// RetrievalService 对知识库执行词法与向量并行召回、名次融合和重排打分，人工检索测试与 Agent 共用。
 type RetrievalService struct {
 	db       *bun.DB
 	embedder queryEmbedder
@@ -67,11 +67,10 @@ func NewRetrievalService(db *bun.DB, embedder queryEmbedder, reranker candidateR
 
 // knowledgeSource 固定一个知识库及其模型凭据，承担该库的召回与阅读。
 type knowledgeSource struct {
-	service  *RetrievalService
-	base     servermodels.KnowledgeBase
-	embed    embedding.Credential
-	rerank   rerank.Credential
-	rerankOn bool
+	service *RetrievalService
+	base    servermodels.KnowledgeBase
+	embed   embedding.Credential
+	rerank  rerank.Credential
 }
 
 // Retrieve 在当前企业的指定知识库中检索单条内容，用于知识库页面的检索测试。
@@ -141,10 +140,7 @@ func (s *RetrievalService) sources(ctx context.Context, organizationID string, k
 	}
 	providerIDs := make([]string, 0, len(bases)*2)
 	for _, base := range bases {
-		providerIDs = append(providerIDs, base.EmbeddingProviderID)
-		if base.RerankProviderID != "" {
-			providerIDs = append(providerIDs, base.RerankProviderID)
-		}
+		providerIDs = append(providerIDs, base.EmbeddingProviderID, base.RerankProviderID)
 	}
 	var providers []servermodels.AIProvider
 	if err := s.db.NewSelect().Model(&providers).Where("aip.organization_id = ? AND aip.id IN (?)", organizationID, bun.In(providerIDs)).Scan(ctx); err != nil {
@@ -170,21 +166,17 @@ func (s *RetrievalService) sources(ctx context.Context, organizationID string, k
 				return nil, &embedding.Error{Code: "embedding_model_unavailable"}
 			}
 			source.embed = embedding.Credential{BaseURL: baseURL, APIKey: provider.APIKey}
-			if base.RerankProviderID != "" {
-				provider, ok := byID[base.RerankProviderID]
-				if !ok {
-					return nil, &rerank.Error{Code: "rerank_model_unavailable"}
-				}
-				source.rerank = rerank.Credential{Brand: provider.Brand, BaseURL: provider.APIURL, APIKey: provider.APIKey}
-				source.rerankOn = true
+			if provider, ok = byID[base.RerankProviderID]; !ok {
+				return nil, &rerank.Error{Code: "rerank_model_unavailable"}
 			}
+			source.rerank = rerank.Credential{Brand: provider.Brand, BaseURL: provider.APIURL, APIKey: provider.APIKey}
 			sources = append(sources, source)
 		}
 	}
 	return sources, nil
 }
 
-// retrieve 并行执行向量路和词法路，按名次倒数融合后交给重排模型，最后截取知识库的召回数量。
+// retrieve 并行执行向量路和词法路，按名次倒数融合选出候选，交给重排模型打分后按得分截取知识库的召回数量。
 func (k *knowledgeSource) retrieve(ctx context.Context, query string) ([]RetrievalRecord, error) {
 	started := time.Now()
 	tsquery, lexical := searchtext.KnowledgeQuery(query)
@@ -250,8 +242,8 @@ func (k *knowledgeSource) retrieve(ctx context.Context, query string) ([]Retriev
 		}
 		return ordered[i].hit.ID < ordered[j].hit.ID
 	})
-	// 已打分的候选按重排得分降序排在前面，供应商未返回得分的候选保持融合顺序和融合分数接在后面。
-	if k.rerankOn && len(ordered) > 0 {
+	// 最终分数与顺序只由重排得分决定，供应商未返回得分的候选不进入结果。
+	if len(ordered) > 0 {
 		documents := make([]string, 0, len(ordered))
 		for _, item := range ordered {
 			documents = append(documents, item.hit.Content)
@@ -260,19 +252,17 @@ func (k *knowledgeSource) retrieve(ctx context.Context, query string) ([]Retriev
 		if err != nil {
 			return nil, fmt.Errorf("rerank knowledge candidates: %w", err)
 		}
-		reranked := make([]*candidate, 0, len(ordered))
+		reranked := make([]*candidate, 0, len(scores))
 		for _, score := range scores {
 			if item := ordered[score.Index]; !item.reranked {
 				item.score, item.reranked = score.Relevance, true
 				reranked = append(reranked, item)
 			}
 		}
-		sort.SliceStable(reranked, func(i, j int) bool { return reranked[i].score > reranked[j].score })
-		for _, item := range ordered {
-			if !item.reranked {
-				reranked = append(reranked, item)
-			}
+		if len(reranked) < len(ordered) {
+			slog.Warn("重排模型未返回全部候选得分", "knowledge_base_id", k.base.ID, "candidate_count", len(ordered), "scored_count", len(reranked))
 		}
+		sort.SliceStable(reranked, func(i, j int) bool { return reranked[i].score > reranked[j].score })
 		ordered = reranked
 	}
 	ordered = ordered[:min(len(ordered), k.base.RetrievalCount)]
@@ -286,7 +276,7 @@ func (k *knowledgeSource) retrieve(ctx context.Context, query string) ([]Retriev
 	}
 	slog.Info("知识库混合召回完成",
 		"knowledge_base_id", k.base.ID, "lexical_count", len(lexicalHits), "vector_count", len(vectorHits),
-		"reranked", k.rerankOn, "result_count", len(records), "duration_ms", time.Since(started).Milliseconds())
+		"result_count", len(records), "duration_ms", time.Since(started).Milliseconds())
 	return records, nil
 }
 

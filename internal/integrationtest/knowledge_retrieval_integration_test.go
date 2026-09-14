@@ -57,12 +57,18 @@ func (p *retrievalProbe) Embed(_ context.Context, _ embedding.Credential, _ stri
 	return vectors, nil
 }
 
-// Rerank 记录调用次数，并给靠后的候选更高的相关性以验证重排结果生效。
+// Rerank 记录调用次数，按候选是否包含退款、发票关键词给出固定相关性。
 func (p *retrievalProbe) Rerank(_ context.Context, _ rerank.Credential, _, _ string, documents []string, _ int) ([]rerank.Score, error) {
 	p.reranked++
 	scores := make([]rerank.Score, 0, len(documents))
-	for index := range documents {
-		scores = append(scores, rerank.Score{Index: index, Relevance: float64(index+1) / float64(len(documents))})
+	for index, document := range documents {
+		relevance := 0.1
+		if strings.Contains(document, "退款") {
+			relevance = 1
+		} else if strings.Contains(document, "发票") {
+			relevance = 0.5
+		}
+		scores = append(scores, rerank.Score{Index: index, Relevance: relevance})
 	}
 	return scores, nil
 }
@@ -93,7 +99,7 @@ func publishRetrievalDocument(t *testing.T, db *bun.DB, probe *retrievalProbe, i
 	return document.ID
 }
 
-// TestKnowledgeHybridRetrieval 验证词法与向量两路召回、名次融合、重排、单路失败保留、企业隔离与游标阅读。
+// TestKnowledgeHybridRetrieval 验证词法与向量两路召回、名次融合、重排得分、单路失败保留、企业隔离与游标阅读。
 func TestKnowledgeHybridRetrieval(t *testing.T) {
 	ctx := context.Background()
 	store, err := serverstorage.Open(ctx, servertest.DatabaseConfig(t))
@@ -114,19 +120,21 @@ func TestKnowledgeHybridRetrieval(t *testing.T) {
 	publishRetrievalDocument(t, db, probe, identity, base, "发票说明.txt", "下单时可以选择开具电子发票。")
 	publishRetrievalDocument(t, db, probe, identity, base, "配送说明.txt", "配送时效按收货地址计算。")
 
-	// 词法路与向量路都命中退款文档，融合后排在首位。
+	// 词法路与向量路都命中退款文档，最终分数为重排得分。
 	records, err := service.Retrieve(ctx, identity, base.ID, "如何申请退款")
 	if err != nil || len(records) == 0 || records[0].DocumentID != refundID || records[0].DocumentName != "退款政策.txt" {
 		t.Fatalf("records=%+v err=%v", records, err)
 	}
-	if records[0].LexicalRank == 0 || records[0].VectorRank == 0 || records[0].Score <= 0 || records[0].SegmentBatchID == "" || records[0].Position == 0 {
+	if records[0].LexicalRank == 0 || records[0].VectorRank == 0 || records[0].Score != 1 || records[0].SegmentBatchID == "" || records[0].Position == 0 {
 		t.Fatalf("first=%+v", records[0])
 	}
-	if len(records) > base.RetrievalCount {
-		t.Fatalf("count=%d limit=%d", len(records), base.RetrievalCount)
+	if len(records) > base.RetrievalCount || probe.reranked != 1 {
+		t.Fatalf("count=%d limit=%d reranked=%d", len(records), base.RetrievalCount, probe.reranked)
 	}
-	if probe.reranked != 0 || records[0].Score >= 1 {
-		t.Fatalf("reranked=%d first=%+v", probe.reranked, records[0])
+	// 两路都把发票文档排在首位，重排后退款文档仍按得分排在前面。
+	records, err = service.Retrieve(ctx, identity, base.ID, "发票")
+	if err != nil || len(records) < 2 || records[0].DocumentID != refundID || records[0].LexicalRank != 0 {
+		t.Fatalf("records=%+v err=%v", records, err)
 	}
 
 	// 多知识库来源经统一融合返回，并可按游标读取相邻分段。
@@ -161,16 +169,15 @@ func TestKnowledgeHybridRetrieval(t *testing.T) {
 	}
 	probe.embedFail = false
 
-	// 开启重排后按重排模型返回的相关性重新排序。
+	// 召回数量限制作用于重排后的结果。
 	input := newKnowledgeBaseInput(t, db, identity, base.Name, base.Category)
-	input.EmbeddingProviderID, input.RetrievalCount = base.EmbeddingProviderID, 2
-	input.RerankProviderID, input.RerankModelIdentifier = base.EmbeddingProviderID, "rerank"
+	input.EmbeddingProviderID, input.RerankProviderID, input.RetrievalCount = base.EmbeddingProviderID, base.EmbeddingProviderID, 2
 	if _, err := knowledgeaction.NewUpdateKnowledgeBaseAction(db).Execute(ctx, identity, base.ID, input); err != nil {
 		t.Fatal(err)
 	}
 	records, err = service.Retrieve(ctx, identity, base.ID, "如何申请退款")
-	if err != nil || probe.reranked != 1 || len(records) != 2 || records[0].DocumentID == refundID || records[0].Score != 1 {
-		t.Fatalf("records=%+v reranked=%d err=%v", records, probe.reranked, err)
+	if err != nil || len(records) != 2 || records[0].DocumentID != refundID || records[1].DocumentID != refundID {
+		t.Fatalf("records=%+v err=%v", records, err)
 	}
 
 	if _, err := service.Retrieve(ctx, identity, base.ID, "   "); !errors.Is(err, knowledgeaction.ErrRetrievalQueryInvalid) {

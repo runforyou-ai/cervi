@@ -18,7 +18,7 @@ type KnowledgeBase struct {
 	ChunkLength              *int   `bun:"chunk_length"`
 	ChunkOverlap             *int   `bun:"chunk_overlap"`
 	RetrievalCount           int    `bun:"retrieval_count"`
-	RerankProviderID         string `bun:"rerank_provider_id,nullzero"`
+	RerankProviderID         string `bun:"rerank_provider_id"`
 	RerankModelIdentifier    string `bun:"rerank_model_identifier"`
 
 	ID              string    `bun:"id,pk"`
