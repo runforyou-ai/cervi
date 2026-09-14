@@ -317,6 +317,9 @@ type Backend interface {
 	// ListKnowledgeDocumentSegments 返回固定批次的分段页或锚点所在页。
 	//cervi:route GET /knowledge-bases/:knowledgeBaseID/documents/:documentID/segments
 	ListKnowledgeDocumentSegments(context.Context, RequestMeta, string, string, KnowledgeDocumentSegmentInput) (KnowledgeDocumentSegmentPage, error)
+	// RetrieveKnowledgeBase 在指定知识库中执行检索测试，返回混合召回与重排后的分段。
+	//cervi:route POST /knowledge-bases/:knowledgeBaseID/retrieval
+	RetrieveKnowledgeBase(context.Context, RequestMeta, string, KnowledgeRetrievalInput) (KnowledgeRetrievalResult, error)
 	// ListKnowledgeDocuments 返回当前分组的文档列表。
 	//cervi:route GET /knowledge-bases/:knowledgeBaseID/documents
 	ListKnowledgeDocuments(context.Context, RequestMeta, string, KnowledgeDocumentListInput) (KnowledgeDocumentList, error)

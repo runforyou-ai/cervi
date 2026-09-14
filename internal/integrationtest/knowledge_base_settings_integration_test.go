@@ -34,7 +34,7 @@ func newKnowledgeBaseInput(t *testing.T, db *bun.DB, identity *servermodels.Iden
 		t.Fatal(err)
 	}
 	length, overlap := 512, 50
-	input := knowledgeaction.Input{Name: name, Category: category, EmbeddingProviderID: provider.ID, EmbeddingModelIdentifier: "embedding-a", EmbeddingDimension: 1024, RetrievalCount: 3}
+	input := knowledgeaction.Input{Name: name, Category: category, EmbeddingProviderID: provider.ID, EmbeddingModelIdentifier: "embedding-a", EmbeddingDimension: 1024, RetrievalCount: 3, RerankProviderID: provider.ID, RerankModelIdentifier: "rerank"}
 	if category == domain.KnowledgeBaseCategoryStandard {
 		input.ChunkLength, input.ChunkOverlap = &length, &overlap
 	}
@@ -52,7 +52,6 @@ func TestKnowledgeBaseSettings(t *testing.T) {
 	db := store.DB()
 	identity, qa := newQAFixture(t, db)
 	input := newKnowledgeBaseInput(t, db, identity, "配置测试", domain.KnowledgeBaseCategoryStandard)
-	input.RerankProviderID, input.RerankModelIdentifier = input.EmbeddingProviderID, "rerank"
 	create, update := knowledgeaction.NewCreateKnowledgeBaseAction(db), knowledgeaction.NewUpdateKnowledgeBaseAction(db)
 	base, err := create.Execute(ctx, identity, input)
 	if err != nil {
@@ -62,11 +61,17 @@ func TestKnowledgeBaseSettings(t *testing.T) {
 		t.Fatalf("base=%+v", base)
 	}
 	input.EmbeddingModelIdentifier, input.EmbeddingDimension, input.RetrievalCount = "embedding-b", 768, 20
-	input.RerankProviderID, input.RerankModelIdentifier = "", ""
 	updated, err := update.Execute(ctx, identity, base.ID, input)
-	if err != nil || updated.EmbeddingModelIdentifier != "embedding-b" || updated.EmbeddingDimension != 768 || updated.RetrievalCount != 20 || updated.RerankProviderID != "" || updated.RerankModelIdentifier != "" {
+	if err != nil || updated.EmbeddingModelIdentifier != "embedding-b" || updated.EmbeddingDimension != 768 || updated.RetrievalCount != 20 || updated.RerankModelIdentifier != "rerank" {
 		t.Fatalf("updated=%+v err=%v", updated, err)
 	}
+	// 重排模型为必填项。
+	var fieldError *common.FieldError
+	input.RerankProviderID, input.RerankModelIdentifier = "", ""
+	if _, err := update.Execute(ctx, identity, base.ID, input); !errors.As(err, &fieldError) || fieldError.Fields["rerankModelIdentifier"] != knowledgeaction.ValidationRerankModelInvalid {
+		t.Fatalf("rerank required error=%v", err)
+	}
+	input.RerankProviderID, input.RerankModelIdentifier = input.EmbeddingProviderID, "rerank"
 	loaded, err := knowledgeaction.NewGetKnowledgeBaseQuery(db).Execute(ctx, identity, base.ID)
 	if err != nil || loaded.EmbeddingDimension != 768 {
 		t.Fatalf("loaded=%+v err=%v", loaded, err)
@@ -83,7 +88,6 @@ func TestKnowledgeBaseSettings(t *testing.T) {
 	}
 	foreignIdentity, _ := newQAFixture(t, db)
 	_, err = create.Execute(ctx, foreignIdentity, input)
-	var fieldError *common.FieldError
 	if !errors.As(err, &fieldError) || fieldError.Fields["embeddingModelIdentifier"] != knowledgeaction.ValidationEmbeddingModelInvalid {
 		t.Fatalf("foreign model error=%v", err)
 	}

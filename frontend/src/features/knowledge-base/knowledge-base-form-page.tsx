@@ -85,6 +85,7 @@ export function KnowledgeBaseFormPage({
         chunkLengthInvalid: t("validation.chunkLengthInvalid"),
         chunkOverlapInvalid: t("validation.chunkOverlapInvalid"),
         retrievalCountInvalid: t("validation.retrievalCountInvalid"),
+        rerankModelRequired: t("validation.rerankModelRequired"),
       }, isQA),
     [t, isQA],
   )

@@ -489,6 +489,11 @@ func (s *Service) ListKnowledgeDocumentSegments(ctx context.Context, meta Reques
 	return withNormalizedSlices(s.backend.ListKnowledgeDocumentSegments(ctx, meta, knowledgeBaseID, documentID, input))
 }
 
+// RetrieveKnowledgeBase 在指定知识库中执行检索测试，返回混合召回与重排后的分段。
+func (s *Service) RetrieveKnowledgeBase(ctx context.Context, meta RequestMeta, knowledgeBaseID string, input KnowledgeRetrievalInput) (KnowledgeRetrievalResult, error) {
+	return withNormalizedSlices(s.backend.RetrieveKnowledgeBase(ctx, meta, knowledgeBaseID, input))
+}
+
 // ListKnowledgeDocuments 返回当前分组的文档列表。
 func (s *Service) ListKnowledgeDocuments(ctx context.Context, meta RequestMeta, knowledgeBaseID string, input KnowledgeDocumentListInput) (KnowledgeDocumentList, error) {
 	return withNormalizedSlices(s.backend.ListKnowledgeDocuments(ctx, meta, knowledgeBaseID, input))

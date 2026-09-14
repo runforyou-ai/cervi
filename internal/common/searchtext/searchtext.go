@@ -1,4 +1,4 @@
-// Package searchtext 为聊天记录检索生成 tsvector 词元、tsquery 条件和命中摘要。
+// Package searchtext 为聊天记录和知识库检索生成 tsvector 词元、tsquery 条件和命中摘要。
 package searchtext
 
 import (
@@ -29,8 +29,8 @@ type slot struct {
 	start, end int
 }
 
-// tokenize 按字规范化原文，切分为单字和字母、数字连续片段，标点与空白不占位置。
-func tokenize(text string) []slot {
+// tokenize 按字规范化原文，切分为单字和字母、数字连续片段，标点与空白不占位置；pinyin 为真时汉字附带读音词元。
+func tokenize(text string, pinyin bool) []slot {
 	var slots []slot
 	var word []rune
 	wordStart, wordEnd := 0, 0
@@ -46,7 +46,11 @@ func tokenize(text string) []slot {
 			switch {
 			case unicode.In(r, unicode.Han, unicode.Hiragana, unicode.Katakana, unicode.Hangul):
 				flush()
-				slots = append(slots, slot{lexemes: append([]string{string(r)}, pinyinLexemes(r)...), start: index, end: index + 1})
+				lexemes := []string{string(r)}
+				if pinyin {
+					lexemes = append(lexemes, pinyinLexemes(r)...)
+				}
+				slots = append(slots, slot{lexemes: lexemes, start: index, end: index + 1})
 			case unicode.IsLetter(r) || unicode.IsNumber(r):
 				// 字母与数字交界处拆成两个片段，使 E731 与 E-731 得到相同词元。
 				if len(word) > 0 && unicode.IsNumber(word[len(word)-1]) != unicode.IsNumber(r) {
@@ -71,22 +75,32 @@ func Vector(texts ...string) string {
 	positions := map[string][]int{}
 	position := 0
 	for _, text := range texts {
-		for _, item := range tokenize(text) {
+		for _, item := range tokenize(text, true) {
 			position++
 			for _, lexeme := range item.lexemes {
-				if len(positions[lexeme]) < maxLexemePositions {
-					positions[lexeme] = append(positions[lexeme], min(position, maxPosition))
-				}
+				addPosition(positions, lexeme, position)
 			}
 		}
 		position++
 	}
+	return vectorLiteral(positions)
+}
+
+// addPosition 记录词元出现位置，超出单个词元的位置数量或位置值上限时截断。
+func addPosition(positions map[string][]int, lexeme string, position int) {
+	if len(positions[lexeme]) < maxLexemePositions {
+		positions[lexeme] = append(positions[lexeme], min(position, maxPosition))
+	}
+}
+
+// vectorLiteral 把词元位置表转成 tsvector 字面量。
+func vectorLiteral(positions map[string][]int) string {
 	var builder strings.Builder
 	for _, lexeme := range slices.Sorted(maps.Keys(positions)) {
 		if builder.Len() > 0 {
 			builder.WriteByte(' ')
 		}
-		// 词元只由字母、数字、单字和读音前缀组成，不含需要转义的引号或反斜杠。
+		// 词元只由字母、数字、汉字和读音前缀组成，不含需要转义的引号或反斜杠。
 		builder.WriteString("'" + lexeme + "':")
 		for index, value := range positions[lexeme] {
 			if index > 0 {

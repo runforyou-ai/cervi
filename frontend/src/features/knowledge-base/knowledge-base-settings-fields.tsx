@@ -47,8 +47,8 @@ function KnowledgeModelField({ control, name, providers }: {
   providers: AIProviderSummaryData[]
 }) {
   const { t } = useTranslation("knowledgeBase")
-  const required = name === "embeddingModel"
-  const type = required ? AIModelType.AIModelTypeEmbedding : AIModelType.AIModelTypeRerank
+  const embedding = name === "embeddingModel"
+  const type = embedding ? AIModelType.AIModelTypeEmbedding : AIModelType.AIModelTypeRerank
   const groups = providers.map((provider) => ({
     ...provider,
     models: provider.models.filter((model) => model.type === type),
@@ -56,9 +56,9 @@ function KnowledgeModelField({ control, name, providers }: {
   return (
     <Controller control={control} name={name} render={({ field, fieldState }) => (
       <Field data-invalid={fieldState.invalid}>
-        <FieldLabel htmlFor={name} required={required}>{t(`form.${name}`)}</FieldLabel>
-        <NativeSelect {...field} id={name} required={required} aria-invalid={fieldState.invalid}>
-          <option value="">{t(required ? "form.selectEmbeddingModel" : "form.noRerank")}</option>
+        <FieldLabel htmlFor={name} required>{t(`form.${name}`)}</FieldLabel>
+        <NativeSelect {...field} id={name} required aria-invalid={fieldState.invalid}>
+          <option value="">{t(embedding ? "form.selectEmbeddingModel" : "form.selectRerankModel")}</option>
           {groups.map((provider) => (
             <optgroup key={provider.id} label={provider.name}>
               {provider.models.map((model) => (
@@ -67,7 +67,7 @@ function KnowledgeModelField({ control, name, providers }: {
             </optgroup>
           ))}
         </NativeSelect>
-        {groups.length === 0 && <FieldDescription>{t(required ? "form.noEmbeddingModels" : "form.noRerankModels")}</FieldDescription>}
+        {groups.length === 0 && <FieldDescription>{t(embedding ? "form.noEmbeddingModels" : "form.noRerankModels")}</FieldDescription>}
       </Field>
     )} />
   )

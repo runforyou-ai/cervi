@@ -14,10 +14,7 @@ import (
 
 // validateModels 锁定同企业供应商并校验知识库所选模型用途。
 func validateModels(ctx context.Context, tx bun.Tx, organizationID string, input Input) error {
-	providerIDs := []string{input.EmbeddingProviderID}
-	if input.RerankProviderID != "" {
-		providerIDs = append(providerIDs, input.RerankProviderID)
-	}
+	providerIDs := []string{input.EmbeddingProviderID, input.RerankProviderID}
 	slices.Sort(providerIDs)
 	providers := make([]servermodels.AIProvider, 0)
 	if err := tx.NewSelect().Model(&providers).Where("organization_id = ?", organizationID).
@@ -33,9 +30,6 @@ func validateModels(ctx context.Context, tx bun.Tx, organizationID string, input
 		{input.EmbeddingProviderID, input.EmbeddingModelIdentifier, "embeddingModelIdentifier", domain.AIModelTypeEmbedding, ValidationEmbeddingModelInvalid},
 		{input.RerankProviderID, input.RerankModelIdentifier, "rerankModelIdentifier", domain.AIModelTypeRerank, ValidationRerankModelInvalid},
 	} {
-		if selected.providerID == "" {
-			continue
-		}
 		found := slices.ContainsFunc(providers, func(provider servermodels.AIProvider) bool { return provider.ID == selected.providerID })
 		if found {
 			var err error

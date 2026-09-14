@@ -15,6 +15,7 @@ import (
 	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
 	"github.com/runforyou-ai/cervi/internal/api"
 	"github.com/runforyou-ai/cervi/internal/appservice"
+	"github.com/runforyou-ai/cervi/internal/common/searchtext"
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/ingress"
@@ -55,6 +56,10 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	attachmentScheme := "http"
 	if config.TLS.Mode != "off" {
 		attachmentScheme = "https"
+	}
+	// 知识库分词词典在启动时加载一次，供分段写入与词法召回共用。
+	if err := searchtext.LoadKnowledgeDictionary(); err != nil {
+		return nil, err
 	}
 	processDocument := knowledgeaction.NewProcessDocumentAction(appStorage.DB(), documentConverter, embedding.NewClient(), fileReader)
 	if err := tasks.Registry().RegisterJSONWithTerminalFailure(knowledgeaction.ProcessDocumentActionName, processDocument.Execute, processDocument.FinalizeFailure); err != nil {

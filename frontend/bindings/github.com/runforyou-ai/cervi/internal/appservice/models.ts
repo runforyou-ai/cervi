@@ -2006,6 +2006,33 @@ export interface KnowledgeQASummary {
 }
 
 /**
+ * KnowledgeRetrievalInput 定义检索测试的查询内容。
+ */
+export interface KnowledgeRetrievalInput {
+    "query": string;
+}
+
+/**
+ * KnowledgeRetrievalRecord 定义检索测试命中的分段和重排得分。
+ */
+export interface KnowledgeRetrievalRecord {
+    "documentId": string;
+    "documentName": string;
+    "segmentId": string;
+    "segmentBatchId": string;
+    "position": number;
+    "content": string;
+    "score": number;
+}
+
+/**
+ * KnowledgeRetrievalResult 定义检索测试结果。
+ */
+export interface KnowledgeRetrievalResult {
+    "records": KnowledgeRetrievalRecord[] | null;
+}
+
+/**
  * LoadInboxInput 定义统一收件箱筛选和分页边界。
  */
 export interface LoadInboxInput {
