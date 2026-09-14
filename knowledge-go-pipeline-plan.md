@@ -219,11 +219,13 @@ docker compose up -d postgres nats markitdown
 
 ## 10. 后续
 
-向量召回尚未接线：`internal/integration/knowledgeretrieval` 已提供多查询 RRF 融合和游标读取，但 `Source{Retrieve, Read}` 没有任何实现，应用层也未注入 `KnowledgeSearch`。后续 PR 按下述边界接入 pgvector：
+向量召回与词法召回已接入知识库页面的检索测试：分段存储收敛在 `internal/actions/knowledgebase/segment_store.go`（批次写入、按文档删除、向量检索、词法检索、按位置阅读），`RetrievalService` 按知识库并行执行 pgvector 余弦最近邻与 `tsvector` 词法召回，各取前 50 条候选做 RRF 融合，配置了重排模型时再经重排打分，最后截取知识库的召回数量。`knowledgeretrieval.Source` 与该文件共同构成将来切换向量存储的唯一改动面。已落实的边界：
 
-- 把分段存储收敛为一个接口（批次写入、按文档删除、向量检索、按位置读取），pgvector 实现先落地。`knowledgeretrieval.Source` 与该接口共同构成将来切换向量存储的唯一改动面。
-- 检索 SQL 必须带 `embedding_dimension` 谓词才能命中 halfvec 部分索引。
-- 本地问答路在进入融合前按条目折叠，`documentId` 与 `segmentId` 都使用问答条目编号，位置固定为 1。
+- 检索 SQL 以字面量写入 `embedding_dimension` 谓词和 `halfvec(N)` 类型，命中对应维度的部分索引。
+- 词法路 GIN 命中后至多取 2000 条候选按 `ts_rank_cd` 排名，超过上限时为近似排名。
+- 重排接口按品牌适配：阿里云走 DashScope 原生重排接口，其余品牌走 `/rerank` 通用格式。
+
+尚未完成：Agent 运行期注入 `KnowledgeSearch`（按 Run 绑定 Revision 的知识库范围调用 `RetrievalService.Sources`）；本地问答路在进入融合前按条目折叠，`documentId` 与 `segmentId` 都使用问答条目编号，位置固定为 1。
 
 Qdrant 暂不引入。触发条件是单企业分段规模进入千万级、或确认需要 sparse 与 dense 原生混合检索；在此之前跨库双写会破坏删除文档时的事务一致性，并把企业隔离从 SQL 条件降级为 payload 过滤。
 

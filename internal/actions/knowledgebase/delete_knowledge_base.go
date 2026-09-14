@@ -35,7 +35,7 @@ func (a *DeleteKnowledgeBaseAction) Execute(ctx context.Context, identity *serve
 		if err := tx.NewSelect().Model(&locked).Where("kd.knowledge_base_id = ?", knowledgeBaseID).Order("kd.id").For("UPDATE").Scan(ctx); err != nil {
 			return err
 		}
-		if _, err := tx.NewDelete().TableExpr("public.knowledge_segments").Where("meta->>'knowledge_base_id' = ?", knowledgeBaseID).Exec(ctx); err != nil {
+		if err := deleteKnowledgeBaseSegments(ctx, tx, knowledgeBaseID); err != nil {
 			return err
 		}
 		// 文档原件在事务中释放，后台文件任务负责实际清理。

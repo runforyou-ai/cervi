@@ -9,7 +9,7 @@ Cervi 管理本地知识库、分组和问答内容。外部系统后续统一�
 - `internal/integration/knowledgeretrieval`：多查询、多知识库的并发检索、去重、RRF 排序和游标上下文读取。
 - `internal/integration/agentruntime/knowledge.go`：将上述业务契约注册为 `search_knowledge` Tool。
 
-Agent 创建和编辑支持绑定当前企业的本地知识库，范围保存到不可变 Revision，保存时校验并锁定同企业知识库。删除知识库后保留失效绑定供用户移除。本地索引与检索尚未接通，应用层当前不注入 `KnowledgeSearch`；后续按 [本地知识库接入方案](knowledge-base-plan.md) 接通真实检索时使用已保存的范围。
+Agent 创建和编辑支持绑定当前企业的本地知识库，范围保存到不可变 Revision，保存时校验并锁定同企业知识库。删除知识库后保留失效绑定供用户移除。本地混合检索已由 `knowledgebase.RetrievalService` 提供并接入知识库页面的检索测试，`Sources` 按企业和知识库范围构造 `knowledgeretrieval.Source`；Agent 运行期尚未注入 `KnowledgeSearch`，接通时使用已保存的范围。
 
 ## 本地检索的职责
 

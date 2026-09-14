@@ -37,7 +37,7 @@ type Segment struct {
 func ParseQuery(input string) (Query, bool) {
 	var query Query
 	for _, field := range strings.FieldsFunc(input, unicode.IsSpace) {
-		slots := tokenize(field)
+		slots := tokenize(field, false)
 		if len(slots) == 0 {
 			continue
 		}
@@ -98,7 +98,7 @@ func (p pattern) matches(slots []slot) bool {
 // Excerpt 返回从首个命中附近开始的单行摘要；文本不含命中时返回 false。
 func (q Query) Excerpt(text string) ([]Segment, bool) {
 	runes := []rune(text)
-	slots := tokenize(text)
+	slots := tokenize(text, true)
 	matched := make([]bool, len(runes))
 	found := false
 	for _, alternatives := range q.terms {
