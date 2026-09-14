@@ -60,6 +60,8 @@ func run(arguments []string) error {
 		Name:        "Cervi",
 		Description: "Cervi is an open-source AI customer support teammate platform",
 		Services:    services,
+		// 由 Wails 服务端运行时监听退出信号。
+		DisableDefaultSignalHandler: true,
 		Assets: application.AssetOptions{
 			Handler:    application.AssetFileServerFS(assets),
 			Middleware: api.TenantContextMiddleware,
@@ -71,5 +73,11 @@ func run(arguments []string) error {
 	})
 
 	slog.Info("启动 Cervi 服务端", "host", config.Server.Host, "port", config.Server.Port, "tls_mode", config.TLS.Mode)
-	return app.Run()
+	runErr := app.Run()
+	// Run 返回后同步执行应用清理。
+	app.Quit()
+	if runErr == nil {
+		slog.Info("Cervi 服务端已停止")
+	}
+	return runErr
 }
