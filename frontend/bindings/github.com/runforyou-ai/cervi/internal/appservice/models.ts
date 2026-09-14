@@ -2015,7 +2015,7 @@ export interface KnowledgeRetrievalInput {
 }
 
 /**
- * KnowledgeRetrievalRecord 定义检索测试命中的分段和重排得分。
+ * KnowledgeRetrievalRecord 定义检索测试命中的来源片段和重排得分；问答记录的编号为条目编号并携带完整答案。
  */
 export interface KnowledgeRetrievalRecord {
     "documentId": string;
@@ -2024,6 +2024,7 @@ export interface KnowledgeRetrievalRecord {
     "segmentBatchId": string;
     "position": number;
     "content": string;
+    "answer": string;
     "score": number;
 }
 

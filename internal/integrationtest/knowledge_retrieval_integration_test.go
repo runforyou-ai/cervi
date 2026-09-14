@@ -196,3 +196,117 @@ func TestKnowledgeHybridRetrieval(t *testing.T) {
 		t.Fatalf("err=%v", err)
 	}
 }
+
+// publishQAEntry 保存一条问答并执行索引任务，返回条目编号。
+func publishQAEntry(t *testing.T, db *bun.DB, probe *retrievalProbe, identity *servermodels.Identity, base *knowledgeaction.Record, input knowledgeaction.QAInput) string {
+	t.Helper()
+	ctx := context.Background()
+	input.GroupID = base.Groups[0].ID
+	entry, err := knowledgeaction.NewSaveQAEntryAction(db, newKnowledgeTasks(t, db)).Execute(ctx, identity, base.ID, "", input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	task, _ := qaProcessInput(t, db, identity.Organization.ID, base.ID, entry.ID)
+	if err := knowledgeaction.NewProcessQAEntryAction(db, probe).Execute(ctx, task); err != nil {
+		t.Fatal(err)
+	}
+	return entry.ID
+}
+
+// TestKnowledgeQARetrieval 验证问答库的就绪判断、问题与答案片段命中折叠为条目、完整答案交付以及游标读取与失效。
+func TestKnowledgeQARetrieval(t *testing.T) {
+	ctx := context.Background()
+	store, err := serverstorage.Open(ctx, servertest.DatabaseConfig(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	db := store.DB()
+	identity, base := newQAFixture(t, db)
+	probe := &retrievalProbe{}
+	service := knowledgeaction.NewRetrievalService(db, probe, probe)
+	if _, err := service.Retrieve(ctx, identity, base.ID, "退款"); !errors.Is(err, knowledgeaction.ErrRetrievalNotReady) {
+		t.Fatalf("err=%v", err)
+	}
+	answer := strings.Repeat("进入订单详情申请退款，审核通过后退款原路返回。", 40)
+	refundID := publishQAEntry(t, db, probe, identity, base, knowledgeaction.QAInput{Question: "如何退款？", Answer: answer, SimilarQuestions: []knowledgeaction.QASimilarQuestion{{Content: "退款入口在哪里"}, {Content: "怎么申请退款"}}})
+	invoiceID := publishQAEntry(t, db, probe, identity, base, knowledgeaction.QAInput{Question: "怎么开发票", Answer: "下单时选择电子发票。"})
+	publishQAEntry(t, db, probe, identity, base, knowledgeaction.QAInput{Question: "配送要多久", Answer: "配送时效按收货地址计算。"})
+
+	// 主问题、相似问题和多段答案都命中退款条目，折叠后只返回一条并携带完整答案。
+	records, err := service.Retrieve(ctx, identity, base.ID, "怎么申请退款")
+	if err != nil || len(records) == 0 {
+		t.Fatalf("records=%+v err=%v", records, err)
+	}
+	first := records[0]
+	if first.DocumentID != refundID || first.SegmentID != refundID || first.Position != 1 || first.DocumentName != "如何退款？" || first.Answer != answer || first.Score != 1 {
+		t.Fatalf("first=%+v", first)
+	}
+	if first.LexicalRank == 0 || first.VectorRank == 0 || !strings.Contains(first.Content, "退款") {
+		t.Fatalf("first=%+v", first)
+	}
+	for _, record := range records[1:] {
+		if record.DocumentID == refundID {
+			t.Fatalf("refund entry not folded: %+v", records)
+		}
+		if record.Answer == "" || record.SegmentID != record.DocumentID {
+			t.Fatalf("record=%+v", record)
+		}
+	}
+	if len(records) > base.RetrievalCount {
+		t.Fatalf("count=%d limit=%d", len(records), base.RetrievalCount)
+	}
+	// 发票查询命中发票条目并返回其答案。
+	records, err = service.Retrieve(ctx, identity, base.ID, "发票")
+	if err != nil {
+		t.Fatal(err)
+	}
+	found := false
+	for _, record := range records {
+		if record.DocumentID == invoiceID {
+			found = record.Answer == "下单时选择电子发票。" && record.DocumentName == "怎么开发票"
+		}
+	}
+	if !found {
+		t.Fatalf("records=%+v", records)
+	}
+
+	// 跨知识库融合返回问答答案，游标读取返回条目本身。
+	sources, err := service.Sources(ctx, identity.Organization.ID, []string{base.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	result, err := knowledgeretrieval.Search(ctx, sources, knowledgeretrieval.Request{Queries: []string{"退款", "退款入口"}})
+	if err != nil || len(result.Records) == 0 || result.Records[0].DocumentID != refundID || result.Records[0].Answer == nil || *result.Records[0].Answer != answer {
+		t.Fatalf("result=%+v err=%v", result, err)
+	}
+	for _, record := range result.Records[1:] {
+		if record.DocumentID == refundID {
+			t.Fatalf("refund entry duplicated across queries: %+v", result.Records)
+		}
+	}
+	cursor := result.Records[0].Cursor
+	window, err := knowledgeretrieval.Search(ctx, sources, knowledgeretrieval.Request{Cursor: &cursor, Before: 1, After: 1})
+	if err != nil || len(window.Records) != 1 || window.Records[0].SegmentID != refundID || window.Records[0].Content != "如何退款？" || window.Records[0].Answer == nil || *window.Records[0].Answer != answer {
+		t.Fatalf("window=%+v err=%v", window, err)
+	}
+	other, _ := newQAFixture(t, db)
+	if _, err := service.Retrieve(ctx, other, base.ID, "退款"); !errors.Is(err, knowledgeaction.ErrNotFound) {
+		t.Fatalf("err=%v", err)
+	}
+	if err := knowledgeaction.NewDeleteQAEntryAction(db).Execute(ctx, identity, base.ID, refundID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := knowledgeretrieval.Search(ctx, sources, knowledgeretrieval.Request{Cursor: &cursor}); !errors.Is(err, knowledgeaction.ErrSegmentStale) {
+		t.Fatalf("err=%v", err)
+	}
+	records, err = service.Retrieve(ctx, identity, base.ID, "退款")
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, record := range records {
+		if record.DocumentID == refundID {
+			t.Fatalf("deleted entry returned: %+v", records)
+		}
+	}
+}

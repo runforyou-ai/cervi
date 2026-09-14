@@ -4,6 +4,7 @@ package knowledgebase
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"log/slog"
@@ -40,7 +41,8 @@ type candidateReranker interface {
 	Rerank(context.Context, rerank.Credential, string, string, []string, int) ([]rerank.Score, error)
 }
 
-// RetrievalRecord 定义混合召回返回的一条分段、重排得分和两路名次。
+// RetrievalRecord 定义混合召回返回的一条来源片段、重排得分和两路名次。
+// 文档记录指向命中的分段；问答记录以条目编号作为文档与分段编号，位置固定为 1，并携带完整答案。
 type RetrievalRecord struct {
 	DocumentID     string
 	DocumentName   string
@@ -48,6 +50,7 @@ type RetrievalRecord struct {
 	SegmentBatchID string
 	Position       int
 	Content        string
+	Answer         string
 	Score          float64
 	LexicalRank    int
 	VectorRank     int
@@ -83,8 +86,12 @@ func (s *RetrievalService) Retrieve(ctx context.Context, identity *servermodels.
 	if err != nil {
 		return nil, err
 	}
-	published, err := s.db.NewSelect().Model((*servermodels.KnowledgeDocument)(nil)).
-		Where("kd.knowledge_base_id = ? AND kd.segment_batch_id IS NOT NULL", knowledgeBaseID).Exists(ctx)
+	// 按知识库类别检查是否存在已发布批次的来源。
+	ready := s.db.NewSelect().Model((*servermodels.KnowledgeDocument)(nil)).Where("kd.knowledge_base_id = ? AND kd.segment_batch_id IS NOT NULL", knowledgeBaseID)
+	if sources[0].base.Category == string(domain.KnowledgeBaseCategoryQA) {
+		ready = s.db.NewSelect().Model((*servermodels.KnowledgeQAEntry)(nil)).Where("kqe.knowledge_base_id = ? AND kqe.segment_batch_id IS NOT NULL", knowledgeBaseID)
+	}
+	published, err := ready.Exists(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -109,15 +116,8 @@ func (s *RetrievalService) Sources(ctx context.Context, organizationID string, k
 				return retrievalRecords(records, true), err
 			},
 			Read: func(ctx context.Context, cursor knowledgeretrieval.Cursor, before, after int) ([]knowledgeretrieval.Record, error) {
-				hits, err := readSegmentWindow(ctx, s.db, source.base, cursor.DocumentID, cursor.SegmentID, before, after)
-				if err != nil {
-					return nil, err
-				}
-				records := make([]RetrievalRecord, 0, len(hits))
-				for _, hit := range hits {
-					records = append(records, RetrievalRecord{DocumentID: hit.SourceID, DocumentName: hit.SourceName, SegmentID: hit.ID, SegmentBatchID: hit.SegmentBatchID, Position: hit.Position, Content: hit.Content})
-				}
-				return retrievalRecords(records, false), nil
+				records, err := source.read(ctx, cursor.DocumentID, cursor.SegmentID, before, after)
+				return retrievalRecords(records, false), err
 			},
 		})
 	}
@@ -265,6 +265,19 @@ func (k *knowledgeSource) retrieve(ctx context.Context, query string) ([]Retriev
 		sort.SliceStable(reranked, func(i, j int) bool { return reranked[i].score > reranked[j].score })
 		ordered = reranked
 	}
+	// 问答库按条目折叠，保留每个条目得分最高的片段。
+	qa := k.base.Category == string(domain.KnowledgeBaseCategoryQA)
+	if qa {
+		seen := make(map[string]bool, len(ordered))
+		folded := make([]*candidate, 0, len(ordered))
+		for _, item := range ordered {
+			if !seen[item.hit.SourceID] {
+				seen[item.hit.SourceID] = true
+				folded = append(folded, item)
+			}
+		}
+		ordered = folded
+	}
 	ordered = ordered[:min(len(ordered), k.base.RetrievalCount)]
 	records := make([]RetrievalRecord, 0, len(ordered))
 	for _, item := range ordered {
@@ -274,10 +287,68 @@ func (k *knowledgeSource) retrieve(ctx context.Context, query string) ([]Retriev
 			Content: item.hit.Content, Score: item.score, LexicalRank: item.lexicalRank, VectorRank: item.vectorRank,
 		})
 	}
+	if qa {
+		if err := attachQAAnswers(ctx, k.service.db, records); err != nil {
+			return nil, err
+		}
+	}
 	slog.Info("知识库混合召回完成",
 		"knowledge_base_id", k.base.ID, "lexical_count", len(lexicalHits), "vector_count", len(vectorHits),
 		"result_count", len(records), "duration_ms", time.Since(started).Milliseconds())
 	return records, nil
+}
+
+// read 读取游标指向的内容：文档返回分段及前后相邻分段，问答返回条目本身。
+func (k *knowledgeSource) read(ctx context.Context, sourceID, segmentID string, before, after int) ([]RetrievalRecord, error) {
+	if k.base.Category == string(domain.KnowledgeBaseCategoryQA) {
+		if !common.ValidUUID(sourceID) || sourceID != segmentID {
+			return nil, ErrSegmentStale
+		}
+		var question string
+		err := k.service.db.NewSelect().TableExpr("knowledge_qa_entries AS kqe").ColumnExpr("question.content").
+			Join("JOIN knowledge_qa_contents question ON question.entry_id = kqe.id AND question.kind = ?", domain.KnowledgeQAContentPrimaryQuestion).
+			Where("kqe.id = ? AND kqe.knowledge_base_id = ? AND kqe.segment_batch_id IS NOT NULL", sourceID, k.base.ID).Scan(ctx, &question)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, ErrSegmentStale
+		}
+		if err != nil {
+			return nil, err
+		}
+		records := []RetrievalRecord{{DocumentID: sourceID, DocumentName: question, SegmentID: sourceID, Position: 1, Content: question}}
+		return records, attachQAAnswers(ctx, k.service.db, records)
+	}
+	hits, err := readSegmentWindow(ctx, k.service.db, k.base, sourceID, segmentID, before, after)
+	if err != nil {
+		return nil, err
+	}
+	records := make([]RetrievalRecord, 0, len(hits))
+	for _, hit := range hits {
+		records = append(records, RetrievalRecord{DocumentID: hit.SourceID, DocumentName: hit.SourceName, SegmentID: hit.ID, SegmentBatchID: hit.SegmentBatchID, Position: hit.Position, Content: hit.Content})
+	}
+	return records, nil
+}
+
+// attachQAAnswers 把问答记录收敛到条目编号并补上当前完整答案。
+func attachQAAnswers(ctx context.Context, db bun.IDB, records []RetrievalRecord) error {
+	if len(records) == 0 {
+		return nil
+	}
+	entryIDs := make([]string, 0, len(records))
+	for _, record := range records {
+		entryIDs = append(entryIDs, record.DocumentID)
+	}
+	var answers []servermodels.KnowledgeQAContent
+	if err := db.NewSelect().Model(&answers).Column("entry_id", "content").Where("kqc.entry_id IN (?) AND kqc.kind = ?", bun.In(entryIDs), domain.KnowledgeQAContentAnswer).Scan(ctx); err != nil {
+		return err
+	}
+	byEntry := make(map[string]string, len(answers))
+	for _, answer := range answers {
+		byEntry[answer.EntryID] = answer.Content
+	}
+	for index := range records {
+		records[index].SegmentID, records[index].Position, records[index].Answer = records[index].DocumentID, 1, byEntry[records[index].DocumentID]
+	}
+	return nil
 }
 
 // retrievalRecords 把召回或阅读结果映射为跨知识库融合使用的统一记录，只有召回结果携带分数。
@@ -287,6 +358,10 @@ func retrievalRecords(records []RetrievalRecord, scored bool) []knowledgeretriev
 		item := knowledgeretrieval.Record{
 			DocumentID: record.DocumentID, DocumentName: record.DocumentName,
 			SegmentID: record.SegmentID, Position: record.Position, Content: record.Content,
+		}
+		if record.Answer != "" {
+			answer := record.Answer
+			item.Answer = &answer
 		}
 		if scored {
 			score := record.Score
