@@ -119,6 +119,11 @@ func (s *Service) ListInboxChannels(ctx context.Context, meta RequestMeta) (Inbo
 	return withNormalizedSlices(s.backend.ListInboxChannels(ctx, meta))
 }
 
+// GetSyncHeads 返回当前用户可见会话与身份资料的同步探针值。
+func (s *Service) GetSyncHeads(ctx context.Context, meta RequestMeta) (SyncHeads, error) {
+	return withNormalizedSlices(s.backend.GetSyncHeads(ctx, meta))
+}
+
 // ListConversationMessages 返回成员可见的会话消息。
 func (s *Service) ListConversationMessages(ctx context.Context, meta RequestMeta, conversationID string, input ConversationMessageListInput) (ConversationMessageList, error) {
 	return withNormalizedSlices(s.backend.ListConversationMessages(ctx, meta, conversationID, input))

@@ -250,3 +250,10 @@ type InboxContext struct {
 	Anchor InboxConversationResult `json:"anchor"`
 	Window InboxWindow             `json:"window"`
 }
+
+// SyncHeads 保存同步探针的不透明比较值，客户端只判断与上次返回是否相同。
+type SyncHeads struct {
+	ConversationCount      int    `json:"conversationCount"`
+	ConversationChecksum   string `json:"conversationChecksum"`
+	IdentityProfileVersion string `json:"identityProfileVersion"`
+}

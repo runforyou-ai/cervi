@@ -251,6 +251,16 @@ func (b *DirectBackend) ListInboxChannels(ctx context.Context, meta RequestMeta)
 	return b.ops.ListInboxChannels(ctx, meta, identity)
 }
 
+// GetSyncHeads 返回当前用户可见会话与身份资料的同步探针值。
+func (b *DirectBackend) GetSyncHeads(ctx context.Context, meta RequestMeta) (SyncHeads, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero SyncHeads
+		return zero, err
+	}
+	return b.ops.GetSyncHeads(ctx, meta, identity)
+}
+
 // ListConversationMessages 返回成员可见的会话消息。
 func (b *DirectBackend) ListConversationMessages(ctx context.Context, meta RequestMeta, conversationID string, input ConversationMessageListInput) (ConversationMessageList, error) {
 	identity, err := b.ops.authenticate(ctx, meta)

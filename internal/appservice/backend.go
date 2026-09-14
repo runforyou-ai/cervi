@@ -95,6 +95,9 @@ type Backend interface {
 	// ListInboxChannels 返回收件箱渠道筛选候选，含已停用渠道。
 	//cervi:route GET /inbox/channels
 	ListInboxChannels(context.Context, RequestMeta) (InboxChannelList, error)
+	// GetSyncHeads 返回当前用户可见会话与身份资料的同步探针值。
+	//cervi:route GET /sync/heads
+	GetSyncHeads(context.Context, RequestMeta) (SyncHeads, error)
 	// ListConversationMessages 返回成员可见的会话消息。
 	//cervi:route GET /conversations/:conversationID/messages
 	ListConversationMessages(context.Context, RequestMeta, string, ConversationMessageListInput) (ConversationMessageList, error)

@@ -57,15 +57,11 @@ func (a *UpdateWorkStatusAction) Execute(ctx context.Context, identity *servermo
 		if err != nil {
 			return err
 		}
-		if _, err := tx.NewUpdate().
+		if err := identityaction.UpdateUserIdentity(ctx, tx, identity.Organization.ID, storedUser.IdentityID, tx.NewUpdate().
 			Model((*servermodels.OrganizationIdentity)(nil)).
 			Set("work_status = ?", input.WorkStatus).
 			Set("work_status_updated_at = now()").
-			Set("updated_at = now()").
-			Where("oi.id = ?", storedUser.IdentityID).
-			Where("oi.organization_id = ?", identity.Organization.ID).
-			Where("oi.type = ?", domain.OrganizationIdentityTypeUser).
-			Exec(ctx); err != nil {
+			Set("updated_at = now()")); err != nil {
 			return err
 		}
 		updatedIdentity, err = loadCurrentIdentity(ctx, tx, identity.Organization, identity.User.ID)

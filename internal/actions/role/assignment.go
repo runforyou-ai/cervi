@@ -131,6 +131,12 @@ func (a *UpdateAssignmentsAction) Execute(ctx context.Context, identity *serverm
 		for _, role := range roles {
 			roleKinds[role.ID] = domain.RoleKind(role.Kind)
 		}
+		// 先锁定真人账号，保持用户账号先于企业身份的锁序。
+		if _, err := tx.NewSelect().Model((*servermodels.User)(nil)).Column("id").
+			Where("organization_id = ? AND identity_id IN (?)", identity.Organization.ID, bun.In(identityIDs)).
+			OrderExpr("id").For("NO KEY UPDATE").Exec(ctx); err != nil {
+			return err
+		}
 		var identities []servermodels.OrganizationIdentity
 		if err := tx.NewSelect().Model(&identities).
 			Column("id", "type").
@@ -151,12 +157,15 @@ func (a *UpdateAssignmentsAction) Execute(ctx context.Context, identity *serverm
 			if identityTypes[change.IdentityID] == domain.OrganizationIdentityTypeAgent && roleKinds[change.RoleID] == domain.RoleKindAdmin {
 				return ErrAgentAdministrator
 			}
-			if _, err := tx.NewUpdate().Model((*servermodels.OrganizationIdentity)(nil)).
+			query := tx.NewUpdate().Model((*servermodels.OrganizationIdentity)(nil)).
 				Set("role_id = ?", change.RoleID).
-				Set("updated_at = now()").
-				Where("organization_id = ?", identity.Organization.ID).
-				Where("id = ?", change.IdentityID).
-				Exec(ctx); err != nil {
+				Set("updated_at = now()")
+			if identityTypes[change.IdentityID] == domain.OrganizationIdentityTypeUser {
+				err = identityaction.UpdateUserIdentity(ctx, tx, identity.Organization.ID, change.IdentityID, query)
+			} else {
+				_, err = query.Where("organization_id = ? AND id = ?", identity.Organization.ID, change.IdentityID).Exec(ctx)
+			}
+			if err != nil {
 				return err
 			}
 		}

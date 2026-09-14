@@ -239,17 +239,25 @@ func TestAttachmentBatchLifecycle(t *testing.T) {
 	if err != nil || len(expiredHistory.Messages) != 2 || expiredHistory.Messages[0].ID != result.Messages[0].ID || expiredHistory.Messages[0].Attachment == nil || expiredHistory.Messages[0].Attachment.UploadStatus != domain.AttachmentFailed || expiredHistory.Messages[1].Attachment == nil || expiredHistory.Messages[1].Attachment.UploadStatus != domain.AttachmentUploading {
 		t.Fatalf("expired upload history=%+v %v", expiredHistory, err)
 	}
+	// 失败与心跳不推进会话版本，完成和取消各推进一次，取消后的完成被忽略。
+	uploadVersion := loadConversationVersion(t, f.db, result.ConversationID)
 	if err := send.UpdateUploads(ctx, f.owner, []string{first}, domain.AttachmentFailed); err != nil {
 		t.Fatal(err)
 	}
 	if err := send.UpdateUploads(ctx, f.owner, []string{first}, domain.AttachmentUploading); err != nil {
 		t.Fatal(err)
 	}
+	if version := loadConversationVersion(t, f.db, result.ConversationID); version != uploadVersion {
+		t.Fatalf("failed upload version=%d want=%d", version, uploadVersion)
+	}
 	if _, err := fileaction.NewMarkUploadedAction(f.db).Execute(ctx, f.owner, first, ""); err != nil {
 		t.Fatal(err)
 	}
 	if err := send.UpdateUploads(ctx, f.owner, []string{first}, domain.AttachmentReady); err != nil {
 		t.Fatal(err)
+	}
+	if version := loadConversationVersion(t, f.db, result.ConversationID); version != uploadVersion+1 {
+		t.Fatalf("ready upload version=%d want=%d", version, uploadVersion+1)
 	}
 	if _, err := query.GetAttachmentFile(ctx, f.member, result.ConversationID, result.Messages[0].ID); err != nil {
 		t.Fatal(err)
@@ -259,6 +267,9 @@ func TestAttachmentBatchLifecycle(t *testing.T) {
 	}
 	if err := send.UpdateUploads(ctx, f.owner, []string{second}, domain.AttachmentReady); err != nil {
 		t.Fatal(err)
+	}
+	if version := loadConversationVersion(t, f.db, result.ConversationID); version != uploadVersion+2 {
+		t.Fatalf("cancelled upload version=%d want=%d", version, uploadVersion+2)
 	}
 	history, err := query.Execute(ctx, f.member, conversationaction.ConversationMessageHistoryInput{ConversationID: result.ConversationID})
 	if err != nil {

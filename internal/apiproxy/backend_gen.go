@@ -184,6 +184,14 @@ func (b *Backend) ListInboxChannels(ctx context.Context, meta appservice.Request
 	return output, err
 }
 
+// GetSyncHeads 返回当前用户可见会话与身份资料的同步探针值。
+func (b *Backend) GetSyncHeads(ctx context.Context, meta appservice.RequestMeta) (appservice.SyncHeads, error) {
+	var output appservice.SyncHeads
+	err := b.do(ctx, meta, http.MethodGet, "/sync/heads", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // ListConversationMessages 返回成员可见的会话消息。
 func (b *Backend) ListConversationMessages(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.ConversationMessageListInput) (appservice.ConversationMessageList, error) {
 	var output appservice.ConversationMessageList

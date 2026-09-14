@@ -121,6 +121,7 @@ func (a *UpdateGroupConversationAction) Execute(ctx context.Context, identity *s
 				Set("title = ?", normalized.Title).
 				Set("description = ?", common.OptionalString(normalized.Description)).
 				Set("image_file_id = ?", nextImageFileID).
+				Set("version = version + 1").
 				Set("updated_at = now()").
 				Where("organization_id = ?", identity.Organization.ID).
 				Where("id = ?", normalized.ConversationID).
@@ -215,13 +216,13 @@ func (a *AddGroupConversationMembersAction) Execute(ctx context.Context, identit
 		}
 		// 新成员以本轮加入事件为已读基线。
 		if _, err := tx.ExecContext(ctx, `
-				INSERT INTO conversation_user_states (organization_id, conversation_id, user_id, last_read_message_id, last_read_at, last_reviewed_mention_message_id, read_seq)
-				SELECT u.organization_id, cv.id, u.id, ?::uuid, now(), ?::uuid, ?
+				INSERT INTO conversation_user_states (organization_id, conversation_id, user_id, last_read_message_id, last_read_at, last_reviewed_mention_message_id, read_seq, version)
+				SELECT u.organization_id, cv.id, u.id, ?::uuid, now(), ?::uuid, ?, 1
 				FROM users AS u
 				JOIN conversations AS cv ON cv.organization_id = u.organization_id AND cv.id = ?
 				WHERE u.organization_id = ? AND u.identity_id IN (?)
 				ON CONFLICT (organization_id, conversation_id, user_id) DO UPDATE
-				SET read_seq = EXCLUDED.read_seq, last_read_message_id = EXCLUDED.last_read_message_id, last_read_at = now(), last_reviewed_mention_message_id = EXCLUDED.last_reviewed_mention_message_id, updated_at = now()
+				SET read_seq = EXCLUDED.read_seq, last_read_message_id = EXCLUDED.last_read_message_id, last_read_at = now(), last_reviewed_mention_message_id = EXCLUDED.last_reviewed_mention_message_id, version = conversation_user_states.version + 1, updated_at = now()
 			`, eventMessage.ID, eventMessage.ID, eventMessage.MessageSeq, conversationID, identity.Organization.ID, bun.In(memberIDs)); err != nil {
 			return fmt.Errorf("initialize added group member read states: %w", err)
 		}

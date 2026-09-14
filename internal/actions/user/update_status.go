@@ -54,14 +54,10 @@ func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels
 			return err
 		}
 		if status == domain.UserStatusInactive {
-			if _, err := tx.NewUpdate().Model((*servermodels.OrganizationIdentity)(nil)).
+			if err := identityaction.UpdateUserIdentity(ctx, tx, identity.Organization.ID, updatedUser.IdentityID, tx.NewUpdate().Model((*servermodels.OrganizationIdentity)(nil)).
 				Set("work_status = ?", domain.WorkStatusOffDuty).
 				Set("work_status_updated_at = now()").
-				Set("updated_at = now()").
-				Where("organization_id = ?", identity.Organization.ID).
-				Where("id = ?", updatedUser.IdentityID).
-				Where("type = ?", domain.OrganizationIdentityTypeUser).
-				Exec(ctx); err != nil {
+				Set("updated_at = now()")); err != nil {
 				return err
 			}
 			if err := channelaction.ResetRoutingTarget(ctx, tx, identity.Organization.ID, domain.ChannelRoutingTargetTypeMember, updatedUser.IdentityID); err != nil {

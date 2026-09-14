@@ -97,6 +97,7 @@ func (a *UpdateProfileAction) Execute(ctx context.Context, identity *servermodel
 			identityQuery = identityQuery.Set("avatar_file_id = ?", file.ID)
 		}
 		_, err := tx.NewUpdate().Model((*servermodels.User)(nil)).
+			Set("profile_version = profile_version + CASE WHEN email IS DISTINCT FROM ? THEN 1 ELSE 0 END", input.Email).
 			Set("email = ?", input.Email).
 			Set("updated_at = now()").
 			Where("u.id = ?", identity.User.ID).
@@ -105,12 +106,7 @@ func (a *UpdateProfileAction) Execute(ctx context.Context, identity *servermodel
 		if err != nil {
 			return err
 		}
-		_, err = identityQuery.
-			Where("oi.id = ?", identity.User.IdentityID).
-			Where("oi.organization_id = ?", identity.Organization.ID).
-			Where("oi.type = ?", domain.OrganizationIdentityTypeUser).
-			Exec(ctx)
-		if err != nil {
+		if err := identityaction.UpdateUserIdentity(ctx, tx, identity.Organization.ID, identity.User.IdentityID, identityQuery); err != nil {
 			return err
 		}
 		if previousAvatarFileID != nil && *previousAvatarFileID != input.AvatarFileID {

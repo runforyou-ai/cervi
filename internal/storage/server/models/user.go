@@ -22,6 +22,7 @@ type User struct {
 	TimeZone                    string    `bun:"time_zone"`
 	MessageNotificationsEnabled bool      `bun:"message_notifications_enabled"`
 	WorkspaceTabsEnabled        bool      `bun:"workspace_tabs_enabled"`
+	ProfileVersion              int64     `bun:"profile_version"`
 	CreatedAt                   time.Time `bun:"created_at"`
 	UpdatedAt                   time.Time `bun:"updated_at"`
 }
