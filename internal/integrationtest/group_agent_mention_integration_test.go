@@ -219,7 +219,8 @@ func testGroupAgentMentionReplies(t *testing.T, db *bun.DB, identity *servermode
 					} `json:"attachment"`
 					ReplyTo *struct {
 						Attachment *struct {
-							Name string `json:"name"`
+							Name     string `json:"name"`
+							ByteSize int64  `json:"byteSize"`
 						} `json:"attachment"`
 					} `json:"replyTo"`
 				}
@@ -230,7 +231,7 @@ func testGroupAgentMentionReplies(t *testing.T, db *bun.DB, identity *servermode
 					attached = envelope.Attachment != nil && envelope.Attachment.MessageID == attachment.Message.ID &&
 						envelope.Attachment.Name == "diagram.png" && strings.Contains(envelope.Attachment.URL, "/storage/") && message.Media != nil && message.Media.MIMEType == "image/png"
 				}
-				if envelope.ReplyTo != nil && envelope.ReplyTo.Attachment != nil && envelope.ReplyTo.Attachment.Name == "diagram.png" {
+				if envelope.ReplyTo != nil && envelope.ReplyTo.Attachment != nil && envelope.ReplyTo.Attachment.Name == "diagram.png" && envelope.ReplyTo.Attachment.ByteSize == domain.FilePartSize+1 {
 					referenced = true
 				}
 			}

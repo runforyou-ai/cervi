@@ -53,11 +53,14 @@ func TestTurnHistoryInlinesRecentMedia(t *testing.T) {
 	if len(next[6].UserInputMultiContent) != 0 {
 		t.Fatalf("media beyond run budget inlined: %#v", next[6])
 	}
+	// 较新附件读取失败时不占用预算，数量上限留给更早的可读取附件。
 	failed := (&turnHistory{}).appendInput(context.Background(), []Message{
+		{ID: "readable", Role: MessageRoleUser, Content: "可读取", Media: png},
 		{ID: "broken", Role: MessageRoleUser, Content: "读取失败", Media: png},
 		{ID: "reply", Role: MessageRoleAssistant, Content: "助手消息", Media: png},
-	}, mediaInput{read: read, modalities: visual, maxCount: 5})
-	if failed[0].Content != "读取失败" || len(failed[0].UserInputMultiContent) != 0 || failed[1].Role != schema.Assistant || len(failed[1].UserInputMultiContent) != 0 {
+	}, mediaInput{read: read, modalities: visual, maxCount: 1})
+	if len(failed[0].UserInputMultiContent) != 2 || failed[1].Content != "读取失败" || len(failed[1].UserInputMultiContent) != 0 ||
+		failed[2].Role != schema.Assistant || len(failed[2].UserInputMultiContent) != 0 {
 		t.Fatalf("fallback history = %#v", failed)
 	}
 }

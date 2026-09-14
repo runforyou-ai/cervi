@@ -6,7 +6,6 @@ import (
 	"context"
 
 	"github.com/cloudwego/eino/schema"
-	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
 // turnHistory 按消费顺序保留当前运行的会话消息和完整工具交互。
@@ -30,8 +29,8 @@ func (h *turnHistory) appendInput(ctx context.Context, messages []Message, media
 		h.seen[message.ID] = struct{}{}
 		fresh = append(fresh, message)
 	}
-	// 由新到旧选出模型支持格式的用户附件，超出数量或字节预算的较早附件只保留正文中的链接。
-	inline := make(map[string]domain.AIModelInputModality)
+	// 由新到旧读取模型支持格式的用户附件，读取成功才计入数量和字节预算，其余附件只保留正文中的链接。
+	inline := make(map[string]*schema.Message)
 	for i := len(fresh) - 1; i >= 0; i-- {
 		attachment := fresh[i].Media
 		if attachment == nil || fresh[i].Role != MessageRoleUser || h.mediaCount >= media.maxCount ||
@@ -42,17 +41,21 @@ func (h *turnHistory) appendInput(ctx context.Context, messages []Message, media
 		if !supported || !media.modalities[modality] {
 			continue
 		}
-		inline[fresh[i].ID] = modality
+		direct, read := mediaUserMessage(ctx, fresh[i], modality, media.read)
+		if !read {
+			continue
+		}
+		inline[fresh[i].ID] = direct
 		h.mediaCount++
 		h.mediaBytes += attachment.ByteSize
 	}
 	for _, message := range fresh {
-		modality, direct := inline[message.ID]
+		direct, inlined := inline[message.ID]
 		switch {
 		case message.Role == MessageRoleAssistant:
 			h.messages = append(h.messages, schema.AssistantMessage(message.Content, nil))
-		case direct:
-			h.messages = append(h.messages, mediaUserMessage(ctx, message, modality, media.read))
+		case inlined:
+			h.messages = append(h.messages, direct)
 		default:
 			h.messages = append(h.messages, schema.UserMessage(message.Content))
 		}

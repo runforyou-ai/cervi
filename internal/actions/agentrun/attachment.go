@@ -111,6 +111,7 @@ type contextAttachmentRow struct {
 	AttachmentStorageKey          *string `bun:"attachment_storage_key"`
 	ReplyAttachmentName           *string `bun:"reply_attachment_name"`
 	ReplyAttachmentContentType    string  `bun:"reply_attachment_content_type"`
+	ReplyAttachmentByteSize       int64   `bun:"reply_attachment_byte_size"`
 	ReplyAttachmentStorageBackend *string `bun:"reply_attachment_storage_backend"`
 	ReplyAttachmentStorageKey     *string `bun:"reply_attachment_storage_key"`
 }
@@ -129,7 +130,7 @@ func withContextAttachments(query *bun.SelectQuery) *bun.SelectQuery {
 	return query.
 		ColumnExpr("ma.name AS attachment_name, COALESCE(ma.content_type, '') AS attachment_content_type, COALESCE(ma.byte_size, 0) AS attachment_byte_size").
 		ColumnExpr("af.storage_backend AS attachment_storage_backend, af.storage_key AS attachment_storage_key").
-		ColumnExpr("reply_ma.name AS reply_attachment_name, COALESCE(reply_ma.content_type, '') AS reply_attachment_content_type").
+		ColumnExpr("reply_ma.name AS reply_attachment_name, COALESCE(reply_ma.content_type, '') AS reply_attachment_content_type, COALESCE(reply_ma.byte_size, 0) AS reply_attachment_byte_size").
 		ColumnExpr("reply_af.storage_backend AS reply_attachment_storage_backend, reply_af.storage_key AS reply_attachment_storage_key").
 		Join("LEFT JOIN message_attachments AS ma ON ma.message_id = msg.id AND ma.organization_id = msg.organization_id").
 		Join("LEFT JOIN files AS af ON af.id = ma.file_id AND af.organization_id = ma.organization_id").
@@ -155,7 +156,7 @@ func (r contextAttachmentRow) replyAttachment(links attachmentLinks) *contextAtt
 		return nil
 	}
 	return &contextAttachment{
-		Name: *r.ReplyAttachmentName, ContentType: r.ReplyAttachmentContentType,
+		Name: *r.ReplyAttachmentName, ContentType: r.ReplyAttachmentContentType, ByteSize: r.ReplyAttachmentByteSize,
 		URL: links.url(r.ReplyAttachmentStorageBackend, r.ReplyAttachmentStorageKey),
 	}
 }

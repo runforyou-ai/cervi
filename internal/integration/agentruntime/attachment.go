@@ -45,13 +45,13 @@ type mediaInput struct {
 	maxCount   int
 }
 
-// mediaUserMessage 读取附件并构造正文与多模态内容并列的用户消息，读取失败时只保留正文。
-func mediaUserMessage(ctx context.Context, message Message, modality domain.AIModelInputModality, read AttachmentContent) *schema.Message {
+// mediaUserMessage 读取附件并构造正文与多模态内容并列的用户消息，读取失败或模态不可直传时返回 false。
+func mediaUserMessage(ctx context.Context, message Message, modality domain.AIModelInputModality, read AttachmentContent) (*schema.Message, bool) {
 	content, err := read(ctx, message.ID)
 	if err != nil {
 		slog.Warn("读取直传附件失败，仅以正文链接提供给模型",
 			"agent_run_id", runIDFromContext(ctx), "message_id", message.ID, "error", err)
-		return schema.UserMessage(message.Content)
+		return nil, false
 	}
 	data := base64.StdEncoding.EncodeToString(content)
 	common := schema.MessagePartCommon{Base64Data: &data, MIMEType: message.Media.MIMEType}
@@ -64,10 +64,10 @@ func mediaUserMessage(ctx context.Context, message Message, modality domain.AIMo
 	case domain.AIModelInputModalityVideo:
 		part = schema.MessageInputPart{Type: schema.ChatMessagePartTypeVideoURL, Video: &schema.MessageInputVideo{MessagePartCommon: common}}
 	default:
-		return schema.UserMessage(message.Content)
+		return nil, false
 	}
 	return &schema.Message{Role: schema.User, UserInputMultiContent: []schema.MessageInputPart{
 		{Type: schema.ChatMessagePartTypeText, Text: message.Content},
 		part,
-	}}
+	}}, true
 }
