@@ -107,6 +107,12 @@ func updateAttachmentUpload(ctx context.Context, tx bun.Tx, identity *servermode
 			return err
 		}
 	}
+	// 附件完成或取消时推进会话版本。
+	if status == domain.AttachmentReady || status == domain.AttachmentCancelled {
+		if _, err := tx.NewUpdate().Model(member.Conversation).Set("version = version + 1").WherePK().Exec(ctx); err != nil {
+			return err
+		}
+	}
 	_, err = tx.NewRaw(`UPDATE message_attachments SET upload_status = ?, upload_expires_at = CASE WHEN ? = 'uploading' THEN now() + interval '2 minutes' END WHERE message_id = ?`, status, status, row.MessageID).Exec(ctx)
 	if err != nil {
 		return fmt.Errorf("update attachment upload: %w", err)

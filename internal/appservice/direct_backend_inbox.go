@@ -7,6 +7,7 @@ import (
 	"errors"
 	"log/slog"
 	"slices"
+	"strconv"
 	"strings"
 
 	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
@@ -242,6 +243,18 @@ func (o *directOperations) ListInboxChannels(ctx context.Context, meta RequestMe
 		return strings.Compare(left.Name, right.Name)
 	})
 	return InboxChannelList{Channels: channels}, nil
+}
+
+// GetSyncHeads 返回当前用户可见会话数量、版本校验和与身份资料版本。
+func (o *directOperations) GetSyncHeads(ctx context.Context, meta RequestMeta, identity *servermodels.Identity) (SyncHeads, error) {
+	heads, err := o.loadInbox.SyncHeads(ctx, identity)
+	if err != nil {
+		return SyncHeads{}, inboxReadError(ctx, meta, identity.Organization.ID, "同步探针", err)
+	}
+	return SyncHeads{
+		ConversationCount: heads.ConversationCount, ConversationChecksum: heads.ConversationChecksum,
+		IdentityProfileVersion: strconv.FormatInt(heads.IdentityProfileVersion, 10),
+	}, nil
 }
 
 // inboxReadError 统一转换收件箱读取错误，并记录失败的查询入口。

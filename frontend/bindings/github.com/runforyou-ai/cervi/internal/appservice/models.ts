@@ -2444,6 +2444,15 @@ export enum StorageProvider {
 };
 
 /**
+ * SyncHeads 保存同步探针的不透明比较值，客户端只判断与上次返回是否相同。
+ */
+export interface SyncHeads {
+    "conversationCount": number;
+    "conversationChecksum": string;
+    "identityProfileVersion": string;
+}
+
+/**
  * Team 定义团队详情。
  */
 export interface Team {

@@ -10,7 +10,6 @@ import (
 
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
-	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -52,6 +51,7 @@ func (a *UpdateUserAction) Execute(ctx context.Context, identity *servermodels.I
 		}
 		updatedUser := &servermodels.User{}
 		err = tx.NewUpdate().Model(updatedUser).
+			Set("profile_version = profile_version + CASE WHEN email IS DISTINCT FROM ? THEN 1 ELSE 0 END", input.Email).
 			Set("email = ?", input.Email).
 			Set("updated_at = now()").
 			Where("organization_id = ?", identity.Organization.ID).
@@ -67,15 +67,10 @@ func (a *UpdateUserAction) Execute(ctx context.Context, identity *servermodels.I
 		if err != nil {
 			return err
 		}
-		_, err = tx.NewUpdate().Model((*servermodels.OrganizationIdentity)(nil)).
+		if err := identityaction.UpdateUserIdentity(ctx, tx, identity.Organization.ID, updatedUser.IdentityID, tx.NewUpdate().Model((*servermodels.OrganizationIdentity)(nil)).
 			Set("display_name = ?", input.DisplayName).
 			Set("role_id = ?", input.RoleID).
-			Set("updated_at = now()").
-			Where("organization_id = ?", identity.Organization.ID).
-			Where("id = ?", updatedUser.IdentityID).
-			Where("type = ?", domain.OrganizationIdentityTypeUser).
-			Exec(ctx)
-		if err != nil {
+			Set("updated_at = now()")); err != nil {
 			return err
 		}
 		if err := ensureActiveAdministratorRemains(ctx, tx, identity.Organization.ID, administratorRoleID); err != nil {

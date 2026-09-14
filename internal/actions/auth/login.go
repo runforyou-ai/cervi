@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"time"
 
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	commonemail "github.com/runforyou-ai/cervi/internal/common/email"
 	commonpassword "github.com/runforyou-ai/cervi/internal/common/password"
@@ -68,14 +69,14 @@ func (a *LoginAction) Execute(ctx context.Context, input LoginInput) (LoginOutpu
 
 	var output LoginOutput
 	err = a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if _, err := tx.NewUpdate().Model((*servermodels.OrganizationIdentity)(nil)).
+		// 先锁定用户账号，保持用户账号先于企业身份的锁序。
+		if _, err := tx.NewSelect().Model((*servermodels.User)(nil)).Column("id").Where("id = ?", user.ID).For("NO KEY UPDATE").Exec(ctx); err != nil {
+			return err
+		}
+		if err := identityaction.UpdateUserIdentity(ctx, tx, user.OrganizationID, user.IdentityID, tx.NewUpdate().Model((*servermodels.OrganizationIdentity)(nil)).
 			Set("work_status = ?", domain.WorkStatusWorking).
 			Set("work_status_updated_at = now()").
-			Set("updated_at = now()").
-			Where("organization_id = ?", user.OrganizationID).
-			Where("id = ?", user.IdentityID).
-			Where("type = ?", domain.OrganizationIdentityTypeUser).
-			Exec(ctx); err != nil {
+			Set("updated_at = now()")); err != nil {
 			return err
 		}
 		issued, identity, err := issueToken(ctx, tx, input.OrganizationID, user.ID)

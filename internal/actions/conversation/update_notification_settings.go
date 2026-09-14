@@ -45,11 +45,17 @@ func (a *UpdateConversationNotificationSettingsAction) Execute(ctx context.Conte
 			OrganizationID: identity.Organization.ID, ConversationID: conversationID,
 			UserID: identity.User.ID, Muted: muted,
 		}
+		// 首次插入时仅静音计为一次个人状态变化。
+		if muted {
+			state.Version = 1
+		}
 		if _, err := tx.NewInsert().Model(state).
-			Column("organization_id", "conversation_id", "user_id", "muted").
+			Column("organization_id", "conversation_id", "user_id", "muted", "version").
 			On("CONFLICT (organization_id, conversation_id, user_id) DO UPDATE").
 			Set("muted = EXCLUDED.muted").
+			Set("version = cus.version + 1").
 			Set("updated_at = now()").
+			Where("cus.muted <> EXCLUDED.muted").
 			Exec(ctx); err != nil {
 			return fmt.Errorf("save conversation notification settings: %w", err)
 		}

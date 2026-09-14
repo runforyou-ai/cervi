@@ -36,18 +36,19 @@ func (a *UpdateConversationUnreadMarkAction) Execute(ctx context.Context, identi
 		// 进入会话时清除已有个人状态中的未读标记。
 		if !markedUnread {
 			_, err := tx.NewUpdate().Model((*servermodels.ConversationUserState)(nil)).
-				Set("marked_unread = false").Set("updated_at = now()").
+				Set("marked_unread = false").Set("version = version + 1").Set("updated_at = now()").
 				Where("organization_id = ? AND conversation_id = ? AND user_id = ? AND marked_unread", identity.Organization.ID, conversationID, identity.User.ID).Exec(ctx)
 			return err
 		}
 		state := &servermodels.ConversationUserState{
 			OrganizationID: identity.Organization.ID, ConversationID: conversationID,
-			UserID: identity.User.ID, MarkedUnread: markedUnread,
+			UserID: identity.User.ID, MarkedUnread: true, Version: 1,
 		}
 		if _, err := tx.NewInsert().Model(state).
-			Column("organization_id", "conversation_id", "user_id", "marked_unread").
+			Column("organization_id", "conversation_id", "user_id", "marked_unread", "version").
 			On("CONFLICT (organization_id, conversation_id, user_id) DO UPDATE").
-			Set("marked_unread = EXCLUDED.marked_unread").Set("updated_at = now()").Exec(ctx); err != nil {
+			Set("marked_unread = true").Set("version = cus.version + 1").Set("updated_at = now()").
+			Where("NOT cus.marked_unread").Exec(ctx); err != nil {
 			return fmt.Errorf("save conversation unread mark: %w", err)
 		}
 		return nil

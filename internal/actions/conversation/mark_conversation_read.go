@@ -89,7 +89,7 @@ func (a *MarkConversationReadAction) Execute(ctx context.Context, identity *serv
 		// 主动标为已读时，在同一事务清除独立标记；可见消息自动已读只推进水位。
 		if clearUnreadMark {
 			if _, err := tx.NewUpdate().Model((*servermodels.ConversationUserState)(nil)).
-				Set("marked_unread = false").Set("updated_at = now()").
+				Set("marked_unread = false").Set("version = version + 1").Set("updated_at = now()").
 				Where("organization_id = ? AND conversation_id = ? AND user_id = ? AND marked_unread", identity.Organization.ID, conversationID, identity.User.ID).Exec(ctx); err != nil {
 				return fmt.Errorf("clear conversation unread mark: %w", err)
 			}
@@ -116,11 +116,13 @@ func advanceConversationUserReadState(ctx context.Context, db bun.IDB, state *se
 	readAt := time.Now().UTC()
 	state.LastReadAt = &readAt
 	state.ReadSeq = message.MessageSeq
+	state.Version = 1
 	if _, err := db.NewInsert().Model(state).
-		Column("organization_id", "conversation_id", "user_id", "last_read_message_id", "last_read_at", "read_seq").
+		Column("organization_id", "conversation_id", "user_id", "last_read_message_id", "last_read_at", "read_seq", "version").
 		On("CONFLICT (organization_id, conversation_id, user_id) DO UPDATE").
 		Set("last_read_message_id = EXCLUDED.last_read_message_id").
 		Set("read_seq = EXCLUDED.read_seq").
+		Set("version = cus.version + 1").
 		Set("last_read_at = now()").
 		Set("updated_at = now()").
 		Where("cus.read_seq < EXCLUDED.read_seq").

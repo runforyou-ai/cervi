@@ -39,6 +39,7 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.POST("/inbox/conversations/query", s.readInboxConversations)
 	router.GET("/inbox/assignees", s.listCustomerServiceAssignees)
 	router.GET("/inbox/channels", s.listInboxChannels)
+	router.GET("/sync/heads", s.getSyncHeads)
 	router.GET("/conversations/:conversationID/messages", s.listConversationMessages)
 	router.GET("/conversations/:conversationID/message-references", s.listConversationMessageReferences)
 	router.GET("/conversations/:conversationID/messages/:messageID/context", s.getConversationMessageContext)
@@ -374,6 +375,12 @@ func (s *Service) listCustomerServiceAssignees(c *gin.Context) {
 // listInboxChannels 返回收件箱渠道筛选候选，含已停用渠道。
 func (s *Service) listInboxChannels(c *gin.Context) {
 	output, err := s.application.ListInboxChannels(c.Request.Context(), requestMeta(c))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// getSyncHeads 返回当前用户可见会话与身份资料的同步探针值。
+func (s *Service) getSyncHeads(c *gin.Context) {
+	output, err := s.application.GetSyncHeads(c.Request.Context(), requestMeta(c))
 	writeResult(c, http.StatusOK, output, err)
 }
 

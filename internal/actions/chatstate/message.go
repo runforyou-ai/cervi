@@ -13,7 +13,7 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// AppendMessage 在调用方事务和会话锁内追加消息并维护摘要；调用方负责授权及完整发送意图校验。
+// AppendMessage 在调用方事务和会话锁内追加消息、推进会话版本并维护摘要；调用方负责授权及完整发送意图校验。
 func AppendMessage(ctx context.Context, db bun.IDB, conversation *servermodels.Conversation, message *servermodels.Message) (*servermodels.Message, bool, error) {
 	// 幂等重放返回既有消息并保留序号和摘要。
 	if message.IdempotencyKey != nil {
@@ -28,14 +28,15 @@ func AppendMessage(ctx context.Context, db bun.IDB, conversation *servermodels.C
 			return nil, false, fmt.Errorf("load appended message: %w", err)
 		}
 	}
-	// 事务回滚同时撤销未提交序号。
+	// 序号与会话版本同句推进。
 	if err := db.NewUpdate().Model(conversation).
 		Set("last_message_seq = last_message_seq + 1").
+		Set("version = version + 1").
 		WherePK().Where("organization_id = ?", conversation.OrganizationID).
-		Returning("last_message_seq").Scan(ctx, &message.MessageSeq); err != nil {
+		Returning("last_message_seq, version").Scan(ctx); err != nil {
 		return nil, false, fmt.Errorf("allocate message sequence: %w", err)
 	}
-	conversation.LastMessageSeq = message.MessageSeq
+	message.MessageSeq = conversation.LastMessageSeq
 	if _, err := db.NewInsert().Model(message).
 		Column("id", "organization_id", "conversation_id", "service_session_id", "sender_participant_id", "type", "body", "system_event_type", "system_event_payload", "reply_to_message_id", "mention_all", "thread_root_message_id", "idempotency_key", "client_message_id", "originated_at", "source_order", "message_seq").
 		Returning("*").Exec(ctx); err != nil {

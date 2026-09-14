@@ -437,6 +437,13 @@ export function GetS3Setting(meta: $models.RequestMeta): $CancellablePromise<$mo
 }
 
 /**
+ * GetSyncHeads 返回当前用户可见会话与身份资料的同步探针值。
+ */
+export function GetSyncHeads(meta: $models.RequestMeta): $CancellablePromise<$models.SyncHeads> {
+    return $Call.ByID(2961676696, meta);
+}
+
+/**
  * GetTelegramChannel 返回 Telegram 渠道详情。
  */
 export function GetTelegramChannel(meta: $models.RequestMeta, channelID: string): $CancellablePromise<$models.TelegramChannel> {

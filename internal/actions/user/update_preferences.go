@@ -43,6 +43,8 @@ func (a *UpdatePreferencesAction) Execute(ctx context.Context, identity *serverm
 		}
 		if _, err := tx.NewUpdate().
 			Model((*servermodels.User)(nil)).
+			Set("profile_version = profile_version + CASE WHEN (locale, time_zone, message_notifications_enabled, workspace_tabs_enabled) IS DISTINCT FROM (?, ?, ?, ?) THEN 1 ELSE 0 END",
+				input.Locale, input.TimeZone, input.MessageNotificationsEnabled, input.WorkspaceTabsEnabled).
 			Set("locale = ?", input.Locale).
 			Set("time_zone = ?", input.TimeZone).
 			Set("message_notifications_enabled = ?", input.MessageNotificationsEnabled).

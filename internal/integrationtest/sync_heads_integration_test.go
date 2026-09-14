@@ -1,0 +1,284 @@
+//go:build server
+
+package integrationtest
+
+import (
+	"context"
+	"errors"
+	"strconv"
+	"sync"
+	"testing"
+	"time"
+	"uuid"
+
+	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
+	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
+	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
+	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
+	"github.com/runforyou-ai/cervi/internal/appservice"
+	"github.com/runforyou-ai/cervi/internal/domain"
+	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
+	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	"github.com/runforyou-ai/cervi/internal/tenant"
+	"github.com/uptrace/bun"
+)
+
+// loadSyncHeads 读取当前用户的同步探针值。
+func loadSyncHeads(t *testing.T, db *bun.DB, identity *servermodels.Identity) inboxaction.SyncHeads {
+	t.Helper()
+	heads, err := inboxaction.NewLoadInboxQuery(db).SyncHeads(context.Background(), identity)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return heads
+}
+
+// loadConversationVersion 读取会话当前版本。
+func loadConversationVersion(t *testing.T, db *bun.DB, conversationID string) int64 {
+	t.Helper()
+	var version int64
+	if err := db.NewSelect().Table("conversations").Column("version").Where("id = ?", conversationID).Scan(context.Background(), &version); err != nil {
+		t.Fatal(err)
+	}
+	return version
+}
+
+// TestConversationVersionAppend 验证并发追加逐次推进会话版本，回滚和幂等重放不推进。
+func TestConversationVersionAppend(t *testing.T) {
+	f := newNavigationFixture(t)
+	ctx := context.Background()
+	send := newGroupSendAction(f.db)
+	before := loadConversationVersion(t, f.db, f.groupID)
+	const writers = 8
+	start := make(chan struct{})
+	errs := make(chan error, writers)
+	var wg sync.WaitGroup
+	for index := range writers {
+		identity := f.owner
+		if index%2 == 1 {
+			identity = f.member
+		}
+		wg.Go(func() {
+			<-start
+			_, err := send.Execute(ctx, identity, conversationaction.GroupTextMessageInput{ConversationID: f.groupID, ClientMessageID: uuid.NewV7().String(), Body: "并发消息"})
+			errs <- err
+		})
+	}
+	close(start)
+	wg.Wait()
+	close(errs)
+	for err := range errs {
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+	current := loadConversationVersion(t, f.db, f.groupID)
+	if current != before+writers {
+		t.Fatalf("concurrent version=%d want=%d", current, before+writers)
+	}
+
+	errRollback := errors.New("rollback")
+	cv := &servermodels.Conversation{ID: f.groupID}
+	key := uuid.NewV7().String()
+	// 同一幂等键依次验证回滚、首次提交和重放。
+	for _, step := range []struct {
+		name    string
+		fail    bool
+		advance int64
+	}{{"rollback", true, 0}, {"commit", false, 1}, {"replay", false, 0}} {
+		err := f.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+			if err := tx.NewSelect().Model(cv).WherePK().For("UPDATE").Scan(ctx); err != nil {
+				return err
+			}
+			message := &servermodels.Message{ID: uuid.NewV7().String(), OrganizationID: cv.OrganizationID, ConversationID: cv.ID, Type: "text", Body: "版本回滚", OriginatedAt: time.Now().UTC(), IdempotencyKey: &key}
+			if _, _, err := chatstate.AppendMessage(ctx, tx, cv, message); err != nil {
+				return err
+			}
+			if step.fail {
+				return errRollback
+			}
+			return nil
+		})
+		if step.fail != errors.Is(err, errRollback) || (!step.fail && err != nil) {
+			t.Fatalf("%s error=%v", step.name, err)
+		}
+		if version := loadConversationVersion(t, f.db, f.groupID); version != current+step.advance {
+			t.Fatalf("%s version=%d want=%d", step.name, version, current+step.advance)
+		}
+		current += step.advance
+	}
+}
+
+// TestSyncHeadsConversationChanges 验证探针覆盖消息、个人状态、群资料、成员变化与企业隔离。
+func TestSyncHeadsConversationChanges(t *testing.T) {
+	f := newNavigationFixture(t)
+	ctx := context.Background()
+	// expectHeads 执行变化后核对校验和是否变化及可见会话数量，身份资料版本保持不变。
+	expectHeads := func(name string, changed bool, count int, change func()) {
+		t.Helper()
+		before := loadSyncHeads(t, f.db, f.member)
+		change()
+		after := loadSyncHeads(t, f.db, f.member)
+		if (after.ConversationChecksum != before.ConversationChecksum) != changed || after.ConversationCount != count || after.IdentityProfileVersion != before.IdentityProfileVersion {
+			t.Fatalf("%s: before=%+v after=%+v", name, before, after)
+		}
+	}
+	stateRows, err := f.db.NewSelect().Table("conversation_user_states").Where("conversation_id = ? AND user_id = ?", f.groupID, f.member.User.ID).Count(ctx)
+	if err != nil || stateRows != 0 {
+		t.Fatalf("member state rows=%d err=%v", stateRows, err)
+	}
+	expectHeads("无个人状态行时追加消息", true, 1, func() { f.send(t, f.owner, "尚无个人状态", false) })
+
+	var second conversationaction.GroupConversationSummary
+	expectHeads("加入新群", true, 2, func() {
+		second, err = conversationaction.NewCreateGroupConversationAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationInput{Title: "低版本群", MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID}})
+		if err != nil {
+			t.Fatal(err)
+		}
+	})
+	for range 3 {
+		f.send(t, f.owner, "推高第一个群版本", false)
+	}
+	expectHeads("低版本会话追加消息", true, 2, func() {
+		if _, err := newGroupSendAction(f.db).Execute(ctx, f.owner, conversationaction.GroupTextMessageInput{ConversationID: second.ID, ClientMessageID: uuid.NewV7().String(), Body: "低版本群消息"}); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	last := f.send(t, f.owner, "待读", false)
+	mention := f.send(t, f.owner, "提及", false, f.subjectID)
+	groupVersion := loadConversationVersion(t, f.db, f.groupID)
+	read := conversationaction.NewMarkConversationReadAction(f.db)
+	mute := conversationaction.NewUpdateConversationNotificationSettingsAction(f.db)
+	mark := conversationaction.NewUpdateConversationUnreadMarkAction(f.db)
+	review := conversationaction.NewMarkConversationMentionReviewedAction(f.db)
+	for _, step := range []struct {
+		name   string
+		change func() error
+	}{
+		{"已读", func() error { _, err := read.Execute(ctx, f.member, f.groupID, last.ID, false); return err }},
+		{"静音", func() error { _, err := mute.Execute(ctx, f.member, f.groupID, true); return err }},
+		{"手动未读", func() error { return mark.Execute(ctx, f.member, f.groupID, true) }},
+		{"确认提及", func() error { _, err := review.Execute(ctx, f.member, f.groupID, mention.ID); return err }},
+	} {
+		// 首次操作改变个人状态，重复同一操作不产生变化。
+		for attempt, changed := range []bool{true, false} {
+			expectHeads(step.name+strconv.Itoa(attempt), changed, 2, func() {
+				if err := step.change(); err != nil {
+					t.Fatal(err)
+				}
+			})
+		}
+	}
+	if version := loadConversationVersion(t, f.db, f.groupID); version != groupVersion {
+		t.Fatalf("personal states moved conversation version=%d want=%d", version, groupVersion)
+	}
+
+	expectHeads("修改群描述", true, 2, func() {
+		if _, err := conversationaction.NewUpdateGroupConversationAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationProfileInput{ConversationID: f.groupID, Title: "导航测试群", Description: "新的描述"}); err != nil {
+			t.Fatal(err)
+		}
+	})
+	expectHeads("移出群", true, 1, func() {
+		if _, err := conversationaction.NewRemoveGroupConversationMemberAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, conversationaction.GroupConversationMemberInput{ConversationID: second.ID, MemberIdentityID: f.member.OrganizationIdentity.ID}); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	// 两个群的会话版本与个人状态版本对齐后交换可见性，数量不变而校验和变化。
+	groupIDs := bun.In([]string{f.groupID, second.ID})
+	if _, err := f.db.NewRaw("UPDATE conversations SET version = 100 WHERE id IN (?)", groupIDs).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.db.NewRaw("DELETE FROM conversation_user_states WHERE user_id = ? AND conversation_id IN (?)", f.member.User.ID, groupIDs).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	expectHeads("同版本会话互换", true, 1, func() {
+		if _, err := f.db.NewRaw("UPDATE conversation_participants SET left_at = CASE WHEN conversation_id = ? THEN now() END WHERE subject_id = ? AND conversation_id IN (?)", f.groupID, f.subjectID, groupIDs).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+	})
+
+	other := newNavigationFixture(t)
+	expectHeads("其他企业追加消息", false, 1, func() { other.send(t, other.owner, "其他企业", false) })
+}
+
+// TestSyncHeadsIdentityProfile 验证身份资料与账户偏好实际变化时推进版本，重复保存不推进。
+func TestSyncHeadsIdentityProfile(t *testing.T) {
+	f := newNavigationFixture(t)
+	ctx := context.Background()
+	if _, err := useraction.NewCreateUserAction(f.db).Execute(ctx, f.owner, useraction.CreateInput{DisplayName: "无会话成员", Email: "lonely@navigation.test", Password: "password123", RoleID: f.owner.OrganizationIdentity.RoleID}); err != nil {
+		t.Fatal(err)
+	}
+	loginAction := authaction.NewLoginAction(f.db)
+	loginInput := authaction.LoginInput{OrganizationID: f.owner.Organization.ID, Email: "lonely@navigation.test", Password: "password123"}
+	login, err := loginAction.Execute(ctx, loginInput)
+	if err != nil {
+		t.Fatal(err)
+	}
+	lonely := login.Identity
+	workStatus := useraction.NewUpdateWorkStatusAction(f.db)
+	// expectProfile 执行变化后核对身份资料版本是否推进，会话数量与校验和保持不变。
+	expectProfile := func(name string, changed bool, change func() error) {
+		t.Helper()
+		before := loadSyncHeads(t, f.db, lonely)
+		if err := change(); err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		after := loadSyncHeads(t, f.db, lonely)
+		if (after.IdentityProfileVersion != before.IdentityProfileVersion) != changed || after.ConversationCount != before.ConversationCount || after.ConversationChecksum != before.ConversationChecksum {
+			t.Fatalf("%s: before=%+v after=%+v", name, before, after)
+		}
+	}
+	if heads := loadSyncHeads(t, f.db, lonely); heads.ConversationCount != 0 || heads.ConversationChecksum != "0" {
+		t.Fatalf("empty heads=%+v", heads)
+	}
+	expectProfile("无会话时修改工作状态", true, func() error {
+		_, err := workStatus.Execute(ctx, lonely, useraction.WorkStatusInput{WorkStatus: domain.WorkStatusOffDuty})
+		return err
+	})
+	// 加入群后在已有会话上验证资料变化不改变会话校验和。
+	if _, err := conversationaction.NewAddGroupConversationMembersAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationMembersInput{ConversationID: f.groupID, MemberIdentityIDs: []string{lonely.OrganizationIdentity.ID}}); err != nil {
+		t.Fatal(err)
+	}
+	preferences := useraction.NewUpdatePreferencesAction(f.db)
+	profile := useraction.NewUpdateProfileAction(f.db)
+	updateUser := useraction.NewUpdateUserAction(f.db)
+	shanghai := useraction.PreferencesInput{Locale: domain.Locale(lonely.User.Locale), TimeZone: "Asia/Shanghai", MessageNotificationsEnabled: lonely.User.MessageNotificationsEnabled, WorkspaceTabsEnabled: lonely.User.WorkspaceTabsEnabled}
+	for _, step := range []struct {
+		name   string
+		change func() error
+	}{
+		{"工作状态", func() error {
+			_, err := workStatus.Execute(ctx, lonely, useraction.WorkStatusInput{WorkStatus: domain.WorkStatusAway})
+			return err
+		}},
+		{"登录恢复工作中", func() (err error) { login, err = loginAction.Execute(ctx, loginInput); return err }},
+		{"账户偏好", func() error { _, err := preferences.Execute(ctx, lonely, shanghai); return err }},
+		{"个人资料", func() error {
+			_, err := profile.Execute(ctx, lonely, useraction.ProfileInput{DisplayName: "改名成员", Email: "lonely@navigation.test"})
+			return err
+		}},
+		{"管理员修改邮箱", func() error {
+			_, err := updateUser.Execute(ctx, f.owner, lonely.User.ID, useraction.UpdateInput{DisplayName: "改名成员", Email: "renamed@navigation.test", RoleID: lonely.OrganizationIdentity.RoleID})
+			return err
+		}},
+	} {
+		// 首次保存改变资料，重复保存同一值不推进版本。
+		for attempt, changed := range []bool{true, false} {
+			expectProfile(step.name+strconv.Itoa(attempt), changed, step.change)
+		}
+	}
+
+	var accessHost string
+	if err := f.db.NewSelect().Table("organizations").Column("access_host").Where("id = ?", f.owner.Organization.ID).Scan(ctx, &accessHost); err != nil {
+		t.Fatal(err)
+	}
+	backend := appservice.NewDirectBackend(f.db, nil, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil)
+	heads, err := backend.GetSyncHeads(tenant.WithAccessHost(ctx, accessHost), appservice.RequestMeta{Token: login.Token})
+	stored := loadSyncHeads(t, f.db, lonely)
+	if err != nil || heads.ConversationCount != 1 || heads.ConversationChecksum != stored.ConversationChecksum || heads.IdentityProfileVersion != strconv.FormatInt(stored.IdentityProfileVersion, 10) {
+		t.Fatalf("backend heads=%+v stored=%+v err=%v", heads, stored, err)
+	}
+}

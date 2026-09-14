@@ -184,6 +184,12 @@ func (a *MarkConversationMentionReviewedAction) Execute(ctx context.Context, ide
 		if err := advanceMentionReviewState(ctx, tx, identity, conversationID, &result); err != nil {
 			return err
 		}
+		// 每次确认提及推进一次个人状态版本。
+		state := &servermodels.ConversationUserState{OrganizationID: identity.Organization.ID, ConversationID: conversationID, UserID: identity.User.ID, Version: 1}
+		if _, err := tx.NewInsert().Model(state).Column("organization_id", "conversation_id", "user_id", "version").
+			On("CONFLICT (organization_id, conversation_id, user_id) DO UPDATE").Set("version = cus.version + 1").Set("updated_at = now()").Exec(ctx); err != nil {
+			return err
+		}
 		result.Outcome = "reviewed"
 		return nil
 	})

@@ -234,6 +234,7 @@ export type {
     S3Setting,
     S3SettingInput,
     Startup,
+    SyncHeads,
     Team,
     TeamInput,
     TeamList,
