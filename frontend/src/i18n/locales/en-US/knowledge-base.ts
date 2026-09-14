@@ -14,14 +14,6 @@ const knowledgeBase = {
     deleteSuccess: "Document deleted",
     deleteDescription: "Delete “{{name}}”? This cannot be undone.",
     operationFailed: "Operation failed. Please retry.",
-    status: {
-      initial: "Not processed",
-      queued: "Queued",
-      running: "Processing",
-      succeeded: "Completed",
-      failed: "Failed",
-      cancelled: "Cancelled",
-    },
     columns: {
       name: "Name",
       type: "Type",
@@ -45,6 +37,14 @@ const knowledgeBase = {
       saved: "Completed",
       retry: "Retry failed",
     },
+  },
+  indexStatus: {
+    initial: "Not processed",
+    queued: "Queued",
+    running: "Processing",
+    succeeded: "Completed",
+    failed: "Failed",
+    cancelled: "Cancelled",
   },
   retrieval: {
     action: "Test retrieval",

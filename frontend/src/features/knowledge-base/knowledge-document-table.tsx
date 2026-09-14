@@ -17,7 +17,7 @@ import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import { useDateTime } from "@/hooks/use-date-time"
 import { formatFileSize } from "@/lib/file-size"
 import type { DocumentAction } from "./knowledge-document-actions"
-import { KnowledgeDocumentStatus } from "./knowledge-document-status"
+import { KnowledgeIndexStatus } from "./knowledge-index-status"
 
 /** 显示文档列表，操作列固定在最右侧。 */
 export function KnowledgeDocumentTable({
@@ -96,7 +96,7 @@ export function KnowledgeDocumentTable({
           {
             key: "status",
             header: t("documents.columns.status"),
-            cell: (document) => <KnowledgeDocumentStatus document={document} />,
+            cell: (document) => <KnowledgeIndexStatus status={document.status} failureMessage={document.failureMessage} />,
           },
           {
             key: "createdAt",

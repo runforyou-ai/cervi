@@ -1778,8 +1778,8 @@ export interface KnowledgeDocument {
     "name": string;
     "contentType": string;
     "byteSize": number;
-    "status": KnowledgeDocumentStatus;
-    "processingStatus": KnowledgeDocumentProcessingStatus;
+    "status": KnowledgeIndexStatus;
+    "processingStatus": KnowledgeIndexProcessingStatus;
     "segmentBatchId": string;
     "segmentCount": number;
     "failureMessage": string;
@@ -1857,27 +1857,6 @@ export interface KnowledgeDocumentPreviewRequest {
 }
 
 /**
- * KnowledgeDocumentProcessingStatus 定义文档处理流程的执行状态。
- */
-export enum KnowledgeDocumentProcessingStatus {
-    /**
-     * The Go zero value for the underlying type of the enum.
-     */
-    $zero = "",
-
-    KnowledgeProcessingInitial = "initial",
-    KnowledgeProcessingQueued = "queued",
-    KnowledgeProcessingFetching = "fetching",
-    KnowledgeProcessingConverting = "converting",
-    KnowledgeProcessingSplitting = "splitting",
-    KnowledgeProcessingEmbedding = "embedding",
-    KnowledgeProcessingPublishing = "publishing",
-    KnowledgeProcessingSucceeded = "succeeded",
-    KnowledgeProcessingFailed = "failed",
-    KnowledgeProcessingCancelled = "cancelled",
-};
-
-/**
  * KnowledgeDocumentSegment 定义可阅读和定位的分段正文。
  */
 export interface KnowledgeDocumentSegment {
@@ -1909,23 +1888,6 @@ export interface KnowledgeDocumentSegmentPage {
 }
 
 /**
- * KnowledgeDocumentStatus 定义文档展示状态。
- */
-export enum KnowledgeDocumentStatus {
-    /**
-     * The Go zero value for the underlying type of the enum.
-     */
-    $zero = "",
-
-    KnowledgeDocumentInitial = "initial",
-    KnowledgeDocumentQueued = "queued",
-    KnowledgeDocumentRunning = "running",
-    KnowledgeDocumentSucceeded = "succeeded",
-    KnowledgeDocumentFailed = "failed",
-    KnowledgeDocumentCancelled = "cancelled",
-};
-
-/**
  * KnowledgeGroup 定义知识库分组树节点。
  */
 export interface KnowledgeGroup {
@@ -1943,6 +1905,44 @@ export interface KnowledgeGroupInput {
     "name": string;
     "parentId": string;
 }
+
+/**
+ * KnowledgeIndexProcessingStatus 定义知识来源索引流程的执行状态。
+ */
+export enum KnowledgeIndexProcessingStatus {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    KnowledgeProcessingInitial = "initial",
+    KnowledgeProcessingQueued = "queued",
+    KnowledgeProcessingFetching = "fetching",
+    KnowledgeProcessingConverting = "converting",
+    KnowledgeProcessingSplitting = "splitting",
+    KnowledgeProcessingEmbedding = "embedding",
+    KnowledgeProcessingPublishing = "publishing",
+    KnowledgeProcessingSucceeded = "succeeded",
+    KnowledgeProcessingFailed = "failed",
+    KnowledgeProcessingCancelled = "cancelled",
+};
+
+/**
+ * KnowledgeIndexStatus 定义知识来源的索引展示状态，文档与问答条目共用。
+ */
+export enum KnowledgeIndexStatus {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    KnowledgeIndexInitial = "initial",
+    KnowledgeIndexQueued = "queued",
+    KnowledgeIndexRunning = "running",
+    KnowledgeIndexSucceeded = "succeeded",
+    KnowledgeIndexFailed = "failed",
+    KnowledgeIndexCancelled = "cancelled",
+};
 
 /**
  * KnowledgeQAEntry 定义完整问答详情。

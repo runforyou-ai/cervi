@@ -14,14 +14,6 @@ const knowledgeBase = {
     deleteSuccess: "文档已删除",
     deleteDescription: "确定删除“{{name}}”？此操作无法撤销。",
     operationFailed: "操作失败，请重试",
-    status: {
-      initial: "未处理",
-      queued: "排队中",
-      running: "处理中",
-      succeeded: "已完成",
-      failed: "处理失败",
-      cancelled: "已取消",
-    },
     columns: {
       name: "名称",
       type: "类型",
@@ -45,6 +37,14 @@ const knowledgeBase = {
       saved: "已完成",
       retry: "重试失败项",
     },
+  },
+  indexStatus: {
+    initial: "未处理",
+    queued: "排队中",
+    running: "处理中",
+    succeeded: "已完成",
+    failed: "处理失败",
+    cancelled: "已取消",
   },
   retrieval: {
     action: "检索测试",

@@ -96,7 +96,7 @@ func TestKnowledgeDocumentLifecycle(t *testing.T) {
 			t.Fatalf("search %s=%+v %v", keyword, result, err)
 		}
 	}
-	if docs[0].Status != domain.KnowledgeDocumentQueued {
+	if docs[0].Status != domain.KnowledgeIndexQueued {
 		t.Fatal("new document not queued")
 	}
 	grouped, err := knowledgeaction.NewCreateKnowledgeGroupAction(db).Execute(ctx, identity, base.ID, knowledgeaction.GroupInput{Name: "归档"})

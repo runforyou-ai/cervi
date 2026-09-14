@@ -123,20 +123,20 @@ func knowledgeDocumentFromAction(meta RequestMeta, record knowledgeaction.Docume
 		message, _ = cervii18n.Localize(string(meta.Locale), key)
 	}
 	// 将文档处理阶段映射为展示状态。
-	status := KnowledgeDocumentRunning
+	status := KnowledgeIndexRunning
 	switch record.Status {
-	case domain.KnowledgeDocumentInitial:
-		status = KnowledgeDocumentInitial
-	case domain.KnowledgeDocumentQueued:
-		status = KnowledgeDocumentQueued
-	case domain.KnowledgeDocumentSucceeded:
-		status = KnowledgeDocumentSucceeded
-	case domain.KnowledgeDocumentFailed:
-		status = KnowledgeDocumentFailed
-	case domain.KnowledgeDocumentCancelled:
-		status = KnowledgeDocumentCancelled
+	case domain.KnowledgeIndexInitial:
+		status = KnowledgeIndexInitial
+	case domain.KnowledgeIndexQueued:
+		status = KnowledgeIndexQueued
+	case domain.KnowledgeIndexSucceeded:
+		status = KnowledgeIndexSucceeded
+	case domain.KnowledgeIndexFailed:
+		status = KnowledgeIndexFailed
+	case domain.KnowledgeIndexCancelled:
+		status = KnowledgeIndexCancelled
 	}
-	return KnowledgeDocument{ProcessingStatus: KnowledgeDocumentProcessingStatus(record.Status), SegmentBatchID: record.SegmentBatchID, SegmentCount: record.SegmentCount, FailureMessage: message, Format: KnowledgeDocumentFormat(strings.ToLower(filepath.Ext(record.Name))), ID: record.ID, GroupID: record.GroupID, Name: record.Name, ContentType: record.ContentType, ByteSize: record.ByteSize, Status: status, CreatedAt: record.CreatedAt}
+	return KnowledgeDocument{ProcessingStatus: KnowledgeIndexProcessingStatus(record.Status), SegmentBatchID: record.SegmentBatchID, SegmentCount: record.SegmentCount, FailureMessage: message, Format: KnowledgeDocumentFormat(strings.ToLower(filepath.Ext(record.Name))), ID: record.ID, GroupID: record.GroupID, Name: record.Name, ContentType: record.ContentType, ByteSize: record.ByteSize, Status: status, CreatedAt: record.CreatedAt}
 }
 
 // RetryKnowledgeDocument 按当前配置为文档安排新的处理任务。

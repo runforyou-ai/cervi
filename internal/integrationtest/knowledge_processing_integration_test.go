@@ -84,7 +84,7 @@ func TestKnowledgeProcessingRetryAndPublication(t *testing.T) {
 	if err := db.NewSelect().Model(&document).Where("kd.id = ?", documentID).Scan(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if document.Status != domain.KnowledgeDocumentQueued || document.ChunkLength != 512 || document.ProcessingID == "" {
+	if document.Status != domain.KnowledgeIndexQueued || document.ChunkLength != 512 || document.ProcessingID == "" {
 		t.Fatalf("document=%+v", document)
 	}
 	input := knowledgeaction.ProcessInput{OrganizationID: installed.Identity.Organization.ID, KnowledgeBaseID: base.ID, DocumentID: documentID, ProcessingID: document.ProcessingID, ChunkLength: document.ChunkLength, ChunkOverlap: document.ChunkOverlap, EmbeddingProviderID: document.EmbeddingProviderID, EmbeddingModelIdentifier: document.EmbeddingModelIdentifier, EmbeddingDimension: document.EmbeddingDimension}
@@ -99,7 +99,7 @@ func TestKnowledgeProcessingRetryAndPublication(t *testing.T) {
 	}
 	query := knowledgeaction.NewDocumentQuery(db)
 	failed, err := query.Get(ctx, installed.Identity, base.ID, documentID)
-	if err != nil || failed.Status != domain.KnowledgeDocumentFailed || failed.FailureCode != "parse_failed" {
+	if err != nil || failed.Status != domain.KnowledgeIndexFailed || failed.FailureCode != "parse_failed" {
 		t.Fatalf("failure=%+v %v", failed, err)
 	}
 	// 核验连续重试后生效的任务标识。
@@ -139,7 +139,7 @@ func TestKnowledgeProcessingRetryAndPublication(t *testing.T) {
 		t.Fatal(err)
 	}
 	completed, err := query.Get(ctx, installed.Identity, base.ID, documentID)
-	if err != nil || completed.Status != domain.KnowledgeDocumentSucceeded || completed.SegmentCount != 1 || completed.SegmentBatchID != input.ProcessingID {
+	if err != nil || completed.Status != domain.KnowledgeIndexSucceeded || completed.SegmentCount != 1 || completed.SegmentBatchID != input.ProcessingID {
 		t.Fatalf("completed=%+v %v", completed, err)
 	}
 	// 核验向量配置快照、执行时解析的模型凭据和落库的分段维度。
@@ -198,7 +198,7 @@ func TestKnowledgeRetryAllStates(t *testing.T) {
 		t.Fatal(err)
 	}
 	retry := knowledgeaction.NewDocumentProcessing(db, tasks)
-	states := []domain.KnowledgeDocumentStatus{domain.KnowledgeDocumentInitial, domain.KnowledgeDocumentQueued, domain.KnowledgeDocumentFetching, domain.KnowledgeDocumentConverting, domain.KnowledgeDocumentSplitting, domain.KnowledgeDocumentEmbedding, domain.KnowledgeDocumentPublishing, domain.KnowledgeDocumentSucceeded, domain.KnowledgeDocumentFailed, domain.KnowledgeDocumentCancelled}
+	states := []domain.KnowledgeIndexStatus{domain.KnowledgeIndexInitial, domain.KnowledgeIndexQueued, domain.KnowledgeIndexFetching, domain.KnowledgeIndexConverting, domain.KnowledgeIndexSplitting, domain.KnowledgeIndexEmbedding, domain.KnowledgeIndexPublishing, domain.KnowledgeIndexSucceeded, domain.KnowledgeIndexFailed, domain.KnowledgeIndexCancelled}
 	for _, state := range states {
 		if _, err := db.NewUpdate().Model(&document).Set("status = ?", state).WherePK().Exec(ctx); err != nil {
 			t.Fatal(err)
@@ -209,7 +209,7 @@ func TestKnowledgeRetryAllStates(t *testing.T) {
 		if err := db.NewSelect().Model(&document).Where("kd.id = ?", document.ID).Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
-		if document.ProcessingID == input.ProcessingID || document.Status != domain.KnowledgeDocumentQueued || document.ChunkLength != 768 || document.ChunkOverlap != 80 || document.SegmentBatchID != published {
+		if document.ProcessingID == input.ProcessingID || document.Status != domain.KnowledgeIndexQueued || document.ChunkLength != 768 || document.ChunkOverlap != 80 || document.SegmentBatchID != published {
 			t.Fatalf("%s: %+v", state, document)
 		}
 		if err := worker.Execute(ctx, input); err != nil {
@@ -247,7 +247,7 @@ func TestKnowledgeRetryAllStates(t *testing.T) {
 	if err := db.NewSelect().Model(&document).Where("kd.id = ?", document.ID).Scan(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if document.Status != domain.KnowledgeDocumentSucceeded || document.SegmentBatchID != input.ProcessingID {
+	if document.Status != domain.KnowledgeIndexSucceeded || document.SegmentBatchID != input.ProcessingID {
 		t.Fatalf("completed=%+v", document)
 	}
 }
@@ -287,7 +287,7 @@ func TestKnowledgeProcessingMissingFile(t *testing.T) {
 	if err := db.NewSelect().Model(&document).Where("kd.id = ?", document.ID).Scan(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if document.Status != domain.KnowledgeDocumentFailed || document.FailureCode != "file_read_failed" {
+	if document.Status != domain.KnowledgeIndexFailed || document.FailureCode != "file_read_failed" {
 		t.Fatalf("document=%+v", document)
 	}
 }
@@ -345,7 +345,7 @@ func TestKnowledgeProcessingPublishesSegments(t *testing.T) {
 	if err := db.NewSelect().Model(document).Where("kd.id = ?", document.ID).Scan(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if document.Status != domain.KnowledgeDocumentSucceeded || document.SegmentBatchID != input.ProcessingID || document.SegmentCount != len(expected) {
+	if document.Status != domain.KnowledgeIndexSucceeded || document.SegmentBatchID != input.ProcessingID || document.SegmentCount != len(expected) {
 		t.Fatalf("document=%+v 期望 %d 段", document, len(expected))
 	}
 	// 读回发布批次，核对正文、序号与按任务标识确定的分段编号。
@@ -369,13 +369,13 @@ func TestKnowledgeProcessingPublishesSegments(t *testing.T) {
 	// 转换结果为空白时按空正文失败，并保留上次成功的批次。
 	empty := input
 	empty.ProcessingID = uuid.NewV7().String()
-	if _, err := db.NewUpdate().Model(document).Set("processing_id = ?", empty.ProcessingID).Set("status = ?", domain.KnowledgeDocumentQueued).WherePK().Exec(ctx); err != nil {
+	if _, err := db.NewUpdate().Model(document).Set("processing_id = ?", empty.ProcessingID).Set("status = ?", domain.KnowledgeIndexQueued).WherePK().Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
 	probe.markdown = " \n\t"
 	runErr := action.Execute(ctx, empty)
 	var failure *knowledgeaction.ProcessError
-	if !errors.As(runErr, &failure) || failure.Code != "empty_content" || failure.Stage != domain.KnowledgeDocumentSplitting {
+	if !errors.As(runErr, &failure) || failure.Code != "empty_content" || failure.Stage != domain.KnowledgeIndexSplitting {
 		t.Fatalf("empty=%v", runErr)
 	}
 	if err := action.FinalizeFailure(ctx, empty, runErr); err != nil {
@@ -384,7 +384,7 @@ func TestKnowledgeProcessingPublishesSegments(t *testing.T) {
 	if err := db.NewSelect().Model(document).Where("kd.id = ?", document.ID).Scan(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if document.Status != domain.KnowledgeDocumentFailed || document.FailureCode != "empty_content" || document.SegmentBatchID != input.ProcessingID {
+	if document.Status != domain.KnowledgeIndexFailed || document.FailureCode != "empty_content" || document.SegmentBatchID != input.ProcessingID {
 		t.Fatalf("失败后 document=%+v", document)
 	}
 }
@@ -509,7 +509,7 @@ func TestKnowledgeConnectionFailureSkipsTask(t *testing.T) {
 		if err := db.NewSelect().Model(&document).Where("kd.id = ?", document.ID).Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
-		if document.Status != domain.KnowledgeDocumentFailed || document.FailureCode != code || document.ProcessingID == input.ProcessingID || document.SegmentBatchID != published || document.SegmentCount != 1 {
+		if document.Status != domain.KnowledgeIndexFailed || document.FailureCode != code || document.ProcessingID == input.ProcessingID || document.SegmentBatchID != published || document.SegmentCount != 1 {
 			t.Fatalf("document=%+v", document)
 		}
 		if err := worker.Execute(ctx, input); err != nil {
@@ -548,7 +548,7 @@ func TestKnowledgeConnectionFailureSkipsTask(t *testing.T) {
 	if err := db.NewSelect().Model(&document).Where("kd.id = ?", document.ID).Scan(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if document.Status != domain.KnowledgeDocumentFailed || document.FailureCode != "parse_failed" || document.SegmentBatchID != published {
+	if document.Status != domain.KnowledgeIndexFailed || document.FailureCode != "parse_failed" || document.SegmentBatchID != published {
 		t.Fatalf("document=%+v", document)
 	}
 }
