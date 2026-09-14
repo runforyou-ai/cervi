@@ -106,6 +106,7 @@ const contacts = {
     },
     validation: {
       nameRequired: "Enter a name.",
+      nameInvalid: "Names can only contain letters, numbers, spaces, and · - _ . characters.",
       emailRequired: "Enter an email address.",
       emailInvalid: "Enter a valid email address.",
       passwordRequired: "Enter an initial password.",
@@ -145,6 +146,7 @@ const contacts = {
     },
     validation: {
       nameRequired: "Enter an AI employee name.",
+      nameInvalid: "AI employee names can only contain letters, numbers, spaces, and · - _ . characters.",
       modelRequired: "Select a chat model.",
       instructionRequired: "Enter work instructions.",
       instructionTooLong: "Work instructions cannot exceed 20,000 characters.",

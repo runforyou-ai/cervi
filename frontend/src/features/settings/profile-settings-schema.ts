@@ -1,9 +1,12 @@
 /** 个人资料表单校验规则。 */
 import { z } from "zod"
 
+import { displayNamePattern } from "@/lib/display-name"
+
 type ProfileTranslator = (
   key:
     | "profile.validation.displayNameRequired"
+    | "profile.validation.displayNameInvalid"
     | "profile.validation.emailRequired"
     | "profile.validation.emailInvalid",
 ) => string
@@ -14,7 +17,8 @@ export function createProfileSettingsSchema(t: ProfileTranslator) {
     displayName: z
       .string()
       .trim()
-      .min(1, t("profile.validation.displayNameRequired")),
+      .min(1, t("profile.validation.displayNameRequired"))
+      .regex(displayNamePattern, t("profile.validation.displayNameInvalid")),
     email: z
       .string()
       .trim()

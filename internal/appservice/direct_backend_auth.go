@@ -147,6 +147,7 @@ func installationFieldKeys(fields map[string]common.FieldCode) map[string]cervii
 		installationaction.ValidationOrganizationNameRequired: cervii18n.FieldOrganizationNameRequired,
 		installationaction.ValidationOrganizationNameTooLong:  cervii18n.FieldOrganizationNameTooLong,
 		installationaction.ValidationDisplayNameRequired:      cervii18n.FieldDisplayNameRequired,
+		installationaction.ValidationDisplayNameInvalid:       cervii18n.FieldDisplayNameInvalid,
 		installationaction.ValidationEmailInvalid:             cervii18n.FieldEmailInvalid,
 		installationaction.ValidationPasswordTooShort:         cervii18n.FieldPasswordTooShort,
 		installationaction.ValidationPasswordTooLong:          cervii18n.FieldPasswordTooLong,

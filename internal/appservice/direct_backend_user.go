@@ -295,6 +295,7 @@ func userFromAction(user useraction.User) User {
 func userFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key {
 	keys := map[common.FieldCode]cervii18n.Key{
 		useraction.ValidationDisplayNameRequired: cervii18n.FieldDisplayNameRequired,
+		useraction.ValidationDisplayNameInvalid:  cervii18n.FieldDisplayNameInvalid,
 		useraction.ValidationEmailInvalid:        cervii18n.FieldEmailInvalid,
 		useraction.ValidationEmailDuplicate:      cervii18n.FieldEmailDuplicate,
 		useraction.ValidationPasswordTooShort:    cervii18n.FieldPasswordTooShort,
@@ -310,6 +311,7 @@ func userFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key 
 func profileFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key {
 	keys := map[common.FieldCode]cervii18n.Key{
 		useraction.ValidationDisplayNameRequired: cervii18n.FieldDisplayNameRequired,
+		useraction.ValidationDisplayNameInvalid:  cervii18n.FieldDisplayNameInvalid,
 		useraction.ValidationEmailInvalid:        cervii18n.FieldEmailInvalid,
 		useraction.ValidationEmailDuplicate:      cervii18n.FieldEmailDuplicate,
 	}

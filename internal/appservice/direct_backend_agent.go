@@ -53,6 +53,7 @@ func (o *directOperations) CreateAgent(ctx context.Context, meta RequestMeta, id
 	if err != nil {
 		return Agent{}, o.agentError(ctx, meta, err, cervii18n.ErrorAgentCreateFailed, identity.Organization.ID, "", map[common.FieldCode]cervii18n.Key{
 			agentaction.ValidationDisplayNameRequired:       cervii18n.FieldAgentNameRequired,
+			agentaction.ValidationDisplayNameInvalid:        cervii18n.FieldDisplayNameInvalid,
 			agentaction.ValidationRoleInvalid:               cervii18n.FieldMemberRoleInvalid,
 			agentaction.ValidationTeamInvalid:               cervii18n.FieldTeamInvalid,
 			agentaction.ValidationExecutionInvalid:          cervii18n.FieldAgentExecutionInvalid,
@@ -151,6 +152,7 @@ func (o *directOperations) UpdateAgent(ctx context.Context, meta RequestMeta, id
 	if err != nil {
 		return Agent{}, o.agentError(ctx, meta, err, cervii18n.ErrorAgentUpdateFailed, identity.Organization.ID, agentID, map[common.FieldCode]cervii18n.Key{
 			agentaction.ValidationDisplayNameRequired:   cervii18n.FieldAgentNameRequired,
+			agentaction.ValidationDisplayNameInvalid:    cervii18n.FieldDisplayNameInvalid,
 			agentaction.ValidationRoleInvalid:           cervii18n.FieldMemberRoleInvalid,
 			agentaction.ValidationTeamInvalid:           cervii18n.FieldTeamInvalid,
 			agentaction.ValidationWorkStatusInvalid:     cervii18n.FieldWorkStatusInvalid,

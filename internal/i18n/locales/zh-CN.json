@@ -301,6 +301,7 @@
   "field.organization_name_required": "请输入企业名称。",
   "field.organization_name_too_long": "企业名称不能超过 32 个字符。",
   "field.display_name_required": "请输入你的姓名。",
+  "field.display_name_invalid": "名称只能包含文字、数字、空格和 · - _ . 符号。",
   "field.agent_name_required": "请输入 AI 员工名称。",
   "field.agent_execution_invalid": "请选择有效的 AI 员工运行配置。",
   "field.agent_mcp_server_invalid": "所选 MCP 服务不存在或已删除，请重新选择。",
