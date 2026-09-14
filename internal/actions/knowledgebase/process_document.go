@@ -133,10 +133,11 @@ func (a *ProcessDocumentAction) Execute(ctx context.Context, input ProcessInput)
 		if document.ProcessingID != input.ProcessingID || !document.Status.IsProcessing() {
 			return nil
 		}
-		if err := deleteDocumentSegments(ctx, tx, input.DocumentID); err != nil {
+		if err := deleteSourceSegments(ctx, tx, input.DocumentID); err != nil {
 			return err
 		}
-		if err := insertSegments(ctx, tx, input, segments, vectors); err != nil {
+		batch := segmentBatch{OrganizationID: input.OrganizationID, KnowledgeBaseID: input.KnowledgeBaseID, SourceType: domain.KnowledgeSourceDocument, SourceID: input.DocumentID, BatchID: input.ProcessingID, EmbeddingDimension: input.EmbeddingDimension}
+		if err := insertSegments(ctx, tx, batch, segments, vectors); err != nil {
 			return err
 		}
 		_, err := tx.NewUpdate().Model(document).Set("status = ?", domain.KnowledgeIndexSucceeded).Set("segment_batch_id = ?", input.ProcessingID).Set("segment_count = ?", len(segments)).Set("failure_code = ''").Set("updated_at = now()").WherePK().Exec(ctx)

@@ -25,3 +25,18 @@ func (status KnowledgeIndexStatus) IsProcessing() bool {
 		return false
 	}
 }
+
+// KnowledgeSourceType 表示分段所属的知识来源类型。
+type KnowledgeSourceType string
+
+const (
+	KnowledgeSourceDocument KnowledgeSourceType = "document"
+	KnowledgeSourceQAEntry  KnowledgeSourceType = "qa_entry"
+)
+
+const (
+	// KnowledgeQAChunkLength 是问答答案分段的字符长度。
+	KnowledgeQAChunkLength = 512
+	// KnowledgeQAChunkOverlap 是问答答案分段的重叠字符数。
+	KnowledgeQAChunkOverlap = 50
+)

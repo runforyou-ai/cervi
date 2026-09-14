@@ -109,13 +109,13 @@ func (s *RetrievalService) Sources(ctx context.Context, organizationID string, k
 				return retrievalRecords(records, true), err
 			},
 			Read: func(ctx context.Context, cursor knowledgeretrieval.Cursor, before, after int) ([]knowledgeretrieval.Record, error) {
-				hits, err := readSegmentWindow(ctx, s.db, source.base.ID, cursor.DocumentID, cursor.SegmentID, before, after)
+				hits, err := readSegmentWindow(ctx, s.db, source.base, cursor.DocumentID, cursor.SegmentID, before, after)
 				if err != nil {
 					return nil, err
 				}
 				records := make([]RetrievalRecord, 0, len(hits))
 				for _, hit := range hits {
-					records = append(records, RetrievalRecord{DocumentID: hit.DocumentID, DocumentName: hit.DocumentName, SegmentID: hit.ID, SegmentBatchID: hit.SegmentBatchID, Position: hit.Position, Content: hit.Content})
+					records = append(records, RetrievalRecord{DocumentID: hit.SourceID, DocumentName: hit.SourceName, SegmentID: hit.ID, SegmentBatchID: hit.SegmentBatchID, Position: hit.Position, Content: hit.Content})
 				}
 				return retrievalRecords(records, false), nil
 			},
@@ -189,11 +189,11 @@ func (k *knowledgeSource) retrieve(ctx context.Context, query string) ([]Retriev
 			vectorErr = err
 			return
 		}
-		vectorHits, vectorErr = searchSegmentsByVector(ctx, k.service.db, k.base.ID, k.base.EmbeddingDimension, vectors[0])
+		vectorHits, vectorErr = searchSegmentsByVector(ctx, k.service.db, k.base, vectors[0])
 	})
 	if lexical {
 		group.Go(func() {
-			lexicalHits, lexicalErr = searchSegmentsByText(ctx, k.service.db, k.base.ID, tsquery)
+			lexicalHits, lexicalErr = searchSegmentsByText(ctx, k.service.db, k.base, tsquery)
 		})
 	}
 	group.Wait()
@@ -269,7 +269,7 @@ func (k *knowledgeSource) retrieve(ctx context.Context, query string) ([]Retriev
 	records := make([]RetrievalRecord, 0, len(ordered))
 	for _, item := range ordered {
 		records = append(records, RetrievalRecord{
-			DocumentID: item.hit.DocumentID, DocumentName: item.hit.DocumentName,
+			DocumentID: item.hit.SourceID, DocumentName: item.hit.SourceName,
 			SegmentID: item.hit.ID, SegmentBatchID: item.hit.SegmentBatchID, Position: item.hit.Position,
 			Content: item.hit.Content, Score: item.score, LexicalRank: item.lexicalRank, VectorRank: item.vectorRank,
 		})

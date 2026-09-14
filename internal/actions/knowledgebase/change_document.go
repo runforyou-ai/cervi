@@ -59,7 +59,7 @@ func (a *DeleteDocumentAction) Execute(ctx context.Context, identity *servermode
 		if err := tx.NewSelect().Model(&locked).Where("kd.id = ?", documentID).For("UPDATE").Scan(ctx); err != nil {
 			return err
 		}
-		if err := deleteDocumentSegments(ctx, tx, documentID); err != nil {
+		if err := deleteSourceSegments(ctx, tx, documentID); err != nil {
 			return err
 		}
 		if _, err := tx.NewUpdate().Model((*servermodels.File)(nil)).Set("status = ?", domain.FileStatusDeleting).Set("expires_at = now()").Set("updated_at = now()").Where("id IN (SELECT file_id FROM knowledge_documents WHERE id = ?)", documentID).Exec(ctx); err != nil {
