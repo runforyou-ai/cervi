@@ -16,7 +16,7 @@ func AvailableModels(brand domain.AIProviderBrand) []Model {
 	switch brand {
 	case domain.AIProviderBrandDeepSeek:
 		return []Model{
-			{Identifier: "deepseek-v4-flash", Name: "DeepSeek V4 Flash", Type: domain.AIModelTypeChat, InputModalities: text, ContextWindow: 1_048_576, MaxOutputTokens: 393_216},
+			{Identifier: "deepseek-flash", Name: "DeepSeek Flash", Type: domain.AIModelTypeChat, InputModalities: text, ContextWindow: 1_048_576, MaxOutputTokens: 393_216},
 			{Identifier: "deepseek-v4-pro", Name: "DeepSeek V4 Pro", Type: domain.AIModelTypeChat, InputModalities: text, ContextWindow: 1_048_576, MaxOutputTokens: 393_216},
 		}
 	case domain.AIProviderBrandAlibaba:
@@ -36,6 +36,34 @@ func AvailableModels(brand domain.AIProviderBrand) []Model {
 			{Identifier: "gpt-5.6-luna", Name: "GPT-5.6 Luna", Type: domain.AIModelTypeChat, InputModalities: textAndImage, ContextWindow: 1_050_000, MaxOutputTokens: 128_000},
 			{Identifier: "text-embedding-3-large", Name: "Text Embedding 3 Large", Type: domain.AIModelTypeEmbedding, InputModalities: text, ContextWindow: 8_192},
 			{Identifier: "text-embedding-3-small", Name: "Text Embedding 3 Small", Type: domain.AIModelTypeEmbedding, InputModalities: text, ContextWindow: 8_192},
+		}
+	case domain.AIProviderBrandMoonshot:
+		return []Model{
+			{Identifier: "kimi-k3", Name: "Kimi K3", Type: domain.AIModelTypeChat, InputModalities: textAndImage, ContextWindow: 1_048_576, MaxOutputTokens: 131_072},
+		}
+	case domain.AIProviderBrandZhipu:
+		return []Model{
+			{Identifier: "glm-5.3", Name: "GLM-5.3", Type: domain.AIModelTypeChat, InputModalities: text, ContextWindow: 1_048_576, MaxOutputTokens: 131_072},
+			{Identifier: "glm-5.3-flash", Name: "GLM-5.3-Flash", Type: domain.AIModelTypeChat, InputModalities: textImageVideo, ContextWindow: 1_048_576, MaxOutputTokens: 131_072},
+		}
+	case domain.AIProviderBrandVolcengine:
+		return []Model{
+			{Identifier: "doubao-seed-evolving", Name: "Doubao Seed Evolving", Type: domain.AIModelTypeChat, InputModalities: textImageVideo, ContextWindow: 1_048_576, MaxOutputTokens: 262_144},
+		}
+	case domain.AIProviderBrandMiniMax:
+		return []Model{
+			{Identifier: "MiniMax-M3", Name: "MiniMax M3", Type: domain.AIModelTypeChat, InputModalities: textImageVideo, ContextWindow: 1_048_576, MaxOutputTokens: 131_072},
+		}
+	case domain.AIProviderBrandXAI:
+		return []Model{
+			{Identifier: "grok-4.6", Name: "Grok 4.6", Type: domain.AIModelTypeChat, InputModalities: textAndImage, ContextWindow: 500_000, MaxOutputTokens: 131_072},
+		}
+	case domain.AIProviderBrandMistral:
+		return []Model{
+			{Identifier: "mistral-medium-2604", Name: "Mistral Medium 3.5", Type: domain.AIModelTypeChat, InputModalities: textAndImage, ContextWindow: 262_144, MaxOutputTokens: 262_144},
+			{Identifier: "mistral-small-2603", Name: "Mistral Small 4", Type: domain.AIModelTypeChat, InputModalities: textAndImage, ContextWindow: 262_144, MaxOutputTokens: 262_144},
+			{Identifier: "mistral-embed", Name: "Mistral Embed", Type: domain.AIModelTypeEmbedding, InputModalities: text, ContextWindow: 8_192},
+			{Identifier: "codestral-embed-2505", Name: "Codestral Embed", Type: domain.AIModelTypeEmbedding, InputModalities: text, ContextWindow: 8_192},
 		}
 	default:
 		return nil

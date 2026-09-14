@@ -123,6 +123,12 @@ const integrations = {
       deepseek: "DeepSeek",
       alibaba: "Alibaba Cloud Model Studio",
       openai: "OpenAI",
+      moonshot: "Moonshot Kimi",
+      zhipu: "Zhipu AI",
+      volcengine: "Volcengine",
+      minimax: "MiniMax",
+      xai: "xAI",
+      mistral: "Mistral",
     },
     list: {
       create: "Add provider",

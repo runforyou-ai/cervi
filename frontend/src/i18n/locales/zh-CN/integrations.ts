@@ -120,6 +120,12 @@ const integrations = {
       deepseek: "DeepSeek",
       alibaba: "阿里云百炼",
       openai: "OpenAI",
+      moonshot: "月之暗面 Kimi",
+      zhipu: "智谱",
+      volcengine: "火山引擎",
+      minimax: "MiniMax",
+      xai: "xAI",
+      mistral: "Mistral",
     },
     list: {
       create: "添加供应商",

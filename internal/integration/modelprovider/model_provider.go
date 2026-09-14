@@ -35,10 +35,17 @@ type Registry struct {
 
 // NewRegistry 创建内置供应商品牌注册表。
 func NewRegistry(client HTTPDoer) *Registry {
+	openAICompatible := newOpenAICompatibleFactory(client)
 	return &Registry{factories: map[domain.AIProviderBrand]Factory{
-		domain.AIProviderBrandDeepSeek: newOpenAICompatibleFactory(client),
-		domain.AIProviderBrandOpenAI:   newOpenAICompatibleFactory(client),
-		domain.AIProviderBrandAlibaba:  newAlibabaFactory(client),
+		domain.AIProviderBrandDeepSeek:   openAICompatible,
+		domain.AIProviderBrandOpenAI:     openAICompatible,
+		domain.AIProviderBrandAlibaba:    newAlibabaFactory(client),
+		domain.AIProviderBrandMoonshot:   openAICompatible,
+		domain.AIProviderBrandZhipu:      openAICompatible,
+		domain.AIProviderBrandVolcengine: openAICompatible,
+		domain.AIProviderBrandMiniMax:    openAICompatible,
+		domain.AIProviderBrandXAI:        openAICompatible,
+		domain.AIProviderBrandMistral:    openAICompatible,
 	}}
 }
 

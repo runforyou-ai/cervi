@@ -54,6 +54,12 @@ export enum AIProviderBrand {
     AIProviderBrandDeepSeek = "deepseek",
     AIProviderBrandAlibaba = "alibaba",
     AIProviderBrandOpenAI = "openai",
+    AIProviderBrandMoonshot = "moonshot",
+    AIProviderBrandZhipu = "zhipu",
+    AIProviderBrandVolcengine = "volcengine",
+    AIProviderBrandMiniMax = "minimax",
+    AIProviderBrandXAI = "xai",
+    AIProviderBrandMistral = "mistral",
 };
 
 /**
