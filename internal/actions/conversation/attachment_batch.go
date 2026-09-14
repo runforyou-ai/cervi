@@ -12,6 +12,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
+	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -22,7 +23,8 @@ import (
 func (a *SendAttachmentMessageAction) ExecuteBatch(ctx context.Context, identity *servermodels.Identity, input AttachmentBatchInput, backend domain.FileStorageBackend) (AttachmentBatchResult, error) {
 	if len(input.Attachments) == 0 || len(input.Attachments) > 100 ||
 		(input.ConversationID == "") == (input.TargetIdentityID == "") ||
-		(input.ConversationID != "" && !common.ValidUUID(input.ConversationID)) || (input.TargetIdentityID != "" && !common.ValidUUID(input.TargetIdentityID)) {
+		(input.ConversationID != "" && !common.ValidUUID(input.ConversationID)) || (input.TargetIdentityID != "" && !common.ValidUUID(input.TargetIdentityID)) ||
+		(input.AgentIdentityID != "" && (input.TargetIdentityID != "" || !common.ValidUUID(input.AgentIdentityID))) {
 		return AttachmentBatchResult{}, ErrConversationNotFound
 	}
 	seen := map[string]bool{}
@@ -72,6 +74,13 @@ func (a *SendAttachmentMessageAction) ExecuteBatch(ctx context.Context, identity
 				}
 				result.Conversation = &summary
 			}
+			if input.AgentIdentityID != "" {
+				summary, err := inboxaction.NewLoadInboxQuery(tx).LoadAgentConversation(ctx, identity, member.Conversation.ID)
+				if err != nil {
+					return err
+				}
+				result.AgentConversation = &summary
+			}
 			return nil
 		})
 		if err == nil {
@@ -112,9 +121,19 @@ func savePendingAttachment(ctx context.Context, tx bun.Tx, identity *servermodel
 	return saveAttachmentMessage(ctx, tx, identity, member, attachmentMessageContent{Pending: true, Body: item.Body, ClientMessageID: item.ClientMessageID, FileID: file.ID, ImageWidth: item.ImageWidth, ImageHeight: item.ImageHeight})
 }
 
-// lockAttachmentBatchConversation 找到或创建成员单聊并锁定发送资格。
+// lockAttachmentBatchConversation 找到或创建成员单聊或 AI 聊天，并锁定发送资格。
 func lockAttachmentBatchConversation(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, input AttachmentBatchInput) (chatstate.Member, error) {
 	conversationID := input.ConversationID
+	if input.AgentIdentityID != "" {
+		// AI 聊天草稿按草稿编号创建会话，标题取附件说明，没有说明时取首个文件名。
+		title := input.Attachments[len(input.Attachments)-1].Body
+		if title == "" {
+			title = input.Attachments[0].File.FileName
+		}
+		if err := ensureAgentConversation(ctx, tx, identity, conversationID, input.AgentIdentityID, title); err != nil {
+			return chatstate.Member{}, err
+		}
+	}
 	if input.TargetIdentityID != "" {
 		if input.TargetIdentityID == identity.OrganizationIdentity.ID {
 			return chatstate.Member{}, ErrDirectTargetNotFound
@@ -138,14 +157,19 @@ func lockAttachmentBatchConversation(ctx context.Context, tx bun.Tx, identity *s
 	if err != nil {
 		return member, err
 	}
-	if member.Conversation.Type != string(domain.ConversationTypeDirect) {
+	switch domain.ConversationType(member.Conversation.Type) {
+	case domain.ConversationTypeAgent:
+		_, err = lockAgentSendContext(ctx, tx, identity, conversationID)
+		return member, err
+	case domain.ConversationTypeDirect:
+		if input.TargetIdentityID != "" && member.Conversation.Status == string(domain.ConversationStatusArchived) {
+			if _, err := tx.NewUpdate().Model(member.Conversation).Set("status = ?", domain.ConversationStatusActive).Set("updated_at = now()").WherePK().Exec(ctx); err != nil {
+				return member, err
+			}
+		}
+		_, err = loadDirectSendContext(ctx, tx, identity, conversationID)
+		return member, err
+	default:
 		return member, ErrConversationNotFound
 	}
-	if input.TargetIdentityID != "" && member.Conversation.Status == string(domain.ConversationStatusArchived) {
-		if _, err := tx.NewUpdate().Model(member.Conversation).Set("status = ?", domain.ConversationStatusActive).Set("updated_at = now()").WherePK().Exec(ctx); err != nil {
-			return member, err
-		}
-	}
-	_, err = loadDirectSendContext(ctx, tx, identity, conversationID)
-	return member, err
 }

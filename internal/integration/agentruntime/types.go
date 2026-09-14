@@ -6,6 +6,8 @@ package agentruntime
 import (
 	"context"
 
+	"github.com/runforyou-ai/cervi/internal/domain"
+
 	"github.com/runforyou-ai/cervi/internal/integration/knowledgeretrieval"
 )
 
@@ -22,6 +24,13 @@ type Message struct {
 	ID      string
 	Role    MessageRole
 	Content string
+	Media   *Media // 非空表示消息携带附件，模型支持该附件格式时在预算内随消息直传。
+}
+
+// Media 定义上下文消息的附件格式和大小，内容在直传给模型时按消息编号读取。
+type Media struct {
+	MIMEType string
+	ByteSize int64
 }
 
 // Trigger 定义等待 TurnLoop 消费的输入信号。
@@ -49,7 +58,11 @@ type ModelConfig struct {
 	Identifier      string
 	MaxOutputTokens int
 	ContextWindow   int
+	InputModalities []domain.AIModelInputModality
 }
+
+// AttachmentContent 读取本次运行会话中指定附件消息的文件内容。
+type AttachmentContent func(context.Context, string) ([]byte, error)
 
 // KnowledgeSearch 检索本次 Agent Run 获准使用的知识库。
 type KnowledgeSearch func(context.Context, knowledgeretrieval.Request) (knowledgeretrieval.Result, error)
@@ -71,6 +84,7 @@ type RunRequest struct {
 	Model                 ModelConfig
 	KnowledgeSearch       KnowledgeSearch
 	CustomerHistorySearch CustomerHistorySearch
+	ReadAttachment        AttachmentContent
 	MCPServers            []MCPServer       // 本次运行配置版本绑定的远程 MCP 服务。
 	GroupReply            *GroupReplyConfig // 非空表示本次运行以结构化群聊结果结束。
 	MaxIterations         int               // 单轮模型与工具迭代上限，零值使用默认值。

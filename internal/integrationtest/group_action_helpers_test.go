@@ -26,5 +26,5 @@ func newGroupSendAction(db *bun.DB) *conversationaction.SendGroupTextMessageActi
 
 // newGroupAgentCoordinator 创建群成员变化事务使用的 Agent 执行收敛器。
 func newGroupAgentCoordinator(db *bun.DB) *agentrunaction.ExecuteAction {
-	return agentrunaction.NewExecuteAction(db, newGroupAgentTasks(db), nil)
+	return agentrunaction.NewExecuteAction(db, newGroupAgentTasks(db), nil, testAttachmentReader(db))
 }

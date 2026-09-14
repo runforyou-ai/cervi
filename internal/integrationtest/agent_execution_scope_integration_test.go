@@ -57,7 +57,7 @@ func newExecutionScopeFixture(t *testing.T) executionScopeFixture {
 		t.Fatalf("注册任务失败：%v", err)
 	}
 	scheduler := agentrunaction.NewScheduler(tasks)
-	coordinator := agentrunaction.NewExecuteAction(f.db, tasks, nil)
+	coordinator := agentrunaction.NewExecuteAction(f.db, tasks, nil, testAttachmentReader(f.db))
 	return executionScopeFixture{
 		customerReadFixture: f, agentIdentityID: agent.IdentityID, scheduler: scheduler, coordinator: coordinator,
 		transfer: conversationaction.NewTransferServiceSessionAction(f.db, coordinator, scheduler),

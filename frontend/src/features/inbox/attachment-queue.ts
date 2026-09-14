@@ -41,6 +41,7 @@ type Batch = {
   id: string
   conversationID: string
   targetIdentityID: string
+  agentIdentityID: string
   jobs: AttachmentJob[]
   saved: boolean
   preparing: boolean
@@ -105,8 +106,11 @@ export class AttachmentQueue {
   /** 立即展示附件消息，以固定消息编号提交一次有序发送。 */
   enqueue(
     files: (SelectedAttachment & { body: string })[],
-    conversationID: string,
-    targetIdentityID: string,
+    {
+      conversationID,
+      targetIdentityID = "",
+      agentIdentityID = "",
+    }: { conversationID: string; targetIdentityID?: string; agentIdentityID?: string },
     onCreated: Batch["onCreated"],
   ) {
     const batchID = crypto.randomUUID()
@@ -157,6 +161,7 @@ export class AttachmentQueue {
       id: batchID,
       conversationID,
       targetIdentityID,
+      agentIdentityID,
       jobs,
       saved: false,
       preparing: false,
@@ -181,6 +186,7 @@ export class AttachmentQueue {
       const result = await sendAttachmentBatch({
         conversationId: batch.targetIdentityID ? "" : batch.conversationID,
         targetIdentityId: batch.targetIdentityID,
+        agentIdentityId: batch.agentIdentityID,
         attachments: batch.jobs.map((job) => ({
           clientMessageId: job.id,
           body: job.body,

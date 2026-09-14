@@ -50,7 +50,13 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 
 	// 注册文档处理任务及最终失败时的状态处理。
 	documentConverter := documentconvert.NewClient(config.MarkitdownURL)
-	processDocument := knowledgeaction.NewProcessDocumentAction(appStorage.DB(), documentConverter, embedding.NewClient(), serverfilecontent.NewReader(localFiles, resolveFileS3))
+	fileReader := serverfilecontent.NewReader(localFiles, resolveFileS3)
+	// 上下文附件链接与企业访问入口使用同一协议。
+	attachmentScheme := "http"
+	if config.TLS.Mode != "off" {
+		attachmentScheme = "https"
+	}
+	processDocument := knowledgeaction.NewProcessDocumentAction(appStorage.DB(), documentConverter, embedding.NewClient(), fileReader)
 	if err := tasks.Registry().RegisterJSONWithTerminalFailure(knowledgeaction.ProcessDocumentActionName, processDocument.Execute, processDocument.FinalizeFailure); err != nil {
 		return nil, err
 	}
@@ -61,13 +67,13 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 		return nil, err
 	}
 
-	// 初始化智能体运行环境，注册执行任务及最终失败处理。
+	// 初始化智能体运行环境，注册执行任务及最终失败处理；运行期通过附件读取器读取会话附件。
 	agentRuntime, err := agentruntime.New()
 	if err != nil {
 		return nil, err
 	}
 	agentRunScheduler := agentrunaction.NewScheduler(tasks)
-	executeAgentRun := agentrunaction.NewExecuteAction(appStorage.DB(), tasks, agentRuntime)
+	executeAgentRun := agentrunaction.NewExecuteAction(appStorage.DB(), tasks, agentRuntime, agentrunaction.NewAttachmentReader(appStorage.DB(), fileReader, attachmentScheme))
 	if err := tasks.Registry().RegisterJSONWithTerminalFailure(agentrunaction.RunActionName, executeAgentRun.Execute, executeAgentRun.FinalizeFailure); err != nil {
 		return nil, err
 	}

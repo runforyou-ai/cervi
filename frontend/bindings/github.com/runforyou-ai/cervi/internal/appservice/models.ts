@@ -370,6 +370,11 @@ export enum AgentToolCallStatus {
 export interface AttachmentBatchInput {
     "conversationId": string;
     "targetIdentityId": string;
+
+    /**
+     * 非空表示按 conversationId 草稿编号首发 AI 聊天。
+     */
+    "agentIdentityId": string;
     "attachments": AttachmentBatchItem[] | null;
 }
 

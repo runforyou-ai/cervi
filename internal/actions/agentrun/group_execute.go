@@ -21,7 +21,7 @@ import (
 )
 
 const groupInstructionSuffix = `你是企业 AI 员工「%s」，当前在群聊「%s」中与其他成员一起工作。
-群内其他成员的发言以 JSON 提供：sender.name 是发送者名称，sender.kind 为 user 表示真人、为 agent 表示另一位 AI 员工，mentions 是这条消息点名的成员，replyTo 是被引用的原消息；你自己的历史发言是纯文本。
+群内其他成员的发言以 JSON 提供：sender.name 是发送者名称，sender.kind 为 user 表示真人、为 agent 表示另一位 AI 员工，mentions 是这条消息点名的成员，replyTo 是被引用的原消息，attachment 是消息携带的附件；你自己的历史发言是纯文本。
 addressedToYou 为 true 的消息是本次需要你处理的请求，其余消息是群内上下文。
 结束本轮时调用 submit_group_reply 提交结果：outcome 为 reply 时在 body 写要发到群里的正文，需要点名成员时填 mentions；无需回应时 outcome 填 silent。`
 
@@ -72,8 +72,8 @@ func (p groupMentionRunPolicy) prepareLocked(ctx context.Context, db bun.IDB, po
 }
 
 // loadMessages 读取不越过已认领输入的群聊上下文。
-func (p groupMentionRunPolicy) loadMessages(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, endSeq int64) ([]agentruntime.Message, error) {
-	return loadClaimedGroupMessages(ctx, db, run, endSeq)
+func (p groupMentionRunPolicy) loadMessages(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, endSeq int64, links attachmentLinks) ([]agentruntime.Message, error) {
+	return loadClaimedGroupMessages(ctx, db, run, endSeq, links)
 }
 
 // persistMessage 以 Agent 成员身份追加群聊结果消息。
@@ -162,6 +162,7 @@ type groupMessageRow struct {
 	ReplyBody        string  `bun:"reply_body"`
 	ReplySenderName  string  `bun:"reply_sender_name"`
 	ReplyDeleted     bool    `bun:"reply_deleted"`
+	contextAttachmentRow
 }
 
 type groupMessageSender struct {
@@ -175,11 +176,12 @@ type groupMessageEnvelope struct {
 	AddressedToYou bool                     `json:"addressedToYou,omitempty"`
 	Mentions       []groupMessageSender     `json:"mentions,omitempty"`
 	MentionAll     bool                     `json:"mentionAll,omitempty"`
+	Attachment     *contextAttachment       `json:"attachment,omitempty"`
 	ReplyTo        *claimedMessageReference `json:"replyTo,omitempty"`
 }
 
 // loadClaimedGroupMessages 读取带发送者标识的群聊上下文，自己的发言投影为助手消息。
-func loadClaimedGroupMessages(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, endSeq int64) ([]agentruntime.Message, error) {
+func loadClaimedGroupMessages(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, endSeq int64, links attachmentLinks) ([]agentruntime.Message, error) {
 	boundary, err := loadClaimedMessageBoundary(ctx, db, run, endSeq)
 	if err != nil {
 		return nil, err
@@ -202,9 +204,9 @@ func loadClaimedGroupMessages(ctx context.Context, db bun.IDB, run *servermodels
 		Join("LEFT JOIN conversation_participants AS reply_cp ON reply_cp.id = reply.sender_participant_id AND reply_cp.organization_id = reply.organization_id AND reply_cp.conversation_id = reply.conversation_id").
 		Join("LEFT JOIN chat_subjects AS reply_cs ON reply_cs.id = reply_cp.subject_id AND reply_cs.organization_id = reply_cp.organization_id AND reply_cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
 		Join("LEFT JOIN organization_identities AS reply_oi ON reply_oi.id = reply_cs.source_id AND reply_oi.organization_id = reply_cs.organization_id").
+		Apply(withContextAttachments).
 		Where("msg.organization_id = ?", run.OrganizationID).
 		Where("msg.conversation_id = ?", run.ConversationID).
-		Where("msg.type = ?", domain.MessageTypeText).
 		Where("msg.deleted_at IS NULL").
 		Where("msg.message_seq <= ?", boundary.MessageSeq).
 		OrderExpr("msg.message_seq DESC").
@@ -238,6 +240,7 @@ func loadClaimedGroupMessages(ctx context.Context, db bun.IDB, run *servermodels
 			Mentions:       mentions[row.ID],
 			MentionAll:     row.MentionAll,
 			AddressedToYou: addressed[row.ID],
+			Attachment:     row.attachment(row.ID, links),
 		}
 		if row.SenderIsAgent {
 			envelope.Sender.Kind = string(domain.OrganizationIdentityTypeAgent)
@@ -246,6 +249,7 @@ func loadClaimedGroupMessages(ctx context.Context, db bun.IDB, run *servermodels
 			reference := claimedMessageReference{MessageID: *row.ReplyToMessageID, Deleted: row.ReplyDeleted}
 			if !row.ReplyDeleted {
 				reference.SenderName, reference.Body = row.ReplySenderName, row.ReplyBody
+				reference.Attachment = row.replyAttachment(links)
 			}
 			envelope.ReplyTo = &reference
 		}
@@ -253,7 +257,7 @@ func loadClaimedGroupMessages(ctx context.Context, db bun.IDB, run *servermodels
 		if err != nil {
 			return nil, fmt.Errorf("encode group conversation context: %w", err)
 		}
-		messages = append(messages, agentruntime.Message{ID: row.ID, Role: agentruntime.MessageRoleUser, Content: string(encoded)})
+		messages = append(messages, agentruntime.Message{ID: row.ID, Role: agentruntime.MessageRoleUser, Content: string(encoded), Media: row.media()})
 	}
 	return messages, nil
 }

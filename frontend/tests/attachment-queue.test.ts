@@ -156,7 +156,7 @@ test("消息尚未入库时不准备上传，会在返回后继续执行单个�
   }
   // 绑定函数在队列加载时已捕获，使用第二个宿主注入阻塞请求。
   const q = host({ sendAttachmentBatch: h.api.sendAttachmentBatch })
-  q.queue.enqueue(q.files, "conversation", "", () => {})
+  q.queue.enqueue(q.files, { conversationID: "conversation" }, () => {})
   await q.queue.cancel("message-1")
   assert.equal(q.counts().prepared, 0)
   gate.resolve()
@@ -175,7 +175,7 @@ test("消息尚未入库时不准备上传，会在返回后继续执行单个�
 test("单个附件的说明在本地和保存后始终属于同一条消息", async () => {
   const h = host()
   const file = { ...h.files[0], body: "  单个附件说明\n第二行  " }
-  h.queue.enqueue([file], "conversation", "", () => {})
+  h.queue.enqueue([file], { conversationID: "conversation" }, () => {})
   assert.equal(h.queue.snapshot().length, 1)
   assert.equal(h.sent()[0].body, "单个附件说明\n第二行")
   await settled(() => h.queue.snapshot()[0].stage === "ready")
@@ -192,7 +192,7 @@ test("完成请求期间取消会释放文件，迟到的完成响应不能恢�
       await gate.promise
     },
   })
-  h.queue.enqueue(h.files.slice(0, 1), "conversation", "", () => {})
+  h.queue.enqueue(h.files.slice(0, 1), { conversationID: "conversation" }, () => {})
   await settled(() => entered)
   await h.queue.cancel("message-1")
   gate.resolve()
@@ -218,7 +218,7 @@ test("取消请求失败时保留失败的发送项与重试入口", async () =>
       if (input.status === "cancelled") throw new Error("取消失败")
     },
   })
-  h.queue.enqueue(h.files.slice(0, 1), "conversation", "", () => {})
+  h.queue.enqueue(h.files.slice(0, 1), { conversationID: "conversation" }, () => {})
   await settled(() => entered)
   await assert.rejects(() => h.queue.cancel("message-1"))
   gate.resolve()
@@ -237,7 +237,7 @@ test("离开页面后入库响应才返回，附件标记失败且不会开始�
       return h.api.sendAttachmentBatch(input)
     },
   })
-  q.queue.enqueue(q.files, "conversation", "", () => {})
+  q.queue.enqueue(q.files, { conversationID: "conversation" }, () => {})
   q.queue.dispose()
   gate.resolve()
   await settled(() =>
@@ -266,7 +266,7 @@ test("完成失败后重试复用成功分片，仅重新确认完成", async ()
       if (++completed === 1) throw new Error("完成暂时失败")
     },
   })
-  h.queue.enqueue(h.files.slice(0, 1), "conversation", "", () => {})
+  h.queue.enqueue(h.files.slice(0, 1), { conversationID: "conversation" }, () => {})
   await settled(() => h.queue.snapshot()[0].stage === "failed")
   assert.equal(h.counts().transfers, 4)
   h.queue.retry("message-1")
@@ -285,7 +285,7 @@ test("入库响应丢失后重试沿用带说明附件的消息编号", async ()
       return h.api.sendAttachmentBatch(input)
     },
   })
-  q.queue.enqueue(q.files, "conversation", "", () => {})
+  q.queue.enqueue(q.files, { conversationID: "conversation" }, () => {})
   await settled(() => q.queue.snapshot()[0].stage === "failed")
   q.queue.retry(q.queue.snapshot()[1].id)
   await settled(() => q.queue.snapshot()[1].stage === "ready")
@@ -322,7 +322,7 @@ test("失败分片重试跳过已成功的片", async () => {
       }
     },
   })
-  h.queue.enqueue(h.files.slice(0, 1), "conversation", "", () => {})
+  h.queue.enqueue(h.files.slice(0, 1), { conversationID: "conversation" }, () => {})
   await settled(() => h.queue.snapshot()[0].stage === "failed")
   h.queue.retry("message-1")
   await settled(() => h.queue.snapshot()[0].stage === "ready")
@@ -334,7 +334,7 @@ test("失权时清除排队附件，迟到的保存结果不能恢复队列或�
   const h = host()
   const q = host({ sendAttachmentBatch: async (input: any) => { await gate.promise; return h.api.sendAttachmentBatch(input) } })
   let opened = 0
-  q.queue.enqueue(q.files, "removed", "", () => { opened++ })
+  q.queue.enqueue(q.files, { conversationID: "removed" }, () => { opened++ })
   q.queue.forgetConversation("removed")
   assert.equal(q.queue.snapshot().length, 0)
   assert.equal(q.sent("removed").length, 0)

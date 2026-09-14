@@ -54,7 +54,7 @@ func (s *Service) SendAttachmentMessage(ctx context.Context, meta RequestMeta, i
 	return withNormalizedSlices(s.backend.SendAttachmentMessage(ctx, meta, input))
 }
 
-// SendAttachmentBatch 按选择顺序保存可带说明的单聊附件消息。
+// SendAttachmentBatch 按选择顺序保存可带说明的单聊或 AI 聊天附件消息。
 func (s *Service) SendAttachmentBatch(ctx context.Context, meta RequestMeta, input AttachmentBatchInput) (AttachmentBatchResult, error) {
 	return withNormalizedSlices(s.backend.SendAttachmentBatch(ctx, meta, input))
 }

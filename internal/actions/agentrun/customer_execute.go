@@ -67,8 +67,8 @@ func (p customerRunPolicy) prepareLocked(ctx context.Context, db bun.IDB, policy
 }
 
 // loadMessages 读取本轮客服周期内的模型上下文。
-func (p customerRunPolicy) loadMessages(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, endSeq int64) ([]agentruntime.Message, error) {
-	return loadClaimedCustomerMessages(ctx, db, run, endSeq)
+func (p customerRunPolicy) loadMessages(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, endSeq int64, links attachmentLinks) ([]agentruntime.Message, error) {
+	return loadClaimedCustomerMessages(ctx, db, run, endSeq, links)
 }
 
 // persistMessage 追加客服 Agent 结果并记录有效首响。
@@ -132,21 +132,23 @@ type customerMessageRow struct {
 	ReplySenderName          string  `bun:"reply_sender_name"`
 	Body                     string  `bun:"body"`
 	Kind                     string  `bun:"kind"`
+	contextAttachmentRow
 }
 
 type customerMessageReference struct {
-	MessageID      string `json:"messageId,omitempty"`
-	External       bool   `json:"external,omitempty"`
-	SenderIsBot    bool   `json:"senderIsBot,omitempty"`
-	Deleted        bool   `json:"deleted,omitempty"`
-	SenderKind     string `json:"senderKind,omitempty"`
-	SenderSourceID string `json:"senderSourceId,omitempty"`
-	SenderName     string `json:"senderName,omitempty"`
-	Body           string `json:"body,omitempty"`
+	MessageID      string             `json:"messageId,omitempty"`
+	External       bool               `json:"external,omitempty"`
+	SenderIsBot    bool               `json:"senderIsBot,omitempty"`
+	Deleted        bool               `json:"deleted,omitempty"`
+	SenderKind     string             `json:"senderKind,omitempty"`
+	SenderSourceID string             `json:"senderSourceId,omitempty"`
+	SenderName     string             `json:"senderName,omitempty"`
+	Body           string             `json:"body,omitempty"`
+	Attachment     *contextAttachment `json:"attachment,omitempty"`
 }
 
 // loadClaimedCustomerMessages 读取本轮客服周期内不越过已认领输入的消息。
-func loadClaimedCustomerMessages(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, endSeq int64) ([]agentruntime.Message, error) {
+func loadClaimedCustomerMessages(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, endSeq int64, links attachmentLinks) ([]agentruntime.Message, error) {
 	boundary, err := loadClaimedMessageBoundary(ctx, db, run, endSeq)
 	if err != nil {
 		return nil, err
@@ -174,8 +176,8 @@ func loadClaimedCustomerMessages(ctx context.Context, db bun.IDB, run *servermod
 		Join("LEFT JOIN contacts AS reply_c ON reply_c.id = reply_cs.source_id AND reply_c.organization_id = reply_cs.organization_id AND reply_cs.kind = ?", domain.ChatSubjectKindContact).
 		Where("msg.organization_id = ?", run.OrganizationID).
 		Where("msg.conversation_id = ?", run.ConversationID).
+		Apply(withContextAttachments).
 		Where("msg.service_session_id = ?", run.ScopeID).
-		Where("msg.type = ?", domain.MessageTypeText).
 		Where("msg.deleted_at IS NULL").
 		Where("cs.kind IN (?, ?)", domain.ChatSubjectKindContact, domain.ChatSubjectKindOrganizationIdentity).
 		Where("msg.message_seq <= ?", boundary.MessageSeq).
@@ -192,27 +194,33 @@ func loadClaimedCustomerMessages(ctx context.Context, db bun.IDB, run *servermod
 			role = agentruntime.MessageRoleUser
 		}
 		content := row.Body
-		// 在同一模型消息中保留一层引用原文和主体类型。
-		if row.ReplyToMessageID != nil || row.ExternalReplyID != nil {
-			reference := customerMessageReference{Deleted: row.ReplyDeleted}
-			if row.ReplyToMessageID != nil {
-				reference.MessageID = *row.ReplyToMessageID
-			}
-			if !row.ReplyDeleted {
-				reference.Body, reference.SenderKind = row.ReplyBody, row.ReplySenderKind
-				reference.SenderSourceID, reference.SenderName = row.ReplySenderID, row.ReplySenderName
-			}
-			if row.ReplyToMessageID == nil {
-				reference.External = true
-				reference.Body, reference.SenderName, reference.SenderIsBot = row.ExternalReplyBody, row.ExternalReplySenderName, row.ExternalReplySenderIsBot
+		attachment := row.attachment(row.ID, links)
+		// 在同一模型消息中保留附件描述、一层引用原文和主体类型。
+		if row.ReplyToMessageID != nil || row.ExternalReplyID != nil || attachment != nil {
+			var replyTo *customerMessageReference
+			if row.ReplyToMessageID != nil || row.ExternalReplyID != nil {
+				replyTo = &customerMessageReference{Deleted: row.ReplyDeleted}
+				if row.ReplyToMessageID != nil {
+					replyTo.MessageID = *row.ReplyToMessageID
+				}
+				if !row.ReplyDeleted {
+					replyTo.Body, replyTo.SenderKind = row.ReplyBody, row.ReplySenderKind
+					replyTo.SenderSourceID, replyTo.SenderName = row.ReplySenderID, row.ReplySenderName
+					replyTo.Attachment = row.replyAttachment(links)
+				}
+				if row.ReplyToMessageID == nil {
+					replyTo.External = true
+					replyTo.Body, replyTo.SenderName, replyTo.SenderIsBot = row.ExternalReplyBody, row.ExternalReplySenderName, row.ExternalReplySenderIsBot
+				}
 			}
 			encoded, _ := json.Marshal(struct {
-				Body    string                   `json:"body"`
-				ReplyTo customerMessageReference `json:"replyTo"`
-			}{Body: row.Body, ReplyTo: reference})
+				Body       string                    `json:"body"`
+				Attachment *contextAttachment        `json:"attachment,omitempty"`
+				ReplyTo    *customerMessageReference `json:"replyTo,omitempty"`
+			}{Body: row.Body, Attachment: attachment, ReplyTo: replyTo})
 			content = string(encoded)
 		}
-		messages = append(messages, agentruntime.Message{ID: row.ID, Role: role, Content: content})
+		messages = append(messages, agentruntime.Message{ID: row.ID, Role: role, Content: content, Media: row.media()})
 	}
 	return messages, nil
 }

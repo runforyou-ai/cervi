@@ -32,7 +32,7 @@ type agentRunPolicyContext struct {
 type agentRunPolicy interface {
 	lockContext(context.Context, bun.IDB, *servermodels.AgentRun) (agentRunPolicyContext, error)
 	prepareLocked(context.Context, bun.IDB, agentRunPolicyContext, *servermodels.AgentRun) (bool, error)
-	loadMessages(context.Context, bun.IDB, *servermodels.AgentRun, int64) ([]agentruntime.Message, error)
+	loadMessages(context.Context, bun.IDB, *servermodels.AgentRun, int64, attachmentLinks) ([]agentruntime.Message, error)
 	persistMessage(context.Context, bun.IDB, agentRunPolicyContext, *servermodels.AgentRun, string, domain.MessageType, string) error
 	laneRevision(context.Context, bun.IDB, agentRunPolicyContext, *servermodels.AgentLane) (string, bool, error)
 	instruction(context.Context, bun.IDB, executionContext) (string, error)
@@ -51,10 +51,11 @@ type lockedAgentRun struct {
 }
 
 type databaseInputFeed struct {
-	db        *bun.DB
-	enqueuer  servertask.TxEnqueuer
-	execution executionContext
-	policy    agentRunPolicy
+	db          *bun.DB
+	enqueuer    servertask.TxEnqueuer
+	execution   executionContext
+	policy      agentRunPolicy
+	attachments *AttachmentReader
 }
 
 // Peek 返回尚未进入 TurnLoop 缓冲区的连续输入信号。
@@ -78,10 +79,14 @@ func (f *databaseInputFeed) Claim(ctx context.Context, throughSeq int64) (agentr
 	if throughSeq <= 0 {
 		return agentruntime.ClaimedInput{}, errors.New("agent input sequence is invalid")
 	}
+	links, err := f.attachments.links(ctx, f.execution.Run.OrganizationID)
+	if err != nil {
+		return agentruntime.ClaimedInput{}, err
+	}
 	var output agentruntime.ClaimedInput
 	var previousEndSeq int64
 	suppressed := false
-	err := f.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err = f.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		locked, err := lockAgentRun(ctx, tx, f.policy, &f.execution.Run)
 		if err != nil {
 			return fmt.Errorf("lock agent input: %w", err)
@@ -123,7 +128,7 @@ func (f *databaseInputFeed) Claim(ctx context.Context, throughSeq int64) (agentr
 			WherePK().Exec(ctx); err != nil {
 			return fmt.Errorf("update agent run input boundary: %w", err)
 		}
-		messages, err := f.policy.loadMessages(ctx, tx, run, claimEnd)
+		messages, err := f.policy.loadMessages(ctx, tx, run, claimEnd, links)
 		if err != nil {
 			return err
 		}
@@ -225,18 +230,20 @@ type claimedMessageRow struct {
 	ReplySenderID    string  `bun:"reply_sender_id"`
 	ReplySenderName  string  `bun:"reply_sender_name"`
 	ReplyDeleted     bool    `bun:"reply_deleted"`
+	contextAttachmentRow
 }
 
 type claimedMessageReference struct {
-	MessageID  string `json:"messageId"`
-	SenderID   string `json:"senderIdentityId,omitempty"`
-	SenderName string `json:"senderName,omitempty"`
-	Body       string `json:"body,omitempty"`
-	Deleted    bool   `json:"deleted,omitempty"`
+	MessageID  string             `json:"messageId"`
+	SenderID   string             `json:"senderIdentityId,omitempty"`
+	SenderName string             `json:"senderName,omitempty"`
+	Body       string             `json:"body,omitempty"`
+	Attachment *contextAttachment `json:"attachment,omitempty"`
+	Deleted    bool               `json:"deleted,omitempty"`
 }
 
 // loadClaimedConversationMessages 读取不越过已认领输入的最近会话上下文。
-func loadClaimedConversationMessages(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, endSeq int64) ([]agentruntime.Message, error) {
+func loadClaimedConversationMessages(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, endSeq int64, links attachmentLinks) ([]agentruntime.Message, error) {
 	boundary, err := loadClaimedMessageBoundary(ctx, db, run, endSeq)
 	if err != nil {
 		return nil, err
@@ -256,9 +263,9 @@ func loadClaimedConversationMessages(ctx context.Context, db bun.IDB, run *serve
 		Join("LEFT JOIN conversation_participants AS reply_cp ON reply_cp.id = reply.sender_participant_id AND reply_cp.organization_id = reply.organization_id AND reply_cp.conversation_id = reply.conversation_id").
 		Join("LEFT JOIN chat_subjects AS reply_cs ON reply_cs.id = reply_cp.subject_id AND reply_cs.organization_id = reply_cp.organization_id AND reply_cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
 		Join("LEFT JOIN organization_identities AS reply_oi ON reply_oi.id = reply_cs.source_id AND reply_oi.organization_id = reply_cs.organization_id").
+		Apply(withContextAttachments).
 		Where("msg.organization_id = ?", run.OrganizationID).
 		Where("msg.conversation_id = ?", run.ConversationID).
-		Where("msg.type = ?", domain.MessageTypeText).
 		Where("msg.deleted_at IS NULL").
 		Where("msg.message_seq <= ?", boundary.MessageSeq).
 		OrderExpr("msg.message_seq DESC").
@@ -274,19 +281,25 @@ func loadClaimedConversationMessages(ctx context.Context, db bun.IDB, run *serve
 			role = agentruntime.MessageRoleAssistant
 		}
 		content := row.Body
-		// 在同一对话消息的结构化正文中携带一层引用。
-		if row.ReplyToMessageID != nil {
-			reference := claimedMessageReference{MessageID: *row.ReplyToMessageID, Deleted: row.ReplyDeleted}
-			if !row.ReplyDeleted {
-				reference.SenderID, reference.SenderName, reference.Body = row.ReplySenderID, row.ReplySenderName, row.ReplyBody
+		attachment := row.attachment(row.ID, links)
+		// 在同一对话消息的结构化正文中携带附件描述和一层引用。
+		if row.ReplyToMessageID != nil || attachment != nil {
+			var replyTo *claimedMessageReference
+			if row.ReplyToMessageID != nil {
+				replyTo = &claimedMessageReference{MessageID: *row.ReplyToMessageID, Deleted: row.ReplyDeleted}
+				if !row.ReplyDeleted {
+					replyTo.SenderID, replyTo.SenderName, replyTo.Body = row.ReplySenderID, row.ReplySenderName, row.ReplyBody
+					replyTo.Attachment = row.replyAttachment(links)
+				}
 			}
 			encoded, _ := json.Marshal(struct {
-				Body    string                  `json:"body"`
-				ReplyTo claimedMessageReference `json:"replyTo"`
-			}{Body: row.Body, ReplyTo: reference})
+				Body       string                   `json:"body"`
+				Attachment *contextAttachment       `json:"attachment,omitempty"`
+				ReplyTo    *claimedMessageReference `json:"replyTo,omitempty"`
+			}{Body: row.Body, Attachment: attachment, ReplyTo: replyTo})
 			content = string(encoded)
 		}
-		messages = append(messages, agentruntime.Message{ID: row.ID, Role: role, Content: content})
+		messages = append(messages, agentruntime.Message{ID: row.ID, Role: role, Content: content, Media: row.media()})
 	}
 	return messages, nil
 }

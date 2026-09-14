@@ -72,7 +72,7 @@ func (a *ImportAction) Execute(ctx context.Context, input ImportInput) (*serverm
 	record := &servermodels.File{
 		ID: fileID.String(), OrganizationID: input.OrganizationID, CreatedByUserID: input.CreatedByUserID,
 		Purpose: string(domain.FilePurposeContactAvatar), ExternalID: &input.ExternalID, StorageBackend: string(backend),
-		StorageKey:   storageKey(input.OrganizationID, fileID.String(), metadata.ContentType),
+		StorageKey:   storageKey(input.OrganizationID, fileID.String(), metadata.FileName, metadata.ContentType),
 		OriginalName: metadata.FileName, ContentType: metadata.ContentType, ByteSize: metadata.ByteSize,
 		Status: string(domain.FileStatusPending),
 	}

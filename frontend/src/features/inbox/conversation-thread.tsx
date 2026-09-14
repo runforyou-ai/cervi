@@ -6,8 +6,8 @@ import { useNavigate } from "react-router"
 import {
   ChannelType,
   ConversationType,
-  isAgentInboxConversation,
   isCustomerInboxConversation,
+  isAgentInboxConversation,
   isDirectInboxConversation,
   isGroupInboxConversation,
   markConversationRead,
@@ -215,10 +215,12 @@ export function ConversationThread({
         }}
         onSucceeded={onConversationChanged}
         attachmentTargetIdentityID={directTarget && !agentDraftID ? directTarget.id : undefined}
+        attachmentAgentDraft={directTarget && agentDraftID ? { conversationID: agentDraftID, agentIdentityID: directTarget.id } : undefined}
         onAttachmentConversationCreated={(created) => {
-          if (directTarget) void invalidate(resourceKeys.directConversation(directTarget.id))
+          if (directTarget && !agentDraftID) void invalidate(resourceKeys.directConversation(directTarget.id))
           void invalidate(resourceKeys.conversationMessages(created.id))
-          if (aliveRef.current && isDirectInboxConversation(created)) onChatStarted(created)
+          // 附件首发成功后切到新建的单聊或 AI 聊天。
+          if (aliveRef.current && (isDirectInboxConversation(created) || isAgentInboxConversation(created))) onChatStarted(created)
         }}
         sendIndividualMessage={
           directTarget

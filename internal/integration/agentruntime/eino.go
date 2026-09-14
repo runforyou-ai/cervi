@@ -13,6 +13,7 @@ import (
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
+	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
 const (
@@ -96,6 +97,16 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 	if err != nil {
 		return RunResult{}, err
 	}
+	// 模型声明文本以外的输入模态时，按窗口推导随消息直传的附件数量上限，至少直传一个。
+	media := mediaInput{read: request.ReadAttachment, modalities: make(map[domain.AIModelInputModality]bool)}
+	for _, modality := range request.Model.InputModalities {
+		if modality != domain.AIModelInputModalityText {
+			media.modalities[modality] = true
+		}
+	}
+	if len(media.modalities) > 0 {
+		media.maxCount = max(1, window*mediaWindowPercent/100/mediaTokens)
+	}
 	handlers := append([]adk.ChatModelAgentMiddleware{recorder, newFinalIterationGuard(maxIterations, groupReply != nil)}, reductionHandlers...)
 	agent, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
 		Name: request.Name, Instruction: request.Instruction, Model: chatModel,
@@ -114,7 +125,7 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 	for attempt := 0; ; attempt++ {
 		execution := &einoExecution{
 			inputs: &turnInputs{feed: feed}, recorder: recorder, maxTurns: request.MaxTurns,
-			groupReply: groupReply, contextWindow: window,
+			groupReply: groupReply, contextWindow: window, media: media,
 		}
 		execution.inputs.loop = adk.NewTurnLoop(adk.TurnLoopConfig[Trigger, *schema.Message]{
 			GenInput: execution.genInput,
@@ -154,6 +165,7 @@ type einoExecution struct {
 	groupReply    *groupReplyTool
 	maxTurns      int
 	contextWindow int
+	media         mediaInput
 	turns         int
 	result        RunResult
 }
@@ -174,7 +186,7 @@ func (e *einoExecution) genInput(ctx context.Context, _ *adk.TurnLoop[Trigger, *
 		return nil, err
 	}
 	return &adk.GenInputResult[Trigger, *schema.Message]{
-		Input: &adk.AgentInput{Messages: e.history.appendInput(trimClaimedHistory(ctx, claimed.Messages, e.contextWindow))},
+		Input: &adk.AgentInput{Messages: e.history.appendInput(ctx, trimClaimedHistory(ctx, claimed.Messages, e.contextWindow), e.media)},
 		RunOpts: []adk.AgentRunOption{
 			adk.WithAfterToolCallsHook(func(hookCtx context.Context) error {
 				return e.inputs.poll(hookCtx, true)

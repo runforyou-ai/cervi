@@ -12,6 +12,9 @@ import (
 // ImmutableCacheControl 是 UUID 对象统一使用的浏览器和 CDN 缓存策略。
 const ImmutableCacheControl = "public, max-age=31536000, immutable"
 
+// LocalPublicPath 是本地存储文件稳定公开地址的路径前缀。
+const LocalPublicPath = "/storage"
+
 // PublicURL 将公开基础地址与受控对象键拼成稳定访问地址。
 func PublicURL(baseURL, key string) (string, error) {
 	baseURL = strings.TrimRight(strings.TrimSpace(baseURL), "/")

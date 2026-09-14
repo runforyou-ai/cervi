@@ -6,6 +6,7 @@ import (
 	"time"
 
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
+	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
@@ -438,14 +439,16 @@ type AttachmentBatchItem struct {
 type AttachmentBatchInput struct {
 	ConversationID   string
 	TargetIdentityID string
+	AgentIdentityID  string // 非空表示按 ConversationID 草稿编号首发 AI 聊天。
 	Attachments      []AttachmentBatchItem
 }
 
-// AttachmentBatchResult 返回一次发送的全部消息。
+// AttachmentBatchResult 返回一次发送的全部消息，首发时返回新建会话摘要。
 type AttachmentBatchResult struct {
-	ConversationID string
-	Conversation   *DirectConversationSummary
-	Messages       []ConversationMessage
+	ConversationID    string
+	Conversation      *DirectConversationSummary
+	AgentConversation *inboxaction.ConversationSummary
+	Messages          []ConversationMessage
 }
 
 // AttachmentMessageState 保存附件消息的当前内容状态和撤去标记。

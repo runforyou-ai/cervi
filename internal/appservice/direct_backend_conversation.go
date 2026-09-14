@@ -54,7 +54,7 @@ type conversationOps struct {
 // newConversationOps 创建会话与消息的业务实现依赖。
 func newConversationOps(db *bun.DB, agentScheduler conversationaction.AgentMessageScheduler, agentCoordinator *agentrunaction.ExecuteAction, taskEnqueuer servertask.TxEnqueuer) conversationOps {
 	return conversationOps{
-		sendAttachmentMessage:           conversationaction.NewSendAttachmentMessageAction(db),
+		sendAttachmentMessage:           conversationaction.NewSendAttachmentMessageAction(db, agentScheduler),
 		listConversationMessages:        conversationaction.NewListConversationMessagesQuery(db),
 		updateConversationUnreadMark:    conversationaction.NewUpdateConversationUnreadMarkAction(db),
 		markConversationRead:            conversationaction.NewMarkConversationReadAction(db),

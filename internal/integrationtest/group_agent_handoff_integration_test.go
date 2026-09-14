@@ -38,7 +38,7 @@ func (f groupAgentFixture) submitReply(t *testing.T, result agentruntime.RunResu
 		result.EndSeq = claimed.EndSeq
 		return result, nil
 	}}
-	if err := agentrunaction.NewExecuteAction(f.db, f.tasks, runtime).Execute(ctx, agentrunaction.RunInput{RunID: run.ID}); err != nil {
+	if err := agentrunaction.NewExecuteAction(f.db, f.tasks, runtime, testAttachmentReader(f.db)).Execute(ctx, agentrunaction.RunInput{RunID: run.ID}); err != nil {
 		t.Fatal(err)
 	}
 	return run.AgentIdentityID
