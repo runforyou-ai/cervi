@@ -29,6 +29,7 @@ import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { MessageMarkdown } from "@/components/message-markdown"
 import { messagePreview } from "@/lib/message-preview"
+import { resolveAppPlatform } from "@/platform/app-platform"
 import { openExternalURL } from "@/platform/external-navigation"
 import { ProfileAvatar } from "@/components/profile-avatar"
 import { LoadingIndicator } from "@/components/loading-indicator"
@@ -255,6 +256,9 @@ function ConversationTimelineContent({
   locateMessage?: ConversationLocateTarget | null
 }) {
   const currentIdentityID = currentUser.identityId
+  // 移动端气泡禁止文本选择，消息菜单项使用触屏尺寸，回复入口只通过长按菜单提供。
+  const mobile = resolveAppPlatform() === "mobile"
+  const menuItemClassName = cn(mobile && "min-h-11")
   const { t, i18n } = useTranslation(["inbox", "common"])
   const navigate = useNavigate()
   const timeZone = useUserTimeZone()
@@ -861,8 +865,8 @@ function ConversationTimelineContent({
                               />
                             ) : null}
                             <ContextMenuTrigger asChild>
-                              <div className="group/message relative max-w-full">
-                                {incoming && !agentNotice && onReplyMessage ? (
+                              <div className={cn("group/message relative max-w-full", mobile && "select-none")}>
+                                {incoming && !agentNotice && onReplyMessage && !mobile ? (
                                   <button
                                     type="button"
                                     disabled={!message.canReply}
@@ -991,6 +995,7 @@ function ConversationTimelineContent({
                       <ContextMenuContent>
                         {!message.local && !agentNotice && onReplyMessage ? (
                           <ContextMenuItem
+                            className={menuItemClassName}
                             disabled={!message.canReply}
                             onSelect={() =>
                               onReplyMessage({
@@ -1006,6 +1011,7 @@ function ConversationTimelineContent({
                           </ContextMenuItem>
                         ) : null}
                         <ContextMenuItem
+                          className={menuItemClassName}
                           onSelect={() => void copyMessageText(agentNotice ? t(agentError ? "agentRunFailed" : "agentReplyStopped") : referenceBody)}
                         >
                           {t("messageCopyText")}
