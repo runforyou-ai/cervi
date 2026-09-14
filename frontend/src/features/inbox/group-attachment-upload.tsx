@@ -72,8 +72,12 @@ export function GroupAttachmentUpload({
       const result = await sendAttachmentMessage({
         conversationId: targetIdentityID ? "" : conversationID,
         targetIdentityId: targetIdentityID,
+        agentIdentityId: "",
         clientMessageId: clientMessageID.current,
         fileId: upload.uploaded.id,
+        body: "",
+        imageWidth: 0,
+        imageHeight: 0,
       })
       upload.clear(true)
       if (aliveRef.current)

@@ -7,12 +7,15 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"strings"
 	"time"
+	"unicode/utf8"
 	"uuid"
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
+	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/common/searchtext"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -32,14 +35,17 @@ func NewSendAttachmentMessageAction(db *bun.DB, scheduler AgentChatMessageSchedu
 	return &SendAttachmentMessageAction{db: db, scheduler: scheduler}
 }
 
-// Execute 在成员和会话锁内幂等发送附件，首发时按需创建单聊。
+// Execute 在成员和会话锁内幂等发送一个已上传的附件，首发时按需创建单聊或 AI 聊天，AI 聊天首次保存时追加 Agent 输入。
 func (a *SendAttachmentMessageAction) Execute(ctx context.Context, identity *servermodels.Identity, input AttachmentMessageInput) (AttachmentMessageResult, error) {
 	clientMessageID, valid := common.NormalizeUUID(input.ClientMessageID)
 	input.ClientMessageID = clientMessageID
+	input.Body = strings.TrimSpace(input.Body)
 	if !valid || !common.ValidUUID(input.FileID) ||
 		(input.ConversationID == "") == (input.TargetIdentityID == "") ||
 		(input.ConversationID != "" && !common.ValidUUID(input.ConversationID)) ||
-		(input.TargetIdentityID != "" && !common.ValidUUID(input.TargetIdentityID)) {
+		(input.TargetIdentityID != "" && !common.ValidUUID(input.TargetIdentityID)) ||
+		(input.AgentIdentityID != "" && (input.TargetIdentityID != "" || !common.ValidUUID(input.AgentIdentityID))) ||
+		input.ImageWidth < 0 || input.ImageHeight < 0 || utf8.RuneCountInString(input.Body) > 4000 {
 		return AttachmentMessageResult{}, ErrConversationNotFound
 	}
 	var result AttachmentMessageResult
@@ -49,61 +55,40 @@ func (a *SendAttachmentMessageAction) Execute(ctx context.Context, identity *ser
 			if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 				return err
 			}
-			conversationID := input.ConversationID
-			var target directTargetRow
-			if input.TargetIdentityID != "" {
-				if input.TargetIdentityID == identity.OrganizationIdentity.ID {
-					return ErrDirectTargetNotFound
-				}
-				var err error
-				target, err = loadDirectTarget(ctx, tx, identity.Organization.ID, input.TargetIdentityID)
-				if err != nil {
-					return err
-				}
-				conversation, err := findDirectConversation(ctx, tx, identity.Organization.ID, identity.OrganizationIdentity.ID, input.TargetIdentityID)
-				if err != nil {
-					return err
-				}
-				if conversation == nil {
-					conversation, err = createDirectConversation(ctx, tx, identity.Organization.ID, identity.OrganizationIdentity.ID, input.TargetIdentityID)
-					if err != nil {
-						return err
-					}
-				}
-				conversationID = conversation.ID
-			}
-			member, err := chatstate.LockMember(ctx, tx, identity, conversationID)
+			member, agentContext, err := lockAttachmentConversation(ctx, tx, identity, input)
 			if err != nil {
 				return err
 			}
-			switch domain.ConversationType(member.Conversation.Type) {
-			case domain.ConversationTypeDirect:
-				if input.TargetIdentityID != "" && member.Conversation.Status == string(domain.ConversationStatusArchived) {
-					if _, err := tx.NewUpdate().Model(member.Conversation).Set("status = ?", domain.ConversationStatusActive).Set("updated_at = now()").WherePK().Exec(ctx); err != nil {
-						return err
-					}
-				}
-				if _, err := loadDirectSendContext(ctx, tx, identity, conversationID); err != nil {
-					return err
-				}
-			case domain.ConversationTypeGroup:
-				if member.Conversation.Status != string(domain.ConversationStatusActive) {
-					return ErrConversationNotFound
-				}
-			default:
-				return ErrConversationNotFound
-			}
-			message, err := saveAttachmentMessage(ctx, tx, identity, member, attachmentMessageContent{ClientMessageID: input.ClientMessageID, FileID: input.FileID})
+			message, inserted, err := saveAttachmentMessage(ctx, tx, identity, member, input)
 			if err != nil {
 				return err
 			}
-			result = AttachmentMessageResult{ConversationID: conversationID, Message: message}
+			if agentContext != nil && inserted {
+				if a.scheduler == nil || agentContext.AgentRevisionID == nil {
+					return ErrDataInvariant
+				}
+				if err := a.scheduler.Schedule(ctx, tx, identity.Organization.ID, member.Conversation.ID, agentContext.AgentIdentityID, *agentContext.AgentRevisionID, message.ID, agentContext.SubjectID); err != nil {
+					return fmt.Errorf("schedule AI chat attachment: %w", err)
+				}
+			}
+			result = AttachmentMessageResult{ConversationID: member.Conversation.ID, Message: message}
 			if input.TargetIdentityID != "" {
-				summary, err := loadDirectConversationSummary(ctx, tx, identity.Organization.ID, conversationID, target)
+				target, err := loadDirectTarget(ctx, tx, identity.Organization.ID, input.TargetIdentityID)
+				if err != nil {
+					return err
+				}
+				summary, err := loadDirectConversationSummary(ctx, tx, identity.Organization.ID, member.Conversation.ID, target)
 				if err != nil {
 					return err
 				}
 				result.Conversation = &summary
+			}
+			if input.AgentIdentityID != "" {
+				summary, err := inboxaction.NewLoadInboxQuery(tx).LoadAgentConversation(ctx, identity, member.Conversation.ID)
+				if err != nil {
+					return err
+				}
+				result.AgentConversation = &summary
 			}
 			return nil
 		})
@@ -120,49 +105,104 @@ func (a *SendAttachmentMessageAction) Execute(ctx context.Context, identity *ser
 	return AttachmentMessageResult{}, err
 }
 
-// attachmentMessageContent 定义已确认会话内待保存的附件消息内容。
-type attachmentMessageContent struct {
-	ClientMessageID string
-	FileID          string
-	Body            string
-	Pending         bool
-	ImageWidth      int
-	ImageHeight     int
+// lockAttachmentConversation 找到或创建附件所属的单聊或 AI 聊天并锁定发送资格，AI 聊天同时返回 Agent 发送上下文。
+func lockAttachmentConversation(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, input AttachmentMessageInput) (chatstate.Member, *internalMessageContext, error) {
+	conversationID := input.ConversationID
+	if input.AgentIdentityID != "" {
+		// AI 聊天草稿按草稿编号创建会话，标题取附件说明，没有说明时取文件名。
+		title := input.Body
+		if title == "" {
+			err := tx.NewSelect().Model((*servermodels.File)(nil)).Column("original_name").
+				Where("f.id = ? AND f.organization_id = ? AND f.created_by_user_id = ?", input.FileID, identity.Organization.ID, identity.User.ID).Scan(ctx, &title)
+			if errors.Is(err, sql.ErrNoRows) {
+				return chatstate.Member{}, nil, fileaction.ErrFileNotFound
+			}
+			if err != nil {
+				return chatstate.Member{}, nil, err
+			}
+		}
+		if err := ensureAgentConversation(ctx, tx, identity, conversationID, input.AgentIdentityID, title); err != nil {
+			return chatstate.Member{}, nil, err
+		}
+	}
+	if input.TargetIdentityID != "" {
+		if input.TargetIdentityID == identity.OrganizationIdentity.ID {
+			return chatstate.Member{}, nil, ErrDirectTargetNotFound
+		}
+		if _, err := loadDirectTarget(ctx, tx, identity.Organization.ID, input.TargetIdentityID); err != nil {
+			return chatstate.Member{}, nil, err
+		}
+		conversation, err := findDirectConversation(ctx, tx, identity.Organization.ID, identity.OrganizationIdentity.ID, input.TargetIdentityID)
+		if err != nil {
+			return chatstate.Member{}, nil, err
+		}
+		if conversation == nil {
+			conversation, err = createDirectConversation(ctx, tx, identity.Organization.ID, identity.OrganizationIdentity.ID, input.TargetIdentityID)
+			if err != nil {
+				return chatstate.Member{}, nil, err
+			}
+		}
+		conversationID = conversation.ID
+	}
+	member, err := chatstate.LockMember(ctx, tx, identity, conversationID)
+	if err != nil {
+		return member, nil, err
+	}
+	switch domain.ConversationType(member.Conversation.Type) {
+	case domain.ConversationTypeAgent:
+		agentContext, err := lockAgentSendContext(ctx, tx, identity, conversationID)
+		return member, &agentContext, err
+	case domain.ConversationTypeDirect:
+		if input.TargetIdentityID != "" && member.Conversation.Status == string(domain.ConversationStatusArchived) {
+			if _, err := tx.NewUpdate().Model(member.Conversation).Set("status = ?", domain.ConversationStatusActive).Set("updated_at = now()").WherePK().Exec(ctx); err != nil {
+				return member, nil, err
+			}
+		}
+		_, err = loadDirectSendContext(ctx, tx, identity, conversationID)
+		return member, nil, err
+	case domain.ConversationTypeGroup:
+		if member.Conversation.Status != string(domain.ConversationStatusActive) {
+			return member, nil, ErrConversationNotFound
+		}
+		return member, nil, nil
+	default:
+		return member, nil, ErrConversationNotFound
+	}
 }
 
-// saveAttachmentMessage 校验完整发送意图并在同一事务内保存消息、附件和阅读位置。
-func saveAttachmentMessage(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, member chatstate.Member, input attachmentMessageContent) (ConversationMessage, error) {
+// saveAttachmentMessage 校验完整发送意图并在同一事务内保存消息、附件、文件激活和阅读位置，返回是否新建消息。
+func saveAttachmentMessage(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, member chatstate.Member, input AttachmentMessageInput) (ConversationMessage, bool, error) {
 	key := "mmsg:" + identity.OrganizationIdentity.ID + ":" + input.ClientMessageID
 	existing := &servermodels.Message{}
 	err := tx.NewSelect().Model(existing).Where("msg.organization_id = ? AND msg.idempotency_key = ?", identity.Organization.ID, key).Scan(ctx)
 	if err == nil {
 		var fileID string
 		if err := tx.NewSelect().Table("message_attachments").Column("file_id").Where("organization_id = ? AND message_id = ?", identity.Organization.ID, existing.ID).Scan(ctx, &fileID); err != nil && !errors.Is(err, sql.ErrNoRows) {
-			return ConversationMessage{}, err
+			return ConversationMessage{}, false, err
 		}
 		if existing.Type != string(domain.MessageTypeAttachment) || existing.ConversationID != member.Conversation.ID ||
-			existing.Body != input.Body || existing.DeletedAt != nil || existing.SenderParticipantID == nil || *existing.SenderParticipantID != member.ParticipantID || fileID != input.FileID {
-			return ConversationMessage{}, &ConflictError{Reason: ConflictReasonIdempotencyMismatch}
+			existing.Body != input.Body || existing.SenderParticipantID == nil || *existing.SenderParticipantID != member.ParticipantID || fileID != input.FileID {
+			return ConversationMessage{}, false, &ConflictError{Reason: ConflictReasonIdempotencyMismatch}
 		}
 		messages := []ConversationMessage{memberConversationMessage(existing, member.SubjectID, identity.OrganizationIdentity)}
 		err := loadMessageAttachments(ctx, tx, identity.Organization.ID, messages)
-		return messages[0], err
+		return messages[0], false, err
 	}
 	if !errors.Is(err, sql.ErrNoRows) {
-		return ConversationMessage{}, err
+		return ConversationMessage{}, false, err
 	}
 	file := &servermodels.File{}
 	err = tx.NewSelect().Model(file).ColumnExpr("f.*").ColumnExpr("f.expires_at <= now() AS expired").
 		Where("f.id = ? AND f.organization_id = ? AND f.created_by_user_id = ?", input.FileID, identity.Organization.ID, identity.User.ID).
 		Where("f.purpose = ?", domain.FilePurposeMessageAttachment).For("UPDATE").Scan(ctx)
 	if errors.Is(err, sql.ErrNoRows) {
-		return ConversationMessage{}, fileaction.ErrFileNotFound
+		return ConversationMessage{}, false, fileaction.ErrFileNotFound
 	}
 	if err != nil {
-		return ConversationMessage{}, err
+		return ConversationMessage{}, false, err
 	}
-	if (file.Status != string(domain.FileStatusUploaded) && !(input.Pending && file.Status == string(domain.FileStatusPending))) || file.Expired {
-		return ConversationMessage{}, fileaction.ErrFileNotFound
+	if file.Status != string(domain.FileStatusUploaded) || file.Expired {
+		return ConversationMessage{}, false, fileaction.ErrFileNotFound
 	}
 	message := &servermodels.Message{
 		ID: uuid.NewV7().String(), OrganizationID: identity.Organization.ID, ConversationID: member.Conversation.ID,
@@ -173,31 +213,25 @@ func saveAttachmentMessage(ctx context.Context, tx bun.Tx, identity *servermodel
 	// 会话锁内已完成完整幂等校验，已有附件在文件状态检查前返回。
 	message, _, err = chatstate.AppendMessage(ctx, tx, member.Conversation, message)
 	if err != nil {
-		return ConversationMessage{}, err
-	}
-	status := domain.AttachmentReady
-	if input.Pending {
-		status = domain.AttachmentUploading
+		return ConversationMessage{}, false, err
 	}
 	if _, err := tx.NewRaw(`INSERT INTO message_attachments
- (message_id, organization_id, file_id, name, content_type, byte_size, image_width, image_height, upload_status, upload_expires_at)
- VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, CASE WHEN ? THEN now() + interval '2 minutes' END)`,
-		message.ID, identity.Organization.ID, file.ID, file.OriginalName, file.ContentType, file.ByteSize, input.ImageWidth, input.ImageHeight, status, input.Pending).Exec(ctx); err != nil {
-		return ConversationMessage{}, err
+ (message_id, organization_id, file_id, name, content_type, byte_size, image_width, image_height)
+ VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		message.ID, identity.Organization.ID, file.ID, file.OriginalName, file.ContentType, file.ByteSize, input.ImageWidth, input.ImageHeight).Exec(ctx); err != nil {
+		return ConversationMessage{}, false, err
 	}
-	if !input.Pending {
-		if _, err := tx.NewUpdate().Model(file).Set("status = ?", domain.FileStatusActive).Set("expires_at = NULL").Set("updated_at = now()").WherePK().Exec(ctx); err != nil {
-			return ConversationMessage{}, err
-		}
+	if _, err := tx.NewUpdate().Model(file).Set("status = ?", domain.FileStatusActive).Set("expires_at = NULL").Set("updated_at = now()").WherePK().Exec(ctx); err != nil {
+		return ConversationMessage{}, false, err
 	}
 	if err := advanceConversationUserReadState(ctx, tx, &servermodels.ConversationUserState{
 		OrganizationID: identity.Organization.ID, ConversationID: member.Conversation.ID, UserID: identity.User.ID, LastReadMessageID: &message.ID,
 	}, message); err != nil {
-		return ConversationMessage{}, err
+		return ConversationMessage{}, false, err
 	}
 	result := memberConversationMessage(message, member.SubjectID, identity.OrganizationIdentity)
-	result.Attachment = &MessageAttachment{ID: file.ID, Name: file.OriginalName, ContentType: file.ContentType, ByteSize: file.ByteSize, UploadStatus: status, ImageWidth: input.ImageWidth, ImageHeight: input.ImageHeight}
-	return result, nil
+	result.Attachment = &MessageAttachment{ID: file.ID, Name: file.OriginalName, ContentType: file.ContentType, ByteSize: file.ByteSize, ImageWidth: input.ImageWidth, ImageHeight: input.ImageHeight}
+	return result, true, nil
 }
 
 // loadMessageAttachments 批量读取当前消息窗口中的附件元数据。
@@ -217,7 +251,6 @@ func loadMessageAttachments(ctx context.Context, db bun.IDB, organizationID stri
 	}{}
 	if err := db.NewSelect().TableExpr("message_attachments AS ma").
 		ColumnExpr("ma.message_id, COALESCE(ma.file_id::text, '') AS id, ma.name, ma.content_type, ma.byte_size, ma.image_width, ma.image_height").
-		ColumnExpr("CASE WHEN ma.upload_status = ? AND ma.upload_expires_at <= now() THEN ? ELSE ma.upload_status END AS upload_status", domain.AttachmentUploading, domain.AttachmentFailed).
 		Where("ma.organization_id = ? AND ma.message_id IN (?)", organizationID, bun.In(ids)).Scan(ctx, &rows); err != nil {
 		return fmt.Errorf("load message attachments: %w", err)
 	}
@@ -256,39 +289,4 @@ func (q *ListConversationMessagesQuery) GetAttachmentFile(ctx context.Context, i
 		return nil, fileaction.ErrFileNotFound
 	}
 	return record, err
-}
-
-// AttachmentStates 按已有附件消息编号读取状态。
-func (q *ListConversationMessagesQuery) AttachmentStates(ctx context.Context, identity *servermodels.Identity, conversationID string, ids []string) ([]AttachmentMessageState, error) {
-	if !common.ValidUUID(conversationID) {
-		return nil, ErrConversationNotFound
-	}
-	for _, id := range ids {
-		if !common.ValidUUID(id) {
-			return nil, ErrConversationNotFound
-		}
-	}
-	if err := authorizeConversationHistory(ctx, q.db, identity, conversationID); err != nil {
-		return nil, err
-	}
-	rows := []struct {
-		ID      string
-		Deleted bool
-	}{}
-	if err := q.db.NewSelect().TableExpr("messages msg").ColumnExpr("msg.id, msg.deleted_at IS NOT NULL AS deleted").
-		Where("msg.organization_id = ? AND msg.conversation_id = ? AND msg.id IN (?) AND msg.type = ?", identity.Organization.ID, conversationID, bun.In(ids), domain.MessageTypeAttachment).Scan(ctx, &rows); err != nil {
-		return nil, err
-	}
-	messages := make([]ConversationMessage, len(rows))
-	for index, row := range rows {
-		messages[index] = ConversationMessage{ID: row.ID, Type: domain.MessageTypeAttachment}
-	}
-	if err := loadMessageAttachments(ctx, q.db, identity.Organization.ID, messages); err != nil {
-		return nil, err
-	}
-	states := make([]AttachmentMessageState, 0, len(rows))
-	for index, row := range rows {
-		states = append(states, AttachmentMessageState{MessageID: row.ID, Attachment: *messages[index].Attachment, Deleted: row.Deleted})
-	}
-	return states, nil
 }

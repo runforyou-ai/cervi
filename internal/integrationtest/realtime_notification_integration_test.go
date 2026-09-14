@@ -16,7 +16,6 @@ import (
 	"github.com/nats-io/nats.go"
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
-	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -267,27 +266,25 @@ func TestRealtimeIdentityProfileNotifications(t *testing.T) {
 	feed.expect(t, feed.notice(f.member.User.ID, realtime.KindIdentityProfileChanged, "", loadProfileVersion(t, f.db, f.member.User.ID)))
 }
 
-// TestRealtimeAttachmentCancelNotification 验证附件取消推进会话版本并通知单聊双方。
-func TestRealtimeAttachmentCancelNotification(t *testing.T) {
+// TestRealtimeAttachmentMessageNotification 验证附件消息保存后通知单聊双方，发送者另收阅读水位推进。
+func TestRealtimeAttachmentMessageNotification(t *testing.T) {
 	f := newNavigationFixture(t)
 	ctx := context.Background()
-	send := conversationaction.NewSendAttachmentMessageAction(f.db, nil)
-	result, err := send.ExecuteBatch(ctx, f.owner, conversationaction.AttachmentBatchInput{
-		TargetIdentityID: f.member.OrganizationIdentity.ID,
-		Attachments:      []conversationaction.AttachmentBatchItem{{File: fileaction.UploadInput{FileName: "photo.png", ContentType: "image/png", ByteSize: domain.FilePartSize + 1}, ClientMessageID: uuid.NewV7().String()}},
-	}, domain.FileStorageBackendLocal)
-	if err != nil {
-		t.Fatal(err)
-	}
+	fileID := uploadedAttachment(t, f.db, f.owner, "photo.png", "image/png")
 	feed := startRealtimeFeed(t, f.owner.Organization.ID)
-	if err := send.UpdateUploads(ctx, f.owner, []string{result.Messages[0].Attachment.ID}, domain.AttachmentCancelled); err != nil {
+	result, err := conversationaction.NewSendAttachmentMessageAction(f.db, nil).Execute(ctx, f.owner, conversationaction.AttachmentMessageInput{
+		TargetIdentityID: f.member.OrganizationIdentity.ID, ClientMessageID: uuid.NewV7().String(), FileID: fileID,
+	})
+	if err != nil {
 		t.Fatal(err)
 	}
 	version := loadConversationVersion(t, f.db, result.ConversationID)
 	feed.expect(t,
 		feed.notice(f.owner.User.ID, realtime.KindConversationChanged, result.ConversationID, version),
 		feed.notice(f.member.User.ID, realtime.KindConversationChanged, result.ConversationID, version),
+		feed.notice(f.owner.User.ID, realtime.KindConversationStateChanged, result.ConversationID, loadConversationStateVersion(t, f.db, result.ConversationID, f.owner.User.ID)),
 	)
+	// 以一次本人静音收尾。
 	if _, err := conversationaction.NewUpdateConversationNotificationSettingsAction(f.db).Execute(ctx, f.owner, result.ConversationID, true); err != nil {
 		t.Fatal(err)
 	}

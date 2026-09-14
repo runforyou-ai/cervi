@@ -90,10 +90,8 @@ func TestInboxActivityAppend(t *testing.T) {
 					return err
 				}
 				late := &servermodels.Message{ID: uuid.NewV7().String(), OrganizationID: cv.OrganizationID, ConversationID: cv.ID, Type: "system", Body: "晚到消息", OriginatedAt: databaseStart.Add(-24 * time.Hour)}
-				if _, _, err := chatstate.AppendMessage(ctx, tx, cv, late); err != nil {
-					return err
-				}
-				return chatstate.RecomputeConversationSummary(ctx, tx, cv, late.ID)
+				_, _, err := chatstate.AppendMessage(ctx, tx, cv, late)
+				return err
 			}); err != nil {
 				t.Fatal(err)
 			}

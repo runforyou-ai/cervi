@@ -94,15 +94,3 @@ func NotifyConversationMembers(ctx context.Context, db bun.IDB, conversation *se
 	}
 	return nil
 }
-
-// RecomputeConversationSummary 在调用方事务和会话锁内撤去末条消息摘要，保留当前最后一条可见消息。
-func RecomputeConversationSummary(ctx context.Context, db bun.IDB, conversation *servermodels.Conversation, removedMessageID string) error {
-	_, err := db.NewRaw(`UPDATE conversations SET (last_message_id, last_message_at) =
- (SELECT latest.id, latest.originated_at FROM (SELECT 1) AS anchor LEFT JOIN LATERAL
- (SELECT id, originated_at FROM messages WHERE organization_id = ? AND conversation_id = ? AND deleted_at IS NULL ORDER BY message_seq DESC LIMIT 1) latest ON true), updated_at = now()
- WHERE organization_id = ? AND id = ? AND last_message_id = ?`, conversation.OrganizationID, conversation.ID, conversation.OrganizationID, conversation.ID, removedMessageID).Exec(ctx)
-	if err != nil {
-		return fmt.Errorf("recompute conversation summary: %w", err)
-	}
-	return nil
-}

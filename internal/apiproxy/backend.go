@@ -130,13 +130,6 @@ func (b *Backend) normalizeOutput(output any) {
 		value.URL = b.absoluteContentURL(value.URL)
 	case *appservice.FileUploadRequest:
 		value.URL = b.absoluteContentURL(value.URL)
-	case *appservice.AttachmentBatchResult:
-		for index := range value.Messages {
-			b.normalizeOutput(&value.Messages[index])
-		}
-		if value.Conversation != nil {
-			b.normalizeOutput(value.Conversation)
-		}
 	case *appservice.AttachmentMessageResult:
 		b.normalizeOutput(&value.Message)
 		if value.Conversation != nil {

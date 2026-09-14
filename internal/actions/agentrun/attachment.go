@@ -49,7 +49,7 @@ func (r *AttachmentReader) Content(ctx context.Context, run *servermodels.AgentR
 		Join("JOIN message_attachments AS ma ON ma.organization_id = f.organization_id AND ma.file_id = f.id").
 		Join("JOIN messages AS msg ON msg.organization_id = ma.organization_id AND msg.id = ma.message_id").
 		Where("msg.organization_id = ? AND msg.conversation_id = ? AND msg.id = ?", run.OrganizationID, run.ConversationID, messageID).
-		Where("msg.deleted_at IS NULL AND ma.upload_status = ? AND f.status = ?", domain.AttachmentReady, domain.FileStatusActive).
+		Where("msg.deleted_at IS NULL AND f.status = ?", domain.FileStatusActive).
 		Scan(ctx)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, errAttachmentUnavailable
@@ -125,7 +125,7 @@ type contextAttachment struct {
 	URL         string `json:"url,omitempty"`
 }
 
-// withContextAttachments 为上下文查询补充附件列，只保留文本消息和已上传完成的附件消息；调用前须已关联 reply 引用消息。
+// withContextAttachments 为上下文查询补充附件列，只保留文本消息和附件消息；调用前须已关联 reply 引用消息。
 func withContextAttachments(query *bun.SelectQuery) *bun.SelectQuery {
 	return query.
 		ColumnExpr("ma.name AS attachment_name, COALESCE(ma.content_type, '') AS attachment_content_type, COALESCE(ma.byte_size, 0) AS attachment_byte_size").
@@ -134,9 +134,9 @@ func withContextAttachments(query *bun.SelectQuery) *bun.SelectQuery {
 		ColumnExpr("reply_af.storage_backend AS reply_attachment_storage_backend, reply_af.storage_key AS reply_attachment_storage_key").
 		Join("LEFT JOIN message_attachments AS ma ON ma.message_id = msg.id AND ma.organization_id = msg.organization_id").
 		Join("LEFT JOIN files AS af ON af.id = ma.file_id AND af.organization_id = ma.organization_id").
-		Join("LEFT JOIN message_attachments AS reply_ma ON reply_ma.message_id = reply.id AND reply_ma.organization_id = reply.organization_id AND reply_ma.upload_status = ?", domain.AttachmentReady).
+		Join("LEFT JOIN message_attachments AS reply_ma ON reply_ma.message_id = reply.id AND reply_ma.organization_id = reply.organization_id").
 		Join("LEFT JOIN files AS reply_af ON reply_af.id = reply_ma.file_id AND reply_af.organization_id = reply_ma.organization_id").
-		Where("(msg.type = ? OR (msg.type = ? AND ma.upload_status = ?))", domain.MessageTypeText, domain.MessageTypeAttachment, domain.AttachmentReady)
+		Where("msg.type IN (?, ?)", domain.MessageTypeText, domain.MessageTypeAttachment)
 }
 
 // attachment 返回消息自身的附件描述，messageId 标识附件所在消息。

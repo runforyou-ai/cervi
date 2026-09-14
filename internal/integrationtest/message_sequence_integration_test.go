@@ -157,38 +157,14 @@ func TestMessageSequenceLargeReadAndWindows(t *testing.T) {
 	}
 }
 
-// TestMessageSequenceSummaryRecompute 验证重算按本地顺序选择摘要且已提交序号不回退。
-func TestMessageSequenceSummaryRecompute(t *testing.T) {
+// TestMessageSequenceUnique 验证同一会话序号逐条递增，唯一约束拒绝复用已提交序号。
+func TestMessageSequenceUnique(t *testing.T) {
 	f := newNavigationFixture(t)
 	ctx := context.Background()
-	first := f.send(t, f.owner, "来源较新", false)
-	second := f.send(t, f.owner, "本地较新", false)
-	third := f.send(t, f.owner, "准备撤去", false)
-	if _, err := f.db.NewUpdate().Model((*servermodels.Message)(nil)).Set("originated_at = ?", first.OriginatedAt.Add(-time.Hour)).Where("id = ?", second.ID).Exec(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if err := f.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		cv := &servermodels.Conversation{ID: f.groupID}
-		if err := tx.NewSelect().Model(cv).WherePK().For("UPDATE").Scan(ctx); err != nil {
-			return err
-		}
-		if _, err := tx.NewUpdate().Model((*servermodels.Message)(nil)).Set("deleted_at = now()").Where("id = ?", third.ID).Exec(ctx); err != nil {
-			return err
-		}
-		return chatstate.RecomputeConversationSummary(ctx, tx, cv, third.ID)
-	}); err != nil {
-		t.Fatal(err)
-	}
-	cv := &servermodels.Conversation{ID: f.groupID}
-	if err := f.db.NewSelect().Model(cv).WherePK().Scan(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if cv.LastMessageID == nil || *cv.LastMessageID != second.ID || cv.LastMessageSeq != third.MessageSeq {
-		t.Fatalf("recomputed=%+v", cv)
-	}
-	next := f.send(t, f.owner, "撤去后的消息", false)
-	if next.MessageSeq != third.MessageSeq+1 {
-		t.Fatalf("reused committed sequence=%d", next.MessageSeq)
+	first := f.send(t, f.owner, "第一条", false)
+	next := f.send(t, f.owner, "第二条", false)
+	if next.MessageSeq != first.MessageSeq+1 {
+		t.Fatalf("sequence=%d want=%d", next.MessageSeq, first.MessageSeq+1)
 	}
 	// 唯一约束拒绝同一会话复用已提交序号。
 	duplicate := &servermodels.Message{ID: uuid.NewV7().String(), OrganizationID: f.owner.Organization.ID, ConversationID: f.groupID, MessageSeq: next.MessageSeq, Type: "text", Body: "重复", OriginatedAt: time.Now()}

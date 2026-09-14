@@ -20,7 +20,6 @@ import {
   type ConversationMessageReference,
   type ConversationSystemEventParticipant,
   type GroupParticipant,
-  listAttachmentStates,
 } from "@/api"
 import { CustomerDeliveryState } from "./customer-delivery-state"
 import { ConversationAttachment } from "./conversation-attachment"
@@ -274,28 +273,11 @@ function ConversationTimelineContent({
     // 窗口已收录的发送项从发送状态中删除。
     outgoingStore.reconcile(conversationID, currentPage.messages)
   }, [conversationID, currentPage, outgoingStore])
-  const combinedMessages = mergeTimelineMessages(
+  const visibleMessages = mergeTimelineMessages(
     currentPage?.messages ?? [],
     timeline.mode === "latest" ? outgoingMessages : [],
     groupParticipants,
   )
-  // 刷新窗口内已有消息的附件与引用目标状态。
-  const attachmentIDs = [...new Set(combinedMessages.flatMap(message => [
-    ...(message.attachment && message.persistedMessageID ? [message.persistedMessageID] : []),
-    ...(message.replyTo?.type === MessageType.MessageTypeAttachment && !message.replyTo.deleted ? [message.replyTo.id] : []),
-  ]))].sort().join(",")
-  const attachmentStates = useResource(resourceKeys.attachmentStates(conversationID, attachmentIDs), () => listAttachmentStates(conversationID, attachmentIDs), {
-    enabled: enabled && Boolean(attachmentIDs), keepPreviousData: true, refetchInterval: pollingActive ? 2000 : false,
-  })
-  const attachmentsByMessage = new Map(attachmentStates.data?.states.map(state => [state.messageId, state]))
-  const visibleMessages = combinedMessages.flatMap(message => {
-    const state = attachmentsByMessage.get(message.persistedMessageID ?? "")
-    const replyDeleted = message.replyTo && attachmentsByMessage.get(message.replyTo.id)?.deleted
-    return state?.deleted ? [] : [{
-      ...message, attachment: state?.attachment ?? message.attachment,
-      replyTo: replyDeleted ? { ...message.replyTo!, body: "", sender: null, deleted: true } : message.replyTo,
-    }]
-  })
   // 使用窗口内持久消息编号查询投递，历史窗口也能刷新原有消息的状态。
   const deliveryMessageIDs = visibleMessages
     .flatMap((message) => message.persistedMessageID ? [message.persistedMessageID] : [])

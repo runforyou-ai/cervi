@@ -49,8 +49,6 @@ export const resourceKeys = {
   customerServiceAssignees: () => ["customer-service-assignees"],
   /** 渠道筛选候选。 */
   inboxChannels: () => ["inbox-channels"],
-  /** 窗口内附件的上传状态。 */
-  attachmentStates: (conversationId: string, messageIds?: string) => scopedListKey("attachment-states", conversationId, messageIds === undefined ? undefined : { messageIds }),
   /** 附件下载与图片读取地址。 */
   attachmentDownload: (conversationId: string, messageId?: string) => messageId === undefined
     ? ["attachment-download", conversationId] as const

@@ -31,13 +31,3 @@ const (
 
 // FilePartSize 是分片上传阈值和默认分片字节数。
 const FilePartSize int64 = 5 * 1024 * 1024
-
-// AttachmentUploadStatus 定义附件消息的内容上传状态。
-type AttachmentUploadStatus string
-
-const (
-	AttachmentUploading AttachmentUploadStatus = "uploading"
-	AttachmentReady     AttachmentUploadStatus = "ready"
-	AttachmentFailed    AttachmentUploadStatus = "failed"
-	AttachmentCancelled AttachmentUploadStatus = "cancelled"
-)
