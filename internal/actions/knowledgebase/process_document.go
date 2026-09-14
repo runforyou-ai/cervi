@@ -10,7 +10,6 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/common/textsplit"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/documentconvert"
@@ -59,18 +58,14 @@ func (a *ProcessDocumentAction) Execute(ctx context.Context, input ProcessInput)
 	if err != nil {
 		return err
 	}
-	// 按任务快照读取供应商并解析 OpenAI 兼容入口。
-	provider := &servermodels.AIProvider{}
-	err = a.db.NewSelect().Model(provider).Where("id = ? AND organization_id = ?", input.EmbeddingProviderID, input.OrganizationID).Scan(ctx)
-	if errors.Is(err, sql.ErrNoRows) {
-		return &ProcessError{Code: "embedding_model_unavailable", Stage: domain.KnowledgeIndexEmbedding}
+	// 按任务快照解析向量模型凭据。
+	credential, err := resolveEmbeddingCredential(ctx, a.db, input.OrganizationID, input.EmbeddingProviderID)
+	var unavailable *embedding.Error
+	if errors.As(err, &unavailable) {
+		return &ProcessError{Code: unavailable.Code, Stage: domain.KnowledgeIndexEmbedding}
 	}
 	if err != nil {
 		return err
-	}
-	baseURL, err := common.CompatibleModelBaseURL(provider.Brand, provider.APIURL)
-	if err != nil {
-		return &ProcessError{Code: "embedding_model_unavailable", Stage: domain.KnowledgeIndexEmbedding}
 	}
 	source, err := a.files.Open(ctx, file)
 	if err != nil {
@@ -105,7 +100,7 @@ func (a *ProcessDocumentAction) Execute(ctx context.Context, input ProcessInput)
 	for _, segment := range segments {
 		contents = append(contents, segment.Content)
 	}
-	vectors, err := a.embedder.Embed(ctx, embedding.Credential{BaseURL: baseURL, APIKey: provider.APIKey}, input.EmbeddingModelIdentifier, input.EmbeddingDimension, contents)
+	vectors, err := a.embedder.Embed(ctx, credential, input.EmbeddingModelIdentifier, input.EmbeddingDimension, contents)
 	if err != nil {
 		var failure *embedding.Error
 		if errors.As(err, &failure) {
@@ -156,45 +151,15 @@ func (a *ProcessDocumentAction) Execute(ctx context.Context, input ProcessInput)
 	return err
 }
 
-// setStage 更新当前任务的执行阶段，任务已被替代或已进入终态时返回 false。
+// setStage 更新当前文档任务的执行阶段，任务已被替代或已进入终态时返回 false。
 func (a *ProcessDocumentAction) setStage(ctx context.Context, input ProcessInput, stage domain.KnowledgeIndexStatus) (bool, error) {
-	result, err := a.db.NewUpdate().Model((*servermodels.KnowledgeDocument)(nil)).
-		Set("status = ?", stage).Set("failure_code = ''").Set("updated_at = now()").
-		Where("id = ? AND processing_id = ? AND status NOT IN (?, ?, ?, ?)", input.DocumentID, input.ProcessingID,
-			domain.KnowledgeIndexInitial, domain.KnowledgeIndexSucceeded, domain.KnowledgeIndexFailed, domain.KnowledgeIndexCancelled).
-		Exec(ctx)
-	if err != nil {
-		return false, err
-	}
-	count, err := result.RowsAffected()
-	return count > 0, err
+	return updateIndexStage(ctx, a.db, (*servermodels.KnowledgeDocument)(nil), input.DocumentID, input.ProcessingID, stage)
 }
 
 // FinalizeFailure 保存当前文档任务的失败状态和原因码。
 func (a *ProcessDocumentAction) FinalizeFailure(ctx context.Context, input ProcessInput, runErr error) error {
-	code := "service_failed"
-	var stage domain.KnowledgeIndexStatus
-	var failure *ProcessError
-	if errors.As(runErr, &failure) {
-		code, stage = failure.Code, failure.Stage
-	}
-	changed := false
-	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		query := tx.NewUpdate().Model((*servermodels.KnowledgeDocument)(nil)).Set("status = ?", domain.KnowledgeIndexFailed).Set("failure_code = ?", code).Set("updated_at = now()").Where("id = ? AND processing_id = ? AND status NOT IN (?, ?, ?, ?)", input.DocumentID, input.ProcessingID, domain.KnowledgeIndexInitial, domain.KnowledgeIndexSucceeded, domain.KnowledgeIndexFailed, domain.KnowledgeIndexCancelled)
-		result, err := query.Exec(ctx)
-		if err != nil {
-			return err
-		}
-		count, err := result.RowsAffected()
-		if err != nil {
-			return err
-		}
-		changed = count > 0
-		return servertask.LockExecution(ctx, tx)
-	})
-	if errors.Is(err, servertask.ErrExecutionLost) {
-		return nil
-	}
+	code, stage := indexFailureCode(runErr)
+	changed, err := finalizeIndexFailure(ctx, a.db, (*servermodels.KnowledgeDocument)(nil), input.DocumentID, input.ProcessingID, code)
 	if err == nil && changed {
 		slog.Warn("知识文档处理失败", "document_id", input.DocumentID, "processing_id", input.ProcessingID, "failure_code", code, "stage", stage)
 	}

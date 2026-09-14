@@ -78,7 +78,7 @@ func publishRetrievalDocument(t *testing.T, db *bun.DB, probe *retrievalProbe, i
 	t.Helper()
 	ctx := context.Background()
 	file := uploadedDocumentFile(t, db, identity, name)
-	documents, err := knowledgeaction.NewCreateDocumentsAction(db, newDocumentTasks(t, db)).Execute(ctx, identity, base.ID, base.Groups[0].ID, []string{file.ID})
+	documents, err := knowledgeaction.NewCreateDocumentsAction(db, newKnowledgeTasks(t, db)).Execute(ctx, identity, base.ID, base.Groups[0].ID, []string{file.ID})
 	if err != nil {
 		t.Fatal(err)
 	}

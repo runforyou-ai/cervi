@@ -76,7 +76,7 @@ func TestKnowledgeDocumentLifecycle(t *testing.T) {
 	identity := installed.Identity
 	first := uploadedDocumentFile(t, db, identity, "报表100%.XLSX")
 	second := uploadedDocumentFile(t, db, identity, "说明.pdf")
-	create := knowledgeaction.NewCreateDocumentsAction(db, newDocumentTasks(t, db))
+	create := knowledgeaction.NewCreateDocumentsAction(db, newKnowledgeTasks(t, db))
 	query := knowledgeaction.NewDocumentQuery(db)
 	docs, err := create.Execute(ctx, identity, base.ID, base.Groups[0].ID, []string{first.ID, second.ID})
 	if err != nil || len(docs) != 2 {
@@ -149,7 +149,7 @@ func TestKnowledgeDocumentBatchIsolation(t *testing.T) {
 	db := store.DB()
 	owner, base := newDocumentFixture(t, db)
 	other, otherBase := newDocumentFixture(t, db)
-	create := knowledgeaction.NewCreateDocumentsAction(db, newDocumentTasks(t, db))
+	create := knowledgeaction.NewCreateDocumentsAction(db, newKnowledgeTasks(t, db))
 	first := uploadedDocumentFile(t, db, owner.Identity, "same.txt")
 	foreign := uploadedDocumentFile(t, db, other.Identity, "foreign.txt")
 	if _, err := create.Execute(ctx, owner.Identity, base.ID, base.Groups[0].ID, []string{first.ID, foreign.ID}); !errors.Is(err, fileaction.ErrFileNotFound) {
@@ -223,7 +223,7 @@ func TestKnowledgeDocumentLocalPreview(t *testing.T) {
 	owner, base := newDocumentFixture(t, db)
 	other, _ := newDocumentFixture(t, db)
 	file := uploadedDocumentFile(t, db, owner.Identity, "preview.txt")
-	docs, err := knowledgeaction.NewCreateDocumentsAction(db, newDocumentTasks(t, db)).Execute(ctx, owner.Identity, base.ID, base.Groups[0].ID, []string{file.ID})
+	docs, err := knowledgeaction.NewCreateDocumentsAction(db, newKnowledgeTasks(t, db)).Execute(ctx, owner.Identity, base.ID, base.Groups[0].ID, []string{file.ID})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -316,7 +316,7 @@ func TestKnowledgeDocumentS3Preview(t *testing.T) {
 		}
 		objects["/cervi/"+record.StorageKey] = true
 	}
-	docs, err := knowledgeaction.NewCreateDocumentsAction(db, newDocumentTasks(t, db)).Execute(ctx, owner.Identity, base.ID, base.Groups[0].ID, []string{files[0].ID, files[1].ID})
+	docs, err := knowledgeaction.NewCreateDocumentsAction(db, newKnowledgeTasks(t, db)).Execute(ctx, owner.Identity, base.ID, base.Groups[0].ID, []string{files[0].ID, files[1].ID})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -380,11 +380,14 @@ func TestKnowledgeDocumentS3Preview(t *testing.T) {
 	}
 }
 
-// newDocumentTasks 创建可持久化文档任务的测试运行时。
-func newDocumentTasks(t *testing.T, db *bun.DB) *servertask.Runtime {
+// newKnowledgeTasks 创建可持久化文档与问答索引任务的测试运行时。
+func newKnowledgeTasks(t *testing.T, db *bun.DB) *servertask.Runtime {
 	t.Helper()
 	tasks := servertask.New(db, serverconfig.NATSConfig{})
 	if err := tasks.Registry().RegisterJSON(knowledgeaction.ProcessDocumentActionName, func(context.Context, knowledgeaction.ProcessInput) error { return nil }); err != nil {
+		t.Fatal(err)
+	}
+	if err := tasks.Registry().RegisterJSON(knowledgeaction.ProcessQAEntryActionName, func(context.Context, knowledgeaction.ProcessQAInput) error { return nil }); err != nil {
 		t.Fatal(err)
 	}
 	return tasks

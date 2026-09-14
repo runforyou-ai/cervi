@@ -39,6 +39,7 @@
   "error.knowledge_qa_read_failed": "Failed to load Q&A entries. Please try again.",
   "error.knowledge_qa_save_failed": "Failed to save the Q&A entry. Please try again.",
   "error.knowledge_qa_delete_failed": "Failed to delete the Q&A entry. Please try again.",
+  "error.knowledge_qa_retry_failed": "Could not retry Q&A indexing. Please try again.",
   "field.knowledge_qa_question_required": "Enter the primary question.",
   "field.knowledge_qa_answer_required": "Enter the answer.",
   "field.knowledge_qa_group_invalid": "Select a group.",

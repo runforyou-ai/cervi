@@ -1101,6 +1101,15 @@ func (b *DirectBackend) DeleteKnowledgeQAEntry(ctx context.Context, meta Request
 	return b.ops.DeleteKnowledgeQAEntry(ctx, meta, identity, knowledgeBaseID, entryID)
 }
 
+// RetryKnowledgeQAEntry 按当前配置重新索引问答。
+func (b *DirectBackend) RetryKnowledgeQAEntry(ctx context.Context, meta RequestMeta, knowledgeBaseID string, entryID string) error {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		return err
+	}
+	return b.ops.RetryKnowledgeQAEntry(ctx, meta, identity, knowledgeBaseID, entryID)
+}
+
 // ListKnowledgeBases 返回当前企业的知识库列表。
 func (b *DirectBackend) ListKnowledgeBases(ctx context.Context, meta RequestMeta) (KnowledgeBaseList, error) {
 	identity, err := b.ops.authenticate(ctx, meta)

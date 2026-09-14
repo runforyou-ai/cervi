@@ -27,6 +27,7 @@ import (
 
 type processingProbe struct {
 	fail          bool
+	embedFail     bool
 	connectionErr error
 	credential    embedding.Credential
 	markdown      string
@@ -53,9 +54,12 @@ func (p *processingProbe) Convert(context.Context, string, io.Reader) (string, e
 	return "正文", nil
 }
 
-// Embed 记录本次凭据并按维度返回定长向量。
+// Embed 记录本次凭据并按维度返回定长向量，或按需模拟向量接口失败。
 func (p *processingProbe) Embed(_ context.Context, credential embedding.Credential, _ string, dimension int, inputs []string) ([][]float32, error) {
 	p.credential = credential
+	if p.embedFail {
+		return nil, &embedding.Error{Code: "embedding_failed"}
+	}
 	vectors := make([][]float32, len(inputs))
 	for index := range vectors {
 		vectors[index] = make([]float32, dimension)
@@ -73,7 +77,7 @@ func TestKnowledgeProcessingRetryAndPublication(t *testing.T) {
 	defer store.Close()
 	db := store.DB()
 	installed, base := newDocumentFixture(t, db)
-	tasks := newDocumentTasks(t, db)
+	tasks := newKnowledgeTasks(t, db)
 	file := uploadedDocumentFile(t, db, installed.Identity, "资料.txt")
 	documents, err := knowledgeaction.NewCreateDocumentsAction(db, tasks).Execute(ctx, installed.Identity, base.ID, base.Groups[0].ID, []string{file.ID})
 	if err != nil {
@@ -178,7 +182,7 @@ func TestKnowledgeRetryAllStates(t *testing.T) {
 	defer store.Close()
 	db := store.DB()
 	owner, base := newDocumentFixture(t, db)
-	tasks := newDocumentTasks(t, db)
+	tasks := newKnowledgeTasks(t, db)
 	docs, err := knowledgeaction.NewCreateDocumentsAction(db, tasks).Execute(ctx, owner.Identity, base.ID, base.Groups[0].ID, []string{uploadedDocumentFile(t, db, owner.Identity, "重新分段.txt").ID})
 	if err != nil {
 		t.Fatal(err)
@@ -263,7 +267,7 @@ func TestKnowledgeProcessingMissingFile(t *testing.T) {
 	db := store.DB()
 	owner, base := newDocumentFixture(t, db)
 	file := uploadedDocumentFile(t, db, owner.Identity, "缺失原件.txt")
-	docs, err := knowledgeaction.NewCreateDocumentsAction(db, newDocumentTasks(t, db)).Execute(ctx, owner.Identity, base.ID, base.Groups[0].ID, []string{file.ID})
+	docs, err := knowledgeaction.NewCreateDocumentsAction(db, newKnowledgeTasks(t, db)).Execute(ctx, owner.Identity, base.ID, base.Groups[0].ID, []string{file.ID})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -318,7 +322,7 @@ func TestKnowledgeProcessingPublishesSegments(t *testing.T) {
 	defer store.Close()
 	db := store.DB()
 	owner, base := newDocumentFixture(t, db)
-	docs, err := knowledgeaction.NewCreateDocumentsAction(db, newDocumentTasks(t, db)).Execute(ctx, owner.Identity, base.ID, base.Groups[0].ID, []string{uploadedDocumentFile(t, db, owner.Identity, "多段.txt").ID})
+	docs, err := knowledgeaction.NewCreateDocumentsAction(db, newKnowledgeTasks(t, db)).Execute(ctx, owner.Identity, base.ID, base.Groups[0].ID, []string{uploadedDocumentFile(t, db, owner.Identity, "多段.txt").ID})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -399,7 +403,7 @@ func TestKnowledgeSegmentsScopeAndBatch(t *testing.T) {
 	defer store.Close()
 	db := store.DB()
 	owner, base := newDocumentFixture(t, db)
-	docs, err := knowledgeaction.NewCreateDocumentsAction(db, newDocumentTasks(t, db)).Execute(ctx, owner.Identity, base.ID, base.Groups[0].ID, []string{uploadedDocumentFile(t, db, owner.Identity, "分段.txt").ID})
+	docs, err := knowledgeaction.NewCreateDocumentsAction(db, newKnowledgeTasks(t, db)).Execute(ctx, owner.Identity, base.ID, base.Groups[0].ID, []string{uploadedDocumentFile(t, db, owner.Identity, "分段.txt").ID})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -484,7 +488,7 @@ func TestKnowledgeConnectionFailureSkipsTask(t *testing.T) {
 	defer store.Close()
 	db := store.DB()
 	owner, base := newDocumentFixture(t, db)
-	tasks := newDocumentTasks(t, db)
+	tasks := newKnowledgeTasks(t, db)
 	docs, err := knowledgeaction.NewCreateDocumentsAction(db, tasks).Execute(ctx, owner.Identity, base.ID, base.Groups[0].ID, []string{uploadedDocumentFile(t, db, owner.Identity, "服务离线.txt").ID})
 	if err != nil {
 		t.Fatal(err)

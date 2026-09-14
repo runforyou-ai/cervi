@@ -9,14 +9,20 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
 )
 
-// SaveQAEntryAction 创建或更新完整问答并保留既有内容编号。
-type SaveQAEntryAction struct{ db *bun.DB }
+// SaveQAEntryAction 创建或更新完整问答，保留既有内容编号，并在内容变化时投递索引任务。
+type SaveQAEntryAction struct {
+	db         *bun.DB
+	processing *QAProcessing
+}
 
 // NewSaveQAEntryAction 创建问答保存操作。
-func NewSaveQAEntryAction(db *bun.DB) *SaveQAEntryAction { return &SaveQAEntryAction{db: db} }
+func NewSaveQAEntryAction(db *bun.DB, tasks servertask.TxEnqueuer) *SaveQAEntryAction {
+	return &SaveQAEntryAction{db: db, processing: NewQAProcessing(db, tasks)}
+}
 
 // Execute 在同一事务中保存问答归属和全部内容，空编号表示新增。
 func (a *SaveQAEntryAction) Execute(ctx context.Context, identity *servermodels.Identity, knowledgeBaseID, entryID string, input QAInput) (*QARecord, error) {
@@ -54,8 +60,15 @@ func (a *SaveQAEntryAction) Execute(ctx context.Context, identity *servermodels.
 				return err
 			}
 		}
-		if err := saveQAContents(ctx, tx, entry.ID, input); err != nil {
+		changed, err := saveQAContents(ctx, tx, entry.ID, input)
+		if err != nil {
 			return err
+		}
+		// 新建、内容变化或索引未完成时投递任务；仅移动分组保留已发布分段。
+		if entryID == "" || changed || entry.Status != domain.KnowledgeIndexSucceeded {
+			if err := a.processing.enqueue(ctx, tx, identity.Organization.ID, base, entry); err != nil {
+				return err
+			}
 		}
 		output, err = loadQARecord(ctx, tx, entry)
 		return err
@@ -63,11 +76,11 @@ func (a *SaveQAEntryAction) Execute(ctx context.Context, identity *servermodels.
 	return output, err
 }
 
-// saveQAContents 按内容编号更新文本和顺序，并删除被移除的相似问题。
-func saveQAContents(ctx context.Context, tx bun.Tx, entryID string, input QAInput) error {
+// saveQAContents 按内容编号更新文本和顺序，删除被移除的相似问题，并返回问题或答案文本是否变化。
+func saveQAContents(ctx context.Context, tx bun.Tx, entryID string, input QAInput) (bool, error) {
 	stored := make([]servermodels.KnowledgeQAContent, 0)
 	if err := tx.NewSelect().Model(&stored).Where("kqc.entry_id = ?", entryID).Scan(ctx); err != nil {
-		return err
+		return false, err
 	}
 	byID := make(map[string]servermodels.KnowledgeQAContent)
 	byKind := make(map[domain.KnowledgeQAContentKind]string)
@@ -80,7 +93,7 @@ func saveQAContents(ctx context.Context, tx bun.Tx, entryID string, input QAInpu
 		if question.ID != "" {
 			content, exists := byID[question.ID]
 			if !exists || content.Kind != domain.KnowledgeQAContentSimilarQuestion {
-				return &common.FieldError{Fields: map[string]common.FieldCode{"similarQuestions": ValidationQAContentInvalid}}
+				return false, &common.FieldError{Fields: map[string]common.FieldCode{"similarQuestions": ValidationQAContentInvalid}}
 			}
 		}
 	}
@@ -97,20 +110,27 @@ func saveQAContents(ctx context.Context, tx bun.Tx, entryID string, input QAInpu
 		desired = append(desired, servermodels.KnowledgeQAContent{ID: question.ID, Kind: domain.KnowledgeQAContentSimilarQuestion, Content: question.Content, SortOrder: len(desired) - 2})
 	}
 	retained := make([]string, 0, len(desired))
+	changed := false
 	for _, content := range desired {
 		if content.ID == "" {
 			content.EntryID = entryID
 			if _, err := tx.NewInsert().Model(&content).Column("entry_id", "kind", "content", "sort_order").Returning("id").Exec(ctx); err != nil {
-				return err
+				return false, err
 			}
+			changed = true
 		} else if previous := byID[content.ID]; previous.Content != content.Content || previous.SortOrder != content.SortOrder {
 			if _, err := tx.NewUpdate().Model(&content).Set("content = ?", content.Content).Set("sort_order = ?", content.SortOrder).
 				Set("updated_at = now()").WherePK().Exec(ctx); err != nil {
-				return err
+				return false, err
 			}
+			changed = changed || previous.Content != content.Content
 		}
 		retained = append(retained, content.ID)
 	}
-	_, err := tx.NewDelete().Model((*servermodels.KnowledgeQAContent)(nil)).Where("entry_id = ?", entryID).Where("id NOT IN (?)", bun.In(retained)).Exec(ctx)
-	return err
+	result, err := tx.NewDelete().Model((*servermodels.KnowledgeQAContent)(nil)).Where("entry_id = ?", entryID).Where("id NOT IN (?)", bun.In(retained)).Exec(ctx)
+	if err != nil {
+		return false, err
+	}
+	removed, err := result.RowsAffected()
+	return changed || removed > 0, err
 }

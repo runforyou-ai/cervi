@@ -1994,7 +1994,7 @@ export interface KnowledgeQASimilarQuestion {
 }
 
 /**
- * KnowledgeQASummary 定义问答列表项。
+ * KnowledgeQASummary 定义问答列表项及其索引状态。
  */
 export interface KnowledgeQASummary {
     "id": string;
@@ -2002,6 +2002,8 @@ export interface KnowledgeQASummary {
     "question": string;
     "similarQuestions": string[] | null;
     "answer": string;
+    "status": KnowledgeIndexStatus;
+    "failureMessage": string;
     "createdAt": string;
 }
 

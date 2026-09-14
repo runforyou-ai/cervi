@@ -20,8 +20,9 @@ func (o *directOperations) ListKnowledgeQAEntries(ctx context.Context, meta Requ
 	}
 	entries := make([]KnowledgeQASummary, 0, len(output.Entries))
 	for _, entry := range output.Entries {
+		status, message := knowledgeIndexPresentation(meta, entry.Status, entry.FailureCode)
 		entries = append(entries, KnowledgeQASummary{ID: entry.ID, GroupID: entry.GroupID, Question: entry.Question,
-			SimilarQuestions: entry.SimilarQuestions, Answer: entry.Answer, CreatedAt: entry.CreatedAt})
+			SimilarQuestions: entry.SimilarQuestions, Answer: entry.Answer, Status: status, FailureMessage: message, CreatedAt: entry.CreatedAt})
 	}
 	return KnowledgeQAList{Entries: entries, Page: PageInfo{Number: output.Page, Size: output.PageSize, Total: output.Total}}, nil
 }
@@ -70,6 +71,15 @@ func (o *directOperations) DeleteKnowledgeQAEntry(ctx context.Context, meta Requ
 		return o.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeQADeleteFailed, identity.Organization.ID, knowledgeBaseID)
 	}
 	slog.Info("知识问答删除成功", "organization_id", identity.Organization.ID, "knowledge_base_id", knowledgeBaseID, "entry_id", entryID)
+	return nil
+}
+
+// RetryKnowledgeQAEntry 按当前配置为问答安排新的索引任务。
+func (o *directOperations) RetryKnowledgeQAEntry(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, knowledgeBaseID, entryID string) error {
+	if err := o.qaProcessing.Retry(ctx, identity, knowledgeBaseID, entryID); err != nil {
+		return o.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeQARetryFailed, identity.Organization.ID, knowledgeBaseID)
+	}
+	slog.Info("知识问答已提交重试", "knowledge_base_id", knowledgeBaseID, "entry_id", entryID)
 	return nil
 }
 

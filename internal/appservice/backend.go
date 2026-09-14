@@ -354,6 +354,9 @@ type Backend interface {
 	// DeleteKnowledgeQAEntry 删除本地问答。
 	//cervi:route DELETE /knowledge-bases/:knowledgeBaseID/qa-entries/:entryID
 	DeleteKnowledgeQAEntry(context.Context, RequestMeta, string, string) error
+	// RetryKnowledgeQAEntry 按当前配置重新索引问答。
+	//cervi:route POST /knowledge-bases/:knowledgeBaseID/qa-entries/:entryID/retry
+	RetryKnowledgeQAEntry(context.Context, RequestMeta, string, string) error
 	// ListKnowledgeBases 返回当前企业的知识库列表。
 	//cervi:route GET /knowledge-bases
 	ListKnowledgeBases(context.Context, RequestMeta) (KnowledgeBaseList, error)
