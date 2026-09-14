@@ -174,7 +174,7 @@ func updateAttachmentUpload(ctx context.Context, tx bun.Tx, identity *servermode
 	// 附件完成或取消时推进会话版本。
 	if status == domain.AttachmentReady || status == domain.AttachmentCancelled {
 		if _, err := tx.NewUpdate().Model(member.Conversation).Set("version = version + 1").WherePK().Exec(ctx); err != nil {
-			return err
+			return member, err
 		}
 	}
 	_, err = tx.NewRaw(`UPDATE message_attachments SET upload_status = ?, upload_expires_at = CASE WHEN ? = 'uploading' THEN now() + interval '2 minutes' END WHERE message_id = ?`, status, status, row.MessageID).Exec(ctx)
