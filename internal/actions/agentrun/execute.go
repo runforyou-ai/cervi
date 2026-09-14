@@ -36,25 +36,27 @@ type ExecuteAction struct {
 	db          *bun.DB
 	enqueuer    servertask.TxEnqueuer
 	runtime     agentruntime.Runtime
+	attachments *AttachmentReader
 	runningMu   sync.Mutex
 	runningRuns map[string]*runningAgentRun
 }
 
 type executionContext struct {
-	Run             servermodels.AgentRun `bun:",embed"`
-	AgentName       string                `bun:"agent_name"`
-	Brand           string                `bun:"brand"`
-	APIKey          string                `bun:"api_key"`
-	APIURL          string                `bun:"api_url"`
-	ModelIdentifier string                `bun:"model_identifier"`
-	MaxOutputTokens int64                 `bun:"max_output_tokens"`
-	ContextWindow   int64                 `bun:"context_window"`
-	Instruction     string                `bun:"instruction"`
+	Run             servermodels.AgentRun         `bun:",embed"`
+	AgentName       string                        `bun:"agent_name"`
+	Brand           string                        `bun:"brand"`
+	APIKey          string                        `bun:"api_key"`
+	APIURL          string                        `bun:"api_url"`
+	ModelIdentifier string                        `bun:"model_identifier"`
+	MaxOutputTokens int64                         `bun:"max_output_tokens"`
+	ContextWindow   int64                         `bun:"context_window"`
+	InputModalities []domain.AIModelInputModality `bun:"input_modalities,type:jsonb"`
+	Instruction     string                        `bun:"instruction"`
 }
 
 // NewExecuteAction 创建 Agent Worker Action。
-func NewExecuteAction(db *bun.DB, enqueuer servertask.TxEnqueuer, runtime agentruntime.Runtime) *ExecuteAction {
-	return &ExecuteAction{db: db, enqueuer: enqueuer, runtime: runtime, runningRuns: make(map[string]*runningAgentRun)}
+func NewExecuteAction(db *bun.DB, enqueuer servertask.TxEnqueuer, runtime agentruntime.Runtime, attachments *AttachmentReader) *ExecuteAction {
+	return &ExecuteAction{db: db, enqueuer: enqueuer, runtime: runtime, attachments: attachments, runningRuns: make(map[string]*runningAgentRun)}
 }
 
 // Execute 运行 TurnLoop，并只保存吸收完当前输入后的稳定回复。
@@ -89,7 +91,7 @@ func (a *ExecuteAction) Execute(ctx context.Context, input RunInput) error {
 	if err != nil {
 		return task.Permanent(err)
 	}
-	feed := &databaseInputFeed{db: a.db, enqueuer: a.enqueuer, execution: execution, policy: policy}
+	feed := &databaseInputFeed{db: a.db, enqueuer: a.enqueuer, execution: execution, policy: policy, attachments: a.attachments}
 	var customerHistorySearch agentruntime.CustomerHistorySearch
 	if domain.AgentExecutionScopeKind(execution.Run.ScopeKind) == domain.AgentExecutionScopeServiceSession {
 		// TODO：接入本企业、本 Conversation 内已关闭 ServiceSession 的全文历史查询。
@@ -114,11 +116,15 @@ func (a *ExecuteAction) Execute(ctx context.Context, input RunInput) error {
 		Model: agentruntime.ModelConfig{
 			Brand: execution.Brand, APIKey: execution.APIKey, BaseURL: execution.APIURL,
 			Identifier: execution.ModelIdentifier, MaxOutputTokens: maxOutputTokens, ContextWindow: int(execution.ContextWindow),
+			InputModalities: execution.InputModalities,
 		},
 		CustomerHistorySearch: customerHistorySearch,
-		MCPServers:            mcpServers,
-		StreamID:              running.progress.StreamID,
-		Attempt:               running.attempt,
+		ReadAttachment: func(ctx context.Context, messageID string) ([]byte, error) {
+			return a.attachments.Content(ctx, &execution.Run, messageID)
+		},
+		MCPServers: mcpServers,
+		StreamID:   running.progress.StreamID,
+		Attempt:    running.attempt,
 		OnProgress: func(progress agentruntime.Progress) {
 			a.runningMu.Lock()
 			defer a.runningMu.Unlock()
@@ -201,6 +207,7 @@ func (a *ExecuteAction) begin(ctx context.Context, runID string) (executionConte
 		ColumnExpr("aip.brand AS brand, aip.api_key AS api_key, aip.api_url AS api_url").
 		ColumnExpr("ar.configuration->'model'->>'identifier' AS model_identifier").
 		ColumnExpr("aipm.max_output_tokens AS max_output_tokens, aipm.context_window AS context_window").
+		ColumnExpr("aipm.input_modalities").
 		ColumnExpr("ar.configuration->>'systemInstruction' AS instruction").
 		Join("JOIN agents AS a ON a.identity_id = agr.agent_identity_id AND a.organization_id = agr.organization_id").
 		Join("JOIN organization_identities AS oi ON oi.id = a.identity_id AND oi.organization_id = a.organization_id").

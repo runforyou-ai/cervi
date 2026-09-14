@@ -19,8 +19,26 @@ func TestNormalizeUploadInput(t *testing.T) {
 	if normalized.FileName != "avatar.png" || normalized.ContentType != "image/png" {
 		t.Fatalf("normalized input = %#v", normalized)
 	}
-	if key := storageKey("org", "file", normalized.ContentType); key != "organizations/org/files/file.png" {
+	if key := storageKey("org", "file", normalized.FileName, normalized.ContentType); key != "organizations/org/files/file.png" {
 		t.Fatalf("storage key = %q", key)
+	}
+	// 扩展名优先取原始文件名的单段扩展名，不合规时按内容类型补全，最后回落为 .bin。
+	for _, item := range []struct{ name, contentType, want string }{
+		{"memo.md", "text/markdown", "organizations/org/files/file.md"},
+		{"Report.PDF", "application/pdf", "organizations/org/files/file.pdf"},
+		{"archive.tar.gz", "application/gzip", "organizations/org/files/file.gz"},
+		{"photo", "image/jpeg", "organizations/org/files/file.jpg"},
+		{"note.a b", "image/webp", "organizations/org/files/file.webp"},
+		{"README", "text/plain", "organizations/org/files/file.txt"},
+		{"方案", "application/vnd.openxmlformats-officedocument.wordprocessingml.document", "organizations/org/files/file.docx"},
+		{"报表", "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet", "organizations/org/files/file.xlsx"},
+		{"合同", "application/pdf", "organizations/org/files/file.pdf"},
+		{"blob", "application/x-unknown", "organizations/org/files/file.bin"},
+		{"data.verylongextensionname", "application/octet-stream", "organizations/org/files/file.bin"},
+	} {
+		if key := storageKey("org", "file", item.name, item.contentType); key != item.want {
+			t.Fatalf("storage key for %q = %q, want %q", item.name, key, item.want)
+		}
 	}
 	_, fields = NormalizeUploadInput(UploadInput{Purpose: domain.FilePurposeGroupImage, FileName: "group.webp", ContentType: "image/webp", ByteSize: 2048})
 	if len(fields) != 0 {

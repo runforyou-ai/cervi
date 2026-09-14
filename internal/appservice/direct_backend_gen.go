@@ -113,7 +113,7 @@ func (b *DirectBackend) SendAttachmentMessage(ctx context.Context, meta RequestM
 	return b.ops.SendAttachmentMessage(ctx, meta, identity, input)
 }
 
-// SendAttachmentBatch 按选择顺序保存可带说明的单聊附件消息。
+// SendAttachmentBatch 按选择顺序保存可带说明的单聊或 AI 聊天附件消息。
 func (b *DirectBackend) SendAttachmentBatch(ctx context.Context, meta RequestMeta, input AttachmentBatchInput) (AttachmentBatchResult, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
 	if err != nil {

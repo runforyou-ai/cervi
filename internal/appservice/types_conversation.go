@@ -390,6 +390,7 @@ type AttachmentBatchItem struct {
 type AttachmentBatchInput struct {
 	ConversationID   string                `json:"conversationId"`
 	TargetIdentityID string                `json:"targetIdentityId"`
+	AgentIdentityID  string                `json:"agentIdentityId"` // 非空表示按 conversationId 草稿编号首发 AI 聊天。
 	Attachments      []AttachmentBatchItem `json:"attachments"`
 }
 

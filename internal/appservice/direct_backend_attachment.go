@@ -70,7 +70,7 @@ func (o *directOperations) GetAttachmentDownload(ctx context.Context, meta Reque
 	return FileDownload{URL: request.URL, PreviewURL: preview.URL}, nil
 }
 
-// SendAttachmentBatch 按顺序保存可带说明的单聊附件消息。
+// SendAttachmentBatch 按顺序保存可带说明的单聊或 AI 聊天附件消息。
 func (o *directOperations) SendAttachmentBatch(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input AttachmentBatchInput) (AttachmentBatchResult, error) {
 	items := make([]conversationaction.AttachmentBatchItem, 0, len(input.Attachments))
 	for _, item := range input.Attachments {
@@ -84,7 +84,7 @@ func (o *directOperations) SendAttachmentBatch(ctx context.Context, meta Request
 	if setting.Enabled {
 		backend = domain.FileStorageBackendS3
 	}
-	result, err := o.sendAttachmentMessage.ExecuteBatch(ctx, identity, conversationaction.AttachmentBatchInput{ConversationID: input.ConversationID, TargetIdentityID: input.TargetIdentityID, Attachments: items}, backend)
+	result, err := o.sendAttachmentMessage.ExecuteBatch(ctx, identity, conversationaction.AttachmentBatchInput{ConversationID: input.ConversationID, TargetIdentityID: input.TargetIdentityID, AgentIdentityID: input.AgentIdentityID, Attachments: items}, backend)
 	if _, ok := errors.AsType[*fileaction.ValidationError](err); ok {
 		return AttachmentBatchResult{}, o.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCreateFailed)
 	}
@@ -103,7 +103,15 @@ func (o *directOperations) SendAttachmentBatch(ctx context.Context, meta Request
 		conversation := directInboxConversationFromSummary(*result.Conversation, urls)
 		output.Conversation = &conversation
 	}
-	slog.Info("单聊附件批次已保存", "conversation_id", result.ConversationID, "message_count", len(result.Messages))
+	if result.AgentConversation != nil {
+		urls, err := o.conversationAvatarURLs(ctx, identity, nil, result.AgentConversation.Agent.AgentAvatarFileID)
+		if err != nil {
+			slog.Warn("读取附件首发 AI 聊天头像失败", "conversation_id", result.ConversationID, "error", err)
+		}
+		conversation := inboxConversationFromAction(*result.AgentConversation, urls)
+		output.Conversation = &conversation
+	}
+	slog.Info("附件批次已保存", "organization_id", identity.Organization.ID, "conversation_id", result.ConversationID, "message_count", len(result.Messages))
 	return output, nil
 }
 

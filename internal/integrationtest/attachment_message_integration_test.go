@@ -22,7 +22,7 @@ func TestAttachmentMessages(t *testing.T) {
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	upload := fileaction.NewCreateUploadAction(f.db)
-	send := conversationaction.NewSendAttachmentMessageAction(f.db)
+	send := conversationaction.NewSendAttachmentMessageAction(f.db, nil)
 	query := conversationaction.NewListConversationMessagesQuery(f.db)
 	for _, target := range []string{"group", "direct"} {
 		file, err := upload.Execute(ctx, f.owner, domain.FileStorageBackendLocal, fileaction.UploadInput{
@@ -143,7 +143,7 @@ func TestAttachmentMessages(t *testing.T) {
 func TestAttachmentBatchLifecycle(t *testing.T) {
 	f := newNavigationFixture(t)
 	ctx := context.Background()
-	send := conversationaction.NewSendAttachmentMessageAction(f.db)
+	send := conversationaction.NewSendAttachmentMessageAction(f.db, nil)
 	query := conversationaction.NewListConversationMessagesQuery(f.db)
 	input := conversationaction.AttachmentBatchInput{TargetIdentityID: f.member.OrganizationIdentity.ID}
 	for index := 0; index < 2; index++ {
@@ -332,7 +332,7 @@ func TestAttachmentBatchLifecycle(t *testing.T) {
 func TestCancelOnlyAttachment(t *testing.T) {
 	f := newNavigationFixture(t)
 	ctx := context.Background()
-	send := conversationaction.NewSendAttachmentMessageAction(f.db)
+	send := conversationaction.NewSendAttachmentMessageAction(f.db, nil)
 	input := conversationaction.AttachmentBatchInput{TargetIdentityID: f.member.OrganizationIdentity.ID, Attachments: []conversationaction.AttachmentBatchItem{{File: fileaction.UploadInput{FileName: "empty", ByteSize: 0}, ClientMessageID: uuid.NewV7().String()}}}
 	result, err := send.ExecuteBatch(ctx, f.owner, input, domain.FileStorageBackendLocal)
 	if err != nil {
@@ -354,7 +354,7 @@ func TestCancelOnlyAttachment(t *testing.T) {
 func TestAttachmentReplayAfterCleanup(t *testing.T) {
 	f := newNavigationFixture(t)
 	ctx := context.Background()
-	send := conversationaction.NewSendAttachmentMessageAction(f.db)
+	send := conversationaction.NewSendAttachmentMessageAction(f.db, nil)
 	input := conversationaction.AttachmentBatchInput{TargetIdentityID: f.member.OrganizationIdentity.ID, Attachments: []conversationaction.AttachmentBatchItem{{File: fileaction.UploadInput{FileName: "cancelled.txt", ByteSize: 7}, ClientMessageID: uuid.NewV7().String()}}}
 	result, err := send.ExecuteBatch(ctx, f.owner, input, domain.FileStorageBackendLocal)
 	if err != nil {
@@ -388,7 +388,7 @@ func TestAttachmentReplayAfterCleanup(t *testing.T) {
 func TestAttachmentBatchRollback(t *testing.T) {
 	f := newNavigationFixture(t)
 	ctx := context.Background()
-	send := conversationaction.NewSendAttachmentMessageAction(f.db)
+	send := conversationaction.NewSendAttachmentMessageAction(f.db, nil)
 	original := conversationaction.AttachmentBatchItem{File: fileaction.UploadInput{FileName: "first.txt", ByteSize: 7}, ClientMessageID: uuid.NewV7().String()}
 	input := conversationaction.AttachmentBatchInput{TargetIdentityID: f.member.OrganizationIdentity.ID, Attachments: []conversationaction.AttachmentBatchItem{original}}
 	saved, err := send.ExecuteBatch(ctx, f.owner, input, domain.FileStorageBackendLocal)
@@ -419,7 +419,7 @@ func TestAttachmentMessageReplies(t *testing.T) {
 		t.Run("body="+body, func(t *testing.T) {
 			f := newNavigationFixture(t)
 			ctx := context.Background()
-			attachments := conversationaction.NewSendAttachmentMessageAction(f.db)
+			attachments := conversationaction.NewSendAttachmentMessageAction(f.db, nil)
 			batch, err := attachments.ExecuteBatch(ctx, f.owner, conversationaction.AttachmentBatchInput{
 				TargetIdentityID: f.member.OrganizationIdentity.ID,
 				Attachments:      []conversationaction.AttachmentBatchItem{{ClientMessageID: uuid.NewV7().String(), Body: body, File: fileaction.UploadInput{FileName: "report.txt", ByteSize: 7}}},

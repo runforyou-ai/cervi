@@ -421,7 +421,7 @@ func testAgentRunMCPServices(t *testing.T, db *bun.DB, owner *servermodels.Ident
 		servers = request.MCPServers
 		return agentruntime.RunResult{Content: "已调用工具", EndSeq: claimed.EndSeq}, nil
 	}}
-	if err := agentrunaction.NewExecuteAction(db, tasks, runtime).Execute(ctx, agentrunaction.RunInput{RunID: run.ID}); err != nil {
+	if err := agentrunaction.NewExecuteAction(db, tasks, runtime, testAttachmentReader(db)).Execute(ctx, agentrunaction.RunInput{RunID: run.ID}); err != nil {
 		t.Fatal(err)
 	}
 	var service servermodels.MCPServer

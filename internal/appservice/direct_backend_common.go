@@ -13,8 +13,6 @@ import (
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
-const localObjectBaseURL = "/storage"
-
 // identityFromModel 把存储身份转换为应用契约并补齐文件地址。
 func (o *directOperations) identityFromModel(ctx context.Context, identity *servermodels.Identity) (Identity, error) {
 	user, err := o.currentUserFromIdentity(ctx, identity)
@@ -83,7 +81,7 @@ func (o *directOperations) activeFileURLs(ctx context.Context, identity *serverm
 
 // fileContentURL 按文件实际存储类型生成稳定公开地址。
 func fileContentURL(backend domain.FileStorageBackend, storageKey, publicBaseURL string) (string, error) {
-	baseURL := localObjectBaseURL
+	baseURL := serverfilecontent.LocalPublicPath
 	if backend == domain.FileStorageBackendS3 {
 		baseURL = publicBaseURL
 	} else if backend != domain.FileStorageBackendLocal {

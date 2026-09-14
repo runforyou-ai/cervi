@@ -1,4 +1,4 @@
-/** 在单聊附件模态框中选择文件和说明，发送后交给时间线上传。 */
+/** 在单聊或 AI 聊天附件模态框中选择文件和说明，发送后交给时间线上传。 */
 import { useEffect, useRef, useState } from "react"
 import { PaperclipIcon, XIcon } from "lucide-react"
 import { ScrollArea } from "radix-ui"
@@ -27,11 +27,13 @@ import type { SelectedAttachment } from "./attachment-queue"
 export function ConversationAttachmentUpload({
   conversationID,
   targetIdentityID = "",
+  agentIdentityID = "",
   disabled,
   onCreated,
 }: {
   conversationID: string
   targetIdentityID?: string
+  agentIdentityID?: string
   disabled: boolean
   onCreated: (conversation: InboxConversation) => void
 }) {
@@ -143,8 +145,7 @@ export function ConversationAttachmentUpload({
         ...item,
         body: index === selectedRef.current.length - 1 ? values.description : "",
       })),
-      conversationID,
-      targetIdentityID,
+      { conversationID, targetIdentityID, agentIdentityID },
       (conversation) => {
         if (aliveRef.current && conversation) onCreated(conversation)
       },

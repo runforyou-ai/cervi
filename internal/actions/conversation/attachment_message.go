@@ -20,11 +20,14 @@ import (
 )
 
 // SendAttachmentMessageAction 保存内部会话附件并激活文件。
-type SendAttachmentMessageAction struct{ db *bun.DB }
+type SendAttachmentMessageAction struct {
+	db        *bun.DB
+	scheduler AgentChatMessageScheduler
+}
 
 // NewSendAttachmentMessageAction 创建附件消息发送操作。
-func NewSendAttachmentMessageAction(db *bun.DB) *SendAttachmentMessageAction {
-	return &SendAttachmentMessageAction{db: db}
+func NewSendAttachmentMessageAction(db *bun.DB, scheduler AgentChatMessageScheduler) *SendAttachmentMessageAction {
+	return &SendAttachmentMessageAction{db: db, scheduler: scheduler}
 }
 
 // Execute 在成员和会话锁内幂等发送附件，首发时按需创建单聊。

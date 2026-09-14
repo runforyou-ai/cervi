@@ -8,11 +8,13 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
+	"sync/atomic"
 
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/components/tool"
 	"github.com/cloudwego/eino/compose"
 	"github.com/cloudwego/eino/schema"
+	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
 const (
@@ -91,10 +93,21 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 	if err != nil {
 		return RunResult{}, err
 	}
+	// 模型声明文本以外的输入模态时，按窗口推导随消息直传的附件数量上限，至少直传一个。
+	media := mediaInput{read: request.ReadAttachment, modalities: make(map[domain.AIModelInputModality]bool)}
+	for _, modality := range request.Model.InputModalities {
+		if modality != domain.AIModelInputModalityText {
+			media.modalities[modality] = true
+		}
+	}
+	if len(media.modalities) > 0 {
+		media.maxCount = max(1, window*mediaWindowPercent/100/mediaTokens)
+	}
+	trackedModel := &mediaTrackingModel{ToolCallingChatModel: chatModel, rejected: &atomic.Bool{}}
 	handlers := append([]adk.ChatModelAgentMiddleware{recorder, newFinalIterationGuard(maxIterations)}, reductionHandlers...)
 	handlers = append(handlers, &toolArgumentsNormalizer{})
 	agent, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
-		Name: request.Name, Instruction: request.Instruction, Model: chatModel,
+		Name: request.Name, Instruction: request.Instruction, Model: trackedModel,
 		ToolsConfig: adk.ToolsConfig{ToolsNodeConfig: compose.ToolsNodeConfig{
 			Tools: tools, ToolCallMiddlewares: []compose.ToolMiddleware{toolExecutionMiddleware(recorder)},
 		}},
@@ -105,11 +118,11 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 		return RunResult{}, fmt.Errorf("create Eino chat model agent: %w", err)
 	}
 
-	// 模型偶发只产出推理内容而没有正文，按有界次数重新执行本次输入。
+	// 模型偶发只产出推理内容而没有正文时按有界次数重新执行；携带直传附件的模型调用失败时去掉多模态内容重新执行一次。
 	var carriedUsage Usage
-	for attempt := 0; ; attempt++ {
+	for emptyRetries := 0; ; {
 		execution := &einoExecution{
-			inputs: &turnInputs{feed: feed}, recorder: recorder, maxTurns: request.MaxTurns, contextWindow: window,
+			inputs: &turnInputs{feed: feed}, recorder: recorder, maxTurns: request.MaxTurns, contextWindow: window, media: media,
 		}
 		execution.inputs.loop = adk.NewTurnLoop(adk.TurnLoopConfig[Trigger, *schema.Message]{
 			GenInput: execution.genInput,
@@ -122,10 +135,18 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 		carriedUsage.PromptTokens += execution.result.Usage.PromptTokens
 		carriedUsage.CompletionTokens += execution.result.Usage.CompletionTokens
 		carriedUsage.TotalTokens += execution.result.Usage.TotalTokens
-		if errors.Is(err, errEmptyFinalResponse) && attempt < emptyResponseRetryLimit && ctx.Err() == nil {
+		if errors.Is(err, errEmptyFinalResponse) && emptyRetries < emptyResponseRetryLimit && ctx.Err() == nil {
+			emptyRetries++
 			slog.Warn("模型未产出正文，重新执行本次输入",
-				"agent_run_id", request.RunID, "attempt", attempt+1, "retry_limit", emptyResponseRetryLimit)
+				"agent_run_id", request.RunID, "attempt", emptyRetries, "retry_limit", emptyResponseRetryLimit)
 			recorder.reset()
+			continue
+		}
+		if err != nil && ctx.Err() == nil && media.maxCount > 0 && trackedModel.rejected.Load() {
+			slog.Warn("模型调用拒绝直传附件，改为仅在正文提供附件链接并重新执行",
+				"agent_run_id", request.RunID, "error", err)
+			recorder.reset()
+			media = mediaInput{}
 			continue
 		}
 		if err != nil {
@@ -148,6 +169,7 @@ type einoExecution struct {
 	recorder      *processRecorder
 	maxTurns      int
 	contextWindow int
+	media         mediaInput
 	turns         int
 	result        RunResult
 }
@@ -168,7 +190,7 @@ func (e *einoExecution) genInput(ctx context.Context, _ *adk.TurnLoop[Trigger, *
 		return nil, err
 	}
 	return &adk.GenInputResult[Trigger, *schema.Message]{
-		Input: &adk.AgentInput{Messages: e.history.appendInput(trimClaimedHistory(ctx, claimed.Messages, e.contextWindow))},
+		Input: &adk.AgentInput{Messages: e.history.appendInput(ctx, trimClaimedHistory(ctx, claimed.Messages, e.contextWindow), e.media)},
 		RunOpts: []adk.AgentRunOption{
 			adk.WithAfterToolCallsHook(func(hookCtx context.Context) error {
 				return e.inputs.poll(hookCtx, true)

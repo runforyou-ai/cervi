@@ -76,7 +76,7 @@ func TestInboxChannelFilter(t *testing.T) {
 	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, nil).Execute(ctx, f.owner, other.Conversation.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil)).Execute(ctx, f.owner, other.Conversation.ID); err != nil {
+	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db))).Execute(ctx, f.owner, other.Conversation.ID); err != nil {
 		t.Fatal(err)
 	}
 	closed := inboxaction.LoadInput{

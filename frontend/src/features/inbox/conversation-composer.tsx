@@ -107,9 +107,11 @@ export function ConversationComposer({
   onSucceeded,
   sendIndividualMessage,
   attachmentTargetIdentityID,
+  attachmentAgentDraft,
   onAttachmentConversationCreated,
 }: {
   attachmentTargetIdentityID?: string
+  attachmentAgentDraft?: { conversationID: string; agentIdentityID: string }
   onAttachmentConversationCreated?: (conversation: InboxConversation) => void
   conversationID: string
   conversationType: ConversationType
@@ -718,11 +720,14 @@ export function ConversationComposer({
               <p id={`${inputID}-reason`} className="text-xs text-muted-foreground">{disabledReason}</p>
             ) : resolveAppPlatform() !== "mobile" &&
             (conversationType === ConversationType.ConversationTypeDirect ||
+              conversationType === ConversationType.ConversationTypeAgent ||
               conversationType === ConversationType.ConversationTypeGroup) ? (
-              conversationType === ConversationType.ConversationTypeDirect ? (
+              conversationType === ConversationType.ConversationTypeDirect ||
+              conversationType === ConversationType.ConversationTypeAgent ? (
                 <ConversationAttachmentUpload
-                  conversationID={conversationID}
+                  conversationID={conversationID || (attachmentAgentDraft?.conversationID ?? "")}
                   targetIdentityID={attachmentTargetIdentityID}
+                  agentIdentityID={attachmentAgentDraft?.agentIdentityID}
                   disabled={isSubmitting}
                   onCreated={(conversation) => onAttachmentConversationCreated?.(conversation)}
                 />

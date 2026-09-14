@@ -25,7 +25,7 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.POST("/attachment-uploads/:fileID/complete", s.completeAttachmentUpload)
 	router.DELETE("/files/:fileID/upload", s.cancelFileUpload)
 	router.POST("/conversation-attachments", s.sendAttachmentMessage)
-	router.POST("/direct-attachment-batches", s.sendAttachmentBatch)
+	router.POST("/attachment-batches", s.sendAttachmentBatch)
 	router.PATCH("/attachment-uploads", s.updateAttachmentUploads)
 	router.GET("/conversations/:conversationID/attachments", s.listAttachmentStates)
 	router.GET("/conversations/:conversationID/messages/:messageID/attachment", s.getAttachmentDownload)
@@ -256,7 +256,7 @@ func (s *Service) sendAttachmentMessage(c *gin.Context) {
 	writeResult(c, http.StatusCreated, output, err)
 }
 
-// sendAttachmentBatch 按选择顺序保存可带说明的单聊附件消息。
+// sendAttachmentBatch 按选择顺序保存可带说明的单聊或 AI 聊天附件消息。
 func (s *Service) sendAttachmentBatch(c *gin.Context) {
 	var input appservice.AttachmentBatchInput
 	if !bindJSON(c, &input) {

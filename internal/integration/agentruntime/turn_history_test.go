@@ -3,6 +3,7 @@
 package agentruntime
 
 import (
+	"context"
 	"reflect"
 	"testing"
 
@@ -14,14 +15,14 @@ func TestTurnHistoryRetainsOutputsAcrossSlidingInput(t *testing.T) {
 	history := &turnHistory{}
 	first := Message{ID: "1", Role: MessageRoleUser, Content: "继续"}
 	second := Message{ID: "2", Role: MessageRoleUser, Content: "继续"}
-	history.appendInput([]Message{first})
+	history.appendInput(context.Background(), []Message{first}, mediaInput{})
 	call := schema.AssistantMessage("先查资料", []schema.ToolCall{{ID: "lookup", Function: schema.FunctionCall{Name: "search", Arguments: "{}"}}})
 	call.ReasoningContent = "需要查证"
 	result := schema.ToolMessage("找到规定", "lookup")
 	history.appendOutput([]*schema.Message{call, result})
-	history.appendInput([]Message{first, second})
+	history.appendInput(context.Background(), []Message{first, second}, mediaInput{})
 	history.appendOutput([]*schema.Message{schema.AssistantMessage("已查到差旅规定", nil)})
-	got := history.appendInput([]Message{second, {ID: "3", Role: MessageRoleUser, Content: "用中文"}})
+	got := history.appendInput(context.Background(), []Message{second, {ID: "3", Role: MessageRoleUser, Content: "用中文"}}, mediaInput{})
 	want := []*schema.Message{schema.UserMessage("继续"), call, result, schema.UserMessage("继续"), schema.AssistantMessage("已查到差旅规定", nil), schema.UserMessage("用中文")}
 	if !reflect.DeepEqual(got, want) {
 		t.Fatalf("history = %#v, want %#v", got, want)

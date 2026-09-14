@@ -98,12 +98,19 @@ func offloadThresholdBytes(window int) int {
 	return max(window*toolResultWindowPercent/100*bytesPerToken, minToolResultOffloadBytes)
 }
 
-// countContextTokens 估算上下文 Token 数，中日韩字符按一个 Token 计，其余字符按四分之一计。
+// countContextTokens 估算上下文 Token 数，中日韩字符按一个 Token 计，其余字符按四分之一计，直传附件按单个估值计。
 // 工具定义按参数 schema 的 JSON 计入，工具较多时其体积与消息同样占用窗口。
 func countContextTokens(_ context.Context, messages []*schema.Message, tools []*schema.ToolInfo) (int64, error) {
 	texts := make([]string, 0, len(messages)*2+len(tools)*3)
+	mediaParts := 0
 	for _, message := range messages {
 		texts = append(texts, message.Content, message.ReasoningContent)
+		for _, part := range message.UserInputMultiContent {
+			texts = append(texts, part.Text)
+			if part.Image != nil || part.Audio != nil || part.Video != nil {
+				mediaParts++
+			}
+		}
 		for _, call := range message.ToolCalls {
 			texts = append(texts, call.Function.Name, call.Function.Arguments)
 		}
@@ -120,7 +127,7 @@ func countContextTokens(_ context.Context, messages []*schema.Message, tools []*
 		}
 		texts = append(texts, string(encoded))
 	}
-	total := 0
+	total := mediaParts * mediaTokens
 	for _, text := range texts {
 		total += estimateTextTokens(text)
 	}

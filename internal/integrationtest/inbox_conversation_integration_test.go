@@ -135,7 +135,7 @@ func TestInboxCustomerDetailSnapshot(t *testing.T) {
 		done <- err
 	}()
 	waitChatSignal(t, ctx, gate.reached)
-	if _, err := conversationaction.NewTransferServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil), agentrunaction.NewScheduler(servertask.New(f.db, serverconfig.NATSConfig{}))).Execute(ctx, f.owner, conversationaction.TransferServiceSessionInput{ConversationID: f.conversationID, AssigneeIdentityID: f.member.OrganizationIdentity.ID}); err != nil {
+	if _, err := conversationaction.NewTransferServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db)), agentrunaction.NewScheduler(servertask.New(f.db, serverconfig.NATSConfig{}))).Execute(ctx, f.owner, conversationaction.TransferServiceSessionInput{ConversationID: f.conversationID, AssigneeIdentityID: f.member.OrganizationIdentity.ID}); err != nil {
 		t.Fatal(err)
 	}
 	gate.open()
@@ -149,7 +149,7 @@ func TestInboxCustomerDetailSnapshot(t *testing.T) {
 	if err != nil || current[0].MatchesQuery || current[0].Conversation.Customer.Assignee.IdentityID != f.member.OrganizationIdentity.ID {
 		t.Fatalf("transferred=%+v err=%v", current, err)
 	}
-	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil)).Execute(ctx, f.member, f.conversationID); err != nil {
+	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db))).Execute(ctx, f.member, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
 	closed := inboxaction.LoadInput{Scope: domain.InboxScopeCustomer, CustomerView: domain.CustomerInboxViewCoworkers, ServiceStatus: domain.ServiceSessionStatusClosed}
