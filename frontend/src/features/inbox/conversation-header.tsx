@@ -1,6 +1,6 @@
 /** 成员会话头与操作菜单。 */
 import { useState } from "react"
-import { ChevronDownIcon, LoaderCircleIcon, MoreHorizontalIcon } from "lucide-react"
+import { ChevronDownIcon, LoaderCircleIcon, MoreHorizontalIcon, SearchIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -54,6 +54,7 @@ export function ConversationHeader({
   sessionStatus,
   currentIdentityId,
   onSessionChanged,
+  onSearch,
   narrowViewport = false,
 }: {
   conversation: InboxConversation
@@ -61,6 +62,7 @@ export function ConversationHeader({
   sessionStatus: string
   currentIdentityId: string
   onSessionChanged: () => void
+  onSearch: () => void
   narrowViewport?: boolean
 }) {
   const { t } = useTranslation(["inbox", "common"])
@@ -205,6 +207,17 @@ export function ConversationHeader({
             ) : null}
           </div>
         </div>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className="shrink-0 text-muted-foreground"
+          aria-label={t("searchCurrentConversation")}
+          title={t("searchCurrentConversation")}
+          onClick={onSearch}
+        >
+          <SearchIcon />
+        </Button>
         {customer ? (
           <div
             data-slot="conversation-actions"

@@ -26,7 +26,10 @@ import { usePortalContainer } from "@/components/ui/portal-container"
 import { useWorkspace } from "@/contexts/workspace-context"
 import { useAttachmentQueue } from "@/features/inbox/attachment-queue-context"
 import { ConversationComposer } from "@/features/inbox/conversation-composer"
-import { ConversationTimeline } from "@/features/inbox/conversation-timeline"
+import {
+  ConversationTimeline,
+  type ConversationLocateTarget,
+} from "@/features/inbox/conversation-timeline"
 import { useOutgoingMessages } from "@/features/inbox/outgoing-message-context"
 import type { OutgoingConversationDraft } from "@/features/inbox/outgoing-message-store"
 import { resourceKeys } from "@/hooks/resource-keys"
@@ -42,6 +45,7 @@ export function ConversationThread({
   replyDisabledReason,
   onConversationChanged,
   onChatStarted,
+  locateMessage,
 }: {
   conversation:
     | CustomerInboxConversationData
@@ -57,6 +61,7 @@ export function ConversationThread({
   onChatStarted: (
     conversation: DirectInboxConversationData | AgentInboxConversationData,
   ) => void
+  locateMessage: ConversationLocateTarget | null
 }) {
   const prepareSendRef = useRef<(() => Promise<boolean>) | null>(null)
   const { t } = useTranslation("inbox")
@@ -187,6 +192,7 @@ export function ConversationThread({
         onReadMessage={conversation ? markRead : undefined}
         readThroughMessageID={conversation?.lastReadMessageId}
         enabled={Boolean(conversation)}
+        locateMessage={locateMessage}
       />
       <ConversationComposer
         disabledReason={!replySupported ? t("channelReplyUnsupported") : replyDisabledReason}

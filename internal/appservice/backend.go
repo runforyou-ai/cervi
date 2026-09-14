@@ -89,6 +89,9 @@ type Backend interface {
 	// ReadInboxConversations 按 ID 批量返回会话摘要及当前筛选资格。
 	//cervi:route POST /inbox/conversations/query
 	ReadInboxConversations(context.Context, RequestMeta, ReadInboxConversationsInput) (InboxConversationResults, error)
+	// SearchInbox 按范围检索会话名称、消息正文与附件文件名、成员和外部联系人。
+	//cervi:route GET /inbox/search
+	SearchInbox(context.Context, RequestMeta, InboxSearchInput) (InboxSearchResult, error)
 	// ListCustomerServiceAssignees 返回有效真人和 AI 客服。
 	//cervi:route GET /inbox/assignees
 	ListCustomerServiceAssignees(context.Context, RequestMeta) (CustomerServiceAssigneeList, error)

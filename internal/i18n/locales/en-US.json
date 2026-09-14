@@ -269,6 +269,7 @@
   "error.server_connection_failed": "The company server connection failed.",
   "error.inbox_cursor_invalid": "The conversation list position is invalid. Refresh the list.",
   "error.inbox_load_failed": "Could not load the conversation list. Try again.",
+  "error.inbox_search_failed": "Could not complete the search. Try again.",
   "error.conversation_not_found": "This conversation could not be found.",
   "error.conversation_message_list_failed": "Could not load the conversation messages. Try again.",
   "error.conversation_read_update_failed": "Could not update the conversation read state. Try again.",

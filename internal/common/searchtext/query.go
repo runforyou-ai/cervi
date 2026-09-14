@@ -1,0 +1,151 @@
+package searchtext
+
+import (
+	"slices"
+	"strings"
+	"unicode"
+)
+
+const (
+	// excerptLeading 是摘要中首个命中之前保留的字符数。
+	excerptLeading = 12
+	// excerptLength 是摘要保留的最大字符数。
+	excerptLength = 120
+)
+
+// Query 保存解析后的检索词，检索词之间同时满足，同一检索词的多种匹配方式满足其一。
+type Query struct {
+	terms [][]pattern
+}
+
+// pattern 表示在连续位置上逐个匹配的词元序列。
+type pattern []matcher
+
+// matcher 匹配单个位置上的词元，prefix 为真时按前缀匹配。
+type matcher struct {
+	lexeme string
+	prefix bool
+}
+
+// Segment 表示摘要中的一段文字及其是否命中。
+type Segment struct {
+	Text  string
+	Match bool
+}
+
+// ParseQuery 解析用户输入，按空白拆分检索词；没有可检索内容时返回 false。
+func ParseQuery(input string) (Query, bool) {
+	var query Query
+	for _, field := range strings.FieldsFunc(input, unicode.IsSpace) {
+		slots := tokenize(field)
+		if len(slots) == 0 {
+			continue
+		}
+		// 检索词末尾的字母或数字片段按前缀匹配，支持边输入边检索。
+		literal := make(pattern, 0, len(slots))
+		for index, item := range slots {
+			literal = append(literal, matcher{lexeme: item.lexemes[0], prefix: item.word && index == len(slots)-1})
+		}
+		alternatives := []pattern{literal}
+		if len(slots) == 1 && slots[0].word {
+			for _, split := range splitPinyin(slots[0].lexemes[0]) {
+				// 末个音节按前缀匹配，拼音输入到一半时同样能命中。
+				syllables := make(pattern, 0, len(split))
+				for index, syllable := range split {
+					syllables = append(syllables, matcher{lexeme: pinyinPrefix + syllable, prefix: index == len(split)-1})
+				}
+				alternatives = append(alternatives, syllables)
+			}
+		}
+		query.terms = append(query.terms, alternatives)
+	}
+	return query, len(query.terms) > 0
+}
+
+// TSQuery 返回可直接转换为 tsquery 的条件文本。
+func (q Query) TSQuery() string {
+	terms := make([]string, 0, len(q.terms))
+	for _, alternatives := range q.terms {
+		options := make([]string, 0, len(alternatives))
+		for _, item := range alternatives {
+			positions := make([]string, 0, len(item))
+			for _, position := range item {
+				value := "'" + position.lexeme + "'"
+				if position.prefix {
+					value += ":*"
+				}
+				positions = append(positions, value)
+			}
+			options = append(options, "("+strings.Join(positions, " <-> ")+")")
+		}
+		terms = append(terms, "("+strings.Join(options, " | ")+")")
+	}
+	return strings.Join(terms, " & ")
+}
+
+// matches 判断连续位置是否依次满足词元序列。
+func (p pattern) matches(slots []slot) bool {
+	for index, position := range p {
+		if !slices.ContainsFunc(slots[index].lexemes, func(lexeme string) bool {
+			return lexeme == position.lexeme || position.prefix && strings.HasPrefix(lexeme, position.lexeme)
+		}) {
+			return false
+		}
+	}
+	return true
+}
+
+// Excerpt 返回从首个命中附近开始的单行摘要；文本不含命中时返回 false。
+func (q Query) Excerpt(text string) ([]Segment, bool) {
+	runes := []rune(text)
+	slots := tokenize(text)
+	matched := make([]bool, len(runes))
+	found := false
+	for _, alternatives := range q.terms {
+		for _, item := range alternatives {
+			for start := 0; start+len(item) <= len(slots); start++ {
+				if !item.matches(slots[start : start+len(item)]) {
+					continue
+				}
+				found = true
+				for index := slots[start].start; index < slots[start+len(item)-1].end; index++ {
+					matched[index] = true
+				}
+			}
+		}
+	}
+	if !found {
+		return nil, false
+	}
+	begin := max(0, slices.Index(matched, true)-excerptLeading)
+	end := min(len(runes), begin+excerptLength)
+	var segments []Segment
+	appendText := func(value string, match bool) {
+		if len(segments) > 0 && segments[len(segments)-1].Match == match {
+			segments[len(segments)-1].Text += value
+			return
+		}
+		segments = append(segments, Segment{Text: value, Match: match})
+	}
+	if begin > 0 {
+		appendText("…", false)
+	}
+	for index := begin; index < end; {
+		// 同一命中状态的连续字符合并为一段，换行等空白统一显示为空格。
+		next := index
+		for next < end && matched[next] == matched[index] {
+			next++
+		}
+		appendText(strings.Map(func(r rune) rune {
+			if unicode.IsSpace(r) {
+				return ' '
+			}
+			return r
+		}, string(runes[index:next])), matched[index])
+		index = next
+	}
+	if end < len(runes) {
+		appendText("…", false)
+	}
+	return segments, true
+}

@@ -37,6 +37,7 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.POST("/inbox/window/query", s.readInboxWindow)
 	router.GET("/conversations/:conversationID/summary", s.getInboxConversation)
 	router.POST("/inbox/conversations/query", s.readInboxConversations)
+	router.GET("/inbox/search", s.searchInbox)
 	router.GET("/inbox/assignees", s.listCustomerServiceAssignees)
 	router.GET("/inbox/channels", s.listInboxChannels)
 	router.GET("/sync/heads", s.getSyncHeads)
@@ -363,6 +364,16 @@ func (s *Service) readInboxConversations(c *gin.Context) {
 		return
 	}
 	output, err := s.application.ReadInboxConversations(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// searchInbox 按范围检索会话名称、消息正文与附件文件名、成员和外部联系人。
+func (s *Service) searchInbox(c *gin.Context) {
+	input, ok := bindInboxSearchInputQuery(c)
+	if !ok {
+		return
+	}
+	output, err := s.application.SearchInbox(c.Request.Context(), requestMeta(c), input)
 	writeResult(c, http.StatusOK, output, err)
 }
 
@@ -1429,6 +1440,21 @@ func bindConversationMessageReferenceListInputQuery(c *gin.Context) (appservice.
 func bindCustomerDeliveryListInputQuery(c *gin.Context) (appservice.CustomerDeliveryListInput, bool) {
 	return appservice.CustomerDeliveryListInput{
 		MessageIDs: c.Query("messageIds"),
+	}, true
+}
+
+// bindInboxSearchInputQuery 从查询参数解析 appservice.InboxSearchInput。
+func bindInboxSearchInputQuery(c *gin.Context) (appservice.InboxSearchInput, bool) {
+	return appservice.InboxSearchInput{
+		Query:              c.Query("query"),
+		Range:              appservice.InboxSearchRange(c.Query("range")),
+		ConversationID:     c.Query("conversationId"),
+		Scope:              appservice.InboxScope(c.Query("scope")),
+		CustomerView:       appservice.CustomerInboxView(c.Query("customerView")),
+		AssigneeIdentityID: c.Query("assigneeIdentityId"),
+		ChannelID:          c.Query("channelId"),
+		ServiceStatus:      appservice.ServiceSessionStatus(c.Query("serviceStatus")),
+		Kinds:              enumList[appservice.ConversationType](c.QueryArray("kinds")),
 	}, true
 }
 

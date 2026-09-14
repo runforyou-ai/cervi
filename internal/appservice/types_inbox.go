@@ -257,3 +257,66 @@ type SyncHeads struct {
 	ConversationChecksum   string `json:"conversationChecksum"`
 	IdentityProfileVersion string `json:"identityProfileVersion"`
 }
+
+// InboxSearchRange 表示收件箱检索范围。
+type InboxSearchRange string
+
+const (
+	InboxSearchRangeList         InboxSearchRange = "list"
+	InboxSearchRangeReadable     InboxSearchRange = "readable"
+	InboxSearchRangeConversation InboxSearchRange = "conversation"
+)
+
+// InboxSearchInput 定义检索文本与范围；列表筛选只在 list 范围生效，会话编号只在 conversation 范围生效。
+type InboxSearchInput struct {
+	Query              string               `json:"query" query:"query"`
+	Range              InboxSearchRange     `json:"range" query:"range"`
+	ConversationID     string               `json:"conversationId" query:"conversationId"`
+	Scope              InboxScope           `json:"scope" query:"scope"`
+	CustomerView       CustomerInboxView    `json:"customerView" query:"customerView"`
+	AssigneeIdentityID string               `json:"assigneeIdentityId" query:"assigneeIdentityId"`
+	ChannelID          string               `json:"channelId" query:"channelId"`
+	ServiceStatus      ServiceSessionStatus `json:"serviceStatus" query:"serviceStatus"`
+	Kinds              []ConversationType   `json:"kinds" query:"kinds"`
+}
+
+// InboxSearchSegment 表示摘要中的一段文字及其是否命中。
+type InboxSearchSegment struct {
+	Text  string `json:"text"`
+	Match bool   `json:"match"`
+}
+
+// InboxSearchMessage 表示命中的消息、所在会话和高亮摘要。
+type InboxSearchMessage struct {
+	ID           string               `json:"id"`
+	Type         MessageType          `json:"type"`
+	SenderName   *string              `json:"senderName"`
+	OriginatedAt time.Time            `json:"originatedAt"`
+	Excerpt      []InboxSearchSegment `json:"excerpt"`
+	Conversation InboxConversation    `json:"conversation"`
+}
+
+// InboxSearchPersonKind 表示人员检索结果的来源。
+type InboxSearchPersonKind string
+
+const (
+	InboxSearchPersonMember  InboxSearchPersonKind = "member"
+	InboxSearchPersonContact InboxSearchPersonKind = "contact"
+)
+
+// InboxSearchPerson 表示命中的企业成员或外部联系人；外部联系人没有客户会话时 conversationId 为空。
+type InboxSearchPerson struct {
+	Kind           InboxSearchPersonKind     `json:"kind"`
+	ID             string                    `json:"id"`
+	IdentityType   *OrganizationIdentityType `json:"identityType"`
+	DisplayName    string                    `json:"displayName"`
+	AvatarURL      string                    `json:"avatarUrl"`
+	ConversationID *string                   `json:"conversationId"`
+}
+
+// InboxSearchResult 返回会话、消息和人员三组检索结果，每组最多六条。
+type InboxSearchResult struct {
+	Conversations []InboxConversation  `json:"conversations"`
+	Messages      []InboxSearchMessage `json:"messages"`
+	People        []InboxSearchPerson  `json:"people"`
+}

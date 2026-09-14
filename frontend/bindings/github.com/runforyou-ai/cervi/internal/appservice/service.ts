@@ -850,6 +850,13 @@ export function SaveTelegramChannelConnection(meta: $models.RequestMeta, channel
 }
 
 /**
+ * SearchInbox 按范围检索会话名称、消息正文与附件文件名、成员和外部联系人。
+ */
+export function SearchInbox(meta: $models.RequestMeta, input: $models.InboxSearchInput): $CancellablePromise<$models.InboxSearchResult> {
+    return $Call.ByID(3192276034, meta, input);
+}
+
+/**
  * SelectImage 在原生端选择并读取图片。
  */
 export function SelectImage(meta: $models.RequestMeta): $CancellablePromise<$models.ImageFile> {

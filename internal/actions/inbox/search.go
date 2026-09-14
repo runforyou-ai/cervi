@@ -1,0 +1,289 @@
+//go:build server
+
+package inbox
+
+import (
+	"context"
+	"database/sql"
+	"slices"
+	"strings"
+	"time"
+
+	"github.com/runforyou-ai/cervi/internal/common"
+	"github.com/runforyou-ai/cervi/internal/common/searchtext"
+	"github.com/runforyou-ai/cervi/internal/domain"
+	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	"github.com/uptrace/bun"
+)
+
+// searchResultLimit 是每组检索结果返回的最大数量。
+const searchResultLimit = 6
+
+// SearchRange 表示检索覆盖的会话范围。
+type SearchRange string
+
+const (
+	// SearchRangeList 按当前列表筛选检索会话。
+	SearchRangeList SearchRange = "list"
+	// SearchRangeReadable 检索当前身份可阅读的全部会话。
+	SearchRangeReadable SearchRange = "readable"
+	// SearchRangeConversation 只检索指定会话的消息。
+	SearchRangeConversation SearchRange = "conversation"
+)
+
+// SearchPersonKind 表示人员结果的来源。
+type SearchPersonKind string
+
+const (
+	// SearchPersonMember 表示企业成员或 AI 员工。
+	SearchPersonMember SearchPersonKind = "member"
+	// SearchPersonContact 表示外部联系人。
+	SearchPersonContact SearchPersonKind = "contact"
+)
+
+// SearchInput 定义收件箱检索文本与范围，List 只在列表范围生效，ConversationID 只在会话范围生效。
+type SearchInput struct {
+	Text           string
+	Range          SearchRange
+	List           LoadInput
+	ConversationID string
+}
+
+// SearchMessage 表示命中的消息、所在会话摘要和高亮摘要。
+type SearchMessage struct {
+	ID           string
+	Type         domain.MessageType
+	SenderName   *string
+	OriginatedAt time.Time
+	Excerpt      []searchtext.Segment
+	Conversation ConversationSummary
+}
+
+// SearchPerson 表示命中的企业成员或外部联系人，外部联系人携带最近一次客户会话。
+type SearchPerson struct {
+	Kind           SearchPersonKind                `bun:"kind"`
+	ID             string                          `bun:"id"`
+	IdentityType   domain.OrganizationIdentityType `bun:"identity_type"`
+	DisplayName    string                          `bun:"display_name"`
+	AvatarFileID   *string                         `bun:"avatar_file_id"`
+	ConversationID *string                         `bun:"conversation_id"`
+}
+
+// SearchResult 保存各组检索结果。
+type SearchResult struct {
+	Conversations []ConversationSummary
+	Messages      []SearchMessage
+	People        []SearchPerson
+}
+
+type searchMessageRow struct {
+	ID             string             `bun:"id"`
+	ConversationID string             `bun:"conversation_id"`
+	Type           domain.MessageType `bun:"type"`
+	Body           string             `bun:"body"`
+	AttachmentName *string            `bun:"attachment_name"`
+	SenderName     *string            `bun:"sender_name"`
+	OriginatedAt   time.Time          `bun:"originated_at"`
+}
+
+// Search 在同一只读快照中检索会话名称、消息正文与附件文件名、成员和外部联系人；会话范围只检索消息。
+func (q *LoadInboxQuery) Search(ctx context.Context, identity *servermodels.Identity, input SearchInput) (SearchResult, error) {
+	result := SearchResult{Conversations: []ConversationSummary{}, Messages: []SearchMessage{}, People: []SearchPerson{}}
+	switch input.Range {
+	case SearchRangeList:
+		normalized, err := normalizeLoadInput(input.List)
+		if err != nil {
+			return result, err
+		}
+		input.List = normalized
+	case SearchRangeReadable:
+	case SearchRangeConversation:
+		if !common.ValidUUID(input.ConversationID) {
+			return result, ErrQueryInvalid
+		}
+	default:
+		return result, ErrQueryInvalid
+	}
+	text := strings.TrimSpace(input.Text)
+	if text == "" {
+		return result, nil
+	}
+	err := q.db.RunInTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true}, func(ctx context.Context, tx bun.Tx) error {
+		snapshot := NewLoadInboxQuery(tx)
+		candidates := snapshot.readableCandidates(identity)
+		if input.Range == SearchRangeList {
+			candidates = snapshot.listCandidates(identity, input.List)
+		}
+		if input.Range == SearchRangeConversation {
+			readable, err := tx.NewSelect().TableExpr("(?) AS candidates", candidates).Where("candidates.id = ?", input.ConversationID).Exists(ctx)
+			if err != nil {
+				return err
+			}
+			if !readable {
+				return ErrConversationUnavailable
+			}
+		}
+		var rows []searchMessageRow
+		query, searchable := searchtext.ParseQuery(text)
+		if searchable {
+			var err error
+			if rows, err = snapshot.searchMessages(ctx, identity, query, candidates, input); err != nil {
+				return err
+			}
+		}
+		var conversationIDs []string
+		if input.Range != SearchRangeConversation {
+			var err error
+			if conversationIDs, err = snapshot.searchConversationNames(ctx, identity, candidates, text); err != nil {
+				return err
+			}
+			if result.People, err = snapshot.searchPeople(ctx, identity, text); err != nil {
+				return err
+			}
+		}
+		ids := slices.Clone(conversationIDs)
+		for _, row := range rows {
+			if !slices.Contains(ids, row.ConversationID) {
+				ids = append(ids, row.ConversationID)
+			}
+		}
+		if len(ids) == 0 {
+			return nil
+		}
+		summaries, err := snapshot.readSummaries(ctx, identity, ids)
+		if err != nil {
+			return err
+		}
+		for _, id := range conversationIDs {
+			if summary := summaries[id]; summary != nil {
+				result.Conversations = append(result.Conversations, *summary)
+			}
+		}
+		for _, row := range rows {
+			summary := summaries[row.ConversationID]
+			if summary == nil {
+				continue
+			}
+			// 摘要优先取正文命中，正文未命中时取附件文件名命中。
+			excerpt, matched := query.Excerpt(row.Body)
+			if !matched && row.AttachmentName != nil {
+				excerpt, _ = query.Excerpt(*row.AttachmentName)
+			}
+			result.Messages = append(result.Messages, SearchMessage{
+				ID: row.ID, Type: row.Type, SenderName: row.SenderName, OriginatedAt: row.OriginatedAt, Excerpt: excerpt, Conversation: *summary,
+			})
+		}
+		return nil
+	})
+	return result, err
+}
+
+// searchMessages 按检索词元读取候选会话内的文本与附件消息，会话内按消息序号倒序，跨会话按消息时间倒序。
+func (q *LoadInboxQuery) searchMessages(ctx context.Context, identity *servermodels.Identity, query searchtext.Query, candidates *bun.SelectQuery, input SearchInput) ([]searchMessageRow, error) {
+	messages := q.db.NewSelect().TableExpr("messages AS msg").
+		ColumnExpr("msg.id::text AS id, msg.conversation_id::text AS conversation_id, msg.type, msg.body, msg.originated_at").
+		ColumnExpr("ma.name AS attachment_name").
+		ColumnExpr("CASE WHEN cs.kind = ? THEN COALESCE(cci.display_name, c.display_name) WHEN cs.kind = ? THEN oi.display_name END AS sender_name", domain.ChatSubjectKindContact, domain.ChatSubjectKindOrganizationIdentity).
+		Join("LEFT JOIN message_attachments AS ma ON ma.organization_id = msg.organization_id AND ma.message_id = msg.id").
+		Join("LEFT JOIN conversation_participants AS cp ON cp.organization_id = msg.organization_id AND cp.conversation_id = msg.conversation_id AND cp.id = msg.sender_participant_id").
+		Join("LEFT JOIN chat_subjects AS cs ON cs.organization_id = cp.organization_id AND cs.id = cp.subject_id").
+		Join("LEFT JOIN organization_identities AS oi ON oi.organization_id = cs.organization_id AND oi.id = cs.source_id AND cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
+		Join("LEFT JOIN contacts AS c ON c.organization_id = cs.organization_id AND c.id = cs.source_id AND cs.kind = ?", domain.ChatSubjectKindContact).
+		Join("LEFT JOIN customer_conversations AS cc ON cc.organization_id = msg.organization_id AND cc.conversation_id = msg.conversation_id").
+		Join("LEFT JOIN contact_channel_identities AS cci ON cci.organization_id = cc.organization_id AND cci.id = cc.contact_channel_identity_id AND cci.contact_id = cs.source_id AND cs.kind = ?", domain.ChatSubjectKindContact).
+		Where("msg.organization_id = ?", identity.Organization.ID).
+		Where("msg.deleted_at IS NULL").
+		Where("msg.type IN (?)", bun.In([]domain.MessageType{domain.MessageTypeText, domain.MessageTypeAttachment})).
+		Where("msg.search_vector @@ ?::tsquery", query.TSQuery()).
+		Limit(searchResultLimit)
+	if input.Range == SearchRangeConversation {
+		messages = messages.Where("msg.conversation_id = ?", input.ConversationID).OrderExpr("msg.message_seq DESC")
+	} else {
+		messages = messages.Where("msg.conversation_id IN (SELECT candidates.id FROM (?) AS candidates)", candidates).OrderExpr("msg.originated_at DESC, msg.id DESC")
+	}
+	var rows []searchMessageRow
+	if err := messages.Scan(ctx, &rows); err != nil {
+		return nil, err
+	}
+	return rows, nil
+}
+
+// searchConversationNames 按列表展示的会话名称匹配候选会话，按最近活动倒序。
+func (q *LoadInboxQuery) searchConversationNames(ctx context.Context, identity *servermodels.Identity, candidates *bun.SelectQuery, text string) ([]string, error) {
+	pattern := "%" + text + "%"
+	var ids []string
+	err := q.db.NewSelect().TableExpr("(?) AS candidates", candidates).
+		ColumnExpr("cv.id::text").
+		Join("JOIN conversations AS cv ON cv.organization_id = ? AND cv.id = candidates.id", identity.Organization.ID).
+		Join("LEFT JOIN direct_conversations AS dc ON dc.organization_id = cv.organization_id AND dc.conversation_id = cv.id").
+		Join("LEFT JOIN organization_identities AS peer_oi ON peer_oi.organization_id = dc.organization_id AND peer_oi.id = CASE WHEN dc.first_identity_id = ? THEN dc.second_identity_id ELSE dc.first_identity_id END", identity.OrganizationIdentity.ID).
+		Join("LEFT JOIN agent_conversations AS ac ON ac.organization_id = cv.organization_id AND ac.conversation_id = cv.id").
+		Join("LEFT JOIN organization_identities AS agent_oi ON agent_oi.organization_id = ac.organization_id AND agent_oi.id = ac.agent_identity_id").
+		Join("LEFT JOIN customer_conversations AS cc ON cc.organization_id = cv.organization_id AND cc.conversation_id = cv.id").
+		Join("LEFT JOIN contact_channel_identities AS cci ON cci.organization_id = cc.organization_id AND cci.id = cc.contact_channel_identity_id").
+		Join("LEFT JOIN contacts AS c ON c.organization_id = cci.organization_id AND c.id = cci.contact_id").
+		Where(`(cv.type = ? AND cv.title ILIKE ?) OR (cv.type = ? AND peer_oi.display_name ILIKE ?)
+			OR (cv.type = ? AND (cv.title ILIKE ? OR agent_oi.display_name ILIKE ?))
+			OR (cv.type = ? AND COALESCE(cci.display_name, c.display_name) ILIKE ?)`,
+			domain.ConversationTypeGroup, pattern, domain.ConversationTypeDirect, pattern,
+			domain.ConversationTypeAgent, pattern, pattern, domain.ConversationTypeCustomer, pattern).
+		OrderExpr("cv.last_activity_at DESC NULLS LAST, cv.id DESC").
+		Limit(searchResultLimit).
+		Scan(ctx, &ids)
+	return ids, err
+}
+
+// searchPeople 在全企业通讯录中匹配活跃成员、AI 员工和外部联系人，不随会话范围收窄；成员优先，外部联系人补足剩余名额。
+func (q *LoadInboxQuery) searchPeople(ctx context.Context, identity *servermodels.Identity, text string) ([]SearchPerson, error) {
+	pattern := "%" + text + "%"
+	people := []SearchPerson{}
+	if err := q.db.NewSelect().TableExpr("organization_identities AS oi").
+		ColumnExpr("? AS kind, oi.id::text AS id, oi.type AS identity_type, oi.display_name, oi.avatar_file_id::text AS avatar_file_id", SearchPersonMember).
+		Join("LEFT JOIN users AS u ON u.organization_id = oi.organization_id AND u.identity_id = oi.id").
+		Join("LEFT JOIN agents AS a ON a.organization_id = oi.organization_id AND a.identity_id = oi.id").
+		Where("oi.organization_id = ? AND oi.id <> ?", identity.Organization.ID, identity.OrganizationIdentity.ID).
+		Where("((oi.type = ? AND u.status = ?) OR (oi.type = ? AND a.status = ?))", domain.OrganizationIdentityTypeUser, domain.UserStatusActive, domain.OrganizationIdentityTypeAgent, domain.UserStatusActive).
+		Where("(oi.display_name ILIKE ? OR u.email ILIKE ?)", pattern, pattern).
+		OrderExpr("lower(oi.display_name), oi.id").
+		Limit(searchResultLimit).
+		Scan(ctx, &people); err != nil {
+		return nil, err
+	}
+	remaining := searchResultLimit - len(people)
+	if remaining == 0 {
+		return people, nil
+	}
+	// 外部联系人关联最近一次客户会话，关联条件与客户会话阅读范围一致；有会话的联系人排在前面。
+	var contacts []SearchPerson
+	if err := q.db.NewSelect().TableExpr("contacts AS c").
+		ColumnExpr("? AS kind, c.id::text AS id, COALESCE(c.display_name, latest.channel_display_name, '') AS display_name, latest.avatar_file_id, latest.conversation_id", SearchPersonContact).
+		Join(`LEFT JOIN LATERAL (
+			SELECT cv.id::text AS conversation_id, cci.display_name AS channel_display_name, cci.avatar_file_id::text AS avatar_file_id
+			FROM customer_conversations AS cc
+			JOIN contact_channel_identities AS cci ON cci.organization_id = cc.organization_id AND cci.id = cc.contact_channel_identity_id
+			JOIN conversations AS cv ON cv.organization_id = cc.organization_id AND cv.id = cc.conversation_id
+			JOIN service_sessions AS current ON current.organization_id = cc.organization_id AND current.conversation_id = cc.conversation_id AND current.id = cc.current_service_session_id
+			WHERE cc.organization_id = c.organization_id AND cci.contact_id = c.id
+			ORDER BY cv.last_activity_at DESC NULLS LAST, cv.id DESC
+			LIMIT 1
+		) AS latest ON TRUE`).
+		Where("c.organization_id = ? AND c.deleted_at IS NULL", identity.Organization.ID).
+		Where(`(COALESCE(c.display_name, '') ILIKE ?
+			OR EXISTS (SELECT 1 FROM contact_methods AS cm WHERE cm.organization_id = c.organization_id AND cm.contact_id = c.id AND cm.normalized_value ILIKE ?)
+			OR EXISTS (SELECT 1 FROM contact_channel_identities AS name_cci WHERE name_cci.organization_id = c.organization_id AND name_cci.contact_id = c.id AND COALESCE(name_cci.display_name, '') ILIKE ?))`, pattern, pattern, pattern).
+		OrderExpr("latest.conversation_id IS NULL, lower(COALESCE(c.display_name, latest.channel_display_name, '')), c.id").
+		Limit(remaining).
+		Scan(ctx, &contacts); err != nil {
+		return nil, err
+	}
+	return append(people, contacts...), nil
+}
+
+// readableCandidates 返回当前身份可阅读的全部会话，不附加列表筛选。
+func (q *LoadInboxQuery) readableCandidates(identity *servermodels.Identity) *bun.SelectQuery {
+	organizationID, identityID := identity.Organization.ID, identity.OrganizationIdentity.ID
+	return q.customerConversationAccessQuery(organizationID).
+		UnionAll(q.directConversationAccessQuery(organizationID, identityID)).
+		UnionAll(q.agentConversationAccessQuery(organizationID, identityID)).
+		UnionAll(q.groupConversationAccessQuery(organizationID, identityID))
+}
