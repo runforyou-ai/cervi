@@ -33,9 +33,10 @@ const avatarContentTypes = new Set(["image/jpeg", "image/png", "image/webp"])
 const maxAvatarByteSize = 5 * 1024 * 1024
 const avatarFileAccept = ".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
 
-/** 修改当前用户的头像、姓名和邮箱。 */
+/** 修改当前用户的头像、姓名和邮箱，移动端使用触屏尺寸的整行保存按钮。 */
 export function ProfileSettingsForm({ user }: { user: CurrentUser }) {
   const { t } = useTranslation(["settings", "common"])
+  const mobile = resolveAppPlatform() === "mobile"
   const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -198,7 +199,7 @@ export function ProfileSettingsForm({ user }: { user: CurrentUser }) {
                 autoComplete="name"
                 aria-invalid={fieldState.invalid}
                 required
-                autoFocus
+                autoFocus={!mobile}
               />
             </Field>
           )}
@@ -224,7 +225,11 @@ export function ProfileSettingsForm({ user }: { user: CurrentUser }) {
         />
       </FieldGroup>
       <div>
-        <Button type="submit" disabled={isSubmitting}>
+        <Button
+          type="submit"
+          className={mobile ? "min-h-11 w-full" : undefined}
+          disabled={isSubmitting}
+        >
           {isSubmitting ? (
             <LoaderCircleIcon className="animate-spin" />
           ) : null}

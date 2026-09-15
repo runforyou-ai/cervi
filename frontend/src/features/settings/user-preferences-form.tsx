@@ -39,15 +39,17 @@ import { useResourceInvalidator } from "@/hooks/use-resource"
 import { changeAppLanguage } from "@/i18n"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { supportedTimeZones } from "@/lib/time-zones"
+import { resolveAppPlatform } from "@/platform/app-platform"
 import {
   readNotificationDevicePreferences,
   setNotificationSoundEnabled,
   type NotificationDeviceScope,
 } from "@/platform/notifications"
 
-/** 修改当前用户偏好设置。 */
+/** 修改当前用户偏好设置，移动端展示主题、语言和时区。 */
 export function UserPreferencesForm({ user }: { user: CurrentUser }) {
   const { t } = useTranslation(["settings", "common"])
+  const mobile = resolveAppPlatform() === "mobile"
   const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
   const { theme, setTheme } = useTheme()
@@ -203,98 +205,106 @@ export function UserPreferencesForm({ user }: { user: CurrentUser }) {
             </Field>
           )}
         />
-        <section
-          className="grid gap-4 border-t pt-5"
-          aria-labelledby="workspace-preferences-title"
-        >
-          <h3 id="workspace-preferences-title" className="font-medium">
-            {t("preferences.workspace.title")}
-          </h3>
-          <Controller
-            name="workspaceTabsEnabled"
-            control={form.control}
-            render={({ field }) => (
-              <Field orientation="horizontal">
-                <FieldContent>
-                  <FieldLabel htmlFor={field.name}>
-                    {t("preferences.workspace.tabs")}
-                  </FieldLabel>
-                  <FieldDescription>
-                    {t("preferences.workspace.tabsDescription")}
-                  </FieldDescription>
-                </FieldContent>
-                <Switch
-                  id={field.name}
-                  name={field.name}
-                  checked={field.value}
-                  onBlur={field.onBlur}
-                  onCheckedChange={field.onChange}
-                  ref={field.ref}
-                />
-              </Field>
-            )}
-          />
-        </section>
-        <section
-          className="grid gap-4 border-t pt-5"
-          aria-labelledby="notification-preferences-title"
-        >
-          <h3 id="notification-preferences-title" className="font-medium">
-            {t("preferences.notifications.title")}
-          </h3>
-          <Controller
-            name="messageNotificationsEnabled"
-            control={form.control}
-            render={({ field }) => (
-              <Field orientation="horizontal">
-                <FieldContent>
-                  <FieldLabel htmlFor={field.name}>
-                    {t("preferences.notifications.newMessages")}
-                  </FieldLabel>
-                  <FieldDescription>
-                    {t("preferences.notifications.newMessagesDescription")}
-                  </FieldDescription>
-                </FieldContent>
-                <Switch
-                  id={field.name}
-                  name={field.name}
-                  checked={field.value}
-                  onBlur={field.onBlur}
-                  onCheckedChange={field.onChange}
-                  ref={field.ref}
-                />
-              </Field>
-            )}
-          />
-          <Controller
-            name="notificationSoundEnabled"
-            control={form.control}
-            render={({ field }) => (
-              <Field orientation="horizontal">
-                <FieldContent>
-                  <FieldLabel htmlFor={field.name}>
-                    {t("preferences.notifications.sound")}
-                  </FieldLabel>
-                  <FieldDescription>
-                    {t("preferences.notifications.soundDescription")}
-                  </FieldDescription>
-                </FieldContent>
-                <Switch
-                  id={field.name}
-                  name={field.name}
-                  checked={field.value}
-                  onBlur={field.onBlur}
-                  onCheckedChange={field.onChange}
-                  ref={field.ref}
-                />
-              </Field>
-            )}
-          />
-          <NotificationPermissionSettings />
-        </section>
+        {mobile ? null : (
+          <>
+            <section
+              className="grid gap-4 border-t pt-5"
+              aria-labelledby="workspace-preferences-title"
+            >
+              <h3 id="workspace-preferences-title" className="font-medium">
+                {t("preferences.workspace.title")}
+              </h3>
+              <Controller
+                name="workspaceTabsEnabled"
+                control={form.control}
+                render={({ field }) => (
+                  <Field orientation="horizontal">
+                    <FieldContent>
+                      <FieldLabel htmlFor={field.name}>
+                        {t("preferences.workspace.tabs")}
+                      </FieldLabel>
+                      <FieldDescription>
+                        {t("preferences.workspace.tabsDescription")}
+                      </FieldDescription>
+                    </FieldContent>
+                    <Switch
+                      id={field.name}
+                      name={field.name}
+                      checked={field.value}
+                      onBlur={field.onBlur}
+                      onCheckedChange={field.onChange}
+                      ref={field.ref}
+                    />
+                  </Field>
+                )}
+              />
+            </section>
+            <section
+              className="grid gap-4 border-t pt-5"
+              aria-labelledby="notification-preferences-title"
+            >
+              <h3 id="notification-preferences-title" className="font-medium">
+                {t("preferences.notifications.title")}
+              </h3>
+              <Controller
+                name="messageNotificationsEnabled"
+                control={form.control}
+                render={({ field }) => (
+                  <Field orientation="horizontal">
+                    <FieldContent>
+                      <FieldLabel htmlFor={field.name}>
+                        {t("preferences.notifications.newMessages")}
+                      </FieldLabel>
+                      <FieldDescription>
+                        {t("preferences.notifications.newMessagesDescription")}
+                      </FieldDescription>
+                    </FieldContent>
+                    <Switch
+                      id={field.name}
+                      name={field.name}
+                      checked={field.value}
+                      onBlur={field.onBlur}
+                      onCheckedChange={field.onChange}
+                      ref={field.ref}
+                    />
+                  </Field>
+                )}
+              />
+              <Controller
+                name="notificationSoundEnabled"
+                control={form.control}
+                render={({ field }) => (
+                  <Field orientation="horizontal">
+                    <FieldContent>
+                      <FieldLabel htmlFor={field.name}>
+                        {t("preferences.notifications.sound")}
+                      </FieldLabel>
+                      <FieldDescription>
+                        {t("preferences.notifications.soundDescription")}
+                      </FieldDescription>
+                    </FieldContent>
+                    <Switch
+                      id={field.name}
+                      name={field.name}
+                      checked={field.value}
+                      onBlur={field.onBlur}
+                      onCheckedChange={field.onChange}
+                      ref={field.ref}
+                    />
+                  </Field>
+                )}
+              />
+              <NotificationPermissionSettings />
+            </section>
+          </>
+        )}
       </FieldGroup>
       <div>
-        <Button type="submit" disabled={isSubmitting}>
+        <Button
+          type="submit"
+          className={mobile ? "min-h-11 w-full" : undefined}
+          disabled={isSubmitting}
+        >
           {isSubmitting ? <LoaderCircleIcon className="animate-spin" /> : null}
           {isSubmitting ? t("common:actions.saving") : t("common:actions.save")}
         </Button>

@@ -19,8 +19,7 @@ import { MobileAgentChatPage, MobileAgentConversationPage } from "@/apps/mobile/
 import { MobileInboxPage } from "@/apps/mobile/mobile-inbox-page"
 import {
   MobileMePage,
-  MobileProfilePage,
-  MobileSecurityPage,
+  MobileMeSettingsPage,
 } from "@/apps/mobile/mobile-me-page"
 import {
   MobileContactCategoryPage,
@@ -122,8 +121,18 @@ export default function MobileApp() {
                 />
               }
             />
-            <Route path="/me/profile" element={<MobileProfilePage />} />
-            <Route path="/me/security" element={<MobileSecurityPage />} />
+            <Route
+              path="/me/profile"
+              element={<MobileMeSettingsPage section="profile" />}
+            />
+            <Route
+              path="/me/security"
+              element={<MobileMeSettingsPage section="security" />}
+            />
+            <Route
+              path="/me/preferences"
+              element={<MobileMeSettingsPage section="preferences" />}
+            />
             <Route
               path="/contacts/employees"
               element={<MobileDirectoryPage key="employees" kind="employees" />}
