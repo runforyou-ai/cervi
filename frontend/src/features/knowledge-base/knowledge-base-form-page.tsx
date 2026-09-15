@@ -162,6 +162,12 @@ export function KnowledgeBaseFormPage({
     }
   }, [])
 
+  // 新建页取消回到知识库首页，编辑页取消进入该库默认分组的内容列表。
+  const defaultGroup = loadedKnowledgeBase?.groups.find((group) => group.isDefault)
+  const cancelPath = loadedKnowledgeBase
+    ? `/knowledge-bases/${loadedKnowledgeBase.id}/groups/${defaultGroup!.id}/${loadedKnowledgeBase.category === KnowledgeBaseCategory.KnowledgeBaseCategoryQA ? "qa" : "documents"}`
+    : "/knowledge-bases"
+
   /** 保存知识库。 */
   async function save(values: KnowledgeBaseFormValues) {
     try {
@@ -329,11 +335,9 @@ export function KnowledgeBaseFormPage({
                     ? t("common:actions.create")
                     : t("common:actions.save")}
               </Button>
-              {mode === "create" ? (
-                <Button type="button" variant="outline" asChild>
-                  <Link to="/knowledge-bases">{t("common:actions.cancel")}</Link>
-                </Button>
-              ) : null}
+              <Button type="button" variant="outline" asChild>
+                <Link to={cancelPath}>{t("common:actions.cancel")}</Link>
+              </Button>
             </div>
           </form>
         )}
