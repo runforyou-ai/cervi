@@ -31,9 +31,9 @@ export const resourceKeys = {
   /** 指定会话的列表资格。 */
   inboxConversations: (parameters?: KeyParameters) => listKey("inbox-conversations", parameters),
   /** 当前窗口内消息的引用状态。 */
-  conversationMessageReferences: (conversationId: string, messageIds?: string) => scopedListKey("conversation-message-references", conversationId, messageIds === undefined ? undefined : { messageIds }),
+  conversationMessageReferences: (conversationId?: string, messageIds?: string) => scopedListKey("conversation-message-references", conversationId, messageIds === undefined ? undefined : { messageIds }),
   /** 当前会话窗口的外部投递状态。 */
-  customerDeliveries: (conversationId: string, messageIds?: string) =>
+  customerDeliveries: (conversationId?: string, messageIds?: string) =>
     scopedListKey("customer-deliveries", conversationId, messageIds === undefined ? undefined : { messageIds }),
   /** 收件箱数据。 */
   inbox: (parameters?: KeyParameters) => listKey("inbox", parameters),
@@ -60,7 +60,7 @@ export const resourceKeys = {
     itemKey("conversation-messages", conversationId),
   /** 成员消息前后分页。 */
   conversationMessagePage: (
-    conversationId: string,
+    conversationId?: string,
     parameters?: KeyParameters,
   ) => scopedListKey("conversation-message-pages", conversationId, parameters),
   /** 目标消息上下文。 */
@@ -71,10 +71,10 @@ export const resourceKeys = {
       messageId ? { messageId } : undefined,
     ),
   /** 当前群聊的提及进度。 */
-  conversationNavigation: (conversationId: string) =>
+  conversationNavigation: (conversationId?: string) =>
     itemKey("conversation-navigation", conversationId),
   /** 开始一轮导航时读取的提及队列。 */
-  conversationMentions: (conversationId: string) =>
+  conversationMentions: (conversationId?: string) =>
     itemKey("conversation-mentions", conversationId),
   /** 当前成员与目标身份的已有单聊。 */
   directConversation: (identityId?: string) =>

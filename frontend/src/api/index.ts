@@ -9,7 +9,7 @@ export {
   logout,
   probeServer,
 } from "@/api/auth"
-export { loadIdentity, loadStartup, sessionPath } from "@/api/session"
+export { getSyncHeads, loadIdentity, loadStartup, sessionPath } from "@/api/session"
 export {
   realtimeClient,
   type RealtimeClientEvent,

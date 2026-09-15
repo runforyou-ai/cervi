@@ -1,6 +1,7 @@
 /** 读取启动入口、登录身份并提供会话状态路由。 */
 import { SessionState } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import {
+  GetSyncHeads,
   LoadIdentity,
   LoadStartup,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
@@ -12,6 +13,9 @@ export const loadStartup = bind(LoadStartup)
 
 /** 读取当前登录身份。 */
 export const loadIdentity = bind(LoadIdentity)
+
+/** 读取当前用户可见会话与身份资料的同步探针值。 */
+export const getSyncHeads = bind(GetSyncHeads)
 
 /** 将会话状态映射为路由。 */
 export function sessionPath(state: string) {
