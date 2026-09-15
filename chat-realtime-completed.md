@@ -2,7 +2,7 @@
 
 本文保存 `chat-realtime-pr-plan.md` 中已合并 PR 的原始范围、实施记录、验证记录和审核记录，供追溯实现依据与验证结论。仍在推进的范围和共用契约见 `chat-realtime-pr-plan.md`。
 
-已合并：PR01（`#216`）、PR02（`#218`）、PR03（`#222`）、PR04（`#224`）、PR05（`#232`）、PR06（`#233`）、PR07（`#234`）、PR08（`#238`）、PR09（`#245`）、PR10（`#248`）、PR11（`#249`）、PR12（`#253`）、PR13（`#256`）、PR14（`#267`）、PR14A（`#272`）、PR15（`#276`）、PR16（`#279`）、PR17（`#288`）。
+已合并：PR01（`#216`）、PR02（`#218`）、PR03（`#222`）、PR04（`#224`）、PR05（`#232`）、PR06（`#233`）、PR07（`#234`）、PR08（`#238`）、PR09（`#245`）、PR10（`#248`）、PR11（`#249`）、PR12（`#253`）、PR13（`#256`）、PR14（`#267`）、PR14A（`#272`）、PR15（`#276`）、PR16（`#279`）、PR17（`#288`）、PR18（`#294`）。
 
 原清单中的 PR00（禁用 AI 员工后保留会话）改编为新清单的 PR16，由 `#279` 交付。
 
@@ -283,3 +283,18 @@
 - **确认项：** 身份资料版本和后续 `pinOrderVersion` 存 `users` 表；附件上传完成和取消推进会话版本，上传失败不推进；身份资料版本覆盖登录态可见的全部字段，修改密码与团队不推进。
 - **验证记录（2026-09-13）：** 运行 appservice 生成器与 Wails 绑定生成，绑定仅新增 `GetSyncHeads` 与 `SyncHeads`。macOS 本机 PostgreSQL 18.6 上通过 `wails3 task test:server`，新增 `TestConversationVersionAppend`、`TestSyncHeadsConversationChanges`、`TestSyncHeadsIdentityProfile`，并在 `TestAttachmentBatchLifecycle` 增加版本断言；`wails3 task common:build:frontend` 通过且构建后绑定无额外变化。本条无前端交互，未执行界面验证和原生端、移动端构建。
 - **审核处理：** Pi CLI 审核后精简注释，身份资料测试改在已有会话上断言校验和不变并覆盖邮箱修改，附件生命周期测试补版本断言。未采纳：同一事务内版本可能推进两次（如群改名同时写系统消息），版本只用于判断是否变化，契约只要求单调；探针包含企业全部客服会话，与当前全部成员可查看客服会话的阅读资格一致。
+
+### PR18：提交后发布与受众通知契约
+
+- **依赖：** PR17。合并本清单原 PR23 的发布职责。
+- **范围：** 事务内登记待发通知，包含受众种类、受众 ID、通知种类和最小载荷；提交成功后按 namespace、企业、受众种类和受众 ID 异步发布 Core NATS，请求响应不等待发布，回滚则丢弃。接入内部会话新消息（含附件消息、群系统事件与 AI 结果消息）、本人已读／提及确认／静音／手动未读，以及身份资料与账户偏好变化。附件改为传完才入库：客户端先上传临时文件，传完后逐个发送附件消息，服务端不保存上传中的占位消息、上传状态和活跃期限，附件通知随消息追加登记。受众种类显式区分 `user`、`customer_inbox`、`visitor_directory`，本条只登记 `user`。不建通知表和后台发布器，业务事务内不发 NATS，不在网络中持事务。
+- **落点：** 新增 `internal/realtime` 的 `RunInTx`／`Notify` 与 `Publisher`，服务端装配接入发布器生命周期；`chatstate.AppendMessage` 与 `NotifyConversationMembers`、附件发送 Action 与前端附件队列、个人会话状态 Action、`identity.UpdateUserIdentity` 与 `UpdateUserAccount`，以及到达这些登记点的写事务入口。不改 `task_outbox`，不建立每用户 JetStream Consumer。
+- **实施：** 写事务经 `realtime.RunInTx` 执行，`Notify` 把通知记在该事务的上下文中，在事务外调用视为编程错误并 panic；提交成功后整批交给进程级发布器。发布器使用独立 NATS 连接，启动时 NATS 不可用也后台重连，断连期间不缓存；有界队列和单个协程按已提交批次的入队顺序发布，并发事务之间的通知可能乱序；队列已满或发布失败记录 `WARN` 并丢弃，不重试、不影响业务结果，由兜底探针恢复。载荷只含通知种类、会话 ID 和字符串版本，不含正文、姓名或未读数。内部会话通知当前真人成员，客户会话不登记成员受众；个人会话状态与身份资料只通知本人，管理员修改他人资料时通知资料所属用户；版本为 0 的个人状态行与缺行等价，不登记。同一事务内同一受众、同一通知种类、同一会话的多次变化合并为一条并保留最高版本，撤销控制不参与合并。附件每个文件独立发送并沿用各自的发送编号，同批按选择顺序提交：前面的文件未结束时后续文件等待，上传或发送失败、取消的文件不阻塞后续文件，失败文件在发送方本地保留重试并在重试成功后排在会话末尾；说明随最后一个文件发送；AI 聊天附件与文本一样逐条进入 Agent 输入流，连续输入由同一次运行认领；删除 `message_attachments` 的上传状态与活跃期限及对应的状态查询、心跳和取消撤回接口。
+- **边界：** 群资料修改、成员变化和不追加消息的 Run 状态转换由 PR19 接入；群系统事件经消息追加已发送会话变更通知。客户会话受众由 PR20 接入。
+- **验收：** 回滚不发布；实际无变化不登记；个人设置与身份资料不广播给其他人；载荷不含业务内容；NATS 不可用时业务写入照常成功且请求不被阻塞。
+- **验证步骤：** 登记通知后主动回滚，版本不变且订阅端收不到通知；同一事务写两个会话收到两条通知、同一会话两次追加只收到最高版本；本人已读、静音、手动未读、提及确认只发往本人受众，重复操作不发布；工作状态、账户偏好与管理员修改邮箱只通知资料所属用户；附件发送通知单聊双方；附件按选择顺序发送，前面的文件失败不阻塞后续文件，未完成上传或已过期的临时文件不能发送；NATS 不可达时发送消息成功，探针值仍变化；发布阻塞时事务提交照常返回，队列已满与发布失败记录 `WARN`。
+
+- **实现记录：** `realtime.RunInTx` 为写事务创建通知批次，`Notify` 按「企业、受众种类、受众 ID、通知种类、会话」合并并保留最高版本；提交成功后整批交给进程级 `Publisher`，Subject 为 `cervi.<namespace>.realtime.<organizationId>.<audienceKind>.<audienceId>`，载荷为 `kind`、`conversationId` 与字符串 `version`。`chatstate.AppendMessage` 追加后调用 `NotifyConversationMembers` 通知内部会话当前真人成员；已读水位推进、手动未读、静音与提及确认在写入生效时通知本人；`identity.UpdateUserIdentity` 返回推进了版本的用户账号，新增 `identity.UpdateUserAccount` 用 `RETURNING old/new` 判断邮箱与账户偏好变化，管理员修改他人资料或角色时通知资料所属用户。到达登记点的写事务改用 `realtime.RunInTx`，覆盖单聊、AI 聊天、群聊发送与群管理、附件、个人会话状态、Agent 运行完成／失败／停止回复、登录、工作状态、账号状态、资料、偏好、管理员修改用户和角色分配。附件删除 `SendAttachmentBatch`、`UpdateAttachmentUploads`、`ListAttachmentStates`、`CompleteAttachmentUpload` 接口，迁移删除 `message_attachments.upload_status` 与 `upload_expires_at`，`SendAttachmentMessage` 只接受已上传未过期的文件；前端附件队列最多三个并发上传，同批按选择顺序串行发送。
+- **确认项：** 身份资料通知原清单无 PR 负责，并入本条；附件改为传完才入库在本条完成，发送方刷新或关闭页面时上传中的附件不保留；群资料修改、成员变化和不追加消息的 Run 状态转换留给 PR19，客户会话受众留给 PR20。
+- **验证记录（2026-09-14）：** 运行 appservice 生成器与 Wails 绑定生成；macOS 本机 PostgreSQL 与 NATS 上通过 `wails3 task test:server`，新增 `realtime_notification_integration_test.go` 以真实 NATS 订阅覆盖群消息通知全部真人成员、回滚不发布、同一事务两会话两条且同会话合并、个人会话状态只通知本人且重复操作不发布、身份资料只通知资料所属用户、附件通知单聊双方、NATS 不可达时发送成功且探针变化；`TestPublisherKeepsCommitsNonBlocking` 注入阻塞的发送函数，覆盖发布阻塞时提交不等待、队列已满与发布失败记录 `WARN`。合入最新 `main` 后 `wails3 task test:server`、`wails3 task test:desktop`、`wails3 task test:frontend`（97 项）、`wails3 task common:build:frontend` 与 `wails3 task build:server` 均通过。Codex CLI 以桌面端 Wails MCP 与 Web 双账号完成附件界面验证：多文件按选择顺序送达且说明只在最后一个文件、接收方上传期间无占位、取消与中断上传不阻塞同批文件、失败重试排在末尾、AI 聊天以附件首发、群聊附件与引用正常。未执行原生端与移动端构建（移动端无附件入口）。
+- **审核处理：** Pi CLI 审核后其余直接调用 `chatstate.AppendMessage` 的测试事务改用 `realtime.RunInTx`，注释改为直述，发布失败 `WARN` 补充受众与版本字段；附件改造按审核把重试附件移到本批末尾、页面退出时未发送附件置为失败、取消／失权／页面退出统一释放临时文件。Codex CLI 只读审核后拆出发布器发送函数并补发布阻塞测试，发布顺序表述改为按已提交批次入队顺序。未采纳：`TestMessageSequenceCommitOrder` 中先取锁的事务需由测试控制提交或回滚，保留 `BeginTx`；AI 聊天多文件首发标题取首个文件名；附件参数校验沿用会话不存在错误；同一草稿连续两批的跨批次交错由服务端建会话与幂等保证结果正确。
