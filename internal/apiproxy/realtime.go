@@ -61,7 +61,11 @@ func (b *Backend) ConnectRealtime(ctx context.Context, meta appservice.RequestMe
 	// 事件流是长响应，使用不设整体超时的客户端，只限制等待响应头的时间。
 	connectTimer := time.AfterFunc(realtimeConnectTimeout, cancel)
 	response, err := (&http.Client{Transport: state.client.Transport}).Do(request)
-	connectTimer.Stop()
+	// 计时器已触发时请求已被取消，按建立超时处理。
+	if !connectTimer.Stop() && err == nil {
+		response.Body.Close()
+		err = context.DeadlineExceeded
+	}
 	if err != nil {
 		cancel()
 		if ctx.Err() != nil {

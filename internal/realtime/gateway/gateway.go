@@ -15,6 +15,7 @@ import (
 
 	"github.com/nats-io/nats.go"
 	"github.com/runforyou-ai/cervi/internal/appservice"
+	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	"github.com/runforyou-ai/cervi/internal/realtime/protocol"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -142,7 +143,7 @@ func (g *Gateway) serve(writer http.ResponseWriter, request *http.Request) {
 	meta := appservice.RequestMeta{Token: bearerToken(request.Header.Get("Authorization")), Locale: appservice.Locale(request.Header.Get("Accept-Language"))}
 	identity, err := g.backend.AuthenticateMember(request.Context(), meta)
 	if err != nil {
-		writeError(writer, err)
+		writeError(writer, meta, err)
 		return
 	}
 	ctx, cancel := context.WithCancel(request.Context())
@@ -151,7 +152,7 @@ func (g *Gateway) serve(writer http.ResponseWriter, request *http.Request) {
 	g.mu.Lock()
 	if g.closing || g.nats == nil {
 		g.mu.Unlock()
-		http.Error(writer, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
+		writeUnavailable(writer, meta)
 		return
 	}
 	g.connections[current] = struct{}{}
@@ -161,17 +162,17 @@ func (g *Gateway) serve(writer http.ResponseWriter, request *http.Request) {
 
 	if err := g.subscribe(ctx, current, identity); err != nil {
 		slog.Warn("实时受众订阅失败", "connection_id", current.id, "user_id", identity.User.ID, "error", err)
-		http.Error(writer, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
+		writeUnavailable(writer, meta)
 		return
 	}
 	// 订阅生效后再次校验登录会话，之后提交的登出或停用经受众通知送达。
 	if _, err := g.backend.AuthenticateMember(ctx, meta); err != nil {
-		writeError(writer, err)
+		writeError(writer, meta, err)
 		return
 	}
 	heads, err := g.backend.MemberSyncHeads(ctx, identity)
 	if err != nil {
-		writeError(writer, err)
+		writeError(writer, meta, err)
 		return
 	}
 
@@ -179,9 +180,11 @@ func (g *Gateway) serve(writer http.ResponseWriter, request *http.Request) {
 	controller := http.NewResponseController(writer)
 	if err := controller.SetReadDeadline(time.Time{}); err != nil {
 		slog.Warn("清除实时事件流读超时失败", "connection_id", current.id, "error", err)
+		writeUnavailable(writer, meta)
+		return
 	}
 	if !current.attach(controller) {
-		http.Error(writer, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
+		writeUnavailable(writer, meta)
 		return
 	}
 	writer.Header().Set("Content-Type", "text/event-stream")
@@ -211,12 +214,17 @@ func bearerToken(authorization string) string {
 	return strings.TrimSpace(token)
 }
 
-// writeError 按业务 HTTP 接口的错误体输出校验失败，其余错误输出服务不可用。
-func writeError(writer http.ResponseWriter, err error) {
+// writeUnavailable 以业务错误体输出服务暂不可用。
+func writeUnavailable(writer http.ResponseWriter, meta appservice.RequestMeta) {
+	writeError(writer, meta, appservice.UnavailableError(meta, cervii18n.ErrorServerUnavailable, nil).WithStatus(http.StatusServiceUnavailable))
+}
+
+// writeError 按业务 HTTP 接口的错误体输出业务错误，其余错误输出服务暂不可用。
+func writeError(writer http.ResponseWriter, meta appservice.RequestMeta, err error) {
 	var applicationError *appservice.Error
 	if !errors.As(err, &applicationError) {
 		slog.Warn("实时事件流请求处理失败", "error", err)
-		http.Error(writer, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
+		writeUnavailable(writer, meta)
 		return
 	}
 	if applicationError.State != "" {

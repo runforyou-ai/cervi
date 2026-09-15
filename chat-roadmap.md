@@ -1139,7 +1139,7 @@ AI 流按 runId 使用独立的运行过程流：客户端展开运行过程时�
 
 ### 10.12 连接认证、恢复与背压
 
-成员事件流使用 `GET /api/realtime`，请求头携带与业务调用相同的 `Authorization: Bearer <token>` 和 `Accept-Language`，复用业务调用的身份解析：令牌须存在、未过期且账号活跃。认证失败返回与业务 HTTP 接口相同的错误体和状态码，登录失效为 401；Gateway 正在下线或 NATS 未就绪返回 503。凭据不放入 URL 查询参数，避免进入代理和访问日志；成员端不使用 Cookie，不建一次性票据表。Web 端用 fetch 流式读取并沿用既有 Bearer 存储，不使用浏览器原生 `EventSource`。网站挂件在同源 iframe 中请求访客事件流：Cookie 模式使用 `EventSource` 携带第 4.5 节的长期访客 Cookie，Header 恢复模式用 fetch 流式读取并携带同一 Header，服务端恢复出渠道身份后接入访客目录受众。
+成员事件流使用 `GET /api/realtime`，请求头携带与业务调用相同的 `Authorization: Bearer <token>` 和 `Accept-Language`，复用业务调用的身份解析：令牌须存在、未过期且账号活跃。认证失败返回与业务 HTTP 接口相同的错误体和状态码，登录失效为 401；Gateway 正在下线、NATS 未就绪、订阅失败或无法清除读超时时返回 503 与 `kind=unavailable` 的业务错误体。凭据不放入 URL 查询参数，避免进入代理和访问日志；成员端不使用 Cookie，不建一次性票据表。Web 端用 fetch 流式读取并沿用既有 Bearer 存储，不使用浏览器原生 `EventSource`。网站挂件在同源 iframe 中请求访客事件流：Cookie 模式使用 `EventSource` 携带第 4.5 节的长期访客 Cookie，Header 恢复模式用 fetch 流式读取并携带同一 Header，服务端恢复出渠道身份后接入访客目录受众。
 
 原生端由 Go 侧 `apiproxy` 持有事件流，前端传输内核调用 `ConnectRealtime`／`DisconnectRealtime` 驱动启停与重连；Go 侧用 `clientsession` 中的 Bearer 发起不设整体超时的流式 GET（等待响应头最长 30 秒），把每个事件的 JSON 原文经 `cervi:realtime:frame`、流结束经 `cervi:realtime:closed` 交给 TS。401 时与其他 API 调用一样清除本地凭据并返回登录会话错误；登录、登出与切换企业服务器时关闭当前流。长期 Token 只留在 Go `clientsession` 中，凭据边界与现有 API Proxy 一致。
 

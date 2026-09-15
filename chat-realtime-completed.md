@@ -352,7 +352,7 @@
 - **范围：** 成员实时连接从 WebSocket 改为 SSE 事件流 `GET /api/realtime`，请求头 Bearer 认证，事件只由服务端下行；删除 Authenticate、ClientHello、客户端 Ping／Pong、Authenticated、SessionRevoked、ServerGoingAway、RealtimeError、关闭原因码、Hello 能力协商与 `realtime.maxFrameBytes` 配置；原生端改为流式 GET。受众订阅、按版本合并的发送队列、登出与停用撤销、最长存活时间以及先订阅后读探针的顺序保持 PR25 语义。同步改写 `chat-roadmap.md`、`agent-roadmap.md` 与 PR 清单中以 WebSocket 为前提的设计。
 - **落点：** `internal/realtime/gateway`、`internal/realtime/protocol` 与共用夹具、`frontend/src/api/realtime/protocol.ts` 与前端协议测试、`internal/apiproxy/realtime.go` 与 `backend.go` 共用的错误响应解码、`internal/appservice/types_realtime.go` 与 Service 的 `ConnectRealtime`、服务端装配与 `run_server.go`、`internal/config/server`；删除 `coder/websocket` 直接依赖。
 - **实施：**
-  - **认证与建立：** 请求头 `Authorization: Bearer` 与 `Accept-Language` 复用业务调用的身份解析，失败返回与业务 HTTP 接口相同的错误体和状态码，Gateway 下线中或 NATS 未就绪返回 503。认证后登记连接、订阅本人用户受众与本企业客服共享受众并等待 NATS Flush，重新校验登录会话并读取同步探针，再写 200 响应头（`text/event-stream`、`Cache-Control: no-cache`、`X-Accel-Buffering: no`）与首个 `server_hello`。
+  - **认证与建立：** 请求头 `Authorization: Bearer` 与 `Accept-Language` 复用业务调用的身份解析，失败返回与业务 HTTP 接口相同的错误体和状态码，Gateway 下线中、NATS 未就绪、订阅失败或无法清除读超时时返回 503 与 `kind=unavailable` 的业务错误体。认证后登记连接、订阅本人用户受众与本企业客服共享受众并等待 NATS Flush，重新校验登录会话并读取同步探针，再写 200 响应头（`text/event-stream`、`Cache-Control: no-cache`、`X-Accel-Buffering: no`）与首个 `server_hello`。
   - **写出与超时：** 每个事件写成一行 `data: <JSON>` 加空行后 Flush；通过 `http.ResponseController` 清除 Wails 服务器默认读超时，每次写入前设置 10 秒写截止时间；服务端每 25 秒发送 `ping`。
   - **队列、撤销与寿命：** 沿用 PR25 的单写协程、有界发送队列与按会话种类合并；队列溢出、登出或停用撤销、到达最长存活时间时停止发送并结束响应，撤销时清除未发送的事件，不发送原因事件。
   - **下线：** 收到 SIGINT／SIGTERM 时拒绝新的事件流请求并结束全部事件流，默认 5 秒内未结束的强制断开，之后停止通知发布器，Wails 执行 `http.Server.Shutdown` 时不再等待事件流。

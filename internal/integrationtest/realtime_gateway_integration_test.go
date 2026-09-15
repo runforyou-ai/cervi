@@ -431,8 +431,12 @@ func TestRealtimeGatewayConnectionLimits(t *testing.T) {
 		case <-time.After(time.Second):
 			t.Fatal("事件流结束后网关未及时停止")
 		}
-		if response := h.request(t, token); response.StatusCode != http.StatusServiceUnavailable {
-			t.Fatalf("下线后请求 status = %d", response.StatusCode)
+		response := h.request(t, token)
+		var payload struct {
+			Error appservice.Error `json:"error"`
+		}
+		if err := json.NewDecoder(response.Body).Decode(&payload); err != nil || response.StatusCode != http.StatusServiceUnavailable || payload.Error.Kind != appservice.ErrorKindUnavailable {
+			t.Fatalf("下线后请求 status = %d, error = %+v (%v)", response.StatusCode, payload.Error, err)
 		}
 	})
 }
