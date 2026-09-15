@@ -15,6 +15,7 @@ import (
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -55,7 +56,7 @@ func (a *SendFirstAgentTextMessageAction) Execute(ctx context.Context, identity 
 		return FirstAgentTextMessageResult{}, &ValidationError{Fields: fields}
 	}
 	var result FirstAgentTextMessageResult
-	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
@@ -177,7 +178,7 @@ func (a *SendAgentTextMessageAction) Execute(ctx context.Context, identity *serv
 		return ConversationMessage{}, &ValidationError{Fields: fields}
 	}
 	var result ConversationMessage
-	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}

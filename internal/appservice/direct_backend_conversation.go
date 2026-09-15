@@ -543,7 +543,7 @@ func conversationMessageFromAction(message conversationaction.ConversationMessag
 	}
 	var attachment *MessageAttachment
 	if message.Attachment != nil {
-		attachment = &MessageAttachment{File: File{ID: message.Attachment.ID, Name: message.Attachment.Name, ContentType: message.Attachment.ContentType, ByteSize: message.Attachment.ByteSize}, UploadStatus: AttachmentUploadStatus(message.Attachment.UploadStatus), ImageWidth: message.Attachment.ImageWidth, ImageHeight: message.Attachment.ImageHeight}
+		attachment = &MessageAttachment{File: File{ID: message.Attachment.ID, Name: message.Attachment.Name, ContentType: message.Attachment.ContentType, ByteSize: message.Attachment.ByteSize}, ImageWidth: message.Attachment.ImageWidth, ImageHeight: message.Attachment.ImageHeight}
 	}
 	return ConversationMessage{
 		CanReply:        !message.ReplyUnavailable && (message.Type == domain.MessageTypeText || message.Type == domain.MessageTypeAttachment),

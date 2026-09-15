@@ -1079,7 +1079,7 @@ RealtimeNotice
 NATS Subject 使用唯一编解码器，与通知登记、Hello 探针值、通知帧及客户端追赶 key 的受众标识一致：
 
 ```text
-<namespace>.realtime.<organizationId>.<audienceKind>.<audienceId>
+cervi.<namespace>.realtime.<organizationId>.<audienceKind>.<audienceId>
 ```
 
 `audienceKind` 仅为 `user / customer_inbox / visitor_directory`，ID 使用无点的内部规范值；禁止原始凭据或用户输入直接拼接。撤销和下线控制与变更通知共用提交后发布链路，以通知种类区分，按需携带 tokenSessionId／conversationId，不参与变更通知的版本合并；控制通知丢失时由服务端低频授权复核生效，复核失权时与收到控制走同一撤销路径。
@@ -1089,7 +1089,7 @@ NATS Subject 使用唯一编解码器，与通知登记、Hello 探针值、通�
 - Gateway 只为本节点已连接用户订阅用户 Subject；只有本节点存在有权连接时才订阅对应客服 Inbox／访客目录 Subject；大群受众到对应阶段再扩展。
 - 在线扇出不能使用 Queue Group，否则同一用户连接分布在多个 Gateway 时只有一个节点收到通知。
 - 同一用户的多个标签页和设备在节点内扇出；连接注册、能力和发送队列首版只保存在进程内，不引入 Redis、NATS KV 或粘滞会话。
-- 不订阅企业级 `<namespace>.realtime.<organizationId>.>` 通配 Subject，避免把无关用户和租户流量发送给每个 Gateway。
+- 不订阅企业级 `cervi.<namespace>.realtime.<organizationId>.>` 通配 Subject，避免把无关用户和租户流量发送给每个 Gateway。
 - 服务端当前单实例部署：退出先停止接收新连接，再发送 `server_going_away` 并有界关闭连接。拆分为多实例滚动升级时，再增加随机重连延迟以及发送队列和 NATS 订阅 Drain，分散客户端重连。
 - Ping/Pong 只负责保活，不每隔十几秒查询 PostgreSQL。客户端在窗口重新聚焦和第 10.8 节的定期兜底校验时通过 HTTP 获取权威探针值，修复网关或权限异常。
 
@@ -1210,7 +1210,7 @@ PR08 的 lastActivityAt 取消息追加事务中数据库当前时间与该会�
 
 ### 10.14 写入口、守卫与锁序
 
-以下表初始按 `707fdff` 追踪，PR03 基于 `7c64c07` 更新真人单聊、独立 AI 聊天、共享主体和 Agent 执行入口，PR04 基于 `6dc3bdc` 并同步 `8f96135` 更新客服入站、周期管理、Agent 与 Telegram 外发交叉路径；本轮锁序、幂等、停用／归档和任务租约用例已于 2026-09-08 通过服务端全量测试，构建及界面回归记录见 PR 实施清单。当前列记录事务路径，目标列是 PR02–04、PR17–22、PR25–26、PR40 要实现的约束；变更版本与受众通知尚未接入。`U` 表示本人或有效内部真人受众，`C` 表示企业客服 Inbox，`V` 表示受影响网站渠道身份的访客目录；V 只允许公开投影。
+以下表初始按 `707fdff` 追踪，PR03 基于 `7c64c07` 更新真人单聊、独立 AI 聊天、共享主体和 Agent 执行入口，PR04 基于 `6dc3bdc` 并同步 `8f96135` 更新客服入站、周期管理、Agent 与 Telegram 外发交叉路径；本轮锁序、幂等、停用／归档和任务租约用例已于 2026-09-08 通过服务端全量测试，构建及界面回归记录见 PR 实施清单。当前列记录事务路径，目标列是 PR02–04、PR17–22、PR25–26、PR40 要实现的约束；PR17 已接入变更版本，PR18 已接入消息追加（含附件消息）、本人会话状态与身份资料的受众通知，群关系、客服、访客与资料引用的通知由 PR19–22 接入。`U` 表示本人或有效内部真人受众，`C` 表示企业客服 Inbox，`V` 表示受影响网站渠道身份的访客目录；V 只允许公开投影。
 
 共用目标顺序：入口守卫／稳定定位 → 按 conversationId 排序锁定业务会话集合 → 每会话的 CustomerConversation／ServiceSession（客服才需要）→ 个人状态 → AgentState → Run → 任务执行记录 → 本人成员身份行（置顶顺序版本）。仅获取本次需要的锁；多 Agent 按 agentIdentityId、Run 按 runId 排序。受众通知只在事务内登记，不取受众锁。个人置顶顺序版本在本人成员身份行上，不新增独立顺序锁。
 

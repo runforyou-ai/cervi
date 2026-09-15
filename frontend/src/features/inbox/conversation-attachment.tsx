@@ -1,13 +1,9 @@
-/** 在时间线中展示附件、图片、说明和原地上传状态。 */
+/** 在时间线中展示附件、图片、说明和发送方本地的上传状态。 */
 import { ClockIcon, RotateCcwIcon, XIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
-import {
-  AttachmentUploadStatus,
-  getAttachmentDownload,
-  type MessageAttachment,
-} from "@/api"
+import { getAttachmentDownload, type MessageAttachment } from "@/api"
 import { useResource } from "@/hooks/use-resource"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { formatFileSize } from "@/lib/file-size"
@@ -49,13 +45,14 @@ export function ConversationAttachment({
       item.id === attachment.id ||
       (item.fileID && item.fileID === attachment.id),
   )
-  const ready =
-    attachment.uploadStatus === AttachmentUploadStatus.AttachmentReady ||
-    job?.stage === "ready"
-  const failed =
-    !ready &&
-    (attachment.uploadStatus === AttachmentUploadStatus.AttachmentFailed ||
-      job?.stage === "failed")
+  // 已保存的附件均已上传完成，本地附件按上传任务阶段展示进度、取消和失败。
+  const ready = !job || job.stage === "sent"
+  const failed = job?.stage === "failed"
+  const cancellable =
+    job?.stage === "queued" ||
+    job?.stage === "uploading" ||
+    job?.stage === "uploaded"
+  const failedLabel = t(job?.fileID ? "messageSendError" : "attachmentUploadFailed")
   const image = attachment.imageWidth > 0 && attachment.imageHeight > 0
   const preview = useResource(
     resourceKeys.attachmentDownload(conversationID, messageID),
@@ -65,7 +62,6 @@ export function ConversationAttachment({
   const progress = attachment.byteSize
     ? Math.min((job?.bytes ?? 0) / attachment.byteSize, 1)
     : 0
-  const controlLabel = failed ? t("messageRetry") : t("attachmentCancel")
 
   /** 点击文件图标或名称后，通过浏览器下载已完成的附件。 */
   async function download() {
@@ -93,7 +89,7 @@ export function ConversationAttachment({
     >
       <svg
         viewBox="0 0 48 48"
-        className={`absolute inset-0 size-full -rotate-90 ${!job && !failed ? "animate-spin" : ""}`}
+        className={`absolute inset-0 size-full -rotate-90 ${job?.stage === "queued" ? "animate-spin" : ""}`}
         aria-hidden="true"
       >
         <circle
@@ -118,17 +114,14 @@ export function ConversationAttachment({
           />
         ) : null}
       </svg>
-      {!incoming && job && queue ? (
+      {!incoming && job && queue && (failed || cancellable) ? (
         <button
           type="button"
           className="relative flex size-full items-center justify-center rounded-full"
-          aria-label={controlLabel}
+          aria-label={failed ? t("messageRetry") : t("attachmentCancel")}
           onClick={() => {
             if (failed) queue.retry(job.id)
-            else
-              void queue
-                .cancel(job.id)
-                .catch(() => toast.error(t("attachmentCancelFailed")))
+            else queue.cancel(job.id)
           }}
         >
           {failed ? (
@@ -138,12 +131,7 @@ export function ConversationAttachment({
           )}
         </button>
       ) : (
-        <ClockIcon
-          className="size-5"
-          aria-label={t(
-            failed ? "attachmentUploadFailed" : "attachmentReceiving",
-          )}
-        />
+        <ClockIcon className="size-5" aria-label={t("messageSending")} />
       )}
     </div>
   )
@@ -158,10 +146,8 @@ export function ConversationAttachment({
   const detail = ready
     ? undefined
     : failed
-      ? t("attachmentUploadFailed")
-      : incoming
-        ? t("attachmentReceiving")
-        : `${formatFileSize(job?.bytes ?? 0)} / ${formatFileSize(attachment.byteSize)}`
+      ? failedLabel
+      : `${formatFileSize(job?.bytes ?? 0)} / ${formatFileSize(attachment.byteSize)}`
   const bubble = cn("rounded-2xl px-3 py-2", bubbleClassName)
   return (
     <div
@@ -196,7 +182,7 @@ export function ConversationAttachment({
       />
       {image && failed ? (
         <p className="text-xs text-muted-foreground">
-          {t("attachmentUploadFailed")}
+          {failedLabel}
         </p>
       ) : null}
       {image && preview.error ? (

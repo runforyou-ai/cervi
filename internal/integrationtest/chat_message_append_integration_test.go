@@ -16,6 +16,7 @@ import (
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
@@ -35,7 +36,7 @@ func TestChatMessageAppendReplay(t *testing.T) {
 	if err := f.db.NewSelect().Model(before).WherePK().Scan(ctx); err != nil {
 		t.Fatal(err)
 	}
-	err = f.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err = realtime.RunInTx(ctx, f.db, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, f.owner); err != nil {
 			return err
 		}
@@ -79,7 +80,7 @@ func TestChatMessageAppendRollback(t *testing.T) {
 	before := f.send(t, f.owner, "保留的消息", false)
 	rollback := errors.New("rollback after summary")
 	messageID := uuid.NewV7().String()
-	err := f.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err := realtime.RunInTx(ctx, f.db, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, f.owner); err != nil {
 			return err
 		}
@@ -234,7 +235,7 @@ func TestGroupSystemMessageSummary(t *testing.T) {
 func appendTestMessage(t *testing.T, db *bun.DB, message *servermodels.Message) {
 	t.Helper()
 	message.ID = uuid.NewV7().String()
-	err := db.RunInTx(context.Background(), nil, func(ctx context.Context, tx bun.Tx) error {
+	err := realtime.RunInTx(context.Background(), db, func(ctx context.Context, tx bun.Tx) error {
 		cv := &servermodels.Conversation{ID: message.ConversationID}
 		if err := tx.NewSelect().Model(cv).WherePK().For("UPDATE").Scan(ctx); err != nil {
 			return err

@@ -372,104 +372,26 @@ export enum AgentToolCallStatus {
 };
 
 /**
- * AttachmentBatchInput 定义按顺序发送的附件消息。
+ * AttachmentMessageInput 定义已上传附件的发送意图，agentIdentityId 非空表示按 conversationId 草稿编号首发 AI 聊天。
  */
-export interface AttachmentBatchInput {
+export interface AttachmentMessageInput {
     "conversationId": string;
     "targetIdentityId": string;
-
-    /**
-     * 非空表示按 conversationId 草稿编号首发 AI 聊天。
-     */
     "agentIdentityId": string;
-    "attachments": AttachmentBatchItem[] | null;
-}
-
-/**
- * AttachmentBatchItem 定义一条附件消息的文件、说明和图片展示尺寸。
- */
-export interface AttachmentBatchItem {
-    "body": string;
-    "fileName": string;
-    "contentType": string;
-    "byteSize": number;
     "clientMessageId": string;
+    "fileId": string;
+    "body": string;
     "imageWidth": number;
     "imageHeight": number;
 }
 
 /**
- * AttachmentBatchResult 返回已保存的有序消息。
- */
-export interface AttachmentBatchResult {
-    "conversationId": string;
-    "conversation": InboxConversation | null;
-    "messages": ConversationMessage[] | null;
-}
-
-/**
- * AttachmentMessageInput 定义发往已有会话或单聊目标的附件消息。
- */
-export interface AttachmentMessageInput {
-    "conversationId": string;
-    "targetIdentityId": string;
-    "clientMessageId": string;
-    "fileId": string;
-}
-
-/**
- * AttachmentMessageResult 定义附件消息及首发时创建的单聊。
+ * AttachmentMessageResult 定义附件消息及首发时创建的单聊或 AI 聊天。
  */
 export interface AttachmentMessageResult {
     "conversationId": string;
     "conversation": InboxConversation | null;
     "message": ConversationMessage;
-}
-
-/**
- * AttachmentMessageState 定义消息窗口内附件的可见性和上传状态。
- */
-export interface AttachmentMessageState {
-    "messageId": string;
-    "attachment": MessageAttachment;
-    "deleted": boolean;
-}
-
-/**
- * AttachmentStateList 返回当前窗口已有附件的状态。
- */
-export interface AttachmentStateList {
-    "states": AttachmentMessageState[] | null;
-}
-
-/**
- * AttachmentStateListInput 指定当前消息窗口需要刷新的附件。
- */
-export interface AttachmentStateListInput {
-    "messageIds": string;
-}
-
-/**
- * AttachmentUploadStatus 定义附件消息的上传状态。
- */
-export enum AttachmentUploadStatus {
-    /**
-     * The Go zero value for the underlying type of the enum.
-     */
-    $zero = "",
-
-    AttachmentUploading = "uploading",
-    AttachmentReady = "ready",
-    AttachmentFailed = "failed",
-    AttachmentCancelled = "cancelled",
-};
-
-/**
- * AttachmentUploadUpdate 定义当前客户端上传的状态变更或活跃确认。
- */
-export interface AttachmentUploadUpdate {
-    "fileIds": string[] | null;
-    "status": AttachmentUploadStatus;
 }
 
 /**
@@ -2181,7 +2103,7 @@ export interface MemberOptionListInput {
 }
 
 /**
- * MessageAttachment 定义消息的文件信息与上传状态。
+ * MessageAttachment 定义消息的文件信息与图片尺寸。
  */
 export interface MessageAttachment {
     "id": string;
@@ -2189,7 +2111,6 @@ export interface MessageAttachment {
     "contentType": string;
     "byteSize": number;
     "contentUrl": string;
-    "uploadStatus": AttachmentUploadStatus;
     "imageWidth": number;
     "imageHeight": number;
 }

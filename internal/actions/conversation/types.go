@@ -5,7 +5,6 @@ package conversation
 import (
 	"time"
 
-	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -402,58 +401,30 @@ type ConversationNotificationSettings struct {
 
 // MessageAttachment 定义消息文件的元数据。
 type MessageAttachment struct {
-	UploadStatus domain.AttachmentUploadStatus `bun:"upload_status"`
-	ImageWidth   int                           `bun:"image_width"`
-	ImageHeight  int                           `bun:"image_height"`
-	ID           string                        `bun:"id"`
-	Name         string                        `bun:"name"`
-	ContentType  string                        `bun:"content_type"`
-	ByteSize     int64                         `bun:"byte_size"`
+	ImageWidth  int    `bun:"image_width"`
+	ImageHeight int    `bun:"image_height"`
+	ID          string `bun:"id"`
+	Name        string `bun:"name"`
+	ContentType string `bun:"content_type"`
+	ByteSize    int64  `bun:"byte_size"`
 }
 
-// AttachmentMessageInput 定义已有会话或单聊目标的附件发送意图。
+// AttachmentMessageInput 定义已上传附件的发送意图，AgentIdentityID 非空表示按 ConversationID 草稿编号首发 AI 聊天。
 type AttachmentMessageInput struct {
 	ConversationID   string
 	TargetIdentityID string
+	AgentIdentityID  string
 	ClientMessageID  string
 	FileID           string
+	Body             string
+	ImageWidth       int
+	ImageHeight      int
 }
 
-// AttachmentMessageResult 返回附件消息和首发单聊摘要。
+// AttachmentMessageResult 返回附件消息，首发时返回新建单聊或 AI 聊天摘要。
 type AttachmentMessageResult struct {
-	ConversationID string
-	Conversation   *DirectConversationSummary
-	Message        ConversationMessage
-}
-
-// AttachmentBatchItem 定义一条待创建的附件消息。
-type AttachmentBatchItem struct {
-	Body            string
-	File            fileaction.UploadInput
-	ClientMessageID string
-	ImageWidth      int
-	ImageHeight     int
-}
-
-// AttachmentBatchInput 定义按选择顺序发送的附件消息。
-type AttachmentBatchInput struct {
-	ConversationID   string
-	TargetIdentityID string
-	AgentIdentityID  string // 非空表示按 ConversationID 草稿编号首发 AI 聊天。
-	Attachments      []AttachmentBatchItem
-}
-
-// AttachmentBatchResult 返回一次发送的全部消息，首发时返回新建会话摘要。
-type AttachmentBatchResult struct {
 	ConversationID    string
 	Conversation      *DirectConversationSummary
 	AgentConversation *inboxaction.ConversationSummary
-	Messages          []ConversationMessage
-}
-
-// AttachmentMessageState 保存附件消息的当前内容状态和撤去标记。
-type AttachmentMessageState struct {
-	MessageID  string
-	Attachment MessageAttachment
-	Deleted    bool
+	Message           ConversationMessage
 }

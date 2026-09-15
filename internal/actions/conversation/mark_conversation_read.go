@@ -13,6 +13,7 @@ import (
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -45,7 +46,7 @@ func (a *MarkConversationReadAction) Execute(ctx context.Context, identity *serv
 		return ConversationReadState{}, &ValidationError{Fields: fields}
 	}
 	var result ConversationReadState
-	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
@@ -88,9 +89,10 @@ func (a *MarkConversationReadAction) Execute(ctx context.Context, identity *serv
 		}
 		// 主动标为已读时，在同一事务清除独立标记；可见消息自动已读只推进水位。
 		if clearUnreadMark {
-			if _, err := tx.NewUpdate().Model((*servermodels.ConversationUserState)(nil)).
+			if err := notifyConversationStateWrite(ctx, tx.NewUpdate().Model((*servermodels.ConversationUserState)(nil)).
 				Set("marked_unread = false").Set("version = version + 1").Set("updated_at = now()").
-				Where("organization_id = ? AND conversation_id = ? AND user_id = ? AND marked_unread", identity.Organization.ID, conversationID, identity.User.ID).Exec(ctx); err != nil {
+				Where("organization_id = ? AND conversation_id = ? AND user_id = ? AND marked_unread", identity.Organization.ID, conversationID, identity.User.ID).
+				Returning("version"), identity.Organization.ID, conversationID, identity.User.ID); err != nil {
 				return fmt.Errorf("clear conversation unread mark: %w", err)
 			}
 		}
@@ -117,7 +119,7 @@ func advanceConversationUserReadState(ctx context.Context, db bun.IDB, state *se
 	state.LastReadAt = &readAt
 	state.ReadSeq = message.MessageSeq
 	state.Version = 1
-	if _, err := db.NewInsert().Model(state).
+	if err := notifyConversationStateWrite(ctx, db.NewInsert().Model(state).
 		Column("organization_id", "conversation_id", "user_id", "last_read_message_id", "last_read_at", "read_seq", "version").
 		On("CONFLICT (organization_id, conversation_id, user_id) DO UPDATE").
 		Set("last_read_message_id = EXCLUDED.last_read_message_id").
@@ -126,8 +128,25 @@ func advanceConversationUserReadState(ctx context.Context, db bun.IDB, state *se
 		Set("last_read_at = now()").
 		Set("updated_at = now()").
 		Where("cus.read_seq < EXCLUDED.read_seq").
-		Exec(ctx); err != nil {
+		Returning("version"), state.OrganizationID, state.ConversationID, state.UserID); err != nil {
 		return fmt.Errorf("advance conversation user read state: %w", err)
+	}
+	return nil
+}
+
+// notifyConversationStateWrite 执行返回个人状态版本的写入，写入生效时登记本人会话状态通知。
+func notifyConversationStateWrite(ctx context.Context, query interface {
+	Scan(context.Context, ...any) error
+}, organizationID, conversationID, userID string) error {
+	var version int64
+	if err := query.Scan(ctx, &version); errors.Is(err, sql.ErrNoRows) {
+		return nil
+	} else if err != nil {
+		return err
+	}
+	// 版本 0 与缺少个人状态行等价，不登记通知。
+	if version > 0 {
+		realtime.Notify(ctx, realtime.UserConversationStateChanged(organizationID, userID, conversationID, version))
 	}
 	return nil
 }

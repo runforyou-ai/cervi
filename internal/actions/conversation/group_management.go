@@ -18,6 +18,7 @@ import (
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -97,7 +98,7 @@ func (a *UpdateGroupConversationAction) Execute(ctx context.Context, identity *s
 		return GroupConversation{}, &ValidationError{Fields: fields}
 	}
 	var result GroupConversation
-	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
@@ -167,7 +168,7 @@ func (a *AddGroupConversationMembersAction) Execute(ctx context.Context, identit
 	}
 
 	var result GroupConversation
-	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
@@ -249,7 +250,7 @@ func (a *RemoveGroupConversationMemberAction) Execute(ctx context.Context, ident
 	}
 	var result GroupConversation
 	var cancelledRunIDs []string
-	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
@@ -295,7 +296,7 @@ func (a *TransferGroupConversationOwnerAction) Execute(ctx context.Context, iden
 		return GroupConversation{}, &ValidationError{Fields: fields}
 	}
 	var result GroupConversation
-	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
@@ -334,7 +335,7 @@ func (a *LeaveGroupConversationAction) Execute(ctx context.Context, identity *se
 	if !valid {
 		return &ValidationError{Fields: map[string]ValidationCode{"conversationId": ValidationConversationIDInvalid}}
 	}
-	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
@@ -367,7 +368,7 @@ func (a *DissolveGroupConversationAction) Execute(ctx context.Context, identity 
 	}
 	var result GroupConversation
 	var cancelledRunIDs []string
-	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}

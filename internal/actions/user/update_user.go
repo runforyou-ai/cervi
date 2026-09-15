@@ -10,6 +10,7 @@ import (
 
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
+	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -38,7 +39,7 @@ func (a *UpdateUserAction) Execute(ctx context.Context, identity *servermodels.I
 		return nil, ErrNotFound
 	}
 	var output *User
-	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
@@ -49,15 +50,12 @@ func (a *UpdateUserAction) Execute(ctx context.Context, identity *servermodels.I
 		if err := validateRoleID(ctx, tx, identity.Organization.ID, input.RoleID); err != nil {
 			return err
 		}
-		updatedUser := &servermodels.User{}
-		err = tx.NewUpdate().Model(updatedUser).
+		identityID, err := identityaction.UpdateUserAccount(ctx, identity.Organization.ID, tx.NewUpdate().Model((*servermodels.User)(nil)).
 			Set("profile_version = profile_version + CASE WHEN email IS DISTINCT FROM ? THEN 1 ELSE 0 END", input.Email).
 			Set("email = ?", input.Email).
 			Set("updated_at = now()").
 			Where("organization_id = ?", identity.Organization.ID).
-			Where("id = ?", userID).
-			Returning("identity_id").
-			Scan(ctx)
+			Where("id = ?", userID))
 		if isUniqueViolation(err) {
 			return &ValidationError{Fields: map[string]ValidationCode{"email": ValidationEmailDuplicate}}
 		}
@@ -67,7 +65,7 @@ func (a *UpdateUserAction) Execute(ctx context.Context, identity *servermodels.I
 		if err != nil {
 			return err
 		}
-		if err := identityaction.UpdateUserIdentity(ctx, tx, identity.Organization.ID, updatedUser.IdentityID, tx.NewUpdate().Model((*servermodels.OrganizationIdentity)(nil)).
+		if err := identityaction.UpdateUserIdentity(ctx, tx, identity.Organization.ID, identityID, tx.NewUpdate().Model((*servermodels.OrganizationIdentity)(nil)).
 			Set("display_name = ?", input.DisplayName).
 			Set("role_id = ?", input.RoleID).
 			Set("updated_at = now()")); err != nil {
@@ -76,7 +74,7 @@ func (a *UpdateUserAction) Execute(ctx context.Context, identity *servermodels.I
 		if err := ensureActiveAdministratorRemains(ctx, tx, identity.Organization.ID, administratorRoleID); err != nil {
 			return err
 		}
-		if err := replaceUserTeams(ctx, tx, identity, updatedUser.IdentityID, input.TeamIDs); err != nil {
+		if err := replaceUserTeams(ctx, tx, identity, identityID, input.TeamIDs); err != nil {
 			return err
 		}
 		output, err = loadUser(ctx, tx, identity.Organization.ID, userID)

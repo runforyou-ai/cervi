@@ -1,4 +1,4 @@
-/** 验证真实上传执行器和消息队列的重试、取消及页面退出行为。 */
+/** 验证真实上传执行器和附件队列的顺序发送、重试、取消及页面退出行为。 */
 import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 import { test } from "node:test"
@@ -37,49 +37,38 @@ const transferCode =
   ).replace("export class FileTransfer", "class FileTransfer") +
   "\nexports.FileTransfer = FileTransfer;"
 
-/** 用可控制的请求运行实际上传执行器和队列。 */
+/** 用可控制的请求运行实际上传执行器、附件队列和发送状态存储。 */
 function host(overrides: Record<string, (...args: any[]) => any> = {}) {
-  const updates: { fileIds: string[]; status: string }[] = []
+  const sends: any[] = []
+  const cancelled: string[] = []
   const errors: unknown[] = []
-  let prepared = 0
   let transfers = 0
-  let batches = 0
   const api: Record<string, any> = {
-    AttachmentUploadStatus: {
-      AttachmentUploading: "uploading",
-      AttachmentReady: "ready",
-      AttachmentFailed: "failed",
-      AttachmentCancelled: "cancelled",
-    },
-    prepareFileUpload: async (id: string) => {
-      prepared++
-      return { file: { id }, partSize: 0, request: {} }
-    },
-    updateAttachmentUploads: async (input: any) => {
-      updates.push(input)
-    },
+    FilePurpose: { FilePurposeMessageAttachment: "message_attachment" },
+    createFileUpload: async (input: any) => ({
+      file: { id: `file-${input.fileName}` },
+      partSize: 0,
+      request: {},
+    }),
     createFilePartUpload: async () => ({}),
     uploadFileSlice: async () => {
       transfers++
     },
-    completeAttachmentUpload: async () => {},
-    sendAttachmentBatch: async (input: any) => {
-      batches++
+    completeFileUpload: async (id: string) => ({ id }),
+    cancelFileUpload: async (id: string) => {
+      cancelled.push(id)
+    },
+    sendAttachmentMessage: async (input: any) => {
+      sends.push(input)
       return {
-        conversationId: "conversation",
-        conversation: null,
-        messages: [
-          ...input.attachments.map((item: any) => ({
-            id: item.clientMessageId,
-            body: item.body,
-            originatedAt: new Date().toISOString(),
-            attachment: {
-              id: `file-${item.clientMessageId}`,
-              uploadStatus: "uploading",
-            },
-          })),
-
-        ],
+        conversationId: input.conversationId || "created",
+        conversation: input.conversationId ? null : { id: "created" },
+        message: {
+          id: `saved-${input.clientMessageId}`,
+          body: input.body,
+          originatedAt: new Date().toISOString(),
+          attachment: { id: input.fileId },
+        },
       }
     },
     ...overrides,
@@ -87,8 +76,8 @@ function host(overrides: Record<string, (...args: any[]) => any> = {}) {
   const exports: Record<string, any> = {}
   runInNewContext(transferCode, {
     exports,
-    createFilePartUpload: api.createFilePartUpload,
-    uploadFileSlice: api.uploadFileSlice,
+    createFilePartUpload: (...args: any[]) => api.createFilePartUpload(...args),
+    uploadFileSlice: (...args: any[]) => api.uploadFileSlice(...args),
   })
   api.FileTransfer = exports.FileTransfer
   runInNewContext(queueCode, {
@@ -97,8 +86,6 @@ function host(overrides: Record<string, (...args: any[]) => any> = {}) {
     crypto,
     AbortController,
     URL,
-    setInterval,
-    clearInterval,
     console: { warn() {} },
   })
   const storeExports: Record<string, any> = {}
@@ -125,15 +112,16 @@ function host(overrides: Record<string, (...args: any[]) => any> = {}) {
   }))
   return {
     queue,
-    outgoing,
-    /** 返回当前会话分组内的发送项。 */
+    /** 返回指定会话分组内的发送项。 */
     sent: (conversationID = "conversation") =>
       outgoing.snapshot().get(conversationID) ?? [],
+    /** 按编号返回队列中的附件任务。 */
+    job: (id: string) => queue.snapshot().find((item: any) => item.id === id),
     files,
-    updates,
+    sends,
+    cancelled,
     errors,
-    api,
-    counts: () => ({ prepared, transfers, batches }),
+    transfers: () => transfers,
   }
 }
 
@@ -146,155 +134,96 @@ async function settled(predicate: () => boolean) {
   assert.fail("队列未达到预期状态")
 }
 
-test("消息尚未入库时不准备上传，会在返回后继续执行单个文件取消", async () => {
+test("后选的文件先上传完成时，等前面的附件发送后再按选择顺序发送", async () => {
   const gate = Promise.withResolvers<void>()
-  const h = host()
-  const save = h.api.sendAttachmentBatch
-  h.api.sendAttachmentBatch = async (input: any) => {
-    await gate.promise
-    return save(input)
-  }
-  // 绑定函数在队列加载时已捕获，使用第二个宿主注入阻塞请求。
-  const q = host({ sendAttachmentBatch: h.api.sendAttachmentBatch })
-  q.queue.enqueue(q.files, { conversationID: "conversation" }, () => {})
-  await q.queue.cancel("message-1")
-  assert.equal(q.counts().prepared, 0)
-  gate.resolve()
-  await settled(() => q.queue.snapshot()[1].stage === "ready")
-  assert.equal(q.queue.snapshot().length, 2)
-  // 取消的附件从发送状态中移除，保留的那条继续入库。
-  assert.equal(q.sent().length, 1)
-  assert.equal(q.sent()[0].body, "说明")
-  assert.equal(q.sent()[0].saved.body, "说明")
-  assert.equal(q.queue.snapshot()[0].stage, "cancelled")
-  assert.equal(q.counts().prepared, 1)
-  assert.equal(q.counts().transfers, 1)
-  assert.ok(q.updates.some((item) => item.status === "cancelled"))
-})
-
-test("单个附件的说明在本地和保存后始终属于同一条消息", async () => {
-  const h = host()
-  const file = { ...h.files[0], body: "  单个附件说明\n第二行  " }
-  h.queue.enqueue([file], { conversationID: "conversation" }, () => {})
-  assert.equal(h.queue.snapshot().length, 1)
-  assert.equal(h.sent()[0].body, "单个附件说明\n第二行")
-  await settled(() => h.queue.snapshot()[0].stage === "ready")
-  assert.equal(h.queue.snapshot().length, 1)
-  assert.equal(h.sent()[0].saved.body, "单个附件说明\n第二行")
-})
-
-test("完成请求期间取消会释放文件，迟到的完成响应不能恢复本地消息", async () => {
-  const gate = Promise.withResolvers<void>()
-  let entered = false
   const h = host({
-    completeAttachmentUpload: async () => {
-      entered = true
-      await gate.promise
+    completeFileUpload: async (id: string) => {
+      if (id === "file-1.csv") await gate.promise
+      return { id }
     },
   })
-  h.queue.enqueue(h.files.slice(0, 1), { conversationID: "conversation" }, () => {})
-  await settled(() => entered)
-  await h.queue.cancel("message-1")
+  h.queue.enqueue(h.files, { conversationID: "conversation" }, () => {})
+  await settled(() => h.job("message-2").stage === "uploaded")
+  assert.equal(h.sends.length, 0)
   gate.resolve()
-  await new Promise((resolve) => setImmediate(resolve))
-  assert.equal(h.queue.snapshot()[0].stage, "cancelled")
-  assert.equal(h.queue.snapshot()[0].selected, null)
-  assert.equal(h.queue.snapshot()[0].transfer, null)
-  // 取消成功后发送项随之丢弃，展示交给窗口消息。
-  assert.equal(h.sent().length, 0)
+  await settled(() => h.job("message-2").stage === "sent")
+  assert.deepEqual(
+    h.sends.map((item) => [item.clientMessageId, item.fileId, item.body]),
+    [
+      ["message-1", "file-1.csv", ""],
+      ["message-2", "file-2.csv", "说明"],
+    ],
+  )
+  assert.equal(h.sent().map((item: any) => item.status).join(","), "sent,sent")
 })
 
-test("取消请求失败时保留失败的发送项与重试入口", async () => {
-  const gate = Promise.withResolvers<void>()
-  let entered = false
-  const updates: any[] = []
+test("前面的附件上传失败时不阻塞后续附件，重试成功后排在最后发送", async () => {
+  let failFirst = true
   const h = host({
-    completeAttachmentUpload: async () => {
-      entered = true
-      await gate.promise
-    },
-    updateAttachmentUploads: async (input: any) => {
-      updates.push(input)
-      if (input.status === "cancelled") throw new Error("取消失败")
+    completeFileUpload: async (id: string) => {
+      if (id === "file-1.csv" && failFirst) {
+        failFirst = false
+        throw new Error("上传失败")
+      }
+      return { id }
     },
   })
-  h.queue.enqueue(h.files.slice(0, 1), { conversationID: "conversation" }, () => {})
-  await settled(() => entered)
-  await assert.rejects(() => h.queue.cancel("message-1"))
-  gate.resolve()
-  assert.equal(h.queue.snapshot()[0].stage, "failed")
-  // 取消未落地，发送项回到失败态，气泡与重试入口保留。
-  assert.equal(h.sent().length, 1)
+  h.queue.enqueue(h.files, { conversationID: "conversation" }, () => {})
+  await settled(() => h.job("message-2").stage === "sent")
+  assert.equal(h.job("message-1").stage, "failed")
   assert.equal(h.sent()[0].status, "failed")
-})
-
-test("离开页面后入库响应才返回，附件标记失败且不会开始上传", async () => {
-  const gate = Promise.withResolvers<void>()
-  const h = host()
-  const q = host({
-    sendAttachmentBatch: async (input: any) => {
-      await gate.promise
-      return h.api.sendAttachmentBatch(input)
-    },
-  })
-  q.queue.enqueue(q.files, { conversationID: "conversation" }, () => {})
-  q.queue.dispose()
-  gate.resolve()
-  await settled(() =>
-    q.updates.some(
-      (item) => item.status === "failed" && item.fileIds.length === 2,
-    ),
-  )
-  assert.equal(q.counts().prepared, 0)
-  assert.equal(q.counts().transfers, 0)
-  // 服务端把附件标记失败，发送状态取相同结果。
-  assert.equal(
-    q.sent().map((item: any) => item.status).join(","),
-    "failed,failed",
-  )
-})
-
-test("完成失败后重试复用成功分片，仅重新确认完成", async () => {
-  let completed = 0
-  const h = host({
-    prepareFileUpload: async () => ({
-      file: { id: "file" },
-      partSize: 2,
-      request: {},
-    }),
-    completeAttachmentUpload: async () => {
-      if (++completed === 1) throw new Error("完成暂时失败")
-    },
-  })
-  h.queue.enqueue(h.files.slice(0, 1), { conversationID: "conversation" }, () => {})
-  await settled(() => h.queue.snapshot()[0].stage === "failed")
-  assert.equal(h.counts().transfers, 4)
   h.queue.retry("message-1")
-  await settled(() => h.queue.snapshot()[0].stage === "ready")
-  assert.equal(h.counts().transfers, 4)
-  assert.equal(h.queue.snapshot()[0].transfer, null)
+  await settled(() => h.job("message-1").stage === "sent")
+  assert.deepEqual(
+    h.sends.map((item) => item.clientMessageId),
+    ["message-2", "message-1"],
+  )
 })
 
-test("入库响应丢失后重试沿用带说明附件的消息编号", async () => {
-  const requests: any[] = []
-  const h = host()
-  const q = host({
-    sendAttachmentBatch: async (input: any) => {
-      requests.push(input)
-      if (requests.length === 1) throw new Error("响应丢失")
-      return h.api.sendAttachmentBatch(input)
+test("同批后续附件仍在上传时重试失败的附件，重试的附件排在后续附件之后发送", async () => {
+  const gate = Promise.withResolvers<void>()
+  let failFirst = true
+  const h = host({
+    completeFileUpload: async (id: string) => {
+      if (id === "file-1.csv" && failFirst) {
+        failFirst = false
+        throw new Error("上传失败")
+      }
+      if (id === "file-2.csv") await gate.promise
+      return { id }
     },
   })
-  q.queue.enqueue(q.files, { conversationID: "conversation" }, () => {})
-  await settled(() => q.queue.snapshot()[0].stage === "failed")
-  q.queue.retry(q.queue.snapshot()[1].id)
-  await settled(() => q.queue.snapshot()[1].stage === "ready")
-  assert.equal(JSON.stringify(requests[0]), JSON.stringify(requests[1]))
-  assert.equal(q.queue.snapshot()[1].stage, "ready")
-  assert.equal(q.sent()[1].saved.body, "说明")
-  assert.equal(requests[0].attachments.length, 2)
-  assert.equal(requests[0].attachments[0].body, "")
-  assert.equal(requests[0].attachments[1].body, "说明")
+  h.queue.enqueue(h.files, { conversationID: "conversation" }, () => {})
+  await settled(() => h.job("message-1").stage === "failed")
+  h.queue.retry("message-1")
+  await settled(() => h.job("message-1").stage === "uploaded")
+  assert.equal(h.sends.length, 0)
+  gate.resolve()
+  await settled(() => h.job("message-1").stage === "sent")
+  assert.deepEqual(
+    h.sends.map((item) => item.clientMessageId),
+    ["message-2", "message-1"],
+  )
+})
+
+test("发送失败后重试沿用同一发送编号和已上传的文件", async () => {
+  let attempts = 0
+  const q = host({
+    sendAttachmentMessage: async (input: any) => {
+      attempts++
+      if (attempts === 1) throw new Error("响应丢失")
+      return { conversationId: "conversation", conversation: null, message: { id: "saved", body: input.body, originatedAt: new Date().toISOString(), attachment: { id: input.fileId } } }
+    },
+  })
+  q.queue.enqueue(q.files.slice(1), { conversationID: "conversation" }, () => {})
+  await settled(() => q.job("message-2").stage === "failed")
+  assert.equal(q.errors.length, 1)
+  const transfers = q.transfers()
+  q.queue.retry("message-2")
+  await settled(() => q.job("message-2").stage === "sent")
+  assert.equal(attempts, 2)
+  assert.equal(q.transfers(), transfers)
+  assert.equal(q.sent()[0].saved.body, "说明")
 })
 
 test("失败分片重试跳过已成功的片", async () => {
@@ -302,15 +231,8 @@ test("失败分片重试跳过已成功的片", async () => {
   let fail = true
   let current = 0
   const h = host({
-    prepareFileUpload: async () => ({
-      file: { id: "file" },
-      partSize: 2,
-      request: {},
-    }),
-    createFilePartUpload: async (
-      _id: string,
-      input: { partNumber: number },
-    ) => {
+    createFileUpload: async () => ({ file: { id: "file" }, partSize: 2, request: {} }),
+    createFilePartUpload: async (_id: string, input: { partNumber: number }) => {
       current = input.partNumber
       return {}
     },
@@ -323,27 +245,107 @@ test("失败分片重试跳过已成功的片", async () => {
     },
   })
   h.queue.enqueue(h.files.slice(0, 1), { conversationID: "conversation" }, () => {})
-  await settled(() => h.queue.snapshot()[0].stage === "failed")
+  await settled(() => h.job("message-1").stage === "failed")
   h.queue.retry("message-1")
-  await settled(() => h.queue.snapshot()[0].stage === "ready")
+  await settled(() => h.job("message-1").stage === "sent")
   assert.deepEqual(parts, [1, 2, 2, 3, 4])
 })
 
-test("失权时清除排队附件，迟到的保存结果不能恢复队列或打开详情", async () => {
+test("取消上传中的附件会释放临时文件并放行同批后续附件", async () => {
   const gate = Promise.withResolvers<void>()
-  const h = host()
-  const q = host({ sendAttachmentBatch: async (input: any) => { await gate.promise; return h.api.sendAttachmentBatch(input) } })
-  let opened = 0
-  q.queue.enqueue(q.files, { conversationID: "removed" }, () => { opened++ })
-  q.queue.forgetConversation("removed")
-  assert.equal(q.queue.snapshot().length, 0)
-  assert.equal(q.sent("removed").length, 0)
+  let entered = false
+  const h = host({
+    completeFileUpload: async (id: string) => {
+      if (id === "file-1.csv") {
+        entered = true
+        await gate.promise
+      }
+      return { id }
+    },
+  })
+  h.queue.enqueue(h.files, { conversationID: "conversation" }, () => {})
+  await settled(() => entered && h.job("message-2").stage === "uploaded")
+  h.queue.cancel("message-1")
+  await settled(() => h.job("message-2").stage === "sent")
   gate.resolve()
-  await settled(() => h.counts().batches === 1)
   await new Promise((resolve) => setImmediate(resolve))
-  assert.equal(q.queue.snapshot().length, 0)
-  assert.equal(q.sent("removed").length, 0)
+  assert.equal(h.job("message-1").stage, "cancelled")
+  assert.deepEqual(h.cancelled, ["file-1.csv"])
+  assert.deepEqual(h.sends.map((item) => item.clientMessageId), ["message-2"])
+  assert.equal(h.sent().length, 1)
+})
+
+test("草稿首发后后续附件改用正式会话，只回调一次", async () => {
+  const h = host()
+  const created: unknown[] = []
+  h.queue.enqueue(h.files, { conversationID: "", targetIdentityID: "peer" }, (conversation: unknown) => created.push(conversation))
+  await settled(() => h.job("message-2").stage === "sent")
+  assert.equal(h.sends[0].targetIdentityId, "peer")
+  assert.equal(h.sends[0].conversationId, "")
+  assert.equal(h.sends[1].targetIdentityId, "")
+  assert.equal(h.sends[1].conversationId, "created")
+  assert.deepEqual(created, [{ id: "created" }])
+  assert.equal(h.job("message-1").conversationID, "created")
+})
+
+test("失权时清除附件，迟到的发送结果不能恢复队列或打开详情", async () => {
+  const gate = Promise.withResolvers<void>()
+  let entered = false
+  const h = host({
+    sendAttachmentMessage: async (input: any) => {
+      entered = true
+      await gate.promise
+      return { conversationId: "removed", conversation: null, message: { id: "saved", body: input.body, originatedAt: new Date().toISOString(), attachment: { id: input.fileId } } }
+    },
+  })
+  let opened = 0
+  h.queue.enqueue(h.files, { conversationID: "removed" }, () => {
+    opened++
+  })
+  await settled(() => entered && h.job("message-2").stage === "uploaded")
+  h.queue.forgetConversation("removed")
+  gate.resolve()
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.equal(h.queue.snapshot().length, 0)
+  assert.equal(h.sent("removed").length, 0)
   assert.equal(opened, 0)
-  assert.equal(q.counts().transfers, 0)
-  assert.equal(q.errors.length, 0)
+  assert.equal(h.errors.length, 0)
+  // 失权时释放尚未确认发送的临时文件。
+  assert.deepEqual([...h.cancelled].sort(), ["file-1.csv", "file-2.csv"])
+})
+
+test("发送进行中离开页面，迟到的成功结果不改写失败状态，后续附件不再发送", async () => {
+  const gate = Promise.withResolvers<void>()
+  let entered = false
+  const h = host({
+    sendAttachmentMessage: async (input: any) => {
+      entered = true
+      await gate.promise
+      return { conversationId: "conversation", conversation: null, message: { id: "saved", body: input.body, originatedAt: new Date().toISOString(), attachment: { id: input.fileId } } }
+    },
+  })
+  h.queue.enqueue(h.files, { conversationID: "conversation" }, () => {})
+  await settled(() => entered && h.job("message-2").stage === "uploaded")
+  h.queue.dispose()
+  gate.resolve()
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.equal(h.job("message-1").stage, "failed")
+  assert.equal(h.sent().map((item: any) => item.status).join(","), "failed,failed")
+})
+
+test("离开页面后未发送的附件标记失败且不再发送", async () => {
+  const gate = Promise.withResolvers<void>()
+  const h = host({
+    uploadFileSlice: async () => {
+      await gate.promise
+    },
+  })
+  h.queue.enqueue(h.files, { conversationID: "conversation" }, () => {})
+  await settled(() => h.queue.snapshot().every((item: any) => item.transfer?.upload))
+  h.queue.dispose()
+  gate.resolve()
+  await new Promise((resolve) => setImmediate(resolve))
+  assert.equal(h.sends.length, 0)
+  assert.equal(h.sent().map((item: any) => item.status).join(","), "failed,failed")
+  assert.deepEqual([...h.cancelled].sort(), ["file-1.csv", "file-2.csv"])
 })
