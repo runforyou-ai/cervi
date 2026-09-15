@@ -157,7 +157,7 @@ export function ConversationAttachment({
       : `${formatFileSize(job?.bytes ?? 0)} / ${formatFileSize(attachment.byteSize)}`
   // 文件打开下载地址，移动端图片打开应用内预览。
   const canPreview = ready && mobile && image && Boolean(preview.data?.previewUrl)
-  const canDownload = ready && !image
+  const canDownload = ready && !(mobile && image)
   const bubble = cn("rounded-2xl px-3 py-2", bubbleClassName)
   return (
     <>
@@ -186,7 +186,7 @@ export function ConversationAttachment({
               ? "opacity-0 group-hover/message-row:opacity-100 group-focus-within/message-row:opacity-100"
               : undefined
           }
-          openLabel={image ? t("attachmentPreview", { name: attachment.name }) : undefined}
+          openLabel={canPreview ? t("attachmentPreview", { name: attachment.name }) : undefined}
           onOpen={canPreview || canDownload ? () => {
             if (canPreview) setPreviewOpen(true)
             else void download()

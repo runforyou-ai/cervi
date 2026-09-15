@@ -216,7 +216,7 @@ export function ConversationAttachmentUpload({
             <DialogTitle>{t("attachmentSend")}</DialogTitle>
           </DialogHeader>
           <form
-            className={cn("min-h-0 min-w-0 space-y-9", mobile && "[&_button]:min-h-11")}
+            className="min-h-0 min-w-0 space-y-9"
             onSubmit={(event) => {
               event.stopPropagation()
               void form.handleSubmit(send)(event)
@@ -305,6 +305,7 @@ export function ConversationAttachmentUpload({
               <Button
                 type="button"
                 variant="outline"
+                className={mobile ? "min-h-11" : undefined}
                 disabled={selected.length >= 100 || selecting || form.formState.isSubmitting}
                 onClick={() => inputRef.current?.click()}
               >
@@ -314,6 +315,7 @@ export function ConversationAttachmentUpload({
                 <Button
                   type="button"
                   variant="outline"
+                  className={mobile ? "min-h-11" : undefined}
                   disabled={form.formState.isSubmitting}
                   onClick={() => {
                     replace([])
@@ -322,7 +324,7 @@ export function ConversationAttachmentUpload({
                 >
                   {tCommon("actions.cancel")}
                 </Button>
-                <Button type="submit" disabled={selecting || form.formState.isSubmitting}>
+                <Button type="submit" className={mobile ? "min-h-11" : undefined} disabled={selecting || form.formState.isSubmitting}>
                   {t("messageSend")}
                 </Button>
               </div>

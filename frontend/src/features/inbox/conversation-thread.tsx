@@ -21,7 +21,6 @@ import {
 } from "@/api"
 import { usePortalContainer } from "@/components/ui/portal-container"
 import { useWorkspace } from "@/contexts/workspace-context"
-import { useAttachmentQueue } from "@/features/inbox/attachment-queue-context"
 import { ConversationComposer } from "@/features/inbox/conversation-composer"
 import {
   ConversationTimeline,
@@ -64,7 +63,6 @@ export function ConversationThread({
   const { t } = useTranslation("inbox")
   const pageActive = usePortalContainer()?.active ?? true
   const { identity } = useWorkspace()
-  const { queue: attachmentQueue, jobs: attachmentJobs } = useAttachmentQueue()
   const invalidate = useResourceInvalidator()
   const aliveRef = useRef(true)
   const conversationID = conversation?.id ?? ""
@@ -99,9 +97,6 @@ export function ConversationThread({
   )
   const [retryDraft, setRetryDraft] =
     useState<OutgoingConversationDraft | null>(null)
-  const messageSending = outgoing.messages.some(
-    (message) => message.status === "sending",
-  )
   const replySupported =
     !conversation ||
     isAgentInboxConversation(conversation) ||
@@ -126,14 +121,8 @@ export function ConversationThread({
         conversationType={conversationType}
         currentUser={identity.user}
         outgoingMessages={outgoing.messages}
-        onRetryFailedMessage={(draft) => {
-          if (attachmentJobs.some(job => job.id === draft.clientMessageID)) attachmentQueue?.retry(draft.clientMessageID)
-          else setRetryDraft(draft)
-        }}
-        attachmentRetryDisabled={!replySupported || Boolean(replyDisabledReason)}
-        retryFailedMessageDisabled={
-          messageSending || !replySupported || Boolean(replyDisabledReason)
-        }
+        onRetryFailedMessage={setRetryDraft}
+        retryFailedMessageDisabled={!replySupported || Boolean(replyDisabledReason)}
         groupParticipants={groupParticipants}
         onReplyMessage={
           conversation && replySupported && !replyDisabledReason

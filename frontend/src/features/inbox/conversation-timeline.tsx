@@ -226,7 +226,6 @@ function ConversationTimelineContent({
   outgoingMessages,
   onRetryFailedMessage,
   retryFailedMessageDisabled = false,
-  attachmentRetryDisabled = false,
   onReplyMessage,
   groupParticipants,
   onReadMessage,
@@ -245,7 +244,6 @@ function ConversationTimelineContent({
   outgoingMessages: OutgoingConversationMessage[]
   onRetryFailedMessage?: (message: OutgoingConversationDraft) => void
   retryFailedMessageDisabled?: boolean
-  attachmentRetryDisabled?: boolean
   onReplyMessage?: (message: ConversationMessageReference) => void
   groupParticipants?: GroupParticipant[]
   onReadMessage?: (messageID: string) => void
@@ -257,6 +255,10 @@ function ConversationTimelineContent({
   locateMessage?: ConversationLocateTarget | null
 }) {
   const currentIdentityID = currentUser.identityId
+  // 有文本发送中时禁用文本重试，附件重试由上传队列排队。
+  const textRetryDisabled =
+    retryFailedMessageDisabled ||
+    outgoingMessages.some((message) => message.status === "sending")
   // 移动端气泡禁止文本选择，消息菜单项使用触屏尺寸，回复入口只通过长按菜单提供。
   const mobile = resolveAppPlatform() === "mobile"
   const menuItemClassName = cn(mobile && "min-h-11")
@@ -917,7 +919,7 @@ function ConversationTimelineContent({
                                     {agentNotice ? (
                                       <span className={agentError ? "text-destructive" : "text-muted-foreground"}>{t(agentError ? "agentRunFailed" : "agentReplyStopped")}</span>
                                     ) : message.attachment ? (
-                                      <ConversationAttachment retryDisabled={attachmentRetryDisabled} body={message.body} attachment={message.attachment} conversationID={conversationID} messageID={message.persistedMessageID ?? message.id}
+                                      <ConversationAttachment retryDisabled={retryFailedMessageDisabled}body={message.body} attachment={message.attachment} conversationID={conversationID} messageID={message.persistedMessageID ?? message.id}
                                         originatedAt={message.originatedAt} timeLabel={dateFormatters.clock.format(date)} timeTitle={dateFormatters.full.format(date)} incoming={incoming} bubbleClassName={bubbleClassName} />
                                     ) : message.sender?.identityType === OrganizationIdentityType.OrganizationIdentityTypeAgent ? (
                                       <div className="min-w-0 flex-1">
@@ -948,7 +950,7 @@ function ConversationTimelineContent({
                                           onRefresh={() => void deliveries.refresh()}
                                           localFailed={message.deliveryStatus === "failed"}
                                           onRetryLocal={failedDraft && onRetryFailedMessage ? () => onRetryFailedMessage(failedDraft) : undefined}
-                                          retryLocalDisabled={retryFailedMessageDisabled}
+                                          retryLocalDisabled={textRetryDisabled}
                                         />
                                       ) : message.deliveryStatus ? (
                                         <div className="inline-flex items-center gap-1.5 text-[11px]">
@@ -960,7 +962,7 @@ function ConversationTimelineContent({
                                             <button
                                               type="button"
                                               className="underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:opacity-50 disabled:no-underline"
-                                              disabled={retryFailedMessageDisabled}
+                                              disabled={textRetryDisabled}
                                               onClick={() => onRetryFailedMessage(failedDraft)}
                                             >
                                               {t("messageRetry")}

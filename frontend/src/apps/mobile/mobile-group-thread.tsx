@@ -9,7 +9,6 @@ import {
   type GroupConversationData,
 } from "@/api"
 import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
-import { useAttachmentQueue } from "@/features/inbox/attachment-queue-context"
 import { ConversationComposer } from "@/features/inbox/conversation-composer"
 import { ConversationTimeline } from "@/features/inbox/conversation-timeline"
 import { useOutgoingMessages } from "@/features/inbox/outgoing-message-context"
@@ -30,7 +29,6 @@ export function MobileGroupThread({
 }) {
   const { t } = useTranslation("mobile")
   const { identity } = useMobileWorkspace()
-  const { queue, jobs } = useAttachmentQueue()
   const invalidate = useResourceInvalidator()
   const outgoing = useOutgoingMessages(conversation.id)
   const markRead = useConversationReadMarker(conversation.id, active)
@@ -56,14 +54,8 @@ export function MobileGroupThread({
         groupParticipants={conversation.participants}
         prepareSendRef={prepareSendRef}
         outgoingMessages={outgoing.messages}
-        onRetryFailedMessage={(draft) => {
-          if (jobs.some((job) => job.id === draft.clientMessageID)) queue?.retry(draft.clientMessageID)
-          else setRetryDraft(draft)
-        }}
-        attachmentRetryDisabled={archived}
-        retryFailedMessageDisabled={
-          archived || outgoing.messages.some((message) => message.status === "sending")
-        }
+        onRetryFailedMessage={setRetryDraft}
+        retryFailedMessageDisabled={archived}
       />
       {archived ? (
         <div

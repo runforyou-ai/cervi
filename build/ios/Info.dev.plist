@@ -29,8 +29,12 @@
 			<key>NSAllowsLocalNetworking</key>
 			<true/>
 		</dict>
+		<key>NSCameraUsageDescription</key>
+		<string>用于拍摄照片或视频并作为附件发送。</string>
 		<key>NSHumanReadableCopyright</key>
 		<string>© 2026 武汉润予科技有限公司</string>
+		<key>NSMicrophoneUsageDescription</key>
+		<string>用于录制视频附件中的声音。</string>
 		<key>UILaunchStoryboardName</key>
 		<string>LaunchScreen</string>
 		<key>UIRequiredDeviceCapabilities</key>

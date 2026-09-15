@@ -9,7 +9,6 @@ import {
   type InboxConversation,
 } from "@/api"
 import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
-import { useAttachmentQueue } from "@/features/inbox/attachment-queue-context"
 import { ConversationComposer } from "@/features/inbox/conversation-composer"
 import { ConversationTimeline } from "@/features/inbox/conversation-timeline"
 import { useOutgoingMessages } from "@/features/inbox/outgoing-message-context"
@@ -43,7 +42,6 @@ export function MobileIndividualThread({
   ) => Promise<ConversationMessageData>
 }) {
   const { identity } = useMobileWorkspace()
-  const { queue, jobs } = useAttachmentQueue()
   const prepareSendRef = useRef<(() => Promise<boolean>) | null>(null)
   const invalidate = useResourceInvalidator()
   // 真人草稿尚无会话编号，发送状态按对端身份分组。
@@ -70,15 +68,8 @@ export function MobileIndividualThread({
         onReplyMessage={enabled && !disabledReason ? setReplyTo : undefined}
         readThroughMessageID={lastReadMessageID}
         outgoingMessages={outgoing.messages}
-        onRetryFailedMessage={(draft) => {
-          if (jobs.some((job) => job.id === draft.clientMessageID)) queue?.retry(draft.clientMessageID)
-          else setRetryDraft(draft)
-        }}
-        attachmentRetryDisabled={Boolean(disabledReason)}
-        retryFailedMessageDisabled={
-          Boolean(disabledReason) ||
-          outgoing.messages.some((message) => message.status === "sending")
-        }
+        onRetryFailedMessage={setRetryDraft}
+        retryFailedMessageDisabled={Boolean(disabledReason)}
       />
       <ConversationComposer
         attachmentTargetIdentityID={!conversationID ? peerIdentityID : undefined}
