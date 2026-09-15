@@ -251,6 +251,22 @@ func (b *Backend) SendCustomerTextMessage(ctx context.Context, meta appservice.R
 	return output, err
 }
 
+// ListCustomerReplyAgents 返回可用于 AI 写回复的 AI 员工。
+func (b *Backend) ListCustomerReplyAgents(ctx context.Context, meta appservice.RequestMeta) (appservice.CustomerReplyAgentList, error) {
+	var output appservice.CustomerReplyAgentList
+	err := b.do(ctx, meta, http.MethodGet, "/reply-suggestion-agents", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// GenerateCustomerReplySuggestions 使用 AI 员工为客户会话生成对客回复候选。
+func (b *Backend) GenerateCustomerReplySuggestions(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.CustomerReplySuggestionsInput) (appservice.CustomerReplySuggestions, error) {
+	var output appservice.CustomerReplySuggestions
+	err := b.do(ctx, meta, http.MethodPost, "/conversations/"+url.PathEscape(conversationID)+"/reply-suggestions", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // ListCustomerMessageDeliveries 读取当前窗口的外部投递状态。
 func (b *Backend) ListCustomerMessageDeliveries(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.CustomerDeliveryListInput) (appservice.CustomerDeliveryList, error) {
 	var output appservice.CustomerDeliveryList

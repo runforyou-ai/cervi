@@ -57,7 +57,7 @@ func TestInboxContextDeepWindow(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	backend := appservice.NewDirectBackend(f.db, nil, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil)
+	backend := appservice.NewDirectBackend(f.db, nil, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil)
 	meta := appservice.RequestMeta{Token: login.Token}
 	filter := appservice.InboxQuery{Scope: appservice.InboxScopeInternal}
 	all, err := backend.LoadInbox(ctx, meta, appservice.LoadInboxInput{Scope: filter.Scope, Limit: 300})
@@ -206,7 +206,7 @@ func TestInboxContextUnavailable(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	backend := appservice.NewDirectBackend(f.db, nil, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil)
+	backend := appservice.NewDirectBackend(f.db, nil, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil)
 	meta := appservice.RequestMeta{Token: login.Token}
 	filter := appservice.InboxQuery{Scope: appservice.InboxScopeInternal}
 	located, err := backend.GetInboxContext(ctx, meta, appservice.InboxContextInput{Query: filter, AnchorID: f.groupID})

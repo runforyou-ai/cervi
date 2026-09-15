@@ -1086,6 +1086,67 @@ export interface CustomerMessageDelivery {
 }
 
 /**
+ * CustomerReplyAgent 定义可用于 AI 写回复的 AI 员工。
+ */
+export interface CustomerReplyAgent {
+    "identityId": string;
+    "displayName": string;
+}
+
+/**
+ * CustomerReplyAgentList 定义可用于 AI 写回复的 AI 员工列表。
+ */
+export interface CustomerReplyAgentList {
+    "agents": CustomerReplyAgent[] | null;
+}
+
+/**
+ * CustomerReplyMode 表示 AI 写回复的生成方式。
+ */
+export enum CustomerReplyMode {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    CustomerReplyModeReply = "reply",
+    CustomerReplyModeRewrite = "rewrite",
+};
+
+/**
+ * CustomerReplySuggestions 定义可直接填入对客草稿的回复候选。
+ */
+export interface CustomerReplySuggestions {
+    "candidates": string[] | null;
+}
+
+/**
+ * CustomerReplySuggestionsInput 定义 AI 写回复的生成条件，草稿仅在改写模式使用。
+ */
+export interface CustomerReplySuggestionsInput {
+    "agentIdentityId": string;
+    "mode": CustomerReplyMode;
+    "tone": CustomerReplyTone;
+    "draft": string;
+    "replyToMessageId": string;
+}
+
+/**
+ * CustomerReplyTone 表示 AI 写回复的语气。
+ */
+export enum CustomerReplyTone {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    CustomerReplyToneKeep = "keep",
+    CustomerReplyToneProfessional = "professional",
+    CustomerReplyToneFriendly = "friendly",
+    CustomerReplyToneConcise = "concise",
+};
+
+/**
  * CustomerServiceAssigneeList 定义客服筛选候选列表。
  */
 export interface CustomerServiceAssigneeList {

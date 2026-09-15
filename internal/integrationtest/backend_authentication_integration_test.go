@@ -44,7 +44,7 @@ func TestBackendMethodsRequireAuthentication(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	backend := appservice.NewDirectBackend(db, nil, serverstorage.NewTenantResolver(db), nil, nil, nil, nil)
+	backend := appservice.NewDirectBackend(db, nil, serverstorage.NewTenantResolver(db), nil, nil, nil, nil, nil)
 	tenantContext := tenant.WithAccessHost(ctx, accessHost)
 	backendValue := reflect.ValueOf(backend)
 	backendInterface := reflect.TypeFor[appservice.Backend]()

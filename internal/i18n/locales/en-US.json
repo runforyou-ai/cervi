@@ -29,6 +29,12 @@
   "error.knowledge_document_delete_failed": "Failed to delete the document. Please retry.",
 
   "error.agent_reply_stop_failed": "Failed to stop the AI reply. Please try again.",
+  "error.agent_unavailable": "This AI employee is currently unavailable.",
+  "error.customer_reply_suggest_failed": "Could not generate replies. Try again.",
+  "field.agent_identity_id_invalid": "Select a valid AI employee.",
+  "field.customer_reply_mode_invalid": "Select a valid generation mode.",
+  "field.customer_reply_tone_invalid": "Select a valid tone.",
+  "field.customer_reply_draft_required": "Enter a reply to rewrite first.",
   "error.customer_delivery_conflict": "The delivery state changed or the channel cannot send. Refresh and try again.",
   "error.customer_delivery_failed": "Could not process message delivery. Try again.",
   "error.channel_outbound_unavailable": "The channel is disabled or its bot is not configured.",

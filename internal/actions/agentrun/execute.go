@@ -218,22 +218,14 @@ func (a *ExecuteAction) begin(ctx context.Context, runID string) (executionConte
 		TableExpr("agent_runs AS agr").
 		ColumnExpr("agr.*").
 		ColumnExpr("oi.display_name AS agent_name").
-		ColumnExpr("aip.brand AS brand, aip.api_key AS api_key, aip.api_url AS api_url").
-		ColumnExpr("ar.configuration->'model'->>'identifier' AS model_identifier").
-		ColumnExpr("aipm.max_output_tokens AS max_output_tokens, aipm.context_window AS context_window").
 		ColumnExpr("aipm.input_modalities").
-		ColumnExpr("ar.configuration->>'systemInstruction' AS instruction").
 		ColumnExpr("ar.configuration->'knowledgeBaseIds' AS knowledge_base_ids").
 		Join("JOIN agents AS a ON a.identity_id = agr.agent_identity_id AND a.organization_id = agr.organization_id").
-		Join("JOIN organization_identities AS oi ON oi.id = a.identity_id AND oi.organization_id = a.organization_id").
-		Join("JOIN agent_revisions AS ar ON ar.id = agr.agent_revision_id AND ar.agent_id = a.id AND ar.organization_id = agr.organization_id").
-		Join("JOIN ai_providers AS aip ON aip.id = (ar.configuration->'model'->>'providerId')::uuid AND aip.organization_id = agr.organization_id").
-		Join("JOIN ai_provider_models AS aipm ON aipm.provider_id = aip.id AND aipm.organization_id = aip.organization_id AND aipm.identifier = ar.configuration->'model'->>'identifier'").
+		Apply(func(query *bun.SelectQuery) *bun.SelectQuery {
+			return withManagedAgentConfiguration(query, "agr.agent_revision_id")
+		}).
 		Where("agr.id = ?", runID).
 		Where("agr.status = ?", domain.AgentRunStatusRunning).
-		Where("ar.execution_mode = ?", domain.AgentExecutionModeManaged).
-		Where("ar.schema_version = 1").
-		Where("aipm.model_type = ?", domain.AIModelTypeChat).
 		Scan(ctx, &execution)
 	if errors.Is(err, sql.ErrNoRows) {
 		var status string
@@ -249,6 +241,27 @@ func (a *ExecuteAction) begin(ctx context.Context, runID string) (executionConte
 		return executionContext{}, false, fmt.Errorf("load agent run execution: %w", err)
 	}
 	return execution, false, nil
+}
+
+// withManagedAgentConfiguration 为已关联 agents AS a 的查询补充指定配置版本的模型和系统指令列，只保留有效的托管对话模型配置。
+func withManagedAgentConfiguration(query *bun.SelectQuery, revisionIDColumn string) *bun.SelectQuery {
+	return joinManagedAgentConfiguration(query, revisionIDColumn).
+		ColumnExpr("aip.brand AS brand, aip.api_key AS api_key, aip.api_url AS api_url").
+		ColumnExpr("ar.configuration->'model'->>'identifier' AS model_identifier").
+		ColumnExpr("aipm.max_output_tokens AS max_output_tokens, aipm.context_window AS context_window").
+		ColumnExpr("ar.configuration->>'systemInstruction' AS instruction")
+}
+
+// joinManagedAgentConfiguration 为已关联 agents AS a 的查询关联身份、指定配置版本与对话模型，只保留有效的托管对话模型配置。
+func joinManagedAgentConfiguration(query *bun.SelectQuery, revisionIDColumn string) *bun.SelectQuery {
+	return query.
+		Join("JOIN organization_identities AS oi ON oi.id = a.identity_id AND oi.organization_id = a.organization_id").
+		Join("JOIN agent_revisions AS ar ON ar.id = "+revisionIDColumn+" AND ar.agent_id = a.id AND ar.organization_id = a.organization_id").
+		Join("JOIN ai_providers AS aip ON aip.id = (ar.configuration->'model'->>'providerId')::uuid AND aip.organization_id = a.organization_id").
+		Join("JOIN ai_provider_models AS aipm ON aipm.provider_id = aip.id AND aipm.organization_id = aip.organization_id AND aipm.identifier = ar.configuration->'model'->>'identifier'").
+		Where("ar.execution_mode = ?", domain.AgentExecutionModeManaged).
+		Where("ar.schema_version = 1").
+		Where("aipm.model_type = ?", domain.AIModelTypeChat)
 }
 
 // agentRunStatusTerminal 判断 Agent Run 是否已经进入不可覆盖的终态。

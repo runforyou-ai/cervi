@@ -318,6 +318,13 @@ export function FindDirectConversation(meta: $models.RequestMeta, targetIdentity
 }
 
 /**
+ * GenerateCustomerReplySuggestions 使用 AI 员工为客户会话生成对客回复候选。
+ */
+export function GenerateCustomerReplySuggestions(meta: $models.RequestMeta, conversationID: string, input: $models.CustomerReplySuggestionsInput): $CancellablePromise<$models.CustomerReplySuggestions> {
+    return $Call.ByID(2144333880, meta, conversationID, input);
+}
+
+/**
  * GetAIProvider 返回当前企业中的模型服务供应商详情。
  */
 export function GetAIProvider(meta: $models.RequestMeta, providerID: string): $CancellablePromise<$models.AIProvider> {
@@ -567,6 +574,13 @@ export function ListConversationMessages(meta: $models.RequestMeta, conversation
  */
 export function ListCustomerMessageDeliveries(meta: $models.RequestMeta, conversationID: string, input: $models.CustomerDeliveryListInput): $CancellablePromise<$models.CustomerDeliveryList> {
     return $Call.ByID(344678729, meta, conversationID, input);
+}
+
+/**
+ * ListCustomerReplyAgents 返回可用于 AI 写回复的 AI 员工。
+ */
+export function ListCustomerReplyAgents(meta: $models.RequestMeta): $CancellablePromise<$models.CustomerReplyAgentList> {
+    return $Call.ByID(1363919924, meta);
 }
 
 /**

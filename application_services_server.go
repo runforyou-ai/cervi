@@ -92,9 +92,11 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 		return nil, nil, err
 	}
 	agentRunScheduler := agentrunaction.NewScheduler(tasks)
-	executeAgentRun := agentrunaction.NewExecuteAction(appStorage.DB(), tasks, agentRuntime,
-		agentrunaction.NewAttachmentReader(appStorage.DB(), fileReader, attachmentScheme),
+	agentAttachments := agentrunaction.NewAttachmentReader(appStorage.DB(), fileReader, attachmentScheme)
+	executeAgentRun := agentrunaction.NewExecuteAction(appStorage.DB(), tasks, agentRuntime, agentAttachments,
 		knowledgeaction.NewRetrievalService(appStorage.DB(), embedding.NewClient(), rerank.NewClient()))
+	// 客服 AI 写回复复用模型构造和附件链接，以单次模型调用同步生成回复候选。
+	customerReplySuggestions := agentrunaction.NewGenerateCustomerReplySuggestionsAction(appStorage.DB(), agentRuntime, agentAttachments)
 	if err := tasks.Registry().RegisterJSONWithTerminalFailure(agentrunaction.RunActionName, executeAgentRun.Execute, executeAgentRun.FinalizeFailure); err != nil {
 		return nil, nil, err
 	}
@@ -115,7 +117,7 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	})
 
 	// 组装企业成员与网站匿名访客各自的业务入口。
-	directBackend := appservice.NewDirectBackend(appStorage.DB(), localFiles, tenantResolver, agentRunScheduler, executeAgentRun, tasks, documentConverter)
+	directBackend := appservice.NewDirectBackend(appStorage.DB(), localFiles, tenantResolver, agentRunScheduler, executeAgentRun, tasks, documentConverter, customerReplySuggestions)
 	boundService := appservice.New(directBackend)
 	// 成员实时网关复用业务调用的身份解析与同步探针。
 	realtimeGateway := gateway.New(directBackend, config.NATS.Namespace, gateway.DefaultOptions())

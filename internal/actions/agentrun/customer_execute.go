@@ -153,6 +153,11 @@ func loadClaimedCustomerMessages(ctx context.Context, db bun.IDB, run *servermod
 	if err != nil {
 		return nil, err
 	}
+	return loadServiceSessionMessages(ctx, db, run.OrganizationID, run.ConversationID, run.ScopeID, boundary.MessageSeq, links)
+}
+
+// loadServiceSessionMessages 读取客服周期内不越过指定消息序号的最近对客消息，客户发言投影为 user，企业侧发言投影为 assistant。
+func loadServiceSessionMessages(ctx context.Context, db bun.IDB, organizationID, conversationID, serviceSessionID string, throughSeq int64, links attachmentLinks) ([]agentruntime.Message, error) {
 	rows := make([]customerMessageRow, 0, agentHistoryLimit)
 	// 仅筛选主消息的客服周期；当前消息主动引用的旧周期原文仍作为一层引用传入。
 	if err := db.NewSelect().
@@ -174,13 +179,13 @@ func loadClaimedCustomerMessages(ctx context.Context, db bun.IDB, run *servermod
 		Join("LEFT JOIN customer_conversations AS cc ON cc.conversation_id = msg.conversation_id AND cc.organization_id = msg.organization_id").
 		Join("LEFT JOIN contact_channel_identities AS reply_cci ON reply_cci.id = cc.contact_channel_identity_id AND reply_cci.organization_id = cc.organization_id AND reply_cci.contact_id = reply_cs.source_id AND reply_cs.kind = ?", domain.ChatSubjectKindContact).
 		Join("LEFT JOIN contacts AS reply_c ON reply_c.id = reply_cs.source_id AND reply_c.organization_id = reply_cs.organization_id AND reply_cs.kind = ?", domain.ChatSubjectKindContact).
-		Where("msg.organization_id = ?", run.OrganizationID).
-		Where("msg.conversation_id = ?", run.ConversationID).
+		Where("msg.organization_id = ?", organizationID).
+		Where("msg.conversation_id = ?", conversationID).
 		Apply(withContextAttachments).
-		Where("msg.service_session_id = ?", run.ScopeID).
+		Where("msg.service_session_id = ?", serviceSessionID).
 		Where("msg.deleted_at IS NULL").
 		Where("cs.kind IN (?, ?)", domain.ChatSubjectKindContact, domain.ChatSubjectKindOrganizationIdentity).
-		Where("msg.message_seq <= ?", boundary.MessageSeq).
+		Where("msg.message_seq <= ?", throughSeq).
 		OrderExpr("msg.message_seq DESC").
 		Limit(agentHistoryLimit).
 		Scan(ctx, &rows); err != nil {
