@@ -47,7 +47,6 @@ func (b *Backend) ConnectRealtime(ctx context.Context, meta appservice.RequestMe
 	if !authenticated {
 		return appservice.RealtimeConnection{}, appservice.SessionError(meta, appservice.SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
 	}
-	b.realtime.disconnect()
 	socket, _, err := websocket.Dial(ctx, remoteEndpoint(state.baseURL, "/realtime", ""), &websocket.DialOptions{HTTPClient: state.client})
 	if err != nil {
 		if ctx.Err() != nil {
@@ -57,6 +56,14 @@ func (b *Backend) ConnectRealtime(ctx context.Context, meta appservice.RequestMe
 		return appservice.RealtimeConnection{}, appservice.UnavailableError(meta, cervii18n.ErrorServerConnectionFailed, nil)
 	}
 	socket.SetReadLimit(maxResponseBytes)
+	// 拨号期间登录会话或企业服务器已变化时丢弃新连接，由前端按新凭据重连。
+	b.sessionMu.Lock()
+	defer b.sessionMu.Unlock()
+	if current, ok := b.sessions.Current(ctx, state.baseURL.String()); !ok || current.Token != credential.Token || b.connection.currentState() != state {
+		_ = socket.CloseNow()
+		slog.Info("登录会话在建立实时连接期间变化，丢弃新连接", "server_url", state.baseURL.String())
+		return appservice.RealtimeConnection{}, appservice.UnavailableError(meta, cervii18n.ErrorServerConnectionFailed, nil)
+	}
 	clientKind := protocol.ClientDesktop
 	if runtime.GOOS == "ios" || runtime.GOOS == "android" {
 		clientKind = protocol.ClientMobile
@@ -127,7 +134,7 @@ func (c *realtimeClient) receive(ctx context.Context, session *realtimeSession) 
 	}
 }
 
-// heartbeat 先发送认证与 Hello 帧，之后按固定间隔发送 Ping，写入失败时连接随之关闭。
+// heartbeat 先发送认证与 Hello 帧，之后按固定间隔发送 Ping；写入失败时断开连接，接收协程随后投递关闭事件。
 func (s *realtimeSession) heartbeat(ctx context.Context, frames []protocol.Frame) {
 	ticker := time.NewTicker(realtimePingInterval)
 	defer ticker.Stop()
@@ -136,12 +143,14 @@ func (s *realtimeSession) heartbeat(ctx context.Context, frames []protocol.Frame
 			data, err := protocol.Encode(frame)
 			if err != nil {
 				slog.Warn("编码实时帧失败", "connection_id", s.id, "type", frame.FrameType(), "error", err)
+				_ = s.socket.CloseNow()
 				return
 			}
 			writeCtx, cancel := context.WithTimeout(ctx, realtimeWriteTimeout)
 			err = s.socket.Write(writeCtx, websocket.MessageText, data)
 			cancel()
 			if err != nil {
+				_ = s.socket.CloseNow()
 				return
 			}
 		}

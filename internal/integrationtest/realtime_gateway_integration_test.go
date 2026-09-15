@@ -328,6 +328,30 @@ func TestRealtimeGatewayConnectionLimits(t *testing.T) {
 		client.expect(protocol.RealtimeError{Code: protocol.ErrorUnsupportedVersion})
 		client.expectClosed(websocket.StatusPolicyViolation, string(protocol.ErrorUnsupportedVersion))
 	})
+	t.Run("认证后 Hello 前登出", func(t *testing.T) {
+		loggedOut := loginToken(t, f.db, f.owner.Organization.ID, "member@navigation.test")
+		client := startRealtimeGateway(t, f, testGatewayOptions(), nil).dial(t)
+		client.send(protocol.Authenticate{Token: loggedOut})
+		client.expect(protocol.Authenticated{})
+		if err := authaction.NewLogoutAction(f.db).Execute(context.Background(), f.owner.Organization.ID, loggedOut); err != nil {
+			t.Fatal(err)
+		}
+		client.send(protocol.ClientHello{ClientKind: protocol.ClientWeb, AppVersion: "test"})
+		client.expect(protocol.RealtimeError{Code: protocol.ErrorAuthenticationFailed})
+		client.expectClosed(websocket.StatusPolicyViolation, string(protocol.ErrorAuthenticationFailed))
+	})
+	t.Run("未知帧刷新空闲时限", func(t *testing.T) {
+		options := testGatewayOptions()
+		options.IdleTimeout = 500 * time.Millisecond
+		client, _ := startRealtimeGateway(t, f, options, nil).connect(t, token)
+		// 每 200 毫秒发送一个未知帧，持续超过空闲时限后连接仍应答 Ping。
+		for range 5 {
+			time.Sleep(200 * time.Millisecond)
+			client.sendText(`{"v":1,"type":"subscribe_run","data":{}}`)
+		}
+		client.send(protocol.Ping{})
+		client.expect(protocol.Pong{})
+	})
 	t.Run("空闲超时", func(t *testing.T) {
 		options := testGatewayOptions()
 		options.IdleTimeout = 500 * time.Millisecond

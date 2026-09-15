@@ -25,18 +25,21 @@ type mergeKey struct {
 
 // connection 是一条成员实时连接，读协程处理客户端帧，写协程独占发送。
 type connection struct {
-	gateway *Gateway
-	id      string
-	socket  *websocket.Conn
-	cancel  context.CancelFunc
+	gateway  *Gateway
+	id       string
+	socket   *websocket.Conn
+	cancel   context.CancelFunc
+	lastRead atomic.Int64
 
-	// subject 与 tokenSessionID 在订阅受众时写入，之后由网关锁保护读取。
+	// subject 与 tokenSessionID 在加入受众前写入，之后只读。
 	subject        string
 	tokenSessionID string
 
-	mu          sync.Mutex
-	queue       []protocol.Frame
-	merged      map[mergeKey]int
+	mu     sync.Mutex
+	queue  []protocol.Frame
+	merged map[mergeKey]int
+	// epoch 在清除队列时递增，写协程据此丢弃已取出但未发送的帧。
+	epoch       int
 	wake        chan struct{}
 	closing     bool
 	closeStatus websocket.StatusCode
@@ -74,19 +77,13 @@ func (c *connection) run(ctx context.Context) {
 		<-written
 	}()
 
-	// 首帧须在认证时限内到达，认证后每收到一帧重新计算空闲时限。
-	var authenticated atomic.Bool
-	deadline := time.AfterFunc(c.gateway.options.AuthTimeout, func() {
-		if authenticated.Load() {
-			c.close(true, websocket.StatusNormalClosure, string(protocol.CloseIdleTimeout))
-			return
-		}
+	// 首帧须在认证时限内到达，定时器已触发时连接已进入关闭流程。
+	authTimer := time.AfterFunc(c.gateway.options.AuthTimeout, func() {
+		slog.Warn("实时连接认证超时", "connection_id", c.id)
 		c.fail(protocol.ErrorAuthenticationTimeout)
 	})
-	defer deadline.Stop()
-
 	frame, ok := c.read(ctx)
-	if !ok {
+	if stopped := authTimer.Stop(); !ok || !stopped {
 		return
 	}
 	authenticate, ok := frame.(protocol.Authenticate)
@@ -96,18 +93,11 @@ func (c *connection) run(ctx context.Context) {
 	}
 	identity, err := c.gateway.backend.AuthenticateMember(ctx, authenticate.Token)
 	if err != nil {
-		if appservice.SessionStateOf(err) != "" {
-			slog.Warn("实时连接认证失败", "connection_id", c.id)
-			c.fail(protocol.ErrorAuthenticationFailed)
-			return
-		}
-		slog.Warn("实时连接认证读取失败", "connection_id", c.id, "error", err)
-		c.fail(protocol.ErrorUnavailable)
+		c.reject(err)
 		return
 	}
-	authenticated.Store(true)
-	deadline.Reset(c.gateway.options.IdleTimeout)
 	c.send(protocol.Authenticated{})
+	go c.watchIdle(ctx)
 
 	// 连接最长存活时间不晚于登录会话到期。
 	lifetime := min(c.gateway.options.MaxLifetime, time.Until(identity.Token.ExpiresAt))
@@ -123,7 +113,6 @@ func (c *connection) run(ctx context.Context) {
 		if !ok {
 			return
 		}
-		deadline.Reset(c.gateway.options.IdleTimeout)
 		switch value := frame.(type) {
 		case protocol.Ping:
 			c.send(protocol.Pong{})
@@ -134,9 +123,8 @@ func (c *connection) run(ctx context.Context) {
 				return
 			}
 			helloReceived = true
-			if err := c.hello(ctx, identity, value); err != nil {
-				slog.Warn("实时连接 Hello 处理失败", "connection_id", c.id, "user_id", identity.User.ID, "error", err)
-				c.fail(protocol.ErrorUnavailable)
+			if err := c.hello(ctx, authenticate.Token, identity, value); err != nil {
+				c.reject(err)
 				return
 			}
 		default:
@@ -146,9 +134,13 @@ func (c *connection) run(ctx context.Context) {
 	}
 }
 
-// hello 安装受众订阅并在订阅生效后读取同步探针值，回复 ServerHello。
-func (c *connection) hello(ctx context.Context, identity *servermodels.Identity, hello protocol.ClientHello) error {
+// hello 安装受众订阅，订阅生效后重新校验登录会话并读取同步探针值，回复 ServerHello。
+func (c *connection) hello(ctx context.Context, token string, identity *servermodels.Identity, hello protocol.ClientHello) error {
 	if err := c.gateway.subscribe(c, identity); err != nil {
+		return err
+	}
+	// 认证与订阅生效之间提交的登出或停用由重新校验发现，之后的撤销经受众通知送达。
+	if _, err := c.gateway.backend.AuthenticateMember(ctx, token); err != nil {
 		return err
 	}
 	heads, err := c.gateway.backend.MemberSyncHeads(ctx, identity)
@@ -160,6 +152,36 @@ func (c *connection) hello(ctx context.Context, identity *servermodels.Identity,
 	return nil
 }
 
+// reject 按校验错误关闭连接：登录会话无效时为认证失败，其余为服务不可用。
+func (c *connection) reject(err error) {
+	if appservice.SessionStateOf(err) != "" {
+		slog.Warn("实时连接认证失败", "connection_id", c.id)
+		c.fail(protocol.ErrorAuthenticationFailed)
+		return
+	}
+	slog.Warn("实时连接处理失败", "connection_id", c.id, "error", err)
+	c.fail(protocol.ErrorUnavailable)
+}
+
+// watchIdle 在空闲时限内未读到任何帧时关闭连接，直到连接结束。
+func (c *connection) watchIdle(ctx context.Context) {
+	timer := time.NewTimer(c.gateway.options.IdleTimeout)
+	defer timer.Stop()
+	for {
+		select {
+		case <-ctx.Done():
+			return
+		case <-timer.C:
+			remaining := c.gateway.options.IdleTimeout - time.Since(time.Unix(0, c.lastRead.Load()))
+			if remaining <= 0 {
+				c.close(true, websocket.StatusNormalClosure, string(protocol.CloseIdleTimeout))
+				return
+			}
+			timer.Reset(remaining)
+		}
+	}
+}
+
 // read 读取并解码一帧客户端帧；忽略未知帧，协议错误时关闭连接，连接结束时返回 false。
 func (c *connection) read(ctx context.Context) (protocol.Frame, bool) {
 	for {
@@ -167,6 +189,7 @@ func (c *connection) read(ctx context.Context) (protocol.Frame, bool) {
 		if err != nil {
 			return nil, false
 		}
+		c.lastRead.Store(time.Now().UnixNano())
 		if messageType != websocket.MessageText {
 			c.fail(protocol.ErrorInvalidFrame)
 			return nil, false
@@ -257,6 +280,8 @@ func (c *connection) beginClose(discard bool, status websocket.StatusCode, reaso
 	c.closeReason = reason
 	if discard {
 		c.queue = nil
+		clear(c.merged)
+		c.epoch++
 	}
 	c.queue = append(c.queue, frames...)
 	c.signal()
@@ -270,16 +295,22 @@ func (c *connection) signal() {
 	}
 }
 
-// write 按入队顺序发送帧，进入关闭状态且队列发送完毕后关闭连接。
+// write 按入队顺序发送帧，进入关闭状态且队列发送完毕后关闭连接；写入超时说明对端停止读取，直接断开。
 func (c *connection) write(ctx context.Context) {
 	for {
 		c.mu.Lock()
-		frames, closing, status, reason := c.queue, c.closing, c.closeStatus, c.closeReason
+		frames, epoch := c.queue, c.epoch
 		c.queue = nil
 		clear(c.merged)
 		c.mu.Unlock()
 
 		for _, frame := range frames {
+			c.mu.Lock()
+			discarded := c.epoch != epoch
+			c.mu.Unlock()
+			if discarded {
+				break
+			}
 			data, err := protocol.Encode(frame)
 			if err != nil {
 				slog.Warn("编码实时帧失败", "connection_id", c.id, "type", frame.FrameType(), "error", err)
@@ -294,11 +325,19 @@ func (c *connection) write(ctx context.Context) {
 			cancel()
 			if err != nil {
 				if errors.Is(err, context.DeadlineExceeded) {
-					slog.Warn("实时连接写入超时，按慢连接关闭", "connection_id", c.id)
+					slog.Warn("实时连接写入超时，断开连接", "connection_id", c.id)
 				}
+				_ = c.socket.CloseNow()
 				c.cancel()
 				return
 			}
+		}
+
+		c.mu.Lock()
+		pending, closing, status, reason := len(c.queue), c.closing, c.closeStatus, c.closeReason
+		c.mu.Unlock()
+		if pending > 0 {
+			continue
 		}
 		if closing {
 			if err := c.socket.Close(status, reason); err != nil {
