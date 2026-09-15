@@ -490,9 +490,9 @@ type ServerConnector interface {
 	ConnectServer(context.Context, RequestMeta, string) error
 }
 
-// RealtimeConnector 由持有企业服务器实时连接的原生端后端实现。
+// RealtimeConnector 由持有企业服务器实时事件流的原生端后端实现。
 type RealtimeConnector interface {
-	ConnectRealtime(context.Context, RequestMeta, RealtimeConnectInput) (RealtimeConnection, error)
+	ConnectRealtime(context.Context, RequestMeta) (RealtimeConnection, error)
 	DisconnectRealtime(context.Context, RequestMeta) error
 }
 

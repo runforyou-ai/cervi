@@ -1,26 +1,27 @@
 //go:build server
 
-// Package gateway 在企业服务端内接收成员实时 WebSocket 连接，按已认证身份订阅受众通知并转发为实时帧。
+// Package gateway 在企业服务端内提供成员实时 SSE 事件流，按已认证身份订阅受众通知并转发为实时事件。
 package gateway
 
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"log/slog"
 	"net/http"
 	"strings"
 	"sync"
 	"time"
 
-	"github.com/coder/websocket"
 	"github.com/nats-io/nats.go"
 	"github.com/runforyou-ai/cervi/internal/appservice"
+	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	"github.com/runforyou-ai/cervi/internal/realtime/protocol"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
-// Path 是实时连接的升级路径。
+// Path 是成员实时事件流路径。
 const Path = "/api/realtime"
 
 // flushTimeout 是等待 NATS 确认订阅生效的上限。
@@ -28,48 +29,45 @@ const flushTimeout = 5 * time.Second
 
 // MemberBackend 解析成员登录令牌并读取同步探针值。
 type MemberBackend interface {
-	// AuthenticateMember 校验登录令牌并返回当前身份，令牌无效或账号不可用时返回登录会话错误。
-	AuthenticateMember(ctx context.Context, token string) (*servermodels.Identity, error)
+	// AuthenticateMember 校验请求携带的登录令牌并返回当前身份，令牌无效或账号不可用时返回登录会话错误。
+	AuthenticateMember(ctx context.Context, meta appservice.RequestMeta) (*servermodels.Identity, error)
 	// MemberSyncHeads 返回指定身份的同步探针值。
 	MemberSyncHeads(ctx context.Context, identity *servermodels.Identity) (appservice.SyncHeads, error)
 }
 
-// Options 定义连接时限、发送队列与单帧上限。
+// Options 定义事件流心跳、时限与发送队列。
 type Options struct {
-	AuthTimeout     time.Duration
-	IdleTimeout     time.Duration
+	PingInterval    time.Duration
 	MaxLifetime     time.Duration
 	WriteTimeout    time.Duration
 	ShutdownTimeout time.Duration
 	QueueSize       int
-	MaxFrameBytes   int
 }
 
-// DefaultOptions 返回首版连接参数：5 秒内认证、60 秒未收到帧即关闭、最长存活 1 小时。
-func DefaultOptions(maxFrameBytes int) Options {
+// DefaultOptions 返回首版事件流参数：每 25 秒发送心跳、最长存活 1 小时。
+func DefaultOptions() Options {
 	return Options{
-		AuthTimeout:     5 * time.Second,
-		IdleTimeout:     60 * time.Second,
+		PingInterval:    25 * time.Second,
 		MaxLifetime:     time.Hour,
 		WriteTimeout:    10 * time.Second,
 		ShutdownTimeout: 5 * time.Second,
 		QueueSize:       256,
-		MaxFrameBytes:   maxFrameBytes,
 	}
 }
 
-// Gateway 管理本节点的成员实时连接与受众订阅。
+// Gateway 管理本节点的成员实时事件流与受众订阅。
 type Gateway struct {
 	backend   MemberBackend
 	namespace string
 	options   Options
 
-	mu          sync.Mutex
-	nats        *nats.Conn
-	closing     bool
-	connections map[*connection]struct{}
-	audiences   map[string]*audience
-	running     sync.WaitGroup
+	mu           sync.Mutex
+	nats         *nats.Conn
+	closing      bool
+	connections  map[*connection]struct{}
+	audiences    map[string]*audience
+	running      sync.WaitGroup
+	shutdownOnce sync.Once
 }
 
 // audience 是一个受众 Subject 的 NATS 订阅及本节点订阅该受众的连接。
@@ -89,7 +87,7 @@ func New(backend MemberBackend, namespace string, options Options) *Gateway {
 	}
 }
 
-// Start 使用指定 NATS 连接开始接收实时连接。
+// Start 使用指定 NATS 连接开始接收事件流请求。
 func (g *Gateway) Start(connection *nats.Conn) {
 	g.mu.Lock()
 	defer g.mu.Unlock()
@@ -97,10 +95,10 @@ func (g *Gateway) Start(connection *nats.Conn) {
 	slog.Info("实时网关已启动", "namespace", g.namespace, "path", Path)
 }
 
-// Middleware 在 Wails 资源服务之前处理实时连接升级请求，其余请求交给下一个处理器。
+// Middleware 在 Wails 资源服务之前处理实时事件流请求，其余请求交给下一个处理器。
 func (g *Gateway) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		if request.URL.Path != Path || !strings.EqualFold(request.Header.Get("Upgrade"), "websocket") {
+		if request.URL.Path != Path || request.Method != http.MethodGet {
 			next.ServeHTTP(writer, request)
 			return
 		}
@@ -108,65 +106,53 @@ func (g *Gateway) Middleware(next http.Handler) http.Handler {
 	})
 }
 
-// Shutdown 停止接收新连接，向现有连接发送下线提示并在时限内关闭。
+// Shutdown 停止接收新请求，结束现有事件流并在时限内等待其退出；重复调用等待首次调用完成。
 func (g *Gateway) Shutdown() {
-	g.mu.Lock()
-	g.closing = true
-	connections := make([]*connection, 0, len(g.connections))
-	for current := range g.connections {
-		connections = append(connections, current)
-	}
-	g.mu.Unlock()
-
-	for _, current := range connections {
-		current.close(false, websocket.StatusGoingAway, string(protocol.CloseServerGoingAway), protocol.ServerGoingAway{})
-	}
-	done := make(chan struct{})
-	go func() {
-		g.running.Wait()
-		close(done)
-	}()
-	select {
-	case <-done:
-	case <-time.After(g.options.ShutdownTimeout):
-		slog.Warn("实时连接未在时限内关闭，强制断开", "count", len(connections))
-		for _, current := range connections {
-			_ = current.socket.CloseNow()
+	g.shutdownOnce.Do(func() {
+		g.mu.Lock()
+		g.closing = true
+		connections := make([]*connection, 0, len(g.connections))
+		for current := range g.connections {
+			connections = append(connections, current)
 		}
-		<-done
-	}
-	slog.Info("实时网关已停止", "namespace", g.namespace, "closed", len(connections))
+		g.mu.Unlock()
+
+		for _, current := range connections {
+			current.close(false)
+		}
+		done := make(chan struct{})
+		go func() {
+			g.running.Wait()
+			close(done)
+		}()
+		select {
+		case <-done:
+		case <-time.After(g.options.ShutdownTimeout):
+			slog.Warn("实时事件流未在时限内结束，强制断开", "count", len(connections))
+			for _, current := range connections {
+				current.abort()
+			}
+			<-done
+		}
+		slog.Info("实时网关已停止", "namespace", g.namespace, "closed", len(connections))
+	})
 }
 
-// serve 升级请求并运行连接直到关闭。
+// serve 认证请求、安装受众订阅并读取同步探针后输出事件流，直到事件流结束。
 func (g *Gateway) serve(writer http.ResponseWriter, request *http.Request) {
-	g.mu.Lock()
-	unavailable := g.closing || g.nats == nil
-	g.mu.Unlock()
-	if unavailable {
-		http.Error(writer, http.StatusText(http.StatusServiceUnavailable), http.StatusServiceUnavailable)
-		return
-	}
-	// Wails 资源服务的写入器延迟下发响应头，沿 Unwrap 取得底层写入器后再升级。
-	for {
-		unwrapper, ok := writer.(interface{ Unwrap() http.ResponseWriter })
-		if !ok {
-			break
-		}
-		writer = unwrapper.Unwrap()
-	}
-	socket, err := websocket.Accept(writer, request, nil)
+	meta := appservice.RequestMeta{Token: bearerToken(request.Header.Get("Authorization")), Locale: appservice.Locale(request.Header.Get("Accept-Language"))}
+	identity, err := g.backend.AuthenticateMember(request.Context(), meta)
 	if err != nil {
-		slog.Warn("实时连接升级失败", "error", err)
+		writeError(writer, meta, err)
 		return
 	}
-	socket.SetReadLimit(int64(g.options.MaxFrameBytes))
-	current := newConnection(g, socket)
-
+	ctx, cancel := context.WithCancel(request.Context())
+	defer cancel()
+	current := newConnection(g, cancel)
 	g.mu.Lock()
-	if g.closing {
+	if g.closing || g.nats == nil {
 		g.mu.Unlock()
-		_ = socket.Close(websocket.StatusGoingAway, string(protocol.CloseServerGoingAway))
+		writeUnavailable(writer, meta)
 		return
 	}
 	g.connections[current] = struct{}{}
@@ -174,11 +160,87 @@ func (g *Gateway) serve(writer http.ResponseWriter, request *http.Request) {
 	g.mu.Unlock()
 	defer g.unregister(current)
 
-	current.run(context.WithoutCancel(request.Context()))
+	if err := g.subscribe(ctx, current, identity); err != nil {
+		slog.Warn("实时受众订阅失败", "connection_id", current.id, "user_id", identity.User.ID, "error", err)
+		writeUnavailable(writer, meta)
+		return
+	}
+	// 订阅生效后再次校验登录会话，之后提交的登出或停用经受众通知送达。
+	if _, err := g.backend.AuthenticateMember(ctx, meta); err != nil {
+		writeError(writer, meta, err)
+		return
+	}
+	heads, err := g.backend.MemberSyncHeads(ctx, identity)
+	if err != nil {
+		writeError(writer, meta, err)
+		return
+	}
+
+	// 事件流是长响应：清除服务器读超时，写超时按每次写入设置；网关已开始下线时不输出事件流。
+	controller := http.NewResponseController(writer)
+	if err := controller.SetReadDeadline(time.Time{}); err != nil {
+		slog.Warn("清除实时事件流读超时失败", "connection_id", current.id, "error", err)
+		writeUnavailable(writer, meta)
+		return
+	}
+	if !current.attach(controller) {
+		writeUnavailable(writer, meta)
+		return
+	}
+	writer.Header().Set("Content-Type", "text/event-stream")
+	writer.Header().Set("Cache-Control", "no-cache")
+	writer.Header().Set("X-Accel-Buffering", "no")
+	writer.WriteHeader(http.StatusOK)
+	current.send(protocol.ServerHello{ConnectionID: current.id, SyncHeads: heads})
+
+	// 事件流最长存活时间不晚于登录会话到期。
+	lifetime := min(g.options.MaxLifetime, time.Until(identity.Token.ExpiresAt))
+	expiry := time.AfterFunc(lifetime, func() {
+		slog.Info("实时事件流到达最长存活时间", "connection_id", current.id)
+		current.close(true)
+	})
+	defer expiry.Stop()
+	slog.Info("实时事件流已就绪", "connection_id", current.id, "organization_id", identity.Organization.ID, "user_id", identity.User.ID, "lifetime", lifetime)
+	current.run(ctx, writer, controller)
+	slog.Info("实时事件流已结束", "connection_id", current.id, "user_id", identity.User.ID)
+}
+
+// bearerToken 从 Authorization 头解析 Bearer 令牌，格式不符时返回空串。
+func bearerToken(authorization string) string {
+	scheme, token, found := strings.Cut(strings.TrimSpace(authorization), " ")
+	if !found || !strings.EqualFold(scheme, "Bearer") {
+		return ""
+	}
+	return strings.TrimSpace(token)
+}
+
+// writeUnavailable 以业务错误体输出服务暂不可用。
+func writeUnavailable(writer http.ResponseWriter, meta appservice.RequestMeta) {
+	writeError(writer, meta, appservice.UnavailableError(meta, cervii18n.ErrorServerUnavailable, nil).WithStatus(http.StatusServiceUnavailable))
+}
+
+// writeError 按业务 HTTP 接口的错误体输出业务错误，其余错误输出服务暂不可用。
+func writeError(writer http.ResponseWriter, meta appservice.RequestMeta, err error) {
+	var applicationError *appservice.Error
+	if !errors.As(err, &applicationError) {
+		slog.Warn("实时事件流请求处理失败", "error", err)
+		writeUnavailable(writer, meta)
+		return
+	}
+	if applicationError.State != "" {
+		slog.Warn("实时事件流认证失败", "state", applicationError.State)
+	}
+	writer.Header().Set("Content-Type", "application/json; charset=utf-8")
+	writer.WriteHeader(applicationError.HTTPStatus())
+	if err := json.NewEncoder(writer).Encode(struct {
+		Error *appservice.Error `json:"error"`
+	}{applicationError}); err != nil {
+		slog.Warn("写入实时事件流错误响应失败", "error", err)
+	}
 }
 
 // subscribe 让连接加入本人用户受众与本企业客服共享受众，受众的首个连接建立 NATS 订阅，并在 NATS 确认订阅生效后返回。
-func (g *Gateway) subscribe(current *connection, identity *servermodels.Identity) error {
+func (g *Gateway) subscribe(ctx context.Context, current *connection, identity *servermodels.Identity) error {
 	organizationID := identity.Organization.ID
 	subjects := []string{
 		realtime.Subject(g.namespace, organizationID, realtime.AudienceUser, identity.User.ID),
@@ -207,7 +269,9 @@ func (g *Gateway) subscribe(current *connection, identity *servermodels.Identity
 	g.mu.Unlock()
 
 	// NATS 暂不可达时照常返回探针值，期间丢失的通知由客户端兜底探针恢复。
-	if err := connection.FlushTimeout(flushTimeout); err != nil {
+	flushCtx, cancel := context.WithTimeout(ctx, flushTimeout)
+	defer cancel()
+	if err := connection.FlushWithContext(flushCtx); err != nil {
 		slog.Warn("实时订阅确认失败", "connection_id", current.id, "user_id", identity.User.ID, "error", err)
 	}
 	return nil
@@ -231,7 +295,7 @@ func (g *Gateway) unregister(current *connection) {
 	g.running.Done()
 }
 
-// deliver 把受众通知转换为实时帧发给该受众的全部本节点连接，撤销控制关闭对应连接。
+// deliver 把受众通知转换为实时事件发给该受众的全部本节点连接，撤销控制结束对应事件流。
 func (g *Gateway) deliver(subject string, data []byte) {
 	var payload realtime.Payload
 	if err := json.Unmarshal(data, &payload); err != nil {
@@ -261,13 +325,13 @@ func (g *Gateway) deliver(subject string, data []byte) {
 	case realtime.KindSessionLoggedOut:
 		for _, current := range targets {
 			if current.tokenSessionID == payload.TokenSessionID {
-				current.revoke(protocol.SessionRevokedLogout)
+				current.revoke(payload.Kind)
 			}
 		}
 		return
 	case realtime.KindUserDisabled:
 		for _, current := range targets {
-			current.revoke(protocol.SessionRevokedUserDisabled)
+			current.revoke(payload.Kind)
 		}
 		return
 	default:

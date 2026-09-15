@@ -65,7 +65,7 @@ func run(arguments []string) error {
 		DisableDefaultSignalHandler: true,
 		Assets: application.AssetOptions{
 			Handler: application.AssetFileServerFS(assets),
-			// 实时连接升级位于租户上下文之内，并在 Wails 资源服务拒绝 WebSocket 升级之前处理。
+			// 实时事件流位于租户上下文之内，在 Wails 资源服务之前处理。
 			Middleware: func(next http.Handler) http.Handler {
 				return api.TenantContextMiddleware(realtimeMiddleware(next))
 			},

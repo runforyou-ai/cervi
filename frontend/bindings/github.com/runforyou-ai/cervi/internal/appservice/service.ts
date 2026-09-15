@@ -80,10 +80,10 @@ export function CompleteFileUpload(meta: $models.RequestMeta, fileID: string): $
 }
 
 /**
- * ConnectRealtime 在原生端使用当前登录凭据建立实时连接，服务端帧与连接结束经 Wails 事件投递。
+ * ConnectRealtime 在原生端使用当前登录凭据建立实时事件流，服务端事件与事件流结束经 Wails 事件投递。
  */
-export function ConnectRealtime(meta: $models.RequestMeta, input: $models.RealtimeConnectInput): $CancellablePromise<$models.RealtimeConnection> {
-    return $Call.ByID(3104432381, meta, input);
+export function ConnectRealtime(meta: $models.RequestMeta): $CancellablePromise<$models.RealtimeConnection> {
+    return $Call.ByID(3104432381, meta);
 }
 
 /**
@@ -297,7 +297,7 @@ export function DeleteTeam(meta: $models.RequestMeta, teamID: string): $Cancella
 }
 
 /**
- * DisconnectRealtime 关闭原生端当前实时连接。
+ * DisconnectRealtime 关闭原生端当前实时事件流。
  */
 export function DisconnectRealtime(meta: $models.RequestMeta): $CancellablePromise<void> {
     return $Call.ByID(2251706905, meta);

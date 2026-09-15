@@ -379,25 +379,14 @@ func (b *Backend) do(ctx context.Context, meta appservice.RequestMeta, method, p
 		return appservice.UnavailableError(meta, cervii18n.ErrorServerConnectionFailed, nil)
 	}
 	defer response.Body.Close()
-	limited := io.LimitReader(response.Body, maxResponseBytes)
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
-		var payload errorBody
-		if err := json.NewDecoder(limited).Decode(&payload); err != nil {
-			slog.Warn("解析企业服务器错误响应失败", "server_url", state.baseURL.String(), "method", method, "path", path, "status", response.StatusCode, "error", err)
-			return &appservice.Error{Kind: appservice.ErrorKindFailed, Message: http.StatusText(response.StatusCode)}
+		var rejected *clientsession.Credential
+		if authenticated {
+			rejected = &credential
 		}
-		sessionState := payload.Error.State
-		if sessionState == appservice.SessionStateSetup {
-			slog.Info("远端要求初始化，改为连接企业服务器")
-			sessionState = appservice.SessionStateConnect
-		}
-		if sessionState == appservice.SessionStateLogin && authenticated {
-			if err := b.sessions.ClearIfCurrent(ctx, credential); err != nil {
-				slog.Warn("登录凭据失效后清理本地会话失败", "server_url", state.baseURL.String(), "error", err)
-			}
-		}
-		return &appservice.Error{Kind: payload.Error.Kind, State: sessionState, Message: payload.Error.Message, Fields: payload.Error.Fields, Reason: payload.Error.Reason}
+		return b.remoteError(ctx, state, rejected, response, method, path)
 	}
+	limited := io.LimitReader(response.Body, maxResponseBytes)
 	if output == nil || response.StatusCode == http.StatusNoContent {
 		return nil
 	}
@@ -406,6 +395,26 @@ func (b *Backend) do(ctx context.Context, meta appservice.RequestMeta, method, p
 		return appservice.UnavailableError(meta, cervii18n.ErrorServerConnectionFailed, nil)
 	}
 	return nil
+}
+
+// remoteError 解析企业服务器错误响应；登录会话失效且请求携带了凭据时清除本地凭据。
+func (b *Backend) remoteError(ctx context.Context, state *remoteState, credential *clientsession.Credential, response *http.Response, method, path string) error {
+	var payload errorBody
+	if err := json.NewDecoder(io.LimitReader(response.Body, maxResponseBytes)).Decode(&payload); err != nil {
+		slog.Warn("解析企业服务器错误响应失败", "server_url", state.baseURL.String(), "method", method, "path", path, "status", response.StatusCode, "error", err)
+		return &appservice.Error{Kind: appservice.ErrorKindFailed, Message: http.StatusText(response.StatusCode)}
+	}
+	sessionState := payload.Error.State
+	if sessionState == appservice.SessionStateSetup {
+		slog.Info("远端要求初始化，改为连接企业服务器")
+		sessionState = appservice.SessionStateConnect
+	}
+	if sessionState == appservice.SessionStateLogin && credential != nil {
+		if err := b.sessions.ClearIfCurrent(ctx, *credential); err != nil {
+			slog.Warn("登录凭据失效后清理本地会话失败", "server_url", state.baseURL.String(), "error", err)
+		}
+	}
+	return &appservice.Error{Kind: payload.Error.Kind, State: sessionState, Message: payload.Error.Message, Fields: payload.Error.Fields, Reason: payload.Error.Reason}
 }
 
 // setQuery 在值非空时写入查询参数。
