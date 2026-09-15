@@ -23,11 +23,12 @@ type Kind string
 
 const (
 	KindConversationChanged      Kind = "conversation_changed"
+	KindConversationRemoved      Kind = "conversation_removed"
 	KindConversationStateChanged Kind = "conversation_state_changed"
 	KindIdentityProfileChanged   Kind = "identity_profile_changed"
 )
 
-// Notification 表示发往单个受众的变更通知，载荷只含通知种类、会话 ID 与版本。
+// Notification 表示发往单个受众的变更通知，载荷含通知种类、会话 ID 与版本，版本为 0 时省略。
 type Notification struct {
 	OrganizationID string
 	AudienceKind   AudienceKind
@@ -40,6 +41,11 @@ type Notification struct {
 // UserConversationChanged 构造发往用户受众的会话变更通知。
 func UserConversationChanged(organizationID, userID, conversationID string, version int64) Notification {
 	return Notification{OrganizationID: organizationID, AudienceKind: AudienceUser, AudienceID: userID, Kind: KindConversationChanged, ConversationID: conversationID, Version: version}
+}
+
+// UserConversationRemoved 构造发往失去会话阅读资格用户的会话失权通知，载荷不含版本。
+func UserConversationRemoved(organizationID, userID, conversationID string) Notification {
+	return Notification{OrganizationID: organizationID, AudienceKind: AudienceUser, AudienceID: userID, Kind: KindConversationRemoved, ConversationID: conversationID}
 }
 
 // UserConversationStateChanged 构造发往本人受众的个人会话状态通知。

@@ -17,6 +17,7 @@ import (
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
+	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
@@ -449,6 +450,37 @@ func testGroupAgentMentionReplies(t *testing.T, db *bun.DB, identity *servermode
 		if next == nil || next.AgentIdentityID == running.AgentIdentityID {
 			t.Fatalf("移出正在执行的 AI 员工后未轮转到另一位：%+v", next)
 		}
+	})
+
+	t.Run("失效运行收敛推进会话版本", func(t *testing.T) {
+		f := newGroupAgentFixture(t, db, identity, agents)
+		f.post(t, "请看下", []string{f.agents[0].IdentityID}, "")
+		running := f.activeRun(t)
+		// 绕过成员操作直接移出 AI 员工，模拟运行写回前失去执行资格。
+		if _, err := db.NewUpdate().Table("conversation_participants").Set("left_at = now()").
+			Where("conversation_id = ? AND subject_id IN (SELECT id FROM chat_subjects WHERE source_id = ?)", f.groupID, running.AgentIdentityID).
+			Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		feed := startRealtimeFeed(t, identity.Organization.ID)
+		before := loadConversationVersion(t, db, f.groupID)
+		coordinator := agentrunaction.NewExecuteAction(db, f.tasks, nil, testAttachmentReader(db), nil)
+		if err := coordinator.FinalizeFailure(ctx, agentrunaction.RunInput{RunID: running.ID}, errors.New("late failure")); err != nil {
+			t.Fatal(err)
+		}
+		cancelled := &servermodels.AgentRun{}
+		if err := db.NewSelect().Model(cancelled).Where("agr.id = ?", running.ID).Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if cancelled.Status != string(domain.AgentRunStatusCancelled) || cancelled.ErrorCode == nil ||
+			*cancelled.ErrorCode != string(domain.AgentRunErrorCodeAgentRemoved) {
+			t.Fatalf("失效运行 = %+v", cancelled)
+		}
+		after := loadConversationVersion(t, db, f.groupID)
+		if after != before+1 {
+			t.Fatalf("收敛后的会话版本=%d want=%d", after, before+1)
+		}
+		feed.expect(t, feed.notice(identity.User.ID, realtime.KindConversationChanged, f.groupID, after))
 	})
 
 	t.Run("解散群取消全部在途运行", func(t *testing.T) {

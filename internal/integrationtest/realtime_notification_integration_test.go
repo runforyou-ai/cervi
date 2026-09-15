@@ -14,14 +14,17 @@ import (
 	"uuid"
 
 	"github.com/nats-io/nats.go"
+	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	"github.com/runforyou-ai/cervi/internal/servertest"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
 )
 
@@ -69,6 +72,14 @@ func (f *realtimeFeed) notice(userID string, kind realtime.Kind, conversationID 
 	return receivedNotification{
 		Subject: realtime.Subject(f.namespace, f.organizationID, realtime.AudienceUser, userID),
 		Kind:    string(kind), ConversationID: conversationID, Version: strconv.FormatInt(version, 10),
+	}
+}
+
+// removed 构造发往指定用户受众的会话失权通知。
+func (f *realtimeFeed) removed(userID, conversationID string) receivedNotification {
+	return receivedNotification{
+		Subject: realtime.Subject(f.namespace, f.organizationID, realtime.AudienceUser, userID),
+		Kind:    string(realtime.KindConversationRemoved), ConversationID: conversationID,
 	}
 }
 
@@ -304,4 +315,156 @@ func TestRealtimeNotificationsWithoutNATS(t *testing.T) {
 	if after := loadSyncHeads(t, f.db, f.member); after.ConversationChecksum == before.ConversationChecksum {
 		t.Fatalf("checksum unchanged before=%+v after=%+v", before, after)
 	}
+}
+
+// TestRealtimeGroupMembershipNotifications 验证群创建、资料与成员关系变化通知变更前后的真人受众，被移出者只收会话失权通知。
+func TestRealtimeGroupMembershipNotifications(t *testing.T) {
+	f := newNavigationFixture(t)
+	ctx := context.Background()
+	third := newChatLockUser(t, f.db, f.owner)
+	coordinator := newGroupAgentCoordinator(f.db)
+	feed := startRealtimeFeed(t, f.owner.Organization.ID)
+
+	group, err := conversationaction.NewCreateGroupConversationAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationInput{
+		Title: "成员变化群", MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID, third.OrganizationIdentity.ID},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// changed 构造指定成员在群当前版本上的会话变更通知。
+	changed := func(members ...*servermodels.Identity) []receivedNotification {
+		version := loadConversationVersion(t, f.db, group.ID)
+		notices := make([]receivedNotification, 0, len(members))
+		for _, member := range members {
+			notices = append(notices, feed.notice(member.User.ID, realtime.KindConversationChanged, group.ID, version))
+		}
+		return notices
+	}
+	// actorRead 构造系统事件推进操作人阅读水位后的本人会话状态通知。
+	actorRead := func(actor *servermodels.Identity) receivedNotification {
+		return feed.notice(actor.User.ID, realtime.KindConversationStateChanged, group.ID, loadConversationStateVersion(t, f.db, group.ID, actor.User.ID))
+	}
+
+	// 建群以初始版本通知全部真人成员。
+	if version := loadConversationVersion(t, f.db, group.ID); version != 1 {
+		t.Fatalf("created group version=%d", version)
+	}
+	feed.expect(t, changed(f.owner, f.member, third)...)
+
+	// 只改简介不追加系统消息，仍按新版本通知全部成员。
+	if _, err := conversationaction.NewUpdateGroupConversationAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationProfileInput{
+		ConversationID: group.ID, Title: "成员变化群", Description: "只改简介",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	feed.expect(t, changed(f.owner, f.member, third)...)
+
+	// 改名同时推进资料版本并追加系统事件，同一事务的通知合并为最高版本。
+	if _, err := conversationaction.NewUpdateGroupConversationAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationProfileInput{
+		ConversationID: group.ID, Title: "改名后的群", Description: "只改简介",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	feed.expect(t, append(changed(f.owner, f.member, third), actorRead(f.owner))...)
+
+	// 移出成员后仍在群内的成员收到变更，被移出者只收到失权通知。
+	if _, err := conversationaction.NewRemoveGroupConversationMemberAction(f.db, coordinator).Execute(ctx, f.owner, conversationaction.GroupConversationMemberInput{
+		ConversationID: group.ID, MemberIdentityID: third.OrganizationIdentity.ID,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	feed.expect(t, append(changed(f.owner, f.member), feed.removed(third.User.ID, group.ID), actorRead(f.owner))...)
+
+	// 重新加入是新的有效关系，重入者与原成员一起收到变更。
+	if _, err := conversationaction.NewAddGroupConversationMembersAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationMembersInput{
+		ConversationID: group.ID, MemberIdentityIDs: []string{third.OrganizationIdentity.ID},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	feed.expect(t, append(changed(f.owner, f.member, third), actorRead(f.owner))...)
+
+	// 主动退出的成员收到失权通知，并作为系统事件操作人收到本人阅读水位通知；其余成员收到变更。
+	if err := conversationaction.NewLeaveGroupConversationAction(f.db).Execute(ctx, third, group.ID); err != nil {
+		t.Fatal(err)
+	}
+	feed.expect(t, append(changed(f.owner, f.member), feed.removed(third.User.ID, group.ID), actorRead(third))...)
+
+	// 转让群主通知全部当前成员。
+	if _, err := conversationaction.NewTransferGroupConversationOwnerAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationOwnerInput{
+		ConversationID: group.ID, OwnerIdentityID: f.member.OrganizationIdentity.ID,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	feed.expect(t, append(changed(f.owner, f.member), actorRead(f.owner))...)
+
+	// 失去管理资格的移除失败，不留系统消息也不发布通知。
+	messageCount, err := f.db.NewSelect().Model((*servermodels.Message)(nil)).Where("conversation_id = ?", group.ID).Count(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conversationaction.NewRemoveGroupConversationMemberAction(f.db, coordinator).Execute(ctx, f.owner, conversationaction.GroupConversationMemberInput{
+		ConversationID: group.ID, MemberIdentityID: f.member.OrganizationIdentity.ID,
+	}); err == nil {
+		t.Fatal("former owner removed the new owner")
+	}
+	if count, err := f.db.NewSelect().Model((*servermodels.Message)(nil)).Where("conversation_id = ?", group.ID).Count(ctx); err != nil || count != messageCount {
+		t.Fatalf("failed removal messages=%d want=%d err=%v", count, messageCount, err)
+	}
+
+	// 解散保留只读成员关系，通知当前成员而不发送失权通知。
+	if _, err := conversationaction.NewDissolveGroupConversationAction(f.db, coordinator).Execute(ctx, f.member, group.ID); err != nil {
+		t.Fatal(err)
+	}
+	feed.expect(t, append(changed(f.owner, f.member), actorRead(f.member))...)
+	// 以一次本人静音收尾，暴露解散后多余的通知。
+	if _, err := conversationaction.NewUpdateConversationNotificationSettingsAction(f.db).Execute(ctx, f.owner, f.groupID, true); err != nil {
+		t.Fatal(err)
+	}
+	feed.expect(t, feed.notice(f.owner.User.ID, realtime.KindConversationStateChanged, f.groupID, loadConversationStateVersion(t, f.db, f.groupID, f.owner.User.ID)))
+}
+
+// testAgentRunNotifications 验证 AI 聊天运行开始、失败结果与崩溃恢复重入的会话变更通知。
+func testAgentRunNotifications(t *testing.T, db *bun.DB, identity *servermodels.Identity, agentIdentityID string, tasks *servertask.Runtime) {
+	ctx := context.Background()
+	_, failing := createAgentLockChat(t, ctx, db, identity, agentIdentityID, tasks)
+	_, recovering := createAgentLockChat(t, ctx, db, identity, agentIdentityID, tasks)
+	feed := startRealtimeFeed(t, identity.Organization.ID)
+
+	// 排队运行开始后模型失败，开始与失败结果各推进一次版本。
+	var runningVersion int64
+	failRuntime := testAgentRuntime{run: func(ctx context.Context, _ agentruntime.RunRequest, input agentruntime.InputFeed) (agentruntime.RunResult, error) {
+		if _, err := input.Claim(ctx, 1); err != nil {
+			return agentruntime.RunResult{}, err
+		}
+		runningVersion = loadConversationVersion(t, db, failing.ConversationID)
+		return agentruntime.RunResult{}, errors.New("test model failure")
+	}}
+	if err := agentrunaction.NewExecuteAction(db, tasks, failRuntime, testAttachmentReader(db), nil).Execute(ctx, agentrunaction.RunInput{RunID: failing.ID}); err == nil {
+		t.Fatal("model failure was not reported")
+	}
+	feed.expect(t,
+		feed.notice(identity.User.ID, realtime.KindConversationChanged, failing.ConversationID, runningVersion),
+		feed.notice(identity.User.ID, realtime.KindConversationChanged, failing.ConversationID, loadConversationVersion(t, db, failing.ConversationID)),
+	)
+
+	// 崩溃恢复重入运行中状态不推进版本，成功结果推进一次。
+	if _, err := db.NewUpdate().Table("agent_runs").Set("status = ?", domain.AgentRunStatusRunning).Set("started_at = now()").Where("id = ?", recovering.ID).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	before := loadConversationVersion(t, db, recovering.ConversationID)
+	successRuntime := testAgentRuntime{run: func(ctx context.Context, _ agentruntime.RunRequest, input agentruntime.InputFeed) (agentruntime.RunResult, error) {
+		claimed, err := input.Claim(ctx, 1)
+		if err != nil {
+			return agentruntime.RunResult{}, err
+		}
+		return agentruntime.RunResult{Content: "恢复后完成", EndSeq: claimed.EndSeq}, nil
+	}}
+	if err := agentrunaction.NewExecuteAction(db, tasks, successRuntime, testAttachmentReader(db), nil).Execute(ctx, agentrunaction.RunInput{RunID: recovering.ID}); err != nil {
+		t.Fatal(err)
+	}
+	after := loadConversationVersion(t, db, recovering.ConversationID)
+	if after != before+1 {
+		t.Fatalf("recovered run version=%d want=%d", after, before+1)
+	}
+	feed.expect(t, feed.notice(identity.User.ID, realtime.KindConversationChanged, recovering.ConversationID, after))
 }
