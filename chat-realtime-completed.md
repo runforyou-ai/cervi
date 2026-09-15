@@ -361,6 +361,26 @@
 - **验收：** 缺失、无效或已登出的令牌得到 401 且错误体与业务接口一致；同一用户两条事件流均收到用户受众与客服共享受众通知；订阅与探针读取之间提交的变化在 `server_hello` 或后续通知中至少出现一次；登出只结束对应登录会话的事件流，停用结束该用户全部事件流且重连得到 401；撤销事务回滚不结束事件流；到达最长存活时间后结束且凭据有效时可重连；停止读取的事件流被有界结束，其他事件流照常收到通知；事件流在超过 Wails 默认读写超时后仍持续下发；服务端下线时事件流在时限内结束；原生端按服务器地址路径拼接并投递事件与流结束。
 - **验证记录：** 2026-09-15 通过 `wails3 task test:server`（含 SSE 网关集成测试：同一用户两条事件流的用户受众与客服共享受众投递、撤销事务回滚、登出与停用结束事件流并重连得到 401、认证与订阅之间登出、服务器 1 秒读写超时下持续心跳与通知、最长存活时间、服务端下线与慢连接）、`wails3 task test:desktop`（含原生端事件投递、流结束与 401 清除本地凭据）、`wails3 task test:frontend`（100 项）与 `wails3 task build:server`。以本机 `bin/cervi-server`（Wails v3.0.0-beta.21 服务端模式，默认 30 秒读写超时）实测：未携带令牌返回 401 与业务错误体；`server_hello` 在 0.04 秒内到达，第 25 秒收到 `ping`，事件流持续 40 秒未被服务器超时中断，响应头为 `text/event-stream`、`Cache-Control: no-cache` 与 `X-Accel-Buffering: no`；事件流打开时发送 SIGTERM，事件流 0.02 秒内结束、服务端进程 0.04 秒内退出。未验证 Cloudflare Tunnel、自动 HTTPS `ingress` 与 iOS／Android。验证结束后本轮服务端进程已退出，8080 端口已释放。
 
+### PR27：共享客户端事件流与会话代次
+
+- **依赖：** 无（PR25、PR25A 已合并）。
+- **范围：** `src/api/realtime` 实现无 feature 依赖的 TS 传输内核；一个应用实例一条成员事件流、业务页签共用，浏览器各标签页独立连接。原生端驱动 Go 侧 `ConnectRealtime`／`DisconnectRealtime` 并消费 `cervi:realtime:frame`／`cervi:realtime:closed`，Web 端用 fetch 携带 Bearer 流式读取 `data:` 行。流结束和 60 秒无数据按网络错误抖动退避重连，会话错误进入对应入口，协议主版本不支持时停止。同时建立登录会话代次，覆盖登录、初始化、登出、切换企业、会话恢复与多标签页令牌变化。移动端外壳由 PR33 接入；本条不消费通知、不删除轮询。
+- **落点：** `frontend/src/api/session-scope.ts`、`client.ts`、`auth.ts`、`conversation-read-queue.ts`；`frontend/src/api/realtime` 的 `realtime-client.ts`、`web-transport.ts`、`native-transport.ts` 与 `index.ts`；`lib/resource-client.ts`、`lib/session-navigation.ts`、`features/session/use-realtime-connection.ts`、`hooks/use-session-generation.ts`、`apps/shared-app-routes.tsx`、`features/workspace/workspace-layout.tsx`；`internal/apiproxy/realtime.go` 的建立日志记录 HTTP 协议版本。
+- **实施：**
+  - **会话边界：** `beginSessionBoundary()` 提升代次并按订阅顺序同步通知订阅方（实时客户端关闭事件流与计时器，未读标记队列丢弃旧排队链），再清空查询缓存。登录与初始化保存令牌后进入新代次；登出先取原令牌、清除本地令牌并进入新代次，再用原令牌调用 `Logout`，登出返回后不再写入令牌或缓存；切换企业服务器在调用 `ConnectServer` 前进入新代次；`recoverSession` 对 login／connect／setup 状态都进入新代次，login 额外清除令牌。原生端 `Login` 与 `Logout` 在 Go 侧持有同一把会话锁，旧登出不会清除新凭据。
+  - **调用结果：** `call()` 记录发起时代次，成功与失败结果只在代次未变时交付，过期结果既不 resolve 也不 reject，调用方不再执行 Toast、导航和后续操作，旧会话的登录失效错误不会触发新会话的入口恢复。登录、初始化、登出、切换企业与原生连接使用不受代次约束的 `invoke()`。
+  - **多标签页：** Web 端记录本代次归属的令牌；`storage` 事件，或 `call()` 与事件流读取凭据时发现令牌已被其他标签页改动，即采用新令牌并进入新代次，本次调用不再发起。Web／桌面工作台以代次为 key 重新挂载，重新读取身份、缓存并建立事件流。
+  - **状态机：** 状态为 disconnected、connecting、ready、backoff、stopped，`server_hello` 进入 ready 并清零失败次数。每次连接尝试有独立编号，`stop()`、代次变化和重连都使旧尝试的事件与结束回调失效。第 n 次连续失败的退避上限为 1s×2ⁿ⁻¹（最高 30s），等待时间取上限的一半到上限之间；`resume()` 只在 backoff 时立即重连；会话错误与协议主版本不支持进入 stopped，网络恢复与前台恢复不会重启；无法解析的事件记录 `WARN` 后忽略。
+  - **原生端：** 传输在模块级串行执行连接与断开：上一次连接请求结束且完成清理后才发起下一次连接，已关闭的在途请求调用 `CancellablePromise.cancel()` 缩短等待，调用方已关闭而请求成功时先 `DisconnectRealtime`。连接编号返回前到达的事件先缓存，拿到编号后只回放本连接的事件；流结束、连接失败和关闭都注销 Wails 事件监听。
+  - **Web 端：** 在 `open` 返回后读取凭据，携带 `Accept: text/event-stream`、`Accept-Language` 与 Bearer 请求 `/api/realtime`；非 2xx 响应按业务错误体转换为 `ApiError`；按行解析并保留跨数据块的半行；从发起请求起 60 秒未收到任何数据即中止并按网络错误处理。
+  - **外壳挂载：** Web 与桌面工作台在身份就绪后 `start()`，卸载时 `stop()`；`online` 与回到前台时调用 `resume()`；订阅方目前只处理会话错误并调用 `recoverSession`。
+- **验收：** 企业／账号切换先提升代次再清缓存，旧 Promise、事件流和回调失效；多标签页换账号后身份、缓存、普通请求和事件流归属一致；旧连接请求晚到不替换新事件流；重连与旧流结束回调交错时只保留一条事件流；401 进入登录，协议主版本不支持时不无限重试。
+- **验证记录：** 2026-09-15 通过 `wails3 task common:build:frontend`（含 tsc）、`wails3 task test:frontend`（125 项）与 `wails3 task test:desktop`。新增前端测试覆盖：慢响应在换代后返回被关闭且不交付；旧流结束回调与重连交错；会话错误与协议不支持不重试；online 与前台同时恢复只重连一次；start／stop／start；连接编号返回前到达的事件与结束事件回放；旧连接请求晚到时先断开再发起新连接；断开与新连接串行；监听清理；跨数据块行解析、非 2xx 错误体、空闲超时与关闭中止；过期代次的成功与失败结果不交付；新会话的未读标记不等待旧排队链。
+  - **Web 端：** 以本机 `wails3 task run:server`（127.0.0.1:8081，HTTP，无 TLS）与无头 Chrome（CDP 驱动）实测。登录后 `/api/realtime` 返回 200、`text/event-stream`、协议 `http/1.1` 并进入 ready；停止服务端后按 0.76s、1.7s、2.7s、5.9s 退避，服务端恢复后重新 ready。A、B、C 三个标签页以 ai.shellphy 登录，C 经登录接口取得 jack 令牌写入本地存储后，A、B 经 storage 事件、C 在下一次请求时发现令牌归属变化，工作台重新挂载，用户菜单由「艾翔飞」变为「任杰」，三页新的事件流均携带 jack 令牌且没有旧令牌请求。A 从用户菜单退出登录后三页均回到登录页，本地令牌已清除，8 秒内没有新的事件流请求。
+  - **桌面端：** 以 `wails3 task dev:mcp` 经 Wails MCP 实测。启动恢复登录后 Go 日志为 `实时事件流已建立 … protocol=HTTP/1.1`，前端 ready；停止服务端后 Go 侧事件流结束，前端收到 `unavailable` 错误并逐次退避，服务端恢复后重新 ready；从用户菜单退出登录后前端为 disconnected，Go 侧事件流以 `context canceled` 结束且 8 秒内没有重连；重新登录后建立新的事件流并 ready。
+  - **未验证：** Cloudflare Tunnel（由维护者手动验证）、HTTPS／HTTP/2 部署、两个真实企业服务器之间的切换（由会话代次与传输单元测试覆盖）以及 iOS／Android（PR33）。验证结束后本轮启动的服务端、桌面端、Vite 与无头 Chrome 均已退出，8081、9246、9100 端口已释放。
+- **审核记录：** 设计阶段经 codex 审核后修订：原生端连接改为串行，并在丢弃过期结果前完成连接清理；会话边界覆盖登出、切换企业、登录、初始化与会话恢复，登出改为先清除令牌并进入新代次；接入 `storage` 监听并在请求时核对令牌归属；过期代次结果改为不交付，旧会话错误不触发 Toast、导航与入口恢复。
+
 ### PR37：模型增量消费与流基线
 
 - **依赖：** 无。运行时增量不依赖 PR36 的过程详情拆分，先于 PR36 交付。

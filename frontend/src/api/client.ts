@@ -7,8 +7,13 @@ import {
   type RequestMeta,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import type { NonNullArrays } from "@/api/normalize"
+import {
+  currentSessionGeneration,
+  settleInSessionGeneration,
+} from "@/api/session-scope"
 import { i18n } from "@/i18n"
 import { fallbackLanguage } from "@/i18n/resources"
+import { beginSessionBoundary } from "@/lib/resource-client"
 import { resolveAppPlatform } from "@/platform/app-platform"
 
 const tokenStorageKey = "cervi.token"
@@ -58,36 +63,42 @@ export function isNotFoundApiError(error: unknown): error is ApiError {
   return isApiError(error) && error.kind === "not_found"
 }
 
+// Web 端当前登录会话代次归属的令牌原文，本页写入令牌时同步更新。
+let sessionToken = resolveAppPlatform() === "web" ? (readStoredToken()?.token ?? "") : ""
+
+if (resolveAppPlatform() === "web") {
+  // 其他标签页改动令牌时本页进入新的登录会话代次。
+  window.addEventListener("storage", (event) => {
+    if (event.key === tokenStorageKey || event.key === null) {
+      adoptForeignWebToken()
+    }
+  })
+}
+
 /**
- * 注入认证和语言后调用应用服务，卸载时丢弃过期结果。
+ * 注入认证和语言后调用应用服务，卸载时丢弃过期结果；只交付发起时代次仍为当前代次的结果。
  * 结果按服务端保证的非空切片声明类型。
  */
-export async function call<T>(
+export function call<T>(
   operation: (meta: RequestMeta) => CancellablePromise<T>,
   signal?: AbortSignal,
 ): Promise<NonNullArrays<T>> {
+  const meta = sessionRequestMeta()
+  // 令牌已被其他标签页改动时本次调用属于旧会话，保持挂起。
+  if (!meta) {
+    return new Promise(() => {})
+  }
+  return settleInSessionGeneration(currentSessionGeneration(), invoke(operation, meta, signal))
+}
+
+/** 使用给定请求信息调用应用服务并转换错误，结果不受登录会话代次约束，供会话边界操作使用。 */
+export async function invoke<T>(
+  operation: (meta: RequestMeta) => CancellablePromise<T>,
+  meta: RequestMeta = requestMeta(),
+  signal?: AbortSignal,
+): Promise<NonNullArrays<T>> {
   try {
-    // Web 端从本地存储读取未过期令牌。
-    let token = ""
-    if (resolveAppPlatform() === "web") {
-      const value = window.localStorage.getItem(tokenStorageKey)
-      if (value) {
-        const stored = JSON.parse(value) as StoredToken
-        if (Date.parse(stored.expiresAt) <= Date.now()) {
-          clearWebToken()
-        } else {
-          token = stored.token
-        }
-      }
-    }
-    // 组装当前请求的令牌和语言。
-    const result = await operation({
-      token,
-      locale:
-        (i18n.resolvedLanguage ?? fallbackLanguage) === "en-US"
-          ? Locale.LocaleEnglishUnitedStates
-          : Locale.LocaleChineseSimplified,
-    })
+    const result = await operation(meta)
     if (signal?.aborted) {
       throw abortError()
     }
@@ -97,6 +108,59 @@ export async function call<T>(
       throw abortError()
     }
     throw normalizeError(error)
+  }
+}
+
+/** 组装当前请求的令牌和语言，Web 端读取时清除已过期令牌。 */
+export function requestMeta(): RequestMeta {
+  let token = ""
+  if (resolveAppPlatform() === "web") {
+    const stored = readStoredToken()
+    if (stored && Date.parse(stored.expiresAt) <= Date.now()) {
+      clearWebToken()
+    } else {
+      token = stored?.token ?? ""
+    }
+  }
+  return {
+    token,
+    locale:
+      (i18n.resolvedLanguage ?? fallbackLanguage) === "en-US"
+        ? Locale.LocaleEnglishUnitedStates
+        : Locale.LocaleChineseSimplified,
+  }
+}
+
+/** 返回本代次请求信息；Web 端令牌已被其他标签页改动时进入新的登录会话代次并返回 undefined。 */
+export function sessionRequestMeta(): RequestMeta | undefined {
+  if (resolveAppPlatform() === "web" && adoptForeignWebToken()) {
+    return undefined
+  }
+  return requestMeta()
+}
+
+/** 采用其他标签页写入的令牌并进入新的登录会话代次，令牌未变化时返回 false。 */
+function adoptForeignWebToken() {
+  const token = readStoredToken()?.token ?? ""
+  if (token === sessionToken) {
+    return false
+  }
+  sessionToken = token
+  console.info("登录令牌已被其他页面改动，进入新的登录会话")
+  beginSessionBoundary()
+  return true
+}
+
+/** 读取 Web 端本地保存的令牌，内容无法解析时视为未登录。 */
+function readStoredToken(): StoredToken | undefined {
+  const value = window.localStorage.getItem(tokenStorageKey)
+  if (!value) {
+    return undefined
+  }
+  try {
+    return JSON.parse(value) as StoredToken
+  } catch {
+    return undefined
   }
 }
 
@@ -127,6 +191,7 @@ export function storeWebToken(auth: Auth) {
     tokenStorageKey,
     JSON.stringify({ token: auth.token, expiresAt: auth.expiresAt }),
   )
+  sessionToken = auth.token
   return auth.identity
 }
 
@@ -134,11 +199,23 @@ export function storeWebToken(auth: Auth) {
 export function clearWebToken() {
   if (resolveAppPlatform() === "web") {
     window.localStorage.removeItem(tokenStorageKey)
+    sessionToken = ""
   }
 }
 
+/** 把 HTTP 响应中的业务错误体转换为前端错误，错误体不可识别时返回通用错误。 */
+export function responseError(status: number, body: unknown) {
+  const cause =
+    typeof body === "object" && body !== null
+      ? (body as { error?: unknown }).error
+      : undefined
+  return isErrorCause(cause)
+    ? apiErrorFromCause(cause)
+    : new Error(`request failed with status ${status}`)
+}
+
 /** 把应用服务异常转换为前端错误。 */
-function normalizeError(error: unknown) {
+export function normalizeError(error: unknown) {
   if (error instanceof ApiError) return error
   if (error instanceof Error) {
     const cause = (error as Error & { cause?: unknown }).cause
