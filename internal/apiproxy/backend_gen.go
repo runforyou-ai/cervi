@@ -837,6 +837,14 @@ func (b *Backend) GetKnowledgeBase(ctx context.Context, meta appservice.RequestM
 	return output, err
 }
 
+// ListKnowledgeBaseAgents 返回当前配置版本绑定知识库的 AI 员工。
+func (b *Backend) ListKnowledgeBaseAgents(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string) (appservice.KnowledgeBaseAgentList, error) {
+	var output appservice.KnowledgeBaseAgentList
+	err := b.do(ctx, meta, http.MethodGet, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/agents", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // CreateKnowledgeBase 创建企业知识库。
 func (b *Backend) CreateKnowledgeBase(ctx context.Context, meta appservice.RequestMeta, input appservice.KnowledgeBaseInput) (appservice.KnowledgeBase, error) {
 	var output appservice.KnowledgeBase

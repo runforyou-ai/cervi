@@ -164,6 +164,9 @@ const knowledgeBase = {
     editTitle: "编辑知识库",
     category: "知识库类型",
     name: "知识库名称",
+    agents: "AI 员工",
+    agentsEmpty: "暂无 AI 员工使用",
+    agentInactive: "{{name}}（已禁用）",
     description: "描述",
     createSuccess: "知识库创建成功。",
     updateSuccess: "知识库保存成功。",
@@ -205,6 +208,8 @@ const knowledgeBase = {
   delete: {
     title: "删除“{{name}}”？",
     description: "删除后无法恢复。",
+    agentSeparator: "、",
+    agentsDescription: "{{names}}正在使用该知识库，删除后将无法检索其中的资料，且无法恢复。",
     success: "知识库已删除。",
     error: "删除知识库失败，请重试。",
   },

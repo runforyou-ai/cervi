@@ -114,6 +114,8 @@ export const resourceKeys = {
   knowledgeBases: () => ["knowledge-bases"],
   /** 单个知识库。 */
   knowledgeBase: (id?: string) => itemKey("knowledge-base", id),
+  /** 当前配置版本绑定指定知识库的 AI 员工。 */
+  knowledgeBaseAgents: (knowledgeBaseId?: string) => itemKey("knowledge-base-agents", knowledgeBaseId),
   /** 指定知识库及分组条件的问答列表。 */
   knowledgeQAEntries: (knowledgeBaseId?: string, parameters?: KeyParameters) =>
     scopedListKey("knowledge-qa-entries", knowledgeBaseId, parameters),

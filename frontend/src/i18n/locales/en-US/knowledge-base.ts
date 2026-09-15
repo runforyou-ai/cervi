@@ -164,6 +164,9 @@ const knowledgeBase = {
     editTitle: "Edit knowledge base",
     category: "Knowledge base type",
     name: "Knowledge base name",
+    agents: "AI employees",
+    agentsEmpty: "No AI employees use this knowledge base",
+    agentInactive: "{{name}} (disabled)",
     description: "Description",
     createSuccess: "Knowledge base created.",
     updateSuccess: "Knowledge base saved.",
@@ -205,6 +208,8 @@ const knowledgeBase = {
   delete: {
     title: "Delete “{{name}}”?",
     description: "This action cannot be undone.",
+    agentSeparator: ", ",
+    agentsDescription: "{{names}} use this knowledge base and will no longer be able to search it. This action cannot be undone.",
     success: "Knowledge base deleted.",
     error: "Could not delete the knowledge base. Try again.",
   },

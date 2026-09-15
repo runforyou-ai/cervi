@@ -1663,6 +1663,22 @@ export interface KnowledgeBase {
 }
 
 /**
+ * KnowledgeBaseAgent 定义当前配置版本绑定知识库的 AI 员工。
+ */
+export interface KnowledgeBaseAgent {
+    "id": string;
+    "displayName": string;
+    "status": UserStatus;
+}
+
+/**
+ * KnowledgeBaseAgentList 定义绑定知识库的 AI 员工列表。
+ */
+export interface KnowledgeBaseAgentList {
+    "agents": KnowledgeBaseAgent[] | null;
+}
+
+/**
  * KnowledgeBaseCategory 表示知识库内容类型。
  */
 export enum KnowledgeBaseCategory {

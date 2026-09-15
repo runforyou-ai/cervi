@@ -124,6 +124,7 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.POST("/knowledge-bases/:knowledgeBaseID/qa-entries/:entryID/retry", s.retryKnowledgeQAEntry)
 	router.GET("/knowledge-bases", s.listKnowledgeBases)
 	router.GET("/knowledge-bases/:knowledgeBaseID", s.getKnowledgeBase)
+	router.GET("/knowledge-bases/:knowledgeBaseID/agents", s.listKnowledgeBaseAgents)
 	router.POST("/knowledge-bases", s.createKnowledgeBase)
 	router.PUT("/knowledge-bases/:knowledgeBaseID", s.updateKnowledgeBase)
 	router.DELETE("/knowledge-bases/:knowledgeBaseID", s.deleteKnowledgeBase)
@@ -1067,6 +1068,12 @@ func (s *Service) listKnowledgeBases(c *gin.Context) {
 // getKnowledgeBase 返回当前企业中的知识库详情。
 func (s *Service) getKnowledgeBase(c *gin.Context) {
 	output, err := s.application.GetKnowledgeBase(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// listKnowledgeBaseAgents 返回当前配置版本绑定知识库的 AI 员工。
+func (s *Service) listKnowledgeBaseAgents(c *gin.Context) {
+	output, err := s.application.ListKnowledgeBaseAgents(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"))
 	writeResult(c, http.StatusOK, output, err)
 }
 

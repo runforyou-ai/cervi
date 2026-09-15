@@ -351,6 +351,9 @@ type Backend interface {
 	// GetKnowledgeBase 返回当前企业中的知识库详情。
 	//cervi:route GET /knowledge-bases/:knowledgeBaseID
 	GetKnowledgeBase(context.Context, RequestMeta, string) (KnowledgeBase, error)
+	// ListKnowledgeBaseAgents 返回当前配置版本绑定知识库的 AI 员工。
+	//cervi:route GET /knowledge-bases/:knowledgeBaseID/agents
+	ListKnowledgeBaseAgents(context.Context, RequestMeta, string) (KnowledgeBaseAgentList, error)
 	// CreateKnowledgeBase 创建企业知识库。
 	//cervi:route POST /knowledge-bases status=201
 	CreateKnowledgeBase(context.Context, RequestMeta, KnowledgeBaseInput) (KnowledgeBase, error)

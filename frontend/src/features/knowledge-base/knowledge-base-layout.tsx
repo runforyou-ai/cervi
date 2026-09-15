@@ -16,6 +16,7 @@ import {
   deleteKnowledgeGroup,
   isApiError,
   KnowledgeBaseCategory,
+  listKnowledgeBaseAgents,
   listKnowledgeBases,
   type KnowledgeBaseData,
   type KnowledgeGroupData,
@@ -82,6 +83,11 @@ export function KnowledgeBaseLayout() {
     refresh,
   } = useResource(resourceKeys.knowledgeBases(), () => listKnowledgeBases())
   const showLoading = loading || (Boolean(loadError) && refreshing)
+  const deletingAgents = useResource(
+    resourceKeys.knowledgeBaseAgents(deletingKnowledgeBase?.id),
+    () => listKnowledgeBaseAgents(deletingKnowledgeBase!.id),
+    { enabled: deletingKnowledgeBase !== null, staleTime: 0 },
+  )
   const knowledgeBases = data?.knowledgeBases ?? []
 
   useEffect(() => {
@@ -276,7 +282,13 @@ export function KnowledgeBaseLayout() {
                 : null}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {t("delete.description")}
+              {deletingAgents.data?.agents.length
+                ? t("delete.agentsDescription", {
+                    names: deletingAgents.data.agents
+                      .map((agent) => agent.displayName)
+                      .join(t("delete.agentSeparator")),
+                  })
+                : t("delete.description")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
@@ -284,7 +296,7 @@ export function KnowledgeBaseLayout() {
               {t("common:actions.cancel")}
             </AlertDialogCancel>
             <AlertDialogAction
-              disabled={deleting}
+              disabled={deleting || deletingAgents.loading}
               onClick={() => void confirmDeleteKnowledgeBase()}
             >
               {deleting ? t("common:actions.deleting") : t("common:actions.delete")}

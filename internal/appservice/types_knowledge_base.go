@@ -70,6 +70,18 @@ type KnowledgeBaseList struct {
 	KnowledgeBases []KnowledgeBase `json:"knowledgeBases"`
 }
 
+// KnowledgeBaseAgent 定义当前配置版本绑定知识库的 AI 员工。
+type KnowledgeBaseAgent struct {
+	ID          string     `json:"id"`
+	DisplayName string     `json:"displayName"`
+	Status      UserStatus `json:"status"`
+}
+
+// KnowledgeBaseAgentList 定义绑定知识库的 AI 员工列表。
+type KnowledgeBaseAgentList struct {
+	Agents []KnowledgeBaseAgent `json:"agents"`
+}
+
 // KnowledgeRetrievalInput 定义检索测试的查询内容。
 type KnowledgeRetrievalInput struct {
 	Query string `json:"query"`

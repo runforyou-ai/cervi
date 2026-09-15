@@ -544,6 +544,11 @@ func (s *Service) GetKnowledgeBase(ctx context.Context, meta RequestMeta, knowle
 	return withNormalizedSlices(s.backend.GetKnowledgeBase(ctx, meta, knowledgeBaseID))
 }
 
+// ListKnowledgeBaseAgents 返回当前配置版本绑定知识库的 AI 员工。
+func (s *Service) ListKnowledgeBaseAgents(ctx context.Context, meta RequestMeta, knowledgeBaseID string) (KnowledgeBaseAgentList, error) {
+	return withNormalizedSlices(s.backend.ListKnowledgeBaseAgents(ctx, meta, knowledgeBaseID))
+}
+
 // CreateKnowledgeBase 创建企业知识库。
 func (s *Service) CreateKnowledgeBase(ctx context.Context, meta RequestMeta, input KnowledgeBaseInput) (KnowledgeBase, error) {
 	return withNormalizedSlices(s.backend.CreateKnowledgeBase(ctx, meta, input))
