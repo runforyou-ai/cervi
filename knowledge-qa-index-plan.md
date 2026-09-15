@@ -78,7 +78,7 @@
 ### 6.2 结果契约
 
 - `RetrievalRecord` 与 `knowledgeretrieval.Record` 增加 `Answer`，文档记录为空。问答记录的 `DocumentID` 与 `SegmentID` 均为条目编号，`Position` 固定为 1，`Content` 为命中的问题或答案分段原文，`DocumentName` 为主问题，`Answer` 为完整答案。跨知识库融合按 `knowledge_base_id + segment_id` 去重，相似问题与答案分段的命中因此合并为一条。
-- `Source.Read` 对问答库忽略 `before` 与 `after`，校验条目存在且批次已发布后返回该条目一条记录，否则返回 `ErrSegmentStale`。
+- `Source.Read` 对问答库忽略 `before` 与 `after`，校验条目存在且当前已发布批次与游标批次一致后返回该条目一条记录，否则返回 `ErrSegmentStale`；条目修改并重新发布后旧游标失效。
 - `appservice.KnowledgeRetrievalRecord` 增加 `answer`；检索测试结果对问答记录展示主问题、命中原文与完整答案，不展示分段序号与「查看上下文」。
 - 问答列表页标题栏增加「检索测试」入口，复用现有侧栏。
 

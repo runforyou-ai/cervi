@@ -152,7 +152,7 @@ func TestAgentKnowledgeSearch(t *testing.T) {
 		if more, err := search(ctx, knowledgeretrieval.Request{Cursor: &next.Cursor, Before: 1}); err != nil || len(more.Records) != 2 || more.Records[0].Position != 1 || more.Records[1].SegmentID != next.SegmentID {
 			t.Fatalf("more=%+v err=%v", more, err)
 		}
-		foreign := knowledgeretrieval.Cursor{KnowledgeBaseID: unboundBase.ID, DocumentID: refundID, SegmentID: cursor.SegmentID, Position: 1}
+		foreign := knowledgeretrieval.Cursor{KnowledgeBaseID: unboundBase.ID, DocumentID: refundID, SegmentID: cursor.SegmentID, SegmentBatchID: cursor.SegmentBatchID, Position: 1}
 		if _, err := search(ctx, knowledgeretrieval.Request{Cursor: &foreign}); err == nil {
 			t.Fatal("unbound knowledge base cursor readable")
 		}
