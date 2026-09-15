@@ -48,13 +48,13 @@ func TestSearchKeepsSuccessfulSources(t *testing.T) {
 // TestSearchReadsCursorContext 验证游标模式直接读取指定知识库中的周边分段。
 func TestSearchReadsCursorContext(t *testing.T) {
 	sources := []Source{{ID: "base-a", Name: "知识库 A", Read: func(_ context.Context, cursor Cursor, before, after int) ([]Record, error) {
-		if cursor.SegmentID != "segment-2" || before != 1 || after != 2 {
+		if cursor.SegmentID != "segment-2" || cursor.SegmentBatchID != "batch-1" || before != 1 || after != 2 {
 			t.Fatalf("cursor = %#v, before = %d, after = %d", cursor, before, after)
 		}
-		return []Record{{DocumentID: "document-1", SegmentID: "segment-1", Position: 1}, {DocumentID: "document-1", SegmentID: "segment-2", Position: 2, Matched: true}}, nil
+		return []Record{{DocumentID: "document-1", SegmentID: "segment-1", SegmentBatchID: "batch-1", Position: 1}, {DocumentID: "document-1", SegmentID: "segment-2", SegmentBatchID: "batch-1", Position: 2, Matched: true}}, nil
 	}}}
 	result, err := Search(context.Background(), sources, Request{
-		Cursor: &Cursor{KnowledgeBaseID: "base-a", DocumentID: "document-1", SegmentID: "segment-2", Position: 2},
+		Cursor: &Cursor{KnowledgeBaseID: "base-a", DocumentID: "document-1", SegmentID: "segment-2", SegmentBatchID: "batch-1", Position: 2},
 		Before: 1, After: 2,
 	})
 	if err != nil || len(result.Records) != 2 || !result.Records[1].Matched {
@@ -63,8 +63,12 @@ func TestSearchReadsCursorContext(t *testing.T) {
 	// 阅读结果携带知识库标识和自身游标。
 	first := result.Records[0]
 	if first.KnowledgeBaseID != "base-a" || first.KnowledgeBaseName != "知识库 A" ||
-		first.Cursor != (Cursor{KnowledgeBaseID: "base-a", DocumentID: "document-1", SegmentID: "segment-1", Position: 1}) {
+		first.Cursor != (Cursor{KnowledgeBaseID: "base-a", DocumentID: "document-1", SegmentID: "segment-1", SegmentBatchID: "batch-1", Position: 1}) {
 		t.Fatalf("first = %#v", first)
+	}
+	// 缺少批次编号的游标不可读取。
+	if _, err := Search(context.Background(), sources, Request{Cursor: &Cursor{KnowledgeBaseID: "base-a", DocumentID: "document-1", SegmentID: "segment-2", Position: 2}}); err == nil {
+		t.Fatal("cursor without segment batch should be rejected")
 	}
 }
 

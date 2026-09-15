@@ -136,13 +136,13 @@ func searchSegmentsByText(ctx context.Context, db bun.IDB, base servermodels.Kno
 }
 
 // readSegmentWindow 读取指定分段及其前后相邻分段；分段不属于来源当前已发布批次时返回 ErrSegmentStale。
-func readSegmentWindow(ctx context.Context, db bun.IDB, base servermodels.KnowledgeBase, sourceID, segmentID string, before, after int) ([]segmentHit, error) {
-	if !common.ValidUUID(sourceID) || !common.ValidUUID(segmentID) {
+func readSegmentWindow(ctx context.Context, db bun.IDB, base servermodels.KnowledgeBase, sourceID, segmentID, batchID string, before, after int) ([]segmentHit, error) {
+	if !common.ValidUUID(sourceID) || !common.ValidUUID(segmentID) || !common.ValidUUID(batchID) {
 		return nil, ErrSegmentStale
 	}
 	var position int
 	err := publishedSegments(db, base).ColumnExpr("ks.position").
-		Where("ks.source_id = ? AND ks.id = ?", sourceID, segmentID).Scan(ctx, &position)
+		Where("ks.source_id = ? AND ks.id = ? AND ks.segment_batch_id = ?", sourceID, segmentID, batchID).Scan(ctx, &position)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrSegmentStale
 	}
@@ -151,7 +151,7 @@ func readSegmentWindow(ctx context.Context, db bun.IDB, base servermodels.Knowle
 	}
 	hits := make([]segmentHit, 0, before+after+1)
 	err = publishedSegments(db, base).ColumnExpr(segmentColumns(base)).
-		Where("ks.source_id = ? AND ks.position BETWEEN ? AND ?", sourceID, position-before, position+after).
+		Where("ks.source_id = ? AND ks.segment_batch_id = ? AND ks.position BETWEEN ? AND ?", sourceID, batchID, position-before, position+after).
 		OrderExpr("ks.position").Scan(ctx, &hits)
 	return hits, err
 }

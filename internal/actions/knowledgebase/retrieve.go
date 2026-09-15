@@ -116,7 +116,7 @@ func (s *RetrievalService) Sources(ctx context.Context, organizationID string, k
 				return retrievalRecords(records, true), err
 			},
 			Read: func(ctx context.Context, cursor knowledgeretrieval.Cursor, before, after int) ([]knowledgeretrieval.Record, error) {
-				records, err := source.read(ctx, cursor.DocumentID, cursor.SegmentID, before, after)
+				records, err := source.read(ctx, cursor.DocumentID, cursor.SegmentID, cursor.SegmentBatchID, before, after)
 				return retrievalRecords(records, false), err
 			},
 		})
@@ -310,10 +310,10 @@ func (k *knowledgeSource) retrieve(ctx context.Context, query string) ([]Retriev
 	return records, nil
 }
 
-// read 读取游标指向的内容：文档返回分段及前后相邻分段，问答返回条目本身。
-func (k *knowledgeSource) read(ctx context.Context, sourceID, segmentID string, before, after int) ([]RetrievalRecord, error) {
+// read 读取游标指向的内容，游标批次必须是来源当前已发布批次：文档返回分段及前后相邻分段，问答返回条目本身。
+func (k *knowledgeSource) read(ctx context.Context, sourceID, segmentID, batchID string, before, after int) ([]RetrievalRecord, error) {
 	if k.base.Category == string(domain.KnowledgeBaseCategoryQA) {
-		if !common.ValidUUID(sourceID) || sourceID != segmentID {
+		if !common.ValidUUID(sourceID) || sourceID != segmentID || !common.ValidUUID(batchID) {
 			return nil, ErrSegmentStale
 		}
 		var entry struct {
@@ -323,16 +323,16 @@ func (k *knowledgeSource) read(ctx context.Context, sourceID, segmentID string, 
 		err := k.service.db.NewSelect().TableExpr("knowledge_qa_entries AS kqe").ColumnExpr("question.content AS question, answer.content AS answer").
 			Join("JOIN knowledge_qa_contents question ON question.entry_id = kqe.id AND question.kind = ?", domain.KnowledgeQAContentPrimaryQuestion).
 			Join("JOIN knowledge_qa_contents answer ON answer.entry_id = kqe.id AND answer.kind = ?", domain.KnowledgeQAContentAnswer).
-			Where("kqe.id = ? AND kqe.knowledge_base_id = ? AND kqe.segment_batch_id IS NOT NULL", sourceID, k.base.ID).Scan(ctx, &entry)
+			Where("kqe.id = ? AND kqe.knowledge_base_id = ? AND kqe.segment_batch_id = ?", sourceID, k.base.ID, batchID).Scan(ctx, &entry)
 		if errors.Is(err, sql.ErrNoRows) {
 			return nil, ErrSegmentStale
 		}
 		if err != nil {
 			return nil, err
 		}
-		return []RetrievalRecord{{DocumentID: sourceID, DocumentName: entry.Question, SegmentID: sourceID, Position: 1, Content: entry.Question, Answer: entry.Answer}}, nil
+		return []RetrievalRecord{{DocumentID: sourceID, DocumentName: entry.Question, SegmentID: sourceID, SegmentBatchID: batchID, Position: 1, Content: entry.Question, Answer: entry.Answer}}, nil
 	}
-	hits, err := readSegmentWindow(ctx, k.service.db, k.base, sourceID, segmentID, before, after)
+	hits, err := readSegmentWindow(ctx, k.service.db, k.base, sourceID, segmentID, batchID, before, after)
 	if err != nil {
 		return nil, err
 	}
@@ -372,7 +372,7 @@ func retrievalRecords(records []RetrievalRecord, scored bool) []knowledgeretriev
 	for _, record := range records {
 		item := knowledgeretrieval.Record{
 			DocumentID: record.DocumentID, DocumentName: record.DocumentName,
-			SegmentID: record.SegmentID, Position: record.Position, Content: record.Content,
+			SegmentID: record.SegmentID, SegmentBatchID: record.SegmentBatchID, Position: record.Position, Content: record.Content,
 		}
 		if record.Answer != "" {
 			answer := record.Answer

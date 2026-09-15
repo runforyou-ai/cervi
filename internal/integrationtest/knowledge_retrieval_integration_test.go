@@ -333,6 +333,25 @@ func TestKnowledgeQARetrieval(t *testing.T) {
 	if err != nil || len(window.Records) != 1 || window.Records[0].SegmentID != refundID || window.Records[0].Content != "如何退款？" || window.Records[0].Answer == nil || *window.Records[0].Answer != answer {
 		t.Fatalf("window=%+v err=%v", window, err)
 	}
+	// 条目修改并重新发布后，旧批次游标失效，新检索结果的游标读取当前答案。
+	if _, err := knowledgeaction.NewSaveQAEntryAction(db, newKnowledgeTasks(t, db)).Execute(ctx, identity, base.ID, refundID, knowledgeaction.QAInput{GroupID: base.Groups[0].ID, Question: "如何退款？", Answer: "联系客服办理退款。"}); err != nil {
+		t.Fatal(err)
+	}
+	task, _ := qaProcessInput(t, db, identity.Organization.ID, base.ID, refundID)
+	if err := knowledgeaction.NewProcessQAEntryAction(db, probe).Execute(ctx, task); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := knowledgeretrieval.Search(ctx, sources, knowledgeretrieval.Request{Cursor: &cursor}); !errors.Is(err, knowledgeaction.ErrSegmentStale) {
+		t.Fatalf("err=%v", err)
+	}
+	result, err = knowledgeretrieval.Search(ctx, sources, knowledgeretrieval.Request{Queries: []string{"退款"}})
+	if err != nil || len(result.Records) == 0 || result.Records[0].DocumentID != refundID || result.Records[0].Cursor.SegmentBatchID == cursor.SegmentBatchID {
+		t.Fatalf("result=%+v err=%v", result, err)
+	}
+	cursor = result.Records[0].Cursor
+	if window, err := knowledgeretrieval.Search(ctx, sources, knowledgeretrieval.Request{Cursor: &cursor}); err != nil || len(window.Records) != 1 || window.Records[0].Cursor != cursor || *window.Records[0].Answer != "联系客服办理退款。" {
+		t.Fatalf("window=%+v err=%v", window, err)
+	}
 	other, _ := newQAFixture(t, db)
 	if _, err := service.Retrieve(ctx, other, base.ID, "退款"); !errors.Is(err, knowledgeaction.ErrNotFound) {
 		t.Fatalf("err=%v", err)

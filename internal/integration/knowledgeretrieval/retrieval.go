@@ -24,6 +24,7 @@ type Record struct {
 	DocumentID        string   `json:"documentId"`
 	DocumentName      string   `json:"documentName"`
 	SegmentID         string   `json:"segmentId"`
+	SegmentBatchID    string   `json:"-"`
 	Position          int      `json:"position"`
 	Content           string   `json:"content"`
 	Answer            *string  `json:"answer"`
@@ -33,11 +34,12 @@ type Record struct {
 	Matched           bool     `json:"matched"`
 }
 
-// Cursor 定位知识库文档中的一个分段。
+// Cursor 定位知识库来源已发布批次中的一个分段。
 type Cursor struct {
 	KnowledgeBaseID string `json:"knowledgeBaseId"`
 	DocumentID      string `json:"documentId"`
 	SegmentID       string `json:"segmentId"`
+	SegmentBatchID  string `json:"segmentBatchId"`
 	Position        int    `json:"position"`
 }
 
@@ -86,8 +88,9 @@ func Search(ctx context.Context, sources []Source, request Request) (Result, err
 		cursor.KnowledgeBaseID = strings.TrimSpace(cursor.KnowledgeBaseID)
 		cursor.DocumentID = strings.TrimSpace(cursor.DocumentID)
 		cursor.SegmentID = strings.TrimSpace(cursor.SegmentID)
+		cursor.SegmentBatchID = strings.TrimSpace(cursor.SegmentBatchID)
 		if cursor.KnowledgeBaseID == "" || cursor.DocumentID == "" ||
-			cursor.SegmentID == "" || cursor.Position <= 0 {
+			cursor.SegmentID == "" || cursor.SegmentBatchID == "" || cursor.Position <= 0 {
 			return Result{}, errors.New("knowledge cursor is invalid")
 		}
 		for _, source := range sources {
@@ -103,7 +106,7 @@ func Search(ctx context.Context, sources []Source, request Request) (Result, err
 				records[index].KnowledgeBaseID, records[index].KnowledgeBaseName = source.ID, source.Name
 				records[index].Cursor = Cursor{
 					KnowledgeBaseID: source.ID, DocumentID: records[index].DocumentID,
-					SegmentID: records[index].SegmentID, Position: records[index].Position,
+					SegmentID: records[index].SegmentID, SegmentBatchID: records[index].SegmentBatchID, Position: records[index].Position,
 				}
 			}
 			result := Result{Records: records}
@@ -231,7 +234,7 @@ func searchQueries(ctx context.Context, sources []Source, queries []string) (Res
 		candidate.record.Cursor = Cursor{
 			KnowledgeBaseID: candidate.record.KnowledgeBaseID,
 			DocumentID:      candidate.record.DocumentID,
-			SegmentID:       candidate.record.SegmentID, Position: candidate.record.Position,
+			SegmentID:       candidate.record.SegmentID, SegmentBatchID: candidate.record.SegmentBatchID, Position: candidate.record.Position,
 		}
 		candidate.record.Matched = true
 		result.Records = append(result.Records, candidate.record)
