@@ -14,6 +14,7 @@ import (
 	commonemail "github.com/runforyou-ai/cervi/internal/common/email"
 	commonpassword "github.com/runforyou-ai/cervi/internal/common/password"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -68,7 +69,7 @@ func (a *LoginAction) Execute(ctx context.Context, input LoginInput) (LoginOutpu
 	}
 
 	var output LoginOutput
-	err = a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err = realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		// 先锁定用户账号，保持用户账号先于企业身份的锁序。
 		if _, err := tx.NewSelect().Model((*servermodels.User)(nil)).Column("id").Where("id = ?", user.ID).For("NO KEY UPDATE").Exec(ctx); err != nil {
 			return err

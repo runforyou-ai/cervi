@@ -8,7 +8,6 @@ import (
 	"log/slog"
 	"mime"
 	"net/url"
-	"strings"
 
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
@@ -18,10 +17,11 @@ import (
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
-// SendAttachmentMessage 保存内部会话附件并返回消息及首发会话。
+// SendAttachmentMessage 保存已上传的内部会话附件，并返回消息及首发创建的单聊或 AI 聊天。
 func (o *directOperations) SendAttachmentMessage(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input AttachmentMessageInput) (AttachmentMessageResult, error) {
 	result, err := o.sendAttachmentMessage.Execute(ctx, identity, conversationaction.AttachmentMessageInput{
-		ConversationID: input.ConversationID, TargetIdentityID: input.TargetIdentityID, ClientMessageID: input.ClientMessageID, FileID: input.FileID,
+		ConversationID: input.ConversationID, TargetIdentityID: input.TargetIdentityID, AgentIdentityID: input.AgentIdentityID,
+		ClientMessageID: input.ClientMessageID, FileID: input.FileID, Body: input.Body, ImageWidth: input.ImageWidth, ImageHeight: input.ImageHeight,
 	})
 	if errors.Is(err, fileaction.ErrFileNotFound) {
 		return AttachmentMessageResult{}, NotFoundError(meta, cervii18n.ErrorFileNotFound)
@@ -33,9 +33,17 @@ func (o *directOperations) SendAttachmentMessage(ctx context.Context, meta Reque
 	if result.Conversation != nil {
 		urls, err := o.conversationAvatarURLs(ctx, identity, nil, result.Conversation.PeerAvatarFileID)
 		if err != nil {
-			slog.Warn("读取附件首发单聊头像失败", "error", err)
+			slog.Warn("读取附件首发单聊头像失败", "conversation_id", result.ConversationID, "error", err)
 		}
 		conversation := directInboxConversationFromSummary(*result.Conversation, urls)
+		output.Conversation = &conversation
+	}
+	if result.AgentConversation != nil {
+		urls, err := o.conversationAvatarURLs(ctx, identity, nil, result.AgentConversation.Agent.AgentAvatarFileID)
+		if err != nil {
+			slog.Warn("读取附件首发 AI 聊天头像失败", "conversation_id", result.ConversationID, "error", err)
+		}
+		conversation := inboxConversationFromAction(*result.AgentConversation, urls)
 		output.Conversation = &conversation
 	}
 	slog.Info("聊天附件消息已保存", "organization_id", identity.Organization.ID, "conversation_id", result.ConversationID, "message_id", result.Message.ID, "file_id", input.FileID)
@@ -68,88 +76,4 @@ func (o *directOperations) GetAttachmentDownload(ctx context.Context, meta Reque
 		return FileDownload{}, o.fileOperationError(ctx, meta, err, cervii18n.ErrorFileNotFound)
 	}
 	return FileDownload{URL: request.URL, PreviewURL: preview.URL}, nil
-}
-
-// SendAttachmentBatch 按顺序保存可带说明的单聊或 AI 聊天附件消息。
-func (o *directOperations) SendAttachmentBatch(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input AttachmentBatchInput) (AttachmentBatchResult, error) {
-	items := make([]conversationaction.AttachmentBatchItem, 0, len(input.Attachments))
-	for _, item := range input.Attachments {
-		items = append(items, conversationaction.AttachmentBatchItem{File: fileaction.UploadInput{FileName: item.FileName, ContentType: item.ContentType, ByteSize: item.ByteSize}, ClientMessageID: item.ClientMessageID, Body: item.Body, ImageWidth: item.ImageWidth, ImageHeight: item.ImageHeight})
-	}
-	setting, err := o.getS3Setting.Execute(ctx, identity)
-	if err != nil {
-		return AttachmentBatchResult{}, o.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCreateFailed)
-	}
-	backend := domain.FileStorageBackendLocal
-	if setting.Enabled {
-		backend = domain.FileStorageBackendS3
-	}
-	result, err := o.sendAttachmentMessage.ExecuteBatch(ctx, identity, conversationaction.AttachmentBatchInput{ConversationID: input.ConversationID, TargetIdentityID: input.TargetIdentityID, AgentIdentityID: input.AgentIdentityID, Attachments: items}, backend)
-	if _, ok := errors.AsType[*fileaction.ValidationError](err); ok {
-		return AttachmentBatchResult{}, o.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCreateFailed)
-	}
-	if err != nil {
-		return AttachmentBatchResult{}, individualConversationError(ctx, meta, err, identity.Organization.ID, input.ConversationID, "send_attachments")
-	}
-	output := AttachmentBatchResult{ConversationID: result.ConversationID, Messages: make([]ConversationMessage, 0, len(result.Messages))}
-	for _, message := range result.Messages {
-		output.Messages = append(output.Messages, o.conversationMessageWithAvatar(ctx, identity, message))
-	}
-	if result.Conversation != nil {
-		urls, err := o.conversationAvatarURLs(ctx, identity, nil, result.Conversation.PeerAvatarFileID)
-		if err != nil {
-			slog.Warn("读取附件单聊头像失败", "error", err)
-		}
-		conversation := directInboxConversationFromSummary(*result.Conversation, urls)
-		output.Conversation = &conversation
-	}
-	if result.AgentConversation != nil {
-		urls, err := o.conversationAvatarURLs(ctx, identity, nil, result.AgentConversation.Agent.AgentAvatarFileID)
-		if err != nil {
-			slog.Warn("读取附件首发 AI 聊天头像失败", "conversation_id", result.ConversationID, "error", err)
-		}
-		conversation := inboxConversationFromAction(*result.AgentConversation, urls)
-		output.Conversation = &conversation
-	}
-	slog.Info("附件批次已保存", "organization_id", identity.Organization.ID, "conversation_id", result.ConversationID, "message_count", len(result.Messages))
-	return output, nil
-}
-
-// UpdateAttachmentUploads 更新当前发送者的附件内容状态。
-func (o *directOperations) UpdateAttachmentUploads(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input AttachmentUploadUpdate) error {
-	if err := o.sendAttachmentMessage.UpdateUploads(ctx, identity, input.FileIDs, domain.AttachmentUploadStatus(input.Status)); err != nil {
-		return o.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCompleteFailed)
-	}
-	if input.Status != AttachmentUploading {
-		slog.Info("附件上传状态已更新", "file_count", len(input.FileIDs), "status", input.Status)
-	}
-	return nil
-}
-
-// ListAttachmentStates 刷新双方消息窗口里已有附件的内容状态。
-func (o *directOperations) ListAttachmentStates(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, input AttachmentStateListInput) (AttachmentStateList, error) {
-	states, err := o.listConversationMessages.AttachmentStates(ctx, identity, conversationID, strings.Split(input.MessageIDs, ","))
-	if err != nil {
-		return AttachmentStateList{}, individualConversationError(ctx, meta, err, identity.Organization.ID, conversationID, "attachment_states")
-	}
-	output := AttachmentStateList{States: make([]AttachmentMessageState, 0, len(states))}
-	for _, state := range states {
-		mapped := conversationMessageFromAction(conversationaction.ConversationMessage{Attachment: &state.Attachment}, nil)
-		output.States = append(output.States, AttachmentMessageState{MessageID: state.MessageID, Attachment: *mapped.Attachment, Deleted: state.Deleted})
-	}
-	return output, nil
-}
-
-// CompleteAttachmentUpload 完成传输后在事务中激活文件和附件消息。
-func (o *directOperations) CompleteAttachmentUpload(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, fileID string) error {
-	record, err := o.completeFileUpload.Execute(ctx, identity, fileID, o.finalizeFileContent)
-	if err != nil {
-		return o.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCompleteFailed)
-	}
-	o.cleanupCompletedParts(record)
-	if err := o.sendAttachmentMessage.UpdateUploads(ctx, identity, []string{fileID}, domain.AttachmentReady); err != nil {
-		return o.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCompleteFailed)
-	}
-	slog.Info("附件上传完成请求已处理", "organization_id", identity.Organization.ID, "file_id", fileID)
-	return nil
 }

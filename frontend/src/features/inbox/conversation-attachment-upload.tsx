@@ -1,4 +1,4 @@
-/** 在单聊或 AI 聊天附件模态框中选择文件和说明，发送后交给时间线上传。 */
+/** 在单聊或 AI 聊天附件模态框中选择文件和说明，发送后交给工作台队列上传。 */
 import { useEffect, useRef, useState } from "react"
 import { PaperclipIcon, XIcon } from "lucide-react"
 import { ScrollArea } from "radix-ui"
@@ -23,7 +23,7 @@ import { AttachmentContent } from "./attachment-content"
 import { useAttachmentQueue } from "./attachment-queue-context"
 import type { SelectedAttachment } from "./attachment-queue"
 
-/** 选择最多一百个文件并在发送时建立有序消息。 */
+/** 选择最多一百个文件，发送后交给工作台队列按选择顺序上传并发送。 */
 export function ConversationAttachmentUpload({
   conversationID,
   targetIdentityID = "",

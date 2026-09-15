@@ -43,6 +43,7 @@ const (
 	ErrorKnowledgeQAReadFailed       Key = "error.knowledge_qa_read_failed"
 	ErrorKnowledgeQASaveFailed       Key = "error.knowledge_qa_save_failed"
 	ErrorKnowledgeQADeleteFailed     Key = "error.knowledge_qa_delete_failed"
+	ErrorKnowledgeQARetryFailed      Key = "error.knowledge_qa_retry_failed"
 	FieldKnowledgeQAQuestionRequired Key = "field.knowledge_qa_question_required"
 	FieldKnowledgeQAAnswerRequired   Key = "field.knowledge_qa_answer_required"
 	FieldKnowledgeQAGroupInvalid     Key = "field.knowledge_qa_group_invalid"

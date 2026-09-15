@@ -73,13 +73,6 @@ export function CloseServiceSession(meta: $models.RequestMeta, conversationID: s
 }
 
 /**
- * CompleteAttachmentUpload 完成文件上传并激活原附件消息。
- */
-export function CompleteAttachmentUpload(meta: $models.RequestMeta, fileID: string): $CancellablePromise<void> {
-    return $Call.ByID(901775053, meta, fileID);
-}
-
-/**
  * CompleteFileUpload 核验并完成文件上传。
  */
 export function CompleteFileUpload(meta: $models.RequestMeta, fileID: string): $CancellablePromise<$models.File> {
@@ -514,13 +507,6 @@ export function ListAgents(meta: $models.RequestMeta, input: $models.AgentListIn
 }
 
 /**
- * ListAttachmentStates 读取窗口内已存在附件消息的最新状态。
- */
-export function ListAttachmentStates(meta: $models.RequestMeta, conversationID: string, input: $models.AttachmentStateListInput): $CancellablePromise<$models.AttachmentStateList> {
-    return $Call.ByID(2257532333, meta, conversationID, input);
-}
-
-/**
  * ListAvailableAIModels 返回指定品牌的预设模型目录。
  */
 export function ListAvailableAIModels(meta: $models.RequestMeta, brand: $models.AIProviderBrand): $CancellablePromise<$models.AIProviderModelList> {
@@ -843,6 +829,13 @@ export function RetryKnowledgeDocument(meta: $models.RequestMeta, knowledgeBaseI
 }
 
 /**
+ * RetryKnowledgeQAEntry 按当前配置重新索引问答。
+ */
+export function RetryKnowledgeQAEntry(meta: $models.RequestMeta, knowledgeBaseID: string, entryID: string): $CancellablePromise<void> {
+    return $Call.ByID(3560499234, meta, knowledgeBaseID, entryID);
+}
+
+/**
  * SaveS3Setting 保存当前企业的对象存储设置。
  */
 export function SaveS3Setting(meta: $models.RequestMeta, input: $models.S3SettingInput): $CancellablePromise<$models.S3Setting> {
@@ -878,14 +871,7 @@ export function SendAgentTextMessage(meta: $models.RequestMeta, conversationID: 
 }
 
 /**
- * SendAttachmentBatch 按选择顺序保存可带说明的单聊或 AI 聊天附件消息。
- */
-export function SendAttachmentBatch(meta: $models.RequestMeta, input: $models.AttachmentBatchInput): $CancellablePromise<$models.AttachmentBatchResult> {
-    return $Call.ByID(294445027, meta, input);
-}
-
-/**
- * SendAttachmentMessage 发送内部单聊或群聊附件消息。
+ * SendAttachmentMessage 发送已上传的单聊、群聊或 AI 聊天附件消息，首发时创建会话。
  */
 export function SendAttachmentMessage(meta: $models.RequestMeta, input: $models.AttachmentMessageInput): $CancellablePromise<$models.AttachmentMessageResult> {
     return $Call.ByID(115977132, meta, input);
@@ -1022,13 +1008,6 @@ export function UpdateAgent(meta: $models.RequestMeta, agentID: string, input: $
  */
 export function UpdateAgentExecution(meta: $models.RequestMeta, agentID: string, input: $models.UpdateAgentExecutionInput): $CancellablePromise<$models.Agent> {
     return $Call.ByID(3177846414, meta, agentID, input);
-}
-
-/**
- * UpdateAttachmentUploads 更新附件上传状态或取消尚未完成的消息。
- */
-export function UpdateAttachmentUploads(meta: $models.RequestMeta, input: $models.AttachmentUploadUpdate): $CancellablePromise<void> {
-    return $Call.ByID(3367707592, meta, input);
 }
 
 /**

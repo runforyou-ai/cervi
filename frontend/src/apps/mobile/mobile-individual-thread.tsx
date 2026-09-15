@@ -1,9 +1,10 @@
-/** 移动端真人与 AI 聊天共用的时间线、阅读进度、发送和失败重试。 */
+/** 移动端真人与 AI 聊天共用的时间线、阅读进度、引用发送和失败重试。 */
 import { useState } from "react"
 
 import {
   ConversationType,
   type ConversationMessageData,
+  type ConversationMessageReference,
   type DirectTextMessageInput,
 } from "@/api"
 import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
@@ -45,6 +46,8 @@ export function MobileIndividualThread({
   const markRead = useConversationReadMarker(conversationID, enabled)
   const [retryDraft, setRetryDraft] =
     useState<OutgoingConversationDraft | null>(null)
+  const [replyTo, setReplyTo] =
+    useState<ConversationMessageReference | null>(null)
 
   return (
     <>
@@ -55,6 +58,7 @@ export function MobileIndividualThread({
         requireWindowFocus={false}
         enabled={enabled}
         onReadMessage={enabled ? markRead : undefined}
+        onReplyMessage={enabled && !disabledReason ? setReplyTo : undefined}
         readThroughMessageID={lastReadMessageID}
         outgoingMessages={outgoing.messages}
         onRetryFailedMessage={setRetryDraft}
@@ -69,7 +73,9 @@ export function MobileIndividualThread({
         retryFailedMessage
         disabledReason={disabledReason}
         retryDraft={retryDraft}
+        replyTo={replyTo}
         onRetryDraftHandled={() => setRetryDraft(null)}
+        onReplyToChange={setReplyTo}
         sendIndividualMessage={sendIndividualMessage}
         onSucceeded={() => void invalidate(resourceKeys.inbox())}
         onSending={outgoing.start}

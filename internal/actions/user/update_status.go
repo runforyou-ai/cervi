@@ -12,6 +12,7 @@ import (
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -31,7 +32,7 @@ func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels
 		return nil, &ValidationError{Fields: map[string]ValidationCode{"status": ValidationStatusInvalid}}
 	}
 	var output *User
-	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}

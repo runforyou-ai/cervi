@@ -85,15 +85,6 @@ func (b *DirectBackend) PrepareFileUpload(ctx context.Context, meta RequestMeta,
 	return b.ops.PrepareFileUpload(ctx, meta, identity, fileID)
 }
 
-// CompleteAttachmentUpload 完成文件上传并激活原附件消息。
-func (b *DirectBackend) CompleteAttachmentUpload(ctx context.Context, meta RequestMeta, fileID string) error {
-	identity, err := b.ops.authenticate(ctx, meta)
-	if err != nil {
-		return err
-	}
-	return b.ops.CompleteAttachmentUpload(ctx, meta, identity, fileID)
-}
-
 // CancelFileUpload 将未发送的临时文件交给清理任务。
 func (b *DirectBackend) CancelFileUpload(ctx context.Context, meta RequestMeta, fileID string) error {
 	identity, err := b.ops.authenticate(ctx, meta)
@@ -103,7 +94,7 @@ func (b *DirectBackend) CancelFileUpload(ctx context.Context, meta RequestMeta, 
 	return b.ops.CancelFileUpload(ctx, meta, identity, fileID)
 }
 
-// SendAttachmentMessage 发送内部单聊或群聊附件消息。
+// SendAttachmentMessage 发送已上传的单聊、群聊或 AI 聊天附件消息，首发时创建会话。
 func (b *DirectBackend) SendAttachmentMessage(ctx context.Context, meta RequestMeta, input AttachmentMessageInput) (AttachmentMessageResult, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
 	if err != nil {
@@ -111,35 +102,6 @@ func (b *DirectBackend) SendAttachmentMessage(ctx context.Context, meta RequestM
 		return zero, err
 	}
 	return b.ops.SendAttachmentMessage(ctx, meta, identity, input)
-}
-
-// SendAttachmentBatch 按选择顺序保存可带说明的单聊或 AI 聊天附件消息。
-func (b *DirectBackend) SendAttachmentBatch(ctx context.Context, meta RequestMeta, input AttachmentBatchInput) (AttachmentBatchResult, error) {
-	identity, err := b.ops.authenticate(ctx, meta)
-	if err != nil {
-		var zero AttachmentBatchResult
-		return zero, err
-	}
-	return b.ops.SendAttachmentBatch(ctx, meta, identity, input)
-}
-
-// UpdateAttachmentUploads 更新附件上传状态或取消尚未完成的消息。
-func (b *DirectBackend) UpdateAttachmentUploads(ctx context.Context, meta RequestMeta, input AttachmentUploadUpdate) error {
-	identity, err := b.ops.authenticate(ctx, meta)
-	if err != nil {
-		return err
-	}
-	return b.ops.UpdateAttachmentUploads(ctx, meta, identity, input)
-}
-
-// ListAttachmentStates 读取窗口内已存在附件消息的最新状态。
-func (b *DirectBackend) ListAttachmentStates(ctx context.Context, meta RequestMeta, conversationID string, input AttachmentStateListInput) (AttachmentStateList, error) {
-	identity, err := b.ops.authenticate(ctx, meta)
-	if err != nil {
-		var zero AttachmentStateList
-		return zero, err
-	}
-	return b.ops.ListAttachmentStates(ctx, meta, identity, conversationID, input)
 }
 
 // GetAttachmentDownload 签发当前成员可见消息附件的下载地址。
@@ -1099,6 +1061,15 @@ func (b *DirectBackend) DeleteKnowledgeQAEntry(ctx context.Context, meta Request
 		return err
 	}
 	return b.ops.DeleteKnowledgeQAEntry(ctx, meta, identity, knowledgeBaseID, entryID)
+}
+
+// RetryKnowledgeQAEntry 按当前配置重新索引问答。
+func (b *DirectBackend) RetryKnowledgeQAEntry(ctx context.Context, meta RequestMeta, knowledgeBaseID string, entryID string) error {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		return err
+	}
+	return b.ops.RetryKnowledgeQAEntry(ctx, meta, identity, knowledgeBaseID, entryID)
 }
 
 // ListKnowledgeBases 返回当前企业的知识库列表。

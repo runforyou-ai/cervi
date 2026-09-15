@@ -20,7 +20,6 @@ import {
   type ConversationMessageReference,
   type ConversationSystemEventParticipant,
   type GroupParticipant,
-  listAttachmentStates,
 } from "@/api"
 import { CustomerDeliveryState } from "./customer-delivery-state"
 import { ConversationAttachment } from "./conversation-attachment"
@@ -29,6 +28,7 @@ import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { MessageMarkdown } from "@/components/message-markdown"
 import { messagePreview } from "@/lib/message-preview"
+import { resolveAppPlatform } from "@/platform/app-platform"
 import { openExternalURL } from "@/platform/external-navigation"
 import { ProfileAvatar } from "@/components/profile-avatar"
 import { LoadingIndicator } from "@/components/loading-indicator"
@@ -255,6 +255,9 @@ function ConversationTimelineContent({
   locateMessage?: ConversationLocateTarget | null
 }) {
   const currentIdentityID = currentUser.identityId
+  // 移动端气泡禁止文本选择，消息菜单项使用触屏尺寸，回复入口只通过长按菜单提供。
+  const mobile = resolveAppPlatform() === "mobile"
+  const menuItemClassName = cn(mobile && "min-h-11")
   const { t, i18n } = useTranslation(["inbox", "common"])
   const navigate = useNavigate()
   const timeZone = useUserTimeZone()
@@ -274,28 +277,11 @@ function ConversationTimelineContent({
     // 窗口已收录的发送项从发送状态中删除。
     outgoingStore.reconcile(conversationID, currentPage.messages)
   }, [conversationID, currentPage, outgoingStore])
-  const combinedMessages = mergeTimelineMessages(
+  const visibleMessages = mergeTimelineMessages(
     currentPage?.messages ?? [],
     timeline.mode === "latest" ? outgoingMessages : [],
     groupParticipants,
   )
-  // 刷新窗口内已有消息的附件与引用目标状态。
-  const attachmentIDs = [...new Set(combinedMessages.flatMap(message => [
-    ...(message.attachment && message.persistedMessageID ? [message.persistedMessageID] : []),
-    ...(message.replyTo?.type === MessageType.MessageTypeAttachment && !message.replyTo.deleted ? [message.replyTo.id] : []),
-  ]))].sort().join(",")
-  const attachmentStates = useResource(resourceKeys.attachmentStates(conversationID, attachmentIDs), () => listAttachmentStates(conversationID, attachmentIDs), {
-    enabled: enabled && Boolean(attachmentIDs), keepPreviousData: true, refetchInterval: pollingActive ? 2000 : false,
-  })
-  const attachmentsByMessage = new Map(attachmentStates.data?.states.map(state => [state.messageId, state]))
-  const visibleMessages = combinedMessages.flatMap(message => {
-    const state = attachmentsByMessage.get(message.persistedMessageID ?? "")
-    const replyDeleted = message.replyTo && attachmentsByMessage.get(message.replyTo.id)?.deleted
-    return state?.deleted ? [] : [{
-      ...message, attachment: state?.attachment ?? message.attachment,
-      replyTo: replyDeleted ? { ...message.replyTo!, body: "", sender: null, deleted: true } : message.replyTo,
-    }]
-  })
   // 使用窗口内持久消息编号查询投递，历史窗口也能刷新原有消息的状态。
   const deliveryMessageIDs = visibleMessages
     .flatMap((message) => message.persistedMessageID ? [message.persistedMessageID] : [])
@@ -861,8 +847,8 @@ function ConversationTimelineContent({
                               />
                             ) : null}
                             <ContextMenuTrigger asChild>
-                              <div className="group/message relative max-w-full">
-                                {incoming && !agentNotice && onReplyMessage ? (
+                              <div className={cn("group/message relative max-w-full", mobile && "select-none")}>
+                                {incoming && !agentNotice && onReplyMessage && !mobile ? (
                                   <button
                                     type="button"
                                     disabled={!message.canReply}
@@ -991,6 +977,7 @@ function ConversationTimelineContent({
                       <ContextMenuContent>
                         {!message.local && !agentNotice && onReplyMessage ? (
                           <ContextMenuItem
+                            className={menuItemClassName}
                             disabled={!message.canReply}
                             onSelect={() =>
                               onReplyMessage({
@@ -1006,6 +993,7 @@ function ConversationTimelineContent({
                           </ContextMenuItem>
                         ) : null}
                         <ContextMenuItem
+                          className={menuItemClassName}
                           onSelect={() => void copyMessageText(agentNotice ? t(agentError ? "agentRunFailed" : "agentReplyStopped") : referenceBody)}
                         >
                           {t("messageCopyText")}

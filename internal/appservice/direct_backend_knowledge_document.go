@@ -97,46 +97,8 @@ func (o *directOperations) GetKnowledgeDocumentPreview(ctx context.Context, meta
 
 // knowledgeDocumentFromAction 转换本地文档元数据。
 func knowledgeDocumentFromAction(meta RequestMeta, record knowledgeaction.DocumentRecord) KnowledgeDocument {
-	message := ""
-	if record.FailureCode != "" {
-		key := cervii18n.ErrorKnowledgeProcessingFailed
-		switch record.FailureCode {
-		case "unavailable":
-			key = cervii18n.ErrorKnowledgeProcessingUnavailable
-		case "connection_timeout":
-			key = cervii18n.ErrorKnowledgeConnectionTimeout
-		case "request_timeout":
-			key = cervii18n.ErrorKnowledgeRequestTimeout
-		case "file_read_failed":
-			key = cervii18n.ErrorKnowledgeOriginalReadFailed
-		case "empty_content":
-			key = cervii18n.ErrorKnowledgeContentEmpty
-		case "parse_failed", "unsupported_file":
-			key = cervii18n.ErrorKnowledgeParseFailed
-		case "embedding_model_unavailable":
-			key = cervii18n.ErrorKnowledgeEmbeddingUnavailable
-		case "embedding_failed":
-			key = cervii18n.ErrorKnowledgeEmbeddingFailed
-		case "embedding_dimension_mismatch":
-			key = cervii18n.ErrorKnowledgeEmbeddingDimension
-		}
-		message, _ = cervii18n.Localize(string(meta.Locale), key)
-	}
-	// 将文档处理阶段映射为展示状态。
-	status := KnowledgeDocumentRunning
-	switch record.Status {
-	case domain.KnowledgeDocumentInitial:
-		status = KnowledgeDocumentInitial
-	case domain.KnowledgeDocumentQueued:
-		status = KnowledgeDocumentQueued
-	case domain.KnowledgeDocumentSucceeded:
-		status = KnowledgeDocumentSucceeded
-	case domain.KnowledgeDocumentFailed:
-		status = KnowledgeDocumentFailed
-	case domain.KnowledgeDocumentCancelled:
-		status = KnowledgeDocumentCancelled
-	}
-	return KnowledgeDocument{ProcessingStatus: KnowledgeDocumentProcessingStatus(record.Status), SegmentBatchID: record.SegmentBatchID, SegmentCount: record.SegmentCount, FailureMessage: message, Format: KnowledgeDocumentFormat(strings.ToLower(filepath.Ext(record.Name))), ID: record.ID, GroupID: record.GroupID, Name: record.Name, ContentType: record.ContentType, ByteSize: record.ByteSize, Status: status, CreatedAt: record.CreatedAt}
+	status, message := knowledgeIndexPresentation(meta, record.Status, record.FailureCode)
+	return KnowledgeDocument{ProcessingStatus: KnowledgeIndexProcessingStatus(record.Status), SegmentBatchID: record.SegmentBatchID, SegmentCount: record.SegmentCount, FailureMessage: message, Format: KnowledgeDocumentFormat(strings.ToLower(filepath.Ext(record.Name))), ID: record.ID, GroupID: record.GroupID, Name: record.Name, ContentType: record.ContentType, ByteSize: record.ByteSize, Status: status, CreatedAt: record.CreatedAt}
 }
 
 // RetryKnowledgeDocument 按当前配置为文档安排新的处理任务。

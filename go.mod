@@ -3,9 +3,9 @@ module github.com/runforyou-ai/cervi
 go 1.27.0
 
 require (
-	github.com/aws/aws-sdk-go-v2 v1.46.0
-	github.com/aws/aws-sdk-go-v2/credentials v1.20.3
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.111.0
+	github.com/aws/aws-sdk-go-v2 v1.47.0
+	github.com/aws/aws-sdk-go-v2/credentials v1.20.4
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.113.0
 	github.com/cloudwego/eino v0.10.0-alpha.32
 	github.com/cloudwego/eino-ext/components/model/agenticark v0.2.4
 	github.com/cloudwego/eino-ext/components/model/agenticclaude v0.1.5
@@ -18,7 +18,7 @@ require (
 	github.com/go-ego/gse v1.1.0
 	github.com/goccy/go-yaml v1.19.2
 	github.com/mattn/go-sqlite3 v1.14.52
-	github.com/modelcontextprotocol/go-sdk v1.7.0
+	github.com/modelcontextprotocol/go-sdk v1.8.0
 	github.com/mozillazg/go-pinyin v0.21.0
 	github.com/nats-io/nats.go v1.53.1
 	github.com/nicksnyder/go-i18n/v2 v2.6.1
@@ -29,9 +29,9 @@ require (
 	github.com/uptrace/bun/dialect/sqlitedialect v1.2.18
 	github.com/uptrace/bun/driver/pgdriver v1.2.18
 	github.com/wailsapp/wails/v3 v3.0.0-beta.21
-	github.com/yuin/goldmark v1.7.16
-	golang.org/x/crypto v0.56.0
-	golang.org/x/text v0.41.0
+	github.com/yuin/goldmark v1.8.6
+	golang.org/x/crypto v0.57.0
+	golang.org/x/text v0.42.0
 	google.golang.org/genai v1.70.0
 )
 
@@ -47,18 +47,18 @@ require (
 	github.com/anthropics/anthropic-sdk-go v1.56.0 // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.20 // indirect
 	github.com/aws/aws-sdk-go-v2/config v1.27.27 // indirect
-	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.19.2 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/configsources v1.5.2 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.8.2 // indirect
+	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.20.0 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/configsources v1.5.3 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/endpoints/v2 v2.8.3 // indirect
 	github.com/aws/aws-sdk-go-v2/internal/ini v1.8.0 // indirect
-	github.com/aws/aws-sdk-go-v2/internal/v4a v1.5.2 // indirect
+	github.com/aws/aws-sdk-go-v2/internal/v4a v1.5.3 // indirect
 	github.com/aws/aws-sdk-go-v2/service/internal/accept-encoding v1.13.19 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.11.2 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.14.2 // indirect
-	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.20.2 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sso v1.37.0 // indirect
-	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.42.0 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sts v1.49.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/checksum v1.11.3 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/presigned-url v1.14.3 // indirect
+	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.20.3 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sso v1.38.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.43.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sts v1.50.0 // indirect
 	github.com/aws/smithy-go v1.28.1 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/bmatcuk/doublestar/v4 v4.10.0 // indirect
@@ -151,8 +151,8 @@ require (
 	golang.org/x/image v0.41.0 // indirect
 	golang.org/x/net v0.58.0 // indirect
 	golang.org/x/oauth2 v0.36.0 // indirect
-	golang.org/x/sync v0.22.0 // indirect
-	golang.org/x/sys v0.47.0 // indirect
+	golang.org/x/sync v0.23.0 // indirect
+	golang.org/x/sys v0.48.0 // indirect
 	golang.org/x/time v0.15.0 // indirect
 	google.golang.org/api v0.264.0 // indirect
 	google.golang.org/genproto/googleapis/rpc v0.0.0-20260831171406-18b4a7587f8a // indirect
