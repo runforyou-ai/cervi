@@ -64,7 +64,7 @@ func run(arguments []string) error {
 		// 由 Wails 服务端运行时监听退出信号。
 		DisableDefaultSignalHandler: true,
 		Assets: application.AssetOptions{
-			Handler:    application.AssetFileServerFS(assets),
+			Handler: application.AssetFileServerFS(assets),
 			// 实时连接升级位于租户上下文之内，并在 Wails 资源服务拒绝 WebSocket 升级之前处理。
 			Middleware: func(next http.Handler) http.Handler {
 				return api.TenantContextMiddleware(realtimeMiddleware(next))
