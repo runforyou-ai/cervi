@@ -8,7 +8,7 @@ import {
   type PointerEvent as ReactPointerEvent,
 } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { LoaderCircleIcon, PaperclipIcon } from "lucide-react"
+import { LoaderCircleIcon, PaperclipIcon, SmileIcon } from "lucide-react"
 import { useForm } from "react-hook-form"
 import { messagePreview } from "@/lib/message-preview"
 import { useTranslation } from "react-i18next"
@@ -30,6 +30,11 @@ import {
   type InboxConversation,
 } from "@/api"
 import { Button } from "@/components/ui/button"
+import {
+  Popover,
+  PopoverContent,
+  PopoverTrigger,
+} from "@/components/ui/popover"
 import { Textarea } from "@/components/ui/textarea"
 import {
   createConversationComposerSchema,
@@ -49,6 +54,7 @@ import { resolveAppPlatform } from "@/platform/app-platform"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 import { cn } from "@/lib/utils"
+import composerEmojis from "../../../../internal/publicweb/composer-emojis.json"
 
 const conversationComposerMaxHeight = 200
 const conversationComposerMinHeight = 80
@@ -164,6 +170,8 @@ export function ConversationComposer({
     value: string
   } | null>(null)
   const [activeMentionIndex, setActiveMentionIndex] = useState(0)
+  const [emojiOpen, setEmojiOpen] = useState(false)
+  const emojiCaretRef = useRef<number | null>(null)
   // 移动端的提及候选和取消引用使用触屏尺寸。
   const mobile = resolveAppPlatform() === "mobile"
   const { isSubmitting } = form.formState
@@ -299,6 +307,25 @@ export function ConversationComposer({
       input.setSelectionRange(nextCaret, nextCaret)
       resizeComposerInput(input, manualInputHeightRef.current)
     })
+  }
+
+  /** 用选中的表情替换正文当前选区，关闭面板后光标落在表情之后。 */
+  function insertEmoji(emoji: string) {
+    const input = inputRef.current
+    if (!input) return
+    const body = form.getValues("body")
+    const start = input.selectionStart ?? body.length
+    const end = input.selectionEnd ?? start
+    const nextBody = `${body.slice(0, start)}${emoji}${body.slice(end)}`
+    const nextCaret = start + emoji.length
+    setMentionAllToken((current) =>
+      reconcileMentionAllToken(current, body, nextBody, nextCaret),
+    )
+    form.setValue("body", nextBody, { shouldDirty: true })
+    reconcileMentionSubjects(nextBody)
+    resizeComposerInput(input, manualInputHeightRef.current)
+    emojiCaretRef.current = nextCaret
+    setEmojiOpen(false)
   }
 
   useEffect(() => {
@@ -704,21 +731,73 @@ export function ConversationComposer({
           <div className="flex items-center justify-between gap-3 px-2.5 pb-2.5">
             {disabledReason ? (
               <p id={`${inputID}-reason`} className="text-xs text-muted-foreground">{disabledReason}</p>
-            ) : (conversationType === ConversationType.ConversationTypeDirect ||
-              conversationType === ConversationType.ConversationTypeAgent ||
-              conversationType === ConversationType.ConversationTypeGroup) ? (
-              <ConversationAttachmentUpload
-                conversationID={conversationID || (attachmentAgentDraft?.conversationID ?? "")}
-                targetIdentityID={attachmentTargetIdentityID}
-                agentIdentityID={attachmentAgentDraft?.agentIdentityID}
-                disabled={isSubmitting}
-                onBeforeSend={onBeforeSend}
-                onCreated={(conversation) => onAttachmentConversationCreated?.(conversation)}
-              />
             ) : (
-              <Button type="button" variant="ghost" size="icon-sm" disabled aria-label={t("attachmentAdd")}>
-                <PaperclipIcon />
-              </Button>
+              <div className="flex items-center gap-1">
+                {(conversationType === ConversationType.ConversationTypeDirect ||
+                  conversationType === ConversationType.ConversationTypeAgent ||
+                  conversationType === ConversationType.ConversationTypeGroup) ? (
+                  <ConversationAttachmentUpload
+                    conversationID={conversationID || (attachmentAgentDraft?.conversationID ?? "")}
+                    targetIdentityID={attachmentTargetIdentityID}
+                    agentIdentityID={attachmentAgentDraft?.agentIdentityID}
+                    disabled={isSubmitting}
+                    onBeforeSend={onBeforeSend}
+                    onCreated={(conversation) => onAttachmentConversationCreated?.(conversation)}
+                  />
+                ) : (
+                  <Button type="button" variant="ghost" size="icon-sm" disabled aria-label={t("attachmentAdd")}>
+                    <PaperclipIcon />
+                  </Button>
+                )}
+                <Popover open={emojiOpen} onOpenChange={setEmojiOpen}>
+                  <PopoverTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      className={mobile ? "size-11" : undefined}
+                      disabled={isSubmitting}
+                      aria-label={t("emojiPick")}
+                    >
+                      <SmileIcon />
+                    </Button>
+                  </PopoverTrigger>
+                  <PopoverContent
+                    side="top"
+                    align="start"
+                    collisionPadding={8}
+                    aria-label={t("emojiPick")}
+                    className={cn(
+                      "grid max-h-64 w-auto gap-0.5 overflow-y-auto p-1.5",
+                      mobile ? "grid-cols-7" : "grid-cols-8",
+                    )}
+                    onCloseAutoFocus={(event) => {
+                      // 选中表情后焦点回到输入框并定位到插入内容之后。
+                      const caret = emojiCaretRef.current
+                      const input = inputRef.current
+                      if (caret === null || !input) return
+                      emojiCaretRef.current = null
+                      event.preventDefault()
+                      input.focus()
+                      input.setSelectionRange(caret, caret)
+                    }}
+                  >
+                    {composerEmojis.map((emoji) => (
+                      <button
+                        key={emoji}
+                        type="button"
+                        className={cn(
+                          "flex items-center justify-center rounded-md text-xl leading-none outline-none hover:bg-accent focus-visible:bg-accent",
+                          mobile ? "size-11" : "size-8",
+                        )}
+                        onClick={() => insertEmoji(emoji)}
+                      >
+                        {emoji}
+                      </button>
+                    ))}
+                  </PopoverContent>
+                </Popover>
+              </div>
             )}
             <Button type="submit" size="sm" className={mobile ? "min-h-11" : undefined} disabled={isSubmitting || Boolean(disabledReason) || isBodyEmpty || replyTo?.deleted}>
               {isSubmitting && showSubmitting ? (
