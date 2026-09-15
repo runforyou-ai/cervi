@@ -118,7 +118,7 @@ func TestKnowledgeQALifecycle(t *testing.T) {
 	if _, err := knowledgeaction.NewDeleteKnowledgeGroupAction(db).Execute(ctx, identity, base.ID, groupID); !errors.Is(err, knowledgeaction.ErrGroupNotEmpty) {
 		t.Fatalf("delete occupied group=%v", err)
 	}
-	if _, err := knowledgeaction.NewUpdateKnowledgeBaseAction(db).Execute(ctx, identity, base.ID, newKnowledgeBaseInput(t, db, identity, base.Name, domain.KnowledgeBaseCategoryStandard)); !errors.Is(err, knowledgeaction.ErrBaseHasContent) {
+	if _, err := knowledgeaction.NewUpdateKnowledgeBaseAction(db, newKnowledgeTasks(t, db)).Execute(ctx, identity, base.ID, newKnowledgeBaseInput(t, db, identity, base.Name, domain.KnowledgeBaseCategoryStandard)); !errors.Is(err, knowledgeaction.ErrBaseHasContent) {
 		t.Fatalf("change type=%v", err)
 	}
 	input.SimilarQuestions = []knowledgeaction.QASimilarQuestion{{Content: "新增相似问题"}}

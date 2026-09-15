@@ -118,7 +118,7 @@ func TestKnowledgeDocumentLifecycle(t *testing.T) {
 	if _, err := knowledgeaction.NewDeleteKnowledgeGroupAction(db).Execute(ctx, identity, base.ID, target); !errors.Is(err, knowledgeaction.ErrGroupNotEmpty) {
 		t.Fatal("occupied group", err)
 	}
-	if _, err := knowledgeaction.NewUpdateKnowledgeBaseAction(db).Execute(ctx, identity, base.ID, newKnowledgeBaseInput(t, db, identity, base.Name, domain.KnowledgeBaseCategoryQA)); !errors.Is(err, knowledgeaction.ErrBaseHasContent) {
+	if _, err := knowledgeaction.NewUpdateKnowledgeBaseAction(db, newKnowledgeTasks(t, db)).Execute(ctx, identity, base.ID, newKnowledgeBaseInput(t, db, identity, base.Name, domain.KnowledgeBaseCategoryQA)); !errors.Is(err, knowledgeaction.ErrBaseHasContent) {
 		t.Fatal("occupied base", err)
 	}
 	if err := knowledgeaction.NewDeleteDocumentAction(db).Execute(ctx, identity, base.ID, docs[0].ID); err != nil {

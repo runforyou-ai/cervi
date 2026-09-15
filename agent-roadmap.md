@@ -130,12 +130,12 @@ Eino Session、Checkpoint 和 BackgroundTask 若以后启用，只是某个 Run 
 Realtime 不参与 P1a/P1b 的正确性闭环；两阶段分别通过 appservice 业务查询和网站轮询读取最终 Message。完整 P1 和设备阶段使用以下统一实时设计。
 
 - 全产品只使用 `chat-roadmap.md` 定义的一个版本化 Realtime WebSocket 及其 JSON 帧协议，不为设备能力另建连接或 MCP Transport；AI 流在同一连接上按 runId 授权订阅，不另建 SSE。
-- 聊天变化通过用户、客服 Inbox 和访客目录三类受众的会话版本通知送达，客户端经 HTTP／Wails 业务 Query 重读；WebSocket 不复制完整业务 DTO。受众采用 `(namespace, organizationId, audienceKind, audienceId)`，Subject 为 `<namespace>.realtime.<organizationId>.<audienceKind>.<audienceId>`。
+- 聊天变化通过用户、客服 Inbox 和访客目录三类受众的会话版本通知送达，客户端经 HTTP／Wails 业务 Query 重读；WebSocket 不复制完整业务 DTO。受众采用 `(namespace, organizationId, audienceKind, audienceId)`，Subject 为 `cervi.<namespace>.realtime.<organizationId>.<audienceKind>.<audienceId>`。
 - 最小协议只包含认证、Hello、心跳、变更通知、撤销、错误和下线；AI 流订阅与流帧由 PR38 在同一协议中增加，设备帧到设备阶段再增加。
-- 首版投影与版本只驻留内存，刷新、重连或缓存丢失后按兜底探针重读已加载窗口，不扫描完整授权索引。target／applied 与实体读取版本分开，Query 失败保留 dirty；独立保存游标不能替代离线库。
-- 网站已有渠道身份才连接；首条有效消息建立身份后再连接，无身份页面仅通过恢复前台和低频无副作用检查发现其他页面建立的身份。访客先同步目录，再补所需窗口。
+- 首版投影与版本只驻留内存，刷新、重连或缓存丢失后按兜底探针重读已加载窗口，不扫描完整授权索引。客户端收到通知即失效对应 Query，读取失败保留查询错误状态并由重试恢复；独立保存游标不能替代离线库。
+- 网站已有渠道身份才连接；首条有效消息建立身份后再连接，其他页面建立的身份在本页刷新后生效。访客先同步目录，再补所需窗口。
 - 实时接入保留列表选择和滚动锚点，深处暂存活动序移动；个人置顶由本人手动排序并跨端同步，新消息不改变顺序。收到帧或补拉完成不能推进已读；冷启动／重连不逐条补弹通知。
-- AI token 流在同一 WebSocket 上按 runId 授权订阅，帧为 `RunStreamSnapshot`、`RunStreamDelta`、`RunStreamEnded`（完成、失败或取消）与 `RunStreamResubscribe`；增量不写入 Message、不推进会话版本、不发布变更通知；最终消息和 Run 状态仍从 PostgreSQL 与 HTTP 恢复。
+- AI token 流在同一 WebSocket 上按 runId 授权订阅，帧为 `RunStreamSnapshot`、`RunStreamDelta`、`RunStreamEnded`（完成、失败或取消）；增量不写入 Message、不推进会话版本、不发布变更通知；最终消息和 Run 状态仍从 PostgreSQL 与 HTTP 恢复。
 - 设备调用先写入 PostgreSQL，事务提交后发布设备工作水位通知；Realtime Gateway 只推送设备工作水位，参数领取、进度、结果和持久取消状态走 HTTP。
 - 提交后发布、WSS、Gateway 或 Core NATS 丢失通知后，设备连接在重连、前台恢复和设备自身的定期校验时经 HTTP 读取工作水位和待领取列表恢复；设备水位不进入聊天 `GetSyncHeads`。
 - WSS 在线只表示连接存在，不代表设备可弹审批、拥有 OS 权限或能在后台可靠执行。
@@ -379,7 +379,7 @@ agent_runs
 - 内容块只在 Run 成功时与最终 Message、Run 终态和消费水位原子提交。整次运行失败、取消或当前尝试退出时丢弃内存过程，不持久化半成品。
 - 运行快照包含 `runId`、任务 `attempt`、`streamId`、流内递增 `sequence`、稳定块编号及候选正文。重算建立新流并清空旧过程；未来 WebSocket 切换流时替换整个思考区，并忽略旧尝试事件。模型调用以流式执行，过程记录器按分片序号累积思考、正文和工具调用并分配稳定块编号，模型调用定稿后沿用这些编号；展示变化按约 50ms 合并为可按序应用的增量（写入块、追加块文本、移除块、追加或清空候选正文、重置），运行流中的工具调用只含名称、状态和起止时间，完整参数与结果随成功过程持久化后读取。`agentrun` 按 runId 提供本进程内订阅：同一把锁内返回快照并登记之后的增量，订阅积压超限时关闭并要求重新订阅，执行尝试退出时结束订阅；尚未接入传输订阅。
 - 后续实时交付统一接入产品 WebSocket；各端只有通过补拉、失权和阅读回归后才移除对应轮询，不新增过程轮询接口。PR36 拆分轻量 Run 摘要集合与按 runId 读取的持久过程；PR37 增量消费模型输出并维护内存流快照。
-- PR38 在同一 WebSocket 上按 runId 授权订阅交付成员流：订阅即取快照再接增量，断线或收到重订阅要求后重新订阅取新快照，忽略旧 attempt／streamId；只有事务提交后才能提示 completed，持久 Query 终态覆盖临时候选，丢失 completed 仍由会话版本收敛。PR39 在服务端构造访客专属公开正文／基础状态，内部思考、工具参数与结果不进入访客流；接管或关闭立即终止旧候选资格。
+- PR38 在同一 WebSocket 上按 runId 授权订阅交付成员流：订阅即取快照再接增量，断线或因发送队列溢出被关闭后重连并重新订阅取新快照，忽略旧 attempt／streamId；只有事务提交后才能提示 completed，持久 Query 终态覆盖临时候选，丢失 completed 仍由会话版本收敛。推迟的 PR39 开启后在服务端构造访客专属公开正文／基础状态，内部思考、工具参数与结果不进入访客流；接管或关闭立即终止旧候选资格；推迟期间访客经会话通知读取最终回复。
 - 当前 Web、桌面端和移动端成员消息时间线共用一个默认折叠的思考区，展开箭头紧邻状态文字；thinking 用斜体，content 正常显示，工具逐个折叠展示状态和完整参数、结果或错误。工具原文按实际布局截断，只有溢出时提供完整内容提示；最终正文下显示输入、输出用量。现有消息读取带上最近 Run 的状态，运行中显示“思考中”，实时过程和打字机效果待 WebSocket 接入。
 
 聊天内容块用于回看成功回复的过程；未来涉及外部副作用、审批和费用的审计记录另按下面的语义步骤模型建设，不能用聊天过程的丢弃规则代替业务审计。
@@ -741,7 +741,7 @@ device_invocations
   -> Gateway 更新 Tool Invocation
 ```
 
-设备能力进入开发阶段时，在同一套实时帧定义中新增可被旧客户端忽略的 `DeviceWorkAdvanced` ServerFrame，并通过 `ClientHello` 能力协商。它属于 P1 水位通知优先级，只携带设备编号和最新 `work_seq`，不携带工具名、参数或审批内容；不增加客户端持久命令帧。首版复用用户 NATS Subject，由各 Realtime Gateway 按已认证 `device_id` 过滤，不提前增加设备 Subject。
+设备能力进入开发阶段时，在同一套实时帧定义中新增可被旧客户端忽略的 `DeviceWorkAdvanced` ServerFrame，并通过 `ClientHello` 能力协商。它与变更通知共用连接发送队列并按设备合并为最新水位，只携带设备编号和最新 `work_seq`，不携带工具名、参数或审批内容；不增加客户端持久命令帧。首版复用用户 NATS Subject，由各 Realtime Gateway 按已认证 `device_id` 过滤，不提前增加设备 Subject。
 
 设备重连后使用现有 Realtime 认证和 Hello，再通过 HTTP 比较工作 Head、补拉或领取调用；声明 Executor 能力的设备连接另按固定间隔经 HTTP 比较工作 Head，覆盖提交后发布丢失的通知；设备 Head 不进入聊天 `GetSyncHeads`。不能依赖 Gateway 重放帧。终态设备调用按保留策略清理，长期审计仍由 Agent Tool Invocation 保存。
 
