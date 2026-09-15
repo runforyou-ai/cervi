@@ -42,7 +42,6 @@ export function DocumentPDFPreview({ content }: { content: Uint8Array<ArrayBuffe
       cMapPacked: true,
       standardFontDataUrl: `${base}standard_fonts/`,
       wasmUrl: `${base}wasm/`,
-      isEvalSupported: false,
     })
     void task.promise
       .then((document) => {
