@@ -1146,7 +1146,7 @@ AI 流在同一 WebSocket 连接上按 runId 订阅：客户端展开运行过�
 
 浏览器 WebSocket 不能自由设置认证 Header，因此认证放在连接建立后的首帧：客户端在五秒内提交 `Authenticate` 帧，成员使用与业务调用相同的 Bearer Token，网站挂件使用第 4.5 节的长期访客 Cookie/Header 恢复出的渠道身份。凭据不放入 URL 查询参数，避免进入代理和访问日志；不建一次性票据表。
 
-原生端由 Go 侧 Proxy 持有 WebSocket，把帧经 Wails 事件交给 TS，长期 Token 仍只留在 Go `clientsession` 中，凭据边界与现有 API Proxy 一致。Web 端直接建立连接并沿用既有 Bearer 存储。Socket Origin 按 iframe 自身来源校验，宿主页白名单沿用网站嵌入规则。
+原生端由 Go 侧 Proxy 持有 WebSocket，前端传输内核调用 `ConnectRealtime`／`DisconnectRealtime` 驱动启停与重连；Go 侧发送认证、Hello 与心跳，把服务端帧原文与关闭码、原因经 Wails 事件交给 TS，长期 Token 仍只留在 Go `clientsession` 中，凭据边界与现有 API Proxy 一致。Web 端直接建立连接并沿用既有 Bearer 存储。Socket Origin 按 iframe 自身来源校验，宿主页白名单沿用网站嵌入规则。
 
 Wails 服务端模式的 AssetServer 拒绝 WebSocket 升级，且延迟下发响应头：连接路径为 `/api/realtime`，Gateway 在服务端 `Assets.Middleware` 中位于租户上下文中间件之内处理该路径的升级请求，沿 `Unwrap` 解包 Wails 写入器后再升级。连接默认只接受与 Host 相同的 Origin，Web 端、网站挂件 iframe 与服务端同源，`ingress` 反向代理与 Cloudflare Tunnel 保留原始 Host；原生端 Go 连接不带 Origin。原生端按服务器地址路径拼接连接地址，可部署在剥离前缀的反向代理之后；Web 端的 Wails 运行时本身不支持子路径部署。
 
@@ -1163,6 +1163,8 @@ Gateway 安装订阅并 Flush 后再读取探针值，避免先读探针后订�
 - 多设备分别维护内存投影，同一用户的连接可以同时接收通知；缓存丢失按第 10.8 节重建。
 - 页面或应用进入后台时不假设长连接持续存活；恢复前台后总是重新校验探针。
 - 无论连接是否健康，每 30 秒执行一次第 10.8 节的兜底校验。
+
+服务端关闭连接时在关闭帧中写明原因：协议与认证错误先发送 `realtime_error` 再以错误码关闭，撤销、到期、空闲、慢连接与下线分别使用 `session_revoked`、`session_expired`、`idle_timeout`、`slow_consumer` 与 `server_going_away`。
 
 Gateway 为每条连接维护单写协程和一条有界发送队列：变更通知按同一会话同一种类只保留最高版本，同一 Run 的待发流增量合并，会话失权与撤销控制不合并；队列溢出时以 `slow_consumer` 关闭连接，客户端重连后按探针同步并重新订阅 AI 流取新快照。typing、presence 等临时事件随真实功能加入时再确定合并与丢弃规则。
 

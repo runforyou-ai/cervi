@@ -28,6 +28,7 @@ import (
 	telegramintegration "github.com/runforyou-ai/cervi/internal/integration/telegram"
 	"github.com/runforyou-ai/cervi/internal/publicweb"
 	"github.com/runforyou-ai/cervi/internal/realtime"
+	"github.com/runforyou-ai/cervi/internal/realtime/gateway"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
@@ -35,8 +36,8 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
-// applicationServices 组装企业服务端入口、业务服务和后台任务。
-func applicationServices(appStorage *serverstorage.Store, config serverconfig.Config) ([]application.Service, error) {
+// applicationServices 组装企业服务端入口、业务服务和后台任务，并返回处理实时连接升级的资源中间件。
+func applicationServices(appStorage *serverstorage.Store, config serverconfig.Config) ([]application.Service, application.Middleware, error) {
 	// 按请求域名解析企业，并为 HTTPS 入口提供证书缓存。
 	tenantResolver := serverstorage.NewTenantResolver(appStorage.DB())
 	httpsEntry := ingress.NewHTTPSEntry(config.TLS, config.Server, serverstorage.NewACMECache(appStorage.DB()), tenantResolver)
@@ -44,7 +45,7 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	// 初始化本地文件存储和按企业读取的对象存储配置。
 	localFiles, err := serverfilecontent.NewLocalStore(config.Storage.LocalDirectory)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	resolveFileS3 := newFileContentS3ConfigResolver(appStorage.DB())
 
@@ -64,46 +65,46 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	}
 	// 知识库分词词典在启动时加载一次，供分段写入与词法召回共用。
 	if err := searchtext.LoadKnowledgeDictionary(); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	embeddingClient := embedding.NewClient()
 	processDocument := knowledgeaction.NewProcessDocumentAction(appStorage.DB(), documentConverter, embeddingClient, fileReader)
 	if err := tasks.Registry().RegisterJSONWithTerminalFailure(knowledgeaction.ProcessDocumentActionName, processDocument.Execute, processDocument.FinalizeFailure); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	// 注册问答索引任务及最终失败时的状态处理。
 	processQAEntry := knowledgeaction.NewProcessQAEntryAction(appStorage.DB(), embeddingClient)
 	if err := tasks.Registry().RegisterJSONWithTerminalFailure(knowledgeaction.ProcessQAEntryActionName, processQAEntry.Execute, processQAEntry.FinalizeFailure); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// 注册 MCP 工具目录更新任务及最终失败时的状态处理。
 	updateMCPTools := mcpserveraction.NewUpdateToolsAction(appStorage.DB(), mcpintegration.NewClient())
 	if err := tasks.Registry().RegisterJSONWithTerminalFailure(mcpserveraction.RefreshToolsActionName, updateMCPTools.Execute, updateMCPTools.FinalizeFailure); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// 初始化智能体运行环境，注册执行任务及最终失败处理；运行期通过附件读取器读取会话附件，按配置版本绑定的知识库执行混合检索。
 	agentRuntime, err := agentruntime.New()
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	agentRunScheduler := agentrunaction.NewScheduler(tasks)
 	executeAgentRun := agentrunaction.NewExecuteAction(appStorage.DB(), tasks, agentRuntime,
 		agentrunaction.NewAttachmentReader(appStorage.DB(), fileReader, attachmentScheme),
 		knowledgeaction.NewRetrievalService(appStorage.DB(), embedding.NewClient(), rerank.NewClient()))
 	if err := tasks.Registry().RegisterJSONWithTerminalFailure(agentrunaction.RunActionName, executeAgentRun.Execute, executeAgentRun.FinalizeFailure); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 
 	// 注册过期文件扫描与删除任务，每小时触发一次扫描。
 	scanExpired := filemaintenance.NewScanExpiredAction(appStorage.DB(), tasks)
 	deleteExpired := filemaintenance.NewDeleteExpiredAction(appStorage.DB(), serverfilecontent.NewDeleter(localFiles, resolveFileS3))
 	if err := tasks.Registry().RegisterJSON(filemaintenance.ScanExpiredActionName, scanExpired.Execute); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if err := tasks.Registry().RegisterJSON(filemaintenance.DeleteExpiredActionName, deleteExpired.Execute); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	tasks.RegisterSchedule(servertask.ScheduleDefinition{
 		Key: filemaintenance.CleanupScheduleKey, ActionName: filemaintenance.ScanExpiredActionName, Queue: "maintenance",
@@ -114,6 +115,8 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	// 组装企业成员与网站匿名访客各自的业务入口。
 	directBackend := appservice.NewDirectBackend(appStorage.DB(), localFiles, tenantResolver, agentRunScheduler, executeAgentRun, tasks, documentConverter)
 	boundService := appservice.New(directBackend)
+	// 成员实时网关复用业务调用的身份解析与同步探针。
+	realtimeGateway := gateway.New(directBackend, config.NATS.Namespace, gateway.DefaultOptions(config.Realtime.MaxFrameBytes))
 	websiteVisitorBackend := appservice.NewWebsiteVisitorDirectBackend(appStorage.DB(), agentRunScheduler)
 	websiteVisitorService := appservice.NewWebsiteVisitorService(websiteVisitorBackend)
 
@@ -121,10 +124,10 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	telegramAPI := telegramintegration.NewClient(connectiontest.NewHTTPClient())
 	deliveryWorker := deliveryaction.NewWorker(appStorage.DB(), telegramAPI, tasks)
 	if err := tasks.Registry().RegisterJSON(deliveryaction.SendActionName, deliveryWorker.Execute); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if err := tasks.Registry().RegisterJSON(deliveryaction.ScanActionName, deliveryWorker.Scan); err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	tasks.RegisterSchedule(servertask.ScheduleDefinition{
 		Key: "customer-delivery-scan", ActionName: deliveryaction.ScanActionName, Queue: "maintenance",
@@ -157,7 +160,7 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	return []application.Service{
 		application.NewServiceWithOptions(api.NewLiveness(), application.ServiceOptions{Route: "/healthz"}),
 		application.NewServiceWithOptions(api.NewReadiness(appStorage.DB()), application.ServiceOptions{Route: "/readyz"}),
-		application.NewService(&realtimeLifecycle{publisher: realtimePublisher}),
+		application.NewService(&realtimeLifecycle{publisher: realtimePublisher, gateway: realtimeGateway}),
 		application.NewService(&httpsLifecycle{service: httpsEntry}),
 		application.NewServiceWithOptions(boundService, application.ServiceOptions{
 			MarshalError: appservice.MarshalError,
@@ -175,7 +178,7 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 		application.NewServiceWithOptions(publicweb.NewChatService(publicLookup), application.ServiceOptions{
 			Route: "/chat/",
 		}),
-	}, nil
+	}, realtimeGateway.Middleware, nil
 }
 
 // newFileContentS3ConfigResolver 创建读取企业对象存储配置的解析器。
@@ -224,17 +227,23 @@ func (l *serverTaskLifecycle) ServiceShutdown() error {
 	return l.runtime.Stop()
 }
 
-// realtimeLifecycle 将实时通知发布器接入 Wails 服务生命周期。
+// realtimeLifecycle 将实时通知发布器与成员实时网关接入 Wails 服务生命周期。
 type realtimeLifecycle struct {
 	publisher *realtime.Publisher
+	gateway   *gateway.Gateway
 }
 
-// ServiceStartup 连接 NATS 并开始发布已提交通知。
+// ServiceStartup 连接 NATS，开始发布已提交通知并接收实时连接。
 func (l *realtimeLifecycle) ServiceStartup(context.Context, application.ServiceOptions) error {
-	return l.publisher.Start()
+	if err := l.publisher.Start(); err != nil {
+		return err
+	}
+	l.gateway.Start(l.publisher.Connection())
+	return nil
 }
 
-// ServiceShutdown 停止实时通知发布器。
+// ServiceShutdown 先向实时连接发送下线提示并有界关闭，再停止实时通知发布器。
 func (l *realtimeLifecycle) ServiceShutdown() error {
+	l.gateway.Shutdown()
 	return l.publisher.Stop()
 }

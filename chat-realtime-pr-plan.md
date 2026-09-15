@@ -184,13 +184,15 @@ PR01–PR19 与 PR37 已交付以下能力，后续 PR 直接依赖，不重复�
 
 - **依赖：** PR18。合并原清单 PR28、PR29、PR30，以及本清单 PR24 与 PR35 的原生端子路径、心跳和关闭部分；客服共享受众的订阅在 PR20 完成后生效。
 - **范围：** 按 `chat-roadmap.md` 第 10.11 节定义首版 WebSocket JSON 帧：Authenticate、ClientHello／ServerHello、Ping／Pong、ConversationChanged、ConversationRemoved、ConversationStateChanged、IdentityProfileChanged、SessionRevoked、ServerGoingAway、RealtimeError；访客帧由 PR26 增加，AI 流订阅与流帧由 PR38 增加，PinOrderChanged 由 PR40 增加，均遵守同一版本与未知帧规则，64 位整数一律用字符串。Server 内嵌 Gateway，首帧限时 Authenticate；Web 使用现有 Bearer，原生端由 Go 侧 Proxy 持有连接并把帧经 Wails 事件交给 TS。按本节点在线受众订阅，禁止 Queue Group 与企业通配订阅。登出按 token session、停用按用户发送控制通知，连接设最长存活时间。原生端支持子路径部署，配置心跳，停止时发送下线提示后有界关闭。不建票据表。
-- **落点：** 新增 `internal/realtime` 的帧定义、Gateway 与连接注册表，以及对应的 TS 帧类型与共用夹具；`internal/realtime` 通知新增撤销种类与 tokenSessionId；`internal/apiproxy` 的原生连接持有；服务端 `Assets.Middleware` 装配与 `internal/config/server`；`actions/auth/logout.go` 与用户停用入口。
+- **落点：** 新增 `internal/realtime/protocol`（Go 帧定义、编解码与共用夹具 `testdata/frames.json`）、`internal/realtime/gateway`（连接、发送队列与受众订阅）与 `frontend/src/api/realtime/protocol.ts`；`internal/realtime` 通知新增 `session_logged_out`、`user_disabled` 撤销种类与 tokenSessionId；`actions/auth/logout.go` 与 `actions/user/update_status.go` 登记撤销；`appservice.DirectBackend` 提供 `AuthenticateMember`／`MemberSyncHeads`；Service 新增原生端 `ConnectRealtime`／`DisconnectRealtime`，由 `internal/apiproxy/realtime.go` 实现；服务端 `Assets.Middleware` 装配与 `internal/config/server` 的 `realtime.maxFrameBytes`。
 - **实施：**
   - **帧契约：** Go 结构体与 TS 类型各自手写，线上 `type` 使用 snake_case 并与 NATS `kind` 一致；以共用夹具锁定线上格式、协议主版本和字符串整数边界，Go 覆盖两个方向的编解码，TS 覆盖客户端帧编码与服务端帧解码。
   - **挂载与地址：** 连接路径为 `/api/realtime`；Gateway 在服务端 `Assets.Middleware` 中位于租户上下文中间件之内处理该路径的升级请求，升级前沿 `Unwrap` 解包 Wails 写入器，允许来源保持默认同源。原生端按服务器地址路径拼接，与 API Proxy 一致。
-  - **认证与寿命：** 连接依次处于 awaiting_auth、authenticated、closing；认证前只允许 Authenticate，五秒内未认证即关闭；Authenticate 复用业务调用的身份解析，令牌须存在、未过期且账号活跃。连接最长存活 1 小时且不晚于登录会话到期，到期关闭后客户端重连并重新认证。连接登记 tokenSessionId、userId 和企业；订阅安装完成并 Flush 之后才读取 Hello 探针值。
-  - **撤销：** 登出通知携带 tokenSessionId，停用按用户受众发送；Gateway 收到后撤销订阅并关闭对应连接。
-  - **发送队列与心跳：** 每条连接一个写协程与一条有界发送队列，单帧受可配置上限约束；变更通知按同一会话同一种类保留最高版本，`conversation_removed` 与撤销控制不合并；溢出时以 `slow_consumer` 原因码关闭连接，客户端重连后经探针恢复。客户端每 25 秒发送 Ping，服务端 60 秒内未收到任何帧即关闭连接；心跳间隔与代理空闲时间一起记录。
+  - **下线：** 服务端退出时 Gateway 先拒绝新的升级请求（503），再向现有连接发送 `server_going_away` 并以同名原因关闭，默认 5 秒内未完成的连接强制断开，之后停止通知发布器。
+  - **认证与寿命：** 连接依次处于 awaiting_auth、authenticated、closing；认证前只允许 Authenticate，五秒内未认证即以 `authentication_timeout` 关闭；Authenticate 复用业务调用的身份解析，令牌须存在、未过期且账号活跃，身份解析同时返回令牌编号（即 tokenSessionId）与到期时间。连接最长存活 1 小时且不晚于登录会话到期，到期以 `session_expired` 关闭后客户端重连并重新认证。认证后收到 `client_hello` 时登记 tokenSessionId、userId 和企业并安装受众订阅，Flush 之后才读取 Hello 探针值；变更通知可能先于 `server_hello` 送达。
+  - **撤销：** 登出在删除令牌的事务内登记携带 tokenSessionId 的 `session_logged_out`，停用在账号状态事务内按用户受众登记 `user_disabled`；Gateway 收到后清除该连接未发送的帧，发送 `session_revoked` 并以 `session_revoked` 原因关闭。
+  - **发送队列与心跳：** 每条连接一个写协程与一条有界发送队列，单帧上限由 `realtime.maxFrameBytes`（环境变量 `REALTIME_MAX_FRAME_BYTES`，默认 65536，范围 64–256KB）配置，同时约束客户端帧读取；变更通知按同一会话同一种类保留最高版本，`conversation_removed` 与撤销控制不合并；队列溢出或单帧写入超过 10 秒时按 `slow_consumer` 关闭连接，客户端重连后经探针恢复。客户端每 25 秒发送 Ping，服务端 60 秒内未收到任何帧即以 `idle_timeout` 关闭；心跳间隔与代理空闲时间一起记录。协议错误发送 `realtime_error` 后以错误码作为关闭原因，认证读取失败使用 `unavailable`。
+  - **原生端：** Service 的 `ConnectRealtime`／`DisconnectRealtime` 由 PR27 的传输内核驱动启停与退避重连；Go 侧 `apiproxy` 用当前登录凭据拨号 `<服务器地址路径>/api/realtime`，发送 Authenticate、ClientHello 并每 25 秒发送 Ping，把服务端帧原文经 `cervi:realtime:frame` 事件、关闭码与原因经 `cervi:realtime:closed` 事件交给前端，事件携带本地连接编号区分新旧连接；登录、登出与切换企业服务器时关闭当前连接。
   - **日志与凭据：** 认证失败、慢连接关闭和发布失败记录 `WARN`，不记凭据或正文；原生端不把长期 Token 交给 TS。
 - **验收：** 共用夹具下两端编解码结果一致，未知可忽略帧与不支持的协议主版本分别有明确结果，超过 JS 安全整数的值正确；一用户多设备均收到通知；先注册订阅再给探针值；慢消费者断开后可补拉；已连接后登出或停用不再收到通知；撤销事务回滚不产生错误断连；连接到达最长存活时间后关闭，凭据有效时重连成功，登出或停用后重连认证失败；原生端经剥离子路径前缀的反向代理可连，空闲超过代理默认时间仍正常。
 - **验证步骤：** 客户端帧由 TS 编码、Go 解码，服务端帧由 Go 编码、TS 解码，均与共用夹具一致；在安装订阅与读取探针之间提交消息，客户端通过 Hello 或后续通知至少发现一次；同账号建立两条连接两端均收到；堵塞一端读流触发有界关闭，另一端继续正常工作。连接后登出本次 token 只关闭对应登录会话，停用用户关闭其全部会话；分别丢弃登出与停用的控制通知后，连接在最长存活时间到期时关闭，重连认证失败。SIGTERM 后连接收到下线提示，重启后客户端经探针补齐停机期间的变化，退出不关闭共享 NATS。
@@ -214,7 +216,7 @@ PR01–PR19 与 PR37 已交付以下能力，后续 PR 直接依赖，不重复�
 ### PR27：共享客户端连接与会话代次
 
 - **依赖：** PR25。
-- **范围：** `src/api/realtime` 实现无 feature 依赖的 TS 传输内核；一个应用实例一连接、业务页签共用，浏览器各标签页可独立连接。原生端消费 Go 侧连接投递的帧，Web 端自建 Socket。抖动退避、重新认证，网络／认证／版本错误分流；`slow_consumer` 关闭与 `server_going_away` 按网络错误退避重连。
+- **范围：** `src/api/realtime` 实现无 feature 依赖的 TS 传输内核；一个应用实例一连接、业务页签共用，浏览器各标签页可独立连接。原生端调用 `ConnectRealtime`／`DisconnectRealtime` 驱动 Go 侧连接并消费 `cervi:realtime:frame`／`cervi:realtime:closed` 事件，Web 端自建 Socket 并发送 Ping。抖动退避、重新认证，网络／认证／版本错误分流；`slow_consumer` 关闭与 `server_going_away` 按网络错误退避重连。
 - **落点：** 新增 `frontend/src/api/realtime`；`frontend/src/api` 的认证边界与各端登录外壳。
 - **实施：** 传输内核只接收认证输入、URL／Origin 适配、frame handler 和生命周期输入，不导入 inbox 或 workspace。维护 disconnected、connecting、authenticating、ready、backoff、stopped；退出登录或切企业先使 generation 失效再释放旧连接。
 - **验收：** 企业／账号切换先提升 generation 再清缓存；旧 Promise、Socket 和通知失效，同源凭据改变可恢复；验证 WebView 地址；临时断网保留草稿。

@@ -12,6 +12,7 @@ import (
 type Token struct {
 	bun.BaseModel `bun:"table:tokens,alias:token"`
 
+	ID        string    `bun:"id,pk"`
 	UserID    string    `bun:"user_id"`
 	TokenHash string    `bun:"token_hash"`
 	ExpiresAt time.Time `bun:"expires_at"`

@@ -26,9 +26,11 @@ const (
 	KindConversationRemoved      Kind = "conversation_removed"
 	KindConversationStateChanged Kind = "conversation_state_changed"
 	KindIdentityProfileChanged   Kind = "identity_profile_changed"
+	KindSessionLoggedOut         Kind = "session_logged_out"
+	KindUserDisabled             Kind = "user_disabled"
 )
 
-// Notification 表示发往单个受众的变更通知，载荷含通知种类、会话 ID 与版本，版本为 0 时省略。
+// Notification 表示发往单个受众的变更通知或撤销控制，载荷含通知种类、会话 ID、版本与登录会话 ID，零值字段省略。
 type Notification struct {
 	OrganizationID string
 	AudienceKind   AudienceKind
@@ -36,6 +38,7 @@ type Notification struct {
 	Kind           Kind
 	ConversationID string
 	Version        int64
+	TokenSessionID string
 }
 
 // UserConversationChanged 构造发往用户受众的会话变更通知。
@@ -58,15 +61,26 @@ func UserIdentityProfileChanged(organizationID, userID string, version int64) No
 	return Notification{OrganizationID: organizationID, AudienceKind: AudienceUser, AudienceID: userID, Kind: KindIdentityProfileChanged, Version: version}
 }
 
+// UserSessionLoggedOut 构造登出撤销控制，Gateway 据此关闭该登录会话的连接。
+func UserSessionLoggedOut(organizationID, userID, tokenSessionID string) Notification {
+	return Notification{OrganizationID: organizationID, AudienceKind: AudienceUser, AudienceID: userID, Kind: KindSessionLoggedOut, TokenSessionID: tokenSessionID}
+}
+
+// UserDisabled 构造账号停用撤销控制，Gateway 据此关闭该用户的全部连接。
+func UserDisabled(organizationID, userID string) Notification {
+	return Notification{OrganizationID: organizationID, AudienceKind: AudienceUser, AudienceID: userID, Kind: KindUserDisabled}
+}
+
 type batchKey struct{}
 
-// mergeKey 标识可合并的通知：同一受众、同一种类、同一会话。
+// mergeKey 标识可合并的通知：同一受众、同一种类、同一会话、同一登录会话。
 type mergeKey struct {
 	organizationID string
 	audienceKind   AudienceKind
 	audienceID     string
 	kind           Kind
 	conversationID string
+	tokenSessionID string
 }
 
 // batch 按登记顺序保存一次事务内合并后的通知。
@@ -97,7 +111,7 @@ func Notify(ctx context.Context, notification Notification) {
 	if !ok {
 		panic("realtime: Notify called outside realtime.RunInTx")
 	}
-	key := mergeKey{notification.OrganizationID, notification.AudienceKind, notification.AudienceID, notification.Kind, notification.ConversationID}
+	key := mergeKey{notification.OrganizationID, notification.AudienceKind, notification.AudienceID, notification.Kind, notification.ConversationID, notification.TokenSessionID}
 	current, exists := pending.items[key]
 	if !exists {
 		pending.order = append(pending.order, key)

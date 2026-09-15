@@ -2324,6 +2324,21 @@ export interface ReadInboxConversationsInput {
 }
 
 /**
+ * RealtimeConnectInput 定义原生端建立实时连接时声明的应用版本与能力集合。
+ */
+export interface RealtimeConnectInput {
+    "appVersion": string;
+    "capabilities": string[] | null;
+}
+
+/**
+ * RealtimeConnection 是原生端本地实时连接编号，事件据此区分新旧连接。
+ */
+export interface RealtimeConnection {
+    "connectionId": string;
+}
+
+/**
  * RequestMeta 携带一次应用服务调用的认证和本地化信息。
  */
 export interface RequestMeta {

@@ -30,7 +30,9 @@ func applicationServices(
 	if err != nil {
 		return nil, fmt.Errorf("initialize client session: %w", err)
 	}
-	backend, err := apiproxy.NewBackend(appStorage, sessions)
+	backend, err := apiproxy.NewBackend(appStorage, sessions, func(name string, data any) {
+		application.Get().Event.Emit(name, data)
+	})
 	if err != nil {
 		return nil, fmt.Errorf("initialize remote application backend: %w", err)
 	}

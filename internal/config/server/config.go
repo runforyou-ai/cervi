@@ -25,6 +25,7 @@ type Config struct {
 	NATS          NATSConfig     `yaml:"nats"`
 	TLS           TLSConfig      `yaml:"tls"`
 	Storage       StorageConfig  `yaml:"storage"`
+	Realtime      RealtimeConfig `yaml:"realtime"`
 }
 
 // ServerConfig 定义 HTTP 服务监听配置。
@@ -58,6 +59,11 @@ type TLSConfig struct {
 // StorageConfig 定义企业服务端本地文件存储配置。
 type StorageConfig struct {
 	LocalDirectory string `yaml:"localDirectory"`
+}
+
+// RealtimeConfig 定义实时 WebSocket 连接配置。
+type RealtimeConfig struct {
+	MaxFrameBytes int `yaml:"maxFrameBytes"`
 }
 
 // Load 从显式配置文件和环境变量加载服务端配置。
@@ -109,6 +115,9 @@ func defaultConfig() Config {
 		Storage: StorageConfig{
 			LocalDirectory: "data/files",
 		},
+		Realtime: RealtimeConfig{
+			MaxFrameBytes: 64 << 10,
+		},
 	}
 }
 
@@ -137,6 +146,11 @@ func applyEnvironment(config *Config) error {
 		return err
 	}
 	config.Database.Port = databasePort
+	maxFrameBytes, err := intEnvironment("REALTIME_MAX_FRAME_BYTES", config.Realtime.MaxFrameBytes)
+	if err != nil {
+		return err
+	}
+	config.Realtime.MaxFrameBytes = maxFrameBytes
 	return nil
 }
 
@@ -199,6 +213,9 @@ func (config Config) validate() error {
 	}
 	if config.Storage.LocalDirectory == "" {
 		return fmt.Errorf("必须配置本地文件存储目录")
+	}
+	if config.Realtime.MaxFrameBytes < 64<<10 || config.Realtime.MaxFrameBytes > 256<<10 {
+		return fmt.Errorf("realtime.maxFrameBytes 必须在 65536 到 262144 之间")
 	}
 	return nil
 }
