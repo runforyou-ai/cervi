@@ -23,7 +23,7 @@
 以下内容已经存在：
 
 - `organization_identities.type = agent` 和 `agents` 已提供企业 AI 员工身份、状态、团队关系及管理接口。
-- Web 与桌面端创建群聊和添加成员支持同企业活跃 Agent，成员列表展示 AI 员工标识。群主仍由真人担任；群聊消息不触发 Agent，群内 @Agent 与响应策略留待后续设计。
+- Web、桌面端与移动端创建群聊和添加成员支持同企业活跃 Agent，成员列表展示 AI 员工标识。群主仍由真人担任；群内 `@Agent` 或引用 Agent 的消息触发该 Agent 按点名顺序轮流发言，回复正文中的点名形成接力，群内有效成员可停止单个 Agent 的发言，规则见 `group-agent-collaboration-plan.md`。
 - Agent 已保存模型选择、系统指令、知识库绑定和不可变配置版本，`agents.active_revision_id` 指向当前版本。
 - AI 员工编辑页的运行配置支持通过三列卡片模态框选择 MCP 服务，确认只回写表单，页面保存时整体提交。创建页保留必要字段。MCP 服务选择随 Revision 保存；删除服务时在同一事务为受影响员工生成移除该服务的新版本，不测试远端可用性，也不改写历史 Revision。Run 开始时按本次 Revision 绑定的服务建立会话、读取工具目录并把远端工具注册给模型，过大的工具结果按上下文治理规则转存；服务不可用、目录读取失败或工具名与内置工具重复时跳过该部分工具，本次运行继续执行。
 - AI Provider 和模型目录已经存在，可以保存企业配置的模型服务；模型使用现有复合键 `(provider_id, identifier)`。
@@ -45,7 +45,7 @@
 - `conversation_agent_policies`、完整 Run 快照、Step、Tool Invocation、审批和费用审计。
 - 各端前端尚未接入实时事件；服务端与原生端 Go 侧已提供成员 SSE 事件流，`chat-roadmap.md` 已确定 Realtime Gateway、JSON 事件协议、连接认证、同步恢复和背压方案；AI 运行过程流、设备注册和 Capability Executor 仍未落地。
 - 客户端可靠任务 Runtime；当前只有按真实场景落地的书面方案。
-- 群聊 @Agent 和通用响应策略。
+- 通用响应策略。
 
 现有 Wails MCP 只用于开发期桌面页面检查，不属于 Cervi 产品中的设备能力协议。
 
