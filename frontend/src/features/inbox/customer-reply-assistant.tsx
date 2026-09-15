@@ -164,10 +164,14 @@ export function CustomerReplyAssistant({
             : t("replyAssistantError")
           : t("replyAssistantEmpty")
 
-  /** 打开弹层时回到写回复模式，并以当前草稿和引用作为生成条件。 */
+  /** 打开弹层时按草稿是否为空选中改写或写回复，并以当前草稿和引用作为生成条件。 */
   function changeOpen(nextOpen: boolean) {
     if (nextOpen) {
-      setMode(CustomerReplyMode.CustomerReplyModeReply)
+      setMode(
+        draft.trim()
+          ? CustomerReplyMode.CustomerReplyModeRewrite
+          : CustomerReplyMode.CustomerReplyModeReply,
+      )
       setSource({ draft, replyToMessageID })
     }
     setOpen(nextOpen)
