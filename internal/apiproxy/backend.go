@@ -22,8 +22,9 @@ import (
 )
 
 var (
-	_ appservice.Backend         = (*Backend)(nil)
-	_ appservice.ServerConnector = (*Backend)(nil)
+	_ appservice.Backend           = (*Backend)(nil)
+	_ appservice.ServerConnector   = (*Backend)(nil)
+	_ appservice.RealtimeConnector = (*Backend)(nil)
 )
 
 // Backend 将类型化应用服务调用转换为远程 HTTP 请求。
@@ -31,15 +32,16 @@ type Backend struct {
 	connection *connection
 	sessions   *clientsession.Manager
 	sessionMu  sync.Mutex
+	realtime   *realtimeClient
 }
 
-// NewBackend 创建原生端使用的远程应用后端。
-func NewBackend(store Store, sessions *clientsession.Manager) (*Backend, error) {
+// NewBackend 创建原生端使用的远程应用后端，emit 把实时连接事件投递给前端。
+func NewBackend(store Store, sessions *clientsession.Manager, emit func(name string, data any)) (*Backend, error) {
 	remoteConnection, err := newConnection(store)
 	if err != nil {
 		return nil, err
 	}
-	return &Backend{connection: remoteConnection, sessions: sessions}, nil
+	return &Backend{connection: remoteConnection, sessions: sessions, realtime: &realtimeClient{emit: emit}}, nil
 }
 
 // InstallationStatus 通过公开接口读取远程初始化状态。
@@ -79,6 +81,8 @@ func (b *Backend) Login(ctx context.Context, meta appservice.RequestMeta, input 
 		slog.Warn("保存原生端登录凭据失败", "server_url", state.baseURL.String(), "user_id", output.Identity.User.ID, "error", err)
 		return appservice.Auth{}, appservice.FailedError(meta, cervii18n.ErrorLoginFailed)
 	}
+	// 新登录会话不沿用上一会话的实时连接。
+	b.realtime.disconnect()
 	return appservice.Auth{Identity: output.Identity}, nil
 }
 
@@ -87,6 +91,7 @@ func (b *Backend) Logout(ctx context.Context, meta appservice.RequestMeta) error
 	b.sessionMu.Lock()
 	defer b.sessionMu.Unlock()
 	remoteErr := b.do(ctx, meta, http.MethodPost, "/auth/logout", nil, nil, nil)
+	b.realtime.disconnect()
 	// 远程请求取消后仍清除本地凭据。
 	if err := b.sessions.Clear(context.WithoutCancel(ctx)); err != nil {
 		slog.Warn("清理原生端登录凭据失败", "error", err)
@@ -291,6 +296,7 @@ func (b *Backend) ConnectServer(ctx context.Context, meta appservice.RequestMeta
 			slog.Warn("切换企业服务器前清理登录凭据失败", "server_url", state.baseURL.String(), "error", err)
 			return appservice.FailedError(meta, cervii18n.ErrorServerConnectionSaveFailed)
 		}
+		b.realtime.disconnect()
 	}
 	if err := b.connection.store.SetServerURL(ctx, state.baseURL.String()); err != nil {
 		if ctx.Err() != nil {

@@ -57,7 +57,9 @@ func resolveIdentity(ctx context.Context, db bun.IDB, organizationID string, val
 			oi.role_id::text,
 			oi.display_name,
 			oi.avatar_file_id::text,
-			oi.work_status
+			oi.work_status,
+			token.id::text,
+			token.expires_at
 		FROM tokens AS token
 		JOIN users AS u ON u.id = token.user_id
 		JOIN organization_identities AS oi ON oi.id = u.identity_id AND oi.organization_id = u.organization_id AND oi.type = ?
@@ -86,6 +88,8 @@ func resolveIdentity(ctx context.Context, db bun.IDB, organizationID string, val
 		&identity.OrganizationIdentity.DisplayName,
 		&identity.OrganizationIdentity.AvatarFileID,
 		&identity.OrganizationIdentity.WorkStatus,
+		&identity.Token.ID,
+		&identity.Token.ExpiresAt,
 	)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrIdentityNotFound

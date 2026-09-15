@@ -80,6 +80,13 @@ export function CompleteFileUpload(meta: $models.RequestMeta, fileID: string): $
 }
 
 /**
+ * ConnectRealtime 在原生端使用当前登录凭据建立实时连接，服务端帧与连接结束经 Wails 事件投递。
+ */
+export function ConnectRealtime(meta: $models.RequestMeta, input: $models.RealtimeConnectInput): $CancellablePromise<$models.RealtimeConnection> {
+    return $Call.ByID(3104432381, meta, input);
+}
+
+/**
  * ConnectServer 验证并保存原生端企业服务器地址。
  */
 export function ConnectServer(meta: $models.RequestMeta, serverURL: string): $CancellablePromise<void> {
@@ -287,6 +294,13 @@ export function DeleteRole(meta: $models.RequestMeta, roleID: string): $Cancella
  */
 export function DeleteTeam(meta: $models.RequestMeta, teamID: string): $CancellablePromise<void> {
     return $Call.ByID(798533364, meta, teamID);
+}
+
+/**
+ * DisconnectRealtime 关闭原生端当前实时连接。
+ */
+export function DisconnectRealtime(meta: $models.RequestMeta): $CancellablePromise<void> {
+    return $Call.ByID(2251706905, meta);
 }
 
 /**

@@ -2,7 +2,7 @@
 
 ## 执行约定
 
-PR01–PR18 已合并（最新 `#294`），原始范围与验证记录见 `chat-realtime-completed.md`。本文只保留共用契约和尚未交付的范围。2026-09-10 对原路线图做过一次范围削减评审，结论见「本轮范围削减」；原清单的 PR00 已改编为 PR16 并交付。2026-09-13 对通知发布、兜底探针和 AI 流传输做了第二轮调整，结论见「第二轮调整」，与第一轮结论冲突处以第二轮为准。2026-09-15 对授权复核、客户端版本追赶、帧优先级和非主线范围做了第三轮调整，结论见「第三轮调整」，与前两轮冲突处以第三轮为准。
+PR01–PR19 与 PR37 已合并（最新 `#306`），原始范围与验证记录见 `chat-realtime-completed.md`。本文只保留共用契约和尚未交付的范围。2026-09-10 对原路线图做过一次范围削减评审，结论见「本轮范围削减」；原清单的 PR00 已改编为 PR16 并交付。2026-09-13 对通知发布、兜底探针和 AI 流传输做了第二轮调整，结论见「第二轮调整」，与第一轮结论冲突处以第二轮为准。2026-09-15 对授权复核、客户端版本追赶、帧优先级和非主线范围做了第三轮调整，结论见「第三轮调整」，与前两轮冲突处以第三轮为准。
 
 - 一个 PR 交付一个明确行为；后端能力可用真实数据库与应用服务测试独立验收。正确性耦合的迁移、写入、读取及绑定一起提交，不拆成无法运行的中间版本。
 - 保留 Conversation、ChatSubject、Participant、ServiceSession、Agent Run 和 appservice 边界。持久命令走 HTTP／Wails；WebSocket 推送版本通知、撤销控制和 AI 流等临时流帧，客户端通过业务 Query 读权威数据。
@@ -60,11 +60,11 @@ PR01–PR18 已合并（最新 `#294`），原始范围与验证记录见 `chat-
 | 网站公开 AI 流（PR39） | 推迟；访客经会话通知读取最终回复，生成期间沿用挂件现有的正在输入提示 | 公开投影与接管后候选作废的复杂度高于首版价值 |
 | 挂件跨标签页身份发现（PR32）、本地通知跨标签页前台协调（PR34）、NATS 恢复时主动要求校验探针（PR25）、前端收发队列上限与 `bufferedAmount` 观察（PR27） | 推迟 | 不影响单页面内的最终正确性，NATS 恢复场景由 30 秒兜底探针覆盖 |
 
-编号 PR24 空缺，帧契约由 PR25 交付；PR22、PR31、PR35、PR39 保留条目并标注触发条件。PR18 已合并，PR19 起剩余 22 个可交付 PR，其中 PR43–PR46 按需求或证据开启。
+编号 PR24 空缺，帧契约由 PR25 交付；PR22、PR31、PR35、PR39 保留条目并标注触发条件。PR19、PR37 已合并，剩余 20 个可交付 PR，其中 PR43–PR46 按需求或证据开启。
 
 ## 已交付基线
 
-PR01–PR18 已交付以下能力，后续 PR 直接依赖，不重复定义。
+PR01–PR19 与 PR37 已交付以下能力，后续 PR 直接依赖，不重复定义。
 
 - **锁序：** `internal/actions/chatstate` 提供会话授权与锁定入口，覆盖真人单聊、独立 AI 聊天、群聊和客户会话；可读、可发、可管理三种资格在锁后判断。
 - **`message_seq`：** 全部会话类型统一，会话锁内分配，`last_message_seq` 保存已提交位置；HTTP 用字符串、TS 用 bigint。`read_seq` 为阅读基线，服务端单调推进。
@@ -79,6 +79,8 @@ PR01–PR18 已交付以下能力，后续 PR 直接依赖，不重复定义。
 - **变更版本：** `conversations.version` 在分配 `message_seq` 的同一语句推进，覆盖成员消息、附件消息、客户入站、AI 回复和群系统事件，群资料修改同样推进；`conversation_user_states.version` 随已读、提及确认、静音、手动未读和入群阅读基线推进；`users.profile_version` 经 `identity.UpdateUserIdentity` 和用户账号更新按实际变化推进，修改密码与团队不推进。幂等重放、回滚和实际无变化的写入均不推进。
 - **同步探针：** `GetSyncHeads`（`GET /sync/heads`）在一条语句内返回可见会话数量、`(conversationId, conversation.version, 本人会话状态 version)` 的 64 位哈希和与身份资料版本，64 位值以字符串传输；客户会话覆盖全部视图与服务状态。
 - **提交后发布：** 写事务经 `realtime.RunInTx` 执行，`realtime.Notify` 在事务内登记通知，同一受众、种类和会话合并为最高版本；提交成功后交给进程级 `Publisher` 异步发布 Core NATS，回滚丢弃，队列已满或发布失败记录 `WARN` 并丢弃。Subject 为 `cervi.<namespace>.realtime.<organizationId>.<audienceKind>.<audienceId>`，载荷为 `kind`、`conversationId` 与字符串 `version`。已接入内部会话消息（含群系统事件、AI 结果与附件消息）通知当前真人成员，本人会话状态与身份资料只通知本人，目前只登记 `user` 受众。附件在上传完成后逐个发送，服务端不保存上传中的占位消息。
+- **成员会话变化：** 群创建、资料、增员、移除、退出、转让、解散，以及成员会话 AI 运行开始与失效取消接入会话版本和通知；`chatstate.TouchConversation` 在已持有会话锁的事务内推进版本并通知真人成员。失去阅读资格的真人收到仅含会话 ID 的 `conversation_removed`，该种类不与会话变更合并；客户会话只推进版本，受众由 PR20 接入。
+- **运行流：** `ExecuteAction.SubscribeRunStream(runID, onDelta, onEnd)` 在同一把锁内返回当前尝试的快照并登记回调，之后按序回调增量；增量携带 `runId`、`attempt`、`streamId` 与起止序号，`MergeStreamDeltas` 合并首尾相接的增量，执行尝试退出或增量无法应用时回调结束。token 不写 Message、不推进会话版本。
 
 ## 变更版本与通知契约
 
@@ -148,15 +150,6 @@ PR01–PR18 已交付以下能力，后续 PR 直接依赖，不重复定义。
 
 ## 一、变更版本与发布
 
-### PR19：成员会话变化接入
-
-- **依赖：** PR18。合并削减前编号的原 PR18 与原 PR23。
-- **范围：** 群创建、资料、增员、移除、退出、转让、解散，以及成员会话中 AI 运行的排队、运行中、成功、失败、停止回复和失效收敛接入版本推进与通知。变更前后的真人受众都写通知，失权者只收仅含会话 ID 的 `conversation_removed` 通知；Agent 不消费成员受众。客户会话受众与人工接管、转交、关闭等客服周期变化由 PR20 接入。
-- **落点：** `internal/realtime` 通知种类、`chatstate` 会话版本推进、`conversation/group_conversation.go`、`group_management.go`、`agentrun/execute.go`。
-- **实施：** 建群在 `realtime.RunInTx` 内以初始版本 1 插入会话并通知全部真人成员；群资料实际变化时推进版本并通知，改名另追加系统事件，同一事务的通知合并为最高版本。增员、转让、解散经系统事件的消息追加通知当前成员；移除与退出在更新成员关系后向失权的真人登记 `conversation_removed`，该种类不与会话变更合并、载荷不含版本，重入是新的有效关系；退出者作为系统事件操作人另收本人阅读水位通知。解散保留成员关系与只读历史，只通知会话变更。`chatstate.TouchConversation` 在已持有会话锁的事务内推进版本并通知真人成员：Agent 运行由排队转为运行中时推进，崩溃恢复重入不推进；认领输入、完成或失败事务中运行策略判定失效、收敛为取消且不追加消息时推进。成功、失败与停止回复由结果消息推进版本；入队与群成员变化触发的取消和触发消息或系统事件同事务提交。仅内存进度不推进版本，重复终态回调按当前运行状态判定无变化。
-- **验收：** 移除后重入恢复当前成员关系；新成员阅读基线正确；解散只读与失权区分；失败结果消息与 Run 终态、无结果消息的取消都能通过 HTTP 恢复；事务失败不留半条系统消息，也不发布通知。
-- **验证步骤：** A 被移除后立刻重入，延迟消费通知仍恢复最新成员关系；A 仅被移除时批量摘要不可读，通知载荷无群名或正文。让模型失败并生成 agent_error，另构造不产生消息的取消，断开 Socket 后仅靠 HTTP 恢复两种终态；旧租约成功回调晚于取消到达时不得复活 Run。
-
 ### PR20：客服共享收件箱通知
 
 - **依赖：** PR18。
@@ -177,7 +170,7 @@ PR01–PR18 已交付以下能力，后续 PR 直接依赖，不重复定义。
 
 ### PR22：名称、头像和渠道资料失效（推迟）
 
-- **依赖：** PR19、PR21。
+- **依赖：** PR21（PR19 已合并）。
 - **触发条件：** 他人资料更新不及时出现实际使用反馈，或 PR43 会话名称搜索需要改名即时改变匹配资格。
 - **范围：** 接通成员／Agent、联系人／渠道身份及渠道资料写入口；按真实 JOIN 依赖标记受影响会话，推进这些会话的版本并按固定锁序写对应受众通知；头像异步导入成功也覆盖。
 - **落点：** `internal/actions/identity`、`agent`、`channel` 及联系人资料入口；inbox 与消息查询的资料 JOIN。
@@ -189,15 +182,17 @@ PR01–PR18 已交付以下能力，后续 PR 直接依赖，不重复定义。
 
 ### PR25：成员 Gateway、帧契约与连接认证
 
-- **依赖：** PR18。合并原清单 PR28、PR29、PR30，以及本清单 PR24 与 PR35 的原生端子路径、心跳和关闭部分；客服共享受众的订阅在 PR20 完成后生效。
+- **依赖：** PR18。合并原清单 PR28、PR29、PR30，以及本清单 PR24 与 PR35 的原生端子路径、心跳和关闭部分；PR20 已合并，客服共享受众订阅随本条交付。
 - **范围：** 按 `chat-roadmap.md` 第 10.11 节定义首版 WebSocket JSON 帧：Authenticate、ClientHello／ServerHello、Ping／Pong、ConversationChanged、ConversationRemoved、ConversationStateChanged、IdentityProfileChanged、SessionRevoked、ServerGoingAway、RealtimeError；访客帧由 PR26 增加，AI 流订阅与流帧由 PR38 增加，PinOrderChanged 由 PR40 增加，均遵守同一版本与未知帧规则，64 位整数一律用字符串。Server 内嵌 Gateway，首帧限时 Authenticate；Web 使用现有 Bearer，原生端由 Go 侧 Proxy 持有连接并把帧经 Wails 事件交给 TS。按本节点在线受众订阅，禁止 Queue Group 与企业通配订阅。登出按 token session、停用按用户发送控制通知，连接设最长存活时间。原生端支持子路径部署，配置心跳，停止时发送下线提示后有界关闭。不建票据表。
-- **落点：** 新增 `internal/realtime` 的帧定义、Gateway 与连接注册表，以及对应的 TS 帧类型与共用夹具；`internal/realtime` 通知新增撤销种类与 tokenSessionId；`internal/apiproxy` 的原生连接持有；服务端 `Assets.Middleware` 装配与 `internal/config/server`；`actions/auth/logout.go` 与用户停用入口。
+- **落点：** 新增 `internal/realtime/protocol`（Go 帧定义、编解码与共用夹具 `testdata/frames.json`）、`internal/realtime/gateway`（连接、发送队列与受众订阅）与 `frontend/src/api/realtime/protocol.ts`；`internal/realtime` 通知新增 `session_logged_out`、`user_disabled` 撤销种类与 tokenSessionId；`actions/auth/logout.go` 与 `actions/user/update_status.go` 登记撤销；`appservice.DirectBackend` 提供 `AuthenticateMember`／`MemberSyncHeads`；Service 新增原生端 `ConnectRealtime`／`DisconnectRealtime`，由 `internal/apiproxy/realtime.go` 实现；服务端 `Assets.Middleware` 装配与 `internal/config/server` 的 `realtime.maxFrameBytes`。
 - **实施：**
   - **帧契约：** Go 结构体与 TS 类型各自手写，线上 `type` 使用 snake_case 并与 NATS `kind` 一致；以共用夹具锁定线上格式、协议主版本和字符串整数边界，Go 覆盖两个方向的编解码，TS 覆盖客户端帧编码与服务端帧解码。
   - **挂载与地址：** 连接路径为 `/api/realtime`；Gateway 在服务端 `Assets.Middleware` 中位于租户上下文中间件之内处理该路径的升级请求，升级前沿 `Unwrap` 解包 Wails 写入器，允许来源保持默认同源。原生端按服务器地址路径拼接，与 API Proxy 一致。
-  - **认证与寿命：** 连接依次处于 awaiting_auth、authenticated、closing；认证前只允许 Authenticate，五秒内未认证即关闭；Authenticate 复用业务调用的身份解析，令牌须存在、未过期且账号活跃。连接最长存活 1 小时且不晚于登录会话到期，到期关闭后客户端重连并重新认证。连接登记 tokenSessionId、userId 和企业；订阅安装完成并 Flush 之后才读取 Hello 探针值。
-  - **撤销：** 登出通知携带 tokenSessionId，停用按用户受众发送；Gateway 收到后撤销订阅并关闭对应连接。
-  - **发送队列与心跳：** 每条连接一个写协程与一条有界发送队列，单帧受可配置上限约束；变更通知按同一会话同一种类保留最高版本，`conversation_removed` 与撤销控制不合并；溢出时以 `slow_consumer` 原因码关闭连接，客户端重连后经探针恢复。客户端每 25 秒发送 Ping，服务端 60 秒内未收到任何帧即关闭连接；心跳间隔与代理空闲时间一起记录。
+  - **下线：** 服务端退出时 Gateway 先拒绝新的升级请求（503），再向现有连接发送 `server_going_away` 并以同名原因关闭，默认 5 秒内未完成的连接强制断开，之后停止通知发布器。
+  - **认证与寿命：** 连接依次处于 awaiting_auth、authenticated、closing；认证前只允许 Authenticate，五秒内未认证即以 `authentication_timeout` 关闭；Authenticate 复用业务调用的身份解析，令牌须存在、未过期且账号活跃，身份解析同时返回令牌编号（即 tokenSessionId）与到期时间。连接最长存活 1 小时且不晚于登录会话到期，到期以 `session_expired` 关闭后客户端重连并重新认证。认证后收到 `client_hello` 时登记 tokenSessionId、userId 和企业，并安装本人用户受众与本企业客服共享受众（`customer_inbox`，受众 ID 为企业 ID）订阅，当前阶段所有成员均可阅读客户会话；Flush 之后重新校验登录会话，再读取 Hello 探针值；变更通知可能先于 `server_hello` 送达。
+  - **撤销：** 登出在删除令牌的事务内登记携带 tokenSessionId 的 `session_logged_out`，停用在账号状态事务内按用户受众登记 `user_disabled`；Gateway 收到后清除该连接未发送的帧，发送 `session_revoked` 并以 `session_revoked` 原因关闭。
+  - **发送队列与心跳：** 每条连接一个写协程与一条有界发送队列，单帧上限由 `realtime.maxFrameBytes`（环境变量 `REALTIME_MAX_FRAME_BYTES`，默认 65536，范围 64–256KB）配置，同时约束客户端帧读取；变更通知按同一会话同一种类保留最高版本，`conversation_removed` 与撤销控制不合并；队列溢出时按 `slow_consumer` 关闭连接，单帧写入超过 10 秒说明对端停止读取，直接断开；客户端重连后经探针恢复。客户端每 25 秒发送 Ping，服务端 60 秒内未收到任何帧即以 `idle_timeout` 关闭；心跳间隔与代理空闲时间一起记录。协议错误发送 `realtime_error` 后以错误码作为关闭原因，认证读取失败使用 `unavailable`。
+  - **原生端：** Service 的 `ConnectRealtime`／`DisconnectRealtime` 由 PR27 的传输内核驱动启停与退避重连；Go 侧 `apiproxy` 用当前登录凭据拨号 `<服务器地址路径>/api/realtime`，拨号期间登录会话或企业服务器变化时丢弃新连接，发送 Authenticate、ClientHello 并每 25 秒发送 Ping，把服务端帧原文经 `cervi:realtime:frame` 事件、关闭码与原因经 `cervi:realtime:closed` 事件交给前端，事件携带本地连接编号区分新旧连接；登录、登出与切换企业服务器时关闭当前连接。
   - **日志与凭据：** 认证失败、慢连接关闭和发布失败记录 `WARN`，不记凭据或正文；原生端不把长期 Token 交给 TS。
 - **验收：** 共用夹具下两端编解码结果一致，未知可忽略帧与不支持的协议主版本分别有明确结果，超过 JS 安全整数的值正确；一用户多设备均收到通知；先注册订阅再给探针值；慢消费者断开后可补拉；已连接后登出或停用不再收到通知；撤销事务回滚不产生错误断连；连接到达最长存活时间后关闭，凭据有效时重连成功，登出或停用后重连认证失败；原生端经剥离子路径前缀的反向代理可连，空闲超过代理默认时间仍正常。
 - **验证步骤：** 客户端帧由 TS 编码、Go 解码，服务端帧由 Go 编码、TS 解码，均与共用夹具一致；在安装订阅与读取探针之间提交消息，客户端通过 Hello 或后续通知至少发现一次；同账号建立两条连接两端均收到；堵塞一端读流触发有界关闭，另一端继续正常工作。连接后登出本次 token 只关闭对应登录会话，停用用户关闭其全部会话；分别丢弃登出与停用的控制通知后，连接在最长存活时间到期时关闭，重连认证失败。SIGTERM 后连接收到下线提示，重启后客户端经探针补齐停机期间的变化，退出不关闭共享 NATS。
@@ -221,7 +216,7 @@ PR01–PR18 已交付以下能力，后续 PR 直接依赖，不重复定义。
 ### PR27：共享客户端连接与会话代次
 
 - **依赖：** PR25。
-- **范围：** `src/api/realtime` 实现无 feature 依赖的 TS 传输内核；一个应用实例一连接、业务页签共用，浏览器各标签页可独立连接。原生端消费 Go 侧连接投递的帧，Web 端自建 Socket。抖动退避、重新认证，网络／认证／版本错误分流；`slow_consumer` 关闭与 `server_going_away` 按网络错误退避重连。
+- **范围：** `src/api/realtime` 实现无 feature 依赖的 TS 传输内核；一个应用实例一连接、业务页签共用，浏览器各标签页可独立连接。原生端调用 `ConnectRealtime`／`DisconnectRealtime` 驱动 Go 侧连接并消费 `cervi:realtime:frame`／`cervi:realtime:closed` 事件，Web 端自建 Socket 并发送 Ping。抖动退避、重新认证，网络／认证／版本错误分流；`slow_consumer` 关闭与 `server_going_away` 按网络错误退避重连。
 - **落点：** 新增 `frontend/src/api/realtime`；`frontend/src/api` 的认证边界与各端登录外壳。
 - **实施：** 传输内核只接收认证输入、URL／Origin 适配、frame handler 和生命周期输入，不导入 inbox 或 workspace。维护 disconnected、connecting、authenticating、ready、backoff、stopped；退出登录或切企业先使 generation 失效再释放旧连接。
 - **验收：** 企业／账号切换先提升 generation 再清缓存；旧 Promise、Socket 和通知失效，同源凭据改变可恢复；验证 WebView 地址；临时断网保留草稿。
@@ -305,25 +300,16 @@ PR01–PR18 已交付以下能力，后续 PR 直接依赖，不重复定义。
 
 ### PR36：拆分运行摘要与过程详情
 
-- **依赖：** PR19、PR29。
+- **依赖：** PR29（PR19 已合并）。
 - **范围：** Run 摘要按 runId／agentIdentityId 返回集合，当前 UI 可选最相关项；消息只留过程引用，展开时取详情，移除每次消息查询携带完整 blocks 的实现。
 - **落点：** `direct_backend_agent_process.go`、`types_agent_process.go`、`conversation/agent_process.go`、`features/inbox/agent-process.tsx`。
 - **实施：** 列表与消息窗口只带轻量 Run 摘要和过程引用；独立过程 Query 按 runId 获取持久 blocks、工具参数结果和用量。当前 Run 集合与历史消息关联分开，失败通过结果消息定位，取消无消息也可选中查看；展开状态 key 用 runId。
 - **验收：** 多 Run、无消息失败和历史过程均可读取；窗口更新不丢展开状态；运行详情按会话授权，保留工具完整参数、结果及用量。
 - **验证步骤：** 同会话两个 Agent 各有 Run，刷新不会只剩「最近一个」；历史过程首次展开才请求完整 blocks，关闭再展开可用缓存；移出群后该 Query 不再返回详情。
 
-### PR37：模型增量消费与流基线
-
-- **依赖：** 无。运行时增量不依赖 PR36 的过程详情拆分，先于 PR36 交付。
-- **范围：** Runtime 真正消费 token 与工具进度，使用 runId、attempt、streamId、sequence 与稳定块编号，短周期合并；暴露当前内存快照和临时发布接口，不直接依赖传输实现。
-- **落点：** `internal/integration/agentruntime/eino.go`、`progress.go`、`stream.go`、`attachment.go`、`types.go`，`internal/actions/agentrun/stream.go`、`execute.go`、`cancellation.go`。
-- **实施：** 将整段输出收集点替换为运行时增量消费；每个 attempt 创建独立 streamId，块有稳定 blockId，同流 sequence 单调。内存快照与最高 sequence 同步捕获，发布端按短周期合并可重建增量，模型执行不等待浏览器消费。运行流中的工具调用只含名称、状态和起止时间，完整参数与结果经过程详情读取。增量携带起止序号，首尾相接的增量可合并，供 PR38 发送队列合并同一 Run 的待发增量；订阅在同一把锁内返回快照并按序回调增量，背压由连接发送队列承担，执行尝试退出时回调结束。
-- **验收：** 同流重复／乱序、gap、尝试切换、工具并行与输入抢占正确；token 不写 Message、不推进会话版本、不发布变更通知；限速发送不阻塞模型执行。
-- **验证步骤：** 分片产生文本、工具参数、工具结果并模拟并行工具，块顺序稳定；故意漏一片后快照可恢复全文；重试产生新 streamId，旧尝试尾部不能拼入新正文。
-
 ### PR38：成员 AI 流订阅与终态收敛
 
-- **依赖：** PR28、PR37。流帧走 PR25／PR27 建立的同一条 WebSocket 连接，不新增 SSE 或其他连接；取代原清单 PR44、PR45 的焦点注册与跨节点快照方案。
+- **依赖：** PR28（PR37 已合并）。流帧走 PR25／PR27 建立的同一条 WebSocket 连接，不新增 SSE 或其他连接；取代原清单 PR44、PR45 的焦点注册与跨节点快照方案。
 - **范围：** 在 JSON 帧契约中增加按 runId 的 SubscribeRun／UnsubscribeRun 及 RunStreamSnapshot、RunStreamDelta、RunStreamEnded 帧；展开运行过程时订阅、收起时取消。服务端先按会话授权再挂接该 Run 的内存流，首帧发当前快照，之后发增量。仅数据库提交后发 RunStreamEnded，持久终态覆盖临时候选。
 - **落点：** `internal/realtime` Gateway 的连接订阅集合与流帧发送、Run 流订阅、PR25 帧契约与共用夹具、`frontend/src/api/realtime`、成员 `agent-process.tsx` 与运行展示控制器。
 - **实施：** `SubscribeRun` 每次重新校验登录会话有效、账号活跃与会话阅读资格；连接登记已订阅的 runId 集合并限制数量；撤销控制或最长存活时间关闭连接时订阅随之释放，Gateway 收到本人某会话的 `conversation_removed` 通知时移除该会话的全部 Run 订阅。客户端经 `conversation_removed` 或资格读取发现失去会话阅读资格时，对该会话的 Run 发送 UnsubscribeRun 并丢弃临时候选；失权通知丢失且客户端未取消时，服务端最多推送到当前 Run 结束。流帧与变更通知共用连接的有界发送队列，队列内同一 Run 的待发增量合并；队列溢出时以 `slow_consumer` 关闭连接，客户端重连后重新订阅取新快照。快照按块分帧，单帧受大小上限约束，工具完整参数与结果经 PR36 过程详情 Query 读取。客户端按 streamId 与增量的起止序号判断重复与缺口，发送队列合并后的增量可跨越多个序号；gap 或重连后按退避重新订阅取新快照，不做单独的快照修复协议。终态由持久 Query 确认，RunStreamEnded 只是加速提示；运行过程未展开时不订阅。
@@ -345,7 +331,7 @@ PR01–PR18 已交付以下能力，后续 PR 直接依赖，不重复定义。
 
 ### PR40：个人置顶事实、顺序与分页
 
-- **依赖：** PR19。
+- **依赖：** 无（PR19 已合并）。
 - **范围：** 个人状态增加 pinRank，本人用户账号行增加 pinOrderVersion；置顶、取消、按邻居移动同事务推进版本并写本人受众通知；`GetSyncHeads` 同时返回 pinOrderVersion，帧契约增加 PinOrderChanged。提供显式分区查询，未启用置顶的调用方继续完整活动序查询；扩展锚点上下文的分区、顺序版本及跨区邻居。新增默认追加末尾，取消回普通活动顺序；过滤只是全局个人顺序的投影。
 - **落点：** `models/conversation_user_state.go`、成员身份模型、新增置顶写 Action、已交付的分页与锚点 Query。
 - **实施：** 命令使用共用置顶契约的 position／neighborId 和 expectedPinOrderVersion，不提交全列表覆盖隐藏项。锁定所涉会话并校验当前资格后，在已锁定的本人用户账号行上校验并推进顺序版本；冲突返回当前版本且不部分写入。按 rank 留间隔，耗尽时同事务无唯一冲突地重编号；取消清 rank，再次置顶追加末尾。

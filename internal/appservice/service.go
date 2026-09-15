@@ -195,3 +195,21 @@ func (s *Service) ConnectServer(ctx context.Context, meta RequestMeta, serverURL
 	}
 	return connector.ConnectServer(ctx, meta, serverURL)
 }
+
+// ConnectRealtime 在原生端使用当前登录凭据建立实时连接，服务端帧与连接结束经 Wails 事件投递。
+func (s *Service) ConnectRealtime(ctx context.Context, meta RequestMeta, input RealtimeConnectInput) (RealtimeConnection, error) {
+	connector, ok := s.backend.(RealtimeConnector)
+	if !ok {
+		return RealtimeConnection{}, methodNotAllowedError(meta, "ConnectRealtime")
+	}
+	return withNormalizedSlices(connector.ConnectRealtime(ctx, meta, input))
+}
+
+// DisconnectRealtime 关闭原生端当前实时连接。
+func (s *Service) DisconnectRealtime(ctx context.Context, meta RequestMeta) error {
+	connector, ok := s.backend.(RealtimeConnector)
+	if !ok {
+		return methodNotAllowedError(meta, "DisconnectRealtime")
+	}
+	return connector.DisconnectRealtime(ctx, meta)
+}

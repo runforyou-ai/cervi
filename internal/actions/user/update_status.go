@@ -64,6 +64,8 @@ func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels
 			if err := channelaction.ResetRoutingTarget(ctx, tx, identity.Organization.ID, domain.ChannelRoutingTargetTypeMember, updatedUser.IdentityID); err != nil {
 				return err
 			}
+			// 提交后通知 Gateway 关闭该用户的全部实时连接。
+			realtime.Notify(ctx, realtime.UserDisabled(identity.Organization.ID, userID))
 		}
 		if err := ensureActiveAdministratorRemains(ctx, tx, identity.Organization.ID, administratorRoleID); err != nil {
 			return err

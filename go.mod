@@ -13,6 +13,7 @@ require (
 	github.com/cloudwego/eino-ext/components/model/agenticgemini v0.2.3
 	github.com/cloudwego/eino-ext/components/model/agenticopenai v0.2.2
 	github.com/cloudwego/eino-ext/components/model/agenticqwen v0.1.0
+	github.com/coder/websocket v1.8.15
 	github.com/eino-contrib/jsonschema v1.0.3
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-ego/gse v1.1.0
@@ -69,7 +70,6 @@ require (
 	github.com/cespare/xxhash/v2 v2.3.0 // indirect
 	github.com/cloudwego/base64x v0.1.7 // indirect
 	github.com/cloudwego/eino-ext/libs/acl/openai v0.1.18-0.20260527084435-846f52bd97c6 // indirect
-	github.com/coder/websocket v1.8.15 // indirect
 	github.com/dustin/go-humanize v1.0.1 // indirect
 	github.com/evanphx/json-patch v0.5.2 // indirect
 	github.com/felixge/httpsnoop v1.1.0 // indirect

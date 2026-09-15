@@ -91,6 +91,16 @@ func (b *DirectBackend) InstallWorkspace(ctx context.Context, meta RequestMeta, 
 	return b.ops.InstallWorkspace(ctx, meta, input)
 }
 
+// AuthenticateMember 校验实时连接首帧携带的登录令牌并返回当前身份。
+func (b *DirectBackend) AuthenticateMember(ctx context.Context, token string) (*servermodels.Identity, error) {
+	return b.ops.authenticate(ctx, RequestMeta{Token: token})
+}
+
+// MemberSyncHeads 返回实时连接所属身份的同步探针值。
+func (b *DirectBackend) MemberSyncHeads(ctx context.Context, identity *servermodels.Identity) (SyncHeads, error) {
+	return b.ops.GetSyncHeads(ctx, RequestMeta{}, identity)
+}
+
 // requireInitialized 解析当前请求的企业范围，并校验该企业是否已完成初始化。
 func (g sessionGuard) requireInitialized(ctx context.Context, meta RequestMeta) (tenant.Scope, error) {
 	scope, err := g.resolveTenant.Resolve(ctx, tenant.AccessHost(ctx))

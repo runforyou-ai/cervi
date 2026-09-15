@@ -28,16 +28,22 @@ type Publisher struct {
 	done       chan struct{}
 }
 
-// payload 是 NATS 通知消息体。
-type payload struct {
+// Payload 是 NATS 通知消息体。
+type Payload struct {
 	Kind           Kind   `json:"kind"`
 	ConversationID string `json:"conversationId,omitempty"`
 	Version        int64  `json:"version,string,omitempty"`
+	TokenSessionID string `json:"tokenSessionId,omitempty"`
 }
 
 // NewPublisher 创建使用指定 NATS 命名空间的通知发布器。
 func NewPublisher(config serverconfig.NATSConfig) *Publisher {
 	return &Publisher{config: config}
+}
+
+// Connection 返回发布器持有的 NATS 连接，供实时网关订阅受众通知；Start 之前为 nil。
+func (p *Publisher) Connection() *nats.Conn {
+	return p.connection
 }
 
 // Subject 生成受众通知的 NATS Subject。
@@ -125,7 +131,7 @@ func (p *Publisher) run() {
 
 // publish 发布单条通知，失败时记录 WARN 日志。
 func (p *Publisher) publish(notification Notification) {
-	data, err := json.Marshal(payload{Kind: notification.Kind, ConversationID: notification.ConversationID, Version: notification.Version})
+	data, err := json.Marshal(Payload{Kind: notification.Kind, ConversationID: notification.ConversationID, Version: notification.Version, TokenSessionID: notification.TokenSessionID})
 	if err == nil {
 		err = p.send(Subject(p.config.Namespace, notification.OrganizationID, notification.AudienceKind, notification.AudienceID), data)
 	}
@@ -138,6 +144,7 @@ func (p *Publisher) publish(notification Notification) {
 			"kind", notification.Kind,
 			"conversation_id", notification.ConversationID,
 			"version", notification.Version,
+			"token_session_id", notification.TokenSessionID,
 			"error", err,
 		)
 	}

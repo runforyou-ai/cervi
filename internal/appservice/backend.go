@@ -490,6 +490,12 @@ type ServerConnector interface {
 	ConnectServer(context.Context, RequestMeta, string) error
 }
 
+// RealtimeConnector 由持有企业服务器实时连接的原生端后端实现。
+type RealtimeConnector interface {
+	ConnectRealtime(context.Context, RequestMeta, RealtimeConnectInput) (RealtimeConnection, error)
+	DisconnectRealtime(context.Context, RequestMeta) error
+}
+
 // ImageSelector 由支持原生文件对话框的平台实现。
 type ImageSelector interface {
 	SelectImage(context.Context, RequestMeta) (ImageFile, error)
