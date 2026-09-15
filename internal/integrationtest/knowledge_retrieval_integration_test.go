@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"io"
+	"slices"
 	"strings"
 	"testing"
 
@@ -66,7 +67,7 @@ func (p *retrievalProbe) Rerank(_ context.Context, _ rerank.Credential, _, _ str
 		if strings.Contains(document, "退款") {
 			relevance = 1
 		} else if strings.Contains(document, "发票") {
-			relevance = 0.5
+			relevance = 0.8
 		}
 		scores = append(scores, rerank.Score{Index: index, Relevance: relevance})
 	}
@@ -99,7 +100,7 @@ func publishRetrievalDocument(t *testing.T, db *bun.DB, probe *retrievalProbe, i
 	return document.ID
 }
 
-// TestKnowledgeHybridRetrieval 验证词法与向量两路召回、名次融合、重排得分、单路失败保留、企业隔离与游标阅读。
+// TestKnowledgeHybridRetrieval 验证词法与向量两路召回、名次融合、重排得分、相关性阈值过滤、单路失败保留、企业隔离与游标阅读。
 func TestKnowledgeHybridRetrieval(t *testing.T) {
 	ctx := context.Background()
 	store, err := serverstorage.Open(ctx, servertest.DatabaseConfig(t))
@@ -117,8 +118,8 @@ func TestKnowledgeHybridRetrieval(t *testing.T) {
 		t.Fatalf("err=%v", err)
 	}
 	refundID := publishRetrievalDocument(t, db, probe, identity, base, "退款政策.txt", strings.Repeat("签收后七天内可以申请退款，退款金额原路返回。", 30))
-	publishRetrievalDocument(t, db, probe, identity, base, "发票说明.txt", "下单时可以选择开具电子发票。")
-	publishRetrievalDocument(t, db, probe, identity, base, "配送说明.txt", "配送时效按收货地址计算。")
+	invoiceID := publishRetrievalDocument(t, db, probe, identity, base, "发票说明.txt", "下单时可以选择开具电子发票。")
+	deliveryID := publishRetrievalDocument(t, db, probe, identity, base, "配送说明.txt", "配送时效按收货地址计算。")
 
 	// 词法路与向量路都命中退款文档，最终分数为重排得分。
 	records, err := service.Retrieve(ctx, identity, base.ID, "如何申请退款")
@@ -135,6 +136,11 @@ func TestKnowledgeHybridRetrieval(t *testing.T) {
 	records, err = service.Retrieve(ctx, identity, base.ID, "发票")
 	if err != nil || len(records) < 2 || records[0].DocumentID != refundID || records[0].LexicalRank != 0 {
 		t.Fatalf("records=%+v err=%v", records, err)
+	}
+	for _, record := range records {
+		if record.Score < base.RetrievalScoreThreshold {
+			t.Fatalf("below threshold record=%+v", record)
+		}
 	}
 
 	// 多知识库来源经统一融合返回，并可按游标读取相邻分段。
@@ -180,6 +186,35 @@ func TestKnowledgeHybridRetrieval(t *testing.T) {
 		t.Fatalf("records=%+v err=%v", records, err)
 	}
 
+	// 相关性阈值为 0 时保留低分候选。
+	input.RetrievalCount, input.RetrievalScoreThreshold = 20, 0
+	if _, err := knowledgeaction.NewUpdateKnowledgeBaseAction(db, newKnowledgeTasks(t, db)).Execute(ctx, identity, base.ID, input); err != nil {
+		t.Fatal(err)
+	}
+	records, err = service.Retrieve(ctx, identity, base.ID, "配送")
+	if err != nil || !slices.ContainsFunc(records, func(record knowledgeaction.RetrievalRecord) bool { return record.DocumentID == deliveryID }) {
+		t.Fatalf("records=%+v err=%v", records, err)
+	}
+	// 重排得分等于相关性阈值的候选仍返回。
+	input.RetrievalScoreThreshold = 0.8
+	if _, err := knowledgeaction.NewUpdateKnowledgeBaseAction(db, newKnowledgeTasks(t, db)).Execute(ctx, identity, base.ID, input); err != nil {
+		t.Fatal(err)
+	}
+	records, err = service.Retrieve(ctx, identity, base.ID, "发票")
+	if err != nil || !slices.ContainsFunc(records, func(record knowledgeaction.RetrievalRecord) bool { return record.DocumentID == invoiceID }) ||
+		slices.ContainsFunc(records, func(record knowledgeaction.RetrievalRecord) bool { return record.DocumentID == deliveryID }) {
+		t.Fatalf("records=%+v err=%v", records, err)
+	}
+	// 提高阈值后只返回重排得分达到阈值的候选。
+	input.RetrievalScoreThreshold = 0.9
+	if _, err := knowledgeaction.NewUpdateKnowledgeBaseAction(db, newKnowledgeTasks(t, db)).Execute(ctx, identity, base.ID, input); err != nil {
+		t.Fatal(err)
+	}
+	records, err = service.Retrieve(ctx, identity, base.ID, "发票")
+	if err != nil || len(records) != 2 || records[0].DocumentID != refundID || records[1].DocumentID != refundID {
+		t.Fatalf("records=%+v err=%v", records, err)
+	}
+
 	if _, err := service.Retrieve(ctx, identity, base.ID, "   "); !errors.Is(err, knowledgeaction.ErrRetrievalQueryInvalid) {
 		t.Fatalf("err=%v", err)
 	}
@@ -194,6 +229,11 @@ func TestKnowledgeHybridRetrieval(t *testing.T) {
 	}
 	if _, err := knowledgeretrieval.Search(ctx, sources, knowledgeretrieval.Request{Cursor: &cursor}); !errors.Is(err, knowledgeaction.ErrSegmentStale) {
 		t.Fatalf("err=%v", err)
+	}
+	// 剩余候选全部低于相关性阈值时返回空结果。
+	records, err = service.Retrieve(ctx, identity, base.ID, "发票")
+	if err != nil || len(records) != 0 {
+		t.Fatalf("records=%+v err=%v", records, err)
 	}
 }
 
@@ -213,7 +253,7 @@ func publishQAEntry(t *testing.T, db *bun.DB, probe *retrievalProbe, identity *s
 	return entry.ID
 }
 
-// TestKnowledgeQARetrieval 验证问答库的就绪判断、问题与答案片段命中折叠为条目、完整答案交付以及游标读取与失效。
+// TestKnowledgeQARetrieval 验证问答库的就绪判断、问题与答案片段命中折叠为条目、低于相关性阈值的条目不返回、完整答案交付以及游标读取与失效。
 func TestKnowledgeQARetrieval(t *testing.T) {
 	ctx := context.Background()
 	store, err := serverstorage.Open(ctx, servertest.DatabaseConfig(t))
@@ -231,7 +271,7 @@ func TestKnowledgeQARetrieval(t *testing.T) {
 	answer := strings.Repeat("进入订单详情申请退款，审核通过后退款原路返回。", 40)
 	refundID := publishQAEntry(t, db, probe, identity, base, knowledgeaction.QAInput{Question: "如何退款？", Answer: answer, SimilarQuestions: []knowledgeaction.QASimilarQuestion{{Content: "退款入口在哪里"}, {Content: "怎么申请退款"}}})
 	invoiceID := publishQAEntry(t, db, probe, identity, base, knowledgeaction.QAInput{Question: "怎么开发票", Answer: "下单时选择电子发票。"})
-	publishQAEntry(t, db, probe, identity, base, knowledgeaction.QAInput{Question: "配送要多久", Answer: "配送时效按收货地址计算。"})
+	deliveryID := publishQAEntry(t, db, probe, identity, base, knowledgeaction.QAInput{Question: "配送要多久", Answer: "配送时效按收货地址计算。"})
 
 	// 主问题、相似问题和多段答案都命中退款条目，折叠后只返回一条并携带完整答案。
 	records, err := service.Retrieve(ctx, identity, base.ID, "怎么申请退款")
@@ -252,6 +292,9 @@ func TestKnowledgeQARetrieval(t *testing.T) {
 		if record.Answer == "" || record.SegmentID != record.DocumentID {
 			t.Fatalf("record=%+v", record)
 		}
+	}
+	if slices.ContainsFunc(records, func(record knowledgeaction.RetrievalRecord) bool { return record.DocumentID == deliveryID }) {
+		t.Fatalf("below threshold entry returned: %+v", records)
 	}
 	if len(records) > base.RetrievalCount {
 		t.Fatalf("count=%d limit=%d", len(records), base.RetrievalCount)

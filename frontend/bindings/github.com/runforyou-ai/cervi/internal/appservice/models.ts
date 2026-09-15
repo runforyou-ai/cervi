@@ -1650,6 +1650,7 @@ export interface KnowledgeBase {
     "chunkLength": number | null;
     "chunkOverlap": number | null;
     "retrievalCount": number;
+    "retrievalScoreThreshold": number;
     "rerankProviderId": string;
     "rerankModelIdentifier": string;
     "id": string;
@@ -1684,6 +1685,7 @@ export interface KnowledgeBaseInput {
     "chunkLength": number | null;
     "chunkOverlap": number | null;
     "retrievalCount": number;
+    "retrievalScoreThreshold": number;
     "rerankProviderId": string;
     "rerankModelIdentifier": string;
     "name": string;

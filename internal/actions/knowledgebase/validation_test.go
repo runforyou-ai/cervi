@@ -53,7 +53,7 @@ func TestNormalizeGroupInput(t *testing.T) {
 // TestKnowledgeSettingsBounds 验证必填、边界值、小于下限及超过上限的数值配置。
 func TestKnowledgeSettingsBounds(t *testing.T) {
 	length, overlap := 512, 50
-	valid := Input{Name: "知识库", Category: domain.KnowledgeBaseCategoryStandard, EmbeddingProviderID: "01991b28-5721-7000-8000-000000000001", EmbeddingModelIdentifier: "embedding", EmbeddingDimension: 1024, ChunkLength: &length, ChunkOverlap: &overlap, RetrievalCount: 3, RerankProviderID: "01991b28-5721-7000-8000-000000000001", RerankModelIdentifier: "rerank"}
+	valid := Input{Name: "知识库", Category: domain.KnowledgeBaseCategoryStandard, EmbeddingProviderID: "01991b28-5721-7000-8000-000000000001", EmbeddingModelIdentifier: "embedding", EmbeddingDimension: 1024, ChunkLength: &length, ChunkOverlap: &overlap, RetrievalCount: 3, RetrievalScoreThreshold: 0.7, RerankProviderID: "01991b28-5721-7000-8000-000000000001", RerankModelIdentifier: "rerank"}
 	for _, test := range []struct {
 		length, overlap, count int
 		field                  string
@@ -66,6 +66,16 @@ func TestKnowledgeSettingsBounds(t *testing.T) {
 		_, fields := normalizeInput(input)
 		if test.field == "" && len(fields) != 0 || test.field != "" && fields[test.field] == "" {
 			t.Fatalf("test=%+v fields=%+v", test, fields)
+		}
+	}
+	for _, test := range []struct {
+		threshold float64
+		valid     bool
+	}{{0, true}, {1, true}, {-0.01, false}, {1.01, false}} {
+		input := valid
+		input.RetrievalScoreThreshold = test.threshold
+		if _, fields := normalizeInput(input); (fields["retrievalScoreThreshold"] == "") != test.valid {
+			t.Fatalf("threshold=%v fields=%+v", test.threshold, fields)
 		}
 	}
 	input := valid

@@ -336,6 +336,7 @@
   "field.knowledge_base_chunk_length_invalid": "Chunk length must be an integer between 256 and 2048.",
   "field.knowledge_base_chunk_overlap_invalid": "Chunk overlap must be an integer between 0 and 200.",
   "field.knowledge_base_retrieval_count_invalid": "Retrieval count must be an integer between 1 and 20.",
+  "field.knowledge_base_retrieval_score_threshold_invalid": "Relevance threshold must be a number between 0 and 1.",
   "field.knowledge_base_rerank_model_invalid": "Select a rerank model.",
   "field.knowledge_retrieval_query_invalid": "Enter search text of at most 250 characters.",
   "field.knowledge_base_name_required": "Enter a knowledge base name.",

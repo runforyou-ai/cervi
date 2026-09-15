@@ -73,8 +73,8 @@ func TestKnowledgeBaseReindex(t *testing.T) {
 		t.Fatalf("segments=%d qa=%d", segmentCount(base.ID), qaSegments)
 	}
 
-	// 召回数量变更保留已发布批次。
-	input := knowledgeaction.Input{Name: base.Name, Category: base.Category, EmbeddingProviderID: base.EmbeddingProviderID, EmbeddingModelIdentifier: base.EmbeddingModelIdentifier, EmbeddingDimension: base.EmbeddingDimension, ChunkLength: base.ChunkLength, ChunkOverlap: base.ChunkOverlap, RetrievalCount: 5, RerankProviderID: base.RerankProviderID, RerankModelIdentifier: base.RerankModelIdentifier}
+	// 召回数量和相关性阈值变更保留已发布批次。
+	input := knowledgeaction.Input{Name: base.Name, Category: base.Category, EmbeddingProviderID: base.EmbeddingProviderID, EmbeddingModelIdentifier: base.EmbeddingModelIdentifier, EmbeddingDimension: base.EmbeddingDimension, ChunkLength: base.ChunkLength, ChunkOverlap: base.ChunkOverlap, RetrievalCount: 5, RetrievalScoreThreshold: 0.5, RerankProviderID: base.RerankProviderID, RerankModelIdentifier: base.RerankModelIdentifier}
 	if _, err := update.Execute(ctx, identity, base.ID, input); err != nil {
 		t.Fatal(err)
 	}
@@ -114,7 +114,7 @@ func TestKnowledgeBaseReindex(t *testing.T) {
 	}
 
 	// 问答库更换向量模型和维度后按新快照重新索引。
-	qaUpdate := knowledgeaction.Input{Name: qaBase.Name, Category: qaBase.Category, EmbeddingProviderID: qaBase.EmbeddingProviderID, EmbeddingModelIdentifier: "embedding-b", EmbeddingDimension: 768, RetrievalCount: qaBase.RetrievalCount, RerankProviderID: qaBase.RerankProviderID, RerankModelIdentifier: qaBase.RerankModelIdentifier}
+	qaUpdate := knowledgeaction.Input{Name: qaBase.Name, Category: qaBase.Category, EmbeddingProviderID: qaBase.EmbeddingProviderID, EmbeddingModelIdentifier: "embedding-b", EmbeddingDimension: 768, RetrievalCount: qaBase.RetrievalCount, RetrievalScoreThreshold: qaBase.RetrievalScoreThreshold, RerankProviderID: qaBase.RerankProviderID, RerankModelIdentifier: qaBase.RerankModelIdentifier}
 	if _, err := update.Execute(ctx, identity, qaBase.ID, qaUpdate); err != nil {
 		t.Fatal(err)
 	}

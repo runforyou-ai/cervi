@@ -22,6 +22,7 @@ type KnowledgeBaseInput struct {
 	ChunkLength              *int                  `json:"chunkLength"`
 	ChunkOverlap             *int                  `json:"chunkOverlap"`
 	RetrievalCount           int                   `json:"retrievalCount"`
+	RetrievalScoreThreshold  float64               `json:"retrievalScoreThreshold"`
 	RerankProviderID         string                `json:"rerankProviderId"`
 	RerankModelIdentifier    string                `json:"rerankModelIdentifier"`
 	Name                     string                `json:"name"`
@@ -52,6 +53,7 @@ type KnowledgeBase struct {
 	ChunkLength              *int                  `json:"chunkLength"`
 	ChunkOverlap             *int                  `json:"chunkOverlap"`
 	RetrievalCount           int                   `json:"retrievalCount"`
+	RetrievalScoreThreshold  float64               `json:"retrievalScoreThreshold"`
 	RerankProviderID         string                `json:"rerankProviderId"`
 	RerankModelIdentifier    string                `json:"rerankModelIdentifier"`
 	ID                       string                `json:"id"`

@@ -34,7 +34,7 @@ func newKnowledgeBaseInput(t *testing.T, db *bun.DB, identity *servermodels.Iden
 		t.Fatal(err)
 	}
 	length, overlap := 512, 50
-	input := knowledgeaction.Input{Name: name, Category: category, EmbeddingProviderID: provider.ID, EmbeddingModelIdentifier: "embedding-a", EmbeddingDimension: 1024, RetrievalCount: 3, RerankProviderID: provider.ID, RerankModelIdentifier: "rerank"}
+	input := knowledgeaction.Input{Name: name, Category: category, EmbeddingProviderID: provider.ID, EmbeddingModelIdentifier: "embedding-a", EmbeddingDimension: 1024, RetrievalCount: 3, RetrievalScoreThreshold: 0.7, RerankProviderID: provider.ID, RerankModelIdentifier: "rerank"}
 	if category == domain.KnowledgeBaseCategoryStandard {
 		input.ChunkLength, input.ChunkOverlap = &length, &overlap
 	}
@@ -57,12 +57,12 @@ func TestKnowledgeBaseSettings(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if base.EmbeddingDimension != 1024 || *base.ChunkLength != 512 || *base.ChunkOverlap != 50 || base.RetrievalCount != 3 || base.RerankModelIdentifier != "rerank" {
+	if base.EmbeddingDimension != 1024 || *base.ChunkLength != 512 || *base.ChunkOverlap != 50 || base.RetrievalCount != 3 || base.RetrievalScoreThreshold != 0.7 || base.RerankModelIdentifier != "rerank" {
 		t.Fatalf("base=%+v", base)
 	}
-	input.EmbeddingModelIdentifier, input.EmbeddingDimension, input.RetrievalCount = "embedding-b", 768, 20
+	input.EmbeddingModelIdentifier, input.EmbeddingDimension, input.RetrievalCount, input.RetrievalScoreThreshold = "embedding-b", 768, 20, 0.35
 	updated, err := update.Execute(ctx, identity, base.ID, input)
-	if err != nil || updated.EmbeddingModelIdentifier != "embedding-b" || updated.EmbeddingDimension != 768 || updated.RetrievalCount != 20 || updated.RerankModelIdentifier != "rerank" {
+	if err != nil || updated.EmbeddingModelIdentifier != "embedding-b" || updated.EmbeddingDimension != 768 || updated.RetrievalCount != 20 || updated.RetrievalScoreThreshold != 0.35 || updated.RerankModelIdentifier != "rerank" {
 		t.Fatalf("updated=%+v err=%v", updated, err)
 	}
 	// 重排模型为必填项。

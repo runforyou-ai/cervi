@@ -135,6 +135,7 @@ func recordFromModel(knowledgeBase servermodels.KnowledgeBase) Record {
 		ChunkLength:              knowledgeBase.ChunkLength,
 		ChunkOverlap:             knowledgeBase.ChunkOverlap,
 		RetrievalCount:           knowledgeBase.RetrievalCount,
+		RetrievalScoreThreshold:  knowledgeBase.RetrievalScoreThreshold,
 		RerankProviderID:         knowledgeBase.RerankProviderID,
 		RerankModelIdentifier:    knowledgeBase.RerankModelIdentifier,
 

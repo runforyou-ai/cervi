@@ -7,24 +7,25 @@ const messages = {
   nameRequired: "nameRequired", nameTooLong: "nameTooLong", descriptionTooLong: "descriptionTooLong",
   embeddingModelRequired: "embeddingModelRequired", embeddingDimensionInvalid: "embeddingDimensionInvalid",
   chunkLengthInvalid: "chunkLengthInvalid", chunkOverlapInvalid: "chunkOverlapInvalid", retrievalCountInvalid: "retrievalCountInvalid",
-  rerankModelRequired: "rerankModelRequired",
+  retrievalScoreThresholdInvalid: "retrievalScoreThresholdInvalid", rerankModelRequired: "rerankModelRequired",
 }
 const valid = {
   name: "知识库", description: "", embeddingModel: '["provider","embedding"]', embeddingDimension: "1024",
-  chunkLength: "512", chunkOverlap: "50", retrievalCount: "3", rerankModel: '["provider","rerank"]',
+  chunkLength: "512", chunkOverlap: "50", retrievalCount: "3", retrievalScoreThreshold: "0.7", rerankModel: '["provider","rerank"]',
 }
 
-test("文档库必填数值接收边界整数，拒绝空值、小数和越界值", () => {
+test("文档库必填数值接收边界值，拒绝空值、非法格式和越界值", () => {
   const schema = createKnowledgeBaseSchema(messages, false)
   assert.equal(schema.safeParse(valid).success, true)
-  assert.equal(schema.safeParse({ ...valid, chunkLength: "256", chunkOverlap: "0", retrievalCount: "1" }).success, true)
-  assert.equal(schema.safeParse({ ...valid, chunkLength: "2048", chunkOverlap: "200", retrievalCount: "20" }).success, true)
+  assert.equal(schema.safeParse({ ...valid, chunkLength: "256", chunkOverlap: "0", retrievalCount: "1", retrievalScoreThreshold: "0" }).success, true)
+  assert.equal(schema.safeParse({ ...valid, chunkLength: "2048", chunkOverlap: "200", retrievalCount: "20", retrievalScoreThreshold: "1" }).success, true)
   assert.equal(schema.safeParse({ ...valid, embeddingDimension: "3072" }).success, true)
   for (const [field, values] of Object.entries({
     embeddingDimension: ["", "0", "-1", "1.5", "1000", "4096"],
     chunkLength: ["", "255", "2049", "512.5"],
     chunkOverlap: ["", "-1", "201", "0.5"],
     retrievalCount: ["", "0", "21", "3.5"],
+    retrievalScoreThreshold: ["", "-0.1", "1.01", "abc"],
   })) {
     for (const value of values) {
       const result = schema.safeParse({ ...valid, [field]: value })

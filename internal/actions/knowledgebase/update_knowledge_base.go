@@ -79,6 +79,7 @@ func (a *UpdateKnowledgeBaseAction) Execute(ctx context.Context, identity *serve
 			Set("chunk_length = ?", input.ChunkLength).
 			Set("chunk_overlap = ?", input.ChunkOverlap).
 			Set("retrieval_count = ?", input.RetrievalCount).
+			Set("retrieval_score_threshold = ?", input.RetrievalScoreThreshold).
 			Set("rerank_provider_id = ?", input.RerankProviderID).
 			Set("rerank_model_identifier = ?", input.RerankModelIdentifier).
 			Set("updated_at = now()").
