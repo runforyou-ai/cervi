@@ -245,11 +245,16 @@ func (a *ExecuteAction) begin(ctx context.Context, runID string) (executionConte
 
 // withManagedAgentConfiguration 为已关联 agents AS a 的查询补充指定配置版本的模型和系统指令列，只保留有效的托管对话模型配置。
 func withManagedAgentConfiguration(query *bun.SelectQuery, revisionIDColumn string) *bun.SelectQuery {
-	return query.
+	return joinManagedAgentConfiguration(query, revisionIDColumn).
 		ColumnExpr("aip.brand AS brand, aip.api_key AS api_key, aip.api_url AS api_url").
 		ColumnExpr("ar.configuration->'model'->>'identifier' AS model_identifier").
 		ColumnExpr("aipm.max_output_tokens AS max_output_tokens, aipm.context_window AS context_window").
-		ColumnExpr("ar.configuration->>'systemInstruction' AS instruction").
+		ColumnExpr("ar.configuration->>'systemInstruction' AS instruction")
+}
+
+// joinManagedAgentConfiguration 为已关联 agents AS a 的查询关联身份、指定配置版本与对话模型，只保留有效的托管对话模型配置。
+func joinManagedAgentConfiguration(query *bun.SelectQuery, revisionIDColumn string) *bun.SelectQuery {
+	return query.
 		Join("JOIN organization_identities AS oi ON oi.id = a.identity_id AND oi.organization_id = a.organization_id").
 		Join("JOIN agent_revisions AS ar ON ar.id = "+revisionIDColumn+" AND ar.agent_id = a.id AND ar.organization_id = a.organization_id").
 		Join("JOIN ai_providers AS aip ON aip.id = (ar.configuration->'model'->>'providerId')::uuid AND aip.organization_id = a.organization_id").

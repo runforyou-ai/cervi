@@ -93,6 +93,17 @@ type CustomerReplySuggestionsInput struct {
 	ReplyToMessageID string            `json:"replyToMessageId"`
 }
 
+// CustomerReplyAgent 定义可用于 AI 写回复的 AI 员工。
+type CustomerReplyAgent struct {
+	IdentityID  string `json:"identityId"`
+	DisplayName string `json:"displayName"`
+}
+
+// CustomerReplyAgentList 定义可用于 AI 写回复的 AI 员工列表。
+type CustomerReplyAgentList struct {
+	Agents []CustomerReplyAgent `json:"agents"`
+}
+
 // CustomerReplySuggestions 定义可直接填入对客草稿的回复候选。
 type CustomerReplySuggestions struct {
 	Candidates []string `json:"candidates"`

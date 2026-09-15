@@ -577,6 +577,13 @@ export function ListCustomerMessageDeliveries(meta: $models.RequestMeta, convers
 }
 
 /**
+ * ListCustomerReplyAgents 返回可用于 AI 写回复的 AI 员工。
+ */
+export function ListCustomerReplyAgents(meta: $models.RequestMeta): $CancellablePromise<$models.CustomerReplyAgentList> {
+    return $Call.ByID(1363919924, meta);
+}
+
+/**
  * ListCustomerServiceAssignees 返回有效真人和 AI 客服。
  */
 export function ListCustomerServiceAssignees(meta: $models.RequestMeta): $CancellablePromise<$models.CustomerServiceAssigneeList> {

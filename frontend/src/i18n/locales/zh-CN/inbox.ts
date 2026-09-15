@@ -299,6 +299,7 @@ const inbox = {
   replyAssistantToneFriendly: "友好",
   replyAssistantToneConcise: "简洁",
   replyAssistantAgent: "AI 员工",
+  replyAssistantAgentsLoadError: "读取 AI 员工失败",
   replyAssistantRewriteEmpty: "请先输入要改写的回复内容",
   replyAssistantGenerating: "正在生成…",
   replyAssistantCandidates: "回复候选",

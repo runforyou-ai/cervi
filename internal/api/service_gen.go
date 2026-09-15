@@ -47,6 +47,7 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.PATCH("/conversations/:conversationID/unread-mark", s.updateConversationUnreadMark)
 	router.PATCH("/conversations/:conversationID/notification-settings", s.updateConversationNotificationSettings)
 	router.POST("/conversations/:conversationID/messages", s.sendCustomerTextMessage)
+	router.GET("/reply-suggestion-agents", s.listCustomerReplyAgents)
 	router.POST("/conversations/:conversationID/reply-suggestions", s.generateCustomerReplySuggestions)
 	router.GET("/conversations/:conversationID/deliveries", s.listCustomerMessageDeliveries)
 	router.POST("/conversations/:conversationID/deliveries/:deliveryID/resolve", s.resolveCustomerMessageDelivery)
@@ -444,6 +445,12 @@ func (s *Service) sendCustomerTextMessage(c *gin.Context) {
 		return
 	}
 	output, err := s.application.SendCustomerTextMessage(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// listCustomerReplyAgents 返回可用于 AI 写回复的 AI 员工。
+func (s *Service) listCustomerReplyAgents(c *gin.Context) {
+	output, err := s.application.ListCustomerReplyAgents(c.Request.Context(), requestMeta(c))
 	writeResult(c, http.StatusOK, output, err)
 }
 

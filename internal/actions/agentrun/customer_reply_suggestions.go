@@ -188,14 +188,17 @@ func loadCustomerReplyContext(ctx context.Context, db bun.IDB, identity *serverm
 		Status             string  `bun:"status"`
 		AssigneeIdentityID *string `bun:"assignee_identity_id"`
 		ChannelType        string  `bun:"channel_type"`
+		ChannelEnabled     bool    `bun:"channel_enabled"`
+		BotID              *int64  `bun:"bot_id"`
 	}
 	err := db.NewSelect().
 		TableExpr("customer_conversations AS cc").
-		ColumnExpr("ss.id, ss.status, ss.assignee_identity_id, ch.type AS channel_type").
+		ColumnExpr("ss.id, ss.status, ss.assignee_identity_id, ch.type AS channel_type, ch.enabled AS channel_enabled, tcs.bot_id").
 		Join("JOIN conversations AS cv ON cv.id = cc.conversation_id AND cv.organization_id = cc.organization_id").
 		Join("JOIN service_sessions AS ss ON ss.id = cc.current_service_session_id AND ss.organization_id = cc.organization_id AND ss.conversation_id = cc.conversation_id").
 		Join("JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id").
 		Join("JOIN channels AS ch ON ch.id = cci.channel_id AND ch.organization_id = cci.organization_id").
+		Join("LEFT JOIN telegram_channel_settings AS tcs ON tcs.channel_id = ch.id AND tcs.organization_id = ch.organization_id").
 		Where("cc.organization_id = ? AND cc.conversation_id = ? AND cv.type = ?", organizationID, input.ConversationID, domain.ConversationTypeCustomer).
 		Scan(ctx, &session)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -204,10 +207,12 @@ func loadCustomerReplyContext(ctx context.Context, db bun.IDB, identity *serverm
 	if err != nil {
 		return customerReplyContext{}, fmt.Errorf("load customer reply service session: %w", err)
 	}
-	// 与对客发送的资格一致：渠道支持外发、周期未关闭，且负责人为本人或无人负责。
+	// 与对客发送的资格一致：渠道支持外发、Telegram 渠道已启用并配置机器人、周期未关闭，且负责人为本人或无人负责。
 	switch {
 	case domain.ChannelType(session.ChannelType) != domain.ChannelTypeWebsite && domain.ChannelType(session.ChannelType) != domain.ChannelTypeTelegram:
 		return customerReplyContext{}, &conversationaction.ConflictError{Reason: conversationaction.ConflictReasonChannelOutboundUnsupported}
+	case domain.ChannelType(session.ChannelType) == domain.ChannelTypeTelegram && (!session.ChannelEnabled || session.BotID == nil):
+		return customerReplyContext{}, &conversationaction.ConflictError{Reason: conversationaction.ConflictReasonChannelOutboundUnavailable}
 	case domain.ServiceSessionStatus(session.Status) != domain.ServiceSessionStatusOpen:
 		return customerReplyContext{}, &conversationaction.ConflictError{Reason: conversationaction.ConflictReasonServiceSessionNotReplyable}
 	case session.AssigneeIdentityID != nil && *session.AssigneeIdentityID != identity.OrganizationIdentity.ID:
@@ -252,6 +257,40 @@ func loadCustomerReplyContext(ctx context.Context, db bun.IDB, identity *serverm
 		return customerReplyContext{}, err
 	}
 	return result, nil
+}
+
+// CustomerReplyAgent 定义可用于 AI 写回复的 AI 员工。
+type CustomerReplyAgent struct {
+	IdentityID  string `bun:"identity_id"`
+	DisplayName string `bun:"display_name"`
+}
+
+// ListCustomerReplyAgentsQuery 读取可用于 AI 写回复的 AI 员工。
+type ListCustomerReplyAgentsQuery struct {
+	db *bun.DB
+}
+
+// NewListCustomerReplyAgentsQuery 创建 AI 写回复可用员工查询。
+func NewListCustomerReplyAgentsQuery(db *bun.DB) *ListCustomerReplyAgentsQuery {
+	return &ListCustomerReplyAgentsQuery{db: db}
+}
+
+// Execute 返回当前企业活跃且当前托管配置有效的 AI 员工，按显示名排序。
+func (q *ListCustomerReplyAgentsQuery) Execute(ctx context.Context, identity *servermodels.Identity) ([]CustomerReplyAgent, error) {
+	agents := make([]CustomerReplyAgent, 0)
+	err := q.db.NewSelect().
+		TableExpr("agents AS a").
+		ColumnExpr("a.identity_id, oi.display_name").
+		Apply(func(query *bun.SelectQuery) *bun.SelectQuery {
+			return joinManagedAgentConfiguration(query, "a.active_revision_id")
+		}).
+		Where("a.organization_id = ? AND a.status = ? AND oi.type = ?", identity.Organization.ID, domain.UserStatusActive, domain.OrganizationIdentityTypeAgent).
+		OrderExpr("oi.display_name, a.identity_id").
+		Scan(ctx, &agents)
+	if err != nil {
+		return nil, fmt.Errorf("list customer reply agents: %w", err)
+	}
+	return agents, nil
 }
 
 // customerReplyInstruction 在 AI 员工系统指令之后追加回复助手要求和输出格式。

@@ -307,6 +307,7 @@ const inbox = {
   replyAssistantToneFriendly: "Friendly",
   replyAssistantToneConcise: "Concise",
   replyAssistantAgent: "AI employee",
+  replyAssistantAgentsLoadError: "Could not load AI employees",
   replyAssistantRewriteEmpty: "Enter a reply to rewrite first",
   replyAssistantGenerating: "Generating…",
   replyAssistantCandidates: "Reply suggestions",

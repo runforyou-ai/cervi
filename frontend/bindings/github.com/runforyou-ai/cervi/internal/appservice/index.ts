@@ -133,6 +133,8 @@ export type {
     CustomerDeliveryResolveInput,
     CustomerInboxConversation,
     CustomerMessageDelivery,
+    CustomerReplyAgent,
+    CustomerReplyAgentList,
     CustomerReplySuggestions,
     CustomerReplySuggestionsInput,
     CustomerServiceAssigneeList,

@@ -159,6 +159,11 @@ func (s *Service) SendCustomerTextMessage(ctx context.Context, meta RequestMeta,
 	return withNormalizedSlices(s.backend.SendCustomerTextMessage(ctx, meta, conversationID, input))
 }
 
+// ListCustomerReplyAgents 返回可用于 AI 写回复的 AI 员工。
+func (s *Service) ListCustomerReplyAgents(ctx context.Context, meta RequestMeta) (CustomerReplyAgentList, error) {
+	return withNormalizedSlices(s.backend.ListCustomerReplyAgents(ctx, meta))
+}
+
 // GenerateCustomerReplySuggestions 使用 AI 员工为客户会话生成对客回复候选。
 func (s *Service) GenerateCustomerReplySuggestions(ctx context.Context, meta RequestMeta, conversationID string, input CustomerReplySuggestionsInput) (CustomerReplySuggestions, error) {
 	return withNormalizedSlices(s.backend.GenerateCustomerReplySuggestions(ctx, meta, conversationID, input))

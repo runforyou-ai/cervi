@@ -11,9 +11,9 @@ import { useTranslation } from "react-i18next"
 import {
   CustomerReplyMode,
   CustomerReplyTone,
-  OrganizationIdentityType,
   generateCustomerReplySuggestions,
   isApiError,
+  listCustomerReplyAgents,
 } from "@/api"
 import { Button } from "@/components/ui/button"
 import { NativeSelect } from "@/components/ui/native-select"
@@ -22,7 +22,6 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
-import { listAllMemberOptions } from "@/features/inbox/list-all-member-options"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceRemover } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
@@ -86,6 +85,9 @@ export function CustomerReplyAssistant({
   )
   const [source, setSource] = useState({ draft, replyToMessageID })
 
+  // 不可使用时关闭弹层，恢复可用后保持关闭。
+  if (disabled && open) setOpen(false)
+
   useEffect(() => {
     if (!open) return
     // 弹层打开期间，草稿和引用变化防抖后才成为新的生成条件。
@@ -103,19 +105,16 @@ export function CustomerReplyAssistant({
   )
 
   const agentOptions = useResource(
-    resourceKeys.memberOptions(),
-    listAllMemberOptions,
+    resourceKeys.customerReplyAgents(),
+    listCustomerReplyAgents,
     { enabled: open, staleTime: 0 },
   )
-  const agents = (agentOptions.data ?? []).filter(
-    (member) =>
-      member.type === OrganizationIdentityType.OrganizationIdentityTypeAgent,
-  )
+  const agents = agentOptions.data ?? []
   const agentIdentityID = agents.some(
-    (agent) => agent.id === preferences.agentIdentityId,
+    (agent) => agent.identityId === preferences.agentIdentityId,
   )
     ? preferences.agentIdentityId
-    : (agents[0]?.id ?? "")
+    : (agents[0]?.identityId ?? "")
   const rewrite = mode === CustomerReplyMode.CustomerReplyModeRewrite
   const parameters = {
     agentIdentityId: agentIdentityID,
@@ -125,13 +124,10 @@ export function CustomerReplyAssistant({
     replyToMessageId: source.replyToMessageID,
   }
   const rewriteEmpty = rewrite && draft.trim() === ""
-  const ready =
-    open &&
-    !disabled &&
-    agentIdentityID !== "" &&
-    !rewriteEmpty &&
-    (!rewrite || parameters.draft !== "")
-  // 生成条件落后于当前草稿或引用时，旧结果不再展示。
+  const available =
+    open && !disabled && agentIdentityID !== "" && !rewriteEmpty
+  const ready = available && (!rewrite || parameters.draft !== "")
+  // 生成条件落后于当前草稿或引用时，旧结果不再展示，按生成中处理。
   const sourceCurrent =
     source.replyToMessageID === replyToMessageID &&
     (!rewrite || source.draft === draft)
@@ -142,7 +138,8 @@ export function CustomerReplyAssistant({
   )
   const generating =
     agentOptions.loading ||
-    (ready && (suggestions.loading || suggestions.refreshing || !sourceCurrent))
+    (available &&
+      (!sourceCurrent || suggestions.loading || suggestions.refreshing))
   const candidates = suggestions.data?.candidates ?? []
   const modeLabels = {
     [CustomerReplyMode.CustomerReplyModeReply]: t("replyAssistantModeReply"),
@@ -154,9 +151,9 @@ export function CustomerReplyAssistant({
     [CustomerReplyTone.CustomerReplyToneFriendly]: t("replyAssistantToneFriendly"),
     [CustomerReplyTone.CustomerReplyToneConcise]: t("replyAssistantToneConcise"),
   }
-  // 没有候选时的提示按原因排序：资料读取、可用员工、改写草稿和生成失败。
+  // 没有候选时的提示按原因排序：员工读取、可用员工、改写草稿和生成失败。
   const emptyMessage = agentOptions.error
-    ? t("agentPickerLoadError")
+    ? t("replyAssistantAgentsLoadError")
     : agents.length === 0
       ? t("agentPickerEmpty")
       : rewriteEmpty
@@ -188,7 +185,7 @@ export function CustomerReplyAssistant({
   }
 
   return (
-    <Popover open={open && !disabled} onOpenChange={changeOpen}>
+    <Popover open={open} onOpenChange={changeOpen}>
       <PopoverTrigger asChild>
         <Button
           type="button"
@@ -208,7 +205,7 @@ export function CustomerReplyAssistant({
       <PopoverContent
         side="top"
         align="start"
-        className="w-[min(30rem,calc(100vw-2rem))] space-y-3 p-3"
+        className="w-[min(36rem,calc(100vw-2rem))] space-y-3 p-3"
         onCloseAutoFocus={(event) => {
           // 使用候选后焦点交给回复输入框。
           if (!appliedRef.current) return
@@ -216,8 +213,8 @@ export function CustomerReplyAssistant({
           event.preventDefault()
         }}
       >
-        <div className="flex flex-wrap items-center gap-2">
-          <p className="shrink-0 text-sm font-medium">{t("replyAssistant")}</p>
+        <div className="flex items-center gap-2">
+          <p className="min-w-0 truncate text-sm font-medium">{t("replyAssistant")}</p>
           <div
             role="radiogroup"
             aria-label={t("replyAssistantMode")}
@@ -230,7 +227,7 @@ export function CustomerReplyAssistant({
                 role="radio"
                 aria-checked={mode === value}
                 className={cn(
-                  "h-7 rounded-sm px-2.5 text-xs font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+                  "h-7 rounded-sm px-2.5 text-xs font-medium whitespace-nowrap transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
                   mode === value
                     ? "bg-foreground text-background"
                     : "text-muted-foreground hover:bg-muted hover:text-foreground",
@@ -244,7 +241,7 @@ export function CustomerReplyAssistant({
           <div className="ml-auto flex shrink-0 items-center gap-1">
             <NativeSelect
               aria-label={t("replyAssistantAgent")}
-              className="h-7 w-28 truncate px-2 pr-7 text-xs shadow-none"
+              className="h-7 w-auto max-w-36 truncate px-2 pr-8 text-xs shadow-none"
               value={agentIdentityID}
               disabled={agents.length === 0}
               onChange={(event) =>
@@ -252,14 +249,14 @@ export function CustomerReplyAssistant({
               }
             >
               {agents.map((agent) => (
-                <option key={agent.id} value={agent.id}>
+                <option key={agent.identityId} value={agent.identityId}>
                   {agent.displayName}
                 </option>
               ))}
             </NativeSelect>
             <NativeSelect
               aria-label={t("replyAssistantTone")}
-              className="h-7 w-24 px-2 pr-7 text-xs shadow-none"
+              className="h-7 w-auto px-2 pr-8 text-xs shadow-none"
               value={preferences.tone}
               onChange={(event) =>
                 updatePreferences({ tone: event.target.value as CustomerReplyTone })

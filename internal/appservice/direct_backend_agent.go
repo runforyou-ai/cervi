@@ -20,6 +20,7 @@ import (
 type agentOps struct {
 	agentCoordinator          *agentrunaction.ExecuteAction
 	customerReplySuggestions  *agentrunaction.GenerateCustomerReplySuggestionsAction
+	listCustomerReplyAgents   *agentrunaction.ListCustomerReplyAgentsQuery
 	listAgentMCPServerOptions *agentaction.ListMCPServerOptionsQuery
 	listAgentModelOptions     *agentaction.ListModelOptionsQuery
 	createAgent               *agentaction.CreateAgentAction
@@ -35,6 +36,7 @@ func newAgentOps(db *bun.DB, agentCoordinator *agentrunaction.ExecuteAction, cus
 	return agentOps{
 		agentCoordinator:          agentCoordinator,
 		customerReplySuggestions:  customerReplySuggestions,
+		listCustomerReplyAgents:   agentrunaction.NewListCustomerReplyAgentsQuery(db),
 		listAgentMCPServerOptions: agentaction.NewListMCPServerOptionsQuery(db),
 		listAgentModelOptions:     agentaction.NewListModelOptionsQuery(db),
 		createAgent:               agentaction.NewCreateAgentAction(db),

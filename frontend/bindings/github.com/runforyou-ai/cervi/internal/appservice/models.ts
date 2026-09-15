@@ -1086,6 +1086,21 @@ export interface CustomerMessageDelivery {
 }
 
 /**
+ * CustomerReplyAgent 定义可用于 AI 写回复的 AI 员工。
+ */
+export interface CustomerReplyAgent {
+    "identityId": string;
+    "displayName": string;
+}
+
+/**
+ * CustomerReplyAgentList 定义可用于 AI 写回复的 AI 员工列表。
+ */
+export interface CustomerReplyAgentList {
+    "agents": CustomerReplyAgent[] | null;
+}
+
+/**
  * CustomerReplyMode 表示 AI 写回复的生成方式。
  */
 export enum CustomerReplyMode {

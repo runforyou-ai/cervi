@@ -79,6 +79,8 @@ export const resourceKeys = {
   /** 当前成员与目标身份的已有单聊。 */
   directConversation: (identityId?: string) =>
     itemKey("direct-conversation", identityId),
+  /** 可用于 AI 写回复的 AI 员工。 */
+  customerReplyAgents: () => ["customer-reply-agents"],
   /** 客户会话 AI 写回复的候选，不带参数时作为该会话全部候选的失效前缀。 */
   customerReplySuggestions: (conversationId: string, parameters?: KeyParameters) =>
     parameters === undefined

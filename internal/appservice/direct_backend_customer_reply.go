@@ -46,6 +46,23 @@ func (o *directOperations) GenerateCustomerReplySuggestions(ctx context.Context,
 	return CustomerReplySuggestions{}, FailedError(meta, cervii18n.ErrorCustomerReplySuggestFailed)
 }
 
+// ListCustomerReplyAgents 返回可用于 AI 写回复的 AI 员工。
+func (o *directOperations) ListCustomerReplyAgents(ctx context.Context, meta RequestMeta, identity *servermodels.Identity) (CustomerReplyAgentList, error) {
+	agents, err := o.listCustomerReplyAgents.Execute(ctx, identity)
+	if err != nil {
+		if ctx.Err() != nil {
+			return CustomerReplyAgentList{}, ctx.Err()
+		}
+		slog.Warn("读取 AI 写回复可用员工失败", "organization_id", identity.Organization.ID, "error", err)
+		return CustomerReplyAgentList{}, FailedError(meta, cervii18n.ErrorAgentListFailed)
+	}
+	output := make([]CustomerReplyAgent, 0, len(agents))
+	for _, agent := range agents {
+		output = append(output, CustomerReplyAgent{IdentityID: agent.IdentityID, DisplayName: agent.DisplayName})
+	}
+	return CustomerReplyAgentList{Agents: output}, nil
+}
+
 var customerReplySuggestionsValidationKeys = map[common.FieldCode]cervii18n.Key{
 	conversationaction.ValidationConversationIDInvalid:   cervii18n.FieldConversationIDInvalid,
 	agentrunaction.ValidationAgentIdentityIDInvalid:      cervii18n.FieldAgentIdentityIDInvalid,

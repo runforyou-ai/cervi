@@ -602,9 +602,9 @@ export function ConversationComposer({
   }
 
   const [showSubmitting, setShowSubmitting] = useState(false)
-  // 客户会话在输入区工具栏提供 AI 写回复入口，不可对客发送时保留显示并禁用。
+  // Web 与桌面端客户会话在输入区工具栏提供 AI 写回复入口，不可对客发送时保留显示并禁用。
   const replyAssistant =
-    conversationType === ConversationType.ConversationTypeCustomer && conversationID ? (
+    conversationType === ConversationType.ConversationTypeCustomer && conversationID && !mobile ? (
       <CustomerReplyAssistant
         conversationID={conversationID}
         currentIdentityID={currentIdentityID}

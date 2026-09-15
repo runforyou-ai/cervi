@@ -29,6 +29,7 @@ import {
   RemoveGroupConversationMember,
   SendCustomerTextMessage,
   GenerateCustomerReplySuggestions,
+  ListCustomerReplyAgents,
   SendAttachmentMessage,
   GetAttachmentDownload,
   SendFirstAgentTextMessage,
@@ -149,6 +150,7 @@ const markConversationMentionReviewedBound = bind(
 )
 const sendCustomerTextMessageBound = bind(SendCustomerTextMessage)
 const generateCustomerReplySuggestionsBound = bind(GenerateCustomerReplySuggestions)
+const listCustomerReplyAgentsBound = bind(ListCustomerReplyAgents)
 const sendFirstAgentTextMessageBound = bind(SendFirstAgentTextMessage)
 const sendAgentTextMessageBound = bind(SendAgentTextMessage)
 const sendFirstDirectTextMessageBound = bind(SendFirstDirectTextMessage)
@@ -327,6 +329,12 @@ export function markConversationRead(
 /** 发送成员客户会话文本消息。 */
 export function sendCustomerTextMessage(conversationID: string, input: CustomerTextMessageInput) {
   return sendCustomerTextMessageBound(conversationID, input)
+}
+
+/** 返回可用于 AI 写回复的 AI 员工。 */
+export async function listCustomerReplyAgents() {
+  const output = await listCustomerReplyAgentsBound()
+  return output.agents
 }
 
 /** 使用 AI 员工为客户会话生成对客回复候选。 */

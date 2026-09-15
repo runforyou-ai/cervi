@@ -197,4 +197,50 @@ func testCustomerReplySuggestions(t *testing.T, db *bun.DB, identity *servermode
 			t.Fatalf("closed error = %v", err)
 		}
 	})
+	t.Run("可用 AI 员工", func(t *testing.T) {
+		listAgents := agentrunaction.NewListCustomerReplyAgentsQuery(db)
+		containsCreated := func() bool {
+			agents, err := listAgents.Execute(ctx, identity)
+			if err != nil {
+				t.Fatal(err)
+			}
+			return slices.ContainsFunc(agents, func(agent agentrunaction.CustomerReplyAgent) bool {
+				return agent.IdentityID == created.IdentityID && agent.DisplayName == "回复建议助手"
+			})
+		}
+		if !containsCreated() {
+			t.Fatal("active agent with managed configuration is not listed")
+		}
+		if _, err := db.NewUpdate().Model((*servermodels.Agent)(nil)).Set("status = ?", domain.UserStatusInactive).Where("identity_id = ?", created.IdentityID).Exec(ctx); err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if _, err := db.NewUpdate().Model((*servermodels.Agent)(nil)).Set("status = ?", domain.UserStatusActive).Where("identity_id = ?", created.IdentityID).Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+		}()
+		if containsCreated() {
+			t.Fatal("inactive agent is listed")
+		}
+	})
+	t.Run("Telegram 渠道不可外发", func(t *testing.T) {
+		f := newAgentTelegramFixture(t, db, identity, roleID, providerID, modelID)
+		input := agentrunaction.CustomerReplySuggestionsInput{
+			ConversationID: f.run.ConversationID, AgentIdentityID: created.IdentityID,
+			Mode: domain.CustomerReplyModeReply, Tone: domain.CustomerReplyToneKeep,
+		}
+		for _, statement := range []string{"UPDATE channels SET enabled = false WHERE id = ?", "UPDATE telegram_channel_settings SET bot_id = NULL WHERE channel_id = ?"} {
+			if _, err := db.ExecContext(ctx, statement, f.channel.ID); err != nil {
+				t.Fatal(err)
+			}
+			calls := len(generator.requests)
+			_, err := action.Execute(ctx, identity, input)
+			if conflictError, ok := errors.AsType[*conversationaction.ConflictError](err); !ok || conflictError.Reason != conversationaction.ConflictReasonChannelOutboundUnavailable || len(generator.requests) != calls {
+				t.Fatalf("%s: error = %v, generator calls = %d", statement, err, len(generator.requests)-calls)
+			}
+			if _, err := db.ExecContext(ctx, "UPDATE channels SET enabled = true WHERE id = ?", f.channel.ID); err != nil {
+				t.Fatal(err)
+			}
+		}
+	})
 }
