@@ -33,7 +33,6 @@ markitdown 为 MIT 许可，无 CGO 和 AGPL 约束，同时解决了纯 Go PDF 
 本次不做：
 
 - **OCR 与扫描版 PDF**。PDF 一律按纯文本解析，无可提取文字的原件按 `empty_content` 失败。
-- **页级引用**。见第 3 节，`page_number` 与 `source_label` 两个 meta 字段一并删除。
 - **引入 Qdrant**。向量继续存放在同库的 `public.knowledge_segments`，沿用现有 halfvec HNSW 部分索引。
 - **向量召回接入**。`knowledgeretrieval.Source` 的实际实现见第 9 节，另行排期。
 
@@ -45,11 +44,11 @@ markitdown 为 MIT 许可，无 CGO 和 AGPL 约束，同时解决了纯 Go PDF 
 
 实测中文纯文本 PDF 和标签取值分列的表单式 PDF 均走 pdfminer 路径：三页 PDF（含一页空白）按 `\f` 切分得到正好三段，空白页对应空段。未能构造出触发表单式分支的样本，该分支行为按源码判定。
 
-因此按 `\f` 计算页码对多数 PDF 成立，但响应中没有任何字段标明本次走的是哪条路径：一旦命中表单式分支，分隔符和页序对应关系同时失效，页码会静默错位而非缺失。`knowledge_segments.meta.page_number` 不按此实现，roadmap 中"页级引用使用解析器提供的真实页码"推后到能够稳定判定页边界时。中文正文本身无乱码。
+因此按 `\f` 计算页码对多数 PDF 成立，但响应中没有任何字段标明本次走的是哪条路径：一旦命中表单式分支，分隔符和页序对应关系同时失效，页码会静默错位而非缺失。`knowledge_segments.meta` 不保存页码。中文正文本身无乱码。
 
-**XLSX 数值被类型推断改写。** `_xlsx_converter.py` 使用 `pd.read_excel(..., engine="openpyxl")`，pandas 按数值读取单元格。实测编号 `0012` 输出为 `12`，金额 `1234.50` 输出为 `1234.5`：前导零和小数尾零都会丢失。现行实现中 `dtype=str, keep_default_na=False` 的防护不再存在。金额与编号类字段的检索和引用按改写后的字面值进行。
+**XLSX 数值被类型推断改写。** `_xlsx_converter.py` 使用 `pd.read_excel(..., engine="openpyxl")`，pandas 按数值读取单元格。实测编号 `0012` 输出为 `12`，金额 `1234.50` 输出为 `1234.5`：前导零和小数尾零都会丢失。现行实现中 `dtype=str, keep_default_na=False` 的防护不再存在。金额与编号类字段的检索按改写后的字面值进行。
 
-**来源标记只保留在正文内。** XLSX 输出 `## 工作表名` 标题，PPTX 每页输出 `<!-- Slide number: N -->` 注释，PDF 在 pdfminer 路径下输出 `\f`，均经实测确认。这些信息进入分段正文，不再单独成列。将来若要恢复页级引用，PPTX 和 XLSX 的序号可从正文标记还原，PDF 需要第 9 节之外的单独方案。
+**来源标记只保留在正文内。** XLSX 输出 `## 工作表名` 标题，PPTX 每页输出 `<!-- Slide number: N -->` 注释，PDF 在 pdfminer 路径下输出 `\f`，均经实测确认。这些信息进入分段正文，不单独成列。
 
 若后续认定 XLSX 的数值改写不可接受，把该格式的分派改回 Go 侧的 excelize 只影响 `ProcessDocumentAction` 中一处按扩展名的分派，不动其余链路。
 
