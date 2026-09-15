@@ -1,8 +1,8 @@
 # 知识文档处理管线 Go 化与 Haystack 移除方案
 
-日期：2026-09-11。状态：待实施的开发方案。
+日期：2026-09-11。状态：已实施，召回、问答接入与 Agent 检索的现状见第 10 节。
 
-本文取代 [知识库接入方案](knowledge-base-plan.md) 第 3 节和 [知识库最小 MVP 开发顺序](knowledge-base-mvp-plan.md) PR 3 中"本地执行层直接采用 Haystack + Hayhooks"的结论。
+本文取代早期知识库方案中"本地执行层直接采用 Haystack + Hayhooks"的结论。
 
 调整后的职责边界：**原件转换交给 markitdown 独立容器，其余全部在 Go 服务端进程内**。字符分段、向量化、分段写入、批次发布、分段阅读和召回编排都由 Go 完成，`haystack/` 目录及其 HTTP 服务整体删除。
 

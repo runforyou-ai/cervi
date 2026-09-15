@@ -22,6 +22,7 @@ import (
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
+	"github.com/uptrace/bun"
 )
 
 type testKnowledgeRuntime struct {
@@ -44,6 +45,59 @@ func (r *testKnowledgeRuntime) Run(ctx context.Context, request agentruntime.Run
 	}
 	r.check(request.KnowledgeSearch)
 	return agentruntime.RunResult{Content: "已查阅资料", EndSeq: claimed.EndSeq}, nil
+}
+
+// newKnowledgeAgent 创建绑定指定知识库的托管 AI 员工，返回员工与对话模型供应商编号。
+func newKnowledgeAgent(t *testing.T, db *bun.DB, identity *servermodels.Identity, knowledgeBaseIDs []string) (*agentaction.Agent, string) {
+	t.Helper()
+	ctx := context.Background()
+	provider, err := aiprovideraction.NewCreateAIProviderAction(db).Execute(ctx, identity, aiprovideraction.Input{
+		Brand: domain.AIProviderBrandOpenAI, Name: uuid.NewV7().String(), APIKey: "test-key", APIURL: "https://models.test/v1",
+		Models: []aiprovideraction.Model{{Identifier: "chat", Name: "对话模型", Type: domain.AIModelTypeChat, InputModalities: []domain.AIModelInputModality{domain.AIModelInputModalityText}, ContextWindow: 32000, MaxOutputTokens: 4096}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	var roleID string
+	if err := db.NewSelect().Table("roles").Column("id").Where("organization_id = ? AND kind = ?", identity.Organization.ID, domain.RoleKindCustomerService).Scan(ctx, &roleID); err != nil {
+		t.Fatal(err)
+	}
+	agent, err := agentaction.NewCreateAgentAction(db).Execute(ctx, identity, agentaction.CreateInput{
+		DisplayName: "资料助手", RoleID: roleID,
+		Execution: agentaction.ExecutionInput{Mode: domain.AgentExecutionModeManaged, Managed: &agentaction.ManagedExecutionInput{
+			ProviderID: provider.ID, ModelIdentifier: "chat", SystemInstruction: "依据知识库回答", KnowledgeBaseIDs: knowledgeBaseIDs,
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	return agent, provider.ID
+}
+
+// newKnowledgeAgentScheduler 创建只登记运行任务的 Agent 调度器。
+func newKnowledgeAgentScheduler(t *testing.T, db *bun.DB) (*servertask.Runtime, *agentrunaction.Scheduler) {
+	t.Helper()
+	tasks := servertask.New(db, serverconfig.NATSConfig{})
+	if err := tasks.Registry().RegisterJSON(agentrunaction.RunActionName, func(context.Context, agentrunaction.RunInput) error { return nil }); err != nil {
+		t.Fatal(err)
+	}
+	return tasks, agentrunaction.NewScheduler(tasks)
+}
+
+// runQueuedAgentRun 同步执行会话中排队的运行并确认成功收尾。
+func runQueuedAgentRun(t *testing.T, db *bun.DB, execute *agentrunaction.ExecuteAction, conversationID string) {
+	t.Helper()
+	ctx := context.Background()
+	run := &servermodels.AgentRun{}
+	if err := db.NewSelect().Model(run).Where("agr.conversation_id = ? AND agr.status = ?", conversationID, domain.AgentRunStatusQueued).Scan(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := execute.Execute(ctx, agentrunaction.RunInput{RunID: run.ID}); err != nil {
+		t.Fatal(err)
+	}
+	if err := db.NewSelect().Model(run).WherePK().Scan(ctx); err != nil || domain.AgentRunStatus(run.Status) != domain.AgentRunStatusSucceeded {
+		t.Fatalf("run=%+v err=%v", run, err)
+	}
 }
 
 // TestAgentKnowledgeSearch 验证运行期按配置版本绑定的知识库注入检索、跨库融合、游标阅读、范围隔离以及知识库删除后的行为。
@@ -70,31 +124,8 @@ func TestAgentKnowledgeSearch(t *testing.T) {
 	invoiceID := publishRetrievalDocument(t, db, probe, identity, invoiceBase, "发票说明.txt", "下单时可以选择开具电子发票。")
 	publishRetrievalDocument(t, db, probe, identity, unboundBase, "配送说明.txt", "配送时效按收货地址计算。")
 
-	provider, err := aiprovideraction.NewCreateAIProviderAction(db).Execute(ctx, identity, aiprovideraction.Input{
-		Brand: domain.AIProviderBrandOpenAI, Name: uuid.NewV7().String(), APIKey: "test-key", APIURL: "https://models.test/v1",
-		Models: []aiprovideraction.Model{{Identifier: "chat", Name: "对话模型", Type: domain.AIModelTypeChat, InputModalities: []domain.AIModelInputModality{domain.AIModelInputModalityText}, ContextWindow: 32000, MaxOutputTokens: 4096}},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	var roleID string
-	if err := db.NewSelect().Table("roles").Column("id").Where("organization_id = ? AND kind = ?", identity.Organization.ID, domain.RoleKindCustomerService).Scan(ctx, &roleID); err != nil {
-		t.Fatal(err)
-	}
-	agent, err := agentaction.NewCreateAgentAction(db).Execute(ctx, identity, agentaction.CreateInput{
-		DisplayName: "资料助手", RoleID: roleID,
-		Execution: agentaction.ExecutionInput{Mode: domain.AgentExecutionModeManaged, Managed: &agentaction.ManagedExecutionInput{
-			ProviderID: provider.ID, ModelIdentifier: "chat", SystemInstruction: "依据知识库回答", KnowledgeBaseIDs: []string{refundBase.ID, invoiceBase.ID},
-		}},
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	tasks := servertask.New(db, serverconfig.NATSConfig{})
-	if err := tasks.Registry().RegisterJSON(agentrunaction.RunActionName, func(context.Context, agentrunaction.RunInput) error { return nil }); err != nil {
-		t.Fatal(err)
-	}
-	scheduler := agentrunaction.NewScheduler(tasks)
+	agent, _ := newKnowledgeAgent(t, db, identity, []string{refundBase.ID, invoiceBase.ID})
+	tasks, scheduler := newKnowledgeAgentScheduler(t, db)
 	first, err := conversationaction.NewSendFirstAgentTextMessageAction(db, scheduler).Execute(ctx, identity, conversationaction.FirstAgentTextMessageInput{
 		ConversationID: uuid.NewV7().String(), AgentIdentityID: agent.IdentityID, ClientMessageID: uuid.NewV7().String(), Body: "怎么退款和开发票",
 	})
@@ -103,20 +134,6 @@ func TestAgentKnowledgeSearch(t *testing.T) {
 	}
 	runtime := &testKnowledgeRuntime{t: t}
 	execute := agentrunaction.NewExecuteAction(db, tasks, runtime, testAttachmentReader(db), knowledgeaction.NewRetrievalService(db, probe, probe))
-	// runQueued 同步执行会话中排队的运行并确认成功收尾。
-	runQueued := func() {
-		t.Helper()
-		run := &servermodels.AgentRun{}
-		if err := db.NewSelect().Model(run).Where("agr.conversation_id = ? AND agr.status = ?", first.Conversation.ID, domain.AgentRunStatusQueued).Scan(ctx); err != nil {
-			t.Fatal(err)
-		}
-		if err := execute.Execute(ctx, agentrunaction.RunInput{RunID: run.ID}); err != nil {
-			t.Fatal(err)
-		}
-		if err := db.NewSelect().Model(run).WherePK().Scan(ctx); err != nil || domain.AgentRunStatus(run.Status) != domain.AgentRunStatusSucceeded {
-			t.Fatalf("run=%+v err=%v", run, err)
-		}
-	}
 
 	// 两个绑定库的结果经统一融合返回，未绑定库不进入范围；命中记录可按游标读取相邻分段。
 	runtime.check = func(search agentruntime.KnowledgeSearch) {
@@ -157,7 +174,7 @@ func TestAgentKnowledgeSearch(t *testing.T) {
 			t.Fatal("unbound knowledge base cursor readable")
 		}
 	}
-	runQueued()
+	runQueuedAgentRun(t, db, execute, first.Conversation.ID)
 
 	// 删除一个绑定库后，运行继续在剩余库中检索，结果不再包含已删除库的文档。
 	if err := knowledgeaction.NewDeleteKnowledgeBaseAction(db).Execute(ctx, identity, invoiceBase.ID); err != nil {
@@ -178,7 +195,7 @@ func TestAgentKnowledgeSearch(t *testing.T) {
 			}
 		}
 	}
-	runQueued()
+	runQueuedAgentRun(t, db, execute, first.Conversation.ID)
 
 	// 绑定库全部删除后，检索向模型明确报告范围失效。
 	if err := knowledgeaction.NewDeleteKnowledgeBaseAction(db).Execute(ctx, identity, refundBase.ID); err != nil {
@@ -192,9 +209,88 @@ func TestAgentKnowledgeSearch(t *testing.T) {
 			t.Fatalf("err=%v", err)
 		}
 	}
-	runQueued()
+	runQueuedAgentRun(t, db, execute, first.Conversation.ID)
 	history, err := conversationaction.NewListConversationMessagesQuery(db).Execute(ctx, identity, conversationaction.ConversationMessageHistoryInput{ConversationID: first.Conversation.ID})
 	if err != nil || len(history.Messages) != 6 {
 		t.Fatalf("messages=%d err=%v", len(history.Messages), err)
 	}
+}
+
+// TestAgentKnowledgeSearchRevisionAndQA 验证运行按排队时锁定的配置版本确定知识库范围，问答库经检索工具返回完整答案。
+func TestAgentKnowledgeSearchRevisionAndQA(t *testing.T) {
+	ctx := context.Background()
+	store, err := serverstorage.Open(ctx, servertest.DatabaseConfig(t))
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	db := store.DB()
+	installed, documentBase := newDocumentFixture(t, db)
+	identity := installed.Identity
+	qaBase, err := knowledgeaction.NewCreateKnowledgeBaseAction(db).Execute(ctx, identity, newKnowledgeBaseInput(t, db, identity, "售后问答", domain.KnowledgeBaseCategoryQA))
+	if err != nil {
+		t.Fatal(err)
+	}
+	probe := &retrievalProbe{}
+	documentID := publishRetrievalDocument(t, db, probe, identity, documentBase, "退款政策.txt", "签收后七天内可以申请退款，退款金额原路返回。")
+	answer := strings.Repeat("进入订单详情申请退款，审核通过后原路返回。", 40)
+	entryID := publishQAEntry(t, db, probe, identity, qaBase, knowledgeaction.QAInput{
+		Question: "如何退款？", Answer: answer, SimilarQuestions: []knowledgeaction.QASimilarQuestion{{Content: "怎么申请退款"}},
+	})
+
+	agent, providerID := newKnowledgeAgent(t, db, identity, []string{qaBase.ID})
+	tasks, scheduler := newKnowledgeAgentScheduler(t, db)
+	first, err := conversationaction.NewSendFirstAgentTextMessageAction(db, scheduler).Execute(ctx, identity, conversationaction.FirstAgentTextMessageInput{
+		ConversationID: uuid.NewV7().String(), AgentIdentityID: agent.IdentityID, ClientMessageID: uuid.NewV7().String(), Body: "怎么退款",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 首次运行排队后改为只绑定文档库，已排队的运行仍使用排队时的问答库范围。
+	_, err = agentaction.NewUpdateExecutionAction(db).Execute(ctx, identity, agent.ID, agentaction.UpdateExecutionInput{ExecutionInput: agentaction.ExecutionInput{
+		Mode: domain.AgentExecutionModeManaged, Managed: &agentaction.ManagedExecutionInput{
+			ProviderID: providerID, ModelIdentifier: "chat", SystemInstruction: "依据知识库回答", KnowledgeBaseIDs: []string{documentBase.ID},
+		},
+	}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtime := &testKnowledgeRuntime{t: t}
+	execute := agentrunaction.NewExecuteAction(db, tasks, runtime, testAttachmentReader(db), knowledgeaction.NewRetrievalService(db, probe, probe))
+
+	// 问题与答案分段的命中折叠为一条问答并携带完整答案，游标读取返回同一条目。
+	runtime.check = func(search agentruntime.KnowledgeSearch) {
+		result, err := search(ctx, knowledgeretrieval.Request{Queries: []string{"退款", "申请退款"}})
+		if err != nil || len(result.Records) != 1 {
+			t.Fatalf("result=%+v err=%v", result, err)
+		}
+		record := result.Records[0]
+		if record.KnowledgeBaseID != qaBase.ID || record.DocumentID != entryID || record.DocumentName != "如何退款？" || record.Answer == nil || *record.Answer != answer {
+			t.Fatalf("record=%+v", record)
+		}
+		window, err := search(ctx, knowledgeretrieval.Request{Cursor: &record.Cursor, Before: 1, After: 1})
+		if err != nil || len(window.Records) != 1 || window.Records[0].SegmentID != entryID || window.Records[0].Answer == nil || *window.Records[0].Answer != answer {
+			t.Fatalf("window=%+v err=%v", window, err)
+		}
+	}
+	runQueuedAgentRun(t, db, execute, first.Conversation.ID)
+
+	// 新输入创建的运行使用切换后的配置版本，只在文档库中检索。
+	if _, err := conversationaction.NewSendAgentTextMessageAction(db, scheduler).Execute(ctx, identity, conversationaction.InternalTextMessageInput{
+		ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "再说说退款",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	runtime.check = func(search agentruntime.KnowledgeSearch) {
+		result, err := search(ctx, knowledgeretrieval.Request{Queries: []string{"退款"}})
+		if err != nil || len(result.Records) == 0 || result.Records[0].DocumentID != documentID {
+			t.Fatalf("result=%+v err=%v", result, err)
+		}
+		for _, record := range result.Records {
+			if record.KnowledgeBaseID != documentBase.ID {
+				t.Fatalf("record=%+v", record)
+			}
+		}
+	}
+	runQueuedAgentRun(t, db, execute, first.Conversation.ID)
 }

@@ -11,7 +11,7 @@
 - 本文负责 Agent 配置、运行、工具、审批、设备能力和 Eino 接入。
 - Agent 继续沿统一聊天路径发送消息。独立 AI 聊天使用统一 `conversations` 的 `agent` 类型及 `agent_conversations` 业务归属扩展，不创建第二套消息或执行系统。
 - 本文不提前创建尚未进入开发阶段的表和字段；文中的后续对象只在对应阶段出现首个真实场景时落地。
-- 本地知识库的原件转换由 markitdown 独立容器承担，分段、向量化与召回编排在 Go 服务端进程内实现，模型配置统一由 Cervi 后台管理；实施顺序见 [知识文档处理管线 Go 化与 Haystack 移除方案](knowledge-go-pipeline-plan.md)，选型实验与评测结论见 [本地知识库接入方案](knowledge-base-plan.md)。长期记忆的职责与验收记录在后者第 9 节，交互确定后独立实施。
+- 本地知识库的原件转换由 markitdown 独立容器承担，分段、向量化与召回编排在 Go 服务端进程内实现，模型配置统一由 Cervi 后台管理；处理管线与召回见 [知识文档处理管线 Go 化与 Haystack 移除方案](knowledge-go-pipeline-plan.md)，问答库见 [问答知识库索引与召回方案](knowledge-qa-index-plan.md)。长期记忆在产品交互确定后另行设计。
 - 客服在客户会话中使用的 AI 写回复与 Copilot 见 [客服 AI 辅助方案](customer-ai-assist-plan.md)；两者不向客户会话写入消息。
 
 首轮按 P1a 内部 AI 员工验证、P1b 网站 AI 客服的顺序交付；P1a 验证通过后立即进入 P1b。
