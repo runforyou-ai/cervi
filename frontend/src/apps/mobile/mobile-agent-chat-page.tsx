@@ -98,6 +98,16 @@ function MobileAgentConversation({ conversationID }: { conversationID: string })
     }
   }, [])
 
+  /** 首发后保留聊天实例并清除路由中的草稿标记。 */
+  function handleCreated(conversation: AgentInboxConversationData) {
+    if (!alive.current) return
+    setCreated(conversation)
+    void navigate(`/inbox/agent/${conversationID}`, {
+      replace: true,
+      state: { ...location.state, draftAgentID: undefined },
+    })
+  }
+
   return (
     <section className="flex h-full min-h-0 flex-col bg-background">
       <MobileIndividualHeader
@@ -112,6 +122,10 @@ function MobileAgentConversation({ conversationID }: { conversationID: string })
           conversationID={conversationID}
           conversationType={ConversationType.ConversationTypeAgent}
           enabled={persisted}
+          attachmentAgentIdentityID={!persisted ? draftAgent?.identityId : undefined}
+          onAttachmentConversationCreated={(created) => {
+            if (isAgentInboxConversation(created)) handleCreated(created)
+          }}
           disabledReason={disabledReason}
           lastReadMessageID={conversation?.lastReadMessageId}
           sendIndividualMessage={!persisted && draftAgent ? async (input) => {
@@ -126,14 +140,7 @@ function MobileAgentConversation({ conversationID }: { conversationID: string })
               clientMessageId: input.clientMessageId,
               body: input.body,
             })
-            if (alive.current) {
-              setCreated(result.conversation)
-              // 只清除草稿标记，刷新地址时直接读取已保存的会话。
-              void navigate(`/inbox/agent/${conversationID}`, {
-                replace: true,
-                state: { ...location.state, draftAgentID: undefined },
-              })
-            }
+            handleCreated(result.conversation)
             return result.message
           } : undefined}
         />

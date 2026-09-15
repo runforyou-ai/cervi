@@ -6,6 +6,8 @@ import { Navigate, useLocation, useNavigate, useParams } from "react-router"
 import {
   findDirectConversation,
   getUser,
+  isDirectInboxConversation,
+  type DirectInboxConversationData,
   sendFirstDirectTextMessage,
   UserStatus,
   type UserData,
@@ -153,30 +155,31 @@ function MobileEmployeeDraft({ user }: { user: UserData }) {
     }
   }, [])
 
+  /** 首发确认后更新查询并替换当前草稿路由。 */
+  function handleCreated(conversation: DirectInboxConversationData) {
+    void invalidate(resourceKeys.directConversation(user.identityId))
+    void invalidate(resourceKeys.conversationMessages(conversation.id))
+    if (alive.current) {
+      void navigate(`/inbox/direct/${conversation.id}`, {
+        replace: true,
+        state: { ...location.state, conversation, memberUserID: user.id },
+      })
+    }
+  }
+
   return (
     <MobileIndividualThread
       conversationID=""
       peerIdentityID={user.identityId}
+      onAttachmentConversationCreated={(conversation) => {
+        if (isDirectInboxConversation(conversation)) handleCreated(conversation)
+      }}
       sendIndividualMessage={async (input) => {
         const result = await sendFirstDirectTextMessage({
           targetIdentityId: user.identityId,
           ...input,
         })
-        // 首条消息持久化后，使已有会话查找和历史缓存失效。
-        void invalidate(resourceKeys.directConversation(user.identityId))
-        void invalidate(
-          resourceKeys.conversationMessages(result.conversation.id),
-        )
-        if (alive.current) {
-          void navigate(`/inbox/direct/${result.conversation.id}`, {
-            replace: true,
-            state: {
-              ...location.state,
-              conversation: result.conversation,
-              memberUserID: user.id,
-            },
-          })
-        }
+        handleCreated(result.conversation)
         return result.message
       }}
     />

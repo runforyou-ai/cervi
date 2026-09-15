@@ -1,6 +1,7 @@
 package com.wails.app;
 
 import android.annotation.SuppressLint;
+import android.content.ActivityNotFoundException;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -22,6 +23,8 @@ import android.provider.MediaStore;
 import android.provider.OpenableColumns;
 import android.util.Base64;
 import android.util.Log;
+import android.webkit.ValueCallback;
+import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebResourceResponse;
 import android.webkit.WebSettings;
@@ -54,6 +57,8 @@ public class MainActivity extends AppCompatActivity {
     private static final String WAILS_SCHEME = "https";
     private static final String WAILS_HOST = "wails.localhost";
     private static final int FILE_PICKER_REQUEST = 7001;
+    private static final int WEB_FILE_PICKER_REQUEST = 7004;
+    private ValueCallback<Uri[]> pendingWebFilePicker;
 
     private WebView webView;
     private WailsBridge bridge;
@@ -107,7 +112,7 @@ public class MainActivity extends AppCompatActivity {
         settings.setDomStorageEnabled(true);
         settings.setDatabaseEnabled(true);
         settings.setAllowFileAccess(false);
-        settings.setAllowContentAccess(false);
+        settings.setAllowContentAccess(true);
         settings.setMediaPlaybackRequiresUserGesture(false);
         settings.setMixedContentMode(WebSettings.MIXED_CONTENT_NEVER_ALLOW);
 
@@ -121,6 +126,25 @@ public class MainActivity extends AppCompatActivity {
                 .setDomain(WAILS_HOST)
                 .addPathHandler("/", new WailsPathHandler(bridge))
                 .build();
+
+        // 网页文件输入使用系统选择器，将授权的文件 URI 交回 WebView。
+        webView.setWebChromeClient(new WebChromeClient() {
+            /** 打开网页请求的文件选择器。 */
+            @Override
+            public boolean onShowFileChooser(WebView view, ValueCallback<Uri[]> callback,
+                    FileChooserParams params) {
+                if (pendingWebFilePicker != null) pendingWebFilePicker.onReceiveValue(null);
+                pendingWebFilePicker = callback;
+                try {
+                    startActivityForResult(params.createIntent(), WEB_FILE_PICKER_REQUEST);
+                } catch (ActivityNotFoundException e) {
+                    Log.w(TAG, "系统文件选择器不可用", e);
+                    pendingWebFilePicker = null;
+                    callback.onReceiveValue(null);
+                }
+                return true;
+            }
+        });
 
         // Set up WebView client to intercept requests
         webView.setWebViewClient(new WebViewClient() {
@@ -447,6 +471,14 @@ public class MainActivity extends AppCompatActivity {
     @Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
+        if (requestCode == WEB_FILE_PICKER_REQUEST) {
+            ValueCallback<Uri[]> callback = pendingWebFilePicker;
+            pendingWebFilePicker = null;
+            if (callback != null) {
+                callback.onReceiveValue(WebChromeClient.FileChooserParams.parseResult(resultCode, data));
+            }
+            return;
+        }
         if (requestCode == PHOTO_CAPTURE_REQUEST || requestCode == VIDEO_CAPTURE_REQUEST) {
             handleCaptureResult(resultCode, data);
             return;
@@ -802,6 +834,10 @@ public class MainActivity extends AppCompatActivity {
     protected void onDestroy() {
         super.onDestroy();
         unregisterSystemEventReceivers();
+        if (pendingWebFilePicker != null) {
+            pendingWebFilePicker.onReceiveValue(null);
+            pendingWebFilePicker = null;
+        }
         if (bridge != null) {
             bridge.shutdown();
         }

@@ -20,6 +20,7 @@ import { useAccountDisabledReason } from "@/features/inbox/use-account-disabled-
 type MobileIndividualLocationState = {
   memberUserID?: string
   agentDirectory?: boolean
+  conversation?: DirectInboxConversationData | AgentInboxConversationData
 }
 
 /** 展示当前双方会话的移动端头部。 */
@@ -73,9 +74,14 @@ export function MobileIndividualConversationPage({
   const { t } = useTranslation(["inbox", "common"])
   const { inboxURL } = useMobileNavigation()
   const { conversationID = "" } = useParams()
+  const location = useLocation()
   const summary = useConversationSummary(conversationID, false)
-  const conversation = summary.data && summary.data.type === conversationType &&
-    (isDirectInboxConversation(summary.data) || isAgentInboxConversation(summary.data)) ? summary.data : null
+  // 路由携带的摘要保持首屏线程，查询完成后由服务端结果接管。
+  const initial = (location.state as MobileIndividualLocationState | null)?.conversation
+  const data = summary.data === undefined && initial?.id === conversationID
+    ? initial : summary.data
+  const conversation = data && data.type === conversationType &&
+    (isDirectInboxConversation(data) || isAgentInboxConversation(data)) ? data : null
   const disabledReason = useAccountDisabledReason(conversation)
   if (!conversationID) return <Navigate to={inboxURL} replace />
   const peerName =

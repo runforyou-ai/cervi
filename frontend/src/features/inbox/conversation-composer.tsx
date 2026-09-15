@@ -44,7 +44,6 @@ import {
   conversationSendingIndicatorDelay,
   type OutgoingConversationDraft,
 } from "@/features/inbox/outgoing-message-store"
-import { GroupAttachmentUpload } from "./group-attachment-upload"
 import { ConversationAttachmentUpload } from "./conversation-attachment-upload"
 import { resolveAppPlatform } from "@/platform/app-platform"
 import { apiErrorMessage } from "@/lib/form-errors"
@@ -705,47 +704,23 @@ export function ConversationComposer({
           <div className="flex items-center justify-between gap-3 px-2.5 pb-2.5">
             {disabledReason ? (
               <p id={`${inputID}-reason`} className="text-xs text-muted-foreground">{disabledReason}</p>
-            ) : !mobile &&
-            (conversationType === ConversationType.ConversationTypeDirect ||
+            ) : (conversationType === ConversationType.ConversationTypeDirect ||
               conversationType === ConversationType.ConversationTypeAgent ||
               conversationType === ConversationType.ConversationTypeGroup) ? (
-              conversationType === ConversationType.ConversationTypeDirect ||
-              conversationType === ConversationType.ConversationTypeAgent ? (
-                <ConversationAttachmentUpload
-                  conversationID={conversationID || (attachmentAgentDraft?.conversationID ?? "")}
-                  targetIdentityID={attachmentTargetIdentityID}
-                  agentIdentityID={attachmentAgentDraft?.agentIdentityID}
-                  disabled={isSubmitting}
-                  onCreated={(conversation) => onAttachmentConversationCreated?.(conversation)}
-                />
-              ) : (
-                <GroupAttachmentUpload
-                  conversationID={conversationID}
-                  targetIdentityID={attachmentTargetIdentityID}
-                  disabled={isSubmitting}
-                  onSent={(clientMessageID, message, conversation) => {
-                    onSucceeded()
-                    if (conversation) onAttachmentConversationCreated?.(conversation)
-                    if (!aliveRef.current) return
-                    onSending({
-                      clientMessageID,
-                      body: "",
-                      originatedAt: message.originatedAt,
-                      replyTo: null,
-                      mentionSubjectIDs: [],
-                      mentionAll: false,
-                      mentionAllToken: null,
-                    })
-                    onSent(clientMessageID, message)
-                  }}
-                />
-              )
+              <ConversationAttachmentUpload
+                conversationID={conversationID || (attachmentAgentDraft?.conversationID ?? "")}
+                targetIdentityID={attachmentTargetIdentityID}
+                agentIdentityID={attachmentAgentDraft?.agentIdentityID}
+                disabled={isSubmitting}
+                onBeforeSend={onBeforeSend}
+                onCreated={(conversation) => onAttachmentConversationCreated?.(conversation)}
+              />
             ) : (
               <Button type="button" variant="ghost" size="icon-sm" disabled aria-label={t("attachmentAdd")}>
                 <PaperclipIcon />
               </Button>
             )}
-            <Button type="submit" size="sm" disabled={isSubmitting || Boolean(disabledReason) || isBodyEmpty || replyTo?.deleted}>
+            <Button type="submit" size="sm" className={mobile ? "min-h-11" : undefined} disabled={isSubmitting || Boolean(disabledReason) || isBodyEmpty || replyTo?.deleted}>
               {isSubmitting && showSubmitting ? (
                 <LoaderCircleIcon className="animate-spin" />
               ) : null}

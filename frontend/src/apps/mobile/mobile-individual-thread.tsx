@@ -1,11 +1,12 @@
-/** 移动端真人与 AI 聊天共用的时间线、阅读进度、引用发送和失败重试。 */
-import { useState } from "react"
+/** 移动端真人与 AI 聊天共用的时间线、阅读进度、文本与附件发送和失败重试。 */
+import { useRef, useState } from "react"
 
 import {
   ConversationType,
   type ConversationMessageData,
   type ConversationMessageReference,
   type DirectTextMessageInput,
+  type InboxConversation,
 } from "@/api"
 import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
 import { ConversationComposer } from "@/features/inbox/conversation-composer"
@@ -22,6 +23,8 @@ export function MobileIndividualThread({
   conversationType = ConversationType.ConversationTypeDirect,
   peerIdentityID = "",
   sendIndividualMessage,
+  attachmentAgentIdentityID,
+  onAttachmentConversationCreated,
   enabled = Boolean(conversationID),
   disabledReason = null,
   lastReadMessageID = null,
@@ -29,6 +32,8 @@ export function MobileIndividualThread({
   conversationID: string
   conversationType?: ConversationType
   peerIdentityID?: string
+  attachmentAgentIdentityID?: string
+  onAttachmentConversationCreated?: (conversation: InboxConversation) => void
   enabled?: boolean
   disabledReason?: string | null
   lastReadMessageID?: string | null
@@ -37,6 +42,7 @@ export function MobileIndividualThread({
   ) => Promise<ConversationMessageData>
 }) {
   const { identity } = useMobileWorkspace()
+  const prepareSendRef = useRef<(() => Promise<boolean>) | null>(null)
   const invalidate = useResourceInvalidator()
   // 真人草稿尚无会话编号，发送状态按对端身份分组。
   const outgoing = useOutgoingMessages(
@@ -52,6 +58,7 @@ export function MobileIndividualThread({
   return (
     <>
       <ConversationTimeline
+        prepareSendRef={prepareSendRef}
         conversationID={conversationID}
         conversationType={conversationType}
         currentUser={identity.user}
@@ -62,12 +69,15 @@ export function MobileIndividualThread({
         readThroughMessageID={lastReadMessageID}
         outgoingMessages={outgoing.messages}
         onRetryFailedMessage={setRetryDraft}
-        retryFailedMessageDisabled={
-          Boolean(disabledReason) ||
-          outgoing.messages.some((message) => message.status === "sending")
-        }
+        retryFailedMessageDisabled={Boolean(disabledReason)}
       />
       <ConversationComposer
+        attachmentTargetIdentityID={!conversationID ? peerIdentityID : undefined}
+        attachmentAgentDraft={attachmentAgentIdentityID
+          ? { conversationID, agentIdentityID: attachmentAgentIdentityID }
+          : undefined}
+        onAttachmentConversationCreated={onAttachmentConversationCreated}
+        onBeforeSend={() => prepareSendRef.current?.() ?? Promise.resolve(true)}
         conversationID={conversationID}
         conversationType={conversationType}
         retryFailedMessage

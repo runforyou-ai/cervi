@@ -1,4 +1,4 @@
-/** 移动端群聊历史、文本发送、引用与提及输入、阅读进度和解散后的只读状态。 */
+/** 移动端群聊历史、文本与附件发送、引用与提及输入、阅读进度和解散后的只读状态。 */
 import { useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 
@@ -55,9 +55,7 @@ export function MobileGroupThread({
         prepareSendRef={prepareSendRef}
         outgoingMessages={outgoing.messages}
         onRetryFailedMessage={setRetryDraft}
-        retryFailedMessageDisabled={
-          archived || outgoing.messages.some((message) => message.status === "sending")
-        }
+        retryFailedMessageDisabled={archived}
       />
       {archived ? (
         <div
