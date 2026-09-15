@@ -20,7 +20,8 @@ import (
 type runningAgentRun struct {
 	cancel   context.CancelFunc
 	attempt  int
-	progress agentruntime.Progress
+	streamID string
+	stream   *runStream
 }
 
 // CancelForServiceSession 在客服事务内取消原负责人尚未结束的运行。
@@ -104,7 +105,9 @@ func (a *ExecuteAction) CancelRunContexts(runIDs []string) {
 // registerRunContext 注册一次可被客服负责人变化中断的模型调用。
 func (a *ExecuteAction) registerRunContext(ctx context.Context, runID string, cancel context.CancelFunc) (*runningAgentRun, func(), error) {
 	execution, _ := servertask.CurrentExecution(ctx)
-	running := &runningAgentRun{cancel: cancel, attempt: execution.Attempt, progress: agentruntime.Progress{RunID: runID, StreamID: uuid.NewV7().String(), Attempt: execution.Attempt}}
+	streamID := uuid.NewV7().String()
+	running := &runningAgentRun{cancel: cancel, attempt: execution.Attempt, streamID: streamID,
+		stream: newRunStream(agentruntime.StreamSnapshot{RunID: runID, StreamID: streamID, Attempt: execution.Attempt})}
 	a.runningMu.Lock()
 	if previous := a.runningRuns[runID]; previous != nil {
 		if previous.attempt >= running.attempt {
@@ -121,16 +124,6 @@ func (a *ExecuteAction) registerRunContext(ctx context.Context, runID string, ca
 			delete(a.runningRuns, runID)
 		}
 		a.runningMu.Unlock()
+		running.stream.end()
 	}, nil
-}
-
-// Progress 返回本进程中当前执行尝试的快照，调用方负责会话访问校验。
-func (a *ExecuteAction) Progress(runID string) (agentruntime.Progress, bool) {
-	a.runningMu.Lock()
-	defer a.runningMu.Unlock()
-	running := a.runningRuns[runID]
-	if running == nil {
-		return agentruntime.Progress{}, false
-	}
-	return running.progress.Clone(), true
 }

@@ -18,6 +18,7 @@ type mediaRejectingChatModel struct {
 	mu         sync.Mutex
 	calls      int
 	mediaCalls int
+	midStream  bool
 }
 
 func (m *mediaRejectingChatModel) Generate(_ context.Context, input []*schema.AgenticMessage, _ ...model.Option) (*schema.AgenticMessage, error) {
@@ -31,34 +32,50 @@ func (m *mediaRejectingChatModel) Generate(_ context.Context, input []*schema.Ag
 	return assistantReply("已按链接回答"), nil
 }
 
-func (m *mediaRejectingChatModel) Stream(context.Context, []*schema.AgenticMessage, ...model.Option) (*schema.StreamReader[*schema.AgenticMessage], error) {
-	return nil, errors.New("unexpected streaming call")
+// Stream 按测试场景在建立流或读取分片时拒绝直传附件，其余调用以单个分片返回模型输出。
+func (m *mediaRejectingChatModel) Stream(ctx context.Context, input []*schema.AgenticMessage, opts ...model.Option) (*schema.StreamReader[*schema.AgenticMessage], error) {
+	if !m.midStream || !carriesMedia(input) {
+		return singleChunkStream(m.Generate(ctx, input, opts...))
+	}
+	m.mu.Lock()
+	m.calls++
+	m.mediaCalls++
+	m.mu.Unlock()
+	reader, writer := schema.Pipe[*schema.AgenticMessage](2)
+	writer.Send(assistantReply("部分回答"), nil)
+	writer.Send(nil, errors.New("unknown variant `image_url`"))
+	writer.Close()
+	return reader, nil
 }
 
 // TestEinoRuntimeRetriesWithoutRejectedMedia 验证模型拒绝直传附件时去掉多模态内容重新执行一次并成功回复。
 func TestEinoRuntimeRetriesWithoutRejectedMedia(t *testing.T) {
-	chatModel := &mediaRejectingChatModel{}
-	runtime := &EinoRuntime{newModel: func(context.Context, ModelConfig) (model.AgenticModel, error) {
-		return chatModel, nil
-	}}
-	feed := &testInputFeed{desired: 1, messages: []Message{{
-		ID: "1", Role: MessageRoleUser, Content: `{"body":"看图","attachment":{"name":"photo.png"}}`,
-		Media: &Media{MIMEType: "image/png", ByteSize: 16},
-	}}}
-	result, err := runtime.Run(context.Background(), RunRequest{
-		RunID: "media-fallback", Name: "test-agent", MaxTurns: 2,
-		Model: ModelConfig{InputModalities: []domain.AIModelInputModality{domain.AIModelInputModalityText, domain.AIModelInputModalityImage}},
-		ReadAttachment: func(context.Context, string) ([]byte, error) {
-			return []byte("image"), nil
-		},
-	}, feed)
-	if err != nil || result.Content != "已按链接回答" || result.EndSeq != 1 {
-		t.Fatalf("result = %#v, err = %v", result, err)
-	}
-	chatModel.mu.Lock()
-	defer chatModel.mu.Unlock()
-	if chatModel.calls != 2 || chatModel.mediaCalls != 1 {
-		t.Fatalf("model calls = %d, media calls = %d", chatModel.calls, chatModel.mediaCalls)
+	for name, midStream := range map[string]bool{"open": false, "mid-stream": true} {
+		t.Run(name, func(t *testing.T) {
+			chatModel := &mediaRejectingChatModel{midStream: midStream}
+			runtime := &EinoRuntime{newModel: func(context.Context, ModelConfig) (model.AgenticModel, error) {
+				return chatModel, nil
+			}}
+			feed := &testInputFeed{desired: 1, messages: []Message{{
+				ID: "1", Role: MessageRoleUser, Content: `{"body":"看图","attachment":{"name":"photo.png"}}`,
+				Media: &Media{MIMEType: "image/png", ByteSize: 16},
+			}}}
+			result, err := runtime.Run(context.Background(), RunRequest{
+				RunID: "media-fallback", Name: "test-agent", MaxTurns: 2,
+				Model: ModelConfig{InputModalities: []domain.AIModelInputModality{domain.AIModelInputModalityText, domain.AIModelInputModalityImage}},
+				ReadAttachment: func(context.Context, string) ([]byte, error) {
+					return []byte("image"), nil
+				},
+			}, feed)
+			if err != nil || result.Content != "已按链接回答" || result.EndSeq != 1 {
+				t.Fatalf("result = %#v, err = %v", result, err)
+			}
+			chatModel.mu.Lock()
+			defer chatModel.mu.Unlock()
+			if chatModel.calls != 2 || chatModel.mediaCalls != 1 {
+				t.Fatalf("model calls = %d, media calls = %d", chatModel.calls, chatModel.mediaCalls)
+			}
+		})
 	}
 }
 

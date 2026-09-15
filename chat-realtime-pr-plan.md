@@ -299,10 +299,10 @@ PR01–PR17 已交付以下能力，后续 PR 直接依赖，不重复定义。
 
 ### PR37：模型增量消费与流基线
 
-- **依赖：** PR36。
+- **依赖：** 无。运行时增量不依赖 PR36 的过程详情拆分，先于 PR36 交付。
 - **范围：** Runtime 真正消费 token 与工具进度，使用 runId、attempt、streamId、sequence 与稳定块编号，短周期合并；暴露当前内存快照和临时发布接口，不直接依赖传输实现。
-- **落点：** `internal/integration/agentruntime/eino.go`、`openai.go`、`progress.go`、`types.go`。
-- **实施：** 将整段输出收集点替换为运行时增量消费；每个 attempt 创建独立 streamId，块有稳定 blockId，同流 sequence 单调。内存快照与最高 sequence 同步捕获，发布端按短周期合并可重建增量，模型执行不等待浏览器消费。
+- **落点：** `internal/integration/agentruntime/eino.go`、`progress.go`、`stream.go`、`attachment.go`、`types.go`，`internal/actions/agentrun/stream.go`、`execute.go`、`cancellation.go`。
+- **实施：** 将整段输出收集点替换为运行时增量消费；每个 attempt 创建独立 streamId，块有稳定 blockId，同流 sequence 单调。内存快照与最高 sequence 同步捕获，发布端按短周期合并可重建增量，模型执行不等待浏览器消费。运行流中的工具调用只含名称、状态和起止时间，完整参数与结果经过程详情读取。
 - **验收：** 同流重复／乱序、gap、尝试切换、工具并行与输入抢占正确；token 不写 Message、不推进会话版本、不发布变更通知；限速发送不阻塞模型执行。
 - **验证步骤：** 分片产生文本、工具参数、工具结果并模拟并行工具，块顺序稳定；故意漏一片后快照可恢复全文；重试产生新 streamId，旧尝试尾部不能拼入新正文。
 

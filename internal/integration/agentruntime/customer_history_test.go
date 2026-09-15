@@ -24,6 +24,11 @@ func (m *customerHistoryChatModel) Generate(ctx context.Context, input []*schema
 	return m.processChatModel.Generate(ctx, input, opts...)
 }
 
+// Stream 记录调用参数中的工具并以单个分片返回当前测试步骤的模型输出。
+func (m *customerHistoryChatModel) Stream(ctx context.Context, input []*schema.AgenticMessage, opts ...model.Option) (*schema.StreamReader[*schema.AgenticMessage], error) {
+	return singleChunkStream(m.Generate(ctx, input, opts...))
+}
+
 // TestCustomerHistoryTool 验证模型收到历史占位结果及工具的运行范围隔离。
 func TestCustomerHistoryTool(t *testing.T) {
 	runtime, err := New()

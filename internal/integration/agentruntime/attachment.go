@@ -62,13 +62,22 @@ func (m *mediaTrackingModel) Generate(ctx context.Context, input []*schema.Agent
 	return output, err
 }
 
-// Stream 以流式调用模型，携带直传附件的请求失败时记录拒绝状态。
+// Stream 以流式调用模型，携带直传附件的请求在建立流或读取分片时失败都记录拒绝状态。
 func (m *mediaTrackingModel) Stream(ctx context.Context, input []*schema.AgenticMessage, opts ...model.Option) (*schema.StreamReader[*schema.AgenticMessage], error) {
 	output, err := m.AgenticModel.Stream(ctx, input, opts...)
-	if err != nil && carriesMedia(input) {
-		m.rejected.Store(true)
+	if !carriesMedia(input) {
+		return output, err
 	}
-	return output, err
+	if err != nil {
+		m.rejected.Store(true)
+		return nil, err
+	}
+	return schema.StreamReaderWithConvert(output, func(chunk *schema.AgenticMessage) (*schema.AgenticMessage, error) {
+		return chunk, nil
+	}, schema.WithErrWrapper(func(err error) error {
+		m.rejected.Store(true)
+		return err
+	})), nil
 }
 
 // carriesMedia 判断模型输入是否包含直传的图片、音频或视频内容块。

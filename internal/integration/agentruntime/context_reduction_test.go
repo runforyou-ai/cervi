@@ -4,7 +4,6 @@ package agentruntime
 
 import (
 	"context"
-	"errors"
 	"strings"
 	"sync"
 	"testing"
@@ -56,8 +55,9 @@ func (m *repeatedToolChatModel) Generate(_ context.Context, input []*schema.Agen
 	}), nil
 }
 
-func (m *repeatedToolChatModel) Stream(context.Context, []*schema.AgenticMessage, ...model.Option) (*schema.StreamReader[*schema.AgenticMessage], error) {
-	return nil, errors.New("unexpected streaming call")
+// Stream 以单个分片返回当前测试步骤的模型输出。
+func (m *repeatedToolChatModel) Stream(ctx context.Context, input []*schema.AgenticMessage, opts ...model.Option) (*schema.StreamReader[*schema.AgenticMessage], error) {
+	return singleChunkStream(m.Generate(ctx, input, opts...))
 }
 
 // TestContextClearsOldToolResults 验证上下文超过模型窗口预算后清理较早的工具结果，并保留最近两轮。

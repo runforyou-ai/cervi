@@ -2122,7 +2122,10 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 				ID: uuid.NewV7().String(), Position: 1, ModelCallID: uuid.NewV7().String(),
 				Kind: domain.AgentRunBlockThinking, Payload: agentruntime.BlockPayload{Text: "计算过程"},
 			}}
-			request.OnProgress(agentruntime.Progress{RunID: request.RunID, StreamID: request.StreamID, Sequence: 1, Blocks: successfulBlocks})
+			request.OnStream(agentruntime.StreamDelta{RunID: request.RunID, StreamID: request.StreamID, Attempt: request.Attempt, Sequence: 1, Operations: []agentruntime.StreamOperation{{
+				Kind:  agentruntime.StreamOperationUpsertBlock,
+				Block: &agentruntime.StreamBlock{ID: successfulBlocks[0].ID, Position: 1, ModelCallID: successfulBlocks[0].ModelCallID, Kind: domain.AgentRunBlockThinking, Text: "计算过程"},
+			}}})
 			return agentruntime.RunResult{Content: "结果是 42", EndSeq: claimed.EndSeq, Usage: agentruntime.Usage{TotalTokens: 12}, Blocks: successfulBlocks}, nil
 		}}
 		executeAgentRun := agentrunaction.NewExecuteAction(db, taskRuntime, executedRuntime, testAttachmentReader(db), nil)
@@ -2150,8 +2153,8 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if count, err := db.NewSelect().Model((*servermodels.AgentRunBlock)(nil)).Where("arb.agent_run_id = ?", run.ID).Count(context.Background()); err != nil || count != 0 {
 			t.Fatalf("blocks after failed transaction = %d, error = %v", count, err)
 		}
-		if _, exists := executeAgentRun.Progress(run.ID); exists {
-			t.Fatal("failed attempt retained its temporary progress")
+		if _, exists := executeAgentRun.SubscribeRunStream(run.ID); exists {
+			t.Fatal("failed attempt retained its temporary stream")
 		}
 		if _, err := db.ExecContext(context.Background(), `ALTER TABLE messages DROP CONSTRAINT messages_reject_test_agent_response`); err != nil {
 			t.Fatal(err)

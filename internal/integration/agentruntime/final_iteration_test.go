@@ -4,7 +4,6 @@ package agentruntime
 
 import (
 	"context"
-	"errors"
 	"slices"
 	"sync"
 	"testing"
@@ -45,8 +44,9 @@ func (m *toolHungryChatModel) Generate(_ context.Context, input []*schema.Agenti
 	return assistantReply("按已有资料回答"), nil
 }
 
-func (m *toolHungryChatModel) Stream(context.Context, []*schema.AgenticMessage, ...model.Option) (*schema.StreamReader[*schema.AgenticMessage], error) {
-	return nil, errors.New("unexpected streaming call")
+// Stream 以单个分片返回当前测试步骤的模型输出。
+func (m *toolHungryChatModel) Stream(ctx context.Context, input []*schema.AgenticMessage, opts ...model.Option) (*schema.StreamReader[*schema.AgenticMessage], error) {
+	return singleChunkStream(m.Generate(ctx, input, opts...))
 }
 
 // TestFinalIterationAnswersWithoutTools 验证到达迭代上限时移除工具，本轮以最终回答收尾。

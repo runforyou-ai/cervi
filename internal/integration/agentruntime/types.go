@@ -90,7 +90,7 @@ type RunRequest struct {
 	MaxTurns              int         // 吸收新输入的轮次上限，零值不限制，由运行 context 控制生命周期。
 	StreamID              string
 	Attempt               int
-	OnProgress            func(Progress)
+	OnStream              func(StreamDelta) // 串行接收合并后的运行流增量，实现不得阻塞。
 }
 
 // Usage 定义一次业务运行累计的模型用量。
