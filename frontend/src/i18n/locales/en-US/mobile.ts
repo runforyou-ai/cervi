@@ -93,6 +93,7 @@ const mobile = {
       "You will need to sign in again. Your server connection will be kept.",
     logoutTitle: "Log out of this account?",
     security: "Login and security",
+    preferences: "Preferences",
     title: "Me",
     profile: "Profile",
     email: "Email",

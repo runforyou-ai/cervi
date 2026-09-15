@@ -17,10 +17,12 @@ import {
   type ChangePasswordFormValues,
 } from "@/features/settings/change-password-schema"
 import { apiErrorMessage } from "@/lib/form-errors"
+import { resolveAppPlatform } from "@/platform/app-platform"
 
-/** 修改当前用户的登录密码。 */
+/** 修改当前用户的登录密码，移动端使用触屏尺寸的整行提交按钮。 */
 export function ChangePasswordForm() {
   const { t } = useTranslation("settings")
+  const mobile = resolveAppPlatform() === "mobile"
   const navigate = useNavigate()
   const schema = useMemo(() => createChangePasswordSchema(t), [t])
   const form = useForm<ChangePasswordFormValues>({
@@ -82,7 +84,7 @@ export function ChangePasswordForm() {
                 autoComplete="current-password"
                 aria-invalid={fieldState.invalid}
                 required
-                autoFocus
+                autoFocus={!mobile}
               />
             </Field>
           )}
@@ -127,7 +129,11 @@ export function ChangePasswordForm() {
         />
       </FieldGroup>
       <div>
-        <Button type="submit" disabled={isSubmitting}>
+        <Button
+          type="submit"
+          className={mobile ? "min-h-11 w-full" : undefined}
+          disabled={isSubmitting}
+        >
           {isSubmitting ? (
             <LoaderCircleIcon className="animate-spin" />
           ) : null}
