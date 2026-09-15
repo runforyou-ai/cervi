@@ -225,7 +225,7 @@ docker compose up -d postgres nats markitdown
 - 词法路 GIN 命中后至多取 2000 条候选按 `ts_rank_cd` 排名，超过上限时为近似排名。
 - 重排接口按品牌适配：阿里云走 DashScope 原生重排接口，其余品牌走 `/rerank` 通用格式。
 
-Agent 运行期已按 Run 绑定 Revision 的知识库范围调用 `RetrievalService.Sources` 注入 `KnowledgeSearch`。尚未完成：本地问答路在进入融合前按条目折叠，`documentId` 与 `segmentId` 都使用问答条目编号，位置固定为 1。
+问答知识库已按 [问答知识库索引与召回方案](knowledge-qa-index-plan.md) 接入同一分段表与召回链路：分段表以 `source_type` 与 `source_id` 区分文档和问答条目，问答库在重排后按条目折叠，`documentId` 与 `segmentId` 都使用问答条目编号，位置固定为 1，并携带完整答案。Agent 运行期已按 Run 绑定 Revision 的知识库范围调用 `RetrievalService.Sources` 注入 `KnowledgeSearch`。
 
 Qdrant 暂不引入。触发条件是单企业分段规模进入千万级、或确认需要 sparse 与 dense 原生混合检索；在此之前跨库双写会破坏删除文档时的事务一致性，并把企业隔离从 SQL 条件降级为 payload 过滤。
 

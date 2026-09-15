@@ -24,12 +24,25 @@ func validateQAKnowledgeBase(record *servermodels.KnowledgeBase) error {
 
 // loadQAEntry 读取指定知识库中的问答记录。
 func loadQAEntry(ctx context.Context, db bun.IDB, knowledgeBaseID, entryID string) (*servermodels.KnowledgeQAEntry, error) {
+	return queryQAEntry(ctx, db, knowledgeBaseID, entryID, false)
+}
+
+// lockQAEntry 读取并锁定指定知识库中的问答记录，供修改内容、投递索引任务和删除使用。
+func lockQAEntry(ctx context.Context, db bun.IDB, knowledgeBaseID, entryID string) (*servermodels.KnowledgeQAEntry, error) {
+	return queryQAEntry(ctx, db, knowledgeBaseID, entryID, true)
+}
+
+// queryQAEntry 按知识库读取问答记录，按需持有行锁。
+func queryQAEntry(ctx context.Context, db bun.IDB, knowledgeBaseID, entryID string, lock bool) (*servermodels.KnowledgeQAEntry, error) {
 	if !common.ValidUUID(entryID) {
 		return nil, ErrQANotFound
 	}
 	record := &servermodels.KnowledgeQAEntry{}
-	err := db.NewSelect().Model(record).Where("kqe.id = ?", entryID).
-		Where("kqe.knowledge_base_id = ?", knowledgeBaseID).Scan(ctx)
+	query := db.NewSelect().Model(record).Where("kqe.id = ?", entryID).Where("kqe.knowledge_base_id = ?", knowledgeBaseID)
+	if lock {
+		query = query.For("UPDATE")
+	}
+	err := query.Scan(ctx)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrQANotFound
 	}

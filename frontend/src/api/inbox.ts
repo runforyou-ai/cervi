@@ -29,10 +29,6 @@ import {
   RemoveGroupConversationMember,
   SendCustomerTextMessage,
   SendAttachmentMessage,
-  SendAttachmentBatch,
-  UpdateAttachmentUploads,
-  ListAttachmentStates,
-  CompleteAttachmentUpload,
   GetAttachmentDownload,
   SendFirstAgentTextMessage,
   SendAgentTextMessage,
@@ -492,24 +488,11 @@ export function listCustomerMessageDeliveries(conversationID: string, messageIds
 /** 人工确认或重试一条客户消息投递。 */
 export const resolveCustomerMessageDelivery = bind(ResolveCustomerMessageDelivery)
 
-/** 发送附件消息。 */
+/** 发送已上传的附件消息，首发时创建会话。 */
 export const sendAttachmentMessage = bind(SendAttachmentMessage)
 
 /** 获取当前可见附件的下载请求。 */
 export const getAttachmentDownload = bind(GetAttachmentDownload)
-
-/** 保存一批按顺序发送的单聊附件和说明。 */
-export const sendAttachmentBatch = bind(SendAttachmentBatch)
-/** 更新上传状态、续期当前上传或取消未完成的附件。 */
-export const updateAttachmentUploads = bind(UpdateAttachmentUploads)
-
-/** 读取窗口内已经存在的附件消息状态。 */
-export function listAttachmentStates(conversationID: string, messageIDs: string) {
-  return bind(ListAttachmentStates)(conversationID, { messageIds: messageIDs })
-}
-
-/** 完成上传并激活原附件消息。 */
-export const completeAttachmentUpload = bind(CompleteAttachmentUpload)
 
 /** 停止指定 AI 回复并读取实际运行状态。 */
 export const stopAgentReply = bind(StopAgentReply)

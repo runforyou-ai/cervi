@@ -21,6 +21,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/realtime"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
@@ -44,7 +45,7 @@ func TestInboxActivityAppend(t *testing.T) {
 			}
 			key := uuid.NewV7().String()
 			message := &servermodels.Message{ID: uuid.NewV7().String(), OrganizationID: cv.OrganizationID, ConversationID: cv.ID, Type: "text", Body: "来源时钟超前", OriginatedAt: databaseStart.Add(24 * time.Hour), IdempotencyKey: &key}
-			if err := f.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+			if err := realtime.RunInTx(ctx, f.db, func(ctx context.Context, tx bun.Tx) error {
 				if err := tx.NewSelect().Model(cv).WherePK().For("UPDATE").Scan(ctx); err != nil {
 					return err
 				}
@@ -64,7 +65,7 @@ func TestInboxActivityAppend(t *testing.T) {
 				t.Fatalf("activity=%v database=[%v,%v]", cv.LastActivityAt, databaseStart, databaseEnd)
 			}
 			firstActivity := *cv.LastActivityAt
-			if err := f.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+			if err := realtime.RunInTx(ctx, f.db, func(ctx context.Context, tx bun.Tx) error {
 				if err := tx.NewSelect().Model(cv).WherePK().For("UPDATE").Scan(ctx); err != nil {
 					return err
 				}
@@ -84,15 +85,13 @@ func TestInboxActivityAppend(t *testing.T) {
 			if _, err := f.db.NewUpdate().Model(cv).Set("last_activity_at = ?", future).WherePK().Exec(ctx); err != nil {
 				t.Fatal(err)
 			}
-			if err := f.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+			if err := realtime.RunInTx(ctx, f.db, func(ctx context.Context, tx bun.Tx) error {
 				if err := tx.NewSelect().Model(cv).WherePK().For("UPDATE").Scan(ctx); err != nil {
 					return err
 				}
 				late := &servermodels.Message{ID: uuid.NewV7().String(), OrganizationID: cv.OrganizationID, ConversationID: cv.ID, Type: "system", Body: "晚到消息", OriginatedAt: databaseStart.Add(-24 * time.Hour)}
-				if _, _, err := chatstate.AppendMessage(ctx, tx, cv, late); err != nil {
-					return err
-				}
-				return chatstate.RecomputeConversationSummary(ctx, tx, cv, late.ID)
+				_, _, err := chatstate.AppendMessage(ctx, tx, cv, late)
+				return err
 			}); err != nil {
 				t.Fatal(err)
 			}
@@ -107,7 +106,7 @@ func TestInboxActivityAppend(t *testing.T) {
 				t.Fatal(err)
 			}
 			rollback := errors.New("rollback activity")
-			err := f.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+			err := realtime.RunInTx(ctx, f.db, func(ctx context.Context, tx bun.Tx) error {
 				if err := tx.NewSelect().Model(cv).WherePK().For("UPDATE").Scan(ctx); err != nil {
 					return err
 				}

@@ -279,8 +279,6 @@ const inbox = {
   attachmentDescriptionTooLong: "说明最多 4000 个字符",
   attachmentRemove: "移除 {{name}}",
   attachmentLimit: "一次最多选择 100 个附件或图片",
-  attachmentReceiving: "正在上传",
-  attachmentCancelFailed: "取消附件失败，请重试",
   attachmentPreviewRetry: "图片加载失败，点击重试",
   attachmentAdd: "添加附件",
   messageBodyTooLong: "消息最多 4000 个字符",

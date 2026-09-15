@@ -33,7 +33,6 @@ export function AttachmentQueueProvider({ children }: { children: ReactNode }) {
         (conversationID) => {
           void invalidate(resourceKeys.conversationMessages(conversationID))
           void invalidate(resourceKeys.inbox())
-          void invalidate(resourceKeys.attachmentStates(conversationID))
         },
         (error) => {
           if (!recoverSession(error, navigate)) {

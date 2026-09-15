@@ -18,6 +18,7 @@ import (
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/realtime"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/runforyou-ai/cervi/internal/tenant"
@@ -87,7 +88,7 @@ func TestConversationVersionAppend(t *testing.T) {
 		fail    bool
 		advance int64
 	}{{"rollback", true, 0}, {"commit", false, 1}, {"replay", false, 0}} {
-		err := f.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		err := realtime.RunInTx(ctx, f.db, func(ctx context.Context, tx bun.Tx) error {
 			if err := tx.NewSelect().Model(cv).WherePK().For("UPDATE").Scan(ctx); err != nil {
 				return err
 			}

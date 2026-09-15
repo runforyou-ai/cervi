@@ -39,34 +39,14 @@ func (s *Service) PrepareFileUpload(ctx context.Context, meta RequestMeta, fileI
 	return withNormalizedSlices(s.backend.PrepareFileUpload(ctx, meta, fileID))
 }
 
-// CompleteAttachmentUpload 完成文件上传并激活原附件消息。
-func (s *Service) CompleteAttachmentUpload(ctx context.Context, meta RequestMeta, fileID string) error {
-	return s.backend.CompleteAttachmentUpload(ctx, meta, fileID)
-}
-
 // CancelFileUpload 将未发送的临时文件交给清理任务。
 func (s *Service) CancelFileUpload(ctx context.Context, meta RequestMeta, fileID string) error {
 	return s.backend.CancelFileUpload(ctx, meta, fileID)
 }
 
-// SendAttachmentMessage 发送内部单聊或群聊附件消息。
+// SendAttachmentMessage 发送已上传的单聊、群聊或 AI 聊天附件消息，首发时创建会话。
 func (s *Service) SendAttachmentMessage(ctx context.Context, meta RequestMeta, input AttachmentMessageInput) (AttachmentMessageResult, error) {
 	return withNormalizedSlices(s.backend.SendAttachmentMessage(ctx, meta, input))
-}
-
-// SendAttachmentBatch 按选择顺序保存可带说明的单聊或 AI 聊天附件消息。
-func (s *Service) SendAttachmentBatch(ctx context.Context, meta RequestMeta, input AttachmentBatchInput) (AttachmentBatchResult, error) {
-	return withNormalizedSlices(s.backend.SendAttachmentBatch(ctx, meta, input))
-}
-
-// UpdateAttachmentUploads 更新附件上传状态或取消尚未完成的消息。
-func (s *Service) UpdateAttachmentUploads(ctx context.Context, meta RequestMeta, input AttachmentUploadUpdate) error {
-	return s.backend.UpdateAttachmentUploads(ctx, meta, input)
-}
-
-// ListAttachmentStates 读取窗口内已存在附件消息的最新状态。
-func (s *Service) ListAttachmentStates(ctx context.Context, meta RequestMeta, conversationID string, input AttachmentStateListInput) (AttachmentStateList, error) {
-	return withNormalizedSlices(s.backend.ListAttachmentStates(ctx, meta, conversationID, input))
 }
 
 // GetAttachmentDownload 签发当前成员可见消息附件的下载地址。
@@ -547,6 +527,11 @@ func (s *Service) UpdateKnowledgeQAEntry(ctx context.Context, meta RequestMeta, 
 // DeleteKnowledgeQAEntry 删除本地问答。
 func (s *Service) DeleteKnowledgeQAEntry(ctx context.Context, meta RequestMeta, knowledgeBaseID string, entryID string) error {
 	return s.backend.DeleteKnowledgeQAEntry(ctx, meta, knowledgeBaseID, entryID)
+}
+
+// RetryKnowledgeQAEntry 按当前配置重新索引问答。
+func (s *Service) RetryKnowledgeQAEntry(ctx context.Context, meta RequestMeta, knowledgeBaseID string, entryID string) error {
+	return s.backend.RetryKnowledgeQAEntry(ctx, meta, knowledgeBaseID, entryID)
 }
 
 // ListKnowledgeBases 返回当前企业的知识库列表。

@@ -372,104 +372,26 @@ export enum AgentToolCallStatus {
 };
 
 /**
- * AttachmentBatchInput 定义按顺序发送的附件消息。
+ * AttachmentMessageInput 定义已上传附件的发送意图，agentIdentityId 非空表示按 conversationId 草稿编号首发 AI 聊天。
  */
-export interface AttachmentBatchInput {
+export interface AttachmentMessageInput {
     "conversationId": string;
     "targetIdentityId": string;
-
-    /**
-     * 非空表示按 conversationId 草稿编号首发 AI 聊天。
-     */
     "agentIdentityId": string;
-    "attachments": AttachmentBatchItem[] | null;
-}
-
-/**
- * AttachmentBatchItem 定义一条附件消息的文件、说明和图片展示尺寸。
- */
-export interface AttachmentBatchItem {
-    "body": string;
-    "fileName": string;
-    "contentType": string;
-    "byteSize": number;
     "clientMessageId": string;
+    "fileId": string;
+    "body": string;
     "imageWidth": number;
     "imageHeight": number;
 }
 
 /**
- * AttachmentBatchResult 返回已保存的有序消息。
- */
-export interface AttachmentBatchResult {
-    "conversationId": string;
-    "conversation": InboxConversation | null;
-    "messages": ConversationMessage[] | null;
-}
-
-/**
- * AttachmentMessageInput 定义发往已有会话或单聊目标的附件消息。
- */
-export interface AttachmentMessageInput {
-    "conversationId": string;
-    "targetIdentityId": string;
-    "clientMessageId": string;
-    "fileId": string;
-}
-
-/**
- * AttachmentMessageResult 定义附件消息及首发时创建的单聊。
+ * AttachmentMessageResult 定义附件消息及首发时创建的单聊或 AI 聊天。
  */
 export interface AttachmentMessageResult {
     "conversationId": string;
     "conversation": InboxConversation | null;
     "message": ConversationMessage;
-}
-
-/**
- * AttachmentMessageState 定义消息窗口内附件的可见性和上传状态。
- */
-export interface AttachmentMessageState {
-    "messageId": string;
-    "attachment": MessageAttachment;
-    "deleted": boolean;
-}
-
-/**
- * AttachmentStateList 返回当前窗口已有附件的状态。
- */
-export interface AttachmentStateList {
-    "states": AttachmentMessageState[] | null;
-}
-
-/**
- * AttachmentStateListInput 指定当前消息窗口需要刷新的附件。
- */
-export interface AttachmentStateListInput {
-    "messageIds": string;
-}
-
-/**
- * AttachmentUploadStatus 定义附件消息的上传状态。
- */
-export enum AttachmentUploadStatus {
-    /**
-     * The Go zero value for the underlying type of the enum.
-     */
-    $zero = "",
-
-    AttachmentUploading = "uploading",
-    AttachmentReady = "ready",
-    AttachmentFailed = "failed",
-    AttachmentCancelled = "cancelled",
-};
-
-/**
- * AttachmentUploadUpdate 定义当前客户端上传的状态变更或活跃确认。
- */
-export interface AttachmentUploadUpdate {
-    "fileIds": string[] | null;
-    "status": AttachmentUploadStatus;
 }
 
 /**
@@ -1784,8 +1706,8 @@ export interface KnowledgeDocument {
     "name": string;
     "contentType": string;
     "byteSize": number;
-    "status": KnowledgeDocumentStatus;
-    "processingStatus": KnowledgeDocumentProcessingStatus;
+    "status": KnowledgeIndexStatus;
+    "processingStatus": KnowledgeIndexProcessingStatus;
     "segmentBatchId": string;
     "segmentCount": number;
     "failureMessage": string;
@@ -1863,27 +1785,6 @@ export interface KnowledgeDocumentPreviewRequest {
 }
 
 /**
- * KnowledgeDocumentProcessingStatus 定义文档处理流程的执行状态。
- */
-export enum KnowledgeDocumentProcessingStatus {
-    /**
-     * The Go zero value for the underlying type of the enum.
-     */
-    $zero = "",
-
-    KnowledgeProcessingInitial = "initial",
-    KnowledgeProcessingQueued = "queued",
-    KnowledgeProcessingFetching = "fetching",
-    KnowledgeProcessingConverting = "converting",
-    KnowledgeProcessingSplitting = "splitting",
-    KnowledgeProcessingEmbedding = "embedding",
-    KnowledgeProcessingPublishing = "publishing",
-    KnowledgeProcessingSucceeded = "succeeded",
-    KnowledgeProcessingFailed = "failed",
-    KnowledgeProcessingCancelled = "cancelled",
-};
-
-/**
  * KnowledgeDocumentSegment 定义可阅读和定位的分段正文。
  */
 export interface KnowledgeDocumentSegment {
@@ -1915,23 +1816,6 @@ export interface KnowledgeDocumentSegmentPage {
 }
 
 /**
- * KnowledgeDocumentStatus 定义文档展示状态。
- */
-export enum KnowledgeDocumentStatus {
-    /**
-     * The Go zero value for the underlying type of the enum.
-     */
-    $zero = "",
-
-    KnowledgeDocumentInitial = "initial",
-    KnowledgeDocumentQueued = "queued",
-    KnowledgeDocumentRunning = "running",
-    KnowledgeDocumentSucceeded = "succeeded",
-    KnowledgeDocumentFailed = "failed",
-    KnowledgeDocumentCancelled = "cancelled",
-};
-
-/**
  * KnowledgeGroup 定义知识库分组树节点。
  */
 export interface KnowledgeGroup {
@@ -1949,6 +1833,44 @@ export interface KnowledgeGroupInput {
     "name": string;
     "parentId": string;
 }
+
+/**
+ * KnowledgeIndexProcessingStatus 定义知识来源索引流程的执行状态。
+ */
+export enum KnowledgeIndexProcessingStatus {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    KnowledgeProcessingInitial = "initial",
+    KnowledgeProcessingQueued = "queued",
+    KnowledgeProcessingFetching = "fetching",
+    KnowledgeProcessingConverting = "converting",
+    KnowledgeProcessingSplitting = "splitting",
+    KnowledgeProcessingEmbedding = "embedding",
+    KnowledgeProcessingPublishing = "publishing",
+    KnowledgeProcessingSucceeded = "succeeded",
+    KnowledgeProcessingFailed = "failed",
+    KnowledgeProcessingCancelled = "cancelled",
+};
+
+/**
+ * KnowledgeIndexStatus 定义知识来源的索引展示状态，文档与问答条目共用。
+ */
+export enum KnowledgeIndexStatus {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    KnowledgeIndexInitial = "initial",
+    KnowledgeIndexQueued = "queued",
+    KnowledgeIndexRunning = "running",
+    KnowledgeIndexSucceeded = "succeeded",
+    KnowledgeIndexFailed = "failed",
+    KnowledgeIndexCancelled = "cancelled",
+};
 
 /**
  * KnowledgeQAEntry 定义完整问答详情。
@@ -2000,7 +1922,7 @@ export interface KnowledgeQASimilarQuestion {
 }
 
 /**
- * KnowledgeQASummary 定义问答列表项。
+ * KnowledgeQASummary 定义问答列表项及其索引状态。
  */
 export interface KnowledgeQASummary {
     "id": string;
@@ -2008,6 +1930,8 @@ export interface KnowledgeQASummary {
     "question": string;
     "similarQuestions": string[] | null;
     "answer": string;
+    "status": KnowledgeIndexStatus;
+    "failureMessage": string;
     "createdAt": string;
 }
 
@@ -2019,7 +1943,7 @@ export interface KnowledgeRetrievalInput {
 }
 
 /**
- * KnowledgeRetrievalRecord 定义检索测试命中的分段和重排得分。
+ * KnowledgeRetrievalRecord 定义检索测试命中的来源片段和重排得分；问答记录的编号为条目编号并携带完整答案。
  */
 export interface KnowledgeRetrievalRecord {
     "documentId": string;
@@ -2028,6 +1952,7 @@ export interface KnowledgeRetrievalRecord {
     "segmentBatchId": string;
     "position": number;
     "content": string;
+    "answer": string;
     "score": number;
 }
 
@@ -2181,7 +2106,7 @@ export interface MemberOptionListInput {
 }
 
 /**
- * MessageAttachment 定义消息的文件信息与上传状态。
+ * MessageAttachment 定义消息的文件信息与图片尺寸。
  */
 export interface MessageAttachment {
     "id": string;
@@ -2189,7 +2114,6 @@ export interface MessageAttachment {
     "contentType": string;
     "byteSize": number;
     "contentUrl": string;
-    "uploadStatus": AttachmentUploadStatus;
     "imageWidth": number;
     "imageHeight": number;
 }

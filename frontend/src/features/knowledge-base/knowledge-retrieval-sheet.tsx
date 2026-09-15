@@ -1,4 +1,4 @@
-/** 知识库检索测试侧栏。 */
+/** 知识库检索测试侧栏，按知识库类别展示文档分段或问答条目。 */
 import { useEffect, useMemo, useRef, useState, type RefObject } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm } from "react-hook-form"
@@ -6,7 +6,7 @@ import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { z } from "zod"
 
-import { isApiError, retrieveKnowledgeBase, type KnowledgeRetrievalResultData } from "@/api"
+import { isApiError, retrieveKnowledgeBase, type KnowledgeBaseCategoryId, type KnowledgeRetrievalResultData } from "@/api"
 import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
@@ -18,11 +18,12 @@ import { KnowledgeSegmentsDialog } from "./knowledge-segments-dialog"
 
 const retrievalQueryMaxLength = 250
 
-/** 显示检索输入和按最终顺序排列的命中分段。 */
-export function KnowledgeRetrievalSheet({ open, onOpenChange, knowledgeBaseId, triggerRef }: {
+/** 显示检索输入和按最终顺序排列的命中内容。 */
+export function KnowledgeRetrievalSheet({ open, onOpenChange, knowledgeBaseId, category, triggerRef }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   knowledgeBaseId: string
+  category: KnowledgeBaseCategoryId
   triggerRef: RefObject<HTMLButtonElement | null>
 }) {
   const { t } = useTranslation("knowledgeBase")
@@ -130,6 +131,7 @@ export function KnowledgeRetrievalSheet({ open, onOpenChange, knowledgeBaseId, t
                 <p className="py-12 text-center text-sm text-muted-foreground">{t("retrieval.empty")}</p>
               ) : (
                 <KnowledgeRetrievalResults
+                  category={category}
                   records={result.records}
                   onViewContext={(record, trigger) => {
                     contextTrigger.current = trigger

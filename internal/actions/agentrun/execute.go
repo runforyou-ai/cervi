@@ -18,6 +18,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
+	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/runforyou-ai/cervi/internal/task"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
@@ -310,7 +311,7 @@ func (a *ExecuteAction) complete(ctx context.Context, execution executionContext
 	}
 	suppressed := false
 	completed := false
-	err = a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err = realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		locked, err := lockAgentRun(ctx, tx, policy, &execution.Run)
 		if err != nil {
 			return fmt.Errorf("lock agent run for completion: %w", err)
@@ -421,7 +422,7 @@ func (a *ExecuteAction) fail(ctx context.Context, runID string, runErr error) (b
 		return false, err
 	}
 	terminal := false
-	err = a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err = realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		locked, err := lockAgentRun(ctx, tx, policy, initial)
 		if err != nil {
 			return fmt.Errorf("lock agent run for failure: %w", err)

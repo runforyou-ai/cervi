@@ -10,8 +10,6 @@ import {
 import { zodResolver } from "@hookform/resolvers/zod"
 import { LoaderCircleIcon, PaperclipIcon } from "lucide-react"
 import { useForm } from "react-hook-form"
-import { useResource } from "@/hooks/use-resource"
-import { resourceKeys } from "@/hooks/resource-keys"
 import { messagePreview } from "@/lib/message-preview"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
@@ -19,8 +17,6 @@ import { toast } from "sonner"
 
 import {
   ChatSubjectKind,
-  MessageType,
-  listAttachmentStates,
   ConversationType,
   isApiError,
   sendCustomerTextMessage,
@@ -48,12 +44,12 @@ import {
   conversationSendingIndicatorDelay,
   type OutgoingConversationDraft,
 } from "@/features/inbox/outgoing-message-store"
-import { useMemberChatPollingActive } from "./use-member-chat-polling"
 import { GroupAttachmentUpload } from "./group-attachment-upload"
 import { ConversationAttachmentUpload } from "./conversation-attachment-upload"
 import { resolveAppPlatform } from "@/platform/app-platform"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
+import { cn } from "@/lib/utils"
 
 const conversationComposerMaxHeight = 200
 const conversationComposerMinHeight = 80
@@ -136,7 +132,6 @@ export function ConversationComposer({
 }) {
   const { t } = useTranslation("inbox")
   const navigate = useNavigate()
-  const pollingActive = useMemberChatPollingActive()
   const aliveRef = useRef(true)
   const schema = useMemo(
     () =>
@@ -159,22 +154,6 @@ export function ConversationComposer({
   } | null>(null)
   const retryRef = useRef<OutgoingConversationDraft | null>(null)
   const refocusPendingRef = useRef(false)
-  // 选中的附件引用独立刷新，原消息取消后保留草稿并阻止发送失效引用。
-  const replyAttachmentID =
-    replyTo?.type === MessageType.MessageTypeAttachment && !replyTo.deleted
-      ? replyTo.id
-      : ""
-  const replyAttachment = useResource(
-    resourceKeys.attachmentStates(conversationID, replyAttachmentID),
-    () => listAttachmentStates(conversationID, replyAttachmentID),
-    { enabled: Boolean(conversationID && replyAttachmentID), refetchInterval: pollingActive ? 2000 : false },
-  )
-  const activeReplyTo =
-    replyTo && replyAttachment.data?.states.some(
-      (state) => state.messageId === replyTo.id && state.deleted,
-    )
-      ? { ...replyTo, body: "", sender: null, deleted: true }
-      : replyTo
   const replyToRef = useRef(replyTo)
   replyToRef.current = replyTo
   const [mentionSubjectIDs, setMentionSubjectIDs] = useState<string[]>([])
@@ -186,6 +165,8 @@ export function ConversationComposer({
     value: string
   } | null>(null)
   const [activeMentionIndex, setActiveMentionIndex] = useState(0)
+  // 移动端的提及候选和取消引用使用触屏尺寸。
+  const mobile = resolveAppPlatform() === "mobile"
   const { isSubmitting } = form.formState
   const isBodyEmpty = !form.watch("body").trim()
   const bodyField = form.register("body")
@@ -365,7 +346,7 @@ export function ConversationComposer({
   async function send(values: ConversationComposerValues) {
     if (disabledReason) return
     const body = values.body.trim()
-    if (!body || activeReplyTo?.deleted) return
+    if (!body || replyTo?.deleted) return
     if (onBeforeSend && !(await onBeforeSend())) return
     if (!aliveRef.current) return
     // 草稿正文去掉首部空白后，同步调整结构化标记的位置。
@@ -393,7 +374,7 @@ export function ConversationComposer({
     const retry =
       retryFailedMessage &&
       retryRef.current?.body === body &&
-      retryRef.current.replyTo?.id === activeReplyTo?.id &&
+      retryRef.current.replyTo?.id === replyTo?.id &&
       retryRef.current.mentionAll === mentionAll &&
       retryRef.current.mentionSubjectIDs.join("\u0000") ===
         normalizedMentionSubjectIDs.join("\u0000")
@@ -403,7 +384,7 @@ export function ConversationComposer({
       clientMessageID: retry?.clientMessageID ?? window.crypto.randomUUID(),
       body,
       originatedAt: retry?.originatedAt ?? new Date().toISOString(),
-      replyTo: activeReplyTo,
+      replyTo: replyTo,
       mentionSubjectIDs: normalizedMentionSubjectIDs,
       mentionAll,
       mentionAllToken: draftMentionAllToken,
@@ -423,7 +404,7 @@ export function ConversationComposer({
         case ConversationType.ConversationTypeDirect: {
           const directInput = {
             ...messageInput,
-            replyToMessageId: activeReplyTo?.id ?? "",
+            replyToMessageId: replyTo?.id ?? "",
           }
           message = sendIndividualMessage
             ? await sendIndividualMessage(directInput)
@@ -435,7 +416,7 @@ export function ConversationComposer({
         case ConversationType.ConversationTypeGroup:
           message = await sendGroupTextMessage(conversationID, {
             ...messageInput,
-            replyToMessageId: activeReplyTo?.id ?? "",
+            replyToMessageId: replyTo?.id ?? "",
             mentionSubjectIds: normalizedMentionSubjectIDs,
             mentionAll,
           })
@@ -443,7 +424,7 @@ export function ConversationComposer({
         case ConversationType.ConversationTypeCustomer:
           message = await sendCustomerTextMessage(conversationID, {
             ...messageInput,
-            replyToMessageId: activeReplyTo?.id ?? "",
+            replyToMessageId: replyTo?.id ?? "",
           })
           break
         default:
@@ -456,7 +437,7 @@ export function ConversationComposer({
       setMentionSubjectIDs([])
       setMentionAllToken(null)
       setMentionQuery(null)
-      if (replyToRef.current?.id === activeReplyTo?.id) {
+      if (replyToRef.current?.id === replyTo?.id) {
         onReplyToChange?.(null)
       }
       refocusPendingRef.current = refocusAfterSubmit
@@ -622,7 +603,10 @@ export function ConversationComposer({
                 type="button"
                 role="option"
                 aria-selected={index === activeMentionIndex}
-                className="flex w-full items-center rounded-sm px-2 py-1.5 text-left text-sm outline-none hover:bg-accent aria-selected:bg-accent"
+                className={cn(
+                  "flex w-full items-center rounded-sm px-2 py-1.5 text-left text-sm outline-none hover:bg-accent aria-selected:bg-accent",
+                  mobile && "min-h-11",
+                )}
                 onPointerDown={(event) => event.preventDefault()}
                 onClick={() => selectMention(candidate)}
               >
@@ -642,25 +626,28 @@ export function ConversationComposer({
           onKeyDown={resizeInputFromKeyboard}
         />
         <div className="overflow-hidden rounded-xl border border-input bg-background shadow-xs">
-          {activeReplyTo ? (
+          {replyTo ? (
             <div className="flex items-start justify-between gap-3 border-b px-3 py-2 text-xs">
               <div className="min-w-0">
                 <p className="font-medium text-foreground">
-                  {activeReplyTo.deleted
+                  {replyTo.deleted
                     ? t("messageOriginalDeleted")
                     : t("messageReplyingTo", {
                         name:
-                          activeReplyTo.sender?.displayName?.trim() ||
-                          t(activeReplyTo.sender?.kind === ChatSubjectKind.ChatSubjectKindContact ? "anonymousVisitor" : "unknownSender"),
+                          replyTo.sender?.displayName?.trim() ||
+                          t(replyTo.sender?.kind === ChatSubjectKind.ChatSubjectKindContact ? "anonymousVisitor" : "unknownSender"),
                       })}
                 </p>
                 <p className="truncate text-muted-foreground">
-                  {messagePreview(activeReplyTo.body, activeReplyTo.sender?.identityType)}
+                  {messagePreview(replyTo.body, replyTo.sender?.identityType)}
                 </p>
               </div>
               <button
                 type="button"
-                className="shrink-0 text-muted-foreground hover:text-foreground"
+                className={cn(
+                  "shrink-0 text-muted-foreground hover:text-foreground",
+                  mobile && "-my-2 min-h-11 px-2",
+                )}
                 disabled={Boolean(disabledReason)}
                 onClick={() => onReplyToChange?.(null)}
               >
@@ -718,7 +705,7 @@ export function ConversationComposer({
           <div className="flex items-center justify-between gap-3 px-2.5 pb-2.5">
             {disabledReason ? (
               <p id={`${inputID}-reason`} className="text-xs text-muted-foreground">{disabledReason}</p>
-            ) : resolveAppPlatform() !== "mobile" &&
+            ) : !mobile &&
             (conversationType === ConversationType.ConversationTypeDirect ||
               conversationType === ConversationType.ConversationTypeAgent ||
               conversationType === ConversationType.ConversationTypeGroup) ? (
@@ -758,7 +745,7 @@ export function ConversationComposer({
                 <PaperclipIcon />
               </Button>
             )}
-            <Button type="submit" size="sm" disabled={isSubmitting || Boolean(disabledReason) || isBodyEmpty || activeReplyTo?.deleted}>
+            <Button type="submit" size="sm" disabled={isSubmitting || Boolean(disabledReason) || isBodyEmpty || replyTo?.deleted}>
               {isSubmitting && showSubmitting ? (
                 <LoaderCircleIcon className="animate-spin" />
               ) : null}

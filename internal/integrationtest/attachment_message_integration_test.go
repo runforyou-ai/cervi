@@ -13,8 +13,8 @@ import (
 	"github.com/runforyou-ai/cervi/internal/actions/filemaintenance"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	"github.com/uptrace/bun"
 )
 
 // TestAttachmentMessages 验证附件激活、发送幂等、成员资格、首发单聊和历史读取。
@@ -139,301 +139,128 @@ func TestAttachmentMessages(t *testing.T) {
 	}
 }
 
-// TestAttachmentBatchLifecycle 验证先入库、顺序、接收方状态、幂等和取消。
-func TestAttachmentBatchLifecycle(t *testing.T) {
+// uploadedAttachment 创建一个已完成上传、尚未发送的消息附件临时文件。
+func uploadedAttachment(t *testing.T, db *bun.DB, identity *servermodels.Identity, name, contentType string) string {
+	t.Helper()
+	ctx := context.Background()
+	file, err := fileaction.NewCreateUploadAction(db).Execute(ctx, identity, domain.FileStorageBackendLocal, fileaction.UploadInput{
+		Purpose: domain.FilePurposeMessageAttachment, FileName: name, ContentType: contentType, ByteSize: 7,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fileaction.NewMarkUploadedAction(db).Execute(ctx, identity, file.ID, ""); err != nil {
+		t.Fatal(err)
+	}
+	return file.ID
+}
+
+// TestAttachmentMessageSequence 验证附件按发送顺序保存说明和图片尺寸，重放幂等，未完成上传或已过期的文件不能发送。
+func TestAttachmentMessageSequence(t *testing.T) {
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	send := conversationaction.NewSendAttachmentMessageAction(f.db, nil)
 	query := conversationaction.NewListConversationMessagesQuery(f.db)
-	input := conversationaction.AttachmentBatchInput{TargetIdentityID: f.member.OrganizationIdentity.ID}
-	for index := 0; index < 2; index++ {
-		input.Attachments = append(input.Attachments, conversationaction.AttachmentBatchItem{File: fileaction.UploadInput{FileName: "photo.png", ContentType: "image/png", ByteSize: domain.FilePartSize + 1}, ClientMessageID: uuid.NewV7().String(), ImageWidth: 320, ImageHeight: 200})
+	// 首个附件以对端身份首发单聊，第二个附件带说明发往已建立的会话。
+	first := conversationaction.AttachmentMessageInput{
+		TargetIdentityID: f.member.OrganizationIdentity.ID, ClientMessageID: uuid.NewV7().String(),
+		FileID: uploadedAttachment(t, f.db, f.owner, "photo.png", "image/png"), ImageWidth: 320, ImageHeight: 200,
 	}
-	input.Attachments[len(input.Attachments)-1].Body = "  文件说明  "
-	result, err := send.ExecuteBatch(ctx, f.owner, input, domain.FileStorageBackendLocal)
+	firstResult, err := send.Execute(ctx, f.owner, first)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(result.Messages) != 2 || result.Messages[0].Body != "" || result.Messages[1].Body != "文件说明" {
-		t.Fatalf("batch=%+v", result)
+	if firstResult.Conversation == nil || firstResult.Message.Attachment == nil || firstResult.Message.Attachment.ImageWidth != 320 || firstResult.Message.Attachment.ImageHeight != 200 {
+		t.Fatalf("first=%+v", firstResult)
 	}
-	for index := 0; index < 2; index++ {
-		message := result.Messages[index]
-		if message.ClientMessageID == nil || *message.ClientMessageID != input.Attachments[index].ClientMessageID || message.Attachment.UploadStatus != domain.AttachmentUploading || message.Attachment.ID == "" {
-			t.Fatalf("pending=%+v", message)
-		}
-		assertMemberClientAssociation(t, f.db, f.owner, result.ConversationID, message.ID, input.Attachments[index].ClientMessageID, f.member)
-		if index > 0 {
-			previous := result.Messages[index-1]
-			if message.OriginatedAt.Before(previous.OriginatedAt) || (message.OriginatedAt.Equal(previous.OriginatedAt) && message.ID <= previous.ID) {
-				t.Fatal("message order was not preserved")
-			}
-		}
-		if _, err := query.GetAttachmentFile(ctx, f.member, result.ConversationID, message.ID); err == nil {
-			t.Fatal("incomplete attachment downloadable")
-		}
+	second := conversationaction.AttachmentMessageInput{
+		ConversationID: firstResult.ConversationID, ClientMessageID: uuid.NewV7().String(),
+		FileID: uploadedAttachment(t, f.db, f.owner, "spec.pdf", "application/pdf"), Body: "  文件说明  ",
 	}
-	repeated, err := send.ExecuteBatch(ctx, f.owner, input, domain.FileStorageBackendLocal)
-	if err != nil || len(repeated.Messages) != 2 || repeated.Messages[0].ID != result.Messages[0].ID || repeated.Messages[1].Body != "文件说明" {
-		t.Fatalf("repeat=%+v %v", repeated, err)
+	secondResult, err := send.Execute(ctx, f.owner, second)
+	if err != nil || secondResult.Conversation != nil || secondResult.Message.Body != "文件说明" || secondResult.Message.MessageSeq != firstResult.Message.MessageSeq+1 {
+		t.Fatalf("second=%+v err=%v", secondResult, err)
 	}
-	for index, message := range repeated.Messages {
-		if message.ClientMessageID == nil || *message.ClientMessageID != input.Attachments[index].ClientMessageID {
-			t.Fatalf("batch replay association=%+v", message)
-		}
+	assertMemberClientAssociation(t, f.db, f.owner, secondResult.ConversationID, secondResult.Message.ID, second.ClientMessageID, f.member)
+	// 同一发送编号重放返回原消息，改变说明视为冲突。
+	repeated, err := send.Execute(ctx, f.owner, second)
+	if err != nil || repeated.Message.ID != secondResult.Message.ID || repeated.Message.Body != "文件说明" || repeated.Message.Attachment == nil {
+		t.Fatalf("repeat=%+v err=%v", repeated, err)
 	}
-	changed := input
-	changed.Attachments = append([]conversationaction.AttachmentBatchItem(nil), input.Attachments...)
-	changed.Attachments[1].Body = "不同说明"
+	changed := second
+	changed.Body = "不同说明"
 	var conflict *conversationaction.ConflictError
-	if _, err := send.ExecuteBatch(ctx, f.owner, changed, domain.FileStorageBackendLocal); !errors.As(err, &conflict) {
-		t.Fatalf("batch intent changed: %v", err)
+	if _, err := send.Execute(ctx, f.owner, changed); !errors.As(err, &conflict) {
+		t.Fatalf("changed intent=%v", err)
 	}
-	// 说明随附件读取，并成为首发摘要和收件箱摘要。
-	if result.Conversation == nil || result.Conversation.Preview == nil || *result.Conversation.Preview != "文件说明" {
-		t.Fatalf("caption summary=%+v", result.Conversation)
+	resized := first
+	resized.ConversationID, resized.TargetIdentityID, resized.ImageWidth = firstResult.ConversationID, "", 640
+	if _, err := send.Execute(ctx, f.owner, resized); !errors.As(err, &conflict) {
+		t.Fatalf("changed image size=%v", err)
 	}
-	captionHistory, err := query.Execute(ctx, f.member, conversationaction.ConversationMessageHistoryInput{ConversationID: result.ConversationID})
-	if err != nil || len(captionHistory.Messages) != 2 || captionHistory.Messages[1].Body != "文件说明" || captionHistory.Messages[1].Attachment == nil {
-		t.Fatalf("caption history=%+v %v", captionHistory, err)
+	// 接收方按发送顺序读取并下载附件，说明成为收件箱摘要。
+	history, err := query.Execute(ctx, f.member, conversationaction.ConversationMessageHistoryInput{ConversationID: secondResult.ConversationID})
+	if err != nil || len(history.Messages) != 2 || history.Messages[0].ID != firstResult.Message.ID || history.Messages[1].Body != "文件说明" || history.Messages[1].Attachment == nil || history.Messages[1].Attachment.Name != "spec.pdf" {
+		t.Fatalf("history=%+v err=%v", history, err)
+	}
+	if _, err := query.GetAttachmentFile(ctx, f.member, secondResult.ConversationID, secondResult.Message.ID); err != nil {
+		t.Fatal(err)
 	}
 	itemsPage, _, err := inboxaction.NewLoadInboxQuery(f.db).Execute(ctx, f.member, inboxaction.LoadInput{Scope: domain.InboxScopeAll})
-	items := itemsPage.Conversations
 	if err != nil {
 		t.Fatal(err)
 	}
 	foundConversation := false
-	for _, item := range items {
-		if item.ID == result.ConversationID {
-			foundConversation = true
-			if item.Direct == nil || item.Direct.Preview == nil || *item.Direct.Preview != "文件说明" {
-				t.Fatalf("caption inbox=%+v", item.Direct)
-			}
+	for _, item := range itemsPage.Conversations {
+		if item.ID == secondResult.ConversationID {
+			foundConversation = item.Direct != nil && item.Direct.Preview != nil && *item.Direct.Preview == "文件说明"
 		}
 	}
 	if !foundConversation {
-		t.Fatal("caption conversation missing from inbox")
+		t.Fatal("caption preview missing from inbox")
 	}
-
-	first := result.Messages[0].Attachment.ID
-	second := result.Messages[1].Attachment.ID
-	// 核验通用临时文件取消接口对已入库附件的保护。
-	if err := filemaintenance.NewCancelUploadAction(f.db).Execute(ctx, f.owner, first); err != nil {
-		t.Fatal(err)
-	}
-	pending := &servermodels.File{ID: first}
-	if err := f.db.NewSelect().Model(pending).WherePK().Scan(ctx); err != nil || pending.Status != string(domain.FileStatusPending) {
-		t.Fatalf("attached file was cancelled directly: %+v %v", pending, err)
-	}
-	if err := send.UpdateUploads(ctx, f.member, []string{first}, domain.AttachmentReady); err == nil {
-		t.Fatal("recipient changed upload")
-	}
-	if err := send.UpdateUploads(ctx, f.owner, []string{first}, domain.AttachmentReady); err == nil {
-		t.Fatal("pending file marked ready")
-	}
-	// 客户端失权或退出后停止心跳，接收方仍能读到超时失败，消息位置不变。
-	if _, err := f.db.NewRaw("UPDATE message_attachments SET upload_expires_at = now() - interval '1 second' WHERE file_id = ?", first).Exec(ctx); err != nil {
-		t.Fatal(err)
-	}
-	expiredHistory, err := query.Execute(ctx, f.member, conversationaction.ConversationMessageHistoryInput{ConversationID: result.ConversationID})
-	if err != nil || len(expiredHistory.Messages) != 2 || expiredHistory.Messages[0].ID != result.Messages[0].ID || expiredHistory.Messages[0].Attachment == nil || expiredHistory.Messages[0].Attachment.UploadStatus != domain.AttachmentFailed || expiredHistory.Messages[1].Attachment == nil || expiredHistory.Messages[1].Attachment.UploadStatus != domain.AttachmentUploading {
-		t.Fatalf("expired upload history=%+v %v", expiredHistory, err)
-	}
-	// 失败与心跳不推进会话版本，完成和取消各推进一次，取消后的完成被忽略。
-	uploadVersion := loadConversationVersion(t, f.db, result.ConversationID)
-	if err := send.UpdateUploads(ctx, f.owner, []string{first}, domain.AttachmentFailed); err != nil {
-		t.Fatal(err)
-	}
-	if err := send.UpdateUploads(ctx, f.owner, []string{first}, domain.AttachmentUploading); err != nil {
-		t.Fatal(err)
-	}
-	if version := loadConversationVersion(t, f.db, result.ConversationID); version != uploadVersion {
-		t.Fatalf("failed upload version=%d want=%d", version, uploadVersion)
-	}
-	if _, err := fileaction.NewMarkUploadedAction(f.db).Execute(ctx, f.owner, first, ""); err != nil {
-		t.Fatal(err)
-	}
-	if err := send.UpdateUploads(ctx, f.owner, []string{first}, domain.AttachmentReady); err != nil {
-		t.Fatal(err)
-	}
-	if version := loadConversationVersion(t, f.db, result.ConversationID); version != uploadVersion+1 {
-		t.Fatalf("ready upload version=%d want=%d", version, uploadVersion+1)
-	}
-	if _, err := query.GetAttachmentFile(ctx, f.member, result.ConversationID, result.Messages[0].ID); err != nil {
-		t.Fatal(err)
-	}
-	if err := send.UpdateUploads(ctx, f.owner, []string{second}, domain.AttachmentCancelled); err != nil {
-		t.Fatal(err)
-	}
-	if err := send.UpdateUploads(ctx, f.owner, []string{second}, domain.AttachmentReady); err != nil {
-		t.Fatal(err)
-	}
-	if version := loadConversationVersion(t, f.db, result.ConversationID); version != uploadVersion+2 {
-		t.Fatalf("cancelled upload version=%d want=%d", version, uploadVersion+2)
-	}
-	history, err := query.Execute(ctx, f.member, conversationaction.ConversationMessageHistoryInput{ConversationID: result.ConversationID})
+	// 尚未完成上传或已经过期的临时文件不能发送，也不留下消息。
+	pending, err := fileaction.NewCreateUploadAction(f.db).Execute(ctx, f.owner, domain.FileStorageBackendLocal, fileaction.UploadInput{
+		Purpose: domain.FilePurposeMessageAttachment, FileName: "pending.txt", ByteSize: 7,
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
-	foundFirst := false
-	for _, message := range history.Messages {
-		if message.ID == result.Messages[1].ID {
-			t.Fatal("cancelled attachment visible")
-		}
-		if message.ID == result.Messages[0].ID {
-			foundFirst = message.Attachment.UploadStatus == domain.AttachmentReady
-		}
-	}
-	states, err := query.AttachmentStates(ctx, f.member, result.ConversationID, []string{result.Messages[0].ID, result.Messages[1].ID})
-	if err != nil || len(states) != 2 {
-		t.Fatalf("states=%+v %v", states, err)
-	}
-	for _, state := range states {
-		if state.MessageID == result.Messages[0].ID && state.Attachment.UploadStatus != domain.AttachmentReady {
-			t.Fatal("ready state missing")
-		}
-		if state.MessageID == result.Messages[1].ID && !state.Deleted {
-			t.Fatal("cancelled state missing")
-		}
-	}
-	if !foundFirst || len(history.Messages) != 1 {
-		t.Fatalf("history=%+v", history.Messages)
-	}
-	var summary servermodels.Conversation
-	if err := f.db.NewSelect().Model(&summary).Where("id = ?", result.ConversationID).Scan(ctx); err != nil {
+	expired := uploadedAttachment(t, f.db, f.owner, "expired.txt", "text/plain")
+	if _, err := f.db.NewUpdate().Table("files").Set("expires_at = now() - interval '1 second'").Where("id = ?", expired).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if summary.LastMessageID == nil || *summary.LastMessageID != result.Messages[0].ID {
-		t.Fatalf("cancelled last attachment did not restore previous summary: %+v", summary)
+	for _, fileID := range []string{pending.ID, expired} {
+		if _, err := send.Execute(ctx, f.owner, conversationaction.AttachmentMessageInput{ConversationID: secondResult.ConversationID, ClientMessageID: uuid.NewV7().String(), FileID: fileID}); !errors.Is(err, fileaction.ErrFileNotFound) {
+			t.Fatalf("unfinished file %s accepted: %v", fileID, err)
+		}
 	}
-	// 核验完成后取消及迟到完成请求均收敛为取消状态。
-	if err := send.UpdateUploads(ctx, f.owner, []string{first}, domain.AttachmentCancelled); err != nil {
-		t.Fatal(err)
-	}
-	if err := send.UpdateUploads(ctx, f.owner, []string{first}, domain.AttachmentReady); err != nil {
-		t.Fatal(err)
-	}
-	states, err = query.AttachmentStates(ctx, f.member, result.ConversationID, []string{result.Messages[0].ID})
-	if err != nil || len(states) != 1 || !states[0].Deleted || states[0].Attachment.UploadStatus != domain.AttachmentCancelled {
-		t.Fatalf("completed attachment cancellation=%+v %v", states, err)
-	}
-	if _, err := query.GetAttachmentFile(ctx, f.member, result.ConversationID, result.Messages[0].ID); !errors.Is(err, fileaction.ErrFileNotFound) {
-		t.Fatalf("cancelled attachment download=%v", err)
-	}
-	groupInput := input
-	groupInput.ConversationID = f.groupID
-	groupInput.TargetIdentityID = ""
-	if _, err := send.ExecuteBatch(ctx, f.owner, groupInput, domain.FileStorageBackendLocal); err == nil {
-		t.Fatal("group batch accepted")
+	count, err := f.db.NewSelect().Model((*servermodels.Message)(nil)).Where("conversation_id = ?", secondResult.ConversationID).Count(ctx)
+	if err != nil || count != 2 {
+		t.Fatalf("messages=%d err=%v", count, err)
 	}
 }
 
-// TestCancelOnlyAttachment 验证取消唯一一条附件时清空会话摘要且保留游标记录。
-func TestCancelOnlyAttachment(t *testing.T) {
-	f := newNavigationFixture(t)
-	ctx := context.Background()
-	send := conversationaction.NewSendAttachmentMessageAction(f.db, nil)
-	input := conversationaction.AttachmentBatchInput{TargetIdentityID: f.member.OrganizationIdentity.ID, Attachments: []conversationaction.AttachmentBatchItem{{File: fileaction.UploadInput{FileName: "empty", ByteSize: 0}, ClientMessageID: uuid.NewV7().String()}}}
-	result, err := send.ExecuteBatch(ctx, f.owner, input, domain.FileStorageBackendLocal)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := send.UpdateUploads(ctx, f.owner, []string{result.Messages[0].Attachment.ID}, domain.AttachmentCancelled); err != nil {
-		t.Fatal(err)
-	}
-	conversation := &servermodels.Conversation{ID: result.ConversationID}
-	if err := f.db.NewSelect().Model(conversation).WherePK().Scan(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if conversation.LastMessageID != nil || conversation.LastMessageAt != nil {
-		t.Fatalf("summary=%+v", conversation)
-	}
-}
-
-// TestAttachmentReplayAfterCleanup 验证取消和文件回收后的重放不创建文件或恢复消息。
-func TestAttachmentReplayAfterCleanup(t *testing.T) {
-	f := newNavigationFixture(t)
-	ctx := context.Background()
-	send := conversationaction.NewSendAttachmentMessageAction(f.db, nil)
-	input := conversationaction.AttachmentBatchInput{TargetIdentityID: f.member.OrganizationIdentity.ID, Attachments: []conversationaction.AttachmentBatchItem{{File: fileaction.UploadInput{FileName: "cancelled.txt", ByteSize: 7}, ClientMessageID: uuid.NewV7().String()}}}
-	result, err := send.ExecuteBatch(ctx, f.owner, input, domain.FileStorageBackendLocal)
-	if err != nil {
-		t.Fatal(err)
-	}
-	fileID := result.Messages[0].Attachment.ID
-	if err := send.UpdateUploads(ctx, f.owner, []string{fileID}, domain.AttachmentCancelled); err != nil {
-		t.Fatal(err)
-	}
-	local, err := serverfilecontent.NewLocalStore(t.TempDir())
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := filemaintenance.NewDeleteExpiredAction(f.db, serverfilecontent.NewDeleter(local, nil)).Execute(ctx, filemaintenance.DeleteExpiredInput{FileID: fileID}); err != nil {
-		t.Fatal(err)
-	}
-	repeated, err := send.ExecuteBatch(ctx, f.owner, input, domain.FileStorageBackendLocal)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if repeated.Messages[0].ID != result.Messages[0].ID || repeated.Messages[0].Attachment.ID != "" || repeated.Messages[0].Attachment.UploadStatus != domain.AttachmentCancelled {
-		t.Fatalf("replayed=%+v", repeated)
-	}
-	count, err := f.db.NewSelect().Model((*servermodels.File)(nil)).Where("organization_id = ?", f.owner.Organization.ID).Count(ctx)
-	if err != nil || count != 0 {
-		t.Fatalf("new file created: %d %v", count, err)
-	}
-}
-
-// TestAttachmentBatchRollback 验证后续消息冲突时撤销本次新建的文件和消息。
-func TestAttachmentBatchRollback(t *testing.T) {
-	f := newNavigationFixture(t)
-	ctx := context.Background()
-	send := conversationaction.NewSendAttachmentMessageAction(f.db, nil)
-	original := conversationaction.AttachmentBatchItem{File: fileaction.UploadInput{FileName: "first.txt", ByteSize: 7}, ClientMessageID: uuid.NewV7().String()}
-	input := conversationaction.AttachmentBatchInput{TargetIdentityID: f.member.OrganizationIdentity.ID, Attachments: []conversationaction.AttachmentBatchItem{original}}
-	saved, err := send.ExecuteBatch(ctx, f.owner, input, domain.FileStorageBackendLocal)
-	if err != nil {
-		t.Fatal(err)
-	}
-	added := original
-	added.ClientMessageID = uuid.NewV7().String()
-	original.File.FileName = "changed.txt"
-	input.Attachments = []conversationaction.AttachmentBatchItem{added, original}
-	var conflict *conversationaction.ConflictError
-	if _, err := send.ExecuteBatch(ctx, f.owner, input, domain.FileStorageBackendLocal); !errors.As(err, &conflict) {
-		t.Fatalf("changed intent accepted: %v", err)
-	}
-	count, err := f.db.NewSelect().Model((*servermodels.File)(nil)).Where("organization_id = ?", f.owner.Organization.ID).Count(ctx)
-	if err != nil || count != 1 {
-		t.Fatalf("file rollback: %d %v", count, err)
-	}
-	count, err = f.db.NewSelect().Model((*servermodels.Message)(nil)).Where("conversation_id = ?", saved.ConversationID).Count(ctx)
-	if err != nil || count != 1 {
-		t.Fatalf("message rollback: %d %v", count, err)
-	}
-}
-
-// TestAttachmentMessageReplies 验证附件引用的摘要、幂等、会话隔离及取消后的读取。
+// TestAttachmentMessageReplies 验证附件引用的摘要、幂等和会话隔离。
 func TestAttachmentMessageReplies(t *testing.T) {
 	for _, body := range []string{"", "附件的说明"} {
 		t.Run("body="+body, func(t *testing.T) {
 			f := newNavigationFixture(t)
 			ctx := context.Background()
-			attachments := conversationaction.NewSendAttachmentMessageAction(f.db, nil)
-			batch, err := attachments.ExecuteBatch(ctx, f.owner, conversationaction.AttachmentBatchInput{
-				TargetIdentityID: f.member.OrganizationIdentity.ID,
-				Attachments:      []conversationaction.AttachmentBatchItem{{ClientMessageID: uuid.NewV7().String(), Body: body, File: fileaction.UploadInput{FileName: "report.txt", ByteSize: 7}}},
-			}, domain.FileStorageBackendLocal)
+			sent, err := conversationaction.NewSendAttachmentMessageAction(f.db, nil).Execute(ctx, f.owner, conversationaction.AttachmentMessageInput{
+				TargetIdentityID: f.member.OrganizationIdentity.ID, ClientMessageID: uuid.NewV7().String(), Body: body,
+				FileID: uploadedAttachment(t, f.db, f.owner, "report.txt", "text/plain"),
+			})
 			if err != nil {
 				t.Fatal(err)
 			}
-			target := batch.Messages[0]
+			target := sent.Message
 			expected := body
 			if expected == "" {
 				expected = "report.txt"
 			}
 			send := conversationaction.NewSendDirectTextMessageAction(f.db)
-			input := conversationaction.InternalTextMessageInput{ConversationID: batch.ConversationID, ClientMessageID: uuid.NewV7().String(), Body: "收到", ReplyToMessageID: target.ID}
+			input := conversationaction.InternalTextMessageInput{ConversationID: sent.ConversationID, ClientMessageID: uuid.NewV7().String(), Body: "收到", ReplyToMessageID: target.ID}
 			reply, err := send.Execute(ctx, f.member, input)
 			if err != nil || reply.ReplyTo == nil || reply.ReplyTo.ID != target.ID || reply.ReplyTo.Type != domain.MessageTypeAttachment || reply.ReplyTo.Body != expected || reply.ReplyTo.Sender.SourceID != f.owner.OrganizationIdentity.ID {
 				t.Fatalf("reply=%+v err=%v", reply, err)
@@ -448,25 +275,9 @@ func TestAttachmentMessageReplies(t *testing.T) {
 			if !errors.As(err, &conflict) || conflict.Reason != conversationaction.ConflictReasonReplyTargetInvalid {
 				t.Fatalf("cross-conversation reference=%v", err)
 			}
-			query := conversationaction.NewListConversationMessagesQuery(f.db)
-			history, err := query.Execute(ctx, f.owner, conversationaction.ConversationMessageHistoryInput{ConversationID: batch.ConversationID})
+			history, err := conversationaction.NewListConversationMessagesQuery(f.db).Execute(ctx, f.owner, conversationaction.ConversationMessageHistoryInput{ConversationID: sent.ConversationID})
 			if err != nil || len(history.Messages) != 2 || history.Messages[1].ReplyTo == nil || history.Messages[1].ReplyTo.Body != expected || history.Messages[1].ReplyTo.Type != domain.MessageTypeAttachment {
 				t.Fatalf("history=%+v err=%v", history, err)
-			}
-			if err := attachments.UpdateUploads(ctx, f.owner, []string{target.Attachment.ID}, domain.AttachmentCancelled); err != nil {
-				t.Fatal(err)
-			}
-			history, err = query.Execute(ctx, f.member, conversationaction.ConversationMessageHistoryInput{ConversationID: batch.ConversationID})
-			if err != nil || len(history.Messages) != 1 || history.Messages[0].ReplyTo == nil || !history.Messages[0].ReplyTo.Deleted || history.Messages[0].ReplyTo.Body != "" || history.Messages[0].ReplyTo.Sender != nil {
-				t.Fatalf("cancelled history=%+v err=%v", history, err)
-			}
-			replayed, err = send.Execute(ctx, f.member, input)
-			if err != nil || replayed.ID != reply.ID || replayed.ReplyTo == nil || !replayed.ReplyTo.Deleted {
-				t.Fatalf("cancelled replay=%+v err=%v", replayed, err)
-			}
-			input.ClientMessageID = uuid.NewV7().String()
-			if _, err := send.Execute(ctx, f.member, input); !errors.As(err, &conflict) || conflict.Reason != conversationaction.ConflictReasonReplyTargetInvalid {
-				t.Fatalf("cancelled target accepted=%v", err)
 			}
 		})
 	}

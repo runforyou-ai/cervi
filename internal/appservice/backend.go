@@ -44,24 +44,12 @@ type Backend interface {
 	// PrepareFileUpload 为已有文件记录准备直传请求。
 	//cervi:route POST /files/:fileID/upload
 	PrepareFileUpload(context.Context, RequestMeta, string) (FileUpload, error)
-	// CompleteAttachmentUpload 完成文件上传并激活原附件消息。
-	//cervi:route POST /attachment-uploads/:fileID/complete
-	CompleteAttachmentUpload(context.Context, RequestMeta, string) error
 	// CancelFileUpload 将未发送的临时文件交给清理任务。
 	//cervi:route DELETE /files/:fileID/upload
 	CancelFileUpload(context.Context, RequestMeta, string) error
-	// SendAttachmentMessage 发送内部单聊或群聊附件消息。
+	// SendAttachmentMessage 发送已上传的单聊、群聊或 AI 聊天附件消息，首发时创建会话。
 	//cervi:route POST /conversation-attachments status=201
 	SendAttachmentMessage(context.Context, RequestMeta, AttachmentMessageInput) (AttachmentMessageResult, error)
-	// SendAttachmentBatch 按选择顺序保存可带说明的单聊或 AI 聊天附件消息。
-	//cervi:route POST /attachment-batches status=201
-	SendAttachmentBatch(context.Context, RequestMeta, AttachmentBatchInput) (AttachmentBatchResult, error)
-	// UpdateAttachmentUploads 更新附件上传状态或取消尚未完成的消息。
-	//cervi:route PATCH /attachment-uploads
-	UpdateAttachmentUploads(context.Context, RequestMeta, AttachmentUploadUpdate) error
-	// ListAttachmentStates 读取窗口内已存在附件消息的最新状态。
-	//cervi:route GET /conversations/:conversationID/attachments
-	ListAttachmentStates(context.Context, RequestMeta, string, AttachmentStateListInput) (AttachmentStateList, error)
 	// GetAttachmentDownload 签发当前成员可见消息附件的下载地址。
 	//cervi:route GET /conversations/:conversationID/messages/:messageID/attachment
 	GetAttachmentDownload(context.Context, RequestMeta, string, string) (FileDownload, error)
@@ -354,6 +342,9 @@ type Backend interface {
 	// DeleteKnowledgeQAEntry 删除本地问答。
 	//cervi:route DELETE /knowledge-bases/:knowledgeBaseID/qa-entries/:entryID
 	DeleteKnowledgeQAEntry(context.Context, RequestMeta, string, string) error
+	// RetryKnowledgeQAEntry 按当前配置重新索引问答。
+	//cervi:route POST /knowledge-bases/:knowledgeBaseID/qa-entries/:entryID/retry
+	RetryKnowledgeQAEntry(context.Context, RequestMeta, string, string) error
 	// ListKnowledgeBases 返回当前企业的知识库列表。
 	//cervi:route GET /knowledge-bases
 	ListKnowledgeBases(context.Context, RequestMeta) (KnowledgeBaseList, error)

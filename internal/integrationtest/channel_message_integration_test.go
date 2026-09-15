@@ -10,6 +10,7 @@ import (
 
 	"github.com/runforyou-ai/cervi/internal/actions/channelmessage"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	"github.com/runforyou-ai/cervi/internal/realtime"
 	models "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -25,7 +26,7 @@ func TestChannelMessageOpaqueIdentifiers(t *testing.T) {
 	// 使用渠道通用入站契约核验平台消息编号原值。
 	receive := func(input channelmessage.Inbound, body string) (conversationaction.InboundCustomerTextMessageResult, error) {
 		var result conversationaction.InboundCustomerTextMessageResult
-		err := f.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		err := realtime.RunInTx(ctx, f.db, func(ctx context.Context, tx bun.Tx) error {
 			var err error
 			result, err = conversationaction.ReceiveInboundCustomerTextMessage(ctx, tx, channel, conversationaction.InboundCustomerTextMessageInput{
 				ExternalID: "contact:opaque", SingleConversation: true, Body: body, OriginatedAt: time.Now().UTC(),

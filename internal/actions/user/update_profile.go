@@ -12,6 +12,7 @@ import (
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/runforyou-ai/cervi/internal/storage/server/pgerr"
 	"github.com/uptrace/bun"
@@ -37,7 +38,7 @@ func (a *UpdateProfileAction) Execute(ctx context.Context, identity *servermodel
 		return nil, &ValidationError{Fields: fields}
 	}
 	var updatedIdentity *servermodels.Identity
-	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
@@ -96,13 +97,12 @@ func (a *UpdateProfileAction) Execute(ctx context.Context, identity *servermodel
 			}
 			identityQuery = identityQuery.Set("avatar_file_id = ?", file.ID)
 		}
-		_, err := tx.NewUpdate().Model((*servermodels.User)(nil)).
+		_, err := identityaction.UpdateUserAccount(ctx, identity.Organization.ID, tx.NewUpdate().Model((*servermodels.User)(nil)).
 			Set("profile_version = profile_version + CASE WHEN email IS DISTINCT FROM ? THEN 1 ELSE 0 END", input.Email).
 			Set("email = ?", input.Email).
 			Set("updated_at = now()").
 			Where("u.id = ?", identity.User.ID).
-			Where("u.organization_id = ?", identity.Organization.ID).
-			Exec(ctx)
+			Where("u.organization_id = ?", identity.Organization.ID))
 		if err != nil {
 			return err
 		}

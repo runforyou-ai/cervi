@@ -60,41 +60,15 @@ func (b *Backend) PrepareFileUpload(ctx context.Context, meta appservice.Request
 	return output, err
 }
 
-// CompleteAttachmentUpload 完成文件上传并激活原附件消息。
-func (b *Backend) CompleteAttachmentUpload(ctx context.Context, meta appservice.RequestMeta, fileID string) error {
-	return b.do(ctx, meta, http.MethodPost, "/attachment-uploads/"+url.PathEscape(fileID)+"/complete", nil, nil, nil)
-}
-
 // CancelFileUpload 将未发送的临时文件交给清理任务。
 func (b *Backend) CancelFileUpload(ctx context.Context, meta appservice.RequestMeta, fileID string) error {
 	return b.do(ctx, meta, http.MethodDelete, "/files/"+url.PathEscape(fileID)+"/upload", nil, nil, nil)
 }
 
-// SendAttachmentMessage 发送内部单聊或群聊附件消息。
+// SendAttachmentMessage 发送已上传的单聊、群聊或 AI 聊天附件消息，首发时创建会话。
 func (b *Backend) SendAttachmentMessage(ctx context.Context, meta appservice.RequestMeta, input appservice.AttachmentMessageInput) (appservice.AttachmentMessageResult, error) {
 	var output appservice.AttachmentMessageResult
 	err := b.do(ctx, meta, http.MethodPost, "/conversation-attachments", nil, input, &output)
-	b.normalizeOutput(&output)
-	return output, err
-}
-
-// SendAttachmentBatch 按选择顺序保存可带说明的单聊或 AI 聊天附件消息。
-func (b *Backend) SendAttachmentBatch(ctx context.Context, meta appservice.RequestMeta, input appservice.AttachmentBatchInput) (appservice.AttachmentBatchResult, error) {
-	var output appservice.AttachmentBatchResult
-	err := b.do(ctx, meta, http.MethodPost, "/attachment-batches", nil, input, &output)
-	b.normalizeOutput(&output)
-	return output, err
-}
-
-// UpdateAttachmentUploads 更新附件上传状态或取消尚未完成的消息。
-func (b *Backend) UpdateAttachmentUploads(ctx context.Context, meta appservice.RequestMeta, input appservice.AttachmentUploadUpdate) error {
-	return b.do(ctx, meta, http.MethodPatch, "/attachment-uploads", nil, input, nil)
-}
-
-// ListAttachmentStates 读取窗口内已存在附件消息的最新状态。
-func (b *Backend) ListAttachmentStates(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.AttachmentStateListInput) (appservice.AttachmentStateList, error) {
-	var output appservice.AttachmentStateList
-	err := b.do(ctx, meta, http.MethodGet, "/conversations/"+url.PathEscape(conversationID)+"/attachments", encodeAttachmentStateListInputQuery(input), nil, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }
@@ -842,6 +816,11 @@ func (b *Backend) DeleteKnowledgeQAEntry(ctx context.Context, meta appservice.Re
 	return b.do(ctx, meta, http.MethodDelete, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/qa-entries/"+url.PathEscape(entryID), nil, nil, nil)
 }
 
+// RetryKnowledgeQAEntry 按当前配置重新索引问答。
+func (b *Backend) RetryKnowledgeQAEntry(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, entryID string) error {
+	return b.do(ctx, meta, http.MethodPost, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/qa-entries/"+url.PathEscape(entryID)+"/retry", nil, nil, nil)
+}
+
 // ListKnowledgeBases 返回当前企业的知识库列表。
 func (b *Backend) ListKnowledgeBases(ctx context.Context, meta appservice.RequestMeta) (appservice.KnowledgeBaseList, error) {
 	var output appservice.KnowledgeBaseList
@@ -1154,13 +1133,6 @@ func encodeAgentListInputQuery(input appservice.AgentListInput) url.Values {
 	setOptionalQuery(query, "status", input.Status)
 	setPositiveQuery(query, "page", input.Page)
 	setPositiveQuery(query, "pageSize", input.PageSize)
-	return query
-}
-
-// encodeAttachmentStateListInputQuery 将 appservice.AttachmentStateListInput 编码为查询参数。
-func encodeAttachmentStateListInputQuery(input appservice.AttachmentStateListInput) url.Values {
-	query := url.Values{}
-	setQuery(query, "messageIds", input.MessageIDs)
 	return query
 }
 

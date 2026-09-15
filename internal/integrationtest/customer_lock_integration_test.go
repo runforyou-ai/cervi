@@ -17,6 +17,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
+	"github.com/runforyou-ai/cervi/internal/realtime"
 	models "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
@@ -258,7 +259,7 @@ func TestCustomerInboundAndManagementLocks(t *testing.T) {
 			}()
 			waitChatSignal(t, ctx, gate.reached)
 			go func() {
-				contended <- f.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+				contended <- realtime.RunInTx(ctx, f.db, func(ctx context.Context, tx bun.Tx) error {
 					_, err := tx.ExecContext(ctx, "SELECT id FROM conversations WHERE id = ? FOR UPDATE", f.conversationID)
 					return err
 				})
