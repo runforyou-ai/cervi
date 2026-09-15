@@ -52,7 +52,7 @@ func TestKnowledgeBaseSettings(t *testing.T) {
 	db := store.DB()
 	identity, qa := newQAFixture(t, db)
 	input := newKnowledgeBaseInput(t, db, identity, "配置测试", domain.KnowledgeBaseCategoryStandard)
-	create, update := knowledgeaction.NewCreateKnowledgeBaseAction(db), knowledgeaction.NewUpdateKnowledgeBaseAction(db)
+	create, update := knowledgeaction.NewCreateKnowledgeBaseAction(db), knowledgeaction.NewUpdateKnowledgeBaseAction(db, newKnowledgeTasks(t, db))
 	base, err := create.Execute(ctx, identity, input)
 	if err != nil {
 		t.Fatal(err)

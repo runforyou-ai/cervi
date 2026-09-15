@@ -61,7 +61,7 @@ func newKnowledgeOps(db *bun.DB, taskEnqueuer servertask.TxEnqueuer, documentQue
 		listKnowledgeBases:   knowledgebaseaction.NewListKnowledgeBasesQuery(db),
 		getKnowledgeBase:     knowledgebaseaction.NewGetKnowledgeBaseQuery(db),
 		createKnowledgeBase:  knowledgebaseaction.NewCreateKnowledgeBaseAction(db),
-		updateKnowledgeBase:  knowledgebaseaction.NewUpdateKnowledgeBaseAction(db),
+		updateKnowledgeBase:  knowledgebaseaction.NewUpdateKnowledgeBaseAction(db, taskEnqueuer),
 		deleteKnowledgeBase:  knowledgebaseaction.NewDeleteKnowledgeBaseAction(db),
 		createKnowledgeGroup: knowledgebaseaction.NewCreateKnowledgeGroupAction(db),
 		updateKnowledgeGroup: knowledgebaseaction.NewUpdateKnowledgeGroupAction(db),

@@ -21,11 +21,11 @@ func TestRunFollowUpsDoNotConsumeIterationBudget(t *testing.T) {
 			feed := &testInputFeed{}
 			feed.appendUser("开始")
 			calls := 0
-			chatModel := &processChatModel{generate: func(_ context.Context, messages []*schema.Message) (*schema.Message, error) {
+			chatModel := &processChatModel{generate: func(_ context.Context, messages []*schema.AgenticMessage) (*schema.AgenticMessage, error) {
 				calls++
 				var assistantCount int
 				for _, message := range messages {
-					if message.Role == schema.Assistant {
+					if message.Role == schema.AgenticRoleTypeAssistant {
 						assistantCount++
 					}
 				}
@@ -35,9 +35,9 @@ func TestRunFollowUpsDoNotConsumeIterationBudget(t *testing.T) {
 				if calls < 12 {
 					feed.appendUser("继续")
 				}
-				return schema.AssistantMessage(fmt.Sprintf("回答 %d", calls), nil), nil
+				return assistantReply(fmt.Sprintf("回答 %d", calls)), nil
 			}}
-			runtime := &EinoRuntime{newModel: func(context.Context, ModelConfig) (model.ToolCallingChatModel, error) { return chatModel, nil }}
+			runtime := &EinoRuntime{newModel: func(context.Context, ModelConfig) (model.AgenticModel, error) { return chatModel, nil }}
 			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 			defer cancel()
 			result, err := runtime.Run(ctx, RunRequest{Name: "test", MaxIterations: 1, MaxTurns: maxTurns}, feed)
@@ -61,26 +61,26 @@ func TestRunRetainsToolsAcrossRepeatedPreemption(t *testing.T) {
 	feed := &testInputFeed{}
 	feed.appendUser("开始计算")
 	calls := 0
-	chatModel := &processChatModel{generate: func(_ context.Context, messages []*schema.Message) (*schema.Message, error) {
+	chatModel := &processChatModel{generate: func(_ context.Context, messages []*schema.AgenticMessage) (*schema.AgenticMessage, error) {
 		calls++
 		var results int
 		for _, message := range messages {
-			if message.Role == schema.Tool {
+			if reply := toolResult(message); reply != nil {
 				results++
-				if message.ToolCallID != fmt.Sprintf("call-%d", results) || message.Content != `{"result":3}` {
+				if reply.CallID != fmt.Sprintf("call-%d", results) || messageText(message) != `{"result":3}` {
 					return nil, fmt.Errorf("unexpected tool result: %#v", message)
 				}
 			}
 		}
-		if results != calls-1 || messages[len(messages)-1].Role != schema.User {
-			return nil, fmt.Errorf("tool results = %d for model call %d, last role = %s", results, calls, messages[len(messages)-1].Role)
+		if results != calls-1 || messageKind(messages[len(messages)-1]) != "user" {
+			return nil, fmt.Errorf("tool results = %d for model call %d, last kind = %s", results, calls, messageKind(messages[len(messages)-1]))
 		}
 		if calls == 4 {
-			return schema.AssistantMessage("完成", nil), nil
+			return assistantReply("完成"), nil
 		}
-		return schema.AssistantMessage("正在计算", []schema.ToolCall{{ID: fmt.Sprintf("call-%d", calls), Type: "function", Function: schema.FunctionCall{Name: "calculator", Arguments: `{"operation":"add","left":1,"right":2}`}}}), nil
+		return assistantReply("正在计算", &schema.FunctionToolCall{CallID: fmt.Sprintf("call-%d", calls), Name: "calculator", Arguments: `{"operation":"add","left":1,"right":2}`}), nil
 	}}
-	runtime.newModel = func(context.Context, ModelConfig) (model.ToolCallingChatModel, error) { return chatModel, nil }
+	runtime.newModel = func(context.Context, ModelConfig) (model.AgenticModel, error) { return chatModel, nil }
 	seen := make(map[string]bool)
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
@@ -104,11 +104,11 @@ func TestRunIterationLimitStillStopsToolLoop(t *testing.T) {
 		t.Fatal(err)
 	}
 	calls := 0
-	chatModel := &processChatModel{generate: func(context.Context, []*schema.Message) (*schema.Message, error) {
+	chatModel := &processChatModel{generate: func(context.Context, []*schema.AgenticMessage) (*schema.AgenticMessage, error) {
 		calls++
-		return schema.AssistantMessage("", []schema.ToolCall{{ID: fmt.Sprintf("call-%d", calls), Type: "function", Function: schema.FunctionCall{Name: "calculator", Arguments: `{"operation":"add","left":1,"right":2}`}}}), nil
+		return assistantReply("", &schema.FunctionToolCall{CallID: fmt.Sprintf("call-%d", calls), Name: "calculator", Arguments: `{"operation":"add","left":1,"right":2}`}), nil
 	}}
-	runtime.newModel = func(context.Context, ModelConfig) (model.ToolCallingChatModel, error) { return chatModel, nil }
+	runtime.newModel = func(context.Context, ModelConfig) (model.AgenticModel, error) { return chatModel, nil }
 	feed := &testInputFeed{}
 	feed.appendUser("计算")
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)

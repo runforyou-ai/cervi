@@ -54,6 +54,8 @@ export enum AIProviderBrand {
     AIProviderBrandDeepSeek = "deepseek",
     AIProviderBrandAlibaba = "alibaba",
     AIProviderBrandOpenAI = "openai",
+    AIProviderBrandAnthropic = "anthropic",
+    AIProviderBrandGoogle = "google",
     AIProviderBrandMoonshot = "moonshot",
     AIProviderBrandZhipu = "zhipu",
     AIProviderBrandVolcengine = "volcengine",

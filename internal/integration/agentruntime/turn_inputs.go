@@ -20,7 +20,7 @@ var errEmptyFinalResponse = errors.New("agent returned an empty final response")
 // turnInputs 统一管理持久输入的投递、认领边界和循环停止决策。
 type turnInputs struct {
 	feed InputFeed
-	loop *adk.TurnLoop[Trigger, *schema.Message]
+	loop *adk.TurnLoop[Trigger, *schema.AgenticMessage]
 
 	mu           sync.Mutex
 	maxPushedSeq int64
@@ -95,7 +95,7 @@ func (i *turnInputs) poll(ctx context.Context, preempt bool) error {
 			}
 			var accepted bool
 			if preempt && ack == nil {
-				accepted, ack = i.loop.Push(trigger, adk.WithPreempt[Trigger, *schema.Message](adk.AnySafePoint))
+				accepted, ack = i.loop.Push(trigger, adk.WithPreempt[Trigger, *schema.AgenticMessage](adk.AnySafePoint))
 			} else {
 				accepted, _ = i.loop.Push(trigger)
 			}
@@ -130,7 +130,7 @@ func (i *turnInputs) claim(ctx context.Context, throughSeq int64) (ClaimedInput,
 }
 
 // finish 在锁内根据已投递序号决定是否收尾。
-func (i *turnInputs) finish(ctx context.Context, turn *adk.TurnContext[Trigger, *schema.Message], candidate string) (bool, error) {
+func (i *turnInputs) finish(ctx context.Context, turn *adk.TurnContext[Trigger, *schema.AgenticMessage], candidate string) (bool, error) {
 	select {
 	case <-turn.Preempted:
 		return false, nil

@@ -24,6 +24,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/integration/documentconvert"
 	"github.com/runforyou-ai/cervi/internal/integration/embedding"
 	mcpintegration "github.com/runforyou-ai/cervi/internal/integration/mcp"
+	"github.com/runforyou-ai/cervi/internal/integration/rerank"
 	telegramintegration "github.com/runforyou-ai/cervi/internal/integration/telegram"
 	"github.com/runforyou-ai/cervi/internal/publicweb"
 	"github.com/runforyou-ai/cervi/internal/realtime"
@@ -82,13 +83,15 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 		return nil, err
 	}
 
-	// 初始化智能体运行环境，注册执行任务及最终失败处理；运行期通过附件读取器读取会话附件。
+	// 初始化智能体运行环境，注册执行任务及最终失败处理；运行期通过附件读取器读取会话附件，按配置版本绑定的知识库执行混合检索。
 	agentRuntime, err := agentruntime.New()
 	if err != nil {
 		return nil, err
 	}
 	agentRunScheduler := agentrunaction.NewScheduler(tasks)
-	executeAgentRun := agentrunaction.NewExecuteAction(appStorage.DB(), tasks, agentRuntime, agentrunaction.NewAttachmentReader(appStorage.DB(), fileReader, attachmentScheme))
+	executeAgentRun := agentrunaction.NewExecuteAction(appStorage.DB(), tasks, agentRuntime,
+		agentrunaction.NewAttachmentReader(appStorage.DB(), fileReader, attachmentScheme),
+		knowledgeaction.NewRetrievalService(appStorage.DB(), embedding.NewClient(), rerank.NewClient()))
 	if err := tasks.Registry().RegisterJSONWithTerminalFailure(agentrunaction.RunActionName, executeAgentRun.Execute, executeAgentRun.FinalizeFailure); err != nil {
 		return nil, err
 	}

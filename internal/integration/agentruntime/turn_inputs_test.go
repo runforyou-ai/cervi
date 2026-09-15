@@ -49,15 +49,15 @@ func TestTurnInputsOrdersPollingAndFinish(t *testing.T) {
 			defer cancel()
 			feed := &gatedInputFeed{started: make(chan struct{}), release: make(chan struct{}), late: late}
 			inputs := &turnInputs{feed: feed, maxPushedSeq: 1, claimedSeq: 1}
-			inputs.loop = adk.NewTurnLoop(adk.TurnLoopConfig[Trigger, *schema.Message]{
-				GenInput: func(context.Context, *adk.TurnLoop[Trigger, *schema.Message], []Trigger) (*adk.GenInputResult[Trigger, *schema.Message], error) {
+			inputs.loop = adk.NewTurnLoop(adk.TurnLoopConfig[Trigger, *schema.AgenticMessage]{
+				GenInput: func(context.Context, *adk.TurnLoop[Trigger, *schema.AgenticMessage], []Trigger) (*adk.GenInputResult[Trigger, *schema.AgenticMessage], error) {
 					panic("test must not run the loop")
 				},
-				PrepareAgent: func(context.Context, *adk.TurnLoop[Trigger, *schema.Message], []Trigger) (adk.Agent, error) {
+				PrepareAgent: func(context.Context, *adk.TurnLoop[Trigger, *schema.AgenticMessage], []Trigger) (adk.TypedAgent[*schema.AgenticMessage], error) {
 					panic("test must not run the agent")
 				},
 			})
-			turn := &adk.TurnContext[Trigger, *schema.Message]{Loop: inputs.loop}
+			turn := &adk.TurnContext[Trigger, *schema.AgenticMessage]{Loop: inputs.loop}
 			done := make(chan error, 1)
 			var finished bool
 			go func() {

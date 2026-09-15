@@ -7,6 +7,8 @@ const (
 	AIProviderBrandDeepSeek   AIProviderBrand = "deepseek"
 	AIProviderBrandAlibaba    AIProviderBrand = "alibaba"
 	AIProviderBrandOpenAI     AIProviderBrand = "openai"
+	AIProviderBrandAnthropic  AIProviderBrand = "anthropic"
+	AIProviderBrandGoogle     AIProviderBrand = "google"
 	AIProviderBrandMoonshot   AIProviderBrand = "moonshot"
 	AIProviderBrandZhipu      AIProviderBrand = "zhipu"
 	AIProviderBrandVolcengine AIProviderBrand = "volcengine"

@@ -19,7 +19,7 @@ type customerHistoryChatModel struct {
 }
 
 // Generate 记录调用参数中的工具并执行当前测试步骤。
-func (m *customerHistoryChatModel) Generate(ctx context.Context, input []*schema.Message, opts ...model.Option) (*schema.Message, error) {
+func (m *customerHistoryChatModel) Generate(ctx context.Context, input []*schema.AgenticMessage, opts ...model.Option) (*schema.AgenticMessage, error) {
 	m.tools = model.GetCommonOptions(nil, opts...).Tools
 	return m.processChatModel.Generate(ctx, input, opts...)
 }
@@ -34,32 +34,31 @@ func TestCustomerHistoryTool(t *testing.T) {
 		t.Run(fmt.Sprintf("enabled=%t", enabled), func(t *testing.T) {
 			modelCalls, searchCalls := 0, 0
 			chatModel := &customerHistoryChatModel{}
-			chatModel.processChatModel = &processChatModel{generate: func(_ context.Context, messages []*schema.Message) (*schema.Message, error) {
+			chatModel.processChatModel = &processChatModel{generate: func(_ context.Context, messages []*schema.AgenticMessage) (*schema.AgenticMessage, error) {
 				modelCalls++
 				if enabled && modelCalls == 1 {
-					return schema.AssistantMessage("", []schema.ToolCall{{
-						ID: "history", Type: "function",
-						Function: schema.FunctionCall{Name: "search_customer_history", Arguments: `{"query":"上次退款的处理结果"}`},
-					}}), nil
+					return assistantReply("", &schema.FunctionToolCall{
+						CallID: "history", Name: "search_customer_history", Arguments: `{"query":"上次退款的处理结果"}`,
+					}), nil
 				}
 				if enabled {
 					for _, message := range messages {
-						if message.Role == schema.Tool && message.ToolCallID == "history" {
+						if reply := toolResult(message); reply != nil && reply.CallID == "history" {
 							var result CustomerHistoryResult
-							if err := json.Unmarshal([]byte(message.Content), &result); err != nil {
+							if err := json.Unmarshal([]byte(messageText(message)), &result); err != nil {
 								return nil, err
 							}
 							if result.Available || result.Message != "历史查询暂不可用" {
 								return nil, fmt.Errorf("unexpected history result: %+v", result)
 							}
-							return schema.AssistantMessage("请补充上次退款的信息", nil), nil
+							return assistantReply("请补充上次退款的信息"), nil
 						}
 					}
 					return nil, errors.New("history result not delivered to model")
 				}
-				return schema.AssistantMessage("单聊回答", nil), nil
+				return assistantReply("单聊回答"), nil
 			}}
-			runtime.newModel = func(context.Context, ModelConfig) (model.ToolCallingChatModel, error) { return chatModel, nil }
+			runtime.newModel = func(context.Context, ModelConfig) (model.AgenticModel, error) { return chatModel, nil }
 			request := RunRequest{RunID: "history-test", Name: "客服助手"}
 			if enabled {
 				request.CustomerHistorySearch = func(_ context.Context, query string) (CustomerHistoryResult, error) {

@@ -57,27 +57,22 @@ type mcpToolChatModel struct {
 }
 
 // Generate 记录本次可用工具，首次调用远程工具，随后把工具结果作为最终回复。
-func (m *mcpToolChatModel) Generate(_ context.Context, input []*schema.Message, opts ...model.Option) (*schema.Message, error) {
+func (m *mcpToolChatModel) Generate(_ context.Context, input []*schema.AgenticMessage, opts ...model.Option) (*schema.AgenticMessage, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.calls++
 	m.toolInfos = model.GetCommonOptions(&model.Options{}, opts...).Tools
 	if m.calls == 1 {
-		return schema.AssistantMessage("先查工单", []schema.ToolCall{{
-			ID: "mcp-call-1", Type: "function",
-			Function: schema.FunctionCall{Name: "lookup_ticket", Arguments: `{"id":"T-9"}`},
-		}}), nil
+		return assistantReply("先查工单", &schema.FunctionToolCall{
+			CallID: "mcp-call-1", Name: "lookup_ticket", Arguments: `{"id":"T-9"}`,
+		}), nil
 	}
-	m.toolReply = input[len(input)-1].Content
-	return schema.AssistantMessage("查询结果："+m.toolReply, nil), nil
+	m.toolReply = messageText(input[len(input)-1])
+	return assistantReply("查询结果：" + m.toolReply), nil
 }
 
-func (m *mcpToolChatModel) Stream(context.Context, []*schema.Message, ...model.Option) (*schema.StreamReader[*schema.Message], error) {
+func (m *mcpToolChatModel) Stream(context.Context, []*schema.AgenticMessage, ...model.Option) (*schema.StreamReader[*schema.AgenticMessage], error) {
 	return nil, errors.New("unexpected streaming call")
-}
-
-func (m *mcpToolChatModel) WithTools([]*schema.ToolInfo) (model.ToolCallingChatModel, error) {
-	return m, nil
 }
 
 // TestRuntimeCallsMCPTools 验证注册后的长连接会话仍可调用工具，不可用的服务被跳过，内置同名工具保留。
@@ -88,7 +83,7 @@ func TestRuntimeCallsMCPTools(t *testing.T) {
 	}
 	chatModel := &mcpToolChatModel{}
 	runtime := &EinoRuntime{
-		newModel: func(context.Context, ModelConfig) (model.ToolCallingChatModel, error) { return chatModel, nil },
+		newModel: func(context.Context, ModelConfig) (model.AgenticModel, error) { return chatModel, nil },
 		tools:    []tool.BaseTool{calculator},
 	}
 	feed := &testInputFeed{}
@@ -134,18 +129,17 @@ type offloadReadingChatModel struct {
 }
 
 // Generate 先调用大结果工具，再读回被转存的完整内容。
-func (m *offloadReadingChatModel) Generate(_ context.Context, input []*schema.Message, _ ...model.Option) (*schema.Message, error) {
+func (m *offloadReadingChatModel) Generate(_ context.Context, input []*schema.AgenticMessage, _ ...model.Option) (*schema.AgenticMessage, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.calls++
 	switch m.calls {
 	case 1:
-		return schema.AssistantMessage("先抓取", []schema.ToolCall{{
-			ID: "dump-call", Type: "function",
-			Function: schema.FunctionCall{Name: "dump", Arguments: `{}`},
-		}}), nil
+		return assistantReply("先抓取", &schema.FunctionToolCall{
+			CallID: "dump-call", Name: "dump", Arguments: `{}`,
+		}), nil
 	case 2:
-		m.notice = input[len(input)-1].Content
+		m.notice = messageText(input[len(input)-1])
 		path := ""
 		for _, field := range strings.Fields(m.notice) {
 			if strings.HasPrefix(field, "/trunc/") {
@@ -157,22 +151,17 @@ func (m *offloadReadingChatModel) Generate(_ context.Context, input []*schema.Me
 		if err != nil {
 			return nil, err
 		}
-		return schema.AssistantMessage("读取完整内容", []schema.ToolCall{{
-			ID: "read-call", Type: "function",
-			Function: schema.FunctionCall{Name: offloadedResultToolName, Arguments: string(arguments)},
-		}}), nil
+		return assistantReply("读取完整内容", &schema.FunctionToolCall{
+			CallID: "read-call", Name: offloadedResultToolName, Arguments: string(arguments),
+		}), nil
 	default:
-		m.fileResult = input[len(input)-1].Content
-		return schema.AssistantMessage("已读取", nil), nil
+		m.fileResult = messageText(input[len(input)-1])
+		return assistantReply("已读取"), nil
 	}
 }
 
-func (m *offloadReadingChatModel) Stream(context.Context, []*schema.Message, ...model.Option) (*schema.StreamReader[*schema.Message], error) {
+func (m *offloadReadingChatModel) Stream(context.Context, []*schema.AgenticMessage, ...model.Option) (*schema.StreamReader[*schema.AgenticMessage], error) {
 	return nil, errors.New("unexpected streaming call")
-}
-
-func (m *offloadReadingChatModel) WithTools([]*schema.ToolInfo) (model.ToolCallingChatModel, error) {
-	return m, nil
 }
 
 // TestLargeToolResultOffloaded 验证过大的工具结果转存后只向模型提供预览，完整内容仍可由读回工具取得。
@@ -192,7 +181,7 @@ func TestLargeToolResultOffloaded(t *testing.T) {
 	t.Cleanup(func() { slog.SetDefault(originalLogger) })
 
 	chatModel := &offloadReadingChatModel{}
-	runtime := &EinoRuntime{newModel: func(context.Context, ModelConfig) (model.ToolCallingChatModel, error) { return chatModel, nil }}
+	runtime := &EinoRuntime{newModel: func(context.Context, ModelConfig) (model.AgenticModel, error) { return chatModel, nil }}
 	feed := &testInputFeed{}
 	feed.appendUser("抓一下这个页面")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
