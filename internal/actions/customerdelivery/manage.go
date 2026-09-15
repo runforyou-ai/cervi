@@ -9,8 +9,10 @@ import (
 	"log/slog"
 	"time"
 
+	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/realtime"
 	models "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
@@ -57,11 +59,15 @@ func (m *Manager) List(ctx context.Context, organizationID, conversationID strin
 
 // Resolve 锁定渠道身份后重新校验投递状态，人工重试排到队尾。
 func (m *Manager) Resolve(ctx context.Context, identity *models.Identity, conversationID, deliveryID string, resolution domain.CustomerDeliveryResolution, confirmDuplicateRisk bool) error {
-	return m.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	return realtime.RunInTx(ctx, m.db, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
 		route, err := Prepare(ctx, tx, identity.Organization.ID, conversationID)
+		if err != nil {
+			return err
+		}
+		conversation, err := chatstate.LockCustomerConversation(ctx, tx, identity.Organization.ID, conversationID)
 		if err != nil {
 			return err
 		}
@@ -106,7 +112,7 @@ func (m *Manager) Resolve(ctx context.Context, identity *models.Identity, conver
 		default:
 			return ErrConflict
 		}
-		if err := saveDelivery(ctx, tx, delivery); err != nil {
+		if err := saveDelivery(ctx, tx, conversation, delivery); err != nil {
 			return err
 		}
 		if resolution == domain.CustomerDeliveryRetry && m.enqueuer != nil {

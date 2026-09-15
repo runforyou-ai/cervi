@@ -14,6 +14,7 @@ import (
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/runforyou-ai/cervi/internal/storage/server/pgerr"
 	"github.com/uptrace/bun"
@@ -45,11 +46,11 @@ func (a *ClaimServiceSessionAction) Execute(ctx context.Context, identity *serve
 	var output ServiceSessionResult
 	var cancelledRunIDs []string
 	var cancelledSession *servermodels.ServiceSession
-	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		session, err := lockOpenServiceSession(ctx, tx, identity.Organization.ID, conversationID)
+		conversation, session, err := lockOpenServiceSession(ctx, tx, identity.Organization.ID, conversationID)
 		if err != nil {
 			return err
 		}
@@ -76,6 +77,9 @@ func (a *ClaimServiceSessionAction) Execute(ctx context.Context, identity *serve
 			}
 			assigneeIdentityID := identity.OrganizationIdentity.ID
 			session.AssigneeIdentityID = &assigneeIdentityID
+			if err := chatstate.TouchConversation(ctx, tx, conversation); err != nil {
+				return err
+			}
 		}
 		output = serviceSessionResult(session, &identity.OrganizationIdentity)
 		return nil
@@ -117,7 +121,7 @@ func (a *TransferServiceSessionAction) Execute(ctx context.Context, identity *se
 	var output ServiceSessionResult
 	var cancelledRunIDs []string
 	var cancelledSession *servermodels.ServiceSession
-	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
@@ -129,7 +133,7 @@ func (a *TransferServiceSessionAction) Execute(ctx context.Context, identity *se
 		if err != nil {
 			return err
 		}
-		session, err := lockOpenServiceSession(ctx, tx, identity.Organization.ID, input.ConversationID)
+		conversation, session, err := lockOpenServiceSession(ctx, tx, identity.Organization.ID, input.ConversationID)
 		if err != nil {
 			return err
 		}
@@ -167,6 +171,9 @@ func (a *TransferServiceSessionAction) Execute(ctx context.Context, identity *se
 			return err
 		}
 		session.AssigneeIdentityID = &target.ID
+		if err := chatstate.TouchConversation(ctx, tx, conversation); err != nil {
+			return err
+		}
 		if domain.OrganizationIdentityType(target.Type) == domain.OrganizationIdentityTypeAgent {
 			kind, messageID, err := loadServiceSessionLastMessageSender(ctx, tx, session)
 			if err != nil {
@@ -244,11 +251,11 @@ func (a *CloseServiceSessionAction) Execute(ctx context.Context, identity *serve
 	var output ServiceSessionResult
 	var cancelledRunIDs []string
 	var cancelledSession *servermodels.ServiceSession
-	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		session, err := lockOpenServiceSession(ctx, tx, identity.Organization.ID, conversationID)
+		conversation, session, err := lockOpenServiceSession(ctx, tx, identity.Organization.ID, conversationID)
 		if err != nil {
 			return err
 		}
@@ -279,6 +286,9 @@ func (a *CloseServiceSessionAction) Execute(ctx context.Context, identity *serve
 		}
 		session.Status = string(domain.ServiceSessionStatusClosed)
 		session.ClosedAt = &now
+		if err := chatstate.TouchConversation(ctx, tx, conversation); err != nil {
+			return err
+		}
 		var assignee *servermodels.OrganizationIdentity
 		if session.AssigneeIdentityID != nil {
 			// 读取处理周期负责人身份。
@@ -316,11 +326,11 @@ func (a *ReopenServiceSessionAction) Execute(ctx context.Context, identity *serv
 		return ServiceSessionResult{}, &ValidationError{Fields: map[string]ValidationCode{"conversationId": ValidationConversationIDInvalid}}
 	}
 	var output ServiceSessionResult
-	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		session, err := chatstate.LockCustomerServiceSession(ctx, tx, identity.Organization.ID, conversationID)
+		conversation, session, err := chatstate.LockCustomerServiceSession(ctx, tx, identity.Organization.ID, conversationID)
 		if err != nil {
 			return err
 		}
@@ -348,6 +358,9 @@ func (a *ReopenServiceSessionAction) Execute(ctx context.Context, identity *serv
 		session.Status = string(domain.ServiceSessionStatusOpen)
 		session.AssigneeIdentityID = &assigneeIdentityID
 		session.ClosedAt = nil
+		if err := chatstate.TouchConversation(ctx, tx, conversation); err != nil {
+			return err
+		}
 		output = serviceSessionResult(session, &identity.OrganizationIdentity)
 		return nil
 	})
@@ -360,16 +373,16 @@ func (a *ReopenServiceSessionAction) Execute(ctx context.Context, identity *serv
 	return output, nil
 }
 
-// lockOpenServiceSession 锁定客户会话最新且未关闭的客服处理周期。
-func lockOpenServiceSession(ctx context.Context, db bun.IDB, organizationID, conversationID string) (*servermodels.ServiceSession, error) {
-	session, err := chatstate.LockCustomerServiceSession(ctx, db, organizationID, conversationID)
+// lockOpenServiceSession 锁定客户会话及其最新且未关闭的客服处理周期。
+func lockOpenServiceSession(ctx context.Context, db bun.IDB, organizationID, conversationID string) (*servermodels.Conversation, *servermodels.ServiceSession, error) {
+	conversation, session, err := chatstate.LockCustomerServiceSession(ctx, db, organizationID, conversationID)
 	if err != nil {
-		return nil, err
+		return nil, nil, err
 	}
 	if domain.ServiceSessionStatus(session.Status) != domain.ServiceSessionStatusOpen {
-		return nil, &ConflictError{Reason: ConflictReasonServiceSessionNotReplyable}
+		return nil, nil, &ConflictError{Reason: ConflictReasonServiceSessionNotReplyable}
 	}
-	return session, nil
+	return conversation, session, nil
 }
 
 // serviceSessionResult 转换客服处理周期命令结果。

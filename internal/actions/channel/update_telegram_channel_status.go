@@ -8,11 +8,13 @@ import (
 	"log/slog"
 
 	"github.com/runforyou-ai/cervi/internal/actions/channelstate"
+	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
 	"github.com/runforyou-ai/cervi/internal/integration/telegram"
+	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -50,7 +52,7 @@ func (a *UpdateTelegramChannelStatusAction) Execute(ctx context.Context, identit
 			var botUsedByOtherChannel bool
 			var webhookURL string
 			var secret string
-			err := conn.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+			err := realtime.RunInTx(ctx, conn, func(ctx context.Context, tx bun.Tx) error {
 				if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 					return err
 				}
@@ -97,6 +99,25 @@ func (a *UpdateTelegramChannelStatusAction) Execute(ctx context.Context, identit
 				}
 				if rows == 0 {
 					return ErrNotFound
+				}
+
+				// 启停切换改变待发送投递的暂停状态，按会话 ID 顺序推进相关客户会话版本。
+				if detail.Enabled != enabled {
+					var conversationIDs []string
+					if err := tx.NewSelect().TableExpr("customer_message_deliveries").ColumnExpr("DISTINCT conversation_id").
+						Where("organization_id = ? AND channel_id = ? AND status IN (?, ?)", identity.Organization.ID, channelID, domain.CustomerDeliveryPending, domain.CustomerDeliveryRetryWait).
+						OrderExpr("conversation_id").Scan(ctx, &conversationIDs); err != nil {
+						return err
+					}
+					for _, conversationID := range conversationIDs {
+						conversation, err := chatstate.LockCustomerConversation(ctx, tx, identity.Organization.ID, conversationID)
+						if err != nil {
+							return err
+						}
+						if err := chatstate.TouchConversation(ctx, tx, conversation); err != nil {
+							return err
+						}
+					}
 				}
 
 				setting := &servermodels.TelegramChannelSetting{ChannelID: channelID}

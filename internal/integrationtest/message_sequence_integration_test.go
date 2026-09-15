@@ -6,6 +6,7 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"net/http"
 	"net/http/httptest"
@@ -40,17 +41,40 @@ func TestMessageSequenceCommitOrder(t *testing.T) {
 				if _, err := f.db.NewInsert().Model(cv).Column("id", "organization_id", "type", "status").Exec(ctx); err != nil {
 					t.Fatal(err)
 				}
-				tx, err := f.db.BeginTx(ctx, nil)
-				if err != nil {
-					t.Fatal(err)
+				errRollback := errors.New("rollback")
+				appended := make(chan *servermodels.Message, 1)
+				finish := make(chan struct{}, 1)
+				held := make(chan error, 1)
+				// 首个事务追加消息后持有会话锁，直到收到提交或回滚信号。
+				go func() {
+					held <- realtime.RunInTx(ctx, f.db, func(ctx context.Context, tx bun.Tx) error {
+						if err := tx.NewSelect().Model(cv).WherePK().For("UPDATE").Scan(ctx); err != nil {
+							return err
+						}
+						message, _, err := chatstate.AppendMessage(ctx, tx, cv, &servermodels.Message{ID: uuid.NewV7().String(), OrganizationID: cv.OrganizationID, ConversationID: cv.ID, Type: "system", Body: "先取锁", OriginatedAt: time.Now().UTC()})
+						if err != nil {
+							return err
+						}
+						appended <- message
+						select {
+						case <-finish:
+						case <-ctx.Done():
+							return ctx.Err()
+						}
+						if rollback {
+							return errRollback
+						}
+						return nil
+					})
+				}()
+				var first *servermodels.Message
+				select {
+				case first = <-appended:
+				case err := <-held:
+					t.Fatalf("first transaction err=%v", err)
 				}
-				defer tx.Rollback()
-				if err := tx.NewSelect().Model(cv).WherePK().For("UPDATE").Scan(ctx); err != nil {
-					t.Fatal(err)
-				}
-				first, _, err := chatstate.AppendMessage(ctx, tx, cv, &servermodels.Message{ID: uuid.NewV7().String(), OrganizationID: cv.OrganizationID, ConversationID: cv.ID, Type: "system", Body: "先取锁", OriginatedAt: time.Now().UTC()})
-				if err != nil || first.MessageSeq != 1 {
-					t.Fatalf("first=%+v err=%v", first, err)
+				if first.MessageSeq != 1 {
+					t.Fatalf("first=%+v", first)
 				}
 				done := make(chan error, 1)
 				var second *servermodels.Message
@@ -71,13 +95,11 @@ func TestMessageSequenceCommitOrder(t *testing.T) {
 				}
 				want := int64(2)
 				if rollback {
-					err = tx.Rollback()
 					want = 1
-				} else {
-					err = tx.Commit()
 				}
-				if err != nil {
-					t.Fatal(err)
+				finish <- struct{}{}
+				if err := waitChatResult(t, ctx, held); rollback && !errors.Is(err, errRollback) || !rollback && err != nil {
+					t.Fatalf("first transaction err=%v", err)
 				}
 				if err := waitChatResult(t, ctx, done); err != nil {
 					t.Fatal(err)

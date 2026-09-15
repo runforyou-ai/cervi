@@ -139,7 +139,7 @@ func (a *CreateGroupConversationAction) Execute(ctx context.Context, identity *s
 			Exec(ctx); err != nil {
 			return fmt.Errorf("create group conversation participants: %w", err)
 		}
-		return chatstate.NotifyConversationMembers(ctx, tx, conversation)
+		return chatstate.NotifyConversationChanged(ctx, tx, conversation)
 	})
 	if err != nil {
 		return GroupConversationSummary{}, fmt.Errorf("create group conversation: %w", err)

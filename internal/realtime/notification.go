@@ -43,6 +43,11 @@ func UserConversationChanged(organizationID, userID, conversationID string, vers
 	return Notification{OrganizationID: organizationID, AudienceKind: AudienceUser, AudienceID: userID, Kind: KindConversationChanged, ConversationID: conversationID, Version: version}
 }
 
+// CustomerInboxConversationChanged 构造发往企业客服共享受众的客户会话变更通知。
+func CustomerInboxConversationChanged(organizationID, conversationID string, version int64) Notification {
+	return Notification{OrganizationID: organizationID, AudienceKind: AudienceCustomerInbox, AudienceID: organizationID, Kind: KindConversationChanged, ConversationID: conversationID, Version: version}
+}
+
 // UserConversationRemoved 构造发往失去会话阅读资格用户的会话失权通知，载荷不含版本。
 func UserConversationRemoved(organizationID, userID, conversationID string) Notification {
 	return Notification{OrganizationID: organizationID, AudienceKind: AudienceUser, AudienceID: userID, Kind: KindConversationRemoved, ConversationID: conversationID}
@@ -75,8 +80,8 @@ type batch struct {
 	items map[mergeKey]Notification
 }
 
-// RunInTx 执行写事务，事务内通过 Notify 登记的通知在提交成功后交给发布器，回滚则丢弃。
-func RunInTx(ctx context.Context, db *bun.DB, fn func(context.Context, bun.Tx) error) error {
+// RunInTx 在 *bun.DB 或 bun.Conn 上执行写事务，事务内通过 Notify 登记的通知在提交成功后交给发布器，回滚则丢弃。
+func RunInTx(ctx context.Context, db bun.IDB, fn func(context.Context, bun.Tx) error) error {
 	pending := &batch{items: map[mergeKey]Notification{}}
 	if err := db.RunInTx(context.WithValue(ctx, batchKey{}, pending), nil, fn); err != nil {
 		return err

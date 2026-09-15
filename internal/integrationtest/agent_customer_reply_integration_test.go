@@ -208,4 +208,5 @@ func testAgentCustomerReplies(t *testing.T, db *bun.DB, identity *servermodels.I
 	}
 	testCustomerFailureMessage(t, db, identity, tasks, created.IdentityID)
 	testCustomerAgentLocking(t, db, identity, created.IdentityID, tasks)
+	testCustomerAgentRunNotifications(t, db, identity, created.IdentityID, tasks)
 }
