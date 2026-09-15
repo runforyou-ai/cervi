@@ -1,4 +1,4 @@
-/** 实时 WebSocket JSON 帧契约与编解码，与 internal/realtime/protocol 保持一致。 */
+/** 实时 SSE 事件流的 JSON 事件契约与解码，与 internal/realtime/protocol 保持一致。 */
 import type { SyncHeads } from "../../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 
 /** 当前协议主版本，只有破坏性演进才提升。 */
@@ -6,44 +6,16 @@ export const realtimeProtocolVersion = 1
 
 const int64Max = 9223372036854775807n
 
-/** 发起连接的客户端种类。 */
-export type RealtimeClientKind = "web" | "desktop" | "mobile"
-
-/** 服务端关闭帧中的原因；发送 realtime_error 后以错误码作为原因关闭，未定义的取值按未知原因处理。 */
-export type RealtimeCloseReason =
-  | "session_revoked"
-  | "session_expired"
-  | "idle_timeout"
-  | "slow_consumer"
-  | "server_going_away"
-  | "unsupported_version"
-  | "invalid_frame"
-  | "authentication_failed"
-  | "authentication_timeout"
-  | "unavailable"
-
-/** 客户端发往服务端的帧。 */
-export type RealtimeClientFrame =
-  | { type: "authenticate"; token: string }
-  | { type: "client_hello"; clientKind: RealtimeClientKind; appVersion: string; capabilities?: string[] }
-  | { type: "ping" }
-  | { type: "pong" }
-
-/** 服务端发往客户端的帧；未定义的 reason 与 code 取值原样保留。 */
+/** 服务端经事件流下发的事件。 */
 export type RealtimeServerFrame =
-  | { type: "authenticated" }
   | { type: "server_hello"; connectionId: string; syncHeads: SyncHeads }
   | { type: "ping" }
-  | { type: "pong" }
   | { type: "conversation_changed"; conversationId: string; version: bigint }
   | { type: "conversation_removed"; conversationId: string }
   | { type: "conversation_state_changed"; conversationId: string; version: bigint }
   | { type: "identity_profile_changed"; version: bigint }
-  | { type: "session_revoked"; reason: string }
-  | { type: "server_going_away" }
-  | { type: "realtime_error"; code: string }
 
-/** 服务端帧解码结果：未定义的帧种类忽略，主版本不一致与结构错误分别返回。 */
+/** 事件解码结果：未定义的事件种类忽略，主版本不一致与结构错误分别返回。 */
 export type RealtimeServerFrameResult =
   | { status: "frame"; frame: RealtimeServerFrame }
   | { status: "ignored" }
@@ -52,13 +24,7 @@ export type RealtimeServerFrameResult =
 
 type FrameData = Record<string, unknown>
 
-/** 把客户端帧编码为带协议主版本的 JSON 文本。 */
-export function encodeClientFrame(frame: RealtimeClientFrame): string {
-  const { type, ...data } = frame
-  return JSON.stringify({ v: realtimeProtocolVersion, type, data })
-}
-
-/** 解码服务端帧；先校验协议主版本，再校验帧种类、结构和字段类型。 */
+/** 解码一条 SSE data 文本；先校验协议主版本，再校验事件种类、结构和字段类型。 */
 export function decodeServerFrame(text: string): RealtimeServerFrameResult {
   try {
     const value: unknown = JSON.parse(text)
@@ -79,13 +45,10 @@ export function decodeServerFrame(text: string): RealtimeServerFrameResult {
   }
 }
 
-/** 按帧种类读取服务端帧数据，未定义的种类返回 undefined。 */
+/** 按事件种类读取事件数据，未定义的种类返回 undefined。 */
 function decodeServerData(type: string, data: FrameData): RealtimeServerFrame | undefined {
   switch (type) {
-    case "authenticated":
     case "ping":
-    case "pong":
-    case "server_going_away":
       return { type }
     case "server_hello": {
       // 探针校验和与身份资料版本是不透明比较值，保持字符串。
@@ -110,10 +73,6 @@ function decodeServerData(type: string, data: FrameData): RealtimeServerFrame | 
       return { type, conversationId: readString(data, "conversationId") }
     case "identity_profile_changed":
       return { type, version: readInt64(data, "version") }
-    case "session_revoked":
-      return { type, reason: readString(data, "reason") }
-    case "realtime_error":
-      return { type, code: readString(data, "code") }
     default:
       return undefined
   }

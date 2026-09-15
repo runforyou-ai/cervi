@@ -1,205 +1,82 @@
 [
   {
-    "name": "authenticate",
-    "direction": "client",
-    "result": "frame",
-    "encode": true,
-    "wire": {"v": 1, "type": "authenticate", "data": {"token": "cervi-token-example"}}
-  },
-  {
-    "name": "client_hello",
-    "direction": "client",
-    "result": "frame",
-    "encode": true,
-    "wire": {"v": 1, "type": "client_hello", "data": {"clientKind": "web", "appVersion": "0.1.0"}}
-  },
-  {
-    "name": "client_hello_capabilities",
-    "direction": "client",
-    "result": "frame",
-    "encode": true,
-    "wire": {"v": 1, "type": "client_hello", "data": {"clientKind": "desktop", "appVersion": "0.1.0", "capabilities": ["future_capability"]}}
-  },
-  {
-    "name": "client_ping",
-    "direction": "client",
-    "result": "frame",
-    "encode": true,
-    "wire": {"v": 1, "type": "ping", "data": {}}
-  },
-  {
-    "name": "client_pong",
-    "direction": "client",
-    "result": "frame",
-    "encode": true,
-    "wire": {"v": 1, "type": "pong", "data": {}}
-  },
-  {
-    "name": "client_unknown_type",
-    "direction": "client",
-    "result": "ignored",
-    "wire": {"v": 1, "type": "subscribe_run", "data": {"runId": "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8c"}}
-  },
-  {
-    "name": "client_unsupported_version",
-    "direction": "client",
-    "result": "unsupported_version",
-    "wire": {"v": 2, "type": "authenticate", "data": {"token": "cervi-token-example"}}
-  },
-  {
-    "name": "client_token_not_string",
-    "direction": "client",
-    "result": "invalid",
-    "wire": {"v": 1, "type": "authenticate", "data": {"token": 42}}
-  },
-  {
-    "name": "authenticated",
-    "direction": "server",
-    "result": "frame",
-    "encode": true,
-    "wire": {"v": 1, "type": "authenticated", "data": {}}
-  },
-  {
     "name": "server_hello",
-    "direction": "server",
     "result": "frame",
     "encode": true,
     "wire": {"v": 1, "type": "server_hello", "data": {"connectionId": "conn-01", "syncHeads": {"conversationCount": 3, "conversationChecksum": "18446744073709551615", "identityProfileVersion": "9223372036854775807"}}}
   },
   {
-    "name": "server_ping",
-    "direction": "server",
+    "name": "ping",
     "result": "frame",
     "encode": true,
     "wire": {"v": 1, "type": "ping", "data": {}}
   },
   {
-    "name": "server_pong",
-    "direction": "server",
-    "result": "frame",
-    "encode": true,
-    "wire": {"v": 1, "type": "pong", "data": {}}
-  },
-  {
     "name": "conversation_changed",
-    "direction": "server",
     "result": "frame",
     "encode": true,
     "wire": {"v": 1, "type": "conversation_changed", "data": {"conversationId": "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8b", "version": "9223372036854775807"}}
   },
   {
     "name": "conversation_state_changed",
-    "direction": "server",
     "result": "frame",
     "encode": true,
     "wire": {"v": 1, "type": "conversation_state_changed", "data": {"conversationId": "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8b", "version": "42"}}
   },
   {
     "name": "identity_profile_changed",
-    "direction": "server",
     "result": "frame",
     "encode": true,
     "wire": {"v": 1, "type": "identity_profile_changed", "data": {"version": "9007199254740993"}}
   },
   {
     "name": "conversation_removed",
-    "direction": "server",
     "result": "frame",
     "encode": true,
     "wire": {"v": 1, "type": "conversation_removed", "data": {"conversationId": "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8b"}}
   },
   {
-    "name": "session_revoked",
-    "direction": "server",
-    "result": "frame",
-    "encode": true,
-    "wire": {"v": 1, "type": "session_revoked", "data": {"reason": "logout"}}
-  },
-  {
-    "name": "session_revoked_unknown_reason",
-    "direction": "server",
-    "result": "frame",
-    "encode": true,
-    "wire": {"v": 1, "type": "session_revoked", "data": {"reason": "future_reason"}}
-  },
-  {
-    "name": "session_revoked_user_disabled",
-    "direction": "server",
-    "result": "frame",
-    "encode": true,
-    "wire": {"v": 1, "type": "session_revoked", "data": {"reason": "user_disabled"}}
-  },
-  {
-    "name": "server_going_away",
-    "direction": "server",
-    "result": "frame",
-    "encode": true,
-    "wire": {"v": 1, "type": "server_going_away", "data": {}}
-  },
-  {
-    "name": "realtime_error",
-    "direction": "server",
-    "result": "frame",
-    "encode": true,
-    "wire": {"v": 1, "type": "realtime_error", "data": {"code": "authentication_failed"}}
-  },
-  {
     "name": "conversation_changed_extra_fields",
-    "direction": "server",
     "result": "frame",
     "wire": {"v": 1, "type": "conversation_changed", "trace": "t-1", "data": {"conversationId": "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8b", "version": "7", "preview": "ignored"}}
   },
   {
-    "name": "server_ping_without_data",
-    "direction": "server",
+    "name": "ping_without_data",
     "result": "frame",
     "wire": {"v": 1, "type": "ping"}
   },
   {
-    "name": "server_unknown_type",
-    "direction": "server",
+    "name": "unknown_type",
     "result": "ignored",
     "wire": {"v": 1, "type": "run_stream_delta", "data": {"runId": "run-01", "sequence": "1"}}
   },
   {
-    "name": "server_client_only_type",
-    "direction": "server",
-    "result": "ignored",
-    "wire": {"v": 1, "type": "authenticate", "data": {"token": "cervi-token-example"}}
-  },
-  {
-    "name": "server_unsupported_version",
-    "direction": "server",
+    "name": "unsupported_version",
     "result": "unsupported_version",
     "wire": {"v": 2, "type": "conversation_changed", "data": {"conversationId": "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8b", "version": "7"}}
   },
   {
-    "name": "server_missing_version",
-    "direction": "server",
+    "name": "missing_version",
     "result": "unsupported_version",
     "wire": {"type": "ping", "data": {}}
   },
   {
     "name": "version_not_numeric",
-    "direction": "server",
     "result": "invalid",
     "wire": {"v": 1, "type": "conversation_changed", "data": {"conversationId": "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8b", "version": "abc"}}
   },
   {
     "name": "version_overflow",
-    "direction": "server",
     "result": "invalid",
     "wire": {"v": 1, "type": "identity_profile_changed", "data": {"version": "9223372036854775808"}}
   },
   {
     "name": "version_unquoted",
-    "direction": "server",
     "result": "invalid",
     "wire": {"v": 1, "type": "conversation_state_changed", "data": {"conversationId": "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8b", "version": 42}}
   },
   {
     "name": "data_not_object",
-    "direction": "server",
     "result": "invalid",
     "wire": {"v": 1, "type": "conversation_removed", "data": ["0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8b"]}
   }

@@ -91,12 +91,12 @@ func (b *DirectBackend) InstallWorkspace(ctx context.Context, meta RequestMeta, 
 	return b.ops.InstallWorkspace(ctx, meta, input)
 }
 
-// AuthenticateMember 校验实时连接首帧携带的登录令牌并返回当前身份。
-func (b *DirectBackend) AuthenticateMember(ctx context.Context, token string) (*servermodels.Identity, error) {
-	return b.ops.authenticate(ctx, RequestMeta{Token: token})
+// AuthenticateMember 校验实时事件流请求携带的登录令牌并返回当前身份。
+func (b *DirectBackend) AuthenticateMember(ctx context.Context, meta RequestMeta) (*servermodels.Identity, error) {
+	return b.ops.authenticate(ctx, meta)
 }
 
-// MemberSyncHeads 返回实时连接所属身份的同步探针值。
+// MemberSyncHeads 返回实时事件流所属身份的同步探针值。
 func (b *DirectBackend) MemberSyncHeads(ctx context.Context, identity *servermodels.Identity) (SyncHeads, error) {
 	return b.ops.GetSyncHeads(ctx, RequestMeta{}, identity)
 }

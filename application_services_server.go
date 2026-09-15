@@ -4,6 +4,8 @@ package main
 
 import (
 	"context"
+	"os/signal"
+	"syscall"
 
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
@@ -36,7 +38,7 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
-// applicationServices 组装企业服务端入口、业务服务和后台任务，并返回处理实时连接升级的资源中间件。
+// applicationServices 组装企业服务端入口、业务服务和后台任务，并返回处理实时事件流的资源中间件。
 func applicationServices(appStorage *serverstorage.Store, config serverconfig.Config) ([]application.Service, application.Middleware, error) {
 	// 按请求域名解析企业，并为 HTTPS 入口提供证书缓存。
 	tenantResolver := serverstorage.NewTenantResolver(appStorage.DB())
@@ -116,7 +118,7 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	directBackend := appservice.NewDirectBackend(appStorage.DB(), localFiles, tenantResolver, agentRunScheduler, executeAgentRun, tasks, documentConverter)
 	boundService := appservice.New(directBackend)
 	// 成员实时网关复用业务调用的身份解析与同步探针。
-	realtimeGateway := gateway.New(directBackend, config.NATS.Namespace, gateway.DefaultOptions(config.Realtime.MaxFrameBytes))
+	realtimeGateway := gateway.New(directBackend, config.NATS.Namespace, gateway.DefaultOptions())
 	websiteVisitorBackend := appservice.NewWebsiteVisitorDirectBackend(appStorage.DB(), agentRunScheduler)
 	websiteVisitorService := appservice.NewWebsiteVisitorService(websiteVisitorBackend)
 
@@ -233,16 +235,23 @@ type realtimeLifecycle struct {
 	gateway   *gateway.Gateway
 }
 
-// ServiceStartup 连接 NATS，开始发布已提交通知并接收实时连接。
-func (l *realtimeLifecycle) ServiceStartup(context.Context, application.ServiceOptions) error {
+// ServiceStartup 连接 NATS，开始发布已提交通知并接收实时事件流请求。
+func (l *realtimeLifecycle) ServiceStartup(ctx context.Context, _ application.ServiceOptions) error {
 	if err := l.publisher.Start(); err != nil {
 		return err
 	}
 	l.gateway.Start(l.publisher.Connection())
+	// 收到 SIGINT、SIGTERM 时立即结束实时事件流。
+	signals, stop := signal.NotifyContext(ctx, syscall.SIGINT, syscall.SIGTERM)
+	go func() {
+		<-signals.Done()
+		stop()
+		l.gateway.Shutdown()
+	}()
 	return nil
 }
 
-// ServiceShutdown 先向实时连接发送下线提示并有界关闭，再停止实时通知发布器。
+// ServiceShutdown 结束实时事件流后停止实时通知发布器。
 func (l *realtimeLifecycle) ServiceShutdown() error {
 	l.gateway.Shutdown()
 	return l.publisher.Stop()

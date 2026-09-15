@@ -2,7 +2,7 @@
 
 本文保存 `chat-realtime-pr-plan.md` 中已合并 PR 的原始范围、实施记录、验证记录和审核记录，供追溯实现依据与验证结论。仍在推进的范围和共用契约见 `chat-realtime-pr-plan.md`。
 
-已合并：PR01（`#216`）、PR02（`#218`）、PR03（`#222`）、PR04（`#224`）、PR05（`#232`）、PR06（`#233`）、PR07（`#234`）、PR08（`#238`）、PR09（`#245`）、PR10（`#248`）、PR11（`#249`）、PR12（`#253`）、PR13（`#256`）、PR14（`#267`）、PR14A（`#272`）、PR15（`#276`）、PR16（`#279`）、PR17（`#288`）、PR18（`#294`）、PR19（`#306`）、PR37（`#305`）。
+已合并：PR01（`#216`）、PR02（`#218`）、PR03（`#222`）、PR04（`#224`）、PR05（`#232`）、PR06（`#233`）、PR07（`#234`）、PR08（`#238`）、PR09（`#245`）、PR10（`#248`）、PR11（`#249`）、PR12（`#253`）、PR13（`#256`）、PR14（`#267`）、PR14A（`#272`）、PR15（`#276`）、PR16（`#279`）、PR17（`#288`）、PR18（`#294`）、PR19（`#306`）、PR20（`#307`）、PR25（`#308`）、PR37（`#305`）。
 
 原清单中的 PR00（禁用 AI 员工后保留会话）改编为新清单的 PR16，由 `#279` 交付。
 
@@ -312,6 +312,54 @@
 - **确认项：** 人工接管只出现在客户会话领取流程中，随客户会话受众由 PR20 接入，共用执行路径对客户会话同样推进版本但不登记成员受众；新成员入群阅读基线推进的本人会话状态版本不单独通知，入群成员随系统事件收到会话变更通知；退出者作为系统事件操作人，阅读水位推进后仍收到一条本人会话状态通知，客户端重读时按失权结果处理。
 - **验证记录（2026-09-15）：** macOS 本机 PostgreSQL 与 NATS 上 `wails3 task test:server` 47 个包通过，`wails3 task test:desktop` 22 个包通过。`TestRealtimeGroupMembershipNotifications` 以真实 NATS 订阅依次覆盖建群、改简介、改名合并、移除与重入、主动退出、转让、失去管理资格的移除失败不留系统消息也不发布、解散只发送会话变更，每步按期望集合精确比较并以一次本人静音收尾；「独立 AI 聊天/运行状态实时通知」覆盖模型失败时开始与 agent_error 结果各推进一次、运行中重入不推进；「Agent 群内点名/失效运行收敛推进会话版本」覆盖移出执行中的 AI 员工后失败回调收敛为 `agent_removed` 取消且只推进一次。重建测试库后以 `-v` 单独运行，确认子测试实际执行。本条无契约、绑定与前端改动，未运行绑定生成、前端构建与界面验证。
 - **审核处理：** Pi CLI 审核后认领输入路径改用 `realtime.RunInTx` 并在收敛为取消时推进版本；群成员通知用例以本人静音收尾并补充改名合并用例；`begin` 注释改为直述并删除重复的行内注释，`Notification` 注释补充版本为 0 时省略；退出者本人阅读水位通知保留既有行为，测试注释与清单如实描述。未采纳：延迟消费旧失权通知后重入的乱序场景属于客户端重读行为，服务端不增加用例；停止回复经结果消息推进版本，沿用已有用例。
+
+### PR20：客服共享收件箱通知
+
+- **依赖：** PR18。
+- **范围：** 网站与 Telegram 客户入站、成员回复与 AI 最终消息、隐式领取、领取与人工接管、转交、关闭、显式重开及新周期接入会话版本与企业客服受众通知；Telegram 投递状态变化（发送认领、发送结果与人工处理）、渠道启停和更换机器人同样推进受影响客户会话的版本。共享受众不逐客服扇出；本人客服已读只写本人受众。
+- **落点：** `internal/realtime` 客服受众通知、`chatstate` 会话变更通知、`conversation/manage_service_session.go` 与客服收发 Action、`customerdelivery`、`channel` 的 Telegram 回调、连接与启停、`agentrun/cancellation.go`。
+- **实施：** 所有有权客服共享一条企业受众（`customer_inbox`，受众 ID 为企业 ID），通知只表示该客户会话需要重读；公共／本人／同事／关闭资格仍由现有 Query 判断。`chatstate.NotifyConversationChanged` 对客户会话登记共享受众通知，消息追加与 `TouchConversation` 由此覆盖入站、回复、AI 运行状态与新周期；领取在负责人实际变化时推进版本，转交、关闭、重开推进版本且不改活动时间。投递写入按渠道身份、会话、投递的顺序加锁，状态实际写入时推进版本，渠道停用期间认领不写入投递；渠道启停在状态实际变化时按会话 ID 顺序推进有待发送投递的会话版本；更换机器人改变引用可用性，推进该渠道全部客户会话版本。`realtime.RunInTx` 接受 `bun.DB` 或 `bun.Conn`，客服写入路径统一在其中执行。负责人变化不为所有客服创建 Participant，个人已读继续走本人受众。
+- **验收：** 公共、本人、同事和关闭视图同时收敛；筛选迁移不等于授权移除；客服参与者不被误当全部有权阅读者。
+- **验证步骤：** A 领取公共会话后，B 的公共列表移除、A 的本人列表出现，双方有权详情仍可读；关闭／重开改变队列但不改活动时间；AI 最终回复也能触发共享受众通知。
+
+### PR25：成员 Gateway、帧契约与连接认证
+
+- **依赖：** PR18。合并原清单 PR28、PR29、PR30，以及本清单 PR24 与 PR35 的原生端子路径、心跳和关闭部分；PR20 已合并，客服共享受众订阅随本条交付。
+- **范围：** 按 `chat-roadmap.md` 第 10.11 节定义首版 WebSocket JSON 帧：Authenticate、ClientHello／ServerHello、Ping／Pong、ConversationChanged、ConversationRemoved、ConversationStateChanged、IdentityProfileChanged、SessionRevoked、ServerGoingAway、RealtimeError；访客帧由 PR26 增加，AI 流订阅与流帧由 PR38 增加，PinOrderChanged 由 PR40 增加，均遵守同一版本与未知帧规则，64 位整数一律用字符串。Server 内嵌 Gateway，首帧限时 Authenticate；Web 使用现有 Bearer，原生端由 Go 侧 Proxy 持有连接并把帧经 Wails 事件交给 TS。按本节点在线受众订阅，禁止 Queue Group 与企业通配订阅。登出按 token session、停用按用户发送控制通知，连接设最长存活时间。原生端支持子路径部署，配置心跳，停止时发送下线提示后有界关闭。不建票据表。
+- **落点：** 新增 `internal/realtime/protocol`（Go 帧定义、编解码与共用夹具 `testdata/frames.json`）、`internal/realtime/gateway`（连接、发送队列与受众订阅）与 `frontend/src/api/realtime/protocol.ts`；`internal/realtime` 通知新增 `session_logged_out`、`user_disabled` 撤销种类与 tokenSessionId；`actions/auth/logout.go` 与 `actions/user/update_status.go` 登记撤销；`appservice.DirectBackend` 提供 `AuthenticateMember`／`MemberSyncHeads`；Service 新增原生端 `ConnectRealtime`／`DisconnectRealtime`，由 `internal/apiproxy/realtime.go` 实现；服务端 `Assets.Middleware` 装配与 `internal/config/server` 的 `realtime.maxFrameBytes`。
+- **实施：**
+  - **帧契约：** Go 结构体与 TS 类型各自手写，线上 `type` 使用 snake_case 并与 NATS `kind` 一致；以共用夹具锁定线上格式、协议主版本和字符串整数边界，Go 覆盖两个方向的编解码，TS 覆盖客户端帧编码与服务端帧解码。
+  - **挂载与地址：** 连接路径为 `/api/realtime`；Gateway 在服务端 `Assets.Middleware` 中位于租户上下文中间件之内处理该路径的升级请求，升级前沿 `Unwrap` 解包 Wails 写入器，允许来源保持默认同源。原生端按服务器地址路径拼接，与 API Proxy 一致。
+  - **下线：** 服务端退出时 Gateway 先拒绝新的升级请求（503），再向现有连接发送 `server_going_away` 并以同名原因关闭，默认 5 秒内未完成的连接强制断开，之后停止通知发布器。
+  - **认证与寿命：** 连接依次处于 awaiting_auth、authenticated、closing；认证前只允许 Authenticate，五秒内未认证即以 `authentication_timeout` 关闭；Authenticate 复用业务调用的身份解析，令牌须存在、未过期且账号活跃，身份解析同时返回令牌编号（即 tokenSessionId）与到期时间。连接最长存活 1 小时且不晚于登录会话到期，到期以 `session_expired` 关闭后客户端重连并重新认证。认证后收到 `client_hello` 时登记 tokenSessionId、userId 和企业，并安装本人用户受众与本企业客服共享受众（`customer_inbox`，受众 ID 为企业 ID）订阅，当前阶段所有成员均可阅读客户会话；Flush 之后重新校验登录会话，再读取 Hello 探针值；变更通知可能先于 `server_hello` 送达。
+  - **撤销：** 登出在删除令牌的事务内登记携带 tokenSessionId 的 `session_logged_out`，停用在账号状态事务内按用户受众登记 `user_disabled`；Gateway 收到后清除该连接未发送的帧，发送 `session_revoked` 并以 `session_revoked` 原因关闭。
+  - **发送队列与心跳：** 每条连接一个写协程与一条有界发送队列，单帧上限由 `realtime.maxFrameBytes`（环境变量 `REALTIME_MAX_FRAME_BYTES`，默认 65536，范围 64–256KB）配置，同时约束客户端帧读取；变更通知按同一会话同一种类保留最高版本，`conversation_removed` 与撤销控制不合并；队列溢出时按 `slow_consumer` 关闭连接，单帧写入超过 10 秒说明对端停止读取，直接断开；客户端重连后经探针恢复。客户端每 25 秒发送 Ping，服务端 60 秒内未收到任何帧即以 `idle_timeout` 关闭；心跳间隔与代理空闲时间一起记录。协议错误发送 `realtime_error` 后以错误码作为关闭原因，认证读取失败使用 `unavailable`。
+  - **原生端：** Service 的 `ConnectRealtime`／`DisconnectRealtime` 由 PR27 的传输内核驱动启停与退避重连；Go 侧 `apiproxy` 用当前登录凭据拨号 `<服务器地址路径>/api/realtime`，拨号期间登录会话或企业服务器变化时丢弃新连接，发送 Authenticate、ClientHello 并每 25 秒发送 Ping，把服务端帧原文经 `cervi:realtime:frame` 事件、关闭码与原因经 `cervi:realtime:closed` 事件交给前端，事件携带本地连接编号区分新旧连接；登录、登出与切换企业服务器时关闭当前连接。
+  - **日志与凭据：** 认证失败、慢连接关闭和发布失败记录 `WARN`，不记凭据或正文；原生端不把长期 Token 交给 TS。
+- **验收：** 共用夹具下两端编解码结果一致，未知可忽略帧与不支持的协议主版本分别有明确结果，超过 JS 安全整数的值正确；一用户多设备均收到通知；先注册订阅再给探针值；慢消费者断开后可补拉；已连接后登出或停用不再收到通知；撤销事务回滚不产生错误断连；连接到达最长存活时间后关闭，凭据有效时重连成功，登出或停用后重连认证失败；原生端经剥离子路径前缀的反向代理可连，空闲超过代理默认时间仍正常。
+- **验证步骤：** 客户端帧由 TS 编码、Go 解码，服务端帧由 Go 编码、TS 解码，均与共用夹具一致；在安装订阅与读取探针之间提交消息，客户端通过 Hello 或后续通知至少发现一次；同账号建立两条连接两端均收到；堵塞一端读流触发有界关闭，另一端继续正常工作。连接后登出本次 token 只关闭对应登录会话，停用用户关闭其全部会话；分别丢弃登出与停用的控制通知后，连接在最长存活时间到期时关闭，重连认证失败。SIGTERM 后连接收到下线提示，重启后客户端经探针补齐停机期间的变化，退出不关闭共享 NATS。
+- **平台探针结论（原 PR24，2026-09-14）：** macOS、Go 1.27.1、Wails v3.0.0-beta.21 服务端模式、`coder/websocket` v1.8.15；临时端点用首版帧应答认证、Hello 与 Ping，每个场景保持 75 秒，验证后删除。
+  - **挂载与写入器：** Wails AssetServer 在匹配服务 Route 前对 WebSocket 升级请求直接返回 501，Gin `/api` 路由与 Wails 服务 Route 都无法升级；中间件收到的 `assetserver.contentTypeSniffer` 延迟下发响应头，直接 `websocket.Accept` 时 101 响应随连接劫持丢失、客户端握手超时，沿 `Unwrap` 解包到 `*http.response` 后握手成功。
+  - **截止时间：** `net/http` 劫持连接时清除读写截止时间，Wails 默认 30 秒读写超时不影响升级后的连接。
+  - **Origin 与 Host：** `coder/websocket` 默认只接受与 Host 相同的 Origin；本地复刻 `ingress` 重写规则的反向代理与 Cloudflare Tunnel 都保留原始 Host（隧道带 `X-Forwarded-Proto: https`），跨源连接被拒绝；原生端 Go 连接不带 Origin。
+  - **Web（Chrome 153）：** 同源 `ws://` 与 Cloudflare Tunnel `wss://` 均保持连接，双向 ping／pong 正常；Chrome 请求 `permessage-deflate`，服务端默认不协商。Wails 运行时以 `window.location.origin + "/wails/runtime"` 调用绑定，Web 端不支持子路径部署。
+  - **macOS 原生端：** 探针程序使用与 `apiproxy` 相同的 Go 网络栈，未在桌面应用进程内运行；带 30 秒 `Timeout` 的 `http.Client` 可直接拨号，本地、Cloudflare Tunnel 与剥离 `/cervi` 前缀的反向代理均通过。
+  - **未验证：** iOS、Android（PR33 记录）与 `ingress` 自动证书模式。
+
+### PR25A：实时传输改为 SSE
+
+- **依赖：** PR25。按 PR 清单「第四轮调整」原地改造 PR25 已交付的成员 Gateway 与原生端连接。
+- **范围：** 成员实时连接从 WebSocket 改为 SSE 事件流 `GET /api/realtime`，请求头 Bearer 认证，事件只由服务端下行；删除 Authenticate、ClientHello、客户端 Ping／Pong、Authenticated、SessionRevoked、ServerGoingAway、RealtimeError、关闭原因码、Hello 能力协商与 `realtime.maxFrameBytes` 配置；原生端改为流式 GET。受众订阅、按版本合并的发送队列、登出与停用撤销、最长存活时间以及先订阅后读探针的顺序保持 PR25 语义。同步改写 `chat-roadmap.md`、`agent-roadmap.md` 与 PR 清单中以 WebSocket 为前提的设计。
+- **落点：** `internal/realtime/gateway`、`internal/realtime/protocol` 与共用夹具、`frontend/src/api/realtime/protocol.ts` 与前端协议测试、`internal/apiproxy/realtime.go` 与 `backend.go` 共用的错误响应解码、`internal/appservice/types_realtime.go` 与 Service 的 `ConnectRealtime`、服务端装配与 `run_server.go`、`internal/config/server`；删除 `coder/websocket` 直接依赖。
+- **实施：**
+  - **认证与建立：** 请求头 `Authorization: Bearer` 与 `Accept-Language` 复用业务调用的身份解析，失败返回与业务 HTTP 接口相同的错误体和状态码，Gateway 下线中或 NATS 未就绪返回 503。认证后登记连接、订阅本人用户受众与本企业客服共享受众并等待 NATS Flush，重新校验登录会话并读取同步探针，再写 200 响应头（`text/event-stream`、`Cache-Control: no-cache`、`X-Accel-Buffering: no`）与首个 `server_hello`。
+  - **写出与超时：** 每个事件写成一行 `data: <JSON>` 加空行后 Flush；通过 `http.ResponseController` 清除 Wails 服务器默认读超时，每次写入前设置 10 秒写截止时间；服务端每 25 秒发送 `ping`。
+  - **队列、撤销与寿命：** 沿用 PR25 的单写协程、有界发送队列与按会话种类合并；队列溢出、登出或停用撤销、到达最长存活时间时停止发送并结束响应，撤销时清除未发送的事件，不发送原因事件。
+  - **下线：** 收到 SIGINT／SIGTERM 时拒绝新的事件流请求并结束全部事件流，默认 5 秒内未结束的强制断开，之后停止通知发布器，Wails 执行 `http.Server.Shutdown` 时不再等待事件流。
+  - **协议：** 事件集合为 `server_hello`、`ping`、`conversation_changed`、`conversation_removed`、`conversation_state_changed` 与 `identity_profile_changed`；Go 保留服务端事件的编码与解码，TypeScript 只保留解码，共用夹具删除客户端方向样例。
+  - **原生端：** `ConnectRealtime(meta)` 不再接收应用版本与能力参数，用 `clientsession` 中的 Bearer 发起不设整体超时的流式 GET；非 200 响应沿用 API Proxy 的错误解码，401 时清除本地凭据并返回登录会话错误；逐个解析 `data:` 事件，把 JSON 原文经 `cervi:realtime:frame` 投递，60 秒未读到任何事件时主动断开，流结束经只含连接编号的 `cervi:realtime:closed` 投递。登录、登出与切换企业服务器时关闭当前流。
+- **验收：** 缺失、无效或已登出的令牌得到 401 且错误体与业务接口一致；同一用户两条事件流均收到用户受众与客服共享受众通知；订阅与探针读取之间提交的变化在 `server_hello` 或后续通知中至少出现一次；登出只结束对应登录会话的事件流，停用结束该用户全部事件流且重连得到 401；撤销事务回滚不结束事件流；到达最长存活时间后结束且凭据有效时可重连；停止读取的事件流被有界结束，其他事件流照常收到通知；事件流在超过 Wails 默认读写超时后仍持续下发；服务端下线时事件流在时限内结束；原生端按服务器地址路径拼接并投递事件与流结束。
+- **验证记录：** 2026-09-15 通过 `wails3 task test:server`（含 SSE 网关集成测试：同一用户两条事件流的用户受众与客服共享受众投递、撤销事务回滚、登出与停用结束事件流并重连得到 401、认证与订阅之间登出、服务器 1 秒读写超时下持续心跳与通知、最长存活时间、服务端下线与慢连接）、`wails3 task test:desktop`（含原生端事件投递、流结束与 401 清除本地凭据）、`wails3 task test:frontend`（100 项）与 `wails3 task build:server`。以本机 `bin/cervi-server`（Wails v3.0.0-beta.21 服务端模式，默认 30 秒读写超时）实测：未携带令牌返回 401 与业务错误体；`server_hello` 在 0.04 秒内到达，第 25 秒收到 `ping`，事件流持续 40 秒未被服务器超时中断，响应头为 `text/event-stream`、`Cache-Control: no-cache` 与 `X-Accel-Buffering: no`；事件流打开时发送 SIGTERM，事件流 0.02 秒内结束、服务端进程 0.04 秒内退出。未验证 Cloudflare Tunnel、自动 HTTPS `ingress` 与 iOS／Android。验证结束后本轮服务端进程已退出，8080 端口已释放。
 
 ### PR37：模型增量消费与流基线
 

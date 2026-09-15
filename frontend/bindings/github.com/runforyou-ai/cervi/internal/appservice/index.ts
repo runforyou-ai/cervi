@@ -226,7 +226,6 @@ export type {
     PermissionDefinition,
     ProfileInput,
     ReadInboxConversationsInput,
-    RealtimeConnectInput,
     RealtimeConnection,
     RequestMeta,
     Role,

@@ -6,12 +6,13 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/runforyou-ai/cervi/internal/realtime"
 	"github.com/runforyou-ai/cervi/internal/realtime/protocol"
 )
 
-// TestConnectionQueue 验证发送队列按会话与种类保留最高版本，失权帧不合并，溢出时清空队列并按慢连接关闭。
+// TestConnectionQueue 验证发送队列按会话与种类保留最高版本，失权事件不合并，溢出时清空队列并结束事件流。
 func TestConnectionQueue(t *testing.T) {
-	current := newConnection(New(nil, "test", Options{QueueSize: 4}), nil)
+	current := newConnection(New(nil, "test", Options{QueueSize: 4}), func() {})
 	current.send(protocol.ConversationChanged{ConversationID: "a", Version: 2})
 	current.send(protocol.ConversationChanged{ConversationID: "a", Version: 1})
 	current.send(protocol.ConversationStateChanged{ConversationID: "a", Version: 5})
@@ -28,21 +29,20 @@ func TestConnectionQueue(t *testing.T) {
 		t.Fatalf("queue = %#v, want %#v", current.queue, want)
 	}
 
-	// 队列已满时新帧触发慢连接关闭，关闭后不再入队。
+	// 队列已满时新事件触发慢连接结束，结束后不再入队。
 	current.send(protocol.IdentityProfileChanged{Version: 1})
-	current.send(protocol.Pong{})
-	if !current.closing || current.closeReason != string(protocol.CloseSlowConsumer) || len(current.queue) != 0 {
-		t.Fatalf("closing = %v, reason = %q, queue = %#v", current.closing, current.closeReason, current.queue)
+	current.send(protocol.Ping{})
+	if !current.closing || len(current.queue) != 0 {
+		t.Fatalf("closing = %v, queue = %#v", current.closing, current.queue)
 	}
 }
 
-// TestConnectionRevokeDiscardsQueue 验证撤销清除未发送的帧，只保留撤销帧。
+// TestConnectionRevokeDiscardsQueue 验证撤销清除未发送的事件并进入关闭状态。
 func TestConnectionRevokeDiscardsQueue(t *testing.T) {
-	current := newConnection(New(nil, "test", Options{QueueSize: 4}), nil)
+	current := newConnection(New(nil, "test", Options{QueueSize: 4}), func() {})
 	current.send(protocol.ConversationChanged{ConversationID: "a", Version: 1})
-	current.revoke(protocol.SessionRevokedLogout)
-	want := []protocol.Frame{protocol.SessionRevoked{Reason: protocol.SessionRevokedLogout}}
-	if !reflect.DeepEqual(current.queue, want) || current.closeReason != string(protocol.CloseSessionRevoked) {
-		t.Fatalf("queue = %#v, reason = %q", current.queue, current.closeReason)
+	current.revoke(realtime.KindSessionLoggedOut)
+	if !current.closing || len(current.queue) != 0 || current.epoch != 1 {
+		t.Fatalf("closing = %v, queue = %#v, epoch = %d", current.closing, current.queue, current.epoch)
 	}
 }
