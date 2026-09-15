@@ -1,0 +1,203 @@
+/** 移动端客户会话详情、回复与客服处理周期操作。 */
+import { LoaderCircleIcon, MoreHorizontalIcon } from "lucide-react"
+import { useTranslation } from "react-i18next"
+import { Navigate, useLocation, useParams } from "react-router"
+
+import {
+  ChannelType,
+  ConversationType,
+  isCustomerInboxConversation,
+  type CustomerInboxConversationData,
+} from "@/api"
+import { MobileIndividualThread } from "@/apps/mobile/mobile-individual-thread"
+import { useMobileNavigation } from "@/apps/mobile/mobile-navigation"
+import { MobilePageHeader } from "@/apps/mobile/mobile-page"
+import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
+import { LoadingIndicator } from "@/components/loading-indicator"
+import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
+  CustomerSessionCloseDialog,
+  customerReplyDisabledReason,
+  customerReplySupported,
+  useCustomerSessionActions,
+} from "@/features/inbox/customer-session-actions"
+import { sessionStatusLabel } from "@/features/inbox/session-status-label"
+import { useConversationSummary } from "@/features/inbox/use-conversation-summary"
+import { resourceKeys } from "@/hooks/resource-keys"
+import { useResourceInvalidator } from "@/hooks/use-resource"
+
+/** 展示客服处理周期的领取、接管、转交、关闭与重新打开菜单。 */
+function MobileCustomerSessionMenu({
+  conversation,
+}: {
+  conversation: CustomerInboxConversationData
+}) {
+  const { t } = useTranslation("inbox")
+  const { identity } = useMobileWorkspace()
+  const invalidate = useResourceInvalidator()
+  const actions = useCustomerSessionActions(
+    conversation,
+    identity.user.identityId,
+    () => {
+      void invalidate(resourceKeys.inbox())
+      void invalidate(resourceKeys.conversationSummary(conversation.id))
+    },
+  )
+  const { operation, sessionClosed, assignedToCurrentUser, transferCandidates } =
+    actions
+
+  return (
+    <>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon-lg"
+            className="-mr-2"
+            disabled={operation !== ""}
+            aria-label={t("conversationMore")}
+          >
+            {operation ? (
+              <LoaderCircleIcon className="animate-spin" />
+            ) : (
+              <MoreHorizontalIcon />
+            )}
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="min-w-48">
+          {sessionClosed ? (
+            <DropdownMenuItem
+              className="min-h-11"
+              onSelect={() => void actions.reopen()}
+            >
+              {t("conversationReopen")}
+            </DropdownMenuItem>
+          ) : !assignedToCurrentUser ? (
+            <DropdownMenuItem
+              className="min-h-11"
+              onSelect={() => void actions.claim()}
+            >
+              {conversation.customer.assignee
+                ? t("conversationTakeover")
+                : t("conversationClaim")}
+            </DropdownMenuItem>
+          ) : transferCandidates.length === 0 ? (
+            <DropdownMenuItem className="min-h-11" disabled>
+              {t("conversationTransferEmpty")}
+            </DropdownMenuItem>
+          ) : (
+            transferCandidates.map((assignee) => (
+              <DropdownMenuItem
+                key={assignee.identityId}
+                className="min-h-11"
+                onSelect={() => void actions.transfer(assignee)}
+              >
+                {t("conversationTransferTo", { name: assignee.displayName })}
+              </DropdownMenuItem>
+            ))
+          )}
+          {actions.closable ? (
+            <DropdownMenuItem
+              className="min-h-11 text-destructive focus:text-destructive"
+              onSelect={() => actions.setCloseConfirmationOpen(true)}
+            >
+              {t("conversationClose")}
+            </DropdownMenuItem>
+          ) : null}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      <CustomerSessionCloseDialog actions={actions} />
+    </>
+  )
+}
+
+/** 加载客户会话摘要，展示历史、回复区和处理菜单。 */
+export function MobileCustomerConversationPage() {
+  const { t } = useTranslation(["inbox", "common"])
+  const { inboxURL } = useMobileNavigation()
+  const { identity } = useMobileWorkspace()
+  const { conversationID = "" } = useParams()
+  const location = useLocation()
+  const summary = useConversationSummary(conversationID, false)
+  // 路由携带的摘要保持首屏线程，查询完成后由服务端结果接管。
+  const initial = (
+    location.state as { conversation?: CustomerInboxConversationData } | null
+  )?.conversation
+  const data =
+    summary.data === undefined && initial?.id === conversationID
+      ? initial
+      : summary.data
+  const conversation = data && isCustomerInboxConversation(data) ? data : null
+  if (!conversationID) return <Navigate to={inboxURL} replace />
+  const customer = conversation?.customer
+  const disabledReason = customer
+    ? customerReplySupported(customer)
+      ? customerReplyDisabledReason(customer, identity.user.identityId, t)
+      : t("channelReplyUnsupported")
+    : null
+
+  return (
+    <section className="flex h-full min-h-0 flex-col bg-background">
+      <MobilePageHeader
+        backTo={inboxURL}
+        title={
+          <span className="block min-w-0">
+            <span className="block truncate">
+              {customer
+                ? (customer.contactName ?? t("anonymousVisitor"))
+                : t("unknownSender")}
+            </span>
+            {customer ? (
+              <span className="block truncate text-xs font-normal text-muted-foreground">
+                {sessionStatusLabel(customer.serviceSessionStatus, t)} ·{" "}
+                {customer.channelName}
+              </span>
+            ) : null}
+          </span>
+        }
+        actions={
+          conversation ? (
+            <MobileCustomerSessionMenu conversation={conversation} />
+          ) : null
+        }
+      />
+      {summary.loading && !conversation ? (
+        <LoadingIndicator className="min-h-0 flex-1 justify-center">
+          {t("messagesLoading")}
+        </LoadingIndicator>
+      ) : !conversation ? (
+        <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-sm text-muted-foreground">
+          <p>
+            {t(summary.error ? "conversationLoadError" : "conversationUnavailable")}
+          </p>
+          {summary.error ? (
+            <Button
+              variant="outline"
+              className="min-h-11"
+              onClick={() => void summary.refresh()}
+            >
+              {t("common:actions.retry")}
+            </Button>
+          ) : null}
+        </div>
+      ) : (
+        <MobileIndividualThread
+          key={conversationID}
+          conversationID={conversationID}
+          conversationType={ConversationType.ConversationTypeCustomer}
+          customerDeliveries={
+            conversation.customer.channelType === ChannelType.ChannelTypeTelegram
+          }
+          disabledReason={disabledReason}
+          lastReadMessageID={conversation.lastReadMessageId}
+        />
+      )}
+    </section>
+  )
+}

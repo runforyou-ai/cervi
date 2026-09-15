@@ -5,6 +5,7 @@ import { Navigate, Route, Routes } from "react-router"
 
 import { MobileCreateGroupPage } from "@/apps/mobile/mobile-create-group-page"
 import { MobileAddGroupMembersPage } from "@/apps/mobile/mobile-add-group-members-page"
+import { MobileCustomerConversationPage } from "@/apps/mobile/mobile-customer-conversation-page"
 import { MobileIndividualConversationPage } from "@/apps/mobile/mobile-individual-conversation-page"
 import { MobileEmployeeChatPage } from "@/apps/mobile/mobile-employee-chat-page"
 import { MobileEmployeeProfilePage } from "@/apps/mobile/mobile-employee-profile-page"
@@ -108,6 +109,10 @@ export default function MobileApp() {
             <Route
               path="/inbox/agent/:conversationID"
               element={<MobileAgentConversationPage />}
+            />
+            <Route
+              path="/inbox/customer/:conversationID"
+              element={<MobileCustomerConversationPage />}
             />
             <Route
               path="/inbox/direct/:conversationID"

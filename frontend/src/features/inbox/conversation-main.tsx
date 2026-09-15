@@ -4,7 +4,6 @@ import { useTranslation } from "react-i18next"
 
 import {
   ConversationStatus,
-  ServiceSessionStatus,
   getGroupConversation,
   isAgentInboxConversation,
   isCustomerInboxConversation,
@@ -18,6 +17,7 @@ import { ConversationContextPane } from "@/features/inbox/conversation-context-p
 import { ConversationHeader } from "@/features/inbox/conversation-header"
 import { ConversationThread } from "@/features/inbox/conversation-thread"
 import type { ConversationLocateTarget } from "@/features/inbox/conversation-timeline"
+import { customerReplyDisabledReason } from "@/features/inbox/customer-session-actions"
 import { DirectConversationDraftHeader } from "@/features/inbox/direct-conversation-draft-header"
 import { sessionStatusLabel } from "@/features/inbox/session-status-label"
 import { useAccountDisabledReason } from "@/features/inbox/use-account-disabled-reason"
@@ -121,16 +121,11 @@ export function ConversationMain({
     ? sessionStatusLabel(customerConversation.customer.serviceSessionStatus, t)
     : ""
   const replyDisabledReason = customerConversation
-    ? customerConversation.customer.serviceSessionStatus ===
-      ServiceSessionStatus.ServiceSessionStatusClosed
-      ? t("replyClosedUnavailable")
-      : customerConversation.customer.assignee &&
-          customerConversation.customer.assignee.identityId !==
-            identity.user.identityId
-        ? t("replyAssignedUnavailable", {
-            name: customerConversation.customer.assignee.displayName,
-          })
-        : null
+    ? customerReplyDisabledReason(
+        customerConversation.customer,
+        identity.user.identityId,
+        t,
+      )
     : groupConversation?.group.status ===
         ConversationStatus.ConversationStatusArchived
       ? t("groupDissolvedUnavailable")

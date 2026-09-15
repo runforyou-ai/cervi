@@ -1,50 +1,27 @@
 /** 成员会话头与操作菜单。 */
-import { useState } from "react"
 import { ChevronDownIcon, LoaderCircleIcon, MoreHorizontalIcon, SearchIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { useNavigate } from "react-router"
-import { toast } from "sonner"
 
 import {
-  ChannelType,
   ConversationStatus,
-  ServiceSessionStatus,
-  claimServiceSession,
-  closeServiceSession,
-  isApiError,
   isCustomerInboxConversation,
   isAgentInboxConversation,
   isGroupInboxConversation,
-  OrganizationIdentityType,
-  listCustomerServiceAssignees,
-  reopenServiceSession,
-  transferServiceSession,
-  type CustomerServiceSession,
   type InboxConversation,
 } from "@/api"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
 import { ConversationAvatar } from "@/features/inbox/conversation-avatar"
+import {
+  CustomerSessionCloseDialog,
+  useCustomerSessionActions,
+} from "@/features/inbox/customer-session-actions"
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { resourceKeys } from "@/hooks/resource-keys"
-import { useResource } from "@/hooks/use-resource"
-import { apiErrorMessage } from "@/lib/form-errors"
-import { recoverSession } from "@/lib/session-navigation"
 import { cn } from "@/lib/utils"
 
 /** 按 Helmdesk 会话头布局展示当前联系人、会话状态和操作区。 */
@@ -66,91 +43,25 @@ export function ConversationHeader({
   narrowViewport?: boolean
 }) {
   const { t } = useTranslation(["inbox", "common"])
-  const navigate = useNavigate()
-  const [operation, setOperation] = useState("")
-  const [closeConfirmationOpen, setCloseConfirmationOpen] = useState(false)
-  const customer = isCustomerInboxConversation(conversation)
-    ? conversation.customer
+  const customerConversation = isCustomerInboxConversation(conversation)
+    ? conversation
     : null
+  const customer = customerConversation?.customer ?? null
   const agent = isAgentInboxConversation(conversation) ? conversation.agent : null
   const group = isGroupInboxConversation(conversation) ? conversation.group : null
   const agentRunLabel = agentRunStatusLabel(agent?.agentRunStatus ?? null, t)
-  const sessionOpen =
-    customer?.serviceSessionStatus === ServiceSessionStatus.ServiceSessionStatusOpen
-  const sessionClosed =
-    customer?.serviceSessionStatus === ServiceSessionStatus.ServiceSessionStatusClosed
-  const assignedToCurrentUser = customer?.assignee?.identityId === currentIdentityId
-  const { data: assignees = [] } = useResource(
-    resourceKeys.customerServiceAssignees(),
-    () => listCustomerServiceAssignees(),
-    { enabled: Boolean(customer && sessionOpen && assignedToCurrentUser) },
+  const actions = useCustomerSessionActions(
+    customerConversation,
+    currentIdentityId,
+    onSessionChanged,
   )
-  const transferCandidates = assignees.filter(
-    (assignee) =>
-      assignee.identityId !== currentIdentityId &&
-      (customer?.channelType === ChannelType.ChannelTypeWebsite ||
-        customer?.channelType === ChannelType.ChannelTypeTelegram ||
-        assignee.type !== OrganizationIdentityType.OrganizationIdentityTypeAgent),
-  )
-  /** 执行客服处理周期命令并通知上层刷新受影响视图。 */
-  async function runSessionOperation(
-    nextOperation: string,
-    execute: () => Promise<CustomerServiceSession>,
-    successMessage: string,
-  ) {
-    setOperation(nextOperation)
-    try {
-      await execute()
-      onSessionChanged()
-      toast.success(successMessage)
-    } catch (error) {
-      if (recoverSession(error, navigate)) return
-      console.warn("更新客服会话失败", {
-        conversationId: conversation.id,
-        operation: nextOperation,
-        error,
-      })
-      toast.error(
-        isApiError(error) ? apiErrorMessage(error) : t("conversationActionError"),
-      )
-    } finally {
-      setOperation("")
-    }
-  }
-
-  /** 重新打开会话并刷新受影响视图。 */
-  function reopen() {
-    return runSessionOperation(
-      "reopen",
-      () => reopenServiceSession(conversation.id),
-      t("conversationReopenSuccess"),
-    )
-  }
-
-  /** 领取或接管会话并刷新受影响视图。 */
-  function claim() {
-    return runSessionOperation(
-      "claim",
-      () => claimServiceSession(conversation.id),
-      customer?.assignee
-        ? t("conversationTakeoverSuccess")
-        : t("conversationClaimSuccess"),
-    )
-  }
-
-  /** 将会话转交给指定接待成员。 */
-  function transfer(assignee: (typeof transferCandidates)[number]) {
-    return runSessionOperation(
-      `transfer:${assignee.identityId}`,
-      () =>
-        transferServiceSession(conversation.id, {
-          assigneeIdentityId: assignee.identityId,
-        }),
-      t("conversationTransferSuccess", {
-        name: assignee.displayName,
-      }),
-    )
-  }
+  const {
+    operation,
+    sessionOpen,
+    sessionClosed,
+    assignedToCurrentUser,
+    transferCandidates,
+  } = actions
 
   return (
     <>
@@ -230,7 +141,7 @@ export function ConversationHeader({
                 size="sm"
                 className="hidden lg:inline-flex"
                 disabled={operation !== ""}
-                onClick={() => void reopen()}
+                onClick={() => void actions.reopen()}
               >
                 {operation === "reopen" ? (
                   <LoaderCircleIcon className="animate-spin" />
@@ -245,7 +156,7 @@ export function ConversationHeader({
                 size="sm"
                 className="hidden lg:inline-flex"
                 disabled={operation !== ""}
-                onClick={() => void claim()}
+                onClick={() => void actions.claim()}
               >
                 {operation === "claim" ? (
                   <LoaderCircleIcon className="animate-spin" />
@@ -279,7 +190,7 @@ export function ConversationHeader({
                     transferCandidates.map((assignee) => (
                       <DropdownMenuItem
                         key={assignee.identityId}
-                        onSelect={() => void transfer(assignee)}
+                        onSelect={() => void actions.transfer(assignee)}
                       >
                         {assignee.displayName}
                       </DropdownMenuItem>
@@ -288,7 +199,7 @@ export function ConversationHeader({
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : null}
-            {sessionOpen && (!customer.assignee || assignedToCurrentUser) ? (
+            {actions.closable ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -310,7 +221,7 @@ export function ConversationHeader({
                 <DropdownMenuContent align="end">
                   <DropdownMenuItem
                     className="text-destructive focus:text-destructive"
-                    onSelect={() => setCloseConfirmationOpen(true)}
+                    onSelect={() => actions.setCloseConfirmationOpen(true)}
                   >
                     {t("conversationClose")}
                   </DropdownMenuItem>
@@ -337,20 +248,24 @@ export function ConversationHeader({
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="min-w-48">
                 {sessionClosed ? (
-                  <DropdownMenuItem onSelect={() => void reopen()}>
+                  <DropdownMenuItem onSelect={() => void actions.reopen()}>
                     {t("conversationReopen")}
                   </DropdownMenuItem>
                 ) : !assignedToCurrentUser ? (
-                  <DropdownMenuItem onSelect={() => void claim()}>
+                  <DropdownMenuItem onSelect={() => void actions.claim()}>
                     {customer.assignee
                       ? t("conversationTakeover")
                       : t("conversationClaim")}
+                  </DropdownMenuItem>
+                ) : transferCandidates.length === 0 ? (
+                  <DropdownMenuItem disabled>
+                    {t("conversationTransferEmpty")}
                   </DropdownMenuItem>
                 ) : (
                   transferCandidates.map((assignee) => (
                     <DropdownMenuItem
                       key={assignee.identityId}
-                      onSelect={() => void transfer(assignee)}
+                      onSelect={() => void actions.transfer(assignee)}
                     >
                       {t("conversationTransferTo", {
                         name: assignee.displayName,
@@ -358,10 +273,10 @@ export function ConversationHeader({
                     </DropdownMenuItem>
                   ))
                 )}
-                {sessionOpen && (!customer.assignee || assignedToCurrentUser) ? (
+                {actions.closable ? (
                   <DropdownMenuItem
                     className="text-destructive focus:text-destructive"
-                    onSelect={() => setCloseConfirmationOpen(true)}
+                    onSelect={() => actions.setCloseConfirmationOpen(true)}
                   >
                     {t("conversationClose")}
                   </DropdownMenuItem>
@@ -371,30 +286,7 @@ export function ConversationHeader({
           </div>
         ) : null}
       </header>
-      <AlertDialog open={closeConfirmationOpen} onOpenChange={setCloseConfirmationOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t("conversationCloseConfirmTitle")}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("conversationCloseConfirmDescription")}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t("common:actions.cancel")}</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() =>
-                void runSessionOperation(
-                  "close",
-                  () => closeServiceSession(conversation.id),
-                  t("conversationCloseSuccess"),
-                )
-              }
-            >
-              {t("conversationCloseConfirm")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <CustomerSessionCloseDialog actions={actions} />
     </>
   )
 }
