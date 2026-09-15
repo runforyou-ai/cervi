@@ -20,7 +20,7 @@ type mediaRejectingChatModel struct {
 	mediaCalls int
 }
 
-func (m *mediaRejectingChatModel) Generate(_ context.Context, input []*schema.Message, _ ...model.Option) (*schema.Message, error) {
+func (m *mediaRejectingChatModel) Generate(_ context.Context, input []*schema.AgenticMessage, _ ...model.Option) (*schema.AgenticMessage, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.calls++
@@ -28,21 +28,17 @@ func (m *mediaRejectingChatModel) Generate(_ context.Context, input []*schema.Me
 		m.mediaCalls++
 		return nil, errors.New("unknown variant `image_url`")
 	}
-	return schema.AssistantMessage("已按链接回答", nil), nil
+	return assistantReply("已按链接回答"), nil
 }
 
-func (m *mediaRejectingChatModel) Stream(context.Context, []*schema.Message, ...model.Option) (*schema.StreamReader[*schema.Message], error) {
+func (m *mediaRejectingChatModel) Stream(context.Context, []*schema.AgenticMessage, ...model.Option) (*schema.StreamReader[*schema.AgenticMessage], error) {
 	return nil, errors.New("unexpected streaming call")
-}
-
-func (m *mediaRejectingChatModel) WithTools([]*schema.ToolInfo) (model.ToolCallingChatModel, error) {
-	return m, nil
 }
 
 // TestEinoRuntimeRetriesWithoutRejectedMedia 验证模型拒绝直传附件时去掉多模态内容重新执行一次并成功回复。
 func TestEinoRuntimeRetriesWithoutRejectedMedia(t *testing.T) {
 	chatModel := &mediaRejectingChatModel{}
-	runtime := &EinoRuntime{newModel: func(context.Context, ModelConfig) (model.ToolCallingChatModel, error) {
+	runtime := &EinoRuntime{newModel: func(context.Context, ModelConfig) (model.AgenticModel, error) {
 		return chatModel, nil
 	}}
 	feed := &testInputFeed{desired: 1, messages: []Message{{
@@ -89,22 +85,22 @@ func TestTurnHistoryInlinesRecentMedia(t *testing.T) {
 		t.Fatalf("history = %#v", got)
 	}
 	for _, index := range []int{0, 1, 2, 3} {
-		if len(got[index].UserInputMultiContent) != 0 || got[index].Content == "" {
+		if len(got[index].ContentBlocks) != 1 || got[index].ContentBlocks[0].UserInputText == nil || messageText(got[index]) == "" {
 			t.Fatalf("message %d inlined unexpectedly: %#v", index, got[index])
 		}
 	}
-	voice := got[4].UserInputMultiContent
-	if len(voice) != 2 || voice[0].Text != "语音" || voice[1].Audio == nil || voice[1].Audio.MIMEType != "audio/wav" {
+	voice := got[4].ContentBlocks
+	if len(voice) != 2 || voice[0].UserInputText.Text != "语音" || voice[1].UserInputAudio == nil || voice[1].UserInputAudio.MIMEType != "audio/wav" {
 		t.Fatalf("audio message = %#v", got[4])
 	}
-	parts := got[5].UserInputMultiContent
-	if got[5].Content != "" || len(parts) != 2 || parts[0].Text != "新图" || parts[1].Image == nil ||
-		parts[1].Image.MIMEType != "image/png" || *parts[1].Image.Base64Data != base64.StdEncoding.EncodeToString([]byte("media:new")) {
+	parts := got[5].ContentBlocks
+	if len(parts) != 2 || parts[0].UserInputText.Text != "新图" || parts[1].UserInputImage == nil ||
+		parts[1].UserInputImage.MIMEType != "image/png" || parts[1].UserInputImage.Base64Data != base64.StdEncoding.EncodeToString([]byte("media:new")) {
 		t.Fatalf("latest image message = %#v", got[5])
 	}
 	// 后续轮次补入的附件沿用本次运行已占用的数量预算。
 	next := history.appendInput(context.Background(), []Message{{ID: "later", Role: MessageRoleUser, Content: "再一张", Media: png}}, mediaInput{read: read, modalities: visual, maxCount: 2})
-	if len(next[6].UserInputMultiContent) != 0 {
+	if len(next[6].ContentBlocks) != 1 {
 		t.Fatalf("media beyond run budget inlined: %#v", next[6])
 	}
 	// 较新附件读取失败时不占用预算，数量上限留给更早的可读取附件。
@@ -113,22 +109,20 @@ func TestTurnHistoryInlinesRecentMedia(t *testing.T) {
 		{ID: "broken", Role: MessageRoleUser, Content: "读取失败", Media: png},
 		{ID: "reply", Role: MessageRoleAssistant, Content: "助手消息", Media: png},
 	}, mediaInput{read: read, modalities: visual, maxCount: 1})
-	if len(failed[0].UserInputMultiContent) != 2 || failed[1].Content != "读取失败" || len(failed[1].UserInputMultiContent) != 0 ||
-		failed[2].Role != schema.Assistant || len(failed[2].UserInputMultiContent) != 0 {
+	if len(failed[0].ContentBlocks) != 2 || messageText(failed[1]) != "读取失败" || len(failed[1].ContentBlocks) != 1 ||
+		failed[2].Role != schema.AgenticRoleTypeAssistant || len(failed[2].ContentBlocks) != 1 {
 		t.Fatalf("fallback history = %#v", failed)
 	}
 }
 
 // TestCountContextTokensIncludesMediaParts 验证多模态消息的正文片段和媒体片段都计入上下文估算。
 func TestCountContextTokensIncludesMediaParts(t *testing.T) {
-	data := "bWVkaWE="
-	common := schema.MessagePartCommon{Base64Data: &data, MIMEType: "image/png"}
-	message := &schema.Message{Role: schema.User, UserInputMultiContent: []schema.MessageInputPart{
-		{Type: schema.ChatMessagePartTypeText, Text: "看图"},
-		{Type: schema.ChatMessagePartTypeImageURL, Image: &schema.MessageInputImage{MessagePartCommon: common}},
-		{Type: schema.ChatMessagePartTypeVideoURL, Video: &schema.MessageInputVideo{MessagePartCommon: common}},
+	message := &schema.AgenticMessage{Role: schema.AgenticRoleTypeUser, ContentBlocks: []*schema.ContentBlock{
+		schema.NewContentBlock(&schema.UserInputText{Text: "看图"}),
+		schema.NewContentBlock(&schema.UserInputImage{Base64Data: "bWVkaWE=", MIMEType: "image/png"}),
+		schema.NewContentBlock(&schema.UserInputVideo{Base64Data: "bWVkaWE=", MIMEType: "video/mp4"}),
 	}}
-	tokens, err := countContextTokens(context.Background(), []*schema.Message{message}, nil)
+	tokens, err := countContextTokens(context.Background(), []*schema.AgenticMessage{message}, nil)
 	if err != nil || tokens != 2*mediaTokens+2 {
 		t.Fatalf("tokens = %d, err = %v", tokens, err)
 	}

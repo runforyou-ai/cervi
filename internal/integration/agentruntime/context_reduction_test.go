@@ -17,9 +17,9 @@ import (
 
 // TestCountContextTokens 验证中文按字计、其余字符按四分之一计。
 func TestCountContextTokens(t *testing.T) {
-	messages := []*schema.Message{
-		schema.UserMessage(strings.Repeat("字", 100)),
-		schema.AssistantMessage(strings.Repeat("a", 40), nil),
+	messages := []*schema.AgenticMessage{
+		schema.UserAgenticMessage(strings.Repeat("字", 100)),
+		assistantReply(strings.Repeat("a", 40)),
 	}
 	tokens, err := countContextTokens(context.Background(), messages, nil)
 	if err != nil || tokens != 110 {
@@ -35,34 +35,29 @@ type repeatedToolChatModel struct {
 }
 
 // Generate 反复调用计算器，并记录最后一次规划时最早与最近的工具结果内容。
-func (m *repeatedToolChatModel) Generate(_ context.Context, input []*schema.Message, _ ...model.Option) (*schema.Message, error) {
+func (m *repeatedToolChatModel) Generate(_ context.Context, input []*schema.AgenticMessage, _ ...model.Option) (*schema.AgenticMessage, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.calls++
 	if m.calls > 4 {
 		for _, message := range input {
-			if message.Role != schema.Tool {
+			if toolResult(message) == nil {
 				continue
 			}
 			if m.earliestSeen == "" {
-				m.earliestSeen = message.Content
+				m.earliestSeen = messageText(message)
 			}
-			m.latestSeen = message.Content
+			m.latestSeen = messageText(message)
 		}
-		return schema.AssistantMessage("算完了", nil), nil
+		return assistantReply("算完了"), nil
 	}
-	return schema.AssistantMessage("继续算", []schema.ToolCall{{
-		ID: "calculator-call-" + string(rune('a'+m.calls)), Type: "function",
-		Function: schema.FunctionCall{Name: "calculator", Arguments: `{"operation":"add","left":1,"right":1}`},
-	}}), nil
+	return assistantReply("继续算", &schema.FunctionToolCall{
+		CallID: "calculator-call-" + string(rune('a'+m.calls)), Name: "calculator", Arguments: `{"operation":"add","left":1,"right":1}`,
+	}), nil
 }
 
-func (m *repeatedToolChatModel) Stream(context.Context, []*schema.Message, ...model.Option) (*schema.StreamReader[*schema.Message], error) {
+func (m *repeatedToolChatModel) Stream(context.Context, []*schema.AgenticMessage, ...model.Option) (*schema.StreamReader[*schema.AgenticMessage], error) {
 	return nil, errors.New("unexpected streaming call")
-}
-
-func (m *repeatedToolChatModel) WithTools([]*schema.ToolInfo) (model.ToolCallingChatModel, error) {
-	return m, nil
 }
 
 // TestContextClearsOldToolResults 验证上下文超过模型窗口预算后清理较早的工具结果，并保留最近两轮。
@@ -73,7 +68,7 @@ func TestContextClearsOldToolResults(t *testing.T) {
 	}
 	chatModel := &repeatedToolChatModel{}
 	runtime := &EinoRuntime{
-		newModel: func(context.Context, ModelConfig) (model.ToolCallingChatModel, error) { return chatModel, nil },
+		newModel: func(context.Context, ModelConfig) (model.AgenticModel, error) { return chatModel, nil },
 		tools:    []tool.BaseTool{calculator},
 	}
 	feed := &testInputFeed{}

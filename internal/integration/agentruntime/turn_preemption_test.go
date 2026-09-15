@@ -27,7 +27,7 @@ func TestTurnPreemptionDoesNotSendEmptyAssistant(t *testing.T) {
 			recorder := newProcessRecorder(RunRequest{})
 			execution := &einoExecution{inputs: &turnInputs{feed: feed}, recorder: recorder, maxTurns: 2}
 			calls := 0
-			chatModel := &processChatModel{generate: func(ctx context.Context, messages []*schema.Message) (*schema.Message, error) {
+			chatModel := &processChatModel{generate: func(ctx context.Context, messages []*schema.AgenticMessage) (*schema.AgenticMessage, error) {
 				calls++
 				if calls == 1 {
 					feed.appendUser("换一个问题")
@@ -35,46 +35,46 @@ func TestTurnPreemptionDoesNotSendEmptyAssistant(t *testing.T) {
 					if err := execution.inputs.poll(ctx, true); err != nil {
 						return nil, err
 					}
-					output := schema.AssistantMessage("", nil)
-					if kind != "empty" {
-						output.ReasoningContent = "需要先计算"
-					}
+					output := assistantReply("")
 					if kind == "reasoning-with-skipped-tool" {
-						output.ToolCalls = []schema.ToolCall{{ID: "skipped", Type: "function", Function: schema.FunctionCall{Name: "calculator", Arguments: `{"operation":"add","left":1,"right":2}`}}}
+						output = assistantReply("", &schema.FunctionToolCall{CallID: "skipped", Name: "calculator", Arguments: `{"operation":"add","left":1,"right":2}`})
+					}
+					if kind != "empty" {
+						output = withReasoning(output, "需要先计算")
 					}
 					return output, nil
 				}
 				var contents []string
 				for _, message := range messages {
-					if message.Role == schema.Assistant && message.Content == "" && len(message.ToolCalls) == 0 {
+					if message.Role == schema.AgenticRoleTypeAssistant && messageText(message) == "" && len(toolCalls(message)) == 0 {
 						return nil, fmt.Errorf("Invalid assistant message: content or tool_calls must be set")
 					}
-					if message.Role != schema.System {
-						if message.Role != schema.User {
-							return nil, fmt.Errorf("unexpected retained role: %s", message.Role)
+					if message.Role != schema.AgenticRoleTypeSystem {
+						if messageKind(message) != "user" {
+							return nil, fmt.Errorf("unexpected retained kind: %s", messageKind(message))
 						}
-						contents = append(contents, message.Content)
+						contents = append(contents, messageText(message))
 					}
 				}
 				if !reflect.DeepEqual(contents, []string{"开始计算", "换一个问题"}) {
 					return nil, fmt.Errorf("follow-up input = %v", contents)
 				}
-				return schema.AssistantMessage("已按新问题回答", nil), nil
+				return assistantReply("已按新问题回答"), nil
 			}}
 			calculator, err := newCalculatorTool()
 			if err != nil {
 				t.Fatal(err)
 			}
-			agent, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
-				Name: "test", Model: chatModel, Handlers: []adk.ChatModelAgentMiddleware{recorder},
+			agent, err := adk.NewTypedChatModelAgent(ctx, &adk.TypedChatModelAgentConfig[*schema.AgenticMessage]{
+				Name: "test", Model: chatModel, Handlers: []adk.TypedChatModelAgentMiddleware[*schema.AgenticMessage]{recorder},
 				ToolsConfig: adk.ToolsConfig{ToolsNodeConfig: compose.ToolsNodeConfig{Tools: []tool.BaseTool{calculator}}},
 			})
 			if err != nil {
 				t.Fatal(err)
 			}
-			execution.inputs.loop = adk.NewTurnLoop(adk.TurnLoopConfig[Trigger, *schema.Message]{
+			execution.inputs.loop = adk.NewTurnLoop(adk.TurnLoopConfig[Trigger, *schema.AgenticMessage]{
 				GenInput: execution.genInput,
-				PrepareAgent: func(context.Context, *adk.TurnLoop[Trigger, *schema.Message], []Trigger) (adk.Agent, error) {
+				PrepareAgent: func(context.Context, *adk.TurnLoop[Trigger, *schema.AgenticMessage], []Trigger) (adk.TypedAgent[*schema.AgenticMessage], error) {
 					return agent, nil
 				},
 				OnAgentEvents: execution.onAgentEvents,

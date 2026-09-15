@@ -49,13 +49,13 @@ type mediaInput struct {
 
 // mediaTrackingModel 记录携带直传附件的模型调用是否失败，运行据此改用正文链接重新执行。
 type mediaTrackingModel struct {
-	model.ToolCallingChatModel
+	model.AgenticModel
 	rejected *atomic.Bool
 }
 
 // Generate 调用模型，携带直传附件的请求失败时记录拒绝状态。
-func (m *mediaTrackingModel) Generate(ctx context.Context, input []*schema.Message, opts ...model.Option) (*schema.Message, error) {
-	output, err := m.ToolCallingChatModel.Generate(ctx, input, opts...)
+func (m *mediaTrackingModel) Generate(ctx context.Context, input []*schema.AgenticMessage, opts ...model.Option) (*schema.AgenticMessage, error) {
+	output, err := m.AgenticModel.Generate(ctx, input, opts...)
 	if err != nil && carriesMedia(input) {
 		m.rejected.Store(true)
 	}
@@ -63,28 +63,20 @@ func (m *mediaTrackingModel) Generate(ctx context.Context, input []*schema.Messa
 }
 
 // Stream 以流式调用模型，携带直传附件的请求失败时记录拒绝状态。
-func (m *mediaTrackingModel) Stream(ctx context.Context, input []*schema.Message, opts ...model.Option) (*schema.StreamReader[*schema.Message], error) {
-	output, err := m.ToolCallingChatModel.Stream(ctx, input, opts...)
+func (m *mediaTrackingModel) Stream(ctx context.Context, input []*schema.AgenticMessage, opts ...model.Option) (*schema.StreamReader[*schema.AgenticMessage], error) {
+	output, err := m.AgenticModel.Stream(ctx, input, opts...)
 	if err != nil && carriesMedia(input) {
 		m.rejected.Store(true)
 	}
 	return output, err
 }
 
-// WithTools 绑定工具并共用同一拒绝状态。
-func (m *mediaTrackingModel) WithTools(tools []*schema.ToolInfo) (model.ToolCallingChatModel, error) {
-	bound, err := m.ToolCallingChatModel.WithTools(tools)
-	if err != nil {
-		return nil, err
-	}
-	return &mediaTrackingModel{ToolCallingChatModel: bound, rejected: m.rejected}, nil
-}
-
-// carriesMedia 判断模型输入是否包含直传的图片、音频或视频内容。
-func carriesMedia(input []*schema.Message) bool {
+// carriesMedia 判断模型输入是否包含直传的图片、音频或视频内容块。
+func carriesMedia(input []*schema.AgenticMessage) bool {
 	for _, message := range input {
-		for _, part := range message.UserInputMultiContent {
-			if part.Image != nil || part.Audio != nil || part.Video != nil {
+		for _, block := range message.ContentBlocks {
+			switch block.Type {
+			case schema.ContentBlockTypeUserInputImage, schema.ContentBlockTypeUserInputAudio, schema.ContentBlockTypeUserInputVideo:
 				return true
 			}
 		}
@@ -92,8 +84,8 @@ func carriesMedia(input []*schema.Message) bool {
 	return false
 }
 
-// mediaUserMessage 读取附件并构造正文与多模态内容并列的用户消息，读取失败或模态不可直传时返回 false。
-func mediaUserMessage(ctx context.Context, message Message, modality domain.AIModelInputModality, read AttachmentContent) (*schema.Message, bool) {
+// mediaUserMessage 读取附件并构造正文块与多模态块并列的用户消息，读取失败或模态不可直传时返回 false。
+func mediaUserMessage(ctx context.Context, message Message, modality domain.AIModelInputModality, read AttachmentContent) (*schema.AgenticMessage, bool) {
 	content, err := read(ctx, message.ID)
 	if err != nil {
 		slog.Warn("读取直传附件失败，仅以正文链接提供给模型",
@@ -101,20 +93,19 @@ func mediaUserMessage(ctx context.Context, message Message, modality domain.AIMo
 		return nil, false
 	}
 	data := base64.StdEncoding.EncodeToString(content)
-	common := schema.MessagePartCommon{Base64Data: &data, MIMEType: message.Media.MIMEType}
-	var part schema.MessageInputPart
+	var media *schema.ContentBlock
 	switch modality {
 	case domain.AIModelInputModalityImage:
-		part = schema.MessageInputPart{Type: schema.ChatMessagePartTypeImageURL, Image: &schema.MessageInputImage{MessagePartCommon: common}}
+		media = schema.NewContentBlock(&schema.UserInputImage{Base64Data: data, MIMEType: message.Media.MIMEType})
 	case domain.AIModelInputModalityAudio:
-		part = schema.MessageInputPart{Type: schema.ChatMessagePartTypeAudioURL, Audio: &schema.MessageInputAudio{MessagePartCommon: common}}
+		media = schema.NewContentBlock(&schema.UserInputAudio{Base64Data: data, MIMEType: message.Media.MIMEType})
 	case domain.AIModelInputModalityVideo:
-		part = schema.MessageInputPart{Type: schema.ChatMessagePartTypeVideoURL, Video: &schema.MessageInputVideo{MessagePartCommon: common}}
+		media = schema.NewContentBlock(&schema.UserInputVideo{Base64Data: data, MIMEType: message.Media.MIMEType})
 	default:
 		return nil, false
 	}
-	return &schema.Message{Role: schema.User, UserInputMultiContent: []schema.MessageInputPart{
-		{Type: schema.ChatMessagePartTypeText, Text: message.Content},
-		part,
+	return &schema.AgenticMessage{Role: schema.AgenticRoleTypeUser, ContentBlocks: []*schema.ContentBlock{
+		schema.NewContentBlock(&schema.UserInputText{Text: message.Content}),
+		media,
 	}}, true
 }

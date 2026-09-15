@@ -123,6 +123,8 @@ const integrations = {
       deepseek: "DeepSeek",
       alibaba: "Alibaba Cloud Model Studio",
       openai: "OpenAI",
+      anthropic: "Anthropic",
+      google: "Google Gemini",
       moonshot: "Moonshot Kimi",
       zhipu: "Zhipu AI",
       volcengine: "Volcengine",
