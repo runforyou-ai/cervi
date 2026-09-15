@@ -258,7 +258,7 @@ function ConversationTimelineContent({
   // 有文本发送中时禁用文本重试，附件重试由上传队列排队。
   const textRetryDisabled =
     retryFailedMessageDisabled ||
-    outgoingMessages.some((message) => message.status === "sending")
+    outgoingMessages.some((message) => message.status === "sending" && !message.attachment)
   // 移动端气泡禁止文本选择，消息菜单项使用触屏尺寸，回复入口只通过长按菜单提供。
   const mobile = resolveAppPlatform() === "mobile"
   const menuItemClassName = cn(mobile && "min-h-11")
@@ -919,7 +919,7 @@ function ConversationTimelineContent({
                                     {agentNotice ? (
                                       <span className={agentError ? "text-destructive" : "text-muted-foreground"}>{t(agentError ? "agentRunFailed" : "agentReplyStopped")}</span>
                                     ) : message.attachment ? (
-                                      <ConversationAttachment retryDisabled={retryFailedMessageDisabled}body={message.body} attachment={message.attachment} conversationID={conversationID} messageID={message.persistedMessageID ?? message.id}
+                                      <ConversationAttachment retryDisabled={retryFailedMessageDisabled} body={message.body} attachment={message.attachment} conversationID={conversationID} messageID={message.persistedMessageID ?? message.id}
                                         originatedAt={message.originatedAt} timeLabel={dateFormatters.clock.format(date)} timeTitle={dateFormatters.full.format(date)} incoming={incoming} bubbleClassName={bubbleClassName} />
                                     ) : message.sender?.identityType === OrganizationIdentityType.OrganizationIdentityTypeAgent ? (
                                       <div className="min-w-0 flex-1">
