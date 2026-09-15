@@ -1,4 +1,4 @@
-/** 移动端群主添加真人成员，保留选择并返回原群详情。 */
+/** 移动端群主添加真人和 AI 员工成员，保留选择并返回原群详情。 */
 import { groupMemberMaxCount } from "@/features/inbox/group-conversation-schema"
 import { useEffect, useRef } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -15,7 +15,7 @@ import { MobilePageHeader } from "@/apps/mobile/mobile-page"
 import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
 import { Button } from "@/components/ui/button"
 
-/** 按当前群成员和剩余名额选择真人，成功后刷新群聊事实。 */
+/** 按当前群成员和剩余名额选择成员，成功后刷新群聊事实。 */
 export function MobileAddGroupMembersPage() {
   const { t } = useTranslation("mobile")
   const { t: tInbox } = useTranslation("inbox")
