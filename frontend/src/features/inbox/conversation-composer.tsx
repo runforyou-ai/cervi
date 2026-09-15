@@ -768,8 +768,11 @@ export function ConversationComposer({
                     collisionPadding={8}
                     aria-label={t("emojiPick")}
                     className={cn(
-                      "grid max-h-64 w-auto gap-0.5 overflow-y-auto p-1.5",
-                      mobile ? "grid-cols-7" : "grid-cols-8",
+                      "grid max-h-64 gap-0.5 overflow-y-auto p-1.5",
+                      // 移动端面板不超过可用宽度，列数按 44px 触控按钮自动填充。
+                      mobile
+                        ? "w-[min(22rem,var(--radix-popover-content-available-width))] grid-cols-[repeat(auto-fill,2.75rem)]"
+                        : "w-auto grid-cols-8",
                     )}
                     onCloseAutoFocus={(event) => {
                       // 选中表情后焦点回到输入框并定位到插入内容之后。
