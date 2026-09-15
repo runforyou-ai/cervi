@@ -2153,7 +2153,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if count, err := db.NewSelect().Model((*servermodels.AgentRunBlock)(nil)).Where("arb.agent_run_id = ?", run.ID).Count(context.Background()); err != nil || count != 0 {
 			t.Fatalf("blocks after failed transaction = %d, error = %v", count, err)
 		}
-		if _, exists := executeAgentRun.SubscribeRunStream(run.ID); exists {
+		if _, _, exists := executeAgentRun.SubscribeRunStream(run.ID, func(agentruntime.StreamDelta) {}, func() {}); exists {
 			t.Fatal("failed attempt retained its temporary stream")
 		}
 		if _, err := db.ExecContext(context.Background(), `ALTER TABLE messages DROP CONSTRAINT messages_reject_test_agent_response`); err != nil {

@@ -62,13 +62,14 @@ type StreamToolCall struct {
 	CompletedAt *time.Time
 }
 
-// StreamDelta 定义一次合并发布的运行流增量，序号在同一流内从 1 连续递增。
+// StreamDelta 定义运行流快照从起始序号到终止序号的增量，序号在同一流内从 1 连续递增。
 type StreamDelta struct {
-	RunID      string
-	StreamID   string
-	Attempt    int
-	Sequence   int64
-	Operations []StreamOperation
+	RunID        string
+	StreamID     string
+	Attempt      int
+	BaseSequence int64 // 应用前快照所在的序号。
+	Sequence     int64 // 应用后快照所在的序号。
+	Operations   []StreamOperation
 }
 
 // StreamSnapshot 定义运行流在某个序号上的完整展示状态。
@@ -81,7 +82,7 @@ type StreamSnapshot struct {
 	CandidateContent string
 }
 
-// Apply 按序号应用增量；重复序号返回 false，序号缺口、流不一致或操作无法应用时返回错误。
+// Apply 应用起始序号与快照序号一致的增量；终止序号不超过快照序号时视为重复返回 false，起始序号不一致、流不一致或操作无法应用时返回错误。
 func (s *StreamSnapshot) Apply(delta StreamDelta) (bool, error) {
 	if delta.RunID != s.RunID || delta.StreamID != s.StreamID {
 		return false, ErrStreamMismatch
@@ -89,7 +90,7 @@ func (s *StreamSnapshot) Apply(delta StreamDelta) (bool, error) {
 	if delta.Sequence <= s.Sequence {
 		return false, nil
 	}
-	if delta.Sequence != s.Sequence+1 {
+	if delta.BaseSequence != s.Sequence {
 		return false, ErrStreamGap
 	}
 	// 在副本上应用全部操作，任一操作失败时快照保持原状。
@@ -129,6 +130,17 @@ func (s *StreamSnapshot) Apply(delta StreamDelta) (bool, error) {
 	}
 	s.Blocks, s.CandidateContent, s.Sequence = blocks, candidate, delta.Sequence
 	return true, nil
+}
+
+// MergeStreamDeltas 把同一流内首尾相接的两条增量合并为一条，不相接时返回 false。
+func MergeStreamDeltas(earlier, later StreamDelta) (StreamDelta, bool) {
+	if earlier.RunID != later.RunID || earlier.StreamID != later.StreamID || earlier.Sequence != later.BaseSequence {
+		return StreamDelta{}, false
+	}
+	merged := later
+	merged.BaseSequence = earlier.BaseSequence
+	merged.Operations = mergeStreamOperations(append(slices.Clone(earlier.Operations), later.Operations...))
+	return merged, true
 }
 
 // Clone 复制快照供独立读取。
@@ -216,7 +228,7 @@ func (p *streamPublisher) flush() {
 		return
 	}
 	delta := p.header
-	delta.Sequence = p.header.Sequence + 1
+	delta.BaseSequence, delta.Sequence = p.header.Sequence, p.header.Sequence+1
 	p.header.Sequence = delta.Sequence
 	delta.Operations = mergeStreamOperations(p.pending)
 	p.pending = nil
