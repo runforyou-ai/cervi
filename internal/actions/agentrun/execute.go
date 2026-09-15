@@ -84,7 +84,7 @@ func (a *ExecuteAction) Execute(ctx context.Context, input RunInput) error {
 	if running.attempt > 1 {
 		taskExecution, _ := servertask.CurrentExecution(ctx)
 		slog.Warn("Agent 任务重新计算", "agent_run_id", execution.Run.ID, "task_run_id", taskExecution.TaskRunID,
-			"attempt", running.attempt, "stream_id", running.progress.StreamID)
+			"attempt", running.attempt, "stream_id", running.streamID)
 	}
 	maxOutputTokens := agentMaxOutputTokens
 	if execution.MaxOutputTokens > 0 && execution.MaxOutputTokens < int64(maxOutputTokens) {
@@ -131,13 +131,12 @@ func (a *ExecuteAction) Execute(ctx context.Context, input RunInput) error {
 			return a.attachments.Content(ctx, &execution.Run, messageID)
 		},
 		MCPServers: mcpServers,
-		StreamID:   running.progress.StreamID,
+		StreamID:   running.streamID,
 		Attempt:    running.attempt,
-		OnProgress: func(progress agentruntime.Progress) {
-			a.runningMu.Lock()
-			defer a.runningMu.Unlock()
-			if a.runningRuns[execution.Run.ID] == running && runCtx.Err() == nil {
-				running.progress = progress.Clone()
+		OnStream: func(delta agentruntime.StreamDelta) {
+			// 运行 context 已取消时丢弃增量。
+			if runCtx.Err() == nil {
+				running.stream.publish(delta)
 			}
 		},
 	}, feed)

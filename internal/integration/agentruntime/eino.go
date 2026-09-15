@@ -51,6 +51,8 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 	}
 	ctx = context.WithValue(ctx, runIDContextKey{}, request.RunID)
 	recorder := newProcessRecorder(request)
+	recorder.publisher.start()
+	defer recorder.publisher.close()
 	maxIterations := request.MaxIterations
 	if maxIterations <= 0 {
 		maxIterations = defaultMaxIterations
@@ -190,7 +192,10 @@ func (e *einoExecution) genInput(ctx context.Context, _ *adk.TurnLoop[Trigger, *
 		return nil, err
 	}
 	return &adk.GenInputResult[Trigger, *schema.AgenticMessage]{
-		Input: &adk.TypedAgentInput[*schema.AgenticMessage]{Messages: e.history.appendInput(ctx, trimClaimedHistory(ctx, claimed.Messages, e.contextWindow), e.media)},
+		Input: &adk.TypedAgentInput[*schema.AgenticMessage]{
+			Messages:        e.history.appendInput(ctx, trimClaimedHistory(ctx, claimed.Messages, e.contextWindow), e.media),
+			EnableStreaming: true,
+		},
 		RunOpts: []adk.AgentRunOption{
 			adk.WithAfterToolCallsHook(func(hookCtx context.Context) error {
 				return e.inputs.poll(hookCtx, true)

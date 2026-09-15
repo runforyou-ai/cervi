@@ -314,10 +314,10 @@ PR01–PR18 已交付以下能力，后续 PR 直接依赖，不重复定义。
 
 ### PR37：模型增量消费与流基线
 
-- **依赖：** PR36。
+- **依赖：** 无。运行时增量不依赖 PR36 的过程详情拆分，先于 PR36 交付。
 - **范围：** Runtime 真正消费 token 与工具进度，使用 runId、attempt、streamId、sequence 与稳定块编号，短周期合并；暴露当前内存快照和临时发布接口，不直接依赖传输实现。
-- **落点：** `internal/integration/agentruntime/eino.go`、`openai.go`、`progress.go`、`types.go`。
-- **实施：** 将整段输出收集点替换为运行时增量消费；每个 attempt 创建独立 streamId，块有稳定 blockId，同流 sequence 单调。内存快照与最高 sequence 同步捕获，发布端按短周期合并可重建增量，模型执行不等待浏览器消费。
+- **落点：** `internal/integration/agentruntime/eino.go`、`progress.go`、`stream.go`、`attachment.go`、`types.go`，`internal/actions/agentrun/stream.go`、`execute.go`、`cancellation.go`。
+- **实施：** 将整段输出收集点替换为运行时增量消费；每个 attempt 创建独立 streamId，块有稳定 blockId，同流 sequence 单调。内存快照与最高 sequence 同步捕获，发布端按短周期合并可重建增量，模型执行不等待浏览器消费。运行流中的工具调用只含名称、状态和起止时间，完整参数与结果经过程详情读取。增量携带起止序号，首尾相接的增量可合并，供 PR38 发送队列合并同一 Run 的待发增量；订阅在同一把锁内返回快照并按序回调增量，背压由连接发送队列承担，执行尝试退出时回调结束。
 - **验收：** 同流重复／乱序、gap、尝试切换、工具并行与输入抢占正确；token 不写 Message、不推进会话版本、不发布变更通知；限速发送不阻塞模型执行。
 - **验证步骤：** 分片产生文本、工具参数、工具结果并模拟并行工具，块顺序稳定；故意漏一片后快照可恢复全文；重试产生新 streamId，旧尝试尾部不能拼入新正文。
 
@@ -326,7 +326,7 @@ PR01–PR18 已交付以下能力，后续 PR 直接依赖，不重复定义。
 - **依赖：** PR28、PR37。流帧走 PR25／PR27 建立的同一条 WebSocket 连接，不新增 SSE 或其他连接；取代原清单 PR44、PR45 的焦点注册与跨节点快照方案。
 - **范围：** 在 JSON 帧契约中增加按 runId 的 SubscribeRun／UnsubscribeRun 及 RunStreamSnapshot、RunStreamDelta、RunStreamEnded 帧；展开运行过程时订阅、收起时取消。服务端先按会话授权再挂接该 Run 的内存流，首帧发当前快照，之后发增量。仅数据库提交后发 RunStreamEnded，持久终态覆盖临时候选。
 - **落点：** `internal/realtime` Gateway 的连接订阅集合与流帧发送、Run 流订阅、PR25 帧契约与共用夹具、`frontend/src/api/realtime`、成员 `agent-process.tsx` 与运行展示控制器。
-- **实施：** `SubscribeRun` 每次重新校验登录会话有效、账号活跃与会话阅读资格；连接登记已订阅的 runId 集合并限制数量；撤销控制或最长存活时间关闭连接时订阅随之释放，Gateway 收到本人某会话的 `conversation_removed` 通知时移除该会话的全部 Run 订阅。客户端经 `conversation_removed` 或资格读取发现失去会话阅读资格时，对该会话的 Run 发送 UnsubscribeRun 并丢弃临时候选；失权通知丢失且客户端未取消时，服务端最多推送到当前 Run 结束。流帧与变更通知共用连接的有界发送队列，队列内同一 Run 的待发增量合并；队列溢出时以 `slow_consumer` 关闭连接，客户端重连后重新订阅取新快照。快照按块分帧，单帧受大小上限约束，工具完整参数与结果经 PR36 过程详情 Query 读取。客户端按 attempt、streamId、sequence 去重；gap 或重连后按退避重新订阅取新快照，不做单独的快照修复协议。终态由持久 Query 确认，RunStreamEnded 只是加速提示；运行过程未展开时不订阅。
+- **实施：** `SubscribeRun` 每次重新校验登录会话有效、账号活跃与会话阅读资格；连接登记已订阅的 runId 集合并限制数量；撤销控制或最长存活时间关闭连接时订阅随之释放，Gateway 收到本人某会话的 `conversation_removed` 通知时移除该会话的全部 Run 订阅。客户端经 `conversation_removed` 或资格读取发现失去会话阅读资格时，对该会话的 Run 发送 UnsubscribeRun 并丢弃临时候选；失权通知丢失且客户端未取消时，服务端最多推送到当前 Run 结束。流帧与变更通知共用连接的有界发送队列，队列内同一 Run 的待发增量合并；队列溢出时以 `slow_consumer` 关闭连接，客户端重连后重新订阅取新快照。快照按块分帧，单帧受大小上限约束，工具完整参数与结果经 PR36 过程详情 Query 读取。客户端按 streamId 与增量的起止序号判断重复与缺口，发送队列合并后的增量可跨越多个序号；gap 或重连后按退避重新订阅取新快照，不做单独的快照修复协议。终态由持久 Query 确认，RunStreamEnded 只是加速提示；运行过程未展开时不订阅。
 - **边界：** 服务端当前为单进程内嵌 Worker Pool，Gateway 与执行在同一进程内定位 Run。拆分部署时再评估跨节点快照，本条不预建。
 - **验收：** 发送队列未溢出时，长输出期间的变更通知与流帧一同送达，慢客户端溢出后关闭连接并经重连与探针收敛；断线重连、失败、取消和人工接管不复活旧候选；RunStreamEnded 丢失可由会话版本恢复；未展开的运行不产生订阅；无权订阅被拒绝，移出群的失权通知送达后订阅结束，通知丢失时客户端经兜底探针发现失权后取消订阅。
 - **验证步骤：** 展开过程中持续输出，同时向该会话发送新消息，客户端收到变更通知；堵塞客户端读流触发队列溢出后连接关闭，重连并重新订阅后不重复拼接已有 token；丢弃 RunStreamEnded 后仅靠会话版本仍显示最终消息；取消后晚到的 delta 不能重新打开运行中状态；无权用户及已登出但连接仍在的登录会话订阅该 runId 均被拒绝，运行中移出群后不再收到流帧；丢弃失权通知时，客户端经兜底探针发现失权后取消订阅，服务端随之停止推送。

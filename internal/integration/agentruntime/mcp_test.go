@@ -6,7 +6,6 @@ import (
 	"bytes"
 	"context"
 	"encoding/json"
-	"errors"
 	"log/slog"
 	"net/http"
 	"net/http/httptest"
@@ -71,8 +70,9 @@ func (m *mcpToolChatModel) Generate(_ context.Context, input []*schema.AgenticMe
 	return assistantReply("查询结果：" + m.toolReply), nil
 }
 
-func (m *mcpToolChatModel) Stream(context.Context, []*schema.AgenticMessage, ...model.Option) (*schema.StreamReader[*schema.AgenticMessage], error) {
-	return nil, errors.New("unexpected streaming call")
+// Stream 以单个分片返回当前测试步骤的模型输出。
+func (m *mcpToolChatModel) Stream(ctx context.Context, input []*schema.AgenticMessage, opts ...model.Option) (*schema.StreamReader[*schema.AgenticMessage], error) {
+	return singleChunkStream(m.Generate(ctx, input, opts...))
 }
 
 // TestRuntimeCallsMCPTools 验证注册后的长连接会话仍可调用工具，不可用的服务被跳过，内置同名工具保留。
@@ -160,8 +160,9 @@ func (m *offloadReadingChatModel) Generate(_ context.Context, input []*schema.Ag
 	}
 }
 
-func (m *offloadReadingChatModel) Stream(context.Context, []*schema.AgenticMessage, ...model.Option) (*schema.StreamReader[*schema.AgenticMessage], error) {
-	return nil, errors.New("unexpected streaming call")
+// Stream 以单个分片返回当前测试步骤的模型输出。
+func (m *offloadReadingChatModel) Stream(ctx context.Context, input []*schema.AgenticMessage, opts ...model.Option) (*schema.StreamReader[*schema.AgenticMessage], error) {
+	return singleChunkStream(m.Generate(ctx, input, opts...))
 }
 
 // TestLargeToolResultOffloaded 验证过大的工具结果转存后只向模型提供预览，完整内容仍可由读回工具取得。

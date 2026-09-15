@@ -78,15 +78,18 @@ func TestRunRetainsToolsAcrossRepeatedPreemption(t *testing.T) {
 		if calls == 4 {
 			return assistantReply("完成"), nil
 		}
-		return assistantReply("正在计算", &schema.FunctionToolCall{CallID: fmt.Sprintf("call-%d", calls), Name: "calculator", Arguments: `{"operation":"add","left":1,"right":2}`}), nil
+		return assistantReply("正在计算", &schema.FunctionToolCall{CallID: fmt.Sprintf("call-%d", calls), Name: "calculator", Arguments: `{"operation":"add","left":1,"right":2,"delayMilliseconds":200}`}), nil
 	}}
 	runtime.newModel = func(context.Context, ModelConfig) (model.AgenticModel, error) { return chatModel, nil }
 	seen := make(map[string]bool)
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	result, err := runtime.Run(ctx, RunRequest{Name: "test", MaxIterations: 2, OnProgress: func(progress Progress) {
-		for _, block := range progress.Blocks {
-			if call := block.Payload.ToolCall; call != nil && call.Status == domain.AgentToolCallRunning && !seen[call.CallID] {
+	result, err := runtime.Run(ctx, RunRequest{Name: "test", MaxIterations: 2, OnStream: func(delta StreamDelta) {
+		for _, operation := range delta.Operations {
+			if operation.Block == nil {
+				continue
+			}
+			if call := operation.Block.ToolCall; call != nil && call.Status == domain.AgentToolCallRunning && !seen[call.CallID] {
 				seen[call.CallID] = true
 				feed.appendUser("再补充一项")
 			}

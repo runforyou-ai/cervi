@@ -59,6 +59,14 @@ func assistantReply(text string, calls ...*schema.FunctionToolCall) *schema.Agen
 	return message
 }
 
+// singleChunkStream 把一次完整模型输出包装为单分片流。
+func singleChunkStream(message *schema.AgenticMessage, err error) (*schema.StreamReader[*schema.AgenticMessage], error) {
+	if err != nil {
+		return nil, err
+	}
+	return schema.StreamReaderFromArray([]*schema.AgenticMessage{message}), nil
+}
+
 // withReasoning 在模型输出最前面加入思考块。
 func withReasoning(message *schema.AgenticMessage, text string) *schema.AgenticMessage {
 	message.ContentBlocks = append([]*schema.ContentBlock{schema.NewContentBlock(&schema.Reasoning{Text: text})}, message.ContentBlocks...)
@@ -154,8 +162,9 @@ func (m *steeringChatModel) Generate(_ context.Context, input []*schema.AgenticM
 	return assistantReply("response with follow-up"), nil
 }
 
-func (m *steeringChatModel) Stream(context.Context, []*schema.AgenticMessage, ...model.Option) (*schema.StreamReader[*schema.AgenticMessage], error) {
-	return nil, errors.New("unexpected streaming call")
+// Stream 以单个分片返回当前测试步骤的模型输出。
+func (m *steeringChatModel) Stream(ctx context.Context, input []*schema.AgenticMessage, opts ...model.Option) (*schema.StreamReader[*schema.AgenticMessage], error) {
+	return singleChunkStream(m.Generate(ctx, input, opts...))
 }
 
 type cancelRaceInputFeed struct {
@@ -197,8 +206,9 @@ func (m *finalAfterWatcherModel) Generate(ctx context.Context, _ []*schema.Agent
 	}
 }
 
-func (m *finalAfterWatcherModel) Stream(context.Context, []*schema.AgenticMessage, ...model.Option) (*schema.StreamReader[*schema.AgenticMessage], error) {
-	return nil, errors.New("unexpected streaming call")
+// Stream 以单个分片返回当前测试步骤的模型输出。
+func (m *finalAfterWatcherModel) Stream(ctx context.Context, input []*schema.AgenticMessage, opts ...model.Option) (*schema.StreamReader[*schema.AgenticMessage], error) {
+	return singleChunkStream(m.Generate(ctx, input, opts...))
 }
 
 // TestEinoRuntimeSteersBeforeNextModelCall 验证 Tool 完成后先吸收新输入再继续规划。

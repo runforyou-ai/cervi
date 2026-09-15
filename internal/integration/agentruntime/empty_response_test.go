@@ -28,8 +28,9 @@ func (m *emptyThenAnswerChatModel) Generate(_ context.Context, _ []*schema.Agent
 	return assistantReply("重试后的回答"), nil
 }
 
-func (m *emptyThenAnswerChatModel) Stream(context.Context, []*schema.AgenticMessage, ...model.Option) (*schema.StreamReader[*schema.AgenticMessage], error) {
-	return nil, nil
+// Stream 以单个分片返回当前测试步骤的模型输出。
+func (m *emptyThenAnswerChatModel) Stream(ctx context.Context, input []*schema.AgenticMessage, opts ...model.Option) (*schema.StreamReader[*schema.AgenticMessage], error) {
+	return singleChunkStream(m.Generate(ctx, input, opts...))
 }
 
 // TestEmptyFinalResponseRetryIsBounded 验证空正文按有界次数重新执行本次输入。
