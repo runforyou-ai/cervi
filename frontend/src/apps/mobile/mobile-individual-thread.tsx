@@ -1,4 +1,4 @@
-/** 移动端真人与 AI 聊天共用的时间线、阅读进度、文本与附件发送和失败重试。 */
+/** 移动端真人、AI 与客户聊天共用的时间线、阅读进度、文本与附件发送和失败重试。 */
 import { useRef, useState } from "react"
 
 import {
@@ -28,6 +28,7 @@ export function MobileIndividualThread({
   enabled = Boolean(conversationID),
   disabledReason = null,
   lastReadMessageID = null,
+  customerDeliveries = false,
 }: {
   conversationID: string
   conversationType?: ConversationType
@@ -37,6 +38,7 @@ export function MobileIndividualThread({
   enabled?: boolean
   disabledReason?: string | null
   lastReadMessageID?: string | null
+  customerDeliveries?: boolean
   sendIndividualMessage?: (
     input: DirectTextMessageInput,
   ) => Promise<ConversationMessageData>
@@ -49,7 +51,11 @@ export function MobileIndividualThread({
     conversationID,
     peerIdentityID ? `draft:${peerIdentityID}` : "",
   )
-  const markRead = useConversationReadMarker(conversationID, enabled)
+  // 客户会话没有手动未读标记，进入时只推进已读水位。
+  const markRead = useConversationReadMarker(
+    conversationID,
+    enabled && conversationType !== ConversationType.ConversationTypeCustomer,
+  )
   const [retryDraft, setRetryDraft] =
     useState<OutgoingConversationDraft | null>(null)
   const [replyTo, setReplyTo] =
@@ -63,6 +69,7 @@ export function MobileIndividualThread({
         conversationType={conversationType}
         currentUser={identity.user}
         requireWindowFocus={false}
+        customerDeliveries={customerDeliveries}
         enabled={enabled}
         onReadMessage={enabled ? markRead : undefined}
         onReplyMessage={enabled && !disabledReason ? setReplyTo : undefined}
@@ -87,7 +94,12 @@ export function MobileIndividualThread({
         onRetryDraftHandled={() => setRetryDraft(null)}
         onReplyToChange={setReplyTo}
         sendIndividualMessage={sendIndividualMessage}
-        onSucceeded={() => void invalidate(resourceKeys.inbox())}
+        onSucceeded={() => {
+          void invalidate(resourceKeys.inbox())
+          // 发送结果可能改变客服负责人与处理状态，同时刷新会话摘要。
+          if (conversationID)
+            void invalidate(resourceKeys.conversationSummary(conversationID))
+        }}
         onSending={outgoing.start}
         onSent={outgoing.succeed}
         onFailed={outgoing.fail}

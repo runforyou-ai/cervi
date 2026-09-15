@@ -26,6 +26,7 @@ import {
   ConversationTimeline,
   type ConversationLocateTarget,
 } from "@/features/inbox/conversation-timeline"
+import { customerReplySupported } from "@/features/inbox/customer-session-actions"
 import { useOutgoingMessages } from "@/features/inbox/outgoing-message-context"
 import type { OutgoingConversationDraft } from "@/features/inbox/outgoing-message-store"
 import { useConversationReadMarker } from "@/features/inbox/use-conversation-read-marker"
@@ -102,8 +103,7 @@ export function ConversationThread({
     isAgentInboxConversation(conversation) ||
     isDirectInboxConversation(conversation) ||
     isGroupInboxConversation(conversation) ||
-    (conversation.customer.channelType === ChannelType.ChannelTypeWebsite ||
-      conversation.customer.channelType === ChannelType.ChannelTypeTelegram)
+    customerReplySupported(conversation.customer)
   const telegramConversation = Boolean(
     conversation &&
     isCustomerInboxConversation(conversation) &&

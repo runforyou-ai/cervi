@@ -44,7 +44,6 @@ const mobile = {
   inbox: {
     add: "新增",
     refreshFailed: "刷新失败",
-    customerSummaryOnly: "仅查看摘要",
     assigneesRetry: "负责人加载失败，重试",
     allCoworkers: "全部同事",
     selectedAssignee: "已选负责人",

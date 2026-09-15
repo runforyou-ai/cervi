@@ -44,7 +44,6 @@ const mobile = {
   inbox: {
     add: "Add",
     refreshFailed: "Refresh failed",
-    customerSummaryOnly: "Summary only",
     assigneesRetry: "Could not load assignees. Retry",
     allCoworkers: "All coworkers",
     selectedAssignee: "Selected assignee",

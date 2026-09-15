@@ -72,7 +72,7 @@ function isMobileInboxConversation(
   )
 }
 
-/** 渲染会话摘要和未读角标，长按打开阅读状态菜单，客户会话保留只读摘要。 */
+/** 渲染会话摘要和未读角标，点击进入会话详情，长按打开阅读状态菜单。 */
 function MobileConversationRow({
   conversation,
   actions,
@@ -82,15 +82,9 @@ function MobileConversationRow({
   conversation: MobileInboxConversation
   actions: ReturnType<typeof useConversationListActions>
   onMenuChange: (open: boolean) => void
-  onOpen: (
-    conversation:
-      | DirectInboxConversationData
-      | AgentInboxConversationData
-      | GroupInboxConversationData,
-  ) => void
+  onOpen: (conversation: MobileInboxConversation) => void
 }) {
   const { t } = useTranslation("inbox")
-  const { t: tMobile } = useTranslation("mobile")
   const formatTime = useConversationTime()
   const customerConversation = isCustomerInboxConversation(conversation)
     ? conversation
@@ -189,11 +183,6 @@ function MobileConversationRow({
           ) : null}
         </div>
         {customerConversation ? (
-          <p className="mt-1 text-xs text-muted-foreground">
-            {tMobile("inbox.customerSummaryOnly")}
-          </p>
-        ) : null}
-        {customerConversation ? (
           <div className="mt-1.5 flex min-w-0 items-center gap-2">
             <span className="truncate text-xs text-muted-foreground">
               {customerConversation.customer.channelName}
@@ -223,18 +212,14 @@ function MobileConversationRow({
         itemClassName="min-h-11"
         onOpenChange={onMenuChange}
       >
-        {internalConversation ? (
-          <button
-            type="button"
-            className="flex w-full min-w-0 gap-3 px-4 py-3 text-left outline-none transition-colors select-none active:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-            aria-label={name}
-            onClick={() => onOpen(internalConversation)}
-          >
-            {content}
-          </button>
-        ) : (
-          <div className="flex min-w-0 gap-3 px-4 py-3 select-none">{content}</div>
-        )}
+        <button
+          type="button"
+          className="flex w-full min-w-0 gap-3 px-4 py-3 text-left outline-none transition-colors select-none active:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+          aria-label={name}
+          onClick={() => onOpen(conversation)}
+        >
+          {content}
+        </button>
       </ConversationListMenu>
     </li>
   )
@@ -326,11 +311,13 @@ function MobileInboxList({ query, changeQuery }: ReturnType<typeof useMobileInbo
                 actions={actions}
                 onMenuChange={viewport.setMenu}
                 onOpen={(conversation) => {
-                  const type = isAgentInboxConversation(conversation)
-                    ? "agent"
-                    : isDirectInboxConversation(conversation)
-                      ? "direct"
-                      : "group"
+                  const type = isCustomerInboxConversation(conversation)
+                    ? "customer"
+                    : isAgentInboxConversation(conversation)
+                      ? "agent"
+                      : isDirectInboxConversation(conversation)
+                        ? "direct"
+                        : "group"
                   navigate(`/inbox/${type}/${conversation.id}`, {
                     state: { conversation, mobileBack: true },
                   })
