@@ -172,7 +172,7 @@ func TestKnowledgeHybridRetrieval(t *testing.T) {
 	// 召回数量限制作用于重排后的结果。
 	input := newKnowledgeBaseInput(t, db, identity, base.Name, base.Category)
 	input.EmbeddingProviderID, input.RerankProviderID, input.RetrievalCount = base.EmbeddingProviderID, base.EmbeddingProviderID, 2
-	if _, err := knowledgeaction.NewUpdateKnowledgeBaseAction(db).Execute(ctx, identity, base.ID, input); err != nil {
+	if _, err := knowledgeaction.NewUpdateKnowledgeBaseAction(db, newKnowledgeTasks(t, db)).Execute(ctx, identity, base.ID, input); err != nil {
 		t.Fatal(err)
 	}
 	records, err = service.Retrieve(ctx, identity, base.ID, "如何申请退款")
