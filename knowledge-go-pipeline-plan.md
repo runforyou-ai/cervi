@@ -1,8 +1,8 @@
 # 知识文档处理管线 Go 化与 Haystack 移除方案
 
-日期：2026-09-11。状态：待实施的开发方案。
+日期：2026-09-11。状态：已实施，召回、问答接入与 Agent 检索的现状见第 10 节。
 
-本文取代 [知识库接入方案](knowledge-base-plan.md) 第 3 节和 [知识库最小 MVP 开发顺序](knowledge-base-mvp-plan.md) PR 3 中"本地执行层直接采用 Haystack + Hayhooks"的结论。
+本文取代早期知识库方案中"本地执行层直接采用 Haystack + Hayhooks"的结论。
 
 调整后的职责边界：**原件转换交给 markitdown 独立容器，其余全部在 Go 服务端进程内**。字符分段、向量化、分段写入、批次发布、分段阅读和召回编排都由 Go 完成，`haystack/` 目录及其 HTTP 服务整体删除。
 
@@ -218,7 +218,7 @@ docker compose up -d postgres nats markitdown
 
 ## 10. 后续
 
-向量召回与词法召回已接入知识库页面的检索测试：分段存储收敛在 `internal/actions/knowledgebase/segment_store.go`（批次写入、按文档删除、向量检索、词法检索、按位置阅读），`RetrievalService` 按知识库并行执行 pgvector 余弦最近邻与 `tsvector` 词法召回，各取前 50 条候选做 RRF 融合选出候选，再由知识库配置的重排模型打分，去掉重排得分低于知识库相关性阈值（默认 0.7）的候选后，按重排得分截取知识库的召回数量。`knowledgeretrieval.Source` 与该文件共同构成将来切换向量存储的唯一改动面。已落实的边界：
+向量召回与词法召回已接入知识库页面的检索测试：分段存储收敛在 `internal/actions/knowledgebase/segment_store.go`（批次写入、按文档删除、向量检索、词法检索、按位置阅读），`RetrievalService` 按知识库并行执行 pgvector 余弦最近邻与 `tsvector` 词法召回，各取前 50 条候选做 RRF 融合选出候选，再由知识库配置的重排模型打分，去掉重排得分低于知识库相关性阈值（默认 0.5）的候选后，按重排得分截取知识库的召回数量。`knowledgeretrieval.Source` 与该文件共同构成将来切换向量存储的唯一改动面。已落实的边界：
 
 - 检索 SQL 以字面量写入 `embedding_dimension` 谓词和 `halfvec(N)` 类型，命中对应维度的部分索引。
 - 词法路 GIN 命中后至多取 2000 条候选按 `ts_rank_cd` 排名，超过上限时为近似排名。

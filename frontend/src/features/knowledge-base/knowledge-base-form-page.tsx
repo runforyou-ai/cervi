@@ -103,7 +103,7 @@ export function KnowledgeBaseFormPage({
       chunkLength: "512",
       chunkOverlap: "50",
       retrievalCount: "3",
-      retrievalScoreThreshold: "0.7",
+      retrievalScoreThreshold: "0.5",
       rerankModel: "",
     },
   })
@@ -118,7 +118,7 @@ export function KnowledgeBaseFormPage({
       chunkLength: "512",
       chunkOverlap: "50",
       retrievalCount: "3",
-      retrievalScoreThreshold: "0.7",
+      retrievalScoreThreshold: "0.5",
       rerankModel: "",
     })
   }, [form, mode, requestedCategory])
