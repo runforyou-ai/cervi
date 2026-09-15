@@ -131,7 +131,7 @@ func TestAgentAttachmentInputs(t *testing.T) {
 		if err := f.db.NewSelect().Model(run).Where("agr.conversation_id = ? AND agr.status = ?", conversationID, domain.AgentRunStatusQueued).Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
-		if err := agentrunaction.NewExecuteAction(f.db, tasks, runtime, testAttachmentReader(f.db)).Execute(ctx, agentrunaction.RunInput{RunID: run.ID}); err != nil {
+		if err := agentrunaction.NewExecuteAction(f.db, tasks, runtime, testAttachmentReader(f.db), nil).Execute(ctx, agentrunaction.RunInput{RunID: run.ID}); err != nil {
 			t.Fatal(err)
 		}
 	}

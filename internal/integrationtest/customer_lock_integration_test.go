@@ -76,7 +76,7 @@ func testCustomerAgentLocking(t *testing.T, db *bun.DB, identity *models.Identit
 				}
 				return agentruntime.RunResult{Content: "客服结果", EndSeq: claim.EndSeq}, nil
 			}}
-			executor := agentrunaction.NewExecuteAction(db, tasks, model, testAttachmentReader(db))
+			executor := agentrunaction.NewExecuteAction(db, tasks, model, testAttachmentReader(db), nil)
 			executed, received := make(chan error, 1), make(chan error, 1)
 			go func() {
 				gated := context.WithValue(ctx, chatQueryGateKey{}, gate)
@@ -147,9 +147,9 @@ func testCustomerLateResult(t *testing.T, db *bun.DB, identity *models.Identity,
 		claim, err := feed.Claim(ctx, 1)
 		return agentruntime.RunResult{Content: "迟到结果", EndSeq: claim.EndSeq}, err
 	}}
-	executor := agentrunaction.NewExecuteAction(db, tasks, model, testAttachmentReader(db))
+	executor := agentrunaction.NewExecuteAction(db, tasks, model, testAttachmentReader(db), nil)
 	// 使用独立协调器验证跨进程的事务校验。
-	coordinator := agentrunaction.NewExecuteAction(db, tasks, nil, testAttachmentReader(db))
+	coordinator := agentrunaction.NewExecuteAction(db, tasks, nil, testAttachmentReader(db), nil)
 	executed, managed := make(chan error, 1), make(chan error, 1)
 	go func() {
 		executed <- executor.Execute(context.WithValue(ctx, chatQueryGateKey{}, gate), agentrunaction.RunInput{RunID: run.ID})
@@ -221,7 +221,7 @@ func TestCustomerInboundAndManagementLocks(t *testing.T) {
 			f := newCustomerReadFixture(t)
 			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 			defer cancel()
-			coordinator := agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db))
+			coordinator := agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil)
 			if operation == "转交" {
 				if _, err := conversationaction.NewClaimServiceSessionAction(f.db, coordinator).Execute(ctx, f.owner, f.conversationID); err != nil {
 					t.Fatal(err)
@@ -327,7 +327,7 @@ func TestCustomerReopenAndInboundConverge(t *testing.T) {
 			f := newCustomerReadFixture(t)
 			ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 			defer cancel()
-			closed, err := conversationaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db))).Execute(ctx, f.owner, f.conversationID)
+			closed, err := conversationaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil)).Execute(ctx, f.owner, f.conversationID)
 			if err != nil {
 				t.Fatal(err)
 			}
@@ -471,7 +471,7 @@ func testCustomerSharedAgentSubject(t *testing.T, db *bun.DB, identity *models.I
 			executionCtx = context.WithValue(ctx, chatQueryGateKey{}, gate)
 		}
 		go func() {
-			done <- agentrunaction.NewExecuteAction(db, tasks, model, testAttachmentReader(db)).Execute(executionCtx, agentrunaction.RunInput{RunID: run.ID})
+			done <- agentrunaction.NewExecuteAction(db, tasks, model, testAttachmentReader(db), nil).Execute(executionCtx, agentrunaction.RunInput{RunID: run.ID})
 		}()
 		if i == 0 {
 			waitChatSignal(t, ctx, gate.reached)

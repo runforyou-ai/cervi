@@ -165,7 +165,7 @@ func testAgentConversations(t *testing.T, db *bun.DB, identity *servermodels.Ide
 		}
 		runtime.expected[run.ID] = []string{body}
 	}
-	executor := agentrunaction.NewExecuteAction(db, tasks, runtime, testAttachmentReader(db))
+	executor := agentrunaction.NewExecuteAction(db, tasks, runtime, testAttachmentReader(db), nil)
 	for _, run := range runs {
 		if err := executor.Execute(ctx, agentrunaction.RunInput{RunID: run.ID}); err != nil {
 			t.Fatal(err)
