@@ -1095,7 +1095,7 @@ cervi.<namespace>.realtime.<organizationId>.<audienceKind>.<audienceId>
 
 ### 10.11 实时帧协议
 
-WebSocket 实时协议使用手写的 JSON 帧，Go 结构体与 TypeScript 类型各自维护，并以双向编解码夹具锁定一致性。帧载荷是变更通知和控制信息，量小且允许丢失；不引入 Protobuf、Buf 或第三方代码生成器，避免在 appservice 生成器和 Wails 绑定之外叠加第三条强制生成链路。
+WebSocket 实时协议使用手写的 JSON 帧，Go 结构体与 TypeScript 类型各自维护，并以共用夹具锁定线上格式。帧载荷是变更通知和控制信息，量小且允许丢失；不引入 Protobuf、Buf 或第三方代码生成器，避免在 appservice 生成器和 Wails 绑定之外叠加第三条强制生成链路。
 
 契约边界：
 
@@ -1103,6 +1103,7 @@ WebSocket 实时协议使用手写的 JSON 帧，Go 结构体与 TypeScript 类�
 - 实时帧只定义连接认证、Hello、变更通知、AI 流、临时状态、错误和优雅下线，不重新定义完整业务 DTO。
 - Go 定义放入 `internal/realtime/protocol`；TypeScript 定义放入 `frontend/src/api/realtime`。页面只能通过 `frontend/src/api/realtime` 使用实时能力。
 - 64 位整数一律用字符串传输，TypeScript 侧用 bigint 比较。
+- 每帧的线上格式为 `{"v": 协议主版本, "type": 帧种类, "data": 帧字段}`，帧种类使用 snake_case，变更通知的帧种类与 NATS 通知载荷的 `kind` 取值一致；没有字段的帧 `data` 可省略。两端以 `internal/realtime/protocol/testdata/frames.json` 共用夹具锁定线上格式：Go 覆盖两个方向的编码与解码，TypeScript 覆盖客户端帧编码与服务端帧解码。
 
 最小帧集合：
 
@@ -1145,7 +1146,9 @@ AI 流在同一 WebSocket 连接上按 runId 订阅：客户端展开运行过�
 
 原生端由 Go 侧 Proxy 持有 WebSocket，把帧经 Wails 事件交给 TS，长期 Token 仍只留在 Go `clientsession` 中，凭据边界与现有 API Proxy 一致。Web 端直接建立连接并沿用既有 Bearer 存储。Socket Origin 按 iframe 自身来源校验，宿主页白名单沿用网站嵌入规则。
 
-认证后 `ClientHello` 携带协议主版本、Web/桌面/移动/挂件客户端种类、应用版本和能力集合；`ServerHello` 返回连接信息与当前身份的同步探针值。服务端不允许任何客户端任意订阅会话编号；连接按已认证身份接收通知，AI 流订阅按 runId 所属会话的阅读资格逐次授权，焦点会话只用于提高临时状态和通知密度，不能改变授权。
+Wails 服务端模式的 AssetServer 拒绝 WebSocket 升级，且延迟下发响应头：Gateway 在服务端 `Assets.Middleware` 中处理升级请求，沿 `Unwrap` 解包 Wails 写入器后再升级。连接默认只接受与 Host 相同的 Origin，Web 端、网站挂件 iframe 与服务端同源，`ingress` 反向代理与 Cloudflare Tunnel 保留原始 Host；原生端 Go 连接不带 Origin。
+
+认证后 `client_hello` 携带 Web/桌面/移动/挂件客户端种类、应用版本和能力集合，协议主版本由每帧的 `v` 表示；`ServerHello` 返回连接信息与当前身份的同步探针值。服务端不允许任何客户端任意订阅会话编号；连接按已认证身份接收通知，AI 流订阅按 runId 所属会话的阅读资格逐次授权，焦点会话只用于提高临时状态和通知密度，不能改变授权。
 
 Gateway 安装订阅并 Flush 后再读取探针值，避免先读探针后订阅的空窗。成员连接到期不晚于原登录会话；登出、停用、群失权和渠道停用在事务提交后发布撤销控制，服务端低频授权复核修复控制丢失，复核失权时与收到撤销控制走同一清理路径。撤销时清除未发送的受限帧、焦点与相关 AI 流订阅，不承诺撤回已进入网络的字节。NATS 恢复但 Socket 未断时也主动要求重新校验探针。
 

@@ -2,7 +2,7 @@
 
 ## 执行约定
 
-PR01–PR17 已合并（最新 `#288`），原始范围与验证记录见 `chat-realtime-completed.md`。本文只保留共用契约和尚未交付的范围。2026-09-10 对原路线图做过一次范围削减评审，结论见「本轮范围削减」；原清单的 PR00 已改编为 PR16 并交付。2026-09-13 对通知发布、兜底探针和 AI 流传输做了第二轮调整，结论见「第二轮调整」，与第一轮结论冲突处以第二轮为准。
+PR01–PR18 已合并（最新 `#294`），原始范围与验证记录见 `chat-realtime-completed.md`。本文只保留共用契约和尚未交付的范围。2026-09-10 对原路线图做过一次范围削减评审，结论见「本轮范围削减」；原清单的 PR00 已改编为 PR16 并交付。2026-09-13 对通知发布、兜底探针和 AI 流传输做了第二轮调整，结论见「第二轮调整」，与第一轮结论冲突处以第二轮为准。
 
 - 一个 PR 交付一个明确行为；后端能力可用真实数据库与应用服务测试独立验收。正确性耦合的迁移、写入、读取及绑定一起提交，不拆成无法运行的中间版本。
 - 保留 Conversation、ChatSubject、Participant、ServiceSession、Agent Run 和 appservice 边界。持久命令走 HTTP／Wails；WebSocket 推送版本通知、撤销控制和 AI 流等临时流帧，客户端通过业务 Query 读权威数据。
@@ -46,7 +46,7 @@ PR01–PR17 已合并（最新 `#288`），原始范围与验证记录见 `chat-
 
 ## 已交付基线
 
-PR01–PR17 已交付以下能力，后续 PR 直接依赖，不重复定义。
+PR01–PR18 已交付以下能力，后续 PR 直接依赖，不重复定义。
 
 - **锁序：** `internal/actions/chatstate` 提供会话授权与锁定入口，覆盖真人单聊、独立 AI 聊天、群聊和客户会话；可读、可发、可管理三种资格在锁后判断。
 - **`message_seq`：** 全部会话类型统一，会话锁内分配，`last_message_seq` 保存已提交位置；HTTP 用字符串、TS 用 bigint。`read_seq` 为阅读基线，服务端单调推进。
@@ -60,6 +60,7 @@ PR01–PR17 已交付以下能力，后续 PR 直接依赖，不重复定义。
 - **禁用账号会话：** 单聊与 AI 会话的列表资格只按会话归属与会话状态判断，摘要返回 `peerStatus`／`agentStatus`。
 - **变更版本：** `conversations.version` 在分配 `message_seq` 的同一语句推进，覆盖成员消息、附件消息、客户入站、AI 回复和群系统事件，群资料修改同样推进；`conversation_user_states.version` 随已读、提及确认、静音、手动未读和入群阅读基线推进；`users.profile_version` 经 `identity.UpdateUserIdentity` 和用户账号更新按实际变化推进，修改密码与团队不推进。幂等重放、回滚和实际无变化的写入均不推进。
 - **同步探针：** `GetSyncHeads`（`GET /sync/heads`）在一条语句内返回可见会话数量、`(conversationId, conversation.version, 本人会话状态 version)` 的 64 位哈希和与身份资料版本，64 位值以字符串传输；客户会话覆盖全部视图与服务状态。
+- **提交后发布：** 写事务经 `realtime.RunInTx` 执行，`realtime.Notify` 在事务内登记通知，同一受众、种类和会话合并为最高版本；提交成功后交给进程级 `Publisher` 异步发布 Core NATS，回滚丢弃，队列已满或发布失败记录 `WARN` 并丢弃。Subject 为 `cervi.<namespace>.realtime.<organizationId>.<audienceKind>.<audienceId>`，载荷为 `kind`、`conversationId` 与字符串 `version`。已接入内部会话消息（含群系统事件、AI 结果与附件消息）通知当前真人成员，本人会话状态与身份资料只通知本人，目前只登记 `user` 受众。附件在上传完成后逐个发送，服务端不保存上传中的占位消息。
 
 ## 变更版本与通知契约
 
@@ -130,16 +131,6 @@ PR01–PR17 已交付以下能力，后续 PR 直接依赖，不重复定义。
 
 ## 一、变更版本与发布
 
-### PR18：提交后发布与受众通知契约
-
-- **依赖：** PR17。合并本清单原 PR23 的发布职责。
-- **范围：** 事务内登记待发通知，包含受众种类、受众 ID、通知种类和最小载荷；提交成功后按 namespace、企业、受众种类和受众 ID 异步发布 Core NATS，请求响应不等待发布，回滚则丢弃。接入内部会话新消息（含附件消息、群系统事件与 AI 结果消息）、本人已读／提及确认／静音／手动未读，以及身份资料与账户偏好变化。附件改为传完才入库：客户端先上传临时文件，传完后逐个发送附件消息，服务端不保存上传中的占位消息、上传状态和活跃期限，附件通知随消息追加登记。受众种类显式区分 `user`、`customer_inbox`、`visitor_directory`，本条只登记 `user`。不建通知表和后台发布器，业务事务内不发 NATS，不在网络中持事务。
-- **落点：** 新增 `internal/realtime` 的 `RunInTx`／`Notify` 与 `Publisher`，服务端装配接入发布器生命周期；`chatstate.AppendMessage` 与 `NotifyConversationMembers`、附件发送 Action 与前端附件队列、个人会话状态 Action、`identity.UpdateUserIdentity` 与 `UpdateUserAccount`，以及到达这些登记点的写事务入口。不改 `task_outbox`，不建立每用户 JetStream Consumer。
-- **实施：** 写事务经 `realtime.RunInTx` 执行，`Notify` 把通知记在该事务的上下文中，在事务外调用视为编程错误并 panic；提交成功后整批交给进程级发布器。发布器使用独立 NATS 连接，启动时 NATS 不可用也后台重连，断连期间不缓存；有界队列和单个协程按已提交批次的入队顺序发布，并发事务之间的通知可能乱序；队列已满或发布失败记录 `WARN` 并丢弃，不重试、不影响业务结果，由兜底探针恢复。载荷只含通知种类、会话 ID 和字符串版本，不含正文、姓名或未读数。内部会话通知当前真人成员，客户会话不登记成员受众；个人会话状态与身份资料只通知本人，管理员修改他人资料时通知资料所属用户；版本为 0 的个人状态行与缺行等价，不登记。同一事务内同一受众、同一通知种类、同一会话的多次变化合并为一条并保留最高版本，撤销控制不参与合并。附件每个文件独立发送并沿用各自的发送编号，同批按选择顺序提交：前面的文件未结束时后续文件等待，上传或发送失败、取消的文件不阻塞后续文件，失败文件在发送方本地保留重试并在重试成功后排在会话末尾；说明随最后一个文件发送；AI 聊天附件与文本一样逐条进入 Agent 输入流，连续输入由同一次运行认领；删除 `message_attachments` 的上传状态与活跃期限及对应的状态查询、心跳和取消撤回接口。
-- **边界：** 群资料修改、成员变化和不追加消息的 Run 状态转换由 PR19 接入；群系统事件经消息追加已发送会话变更通知。客户会话受众由 PR20 接入。
-- **验收：** 回滚不发布；实际无变化不登记；个人设置与身份资料不广播给其他人；载荷不含业务内容；NATS 不可用时业务写入照常成功且请求不被阻塞。
-- **验证步骤：** 登记通知后主动回滚，版本不变且订阅端收不到通知；同一事务写两个会话收到两条通知、同一会话两次追加只收到最高版本；本人已读、静音、手动未读、提及确认只发往本人受众，重复操作不发布；工作状态、账户偏好与管理员修改邮箱只通知资料所属用户；附件发送通知单聊双方；附件按选择顺序发送，前面的文件失败不阻塞后续文件，未完成上传或已过期的临时文件不能发送；NATS 不可达时发送消息成功，探针值仍变化；发布阻塞时事务提交照常返回，队列已满与发布失败记录 `WARN`。
-
 ### PR19：成员会话变化接入
 
 - **依赖：** PR18。合并削减前编号的原 PR18 与原 PR23。
@@ -181,18 +172,28 @@ PR01–PR17 已交付以下能力，后续 PR 直接依赖，不重复定义。
 ### PR24：JSON 帧契约与平台探针
 
 - **依赖：** 无（可与「变更版本与发布」并行）。取代原清单 PR27 的 Protobuf 工具链。
-- **范围：** 按 `chat-roadmap.md` 第 10.11 节定义 WebSocket JSON 帧：Authenticate、ClientHello／ServerHello、Ping／Pong、ConversationChanged、ConversationStateChanged、IdentityProfileChanged、AccessRevoked／SessionRevoked、ServerGoingAway、RealtimeError，并覆盖访客目录与会话通知。PinOrderChanged 由 PR40 增加，AI 流订阅与流帧由 PR38 增加，均遵守同一版本与未知帧规则。定义版本字段、未知帧忽略规则，64 位整数一律用字符串。探测 Wails 各端 Origin、Upgrade、TLS 与子路径。
-- **落点：** 新增协议定义（Go 结构体与 TS 类型各自手写，以双向夹具锁定）；`build`、平台探针记录。
-- **实施：** 以双向编解码夹具锁定帧结构、版本协商和字符串整数边界。不引入 Protobuf、Buf 或第三方代码生成器，避免在 appservice 生成器和 Wails 绑定之外叠加第三条强制生成链路。Hello 返回连接信息与当前身份的探针值。平台探针单独记录实际 Origin、服务端地址拼接和 TLS 结果，再据此确定允许来源配置。
-- **验收：** Go 与 TS 双向解析一致；未知可忽略帧、协议主版本不支持分别有明确结果；超过 JS 安全整数的值正确；记录真实平台结果，不把 Web 通过视为原生通过；探针不成为另一套产品协议。
-- **验证步骤：** 同一份帧分别由 Go／TS 编码并对端解码；Web、桌面、iOS、Android 分别记录通过或未验证，不以模拟结果替代真平台。
+- **范围：** 按 `chat-roadmap.md` 第 10.11 节定义 WebSocket JSON 帧：`authenticate`、`client_hello`、`ping`／`pong`、`authenticated`、`server_hello`、`conversation_changed`、`conversation_state_changed`、`identity_profile_changed`、`access_revoked`、`session_revoked`、`server_going_away`、`realtime_error`。访客目录与会话通知复用 `conversation_changed`，访客认证字段由 PR26 增加；`pin_order_changed` 由 PR40 增加，AI 流订阅与流帧由 PR38 增加，均遵守同一版本与未知帧规则。64 位整数一律用字符串。探测 Wails 各端 Origin、Upgrade、TLS 与子路径。本条不提供服务端连接端点。
+- **落点：** 新增 `internal/realtime/protocol`（Go 帧定义与两个方向的编解码）、`frontend/src/api/realtime/protocol.ts`（客户端帧编码与服务端帧解码）、共用夹具 `internal/realtime/protocol/testdata/frames.json` 与两端夹具测试；平台探针使用本地临时端点，不提交。
+- **实施：** 帧线上格式为 `{"v", "type", "data"}`，变更通知的帧种类与 NATS 通知 `kind` 取值一致，没有字段的帧 `data` 可省略。Go `DecodeClient`／`DecodeServer` 先校验主版本再按方向查帧种类：主版本不一致返回 `ErrUnsupportedVersion`，当前方向未定义的种类返回 `ErrUnknownFrame` 供接收方忽略，结构或字段类型错误返回解码错误。TS `decodeServerFrame` 返回 frame、ignored、unsupported_version、invalid 四种结果，64 位版本解码为 bigint，探针校验和与身份资料版本保持不透明字符串。`server_hello` 复用 appservice `SyncHeads`，能力集合为空时省略；未定义的撤销原因与错误码原样保留，由接收方按未知值处理。Go 夹具测试要求每个方向的每种帧至少有一个编码往返样例。不引入 Protobuf、Buf 或第三方代码生成器。
+- **验收：** 共用夹具下 Go 两个方向的编解码、TS 客户端帧编码与服务端帧解码结果一致；未知可忽略帧、协议主版本不支持分别有明确结果；超过 JS 安全整数的值正确；记录真实平台结果，不把 Web 通过视为原生通过；探针不成为另一套产品协议。
+- **验证步骤：** 客户端帧由 TS 编码、Go 解码，服务端帧由 Go 编码、TS 解码，均与共用夹具的线上格式一致；Web、桌面、iOS、Android 分别记录通过或未验证，不以模拟结果替代真平台。
+- **平台探针记录（2026-09-14）：** macOS、Go 1.27.1、Wails v3.0.0-beta.21 服务端模式（`TLS_MODE=off`）、`coder/websocket` v1.8.15。临时端点 `/api/realtime` 用本条帧契约应答认证、Hello 与 Ping，每 20 秒下发一次 `ping`，每个场景保持 75 秒。
+  - **挂载位置：** Wails AssetServer 在匹配服务 Route 之前对 `Upgrade: websocket` 请求直接返回 501，Gin `/api` 路由与 Wails 服务 Route 都无法升级；只有 `Assets.Middleware` 在该检查之前执行。
+  - **写入器：** 中间件收到的写入器是 `assetserver.contentTypeSniffer`，其 `WriteHeader` 延迟到首次写入才下发；直接 `websocket.Accept` 时 101 响应随连接劫持丢失，客户端握手 30 秒超时。沿 `Unwrap` 解包到 `*http.response` 后握手成功，AssetServer 不再记录响应写入错误。
+  - **截止时间：** `net/http` 劫持连接时清除读写截止时间，Wails 默认 30 秒读写超时不影响升级后的连接；保留默认截止时间的本地与隧道连接均保持 75 秒并正常收发。
+  - **Origin：** `coder/websocket` 默认只接受与 Host 相同的 Origin，`https://evil.example` 返回 403；原生端 Go 连接不带 Origin，校验放行。本地复刻 `ingress` 重写规则的反向代理与 Cloudflare Tunnel 都保留原始 Host（隧道请求为公网域名并带 `X-Forwarded-Proto: https`），同域 Origin 通过。允许来源保持默认同源，不增加配置。
+  - **原生端（macOS）：** 探针程序使用与桌面端 `apiproxy` 相同的 Go `net/http` 与 TLS 栈，未在桌面应用进程内运行。带 30 秒 `Timeout` 的 `http.Client` 可直接用于拨号，`coder/websocket` 把 `Timeout` 转为握手超时。本地 `ws://`、Cloudflare Tunnel `wss://`（系统根证书）以及复刻 `ingress` 重写规则并剥离 `/cervi` 前缀的反向代理均通过，双向 `ping`／`pong` 正常，均未协商 `permessage-deflate`。
+  - **Web（Chrome 153，macOS）：** 由服务端临时页面自动运行浏览器 `WebSocket`。同源 `ws://127.0.0.1:8084` 与 Cloudflare Tunnel 同源 `wss://` 均建立连接并保持 75 秒，收到 `authenticated`、`server_hello` 与服务端 `ping`，客户端 `ping` 收到 `pong`，`bufferedAmount` 始终为 0；保留默认截止时间的两种连接结果相同。从 `http://127.0.0.1:8084` 页面连接隧道域名时服务端以 Origin 不匹配拒绝，浏览器报告关闭码 1006。Chrome 请求 `permessage-deflate`，服务端默认不协商。
+  - **iOS、Android：** 未验证。两端连接同样由 Go `apiproxy` 发起，PR33 接入移动端时实测。
+  - **子路径：** 原生端按服务器地址路径拼接，经剥离前缀的反向代理可连接；Web 端的 Wails 运行时以 `window.location.origin + "/wails/runtime"` 调用绑定，本身不支持子路径部署。
+  - **自动 HTTPS 入口：** `ingress` 自动证书模式需要公网域名与 80／443 端口，本机未验证；其反向代理重写规则已由本地代理复刻验证。
 
 ### PR25：成员 Gateway、连接认证与撤销控制
 
 - **依赖：** PR18、PR24。合并原清单 PR28、PR29 与 PR30；客服共享受众的订阅在 PR20 完成后生效。
 - **范围：** Server 内嵌 Gateway，首帧限时 Authenticate；Web 使用现有 Bearer，原生端由 Go 侧 Proxy 持有连接并把帧经 Wails 事件交给 TS。按本节点在线受众订阅，禁止 Queue Group 与企业通配订阅。单写协程、有界队列与帧大小限制，控制帧优先。登出按 token session、停用按用户、群失权按会话发送控制通知，服务端低频复核授权。不建票据表。
 - **落点：** 新增 `internal/realtime` Gateway 与连接注册表；`internal/apiproxy` 的原生连接持有；服务端 HTTP 路由；`actions/auth/logout.go`、用户停用入口与群关系 Action。
-- **实施：** 连接依次处于 awaiting_auth、authenticated、closing；认证前只允许 Authenticate，超时关闭；连接到期不晚于登录会话。订阅安装完成并 Flush 之后才读取 Hello 探针值，堵住「先读探针再订阅」的丢通知窗口。连接登记 tokenSessionId、userId、企业和已授权会话；登出／停用提交后发布控制通知，收到控制后撤销订阅、清理未发送的受限帧并关闭或缩减连接权限。定期复核是丢控制帧后的修复路径，复核失权时与收到控制帧走同一撤销路径，记录复核间隔和最坏生效窗口。原生端不把长期 Token 交给 TS。
+- **实施：** Gateway 按 PR24 平台探针记录接入：在服务端 `Assets.Middleware` 中处理升级请求，沿 `Unwrap` 解包 Wails 写入器后再升级，允许来源保持默认同源；原生端按服务器地址路径拼接连接地址，与 API Proxy 一致。连接依次处于 awaiting_auth、authenticated、closing；认证前只允许 Authenticate，超时关闭；连接到期不晚于登录会话。订阅安装完成并 Flush 之后才读取 Hello 探针值，堵住「先读探针再订阅」的丢通知窗口。连接登记 tokenSessionId、userId、企业和已授权会话；登出／停用提交后发布控制通知，收到控制后撤销订阅、清理未发送的受限帧并关闭或缩减连接权限。定期复核是丢控制帧后的修复路径，复核失权时与收到控制帧走同一撤销路径，记录复核间隔和最坏生效窗口。原生端不把长期 Token 交给 TS。
 - **验收：** 一用户多设备均收到通知；先注册订阅再给探针值；慢消费者断开后可补拉；NATS 恢复而 Socket 未断时主动要求重新校验探针；已连接后登出、停用或移出群不再获得受限内容；撤销事务回滚不产生错误断连。
 - **验证步骤：** 在安装订阅与读取探针之间提交消息，客户端通过 Hello 或后续通知至少发现一次；同账号建立两条连接两端均收到；堵塞一端读流触发有界关闭，另一端继续正常工作。连接后登出本次 token 只关闭对应登录会话，停用用户关闭其全部会话；丢弃一次控制通知后服务端复核仍生效；已写入网络的字节不承诺可撤回。
 
