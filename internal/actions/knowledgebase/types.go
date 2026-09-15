@@ -16,6 +16,7 @@ type Input struct {
 	ChunkLength              *int
 	ChunkOverlap             *int
 	RetrievalCount           int
+	RetrievalScoreThreshold  float64
 	RerankProviderID         string
 	RerankModelIdentifier    string
 	Name                     string
@@ -37,6 +38,7 @@ type Record struct {
 	ChunkLength              *int
 	ChunkOverlap             *int
 	RetrievalCount           int
+	RetrievalScoreThreshold  float64
 	RerankProviderID         string
 	RerankModelIdentifier    string
 	ID                       string                       `bun:"id"`

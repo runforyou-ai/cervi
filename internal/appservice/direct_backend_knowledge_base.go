@@ -119,6 +119,7 @@ func (o *directOperations) CreateKnowledgeBase(ctx context.Context, meta Request
 		ChunkLength:              input.ChunkLength,
 		ChunkOverlap:             input.ChunkOverlap,
 		RetrievalCount:           input.RetrievalCount,
+		RetrievalScoreThreshold:  input.RetrievalScoreThreshold,
 		RerankProviderID:         input.RerankProviderID,
 		RerankModelIdentifier:    input.RerankModelIdentifier,
 	})
@@ -139,6 +140,7 @@ func (o *directOperations) UpdateKnowledgeBase(ctx context.Context, meta Request
 		ChunkLength:              input.ChunkLength,
 		ChunkOverlap:             input.ChunkOverlap,
 		RetrievalCount:           input.RetrievalCount,
+		RetrievalScoreThreshold:  input.RetrievalScoreThreshold,
 		RerankProviderID:         input.RerankProviderID,
 		RerankModelIdentifier:    input.RerankModelIdentifier,
 	})
@@ -275,6 +277,7 @@ func knowledgeBaseFromAction(record knowledgebaseaction.Record) KnowledgeBase {
 		ChunkLength:              record.ChunkLength,
 		ChunkOverlap:             record.ChunkOverlap,
 		RetrievalCount:           record.RetrievalCount,
+		RetrievalScoreThreshold:  record.RetrievalScoreThreshold,
 		RerankProviderID:         record.RerankProviderID,
 		RerankModelIdentifier:    record.RerankModelIdentifier,
 
@@ -301,12 +304,13 @@ func knowledgeGroupsFromAction(records []knowledgebaseaction.GroupRecord) []Know
 // knowledgeBaseFieldKeys 把知识库校验错误码映射为本地化文案键。
 func knowledgeBaseFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key {
 	keys := map[common.FieldCode]cervii18n.Key{
-		knowledgebaseaction.ValidationEmbeddingModelInvalid:     cervii18n.FieldKnowledgeBaseEmbeddingModelInvalid,
-		knowledgebaseaction.ValidationEmbeddingDimensionInvalid: cervii18n.FieldKnowledgeBaseEmbeddingDimensionInvalid,
-		knowledgebaseaction.ValidationChunkLengthInvalid:        cervii18n.FieldKnowledgeBaseChunkLengthInvalid,
-		knowledgebaseaction.ValidationChunkOverlapInvalid:       cervii18n.FieldKnowledgeBaseChunkOverlapInvalid,
-		knowledgebaseaction.ValidationRetrievalCountInvalid:     cervii18n.FieldKnowledgeBaseRetrievalCountInvalid,
-		knowledgebaseaction.ValidationRerankModelInvalid:        cervii18n.FieldKnowledgeBaseRerankModelInvalid,
+		knowledgebaseaction.ValidationEmbeddingModelInvalid:          cervii18n.FieldKnowledgeBaseEmbeddingModelInvalid,
+		knowledgebaseaction.ValidationEmbeddingDimensionInvalid:      cervii18n.FieldKnowledgeBaseEmbeddingDimensionInvalid,
+		knowledgebaseaction.ValidationChunkLengthInvalid:             cervii18n.FieldKnowledgeBaseChunkLengthInvalid,
+		knowledgebaseaction.ValidationChunkOverlapInvalid:            cervii18n.FieldKnowledgeBaseChunkOverlapInvalid,
+		knowledgebaseaction.ValidationRetrievalCountInvalid:          cervii18n.FieldKnowledgeBaseRetrievalCountInvalid,
+		knowledgebaseaction.ValidationRetrievalScoreThresholdInvalid: cervii18n.FieldKnowledgeBaseRetrievalScoreThresholdInvalid,
+		knowledgebaseaction.ValidationRerankModelInvalid:             cervii18n.FieldKnowledgeBaseRerankModelInvalid,
 
 		knowledgebaseaction.ValidationQAQuestionRequired: cervii18n.FieldKnowledgeQAQuestionRequired,
 		knowledgebaseaction.ValidationQAAnswerRequired:   cervii18n.FieldKnowledgeQAAnswerRequired,

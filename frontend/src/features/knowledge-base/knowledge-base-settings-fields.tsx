@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next"
 import { AIModelType, type AIProviderSummaryData } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field"
+import { Input } from "@/components/ui/input"
 import { NativeSelect } from "@/components/ui/native-select"
 import { knowledgeEmbeddingDimensions, type KnowledgeBaseFormValues } from "./knowledge-base-schema"
 
@@ -35,6 +36,13 @@ export function KnowledgeBaseSettingsFields({ control, isQA, providers }: {
         </>
       )}
       <FormInputField control={control} name="retrievalCount" label={t("form.retrievalCount")} type="number" min={1} max={20} step={1} />
+      <Controller control={control} name="retrievalScoreThreshold" render={({ field, fieldState }) => (
+        <Field data-invalid={fieldState.invalid}>
+          <FieldLabel htmlFor="retrievalScoreThreshold" required>{t("form.retrievalScoreThreshold")}</FieldLabel>
+          <Input {...field} id="retrievalScoreThreshold" type="number" min={0} max={1} step={0.01} required aria-invalid={fieldState.invalid} />
+          <FieldDescription>{t("form.retrievalScoreThresholdDescription")}</FieldDescription>
+        </Field>
+      )} />
       <KnowledgeModelField control={control} name="rerankModel" providers={providers} />
     </>
   )

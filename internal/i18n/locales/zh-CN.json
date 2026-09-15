@@ -336,6 +336,7 @@
   "field.knowledge_base_chunk_length_invalid": "分段长度必须是 256 至 2048 的整数。",
   "field.knowledge_base_chunk_overlap_invalid": "分段重叠必须是 0 至 200 的整数。",
   "field.knowledge_base_retrieval_count_invalid": "召回数量必须是 1 至 20 的整数。",
+  "field.knowledge_base_retrieval_score_threshold_invalid": "相关性阈值必须是 0 至 1 之间的数值。",
   "field.knowledge_base_rerank_model_invalid": "请选择重排模型。",
   "field.knowledge_retrieval_query_invalid": "检索内容不能为空，且不能超过 250 个字符。",
   "field.knowledge_base_name_required": "请输入知识库名称。",

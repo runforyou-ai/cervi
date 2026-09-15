@@ -45,11 +45,12 @@ func (a *CreateKnowledgeBaseAction) Execute(ctx context.Context, identity *serve
 			ChunkLength:              input.ChunkLength,
 			ChunkOverlap:             input.ChunkOverlap,
 			RetrievalCount:           input.RetrievalCount,
+			RetrievalScoreThreshold:  input.RetrievalScoreThreshold,
 			RerankProviderID:         input.RerankProviderID,
 			RerankModelIdentifier:    input.RerankModelIdentifier,
 		}
 		_, err := tx.NewInsert().Model(knowledgeBase).
-			Column("organization_id", "created_by_user_id", "name", "category", "description", "embedding_provider_id", "embedding_model_identifier", "embedding_dimension", "chunk_length", "chunk_overlap", "retrieval_count", "rerank_provider_id", "rerank_model_identifier").
+			Column("organization_id", "created_by_user_id", "name", "category", "description", "embedding_provider_id", "embedding_model_identifier", "embedding_dimension", "chunk_length", "chunk_overlap", "retrieval_count", "retrieval_score_threshold", "rerank_provider_id", "rerank_model_identifier").
 			Returning("*").
 			Exec(ctx)
 		if isConstraintConflict(err, "knowledge_bases_organization_name_unique") {

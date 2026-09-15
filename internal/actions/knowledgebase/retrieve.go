@@ -56,7 +56,7 @@ type RetrievalRecord struct {
 	VectorRank     int
 }
 
-// RetrievalService 对知识库执行词法与向量并行召回、名次融合和重排打分，人工检索测试与 Agent 共用。
+// RetrievalService 对知识库执行词法与向量并行召回、名次融合、重排打分和相关性阈值过滤，人工检索测试与 Agent 共用。
 type RetrievalService struct {
 	db       *bun.DB
 	embedder queryEmbedder
@@ -176,7 +176,7 @@ func (s *RetrievalService) sources(ctx context.Context, organizationID string, k
 	return sources, nil
 }
 
-// retrieve 并行执行向量路和词法路，按名次倒数融合选出候选，交给重排模型打分后按得分截取知识库的召回数量。
+// retrieve 并行执行向量路和词法路，按名次倒数融合选出候选，交给重排模型打分，去掉低于相关性阈值的候选后按得分截取知识库的召回数量。
 func (k *knowledgeSource) retrieve(ctx context.Context, query string) ([]RetrievalRecord, error) {
 	started := time.Now()
 	tsquery, lexical := searchtext.KnowledgeQuery(query)
@@ -242,7 +242,8 @@ func (k *knowledgeSource) retrieve(ctx context.Context, query string) ([]Retriev
 		}
 		return ordered[i].hit.ID < ordered[j].hit.ID
 	})
-	// 最终分数与顺序只由重排得分决定，供应商未返回得分的候选不进入结果。
+	// 最终分数与顺序只由重排得分决定，供应商未返回得分和重排得分低于相关性阈值的候选不进入结果。
+	belowThreshold := 0
 	if len(ordered) > 0 {
 		documents := make([]string, 0, len(ordered))
 		for _, item := range ordered {
@@ -263,7 +264,12 @@ func (k *knowledgeSource) retrieve(ctx context.Context, query string) ([]Retriev
 			slog.Warn("重排模型未返回全部候选得分", "knowledge_base_id", k.base.ID, "candidate_count", len(ordered), "scored_count", len(reranked))
 		}
 		sort.SliceStable(reranked, func(i, j int) bool { return reranked[i].score > reranked[j].score })
-		ordered = reranked
+		qualified := 0
+		for qualified < len(reranked) && reranked[qualified].score >= k.base.RetrievalScoreThreshold {
+			qualified++
+		}
+		belowThreshold = len(reranked) - qualified
+		ordered = reranked[:qualified]
 	}
 	// 问答库按条目折叠，保留每个条目得分最高的片段。
 	qa := k.base.Category == string(domain.KnowledgeBaseCategoryQA)
@@ -299,6 +305,7 @@ func (k *knowledgeSource) retrieve(ctx context.Context, query string) ([]Retriev
 	}
 	slog.Info("知识库混合召回完成",
 		"knowledge_base_id", k.base.ID, "lexical_count", len(lexicalHits), "vector_count", len(vectorHits),
+		"score_threshold", k.base.RetrievalScoreThreshold, "below_threshold_count", belowThreshold,
 		"result_count", len(records), "duration_ms", time.Since(started).Milliseconds())
 	return records, nil
 }

@@ -85,6 +85,7 @@ export function KnowledgeBaseFormPage({
         chunkLengthInvalid: t("validation.chunkLengthInvalid"),
         chunkOverlapInvalid: t("validation.chunkOverlapInvalid"),
         retrievalCountInvalid: t("validation.retrievalCountInvalid"),
+        retrievalScoreThresholdInvalid: t("validation.retrievalScoreThresholdInvalid"),
         rerankModelRequired: t("validation.rerankModelRequired"),
       }, isQA),
     [t, isQA],
@@ -100,6 +101,7 @@ export function KnowledgeBaseFormPage({
       chunkLength: "512",
       chunkOverlap: "50",
       retrievalCount: "3",
+      retrievalScoreThreshold: "0.7",
       rerankModel: "",
     },
   })
@@ -114,6 +116,7 @@ export function KnowledgeBaseFormPage({
       chunkLength: "512",
       chunkOverlap: "50",
       retrievalCount: "3",
+      retrievalScoreThreshold: "0.7",
       rerankModel: "",
     })
   }, [form, mode, requestedCategory])
@@ -146,6 +149,7 @@ export function KnowledgeBaseFormPage({
       chunkLength: loadedKnowledgeBase.chunkLength === null ? "" : String(loadedKnowledgeBase.chunkLength),
       chunkOverlap: loadedKnowledgeBase.chunkOverlap === null ? "" : String(loadedKnowledgeBase.chunkOverlap),
       retrievalCount: String(loadedKnowledgeBase.retrievalCount),
+      retrievalScoreThreshold: String(loadedKnowledgeBase.retrievalScoreThreshold),
       rerankModel: loadedKnowledgeBase.rerankProviderId ? JSON.stringify([loadedKnowledgeBase.rerankProviderId, loadedKnowledgeBase.rerankModelIdentifier]) : "",
     })
     setCategory(loadedKnowledgeBase.category)
@@ -175,6 +179,7 @@ export function KnowledgeBaseFormPage({
         chunkLength: isQA ? null : Number(values.chunkLength),
         chunkOverlap: isQA ? null : Number(values.chunkOverlap),
         retrievalCount: Number(values.retrievalCount),
+        retrievalScoreThreshold: Number(values.retrievalScoreThreshold),
         rerankProviderId,
         rerankModelIdentifier,
       }
@@ -218,6 +223,7 @@ export function KnowledgeBaseFormPage({
               "chunkLength",
               "chunkOverlap",
               "retrievalCount",
+              "retrievalScoreThreshold",
               "rerankModelIdentifier",
             ])
           : t("form.saveError"),

@@ -12,12 +12,13 @@ import (
 )
 
 const (
-	ValidationEmbeddingModelInvalid     common.FieldCode = "KNOWLEDGE_BASE_EMBEDDING_MODEL_INVALID"
-	ValidationEmbeddingDimensionInvalid common.FieldCode = "KNOWLEDGE_BASE_EMBEDDING_DIMENSION_INVALID"
-	ValidationChunkLengthInvalid        common.FieldCode = "KNOWLEDGE_BASE_CHUNK_LENGTH_INVALID"
-	ValidationChunkOverlapInvalid       common.FieldCode = "KNOWLEDGE_BASE_CHUNK_OVERLAP_INVALID"
-	ValidationRetrievalCountInvalid     common.FieldCode = "KNOWLEDGE_BASE_RETRIEVAL_COUNT_INVALID"
-	ValidationRerankModelInvalid        common.FieldCode = "KNOWLEDGE_BASE_RERANK_MODEL_INVALID"
+	ValidationEmbeddingModelInvalid          common.FieldCode = "KNOWLEDGE_BASE_EMBEDDING_MODEL_INVALID"
+	ValidationEmbeddingDimensionInvalid      common.FieldCode = "KNOWLEDGE_BASE_EMBEDDING_DIMENSION_INVALID"
+	ValidationChunkLengthInvalid             common.FieldCode = "KNOWLEDGE_BASE_CHUNK_LENGTH_INVALID"
+	ValidationChunkOverlapInvalid            common.FieldCode = "KNOWLEDGE_BASE_CHUNK_OVERLAP_INVALID"
+	ValidationRetrievalCountInvalid          common.FieldCode = "KNOWLEDGE_BASE_RETRIEVAL_COUNT_INVALID"
+	ValidationRetrievalScoreThresholdInvalid common.FieldCode = "KNOWLEDGE_BASE_RETRIEVAL_SCORE_THRESHOLD_INVALID"
+	ValidationRerankModelInvalid             common.FieldCode = "KNOWLEDGE_BASE_RERANK_MODEL_INVALID"
 
 	ValidationQAQuestionRequired common.FieldCode = "KNOWLEDGE_QA_QUESTION_REQUIRED"
 	ValidationQAAnswerRequired   common.FieldCode = "KNOWLEDGE_QA_ANSWER_REQUIRED"
@@ -72,6 +73,9 @@ func normalizeInput(input Input) (Input, map[string]common.FieldCode) {
 	}
 	if input.RetrievalCount < 1 || input.RetrievalCount > 20 {
 		fields["retrievalCount"] = ValidationRetrievalCountInvalid
+	}
+	if input.RetrievalScoreThreshold < 0 || input.RetrievalScoreThreshold > 1 {
+		fields["retrievalScoreThreshold"] = ValidationRetrievalScoreThresholdInvalid
 	}
 	if !common.ValidUUID(input.RerankProviderID) || input.RerankModelIdentifier == "" {
 		fields["rerankModelIdentifier"] = ValidationRerankModelInvalid
