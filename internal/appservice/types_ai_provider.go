@@ -9,6 +9,8 @@ const (
 	AIProviderBrandDeepSeek   AIProviderBrand = AIProviderBrand(domain.AIProviderBrandDeepSeek)
 	AIProviderBrandAlibaba    AIProviderBrand = AIProviderBrand(domain.AIProviderBrandAlibaba)
 	AIProviderBrandOpenAI     AIProviderBrand = AIProviderBrand(domain.AIProviderBrandOpenAI)
+	AIProviderBrandAnthropic  AIProviderBrand = AIProviderBrand(domain.AIProviderBrandAnthropic)
+	AIProviderBrandGoogle     AIProviderBrand = AIProviderBrand(domain.AIProviderBrandGoogle)
 	AIProviderBrandMoonshot   AIProviderBrand = AIProviderBrand(domain.AIProviderBrandMoonshot)
 	AIProviderBrandZhipu      AIProviderBrand = AIProviderBrand(domain.AIProviderBrandZhipu)
 	AIProviderBrandVolcengine AIProviderBrand = AIProviderBrand(domain.AIProviderBrandVolcengine)

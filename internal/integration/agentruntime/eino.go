@@ -25,7 +25,7 @@ const (
 
 type runIDContextKey struct{}
 
-// EinoRuntime 使用标准 Message TurnLoop 执行 Agent。
+// EinoRuntime 使用 AgenticMessage TurnLoop 执行 Agent。
 type EinoRuntime struct {
 	newModel modelFactory
 	tools    []tool.BaseTool
@@ -41,7 +41,7 @@ func New() (*EinoRuntime, error) {
 	if err != nil {
 		return nil, fmt.Errorf("create calculator tool: %w", err)
 	}
-	return &EinoRuntime{newModel: newOpenAICompatibleModel, tools: []tool.BaseTool{calculator}}, nil
+	return &EinoRuntime{newModel: newAgenticModel, tools: []tool.BaseTool{calculator}}, nil
 }
 
 // Run 执行受迭代上限和 context 控制的 TurnLoop，并在安全点吸收后续输入。
@@ -103,10 +103,10 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 	if len(media.modalities) > 0 {
 		media.maxCount = max(1, window*mediaWindowPercent/100/mediaTokens)
 	}
-	trackedModel := &mediaTrackingModel{ToolCallingChatModel: chatModel, rejected: &atomic.Bool{}}
-	handlers := append([]adk.ChatModelAgentMiddleware{recorder, newFinalIterationGuard(maxIterations)}, reductionHandlers...)
+	trackedModel := &mediaTrackingModel{AgenticModel: chatModel, rejected: &atomic.Bool{}}
+	handlers := append([]adk.TypedChatModelAgentMiddleware[*schema.AgenticMessage]{recorder, newFinalIterationGuard(maxIterations)}, reductionHandlers...)
 	handlers = append(handlers, &toolArgumentsNormalizer{})
-	agent, err := adk.NewChatModelAgent(ctx, &adk.ChatModelAgentConfig{
+	agent, err := adk.NewTypedChatModelAgent(ctx, &adk.TypedChatModelAgentConfig[*schema.AgenticMessage]{
 		Name: request.Name, Instruction: request.Instruction, Model: trackedModel,
 		ToolsConfig: adk.ToolsConfig{ToolsNodeConfig: compose.ToolsNodeConfig{
 			Tools: tools, ToolCallMiddlewares: []compose.ToolMiddleware{toolExecutionMiddleware(recorder)},
@@ -124,9 +124,9 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 		execution := &einoExecution{
 			inputs: &turnInputs{feed: feed}, recorder: recorder, maxTurns: request.MaxTurns, contextWindow: window, media: media,
 		}
-		execution.inputs.loop = adk.NewTurnLoop(adk.TurnLoopConfig[Trigger, *schema.Message]{
+		execution.inputs.loop = adk.NewTurnLoop(adk.TurnLoopConfig[Trigger, *schema.AgenticMessage]{
 			GenInput: execution.genInput,
-			PrepareAgent: func(context.Context, *adk.TurnLoop[Trigger, *schema.Message], []Trigger) (adk.Agent, error) {
+			PrepareAgent: func(context.Context, *adk.TurnLoop[Trigger, *schema.AgenticMessage], []Trigger) (adk.TypedAgent[*schema.AgenticMessage], error) {
 				return agent, nil
 			},
 			OnAgentEvents: execution.onAgentEvents,
@@ -175,7 +175,7 @@ type einoExecution struct {
 }
 
 // genInput 认领新输入，并在已有执行上下文后追加尚未消费的会话消息。
-func (e *einoExecution) genInput(ctx context.Context, _ *adk.TurnLoop[Trigger, *schema.Message], items []Trigger) (*adk.GenInputResult[Trigger, *schema.Message], error) {
+func (e *einoExecution) genInput(ctx context.Context, _ *adk.TurnLoop[Trigger, *schema.AgenticMessage], items []Trigger) (*adk.GenInputResult[Trigger, *schema.AgenticMessage], error) {
 	e.turns++
 	e.recorder.resetCandidate()
 	if e.maxTurns > 0 && e.turns > e.maxTurns {
@@ -189,8 +189,8 @@ func (e *einoExecution) genInput(ctx context.Context, _ *adk.TurnLoop[Trigger, *
 	if err != nil {
 		return nil, err
 	}
-	return &adk.GenInputResult[Trigger, *schema.Message]{
-		Input: &adk.AgentInput{Messages: e.history.appendInput(ctx, trimClaimedHistory(ctx, claimed.Messages, e.contextWindow), e.media)},
+	return &adk.GenInputResult[Trigger, *schema.AgenticMessage]{
+		Input: &adk.TypedAgentInput[*schema.AgenticMessage]{Messages: e.history.appendInput(ctx, trimClaimedHistory(ctx, claimed.Messages, e.contextWindow), e.media)},
 		RunOpts: []adk.AgentRunOption{
 			adk.WithAfterToolCallsHook(func(hookCtx context.Context) error {
 				return e.inputs.poll(hookCtx, true)
@@ -201,9 +201,9 @@ func (e *einoExecution) genInput(ctx context.Context, _ *adk.TurnLoop[Trigger, *
 }
 
 // onAgentEvents 保存完整中间消息，并由输入协调器决定继续下一轮或收尾。
-func (e *einoExecution) onAgentEvents(ctx context.Context, turn *adk.TurnContext[Trigger, *schema.Message], events *adk.AsyncIterator[*adk.AgentEvent]) error {
+func (e *einoExecution) onAgentEvents(ctx context.Context, turn *adk.TurnContext[Trigger, *schema.AgenticMessage], events *adk.AsyncIterator[*adk.TypedAgentEvent[*schema.AgenticMessage]]) error {
 	candidate := ""
-	var intermediates []*schema.Message
+	var intermediates []*schema.AgenticMessage
 	for {
 		event, ok := events.Next()
 		if !ok {
@@ -222,20 +222,21 @@ func (e *einoExecution) onAgentEvents(ctx context.Context, turn *adk.TurnContext
 		if err != nil {
 			return err
 		}
-		if message == nil || (message.Role != schema.Assistant && message.Role != schema.Tool) {
+		// 模型输出以 assistant 角色返回，工具结果以携带结果块的 user 角色返回。
+		if message == nil || message.Role == schema.AgenticRoleTypeSystem {
 			continue
 		}
 		intermediates = append(intermediates, message)
-		if message.Role != schema.Assistant {
+		if message.Role != schema.AgenticRoleTypeAssistant {
 			continue
 		}
-		if message.ResponseMeta != nil && message.ResponseMeta.Usage != nil {
-			e.result.Usage.PromptTokens += message.ResponseMeta.Usage.PromptTokens
-			e.result.Usage.CompletionTokens += message.ResponseMeta.Usage.CompletionTokens
-			e.result.Usage.TotalTokens += message.ResponseMeta.Usage.TotalTokens
+		if message.ResponseMeta != nil && message.ResponseMeta.TokenUsage != nil {
+			e.result.Usage.PromptTokens += message.ResponseMeta.TokenUsage.PromptTokens
+			e.result.Usage.CompletionTokens += message.ResponseMeta.TokenUsage.CompletionTokens
+			e.result.Usage.TotalTokens += message.ResponseMeta.TokenUsage.TotalTokens
 		}
-		if len(message.ToolCalls) == 0 && strings.TrimSpace(message.Content) != "" {
-			candidate = strings.TrimSpace(message.Content)
+		if text := strings.TrimSpace(assistantText(message)); !hasToolCalls(message) && text != "" {
+			candidate = text
 		}
 	}
 	e.history.appendOutput(intermediates)
@@ -247,6 +248,27 @@ func (e *einoExecution) onAgentEvents(ctx context.Context, turn *adk.TurnContext
 		e.result.Content = candidate
 	}
 	return nil
+}
+
+// assistantText 拼接模型输出中的全部正文块。
+func assistantText(message *schema.AgenticMessage) string {
+	var text strings.Builder
+	for _, block := range message.ContentBlocks {
+		if block.Type == schema.ContentBlockTypeAssistantGenText {
+			text.WriteString(block.AssistantGenText.Text)
+		}
+	}
+	return text.String()
+}
+
+// hasToolCalls 判断模型输出是否包含工具调用块。
+func hasToolCalls(message *schema.AgenticMessage) bool {
+	for _, block := range message.ContentBlocks {
+		if block.Type == schema.ContentBlockTypeFunctionToolCall {
+			return true
+		}
+	}
+	return false
 }
 
 // runIDFromContext 返回当前 Runtime 传给组件的 Agent Run 编号。

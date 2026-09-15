@@ -10,6 +10,8 @@ export const aiProviderBrandOrder: AIProviderBrandId[] = [
   AIProviderBrand.AIProviderBrandDeepSeek,
   AIProviderBrand.AIProviderBrandAlibaba,
   AIProviderBrand.AIProviderBrandOpenAI,
+  AIProviderBrand.AIProviderBrandAnthropic,
+  AIProviderBrand.AIProviderBrandGoogle,
   AIProviderBrand.AIProviderBrandMoonshot,
   AIProviderBrand.AIProviderBrandZhipu,
   AIProviderBrand.AIProviderBrandVolcengine,
@@ -33,6 +35,14 @@ export const aiProviderBrandConfigs: Record<
   [AIProviderBrand.AIProviderBrandOpenAI]: {
     nameKey: "modelServices.brands.openai",
     defaultAPIURL: "https://api.openai.com/v1",
+  },
+  [AIProviderBrand.AIProviderBrandAnthropic]: {
+    nameKey: "modelServices.brands.anthropic",
+    defaultAPIURL: "https://api.anthropic.com",
+  },
+  [AIProviderBrand.AIProviderBrandGoogle]: {
+    nameKey: "modelServices.brands.google",
+    defaultAPIURL: "https://generativelanguage.googleapis.com",
   },
   [AIProviderBrand.AIProviderBrandMoonshot]: {
     nameKey: "modelServices.brands.moonshot",

@@ -13,14 +13,17 @@ import (
 // TestRegistryUsesProviderReadOnlyEndpoints 验证内置供应商通过只读模型列表接口测试连接。
 func TestRegistryUsesProviderReadOnlyEndpoints(t *testing.T) {
 	tests := []struct {
-		name     string
-		brand    domain.AIProviderBrand
-		basePath string
-		wantPath string
-		response string
+		name       string
+		brand      domain.AIProviderBrand
+		basePath   string
+		wantPath   string
+		authHeader string
+		response   string
 	}{
 		{name: "DeepSeek", brand: domain.AIProviderBrandDeepSeek, wantPath: "/models", response: `{"object":"list","data":[]}`},
 		{name: "OpenAI", brand: domain.AIProviderBrandOpenAI, basePath: "/v1", wantPath: "/v1/models", response: `{"object":"list","data":[]}`},
+		{name: "Anthropic", brand: domain.AIProviderBrandAnthropic, wantPath: "/v1/models", authHeader: "x-api-key", response: `{"data":[],"has_more":false}`},
+		{name: "Google", brand: domain.AIProviderBrandGoogle, wantPath: "/v1beta/models", authHeader: "x-goog-api-key", response: `{"models":[]}`},
 		{name: "阿里云百炼", brand: domain.AIProviderBrandAlibaba, wantPath: "/api/v1/models", response: `{"success":true,"output":{"models":[]}}`},
 		{name: "月之暗面", brand: domain.AIProviderBrandMoonshot, basePath: "/v1", wantPath: "/v1/models", response: `{"object":"list","data":[]}`},
 		{name: "智谱", brand: domain.AIProviderBrandZhipu, basePath: "/api/paas/v4", wantPath: "/api/paas/v4/models", response: `{"object":"list","data":[]}`},
@@ -35,8 +38,15 @@ func TestRegistryUsesProviderReadOnlyEndpoints(t *testing.T) {
 				if request.Method != http.MethodGet || request.URL.Path != test.wantPath {
 					t.Errorf("request = %s %s, want GET %s", request.Method, request.URL.Path, test.wantPath)
 				}
-				if request.Header.Get("Authorization") != "Bearer test-key" {
+				// 没有指定专用凭据头的品牌统一使用 Bearer 认证。
+				if test.authHeader != "" && request.Header.Get(test.authHeader) != "test-key" {
+					t.Errorf("missing %s credential", test.authHeader)
+				}
+				if test.authHeader == "" && request.Header.Get("Authorization") != "Bearer test-key" {
 					t.Error("missing bearer authorization")
+				}
+				if test.brand == domain.AIProviderBrandAnthropic && request.Header.Get("anthropic-version") != "2023-06-01" {
+					t.Error("missing anthropic-version header")
 				}
 				writer.Header().Set("Content-Type", "application/json")
 				_, _ = writer.Write([]byte(test.response))

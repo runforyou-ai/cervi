@@ -24,7 +24,7 @@ type toolHungryChatModel struct {
 }
 
 // Generate 按本次可用工具决定继续调用还是收尾。
-func (m *toolHungryChatModel) Generate(_ context.Context, input []*schema.Message, opts ...model.Option) (*schema.Message, error) {
+func (m *toolHungryChatModel) Generate(_ context.Context, input []*schema.AgenticMessage, opts ...model.Option) (*schema.AgenticMessage, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.lastTools = nil
@@ -33,25 +33,20 @@ func (m *toolHungryChatModel) Generate(_ context.Context, input []*schema.Messag
 	}
 	m.toolsByCall = append(m.toolsByCall, m.lastTools)
 	for _, message := range input {
-		if message.Role == schema.User {
-			m.lastUserText = message.Content
+		if messageKind(message) == "user" {
+			m.lastUserText = messageText(message)
 		}
 	}
 	if slices.Contains(m.lastTools, "calculator") {
-		return schema.AssistantMessage("继续算", []schema.ToolCall{{
-			ID: "calculator-call", Type: "function",
-			Function: schema.FunctionCall{Name: "calculator", Arguments: `{"operation":"add","left":1,"right":1}`},
-		}}), nil
+		return assistantReply("继续算", &schema.FunctionToolCall{
+			CallID: "calculator-call", Name: "calculator", Arguments: `{"operation":"add","left":1,"right":1}`,
+		}), nil
 	}
-	return schema.AssistantMessage("按已有资料回答", nil), nil
+	return assistantReply("按已有资料回答"), nil
 }
 
-func (m *toolHungryChatModel) Stream(context.Context, []*schema.Message, ...model.Option) (*schema.StreamReader[*schema.Message], error) {
+func (m *toolHungryChatModel) Stream(context.Context, []*schema.AgenticMessage, ...model.Option) (*schema.StreamReader[*schema.AgenticMessage], error) {
 	return nil, errors.New("unexpected streaming call")
-}
-
-func (m *toolHungryChatModel) WithTools([]*schema.ToolInfo) (model.ToolCallingChatModel, error) {
-	return m, nil
 }
 
 // TestFinalIterationAnswersWithoutTools 验证到达迭代上限时移除工具，本轮以最终回答收尾。
@@ -62,7 +57,7 @@ func TestFinalIterationAnswersWithoutTools(t *testing.T) {
 	}
 	chatModel := &toolHungryChatModel{}
 	runtime := &EinoRuntime{
-		newModel: func(context.Context, ModelConfig) (model.ToolCallingChatModel, error) { return chatModel, nil },
+		newModel: func(context.Context, ModelConfig) (model.AgenticModel, error) { return chatModel, nil },
 		tools:    []tool.BaseTool{calculator},
 	}
 	feed := &testInputFeed{}

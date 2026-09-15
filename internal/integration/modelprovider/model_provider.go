@@ -39,6 +39,8 @@ func NewRegistry(client HTTPDoer) *Registry {
 	return &Registry{factories: map[domain.AIProviderBrand]Factory{
 		domain.AIProviderBrandDeepSeek:   openAICompatible,
 		domain.AIProviderBrandOpenAI:     openAICompatible,
+		domain.AIProviderBrandAnthropic:  newAnthropicFactory(client),
+		domain.AIProviderBrandGoogle:     newGoogleFactory(client),
 		domain.AIProviderBrandAlibaba:    newAlibabaFactory(client),
 		domain.AIProviderBrandMoonshot:   openAICompatible,
 		domain.AIProviderBrandZhipu:      openAICompatible,
@@ -107,6 +109,41 @@ func newAlibabaFactory(client HTTPDoer) Factory {
 	}
 }
 
+// newAnthropicFactory 创建 Anthropic 模型列表探测器工厂，凭据通过 x-api-key 传递。
+func newAnthropicFactory(client HTTPDoer) Factory {
+	return func(config Config) (connectiontest.Probe, error) {
+		requestURL, err := connectiontest.AppendPath(config.APIURL, "v1/models")
+		if err != nil {
+			return nil, connectiontest.InvalidConfigError(err)
+		}
+		request, err := http.NewRequest(http.MethodGet, requestURL, nil)
+		if err != nil {
+			return nil, connectiontest.InvalidConfigError(err)
+		}
+		request.Header.Set("Accept", "application/json")
+		request.Header.Set("x-api-key", config.APIKey)
+		request.Header.Set("anthropic-version", "2023-06-01")
+		return &httpProbe{client: client, request: request, validate: connectiontest.ValidateDataList}, nil
+	}
+}
+
+// newGoogleFactory 创建 Gemini API 模型列表探测器工厂，凭据通过 x-goog-api-key 传递。
+func newGoogleFactory(client HTTPDoer) Factory {
+	return func(config Config) (connectiontest.Probe, error) {
+		requestURL, err := connectiontest.AppendPath(config.APIURL, "v1beta/models")
+		if err != nil {
+			return nil, connectiontest.InvalidConfigError(err)
+		}
+		request, err := http.NewRequest(http.MethodGet, requestURL, nil)
+		if err != nil {
+			return nil, connectiontest.InvalidConfigError(err)
+		}
+		request.Header.Set("Accept", "application/json")
+		request.Header.Set("x-goog-api-key", config.APIKey)
+		return &httpProbe{client: client, request: request, validate: validateGoogleModelList}, nil
+	}
+}
+
 // setHeaders 设置模型服务探测的通用请求头。
 func setHeaders(request *http.Request, apiKey string) {
 	request.Header.Set("Accept", "application/json")
@@ -131,6 +168,20 @@ func alibabaModelsURL(baseURL string) (string, error) {
 	parsed.RawPath = ""
 	parsed.Path = path
 	return parsed.String(), nil
+}
+
+// validateGoogleModelList 校验 Gemini API 模型列表的最小响应契约。
+func validateGoogleModelList(reader io.Reader) error {
+	var payload struct {
+		Models json.RawMessage `json:"models"`
+	}
+	if err := json.NewDecoder(reader).Decode(&payload); err != nil {
+		return err
+	}
+	if len(payload.Models) == 0 || payload.Models[0] != '[' {
+		return errors.New("model list response does not contain a models array")
+	}
+	return nil
 }
 
 // validateAlibabaModelList 校验阿里云百炼模型列表的最小响应契约。
