@@ -25,7 +25,7 @@ func (s *Scheduler) ScheduleCustomerAuto(ctx context.Context, db bun.IDB, organi
 	if s == nil || s.enqueuer == nil {
 		return false, errors.New("agent run scheduler is unavailable")
 	}
-	session, err := chatstate.LockCustomerServiceSession(ctx, db, organizationID, conversationID)
+	_, session, err := chatstate.LockCustomerServiceSession(ctx, db, organizationID, conversationID)
 	if err != nil {
 		return false, err
 	}

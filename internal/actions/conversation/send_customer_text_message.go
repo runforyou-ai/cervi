@@ -19,6 +19,7 @@ import (
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
@@ -87,7 +88,7 @@ func (a *SendCustomerTextMessageAction) Execute(ctx context.Context, identity *s
 
 	for attempt := 0; attempt < maxWriteAttempts; attempt++ {
 		var result ConversationMessage
-		err = a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		err = realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 			var executeErr error
 			result, executeErr = a.executeTransaction(ctx, tx, identity, normalized, ids, idempotencyKey)
 			return executeErr

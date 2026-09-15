@@ -17,6 +17,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
 	"github.com/runforyou-ai/cervi/internal/integration/telegram"
+	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -69,7 +70,7 @@ func (a *SaveTelegramConnectionAction) Execute(ctx context.Context, identity *se
 			var enabled bool
 			var secret string
 			var cancelledRuns int
-			err := conn.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+			err := realtime.RunInTx(ctx, conn, func(ctx context.Context, tx bun.Tx) error {
 				if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 					return err
 				}

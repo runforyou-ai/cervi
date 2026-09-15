@@ -13,8 +13,10 @@ import (
 
 	"github.com/runforyou-ai/cervi/internal/actions/channelmessage"
 	"github.com/runforyou-ai/cervi/internal/actions/channelstate"
+	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/telegram"
+	"github.com/runforyou-ai/cervi/internal/realtime"
 	models "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
@@ -90,13 +92,18 @@ func (w *Worker) Execute(ctx context.Context, input Input) error {
 func (w *Worker) claim(ctx context.Context, conn bun.Conn, id string) (*models.CustomerMessageDelivery, string, string, string, error) {
 	var claimed *models.CustomerMessageDelivery
 	var token, recipient, body string
-	err := conn.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err := realtime.RunInTx(ctx, conn, func(ctx context.Context, tx bun.Tx) error {
 		delivery := &models.CustomerMessageDelivery{}
 		if err := tx.NewSelect().Model(delivery).Where("cmd.id = ?", id).Scan(ctx); err != nil {
 			return err
 		}
 		// 身份行统一协调消息生产、扫描和人工重新排队。
 		if _, err := tx.ExecContext(ctx, "SELECT id FROM contact_channel_identities WHERE id = ? AND organization_id = ? FOR UPDATE", delivery.ContactChannelIdentityID, delivery.OrganizationID); err != nil {
+			return err
+		}
+		// 按渠道身份、会话、投递的顺序加锁，投递状态变化推进会话版本。
+		conversation, err := chatstate.LockCustomerConversation(ctx, tx, delivery.OrganizationID, delivery.ConversationID)
+		if err != nil {
 			return err
 		}
 		if err := tx.NewSelect().Model(delivery).WherePK().Where("cmd.organization_id = ?", delivery.OrganizationID).For("UPDATE").Scan(ctx); err != nil {
@@ -110,13 +117,13 @@ func (w *Worker) claim(ctx context.Context, conn bun.Conn, id string) (*models.C
 				delivery.Status, delivery.UncertainUntil, delivery.LastError = domain.CustomerDeliveryUncertain, &until, "unknown_result"
 				slog.Warn("客户消息发送认领过期，等待人工确认", "delivery_id", delivery.ID, "channel_id", delivery.ChannelID)
 				delivery.LeaseWorker, delivery.LeaseExpiresAt = nil, nil
-				return saveDelivery(ctx, tx, delivery)
+				return saveDelivery(ctx, tx, conversation, delivery)
 			}
 			return nil
 		case domain.CustomerDeliveryUncertain:
 			if delivery.UncertainUntil != nil && !delivery.UncertainUntil.After(now) {
 				delivery.Status = domain.CustomerDeliveryNeedsReview
-				return saveDelivery(ctx, tx, delivery)
+				return saveDelivery(ctx, tx, conversation, delivery)
 			}
 			return nil
 		case domain.CustomerDeliveryPending, domain.CustomerDeliveryRetryWait:
@@ -149,19 +156,16 @@ func (w *Worker) claim(ctx context.Context, conn bun.Conn, id string) (*models.C
 		if route.BotID == nil || *route.BotID != delivery.BotID {
 			delivery.Status, delivery.LastError = domain.CustomerDeliveryFailed, "bot_changed"
 			slog.Warn("客户消息因机器人变化停止投递", "delivery_id", delivery.ID, "channel_id", delivery.ChannelID)
-			return saveDelivery(ctx, tx, delivery)
+			return saveDelivery(ctx, tx, conversation, delivery)
 		}
 		if !route.Enabled {
-			if delivery.LastError != "channel_disabled" {
-				slog.Info("客户消息因渠道停用暂停投递", "delivery_id", delivery.ID, "channel_id", delivery.ChannelID)
-			}
-			delivery.LastError = "channel_disabled"
-			return saveDelivery(ctx, tx, delivery)
+			slog.Info("客户消息因渠道停用暂停投递", "delivery_id", delivery.ID, "channel_id", delivery.ChannelID)
+			return nil
 		}
 		if route.Token == nil || *route.Token == "" {
 			delivery.Status, delivery.LastError = domain.CustomerDeliveryFailed, "invalid_token"
 			slog.Warn("客户消息因缺少机器人凭据停止投递", "delivery_id", delivery.ID, "channel_id", delivery.ChannelID)
-			return saveDelivery(ctx, tx, delivery)
+			return saveDelivery(ctx, tx, conversation, delivery)
 		}
 		blocked, err = tx.NewSelect().TableExpr("customer_channel_send_gates").Where("organization_id = ? AND channel_id = ? AND flood_wait_until > now()", delivery.OrganizationID, delivery.ChannelID).Exists(ctx)
 		if err != nil || blocked {
@@ -175,7 +179,7 @@ func (w *Worker) claim(ctx context.Context, conn bun.Conn, id string) (*models.C
 		delivery.Status, delivery.LeaseWorker, delivery.LeaseExpiresAt = domain.CustomerDeliverySending, &worker, &expires
 		delivery.Attempt++
 		delivery.LastError = ""
-		if err := saveDelivery(ctx, tx, delivery); err != nil {
+		if err := saveDelivery(ctx, tx, conversation, delivery); err != nil {
 			return err
 		}
 		claimed, token, recipient, body = delivery, *route.Token, route.Recipient, route.Body
@@ -186,9 +190,13 @@ func (w *Worker) claim(ctx context.Context, conn bun.Conn, id string) (*models.C
 
 // finish 保存带认领标识的平台结果，未知结果绝不自动重发。
 func (w *Worker) finish(ctx context.Context, conn bun.Conn, delivery *models.CustomerMessageDelivery, recipient string, messageID int64, sendErr error) error {
-	return conn.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	return realtime.RunInTx(ctx, conn, func(ctx context.Context, tx bun.Tx) error {
 		// 与入站共用渠道身份锁，使映射写入和迟到引用关联串行提交。
 		if _, err := tx.ExecContext(ctx, "SELECT id FROM contact_channel_identities WHERE id = ? AND organization_id = ? FOR UPDATE", delivery.ContactChannelIdentityID, delivery.OrganizationID); err != nil {
+			return err
+		}
+		conversation, err := chatstate.LockCustomerConversation(ctx, tx, delivery.OrganizationID, delivery.ConversationID)
+		if err != nil {
 			return err
 		}
 		worker := delivery.LeaseWorker
@@ -231,7 +239,7 @@ func (w *Worker) finish(ctx context.Context, conn bun.Conn, delivery *models.Cus
 				current.Status, current.UncertainUntil = domain.CustomerDeliveryUncertain, &until
 			}
 		}
-		if err := saveDelivery(ctx, tx, current); err != nil {
+		if err := saveDelivery(ctx, tx, conversation, current); err != nil {
 			return err
 		}
 		slog.Info("客户消息投递结果已保存", "delivery_id", current.ID, "channel_id", current.ChannelID, "status", current.Status, "attempt", current.Attempt, "error_code", current.LastError)
@@ -239,9 +247,11 @@ func (w *Worker) finish(ctx context.Context, conn bun.Conn, delivery *models.Cus
 	})
 }
 
-// saveDelivery 更新投递状态与运行字段。
-func saveDelivery(ctx context.Context, db bun.IDB, delivery *models.CustomerMessageDelivery) error {
+// saveDelivery 在持有会话锁的事务内更新投递状态与运行字段，并推进会话版本。
+func saveDelivery(ctx context.Context, db bun.IDB, conversation *models.Conversation, delivery *models.CustomerMessageDelivery) error {
 	delivery.UpdatedAt = time.Now().UTC()
-	_, err := db.NewUpdate().Model(delivery).WherePK().Where("organization_id = ?", delivery.OrganizationID).Exec(ctx)
-	return err
+	if _, err := db.NewUpdate().Model(delivery).WherePK().Where("organization_id = ?", delivery.OrganizationID).Exec(ctx); err != nil {
+		return err
+	}
+	return chatstate.TouchConversation(ctx, db, conversation)
 }

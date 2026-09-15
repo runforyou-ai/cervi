@@ -64,7 +64,7 @@ func cancelServiceSessionRuns(ctx context.Context, db bun.IDB, organizationID, s
 	return runIDs, nil
 }
 
-// CancelTelegramChannelRuns 在机器人更换事务中取消旧渠道输入，调用方已锁定渠道和连接设置。
+// CancelTelegramChannelRuns 在机器人更换事务中取消旧渠道输入并推进该渠道全部客户会话版本，调用方已锁定渠道和连接设置。
 func CancelTelegramChannelRuns(ctx context.Context, db bun.IDB, organizationID, channelID string) (int, error) {
 	cancelled := 0
 	var conversationIDs []string
@@ -76,7 +76,7 @@ func CancelTelegramChannelRuns(ctx context.Context, db bun.IDB, organizationID, 
 		return 0, err
 	}
 	for _, conversationID := range conversationIDs {
-		session, err := chatstate.LockCustomerServiceSession(ctx, db, organizationID, conversationID)
+		conversation, session, err := chatstate.LockCustomerServiceSession(ctx, db, organizationID, conversationID)
 		if err != nil {
 			return 0, err
 		}
@@ -86,6 +86,9 @@ func CancelTelegramChannelRuns(ctx context.Context, db bun.IDB, organizationID, 
 				return 0, err
 			}
 			cancelled += len(runIDs)
+		}
+		if err := chatstate.TouchConversation(ctx, db, conversation); err != nil {
+			return 0, err
 		}
 	}
 	return cancelled, nil

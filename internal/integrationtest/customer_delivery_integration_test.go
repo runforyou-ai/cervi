@@ -211,7 +211,7 @@ func TestCustomerDeliveryLeaseAndLifecycle(t *testing.T) {
 	if _, err := f.db.ExecContext(ctx, "UPDATE channels SET enabled = false WHERE id = ?", f.channelID); err != nil {
 		t.Fatal(err)
 	}
-	if got := f.execute(t, second.ID); got.Status != domain.CustomerDeliveryPending || got.LastError != "channel_disabled" {
+	if got := f.execute(t, second.ID); got.Status != domain.CustomerDeliveryPending || got.LastError != "" {
 		t.Fatalf("paused=%+v", got)
 	}
 	if _, err := f.db.ExecContext(ctx, "UPDATE channels SET enabled = true WHERE id = ?", f.channelID); err != nil {

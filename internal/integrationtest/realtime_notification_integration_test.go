@@ -15,12 +15,17 @@ import (
 
 	"github.com/nats-io/nats.go"
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
+	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
+	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
+	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
+	telegramintegration "github.com/runforyou-ai/cervi/internal/integration/telegram"
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	"github.com/runforyou-ai/cervi/internal/servertest"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -80,6 +85,14 @@ func (f *realtimeFeed) removed(userID, conversationID string) receivedNotificati
 	return receivedNotification{
 		Subject: realtime.Subject(f.namespace, f.organizationID, realtime.AudienceUser, userID),
 		Kind:    string(realtime.KindConversationRemoved), ConversationID: conversationID,
+	}
+}
+
+// customerInbox 构造发往企业客服共享受众的客户会话变更通知。
+func (f *realtimeFeed) customerInbox(conversationID string, version int64) receivedNotification {
+	return receivedNotification{
+		Subject: realtime.Subject(f.namespace, f.organizationID, realtime.AudienceCustomerInbox, f.organizationID),
+		Kind:    string(realtime.KindConversationChanged), ConversationID: conversationID, Version: strconv.FormatInt(version, 10),
 	}
 }
 
@@ -467,4 +480,213 @@ func testAgentRunNotifications(t *testing.T, db *bun.DB, identity *servermodels.
 		t.Fatalf("recovered run version=%d want=%d", after, before+1)
 	}
 	feed.expect(t, feed.notice(identity.User.ID, realtime.KindConversationChanged, recovering.ConversationID, after))
+}
+
+// TestRealtimeCustomerInboxNotifications 验证客户会话收发与服务周期变化只通知企业客服共享受众，客服已读只通知本人。
+func TestRealtimeCustomerInboxNotifications(t *testing.T) {
+	f := newCustomerReadFixture(t)
+	ctx := context.Background()
+	coordinator := newGroupAgentCoordinator(f.db)
+	claim := conversationaction.NewClaimServiceSessionAction(f.db, coordinator)
+	closeSession := conversationaction.NewCloseServiceSessionAction(f.db, coordinator)
+	reopen := conversationaction.NewReopenServiceSessionAction(f.db)
+	inbox := inboxaction.NewLoadInboxQuery(f.db)
+	feed := startRealtimeFeed(t, f.owner.Organization.ID)
+	// changed 构造客户会话当前版本的共享受众通知。
+	changed := func() receivedNotification {
+		return feed.customerInbox(f.conversationID, loadConversationVersion(t, f.db, f.conversationID))
+	}
+	// listed 判断客户会话是否出现在指定客服的处理视图中。
+	listed := func(identity *servermodels.Identity, view domain.CustomerInboxView, status domain.ServiceSessionStatus) bool {
+		page, _, err := inbox.Execute(ctx, identity, inboxaction.LoadInput{Scope: domain.InboxScopeCustomer, CustomerView: view, ServiceStatus: status})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return slices.ContainsFunc(page.Conversations, func(row inboxaction.ConversationSummary) bool { return row.ID == f.conversationID })
+	}
+	// activity 读取客户会话的活动排序时间。
+	activity := func() time.Time {
+		var value time.Time
+		if err := f.db.NewSelect().Table("conversations").Column("last_activity_at").Where("id = ?", f.conversationID).Scan(ctx, &value); err != nil {
+			t.Fatal(err)
+		}
+		return value
+	}
+
+	// 访客消息只通知共享受众，不逐客服扇出。
+	if _, err := f.visitorMessage(ctx, "访客追问"); err != nil {
+		t.Fatal(err)
+	}
+	feed.expect(t, changed())
+
+	// 领取后公共队列移除、本人与同事视图出现，筛选迁移不影响双方按 ID 阅读。
+	if _, err := claim.Execute(ctx, f.owner, f.conversationID); err != nil {
+		t.Fatal(err)
+	}
+	feed.expect(t, changed())
+	if listed(f.owner, domain.CustomerInboxViewQueue, domain.ServiceSessionStatusOpen) || listed(f.member, domain.CustomerInboxViewQueue, domain.ServiceSessionStatusOpen) || !listed(f.owner, domain.CustomerInboxViewMine, domain.ServiceSessionStatusOpen) || !listed(f.member, domain.CustomerInboxViewCoworkers, domain.ServiceSessionStatusOpen) {
+		t.Fatal("claimed conversation views did not converge")
+	}
+	for _, identity := range []*servermodels.Identity{f.owner, f.member} {
+		results, err := inbox.ReadByIDs(ctx, identity, []string{f.conversationID}, nil)
+		if err != nil || len(results) != 1 || results[0].Conversation == nil {
+			t.Fatalf("claimed conversation unreadable results=%+v err=%v", results, err)
+		}
+	}
+	// 负责人重复领取没有变化，不推进版本。
+	version := loadConversationVersion(t, f.db, f.conversationID)
+	if _, err := claim.Execute(ctx, f.owner, f.conversationID); err != nil {
+		t.Fatal(err)
+	}
+	if after := loadConversationVersion(t, f.db, f.conversationID); after != version {
+		t.Fatalf("repeated claim version=%d want=%d", after, version)
+	}
+
+	// 负责人回复通知共享受众。
+	if _, err := conversationaction.NewSendCustomerTextMessageAction(f.db, nil).Execute(ctx, f.owner, conversationaction.CustomerTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "客服回复"}); err != nil {
+		t.Fatal(err)
+	}
+	feed.expect(t, changed())
+
+	// 转交通知共享受众；原负责人随后关闭被拒绝，不留通知。
+	if _, err := conversationaction.NewTransferServiceSessionAction(f.db, coordinator, nil).Execute(ctx, f.owner, conversationaction.TransferServiceSessionInput{ConversationID: f.conversationID, AssigneeIdentityID: f.member.OrganizationIdentity.ID}); err != nil {
+		t.Fatal(err)
+	}
+	feed.expect(t, changed())
+	if _, err := closeSession.Execute(ctx, f.owner, f.conversationID); err == nil {
+		t.Fatal("former assignee closed the transferred session")
+	}
+
+	// 关闭与重开改变服务视图并通知，但不改变活动时间。
+	lastActivity := activity()
+	if _, err := closeSession.Execute(ctx, f.member, f.conversationID); err != nil {
+		t.Fatal(err)
+	}
+	feed.expect(t, changed())
+	if !listed(f.member, domain.CustomerInboxViewMine, domain.ServiceSessionStatusClosed) {
+		t.Fatal("closed conversation missing from closed view")
+	}
+	if _, err := reopen.Execute(ctx, f.member, f.conversationID); err != nil {
+		t.Fatal(err)
+	}
+	feed.expect(t, changed())
+	if !activity().Equal(lastActivity) {
+		t.Fatalf("service status changed activity from %s to %s", lastActivity, activity())
+	}
+
+	// 关闭后访客再发消息开启新周期并通知共享受众。
+	if _, err := closeSession.Execute(ctx, f.member, f.conversationID); err != nil {
+		t.Fatal(err)
+	}
+	feed.expect(t, changed())
+	next, err := f.visitorMessage(ctx, "新周期消息")
+	if err != nil || !next.OpenedNewServiceSession {
+		t.Fatalf("new service session result=%+v err=%v", next, err)
+	}
+	feed.expect(t, changed())
+
+	// 客服已读只通知本人。
+	if _, err := conversationaction.NewMarkConversationReadAction(f.db).Execute(ctx, f.member, f.conversationID, next.Message.ID, false); err != nil {
+		t.Fatal(err)
+	}
+	feed.expect(t, feed.notice(f.member.User.ID, realtime.KindConversationStateChanged, f.conversationID, loadConversationStateVersion(t, f.db, f.conversationID, f.member.User.ID)))
+}
+
+// TestRealtimeCustomerDeliveryNotifications 验证投递状态变化、渠道启停与更换机器人推进客户会话版本并通知共享受众，无变化的写入不推进。
+func TestRealtimeCustomerDeliveryNotifications(t *testing.T) {
+	f := newCustomerDeliveryFixture(t)
+	ctx := context.Background()
+	feed := startRealtimeFeed(t, f.owner.Organization.ID)
+	// changed 构造比客户会话当前版本低 offset 的共享受众通知。
+	changed := func(offset int64) receivedNotification {
+		return feed.customerInbox(f.conversationID, loadConversationVersion(t, f.db, f.conversationID)-offset)
+	}
+	// unchanged 执行一次投递并断言会话版本不变。
+	unchanged := func(id string) {
+		version := loadConversationVersion(t, f.db, f.conversationID)
+		f.execute(t, id)
+		if after := loadConversationVersion(t, f.db, f.conversationID); after != version {
+			t.Fatalf("no-op delivery version=%d want=%d", after, version)
+		}
+	}
+
+	// 回复与入队同事务通知一次。
+	first := f.send(t, "第一条", uuid.NewV7().String())
+	feed.expect(t, changed(0))
+	second := f.send(t, "第二条", uuid.NewV7().String())
+	feed.expect(t, changed(0))
+	// 队头未完成时第二条认领不写入。
+	unchanged(second.ID)
+
+	// 认领与发送结果各推进一次版本。
+	f.sender.err = &telegramintegration.SendError{Code: "recipient_unavailable"}
+	if got := f.execute(t, first.ID); got.Status != domain.CustomerDeliveryFailed {
+		t.Fatalf("delivery status=%s", got.Status)
+	}
+	feed.expect(t, changed(1), changed(0))
+
+	// 人工重试通知共享受众。
+	f.sender.err = nil
+	if err := deliveryaction.NewManager(f.db, nil).Resolve(ctx, f.owner, f.conversationID, first.ID, domain.CustomerDeliveryRetry, false); err != nil {
+		t.Fatal(err)
+	}
+	feed.expect(t, changed(0))
+
+	// 停用渠道推进有待发送投递的会话版本，重复停用不推进。
+	api := &telegramBotAPIFake{bot: telegramintegration.Bot{ID: 456, IsBot: true, FirstName: "新机器人", Username: "new_delivery_bot"}}
+	runner := connectiontest.NewRunner(time.Second)
+	updateStatus := channelaction.NewUpdateTelegramChannelStatusAction(f.db, runner, api)
+	if _, err := updateStatus.Execute(ctx, f.owner, f.channelID, false); err != nil {
+		t.Fatal(err)
+	}
+	feed.expect(t, changed(0))
+	version := loadConversationVersion(t, f.db, f.conversationID)
+	if _, err := updateStatus.Execute(ctx, f.owner, f.channelID, false); err != nil {
+		t.Fatal(err)
+	}
+	if after := loadConversationVersion(t, f.db, f.conversationID); after != version {
+		t.Fatalf("repeated disable version=%d want=%d", after, version)
+	}
+	// 停用期间认领队头不写入投递，不推进版本。
+	unchanged(second.ID)
+	// 重新启用渠道推进版本。
+	if _, err := f.db.ExecContext(ctx, "UPDATE telegram_channel_settings SET webhook_base_url = 'https://example.com' WHERE channel_id = ?", f.channelID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := updateStatus.Execute(ctx, f.owner, f.channelID, true); err != nil {
+		t.Fatal(err)
+	}
+	feed.expect(t, changed(0))
+
+	// 更换机器人推进渠道内客户会话版本并通知一次。
+	if _, err := channelaction.NewSaveTelegramConnectionAction(f.db, runner, api).Execute(ctx, f.owner, f.channelID, channelaction.TelegramChannelConnectionInput{BotToken: "456:new_token", WebhookBaseURL: "https://example.com"}); err != nil {
+		t.Fatal(err)
+	}
+	feed.expect(t, changed(0))
+	if got := f.load(t, first.ID); got.Status != domain.CustomerDeliveryFailed || got.LastError != "bot_changed" {
+		t.Fatalf("bot changed delivery=%+v", got)
+	}
+}
+
+// testCustomerAgentRunNotifications 验证客服 Agent 运行开始与最终回复通知企业客服共享受众。
+func testCustomerAgentRunNotifications(t *testing.T, db *bun.DB, identity *servermodels.Identity, agentIdentityID string, tasks *servertask.Runtime) {
+	ctx := context.Background()
+	first, _, run := createCustomerLockRun(t, ctx, db, identity, agentIdentityID, tasks)
+	feed := startRealtimeFeed(t, identity.Organization.ID)
+	var runningVersion int64
+	runtime := testAgentRuntime{run: func(ctx context.Context, _ agentruntime.RunRequest, input agentruntime.InputFeed) (agentruntime.RunResult, error) {
+		claimed, err := input.Claim(ctx, 1)
+		if err != nil {
+			return agentruntime.RunResult{}, err
+		}
+		runningVersion = loadConversationVersion(t, db, first.Conversation.ID)
+		return agentruntime.RunResult{Content: "AI 最终回复", EndSeq: claimed.EndSeq}, nil
+	}}
+	if err := agentrunaction.NewExecuteAction(db, tasks, runtime, testAttachmentReader(db), nil).Execute(ctx, agentrunaction.RunInput{RunID: run.ID}); err != nil {
+		t.Fatal(err)
+	}
+	feed.expect(t,
+		feed.customerInbox(first.Conversation.ID, runningVersion),
+		feed.customerInbox(first.Conversation.ID, loadConversationVersion(t, db, first.Conversation.ID)),
+	)
 }
