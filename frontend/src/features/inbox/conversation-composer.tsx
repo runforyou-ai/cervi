@@ -705,17 +705,16 @@ export function ConversationComposer({
           <div className="flex items-center justify-between gap-3 px-2.5 pb-2.5">
             {disabledReason ? (
               <p id={`${inputID}-reason`} className="text-xs text-muted-foreground">{disabledReason}</p>
-            ) : !mobile &&
-            (conversationType === ConversationType.ConversationTypeDirect ||
+            ) : (conversationType === ConversationType.ConversationTypeDirect ||
               conversationType === ConversationType.ConversationTypeAgent ||
               conversationType === ConversationType.ConversationTypeGroup) ? (
-              conversationType === ConversationType.ConversationTypeDirect ||
-              conversationType === ConversationType.ConversationTypeAgent ? (
+              conversationType !== ConversationType.ConversationTypeGroup || mobile ? (
                 <ConversationAttachmentUpload
                   conversationID={conversationID || (attachmentAgentDraft?.conversationID ?? "")}
                   targetIdentityID={attachmentTargetIdentityID}
                   agentIdentityID={attachmentAgentDraft?.agentIdentityID}
                   disabled={isSubmitting}
+                  onBeforeSend={onBeforeSend}
                   onCreated={(conversation) => onAttachmentConversationCreated?.(conversation)}
                 />
               ) : (
@@ -745,7 +744,7 @@ export function ConversationComposer({
                 <PaperclipIcon />
               </Button>
             )}
-            <Button type="submit" size="sm" disabled={isSubmitting || Boolean(disabledReason) || isBodyEmpty || replyTo?.deleted}>
+            <Button type="submit" size="sm" className={mobile ? "min-h-11" : undefined} disabled={isSubmitting || Boolean(disabledReason) || isBodyEmpty || replyTo?.deleted}>
               {isSubmitting && showSubmitting ? (
                 <LoaderCircleIcon className="animate-spin" />
               ) : null}

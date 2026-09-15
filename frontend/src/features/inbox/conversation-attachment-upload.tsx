@@ -1,4 +1,4 @@
-/** 在单聊或 AI 聊天附件模态框中选择文件和说明，发送后交给工作台队列上传。 */
+/** 在内部聊天附件模态框中选择文件和说明，发送后交给工作台队列上传。 */
 import { useEffect, useRef, useState } from "react"
 import { PaperclipIcon, XIcon } from "lucide-react"
 import { ScrollArea } from "radix-ui"
@@ -18,6 +18,7 @@ import {
 import { FieldLabel } from "@/components/ui/field"
 import { ScrollBar } from "@/components/ui/scroll-area"
 import { Textarea } from "@/components/ui/textarea"
+import { resolveAppPlatform } from "@/platform/app-platform"
 import { cn } from "@/lib/utils"
 import { AttachmentContent } from "./attachment-content"
 import { useAttachmentQueue } from "./attachment-queue-context"
@@ -30,16 +31,19 @@ export function ConversationAttachmentUpload({
   agentIdentityID = "",
   disabled,
   onCreated,
+  onBeforeSend,
 }: {
   conversationID: string
   targetIdentityID?: string
   agentIdentityID?: string
   disabled: boolean
   onCreated: (conversation: InboxConversation) => void
+  onBeforeSend?: () => Promise<boolean>
 }) {
   const { t } = useTranslation("inbox")
   const { t: tCommon } = useTranslation("common")
   const { queue } = useAttachmentQueue()
+  const mobile = resolveAppPlatform() === "mobile"
   const [selected, setSelected] = useState<SelectedAttachment[]>([])
   const selectedRef = useRef<SelectedAttachment[]>([])
   const inputRef = useRef<HTMLInputElement>(null)
@@ -137,8 +141,11 @@ export function ConversationAttachmentUpload({
   }
 
   /** 把文件所有权移交工作台队列，立即关闭选择框。 */
-  function send(values: { description: string }) {
+  async function send(values: { description: string }) {
     if (!queue || selectingRef.current || selectedRef.current.length === 0) return
+    // 发送前回到最新消息窗口，随后展示本地上传气泡。
+    if (onBeforeSend && !(await onBeforeSend())) return
+    if (!aliveRef.current) return
     // 说明只随最后一个附件发送，其余附件保持独立消息。
     queue.enqueue(
       selectedRef.current.map((item, index) => ({
@@ -173,7 +180,8 @@ export function ConversationAttachmentUpload({
         type="button"
         variant="ghost"
         size="icon-sm"
-        disabled={disabled}
+        className={mobile ? "size-11" : undefined}
+        disabled={disabled || selecting || form.formState.isSubmitting || !queue}
         aria-label={t("attachmentAdd")}
         onClick={() => inputRef.current?.click()}
       >
@@ -182,7 +190,7 @@ export function ConversationAttachmentUpload({
       <Dialog
         open={selected.length > 0}
         onOpenChange={(open) => {
-          if (!open) {
+          if (!open && !form.formState.isSubmitting) {
             replace([])
             form.reset()
           }
@@ -190,7 +198,9 @@ export function ConversationAttachmentUpload({
       >
         <DialogContent
           ref={dialogRef}
+          closeDisabled={form.formState.isSubmitting}
           className="max-h-[85dvh] sm:max-w-lg"
+          closeButtonClassName={mobile ? "top-1 right-1 flex size-11 items-center justify-center" : undefined}
           aria-describedby={undefined}
           onInteractOutside={(event) => event.preventDefault()}
           onOpenAutoFocus={(event) => {
@@ -202,11 +212,11 @@ export function ConversationAttachmentUpload({
             }
           }}
         >
-          <DialogHeader>
+          <DialogHeader className={mobile ? "pr-8" : undefined}>
             <DialogTitle>{t("attachmentSend")}</DialogTitle>
           </DialogHeader>
           <form
-            className="min-h-0 min-w-0 space-y-9"
+            className={cn("min-h-0 min-w-0 space-y-9", mobile && "[&_button]:min-h-11")}
             onSubmit={(event) => {
               event.stopPropagation()
               void form.handleSubmit(send)(event)
@@ -244,9 +254,11 @@ export function ConversationAttachmentUpload({
                           type="button"
                           variant="ghost"
                           size="icon-sm"
+                          className={mobile ? "size-11 shrink-0" : undefined}
                           aria-label={t("attachmentRemove", {
                             name: item.file.name,
                           })}
+                          disabled={form.formState.isSubmitting}
                           onClick={() =>
                             replace(
                               selectedRef.current.filter(
@@ -269,6 +281,7 @@ export function ConversationAttachmentUpload({
                 </FieldLabel>
                 <Textarea
                   {...description}
+                  disabled={form.formState.isSubmitting}
                   id="attachment-description"
                   rows={1}
                   className="min-h-0 max-h-[184px] resize-none leading-6"
@@ -280,8 +293,8 @@ export function ConversationAttachmentUpload({
                     input.style.height = `${Math.min(input.scrollHeight + input.offsetHeight - input.clientHeight, 184)}px`
                   }}
                   onKeyDown={(event) => {
-                    // Enter 发送，Shift+Enter 换行，输入法组字时不发送。
-                    if (event.key !== "Enter" || event.shiftKey || event.keyCode === 229 || event.nativeEvent.isComposing) return
+                    // 移动端换行；Web 与桌面端 Enter 发送，Shift+Enter 换行，组字中保留原生输入。
+                    if (mobile || event.key !== "Enter" || event.shiftKey || event.keyCode === 229 || event.nativeEvent.isComposing) return
                     event.preventDefault()
                     event.currentTarget.form?.requestSubmit()
                   }}
@@ -292,7 +305,7 @@ export function ConversationAttachmentUpload({
               <Button
                 type="button"
                 variant="outline"
-                disabled={selected.length >= 100 || selecting}
+                disabled={selected.length >= 100 || selecting || form.formState.isSubmitting}
                 onClick={() => inputRef.current?.click()}
               >
                 {tCommon("actions.add")}
@@ -301,6 +314,7 @@ export function ConversationAttachmentUpload({
                 <Button
                   type="button"
                   variant="outline"
+                  disabled={form.formState.isSubmitting}
                   onClick={() => {
                     replace([])
                     form.reset()
@@ -308,7 +322,7 @@ export function ConversationAttachmentUpload({
                 >
                   {tCommon("actions.cancel")}
                 </Button>
-                <Button type="submit" disabled={selecting}>
+                <Button type="submit" disabled={selecting || form.formState.isSubmitting}>
                   {t("messageSend")}
                 </Button>
               </div>

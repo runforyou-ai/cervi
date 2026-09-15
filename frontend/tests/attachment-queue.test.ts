@@ -112,6 +112,8 @@ function host(overrides: Record<string, (...args: any[]) => any> = {}) {
   }))
   return {
     queue,
+    /** 模拟正式会话挂载时由共享 hook 移交草稿发送项。 */
+    adopt: (draftID: string, conversationID: string) => outgoing.adopt(draftID, conversationID),
     /** 返回指定会话分组内的发送项。 */
     sent: (conversationID = "conversation") =>
       outgoing.snapshot().get(conversationID) ?? [],
@@ -286,6 +288,29 @@ test("草稿首发后后续附件改用正式会话，只回调一次", async ()
   assert.equal(h.sends[1].conversationId, "created")
   assert.deepEqual(created, [{ id: "created" }])
   assert.equal(h.job("message-1").conversationID, "created")
+})
+
+test("首发成功后保留草稿气泡，正式会话挂载时接管仍在上传的附件", async () => {
+  const gate = Promise.withResolvers<void>()
+  const h = host({
+    completeFileUpload: async (id: string) => {
+      if (id === "file-2.csv") await gate.promise
+      return { id }
+    },
+  })
+  h.queue.enqueue(h.files, { conversationID: "", targetIdentityID: "peer" }, () => {})
+  await settled(() => h.job("message-1").stage === "sent")
+  assert.equal(h.sent("draft:peer").length, 2)
+  assert.equal(h.sent("created").length, 0)
+  assert.equal(h.job("message-2").conversationID, "created")
+  h.adopt("draft:peer", "created")
+  assert.equal(h.sent("draft:peer").length, 0)
+  assert.equal(h.sent("created").length, 2)
+  assert.equal(h.sent("created")[1].status, "sending")
+  assert.equal(h.job("message-2").conversationID, "created")
+  gate.resolve()
+  await settled(() => h.job("message-2").stage === "sent")
+  assert.equal(h.sent("created").map((item: any) => item.status).join(","), "sent,sent")
 })
 
 test("失权时清除附件，迟到的发送结果不能恢复队列或打开详情", async () => {

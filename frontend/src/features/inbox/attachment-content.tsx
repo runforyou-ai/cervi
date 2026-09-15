@@ -18,6 +18,7 @@ export function AttachmentContent({
   imageFooterClassName,
   inverted = false,
   onOpen,
+  openLabel,
   onImageLoad,
 }: {
   name: string
@@ -31,6 +32,7 @@ export function AttachmentContent({
   imageFooterClassName?: string
   inverted?: boolean
   onOpen?: () => void
+  openLabel?: string
   onImageLoad?: () => void
 }) {
   if (imageWidth > 0 && imageHeight > 0) {
@@ -45,13 +47,21 @@ export function AttachmentContent({
         {previewURL ? (
           <img
             src={previewURL}
-            alt={name}
+            alt={onOpen ? "" : name}
             className="block size-full object-contain"
             onLoad={onImageLoad}
           />
         ) : (
           <div className="size-full min-h-20" />
         )}
+        {onOpen ? (
+          <button
+            type="button"
+            className="absolute inset-0 rounded-xl outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+            aria-label={openLabel ?? name}
+            onClick={onOpen}
+          />
+        ) : null}
         {action ? (
           <div className="absolute inset-0 flex items-center justify-center">
             {action}
@@ -60,7 +70,7 @@ export function AttachmentContent({
         {footer ? (
           <div
             className={cn(
-              "absolute right-1.5 bottom-1.5 rounded-full bg-black/45 px-2 py-0.5 text-white transition-opacity",
+              "pointer-events-none absolute right-1.5 bottom-1.5 rounded-full bg-black/45 px-2 py-0.5 text-white transition-opacity",
               imageFooterClassName,
             )}
           >
@@ -82,7 +92,7 @@ export function AttachmentContent({
           <button
             type="button"
             disabled={!onOpen}
-            aria-label={name}
+            aria-label={openLabel ?? name}
             className="flex size-full items-center justify-center rounded-full disabled:cursor-default"
             onClick={onOpen}
           >

@@ -286,6 +286,7 @@ const inbox = {
   attachmentDescriptionTooLong: "Use at most 4,000 characters",
   attachmentRemove: "Remove {{name}}",
   attachmentLimit: "Select up to 100 files or images",
+  attachmentPreview: "Preview {{name}}",
   attachmentPreviewRetry: "Image could not load. Retry",
   attachmentAdd: "Add attachment",
   messageBodyTooLong: "Messages can contain up to 4,000 characters",

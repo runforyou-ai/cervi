@@ -226,6 +226,7 @@ function ConversationTimelineContent({
   outgoingMessages,
   onRetryFailedMessage,
   retryFailedMessageDisabled = false,
+  attachmentRetryDisabled = false,
   onReplyMessage,
   groupParticipants,
   onReadMessage,
@@ -244,6 +245,7 @@ function ConversationTimelineContent({
   outgoingMessages: OutgoingConversationMessage[]
   onRetryFailedMessage?: (message: OutgoingConversationDraft) => void
   retryFailedMessageDisabled?: boolean
+  attachmentRetryDisabled?: boolean
   onReplyMessage?: (message: ConversationMessageReference) => void
   groupParticipants?: GroupParticipant[]
   onReadMessage?: (messageID: string) => void
@@ -915,7 +917,7 @@ function ConversationTimelineContent({
                                     {agentNotice ? (
                                       <span className={agentError ? "text-destructive" : "text-muted-foreground"}>{t(agentError ? "agentRunFailed" : "agentReplyStopped")}</span>
                                     ) : message.attachment ? (
-                                      <ConversationAttachment body={message.body} attachment={message.attachment} conversationID={conversationID} messageID={message.persistedMessageID ?? message.id}
+                                      <ConversationAttachment retryDisabled={attachmentRetryDisabled} body={message.body} attachment={message.attachment} conversationID={conversationID} messageID={message.persistedMessageID ?? message.id}
                                         originatedAt={message.originatedAt} timeLabel={dateFormatters.clock.format(date)} timeTitle={dateFormatters.full.format(date)} incoming={incoming} bubbleClassName={bubbleClassName} />
                                     ) : message.sender?.identityType === OrganizationIdentityType.OrganizationIdentityTypeAgent ? (
                                       <div className="min-w-0 flex-1">

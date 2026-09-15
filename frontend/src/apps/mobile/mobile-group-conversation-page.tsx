@@ -17,6 +17,7 @@ import { MobileGroupThread } from "@/apps/mobile/mobile-group-thread"
 import { useMobileNavigation } from "@/apps/mobile/mobile-navigation"
 import { MobilePageHeader, MobilePageState } from "@/apps/mobile/mobile-page"
 import { LoadingIndicator } from "@/components/loading-indicator"
+import { useAttachmentQueue } from "@/features/inbox/attachment-queue-context"
 import { useOutgoingMessageStore } from "@/features/inbox/outgoing-message-context"
 import { Button } from "@/components/ui/button"
 import {
@@ -46,6 +47,7 @@ function MobileGroupConversation({
   const { t } = useTranslation(["mobile", "inbox", "common"])
   const navigate = useNavigate()
   const outgoingStore = useOutgoingMessageStore()
+  const { queue } = useAttachmentQueue()
   const location = useLocation()
   const navigationState = location.state as {
     mobileBack?: boolean
@@ -79,16 +81,18 @@ function MobileGroupConversation({
   const handleUnavailable = useCallback(() => {
     if (leaving.current) return
     leaving.current = true
+    queue?.forgetConversation(conversationID)
     outgoingStore.forgetConversation(conversationID)
     toast.message(t("group.unavailable"))
     void invalidate(resourceKeys.inbox())
     if (returnDepth > 0) void navigate(-returnDepth)
     else void navigate(inboxURL, { replace: true })
-  }, [conversationID, inboxURL, invalidate, navigate, outgoingStore, returnDepth, t])
+  }, [conversationID, inboxURL, invalidate, navigate, outgoingStore, queue, returnDepth, t])
 
   /** 主动退出后结束访问检测并返回来源列表。 */
   function handleLeft() {
     leaving.current = true
+    queue?.forgetConversation(conversationID)
     outgoingStore.forgetConversation(conversationID)
     if (returnDepth > 0) void navigate(-returnDepth)
     else void navigate(inboxURL, { replace: true })

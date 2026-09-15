@@ -130,6 +130,7 @@ export function ConversationThread({
           if (attachmentJobs.some(job => job.id === draft.clientMessageID)) attachmentQueue?.retry(draft.clientMessageID)
           else setRetryDraft(draft)
         }}
+        attachmentRetryDisabled={!replySupported || Boolean(replyDisabledReason)}
         retryFailedMessageDisabled={
           messageSending || !replySupported || Boolean(replyDisabledReason)
         }

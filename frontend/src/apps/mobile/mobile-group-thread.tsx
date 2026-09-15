@@ -1,4 +1,4 @@
-/** 移动端群聊历史、文本发送、引用与提及输入、阅读进度和解散后的只读状态。 */
+/** 移动端群聊历史、文本与附件发送、引用与提及输入、阅读进度和解散后的只读状态。 */
 import { useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 
@@ -9,6 +9,7 @@ import {
   type GroupConversationData,
 } from "@/api"
 import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
+import { useAttachmentQueue } from "@/features/inbox/attachment-queue-context"
 import { ConversationComposer } from "@/features/inbox/conversation-composer"
 import { ConversationTimeline } from "@/features/inbox/conversation-timeline"
 import { useOutgoingMessages } from "@/features/inbox/outgoing-message-context"
@@ -29,6 +30,7 @@ export function MobileGroupThread({
 }) {
   const { t } = useTranslation("mobile")
   const { identity } = useMobileWorkspace()
+  const { queue, jobs } = useAttachmentQueue()
   const invalidate = useResourceInvalidator()
   const outgoing = useOutgoingMessages(conversation.id)
   const markRead = useConversationReadMarker(conversation.id, active)
@@ -54,7 +56,11 @@ export function MobileGroupThread({
         groupParticipants={conversation.participants}
         prepareSendRef={prepareSendRef}
         outgoingMessages={outgoing.messages}
-        onRetryFailedMessage={setRetryDraft}
+        onRetryFailedMessage={(draft) => {
+          if (jobs.some((job) => job.id === draft.clientMessageID)) queue?.retry(draft.clientMessageID)
+          else setRetryDraft(draft)
+        }}
+        attachmentRetryDisabled={archived}
         retryFailedMessageDisabled={
           archived || outgoing.messages.some((message) => message.status === "sending")
         }

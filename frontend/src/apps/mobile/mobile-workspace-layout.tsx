@@ -11,6 +11,7 @@ import {
 } from "@/apps/mobile/mobile-navigation"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { UserPreferencesProvider } from "@/contexts/user-preferences"
+import { AttachmentQueueProvider } from "@/features/inbox/attachment-queue-context"
 import { OutgoingMessageProvider } from "@/features/inbox/outgoing-message-context"
 import { useIdentityLoader } from "@/features/session/use-identity-loader"
 import { cn } from "@/lib/utils"
@@ -43,9 +44,11 @@ export function MobileWorkspaceLayout() {
       <UserPreferencesProvider user={identity.user}>
         <MobileNavigationProvider>
           <OutgoingMessageProvider key={identity.user.id}>
-            <div className="flex h-dvh min-h-0 flex-col overflow-hidden bg-sidebar pt-[env(safe-area-inset-top)]">
-              <Outlet />
-            </div>
+            <AttachmentQueueProvider>
+              <div className="flex h-dvh min-h-0 flex-col overflow-hidden bg-sidebar pt-[env(safe-area-inset-top)]">
+                <Outlet />
+              </div>
+            </AttachmentQueueProvider>
           </OutgoingMessageProvider>
         </MobileNavigationProvider>
       </UserPreferencesProvider>

@@ -1,6 +1,8 @@
 /** 在时间线中展示附件、图片、说明和发送方本地的上传状态。 */
 import { ClockIcon, RotateCcwIcon, XIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
+import { useState } from "react"
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
 import { getAttachmentDownload, type MessageAttachment } from "@/api"
@@ -25,6 +27,7 @@ export function ConversationAttachment({
   timeTitle,
   incoming,
   bubbleClassName,
+  retryDisabled = false,
 }: {
   attachment: MessageAttachment
   body: string
@@ -35,9 +38,12 @@ export function ConversationAttachment({
   timeTitle: string
   incoming: boolean
   bubbleClassName: string
+  retryDisabled?: boolean
 }) {
   const { t } = useTranslation("inbox")
   const navigate = useNavigate()
+  const mobile = resolveAppPlatform() === "mobile"
+  const [previewOpen, setPreviewOpen] = useState(false)
   const { queue, jobs } = useAttachmentQueue()
   const job = jobs.find(
     (item) =>
@@ -117,8 +123,9 @@ export function ConversationAttachment({
       {!incoming && job && queue && (failed || cancellable) ? (
         <button
           type="button"
-          className="relative flex size-full items-center justify-center rounded-full"
+          className="relative flex size-full items-center justify-center rounded-full disabled:opacity-50"
           aria-label={failed ? t("messageRetry") : t("attachmentCancel")}
+          disabled={failed && retryDisabled}
           onClick={() => {
             if (failed) queue.retry(job.id)
             else queue.cancel(job.id)
@@ -148,59 +155,82 @@ export function ConversationAttachment({
     : failed
       ? failedLabel
       : `${formatFileSize(job?.bytes ?? 0)} / ${formatFileSize(attachment.byteSize)}`
+  // 文件打开下载地址，移动端图片打开应用内预览。
+  const canPreview = ready && mobile && image && Boolean(preview.data?.previewUrl)
+  const canDownload = ready && !image
   const bubble = cn("rounded-2xl px-3 py-2", bubbleClassName)
   return (
-    <div
-      // 图片不加气泡并按收发方向对齐，非图片附件整体使用文字气泡。
-      className={cn(
-        "min-w-0 max-w-full",
-        image
-          ? cn("flex flex-col gap-1 text-foreground", incoming ? "items-start" : "items-end")
-          : cn("w-80", bubble),
-      )}
-      data-attachment-status={ready ? "ready" : failed ? "failed" : "uploading"}
-    >
-      <AttachmentContent
-        name={attachment.name}
-        byteSize={attachment.byteSize}
-        imageWidth={attachment.imageWidth}
-        imageHeight={attachment.imageHeight}
-        previewURL={preview.data?.previewUrl || job?.previewURL}
-        action={control}
-        detail={detail}
-        footer={body ? undefined : footer}
-        inverted={!incoming}
-        imageFooterClassName={
-          ready
-            ? "opacity-0 group-hover/message-row:opacity-100 group-focus-within/message-row:opacity-100"
-            : undefined
-        }
-        onOpen={ready ? () => void download() : undefined}
-        onImageLoad={() => {
-          if (preview.data?.previewUrl && job) queue?.releasePreview(job.id)
-        }}
-      />
-      {image && failed ? (
-        <p className="text-xs text-muted-foreground">
-          {failedLabel}
-        </p>
+    <>
+      <div
+        // 图片不加气泡并按收发方向对齐，非图片附件整体使用文字气泡。
+        className={cn(
+          "min-w-0 max-w-full",
+          image
+            ? cn("flex flex-col gap-1 text-foreground", incoming ? "items-start" : "items-end")
+            : cn("w-80", bubble),
+        )}
+        data-attachment-status={ready ? "ready" : failed ? "failed" : "uploading"}
+      >
+        <AttachmentContent
+          name={attachment.name}
+          byteSize={attachment.byteSize}
+          imageWidth={attachment.imageWidth}
+          imageHeight={attachment.imageHeight}
+          previewURL={preview.data?.previewUrl || job?.previewURL}
+          action={control}
+          detail={detail}
+          footer={body ? undefined : footer}
+          inverted={!incoming}
+          imageFooterClassName={
+            ready && !mobile
+              ? "opacity-0 group-hover/message-row:opacity-100 group-focus-within/message-row:opacity-100"
+              : undefined
+          }
+          openLabel={image ? t("attachmentPreview", { name: attachment.name }) : undefined}
+          onOpen={canPreview || canDownload ? () => {
+            if (canPreview) setPreviewOpen(true)
+            else void download()
+          } : undefined}
+          onImageLoad={() => {
+            if (preview.data?.previewUrl && job) queue?.releasePreview(job.id)
+          }}
+        />
+        {image && failed ? (
+          <p className="text-xs text-muted-foreground">
+            {failedLabel}
+          </p>
+        ) : null}
+        {image && preview.error ? (
+          <button
+            type="button"
+            className="text-xs text-muted-foreground"
+            onClick={() => void preview.refresh()}
+          >
+            {t("attachmentPreviewRetry")}
+          </button>
+        ) : null}
+        {body ? (
+          // 图片正文单独成气泡，非图片正文留在附件气泡内，时间与正文同行。
+          <div className={cn("flex min-w-0 items-end gap-2", image ? cn("max-w-80", bubble) : "justify-between pt-2")}>
+            <p className="min-w-0 whitespace-pre-wrap [overflow-wrap:anywhere]">{body}</p>
+            <div className={cn("shrink-0 translate-y-0.5", incoming ? "text-muted-foreground" : "text-primary-foreground/75")}>{footer}</div>
+          </div>
+        ) : null}
+      </div>
+      {mobile && image ? (
+        <Dialog open={previewOpen} onOpenChange={setPreviewOpen}>
+          <DialogContent
+            className="max-h-[85dvh] p-4"
+            closeButtonClassName="top-1 right-1 flex size-11 items-center justify-center"
+            aria-describedby={undefined}
+          >
+            <DialogHeader className="pr-8">
+              <DialogTitle className="break-all">{attachment.name}</DialogTitle>
+            </DialogHeader>
+            <img src={preview.data?.previewUrl} alt={attachment.name} className="max-h-[65dvh] w-full object-contain" />
+          </DialogContent>
+        </Dialog>
       ) : null}
-      {image && preview.error ? (
-        <button
-          type="button"
-          className="text-xs text-muted-foreground"
-          onClick={() => void preview.refresh()}
-        >
-          {t("attachmentPreviewRetry")}
-        </button>
-      ) : null}
-      {body ? (
-        // 图片正文单独成气泡，非图片正文留在附件气泡内，时间与正文同行。
-        <div className={cn("flex min-w-0 items-end gap-2", image ? cn("max-w-80", bubble) : "justify-between pt-2")}>
-          <p className="min-w-0 whitespace-pre-wrap [overflow-wrap:anywhere]">{body}</p>
-          <div className={cn("shrink-0 translate-y-0.5", incoming ? "text-muted-foreground" : "text-primary-foreground/75")}>{footer}</div>
-        </div>
-      ) : null}
-    </div>
+    </>
   )
 }
