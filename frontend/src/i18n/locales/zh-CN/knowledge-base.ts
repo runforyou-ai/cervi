@@ -154,8 +154,8 @@ const knowledgeBase = {
     selectRerankModel: "请选择重排模型",
     noEmbeddingModels: "请先在模型服务中配置向量模型。",
     noRerankModels: "请先在模型服务中配置重排模型。",
-    changeEmbeddingTitle: "更换向量模型？",
-    changeEmbeddingDescription: "更换向量模型后，需要重新索引此知识库的全部资料。确定保存？",
+    reindexTitle: "重新索引知识库？",
+    reindexDescription: "保存后将清空此知识库的全部索引，并按新设置重新处理资料，每条资料处理完成后恢复检索。",
     confirmSave: "确认保存",
 
     createTitle: "新建知识库",

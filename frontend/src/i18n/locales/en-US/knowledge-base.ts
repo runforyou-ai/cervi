@@ -154,8 +154,8 @@ const knowledgeBase = {
     selectRerankModel: "Select a rerank model",
     noEmbeddingModels: "Configure an embedding model in model services first.",
     noRerankModels: "Configure a rerank model in model services first.",
-    changeEmbeddingTitle: "Change embedding model?",
-    changeEmbeddingDescription: "Changing the embedding model requires reindexing all content in this knowledge base. Save changes?",
+    reindexTitle: "Reindex knowledge base?",
+    reindexDescription: "Saving clears all indexes in this knowledge base and reprocesses its content with the new settings. Each item becomes searchable again once it finishes processing.",
     confirmSave: "Confirm save",
 
     createTitle: "New knowledge base",

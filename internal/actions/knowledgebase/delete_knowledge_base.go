@@ -31,8 +31,13 @@ func (a *DeleteKnowledgeBaseAction) Execute(ctx context.Context, identity *serve
 		if _, err := lockKnowledgeBase(ctx, tx, identity.Organization.ID, knowledgeBaseID); err != nil {
 			return err
 		}
-		var locked []servermodels.KnowledgeDocument
-		if err := tx.NewSelect().Model(&locked).Where("kd.knowledge_base_id = ?", knowledgeBaseID).Order("kd.id").For("UPDATE").Scan(ctx); err != nil {
+		// 锁定全部文档和问答条目，等待进行中的索引发布事务结束后再删除分段。
+		var documents []servermodels.KnowledgeDocument
+		if err := tx.NewSelect().Model(&documents).Where("kd.knowledge_base_id = ?", knowledgeBaseID).Order("kd.id").For("UPDATE").Scan(ctx); err != nil {
+			return err
+		}
+		var qaEntries []servermodels.KnowledgeQAEntry
+		if err := tx.NewSelect().Model(&qaEntries).Where("kqe.knowledge_base_id = ?", knowledgeBaseID).Order("kqe.id").For("UPDATE").Scan(ctx); err != nil {
 			return err
 		}
 		if err := deleteKnowledgeBaseSegments(ctx, tx, knowledgeBaseID); err != nil {

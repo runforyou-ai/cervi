@@ -72,7 +72,7 @@ export function KnowledgeBaseFormPage({
     useState<KnowledgeBaseCategoryId>(requestedCategory)
   const mounted = useRef(true)
   const saveButton = useRef<HTMLButtonElement>(null)
-  const [confirmModelChange, setConfirmModelChange] = useState(false)
+  const [confirmReindex, setConfirmReindex] = useState(false)
   const isQA = category === KnowledgeBaseCategory.KnowledgeBaseCategoryQA
   const schema = useMemo(
     () =>
@@ -187,7 +187,7 @@ export function KnowledgeBaseFormPage({
         void invalidateResource(resourceKeys.knowledgeBase(knowledgeBaseId))
       }
       if (!mounted.current) return
-      setConfirmModelChange(false)
+      setConfirmReindex(false)
       form.reset(values)
       upsertKnowledgeBase(knowledgeBase)
       toast.success(
@@ -225,10 +225,14 @@ export function KnowledgeBaseFormPage({
     }
   }
 
-  /** 保存前确认编辑页中的向量模型切换。 */
+  /** 编辑页变更向量模型、维度或分段参数时，保存前确认重新索引。 */
   async function submit(values: KnowledgeBaseFormValues) {
-    if (mode === "edit" && loadedKnowledgeBase && values.embeddingModel !== JSON.stringify([loadedKnowledgeBase.embeddingProviderId, loadedKnowledgeBase.embeddingModelIdentifier])) {
-      setConfirmModelChange(true)
+    if (mode === "edit" && loadedKnowledgeBase && (
+      values.embeddingModel !== JSON.stringify([loadedKnowledgeBase.embeddingProviderId, loadedKnowledgeBase.embeddingModelIdentifier]) ||
+      Number(values.embeddingDimension) !== loadedKnowledgeBase.embeddingDimension ||
+      (!isQA && (Number(values.chunkLength) !== loadedKnowledgeBase.chunkLength || Number(values.chunkOverlap) !== loadedKnowledgeBase.chunkOverlap))
+    )) {
+      setConfirmReindex(true)
       return
     }
     await save(values)
@@ -328,15 +332,15 @@ export function KnowledgeBaseFormPage({
           </form>
         )}
       </PageContent>
-      <AlertDialog open={confirmModelChange} onOpenChange={(open) => !form.formState.isSubmitting && setConfirmModelChange(open)}>
+      <AlertDialog open={confirmReindex} onOpenChange={(open) => !form.formState.isSubmitting && setConfirmReindex(open)}>
         <AlertDialogContent onCloseAutoFocus={(event) => {
           // 确认框关闭后恢复保存按钮的键盘焦点。
           event.preventDefault()
           saveButton.current?.focus()
         }}>
           <AlertDialogHeader>
-            <AlertDialogTitle>{t("form.changeEmbeddingTitle")}</AlertDialogTitle>
-            <AlertDialogDescription>{t("form.changeEmbeddingDescription")}</AlertDialogDescription>
+            <AlertDialogTitle>{t("form.reindexTitle")}</AlertDialogTitle>
+            <AlertDialogDescription>{t("form.reindexDescription")}</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel disabled={form.formState.isSubmitting}>{t("common:actions.cancel")}</AlertDialogCancel>
