@@ -286,6 +286,7 @@ const inbox = {
   attachmentPreview: "Preview {{name}}",
   attachmentPreviewRetry: "Image could not load. Retry",
   attachmentAdd: "Add attachment",
+  emojiPick: "Choose emoji",
   messageBodyTooLong: "Messages can contain up to 4,000 characters",
   messageSend: "Send",
   messageSenderYou: "You",
