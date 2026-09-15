@@ -118,16 +118,18 @@ func (a *UpdateGroupConversationAction) Execute(ctx context.Context, identity *s
 			imageChanged = group.Conversation.ImageFileID == nil || *group.Conversation.ImageFileID != *normalized.ImageFileID
 		}
 		if title != normalized.Title || description != normalized.Description || imageChanged {
-			if _, err := tx.NewUpdate().Model((*servermodels.Conversation)(nil)).
+			if err := tx.NewUpdate().Model(group.Conversation).
 				Set("title = ?", normalized.Title).
 				Set("description = ?", common.OptionalString(normalized.Description)).
 				Set("image_file_id = ?", nextImageFileID).
 				Set("version = version + 1").
 				Set("updated_at = now()").
-				Where("organization_id = ?", identity.Organization.ID).
-				Where("id = ?", normalized.ConversationID).
-				Exec(ctx); err != nil {
+				WherePK().Where("organization_id = ?", identity.Organization.ID).
+				Returning("version").Scan(ctx); err != nil {
 				return fmt.Errorf("update group conversation profile: %w", err)
+			}
+			if err := chatstate.NotifyConversationMembers(ctx, tx, group.Conversation); err != nil {
+				return err
 			}
 			if imageChanged {
 				if err := retireGroupImage(ctx, tx, identity.Organization.ID, group.Conversation.ImageFileID, nextImageFileID); err != nil {
@@ -268,6 +270,16 @@ func (a *RemoveGroupConversationMemberAction) Execute(ctx context.Context, ident
 		if err := leaveGroupParticipant(ctx, tx, identity.Organization.ID, target.ParticipantID); err != nil {
 			return err
 		}
+		// 被移出的真人成员收到会话失权通知。
+		removedUserIDs := make([]string, 0, 1)
+		if err := tx.NewSelect().Table("users").Column("id").
+			Where("organization_id = ? AND identity_id = ?", identity.Organization.ID, target.IdentityID).
+			Scan(ctx, &removedUserIDs); err != nil {
+			return fmt.Errorf("load removed group member user: %w", err)
+		}
+		for _, userID := range removedUserIDs {
+			realtime.Notify(ctx, realtime.UserConversationRemoved(identity.Organization.ID, userID, conversationID))
+		}
 		cancelledRunIDs, err = a.coordinator.CancelForGroupAgent(ctx, tx, identity.Organization.ID, conversationID, memberID)
 		if err != nil {
 			return err
@@ -349,6 +361,7 @@ func (a *LeaveGroupConversationAction) Execute(ctx context.Context, identity *se
 		if err := leaveGroupParticipant(ctx, tx, identity.Organization.ID, group.ParticipantID); err != nil {
 			return err
 		}
+		realtime.Notify(ctx, realtime.UserConversationRemoved(identity.Organization.ID, identity.User.ID, conversationID))
 		_, err = createGroupSystemEvent(ctx, tx, identity, group.Conversation, ConversationSystemEvent{
 			Type: domain.ConversationSystemEventGroupMemberLeft, Actor: groupActorSnapshot(identity),
 		})

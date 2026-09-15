@@ -182,7 +182,7 @@ func (a *ExecuteAction) begin(ctx context.Context, runID string) (executionConte
 		return executionContext{}, false, task.Permanent(err)
 	}
 	terminal := false
-	err = a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err = realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		locked, err := lockAgentRun(ctx, tx, policy, initial)
 		if err != nil {
 			return err
@@ -195,11 +195,18 @@ func (a *ExecuteAction) begin(ctx context.Context, runID string) (executionConte
 		if run.Status != string(domain.AgentRunStatusQueued) && run.Status != string(domain.AgentRunStatusRunning) {
 			return task.Permanent(fmt.Errorf("unsupported agent run status %q", run.Status))
 		}
-		_, err = tx.NewUpdate().Model(run).
+		queued := run.Status == string(domain.AgentRunStatusQueued)
+		if _, err := tx.NewUpdate().Model(run).
 			Set("status = ?", domain.AgentRunStatusRunning).
 			Set("started_at = COALESCE(started_at, now())").
-			Set("updated_at = now()").WherePK().Exec(ctx)
-		return err
+			Set("updated_at = now()").WherePK().Exec(ctx); err != nil {
+			return err
+		}
+		// 排队运行转为运行中时推进会话版本。
+		if !queued {
+			return nil
+		}
+		return chatstate.TouchConversation(ctx, tx, locked.PolicyContext.Conversation)
 	})
 	if err != nil {
 		return executionContext{}, false, fmt.Errorf("begin agent run: %w", err)
@@ -326,6 +333,9 @@ func (a *ExecuteAction) complete(ctx context.Context, execution executionContext
 		}
 		if !allowed {
 			suppressed = true
+			if err := chatstate.TouchConversation(ctx, tx, policyContext.Conversation); err != nil {
+				return err
+			}
 			return scheduleNextRun(ctx, tx, a.enqueuer, policy, policyContext, run.OrganizationID, domain.AgentExecutionScopeKind(run.ScopeKind), run.ScopeID)
 		}
 		if run.Status != string(domain.AgentRunStatusRunning) || run.InputEndSeq == nil ||
@@ -438,6 +448,9 @@ func (a *ExecuteAction) fail(ctx context.Context, runID string, runErr error) (b
 		}
 		if !allowed {
 			terminal = true
+			if err := chatstate.TouchConversation(ctx, tx, policyContext.Conversation); err != nil {
+				return err
+			}
 			return scheduleNextRun(ctx, tx, a.enqueuer, policy, policyContext, run.OrganizationID, domain.AgentExecutionScopeKind(run.ScopeKind), run.ScopeID)
 		}
 		if run.Status != string(domain.AgentRunStatusQueued) && run.Status != string(domain.AgentRunStatusRunning) {

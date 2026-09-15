@@ -10,9 +10,11 @@ import (
 	"log/slog"
 	"slices"
 
+	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
+	"github.com/runforyou-ai/cervi/internal/realtime"
 	"github.com/runforyou-ai/cervi/internal/storage/server/messagequery"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
@@ -85,7 +87,7 @@ func (f *databaseInputFeed) Claim(ctx context.Context, throughSeq int64) (agentr
 	var output agentruntime.ClaimedInput
 	var previousEndSeq int64
 	suppressed := false
-	err = f.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err = realtime.RunInTx(ctx, f.db, func(ctx context.Context, tx bun.Tx) error {
 		locked, err := lockAgentRun(ctx, tx, f.policy, &f.execution.Run)
 		if err != nil {
 			return fmt.Errorf("lock agent input: %w", err)
@@ -101,6 +103,9 @@ func (f *databaseInputFeed) Claim(ctx context.Context, throughSeq int64) (agentr
 		}
 		if !allowed {
 			suppressed = true
+			if err := chatstate.TouchConversation(ctx, tx, policyContext.Conversation); err != nil {
+				return err
+			}
 			return scheduleNextRun(ctx, tx, f.enqueuer, f.policy, policyContext, run.OrganizationID, domain.AgentExecutionScopeKind(run.ScopeKind), run.ScopeID)
 		}
 		if run.Status != string(domain.AgentRunStatusRunning) || lane.DesiredSeq <= lane.ProcessedSeq {

@@ -32,7 +32,7 @@ type Publisher struct {
 type payload struct {
 	Kind           Kind   `json:"kind"`
 	ConversationID string `json:"conversationId,omitempty"`
-	Version        int64  `json:"version,string"`
+	Version        int64  `json:"version,string,omitempty"`
 }
 
 // NewPublisher 创建使用指定 NATS 命名空间的通知发布器。

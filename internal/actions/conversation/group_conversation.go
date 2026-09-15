@@ -87,7 +87,7 @@ func (a *CreateGroupConversationAction) Execute(ctx context.Context, identity *s
 		participantIDs[identityID] = uuid.NewV7().String()
 	}
 
-	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
@@ -112,10 +112,10 @@ func (a *CreateGroupConversationAction) Execute(ctx context.Context, identity *s
 			ID: conversationID, OrganizationID: identity.Organization.ID,
 			Type: string(domain.ConversationTypeGroup), Status: string(domain.ConversationStatusActive),
 			Title: &normalized.Title, Description: common.OptionalString(normalized.Description),
-			ImageFileID: imageFileID, CreatedBySubjectID: &createdBySubjectID,
+			ImageFileID: imageFileID, CreatedBySubjectID: &createdBySubjectID, Version: 1,
 		}
 		if _, err := tx.NewInsert().Model(conversation).
-			Column("id", "organization_id", "type", "status", "title", "description", "image_file_id", "created_by_subject_id").
+			Column("id", "organization_id", "type", "status", "title", "description", "image_file_id", "created_by_subject_id", "version").
 			Exec(ctx); err != nil {
 			return fmt.Errorf("create group conversation: %w", err)
 		}
@@ -139,7 +139,7 @@ func (a *CreateGroupConversationAction) Execute(ctx context.Context, identity *s
 			Exec(ctx); err != nil {
 			return fmt.Errorf("create group conversation participants: %w", err)
 		}
-		return nil
+		return chatstate.NotifyConversationMembers(ctx, tx, conversation)
 	})
 	if err != nil {
 		return GroupConversationSummary{}, fmt.Errorf("create group conversation: %w", err)

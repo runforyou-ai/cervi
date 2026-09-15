@@ -75,6 +75,17 @@ func AppendMessage(ctx context.Context, db bun.IDB, conversation *servermodels.C
 	return message, true, nil
 }
 
+// TouchConversation 在调用方持有会话锁的事务内推进会话版本，并登记内部会话真人成员的会话变更通知。
+func TouchConversation(ctx context.Context, db bun.IDB, conversation *servermodels.Conversation) error {
+	if err := db.NewUpdate().Model(conversation).
+		Set("version = version + 1").
+		WherePK().Where("organization_id = ?", conversation.OrganizationID).
+		Returning("version").Scan(ctx); err != nil {
+		return fmt.Errorf("advance conversation version: %w", err)
+	}
+	return NotifyConversationMembers(ctx, db, conversation)
+}
+
 // NotifyConversationMembers 按会话当前版本登记内部会话真人成员的会话变更通知；客户会话不登记成员受众。
 func NotifyConversationMembers(ctx context.Context, db bun.IDB, conversation *servermodels.Conversation) error {
 	if conversation.Type == string(domain.ConversationTypeCustomer) {
