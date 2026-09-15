@@ -9,6 +9,7 @@ import { recoverSession } from "@/lib/session-navigation"
 import { BrainIcon, ChevronDownIcon, LightbulbIcon, SquareIcon } from "lucide-react"
 import { MessageMarkdown } from "@/components/message-markdown"
 import { ProfileAvatar } from "@/components/profile-avatar"
+import { resolveAppPlatform } from "@/platform/app-platform"
 import { openExternalURL } from "@/platform/external-navigation"
 import { useTranslation } from "react-i18next"
 import { Popover } from "radix-ui"
@@ -290,7 +291,11 @@ function AgentReplyStopButton({ conversationID, runID, group, onStopped }: { con
   return (
     <button
       type="button"
-      className="inline-flex size-5 shrink-0 items-center justify-center rounded-sm text-destructive focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50"
+      className={cn(
+        "inline-flex size-5 shrink-0 items-center justify-center rounded-sm text-destructive focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50",
+        // 移动端扩大触屏点击区域，负外边距保持原有行高和图标位置。
+        resolveAppPlatform() === "mobile" && "-m-3 size-11",
+      )}
       aria-label={t("agentStopReply")}
       title={t("agentStopReply")}
       disabled={stopping}
