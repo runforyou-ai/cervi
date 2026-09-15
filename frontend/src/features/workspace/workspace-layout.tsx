@@ -15,6 +15,7 @@ import {
   notifyNewMessage as deliverNewMessageNotification,
 } from "@/features/notifications/new-message-notifications"
 import { useIdentityLoader } from "@/features/session/use-identity-loader"
+import { useRealtimeConnection } from "@/features/session/use-realtime-connection"
 import type {
   WorkspaceNewMessageNotification,
   WorkspaceOutletContext,
@@ -80,6 +81,7 @@ export function WorkspaceLayout() {
   const userId = identity?.user.id
   const messageNotificationsEnabled = identity?.user.messageNotificationsEnabled
   const workStatus = identity?.user.workStatus
+  useRealtimeConnection(Boolean(userId))
 
   /** 修正规范工作台地址。 */
   useLayoutEffect(() => {

@@ -11,6 +11,11 @@ export {
 } from "@/api/auth"
 export { loadIdentity, loadStartup, sessionPath } from "@/api/session"
 export {
+  realtimeClient,
+  type RealtimeClientEvent,
+  type RealtimeState,
+} from "@/api/realtime"
+export {
   completeFileUpload,
   createFilePartUpload,
   prepareFileUpload,

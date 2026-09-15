@@ -6,10 +6,12 @@ import { SetupPage } from "@/features/installation/setup-page"
 import { ServerConnectionPage } from "@/features/server-connection/server-connection-page"
 import { WorkspaceLayout } from "@/features/workspace/workspace-layout"
 import { usePreventPageSelectAll } from "@/hooks/use-prevent-page-select-all"
+import { useSessionGeneration } from "@/hooks/use-session-generation"
 
-/** 按平台注册入口页面，并把工作台页面交给标签宿主管理。 */
+/** 按平台注册入口页面，并把工作台页面交给标签宿主管理；登录会话代次变化时重新挂载工作台。 */
 export function SharedAppRoutes({ platform }: { platform: "web" | "desktop" }) {
   usePreventPageSelectAll()
+  const sessionGeneration = useSessionGeneration()
 
   return (
     <Routes>
@@ -24,7 +26,7 @@ export function SharedAppRoutes({ platform }: { platform: "web" | "desktop" }) {
         path="/login"
         element={<LoginPage allowServerChange={platform === "desktop"} />}
       />
-      <Route path="*" element={<WorkspaceLayout />} />
+      <Route path="*" element={<WorkspaceLayout key={sessionGeneration} />} />
     </Routes>
   )
 }

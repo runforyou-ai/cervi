@@ -1,6 +1,8 @@
 /** 全局查询缓存客户端，缓存生命周期与登录会话绑定。 */
 import { QueryClient } from "@tanstack/react-query"
 
+import { advanceSessionGeneration } from "@/api/session-scope"
+
 /**
  * 进程级查询客户端。
  * 默认单次请求，结果在页面存活期间保持新鲜。
@@ -17,7 +19,8 @@ export const resourceClient = new QueryClient({
   },
 })
 
-/** 在登录、登出和企业初始化等会话边界清空全部查询缓存。 */
-export function resetResourceCache() {
+/** 进入新的登录会话：先提升会话代次让实时连接等订阅方清理，再清空全部查询缓存。 */
+export function beginSessionBoundary() {
+  advanceSessionGeneration()
   resourceClient.clear()
 }

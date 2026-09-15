@@ -3,9 +3,9 @@ import type { NavigateFunction } from "react-router"
 
 import { isApiError, sessionPath, SessionState } from "@/api"
 import { clearWebToken } from "@/api/client"
-import { resetResourceCache } from "@/lib/resource-client"
+import { beginSessionBoundary } from "@/lib/resource-client"
 
-/** 将带有会话状态的错误导航到对应入口。 */
+/** 将带有会话状态的错误导航到对应入口，并进入新的登录会话代次。 */
 export function recoverSession(
   error: unknown,
   navigate: NavigateFunction,
@@ -19,8 +19,8 @@ export function recoverSession(
   }
   if (error.state === SessionState.SessionStateLogin) {
     clearWebToken()
-    resetResourceCache()
   }
+  beginSessionBoundary()
   navigate(path, { replace: true })
   return true
 }

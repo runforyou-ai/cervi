@@ -89,7 +89,7 @@ func (b *Backend) ConnectRealtime(ctx context.Context, meta appservice.RequestMe
 		return appservice.RealtimeConnection{}, appservice.UnavailableError(meta, cervii18n.ErrorServerConnectionFailed, nil)
 	}
 	session := b.realtime.start(response.Body, cancel)
-	slog.Info("实时事件流已建立", "connection_id", session.id, "server_url", state.baseURL.String(), "user_id", credential.UserID)
+	slog.Info("实时事件流已建立", "connection_id", session.id, "server_url", state.baseURL.String(), "protocol", response.Proto, "user_id", credential.UserID)
 	return appservice.RealtimeConnection{ConnectionID: session.id}, nil
 }
 
