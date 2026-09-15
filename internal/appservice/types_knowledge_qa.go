@@ -24,14 +24,16 @@ type KnowledgeQAListInput struct {
 	PageSize int    `json:"pageSize" query:"pageSize,default=20"`
 }
 
-// KnowledgeQASummary 定义问答列表项。
+// KnowledgeQASummary 定义问答列表项及其索引状态。
 type KnowledgeQASummary struct {
-	ID               string    `json:"id"`
-	GroupID          string    `json:"groupId"`
-	Question         string    `json:"question"`
-	SimilarQuestions []string  `json:"similarQuestions"`
-	Answer           string    `json:"answer"`
-	CreatedAt        time.Time `json:"createdAt"`
+	ID               string               `json:"id"`
+	GroupID          string               `json:"groupId"`
+	Question         string               `json:"question"`
+	SimilarQuestions []string             `json:"similarQuestions"`
+	Answer           string               `json:"answer"`
+	Status           KnowledgeIndexStatus `json:"status"`
+	FailureMessage   string               `json:"failureMessage"`
+	CreatedAt        time.Time            `json:"createdAt"`
 }
 
 // KnowledgeQAEntry 定义完整问答详情。

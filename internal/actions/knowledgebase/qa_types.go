@@ -2,7 +2,11 @@
 
 package knowledgebase
 
-import "time"
+import (
+	"time"
+
+	"github.com/runforyou-ai/cervi/internal/domain"
+)
 
 // QASimilarQuestion 定义带稳定编号的相似问题，新问题的编号为空。
 type QASimilarQuestion struct {
@@ -26,14 +30,16 @@ type QAListInput struct {
 	PageSize int
 }
 
-// QASummary 定义问答列表项。
+// QASummary 定义问答列表项及其索引状态。
 type QASummary struct {
-	ID               string    `bun:"id"`
-	GroupID          string    `bun:"group_id"`
-	Question         string    `bun:"question"`
-	SimilarQuestions []string  `bun:"similar_questions,array"`
-	Answer           string    `bun:"answer"`
-	CreatedAt        time.Time `bun:"created_at"`
+	ID               string                      `bun:"id"`
+	GroupID          string                      `bun:"group_id"`
+	Question         string                      `bun:"question"`
+	SimilarQuestions []string                    `bun:"similar_questions,array"`
+	Answer           string                      `bun:"answer"`
+	Status           domain.KnowledgeIndexStatus `bun:"status"`
+	FailureCode      string                      `bun:"failure_code"`
+	CreatedAt        time.Time                   `bun:"created_at"`
 }
 
 // QARecord 定义完整问答详情。

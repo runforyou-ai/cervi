@@ -121,6 +121,7 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.POST("/knowledge-bases/:knowledgeBaseID/qa-entries", s.createKnowledgeQAEntry)
 	router.PUT("/knowledge-bases/:knowledgeBaseID/qa-entries/:entryID", s.updateKnowledgeQAEntry)
 	router.DELETE("/knowledge-bases/:knowledgeBaseID/qa-entries/:entryID", s.deleteKnowledgeQAEntry)
+	router.POST("/knowledge-bases/:knowledgeBaseID/qa-entries/:entryID/retry", s.retryKnowledgeQAEntry)
 	router.GET("/knowledge-bases", s.listKnowledgeBases)
 	router.GET("/knowledge-bases/:knowledgeBaseID", s.getKnowledgeBase)
 	router.POST("/knowledge-bases", s.createKnowledgeBase)
@@ -1050,6 +1051,11 @@ func (s *Service) updateKnowledgeQAEntry(c *gin.Context) {
 // deleteKnowledgeQAEntry 删除本地问答。
 func (s *Service) deleteKnowledgeQAEntry(c *gin.Context) {
 	writeEmpty(c, s.application.DeleteKnowledgeQAEntry(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), c.Param("entryID")))
+}
+
+// retryKnowledgeQAEntry 按当前配置重新索引问答。
+func (s *Service) retryKnowledgeQAEntry(c *gin.Context) {
+	writeEmpty(c, s.application.RetryKnowledgeQAEntry(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), c.Param("entryID")))
 }
 
 // listKnowledgeBases 返回当前企业的知识库列表。

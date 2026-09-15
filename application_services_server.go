@@ -65,8 +65,14 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	if err := searchtext.LoadKnowledgeDictionary(); err != nil {
 		return nil, err
 	}
-	processDocument := knowledgeaction.NewProcessDocumentAction(appStorage.DB(), documentConverter, embedding.NewClient(), fileReader)
+	embeddingClient := embedding.NewClient()
+	processDocument := knowledgeaction.NewProcessDocumentAction(appStorage.DB(), documentConverter, embeddingClient, fileReader)
 	if err := tasks.Registry().RegisterJSONWithTerminalFailure(knowledgeaction.ProcessDocumentActionName, processDocument.Execute, processDocument.FinalizeFailure); err != nil {
+		return nil, err
+	}
+	// 注册问答索引任务及最终失败时的状态处理。
+	processQAEntry := knowledgeaction.NewProcessQAEntryAction(appStorage.DB(), embeddingClient)
+	if err := tasks.Registry().RegisterJSONWithTerminalFailure(knowledgeaction.ProcessQAEntryActionName, processQAEntry.Execute, processQAEntry.FinalizeFailure); err != nil {
 		return nil, err
 	}
 

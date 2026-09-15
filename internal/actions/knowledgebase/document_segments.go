@@ -76,7 +76,7 @@ func (q *DocumentQuery) Segments(ctx context.Context, identity *servermodels.Ide
 			page = 1
 		}
 		scope := []any{identity.Organization.ID, baseID, documentID, document.SegmentBatchID}
-		condition := "organization_id = ? AND knowledge_base_id = ? AND document_id = ? AND segment_batch_id = ?"
+		condition := "organization_id = ? AND knowledge_base_id = ? AND source_id = ? AND segment_batch_id = ?"
 		if input.AnchorSegmentID != "" {
 			err := tx.NewSelect().TableExpr("public.knowledge_segments").ColumnExpr("position").
 				Where(condition, scope...).Where("id = ?", input.AnchorSegmentID).Scan(ctx, &position)

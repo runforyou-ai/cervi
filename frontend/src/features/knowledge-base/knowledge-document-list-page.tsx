@@ -2,7 +2,7 @@
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { useLocation, useParams } from "react-router"
-import { getKnowledgeBase, listKnowledgeDocuments } from "@/api"
+import { KnowledgeBaseCategory, getKnowledgeBase, listKnowledgeDocuments } from "@/api"
 import { ListToolbar, ListToolbarSearch, ListToolbarReset } from "@/components/list-toolbar"
 import { PageHeader } from "@/components/page-header"
 import { PageContent } from "@/components/page-content"
@@ -120,7 +120,7 @@ function KnowledgeDocumentGroupList({ baseId, groupId }: { baseId: string; group
       {action && base.data && (
         <KnowledgeDocumentActions base={base.data} action={action} onClose={() => setAction(null)} />
       )}
-      <KnowledgeRetrievalSheet open={retrievalOpen} onOpenChange={setRetrievalOpen} knowledgeBaseId={baseId} triggerRef={retrievalTrigger} />
+      <KnowledgeRetrievalSheet open={retrievalOpen} onOpenChange={setRetrievalOpen} knowledgeBaseId={baseId} category={KnowledgeBaseCategory.KnowledgeBaseCategoryStandard} triggerRef={retrievalTrigger} />
     </>
   )
 }

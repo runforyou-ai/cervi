@@ -45,7 +45,7 @@ func TestKnowledgeQALifecycle(t *testing.T) {
 	defer store.Close()
 	db := store.DB()
 	identity, base := newQAFixture(t, db)
-	save := knowledgeaction.NewSaveQAEntryAction(db)
+	save := knowledgeaction.NewSaveQAEntryAction(db, newKnowledgeTasks(t, db))
 	list := knowledgeaction.NewListQAEntriesQuery(db)
 	get := knowledgeaction.NewGetQAEntryQuery(db)
 	remove := knowledgeaction.NewDeleteQAEntryAction(db)
@@ -180,7 +180,7 @@ func TestKnowledgeQAIsolation(t *testing.T) {
 	db := store.DB()
 	identity, base := newQAFixture(t, db)
 	foreignIdentity, foreignBase := newQAFixture(t, db)
-	save := knowledgeaction.NewSaveQAEntryAction(db)
+	save := knowledgeaction.NewSaveQAEntryAction(db, newKnowledgeTasks(t, db))
 	get := knowledgeaction.NewGetQAEntryQuery(db)
 	input := knowledgeaction.QAInput{GroupID: base.Groups[0].ID, Question: "问题", Answer: "答案", SimilarQuestions: []knowledgeaction.QASimilarQuestion{{Content: "相似问题"}}}
 	entry, err := save.Execute(ctx, identity, base.ID, "", input)

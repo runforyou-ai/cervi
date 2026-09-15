@@ -816,6 +816,11 @@ func (b *Backend) DeleteKnowledgeQAEntry(ctx context.Context, meta appservice.Re
 	return b.do(ctx, meta, http.MethodDelete, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/qa-entries/"+url.PathEscape(entryID), nil, nil, nil)
 }
 
+// RetryKnowledgeQAEntry 按当前配置重新索引问答。
+func (b *Backend) RetryKnowledgeQAEntry(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, entryID string) error {
+	return b.do(ctx, meta, http.MethodPost, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/qa-entries/"+url.PathEscape(entryID)+"/retry", nil, nil, nil)
+}
+
 // ListKnowledgeBases 返回当前企业的知识库列表。
 func (b *Backend) ListKnowledgeBases(ctx context.Context, meta appservice.RequestMeta) (appservice.KnowledgeBaseList, error) {
 	var output appservice.KnowledgeBaseList

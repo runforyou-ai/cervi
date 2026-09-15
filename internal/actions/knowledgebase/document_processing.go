@@ -35,7 +35,7 @@ func (p *DocumentProcessing) enqueue(ctx context.Context, tx bun.IDB, organizati
 	document.ProcessingID = uuid.NewV7().String()
 	document.ChunkLength, document.ChunkOverlap = *base.ChunkLength, *base.ChunkOverlap
 	document.EmbeddingProviderID, document.EmbeddingModelIdentifier, document.EmbeddingDimension = base.EmbeddingProviderID, base.EmbeddingModelIdentifier, base.EmbeddingDimension
-	document.Status, document.FailureCode = domain.KnowledgeDocumentQueued, ""
+	document.Status, document.FailureCode = domain.KnowledgeIndexQueued, ""
 	if _, err := tx.NewUpdate().Model(document).Column("processing_id", "chunk_length", "chunk_overlap", "embedding_provider_id", "embedding_model_identifier", "embedding_dimension", "status", "failure_code").Set("updated_at = now()").WherePK().Exec(ctx); err != nil {
 		return err
 	}
@@ -74,7 +74,7 @@ func (p *DocumentProcessing) Retry(ctx context.Context, identity *servermodels.I
 				code = failure.Code
 			}
 			// 生成新的处理标识并保存连接失败状态。
-			_, err := tx.NewUpdate().Model(document).Set("processing_id = ?", uuid.NewV7().String()).Set("status = ?", domain.KnowledgeDocumentFailed).Set("failure_code = ?", code).Set("updated_at = now()").WherePK().Exec(ctx)
+			_, err := tx.NewUpdate().Model(document).Set("processing_id = ?", uuid.NewV7().String()).Set("status = ?", domain.KnowledgeIndexFailed).Set("failure_code = ?", code).Set("updated_at = now()").WherePK().Exec(ctx)
 			return err
 		}
 		return p.enqueue(ctx, tx, identity.Organization.ID, base, document)

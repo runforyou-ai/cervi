@@ -529,6 +529,11 @@ func (s *Service) DeleteKnowledgeQAEntry(ctx context.Context, meta RequestMeta, 
 	return s.backend.DeleteKnowledgeQAEntry(ctx, meta, knowledgeBaseID, entryID)
 }
 
+// RetryKnowledgeQAEntry 按当前配置重新索引问答。
+func (s *Service) RetryKnowledgeQAEntry(ctx context.Context, meta RequestMeta, knowledgeBaseID string, entryID string) error {
+	return s.backend.RetryKnowledgeQAEntry(ctx, meta, knowledgeBaseID, entryID)
+}
+
 // ListKnowledgeBases 返回当前企业的知识库列表。
 func (s *Service) ListKnowledgeBases(ctx context.Context, meta RequestMeta) (KnowledgeBaseList, error) {
 	return withNormalizedSlices(s.backend.ListKnowledgeBases(ctx, meta))

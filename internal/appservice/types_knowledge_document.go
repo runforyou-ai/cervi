@@ -6,34 +6,6 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
-// KnowledgeDocumentStatus 定义文档展示状态。
-type KnowledgeDocumentStatus string
-
-const (
-	KnowledgeDocumentInitial   KnowledgeDocumentStatus = "initial"
-	KnowledgeDocumentQueued    KnowledgeDocumentStatus = "queued"
-	KnowledgeDocumentRunning   KnowledgeDocumentStatus = "running"
-	KnowledgeDocumentSucceeded KnowledgeDocumentStatus = "succeeded"
-	KnowledgeDocumentFailed    KnowledgeDocumentStatus = "failed"
-	KnowledgeDocumentCancelled KnowledgeDocumentStatus = "cancelled"
-)
-
-// KnowledgeDocumentProcessingStatus 定义文档处理流程的执行状态。
-type KnowledgeDocumentProcessingStatus string
-
-const (
-	KnowledgeProcessingInitial    KnowledgeDocumentProcessingStatus = KnowledgeDocumentProcessingStatus(domain.KnowledgeDocumentInitial)
-	KnowledgeProcessingQueued     KnowledgeDocumentProcessingStatus = KnowledgeDocumentProcessingStatus(domain.KnowledgeDocumentQueued)
-	KnowledgeProcessingFetching   KnowledgeDocumentProcessingStatus = KnowledgeDocumentProcessingStatus(domain.KnowledgeDocumentFetching)
-	KnowledgeProcessingConverting KnowledgeDocumentProcessingStatus = KnowledgeDocumentProcessingStatus(domain.KnowledgeDocumentConverting)
-	KnowledgeProcessingSplitting  KnowledgeDocumentProcessingStatus = KnowledgeDocumentProcessingStatus(domain.KnowledgeDocumentSplitting)
-	KnowledgeProcessingEmbedding  KnowledgeDocumentProcessingStatus = KnowledgeDocumentProcessingStatus(domain.KnowledgeDocumentEmbedding)
-	KnowledgeProcessingPublishing KnowledgeDocumentProcessingStatus = KnowledgeDocumentProcessingStatus(domain.KnowledgeDocumentPublishing)
-	KnowledgeProcessingSucceeded  KnowledgeDocumentProcessingStatus = KnowledgeDocumentProcessingStatus(domain.KnowledgeDocumentSucceeded)
-	KnowledgeProcessingFailed     KnowledgeDocumentProcessingStatus = KnowledgeDocumentProcessingStatus(domain.KnowledgeDocumentFailed)
-	KnowledgeProcessingCancelled  KnowledgeDocumentProcessingStatus = KnowledgeDocumentProcessingStatus(domain.KnowledgeDocumentCancelled)
-)
-
 // KnowledgeDocumentFormat 定义允许上传的文档扩展名。
 type KnowledgeDocumentFormat string
 
@@ -53,18 +25,18 @@ const (
 
 // KnowledgeDocument 定义文档列表与预览页使用的元数据。
 type KnowledgeDocument struct {
-	Format           KnowledgeDocumentFormat           `json:"format"`
-	ID               string                            `json:"id"`
-	GroupID          string                            `json:"groupId"`
-	Name             string                            `json:"name"`
-	ContentType      string                            `json:"contentType"`
-	ByteSize         int64                             `json:"byteSize"`
-	Status           KnowledgeDocumentStatus           `json:"status"`
-	ProcessingStatus KnowledgeDocumentProcessingStatus `json:"processingStatus"`
-	SegmentBatchID   string                            `json:"segmentBatchId"`
-	SegmentCount     int                               `json:"segmentCount"`
-	FailureMessage   string                            `json:"failureMessage"`
-	CreatedAt        time.Time                         `json:"createdAt"`
+	Format           KnowledgeDocumentFormat        `json:"format"`
+	ID               string                         `json:"id"`
+	GroupID          string                         `json:"groupId"`
+	Name             string                         `json:"name"`
+	ContentType      string                         `json:"contentType"`
+	ByteSize         int64                          `json:"byteSize"`
+	Status           KnowledgeIndexStatus           `json:"status"`
+	ProcessingStatus KnowledgeIndexProcessingStatus `json:"processingStatus"`
+	SegmentBatchID   string                         `json:"segmentBatchId"`
+	SegmentCount     int                            `json:"segmentCount"`
+	FailureMessage   string                         `json:"failureMessage"`
+	CreatedAt        time.Time                      `json:"createdAt"`
 }
 
 // KnowledgeDocumentListInput 定义分组文档的查询参数。

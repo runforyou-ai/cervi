@@ -31,6 +31,7 @@ type knowledgeOps struct {
 	listQAEntries        *knowledgebaseaction.ListQAEntriesQuery
 	getQAEntry           *knowledgebaseaction.GetQAEntryQuery
 	saveQAEntry          *knowledgebaseaction.SaveQAEntryAction
+	qaProcessing         *knowledgebaseaction.QAProcessing
 	deleteQAEntry        *knowledgebaseaction.DeleteQAEntryAction
 	listKnowledgeBases   *knowledgebaseaction.ListKnowledgeBasesQuery
 	getKnowledgeBase     *knowledgebaseaction.GetKnowledgeBaseQuery
@@ -54,7 +55,8 @@ func newKnowledgeOps(db *bun.DB, taskEnqueuer servertask.TxEnqueuer, documentQue
 		deleteDocument:       knowledgebaseaction.NewDeleteDocumentAction(db),
 		listQAEntries:        knowledgebaseaction.NewListQAEntriesQuery(db),
 		getQAEntry:           knowledgebaseaction.NewGetQAEntryQuery(db),
-		saveQAEntry:          knowledgebaseaction.NewSaveQAEntryAction(db),
+		saveQAEntry:          knowledgebaseaction.NewSaveQAEntryAction(db, taskEnqueuer),
+		qaProcessing:         knowledgebaseaction.NewQAProcessing(db, taskEnqueuer),
 		deleteQAEntry:        knowledgebaseaction.NewDeleteQAEntryAction(db),
 		listKnowledgeBases:   knowledgebaseaction.NewListKnowledgeBasesQuery(db),
 		getKnowledgeBase:     knowledgebaseaction.NewGetKnowledgeBaseQuery(db),
@@ -79,7 +81,7 @@ func (o *directOperations) RetrieveKnowledgeBase(ctx context.Context, meta Reque
 		result.Records = append(result.Records, KnowledgeRetrievalRecord{
 			DocumentID: record.DocumentID, DocumentName: record.DocumentName,
 			SegmentID: record.SegmentID, SegmentBatchID: record.SegmentBatchID, Position: record.Position,
-			Content: record.Content, Score: record.Score,
+			Content: record.Content, Answer: record.Answer, Score: record.Score,
 		})
 	}
 	return result, nil

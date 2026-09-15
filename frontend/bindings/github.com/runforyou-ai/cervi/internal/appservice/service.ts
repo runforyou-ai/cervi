@@ -829,6 +829,13 @@ export function RetryKnowledgeDocument(meta: $models.RequestMeta, knowledgeBaseI
 }
 
 /**
+ * RetryKnowledgeQAEntry 按当前配置重新索引问答。
+ */
+export function RetryKnowledgeQAEntry(meta: $models.RequestMeta, knowledgeBaseID: string, entryID: string): $CancellablePromise<void> {
+    return $Call.ByID(3560499234, meta, knowledgeBaseID, entryID);
+}
+
+/**
  * SaveS3Setting 保存当前企业的对象存储设置。
  */
 export function SaveS3Setting(meta: $models.RequestMeta, input: $models.S3SettingInput): $CancellablePromise<$models.S3Setting> {
