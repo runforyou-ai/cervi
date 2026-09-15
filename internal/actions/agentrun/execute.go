@@ -38,26 +38,28 @@ type ExecuteAction struct {
 	enqueuer    servertask.TxEnqueuer
 	runtime     agentruntime.Runtime
 	attachments *AttachmentReader
+	knowledge   KnowledgeRetrieval
 	runningMu   sync.Mutex
 	runningRuns map[string]*runningAgentRun
 }
 
 type executionContext struct {
-	Run             servermodels.AgentRun         `bun:",embed"`
-	AgentName       string                        `bun:"agent_name"`
-	Brand           string                        `bun:"brand"`
-	APIKey          string                        `bun:"api_key"`
-	APIURL          string                        `bun:"api_url"`
-	ModelIdentifier string                        `bun:"model_identifier"`
-	MaxOutputTokens int64                         `bun:"max_output_tokens"`
-	ContextWindow   int64                         `bun:"context_window"`
-	InputModalities []domain.AIModelInputModality `bun:"input_modalities,type:jsonb"`
-	Instruction     string                        `bun:"instruction"`
+	Run              servermodels.AgentRun         `bun:",embed"`
+	AgentName        string                        `bun:"agent_name"`
+	Brand            string                        `bun:"brand"`
+	APIKey           string                        `bun:"api_key"`
+	APIURL           string                        `bun:"api_url"`
+	ModelIdentifier  string                        `bun:"model_identifier"`
+	MaxOutputTokens  int64                         `bun:"max_output_tokens"`
+	ContextWindow    int64                         `bun:"context_window"`
+	InputModalities  []domain.AIModelInputModality `bun:"input_modalities,type:jsonb"`
+	Instruction      string                        `bun:"instruction"`
+	KnowledgeBaseIDs []string                      `bun:"knowledge_base_ids,type:jsonb"`
 }
 
 // NewExecuteAction 创建 Agent Worker Action。
-func NewExecuteAction(db *bun.DB, enqueuer servertask.TxEnqueuer, runtime agentruntime.Runtime, attachments *AttachmentReader) *ExecuteAction {
-	return &ExecuteAction{db: db, enqueuer: enqueuer, runtime: runtime, attachments: attachments, runningRuns: make(map[string]*runningAgentRun)}
+func NewExecuteAction(db *bun.DB, enqueuer servertask.TxEnqueuer, runtime agentruntime.Runtime, attachments *AttachmentReader, knowledge KnowledgeRetrieval) *ExecuteAction {
+	return &ExecuteAction{db: db, enqueuer: enqueuer, runtime: runtime, attachments: attachments, knowledge: knowledge, runningRuns: make(map[string]*runningAgentRun)}
 }
 
 // Execute 运行 TurnLoop，并只保存吸收完当前输入后的稳定回复。
@@ -112,6 +114,10 @@ func (a *ExecuteAction) Execute(ctx context.Context, input RunInput) error {
 	if err != nil {
 		return fmt.Errorf("load agent run mcp servers: %w", err)
 	}
+	knowledgeSearch, err := loadRunKnowledgeSearch(ctx, a.db, a.knowledge, execution)
+	if err != nil {
+		return fmt.Errorf("load agent run knowledge bases: %w", err)
+	}
 	result, err := a.runtime.Run(runCtx, agentruntime.RunRequest{
 		RunID: execution.Run.ID, Name: execution.AgentName, Instruction: instruction,
 		Model: agentruntime.ModelConfig{
@@ -119,6 +125,7 @@ func (a *ExecuteAction) Execute(ctx context.Context, input RunInput) error {
 			Identifier: execution.ModelIdentifier, MaxOutputTokens: maxOutputTokens, ContextWindow: int(execution.ContextWindow),
 			InputModalities: execution.InputModalities,
 		},
+		KnowledgeSearch:       knowledgeSearch,
 		CustomerHistorySearch: customerHistorySearch,
 		ReadAttachment: func(ctx context.Context, messageID string) ([]byte, error) {
 			return a.attachments.Content(ctx, &execution.Run, messageID)
@@ -210,6 +217,7 @@ func (a *ExecuteAction) begin(ctx context.Context, runID string) (executionConte
 		ColumnExpr("aipm.max_output_tokens AS max_output_tokens, aipm.context_window AS context_window").
 		ColumnExpr("aipm.input_modalities").
 		ColumnExpr("ar.configuration->>'systemInstruction' AS instruction").
+		ColumnExpr("ar.configuration->'knowledgeBaseIds' AS knowledge_base_ids").
 		Join("JOIN agents AS a ON a.identity_id = agr.agent_identity_id AND a.organization_id = agr.organization_id").
 		Join("JOIN organization_identities AS oi ON oi.id = a.identity_id AND oi.organization_id = a.organization_id").
 		Join("JOIN agent_revisions AS ar ON ar.id = agr.agent_revision_id AND ar.agent_id = a.id AND ar.organization_id = agr.organization_id").

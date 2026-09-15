@@ -12,7 +12,7 @@ import (
 
 type knowledgeSearchInput struct {
 	Queries []string                   `json:"queries,omitempty" jsonschema_description:"用于检索企业知识的查询列表；与 cursor 二选一"`
-	Cursor  *knowledgeretrieval.Cursor `json:"cursor,omitempty" jsonschema_description:"关键词结果返回的游标；传入后读取该片段周边内容"`
+	Cursor  *knowledgeretrieval.Cursor `json:"cursor,omitempty" jsonschema_description:"检索或阅读结果返回的游标；传入后读取该片段周边内容"`
 	Before  int                        `json:"before,omitempty" jsonschema_description:"游标片段之前读取的分段数量"`
 	After   int                        `json:"after,omitempty" jsonschema_description:"游标片段之后读取的分段数量"`
 }

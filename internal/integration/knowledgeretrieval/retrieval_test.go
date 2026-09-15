@@ -47,11 +47,11 @@ func TestSearchKeepsSuccessfulSources(t *testing.T) {
 
 // TestSearchReadsCursorContext 验证游标模式直接读取指定知识库中的周边分段。
 func TestSearchReadsCursorContext(t *testing.T) {
-	sources := []Source{{ID: "base-a", Read: func(_ context.Context, cursor Cursor, before, after int) ([]Record, error) {
+	sources := []Source{{ID: "base-a", Name: "知识库 A", Read: func(_ context.Context, cursor Cursor, before, after int) ([]Record, error) {
 		if cursor.SegmentID != "segment-2" || before != 1 || after != 2 {
 			t.Fatalf("cursor = %#v, before = %d, after = %d", cursor, before, after)
 		}
-		return []Record{{SegmentID: "segment-1"}, {SegmentID: "segment-2", Matched: true}}, nil
+		return []Record{{DocumentID: "document-1", SegmentID: "segment-1", Position: 1}, {DocumentID: "document-1", SegmentID: "segment-2", Position: 2, Matched: true}}, nil
 	}}}
 	result, err := Search(context.Background(), sources, Request{
 		Cursor: &Cursor{KnowledgeBaseID: "base-a", DocumentID: "document-1", SegmentID: "segment-2", Position: 2},
@@ -59,6 +59,12 @@ func TestSearchReadsCursorContext(t *testing.T) {
 	})
 	if err != nil || len(result.Records) != 2 || !result.Records[1].Matched {
 		t.Fatalf("result = %#v, error = %v", result, err)
+	}
+	// 阅读结果携带知识库标识和自身游标。
+	first := result.Records[0]
+	if first.KnowledgeBaseID != "base-a" || first.KnowledgeBaseName != "知识库 A" ||
+		first.Cursor != (Cursor{KnowledgeBaseID: "base-a", DocumentID: "document-1", SegmentID: "segment-1", Position: 1}) {
+		t.Fatalf("first = %#v", first)
 	}
 }
 

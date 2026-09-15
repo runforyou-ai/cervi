@@ -144,7 +144,7 @@ func testAgentTelegramReplies(t *testing.T, db *bun.DB, identity *models.Identit
 				}
 				return agentruntime.RunResult{Content: "引用上下文验证完成", EndSeq: claimed.EndSeq}, nil
 			}}
-			if err := agentrunaction.NewExecuteAction(db, f.tasks, model, testAttachmentReader(db)).Execute(context.Background(), agentrunaction.RunInput{RunID: f.run.ID}); err != nil {
+			if err := agentrunaction.NewExecuteAction(db, f.tasks, model, testAttachmentReader(db), nil).Execute(context.Background(), agentrunaction.RunInput{RunID: f.run.ID}); err != nil {
 				t.Fatal(err)
 			}
 			f.reload(t)
@@ -194,7 +194,7 @@ func testAgentTelegramReplies(t *testing.T, db *bun.DB, identity *models.Identit
 			}
 			return agentruntime.RunResult{Content: "产品及使用方式", EndSeq: claimed.EndSeq}, nil
 		}}
-		executor := agentrunaction.NewExecuteAction(db, f.tasks, model, testAttachmentReader(db))
+		executor := agentrunaction.NewExecuteAction(db, f.tasks, model, testAttachmentReader(db), nil)
 		for range 2 {
 			if err := executor.Execute(ctx, agentrunaction.RunInput{RunID: f.run.ID}); err != nil {
 				t.Fatal(err)
@@ -245,7 +245,7 @@ func testAgentTelegramReplies(t *testing.T, db *bun.DB, identity *models.Identit
 		t.Run(scenario, func(t *testing.T) {
 			f := newAgentTelegramFixture(t, db, identity, roleID, providerID, modelID)
 			ctx := context.Background()
-			coordinator := agentrunaction.NewExecuteAction(db, f.tasks, nil, testAttachmentReader(db))
+			coordinator := agentrunaction.NewExecuteAction(db, f.tasks, nil, testAttachmentReader(db), nil)
 			model := &testAgentRuntime{run: func(ctx context.Context, _ agentruntime.RunRequest, feed agentruntime.InputFeed) (agentruntime.RunResult, error) {
 				pending, err := feed.Peek(ctx, 0)
 				if err != nil {
@@ -282,7 +282,7 @@ func testAgentTelegramReplies(t *testing.T, db *bun.DB, identity *models.Identit
 			if scenario == "投递入队失败" {
 				enqueuer = failing
 			}
-			err := agentrunaction.NewExecuteAction(db, enqueuer, model, testAttachmentReader(db)).Execute(ctx, agentrunaction.RunInput{RunID: f.run.ID})
+			err := agentrunaction.NewExecuteAction(db, enqueuer, model, testAttachmentReader(db), nil).Execute(ctx, agentrunaction.RunInput{RunID: f.run.ID})
 			if (scenario == "失败" || scenario == "投递入队失败") != (err != nil) {
 				t.Fatalf("execution err=%v", err)
 			}

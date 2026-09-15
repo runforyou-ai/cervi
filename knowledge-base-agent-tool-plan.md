@@ -9,18 +9,18 @@ Cervi 管理本地知识库、分组和问答内容。外部系统后续统一�
 - `internal/integration/knowledgeretrieval`：多查询、多知识库的并发检索、去重、RRF 排序和游标上下文读取。
 - `internal/integration/agentruntime/knowledge.go`：将上述业务契约注册为 `search_knowledge` Tool。
 
-Agent 创建和编辑支持绑定当前企业的本地知识库，范围保存到不可变 Revision，保存时校验并锁定同企业知识库。删除知识库后保留失效绑定供用户移除。本地混合检索已由 `knowledgebase.RetrievalService` 提供并接入知识库页面的检索测试，`Sources` 按企业和知识库范围构造 `knowledgeretrieval.Source`；Agent 运行期尚未注入 `KnowledgeSearch`，接通时使用已保存的范围。
+Agent 创建和编辑支持绑定当前企业的本地知识库，范围保存到不可变 Revision，保存时校验并锁定同企业知识库。删除知识库后保留失效绑定供用户移除。本地混合检索已由 `knowledgebase.RetrievalService` 提供并接入知识库页面的检索测试，`Sources` 按企业和知识库范围构造 `knowledgeretrieval.Source`；Agent 运行期由 `internal/actions/agentrun/knowledge.go` 按 Run 冻结 Revision 中保存的范围注入 `KnowledgeSearch`。
 
 ## 本地检索的职责
 
 Agent 决定是否检索、如何表达查询、是否继续读取上下文。Cervi 服务端确定企业身份、Agent 可用知识库范围和检索配置，执行查询并整理结果。内部工具直接调用业务检索服务。
 
-后续接入时：
+运行期接入规则：
 
 1. Agent 执行配置保存明确的本地知识库范围；Run 使用绑定 Revision 的配置快照。
-2. 写入配置时校验同企业知识库，运行时再次解析可用范围。
-3. 按范围构造 `knowledgeretrieval.Source{Retrieve, Read}`，注入本轮 `KnowledgeSearch`。
-4. 绑定为空时不注册工具；范围失效时明确报告错误，不能把无法读取表达为没有相关资料。
+2. 写入配置时校验同企业知识库；Run 开始时按同企业过滤仍存在的知识库，部分删除记录 `WARN` 并只在剩余知识库中检索。
+3. 每次工具调用按范围构造 `knowledgeretrieval.Source{Retrieve, Read}`，向量与重排模型使用各知识库当时的配置。
+4. 绑定为空时不注册工具；绑定的知识库全部删除时工具返回范围失效错误，由模型据此答复，不表达为没有相关资料。
 5. 人工检索与 Agent 使用相同的本地检索配置和实现。
 
 ## 工具契约
@@ -30,7 +30,7 @@ Agent 决定是否检索、如何表达查询、是否继续读取上下文。Ce
 - `queries`：非空查询列表，允许 Agent 使用不同关键词或表达方式。
 - `cursor`、`before`、`after`：读取已命中片段附近的内容。
 
-工具输出知识库、文档、分段、位置、正文、答案和游标等引用信息。具体字段和当前参数校验以 `knowledgeretrieval` 中的类型及实现为准。
+工具输出知识库、文档、分段、位置、正文、答案和游标等引用信息；检索命中与游标阅读的结果都携带知识库标识和自身游标，可以连续向前后读取。具体字段和当前参数校验以 `knowledgeretrieval` 中的类型及实现为准。
 
 授权范围由服务端注入，不能由模型传入的知识库编号或工具描述代替。后续本地游标需要增加来源索引版本，更新、重建或删除后拒绝读取失效版本；具体来源生命周期按本地方案实现。
 
