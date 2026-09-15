@@ -15,7 +15,7 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// AppendMessage 在调用方事务和会话锁内追加消息、推进会话版本、维护摘要并登记成员通知；调用方负责授权及完整发送意图校验。
+// AppendMessage 在调用方事务和会话锁内追加消息、推进会话版本、维护摘要并登记会话受众通知；调用方负责授权及完整发送意图校验。
 func AppendMessage(ctx context.Context, db bun.IDB, conversation *servermodels.Conversation, message *servermodels.Message) (*servermodels.Message, bool, error) {
 	// 幂等重放返回既有消息并保留序号和摘要。
 	if message.IdempotencyKey != nil {
@@ -69,13 +69,13 @@ func AppendMessage(ctx context.Context, db bun.IDB, conversation *servermodels.C
 	if err := query.Returning("last_activity_at").Scan(ctx); err != nil {
 		return nil, false, fmt.Errorf("update conversation summary: %w", err)
 	}
-	if err := NotifyConversationMembers(ctx, db, conversation); err != nil {
+	if err := NotifyConversationChanged(ctx, db, conversation); err != nil {
 		return nil, false, err
 	}
 	return message, true, nil
 }
 
-// TouchConversation 在调用方持有会话锁的事务内推进会话版本，并登记内部会话真人成员的会话变更通知。
+// TouchConversation 在调用方持有会话锁的事务内推进会话版本，并登记会话受众的变更通知。
 func TouchConversation(ctx context.Context, db bun.IDB, conversation *servermodels.Conversation) error {
 	if err := db.NewUpdate().Model(conversation).
 		Set("version = version + 1").
@@ -83,12 +83,13 @@ func TouchConversation(ctx context.Context, db bun.IDB, conversation *servermode
 		Returning("version").Scan(ctx); err != nil {
 		return fmt.Errorf("advance conversation version: %w", err)
 	}
-	return NotifyConversationMembers(ctx, db, conversation)
+	return NotifyConversationChanged(ctx, db, conversation)
 }
 
-// NotifyConversationMembers 按会话当前版本登记内部会话真人成员的会话变更通知；客户会话不登记成员受众。
-func NotifyConversationMembers(ctx context.Context, db bun.IDB, conversation *servermodels.Conversation) error {
+// NotifyConversationChanged 按会话当前版本登记变更通知：客户会话通知企业客服共享受众，内部会话通知当前真人成员。
+func NotifyConversationChanged(ctx context.Context, db bun.IDB, conversation *servermodels.Conversation) error {
 	if conversation.Type == string(domain.ConversationTypeCustomer) {
+		realtime.Notify(ctx, realtime.CustomerInboxConversationChanged(conversation.OrganizationID, conversation.ID, conversation.Version))
 		return nil
 	}
 	var userIDs []string

@@ -63,9 +63,14 @@ func LockCurrentServiceSession(ctx context.Context, db bun.IDB, organizationID, 
 }
 
 // LockCustomerServiceSession 依次锁定已有客户会话、客户扩展和当前客服周期。
-func LockCustomerServiceSession(ctx context.Context, db bun.IDB, organizationID, conversationID string) (*servermodels.ServiceSession, error) {
-	if _, err := LockCustomerConversation(ctx, db, organizationID, conversationID); err != nil {
-		return nil, err
+func LockCustomerServiceSession(ctx context.Context, db bun.IDB, organizationID, conversationID string) (*servermodels.Conversation, *servermodels.ServiceSession, error) {
+	conversation, err := LockCustomerConversation(ctx, db, organizationID, conversationID)
+	if err != nil {
+		return nil, nil, err
 	}
-	return LockCurrentServiceSession(ctx, db, organizationID, conversationID)
+	session, err := LockCurrentServiceSession(ctx, db, organizationID, conversationID)
+	if err != nil {
+		return nil, nil, err
+	}
+	return conversation, session, nil
 }

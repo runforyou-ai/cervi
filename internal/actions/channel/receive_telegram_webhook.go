@@ -19,6 +19,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/telegram"
+	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -92,7 +93,7 @@ func (a *ReceiveTelegramWebhookAction) Execute(ctx context.Context, channelID st
 	var avatarBotToken string
 	var avatarOrganizationID string
 	var avatarCreatedByUserID string
-	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		setting, err := loadActiveTelegramWebhookSetting(ctx, tx, channelID, true)
 		if err != nil {
 			return err

@@ -128,7 +128,7 @@ func (a *UpdateGroupConversationAction) Execute(ctx context.Context, identity *s
 				Returning("version").Scan(ctx); err != nil {
 				return fmt.Errorf("update group conversation profile: %w", err)
 			}
-			if err := chatstate.NotifyConversationMembers(ctx, tx, group.Conversation); err != nil {
+			if err := chatstate.NotifyConversationChanged(ctx, tx, group.Conversation); err != nil {
 				return err
 			}
 			if imageChanged {
