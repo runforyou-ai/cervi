@@ -18,22 +18,18 @@ type emptyThenAnswerChatModel struct {
 	emptyReplies int
 }
 
-func (m *emptyThenAnswerChatModel) Generate(_ context.Context, _ []*schema.Message, _ ...model.Option) (*schema.Message, error) {
+func (m *emptyThenAnswerChatModel) Generate(_ context.Context, _ []*schema.AgenticMessage, _ ...model.Option) (*schema.AgenticMessage, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.calls++
 	if m.calls <= m.emptyReplies {
-		return schema.AssistantMessage("", nil), nil
+		return assistantReply(""), nil
 	}
-	return schema.AssistantMessage("重试后的回答", nil), nil
+	return assistantReply("重试后的回答"), nil
 }
 
-func (m *emptyThenAnswerChatModel) Stream(context.Context, []*schema.Message, ...model.Option) (*schema.StreamReader[*schema.Message], error) {
+func (m *emptyThenAnswerChatModel) Stream(context.Context, []*schema.AgenticMessage, ...model.Option) (*schema.StreamReader[*schema.AgenticMessage], error) {
 	return nil, nil
-}
-
-func (m *emptyThenAnswerChatModel) WithTools([]*schema.ToolInfo) (model.ToolCallingChatModel, error) {
-	return m, nil
 }
 
 // TestEmptyFinalResponseRetryIsBounded 验证空正文按有界次数重新执行本次输入。
@@ -50,7 +46,7 @@ func TestEmptyFinalResponseRetryIsBounded(t *testing.T) {
 		t.Run(scenario.name, func(t *testing.T) {
 			chatModel := &emptyThenAnswerChatModel{emptyReplies: scenario.emptyReplies}
 			runtime := &EinoRuntime{
-				newModel: func(context.Context, ModelConfig) (model.ToolCallingChatModel, error) { return chatModel, nil },
+				newModel: func(context.Context, ModelConfig) (model.AgenticModel, error) { return chatModel, nil },
 			}
 			feed := &testInputFeed{}
 			feed.appendUser("群里的问题")

@@ -45,11 +45,11 @@ func contextWindowTokens(model ModelConfig) int {
 }
 
 // newContextReductionHandlers 创建大工具结果转存和上下文清理中间件，转存内容存活到本次运行结束。
-func newContextReductionHandlers(ctx context.Context, window int) ([]adk.ChatModelAgentMiddleware, error) {
+func newContextReductionHandlers(ctx context.Context, window int) ([]adk.TypedChatModelAgentMiddleware[*schema.AgenticMessage], error) {
 	backend := filesystem.NewInMemoryBackend()
 	disabled := &fsmiddleware.ToolConfig{Disable: true}
 	description := "读取本次运行中因结果过大而转存的工具输出，file_path 使用转存提示中给出的路径。"
-	readTool, err := fsmiddleware.New(ctx, &fsmiddleware.MiddlewareConfig{
+	readTool, err := fsmiddleware.NewTyped[*schema.AgenticMessage](ctx, &fsmiddleware.MiddlewareConfig{
 		Backend:             backend,
 		ReadFileToolConfig:  &fsmiddleware.ToolConfig{Name: offloadedResultToolName, Desc: &description},
 		LsToolConfig:        disabled,
@@ -63,7 +63,7 @@ func newContextReductionHandlers(ctx context.Context, window int) ([]adk.ChatMod
 	}
 	clearTokens := int64(window) * contextClearWindowPercent / 100
 	offloadBytes := offloadThresholdBytes(window)
-	reduce, err := reduction.New(ctx, &reduction.Config{
+	reduce, err := reduction.NewTyped(ctx, &reduction.TypedConfig[*schema.AgenticMessage]{
 		Backend:          backend,
 		ReadFileToolName: offloadedResultToolName,
 		// 读回工具的结果不参与转存和清理。
@@ -80,7 +80,7 @@ func newContextReductionHandlers(ctx context.Context, window int) ([]adk.ChatMod
 				"tool_call_id", detail.ToolContext.CallID, "file_path", path, "offload_threshold_bytes", offloadBytes)
 			return path, nil
 		},
-		ClearPostProcess: func(ctx context.Context, state *adk.ChatModelAgentState) context.Context {
+		ClearPostProcess: func(ctx context.Context, state *adk.TypedChatModelAgentState[*schema.AgenticMessage]) context.Context {
 			tokens, _ := countContextTokens(ctx, state.Messages, state.ToolInfos)
 			slog.Info("Agent 上下文已清理较早的工具调用",
 				"agent_run_id", runIDFromContext(ctx), "clear_threshold_tokens", clearTokens, "tokens_after_clear", tokens)
@@ -90,7 +90,7 @@ func newContextReductionHandlers(ctx context.Context, window int) ([]adk.ChatMod
 	if err != nil {
 		return nil, fmt.Errorf("create context reduction middleware: %w", err)
 	}
-	return []adk.ChatModelAgentMiddleware{readTool, reduce}, nil
+	return []adk.TypedChatModelAgentMiddleware[*schema.AgenticMessage]{readTool, reduce}, nil
 }
 
 // offloadThresholdBytes 按模型窗口推导单次工具结果的转存阈值。
@@ -100,19 +100,31 @@ func offloadThresholdBytes(window int) int {
 
 // countContextTokens 估算上下文 Token 数，中日韩字符按一个 Token 计，其余字符按四分之一计，直传附件按单个估值计。
 // 工具定义按参数 schema 的 JSON 计入，工具较多时其体积与消息同样占用窗口。
-func countContextTokens(_ context.Context, messages []*schema.Message, tools []*schema.ToolInfo) (int64, error) {
+func countContextTokens(_ context.Context, messages []*schema.AgenticMessage, tools []*schema.ToolInfo) (int64, error) {
 	texts := make([]string, 0, len(messages)*2+len(tools)*3)
 	mediaParts := 0
 	for _, message := range messages {
-		texts = append(texts, message.Content, message.ReasoningContent)
-		for _, part := range message.UserInputMultiContent {
-			texts = append(texts, part.Text)
-			if part.Image != nil || part.Audio != nil || part.Video != nil {
+		for _, block := range message.ContentBlocks {
+			switch block.Type {
+			case schema.ContentBlockTypeReasoning:
+				texts = append(texts, block.Reasoning.Text)
+			case schema.ContentBlockTypeUserInputText:
+				texts = append(texts, block.UserInputText.Text)
+			case schema.ContentBlockTypeUserInputImage, schema.ContentBlockTypeUserInputAudio, schema.ContentBlockTypeUserInputVideo:
 				mediaParts++
+			case schema.ContentBlockTypeAssistantGenText:
+				texts = append(texts, block.AssistantGenText.Text)
+			case schema.ContentBlockTypeFunctionToolCall:
+				texts = append(texts, block.FunctionToolCall.Name, block.FunctionToolCall.Arguments)
+			case schema.ContentBlockTypeFunctionToolResult:
+				for _, content := range block.FunctionToolResult.Content {
+					if content.Type == schema.FunctionToolResultContentBlockTypeText {
+						texts = append(texts, content.Text.Text)
+						continue
+					}
+					mediaParts++
+				}
 			}
-		}
-		for _, call := range message.ToolCalls {
-			texts = append(texts, call.Function.Name, call.Function.Arguments)
 		}
 	}
 	for _, info := range tools {

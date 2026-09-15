@@ -13,6 +13,12 @@ func AvailableModels(brand domain.AIProviderBrand) []Model {
 		domain.AIModelInputModalityImage,
 		domain.AIModelInputModalityVideo,
 	}
+	textImageAudioVideo := []domain.AIModelInputModality{
+		domain.AIModelInputModalityText,
+		domain.AIModelInputModalityImage,
+		domain.AIModelInputModalityAudio,
+		domain.AIModelInputModalityVideo,
+	}
 	switch brand {
 	case domain.AIProviderBrandDeepSeek:
 		return []Model{
@@ -36,6 +42,16 @@ func AvailableModels(brand domain.AIProviderBrand) []Model {
 			{Identifier: "gpt-5.6-luna", Name: "GPT-5.6 Luna", Type: domain.AIModelTypeChat, InputModalities: textAndImage, ContextWindow: 1_050_000, MaxOutputTokens: 128_000},
 			{Identifier: "text-embedding-3-large", Name: "Text Embedding 3 Large", Type: domain.AIModelTypeEmbedding, InputModalities: text, ContextWindow: 8_192},
 			{Identifier: "text-embedding-3-small", Name: "Text Embedding 3 Small", Type: domain.AIModelTypeEmbedding, InputModalities: text, ContextWindow: 8_192},
+		}
+	case domain.AIProviderBrandAnthropic:
+		return []Model{
+			{Identifier: "claude-fable-5-1", Name: "Claude Fable 5.1", Type: domain.AIModelTypeChat, InputModalities: textAndImage, ContextWindow: 1_000_000, MaxOutputTokens: 128_000},
+			{Identifier: "claude-opus-5", Name: "Claude Opus 5", Type: domain.AIModelTypeChat, InputModalities: textAndImage, ContextWindow: 1_000_000, MaxOutputTokens: 128_000},
+			{Identifier: "claude-sonnet-5", Name: "Claude Sonnet 5", Type: domain.AIModelTypeChat, InputModalities: textAndImage, ContextWindow: 1_000_000, MaxOutputTokens: 128_000},
+		}
+	case domain.AIProviderBrandGoogle:
+		return []Model{
+			{Identifier: "gemini-3.8-flash", Name: "Gemini 3.8 Flash", Type: domain.AIModelTypeChat, InputModalities: textImageAudioVideo, ContextWindow: 1_048_576, MaxOutputTokens: 65_536},
 		}
 	case domain.AIProviderBrandMoonshot:
 		return []Model{

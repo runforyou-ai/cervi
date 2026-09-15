@@ -50,45 +50,112 @@ func (f *testInputFeed) appendUser(content string) {
 	f.messages = append(f.messages, Message{ID: fmt.Sprint(f.desired), Role: MessageRoleUser, Content: content})
 }
 
+// assistantReply 构造带正文和工具调用块的模型输出。
+func assistantReply(text string, calls ...*schema.FunctionToolCall) *schema.AgenticMessage {
+	message := &schema.AgenticMessage{Role: schema.AgenticRoleTypeAssistant, ContentBlocks: []*schema.ContentBlock{schema.NewContentBlock(&schema.AssistantGenText{Text: text})}}
+	for _, call := range calls {
+		message.ContentBlocks = append(message.ContentBlocks, schema.NewContentBlock(call))
+	}
+	return message
+}
+
+// withReasoning 在模型输出最前面加入思考块。
+func withReasoning(message *schema.AgenticMessage, text string) *schema.AgenticMessage {
+	message.ContentBlocks = append([]*schema.ContentBlock{schema.NewContentBlock(&schema.Reasoning{Text: text})}, message.ContentBlocks...)
+	return message
+}
+
+// toolReply 构造框架返回给模型的工具结果消息。
+func toolReply(callID, text string) *schema.AgenticMessage {
+	return &schema.AgenticMessage{Role: schema.AgenticRoleTypeUser, ContentBlocks: []*schema.ContentBlock{schema.NewContentBlock(&schema.FunctionToolResult{
+		CallID:  callID,
+		Content: []*schema.FunctionToolResultContentBlock{{Type: schema.FunctionToolResultContentBlockTypeText, Text: &schema.UserInputText{Text: text}}},
+	})}}
+}
+
+// toolResult 返回消息中的工具结果块，没有时返回 nil。
+func toolResult(message *schema.AgenticMessage) *schema.FunctionToolResult {
+	for _, block := range message.ContentBlocks {
+		if block.Type == schema.ContentBlockTypeFunctionToolResult {
+			return block.FunctionToolResult
+		}
+	}
+	return nil
+}
+
+// toolCalls 返回模型输出中的工具调用块。
+func toolCalls(message *schema.AgenticMessage) []*schema.FunctionToolCall {
+	var calls []*schema.FunctionToolCall
+	for _, block := range message.ContentBlocks {
+		if block.Type == schema.ContentBlockTypeFunctionToolCall {
+			calls = append(calls, block.FunctionToolCall)
+		}
+	}
+	return calls
+}
+
+// messageText 拼接消息中的用户正文、模型正文和工具结果文本。
+func messageText(message *schema.AgenticMessage) string {
+	var text strings.Builder
+	for _, block := range message.ContentBlocks {
+		switch block.Type {
+		case schema.ContentBlockTypeUserInputText:
+			text.WriteString(block.UserInputText.Text)
+		case schema.ContentBlockTypeAssistantGenText:
+			text.WriteString(block.AssistantGenText.Text)
+		case schema.ContentBlockTypeFunctionToolResult:
+			for _, content := range block.FunctionToolResult.Content {
+				if content.Type == schema.FunctionToolResultContentBlockTypeText {
+					text.WriteString(content.Text.Text)
+				}
+			}
+		}
+	}
+	return text.String()
+}
+
+// messageKind 区分系统、用户、模型输出和工具结果消息。
+func messageKind(message *schema.AgenticMessage) string {
+	if toolResult(message) != nil {
+		return "tool"
+	}
+	return string(message.Role)
+}
+
 type steeringChatModel struct {
 	mu               sync.Mutex
 	calls            int
 	calledWithoutNew bool
 	firstCall        chan struct{}
-	lastInput        []*schema.Message
+	lastInput        []*schema.AgenticMessage
 }
 
-func (m *steeringChatModel) Generate(_ context.Context, input []*schema.Message, _ ...model.Option) (*schema.Message, error) {
+func (m *steeringChatModel) Generate(_ context.Context, input []*schema.AgenticMessage, _ ...model.Option) (*schema.AgenticMessage, error) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	m.calls++
 	m.lastInput = input
 	if m.calls == 1 {
 		close(m.firstCall)
-		return schema.AssistantMessage("先计算一加二", []schema.ToolCall{{
-			ID: "calculator-call-1", Type: "function",
-			Function: schema.FunctionCall{Name: "calculator", Arguments: `{"operation":"add","left":1,"right":2,"delayMilliseconds":500}`},
-		}}), nil
+		return assistantReply("先计算一加二", &schema.FunctionToolCall{
+			CallID: "calculator-call-1", Name: "calculator", Arguments: `{"operation":"add","left":1,"right":2,"delayMilliseconds":500}`,
+		}), nil
 	}
 	userMessages := 0
 	for _, message := range input {
-		if message.Role == schema.User {
+		if messageKind(message) == "user" {
 			userMessages++
 		}
 	}
 	if userMessages < 2 {
 		m.calledWithoutNew = true
-		return schema.AssistantMessage("stale response", nil), nil
+		return assistantReply("stale response"), nil
 	}
-	return schema.AssistantMessage("response with follow-up", nil), nil
+	return assistantReply("response with follow-up"), nil
 }
 
-func (m *steeringChatModel) Stream(context.Context, []*schema.Message, ...model.Option) (*schema.StreamReader[*schema.Message], error) {
+func (m *steeringChatModel) Stream(context.Context, []*schema.AgenticMessage, ...model.Option) (*schema.StreamReader[*schema.AgenticMessage], error) {
 	return nil, errors.New("unexpected streaming call")
-}
-
-func (m *steeringChatModel) WithTools([]*schema.ToolInfo) (model.ToolCallingChatModel, error) {
-	return m, nil
 }
 
 type cancelRaceInputFeed struct {
@@ -121,21 +188,17 @@ type finalAfterWatcherModel struct {
 	watcherStarted <-chan struct{}
 }
 
-func (m *finalAfterWatcherModel) Generate(ctx context.Context, _ []*schema.Message, _ ...model.Option) (*schema.Message, error) {
+func (m *finalAfterWatcherModel) Generate(ctx context.Context, _ []*schema.AgenticMessage, _ ...model.Option) (*schema.AgenticMessage, error) {
 	select {
 	case <-ctx.Done():
 		return nil, ctx.Err()
 	case <-m.watcherStarted:
-		return schema.AssistantMessage("final response", nil), nil
+		return assistantReply("final response"), nil
 	}
 }
 
-func (m *finalAfterWatcherModel) Stream(context.Context, []*schema.Message, ...model.Option) (*schema.StreamReader[*schema.Message], error) {
+func (m *finalAfterWatcherModel) Stream(context.Context, []*schema.AgenticMessage, ...model.Option) (*schema.StreamReader[*schema.AgenticMessage], error) {
 	return nil, errors.New("unexpected streaming call")
-}
-
-func (m *finalAfterWatcherModel) WithTools([]*schema.ToolInfo) (model.ToolCallingChatModel, error) {
-	return m, nil
 }
 
 // TestEinoRuntimeSteersBeforeNextModelCall 验证 Tool 完成后先吸收新输入再继续规划。
@@ -151,7 +214,7 @@ func TestEinoRuntimeSteersBeforeNextModelCall(t *testing.T) {
 	}
 	chatModel := &steeringChatModel{firstCall: make(chan struct{})}
 	runtime := &EinoRuntime{
-		newModel: func(context.Context, ModelConfig) (model.ToolCallingChatModel, error) {
+		newModel: func(context.Context, ModelConfig) (model.AgenticModel, error) {
 			return chatModel, nil
 		},
 		tools: []tool.BaseTool{calculator},
@@ -181,18 +244,18 @@ func TestEinoRuntimeSteersBeforeNextModelCall(t *testing.T) {
 	if chatModel.calls != 2 {
 		t.Fatalf("model calls = %d, want 2", chatModel.calls)
 	}
-	var roles []schema.RoleType
+	var kinds []string
 	for _, message := range chatModel.lastInput {
-		if message.Role != schema.System {
-			roles = append(roles, message.Role)
+		if message.Role != schema.AgenticRoleTypeSystem {
+			kinds = append(kinds, messageKind(message))
 		}
 	}
-	if !reflect.DeepEqual(roles, []schema.RoleType{schema.User, schema.Assistant, schema.Tool, schema.User}) {
-		t.Fatalf("steered message roles = %v", roles)
+	if !reflect.DeepEqual(kinds, []string{"user", "assistant", "tool", "user"}) {
+		t.Fatalf("steered message kinds = %v", kinds)
 	}
 	messages := chatModel.lastInput[len(chatModel.lastInput)-4:]
-	if messages[1].Content != "先计算一加二" || messages[1].ToolCalls[0].ID != "calculator-call-1" ||
-		messages[2].ToolCallID != "calculator-call-1" || messages[2].Content != `{"result":3}` {
+	if messageText(messages[1]) != "先计算一加二" || toolCalls(messages[1])[0].CallID != "calculator-call-1" ||
+		toolResult(messages[2]).CallID != "calculator-call-1" || messageText(messages[2]) != `{"result":3}` {
 		t.Fatalf("steered tool exchange = %#v / %#v", messages[1], messages[2])
 	}
 	logs := logOutput.String()
@@ -211,7 +274,7 @@ func TestEinoRuntimeIgnoresWatcherCancellationAfterSuccess(t *testing.T) {
 	feed := &cancelRaceInputFeed{blockingPeekStarted: make(chan struct{})}
 	chatModel := &finalAfterWatcherModel{watcherStarted: feed.blockingPeekStarted}
 	runtime := &EinoRuntime{
-		newModel: func(context.Context, ModelConfig) (model.ToolCallingChatModel, error) {
+		newModel: func(context.Context, ModelConfig) (model.AgenticModel, error) {
 			return chatModel, nil
 		},
 	}

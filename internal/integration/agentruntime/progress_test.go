@@ -15,24 +15,23 @@ import (
 )
 
 type processChatModel struct {
-	generate func(context.Context, []*schema.Message) (*schema.Message, error)
+	generate func(context.Context, []*schema.AgenticMessage) (*schema.AgenticMessage, error)
 }
 
 // TestRecorderDropsSkippedTools 验证安全点补入新输入后不保留尚未执行的工具。
 func TestRecorderDropsSkippedTools(t *testing.T) {
 	recorder := newProcessRecorder(RunRequest{RunID: "run"})
-	message := schema.AssistantMessage("准备计算", []schema.ToolCall{
-		{ID: "skipped-1", Function: schema.FunctionCall{Name: "calculator", Arguments: "{}"}},
-		{ID: "skipped-2", Function: schema.FunctionCall{Name: "calculator", Arguments: "{}"}},
-	})
-	message.ReasoningContent = "先分析旧问题"
-	state := &adk.ChatModelAgentState{Messages: []*schema.Message{message}}
+	message := withReasoning(assistantReply("准备计算",
+		&schema.FunctionToolCall{CallID: "skipped-1", Name: "calculator", Arguments: "{}"},
+		&schema.FunctionToolCall{CallID: "skipped-2", Name: "calculator", Arguments: "{}"},
+	), "先分析旧问题")
+	state := &adk.TypedChatModelAgentState[*schema.AgenticMessage]{Messages: []*schema.AgenticMessage{message}}
 	if _, _, err := recorder.AfterModelRewriteState(context.Background(), state, nil); err != nil {
 		t.Fatal(err)
 	}
 	before := recorder.blocks()
 	recorder.resetCandidate()
-	state.Messages = append(state.Messages, schema.AssistantMessage("根据补充信息得出的结果", nil))
+	state.Messages = append(state.Messages, assistantReply("根据补充信息得出的结果"))
 	if _, _, err := recorder.AfterModelRewriteState(context.Background(), state, nil); err != nil {
 		t.Fatal(err)
 	}
@@ -46,18 +45,13 @@ func TestRecorderDropsSkippedTools(t *testing.T) {
 }
 
 // Generate 返回当前测试步骤指定的模型输出。
-func (m *processChatModel) Generate(ctx context.Context, input []*schema.Message, _ ...model.Option) (*schema.Message, error) {
+func (m *processChatModel) Generate(ctx context.Context, input []*schema.AgenticMessage, _ ...model.Option) (*schema.AgenticMessage, error) {
 	return m.generate(ctx, input)
 }
 
 // Stream 拒绝当前测试未使用的流式调用。
-func (m *processChatModel) Stream(context.Context, []*schema.Message, ...model.Option) (*schema.StreamReader[*schema.Message], error) {
+func (m *processChatModel) Stream(context.Context, []*schema.AgenticMessage, ...model.Option) (*schema.StreamReader[*schema.AgenticMessage], error) {
 	return nil, errors.New("unexpected streaming call")
-}
-
-// WithTools 保留测试模型的执行步骤。
-func (m *processChatModel) WithTools([]*schema.ToolInfo) (model.ToolCallingChatModel, error) {
-	return m, nil
 }
 
 // TestRunRecordsToolCorrection 验证工具乱序完成、参数修正和成功过程的完整顺序。
@@ -67,36 +61,32 @@ func TestRunRecordsToolCorrection(t *testing.T) {
 		t.Fatal(err)
 	}
 	modelCalls := 0
-	chatModel := &processChatModel{generate: func(_ context.Context, messages []*schema.Message) (*schema.Message, error) {
+	chatModel := &processChatModel{generate: func(_ context.Context, messages []*schema.AgenticMessage) (*schema.AgenticMessage, error) {
 		modelCalls++
 		switch modelCalls {
 		case 1:
-			message := schema.AssistantMessage("先计算两个结果", []schema.ToolCall{
-				{ID: "slow", Type: "function", Function: schema.FunctionCall{Name: "calculator", Arguments: `{"operation":"add","left":1,"right":2,"delayMilliseconds":100}`}},
-				{ID: "invalid", Type: "function", Function: schema.FunctionCall{Name: "calculator", Arguments: `{"operation":`}},
-			})
-			message.ReasoningContent = "需要分两步计算"
-			return message, nil
+			return withReasoning(assistantReply("先计算两个结果",
+				&schema.FunctionToolCall{CallID: "slow", Name: "calculator", Arguments: `{"operation":"add","left":1,"right":2,"delayMilliseconds":100}`},
+				&schema.FunctionToolCall{CallID: "invalid", Name: "calculator", Arguments: `{"operation":`},
+			), "需要分两步计算"), nil
 		case 2:
 			foundError := false
 			for _, message := range messages {
-				if message.Role == schema.Tool && message.ToolCallID == "invalid" && strings.Contains(message.Content, `"error"`) {
+				if result := toolResult(message); result != nil && result.CallID == "invalid" && strings.Contains(messageText(message), `"error"`) {
 					foundError = true
 				}
 			}
 			if !foundError {
 				return nil, errors.New("model did not receive tool error")
 			}
-			return schema.AssistantMessage("修正参数再试一次", []schema.ToolCall{
-				{ID: "corrected", Type: "function", Function: schema.FunctionCall{Name: "calculator", Arguments: `{"operation":"multiply","left":3,"right":4}`}},
-			}), nil
+			return assistantReply("修正参数再试一次",
+				&schema.FunctionToolCall{CallID: "corrected", Name: "calculator", Arguments: `{"operation":"multiply","left":3,"right":4}`},
+			), nil
 		default:
-			message := schema.AssistantMessage("最终结果为 12", nil)
-			message.ReasoningContent = "两个步骤均已完成"
-			return message, nil
+			return withReasoning(assistantReply("最终结果为 12"), "两个步骤均已完成"), nil
 		}
 	}}
-	runtime.newModel = func(context.Context, ModelConfig) (model.ToolCallingChatModel, error) { return chatModel, nil }
+	runtime.newModel = func(context.Context, ModelConfig) (model.AgenticModel, error) { return chatModel, nil }
 	feed := &testInputFeed{}
 	feed.appendUser("开始计算")
 	var snapshots []Progress
@@ -150,11 +140,11 @@ func TestRunCancellationDiscardsProcess(t *testing.T) {
 	ctx, cancel := context.WithCancel(context.Background())
 	defer cancel()
 	modelCalls := 0
-	chatModel := &processChatModel{generate: func(context.Context, []*schema.Message) (*schema.Message, error) {
+	chatModel := &processChatModel{generate: func(context.Context, []*schema.AgenticMessage) (*schema.AgenticMessage, error) {
 		modelCalls++
-		return schema.AssistantMessage("准备计算", []schema.ToolCall{{ID: "slow", Type: "function", Function: schema.FunctionCall{Name: "calculator", Arguments: `{"operation":"add","left":1,"right":2,"delayMilliseconds":1000}`}}}), nil
+		return assistantReply("准备计算", &schema.FunctionToolCall{CallID: "slow", Name: "calculator", Arguments: `{"operation":"add","left":1,"right":2,"delayMilliseconds":1000}`}), nil
 	}}
-	runtime.newModel = func(context.Context, ModelConfig) (model.ToolCallingChatModel, error) { return chatModel, nil }
+	runtime.newModel = func(context.Context, ModelConfig) (model.AgenticModel, error) { return chatModel, nil }
 	feed := &testInputFeed{}
 	feed.appendUser("计算")
 	result, err := runtime.Run(ctx, RunRequest{Name: "test", OnProgress: func(progress Progress) {

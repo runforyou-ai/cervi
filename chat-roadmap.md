@@ -1569,7 +1569,7 @@ Direct 发送只允许现有双方有效 Participant，不自动加入、恢复 
 
 本 PR 在既有 Direct 上允许选择活跃 AI 员工。用户文本首次持久化时，在同一事务推进 `conversation_agent_states`、创建 `conversation_agent_triggers`、单个活动 `agent_runs` 和隔离 Agent Worker 任务；消息幂等重放不重复触发。Run 成功或失败都推进明确的 `processed_seq`，Task 重试耗尽通过通用终态回调收敛业务 Run，避免活动索引永久卡住会话。
 
-Runtime 通过内部适配层精确锁定 Eino v0.10 Alpha，并优先使用 eino-ext 的 OpenAI 兼容模型组件。开发期 Tool 只有无副作用四则运算 calculator，并支持可控延时测试并发；TurnLoop 轮询持久 Trigger，通过 `Push + AnySafePoint` 并等待 preempt ack，保证 Tool 完成后、下一次模型规划前读取最新会话上下文。calculator 正式发布前删除，该重建方式也不作为未来设备或副作用 Tool 的恢复模型。
+Runtime 通过内部适配层精确锁定 Eino v0.10 Alpha，模型统一使用 eino-ext 的 AgenticModel 组件：DeepSeek、阿里云百炼、火山方舟、Anthropic 和 Google 使用品牌专用组件，其余品牌使用 OpenAI 兼容组件。开发期 Tool 只有无副作用四则运算 calculator，并支持可控延时测试并发；TurnLoop 轮询持久 Trigger，通过 `Push + AnySafePoint` 并等待 preempt ack，保证 Tool 完成后、下一次模型规划前读取最新会话上下文。calculator 正式发布前删除，该重建方式也不作为未来设备或副作用 Tool 的恢复模型。
 
 Web、桌面端与移动端复用统一收件箱、Direct 时间线和前台轮询，展示 Agent 类型及排队、运行、失败状态；移动端详情继续遵循前台运行与底部安全区约束。本 PR 不实现流式输出、Tool Invocation、审批、设备权限、本地 Agent Runtime、群聊 @Agent 或网站 AI 客服。
 

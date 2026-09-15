@@ -10,6 +10,7 @@ import (
 	"uuid"
 
 	"github.com/cloudwego/eino/adk"
+	"github.com/cloudwego/eino/schema"
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
@@ -51,7 +52,7 @@ type Progress struct {
 }
 
 type processRecorder struct {
-	adk.BaseChatModelAgentMiddleware
+	adk.TypedBaseChatModelAgentMiddleware[*schema.AgenticMessage]
 	mu            sync.Mutex
 	progress      Progress
 	toolPositions map[string]int
@@ -67,26 +68,33 @@ func newProcessRecorder(request RunRequest) *processRecorder {
 	return &processRecorder{progress: Progress{RunID: request.RunID, StreamID: streamID, Attempt: request.Attempt}, toolPositions: make(map[string]int), onProgress: request.OnProgress}
 }
 
-// AfterModelRewriteState 在工具执行前固定同次模型输出的内容块顺序。
-func (r *processRecorder) AfterModelRewriteState(ctx context.Context, state *adk.ChatModelAgentState, _ *adk.ModelContext) (context.Context, *adk.ChatModelAgentState, error) {
+// AfterModelRewriteState 在工具执行前按模型输出的内容块顺序固定思考、正文和工具调用。
+func (r *processRecorder) AfterModelRewriteState(ctx context.Context, state *adk.TypedChatModelAgentState[*schema.AgenticMessage], _ *adk.TypedModelContext[*schema.AgenticMessage]) (context.Context, *adk.TypedChatModelAgentState[*schema.AgenticMessage], error) {
 	r.mu.Lock()
 	defer r.mu.Unlock()
 	message := state.Messages[len(state.Messages)-1]
 	modelCallID := uuid.NewV7().String()
 	r.progress.CandidateContent = ""
-	if message.ReasoningContent != "" {
-		r.appendBlock(modelCallID, domain.AgentRunBlockThinking, BlockPayload{Text: message.ReasoningContent})
+	// 没有工具调用时正文是候选回复，有工具调用时正文作为说明块记录在调用之前。
+	withCalls := hasToolCalls(message)
+	if !withCalls {
+		r.progress.CandidateContent = assistantText(message)
 	}
-	if len(message.ToolCalls) == 0 {
-		r.progress.CandidateContent = message.Content
-	} else {
-		if message.Content != "" {
-			r.appendBlock(modelCallID, domain.AgentRunBlockContent, BlockPayload{Text: message.Content})
-		}
-		for _, call := range message.ToolCalls {
-			r.toolPositions[call.ID] = len(r.progress.Blocks)
+	for _, block := range message.ContentBlocks {
+		switch block.Type {
+		case schema.ContentBlockTypeReasoning:
+			if block.Reasoning.Text != "" {
+				r.appendBlock(modelCallID, domain.AgentRunBlockThinking, BlockPayload{Text: block.Reasoning.Text})
+			}
+		case schema.ContentBlockTypeAssistantGenText:
+			if withCalls && block.AssistantGenText.Text != "" {
+				r.appendBlock(modelCallID, domain.AgentRunBlockContent, BlockPayload{Text: block.AssistantGenText.Text})
+			}
+		case schema.ContentBlockTypeFunctionToolCall:
+			call := block.FunctionToolCall
+			r.toolPositions[call.CallID] = len(r.progress.Blocks)
 			r.appendBlock(modelCallID, domain.AgentRunBlockToolCall, BlockPayload{ToolCall: &ToolCall{
-				CallID: call.ID, Name: call.Function.Name, Arguments: call.Function.Arguments, Status: domain.AgentToolCallQueued,
+				CallID: call.CallID, Name: call.Name, Arguments: call.Arguments, Status: domain.AgentToolCallQueued,
 			}})
 		}
 	}

@@ -98,6 +98,14 @@ func Search(ctx context.Context, sources []Source, request Request) (Result, err
 			if err != nil {
 				return Result{}, fmt.Errorf("read knowledge cursor: %w", err)
 			}
+			// 阅读结果同样带上知识库标识和自身游标，供模型继续向前后读取。
+			for index := range records {
+				records[index].KnowledgeBaseID, records[index].KnowledgeBaseName = source.ID, source.Name
+				records[index].Cursor = Cursor{
+					KnowledgeBaseID: source.ID, DocumentID: records[index].DocumentID,
+					SegmentID: records[index].SegmentID, Position: records[index].Position,
+				}
+			}
 			result := Result{Records: records}
 			slog.Info("知识库游标查询成功",
 				"knowledge_base_id", cursor.KnowledgeBaseID,

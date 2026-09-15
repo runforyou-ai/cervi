@@ -15,7 +15,7 @@
 当前代码已经具备：
 
 - `knowledge_bases`、分组、本地问答条目，以及稳定编号的主问题、相似问题和答案，本次继续沿用。
-- 通用 `search_knowledge` Tool、多查询 RRF 融合和游标上下文读取；应用层尚未注入本地检索。
+- 通用 `search_knowledge` Tool、多查询 RRF 融合和游标上下文读取；Agent 运行期按 Revision 绑定范围注入本地检索。
 - Agent 创建与详情中的本地知识库选择，以及 Agent Revision 中保存的绑定范围。
 - 临时文件上传、事务激活、本地或对象存储读取，以及 PostgreSQL/NATS 可靠任务。
 
