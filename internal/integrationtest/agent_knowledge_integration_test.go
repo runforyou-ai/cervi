@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"slices"
+	"strings"
 	"testing"
 	"uuid"
 
@@ -58,6 +59,7 @@ func testAgentKnowledgeScopes(t *testing.T, db *bun.DB, identity *servermodels.I
 	}
 	bound := []string{created.ID + ":本地知识助手:" + string(domain.UserStatusActive)}
 	assertAgents(bases[0], bound)
+	assertAgents(strings.ToUpper(bases[0]), bound)
 	assertAgents(bases[1], []string{})
 	if _, err := listAgents.Execute(ctx, identity, foreign.ID); !errors.Is(err, knowledgeaction.ErrNotFound) {
 		t.Fatalf("foreign knowledge base agents err=%v", err)

@@ -30,7 +30,8 @@ func NewListKnowledgeBaseAgentsQuery(db *bun.DB) *ListKnowledgeBaseAgentsQuery {
 
 // Execute 返回当前企业中按名称排序的 AI 员工。
 func (q *ListKnowledgeBaseAgentsQuery) Execute(ctx context.Context, identity *servermodels.Identity, knowledgeBaseID string) ([]AgentUsage, error) {
-	if _, err := loadKnowledgeBase(ctx, q.db, identity.Organization.ID, knowledgeBaseID); err != nil {
+	knowledgeBase, err := loadKnowledgeBase(ctx, q.db, identity.Organization.ID, knowledgeBaseID)
+	if err != nil {
 		return nil, fmt.Errorf("list knowledge base agents: %w", err)
 	}
 	agents := make([]AgentUsage, 0)
@@ -39,7 +40,7 @@ func (q *ListKnowledgeBaseAgentsQuery) Execute(ctx context.Context, identity *se
 		Join("JOIN organization_identities AS oi ON oi.id = a.identity_id AND oi.organization_id = a.organization_id").
 		ColumnExpr("a.id::text AS id, oi.display_name, a.status").
 		Where("a.organization_id = ?", identity.Organization.ID).
-		Where("ar.configuration->'knowledgeBaseIds' @> jsonb_build_array(?::text)", knowledgeBaseID).
+		Where("ar.configuration->'knowledgeBaseIds' @> jsonb_build_array(?::text)", knowledgeBase.ID).
 		OrderExpr("lower(oi.display_name) ASC, a.id ASC").
 		Scan(ctx, &agents); err != nil {
 		return nil, fmt.Errorf("list knowledge base agents: %w", err)

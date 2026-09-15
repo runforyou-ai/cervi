@@ -142,9 +142,9 @@ export function KnowledgeBaseFormPage({
   const providers = useResource(resourceKeys.aiProviders(), () => listAIProviders(), { staleTime: 0 })
   const loading = providers.loading || (Boolean(providers.error) && providers.refreshing) || (
     mode === "edit" &&
-    (detailLoading || (Boolean(detailError) && detailRefreshing) || agents.loading || (Boolean(agents.error) && agents.refreshing))
+    (detailLoading || (Boolean(detailError) && detailRefreshing))
   )
-  const loadError = !loading && (Boolean(providers.error) || (mode === "edit" && (Boolean(detailError) || Boolean(agents.error))))
+  const loadError = !loading && (Boolean(providers.error) || (mode === "edit" && Boolean(detailError)))
   /** 详情就绪后回填知识库表单和派生状态。 */
   useEffect(() => {
     if (!loadedKnowledgeBase) return
@@ -280,7 +280,6 @@ export function KnowledgeBaseFormPage({
                 // 一次重试本页所有读取失败的数据。
                 if (providers.error) void providers.refresh()
                 if (mode === "edit" && detailError) void refreshKnowledgeBase()
-                if (mode === "edit" && agents.error) void agents.refresh()
               }}
             >
               {t("common:actions.retry")}
@@ -303,8 +302,23 @@ export function KnowledgeBaseFormPage({
               </Field>
               {mode === "edit" ? (
                 <Field>
-                  <FieldLabel>{t("form.agents")}</FieldLabel>
-                  {agents.data?.agents.length ? (
+                  <FieldLabel>{t("agents.title")}</FieldLabel>
+                  {agents.loading || (Boolean(agents.error) && agents.refreshing) ? (
+                    <p className="text-sm text-muted-foreground">{t("common:status.loading")}</p>
+                  ) : agents.error ? (
+                    <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                      {t("agents.loadError")}
+                      <Button
+                        type="button"
+                        variant="link"
+                        size="xs"
+                        className="h-auto p-0"
+                        onClick={() => void agents.refresh()}
+                      >
+                        {t("common:actions.retry")}
+                      </Button>
+                    </p>
+                  ) : agents.data?.agents.length ? (
                     <p className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
                       {agents.data.agents.map((agent) => (
                         <Link
@@ -314,12 +328,12 @@ export function KnowledgeBaseFormPage({
                         >
                           {agent.status === UserStatus.UserStatusActive
                             ? agent.displayName
-                            : t("form.agentInactive", { name: agent.displayName })}
+                            : t("agents.inactive", { name: agent.displayName })}
                         </Link>
                       ))}
                     </p>
                   ) : (
-                    <p className="text-sm text-muted-foreground">{t("form.agentsEmpty")}</p>
+                    <p className="text-sm text-muted-foreground">{t("agents.empty")}</p>
                   )}
                 </Field>
               ) : null}

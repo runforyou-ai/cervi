@@ -63,6 +63,8 @@ export type KnowledgeBaseData = Omit<NonNullArrays<KnowledgeBase>, "category"> &
   category: KnowledgeBaseCategoryId
 }
 
+export type KnowledgeBaseAgentListData = NonNullArrays<KnowledgeBaseAgentList>
+
 export type KnowledgeBaseListData = Omit<
   NonNullArrays<KnowledgeBaseList>,
   "knowledgeBases"
@@ -139,7 +141,7 @@ export function deleteKnowledgeGroup(knowledgeBaseId: string, groupId: string) {
 
 /** 读取当前配置版本绑定知识库的 AI 员工。 */
 export function listKnowledgeBaseAgents(knowledgeBaseId: string) {
-  return listKnowledgeBaseAgentsBound(knowledgeBaseId) as Promise<NonNullArrays<KnowledgeBaseAgentList>>
+  return listKnowledgeBaseAgentsBound(knowledgeBaseId) as Promise<KnowledgeBaseAgentListData>
 }
 
 /** 读取当前企业的知识库列表。 */
