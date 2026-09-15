@@ -4,6 +4,7 @@ package apiproxy
 
 import (
 	"context"
+	"errors"
 	"net/http"
 	"net/http/httptest"
 	"reflect"
@@ -72,6 +73,30 @@ func TestRealtimeConnection(t *testing.T) {
 	expectEvent(t, events, emittedEvent{appservice.RealtimeFrameEventName, appservice.RealtimeFrameEvent{ConnectionID: connection.ConnectionID, Frame: string(frame)}})
 	close(release)
 	expectEvent(t, events, emittedEvent{appservice.RealtimeClosedEventName, appservice.RealtimeClosedEvent{ConnectionID: connection.ConnectionID}})
+}
+
+// TestRealtimeConnectionHeaderTimeout 验证服务端迟迟不返回响应头时建立事件流在时限内失败。
+func TestRealtimeConnectionHeaderTimeout(t *testing.T) {
+	release := make(chan struct{})
+	server := httptest.NewServer(http.HandlerFunc(func(_ http.ResponseWriter, request *http.Request) {
+		select {
+		case <-release:
+		case <-request.Context().Done():
+		}
+	}))
+	t.Cleanup(server.Close)
+	t.Cleanup(func() { close(release) })
+	previous := realtimeConnectTimeout
+	realtimeConnectTimeout = 200 * time.Millisecond
+	t.Cleanup(func() { realtimeConnectTimeout = previous })
+
+	backend, _ := newRealtimeTestBackend(t, server.URL)
+	started := time.Now()
+	_, err := backend.ConnectRealtime(context.Background(), appservice.RequestMeta{Locale: "zh-CN"})
+	var applicationError *appservice.Error
+	if !errors.As(err, &applicationError) || applicationError.Kind != appservice.ErrorKindUnavailable || time.Since(started) > 5*time.Second {
+		t.Fatalf("err = %v, elapsed = %v", err, time.Since(started))
+	}
 }
 
 // TestRealtimeConnectionRejectedCredential 验证服务端拒绝登录凭据时返回登录会话错误并清除本地凭据。

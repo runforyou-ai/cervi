@@ -20,6 +20,9 @@ import (
 // realtimeIdleTimeout 是原生端未收到任何服务端事件即断开事件流的时限，服务端每 25 秒发送心跳。
 const realtimeIdleTimeout = 60 * time.Second
 
+// realtimeConnectTimeout 是原生端等待事件流响应头的时限。
+var realtimeConnectTimeout = 30 * time.Second
+
 // realtimeClient 持有原生端到企业服务器的唯一实时事件流，并把服务端事件经 Wails 事件交给前端。
 type realtimeClient struct {
 	emit    func(name string, data any)
@@ -55,8 +58,10 @@ func (b *Backend) ConnectRealtime(ctx context.Context, meta appservice.RequestMe
 	request.Header.Set("Accept", "text/event-stream")
 	request.Header.Set("Accept-Language", string(meta.Locale))
 	request.Header.Set("Authorization", "Bearer "+credential.Token)
-	// 事件流是长响应，使用不设整体超时的客户端。
+	// 事件流是长响应，使用不设整体超时的客户端，只限制等待响应头的时间。
+	connectTimer := time.AfterFunc(realtimeConnectTimeout, cancel)
 	response, err := (&http.Client{Transport: state.client.Transport}).Do(request)
+	connectTimer.Stop()
 	if err != nil {
 		cancel()
 		if ctx.Err() != nil {
