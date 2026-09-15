@@ -177,25 +177,32 @@ func (g *Gateway) serve(writer http.ResponseWriter, request *http.Request) {
 	current.run(context.WithoutCancel(request.Context()))
 }
 
-// subscribe 让连接加入其用户受众，首个连接建立 NATS 订阅，并在 NATS 确认订阅生效后返回。
+// subscribe 让连接加入本人用户受众与本企业客服共享受众，受众的首个连接建立 NATS 订阅，并在 NATS 确认订阅生效后返回。
 func (g *Gateway) subscribe(current *connection, identity *servermodels.Identity) error {
-	subject := realtime.Subject(g.namespace, identity.Organization.ID, realtime.AudienceUser, identity.User.ID)
-	g.mu.Lock()
-	target := g.audiences[subject]
-	if target == nil {
-		subscription, err := g.nats.Subscribe(subject, func(message *nats.Msg) {
-			g.deliver(subject, message.Data)
-		})
-		if err != nil {
-			g.mu.Unlock()
-			return err
-		}
-		target = &audience{subscription: subscription, connections: map[*connection]struct{}{}}
-		g.audiences[subject] = target
+	organizationID := identity.Organization.ID
+	subjects := []string{
+		realtime.Subject(g.namespace, organizationID, realtime.AudienceUser, identity.User.ID),
+		// 当前阶段所有成员均可阅读客户会话，成员连接都接收客服共享受众通知。
+		realtime.Subject(g.namespace, organizationID, realtime.AudienceCustomerInbox, organizationID),
 	}
-	target.connections[current] = struct{}{}
-	current.subject = subject
+	g.mu.Lock()
 	current.tokenSessionID = identity.Token.ID
+	for _, subject := range subjects {
+		target := g.audiences[subject]
+		if target == nil {
+			subscription, err := g.nats.Subscribe(subject, func(message *nats.Msg) {
+				g.deliver(subject, message.Data)
+			})
+			if err != nil {
+				g.mu.Unlock()
+				return err
+			}
+			target = &audience{subscription: subscription, connections: map[*connection]struct{}{}}
+			g.audiences[subject] = target
+		}
+		target.connections[current] = struct{}{}
+		current.subjects = append(current.subjects, subject)
+	}
 	connection := g.nats
 	g.mu.Unlock()
 
@@ -210,12 +217,13 @@ func (g *Gateway) subscribe(current *connection, identity *servermodels.Identity
 func (g *Gateway) unregister(current *connection) {
 	g.mu.Lock()
 	delete(g.connections, current)
-	if target := g.audiences[current.subject]; target != nil {
+	for _, subject := range current.subjects {
+		target := g.audiences[subject]
 		delete(target.connections, current)
 		if len(target.connections) == 0 {
-			delete(g.audiences, current.subject)
+			delete(g.audiences, subject)
 			if err := target.subscription.Unsubscribe(); err != nil {
-				slog.Warn("取消实时受众订阅失败", "subject", current.subject, "error", err)
+				slog.Warn("取消实时受众订阅失败", "subject", subject, "error", err)
 			}
 		}
 	}

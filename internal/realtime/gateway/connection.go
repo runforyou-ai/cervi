@@ -31,8 +31,8 @@ type connection struct {
 	cancel   context.CancelFunc
 	lastRead atomic.Int64
 
-	// subject 与 tokenSessionID 在加入受众前写入，之后只读。
-	subject        string
+	// subjects 与 tokenSessionID 在加入受众时写入，之后只读。
+	subjects       []string
 	tokenSessionID string
 
 	mu     sync.Mutex

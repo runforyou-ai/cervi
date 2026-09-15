@@ -201,7 +201,7 @@ func (b commitBeforeHeads) MemberSyncHeads(ctx context.Context, identity *server
 	return b.MemberBackend.MemberSyncHeads(ctx, identity)
 }
 
-// TestRealtimeGatewayDelivery 验证同一用户多条连接都收到通知，登出只关闭对应登录会话，停用关闭全部连接且无法重连。
+// TestRealtimeGatewayDelivery 验证同一用户多条连接都收到用户与客服共享受众通知，登出只关闭对应登录会话，停用关闭全部连接且无法重连。
 func TestRealtimeGatewayDelivery(t *testing.T) {
 	f := newNavigationFixture(t)
 	ctx := context.Background()
@@ -220,6 +220,18 @@ func TestRealtimeGatewayDelivery(t *testing.T) {
 	changed := protocol.ConversationChanged{ConversationID: f.groupID, Version: loadConversationVersion(t, f.db, f.groupID)}
 	clientA.expect(changed)
 	clientB.expect(changed)
+
+	// 客户会话变化经客服共享受众送达全部成员连接。
+	customerConversationID := uuid.NewV7().String()
+	if err := realtime.RunInTx(ctx, f.db, func(ctx context.Context, _ bun.Tx) error {
+		realtime.Notify(ctx, realtime.CustomerInboxConversationChanged(organizationID, customerConversationID, 3))
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	customerChanged := protocol.ConversationChanged{ConversationID: customerConversationID, Version: 3}
+	clientA.expect(customerChanged)
+	clientB.expect(customerChanged)
 
 	// 未知帧被忽略，连接照常应答心跳。
 	clientA.sendText(`{"v":1,"type":"subscribe_run","data":{"runId":"run-1"}}`)
