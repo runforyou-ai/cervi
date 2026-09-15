@@ -4,8 +4,6 @@ package knowledgebase
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"fmt"
 	"strconv"
 	"strings"
@@ -140,18 +138,19 @@ func readSegmentWindow(ctx context.Context, db bun.IDB, base servermodels.Knowle
 	if !common.ValidUUID(sourceID) || !common.ValidUUID(segmentID) || !common.ValidUUID(batchID) {
 		return nil, ErrSegmentStale
 	}
-	var position int
-	err := publishedSegments(db, base).ColumnExpr("ks.position").
-		Where("ks.source_id = ? AND ks.id = ? AND ks.segment_batch_id = ?", sourceID, segmentID, batchID).Scan(ctx, &position)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil, ErrSegmentStale
-	}
+	// 锚点定位与取窗在同一条语句的快照内完成，锚点分段存在时结果必然包含锚点本身。
+	anchor := publishedSegments(db, base).ColumnExpr("ks.position").
+		Where("ks.source_id = ? AND ks.id = ? AND ks.segment_batch_id = ?", sourceID, segmentID, batchID)
+	hits := make([]segmentHit, 0, before+after+1)
+	err := publishedSegments(db, base).ColumnExpr(segmentColumns(base)).
+		Join("JOIN (?) AS anchor ON ks.position BETWEEN anchor.position - ? AND anchor.position + ?", anchor, before, after).
+		Where("ks.source_id = ? AND ks.segment_batch_id = ?", sourceID, batchID).
+		OrderExpr("ks.position").Scan(ctx, &hits)
 	if err != nil {
 		return nil, err
 	}
-	hits := make([]segmentHit, 0, before+after+1)
-	err = publishedSegments(db, base).ColumnExpr(segmentColumns(base)).
-		Where("ks.source_id = ? AND ks.segment_batch_id = ? AND ks.position BETWEEN ? AND ?", sourceID, batchID, position-before, position+after).
-		OrderExpr("ks.position").Scan(ctx, &hits)
-	return hits, err
+	if len(hits) == 0 {
+		return nil, ErrSegmentStale
+	}
+	return hits, nil
 }

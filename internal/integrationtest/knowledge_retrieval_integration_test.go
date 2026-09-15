@@ -163,6 +163,43 @@ func TestKnowledgeHybridRetrieval(t *testing.T) {
 		t.Fatalf("cursor=%+v window=%+v err=%v", cursor, window, err)
 	}
 
+	// 文档重新发布后，旧批次游标失效，新检索结果的游标可读取相邻分段。
+	if err := knowledgeaction.NewDocumentProcessing(db, newKnowledgeTasks(t, db)).Retry(ctx, identity, base.ID, refundID, func(context.Context) error { return nil }); err != nil {
+		t.Fatal(err)
+	}
+	var republished servermodels.KnowledgeDocument
+	if err := db.NewSelect().Model(&republished).Where("kd.id = ?", refundID).Scan(ctx); err != nil {
+		t.Fatal(err)
+	}
+	probe.markdown = strings.Repeat("签收后七天内可以申请退款，退款金额原路返回。", 30)
+	if err := knowledgeaction.NewProcessDocumentAction(db, probe, probe, probe).Execute(ctx, knowledgeaction.ProcessInput{
+		OrganizationID: identity.Organization.ID, KnowledgeBaseID: base.ID, DocumentID: refundID, ProcessingID: republished.ProcessingID,
+		ChunkLength: republished.ChunkLength, ChunkOverlap: republished.ChunkOverlap,
+		EmbeddingProviderID: republished.EmbeddingProviderID, EmbeddingModelIdentifier: republished.EmbeddingModelIdentifier, EmbeddingDimension: republished.EmbeddingDimension,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := knowledgeretrieval.Search(ctx, sources, knowledgeretrieval.Request{Cursor: &cursor, After: 1}); !errors.Is(err, knowledgeaction.ErrSegmentStale) {
+		t.Fatalf("err=%v", err)
+	}
+	stale := cursor
+	result, err = knowledgeretrieval.Search(ctx, sources, knowledgeretrieval.Request{Queries: []string{"退款", "退款金额"}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, record := range result.Records {
+		if record.DocumentID == refundID && record.Position == 1 {
+			cursor = record.Cursor
+		}
+	}
+	if cursor.SegmentBatchID == stale.SegmentBatchID {
+		t.Fatalf("cursor=%+v result=%+v", cursor, result)
+	}
+	window, err = knowledgeretrieval.Search(ctx, sources, knowledgeretrieval.Request{Cursor: &cursor, After: 1})
+	if err != nil || len(window.Records) != 2 || window.Records[0].SegmentID != cursor.SegmentID || window.Records[1].Cursor.SegmentBatchID != cursor.SegmentBatchID {
+		t.Fatalf("cursor=%+v window=%+v err=%v", cursor, window, err)
+	}
+
 	// 向量路失败时保留词法路结果。
 	probe.embedFail = true
 	records, err = service.Retrieve(ctx, identity, base.ID, "退款")
