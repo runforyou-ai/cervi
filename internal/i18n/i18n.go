@@ -37,6 +37,12 @@ const (
 	ErrorKnowledgeDocumentDeleteFailed  Key = "error.knowledge_document_delete_failed"
 
 	ErrorAgentReplyStopFailed        Key = "error.agent_reply_stop_failed"
+	ErrorAgentUnavailable            Key = "error.agent_unavailable"
+	ErrorCustomerReplySuggestFailed  Key = "error.customer_reply_suggest_failed"
+	FieldAgentIdentityIDInvalid      Key = "field.agent_identity_id_invalid"
+	FieldCustomerReplyModeInvalid    Key = "field.customer_reply_mode_invalid"
+	FieldCustomerReplyToneInvalid    Key = "field.customer_reply_tone_invalid"
+	FieldCustomerReplyDraftRequired  Key = "field.customer_reply_draft_required"
 	ErrorKnowledgeQANotFound         Key = "error.knowledge_qa_not_found"
 	ErrorKnowledgeQAUnsupported      Key = "error.knowledge_qa_unsupported"
 	ErrorKnowledgeBaseHasContent     Key = "error.knowledge_base_has_content"

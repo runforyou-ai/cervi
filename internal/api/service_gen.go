@@ -47,6 +47,7 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.PATCH("/conversations/:conversationID/unread-mark", s.updateConversationUnreadMark)
 	router.PATCH("/conversations/:conversationID/notification-settings", s.updateConversationNotificationSettings)
 	router.POST("/conversations/:conversationID/messages", s.sendCustomerTextMessage)
+	router.POST("/conversations/:conversationID/reply-suggestions", s.generateCustomerReplySuggestions)
 	router.GET("/conversations/:conversationID/deliveries", s.listCustomerMessageDeliveries)
 	router.POST("/conversations/:conversationID/deliveries/:deliveryID/resolve", s.resolveCustomerMessageDelivery)
 	router.POST("/conversations/:conversationID/claim", s.claimServiceSession)
@@ -443,6 +444,16 @@ func (s *Service) sendCustomerTextMessage(c *gin.Context) {
 		return
 	}
 	output, err := s.application.SendCustomerTextMessage(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// generateCustomerReplySuggestions 使用 AI 员工为客户会话生成对客回复候选。
+func (s *Service) generateCustomerReplySuggestions(c *gin.Context) {
+	var input appservice.CustomerReplySuggestionsInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.GenerateCustomerReplySuggestions(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
 	writeResult(c, http.StatusOK, output, err)
 }
 

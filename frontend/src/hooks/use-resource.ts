@@ -102,6 +102,15 @@ export function useResourceInvalidator() {
   )
 }
 
+/** 返回按 key 移除缓存的函数，供离开所属页面上下文时丢弃不再复用的读取结果。 */
+export function useResourceRemover() {
+  const client = useQueryClient()
+  return useCallback(
+    (key: QueryKey) => client.removeQueries({ queryKey: key }),
+    [client],
+  )
+}
+
 /** 读取可双向追加的分页资源，并统一恢复失效会话。 */
 export function useInfiniteResource<T>(
   key: QueryKey,

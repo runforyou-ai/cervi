@@ -2325,6 +2325,10 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			testAgentCustomerReplies(t, db, loggedIn.Identity, customerServiceRole.ID, provider.ID, model.Identifier)
 		})
 
+		t.Run("客服 AI 写回复", func(t *testing.T) {
+			testCustomerReplySuggestions(t, db, loggedIn.Identity, customerServiceRole.ID, provider.ID, model.Identifier)
+		})
+
 		t.Run("Telegram AI 客服", func(t *testing.T) {
 			testAgentTelegramReplies(t, db, loggedIn.Identity, customerServiceRole.ID, provider.ID, model.Identifier)
 		})

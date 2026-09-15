@@ -29,6 +29,12 @@
   "error.knowledge_document_delete_failed": "删除文档失败，请重试。",
 
   "error.agent_reply_stop_failed": "停止 AI 回复失败，请重试。",
+  "error.agent_unavailable": "这个 AI 员工当前不可用。",
+  "error.customer_reply_suggest_failed": "生成回复失败，请重试。",
+  "field.agent_identity_id_invalid": "请选择有效的 AI 员工。",
+  "field.customer_reply_mode_invalid": "请选择有效的生成方式。",
+  "field.customer_reply_tone_invalid": "请选择有效的语气。",
+  "field.customer_reply_draft_required": "请先输入要改写的回复内容。",
   "error.customer_delivery_conflict": "投递状态已变化或渠道当前无法发送，请刷新后重试。",
   "error.customer_delivery_failed": "处理消息投递失败，请重试。",
   "error.channel_outbound_unavailable": "渠道已停用或尚未配置机器人，无法发送。",

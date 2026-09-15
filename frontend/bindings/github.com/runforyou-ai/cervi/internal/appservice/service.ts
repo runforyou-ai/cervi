@@ -318,6 +318,13 @@ export function FindDirectConversation(meta: $models.RequestMeta, targetIdentity
 }
 
 /**
+ * GenerateCustomerReplySuggestions 使用 AI 员工为客户会话生成对客回复候选。
+ */
+export function GenerateCustomerReplySuggestions(meta: $models.RequestMeta, conversationID: string, input: $models.CustomerReplySuggestionsInput): $CancellablePromise<$models.CustomerReplySuggestions> {
+    return $Call.ByID(2144333880, meta, conversationID, input);
+}
+
+/**
  * GetAIProvider 返回当前企业中的模型服务供应商详情。
  */
 export function GetAIProvider(meta: $models.RequestMeta, providerID: string): $CancellablePromise<$models.AIProvider> {

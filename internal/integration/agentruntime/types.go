@@ -59,6 +59,7 @@ type ModelConfig struct {
 	MaxOutputTokens int
 	ContextWindow   int
 	InputModalities []domain.AIModelInputModality
+	DisableThinking bool // 为 true 时在模型组件提供思考开关的品牌上关闭思考模式。
 }
 
 // AttachmentContent 读取本次运行会话中指定附件消息的文件内容。

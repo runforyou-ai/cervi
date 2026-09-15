@@ -715,23 +715,27 @@ func customerTextMessageError(ctx context.Context, meta RequestMeta, err error, 
 		return InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, conversationMessageValidationKeys))
 	}
 	if conflictError, ok := errors.AsType[*conversationaction.ConflictError](err); ok {
-		messageKey := cervii18n.ErrorMessageConflict
-		switch conflictError.Reason {
-		case conversationaction.ConflictReasonServiceSessionOwned:
-			messageKey = cervii18n.ErrorServiceSessionOwned
-		case conversationaction.ConflictReasonServiceSessionNotReplyable:
-			messageKey = cervii18n.ErrorServiceSessionNotReplyable
-		case conversationaction.ConflictReasonChannelOutboundUnavailable:
-			messageKey = cervii18n.ErrorChannelOutboundUnavailable
-		case conversationaction.ConflictReasonChannelOutboundUnsupported:
-			messageKey = cervii18n.ErrorChannelOutboundUnsupported
-		case conversationaction.ConflictReasonReplyTargetInvalid:
-			messageKey = cervii18n.ErrorReplyTargetInvalid
-		}
-		return ConflictError(meta, messageKey, conflictError.Reason)
+		return ConflictError(meta, customerReplyConflictMessageKey(conflictError.Reason), conflictError.Reason)
 	}
 	slog.Warn("发送成员客户消息失败", "organization_id", organizationID, "conversation_id", conversationID, "error", err)
 	return FailedError(meta, cervii18n.ErrorMessageSendFailed)
+}
+
+// customerReplyConflictMessageKey 返回对客回复资格冲突的本地化文案键。
+func customerReplyConflictMessageKey(reason string) cervii18n.Key {
+	switch reason {
+	case conversationaction.ConflictReasonServiceSessionOwned:
+		return cervii18n.ErrorServiceSessionOwned
+	case conversationaction.ConflictReasonServiceSessionNotReplyable:
+		return cervii18n.ErrorServiceSessionNotReplyable
+	case conversationaction.ConflictReasonChannelOutboundUnavailable:
+		return cervii18n.ErrorChannelOutboundUnavailable
+	case conversationaction.ConflictReasonChannelOutboundUnsupported:
+		return cervii18n.ErrorChannelOutboundUnsupported
+	case conversationaction.ConflictReasonReplyTargetInvalid:
+		return cervii18n.ErrorReplyTargetInvalid
+	}
+	return cervii18n.ErrorMessageConflict
 }
 
 var conversationMessageValidationKeys = map[conversationaction.ValidationCode]cervii18n.Key{

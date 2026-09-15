@@ -159,6 +159,11 @@ func (s *Service) SendCustomerTextMessage(ctx context.Context, meta RequestMeta,
 	return withNormalizedSlices(s.backend.SendCustomerTextMessage(ctx, meta, conversationID, input))
 }
 
+// GenerateCustomerReplySuggestions 使用 AI 员工为客户会话生成对客回复候选。
+func (s *Service) GenerateCustomerReplySuggestions(ctx context.Context, meta RequestMeta, conversationID string, input CustomerReplySuggestionsInput) (CustomerReplySuggestions, error) {
+	return withNormalizedSlices(s.backend.GenerateCustomerReplySuggestions(ctx, meta, conversationID, input))
+}
+
 // ListCustomerMessageDeliveries 读取当前窗口的外部投递状态。
 func (s *Service) ListCustomerMessageDeliveries(ctx context.Context, meta RequestMeta, conversationID string, input CustomerDeliveryListInput) (CustomerDeliveryList, error) {
 	return withNormalizedSlices(s.backend.ListCustomerMessageDeliveries(ctx, meta, conversationID, input))

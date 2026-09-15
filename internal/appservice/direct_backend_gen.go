@@ -332,6 +332,16 @@ func (b *DirectBackend) SendCustomerTextMessage(ctx context.Context, meta Reques
 	return b.ops.SendCustomerTextMessage(ctx, meta, identity, conversationID, input)
 }
 
+// GenerateCustomerReplySuggestions 使用 AI 员工为客户会话生成对客回复候选。
+func (b *DirectBackend) GenerateCustomerReplySuggestions(ctx context.Context, meta RequestMeta, conversationID string, input CustomerReplySuggestionsInput) (CustomerReplySuggestions, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero CustomerReplySuggestions
+		return zero, err
+	}
+	return b.ops.GenerateCustomerReplySuggestions(ctx, meta, identity, conversationID, input)
+}
+
 // ListCustomerMessageDeliveries 读取当前窗口的外部投递状态。
 func (b *DirectBackend) ListCustomerMessageDeliveries(ctx context.Context, meta RequestMeta, conversationID string, input CustomerDeliveryListInput) (CustomerDeliveryList, error) {
 	identity, err := b.ops.authenticate(ctx, meta)

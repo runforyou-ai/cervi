@@ -16,11 +16,13 @@ import (
 	"github.com/cloudwego/eino-ext/components/model/agenticgemini"
 	"github.com/cloudwego/eino-ext/components/model/agenticopenai"
 	"github.com/cloudwego/eino-ext/components/model/agenticqwen"
+	"github.com/cloudwego/eino-ext/libs/acl/openai"
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/schema"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/volcengine/volcengine-go-sdk/service/arkruntime/model/responses"
 	"google.golang.org/genai"
 )
 
@@ -50,14 +52,28 @@ func newAgenticModel(ctx context.Context, config ModelConfig) (model.AgenticMode
 		chatModel, err = agenticdeepseek.New(ctx, &agenticdeepseek.Config{
 			APIKey: config.APIKey, BaseURL: baseURL, Model: config.Identifier, MaxTokens: maxTokens, HTTPClient: httpClient,
 		})
+		// DeepSeek 组件没有思考开关，每次请求附加 thinking 参数关闭思考。
+		if err == nil && config.DisableThinking {
+			chatModel = &requestOptionsModel{AgenticModel: chatModel, options: []model.Option{
+				openai.WithExtraFields(map[string]any{"thinking": map[string]any{"type": "disabled"}}),
+			}}
+		}
 	case domain.AIProviderBrandAlibaba:
-		chatModel, err = agenticqwen.New(ctx, &agenticqwen.Config{
+		componentConfig := &agenticqwen.Config{
 			APIKey: config.APIKey, BaseURL: baseURL, Model: config.Identifier, MaxTokens: maxTokens, HTTPClient: httpClient,
-		})
+		}
+		if config.DisableThinking {
+			componentConfig.EnableThinking = new(false)
+		}
+		chatModel, err = agenticqwen.New(ctx, componentConfig)
 	case domain.AIProviderBrandVolcengine:
-		chatModel, err = agenticark.New(ctx, &agenticark.Config{
+		componentConfig := &agenticark.Config{
 			APIKey: config.APIKey, BaseURL: baseURL, Model: config.Identifier, MaxTokens: maxTokens, HTTPClient: httpClient,
-		})
+		}
+		if config.DisableThinking {
+			componentConfig.Thinking = &responses.ResponsesThinking{Type: responses.ThinkingType_disabled.Enum()}
+		}
+		chatModel, err = agenticark.New(ctx, componentConfig)
 	case domain.AIProviderBrandAnthropic:
 		// Anthropic 接口要求每次请求携带 max_tokens。
 		if maxTokens == nil {
@@ -85,8 +101,13 @@ func newAgenticModel(ctx context.Context, config ModelConfig) (model.AgenticMode
 		componentConfig := &agenticopenai.ChatConfig{
 			APIKey: config.APIKey, BaseURL: baseURL, Model: config.Identifier, HTTPClient: httpClient,
 		}
+		componentConfig.ExtraFields = map[string]any{}
 		if maxTokens != nil {
-			componentConfig.ExtraFields = map[string]any{"max_tokens": *maxTokens}
+			componentConfig.ExtraFields["max_tokens"] = *maxTokens
+		}
+		// 智谱通过请求体的 thinking 参数关闭思考。
+		if domain.AIProviderBrand(config.Brand) == domain.AIProviderBrandZhipu && config.DisableThinking {
+			componentConfig.ExtraFields["thinking"] = map[string]any{"type": "disabled"}
 		}
 		chatModel, err = agenticopenai.NewChatModel(ctx, componentConfig)
 	}
@@ -94,6 +115,22 @@ func newAgenticModel(ctx context.Context, config ModelConfig) (model.AgenticMode
 		return nil, fmt.Errorf("create %s agentic model: %w", config.Brand, err)
 	}
 	return chatModel, nil
+}
+
+// requestOptionsModel 在每次模型调用时附加固定的请求选项，调用方选项在后并可覆盖。
+type requestOptionsModel struct {
+	model.AgenticModel
+	options []model.Option
+}
+
+// Generate 附加固定请求选项后调用模型。
+func (m *requestOptionsModel) Generate(ctx context.Context, input []*schema.AgenticMessage, opts ...model.Option) (*schema.AgenticMessage, error) {
+	return m.AgenticModel.Generate(ctx, input, append(slices.Clone(m.options), opts...)...)
+}
+
+// Stream 附加固定请求选项后流式调用模型。
+func (m *requestOptionsModel) Stream(ctx context.Context, input []*schema.AgenticMessage, opts ...model.Option) (*schema.StreamReader[*schema.AgenticMessage], error) {
+	return m.AgenticModel.Stream(ctx, input, append(slices.Clone(m.options), opts...)...)
 }
 
 // toolArgumentsNormalizer 把工具调用的空参数补为空 JSON 对象，请求体按 omitempty 序列化时保留 arguments 字段。

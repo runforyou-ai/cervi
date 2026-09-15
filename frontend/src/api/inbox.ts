@@ -28,6 +28,7 @@ import {
   SearchInbox,
   RemoveGroupConversationMember,
   SendCustomerTextMessage,
+  GenerateCustomerReplySuggestions,
   SendAttachmentMessage,
   GetAttachmentDownload,
   SendFirstAgentTextMessage,
@@ -53,6 +54,7 @@ import type {
   ConversationNotificationSettingsInput,
   ConversationUnreadMarkInput,
   CustomerTextMessageInput,
+  CustomerReplySuggestionsInput,
   DirectInboxConversation,
   FirstAgentTextMessageInput,
   AgentTextMessageInput,
@@ -146,6 +148,7 @@ const markConversationMentionReviewedBound = bind(
   MarkConversationMentionReviewed,
 )
 const sendCustomerTextMessageBound = bind(SendCustomerTextMessage)
+const generateCustomerReplySuggestionsBound = bind(GenerateCustomerReplySuggestions)
 const sendFirstAgentTextMessageBound = bind(SendFirstAgentTextMessage)
 const sendAgentTextMessageBound = bind(SendAgentTextMessage)
 const sendFirstDirectTextMessageBound = bind(SendFirstDirectTextMessage)
@@ -324,6 +327,14 @@ export function markConversationRead(
 /** 发送成员客户会话文本消息。 */
 export function sendCustomerTextMessage(conversationID: string, input: CustomerTextMessageInput) {
   return sendCustomerTextMessageBound(conversationID, input)
+}
+
+/** 使用 AI 员工为客户会话生成对客回复候选。 */
+export function generateCustomerReplySuggestions(
+  conversationID: string,
+  input: CustomerReplySuggestionsInput,
+) {
+  return generateCustomerReplySuggestionsBound(conversationID, input)
 }
 
 /** 发送首条单聊消息并返回最终会话。 */

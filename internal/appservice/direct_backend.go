@@ -61,7 +61,7 @@ type directOperations struct {
 }
 
 // NewDirectBackend 创建直接访问服务端存储的应用后端。
-func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tenantResolver tenant.Resolver, agentScheduler conversationaction.AgentMessageScheduler, agentCoordinator *agentrunaction.ExecuteAction, taskEnqueuer servertask.TxEnqueuer, documentConverter *documentconvert.Client) *DirectBackend {
+func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tenantResolver tenant.Resolver, agentScheduler conversationaction.AgentMessageScheduler, agentCoordinator *agentrunaction.ExecuteAction, taskEnqueuer servertask.TxEnqueuer, documentConverter *documentconvert.Client, customerReplySuggestions *agentrunaction.GenerateCustomerReplySuggestionsAction) *DirectBackend {
 	connectionRunner := connectiontest.NewRunner(10 * time.Second)
 	connectionClient := connectiontest.NewHTTPClient()
 	modelProviderRegistry := modelprovider.NewRegistry(connectionClient)
@@ -78,7 +78,7 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tena
 		channelOps:      newChannelOps(db, connectionRunner, telegramAPI),
 		contactOps:      newContactOps(db),
 		directoryOps:    newDirectoryOps(db),
-		agentOps:        newAgentOps(db, agentCoordinator),
+		agentOps:        newAgentOps(db, agentCoordinator, customerReplySuggestions),
 		knowledgeOps:    newKnowledgeOps(db, taskEnqueuer, documentQuery, documentConverter),
 		integrationOps:  newIntegrationOps(db, connectionRunner, modelProviderRegistry, mcpTest, mcpScheduler),
 		fileOps:         newFileOps(db, connectionRunner, localFiles),

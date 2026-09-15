@@ -302,7 +302,7 @@ func TestKnowledgeDocumentS3Preview(t *testing.T) {
 	if _, err := settingaction.NewSaveS3SettingAction(db).Execute(ctx, owner.Identity, setting); err != nil {
 		t.Fatal(err)
 	}
-	backend := appservice.NewDirectBackend(db, nil, serverstorage.NewTenantResolver(db), nil, nil, nil, nil)
+	backend := appservice.NewDirectBackend(db, nil, serverstorage.NewTenantResolver(db), nil, nil, nil, nil, nil)
 	meta := appservice.RequestMeta{Token: owner.Token, Locale: appservice.LocaleChineseSimplified}
 	files := make([]*servermodels.File, 2)
 	for i := range files {

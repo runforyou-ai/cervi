@@ -50,6 +50,7 @@ import {
   type OutgoingConversationDraft,
 } from "@/features/inbox/outgoing-message-store"
 import { ConversationAttachmentUpload } from "./conversation-attachment-upload"
+import { CustomerReplyAssistant } from "@/features/inbox/customer-reply-assistant"
 import { resolveAppPlatform } from "@/platform/app-platform"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
@@ -175,7 +176,8 @@ export function ConversationComposer({
   // 移动端的提及候选和取消引用使用触屏尺寸。
   const mobile = resolveAppPlatform() === "mobile"
   const { isSubmitting } = form.formState
-  const isBodyEmpty = !form.watch("body").trim()
+  const bodyValue = form.watch("body")
+  const isBodyEmpty = !bodyValue.trim()
   const bodyField = form.register("body")
 
   useEffect(() => {
@@ -494,6 +496,15 @@ export function ConversationComposer({
     }
   }
 
+  /** 用选中的 AI 回复候选替换当前对客草稿。 */
+  function applyReplySuggestion(reply: string) {
+    form.setValue("body", reply, { shouldDirty: true })
+    window.requestAnimationFrame(() => {
+      resizeComposerInput(inputRef.current, manualInputHeightRef.current)
+      form.setFocus("body")
+    })
+  }
+
   /** 在桌面键盘上提交消息，并保留 Shift+Enter 换行。 */
   function submitFromKeyboard(event: KeyboardEvent<HTMLTextAreaElement>) {
     if (disabledReason) return
@@ -591,6 +602,18 @@ export function ConversationComposer({
   }
 
   const [showSubmitting, setShowSubmitting] = useState(false)
+  // 客户会话在输入区工具栏提供 AI 写回复入口，不可对客发送时保留显示并禁用。
+  const replyAssistant =
+    conversationType === ConversationType.ConversationTypeCustomer && conversationID ? (
+      <CustomerReplyAssistant
+        conversationID={conversationID}
+        currentIdentityID={currentIdentityID}
+        draft={bodyValue}
+        replyToMessageID={replyTo && !replyTo.deleted ? replyTo.id : ""}
+        disabled={isSubmitting || Boolean(disabledReason)}
+        onApply={applyReplySuggestion}
+      />
+    ) : null
 
   useEffect(() => {
     if (!isSubmitting) {
@@ -730,7 +753,10 @@ export function ConversationComposer({
           />
           <div className="flex items-center justify-between gap-3 px-2.5 pb-2.5">
             {disabledReason ? (
-              <p id={`${inputID}-reason`} className="text-xs text-muted-foreground">{disabledReason}</p>
+              <div className="flex min-w-0 items-center gap-1">
+                {replyAssistant}
+                <p id={`${inputID}-reason`} className="truncate text-xs text-muted-foreground">{disabledReason}</p>
+              </div>
             ) : (
               <div className="flex items-center gap-1">
                 {(conversationType === ConversationType.ConversationTypeDirect ||
@@ -800,6 +826,7 @@ export function ConversationComposer({
                     ))}
                   </PopoverContent>
                 </Popover>
+                {replyAssistant}
               </div>
             )}
             <Button type="submit" size="sm" className={mobile ? "min-h-11" : undefined} disabled={isSubmitting || Boolean(disabledReason) || isBodyEmpty || replyTo?.deleted}>

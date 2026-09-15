@@ -272,7 +272,7 @@ func TestInboxPaginationBoundaries(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			backend := appservice.NewDirectBackend(f.db, nil, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil)
+			backend := appservice.NewDirectBackend(f.db, nil, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil)
 			meta := appservice.RequestMeta{Token: login.Token}
 			for _, request := range []appservice.LoadInboxInput{
 				{Scope: appservice.InboxScopeCustomer, Cursor: input.Cursor},

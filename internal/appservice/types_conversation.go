@@ -66,6 +66,38 @@ type CustomerTextMessageInput struct {
 	Body             string `json:"body"`
 }
 
+// CustomerReplyMode 表示 AI 写回复的生成方式。
+type CustomerReplyMode string
+
+const (
+	CustomerReplyModeReply   CustomerReplyMode = CustomerReplyMode(domain.CustomerReplyModeReply)
+	CustomerReplyModeRewrite CustomerReplyMode = CustomerReplyMode(domain.CustomerReplyModeRewrite)
+)
+
+// CustomerReplyTone 表示 AI 写回复的语气。
+type CustomerReplyTone string
+
+const (
+	CustomerReplyToneKeep         CustomerReplyTone = CustomerReplyTone(domain.CustomerReplyToneKeep)
+	CustomerReplyToneProfessional CustomerReplyTone = CustomerReplyTone(domain.CustomerReplyToneProfessional)
+	CustomerReplyToneFriendly     CustomerReplyTone = CustomerReplyTone(domain.CustomerReplyToneFriendly)
+	CustomerReplyToneConcise      CustomerReplyTone = CustomerReplyTone(domain.CustomerReplyToneConcise)
+)
+
+// CustomerReplySuggestionsInput 定义 AI 写回复的生成条件，草稿仅在改写模式使用。
+type CustomerReplySuggestionsInput struct {
+	AgentIdentityID  string            `json:"agentIdentityId"`
+	Mode             CustomerReplyMode `json:"mode"`
+	Tone             CustomerReplyTone `json:"tone"`
+	Draft            string            `json:"draft"`
+	ReplyToMessageID string            `json:"replyToMessageId"`
+}
+
+// CustomerReplySuggestions 定义可直接填入对客草稿的回复候选。
+type CustomerReplySuggestions struct {
+	Candidates []string `json:"candidates"`
+}
+
 // TransferServiceSessionInput 定义客服处理周期转交目标。
 type TransferServiceSessionInput struct {
 	AssigneeIdentityID string `json:"assigneeIdentityId"`

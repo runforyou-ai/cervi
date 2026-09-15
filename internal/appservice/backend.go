@@ -119,6 +119,9 @@ type Backend interface {
 	// SendCustomerTextMessage 发送客户会话文本消息。
 	//cervi:route POST /conversations/:conversationID/messages
 	SendCustomerTextMessage(context.Context, RequestMeta, string, CustomerTextMessageInput) (ConversationMessage, error)
+	// GenerateCustomerReplySuggestions 使用 AI 员工为客户会话生成对客回复候选。
+	//cervi:route POST /conversations/:conversationID/reply-suggestions
+	GenerateCustomerReplySuggestions(context.Context, RequestMeta, string, CustomerReplySuggestionsInput) (CustomerReplySuggestions, error)
 	// ListCustomerMessageDeliveries 读取当前窗口的外部投递状态。
 	//cervi:route GET /conversations/:conversationID/deliveries
 	ListCustomerMessageDeliveries(context.Context, RequestMeta, string, CustomerDeliveryListInput) (CustomerDeliveryList, error)
