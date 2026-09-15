@@ -7,6 +7,7 @@ import (
 	"encoding/json"
 	"errors"
 	"slices"
+	"strings"
 	"testing"
 	"uuid"
 
@@ -40,6 +41,29 @@ func testAgentKnowledgeScopes(t *testing.T, db *bun.DB, identity *servermodels.I
 		t.Fatalf("create=%+v err=%v", created, err)
 	}
 	originalRevisionID := created.Execution.RevisionID
+	listAgents := knowledgeaction.NewListKnowledgeBaseAgentsQuery(db)
+	// 核验知识库只列出当前配置版本绑定它的 AI 员工。
+	assertAgents := func(knowledgeBaseID string, want []string) {
+		t.Helper()
+		agents, err := listAgents.Execute(ctx, identity, knowledgeBaseID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		got := make([]string, 0, len(agents))
+		for _, agent := range agents {
+			got = append(got, agent.ID+":"+agent.DisplayName+":"+string(agent.Status))
+		}
+		if !slices.Equal(got, want) {
+			t.Fatalf("knowledge base %s agents=%v want=%v", knowledgeBaseID, got, want)
+		}
+	}
+	bound := []string{created.ID + ":本地知识助手:" + string(domain.UserStatusActive)}
+	assertAgents(bases[0], bound)
+	assertAgents(strings.ToUpper(bases[0]), bound)
+	assertAgents(bases[1], []string{})
+	if _, err := listAgents.Execute(ctx, identity, foreign.ID); !errors.Is(err, knowledgeaction.ErrNotFound) {
+		t.Fatalf("foreign knowledge base agents err=%v", err)
+	}
 	update := agentaction.NewUpdateExecutionAction(db)
 	before, err := db.NewSelect().Model((*servermodels.Agent)(nil)).Where("organization_id = ?", identity.Organization.ID).Count(ctx)
 	if err != nil {
@@ -69,6 +93,7 @@ func testAgentKnowledgeScopes(t *testing.T, db *bun.DB, identity *servermodels.I
 	if err != nil || updated.Execution.RevisionID == originalRevisionID || !slices.Equal(updated.Execution.Managed.KnowledgeBaseIDs, bases) {
 		t.Fatalf("update=%+v err=%v", updated, err)
 	}
+	assertAgents(bases[1], bound)
 	// 核验保存新配置后旧 Revision 的知识库范围保持原值。
 	var revision servermodels.AgentRevision
 	if err := db.NewSelect().Model(&revision).Where("id = ?", originalRevisionID).Scan(ctx); err != nil {
@@ -95,4 +120,5 @@ func testAgentKnowledgeScopes(t *testing.T, db *bun.DB, identity *servermodels.I
 	if err != nil || len(cleared.Execution.Managed.KnowledgeBaseIDs) != 0 {
 		t.Fatalf("clear=%+v err=%v", cleared, err)
 	}
+	assertAgents(bases[0], []string{})
 }

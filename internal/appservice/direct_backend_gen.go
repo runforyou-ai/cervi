@@ -1112,6 +1112,16 @@ func (b *DirectBackend) GetKnowledgeBase(ctx context.Context, meta RequestMeta, 
 	return b.ops.GetKnowledgeBase(ctx, meta, identity, knowledgeBaseID)
 }
 
+// ListKnowledgeBaseAgents 返回当前配置版本绑定知识库的 AI 员工。
+func (b *DirectBackend) ListKnowledgeBaseAgents(ctx context.Context, meta RequestMeta, knowledgeBaseID string) (KnowledgeBaseAgentList, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero KnowledgeBaseAgentList
+		return zero, err
+	}
+	return b.ops.ListKnowledgeBaseAgents(ctx, meta, identity, knowledgeBaseID)
+}
+
 // CreateKnowledgeBase 创建企业知识库。
 func (b *DirectBackend) CreateKnowledgeBase(ctx context.Context, meta RequestMeta, input KnowledgeBaseInput) (KnowledgeBase, error) {
 	identity, err := b.ops.authenticate(ctx, meta)

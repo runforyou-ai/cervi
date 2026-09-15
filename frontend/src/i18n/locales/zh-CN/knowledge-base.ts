@@ -170,6 +170,12 @@ const knowledgeBase = {
     loadError: "读取知识库详情失败。",
     saveError: "保存知识库失败，请重试。",
   },
+  agents: {
+    title: "AI 员工",
+    empty: "暂无 AI 员工使用",
+    inactive: "{{name}}（已禁用）",
+    loadError: "读取 AI 员工失败，请重试。",
+  },
   validation: {
     embeddingModelRequired: "请选择向量模型。",
     rerankModelRequired: "请选择重排模型。",
@@ -205,6 +211,9 @@ const knowledgeBase = {
   delete: {
     title: "删除“{{name}}”？",
     description: "删除后无法恢复。",
+    agentSeparator: "、",
+    agentsDescription_one: "{{names}}正在使用该知识库，删除后将无法检索其中的资料，且无法恢复。",
+    agentsDescription_other: "{{names}}正在使用该知识库，删除后将无法检索其中的资料，且无法恢复。",
     success: "知识库已删除。",
     error: "删除知识库失败，请重试。",
   },

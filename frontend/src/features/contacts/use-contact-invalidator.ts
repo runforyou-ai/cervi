@@ -2,7 +2,7 @@
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
 
-/** 刷新真人或 AI 员工及其团队、角色和会话候选。 */
+/** 刷新真人或 AI 员工及其团队、角色、会话候选和知识库使用情况。 */
 export function useContactInvalidator() {
   const invalidate = useResourceInvalidator()
   return (kind: "user" | "agent", id?: string) => {
@@ -16,6 +16,8 @@ export function useContactInvalidator() {
       resourceKeys.customerServiceAssignees(),
       resourceKeys.memberOptions(),
     ]
+    // AI 员工的名称、状态和知识库绑定变化后刷新知识库的员工列表。
+    if (kind === "agent") keys.push(resourceKeys.knowledgeBaseAgents())
     if (id) keys.push(kind === "user" ? resourceKeys.user(id) : resourceKeys.agent(id))
     return Promise.all(keys.map((key) => invalidate(key)))
   }

@@ -35,6 +35,7 @@ type knowledgeOps struct {
 	deleteQAEntry        *knowledgebaseaction.DeleteQAEntryAction
 	listKnowledgeBases   *knowledgebaseaction.ListKnowledgeBasesQuery
 	getKnowledgeBase     *knowledgebaseaction.GetKnowledgeBaseQuery
+	listBaseAgents       *knowledgebaseaction.ListKnowledgeBaseAgentsQuery
 	createKnowledgeBase  *knowledgebaseaction.CreateKnowledgeBaseAction
 	updateKnowledgeBase  *knowledgebaseaction.UpdateKnowledgeBaseAction
 	deleteKnowledgeBase  *knowledgebaseaction.DeleteKnowledgeBaseAction
@@ -60,6 +61,7 @@ func newKnowledgeOps(db *bun.DB, taskEnqueuer servertask.TxEnqueuer, documentQue
 		deleteQAEntry:        knowledgebaseaction.NewDeleteQAEntryAction(db),
 		listKnowledgeBases:   knowledgebaseaction.NewListKnowledgeBasesQuery(db),
 		getKnowledgeBase:     knowledgebaseaction.NewGetKnowledgeBaseQuery(db),
+		listBaseAgents:       knowledgebaseaction.NewListKnowledgeBaseAgentsQuery(db),
 		createKnowledgeBase:  knowledgebaseaction.NewCreateKnowledgeBaseAction(db),
 		updateKnowledgeBase:  knowledgebaseaction.NewUpdateKnowledgeBaseAction(db, taskEnqueuer),
 		deleteKnowledgeBase:  knowledgebaseaction.NewDeleteKnowledgeBaseAction(db),
@@ -107,6 +109,19 @@ func (o *directOperations) GetKnowledgeBase(ctx context.Context, meta RequestMet
 		return KnowledgeBase{}, o.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeBaseReadFailed, identity.Organization.ID, knowledgeBaseID)
 	}
 	return knowledgeBaseFromAction(*record), nil
+}
+
+// ListKnowledgeBaseAgents 返回当前配置版本绑定知识库的 AI 员工。
+func (o *directOperations) ListKnowledgeBaseAgents(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, knowledgeBaseID string) (KnowledgeBaseAgentList, error) {
+	agents, err := o.listBaseAgents.Execute(ctx, identity, knowledgeBaseID)
+	if err != nil {
+		return KnowledgeBaseAgentList{}, o.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeBaseReadFailed, identity.Organization.ID, knowledgeBaseID)
+	}
+	result := KnowledgeBaseAgentList{Agents: make([]KnowledgeBaseAgent, 0, len(agents))}
+	for _, agent := range agents {
+		result.Agents = append(result.Agents, KnowledgeBaseAgent{ID: agent.ID, DisplayName: agent.DisplayName, Status: UserStatus(agent.Status)})
+	}
+	return result, nil
 }
 
 // CreateKnowledgeBase 创建企业知识库。

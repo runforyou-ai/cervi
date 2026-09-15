@@ -20,6 +20,7 @@ import {
   DeleteKnowledgeBase,
   DeleteKnowledgeGroup,
   GetKnowledgeBase,
+  ListKnowledgeBaseAgents,
   ListKnowledgeBases,
   UpdateKnowledgeBase,
   UpdateKnowledgeGroup,
@@ -40,6 +41,7 @@ import {
   type KnowledgeQASummary,
   KnowledgeBaseCategory,
   type KnowledgeBase,
+  type KnowledgeBaseAgentList,
   type KnowledgeBaseInput,
   type KnowledgeBaseList,
   type KnowledgeGroup,
@@ -61,6 +63,8 @@ export type KnowledgeBaseData = Omit<NonNullArrays<KnowledgeBase>, "category"> &
   category: KnowledgeBaseCategoryId
 }
 
+export type KnowledgeBaseAgentListData = NonNullArrays<KnowledgeBaseAgentList>
+
 export type KnowledgeBaseListData = Omit<
   NonNullArrays<KnowledgeBaseList>,
   "knowledgeBases"
@@ -75,6 +79,7 @@ const createKnowledgeGroupBound = bind(CreateKnowledgeGroup)
 const updateKnowledgeGroupBound = bind(UpdateKnowledgeGroup)
 const deleteKnowledgeGroupBound = bind(DeleteKnowledgeGroup)
 const listKnowledgeBasesBound = bind(ListKnowledgeBases)
+const listKnowledgeBaseAgentsBound = bind(ListKnowledgeBaseAgents)
 /** 创建企业知识库。 */
 export function createKnowledgeBase(input: KnowledgeBaseInput) {
   return createKnowledgeBaseBound(input) as Promise<KnowledgeBaseData>
@@ -132,6 +137,11 @@ export function deleteKnowledgeGroup(knowledgeBaseId: string, groupId: string) {
     knowledgeBaseId,
     groupId,
   ) as Promise<KnowledgeBaseData>
+}
+
+/** 读取当前配置版本绑定知识库的 AI 员工。 */
+export function listKnowledgeBaseAgents(knowledgeBaseId: string) {
+  return listKnowledgeBaseAgentsBound(knowledgeBaseId) as Promise<KnowledgeBaseAgentListData>
 }
 
 /** 读取当前企业的知识库列表。 */

@@ -19,7 +19,9 @@ import {
   getKnowledgeBase,
   listAIProviders,
   isApiError,
+  listKnowledgeBaseAgents,
   updateKnowledgeBase,
+  UserStatus,
 } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
 import { LoadingIndicator } from "@/components/loading-indicator"
@@ -131,6 +133,11 @@ export function KnowledgeBaseFormPage({
     resourceKeys.knowledgeBase(knowledgeBaseId),
     () => getKnowledgeBase(knowledgeBaseId),
     { enabled: mode === "edit" },
+  )
+  const agents = useResource(
+    resourceKeys.knowledgeBaseAgents(knowledgeBaseId),
+    () => listKnowledgeBaseAgents(knowledgeBaseId),
+    { enabled: mode === "edit", staleTime: 0 },
   )
   const providers = useResource(resourceKeys.aiProviders(), () => listAIProviders(), { staleTime: 0 })
   const loading = providers.loading || (Boolean(providers.error) && providers.refreshing) || (
@@ -293,6 +300,43 @@ export function KnowledgeBaseFormPage({
                     : t("category.standard")}
                 </p>
               </Field>
+              {mode === "edit" ? (
+                <Field>
+                  <FieldLabel>{t("agents.title")}</FieldLabel>
+                  {agents.loading || (Boolean(agents.error) && agents.refreshing) ? (
+                    <p className="text-sm text-muted-foreground">{t("common:status.loading")}</p>
+                  ) : agents.error ? (
+                    <p className="flex items-center gap-2 text-sm text-muted-foreground">
+                      {t("agents.loadError")}
+                      <Button
+                        type="button"
+                        variant="link"
+                        size="xs"
+                        className="h-auto p-0"
+                        onClick={() => void agents.refresh()}
+                      >
+                        {t("common:actions.retry")}
+                      </Button>
+                    </p>
+                  ) : agents.data?.agents.length ? (
+                    <p className="flex flex-wrap gap-x-4 gap-y-1 text-sm">
+                      {agents.data.agents.map((agent) => (
+                        <Link
+                          key={agent.id}
+                          to={`/contacts/ai-employees/${agent.id}`}
+                          className="underline-offset-4 hover:underline"
+                        >
+                          {agent.status === UserStatus.UserStatusActive
+                            ? agent.displayName
+                            : t("agents.inactive", { name: agent.displayName })}
+                        </Link>
+                      ))}
+                    </p>
+                  ) : (
+                    <p className="text-sm text-muted-foreground">{t("agents.empty")}</p>
+                  )}
+                </Field>
+              ) : null}
               <FormInputField
                 name="name"
                 control={form.control}

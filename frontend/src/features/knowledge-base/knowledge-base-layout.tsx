@@ -16,9 +16,13 @@ import {
   deleteKnowledgeGroup,
   isApiError,
   KnowledgeBaseCategory,
+  listKnowledgeBaseAgents,
   listKnowledgeBases,
+  type KnowledgeBaseAgentListData,
   type KnowledgeBaseData,
   type KnowledgeGroupData,
+  sessionPath,
+  UserStatus,
 } from "@/api"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { PagePaneNav, PageSplit } from "@/components/page-split"
@@ -46,7 +50,7 @@ import {
   type KnowledgeGroupDialogState,
 } from "@/features/knowledge-base/knowledge-group-dialog"
 import { resourceKeys } from "@/hooks/resource-keys"
-import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
+import { useResource, useResourceInvalidator, useResourceReader } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 import { cn } from "@/lib/utils"
@@ -66,6 +70,10 @@ export function KnowledgeBaseLayout() {
     useState<KnowledgeGroupDialogState | null>(null)
   const [deletingKnowledgeBase, setDeletingKnowledgeBase] =
     useState<KnowledgeBaseData | null>(null)
+  const [deletingAgents, setDeletingAgents] = useState<
+    KnowledgeBaseAgentListData["agents"]
+  >([])
+  const readResource = useResourceReader()
   const [deletingGroup, setDeletingGroup] = useState<DeleteGroupTarget | null>(
     null,
   )
@@ -99,6 +107,29 @@ export function KnowledgeBaseLayout() {
     },
     [refresh, invalidate],
   )
+
+  /** 读取最新的 AI 员工绑定后打开知识库删除确认。 */
+  async function requestDeleteKnowledgeBase(knowledgeBase: KnowledgeBaseData) {
+    try {
+      const result = await readResource(
+        resourceKeys.knowledgeBaseAgents(knowledgeBase.id),
+        () => listKnowledgeBaseAgents(knowledgeBase.id),
+      )
+      if (!mounted.current) return
+      setDeletingAgents(result.agents)
+      setDeletingKnowledgeBase(knowledgeBase)
+    } catch (error) {
+      if (!mounted.current) return
+      if (isApiError(error) && sessionPath(error.state)) return
+      console.warn("知识库 AI 员工读取失败", {
+        knowledge_base_id: knowledgeBase.id,
+        error,
+      })
+      toast.error(
+        isApiError(error) ? apiErrorMessage(error) : t("agents.loadError"),
+      )
+    }
+  }
 
   /** 删除当前选中的知识库。 */
   async function confirmDeleteKnowledgeBase() {
@@ -239,7 +270,7 @@ export function KnowledgeBaseLayout() {
                     setDeletingGroup({ knowledgeBase, group })
                   }
                   onDeleteKnowledgeBase={() =>
-                    setDeletingKnowledgeBase(knowledgeBase)
+                    void requestDeleteKnowledgeBase(knowledgeBase)
                   }
                 />
               ))
@@ -276,7 +307,18 @@ export function KnowledgeBaseLayout() {
                 : null}
             </AlertDialogTitle>
             <AlertDialogDescription>
-              {t("delete.description")}
+              {deletingAgents.length > 0
+                ? t("delete.agentsDescription", {
+                    count: deletingAgents.length,
+                    names: deletingAgents
+                      .map((agent) =>
+                        agent.status === UserStatus.UserStatusActive
+                          ? agent.displayName
+                          : t("agents.inactive", { name: agent.displayName }),
+                      )
+                      .join(t("delete.agentSeparator")),
+                  })
+                : t("delete.description")}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>

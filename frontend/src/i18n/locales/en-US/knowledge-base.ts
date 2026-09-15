@@ -170,6 +170,12 @@ const knowledgeBase = {
     loadError: "Could not load the knowledge base.",
     saveError: "Could not save the knowledge base. Try again.",
   },
+  agents: {
+    title: "AI employees",
+    empty: "No AI employees use this knowledge base",
+    inactive: "{{name}} (disabled)",
+    loadError: "Could not load AI employees. Try again.",
+  },
   validation: {
     embeddingModelRequired: "Select an embedding model.",
     rerankModelRequired: "Select a rerank model.",
@@ -205,6 +211,9 @@ const knowledgeBase = {
   delete: {
     title: "Delete “{{name}}”?",
     description: "This action cannot be undone.",
+    agentSeparator: ", ",
+    agentsDescription_one: "{{names}} uses this knowledge base and will no longer be able to search it. This action cannot be undone.",
+    agentsDescription_other: "{{names}} use this knowledge base and will no longer be able to search it. This action cannot be undone.",
     success: "Knowledge base deleted.",
     error: "Could not delete the knowledge base. Try again.",
   },

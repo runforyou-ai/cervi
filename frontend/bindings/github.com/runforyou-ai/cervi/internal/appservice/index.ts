@@ -185,6 +185,8 @@ export type {
     InstallWorkspaceInput,
     InstallationStatus,
     KnowledgeBase,
+    KnowledgeBaseAgent,
+    KnowledgeBaseAgentList,
     KnowledgeBaseInput,
     KnowledgeBaseList,
     KnowledgeDocument,

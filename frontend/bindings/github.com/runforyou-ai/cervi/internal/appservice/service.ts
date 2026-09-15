@@ -598,6 +598,13 @@ export function ListInboxChannels(meta: $models.RequestMeta): $CancellablePromis
 }
 
 /**
+ * ListKnowledgeBaseAgents 返回当前配置版本绑定知识库的 AI 员工。
+ */
+export function ListKnowledgeBaseAgents(meta: $models.RequestMeta, knowledgeBaseID: string): $CancellablePromise<$models.KnowledgeBaseAgentList> {
+    return $Call.ByID(3510805805, meta, knowledgeBaseID);
+}
+
+/**
  * ListKnowledgeBases 返回当前企业的知识库列表。
  */
 export function ListKnowledgeBases(meta: $models.RequestMeta): $CancellablePromise<$models.KnowledgeBaseList> {
