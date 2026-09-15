@@ -1,4 +1,4 @@
-/** 移动端建群和添加群成员共用的真人搜索与多选。 */
+/** 移动端建群和添加群成员共用的真人与 AI 员工搜索和多选。 */
 import { groupAdditionalMemberMaxCount } from "@/features/inbox/group-conversation-schema"
 import { useState, type Ref } from "react"
 import { useTranslation } from "react-i18next"
@@ -45,7 +45,6 @@ export function MobileGroupMemberPicker({
   )
   const members = (data ?? []).filter(
     (member) =>
-      member.type === OrganizationIdentityType.OrganizationIdentityTypeUser &&
       member.id !== currentIdentityID &&
       !excludedIdentityIDs.includes(member.id),
   )
@@ -141,6 +140,8 @@ export function MobileGroupMemberPicker({
         <ul className="divide-y">
           {candidates.map((member) => {
             const checked = selected.some((item) => item.id === member.id)
+            const agent =
+              member.type === OrganizationIdentityType.OrganizationIdentityTypeAgent
             return (
               <li key={member.id}>
                 <label className="flex min-h-16 items-center gap-3 px-3 py-2 active:bg-muted">
@@ -162,9 +163,15 @@ export function MobileGroupMemberPicker({
                   <ProfileAvatar
                     name={member.displayName}
                     imageURL={member.avatarUrl}
+                    fallback={agent ? "agent" : "person"}
                     className="size-9"
                   />
-                  <span className="min-w-0 truncate text-sm">{member.displayName}</span>
+                  <span className="min-w-0 flex-1 truncate text-sm">{member.displayName}</span>
+                  {agent ? (
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {tInbox("groupAgent")}
+                    </span>
+                  ) : null}
                 </label>
               </li>
             )

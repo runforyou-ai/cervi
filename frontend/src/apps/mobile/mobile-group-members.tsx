@@ -162,6 +162,12 @@ export function MobileGroupMemberList({
               <span className="min-w-0 flex-1 break-words text-sm">
                 {member.displayName}
               </span>
+              {member.identityType ===
+              OrganizationIdentityType.OrganizationIdentityTypeAgent ? (
+                <span className="shrink-0 text-xs text-muted-foreground">
+                  {t("groupAgent")}
+                </span>
+              ) : null}
               {trailing(member)}
             </li>
           ))}
