@@ -322,6 +322,20 @@
 - **验收：** 公共、本人、同事和关闭视图同时收敛；筛选迁移不等于授权移除；客服参与者不被误当全部有权阅读者。
 - **验证步骤：** A 领取公共会话后，B 的公共列表移除、A 的本人列表出现，双方有权详情仍可读；关闭／重开改变队列但不改活动时间；AI 最终回复也能触发共享受众通知。
 
+### PR21：访客授权与线程目录通知
+
+- **依赖：** PR20。
+- **范围：** 提取网站 HTTP 共同授权，建立渠道身份级受众通知与目录／会话公开投影查询，补齐未知新线程发现。只返回访客公开投影。
+- **落点：** `website_visitor_direct_backend.go`、`api/website_visitor.go`、`conversation/list_website_conversations.go`、`list_website_messages.go`。
+- **实施：** 把 Cookie／Header 恢复出的渠道身份作为唯一受众，目录按该身份列出线程；成员 Query 的内部字段不复用到访客 DTO。首次消息以外的读操作不建立联系人。
+- **验收：** 同一访客两标签页新建不同线程可互相发现；跨渠道／身份请求被拒绝；初始化和草稿不创建联系人，客服内部资料不外泄。
+- **验证步骤：** 同渠道同访客在两个标签页分别首发新线程，互相能发现；换另一个渠道或伪造线程 ID 读不到消息；空白页反复初始化后数据库业务记录数不变。
+
+- **范围确认（2026-09-15）：** 本条只交付服务端能力，挂件建立事件流并改用通知触发拉取由 PR32 完成；访客事件流本身由 PR26 交付，本条只负责发布到访客目录受众。
+- **实现记录：** `realtime.VisitorDirectoryConversationChanged` 以渠道身份记录 ID 为受众 ID 构造 `visitor_directory` 受众通知。`chatstate.NotifyConversationChanged` 在客户会话通知企业客服共享受众之后，按 `customer_conversations` 关联的渠道身份再登记一条访客目录通知，并用 `channels.type = website` 限定：只有网站渠道存在访客事件流，Telegram 客户会话与客服 Copilot 线程不产生该通知。新增公开路由 `GET /public/website-channels/:channelID/conversations` 返回 `{conversations}` 目录，供访客在初始化之后重新发现线程；`WebsiteVisitorService.InitializeMessenger` 改为复用同一个 `ListConversations`，目录与初始化返回同一份公开投影。HTTP 共同授权提取为 `authorizeWebsiteVisitor` 中间件：统一写 `Cache-Control: no-store`、按 Header 与 Cookie 恢复访客 Token、失败按公开错误体拒绝并把渠道外部编号写入请求上下文，发送、目录与历史三条路由共用，PR26 的访客事件流可直接复用。Action 层把两处重复的渠道身份读取合并为 `loadWebsiteVisitorIdentity`，尚未建立身份时返回未找到而不创建联系人，目录查询据此返回空集合、历史查询返回会话不存在。
+- **验证记录（2026-09-15）：** `wails3 task test:server` 全量通过；`wails3 task build:server` 通过，`go generate ./internal/appservice` 无差异（访客服务不在 `Backend` 契约内，无需重新生成绑定），构建改写的 `frontend/bindings` 已还原。新增 `TestRealtimeVisitorDirectoryNotifications`：同一访客新建第二线程时共享受众与本人访客目录受众各收到一条同版本通知，目录查询列出两个线程，另一访客身份的线程只通知其自身受众且不进入前者目录。新增 `TestWebsiteVisitorDirectoryHTTP`：缺少或格式非法的访客 Token 被共同授权拒绝（400）；空白页连续初始化两次并读取目录后企业联系人数量不变；同一 Token 的两个标签页各新建线程后目录同时列出两条；另一访客身份读目录为空、读线程历史返回 404；同一 Token 在另一个网站渠道下是不同身份，目录为空且读不到原渠道线程；目录路由只接受 GET。目录行字段被逐一核对为 `id`、`title`、`preview`、`previewSenderIdentityType`、`lastMessageSeq`、`lastMessageAt`、`serviceSession`，`serviceSession` 只含 `id` 与 `status`，客服内部资料不外泄。既有客户会话通知测试同步补齐访客目录受众期望；Telegram 投递通知测试保持只有共享受众一条，确认网站渠道限定生效。
+- **未验证：** 访客侧界面未改动，挂件仍按现有三秒轮询工作，新目录接口在浏览器中的实际调用由 PR32 验收。
+
 ### PR25：成员 Gateway、帧契约与连接认证
 
 - **依赖：** PR18。合并原清单 PR28、PR29、PR30，以及本清单 PR24 与 PR35 的原生端子路径、心跳和关闭部分；PR20 已合并，客服共享受众订阅随本条交付。

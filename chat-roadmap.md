@@ -1499,8 +1499,11 @@ chmsg:<contact_channel_identity_id>:<client_message_id>
 ```text
 GET  /api/public/website-channels/{channelID}/messenger
 POST /api/public/website-channels/{channelID}/messages
+GET  /api/public/website-channels/{channelID}/conversations
 GET  /api/public/website-channels/{channelID}/conversations/{conversationID}/messages
 ```
+
+除 `messenger` 之外的公开路由要求已有访客 Token，由共同授权按 Header、Cookie 读取 Token 并规范化为渠道外部编号后才进入业务调用，渠道身份在 Action 内按该编号加载。目录路由按当前渠道身份返回线程的访客公开投影，与 `messenger` 初始化返回同一份数据，供访客在初始化之后发现其他标签页新建的线程。
 
 打开页面、初始化 Token、点击“开始聊天”和输入草稿不创建业务记录。每次点击“开始聊天”都创建本地草稿，首条合法文本成功后才变为新的真实 Conversation。
 

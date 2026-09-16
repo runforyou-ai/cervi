@@ -18,10 +18,11 @@ import (
 )
 
 const (
-	websiteVisitorHeader    = "X-Cervi-Visitor-Token"
-	websiteVisitorTokenSize = 32
-	websiteVisitorBodyLimit = 16 * 1024
-	websiteVisitorCookieAge = 365 * 24 * 60 * 60
+	websiteVisitorHeader      = "X-Cervi-Visitor-Token"
+	websiteVisitorTokenSize   = 32
+	websiteVisitorBodyLimit   = 16 * 1024
+	websiteVisitorCookieAge   = 365 * 24 * 60 * 60
+	websiteVisitorExternalKey = "cervi_website_visitor_external_id"
 )
 
 // registerWebsiteVisitorRoutes 注册匿名网站 Messenger 路由。
@@ -31,18 +32,33 @@ func (s *Service) registerWebsiteVisitorRoutes(router *gin.Engine) {
 	}
 	const messengerPath = "/public/website-channels/:channelID/messenger"
 	const messagesPath = "/public/website-channels/:channelID/messages"
+	const directoryPath = "/public/website-channels/:channelID/conversations"
 	const historyPath = "/public/website-channels/:channelID/conversations/:conversationID/messages"
 	router.GET(messengerPath, s.initializeWebsiteMessenger)
-	router.POST(messagesPath, s.sendWebsiteVisitorMessage)
-	router.GET(historyPath, s.listWebsiteVisitorMessages)
+	router.POST(messagesPath, authorizeWebsiteVisitor, s.sendWebsiteVisitorMessage)
+	router.GET(directoryPath, authorizeWebsiteVisitor, s.listWebsiteVisitorConversations)
+	router.GET(historyPath, authorizeWebsiteVisitor, s.listWebsiteVisitorMessages)
 	router.Match([]string{http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace}, messengerPath, websiteVisitorMethodNotAllowed(http.MethodGet))
 	router.Match([]string{http.MethodGet, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace}, messagesPath, websiteVisitorMethodNotAllowed(http.MethodPost))
+	router.Match([]string{http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace}, directoryPath, websiteVisitorMethodNotAllowed(http.MethodGet))
 	router.Match([]string{http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace}, historyPath, websiteVisitorMethodNotAllowed(http.MethodGet))
+}
+
+// authorizeWebsiteVisitor 统一处理需要访客 Token 的公开路由：禁止缓存，按 Header、Cookie 读取 Token 并写入渠道外部编号，Token 缺失或格式非法按公开错误体拒绝。
+func authorizeWebsiteVisitor(c *gin.Context) {
+	c.Header("Cache-Control", "no-store")
+	token, valid := readWebsiteVisitorToken(c, c.Param("channelID"))
+	if !valid {
+		writeApplicationError(c, invalidWebsiteVisitorTokenError(c))
+		c.Abort()
+		return
+	}
+	c.Set(websiteVisitorExternalKey, websiteVisitorExternalID(token))
 }
 
 // initializeWebsiteMessenger 签发或恢复访客 Token 并返回会话列表。
 func (s *Service) initializeWebsiteMessenger(c *gin.Context) {
-	s.prepareWebsiteVisitorResponse(c)
+	c.Header("Cache-Control", "no-store")
 	channelID := c.Param("channelID")
 	token, valid := readWebsiteVisitorToken(c, channelID)
 	issued := false
@@ -77,18 +93,20 @@ func (s *Service) initializeWebsiteMessenger(c *gin.Context) {
 
 // sendWebsiteVisitorMessage 接收网站访客文本消息。
 func (s *Service) sendWebsiteVisitorMessage(c *gin.Context) {
-	s.prepareWebsiteVisitorResponse(c)
-	channelID := c.Param("channelID")
-	token, valid := readWebsiteVisitorToken(c, channelID)
-	if !valid {
-		writeApplicationError(c, invalidWebsiteVisitorTokenError(c))
-		return
-	}
 	var input appservice.WebsiteVisitorTextMessageInput
 	if !bindWebsiteVisitorJSON(c, &input) {
 		return
 	}
-	result, err := s.websiteVisitor.SendTextMessage(c.Request.Context(), websiteVisitorMeta(c), channelID, websiteVisitorExternalID(token), input)
+	result, err := s.websiteVisitor.SendTextMessage(c.Request.Context(), websiteVisitorMeta(c), c.Param("channelID"), c.GetString(websiteVisitorExternalKey), input)
+	if writeApplicationError(c, err) {
+		return
+	}
+	writeWebsiteVisitorResult(c, http.StatusOK, result)
+}
+
+// listWebsiteVisitorConversations 返回网站访客当前渠道身份的线程目录。
+func (s *Service) listWebsiteVisitorConversations(c *gin.Context) {
+	result, err := s.websiteVisitor.ListConversations(c.Request.Context(), websiteVisitorMeta(c), c.Param("channelID"), c.GetString(websiteVisitorExternalKey))
 	if writeApplicationError(c, err) {
 		return
 	}
@@ -97,14 +115,7 @@ func (s *Service) sendWebsiteVisitorMessage(c *gin.Context) {
 
 // listWebsiteVisitorMessages 返回网站访客指定线程的消息历史。
 func (s *Service) listWebsiteVisitorMessages(c *gin.Context) {
-	s.prepareWebsiteVisitorResponse(c)
-	channelID := c.Param("channelID")
-	token, valid := readWebsiteVisitorToken(c, channelID)
-	if !valid {
-		writeApplicationError(c, invalidWebsiteVisitorTokenError(c))
-		return
-	}
-	result, err := s.websiteVisitor.ListMessages(c.Request.Context(), websiteVisitorMeta(c), channelID, websiteVisitorExternalID(token), c.Param("conversationID"), appservice.WebsiteVisitorMessageHistoryInput{
+	result, err := s.websiteVisitor.ListMessages(c.Request.Context(), websiteVisitorMeta(c), c.Param("channelID"), c.GetString(websiteVisitorExternalKey), c.Param("conversationID"), appservice.WebsiteVisitorMessageHistoryInput{
 		Before: c.Query("before"), After: c.Query("after"),
 	})
 	if writeApplicationError(c, err) {
@@ -189,11 +200,6 @@ func websiteVisitorRequestMeta(c *gin.Context) appservice.RequestMeta {
 // invalidWebsiteVisitorTokenError 返回缺失或非法访客 Token 错误。
 func invalidWebsiteVisitorTokenError(c *gin.Context) *appservice.Error {
 	return appservice.InvalidError(websiteVisitorRequestMeta(c), cervii18n.ErrorValidationFailed, map[string]cervii18n.Key{"visitorToken": cervii18n.FieldVisitorTokenInvalid})
-}
-
-// prepareWebsiteVisitorResponse 禁止公开 Messenger 响应缓存。
-func (s *Service) prepareWebsiteVisitorResponse(c *gin.Context) {
-	c.Header("Cache-Control", "no-store")
 }
 
 // writeWebsiteVisitorResult 写入公开 Messenger 成功响应和本地化语言。

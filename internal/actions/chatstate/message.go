@@ -86,10 +86,28 @@ func TouchConversation(ctx context.Context, db bun.IDB, conversation *servermode
 	return NotifyConversationChanged(ctx, db, conversation)
 }
 
-// NotifyConversationChanged 按会话当前版本登记变更通知：客户会话及其 Copilot 线程通知企业客服共享受众，内部会话通知当前真人成员。
+// NotifyConversationChanged 按会话当前版本登记变更通知：客户会话及其 Copilot 线程通知企业客服共享受众，网站客户会话同时通知所属渠道身份受众，内部会话通知当前真人成员。
 func NotifyConversationChanged(ctx context.Context, db bun.IDB, conversation *servermodels.Conversation) error {
 	if conversation.Type == string(domain.ConversationTypeCustomer) || conversation.Type == string(domain.ConversationTypeCopilot) {
 		realtime.Notify(ctx, realtime.CustomerInboxConversationChanged(conversation.OrganizationID, conversation.ID, conversation.Version))
+		if conversation.Type != string(domain.ConversationTypeCustomer) {
+			return nil
+		}
+		// 仅网站客户会话按所属渠道身份登记访客目录受众通知。
+		var channelIdentityID string
+		err := db.NewSelect().TableExpr("customer_conversations AS cc").
+			Column("cci.id").
+			Join("JOIN contact_channel_identities AS cci ON cci.organization_id = cc.organization_id AND cci.id = cc.contact_channel_identity_id").
+			Join("JOIN channels AS c ON c.organization_id = cci.organization_id AND c.id = cci.channel_id AND c.type = ?", domain.ChannelTypeWebsite).
+			Where("cc.organization_id = ? AND cc.conversation_id = ?", conversation.OrganizationID, conversation.ID).
+			Scan(ctx, &channelIdentityID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil
+		}
+		if err != nil {
+			return fmt.Errorf("load visitor notification audience: %w", err)
+		}
+		realtime.Notify(ctx, realtime.VisitorDirectoryConversationChanged(conversation.OrganizationID, channelIdentityID, conversation.ID, conversation.Version))
 		return nil
 	}
 	var userIDs []string

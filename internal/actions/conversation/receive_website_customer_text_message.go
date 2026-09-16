@@ -213,6 +213,23 @@ func loadWebsiteChannel(ctx context.Context, db bun.IDB, channelID string) (*ser
 	return channel, nil
 }
 
+// loadWebsiteVisitorIdentity 读取网站渠道内当前访客的渠道身份，尚未建立身份时返回 false；读操作不创建联系人。
+func loadWebsiteVisitorIdentity(ctx context.Context, db bun.IDB, channel *servermodels.Channel, externalID string) (*servermodels.ContactChannelIdentity, bool, error) {
+	identity := &servermodels.ContactChannelIdentity{}
+	err := db.NewSelect().Model(identity).
+		Where("cci.organization_id = ?", channel.OrganizationID).
+		Where("cci.channel_id = ?", channel.ID).
+		Where("cci.external_id = ?", externalID).
+		Scan(ctx)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, false, nil
+	}
+	if err != nil {
+		return nil, false, fmt.Errorf("load website visitor identity: %w", err)
+	}
+	return identity, true, nil
+}
+
 // ensureContactSubject 取得或创建联系人聊天主体。
 func ensureContactSubject(ctx context.Context, db bun.IDB, organizationID, contactID, subjectID string) (*servermodels.ChatSubject, error) {
 	subject := &servermodels.ChatSubject{}

@@ -27,6 +27,11 @@ type WebsiteVisitorConversation struct {
 	ServiceSession            WebsiteVisitorServiceSession `json:"serviceSession"`
 }
 
+// WebsiteVisitorDirectory 定义网站访客当前渠道身份下的客户线程目录。
+type WebsiteVisitorDirectory struct {
+	Conversations []WebsiteVisitorConversation `json:"conversations"`
+}
+
 // WebsiteVisitorMessenger 定义网站 Messenger 初始化结果。
 type WebsiteVisitorMessenger struct {
 	VisitorToken  string                       `json:"visitorToken"`
@@ -104,11 +109,20 @@ func NewWebsiteVisitorService(backend WebsiteVisitorBackend) *WebsiteVisitorServ
 
 // InitializeMessenger 返回访客 Token 和当前渠道的会话列表。
 func (s *WebsiteVisitorService) InitializeMessenger(ctx context.Context, meta WebsiteVisitorMeta, channelID, externalID, visitorToken string) (WebsiteVisitorMessenger, error) {
-	conversations, err := s.backend.ListConversations(ctx, meta, channelID, externalID)
+	directory, err := s.ListConversations(ctx, meta, channelID, externalID)
 	if err != nil {
 		return WebsiteVisitorMessenger{}, err
 	}
-	return WebsiteVisitorMessenger{VisitorToken: visitorToken, Conversations: conversations}, nil
+	return WebsiteVisitorMessenger{VisitorToken: visitorToken, Conversations: directory.Conversations}, nil
+}
+
+// ListConversations 返回当前渠道身份的客户线程目录，供访客在初始化之后重新发现线程。
+func (s *WebsiteVisitorService) ListConversations(ctx context.Context, meta WebsiteVisitorMeta, channelID, externalID string) (WebsiteVisitorDirectory, error) {
+	conversations, err := s.backend.ListConversations(ctx, meta, channelID, externalID)
+	if err != nil {
+		return WebsiteVisitorDirectory{}, err
+	}
+	return WebsiteVisitorDirectory{Conversations: conversations}, nil
 }
 
 // SendTextMessage 持久化网站访客文本消息。
