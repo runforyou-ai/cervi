@@ -30,8 +30,8 @@ function setup() {
         },
       }) as NativeRealtimeConnect
     },
-    async disconnect() {
-      log.push("disconnect")
+    async disconnect(connectionId: string) {
+      log.push(`disconnect:${connectionId}`)
     },
     onFrame(listener) {
       frameListeners.add(listener)
@@ -102,7 +102,7 @@ test("旧连接请求晚到时先断开旧连接，新连接在其后发起", as
 
   bridge.connects[0].resolve("conn-a")
   await flush()
-  assert.deepEqual(bridge.log, ["connect", "disconnect", "connect"])
+  assert.deepEqual(bridge.log, ["connect", "disconnect:conn-a", "connect"])
 
   bridge.connects[1].resolve("conn-b")
   await flush()
@@ -123,7 +123,7 @@ test("断开已建立的连接与新连接交错时按调用顺序串行执行",
   first.close()
   bridge.open()
   await flush()
-  assert.deepEqual(bridge.log, ["connect", "disconnect", "connect"])
+  assert.deepEqual(bridge.log, ["connect", "disconnect:conn-a", "connect"])
   assert.equal(bridge.listenerCount(), 2)
 })
 
@@ -156,5 +156,5 @@ test("关闭后不再回调且注销全部监听", async () => {
   assert.deepEqual(stream.frames, [])
   assert.deepEqual(stream.closed, [])
   assert.equal(bridge.listenerCount(), 0)
-  assert.deepEqual(bridge.log, ["connect", "disconnect"])
+  assert.deepEqual(bridge.log, ["connect", "disconnect:conn-a"])
 })

@@ -5,6 +5,7 @@ package main
 import (
 	"context"
 	"fmt"
+	"strconv"
 
 	"github.com/runforyou-ai/cervi/internal/apiproxy"
 	"github.com/runforyou-ai/cervi/internal/appservice"
@@ -32,6 +33,13 @@ func applicationServices(
 	}
 	backend, err := apiproxy.NewBackend(appStorage, sessions, func(name string, data any) {
 		application.Get().Event.Emit(name, data)
+	}, func(ctx context.Context) string {
+		// 绑定调用携带发起窗口，窗口刷新后重新连接据此关闭原有事件流。
+		window, ok := ctx.Value(application.WindowKey).(application.Window)
+		if !ok || window == nil {
+			return ""
+		}
+		return strconv.FormatUint(uint64(window.ID()), 10)
 	})
 	if err != nil {
 		return nil, fmt.Errorf("initialize remote application backend: %w", err)

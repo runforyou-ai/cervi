@@ -101,18 +101,21 @@ export class SyncCoordinator {
         this.enqueue(conversationKeys(frame.conversationId))
         return
       case "conversation_state_changed":
+        // 群资料携带本人免打扰状态，个人会话状态变化时一并重读。
         this.enqueue([
           ...inboxKeys(),
           resourceKeys.conversationSummary(frame.conversationId),
           resourceKeys.conversationNavigation(frame.conversationId),
           resourceKeys.conversationMentions(frame.conversationId),
+          resourceKeys.groupConversation(frame.conversationId),
         ])
         return
       case "conversation_removed":
-        // 独立摘要重读确认阅读资格，失权后由摘要消费方清理会话资源。
+        // 独立摘要与群资料重读确认阅读资格，失权后由其消费方清理会话资源。
         this.enqueue([
           ...inboxKeys(),
           resourceKeys.conversationSummary(frame.conversationId),
+          resourceKeys.groupConversation(frame.conversationId),
           resourceKeys.inboxSearch(),
         ])
         return

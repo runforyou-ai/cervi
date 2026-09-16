@@ -311,10 +311,10 @@ export function DisconnectAgentRunStream(meta: $models.RequestMeta, connectionID
 }
 
 /**
- * DisconnectRealtime 关闭原生端当前实时事件流。
+ * DisconnectRealtime 关闭原生端指定编号的成员实时事件流及其所属窗口的全部运行过程流。
  */
-export function DisconnectRealtime(meta: $models.RequestMeta): $CancellablePromise<void> {
-    return $Call.ByID(2251706905, meta);
+export function DisconnectRealtime(meta: $models.RequestMeta, connectionID: string): $CancellablePromise<void> {
+    return $Call.ByID(2251706905, meta, connectionID);
 }
 
 /**

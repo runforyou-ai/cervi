@@ -88,8 +88,8 @@ export const realtimeClient = new RealtimeClient({
         })
       : createNativeRealtimeTransport({
           connect: () => nativeConnect(ConnectRealtime(requestMeta())),
-          disconnect: async () => {
-            await DisconnectRealtime(requestMeta())
+          disconnect: async (connectionId) => {
+            await DisconnectRealtime(requestMeta(), connectionId)
           },
           onFrame: (listener) =>
             Events.On(frameEventName, (event) => {
