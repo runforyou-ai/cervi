@@ -59,7 +59,7 @@ export function KnowledgeDocumentPage() {
         </Button>
       </PageHeader>
       {document.data?.sourceUrl ? (
-        <div className="px-6 pb-2 text-sm text-muted-foreground">
+        <div className="shrink-0 px-4 pt-4 text-sm text-muted-foreground sm:px-6 sm:pt-6">
           <a
             href={document.data.sourceUrl}
             target="_blank"
