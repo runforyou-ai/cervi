@@ -1,5 +1,5 @@
-/** 客户会话输入区的 AI 写回复弹层。 */
-import { useEffect, useRef, useState } from "react"
+/** 客户会话输入区的 AI 写回复弹层，桌面端使用 Popover，移动端使用底部 Sheet。 */
+import { useEffect, useId, useRef, useState } from "react"
 import {
   LoaderCircleIcon,
   PencilLineIcon,
@@ -22,6 +22,14 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "@/components/ui/popover"
+import {
+  Sheet,
+  SheetClose,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceRemover } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
@@ -53,6 +61,7 @@ export function CustomerReplyAssistant({
   draft,
   replyToMessageID,
   disabled,
+  mobile = false,
   onApply,
 }: {
   conversationID: string
@@ -60,9 +69,11 @@ export function CustomerReplyAssistant({
   draft: string
   replyToMessageID: string
   disabled: boolean
+  mobile?: boolean
   onApply: (reply: string) => void
 }) {
   const { t } = useTranslation(["inbox", "common"])
+  const fieldPrefix = useId()
   const removeResource = useResourceRemover()
   const appliedRef = useRef(false)
   const [open, setOpen] = useState(false)
@@ -188,90 +199,253 @@ export function CustomerReplyAssistant({
     }
   }
 
+  /** 以候选替换当前对客草稿并关闭弹层。 */
+  function applyCandidate(candidate: string) {
+    appliedRef.current = true
+    onApply(candidate)
+    setOpen(false)
+    void removeResource(resourceKeys.customerReplySuggestions(conversationID))
+  }
+
+  /** 使用候选后焦点交给回复输入框。 */
+  function keepAppliedFocus(event: Event) {
+    if (!appliedRef.current) return
+    appliedRef.current = false
+    event.preventDefault()
+  }
+
+  const trigger = (
+    <Button
+      type="button"
+      variant="ghost"
+      size="icon-sm"
+      className={mobile ? "size-11" : undefined}
+      disabled={disabled}
+      aria-label={t("replyAssistant")}
+      title={t("replyAssistant")}
+    >
+      {open && generating ? (
+        <LoaderCircleIcon className="animate-spin" />
+      ) : (
+        <SparklesIcon />
+      )}
+    </Button>
+  )
+
+  const modeSelector = (
+    <div
+      role="radiogroup"
+      aria-label={t("replyAssistantMode")}
+      className={cn(
+        "flex shrink-0 rounded-md border bg-background p-0.5",
+        mobile && "w-full",
+      )}
+    >
+      {replyModes.map((value) => (
+        <button
+          key={value}
+          type="button"
+          role="radio"
+          aria-checked={mode === value}
+          className={cn(
+            "rounded-sm font-medium whitespace-nowrap transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
+            mobile ? "h-10 flex-1 text-sm" : "h-7 px-2.5 text-xs",
+            mode === value
+              ? "bg-foreground text-background"
+              : "text-muted-foreground hover:bg-muted hover:text-foreground",
+          )}
+          onClick={() => setMode(value)}
+        >
+          {modeLabels[value]}
+        </button>
+      ))}
+    </div>
+  )
+
+  const agentSelect = (
+    <NativeSelect
+      id={mobile ? `${fieldPrefix}-agent` : undefined}
+      aria-label={mobile ? undefined : t("replyAssistantAgent")}
+      className={cn(
+        mobile
+          ? "min-h-11 w-full text-sm"
+          : "h-7 w-auto max-w-36 truncate px-2 pr-8 text-xs shadow-none",
+      )}
+      value={agentIdentityID}
+      disabled={agents.length === 0}
+      onChange={(event) =>
+        updatePreferences({ agentIdentityId: event.target.value })
+      }
+    >
+      {agents.map((agent) => (
+        <option key={agent.identityId} value={agent.identityId}>
+          {agent.displayName}
+        </option>
+      ))}
+    </NativeSelect>
+  )
+
+  const toneSelect = (
+    <NativeSelect
+      id={mobile ? `${fieldPrefix}-tone` : undefined}
+      aria-label={mobile ? undefined : t("replyAssistantTone")}
+      className={cn(
+        mobile ? "min-h-11 w-full text-sm" : "h-7 w-auto px-2 pr-8 text-xs shadow-none",
+      )}
+      value={preferences.tone}
+      onChange={(event) =>
+        updatePreferences({ tone: event.target.value as CustomerReplyTone })
+      }
+    >
+      {replyTones.map((tone) => (
+        <option key={tone} value={tone}>
+          {toneLabels[tone]}
+        </option>
+      ))}
+    </NativeSelect>
+  )
+
+  const results = (
+    <div
+      aria-live="polite"
+      aria-busy={generating}
+      className={cn(
+        "overflow-y-auto",
+        mobile ? "h-56 min-h-0 px-4" : "h-56 max-h-[calc(100dvh-17rem)] pr-1",
+      )}
+    >
+      {generating ? (
+        <div className="flex h-full items-center justify-center">
+          <span className="sr-only">{t("replyAssistantGenerating")}</span>
+          <div aria-hidden="true" className="w-28 space-y-2">
+            <div className="h-2.5 w-full animate-pulse rounded bg-muted-foreground/25" />
+            <div className="h-2.5 w-5/6 animate-pulse rounded bg-muted-foreground/20" />
+            <div className="h-2.5 w-2/3 animate-pulse rounded bg-muted-foreground/15" />
+          </div>
+        </div>
+      ) : ready && !suggestions.error && candidates.length > 0 ? (
+        <ul aria-label={t("replyAssistantCandidates")} className="space-y-2">
+          {candidates.map((candidate, index) =>
+            mobile ? (
+              <li key={index}>
+                <button
+                  type="button"
+                  className="w-full rounded-md border bg-background p-3 text-left text-sm leading-6 whitespace-pre-wrap outline-none active:bg-muted focus-visible:ring-2 focus-visible:ring-ring/50"
+                  onClick={() => applyCandidate(candidate)}
+                >
+                  {candidate}
+                </button>
+              </li>
+            ) : (
+              <li
+                key={index}
+                className="flex gap-2 rounded-md border bg-background p-2.5 text-sm leading-6"
+              >
+                <p className="min-w-0 flex-1 whitespace-pre-wrap">{candidate}</p>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
+                  aria-label={t("replyAssistantApply")}
+                  title={t("replyAssistantApply")}
+                  onClick={() => applyCandidate(candidate)}
+                >
+                  <PencilLineIcon className="size-4" />
+                </Button>
+              </li>
+            ),
+          )}
+        </ul>
+      ) : (
+        <div
+          className={cn(
+            "flex h-full items-center justify-center rounded-md border border-dashed px-3 text-center text-xs text-muted-foreground",
+            mobile && "text-sm",
+            (agentOptions.error || (ready && suggestions.error)) && "text-destructive",
+          )}
+        >
+          {emptyMessage}
+        </div>
+      )}
+    </div>
+  )
+
+  if (mobile) {
+    return (
+      <Sheet open={open} onOpenChange={changeOpen}>
+        <SheetTrigger asChild>{trigger}</SheetTrigger>
+        <SheetContent
+          side="bottom"
+          showCloseButton={false}
+          aria-describedby={undefined}
+          className="max-h-[calc(100dvh-env(safe-area-inset-top)-1rem)] gap-0 overflow-hidden rounded-t-2xl pb-[env(safe-area-inset-bottom)]"
+          onCloseAutoFocus={keepAppliedFocus}
+        >
+          <SheetHeader className="shrink-0 flex-row items-center border-b">
+            <SheetTitle className="flex-1">{t("replyAssistant")}</SheetTitle>
+            <SheetClose asChild>
+              <Button variant="ghost" className="min-h-11">
+                {t("common:actions.cancel")}
+              </Button>
+            </SheetClose>
+          </SheetHeader>
+          <div className="shrink-0 space-y-3 p-4">
+            {modeSelector}
+            <div className="grid grid-cols-2 gap-2">
+              <div className="space-y-1.5">
+                <label
+                  htmlFor={`${fieldPrefix}-agent`}
+                  className="block text-xs font-medium text-muted-foreground"
+                >
+                  {t("replyAssistantAgent")}
+                </label>
+                {agentSelect}
+              </div>
+              <div className="space-y-1.5">
+                <label
+                  htmlFor={`${fieldPrefix}-tone`}
+                  className="block text-xs font-medium text-muted-foreground"
+                >
+                  {t("replyAssistantTone")}
+                </label>
+                {toneSelect}
+              </div>
+            </div>
+          </div>
+          {results}
+          <div className="shrink-0 p-4">
+            <Button
+              type="button"
+              variant="outline"
+              className="min-h-11 w-full"
+              disabled={!ready || generating}
+              onClick={() => void suggestions.refresh()}
+            >
+              <RefreshCwIcon className="size-4" />
+              {t("replyAssistantRegenerate")}
+            </Button>
+          </div>
+        </SheetContent>
+      </Sheet>
+    )
+  }
+
   return (
     <Popover open={open} onOpenChange={changeOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          disabled={disabled}
-          aria-label={t("replyAssistant")}
-          title={t("replyAssistant")}
-        >
-          {open && generating ? (
-            <LoaderCircleIcon className="animate-spin" />
-          ) : (
-            <SparklesIcon />
-          )}
-        </Button>
-      </PopoverTrigger>
+      <PopoverTrigger asChild>{trigger}</PopoverTrigger>
       <PopoverContent
         side="top"
         align="start"
         className="w-[min(36rem,calc(100vw-2rem))] space-y-3 p-3"
-        onCloseAutoFocus={(event) => {
-          // 使用候选后焦点交给回复输入框。
-          if (!appliedRef.current) return
-          appliedRef.current = false
-          event.preventDefault()
-        }}
+        onCloseAutoFocus={keepAppliedFocus}
       >
         <div className="flex items-center gap-2">
           <p className="min-w-0 truncate text-sm font-medium">{t("replyAssistant")}</p>
-          <div
-            role="radiogroup"
-            aria-label={t("replyAssistantMode")}
-            className="flex shrink-0 rounded-md border bg-background p-0.5"
-          >
-            {replyModes.map((value) => (
-              <button
-                key={value}
-                type="button"
-                role="radio"
-                aria-checked={mode === value}
-                className={cn(
-                  "h-7 rounded-sm px-2.5 text-xs font-medium whitespace-nowrap transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring/50",
-                  mode === value
-                    ? "bg-foreground text-background"
-                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
-                )}
-                onClick={() => setMode(value)}
-              >
-                {modeLabels[value]}
-              </button>
-            ))}
-          </div>
+          {modeSelector}
           <div className="ml-auto flex shrink-0 items-center gap-1">
-            <NativeSelect
-              aria-label={t("replyAssistantAgent")}
-              className="h-7 w-auto max-w-36 truncate px-2 pr-8 text-xs shadow-none"
-              value={agentIdentityID}
-              disabled={agents.length === 0}
-              onChange={(event) =>
-                updatePreferences({ agentIdentityId: event.target.value })
-              }
-            >
-              {agents.map((agent) => (
-                <option key={agent.identityId} value={agent.identityId}>
-                  {agent.displayName}
-                </option>
-              ))}
-            </NativeSelect>
-            <NativeSelect
-              aria-label={t("replyAssistantTone")}
-              className="h-7 w-auto px-2 pr-8 text-xs shadow-none"
-              value={preferences.tone}
-              onChange={(event) =>
-                updatePreferences({ tone: event.target.value as CustomerReplyTone })
-              }
-            >
-              {replyTones.map((tone) => (
-                <option key={tone} value={tone}>
-                  {toneLabels[tone]}
-                </option>
-              ))}
-            </NativeSelect>
+            {agentSelect}
+            {toneSelect}
             <Button
               type="button"
               variant="ghost"
@@ -286,58 +460,7 @@ export function CustomerReplyAssistant({
             </Button>
           </div>
         </div>
-        <div
-          aria-live="polite"
-          aria-busy={generating}
-          className="h-56 max-h-[calc(100dvh-17rem)] overflow-y-auto pr-1"
-        >
-          {generating ? (
-            <div className="flex h-full items-center justify-center">
-              <span className="sr-only">{t("replyAssistantGenerating")}</span>
-              <div aria-hidden="true" className="w-28 space-y-2">
-                <div className="h-2.5 w-full animate-pulse rounded bg-muted-foreground/25" />
-                <div className="h-2.5 w-5/6 animate-pulse rounded bg-muted-foreground/20" />
-                <div className="h-2.5 w-2/3 animate-pulse rounded bg-muted-foreground/15" />
-              </div>
-            </div>
-          ) : ready && !suggestions.error && candidates.length > 0 ? (
-            <ul aria-label={t("replyAssistantCandidates")} className="space-y-2">
-              {candidates.map((candidate, index) => (
-                <li
-                  key={index}
-                  className="flex gap-2 rounded-md border bg-background p-2.5 text-sm leading-6"
-                >
-                  <p className="min-w-0 flex-1 whitespace-pre-wrap">{candidate}</p>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    className="size-7 shrink-0 text-muted-foreground hover:text-foreground"
-                    aria-label={t("replyAssistantApply")}
-                    title={t("replyAssistantApply")}
-                    onClick={() => {
-                      appliedRef.current = true
-                      onApply(candidate)
-                      setOpen(false)
-                      void removeResource(resourceKeys.customerReplySuggestions(conversationID))
-                    }}
-                  >
-                    <PencilLineIcon className="size-4" />
-                  </Button>
-                </li>
-              ))}
-            </ul>
-          ) : (
-            <div
-              className={cn(
-                "flex h-full items-center justify-center rounded-md border border-dashed px-3 text-center text-xs text-muted-foreground",
-                (agentOptions.error || (ready && suggestions.error)) && "text-destructive",
-              )}
-            >
-              {emptyMessage}
-            </div>
-          )}
-        </div>
+        {results}
       </PopoverContent>
     </Popover>
   )

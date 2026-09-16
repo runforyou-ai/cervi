@@ -104,6 +104,7 @@ export function MobileIndividualThread({
         onBeforeSend={() => prepareSendRef.current?.() ?? Promise.resolve(true)}
         conversationID={conversationID}
         conversationType={conversationType}
+        currentIdentityID={identity.user.identityId}
         retryFailedMessage
         disabledReason={disabledReason}
         retryDraft={retryDraft}
