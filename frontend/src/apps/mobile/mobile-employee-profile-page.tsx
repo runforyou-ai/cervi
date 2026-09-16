@@ -10,6 +10,7 @@ import {
 } from "@/apps/mobile/mobile-page"
 import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
 import { LoadingIndicator } from "@/components/loading-indicator"
+import { ProfileAvatar } from "@/components/profile-avatar"
 import { Button } from "@/components/ui/button"
 import { WorkStatusBadge } from "@/components/work-status"
 import { resourceKeys } from "@/hooks/resource-keys"
@@ -66,12 +67,10 @@ export function MobileEmployeeProfilePage() {
           <div className="space-y-9">
             <div>
               <div className="flex items-center gap-3 pb-6">
-                <span
-                  className="flex size-14 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xl font-medium text-primary"
-                  aria-hidden="true"
-                >
-                  {Array.from(user.displayName)[0]?.toLocaleUpperCase()}
-                </span>
+                <ProfileAvatar
+                  name={user.displayName}
+                  className="size-14 text-xl"
+                />
                 <div className="min-w-0 space-y-2">
                   <h2 className="break-words text-lg font-semibold">
                     {user.displayName}

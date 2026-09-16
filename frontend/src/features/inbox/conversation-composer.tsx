@@ -62,6 +62,7 @@ import composerEmojis from "../../../../internal/publicweb/composer-emojis.json"
 
 const conversationComposerMaxHeight = 200
 const conversationComposerMinHeight = 80
+const conversationComposerMobileMinHeight = 40
 const conversationComposerKeyboardResizeStep = 16
 
 /** 读取和替换回复输入框草稿的入口。 */
@@ -581,7 +582,12 @@ export function ConversationComposer({
     if (!input) return
     const nextHeight = Math.min(
       conversationComposerMaxHeight,
-      Math.max(conversationComposerMinHeight, height),
+      Math.max(
+        mobile
+          ? conversationComposerMobileMinHeight
+          : conversationComposerMinHeight,
+        height,
+      ),
     )
     manualInputHeightRef.current = nextHeight
     resizeComposerInput(input, nextHeight)
@@ -740,11 +746,14 @@ export function ConversationComposer({
             id={inputID}
             disabled={isSubmitting}
             readOnly={Boolean(disabledReason)}
-            rows={3}
+            rows={mobile ? 1 : 3}
             aria-label={t("replyLabel")}
             aria-describedby={disabledReason ? `${inputID}-reason` : undefined}
             aria-invalid={form.formState.errors.body ? true : undefined}
-            className="min-h-20 max-h-[200px] resize-none rounded-none border-0 bg-transparent py-2 shadow-none caret-primary focus-visible:ring-0 dark:bg-transparent"
+            className={cn(
+              "max-h-[200px] resize-none rounded-none border-0 bg-transparent py-2 shadow-none caret-primary focus-visible:ring-0 dark:bg-transparent",
+              mobile ? "min-h-10" : "min-h-20",
+            )}
             onInput={(event) => {
               resizeComposerInput(
                 event.currentTarget,
@@ -800,7 +809,14 @@ export function ConversationComposer({
                     onCreated={(conversation, conversationID) => onAttachmentConversationCreated?.(conversation, conversationID)}
                   />
                 ) : (
-                  <Button type="button" variant="ghost" size="icon-sm" disabled aria-label={t("attachmentAdd")}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    className={mobile ? "size-11" : undefined}
+                    disabled
+                    aria-label={t("attachmentAdd")}
+                  >
                     <PaperclipIcon />
                   </Button>
                 )}

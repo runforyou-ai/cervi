@@ -101,6 +101,7 @@ const inbox = {
   filterServiceStatusOpen: "Open",
   filterServiceStatusClosed: "Closed",
   filterKind: "Conversation type",
+  filterAllKinds: "All types",
   filterKindCustomer: "Customer",
   filterKindDirect: "Direct",
   filterKindGroup: "Group",
