@@ -101,7 +101,7 @@
 - 超时 30 秒，最多跟随 5 次重定向，响应体上限 10 MB。
 - 按响应内容类型选择转换文件名：`text/html` 与 `application/xhtml+xml` 用 `.html`，`text/plain` 用 `.txt`，其余返回 `url_content_unsupported`。内容类型缺省时按 `url_content_unsupported` 处理，不做内容嗅探。PDF 与 Office 文件仍按上传原件入库。
 - 固定 User-Agent 标识来自 Cervi 知识库导入。
-- 不执行 JavaScript。依赖前端渲染的帮助中心会得到空壳并以 `empty_content` 失败，属于本轮已知限制。
+- 不执行 JavaScript。依赖前端渲染的帮助中心会得到空壳并以 `empty_content` 失败，属于本轮已知限制。浏览器渲染服务暂不引入：触发条件是出现必须导入的客户端渲染站点，在此之前多拉一个 Chromium 量级容器的部署成本高于收益，静态抓取已覆盖服务端渲染与预渲染的文档站点，其余内容可以另存为 HTML 上传或用在线文档录入。引入时只替换 `webfetch.Client.Fetch` 的实现并增加对应配置，快照语义与处理分支不变。
 - 转换整页 HTML，不做正文提取，导航、页脚等页面结构会一并进入正文，属于本轮已知限制。
 - 非 UTF-8 编码的页面本轮不做转码，按 markitdown 的输出结果入库。
 
