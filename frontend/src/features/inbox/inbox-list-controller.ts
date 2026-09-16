@@ -141,8 +141,12 @@ export class InboxListController {
 
   /** 合并重复请求并串行执行，返回本轮队列完成或过期后的 Promise。 */
   request = (operation: InboxListOperation): Promise<void> => {
-    if (this.queue.includes(operation) || (this.running && this.state.operation === operation)) return this.completion
-    if (operation === "poll" && (this.running || this.queue.length)) return this.completion
+    // 变更通知触发的重读只与尚未开始的窗口重读合并，在途读取结束后必定补读一次。
+    if (operation === "poll") {
+      if (this.queue.includes("poll") || this.queue.includes("refresh")) return this.completion
+    } else if (this.queue.includes(operation) || (this.running && this.state.operation === operation)) {
+      return this.completion
+    }
     this.queue.push(operation)
     if (!this.running) this.completion = this.drain()
     return this.completion

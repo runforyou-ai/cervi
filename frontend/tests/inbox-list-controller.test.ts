@@ -396,3 +396,96 @@ test("操作中失权立即移除，待应用顺序不能让该行复活", async
   assert.ok(!f.controller.getSnapshot().ids.includes("20"))
   assert.deepEqual(f.unavailable, ["20"])
 })
+
+test("补页读取期间上浮的未加载会话只能由随后的变更通知发现", async () => {
+  const f = fixture()
+  await f.controller.request("initial")
+  f.top(false)
+  f.trace.length = 0
+  // 第 150 条在补页读取发出之后才上浮到首位，本轮补页的窗口仍是发起时的边界。
+  let surfaced = false
+  const moved = { ...row(150), positionCursor: "top", lastActivityAt: "2026-09-10T00:00:00.000001Z" }
+  f.ports.page = async (cursor = "", before = "") => {
+    f.trace.push(`page:${cursor}:${before}`)
+    if (cursor === "p50") return { ...windowPage(51, 100), hasMore: true, nextCursor: "p100", unreadCount: 99, attentionUnreadCount: 88 }
+    const base = windowPage(1, 50)
+    const page = surfaced ? { ...base, conversations: [moved, ...base.conversations], startCursor: "top" } : base
+    return { ...page, hasMore: true, nextCursor: page.endCursor, unreadCount: 99, attentionUnreadCount: 88 }
+  }
+  const gate = Promise.withResolvers<ReturnType<typeof windowPage>>()
+  f.ports.window = async (start, end) => {
+    f.trace.push(`window:${start}:${end}`)
+    if (start === "top") {
+      const base = windowPage(1, Number(end.slice(1)))
+      return { ...base, conversations: [moved, ...base.conversations], startCursor: "top", hasBefore: false }
+    }
+    return start === "p1" && end === "p100" && !f.trace.includes("page::") ? gate.promise : { ...windowPage(1, Number(end.slice(1))), hasBefore: surfaced }
+  }
+  const paging = f.controller.request("after")
+  await Promise.resolve()
+  surfaced = true
+  const notified = f.controller.request("poll")
+  gate.resolve({ ...windowPage(1, 100), hasBefore: false })
+  await Promise.all([paging, notified])
+  // 补页读到的窗口不含上浮会话，变更通知触发的重读把窗口扩展到最新首页。
+  assert.deepEqual(f.trace.filter((call) => call.startsWith("window:")), ["window:p1:p100", "window:p1:p100", "window:top:p100"])
+  assert.equal(f.controller.getSnapshot().ids[0], "150")
+  assert.equal(f.controller.getSnapshot().ids.filter((id) => id === "150").length, 1)
+  assert.equal(f.controller.getSnapshot().ids.length, 101)
+  assert.equal(f.controller.getSnapshot().hasBefore, false)
+})
+
+test("尚未开始的重读合并重复通知，在途读取不吞掉新到达的通知", async () => {
+  const f = fixture()
+  await f.controller.request("initial")
+  f.top(false)
+  f.trace.length = 0
+  const gate = Promise.withResolvers<Awaited<ReturnType<InboxListPorts["page"]>>>()
+  const originalPage = f.ports.page
+  let gated = true
+  f.ports.page = (cursor, before) => {
+    if (!gated || cursor || before) return originalPage(cursor, before)
+    gated = false
+    f.trace.push("page::")
+    return gate.promise
+  }
+  const first = f.controller.request("poll")
+  void f.controller.request("poll")
+  void f.controller.request("poll")
+  gate.resolve({ ...windowPage(1, 50), hasMore: true, nextCursor: "p50", unreadCount: 99, attentionUnreadCount: 88 })
+  await first
+  // 在途读取之后只补读一次，其余重复通知合并到该次读取。
+  assert.equal(f.trace.filter((call) => call === "page::").length, 2)
+  assert.equal(f.controller.getSnapshot().ids.length, 50)
+})
+
+test("列表加载到尾端后新增的会话仍可经变更通知发现", async () => {
+  const f = fixture()
+  let added = false
+  const created = { ...row(1), id: "300", positionCursor: "top", lastActivityAt: "2026-09-10T00:00:00.000001Z" }
+  const loaded = () => ({ ...windowPage(1, 50), hasBefore: false, hasAfter: false })
+  f.ports.page = async () => {
+    f.trace.push("page::")
+    const base = loaded()
+    const page = added ? { ...base, conversations: [created, ...base.conversations], startCursor: "top" } : base
+    return { ...page, hasMore: false, nextCursor: page.endCursor, unreadCount: 0, attentionUnreadCount: 0 }
+  }
+  f.ports.window = async (start, end) => {
+    f.trace.push(`window:${start}:${end}`)
+    const base = loaded()
+    if (start === "top") return { ...base, conversations: [created, ...base.conversations], startCursor: "top" }
+    return { ...base, hasBefore: added }
+  }
+  await f.controller.request("initial")
+  assert.equal(f.controller.getSnapshot().hasAfter, false)
+  assert.equal(f.controller.getSnapshot().ids.length, 50)
+  added = true
+  f.records.set("300", created)
+  await f.controller.request("poll")
+  const state = f.controller.getSnapshot()
+  assert.equal(state.ids[0], "300")
+  assert.equal(state.ids.filter((id) => id === "300").length, 1)
+  assert.equal(state.ids.length, 51)
+  assert.equal(state.hasBefore, false)
+  assert.deepEqual(f.trace.filter((call) => call.startsWith("window:")), ["window:p1:p50", "window:top:p50"])
+})
