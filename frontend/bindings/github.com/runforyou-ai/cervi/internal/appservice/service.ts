@@ -787,6 +787,13 @@ export function ReactivateUser(meta: $models.RequestMeta, userID: string): $Canc
 }
 
 /**
+ * ReadConversationMessageWindow 重读已加载首尾游标之间的完整消息范围。
+ */
+export function ReadConversationMessageWindow(meta: $models.RequestMeta, conversationID: string, input: $models.ConversationMessageWindowInput): $CancellablePromise<$models.ConversationMessageList> {
+    return $Call.ByID(902845340, meta, conversationID, input);
+}
+
+/**
  * ReadInboxConversations 按 ID 批量返回会话摘要及当前筛选资格。
  */
 export function ReadInboxConversations(meta: $models.RequestMeta, input: $models.ReadInboxConversationsInput): $CancellablePromise<$models.InboxConversationResults> {

@@ -1,238 +1,86 @@
 /** 管理单个连续消息窗口、资源读取和最新/锚点浏览意图。 */
-import { useCallback, useEffect, useRef, useState } from "react"
+import { useId, useMemo, useRef, useSyncExternalStore, type RefObject } from "react"
 import {
   getConversationMessageContext,
   listConversationMessages,
-  type ConversationMessageListData,
+  readConversationMessageWindow,
 } from "@/api"
+import { useRealtimeSyncActive } from "@/contexts/realtime-sync-context"
 import { resourceKeys } from "@/hooks/resource-keys"
-import {
-  useResource,
-  useResourceInvalidator,
-  useResourceReader,
-} from "@/hooks/use-resource"
-import { mergeConversationPage } from "./conversation-window"
+import { useResource, useResourceReader } from "@/hooks/use-resource"
+import { ConversationWindowController } from "./conversation-window"
 import { memberChatPollingInterval } from "./use-member-chat-polling"
 
-/** 在统一资源缓存上拼装当前连续窗口并丢弃过期读取结果。 */
-export function useConversationTimeline(
-  conversationID: string,
-  pollingActive: boolean,
-  enabled = true,
-) {
-  const [page, setPage] = useState<ConversationMessageListData | null>(null)
-  const [mode, setMode] = useState<"latest" | "anchor">("latest")
-  const [loadingDirection, setLoadingDirection] = useState<
-    "before" | "after" | null
-  >(null)
-  const [pageError, setPageError] = useState<"before" | "after" | null>(null)
-  const invalidate = useResourceInvalidator()
-  const [switching, setSwitching] = useState(false)
-  const generation = useRef(0)
-  const modeRef = useRef(mode)
-  const pageRef = useRef(page)
-  modeRef.current = mode
-  pageRef.current = page
-  const initial = useResource(
-    resourceKeys.conversationMessages(conversationID),
-    (signal) => listConversationMessages(conversationID, undefined, signal),
-    { enabled, refetchOnWindowFocus: false, staleTime: 0 },
-  )
+/** 由资源失效驱动当前窗口重读，未接入实时同步的外壳在前台按固定间隔重读。 */
+export function useConversationTimeline({
+  conversationID,
+  enabled,
+  pollingActive,
+  keepPosition,
+}: {
+  conversationID: string
+  enabled: boolean
+  pollingActive: boolean
+  keepPosition: RefObject<(() => void) | null>
+}) {
+  const realtime = useRealtimeSyncActive()
   const read = useResourceReader()
-  const after = page?.after ?? ""
-  const incoming = useResource(
-    resourceKeys.conversationMessagePage(conversationID, { before: "", after }),
-    (signal) =>
-      listConversationMessages(conversationID, { before: "", after }, signal),
+  const readRef = useRef(read)
+  readRef.current = read
+  const view = useId()
+  const controller = useMemo(
+    () =>
+      new ConversationWindowController({
+        latest: () =>
+          readRef.current(
+            resourceKeys.conversationMessagePage(conversationID, { before: "", after: "" }),
+            (signal) => listConversationMessages(conversationID, undefined, signal),
+          ),
+        context: (messageID) =>
+          readRef.current(
+            resourceKeys.conversationMessageContext(conversationID, messageID),
+            (signal) => getConversationMessageContext(conversationID, messageID, signal),
+          ),
+        page: (direction, cursor) => {
+          const parameters = {
+            before: direction === "before" ? cursor : "",
+            after: direction === "after" ? cursor : "",
+          }
+          return readRef.current(
+            resourceKeys.conversationMessagePage(conversationID, parameters),
+            (signal) => listConversationMessages(conversationID, parameters, signal),
+          )
+        },
+        window: (start, end) =>
+          readRef.current(
+            resourceKeys.conversationMessagePage(conversationID, { start, end }),
+            (signal) => readConversationMessageWindow(conversationID, { start, end }, signal),
+          ),
+        keepPosition: () => keepPosition.current?.(),
+      }),
+    [conversationID, keepPosition],
+  )
+  const snapshot = useSyncExternalStore(controller.subscribe, controller.getSnapshot)
+  // 窗口重读登记为挂载中的查询，同步失效、前台轮询与失败重试共用同一入口。
+  const sync = useResource(
+    resourceKeys.conversationMessages(conversationID, { view }),
+    () => controller.refresh(),
     {
-      enabled:
-        enabled &&
-        pollingActive &&
-        mode === "latest" &&
-        Boolean(page) &&
-        !switching &&
-        !loadingDirection,
-      refetchInterval:
-        enabled &&
-        pollingActive &&
-        mode === "latest" &&
-        !switching &&
-        !loadingDirection
-          ? memberChatPollingInterval
-          : false,
+      enabled,
       staleTime: 0,
+      refetchInterval: enabled && pollingActive && !realtime ? memberChatPollingInterval : false,
       refetchOnWindowFocus: false,
     },
   )
 
-  useEffect(() => {
-    if (initial.data && !pageRef.current) setPage(initial.data)
-  }, [initial.data])
-  useEffect(() => {
-    const incomingPage = incoming.data
-    if (
-      !incomingPage ||
-      modeRef.current !== "latest" ||
-      switching ||
-      loadingDirection
-    )
-      return
-    setPage((current) => {
-      if (!current || (current.after ?? "") !== after) return current
-      // 取消状态随增量读取同步。
-      if (
-        !incomingPage.messages.length &&
-        !current.hasLater &&
-        JSON.stringify(current.latestAgentRun) === JSON.stringify(incomingPage.latestAgentRun) &&
-        JSON.stringify(current.pendingAgents) === JSON.stringify(incomingPage.pendingAgents)
-      ) return current
-      return mergeConversationPage(current, incomingPage, "after")
-    })
-  }, [incoming.data, after, switching, loadingDirection])
-  useEffect(
-    () => () => {
-      generation.current += 1
-    },
-    [conversationID],
-  )
-
-  /** 使旧窗口读取失效，保留当前已展示内容。 */
-  const cancelWindowUpdate = useCallback(() => {
-    generation.current += 1
-    setSwitching(false)
-    setLoadingDirection(null)
-  }, [])
-
-  /** 只为窗口外的目标读取上下文，连续窗口到达尾端后恢复增量读取。 */
-  const openWindow = useCallback(
-    async (messageID?: string) => {
-      if (
-        messageID &&
-        pageRef.current?.messages.some((message) => message.id === messageID)
-      ) return true
-      const revision = ++generation.current
-      const previousMode = modeRef.current
-      setSwitching(true)
-      setLoadingDirection(null)
-      setPageError(null)
-      try {
-        let next = pageRef.current
-        if (!messageID)
-          next = await read(
-            resourceKeys.conversationMessages(conversationID),
-            (signal) =>
-              listConversationMessages(conversationID, undefined, signal),
-          )
-        else
-          next = await read(
-            resourceKeys.conversationMessageContext(conversationID, messageID),
-            (signal) =>
-              getConversationMessageContext(conversationID, messageID, signal),
-          )
-        if (generation.current !== revision) return false
-        modeRef.current = messageID && next?.hasLater ? "anchor" : "latest"
-        setMode(modeRef.current)
-        setPage(next)
-        return true
-      } catch (error) {
-        if (generation.current !== revision) return false
-        setMode(previousMode)
-        throw error
-      } finally {
-        if (generation.current === revision) setSwitching(false)
-      }
-    },
-    [conversationID, read],
-  )
-
-  /** 只把匹配当前端点的历史页合入窗口。 */
-  const loadPage = useCallback(
-    async (direction: "before" | "after", preservePosition: () => void) => {
-      const base = pageRef.current
-      if (
-        !base ||
-        loadingDirection ||
-        switching ||
-        !(direction === "before" ? base.hasEarlier : base.hasLater)
-      )
-        return
-      const cursor = base[direction]
-      if (!cursor) return
-      const revision = generation.current
-      setLoadingDirection(direction)
-      setPageError(null)
-      try {
-        const parameters = {
-          before: direction === "before" ? cursor : "",
-          after: direction === "after" ? cursor : "",
-        }
-        const next = await read(
-          resourceKeys.conversationMessagePage(conversationID, parameters),
-          (signal) =>
-            listConversationMessages(conversationID, parameters, signal),
-        )
-        if (generation.current !== revision) return
-        if (pageRef.current?.[direction] !== cursor) return
-        preservePosition()
-        setPage(mergeConversationPage(pageRef.current, next, direction))
-        if (direction === "after" && !next.hasLater) {
-          modeRef.current = "latest"
-          setMode("latest")
-        }
-      } catch (error) {
-        if (generation.current === revision) {
-          setPageError(direction)
-          throw error
-        }
-      } finally {
-        if (generation.current === revision) setLoadingDirection(null)
-      }
-    },
-    [conversationID, read, loadingDirection, switching],
-  )
-
-  /** 失效引用立即在当前窗口显示删除状态，并刷新同会话的资源。 */
-  function markReferenceUnavailable(messageID: string) {
-    setPage((current) =>
-      current
-        ? {
-            ...current,
-            messages: current.messages.map((message) =>
-              message.replyTo?.id === messageID
-                ? {
-                    ...message,
-                    replyTo: {
-                      ...message.replyTo,
-                      deleted: true,
-                      body: "",
-                      sender: null,
-                    },
-                  }
-                : message,
-            ),
-          }
-        : current,
-    )
-    void invalidate(resourceKeys.conversationMessages(conversationID))
-    void invalidate(resourceKeys.conversationMessageContext(conversationID))
-    void invalidate(resourceKeys.conversationMessagePage(conversationID))
-  }
-
   return {
-    page,
-    mode,
-    switching,
-    cancelWindowUpdate,
-    loading: initial.loading,
-    error: initial.error,
-    refresh: initial.refresh,
-    read,
-    openWindow,
-    loadPage,
-    loadingDirection,
-    pageError,
-    markReferenceUnavailable,
-    pollingError: incoming.error,
-    poll: incoming.refresh,
+    ...snapshot,
+    loading: enabled && !snapshot.page && !sync.error,
+    error: snapshot.page ? null : sync.error,
+    refreshError: snapshot.page ? sync.error : null,
+    refresh: () => sync.refresh({ cancelRefetch: false }),
+    openWindow: controller.open,
+    loadPage: controller.loadPage,
+    cancelWindowUpdate: controller.cancel,
   }
 }

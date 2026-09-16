@@ -1,4 +1,4 @@
-/** 按会话内消息序号维护顺序和相邻分页边界。 */
+/** 按会话内消息序号维护顺序、相邻分页边界，并串行调度消息窗口的重读与补页。 */
 import type {
   ConversationMessageData,
   ConversationMessageListData,
@@ -28,9 +28,9 @@ export function mergeConversationPage(
       ]),
     ).values(),
   ].sort(compareConversationMessages)
+  // 沿用读取结果的字段顺序，重读比较时相同内容得到相同序列化结果。
   return {
-    latestAgentRun: page.latestAgentRun,
-    pendingAgents: page.pendingAgents,
+    ...page,
     messages,
     before:
       direction === "before" ? (page.before ?? current.before) : current.before,
@@ -38,5 +38,170 @@ export function mergeConversationPage(
       direction === "after" ? (page.after ?? current.after) : current.after,
     hasEarlier: direction === "before" ? page.hasEarlier : current.hasEarlier,
     hasLater: direction === "after" ? page.hasLater : current.hasLater,
+  }
+}
+
+/** 消息窗口的浏览模式：跟随最新消息或停留在锚点附近。 */
+export type ConversationWindowMode = "latest" | "anchor"
+
+/** 消息窗口对页面展示的当前状态。 */
+export type ConversationWindowSnapshot = {
+  page: ConversationMessageListData | null
+  mode: ConversationWindowMode
+  switching: boolean
+  loadingDirection: "before" | "after" | null
+  pageError: "before" | "after" | null
+}
+
+/** 窗口控制器依赖的读取入口，以及重读结果合入前保存阅读位置的回调。 */
+export type ConversationWindowPorts = {
+  latest: () => Promise<ConversationMessageListData>
+  context: (messageId: string) => Promise<ConversationMessageListData>
+  page: (direction: "before" | "after", cursor: string) => Promise<ConversationMessageListData>
+  window: (start: string, end: string) => Promise<ConversationMessageListData>
+  keepPosition: () => void
+}
+
+/** 单个消息窗口的读取调度：重读与补页串行执行，打开新窗口时丢弃早于它的结果。 */
+export class ConversationWindowController {
+  private readonly ports: ConversationWindowPorts
+  private readonly listeners = new Set<() => void>()
+  private snapshot: ConversationWindowSnapshot = {
+    page: null,
+    mode: "latest",
+    switching: false,
+    loadingDirection: null,
+    pageError: null,
+  }
+  private generation = 0
+  private lane: Promise<unknown> = Promise.resolve()
+  private opening: Promise<unknown> = Promise.resolve()
+  private queuedRefresh: Promise<null> | null = null
+
+  /** 绑定窗口读取入口。 */
+  constructor(ports: ConversationWindowPorts) {
+    this.ports = ports
+  }
+
+  /** 订阅窗口状态变化。 */
+  subscribe = (listener: () => void) => {
+    this.listeners.add(listener)
+    return () => {
+      this.listeners.delete(listener)
+    }
+  }
+
+  /** 返回当前窗口状态。 */
+  getSnapshot = () => this.snapshot
+
+  /** 使在途定位与补页结果失效，保留当前已展示内容。 */
+  cancel = () => {
+    this.generation += 1
+    this.update({ switching: false, loadingDirection: null })
+  }
+
+  /** 读取最新窗口或目标消息上下文；目标已在窗口内时直接完成。 */
+  open = async (messageId?: string) => {
+    if (messageId && this.snapshot.page?.messages.some((message) => message.id === messageId)) return true
+    const generation = ++this.generation
+    this.update({ switching: true, loadingDirection: null, pageError: null })
+    const reading = messageId ? this.ports.context(messageId) : this.ports.latest()
+    this.opening = reading.catch(() => undefined)
+    try {
+      const page = await reading
+      if (generation !== this.generation) return false
+      this.update({ page, mode: messageId && page.hasLater ? "anchor" : "latest", switching: false })
+      return true
+    } catch (error) {
+      if (generation !== this.generation) return false
+      this.update({ switching: false })
+      throw error
+    }
+  }
+
+  /** 按当前模式重读权威窗口；尚未开始的重复请求合并为一次。 */
+  refresh = () => {
+    if (!this.queuedRefresh) {
+      const run = this.lane.then(() => {
+        this.queuedRefresh = null
+        return this.reload()
+      })
+      this.queuedRefresh = run
+      this.lane = run.catch(() => undefined)
+    }
+    return this.queuedRefresh
+  }
+
+  /** 在窗口端点续读相邻页，合入前保存阅读位置。 */
+  loadPage = (direction: "before" | "after", keepPosition: () => void) => {
+    const base = this.snapshot.page
+    if (
+      !base ||
+      this.snapshot.loadingDirection ||
+      this.snapshot.switching ||
+      !(direction === "before" ? base.hasEarlier : base.hasLater)
+    )
+      return Promise.resolve()
+    const generation = this.generation
+    this.update({ loadingDirection: direction, pageError: null })
+    const run = this.lane.then(async () => {
+      const current = this.snapshot.page
+      const cursor = current?.[direction]
+      if (
+        generation !== this.generation ||
+        !current ||
+        !cursor ||
+        !(direction === "before" ? current.hasEarlier : current.hasLater)
+      ) {
+        if (generation === this.generation) this.update({ loadingDirection: null })
+        return
+      }
+      try {
+        const next = await this.ports.page(direction, cursor)
+        if (generation !== this.generation || this.snapshot.page !== current) return
+        keepPosition()
+        this.update({
+          page: mergeConversationPage(current, next, direction),
+          mode: direction === "after" && !next.hasLater ? "latest" : this.snapshot.mode,
+        })
+      } catch (error) {
+        if (generation !== this.generation) return
+        this.update({ pageError: direction })
+        throw error
+      } finally {
+        if (generation === this.generation) this.update({ loadingDirection: null })
+      }
+    })
+    this.lane = run.catch(() => undefined)
+    return run
+  }
+
+  /** 首次或空窗口读取最新页，其余按首尾游标重读；最新模式继续补齐到尾端，窗口已被替换时丢弃结果。 */
+  private async reload(): Promise<null> {
+    await this.opening
+    const { page: current, mode } = this.snapshot
+    try {
+      let next = current?.before && current.after
+        ? await this.ports.window(current.before, current.after)
+        : await this.ports.latest()
+      while (mode === "latest" && next.hasLater && next.after && this.snapshot.page === current) {
+        next = mergeConversationPage(next, await this.ports.page("after", next.after), "after")
+      }
+      // 定位读取期间暂不合入，定位成功替换窗口后本次结果作废。
+      while (this.snapshot.switching) await this.opening
+      if (this.snapshot.page !== current || JSON.stringify(next) === JSON.stringify(current)) return null
+      if (current) this.ports.keepPosition()
+      this.update({ page: next, mode: next.hasLater ? mode : "latest" })
+      return null
+    } catch (error) {
+      if (this.snapshot.page === current) throw error
+      return null
+    }
+  }
+
+  /** 替换窗口状态并通知订阅方。 */
+  private update(patch: Partial<ConversationWindowSnapshot>) {
+    this.snapshot = { ...this.snapshot, ...patch }
+    for (const listener of this.listeners) listener()
   }
 }

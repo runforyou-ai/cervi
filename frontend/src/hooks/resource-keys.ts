@@ -55,10 +55,10 @@ export const resourceKeys = {
   attachmentDownload: (conversationId: string, messageId?: string) => messageId === undefined
     ? ["attachment-download", conversationId] as const
     : ["attachment-download", conversationId, messageId] as const,
-  /** 单个会话的初始消息页。 */
-  conversationMessages: (conversationId?: string) =>
-    itemKey("conversation-messages", conversationId),
-  /** 成员消息前后分页。 */
+  /** 会话消息窗口的重读入口，参数区分同一会话的各个页面实例。 */
+  conversationMessages: (conversationId?: string, parameters?: KeyParameters) =>
+    scopedListKey("conversation-messages", conversationId, parameters),
+  /** 成员消息最新页、前后分页与首尾游标限定的窗口范围。 */
   conversationMessagePage: (
     conversationId?: string,
     parameters?: KeyParameters,

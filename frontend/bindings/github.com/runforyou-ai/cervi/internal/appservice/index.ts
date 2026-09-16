@@ -116,6 +116,7 @@ export type {
     ConversationMessageReferenceState,
     ConversationMessageSender,
     ConversationMessageSessionStart,
+    ConversationMessageWindowInput,
     ConversationNavigationState,
     ConversationNotificationSettings,
     ConversationNotificationSettingsInput,

@@ -31,7 +31,7 @@ export function useVisibleConversationMentions({
     return () => { lifetime.active = false }
   }, [conversationID])
 
-  // 每次列表刷新重新检查可见目标，失败确认沿用现有轮询节奏重试。
+  // 每次列表刷新重新检查可见目标，失败确认在待查看目标下次刷新时重试。
   useEffect(() => {
     const viewport = conversationViewport(root.current)
     if (!enabled || !viewport || !page || !pendingIDs) {

@@ -38,6 +38,7 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.GET("/inbox/channels", s.listInboxChannels)
 	router.GET("/sync/heads", s.getSyncHeads)
 	router.GET("/conversations/:conversationID/messages", s.listConversationMessages)
+	router.GET("/conversations/:conversationID/message-window", s.readConversationMessageWindow)
 	router.GET("/conversations/:conversationID/message-references", s.listConversationMessageReferences)
 	router.GET("/conversations/:conversationID/messages/:messageID/context", s.getConversationMessageContext)
 	router.GET("/conversations/:conversationID/navigation", s.getConversationNavigationState)
@@ -369,6 +370,16 @@ func (s *Service) listConversationMessages(c *gin.Context) {
 		return
 	}
 	output, err := s.application.ListConversationMessages(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// readConversationMessageWindow 重读已加载首尾游标之间的完整消息范围。
+func (s *Service) readConversationMessageWindow(c *gin.Context) {
+	input, ok := bindConversationMessageWindowInputQuery(c)
+	if !ok {
+		return
+	}
+	output, err := s.application.ReadConversationMessageWindow(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
 	writeResult(c, http.StatusOK, output, err)
 }
 
@@ -1430,6 +1441,14 @@ func bindConversationMessageListInputQuery(c *gin.Context) (appservice.Conversat
 func bindConversationMessageReferenceListInputQuery(c *gin.Context) (appservice.ConversationMessageReferenceListInput, bool) {
 	return appservice.ConversationMessageReferenceListInput{
 		MessageIDs: c.Query("messageIds"),
+	}, true
+}
+
+// bindConversationMessageWindowInputQuery 从查询参数解析 appservice.ConversationMessageWindowInput。
+func bindConversationMessageWindowInputQuery(c *gin.Context) (appservice.ConversationMessageWindowInput, bool) {
+	return appservice.ConversationMessageWindowInput{
+		Start: c.Query("start"),
+		End:   c.Query("end"),
 	}, true
 }
 

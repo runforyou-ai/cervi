@@ -823,6 +823,14 @@ export interface ConversationMessageSessionStart {
 }
 
 /**
+ * ConversationMessageWindowInput 定义已加载消息窗口的首尾游标，读取包含两端的连续范围。
+ */
+export interface ConversationMessageWindowInput {
+    "start": string;
+    "end": string;
+}
+
+/**
  * ConversationNavigationState 定义群聊可见尾端和提及查看进度。
  */
 export interface ConversationNavigationState {

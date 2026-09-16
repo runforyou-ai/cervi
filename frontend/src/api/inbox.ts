@@ -22,6 +22,7 @@ import {
   LoadInbox,
   GetInboxContext,
   ReadInboxWindow,
+  ReadConversationMessageWindow,
   GetInboxConversation,
   ReadInboxConversations,
   ReopenServiceSession,
@@ -51,6 +52,7 @@ import type {
   ConversationAgentProcess,
   ConversationMessageList,
   ConversationMessageListInput,
+  ConversationMessageWindowInput,
   ConversationNotificationSettings,
   ConversationNotificationSettingsInput,
   ConversationUnreadMarkInput,
@@ -139,6 +141,7 @@ export type GroupConversationData = NonNullArrays<GroupConversation>
 
 const loadInboxBound = bind(LoadInbox)
 const listConversationMessagesBound = bind(ListConversationMessages)
+const readConversationMessageWindowBound = bind(ReadConversationMessageWindow)
 const markConversationReadBound = bind(MarkConversationRead)
 const getConversationMessageContextBound = bind(GetConversationMessageContext)
 const getConversationNavigationStateBound = bind(GetConversationNavigationState)
@@ -311,6 +314,15 @@ export function listConversationMessages(
   signal?: AbortSignal,
 ) {
   return listConversationMessagesBound(conversationID, input, signal)
+}
+
+/** 重读已加载首尾游标之间的完整消息范围。 */
+export function readConversationMessageWindow(
+  conversationID: string,
+  input: ConversationMessageWindowInput,
+  signal?: AbortSignal,
+) {
+  return readConversationMessageWindowBound(conversationID, input, signal)
 }
 
 /** 单调推进当前用户的会话已读水位。 */

@@ -10,6 +10,7 @@ import {
   markConversationMentionReviewed,
   type ConversationMessageListData,
 } from "@/api"
+import { useRealtimeSyncActive } from "@/contexts/realtime-sync-context"
 import { resourceKeys } from "@/hooks/resource-keys"
 import {
   useResource,
@@ -57,13 +58,15 @@ export function useConversationMentionNavigation({
   const operation = useRef(0)
   const currentRound = useRef(round)
   currentRound.current = round
+  const realtime = useRealtimeSyncActive()
+  // 接入实时同步的外壳由会话通知失效进度与队列，其余外壳在前台轮询。
+  const polling = enabled && pollingActive && !realtime
   const state = useResource(
     resourceKeys.conversationNavigation(conversationID),
     (signal) => getConversationNavigationState(conversationID, signal),
     {
       enabled: enabled && pollingActive,
-      refetchInterval:
-        enabled && pollingActive ? memberChatPollingInterval : false,
+      refetchInterval: polling ? memberChatPollingInterval : false,
       refetchOnWindowFocus: false,
     },
   )
@@ -72,7 +75,7 @@ export function useConversationMentionNavigation({
     (signal) => listPendingConversationMentions(conversationID, signal),
     {
       enabled: enabled && pollingActive,
-      refetchInterval: enabled && pollingActive ? memberChatPollingInterval : false,
+      refetchInterval: polling ? memberChatPollingInterval : false,
       refetchOnWindowFocus: false,
     },
   )

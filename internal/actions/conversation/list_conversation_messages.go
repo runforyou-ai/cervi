@@ -89,7 +89,11 @@ func (q *ListConversationMessagesQuery) Execute(ctx context.Context, identity *s
 		if err != nil {
 			return err
 		}
-		if len(rows) > 0 {
+		// 范围内已无可见消息时保留请求的两端，续读位置仍从原边界计算。
+		if len(rows) == 0 && input.Start != nil {
+			history.Before, history.After = input.Start, input.End
+		}
+		if history.Before != nil {
 			history.HasEarlier, err = conversationMessagesQuery(tx, identity, input.ConversationID).Where("?", messageCursorCondition(*history.Before, "<")).Exists(ctx)
 			if err != nil {
 				return err
@@ -202,6 +206,14 @@ func loadConversationWindowRows(ctx context.Context, db bun.IDB, identity *serve
 		}
 		return append(rows, later...), nil
 	}
+	if input.Start != nil {
+		err := conversationMessagesQuery(db, identity, input.ConversationID).
+			Where("?", messageCursorCondition(*input.Start, ">=")).
+			Where("?", messageCursorCondition(*input.End, "<=")).
+			OrderExpr(order).
+			Scan(ctx, &rows)
+		return rows, err
+	}
 	query := conversationMessagesQuery(db, identity, input.ConversationID)
 	if input.Before != nil {
 		query = query.Where("?", messageCursorCondition(*input.Before, "<"))
@@ -290,7 +302,12 @@ func validateConversationMessageHistoryInput(input ConversationMessageHistoryInp
 	if (input.Before != nil && input.After != nil) || (input.AroundMessageID != "" && (input.Before != nil || input.After != nil || !common.ValidUUID(input.AroundMessageID))) {
 		fields["cursor"] = ValidationCursorInvalid
 	}
-	for _, cursor := range []*MessageCursorPoint{input.Before, input.After} {
+	// 范围读取必须同时给出两端且起点不晚于终点，不与其他读取方式组合。
+	if (input.Start == nil) != (input.End == nil) ||
+		(input.Start != nil && (input.Before != nil || input.After != nil || input.AroundMessageID != "" || input.Start.MessageSeq > input.End.MessageSeq)) {
+		fields["cursor"] = ValidationCursorInvalid
+	}
+	for _, cursor := range []*MessageCursorPoint{input.Before, input.After, input.Start, input.End} {
 		if cursor != nil && (!common.ValidUUID(cursor.ID) || cursor.MessageSeq <= 0) {
 			fields["cursor"] = ValidationCursorInvalid
 		}

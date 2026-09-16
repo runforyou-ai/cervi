@@ -123,18 +123,27 @@ export function useConversationViewport({
     return true
   }, [root, readPosition])
 
-  /** 合入相邻页前保存首个可见消息的像素偏移。 */
-  const preservePosition = useCallback(() => {
+  /** 保存首个可见消息的像素偏移，返回是否找到可见消息。 */
+  const captureFirstVisible = useCallback(() => {
     const viewport = conversationViewport(root.current)
-    if (!viewport) return
+    if (!viewport) return false
     const top = viewport.getBoundingClientRect().top
     const node = [...viewport.querySelectorAll<HTMLElement>("[data-message-id]")]
       .find((row) => row.getBoundingClientRect().bottom > top)
-    if (node?.dataset.messageId) {
-      following.current = false
-      prepend.current = { id: node.dataset.messageId, offset: node.getBoundingClientRect().top - top }
-    }
+    if (!node?.dataset.messageId) return false
+    prepend.current = { id: node.dataset.messageId, offset: node.getBoundingClientRect().top - top }
+    return true
   }, [root])
+
+  /** 合入相邻页前保存首个可见消息的像素偏移。 */
+  const preservePosition = useCallback(() => {
+    if (captureFirstVisible()) following.current = false
+  }, [captureFirstVisible])
+
+  /** 窗口重读结果合入前保存阅读位置，跟随最新时继续贴底。 */
+  const keepReadingPosition = useCallback(() => {
+    if (!following.current || mode !== "latest") captureFirstVisible()
+  }, [captureFirstVisible, mode])
 
   /** 返回最新窗口时立即贴底，并持续跟随最终布局。 */
   const followLatest = useCallback(() => {
@@ -154,5 +163,5 @@ export function useConversationViewport({
     return Boolean(viewport && isAtBottom(viewport))
   }, [root])
 
-  return { atBottom, getAtBottom, holdForLocation, releaseLocation, revealMessage, preservePosition, followLatest }
+  return { atBottom, getAtBottom, holdForLocation, releaseLocation, revealMessage, preservePosition, keepReadingPosition, followLatest }
 }
