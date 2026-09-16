@@ -1614,11 +1614,13 @@ export interface InboxSearchMessage {
 }
 
 /**
- * InboxSearchPerson 表示命中的企业成员或外部联系人；外部联系人没有客户会话时 conversationId 为空。
+ * InboxSearchPerson 表示命中的企业成员或外部联系人；真人成员携带 userId，AI 员工携带 agentId，外部联系人没有客户会话时 conversationId 为空。
  */
 export interface InboxSearchPerson {
     "kind": InboxSearchPersonKind;
     "id": string;
+    "userId": string | null;
+    "agentId": string | null;
     "identityType": OrganizationIdentityType | null;
     "displayName": string;
     "avatarUrl": string;

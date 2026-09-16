@@ -1,6 +1,7 @@
 /** 移动端真人单聊与 AI 聊天详情。 */
+import { SearchIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { Navigate, useLocation, useParams } from "react-router"
+import { Navigate, useLocation, useNavigate, useParams } from "react-router"
 
 import {
   ConversationType,
@@ -11,19 +12,23 @@ import {
 } from "@/api"
 import { MobileIndividualThread } from "@/apps/mobile/mobile-individual-thread"
 import { MobilePageHeader } from "@/apps/mobile/mobile-page"
-import { useMobileNavigation } from "@/apps/mobile/mobile-navigation"
+import {
+  mobileSearchPath,
+  useMobileNavigation,
+  type MobileLocateState,
+} from "@/apps/mobile/mobile-navigation"
 import { Button } from "@/components/ui/button"
 import { useConversationSummary } from "@/features/inbox/use-conversation-summary"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
 import { useAccountDisabledReason } from "@/features/inbox/use-account-disabled-reason"
-type MobileIndividualLocationState = {
+type MobileIndividualLocationState = MobileLocateState & {
   memberUserID?: string
   agentDirectory?: boolean
   conversation?: DirectInboxConversationData | AgentInboxConversationData
 }
 
-/** 展示当前双方会话的移动端头部。 */
+/** 展示当前双方会话的移动端头部和会话内搜索入口。 */
 export function MobileIndividualHeader({
   conversation,
   peerName,
@@ -34,6 +39,7 @@ export function MobileIndividualHeader({
   const { t: tInbox } = useTranslation("inbox")
   const { inboxURL } = useMobileNavigation()
   const location = useLocation()
+  const navigate = useNavigate()
   const { memberUserID, agentDirectory } =
     (location.state as MobileIndividualLocationState | null) ?? {}
   const agentRunLabel = agentRunStatusLabel(
@@ -60,6 +66,23 @@ export function MobileIndividualHeader({
             </span>
           ) : null}
         </span>
+      }
+      actions={
+        <Button
+          variant="ghost"
+          size="icon-lg"
+          className="-mr-2"
+          aria-label={tInbox("searchCurrentConversation")}
+          disabled={!conversation}
+          onClick={() => {
+            if (conversation)
+              void navigate(mobileSearchPath(conversation.id), {
+                state: { mobileBack: true },
+              })
+          }}
+        >
+          <SearchIcon />
+        </Button>
       }
     />
   )
@@ -108,6 +131,7 @@ export function MobileIndividualConversationPage({
           peerIdentityID={conversation.direct?.peerIdentityId ?? ""}
           disabledReason={disabledReason}
           lastReadMessageID={conversation.lastReadMessageId}
+          locateMessage={(location.state as MobileIndividualLocationState | null)?.locateMessage}
         />
       )}
     </section>

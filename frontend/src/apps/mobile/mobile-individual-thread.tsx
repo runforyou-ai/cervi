@@ -1,5 +1,5 @@
 /** 移动端真人、AI 与客户聊天共用的时间线、阅读进度、文本与附件发送和失败重试。 */
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 
 import {
   ConversationType,
@@ -10,14 +10,18 @@ import {
 } from "@/api"
 import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
 import { ConversationComposer } from "@/features/inbox/conversation-composer"
-import { ConversationTimeline } from "@/features/inbox/conversation-timeline"
+import {
+  ConversationTimeline,
+  type ConversationLocateTarget,
+} from "@/features/inbox/conversation-timeline"
 import { useOutgoingMessages } from "@/features/inbox/outgoing-message-context"
 import type { OutgoingConversationDraft } from "@/features/inbox/outgoing-message-store"
 import { useConversationReadMarker } from "@/features/inbox/use-conversation-read-marker"
+import { useRecentConversations } from "@/features/inbox/use-recent-conversations"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
 
-/** 草稿只展示本地发送状态，正式会话读取历史、推进已读并在前台轮询。 */
+/** 草稿只展示本地发送状态，正式会话读取历史、推进已读、按需定位原消息并在前台轮询。 */
 export function MobileIndividualThread({
   conversationID,
   conversationType = ConversationType.ConversationTypeDirect,
@@ -29,6 +33,7 @@ export function MobileIndividualThread({
   disabledReason = null,
   lastReadMessageID = null,
   customerDeliveries = false,
+  locateMessage = null,
 }: {
   conversationID: string
   conversationType?: ConversationType
@@ -39,6 +44,7 @@ export function MobileIndividualThread({
   disabledReason?: string | null
   lastReadMessageID?: string | null
   customerDeliveries?: boolean
+  locateMessage?: ConversationLocateTarget | null
   sendIndividualMessage?: (
     input: DirectTextMessageInput,
   ) => Promise<ConversationMessageData>
@@ -60,6 +66,14 @@ export function MobileIndividualThread({
     useState<OutgoingConversationDraft | null>(null)
   const [replyTo, setReplyTo] =
     useState<ConversationMessageReference | null>(null)
+  const { record: recordRecentConversation } = useRecentConversations(
+    identity.user.identityId,
+  )
+
+  useEffect(() => {
+    // 正式会话打开后记入本机最近打开。
+    if (conversationID && enabled) recordRecentConversation(conversationID)
+  }, [conversationID, enabled, recordRecentConversation])
 
   return (
     <>
@@ -77,6 +91,7 @@ export function MobileIndividualThread({
         outgoingMessages={outgoing.messages}
         onRetryFailedMessage={setRetryDraft}
         retryFailedMessageDisabled={Boolean(disabledReason)}
+        locateMessage={locateMessage}
       />
       <ConversationComposer
         attachmentTargetIdentityID={!conversationID ? peerIdentityID : undefined}

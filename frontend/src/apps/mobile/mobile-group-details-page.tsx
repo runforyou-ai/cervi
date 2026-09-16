@@ -12,6 +12,7 @@ import {
   updateConversationNotificationSettings,
 } from "@/api"
 import { useMobileGroup } from "@/apps/mobile/mobile-group-context"
+import { mobileSearchPath } from "@/apps/mobile/mobile-navigation"
 import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
 import { MobilePageHeader, MobileScrollArea } from "@/apps/mobile/mobile-page"
 import { MobileGroupInfo } from "@/apps/mobile/mobile-group-info"
@@ -197,6 +198,11 @@ export function MobileGroupDetailsPage() {
                   mobileBack: returnDepth > 0,
                   groupReturnDepth: returnDepth > 0 ? returnDepth + 1 : 0,
                 },
+              })
+            }
+            onSearch={() =>
+              void navigate(mobileSearchPath(group.id), {
+                state: { mobileBack: true },
               })
             }
             onLeave={(source) => {

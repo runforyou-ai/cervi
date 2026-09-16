@@ -53,6 +53,7 @@ const mobile = {
     loadError: "无法加载消息，请检查网络后重试。",
     emptyTitle: "暂无会话",
     emptyDescription: "当前分类和筛选条件下没有会话。",
+    clearSearch: "清除搜索内容",
   },
   group: {
     addMembers: "添加群成员",

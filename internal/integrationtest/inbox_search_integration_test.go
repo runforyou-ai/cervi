@@ -4,11 +4,13 @@ package integrationtest
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"slices"
 	"testing"
 	"uuid"
 
+	agentaction "github.com/runforyou-ai/cervi/internal/actions/agent"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
@@ -84,9 +86,52 @@ func TestInboxSearch(t *testing.T) {
 	}
 	people := search(f.owner, inboxaction.SearchInput{Text: "成员", Range: inboxaction.SearchRangeReadable})
 	if !slices.ContainsFunc(people.People, func(person inboxaction.SearchPerson) bool {
-		return person.Kind == inboxaction.SearchPersonMember && person.ID == f.member.OrganizationIdentity.ID
+		return person.Kind == inboxaction.SearchPersonMember && person.ID == f.member.OrganizationIdentity.ID &&
+			person.UserID != nil && *person.UserID == f.member.User.ID && person.AgentID == nil
 	}) {
 		t.Fatalf("成员检索未命中：%+v", people.People)
+	}
+
+	provider := &servermodels.AIProvider{
+		OrganizationID: f.owner.Organization.ID, Brand: string(domain.AIProviderBrandOpenAI),
+		Name: "检索测试模型服务", APIKey: "test-key", APIURL: "https://example.com/v1",
+	}
+	if _, err := f.db.NewInsert().Model(provider).
+		Column("organization_id", "brand", "name", "api_key", "api_url").Returning("id").Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	model := &servermodels.AIProviderModel{
+		ProviderID: provider.ID, OrganizationID: f.owner.Organization.ID,
+		Identifier: "chat-model", Name: "检索测试对话模型", Type: string(domain.AIModelTypeChat),
+		InputModalities: json.RawMessage(`["text"]`), ContextWindow: 128000, MaxOutputTokens: 4096,
+	}
+	if _, err := f.db.NewInsert().Model(model).
+		Column("provider_id", "organization_id", "identifier", "name", "model_type", "input_modalities", "context_window", "max_output_tokens").
+		Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	// AI 员工不能使用管理员角色，改用企业内置的客服角色。
+	customerServiceRole := &servermodels.Role{}
+	if err := f.db.NewSelect().Model(customerServiceRole).
+		Where("organization_id = ?", f.owner.Organization.ID).
+		Where("kind = ?", domain.RoleKindCustomerService).Scan(ctx); err != nil {
+		t.Fatal(err)
+	}
+	agent, err := agentaction.NewCreateAgentAction(f.db).Execute(ctx, f.owner, agentaction.CreateInput{
+		DisplayName: "检索助理", RoleID: customerServiceRole.ID,
+		Execution: agentaction.ExecutionInput{Mode: domain.AgentExecutionModeManaged, Managed: &agentaction.ManagedExecutionInput{
+			ProviderID: provider.ID, ModelIdentifier: model.Identifier, SystemInstruction: "负责检索测试。",
+		}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	agents := search(f.owner, inboxaction.SearchInput{Text: "检索助理", Range: inboxaction.SearchRangeReadable})
+	if !slices.ContainsFunc(agents.People, func(person inboxaction.SearchPerson) bool {
+		return person.Kind == inboxaction.SearchPersonMember && person.IdentityType == domain.OrganizationIdentityTypeAgent &&
+			person.AgentID != nil && *person.AgentID == agent.ID && person.UserID == nil
+	}) {
+		t.Fatalf("AI 员工检索未命中：%+v", agents.People)
 	}
 
 	customerList := search(f.owner, inboxaction.SearchInput{Text: "changchun", Range: inboxaction.SearchRangeList, List: inboxaction.LoadInput{Scope: domain.InboxScopeCustomer}})
