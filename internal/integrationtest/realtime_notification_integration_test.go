@@ -500,7 +500,7 @@ func testAgentRunNotifications(t *testing.T, db *bun.DB, identity *servermodels.
 	feed.expect(t, feed.notice(identity.User.ID, realtime.KindConversationChanged, recovering.ConversationID, after))
 }
 
-// TestRealtimeCustomerInboxNotifications 验证客户会话收发与服务周期变化只通知企业客服共享受众，客服已读只通知本人。
+// TestRealtimeCustomerInboxNotifications 验证客户会话收发与服务周期变化通知企业客服共享受众和访客目录受众，客服已读只通知本人。
 func TestRealtimeCustomerInboxNotifications(t *testing.T) {
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
@@ -533,7 +533,7 @@ func TestRealtimeCustomerInboxNotifications(t *testing.T) {
 		return value
 	}
 
-	// 访客消息只通知共享受众，不逐客服扇出。
+	// 访客消息通知共享受众与访客目录受众，不逐客服扇出。
 	if _, err := f.visitorMessage(ctx, "访客追问"); err != nil {
 		t.Fatal(err)
 	}
@@ -662,8 +662,16 @@ func TestRealtimeVisitorDirectoryNotifications(t *testing.T) {
 	otherVersion := loadConversationVersion(t, f.db, other.Conversation.ID)
 	feed.expect(t, feed.customerInbox(other.Conversation.ID, otherVersion), feed.visitorDirectory(otherIdentityID, other.Conversation.ID, otherVersion))
 	threads, err = directory.Execute(ctx, f.channelID, visitor)
-	if err != nil || len(threads) != 2 {
-		t.Fatalf("跨访客目录隔离 threads=%+v err=%v", threads, err)
+	if err != nil {
+		t.Fatal(err)
+	}
+	listed = listed[:0]
+	for _, thread := range threads {
+		listed = append(listed, thread.ID)
+	}
+	slices.Sort(listed)
+	if !slices.Equal(listed, want) {
+		t.Fatalf("跨访客目录隔离 got=%v want=%v", listed, want)
 	}
 }
 

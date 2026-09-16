@@ -93,7 +93,7 @@ func NotifyConversationChanged(ctx context.Context, db bun.IDB, conversation *se
 		if conversation.Type != string(domain.ConversationTypeCustomer) {
 			return nil
 		}
-		// 网站渠道身份是访客目录受众，其他渠道没有访客事件流。
+		// 仅网站客户会话按所属渠道身份登记访客目录受众通知。
 		var channelIdentityID string
 		err := db.NewSelect().TableExpr("customer_conversations AS cc").
 			Column("cci.id").

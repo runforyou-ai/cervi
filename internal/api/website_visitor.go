@@ -44,7 +44,7 @@ func (s *Service) registerWebsiteVisitorRoutes(router *gin.Engine) {
 	router.Match([]string{http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace}, historyPath, websiteVisitorMethodNotAllowed(http.MethodGet))
 }
 
-// authorizeWebsiteVisitor 统一处理需要访客身份的公开路由：禁止缓存，按 Header、Cookie 恢复渠道身份，失败按公开错误体拒绝。
+// authorizeWebsiteVisitor 统一处理需要访客 Token 的公开路由：禁止缓存，按 Header、Cookie 读取 Token 并写入渠道外部编号，Token 缺失或格式非法按公开错误体拒绝。
 func authorizeWebsiteVisitor(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	token, valid := readWebsiteVisitorToken(c, c.Param("channelID"))
