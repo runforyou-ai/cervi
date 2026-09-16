@@ -96,6 +96,14 @@ func (p *DocumentProcessing) schedule(ctx context.Context, identity *servermodel
 				}
 			}
 		}
+		// 尚无快照的网页无论何种触发都会出网抓取。
+		if document.SourceKind == domain.KnowledgeDocumentSourceWeb && !fetchPage {
+			stored, err := tx.NewSelect().Model((*servermodels.KnowledgeDocumentContent)(nil)).Where("document_id = ?", documentID).Exists(ctx)
+			if err != nil {
+				return err
+			}
+			fetchPage = !stored
+		}
 		// 转换原件和抓取网页都依赖转换服务。
 		if document.SourceKind == domain.KnowledgeDocumentSourceFile || fetchPage {
 			connectionErr = checkConnection(ctx)

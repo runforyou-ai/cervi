@@ -22,6 +22,8 @@ const knowledgeBase = {
       createdAt: "创建时间",
       source: "来源",
     },
+    contentPending: "正在读取内容，请稍候。",
+    contentEmpty: "暂无正文内容。",
     refetch: "重新抓取",
     refetchFailed: "提交重新抓取失败，请重试。",
     sourceUrl: "网页地址",

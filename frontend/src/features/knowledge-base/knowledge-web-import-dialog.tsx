@@ -1,5 +1,5 @@
 /** 导入网页作为知识文档的表单弹窗。 */
-import { useId, useRef, type RefObject } from "react"
+import { useEffect, useId, useRef, type RefObject } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
@@ -58,6 +58,11 @@ export function KnowledgeWebImportDialog({
     shouldUseNativeValidation: true,
     defaultValues: { title: "", sourceUrl: "" },
   })
+
+  // 每次打开都从空白开始，不保留上一次填写的地址和名称。
+  useEffect(() => {
+    if (open) form.reset({ title: "", sourceUrl: "" })
+  }, [open, form])
 
   /** 提交导入并失效该知识库的文档列表缓存。 */
   async function save(values: { title: string; sourceUrl: string }) {

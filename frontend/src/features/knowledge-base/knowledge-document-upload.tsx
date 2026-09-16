@@ -1,7 +1,7 @@
 /** 知识文档的新增入口，包含上传批次及每个原件的进度。 */
 import { useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
-import { Link } from "react-router"
+import { Link, useLocation } from "react-router"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -18,6 +18,7 @@ import { KnowledgeWebImportDialog } from "./knowledge-web-import-dialog"
 /** 在文档列表中提供新增入口、显示批次进度并保留失败重试入口。 */
 export function KnowledgeDocumentUpload({ baseId, groupId }: { baseId: string; groupId: string }) {
   const { t } = useTranslation(["knowledgeBase", "common"])
+  const location = useLocation()
   const picker = useRef<HTMLInputElement>(null)
   const trigger = useRef<HTMLButtonElement>(null)
   const [dragging, setDragging] = useState(false)
@@ -38,7 +39,7 @@ export function KnowledgeDocumentUpload({ baseId, groupId }: { baseId: string; g
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
             <Link
-              to={`/knowledge-bases/${baseId}/groups/${groupId}/documents/new`}
+              to={`/knowledge-bases/${baseId}/groups/${groupId}/documents/new${location.search}`}
             >
               {t("documents.create.write")}
             </Link>

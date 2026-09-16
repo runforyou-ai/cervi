@@ -15,6 +15,9 @@ COMMENT ON COLUMN knowledge_documents.source_url IS '网页文档的页面地址
 COMMENT ON COLUMN knowledge_documents.file_id IS '原件编号及上传重试幂等键，非上传来源为空';
 
 -- +goose Down
+DELETE FROM knowledge_segments WHERE source_type = 'document' AND source_id IN (SELECT id FROM knowledge_documents WHERE source_kind <> 'file');
+DELETE FROM knowledge_documents WHERE source_kind <> 'file';
+
 DROP INDEX knowledge_documents_source_url_unique;
 DROP INDEX knowledge_documents_file_unique;
 CREATE UNIQUE INDEX knowledge_documents_file_unique ON knowledge_documents (file_id);

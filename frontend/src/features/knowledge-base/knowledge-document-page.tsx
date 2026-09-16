@@ -33,10 +33,16 @@ export function KnowledgeDocumentPage() {
   const uploaded =
     document.data?.sourceKind ===
     KnowledgeDocumentSourceKind.KnowledgeDocumentSourceFile
+  const processing =
+    document.data?.status === "queued" || document.data?.status === "running"
   const content = useResource(
     resourceKeys.knowledgeDocumentContent(knowledgeBaseId, documentId),
     (signal) => getKnowledgeDocumentContent(knowledgeBaseId, documentId, signal),
-    { enabled: Boolean(document.data) && !uploaded, staleTime: 0 },
+    {
+      enabled: Boolean(document.data) && !uploaded,
+      staleTime: 0,
+      refetchInterval: () => (processing ? 2000 : false),
+    },
   )
   const returnGroupId = document.data?.groupId ?? groupId
   const returnSearch = returnGroupId === groupId ? location.search : ""
@@ -52,6 +58,18 @@ export function KnowledgeDocumentPage() {
           </Link>
         </Button>
       </PageHeader>
+      {document.data?.sourceUrl ? (
+        <div className="px-6 pb-2 text-sm text-muted-foreground">
+          <a
+            href={document.data.sourceUrl}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="underline underline-offset-4"
+          >
+            {document.data.sourceUrl}
+          </a>
+        </div>
+      ) : null}
       <PageContent className="overflow-hidden">
         {!document.data ? (
           <KnowledgeQAFeedback error={document.error} retry={() => void document.refresh()} />
@@ -66,7 +84,17 @@ export function KnowledgeDocumentPage() {
           <KnowledgeQAFeedback error={content.error} retry={() => void content.refresh()} />
         ) : (
           <div className="h-full overflow-auto rounded-lg border bg-card px-6 py-5">
-            <MessageMarkdown>{content.data.content}</MessageMarkdown>
+            {content.data.content ? (
+              <MessageMarkdown>{content.data.content}</MessageMarkdown>
+            ) : (
+              // 抓取尚未完成或已失败时说明当前状态，不呈现空白正文。
+              <p className="text-sm text-muted-foreground">
+                {processing
+                  ? t("documents.contentPending")
+                  : (document.data.failureMessage ?? "") ||
+                    t("documents.contentEmpty")}
+              </p>
+            )}
           </div>
         )}
       </PageContent>

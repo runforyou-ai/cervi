@@ -114,6 +114,17 @@ func TestKnowledgeWebDocumentLifecycle(t *testing.T) {
 		t.Fatalf("content=%+v err=%v", content, err)
 	}
 
+	// 尚无快照的网页重试按出网处理，先检查转换服务连接；在线文档不检查。
+	checked := 0
+	counting := func(context.Context) error { checked++; return nil }
+	pending, err := create.Execute(ctx, identity, base.ID, knowledgeaction.WebDocumentInput{GroupID: base.Groups[0].ID, Title: "价格说明", SourceURL: "https://example.com/pricing"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := processing.Retry(ctx, identity, base.ID, pending.ID, counting); err != nil || checked != 1 {
+		t.Fatalf("checked=%d err=%v", checked, err)
+	}
+
 	// 在线文档不支持重新抓取。
 	text, err := knowledgeaction.NewSaveTextDocumentAction(db, tasks).Execute(ctx, identity, base.ID, "", knowledgeaction.TextDocumentInput{GroupID: base.Groups[0].ID, Title: "在线说明", Content: "正文"})
 	if err != nil {
@@ -121,5 +132,8 @@ func TestKnowledgeWebDocumentLifecycle(t *testing.T) {
 	}
 	if err := processing.Refetch(ctx, identity, base.ID, text.ID, "", connected); !errors.Is(err, knowledgeaction.ErrDocumentSourceUnsupported) {
 		t.Fatalf("err=%v", err)
+	}
+	if err := processing.Retry(ctx, identity, base.ID, text.ID, counting); err != nil || checked != 1 {
+		t.Fatalf("checked=%d err=%v", checked, err)
 	}
 }

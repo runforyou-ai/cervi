@@ -22,6 +22,8 @@ const knowledgeBase = {
       createdAt: "Created",
       source: "Source",
     },
+    contentPending: "Reading the content, please wait.",
+    contentEmpty: "No content yet.",
     refetch: "Fetch again",
     refetchFailed: "Could not start fetching again. Try again.",
     sourceUrl: "Page address",

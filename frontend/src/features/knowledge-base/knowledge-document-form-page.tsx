@@ -1,5 +1,5 @@
 /** 在线文档的独立新增和编辑页面。 */
-import { useEffect, useId, useMemo, useRef } from "react"
+import { useEffect, useId, useMemo, useRef, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
@@ -131,12 +131,23 @@ function KnowledgeDocumentForm({
     },
   })
   const returnPath = `/knowledge-bases/${baseId}/groups/${groupId}/documents${location.search}`
+  // 表单未编辑时跟随最新读取到的名称与正文，编辑器按内容版本重建。
+  const [contentVersion, setContentVersion] = useState(0)
   useEffect(() => {
     mounted.current = true
     return () => {
       mounted.current = false
     }
   }, [])
+
+  useEffect(() => {
+    if (!stored || form.formState.isDirty) return
+    const values = form.getValues()
+    if (values.title === stored.document.name && values.content === stored.content)
+      return
+    form.reset({ title: stored.document.name, content: stored.content })
+    setContentVersion((version) => version + 1)
+  }, [stored, form])
 
   /** 提交表单并失效该文档的列表、详情和正文缓存。 */
   async function save(values: DocumentFormValues) {
@@ -181,6 +192,7 @@ function KnowledgeDocumentForm({
                 {t("documents.content")}
               </FieldLabel>
               <KnowledgeDocumentEditor
+                key={contentVersion}
                 id={`${id}-content`}
                 value={field.value}
                 disabled={disabled}

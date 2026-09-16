@@ -60,6 +60,7 @@ export function KnowledgeDocumentTable({
       await Promise.all([
         invalidate(resourceKeys.knowledgeDocuments(knowledgeBaseId)),
         invalidate(resourceKeys.knowledgeDocument(knowledgeBaseId, document.id)),
+        invalidate(resourceKeys.knowledgeDocumentContent(knowledgeBaseId, document.id)),
       ])
       setRetryingIDs((current) => {
         const next = new Set(current)
