@@ -29,10 +29,20 @@ import { recoverSession } from "@/lib/session-navigation"
 import { KnowledgeDocumentEditor } from "./knowledge-document-editor"
 import { KnowledgeQAFeedback } from "./knowledge-qa-feedback"
 
-/** 生成在线文档表单的必填校验。 */
-function createDocumentSchema(messages: { title: string; content: string }) {
+export const knowledgeDocumentTitleMaxLength = 120
+
+/** 生成在线文档表单的必填与长度校验。 */
+function createDocumentSchema(messages: {
+  title: string
+  titleTooLong: string
+  content: string
+}) {
   return z.object({
-    title: z.string().trim().min(1, messages.title),
+    title: z
+      .string()
+      .trim()
+      .min(1, messages.title)
+      .max(knowledgeDocumentTitleMaxLength, messages.titleTooLong),
     content: z.string().trim().min(1, messages.content),
   })
 }
@@ -118,6 +128,7 @@ function KnowledgeDocumentForm({
     () =>
       createDocumentSchema({
         title: t("documents.titleRequired"),
+        titleTooLong: t("documents.titleTooLong"),
         content: t("documents.contentRequired"),
       }),
     [t],

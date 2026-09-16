@@ -35,6 +35,7 @@ const knowledgeBase = {
     name: "文档名称",
     content: "正文",
     titleRequired: "请输入文档名称",
+    titleTooLong: "文档名称不能超过 120 个字符",
     contentRequired: "请输入正文",
     saveSuccess: "文档已保存",
     saveError: "保存文档失败，请重试。",

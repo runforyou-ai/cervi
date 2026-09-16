@@ -35,6 +35,7 @@ const knowledgeBase = {
     name: "Document name",
     content: "Content",
     titleRequired: "Enter the document name",
+    titleTooLong: "The document name cannot exceed 120 characters",
     contentRequired: "Enter the content",
     saveSuccess: "Document saved",
     saveError: "Could not save the document. Try again.",

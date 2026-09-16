@@ -21,6 +21,7 @@ import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
+import { knowledgeDocumentTitleMaxLength } from "./knowledge-document-form-page"
 
 /** 收集页面地址和名称后创建网页文档。 */
 export function KnowledgeWebImportDialog({
@@ -44,7 +45,11 @@ export function KnowledgeWebImportDialog({
   const form = useForm<{ title: string; sourceUrl: string }>({
     resolver: zodResolver(
       z.object({
-        title: z.string().trim().min(1, t("documents.titleRequired")),
+        title: z
+          .string()
+          .trim()
+          .min(1, t("documents.titleRequired"))
+          .max(knowledgeDocumentTitleMaxLength, t("documents.titleTooLong")),
         sourceUrl: z
           .string()
           .trim()
