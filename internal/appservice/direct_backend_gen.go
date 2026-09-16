@@ -1094,6 +1094,65 @@ func (b *DirectBackend) GetKnowledgeDocumentPreview(ctx context.Context, meta Re
 	return b.ops.GetKnowledgeDocumentPreview(ctx, meta, identity, knowledgeBaseID, documentID)
 }
 
+// CreateKnowledgeTextDocument 创建在线编写的文档并安排索引。
+func (b *DirectBackend) CreateKnowledgeTextDocument(ctx context.Context, meta RequestMeta, knowledgeBaseID string, input KnowledgeTextDocumentInput) (KnowledgeDocument, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero KnowledgeDocument
+		return zero, err
+	}
+	return b.ops.CreateKnowledgeTextDocument(ctx, meta, identity, knowledgeBaseID, input)
+}
+
+// GetKnowledgeDocumentContent 返回在线文档正文或网页抓取快照。
+func (b *DirectBackend) GetKnowledgeDocumentContent(ctx context.Context, meta RequestMeta, knowledgeBaseID string, documentID string) (KnowledgeDocumentContent, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero KnowledgeDocumentContent
+		return zero, err
+	}
+	return b.ops.GetKnowledgeDocumentContent(ctx, meta, identity, knowledgeBaseID, documentID)
+}
+
+// UpdateKnowledgeDocumentContent 修改在线文档的名称与正文并安排索引。
+func (b *DirectBackend) UpdateKnowledgeDocumentContent(ctx context.Context, meta RequestMeta, knowledgeBaseID string, documentID string, input KnowledgeDocumentContentInput) (KnowledgeDocument, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero KnowledgeDocument
+		return zero, err
+	}
+	return b.ops.UpdateKnowledgeDocumentContent(ctx, meta, identity, knowledgeBaseID, documentID, input)
+}
+
+// RenameKnowledgeDocument 修改在线文档或网页文档的名称。
+func (b *DirectBackend) RenameKnowledgeDocument(ctx context.Context, meta RequestMeta, knowledgeBaseID string, documentID string, input KnowledgeDocumentRenameInput) (KnowledgeDocument, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero KnowledgeDocument
+		return zero, err
+	}
+	return b.ops.RenameKnowledgeDocument(ctx, meta, identity, knowledgeBaseID, documentID, input)
+}
+
+// CreateKnowledgeWebDocument 导入网页并安排首次抓取。
+func (b *DirectBackend) CreateKnowledgeWebDocument(ctx context.Context, meta RequestMeta, knowledgeBaseID string, input KnowledgeWebDocumentInput) (KnowledgeDocument, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero KnowledgeDocument
+		return zero, err
+	}
+	return b.ops.CreateKnowledgeWebDocument(ctx, meta, identity, knowledgeBaseID, input)
+}
+
+// RefetchKnowledgeDocument 重新抓取网页文档并重新索引。
+func (b *DirectBackend) RefetchKnowledgeDocument(ctx context.Context, meta RequestMeta, knowledgeBaseID string, documentID string, input KnowledgeDocumentRefetchInput) error {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		return err
+	}
+	return b.ops.RefetchKnowledgeDocument(ctx, meta, identity, knowledgeBaseID, documentID, input)
+}
+
 // ListKnowledgeQAEntries 返回分组中的本地问答列表。
 func (b *DirectBackend) ListKnowledgeQAEntries(ctx context.Context, meta RequestMeta, knowledgeBaseID string, input KnowledgeQAListInput) (KnowledgeQAList, error) {
 	identity, err := b.ops.authenticate(ctx, meta)

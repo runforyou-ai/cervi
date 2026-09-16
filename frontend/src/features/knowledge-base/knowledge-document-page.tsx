@@ -2,7 +2,12 @@
 import { useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { Link, useLocation, useParams } from "react-router"
-import { getKnowledgeDocument } from "@/api"
+import {
+  getKnowledgeDocument,
+  getKnowledgeDocumentContent,
+  KnowledgeDocumentSourceKind,
+} from "@/api"
+import { MessageMarkdown } from "@/components/message-markdown"
 import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
@@ -12,7 +17,7 @@ import { KnowledgeQAFeedback } from "./knowledge-qa-feedback"
 import { KnowledgeSegmentsDialog } from "./knowledge-segments-dialog"
 import { KnowledgeDocumentPreview } from "./knowledge-document-preview"
 
-/** 显示原件预览和固定批次的分段阅读入口。 */
+/** 按内容来源显示原件预览或正文，并提供固定批次的分段阅读入口。 */
 export function KnowledgeDocumentPage() {
   const { t } = useTranslation(["knowledgeBase", "common"])
   const { knowledgeBaseId = "", groupId = "", documentId = "" } = useParams()
@@ -24,6 +29,20 @@ export function KnowledgeDocumentPage() {
     resourceKeys.knowledgeDocument(knowledgeBaseId, documentId),
     (signal) => getKnowledgeDocument(knowledgeBaseId, documentId, signal),
     { staleTime: 0, refetchInterval: (data) => data?.status === "queued" || data?.status === "running" ? 2000 : false },
+  )
+  const uploaded =
+    document.data?.sourceKind ===
+    KnowledgeDocumentSourceKind.KnowledgeDocumentSourceFile
+  const processing =
+    document.data?.status === "queued" || document.data?.status === "running"
+  const content = useResource(
+    resourceKeys.knowledgeDocumentContent(knowledgeBaseId, documentId),
+    (signal) => getKnowledgeDocumentContent(knowledgeBaseId, documentId, signal),
+    {
+      enabled: Boolean(document.data) && !uploaded,
+      staleTime: 0,
+      refetchInterval: () => (processing ? 2000 : false),
+    },
   )
   const returnGroupId = document.data?.groupId ?? groupId
   const returnSearch = returnGroupId === groupId ? location.search : ""
@@ -39,16 +58,45 @@ export function KnowledgeDocumentPage() {
           </Link>
         </Button>
       </PageHeader>
+      {document.data?.sourceUrl ? (
+        <div className="shrink-0 px-4 pt-4 text-sm text-muted-foreground sm:px-6 sm:pt-6">
+          {t("documents.sourceOrigin")}
+          <a
+            href={document.data.sourceUrl}
+            target="_blank"
+            rel="noreferrer noopener"
+            className="underline underline-offset-4"
+          >
+            {document.data.sourceUrl}
+          </a>
+        </div>
+      ) : null}
       <PageContent className="overflow-hidden">
         {!document.data ? (
           <KnowledgeQAFeedback error={document.error} retry={() => void document.refresh()} />
-        ) : (
+        ) : uploaded ? (
           <KnowledgeDocumentPreview
             key={documentId}
             knowledgeBaseId={knowledgeBaseId}
             documentId={documentId}
             name={document.data.name}
           />
+        ) : !content.data ? (
+          <KnowledgeQAFeedback error={content.error} retry={() => void content.refresh()} />
+        ) : (
+          <div className="h-full overflow-auto rounded-lg border bg-card px-6 py-5">
+            {content.data.content ? (
+              <MessageMarkdown>{content.data.content}</MessageMarkdown>
+            ) : (
+              // 抓取尚未完成或已失败时说明当前状态，不呈现空白正文。
+              <p className="text-sm text-muted-foreground">
+                {processing
+                  ? t("documents.contentPending")
+                  : (document.data.failureMessage ?? "") ||
+                    t("documents.contentEmpty")}
+              </p>
+            )}
+          </div>
         )}
       </PageContent>
       {segmentBatchId && document.data && <KnowledgeSegmentsDialog

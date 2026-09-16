@@ -47,9 +47,9 @@ type segmentHit struct {
 	Content        string `bun:"content"`
 }
 
-// segmentColumns 返回检索和阅读结果读取的分段列，来源名称按知识库类别取文档文件名或问答主问题。
+// segmentColumns 返回检索和阅读结果读取的分段列，来源名称按知识库类别取文档名称或问答主问题。
 func segmentColumns(base servermodels.KnowledgeBase) string {
-	name := "f.original_name"
+	name := documentNameExpr
 	if base.Category == string(domain.KnowledgeBaseCategoryQA) {
 		name = "question.content"
 	}
@@ -64,7 +64,7 @@ func publishedSegments(db bun.IDB, base servermodels.KnowledgeBase) *bun.SelectQ
 			Join("JOIN knowledge_qa_contents question ON question.entry_id = kqe.id AND question.kind = ?", domain.KnowledgeQAContentPrimaryQuestion)
 	}
 	return query.Join("JOIN knowledge_documents kd ON kd.id = ks.source_id AND kd.segment_batch_id = ks.segment_batch_id").
-		Join("JOIN files f ON f.id = kd.file_id")
+		Join("LEFT JOIN files f ON f.id = kd.file_id")
 }
 
 // insertSegments 按批次标识和来源内序号写入本批次分段、上下文、向量和词法词元，词法词元由上下文与正文共同生成。

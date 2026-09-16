@@ -178,6 +178,20 @@ export function CreateKnowledgeQAEntry(meta: $models.RequestMeta, knowledgeBaseI
 }
 
 /**
+ * CreateKnowledgeTextDocument 创建在线编写的文档并安排索引。
+ */
+export function CreateKnowledgeTextDocument(meta: $models.RequestMeta, knowledgeBaseID: string, input: $models.KnowledgeTextDocumentInput): $CancellablePromise<$models.KnowledgeDocument> {
+    return $Call.ByID(3003924288, meta, knowledgeBaseID, input);
+}
+
+/**
+ * CreateKnowledgeWebDocument 导入网页并安排首次抓取。
+ */
+export function CreateKnowledgeWebDocument(meta: $models.RequestMeta, knowledgeBaseID: string, input: $models.KnowledgeWebDocumentInput): $CancellablePromise<$models.KnowledgeDocument> {
+    return $Call.ByID(1630833413, meta, knowledgeBaseID, input);
+}
+
+/**
  * CreateMCPServer 创建 MCP 服务。
  */
 export function CreateMCPServer(meta: $models.RequestMeta, input: $models.MCPServerInput): $CancellablePromise<$models.MCPServer> {
@@ -427,6 +441,13 @@ export function GetKnowledgeBase(meta: $models.RequestMeta, knowledgeBaseID: str
  */
 export function GetKnowledgeDocument(meta: $models.RequestMeta, knowledgeBaseID: string, documentID: string): $CancellablePromise<$models.KnowledgeDocument> {
     return $Call.ByID(593812391, meta, knowledgeBaseID, documentID);
+}
+
+/**
+ * GetKnowledgeDocumentContent 返回在线文档正文或网页抓取快照。
+ */
+export function GetKnowledgeDocumentContent(meta: $models.RequestMeta, knowledgeBaseID: string, documentID: string): $CancellablePromise<$models.KnowledgeDocumentContent> {
+    return $Call.ByID(3035191824, meta, knowledgeBaseID, documentID);
 }
 
 /**
@@ -836,6 +857,13 @@ export function ReadInboxWindow(meta: $models.RequestMeta, input: $models.InboxW
 }
 
 /**
+ * RefetchKnowledgeDocument 重新抓取网页文档并重新索引。
+ */
+export function RefetchKnowledgeDocument(meta: $models.RequestMeta, knowledgeBaseID: string, documentID: string, input: $models.KnowledgeDocumentRefetchInput): $CancellablePromise<void> {
+    return $Call.ByID(1596600466, meta, knowledgeBaseID, documentID, input);
+}
+
+/**
  * RefreshMCPServerTools 提交当前企业的 MCP 工具更新任务。
  */
 export function RefreshMCPServerTools(meta: $models.RequestMeta): $CancellablePromise<void> {
@@ -854,6 +882,13 @@ export function RemoveGroupConversationMember(meta: $models.RequestMeta, convers
  */
 export function RemoveTeamMembers(meta: $models.RequestMeta, teamID: string, input: $models.TeamMemberInput): $CancellablePromise<$models.Team> {
     return $Call.ByID(3538693274, meta, teamID, input);
+}
+
+/**
+ * RenameKnowledgeDocument 修改在线文档或网页文档的名称。
+ */
+export function RenameKnowledgeDocument(meta: $models.RequestMeta, knowledgeBaseID: string, documentID: string, input: $models.KnowledgeDocumentRenameInput): $CancellablePromise<$models.KnowledgeDocument> {
+    return $Call.ByID(870915057, meta, knowledgeBaseID, documentID, input);
 }
 
 /**
@@ -1141,6 +1176,13 @@ export function UpdateGroupConversation(meta: $models.RequestMeta, conversationI
  */
 export function UpdateKnowledgeBase(meta: $models.RequestMeta, knowledgeBaseID: string, input: $models.KnowledgeBaseInput): $CancellablePromise<$models.KnowledgeBase> {
     return $Call.ByID(103390268, meta, knowledgeBaseID, input);
+}
+
+/**
+ * UpdateKnowledgeDocumentContent 修改在线文档的名称与正文并安排索引。
+ */
+export function UpdateKnowledgeDocumentContent(meta: $models.RequestMeta, knowledgeBaseID: string, documentID: string, input: $models.KnowledgeDocumentContentInput): $CancellablePromise<$models.KnowledgeDocument> {
+    return $Call.ByID(3457873805, meta, knowledgeBaseID, documentID, input);
 }
 
 /**

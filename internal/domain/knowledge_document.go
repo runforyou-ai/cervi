@@ -5,6 +5,21 @@ import (
 	"strings"
 )
 
+// KnowledgeDocumentSourceKind 表示知识文档的内容来源。
+type KnowledgeDocumentSourceKind string
+
+const (
+	KnowledgeDocumentSourceFile KnowledgeDocumentSourceKind = "file"
+	KnowledgeDocumentSourceText KnowledgeDocumentSourceKind = "text"
+	KnowledgeDocumentSourceWeb  KnowledgeDocumentSourceKind = "web"
+)
+
+// KnowledgeDocumentTitleMaxLength 是在线文档与网页文档名称允许的最大字符数。
+const KnowledgeDocumentTitleMaxLength = 120
+
+// KnowledgeDocumentMarkdownContentType 是在线文档与网页文档正文的内容类型。
+const KnowledgeDocumentMarkdownContentType = "text/markdown"
+
 // KnowledgeDocumentFormat 表示知识文档支持的文件扩展名。
 type KnowledgeDocumentFormat string
 

@@ -1,6 +1,12 @@
 /** 企业知识库调用。 */
 import {
   RetryKnowledgeDocument,
+  CreateKnowledgeTextDocument,
+  CreateKnowledgeWebDocument,
+  RefetchKnowledgeDocument,
+  GetKnowledgeDocumentContent,
+  UpdateKnowledgeDocumentContent,
+  RenameKnowledgeDocument,
   RetrieveKnowledgeBase,
   ListKnowledgeDocumentSegments,
   ListKnowledgeDocuments,
@@ -29,11 +35,17 @@ import {
   type KnowledgeDocumentSegmentInput,
   type KnowledgeDocumentSegmentPage,
   KnowledgeIndexStatus,
+  KnowledgeDocumentSourceKind,
   type KnowledgeDocumentList,
   type KnowledgeDocumentListInput,
   type KnowledgeDocument,
   type KnowledgeDocumentBatch,
   type KnowledgeDocumentBatchInput,
+  type KnowledgeTextDocumentInput,
+  type KnowledgeWebDocumentInput,
+  type KnowledgeDocumentRefetchInput,
+  type KnowledgeDocumentContentInput,
+  type KnowledgeDocumentRenameInput,
   type KnowledgeQAEntry,
   type KnowledgeQAInput,
   type KnowledgeQAList,
@@ -220,11 +232,16 @@ export const deleteKnowledgeQAEntry = bind(DeleteKnowledgeQAEntry)
 /** 按当前配置重新索引问答。 */
 export const retryKnowledgeQAEntry = bind(RetryKnowledgeQAEntry)
 
+export type KnowledgeDocumentSourceKindId = Exclude<
+  KnowledgeDocumentSourceKind,
+  KnowledgeDocumentSourceKind.$zero
+>
 export type KnowledgeDocumentData = Omit<
   NonNullArrays<KnowledgeDocument>,
-  "status"
+  "status" | "sourceKind"
 > & {
   status: KnowledgeIndexStatusId
+  sourceKind: KnowledgeDocumentSourceKindId
 }
 export type KnowledgeDocumentListData = Omit<
   NonNullArrays<KnowledgeDocumentList>,
@@ -237,6 +254,80 @@ export type KnowledgeDocumentBatchData = Omit<
   "documents"
 > & {
   documents: KnowledgeDocumentData[]
+}
+export type KnowledgeDocumentContentData = {
+  document: KnowledgeDocumentData
+  content: string
+}
+const createKnowledgeTextDocumentBound = bind(CreateKnowledgeTextDocument)
+/** 创建在线编写的文档。 */
+export function createKnowledgeTextDocument(
+  baseId: string,
+  input: KnowledgeTextDocumentInput,
+) {
+  return createKnowledgeTextDocumentBound(
+    baseId,
+    input,
+  ) as Promise<KnowledgeDocumentData>
+}
+const createKnowledgeWebDocumentBound = bind(CreateKnowledgeWebDocument)
+/** 导入网页作为知识文档。 */
+export function createKnowledgeWebDocument(
+  baseId: string,
+  input: KnowledgeWebDocumentInput,
+) {
+  return createKnowledgeWebDocumentBound(
+    baseId,
+    input,
+  ) as Promise<KnowledgeDocumentData>
+}
+const refetchKnowledgeDocumentBound = bind(RefetchKnowledgeDocument)
+/** 重新抓取网页文档。 */
+export function refetchKnowledgeDocument(
+  baseId: string,
+  documentId: string,
+  input: KnowledgeDocumentRefetchInput,
+) {
+  return refetchKnowledgeDocumentBound(baseId, documentId, input)
+}
+const getKnowledgeDocumentContentBound = bind(GetKnowledgeDocumentContent)
+/** 读取在线文档正文或网页抓取快照。 */
+export function getKnowledgeDocumentContent(
+  baseId: string,
+  documentId: string,
+  signal?: AbortSignal,
+) {
+  return getKnowledgeDocumentContentBound(
+    baseId,
+    documentId,
+    signal,
+  ) as Promise<KnowledgeDocumentContentData>
+}
+const updateKnowledgeDocumentContentBound = bind(UpdateKnowledgeDocumentContent)
+/** 保存在线文档的名称与正文。 */
+export function updateKnowledgeDocumentContent(
+  baseId: string,
+  documentId: string,
+  input: KnowledgeDocumentContentInput,
+) {
+  return updateKnowledgeDocumentContentBound(
+    baseId,
+    documentId,
+    input,
+  ) as Promise<KnowledgeDocumentData>
+}
+const renameKnowledgeDocumentBound = bind(RenameKnowledgeDocument)
+/** 修改在线文档或网页文档的名称。 */
+export function renameKnowledgeDocument(
+  baseId: string,
+  documentId: string,
+  input: KnowledgeDocumentRenameInput,
+) {
+  return renameKnowledgeDocumentBound(
+    baseId,
+    documentId,
+    input,
+  ) as Promise<KnowledgeDocumentData>
 }
 const listKnowledgeDocumentsBound = bind(ListKnowledgeDocuments)
 const createKnowledgeDocumentsBound = bind(CreateKnowledgeDocuments)

@@ -23,12 +23,23 @@ const (
 	KnowledgeDocumentJSON     KnowledgeDocumentFormat = KnowledgeDocumentFormat(domain.KnowledgeDocumentJSON)
 )
 
+// KnowledgeDocumentSourceKind 定义文档的内容来源。
+type KnowledgeDocumentSourceKind string
+
+const (
+	KnowledgeDocumentSourceFile KnowledgeDocumentSourceKind = KnowledgeDocumentSourceKind(domain.KnowledgeDocumentSourceFile)
+	KnowledgeDocumentSourceText KnowledgeDocumentSourceKind = KnowledgeDocumentSourceKind(domain.KnowledgeDocumentSourceText)
+	KnowledgeDocumentSourceWeb  KnowledgeDocumentSourceKind = KnowledgeDocumentSourceKind(domain.KnowledgeDocumentSourceWeb)
+)
+
 // KnowledgeDocument 定义文档列表与预览页使用的元数据。
 type KnowledgeDocument struct {
 	Format           KnowledgeDocumentFormat        `json:"format"`
+	SourceKind       KnowledgeDocumentSourceKind    `json:"sourceKind"`
 	ID               string                         `json:"id"`
 	GroupID          string                         `json:"groupId"`
 	Name             string                         `json:"name"`
+	SourceURL        string                         `json:"sourceUrl"`
 	ContentType      string                         `json:"contentType"`
 	ByteSize         int64                          `json:"byteSize"`
 	Status           KnowledgeIndexStatus           `json:"status"`
@@ -62,6 +73,42 @@ type KnowledgeDocumentBatchInput struct {
 // KnowledgeDocumentBatch 返回已保存文档，供重试核对。
 type KnowledgeDocumentBatch struct {
 	Documents []KnowledgeDocument `json:"documents"`
+}
+
+// KnowledgeTextDocumentInput 定义在线编写文档的分组、名称与正文。
+type KnowledgeTextDocumentInput struct {
+	GroupID string `json:"groupId"`
+	Title   string `json:"title"`
+	Content string `json:"content"`
+}
+
+// KnowledgeWebDocumentInput 定义网页导入文档的分组、名称与页面地址。
+type KnowledgeWebDocumentInput struct {
+	GroupID   string `json:"groupId"`
+	Title     string `json:"title"`
+	SourceURL string `json:"sourceUrl"`
+}
+
+// KnowledgeDocumentRefetchInput 定义重新抓取时可选的新页面地址。
+type KnowledgeDocumentRefetchInput struct {
+	SourceURL string `json:"sourceUrl"`
+}
+
+// KnowledgeDocumentContentInput 定义在线文档的名称与正文更新。
+type KnowledgeDocumentContentInput struct {
+	Title   string `json:"title"`
+	Content string `json:"content"`
+}
+
+// KnowledgeDocumentRenameInput 定义文档名称更新。
+type KnowledgeDocumentRenameInput struct {
+	Title string `json:"title"`
+}
+
+// KnowledgeDocumentContent 返回文档元数据与正文。
+type KnowledgeDocumentContent struct {
+	Document KnowledgeDocument `json:"document"`
+	Content  string            `json:"content"`
 }
 
 // KnowledgeDocumentMoveInput 定义目标分组。

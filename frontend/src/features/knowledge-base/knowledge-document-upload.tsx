@@ -1,25 +1,54 @@
-/** 显示知识文档上传批次及每个原件的进度。 */
+/** 知识文档的新增入口，包含上传批次及每个原件的进度。 */
 import { useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
+import { Link, useLocation } from "react-router"
 import { Button } from "@/components/ui/button"
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
 import { AttachmentName } from "@/components/attachment-name"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { formatFileSize } from "@/lib/file-size"
 import { useKnowledgeDocumentUpload, knowledgeDocumentFormats } from "./use-knowledge-document-upload"
+import { KnowledgeWebImportDialog } from "./knowledge-web-import-dialog"
 
-/** 在文档列表中显示批次进度并保留失败重试入口。 */
+/** 在文档列表中提供新增入口、显示批次进度并保留失败重试入口。 */
 export function KnowledgeDocumentUpload({ baseId, groupId }: { baseId: string; groupId: string }) {
   const { t } = useTranslation(["knowledgeBase", "common"])
+  const location = useLocation()
   const picker = useRef<HTMLInputElement>(null)
   const trigger = useRef<HTMLButtonElement>(null)
   const [dragging, setDragging] = useState(false)
+  const [importing, setImporting] = useState(false)
   const { open, busy, items, run, select, close, show } = useKnowledgeDocumentUpload({ baseId, groupId })
   const selected = items.length > 0
   return (
     <>
-      <Button ref={trigger} size="sm" disabled={busy || open} onClick={show}>
-        {t("documents.upload.action")}
-      </Button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <Button ref={trigger} size="sm" disabled={busy || open}>
+            {t("documents.create.action")}
+          </Button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end">
+          <DropdownMenuItem onSelect={show}>
+            {t("documents.create.upload")}
+          </DropdownMenuItem>
+          <DropdownMenuItem asChild>
+            <Link
+              to={`/knowledge-bases/${baseId}/groups/${groupId}/documents/new${location.search}`}
+            >
+              {t("documents.create.write")}
+            </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => setImporting(true)}>
+            {t("documents.create.import")}
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
       <Dialog
         open={open}
         onOpenChange={(value) => {
@@ -112,6 +141,13 @@ export function KnowledgeDocumentUpload({ baseId, groupId }: { baseId: string; g
           </div>
         </DialogContent>
       </Dialog>
+      <KnowledgeWebImportDialog
+        baseId={baseId}
+        groupId={groupId}
+        open={importing}
+        triggerRef={trigger}
+        onClose={() => setImporting(false)}
+      />
     </>
   )
 }

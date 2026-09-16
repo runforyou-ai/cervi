@@ -28,6 +28,7 @@ import (
 	mcpintegration "github.com/runforyou-ai/cervi/internal/integration/mcp"
 	"github.com/runforyou-ai/cervi/internal/integration/rerank"
 	telegramintegration "github.com/runforyou-ai/cervi/internal/integration/telegram"
+	"github.com/runforyou-ai/cervi/internal/integration/webfetch"
 	"github.com/runforyou-ai/cervi/internal/publicweb"
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	"github.com/runforyou-ai/cervi/internal/realtime/gateway"
@@ -70,7 +71,7 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 		return nil, nil, err
 	}
 	embeddingClient := embedding.NewClient()
-	processDocument := knowledgeaction.NewProcessDocumentAction(appStorage.DB(), documentConverter, embeddingClient, fileReader)
+	processDocument := knowledgeaction.NewProcessDocumentAction(appStorage.DB(), documentConverter, embeddingClient, fileReader, webfetch.NewClient())
 	if err := tasks.Registry().RegisterJSONWithTerminalFailure(knowledgeaction.ProcessDocumentActionName, processDocument.Execute, processDocument.FinalizeFailure); err != nil {
 		return nil, nil, err
 	}

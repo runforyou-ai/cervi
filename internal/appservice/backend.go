@@ -350,6 +350,24 @@ type Backend interface {
 	// GetKnowledgeDocumentPreview 签发当前文档的原件预览请求。
 	//cervi:route GET /knowledge-bases/:knowledgeBaseID/documents/:documentID/preview
 	GetKnowledgeDocumentPreview(context.Context, RequestMeta, string, string) (KnowledgeDocumentPreviewRequest, error)
+	// CreateKnowledgeTextDocument 创建在线编写的文档并安排索引。
+	//cervi:route POST /knowledge-bases/:knowledgeBaseID/text-documents status=201
+	CreateKnowledgeTextDocument(context.Context, RequestMeta, string, KnowledgeTextDocumentInput) (KnowledgeDocument, error)
+	// GetKnowledgeDocumentContent 返回在线文档正文或网页抓取快照。
+	//cervi:route GET /knowledge-bases/:knowledgeBaseID/documents/:documentID/content
+	GetKnowledgeDocumentContent(context.Context, RequestMeta, string, string) (KnowledgeDocumentContent, error)
+	// UpdateKnowledgeDocumentContent 修改在线文档的名称与正文并安排索引。
+	//cervi:route PUT /knowledge-bases/:knowledgeBaseID/documents/:documentID/content
+	UpdateKnowledgeDocumentContent(context.Context, RequestMeta, string, string, KnowledgeDocumentContentInput) (KnowledgeDocument, error)
+	// RenameKnowledgeDocument 修改在线文档或网页文档的名称。
+	//cervi:route PUT /knowledge-bases/:knowledgeBaseID/documents/:documentID
+	RenameKnowledgeDocument(context.Context, RequestMeta, string, string, KnowledgeDocumentRenameInput) (KnowledgeDocument, error)
+	// CreateKnowledgeWebDocument 导入网页并安排首次抓取。
+	//cervi:route POST /knowledge-bases/:knowledgeBaseID/web-documents status=201
+	CreateKnowledgeWebDocument(context.Context, RequestMeta, string, KnowledgeWebDocumentInput) (KnowledgeDocument, error)
+	// RefetchKnowledgeDocument 重新抓取网页文档并重新索引。
+	//cervi:route POST /knowledge-bases/:knowledgeBaseID/documents/:documentID/refetch
+	RefetchKnowledgeDocument(context.Context, RequestMeta, string, string, KnowledgeDocumentRefetchInput) error
 
 	// ListKnowledgeQAEntries 返回分组中的本地问答列表。
 	//cervi:route GET /knowledge-bases/:knowledgeBaseID/qa-entries
