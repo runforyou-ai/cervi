@@ -2,6 +2,7 @@
 import { useEffect, useRef } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { getInboxConversation, isNotFoundApiError } from "@/api"
+import { useRealtimeSyncActive } from "@/contexts/realtime-sync-context"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 import { useAttachmentQueue } from "./attachment-queue-context"
@@ -22,21 +23,22 @@ export async function readConversationSummary(conversationID: string, signal?: A
   }
 }
 
-/** 当前会话通过统一轮询发现资料变化，恢复前台后立即重读。 */
+/** 当前会话按变更通知或前台轮询发现资料变化，恢复前台后立即重读。 */
 export function useConversationSummary(conversationID: string, requireWindowFocus = true) {
   const client = useQueryClient()
   const { queue } = useAttachmentQueue()
   const outgoingStore = useOutgoingMessageStore()
   const active = useMemberChatPollingActive({ requireWindowFocus })
   const previousActive = useRef(active)
-  // 不可用时继续轮询，重新获得阅读资格后自动恢复详情。
+  const realtime = useRealtimeSyncActive()
+  // 接入实时同步的外壳由会话通知与失权通知失效摘要，其余外壳在前台轮询；不可用时继续读取，重新获得阅读资格后恢复详情。
   const resource = useResource(
     resourceKeys.conversationSummary(conversationID),
     (signal) => readConversationSummary(conversationID, signal),
     {
       enabled: Boolean(conversationID),
       staleTime: 0,
-      refetchInterval: active ? memberChatPollingInterval : false,
+      refetchInterval: active && !realtime ? memberChatPollingInterval : false,
       refetchOnWindowFocus: false,
     },
   )

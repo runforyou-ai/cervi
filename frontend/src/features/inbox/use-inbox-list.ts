@@ -1,7 +1,8 @@
-/** 将列表控制器接入统一 Query 缓存、前台轮询和会话资源清理。 */
-import { useEffect, useLayoutEffect, useMemo, useRef, useSyncExternalStore } from "react"
+/** 将列表控制器接入统一 Query 缓存、变更失效和会话资源清理。 */
+import { useEffect, useId, useLayoutEffect, useMemo, useRef, useSyncExternalStore } from "react"
 import { useQueryClient } from "@tanstack/react-query"
 import { getInboxContext, loadInbox, readInboxConversations, readInboxWindow, type InboxQuery, type Identity, type InboxConversationResults } from "@/api"
+import { useRealtimeSyncActive } from "@/contexts/realtime-sync-context"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceReader } from "@/hooks/use-resource"
 import { clearConversationResources } from "./conversation-resources"
@@ -24,8 +25,10 @@ type InboxListOptions = {
 export function useInboxList(input: InboxQuery, viewport: InboxListViewport, options: InboxListOptions) {
   const { identity, active, history } = options
   const client = useQueryClient()
+  const realtime = useRealtimeSyncActive()
   const query = useMemo(() => input, [input.scope, input.customerView, input.assigneeIdentityId, input.channelId, input.serviceStatus, input.kinds?.join(",")])
   const owner = useMemo(() => ({ organizationId: identity.organization.id, userId: identity.user.id }), [identity.organization.id, identity.user.id])
+  const view = useId()
   const headKey = resourceKeys.inbox({ ...owner, ...query })
   // 为首页查询登记观察者，让会话资源清理按已挂载列表处理该 key。
   useResource(headKey, () => loadInbox(query), { enabled: false })
@@ -92,10 +95,7 @@ export function useInboxList(input: InboxQuery, viewport: InboxListViewport, opt
   useLayoutEffect(() => () => {
     if (history) history.set(historyKey, controller.remember())
   }, [controller, history, historyKey])
-  useEffect(() => {
-    void controller.request("initial")
-    return () => controller.dispose()
-  }, [controller])
+  useEffect(() => () => controller.dispose(), [controller])
   useEffect(() => client.getQueryCache().subscribe((event) => {
     const key = event.query.queryKey
     if (event.type === "updated" && key[0] === resourceKeys.conversationSummary()[0] && event.query.state.data === null) {
@@ -107,18 +107,29 @@ export function useInboxList(input: InboxQuery, viewport: InboxListViewport, opt
       if (results?.some((row) => row.conversation && controller.getSnapshot().unavailableIds.includes(row.id))) client.removeQueries({ queryKey: key, exact: true })
     }
   }), [client, controller])
+  // 列表窗口重读登记为挂载中的查询，首次读取、同步失效、失败重试与前台轮询共用同一入口。
+  const sync = useResource(
+    resourceKeys.inbox({ ...owner, ...query, view }),
+    async () => {
+      await controller.request("poll")
+      const { error, revision } = controller.getSnapshot()
+      // 控制器读取失败时该查询同样失败，由统一的失败重试接管。
+      if (error) throw new Error(`读取收件箱窗口失败：${error}`)
+      return revision
+    },
+    {
+      staleTime: 0,
+      refetchInterval: active && !realtime ? memberChatPollingInterval : false,
+      refetchOnWindowFocus: false,
+    },
+  )
+  const refresh = sync.refresh
+  const wasActive = useRef(active)
   useEffect(() => {
-    if (!active) return
-    void controller.request("poll")
-    const timer = window.setInterval(() => void controller.request("poll"), memberChatPollingInterval)
-    // 业务变更失效原收件箱入口时，仍经过同一窗口队列重读。
-    const unsubscribe = client.getQueryCache().subscribe((event) => {
-      if (event.type !== "updated") return
-      const prefix = event.query.queryKey[0]
-      if ((prefix === resourceKeys.inbox()[0] || prefix === resourceKeys.inboxConversations()[0]) && (event.action.type === "invalidate" || event.action.type === "setState")) void controller.request("poll")
-    })
-    return () => { window.clearInterval(timer); unsubscribe() }
-  }, [active, client, controller])
+    // 未接入实时同步的外壳回到前台时立即重读当前窗口。
+    if (active && !wasActive.current && !realtime) void refresh({ cancelRefetch: false })
+    wasActive.current = active
+  }, [active, realtime, refresh])
 
   const conversations = new Map(rows.data?.results.flatMap((row) => row.availability === "matching" && row.conversation ? [[row.id, row.conversation] as const] : []) ?? [])
   return {

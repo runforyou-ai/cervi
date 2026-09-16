@@ -141,15 +141,19 @@ export class InboxListController {
 
   /** 合并重复请求并串行执行，返回本轮队列完成或过期后的 Promise。 */
   request = (operation: InboxListOperation): Promise<void> => {
-    if (this.queue.includes(operation) || (this.running && this.state.operation === operation)) return this.completion
-    if (operation === "poll" && (this.running || this.queue.length)) return this.completion
+    // 变更通知触发的重读只与尚未开始的窗口重读合并，在途读取结束后必定补读一次。
+    if (operation === "poll") {
+      if (this.queue.includes("poll") || this.queue.includes("refresh")) return this.completion
+    } else if (this.queue.includes(operation) || (this.running && this.state.operation === operation)) {
+      return this.completion
+    }
     this.queue.push(operation)
     if (!this.running) this.completion = this.drain()
     return this.completion
   }
 
-  /** 轮询失败时主动重读原窗口，其余失败重试原操作。 */
-  retry = () => this.request(this.state.error === "poll" ? "refresh" : this.state.error ?? "refresh")
+  /** 重试上次失败的操作，没有失败记录时重读原窗口。 */
+  retry = () => this.request(this.state.error ?? "refresh")
 
   /** 补页收尾后捕获刷新范围，失败时保留已确认的窗口。 */
   private async drain() {
@@ -161,7 +165,6 @@ export class InboxListController {
         const operation = this.queue.shift()!
         const window = this.deferred ?? this.state
         if ((operation === "before" && !window.hasBefore) || (operation === "after" && !window.hasAfter)) continue
-        if (operation === "poll" && this.state.error) continue
         this.publish({
           operation, error: null,
           status: this.state.revision === 0 ? "initial" : operation === "before" || operation === "after" ? "loadingMore" : "refreshing",

@@ -24,6 +24,7 @@ import { sessionStatusLabel } from "@/features/inbox/session-status-label"
 import { useAccountDisabledReason } from "@/features/inbox/use-account-disabled-reason"
 import type { ConversationSelection } from "@/features/inbox/inbox-selection"
 import { useConversationName } from "@/features/inbox/use-conversation-name"
+import { useRealtimeSyncActive } from "@/contexts/realtime-sync-context"
 import {
   memberChatPollingInterval,
   useMemberChatPollingActive,
@@ -75,13 +76,15 @@ export function ConversationMain({
   const sourceGroupConversation =
     conversation && isGroupInboxConversation(conversation) ? conversation : null
   const groupPollingActive = useMemberChatPollingActive()
+  const realtime = useRealtimeSyncActive()
+  // 接入实时同步的外壳由会话变更通知失效群资料，其余外壳在前台轮询。
   const groupResource = useResource(
     resourceKeys.groupConversation(sourceGroupConversation?.id ?? ""),
     () => getGroupConversation(sourceGroupConversation?.id ?? ""),
     {
       enabled: Boolean(sourceGroupConversation),
       staleTime: 0,
-      refetchInterval: groupPollingActive ? memberChatPollingInterval : false,
+      refetchInterval: groupPollingActive && !realtime ? memberChatPollingInterval : false,
     },
   )
   const group = groupResource.data
