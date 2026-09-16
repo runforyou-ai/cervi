@@ -60,6 +60,7 @@ export function KnowledgeDocumentPage() {
       </PageHeader>
       {document.data?.sourceUrl ? (
         <div className="shrink-0 px-4 pt-4 text-sm text-muted-foreground sm:px-6 sm:pt-6">
+          {t("documents.sourceOrigin")}
           <a
             href={document.data.sourceUrl}
             target="_blank"

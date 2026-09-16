@@ -27,6 +27,7 @@ const knowledgeBase = {
     refetch: "Fetch again",
     refetchFailed: "Could not start fetching again. Try again.",
     sourceUrl: "Page address",
+    sourceOrigin: "Source: ",
     urlInvalid: "Enter a page address starting with http or https",
     importSuccess: "Page imported",
     importError: "Could not import the page. Try again.",

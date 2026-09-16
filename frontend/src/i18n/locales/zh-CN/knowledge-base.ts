@@ -27,6 +27,7 @@ const knowledgeBase = {
     refetch: "重新抓取",
     refetchFailed: "提交重新抓取失败，请重试。",
     sourceUrl: "网页地址",
+    sourceOrigin: "来源：",
     urlInvalid: "请输入以 http 或 https 开头的网页地址",
     importSuccess: "网页已导入",
     importError: "导入网页失败，请重试。",
