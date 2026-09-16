@@ -2,14 +2,24 @@
 
 package appservice
 
-import conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+import (
+	"context"
+	"errors"
+	"log/slog"
 
-// conversationAgentProcessFromAction 转换消息中有序的完整过程。
-func conversationAgentProcessFromAction(process *conversationaction.ConversationAgentProcess) *ConversationAgentProcess {
-	if process == nil {
-		return nil
+	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	"github.com/runforyou-ai/cervi/internal/common"
+	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+)
+
+// GetAgentRunProcess 返回一次成功运行的有序过程内容和模型用量。
+func (o *directOperations) GetAgentRunProcess(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, runID string) (AgentRunProcess, error) {
+	process, err := o.getAgentRunProcess.Execute(ctx, identity, runID)
+	if err != nil {
+		return AgentRunProcess{}, agentRunProcessError(ctx, meta, err, identity.Organization.ID, runID)
 	}
-	result := &ConversationAgentProcess{ID: process.ID, DurationMilliseconds: process.DurationMilliseconds,
+	result := AgentRunProcess{ID: process.ID, DurationMilliseconds: process.DurationMilliseconds,
 		InputTokens: process.Usage.PromptTokens, OutputTokens: process.Usage.CompletionTokens, Blocks: make([]AgentRunContentBlock, 0, len(process.Blocks))}
 	for _, block := range process.Blocks {
 		item := AgentRunContentBlock{ID: block.ID, Position: block.Position, Kind: AgentRunBlockKind(block.Kind), Text: block.Payload.Text}
@@ -18,5 +28,29 @@ func conversationAgentProcessFromAction(process *conversationaction.Conversation
 		}
 		result.Blocks = append(result.Blocks, item)
 	}
-	return result
+	return result, nil
+}
+
+// agentRunProcessError 转换运行过程详情读取错误。
+func agentRunProcessError(ctx context.Context, meta RequestMeta, err error, organizationID, runID string) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	if errors.Is(err, common.ErrIdentityInvalid) {
+		return SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+	}
+	if errors.Is(err, conversationaction.ErrAgentRunProcessUnavailable) || errors.Is(err, conversationaction.ErrConversationNotFound) {
+		return NotFoundError(meta, cervii18n.ErrorAgentRunProcessUnavailable).WithReason("agent_run_process_unavailable")
+	}
+	slog.Warn("读取 AI 运行过程失败", "organization_id", organizationID, "agent_run_id", runID, "error", err)
+	return FailedError(meta, cervii18n.ErrorConversationMessageListFailed)
+}
+
+// conversationAgentProcessFromAction 转换消息携带的运行引用和模型用量。
+func conversationAgentProcessFromAction(process *conversationaction.ConversationAgentProcess) *ConversationAgentProcess {
+	if process == nil {
+		return nil
+	}
+	return &ConversationAgentProcess{ID: process.ID, DurationMilliseconds: process.DurationMilliseconds,
+		InputTokens: process.Usage.PromptTokens, OutputTokens: process.Usage.CompletionTokens}
 }

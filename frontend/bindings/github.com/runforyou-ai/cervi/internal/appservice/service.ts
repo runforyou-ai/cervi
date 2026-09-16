@@ -339,6 +339,13 @@ export function GetAgent(meta: $models.RequestMeta, agentID: string): $Cancellab
 }
 
 /**
+ * GetAgentRunProcess 返回一次成功运行的有序过程内容和模型用量。
+ */
+export function GetAgentRunProcess(meta: $models.RequestMeta, runID: string): $CancellablePromise<$models.AgentRunProcess> {
+    return $Call.ByID(1895048241, meta, runID);
+}
+
+/**
  * GetAttachmentDownload 签发当前成员可见消息附件的下载地址。
  */
 export function GetAttachmentDownload(meta: $models.RequestMeta, conversationID: string, messageID: string): $CancellablePromise<$models.FileDownload> {

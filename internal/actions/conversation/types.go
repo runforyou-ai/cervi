@@ -261,8 +261,15 @@ type ConversationPendingAgent struct {
 	AvatarFileID *string
 }
 
-// ConversationAgentProcess 定义成功回复的完整过程和模型用量。
+// ConversationAgentProcess 定义成功回复的运行引用和模型用量。
 type ConversationAgentProcess struct {
+	ID                   string
+	DurationMilliseconds int64
+	Usage                agentruntime.Usage
+}
+
+// AgentRunProcess 定义一次成功运行的有序过程内容和模型用量。
+type AgentRunProcess struct {
 	ID                   string
 	DurationMilliseconds int64
 	Usage                agentruntime.Usage

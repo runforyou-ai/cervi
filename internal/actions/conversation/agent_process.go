@@ -10,12 +10,11 @@ import (
 	"fmt"
 
 	"github.com/runforyou-ai/cervi/internal/domain"
-	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
 
-// loadConversationAgentProcesses 在已授权的消息窗口中批量补充成功过程和最近运行状态。
+// loadConversationAgentProcesses 在已授权的消息窗口中批量补充成功运行的过程引用和最近运行状态。
 func loadConversationAgentProcesses(ctx context.Context, db bun.IDB, organizationID, conversationID string, history *ConversationMessageHistory) error {
 	var latest struct {
 		servermodels.AgentRun `bun:",embed"`
@@ -52,36 +51,15 @@ func loadConversationAgentProcesses(ctx context.Context, db bun.IDB, organizatio
 		Where("agr.status = ? AND agr.response_message_id IN (?)", domain.AgentRunStatusSucceeded, bun.In(messageIDs)).Scan(ctx); err != nil {
 		return fmt.Errorf("load message agent processes: %w", err)
 	}
-	processes := make(map[string]*ConversationAgentProcess, len(runs))
-	runIDs := make([]string, 0, len(runs))
 	for _, run := range runs {
 		if run.StartedAt == nil || run.CompletedAt == nil || run.ResponseMessageID == nil {
 			return fmt.Errorf("load completed agent process: %w", ErrDataInvariant)
 		}
-		process := &ConversationAgentProcess{ID: run.ID, DurationMilliseconds: run.CompletedAt.Sub(*run.StartedAt).Milliseconds(), Blocks: []agentruntime.Block{}}
+		process := &ConversationAgentProcess{ID: run.ID, DurationMilliseconds: run.CompletedAt.Sub(*run.StartedAt).Milliseconds()}
 		if err := json.Unmarshal(run.Usage, &process.Usage); err != nil {
 			return fmt.Errorf("decode agent usage: %w", err)
 		}
 		history.Messages[messagePositions[*run.ResponseMessageID]].AgentProcess = process
-		processes[run.ID] = process
-		runIDs = append(runIDs, run.ID)
-	}
-	if len(runIDs) == 0 {
-		return nil
-	}
-	var blocks []servermodels.AgentRunBlock
-	if err := db.NewSelect().Model(&blocks).
-		Where("arb.organization_id = ? AND arb.agent_run_id IN (?)", organizationID, bun.In(runIDs)).
-		OrderExpr("arb.agent_run_id, arb.position").Scan(ctx); err != nil {
-		return fmt.Errorf("load agent process blocks: %w", err)
-	}
-	for _, block := range blocks {
-		var payload agentruntime.BlockPayload
-		if err := json.Unmarshal(block.Payload, &payload); err != nil {
-			return fmt.Errorf("decode agent process block: %w", err)
-		}
-		process := processes[block.AgentRunID]
-		process.Blocks = append(process.Blocks, agentruntime.Block{ID: block.ID, Position: block.Position, ModelCallID: block.ModelCallID, Kind: domain.AgentRunBlockKind(block.Kind), Payload: payload})
 	}
 	return nil
 }

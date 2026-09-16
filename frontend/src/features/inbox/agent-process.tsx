@@ -1,9 +1,9 @@
-/** 展示 Agent 思考过程、工具详情、模型用量和停止回复入口。 */
+/** 展示 Agent 运行摘要，展开时读取思考过程与工具详情，并提供停止回复入口。 */
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
 import { resourceKeys } from "@/hooks/resource-keys"
-import { useResourceInvalidator } from "@/hooks/use-resource"
+import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 import { BrainIcon, ChevronDownIcon, LightbulbIcon, SquareIcon } from "lucide-react"
@@ -16,6 +16,7 @@ import { Popover } from "radix-ui"
 
 import {
   isApiError,
+  getAgentRunProcess,
   stopAgentReply,
   stopCustomerCopilotReply,
   stopGroupAgentReply,
@@ -138,12 +139,19 @@ function AgentTool({ call }: { call: AgentToolCall }) {
   )
 }
 
-/** 沿头像侧对齐思考标题、右上角显示本次模型用量，按服务端块顺序展开思考过程。 */
+/** 沿头像侧对齐思考标题、右上角显示本次模型用量，首次展开时按运行编号读取过程内容。 */
 export function AgentProcess({ process, incoming }: { process: ConversationAgentProcessData; incoming: boolean }) {
-  const { t, i18n } = useTranslation("inbox")
+  const { t, i18n } = useTranslation(["inbox", "common"])
+  const [opened, setOpened] = useState(false)
   const seconds = Math.max(0, Math.round(process.durationMilliseconds / 1000))
+  // 成功运行的过程内容不可变，首次展开后按运行编号读取并长期复用缓存。
+  const detail = useResource(
+    resourceKeys.agentRunProcess(process.id),
+    (signal) => getAgentRunProcess(process.id, signal),
+    { enabled: opened, staleTime: Infinity },
+  )
   return (
-    <Collapsible className="mb-3 min-w-0">
+    <Collapsible className="mb-3 min-w-0" onOpenChange={(open) => open && setOpened(true)}>
       <div className="flex items-center gap-3">
         <CollapsibleTrigger className={cn(
           "group flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-sm py-1 text-left text-xs focus-visible:outline focus-visible:outline-ring",
@@ -165,7 +173,7 @@ export function AgentProcess({ process, incoming }: { process: ConversationAgent
         "mt-2 space-y-3 text-left text-sm",
         incoming ? "border-l border-border pl-3" : "border-r border-primary-foreground/30 pr-3",
       )}>
-        {process.blocks.map((block) =>
+        {detail.data ? detail.data.blocks.map((block) =>
           block.kind === AgentRunBlockKind.AgentRunBlockToolCall && block.toolCall ? (
             <AgentTool key={block.id} call={block.toolCall} />
           ) : (
@@ -180,6 +188,22 @@ export function AgentProcess({ process, incoming }: { process: ConversationAgent
               <MessageMarkdown locale={i18n.language} onOpenLink={openExternalURL}>{block.text}</MessageMarkdown>
             </div>
           ),
+        ) : (
+          // 读取中与读取失败共用一行占位，保持展开区域高度稳定。
+          <p className={cn("text-xs", incoming ? "text-muted-foreground" : "text-primary-foreground/75")}>
+            {detail.error ? (
+              <>
+                <span>{isApiError(detail.error) ? apiErrorMessage(detail.error) : t("agentProcessLoadFailed")}</span>
+                <button
+                  type="button"
+                  className="ml-2 rounded-sm underline focus-visible:outline focus-visible:outline-ring"
+                  onClick={() => void detail.refresh()}
+                >
+                  {t("common:actions.retry")}
+                </button>
+              </>
+            ) : t("common:status.loading")}
+          </p>
         )}
       </CollapsibleContent>
     </Collapsible>

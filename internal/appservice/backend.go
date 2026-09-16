@@ -206,6 +206,9 @@ type Backend interface {
 	// StopGroupAgentReply 停止群聊中指定的 AI 员工回复并返回实际运行状态。
 	//cervi:route POST /group-conversations/:conversationID/runs/:runID/stop
 	StopGroupAgentReply(context.Context, RequestMeta, string, string) (AgentRunStatus, error)
+	// GetAgentRunProcess 返回一次成功运行的有序过程内容和模型用量。
+	//cervi:route GET /agent-runs/:runID/process
+	GetAgentRunProcess(context.Context, RequestMeta, string) (AgentRunProcess, error)
 	// ListMessageChannels 返回消息渠道列表。
 	//cervi:route GET /channels
 	ListMessageChannels(context.Context, RequestMeta) (MessageChannelList, error)

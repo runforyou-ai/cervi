@@ -52,6 +52,7 @@ type conversationOps struct {
 	leaveGroupConversation          *conversationaction.LeaveGroupConversationAction
 	dissolveGroupConversation       *conversationaction.DissolveGroupConversationAction
 	sendGroupTextMessage            *conversationaction.SendGroupTextMessageAction
+	getAgentRunProcess              *conversationaction.GetAgentRunProcessQuery
 }
 
 // newConversationOps 创建会话与消息的业务实现依赖。
@@ -87,6 +88,7 @@ func newConversationOps(db *bun.DB, agentScheduler conversationaction.AgentMessa
 		leaveGroupConversation:          conversationaction.NewLeaveGroupConversationAction(db),
 		dissolveGroupConversation:       conversationaction.NewDissolveGroupConversationAction(db, agentCoordinator),
 		sendGroupTextMessage:            conversationaction.NewSendGroupTextMessageAction(db, agentScheduler),
+		getAgentRunProcess:              conversationaction.NewGetAgentRunProcessQuery(db),
 	}
 }
 

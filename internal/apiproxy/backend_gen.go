@@ -477,6 +477,14 @@ func (b *Backend) StopGroupAgentReply(ctx context.Context, meta appservice.Reque
 	return output, err
 }
 
+// GetAgentRunProcess 返回一次成功运行的有序过程内容和模型用量。
+func (b *Backend) GetAgentRunProcess(ctx context.Context, meta appservice.RequestMeta, runID string) (appservice.AgentRunProcess, error) {
+	var output appservice.AgentRunProcess
+	err := b.do(ctx, meta, http.MethodGet, "/agent-runs/"+url.PathEscape(runID)+"/process", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // ListMessageChannels 返回消息渠道列表。
 func (b *Backend) ListMessageChannels(ctx context.Context, meta appservice.RequestMeta) (appservice.MessageChannelList, error) {
 	var output appservice.MessageChannelList

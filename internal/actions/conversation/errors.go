@@ -14,6 +14,8 @@ var (
 	ErrAgentUnavailable = errors.New("agent unavailable")
 	// ErrAgentTargetNotFound 表示 AI 聊天目标不存在或不可用。
 	ErrAgentTargetNotFound = errors.New("AI conversation target not found")
+	// ErrAgentRunProcessUnavailable 表示运行过程不存在或当前身份无权读取。
+	ErrAgentRunProcessUnavailable = errors.New("agent run process unavailable")
 	// ErrMessageUnavailable 表示目标消息不存在或已经删除。
 	ErrMessageUnavailable = errors.New("conversation message unavailable")
 	// ErrMentionTargetInvalid 表示当前用户的提及目标校验失败。

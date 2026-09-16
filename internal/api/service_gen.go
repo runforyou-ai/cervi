@@ -76,6 +76,7 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.POST("/group-conversations/:conversationID/dissolve", s.dissolveGroupConversation)
 	router.POST("/group-conversations/:conversationID/messages", s.sendGroupTextMessage)
 	router.POST("/group-conversations/:conversationID/runs/:runID/stop", s.stopGroupAgentReply)
+	router.GET("/agent-runs/:runID/process", s.getAgentRunProcess)
 	router.GET("/channels", s.listMessageChannels)
 	router.GET("/channels/website/:channelID", s.getWebsiteChannel)
 	router.GET("/channels/telegram/:channelID", s.getTelegramChannel)
@@ -691,6 +692,12 @@ func (s *Service) sendGroupTextMessage(c *gin.Context) {
 // stopGroupAgentReply 停止群聊中指定的 AI 员工回复并返回实际运行状态。
 func (s *Service) stopGroupAgentReply(c *gin.Context) {
 	output, err := s.application.StopGroupAgentReply(c.Request.Context(), requestMeta(c), c.Param("conversationID"), c.Param("runID"))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// getAgentRunProcess 返回一次成功运行的有序过程内容和模型用量。
+func (s *Service) getAgentRunProcess(c *gin.Context) {
+	output, err := s.application.GetAgentRunProcess(c.Request.Context(), requestMeta(c), c.Param("runID"))
 	writeResult(c, http.StatusOK, output, err)
 }
 

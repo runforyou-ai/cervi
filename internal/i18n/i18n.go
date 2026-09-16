@@ -56,6 +56,7 @@ const (
 	FieldKnowledgeQAGroupInvalid         Key = "field.knowledge_qa_group_invalid"
 	FieldKnowledgeQAContentInvalid       Key = "field.knowledge_qa_content_invalid"
 
+	ErrorAgentRunProcessUnavailable       Key = "error.agent_run_process_unavailable"
 	ErrorConversationMessageUnavailable   Key = "error.conversation_message_unavailable"
 	ErrorConversationMentionTargetInvalid Key = "error.conversation_mention_target_invalid"
 )

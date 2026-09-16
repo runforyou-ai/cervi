@@ -70,6 +70,8 @@ export const resourceKeys = {
       conversationId,
       messageId ? { messageId } : undefined,
     ),
+  /** 按运行编号读取的 AI 运行过程详情。 */
+  agentRunProcess: (runId?: string) => itemKey("agent-run-process", runId),
   /** 当前群聊的提及进度。 */
   conversationNavigation: (conversationId?: string) =>
     itemKey("conversation-navigation", conversationId),

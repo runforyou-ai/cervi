@@ -81,6 +81,7 @@ export type {
     AgentModelOption,
     AgentModelOptionList,
     AgentRunContentBlock,
+    AgentRunProcess,
     AgentTextMessageInput,
     AgentToolCall,
     AttachmentMessageInput,
