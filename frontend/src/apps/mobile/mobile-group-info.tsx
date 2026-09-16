@@ -1,4 +1,4 @@
-/** 移动端群成员预览下方的群资料和个人、群主管理入口。 */
+/** 移动端群成员预览下方的群资料、聊天记录搜索和个人、群主管理入口。 */
 import { ChevronRightIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { GroupParticipantRole, type GroupConversationData } from "@/api"
@@ -17,6 +17,7 @@ export function MobileGroupInfo({
   muteBusy,
   onEdit,
   onTransfer,
+  onSearch,
   onLeave,
   onMute,
 }: {
@@ -28,6 +29,7 @@ export function MobileGroupInfo({
   muteBusy: boolean
   onEdit: (field: "image" | "title" | "description") => void
   onTransfer: () => void
+  onSearch: () => void
   onLeave: (trigger: HTMLElement | null) => void
   onMute: (muted: boolean) => void
 }) {
@@ -119,6 +121,14 @@ export function MobileGroupInfo({
           {tm("group.archived")}
         </p>
       ) : null}
+      <button
+        type="button"
+        onClick={onSearch}
+        className="flex min-h-14 w-full items-center justify-between gap-3 border-t text-left text-sm outline-none active:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
+      >
+        {t("searchCurrentConversation")}
+        <ChevronRightIcon className="size-5 shrink-0 text-muted-foreground" />
+      </button>
       <div className="flex min-h-14 items-center justify-between gap-3 border-t text-sm">
         <label
           className="flex min-h-14 flex-1 items-center"

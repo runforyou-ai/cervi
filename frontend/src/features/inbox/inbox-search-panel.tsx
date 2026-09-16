@@ -16,7 +16,7 @@ import { Button } from "@/components/ui/button"
 import { ConversationAvatar } from "@/features/inbox/conversation-avatar"
 import { useConversationName } from "@/features/inbox/use-conversation-name"
 import { useConversationTime } from "@/features/inbox/use-conversation-time"
-import type { InboxSearchState, InboxSearchType } from "@/features/inbox/use-inbox-search"
+import type { InboxSearchMessageData, InboxSearchState, InboxSearchType } from "@/features/inbox/use-inbox-search"
 import { cn } from "@/lib/utils"
 
 const searchGroupLimit = 6
@@ -29,7 +29,7 @@ function keepSearchFocus(event: MouseEvent) {
 }
 
 /** 不区分大小写地标出名称中的首个匹配片段。 */
-function highlightName(name: string, query: string): ReactNode {
+export function highlightName(name: string, query: string): ReactNode {
   const index = query ? name.toLowerCase().indexOf(query.toLowerCase()) : -1
   if (index < 0) return name
   return (
@@ -37,6 +37,23 @@ function highlightName(name: string, query: string): ReactNode {
       {name.slice(0, index)}
       <mark className={markClassName}>{name.slice(index, index + query.length)}</mark>
       {name.slice(index + query.length)}
+    </>
+  )
+}
+
+/** 渲染消息结果的发送者与高亮摘要。 */
+export function InboxSearchExcerpt({ message }: { message: InboxSearchMessageData }) {
+  const { t } = useTranslation("inbox")
+  return (
+    <>
+      {message.senderName ? t("searchMessageSender", { name: message.senderName }) : null}
+      {message.excerpt.map((segment, segmentIndex) =>
+        segment.match ? (
+          <mark key={segmentIndex} className={markClassName}>{segment.text}</mark>
+        ) : (
+          <span key={segmentIndex}>{segment.text}</span>
+        ),
+      )}
     </>
   )
 }
@@ -188,18 +205,7 @@ export function InboxSearchPanel({ search, scope }: { search: InboxSearchState; 
               selected={search.selectedIndex === messageOffset + position}
               avatar={<ConversationAvatar conversation={message.conversation} className="size-7" />}
               title={conversationName(message.conversation)}
-              detail={
-                <>
-                  {message.senderName ? t("searchMessageSender", { name: message.senderName }) : null}
-                  {message.excerpt.map((segment, segmentIndex) =>
-                    segment.match ? (
-                      <mark key={segmentIndex} className={markClassName}>{segment.text}</mark>
-                    ) : (
-                      <span key={segmentIndex}>{segment.text}</span>
-                    ),
-                  )}
-                </>
-              }
+              detail={<InboxSearchExcerpt message={message} />}
               time={formatTime(message.originatedAt)}
               onSelect={search.setActiveIndex}
               onOpen={() => search.open({ kind: "message", message })}

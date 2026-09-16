@@ -1,7 +1,7 @@
 /** 移动端客户会话详情、回复与客服处理周期操作。 */
-import { LoaderCircleIcon, MoreHorizontalIcon } from "lucide-react"
+import { LoaderCircleIcon, MoreHorizontalIcon, SearchIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { Navigate, useLocation, useParams } from "react-router"
+import { Navigate, useLocation, useNavigate, useParams } from "react-router"
 
 import {
   ChannelType,
@@ -10,7 +10,11 @@ import {
   type CustomerInboxConversationData,
 } from "@/api"
 import { MobileIndividualThread } from "@/apps/mobile/mobile-individual-thread"
-import { useMobileNavigation } from "@/apps/mobile/mobile-navigation"
+import {
+  mobileSearchPath,
+  useMobileNavigation,
+  type MobileLocateState,
+} from "@/apps/mobile/mobile-navigation"
 import { MobilePageHeader } from "@/apps/mobile/mobile-page"
 import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
 import { LoadingIndicator } from "@/components/loading-indicator"
@@ -117,18 +121,20 @@ function MobileCustomerSessionMenu({
   )
 }
 
-/** 加载客户会话摘要，展示历史、回复区和处理菜单。 */
+/** 加载客户会话摘要，展示历史、回复区、会话内搜索入口和处理菜单。 */
 export function MobileCustomerConversationPage() {
   const { t } = useTranslation(["inbox", "common"])
   const { inboxURL } = useMobileNavigation()
   const { identity } = useMobileWorkspace()
   const { conversationID = "" } = useParams()
   const location = useLocation()
+  const navigate = useNavigate()
   const summary = useConversationSummary(conversationID, false)
+  const locationState = location.state as
+    | (MobileLocateState & { conversation?: CustomerInboxConversationData })
+    | null
   // 路由携带的摘要保持首屏线程，查询完成后由服务端结果接管。
-  const initial = (
-    location.state as { conversation?: CustomerInboxConversationData } | null
-  )?.conversation
+  const initial = locationState?.conversation
   const data =
     summary.data === undefined && initial?.id === conversationID
       ? initial
@@ -162,9 +168,24 @@ export function MobileCustomerConversationPage() {
           </span>
         }
         actions={
-          conversation ? (
-            <MobileCustomerSessionMenu conversation={conversation} />
-          ) : null
+          <>
+            <Button
+              variant="ghost"
+              size="icon-lg"
+              aria-label={t("searchCurrentConversation")}
+              disabled={!conversation}
+              onClick={() =>
+                void navigate(mobileSearchPath(conversationID), {
+                  state: { mobileBack: true },
+                })
+              }
+            >
+              <SearchIcon />
+            </Button>
+            {conversation ? (
+              <MobileCustomerSessionMenu conversation={conversation} />
+            ) : null}
+          </>
         }
       />
       {summary.loading && !conversation ? (
@@ -196,6 +217,7 @@ export function MobileCustomerConversationPage() {
           }
           disabledReason={disabledReason}
           lastReadMessageID={conversation.lastReadMessageId}
+          locateMessage={locationState?.locateMessage}
         />
       )}
     </section>

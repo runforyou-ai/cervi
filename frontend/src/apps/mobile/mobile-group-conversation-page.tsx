@@ -14,7 +14,10 @@ import { toast } from "sonner"
 import { getGroupConversation, isNotFoundApiError } from "@/api"
 import type { MobileGroupContext } from "@/apps/mobile/mobile-group-context"
 import { MobileGroupThread } from "@/apps/mobile/mobile-group-thread"
-import { useMobileNavigation } from "@/apps/mobile/mobile-navigation"
+import {
+  useMobileNavigation,
+  type MobileLocateState,
+} from "@/apps/mobile/mobile-navigation"
 import { MobilePageHeader, MobilePageState } from "@/apps/mobile/mobile-page"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { useAttachmentQueue } from "@/features/inbox/attachment-queue-context"
@@ -49,10 +52,10 @@ function MobileGroupConversation({
   const outgoingStore = useOutgoingMessageStore()
   const { queue } = useAttachmentQueue()
   const location = useLocation()
-  const navigationState = location.state as {
+  const navigationState = location.state as (MobileLocateState & {
     mobileBack?: boolean
     groupReturnDepth?: number
-  } | null
+  }) | null
   // 记录当前群子页到来源列表的历史距离，退出时一次返回来源。
   const returnDepth =
     navigationState?.groupReturnDepth ?? (navigationState?.mobileBack ? 1 : 0)
@@ -185,6 +188,7 @@ function MobileGroupConversation({
           <MobileGroupThread
             conversation={data}
             active={!detailsOpen}
+            locateMessage={navigationState?.locateMessage}
             onUnavailable={() => {
               if (!leavePending) handleUnavailable()
             }}

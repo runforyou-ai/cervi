@@ -53,6 +53,7 @@ const mobile = {
     loadError: "Could not load messages. Check your connection and try again.",
     emptyTitle: "No conversations",
     emptyDescription: "No conversations match this category and its filters.",
+    clearSearch: "Clear search",
   },
   group: {
     addMembers: "Add group members",

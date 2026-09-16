@@ -7,8 +7,18 @@ import {
   useState,
   type ReactNode,
 } from "react"
+import {
+  isAgentInboxConversation,
+  isCustomerInboxConversation,
+  isDirectInboxConversation,
+  type InboxConversation,
+} from "@/api"
+import type { ConversationLocateTarget } from "@/features/inbox/conversation-timeline"
 import type { InboxListBookmark } from "@/features/inbox/inbox-list-controller"
 import { useLocation, useNavigate } from "react-router"
+
+/** 会话详情路由携带的原消息定位目标。 */
+export type MobileLocateState = { locateMessage?: ConversationLocateTarget }
 
 type MobileNavigationState = {
   inboxURL: string
@@ -69,4 +79,23 @@ export function useMobileBack(fallback: string) {
       void navigate(fallback, { replace: true })
     }
   }
+}
+
+/** 返回会话摘要对应的移动端详情地址。 */
+export function mobileConversationPath(conversation: InboxConversation) {
+  const type = isCustomerInboxConversation(conversation)
+    ? "customer"
+    : isAgentInboxConversation(conversation)
+      ? "agent"
+      : isDirectInboxConversation(conversation)
+        ? "direct"
+        : "group"
+  return `/inbox/${type}/${conversation.id}`
+}
+
+/** 返回移动端检索页地址，传入会话编号时限定在该会话内检索。 */
+export function mobileSearchPath(conversationID = "") {
+  return conversationID
+    ? `/inbox/search?${new URLSearchParams({ conversation: conversationID })}`
+    : "/inbox/search"
 }

@@ -59,10 +59,12 @@ type SearchMessage struct {
 	Conversation ConversationSummary
 }
 
-// SearchPerson 表示命中的企业成员或外部联系人，外部联系人携带最近一次客户会话。
+// SearchPerson 表示命中的企业成员或外部联系人；真人成员携带用户编号，AI 员工携带 Agent 编号，外部联系人携带最近一次客户会话。
 type SearchPerson struct {
 	Kind           SearchPersonKind                `bun:"kind"`
 	ID             string                          `bun:"id"`
+	UserID         *string                         `bun:"user_id"`
+	AgentID        *string                         `bun:"agent_id"`
 	IdentityType   domain.OrganizationIdentityType `bun:"identity_type"`
 	DisplayName    string                          `bun:"display_name"`
 	AvatarFileID   *string                         `bun:"avatar_file_id"`
@@ -238,7 +240,7 @@ func (q *LoadInboxQuery) searchPeople(ctx context.Context, identity *servermodel
 	pattern := "%" + text + "%"
 	people := []SearchPerson{}
 	if err := q.db.NewSelect().TableExpr("organization_identities AS oi").
-		ColumnExpr("? AS kind, oi.id::text AS id, oi.type AS identity_type, oi.display_name, oi.avatar_file_id::text AS avatar_file_id", SearchPersonMember).
+		ColumnExpr("? AS kind, oi.id::text AS id, u.id::text AS user_id, a.id::text AS agent_id, oi.type AS identity_type, oi.display_name, oi.avatar_file_id::text AS avatar_file_id", SearchPersonMember).
 		Join("LEFT JOIN users AS u ON u.organization_id = oi.organization_id AND u.identity_id = oi.id").
 		Join("LEFT JOIN agents AS a ON a.organization_id = oi.organization_id AND a.identity_id = oi.id").
 		Where("oi.organization_id = ? AND oi.id <> ?", identity.Organization.ID, identity.OrganizationIdentity.ID).

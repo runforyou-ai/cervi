@@ -1,4 +1,4 @@
-/** 消息页中栏搜索模式的状态、检索读取与键盘选择。 */
+/** 收件箱检索结果读取，以及消息页中栏搜索模式的状态与键盘选择。 */
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react"
 
 import {
@@ -27,27 +27,27 @@ export type InboxSearchItem =
 
 export type InboxSearchState = ReturnType<typeof useInboxSearch>
 
-/** 管理搜索模式、按范围读取结果和最近打开会话，并提供跨分组的键盘选择。 */
-export function useInboxSearch({
+/** 按检索文本、范围和类型读取分组结果与最近打开会话，只返回与当前输入一致的结果。 */
+export function useInboxSearchResults({
+  active,
+  text,
+  range: selectedRange,
+  conversationId,
+  type,
   query,
   recentConversationIds,
-  onOpen,
 }: {
+  active: boolean
+  text: string
+  range: InboxSearchRange
+  conversationId: string
+  type: InboxSearchType
   query: InboxQuery
   recentConversationIds: string[]
-  onOpen: (item: InboxSearchItem) => void
 }) {
-  const inputRef = useRef<HTMLInputElement>(null)
-  const activeRef = useRef(false)
-  const [active, setActive] = useState(false)
-  const [text, setText] = useState("")
-  const [searchedText, setSearchedText] = useState("")
-  const [selectedRange, setRange] = useState<InboxSearchRange>(InboxSearchRange.InboxSearchRangeReadable)
-  const [conversationId, setConversationId] = useState("")
-  const [type, setType] = useState<InboxSearchType>("all")
-  const [activeIndex, setActiveIndex] = useState(0)
-  const listRange = query.scope !== InboxScope.InboxScopeAll
   const trimmedText = text.trim()
+  const [searchedText, setSearchedText] = useState(trimmedText)
+  const listRange = query.scope !== InboxScope.InboxScopeAll
   // 当前范围为「全部」时列表筛选与全部消息等价，只保留全部消息。
   const range =
     (selectedRange === InboxSearchRange.InboxSearchRangeList && !listRange) ||
@@ -57,7 +57,11 @@ export function useInboxSearch({
   const conversationRange = range === InboxSearchRange.InboxSearchRangeConversation
 
   useEffect(() => {
-    // 输入停顿后再检索。
+    // 输入停顿后再检索；清空输入立即结束上一次检索。
+    if (text.trim() === "") {
+      setSearchedText("")
+      return
+    }
     const timer = window.setTimeout(() => setSearchedText(text.trim()), searchInputDelay)
     return () => window.clearTimeout(timer)
   }, [text])
@@ -83,16 +87,58 @@ export function useInboxSearch({
   // 只展示与当前输入一致的检索结果。
   const current = active && trimmedText !== "" && trimmedText === searchedText
   const data = current ? results.data : undefined
-  const recentConversations = showRecent
-    ? (recent.data?.results ?? []).flatMap((result) => (result.conversation ? [result.conversation] : []))
-    : []
-  const conversations = data && !conversationRange && (type === "all" || type === "conversations") ? data.conversations : []
-  const messages = data && (conversationRange || type === "all" || type === "messages") ? data.messages : []
-  const people = data && !conversationRange && (type === "all" || type === "people") ? data.people : []
+  return {
+    listRange,
+    range,
+    searchedText,
+    showRecent,
+    recentConversations: showRecent
+      ? (recent.data?.results ?? []).flatMap((result) => (result.conversation ? [result.conversation] : []))
+      : [],
+    conversations: data && !conversationRange && (type === "all" || type === "conversations") ? data.conversations : [],
+    messages: data && (conversationRange || type === "all" || type === "messages") ? data.messages : [],
+    people: data && !conversationRange && (type === "all" || type === "people") ? data.people : [],
+    pending: trimmedText !== "" && (!current || results.loading),
+    error: current ? results.error : null,
+    retry: results.refresh,
+  }
+}
+
+/** 管理搜索模式、按范围读取结果和最近打开会话，并提供跨分组的键盘选择。 */
+export function useInboxSearch({
+  query,
+  recentConversationIds,
+  onOpen,
+}: {
+  query: InboxQuery
+  recentConversationIds: string[]
+  onOpen: (item: InboxSearchItem) => void
+}) {
+  const inputRef = useRef<HTMLInputElement>(null)
+  const activeRef = useRef(false)
+  const [active, setActive] = useState(false)
+  const [text, setText] = useState("")
+  const [selectedRange, setRange] = useState<InboxSearchRange>(InboxSearchRange.InboxSearchRangeReadable)
+  const [conversationId, setConversationId] = useState("")
+  const [type, setType] = useState<InboxSearchType>("all")
+  const [activeIndex, setActiveIndex] = useState(0)
+  const results = useInboxSearchResults({
+    active,
+    text,
+    range: selectedRange,
+    conversationId,
+    type,
+    query,
+    recentConversationIds,
+  })
+  const { listRange, range, searchedText, showRecent } = results
   const items: InboxSearchItem[] = [
-    ...(showRecent ? recentConversations : conversations).map((conversation) => ({ kind: "conversation" as const, conversation })),
-    ...messages.map((message) => ({ kind: "message" as const, message })),
-    ...people.map((person) => ({ kind: "person" as const, person })),
+    ...(showRecent ? results.recentConversations : results.conversations).map((conversation) => ({
+      kind: "conversation" as const,
+      conversation,
+    })),
+    ...results.messages.map((message) => ({ kind: "message" as const, message })),
+    ...results.people.map((person) => ({ kind: "person" as const, person })),
   ]
   const selectedIndex = Math.min(activeIndex, items.length - 1)
 
@@ -122,7 +168,6 @@ export function useInboxSearch({
     activeRef.current = false
     setActive(false)
     setText("")
-    setSearchedText("")
     setConversationId("")
     setType("all")
     inputRef.current?.blur()
@@ -185,16 +230,16 @@ export function useInboxSearch({
     type,
     setType,
     showRecent,
-    recentConversations,
-    conversations,
-    messages,
-    people,
+    recentConversations: results.recentConversations,
+    conversations: results.conversations,
+    messages: results.messages,
+    people: results.people,
     items,
     selectedIndex,
     setActiveIndex,
-    pending: trimmedText !== "" && (!current || results.loading),
-    error: current ? results.error : null,
-    retry: results.refresh,
+    pending: results.pending,
+    error: results.error,
+    retry: results.retry,
     open: onOpen,
     enter,
     exit,

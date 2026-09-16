@@ -1,5 +1,5 @@
 /** 移动端统一会话摘要列表、阅读状态菜单和内部聊天入口。 */
-import { BellOffIcon, PlusIcon } from "lucide-react"
+import { BellOffIcon, PlusIcon, SearchIcon } from "lucide-react"
 import { messagePreview } from "@/lib/message-preview"
 import { useTranslation } from "react-i18next"
 import { useNavigate, useOutletContext } from "react-router"
@@ -51,7 +51,11 @@ import {
   useMobileWorkspace,
   type MobileTabContext,
 } from "./mobile-workspace-layout"
-import { useMobileNavigation } from "./mobile-navigation"
+import {
+  mobileConversationPath,
+  mobileSearchPath,
+  useMobileNavigation,
+} from "./mobile-navigation"
 import { InboxListPanel } from "@/features/inbox/inbox-list-panel"
 import { useInboxList } from "@/features/inbox/use-inbox-list"
 import { useInboxListViewport } from "@/features/inbox/use-inbox-list-viewport"
@@ -236,7 +240,7 @@ export function MobileInboxPage() {
 
 /** 每个移动筛选独立挂载窗口，离开时保存原邻域。 */
 function MobileInboxList({ query, changeQuery }: ReturnType<typeof useMobileInboxQuery>) {
-  const { t } = useTranslation(["mobile", "common"])
+  const { t } = useTranslation(["mobile", "inbox", "common"])
   const navigate = useNavigate()
   const pollingActive = useMemberChatPollingActive({
     requireWindowFocus: false,
@@ -261,28 +265,41 @@ function MobileInboxList({ query, changeQuery }: ReturnType<typeof useMobileInbo
       <MobilePageHeader
         title={t("inbox.title")}
         actions={
-          <DropdownMenu onOpenChange={viewport.setMenu}>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="shrink-0 bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
-                aria-label={t("inbox.add")}
-              >
-                <PlusIcon />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem
-                className="min-h-11"
-                onSelect={() => navigate("/inbox/group/new", {
-                  state: { mobileBack: true },
-                })}
-              >
-                {t("group.create")}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
+          <>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              className="shrink-0"
+              aria-label={t("inbox:searchLabel")}
+              onClick={() =>
+                navigate(mobileSearchPath(), { state: { mobileBack: true } })
+              }
+            >
+              <SearchIcon />
+            </Button>
+            <DropdownMenu onOpenChange={viewport.setMenu}>
+              <DropdownMenuTrigger asChild>
+                <Button
+                  variant="ghost"
+                  size="icon-sm"
+                  className="shrink-0 bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
+                  aria-label={t("inbox.add")}
+                >
+                  <PlusIcon />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  className="min-h-11"
+                  onSelect={() => navigate("/inbox/group/new", {
+                    state: { mobileBack: true },
+                  })}
+                >
+                  {t("group.create")}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </>
         }
       />
       <MobileInboxScopes
@@ -319,18 +336,11 @@ function MobileInboxList({ query, changeQuery }: ReturnType<typeof useMobileInbo
                 conversation={conversation}
                 actions={actions}
                 onMenuChange={viewport.setMenu}
-                onOpen={(conversation) => {
-                  const type = isCustomerInboxConversation(conversation)
-                    ? "customer"
-                    : isAgentInboxConversation(conversation)
-                      ? "agent"
-                      : isDirectInboxConversation(conversation)
-                        ? "direct"
-                        : "group"
-                  navigate(`/inbox/${type}/${conversation.id}`, {
+                onOpen={(conversation) =>
+                  navigate(mobileConversationPath(conversation), {
                     state: { conversation, mobileBack: true },
                   })
-                }}
+                }
               />
             ))}
           </ul>

@@ -15,6 +15,7 @@ import {
 } from "@/api"
 import { MobileIndividualHeader } from "@/apps/mobile/mobile-individual-conversation-page"
 import { MobileIndividualThread } from "@/apps/mobile/mobile-individual-thread"
+import type { MobileLocateState } from "@/apps/mobile/mobile-navigation"
 import { MobilePageState } from "@/apps/mobile/mobile-page"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { useAccountDisabledReason } from "@/features/inbox/use-account-disabled-reason"
@@ -22,7 +23,7 @@ import { useConversationSummary } from "@/features/inbox/use-conversation-summar
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 
-type MobileAgentLocationState = {
+type MobileAgentLocationState = MobileLocateState & {
   draftAgentID?: string
   mobileBack?: boolean
   agentDirectory?: boolean
@@ -128,6 +129,7 @@ function MobileAgentConversation({ conversationID }: { conversationID: string })
           }}
           disabledReason={disabledReason}
           lastReadMessageID={conversation?.lastReadMessageId}
+          locateMessage={(location.state as MobileAgentLocationState | null)?.locateMessage}
           sendIndividualMessage={!persisted && draftAgent ? async (input) => {
             console.info("发起移动端 AI 会话", {
               conversationId: conversationID,

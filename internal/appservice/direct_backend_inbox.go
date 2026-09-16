@@ -331,7 +331,7 @@ func (o *directOperations) SearchInbox(ctx context.Context, meta RequestMeta, id
 	}
 	for _, person := range result.People {
 		item := InboxSearchPerson{
-			Kind: InboxSearchPersonKind(person.Kind), ID: person.ID, DisplayName: person.DisplayName,
+			Kind: InboxSearchPersonKind(person.Kind), ID: person.ID, UserID: person.UserID, AgentID: person.AgentID, DisplayName: person.DisplayName,
 			AvatarURL: optionalFileURL(avatarURLs, person.AvatarFileID), ConversationID: person.ConversationID,
 		}
 		if person.Kind == inboxaction.SearchPersonMember {
