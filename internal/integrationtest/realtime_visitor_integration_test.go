@@ -36,7 +36,7 @@ type visitorRealtimeHarness struct {
 }
 
 // startVisitorRealtime 启动发布器、带访客后端的实时网关与公开 HTTP 路由，并记录本次发布的全部 Subject。
-func startVisitorRealtime(t *testing.T, f customerReadFixture) *visitorRealtimeHarness {
+func startVisitorRealtime(t *testing.T, f customerReadFixture, options gateway.Options) *visitorRealtimeHarness {
 	t.Helper()
 	config := servertest.NATSConfig(t, "test_visitor_"+strings.ReplaceAll(uuid.NewV7().String(), "-", ""))
 	publisher := realtime.NewPublisher(config)
@@ -61,7 +61,7 @@ func startVisitorRealtime(t *testing.T, f customerReadFixture) *visitorRealtimeH
 	scheduler := agentrunaction.NewScheduler(servertask.New(f.db, serverconfig.NATSConfig{}))
 	visitorBackend := appservice.NewWebsiteVisitorDirectBackend(f.db, scheduler)
 	memberBackend := appservice.NewDirectBackend(f.db, nil, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil)
-	realtimeGateway := gateway.New(memberBackend, visitorBackend, config.Namespace, testGatewayOptions())
+	realtimeGateway := gateway.New(memberBackend, visitorBackend, config.Namespace, options)
 	realtimeGateway.Start(publisher.Connection())
 	t.Cleanup(realtimeGateway.Shutdown)
 
@@ -148,7 +148,9 @@ func (h *visitorRealtimeHarness) expectRejected(t *testing.T, channelID, token s
 func TestVisitorRealtimeStream(t *testing.T) {
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
-	h := startVisitorRealtime(t, f)
+	options := testGatewayOptions()
+	options.PingInterval = 300 * time.Millisecond
+	h := startVisitorRealtime(t, f, options)
 	const visitorToken = "0123456789abcdef0123456789abcdef"
 	const otherToken = "fedcba9876543210fedcba9876543210"
 
@@ -168,6 +170,26 @@ func TestVisitorRealtimeStream(t *testing.T) {
 	}
 	// 请求中指定他人线程编号不扩大接收范围，事件流仍只按本身份的渠道身份受众收敛。
 	other := h.connect(t, f.channelID, otherToken, "?conversationId="+f.conversationID)
+
+	// 访客事件流持续超过服务器 1 秒读写超时后仍存活并收到心跳。
+	deadline := time.After(1500 * time.Millisecond)
+	pings := 0
+	for waiting := true; waiting; {
+		select {
+		case frame, ok := <-client.frames:
+			if !ok {
+				t.Fatal("访客事件流在服务器读写超时后结束")
+			}
+			if _, ping := frame.(protocol.Ping); ping {
+				pings++
+			}
+		case <-deadline:
+			waiting = false
+		}
+	}
+	if pings < 3 {
+		t.Fatalf("pings = %d", pings)
+	}
 
 	// 客服回复推进本访客线程版本，只有该访客的事件流收到公开变更通知。
 	if _, err := conversationaction.NewSendCustomerTextMessageAction(f.db, nil).Execute(ctx, f.owner, conversationaction.CustomerTextMessageInput{
@@ -201,8 +223,8 @@ func TestVisitorRealtimeStream(t *testing.T) {
 		t.Fatal("未发布访客目录受众通知")
 	}
 
-	// 停用渠道结束该渠道全部访客事件流，重新请求被拒绝。
-	if _, err := channelaction.NewUpdateMessageChannelStatusAction(f.db).Execute(ctx, f.owner, f.channelID, false); err != nil {
+	// 停用渠道结束该渠道全部访客事件流，重新请求被拒绝；请求中的渠道 ID 大小写不同也发往同一个规范受众。
+	if _, err := channelaction.NewUpdateMessageChannelStatusAction(f.db).Execute(ctx, f.owner, strings.ToUpper(f.channelID), false); err != nil {
 		t.Fatal(err)
 	}
 	client.expectEnded()

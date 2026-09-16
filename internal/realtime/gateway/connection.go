@@ -165,7 +165,7 @@ func mergeTarget(frame protocol.Frame) (mergeKey, int64, bool) {
 
 // revoke 清除未发送的事件并结束事件流。
 func (c *connection) revoke(kind realtime.Kind) {
-	slog.Info("实时事件流登录会话已撤销", "connection_id", c.id, "kind", kind)
+	slog.Info("实时事件流已撤销", "connection_id", c.id, "kind", kind)
 	c.close(true)
 }
 

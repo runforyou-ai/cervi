@@ -70,13 +70,14 @@ var memberFrameTypes = []protocol.Type{
 // visitorFrameTypes 是网站访客事件流可下发的公开事件。
 var visitorFrameTypes = []protocol.Type{protocol.TypeVisitorHello, protocol.TypeConversationChanged}
 
-// streamRoute 是一条已授权事件流的受众、撤销标识、可下发事件与最长存活时间。
+// streamRoute 是一条已授权事件流的受众、撤销标识、可下发事件与授权到期时间。
 type streamRoute struct {
 	subjects       []string
 	allowed        []protocol.Type
 	tokenSessionID string
-	lifetime       time.Duration
-	attributes     []any
+	// expiresAt 是事件流授权的绝对到期时间，零值表示只受最长存活时间约束。
+	expiresAt  time.Time
+	attributes []any
 	// greet 在受众订阅生效后复核授权并返回首个事件。
 	greet func(ctx context.Context, connectionID string) (protocol.Frame, error)
 }
@@ -193,7 +194,7 @@ func (g *Gateway) memberRoute(ctx context.Context, meta appservice.RequestMeta) 
 		allowed:        memberFrameTypes,
 		tokenSessionID: identity.Token.ID,
 		// 事件流最长存活时间不晚于登录会话到期。
-		lifetime:   min(g.options.MaxLifetime, time.Until(identity.Token.ExpiresAt)),
+		expiresAt:  identity.Token.ExpiresAt,
 		attributes: []any{"organization_id", organizationID, "user_id", identity.User.ID},
 		greet: func(ctx context.Context, connectionID string) (protocol.Frame, error) {
 			// 订阅生效后再次校验登录会话，之后提交的登出或停用经受众通知送达。
@@ -225,7 +226,6 @@ func (g *Gateway) visitorRoute(ctx context.Context, meta appservice.WebsiteVisit
 			realtime.Subject(g.namespace, target.OrganizationID, realtime.AudienceWebsiteChannel, target.ChannelID),
 		},
 		allowed:    visitorFrameTypes,
-		lifetime:   g.options.MaxLifetime,
 		attributes: []any{"organization_id", target.OrganizationID, "channel_id", target.ChannelID, "channel_identity_id", target.ChannelIdentityID},
 		greet: func(ctx context.Context, connectionID string) (protocol.Frame, error) {
 			// 订阅生效后再次校验渠道与访客身份，之后提交的渠道停用经受众通知送达。
@@ -287,12 +287,17 @@ func (g *Gateway) stream(writer http.ResponseWriter, request *http.Request, meta
 	writer.WriteHeader(http.StatusOK)
 	current.send(hello)
 
-	expiry := time.AfterFunc(route.lifetime, func() {
+	// 存活时长在计时器启动时结算，握手耗时计入授权到期时间之内。
+	lifetime := g.options.MaxLifetime
+	if !route.expiresAt.IsZero() {
+		lifetime = min(lifetime, time.Until(route.expiresAt))
+	}
+	expiry := time.AfterFunc(lifetime, func() {
 		slog.Info("实时事件流到达最长存活时间", "connection_id", current.id)
 		current.close(true)
 	})
 	defer expiry.Stop()
-	slog.Info("实时事件流已就绪", append(attributes, "lifetime", route.lifetime)...)
+	slog.Info("实时事件流已就绪", append(attributes, "lifetime", lifetime)...)
 	current.run(ctx, writer, controller)
 	slog.Info("实时事件流已结束", attributes...)
 }
