@@ -71,12 +71,14 @@ test("通知种类映射到对应资源", (t) => {
   t.mock.timers.tick(300)
   assert.equal(count(invalidated, ["conversation-summary", "c1"]), 1)
   assert.equal(count(invalidated, ["conversation-mentions", "c1"]), 1)
+  assert.equal(count(invalidated, ["group-conversation", "c1"]), 1)
   assert.equal(count(invalidated, ["conversation-messages", "c1"]), 0)
 
   invalidated.length = 0
   coordinator.receive({ type: "conversation_removed", conversationId: "c2" })
   t.mock.timers.tick(300)
   assert.equal(count(invalidated, ["conversation-summary", "c2"]), 1)
+  assert.equal(count(invalidated, ["group-conversation", "c2"]), 1)
   assert.equal(count(invalidated, ["inbox-conversations"]), 1)
   assert.equal(count(invalidated, ["inbox-search"]), 1)
 })

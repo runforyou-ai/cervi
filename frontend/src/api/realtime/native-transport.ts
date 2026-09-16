@@ -7,14 +7,14 @@ export type NativeRealtimeConnect = Promise<string> & { cancel: () => void }
 /** Go 侧事件流的连接、断开与事件监听。 */
 export type NativeRealtimeBridge = {
   connect: () => NativeRealtimeConnect
-  disconnect: () => Promise<void>
+  disconnect: (connectionId: string) => Promise<void>
   onFrame: (listener: (connectionId: string, frame: string) => void) => () => void
   onClosed: (listener: (connectionId: string) => void) => () => void
 }
 
 type NativeEvent = { connectionId: string; frame?: string }
 
-/** 创建原生端事件流传输；Go 侧只保留一条当前事件流，连接与断开按调用顺序串行执行。 */
+/** 创建原生端事件流传输；断开按连接编号关闭对应事件流，连接与断开按调用顺序串行执行。 */
 export function createNativeRealtimeTransport(bridge: NativeRealtimeBridge): RealtimeTransport {
   // 上一次连接请求及其清理完成后才发起下一次连接，旧请求晚到时不会替换新事件流。
   let operations: Promise<void> = Promise.resolve()
@@ -71,7 +71,9 @@ export function createNativeRealtimeTransport(bridge: NativeRealtimeBridge): Rea
           }
           if (closed) {
             // 调用方已关闭时连接可能仍已建立，断开后才允许下一次连接。
-            await bridge.disconnect().catch((error: unknown) => console.warn("断开过期的实时事件流失败", error))
+            await bridge
+              .disconnect(id)
+              .catch((error: unknown) => console.warn("断开过期的实时事件流失败", error))
             return
           }
           connectionId = id
@@ -81,12 +83,14 @@ export function createNativeRealtimeTransport(bridge: NativeRealtimeBridge): Rea
 
       return () => {
         if (closed) return
-        const established = connectionId !== undefined
+        const established = connectionId
         release()
         pending?.cancel()
-        if (established) {
+        if (established !== undefined) {
           operations = operations.then(() =>
-            bridge.disconnect().catch((error: unknown) => console.warn("断开实时事件流失败", error)),
+            bridge
+              .disconnect(established)
+              .catch((error: unknown) => console.warn("断开实时事件流失败", error)),
           )
         }
       }

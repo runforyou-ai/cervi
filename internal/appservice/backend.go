@@ -520,7 +520,7 @@ type ServerConnector interface {
 // RealtimeConnector 由持有企业服务器实时事件流的原生端后端实现。
 type RealtimeConnector interface {
 	ConnectRealtime(context.Context, RequestMeta) (RealtimeConnection, error)
-	DisconnectRealtime(context.Context, RequestMeta) error
+	DisconnectRealtime(context.Context, RequestMeta, string) error
 	ConnectAgentRunStream(context.Context, RequestMeta, string) (RealtimeConnection, error)
 	DisconnectAgentRunStream(context.Context, RequestMeta, string) error
 }

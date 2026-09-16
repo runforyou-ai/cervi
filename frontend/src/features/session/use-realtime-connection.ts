@@ -8,8 +8,11 @@ import { ResourceRefresher } from "@/features/session/resource-refresher"
 import { SyncCoordinator } from "@/features/session/sync-coordinator"
 import { recoverSession } from "@/lib/session-navigation"
 
-/** 身份就绪后连接成员实时事件流并启动兜底校验，卸载时关闭。 */
-export function useRealtimeConnection(enabled: boolean) {
+/** 身份就绪后连接成员实时事件流并启动兜底校验，卸载时关闭；restartOnResume 在回到前台时重建已建立的事件流。 */
+export function useRealtimeConnection(
+  enabled: boolean,
+  { restartOnResume = false }: { restartOnResume?: boolean } = {},
+) {
   const navigate = useNavigate()
   const client = useQueryClient()
 
@@ -37,21 +40,29 @@ export function useRealtimeConnection(enabled: boolean) {
     })
     // 网络恢复或页面回到前台时跳过剩余退避等待，并立即做一次兜底校验。
     const resume = () => {
-      if (document.visibilityState === "visible") {
-        realtimeClient.resume()
-        void coordinator.probe()
+      if (document.visibilityState !== "visible") {
+        return
       }
+      realtimeClient.resume()
+      void coordinator.probe()
+    }
+    // 回到前台时系统挂起期间的连接按可能失活处理，先重建事件流再校验。
+    const resumeForeground = () => {
+      if (restartOnResume && document.visibilityState === "visible") {
+        realtimeClient.restart()
+      }
+      resume()
     }
     window.addEventListener("online", resume)
-    document.addEventListener("visibilitychange", resume)
+    document.addEventListener("visibilitychange", resumeForeground)
     realtimeClient.start()
     coordinator.start()
     return () => {
       window.removeEventListener("online", resume)
-      document.removeEventListener("visibilitychange", resume)
+      document.removeEventListener("visibilitychange", resumeForeground)
       unsubscribe()
       realtimeClient.stop()
       coordinator.dispose()
     }
-  }, [client, enabled, navigate])
+  }, [client, enabled, navigate, restartOnResume])
 }

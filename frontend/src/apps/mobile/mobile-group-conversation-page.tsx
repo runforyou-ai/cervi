@@ -20,6 +20,7 @@ import {
 } from "@/apps/mobile/mobile-navigation"
 import { MobilePageHeader, MobilePageState } from "@/apps/mobile/mobile-page"
 import { LoadingIndicator } from "@/components/loading-indicator"
+import { useRealtimeSyncActive } from "@/contexts/realtime-sync-context"
 import { useAttachmentQueue } from "@/features/inbox/attachment-queue-context"
 import { useOutgoingMessageStore } from "@/features/inbox/outgoing-message-context"
 import { Button } from "@/components/ui/button"
@@ -67,6 +68,7 @@ function MobileGroupConversation({
   const pollingActive = useMemberChatPollingActive({
     requireWindowFocus: false,
   })
+  const realtime = useRealtimeSyncActive()
   const previousPollingActive = useRef(pollingActive)
   const { data, loading, refreshing, error, refresh } = useResource(
     resourceKeys.groupConversation(conversationID),
@@ -74,7 +76,9 @@ function MobileGroupConversation({
     {
       staleTime: 0,
       refetchInterval:
-        pollingActive && !leavePending ? memberChatPollingInterval : false,
+        pollingActive && !leavePending && !realtime
+          ? memberChatPollingInterval
+          : false,
       refetchOnWindowFocus: false,
     },
   )
@@ -107,11 +111,16 @@ function MobileGroupConversation({
   }, [unavailable, leavePending, handleUnavailable])
 
   useEffect(() => {
-    // 恢复前台时立即校验群状态。
-    if (pollingActive && !previousPollingActive.current && !leavePending)
+    // 未接入实时同步时，恢复前台立即校验群状态。
+    if (
+      pollingActive &&
+      !previousPollingActive.current &&
+      !leavePending &&
+      !realtime
+    )
       void refresh()
     previousPollingActive.current = pollingActive
-  }, [pollingActive, leavePending, refresh])
+  }, [pollingActive, leavePending, realtime, refresh])
 
   return (
     <div className="relative h-full min-h-0">

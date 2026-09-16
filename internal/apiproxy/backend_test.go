@@ -59,7 +59,7 @@ func newTestBackend(store *memoryStore) (*Backend, error) {
 	if err != nil {
 		return nil, err
 	}
-	return NewBackend(store, sessions, func(string, any) {})
+	return NewBackend(store, sessions, func(string, any) {}, nil)
 }
 
 // TestBackendRequiresEnterpriseServer 验证未配置企业服务器时拒绝远程调用。

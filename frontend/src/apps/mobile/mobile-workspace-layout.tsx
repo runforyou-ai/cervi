@@ -10,6 +10,10 @@ import {
   useMobileNavigation,
 } from "@/apps/mobile/mobile-navigation"
 import { LoadingIndicator } from "@/components/loading-indicator"
+import {
+  RealtimeSyncProvider,
+  useRealtimeSyncActive,
+} from "@/contexts/realtime-sync-context"
 import { UserPreferencesProvider } from "@/contexts/user-preferences"
 import { AttachmentQueueProvider } from "@/features/inbox/attachment-queue-context"
 import { OutgoingMessageProvider } from "@/features/inbox/outgoing-message-context"
@@ -18,6 +22,7 @@ import {
   useMemberChatPollingActive,
 } from "@/features/inbox/use-member-chat-polling"
 import { useIdentityLoader } from "@/features/session/use-identity-loader"
+import { useRealtimeConnection } from "@/features/session/use-realtime-connection"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 import { cn } from "@/lib/utils"
@@ -33,6 +38,7 @@ export type MobileTabContext = {
 export function MobileWorkspaceLayout() {
   const { t } = useTranslation(["mobile", "common"])
   const { status, identity, redirectPath } = useIdentityLoader()
+  useRealtimeConnection(Boolean(identity?.user.id), { restartOnResume: true })
   if (status === "anonymous") return <Navigate to="/login" replace />
   if (status === "redirect" && redirectPath)
     return <Navigate to={redirectPath} replace />
@@ -55,11 +61,13 @@ export function MobileWorkspaceLayout() {
       <UserPreferencesProvider user={identity.user}>
         <MobileNavigationProvider>
           <OutgoingMessageProvider key={identity.user.id}>
-            <AttachmentQueueProvider>
-              <div className="flex h-dvh min-h-0 flex-col overflow-hidden bg-sidebar pt-[env(safe-area-inset-top)]">
-                <Outlet />
-              </div>
-            </AttachmentQueueProvider>
+            <RealtimeSyncProvider>
+              <AttachmentQueueProvider>
+                <div className="flex h-dvh min-h-0 flex-col overflow-hidden bg-sidebar pt-[env(safe-area-inset-top)]">
+                  <Outlet />
+                </div>
+              </AttachmentQueueProvider>
+            </RealtimeSyncProvider>
           </OutgoingMessageProvider>
         </MobileNavigationProvider>
       </UserPreferencesProvider>
@@ -76,6 +84,7 @@ export function MobileTabLayout() {
   const pollingActive = useMemberChatPollingActive({
     requireWindowFocus: false,
   })
+  const realtime = useRealtimeSyncActive()
   const [listAttention, setListAttention] = useState<{
     count: number
     at: number
@@ -92,7 +101,8 @@ export function MobileTabLayout() {
     async () => (await loadInbox({ limit: 1 })).attentionUnreadCount,
     {
       enabled: pathname !== "/inbox",
-      refetchInterval: pollingActive ? memberChatPollingInterval : false,
+      refetchInterval:
+        pollingActive && !realtime ? memberChatPollingInterval : false,
     },
   )
   // 采用列表上报与页签读取中较新的提醒总数。

@@ -82,6 +82,15 @@ export class RealtimeClient {
     this.halt("disconnected")
   }
 
+  /** 关闭已就绪的事件流并立即重新连接，系统挂起后按可能失活处理该连接；其他状态不受影响。 */
+  restart() {
+    if (this.current !== "ready") {
+      return
+    }
+    this.halt("disconnected")
+    this.start()
+  }
+
   /** 网络恢复或回到前台时跳过剩余退避等待；其他状态不受影响。 */
   resume() {
     if (this.current !== "backoff") {

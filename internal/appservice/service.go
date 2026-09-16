@@ -205,13 +205,13 @@ func (s *Service) ConnectRealtime(ctx context.Context, meta RequestMeta) (Realti
 	return withNormalizedSlices(connector.ConnectRealtime(ctx, meta))
 }
 
-// DisconnectRealtime 关闭原生端当前实时事件流。
-func (s *Service) DisconnectRealtime(ctx context.Context, meta RequestMeta) error {
+// DisconnectRealtime 关闭原生端指定编号的成员实时事件流及其所属窗口的全部运行过程流。
+func (s *Service) DisconnectRealtime(ctx context.Context, meta RequestMeta, connectionID string) error {
 	connector, ok := s.backend.(RealtimeConnector)
 	if !ok {
 		return methodNotAllowedError(meta, "DisconnectRealtime")
 	}
-	return connector.DisconnectRealtime(ctx, meta)
+	return connector.DisconnectRealtime(ctx, meta, connectionID)
 }
 
 // ConnectAgentRunStream 在原生端建立指定运行的过程流，运行过程事件与流结束经 Wails 事件投递。

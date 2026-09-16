@@ -441,6 +441,24 @@
 - **已确认的预期现象：** 首次加载后有一次同参数的串行重读，来自同步协调器启动时把首个探针值按不一致处理。被移出群的一方收到「会话不可用」的 422，是摘要重读确认失权的既有路径；登录前的 422 是未登录的身份探测。全程无未捕获的 JavaScript 异常。
 - **未验证：** 移动端（仍走轮询，由 PR33 接入）；桌面端 WebView 未单独复验，与 Web 共用同一套列表实现。
 
+### PR33：移动端实时接入
+
+- **依赖：** 无（PR29、PR30 已交付）。移动端接入后由 `RealtimeSyncProvider` 声明实时同步可用，消息窗口、提及、列表与会话摘要不再轮询。
+- **范围：** 移动登录外壳接同一连接与同步内核，列表、单聊及已有群聊使用统一实时输入；恢复前台先做兜底校验，再按独立阅读规则工作。保留当前移动功能边界，不顺带开启建群或已读交互。
+- **落点：** `frontend/src/apps/mobile` 登录外壳、mobile-inbox-page、mobile-individual-conversation-page、mobile-group-conversation-page。
+- **实施：** 应用前台事件只触发同一协调器的兜底校验，不由每个页面各建连接；系统挂起后旧连接一律按可能失活处理。移动页面订阅共用版本输入，保持自身详情导航、阅读能力和草稿行为。桌面端开发模式的 mobile-preview 小窗与主窗口共用同一个 Go 后端，而 Go 侧只保留一条当前事件流，接入时先明确两个窗口的连接归属。
+- **验收：** iOS／Android 前后台、旋转、详情返回、连接重建与旧响应隔离；完成对应回归后移除移动三秒轮询。
+- **验证步骤：** 系统挂起期间另一端发送、已读、移除群成员，恢复后列表与详情收敛；快速返回再进另一会话，无重复连接、旧内容闪入或错误已读。iOS 与 Android 分别记录实际服务端地址拼接、TLS 结果与长响应事件的实时下发情况。
+
+- **范围确认（2026-09-15）：** 本条只接入移动端外壳与移动端自有轮询，不改服务端通知、业务接口与迁移，不顺带开启移动端建群外的新交互。桌面开发模式的主窗口与移动端预览窗共用同一个 Go 后端，接入前先确定两个窗口的事件流归属。
+- **实现记录：** `internal/apiproxy/realtime.go` 的 `realtimeClient` 由持有唯一成员事件流改为按前端窗口持有实时通道，`windowStreams` 保存该窗口的成员事件流、运行过程流与通道代次：`start` 登记新成员事件流并结束该窗口原有的通道，`disconnect(connectionID)` 按连接编号结束它所属窗口的通道，新增 `disconnectAll()` 供登录、登出与切换企业服务器使用，`startRun` 与 `disconnectRun` 在所属窗口的通道内登记和注销，接收协程结束时只删除自身登记。窗口标识由 `application_services_native.go` 从 Wails 绑定调用上下文的 `application.WindowKey` 解析，注入为 `NewBackend` 的 `caller` 参数；窗口刷新销毁 JavaScript 上下文、前端清理来不及执行时，下一次连接据此结束原有通道，无法识别窗口的调用归入同一条通道，沿用 PR38 的单条成员事件流语义。`RealtimeConnector.DisconnectRealtime` 与 `Service.DisconnectRealtime` 增加连接编号参数，绑定重新生成；`frontend/src/api/realtime/native-transport.ts` 的 `disconnect` 按编号断开。`RealtimeClient` 增加 `restart()`，只替换处于 ready 的连接，连接中、退避中与已停止的状态直接返回；`useRealtimeConnection` 增加 `restartOnResume` 选项，回到前台时先重建事件流再跳过退避并执行兜底校验，网络恢复只跳过退避并校验，回到前台与网络恢复成对触发时因此只建立一条新连接。`MobileWorkspaceLayout` 在身份就绪后调用 `useRealtimeConnection(..., { restartOnResume: true })` 并包裹 `RealtimeSyncProvider`，移动端消息窗口、列表、会话摘要、提及与群资料因此共用已交付的实时输入；移动端自有的页签提醒读取与群资料读取按 `useRealtimeSyncActive()` 关闭定时重读，群聊页恢复前台的一次性群状态校验同样只在未接入实时同步时执行。`SyncCoordinator` 处理 `conversation_removed` 与 `conversation_state_changed` 时补充失效该会话的群资料：移动端群聊页以群资料读取为失权判据，群资料同时携带本人免打扰状态，只失效摘要无法让群聊页及时发现失权，也无法让另一端修改的免打扰状态及时生效。
+- **验证记录（2026-09-15）：** `wails3 task test:frontend` 155 项通过（新增 `conversation_removed` 失效群资料的断言）；`wails3 task test:desktop`、`wails3 task test:server` 全绿；`internal/apiproxy` 新增三项：两个窗口的事件流各自投递本连接事件且断开一个窗口不影响另一个、同一窗口重新连接关闭原有事件流、无法识别窗口时归入同一条通道；`wails3 task common:build:frontend`（含 tsc）通过，`frontend/bindings` 只有 `DisconnectRealtime` 一处预期变更。界面验证在 `wails3 task dev:mcp` 的移动端预览窗经 Wails MCP 执行，另一账号用 HTTP 接口发起变更：主窗口与预览窗同时建立两条事件流且互不取消；单聊新消息使列表上浮并出现头像未读角标、「内部」红点与消息页签角标；会话详情内新消息约 0.55 秒出现；窗口隐藏使 `visibilityState` 变为 hidden，隐藏期间发送的消息在窗口恢复后约 0.30 秒出现，同一时刻日志显示预览窗旧事件流结束、新事件流建立各一次，主窗口事件流不受影响；新建群聊实时出现在列表；移出群后约 0.32 秒退出群详情、提示「该群聊不存在或你已不在群内。」并从列表移除。轮询移除经页面内 fetch 计数确认：停留在列表页静置 12 秒无任何业务调用，随后一次界面操作立即产生 3 次 Wails 绑定调用，证明计数有效。验证期间服务端曾中断，客户端按退避重连并在服务端恢复后自动接上。耗时含界面采样开销，非网络延迟。
+- **审核修正后的复验（2026-09-15）：** 两条事件流分别记录 `owner=1`（主窗口）与 `owner=2`（移动端预览窗）；刷新预览窗后日志显示关闭 `owner=2` 的原有事件流、建立新的 `owner=2` 事件流，主窗口事件流不受影响，窗口刷新不再留下并存的旧事件流。同一账号的另一登录会话开启与关闭群免打扰，移动端群聊页标题的静音图标分别在约 0.58 秒与 0.56 秒内跟随变化。再次执行窗口隐藏与恢复，事件流建立与结束各增加一次，挂起期间发送的消息在返回列表后已排到首位并带未读角标与页签角标。`wails3 task test:frontend` 158 项通过，新增的 `restart()` 用例在回退实现后确实失败；`wails3 task test:desktop`、`wails3 task test:server` 与 `wails3 task common:build:frontend` 全部通过。
+- **已确认的预期现象：** 桌面开发模式下主窗口与移动端预览窗各建立一条事件流，等价于同一账号的两台设备，两窗口互不影响。
+- **已知边界：** 窗口关闭后前端清理未执行时，该窗口的通道保留到应用退出或服务端一小时上限；窗口重新打开并连接时按窗口标识结束它。
+- **与 PR38 的关系：** 本条变基到 PR38 之后，成员事件流的窗口归属与 PR38 的运行过程流、通道代次合并为按窗口的实时通道，`ConnectAgentRunStream` 登记到发起窗口的通道，`DisconnectRealtime` 结束该窗口的成员事件流与运行过程流，整体语义与 PR38 在单窗口下一致。变基后复验：两个窗口分别建立 `window=1`、`window=2` 的通道，刷新预览窗关闭该窗口原有事件流并重建、主窗口不受影响；移动端向 AI 员工发消息后运行过程流以 `window=2` 建立，思考过程与用量正常展示；另一账号发送的消息约 0.82 秒到达列表。`wails3 task test:frontend` 167 项、`test:desktop`、`test:server` 与 `common:build:frontend` 在新基线上全部通过。
+- **未验证：** iOS 与 Android 真机的服务端地址拼接、TLS 结果与长响应事件下发；移动端搜索页、客户会话与独立 AI 聊天未单独复验，它们与已验证页面共用同一套消息窗口与摘要实现。
+
 ### PR37：模型增量消费与流基线
 
 - **依赖：** 无。运行时增量不依赖 PR36 的过程详情拆分，先于 PR36 交付。
