@@ -101,6 +101,7 @@ const inbox = {
   filterServiceStatusOpen: "未关闭",
   filterServiceStatusClosed: "已关闭",
   filterKind: "会话类型",
+  filterAllKinds: "全部类型",
   filterKindCustomer: "客户会话",
   filterKindDirect: "单聊",
   filterKindGroup: "群聊",

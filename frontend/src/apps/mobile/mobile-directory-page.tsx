@@ -17,6 +17,7 @@ import {
   MobilePageState,
   MobileScrollArea,
 } from "@/apps/mobile/mobile-page"
+import { ProfileAvatar } from "@/components/profile-avatar"
 import { WorkStatusBadge } from "@/components/work-status"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { Button } from "@/components/ui/button"
@@ -235,12 +236,10 @@ function MobileDirectoryResults({
                 state={{ mobileBack: true }}
                 className="flex min-h-18 items-center gap-3 px-4 py-3 outline-none active:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
               >
-                <span
-                  className="flex size-10 shrink-0 items-center justify-center rounded-full bg-primary/10 font-medium text-primary"
-                  aria-hidden="true"
-                >
-                  {[...user.displayName][0]?.toLocaleUpperCase()}
-                </span>
+                <ProfileAvatar
+                  name={user.displayName}
+                  fallback={kind === "agents" ? "agent" : "person"}
+                />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[15px] font-medium">
                     {user.displayName}
@@ -259,7 +258,7 @@ function MobileDirectoryResults({
           ))}
         </ul>
       ) : null}
-      {last && data && !error && (page > 1 || members.length > 0) ? (
+      {last && data && !error && (hasMore || page > 1) ? (
         <div
           ref={sentinel}
           className="flex h-14 items-center justify-center text-sm text-muted-foreground"

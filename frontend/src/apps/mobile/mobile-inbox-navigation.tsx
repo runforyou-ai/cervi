@@ -226,7 +226,7 @@ export function MobileInboxFilter({
               .filter((option) => query.kinds.includes(option.kind))
               .map((option) => t(option.label))
               .join("、")
-          : t("filterKind"),
+          : t("filterAllKinds"),
       ]
   return (
     <Sheet
