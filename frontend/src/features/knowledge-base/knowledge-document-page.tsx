@@ -2,7 +2,12 @@
 import { useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { Link, useLocation, useParams } from "react-router"
-import { getKnowledgeDocument } from "@/api"
+import {
+  getKnowledgeDocument,
+  getKnowledgeDocumentContent,
+  KnowledgeDocumentSourceKind,
+} from "@/api"
+import { MessageMarkdown } from "@/components/message-markdown"
 import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
@@ -12,7 +17,7 @@ import { KnowledgeQAFeedback } from "./knowledge-qa-feedback"
 import { KnowledgeSegmentsDialog } from "./knowledge-segments-dialog"
 import { KnowledgeDocumentPreview } from "./knowledge-document-preview"
 
-/** 显示原件预览和固定批次的分段阅读入口。 */
+/** 按内容来源显示原件预览或正文，并提供固定批次的分段阅读入口。 */
 export function KnowledgeDocumentPage() {
   const { t } = useTranslation(["knowledgeBase", "common"])
   const { knowledgeBaseId = "", groupId = "", documentId = "" } = useParams()
@@ -24,6 +29,14 @@ export function KnowledgeDocumentPage() {
     resourceKeys.knowledgeDocument(knowledgeBaseId, documentId),
     (signal) => getKnowledgeDocument(knowledgeBaseId, documentId, signal),
     { staleTime: 0, refetchInterval: (data) => data?.status === "queued" || data?.status === "running" ? 2000 : false },
+  )
+  const uploaded =
+    document.data?.sourceKind ===
+    KnowledgeDocumentSourceKind.KnowledgeDocumentSourceFile
+  const content = useResource(
+    resourceKeys.knowledgeDocumentContent(knowledgeBaseId, documentId),
+    (signal) => getKnowledgeDocumentContent(knowledgeBaseId, documentId, signal),
+    { enabled: Boolean(document.data) && !uploaded, staleTime: 0 },
   )
   const returnGroupId = document.data?.groupId ?? groupId
   const returnSearch = returnGroupId === groupId ? location.search : ""
@@ -42,13 +55,19 @@ export function KnowledgeDocumentPage() {
       <PageContent className="overflow-hidden">
         {!document.data ? (
           <KnowledgeQAFeedback error={document.error} retry={() => void document.refresh()} />
-        ) : (
+        ) : uploaded ? (
           <KnowledgeDocumentPreview
             key={documentId}
             knowledgeBaseId={knowledgeBaseId}
             documentId={documentId}
             name={document.data.name}
           />
+        ) : !content.data ? (
+          <KnowledgeQAFeedback error={content.error} retry={() => void content.refresh()} />
+        ) : (
+          <div className="h-full overflow-auto rounded-lg border bg-card px-6 py-5">
+            <MessageMarkdown>{content.data.content}</MessageMarkdown>
+          </div>
         )}
       </PageContent>
       {segmentBatchId && document.data && <KnowledgeSegmentsDialog

@@ -835,6 +835,38 @@ func (b *Backend) GetKnowledgeDocumentPreview(ctx context.Context, meta appservi
 	return output, err
 }
 
+// CreateKnowledgeTextDocument 创建在线编写的文档并安排索引。
+func (b *Backend) CreateKnowledgeTextDocument(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, input appservice.KnowledgeTextDocumentInput) (appservice.KnowledgeDocument, error) {
+	var output appservice.KnowledgeDocument
+	err := b.do(ctx, meta, http.MethodPost, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/text-documents", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// GetKnowledgeDocumentContent 返回在线文档正文或网页抓取快照。
+func (b *Backend) GetKnowledgeDocumentContent(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, documentID string) (appservice.KnowledgeDocumentContent, error) {
+	var output appservice.KnowledgeDocumentContent
+	err := b.do(ctx, meta, http.MethodGet, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/documents/"+url.PathEscape(documentID)+"/content", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// UpdateKnowledgeDocumentContent 修改在线文档的名称与正文并安排索引。
+func (b *Backend) UpdateKnowledgeDocumentContent(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, documentID string, input appservice.KnowledgeDocumentContentInput) (appservice.KnowledgeDocument, error) {
+	var output appservice.KnowledgeDocument
+	err := b.do(ctx, meta, http.MethodPut, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/documents/"+url.PathEscape(documentID)+"/content", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// RenameKnowledgeDocument 修改在线文档或网页文档的名称。
+func (b *Backend) RenameKnowledgeDocument(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, documentID string, input appservice.KnowledgeDocumentRenameInput) (appservice.KnowledgeDocument, error) {
+	var output appservice.KnowledgeDocument
+	err := b.do(ctx, meta, http.MethodPut, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/documents/"+url.PathEscape(documentID), nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // ListKnowledgeQAEntries 返回分组中的本地问答列表。
 func (b *Backend) ListKnowledgeQAEntries(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, input appservice.KnowledgeQAListInput) (appservice.KnowledgeQAList, error) {
 	var output appservice.KnowledgeQAList

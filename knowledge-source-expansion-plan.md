@@ -149,8 +149,8 @@ POST   /knowledge-bases/:knowledgeBaseID/documents/:documentID/refetch  { source
 | 提交 | 内容 |
 |---|---|
 | 1 | 来源抽象：迁移与正文表、模型、文档查询与 `publishedSegments` 改写、`Format` 取值、删除链路，`file` 行为不变 |
-| 2 | 在线文档：创建与编辑接口、处理分支、前端编辑器与路由 |
-| 3 | 网页导入：`webfetch`、创建与重新抓取、快照写入、失败原因码、前端入口与来源列 |
+| 2 | 在线文档：创建与编辑接口、处理分支、前端编辑器、路由与来源列 |
+| 3 | 网页导入：`webfetch`、创建与重新抓取、快照写入、失败原因码与前端入口 |
 | 4 | 文档更新：本文与 `knowledge-go-pipeline-plan.md` 第 10 节 |
 
 ## 9. 验收

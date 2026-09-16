@@ -10,22 +10,24 @@ import (
 )
 
 var (
-	ErrDocumentNotFound     = errors.New("knowledge document not found")
-	ErrDocumentUnsupported  = errors.New("knowledge document unsupported")
-	ErrDocumentBatchInvalid = errors.New("knowledge document batch must contain 1 to 10 distinct files")
+	ErrDocumentNotFound          = errors.New("knowledge document not found")
+	ErrDocumentUnsupported       = errors.New("knowledge document unsupported")
+	ErrDocumentBatchInvalid      = errors.New("knowledge document batch must contain 1 to 10 distinct files")
+	ErrDocumentSourceUnsupported = errors.New("knowledge document source unsupported")
 )
 
-// ProcessInput 固定本次文档任务的来源、分段和向量参数。
+// ProcessInput 固定本次文档任务的内容来源、分段和向量参数。
 type ProcessInput struct {
-	OrganizationID           string `json:"organizationId"`
-	KnowledgeBaseID          string `json:"knowledgeBaseId"`
-	DocumentID               string `json:"documentId"`
-	ProcessingID             string `json:"processingId"`
-	ChunkLength              int    `json:"chunkLength"`
-	ChunkOverlap             int    `json:"chunkOverlap"`
-	EmbeddingProviderID      string `json:"embeddingProviderId"`
-	EmbeddingModelIdentifier string `json:"embeddingModelIdentifier"`
-	EmbeddingDimension       int    `json:"embeddingDimension"`
+	OrganizationID           string                             `json:"organizationId"`
+	KnowledgeBaseID          string                             `json:"knowledgeBaseId"`
+	DocumentID               string                             `json:"documentId"`
+	SourceKind               domain.KnowledgeDocumentSourceKind `json:"sourceKind"`
+	ProcessingID             string                             `json:"processingId"`
+	ChunkLength              int                                `json:"chunkLength"`
+	ChunkOverlap             int                                `json:"chunkOverlap"`
+	EmbeddingProviderID      string                             `json:"embeddingProviderId"`
+	EmbeddingModelIdentifier string                             `json:"embeddingModelIdentifier"`
+	EmbeddingDimension       int                                `json:"embeddingDimension"`
 }
 
 // ProcessError 定义知识来源索引的失败原因码和执行阶段。
@@ -63,4 +65,17 @@ type DocumentListInput struct {
 type DocumentListOutput struct {
 	Documents             []DocumentRecord
 	Page, PageSize, Total int
+}
+
+// TextDocumentInput 定义在线编写文档的分组、名称与正文。
+type TextDocumentInput struct {
+	GroupID string
+	Title   string
+	Content string
+}
+
+// DocumentContentRecord 汇总文档元数据与正文。
+type DocumentContentRecord struct {
+	Document DocumentRecord
+	Content  string
 }

@@ -75,6 +75,30 @@ type KnowledgeDocumentBatch struct {
 	Documents []KnowledgeDocument `json:"documents"`
 }
 
+// KnowledgeTextDocumentInput 定义在线编写文档的分组、名称与正文。
+type KnowledgeTextDocumentInput struct {
+	GroupID string `json:"groupId"`
+	Title   string `json:"title"`
+	Content string `json:"content"`
+}
+
+// KnowledgeDocumentContentInput 定义在线文档的名称与正文更新。
+type KnowledgeDocumentContentInput struct {
+	Title   string `json:"title"`
+	Content string `json:"content"`
+}
+
+// KnowledgeDocumentRenameInput 定义文档名称更新。
+type KnowledgeDocumentRenameInput struct {
+	Title string `json:"title"`
+}
+
+// KnowledgeDocumentContent 返回文档元数据与正文。
+type KnowledgeDocumentContent struct {
+	Document KnowledgeDocument `json:"document"`
+	Content  string            `json:"content"`
+}
+
 // KnowledgeDocumentMoveInput 定义目标分组。
 type KnowledgeDocumentMoveInput struct {
 	GroupID string `json:"groupId"`

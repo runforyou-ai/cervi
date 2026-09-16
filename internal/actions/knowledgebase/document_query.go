@@ -60,6 +60,29 @@ func (q *DocumentQuery) Get(ctx context.Context, identity *servermodels.Identity
 	return loadDocumentRecord(ctx, q.db, baseID, documentID)
 }
 
+// Content 读取在线文档正文或网页抓取快照。
+func (q *DocumentQuery) Content(ctx context.Context, identity *servermodels.Identity, baseID, documentID string) (*DocumentContentRecord, error) {
+	if _, err := loadKnowledgeBase(ctx, q.db, identity.Organization.ID, baseID); err != nil {
+		return nil, err
+	}
+	record, err := loadDocumentRecord(ctx, q.db, baseID, documentID)
+	if err != nil {
+		return nil, err
+	}
+	if record.SourceKind == domain.KnowledgeDocumentSourceFile {
+		return nil, ErrDocumentSourceUnsupported
+	}
+	content := &servermodels.KnowledgeDocumentContent{}
+	err = q.db.NewSelect().Model(content).Where("kdc.document_id = ?", documentID).Scan(ctx)
+	if errors.Is(err, sql.ErrNoRows) {
+		return &DocumentContentRecord{Document: *record}, nil
+	}
+	if err != nil {
+		return nil, err
+	}
+	return &DocumentContentRecord{Document: *record, Content: content.Content}, nil
+}
+
 // File 读取仍关联当前企业文档的已激活原件。
 func (q *DocumentQuery) File(ctx context.Context, identity *servermodels.Identity, baseID, documentID string) (*servermodels.File, error) {
 	if !common.ValidUUID(baseID) || !common.ValidUUID(documentID) {
@@ -91,6 +114,19 @@ func loadDocumentRecord(ctx context.Context, db bun.IDB, baseID, documentID stri
 	}
 	record := &DocumentRecord{}
 	err := documentSelect(db).Where("kd.knowledge_base_id = ? AND kd.id = ?", baseID, documentID).Scan(ctx, record)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrDocumentNotFound
+	}
+	return record, err
+}
+
+// lockDocument 按知识库读取文档记录并持有行锁。
+func lockDocument(ctx context.Context, db bun.IDB, baseID, documentID string) (*servermodels.KnowledgeDocument, error) {
+	if !common.ValidUUID(documentID) {
+		return nil, ErrDocumentNotFound
+	}
+	record := &servermodels.KnowledgeDocument{}
+	err := db.NewSelect().Model(record).Where("kd.id = ? AND kd.knowledge_base_id = ?", documentID, baseID).For("UPDATE").Scan(ctx)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil, ErrDocumentNotFound
 	}

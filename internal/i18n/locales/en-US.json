@@ -27,6 +27,11 @@
   "error.knowledge_document_read_failed": "Failed to read the document. Please retry.",
   "error.knowledge_document_save_failed": "Failed to save documents. Please retry.",
   "error.knowledge_document_delete_failed": "Failed to delete the document. Please retry.",
+  "error.knowledge_document_source_unsupported": "This action is not available for this document source.",
+  "field.knowledge_document_title_required": "Enter the document name.",
+  "field.knowledge_document_title_too_long": "The document name cannot exceed 120 characters.",
+  "field.knowledge_document_content_required": "Enter the document content.",
+  "field.knowledge_document_group_invalid": "Select a group.",
 
   "error.agent_reply_stop_failed": "Failed to stop the AI reply. Please try again.",
   "error.agent_unavailable": "This AI employee is currently unavailable.",

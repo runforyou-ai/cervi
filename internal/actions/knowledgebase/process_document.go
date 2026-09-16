@@ -45,19 +45,16 @@ func NewProcessDocumentAction(db *bun.DB, converter documentConverter, embedder 
 // Execute 执行当前文档任务，并在同一事务中写入分段与发布批次。
 func (a *ProcessDocumentAction) Execute(ctx context.Context, input ProcessInput) error {
 	started := time.Now()
-	current, err := a.setStage(ctx, input, domain.KnowledgeIndexFetching)
+	// 在线文档的正文是交付原文，不经过读取原件和转换两个阶段。
+	firstStage := domain.KnowledgeIndexFetching
+	if input.SourceKind == domain.KnowledgeDocumentSourceText {
+		firstStage = domain.KnowledgeIndexSplitting
+	}
+	current, err := a.setStage(ctx, input, firstStage)
 	if err != nil || !current {
 		return err
 	}
-	slog.Info("知识文档处理开始", "document_id", input.DocumentID, "processing_id", input.ProcessingID)
-	file := &servermodels.File{}
-	err = a.db.NewSelect().Model(file).Join("JOIN knowledge_documents kd ON kd.file_id = f.id").Where("kd.id = ? AND f.organization_id = ?", input.DocumentID, input.OrganizationID).Scan(ctx)
-	if errors.Is(err, sql.ErrNoRows) {
-		return &ProcessError{Code: "file_read_failed", Stage: domain.KnowledgeIndexFetching}
-	}
-	if err != nil {
-		return err
-	}
+	slog.Info("知识文档处理开始", "document_id", input.DocumentID, "source_kind", input.SourceKind, "processing_id", input.ProcessingID)
 	// 按任务快照解析向量模型凭据。
 	credential, err := resolveEmbeddingCredential(ctx, a.db, input.OrganizationID, input.EmbeddingProviderID)
 	var unavailable *embedding.Error
@@ -67,27 +64,22 @@ func (a *ProcessDocumentAction) Execute(ctx context.Context, input ProcessInput)
 	if err != nil {
 		return err
 	}
-	source, err := a.files.Open(ctx, file)
-	if err != nil {
-		return &ProcessError{Code: "file_read_failed", Stage: domain.KnowledgeIndexFetching}
-	}
-	defer source.Close()
-
-	if current, err := a.setStage(ctx, input, domain.KnowledgeIndexConverting); err != nil || !current {
-		return err
-	}
-	markdown, err := a.converter.Convert(ctx, file.OriginalName, source)
-	if err != nil {
-		var failure *documentconvert.Error
-		if errors.As(err, &failure) {
-			return &ProcessError{Code: failure.Code, Stage: domain.KnowledgeIndexConverting}
+	markdown := ""
+	if input.SourceKind == domain.KnowledgeDocumentSourceText {
+		markdown, err = a.storedContent(ctx, input.DocumentID)
+		if err != nil {
+			return err
 		}
-		return err
+	} else {
+		markdown, current, err = a.convertOriginal(ctx, input)
+		if err != nil || !current {
+			return err
+		}
+		if current, err := a.setStage(ctx, input, domain.KnowledgeIndexSplitting); err != nil || !current {
+			return err
+		}
 	}
 
-	if current, err := a.setStage(ctx, input, domain.KnowledgeIndexSplitting); err != nil || !current {
-		return err
-	}
 	segments := textsplit.Split(markdown, input.ChunkLength, input.ChunkOverlap)
 	if len(segments) == 0 {
 		return &ProcessError{Code: "empty_content", Stage: domain.KnowledgeIndexSplitting}
@@ -149,6 +141,45 @@ func (a *ProcessDocumentAction) Execute(ctx context.Context, input ProcessInput)
 		slog.Info("知识文档分段与向量完成", "document_id", input.DocumentID, "processing_id", input.ProcessingID, "segment_count", len(segments), "embedding_dimension", input.EmbeddingDimension, "duration_ms", time.Since(started).Milliseconds())
 	}
 	return err
+}
+
+// convertOriginal 读取上传原件并转换为 Markdown，任务已被替代时返回 false。
+func (a *ProcessDocumentAction) convertOriginal(ctx context.Context, input ProcessInput) (string, bool, error) {
+	file := &servermodels.File{}
+	err := a.db.NewSelect().Model(file).Join("JOIN knowledge_documents kd ON kd.file_id = f.id").Where("kd.id = ? AND f.organization_id = ?", input.DocumentID, input.OrganizationID).Scan(ctx)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", false, &ProcessError{Code: "file_read_failed", Stage: domain.KnowledgeIndexFetching}
+	}
+	if err != nil {
+		return "", false, err
+	}
+	source, err := a.files.Open(ctx, file)
+	if err != nil {
+		return "", false, &ProcessError{Code: "file_read_failed", Stage: domain.KnowledgeIndexFetching}
+	}
+	defer source.Close()
+	if current, err := a.setStage(ctx, input, domain.KnowledgeIndexConverting); err != nil || !current {
+		return "", false, err
+	}
+	markdown, err := a.converter.Convert(ctx, file.OriginalName, source)
+	if err != nil {
+		var failure *documentconvert.Error
+		if errors.As(err, &failure) {
+			return "", false, &ProcessError{Code: failure.Code, Stage: domain.KnowledgeIndexConverting}
+		}
+		return "", false, err
+	}
+	return markdown, true, nil
+}
+
+// storedContent 读取在线文档正文或网页抓取快照。
+func (a *ProcessDocumentAction) storedContent(ctx context.Context, documentID string) (string, error) {
+	content := &servermodels.KnowledgeDocumentContent{}
+	err := a.db.NewSelect().Model(content).Where("kdc.document_id = ?", documentID).Scan(ctx)
+	if errors.Is(err, sql.ErrNoRows) {
+		return "", &ProcessError{Code: "empty_content", Stage: domain.KnowledgeIndexSplitting}
+	}
+	return content.Content, err
 }
 
 // setStage 更新当前文档任务的执行阶段，任务已被替代或已进入终态时返回 false。

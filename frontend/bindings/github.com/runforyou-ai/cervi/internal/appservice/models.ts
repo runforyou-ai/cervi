@@ -1875,6 +1875,22 @@ export interface KnowledgeDocumentBatchInput {
 }
 
 /**
+ * KnowledgeDocumentContent 返回文档元数据与正文。
+ */
+export interface KnowledgeDocumentContent {
+    "document": KnowledgeDocument;
+    "content": string;
+}
+
+/**
+ * KnowledgeDocumentContentInput 定义在线文档的名称与正文更新。
+ */
+export interface KnowledgeDocumentContentInput {
+    "title": string;
+    "content": string;
+}
+
+/**
  * KnowledgeDocumentFormat 定义允许上传的文档扩展名。
  */
 export enum KnowledgeDocumentFormat {
@@ -1927,6 +1943,13 @@ export interface KnowledgeDocumentMoveInput {
 export interface KnowledgeDocumentPreviewRequest {
     "url": string;
     "headers": { [_ in string]?: string } | null;
+}
+
+/**
+ * KnowledgeDocumentRenameInput 定义文档名称更新。
+ */
+export interface KnowledgeDocumentRenameInput {
+    "title": string;
 }
 
 /**
@@ -2122,6 +2145,15 @@ export interface KnowledgeRetrievalRecord {
  */
 export interface KnowledgeRetrievalResult {
     "records": KnowledgeRetrievalRecord[] | null;
+}
+
+/**
+ * KnowledgeTextDocumentInput 定义在线编写文档的分组、名称与正文。
+ */
+export interface KnowledgeTextDocumentInput {
+    "groupId": string;
+    "title": string;
+    "content": string;
 }
 
 /**

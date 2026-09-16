@@ -171,6 +171,13 @@ export function CreateKnowledgeQAEntry(meta: $models.RequestMeta, knowledgeBaseI
 }
 
 /**
+ * CreateKnowledgeTextDocument 创建在线编写的文档并安排索引。
+ */
+export function CreateKnowledgeTextDocument(meta: $models.RequestMeta, knowledgeBaseID: string, input: $models.KnowledgeTextDocumentInput): $CancellablePromise<$models.KnowledgeDocument> {
+    return $Call.ByID(3003924288, meta, knowledgeBaseID, input);
+}
+
+/**
  * CreateMCPServer 创建 MCP 服务。
  */
 export function CreateMCPServer(meta: $models.RequestMeta, input: $models.MCPServerInput): $CancellablePromise<$models.MCPServer> {
@@ -406,6 +413,13 @@ export function GetKnowledgeBase(meta: $models.RequestMeta, knowledgeBaseID: str
  */
 export function GetKnowledgeDocument(meta: $models.RequestMeta, knowledgeBaseID: string, documentID: string): $CancellablePromise<$models.KnowledgeDocument> {
     return $Call.ByID(593812391, meta, knowledgeBaseID, documentID);
+}
+
+/**
+ * GetKnowledgeDocumentContent 返回在线文档正文或网页抓取快照。
+ */
+export function GetKnowledgeDocumentContent(meta: $models.RequestMeta, knowledgeBaseID: string, documentID: string): $CancellablePromise<$models.KnowledgeDocumentContent> {
+    return $Call.ByID(3035191824, meta, knowledgeBaseID, documentID);
 }
 
 /**
@@ -836,6 +850,13 @@ export function RemoveTeamMembers(meta: $models.RequestMeta, teamID: string, inp
 }
 
 /**
+ * RenameKnowledgeDocument 修改在线文档或网页文档的名称。
+ */
+export function RenameKnowledgeDocument(meta: $models.RequestMeta, knowledgeBaseID: string, documentID: string, input: $models.KnowledgeDocumentRenameInput): $CancellablePromise<$models.KnowledgeDocument> {
+    return $Call.ByID(870915057, meta, knowledgeBaseID, documentID, input);
+}
+
+/**
  * ReopenServiceSession 重新打开客户会话最新处理周期并分配给当前身份。
  */
 export function ReopenServiceSession(meta: $models.RequestMeta, conversationID: string): $CancellablePromise<$models.CustomerServiceSession> {
@@ -1120,6 +1141,13 @@ export function UpdateGroupConversation(meta: $models.RequestMeta, conversationI
  */
 export function UpdateKnowledgeBase(meta: $models.RequestMeta, knowledgeBaseID: string, input: $models.KnowledgeBaseInput): $CancellablePromise<$models.KnowledgeBase> {
     return $Call.ByID(103390268, meta, knowledgeBaseID, input);
+}
+
+/**
+ * UpdateKnowledgeDocumentContent 修改在线文档的名称与正文并安排索引。
+ */
+export function UpdateKnowledgeDocumentContent(meta: $models.RequestMeta, knowledgeBaseID: string, documentID: string, input: $models.KnowledgeDocumentContentInput): $CancellablePromise<$models.KnowledgeDocument> {
+    return $Call.ByID(3457873805, meta, knowledgeBaseID, documentID, input);
 }
 
 /**

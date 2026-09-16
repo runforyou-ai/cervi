@@ -16,6 +16,7 @@ import { MCPServerListPage } from "@/features/integrations/mcp-servers/mcp-serve
 import { ModelProviderFormPage } from "@/features/integrations/model-services/model-provider-form-page"
 import { ModelProviderListPage } from "@/features/integrations/model-services/model-provider-list-page"
 import { KnowledgeDocumentListPage } from "@/features/knowledge-base/knowledge-document-list-page"
+import { KnowledgeDocumentFormPage } from "@/features/knowledge-base/knowledge-document-form-page"
 import { KnowledgeDocumentPage } from "@/features/knowledge-base/knowledge-document-page"
 import { KnowledgeQAListPage } from "@/features/knowledge-base/knowledge-qa-list-page"
 import { KnowledgeQAFormPage } from "@/features/knowledge-base/knowledge-qa-form-page"
@@ -159,6 +160,18 @@ const workspaceRouteDefinitions = [
     tabPath: "/knowledge-bases",
     titleKey: "tabs.routes.knowledgeBases",
     element: <KnowledgeQAListPage />,
+  },
+  {
+    path: "/knowledge-bases/:knowledgeBaseId/groups/:groupId/documents/new",
+    tabPath: "/knowledge-bases",
+    titleKey: "tabs.routes.knowledgeBases",
+    element: <KnowledgeDocumentFormPage mode="create" />,
+  },
+  {
+    path: "/knowledge-bases/:knowledgeBaseId/groups/:groupId/documents/:documentId/edit",
+    tabPath: "/knowledge-bases",
+    titleKey: "tabs.routes.knowledgeBases",
+    element: <KnowledgeDocumentFormPage mode="edit" />,
   },
   {
     path: "/knowledge-bases/:knowledgeBaseId/groups/:groupId/documents/:documentId",

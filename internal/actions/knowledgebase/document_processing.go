@@ -40,14 +40,14 @@ func (p *DocumentProcessing) enqueue(ctx context.Context, tx bun.IDB, organizati
 		return err
 	}
 	_, err := p.tasks.EnqueueIn(ctx, tx, ProcessDocumentActionName, ProcessInput{
-		OrganizationID: organizationID, KnowledgeBaseID: base.ID, DocumentID: document.ID, ProcessingID: document.ProcessingID,
+		OrganizationID: organizationID, KnowledgeBaseID: base.ID, DocumentID: document.ID, SourceKind: document.SourceKind, ProcessingID: document.ProcessingID,
 		ChunkLength: document.ChunkLength, ChunkOverlap: document.ChunkOverlap,
 		EmbeddingProviderID: document.EmbeddingProviderID, EmbeddingModelIdentifier: document.EmbeddingModelIdentifier, EmbeddingDimension: document.EmbeddingDimension,
 	}, servertask.EnqueueOptions{Queue: servertask.QueueKnowledge, MaxAttempts: 1, IdempotencyKey: document.ProcessingID, TriggerType: servertask.TriggerBusiness})
 	return err
 }
 
-// Retry 检查服务连接后按当前配置投递一次处理，连接失败直接保存失败状态。
+// Retry 按当前配置投递一次处理，依赖转换服务的来源先检查连接，连接失败直接保存失败状态。
 func (p *DocumentProcessing) Retry(ctx context.Context, identity *servermodels.Identity, baseID, documentID string, checkConnection func(context.Context) error) error {
 	var connectionErr error
 	err := p.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
@@ -66,7 +66,10 @@ func (p *DocumentProcessing) Retry(ctx context.Context, identity *servermodels.I
 		if err != nil {
 			return err
 		}
-		connectionErr = checkConnection(ctx)
+		// 只有需要转换原件的来源依赖转换服务。
+		if document.SourceKind == domain.KnowledgeDocumentSourceFile {
+			connectionErr = checkConnection(ctx)
+		}
 		if connectionErr != nil {
 			code := "unavailable"
 			var failure *documentconvert.Error

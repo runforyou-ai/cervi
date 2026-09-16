@@ -71,6 +71,45 @@ func (o *directOperations) DeleteKnowledgeDocument(ctx context.Context, meta Req
 	return nil
 }
 
+// CreateKnowledgeTextDocument 创建在线编写的文档并安排索引。
+func (o *directOperations) CreateKnowledgeTextDocument(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, baseID string, input KnowledgeTextDocumentInput) (KnowledgeDocument, error) {
+	record, err := o.saveTextDocument.Execute(ctx, identity, baseID, "", knowledgeaction.TextDocumentInput{GroupID: input.GroupID, Title: input.Title, Content: input.Content})
+	if err != nil {
+		return KnowledgeDocument{}, o.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeDocumentSaveFailed, identity.Organization.ID, baseID)
+	}
+	slog.Info("在线文档已创建", "knowledge_base_id", baseID, "document_id", record.ID)
+	return knowledgeDocumentFromAction(meta, *record), nil
+}
+
+// GetKnowledgeDocumentContent 返回在线文档正文或网页抓取快照。
+func (o *directOperations) GetKnowledgeDocumentContent(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, baseID, documentID string) (KnowledgeDocumentContent, error) {
+	record, err := o.documentQuery.Content(ctx, identity, baseID, documentID)
+	if err != nil {
+		return KnowledgeDocumentContent{}, o.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeDocumentReadFailed, identity.Organization.ID, baseID)
+	}
+	return KnowledgeDocumentContent{Document: knowledgeDocumentFromAction(meta, record.Document), Content: record.Content}, nil
+}
+
+// UpdateKnowledgeDocumentContent 修改在线文档的名称与正文并安排索引。
+func (o *directOperations) UpdateKnowledgeDocumentContent(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, baseID, documentID string, input KnowledgeDocumentContentInput) (KnowledgeDocument, error) {
+	record, err := o.saveTextDocument.Execute(ctx, identity, baseID, documentID, knowledgeaction.TextDocumentInput{Title: input.Title, Content: input.Content})
+	if err != nil {
+		return KnowledgeDocument{}, o.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeDocumentSaveFailed, identity.Organization.ID, baseID)
+	}
+	slog.Info("在线文档已保存", "knowledge_base_id", baseID, "document_id", documentID)
+	return knowledgeDocumentFromAction(meta, *record), nil
+}
+
+// RenameKnowledgeDocument 修改在线文档或网页文档的名称。
+func (o *directOperations) RenameKnowledgeDocument(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, baseID, documentID string, input KnowledgeDocumentRenameInput) (KnowledgeDocument, error) {
+	record, err := o.renameDocument.Execute(ctx, identity, baseID, documentID, input.Title)
+	if err != nil {
+		return KnowledgeDocument{}, o.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeDocumentSaveFailed, identity.Organization.ID, baseID)
+	}
+	slog.Info("知识文档已改名", "knowledge_base_id", baseID, "document_id", documentID)
+	return knowledgeDocumentFromAction(meta, *record), nil
+}
+
 // GetKnowledgeDocumentPreview 按原件实际存储类型返回受控读取请求。
 func (o *directOperations) GetKnowledgeDocumentPreview(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, baseID, documentID string) (KnowledgeDocumentPreviewRequest, error) {
 	record, err := o.documentQuery.File(ctx, identity, baseID, documentID)

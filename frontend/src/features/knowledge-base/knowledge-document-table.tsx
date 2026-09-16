@@ -1,7 +1,7 @@
 /** 文档表格展示元数据、创建时间及固定操作栏。 */
 import { useRef, useState } from "react"
 import { toast } from "sonner"
-import { retryKnowledgeDocument, isApiError } from "@/api"
+import { retryKnowledgeDocument, isApiError, KnowledgeDocumentSourceKind } from "@/api"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
 import { recoverSession } from "@/lib/session-navigation"
@@ -88,6 +88,12 @@ export function KnowledgeDocumentTable({
             cell: (document) => document.format.slice(1).toUpperCase(),
           },
           {
+            key: "source",
+            header: t("documents.columns.source"),
+            cellClassName: "whitespace-nowrap text-muted-foreground",
+            cell: (document) => t(`documents.sources.${document.sourceKind}`),
+          },
+          {
             key: "size",
             header: t("documents.columns.size"),
             cellClassName: "whitespace-nowrap tabular-nums",
@@ -111,9 +117,16 @@ export function KnowledgeDocumentTable({
         actions={(document) => ({
           primary: (
             <Button variant="outline" size="sm" asChild>
-              <Link to={`${listPath}/${document.id}${search}`}>
-                {t("common:actions.view")}
-              </Link>
+              {document.sourceKind ===
+              KnowledgeDocumentSourceKind.KnowledgeDocumentSourceText ? (
+                <Link to={`${listPath}/${document.id}/edit${search}`}>
+                  {t("common:actions.edit")}
+                </Link>
+              ) : (
+                <Link to={`${listPath}/${document.id}${search}`}>
+                  {t("common:actions.view")}
+                </Link>
+              )}
             </Button>
           ),
           menuLabel: t("documents.more", { name: document.name }),
