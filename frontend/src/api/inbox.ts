@@ -55,7 +55,6 @@ import type {
   CustomerInboxConversation,
   ConversationMessage,
   ConversationAgentProcess,
-  AgentRunProcess,
   ConversationMessageList,
   ConversationMessageListInput,
   ConversationMessageWindowInput,
@@ -108,8 +107,6 @@ export type ConversationMessageListData = NonNullArrays<ConversationMessageList>
 
 export type ConversationAgentProcessData =
   NonNullArrays<ConversationAgentProcess>
-
-export type AgentRunProcessData = NonNullArrays<AgentRunProcess>
 
 export type ConversationMessageData = NonNullArrays<ConversationMessage>
 

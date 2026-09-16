@@ -39,11 +39,11 @@ func agentRunProcessError(ctx context.Context, meta RequestMeta, err error, orga
 	if errors.Is(err, common.ErrIdentityInvalid) {
 		return SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
 	}
-	if errors.Is(err, conversationaction.ErrAgentRunProcessUnavailable) || errors.Is(err, conversationaction.ErrConversationNotFound) {
+	if errors.Is(err, conversationaction.ErrAgentRunProcessUnavailable) {
 		return NotFoundError(meta, cervii18n.ErrorAgentRunProcessUnavailable).WithReason("agent_run_process_unavailable")
 	}
 	slog.Warn("读取 AI 运行过程失败", "organization_id", organizationID, "agent_run_id", runID, "error", err)
-	return FailedError(meta, cervii18n.ErrorConversationMessageListFailed)
+	return FailedError(meta, cervii18n.ErrorAgentRunProcessReadFailed)
 }
 
 // conversationAgentProcessFromAction 转换消息携带的运行引用和模型用量。

@@ -191,7 +191,7 @@ export function AgentProcess({ process, incoming }: { process: ConversationAgent
         ) : (
           // 读取中与读取失败共用一行占位，保持展开区域高度稳定。
           <p className={cn("text-xs", incoming ? "text-muted-foreground" : "text-primary-foreground/75")}>
-            {detail.error ? (
+            {detail.error && !detail.refreshing ? (
               <>
                 <span>{isApiError(detail.error) ? apiErrorMessage(detail.error) : t("agentProcessLoadFailed")}</span>
                 <button

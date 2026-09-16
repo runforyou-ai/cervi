@@ -2224,6 +2224,16 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if _, err := conversationaction.NewGetAgentRunProcessQuery(db).Execute(context.Background(), loggedIn.Identity, uuid.NewV7().String()); !errors.Is(err, conversationaction.ErrAgentRunProcessUnavailable) {
 			t.Fatalf("unknown agent run process error = %v", err)
 		}
+		// 同企业其他成员没有这条 AI 会话的阅读资格，读不到运行过程。
+		outsiderLogin, err := login.Execute(context.Background(), authaction.LoginInput{
+			OrganizationID: loggedIn.Identity.Organization.ID, Email: createdMember.Email, Password: "password123",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := conversationaction.NewGetAgentRunProcessQuery(db).Execute(context.Background(), outsiderLogin.Identity, run.ID); !errors.Is(err, conversationaction.ErrAgentRunProcessUnavailable) {
+			t.Fatalf("outsider agent run process error = %v", err)
+		}
 
 		if _, err := sendAgentMessage.Execute(context.Background(), loggedIn.Identity, conversationaction.InternalTextMessageInput{
 			ConversationID: agentConversation.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f72", Body: "这次模拟模型失败",
@@ -2265,6 +2275,10 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		failedHistory, err := conversationaction.NewListConversationMessagesQuery(db).Execute(context.Background(), loggedIn.Identity, conversationaction.ConversationMessageHistoryInput{ConversationID: agentConversation.ID})
 		if err != nil || failedHistory.LatestAgentRun == nil || failedHistory.LatestAgentRun.ID != failedRun.ID || failedHistory.LatestAgentRun.Status != domain.AgentRunStatusFailed || failedHistory.LatestAgentRun.LastError == nil {
 			t.Fatalf("failed run message state = %#v, error = %v", failedHistory, err)
+		}
+		// 过程内容只对成功运行开放。
+		if _, err := conversationaction.NewGetAgentRunProcessQuery(db).Execute(context.Background(), loggedIn.Identity, failedRun.ID); !errors.Is(err, conversationaction.ErrAgentRunProcessUnavailable) {
+			t.Fatalf("failed agent run process error = %v", err)
 		}
 
 		if _, err := sendAgentMessage.Execute(context.Background(), loggedIn.Identity, conversationaction.InternalTextMessageInput{
