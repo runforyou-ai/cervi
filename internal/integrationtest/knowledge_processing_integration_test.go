@@ -302,7 +302,7 @@ func insertSegments(t *testing.T, db *bun.DB, organizationID, baseID, documentID
 	ids := make([]string, 0, count)
 	for position := 1; position <= count; position++ {
 		id := uuid.NewV7().String()
-		_, err := db.ExecContext(context.Background(), "INSERT INTO public.knowledge_segments(id, organization_id, knowledge_base_id, source_type, source_id, segment_batch_id, position, character_count, content) VALUES (?, ?, ?, ?, ?, ?, ?, 4, ?)",
+		_, err := db.ExecContext(context.Background(), "INSERT INTO public.knowledge_segments(id, organization_id, knowledge_base_id, source_type, source_id, segment_batch_id, position, character_count, context, content) VALUES (?, ?, ?, ?, ?, ?, ?, 4, '', ?)",
 			id, organizationID, baseID, "document", documentID, batchID, position, fmt.Sprintf("第%d段正文", position))
 		if err != nil {
 			t.Fatal(err)
@@ -330,7 +330,7 @@ func TestKnowledgeProcessingPublishesSegments(t *testing.T) {
 	if err := db.NewSelect().Model(document).Where("kd.id = ?", docs[0].ID).Scan(ctx); err != nil {
 		t.Fatal(err)
 	}
-	markdown := strings.Repeat("合同正文。", 400)
+	markdown := "# 采购合同\n" + strings.Repeat("合同正文。", 400)
 	probe := &processingProbe{markdown: markdown}
 	input := knowledgeaction.ProcessInput{
 		OrganizationID: owner.Identity.Organization.ID, KnowledgeBaseID: base.ID, DocumentID: document.ID,
@@ -343,8 +343,8 @@ func TestKnowledgeProcessingPublishesSegments(t *testing.T) {
 		t.Fatal(err)
 	}
 	expected := textsplit.Split(markdown, input.ChunkLength, input.ChunkOverlap)
-	if len(expected) < 2 {
-		t.Fatalf("样本应切出多段，实际 %d", len(expected))
+	if len(expected) < 2 || expected[1].Context != "# 采购合同" {
+		t.Fatalf("样本应切出带标题路径的多段，实际 %+v", expected)
 	}
 	if err := db.NewSelect().Model(document).Where("kd.id = ?", document.ID).Scan(ctx); err != nil {
 		t.Fatal(err)
@@ -352,7 +352,7 @@ func TestKnowledgeProcessingPublishesSegments(t *testing.T) {
 	if document.Status != domain.KnowledgeIndexSucceeded || document.SegmentBatchID != input.ProcessingID || document.SegmentCount != len(expected) {
 		t.Fatalf("document=%+v 期望 %d 段", document, len(expected))
 	}
-	// 读回发布批次，核对正文、序号与按任务标识确定的分段编号。
+	// 读回发布批次，核对上下文、正文、序号与按任务标识确定的分段编号。
 	page, err := knowledgeaction.NewDocumentQuery(db).Segments(ctx, owner.Identity, base.ID, document.ID, knowledgeaction.SegmentQueryInput{PageSize: 100})
 	if err != nil {
 		t.Fatal(err)
@@ -363,7 +363,7 @@ func TestKnowledgeProcessingPublishesSegments(t *testing.T) {
 	namespace := uuid.MustParse(input.ProcessingID)
 	for index, segment := range page.Segments {
 		want := expected[index]
-		if segment.Position != want.Position || segment.Content != want.Content || segment.CharacterCount != want.CharacterCount {
+		if segment.Position != want.Position || segment.Context != want.Context || segment.Content != want.Content || segment.CharacterCount != want.CharacterCount {
 			t.Fatalf("分段 %d = %+v，期望 %+v", index+1, segment, want)
 		}
 		if segment.ID != common.NewUUIDv5(namespace, strconv.Itoa(want.Position)).String() {

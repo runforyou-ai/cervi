@@ -83,10 +83,11 @@ type KnowledgeDocumentSegmentInput struct {
 	PageSize        int    `json:"pageSize" query:"pageSize,default=20"`
 }
 
-// KnowledgeDocumentSegment 定义可阅读和定位的分段正文。
+// KnowledgeDocumentSegment 定义可阅读和定位的分段正文，上下文为分段所属的标题路径和表头。
 type KnowledgeDocumentSegment struct {
 	ID             string `json:"id"`
 	Position       int    `json:"position"`
+	Context        string `json:"context"`
 	Content        string `json:"content"`
 	CharacterCount int    `json:"characterCount"`
 }

@@ -21,7 +21,7 @@ type knowledgeSearchInput struct {
 func newKnowledgeSearchTool(search KnowledgeSearch) (tool.InvokableTool, error) {
 	return toolutils.InferTool(
 		"search_knowledge",
-		"检索已配置知识库中的相关资料。传 queries 执行多关键词检索；传返回结果中的 cursor 以及 before、after 读取命中片段周边内容。",
+		"检索已配置知识库中的相关资料。传 queries 执行多关键词检索；传返回结果中的 cursor 以及 before、after 读取命中片段周边内容。结果中的 context 是该片段所属的标题路径和表格表头。",
 		func(ctx context.Context, input knowledgeSearchInput) (knowledgeretrieval.Result, error) {
 			return search(ctx, knowledgeretrieval.Request{
 				Queries: input.Queries, Cursor: input.Cursor, Before: input.Before, After: input.After,

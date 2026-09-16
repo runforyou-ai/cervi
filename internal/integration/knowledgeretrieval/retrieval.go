@@ -26,6 +26,7 @@ type Record struct {
 	SegmentID         string   `json:"segmentId"`
 	SegmentBatchID    string   `json:"-"`
 	Position          int      `json:"position"`
+	Context           string   `json:"context,omitempty"`
 	Content           string   `json:"content"`
 	Answer            *string  `json:"answer"`
 	Score             *float64 `json:"score,omitempty"`

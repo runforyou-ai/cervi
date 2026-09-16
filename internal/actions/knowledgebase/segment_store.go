@@ -43,6 +43,7 @@ type segmentHit struct {
 	SourceName     string `bun:"source_name"`
 	SegmentBatchID string `bun:"segment_batch_id"`
 	Position       int    `bun:"position"`
+	Context        string `bun:"context"`
 	Content        string `bun:"content"`
 }
 
@@ -52,7 +53,7 @@ func segmentColumns(base servermodels.KnowledgeBase) string {
 	if base.Category == string(domain.KnowledgeBaseCategoryQA) {
 		name = "question.content"
 	}
-	return "ks.id, ks.source_id, " + name + " AS source_name, ks.segment_batch_id, ks.position, ks.content"
+	return "ks.id, ks.source_id, " + name + " AS source_name, ks.segment_batch_id, ks.position, ks.context, ks.content"
 }
 
 // publishedSegments 按知识库类别联结来源记录，只选取与来源当前已发布批次一致的分段。
@@ -66,7 +67,7 @@ func publishedSegments(db bun.IDB, base servermodels.KnowledgeBase) *bun.SelectQ
 		Join("JOIN files f ON f.id = kd.file_id")
 }
 
-// insertSegments 按批次标识和来源内序号写入本批次分段、向量和词法词元。
+// insertSegments 按批次标识和来源内序号写入本批次分段、上下文、向量和词法词元，词法词元由上下文与正文共同生成。
 func insertSegments(ctx context.Context, tx bun.IDB, batch segmentBatch, segments []textsplit.Segment, vectors [][]float32) error {
 	namespace, err := uuid.Parse(batch.BatchID)
 	if err != nil {
@@ -81,13 +82,13 @@ func insertSegments(ctx context.Context, tx bun.IDB, batch segmentBatch, segment
 			for _, value := range vectors[start+offset] {
 				vector = append(vector, strconv.FormatFloat(float64(value), 'f', -1, 32))
 			}
-			placeholders = append(placeholders, "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?::vector, ?, ?::tsvector)")
+			placeholders = append(placeholders, "(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?::vector, ?, ?::tsvector)")
 			arguments = append(arguments, common.NewUUIDv5(namespace, strconv.Itoa(segment.Position)).String(),
 				batch.OrganizationID, batch.KnowledgeBaseID, batch.SourceType, batch.SourceID, batch.BatchID,
-				segment.Position, segment.CharacterCount, segment.Content,
-				"["+strings.Join(vector, ",")+"]", batch.EmbeddingDimension, searchtext.KnowledgeVector(segment.Content))
+				segment.Position, segment.CharacterCount, segment.Context, segment.Content,
+				"["+strings.Join(vector, ",")+"]", batch.EmbeddingDimension, searchtext.KnowledgeVector(textsplit.IndexText(segment.Context, segment.Content)))
 		}
-		query := "INSERT INTO public.knowledge_segments (id, organization_id, knowledge_base_id, source_type, source_id, segment_batch_id, position, character_count, content, embedding, embedding_dimension, search_vector) VALUES " + strings.Join(placeholders, ", ")
+		query := "INSERT INTO public.knowledge_segments (id, organization_id, knowledge_base_id, source_type, source_id, segment_batch_id, position, character_count, context, content, embedding, embedding_dimension, search_vector) VALUES " + strings.Join(placeholders, ", ")
 		if _, err := tx.ExecContext(ctx, query, arguments...); err != nil {
 			return err
 		}
@@ -127,7 +128,7 @@ func searchSegmentsByText(ctx context.Context, db bun.IDB, base servermodels.Kno
 		Where("ks.search_vector @@ ?::tsquery", tsquery).Limit(lexicalMatchLimit)
 	hits := make([]segmentHit, 0, segmentCandidateLimit)
 	err := db.NewSelect().With("candidates", candidates).TableExpr("candidates").
-		ColumnExpr("id, source_id, source_name, segment_batch_id, position, content").
+		ColumnExpr("id, source_id, source_name, segment_batch_id, position, context, content").
 		OrderExpr("ts_rank_cd(search_vector, ?::tsquery) DESC, id", tsquery).
 		Limit(segmentCandidateLimit).Scan(ctx, &hits)
 	return hits, err

@@ -16,6 +16,7 @@ import (
 
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/common/searchtext"
+	"github.com/runforyou-ai/cervi/internal/common/textsplit"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/embedding"
 	"github.com/runforyou-ai/cervi/internal/integration/knowledgeretrieval"
@@ -49,6 +50,7 @@ type RetrievalRecord struct {
 	SegmentID      string
 	SegmentBatchID string
 	Position       int
+	Context        string
 	Content        string
 	Answer         string
 	Score          float64
@@ -247,7 +249,7 @@ func (k *knowledgeSource) retrieve(ctx context.Context, query string) ([]Retriev
 	if len(ordered) > 0 {
 		documents := make([]string, 0, len(ordered))
 		for _, item := range ordered {
-			documents = append(documents, item.hit.Content)
+			documents = append(documents, textsplit.IndexText(item.hit.Context, item.hit.Content))
 		}
 		scores, err := k.service.reranker.Rerank(ctx, k.rerank, k.base.RerankModelIdentifier, query, documents, len(documents))
 		if err != nil {
@@ -290,7 +292,7 @@ func (k *knowledgeSource) retrieve(ctx context.Context, query string) ([]Retriev
 		record := RetrievalRecord{
 			DocumentID: item.hit.SourceID, DocumentName: item.hit.SourceName,
 			SegmentID: item.hit.ID, SegmentBatchID: item.hit.SegmentBatchID, Position: item.hit.Position,
-			Content: item.hit.Content, Score: item.score, LexicalRank: item.lexicalRank, VectorRank: item.vectorRank,
+			Context: item.hit.Context, Content: item.hit.Content, Score: item.score, LexicalRank: item.lexicalRank, VectorRank: item.vectorRank,
 		}
 		// 问答记录以条目编号作为分段编号，位置固定为 1。
 		if qa {
@@ -338,7 +340,7 @@ func (k *knowledgeSource) read(ctx context.Context, sourceID, segmentID, batchID
 	}
 	records := make([]RetrievalRecord, 0, len(hits))
 	for _, hit := range hits {
-		records = append(records, RetrievalRecord{DocumentID: hit.SourceID, DocumentName: hit.SourceName, SegmentID: hit.ID, SegmentBatchID: hit.SegmentBatchID, Position: hit.Position, Content: hit.Content})
+		records = append(records, RetrievalRecord{DocumentID: hit.SourceID, DocumentName: hit.SourceName, SegmentID: hit.ID, SegmentBatchID: hit.SegmentBatchID, Position: hit.Position, Context: hit.Context, Content: hit.Content})
 	}
 	return records, nil
 }
@@ -372,7 +374,8 @@ func retrievalRecords(records []RetrievalRecord, scored bool) []knowledgeretriev
 	for _, record := range records {
 		item := knowledgeretrieval.Record{
 			DocumentID: record.DocumentID, DocumentName: record.DocumentName,
-			SegmentID: record.SegmentID, SegmentBatchID: record.SegmentBatchID, Position: record.Position, Content: record.Content,
+			SegmentID: record.SegmentID, SegmentBatchID: record.SegmentBatchID, Position: record.Position,
+			Context: record.Context, Content: record.Content,
 		}
 		if record.Answer != "" {
 			answer := record.Answer

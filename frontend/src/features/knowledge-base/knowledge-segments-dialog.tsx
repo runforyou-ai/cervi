@@ -111,6 +111,7 @@ export function KnowledgeSegmentsDialog({ knowledgeBaseId, documentId, documentN
               {segment.id === segmentId && <span className="block text-primary">{t("documentDetail.segments.matched")}</span>}
             </div>
             <div className="min-w-0 flex-1">
+              {segment.context && <p className="whitespace-pre-wrap break-words pt-1.5 text-xs leading-5 text-muted-foreground select-text">{segment.context}</p>}
               <p className="whitespace-pre-wrap break-words text-sm leading-7 select-text">{segment.content}</p>
             </div>
           </article>)}

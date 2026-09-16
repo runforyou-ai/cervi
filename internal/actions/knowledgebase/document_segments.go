@@ -25,10 +25,11 @@ type SegmentQueryInput struct {
 	Page, PageSize  int
 }
 
-// Segment 定义按来源顺序阅读的一段正文。
+// Segment 定义按来源顺序阅读的一段正文及其标题路径和表头。
 type Segment struct {
 	ID             string `bun:"id"`
 	Position       int    `bun:"position"`
+	Context        string `bun:"context"`
 	Content        string `bun:"content"`
 	CharacterCount int    `bun:"character_count"`
 }
@@ -96,7 +97,7 @@ func (q *DocumentQuery) Segments(ctx context.Context, identity *servermodels.Ide
 		}
 		segments := make([]Segment, 0, input.PageSize)
 		err = tx.NewSelect().TableExpr("public.knowledge_segments").
-			ColumnExpr("id, content, position, character_count").
+			ColumnExpr("id, context, content, position, character_count").
 			Where(condition, scope...).OrderExpr("position, id").
 			Limit(input.PageSize).Offset((page-1)*input.PageSize).Scan(ctx, &segments)
 		if err != nil {

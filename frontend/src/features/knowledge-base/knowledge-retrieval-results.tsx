@@ -50,7 +50,10 @@ export function KnowledgeRetrievalResults({ category, records, onViewContext }: 
                     </div>
                   </dl>
                 ) : (
-                  <SelectableText className="mt-3 block whitespace-pre-wrap break-words text-sm leading-6">{record.content}</SelectableText>
+                  <div className="mt-3 space-y-1">
+                    {record.context && <SelectableText className="block whitespace-pre-wrap break-words text-xs leading-5 text-muted-foreground">{record.context}</SelectableText>}
+                    <SelectableText className="block whitespace-pre-wrap break-words text-sm leading-6">{record.content}</SelectableText>
+                  </div>
                 )}
               </div>
               <span className="shrink-0 text-xs text-muted-foreground tabular-nums">

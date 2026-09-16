@@ -94,6 +94,7 @@ type KnowledgeRetrievalRecord struct {
 	SegmentID      string  `json:"segmentId"`
 	SegmentBatchID string  `json:"segmentBatchId"`
 	Position       int     `json:"position"`
+	Context        string  `json:"context"`
 	Content        string  `json:"content"`
 	Answer         string  `json:"answer"`
 	Score          float64 `json:"score"`
