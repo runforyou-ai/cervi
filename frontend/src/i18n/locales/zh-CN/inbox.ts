@@ -205,6 +205,7 @@ const inbox = {
   agentRunWaiting: "等待发言：{{names}}",
   agentThoughtRunning: "思考中",
   agentThoughtCompleted: "已思考（用时{{seconds}}秒）",
+  agentProcessLoadFailed: "读取运行过程失败",
   agentToolQueued: "等待执行",
   agentToolRunning: "正在执行",
   agentToolSucceeded: "已成功",

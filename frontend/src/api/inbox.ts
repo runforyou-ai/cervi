@@ -37,6 +37,7 @@ import {
   StopCustomerCopilotReply,
   SendAttachmentMessage,
   GetAttachmentDownload,
+  GetAgentRunProcess,
   SendFirstAgentTextMessage,
   SendAgentTextMessage,
   StopAgentReply,
@@ -545,6 +546,9 @@ export const sendAttachmentMessage = bind(SendAttachmentMessage)
 
 /** 获取当前可见附件的下载请求。 */
 export const getAttachmentDownload = bind(GetAttachmentDownload)
+
+/** 按运行编号读取展开时才需要的过程内容和模型用量。 */
+export const getAgentRunProcess = bind(GetAgentRunProcess)
 
 /** 停止指定 AI 回复并读取实际运行状态。 */
 export const stopAgentReply = bind(StopAgentReply)

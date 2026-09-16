@@ -2191,7 +2191,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatal(err)
 		}
 		assertDirectAgentRunStatus(t, inboxAfterRun, agentConversation.ID, domain.AgentRunStatusSucceeded, "结果是 42")
-		// 最新窗口和锚点窗口均返回消息所属的完整过程，不将过程附到用户消息。
+		// 最新窗口和锚点窗口均返回消息所属的运行引用，不将过程附到用户消息。
 		for _, anchor := range []string{"", *run.ResponseMessageID} {
 			history, err := conversationaction.NewListConversationMessagesQuery(db).Execute(context.Background(), loggedIn.Identity, conversationaction.ConversationMessageHistoryInput{ConversationID: agentConversation.ID, AroundMessageID: anchor})
 			if err != nil || history.LatestAgentRun == nil || history.LatestAgentRun.ID != run.ID || history.LatestAgentRun.AgentName != "售前智能体" {
@@ -2206,7 +2206,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 					continue
 				}
 				process := message.AgentProcess
-				if process == nil || process.ID != run.ID || len(process.Blocks) != 1 || process.Blocks[0].Payload.Text != "计算过程" || process.Usage.TotalTokens != 12 || process.DurationMilliseconds < 0 {
+				if process == nil || process.ID != run.ID || process.Usage.TotalTokens != 12 || process.DurationMilliseconds < 0 {
 					t.Fatalf("message agent process = %#v", process)
 				}
 				foundProcess = true
@@ -2214,6 +2214,25 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			if !foundProcess {
 				t.Fatal("reply process missing from message window")
 			}
+		}
+		// 过程内容按运行编号单独读取，未知运行不返回详情。
+		runProcess, err := conversationaction.NewGetAgentRunProcessQuery(db).Execute(context.Background(), loggedIn.Identity, run.ID)
+		if err != nil || runProcess.ID != run.ID || len(runProcess.Blocks) != 1 || runProcess.Blocks[0].Payload.Text != "计算过程" ||
+			runProcess.Usage.TotalTokens != 12 || runProcess.DurationMilliseconds < 0 {
+			t.Fatalf("agent run process = %#v, error = %v", runProcess, err)
+		}
+		if _, err := conversationaction.NewGetAgentRunProcessQuery(db).Execute(context.Background(), loggedIn.Identity, uuid.NewV7().String()); !errors.Is(err, conversationaction.ErrAgentRunProcessUnavailable) {
+			t.Fatalf("unknown agent run process error = %v", err)
+		}
+		// 同企业其他成员没有这条 AI 会话的阅读资格，读不到运行过程。
+		outsiderLogin, err := login.Execute(context.Background(), authaction.LoginInput{
+			OrganizationID: loggedIn.Identity.Organization.ID, Email: createdMember.Email, Password: "password123",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := conversationaction.NewGetAgentRunProcessQuery(db).Execute(context.Background(), outsiderLogin.Identity, run.ID); !errors.Is(err, conversationaction.ErrAgentRunProcessUnavailable) {
+			t.Fatalf("outsider agent run process error = %v", err)
 		}
 
 		if _, err := sendAgentMessage.Execute(context.Background(), loggedIn.Identity, conversationaction.InternalTextMessageInput{
@@ -2256,6 +2275,10 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		failedHistory, err := conversationaction.NewListConversationMessagesQuery(db).Execute(context.Background(), loggedIn.Identity, conversationaction.ConversationMessageHistoryInput{ConversationID: agentConversation.ID})
 		if err != nil || failedHistory.LatestAgentRun == nil || failedHistory.LatestAgentRun.ID != failedRun.ID || failedHistory.LatestAgentRun.Status != domain.AgentRunStatusFailed || failedHistory.LatestAgentRun.LastError == nil {
 			t.Fatalf("failed run message state = %#v, error = %v", failedHistory, err)
+		}
+		// 过程内容只对成功运行开放。
+		if _, err := conversationaction.NewGetAgentRunProcessQuery(db).Execute(context.Background(), loggedIn.Identity, failedRun.ID); !errors.Is(err, conversationaction.ErrAgentRunProcessUnavailable) {
+			t.Fatalf("failed agent run process error = %v", err)
 		}
 
 		if _, err := sendAgentMessage.Execute(context.Background(), loggedIn.Identity, conversationaction.InternalTextMessageInput{

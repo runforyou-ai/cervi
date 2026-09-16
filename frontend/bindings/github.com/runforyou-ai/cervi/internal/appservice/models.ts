@@ -323,6 +323,17 @@ export interface AgentRunContentBlock {
 }
 
 /**
+ * AgentRunProcess 定义一次成功运行的有序过程内容和模型用量。
+ */
+export interface AgentRunProcess {
+    "id": string;
+    "durationMilliseconds": number;
+    "inputTokens": number;
+    "outputTokens": number;
+    "blocks": AgentRunContentBlock[] | null;
+}
+
+/**
  * AgentRunStatus 表示会话中 Agent 最近一次运行状态。
  */
 export enum AgentRunStatus {
@@ -661,14 +672,13 @@ export interface ContactSummary {
 }
 
 /**
- * ConversationAgentProcess 定义成功消息的有序过程和模型用量。
+ * ConversationAgentProcess 定义成功消息的运行引用和模型用量，过程内容按运行编号单独读取。
  */
 export interface ConversationAgentProcess {
     "id": string;
     "durationMilliseconds": number;
     "inputTokens": number;
     "outputTokens": number;
-    "blocks": AgentRunContentBlock[] | null;
 }
 
 /**

@@ -21,8 +21,16 @@ const (
 	AgentToolCallFailed    AgentToolCallStatus = AgentToolCallStatus(domain.AgentToolCallFailed)
 )
 
-// ConversationAgentProcess 定义成功消息的有序过程和模型用量。
+// ConversationAgentProcess 定义成功消息的运行引用和模型用量，过程内容按运行编号单独读取。
 type ConversationAgentProcess struct {
+	ID                   string `json:"id"`
+	DurationMilliseconds int64  `json:"durationMilliseconds"`
+	InputTokens          int    `json:"inputTokens"`
+	OutputTokens         int    `json:"outputTokens"`
+}
+
+// AgentRunProcess 定义一次成功运行的有序过程内容和模型用量。
+type AgentRunProcess struct {
 	ID                   string                 `json:"id"`
 	DurationMilliseconds int64                  `json:"durationMilliseconds"`
 	InputTokens          int                    `json:"inputTokens"`
