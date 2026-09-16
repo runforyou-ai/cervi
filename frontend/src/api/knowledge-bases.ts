@@ -29,6 +29,7 @@ import {
   type KnowledgeDocumentSegmentInput,
   type KnowledgeDocumentSegmentPage,
   KnowledgeIndexStatus,
+  KnowledgeDocumentSourceKind,
   type KnowledgeDocumentList,
   type KnowledgeDocumentListInput,
   type KnowledgeDocument,
@@ -220,11 +221,16 @@ export const deleteKnowledgeQAEntry = bind(DeleteKnowledgeQAEntry)
 /** 按当前配置重新索引问答。 */
 export const retryKnowledgeQAEntry = bind(RetryKnowledgeQAEntry)
 
+export type KnowledgeDocumentSourceKindId = Exclude<
+  KnowledgeDocumentSourceKind,
+  KnowledgeDocumentSourceKind.$zero
+>
 export type KnowledgeDocumentData = Omit<
   NonNullArrays<KnowledgeDocument>,
-  "status"
+  "status" | "sourceKind"
 > & {
   status: KnowledgeIndexStatusId
+  sourceKind: KnowledgeDocumentSourceKindId
 }
 export type KnowledgeDocumentListData = Omit<
   NonNullArrays<KnowledgeDocumentList>,

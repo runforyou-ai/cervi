@@ -84,7 +84,7 @@ func (a *CreateDocumentsAction) Execute(ctx context.Context, identity *servermod
 			if file.Status != string(domain.FileStatusUploaded) || file.Expired {
 				return fileaction.ErrFileNotFound
 			}
-			document := &servermodels.KnowledgeDocument{ID: uuid.NewV7().String(), KnowledgeBaseID: baseID, GroupID: groupID, FileID: fileID, Status: domain.KnowledgeIndexInitial, CreatedByUserID: identity.User.ID}
+			document := &servermodels.KnowledgeDocument{ID: uuid.NewV7().String(), KnowledgeBaseID: baseID, GroupID: groupID, SourceKind: domain.KnowledgeDocumentSourceFile, FileID: fileID, Status: domain.KnowledgeIndexInitial, CreatedByUserID: identity.User.ID}
 			if _, err := tx.NewInsert().Model(document).Value("created_at", "clock_timestamp()").Value("updated_at", "clock_timestamp()").Exec(ctx); err != nil {
 				return err
 			}

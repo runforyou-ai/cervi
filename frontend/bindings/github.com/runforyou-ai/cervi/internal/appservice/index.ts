@@ -37,6 +37,7 @@ export {
     InboxSearchRange,
     KnowledgeBaseCategory,
     KnowledgeDocumentFormat,
+    KnowledgeDocumentSourceKind,
     KnowledgeIndexProcessingStatus,
     KnowledgeIndexStatus,
     Locale,

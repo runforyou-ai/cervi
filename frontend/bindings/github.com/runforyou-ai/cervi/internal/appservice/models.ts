@@ -1844,9 +1844,11 @@ export interface KnowledgeBaseList {
  */
 export interface KnowledgeDocument {
     "format": KnowledgeDocumentFormat;
+    "sourceKind": KnowledgeDocumentSourceKind;
     "id": string;
     "groupId": string;
     "name": string;
+    "sourceUrl": string;
     "contentType": string;
     "byteSize": number;
     "status": KnowledgeIndexStatus;
@@ -1958,6 +1960,20 @@ export interface KnowledgeDocumentSegmentPage {
     "anchorSegmentId": string;
     "anchorPosition": number;
 }
+
+/**
+ * KnowledgeDocumentSourceKind 定义文档的内容来源。
+ */
+export enum KnowledgeDocumentSourceKind {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    KnowledgeDocumentSourceFile = "file",
+    KnowledgeDocumentSourceText = "text",
+    KnowledgeDocumentSourceWeb = "web",
+};
 
 /**
  * KnowledgeGroup 定义知识库分组树节点。

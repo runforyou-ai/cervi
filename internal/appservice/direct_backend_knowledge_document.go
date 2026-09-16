@@ -98,7 +98,12 @@ func (o *directOperations) GetKnowledgeDocumentPreview(ctx context.Context, meta
 // knowledgeDocumentFromAction 转换本地文档元数据。
 func knowledgeDocumentFromAction(meta RequestMeta, record knowledgeaction.DocumentRecord) KnowledgeDocument {
 	status, message := knowledgeIndexPresentation(meta, record.Status, record.FailureCode)
-	return KnowledgeDocument{ProcessingStatus: KnowledgeIndexProcessingStatus(record.Status), SegmentBatchID: record.SegmentBatchID, SegmentCount: record.SegmentCount, FailureMessage: message, Format: KnowledgeDocumentFormat(strings.ToLower(filepath.Ext(record.Name))), ID: record.ID, GroupID: record.GroupID, Name: record.Name, ContentType: record.ContentType, ByteSize: record.ByteSize, Status: status, CreatedAt: record.CreatedAt}
+	// 在线文档与网页文档的正文是 Markdown，名称不带扩展名。
+	format := KnowledgeDocumentMD
+	if record.SourceKind == domain.KnowledgeDocumentSourceFile {
+		format = KnowledgeDocumentFormat(strings.ToLower(filepath.Ext(record.Name)))
+	}
+	return KnowledgeDocument{ProcessingStatus: KnowledgeIndexProcessingStatus(record.Status), SegmentBatchID: record.SegmentBatchID, SegmentCount: record.SegmentCount, FailureMessage: message, Format: format, SourceKind: KnowledgeDocumentSourceKind(record.SourceKind), ID: record.ID, GroupID: record.GroupID, Name: record.Name, SourceURL: record.SourceURL, ContentType: record.ContentType, ByteSize: record.ByteSize, Status: status, CreatedAt: record.CreatedAt}
 }
 
 // RetryKnowledgeDocument 按当前配置为文档安排新的处理任务。

@@ -47,6 +47,10 @@ func (a *DeleteKnowledgeBaseAction) Execute(ctx context.Context, identity *serve
 		if _, err := tx.NewUpdate().Model((*servermodels.File)(nil)).Set("status = ?", domain.FileStatusDeleting).Set("expires_at = now()").Set("updated_at = now()").Where("id IN (SELECT file_id FROM knowledge_documents WHERE knowledge_base_id = ?)", knowledgeBaseID).Exec(ctx); err != nil {
 			return err
 		}
+		documentIDs := tx.NewSelect().Model((*servermodels.KnowledgeDocument)(nil)).Column("id").Where("knowledge_base_id = ?", knowledgeBaseID)
+		if _, err := tx.NewDelete().Model((*servermodels.KnowledgeDocumentContent)(nil)).Where("document_id IN (?)", documentIDs).Exec(ctx); err != nil {
+			return err
+		}
 		if _, err := tx.NewDelete().Model((*servermodels.KnowledgeDocument)(nil)).Where("knowledge_base_id = ?", knowledgeBaseID).Exec(ctx); err != nil {
 			return err
 		}

@@ -23,12 +23,23 @@ const (
 	KnowledgeDocumentJSON     KnowledgeDocumentFormat = KnowledgeDocumentFormat(domain.KnowledgeDocumentJSON)
 )
 
+// KnowledgeDocumentSourceKind 定义文档的内容来源。
+type KnowledgeDocumentSourceKind string
+
+const (
+	KnowledgeDocumentSourceFile KnowledgeDocumentSourceKind = KnowledgeDocumentSourceKind(domain.KnowledgeDocumentSourceFile)
+	KnowledgeDocumentSourceText KnowledgeDocumentSourceKind = KnowledgeDocumentSourceKind(domain.KnowledgeDocumentSourceText)
+	KnowledgeDocumentSourceWeb  KnowledgeDocumentSourceKind = KnowledgeDocumentSourceKind(domain.KnowledgeDocumentSourceWeb)
+)
+
 // KnowledgeDocument 定义文档列表与预览页使用的元数据。
 type KnowledgeDocument struct {
 	Format           KnowledgeDocumentFormat        `json:"format"`
+	SourceKind       KnowledgeDocumentSourceKind    `json:"sourceKind"`
 	ID               string                         `json:"id"`
 	GroupID          string                         `json:"groupId"`
 	Name             string                         `json:"name"`
+	SourceURL        string                         `json:"sourceUrl"`
 	ContentType      string                         `json:"contentType"`
 	ByteSize         int64                          `json:"byteSize"`
 	Status           KnowledgeIndexStatus           `json:"status"`
