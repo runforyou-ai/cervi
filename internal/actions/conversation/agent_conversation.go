@@ -216,5 +216,6 @@ func lockAgentSendContext(ctx context.Context, tx bun.Tx, identity *servermodels
 		return row, fmt.Errorf("load AI conversation send context: %w", err)
 	}
 	row.Conversation = member.Conversation
+	row.AgentInputKind = domain.AgentInputKindAgentDirect
 	return row, nil
 }

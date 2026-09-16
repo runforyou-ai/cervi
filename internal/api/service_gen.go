@@ -50,6 +50,10 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.POST("/conversations/:conversationID/messages", s.sendCustomerTextMessage)
 	router.GET("/reply-suggestion-agents", s.listCustomerReplyAgents)
 	router.POST("/conversations/:conversationID/reply-suggestions", s.generateCustomerReplySuggestions)
+	router.GET("/conversations/:conversationID/copilot-threads", s.listCustomerCopilotThreads)
+	router.POST("/conversations/:conversationID/copilot-threads", s.sendFirstCustomerCopilotMessage)
+	router.POST("/copilot-threads/:threadID/messages", s.sendCustomerCopilotTextMessage)
+	router.POST("/copilot-threads/:threadID/runs/:runID/stop", s.stopCustomerCopilotReply)
 	router.GET("/conversations/:conversationID/deliveries", s.listCustomerMessageDeliveries)
 	router.POST("/conversations/:conversationID/deliveries/:deliveryID/resolve", s.resolveCustomerMessageDelivery)
 	router.POST("/conversations/:conversationID/claim", s.claimServiceSession)
@@ -473,6 +477,38 @@ func (s *Service) generateCustomerReplySuggestions(c *gin.Context) {
 		return
 	}
 	output, err := s.application.GenerateCustomerReplySuggestions(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// listCustomerCopilotThreads 返回客户会话的全部 Copilot 线程。
+func (s *Service) listCustomerCopilotThreads(c *gin.Context) {
+	output, err := s.application.ListCustomerCopilotThreads(c.Request.Context(), requestMeta(c), c.Param("conversationID"))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// sendFirstCustomerCopilotMessage 以首条提问创建客户会话的 Copilot 线程。
+func (s *Service) sendFirstCustomerCopilotMessage(c *gin.Context) {
+	var input appservice.FirstCustomerCopilotMessageInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.SendFirstCustomerCopilotMessage(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// sendCustomerCopilotTextMessage 向 Copilot 线程发送提问。
+func (s *Service) sendCustomerCopilotTextMessage(c *gin.Context) {
+	var input appservice.CustomerCopilotTextMessageInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.SendCustomerCopilotTextMessage(c.Request.Context(), requestMeta(c), c.Param("threadID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// stopCustomerCopilotReply 停止 Copilot 线程中指定的回复并返回实际运行状态。
+func (s *Service) stopCustomerCopilotReply(c *gin.Context) {
+	output, err := s.application.StopCustomerCopilotReply(c.Request.Context(), requestMeta(c), c.Param("threadID"), c.Param("runID"))
 	writeResult(c, http.StatusOK, output, err)
 }
 

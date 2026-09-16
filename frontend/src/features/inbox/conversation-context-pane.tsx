@@ -5,7 +5,7 @@ import {
   ChevronLeftIcon,
   ChevronRightIcon,
 } from "lucide-react"
-import { useState, type PointerEvent as ReactPointerEvent } from "react"
+import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from "react"
 import { useTranslation } from "react-i18next"
 
 import {
@@ -21,12 +21,15 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ConversationAvatar } from "@/features/inbox/conversation-avatar"
 import { DirectConversationDraftAvatar } from "@/features/inbox/direct-conversation-draft-header"
 import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
+import type { ComposerDraftBridge } from "@/features/inbox/conversation-composer"
+import { CustomerCopilotPanel } from "@/features/inbox/customer-copilot-panel"
 import { GroupConversationContext } from "@/features/inbox/group-conversation-context"
 import { cn } from "@/lib/utils"
 
 const contextPanelMinWidth = 320
 const contextPanelMaxWidth = 640
-const contextPanelToggleWidth = 16
+// 展开资料栏后为会话区保留的宽度，空间不足时资料栏最多占一半。
+const conversationMinWidth = 420
 
 /** 展示尚无数据的上下文页签。 */
 function ContextPlaceholder({
@@ -130,15 +133,20 @@ function ConversationContextContent({
   directTarget,
   displayName,
   currentIdentityID,
+  replyDisabledReason,
+  customerDraftRef,
   onGroupLeft,
 }: {
   conversation: InboxConversation | null
   directTarget: MemberOption | null
   displayName: string
   currentIdentityID: string
+  replyDisabledReason: string | null
+  customerDraftRef: RefObject<ComposerDraftBridge | null>
   onGroupLeft: () => void
 }) {
   const { t } = useTranslation("inbox")
+  const [customerTab, setCustomerTab] = useState("profile")
   const customer =
     conversation && isCustomerInboxConversation(conversation)
       ? conversation.customer
@@ -152,7 +160,8 @@ function ConversationContextContent({
       {conversation && customer ? (
         <Tabs
           key={conversation.id}
-          defaultValue="profile"
+          value={customerTab}
+          onValueChange={setCustomerTab}
           className="min-h-0 flex-1"
         >
           <TabsList
@@ -208,12 +217,15 @@ function ConversationContextContent({
 
           <TabsContent
             value="assistant"
-            className="mt-0 min-h-0 flex-1 overflow-hidden"
+            forceMount
+            className="mt-0 flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
           >
-            <ContextPlaceholder
-              icon={BotIcon}
-              title={t("contextAssistantTitle")}
-              description={t("contextAssistantDescription")}
+            <CustomerCopilotPanel
+              key={conversation.id}
+              customerConversationID={conversation.id}
+              replyDisabledReason={replyDisabledReason}
+              customerDraftRef={customerDraftRef}
+              active={customerTab === "assistant"}
             />
           </TabsContent>
 
@@ -273,6 +285,8 @@ export function ConversationContextPane({
   directTarget,
   displayName,
   currentIdentityID,
+  replyDisabledReason,
+  customerDraftRef,
   onGroupLeft,
   visible,
   onToggle,
@@ -281,13 +295,29 @@ export function ConversationContextPane({
   directTarget: MemberOption | null
   displayName: string
   currentIdentityID: string
+  replyDisabledReason: string | null
+  customerDraftRef: RefObject<ComposerDraftBridge | null>
   onGroupLeft: () => void
   visible: boolean
   onToggle: () => void
 }) {
   const { t } = useTranslation("inbox")
-  const [contextPanelWidth, setContextPanelWidth] =
-    useState(contextPanelMinWidth)
+  const trackRef = useRef<HTMLDivElement>(null)
+  const [rowWidth, setRowWidth] = useState(0)
+  // 展开宽度默认取当前允许的最大值，剩余空间不足时按会话区的保留宽度收窄。
+  const [desiredWidth, setDesiredWidth] = useState(contextPanelMaxWidth)
+  const maxWidth = rowWidth
+    ? Math.min(contextPanelMaxWidth, Math.max(Math.round(rowWidth / 2), rowWidth - conversationMinWidth))
+    : contextPanelMaxWidth
+  const contextPanelWidth = Math.min(desiredWidth, maxWidth)
+
+  useEffect(() => {
+    const row = trackRef.current?.parentElement
+    if (!row) return
+    const observer = new ResizeObserver(([entry]) => setRowWidth(entry.contentRect.width))
+    observer.observe(row)
+    return () => observer.disconnect()
+  }, [])
   /** 结束拖动联系人上下文栏。 */
   function stopContextPanelResize(event: ReactPointerEvent<HTMLButtonElement>) {
     if (event.currentTarget.hasPointerCapture(event.pointerId)) {
@@ -297,12 +327,7 @@ export function ConversationContextPane({
 
   return (
     <>
-      <div
-        className={cn(
-          "relative h-full min-h-0 shrink-0 bg-background",
-          visible ? "w-4 border-l" : "w-0",
-        )}
-      >
+      <div ref={trackRef} className="relative h-full min-h-0 w-0 shrink-0">
         {visible ? (
           <button
             type="button"
@@ -317,12 +342,12 @@ export function ConversationContextPane({
               if (!event.currentTarget.hasPointerCapture(event.pointerId)) {
                 return
               }
-              // 按指针位置调整并限制联系人上下文栏宽度。
+              // 按指针位置调整宽度，下限为最小宽度与当前允许最大值中较小的一个。
               const width = Math.max(
-                contextPanelMinWidth,
-                window.innerWidth - event.clientX - contextPanelToggleWidth,
+                Math.min(contextPanelMinWidth, maxWidth),
+                window.innerWidth - event.clientX,
               )
-              setContextPanelWidth(Math.min(contextPanelMaxWidth, width))
+              setDesiredWidth(Math.min(maxWidth, width))
             }}
             onPointerUp={stopContextPanelResize}
             onPointerCancel={stopContextPanelResize}
@@ -330,10 +355,7 @@ export function ConversationContextPane({
         ) : null}
         <button
           type="button"
-          className={cn(
-            "absolute top-1/2 z-30 flex h-12 w-4 -translate-y-1/2 items-center justify-center border border-border bg-muted text-muted-foreground shadow-sm transition-colors hover:bg-muted/80 hover:text-foreground",
-            visible ? "left-0 rounded-r-md border-l-0" : "right-0 rounded-l-md border-r-0",
-          )}
+          className="absolute top-1/2 right-0 z-30 flex h-12 w-4 -translate-y-1/2 items-center justify-center rounded-l-md border border-r-0 border-border bg-muted text-muted-foreground shadow-sm transition-colors hover:bg-muted/80 hover:text-foreground"
           aria-label={visible ? t("contextClose") : t("contextOpen")}
           title={visible ? t("contextClose") : t("contextOpen")}
           onClick={onToggle}
@@ -348,7 +370,7 @@ export function ConversationContextPane({
 
       <aside
         className={cn(
-          "cervi-conversation-context-pane relative h-full min-h-0 min-w-0 shrink-0 overflow-hidden bg-background",
+          "cervi-conversation-context-pane relative h-full min-h-0 min-w-0 shrink-0 overflow-hidden border-l bg-background",
           !visible && "hidden",
         )}
         style={{ width: contextPanelWidth }}
@@ -358,6 +380,8 @@ export function ConversationContextPane({
           directTarget={directTarget}
           displayName={displayName}
           currentIdentityID={currentIdentityID}
+          replyDisabledReason={replyDisabledReason}
+          customerDraftRef={customerDraftRef}
           onGroupLeft={onGroupLeft}
         />
       </aside>

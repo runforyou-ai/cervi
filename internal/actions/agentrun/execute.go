@@ -284,10 +284,14 @@ func (a *ExecuteAction) policyForRun(ctx context.Context, run *servermodels.Agen
 			Scan(ctx, &conversationType); err != nil {
 			return nil, fmt.Errorf("load agent run conversation type: %w", err)
 		}
-		if domain.ConversationType(conversationType) == domain.ConversationTypeGroup {
+		switch domain.ConversationType(conversationType) {
+		case domain.ConversationTypeGroup:
 			return groupMentionRunPolicy{scheduler: NewScheduler(a.enqueuer)}, nil
+		case domain.ConversationTypeCopilot:
+			return copilotRunPolicy{}, nil
+		default:
+			return agentChatRunPolicy{}, nil
 		}
-		return agentChatRunPolicy{}, nil
 	default:
 		return nil, fmt.Errorf("unsupported agent execution scope %q", run.ScopeKind)
 	}

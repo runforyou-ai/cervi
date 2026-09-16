@@ -29,6 +29,7 @@
 - AI Provider 和模型目录已经存在，可以保存企业配置的模型服务；模型使用现有复合键 `(provider_id, identifier)`。
 - 服务端已有 PostgreSQL、NATS JetStream、`task_runs + task_outbox`、数据库租约、心跳和至少一次任务执行能力。
 - Web、桌面端与移动端已有企业成员文本单聊、统一消息时间线和前台轮询；`direct_conversations` 已用企业内规范身份对唯一约束收敛首发，Agent 复用同一 ChatSubject、Participant 和 Message 路径。
+- 客户会话右侧栏的 AI 助手提供 Copilot 线程：线程是独立的 `copilot` 类型会话，按所属客户会话授权，执行范围为线程本身，每次认领输入时只读引用客户会话的最新背景，回复写回线程，不进入消息列表、搜索和个人会话状态；客服写回复为不创建运行的单次模型调用。详见 [客服 AI 辅助方案](customer-ai-assist-plan.md)。
 - Telegram Bot 私聊文本双向收发已接入客户会话；AI 客服复用 customer_auto 运行，成功文本与持久投递同事务提交。接管前未提交的结果被抑制，已提交投递继续发送；更换 Bot 取消旧在途运行。
 - Agent 任务使用独立 Worker 队列。本阶段已精确锁定 Eino v0.10 Alpha，通过 eino-ext 接入 OpenAI 兼容模型，并以纯函数计算器验证 Tool 与 TurnLoop 安全点补入。
 - `agent_lanes`、`agent_inputs` 和最小 `agent_runs` 已支持 Agent 单聊与网站、Telegram 客服自动触发、执行范围级单在途 Run、成功或失败水位及最终消息幂等。

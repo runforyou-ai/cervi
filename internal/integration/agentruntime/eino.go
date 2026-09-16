@@ -90,7 +90,7 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 		defer releaseSessions()
 		tools = append(tools, mcpTools...)
 	}
-	window := contextWindowTokens(request.Model)
+	window := ContextWindowTokens(request.Model)
 	reductionHandlers, err := newContextReductionHandlers(ctx, window)
 	if err != nil {
 		return RunResult{}, err

@@ -31,6 +31,7 @@
   "error.agent_reply_stop_failed": "Failed to stop the AI reply. Please try again.",
   "error.agent_unavailable": "This AI employee is currently unavailable.",
   "error.customer_reply_suggest_failed": "Could not generate replies. Try again.",
+  "error.customer_copilot_thread_list_failed": "Could not load AI Assistant conversations. Try again.",
   "field.agent_identity_id_invalid": "Select a valid AI employee.",
   "field.customer_reply_mode_invalid": "Select a valid generation mode.",
   "field.customer_reply_tone_invalid": "Select a valid tone.",

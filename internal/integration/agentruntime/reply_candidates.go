@@ -51,7 +51,7 @@ func (r *EinoRuntime) GenerateReplyCandidates(ctx context.Context, request Reply
 		return ReplyCandidatesResult{}, err
 	}
 	// 按窗口预算保留最近的对客消息，整体作为事实资料写入一条用户消息。
-	history := trimClaimedHistory(ctx, request.History, contextWindowTokens(config))
+	history := trimClaimedHistory(ctx, request.History, ContextWindowTokens(config))
 	transcript := make([]replyTranscriptEntry, 0, len(history))
 	for _, message := range history {
 		sender := "customer"

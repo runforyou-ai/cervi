@@ -128,6 +128,18 @@ type Backend interface {
 	// GenerateCustomerReplySuggestions 使用 AI 员工为客户会话生成对客回复候选。
 	//cervi:route POST /conversations/:conversationID/reply-suggestions
 	GenerateCustomerReplySuggestions(context.Context, RequestMeta, string, CustomerReplySuggestionsInput) (CustomerReplySuggestions, error)
+	// ListCustomerCopilotThreads 返回客户会话的全部 Copilot 线程。
+	//cervi:route GET /conversations/:conversationID/copilot-threads
+	ListCustomerCopilotThreads(context.Context, RequestMeta, string) (CustomerCopilotThreadList, error)
+	// SendFirstCustomerCopilotMessage 以首条提问创建客户会话的 Copilot 线程。
+	//cervi:route POST /conversations/:conversationID/copilot-threads
+	SendFirstCustomerCopilotMessage(context.Context, RequestMeta, string, FirstCustomerCopilotMessageInput) (FirstCustomerCopilotMessageResult, error)
+	// SendCustomerCopilotTextMessage 向 Copilot 线程发送提问。
+	//cervi:route POST /copilot-threads/:threadID/messages
+	SendCustomerCopilotTextMessage(context.Context, RequestMeta, string, CustomerCopilotTextMessageInput) (ConversationMessage, error)
+	// StopCustomerCopilotReply 停止 Copilot 线程中指定的回复并返回实际运行状态。
+	//cervi:route POST /copilot-threads/:threadID/runs/:runID/stop
+	StopCustomerCopilotReply(context.Context, RequestMeta, string, string) (AgentRunStatus, error)
 	// ListCustomerMessageDeliveries 读取当前窗口的外部投递状态。
 	//cervi:route GET /conversations/:conversationID/deliveries
 	ListCustomerMessageDeliveries(context.Context, RequestMeta, string, CustomerDeliveryListInput) (CustomerDeliveryList, error)

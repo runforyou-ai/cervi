@@ -100,7 +100,7 @@ type InboxChannelList struct {
 	Channels []InboxChannel `json:"channels"`
 }
 
-// ConversationType 表示统一收件箱会话类型。
+// ConversationType 表示会话类型，Copilot 线程只在所属客户会话的 AI 助手中出现，不进入统一收件箱。
 type ConversationType string
 
 const (
@@ -108,6 +108,7 @@ const (
 	ConversationTypeDirect   ConversationType = ConversationType(domain.ConversationTypeDirect)
 	ConversationTypeAgent    ConversationType = ConversationType(domain.ConversationTypeAgent)
 	ConversationTypeGroup    ConversationType = ConversationType(domain.ConversationTypeGroup)
+	ConversationTypeCopilot  ConversationType = ConversationType(domain.ConversationTypeCopilot)
 )
 
 // CustomerInboxConversation 定义客户会话摘要。

@@ -8,6 +8,7 @@ const (
 	ConversationTypeDirect   ConversationType = "direct"
 	ConversationTypeGroup    ConversationType = "group"
 	ConversationTypeCustomer ConversationType = "customer"
+	ConversationTypeCopilot  ConversationType = "copilot"
 )
 
 // ConversationStatus 定义会话生命周期状态。

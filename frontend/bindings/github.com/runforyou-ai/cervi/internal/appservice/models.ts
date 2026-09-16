@@ -374,12 +374,13 @@ export enum AgentToolCallStatus {
 };
 
 /**
- * AttachmentMessageInput 定义已上传附件的发送意图，agentIdentityId 非空表示按 conversationId 草稿编号首发 AI 聊天。
+ * AttachmentMessageInput 定义已上传附件的发送意图，agentIdentityId 非空表示按 conversationId 草稿编号首发 AI 聊天，同时指定 customerConversationId 表示首发该客户会话的 Copilot 线程。
  */
 export interface AttachmentMessageInput {
     "conversationId": string;
     "targetIdentityId": string;
     "agentIdentityId": string;
+    "customerConversationId": string;
     "clientMessageId": string;
     "fileId": string;
     "body": string;
@@ -923,7 +924,7 @@ export enum ConversationSystemEventType {
 };
 
 /**
- * ConversationType 表示统一收件箱会话类型。
+ * ConversationType 表示会话类型，Copilot 线程只在所属客户会话的 AI 助手中出现，不进入统一收件箱。
  */
 export enum ConversationType {
     /**
@@ -935,6 +936,7 @@ export enum ConversationType {
     ConversationTypeDirect = "direct",
     ConversationTypeAgent = "agent",
     ConversationTypeGroup = "group",
+    ConversationTypeCopilot = "copilot",
 };
 
 /**
@@ -994,6 +996,38 @@ export interface CurrentUser {
     "workspaceTabsEnabled": boolean;
     "workStatus": WorkStatus;
     "avatarUrl": string;
+}
+
+/**
+ * CustomerCopilotTextMessageInput 定义发给 Copilot 线程的成员提问。
+ */
+export interface CustomerCopilotTextMessageInput {
+    "clientMessageId": string;
+    "body": string;
+    "replyToMessageId": string;
+}
+
+/**
+ * CustomerCopilotThread 定义客户会话中 Copilot 线程的摘要。
+ */
+export interface CustomerCopilotThread {
+    "id": string;
+    "title": string;
+    "agentIdentityId": string;
+    "agentName": string;
+    "agentAvatarUrl": string;
+    "agentActive": boolean;
+    "createdByIdentityId": string;
+    "createdByName": string;
+    "createdAt": string;
+    "lastActivityAt": string;
+}
+
+/**
+ * CustomerCopilotThreadList 定义客户会话按最近活动倒序排列的 Copilot 线程。
+ */
+export interface CustomerCopilotThreadList {
+    "threads": CustomerCopilotThread[] | null;
 }
 
 /**
@@ -1302,6 +1336,24 @@ export interface FirstAgentTextMessageInput {
  */
 export interface FirstAgentTextMessageResult {
     "conversation": InboxConversation;
+    "message": ConversationMessage;
+}
+
+/**
+ * FirstCustomerCopilotMessageInput 定义新线程的稳定编号、回答的 AI 员工和首条提问。
+ */
+export interface FirstCustomerCopilotMessageInput {
+    "threadId": string;
+    "agentIdentityId": string;
+    "clientMessageId": string;
+    "body": string;
+}
+
+/**
+ * FirstCustomerCopilotMessageResult 定义首条提问确认的线程和消息。
+ */
+export interface FirstCustomerCopilotMessageResult {
+    "thread": CustomerCopilotThread;
     "message": ConversationMessage;
 }
 

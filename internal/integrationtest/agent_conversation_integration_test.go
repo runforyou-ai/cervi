@@ -54,8 +54,8 @@ type failingMessageScheduler struct {
 }
 
 // Schedule 在真实输入和任务创建后返回失败以验证整个首发事务回滚。
-func (s *failingMessageScheduler) Schedule(ctx context.Context, db bun.IDB, organizationID, conversationID, agentID, revisionID, messageID, senderSubjectID string) error {
-	if err := s.inner.Schedule(ctx, db, organizationID, conversationID, agentID, revisionID, messageID, senderSubjectID); err != nil {
+func (s *failingMessageScheduler) Schedule(ctx context.Context, db bun.IDB, organizationID, conversationID, agentID, revisionID, messageID, senderSubjectID string, kind domain.AgentInputKind) error {
+	if err := s.inner.Schedule(ctx, db, organizationID, conversationID, agentID, revisionID, messageID, senderSubjectID, kind); err != nil {
 		return err
 	}
 	return s.failAfterSchedule(ctx, db, conversationID, messageID)

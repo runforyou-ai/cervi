@@ -46,7 +46,7 @@ func (p agentChatRunPolicy) prepareLocked(context.Context, bun.IDB, agentRunPoli
 
 // loadMessages 按会话稳定顺序读取 AI 聊天 Agent 上下文。
 func (p agentChatRunPolicy) loadMessages(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, endSeq int64, links attachmentLinks) ([]agentruntime.Message, error) {
-	return loadClaimedConversationMessages(ctx, db, run, endSeq, links)
+	return loadClaimedConversationMessages(ctx, db, run, endSeq, links, false)
 }
 
 // persistMessage 追加独立 AI 会话的结果消息。

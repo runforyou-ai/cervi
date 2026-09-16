@@ -86,9 +86,9 @@ func TouchConversation(ctx context.Context, db bun.IDB, conversation *servermode
 	return NotifyConversationChanged(ctx, db, conversation)
 }
 
-// NotifyConversationChanged 按会话当前版本登记变更通知：客户会话通知企业客服共享受众，内部会话通知当前真人成员。
+// NotifyConversationChanged 按会话当前版本登记变更通知：客户会话及其 Copilot 线程通知企业客服共享受众，内部会话通知当前真人成员。
 func NotifyConversationChanged(ctx context.Context, db bun.IDB, conversation *servermodels.Conversation) error {
-	if conversation.Type == string(domain.ConversationTypeCustomer) {
+	if conversation.Type == string(domain.ConversationTypeCustomer) || conversation.Type == string(domain.ConversationTypeCopilot) {
 		realtime.Notify(ctx, realtime.CustomerInboxConversationChanged(conversation.OrganizationID, conversation.ID, conversation.Version))
 		return nil
 	}

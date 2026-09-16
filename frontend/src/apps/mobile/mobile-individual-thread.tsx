@@ -83,7 +83,9 @@ export function MobileIndividualThread({
         attachmentAgentDraft={attachmentAgentIdentityID
           ? { conversationID, agentIdentityID: attachmentAgentIdentityID }
           : undefined}
-        onAttachmentConversationCreated={onAttachmentConversationCreated}
+        onAttachmentConversationCreated={(created) => {
+          if (created) onAttachmentConversationCreated?.(created)
+        }}
         onBeforeSend={() => prepareSendRef.current?.() ?? Promise.resolve(true)}
         conversationID={conversationID}
         conversationType={conversationType}

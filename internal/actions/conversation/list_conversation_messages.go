@@ -262,6 +262,21 @@ func authorizeConversationHistory(ctx context.Context, db bun.IDB, identity *ser
 			return ErrConversationNotFound
 		}
 		return nil
+	case domain.ConversationTypeCopilot:
+		// Copilot 线程沿用所属客户会话的阅读范围。
+		available, err := db.NewSelect().
+			TableExpr("customer_copilot_threads AS cct").
+			Join("JOIN customer_conversations AS cc ON cc.organization_id = cct.organization_id AND cc.conversation_id = cct.customer_conversation_id").
+			Where("cct.organization_id = ?", identity.Organization.ID).
+			Where("cct.conversation_id = ?", conversationID).
+			Exists(ctx)
+		if err != nil {
+			return fmt.Errorf("check copilot thread access: %w", err)
+		}
+		if !available {
+			return ErrConversationNotFound
+		}
+		return nil
 	case domain.ConversationTypeGroup:
 		available, err := chatstate.GroupQuery(db, identity, conversationID).Exists(ctx)
 		if err != nil {

@@ -31,6 +31,10 @@ import {
   SendCustomerTextMessage,
   GenerateCustomerReplySuggestions,
   ListCustomerReplyAgents,
+  ListCustomerCopilotThreads,
+  SendFirstCustomerCopilotMessage,
+  SendCustomerCopilotTextMessage,
+  StopCustomerCopilotReply,
   SendAttachmentMessage,
   GetAttachmentDownload,
   SendFirstAgentTextMessage,
@@ -356,6 +360,23 @@ export function generateCustomerReplySuggestions(
 ) {
   return generateCustomerReplySuggestionsBound(conversationID, input)
 }
+
+const listCustomerCopilotThreadsBound = bind(ListCustomerCopilotThreads)
+
+/** 读取客户会话按最近活动倒序排列的 Copilot 线程。 */
+export async function listCustomerCopilotThreads(conversationID: string) {
+  const output = await listCustomerCopilotThreadsBound(conversationID)
+  return output.threads
+}
+
+/** 以首条提问创建客户会话的 Copilot 线程。 */
+export const sendFirstCustomerCopilotMessage = bind(SendFirstCustomerCopilotMessage)
+
+/** 向 Copilot 线程发送提问。 */
+export const sendCustomerCopilotTextMessage = bind(SendCustomerCopilotTextMessage)
+
+/** 停止 Copilot 线程中的回复并读取实际运行状态。 */
+export const stopCustomerCopilotReply = bind(StopCustomerCopilotReply)
 
 /** 发送首条单聊消息并返回最终会话。 */
 export async function sendFirstDirectTextMessage(

@@ -29,6 +29,7 @@ export function ConversationAttachmentUpload({
   conversationID,
   targetIdentityID = "",
   agentIdentityID = "",
+  customerConversationID = "",
   disabled,
   onCreated,
   onBeforeSend,
@@ -36,8 +37,9 @@ export function ConversationAttachmentUpload({
   conversationID: string
   targetIdentityID?: string
   agentIdentityID?: string
+  customerConversationID?: string
   disabled: boolean
-  onCreated: (conversation: InboxConversation) => void
+  onCreated: (conversation: InboxConversation | null, conversationID: string) => void
   onBeforeSend?: () => Promise<boolean>
 }) {
   const { t } = useTranslation("inbox")
@@ -152,9 +154,9 @@ export function ConversationAttachmentUpload({
         ...item,
         body: index === selectedRef.current.length - 1 ? values.description : "",
       })),
-      { conversationID, targetIdentityID, agentIdentityID },
-      (conversation) => {
-        if (aliveRef.current && conversation) onCreated(conversation)
+      { conversationID, targetIdentityID, agentIdentityID, customerConversationID },
+      (conversation, conversationID) => {
+        if (aliveRef.current) onCreated(conversation, conversationID)
       },
     )
     selectedRef.current = []

@@ -27,6 +27,7 @@ const (
 	AgentInputKindHandoff      AgentInputKind = "handoff"
 	AgentInputKindAgentDirect  AgentInputKind = "agent_direct"
 	AgentInputKindCustomerAuto AgentInputKind = "customer_auto"
+	AgentInputKindCopilot      AgentInputKind = "copilot"
 )
 
 // AgentRunErrorCode 定义 Agent 运行取消或失败的稳定原因。

@@ -67,6 +67,27 @@ func (a *ExecuteAction) StopGroupAgentReply(ctx context.Context, identity *serve
 	})
 }
 
+// StopCustomerCopilotReply 由可读取所属客户会话的成员停止 Copilot 线程中的运行。
+func (a *ExecuteAction) StopCustomerCopilotReply(ctx context.Context, identity *servermodels.Identity, threadID, runID string) (domain.AgentRunStatus, error) {
+	return a.stopReply(ctx, identity, threadID, runID, func(ctx context.Context, tx bun.Tx) (agentRunPolicy, *servermodels.AgentRun, error) {
+		// 读取权限与新提问资格分离，AI 员工停用后仍可停止线程中的运行。
+		run := &servermodels.AgentRun{}
+		err := tx.NewSelect().Model(run).
+			Join("JOIN customer_copilot_threads AS cct ON cct.organization_id = agr.organization_id AND cct.conversation_id = agr.conversation_id AND cct.agent_identity_id = agr.agent_identity_id").
+			Join("JOIN customer_conversations AS cc ON cc.organization_id = cct.organization_id AND cc.conversation_id = cct.customer_conversation_id").
+			Where("agr.organization_id = ? AND agr.conversation_id = ? AND agr.id = ?", identity.Organization.ID, threadID, runID).
+			Where("agr.scope_kind = ?", domain.AgentExecutionScopeConversation).
+			Scan(ctx)
+		if errors.Is(err, sql.ErrNoRows) {
+			return nil, nil, chatstate.ErrConversationNotFound
+		}
+		if err != nil {
+			return nil, nil, err
+		}
+		return copilotRunPolicy{}, run, nil
+	})
+}
+
 // stopReply 在调用方给出的访问守卫内结束一次运行，并安排执行范围内的下一次运行。
 func (a *ExecuteAction) stopReply(ctx context.Context, identity *servermodels.Identity, conversationID, runID string,
 	authorize func(context.Context, bun.Tx) (agentRunPolicy, *servermodels.AgentRun, error)) (domain.AgentRunStatus, error) {

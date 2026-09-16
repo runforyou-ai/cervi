@@ -37,7 +37,7 @@ const (
 
 var (
 	// ErrAgentUnavailable 表示 AI 员工不存在、已停用或没有有效的托管配置版本。
-	ErrAgentUnavailable = errors.New("agent unavailable")
+	ErrAgentUnavailable = conversationaction.ErrAgentUnavailable
 	// ErrCustomerReplyGenerationFailed 表示模型未能在时限内返回有效的回复候选。
 	ErrCustomerReplyGenerationFailed = errors.New("customer reply suggestion generation failed")
 )

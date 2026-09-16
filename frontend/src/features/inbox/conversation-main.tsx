@@ -1,5 +1,5 @@
 /** 消息页会话主区，组合会话头、消息线程和联系人上下文栏。 */
-import { useEffect, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 
 import {
@@ -13,6 +13,7 @@ import {
   type DirectInboxConversationData,
 } from "@/api"
 import { useWorkspace } from "@/contexts/workspace-context"
+import type { ComposerDraftBridge } from "@/features/inbox/conversation-composer"
 import { ConversationContextPane } from "@/features/inbox/conversation-context-pane"
 import { ConversationHeader } from "@/features/inbox/conversation-header"
 import { ConversationThread } from "@/features/inbox/conversation-thread"
@@ -64,6 +65,7 @@ export function ConversationMain({
   const [contextCollapsed, setContextCollapsed] = useState(
     () => !isWideViewport,
   )
+  const customerDraftRef = useRef<ComposerDraftBridge | null>(null)
 
   useEffect(() => {
     // 跨过响应式断点时恢复当前宽度对应的默认状态。
@@ -180,6 +182,7 @@ export function ConversationMain({
               ? locateMessage
               : null
           }
+          customerDraftRef={customerConversation ? customerDraftRef : undefined}
         />
       </div>
       <ConversationContextPane
@@ -187,6 +190,8 @@ export function ConversationMain({
         directTarget={directTarget}
         displayName={contactName}
         currentIdentityID={identity.user.identityId}
+        replyDisabledReason={replyDisabledReason}
+        customerDraftRef={customerDraftRef}
         onGroupLeft={() => {
           if (validConversation) onGroupLeft(validConversation.id)
         }}
