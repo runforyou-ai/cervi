@@ -44,18 +44,21 @@ func saveInternalTextMessage(ctx context.Context, db bun.IDB, identity *servermo
 		saved, _, err := loadIdempotentMemberMessage(ctx, db, identity, input.ConversationID, input.Body, input.ReplyToMessageID, idempotencyKey, false)
 		return saved, err
 	}
-	if err := advanceConversationUserReadState(ctx, db, &servermodels.ConversationUserState{
-		OrganizationID: identity.Organization.ID, ConversationID: input.ConversationID,
-		UserID: identity.User.ID, LastReadMessageID: &message.ID,
-	}, message); err != nil {
-		return ConversationMessage{}, err
+	// Copilot 线程不维护个人会话状态，其余会话推进本人阅读水位。
+	if sendContext.Conversation.Type != string(domain.ConversationTypeCopilot) {
+		if err := advanceConversationUserReadState(ctx, db, &servermodels.ConversationUserState{
+			OrganizationID: identity.Organization.ID, ConversationID: input.ConversationID,
+			UserID: identity.User.ID, LastReadMessageID: &message.ID,
+		}, message); err != nil {
+			return ConversationMessage{}, err
+		}
 	}
 	if sendContext.AgentIdentityID != "" {
 		if agentScheduler == nil || sendContext.AgentRevisionID == nil {
 			return ConversationMessage{}, ErrDataInvariant
 		}
-		if err := agentScheduler.Schedule(ctx, db, identity.Organization.ID, input.ConversationID, sendContext.AgentIdentityID, *sendContext.AgentRevisionID, message.ID, sendContext.SubjectID); err != nil {
-			return ConversationMessage{}, fmt.Errorf("schedule AI chat message: %w", err)
+		if err := agentScheduler.Schedule(ctx, db, identity.Organization.ID, input.ConversationID, sendContext.AgentIdentityID, *sendContext.AgentRevisionID, message.ID, sendContext.SubjectID, sendContext.AgentInputKind); err != nil {
+			return ConversationMessage{}, fmt.Errorf("schedule agent input message: %w", err)
 		}
 	}
 	result := memberConversationMessage(message, sendContext.SubjectID, identity.OrganizationIdentity)
@@ -63,9 +66,9 @@ func saveInternalTextMessage(ctx context.Context, db bun.IDB, identity *servermo
 	return result, nil
 }
 
-// AgentChatMessageScheduler 把 AI 聊天成员消息加入持久化输入流。
+// AgentChatMessageScheduler 把 AI 聊天与 Copilot 线程的成员消息按输入入口加入持久化输入流。
 type AgentChatMessageScheduler interface {
-	Schedule(context.Context, bun.IDB, string, string, string, string, string, string) error
+	Schedule(context.Context, bun.IDB, string, string, string, string, string, string, domain.AgentInputKind) error
 }
 
 type internalMessageContext struct {
@@ -75,6 +78,7 @@ type internalMessageContext struct {
 	SubjectID       string                     `bun:"subject_id"`
 	AgentIdentityID string                     `bun:"agent_identity_id"`
 	AgentRevisionID *string                    `bun:"agent_revision_id"`
+	AgentInputKind  domain.AgentInputKind      `bun:"-"`
 }
 
 // normalizeInternalMessageInput 规范化双方聊天正文和引用。

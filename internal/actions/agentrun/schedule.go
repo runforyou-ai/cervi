@@ -42,13 +42,13 @@ func NewScheduler(enqueuer servertask.TxEnqueuer) *Scheduler {
 	return &Scheduler{enqueuer: enqueuer}
 }
 
-// Schedule 在调用方已锁定会话并保存个人状态的事务内追加 AI 聊天输入。
-func (s *Scheduler) Schedule(ctx context.Context, db bun.IDB, organizationID, conversationID, agentIdentityID, revisionID, messageID, senderSubjectID string) error {
+// Schedule 在调用方已锁定会话的事务内追加 AI 聊天或 Copilot 线程的成员输入，执行范围为该会话。
+func (s *Scheduler) Schedule(ctx context.Context, db bun.IDB, organizationID, conversationID, agentIdentityID, revisionID, messageID, senderSubjectID string, kind domain.AgentInputKind) error {
 	return s.appendInput(ctx, db, agentRunSpec{
 		OrganizationID: organizationID, ConversationID: conversationID,
 		AgentIdentityID: agentIdentityID, RevisionID: revisionID,
 		ScopeKind: domain.AgentExecutionScopeConversation, ScopeID: conversationID,
-		Kind: domain.AgentInputKindAgentDirect, SourceSubjectID: senderSubjectID,
+		Kind: kind, SourceSubjectID: senderSubjectID,
 	}, messageID)
 }
 

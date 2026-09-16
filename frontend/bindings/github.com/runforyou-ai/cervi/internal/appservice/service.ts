@@ -570,6 +570,13 @@ export function ListConversationMessages(meta: $models.RequestMeta, conversation
 }
 
 /**
+ * ListCustomerCopilotThreads 返回客户会话的全部 Copilot 线程。
+ */
+export function ListCustomerCopilotThreads(meta: $models.RequestMeta, conversationID: string): $CancellablePromise<$models.CustomerCopilotThreadList> {
+    return $Call.ByID(679644571, meta, conversationID);
+}
+
+/**
  * ListCustomerMessageDeliveries 读取当前窗口的外部投递状态。
  */
 export function ListCustomerMessageDeliveries(meta: $models.RequestMeta, conversationID: string, input: $models.CustomerDeliveryListInput): $CancellablePromise<$models.CustomerDeliveryList> {
@@ -920,6 +927,13 @@ export function SendAttachmentMessage(meta: $models.RequestMeta, input: $models.
 }
 
 /**
+ * SendCustomerCopilotTextMessage 向 Copilot 线程发送提问。
+ */
+export function SendCustomerCopilotTextMessage(meta: $models.RequestMeta, threadID: string, input: $models.CustomerCopilotTextMessageInput): $CancellablePromise<$models.ConversationMessage> {
+    return $Call.ByID(297233086, meta, threadID, input);
+}
+
+/**
  * SendCustomerTextMessage 发送客户会话文本消息。
  */
 export function SendCustomerTextMessage(meta: $models.RequestMeta, conversationID: string, input: $models.CustomerTextMessageInput): $CancellablePromise<$models.ConversationMessage> {
@@ -938,6 +952,13 @@ export function SendDirectTextMessage(meta: $models.RequestMeta, conversationID:
  */
 export function SendFirstAgentTextMessage(meta: $models.RequestMeta, input: $models.FirstAgentTextMessageInput): $CancellablePromise<$models.FirstAgentTextMessageResult> {
     return $Call.ByID(1367071003, meta, input);
+}
+
+/**
+ * SendFirstCustomerCopilotMessage 以首条提问创建客户会话的 Copilot 线程。
+ */
+export function SendFirstCustomerCopilotMessage(meta: $models.RequestMeta, conversationID: string, input: $models.FirstCustomerCopilotMessageInput): $CancellablePromise<$models.FirstCustomerCopilotMessageResult> {
+    return $Call.ByID(1974994237, meta, conversationID, input);
 }
 
 /**
@@ -973,6 +994,13 @@ export function ServerURL(meta: $models.RequestMeta): $CancellablePromise<string
  */
 export function StopAgentReply(meta: $models.RequestMeta, conversationID: string, runID: string): $CancellablePromise<$models.AgentRunStatus> {
     return $Call.ByID(4044594473, meta, conversationID, runID);
+}
+
+/**
+ * StopCustomerCopilotReply 停止 Copilot 线程中指定的回复并返回实际运行状态。
+ */
+export function StopCustomerCopilotReply(meta: $models.RequestMeta, threadID: string, runID: string): $CancellablePromise<$models.AgentRunStatus> {
+    return $Call.ByID(3961680582, meta, threadID, runID);
 }
 
 /**

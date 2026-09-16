@@ -275,6 +275,38 @@ func (b *Backend) GenerateCustomerReplySuggestions(ctx context.Context, meta app
 	return output, err
 }
 
+// ListCustomerCopilotThreads 返回客户会话的全部 Copilot 线程。
+func (b *Backend) ListCustomerCopilotThreads(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.CustomerCopilotThreadList, error) {
+	var output appservice.CustomerCopilotThreadList
+	err := b.do(ctx, meta, http.MethodGet, "/conversations/"+url.PathEscape(conversationID)+"/copilot-threads", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// SendFirstCustomerCopilotMessage 以首条提问创建客户会话的 Copilot 线程。
+func (b *Backend) SendFirstCustomerCopilotMessage(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.FirstCustomerCopilotMessageInput) (appservice.FirstCustomerCopilotMessageResult, error) {
+	var output appservice.FirstCustomerCopilotMessageResult
+	err := b.do(ctx, meta, http.MethodPost, "/conversations/"+url.PathEscape(conversationID)+"/copilot-threads", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// SendCustomerCopilotTextMessage 向 Copilot 线程发送提问。
+func (b *Backend) SendCustomerCopilotTextMessage(ctx context.Context, meta appservice.RequestMeta, threadID string, input appservice.CustomerCopilotTextMessageInput) (appservice.ConversationMessage, error) {
+	var output appservice.ConversationMessage
+	err := b.do(ctx, meta, http.MethodPost, "/copilot-threads/"+url.PathEscape(threadID)+"/messages", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// StopCustomerCopilotReply 停止 Copilot 线程中指定的回复并返回实际运行状态。
+func (b *Backend) StopCustomerCopilotReply(ctx context.Context, meta appservice.RequestMeta, threadID string, runID string) (appservice.AgentRunStatus, error) {
+	var output appservice.AgentRunStatus
+	err := b.do(ctx, meta, http.MethodPost, "/copilot-threads/"+url.PathEscape(threadID)+"/runs/"+url.PathEscape(runID)+"/stop", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // ListCustomerMessageDeliveries 读取当前窗口的外部投递状态。
 func (b *Backend) ListCustomerMessageDeliveries(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.CustomerDeliveryListInput) (appservice.CustomerDeliveryList, error) {
 	var output appservice.CustomerDeliveryList

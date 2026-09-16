@@ -35,7 +35,7 @@ func NewSendAttachmentMessageAction(db *bun.DB, scheduler AgentChatMessageSchedu
 	return &SendAttachmentMessageAction{db: db, scheduler: scheduler}
 }
 
-// Execute 在成员和会话锁内幂等发送一个已上传的附件，首发时按需创建单聊或 AI 聊天，AI 聊天首次保存时追加 Agent 输入。
+// Execute 在成员和会话锁内幂等发送一个已上传的附件，首发时按需创建单聊、AI 聊天或 Copilot 线程，AI 聊天与 Copilot 线程首次保存时追加 Agent 输入。
 func (a *SendAttachmentMessageAction) Execute(ctx context.Context, identity *servermodels.Identity, input AttachmentMessageInput) (AttachmentMessageResult, error) {
 	clientMessageID, valid := common.NormalizeUUID(input.ClientMessageID)
 	input.ClientMessageID = clientMessageID
@@ -45,6 +45,7 @@ func (a *SendAttachmentMessageAction) Execute(ctx context.Context, identity *ser
 		(input.ConversationID != "" && !common.ValidUUID(input.ConversationID)) ||
 		(input.TargetIdentityID != "" && !common.ValidUUID(input.TargetIdentityID)) ||
 		(input.AgentIdentityID != "" && (input.TargetIdentityID != "" || !common.ValidUUID(input.AgentIdentityID))) ||
+		(input.CustomerConversationID != "" && (input.AgentIdentityID == "" || !common.ValidUUID(input.CustomerConversationID))) ||
 		input.ImageWidth < 0 || input.ImageHeight < 0 || utf8.RuneCountInString(input.Body) > 4000 {
 		return AttachmentMessageResult{}, ErrConversationNotFound
 	}
@@ -67,8 +68,8 @@ func (a *SendAttachmentMessageAction) Execute(ctx context.Context, identity *ser
 				if a.scheduler == nil || agentContext.AgentRevisionID == nil {
 					return ErrDataInvariant
 				}
-				if err := a.scheduler.Schedule(ctx, tx, identity.Organization.ID, member.Conversation.ID, agentContext.AgentIdentityID, *agentContext.AgentRevisionID, message.ID, agentContext.SubjectID); err != nil {
-					return fmt.Errorf("schedule AI chat attachment: %w", err)
+				if err := a.scheduler.Schedule(ctx, tx, identity.Organization.ID, member.Conversation.ID, agentContext.AgentIdentityID, *agentContext.AgentRevisionID, message.ID, agentContext.SubjectID, agentContext.AgentInputKind); err != nil {
+					return fmt.Errorf("schedule agent input attachment: %w", err)
 				}
 			}
 			result = AttachmentMessageResult{ConversationID: member.Conversation.ID, Message: message}
@@ -83,7 +84,7 @@ func (a *SendAttachmentMessageAction) Execute(ctx context.Context, identity *ser
 				}
 				result.Conversation = &summary
 			}
-			if input.AgentIdentityID != "" {
+			if input.AgentIdentityID != "" && input.CustomerConversationID == "" {
 				summary, err := inboxaction.NewLoadInboxQuery(tx).LoadAgentConversation(ctx, identity, member.Conversation.ID)
 				if err != nil {
 					return err
@@ -105,7 +106,7 @@ func (a *SendAttachmentMessageAction) Execute(ctx context.Context, identity *ser
 	return AttachmentMessageResult{}, err
 }
 
-// lockAttachmentConversation 找到或创建附件所属的单聊或 AI 聊天并锁定发送资格，AI 聊天同时返回 Agent 发送上下文。
+// lockAttachmentConversation 找到或创建附件所属的单聊、AI 聊天或 Copilot 线程并锁定发送资格，AI 聊天与 Copilot 线程同时返回 Agent 发送上下文。
 func lockAttachmentConversation(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, input AttachmentMessageInput) (chatstate.Member, *internalMessageContext, error) {
 	conversationID := input.ConversationID
 	if input.AgentIdentityID != "" {
@@ -121,7 +122,12 @@ func lockAttachmentConversation(ctx context.Context, tx bun.Tx, identity *server
 				return chatstate.Member{}, nil, err
 			}
 		}
-		if err := ensureAgentConversation(ctx, tx, identity, conversationID, input.AgentIdentityID, title); err != nil {
+		// 指定所属客户会话时首发 Copilot 线程，否则首发 AI 聊天。
+		if input.CustomerConversationID != "" {
+			if err := ensureCustomerCopilotThread(ctx, tx, identity, conversationID, input.CustomerConversationID, input.AgentIdentityID, title); err != nil {
+				return chatstate.Member{}, nil, err
+			}
+		} else if err := ensureAgentConversation(ctx, tx, identity, conversationID, input.AgentIdentityID, title); err != nil {
 			return chatstate.Member{}, nil, err
 		}
 	}
@@ -143,6 +149,18 @@ func lockAttachmentConversation(ctx context.Context, tx bun.Tx, identity *server
 			}
 		}
 		conversationID = conversation.ID
+	}
+	conversation, err := chatstate.LockConversation(ctx, tx, identity.Organization.ID, conversationID)
+	if err != nil {
+		return chatstate.Member{}, nil, err
+	}
+	// Copilot 线程按所属客户会话授权，提问成员在发送时加入线程参与者。
+	if conversation.Type == string(domain.ConversationTypeCopilot) {
+		copilotContext, err := lockCustomerCopilotSendContext(ctx, tx, identity, conversationID)
+		if err != nil {
+			return chatstate.Member{}, nil, err
+		}
+		return chatstate.Member{Conversation: copilotContext.Conversation, ParticipantID: copilotContext.ParticipantID, SubjectID: copilotContext.SubjectID}, &copilotContext, nil
 	}
 	member, err := chatstate.LockMember(ctx, tx, identity, conversationID)
 	if err != nil {
@@ -229,10 +247,13 @@ func saveAttachmentMessage(ctx context.Context, tx bun.Tx, identity *servermodel
 	if _, err := tx.NewUpdate().Model(file).Set("status = ?", domain.FileStatusActive).Set("expires_at = NULL").Set("updated_at = now()").WherePK().Exec(ctx); err != nil {
 		return ConversationMessage{}, false, err
 	}
-	if err := advanceConversationUserReadState(ctx, tx, &servermodels.ConversationUserState{
-		OrganizationID: identity.Organization.ID, ConversationID: member.Conversation.ID, UserID: identity.User.ID, LastReadMessageID: &message.ID,
-	}, message); err != nil {
-		return ConversationMessage{}, false, err
+	// Copilot 线程不维护个人会话状态，其余会话推进本人阅读水位。
+	if member.Conversation.Type != string(domain.ConversationTypeCopilot) {
+		if err := advanceConversationUserReadState(ctx, tx, &servermodels.ConversationUserState{
+			OrganizationID: identity.Organization.ID, ConversationID: member.Conversation.ID, UserID: identity.User.ID, LastReadMessageID: &message.ID,
+		}, message); err != nil {
+			return ConversationMessage{}, false, err
+		}
 	}
 	result := memberConversationMessage(message, member.SubjectID, identity.OrganizationIdentity)
 	result.Attachment = &MessageAttachment{ID: file.ID, Name: file.OriginalName, ContentType: file.ContentType, ByteSize: file.ByteSize, ImageWidth: input.ImageWidth, ImageHeight: input.ImageHeight}

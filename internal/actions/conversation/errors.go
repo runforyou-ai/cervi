@@ -10,6 +10,8 @@ import (
 )
 
 var (
+	// ErrAgentUnavailable 表示 AI 员工不存在、已停用或没有有效的托管配置版本。
+	ErrAgentUnavailable = errors.New("agent unavailable")
 	// ErrAgentTargetNotFound 表示 AI 聊天目标不存在或不可用。
 	ErrAgentTargetNotFound = errors.New("AI conversation target not found")
 	// ErrMessageUnavailable 表示目标消息不存在或已经删除。

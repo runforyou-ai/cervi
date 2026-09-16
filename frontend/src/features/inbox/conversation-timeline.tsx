@@ -214,6 +214,36 @@ function formatMessageTime(formatter: Intl.DateTimeFormat, date: Date) {
   return `${parts.month}-${parts.day} ${parts.hour}:${parts.minute}`
 }
 
+/** 展示 AI 给出的对客回复，并提供填入回复草稿的操作。 */
+function CustomerReplyBlock({
+  body,
+  disabledReason,
+  onApply,
+}: {
+  body: string
+  disabledReason: string | null
+  onApply: (body: string) => void
+}) {
+  const { t } = useTranslation("inbox")
+  return (
+    <div className="my-2 rounded-lg border bg-background p-2.5 text-foreground">
+      <div className="whitespace-pre-wrap break-words">{body}</div>
+      <div className="mt-2 flex justify-end">
+        <Button
+          type="button"
+          variant="outline"
+          size="xs"
+          disabled={Boolean(disabledReason)}
+          title={disabledReason ?? undefined}
+          onClick={() => onApply(body)}
+        >
+          {t("copilotApplyReply")}
+        </Button>
+      </div>
+    </div>
+  )
+}
+
 /** 外部请求定位的消息，nonce 区分对同一消息的多次请求。 */
 export type ConversationLocateTarget = { messageId: string; nonce: number }
 
@@ -236,6 +266,8 @@ function ConversationTimelineContent({
   onUnavailable,
   enabled = true,
   locateMessage = null,
+  onApplyReply,
+  applyReplyDisabledReason = null,
 }: {
   conversationID: string
   conversationType: ConversationType
@@ -254,6 +286,8 @@ function ConversationTimelineContent({
   onUnavailable?: () => void
   enabled?: boolean
   locateMessage?: ConversationLocateTarget | null
+  onApplyReply?: (body: string) => void
+  applyReplyDisabledReason?: string | null
 }) {
   const currentIdentityID = currentUser.identityId
   // 有文本发送中时禁用文本重试，附件重试由上传队列排队。
@@ -271,6 +305,13 @@ function ConversationTimelineContent({
   const scrollRootRef = useRef<HTMLDivElement>(null)
   const keepPositionRef = useRef<(() => void) | null>(null)
   const invalidate = useResourceInvalidator()
+  // 渲染入口保持稳定，正文组件的缓存不因每次渲染失效。
+  const renderCustomerReply = useCallback(
+    (language: string, code: string) => language === "customer-reply"
+      ? <CustomerReplyBlock body={code.trim()} disabledReason={applyReplyDisabledReason} onApply={onApplyReply!} />
+      : undefined,
+    [applyReplyDisabledReason, onApplyReply],
+  )
   const timeline = useConversationTimeline({
     conversationID,
     enabled,
@@ -829,8 +870,8 @@ function ConversationTimelineContent({
                             incoming ? "ml-10 items-start" : "mr-10 items-end",
                           )}
                         >
-                          {conversationType ===
-                            ConversationType.ConversationTypeGroup &&
+                          {(conversationType === ConversationType.ConversationTypeGroup ||
+                            conversationType === ConversationType.ConversationTypeCopilot) &&
                           incoming &&
                           startsGroup ? (
                             <span className="max-w-full truncate text-xs font-medium text-foreground">
@@ -930,7 +971,14 @@ function ConversationTimelineContent({
                                         originatedAt={message.originatedAt} timeLabel={dateFormatters.clock.format(date)} timeTitle={dateFormatters.full.format(date)} incoming={incoming} bubbleClassName={bubbleClassName} />
                                     ) : message.sender?.identityType === OrganizationIdentityType.OrganizationIdentityTypeAgent ? (
                                       <div className="min-w-0 flex-1">
-                                        <MessageMarkdown locale={i18n.language} mentions={messageMentionNames(message)} onOpenLink={openExternalURL}>{message.body}</MessageMarkdown>
+                                        <MessageMarkdown
+                                          locale={i18n.language}
+                                          mentions={messageMentionNames(message)}
+                                          onOpenLink={openExternalURL}
+                                          renderCodeBlock={onApplyReply ? renderCustomerReply : undefined}
+                                        >
+                                          {message.body}
+                                        </MessageMarkdown>
                                       </div>
                                     ) : (
                                       <span className="min-w-0 whitespace-pre-wrap">{renderMessageBody(message)}</span>
@@ -1023,11 +1071,13 @@ function ConversationTimelineContent({
               onStopped={timeline.refresh}
               conversationID={
                 conversationType === ConversationType.ConversationTypeAgent ||
-                conversationType === ConversationType.ConversationTypeGroup
+                conversationType === ConversationType.ConversationTypeGroup ||
+                conversationType === ConversationType.ConversationTypeCopilot
                   ? conversationID
                   : undefined
               }
               group={conversationType === ConversationType.ConversationTypeGroup}
+              copilot={conversationType === ConversationType.ConversationTypeCopilot}
               incoming={conversationType !== ConversationType.ConversationTypeCustomer}
             />
           ) : null}

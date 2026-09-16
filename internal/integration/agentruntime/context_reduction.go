@@ -36,8 +36,8 @@ const (
 	historyWindowPercent = 50
 )
 
-// contextWindowTokens 返回本次运行按模型窗口计算限额时使用的 Token 数。
-func contextWindowTokens(model ModelConfig) int {
+// ContextWindowTokens 返回本次运行按模型窗口计算限额时使用的 Token 数。
+func ContextWindowTokens(model ModelConfig) int {
 	if model.ContextWindow > 0 {
 		return model.ContextWindow
 	}
@@ -141,13 +141,13 @@ func countContextTokens(_ context.Context, messages []*schema.AgenticMessage, to
 	}
 	total := mediaParts * mediaTokens
 	for _, text := range texts {
-		total += estimateTextTokens(text)
+		total += EstimateTextTokens(text)
 	}
 	return int64(total), nil
 }
 
-// estimateTextTokens 估算单段文本的 Token 数，中日韩字符按一个计，其余字符按四分之一计。
-func estimateTextTokens(text string) int {
+// EstimateTextTokens 估算单段文本的 Token 数，中日韩字符按一个计，其余字符按四分之一计。
+func EstimateTextTokens(text string) int {
 	wide, narrow := 0, 0
 	for _, char := range text {
 		if unicode.Is(unicode.Han, char) || unicode.Is(unicode.Hiragana, char) ||
@@ -166,7 +166,7 @@ func trimClaimedHistory(ctx context.Context, messages []Message, window int) []M
 	budget := window * historyWindowPercent / 100
 	total := 0
 	for i := len(messages) - 1; i >= 0; i-- {
-		total += estimateTextTokens(messages[i].Content)
+		total += EstimateTextTokens(messages[i].Content)
 		if total <= budget || i == len(messages)-1 {
 			continue
 		}

@@ -123,7 +123,7 @@ func TestOffloadThresholdFollowsContextWindow(t *testing.T) {
 	if bytes := offloadThresholdBytes(4000); bytes != minToolResultOffloadBytes {
 		t.Fatalf("small window offload bytes = %d", bytes)
 	}
-	handlers, err := newContextReductionHandlers(context.Background(), contextWindowTokens(ModelConfig{ContextWindow: 128000}))
+	handlers, err := newContextReductionHandlers(context.Background(), ContextWindowTokens(ModelConfig{ContextWindow: 128000}))
 	if err != nil || len(handlers) != 2 {
 		t.Fatalf("handlers = %d, err = %v", len(handlers), err)
 	}

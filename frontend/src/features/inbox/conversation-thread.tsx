@@ -1,5 +1,5 @@
 /** 会话消息线程与回复区的即时消息协调。 */
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState, type RefObject } from "react"
 import { useTranslation } from "react-i18next"
 
 import {
@@ -21,7 +21,10 @@ import {
 } from "@/api"
 import { usePortalContainer } from "@/components/ui/portal-container"
 import { useWorkspace } from "@/contexts/workspace-context"
-import { ConversationComposer } from "@/features/inbox/conversation-composer"
+import {
+  ConversationComposer,
+  type ComposerDraftBridge,
+} from "@/features/inbox/conversation-composer"
 import {
   ConversationTimeline,
   type ConversationLocateTarget,
@@ -43,6 +46,7 @@ export function ConversationThread({
   onConversationChanged,
   onChatStarted,
   locateMessage,
+  customerDraftRef,
 }: {
   conversation:
     | CustomerInboxConversationData
@@ -59,6 +63,7 @@ export function ConversationThread({
     conversation: DirectInboxConversationData | AgentInboxConversationData,
   ) => void
   locateMessage: ConversationLocateTarget | null
+  customerDraftRef?: RefObject<ComposerDraftBridge | null>
 }) {
   const prepareSendRef = useRef<(() => Promise<boolean>) | null>(null)
   const { t } = useTranslation("inbox")
@@ -162,7 +167,9 @@ export function ConversationThread({
         onSucceeded={onConversationChanged}
         attachmentTargetIdentityID={directTarget && !agentDraftID ? directTarget.id : undefined}
         attachmentAgentDraft={directTarget && agentDraftID ? { conversationID: agentDraftID, agentIdentityID: directTarget.id } : undefined}
+        draftBridgeRef={customerDraftRef}
         onAttachmentConversationCreated={(created) => {
+          if (!created) return
           if (directTarget && !agentDraftID) void invalidate(resourceKeys.directConversation(directTarget.id))
           void invalidate(resourceKeys.conversationMessages(created.id))
           // 附件首发成功后切到新建的单聊或 AI 聊天。

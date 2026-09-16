@@ -229,6 +229,7 @@ type claimedMessageRow struct {
 	ID               string  `bun:"id"`
 	Body             string  `bun:"body"`
 	SenderSourceID   string  `bun:"sender_source_id"`
+	SenderName       string  `bun:"sender_name"`
 	ReplyToMessageID *string `bun:"reply_to_message_id"`
 	ReplyBody        string  `bun:"reply_body"`
 	ReplySenderID    string  `bun:"reply_sender_id"`
@@ -246,8 +247,8 @@ type claimedMessageReference struct {
 	Deleted    bool               `json:"deleted,omitempty"`
 }
 
-// loadClaimedConversationMessages 读取不越过已认领输入的最近会话上下文。
-func loadClaimedConversationMessages(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, endSeq int64, links attachmentLinks) ([]agentruntime.Message, error) {
+// loadClaimedConversationMessages 读取不越过已认领输入的最近会话上下文，withSender 为 true 时成员消息携带发送者名称。
+func loadClaimedConversationMessages(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, endSeq int64, links attachmentLinks, withSender bool) ([]agentruntime.Message, error) {
 	boundary, err := loadClaimedMessageBoundary(ctx, db, run, endSeq)
 	if err != nil {
 		return nil, err
@@ -256,6 +257,7 @@ func loadClaimedConversationMessages(ctx context.Context, db bun.IDB, run *serve
 	if err := db.NewSelect().TableExpr("messages AS msg").
 		ColumnExpr("msg.id, msg.body").
 		ColumnExpr("cs.source_id AS sender_source_id").
+		ColumnExpr("COALESCE(sender_oi.display_name, '') AS sender_name").
 		ColumnExpr("msg.reply_to_message_id").
 		ColumnExpr("? AS reply_body", messagequery.Summary("reply")).
 		ColumnExpr("COALESCE(reply_cs.source_id::text, '') AS reply_sender_id").
@@ -263,6 +265,7 @@ func loadClaimedConversationMessages(ctx context.Context, db bun.IDB, run *serve
 		ColumnExpr("reply.deleted_at IS NOT NULL AS reply_deleted").
 		Join("JOIN conversation_participants AS cp ON cp.id = msg.sender_participant_id AND cp.organization_id = msg.organization_id AND cp.conversation_id = msg.conversation_id").
 		Join("JOIN chat_subjects AS cs ON cs.id = cp.subject_id AND cs.organization_id = cp.organization_id AND cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
+		Join("LEFT JOIN organization_identities AS sender_oi ON sender_oi.id = cs.source_id AND sender_oi.organization_id = cs.organization_id").
 		Join("LEFT JOIN messages AS reply ON reply.id = msg.reply_to_message_id AND reply.organization_id = msg.organization_id AND reply.conversation_id = msg.conversation_id AND reply.type IN (?, ?)", domain.MessageTypeText, domain.MessageTypeAttachment).
 		Join("LEFT JOIN conversation_participants AS reply_cp ON reply_cp.id = reply.sender_participant_id AND reply_cp.organization_id = reply.organization_id AND reply_cp.conversation_id = reply.conversation_id").
 		Join("LEFT JOIN chat_subjects AS reply_cs ON reply_cs.id = reply_cp.subject_id AND reply_cs.organization_id = reply_cp.organization_id AND reply_cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
@@ -286,8 +289,12 @@ func loadClaimedConversationMessages(ctx context.Context, db bun.IDB, run *serve
 		}
 		content := row.Body
 		attachment := row.attachment(row.ID, links)
-		// 在同一对话消息的结构化正文中携带附件描述和一层引用。
-		if row.ReplyToMessageID != nil || attachment != nil {
+		var sender *groupMessageSender
+		if withSender && role == agentruntime.MessageRoleUser {
+			sender = &groupMessageSender{Name: row.SenderName, Kind: string(domain.OrganizationIdentityTypeUser)}
+		}
+		// 在同一对话消息的结构化正文中携带发送者、附件描述和一层引用。
+		if sender != nil || row.ReplyToMessageID != nil || attachment != nil {
 			var replyTo *claimedMessageReference
 			if row.ReplyToMessageID != nil {
 				replyTo = &claimedMessageReference{MessageID: *row.ReplyToMessageID, Deleted: row.ReplyDeleted}
@@ -297,10 +304,11 @@ func loadClaimedConversationMessages(ctx context.Context, db bun.IDB, run *serve
 				}
 			}
 			encoded, _ := json.Marshal(struct {
+				Sender     *groupMessageSender      `json:"sender,omitempty"`
 				Body       string                   `json:"body"`
 				Attachment *contextAttachment       `json:"attachment,omitempty"`
 				ReplyTo    *claimedMessageReference `json:"replyTo,omitempty"`
-			}{Body: row.Body, Attachment: attachment, ReplyTo: replyTo})
+			}{Sender: sender, Body: row.Body, Attachment: attachment, ReplyTo: replyTo})
 			content = string(encoded)
 		}
 		messages = append(messages, agentruntime.Message{ID: row.ID, Role: role, Content: content, Media: row.media()})

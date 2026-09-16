@@ -174,6 +174,26 @@ func (s *Service) GenerateCustomerReplySuggestions(ctx context.Context, meta Req
 	return withNormalizedSlices(s.backend.GenerateCustomerReplySuggestions(ctx, meta, conversationID, input))
 }
 
+// ListCustomerCopilotThreads 返回客户会话的全部 Copilot 线程。
+func (s *Service) ListCustomerCopilotThreads(ctx context.Context, meta RequestMeta, conversationID string) (CustomerCopilotThreadList, error) {
+	return withNormalizedSlices(s.backend.ListCustomerCopilotThreads(ctx, meta, conversationID))
+}
+
+// SendFirstCustomerCopilotMessage 以首条提问创建客户会话的 Copilot 线程。
+func (s *Service) SendFirstCustomerCopilotMessage(ctx context.Context, meta RequestMeta, conversationID string, input FirstCustomerCopilotMessageInput) (FirstCustomerCopilotMessageResult, error) {
+	return withNormalizedSlices(s.backend.SendFirstCustomerCopilotMessage(ctx, meta, conversationID, input))
+}
+
+// SendCustomerCopilotTextMessage 向 Copilot 线程发送提问。
+func (s *Service) SendCustomerCopilotTextMessage(ctx context.Context, meta RequestMeta, threadID string, input CustomerCopilotTextMessageInput) (ConversationMessage, error) {
+	return withNormalizedSlices(s.backend.SendCustomerCopilotTextMessage(ctx, meta, threadID, input))
+}
+
+// StopCustomerCopilotReply 停止 Copilot 线程中指定的回复并返回实际运行状态。
+func (s *Service) StopCustomerCopilotReply(ctx context.Context, meta RequestMeta, threadID string, runID string) (AgentRunStatus, error) {
+	return withNormalizedSlices(s.backend.StopCustomerCopilotReply(ctx, meta, threadID, runID))
+}
+
 // ListCustomerMessageDeliveries 读取当前窗口的外部投递状态。
 func (s *Service) ListCustomerMessageDeliveries(ctx context.Context, meta RequestMeta, conversationID string, input CustomerDeliveryListInput) (CustomerDeliveryList, error) {
 	return withNormalizedSlices(s.backend.ListCustomerMessageDeliveries(ctx, meta, conversationID, input))

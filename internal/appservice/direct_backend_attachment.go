@@ -20,7 +20,7 @@ import (
 // SendAttachmentMessage 保存已上传的内部会话附件，并返回消息及首发创建的单聊或 AI 聊天。
 func (o *directOperations) SendAttachmentMessage(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input AttachmentMessageInput) (AttachmentMessageResult, error) {
 	result, err := o.sendAttachmentMessage.Execute(ctx, identity, conversationaction.AttachmentMessageInput{
-		ConversationID: input.ConversationID, TargetIdentityID: input.TargetIdentityID, AgentIdentityID: input.AgentIdentityID,
+		ConversationID: input.ConversationID, TargetIdentityID: input.TargetIdentityID, AgentIdentityID: input.AgentIdentityID, CustomerConversationID: input.CustomerConversationID,
 		ClientMessageID: input.ClientMessageID, FileID: input.FileID, Body: input.Body, ImageWidth: input.ImageWidth, ImageHeight: input.ImageHeight,
 	})
 	if errors.Is(err, fileaction.ErrFileNotFound) {

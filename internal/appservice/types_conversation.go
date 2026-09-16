@@ -391,16 +391,17 @@ type AgentTextMessageInput struct {
 	ReplyToMessageID string `json:"replyToMessageId"`
 }
 
-// AttachmentMessageInput 定义已上传附件的发送意图，agentIdentityId 非空表示按 conversationId 草稿编号首发 AI 聊天。
+// AttachmentMessageInput 定义已上传附件的发送意图，agentIdentityId 非空表示按 conversationId 草稿编号首发 AI 聊天，同时指定 customerConversationId 表示首发该客户会话的 Copilot 线程。
 type AttachmentMessageInput struct {
-	ConversationID   string `json:"conversationId"`
-	TargetIdentityID string `json:"targetIdentityId"`
-	AgentIdentityID  string `json:"agentIdentityId"`
-	ClientMessageID  string `json:"clientMessageId"`
-	FileID           string `json:"fileId"`
-	Body             string `json:"body"`
-	ImageWidth       int    `json:"imageWidth"`
-	ImageHeight      int    `json:"imageHeight"`
+	ConversationID         string `json:"conversationId"`
+	TargetIdentityID       string `json:"targetIdentityId"`
+	AgentIdentityID        string `json:"agentIdentityId"`
+	CustomerConversationID string `json:"customerConversationId"`
+	ClientMessageID        string `json:"clientMessageId"`
+	FileID                 string `json:"fileId"`
+	Body                   string `json:"body"`
+	ImageWidth             int    `json:"imageWidth"`
+	ImageHeight            int    `json:"imageHeight"`
 }
 
 // AttachmentMessageResult 定义附件消息及首发时创建的单聊或 AI 聊天。

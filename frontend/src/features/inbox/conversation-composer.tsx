@@ -1,11 +1,13 @@
 /** 提交成员可回复会话的文本消息。 */
 import {
+  useCallback,
   useEffect,
   useMemo,
   useRef,
   useState,
   type KeyboardEvent,
   type PointerEvent as ReactPointerEvent,
+  type RefObject,
 } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { LoaderCircleIcon, PaperclipIcon, SmileIcon } from "lucide-react"
@@ -21,6 +23,7 @@ import {
   isApiError,
   sendCustomerTextMessage,
   sendAgentTextMessage,
+  sendCustomerCopilotTextMessage,
   sendDirectTextMessage,
   sendGroupTextMessage,
   type ConversationMessageData,
@@ -60,6 +63,12 @@ import composerEmojis from "../../../../internal/publicweb/composer-emojis.json"
 const conversationComposerMaxHeight = 200
 const conversationComposerMinHeight = 80
 const conversationComposerKeyboardResizeStep = 16
+
+/** 读取和替换回复输入框草稿的入口。 */
+export type ComposerDraftBridge = {
+  read: () => string
+  replace: (body: string) => void
+}
 
 type MentionCandidate =
   | { kind: "all"; displayName: string }
@@ -111,10 +120,12 @@ export function ConversationComposer({
   attachmentTargetIdentityID,
   attachmentAgentDraft,
   onAttachmentConversationCreated,
+  draftBridgeRef,
 }: {
   attachmentTargetIdentityID?: string
-  attachmentAgentDraft?: { conversationID: string; agentIdentityID: string }
-  onAttachmentConversationCreated?: (conversation: InboxConversation) => void
+  attachmentAgentDraft?: { conversationID: string; agentIdentityID: string; customerConversationID?: string }
+  onAttachmentConversationCreated?: (conversation: InboxConversation | null, conversationID: string) => void
+  draftBridgeRef?: RefObject<ComposerDraftBridge | null>
   conversationID: string
   conversationType: ConversationType
   submitOnEnter?: boolean
@@ -429,16 +440,19 @@ export function ConversationComposer({
       let message: ConversationMessageData
       switch (conversationType) {
         case ConversationType.ConversationTypeAgent:
+        case ConversationType.ConversationTypeCopilot:
         case ConversationType.ConversationTypeDirect: {
           const directInput = {
             ...messageInput,
             replyToMessageId: replyTo?.id ?? "",
           }
-          message = sendIndividualMessage
-            ? await sendIndividualMessage(directInput)
-            : conversationType === ConversationType.ConversationTypeAgent
-              ? await sendAgentTextMessage(conversationID, directInput)
-              : await sendDirectTextMessage(conversationID, directInput)
+          // 草稿首发走调用方入口，已有会话按类型发送。
+          if (sendIndividualMessage) message = await sendIndividualMessage(directInput)
+          else if (conversationType === ConversationType.ConversationTypeAgent)
+            message = await sendAgentTextMessage(conversationID, directInput)
+          else if (conversationType === ConversationType.ConversationTypeCopilot)
+            message = await sendCustomerCopilotTextMessage(conversationID, directInput)
+          else message = await sendDirectTextMessage(conversationID, directInput)
           break
         }
         case ConversationType.ConversationTypeGroup:
@@ -496,14 +510,26 @@ export function ConversationComposer({
     }
   }
 
-  /** 用选中的 AI 回复候选替换当前对客草稿。 */
-  function applyReplySuggestion(reply: string) {
+  /** 用 AI 生成的回复替换当前对客草稿并聚焦输入框。 */
+  const applyReplySuggestion = useCallback((reply: string) => {
     form.setValue("body", reply, { shouldDirty: true })
     window.requestAnimationFrame(() => {
       resizeComposerInput(inputRef.current, manualInputHeightRef.current)
       form.setFocus("body")
     })
-  }
+  }, [form])
+
+  useEffect(() => {
+    if (!draftBridgeRef) return
+    // 向 AI 助手提供读取和替换当前草稿的入口。
+    draftBridgeRef.current = {
+      read: () => form.getValues("body"),
+      replace: applyReplySuggestion,
+    }
+    return () => {
+      draftBridgeRef.current = null
+    }
+  }, [applyReplySuggestion, draftBridgeRef, form])
 
   /** 在桌面键盘上提交消息，并保留 Shift+Enter 换行。 */
   function submitFromKeyboard(event: KeyboardEvent<HTMLTextAreaElement>) {
@@ -761,14 +787,16 @@ export function ConversationComposer({
               <div className="flex items-center gap-1">
                 {(conversationType === ConversationType.ConversationTypeDirect ||
                   conversationType === ConversationType.ConversationTypeAgent ||
+                  conversationType === ConversationType.ConversationTypeCopilot ||
                   conversationType === ConversationType.ConversationTypeGroup) ? (
                   <ConversationAttachmentUpload
                     conversationID={conversationID || (attachmentAgentDraft?.conversationID ?? "")}
                     targetIdentityID={attachmentTargetIdentityID}
                     agentIdentityID={attachmentAgentDraft?.agentIdentityID}
+                    customerConversationID={attachmentAgentDraft?.customerConversationID}
                     disabled={isSubmitting}
                     onBeforeSend={onBeforeSend}
-                    onCreated={(conversation) => onAttachmentConversationCreated?.(conversation)}
+                    onCreated={(conversation, conversationID) => onAttachmentConversationCreated?.(conversation, conversationID)}
                   />
                 ) : (
                   <Button type="button" variant="ghost" size="icon-sm" disabled aria-label={t("attachmentAdd")}>

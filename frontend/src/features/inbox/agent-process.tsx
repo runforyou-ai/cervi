@@ -17,6 +17,7 @@ import { Popover } from "radix-ui"
 import {
   isApiError,
   stopAgentReply,
+  stopCustomerCopilotReply,
   stopGroupAgentReply,
   AgentRunBlockKind,
   AgentRunStatus,
@@ -186,7 +187,7 @@ export function AgentProcess({ process, incoming }: { process: ConversationAgent
 }
 
 /** 显示最近一次运行的等待、思考或取消状态。 */
-export function AgentRunState({ run, incoming, conversationID, group, onStopped }: { run: ConversationAgentRun; incoming: boolean; conversationID?: string; group?: boolean; onStopped: () => Promise<unknown> }) {
+export function AgentRunState({ run, incoming, conversationID, group, copilot, onStopped }: { run: ConversationAgentRun; incoming: boolean; conversationID?: string; group?: boolean; copilot?: boolean; onStopped: () => Promise<unknown> }) {
   const { t } = useTranslation("inbox")
   if (run.status === AgentRunStatus.AgentRunStatusSucceeded || run.status === AgentRunStatus.AgentRunStatusFailed ||
     (run.status === AgentRunStatus.AgentRunStatusCancelled && run.errorCode === "user_cancelled")) return null
@@ -230,7 +231,7 @@ export function AgentRunState({ run, incoming, conversationID, group, onStopped 
         <div className="flex items-center gap-1.5">
           {cancelled ? <BrainIcon aria-hidden className="size-4" /> : null}
           <span>{label}</span>
-          {conversationID && !cancelled ? <AgentReplyStopButton conversationID={conversationID} runID={run.id} group={group} onStopped={onStopped} /> : null}
+          {conversationID && !cancelled ? <AgentReplyStopButton conversationID={conversationID} runID={run.id} group={group} copilot={copilot} onStopped={onStopped} /> : null}
         </div>
         {cancelled && reason ? (
           <p className="mt-1 whitespace-pre-wrap break-all">{reason}</p>
@@ -258,7 +259,7 @@ export function AgentQueueState({ agents, incoming }: { agents: ConversationPend
 }
 
 /** 停止指定运行后刷新原会话资源，卸载后忽略交互结果。 */
-function AgentReplyStopButton({ conversationID, runID, group, onStopped }: { conversationID: string; runID: string; group?: boolean; onStopped: () => Promise<unknown> }) {
+function AgentReplyStopButton({ conversationID, runID, group, copilot, onStopped }: { conversationID: string; runID: string; group?: boolean; copilot?: boolean; onStopped: () => Promise<unknown> }) {
   const { t } = useTranslation("inbox")
   const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
@@ -273,7 +274,10 @@ function AgentReplyStopButton({ conversationID, runID, group, onStopped }: { con
   async function stop() {
     setStopping(true)
     try {
-      await (group ? stopGroupAgentReply(conversationID, runID) : stopAgentReply(conversationID, runID))
+      // 按会话类型选择 Copilot 线程、群聊或独立 AI 会话的停止入口。
+      if (copilot) await stopCustomerCopilotReply(conversationID, runID)
+      else if (group) await stopGroupAgentReply(conversationID, runID)
+      else await stopAgentReply(conversationID, runID)
       await Promise.all([
         invalidate(resourceKeys.conversationMessages(conversationID)),
         invalidate(resourceKeys.conversationMessagePage(conversationID)),

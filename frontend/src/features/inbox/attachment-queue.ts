@@ -40,9 +40,10 @@ type Batch = {
   conversationID: string
   targetIdentityID: string
   agentIdentityID: string
+  customerConversationID: string
   jobs: AttachmentJob[]
   sending: boolean
-  onCreated: (conversation: InboxConversation | null) => void
+  onCreated: (conversation: InboxConversation | null, conversationID: string) => void
 }
 
 /** 同时上传最多三个文件，并按每批的选择顺序串行发送已上传的附件。 */
@@ -94,7 +95,8 @@ export class AttachmentQueue {
       conversationID,
       targetIdentityID = "",
       agentIdentityID = "",
-    }: { conversationID: string; targetIdentityID?: string; agentIdentityID?: string },
+      customerConversationID = "",
+    }: { conversationID: string; targetIdentityID?: string; agentIdentityID?: string; customerConversationID?: string },
     onCreated: Batch["onCreated"],
   ) {
     const batchID = crypto.randomUUID()
@@ -143,6 +145,7 @@ export class AttachmentQueue {
       conversationID,
       targetIdentityID,
       agentIdentityID,
+      customerConversationID,
       jobs,
       sending: false,
       onCreated,
@@ -231,6 +234,7 @@ export class AttachmentQueue {
         conversationId: batch.targetIdentityID ? "" : batch.conversationID,
         targetIdentityId: batch.targetIdentityID,
         agentIdentityId: batch.agentIdentityID,
+        customerConversationId: batch.customerConversationID,
         clientMessageId: job.id,
         fileId: job.fileID,
         body: job.body,
@@ -247,8 +251,9 @@ export class AttachmentQueue {
         batch.conversationID = result.conversationId
         batch.targetIdentityID = ""
         batch.agentIdentityID = ""
+        batch.customerConversationID = ""
         for (const item of batch.jobs) item.conversationID = result.conversationId
-        batch.onCreated(result.conversation)
+        batch.onCreated(result.conversation, result.conversationId)
       }
       this.refresh(result.conversationId)
     } catch (error) {

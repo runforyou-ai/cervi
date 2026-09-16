@@ -31,6 +31,7 @@
   "error.agent_reply_stop_failed": "停止 AI 回复失败，请重试。",
   "error.agent_unavailable": "这个 AI 员工当前不可用。",
   "error.customer_reply_suggest_failed": "生成回复失败，请重试。",
+  "error.customer_copilot_thread_list_failed": "读取 AI 助手对话失败，请重试。",
   "field.agent_identity_id_invalid": "请选择有效的 AI 员工。",
   "field.customer_reply_mode_invalid": "请选择有效的生成方式。",
   "field.customer_reply_tone_invalid": "请选择有效的语气。",

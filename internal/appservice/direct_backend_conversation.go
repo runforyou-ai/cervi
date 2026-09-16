@@ -37,6 +37,9 @@ type conversationOps struct {
 	reopenServiceSession            *conversationaction.ReopenServiceSessionAction
 	sendFirstAgentTextMessage       *conversationaction.SendFirstAgentTextMessageAction
 	sendAgentTextMessage            *conversationaction.SendAgentTextMessageAction
+	listCustomerCopilotThreads      *conversationaction.ListCustomerCopilotThreadsQuery
+	sendFirstCustomerCopilotMessage *conversationaction.SendFirstCustomerCopilotMessageAction
+	sendCustomerCopilotTextMessage  *conversationaction.SendCustomerCopilotTextMessageAction
 	sendFirstDirectTextMessage      *conversationaction.SendFirstDirectTextMessageAction
 	findDirectConversation          *conversationaction.FindDirectConversationQuery
 	sendDirectTextMessage           *conversationaction.SendDirectTextMessageAction
@@ -69,6 +72,9 @@ func newConversationOps(db *bun.DB, agentScheduler conversationaction.AgentMessa
 		reopenServiceSession:            conversationaction.NewReopenServiceSessionAction(db),
 		sendFirstAgentTextMessage:       conversationaction.NewSendFirstAgentTextMessageAction(db, agentScheduler),
 		sendAgentTextMessage:            conversationaction.NewSendAgentTextMessageAction(db, agentScheduler),
+		listCustomerCopilotThreads:      conversationaction.NewListCustomerCopilotThreadsQuery(db),
+		sendFirstCustomerCopilotMessage: conversationaction.NewSendFirstCustomerCopilotMessageAction(db, agentScheduler),
+		sendCustomerCopilotTextMessage:  conversationaction.NewSendCustomerCopilotTextMessageAction(db, agentScheduler),
 		sendFirstDirectTextMessage:      conversationaction.NewSendFirstDirectTextMessageAction(db),
 		findDirectConversation:          conversationaction.NewFindDirectConversationQuery(db),
 		sendDirectTextMessage:           conversationaction.NewSendDirectTextMessageAction(db),
@@ -593,6 +599,9 @@ func individualConversationError(ctx context.Context, meta RequestMeta, err erro
 	}
 	if errors.Is(err, conversationaction.ErrAgentTargetNotFound) {
 		return NotFoundError(meta, cervii18n.ErrorAgentNotFound)
+	}
+	if errors.Is(err, conversationaction.ErrAgentUnavailable) {
+		return NotFoundError(meta, cervii18n.ErrorAgentUnavailable)
 	}
 	if errors.Is(err, conversationaction.ErrDirectTargetNotFound) {
 		return NotFoundError(meta, cervii18n.ErrorDirectTargetNotFound)

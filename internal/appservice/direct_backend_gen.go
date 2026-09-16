@@ -362,6 +362,46 @@ func (b *DirectBackend) GenerateCustomerReplySuggestions(ctx context.Context, me
 	return b.ops.GenerateCustomerReplySuggestions(ctx, meta, identity, conversationID, input)
 }
 
+// ListCustomerCopilotThreads 返回客户会话的全部 Copilot 线程。
+func (b *DirectBackend) ListCustomerCopilotThreads(ctx context.Context, meta RequestMeta, conversationID string) (CustomerCopilotThreadList, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero CustomerCopilotThreadList
+		return zero, err
+	}
+	return b.ops.ListCustomerCopilotThreads(ctx, meta, identity, conversationID)
+}
+
+// SendFirstCustomerCopilotMessage 以首条提问创建客户会话的 Copilot 线程。
+func (b *DirectBackend) SendFirstCustomerCopilotMessage(ctx context.Context, meta RequestMeta, conversationID string, input FirstCustomerCopilotMessageInput) (FirstCustomerCopilotMessageResult, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero FirstCustomerCopilotMessageResult
+		return zero, err
+	}
+	return b.ops.SendFirstCustomerCopilotMessage(ctx, meta, identity, conversationID, input)
+}
+
+// SendCustomerCopilotTextMessage 向 Copilot 线程发送提问。
+func (b *DirectBackend) SendCustomerCopilotTextMessage(ctx context.Context, meta RequestMeta, threadID string, input CustomerCopilotTextMessageInput) (ConversationMessage, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero ConversationMessage
+		return zero, err
+	}
+	return b.ops.SendCustomerCopilotTextMessage(ctx, meta, identity, threadID, input)
+}
+
+// StopCustomerCopilotReply 停止 Copilot 线程中指定的回复并返回实际运行状态。
+func (b *DirectBackend) StopCustomerCopilotReply(ctx context.Context, meta RequestMeta, threadID string, runID string) (AgentRunStatus, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero AgentRunStatus
+		return zero, err
+	}
+	return b.ops.StopCustomerCopilotReply(ctx, meta, identity, threadID, runID)
+}
+
 // ListCustomerMessageDeliveries 读取当前窗口的外部投递状态。
 func (b *DirectBackend) ListCustomerMessageDeliveries(ctx context.Context, meta RequestMeta, conversationID string, input CustomerDeliveryListInput) (CustomerDeliveryList, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
