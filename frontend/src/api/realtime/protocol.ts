@@ -9,6 +9,7 @@ const int64Max = 9223372036854775807n
 /** 服务端经事件流下发的事件。 */
 export type RealtimeServerFrame =
   | { type: "server_hello"; connectionId: string; syncHeads: SyncHeads }
+  | { type: "visitor_hello"; connectionId: string }
   | { type: "ping" }
   | { type: "conversation_changed"; conversationId: string; version: bigint }
   | { type: "conversation_removed"; conversationId: string }
@@ -66,6 +67,8 @@ function decodeServerData(type: string, data: FrameData): RealtimeServerFrame | 
         },
       }
     }
+    case "visitor_hello":
+      return { type, connectionId: readString(data, "connectionId") }
     case "conversation_changed":
     case "conversation_state_changed":
       return { type, conversationId: readString(data, "conversationId"), version: readInt64(data, "version") }

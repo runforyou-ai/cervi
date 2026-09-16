@@ -1020,6 +1020,7 @@ conversation_user_states.version
 | `user` | userId | 内部会话、本人阅读／提醒／置顶状态及身份变化 |
 | `customer_inbox` | organizationId | 企业客服共享列表和客户会话变化，不逐客服扇出 |
 | `visitor_directory` | 渠道身份记录 ID | 该身份全部有权线程及公开会话版本，覆盖另一页面新建的线程 |
+| `website_channel` | 渠道 ID | 网站渠道停用的撤销控制，结束该渠道全部访客事件流 |
 
 ID 来自服务端授权结果，不能用凭据或客户端任意编号订阅。访客先追目录，再补当前窗口，不能只检查已经打开的会话。团队队列、大群 Shared Fanout 和第三方账号流待对应能力出现后扩展。
 
@@ -1083,7 +1084,7 @@ NATS Subject 使用唯一编解码器，与通知登记、Hello 探针值、通�
 cervi.<namespace>.realtime.<organizationId>.<audienceKind>.<audienceId>
 ```
 
-`audienceKind` 仅为 `user / customer_inbox / visitor_directory`，ID 使用无点的内部规范值；禁止原始凭据或用户输入直接拼接。登出与停用的撤销控制与变更通知共用提交后发布链路，以通知种类区分，登出携带 tokenSessionId，不参与变更通知的版本合并；控制通知丢失时，事件流在最长存活时间到期后结束。群失权不发送控制通知，Gateway 把失权者的 `conversation_removed` 通知转发给客户端，客户端据此关闭该会话的运行过程流。
+`audienceKind` 仅为 `user / customer_inbox / visitor_directory / website_channel`，ID 使用无点的内部规范值；禁止原始凭据或用户输入直接拼接。登出与停用的撤销控制与变更通知共用提交后发布链路，以通知种类区分，登出携带 tokenSessionId，不参与变更通知的版本合并；控制通知丢失时，事件流在最长存活时间到期后结束。群失权不发送控制通知，Gateway 把失权者的 `conversation_removed` 通知转发给客户端，客户端据此关闭该会话的运行过程流。
 
 规则：
 
@@ -1119,13 +1120,18 @@ cervi.<namespace>.realtime.<organizationId>.<audienceKind>.<audienceId>
 ├── pin_order_changed（PR40 增加）
 └── device_work_advanced（设备阶段增加）
 
+访客事件流 GET /public/website-channels/{channelId}/realtime
+├── visitor_hello（连接编号；访客没有同步探针）
+├── ping（服务端每 25 秒一次）
+└── conversation_changed（conversationId ＋ version）
+
 运行过程流 GET /api/realtime/runs/{runId}（PR38 增加）
 ├── run_stream_snapshot（按块拆分为多个事件）
 ├── run_stream_delta
 └── run_stream_ended（完成、失败或取消）
 ```
 
-访客事件流由 PR26 增加，受众为访客目录，只发送公开的目录与会话变更事件；访客会话提示使用目录受众传输，不能据此任意指定 conversationId。typing、presence、任务进度和 WebRTC 需要下发给其他端时随真实功能增加事件，不在最小集合预建空事件。
+访客事件流受众为访客目录与所在渠道，只发送上列公开事件，成员专用事件在发送队列直接丢弃；访客会话提示使用目录受众传输，请求中的会话编号不扩大接收范围。渠道停用按渠道受众发送撤销控制，结束该渠道全部访客事件流。typing、presence、任务进度和 WebRTC 需要下发给其他端时随真实功能增加事件，不在最小集合预建空事件。
 
 演进规则：
 

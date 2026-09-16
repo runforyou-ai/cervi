@@ -21,6 +21,7 @@ type fixtureCase struct {
 // expectedFrames 是结果为 frame 的夹具样例在 Go 端解码后应得到的事件。
 var expectedFrames = map[string]Frame{
 	"server_hello":                      ServerHello{ConnectionID: "conn-01", SyncHeads: appservice.SyncHeads{ConversationCount: 3, ConversationChecksum: "18446744073709551615", IdentityProfileVersion: "9223372036854775807"}},
+	"visitor_hello":                     VisitorHello{ConnectionID: "conn-02"},
 	"ping":                              Ping{},
 	"conversation_changed":              ConversationChanged{ConversationID: "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8b", Version: 9223372036854775807},
 	"conversation_state_changed":        ConversationStateChanged{ConversationID: "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8b", Version: 42},

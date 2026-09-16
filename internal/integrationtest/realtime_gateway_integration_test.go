@@ -63,7 +63,7 @@ func startRealtimeGateway(t *testing.T, f navigationFixture, options gateway.Opt
 	if wrap != nil {
 		member = wrap(backend)
 	}
-	realtimeGateway := gateway.New(member, config.Namespace, options)
+	realtimeGateway := gateway.New(member, nil, config.Namespace, options)
 	realtimeGateway.Start(publisher.Connection())
 	handler := realtimeGateway.Middleware(http.NotFoundHandler())
 	server := httptest.NewUnstartedServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
@@ -189,6 +189,25 @@ func (c *realtimeTestClient) expect(want protocol.Frame) {
 	c.t.Helper()
 	if got := c.next(); !reflect.DeepEqual(got, want) {
 		c.t.Fatalf("frame = %#v, want %#v", got, want)
+	}
+}
+
+// expectQuiet 在短暂等待内确认事件流除心跳外没有事件。
+func (c *realtimeTestClient) expectQuiet() {
+	c.t.Helper()
+	timeout := time.After(500 * time.Millisecond)
+	for {
+		select {
+		case frame, ok := <-c.frames:
+			if !ok {
+				c.t.Fatal("事件流已结束")
+			}
+			if _, ping := frame.(protocol.Ping); !ping {
+				c.t.Fatalf("收到不应送达的事件 %#v", frame)
+			}
+		case <-timeout:
+			return
+		}
 	}
 }
 

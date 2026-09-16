@@ -6,6 +6,12 @@
     "wire": {"v": 1, "type": "server_hello", "data": {"connectionId": "conn-01", "syncHeads": {"conversationCount": 3, "conversationChecksum": "18446744073709551615", "identityProfileVersion": "9223372036854775807"}}}
   },
   {
+    "name": "visitor_hello",
+    "result": "frame",
+    "encode": true,
+    "wire": {"v": 1, "type": "visitor_hello", "data": {"connectionId": "conn-02"}}
+  },
+  {
     "name": "ping",
     "result": "frame",
     "encode": true,

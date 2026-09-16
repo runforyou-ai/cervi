@@ -24,6 +24,7 @@ type Type string
 
 const (
 	TypeServerHello              Type = "server_hello"
+	TypeVisitorHello             Type = "visitor_hello"
 	TypePing                     Type = "ping"
 	TypeConversationChanged      Type = "conversation_changed"
 	TypeConversationRemoved      Type = "conversation_removed"
@@ -41,6 +42,11 @@ type Frame interface {
 type ServerHello struct {
 	ConnectionID string               `json:"connectionId"`
 	SyncHeads    appservice.SyncHeads `json:"syncHeads"`
+}
+
+// VisitorHello 返回网站访客事件流的连接编号；访客没有同步探针，重连后重新拉取目录与线程窗口。
+type VisitorHello struct {
+	ConnectionID string `json:"connectionId"`
 }
 
 // Ping 是服务端定期发送的心跳，客户端据此判断事件流仍然存活。
@@ -71,6 +77,9 @@ type IdentityProfileChanged struct {
 // FrameType 返回服务端 Hello 事件种类。
 func (ServerHello) FrameType() Type { return TypeServerHello }
 
+// FrameType 返回访客 Hello 事件种类。
+func (VisitorHello) FrameType() Type { return TypeVisitorHello }
+
 // FrameType 返回心跳事件种类。
 func (Ping) FrameType() Type { return TypePing }
 
@@ -99,6 +108,7 @@ type decoder func(json.RawMessage) (Frame, error)
 // decoders 是已定义的事件种类。
 var decoders = map[Type]decoder{
 	TypeServerHello:              decodeAs[ServerHello],
+	TypeVisitorHello:             decodeAs[VisitorHello],
 	TypePing:                     decodeAs[Ping],
 	TypeConversationChanged:      decodeAs[ConversationChanged],
 	TypeConversationRemoved:      decodeAs[ConversationRemoved],
