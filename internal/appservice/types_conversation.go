@@ -59,6 +59,12 @@ type ConversationMessageListInput struct {
 	After  string `json:"after" query:"after"`
 }
 
+// ConversationMessageWindowInput 定义已加载消息窗口的首尾游标，读取包含两端的连续范围。
+type ConversationMessageWindowInput struct {
+	Start string `json:"start" query:"start"`
+	End   string `json:"end" query:"end"`
+}
+
 // CustomerTextMessageInput 定义成员发送的客户会话文本消息。
 type CustomerTextMessageInput struct {
 	ReplyToMessageID string `json:"replyToMessageId"`

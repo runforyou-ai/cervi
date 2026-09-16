@@ -182,6 +182,14 @@ func (b *Backend) ListConversationMessages(ctx context.Context, meta appservice.
 	return output, err
 }
 
+// ReadConversationMessageWindow 重读已加载首尾游标之间的完整消息范围。
+func (b *Backend) ReadConversationMessageWindow(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.ConversationMessageWindowInput) (appservice.ConversationMessageList, error) {
+	var output appservice.ConversationMessageList
+	err := b.do(ctx, meta, http.MethodGet, "/conversations/"+url.PathEscape(conversationID)+"/message-window", encodeConversationMessageWindowInputQuery(input), nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // ListConversationMessageReferences 读取当前窗口的引用摘要和回复可用状态。
 func (b *Backend) ListConversationMessageReferences(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.ConversationMessageReferenceListInput) (appservice.ConversationMessageReferenceList, error) {
 	var output appservice.ConversationMessageReferenceList
@@ -1172,6 +1180,14 @@ func encodeConversationMessageListInputQuery(input appservice.ConversationMessag
 func encodeConversationMessageReferenceListInputQuery(input appservice.ConversationMessageReferenceListInput) url.Values {
 	query := url.Values{}
 	setQuery(query, "messageIds", input.MessageIDs)
+	return query
+}
+
+// encodeConversationMessageWindowInputQuery 将 appservice.ConversationMessageWindowInput 编码为查询参数。
+func encodeConversationMessageWindowInputQuery(input appservice.ConversationMessageWindowInput) url.Values {
+	query := url.Values{}
+	setQuery(query, "start", input.Start)
+	setQuery(query, "end", input.End)
 	return query
 }
 

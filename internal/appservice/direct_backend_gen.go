@@ -243,6 +243,16 @@ func (b *DirectBackend) ListConversationMessages(ctx context.Context, meta Reque
 	return b.ops.ListConversationMessages(ctx, meta, identity, conversationID, input)
 }
 
+// ReadConversationMessageWindow 重读已加载首尾游标之间的完整消息范围。
+func (b *DirectBackend) ReadConversationMessageWindow(ctx context.Context, meta RequestMeta, conversationID string, input ConversationMessageWindowInput) (ConversationMessageList, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero ConversationMessageList
+		return zero, err
+	}
+	return b.ops.ReadConversationMessageWindow(ctx, meta, identity, conversationID, input)
+}
+
 // ListConversationMessageReferences 读取当前窗口的引用摘要和回复可用状态。
 func (b *DirectBackend) ListConversationMessageReferences(ctx context.Context, meta RequestMeta, conversationID string, input ConversationMessageReferenceListInput) (ConversationMessageReferenceList, error) {
 	identity, err := b.ops.authenticate(ctx, meta)

@@ -114,6 +114,11 @@ func (s *Service) ListConversationMessages(ctx context.Context, meta RequestMeta
 	return withNormalizedSlices(s.backend.ListConversationMessages(ctx, meta, conversationID, input))
 }
 
+// ReadConversationMessageWindow 重读已加载首尾游标之间的完整消息范围。
+func (s *Service) ReadConversationMessageWindow(ctx context.Context, meta RequestMeta, conversationID string, input ConversationMessageWindowInput) (ConversationMessageList, error) {
+	return withNormalizedSlices(s.backend.ReadConversationMessageWindow(ctx, meta, conversationID, input))
+}
+
 // ListConversationMessageReferences 读取当前窗口的引用摘要和回复可用状态。
 func (s *Service) ListConversationMessageReferences(ctx context.Context, meta RequestMeta, conversationID string, input ConversationMessageReferenceListInput) (ConversationMessageReferenceList, error) {
 	return withNormalizedSlices(s.backend.ListConversationMessageReferences(ctx, meta, conversationID, input))

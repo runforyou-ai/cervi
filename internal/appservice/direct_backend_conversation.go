@@ -436,6 +436,20 @@ func (o *directOperations) ListConversationMessages(ctx context.Context, meta Re
 	return o.conversationMessageListFromAction(ctx, meta, identity, conversationID, history)
 }
 
+// ReadConversationMessageWindow 重读已加载首尾游标之间的完整消息范围。
+func (o *directOperations) ReadConversationMessageWindow(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, input ConversationMessageWindowInput) (ConversationMessageList, error) {
+	start, validStart := decodeConversationMessageCursor(input.Start, conversationID)
+	end, validEnd := decodeConversationMessageCursor(input.End, conversationID)
+	if !validStart || !validEnd || start.MessageSeq > end.MessageSeq {
+		return ConversationMessageList{}, InvalidError(meta, cervii18n.ErrorValidationFailed, map[string]cervii18n.Key{"cursor": cervii18n.FieldMessageCursorInvalid})
+	}
+	history, err := o.listConversationMessages.Execute(ctx, identity, conversationaction.ConversationMessageHistoryInput{ConversationID: conversationID, Start: &start, End: &end})
+	if err != nil {
+		return ConversationMessageList{}, conversationMessageError(ctx, meta, err, identity.Organization.ID, conversationID)
+	}
+	return o.conversationMessageListFromAction(ctx, meta, identity, conversationID, history)
+}
+
 // MarkConversationRead 单调推进当前用户的会话已读水位。
 func (o *directOperations) MarkConversationRead(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, input MarkConversationReadInput) (ConversationReadState, error) {
 	state, err := o.markConversationRead.Execute(ctx, identity, conversationID, input.LastReadMessageID, input.ClearUnreadMark)

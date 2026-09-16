@@ -45,6 +45,7 @@ import { previousDayKey } from "@/features/inbox/calendar"
 import { mentionTokenPattern } from "@/lib/mention-token"
 import { resources, supportedLanguages } from "@/i18n/resources"
 import { useMemberChatPollingActive } from "@/features/inbox/use-member-chat-polling"
+import { useRealtimeSyncActive } from "@/contexts/realtime-sync-context"
 import { useOutgoingMessageStore } from "@/features/inbox/outgoing-message-context"
 import {
   coveredByWindow,
@@ -266,13 +267,16 @@ function ConversationTimelineContent({
   const navigate = useNavigate()
   const timeZone = useUserTimeZone()
   const pollingActive = useMemberChatPollingActive({ requireWindowFocus })
+  const realtime = useRealtimeSyncActive()
   const scrollRootRef = useRef<HTMLDivElement>(null)
+  const keepPositionRef = useRef<(() => void) | null>(null)
   const invalidate = useResourceInvalidator()
-  const timeline = useConversationTimeline(
+  const timeline = useConversationTimeline({
     conversationID,
-    pollingActive,
     enabled,
-  )
+    pollingActive,
+    keepPosition: keepPositionRef,
+  })
   const currentPage = timeline.page
   const { loading, error, refresh } = timeline
   const outgoingStore = useOutgoingMessageStore()
@@ -297,7 +301,7 @@ function ConversationTimelineContent({
     {
       enabled: enabled && customerDeliveries && Boolean(deliveryMessageIDs),
       keepPreviousData: true,
-      refetchInterval: pollingActive ? 2000 : false,
+      refetchInterval: pollingActive && !realtime ? 2000 : false,
     },
   )
   const references = useResource(
@@ -306,7 +310,7 @@ function ConversationTimelineContent({
     {
       enabled: enabled && customerDeliveries && Boolean(deliveryMessageIDs),
       keepPreviousData: true,
-      refetchInterval: pollingActive ? 2000 : false,
+      refetchInterval: pollingActive && !realtime ? 2000 : false,
     },
   )
   const referencesByMessage = new Map(references.data?.states.map((state) => [state.messageId, state]))
@@ -319,6 +323,8 @@ function ConversationTimelineContent({
     visibleCount: visibleMessages.length,
     sentCount: outgoingMessages.length,
   })
+  // 窗口重读在读取完成后同步合入，合入前通过最新的视口入口保存阅读位置。
+  keepPositionRef.current = viewport.keepReadingPosition
   const location = useConversationMessageNavigation({
     root: scrollRootRef,
     page: currentPage,
@@ -350,8 +356,8 @@ function ConversationTimelineContent({
   }, [conversationID, invalidate, onUnavailable])
 
   useEffect(() => {
-    if (isNotFoundApiError(error) || isNotFoundApiError(timeline.pollingError)) handleUnavailable()
-  }, [error, timeline.pollingError, handleUnavailable])
+    if (isNotFoundApiError(error) || isNotFoundApiError(timeline.refreshError)) handleUnavailable()
+  }, [error, timeline.refreshError, handleUnavailable])
 
   const mentions = useConversationMentionNavigation({
     conversationID,
@@ -422,7 +428,8 @@ function ConversationTimelineContent({
       await location.locate(messageID)
     } catch (error) {
       if (isApiError(error) && error.reason === "message_unavailable") {
-        timeline.markReferenceUnavailable(messageID)
+        // 重读当前窗口，引用状态以服务端结果为准。
+        void timeline.refresh()
         toast.message(t("messageOriginalDeleted"))
       } else if (
         isApiError(error) &&
@@ -1013,7 +1020,7 @@ function ConversationTimelineContent({
             <AgentRunState
               key={currentPage.latestAgentRun.id}
               run={currentPage.latestAgentRun}
-              onStopped={timeline.poll}
+              onStopped={timeline.refresh}
               conversationID={
                 conversationType === ConversationType.ConversationTypeAgent ||
                 conversationType === ConversationType.ConversationTypeGroup
@@ -1053,13 +1060,12 @@ function ConversationTimelineContent({
           ) : null}
         </div>
       </ScrollArea>
-      {(timeline.pollingError || (error && !currentPage)) &&
-      timeline.mode === "latest" ? (
+      {timeline.refreshError || (error && !currentPage) ? (
         <button
           type="button"
           className="absolute top-2 left-1/2 z-10 min-h-8 -translate-x-1/2 rounded-full border bg-background/95 px-3 text-xs text-warning shadow-sm backdrop-blur"
           disabled={loading}
-          onClick={() => void (currentPage ? timeline.poll() : refresh())}
+          onClick={() => void refresh()}
         >
           {currentPage
             ? t("messagesRefreshError")

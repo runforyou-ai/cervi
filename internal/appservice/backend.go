@@ -92,6 +92,9 @@ type Backend interface {
 	// ListConversationMessages 返回成员可见的会话消息。
 	//cervi:route GET /conversations/:conversationID/messages
 	ListConversationMessages(context.Context, RequestMeta, string, ConversationMessageListInput) (ConversationMessageList, error)
+	// ReadConversationMessageWindow 重读已加载首尾游标之间的完整消息范围。
+	//cervi:route GET /conversations/:conversationID/message-window
+	ReadConversationMessageWindow(context.Context, RequestMeta, string, ConversationMessageWindowInput) (ConversationMessageList, error)
 	// ListConversationMessageReferences 读取当前窗口的引用摘要和回复可用状态。
 	//cervi:route GET /conversations/:conversationID/message-references
 	ListConversationMessageReferences(context.Context, RequestMeta, string, ConversationMessageReferenceListInput) (ConversationMessageReferenceList, error)

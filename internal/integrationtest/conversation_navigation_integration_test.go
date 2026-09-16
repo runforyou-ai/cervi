@@ -278,6 +278,61 @@ func TestGroupMessageContextAndOrder(t *testing.T) {
 	}
 }
 
+// TestConversationMessageWindowRange 验证按首尾游标重读包含两端的完整范围、删除后的边界与非法范围。
+func TestConversationMessageWindowRange(t *testing.T) {
+	f := newNavigationFixture(t)
+	ctx := context.Background()
+	messages := make([]conversationaction.ConversationMessage, 60)
+	for index := range messages {
+		messages[index] = f.send(t, f.owner, fmt.Sprintf("范围消息 %d", index), false)
+	}
+	history := conversationaction.NewListConversationMessagesQuery(f.db)
+	point := func(message conversationaction.ConversationMessage) *conversationaction.MessageCursorPoint {
+		return &conversationaction.MessageCursorPoint{ID: message.ID, MessageSeq: message.MessageSeq}
+	}
+	window, err := history.Execute(ctx, f.member, conversationaction.ConversationMessageHistoryInput{ConversationID: f.groupID, Start: point(messages[5]), End: point(messages[58])})
+	if err != nil || len(window.Messages) != 54 || window.Messages[0].ID != messages[5].ID || window.Messages[53].ID != messages[58].ID || !window.HasEarlier || !window.HasLater {
+		t.Fatalf("window count=%d err=%v", len(window.Messages), err)
+	}
+	// 删除两端消息后，边界收缩到仍可见的首尾消息，续读判断不变。
+	deleted := []string{messages[5].ID, messages[30].ID, messages[58].ID}
+	if _, err := f.db.NewUpdate().Model((*servermodels.Message)(nil)).Set("deleted_at = now()").Where("id IN (?)", bun.In(deleted)).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	window, err = history.Execute(ctx, f.member, conversationaction.ConversationMessageHistoryInput{ConversationID: f.groupID, Start: point(messages[5]), End: point(messages[58])})
+	if err != nil || len(window.Messages) != 51 || window.Before == nil || window.Before.ID != messages[6].ID || window.After == nil || window.After.ID != messages[57].ID || !window.HasEarlier || !window.HasLater {
+		t.Fatalf("deleted window=%+v err=%v", window.Before, err)
+	}
+	if slices.ContainsFunc(window.Messages, func(message conversationaction.ConversationMessage) bool { return message.ID == messages[30].ID }) {
+		t.Fatal("deleted message stays in window")
+	}
+	// 范围内全部消息删除时保留请求的首尾游标。
+	window, err = history.Execute(ctx, f.member, conversationaction.ConversationMessageHistoryInput{ConversationID: f.groupID, Start: point(messages[58]), End: point(messages[58])})
+	if err != nil || len(window.Messages) != 0 || window.Before == nil || window.Before.ID != messages[58].ID || window.After == nil || window.After.ID != messages[58].ID || !window.HasEarlier || !window.HasLater {
+		t.Fatalf("empty window=%+v err=%v", window, err)
+	}
+	window, err = history.Execute(ctx, f.member, conversationaction.ConversationMessageHistoryInput{ConversationID: f.groupID, Start: point(messages[0]), End: point(messages[59])})
+	if err != nil || len(window.Messages) != 57 || window.HasEarlier || window.HasLater {
+		t.Fatalf("full window count=%d err=%v", len(window.Messages), err)
+	}
+	var validation *conversationaction.ValidationError
+	for name, input := range map[string]conversationaction.ConversationMessageHistoryInput{
+		"reversed":  {ConversationID: f.groupID, Start: point(messages[40]), End: point(messages[10])},
+		"open end":  {ConversationID: f.groupID, Start: point(messages[10])},
+		"mixed":     {ConversationID: f.groupID, Start: point(messages[10]), End: point(messages[20]), After: point(messages[10])},
+		"no access": {ConversationID: uuid.NewV7().String(), Start: point(messages[10]), End: point(messages[20])},
+	} {
+		_, err := history.Execute(ctx, f.member, input)
+		if name == "no access" {
+			if !errors.Is(err, conversationaction.ErrConversationNotFound) {
+				t.Fatalf("%s: %v", name, err)
+			}
+		} else if !errors.As(err, &validation) {
+			t.Fatalf("%s: %v", name, err)
+		}
+	}
+}
+
 type navigationWriteBarrier struct {
 	body             string
 	entered, release chan struct{}

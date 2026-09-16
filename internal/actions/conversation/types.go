@@ -233,12 +233,14 @@ type ConversationMessage struct {
 	MentionAll       bool
 }
 
-// ConversationMessageHistoryInput 定义成员消息历史查询方向。
+// ConversationMessageHistoryInput 定义成员消息历史查询方向；Start 与 End 同时提供时读取包含两端的连续范围。
 type ConversationMessageHistoryInput struct {
 	ConversationID  string
 	Before          *MessageCursorPoint
 	After           *MessageCursorPoint
 	AroundMessageID string
+	Start           *MessageCursorPoint
+	End             *MessageCursorPoint
 }
 
 // ConversationMessageHistory 定义成员消息历史和下一页边界。

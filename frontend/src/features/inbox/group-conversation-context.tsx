@@ -386,7 +386,7 @@ export function GroupConversationContext({
   async function refreshGroup() {
     await Promise.all([
       invalidate(resourceKeys.groupConversation(conversationID), { exact: true }),
-      invalidate(resourceKeys.conversationMessages(conversationID), { exact: true }),
+      invalidate(resourceKeys.conversationMessages(conversationID)),
       invalidate(resourceKeys.inbox()),
     ])
   }
@@ -431,7 +431,6 @@ export function GroupConversationContext({
         refetchType: "none",
       }),
       invalidate(resourceKeys.conversationMessages(conversationID), {
-        exact: true,
         refetchType: "none",
       }),
       invalidate(resourceKeys.inbox()),
