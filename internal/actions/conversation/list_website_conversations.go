@@ -4,14 +4,11 @@ package conversation
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"fmt"
 	"time"
 
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
 
@@ -52,17 +49,12 @@ func (q *ListWebsiteConversationsQuery) Execute(ctx context.Context, channelID, 
 	if err != nil {
 		return nil, err
 	}
-	identity := &servermodels.ContactChannelIdentity{}
-	err = q.db.NewSelect().Model(identity).
-		Where("cci.organization_id = ?", channel.OrganizationID).
-		Where("cci.channel_id = ?", channel.ID).
-		Where("cci.external_id = ?", externalID).
-		Scan(ctx)
-	if errors.Is(err, sql.ErrNoRows) {
-		return []ConversationSummary{}, nil
-	}
+	identity, found, err := loadWebsiteVisitorIdentity(ctx, q.db, channel, externalID)
 	if err != nil {
-		return nil, fmt.Errorf("load website conversation identity: %w", err)
+		return nil, err
+	}
+	if !found {
+		return []ConversationSummary{}, nil
 	}
 	var rows []conversationSummaryRow
 	err = q.db.NewSelect().

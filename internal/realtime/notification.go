@@ -51,6 +51,11 @@ func CustomerInboxConversationChanged(organizationID, conversationID string, ver
 	return Notification{OrganizationID: organizationID, AudienceKind: AudienceCustomerInbox, AudienceID: organizationID, Kind: KindConversationChanged, ConversationID: conversationID, Version: version}
 }
 
+// VisitorDirectoryConversationChanged 构造发往网站渠道身份受众的客户线程变更通知，受众 ID 为渠道身份记录 ID。
+func VisitorDirectoryConversationChanged(organizationID, channelIdentityID, conversationID string, version int64) Notification {
+	return Notification{OrganizationID: organizationID, AudienceKind: AudienceVisitorDirectory, AudienceID: channelIdentityID, Kind: KindConversationChanged, ConversationID: conversationID, Version: version}
+}
+
 // UserConversationRemoved 构造发往失去会话阅读资格用户的会话失权通知，载荷不含版本。
 func UserConversationRemoved(organizationID, userID, conversationID string) Notification {
 	return Notification{OrganizationID: organizationID, AudienceKind: AudienceUser, AudienceID: userID, Kind: KindConversationRemoved, ConversationID: conversationID}

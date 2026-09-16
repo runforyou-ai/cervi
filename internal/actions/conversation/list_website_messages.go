@@ -4,8 +4,6 @@ package conversation
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 	"fmt"
 	"slices"
 	"time"
@@ -13,7 +11,6 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/storage/server/messagequery"
-	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
 
@@ -56,17 +53,12 @@ func (q *ListWebsiteMessagesQuery) Execute(ctx context.Context, input MessageHis
 	if err != nil {
 		return MessageHistory{}, err
 	}
-	identity := &servermodels.ContactChannelIdentity{}
-	err = q.db.NewSelect().Model(identity).
-		Where("cci.organization_id = ?", channel.OrganizationID).
-		Where("cci.channel_id = ?", channel.ID).
-		Where("cci.external_id = ?", input.ExternalID).
-		Scan(ctx)
-	if errors.Is(err, sql.ErrNoRows) {
-		return MessageHistory{}, ErrConversationNotFound
-	}
+	identity, found, err := loadWebsiteVisitorIdentity(ctx, q.db, channel, input.ExternalID)
 	if err != nil {
-		return MessageHistory{}, fmt.Errorf("load website message identity: %w", err)
+		return MessageHistory{}, err
+	}
+	if !found {
+		return MessageHistory{}, ErrConversationNotFound
 	}
 	owned, err := q.db.NewSelect().
 		TableExpr("customer_conversations AS cc").
