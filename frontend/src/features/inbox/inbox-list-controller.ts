@@ -152,8 +152,8 @@ export class InboxListController {
     return this.completion
   }
 
-  /** 轮询失败时主动重读原窗口，其余失败重试原操作。 */
-  retry = () => this.request(this.state.error === "poll" ? "refresh" : this.state.error ?? "refresh")
+  /** 重试上次失败的操作，没有失败记录时重读原窗口。 */
+  retry = () => this.request(this.state.error ?? "refresh")
 
   /** 补页收尾后捕获刷新范围，失败时保留已确认的窗口。 */
   private async drain() {
@@ -165,7 +165,6 @@ export class InboxListController {
         const operation = this.queue.shift()!
         const window = this.deferred ?? this.state
         if ((operation === "before" && !window.hasBefore) || (operation === "after" && !window.hasAfter)) continue
-        if (operation === "poll" && this.state.error) continue
         this.publish({
           operation, error: null,
           status: this.state.revision === 0 ? "initial" : operation === "before" || operation === "after" ? "loadingMore" : "refreshing",

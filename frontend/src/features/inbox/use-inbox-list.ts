@@ -108,11 +108,14 @@ export function useInboxList(input: InboxQuery, viewport: InboxListViewport, opt
     }
   }), [client, controller])
   // 列表窗口重读登记为挂载中的查询，首次读取、同步失效、失败重试与前台轮询共用同一入口。
-  useResource(
+  const sync = useResource(
     resourceKeys.inbox({ ...owner, ...query, view }),
     async () => {
       await controller.request("poll")
-      return controller.getSnapshot().revision
+      const { error, revision } = controller.getSnapshot()
+      // 控制器读取失败时该查询同样失败，由统一的失败重试接管。
+      if (error) throw new Error(`读取收件箱窗口失败：${error}`)
+      return revision
     },
     {
       staleTime: 0,
@@ -120,6 +123,13 @@ export function useInboxList(input: InboxQuery, viewport: InboxListViewport, opt
       refetchOnWindowFocus: false,
     },
   )
+  const refresh = sync.refresh
+  const wasActive = useRef(active)
+  useEffect(() => {
+    // 未接入实时同步的外壳回到前台时立即重读当前窗口。
+    if (active && !wasActive.current && !realtime) void refresh({ cancelRefetch: false })
+    wasActive.current = active
+  }, [active, realtime, refresh])
 
   const conversations = new Map(rows.data?.results.flatMap((row) => row.availability === "matching" && row.conversation ? [[row.id, row.conversation] as const] : []) ?? [])
   return {

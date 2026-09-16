@@ -459,6 +459,22 @@ test("尚未开始的重读合并重复通知，在途读取不吞掉新到达�
   assert.equal(f.controller.getSnapshot().ids.length, 50)
 })
 
+test("读取失败后到达的变更通知继续重读并恢复窗口", async () => {
+  const f = fixture()
+  await f.controller.request("initial")
+  await f.controller.request("after")
+  f.top(false)
+  const read = f.ports.window
+  f.ports.window = async () => { throw new Error("offline") }
+  await f.controller.request("poll")
+  assert.equal(f.controller.getSnapshot().error, "poll")
+  f.ports.window = read
+  await f.controller.request("poll")
+  assert.equal(f.controller.getSnapshot().error, null)
+  assert.equal(f.controller.getSnapshot().ids.length, 100)
+  assert.equal(f.controller.getSnapshot().endCursor, "p100")
+})
+
 test("列表加载到尾端后新增的会话仍可经变更通知发现", async () => {
   const f = fixture()
   let added = false
