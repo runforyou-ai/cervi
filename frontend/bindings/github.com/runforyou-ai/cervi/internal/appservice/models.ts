@@ -1866,11 +1866,12 @@ export interface KnowledgeDocumentPreviewRequest {
 }
 
 /**
- * KnowledgeDocumentSegment 定义可阅读和定位的分段正文。
+ * KnowledgeDocumentSegment 定义可阅读和定位的分段正文，上下文为分段所属的标题路径和表头。
  */
 export interface KnowledgeDocumentSegment {
     "id": string;
     "position": number;
+    "context": string;
     "content": string;
     "characterCount": number;
 }
@@ -2032,6 +2033,7 @@ export interface KnowledgeRetrievalRecord {
     "segmentId": string;
     "segmentBatchId": string;
     "position": number;
+    "context": string;
     "content": string;
     "answer": string;
     "score": number;

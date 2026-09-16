@@ -69,7 +69,8 @@ func (a *ProcessQAEntryAction) Execute(ctx context.Context, input ProcessQAInput
 	for _, content := range contents {
 		if content.Kind == domain.KnowledgeQAContentAnswer {
 			for _, segment := range textsplit.Split(content.Content, domain.KnowledgeQAChunkLength, domain.KnowledgeQAChunkOverlap) {
-				segments = append(segments, textsplit.Segment{Position: len(segments) + 1, Content: segment.Content, CharacterCount: segment.CharacterCount})
+				segment.Position = len(segments) + 1
+				segments = append(segments, segment)
 			}
 			continue
 		}
@@ -84,7 +85,7 @@ func (a *ProcessQAEntryAction) Execute(ctx context.Context, input ProcessQAInput
 	}
 	texts := make([]string, 0, len(segments))
 	for _, segment := range segments {
-		texts = append(texts, segment.Content)
+		texts = append(texts, textsplit.IndexText(segment.Context, segment.Content))
 	}
 	vectors, err := a.embedder.Embed(ctx, credential, input.EmbeddingModelIdentifier, input.EmbeddingDimension, texts)
 	if err != nil {

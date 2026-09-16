@@ -98,7 +98,7 @@ func (a *ProcessDocumentAction) Execute(ctx context.Context, input ProcessInput)
 	}
 	contents := make([]string, 0, len(segments))
 	for _, segment := range segments {
-		contents = append(contents, segment.Content)
+		contents = append(contents, textsplit.IndexText(segment.Context, segment.Content))
 	}
 	vectors, err := a.embedder.Embed(ctx, credential, input.EmbeddingModelIdentifier, input.EmbeddingDimension, contents)
 	if err != nil {

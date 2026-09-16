@@ -126,7 +126,7 @@ func (o *directOperations) ListKnowledgeDocumentSegments(ctx context.Context, me
 	}
 	output := KnowledgeDocumentSegmentPage{SegmentBatchID: page.SegmentBatchID, Page: PageInfo{Number: page.Page, Size: page.PageSize, Total: page.Total}, AnchorSegmentID: page.AnchorSegmentID, AnchorPosition: page.AnchorPosition, Segments: make([]KnowledgeDocumentSegment, 0, len(page.Segments))}
 	for _, segment := range page.Segments {
-		output.Segments = append(output.Segments, KnowledgeDocumentSegment{ID: segment.ID, Position: segment.Position, Content: segment.Content, CharacterCount: segment.CharacterCount})
+		output.Segments = append(output.Segments, KnowledgeDocumentSegment{ID: segment.ID, Position: segment.Position, Context: segment.Context, Content: segment.Content, CharacterCount: segment.CharacterCount})
 	}
 	return output, nil
 }

@@ -39,7 +39,7 @@ func TestKnowledgeBaseDeleteWaitsForQAPublish(t *testing.T) {
 	if _, err := publish.NewSelect().Model((*servermodels.KnowledgeQAEntry)(nil)).Column("id").Where("kqe.id = ?", entry.ID).For("UPDATE").Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := publish.NewRaw("INSERT INTO public.knowledge_segments (id, organization_id, knowledge_base_id, source_type, source_id, segment_batch_id, position, character_count, content) VALUES (?, ?, ?, ?, ?, ?, 1, 2, '退款')",
+	if _, err := publish.NewRaw("INSERT INTO public.knowledge_segments (id, organization_id, knowledge_base_id, source_type, source_id, segment_batch_id, position, character_count, context, content) VALUES (?, ?, ?, ?, ?, ?, 1, 2, '', '退款')",
 		uuid.NewV7().String(), identity.Organization.ID, base.ID, domain.KnowledgeSourceQAEntry, entry.ID, uuid.NewV7().String()).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
