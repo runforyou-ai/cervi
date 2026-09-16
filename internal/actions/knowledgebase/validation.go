@@ -24,6 +24,7 @@ const (
 	ValidationDocumentTitleTooLong    common.FieldCode = "KNOWLEDGE_DOCUMENT_TITLE_TOO_LONG"
 	ValidationDocumentContentRequired common.FieldCode = "KNOWLEDGE_DOCUMENT_CONTENT_REQUIRED"
 	ValidationDocumentGroupInvalid    common.FieldCode = "KNOWLEDGE_DOCUMENT_GROUP_INVALID"
+	ValidationDocumentURLInvalid      common.FieldCode = "KNOWLEDGE_DOCUMENT_URL_INVALID"
 
 	ValidationQAQuestionRequired common.FieldCode = "KNOWLEDGE_QA_QUESTION_REQUIRED"
 	ValidationQAAnswerRequired   common.FieldCode = "KNOWLEDGE_QA_ANSWER_REQUIRED"

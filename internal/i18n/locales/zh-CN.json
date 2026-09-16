@@ -32,6 +32,11 @@
   "field.knowledge_document_title_too_long": "文档名称不能超过 120 个字符。",
   "field.knowledge_document_content_required": "请输入文档正文。",
   "field.knowledge_document_group_invalid": "请选择所属分组。",
+  "field.knowledge_document_url_invalid": "请输入以 http 或 https 开头的网页地址。",
+  "error.knowledge_document_url_duplicate": "该网页已导入到这个知识库。",
+  "error.knowledge_page_unreachable": "读取网页失败，请检查地址是否可访问。",
+  "error.knowledge_page_unsupported": "该地址返回的内容不是网页或纯文本。",
+  "error.knowledge_page_too_large": "网页内容超过 10 MB。",
 
   "error.agent_reply_stop_failed": "停止 AI 回复失败，请重试。",
   "error.agent_unavailable": "这个 AI 员工当前不可用。",

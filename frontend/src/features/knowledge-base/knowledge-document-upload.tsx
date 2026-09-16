@@ -13,6 +13,7 @@ import { AttachmentName } from "@/components/attachment-name"
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog"
 import { formatFileSize } from "@/lib/file-size"
 import { useKnowledgeDocumentUpload, knowledgeDocumentFormats } from "./use-knowledge-document-upload"
+import { KnowledgeWebImportDialog } from "./knowledge-web-import-dialog"
 
 /** 在文档列表中提供新增入口、显示批次进度并保留失败重试入口。 */
 export function KnowledgeDocumentUpload({ baseId, groupId }: { baseId: string; groupId: string }) {
@@ -20,6 +21,7 @@ export function KnowledgeDocumentUpload({ baseId, groupId }: { baseId: string; g
   const picker = useRef<HTMLInputElement>(null)
   const trigger = useRef<HTMLButtonElement>(null)
   const [dragging, setDragging] = useState(false)
+  const [importing, setImporting] = useState(false)
   const { open, busy, items, run, select, close, show } = useKnowledgeDocumentUpload({ baseId, groupId })
   const selected = items.length > 0
   return (
@@ -40,6 +42,9 @@ export function KnowledgeDocumentUpload({ baseId, groupId }: { baseId: string; g
             >
               {t("documents.create.write")}
             </Link>
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => setImporting(true)}>
+            {t("documents.create.import")}
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
@@ -135,6 +140,13 @@ export function KnowledgeDocumentUpload({ baseId, groupId }: { baseId: string; g
           </div>
         </DialogContent>
       </Dialog>
+      <KnowledgeWebImportDialog
+        baseId={baseId}
+        groupId={groupId}
+        open={importing}
+        triggerRef={trigger}
+        onClose={() => setImporting(false)}
+      />
     </>
   )
 }

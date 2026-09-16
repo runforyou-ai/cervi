@@ -178,6 +178,13 @@ export function CreateKnowledgeTextDocument(meta: $models.RequestMeta, knowledge
 }
 
 /**
+ * CreateKnowledgeWebDocument 导入网页并安排首次抓取。
+ */
+export function CreateKnowledgeWebDocument(meta: $models.RequestMeta, knowledgeBaseID: string, input: $models.KnowledgeWebDocumentInput): $CancellablePromise<$models.KnowledgeDocument> {
+    return $Call.ByID(1630833413, meta, knowledgeBaseID, input);
+}
+
+/**
  * CreateMCPServer 创建 MCP 服务。
  */
 export function CreateMCPServer(meta: $models.RequestMeta, input: $models.MCPServerInput): $CancellablePromise<$models.MCPServer> {
@@ -826,6 +833,13 @@ export function ReadInboxConversations(meta: $models.RequestMeta, input: $models
  */
 export function ReadInboxWindow(meta: $models.RequestMeta, input: $models.InboxWindowInput): $CancellablePromise<$models.InboxWindow> {
     return $Call.ByID(2805575182, meta, input);
+}
+
+/**
+ * RefetchKnowledgeDocument 重新抓取网页文档并重新索引。
+ */
+export function RefetchKnowledgeDocument(meta: $models.RequestMeta, knowledgeBaseID: string, documentID: string, input: $models.KnowledgeDocumentRefetchInput): $CancellablePromise<void> {
+    return $Call.ByID(1596600466, meta, knowledgeBaseID, documentID, input);
 }
 
 /**

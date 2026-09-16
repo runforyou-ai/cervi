@@ -26,12 +26,12 @@ func loadKnowledgeDocument(t *testing.T, db *bun.DB, documentID string) *serverm
 	return document
 }
 
-// runDocumentProcessing 按文档当前的任务快照执行一次处理。
-func runDocumentProcessing(t *testing.T, db *bun.DB, probe *retrievalProbe, organizationID, baseID, documentID string) {
+// runDocumentProcessing 按文档当前的任务快照执行一次处理，fetchPage 表示本次是否重新抓取网页。
+func runDocumentProcessing(t *testing.T, db *bun.DB, probe *retrievalProbe, organizationID, baseID, documentID string, fetchPage bool) {
 	t.Helper()
 	document := loadKnowledgeDocument(t, db, documentID)
-	err := knowledgeaction.NewProcessDocumentAction(db, probe, probe, probe).Execute(context.Background(), knowledgeaction.ProcessInput{
-		OrganizationID: organizationID, KnowledgeBaseID: baseID, DocumentID: documentID, SourceKind: document.SourceKind, ProcessingID: document.ProcessingID,
+	err := knowledgeaction.NewProcessDocumentAction(db, probe, probe, probe, probe).Execute(context.Background(), knowledgeaction.ProcessInput{
+		OrganizationID: organizationID, KnowledgeBaseID: baseID, DocumentID: documentID, SourceKind: document.SourceKind, FetchPage: fetchPage, ProcessingID: document.ProcessingID,
 		ChunkLength: document.ChunkLength, ChunkOverlap: document.ChunkOverlap,
 		EmbeddingProviderID: document.EmbeddingProviderID, EmbeddingModelIdentifier: document.EmbeddingModelIdentifier, EmbeddingDimension: document.EmbeddingDimension,
 	})
@@ -68,7 +68,7 @@ func TestKnowledgeTextDocumentLifecycle(t *testing.T) {
 		t.Fatalf("document=%+v", document)
 	}
 
-	runDocumentProcessing(t, db, probe, identity.Organization.ID, base.ID, created.ID)
+	runDocumentProcessing(t, db, probe, identity.Organization.ID, base.ID, created.ID, false)
 	document = loadKnowledgeDocument(t, db, created.ID)
 	if document.Status != domain.KnowledgeIndexSucceeded || document.SegmentBatchID != document.ProcessingID || document.SegmentCount == 0 {
 		t.Fatalf("document=%+v", document)
@@ -101,7 +101,7 @@ func TestKnowledgeTextDocumentLifecycle(t *testing.T) {
 	if document.ProcessingID == published || document.Status != domain.KnowledgeIndexQueued || document.SegmentBatchID != published {
 		t.Fatalf("document=%+v", document)
 	}
-	runDocumentProcessing(t, db, probe, identity.Organization.ID, base.ID, created.ID)
+	runDocumentProcessing(t, db, probe, identity.Organization.ID, base.ID, created.ID, false)
 	document = loadKnowledgeDocument(t, db, created.ID)
 	if document.SegmentBatchID != document.ProcessingID || document.Status != domain.KnowledgeIndexSucceeded {
 		t.Fatalf("document=%+v", document)

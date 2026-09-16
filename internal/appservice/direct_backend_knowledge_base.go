@@ -25,6 +25,7 @@ type knowledgeOps struct {
 	documentQuery        *knowledgebaseaction.DocumentQuery
 	createDocuments      *knowledgebaseaction.CreateDocumentsAction
 	saveTextDocument     *knowledgebaseaction.SaveTextDocumentAction
+	createWebDocument    *knowledgebaseaction.CreateWebDocumentAction
 	renameDocument       *knowledgebaseaction.RenameDocumentAction
 	documentProcessing   *knowledgebaseaction.DocumentProcessing
 	documentConverter    *documentconvert.Client
@@ -53,6 +54,7 @@ func newKnowledgeOps(db *bun.DB, taskEnqueuer servertask.TxEnqueuer, documentQue
 		documentQuery:        documentQuery,
 		createDocuments:      knowledgebaseaction.NewCreateDocumentsAction(db, taskEnqueuer),
 		saveTextDocument:     knowledgebaseaction.NewSaveTextDocumentAction(db, taskEnqueuer),
+		createWebDocument:    knowledgebaseaction.NewCreateWebDocumentAction(db, taskEnqueuer),
 		renameDocument:       knowledgebaseaction.NewRenameDocumentAction(db),
 		documentProcessing:   knowledgebaseaction.NewDocumentProcessing(db, taskEnqueuer),
 		documentConverter:    documentConverter,
@@ -256,6 +258,9 @@ func (o *directOperations) knowledgeBaseError(ctx context.Context, meta RequestM
 	if errors.Is(err, knowledgebaseaction.ErrDocumentSourceUnsupported) {
 		return InvalidError(meta, cervii18n.ErrorKnowledgeDocumentSourceUnsupported, nil)
 	}
+	if errors.Is(err, knowledgebaseaction.ErrDocumentURLDuplicate) {
+		return ConflictError(meta, cervii18n.ErrorKnowledgeDocumentURLDuplicate, "document_url_duplicate")
+	}
 	if errors.Is(err, knowledgebaseaction.ErrDocumentBatchInvalid) {
 		return InvalidError(meta, cervii18n.ErrorKnowledgeDocumentBatchInvalid, nil)
 	}
@@ -338,6 +343,7 @@ func knowledgeBaseFieldKeys(fields map[string]common.FieldCode) map[string]cervi
 		knowledgebaseaction.ValidationDocumentTitleTooLong:    cervii18n.FieldKnowledgeDocumentTitleTooLong,
 		knowledgebaseaction.ValidationDocumentContentRequired: cervii18n.FieldKnowledgeDocumentContentRequired,
 		knowledgebaseaction.ValidationDocumentGroupInvalid:    cervii18n.FieldKnowledgeDocumentGroupInvalid,
+		knowledgebaseaction.ValidationDocumentURLInvalid:      cervii18n.FieldKnowledgeDocumentURLInvalid,
 
 		knowledgebaseaction.ValidationQAQuestionRequired: cervii18n.FieldKnowledgeQAQuestionRequired,
 		knowledgebaseaction.ValidationQAAnswerRequired:   cervii18n.FieldKnowledgeQAAnswerRequired,

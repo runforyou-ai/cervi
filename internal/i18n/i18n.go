@@ -40,6 +40,11 @@ const (
 	FieldKnowledgeDocumentTitleTooLong      Key = "field.knowledge_document_title_too_long"
 	FieldKnowledgeDocumentContentRequired   Key = "field.knowledge_document_content_required"
 	FieldKnowledgeDocumentGroupInvalid      Key = "field.knowledge_document_group_invalid"
+	FieldKnowledgeDocumentURLInvalid        Key = "field.knowledge_document_url_invalid"
+	ErrorKnowledgeDocumentURLDuplicate      Key = "error.knowledge_document_url_duplicate"
+	ErrorKnowledgePageUnreachable           Key = "error.knowledge_page_unreachable"
+	ErrorKnowledgePageUnsupported           Key = "error.knowledge_page_unsupported"
+	ErrorKnowledgePageTooLarge              Key = "error.knowledge_page_too_large"
 
 	ErrorAgentReplyStopFailed            Key = "error.agent_reply_stop_failed"
 	ErrorAgentUnavailable                Key = "error.agent_unavailable"

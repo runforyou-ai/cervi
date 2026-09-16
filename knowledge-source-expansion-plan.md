@@ -102,6 +102,7 @@
 - 按响应内容类型选择转换文件名：`text/html` 与 `application/xhtml+xml` 用 `.html`，`text/plain` 用 `.txt`，其余返回 `url_content_unsupported`。内容类型缺省时按 `url_content_unsupported` 处理，不做内容嗅探。PDF 与 Office 文件仍按上传原件入库。
 - 固定 User-Agent 标识来自 Cervi 知识库导入。
 - 不执行 JavaScript。依赖前端渲染的帮助中心会得到空壳并以 `empty_content` 失败，属于本轮已知限制。
+- 转换整页 HTML，不做正文提取，导航、页脚等页面结构会一并进入正文，属于本轮已知限制。
 - 非 UTF-8 编码的页面本轮不做转码，按 markitdown 的输出结果入库。
 
 不做内网地址与私有网段拦截：私有化部署的企业内网文档站点是本能力的实际来源之一。SSRF 与抓取频率控制列入上线前的安全与容量专项。

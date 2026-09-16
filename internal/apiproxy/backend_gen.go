@@ -867,6 +867,19 @@ func (b *Backend) RenameKnowledgeDocument(ctx context.Context, meta appservice.R
 	return output, err
 }
 
+// CreateKnowledgeWebDocument 导入网页并安排首次抓取。
+func (b *Backend) CreateKnowledgeWebDocument(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, input appservice.KnowledgeWebDocumentInput) (appservice.KnowledgeDocument, error) {
+	var output appservice.KnowledgeDocument
+	err := b.do(ctx, meta, http.MethodPost, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/web-documents", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// RefetchKnowledgeDocument 重新抓取网页文档并重新索引。
+func (b *Backend) RefetchKnowledgeDocument(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, documentID string, input appservice.KnowledgeDocumentRefetchInput) error {
+	return b.do(ctx, meta, http.MethodPost, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/documents/"+url.PathEscape(documentID)+"/refetch", nil, input, nil)
+}
+
 // ListKnowledgeQAEntries 返回分组中的本地问答列表。
 func (b *Backend) ListKnowledgeQAEntries(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, input appservice.KnowledgeQAListInput) (appservice.KnowledgeQAList, error) {
 	var output appservice.KnowledgeQAList

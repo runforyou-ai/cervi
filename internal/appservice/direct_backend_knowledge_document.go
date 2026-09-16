@@ -110,6 +110,33 @@ func (o *directOperations) RenameKnowledgeDocument(ctx context.Context, meta Req
 	return knowledgeDocumentFromAction(meta, *record), nil
 }
 
+// CreateKnowledgeWebDocument 导入网页并安排首次抓取。
+func (o *directOperations) CreateKnowledgeWebDocument(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, baseID string, input KnowledgeWebDocumentInput) (KnowledgeDocument, error) {
+	record, err := o.createWebDocument.Execute(ctx, identity, baseID, knowledgeaction.WebDocumentInput{GroupID: input.GroupID, Title: input.Title, SourceURL: input.SourceURL})
+	if err != nil {
+		return KnowledgeDocument{}, o.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeDocumentSaveFailed, identity.Organization.ID, baseID)
+	}
+	slog.Info("网页文档已导入", "knowledge_base_id", baseID, "document_id", record.ID, "source_url", record.SourceURL)
+	return knowledgeDocumentFromAction(meta, *record), nil
+}
+
+// RefetchKnowledgeDocument 重新抓取网页文档并重新索引。
+func (o *directOperations) RefetchKnowledgeDocument(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, baseID, documentID string, input KnowledgeDocumentRefetchInput) error {
+	if err := o.documentProcessing.Refetch(ctx, identity, baseID, documentID, input.SourceURL, o.documentConverter.CheckConnection); err != nil {
+		var failure *documentconvert.Error
+		if errors.As(err, &failure) {
+			key := cervii18n.ErrorKnowledgeProcessingUnavailable
+			if failure.Code == "connection_timeout" {
+				key = cervii18n.ErrorKnowledgeConnectionTimeout
+			}
+			return FailedError(meta, key)
+		}
+		return o.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeDocumentRetryFailed, identity.Organization.ID, baseID)
+	}
+	slog.Info("网页文档已提交重新抓取", "knowledge_base_id", baseID, "document_id", documentID)
+	return nil
+}
+
 // GetKnowledgeDocumentPreview 按原件实际存储类型返回受控读取请求。
 func (o *directOperations) GetKnowledgeDocumentPreview(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, baseID, documentID string) (KnowledgeDocumentPreviewRequest, error) {
 	record, err := o.documentQuery.File(ctx, identity, baseID, documentID)

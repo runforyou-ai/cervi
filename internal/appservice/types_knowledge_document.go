@@ -82,6 +82,18 @@ type KnowledgeTextDocumentInput struct {
 	Content string `json:"content"`
 }
 
+// KnowledgeWebDocumentInput 定义网页导入文档的分组、名称与页面地址。
+type KnowledgeWebDocumentInput struct {
+	GroupID   string `json:"groupId"`
+	Title     string `json:"title"`
+	SourceURL string `json:"sourceUrl"`
+}
+
+// KnowledgeDocumentRefetchInput 定义重新抓取时可选的新页面地址。
+type KnowledgeDocumentRefetchInput struct {
+	SourceURL string `json:"sourceUrl"`
+}
+
 // KnowledgeDocumentContentInput 定义在线文档的名称与正文更新。
 type KnowledgeDocumentContentInput struct {
 	Title   string `json:"title"`

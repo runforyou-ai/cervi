@@ -127,6 +127,8 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.GET("/knowledge-bases/:knowledgeBaseID/documents/:documentID/content", s.getKnowledgeDocumentContent)
 	router.PUT("/knowledge-bases/:knowledgeBaseID/documents/:documentID/content", s.updateKnowledgeDocumentContent)
 	router.PUT("/knowledge-bases/:knowledgeBaseID/documents/:documentID", s.renameKnowledgeDocument)
+	router.POST("/knowledge-bases/:knowledgeBaseID/web-documents", s.createKnowledgeWebDocument)
+	router.POST("/knowledge-bases/:knowledgeBaseID/documents/:documentID/refetch", s.refetchKnowledgeDocument)
 	router.GET("/knowledge-bases/:knowledgeBaseID/qa-entries", s.listKnowledgeQAEntries)
 	router.GET("/knowledge-bases/:knowledgeBaseID/qa-entries/:entryID", s.getKnowledgeQAEntry)
 	router.POST("/knowledge-bases/:knowledgeBaseID/qa-entries", s.createKnowledgeQAEntry)
@@ -1116,6 +1118,25 @@ func (s *Service) renameKnowledgeDocument(c *gin.Context) {
 	}
 	output, err := s.application.RenameKnowledgeDocument(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), c.Param("documentID"), input)
 	writeResult(c, http.StatusOK, output, err)
+}
+
+// createKnowledgeWebDocument 导入网页并安排首次抓取。
+func (s *Service) createKnowledgeWebDocument(c *gin.Context) {
+	var input appservice.KnowledgeWebDocumentInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.CreateKnowledgeWebDocument(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), input)
+	writeResult(c, http.StatusCreated, output, err)
+}
+
+// refetchKnowledgeDocument 重新抓取网页文档并重新索引。
+func (s *Service) refetchKnowledgeDocument(c *gin.Context) {
+	var input appservice.KnowledgeDocumentRefetchInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	writeEmpty(c, s.application.RefetchKnowledgeDocument(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), c.Param("documentID"), input))
 }
 
 // listKnowledgeQAEntries 返回分组中的本地问答列表。

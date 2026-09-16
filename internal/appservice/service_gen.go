@@ -559,6 +559,16 @@ func (s *Service) RenameKnowledgeDocument(ctx context.Context, meta RequestMeta,
 	return withNormalizedSlices(s.backend.RenameKnowledgeDocument(ctx, meta, knowledgeBaseID, documentID, input))
 }
 
+// CreateKnowledgeWebDocument 导入网页并安排首次抓取。
+func (s *Service) CreateKnowledgeWebDocument(ctx context.Context, meta RequestMeta, knowledgeBaseID string, input KnowledgeWebDocumentInput) (KnowledgeDocument, error) {
+	return withNormalizedSlices(s.backend.CreateKnowledgeWebDocument(ctx, meta, knowledgeBaseID, input))
+}
+
+// RefetchKnowledgeDocument 重新抓取网页文档并重新索引。
+func (s *Service) RefetchKnowledgeDocument(ctx context.Context, meta RequestMeta, knowledgeBaseID string, documentID string, input KnowledgeDocumentRefetchInput) error {
+	return s.backend.RefetchKnowledgeDocument(ctx, meta, knowledgeBaseID, documentID, input)
+}
+
 // ListKnowledgeQAEntries 返回分组中的本地问答列表。
 func (s *Service) ListKnowledgeQAEntries(ctx context.Context, meta RequestMeta, knowledgeBaseID string, input KnowledgeQAListInput) (KnowledgeQAList, error) {
 	return withNormalizedSlices(s.backend.ListKnowledgeQAEntries(ctx, meta, knowledgeBaseID, input))

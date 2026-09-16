@@ -2,6 +2,8 @@
 import {
   RetryKnowledgeDocument,
   CreateKnowledgeTextDocument,
+  CreateKnowledgeWebDocument,
+  RefetchKnowledgeDocument,
   GetKnowledgeDocumentContent,
   UpdateKnowledgeDocumentContent,
   RenameKnowledgeDocument,
@@ -40,6 +42,8 @@ import {
   type KnowledgeDocumentBatch,
   type KnowledgeDocumentBatchInput,
   type KnowledgeTextDocumentInput,
+  type KnowledgeWebDocumentInput,
+  type KnowledgeDocumentRefetchInput,
   type KnowledgeDocumentContentInput,
   type KnowledgeDocumentRenameInput,
   type KnowledgeQAEntry,
@@ -265,6 +269,26 @@ export function createKnowledgeTextDocument(
     baseId,
     input,
   ) as Promise<KnowledgeDocumentData>
+}
+const createKnowledgeWebDocumentBound = bind(CreateKnowledgeWebDocument)
+/** 导入网页作为知识文档。 */
+export function createKnowledgeWebDocument(
+  baseId: string,
+  input: KnowledgeWebDocumentInput,
+) {
+  return createKnowledgeWebDocumentBound(
+    baseId,
+    input,
+  ) as Promise<KnowledgeDocumentData>
+}
+const refetchKnowledgeDocumentBound = bind(RefetchKnowledgeDocument)
+/** 重新抓取网页文档。 */
+export function refetchKnowledgeDocument(
+  baseId: string,
+  documentId: string,
+  input: KnowledgeDocumentRefetchInput,
+) {
+  return refetchKnowledgeDocumentBound(baseId, documentId, input)
 }
 const getKnowledgeDocumentContentBound = bind(GetKnowledgeDocumentContent)
 /** 读取在线文档正文或网页抓取快照。 */

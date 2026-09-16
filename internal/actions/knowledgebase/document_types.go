@@ -14,6 +14,7 @@ var (
 	ErrDocumentUnsupported       = errors.New("knowledge document unsupported")
 	ErrDocumentBatchInvalid      = errors.New("knowledge document batch must contain 1 to 10 distinct files")
 	ErrDocumentSourceUnsupported = errors.New("knowledge document source unsupported")
+	ErrDocumentURLDuplicate      = errors.New("knowledge document url duplicated")
 )
 
 // ProcessInput 固定本次文档任务的内容来源、分段和向量参数。
@@ -22,6 +23,7 @@ type ProcessInput struct {
 	KnowledgeBaseID          string                             `json:"knowledgeBaseId"`
 	DocumentID               string                             `json:"documentId"`
 	SourceKind               domain.KnowledgeDocumentSourceKind `json:"sourceKind"`
+	FetchPage                bool                               `json:"fetchPage"`
 	ProcessingID             string                             `json:"processingId"`
 	ChunkLength              int                                `json:"chunkLength"`
 	ChunkOverlap             int                                `json:"chunkOverlap"`
@@ -78,4 +80,11 @@ type TextDocumentInput struct {
 type DocumentContentRecord struct {
 	Document DocumentRecord
 	Content  string
+}
+
+// WebDocumentInput 定义网页导入文档的分组、名称与页面地址。
+type WebDocumentInput struct {
+	GroupID   string
+	Title     string
+	SourceURL string
 }

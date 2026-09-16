@@ -91,7 +91,7 @@ func (a *CreateDocumentsAction) Execute(ctx context.Context, identity *servermod
 			if _, err := tx.NewUpdate().Model(file).Set("status = ?", domain.FileStatusActive).Set("expires_at = NULL").Set("updated_at = now()").WherePK().Exec(ctx); err != nil {
 				return err
 			}
-			if err := a.processing.enqueue(ctx, tx, identity.Organization.ID, base, document); err != nil {
+			if err := a.processing.enqueue(ctx, tx, identity.Organization.ID, base, document, false); err != nil {
 				return err
 			}
 			record, err := loadDocumentRecord(ctx, tx, baseID, document.ID)

@@ -1946,6 +1946,13 @@ export interface KnowledgeDocumentPreviewRequest {
 }
 
 /**
+ * KnowledgeDocumentRefetchInput 定义重新抓取时可选的新页面地址。
+ */
+export interface KnowledgeDocumentRefetchInput {
+    "sourceUrl": string;
+}
+
+/**
  * KnowledgeDocumentRenameInput 定义文档名称更新。
  */
 export interface KnowledgeDocumentRenameInput {
@@ -2154,6 +2161,15 @@ export interface KnowledgeTextDocumentInput {
     "groupId": string;
     "title": string;
     "content": string;
+}
+
+/**
+ * KnowledgeWebDocumentInput 定义网页导入文档的分组、名称与页面地址。
+ */
+export interface KnowledgeWebDocumentInput {
+    "groupId": string;
+    "title": string;
+    "sourceUrl": string;
 }
 
 /**

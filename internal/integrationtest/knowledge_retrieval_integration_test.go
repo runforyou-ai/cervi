@@ -14,6 +14,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/integration/embedding"
 	"github.com/runforyou-ai/cervi/internal/integration/knowledgeretrieval"
 	"github.com/runforyou-ai/cervi/internal/integration/rerank"
+	"github.com/runforyou-ai/cervi/internal/integration/webfetch"
 	servertest "github.com/runforyou-ai/cervi/internal/servertest"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -27,6 +28,11 @@ type retrievalProbe struct {
 	markdown  string
 	embedFail bool
 	reranked  int
+}
+
+// Fetch 返回固定网页内容。
+func (p *retrievalProbe) Fetch(context.Context, string) (webfetch.Page, error) {
+	return webfetch.Page{Name: "page.html", Body: []byte(p.markdown)}, nil
 }
 
 // Open 提供固定原件。
@@ -88,7 +94,7 @@ func publishRetrievalDocument(t *testing.T, db *bun.DB, probe *retrievalProbe, i
 		t.Fatal(err)
 	}
 	probe.markdown = markdown
-	worker := knowledgeaction.NewProcessDocumentAction(db, probe, probe, probe)
+	worker := knowledgeaction.NewProcessDocumentAction(db, probe, probe, probe, probe)
 	err = worker.Execute(ctx, knowledgeaction.ProcessInput{
 		OrganizationID: identity.Organization.ID, KnowledgeBaseID: base.ID, DocumentID: document.ID, ProcessingID: document.ProcessingID,
 		ChunkLength: document.ChunkLength, ChunkOverlap: document.ChunkOverlap,
@@ -172,7 +178,7 @@ func TestKnowledgeHybridRetrieval(t *testing.T) {
 		t.Fatal(err)
 	}
 	probe.markdown = strings.Repeat("签收后七天内可以申请退款，退款金额原路返回。", 30)
-	if err := knowledgeaction.NewProcessDocumentAction(db, probe, probe, probe).Execute(ctx, knowledgeaction.ProcessInput{
+	if err := knowledgeaction.NewProcessDocumentAction(db, probe, probe, probe, probe).Execute(ctx, knowledgeaction.ProcessInput{
 		OrganizationID: identity.Organization.ID, KnowledgeBaseID: base.ID, DocumentID: refundID, ProcessingID: republished.ProcessingID,
 		ChunkLength: republished.ChunkLength, ChunkOverlap: republished.ChunkOverlap,
 		EmbeddingProviderID: republished.EmbeddingProviderID, EmbeddingModelIdentifier: republished.EmbeddingModelIdentifier, EmbeddingDimension: republished.EmbeddingDimension,

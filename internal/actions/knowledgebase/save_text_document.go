@@ -83,7 +83,7 @@ func (a *SaveTextDocumentAction) Execute(ctx context.Context, identity *servermo
 		}
 		// 新建、正文变化或索引尚未成功时按当前配置投递新任务。
 		if changed || document.Status != domain.KnowledgeIndexSucceeded {
-			if err := a.processing.enqueue(ctx, tx, identity.Organization.ID, base, document); err != nil {
+			if err := a.processing.enqueue(ctx, tx, identity.Organization.ID, base, document, false); err != nil {
 				return err
 			}
 		}

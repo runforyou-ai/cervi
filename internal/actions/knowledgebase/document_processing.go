@@ -7,11 +7,14 @@ import (
 	"database/sql"
 	"errors"
 	"log/slog"
+	"strings"
 	"uuid"
 
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
+	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/documentconvert"
+	"github.com/runforyou-ai/cervi/internal/integration/webfetch"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
@@ -30,8 +33,8 @@ func NewDocumentProcessing(db *bun.DB, tasks servertask.TxEnqueuer) *DocumentPro
 	return &DocumentProcessing{db: db, tasks: tasks}
 }
 
-// enqueue 固定当前分段和向量参数，并在业务事务中投递处理任务。
-func (p *DocumentProcessing) enqueue(ctx context.Context, tx bun.IDB, organizationID string, base *servermodels.KnowledgeBase, document *servermodels.KnowledgeDocument) error {
+// enqueue 固定当前分段和向量参数，并在业务事务中投递处理任务；fetchPage 表示网页来源本次是否重新抓取。
+func (p *DocumentProcessing) enqueue(ctx context.Context, tx bun.IDB, organizationID string, base *servermodels.KnowledgeBase, document *servermodels.KnowledgeDocument, fetchPage bool) error {
 	document.ProcessingID = uuid.NewV7().String()
 	document.ChunkLength, document.ChunkOverlap = *base.ChunkLength, *base.ChunkOverlap
 	document.EmbeddingProviderID, document.EmbeddingModelIdentifier, document.EmbeddingDimension = base.EmbeddingProviderID, base.EmbeddingModelIdentifier, base.EmbeddingDimension
@@ -40,15 +43,25 @@ func (p *DocumentProcessing) enqueue(ctx context.Context, tx bun.IDB, organizati
 		return err
 	}
 	_, err := p.tasks.EnqueueIn(ctx, tx, ProcessDocumentActionName, ProcessInput{
-		OrganizationID: organizationID, KnowledgeBaseID: base.ID, DocumentID: document.ID, SourceKind: document.SourceKind, ProcessingID: document.ProcessingID,
+		OrganizationID: organizationID, KnowledgeBaseID: base.ID, DocumentID: document.ID, SourceKind: document.SourceKind, FetchPage: fetchPage, ProcessingID: document.ProcessingID,
 		ChunkLength: document.ChunkLength, ChunkOverlap: document.ChunkOverlap,
 		EmbeddingProviderID: document.EmbeddingProviderID, EmbeddingModelIdentifier: document.EmbeddingModelIdentifier, EmbeddingDimension: document.EmbeddingDimension,
 	}, servertask.EnqueueOptions{Queue: servertask.QueueKnowledge, MaxAttempts: 1, IdempotencyKey: document.ProcessingID, TriggerType: servertask.TriggerBusiness})
 	return err
 }
 
-// Retry 按当前配置投递一次处理，依赖转换服务的来源先检查连接，连接失败直接保存失败状态。
+// Retry 按当前配置重新索引文档，网页来源读取已保存的快照。
 func (p *DocumentProcessing) Retry(ctx context.Context, identity *servermodels.Identity, baseID, documentID string, checkConnection func(context.Context) error) error {
+	return p.schedule(ctx, identity, baseID, documentID, "", false, checkConnection)
+}
+
+// Refetch 重新抓取网页文档，传入的地址非空时同时更新页面地址。
+func (p *DocumentProcessing) Refetch(ctx context.Context, identity *servermodels.Identity, baseID, documentID, sourceURL string, checkConnection func(context.Context) error) error {
+	return p.schedule(ctx, identity, baseID, documentID, sourceURL, true, checkConnection)
+}
+
+// schedule 投递一次处理，需要转换服务的路径先检查连接，连接失败直接保存失败状态。
+func (p *DocumentProcessing) schedule(ctx context.Context, identity *servermodels.Identity, baseID, documentID, sourceURL string, fetchPage bool, checkConnection func(context.Context) error) error {
 	var connectionErr error
 	err := p.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
@@ -66,8 +79,25 @@ func (p *DocumentProcessing) Retry(ctx context.Context, identity *servermodels.I
 		if err != nil {
 			return err
 		}
-		// 只有需要转换原件的来源依赖转换服务。
-		if document.SourceKind == domain.KnowledgeDocumentSourceFile {
+		if fetchPage {
+			if document.SourceKind != domain.KnowledgeDocumentSourceWeb {
+				return ErrDocumentSourceUnsupported
+			}
+			if address := strings.TrimSpace(sourceURL); address != "" {
+				normalized, err := webfetch.Normalize(address)
+				if err != nil {
+					return &common.FieldError{Fields: map[string]common.FieldCode{"sourceUrl": ValidationDocumentURLInvalid}}
+				}
+				if _, err := tx.NewUpdate().Model(document).Set("source_url = ?", normalized).Set("updated_at = now()").WherePK().Exec(ctx); err != nil {
+					if isConstraintConflict(err, "knowledge_documents_source_url_unique") {
+						return ErrDocumentURLDuplicate
+					}
+					return err
+				}
+			}
+		}
+		// 转换原件和抓取网页都依赖转换服务。
+		if document.SourceKind == domain.KnowledgeDocumentSourceFile || fetchPage {
 			connectionErr = checkConnection(ctx)
 		}
 		if connectionErr != nil {
@@ -80,7 +110,7 @@ func (p *DocumentProcessing) Retry(ctx context.Context, identity *servermodels.I
 			_, err := tx.NewUpdate().Model(document).Set("processing_id = ?", uuid.NewV7().String()).Set("status = ?", domain.KnowledgeIndexFailed).Set("failure_code = ?", code).Set("updated_at = now()").WherePK().Exec(ctx)
 			return err
 		}
-		return p.enqueue(ctx, tx, identity.Organization.ID, base, document)
+		return p.enqueue(ctx, tx, identity.Organization.ID, base, document, fetchPage)
 	})
 	if err != nil {
 		return err

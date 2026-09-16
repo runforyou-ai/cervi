@@ -10,6 +10,18 @@ import {
   TableHeader,
   TableRow,
 } from "@tiptap/extension-table"
+import {
+  BoldIcon,
+  Heading1Icon,
+  Heading2Icon,
+  Heading3Icon,
+  ItalicIcon,
+  ListIcon,
+  ListOrderedIcon,
+  QuoteIcon,
+  SquareCodeIcon,
+  TableIcon,
+} from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
@@ -78,7 +90,7 @@ export function KnowledgeDocumentEditor({
   )
 }
 
-/** 展示标题、行内样式、块结构和表格的插入操作。 */
+/** 以图标展示标题、行内样式、块结构和表格的插入操作。 */
 function EditorToolbar({
   editor,
   disabled,
@@ -91,60 +103,70 @@ function EditorToolbar({
     {
       key: "heading1",
       label: t("documents.editor.heading1"),
+      icon: <Heading1Icon />,
       active: editor.isActive("heading", { level: 1 }),
       run: () => editor.chain().focus().toggleHeading({ level: 1 }).run(),
     },
     {
       key: "heading2",
       label: t("documents.editor.heading2"),
+      icon: <Heading2Icon />,
       active: editor.isActive("heading", { level: 2 }),
       run: () => editor.chain().focus().toggleHeading({ level: 2 }).run(),
     },
     {
       key: "heading3",
       label: t("documents.editor.heading3"),
+      icon: <Heading3Icon />,
       active: editor.isActive("heading", { level: 3 }),
       run: () => editor.chain().focus().toggleHeading({ level: 3 }).run(),
     },
     {
       key: "bold",
       label: t("documents.editor.bold"),
+      icon: <BoldIcon />,
       active: editor.isActive("bold"),
       run: () => editor.chain().focus().toggleBold().run(),
     },
     {
       key: "italic",
       label: t("documents.editor.italic"),
+      icon: <ItalicIcon />,
       active: editor.isActive("italic"),
       run: () => editor.chain().focus().toggleItalic().run(),
     },
     {
       key: "bulletList",
       label: t("documents.editor.bulletList"),
+      icon: <ListIcon />,
       active: editor.isActive("bulletList"),
       run: () => editor.chain().focus().toggleBulletList().run(),
     },
     {
       key: "orderedList",
       label: t("documents.editor.orderedList"),
+      icon: <ListOrderedIcon />,
       active: editor.isActive("orderedList"),
       run: () => editor.chain().focus().toggleOrderedList().run(),
     },
     {
       key: "blockquote",
       label: t("documents.editor.blockquote"),
+      icon: <QuoteIcon />,
       active: editor.isActive("blockquote"),
       run: () => editor.chain().focus().toggleBlockquote().run(),
     },
     {
       key: "codeBlock",
       label: t("documents.editor.codeBlock"),
+      icon: <SquareCodeIcon />,
       active: editor.isActive("codeBlock"),
       run: () => editor.chain().focus().toggleCodeBlock().run(),
     },
     {
       key: "table",
       label: t("documents.editor.table"),
+      icon: <TableIcon />,
       active: editor.isActive("table"),
       run: () =>
         editor
@@ -161,13 +183,15 @@ function EditorToolbar({
           key={action.key}
           type="button"
           variant="ghost"
-          size="sm"
+          size="icon-sm"
           disabled={disabled}
+          aria-label={action.label}
           aria-pressed={action.active}
-          className={cn("h-8 px-2 text-xs", action.active && "bg-accent")}
+          title={action.label}
+          className={cn(action.active && "bg-accent")}
           onClick={action.run}
         >
-          {action.label}
+          {action.icon}
         </Button>
       ))}
     </div>

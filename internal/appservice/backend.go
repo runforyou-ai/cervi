@@ -359,6 +359,12 @@ type Backend interface {
 	// RenameKnowledgeDocument 修改在线文档或网页文档的名称。
 	//cervi:route PUT /knowledge-bases/:knowledgeBaseID/documents/:documentID
 	RenameKnowledgeDocument(context.Context, RequestMeta, string, string, KnowledgeDocumentRenameInput) (KnowledgeDocument, error)
+	// CreateKnowledgeWebDocument 导入网页并安排首次抓取。
+	//cervi:route POST /knowledge-bases/:knowledgeBaseID/web-documents status=201
+	CreateKnowledgeWebDocument(context.Context, RequestMeta, string, KnowledgeWebDocumentInput) (KnowledgeDocument, error)
+	// RefetchKnowledgeDocument 重新抓取网页文档并重新索引。
+	//cervi:route POST /knowledge-bases/:knowledgeBaseID/documents/:documentID/refetch
+	RefetchKnowledgeDocument(context.Context, RequestMeta, string, string, KnowledgeDocumentRefetchInput) error
 
 	// ListKnowledgeQAEntries 返回分组中的本地问答列表。
 	//cervi:route GET /knowledge-bases/:knowledgeBaseID/qa-entries

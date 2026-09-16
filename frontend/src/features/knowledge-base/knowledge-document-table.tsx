@@ -1,7 +1,7 @@
 /** 文档表格展示元数据、创建时间及固定操作栏。 */
 import { useRef, useState } from "react"
 import { toast } from "sonner"
-import { retryKnowledgeDocument, isApiError, KnowledgeDocumentSourceKind } from "@/api"
+import { refetchKnowledgeDocument, retryKnowledgeDocument, isApiError, KnowledgeDocumentSourceKind } from "@/api"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
 import { recoverSession } from "@/lib/session-navigation"
@@ -48,13 +48,14 @@ export function KnowledgeDocumentTable({
   // 记录每行三点菜单按钮，供关闭对话框后恢复焦点。
   const triggers = useRef(new Map<string, HTMLButtonElement>())
 
-  /** 提交重试并在结束后刷新列表和详情中的文档状态。 */
-  async function retryDocument(document: KnowledgeDocumentData) {
+  /** 提交重试或重新抓取，并在结束后刷新列表和详情中的文档状态。 */
+  async function retryDocument(document: KnowledgeDocumentData, refetch = false) {
     setRetryingIDs((current) => new Set(current).add(document.id))
     try {
-      await retryKnowledgeDocument(knowledgeBaseId, document.id)
+      if (refetch) await refetchKnowledgeDocument(knowledgeBaseId, document.id, { sourceUrl: "" })
+      else await retryKnowledgeDocument(knowledgeBaseId, document.id)
     } catch (error) {
-      if (!recoverSession(error, navigate)) toast.error(isApiError(error) ? apiErrorMessage(error) : t("documents.retryFailed"))
+      if (!recoverSession(error, navigate)) toast.error(isApiError(error) ? apiErrorMessage(error) : t(refetch ? "documents.refetchFailed" : "documents.retryFailed"))
     } finally {
       await Promise.all([
         invalidate(resourceKeys.knowledgeDocuments(knowledgeBaseId)),
@@ -141,6 +142,16 @@ export function KnowledgeDocumentTable({
                 onSelect={() => void retryDocument(document)}
               >
                 {t("common:actions.retry")}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={
+                  retryingIDs.has(document.id) ||
+                  document.sourceKind !==
+                    KnowledgeDocumentSourceKind.KnowledgeDocumentSourceWeb
+                }
+                onSelect={() => void retryDocument(document, true)}
+              >
+                {t("documents.refetch")}
               </DropdownMenuItem>
               <DropdownMenuItem
                 disabled={!canMove}

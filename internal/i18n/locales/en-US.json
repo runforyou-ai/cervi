@@ -32,6 +32,11 @@
   "field.knowledge_document_title_too_long": "The document name cannot exceed 120 characters.",
   "field.knowledge_document_content_required": "Enter the document content.",
   "field.knowledge_document_group_invalid": "Select a group.",
+  "field.knowledge_document_url_invalid": "Enter a page address starting with http or https.",
+  "error.knowledge_document_url_duplicate": "This page is already imported into this knowledge base.",
+  "error.knowledge_page_unreachable": "Could not read the page. Check that the address is reachable.",
+  "error.knowledge_page_unsupported": "That address did not return a web page or plain text.",
+  "error.knowledge_page_too_large": "The page content exceeds 10 MB.",
 
   "error.agent_reply_stop_failed": "Failed to stop the AI reply. Please try again.",
   "error.agent_unavailable": "This AI employee is currently unavailable.",

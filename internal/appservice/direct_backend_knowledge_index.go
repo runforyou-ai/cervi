@@ -25,6 +25,12 @@ func knowledgeIndexPresentation(meta RequestMeta, stage domain.KnowledgeIndexSta
 			key = cervii18n.ErrorKnowledgeContentEmpty
 		case "parse_failed", "unsupported_file":
 			key = cervii18n.ErrorKnowledgeParseFailed
+		case "url_unreachable", "url_invalid":
+			key = cervii18n.ErrorKnowledgePageUnreachable
+		case "url_content_unsupported":
+			key = cervii18n.ErrorKnowledgePageUnsupported
+		case "url_content_too_large":
+			key = cervii18n.ErrorKnowledgePageTooLarge
 		case "embedding_model_unavailable":
 			key = cervii18n.ErrorKnowledgeEmbeddingUnavailable
 		case "embedding_failed":
