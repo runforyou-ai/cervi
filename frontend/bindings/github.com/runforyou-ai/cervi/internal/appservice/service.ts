@@ -80,6 +80,13 @@ export function CompleteFileUpload(meta: $models.RequestMeta, fileID: string): $
 }
 
 /**
+ * ConnectAgentRunStream 在原生端建立指定运行的过程流，运行过程事件与流结束经 Wails 事件投递。
+ */
+export function ConnectAgentRunStream(meta: $models.RequestMeta, runID: string): $CancellablePromise<$models.RealtimeConnection> {
+    return $Call.ByID(1264735630, meta, runID);
+}
+
+/**
  * ConnectRealtime 在原生端使用当前登录凭据建立实时事件流，服务端事件与事件流结束经 Wails 事件投递。
  */
 export function ConnectRealtime(meta: $models.RequestMeta): $CancellablePromise<$models.RealtimeConnection> {
@@ -294,6 +301,13 @@ export function DeleteRole(meta: $models.RequestMeta, roleID: string): $Cancella
  */
 export function DeleteTeam(meta: $models.RequestMeta, teamID: string): $CancellablePromise<void> {
     return $Call.ByID(798533364, meta, teamID);
+}
+
+/**
+ * DisconnectAgentRunStream 关闭原生端指定本地流编号的运行过程流。
+ */
+export function DisconnectAgentRunStream(meta: $models.RequestMeta, connectionID: string): $CancellablePromise<void> {
+    return $Call.ByID(673139610, meta, connectionID);
 }
 
 /**

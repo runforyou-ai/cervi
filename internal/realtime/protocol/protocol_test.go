@@ -6,8 +6,17 @@ import (
 	"os"
 	"reflect"
 	"testing"
+	"time"
 
 	"github.com/runforyou-ai/cervi/internal/appservice"
+	"github.com/runforyou-ai/cervi/internal/domain"
+)
+
+var (
+	runStreamRunID     = "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8b"
+	runStreamStreamID  = "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8c"
+	runStreamStarted   = time.Date(2026, 9, 15, 12, 0, 0, 0, time.UTC)
+	runStreamCompleted = time.Date(2026, 9, 15, 12, 0, 3, 0, time.UTC)
 )
 
 // fixtureCase 是 Go 与 TypeScript 共用的事件夹具样例。
@@ -28,6 +37,32 @@ var expectedFrames = map[string]Frame{
 	"conversation_removed":              ConversationRemoved{ConversationID: "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8b"},
 	"conversation_changed_extra_fields": ConversationChanged{ConversationID: "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8b", Version: 7},
 	"ping_without_data":                 Ping{},
+	"run_stream_snapshot": RunStreamSnapshot{
+		RunID: runStreamRunID, StreamID: runStreamStreamID, Attempt: 1, Sequence: 7, Part: 0, PartCount: 2,
+		CandidateContent: "根据知识库的记录，",
+		Blocks: []RunStreamBlock{
+			{ID: "block-1", Position: 1, Kind: domain.AgentRunBlockThinking, Text: "先确认退款政策"},
+			{ID: "block-2", Position: 2, Kind: domain.AgentRunBlockToolCall, ToolCall: &RunStreamToolCall{
+				Name: "search_knowledge", Status: domain.AgentToolCallRunning, StartedAt: &runStreamStarted,
+			}},
+		},
+	},
+	"run_stream_snapshot_empty": RunStreamSnapshot{
+		RunID: runStreamRunID, StreamID: runStreamStreamID, Attempt: 1, Part: 0, PartCount: 1, Blocks: []RunStreamBlock{},
+	},
+	"run_stream_delta": RunStreamDelta{
+		RunID: runStreamRunID, StreamID: runStreamStreamID, Attempt: 1, BaseSequence: 7, Sequence: 9,
+		Operations: []RunStreamOperation{
+			{Kind: RunStreamAppendBlockText, BlockID: "block-1", Text: "，再给出答复"},
+			{Kind: RunStreamUpsertBlock, Block: &RunStreamBlock{ID: "block-2", Position: 2, Kind: domain.AgentRunBlockToolCall, ToolCall: &RunStreamToolCall{
+				Name: "search_knowledge", Status: domain.AgentToolCallSucceeded, StartedAt: &runStreamStarted, CompletedAt: &runStreamCompleted,
+			}}},
+			{Kind: RunStreamRemoveBlocks, BlockIDs: []string{"block-3"}},
+			{Kind: RunStreamClearCandidate},
+			{Kind: RunStreamAppendCandidate, Text: "退款需要在 7 天内提交。"},
+		},
+	},
+	"run_stream_ended": RunStreamEnded{RunID: runStreamRunID},
 }
 
 // TestFrameFixtures 按共用夹具校验 Go 端解码结果，并校验编码输出与夹具线上格式一致。

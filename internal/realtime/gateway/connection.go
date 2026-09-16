@@ -156,11 +156,20 @@ func mergeTarget(frame protocol.Frame) (mergeKey, int64, bool) {
 	return mergeKey{}, 0, false
 }
 
+// tokenSession 返回事件流所属登录会话编号。
+func (c *connection) tokenSession() string { return c.tokenSessionID }
+
+// audienceSubjects 返回事件流加入的受众 Subject。
+func (c *connection) audienceSubjects() []string { return c.subjects }
+
 // revoke 清除未发送的事件并结束事件流。
 func (c *connection) revoke(kind realtime.Kind) {
 	slog.Info("实时事件流登录会话已撤销", "connection_id", c.id, "kind", kind)
 	c.close(true)
 }
+
+// shutdown 在网关下线时停止接收新事件，剩余事件发送完毕后结束事件流。
+func (c *connection) shutdown() { c.close(false) }
 
 // close 停止接收新事件，按需清除未发送的事件，由写协程发送剩余事件后结束事件流。
 func (c *connection) close(discard bool) {

@@ -1,4 +1,4 @@
-/** 展示 Agent 运行摘要，展开时读取思考过程与工具详情，并提供停止回复入口。 */
+/** 展示 Agent 运行摘要与运行中的实时过程，展开时读取思考过程与工具详情，并提供停止回复入口。 */
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -14,6 +14,7 @@ import { openExternalURL } from "@/platform/external-navigation"
 import { useTranslation } from "react-i18next"
 import { Popover } from "radix-ui"
 
+import { useAgentRunStream } from "./use-agent-run-stream"
 import {
   isApiError,
   getAgentRunProcess,
@@ -27,6 +28,8 @@ import {
   type ConversationAgentProcessData,
   type ConversationAgentRun,
   type ConversationPendingAgent,
+  type RunStreamState,
+  type RunStreamToolCall,
 } from "@/api"
 import {
   Collapsible,
@@ -95,16 +98,22 @@ function ToolValue({ value }: { value: string }) {
   )
 }
 
-/** 展示单次工具调用并按需展开完整参数、结果或错误。 */
-function AgentTool({ call }: { call: AgentToolCall }) {
+/** 返回工具执行状态文案。 */
+function useToolStatusLabel() {
   const { t } = useTranslation("inbox")
-  const failed = call.status === AgentToolCallStatus.AgentToolCallFailed
-  const statusLabel = {
+  return (status: AgentToolCallStatus) => ({
     [AgentToolCallStatus.AgentToolCallQueued]: t("agentToolQueued"),
     [AgentToolCallStatus.AgentToolCallRunning]: t("agentToolRunning"),
     [AgentToolCallStatus.AgentToolCallSucceeded]: t("agentToolSucceeded"),
     [AgentToolCallStatus.AgentToolCallFailed]: t("agentToolFailed"),
-  }[call.status]
+  })[status]
+}
+
+/** 展示单次工具调用并按需展开完整参数、结果或错误。 */
+function AgentTool({ call }: { call: AgentToolCall }) {
+  const { t } = useTranslation("inbox")
+  const failed = call.status === AgentToolCallStatus.AgentToolCallFailed
+  const statusLabel = useToolStatusLabel()(call.status)
   return (
     <Collapsible className="min-w-0 rounded-md bg-muted text-foreground">
       <CollapsibleTrigger className="group flex w-full min-w-0 items-center gap-3 rounded-md px-3 py-2 text-left text-xs focus-visible:outline focus-visible:outline-ring">
@@ -210,9 +219,67 @@ export function AgentProcess({ process, incoming }: { process: ConversationAgent
   )
 }
 
-/** 显示最近一次运行的等待、思考或取消状态。 */
+/** 展示运行中工具调用的名称与状态，完整参数和结果在运行成功后读取。 */
+function AgentStreamTool({ call }: { call: RunStreamToolCall }) {
+  const statusLabel = useToolStatusLabel()
+  return (
+    <div className="flex min-w-0 items-center gap-3 rounded-md bg-muted px-3 py-2 text-xs text-foreground">
+      <span className="min-w-0 flex-1 break-all font-medium">{call.name}</span>
+      <span className={cn(
+        "shrink-0 text-muted-foreground",
+        call.status === AgentToolCallStatus.AgentToolCallFailed && "text-destructive",
+      )}>
+        {statusLabel(call.status)}
+      </span>
+    </div>
+  )
+}
+
+/** 按序渲染运行过程流中的思考、工具调用和正在生成的回复正文；区域限高滚动，内容增长时保持贴底。 */
+function AgentRunStreamProcess({ state, incoming }: { state: RunStreamState; incoming: boolean }) {
+  const { i18n } = useTranslation("inbox")
+  const muted = incoming ? "text-muted-foreground" : "text-primary-foreground/75"
+  const scroll = useRef<HTMLDivElement>(null)
+  const following = useRef(true)
+  useLayoutEffect(() => {
+    const node = scroll.current
+    if (node && following.current) node.scrollTop = node.scrollHeight
+  }, [state])
+  return (
+    <div
+      ref={scroll}
+      // 限高让状态行与停止按钮始终可见；用户上滚查看早先过程时不再自动贴底。
+      className="max-h-64 space-y-3 overflow-y-auto"
+      onScroll={(event) => {
+        const node = event.currentTarget
+        following.current = node.scrollHeight - node.scrollTop - node.clientHeight <= 16
+      }}
+    >
+      {state.blocks.map((block) =>
+        block.kind === AgentRunBlockKind.AgentRunBlockToolCall && block.toolCall ? (
+          <AgentStreamTool key={block.id} call={block.toolCall} />
+        ) : (
+          <div
+            key={block.id}
+            className={cn("min-w-0 break-words", block.kind === AgentRunBlockKind.AgentRunBlockThinking && cn("italic", muted))}
+          >
+            <MessageMarkdown locale={i18n.language} onOpenLink={openExternalURL}>{block.text}</MessageMarkdown>
+          </div>
+        ),
+      )}
+      {state.candidateContent ? (
+        <div className="min-w-0 break-words">
+          <MessageMarkdown locale={i18n.language} onOpenLink={openExternalURL}>{state.candidateContent}</MessageMarkdown>
+        </div>
+      ) : null}
+    </div>
+  )
+}
+
+/** 显示最近一次运行的等待、思考或取消状态，运行中默认展开实时过程。 */
 export function AgentRunState({ run, incoming, conversationID, group, copilot, onStopped }: { run: ConversationAgentRun; incoming: boolean; conversationID?: string; group?: boolean; copilot?: boolean; onStopped: () => Promise<unknown> }) {
   const { t } = useTranslation("inbox")
+  const stream = useAgentRunStream(run.id, run.status === AgentRunStatus.AgentRunStatusRunning, onStopped)
   if (run.status === AgentRunStatus.AgentRunStatusSucceeded || run.status === AgentRunStatus.AgentRunStatusFailed ||
     (run.status === AgentRunStatus.AgentRunStatusCancelled && run.errorCode === "user_cancelled")) return null
   const thinking = run.status === AgentRunStatus.AgentRunStatusRunning
@@ -238,7 +305,12 @@ export function AgentRunState({ run, incoming, conversationID, group, copilot, o
       role="status"
       aria-label={`${senderName} ${label}`}
     >
-      <div className={cn("relative flex min-h-8 max-w-[75%] flex-col justify-center py-2", incoming ? "ml-10" : "mr-10")}>
+      <div className={cn(
+        "relative flex min-h-8 max-w-[75%] flex-col justify-center py-2",
+        // 运行中的过程与最终消息气泡同宽，结束后替换为消息时不再重新换行。
+        thinking && "max-w-[min(36rem,85%)] sm:max-w-[min(36rem,75%)]",
+        incoming ? "ml-10" : "mr-10",
+      )}>
         <ProfileAvatar
           imageURL={run.agentAvatarUrl}
           name={run.agentName}
@@ -252,11 +324,30 @@ export function AgentRunState({ run, incoming, conversationID, group, copilot, o
         {group && incoming ? (
           <span className="mb-1 max-w-full truncate text-xs font-medium text-foreground">{senderName}</span>
         ) : null}
-        <div className="flex items-center gap-1.5">
-          {cancelled ? <BrainIcon aria-hidden className="size-4" /> : null}
-          <span>{label}</span>
-          {conversationID && !cancelled ? <AgentReplyStopButton conversationID={conversationID} runID={run.id} group={group} copilot={copilot} onStopped={onStopped} /> : null}
-        </div>
+        {thinking ? (
+          <Collapsible defaultOpen className="min-w-0">
+            <div className="flex items-center gap-1.5">
+              <CollapsibleTrigger className="group flex min-w-0 cursor-pointer items-center gap-1.5 rounded-sm text-left focus-visible:outline focus-visible:outline-ring">
+                <span className="truncate">{label}</span>
+                <ChevronDownIcon aria-hidden className="size-3.5 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
+              </CollapsibleTrigger>
+              {conversationID ? <AgentReplyStopButton conversationID={conversationID} runID={run.id} group={group} copilot={copilot} onStopped={onStopped} /> : null}
+            </div>
+            <CollapsibleContent className={cn(
+              "text-left text-sm",
+              // 首个快照到达前不占位，展开区域不出现空的缩进边框。
+              stream && cn("mt-2", incoming ? "border-l border-border pl-3" : "border-r border-primary-foreground/30 pr-3"),
+            )}>
+              {stream ? <AgentRunStreamProcess state={stream} incoming={incoming} /> : null}
+            </CollapsibleContent>
+          </Collapsible>
+        ) : (
+          <div className="flex items-center gap-1.5">
+            {cancelled ? <BrainIcon aria-hidden className="size-4" /> : null}
+            <span>{label}</span>
+            {conversationID && !cancelled ? <AgentReplyStopButton conversationID={conversationID} runID={run.id} group={group} copilot={copilot} onStopped={onStopped} /> : null}
+          </div>
+        )}
         {cancelled && reason ? (
           <p className="mt-1 whitespace-pre-wrap break-all">{reason}</p>
         ) : null}

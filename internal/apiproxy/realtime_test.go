@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -140,5 +141,66 @@ func expectEvent(t *testing.T, events <-chan emittedEvent, want emittedEvent) {
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatalf("等待事件 %s 超时", want.name)
+	}
+}
+
+// TestRealtimeDisconnectClosesRunStreams 验证成员事件流断开时一并关闭全部运行过程流。
+func TestRealtimeDisconnectClosesRunStreams(t *testing.T) {
+	frame, err := protocol.Encode(protocol.RunStreamEnded{RunID: "run-1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "text/event-stream")
+		if strings.HasPrefix(request.URL.Path, "/api/realtime/runs/") {
+			_, _ = writer.Write(append(append([]byte("data: "), frame...), '\n', '\n'))
+		}
+		writer.(http.Flusher).Flush()
+		<-request.Context().Done()
+	}))
+	t.Cleanup(server.Close)
+
+	backend, events := newRealtimeTestBackend(t, server.URL)
+	meta := appservice.RequestMeta{Locale: "zh-CN"}
+	member, err := backend.ConnectRealtime(context.Background(), meta)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := backend.ConnectAgentRunStream(context.Background(), meta, "run-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := backend.ConnectAgentRunStream(context.Background(), meta, "run-2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 运行过程事件携带运行编号，订阅方据此区分并发的运行过程流。
+	expectEvent(t, events, emittedEvent{appservice.RealtimeRunFrameEventName,
+		appservice.RealtimeRunFrameEvent{ConnectionID: first.ConnectionID, RunID: "run-1", Frame: string(frame)}})
+	expectEvent(t, events, emittedEvent{appservice.RealtimeRunFrameEventName,
+		appservice.RealtimeRunFrameEvent{ConnectionID: second.ConnectionID, RunID: "run-2", Frame: string(frame)}})
+
+	if err := backend.DisconnectRealtime(context.Background(), meta); err != nil {
+		t.Fatal(err)
+	}
+	// 三条事件流都结束，顺序不固定。
+	closed := map[string]bool{}
+	for range 3 {
+		select {
+		case event := <-events:
+			switch data := event.data.(type) {
+			case appservice.RealtimeClosedEvent:
+				closed[data.ConnectionID] = true
+			case appservice.RealtimeRunClosedEvent:
+				closed[data.ConnectionID] = true
+			default:
+				t.Fatalf("event = %#v", event)
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatalf("等待事件流结束超时，已结束 %v", closed)
+		}
+	}
+	if !closed[member.ConnectionID] || !closed[first.ConnectionID] || !closed[second.ConnectionID] {
+		t.Fatalf("closed = %v", closed)
 	}
 }
