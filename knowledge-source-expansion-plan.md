@@ -1,6 +1,6 @@
 # 知识来源扩展方案：在线文档与网页导入
 
-日期：2026-09-15。状态：方案待确认。
+日期：2026-09-15。状态：已实施，验证记录见第 10 节。
 
 本文承接 [知识文档处理管线 Go 化与 Haystack 移除方案](knowledge-go-pipeline-plan.md) 第 5.3 节中「URL 来源需单独设计后再开」，以及 [知识库 Agent Tool 方案](knowledge-base-agent-tool-plan.md) 中「需要导入本地知识库时另行定义有明确范围、来源标识和完成状态的导入任务」。索引与召回链路复用 [问答知识库索引与召回方案](knowledge-qa-index-plan.md) 已建立的来源化分段体系。
 
@@ -168,3 +168,11 @@ POST   /knowledge-bases/:knowledgeBaseID/documents/:documentID/refetch  { source
 - 检索测试与 `search_knowledge` 对三类来源返回一致的分段正文、上下文和游标读取结果，`text` 与 `web` 的来源名称为文档标题。
 
 前端构建、类型检查与测试通过。界面验证：工具栏可插入的块结构在序列化后能被切分规则识别，编辑、保存、重新打开后结构保持（覆盖表格、列表、代码块组合）；网页导入的状态流转与失败提示；来源列与三点菜单在三类来源下的展示。验证结束后清理本次启动的进程。
+
+## 10. 验证记录
+
+- `wails3 task test:server` 通过。新增 `TestKnowledgeDocumentSourceWithoutFile` 覆盖无原件文档在列表、详情、关键词过滤和混合召回中按标题呈现；`TestKnowledgeTextDocumentLifecycle` 覆盖在线文档的创建投递、索引发布、只改名称不投递、正文未变化不投递、正文变化替换批次并清除旧分段、来源限制与删除清理；`TestKnowledgeWebDocumentLifecycle` 覆盖地址校验、重复导入拒绝、首次抓取写快照、重试读快照不出网、重新抓取替换快照与批次、更新页面地址、抓取失败保留上一批次与上一快照、在线文档不支持重新抓取。`internal/integration/webfetch` 的单元测试覆盖地址规范化、HTML 与纯文本的文件名选择、非 2xx、内容类型不支持、体积上限与连接失败。
+- 前端 `common:build:frontend` 与 `test:frontend` 通过。
+- 2026-09-15 浏览器界面验证（通义千问 `qwen3.7-text-embedding` 1536 维与 `qwen3-rerank`）：「添加文档」下拉包含上传文件、编写文档、导入网页三项；在线编写「在线编写验证」经工具栏插入标题、正文、无序列表和 3×3 表格后保存，约 9 秒内完成索引，列表来源列显示「在线编写」、类型列显示 MD、主操作为「编辑」，重新打开后标题、列表与表格结构保持一致；名称与正文的必填提示均由浏览器显示在对应控件上；导入 `https://zh.wikipedia.org/wiki/Markdown` 后来源列显示「网页导入」，约 30 秒内完成索引并落库 97 段，详情页正文按 Markdown 渲染；网页文档的「重新抓取」可用，在线文档的同一菜单项禁用。
+- 界面验证期间发现并修复：承载正文必填的隐藏控件带 `readonly` 时不参与约束校验，且 `onFocus` 转移焦点会取消浏览器气泡；改为透明、覆盖编辑区且接收字段 ref 的控件后提示正常显示。
+- 验证结束后已停止本次启动的服务端，确认端口释放。
