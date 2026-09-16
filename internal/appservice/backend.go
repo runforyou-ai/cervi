@@ -521,6 +521,8 @@ type ServerConnector interface {
 type RealtimeConnector interface {
 	ConnectRealtime(context.Context, RequestMeta) (RealtimeConnection, error)
 	DisconnectRealtime(context.Context, RequestMeta) error
+	ConnectAgentRunStream(context.Context, RequestMeta, string) (RealtimeConnection, error)
+	DisconnectAgentRunStream(context.Context, RequestMeta, string) error
 }
 
 // ImageSelector 由支持原生文件对话框的平台实现。

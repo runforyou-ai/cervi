@@ -3,6 +3,10 @@ import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 import { test } from "node:test"
 import { decodeServerFrame, type RealtimeServerFrame } from "../src/api/realtime/protocol.ts"
+import type {
+  AgentRunBlockKind,
+  AgentToolCallStatus,
+} from "../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 
 type FixtureCase = {
   name: string
@@ -15,6 +19,8 @@ const fixtures = JSON.parse(
 ) as FixtureCase[]
 
 const conversationId = "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8b"
+const runId = "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8b"
+const streamId = "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8c"
 
 const expectedFrames: Record<string, RealtimeServerFrame> = {
   server_hello: {
@@ -29,6 +35,62 @@ const expectedFrames: Record<string, RealtimeServerFrame> = {
   conversation_removed: { type: "conversation_removed", conversationId },
   conversation_changed_extra_fields: { type: "conversation_changed", conversationId, version: 7n },
   ping_without_data: { type: "ping" },
+  run_stream_snapshot: {
+    type: "run_stream_snapshot",
+    runId,
+    streamId,
+    attempt: 1,
+    sequence: 7n,
+    part: 0,
+    partCount: 2,
+    candidateContent: "根据知识库的记录，",
+    blocks: [
+      { id: "block-1", position: 1n, kind: ("thinking" as AgentRunBlockKind), text: "先确认退款政策", toolCall: undefined },
+      {
+        id: "block-2",
+        position: 2n,
+        kind: ("tool_call" as AgentRunBlockKind),
+        text: "",
+        toolCall: { name: "search_knowledge", status: ("running" as AgentToolCallStatus), startedAt: "2026-09-15T12:00:00Z", completedAt: undefined },
+      },
+    ],
+  },
+  run_stream_snapshot_empty: {
+    type: "run_stream_snapshot",
+    runId,
+    streamId,
+    attempt: 1,
+    sequence: 0n,
+    part: 0,
+    partCount: 1,
+    candidateContent: "",
+    blocks: [],
+  },
+  run_stream_delta: {
+    type: "run_stream_delta",
+    runId,
+    streamId,
+    attempt: 1,
+    baseSequence: 7n,
+    sequence: 9n,
+    operations: [
+      { kind: "append_block_text", blockId: "block-1", text: "，再给出答复" },
+      {
+        kind: "upsert_block",
+        block: {
+          id: "block-2",
+          position: 2n,
+          kind: ("tool_call" as AgentRunBlockKind),
+          text: "",
+          toolCall: { name: "search_knowledge", status: ("succeeded" as AgentToolCallStatus), startedAt: "2026-09-15T12:00:00Z", completedAt: "2026-09-15T12:00:03Z" },
+        },
+      },
+      { kind: "remove_blocks", blockIds: ["block-3"] },
+      { kind: "clear_candidate" },
+      { kind: "append_candidate", text: "退款需要在 7 天内提交。" },
+    ],
+  },
+  run_stream_ended: { type: "run_stream_ended", runId },
 }
 
 test("事件按共用夹具解码，64 位版本不丢精度", () => {

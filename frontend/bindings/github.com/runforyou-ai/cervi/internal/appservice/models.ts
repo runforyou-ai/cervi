@@ -2477,7 +2477,7 @@ export interface ReadInboxConversationsInput {
 }
 
 /**
- * RealtimeConnection 是原生端本地实时连接编号，事件据此区分新旧连接。
+ * RealtimeConnection 是原生端本地事件流编号，事件据此区分新旧事件流。
  */
 export interface RealtimeConnection {
     "connectionId": string;

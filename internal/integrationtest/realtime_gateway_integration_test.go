@@ -12,6 +12,7 @@ import (
 	"net/http/httptest"
 	"reflect"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -23,6 +24,7 @@ import (
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	"github.com/runforyou-ai/cervi/internal/realtime/gateway"
 	"github.com/runforyou-ai/cervi/internal/realtime/protocol"
@@ -39,6 +41,7 @@ type realtimeGatewayHarness struct {
 	backend   *appservice.DirectBackend
 	namespace string
 	url       string
+	runURL    string
 	nats      *nats.Conn
 	tenantCtx context.Context
 }
@@ -77,7 +80,7 @@ func startRealtimeGateway(t *testing.T, f navigationFixture, options gateway.Opt
 	t.Cleanup(realtimeGateway.Shutdown)
 	return &realtimeGatewayHarness{
 		gateway: realtimeGateway, backend: backend, namespace: config.Namespace,
-		url: server.URL + gateway.Path, nats: publisher.Connection(),
+		url: server.URL + gateway.Path, runURL: server.URL + gateway.RunPath, nats: publisher.Connection(),
 		tenantCtx: tenant.WithAccessHost(ctx, accessHost),
 	}
 }
@@ -112,6 +115,33 @@ func (h *realtimeGatewayHarness) request(t *testing.T, token string) *http.Respo
 	return response
 }
 
+// requestRun 携带令牌请求指定运行的过程流并返回响应。
+func (h *realtimeGatewayHarness) requestRun(t *testing.T, token, runID string) *http.Response {
+	t.Helper()
+	request, err := http.NewRequest(http.MethodGet, h.runURL+runID, nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+	request.Header.Set("Authorization", "Bearer "+token)
+	request.Header.Set("Accept-Language", "zh-CN")
+	response, err := http.DefaultClient.Do(request)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = response.Body.Close() })
+	return response
+}
+
+// openRun 建立运行过程流并开始读取事件。
+func (h *realtimeGatewayHarness) openRun(t *testing.T, token, runID string) *realtimeTestClient {
+	t.Helper()
+	response := h.requestRun(t, token, runID)
+	if response.StatusCode != http.StatusOK || response.Header.Get("Content-Type") != "text/event-stream" {
+		t.Fatalf("status = %d, content type = %q", response.StatusCode, response.Header.Get("Content-Type"))
+	}
+	return h.readFrames(t, response)
+}
+
 // connect 建立事件流并读取首个事件，要求其为服务端 Hello。
 func (h *realtimeGatewayHarness) connect(t *testing.T, token string) (*realtimeTestClient, protocol.ServerHello) {
 	t.Helper()
@@ -130,6 +160,12 @@ func (h *realtimeGatewayHarness) open(t *testing.T, token string) *realtimeTestC
 	if response.StatusCode != http.StatusOK || response.Header.Get("Content-Type") != "text/event-stream" {
 		t.Fatalf("status = %d, content type = %q", response.StatusCode, response.Header.Get("Content-Type"))
 	}
+	return h.readFrames(t, response)
+}
+
+// readFrames 启动后台协程逐条解码事件流中的事件，事件流结束时关闭通道。
+func (h *realtimeGatewayHarness) readFrames(t *testing.T, response *http.Response) *realtimeTestClient {
+	t.Helper()
 	client := &realtimeTestClient{t: t, frames: make(chan protocol.Frame, 16)}
 	go func() {
 		defer close(client.frames)
@@ -487,4 +523,124 @@ func TestRealtimeGatewaySlowConsumer(t *testing.T) {
 		t.Fatal(err)
 	}
 	fast.expect(protocol.ConversationChanged{ConversationID: f.groupID, Version: 99})
+}
+
+// runStreamBackend 用可控的运行流替换本进程订阅，验证网关的授权、快照分片、增量写出与失权结束。
+type runStreamBackend struct {
+	gateway.MemberBackend
+	mu         sync.Mutex
+	snapshot   agentruntime.StreamSnapshot
+	running    bool
+	onDelta    func(agentruntime.StreamDelta)
+	onEnd      func()
+	subscribed chan struct{}
+}
+
+// SubscribeAgentRunStream 返回预置快照并登记回调，未标记运行中时返回 false。
+func (b *runStreamBackend) SubscribeAgentRunStream(_ string, onDelta func(agentruntime.StreamDelta), onEnd func()) (agentruntime.StreamSnapshot, func(), bool) {
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if !b.running {
+		return agentruntime.StreamSnapshot{}, nil, false
+	}
+	b.onDelta, b.onEnd = onDelta, onEnd
+	close(b.subscribed)
+	return b.snapshot, func() {
+		b.mu.Lock()
+		defer b.mu.Unlock()
+		b.onDelta, b.onEnd = nil, nil
+	}, true
+}
+
+// publish 向已登记的订阅方推送一条增量。
+func (b *runStreamBackend) publish(t *testing.T, delta agentruntime.StreamDelta) {
+	t.Helper()
+	select {
+	case <-b.subscribed:
+	case <-time.After(5 * time.Second):
+		t.Fatal("等待运行过程流订阅超时")
+	}
+	b.mu.Lock()
+	defer b.mu.Unlock()
+	if b.onDelta == nil {
+		t.Fatal("运行过程流没有订阅方")
+	}
+	b.onDelta(delta)
+}
+
+// insertAgentRun 写入一条属于指定会话的运行记录，供运行过程流授权使用。
+func insertAgentRun(t *testing.T, db *bun.DB, organizationID, conversationID string) string {
+	t.Helper()
+	run := servermodels.AgentRun{
+		ID: uuid.NewV7().String(), OrganizationID: organizationID, ConversationID: conversationID,
+		AgentIdentityID: uuid.NewV7().String(), AgentRevisionID: uuid.NewV7().String(), LaneID: uuid.NewV7().String(),
+		ScopeKind: string(domain.AgentExecutionScopeConversation), ScopeID: conversationID,
+		Status: string(domain.AgentRunStatusRunning), Usage: []byte("{}"),
+		CreatedAt: time.Now().UTC(), UpdatedAt: time.Now().UTC(),
+	}
+	if _, err := db.NewInsert().Model(&run).Exec(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	return run.ID
+}
+
+// TestRealtimeGatewayRunStream 验证运行过程流按会话阅读资格授权、按分片写出快照与增量，并在所属会话失权时结束。
+func TestRealtimeGatewayRunStream(t *testing.T) {
+	f := newNavigationFixture(t)
+	organizationID := f.owner.Organization.ID
+	runID := insertAgentRun(t, f.db, organizationID, f.groupID)
+	stub := &runStreamBackend{subscribed: make(chan struct{})}
+	h := startRealtimeGateway(t, f, testGatewayOptions(), func(backend gateway.MemberBackend) gateway.MemberBackend {
+		stub.MemberBackend = backend
+		return stub
+	})
+	token := loginToken(t, f.db, organizationID, "member@navigation.test")
+
+	// 运行不存在时不区分无权与不存在，返回与业务接口一致的错误体。
+	response := h.requestRun(t, token, uuid.NewV7().String())
+	var payload struct {
+		Error appservice.Error `json:"error"`
+	}
+	if err := json.NewDecoder(response.Body).Decode(&payload); err != nil {
+		t.Fatal(err)
+	}
+	if response.StatusCode != http.StatusNotFound || payload.Error.Reason != "agent_run_process_unavailable" {
+		t.Fatalf("status = %d, error = %+v", response.StatusCode, payload.Error)
+	}
+
+	// 运行不在本进程执行时直接结束该流，客户端按持久事实收敛。
+	idle := h.openRun(t, token, runID)
+	idle.expect(protocol.RunStreamEnded{RunID: runID})
+	idle.expectEnded()
+
+	// 运行在本进程执行时先按分片写出快照，再写出增量。
+	stub.mu.Lock()
+	stub.running = true
+	stub.snapshot = agentruntime.StreamSnapshot{
+		RunID: runID, StreamID: "stream-1", Attempt: 1, Sequence: 2, CandidateContent: "候选",
+		Blocks: []agentruntime.StreamBlock{{ID: "block-1", Position: 1, Kind: domain.AgentRunBlockThinking, Text: "先确认"}},
+	}
+	stub.mu.Unlock()
+	client := h.openRun(t, token, runID)
+	client.expect(protocol.RunStreamSnapshot{
+		RunID: runID, StreamID: "stream-1", Attempt: 1, Sequence: 2, Part: 0, PartCount: 1, CandidateContent: "候选",
+		Blocks: []protocol.RunStreamBlock{{ID: "block-1", Position: 1, Kind: domain.AgentRunBlockThinking, Text: "先确认"}},
+	})
+	stub.publish(t, agentruntime.StreamDelta{
+		RunID: runID, StreamID: "stream-1", Attempt: 1, BaseSequence: 2, Sequence: 3,
+		Operations: []agentruntime.StreamOperation{{Kind: agentruntime.StreamOperationAppendBlockText, BlockID: "block-1", Text: "退款政策"}},
+	})
+	client.expect(protocol.RunStreamDelta{
+		RunID: runID, StreamID: "stream-1", Attempt: 1, BaseSequence: 2, Sequence: 3,
+		Operations: []protocol.RunStreamOperation{{Kind: protocol.RunStreamAppendBlockText, BlockID: "block-1", Text: "退款政策"}},
+	})
+
+	// 失去运行所属会话的阅读资格后，服务端结束该流，不再推送后续内容。
+	if err := realtime.RunInTx(context.Background(), f.db, func(ctx context.Context, _ bun.Tx) error {
+		realtime.Notify(ctx, realtime.UserConversationRemoved(organizationID, f.member.User.ID, f.groupID))
+		return nil
+	}); err != nil {
+		t.Fatal(err)
+	}
+	client.expectEnded()
 }
