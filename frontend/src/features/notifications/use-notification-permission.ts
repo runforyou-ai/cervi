@@ -44,10 +44,13 @@ export function useNotificationPermission() {
     setRequesting(false)
     void refreshPermission()
     window.addEventListener("focus", refreshPermission)
+    // 移动端回到前台不触发窗口焦点事件，按页面可见性再刷新一次。
+    document.addEventListener("visibilitychange", refreshPermission)
     return () => {
       active = false
       mountedRef.current = false
       window.removeEventListener("focus", refreshPermission)
+      document.removeEventListener("visibilitychange", refreshPermission)
     }
   }, [])
 

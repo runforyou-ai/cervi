@@ -1,0 +1,17 @@
+//go:build ios
+
+#import <UIKit/UIKit.h>
+#import <UserNotifications/UserNotifications.h>
+#import "unread_indicator_ios.h"
+
+void cervi_unread_set_badge(int count) {
+    NSInteger badge = count > 0 ? count : 0;
+    dispatch_async(dispatch_get_main_queue(), ^{
+        if (@available(iOS 16.0, *)) {
+            [[UNUserNotificationCenter currentNotificationCenter] setBadgeCount:badge
+                                                         withCompletionHandler:nil];
+            return;
+        }
+        [UIApplication sharedApplication].applicationIconBadgeNumber = badge;
+    });
+}

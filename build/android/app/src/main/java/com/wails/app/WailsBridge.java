@@ -4,6 +4,7 @@ import android.app.Activity;
 import android.app.Notification;
 import android.app.NotificationChannel;
 import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.content.ClipData;
 import android.content.ClipboardManager;
 import android.content.Context;
@@ -51,6 +52,7 @@ import androidx.appcompat.app.AlertDialog;
 import androidx.biometric.BiometricManager;
 import androidx.biometric.BiometricPrompt;
 import androidx.core.app.NotificationCompat;
+import androidx.core.app.NotificationManagerCompat;
 import androidx.core.content.ContextCompat;
 import androidx.fragment.app.FragmentActivity;
 import androidx.security.crypto.EncryptedSharedPreferences;
@@ -75,6 +77,9 @@ public class WailsBridge {
     private static final String TAG = "WailsBridge";
     private static final boolean DEBUG = BuildConfig.DEBUG;
     private static final int LOCATION_PERMISSION_REQUEST = 1002;
+    private static final int NOTIFICATION_PERMISSION_REQUEST = 1001;
+    // All message notifications share one id and are told apart by their tag.
+    private static final int NOTIFICATION_ID = 1;
 
     static {
         // Load the native Go library
@@ -101,6 +106,7 @@ public class WailsBridge {
     private boolean proximityWanted = false;
     private boolean torchOn = false;
     private boolean pendingLocationRequest = false;
+    private String pendingNotificationRequestId;
 
     // Native methods - implemented in Go
     private static native void nativeInit(WailsBridge bridge);
@@ -705,41 +711,130 @@ public class WailsBridge {
     }
 
     /**
-     * Post a local notification. json: {"title","body"}. Requests the
-     * POST_NOTIFICATIONS runtime permission on Android 13+.
+     * Cervi notification bridge. The JSON payload selects an "action":
+     * "notify" posts a message notification, "check-permission" reports the
+     * current authorization and "request-permission" asks the user for it.
+     * Every call reports back to Go as the "cervi:notification" event,
+     * correlated by "requestId".
      */
     public void postNotification(final String json) {
         mainHandler.post(() -> {
+            String requestId = "";
             try {
                 JSONObject opts = new JSONObject(json);
-                String title = opts.optString("title", "Notification");
-                String body = opts.optString("body", "");
-                String channelId = "wails_default";
-                NotificationManager nm =
-                        (NotificationManager) activity.getSystemService(Context.NOTIFICATION_SERVICE);
-                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                    NotificationChannel ch = new NotificationChannel(
-                            channelId, "General", NotificationManager.IMPORTANCE_DEFAULT);
-                    nm.createNotificationChannel(ch);
+                requestId = opts.optString("requestId", "");
+                String action = opts.optString("action", "notify");
+                if ("check-permission".equals(action)) {
+                    emitNotificationResult(requestId, true, notificationPermission());
+                    return;
                 }
-                if (Build.VERSION.SDK_INT >= 33 && activity.checkSelfPermission(
-                        "android.permission.POST_NOTIFICATIONS") != PackageManager.PERMISSION_GRANTED) {
-                    activity.requestPermissions(
-                            new String[]{"android.permission.POST_NOTIFICATIONS"}, 1001);
+                if ("request-permission".equals(action)) {
+                    requestNotificationPermission(requestId);
+                    return;
                 }
-                Notification n = new NotificationCompat.Builder(activity, channelId)
-                        .setSmallIcon(android.R.drawable.ic_dialog_info)
-                        .setContentTitle(title)
-                        .setContentText(body)
-                        .setAutoCancel(true)
-                        .build();
-                nm.notify((int) (System.currentTimeMillis() & 0x0fffffff), n);
-                emitEvent("common:notification", "{\"ok\":true}");
+                postMessageNotification(opts);
+                emitNotificationResult(requestId, true, notificationPermission());
             } catch (Exception e) {
                 Log.e(TAG, "postNotification failed", e);
-                emitEvent("common:notification", "{\"ok\":false}");
+                emitNotificationResult(requestId, false, "");
             }
         });
+    }
+
+    /**
+     * Report a notification bridge outcome back to Go. An empty permission
+     * means the call failed before a status could be determined.
+     */
+    private void emitNotificationResult(String requestId, boolean ok, String permission) {
+        try {
+            JSONObject result = new JSONObject();
+            result.put("requestId", requestId != null ? requestId : "");
+            result.put("ok", ok);
+            result.put("permission", permission);
+            emitEvent("cervi:notification", result.toString());
+        } catch (Exception e) {
+            Log.e(TAG, "emitNotificationResult failed", e);
+        }
+    }
+
+    /**
+     * Current notification authorization: "granted", "denied" or "prompt".
+     * "prompt" is only reported while the runtime permission has never been
+     * requested, so the settings page can tell "not asked yet" from "turned
+     * off".
+     */
+    private String notificationPermission() {
+        if (Build.VERSION.SDK_INT >= 33 && activity.checkSelfPermission(
+                "android.permission.POST_NOTIFICATIONS") != PackageManager.PERMISSION_GRANTED) {
+            return notificationPrefs().getBoolean("permission_requested", false) ? "denied" : "prompt";
+        }
+        return NotificationManagerCompat.from(activity).areNotificationsEnabled() ? "granted" : "denied";
+    }
+
+    /**
+     * Ask for the POST_NOTIFICATIONS runtime permission. Below Android 13, or
+     * when it is already granted, the current status is reported straight away.
+     */
+    private void requestNotificationPermission(String requestId) {
+        if (Build.VERSION.SDK_INT < 33 || activity.checkSelfPermission(
+                "android.permission.POST_NOTIFICATIONS") == PackageManager.PERMISSION_GRANTED) {
+            emitNotificationResult(requestId, true, notificationPermission());
+            return;
+        }
+        notificationPrefs().edit().putBoolean("permission_requested", true).apply();
+        pendingNotificationRequestId = requestId;
+        activity.requestPermissions(
+                new String[]{"android.permission.POST_NOTIFICATIONS"}, NOTIFICATION_PERMISSION_REQUEST);
+    }
+
+    /**
+     * Post one message notification. Silent notifications use their own
+     * low-importance channel; the message id is the notification tag, so a
+     * repeated id replaces the previous notification instead of stacking.
+     */
+    private void postMessageNotification(JSONObject opts) {
+        String title = opts.optString("title", "");
+        String body = opts.optString("body", "");
+        String tag = opts.optString("id", "");
+        boolean silent = opts.optBoolean("silent", false);
+        String channelId = silent ? "cervi_messages_silent" : "cervi_messages";
+        NotificationManager manager =
+                (NotificationManager) activity.getSystemService(Context.NOTIFICATION_SERVICE);
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            NotificationChannel channel = new NotificationChannel(
+                    channelId,
+                    activity.getString(silent
+                            ? R.string.notification_channel_messages_silent
+                            : R.string.notification_channel_messages),
+                    silent ? NotificationManager.IMPORTANCE_LOW : NotificationManager.IMPORTANCE_HIGH);
+            if (silent) {
+                channel.setSound(null, null);
+            }
+            manager.createNotificationChannel(channel);
+        }
+        // Tapping the notification brings the existing app task back to the front.
+        Intent intent = new Intent(activity, MainActivity.class)
+                .setFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP | Intent.FLAG_ACTIVITY_CLEAR_TOP);
+        int intentFlags = PendingIntent.FLAG_UPDATE_CURRENT;
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
+            intentFlags |= PendingIntent.FLAG_IMMUTABLE;
+        }
+        PendingIntent contentIntent = PendingIntent.getActivity(activity, 0, intent, intentFlags);
+        Notification notification = new NotificationCompat.Builder(activity, channelId)
+                .setSmallIcon(R.drawable.ic_notification)
+                .setContentTitle(title)
+                .setContentText(body)
+                .setStyle(new NotificationCompat.BigTextStyle().bigText(body))
+                .setContentIntent(contentIntent)
+                .setSilent(silent)
+                .setAutoCancel(true)
+                .build();
+        manager.notify(tag, NOTIFICATION_ID, notification);
+    }
+
+    /** Device-local notification state that survives restarts. */
+    private SharedPreferences notificationPrefs() {
+        return activity.getSharedPreferences("cervi_notifications", Context.MODE_PRIVATE);
     }
 
     /**
@@ -900,6 +995,14 @@ public class WailsBridge {
     }
 
     public void onRequestPermissionsResult(int requestCode, int[] grantResults) {
+        if (requestCode == NOTIFICATION_PERMISSION_REQUEST) {
+            String requestId = pendingNotificationRequestId;
+            pendingNotificationRequestId = null;
+            if (requestId != null) {
+                emitNotificationResult(requestId, true, notificationPermission());
+            }
+            return;
+        }
         if (requestCode == LOCATION_PERMISSION_REQUEST) {
             boolean shouldResume = pendingLocationRequest;
             pendingLocationRequest = false;

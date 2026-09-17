@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next"
 import { NavLink, Outlet } from "react-router"
 
 import { loadInbox, type Identity } from "@/api"
+import { useMobileMessageNotifications } from "@/apps/mobile/mobile-message-notifications"
 import {
   MobileNavigationProvider,
   useMobileNavigation,
@@ -21,12 +22,19 @@ import { cn } from "@/lib/utils"
 
 const MobileWorkspaceContext = createContext<Identity | null>(null)
 
+/** 在登录工作区内挂载新消息系统通知与应用角标。 */
+function MobileMessageNotifications({ identity }: { identity: Identity }) {
+  useMobileMessageNotifications(identity)
+  return null
+}
+
 /** 在登录外壳内为所有移动端页面提供身份和导航上下文，回到前台时重建实时事件流。 */
 export function MobileWorkspaceLayout() {
   return (
     <SessionShell restartOnResume>
       {(identity) => (
         <MobileWorkspaceContext value={identity}>
+          <MobileMessageNotifications identity={identity} />
           <MobileNavigationProvider>
             <div className="flex h-dvh min-h-0 flex-col overflow-hidden bg-sidebar pt-[env(safe-area-inset-top)]">
               <Outlet />

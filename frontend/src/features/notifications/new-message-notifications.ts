@@ -3,6 +3,7 @@ import {
   WorkStatus,
   type MessageNotificationInput,
 } from "@/api"
+import { resolveAppPlatform } from "@/platform/app-platform"
 import {
   canSendNotification,
   checkNotificationPermission,
@@ -43,7 +44,11 @@ function canDeliverWithPolicy(
 
 /** 判断用户是否正在查看应用。 */
 function isApplicationVisible() {
-  return document.visibilityState === "visible" && document.hasFocus()
+  if (document.visibilityState !== "visible") {
+    return false
+  }
+  // 移动端 WebView 没有窗口焦点语义，应用在前台即视为正在查看。
+  return resolveAppPlatform() === "mobile" || document.hasFocus()
 }
 
 /** 激活当前用户的新消息通知策略。 */

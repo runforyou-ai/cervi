@@ -1,10 +1,10 @@
-/** Web 与桌面端通知权限、本机偏好、消息投递和未读提示适配。 */
+/** 各端通知权限、本机偏好、消息投递和未读提示适配。 */
 import {
   NotificationPermissionStatus,
-  checkNotificationPermission as checkDesktopNotificationPermission,
-  requestNotificationPermission as requestDesktopNotificationPermission,
+  checkNotificationPermission as checkNativeNotificationPermission,
+  requestNotificationPermission as requestNativeNotificationPermission,
   sendNativeMessageNotification,
-  updateUnreadIndicator as updateDesktopUnreadIndicator,
+  updateUnreadIndicator as updateNativeUnreadIndicator,
   type MessageNotificationInput,
   type UnreadIndicatorState,
 } from "@/api"
@@ -97,11 +97,7 @@ export function setNotificationSoundEnabled(
 export async function checkNotificationPermission(): Promise<
   NotificationPermissionState
 > {
-  const platform = resolveAppPlatform()
-  if (platform === "mobile") {
-    return NotificationPermissionStatus.NotificationPermissionStatusUnsupported
-  }
-  if (platform === "web") {
+  if (resolveAppPlatform() === "web") {
     if (!("Notification" in window) || !window.isSecureContext) {
       return NotificationPermissionStatus.NotificationPermissionStatusUnsupported
     }
@@ -112,18 +108,14 @@ export async function checkNotificationPermission(): Promise<
       ? NotificationPermissionStatus.NotificationPermissionStatusGranted
       : NotificationPermissionStatus.NotificationPermissionStatusDenied
   }
-  return (await checkDesktopNotificationPermission()) as NotificationPermissionState
+  return (await checkNativeNotificationPermission()) as NotificationPermissionState
 }
 
 /** 在用户操作中申请当前端的通知权限。 */
 export async function requestNotificationPermission(): Promise<
   NotificationPermissionState
 > {
-  const platform = resolveAppPlatform()
-  if (platform === "mobile") {
-    return NotificationPermissionStatus.NotificationPermissionStatusUnsupported
-  }
-  if (platform === "web") {
+  if (resolveAppPlatform() === "web") {
     if (!("Notification" in window) || !window.isSecureContext) {
       return NotificationPermissionStatus.NotificationPermissionStatusUnsupported
     }
@@ -135,7 +127,7 @@ export async function requestNotificationPermission(): Promise<
       ? NotificationPermissionStatus.NotificationPermissionStatusGranted
       : NotificationPermissionStatus.NotificationPermissionStatusDenied
   }
-  return (await requestDesktopNotificationPermission()) as NotificationPermissionState
+  return (await requestNativeNotificationPermission()) as NotificationPermissionState
 }
 
 /** 打开 macOS 通知设置。 */
@@ -180,13 +172,9 @@ export function canSendNotification(state: NotificationPermissionState) {
 export async function deliverMessageNotification(
   input: MessageNotificationInput,
 ) {
-  const platform = resolveAppPlatform()
-  if (platform === "desktop") {
+  if (resolveAppPlatform() !== "web") {
     await sendNativeMessageNotification(input)
     return
-  }
-  if (platform !== "web") {
-    throw new Error("current platform does not support message notifications")
   }
   if (!("Notification" in window) || Notification.permission !== "granted") {
     throw new Error("browser notification permission is unavailable")
@@ -203,12 +191,12 @@ export async function deliverMessageNotification(
 export function updateNotificationUnreadIndicator(
   state: UnreadIndicatorState,
 ) {
-  if (resolveAppPlatform() !== "desktop") {
+  if (resolveAppPlatform() === "web") {
     return Promise.resolve()
   }
 
   const update = unreadIndicatorQueue.then(() =>
-    updateDesktopUnreadIndicator(state),
+    updateNativeUnreadIndicator(state),
   )
   unreadIndicatorQueue = update.catch(() => undefined)
   return update
