@@ -10,7 +10,12 @@ import { useTheme } from "next-themes"
 import { useTranslation } from "react-i18next"
 import { Toaster as Sonner, type ToasterProps } from "sonner"
 
-const Toaster = ({ toastOptions, ...props }: ToasterProps) => {
+const Toaster = ({
+  toastOptions,
+  style,
+  closeButton = true,
+  ...props
+}: ToasterProps) => {
   const { theme = "system" } = useTheme()
   const { t } = useTranslation("common")
 
@@ -19,7 +24,7 @@ const Toaster = ({ toastOptions, ...props }: ToasterProps) => {
       {...props}
       theme={theme as ToasterProps["theme"]}
       className="toaster group"
-      closeButton
+      closeButton={closeButton}
       containerAriaLabel={t("notifications")}
       toastOptions={{
         closeButtonAriaLabel: t("closeNotification"),
@@ -38,6 +43,7 @@ const Toaster = ({ toastOptions, ...props }: ToasterProps) => {
           "--normal-text": "var(--popover-foreground)",
           "--normal-border": "var(--border)",
           "--border-radius": "var(--radius)",
+          ...style,
         } as React.CSSProperties
       }
     />

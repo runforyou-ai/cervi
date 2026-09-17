@@ -152,6 +152,7 @@ function AgentTool({ call }: { call: AgentToolCall }) {
 export function AgentProcess({ process, incoming }: { process: ConversationAgentProcessData; incoming: boolean }) {
   const { t, i18n } = useTranslation(["inbox", "common"])
   const [opened, setOpened] = useState(false)
+  const mobile = resolveAppPlatform() === "mobile"
   const seconds = Math.max(0, Math.round(process.durationMilliseconds / 1000))
   // 成功运行的过程内容不可变，首次展开后按运行编号读取并长期复用缓存。
   const detail = useResource(
@@ -161,12 +162,16 @@ export function AgentProcess({ process, incoming }: { process: ConversationAgent
   )
   return (
     <Collapsible className="mb-3 min-w-0" onOpenChange={(open) => open && setOpened(true)}>
-      <div className="flex items-center gap-3">
+      <div className={cn(
+        "flex gap-3",
+        // 移动端窄屏把用量换到下一行，思考标题保持完整。
+        mobile ? "flex-col gap-1" : "items-center",
+      )}>
         <CollapsibleTrigger className={cn(
           "group flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-sm py-1 text-left text-xs focus-visible:outline focus-visible:outline-ring",
           incoming ? "justify-start text-muted-foreground" : "justify-end text-primary-foreground/75",
-          // 移动端按触屏点击区域抬高行高，点击区不与引用块和正文重叠。
-          resolveAppPlatform() === "mobile" && "py-2",
+          // 移动端按触屏点击区域抬高行高并占满气泡宽度，点击区不与引用块和正文重叠。
+          mobile && "w-full py-2",
         )}>
           <LightbulbIcon aria-hidden className="size-4 shrink-0 text-yellow-400 dark:text-yellow-300" />
           <span className="truncate">{t("agentThoughtCompleted", { seconds })}</span>
@@ -175,6 +180,7 @@ export function AgentProcess({ process, incoming }: { process: ConversationAgent
         <div className={cn(
           "flex shrink-0 gap-2 text-[11px]",
           incoming ? "text-muted-foreground" : "text-primary-foreground/75",
+          mobile && (incoming ? "self-start" : "self-end"),
         )}>
           <span>{t("agentUsageInput", { count: process.inputTokens })}</span>
           <span>{t("agentUsageOutput", { count: process.outputTokens })}</span>

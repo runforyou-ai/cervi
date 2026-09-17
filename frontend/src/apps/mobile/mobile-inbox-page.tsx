@@ -1,4 +1,5 @@
 /** 移动端统一会话摘要列表、阅读状态菜单和内部聊天入口。 */
+import { useRef } from "react"
 import { BellOffIcon, PlusIcon, SearchIcon } from "lucide-react"
 import { messagePreview } from "@/lib/message-preview"
 import { useTranslation } from "react-i18next"
@@ -19,6 +20,7 @@ import {
   type GroupInboxConversationData,
 } from "@/api"
 import {
+  inboxScopes,
   MobileInboxFilter,
   MobileInboxScopes,
   useMobileInboxQuery,
@@ -47,12 +49,12 @@ import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
 import {
   useMemberChatPollingActive,
 } from "@/features/inbox/use-member-chat-polling"
-import { useMobileWorkspace } from "./mobile-workspace-layout"
+import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
 import {
   mobileConversationPath,
   mobileSearchPath,
   useMobileNavigation,
-} from "./mobile-navigation"
+} from "@/apps/mobile/mobile-navigation"
 import { InboxListPanel } from "@/features/inbox/inbox-list-panel"
 import { useInboxList } from "@/features/inbox/use-inbox-list"
 import { useInboxListViewport } from "@/features/inbox/use-inbox-list-viewport"
@@ -173,10 +175,7 @@ function MobileConversationRow({
           ) : null}
         </div>
         <div className="mt-0.5 flex min-w-0 items-center gap-2">
-          <p
-            title={preview}
-            className="min-w-0 flex-1 truncate text-sm text-muted-foreground"
-          >
+          <p className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
             {preview}
           </p>
           {internalConversation?.muted ? (
@@ -251,6 +250,7 @@ function MobileInboxList({ query, changeQuery }: ReturnType<typeof useMobileInbo
     history: inboxWindows,
   })
   const actions = useConversationListActions()
+  const swipeStart = useRef<{ x: number; y: number } | null>(null)
   useMinuteTick()
   const conversations = list.conversations.filter(isMobileInboxConversation)
   const initial = list.revision === 0
@@ -263,7 +263,7 @@ function MobileInboxList({ query, changeQuery }: ReturnType<typeof useMobileInbo
           <>
             <Button
               variant="ghost"
-              size="icon-sm"
+              size="icon-lg"
               className="shrink-0"
               aria-label={t("inbox:searchLabel")}
               onClick={() =>
@@ -276,8 +276,8 @@ function MobileInboxList({ query, changeQuery }: ReturnType<typeof useMobileInbo
               <DropdownMenuTrigger asChild>
                 <Button
                   variant="ghost"
-                  size="icon-sm"
-                  className="shrink-0 bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
+                  size="icon-lg"
+                  className="shrink-0 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
                   aria-label={t("inbox.add")}
                 >
                   <PlusIcon />
@@ -305,42 +305,76 @@ function MobileInboxList({ query, changeQuery }: ReturnType<typeof useMobileInbo
       <div className="flex h-11 shrink-0 items-center border-b">
         <MobileInboxFilter query={query} onChange={changeQuery} onOpenChange={viewport.setMenu} />
       </div>
-      <InboxListPanel list={list} viewport={viewport} mobile>
-        {initial && !list.error ? (
-          <LoadingIndicator className="min-h-64 flex-1 justify-center">
-            {t("common:status.loading")}
-          </LoadingIndicator>
-        ) : null}
-        {initial && list.error ? (
-          <MobilePageState
-            title={t("inbox.loadError")}
-            onRetry={() => void list.retry()}
-          />
-        ) : null}
-        {!initial && conversations.length === 0 && !list.hasBefore && !list.hasAfter ? (
-          <MobilePageState
-            title={t("inbox.emptyTitle")}
-            description={t("inbox.emptyDescription")}
-          />
-        ) : null}
-        {conversations.length > 0 ? (
-          <ul>
-            {conversations.map((conversation) => (
-              <MobileConversationRow
-                key={conversation.id}
-                conversation={conversation}
-                actions={actions}
-                onMenuChange={viewport.setMenu}
-                onOpen={(conversation) =>
-                  navigate(mobileConversationPath(conversation), {
-                    state: { conversation, mobileBack: true },
-                  })
-                }
-              />
-            ))}
-          </ul>
-        ) : null}
-      </InboxListPanel>
+      <div
+        className="flex min-h-0 flex-1 flex-col"
+        onTouchStart={(event) => {
+          // 菜单打开期间的触摸只服务于菜单本身。
+          const touch = event.touches[0]
+          swipeStart.current =
+            touch && !viewport.interaction.current.menu
+              ? { x: touch.clientX, y: touch.clientY }
+              : null
+        }}
+        onTouchCancel={() => {
+          swipeStart.current = null
+        }}
+        onTouchEnd={(event) => {
+          const start = swipeStart.current
+          const touch = event.changedTouches[0]
+          swipeStart.current = null
+          if (!start || !touch || viewport.interaction.current.menu) return
+          const moveX = touch.clientX - start.x
+          const moveY = touch.clientY - start.y
+          // 横向位移达到阈值且是纵向的两倍以上时判定为切换范围的滑动。
+          if (Math.abs(moveX) < 64 || Math.abs(moveX) < Math.abs(moveY) * 2)
+            return
+          const current = inboxScopes.findIndex(
+            (item) => item.value === query.scope,
+          )
+          const next = inboxScopes[current + (moveX < 0 ? 1 : -1)]
+          if (!next) return
+          // 抬手后的点击不应落到滑动经过的会话行上。
+          event.preventDefault()
+          changeQuery({ scope: next.value })
+        }}
+      >
+        <InboxListPanel list={list} viewport={viewport} mobile>
+          {initial && !list.error ? (
+            <LoadingIndicator className="min-h-64 flex-1 justify-center">
+              {t("common:status.loading")}
+            </LoadingIndicator>
+          ) : null}
+          {initial && list.error ? (
+            <MobilePageState
+              title={t("inbox.loadError")}
+              onRetry={() => void list.retry()}
+            />
+          ) : null}
+          {!initial && conversations.length === 0 && !list.hasBefore && !list.hasAfter ? (
+            <MobilePageState
+              title={t("inbox.emptyTitle")}
+              description={t("inbox.emptyDescription")}
+            />
+          ) : null}
+          {conversations.length > 0 ? (
+            <ul>
+              {conversations.map((conversation) => (
+                <MobileConversationRow
+                  key={conversation.id}
+                  conversation={conversation}
+                  actions={actions}
+                  onMenuChange={viewport.setMenu}
+                  onOpen={(conversation) =>
+                    navigate(mobileConversationPath(conversation), {
+                      state: { conversation, mobileBack: true },
+                    })
+                  }
+                />
+              ))}
+            </ul>
+          ) : null}
+        </InboxListPanel>
+      </div>
     </section>
   )
 }

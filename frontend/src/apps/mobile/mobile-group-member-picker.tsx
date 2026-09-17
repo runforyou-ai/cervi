@@ -1,6 +1,6 @@
 /** 移动端建群和添加群成员共用的真人与 AI 员工搜索和多选。 */
 import { groupAdditionalMemberMaxCount } from "@/features/inbox/group-conversation-schema"
-import { useState, type Ref } from "react"
+import { useId, useState, type Ref } from "react"
 import { useTranslation } from "react-i18next"
 
 import { OrganizationIdentityType, type MemberOption } from "@/api"
@@ -24,6 +24,7 @@ export function MobileGroupMemberPicker({
   excludedIdentityIDs = [],
   selectionLimit = groupAdditionalMemberMaxCount,
   showSelectionSummary = true,
+  label,
 }: {
   currentIdentityID: string
   selected: MemberOption[]
@@ -34,9 +35,12 @@ export function MobileGroupMemberPicker({
   excludedIdentityIDs?: string[]
   selectionLimit?: number
   showSelectionSummary?: boolean
+  label?: string
 }) {
   const { t } = useTranslation(["mobile", "common"])
   const { t: tInbox } = useTranslation("inbox")
+  const labelID = useId()
+  const searchID = useId()
   const [search, setSearch] = useState("")
   const { data, loading, refreshing, error, refresh } = useResource(
     resourceKeys.memberOptions(),
@@ -54,54 +58,52 @@ export function MobileGroupMemberPicker({
   )
 
   return (
-    <div className="space-y-2">
+    <div className="space-y-2" role="group" aria-labelledby={labelID}>
+      <div className="flex items-center justify-between gap-2">
+        <FieldLabel id={labelID} required>
+          {label ?? tInbox("groupMembersLabel")}
+        </FieldLabel>
+        <span className="text-xs text-muted-foreground" role="status">
+          {tInbox("groupMembersSelected", { count: selected.length })}
+        </span>
+      </div>
       {showSelectionSummary ? (
-        <>
-          <div className="flex items-center justify-between gap-2">
-            <FieldLabel htmlFor="mobile-group-members" required>
-              {tInbox("groupMembersLabel")}
-            </FieldLabel>
-            <span className="text-xs text-muted-foreground" role="status">
-              {tInbox("groupMembersSelected", { count: selected.length })}
-            </span>
-          </div>
-          <div className="h-20 overflow-y-auto" aria-label={t("group.selectedMembers")}>
-            {selected.length ? (
-              <ul className="flex flex-wrap gap-2">
-                {selected.map((member) => (
-                  <li key={member.id} className="max-w-full">
-                    <Button
-                      type="button"
-                      variant="outline"
-                      className="min-h-11 max-w-full"
-                      disabled={disabled}
-                      aria-label={t("group.removeMember", { name: member.displayName })}
-                      onClick={() =>
-                        onChange(selected.filter((item) => item.id !== member.id))
-                      }
-                    >
-                      <span className="truncate">{member.displayName}</span>
-                      <span className="text-muted-foreground">
-                        {t("common:actions.remove")}
-                      </span>
-                    </Button>
-                  </li>
-                ))}
-              </ul>
-            ) : (
-              <p className="py-3 text-sm text-muted-foreground">
-                {t("group.noSelection")}
-              </p>
-            )}
-          </div>
-        </>
+        <div className="h-20 overflow-y-auto" aria-label={t("group.selectedMembers")}>
+          {selected.length ? (
+            <ul className="flex flex-wrap gap-2">
+              {selected.map((member) => (
+                <li key={member.id} className="max-w-full">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className="min-h-11 max-w-full"
+                    disabled={disabled}
+                    aria-label={t("group.removeMember", { name: member.displayName })}
+                    onClick={() =>
+                      onChange(selected.filter((item) => item.id !== member.id))
+                    }
+                  >
+                    <span className="truncate">{member.displayName}</span>
+                    <span className="text-muted-foreground">
+                      {t("common:actions.remove")}
+                    </span>
+                  </Button>
+                </li>
+              ))}
+            </ul>
+          ) : (
+            <p className="py-3 text-sm text-muted-foreground">
+              {t("group.noSelection")}
+            </p>
+          )}
+        </div>
       ) : null}
       <div className="space-y-2">
-        <label htmlFor="mobile-group-members" className="text-sm">
+        <label htmlFor={searchID} className="text-sm">
           {t("group.searchMembers")}
         </label>
         <Input
-          id="mobile-group-members"
+          id={searchID}
           ref={inputRef}
           value={search}
           type="search"

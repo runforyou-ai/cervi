@@ -214,7 +214,9 @@ function MobileDirectoryResults({
             disabled={loading || refreshing}
             onClick={() => void refresh()}
           >
-            {t("contacts.loadMoreError")} · {t("common:actions.retry")}
+            {t(kind === "agents" ? "agents.loadMoreError" : "contacts.loadMoreError")}
+            {" · "}
+            {t("common:actions.retry")}
           </Button>
         </div>
       ) : null}

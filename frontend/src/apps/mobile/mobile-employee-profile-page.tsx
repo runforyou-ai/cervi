@@ -37,8 +37,12 @@ export function MobileEmployeeProfilePage() {
         backTo="/contacts/employees"
         actions={
           error && user ? (
-            <Button variant="outline" size="sm" onClick={() => void refresh()}>
-              {t("inbox.refreshFailed")} · {t("common:actions.retry")}
+            <Button
+              variant="ghost"
+              className="min-h-11"
+              onClick={() => void refresh()}
+            >
+              {t("refreshFailed")}
             </Button>
           ) : undefined
         }

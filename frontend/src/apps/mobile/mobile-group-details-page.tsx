@@ -154,7 +154,7 @@ export function MobileGroupDetailsPage() {
                 disabled={refreshing}
                 onClick={() => void refresh()}
               >
-                {t("inbox.refreshFailed")}
+                {t("refreshFailed")}
               </Button>
             ) : null
           }

@@ -121,7 +121,15 @@ export function MobileIndividualConversationPage({
       ) : !conversation ? (
         <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-sm text-muted-foreground">
           <p>{t(summary.error ? "conversationLoadError" : "conversationUnavailable")}</p>
-          {summary.error ? <Button variant="outline" size="sm" onClick={() => void summary.refresh()}>{t("common:actions.retry")}</Button> : null}
+          {summary.error ? (
+            <Button
+              variant="outline"
+              className="min-h-11"
+              onClick={() => void summary.refresh()}
+            >
+              {t("common:actions.retry")}
+            </Button>
+          ) : null}
         </div>
       ) : (
         <MobileIndividualThread

@@ -697,16 +697,18 @@ export function ConversationComposer({
             ))}
           </div>
         ) : null}
-        <button
-          type="button"
-          className="absolute inset-x-0 top-0 z-10 h-3 -translate-y-1/2 cursor-row-resize touch-none border-0 bg-transparent p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-          aria-label={t("composerResize")}
-          onPointerDown={startInputResize}
-          onPointerMove={resizeInput}
-          onPointerUp={stopInputResize}
-          onPointerCancel={stopInputResize}
-          onKeyDown={resizeInputFromKeyboard}
-        />
+        {mobile ? null : (
+          <button
+            type="button"
+            className="absolute inset-x-0 top-0 z-10 h-3 -translate-y-1/2 cursor-row-resize touch-none border-0 bg-transparent p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            aria-label={t("composerResize")}
+            onPointerDown={startInputResize}
+            onPointerMove={resizeInput}
+            onPointerUp={stopInputResize}
+            onPointerCancel={stopInputResize}
+            onKeyDown={resizeInputFromKeyboard}
+          />
+        )}
         <div className="overflow-hidden rounded-xl border border-input bg-background shadow-xs">
           {replyTo ? (
             <div className="flex items-start justify-between gap-3 border-b px-3 py-2 text-xs">
@@ -752,7 +754,7 @@ export function ConversationComposer({
             aria-invalid={form.formState.errors.body ? true : undefined}
             className={cn(
               "max-h-[200px] resize-none rounded-none border-0 bg-transparent py-2 shadow-none caret-primary focus-visible:ring-0 dark:bg-transparent",
-              mobile ? "min-h-10" : "min-h-20",
+              mobile ? "min-h-10 md:text-base" : "min-h-20",
             )}
             onInput={(event) => {
               resizeComposerInput(
@@ -874,7 +876,7 @@ export function ConversationComposer({
                 {replyAssistant}
               </div>
             )}
-            <Button type="submit" size="sm" className={mobile ? "min-h-11" : undefined} disabled={isSubmitting || Boolean(disabledReason) || isBodyEmpty || replyTo?.deleted}>
+            <Button type="submit" size="sm" className={mobile ? "relative h-9 px-4 after:absolute after:inset-x-0 after:-inset-y-1 after:content-['']" : undefined} disabled={isSubmitting || Boolean(disabledReason) || isBodyEmpty || replyTo?.deleted}>
               {isSubmitting && showSubmitting ? (
                 <LoaderCircleIcon className="animate-spin" />
               ) : null}
