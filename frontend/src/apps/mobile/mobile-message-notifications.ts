@@ -1,5 +1,5 @@
 /** 移动端新消息系统通知与应用角标。 */
-import { useEffect } from "react"
+import { useEffect, useLayoutEffect } from "react"
 
 import { loadInbox, WorkStatus, type Identity } from "@/api"
 import { activateNotificationPolicy } from "@/features/notifications/new-message-notifications"
@@ -12,27 +12,31 @@ import { updateNotificationUnreadIndicator } from "@/platform/notifications"
 export function useMobileMessageNotifications(identity: Identity | null) {
   const organizationId = identity?.organization.id
   const userId = identity?.user.id
+  const notificationOrganizationId = identity?.user.organizationId
   const messageNotificationsEnabled = identity?.user.messageNotificationsEnabled
   const workStatus = identity?.user.workStatus
 
   /** 同步当前用户的新消息通知策略。 */
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (
-      !identity ||
+      !notificationOrganizationId ||
+      !userId ||
       messageNotificationsEnabled === undefined ||
       workStatus === undefined
     ) {
       return
     }
     return activateNotificationPolicy(
-      {
-        organizationId: identity.user.organizationId,
-        userId: identity.user.id,
-      },
+      { organizationId: notificationOrganizationId, userId },
       messageNotificationsEnabled,
       workStatus,
     )
-  }, [identity, messageNotificationsEnabled, workStatus])
+  }, [
+    notificationOrganizationId,
+    userId,
+    messageNotificationsEnabled,
+    workStatus,
+  ])
 
   useNewMessageNotifications(identity, () => {})
 
@@ -45,14 +49,14 @@ export function useMobileMessageNotifications(identity: Identity | null) {
     async () => (await loadInbox({ limit: 1 })).attentionUnreadCount,
     { enabled: Boolean(organizationId && userId) },
   )
-  const unreadCount = attention.data ?? 0
+  const unreadCount = attention.data
   const attentionEnabled =
     Boolean(messageNotificationsEnabled) &&
     workStatus === WorkStatus.WorkStatusWorking
 
-  /** 同步应用图标角标。 */
+  /** 同步应用图标角标，提醒总数读到之前不改动角标。 */
   useEffect(() => {
-    if (!userId) {
+    if (!userId || unreadCount === undefined) {
       return
     }
     void updateNotificationUnreadIndicator({

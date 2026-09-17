@@ -6,12 +6,12 @@ import { Link, useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import { logout, updateUserWorkStatus, type WorkStatus } from "@/api"
-import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
-import { deactivateNotificationPolicy } from "@/features/notifications/new-message-notifications"
 import {
   MobilePageHeader,
   MobileScrollArea,
 } from "@/apps/mobile/mobile-page"
+import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
+import { deactivateNotificationPolicy } from "@/features/notifications/new-message-notifications"
 import {
   AlertDialog,
   AlertDialogAction,

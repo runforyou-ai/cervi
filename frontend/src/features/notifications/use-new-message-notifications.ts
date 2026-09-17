@@ -1,4 +1,4 @@
-/** 把成员事件流确认的新消息接入 Web 与桌面端的本地通知投递。 */
+/** 把成员事件流确认的新消息接入各端的本地通知投递。 */
 import { useEffect, useEffectEvent } from "react"
 import { useTranslation } from "react-i18next"
 
@@ -19,7 +19,7 @@ import { messagePreview } from "@/lib/message-preview"
 import { NewMessageWatcher } from "./new-message-watcher"
 import { notifyNewMessage } from "./new-message-notifications"
 
-/** 登录身份就绪后观察新消息并投递本地通知，投递成功时上报一次提醒。 */
+/** 登录身份就绪后观察新消息并投递本地通知，投递成功时回调调用方。 */
 export function useNewMessageNotifications(
   identity: Identity | null,
   onDelivered: () => void,

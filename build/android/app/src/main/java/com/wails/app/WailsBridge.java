@@ -38,6 +38,7 @@ import android.os.StatFs;
 import android.os.VibrationEffect;
 import android.os.Vibrator;
 import android.provider.Settings;
+import android.service.notification.StatusBarNotification;
 import android.speech.tts.TextToSpeech;
 import android.util.DisplayMetrics;
 import android.util.Log;
@@ -712,10 +713,11 @@ public class WailsBridge {
 
     /**
      * Cervi notification bridge. The JSON payload selects an "action":
-     * "notify" posts a message notification, "check-permission" reports the
-     * current authorization and "request-permission" asks the user for it.
-     * Every call reports back to Go as the "cervi:notification" event,
-     * correlated by "requestId".
+     * "notify" posts a message notification, "clear" withdraws the message
+     * notifications this app posted, "check-permission" reports the current
+     * authorization and "request-permission" asks the user for it. Every call
+     * reports back to Go as the "cervi:notification" event, correlated by
+     * "requestId".
      */
     public void postNotification(final String json) {
         mainHandler.post(() -> {
@@ -730,6 +732,16 @@ public class WailsBridge {
                 }
                 if ("request-permission".equals(action)) {
                     requestNotificationPermission(requestId);
+                    return;
+                }
+                if ("clear".equals(action)) {
+                    clearMessageNotifications();
+                    emitNotificationResult(requestId, true, notificationPermission());
+                    return;
+                }
+                String permission = notificationPermission();
+                if (!"granted".equals(permission)) {
+                    emitNotificationResult(requestId, false, permission);
                     return;
                 }
                 postMessageNotification(opts);
@@ -830,6 +842,24 @@ public class WailsBridge {
                 .setAutoCancel(true)
                 .build();
         manager.notify(tag, NOTIFICATION_ID, notification);
+    }
+
+    /**
+     * Withdraw the message notifications this app posted. Only notifications
+     * carrying the message notification id are cancelled, so the foreground
+     * service notification stays untouched.
+     */
+    private void clearMessageNotifications() {
+        if (Build.VERSION.SDK_INT < Build.VERSION_CODES.M) {
+            return;
+        }
+        NotificationManager manager =
+                (NotificationManager) activity.getSystemService(Context.NOTIFICATION_SERVICE);
+        for (StatusBarNotification posted : manager.getActiveNotifications()) {
+            if (posted.getId() == NOTIFICATION_ID) {
+                manager.cancel(posted.getTag(), posted.getId());
+            }
+        }
     }
 
     /** Device-local notification state that survives restarts. */
