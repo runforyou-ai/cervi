@@ -982,7 +982,7 @@ function ConversationTimelineContent({
                                     </button>
                                   ) : null}
                                   {message.agentProcess ? (
-                                    <AgentProcess process={message.agentProcess} incoming={incoming} />
+                                    <AgentProcess process={message.agentProcess} incoming={incoming} onPrimary={!incoming && !agentNotice} />
                                   ) : null}
                                   <div className="flex min-w-0 items-end gap-2">
                                     {agentNotice ? (
@@ -1086,23 +1086,25 @@ function ConversationTimelineContent({
               )
             })}
           </div>
-          {timeline.mode === "latest" && !currentPage?.hasLater && currentPage?.latestAgentRun ? (
-            <AgentRunState
-              key={currentPage.latestAgentRun.id}
-              run={currentPage.latestAgentRun}
-              onStopped={timeline.refresh}
-              conversationID={
-                conversationType === ConversationType.ConversationTypeAgent ||
-                conversationType === ConversationType.ConversationTypeGroup ||
-                conversationType === ConversationType.ConversationTypeCopilot
-                  ? conversationID
-                  : undefined
-              }
-              group={conversationType === ConversationType.ConversationTypeGroup}
-              copilot={conversationType === ConversationType.ConversationTypeCopilot}
-              incoming={conversationType !== ConversationType.ConversationTypeCustomer}
-            />
-          ) : null}
+          {timeline.mode === "latest" && !currentPage?.hasLater
+            ? (currentPage?.agentRuns ?? []).map((run) => (
+              <AgentRunState
+                key={run.id}
+                run={run}
+                onStopped={timeline.refresh}
+                conversationID={
+                  conversationType === ConversationType.ConversationTypeAgent ||
+                  conversationType === ConversationType.ConversationTypeGroup ||
+                  conversationType === ConversationType.ConversationTypeCopilot
+                    ? conversationID
+                    : undefined
+                }
+                group={conversationType === ConversationType.ConversationTypeGroup}
+                copilot={conversationType === ConversationType.ConversationTypeCopilot}
+                incoming={conversationType !== ConversationType.ConversationTypeCustomer}
+              />
+            ))
+            : null}
           {timeline.mode === "latest" && !currentPage?.hasLater ? (
             <AgentQueueState
               agents={currentPage?.pendingAgents ?? []}

@@ -304,7 +304,7 @@ func (s *Service) StopGroupAgentReply(ctx context.Context, meta RequestMeta, con
 	return withNormalizedSlices(s.backend.StopGroupAgentReply(ctx, meta, conversationID, runID))
 }
 
-// GetAgentRunProcess 返回一次成功运行的有序过程内容和模型用量。
+// GetAgentRunProcess 返回一次已完成运行的有序过程内容和模型用量。
 func (s *Service) GetAgentRunProcess(ctx context.Context, meta RequestMeta, runID string) (AgentRunProcess, error) {
 	return withNormalizedSlices(s.backend.GetAgentRunProcess(ctx, meta, runID))
 }

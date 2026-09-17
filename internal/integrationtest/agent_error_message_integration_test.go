@@ -25,6 +25,7 @@ func testAgentFailureMessages(t *testing.T, db *bun.DB, identity *servermodels.I
 	ctx := context.Background()
 	query := conversationaction.NewListConversationMessagesQuery(db)
 	failures := make(map[string]bool)
+	processed := make(map[string]bool)
 	finalizer := agentrunaction.NewExecuteAction(db, tasks, nil, testAttachmentReader(db), nil)
 	for _, runID := range []string{firstRunID, secondRunID} {
 		var run servermodels.AgentRun
@@ -42,6 +43,11 @@ func testAgentFailureMessages(t *testing.T, db *bun.DB, identity *servermodels.I
 			t.Fatalf("failure message = %+v", message)
 		}
 		failures[message.ID] = true
+		hasBlocks, err := db.NewSelect().Model((*servermodels.AgentRunBlock)(nil)).Where("arb.agent_run_id = ?", runID).Exists(ctx)
+		if err != nil {
+			t.Fatal(err)
+		}
+		processed[message.ID] = hasBlocks
 		if err := finalizer.FinalizeFailure(ctx, agentrunaction.RunInput{RunID: runID}, errors.New("duplicate completion")); err != nil {
 			t.Fatal(err)
 		}
@@ -56,8 +62,9 @@ func testAgentFailureMessages(t *testing.T, db *bun.DB, identity *servermodels.I
 			continue
 		}
 		count++
-		if message.AgentProcess != nil || message.Sender == nil || message.Sender.IdentityType == nil || *message.Sender.IdentityType != domain.OrganizationIdentityTypeAgent {
-			t.Fatalf("failure sender = %+v", message)
+		// 中断前产生过内容的运行在失败消息上给出过程引用，没有产生内容的运行不给。
+		if (message.AgentProcess != nil) != processed[message.ID] || message.Sender == nil || message.Sender.IdentityType == nil || *message.Sender.IdentityType != domain.OrganizationIdentityTypeAgent {
+			t.Fatalf("failure sender = %+v, process expected = %v", message, processed[message.ID])
 		}
 		cursor := &conversationaction.MessageCursorPoint{ID: message.ID, MessageSeq: message.MessageSeq}
 		earlier, err := query.Execute(ctx, identity, conversationaction.ConversationMessageHistoryInput{ConversationID: conversationID, Before: cursor})

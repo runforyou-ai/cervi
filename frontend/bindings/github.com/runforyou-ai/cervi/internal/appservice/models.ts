@@ -345,7 +345,7 @@ export interface AgentRunContentBlock {
 }
 
 /**
- * AgentRunProcess 定义一次成功运行的有序过程内容和模型用量。
+ * AgentRunProcess 定义一次已完成运行的有序过程内容和模型用量。
  */
 export interface AgentRunProcess {
     "id": string;
@@ -694,7 +694,7 @@ export interface ContactSummary {
 }
 
 /**
- * ConversationAgentProcess 定义成功消息的运行引用和模型用量，过程内容按运行编号单独读取。
+ * ConversationAgentProcess 定义已完成运行的过程引用和模型用量，过程内容按运行编号单独读取。
  */
 export interface ConversationAgentProcess {
     "id": string;
@@ -704,15 +704,17 @@ export interface ConversationAgentProcess {
 }
 
 /**
- * ConversationAgentRun 定义消息窗口中的最近一次运行状态。
+ * ConversationAgentRun 定义消息窗口中尚未由结果消息表达的运行状态，取消运行携带自身过程引用。
  */
 export interface ConversationAgentRun {
     "agentName": string;
     "agentAvatarUrl": string;
     "id": string;
+    "agentIdentityId": string;
     "status": AgentRunStatus;
     "errorCode": string | null;
     "lastError": string | null;
+    "process": ConversationAgentProcess | null;
 }
 
 /**
@@ -770,7 +772,7 @@ export interface ConversationMessage {
  * ConversationMessageList 定义成员消息页。
  */
 export interface ConversationMessageList {
-    "latestAgentRun": ConversationAgentRun | null;
+    "agentRuns": ConversationAgentRun[] | null;
     "pendingAgents": ConversationPendingAgent[] | null;
     "hasEarlier": boolean;
     "hasLater": boolean;

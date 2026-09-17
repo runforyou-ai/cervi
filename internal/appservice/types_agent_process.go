@@ -21,7 +21,7 @@ const (
 	AgentToolCallFailed    AgentToolCallStatus = AgentToolCallStatus(domain.AgentToolCallFailed)
 )
 
-// ConversationAgentProcess 定义成功消息的运行引用和模型用量，过程内容按运行编号单独读取。
+// ConversationAgentProcess 定义已完成运行的过程引用和模型用量，过程内容按运行编号单独读取。
 type ConversationAgentProcess struct {
 	ID                   string `json:"id"`
 	DurationMilliseconds int64  `json:"durationMilliseconds"`
@@ -29,7 +29,7 @@ type ConversationAgentProcess struct {
 	OutputTokens         int    `json:"outputTokens"`
 }
 
-// AgentRunProcess 定义一次成功运行的有序过程内容和模型用量。
+// AgentRunProcess 定义一次已完成运行的有序过程内容和模型用量。
 type AgentRunProcess struct {
 	ID                   string                 `json:"id"`
 	DurationMilliseconds int64                  `json:"durationMilliseconds"`
@@ -56,12 +56,14 @@ type AgentToolCall struct {
 	Status    AgentToolCallStatus `json:"status"`
 }
 
-// ConversationAgentRun 定义消息窗口中的最近一次运行状态。
+// ConversationAgentRun 定义消息窗口中尚未由结果消息表达的运行状态，取消运行携带自身过程引用。
 type ConversationAgentRun struct {
-	AgentName      string         `json:"agentName"`
-	AgentAvatarURL string         `json:"agentAvatarUrl"`
-	ID             string         `json:"id"`
-	Status         AgentRunStatus `json:"status"`
-	ErrorCode      *string        `json:"errorCode"`
-	LastError      *string        `json:"lastError"`
+	AgentName       string                    `json:"agentName"`
+	AgentAvatarURL  string                    `json:"agentAvatarUrl"`
+	ID              string                    `json:"id"`
+	AgentIdentityID string                    `json:"agentIdentityId"`
+	Status          AgentRunStatus            `json:"status"`
+	ErrorCode       *string                   `json:"errorCode"`
+	LastError       *string                   `json:"lastError"`
+	Process         *ConversationAgentProcess `json:"process"`
 }

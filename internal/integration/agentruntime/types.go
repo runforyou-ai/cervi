@@ -101,7 +101,7 @@ type Usage struct {
 	TotalTokens      int `json:"totalTokens"`
 }
 
-// RunResult 定义稳定 Agent 回复及其输入边界。
+// RunResult 定义稳定 Agent 回复及其输入边界；运行出错时 Content 与 EndSeq 为零值，Usage 和 Blocks 仍给出已产生的部分。
 type RunResult struct {
 	Content string
 	EndSeq  int64
@@ -109,7 +109,7 @@ type RunResult struct {
 	Blocks  []Block
 }
 
-// Runtime 执行一次可吸收后续输入的 Agent Run。
+// Runtime 执行一次可吸收后续输入的 Agent Run；返回错误时一并给出已产生的用量和内容块。
 type Runtime interface {
 	Run(context.Context, RunRequest, InputFeed) (RunResult, error)
 }

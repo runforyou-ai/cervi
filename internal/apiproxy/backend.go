@@ -194,6 +194,12 @@ func (b *Backend) normalizeOutput(output any) {
 		for index := range value.Messages {
 			b.normalizeConversationMessage(&value.Messages[index])
 		}
+		for index := range value.AgentRuns {
+			value.AgentRuns[index].AgentAvatarURL = b.absoluteContentURL(value.AgentRuns[index].AgentAvatarURL)
+		}
+		for index := range value.PendingAgents {
+			value.PendingAgents[index].AvatarURL = b.absoluteContentURL(value.PendingAgents[index].AvatarURL)
+		}
 	case *appservice.GroupConversation:
 		value.ImageURL = b.absoluteContentURL(value.ImageURL)
 		for index := range value.Participants {

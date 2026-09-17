@@ -16,7 +16,7 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// GetAgentRunProcessQuery 按运行编号读取一次成功运行的有序过程内容。
+// GetAgentRunProcessQuery 按运行编号读取一次已完成运行的有序过程内容。
 type GetAgentRunProcessQuery struct {
 	db *bun.DB
 }
@@ -26,7 +26,7 @@ func NewGetAgentRunProcessQuery(db *bun.DB) *GetAgentRunProcessQuery {
 	return &GetAgentRunProcessQuery{db: db}
 }
 
-// Execute 校验运行所属会话的阅读资格后返回过程内容和模型用量。
+// Execute 校验运行所属会话的阅读资格后返回过程内容和模型用量，成功、失败和取消的运行一律按已持久化的内容返回。
 func (q *GetAgentRunProcessQuery) Execute(ctx context.Context, identity *servermodels.Identity, runID string) (AgentRunProcess, error) {
 	if !common.ValidUUID(runID) {
 		return AgentRunProcess{}, ErrAgentRunProcessUnavailable
@@ -36,7 +36,10 @@ func (q *GetAgentRunProcessQuery) Execute(ctx context.Context, identity *serverm
 		var run servermodels.AgentRun
 		err := tx.NewSelect().Model(&run).
 			Where("agr.organization_id = ? AND agr.id = ?", identity.Organization.ID, runID).
-			Where("agr.status = ?", domain.AgentRunStatusSucceeded).Scan(ctx)
+			Where("agr.status IN (?)", bun.In([]domain.AgentRunStatus{
+				domain.AgentRunStatusSucceeded, domain.AgentRunStatusFailed, domain.AgentRunStatusCancelled,
+			})).
+			Where("agr.started_at IS NOT NULL AND agr.completed_at IS NOT NULL").Scan(ctx)
 		if errors.Is(err, sql.ErrNoRows) {
 			return ErrAgentRunProcessUnavailable
 		} else if err != nil {
@@ -48,9 +51,6 @@ func (q *GetAgentRunProcessQuery) Execute(ctx context.Context, identity *serverm
 				return ErrAgentRunProcessUnavailable
 			}
 			return err
-		}
-		if run.StartedAt == nil || run.CompletedAt == nil {
-			return fmt.Errorf("load completed agent process: %w", ErrDataInvariant)
 		}
 		process = AgentRunProcess{ID: run.ID, DurationMilliseconds: run.CompletedAt.Sub(*run.StartedAt).Milliseconds(), Blocks: []agentruntime.Block{}}
 		if err := json.Unmarshal(run.Usage, &process.Usage); err != nil {

@@ -2195,7 +2195,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		// 最新窗口和锚点窗口均返回消息所属的运行引用，不将过程附到用户消息。
 		for _, anchor := range []string{"", *run.ResponseMessageID} {
 			history, err := conversationaction.NewListConversationMessagesQuery(db).Execute(context.Background(), loggedIn.Identity, conversationaction.ConversationMessageHistoryInput{ConversationID: agentConversation.ID, AroundMessageID: anchor})
-			if err != nil || history.LatestAgentRun == nil || history.LatestAgentRun.ID != run.ID || history.LatestAgentRun.AgentName != "售前智能体" {
+			if err != nil || len(history.AgentRuns) != 0 {
 				t.Fatalf("agent message history = %#v, error = %v", history, err)
 			}
 			foundProcess := false
@@ -2270,7 +2270,13 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			if _, err := feed.Claim(ctx, pending[0].Seq); err != nil {
 				return agentruntime.RunResult{}, err
 			}
-			return agentruntime.RunResult{}, errors.New("model rejected input")
+			return agentruntime.RunResult{
+				Usage: agentruntime.Usage{PromptTokens: 5, CompletionTokens: 2, TotalTokens: 7},
+				Blocks: []agentruntime.Block{{
+					ID: uuid.NewV7().String(), Position: 1, ModelCallID: uuid.NewV7().String(),
+					Kind: domain.AgentRunBlockThinking, Payload: agentruntime.BlockPayload{Text: "中断前的思考"},
+				}},
+			}, errors.New("model rejected input")
 		}}
 		if err := agentrunaction.NewExecuteAction(db, taskRuntime, failingRuntime, testAttachmentReader(db), nil).Execute(context.Background(), agentrunaction.RunInput{RunID: failedRun.ID}); err == nil {
 			t.Fatal("failing agent run succeeded")
@@ -2285,12 +2291,26 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatalf("failed claimed agent run = %#v, state = %#v", failedRun, state)
 		}
 		failedHistory, err := conversationaction.NewListConversationMessagesQuery(db).Execute(context.Background(), loggedIn.Identity, conversationaction.ConversationMessageHistoryInput{ConversationID: agentConversation.ID})
-		if err != nil || failedHistory.LatestAgentRun == nil || failedHistory.LatestAgentRun.ID != failedRun.ID || failedHistory.LatestAgentRun.Status != domain.AgentRunStatusFailed || failedHistory.LatestAgentRun.LastError == nil {
+		if err != nil || failedRun.LastError == nil || len(failedHistory.AgentRuns) != 0 {
 			t.Fatalf("failed run message state = %#v, error = %v", failedHistory, err)
 		}
-		// 过程内容只对成功运行开放。
-		if _, err := conversationaction.NewGetAgentRunProcessQuery(db).Execute(context.Background(), loggedIn.Identity, failedRun.ID); !errors.Is(err, conversationaction.ErrAgentRunProcessUnavailable) {
-			t.Fatalf("failed agent run process error = %v", err)
+		// 失败由结果消息表达，该消息携带中断前已产生的过程引用。
+		if failedRun.ResponseMessageID == nil {
+			t.Fatal("failed run has no result message")
+		}
+		failedProcess := (*conversationaction.ConversationAgentProcess)(nil)
+		for _, message := range failedHistory.Messages {
+			if message.ID == *failedRun.ResponseMessageID {
+				failedProcess = message.AgentProcess
+			}
+		}
+		if failedProcess == nil || failedProcess.ID != failedRun.ID || failedProcess.Usage.TotalTokens != 7 {
+			t.Fatalf("failed message agent process = %#v", failedProcess)
+		}
+		// 失败运行的过程内容同样按运行编号读取。
+		failedRunProcess, err := conversationaction.NewGetAgentRunProcessQuery(db).Execute(context.Background(), loggedIn.Identity, failedRun.ID)
+		if err != nil || len(failedRunProcess.Blocks) != 1 || failedRunProcess.Blocks[0].Payload.Text != "中断前的思考" || failedRunProcess.Usage.TotalTokens != 7 {
+			t.Fatalf("failed agent run process = %#v, error = %v", failedRunProcess, err)
 		}
 		// 运行过程流不限运行状态，失败运行同样按会话阅读资格授权。
 		if streamConversationID, err := authorizeRunStream.Execute(context.Background(), loggedIn.Identity, failedRun.ID); err != nil || streamConversationID != agentConversation.ID {

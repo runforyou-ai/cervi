@@ -290,8 +290,8 @@ func TestRunStreamsModelChunks(t *testing.T) {
 	}
 }
 
-// TestRunCancellationDiscardsProcess 验证取消工具执行时不把取消作为可修正错误继续调用模型。
-func TestRunCancellationDiscardsProcess(t *testing.T) {
+// TestRunCancellationKeepsPartialProcess 验证取消工具执行时不把取消作为可修正错误继续调用模型，并返回中断前已产生的过程内容。
+func TestRunCancellationKeepsPartialProcess(t *testing.T) {
 	runtime, err := New()
 	if err != nil {
 		t.Fatal(err)
@@ -313,7 +313,7 @@ func TestRunCancellationDiscardsProcess(t *testing.T) {
 			}
 		}
 	}}, feed)
-	if err == nil || modelCalls != 1 || len(result.Blocks) != 0 || result.Content != "" {
+	if err == nil || modelCalls != 1 || len(result.Blocks) == 0 || result.Content != "" {
 		t.Fatalf("cancelled result = %#v, model calls = %d, error = %v", result, modelCalls, err)
 	}
 }

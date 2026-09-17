@@ -4,9 +4,7 @@ package conversation
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
-	"errors"
 	"fmt"
 
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -14,25 +12,11 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// loadConversationAgentProcesses 在已授权的消息窗口中批量补充成功运行的过程引用和最近运行状态。
+// loadConversationAgentProcesses 在已授权的消息窗口中批量补充已完成运行的过程引用、尚未由消息表达的运行状态和等待发言的 AI 员工。
 func loadConversationAgentProcesses(ctx context.Context, db bun.IDB, organizationID, conversationID string, history *ConversationMessageHistory) error {
-	var latest struct {
-		servermodels.AgentRun `bun:",embed"`
-		AgentName             string  `bun:"agent_name"`
-		AgentAvatarFileID     *string `bun:"agent_avatar_file_id"`
+	if err := loadConversationAgentRuns(ctx, db, organizationID, conversationID, history); err != nil {
+		return err
 	}
-	err := db.NewSelect().Model((*servermodels.AgentRun)(nil)).
-		ColumnExpr("agr.*").ColumnExpr("oi.display_name AS agent_name").
-		ColumnExpr("oi.avatar_file_id AS agent_avatar_file_id").
-		Join("JOIN organization_identities AS oi ON oi.id = agr.agent_identity_id AND oi.organization_id = agr.organization_id").
-		Where("agr.organization_id = ? AND agr.conversation_id = ?", organizationID, conversationID).
-		OrderExpr("agr.created_at DESC, agr.id DESC").Limit(1).Scan(ctx, &latest)
-	if errors.Is(err, sql.ErrNoRows) {
-		return nil
-	} else if err != nil {
-		return fmt.Errorf("load latest conversation agent run: %w", err)
-	}
-	history.LatestAgentRun = &ConversationAgentRun{ID: latest.ID, AgentName: latest.AgentName, AgentAvatarFileID: latest.AgentAvatarFileID, Status: domain.AgentRunStatus(latest.Status), ErrorCode: latest.ErrorCode, LastError: latest.LastError}
 	if err := loadConversationPendingAgents(ctx, db, organizationID, conversationID, history); err != nil {
 		return err
 	}
@@ -48,18 +32,72 @@ func loadConversationAgentProcesses(ctx context.Context, db bun.IDB, organizatio
 	var runs []servermodels.AgentRun
 	if err := db.NewSelect().Model(&runs).
 		Where("agr.organization_id = ? AND agr.conversation_id = ?", organizationID, conversationID).
-		Where("agr.status = ? AND agr.response_message_id IN (?)", domain.AgentRunStatusSucceeded, bun.In(messageIDs)).Scan(ctx); err != nil {
+		Where("agr.response_message_id IN (?)", bun.In(messageIDs)).
+		Where("agr.started_at IS NOT NULL AND agr.completed_at IS NOT NULL").
+		Where(agentRunHasProcessCondition).Scan(ctx); err != nil {
 		return fmt.Errorf("load message agent processes: %w", err)
 	}
 	for _, run := range runs {
-		if run.StartedAt == nil || run.CompletedAt == nil || run.ResponseMessageID == nil {
-			return fmt.Errorf("load completed agent process: %w", ErrDataInvariant)
-		}
-		process := &ConversationAgentProcess{ID: run.ID, DurationMilliseconds: run.CompletedAt.Sub(*run.StartedAt).Milliseconds()}
-		if err := json.Unmarshal(run.Usage, &process.Usage); err != nil {
-			return fmt.Errorf("decode agent usage: %w", err)
+		process, err := conversationAgentProcess(&run)
+		if err != nil {
+			return err
 		}
 		history.Messages[messagePositions[*run.ResponseMessageID]].AgentProcess = process
+	}
+	return nil
+}
+
+// agentRunHasProcessCondition 限定已持久化过程内容的运行，没有内容的运行不给出可展开的过程引用。
+const agentRunHasProcessCondition = `EXISTS (
+	SELECT 1 FROM agent_run_blocks AS arb
+	WHERE arb.organization_id = agr.organization_id AND arb.agent_run_id = agr.id
+)`
+
+// conversationAgentProcess 按运行的起止时间和模型用量构造过程引用。
+func conversationAgentProcess(run *servermodels.AgentRun) (*ConversationAgentProcess, error) {
+	process := &ConversationAgentProcess{ID: run.ID, DurationMilliseconds: run.CompletedAt.Sub(*run.StartedAt).Milliseconds()}
+	if err := json.Unmarshal(run.Usage, &process.Usage); err != nil {
+		return nil, fmt.Errorf("decode agent usage: %w", err)
+	}
+	return process, nil
+}
+
+// loadConversationAgentRuns 读取尚未由结果消息表达的运行：仍在执行的运行，以及结束后会话再无新消息的取消运行。取消时间与消息创建时间同取数据库时钟。
+func loadConversationAgentRuns(ctx context.Context, db bun.IDB, organizationID, conversationID string, history *ConversationMessageHistory) error {
+	var rows []struct {
+		servermodels.AgentRun `bun:",embed"`
+		AgentName             string  `bun:"agent_name"`
+		AgentAvatarFileID     *string `bun:"agent_avatar_file_id"`
+		HasProcess            bool    `bun:"has_process"`
+	}
+	if err := db.NewSelect().Model((*servermodels.AgentRun)(nil)).
+		ColumnExpr("agr.*").ColumnExpr("oi.display_name AS agent_name").
+		ColumnExpr("oi.avatar_file_id AS agent_avatar_file_id").
+		ColumnExpr(agentRunHasProcessCondition+" AS has_process").
+		Join("JOIN organization_identities AS oi ON oi.id = agr.agent_identity_id AND oi.organization_id = agr.organization_id").
+		Join("JOIN conversations AS c ON c.id = agr.conversation_id AND c.organization_id = agr.organization_id").
+		Join("LEFT JOIN messages AS lm ON lm.id = c.last_message_id AND lm.organization_id = c.organization_id").
+		Where("agr.organization_id = ? AND agr.conversation_id = ?", organizationID, conversationID).
+		Where("agr.response_message_id IS NULL").
+		Where("agr.status IN (?) OR (agr.status = ? AND (lm.created_at IS NULL OR agr.completed_at > lm.created_at))",
+			bun.In([]domain.AgentRunStatus{domain.AgentRunStatusQueued, domain.AgentRunStatusRunning}),
+			domain.AgentRunStatusCancelled).
+		OrderExpr("agr.created_at, agr.id").Scan(ctx, &rows); err != nil {
+		return fmt.Errorf("load conversation agent runs: %w", err)
+	}
+	history.AgentRuns = make([]ConversationAgentRun, 0, len(rows))
+	for _, row := range rows {
+		run := ConversationAgentRun{ID: row.ID, AgentIdentityID: row.AgentIdentityID, AgentName: row.AgentName,
+			AgentAvatarFileID: row.AgentAvatarFileID, Status: domain.AgentRunStatus(row.Status),
+			ErrorCode: row.ErrorCode, LastError: row.LastError}
+		if row.HasProcess && row.StartedAt != nil && row.CompletedAt != nil {
+			process, err := conversationAgentProcess(&row.AgentRun)
+			if err != nil {
+				return err
+			}
+			run.Process = process
+		}
+		history.AgentRuns = append(history.AgentRuns, run)
 	}
 	return nil
 }

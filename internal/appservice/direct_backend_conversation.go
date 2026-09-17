@@ -791,9 +791,9 @@ var conversationMessageValidationKeys = map[conversationaction.ValidationCode]ce
 
 // conversationMessageListFromAction 共用成员消息窗口及游标转换。
 func (o *directOperations) conversationMessageListFromAction(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, history conversationaction.ConversationMessageHistory) (ConversationMessageList, error) {
-	agentAvatarFileIDs := make([]*string, 0, len(history.PendingAgents)+1)
-	if history.LatestAgentRun != nil {
-		agentAvatarFileIDs = append(agentAvatarFileIDs, history.LatestAgentRun.AgentAvatarFileID)
+	agentAvatarFileIDs := make([]*string, 0, len(history.PendingAgents)+len(history.AgentRuns))
+	for _, run := range history.AgentRuns {
+		agentAvatarFileIDs = append(agentAvatarFileIDs, run.AgentAvatarFileID)
 	}
 	for _, agent := range history.PendingAgents {
 		agentAvatarFileIDs = append(agentAvatarFileIDs, agent.AvatarFileID)
@@ -803,8 +803,12 @@ func (o *directOperations) conversationMessageListFromAction(ctx context.Context
 		return ConversationMessageList{}, conversationMessageError(ctx, meta, err, identity.Organization.ID, conversationID)
 	}
 	result := ConversationMessageList{HasEarlier: history.HasEarlier, HasLater: history.HasLater, Messages: make([]ConversationMessage, 0, len(history.Messages))}
-	if run := history.LatestAgentRun; run != nil {
-		result.LatestAgentRun = &ConversationAgentRun{ID: run.ID, AgentName: run.AgentName, AgentAvatarURL: optionalFileURL(avatarURLs, run.AgentAvatarFileID), Status: AgentRunStatus(run.Status), ErrorCode: run.ErrorCode, LastError: run.LastError}
+	result.AgentRuns = make([]ConversationAgentRun, 0, len(history.AgentRuns))
+	for _, run := range history.AgentRuns {
+		result.AgentRuns = append(result.AgentRuns, ConversationAgentRun{ID: run.ID, AgentIdentityID: run.AgentIdentityID,
+			AgentName: run.AgentName, AgentAvatarURL: optionalFileURL(avatarURLs, run.AgentAvatarFileID),
+			Status: AgentRunStatus(run.Status), ErrorCode: run.ErrorCode, LastError: run.LastError,
+			Process: conversationAgentProcessFromAction(run.Process)})
 	}
 	result.PendingAgents = make([]ConversationPendingAgent, 0, len(history.PendingAgents))
 	for _, agent := range history.PendingAgents {
