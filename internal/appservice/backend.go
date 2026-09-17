@@ -438,6 +438,9 @@ type Backend interface {
 	// ListAvailableAIModels 返回指定品牌的预设模型目录。
 	//cervi:route GET /integrations/model-services/models query=brand
 	ListAvailableAIModels(context.Context, RequestMeta, AIProviderBrand) (AIProviderModelList, error)
+	// DiscoverAIProviderModels 读取模型服务实例当前可用的模型目录。
+	//cervi:route POST /integrations/model-services/discover-models
+	DiscoverAIProviderModels(context.Context, RequestMeta, AIProviderConnectionInput) (AIProviderModelList, error)
 	// TestAIProviderConnection 测试模型服务供应商草稿配置。
 	//cervi:route POST /integrations/model-services/test
 	TestAIProviderConnection(context.Context, RequestMeta, AIProviderConnectionInput) error

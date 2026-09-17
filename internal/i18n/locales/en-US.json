@@ -366,6 +366,7 @@
   "field.role_description_too_long": "The role description cannot exceed 200 characters.",
   "field.role_permissions_invalid": "The role contains unsupported permissions.",
   "field.ai_provider_brand_invalid": "Select a supported provider brand.",
+  "field.ai_provider_credential_type_invalid": "Select a credential type supported by this provider.",
   "field.ai_provider_name_required": "Enter a provider name.",
   "field.ai_provider_name_too_long": "The provider name cannot exceed 100 characters.",
   "field.ai_provider_name_duplicate": "This provider name is already in use.",

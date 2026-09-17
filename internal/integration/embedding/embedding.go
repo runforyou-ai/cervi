@@ -43,7 +43,7 @@ func NewClient() *Client {
 // Embed 按固定批量生成输入文本的向量，并校验返回维度。
 func (c *Client) Embed(ctx context.Context, credential Credential, model string, dimension int, inputs []string) ([][]float32, error) {
 	baseURL := strings.TrimRight(strings.TrimSpace(credential.BaseURL), "/")
-	if baseURL == "" || strings.TrimSpace(credential.APIKey) == "" {
+	if baseURL == "" {
 		return nil, &Error{Code: "embedding_model_unavailable"}
 	}
 	vectors := make([][]float32, 0, len(inputs))
@@ -58,7 +58,10 @@ func (c *Client) Embed(ctx context.Context, credential Credential, model string,
 			return nil, &Error{Code: "embedding_model_unavailable"}
 		}
 		request.Header.Set("Content-Type", "application/json")
-		request.Header.Set("Authorization", "Bearer "+credential.APIKey)
+		// 无凭据的自建或本机服务不携带鉴权头。
+		if credential.APIKey != "" {
+			request.Header.Set("Authorization", "Bearer "+credential.APIKey)
+		}
 		response, err := c.http.Do(request)
 		if err != nil {
 			var networkError net.Error

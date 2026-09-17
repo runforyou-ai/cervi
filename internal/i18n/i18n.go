@@ -287,6 +287,7 @@ const (
 	FieldRoleDescriptionTooLong           Key = "field.role_description_too_long"
 	FieldRolePermissionsInvalid           Key = "field.role_permissions_invalid"
 	FieldAIProviderBrandInvalid           Key = "field.ai_provider_brand_invalid"
+	FieldAIProviderCredentialTypeInvalid  Key = "field.ai_provider_credential_type_invalid"
 	FieldAIProviderNameRequired           Key = "field.ai_provider_name_required"
 	FieldAIProviderNameTooLong            Key = "field.ai_provider_name_too_long"
 	FieldAIProviderNameDuplicate          Key = "field.ai_provider_name_duplicate"

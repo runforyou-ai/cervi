@@ -23,7 +23,8 @@ import (
 func newKnowledgeBaseInput(t *testing.T, db *bun.DB, identity *servermodels.Identity, name string, category domain.KnowledgeBaseCategory) knowledgeaction.Input {
 	t.Helper()
 	provider, err := aiprovideraction.NewCreateAIProviderAction(db).Execute(context.Background(), identity, aiprovideraction.Input{
-		Brand: domain.AIProviderBrandOpenAI, Name: uuid.NewV7().String(), APIKey: "test-key", APIURL: "https://models.test/v1",
+		CredentialType: domain.AIProviderCredentialTypeAPIKey,
+		Brand:          domain.AIProviderBrandOpenAI, Name: uuid.NewV7().String(), APIKey: "test-key", APIURL: "https://models.test/v1",
 		Models: []aiprovideraction.Model{
 			{Identifier: "embedding-a", Name: "向量 A", Type: domain.AIModelTypeEmbedding, InputModalities: []domain.AIModelInputModality{domain.AIModelInputModalityText}, ContextWindow: 8192},
 			{Identifier: "embedding-b", Name: "向量 B", Type: domain.AIModelTypeEmbedding, InputModalities: []domain.AIModelInputModality{domain.AIModelInputModalityText}, ContextWindow: 8192},
@@ -113,7 +114,7 @@ func TestKnowledgeBaseSettings(t *testing.T) {
 	provider.Models = slices.DeleteFunc(provider.Models, func(model aiprovideraction.Model) bool {
 		return model.Identifier == "embedding-b"
 	})
-	_, err = aiprovideraction.NewUpdateAIProviderAction(db).Execute(ctx, identity, provider.ID, aiprovideraction.Input{Brand: provider.Brand, Name: provider.Name, APIKey: provider.APIKey, APIURL: provider.APIURL, Models: provider.Models})
+	_, err = aiprovideraction.NewUpdateAIProviderAction(db).Execute(ctx, identity, provider.ID, aiprovideraction.Input{Brand: provider.Brand, Name: provider.Name, CredentialType: provider.CredentialType, APIKey: provider.APIKey, APIURL: provider.APIURL, Models: provider.Models})
 	var validation *aiprovideraction.ValidationError
 	if !errors.As(err, &validation) || validation.Fields["models"] != aiprovideraction.ValidationModelsInUse {
 		t.Fatalf("remove model error=%v", err)

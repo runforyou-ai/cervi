@@ -41,11 +41,12 @@ func (a *UpdateAIProviderAction) Execute(ctx context.Context, identity *servermo
 		}
 		current.Brand = string(input.Brand)
 		current.Name = input.Name
+		current.CredentialType = string(input.CredentialType)
 		current.APIKey = input.APIKey
 		current.APIURL = input.APIURL
 		if _, err := tx.NewUpdate().
 			Model(current).
-			Column("brand", "name", "api_key", "api_url").
+			Column("brand", "name", "credential_type", "api_key", "api_url").
 			Set("updated_at = now()").
 			Where("organization_id = ?", identity.Organization.ID).
 			WherePK().

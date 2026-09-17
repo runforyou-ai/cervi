@@ -171,7 +171,11 @@ func (s *RetrievalService) sources(ctx context.Context, organizationID string, k
 			if provider, ok = byID[base.RerankProviderID]; !ok {
 				return nil, &rerank.Error{Code: "rerank_model_unavailable"}
 			}
-			source.rerank = rerank.Credential{Brand: provider.Brand, BaseURL: provider.APIURL, APIKey: provider.APIKey}
+			rerankBaseURL, err := common.CompatibleModelBaseURL(provider.Brand, provider.APIURL)
+			if err != nil {
+				return nil, &rerank.Error{Code: "rerank_model_unavailable"}
+			}
+			source.rerank = rerank.Credential{Brand: provider.Brand, BaseURL: rerankBaseURL, APIKey: provider.APIKey}
 			sources = append(sources, source)
 		}
 	}

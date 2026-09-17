@@ -14,16 +14,17 @@ import (
 type ValidationCode = common.FieldCode
 
 const (
-	ValidationBrandInvalid   ValidationCode = "AI_PROVIDER_BRAND_INVALID"
-	ValidationNameRequired   ValidationCode = "AI_PROVIDER_NAME_REQUIRED"
-	ValidationNameTooLong    ValidationCode = "AI_PROVIDER_NAME_TOO_LONG"
-	ValidationNameDuplicate  ValidationCode = "AI_PROVIDER_NAME_DUPLICATE"
-	ValidationAPIKeyRequired ValidationCode = "AI_PROVIDER_API_KEY_REQUIRED"
-	ValidationAPIKeyTooLong  ValidationCode = "AI_PROVIDER_API_KEY_TOO_LONG"
-	ValidationAPIURLRequired ValidationCode = "AI_PROVIDER_API_URL_REQUIRED"
-	ValidationAPIURLInvalid  ValidationCode = "AI_PROVIDER_API_URL_INVALID"
-	ValidationModelsInvalid  ValidationCode = "AI_PROVIDER_MODELS_INVALID"
-	ValidationModelsInUse    ValidationCode = "AI_PROVIDER_MODELS_IN_USE"
+	ValidationBrandInvalid          ValidationCode = "AI_PROVIDER_BRAND_INVALID"
+	ValidationCredentialTypeInvalid ValidationCode = "AI_PROVIDER_CREDENTIAL_TYPE_INVALID"
+	ValidationNameRequired          ValidationCode = "AI_PROVIDER_NAME_REQUIRED"
+	ValidationNameTooLong           ValidationCode = "AI_PROVIDER_NAME_TOO_LONG"
+	ValidationNameDuplicate         ValidationCode = "AI_PROVIDER_NAME_DUPLICATE"
+	ValidationAPIKeyRequired        ValidationCode = "AI_PROVIDER_API_KEY_REQUIRED"
+	ValidationAPIKeyTooLong         ValidationCode = "AI_PROVIDER_API_KEY_TOO_LONG"
+	ValidationAPIURLRequired        ValidationCode = "AI_PROVIDER_API_URL_REQUIRED"
+	ValidationAPIURLInvalid         ValidationCode = "AI_PROVIDER_API_URL_INVALID"
+	ValidationModelsInvalid         ValidationCode = "AI_PROVIDER_MODELS_INVALID"
+	ValidationModelsInUse           ValidationCode = "AI_PROVIDER_MODELS_IN_USE"
 )
 
 const (
@@ -43,9 +44,10 @@ func normalizeInput(input Input) (Input, map[string]ValidationCode) {
 	fields := make(map[string]ValidationCode)
 	input.Name = strings.TrimSpace(input.Name)
 	connection, connectionFields := normalizeConnectionInput(ConnectionInput{
-		Brand: input.Brand, APIKey: input.APIKey, APIURL: input.APIURL,
+		Brand: input.Brand, CredentialType: input.CredentialType, APIKey: input.APIKey, APIURL: input.APIURL,
 	})
 	input.Brand = connection.Brand
+	input.CredentialType = connection.CredentialType
 	input.APIKey = connection.APIKey
 	input.APIURL = connection.APIURL
 	for field, code := range connectionFields {
@@ -88,12 +90,21 @@ func normalizeConnectionInput(input ConnectionInput) (ConnectionInput, map[strin
 	fields := make(map[string]ValidationCode)
 	input.APIKey = strings.TrimSpace(input.APIKey)
 	input.APIURL = strings.TrimSpace(input.APIURL)
-	if len(AvailableModels(input.Brand)) == 0 {
+	if !domain.ValidAIProviderBrand(input.Brand) {
 		fields["brand"] = ValidationBrandInvalid
 	}
-	if input.APIKey == "" {
+	switch {
+	case !domain.ValidAIProviderCredentialType(input.CredentialType):
+		fields["credentialType"] = ValidationCredentialTypeInvalid
+	case input.CredentialType == domain.AIProviderCredentialTypeNone:
+		// 无凭据只适用于自建或本机部署的服务，其余品牌必须配置密钥。
+		if !domain.AIProviderBrandSupportsNoCredential(input.Brand) {
+			fields["credentialType"] = ValidationCredentialTypeInvalid
+		}
+		input.APIKey = ""
+	case input.APIKey == "":
 		fields["apiKey"] = ValidationAPIKeyRequired
-	} else if len(input.APIKey) > maxAPIKeyBytes {
+	case len(input.APIKey) > maxAPIKeyBytes:
 		fields["apiKey"] = ValidationAPIKeyTooLong
 	}
 	if input.APIURL == "" {

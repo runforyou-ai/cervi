@@ -24,6 +24,7 @@ type integrationOps struct {
 	listAIProviders          *aiprovideraction.ListAIProvidersQuery
 	getAIProvider            *aiprovideraction.GetAIProviderQuery
 	testAIProviderConnection *aiprovideraction.TestConnectionAction
+	discoverAIProviderModels *aiprovideraction.DiscoverModelsAction
 	createAIProvider         *aiprovideraction.CreateAIProviderAction
 	updateAIProvider         *aiprovideraction.UpdateAIProviderAction
 	deleteAIProvider         *aiprovideraction.DeleteAIProviderAction
@@ -47,6 +48,7 @@ func newIntegrationOps(db *bun.DB, connectionRunner *connectiontest.Runner, mode
 		listAIProviders:          aiprovideraction.NewListAIProvidersQuery(db),
 		getAIProvider:            aiprovideraction.NewGetAIProviderQuery(db),
 		testAIProviderConnection: aiprovideraction.NewTestConnectionAction(connectionRunner, modelProviderRegistry),
+		discoverAIProviderModels: aiprovideraction.NewDiscoverModelsAction(modelProviderRegistry),
 		createAIProvider:         aiprovideraction.NewCreateAIProviderAction(db),
 		updateAIProvider:         aiprovideraction.NewUpdateAIProviderAction(db),
 		deleteAIProvider:         aiprovideraction.NewDeleteAIProviderAction(db),

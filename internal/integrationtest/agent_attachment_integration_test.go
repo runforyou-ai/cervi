@@ -51,7 +51,8 @@ func TestAgentAttachmentInputs(t *testing.T) {
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	provider, err := aiprovideraction.NewCreateAIProviderAction(f.db).Execute(ctx, f.owner, aiprovideraction.Input{
-		Brand: domain.AIProviderBrandOpenAI, Name: uuid.NewV7().String(), APIKey: "test-key", APIURL: "https://models.test/v1",
+		CredentialType: domain.AIProviderCredentialTypeAPIKey,
+		Brand:          domain.AIProviderBrandOpenAI, Name: uuid.NewV7().String(), APIKey: "test-key", APIURL: "https://models.test/v1",
 		Models: []aiprovideraction.Model{{
 			Identifier: "vision", Name: "视觉模型", Type: domain.AIModelTypeChat,
 			InputModalities: []domain.AIModelInputModality{domain.AIModelInputModalityText, domain.AIModelInputModalityImage}, ContextWindow: 32000, MaxOutputTokens: 4096,

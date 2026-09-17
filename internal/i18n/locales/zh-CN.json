@@ -366,6 +366,7 @@
   "field.role_description_too_long": "角色说明不能超过 200 个字符。",
   "field.role_permissions_invalid": "角色权限包含不支持的项目。",
   "field.ai_provider_brand_invalid": "请选择支持的供应商品牌。",
+  "field.ai_provider_credential_type_invalid": "请选择该供应商支持的凭据类型。",
   "field.ai_provider_name_required": "请输入供应商名称。",
   "field.ai_provider_name_too_long": "供应商名称不能超过 100 个字符。",
   "field.ai_provider_name_duplicate": "供应商名称已存在。",

@@ -4,6 +4,10 @@ import { AIProviderBrand, type AIProviderBrandId } from "@/api"
 type AIProviderBrandConfig = {
   nameKey: `modelServices.brands.${AIProviderBrandId}`
   defaultAPIURL: string
+  /** 模型目录由服务实例提供，添加模型时读取服务实例。 */
+  discoversModels?: boolean
+  /** 自建或本机部署的服务可以不配置凭据。 */
+  supportsNoCredential?: boolean
 }
 
 export const aiProviderBrandOrder: AIProviderBrandId[] = [
@@ -18,6 +22,8 @@ export const aiProviderBrandOrder: AIProviderBrandId[] = [
   AIProviderBrand.AIProviderBrandMiniMax,
   AIProviderBrand.AIProviderBrandXAI,
   AIProviderBrand.AIProviderBrandMistral,
+  AIProviderBrand.AIProviderBrandOllama,
+  AIProviderBrand.AIProviderBrandOpenAICompatible,
 ]
 
 export const aiProviderBrandConfigs: Record<
@@ -67,5 +73,17 @@ export const aiProviderBrandConfigs: Record<
   [AIProviderBrand.AIProviderBrandMistral]: {
     nameKey: "modelServices.brands.mistral",
     defaultAPIURL: "https://api.mistral.ai/v1",
+  },
+  [AIProviderBrand.AIProviderBrandOllama]: {
+    nameKey: "modelServices.brands.ollama",
+    defaultAPIURL: "http://localhost:11434",
+    discoversModels: true,
+    supportsNoCredential: true,
+  },
+  [AIProviderBrand.AIProviderBrandOpenAICompatible]: {
+    nameKey: "modelServices.brands.openai_compatible",
+    defaultAPIURL: "",
+    discoversModels: true,
+    supportsNoCredential: true,
   },
 }

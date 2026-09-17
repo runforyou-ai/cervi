@@ -10,6 +10,7 @@ export {
     AIModelInputModality,
     AIModelType,
     AIProviderBrand,
+    AIProviderCredentialType,
     AgentExecutionMode,
     AgentRunBlockKind,
     AgentRunStatus,

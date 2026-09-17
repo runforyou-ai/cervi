@@ -17,6 +17,18 @@ const (
 	AIProviderBrandMiniMax    AIProviderBrand = AIProviderBrand(domain.AIProviderBrandMiniMax)
 	AIProviderBrandXAI        AIProviderBrand = AIProviderBrand(domain.AIProviderBrandXAI)
 	AIProviderBrandMistral    AIProviderBrand = AIProviderBrand(domain.AIProviderBrandMistral)
+
+	// 以下品牌为自建或本机部署的模型服务，可以不配置凭据。
+	AIProviderBrandOllama           AIProviderBrand = AIProviderBrand(domain.AIProviderBrandOllama)
+	AIProviderBrandOpenAICompatible AIProviderBrand = AIProviderBrand(domain.AIProviderBrandOpenAICompatible)
+)
+
+// AIProviderCredentialType 表示访问模型服务所需的凭据类型。
+type AIProviderCredentialType string
+
+const (
+	AIProviderCredentialTypeAPIKey AIProviderCredentialType = AIProviderCredentialType(domain.AIProviderCredentialTypeAPIKey)
+	AIProviderCredentialTypeNone   AIProviderCredentialType = AIProviderCredentialType(domain.AIProviderCredentialTypeNone)
 )
 
 // AIModelType 表示 AI 模型用途。
@@ -40,18 +52,20 @@ const (
 
 // AIProviderInput 定义模型服务供应商可编辑字段。
 type AIProviderInput struct {
-	Brand  AIProviderBrand   `json:"brand"`
-	Name   string            `json:"name"`
-	APIKey string            `json:"apiKey"`
-	APIURL string            `json:"apiUrl"`
-	Models []AIProviderModel `json:"models"`
+	Brand          AIProviderBrand          `json:"brand"`
+	Name           string                   `json:"name"`
+	CredentialType AIProviderCredentialType `json:"credentialType"`
+	APIKey         string                   `json:"apiKey"`
+	APIURL         string                   `json:"apiUrl"`
+	Models         []AIProviderModel        `json:"models"`
 }
 
-// AIProviderConnectionInput 定义测试模型服务连接需要的草稿配置。
+// AIProviderConnectionInput 定义测试模型服务连接和发现模型需要的草稿配置。
 type AIProviderConnectionInput struct {
-	Brand  AIProviderBrand `json:"brand"`
-	APIKey string          `json:"apiKey"`
-	APIURL string          `json:"apiUrl"`
+	Brand          AIProviderBrand          `json:"brand"`
+	CredentialType AIProviderCredentialType `json:"credentialType"`
+	APIKey         string                   `json:"apiKey"`
+	APIURL         string                   `json:"apiUrl"`
 }
 
 // AIProviderModel 定义模型服务供应商的模型目录项。
@@ -66,12 +80,13 @@ type AIProviderModel struct {
 
 // AIProvider 定义企业模型服务供应商及其模型目录。
 type AIProvider struct {
-	ID     string            `json:"id"`
-	Brand  AIProviderBrand   `json:"brand"`
-	Name   string            `json:"name"`
-	APIKey string            `json:"apiKey"`
-	APIURL string            `json:"apiUrl"`
-	Models []AIProviderModel `json:"models"`
+	ID             string                   `json:"id"`
+	Brand          AIProviderBrand          `json:"brand"`
+	Name           string                   `json:"name"`
+	CredentialType AIProviderCredentialType `json:"credentialType"`
+	APIKey         string                   `json:"apiKey"`
+	APIURL         string                   `json:"apiUrl"`
+	Models         []AIProviderModel        `json:"models"`
 }
 
 // AIProviderModelSummary 定义供应商列表中的模型目录摘要。
@@ -95,7 +110,7 @@ type AIProviderList struct {
 	Providers []AIProviderSummary `json:"providers"`
 }
 
-// AIProviderModelList 定义指定品牌的预设模型目录。
+// AIProviderModelList 定义预设或从服务实例发现的模型目录。
 type AIProviderModelList struct {
 	Models []AIProviderModel `json:"models"`
 }

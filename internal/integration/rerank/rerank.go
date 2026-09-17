@@ -48,7 +48,7 @@ func NewClient() *Client {
 // Rerank 按供应商接口格式提交查询与候选文本，返回候选下标与相关性得分；接口没有返回任何得分时视为失败。
 func (c *Client) Rerank(ctx context.Context, credential Credential, model, query string, documents []string, topN int) ([]Score, error) {
 	endpoint, err := Endpoint(credential.Brand, credential.BaseURL)
-	if err != nil || strings.TrimSpace(credential.APIKey) == "" {
+	if err != nil {
 		return nil, &Error{Code: "rerank_model_unavailable"}
 	}
 	// 阿里云使用 DashScope 原生重排接口，其余品牌使用通用的 rerank 接口格式。
@@ -71,7 +71,10 @@ func (c *Client) Rerank(ctx context.Context, credential Credential, model, query
 		return nil, &Error{Code: "rerank_model_unavailable"}
 	}
 	request.Header.Set("Content-Type", "application/json")
-	request.Header.Set("Authorization", "Bearer "+strings.TrimSpace(credential.APIKey))
+	// 无凭据的自建或本机服务不携带鉴权头。
+	if apiKey := strings.TrimSpace(credential.APIKey); apiKey != "" {
+		request.Header.Set("Authorization", "Bearer "+apiKey)
+	}
 	response, err := c.http.Do(request)
 	if err != nil {
 		var netErr net.Error

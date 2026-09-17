@@ -30,16 +30,21 @@ func CompatibleModelBaseURL(brand, value string) (string, error) {
 	if parsed.Scheme == "" || parsed.Host == "" {
 		return "", errors.New("model base URL must include scheme and host")
 	}
-	if brand != "alibaba" {
-		return strings.TrimSuffix(parsed.String(), "/"), nil
-	}
 	path := strings.TrimSuffix(parsed.Path, "/")
-	switch {
-	case strings.HasSuffix(path, "/compatible-mode/v1"):
-	case strings.HasSuffix(path, "/api/v1"):
-		path = strings.TrimSuffix(path, "/api/v1") + "/compatible-mode/v1"
+	switch brand {
+	case "alibaba":
+		switch {
+		case strings.HasSuffix(path, "/compatible-mode/v1"):
+		case strings.HasSuffix(path, "/api/v1"):
+			path = strings.TrimSuffix(path, "/api/v1") + "/compatible-mode/v1"
+		default:
+			path += "/compatible-mode/v1"
+		}
+	case "ollama":
+		// Ollama 按服务根地址配置，OpenAI 兼容入口固定在 /v1。
+		path = strings.TrimSuffix(path, "/v1") + "/v1"
 	default:
-		path += "/compatible-mode/v1"
+		return strings.TrimSuffix(parsed.String(), "/"), nil
 	}
 	parsed.Path = path
 	parsed.RawPath = ""

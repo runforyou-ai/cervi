@@ -69,10 +69,10 @@ func TestEmbedBatchesAndOrder(t *testing.T) {
 	}
 }
 
-// TestEmbedFailures 验证凭据缺失、维度不符和调用失败分别返回对应原因码。
+// TestEmbedFailures 验证地址缺失、维度不符和调用失败分别返回对应原因码。
 func TestEmbedFailures(t *testing.T) {
 	client := NewClient()
-	for _, credential := range []Credential{{}, {BaseURL: "https://models.test/v1"}, {APIKey: "test-key"}} {
+	for _, credential := range []Credential{{}, {APIKey: "test-key"}} {
 		_, err := client.Embed(context.Background(), credential, "embedding-test", 8, []string{"正文"})
 		var failure *Error
 		if !errors.As(err, &failure) || failure.Code != "embedding_model_unavailable" {
@@ -107,5 +107,24 @@ func TestEmbedFailures(t *testing.T) {
 	_, err = client.Embed(context.Background(), Credential{BaseURL: short.URL, APIKey: "test-key"}, "embedding-test", 8, []string{"正文"})
 	if !errors.As(err, &failure) || failure.Code != "embedding_failed" {
 		t.Fatalf("error=%v", err)
+	}
+}
+
+// TestEmbedWithoutCredential 验证无凭据的自建或本机服务不携带鉴权头且正常返回向量。
+func TestEmbedWithoutCredential(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if authorization := r.Header.Get("Authorization"); authorization != "" {
+			t.Errorf("authorization = %q, want empty", authorization)
+		}
+		_, _ = w.Write([]byte(`{"data":[{"index":0,"embedding":[0.1,0.2]}]}`))
+	}))
+	defer server.Close()
+
+	vectors, err := NewClient().Embed(context.Background(), Credential{BaseURL: server.URL}, "embedding-test", 2, []string{"正文"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(vectors) != 1 || len(vectors[0]) != 2 {
+		t.Fatalf("vectors = %v", vectors)
 	}
 }

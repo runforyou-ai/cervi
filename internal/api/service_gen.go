@@ -152,6 +152,7 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.GET("/integrations/model-services", s.listAIProviders)
 	router.GET("/integrations/model-services/:providerID", s.getAIProvider)
 	router.GET("/integrations/model-services/models", s.listAvailableAIModels)
+	router.POST("/integrations/model-services/discover-models", s.discoverAIProviderModels)
 	router.POST("/integrations/model-services/test", s.testAIProviderConnection)
 	router.POST("/integrations/model-services", s.createAIProvider)
 	router.PUT("/integrations/model-services/:providerID", s.updateAIProvider)
@@ -1289,6 +1290,16 @@ func (s *Service) getAIProvider(c *gin.Context) {
 // listAvailableAIModels 返回指定品牌的预设模型目录。
 func (s *Service) listAvailableAIModels(c *gin.Context) {
 	output, err := s.application.ListAvailableAIModels(c.Request.Context(), requestMeta(c), appservice.AIProviderBrand(c.Query("brand")))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// discoverAIProviderModels 读取模型服务实例当前可用的模型目录。
+func (s *Service) discoverAIProviderModels(c *gin.Context) {
+	var input appservice.AIProviderConnectionInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.DiscoverAIProviderModels(c.Request.Context(), requestMeta(c), input)
 	writeResult(c, http.StatusOK, output, err)
 }
 
