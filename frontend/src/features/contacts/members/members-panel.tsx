@@ -138,11 +138,6 @@ export function MembersPanel({
         changingUserStatus.status === UserStatus.UserStatusActive
           ? await deactivateUser(changingUserStatus.id)
           : await reactivateUser(changingUserStatus.id)
-      console.info("企业成员账号状态已修改", {
-        identity_id: saved.identityId,
-        user_id: saved.id,
-        status: saved.status,
-      })
       toast.success(
         t(
           changingUserStatus.status === UserStatus.UserStatusActive

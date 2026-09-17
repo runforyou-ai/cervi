@@ -108,15 +108,6 @@ export function UserPreferencesForm({ user }: { user: CurrentUser }) {
       })
       void invalidate(resourceKeys.identity())
       await changeAppLanguage(updated.locale)
-      console.info("偏好设置已保存", {
-        user_id: updated.id,
-        locale: updated.locale,
-        time_zone: updated.timeZone,
-        theme: values.theme,
-        workspace_tabs_enabled: updated.workspaceTabsEnabled,
-        message_notifications_enabled: updated.messageNotificationsEnabled,
-        notification_sound_enabled: values.notificationSoundEnabled,
-      })
       toast.success(t("preferences.saveSuccess"))
     } catch (error) {
       if (recoverSession(error, navigate)) {

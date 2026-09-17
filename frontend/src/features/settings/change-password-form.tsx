@@ -42,7 +42,6 @@ export function ChangePasswordForm() {
         newPassword: values.newPassword,
       })
       form.reset()
-      console.info("密码修改成功")
       toast.success(t("password.saveSuccess"))
     } catch (error) {
       if (recoverSession(error, navigate)) {

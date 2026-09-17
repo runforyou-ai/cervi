@@ -5,9 +5,8 @@ import { useTranslation } from "react-i18next"
 
 import { PageControls } from "@/components/page-controls"
 import type { PageInfo } from "@/api"
-import { LoadingIndicator } from "@/components/loading-indicator"
 import { PageContent } from "@/components/page-content"
-import { Button } from "@/components/ui/button"
+import { ResourceContent } from "@/components/resource-content"
 
 const listScrollPositions = new Map<string, number>()
 
@@ -27,7 +26,7 @@ export function ContactListLayout({
   onPageChange: (page: number) => void
   children: ReactNode
 }) {
-  const { t } = useTranslation(["contacts", "common"])
+  const { t } = useTranslation("contacts")
   const location = useLocation()
   const scrollKey = location.pathname + location.search
   const content = useRef<HTMLDivElement>(null)
@@ -45,23 +44,17 @@ export function ContactListLayout({
         listScrollPositions.set(scrollKey, event.currentTarget.scrollTop)
       }}
     >
-      {loading ? (
-        <LoadingIndicator className="min-h-48 justify-center rounded-lg border">
-          {t("common:status.loading")}
-        </LoadingIndicator>
-      ) : error ? (
-        <div className="flex min-h-48 flex-col items-center justify-center rounded-lg border text-center">
-          <p className="text-sm text-muted-foreground">{t("list.loadError")}</p>
-          <Button className="mt-4" variant="outline" onClick={onRetry}>
-            {t("common:actions.retry")}
-          </Button>
-        </div>
-      ) : (
+      <ResourceContent
+        loading={loading}
+        error={error}
+        errorMessage={t("list.loadError")}
+        onRetry={onRetry}
+      >
         <div className="overflow-hidden rounded-lg border bg-card">
           {children}
           <PageControls page={page} onPageChange={onPageChange} />
         </div>
-      )}
+      </ResourceContent>
     </PageContent>
   )
 }

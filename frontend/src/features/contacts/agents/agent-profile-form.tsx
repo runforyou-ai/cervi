@@ -90,7 +90,6 @@ export function AgentProfileForm({
       if (!mounted.current) return
       dirty.current = false
       form.reset(values)
-      console.info("AI 员工基本资料已保存", { agent_id: agent.id })
       toast.success(t("agents.form.saved"))
     } catch (error) {
       if (!mounted.current || recoverSession(error, navigate)) return

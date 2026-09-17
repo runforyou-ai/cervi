@@ -155,7 +155,6 @@ export function ExternalContactsPanel({
     try {
       await deleteContact(deletingContact.id)
       void invalidate(resourceKeys.contact(deletingContact.id))
-      console.info("联系人已移入回收站", { contact_id: deletingContact.id })
       toast.success(t("delete.success"))
       setDeletingContact(null)
       if (selected === deletingContact.id) {
@@ -180,7 +179,6 @@ export function ExternalContactsPanel({
     try {
       await restoreContact(restoringContact.id)
       void invalidate(resourceKeys.contact(restoringContact.id))
-      console.info("联系人已恢复", { contact_id: restoringContact.id })
       toast.success(t("trash.restored"))
       setRestoringContact(null)
       void invalidate(resourceKeys.contacts())
@@ -217,7 +215,6 @@ export function ExternalContactsPanel({
           <ListToolbarSearch
             value={search}
             aria-label={t("search.external")}
-            placeholder={t("search.external")}
             onChange={(event) => setSearch(event.target.value)}
           />
           <ListToolbarFilter

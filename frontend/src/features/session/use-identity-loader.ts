@@ -50,7 +50,6 @@ export function useIdentityLoader(): IdentityLoadState {
   const userID = data?.user.id
   useEffect(() => {
     if (userID) {
-      console.info("登录身份已加载", { user_id: userID })
     }
   }, [userID])
 

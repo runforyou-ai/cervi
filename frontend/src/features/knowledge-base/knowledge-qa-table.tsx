@@ -82,7 +82,7 @@ export function KnowledgeQATable({
   }
 
   return (
-    <div className="overflow-hidden rounded-lg border" aria-busy={loading}>
+    <div className="overflow-hidden rounded-lg border bg-card" aria-busy={loading}>
       <Table className="min-w-[960px] table-fixed">
         {/* 固定辅助列宽，标准问题和答案均分剩余空间。 */}
         <colgroup>

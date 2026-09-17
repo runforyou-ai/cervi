@@ -497,7 +497,6 @@ export function WorkspaceTabs({
       ...current,
       [id]: (current[id] ?? 0) + 1,
     }))
-    console.info("工作台标签已重新加载", { tab_id: id })
   }
 
   /** 只保留指定标签，并在需要时将它激活。 */

@@ -167,11 +167,6 @@ export function WorkspaceNavigation({
       organizationId: identity.user.organizationId,
       userId: identity.user.id,
     })
-      .then((status) => {
-        if (status) {
-          console.info("消息菜单通知权限申请完成", { status })
-        }
-      })
       .catch((error) => {
         console.warn("从消息菜单申请通知权限失败", error)
       })
@@ -189,7 +184,6 @@ export function WorkspaceNavigation({
     changingWorkStatusRef.current = true
     try {
       await updateUserWorkStatus({ workStatus })
-      console.info("工作状态已切换", { work_status: workStatus })
       void invalidate(resourceKeys.identity())
     } catch (error) {
       if (!recoverSession(error, navigate)) {

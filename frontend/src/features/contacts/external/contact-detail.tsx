@@ -168,7 +168,6 @@ export function ContactDetailView({
     setSaving(true)
     try {
       const saved = await updateContact(detail.contact.id, input)
-      console.info("联系人已保存", { contact_id: detail.contact.id })
       toast.success(t("form.updated"))
       onSaved(saved)
     } catch (error) {

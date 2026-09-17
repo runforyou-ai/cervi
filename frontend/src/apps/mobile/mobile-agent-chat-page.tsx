@@ -131,11 +131,6 @@ function MobileAgentConversation({ conversationID }: { conversationID: string })
           lastReadMessageID={conversation?.lastReadMessageId}
           locateMessage={(location.state as MobileAgentLocationState | null)?.locateMessage}
           sendIndividualMessage={!persisted && draftAgent ? async (input) => {
-            console.info("发起移动端 AI 会话", {
-              conversationId: conversationID,
-              agentIdentityId: draftAgent.identityId,
-              clientMessageId: input.clientMessageId,
-            })
             const result = await sendFirstAgentTextMessage({
               conversationId: conversationID,
               agentIdentityId: draftAgent.identityId,

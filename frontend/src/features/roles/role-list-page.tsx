@@ -12,9 +12,9 @@ import {
   type PermissionDefinition,
   type RoleData,
 } from "@/api"
-import { LoadingIndicator } from "@/components/loading-indicator"
 import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
+import { ResourceContent } from "@/components/resource-content"
 import { ResourceTable } from "@/components/resource-table"
 import {
   AlertDialog,
@@ -126,24 +126,12 @@ export function RoleListPage() {
         )}
       </PageHeader>
       <PageContent>
-        {showLoading ? (
-          <LoadingIndicator className="min-h-48 justify-center rounded-lg border">
-            {tCommon("status.loading")}
-          </LoadingIndicator>
-        ) : error ? (
-          <div className="flex min-h-48 flex-col items-center justify-center rounded-lg border text-center">
-            <p className="text-sm text-muted-foreground">
-              {t("roles.list.loadError")}
-            </p>
-            <Button
-              className="mt-4"
-              variant="outline"
-              onClick={() => void refresh()}
-            >
-              {tCommon("actions.retry")}
-            </Button>
-          </div>
-        ) : (
+        <ResourceContent
+          loading={showLoading}
+          error={Boolean(error)}
+          errorMessage={t("roles.list.loadError")}
+          onRetry={() => void refresh()}
+        >
           <div className="@container overflow-hidden rounded-lg border bg-card">
             <ResourceTable
               columns={[
@@ -204,7 +192,7 @@ export function RoleListPage() {
               })}
             />
           </div>
-        )}
+        </ResourceContent>
       </PageContent>
 
       <AlertDialog

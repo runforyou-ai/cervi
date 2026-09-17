@@ -83,7 +83,6 @@ export function ContactForm({
     }
     try {
       const saved = await createContact(input)
-      console.info("联系人已创建", { contact_id: saved.contact.id })
       toast.success(t("form.created"))
       onSaved(saved)
     } catch (error) {

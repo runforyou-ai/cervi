@@ -71,7 +71,6 @@ export function OpenUrlDialog({
       })
       if (!mounted.current) return
       onOpenChange(false)
-      console.info("自定义网址已打开", { url: values.url })
     } catch (error) {
       if (!mounted.current) return
       if (recoverSession(error, navigate)) return
