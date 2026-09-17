@@ -320,7 +320,7 @@ func (q *LoadInboxQuery) customerConversationDetailsQuery(organizationID, curren
 				AND unread_msg.type IN (?) AND unread_msg.deleted_at IS NULL
 				AND NOT (sender_cs.kind = ? AND sender_cs.source_id = ?)
 				AND unread_msg.message_seq > COALESCE(state.read_seq, 0)
-		) AS unread ON TRUE`, bun.In([]domain.MessageType{domain.MessageTypeText, domain.MessageTypeAgentError}), domain.ChatSubjectKindOrganizationIdentity, currentIdentityID)
+		) AS unread ON TRUE`, bun.In([]domain.MessageType{domain.MessageTypeText, domain.MessageTypeAttachment, domain.MessageTypeAgentError}), domain.ChatSubjectKindOrganizationIdentity, currentIdentityID)
 }
 
 // filterCustomerInbox 为客户摘要追加当前列表的筛选条件。

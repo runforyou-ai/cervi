@@ -135,6 +135,12 @@ func inboxConversationFromAction(summary inboxaction.ConversationSummary, avatar
 		if summary.Customer.Assignee != nil {
 			assignee = &InboxAssignee{IdentityID: summary.Customer.Assignee.IdentityID, Type: OrganizationIdentityType(summary.Customer.Assignee.Type), DisplayName: summary.Customer.Assignee.DisplayName, AvatarURL: optionalFileURL(avatarURLs, summary.Customer.Assignee.AvatarFileID)}
 		}
+		// 不支持外发附件时不给出字节上限，客户端据此关闭入口。
+		attachmentSupported := domain.ChannelSupportsOutboundAttachment(summary.Customer.ChannelType)
+		attachmentByteLimit := int64(0)
+		if attachmentSupported {
+			attachmentByteLimit = domain.ChannelAttachmentLimit(summary.Customer.ChannelType, "")
+		}
 		conversation.Customer = &CustomerInboxConversation{
 			Title: summary.Customer.Title, ContactName: summary.Customer.ContactName,
 			ContactAvatarURL: optionalFileURL(avatarURLs, summary.Customer.ContactAvatarFileID),
@@ -142,6 +148,9 @@ func inboxConversationFromAction(summary inboxaction.ConversationSummary, avatar
 			Preview: summary.Customer.Preview, PreviewSenderIdentityType: (*OrganizationIdentityType)(summary.Customer.PreviewSenderIdentityType),
 			PreviewVisibility: (*MessageVisibility)(summary.Customer.PreviewVisibility), LastMessageAt: summary.Customer.LastMessageAt,
 			ServiceSessionID: summary.Customer.ServiceSessionID, ServiceSessionStatus: ServiceSessionStatus(summary.Customer.ServiceSessionStatus), Assignee: assignee,
+			AttachmentSupported:    attachmentSupported,
+			AttachmentByteLimit:    attachmentByteLimit,
+			AttachmentCaptionLimit: domain.ChannelCaptionLimit(summary.Customer.ChannelType),
 		}
 	}
 	if summary.Direct != nil {

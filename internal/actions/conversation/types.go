@@ -36,6 +36,7 @@ const (
 	ValidationBodyRequired             ValidationCode = "body_required"
 	ValidationBodyTooLong              ValidationCode = "body_too_long"
 	ValidationCursorInvalid            ValidationCode = "cursor_invalid"
+	ValidationFileIDInvalid            ValidationCode = "file_id_invalid"
 )
 
 const (
@@ -63,6 +64,12 @@ const (
 	ConflictReasonReplyTargetInvalid = "reply_target_invalid"
 	// ConflictReasonGroupMentionTargetInvalid 表示当前群聊的提醒目标校验失败。
 	ConflictReasonGroupMentionTargetInvalid = "group_mention_target_invalid"
+	// ConflictReasonChannelAttachmentUnsupported 表示来源渠道尚不支持外发附件。
+	ConflictReasonChannelAttachmentUnsupported = "channel_attachment_unsupported"
+	// ConflictReasonAttachmentTooLarge 表示附件超过来源渠道的字节上限。
+	ConflictReasonAttachmentTooLarge = "attachment_too_large"
+	// ConflictReasonCaptionTooLong 表示附件说明超过来源渠道的字符上限。
+	ConflictReasonCaptionTooLong = "caption_too_long"
 )
 
 // ServiceSessionAssignee 定义客服处理周期负责人。
@@ -416,12 +423,24 @@ type ConversationNotificationSettings struct {
 
 // MessageAttachment 定义消息文件的元数据。
 type MessageAttachment struct {
-	ImageWidth  int    `bun:"image_width"`
-	ImageHeight int    `bun:"image_height"`
-	ID          string `bun:"id"`
-	Name        string `bun:"name"`
-	ContentType string `bun:"content_type"`
-	ByteSize    int64  `bun:"byte_size"`
+	ImageWidth     int                                    `bun:"image_width"`
+	ImageHeight    int                                    `bun:"image_height"`
+	ID             string                                 `bun:"id"`
+	Name           string                                 `bun:"name"`
+	ContentType    string                                 `bun:"content_type"`
+	ByteSize       int64                                  `bun:"byte_size"`
+	TransferStatus domain.MessageAttachmentTransferStatus `bun:"transfer_status"`
+}
+
+// CustomerAttachmentMessageInput 定义成员发送的客户会话附件消息。
+type CustomerAttachmentMessageInput struct {
+	ConversationID   string
+	ClientMessageID  string
+	FileID           string
+	Body             string
+	ReplyToMessageID string
+	ImageWidth       int
+	ImageHeight      int
 }
 
 // AttachmentMessageInput 定义已上传附件的发送意图，AgentIdentityID 非空表示按 ConversationID 草稿编号首发 AI 聊天，同时指定 CustomerConversationID 表示首发该客户会话的 Copilot 线程。

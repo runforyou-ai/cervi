@@ -2,11 +2,14 @@
 import {
   FilePurpose,
   FileTransfer,
+  MessageAttachmentTransferStatus,
   cancelFileUpload,
   completeFileUpload,
   createFileUpload,
   MessageVisibility,
   sendAttachmentMessage,
+  sendCustomerAttachmentMessage,
+  type ConversationMessageReference,
   type InboxConversation,
   type MessageAttachment,
 } from "@/api"
@@ -25,6 +28,7 @@ export type AttachmentJob = {
   batchID: string
   conversationID: string
   body: string
+  replyTo: ConversationMessageReference | null
   attachment: MessageAttachment
   fileID: string
   messageID: string
@@ -42,6 +46,8 @@ type Batch = {
   targetIdentityID: string
   agentIdentityID: string
   customerConversationID: string
+  customer: boolean
+  replyTo: ConversationMessageReference | null
   jobs: AttachmentJob[]
   sending: boolean
   onCreated: (conversation: InboxConversation | null, conversationID: string) => void
@@ -97,7 +103,16 @@ export class AttachmentQueue {
       targetIdentityID = "",
       agentIdentityID = "",
       customerConversationID = "",
-    }: { conversationID: string; targetIdentityID?: string; agentIdentityID?: string; customerConversationID?: string },
+      customer = false,
+      replyTo = null,
+    }: {
+      conversationID: string
+      targetIdentityID?: string
+      agentIdentityID?: string
+      customerConversationID?: string
+      customer?: boolean
+      replyTo?: ConversationMessageReference | null
+    },
     onCreated: Batch["onCreated"],
   ) {
     const batchID = crypto.randomUUID()
@@ -112,6 +127,7 @@ export class AttachmentQueue {
         contentType: selected.file.type,
         byteSize: selected.file.size,
         contentUrl: "",
+        transferStatus: MessageAttachmentTransferStatus.MessageAttachmentTransferReady,
         imageWidth: selected.imageWidth,
         imageHeight: selected.imageHeight,
       }
@@ -121,7 +137,7 @@ export class AttachmentQueue {
         visibility: MessageVisibility.MessageVisibilityCustomerVisible,
         body: selected.body.trim(),
         originatedAt: new Date(now + index).toISOString(),
-        replyTo: null,
+        replyTo: index === 0 ? replyTo : null,
         mentionSubjectIDs: [],
         mentionAll: false,
         mentionAllToken: null,
@@ -131,6 +147,8 @@ export class AttachmentQueue {
         batchID,
         conversationID: targetIdentityID ? "" : conversationID,
         body: selected.body.trim(),
+        // 引用只挂在本批第一条附件上，其余附件保持独立消息。
+        replyTo: index === 0 ? replyTo : null,
         attachment,
         fileID: "",
         messageID: "",
@@ -148,6 +166,8 @@ export class AttachmentQueue {
       targetIdentityID,
       agentIdentityID,
       customerConversationID,
+      customer,
+      replyTo,
       jobs,
       sending: false,
       onCreated,
@@ -227,11 +247,29 @@ export class AttachmentQueue {
     }
   }
 
-  /** 以固定发送编号发送一个已上传的附件，草稿首发成功后后续附件改用正式会话。 */
+  /** 以固定发送编号发送一个已上传的附件，客户会话走对客发送接口，草稿首发成功后后续附件改用正式会话。 */
   private async send(batch: Batch, job: AttachmentJob) {
     job.stage = "sending"
     this.emit()
     try {
+      if (batch.customer) {
+        const message = await sendCustomerAttachmentMessage(batch.conversationID, {
+          clientMessageId: job.id,
+          fileId: job.fileID,
+          body: job.body,
+          replyToMessageId: job.replyTo?.id ?? "",
+          imageWidth: job.attachment.imageWidth,
+          imageHeight: job.attachment.imageHeight,
+        })
+        if (job.stage !== "sending" || !this.batches.has(batch.id)) return
+        job.stage = "sent"
+        job.messageID = message.id
+        job.selected = null
+        job.transfer = null
+        this.outgoing.succeed(job.id, message)
+        this.refresh(batch.conversationID)
+        return
+      }
       const result = await sendAttachmentMessage({
         conversationId: batch.targetIdentityID ? "" : batch.conversationID,
         targetIdentityId: batch.targetIdentityID,

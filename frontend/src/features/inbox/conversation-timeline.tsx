@@ -979,7 +979,8 @@ function ConversationTimelineContent({
                                       }
                                       className={cn(
                                         "mb-1.5 block w-full border-l-2 pl-2 text-left text-xs focus-visible:outline focus-visible:outline-2",
-                                        incoming || internalNote
+                                        // 内部备注与附件消息的引用块在对客气泡外，按所在背景取色。
+                                        incoming || internalNote || message.attachment
                                           ? "border-primary text-muted-foreground"
                                           : "border-primary-foreground/60 text-primary-foreground/75",
                                       )}

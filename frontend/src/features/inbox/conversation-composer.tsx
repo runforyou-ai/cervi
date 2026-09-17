@@ -123,11 +123,17 @@ export function ConversationComposer({
   sendIndividualMessage,
   attachmentTargetIdentityID,
   attachmentAgentDraft,
+  customerAttachmentSupported = false,
+  customerAttachmentByteLimit = 0,
+  customerAttachmentCaptionLimit = 4000,
   onAttachmentConversationCreated,
   draftBridgeRef,
 }: {
   attachmentTargetIdentityID?: string
   attachmentAgentDraft?: { conversationID: string; agentIdentityID: string; customerConversationID?: string }
+  customerAttachmentSupported?: boolean
+  customerAttachmentByteLimit?: number
+  customerAttachmentCaptionLimit?: number
   onAttachmentConversationCreated?: (conversation: InboxConversation | null, conversationID: string) => void
   draftBridgeRef?: RefObject<ComposerDraftBridge | null>
   conversationID: string
@@ -910,12 +916,18 @@ export function ConversationComposer({
                 {(conversationType === ConversationType.ConversationTypeDirect ||
                   conversationType === ConversationType.ConversationTypeAgent ||
                   conversationType === ConversationType.ConversationTypeCopilot ||
-                  conversationType === ConversationType.ConversationTypeGroup) ? (
+                  conversationType === ConversationType.ConversationTypeGroup ||
+                  (customerAttachmentSupported && !internalNote)) ? (
                   <ConversationAttachmentUpload
                     conversationID={conversationID || (attachmentAgentDraft?.conversationID ?? "")}
                     targetIdentityID={attachmentTargetIdentityID}
                     agentIdentityID={attachmentAgentDraft?.agentIdentityID}
                     customerConversationID={attachmentAgentDraft?.customerConversationID}
+                    customer={conversationType === ConversationType.ConversationTypeCustomer}
+                    byteLimit={customerAttachmentByteLimit}
+                    captionLimit={customerAttachmentCaptionLimit}
+                    replyTo={replyTo ?? null}
+                    onSent={() => onReplyToChange?.(null)}
                     disabled={isSubmitting}
                     onBeforeSend={onBeforeSend}
                     onCreated={(conversation, conversationID) => onAttachmentConversationCreated?.(conversation, conversationID)}

@@ -126,6 +126,12 @@ type CustomerInboxConversation struct {
 	ServiceSessionStatus ServiceSessionStatus `json:"serviceSessionStatus"`
 	ServiceSessionID     string               `json:"serviceSessionId"`
 	Assignee             *InboxAssignee       `json:"assignee"`
+	// AttachmentSupported 表示来源渠道当前支持向客户发送附件。
+	AttachmentSupported bool `json:"attachmentSupported"`
+	// AttachmentByteLimit 是来源渠道单个外发附件的字节上限。
+	AttachmentByteLimit int64 `json:"attachmentByteLimit"`
+	// AttachmentCaptionLimit 是来源渠道附件说明的字符上限。
+	AttachmentCaptionLimit int `json:"attachmentCaptionLimit"`
 }
 
 // DirectInboxConversation 定义内部单聊摘要。

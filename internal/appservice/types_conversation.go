@@ -82,6 +82,16 @@ type CustomerTextMessageInput struct {
 	Visibility MessageVisibility `json:"visibility"`
 }
 
+// CustomerAttachmentMessageInput 定义成员发送的客户会话附件消息。
+type CustomerAttachmentMessageInput struct {
+	ReplyToMessageID string `json:"replyToMessageId"`
+	ClientMessageID  string `json:"clientMessageId"`
+	FileID           string `json:"fileId"`
+	Body             string `json:"body"`
+	ImageWidth       int    `json:"imageWidth"`
+	ImageHeight      int    `json:"imageHeight"`
+}
+
 // CustomerReplyMode 表示 AI 写回复的生成方式。
 type CustomerReplyMode string
 
@@ -425,11 +435,21 @@ type AttachmentMessageResult struct {
 	Message        ConversationMessage `json:"message"`
 }
 
-// MessageAttachment 定义消息的文件信息与图片尺寸。
+// MessageAttachmentTransferStatus 表示附件内容的取回状态。
+type MessageAttachmentTransferStatus string
+
+const (
+	MessageAttachmentTransferReady   MessageAttachmentTransferStatus = MessageAttachmentTransferStatus(domain.MessageAttachmentTransferReady)
+	MessageAttachmentTransferPending MessageAttachmentTransferStatus = MessageAttachmentTransferStatus(domain.MessageAttachmentTransferPending)
+	MessageAttachmentTransferFailed  MessageAttachmentTransferStatus = MessageAttachmentTransferStatus(domain.MessageAttachmentTransferFailed)
+)
+
+// MessageAttachment 定义消息的文件信息、图片尺寸与内容取回状态。
 type MessageAttachment struct {
 	File
-	ImageWidth  int `json:"imageWidth"`
-	ImageHeight int `json:"imageHeight"`
+	TransferStatus MessageAttachmentTransferStatus `json:"transferStatus"`
+	ImageWidth     int                             `json:"imageWidth"`
+	ImageHeight    int                             `json:"imageHeight"`
 }
 
 // ConversationMessageReferenceListInput 定义窗口内需要刷新引用状态的消息编号。

@@ -12,6 +12,7 @@ import (
 
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
@@ -31,6 +32,7 @@ type conversationOps struct {
 	reviewConversationMention       *conversationaction.MarkConversationMentionReviewedAction
 	updateConversationNotifications *conversationaction.UpdateConversationNotificationSettingsAction
 	sendCustomerTextMessage         *conversationaction.SendCustomerTextMessageAction
+	sendCustomerAttachmentMessage   *conversationaction.SendCustomerAttachmentMessageAction
 	claimServiceSession             *conversationaction.ClaimServiceSessionAction
 	transferServiceSession          *conversationaction.TransferServiceSessionAction
 	closeServiceSession             *conversationaction.CloseServiceSessionAction
@@ -68,6 +70,7 @@ func newConversationOps(db *bun.DB, agentScheduler conversationaction.AgentMessa
 		reviewConversationMention:       conversationaction.NewMarkConversationMentionReviewedAction(db),
 		updateConversationNotifications: conversationaction.NewUpdateConversationNotificationSettingsAction(db),
 		sendCustomerTextMessage:         conversationaction.NewSendCustomerTextMessageAction(db, taskEnqueuer),
+		sendCustomerAttachmentMessage:   conversationaction.NewSendCustomerAttachmentMessageAction(db, taskEnqueuer),
 		claimServiceSession:             conversationaction.NewClaimServiceSessionAction(db, agentCoordinator),
 		transferServiceSession:          conversationaction.NewTransferServiceSessionAction(db, agentCoordinator, agentScheduler),
 		closeServiceSession:             conversationaction.NewCloseServiceSessionAction(db, agentCoordinator),
@@ -108,6 +111,25 @@ func (o *directOperations) SendCustomerTextMessage(ctx context.Context, meta Req
 		"conversation_id", conversationID,
 		"message_id", message.ID,
 		"visibility", message.Visibility,
+		"sender_identity_id", identity.OrganizationIdentity.ID,
+	)
+	return o.conversationMessageWithAvatar(ctx, identity, message), nil
+}
+
+// SendCustomerAttachmentMessage 发送客户会话附件消息。
+func (o *directOperations) SendCustomerAttachmentMessage(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, input CustomerAttachmentMessageInput) (ConversationMessage, error) {
+	message, err := o.sendCustomerAttachmentMessage.Execute(ctx, identity, conversationaction.CustomerAttachmentMessageInput{
+		ConversationID: conversationID, ClientMessageID: input.ClientMessageID, FileID: input.FileID, Body: input.Body,
+		ReplyToMessageID: input.ReplyToMessageID, ImageWidth: input.ImageWidth, ImageHeight: input.ImageHeight,
+	})
+	if err != nil {
+		return ConversationMessage{}, customerTextMessageError(ctx, meta, err, identity.Organization.ID, conversationID)
+	}
+	slog.Info("成员客户附件消息已保存",
+		"organization_id", identity.Organization.ID,
+		"conversation_id", conversationID,
+		"message_id", message.ID,
+		"file_id", input.FileID,
 		"sender_identity_id", identity.OrganizationIdentity.ID,
 	)
 	return o.conversationMessageWithAvatar(ctx, identity, message), nil
@@ -569,7 +591,11 @@ func conversationMessageFromAction(message conversationaction.ConversationMessag
 	}
 	var attachment *MessageAttachment
 	if message.Attachment != nil {
-		attachment = &MessageAttachment{File: File{ID: message.Attachment.ID, Name: message.Attachment.Name, ContentType: message.Attachment.ContentType, ByteSize: message.Attachment.ByteSize}, ImageWidth: message.Attachment.ImageWidth, ImageHeight: message.Attachment.ImageHeight}
+		attachment = &MessageAttachment{
+			File:           File{ID: message.Attachment.ID, Name: message.Attachment.Name, ContentType: message.Attachment.ContentType, ByteSize: message.Attachment.ByteSize},
+			TransferStatus: MessageAttachmentTransferStatus(message.Attachment.TransferStatus),
+			ImageWidth:     message.Attachment.ImageWidth, ImageHeight: message.Attachment.ImageHeight,
+		}
 	}
 	// 文本和附件消息可以被引用；对客回复只能引用对客可见且渠道能够投递该引用的消息。
 	quotable := message.Type == domain.MessageTypeText || message.Type == domain.MessageTypeAttachment
@@ -743,6 +769,9 @@ func customerTextMessageError(ctx context.Context, meta RequestMeta, err error, 
 	if errors.Is(err, conversationaction.ErrConversationNotFound) {
 		return NotFoundError(meta, cervii18n.ErrorConversationNotFound)
 	}
+	if errors.Is(err, fileaction.ErrFileNotFound) {
+		return NotFoundError(meta, cervii18n.ErrorFileNotFound)
+	}
 	if validationError, ok := errors.AsType[*conversationaction.ValidationError](err); ok {
 		return InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, conversationMessageValidationKeys))
 	}
@@ -766,6 +795,12 @@ func customerReplyConflictMessageKey(reason string) cervii18n.Key {
 		return cervii18n.ErrorChannelOutboundUnsupported
 	case conversationaction.ConflictReasonReplyTargetInvalid:
 		return cervii18n.ErrorReplyTargetInvalid
+	case conversationaction.ConflictReasonChannelAttachmentUnsupported:
+		return cervii18n.ErrorChannelAttachmentUnsupported
+	case conversationaction.ConflictReasonAttachmentTooLarge:
+		return cervii18n.ErrorAttachmentTooLarge
+	case conversationaction.ConflictReasonCaptionTooLong:
+		return cervii18n.ErrorAttachmentCaptionTooLong
 	}
 	return cervii18n.ErrorMessageConflict
 }
@@ -780,6 +815,7 @@ var conversationMessageValidationKeys = map[conversationaction.ValidationCode]ce
 	conversationaction.ValidationBodyTooLong:              cervii18n.FieldMessageBodyTooLong,
 	conversationaction.ValidationCursorInvalid:            cervii18n.FieldMessageCursorInvalid,
 	conversationaction.ValidationMessageVisibilityInvalid: cervii18n.FieldMessageVisibilityInvalid,
+	conversationaction.ValidationFileIDInvalid:            cervii18n.ErrorFileNotFound,
 	conversationaction.ValidationTargetIdentityIDInvalid:  cervii18n.FieldTargetIdentityIDInvalid,
 	conversationaction.ValidationGroupTitleRequired:       cervii18n.FieldGroupTitleRequired,
 	conversationaction.ValidationGroupTitleTooLong:        cervii18n.FieldGroupTitleTooLong,

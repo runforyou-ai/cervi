@@ -200,8 +200,8 @@ func testAgentDirectReplies(t *testing.T, db *bun.DB, identity *servermodels.Ide
 	if _, err := db.NewUpdate().Model((*servermodels.Message)(nil)).Set("type = ?", domain.MessageTypeAttachment).Set("body = ''").Where("id = ?", first.Message.ID).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.NewRaw(`INSERT INTO message_attachments (message_id, organization_id, name, content_type, byte_size)
- VALUES (?, ?, 'reference.txt', 'text/plain', 0)`, first.Message.ID, identity.Organization.ID).Exec(ctx); err != nil {
+	if _, err := db.NewRaw(`INSERT INTO message_attachments (message_id, organization_id, name, content_type, byte_size, transfer_status)
+ VALUES (?, ?, 'reference.txt', 'text/plain', 0, ?)`, first.Message.ID, identity.Organization.ID, domain.MessageAttachmentTransferReady).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
 	for _, body := range []string{"", "附件说明", "取消前说明"} {

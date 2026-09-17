@@ -239,9 +239,9 @@ func saveAttachmentMessage(ctx context.Context, tx bun.Tx, identity *servermodel
 		return ConversationMessage{}, false, err
 	}
 	if _, err := tx.NewRaw(`INSERT INTO message_attachments
- (message_id, organization_id, file_id, name, content_type, byte_size, image_width, image_height)
- VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
-		message.ID, identity.Organization.ID, file.ID, file.OriginalName, file.ContentType, file.ByteSize, input.ImageWidth, input.ImageHeight).Exec(ctx); err != nil {
+ (message_id, organization_id, file_id, name, content_type, byte_size, image_width, image_height, transfer_status)
+ VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		message.ID, identity.Organization.ID, file.ID, file.OriginalName, file.ContentType, file.ByteSize, input.ImageWidth, input.ImageHeight, domain.MessageAttachmentTransferReady).Exec(ctx); err != nil {
 		return ConversationMessage{}, false, err
 	}
 	if _, err := tx.NewUpdate().Model(file).Set("status = ?", domain.FileStatusActive).Set("expires_at = NULL").Set("updated_at = now()").WherePK().Exec(ctx); err != nil {
@@ -256,7 +256,7 @@ func saveAttachmentMessage(ctx context.Context, tx bun.Tx, identity *servermodel
 		}
 	}
 	result := memberConversationMessage(message, member.SubjectID, identity.OrganizationIdentity)
-	result.Attachment = &MessageAttachment{ID: file.ID, Name: file.OriginalName, ContentType: file.ContentType, ByteSize: file.ByteSize, ImageWidth: input.ImageWidth, ImageHeight: input.ImageHeight}
+	result.Attachment = &MessageAttachment{ID: file.ID, Name: file.OriginalName, ContentType: file.ContentType, ByteSize: file.ByteSize, ImageWidth: input.ImageWidth, ImageHeight: input.ImageHeight, TransferStatus: domain.MessageAttachmentTransferReady}
 	return result, true, nil
 }
 
@@ -276,7 +276,7 @@ func loadMessageAttachments(ctx context.Context, db bun.IDB, organizationID stri
 		MessageAttachment
 	}{}
 	if err := db.NewSelect().TableExpr("message_attachments AS ma").
-		ColumnExpr("ma.message_id, COALESCE(ma.file_id::text, '') AS id, ma.name, ma.content_type, ma.byte_size, ma.image_width, ma.image_height").
+		ColumnExpr("ma.message_id, COALESCE(ma.file_id::text, '') AS id, ma.name, ma.content_type, ma.byte_size, ma.image_width, ma.image_height, ma.transfer_status").
 		Where("ma.organization_id = ? AND ma.message_id IN (?)", organizationID, bun.In(ids)).Scan(ctx, &rows); err != nil {
 		return fmt.Errorf("load message attachments: %w", err)
 	}

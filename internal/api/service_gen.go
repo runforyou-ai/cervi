@@ -48,6 +48,7 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.PATCH("/conversations/:conversationID/unread-mark", s.updateConversationUnreadMark)
 	router.PATCH("/conversations/:conversationID/notification-settings", s.updateConversationNotificationSettings)
 	router.POST("/conversations/:conversationID/messages", s.sendCustomerTextMessage)
+	router.POST("/conversations/:conversationID/attachment-messages", s.sendCustomerAttachmentMessage)
 	router.GET("/reply-suggestion-agents", s.listCustomerReplyAgents)
 	router.POST("/conversations/:conversationID/reply-suggestions", s.generateCustomerReplySuggestions)
 	router.GET("/conversations/:conversationID/copilot-threads", s.listCustomerCopilotThreads)
@@ -469,6 +470,16 @@ func (s *Service) sendCustomerTextMessage(c *gin.Context) {
 		return
 	}
 	output, err := s.application.SendCustomerTextMessage(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// sendCustomerAttachmentMessage 发送客户会话附件消息。
+func (s *Service) sendCustomerAttachmentMessage(c *gin.Context) {
+	var input appservice.CustomerAttachmentMessageInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.SendCustomerAttachmentMessage(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
 	writeResult(c, http.StatusOK, output, err)
 }
 

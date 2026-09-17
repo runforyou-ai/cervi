@@ -5,7 +5,11 @@ import { useState } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
-import { getAttachmentDownload, type MessageAttachment } from "@/api"
+import {
+  getAttachmentDownload,
+  MessageAttachmentTransferStatus,
+  type MessageAttachment,
+} from "@/api"
 import { useResource } from "@/hooks/use-resource"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { formatFileSize } from "@/lib/file-size"
@@ -53,6 +57,9 @@ export function ConversationAttachment({
   )
   // 已保存的附件均已上传完成，本地附件按上传任务阶段展示进度、取消和失败。
   const ready = !job || job.stage === "sent"
+  // 外部渠道媒体在内容取回完成前没有可读文件。
+  const transferred =
+    attachment.transferStatus === MessageAttachmentTransferStatus.MessageAttachmentTransferReady
   const failed = job?.stage === "failed"
   const cancellable =
     job?.stage === "queued" ||
@@ -63,7 +70,7 @@ export function ConversationAttachment({
   const preview = useResource(
     resourceKeys.attachmentDownload(conversationID, messageID),
     () => getAttachmentDownload(conversationID, messageID),
-    { enabled: ready && image && Boolean(conversationID) },
+    { enabled: ready && transferred && image && Boolean(conversationID) },
   )
   const progress = attachment.byteSize
     ? Math.min((job?.bytes ?? 0) / attachment.byteSize, 1)
@@ -150,14 +157,18 @@ export function ConversationAttachment({
       {!incoming && !ready ? <ClockIcon className="size-3.5" /> : null}
     </span>
   )
-  const detail = ready
-    ? undefined
-    : failed
+  const detail = !ready
+    ? failed
       ? failedLabel
       : `${formatFileSize(job?.bytes ?? 0)} / ${formatFileSize(attachment.byteSize)}`
+    : transferred
+      ? undefined
+      : attachment.transferStatus === MessageAttachmentTransferStatus.MessageAttachmentTransferFailed
+        ? t("attachmentTransferFailed")
+        : t("attachmentTransferPending")
   // 文件打开下载地址，移动端图片打开应用内预览。
-  const canPreview = ready && mobile && image && Boolean(preview.data?.previewUrl)
-  const canDownload = ready && !(mobile && image)
+  const canPreview = ready && transferred && mobile && image && Boolean(preview.data?.previewUrl)
+  const canDownload = ready && transferred && !(mobile && image)
   const bubble = cn("rounded-2xl px-3 py-2", bubbleClassName)
   return (
     <>

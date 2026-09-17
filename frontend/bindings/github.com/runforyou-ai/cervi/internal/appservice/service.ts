@@ -990,6 +990,13 @@ export function SendAttachmentMessage(meta: $models.RequestMeta, input: $models.
 }
 
 /**
+ * SendCustomerAttachmentMessage 发送客户会话附件消息。
+ */
+export function SendCustomerAttachmentMessage(meta: $models.RequestMeta, conversationID: string, input: $models.CustomerAttachmentMessageInput): $CancellablePromise<$models.ConversationMessage> {
+    return $Call.ByID(2602078292, meta, conversationID, input);
+}
+
+/**
  * SendCustomerCopilotTextMessage 向 Copilot 线程发送提问。
  */
 export function SendCustomerCopilotTextMessage(meta: $models.RequestMeta, threadID: string, input: $models.CustomerCopilotTextMessageInput): $CancellablePromise<$models.ConversationMessage> {

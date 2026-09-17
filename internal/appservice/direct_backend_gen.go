@@ -342,6 +342,16 @@ func (b *DirectBackend) SendCustomerTextMessage(ctx context.Context, meta Reques
 	return b.ops.SendCustomerTextMessage(ctx, meta, identity, conversationID, input)
 }
 
+// SendCustomerAttachmentMessage 发送客户会话附件消息。
+func (b *DirectBackend) SendCustomerAttachmentMessage(ctx context.Context, meta RequestMeta, conversationID string, input CustomerAttachmentMessageInput) (ConversationMessage, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero ConversationMessage
+		return zero, err
+	}
+	return b.ops.SendCustomerAttachmentMessage(ctx, meta, identity, conversationID, input)
+}
+
 // ListCustomerReplyAgents 返回可用于 AI 写回复的 AI 员工。
 func (b *DirectBackend) ListCustomerReplyAgents(ctx context.Context, meta RequestMeta) (CustomerReplyAgentList, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
