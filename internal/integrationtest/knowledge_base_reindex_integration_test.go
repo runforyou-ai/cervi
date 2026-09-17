@@ -27,7 +27,7 @@ func TestKnowledgeBaseReindex(t *testing.T) {
 	identity := installed.Identity
 	tasks := newKnowledgeTasks(t, db)
 	probe := &processingProbe{}
-	documentWorker := knowledgeaction.NewProcessDocumentAction(db, probe, probe, probe)
+	documentWorker := knowledgeaction.NewProcessDocumentAction(db, probe, probe, probe, probe)
 	qaWorker := knowledgeaction.NewProcessQAEntryAction(db, probe)
 	update := knowledgeaction.NewUpdateKnowledgeBaseAction(db, tasks)
 	segmentCount := func(baseID string) int {

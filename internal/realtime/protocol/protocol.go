@@ -5,8 +5,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/runforyou-ai/cervi/internal/appservice"
+	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
 // Version 是当前协议主版本，只有破坏性演进才提升。
@@ -30,6 +32,21 @@ const (
 	TypeConversationRemoved      Type = "conversation_removed"
 	TypeConversationStateChanged Type = "conversation_state_changed"
 	TypeIdentityProfileChanged   Type = "identity_profile_changed"
+	TypeRunStreamSnapshot        Type = "run_stream_snapshot"
+	TypeRunStreamDelta           Type = "run_stream_delta"
+	TypeRunStreamEnded           Type = "run_stream_ended"
+)
+
+// RunStreamOperationKind 定义运行过程流增量中的操作类型，与 agentruntime 的运行流操作一一对应。
+type RunStreamOperationKind string
+
+const (
+	RunStreamUpsertBlock     RunStreamOperationKind = "upsert_block"
+	RunStreamAppendBlockText RunStreamOperationKind = "append_block_text"
+	RunStreamRemoveBlocks    RunStreamOperationKind = "remove_blocks"
+	RunStreamAppendCandidate RunStreamOperationKind = "append_candidate"
+	RunStreamClearCandidate  RunStreamOperationKind = "clear_candidate"
+	RunStreamReset           RunStreamOperationKind = "reset"
 )
 
 // Frame 是可编码的实时事件。
@@ -74,6 +91,59 @@ type IdentityProfileChanged struct {
 	Version int64 `json:"version,string"`
 }
 
+// RunStreamToolCall 是运行过程流中的工具调用名称、状态和起止时间，完整参数与结果经过程详情查询读取。
+type RunStreamToolCall struct {
+	Name        string                     `json:"name"`
+	Status      domain.AgentToolCallStatus `json:"status"`
+	StartedAt   *time.Time                 `json:"startedAt,omitempty"`
+	CompletedAt *time.Time                 `json:"completedAt,omitempty"`
+}
+
+// RunStreamBlock 是运行过程流中按位置排列的展示内容块。
+type RunStreamBlock struct {
+	ID       string                   `json:"id"`
+	Position int64                    `json:"position,string"`
+	Kind     domain.AgentRunBlockKind `json:"kind"`
+	Text     string                   `json:"text,omitempty"`
+	ToolCall *RunStreamToolCall       `json:"toolCall,omitempty"`
+}
+
+// RunStreamOperation 是可按顺序应用到运行过程流快照的一条变更。
+type RunStreamOperation struct {
+	Kind     RunStreamOperationKind `json:"kind"`
+	Block    *RunStreamBlock        `json:"block,omitempty"`
+	BlockID  string                 `json:"blockId,omitempty"`
+	BlockIDs []string               `json:"blockIds,omitempty"`
+	Text     string                 `json:"text,omitempty"`
+}
+
+// RunStreamSnapshot 是运行过程流快照的一个分片；分片按 part 从 0 连续递增，收齐 partCount 个分片构成该序号上的完整快照。
+type RunStreamSnapshot struct {
+	RunID            string           `json:"runId"`
+	StreamID         string           `json:"streamId"`
+	Attempt          int              `json:"attempt"`
+	Sequence         int64            `json:"sequence,string"`
+	Part             int              `json:"part"`
+	PartCount        int              `json:"partCount"`
+	CandidateContent string           `json:"candidateContent,omitempty"`
+	Blocks           []RunStreamBlock `json:"blocks"`
+}
+
+// RunStreamDelta 是运行过程流快照从起始序号到终止序号的增量，起始序号与当前快照序号不一致时接收方重新取快照。
+type RunStreamDelta struct {
+	RunID        string               `json:"runId"`
+	StreamID     string               `json:"streamId"`
+	Attempt      int                  `json:"attempt"`
+	BaseSequence int64                `json:"baseSequence,string"`
+	Sequence     int64                `json:"sequence,string"`
+	Operations   []RunStreamOperation `json:"operations"`
+}
+
+// RunStreamEnded 表示本次执行尝试的运行过程流已结束，最终结果以持久查询为准。
+type RunStreamEnded struct {
+	RunID string `json:"runId"`
+}
+
 // FrameType 返回服务端 Hello 事件种类。
 func (ServerHello) FrameType() Type { return TypeServerHello }
 
@@ -95,6 +165,15 @@ func (ConversationStateChanged) FrameType() Type { return TypeConversationStateC
 // FrameType 返回身份资料变更事件种类。
 func (IdentityProfileChanged) FrameType() Type { return TypeIdentityProfileChanged }
 
+// FrameType 返回运行过程流快照分片事件种类。
+func (RunStreamSnapshot) FrameType() Type { return TypeRunStreamSnapshot }
+
+// FrameType 返回运行过程流增量事件种类。
+func (RunStreamDelta) FrameType() Type { return TypeRunStreamDelta }
+
+// FrameType 返回运行过程流结束事件种类。
+func (RunStreamEnded) FrameType() Type { return TypeRunStreamEnded }
+
 // envelope 是事件在 SSE data 行中的外层结构。
 type envelope struct {
 	V    int             `json:"v"`
@@ -114,6 +193,9 @@ var decoders = map[Type]decoder{
 	TypeConversationRemoved:      decodeAs[ConversationRemoved],
 	TypeConversationStateChanged: decodeAs[ConversationStateChanged],
 	TypeIdentityProfileChanged:   decodeAs[IdentityProfileChanged],
+	TypeRunStreamSnapshot:        decodeAs[RunStreamSnapshot],
+	TypeRunStreamDelta:           decodeAs[RunStreamDelta],
+	TypeRunStreamEnded:           decodeAs[RunStreamEnded],
 }
 
 // Encode 把事件编码为带协议主版本的单行 JSON 文本。

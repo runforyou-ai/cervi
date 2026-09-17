@@ -20,15 +20,14 @@ type mergeKey struct {
 	conversationID string
 }
 
-// connection 是一条实时事件流，写协程独占响应写入。
+// connection 是一条成员实时事件流，写协程独占响应写入。
 type connection struct {
 	gateway *Gateway
 	id      string
 	cancel  context.CancelFunc
 
-	// subjects 在加入受众时写入，allowed 与 tokenSessionID 在建立连接时写入，之后只读。
+	// subjects 与 tokenSessionID 在加入受众时写入，之后只读。
 	subjects       []string
-	allowed        map[protocol.Type]bool
 	tokenSessionID string
 
 	mu         sync.Mutex
@@ -42,19 +41,13 @@ type connection struct {
 }
 
 // newConnection 创建尚未输出事件流的连接，cancel 结束该连接的请求处理。
-func newConnection(gateway *Gateway, cancel context.CancelFunc, route streamRoute) *connection {
-	allowed := make(map[protocol.Type]bool, len(route.allowed))
-	for _, frameType := range route.allowed {
-		allowed[frameType] = true
-	}
+func newConnection(gateway *Gateway, cancel context.CancelFunc) *connection {
 	return &connection{
-		gateway:        gateway,
-		id:             uuid.NewV7().String(),
-		cancel:         cancel,
-		allowed:        allowed,
-		tokenSessionID: route.tokenSessionID,
-		merged:         map[mergeKey]int{},
-		wake:           make(chan struct{}, 1),
+		gateway: gateway,
+		id:      uuid.NewV7().String(),
+		cancel:  cancel,
+		merged:  map[mergeKey]int{},
+		wake:    make(chan struct{}, 1),
 	}
 }
 
@@ -124,11 +117,11 @@ func (c *connection) write(writer http.ResponseWriter, controller *http.Response
 	return true
 }
 
-// send 把事件加入发送队列；受众可下发事件之外的事件直接丢弃，变更通知按会话与种类保留最高版本，队列溢出时按慢连接结束事件流。
+// send 把事件加入发送队列；变更通知按会话与种类保留最高版本，队列溢出时按慢连接结束事件流。
 func (c *connection) send(frame protocol.Frame) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if c.closing || !c.allowed[frame.FrameType()] {
+	if c.closing {
 		return
 	}
 	key, version, mergeable := mergeTarget(frame)
@@ -163,11 +156,20 @@ func mergeTarget(frame protocol.Frame) (mergeKey, int64, bool) {
 	return mergeKey{}, 0, false
 }
 
+// tokenSession 返回事件流所属登录会话编号。
+func (c *connection) tokenSession() string { return c.tokenSessionID }
+
+// audienceSubjects 返回事件流加入的受众 Subject。
+func (c *connection) audienceSubjects() []string { return c.subjects }
+
 // revoke 清除未发送的事件并结束事件流。
 func (c *connection) revoke(kind realtime.Kind) {
-	slog.Info("实时事件流已撤销", "connection_id", c.id, "kind", kind)
+	slog.Info("实时事件流登录会话已撤销", "connection_id", c.id, "kind", kind)
 	c.close(true)
 }
+
+// shutdown 在网关下线时停止接收新事件，剩余事件发送完毕后结束事件流。
+func (c *connection) shutdown() { c.close(false) }
 
 // close 停止接收新事件，按需清除未发送的事件，由写协程发送剩余事件后结束事件流。
 func (c *connection) close(discard bool) {

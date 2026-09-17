@@ -1854,9 +1854,11 @@ export interface KnowledgeBaseList {
  */
 export interface KnowledgeDocument {
     "format": KnowledgeDocumentFormat;
+    "sourceKind": KnowledgeDocumentSourceKind;
     "id": string;
     "groupId": string;
     "name": string;
+    "sourceUrl": string;
     "contentType": string;
     "byteSize": number;
     "status": KnowledgeIndexStatus;
@@ -1880,6 +1882,22 @@ export interface KnowledgeDocumentBatch {
 export interface KnowledgeDocumentBatchInput {
     "groupId": string;
     "fileIds": string[] | null;
+}
+
+/**
+ * KnowledgeDocumentContent 返回文档元数据与正文。
+ */
+export interface KnowledgeDocumentContent {
+    "document": KnowledgeDocument;
+    "content": string;
+}
+
+/**
+ * KnowledgeDocumentContentInput 定义在线文档的名称与正文更新。
+ */
+export interface KnowledgeDocumentContentInput {
+    "title": string;
+    "content": string;
 }
 
 /**
@@ -1938,6 +1956,20 @@ export interface KnowledgeDocumentPreviewRequest {
 }
 
 /**
+ * KnowledgeDocumentRefetchInput 定义重新抓取时可选的新页面地址。
+ */
+export interface KnowledgeDocumentRefetchInput {
+    "sourceUrl": string;
+}
+
+/**
+ * KnowledgeDocumentRenameInput 定义文档名称更新。
+ */
+export interface KnowledgeDocumentRenameInput {
+    "title": string;
+}
+
+/**
  * KnowledgeDocumentSegment 定义可阅读和定位的分段正文，上下文为分段所属的标题路径和表头。
  */
 export interface KnowledgeDocumentSegment {
@@ -1968,6 +2000,20 @@ export interface KnowledgeDocumentSegmentPage {
     "anchorSegmentId": string;
     "anchorPosition": number;
 }
+
+/**
+ * KnowledgeDocumentSourceKind 定义文档的内容来源。
+ */
+export enum KnowledgeDocumentSourceKind {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    KnowledgeDocumentSourceFile = "file",
+    KnowledgeDocumentSourceText = "text",
+    KnowledgeDocumentSourceWeb = "web",
+};
 
 /**
  * KnowledgeGroup 定义知识库分组树节点。
@@ -2116,6 +2162,24 @@ export interface KnowledgeRetrievalRecord {
  */
 export interface KnowledgeRetrievalResult {
     "records": KnowledgeRetrievalRecord[] | null;
+}
+
+/**
+ * KnowledgeTextDocumentInput 定义在线编写文档的分组、名称与正文。
+ */
+export interface KnowledgeTextDocumentInput {
+    "groupId": string;
+    "title": string;
+    "content": string;
+}
+
+/**
+ * KnowledgeWebDocumentInput 定义网页导入文档的分组、名称与页面地址。
+ */
+export interface KnowledgeWebDocumentInput {
+    "groupId": string;
+    "title": string;
+    "sourceUrl": string;
 }
 
 /**
@@ -2477,7 +2541,7 @@ export interface ReadInboxConversationsInput {
 }
 
 /**
- * RealtimeConnection 是原生端本地实时连接编号，事件据此区分新旧连接。
+ * RealtimeConnection 是原生端本地事件流编号，事件据此区分新旧事件流。
  */
 export interface RealtimeConnection {
     "connectionId": string;

@@ -1,7 +1,7 @@
 /** 文档表格展示元数据、创建时间及固定操作栏。 */
 import { useRef, useState } from "react"
 import { toast } from "sonner"
-import { retryKnowledgeDocument, isApiError } from "@/api"
+import { refetchKnowledgeDocument, retryKnowledgeDocument, isApiError, KnowledgeDocumentSourceKind } from "@/api"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
 import { recoverSession } from "@/lib/session-navigation"
@@ -48,17 +48,19 @@ export function KnowledgeDocumentTable({
   // 记录每行三点菜单按钮，供关闭对话框后恢复焦点。
   const triggers = useRef(new Map<string, HTMLButtonElement>())
 
-  /** 提交重试并在结束后刷新列表和详情中的文档状态。 */
-  async function retryDocument(document: KnowledgeDocumentData) {
+  /** 提交重试或重新抓取，并在结束后刷新列表和详情中的文档状态。 */
+  async function retryDocument(document: KnowledgeDocumentData, refetch = false) {
     setRetryingIDs((current) => new Set(current).add(document.id))
     try {
-      await retryKnowledgeDocument(knowledgeBaseId, document.id)
+      if (refetch) await refetchKnowledgeDocument(knowledgeBaseId, document.id, { sourceUrl: "" })
+      else await retryKnowledgeDocument(knowledgeBaseId, document.id)
     } catch (error) {
-      if (!recoverSession(error, navigate)) toast.error(isApiError(error) ? apiErrorMessage(error) : t("documents.retryFailed"))
+      if (!recoverSession(error, navigate)) toast.error(isApiError(error) ? apiErrorMessage(error) : t(refetch ? "documents.refetchFailed" : "documents.retryFailed"))
     } finally {
       await Promise.all([
         invalidate(resourceKeys.knowledgeDocuments(knowledgeBaseId)),
         invalidate(resourceKeys.knowledgeDocument(knowledgeBaseId, document.id)),
+        invalidate(resourceKeys.knowledgeDocumentContent(knowledgeBaseId, document.id)),
       ])
       setRetryingIDs((current) => {
         const next = new Set(current)
@@ -88,6 +90,12 @@ export function KnowledgeDocumentTable({
             cell: (document) => document.format.slice(1).toUpperCase(),
           },
           {
+            key: "source",
+            header: t("documents.columns.source"),
+            cellClassName: "whitespace-nowrap text-muted-foreground",
+            cell: (document) => t(`documents.sources.${document.sourceKind}`),
+          },
+          {
             key: "size",
             header: t("documents.columns.size"),
             cellClassName: "whitespace-nowrap tabular-nums",
@@ -111,9 +119,16 @@ export function KnowledgeDocumentTable({
         actions={(document) => ({
           primary: (
             <Button variant="outline" size="sm" asChild>
-              <Link to={`${listPath}/${document.id}${search}`}>
-                {t("common:actions.view")}
-              </Link>
+              {document.sourceKind ===
+              KnowledgeDocumentSourceKind.KnowledgeDocumentSourceText ? (
+                <Link to={`${listPath}/${document.id}/edit${search}`}>
+                  {t("common:actions.edit")}
+                </Link>
+              ) : (
+                <Link to={`${listPath}/${document.id}${search}`}>
+                  {t("common:actions.view")}
+                </Link>
+              )}
             </Button>
           ),
           menuLabel: t("documents.more", { name: document.name }),
@@ -128,6 +143,16 @@ export function KnowledgeDocumentTable({
                 onSelect={() => void retryDocument(document)}
               >
                 {t("common:actions.retry")}
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                disabled={
+                  retryingIDs.has(document.id) ||
+                  document.sourceKind !==
+                    KnowledgeDocumentSourceKind.KnowledgeDocumentSourceWeb
+                }
+                onSelect={() => void retryDocument(document, true)}
+              >
+                {t("documents.refetch")}
               </DropdownMenuItem>
               <DropdownMenuItem
                 disabled={!canMove}

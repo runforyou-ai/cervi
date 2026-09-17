@@ -20,6 +20,12 @@ const (
 	ValidationRetrievalScoreThresholdInvalid common.FieldCode = "KNOWLEDGE_BASE_RETRIEVAL_SCORE_THRESHOLD_INVALID"
 	ValidationRerankModelInvalid             common.FieldCode = "KNOWLEDGE_BASE_RERANK_MODEL_INVALID"
 
+	ValidationDocumentTitleRequired   common.FieldCode = "KNOWLEDGE_DOCUMENT_TITLE_REQUIRED"
+	ValidationDocumentTitleTooLong    common.FieldCode = "KNOWLEDGE_DOCUMENT_TITLE_TOO_LONG"
+	ValidationDocumentContentRequired common.FieldCode = "KNOWLEDGE_DOCUMENT_CONTENT_REQUIRED"
+	ValidationDocumentGroupInvalid    common.FieldCode = "KNOWLEDGE_DOCUMENT_GROUP_INVALID"
+	ValidationDocumentURLInvalid      common.FieldCode = "KNOWLEDGE_DOCUMENT_URL_INVALID"
+
 	ValidationQAQuestionRequired common.FieldCode = "KNOWLEDGE_QA_QUESTION_REQUIRED"
 	ValidationQAAnswerRequired   common.FieldCode = "KNOWLEDGE_QA_ANSWER_REQUIRED"
 	ValidationQAGroupInvalid     common.FieldCode = "KNOWLEDGE_QA_GROUP_INVALID"

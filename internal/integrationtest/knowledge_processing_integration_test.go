@@ -19,6 +19,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/documentconvert"
 	"github.com/runforyou-ai/cervi/internal/integration/embedding"
+	"github.com/runforyou-ai/cervi/internal/integration/webfetch"
 	servertest "github.com/runforyou-ai/cervi/internal/servertest"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -31,6 +32,16 @@ type processingProbe struct {
 	connectionErr error
 	credential    embedding.Credential
 	markdown      string
+	page          string
+	fetchErr      error
+}
+
+// Fetch 返回预设的网页内容，抓取失败时返回预设错误。
+func (p *processingProbe) Fetch(context.Context, string) (webfetch.Page, error) {
+	if p.fetchErr != nil {
+		return webfetch.Page{}, p.fetchErr
+	}
+	return webfetch.Page{Name: "page.html", Body: []byte(p.page)}, nil
 }
 
 // CheckConnection 返回预设的连接检查结果。
@@ -93,7 +104,7 @@ func TestKnowledgeProcessingRetryAndPublication(t *testing.T) {
 	}
 	input := knowledgeaction.ProcessInput{OrganizationID: installed.Identity.Organization.ID, KnowledgeBaseID: base.ID, DocumentID: documentID, ProcessingID: document.ProcessingID, ChunkLength: document.ChunkLength, ChunkOverlap: document.ChunkOverlap, EmbeddingProviderID: document.EmbeddingProviderID, EmbeddingModelIdentifier: document.EmbeddingModelIdentifier, EmbeddingDimension: document.EmbeddingDimension}
 	probe := &processingProbe{fail: true}
-	worker := knowledgeaction.NewProcessDocumentAction(db, probe, probe, probe)
+	worker := knowledgeaction.NewProcessDocumentAction(db, probe, probe, probe, probe)
 	err = worker.Execute(ctx, input)
 	if err == nil {
 		t.Fatalf("failure=%v", err)
@@ -193,7 +204,7 @@ func TestKnowledgeRetryAllStates(t *testing.T) {
 	}
 	input := knowledgeaction.ProcessInput{OrganizationID: owner.Identity.Organization.ID, KnowledgeBaseID: base.ID, DocumentID: document.ID, ProcessingID: document.ProcessingID, ChunkLength: 512, ChunkOverlap: 50, EmbeddingProviderID: document.EmbeddingProviderID, EmbeddingModelIdentifier: document.EmbeddingModelIdentifier, EmbeddingDimension: document.EmbeddingDimension}
 	probe := &processingProbe{}
-	worker := knowledgeaction.NewProcessDocumentAction(db, probe, probe, probe)
+	worker := knowledgeaction.NewProcessDocumentAction(db, probe, probe, probe, probe)
 	if err := worker.Execute(ctx, input); err != nil {
 		t.Fatal(err)
 	}
@@ -279,7 +290,7 @@ func TestKnowledgeProcessingMissingFile(t *testing.T) {
 		t.Fatal(err)
 	}
 	probe := &processingProbe{}
-	worker := knowledgeaction.NewProcessDocumentAction(db, probe, probe, probe)
+	worker := knowledgeaction.NewProcessDocumentAction(db, probe, probe, probe, probe)
 	input := knowledgeaction.ProcessInput{OrganizationID: owner.Identity.Organization.ID, KnowledgeBaseID: base.ID, DocumentID: document.ID, ProcessingID: document.ProcessingID, ChunkLength: 512, ChunkOverlap: 50, EmbeddingProviderID: document.EmbeddingProviderID, EmbeddingModelIdentifier: document.EmbeddingModelIdentifier, EmbeddingDimension: document.EmbeddingDimension}
 	err = worker.Execute(ctx, input)
 	if err == nil {
@@ -338,7 +349,7 @@ func TestKnowledgeProcessingPublishesSegments(t *testing.T) {
 		EmbeddingProviderID: document.EmbeddingProviderID, EmbeddingModelIdentifier: document.EmbeddingModelIdentifier,
 		EmbeddingDimension: document.EmbeddingDimension,
 	}
-	action := knowledgeaction.NewProcessDocumentAction(db, probe, probe, probe)
+	action := knowledgeaction.NewProcessDocumentAction(db, probe, probe, probe, probe)
 	if err := action.Execute(ctx, input); err != nil {
 		t.Fatal(err)
 	}
@@ -499,7 +510,7 @@ func TestKnowledgeConnectionFailureSkipsTask(t *testing.T) {
 	}
 	input := knowledgeaction.ProcessInput{OrganizationID: owner.Identity.Organization.ID, KnowledgeBaseID: base.ID, DocumentID: document.ID, ProcessingID: document.ProcessingID, ChunkLength: 512, ChunkOverlap: 50, EmbeddingProviderID: document.EmbeddingProviderID, EmbeddingModelIdentifier: document.EmbeddingModelIdentifier, EmbeddingDimension: document.EmbeddingDimension}
 	probe := &processingProbe{}
-	worker := knowledgeaction.NewProcessDocumentAction(db, probe, probe, probe)
+	worker := knowledgeaction.NewProcessDocumentAction(db, probe, probe, probe, probe)
 	if err := worker.Execute(ctx, input); err != nil {
 		t.Fatal(err)
 	}

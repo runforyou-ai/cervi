@@ -11,9 +11,14 @@ export {
 } from "@/api/auth"
 export { getSyncHeads, loadIdentity, loadStartup, sessionPath } from "@/api/session"
 export {
+  createRunStreamClient,
   realtimeClient,
   type RealtimeClientEvent,
   type RealtimeState,
+  type RunStreamBlock,
+  type RunStreamEvent,
+  type RunStreamState,
+  type RunStreamToolCall,
 } from "@/api/realtime"
 export {
   completeFileUpload,

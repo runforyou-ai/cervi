@@ -92,6 +92,49 @@ test("旧事件流结束回调与重连交错时只保留当前事件流", (t) =
   assert.equal(streams.length, 2)
 })
 
+test("回到前台重建已就绪的事件流，连续触发只建立一条", (t) => {
+  const { client, streams } = setup(t)
+  client.start()
+  streams[0].handlers.frame(hello)
+  assert.equal(client.state, "ready")
+
+  client.restart()
+  assert.equal(streams[0].closed, true)
+  assert.equal(streams.length, 2)
+  assert.equal(client.state, "connecting")
+
+  // 前台恢复与网络恢复成对触发时，尚未就绪的连接不被再次替换。
+  client.restart()
+  client.resume()
+  assert.equal(streams.length, 2)
+  assert.equal(streams[1].closed, false)
+})
+
+test("未就绪的事件流不因回到前台被重建", (t) => {
+  const { client, streams } = setup(t)
+  client.start()
+  client.restart()
+  assert.equal(streams.length, 1)
+
+  streams[0].handlers.closed(new Error("network"))
+  assert.equal(client.state, "backoff")
+  client.restart()
+  assert.equal(streams.length, 1)
+  // 退避期间仍由 resume 跳过剩余等待。
+  client.resume()
+  assert.equal(streams.length, 2)
+})
+
+test("停止后的事件流不因回到前台被重建", (t) => {
+  const { client, streams } = setup(t)
+  client.start()
+  streams[0].handlers.closed(sessionError)
+  assert.equal(client.state, "stopped")
+  client.restart()
+  t.mock.timers.tick(60_000)
+  assert.equal(streams.length, 1)
+})
+
 test("会话错误停止重连并交给订阅方恢复入口", (t) => {
   const { client, streams, events } = setup(t)
   client.start()

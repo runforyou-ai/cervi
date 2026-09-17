@@ -544,6 +544,36 @@ func (s *Service) GetKnowledgeDocumentPreview(ctx context.Context, meta RequestM
 	return withNormalizedSlices(s.backend.GetKnowledgeDocumentPreview(ctx, meta, knowledgeBaseID, documentID))
 }
 
+// CreateKnowledgeTextDocument 创建在线编写的文档并安排索引。
+func (s *Service) CreateKnowledgeTextDocument(ctx context.Context, meta RequestMeta, knowledgeBaseID string, input KnowledgeTextDocumentInput) (KnowledgeDocument, error) {
+	return withNormalizedSlices(s.backend.CreateKnowledgeTextDocument(ctx, meta, knowledgeBaseID, input))
+}
+
+// GetKnowledgeDocumentContent 返回在线文档正文或网页抓取快照。
+func (s *Service) GetKnowledgeDocumentContent(ctx context.Context, meta RequestMeta, knowledgeBaseID string, documentID string) (KnowledgeDocumentContent, error) {
+	return withNormalizedSlices(s.backend.GetKnowledgeDocumentContent(ctx, meta, knowledgeBaseID, documentID))
+}
+
+// UpdateKnowledgeDocumentContent 修改在线文档的名称与正文并安排索引。
+func (s *Service) UpdateKnowledgeDocumentContent(ctx context.Context, meta RequestMeta, knowledgeBaseID string, documentID string, input KnowledgeDocumentContentInput) (KnowledgeDocument, error) {
+	return withNormalizedSlices(s.backend.UpdateKnowledgeDocumentContent(ctx, meta, knowledgeBaseID, documentID, input))
+}
+
+// RenameKnowledgeDocument 修改在线文档或网页文档的名称。
+func (s *Service) RenameKnowledgeDocument(ctx context.Context, meta RequestMeta, knowledgeBaseID string, documentID string, input KnowledgeDocumentRenameInput) (KnowledgeDocument, error) {
+	return withNormalizedSlices(s.backend.RenameKnowledgeDocument(ctx, meta, knowledgeBaseID, documentID, input))
+}
+
+// CreateKnowledgeWebDocument 导入网页并安排首次抓取。
+func (s *Service) CreateKnowledgeWebDocument(ctx context.Context, meta RequestMeta, knowledgeBaseID string, input KnowledgeWebDocumentInput) (KnowledgeDocument, error) {
+	return withNormalizedSlices(s.backend.CreateKnowledgeWebDocument(ctx, meta, knowledgeBaseID, input))
+}
+
+// RefetchKnowledgeDocument 重新抓取网页文档并重新索引。
+func (s *Service) RefetchKnowledgeDocument(ctx context.Context, meta RequestMeta, knowledgeBaseID string, documentID string, input KnowledgeDocumentRefetchInput) error {
+	return s.backend.RefetchKnowledgeDocument(ctx, meta, knowledgeBaseID, documentID, input)
+}
+
 // ListKnowledgeQAEntries 返回分组中的本地问答列表。
 func (s *Service) ListKnowledgeQAEntries(ctx context.Context, meta RequestMeta, knowledgeBaseID string, input KnowledgeQAListInput) (KnowledgeQAList, error) {
 	return withNormalizedSlices(s.backend.ListKnowledgeQAEntries(ctx, meta, knowledgeBaseID, input))

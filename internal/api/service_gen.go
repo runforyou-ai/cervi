@@ -124,6 +124,12 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.PUT("/knowledge-bases/:knowledgeBaseID/documents/:documentID/group", s.moveKnowledgeDocument)
 	router.DELETE("/knowledge-bases/:knowledgeBaseID/documents/:documentID", s.deleteKnowledgeDocument)
 	router.GET("/knowledge-bases/:knowledgeBaseID/documents/:documentID/preview", s.getKnowledgeDocumentPreview)
+	router.POST("/knowledge-bases/:knowledgeBaseID/text-documents", s.createKnowledgeTextDocument)
+	router.GET("/knowledge-bases/:knowledgeBaseID/documents/:documentID/content", s.getKnowledgeDocumentContent)
+	router.PUT("/knowledge-bases/:knowledgeBaseID/documents/:documentID/content", s.updateKnowledgeDocumentContent)
+	router.PUT("/knowledge-bases/:knowledgeBaseID/documents/:documentID", s.renameKnowledgeDocument)
+	router.POST("/knowledge-bases/:knowledgeBaseID/web-documents", s.createKnowledgeWebDocument)
+	router.POST("/knowledge-bases/:knowledgeBaseID/documents/:documentID/refetch", s.refetchKnowledgeDocument)
 	router.GET("/knowledge-bases/:knowledgeBaseID/qa-entries", s.listKnowledgeQAEntries)
 	router.GET("/knowledge-bases/:knowledgeBaseID/qa-entries/:entryID", s.getKnowledgeQAEntry)
 	router.POST("/knowledge-bases/:knowledgeBaseID/qa-entries", s.createKnowledgeQAEntry)
@@ -1083,6 +1089,61 @@ func (s *Service) deleteKnowledgeDocument(c *gin.Context) {
 func (s *Service) getKnowledgeDocumentPreview(c *gin.Context) {
 	output, err := s.application.GetKnowledgeDocumentPreview(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), c.Param("documentID"))
 	writeResult(c, http.StatusOK, output, err)
+}
+
+// createKnowledgeTextDocument 创建在线编写的文档并安排索引。
+func (s *Service) createKnowledgeTextDocument(c *gin.Context) {
+	var input appservice.KnowledgeTextDocumentInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.CreateKnowledgeTextDocument(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), input)
+	writeResult(c, http.StatusCreated, output, err)
+}
+
+// getKnowledgeDocumentContent 返回在线文档正文或网页抓取快照。
+func (s *Service) getKnowledgeDocumentContent(c *gin.Context) {
+	output, err := s.application.GetKnowledgeDocumentContent(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), c.Param("documentID"))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// updateKnowledgeDocumentContent 修改在线文档的名称与正文并安排索引。
+func (s *Service) updateKnowledgeDocumentContent(c *gin.Context) {
+	var input appservice.KnowledgeDocumentContentInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.UpdateKnowledgeDocumentContent(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), c.Param("documentID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// renameKnowledgeDocument 修改在线文档或网页文档的名称。
+func (s *Service) renameKnowledgeDocument(c *gin.Context) {
+	var input appservice.KnowledgeDocumentRenameInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.RenameKnowledgeDocument(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), c.Param("documentID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// createKnowledgeWebDocument 导入网页并安排首次抓取。
+func (s *Service) createKnowledgeWebDocument(c *gin.Context) {
+	var input appservice.KnowledgeWebDocumentInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.CreateKnowledgeWebDocument(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), input)
+	writeResult(c, http.StatusCreated, output, err)
+}
+
+// refetchKnowledgeDocument 重新抓取网页文档并重新索引。
+func (s *Service) refetchKnowledgeDocument(c *gin.Context) {
+	var input appservice.KnowledgeDocumentRefetchInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	writeEmpty(c, s.application.RefetchKnowledgeDocument(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), c.Param("documentID"), input))
 }
 
 // listKnowledgeQAEntries 返回分组中的本地问答列表。

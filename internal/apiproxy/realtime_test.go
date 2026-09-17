@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"reflect"
+	"strings"
 	"testing"
 	"time"
 
@@ -15,6 +16,9 @@ import (
 	"github.com/runforyou-ai/cervi/internal/clientsession"
 	"github.com/runforyou-ai/cervi/internal/realtime/protocol"
 )
+
+// testWindowKey 在测试中标记发起调用的前端窗口。
+type testWindowKey struct{}
 
 // emittedEvent 是原生端投递给前端的一条事件。
 type emittedEvent struct {
@@ -33,7 +37,10 @@ func newRealtimeTestBackend(t *testing.T, serverURL string) (*Backend, <-chan em
 	if err != nil {
 		t.Fatal(err)
 	}
-	backend, err := NewBackend(store, sessions, func(name string, data any) { events <- emittedEvent{name, data} })
+	backend, err := NewBackend(store, sessions, func(name string, data any) { events <- emittedEvent{name, data} }, func(ctx context.Context) string {
+		owner, _ := ctx.Value(testWindowKey{}).(string)
+		return owner
+	})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -130,6 +137,132 @@ func TestRealtimeConnectionRequiresLogin(t *testing.T) {
 	}
 }
 
+// TestRealtimeIndependentConnections 验证多个前端窗口各自持有事件流，断开一条不影响其余事件流。
+func TestRealtimeIndependentConnections(t *testing.T) {
+	frame, err := protocol.Encode(protocol.ConversationChanged{ConversationID: "conversation-1", Version: 1})
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "text/event-stream")
+		_, _ = writer.Write(append(append([]byte("data: "), frame...), '\n', '\n'))
+		writer.(http.Flusher).Flush()
+		<-request.Context().Done()
+	}))
+	t.Cleanup(server.Close)
+
+	backend, events := newRealtimeTestBackend(t, server.URL)
+	meta := appservice.RequestMeta{Locale: "zh-CN"}
+	first, err := backend.ConnectRealtime(context.WithValue(context.Background(), testWindowKey{}, "1"), meta)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := backend.ConnectRealtime(context.WithValue(context.Background(), testWindowKey{}, "2"), meta)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(backend.realtime.disconnectAll)
+	if first.ConnectionID == second.ConnectionID {
+		t.Fatalf("两条事件流的连接编号相同：%q", first.ConnectionID)
+	}
+	// 每条事件流按自身连接编号投递事件。
+	delivered := map[string]bool{}
+	for range 2 {
+		select {
+		case got := <-events:
+			event, ok := got.data.(appservice.RealtimeFrameEvent)
+			if got.name != appservice.RealtimeFrameEventName || !ok || event.Frame != string(frame) {
+				t.Fatalf("event = %#v", got)
+			}
+			delivered[event.ConnectionID] = true
+		case <-time.After(5 * time.Second):
+			t.Fatal("等待实时事件超时")
+		}
+	}
+	if !delivered[first.ConnectionID] || !delivered[second.ConnectionID] {
+		t.Fatalf("投递事件的连接编号 = %v", delivered)
+	}
+
+	if err := backend.DisconnectRealtime(context.Background(), meta, first.ConnectionID); err != nil {
+		t.Fatal(err)
+	}
+	expectEvent(t, events, emittedEvent{appservice.RealtimeClosedEventName, appservice.RealtimeClosedEvent{ConnectionID: first.ConnectionID}})
+	if current, _ := windowStreamsOf(backend, "1"); current != "" {
+		t.Fatalf("断开的窗口仍登记成员事件流 %q", current)
+	}
+	if current, _ := windowStreamsOf(backend, "2"); current != second.ConnectionID {
+		t.Fatalf("另一窗口的成员事件流 = %q，want %q", current, second.ConnectionID)
+	}
+}
+
+// TestRealtimeWindowReconnectReplacesStream 验证同一窗口刷新后重新连接时关闭该窗口原有的事件流。
+func TestRealtimeWindowReconnectReplacesStream(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "text/event-stream")
+		writer.(http.Flusher).Flush()
+		<-request.Context().Done()
+	}))
+	t.Cleanup(server.Close)
+
+	backend, events := newRealtimeTestBackend(t, server.URL)
+	meta := appservice.RequestMeta{Locale: "zh-CN"}
+	window := context.WithValue(context.Background(), testWindowKey{}, "1")
+	first, err := backend.ConnectRealtime(window, meta)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := backend.ConnectRealtime(window, meta)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(backend.realtime.disconnectAll)
+	expectEvent(t, events, emittedEvent{appservice.RealtimeClosedEventName, appservice.RealtimeClosedEvent{ConnectionID: first.ConnectionID}})
+	if current, _ := windowStreamsOf(backend, "1"); current != second.ConnectionID {
+		t.Fatalf("窗口的成员事件流 = %q，want %q", current, second.ConnectionID)
+	}
+}
+
+// TestRealtimeUnknownWindowSharesChannel 验证无法识别调用窗口时归入同一条实时通道，新连接替换原有事件流。
+func TestRealtimeUnknownWindowSharesChannel(t *testing.T) {
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "text/event-stream")
+		writer.(http.Flusher).Flush()
+		<-request.Context().Done()
+	}))
+	t.Cleanup(server.Close)
+
+	backend, events := newRealtimeTestBackend(t, server.URL)
+	meta := appservice.RequestMeta{Locale: "zh-CN"}
+	first, err := backend.ConnectRealtime(context.Background(), meta)
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := backend.ConnectRealtime(context.Background(), meta)
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(backend.realtime.disconnectAll)
+	expectEvent(t, events, emittedEvent{appservice.RealtimeClosedEventName, appservice.RealtimeClosedEvent{ConnectionID: first.ConnectionID}})
+	if current, _ := windowStreamsOf(backend, ""); current != second.ConnectionID {
+		t.Fatalf("无归属通道的成员事件流 = %q，want %q", current, second.ConnectionID)
+	}
+}
+
+// windowStreamsOf 返回指定窗口当前登记的成员事件流编号与运行过程流数量。
+func windowStreamsOf(backend *Backend, owner string) (string, int) {
+	backend.realtime.mu.Lock()
+	defer backend.realtime.mu.Unlock()
+	streams, ok := backend.realtime.windows[owner]
+	if !ok {
+		return "", 0
+	}
+	current := ""
+	if streams.current != nil {
+		current = streams.current.id
+	}
+	return current, len(streams.runs)
+}
+
 // expectEvent 在时限内读取下一条事件并与期望比较。
 func expectEvent(t *testing.T, events <-chan emittedEvent, want emittedEvent) {
 	t.Helper()
@@ -140,5 +273,66 @@ func expectEvent(t *testing.T, events <-chan emittedEvent, want emittedEvent) {
 		}
 	case <-time.After(5 * time.Second):
 		t.Fatalf("等待事件 %s 超时", want.name)
+	}
+}
+
+// TestRealtimeDisconnectClosesRunStreams 验证成员事件流断开时一并关闭全部运行过程流。
+func TestRealtimeDisconnectClosesRunStreams(t *testing.T) {
+	frame, err := protocol.Encode(protocol.RunStreamEnded{RunID: "run-1"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		writer.Header().Set("Content-Type", "text/event-stream")
+		if strings.HasPrefix(request.URL.Path, "/api/realtime/runs/") {
+			_, _ = writer.Write(append(append([]byte("data: "), frame...), '\n', '\n'))
+		}
+		writer.(http.Flusher).Flush()
+		<-request.Context().Done()
+	}))
+	t.Cleanup(server.Close)
+
+	backend, events := newRealtimeTestBackend(t, server.URL)
+	meta := appservice.RequestMeta{Locale: "zh-CN"}
+	member, err := backend.ConnectRealtime(context.Background(), meta)
+	if err != nil {
+		t.Fatal(err)
+	}
+	first, err := backend.ConnectAgentRunStream(context.Background(), meta, "run-1")
+	if err != nil {
+		t.Fatal(err)
+	}
+	second, err := backend.ConnectAgentRunStream(context.Background(), meta, "run-2")
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 运行过程事件携带运行编号，订阅方据此区分并发的运行过程流。
+	expectEvent(t, events, emittedEvent{appservice.RealtimeRunFrameEventName,
+		appservice.RealtimeRunFrameEvent{ConnectionID: first.ConnectionID, RunID: "run-1", Frame: string(frame)}})
+	expectEvent(t, events, emittedEvent{appservice.RealtimeRunFrameEventName,
+		appservice.RealtimeRunFrameEvent{ConnectionID: second.ConnectionID, RunID: "run-2", Frame: string(frame)}})
+
+	if err := backend.DisconnectRealtime(context.Background(), meta, member.ConnectionID); err != nil {
+		t.Fatal(err)
+	}
+	// 三条事件流都结束，顺序不固定。
+	closed := map[string]bool{}
+	for range 3 {
+		select {
+		case event := <-events:
+			switch data := event.data.(type) {
+			case appservice.RealtimeClosedEvent:
+				closed[data.ConnectionID] = true
+			case appservice.RealtimeRunClosedEvent:
+				closed[data.ConnectionID] = true
+			default:
+				t.Fatalf("event = %#v", event)
+			}
+		case <-time.After(5 * time.Second):
+			t.Fatalf("等待事件流结束超时，已结束 %v", closed)
+		}
+	}
+	if !closed[member.ConnectionID] || !closed[first.ConnectionID] || !closed[second.ConnectionID] {
+		t.Fatalf("closed = %v", closed)
 	}
 }

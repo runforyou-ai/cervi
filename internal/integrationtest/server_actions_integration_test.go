@@ -2234,6 +2234,17 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if _, err := conversationaction.NewGetAgentRunProcessQuery(db).Execute(context.Background(), outsiderLogin.Identity, run.ID); !errors.Is(err, conversationaction.ErrAgentRunProcessUnavailable) {
 			t.Fatalf("outsider agent run process error = %v", err)
 		}
+		// 运行过程流按同一阅读资格授权，本人取得运行所属会话，未知运行与无资格成员均不返回。
+		authorizeRunStream := conversationaction.NewAuthorizeAgentRunStreamQuery(db)
+		if streamConversationID, err := authorizeRunStream.Execute(context.Background(), loggedIn.Identity, run.ID); err != nil || streamConversationID != agentConversation.ID {
+			t.Fatalf("agent run stream conversation = %q, error = %v", streamConversationID, err)
+		}
+		if _, err := authorizeRunStream.Execute(context.Background(), loggedIn.Identity, uuid.NewV7().String()); !errors.Is(err, conversationaction.ErrAgentRunProcessUnavailable) {
+			t.Fatalf("unknown agent run stream error = %v", err)
+		}
+		if _, err := authorizeRunStream.Execute(context.Background(), outsiderLogin.Identity, run.ID); !errors.Is(err, conversationaction.ErrAgentRunProcessUnavailable) {
+			t.Fatalf("outsider agent run stream error = %v", err)
+		}
 
 		if _, err := sendAgentMessage.Execute(context.Background(), loggedIn.Identity, conversationaction.InternalTextMessageInput{
 			ConversationID: agentConversation.ID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f72", Body: "这次模拟模型失败",
@@ -2279,6 +2290,10 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		// 过程内容只对成功运行开放。
 		if _, err := conversationaction.NewGetAgentRunProcessQuery(db).Execute(context.Background(), loggedIn.Identity, failedRun.ID); !errors.Is(err, conversationaction.ErrAgentRunProcessUnavailable) {
 			t.Fatalf("failed agent run process error = %v", err)
+		}
+		// 运行过程流不限运行状态，失败运行同样按会话阅读资格授权。
+		if streamConversationID, err := authorizeRunStream.Execute(context.Background(), loggedIn.Identity, failedRun.ID); err != nil || streamConversationID != agentConversation.ID {
+			t.Fatalf("failed agent run stream conversation = %q, error = %v", streamConversationID, err)
 		}
 
 		if _, err := sendAgentMessage.Execute(context.Background(), loggedIn.Identity, conversationaction.InternalTextMessageInput{

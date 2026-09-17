@@ -84,14 +84,14 @@ func (a *CreateDocumentsAction) Execute(ctx context.Context, identity *servermod
 			if file.Status != string(domain.FileStatusUploaded) || file.Expired {
 				return fileaction.ErrFileNotFound
 			}
-			document := &servermodels.KnowledgeDocument{ID: uuid.NewV7().String(), KnowledgeBaseID: baseID, GroupID: groupID, FileID: fileID, Status: domain.KnowledgeIndexInitial, CreatedByUserID: identity.User.ID}
+			document := &servermodels.KnowledgeDocument{ID: uuid.NewV7().String(), KnowledgeBaseID: baseID, GroupID: groupID, SourceKind: domain.KnowledgeDocumentSourceFile, FileID: fileID, Status: domain.KnowledgeIndexInitial, CreatedByUserID: identity.User.ID}
 			if _, err := tx.NewInsert().Model(document).Value("created_at", "clock_timestamp()").Value("updated_at", "clock_timestamp()").Exec(ctx); err != nil {
 				return err
 			}
 			if _, err := tx.NewUpdate().Model(file).Set("status = ?", domain.FileStatusActive).Set("expires_at = NULL").Set("updated_at = now()").WherePK().Exec(ctx); err != nil {
 				return err
 			}
-			if err := a.processing.enqueue(ctx, tx, identity.Organization.ID, base, document); err != nil {
+			if err := a.processing.enqueue(ctx, tx, identity.Organization.ID, base, document, false); err != nil {
 				return err
 			}
 			record, err := loadDocumentRecord(ctx, tx, baseID, document.ID)

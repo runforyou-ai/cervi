@@ -2,7 +2,7 @@
 
 ## 执行约定
 
-PR01–PR21、PR25、PR25A、PR26、PR27、PR28、PR29、PR30 与 PR37 已交付，原始范围与验证记录见 `chat-realtime-completed.md`。本文只保留共用契约和尚未交付的范围。2026-09-10 对原路线图做过一次范围削减评审，结论见「本轮范围削减」；原清单的 PR00 已改编为 PR16 并交付。2026-09-13 对通知发布、兜底探针和 AI 流传输做了第二轮调整，结论见「第二轮调整」，与第一轮结论冲突处以第二轮为准。2026-09-15 对授权复核、客户端版本追赶、帧优先级和非主线范围做了第三轮调整，结论见「第三轮调整」，与前两轮冲突处以第三轮为准。同日 PR25 合入后把实时传输从 WebSocket 改为 SSE，结论见「第四轮调整」，与前三轮冲突处以第四轮为准。
+PR01–PR21、PR25、PR25A、PR26、PR27、PR28、PR29、PR30、PR33 与 PR37 已交付，原始范围与验证记录见 `chat-realtime-completed.md`。本文只保留共用契约和尚未交付的范围。2026-09-10 对原路线图做过一次范围削减评审，结论见「本轮范围削减」；原清单的 PR00 已改编为 PR16 并交付。2026-09-13 对通知发布、兜底探针和 AI 流传输做了第二轮调整，结论见「第二轮调整」，与第一轮结论冲突处以第二轮为准。2026-09-15 对授权复核、客户端版本追赶、帧优先级和非主线范围做了第三轮调整，结论见「第三轮调整」，与前两轮冲突处以第三轮为准。同日 PR25 合入后把实时传输从 WebSocket 改为 SSE，结论见「第四轮调整」，与前三轮冲突处以第四轮为准。
 
 - 一个 PR 交付一个明确行为；后端能力可用真实数据库与应用服务测试独立验收。正确性耦合的迁移、写入、读取及绑定一起提交，不拆成无法运行的中间版本。
 - 保留 Conversation、ChatSubject、Participant、ServiceSession、Agent Run 和 appservice 边界。持久命令与临时上报走 HTTP／Wails；SSE 事件流只下行推送版本通知和 AI 流等临时事件，撤销与到期直接结束事件流，客户端通过业务 Query 读权威数据。
@@ -53,7 +53,7 @@ PR01–PR21、PR25、PR25A、PR26、PR27、PR28、PR29、PR30 与 PR37 已交付
 | 服务端定期复核授权与群失权控制通知（PR25、PR38） | 删除；撤销控制只覆盖登出与停用。连接最长存活 1 小时，到期关闭后客户端重连并重新认证；`SubscribeRun` 每次重新校验登录会话、账号状态与会话阅读资格。群失权由 PR19 的 `conversation_removed` 通知驱动 Gateway 移除该会话的 AI 流订阅，客户端发现失权后也取消订阅 | 会话投影由 Query 与兜底探针恢复；受限的临时内容只有 AI 流，由逐次订阅校验、失权通知与连接寿命约束。`conversation_removed` 丢失且客户端未取消时，被移出者最多继续收到已订阅的当前一轮输出 |
 | 客户端 `target`／`applied` 版本比较与串行追赶（PR28） | 删除；客户端不保存实体版本，收到通知即失效对应 resourceKeys，同一 key 的失效按短窗口防抖合并 | 失效后发起新的读取，最终以失效后的重读为准；本人写入回显的通知多触发一次重读，不影响正确性；Query 返回值无需增加实体版本字段 |
 | 每连接四级帧优先级与流帧溢出重订阅（PR25、PR38） | 改为单写协程加一条有界发送队列，队列内同一 Run 的待发增量合并；队列溢出即以 `slow_consumer` 关闭连接 | 重连后由探针恢复通知、由订阅首帧快照恢复流，关闭连接覆盖全部溢出场景 |
-| 独立 JSON 帧契约 PR 与平台探针记录（PR24） | 并入 PR25；首版只定义当前使用的帧。已完成的 Web、macOS 原生端与 Cloudflare Tunnel 探针结论写入 PR25 与 `chat-roadmap.md` 第 10.12 节，iOS、Android 在 PR33 实际接入时记录 | 帧契约脱离 Gateway 无法端到端验收；探针发现的升级挂载与写入器约束直接决定 Gateway 实现方式 |
+| 独立 JSON 帧契约 PR 与平台探针记录（PR24） | 并入 PR25；首版只定义当前使用的帧。已完成的 Web、macOS 原生端与 Cloudflare Tunnel 探针结论写入 PR25 与 `chat-roadmap.md` 第 10.12 节，iOS、Android 在各自真机接入时记录 | 帧契约脱离 Gateway 无法端到端验收；探针发现的升级挂载与写入器约束直接决定 Gateway 实现方式 |
 | Gateway 部署与生命周期（PR35） | 原生端子路径、心跳与优雅关闭并入 PR25；指标与就绪顺序推迟 | 前者决定连接能否在反向代理和隧道后工作；Web 端的 Wails 运行时本身不支持子路径部署，服务端不增加路径前缀配置；出现真实部署前以 `INFO`／`WARN` 日志观测 |
 | 名称、头像与渠道资料失效（PR22） | 推迟 | 资料修改低频，推迟期间他人资料在会话因其他变化重读时更新；第二轮保留的设计理由仍成立，重新开启时按原设计实施 |
 | 网站挂件拆分为 TS 模块（PR31） | 推迟；PR32 在现有 `chat.js` 内接入连接，收到通知或重连时调用现有拉取逻辑 | 挂件实时只需把轮询触发换成通知触发，不依赖整份脚本重构 |
@@ -77,11 +77,11 @@ PR01–PR21、PR25、PR25A、PR26、PR27、PR28、PR29、PR30 与 PR37 已交付
 | 部署约束（PR25、PR35） | Web 端部署要求 HTTPS／HTTP2，接受 HTTP/1.1 下同源 6 连接上限对多标签页的限制；反向代理对 `/api/realtime` 关闭响应缓冲并允许长响应；删除 Upgrade 配置与 `permessage-deflate` 评估 | SSE 在 HTTP/2 下与业务请求共用连接；服务端 25 秒心跳维持代理空闲超时 |
 | 优雅下线（PR25） | 删除 `server_going_away`；收到 SIGINT／SIGTERM 即拒绝新的事件流请求（503）并结束全部事件流，5 秒内未结束的强制断开，之后停止通知发布器 | Wails 服务端先执行 `http.Server.Shutdown` 并等待进行中的长响应，之后才停止各服务；被劫持的 WebSocket 不在等待范围内，SSE 长响应在 |
 
-PR25 原文与 WebSocket 平台探针结论保留在 `chat-realtime-completed.md` 作为交付记录；Cloudflare Tunnel 与 iOS／Android 下的 SSE 实时下发在 PR27、PR33 实际接入时记录。PR20、PR25、PR25A、PR27 已合并，PR21、PR26、PR28、PR29、PR30 已交付；剩余 13 个可交付 PR（不含标注推迟的 PR22、PR31、PR35、PR39），其中 PR43–PR46 按需求或证据开启。
+PR25 原文与 WebSocket 平台探针结论保留在 `chat-realtime-completed.md` 作为交付记录；Cloudflare Tunnel 下的 SSE 实时下发在 PR27 实际接入时记录；PR33 已在桌面开发的移动端预览窗验证原生端 SSE 长响应，iOS 与 Android 真机结论待各自接入时补记。PR20、PR25、PR25A、PR27 已合并，PR21、PR26、PR28、PR29、PR30、PR33 已交付；剩余 11 个可交付 PR（不含标注推迟的 PR22、PR31、PR35、PR39），其中 PR43–PR46 按需求或证据开启。
 
 ## 已交付基线
 
-PR01–PR21、PR25、PR25A、PR26、PR27、PR28、PR29、PR30 与 PR37 已交付以下能力，后续 PR 直接依赖，不重复定义。
+PR01–PR21、PR25、PR25A、PR26、PR27、PR28、PR29、PR30、PR33 与 PR37 已交付以下能力，后续 PR 直接依赖，不重复定义。
 
 - **锁序：** `internal/actions/chatstate` 提供会话授权与锁定入口，覆盖真人单聊、独立 AI 聊天、群聊和客户会话；可读、可发、可管理三种资格在锁后判断。
 - **`message_seq`：** 全部会话类型统一，会话锁内分配，`last_message_seq` 保存已提交位置；HTTP 用字符串、TS 用 bigint。`read_seq` 为阅读基线，服务端单调推进。
@@ -101,10 +101,10 @@ PR01–PR21、PR25、PR25A、PR26、PR27、PR28、PR29、PR30 与 PR37 已交付
 - **访客目录受众：** 网站渠道的客户会话在通知企业客服共享受众的同时，按 `customer_conversations` 关联的渠道身份通知访客目录受众 `visitor_directory`（受众 ID 为渠道身份记录 ID）；`channels.type = website` 之外的客户会话和客服 Copilot 线程不产生该通知。公开路由 `GET /public/website-channels/:channelID/conversations` 按当前渠道身份返回线程目录的访客公开投影，与 Messenger 初始化共用同一查询；发送、目录与历史三条公开路由共用 `authorizeWebsiteVisitor` 中间件读取访客 Token 并写入渠道外部编号，渠道身份在 Action 内按该编号加载，尚未建立身份的读操作不创建联系人。
 - **成员实时事件流：** `GET /api/realtime` 由服务端 `Assets.Middleware` 中租户上下文之内的 `internal/realtime/gateway` 处理：请求头 Bearer 复用业务调用的身份解析，失败返回业务错误体与状态码；登记连接并订阅本人用户受众与本企业客服共享受众，NATS Flush 后重新校验登录会话、读取探针，再以 `server_hello` 开始事件流。每个事件一行 `data: <JSON>`，信封为 `{v, type, data}`，当前事件为 `server_hello`、`ping`（每 25 秒）与 `conversation_changed`、`conversation_removed`、`conversation_state_changed`、`identity_profile_changed`；Go 定义在 `internal/realtime/protocol`，TS 在 `frontend/src/api/realtime/protocol.ts`，共用夹具只覆盖服务端事件。每条事件流单写协程加有界发送队列，按会话与种类合并最高版本，溢出即结束；登出在删除令牌的事务内登记携带 tokenSessionId 的 `session_logged_out`，停用按用户登记 `user_disabled`，Gateway 收到后结束对应事件流；事件流最长存活 1 小时且不晚于令牌到期；收到退出信号即拒绝新请求并有界结束全部事件流。原生端 `ConnectRealtime`／`DisconnectRealtime` 由 Go 侧 `apiproxy` 发起流式 GET（等待响应头最长 30 秒），事件原文经 `cervi:realtime:frame`、流结束经 `cervi:realtime:closed` 交给前端，60 秒未读到任何事件时主动断开，并记录实际 HTTP 协议版本。
 - **访客事件流：** `GET /public/website-channels/:channelID/realtime` 与发送、目录、历史共用 `authorizeWebsiteVisitor` 中间件，由 `internal/realtime/gateway` 的 `ServeVisitor` 处理：按启用的网站渠道和渠道外部编号解析渠道身份，渠道停用或不存在返回渠道未找到，尚无业务身份返回会话未找到，错误体与状态码同访客 HTTP 接口，读操作不创建联系人。成员与访客事件流共用同一条实现，受众 Subject、可下发事件白名单、撤销标识与最长存活时间由各自路由给出。访客受众为 `visitor_directory.<渠道身份记录 ID>` 与 `website_channel.<渠道 ID>`，Subject 只用数据库内部 ID；访客只下发 `visitor_hello`（仅含连接编号，访客没有同步探针）与 `conversation_changed`，成员专用事件在发送队列直接丢弃，请求中的额外参数不扩大接收范围。渠道停用在 `UpdateMessageChannelStatusAction` 的事务内登记 `channel_disabled` 撤销控制，Gateway 据此结束该渠道全部访客事件流，重新请求被拒。挂件接入由 PR32 完成。
-- **客户端事件流与会话代次：** `frontend/src/api/session-scope.ts` 维护登录会话代次，`beginSessionBoundary()` 先提升代次并同步通知订阅方，再清空查询缓存；登录与初始化成功后、登出与切换企业服务器之前、`recoverSession` 处理 login／connect／setup 状态时，以及 Web 端其他标签页改动令牌（storage 事件或请求时比对令牌归属）时进入新代次，Web／桌面工作台按代次重新挂载。`call()` 只交付发起时代次仍为当前代次的结果，过期结果既不 resolve 也不 reject；会话边界操作与原生连接使用不受代次约束的 `invoke()`。登出先清除本地令牌并进入新代次，再用原令牌通知企业服务器。`frontend/src/api/realtime` 提供应用级单例 `realtimeClient`（`start`／`stop`／`resume`／`subscribe`），状态为 disconnected、connecting、ready、backoff、stopped，收到 `server_hello` 进入 ready；流结束、网络错误或 60 秒无数据时按上限 1s×2ⁿ（最高 30s）的一半到上限之间抖动退避重连，会话错误交给订阅方恢复入口，协议主版本不支持时停止，代次变化立即关闭事件流并丢弃在途回调。Web 端 fetch 携带 Bearer 流式读取 `data:` 行；原生端串行执行 `ConnectRealtime`／`DisconnectRealtime`，连接编号返回前到达的事件缓存后按编号回放。Web／桌面工作台外壳在身份就绪后连接，网络恢复与回到前台时跳过剩余退避；通知由下一条的同步协调器消费，移动端由 PR33 接入。
-- **同步协调器与兜底校验：** `frontend/src/features/session/sync-coordinator.ts` 的 `SyncCoordinator` 由 `useRealtimeConnection` 随 Web／桌面工作台外壳创建，工作台按登录会话代次重新挂载时销毁，事件流事件经它转成 resourceKeys 失效。`conversation_changed` 失效收件箱列表、列表行、提醒总数、最近会话，以及该会话的摘要、消息首页与增量页、提及进度与队列、群资料、投递与引用状态和已有单聊查找；`conversation_state_changed` 失效收件箱类查询与该会话的摘要、提及进度与队列；`conversation_removed` 失效收件箱类查询、检索结果与该会话摘要，由摘要重读确认失权并清理资源；`identity_profile_changed` 失效身份。待失效 key 在 300ms 固定窗口内合并，窗口不因后续通知顺延，同批已被较短前缀覆盖的 key 不重复失效；`resource-refresher.ts` 的 `ResourceRefresher` 只重读挂载中的查询，同一查询串行读取：在途读取不取消且结果照常写入缓存，读取期间的失效合并为结束后的一次补读，断网暂停的读取在网络恢复并完成后才补读；读取失败的查询在下一次合并窗口结束时重试，探针与连接问候成功后即使探针值一致也开启合并窗口。协调器启动时立即、之后每 30 秒无条件调用 `GetSyncHeads`，回到前台与网络恢复时额外调用，`server_hello` 携带的探针值同样参与比较；会话数量或校验和变化时按前缀失效全部会话类查询与检索结果，列表控制器据此重读已加载窗口，身份资料版本变化时失效身份，首个探针值按不一致处理。探针串行执行，在途时的再次请求于结束后补读一次，早于已应用结果发起的读取直接丢弃；读取失败交给会话恢复入口，其他错误记录 `WARN`。移动端由 PR33 接入；Web／桌面端的成员消息、提及、列表、会话摘要与群资料轮询已分别由 PR29 和 PR30 移除。
-- **消息窗口重读：** `ReadConversationMessageWindow`（`GET /conversations/:conversationID/message-window`）按首尾游标读取包含两端的连续范围，范围内消息全部删除时保留请求的两端。`frontend/src/features/inbox/conversation-window.ts` 的 `ConversationWindowController` 串行调度重读与补页：最新模式重读后连续补页到尾端，锚点模式只重读当前范围，内容不变时保留原窗口，打开新窗口后丢弃早于它的结果。窗口重读登记为挂载中的查询，由同步协调器失效触发；Web／桌面端的成员消息、提及进度与队列、投递与引用状态轮询已移除，移动端经 `contexts/realtime-sync-context.ts` 判定未接入实时同步并保留轮询。
-- **列表实时更新：** `useInboxList` 把列表窗口重读登记为挂载中的查询，首次读取、同步失效、失败重试与前台轮询共用该入口，重读由 `ResourceRefresher` 串行调度，页面不在前台也接收失效。`InboxListController` 的变更重读只与尚未开始的窗口重读合并，在途读取结束后必定补读一次，读取失败不阻止后续变更通知的重读；重读按已加载双向边界读取连续窗口，原先覆盖顶部的窗口扩展到最新首页，按会话 ID 去重后再按 ID 核对资格。会话摘要与群资料同样由会话变更通知失效后重读。Web／桌面端的列表、会话摘要与群资料轮询已移除，移动端经 `contexts/realtime-sync-context.ts` 判定未接入实时同步并保留轮询。
+- **客户端事件流与会话代次：** `frontend/src/api/session-scope.ts` 维护登录会话代次，`beginSessionBoundary()` 先提升代次并同步通知订阅方，再清空查询缓存；登录与初始化成功后、登出与切换企业服务器之前、`recoverSession` 处理 login／connect／setup 状态时，以及 Web 端其他标签页改动令牌（storage 事件或请求时比对令牌归属）时进入新代次，Web／桌面工作台按代次重新挂载。`call()` 只交付发起时代次仍为当前代次的结果，过期结果既不 resolve 也不 reject；会话边界操作与原生连接使用不受代次约束的 `invoke()`。登出先清除本地令牌并进入新代次，再用原令牌通知企业服务器。`frontend/src/api/realtime` 提供应用级单例 `realtimeClient`（`start`／`stop`／`resume`／`subscribe`），状态为 disconnected、connecting、ready、backoff、stopped，收到 `server_hello` 进入 ready；流结束、网络错误或 60 秒无数据时按上限 1s×2ⁿ（最高 30s）的一半到上限之间抖动退避重连，会话错误交给订阅方恢复入口，协议主版本不支持时停止，代次变化立即关闭事件流并丢弃在途回调。Web 端 fetch 携带 Bearer 流式读取 `data:` 行；原生端串行执行 `ConnectRealtime`／`DisconnectRealtime`，连接编号返回前到达的事件缓存后按编号回放。原生端 Go 侧按前端窗口持有实时通道，一个窗口一条成员事件流及其运行过程流：`DisconnectRealtime` 按连接编号结束它所属窗口的通道，同一窗口重新建立成员事件流即通道重建并关闭原有事件流，登录、登出与切换企业服务器结束全部通道，桌面开发模式的主窗口与移动端预览窗因此各自持有一条。Web、桌面与移动端外壳在身份就绪后连接，网络恢复与回到前台时跳过剩余退避；移动端外壳额外声明回到前台重建事件流，`realtimeClient.restart()` 只替换已就绪的连接，连接中、退避中与已停止的状态不受影响。通知由下一条的同步协调器消费。
+- **同步协调器与兜底校验：** `frontend/src/features/session/sync-coordinator.ts` 的 `SyncCoordinator` 由 `useRealtimeConnection` 随 Web、桌面与移动端登录外壳创建，外壳按登录会话代次重新挂载时销毁，事件流事件经它转成 resourceKeys 失效。`conversation_changed` 失效收件箱列表、列表行、提醒总数、最近会话，以及该会话的摘要、消息首页与增量页、提及进度与队列、群资料、投递与引用状态和已有单聊查找；`conversation_state_changed` 失效收件箱类查询与该会话的摘要、提及进度与队列和群资料（群资料携带本人免打扰状态）；`conversation_removed` 失效收件箱类查询、检索结果与该会话的摘要和群资料，由摘要或群资料重读确认失权并清理资源；`identity_profile_changed` 失效身份。待失效 key 在 300ms 固定窗口内合并，窗口不因后续通知顺延，同批已被较短前缀覆盖的 key 不重复失效；`resource-refresher.ts` 的 `ResourceRefresher` 只重读挂载中的查询，同一查询串行读取：在途读取不取消且结果照常写入缓存，读取期间的失效合并为结束后的一次补读，断网暂停的读取在网络恢复并完成后才补读；读取失败的查询在下一次合并窗口结束时重试，探针与连接问候成功后即使探针值一致也开启合并窗口。协调器启动时立即、之后每 30 秒无条件调用 `GetSyncHeads`，回到前台与网络恢复时额外调用，`server_hello` 携带的探针值同样参与比较；会话数量或校验和变化时按前缀失效全部会话类查询与检索结果，列表控制器据此重读已加载窗口，身份资料版本变化时失效身份，首个探针值按不一致处理。探针串行执行，在途时的再次请求于结束后补读一次，早于已应用结果发起的读取直接丢弃；读取失败交给会话恢复入口，其他错误记录 `WARN`。Web／桌面端的成员消息、提及、列表、会话摘要与群资料轮询已分别由 PR29 和 PR30 移除，移动端的消息、列表、会话摘要、群资料与页签提醒轮询由 PR33 移除。
+- **消息窗口重读：** `ReadConversationMessageWindow`（`GET /conversations/:conversationID/message-window`）按首尾游标读取包含两端的连续范围，范围内消息全部删除时保留请求的两端。`frontend/src/features/inbox/conversation-window.ts` 的 `ConversationWindowController` 串行调度重读与补页：最新模式重读后连续补页到尾端，锚点模式只重读当前范围，内容不变时保留原窗口，打开新窗口后丢弃早于它的结果。窗口重读登记为挂载中的查询，由同步协调器失效触发；Web、桌面与移动端的成员消息、提及进度与队列、投递与引用状态轮询已移除；`contexts/realtime-sync-context.ts` 判定当前外壳是否接入实时同步，未接入的外壳保留轮询。
+- **列表实时更新：** `useInboxList` 把列表窗口重读登记为挂载中的查询，首次读取、同步失效、失败重试与前台轮询共用该入口，重读由 `ResourceRefresher` 串行调度，页面不在前台也接收失效。`InboxListController` 的变更重读只与尚未开始的窗口重读合并，在途读取结束后必定补读一次，读取失败不阻止后续变更通知的重读；重读按已加载双向边界读取连续窗口，原先覆盖顶部的窗口扩展到最新首页，按会话 ID 去重后再按 ID 核对资格。会话摘要与群资料同样由会话变更通知失效后重读。Web、桌面与移动端的列表、会话摘要与群资料轮询已移除。
 - **运行流：** `ExecuteAction.SubscribeRunStream(runID, onDelta, onEnd)` 在同一把锁内返回当前尝试的快照并登记回调，之后按序回调增量；增量携带 `runId`、`attempt`、`streamId` 与起止序号，`MergeStreamDeltas` 合并首尾相接的增量，执行尝试退出或增量无法应用时回调结束。token 不写 Message、不推进会话版本。
 
 ## 变更版本与通知契约
@@ -206,15 +206,6 @@ PR01–PR21、PR25、PR25A、PR26、PR27、PR28、PR29、PR30 与 PR37 已交付
 - **验收：** 新线程发现、离线补拉、发送响应乱序、引用窗口和渠道停用均收敛；初始化不创建业务记录，预览不连真实服务。
 - **验证步骤：** 同一访客打开 A、B 两个已有身份的挂件，断线期间 A 新建第二线程，B 恢复后列出两条且不制造新联系人；空白页反复初始化不建立连接，也不创建业务记录。
 
-### PR33：移动端实时接入
-
-- **依赖：** 无（PR29、PR30 已交付）。移动端接入后由 `RealtimeSyncProvider` 声明实时同步可用，消息窗口、提及、列表与会话摘要不再轮询。
-- **范围：** 移动登录外壳接同一连接与同步内核，列表、单聊及已有群聊使用统一实时输入；恢复前台先做兜底校验，再按独立阅读规则工作。保留当前移动功能边界，不顺带开启建群或已读交互。
-- **落点：** `frontend/src/apps/mobile` 登录外壳、mobile-inbox-page、mobile-individual-conversation-page、mobile-group-conversation-page。
-- **实施：** 应用前台事件只触发同一协调器的兜底校验，不由每个页面各建连接；系统挂起后旧连接一律按可能失活处理。移动页面订阅共用版本输入，保持自身详情导航、阅读能力和草稿行为。桌面端开发模式的 mobile-preview 小窗与主窗口共用同一个 Go 后端，而 Go 侧只保留一条当前事件流，接入时先明确两个窗口的连接归属。
-- **验收：** iOS／Android 前后台、旋转、详情返回、连接重建与旧响应隔离；完成对应回归后移除移动三秒轮询。
-- **验证步骤：** 系统挂起期间另一端发送、已读、移除群成员，恢复后列表与详情收敛；快速返回再进另一会话，无重复连接、旧内容闪入或错误已读。iOS 与 Android 分别记录实际服务端地址拼接、TLS 结果与长响应事件的实时下发情况。
-
 ### PR34：实时未读与本地通知闭环
 
 - **依赖：** 无（PR29、PR30 已交付）。
@@ -287,7 +278,7 @@ PR01–PR21、PR25、PR25A、PR26、PR27、PR28、PR29、PR30 与 PR37 已交付
 
 ### PR42：移动端置顶与跨端顺序
 
-- **依赖：** PR33、PR41。
+- **依赖：** PR41（PR33 已交付）。
 - **范围：** 移动端增加触屏置顶、排序与可访问的替代操作；复用个人顺序、版本冲突及分区分页，不同步各设备滚动位置。
 - **落点：** `apps/mobile/mobile-inbox-page.tsx`、移动列表导航，复用置顶命令与分区状态。
 - **实施：** 长按菜单提供置顶、取消及明确的移动操作，触屏拖动有独立手势启动条件；无拖动能力时仍可通过菜单完成同样排序。跨端只接收顺序版本，各端选择、焦点、展开和滚动位置不上传。
@@ -328,7 +319,7 @@ PR01–PR21、PR25、PR25A、PR26、PR27、PR28、PR29、PR30 与 PR37 已交付
 
 ### PR46：实时链路容量与故障验证（测量后决定）
 
-- **依赖：** PR25、PR33。原清单 PR41。
+- **依赖：** 无（PR25、PR33 已交付）。原清单 PR41。
 - **触发条件：** 出现真实部署规模，或已观察到连接、队列、锁争用的具体问题。
 - **范围：** 增加可重复 Task 场景：同用户多会话、小群扇出、共享客服受众、资料批量失效、突发重连和持续热点；分别测 LockActiveUser 守卫、内存、队列、积压与 HTTP 放大，报告真实规模和结果。
 - **落点：** 现有 Task 与服务端集成测试；新增只用于测试的连接、发布和 Query 故障注入点。

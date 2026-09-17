@@ -14,6 +14,7 @@ import (
 	knowledgebaseaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
 	mcpserveraction "github.com/runforyou-ai/cervi/internal/actions/mcpserver"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
+	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
 	"github.com/runforyou-ai/cervi/internal/integration/documentconvert"
 	mcpintegration "github.com/runforyou-ai/cervi/internal/integration/mcp"
@@ -99,6 +100,26 @@ func (b *DirectBackend) AuthenticateMember(ctx context.Context, meta RequestMeta
 // MemberSyncHeads 返回实时事件流所属身份的同步探针值。
 func (b *DirectBackend) MemberSyncHeads(ctx context.Context, identity *servermodels.Identity) (SyncHeads, error) {
 	return b.ops.GetSyncHeads(ctx, RequestMeta{}, identity)
+}
+
+// AuthorizeAgentRunStream 校验运行过程流请求方对运行所属会话的阅读资格，并返回运行所属会话编号。
+func (b *DirectBackend) AuthorizeAgentRunStream(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, runID string) (string, error) {
+	conversationID, err := b.ops.authorizeAgentRunStream.Execute(ctx, identity, runID)
+	if err != nil {
+		return "", agentRunProcessError(ctx, meta, err, identity.Organization.ID, runID)
+	}
+	return conversationID, nil
+}
+
+// SubscribeAgentRunStream 订阅本进程中该运行当前执行尝试的过程流，返回订阅时的快照与取消订阅函数；
+// 运行不在本进程执行时返回 false，调用方按持久事实收敛。
+func (b *DirectBackend) SubscribeAgentRunStream(runID string,
+	onDelta func(agentruntime.StreamDelta), onEnd func()) (agentruntime.StreamSnapshot, func(), bool) {
+	snapshot, subscription, running := b.ops.agentCoordinator.SubscribeRunStream(runID, onDelta, onEnd)
+	if !running {
+		return agentruntime.StreamSnapshot{}, nil, false
+	}
+	return snapshot, subscription.Close, true
 }
 
 // requireInitialized 解析当前请求的企业范围，并校验该企业是否已完成初始化。

@@ -140,7 +140,7 @@ func (a *UpdateKnowledgeBaseAction) reindex(ctx context.Context, tx bun.Tx, orga
 		return 0, 0, err
 	}
 	for index := range documents {
-		if err := a.documents.enqueue(ctx, tx, organizationID, base, &documents[index]); err != nil {
+		if err := a.documents.enqueue(ctx, tx, organizationID, base, &documents[index], false); err != nil {
 			return 0, 0, err
 		}
 	}

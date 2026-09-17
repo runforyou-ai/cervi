@@ -10,22 +10,26 @@ import (
 )
 
 var (
-	ErrDocumentNotFound     = errors.New("knowledge document not found")
-	ErrDocumentUnsupported  = errors.New("knowledge document unsupported")
-	ErrDocumentBatchInvalid = errors.New("knowledge document batch must contain 1 to 10 distinct files")
+	ErrDocumentNotFound          = errors.New("knowledge document not found")
+	ErrDocumentUnsupported       = errors.New("knowledge document unsupported")
+	ErrDocumentBatchInvalid      = errors.New("knowledge document batch must contain 1 to 10 distinct files")
+	ErrDocumentSourceUnsupported = errors.New("knowledge document source unsupported")
+	ErrDocumentURLDuplicate      = errors.New("knowledge document url duplicated")
 )
 
-// ProcessInput 固定本次文档任务的来源、分段和向量参数。
+// ProcessInput 固定本次文档任务的内容来源、分段和向量参数。
 type ProcessInput struct {
-	OrganizationID           string `json:"organizationId"`
-	KnowledgeBaseID          string `json:"knowledgeBaseId"`
-	DocumentID               string `json:"documentId"`
-	ProcessingID             string `json:"processingId"`
-	ChunkLength              int    `json:"chunkLength"`
-	ChunkOverlap             int    `json:"chunkOverlap"`
-	EmbeddingProviderID      string `json:"embeddingProviderId"`
-	EmbeddingModelIdentifier string `json:"embeddingModelIdentifier"`
-	EmbeddingDimension       int    `json:"embeddingDimension"`
+	OrganizationID           string                             `json:"organizationId"`
+	KnowledgeBaseID          string                             `json:"knowledgeBaseId"`
+	DocumentID               string                             `json:"documentId"`
+	SourceKind               domain.KnowledgeDocumentSourceKind `json:"sourceKind"`
+	FetchPage                bool                               `json:"fetchPage"`
+	ProcessingID             string                             `json:"processingId"`
+	ChunkLength              int                                `json:"chunkLength"`
+	ChunkOverlap             int                                `json:"chunkOverlap"`
+	EmbeddingProviderID      string                             `json:"embeddingProviderId"`
+	EmbeddingModelIdentifier string                             `json:"embeddingModelIdentifier"`
+	EmbeddingDimension       int                                `json:"embeddingDimension"`
 }
 
 // ProcessError 定义知识来源索引的失败原因码和执行阶段。
@@ -37,18 +41,20 @@ type ProcessError struct {
 // Error 返回语言无关的失败原因。
 func (e *ProcessError) Error() string { return "knowledge processing: " + e.Code }
 
-// DocumentRecord 汇总文档归属与原件元数据。
+// DocumentRecord 汇总文档归属、内容来源与正文元数据。
 type DocumentRecord struct {
-	ID             string                      `bun:"id"`
-	GroupID        string                      `bun:"group_id"`
-	Name           string                      `bun:"name"`
-	ContentType    string                      `bun:"content_type"`
-	ByteSize       int64                       `bun:"byte_size"`
-	Status         domain.KnowledgeIndexStatus `bun:"status"`
-	SegmentBatchID string                      `bun:"segment_batch_id"`
-	SegmentCount   int                         `bun:"segment_count"`
-	FailureCode    string                      `bun:"failure_code"`
-	CreatedAt      time.Time                   `bun:"created_at"`
+	ID             string                             `bun:"id"`
+	GroupID        string                             `bun:"group_id"`
+	SourceKind     domain.KnowledgeDocumentSourceKind `bun:"source_kind"`
+	SourceURL      string                             `bun:"source_url"`
+	Name           string                             `bun:"name"`
+	ContentType    string                             `bun:"content_type"`
+	ByteSize       int64                              `bun:"byte_size"`
+	Status         domain.KnowledgeIndexStatus        `bun:"status"`
+	SegmentBatchID string                             `bun:"segment_batch_id"`
+	SegmentCount   int                                `bun:"segment_count"`
+	FailureCode    string                             `bun:"failure_code"`
+	CreatedAt      time.Time                          `bun:"created_at"`
 }
 
 // DocumentListInput 定义分组文档的分页查询条件。
@@ -61,4 +67,24 @@ type DocumentListInput struct {
 type DocumentListOutput struct {
 	Documents             []DocumentRecord
 	Page, PageSize, Total int
+}
+
+// TextDocumentInput 定义在线编写文档的分组、名称与正文。
+type TextDocumentInput struct {
+	GroupID string
+	Title   string
+	Content string
+}
+
+// DocumentContentRecord 汇总文档元数据与正文。
+type DocumentContentRecord struct {
+	Document DocumentRecord
+	Content  string
+}
+
+// WebDocumentInput 定义网页导入文档的分组、名称与页面地址。
+type WebDocumentInput struct {
+	GroupID   string
+	Title     string
+	SourceURL string
 }
