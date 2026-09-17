@@ -295,9 +295,9 @@ func chatView(channel *channelaction.PublicWebsiteChannel, entry string, locale 
 
 // baseView 填充聊天页共用内容。
 func baseView(entry string, theme theme, locale domain.Locale) pageView {
-	// 返回按映射表本地化后的 Messenger 固定文案。
+	// 按映射表本地化 Messenger 固定文案。
 	messengerText := cervii18n.LocalizeMap(string(locale), messengerCopyMessageKeys)
-	// 返回客服名称开头的两个字标。
+	// 取客服名称开头的两个字作为字标。
 	characters := []rune(strings.ToUpper(strings.TrimSpace(messengerText["defaultAgentName"])))
 	initials := "?"
 	if len(characters) > 0 {

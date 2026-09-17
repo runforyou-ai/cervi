@@ -33,7 +33,7 @@ func NewMarkConversationReadAction(db *bun.DB) *MarkConversationReadAction {
 	return &MarkConversationReadAction{db: db}
 }
 
-// Execute 校验会话访问权并保存不回退的消息水位。
+// Execute 校验会话访问权并单调推进已读消息水位。
 func (a *MarkConversationReadAction) Execute(ctx context.Context, identity *servermodels.Identity, conversationID, messageID string, clearUnreadMark bool) (ConversationReadState, error) {
 	fields := make(map[string]ValidationCode)
 	if !common.ValidUUID(conversationID) {

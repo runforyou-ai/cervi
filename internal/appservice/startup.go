@@ -40,14 +40,17 @@ func (s *Service) loadNativeStartup(ctx context.Context, meta RequestMeta, conne
 		return Startup{State: SessionStateConnect}, nil
 	}
 	if serverURL == "" {
+		slog.Info("原生端尚未配置企业服务器，进入连接页")
 		return Startup{State: SessionStateConnect}, nil
 	}
 	status, err := s.backend.InstallationStatus(ctx, meta)
 	if err != nil {
+		slog.Warn("读取企业初始化状态失败，进入连接页", "server_url", serverURL, "error", err)
 		return Startup{State: SessionStateConnect}, nil
 	}
 	name := strings.TrimSpace(status.OrganizationName)
 	if !status.Installed || name == "" {
+		slog.Info("企业服务器尚未完成初始化，进入连接页", "server_url", serverURL, "installed", status.Installed)
 		return Startup{State: SessionStateConnect}, nil
 	}
 	return Startup{State: SessionStateReady, OrganizationName: name}, nil

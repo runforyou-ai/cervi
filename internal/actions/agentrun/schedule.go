@@ -54,7 +54,7 @@ func (s *Scheduler) Schedule(ctx context.Context, db bun.IDB, organizationID, co
 
 // appendInput 追加一条持久输入并确保对应执行范围已有在途运行。
 func (s *Scheduler) appendInput(ctx context.Context, db bun.IDB, spec agentRunSpec, messageID string) error {
-	if s == nil || s.enqueuer == nil {
+	if s.enqueuer == nil {
 		return errors.New("agent run scheduler is unavailable")
 	}
 	sequence, err := advanceLaneSequence(ctx, db, spec)

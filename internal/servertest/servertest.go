@@ -15,7 +15,7 @@ import (
 // DatabaseConfig 从测试专用的 PostgreSQL 分项环境变量读取连接配置。
 //
 // 未设置 TEST_POSTGRES_HOST 时跳过当前测试；数据库名必须以 _test 结尾，
-// 防止集成测试误连开发库。
+// 使集成测试只连接测试库。
 func DatabaseConfig(t *testing.T) serverconfig.DatabaseConfig {
 	t.Helper()
 	host := os.Getenv("TEST_POSTGRES_HOST")

@@ -22,7 +22,7 @@ type customerAgentEligibility struct {
 
 // ScheduleCustomerAuto 把一条客户消息追加到当前 AI 客服的持久输入流。
 func (s *Scheduler) ScheduleCustomerAuto(ctx context.Context, db bun.IDB, organizationID, conversationID, serviceSessionID, messageID string) (bool, error) {
-	if s == nil || s.enqueuer == nil {
+	if s.enqueuer == nil {
 		return false, errors.New("agent run scheduler is unavailable")
 	}
 	_, session, err := chatstate.LockCustomerServiceSession(ctx, db, organizationID, conversationID)

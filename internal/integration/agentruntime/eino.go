@@ -19,7 +19,7 @@ import (
 
 const (
 	defaultMaxIterations = 20
-	// emptyResponseRetryLimit 限制空正文的重新执行次数，避免对同一输入无界重算。
+	// emptyResponseRetryLimit 是同一次输入在模型只产出推理内容时允许的重新执行次数。
 	emptyResponseRetryLimit = 1
 )
 
