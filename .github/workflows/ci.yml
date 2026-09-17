@@ -38,8 +38,48 @@ jobs:
         uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7
         with:
           go-version-file: go.mod
-          cache: true
-          cache-dependency-path: go.sum
+          cache: false
+
+      - name: Resolve Go toolchain paths
+        id: toolchain
+        shell: bash
+        run: |
+          {
+            echo "gomodcache=$(go env GOMODCACHE)"
+            echo "gocache=$(go env GOCACHE)"
+            echo "gobin=$(go env GOPATH)/bin"
+            echo "wails=$(go list -m -f '{{.Version}}' github.com/wailsapp/wails/v3)"
+          } >> "$GITHUB_OUTPUT"
+          echo "$(go env GOPATH)/bin" >> "$GITHUB_PATH"
+
+      # 缓存只在默认分支保存：其他 ref 写入的缓存无法被跨分支复用，却同样占用仓库配额。
+      - name: Restore Go cache
+        id: go-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ${{ steps.toolchain.outputs.gomodcache }}
+            ${{ steps.toolchain.outputs.gocache }}
+          key: go-${{ runner.os }}-${{ hashFiles('go.sum') }}
+          restore-keys: go-${{ runner.os }}-
+
+      - name: Restore wails3 CLI
+        id: wails-cache
+        uses: actions/cache/restore@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.toolchain.outputs.gobin }}/wails3
+          key: wails3-${{ runner.os }}-${{ steps.toolchain.outputs.wails }}
+
+      - name: Install wails3 CLI
+        if: steps.wails-cache.outputs.cache-hit != 'true'
+        run: go install github.com/wailsapp/wails/v3/cmd/wails3@${{ steps.toolchain.outputs.wails }}
+
+      - name: Save wails3 CLI
+        if: steps.wails-cache.outputs.cache-hit != 'true' && github.event_name == 'push' && github.ref == 'refs/heads/main'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ${{ steps.toolchain.outputs.gobin }}/wails3
+          key: wails3-${{ runner.os }}-${{ steps.toolchain.outputs.wails }}
 
       - name: Install Linux desktop dependencies
         run: |
@@ -52,9 +92,10 @@ jobs:
 
       - name: Check Wails version alignment
         shell: bash
+        env:
+          WAILS_VERSION: ${{ steps.toolchain.outputs.wails }}
         run: |
-          go_version="$(go list -m -f '{{.Version}}' github.com/wailsapp/wails/v3)"
-          go_version="${go_version#v}"
+          go_version="${WAILS_VERSION#v}"
           runtime_version="$(node -p "require('./frontend/package.json').dependencies['@wailsio/runtime']")"
           if [[ "$runtime_version" != "$go_version" ]]; then
             echo "Wails version mismatch: Go=$go_version, frontend=$runtime_version"
@@ -82,9 +123,7 @@ jobs:
       - name: Check generated Wails bindings
         shell: bash
         run: |
-          wails_version="$(go list -m -f '{{.Version}}' github.com/wailsapp/wails/v3)"
-          go install "github.com/wailsapp/wails/v3/cmd/wails3@${wails_version}"
-          "$(go env GOPATH)/bin/wails3" generate bindings -clean=true -ts -i
+          wails3 generate bindings -clean=true -ts -i
           git diff --exit-code -- go.mod go.sum frontend/bindings
 
       - name: Install frontend dependencies
@@ -92,7 +131,7 @@ jobs:
         run: npm ci
 
       - name: Test frontend message windows
-        run: '"$(go env GOPATH)/bin/wails3" task test:frontend'
+        run: wails3 task test:frontend
 
       - name: Build frontend
         working-directory: frontend
@@ -125,7 +164,7 @@ jobs:
           docker compose up -d --wait postgres nats
 
       - name: Test Go server build
-        run: '"$(go env GOPATH)/bin/wails3" task test:server'
+        run: wails3 task test:server
 
       - name: Build production server
         env:
@@ -140,7 +179,16 @@ jobs:
           .
 
       - name: Test Go Linux desktop build
-        run: '"$(go env GOPATH)/bin/wails3" task test:desktop'
+        run: wails3 task test:desktop
+
+      - name: Save Go cache
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && steps.go-cache.outputs.cache-hit != 'true'
+        uses: actions/cache/save@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ${{ steps.toolchain.outputs.gomodcache }}
+            ${{ steps.toolchain.outputs.gocache }}
+          key: go-${{ runner.os }}-${{ hashFiles('go.sum') }}
 
   container:
     name: Container
@@ -177,4 +225,4 @@ jobs:
           push: false
           tags: cervi:ci
           cache-from: type=gha
-          cache-to: type=gha,mode=max,ignore-error=true
+          cache-to: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'type=gha,mode=min,ignore-error=true' || '' }}
