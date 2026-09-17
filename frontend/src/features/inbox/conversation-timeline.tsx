@@ -982,7 +982,7 @@ function ConversationTimelineContent({
                                     </button>
                                   ) : null}
                                   {message.agentProcess ? (
-                                    <AgentProcess process={message.agentProcess} incoming={incoming} />
+                                    <AgentProcess process={message.agentProcess} incoming={incoming} onPrimary={!incoming && !agentNotice} />
                                   ) : null}
                                   <div className="flex min-w-0 items-end gap-2">
                                     {agentNotice ? (

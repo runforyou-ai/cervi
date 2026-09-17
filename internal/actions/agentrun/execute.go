@@ -141,7 +141,8 @@ func (a *ExecuteAction) Execute(ctx context.Context, input RunInput) error {
 		},
 	}, feed)
 	if errors.Is(err, errAgentRunSuppressed) {
-		return nil
+		// 运行吸收后续输入时已失去资格，保留此前已产生的过程内容。
+		return a.persistPartialProcess(ctx, &execution.Run, result)
 	}
 	if err == nil {
 		if completeErr := a.complete(ctx, execution, policy, result); completeErr != nil {
@@ -150,18 +151,19 @@ func (a *ExecuteAction) Execute(ctx context.Context, input RunInput) error {
 			}
 			return fmt.Errorf("persist completed agent run: %w", completeErr)
 		}
-		return nil
+		// 迟到结果被门禁抑制时运行已被取消，成功收尾则已写入完整过程，此处只补前者。
+		return a.persistPartialProcess(ctx, &execution.Run, result)
 	}
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
-	// 失败与被取消的运行同样保留已产生的过程内容，先于终态写入，成员按终态读取时过程已可展开。
-	if processErr := a.persistPartialProcess(ctx, &execution.Run, result); processErr != nil {
-		return fmt.Errorf("agent run failed: %v; persist partial process: %w", err, processErr)
-	}
 	terminal, failErr := a.fail(ctx, execution.Run.ID, err)
 	if failErr != nil {
 		return fmt.Errorf("agent run failed: %v; persist failure: %w", err, failErr)
+	}
+	// 失败与被取消的运行同样保留已产生的过程内容。
+	if processErr := a.persistPartialProcess(ctx, &execution.Run, result); processErr != nil {
+		return fmt.Errorf("agent run failed: %v; persist partial process: %w", err, processErr)
 	}
 	if terminal {
 		return nil
@@ -414,7 +416,7 @@ func (a *ExecuteAction) complete(ctx context.Context, execution executionContext
 	return nil
 }
 
-// persistPartialProcess 在运行失败或被取消后保留已产生的过程内容与用量，并推进会话版本让成员重读。
+// persistPartialProcess 在运行进入终态后保留已产生的过程内容与用量，并推进会话版本让成员重读。运行仍可继续时不写入，成功收尾的完整过程因此不会撞上半成品。
 func (a *ExecuteAction) persistPartialProcess(ctx context.Context, initial *servermodels.AgentRun, partial agentruntime.RunResult) error {
 	if len(partial.Blocks) == 0 {
 		return nil
@@ -443,13 +445,16 @@ func (a *ExecuteAction) persistPartialProcess(ctx context.Context, initial *serv
 		if err := tx.NewSelect().Model(run).Where("agr.id = ?", initial.ID).For("UPDATE").Scan(ctx); err != nil {
 			return fmt.Errorf("lock agent run for partial process: %w", err)
 		}
+		if !agentRunStatusTerminal(run.Status) {
+			return nil
+		}
 		// 成功运行在结果事务中写入完整过程；同一运行的重复执行尝试只保留最早写入的一份。
 		written, err := tx.NewSelect().Model((*servermodels.AgentRunBlock)(nil)).
 			Where("arb.organization_id = ? AND arb.agent_run_id = ?", initial.OrganizationID, initial.ID).Exists(ctx)
 		if err != nil {
 			return fmt.Errorf("check persisted agent run blocks: %w", err)
 		}
-		if written || run.Status == string(domain.AgentRunStatusSucceeded) {
+		if written {
 			return nil
 		}
 		if _, err := tx.NewInsert().Model(&blocks).Exec(ctx); err != nil {

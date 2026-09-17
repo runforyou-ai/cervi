@@ -36,7 +36,7 @@ func testAgentReplyStopping(t *testing.T, db *bun.DB, identity *servermodels.Ide
 			t.Fatalf("stop=%s %v", status, err)
 		}
 	}
-	stopped := assertStoppedAgentReply(t, ctx, db, run.ID, 2)
+	stopped := assertStoppedAgentReply(t, ctx, db, run.ID, 2, 0)
 	// 核验已停止任务的重放结果和失败回调幂等性。
 	if err := executor.Execute(ctx, agentrunaction.RunInput{RunID: run.ID}); err != nil {
 		t.Fatal(err)
@@ -126,12 +126,12 @@ func testAgentReplyStopping(t *testing.T, db *bun.DB, identity *servermodels.Ide
 		if _, err := executor.StopAgentReply(ctx, identity, run.ConversationID, run.ID); err != nil {
 			t.Fatal(err)
 		}
-		assertStoppedAgentReply(t, ctx, db, run.ID, 1)
+		assertStoppedAgentReply(t, ctx, db, run.ID, 1, 0)
 	})
 }
 
-// assertStoppedAgentReply 核对停止消息与运行边界、触发绑定和无半成品过程。
-func assertStoppedAgentReply(t *testing.T, ctx context.Context, db *bun.DB, runID string, end int64) servermodels.Message {
+// assertStoppedAgentReply 核对停止消息与运行边界、触发绑定和已保留的过程内容条数。
+func assertStoppedAgentReply(t *testing.T, ctx context.Context, db *bun.DB, runID string, end int64, wantBlocks int) servermodels.Message {
 	t.Helper()
 	var run servermodels.AgentRun
 	if err := db.NewSelect().Model(&run).Where("agr.id = ?", runID).Scan(ctx); err != nil {
@@ -153,8 +153,8 @@ func assertStoppedAgentReply(t *testing.T, ctx context.Context, db *bun.DB, runI
 		t.Fatalf("trigger count=%d %v", count, err)
 	}
 	count, err = db.NewSelect().Model((*servermodels.AgentRunBlock)(nil)).Where("arb.agent_run_id = ?", runID).Count(ctx)
-	if err != nil || count != 0 {
-		t.Fatalf("partial blocks=%d %v", count, err)
+	if err != nil || count != wantBlocks {
+		t.Fatalf("partial blocks=%d want %d %v", count, wantBlocks, err)
 	}
 	return message
 }
@@ -173,10 +173,19 @@ func testStopRunningAgentReply(t *testing.T, db *bun.DB, identity *servermodels.
 			}
 			close(claimed)
 			<-ctx.Done()
-			if lateSuccess {
-				return agentruntime.RunResult{Content: "迟到的回复", EndSeq: input.EndSeq}, nil
+			// 中断时已产生的过程内容随结果一并返回，迟到的成功结果同样携带。
+			partial := agentruntime.RunResult{
+				Usage: agentruntime.Usage{PromptTokens: 9, CompletionTokens: 4, TotalTokens: 13},
+				Blocks: []agentruntime.Block{{
+					ID: uuid.NewV7().String(), Position: 1, ModelCallID: uuid.NewV7().String(),
+					Kind: domain.AgentRunBlockThinking, Payload: agentruntime.BlockPayload{Text: "停止前的思考"},
+				}},
 			}
-			return agentruntime.RunResult{}, ctx.Err()
+			if lateSuccess {
+				partial.Content, partial.EndSeq = "迟到的回复", input.EndSeq
+				return partial, nil
+			}
+			return partial, ctx.Err()
 		}}
 		executor := agentrunaction.NewExecuteAction(db, tasks, runtime, testAttachmentReader(db), nil)
 		finished := make(chan error, 1)
@@ -188,7 +197,12 @@ func testStopRunningAgentReply(t *testing.T, db *bun.DB, identity *servermodels.
 		if err := waitChatResult(t, ctx, finished); err != nil {
 			t.Fatal(err)
 		}
-		assertStoppedAgentReply(t, ctx, db, run.ID, 1)
+		assertStoppedAgentReply(t, ctx, db, run.ID, 1, 1)
+		// 主动停止的运行保留中断前的过程，成员可按运行编号读取。
+		process, err := conversationaction.NewGetAgentRunProcessQuery(db).Execute(ctx, identity, run.ID)
+		if err != nil || len(process.Blocks) != 1 || process.Blocks[0].Payload.Text != "停止前的思考" || process.Usage.TotalTokens != 13 {
+			t.Fatalf("stopped agent run process = %#v, error = %v", process, err)
+		}
 	}
 }
 
@@ -229,7 +243,7 @@ func testStopAgentReplyWithSend(t *testing.T, db *bun.DB, identity *servermodels
 		if sendFirst {
 			end = 2
 		}
-		assertStoppedAgentReply(t, ctx, db, run.ID, end)
+		assertStoppedAgentReply(t, ctx, db, run.ID, end, 0)
 		var state servermodels.AgentLane
 		if err := db.NewSelect().Model(&state).Where("al.conversation_id = ?", run.ConversationID).Scan(ctx); err != nil || state.ProcessedSeq != end || state.DesiredSeq != 2 {
 			t.Fatalf("stop/send state=%+v %v", state, err)

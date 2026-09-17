@@ -152,10 +152,10 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 			continue
 		}
 		if err != nil {
-			return RunResult{Usage: carriedUsage, Blocks: recorder.blocks()}, err
+			return RunResult{Usage: carriedUsage, Blocks: recorder.partialBlocks()}, err
 		}
 		if execution.result.Content == "" || execution.inputs.claimedSeq <= 0 {
-			return RunResult{Usage: carriedUsage, Blocks: recorder.blocks()},
+			return RunResult{Usage: carriedUsage, Blocks: recorder.partialBlocks()},
 				errors.New("agent run stopped without a stable response")
 		}
 		execution.result.Usage = carriedUsage

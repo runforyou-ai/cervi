@@ -13,6 +13,7 @@ import (
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/runforyou-ai/cervi/internal/storage/server/pgerr"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
@@ -21,6 +22,7 @@ import (
 type executionScopeFixture struct {
 	customerReadFixture
 	agentIdentityID string
+	tasks           *servertask.Runtime
 	scheduler       *agentrunaction.Scheduler
 	coordinator     *agentrunaction.ExecuteAction
 	transfer        *conversationaction.TransferServiceSessionAction
@@ -60,7 +62,7 @@ func newExecutionScopeFixture(t *testing.T) executionScopeFixture {
 	scheduler := agentrunaction.NewScheduler(tasks)
 	coordinator := agentrunaction.NewExecuteAction(f.db, tasks, nil, testAttachmentReader(f.db), nil)
 	return executionScopeFixture{
-		customerReadFixture: f, agentIdentityID: agent.IdentityID, scheduler: scheduler, coordinator: coordinator,
+		customerReadFixture: f, agentIdentityID: agent.IdentityID, tasks: tasks, scheduler: scheduler, coordinator: coordinator,
 		transfer: conversationaction.NewTransferServiceSessionAction(f.db, coordinator, scheduler),
 		claim:    conversationaction.NewClaimServiceSessionAction(f.db, coordinator),
 		close:    conversationaction.NewCloseServiceSessionAction(f.db, coordinator),
@@ -270,5 +272,53 @@ func TestAgentExecutionScopeReturnsUnrepresentedRuns(t *testing.T) {
 	history, err = query.Execute(ctx, f.owner, conversationaction.ConversationMessageHistoryInput{ConversationID: f.conversationID})
 	if err != nil || len(history.AgentRuns) != 1 || history.AgentRuns[0].Status != domain.AgentRunStatusQueued {
 		t.Fatalf("新消息后运行集合 = %#v，错误 = %v", history.AgentRuns, err)
+	}
+}
+
+// TestAgentExecutionScopeKeepsSuppressedProcess 验证运行在吸收后续输入时失去资格后，中断前的过程内容仍然保留并可读取。
+func TestAgentExecutionScopeKeepsSuppressedProcess(t *testing.T) {
+	f := newExecutionScopeFixture(t)
+	ctx := context.Background()
+	sessionID := f.transferToAgent(t, ctx)
+	run := &servermodels.AgentRun{}
+	if err := f.db.NewSelect().Model(run).
+		Where("agr.scope_id = ? AND agr.status = ?", sessionID, domain.AgentRunStatusQueued).Scan(ctx); err != nil {
+		t.Fatal(err)
+	}
+	claimed, release := make(chan struct{}), make(chan struct{})
+	runtime := testAgentRuntime{run: func(ctx context.Context, _ agentruntime.RunRequest, feed agentruntime.InputFeed) (agentruntime.RunResult, error) {
+		if _, err := feed.Claim(ctx, 1); err != nil {
+			return agentruntime.RunResult{}, err
+		}
+		close(claimed)
+		<-release
+		partial := agentruntime.RunResult{
+			Usage: agentruntime.Usage{PromptTokens: 7, CompletionTokens: 3, TotalTokens: 10},
+			Blocks: []agentruntime.Block{{
+				ID: uuid.NewV7().String(), Position: 1, ModelCallID: uuid.NewV7().String(),
+				Kind: domain.AgentRunBlockThinking, Payload: agentruntime.BlockPayload{Text: "失去资格前的思考"},
+			}},
+		}
+		// 运行已被取消，吸收后续输入时被抑制；运行 context 未取消，与更换机器人等入口一致。
+		_, err := feed.Claim(ctx, 2)
+		if err == nil {
+			t.Error("吸收后续输入没有被抑制")
+		}
+		return partial, err
+	}}
+	executor := agentrunaction.NewExecuteAction(f.db, f.tasks, runtime, testAttachmentReader(f.db), nil)
+	finished := make(chan error, 1)
+	go func() { finished <- executor.Execute(ctx, agentrunaction.RunInput{RunID: run.ID}) }()
+	<-claimed
+	if _, err := f.coordinator.CancelForServiceSession(ctx, f.db, run.OrganizationID, sessionID, f.agentIdentityID, domain.AgentRunErrorCodeBotChanged); err != nil {
+		t.Fatal(err)
+	}
+	close(release)
+	if err := <-finished; err != nil {
+		t.Fatalf("抑制的运行返回错误：%v", err)
+	}
+	process, err := conversationaction.NewGetAgentRunProcessQuery(f.db).Execute(ctx, f.owner, run.ID)
+	if err != nil || len(process.Blocks) != 1 || process.Blocks[0].Payload.Text != "失去资格前的思考" || process.Usage.TotalTokens != 10 {
+		t.Fatalf("被抑制运行的过程 = %#v，错误 = %v", process, err)
 	}
 }

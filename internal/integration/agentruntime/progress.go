@@ -365,3 +365,25 @@ func (r *processRecorder) blocks() []Block {
 	defer r.mu.Unlock()
 	return slices.Clone(r.process)
 }
+
+// partialBlocks 返回运行中断时应持久化的内容，尚未定稿的回复正文补在末尾，否则断流时已输出的正文无处可读。
+func (r *processRecorder) partialBlocks() []Block {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	blocks := slices.Clone(r.process)
+	if r.candidate == "" {
+		return blocks
+	}
+	// 候选正文属于最后一次模型调用，该调用尚未定稿时取其编号，已定稿时沿用它留下的末块编号。
+	modelCallID := ""
+	if r.call != nil {
+		modelCallID = r.call.id
+	} else if len(blocks) > 0 {
+		modelCallID = blocks[len(blocks)-1].ModelCallID
+	}
+	if modelCallID == "" {
+		modelCallID = uuid.NewV7().String()
+	}
+	return append(blocks, Block{ID: uuid.NewV7().String(), Position: int64(len(blocks) + 1),
+		ModelCallID: modelCallID, Kind: domain.AgentRunBlockContent, Payload: BlockPayload{Text: r.candidate}})
+}

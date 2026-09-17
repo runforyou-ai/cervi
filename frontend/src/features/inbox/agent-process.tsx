@@ -148,13 +148,13 @@ function AgentTool({ call }: { call: AgentToolCall }) {
   )
 }
 
-/** 沿头像侧对齐思考标题、右上角显示本次模型用量，首次展开时按运行编号读取过程内容。 */
-export function AgentProcess({ process, incoming }: { process: ConversationAgentProcessData; incoming: boolean }) {
+/** 沿头像侧对齐思考标题、右上角显示本次模型用量，首次展开时按运行编号读取过程内容。onPrimary 表示内容位于主色气泡内，决定配色；incoming 只决定对齐方向。 */
+export function AgentProcess({ process, incoming, onPrimary }: { process: ConversationAgentProcessData; incoming: boolean; onPrimary: boolean }) {
   const { t, i18n } = useTranslation(["inbox", "common"])
   const [opened, setOpened] = useState(false)
   const mobile = resolveAppPlatform() === "mobile"
   const seconds = Math.max(0, Math.round(process.durationMilliseconds / 1000))
-  // 成功运行的过程内容不可变，首次展开后按运行编号读取并长期复用缓存。
+  // 已完成运行的过程内容不可变，首次展开后按运行编号读取并长期复用缓存。
   const detail = useResource(
     resourceKeys.agentRunProcess(process.id),
     (signal) => getAgentRunProcess(process.id, signal),
@@ -169,7 +169,8 @@ export function AgentProcess({ process, incoming }: { process: ConversationAgent
       )}>
         <CollapsibleTrigger className={cn(
           "group flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-sm py-1 text-left text-xs focus-visible:outline focus-visible:outline-ring",
-          incoming ? "justify-start text-muted-foreground" : "justify-end text-primary-foreground/75",
+          incoming ? "justify-start" : "justify-end",
+          onPrimary ? "text-primary-foreground/75" : "text-muted-foreground",
           // 移动端按触屏点击区域抬高行高并占满气泡宽度，点击区不与引用块和正文重叠。
           mobile && "w-full py-2",
         )}>
@@ -179,7 +180,7 @@ export function AgentProcess({ process, incoming }: { process: ConversationAgent
         </CollapsibleTrigger>
         <div className={cn(
           "flex shrink-0 gap-2 text-[11px]",
-          incoming ? "text-muted-foreground" : "text-primary-foreground/75",
+          onPrimary ? "text-primary-foreground/75" : "text-muted-foreground",
           mobile && (incoming ? "self-start" : "self-end"),
         )}>
           <span>{t("agentUsageInput", { count: process.inputTokens })}</span>
@@ -188,7 +189,9 @@ export function AgentProcess({ process, incoming }: { process: ConversationAgent
       </div>
       <CollapsibleContent className={cn(
         "mt-2 space-y-3 text-left text-sm",
-        incoming ? "border-l border-border pl-3" : "border-r border-primary-foreground/30 pr-3",
+        incoming ? "pl-3" : "pr-3",
+        incoming ? "border-l" : "border-r",
+        onPrimary ? "border-primary-foreground/30" : "border-border",
       )}>
         {detail.data ? detail.data.blocks.map((block) =>
           block.kind === AgentRunBlockKind.AgentRunBlockToolCall && block.toolCall ? (
@@ -199,7 +202,7 @@ export function AgentProcess({ process, incoming }: { process: ConversationAgent
               className={cn(
                 "min-w-0 break-words",
                 block.kind === AgentRunBlockKind.AgentRunBlockThinking &&
-                  cn("italic", incoming ? "text-muted-foreground" : "text-primary-foreground/75"),
+                  cn("italic", onPrimary ? "text-primary-foreground/75" : "text-muted-foreground"),
               )}
             >
               <MessageMarkdown locale={i18n.language} onOpenLink={openExternalURL}>{block.text}</MessageMarkdown>
@@ -207,7 +210,7 @@ export function AgentProcess({ process, incoming }: { process: ConversationAgent
           ),
         ) : (
           // 读取中与读取失败共用一行占位，保持展开区域高度稳定。
-          <p className={cn("text-xs", incoming ? "text-muted-foreground" : "text-primary-foreground/75")}>
+          <p className={cn("text-xs", onPrimary ? "text-primary-foreground/75" : "text-muted-foreground")}>
             {detail.error && !detail.refreshing ? (
               <>
                 <span>{isApiError(detail.error) ? apiErrorMessage(detail.error) : t("agentProcessLoadFailed")}</span>
@@ -244,9 +247,9 @@ function AgentStreamTool({ call }: { call: RunStreamToolCall }) {
 }
 
 /** 按序渲染运行过程流中的思考、工具调用和正在生成的回复正文；区域限高滚动，内容增长时保持贴底。 */
-function AgentRunStreamProcess({ state, incoming }: { state: RunStreamState; incoming: boolean }) {
+function AgentRunStreamProcess({ state }: { state: RunStreamState }) {
   const { i18n } = useTranslation("inbox")
-  const muted = incoming ? "text-muted-foreground" : "text-primary-foreground/75"
+  const muted = "text-muted-foreground"
   const scroll = useRef<HTMLDivElement>(null)
   const following = useRef(true)
   useLayoutEffect(() => {
@@ -352,14 +355,14 @@ export function AgentRunState({ run, incoming, conversationID, group, copilot, o
             <CollapsibleContent className={cn(
               "text-left text-sm",
               // 首个快照到达前不占位，展开区域不出现空的缩进边框。
-              stream && cn("mt-2", incoming ? "border-l border-border pl-3" : "border-r border-primary-foreground/30 pr-3"),
+              stream && cn("mt-2 border-border", incoming ? "border-l pl-3" : "border-r pr-3"),
             )}>
-              {stream ? <AgentRunStreamProcess state={stream} incoming={incoming} /> : null}
+              {stream ? <AgentRunStreamProcess state={stream} /> : null}
             </CollapsibleContent>
           </Collapsible>
         ) : (
           <>
-            {run.process ? <AgentProcess process={run.process} incoming={incoming} /> : null}
+            {run.process ? <AgentProcess process={run.process} incoming={incoming} onPrimary={false} /> : null}
             <div className="flex items-center gap-1.5">
               {cancelled ? <BrainIcon aria-hidden className="size-4" /> : null}
               <span>{label}</span>
