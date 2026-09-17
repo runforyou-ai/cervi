@@ -30,7 +30,7 @@ func Validate(value string) error {
 
 // Hash 生成 bcrypt 密码哈希。
 func Hash(value string) (string, error) {
-	hash, err := bcrypt.GenerateFromPassword([]byte(value), bcrypt.DefaultCost)
+	hash, err := bcrypt.GenerateFromPassword([]byte(value), hashCost)
 	return string(hash), err
 }
 
