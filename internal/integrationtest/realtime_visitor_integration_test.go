@@ -59,7 +59,7 @@ func startVisitorRealtime(t *testing.T, f customerReadFixture, options gateway.O
 	t.Cleanup(func() { _ = watch.Unsubscribe() })
 
 	scheduler := agentrunaction.NewScheduler(servertask.New(f.db, serverconfig.NATSConfig{}))
-	visitorBackend := appservice.NewWebsiteVisitorDirectBackend(f.db, scheduler)
+	visitorBackend := appservice.NewWebsiteVisitorDirectBackend(f.db, scheduler, nil)
 	memberBackend := appservice.NewDirectBackend(f.db, nil, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil)
 	realtimeGateway := gateway.New(memberBackend, visitorBackend, config.Namespace, options)
 	realtimeGateway.Start(publisher.Connection())
@@ -162,7 +162,7 @@ func TestVisitorRealtimeStream(t *testing.T) {
 	client := h.connect(t, f.channelID, visitorToken, "")
 
 	// 另一个访客身份先发消息建立身份，其事件流不接收本访客线程的通知。
-	receive := conversationaction.NewReceiveWebsiteCustomerTextMessageAction(f.db, agentrunaction.NewScheduler(servertask.New(f.db, serverconfig.NATSConfig{})))
+	receive := conversationaction.NewReceiveWebsiteCustomerMessageAction(f.db, agentrunaction.NewScheduler(servertask.New(f.db, serverconfig.NATSConfig{})))
 	if _, err := receive.Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
 		ChannelID: f.channelID, ExternalID: "web-session:" + otherToken, ClientMessageID: uuid.NewV7().String(), Body: "另一位访客的问题",
 	}); err != nil {

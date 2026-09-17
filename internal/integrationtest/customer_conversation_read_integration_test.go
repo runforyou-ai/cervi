@@ -23,7 +23,7 @@ import (
 type customerReadFixture struct {
 	navigationFixture
 	channelID, conversationID string
-	receive                   *conversationaction.ReceiveWebsiteCustomerTextMessageAction
+	receive                   *conversationaction.ReceiveWebsiteCustomerMessageAction
 }
 
 // newCustomerReadFixture 建立两个客服共享的网站客户会话。
@@ -49,7 +49,7 @@ func newCustomerReadFixture(t *testing.T) customerReadFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	receive := conversationaction.NewReceiveWebsiteCustomerTextMessageAction(f.db, agentrunaction.NewScheduler(servertask.New(f.db, serverconfig.NATSConfig{})))
+	receive := conversationaction.NewReceiveWebsiteCustomerMessageAction(f.db, agentrunaction.NewScheduler(servertask.New(f.db, serverconfig.NATSConfig{})))
 	result, err := receive.Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
 		ChannelID: channel.ID, ExternalID: "web-session:0123456789abcdef0123456789abcdef", ClientMessageID: uuid.NewV7().String(), Body: "客户首条消息",
 	})
@@ -80,7 +80,7 @@ func (f customerReadFixture) inboxRow(t *testing.T, identity *servermodels.Ident
 }
 
 // visitorMessage 通过网站入口向已有客服会话发送消息。
-func (f customerReadFixture) visitorMessage(ctx context.Context, body string) (conversationaction.ReceiveWebsiteCustomerTextMessageResult, error) {
+func (f customerReadFixture) visitorMessage(ctx context.Context, body string) (conversationaction.ReceiveWebsiteCustomerMessageResult, error) {
 	return f.receive.Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
 		ChannelID: f.channelID, ExternalID: "web-session:0123456789abcdef0123456789abcdef", ConversationID: &f.conversationID,
 		ClientMessageID: uuid.NewV7().String(), Body: body,

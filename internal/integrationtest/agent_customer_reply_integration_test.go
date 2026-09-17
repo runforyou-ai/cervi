@@ -53,7 +53,7 @@ func testAgentCustomerReplies(t *testing.T, db *bun.DB, identity *servermodels.I
 			if err != nil {
 				t.Fatal(err)
 			}
-			receive := conversationaction.NewReceiveWebsiteCustomerTextMessageAction(db, scheduler)
+			receive := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, scheduler)
 			input := conversationaction.WebsiteCustomerTextMessageInput{ChannelID: channel.ID, ExternalID: "web-session:0123456789abcdef0123456789abcdef", ClientMessageID: uuid.NewV7().String(), Body: "最早的客户问题"}
 			original, err := receive.Execute(ctx, input)
 			if err != nil {

@@ -24,11 +24,11 @@ func TestChannelMessageOpaqueIdentifiers(t *testing.T) {
 		t.Fatal(err)
 	}
 	// 使用渠道通用入站契约核验平台消息编号原值。
-	receive := func(input channelmessage.Inbound, body string) (conversationaction.InboundCustomerTextMessageResult, error) {
-		var result conversationaction.InboundCustomerTextMessageResult
+	receive := func(input channelmessage.Inbound, body string) (conversationaction.InboundCustomerMessageResult, error) {
+		var result conversationaction.InboundCustomerMessageResult
 		err := realtime.RunInTx(ctx, f.db, func(ctx context.Context, tx bun.Tx) error {
 			var err error
-			result, err = conversationaction.ReceiveInboundCustomerTextMessage(ctx, tx, channel, conversationaction.InboundCustomerTextMessageInput{
+			result, err = conversationaction.ReceiveInboundCustomerMessage(ctx, tx, channel, conversationaction.InboundCustomerMessageInput{
 				ExternalID: "contact:opaque", SingleConversation: true, Body: body, OriginatedAt: time.Now().UTC(),
 				IdempotencyKey: f.channelID + ":" + input.AccountID + "|" + input.ConversationID + "|" + input.MessageID,
 				ChannelMessage: &input,

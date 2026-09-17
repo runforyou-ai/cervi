@@ -12,15 +12,18 @@ import (
 	"github.com/runforyou-ai/cervi/internal/actions/channelmessage"
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
+	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
+	"github.com/runforyou-ai/cervi/internal/common/searchtext"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
 
-// InboundCustomerTextMessageInput 定义渠道文本入站事务的稳定事实。
-type InboundCustomerTextMessageInput struct {
+// InboundCustomerMessageInput 定义渠道文本与附件入站事务的稳定事实。
+type InboundCustomerMessageInput struct {
 	ChannelMessage          *channelmessage.Inbound
 	ClientMessageID         *string
+	Attachment              *InboundCustomerAttachment
 	ReplyToMessageID        string
 	ExternalID              string
 	DisplayName             *string
@@ -32,9 +35,25 @@ type InboundCustomerTextMessageInput struct {
 	SourceOrder             int64
 }
 
-// InboundCustomerTextMessageResult 返回渠道文本入站事务创建或取得的事实。
-type InboundCustomerTextMessageResult struct {
+// InboundCustomerAttachment 定义客户入站附件消息待关联的已上传文件。
+type InboundCustomerAttachment struct {
+	FileID      string
+	ImageWidth  int
+	ImageHeight int
+}
+
+// messageType 返回本次入站写入的消息类型。
+func (i InboundCustomerMessageInput) messageType() domain.MessageType {
+	if i.Attachment != nil {
+		return domain.MessageTypeAttachment
+	}
+	return domain.MessageTypeText
+}
+
+// InboundCustomerMessageResult 返回渠道入站事务创建或取得的事实。
+type InboundCustomerMessageResult struct {
 	ReplyTo              *ConversationMessageReference
+	Attachment           *VisitorAttachment
 	Summary              ConversationSummary
 	Session              *servermodels.ServiceSession
 	Message              *servermodels.Message
@@ -44,8 +63,8 @@ type InboundCustomerTextMessageResult struct {
 	OpenedServiceSession bool
 }
 
-// ReceiveInboundCustomerTextMessage 在调用方事务中幂等写入客户文本消息。
-func ReceiveInboundCustomerTextMessage(ctx context.Context, db bun.IDB, channel *servermodels.Channel, input InboundCustomerTextMessageInput) (InboundCustomerTextMessageResult, error) {
+// ReceiveInboundCustomerMessage 在调用方事务中幂等写入客户文本或附件消息。
+func ReceiveInboundCustomerMessage(ctx context.Context, db bun.IDB, channel *servermodels.Channel, input InboundCustomerMessageInput) (InboundCustomerMessageResult, error) {
 	ids := generateIDs()
 	ensured, err := contactaction.EnsureChannelIdentity(ctx, db, contactaction.EnsureChannelIdentityInput{
 		OrganizationID: channel.OrganizationID,
@@ -55,7 +74,7 @@ func ReceiveInboundCustomerTextMessage(ctx context.Context, db bun.IDB, channel 
 		IdentityID:     ids.channelIdentity,
 	})
 	if err != nil {
-		return InboundCustomerTextMessageResult{}, err
+		return InboundCustomerMessageResult{}, err
 	}
 	identity := ensured.Identity
 	// 网站发送编号按渠道访客身份隔离，外部平台保留来源幂等键。
@@ -69,40 +88,53 @@ func ReceiveInboundCustomerTextMessage(ctx context.Context, db bun.IDB, channel 
 			WherePK().
 			Where("organization_id = ?", channel.OrganizationID).
 			Exec(ctx); err != nil {
-			return InboundCustomerTextMessageResult{}, fmt.Errorf("update channel identity display name: %w", err)
+			return InboundCustomerMessageResult{}, fmt.Errorf("update channel identity display name: %w", err)
 		}
 		identity.DisplayName = input.DisplayName
 	}
-	if saved, found, err := loadInboundCustomerTextMessage(ctx, db, channel, identity, input); err != nil || found {
+	if saved, found, err := loadInboundCustomerMessage(ctx, db, channel, identity, input); err != nil || found {
 		return saved, err
+	}
+
+	// 附件在会话之前锁定并激活，文件名用于新会话标题和检索向量。
+	var attachment *VisitorAttachment
+	titleSource := input.Body
+	if input.Attachment != nil {
+		attachment, err = lockInboundAttachmentFile(ctx, db, channel, identity.ID, *input.Attachment)
+		if err != nil {
+			return InboundCustomerMessageResult{}, err
+		}
+		if titleSource == "" {
+			titleSource = attachment.Name
+		}
 	}
 
 	subject, err := ensureContactSubject(ctx, db, channel.OrganizationID, ensured.Contact.ID, ids.subject)
 	if err != nil {
-		return InboundCustomerTextMessageResult{}, err
+		return InboundCustomerMessageResult{}, err
 	}
 	var conversation *servermodels.Conversation
 	var insertedConversation bool
 	if input.SingleConversation {
-		conversation, insertedConversation, err = selectSingleCustomerConversation(ctx, db, channel.OrganizationID, identity.ID, input.Body, ids.conversation)
+		conversation, insertedConversation, err = selectSingleCustomerConversation(ctx, db, channel.OrganizationID, identity.ID, titleSource, ids.conversation)
 	} else {
-		conversation, insertedConversation, err = selectTargetConversation(ctx, db, channel.OrganizationID, identity.ID, input.RequestedConversationID, input.Body, ids.conversation)
+		conversation, insertedConversation, err = selectTargetConversation(ctx, db, channel.OrganizationID, identity.ID, input.RequestedConversationID, titleSource, ids.conversation)
 	}
 	if err != nil {
-		return InboundCustomerTextMessageResult{}, err
+		return InboundCustomerMessageResult{}, err
 	}
 	// 渠道身份稳定后锁定会话，已有线程随后锁当前周期并核对渠道身份。
 	conversation, err = chatstate.LockCustomerConversation(ctx, db, channel.OrganizationID, conversation.ID)
 	if err != nil {
-		return InboundCustomerTextMessageResult{}, err
+		return InboundCustomerMessageResult{}, err
 	}
 	replyTo, err := loadConversationReplyTarget(ctx, db, channel.OrganizationID, conversation.ID, input.ReplyToMessageID)
 	if err != nil {
-		return InboundCustomerTextMessageResult{}, err
+		return InboundCustomerMessageResult{}, err
 	}
 	// 客户只能引用对客可见的消息。
 	if replyTo != nil && replyTo.Visibility == domain.MessageVisibilityInternalOnly {
-		return InboundCustomerTextMessageResult{}, &ConflictError{Reason: ConflictReasonReplyTargetInvalid}
+		return InboundCustomerMessageResult{}, &ConflictError{Reason: ConflictReasonReplyTargetInvalid}
 	}
 
 	var session *servermodels.ServiceSession
@@ -113,7 +145,7 @@ func ReceiveInboundCustomerTextMessage(ctx context.Context, db bun.IDB, channel 
 	} else {
 		session, createSession, err = selectServiceSession(ctx, db, channel.OrganizationID, conversation.ID, identity.ID)
 		if err != nil {
-			return InboundCustomerTextMessageResult{}, err
+			return InboundCustomerMessageResult{}, err
 		}
 	}
 	// 网站消息在确定写入周期后生成时间，已有会话此时已持有周期锁；外部渠道保留来源时间。
@@ -127,7 +159,7 @@ func ReceiveInboundCustomerTextMessage(ctx context.Context, db bun.IDB, channel 
 			WherePK().
 			Where("organization_id = ?", channel.OrganizationID).
 			Exec(ctx); err != nil {
-			return InboundCustomerTextMessageResult{}, fmt.Errorf("reactivate customer conversation: %w", err)
+			return InboundCustomerMessageResult{}, fmt.Errorf("reactivate customer conversation: %w", err)
 		}
 		conversation.Status = string(domain.ConversationStatusActive)
 	}
@@ -135,7 +167,7 @@ func ReceiveInboundCustomerTextMessage(ctx context.Context, db bun.IDB, channel 
 	if createSession {
 		route, err := resolveRouteSnapshot(ctx, db, channel, input.OriginatedAt)
 		if err != nil {
-			return InboundCustomerTextMessageResult{}, err
+			return InboundCustomerMessageResult{}, err
 		}
 		session = &servermodels.ServiceSession{
 			ID: ids.serviceSession, OrganizationID: channel.OrganizationID,
@@ -150,7 +182,7 @@ func ReceiveInboundCustomerTextMessage(ctx context.Context, db bun.IDB, channel 
 			Column("id", "organization_id", "conversation_id", "contact_channel_identity_id", "sequence", "status", "team_id", "assignee_identity_id", "opening_message_id", "last_message_id", "last_message_at", "assigned_at", "status_changed_at").
 			Returning("*").
 			Exec(ctx); err != nil {
-			return InboundCustomerTextMessageResult{}, fmt.Errorf("create service session: %w", err)
+			return InboundCustomerMessageResult{}, fmt.Errorf("create service session: %w", err)
 		}
 		if _, err := db.NewUpdate().Model((*servermodels.CustomerConversation)(nil)).
 			Set("current_service_session_id = ?", session.ID).
@@ -158,36 +190,44 @@ func ReceiveInboundCustomerTextMessage(ctx context.Context, db bun.IDB, channel 
 			Where("organization_id = ?", channel.OrganizationID).
 			Where("conversation_id = ?", conversation.ID).
 			Exec(ctx); err != nil {
-			return InboundCustomerTextMessageResult{}, fmt.Errorf("update current service session: %w", err)
+			return InboundCustomerMessageResult{}, fmt.Errorf("update current service session: %w", err)
 		}
 	}
 
 	participant, err := ensureContactParticipant(ctx, db, channel.OrganizationID, conversation.ID, subject.ID, ids.participant)
 	if err != nil {
-		return InboundCustomerTextMessageResult{}, err
+		return InboundCustomerMessageResult{}, err
 	}
 
 	message := &servermodels.Message{
 		ID: ids.message, OrganizationID: channel.OrganizationID,
 		ConversationID: conversation.ID, ServiceSessionID: &session.ID,
-		SenderParticipantID: &participant.ID, Type: string(domain.MessageTypeText),
+		SenderParticipantID: &participant.ID, Type: string(input.messageType()),
 		ClientMessageID: input.ClientMessageID, Body: input.Body, IdempotencyKey: &input.IdempotencyKey,
 		OriginatedAt: input.OriginatedAt, SourceOrder: input.SourceOrder,
 	}
 	if replyTo != nil {
 		message.ReplyToMessageID = &replyTo.ID
 	}
+	if attachment != nil {
+		message.SearchVector = searchtext.Vector(input.Body, attachment.Name)
+	}
 	message, inserted, err := chatstate.AppendMessage(ctx, db, conversation, message)
 	if err != nil {
-		return InboundCustomerTextMessageResult{}, err
+		return InboundCustomerMessageResult{}, err
 	}
 	if !inserted {
-		saved, _, err := loadInboundCustomerTextMessage(ctx, db, channel, identity, input)
+		saved, _, err := loadInboundCustomerMessage(ctx, db, channel, identity, input)
 		return saved, err
+	}
+	if attachment != nil {
+		if err := saveCustomerAttachment(ctx, db, channel.OrganizationID, message.ID, attachment.MessageAttachment); err != nil {
+			return InboundCustomerMessageResult{}, err
+		}
 	}
 	if input.ChannelMessage != nil {
 		if err := channelmessage.RecordInbound(ctx, db, channel.ID, message, input.ChannelMessage); err != nil {
-			return InboundCustomerTextMessageResult{}, err
+			return InboundCustomerMessageResult{}, err
 		}
 	}
 	if _, err := db.NewUpdate().Model(identity).
@@ -196,33 +236,53 @@ func ReceiveInboundCustomerTextMessage(ctx context.Context, db bun.IDB, channel 
 		WherePK().
 		Where("organization_id = ?", channel.OrganizationID).
 		Exec(ctx); err != nil {
-		return InboundCustomerTextMessageResult{}, fmt.Errorf("update channel identity last seen: %w", err)
+		return InboundCustomerMessageResult{}, fmt.Errorf("update channel identity last seen: %w", err)
 	}
 
 	summary, err := loadConversationSummary(ctx, db, channel.OrganizationID, conversation.ID, identity.ID)
 	if err != nil {
-		return InboundCustomerTextMessageResult{}, err
+		return InboundCustomerMessageResult{}, err
 	}
-	result := inboundCustomerTextMessageResult(summary, session, message, true)
+	result := inboundCustomerMessageResult(summary, session, message, true)
 	result.ReplyTo = replyTo
+	result.Attachment = attachment
 	return result, nil
 }
 
-// loadInboundCustomerTextMessage 校验并返回已经写入的渠道文本消息。
-func loadInboundCustomerTextMessage(ctx context.Context, db bun.IDB, channel *servermodels.Channel, identity *servermodels.ContactChannelIdentity, input InboundCustomerTextMessageInput) (InboundCustomerTextMessageResult, bool, error) {
+// loadInboundCustomerMessage 校验并返回已经写入的渠道消息。
+func loadInboundCustomerMessage(ctx context.Context, db bun.IDB, channel *servermodels.Channel, identity *servermodels.ContactChannelIdentity, input InboundCustomerMessageInput) (InboundCustomerMessageResult, bool, error) {
 	message := &servermodels.Message{}
 	err := db.NewSelect().Model(message).
 		Where("msg.organization_id = ?", channel.OrganizationID).
 		Where("msg.idempotency_key = ?", input.IdempotencyKey).
 		Scan(ctx)
 	if errors.Is(err, sql.ErrNoRows) {
-		return InboundCustomerTextMessageResult{}, false, nil
+		return InboundCustomerMessageResult{}, false, nil
 	}
 	if err != nil {
-		return InboundCustomerTextMessageResult{}, false, fmt.Errorf("find idempotent inbound customer message: %w", err)
+		return InboundCustomerMessageResult{}, false, fmt.Errorf("find idempotent inbound customer message: %w", err)
 	}
-	if message.ServiceSessionID == nil || message.SenderParticipantID == nil || message.Type != string(domain.MessageTypeText) || message.DeletedAt != nil {
-		return InboundCustomerTextMessageResult{}, true, ErrDataInvariant
+	if message.ServiceSessionID == nil || message.SenderParticipantID == nil || message.DeletedAt != nil {
+		return InboundCustomerMessageResult{}, true, ErrDataInvariant
+	}
+	if message.Type != string(input.messageType()) {
+		return InboundCustomerMessageResult{}, true, &ConflictError{Reason: ConflictReasonIdempotencyMismatch}
+	}
+	var attachment *VisitorAttachment
+	if input.Attachment != nil {
+		attachment = &VisitorAttachment{}
+		if err := db.NewSelect().TableExpr("message_attachments AS ma").
+			ColumnExpr("COALESCE(ma.file_id::text, '') AS id").
+			ColumnExpr("ma.name, ma.content_type, ma.byte_size, ma.image_width, ma.image_height, ma.transfer_status").
+			ColumnExpr("f.storage_backend, f.storage_key").
+			Join("LEFT JOIN files AS f ON f.id = ma.file_id AND f.organization_id = ma.organization_id").
+			Where("ma.message_id = ? AND ma.organization_id = ?", message.ID, channel.OrganizationID).
+			Scan(ctx, attachment); err != nil {
+			return InboundCustomerMessageResult{}, true, fmt.Errorf("load idempotent inbound attachment: %w", err)
+		}
+		if attachment.ID != input.Attachment.FileID || attachment.ImageWidth != input.Attachment.ImageWidth || attachment.ImageHeight != input.Attachment.ImageHeight {
+			return InboundCustomerMessageResult{}, true, &ConflictError{Reason: ConflictReasonIdempotencyMismatch}
+		}
 	}
 	storedReply := ""
 	if message.ReplyToMessageID != nil {
@@ -232,11 +292,11 @@ func loadInboundCustomerTextMessage(ctx context.Context, db bun.IDB, channel *se
 	if input.ChannelMessage != nil {
 		replyMatches, err = channelmessage.MatchesInbound(ctx, db, message, channel.ID, input.ChannelMessage)
 		if err != nil {
-			return InboundCustomerTextMessageResult{}, true, err
+			return InboundCustomerMessageResult{}, true, err
 		}
 	}
 	if !replyMatches || message.Body != input.Body || (input.RequestedConversationID != nil && *input.RequestedConversationID != message.ConversationID) {
-		return InboundCustomerTextMessageResult{}, true, &ConflictError{Reason: ConflictReasonIdempotencyMismatch}
+		return InboundCustomerMessageResult{}, true, &ConflictError{Reason: ConflictReasonIdempotencyMismatch}
 	}
 	session := &servermodels.ServiceSession{}
 	err = db.NewSelect().Model(session).
@@ -253,29 +313,30 @@ func loadInboundCustomerTextMessage(ctx context.Context, db bun.IDB, channel *se
 		Where("cs.source_id = ?", identity.ContactID).
 		Scan(ctx)
 	if errors.Is(err, sql.ErrNoRows) {
-		return InboundCustomerTextMessageResult{}, true, &ConflictError{Reason: ConflictReasonIdempotencyMismatch}
+		return InboundCustomerMessageResult{}, true, &ConflictError{Reason: ConflictReasonIdempotencyMismatch}
 	}
 	if err != nil {
-		return InboundCustomerTextMessageResult{}, true, fmt.Errorf("check idempotent inbound customer message ownership: %w", err)
+		return InboundCustomerMessageResult{}, true, fmt.Errorf("check idempotent inbound customer message ownership: %w", err)
 	}
 	summary, err := loadConversationSummary(ctx, db, channel.OrganizationID, message.ConversationID, identity.ID)
 	if err != nil {
-		return InboundCustomerTextMessageResult{}, true, err
+		return InboundCustomerMessageResult{}, true, err
 	}
-	result := inboundCustomerTextMessageResult(summary, session, message, false)
+	result := inboundCustomerMessageResult(summary, session, message, false)
+	result.Attachment = attachment
 	if storedReply != "" {
 		result.ReplyTo, err = loadMessageReference(ctx, db, channel.OrganizationID, message.ConversationID, storedReply)
 		if err != nil {
-			return InboundCustomerTextMessageResult{}, true, err
+			return InboundCustomerMessageResult{}, true, err
 		}
 	}
 	return result, true, nil
 }
 
-// inboundCustomerTextMessageResult 构造渠道文本入站结果。
-func inboundCustomerTextMessageResult(summary ConversationSummary, session *servermodels.ServiceSession, message *servermodels.Message, inserted bool) InboundCustomerTextMessageResult {
+// inboundCustomerMessageResult 构造渠道入站结果。
+func inboundCustomerMessageResult(summary ConversationSummary, session *servermodels.ServiceSession, message *servermodels.Message, inserted bool) InboundCustomerMessageResult {
 	openedSession := session.OpeningMessageID == message.ID
-	return InboundCustomerTextMessageResult{
+	return InboundCustomerMessageResult{
 		Summary: summary, Session: session, Message: message,
 		ChannelIdentityID:    session.ContactChannelIdentityID,
 		Inserted:             inserted,
@@ -302,4 +363,35 @@ func selectSingleCustomerConversation(ctx context.Context, db bun.IDB, organizat
 		return nil, false, fmt.Errorf("load channel identity customer conversation: %w", err)
 	}
 	return createCustomerConversation(ctx, db, organizationID, channelIdentityID, body, conversationID)
+}
+
+// lockInboundAttachmentFile 锁定该渠道访客上传的有效文件，按渠道入站上限校验字节数后激活。
+func lockInboundAttachmentFile(ctx context.Context, db bun.IDB, channel *servermodels.Channel, channelIdentityID string, attachment InboundCustomerAttachment) (*VisitorAttachment, error) {
+	file := &servermodels.File{}
+	err := db.NewSelect().Model(file).ColumnExpr("f.*").ColumnExpr("f.expires_at <= now() AS expired").
+		Where("f.id = ? AND f.organization_id = ?", attachment.FileID, channel.OrganizationID).
+		Where("f.purpose = ? AND f.uploader_channel_identity_id = ?", domain.FilePurposeMessageAttachment, channelIdentityID).
+		For("UPDATE").Scan(ctx)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, fileaction.ErrFileNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("lock inbound attachment file: %w", err)
+	}
+	if file.Status != string(domain.FileStatusUploaded) || file.Expired {
+		return nil, fileaction.ErrFileNotFound
+	}
+	if limit := domain.ChannelInboundAttachmentLimit(domain.ChannelType(channel.Type)); limit > 0 && file.ByteSize > limit {
+		return nil, &ConflictError{Reason: ConflictReasonAttachmentTooLarge}
+	}
+	if _, err := db.NewUpdate().Model(file).Set("status = ?", domain.FileStatusActive).Set("expires_at = NULL").Set("updated_at = now()").WherePK().Exec(ctx); err != nil {
+		return nil, fmt.Errorf("activate inbound attachment file: %w", err)
+	}
+	return &VisitorAttachment{
+		MessageAttachment: MessageAttachment{
+			ID: file.ID, Name: file.OriginalName, ContentType: file.ContentType, ByteSize: file.ByteSize,
+			ImageWidth: attachment.ImageWidth, ImageHeight: attachment.ImageHeight, TransferStatus: domain.MessageAttachmentTransferReady,
+		},
+		StorageBackend: domain.FileStorageBackend(file.StorageBackend), StorageKey: file.StorageKey,
+	}, nil
 }

@@ -142,7 +142,7 @@ func lockCustomerAttachmentFile(ctx context.Context, tx bun.Tx, identity *server
 }
 
 // saveCustomerAttachment 写入客户会话消息的附件关联。
-func saveCustomerAttachment(ctx context.Context, tx bun.Tx, organizationID, messageID string, attachment MessageAttachment) error {
+func saveCustomerAttachment(ctx context.Context, tx bun.IDB, organizationID, messageID string, attachment MessageAttachment) error {
 	if _, err := tx.NewRaw(`INSERT INTO message_attachments
  (message_id, organization_id, file_id, name, content_type, byte_size, image_width, image_height, transfer_status)
  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,

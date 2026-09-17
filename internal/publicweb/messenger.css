@@ -585,6 +585,9 @@ button.cv-message-reference { cursor: pointer; }
 .cv-file-asset audio { display: block; width: 100%; }
 .cv-file-asset strong { display: block; overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .cv-file-asset span { display: block; margin-top: 3px; color: var(--cv-muted-foreground); font-size: 10px; }
+.cv-attachment-meta { display: flex; align-items: center; gap: 8px; }
+.cv-attachment-status { color: var(--cv-muted-foreground); font-size: 10px; }
+.cv-attachment-action { border: 0; padding: 0; background: transparent; color: var(--cv-theme); font-size: 10px; cursor: pointer; }
 .cv-voice-message { display: flex; min-width: 190px; align-items: center; gap: 10px; }
 .cv-voice-play { display: grid; width: 30px; height: 30px; flex: 0 0 auto; place-items: center; border: 0; border-radius: 999px; background: currentColor; cursor: pointer; }
 .cv-voice-play::before { content: ""; margin-left: 2px; border-top: 5px solid transparent; border-bottom: 5px solid transparent; border-left: 7px solid var(--cv-theme); }

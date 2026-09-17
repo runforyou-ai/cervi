@@ -36,6 +36,15 @@ type websiteMessageRow struct {
 	ReplyBody               string                           `bun:"reply_body"`
 	ReplySubjectKind        string                           `bun:"reply_subject_kind"`
 	ReplySenderIdentityType *domain.OrganizationIdentityType `bun:"reply_sender_identity_type"`
+	AttachmentFileID        *string                          `bun:"attachment_file_id"`
+	AttachmentName          *string                          `bun:"attachment_name"`
+	AttachmentContentType   *string                          `bun:"attachment_content_type"`
+	AttachmentByteSize      *int64                           `bun:"attachment_byte_size"`
+	AttachmentImageWidth    *int                             `bun:"attachment_image_width"`
+	AttachmentImageHeight   *int                             `bun:"attachment_image_height"`
+	AttachmentTransfer      *string                          `bun:"attachment_transfer_status"`
+	AttachmentBackend       *string                          `bun:"attachment_storage_backend"`
+	AttachmentStorageKey    *string                          `bun:"attachment_storage_key"`
 }
 
 // NewListWebsiteMessagesQuery 创建网站访客消息历史查询。
@@ -90,6 +99,17 @@ func (q *ListWebsiteMessagesQuery) Execute(ctx context.Context, input MessageHis
 		ColumnExpr("? AS reply_body", messagequery.Summary("reply")).
 		ColumnExpr("reply_cs.kind AS reply_subject_kind").
 		ColumnExpr("reply_oi.type AS reply_sender_identity_type").
+		ColumnExpr("ma.file_id::text AS attachment_file_id").
+		ColumnExpr("ma.name AS attachment_name").
+		ColumnExpr("ma.content_type AS attachment_content_type").
+		ColumnExpr("ma.byte_size AS attachment_byte_size").
+		ColumnExpr("ma.image_width AS attachment_image_width").
+		ColumnExpr("ma.image_height AS attachment_image_height").
+		ColumnExpr("ma.transfer_status AS attachment_transfer_status").
+		ColumnExpr("af.storage_backend AS attachment_storage_backend").
+		ColumnExpr("af.storage_key AS attachment_storage_key").
+		Join("LEFT JOIN message_attachments AS ma ON ma.message_id = msg.id AND ma.organization_id = msg.organization_id").
+		Join("LEFT JOIN files AS af ON af.id = ma.file_id AND af.organization_id = ma.organization_id").
 		Join("JOIN service_sessions AS ss ON ss.id = msg.service_session_id AND ss.organization_id = msg.organization_id AND ss.conversation_id = msg.conversation_id").
 		Join("JOIN conversation_participants AS cp ON cp.id = msg.sender_participant_id AND cp.organization_id = msg.organization_id AND cp.conversation_id = msg.conversation_id").
 		Join("JOIN chat_subjects AS cs ON cs.id = cp.subject_id AND cs.organization_id = cp.organization_id").
@@ -100,7 +120,7 @@ func (q *ListWebsiteMessagesQuery) Execute(ctx context.Context, input MessageHis
 		Join("LEFT JOIN organization_identities AS reply_oi ON reply_oi.id = reply_cs.source_id AND reply_oi.organization_id = reply_cs.organization_id AND reply_cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
 		Where("msg.organization_id = ?", channel.OrganizationID).
 		Where("msg.conversation_id = ?", input.ConversationID).
-		Where("msg.type = ?", domain.MessageTypeText).
+		Where("msg.type IN (?, ?)", domain.MessageTypeText, domain.MessageTypeAttachment).
 		Where("msg.visibility = ?", domain.MessageVisibilityCustomerVisible).
 		Where("msg.deleted_at IS NULL")
 	if input.Before != nil {
@@ -116,7 +136,9 @@ func (q *ListWebsiteMessagesQuery) Execute(ctx context.Context, input MessageHis
 	if err := query.Limit(websiteMessagePageSize+1).Scan(ctx, &rows); err != nil {
 		return MessageHistory{}, fmt.Errorf("list website conversation messages: %w", err)
 	}
-	return buildMessageHistory(rows, input), nil
+	history := buildMessageHistory(rows, input)
+	history.OrganizationID = channel.OrganizationID
+	return history, nil
 }
 
 // validateMessageHistoryInput 校验消息分页输入。
@@ -160,6 +182,19 @@ func buildMessageHistory(rows []websiteMessageRow, input MessageHistoryInput) Me
 		message := Message{
 			ClientMessageID: row.ClientMessageID, MessageSeq: row.MessageSeq, ID: row.ID, Author: author, Body: row.Body, SenderIdentityType: row.SenderIdentityType,
 			OriginatedAt: row.OriginatedAt, SourceOrder: row.SourceOrder, CreatedAt: row.CreatedAt,
+		}
+		// 附件行存在时其余列均非空；取回失败的附件没有文件编号和存储位置。
+		if row.AttachmentName != nil {
+			message.Attachment = &VisitorAttachment{MessageAttachment: MessageAttachment{
+				Name: *row.AttachmentName, ContentType: *row.AttachmentContentType, ByteSize: *row.AttachmentByteSize,
+				ImageWidth: *row.AttachmentImageWidth, ImageHeight: *row.AttachmentImageHeight,
+				TransferStatus: domain.MessageAttachmentTransferStatus(*row.AttachmentTransfer),
+			}}
+			if row.AttachmentFileID != nil && row.AttachmentBackend != nil && row.AttachmentStorageKey != nil {
+				message.Attachment.ID = *row.AttachmentFileID
+				message.Attachment.StorageBackend = domain.FileStorageBackend(*row.AttachmentBackend)
+				message.Attachment.StorageKey = *row.AttachmentStorageKey
+			}
 		}
 		if row.ReplyToMessageID != nil {
 			message.ReplyTo = &MessageReference{ID: *row.ReplyToMessageID, Deleted: row.ReplyDeleted}

@@ -47,3 +47,36 @@ func TestNormalizeWebsiteReplyTarget(t *testing.T) {
 		t.Fatalf("input=%+v fields=%+v", input, fields)
 	}
 }
+
+// TestNormalizeWebsiteAttachmentMessageInput 验证附件说明可以为空、超长说明被拒绝，且文件编号必须合法。
+func TestNormalizeWebsiteAttachmentMessageInput(t *testing.T) {
+	base := WebsiteCustomerAttachmentMessageInput{
+		ChannelID:       "0198ddee-c056-7bc5-a1d9-586f878ee966",
+		ExternalID:      "web-session:0123456789abcdef0123456789abcdef",
+		ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f65",
+		FileID:          "0198ddf0-a234-7f01-8d99-e3e0af0f5f66",
+	}
+	normalized, fields := normalizeWebsiteAttachmentMessageInput(base)
+	if len(fields) != 0 || normalized.Body != "" {
+		t.Fatalf("normalized=%+v fields=%#v", normalized, fields)
+	}
+	caption := make([]rune, 4001)
+	for index := range caption {
+		caption[index] = '鹿'
+	}
+	long := base
+	long.Body = string(caption)
+	if _, fields := normalizeWebsiteAttachmentMessageInput(long); fields["body"] != ValidationBodyTooLong {
+		t.Fatalf("fields=%#v", fields)
+	}
+	invalid := base
+	invalid.FileID = "not-a-uuid"
+	if _, fields := normalizeWebsiteAttachmentMessageInput(invalid); fields["fileId"] != ValidationFileIDInvalid {
+		t.Fatalf("fields=%#v", fields)
+	}
+	negative := base
+	negative.ImageHeight = -1
+	if _, fields := normalizeWebsiteAttachmentMessageInput(negative); fields["fileId"] != ValidationFileIDInvalid {
+		t.Fatalf("fields=%#v", fields)
+	}
+}

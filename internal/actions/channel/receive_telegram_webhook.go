@@ -118,7 +118,7 @@ func (a *ReceiveTelegramWebhookAction) Execute(ctx context.Context, channelID st
 			if reply := input.Message.Reply; reply != nil {
 				platformMessage.Reply = &channelmessage.Reply{MessageID: strconv.FormatInt(reply.MessageID, 10), Body: reply.Body, SenderName: reply.SenderName, SenderIsBot: reply.SenderIsBot}
 			}
-			received, err := conversationaction.ReceiveInboundCustomerTextMessage(ctx, tx, channel, conversationaction.InboundCustomerTextMessageInput{
+			received, err := conversationaction.ReceiveInboundCustomerMessage(ctx, tx, channel, conversationaction.InboundCustomerMessageInput{
 				ExternalID: strconv.FormatInt(input.Message.SenderID, 10), DisplayName: &displayName,
 				ChannelMessage:     platformMessage,
 				SingleConversation: true, Body: input.Message.Body,

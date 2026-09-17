@@ -18,6 +18,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/realtime"
+	"github.com/runforyou-ai/cervi/internal/storage/server/messagequery"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/runforyou-ai/cervi/internal/storage/server/pgerr"
 	"github.com/uptrace/bun"
@@ -37,8 +38,8 @@ var websiteMessageRetryableConstraintNames = map[string]struct{}{
 	"messages_organization_idempotency_unique":                   {},
 }
 
-// ReceiveWebsiteCustomerTextMessageAction 持久化网站访客文本消息。
-type ReceiveWebsiteCustomerTextMessageAction struct {
+// ReceiveWebsiteCustomerMessageAction 持久化网站访客文本与附件消息。
+type ReceiveWebsiteCustomerMessageAction struct {
 	db             *bun.DB
 	agentScheduler CustomerAgentMessageScheduler
 }
@@ -71,24 +72,44 @@ type routeSnapshot struct {
 	assignedAt         *time.Time
 }
 
-// NewReceiveWebsiteCustomerTextMessageAction 创建网站访客文本消息操作。
-func NewReceiveWebsiteCustomerTextMessageAction(db *bun.DB, agentScheduler CustomerAgentMessageScheduler) *ReceiveWebsiteCustomerTextMessageAction {
-	return &ReceiveWebsiteCustomerTextMessageAction{db: db, agentScheduler: agentScheduler}
+// NewReceiveWebsiteCustomerMessageAction 创建网站访客消息操作。
+func NewReceiveWebsiteCustomerMessageAction(db *bun.DB, agentScheduler CustomerAgentMessageScheduler) *ReceiveWebsiteCustomerMessageAction {
+	return &ReceiveWebsiteCustomerMessageAction{db: db, agentScheduler: agentScheduler}
 }
 
 // Execute 在一个可重试事务中写入网站访客文本消息。
-func (a *ReceiveWebsiteCustomerTextMessageAction) Execute(ctx context.Context, input WebsiteCustomerTextMessageInput) (ReceiveWebsiteCustomerTextMessageResult, error) {
+func (a *ReceiveWebsiteCustomerMessageAction) Execute(ctx context.Context, input WebsiteCustomerTextMessageInput) (ReceiveWebsiteCustomerMessageResult, error) {
 	normalized, fields := normalizeWebsiteMessageInput(input)
 	if len(fields) > 0 {
-		return ReceiveWebsiteCustomerTextMessageResult{}, &ValidationError{Fields: fields}
+		return ReceiveWebsiteCustomerMessageResult{}, &ValidationError{Fields: fields}
 	}
+	return a.receive(ctx, normalized.ChannelID, InboundCustomerMessageInput{
+		ExternalID: normalized.ExternalID, RequestedConversationID: normalized.ConversationID,
+		Body: normalized.Body, ClientMessageID: &normalized.ClientMessageID, ReplyToMessageID: normalized.ReplyToMessageID,
+	})
+}
 
+// ExecuteAttachment 在一个可重试事务中写入网站访客附件消息并激活上传文件。
+func (a *ReceiveWebsiteCustomerMessageAction) ExecuteAttachment(ctx context.Context, input WebsiteCustomerAttachmentMessageInput) (ReceiveWebsiteCustomerMessageResult, error) {
+	normalized, fields := normalizeWebsiteAttachmentMessageInput(input)
+	if len(fields) > 0 {
+		return ReceiveWebsiteCustomerMessageResult{}, &ValidationError{Fields: fields}
+	}
+	return a.receive(ctx, normalized.ChannelID, InboundCustomerMessageInput{
+		ExternalID: normalized.ExternalID, RequestedConversationID: normalized.ConversationID,
+		Body: normalized.Body, ClientMessageID: &normalized.ClientMessageID, ReplyToMessageID: normalized.ReplyToMessageID,
+		Attachment: &InboundCustomerAttachment{FileID: normalized.FileID, ImageWidth: normalized.ImageWidth, ImageHeight: normalized.ImageHeight},
+	})
+}
+
+// receive 在可重试事务中写入访客入站消息。
+func (a *ReceiveWebsiteCustomerMessageAction) receive(ctx context.Context, channelID string, input InboundCustomerMessageInput) (ReceiveWebsiteCustomerMessageResult, error) {
 	var err error
 	for attempt := 0; attempt < maxWriteAttempts; attempt++ {
-		var result ReceiveWebsiteCustomerTextMessageResult
+		var result ReceiveWebsiteCustomerMessageResult
 		err = realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 			var executeErr error
-			result, executeErr = a.executeTransaction(ctx, tx, normalized)
+			result, executeErr = a.executeTransaction(ctx, tx, channelID, input)
 			return executeErr
 		})
 		if err == nil {
@@ -96,28 +117,25 @@ func (a *ReceiveWebsiteCustomerTextMessageAction) Execute(ctx context.Context, i
 		}
 		constraint, retryable := retryableUniqueViolation(err, websiteMessageRetryableConstraintNames)
 		if !retryable {
-			return ReceiveWebsiteCustomerTextMessageResult{}, err
+			return ReceiveWebsiteCustomerMessageResult{}, err
 		}
 		if attempt < maxWriteAttempts-1 {
-			slog.Info("网站访客消息写入重试", "channel_id", normalized.ChannelID, "attempt", attempt+2, "constraint", constraint)
+			slog.Info("网站访客消息写入重试", "channel_id", channelID, "attempt", attempt+2, "constraint", constraint)
 		}
 	}
-	slog.Warn("网站访客消息写入重试耗尽", "channel_id", normalized.ChannelID, "error", err)
-	return ReceiveWebsiteCustomerTextMessageResult{}, fmt.Errorf("receive website message retries exhausted: %w", err)
+	slog.Warn("网站访客消息写入重试耗尽", "channel_id", channelID, "error", err)
+	return ReceiveWebsiteCustomerMessageResult{}, fmt.Errorf("receive website message retries exhausted: %w", err)
 }
 
 // executeTransaction 执行一次完整的网站访客消息事务。
-func (a *ReceiveWebsiteCustomerTextMessageAction) executeTransaction(ctx context.Context, tx bun.Tx, input WebsiteCustomerTextMessageInput) (ReceiveWebsiteCustomerTextMessageResult, error) {
-	channel, err := loadWebsiteChannel(ctx, tx, input.ChannelID)
+func (a *ReceiveWebsiteCustomerMessageAction) executeTransaction(ctx context.Context, tx bun.Tx, channelID string, input InboundCustomerMessageInput) (ReceiveWebsiteCustomerMessageResult, error) {
+	channel, err := loadWebsiteChannel(ctx, tx, channelID)
 	if err != nil {
-		return ReceiveWebsiteCustomerTextMessageResult{}, err
+		return ReceiveWebsiteCustomerMessageResult{}, err
 	}
-	received, err := ReceiveInboundCustomerTextMessage(ctx, tx, channel, InboundCustomerTextMessageInput{
-		ExternalID: input.ExternalID, RequestedConversationID: input.ConversationID,
-		Body: input.Body, ClientMessageID: &input.ClientMessageID, ReplyToMessageID: input.ReplyToMessageID,
-	})
+	received, err := ReceiveInboundCustomerMessage(ctx, tx, channel, input)
 	if err != nil {
-		return ReceiveWebsiteCustomerTextMessageResult{}, err
+		return ReceiveWebsiteCustomerMessageResult{}, err
 	}
 	if !received.Inserted {
 		slog.Debug("网站访客消息幂等命中",
@@ -125,17 +143,17 @@ func (a *ReceiveWebsiteCustomerTextMessageAction) executeTransaction(ctx context
 			"conversation_id", received.Message.ConversationID,
 			"message_id", received.Message.ID,
 		)
-		return receiveWebsiteCustomerTextMessageResult(received), nil
+		return receiveWebsiteCustomerMessageResult(channel.OrganizationID, received), nil
 	}
 	if a.agentScheduler == nil {
-		return ReceiveWebsiteCustomerTextMessageResult{}, errors.New("customer agent scheduler is unavailable")
+		return ReceiveWebsiteCustomerMessageResult{}, errors.New("customer agent scheduler is unavailable")
 	}
 	if _, err := a.agentScheduler.ScheduleCustomerAuto(
 		ctx, tx, channel.OrganizationID, received.Message.ConversationID, received.Session.ID, received.Message.ID,
 	); err != nil {
-		return ReceiveWebsiteCustomerTextMessageResult{}, fmt.Errorf("schedule website customer agent: %w", err)
+		return ReceiveWebsiteCustomerMessageResult{}, fmt.Errorf("schedule website customer agent: %w", err)
 	}
-	return receiveWebsiteCustomerTextMessageResult(received), nil
+	return receiveWebsiteCustomerMessageResult(channel.OrganizationID, received), nil
 }
 
 // normalizeWebsiteMessageInput 规范化并校验网站消息输入。
@@ -167,6 +185,29 @@ func normalizeWebsiteMessageInput(input WebsiteCustomerTextMessageInput) (Websit
 		fields["body"] = ValidationBodyRequired
 	} else if utf8.RuneCountInString(input.Body) > 4000 {
 		fields["body"] = ValidationBodyTooLong
+	}
+	return input, fields
+}
+
+// normalizeWebsiteAttachmentMessageInput 规范化并校验网站访客附件消息输入。
+func normalizeWebsiteAttachmentMessageInput(input WebsiteCustomerAttachmentMessageInput) (WebsiteCustomerAttachmentMessageInput, map[string]ValidationCode) {
+	text, fields := normalizeWebsiteMessageInput(WebsiteCustomerTextMessageInput{
+		ChannelID: input.ChannelID, ExternalID: input.ExternalID, ConversationID: input.ConversationID,
+		ClientMessageID: input.ClientMessageID, Body: input.Body, ReplyToMessageID: input.ReplyToMessageID,
+	})
+	input.ChannelID, input.ExternalID, input.ConversationID = text.ChannelID, text.ExternalID, text.ConversationID
+	input.ClientMessageID, input.Body, input.ReplyToMessageID = text.ClientMessageID, text.Body, text.ReplyToMessageID
+	// 附件消息的说明可以为空，长度仍按渠道说明上限校验。
+	if fields["body"] == ValidationBodyRequired {
+		delete(fields, "body")
+	}
+	if utf8.RuneCountInString(input.Body) > domain.ChannelCaptionLimit(domain.ChannelTypeWebsite) {
+		fields["body"] = ValidationBodyTooLong
+	}
+	var valid bool
+	input.FileID, valid = common.NormalizeUUID(input.FileID)
+	if !valid || input.ImageWidth < 0 || input.ImageHeight < 0 {
+		fields["fileId"] = ValidationFileIDInvalid
 	}
 	return input, fields
 }
@@ -416,8 +457,8 @@ func availableRoute(ctx context.Context, db bun.IDB, organizationID string, chan
 	}
 }
 
-// receiveWebsiteCustomerTextMessageResult 转换网站访客消息写入结果。
-func receiveWebsiteCustomerTextMessageResult(received InboundCustomerTextMessageResult) ReceiveWebsiteCustomerTextMessageResult {
+// receiveWebsiteCustomerMessageResult 转换网站访客消息写入结果。
+func receiveWebsiteCustomerMessageResult(organizationID string, received InboundCustomerMessageResult) ReceiveWebsiteCustomerMessageResult {
 	var replyTo *MessageReference
 	if reference := received.ReplyTo; reference != nil {
 		replyTo = &MessageReference{ID: reference.ID, Deleted: reference.Deleted}
@@ -430,13 +471,15 @@ func receiveWebsiteCustomerTextMessageResult(received InboundCustomerTextMessage
 			replyTo.SenderIdentityType = reference.Sender.IdentityType
 		}
 	}
-	return ReceiveWebsiteCustomerTextMessageResult{
+	return ReceiveWebsiteCustomerMessageResult{
+		OrganizationID:          organizationID,
 		Conversation:            received.Summary,
 		CreatedConversation:     received.CreatedConversation,
 		OpenedNewServiceSession: received.OpenedServiceSession,
 		Message: Message{
 			ClientMessageID: received.Message.ClientMessageID,
 			ReplyTo:         replyTo,
+			Attachment:      received.Attachment,
 			ID:              received.Message.ID, Author: domain.MessageAuthorVisitor,
 			MessageSeq: received.Message.MessageSeq, Body: received.Message.Body, OriginatedAt: received.Message.OriginatedAt,
 			CreatedAt: received.Message.CreatedAt,
@@ -453,15 +496,15 @@ func loadConversationSummary(ctx context.Context, db bun.IDB, organizationID, co
 		ColumnExpr("cv.title AS title").
 		ColumnExpr("msg.originated_at AS last_message_at").
 		ColumnExpr("msg.message_seq AS last_message_seq").
-		ColumnExpr("msg.body AS preview").
+		ColumnExpr("? AS preview", messagequery.Summary("msg")).
 		ColumnExpr("preview_oi.type AS preview_sender_identity_type").
 		ColumnExpr("current.id AS service_session_id").
 		ColumnExpr("current.status AS service_session_status").
 		Join(`JOIN LATERAL (
  SELECT visible.* FROM messages AS visible
- WHERE visible.organization_id = cv.organization_id AND visible.conversation_id = cv.id AND visible.type = ? AND visible.visibility = ? AND visible.deleted_at IS NULL
+ WHERE visible.organization_id = cv.organization_id AND visible.conversation_id = cv.id AND visible.type IN (?, ?) AND visible.visibility = ? AND visible.deleted_at IS NULL
  ORDER BY visible.message_seq DESC LIMIT 1
- ) AS msg ON TRUE`, domain.MessageTypeText, domain.MessageVisibilityCustomerVisible).
+ ) AS msg ON TRUE`, domain.MessageTypeText, domain.MessageTypeAttachment, domain.MessageVisibilityCustomerVisible).
 		Join("LEFT JOIN conversation_participants AS preview_cp ON preview_cp.id = msg.sender_participant_id AND preview_cp.organization_id = msg.organization_id AND preview_cp.conversation_id = msg.conversation_id").
 		Join("LEFT JOIN chat_subjects AS preview_cs ON preview_cs.id = preview_cp.subject_id AND preview_cs.organization_id = preview_cp.organization_id").
 		Join("LEFT JOIN organization_identities AS preview_oi ON preview_oi.id = preview_cs.source_id AND preview_oi.organization_id = preview_cs.organization_id AND preview_cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
