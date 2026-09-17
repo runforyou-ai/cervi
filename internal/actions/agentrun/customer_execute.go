@@ -183,6 +183,7 @@ func loadServiceSessionMessages(ctx context.Context, db bun.IDB, organizationID,
 		Where("msg.conversation_id = ?", conversationID).
 		Apply(withContextAttachments).
 		Where("msg.service_session_id = ?", serviceSessionID).
+		Where("msg.visibility = ?", domain.MessageVisibilityCustomerVisible).
 		Where("msg.deleted_at IS NULL").
 		Where("cs.kind IN (?, ?)", domain.ChatSubjectKindContact, domain.ChatSubjectKindOrganizationIdentity).
 		Where("msg.message_seq <= ?", throughSeq).

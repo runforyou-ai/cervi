@@ -44,6 +44,7 @@ export {
     Locale,
     MCPServerType,
     MessageType,
+    MessageVisibility,
     NotificationPermissionStatus,
     OrganizationIdentityType,
     PermissionCode,

@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next"
 import {
   ChannelType,
   ConversationType,
+  MessageVisibility,
   isCustomerInboxConversation,
   isAgentInboxConversation,
   isDirectInboxConversation,
@@ -43,6 +44,7 @@ export function ConversationThread({
   directTarget,
   groupParticipants,
   replyDisabledReason,
+  noteDisabledReason,
   onConversationChanged,
   onChatStarted,
   locateMessage,
@@ -58,6 +60,7 @@ export function ConversationThread({
   groupParticipants: GroupParticipant[] | undefined
   agentDraftID: string
   replyDisabledReason: string | null
+  noteDisabledReason: string | null
   onConversationChanged: () => void
   onChatStarted: (
     conversation: DirectInboxConversationData | AgentInboxConversationData,
@@ -98,9 +101,24 @@ export function ConversationThread({
       aliveRef.current = false
     }
   }, [])
-  const [replyTo, setReplyTo] = useState<ConversationMessageReference | null>(
-    null,
+  const [visibility, setVisibility] = useState<MessageVisibility>(
+    MessageVisibility.MessageVisibilityCustomerVisible,
   )
+  // 对客回复与内部备注各自保留引用目标。
+  const [replyTargets, setReplyTargets] = useState<
+    Partial<Record<MessageVisibility, ConversationMessageReference | null>>
+  >({})
+  const replyTo = replyTargets[visibility] ?? null
+
+  /** 保存当前模式的引用目标，引用内部备注时切到内部备注模式。 */
+  function selectReplyTarget(message: ConversationMessageReference | null) {
+    const target =
+      message?.visibility === MessageVisibility.MessageVisibilityInternalOnly
+        ? MessageVisibility.MessageVisibilityInternalOnly
+        : visibility
+    setVisibility(target)
+    setReplyTargets((current) => ({ ...current, [target]: message }))
+  }
   const [retryDraft, setRetryDraft] =
     useState<OutgoingConversationDraft | null>(null)
   const replySupported =
@@ -116,6 +134,8 @@ export function ConversationThread({
   )
   const groupConversation =
     conversation && isGroupInboxConversation(conversation) ? conversation : null
+  const customerConversation =
+    conversation && isCustomerInboxConversation(conversation) ? conversation : null
 
   return (
     <>
@@ -126,14 +146,20 @@ export function ConversationThread({
         conversationType={conversationType}
         currentUser={identity.user}
         outgoingMessages={outgoing.messages}
-        onRetryFailedMessage={setRetryDraft}
+        onRetryFailedMessage={(draft) => {
+          setVisibility(draft.visibility)
+          setReplyTargets((current) => ({ ...current, [draft.visibility]: draft.replyTo }))
+          setRetryDraft(draft)
+        }}
         retryFailedMessageDisabled={!replySupported || Boolean(replyDisabledReason)}
+        noteRetryDisabled={Boolean(noteDisabledReason)}
         groupParticipants={groupParticipants}
         onReplyMessage={
-          conversation && replySupported && !replyDisabledReason
-            ? setReplyTo
+          conversation && ((replySupported && !replyDisabledReason) || !noteDisabledReason)
+            ? selectReplyTarget
             : undefined
         }
+        noteReplyEnabled={Boolean(customerConversation) && !noteDisabledReason}
         onReadMessage={conversation ? markRead : undefined}
         readThroughMessageID={conversation?.lastReadMessageId}
         enabled={Boolean(conversation)}
@@ -154,7 +180,12 @@ export function ConversationThread({
         groupParticipants={groupParticipants}
         currentIdentityID={identity.user.identityId}
         onRetryDraftHandled={() => setRetryDraft(null)}
-        onReplyToChange={setReplyTo}
+        onReplyToChange={(message) =>
+          setReplyTargets((current) => ({ ...current, [visibility]: message }))
+        }
+        visibility={visibility}
+        onVisibilityChange={customerConversation ? setVisibility : undefined}
+        noteDisabledReason={noteDisabledReason}
         onSending={outgoing.start}
         onSent={outgoing.succeed}
         onFailed={(clientMessageID) => {

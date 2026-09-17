@@ -459,9 +459,9 @@ func loadConversationSummary(ctx context.Context, db bun.IDB, organizationID, co
 		ColumnExpr("current.status AS service_session_status").
 		Join(`JOIN LATERAL (
  SELECT visible.* FROM messages AS visible
- WHERE visible.organization_id = cv.organization_id AND visible.conversation_id = cv.id AND visible.type = ? AND visible.deleted_at IS NULL
+ WHERE visible.organization_id = cv.organization_id AND visible.conversation_id = cv.id AND visible.type = ? AND visible.visibility = ? AND visible.deleted_at IS NULL
  ORDER BY visible.message_seq DESC LIMIT 1
- ) AS msg ON TRUE`, domain.MessageTypeText).
+ ) AS msg ON TRUE`, domain.MessageTypeText, domain.MessageVisibilityCustomerVisible).
 		Join("LEFT JOIN conversation_participants AS preview_cp ON preview_cp.id = msg.sender_participant_id AND preview_cp.organization_id = msg.organization_id AND preview_cp.conversation_id = msg.conversation_id").
 		Join("LEFT JOIN chat_subjects AS preview_cs ON preview_cs.id = preview_cp.subject_id AND preview_cs.organization_id = preview_cp.organization_id").
 		Join("LEFT JOIN organization_identities AS preview_oi ON preview_oi.id = preview_cs.source_id AND preview_oi.organization_id = preview_cs.organization_id AND preview_cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).

@@ -460,6 +460,7 @@
   "field.message_body_required": "Enter a message.",
   "field.message_body_too_long": "Messages can contain up to 4,000 characters.",
   "field.message_cursor_invalid": "The message position is invalid. Reopen the conversation.",
+  "field.message_visibility_invalid": "The message visibility is invalid.",
   "error.agent_run_process_read_failed": "Could not load the run process. Try again.",
   "error.agent_run_process_unavailable": "The run process is no longer available",
   "error.conversation_message_unavailable": "The original message is no longer available",

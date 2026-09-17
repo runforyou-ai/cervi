@@ -11,6 +11,7 @@ import {
   ConversationSystemEventType,
   ConversationType,
   MessageType,
+  MessageVisibility,
   OrganizationIdentityType,
   ServiceSessionStatus,
   isApiError,
@@ -69,6 +70,7 @@ type TimelineMessage = Pick<
   ConversationMessageData,
   | "id"
   | "type"
+  | "visibility"
   | "body"
   | "attachment"
   | "originatedAt"
@@ -135,6 +137,7 @@ function mergeTimelineMessages(
       id: `local:${message.clientMessageID}`,
       persistedMessageID: message.saved?.id ?? null,
       type: message.saved?.type ?? (message.attachment ? MessageType.MessageTypeAttachment : MessageType.MessageTypeText),
+      visibility: message.saved?.visibility ?? message.visibility,
       attachment: message.saved?.attachment ?? message.attachment ?? null,
       body: message.body,
       originatedAt: message.originatedAt,
@@ -257,7 +260,9 @@ function ConversationTimelineContent({
   outgoingMessages,
   onRetryFailedMessage,
   retryFailedMessageDisabled = false,
+  noteRetryDisabled = false,
   onReplyMessage,
+  noteReplyEnabled = false,
   groupParticipants,
   onReadMessage,
   readThroughMessageID,
@@ -277,7 +282,9 @@ function ConversationTimelineContent({
   outgoingMessages: OutgoingConversationMessage[]
   onRetryFailedMessage?: (message: OutgoingConversationDraft) => void
   retryFailedMessageDisabled?: boolean
+  noteRetryDisabled?: boolean
   onReplyMessage?: (message: ConversationMessageReference) => void
+  noteReplyEnabled?: boolean
   groupParticipants?: GroupParticipant[]
   onReadMessage?: (messageID: string) => void
   readThroughMessageID?: string | null
@@ -638,6 +645,7 @@ function ConversationTimelineContent({
       !previous ||
       !next ||
       next.sessionStart ||
+      previous.visibility !== next.visibility ||
       previous.type === MessageType.MessageTypeSystem ||
       previous.type === MessageType.MessageTypeAgentError ||
       previous.type === MessageType.MessageTypeAgentCancelled ||
@@ -778,6 +786,7 @@ function ConversationTimelineContent({
                 message.deliveryStatus === "failed" && message.clientMessageID
                   ? {
                       clientMessageID: message.clientMessageID,
+                      visibility: message.visibility,
                       body: message.body,
                       originatedAt: message.originatedAt,
                       replyTo: message.replyTo,
@@ -788,11 +797,17 @@ function ConversationTimelineContent({
                   : null
               // 回复与复制使用同一份消息摘要。
               const referenceBody = message.body || message.attachment?.name || ""
-              // 文字气泡与附件气泡共用同一套方向配色和组尾圆角。
+              const internalNote =
+                message.visibility === MessageVisibility.MessageVisibilityInternalOnly
+              // 重试资格按消息自身的可见范围判断。
+              const messageRetryDisabled = internalNote ? noteRetryDisabled : textRetryDisabled
+              // 文字气泡与附件气泡共用同一套方向配色和组尾圆角，内部备注使用区别于对客消息的常驻样式。
               const bubbleClassName = cn(
-                incoming || agentNotice
-                  ? "border bg-[#EEEEF0] text-foreground shadow-xs dark:bg-muted"
-                  : "bg-primary text-primary-foreground",
+                internalNote
+                  ? "border border-dashed border-amber-500/70 bg-amber-50 text-foreground dark:bg-amber-950/40"
+                  : incoming || agentNotice
+                    ? "border bg-[#EEEEF0] text-foreground shadow-xs dark:bg-muted"
+                    : "bg-primary text-primary-foreground",
                 endsGroup && (incoming ? "rounded-bl-sm" : "rounded-br-sm"),
               )
               const systemEvent = message.systemEvent
@@ -878,6 +893,11 @@ function ConversationTimelineContent({
                               {senderName}
                             </span>
                           ) : null}
+                          {internalNote && startsGroup ? (
+                            <span className="max-w-full truncate text-xs font-medium text-amber-700 dark:text-amber-400">
+                              {t("internalNoteSender", { name: senderName })}
+                            </span>
+                          ) : null}
                           <div className="relative min-w-0 max-w-full">
                             {endsGroup ? (
                               <ProfileAvatar
@@ -909,6 +929,7 @@ function ConversationTimelineContent({
                                       onReplyMessage({
                                         id: message.id,
                                         type: message.type,
+                                        visibility: message.visibility,
                                         body: referenceBody,
                                         sender: message.sender,
                                         deleted: false,
@@ -935,7 +956,7 @@ function ConversationTimelineContent({
                                       }
                                       className={cn(
                                         "mb-1.5 block w-full border-l-2 pl-2 text-left text-xs focus-visible:outline focus-visible:outline-2",
-                                        incoming
+                                        incoming || internalNote
                                           ? "border-primary text-muted-foreground"
                                           : "border-primary-foreground/60 text-primary-foreground/75",
                                       )}
@@ -986,7 +1007,7 @@ function ConversationTimelineContent({
                                     {!message.attachment ? <div
                                       className={cn(
                                         "inline-flex shrink-0 translate-y-0.5 items-center gap-1 whitespace-nowrap text-[10px]",
-                                        incoming || agentNotice
+                                        incoming || agentNotice || internalNote
                                           ? "text-muted-foreground"
                                           : "text-primary-foreground/75",
                                       )}
@@ -997,7 +1018,7 @@ function ConversationTimelineContent({
                                       >
                                         {dateFormatters.clock.format(date)}
                                       </time>
-                                      {customerDeliveries && !agentNotice && (message.local || message.sender?.kind === ChatSubjectKind.ChatSubjectKindOrganizationIdentity) ? (
+                                      {customerDeliveries && !agentNotice && !internalNote && (message.local || message.sender?.kind === ChatSubjectKind.ChatSubjectKindOrganizationIdentity) ? (
                                         <CustomerDeliveryState
                                           conversationID={conversationID}
                                           delivery={message.persistedMessageID ? deliveriesByMessage.get(message.persistedMessageID) : undefined}
@@ -1005,7 +1026,7 @@ function ConversationTimelineContent({
                                           onRefresh={() => void deliveries.refresh()}
                                           localFailed={message.deliveryStatus === "failed"}
                                           onRetryLocal={failedDraft && onRetryFailedMessage ? () => onRetryFailedMessage(failedDraft) : undefined}
-                                          retryLocalDisabled={textRetryDisabled}
+                                          retryLocalDisabled={messageRetryDisabled}
                                         />
                                       ) : message.deliveryStatus ? (
                                         <div className="inline-flex items-center gap-1.5 text-[11px]">
@@ -1017,7 +1038,7 @@ function ConversationTimelineContent({
                                             <button
                                               type="button"
                                               className="underline-offset-2 hover:underline disabled:cursor-not-allowed disabled:opacity-50 disabled:no-underline"
-                                              disabled={textRetryDisabled}
+                                              disabled={messageRetryDisabled}
                                               onClick={() => onRetryFailedMessage(failedDraft)}
                                             >
                                               {t("messageRetry")}
@@ -1037,11 +1058,12 @@ function ConversationTimelineContent({
                         {!message.local && !agentNotice && onReplyMessage ? (
                           <ContextMenuItem
                             className={menuItemClassName}
-                            disabled={!message.canReply}
+                            disabled={!message.canReply || (internalNote && !noteReplyEnabled)}
                             onSelect={() =>
                               onReplyMessage({
                                 id: message.id,
                                 type: message.type,
+                                visibility: message.visibility,
                                 body: referenceBody,
                                 sender: message.sender,
                                 deleted: false,

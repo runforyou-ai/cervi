@@ -753,6 +753,7 @@ export interface ConversationMessage {
     "messageSeq": string;
     "id": string;
     "type": MessageType;
+    "visibility": MessageVisibility;
     "body": string;
     "originatedAt": string;
     "sourceOrder": number;
@@ -805,6 +806,7 @@ export interface ConversationMessageReference {
      */
     "externalSenderName"?: string;
     "type": MessageType;
+    "visibility": MessageVisibility;
     "deleted": boolean;
     "id": string;
     "body": string;
@@ -1244,6 +1246,11 @@ export interface CustomerTextMessageInput {
     "replyToMessageId": string;
     "clientMessageId": string;
     "body": string;
+
+    /**
+     * Visibility 为空时按对客消息处理。
+     */
+    "visibility": MessageVisibility;
 }
 
 /**
@@ -2419,6 +2426,19 @@ export enum MessageType {
     MessageTypeAgentError = "agent_error",
     MessageTypeAgentCancelled = "agent_cancelled",
     MessageTypeAttachment = "attachment",
+};
+
+/**
+ * MessageVisibility 表示消息在客户会话中的可见范围。
+ */
+export enum MessageVisibility {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    MessageVisibilityCustomerVisible = "customer_visible",
+    MessageVisibilityInternalOnly = "internal_only",
 };
 
 /**

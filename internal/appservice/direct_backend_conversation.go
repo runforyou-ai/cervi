@@ -98,6 +98,7 @@ func newConversationOps(db *bun.DB, agentScheduler conversationaction.AgentMessa
 func (o *directOperations) SendCustomerTextMessage(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, input CustomerTextMessageInput) (ConversationMessage, error) {
 	message, err := o.sendCustomerTextMessage.Execute(ctx, identity, conversationaction.CustomerTextMessageInput{
 		ConversationID: conversationID, ClientMessageID: input.ClientMessageID, Body: input.Body, ReplyToMessageID: input.ReplyToMessageID,
+		Visibility: domain.MessageVisibility(input.Visibility),
 	})
 	if err != nil {
 		return ConversationMessage{}, customerTextMessageError(ctx, meta, err, identity.Organization.ID, conversationID)
@@ -106,6 +107,7 @@ func (o *directOperations) SendCustomerTextMessage(ctx context.Context, meta Req
 		"organization_id", identity.Organization.ID,
 		"conversation_id", conversationID,
 		"message_id", message.ID,
+		"visibility", message.Visibility,
 		"sender_identity_id", identity.OrganizationIdentity.ID,
 	)
 	return o.conversationMessageWithAvatar(ctx, identity, message), nil
@@ -554,7 +556,7 @@ func conversationMessageFromAction(message conversationaction.ConversationMessag
 	var replyTo *ConversationMessageReference
 	if message.ReplyTo != nil {
 		replyTo = &ConversationMessageReference{
-			ExternalSenderName: message.ReplyTo.ExternalSenderName, ID: message.ReplyTo.ID, Type: MessageType(message.ReplyTo.Type), Body: message.ReplyTo.Body, Deleted: message.ReplyTo.Deleted,
+			ExternalSenderName: message.ReplyTo.ExternalSenderName, ID: message.ReplyTo.ID, Type: MessageType(message.ReplyTo.Type), Visibility: MessageVisibility(message.ReplyTo.Visibility), Body: message.ReplyTo.Body, Deleted: message.ReplyTo.Deleted,
 			Sender: conversationMessageSenderFromAction(message.ReplyTo.Sender, avatarURLs),
 		}
 	}
@@ -574,7 +576,7 @@ func conversationMessageFromAction(message conversationaction.ConversationMessag
 		ClientMessageID: message.ClientMessageID,
 		Attachment:      attachment,
 		AgentProcess:    conversationAgentProcessFromAction(message.AgentProcess),
-		ID:              message.ID, Type: MessageType(message.Type), Body: message.Body,
+		ID:              message.ID, Type: MessageType(message.Type), Visibility: MessageVisibility(message.Visibility), Body: message.Body,
 		OriginatedAt: message.OriginatedAt, SourceOrder: message.SourceOrder, CreatedAt: message.CreatedAt, MessageSeq: strconv.FormatInt(message.MessageSeq, 10),
 		Sender: sender, SessionStart: sessionStart, SystemEvent: systemEvent,
 		ReplyTo: replyTo, Mentions: mentions, MentionAll: message.MentionAll,
@@ -774,6 +776,7 @@ var conversationMessageValidationKeys = map[conversationaction.ValidationCode]ce
 	conversationaction.ValidationBodyRequired:             cervii18n.FieldMessageBodyRequired,
 	conversationaction.ValidationBodyTooLong:              cervii18n.FieldMessageBodyTooLong,
 	conversationaction.ValidationCursorInvalid:            cervii18n.FieldMessageCursorInvalid,
+	conversationaction.ValidationMessageVisibilityInvalid: cervii18n.FieldMessageVisibilityInvalid,
 	conversationaction.ValidationTargetIdentityIDInvalid:  cervii18n.FieldTargetIdentityIDInvalid,
 	conversationaction.ValidationGroupTitleRequired:       cervii18n.FieldGroupTitleRequired,
 	conversationaction.ValidationGroupTitleTooLong:        cervii18n.FieldGroupTitleTooLong,
