@@ -28,7 +28,6 @@ import (
 const (
 	agentRunTimeout       = 5 * time.Minute
 	agentHistoryLimit     = 100
-	agentMaxOutputTokens  = 4096
 	agentRunErrorMaxRunes = 4000
 )
 
@@ -86,10 +85,6 @@ func (a *ExecuteAction) Execute(ctx context.Context, input RunInput) error {
 		slog.Warn("Agent 任务重新计算", "agent_run_id", execution.Run.ID, "task_run_id", taskExecution.TaskRunID,
 			"attempt", running.attempt, "stream_id", running.streamID)
 	}
-	maxOutputTokens := agentMaxOutputTokens
-	if execution.MaxOutputTokens > 0 && execution.MaxOutputTokens < int64(maxOutputTokens) {
-		maxOutputTokens = int(execution.MaxOutputTokens)
-	}
 	policy, err := a.policyForRun(ctx, &execution.Run)
 	if err != nil {
 		return task.Permanent(err)
@@ -122,7 +117,7 @@ func (a *ExecuteAction) Execute(ctx context.Context, input RunInput) error {
 		RunID: execution.Run.ID, Name: execution.AgentName, Instruction: instruction,
 		Model: agentruntime.ModelConfig{
 			Brand: execution.Brand, APIKey: execution.APIKey, BaseURL: execution.APIURL,
-			Identifier: execution.ModelIdentifier, MaxOutputTokens: maxOutputTokens, ContextWindow: int(execution.ContextWindow),
+			Identifier: execution.ModelIdentifier, MaxOutputTokens: int(execution.MaxOutputTokens), ContextWindow: int(execution.ContextWindow),
 			InputModalities: execution.InputModalities,
 		},
 		KnowledgeSearch:       knowledgeSearch,

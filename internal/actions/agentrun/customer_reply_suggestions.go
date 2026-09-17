@@ -108,10 +108,6 @@ func (a *GenerateCustomerReplySuggestionsAction) Execute(ctx context.Context, id
 	if err != nil {
 		return nil, err
 	}
-	maxOutputTokens := agentMaxOutputTokens
-	if prepared.agent.MaxOutputTokens > 0 && prepared.agent.MaxOutputTokens < int64(maxOutputTokens) {
-		maxOutputTokens = int(prepared.agent.MaxOutputTokens)
-	}
 	generateCtx, cancel := context.WithTimeout(ctx, customerReplySuggestionTimeout)
 	defer cancel()
 	startedAt := time.Now()
@@ -119,7 +115,7 @@ func (a *GenerateCustomerReplySuggestionsAction) Execute(ctx context.Context, id
 		Instruction: customerReplyInstruction(prepared.agent.Instruction),
 		Model: agentruntime.ModelConfig{
 			Brand: prepared.agent.Brand, APIKey: prepared.agent.APIKey, BaseURL: prepared.agent.APIURL,
-			Identifier: prepared.agent.ModelIdentifier, MaxOutputTokens: maxOutputTokens, ContextWindow: int(prepared.agent.ContextWindow),
+			Identifier: prepared.agent.ModelIdentifier, MaxOutputTokens: int(prepared.agent.MaxOutputTokens), ContextWindow: int(prepared.agent.ContextWindow),
 		},
 		History: prepared.history,
 		Task:    customerReplyTask(input, prepared.replyTo),

@@ -81,7 +81,7 @@ func (c runtimeConfig) filterSubject(pool string) string {
 
 // taskSubject 生成指定逻辑队列的发布 Subject。
 func (c runtimeConfig) taskSubject(queue string) string {
-	// 返回逻辑队列所属的 Worker Pool。
+	// 按逻辑队列选择 Worker Pool。
 	pool := workerPoolStandard
 	if queue == QueueKnowledge {
 		pool = workerPoolKnowledge

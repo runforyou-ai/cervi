@@ -405,23 +405,16 @@ func taskFinalizationContext(ctx context.Context) (context.Context, context.Canc
 // handleUnclaimedMessage 根据数据库状态处理重复或暂不可执行的消息。
 func (r *Runtime) handleUnclaimedMessage(ctx context.Context, runID string, message jetstream.Msg) {
 	// 读取任务当前状态。
-	var record servermodels.TaskRun
-	err := r.repository.db.NewSelect().Model(&record).Where("tr.id = ?", runID).Scan(ctx)
-	var run *servermodels.TaskRun
-	if err == nil {
-		run = &record
-	} else if errors.Is(err, sql.ErrNoRows) {
-		err = nil
-	} else {
-		err = fmt.Errorf("get task run: %w", err)
-	}
-	if err != nil {
-		_ = message.NakWithDelay(taskNakRetryDelay)
-		return
-	}
-	if run == nil {
+	var run servermodels.TaskRun
+	err := r.repository.db.NewSelect().Model(&run).Where("tr.id = ?", runID).Scan(ctx)
+	if errors.Is(err, sql.ErrNoRows) {
 		slog.Warn("丢弃不存在的任务消息", "run_id", runID)
 		_ = message.TermWithReason("task run does not exist")
+		return
+	}
+	if err != nil {
+		slog.Warn("读取任务状态失败，等待重投", "run_id", runID, "error", err)
+		_ = message.NakWithDelay(taskNakRetryDelay)
 		return
 	}
 	if run.Status == statusRunning && run.Attempt >= run.MaxAttempts && run.LeaseExpiresAt != nil && !run.LeaseExpiresAt.After(time.Now()) {
@@ -430,7 +423,7 @@ func (r *Runtime) handleUnclaimedMessage(ctx context.Context, runID string, mess
 		finalize, exists := r.registry.lookupTerminalFailure(run.ActionName)
 		var finalizeErr error
 		if exists {
-			finalizeErr = finalize(withExecution(finalizeCtx, run, true, true), run.Payload, exhaustedErr)
+			finalizeErr = finalize(withExecution(finalizeCtx, &run, true, true), run.Payload, exhaustedErr)
 		}
 		cancelFinalize()
 		if finalizeErr != nil {
@@ -439,6 +432,7 @@ func (r *Runtime) handleUnclaimedMessage(ctx context.Context, runID string, mess
 			return
 		}
 		if exhausted, failErr := r.repository.failExhaustedRun(ctx, runID); failErr != nil {
+			slog.Warn("终结耗尽任务失败，等待重投", "run_id", runID, "action", run.ActionName, "error", failErr)
 			_ = message.NakWithDelay(taskNakRetryDelay)
 			return
 		} else if exhausted {
