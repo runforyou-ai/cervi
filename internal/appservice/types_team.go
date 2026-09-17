@@ -45,10 +45,12 @@ type TeamMemberListInput struct {
 	PageSize   int         `json:"pageSize" query:"pageSize,default=50"`
 }
 
-// TeamMember 定义团队成员信息。
+// TeamMember 定义团队成员信息。UserID 与 AgentID 按身份类型二选一，另一个为空字符串。
 type TeamMember struct {
 	IdentityID   string                   `json:"identityId"`
 	IdentityType OrganizationIdentityType `json:"identityType"`
+	UserID       string                   `json:"userId"`
+	AgentID      string                   `json:"agentId"`
 	DisplayName  string                   `json:"displayName"`
 	WorkStatus   WorkStatus               `json:"workStatus"`
 	JoinedAt     time.Time                `json:"joinedAt"`

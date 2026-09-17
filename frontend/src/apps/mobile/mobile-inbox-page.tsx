@@ -277,13 +277,21 @@ function MobileInboxList({ query, changeQuery }: ReturnType<typeof useMobileInbo
                 <Button
                   variant="ghost"
                   size="icon-lg"
-                  className="shrink-0 rounded-full bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
+                  className="shrink-0"
                   aria-label={t("inbox.add")}
                 >
                   <PlusIcon />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end">
+                <DropdownMenuItem
+                  className="min-h-11"
+                  onSelect={() => navigate("/inbox/agent/new", {
+                    state: { mobileBack: true },
+                  })}
+                >
+                  {t("inbox:newAgentConversation")}
+                </DropdownMenuItem>
                 <DropdownMenuItem
                   className="min-h-11"
                   onSelect={() => navigate("/inbox/group/new", {

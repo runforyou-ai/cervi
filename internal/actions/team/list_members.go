@@ -22,10 +22,12 @@ type MemberListInput struct {
 	PageSize   int
 }
 
-// Member 定义团队成员信息。
+// Member 定义团队成员信息。UserID 与 AgentID 按身份类型二选一，另一个为空。
 type Member struct {
 	IdentityID   string                          `bun:"identity_id"`
 	IdentityType domain.OrganizationIdentityType `bun:"identity_type"`
+	UserID       *string                         `bun:"user_id"`
+	AgentID      *string                         `bun:"agent_id"`
 	DisplayName  string                          `bun:"display_name"`
 	WorkStatus   domain.WorkStatus               `bun:"work_status"`
 	JoinedAt     time.Time                       `bun:"joined_at"`
@@ -86,7 +88,7 @@ func (q *ListMembersQuery) Execute(ctx context.Context, identity *servermodels.I
 	}
 	members := make([]Member, 0)
 	if err := applyFilters(base()).
-		ColumnExpr("oi.id::text AS identity_id, oi.type AS identity_type, oi.display_name, oi.work_status, tm.created_at AS joined_at").
+		ColumnExpr("oi.id::text AS identity_id, oi.type AS identity_type, u.id::text AS user_id, a.id::text AS agent_id, oi.display_name, oi.work_status, tm.created_at AS joined_at").
 		OrderExpr("lower(oi.display_name) ASC, oi.id ASC").
 		Limit(input.PageSize).
 		Offset((input.Page-1)*input.PageSize).
