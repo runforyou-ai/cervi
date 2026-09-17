@@ -16,6 +16,7 @@ type AIProvider struct {
 	OrganizationID string    `bun:"organization_id"`
 	Brand          string    `bun:"brand"`
 	Name           string    `bun:"name"`
+	CredentialType string    `bun:"credential_type"`
 	APIKey         string    `bun:"api_key"`
 	APIURL         string    `bun:"api_url"`
 	CreatedAt      time.Time `bun:"created_at"`

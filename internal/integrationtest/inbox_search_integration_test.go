@@ -94,10 +94,11 @@ func TestInboxSearch(t *testing.T) {
 
 	provider := &servermodels.AIProvider{
 		OrganizationID: f.owner.Organization.ID, Brand: string(domain.AIProviderBrandOpenAI),
-		Name: "检索测试模型服务", APIKey: "test-key", APIURL: "https://example.com/v1",
+		Name: "检索测试模型服务", CredentialType: string(domain.AIProviderCredentialTypeAPIKey),
+		APIKey: "test-key", APIURL: "https://example.com/v1",
 	}
 	if _, err := f.db.NewInsert().Model(provider).
-		Column("organization_id", "brand", "name", "api_key", "api_url").Returning("id").Exec(ctx); err != nil {
+		Column("organization_id", "brand", "name", "credential_type", "api_key", "api_url").Returning("id").Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
 	model := &servermodels.AIProviderModel{

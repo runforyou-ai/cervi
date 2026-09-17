@@ -2,6 +2,7 @@
 import {
   CreateAIProvider,
   DeleteAIProvider,
+  DiscoverAIProviderModels,
   GetAIProvider,
   ListAIProviders,
   ListAvailableAIModels,
@@ -12,7 +13,9 @@ import {
   AIModelInputModality,
   AIModelType,
   AIProviderBrand,
+  AIProviderCredentialType,
   type AIProvider,
+  type AIProviderConnectionInput,
   type AIProviderInput,
   type AIProviderList,
   type AIProviderModel,
@@ -23,6 +26,11 @@ import { bind } from "@/api/client"
 import type { NonNullArrays } from "@/api/normalize"
 
 export type AIProviderBrandId = Exclude<AIProviderBrand, AIProviderBrand.$zero>
+
+export type AIProviderCredentialTypeId = Exclude<
+  AIProviderCredentialType,
+  AIProviderCredentialType.$zero
+>
 
 export type AIModelTypeId = Exclude<AIModelType, AIModelType.$zero>
 
@@ -41,9 +49,10 @@ export type AIProviderModelData = Omit<
 
 export type AIProviderData = Omit<
   NonNullArrays<AIProvider>,
-  "brand" | "models"
+  "brand" | "credentialType" | "models"
 > & {
   brand: AIProviderBrandId
+  credentialType: AIProviderCredentialTypeId
   models: AIProviderModelData[]
 }
 
@@ -72,6 +81,7 @@ export type AIProviderListData = Omit<
 const listAIProvidersBound = bind(ListAIProviders)
 const getAIProviderBound = bind(GetAIProvider)
 const listAvailableAIModelsBound = bind(ListAvailableAIModels)
+const discoverAIProviderModelsBound = bind(DiscoverAIProviderModels)
 const createAIProviderBound = bind(CreateAIProvider)
 const updateAIProviderBound = bind(UpdateAIProvider)
 
@@ -88,6 +98,13 @@ export function getAIProvider(providerId: string) {
 /** 读取指定品牌的预设模型目录。 */
 export function listAvailableAIModels(brand: AIProviderBrand) {
   return listAvailableAIModelsBound(brand).then(
+    (output) => output.models as AIProviderModelData[],
+  )
+}
+
+/** 读取模型服务实例当前可用的模型。 */
+export function discoverAIProviderModels(input: AIProviderConnectionInput) {
+  return discoverAIProviderModelsBound(input).then(
     (output) => output.models as AIProviderModelData[],
   )
 }

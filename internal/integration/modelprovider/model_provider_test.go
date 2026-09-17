@@ -31,6 +31,8 @@ func TestRegistryUsesProviderReadOnlyEndpoints(t *testing.T) {
 		{name: "MiniMax", brand: domain.AIProviderBrandMiniMax, basePath: "/v1", wantPath: "/v1/models", response: `{"object":"list","data":[]}`},
 		{name: "xAI", brand: domain.AIProviderBrandXAI, basePath: "/v1", wantPath: "/v1/models", response: `{"object":"list","data":[]}`},
 		{name: "Mistral", brand: domain.AIProviderBrandMistral, basePath: "/v1", wantPath: "/v1/models", response: `{"object":"list","data":[]}`},
+		{name: "Ollama", brand: domain.AIProviderBrandOllama, wantPath: "/api/tags", response: `{"models":[]}`},
+		{name: "OpenAI 兼容", brand: domain.AIProviderBrandOpenAICompatible, basePath: "/v1", wantPath: "/v1/models", response: `{"object":"list","data":[]}`},
 	}
 	for _, test := range tests {
 		t.Run(test.name, func(t *testing.T) {
@@ -92,5 +94,41 @@ func TestAlibabaModelsURLAcceptsCompatibleBaseURL(t *testing.T) {
 	want := "https://dashscope.aliyuncs.com/api/v1/models"
 	if got != want {
 		t.Fatalf("url = %q, want %q", got, want)
+	}
+}
+
+// TestProbeOmitsAuthorizationWithoutCredential 验证无凭据的自建或本机服务探测时不携带鉴权头。
+func TestProbeOmitsAuthorizationWithoutCredential(t *testing.T) {
+	for _, test := range []struct {
+		brand    domain.AIProviderBrand
+		basePath string
+		wantPath string
+		response string
+	}{
+		{brand: domain.AIProviderBrandOllama, wantPath: "/api/tags", response: `{"models":[]}`},
+		{brand: domain.AIProviderBrandOpenAICompatible, basePath: "/v1", wantPath: "/v1/models", response: `{"object":"list","data":[]}`},
+	} {
+		t.Run(string(test.brand), func(t *testing.T) {
+			server := httptest.NewTestServer(t, http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+				if request.URL.Path != test.wantPath {
+					t.Errorf("path = %s, want %s", request.URL.Path, test.wantPath)
+				}
+				if authorization := request.Header.Get("Authorization"); authorization != "" {
+					t.Errorf("authorization = %q, want empty", authorization)
+				}
+				writer.Header().Set("Content-Type", "application/json")
+				_, _ = writer.Write([]byte(test.response))
+			}))
+
+			probe, err := NewRegistry(server.Client()).NewProbe(Config{
+				Brand: test.brand, APIURL: server.URL + test.basePath,
+			})
+			if err != nil {
+				t.Fatal(err)
+			}
+			if err := probe.Run(context.Background()); err != nil {
+				t.Fatal(err)
+			}
+		})
 	}
 }

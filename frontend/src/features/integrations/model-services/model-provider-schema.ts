@@ -6,12 +6,14 @@ import {
   AIModelInputModality,
   AIModelType,
   AIProviderBrand,
+  AIProviderCredentialType,
 } from "@/api"
 import { requiredWailsEnum } from "@/lib/wails-enum"
 
 /** 创建模型服务供应商表单校验。 */
 export function createAIProviderSchema(messages: {
   brandInvalid: string
+  credentialTypeInvalid: string
   nameRequired: string
   nameTooLong: string
   apiKeyRequired: string
@@ -32,16 +34,16 @@ export function createAIProviderSchema(messages: {
 }) {
   return z.object({
     brand: requiredWailsEnum(AIProviderBrand, messages.brandInvalid),
+    credentialType: requiredWailsEnum(
+      AIProviderCredentialType,
+      messages.credentialTypeInvalid,
+    ),
     name: z
       .string()
       .trim()
       .min(1, messages.nameRequired)
       .max(100, messages.nameTooLong),
-    apiKey: z
-      .string()
-      .trim()
-      .min(1, messages.apiKeyRequired)
-      .max(2048, messages.apiKeyTooLong),
+    apiKey: z.string().trim().max(2048, messages.apiKeyTooLong),
     apiUrl: z
       .string()
       .trim()
@@ -106,6 +108,18 @@ export function createAIProviderSchema(messages: {
           identifiers.add(model.identifier)
         })
       }),
+  }).superRefine((values, context) => {
+    // 使用密钥的供应商必须填写密钥，无凭据的服务不校验该字段。
+    if (
+      values.credentialType === AIProviderCredentialType.AIProviderCredentialTypeAPIKey &&
+      values.apiKey === ""
+    ) {
+      context.addIssue({
+        code: z.ZodIssueCode.custom,
+        message: messages.apiKeyRequired,
+        path: ["apiKey"],
+      })
+    }
   })
 }
 

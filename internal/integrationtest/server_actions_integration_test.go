@@ -1527,11 +1527,12 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			OrganizationID: loggedIn.Identity.Organization.ID,
 			Brand:          string(domain.AIProviderBrandOpenAI),
 			Name:           "测试模型服务",
+			CredentialType: string(domain.AIProviderCredentialTypeAPIKey),
 			APIKey:         "test-key",
 			APIURL:         "https://example.com/v1",
 		}
 		if _, err := db.NewInsert().Model(provider).
-			Column("organization_id", "brand", "name", "api_key", "api_url").
+			Column("organization_id", "brand", "name", "credential_type", "api_key", "api_url").
 			Returning("id").
 			Exec(context.Background()); err != nil {
 			t.Fatal(err)

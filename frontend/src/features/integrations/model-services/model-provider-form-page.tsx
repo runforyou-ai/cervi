@@ -10,7 +10,9 @@ import { toast } from "sonner"
 import {
   AIModelInputModality,
   AIModelType,
+  AIProviderCredentialType,
   createAIProvider,
+  discoverAIProviderModels,
   getAIProvider,
   isApiError,
   listAvailableAIModels,
@@ -73,7 +75,8 @@ function modelFormValue(model: AIProviderModelData) {
     name: model.name,
     type: model.type,
     inputModalities: model.inputModalities,
-    contextWindow: formatTokenCount(model.contextWindow),
+    contextWindow:
+      model.contextWindow > 0 ? formatTokenCount(model.contextWindow) : "",
     maxOutputTokens:
       model.maxOutputTokens > 0 ? formatTokenCount(model.maxOutputTokens) : "",
   }
@@ -118,6 +121,7 @@ export function ModelProviderFormPage({
     () =>
       createAIProviderSchema({
         brandInvalid: t("modelServices.validation.brandInvalid"),
+        credentialTypeInvalid: t("modelServices.validation.credentialTypeInvalid"),
         nameRequired: t("modelServices.validation.nameRequired"),
         nameTooLong: t("modelServices.validation.nameTooLong"),
         apiKeyRequired: t("modelServices.validation.apiKeyRequired"),
@@ -144,6 +148,7 @@ export function ModelProviderFormPage({
     defaultValues: {
       brand: initialBrand,
       name: "",
+      credentialType: AIProviderCredentialType.AIProviderCredentialTypeAPIKey,
       apiKey: "",
       apiUrl: aiProviderBrandConfigs[initialBrand].defaultAPIURL,
       models: [],
@@ -173,6 +178,7 @@ export function ModelProviderFormPage({
     form.reset({
       brand: provider.brand,
       name: provider.name,
+      credentialType: provider.credentialType,
       apiKey: provider.apiKey,
       apiUrl: provider.apiUrl,
       models: provider.models.map(modelFormValue),
@@ -186,25 +192,49 @@ export function ModelProviderFormPage({
     }
   }, [])
 
-  /** 获取当前品牌的预设模型并打开选择弹窗。 */
+  /** 读取当前品牌的可选模型并打开选择弹窗。 */
   async function openModelDialog() {
     if (loadingModels) return
+    const brand = form.getValues("brand") as AIProviderBrandId
+    // 模型目录由服务实例提供时，先校验连接配置再读取实例。
+    const discovers = Boolean(aiProviderBrandConfigs[brand].discoversModels)
+    if (discovers) {
+      const valid = await form.trigger(["brand", "credentialType", "apiKey", "apiUrl"], {
+        shouldFocus: true,
+      })
+      if (!valid || !mounted.current) return
+    }
     setLoadingModels(true)
-    const brand = form.getValues("brand")
+    const { credentialType, apiKey, apiUrl } = form.getValues()
+    const requested = `${brand}\n${credentialType}\n${apiKey}\n${apiUrl}`
     try {
-      const models = await listAvailableAIModels(brand)
+      const models = discovers
+        ? await discoverAIProviderModels({ brand, credentialType, apiKey, apiUrl })
+        : await listAvailableAIModels(brand)
       if (!mounted.current) return
+      // 读取期间连接配置变化时结果已过期，不能追加到当前品牌的目录。
+      const current = form.getValues()
+      if (
+        requested !==
+        `${current.brand}\n${current.credentialType}\n${current.apiKey}\n${current.apiUrl}`
+      ) {
+        return
+      }
       setAvailableModels(models)
       setDraftModelIDs(new Set(models.map((model) => model.identifier)))
       setModelDialogOpen(true)
     } catch (requestError) {
       if (!mounted.current) return
       if (recoverSession(requestError, navigate)) return
-      console.warn("预设模型加载失败", { brand, error: requestError })
+      console.warn("可选模型加载失败", { brand, error: requestError })
       toast.error(
         isApiError(requestError)
-          ? apiErrorMessage(requestError, ["brand"])
-          : t("modelServices.models.loadError"),
+          ? apiErrorMessage(requestError, ["brand", "credentialType", "apiKey", "apiUrl"])
+          : t(
+              discovers
+                ? "modelServices.models.discoverError"
+                : "modelServices.models.loadError",
+            ),
       )
     } finally {
       if (mounted.current) setLoadingModels(false)
@@ -221,7 +251,7 @@ export function ModelProviderFormPage({
     })
   }
 
-  /** 取消选择弹窗中的全部预设模型。 */
+  /** 取消选择弹窗中的全部模型。 */
   function clearDraftModels() {
     setDraftModelIDs(new Set())
   }
@@ -255,14 +285,14 @@ export function ModelProviderFormPage({
   /** 使用当前未保存的地址和密钥测试模型服务连接。 */
   async function testConnection() {
     if (testingConnection || form.formState.isSubmitting) return
-    const valid = await form.trigger(["brand", "apiKey", "apiUrl"], {
+    const valid = await form.trigger(["brand", "credentialType", "apiKey", "apiUrl"], {
       shouldFocus: true,
     })
     if (!valid || !mounted.current) return
-    const { brand, apiKey, apiUrl } = form.getValues()
+    const { brand, credentialType, apiKey, apiUrl } = form.getValues()
     setTestingConnection(true)
     try {
-      await testAIProviderConnection({ brand, apiKey, apiUrl })
+      await testAIProviderConnection({ brand, credentialType, apiKey, apiUrl })
       if (!mounted.current) return
       toast.success(t("modelServices.form.testSuccess"))
     } catch (requestError) {
@@ -271,7 +301,12 @@ export function ModelProviderFormPage({
       console.warn("模型服务连接测试失败", { brand, error: requestError })
       toast.error(
         isApiError(requestError)
-          ? apiErrorMessage(requestError, ["brand", "apiKey", "apiUrl"])
+          ? apiErrorMessage(requestError, [
+              "brand",
+              "credentialType",
+              "apiKey",
+              "apiUrl",
+            ])
           : t("modelServices.form.testError"),
       )
     } finally {
@@ -284,6 +319,7 @@ export function ModelProviderFormPage({
     const input = {
       brand: values.brand,
       name: values.name,
+      credentialType: values.credentialType,
       apiKey: values.apiKey,
       apiUrl: values.apiUrl,
       models: values.models.map((model) => ({
@@ -323,7 +359,14 @@ export function ModelProviderFormPage({
       })
       toast.error(
         isApiError(requestError)
-          ? apiErrorMessage(requestError, ["brand", "name", "apiKey", "apiUrl", "models"])
+          ? apiErrorMessage(requestError, [
+              "brand",
+              "name",
+              "credentialType",
+              "apiKey",
+              "apiUrl",
+              "models",
+            ])
           : t("modelServices.form.saveError"),
       )
     }
@@ -334,6 +377,11 @@ export function ModelProviderFormPage({
       ? t("modelServices.form.createTitle")
       : t("modelServices.form.editTitle")
   const modelErrorMessage = modelValidationMessage(form.formState.errors.models)
+  const watchedBrand = form.watch("brand") as AIProviderBrandId
+  const brandConfig = aiProviderBrandConfigs[watchedBrand]
+  const usesAPIKey =
+    form.watch("credentialType") ===
+    AIProviderCredentialType.AIProviderCredentialTypeAPIKey
   const watchedModels = form.watch("models")
   const hasChatModel = watchedModels.some(
     (model) => model.type === AIModelType.AIModelTypeChat,
@@ -384,6 +432,14 @@ export function ModelProviderFormPage({
                             shouldValidate: true,
                           })
                         }
+                        // 只有自建或本机部署的服务可以不配置凭据。
+                        if (!next.supportsNoCredential) {
+                          form.setValue(
+                            "credentialType",
+                            AIProviderCredentialType.AIProviderCredentialTypeAPIKey,
+                            { shouldDirty: true, shouldValidate: true },
+                          )
+                        }
                         modelFields.replace([])
                       }}
                     >
@@ -402,16 +458,62 @@ export function ModelProviderFormPage({
                 label={t("modelServices.form.name")}
                 autoFocus={mode === "create"}
               />
-              <FormInputField
-                name="apiKey"
-                control={form.control}
-                label={t("modelServices.form.apiKey")}
-                autoComplete="off"
-                passwordVisibilityLabels={{
-                  show: t("modelServices.form.showAPIKey"),
-                  hide: t("modelServices.form.hideAPIKey"),
-                }}
-              />
+              {brandConfig.supportsNoCredential ? (
+                <Controller
+                  name="credentialType"
+                  control={form.control}
+                  render={({ field, fieldState }) => (
+                    <Field data-invalid={fieldState.invalid}>
+                      <FieldLabel htmlFor="model-provider-credential-type" required>
+                        {t("modelServices.form.credentialType")}
+                      </FieldLabel>
+                      <NativeSelect
+                        {...field}
+                        id="model-provider-credential-type"
+                        required
+                        aria-invalid={fieldState.invalid}
+                        onChange={(event) => {
+                          const next = event.target
+                            .value as AIProviderFormValues["credentialType"]
+                          field.onChange(next)
+                          // 不需要凭据的服务不保留已填写的密钥。
+                          if (
+                            next ===
+                            AIProviderCredentialType.AIProviderCredentialTypeNone
+                          ) {
+                            form.setValue("apiKey", "", { shouldDirty: true })
+                          }
+                        }}
+                      >
+                        <option
+                          value={
+                            AIProviderCredentialType.AIProviderCredentialTypeAPIKey
+                          }
+                        >
+                          {t("modelServices.form.credentialTypes.apiKey")}
+                        </option>
+                        <option
+                          value={AIProviderCredentialType.AIProviderCredentialTypeNone}
+                        >
+                          {t("modelServices.form.credentialTypes.none")}
+                        </option>
+                      </NativeSelect>
+                    </Field>
+                  )}
+                />
+              ) : null}
+              {usesAPIKey ? (
+                <FormInputField
+                  name="apiKey"
+                  control={form.control}
+                  label={t("modelServices.form.apiKey")}
+                  autoComplete="off"
+                  passwordVisibilityLabels={{
+                    show: t("modelServices.form.showAPIKey"),
+                    hide: t("modelServices.form.hideAPIKey"),
+                  }}
+                />
+              ) : null}
               <FormInputField
                 name="apiUrl"
                 control={form.control}
@@ -448,7 +550,11 @@ export function ModelProviderFormPage({
                   >
                     {loadingModels
                       ? t("modelServices.models.loading")
-                      : t("modelServices.models.fetch")}
+                      : t(
+                          brandConfig.discoversModels
+                            ? "modelServices.models.discover"
+                            : "modelServices.models.fetch",
+                        )}
                   </Button>
                 </div>
               </div>
@@ -677,7 +783,13 @@ export function ModelProviderFormPage({
       <Dialog open={modelDialogOpen} onOpenChange={setModelDialogOpen}>
         <DialogContent className="max-w-3xl">
           <DialogHeader>
-            <DialogTitle>{t("modelServices.models.dialogTitle")}</DialogTitle>
+            <DialogTitle>
+              {t(
+                brandConfig.discoversModels
+                  ? "modelServices.models.discoverDialogTitle"
+                  : "modelServices.models.dialogTitle",
+              )}
+            </DialogTitle>
           </DialogHeader>
           <div className="max-h-[60vh] overflow-auto rounded-lg border">
             <Table>
@@ -694,6 +806,16 @@ export function ModelProviderFormPage({
                 </TableRow>
               </TableHeader>
               <TableBody>
+                {availableModels.length === 0 ? (
+                  <TableRow className="hover:bg-transparent">
+                    <TableCell
+                      colSpan={4}
+                      className="h-24 text-center text-muted-foreground"
+                    >
+                      {t("modelServices.models.dialogEmpty")}
+                    </TableCell>
+                  </TableRow>
+                ) : null}
                 {availableModels.map((model) => (
                   <TableRow key={model.identifier}>
                     <TableCell>

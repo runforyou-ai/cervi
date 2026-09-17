@@ -160,7 +160,8 @@ func validateReferencedModels(ctx context.Context, db bun.IDB, organizationID, p
 func recordFromModel(provider servermodels.AIProvider, models []Model) Record {
 	return Record{
 		ID: provider.ID, Brand: domain.AIProviderBrand(provider.Brand), Name: provider.Name,
-		APIKey: provider.APIKey, APIURL: provider.APIURL, Models: models,
+		CredentialType: domain.AIProviderCredentialType(provider.CredentialType),
+		APIKey:         provider.APIKey, APIURL: provider.APIURL, Models: models,
 	}
 }
 

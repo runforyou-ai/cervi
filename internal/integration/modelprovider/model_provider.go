@@ -1,4 +1,4 @@
-// Package modelprovider 实现模型服务供应商连接探测适配器。
+// Package modelprovider 实现模型服务供应商的连接探测与模型发现适配器。
 package modelprovider
 
 import (
@@ -28,9 +28,10 @@ type Config struct {
 // Factory 根据强类型配置创建一个供应商探测器。
 type Factory func(Config) (connectiontest.Probe, error)
 
-// Registry 按供应商品牌选择连接探测适配器。
+// Registry 按供应商品牌选择连接探测和模型发现适配器。
 type Registry struct {
-	factories map[domain.AIProviderBrand]Factory
+	factories   map[domain.AIProviderBrand]Factory
+	discoverers map[domain.AIProviderBrand]DiscovererFactory
 }
 
 // NewRegistry 创建内置供应商品牌注册表。
@@ -48,6 +49,12 @@ func NewRegistry(client HTTPDoer) *Registry {
 		domain.AIProviderBrandMiniMax:    openAICompatible,
 		domain.AIProviderBrandXAI:        openAICompatible,
 		domain.AIProviderBrandMistral:    openAICompatible,
+
+		domain.AIProviderBrandOllama:           newOllamaFactory(client),
+		domain.AIProviderBrandOpenAICompatible: openAICompatible,
+	}, discoverers: map[domain.AIProviderBrand]DiscovererFactory{
+		domain.AIProviderBrandOllama:           newOllamaDiscovererFactory(client),
+		domain.AIProviderBrandOpenAICompatible: newOpenAICompatibleDiscovererFactory(client),
 	}}
 }
 
@@ -90,6 +97,22 @@ func newOpenAICompatibleFactory(client HTTPDoer) Factory {
 		}
 		setHeaders(request, config.APIKey)
 		return &httpProbe{client: client, request: request, validate: connectiontest.ValidateDataList}, nil
+	}
+}
+
+// newOllamaFactory 创建 Ollama 原生模型列表探测器工厂。
+func newOllamaFactory(client HTTPDoer) Factory {
+	return func(config Config) (connectiontest.Probe, error) {
+		requestURL, err := ollamaEndpoint(config.APIURL, "api/tags")
+		if err != nil {
+			return nil, connectiontest.InvalidConfigError(err)
+		}
+		request, err := http.NewRequest(http.MethodGet, requestURL, nil)
+		if err != nil {
+			return nil, connectiontest.InvalidConfigError(err)
+		}
+		setHeaders(request, config.APIKey)
+		return &httpProbe{client: client, request: request, validate: validateOllamaModelList}, nil
 	}
 }
 
@@ -144,10 +167,26 @@ func newGoogleFactory(client HTTPDoer) Factory {
 	}
 }
 
-// setHeaders 设置模型服务探测的通用请求头。
+// setHeaders 设置模型服务探测的通用请求头，没有凭据的服务不携带鉴权头。
 func setHeaders(request *http.Request, apiKey string) {
 	request.Header.Set("Accept", "application/json")
-	request.Header.Set("Authorization", "Bearer "+apiKey)
+	if apiKey != "" {
+		request.Header.Set("Authorization", "Bearer "+apiKey)
+	}
+}
+
+// ollamaEndpoint 把供应商配置地址规范为 Ollama 原生接口地址。
+func ollamaEndpoint(baseURL, path string) (string, error) {
+	parsed, err := url.Parse(strings.TrimSpace(baseURL))
+	if err != nil {
+		return "", err
+	}
+	if parsed.Scheme == "" || parsed.Host == "" {
+		return "", errors.New("model base URL must include scheme and host")
+	}
+	parsed.Path = strings.TrimSuffix(strings.TrimSuffix(parsed.Path, "/"), "/v1")
+	parsed.RawPath = ""
+	return connectiontest.AppendPath(parsed.String(), path)
 }
 
 // alibabaModelsURL 把 OpenAI 兼容或原生基础地址转换为百炼模型列表地址。
@@ -168,6 +207,20 @@ func alibabaModelsURL(baseURL string) (string, error) {
 	parsed.RawPath = ""
 	parsed.Path = path
 	return parsed.String(), nil
+}
+
+// validateOllamaModelList 校验 Ollama 模型列表的最小响应契约。
+func validateOllamaModelList(reader io.Reader) error {
+	var payload struct {
+		Models json.RawMessage `json:"models"`
+	}
+	if err := json.NewDecoder(reader).Decode(&payload); err != nil {
+		return err
+	}
+	if len(payload.Models) == 0 || payload.Models[0] != '[' {
+		return errors.New("model list response does not contain a models array")
+	}
+	return nil
 }
 
 // validateGoogleModelList 校验 Gemini API 模型列表的最小响应契约。

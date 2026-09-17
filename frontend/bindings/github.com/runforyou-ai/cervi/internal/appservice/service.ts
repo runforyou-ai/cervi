@@ -332,6 +332,13 @@ export function DisconnectRealtime(meta: $models.RequestMeta, connectionID: stri
 }
 
 /**
+ * DiscoverAIProviderModels 读取模型服务实例当前可用的模型目录。
+ */
+export function DiscoverAIProviderModels(meta: $models.RequestMeta, input: $models.AIProviderConnectionInput): $CancellablePromise<$models.AIProviderModelList> {
+    return $Call.ByID(3575483944, meta, input);
+}
+
+/**
  * DissolveGroupConversation 解散群聊并保留当前成员的只读历史。
  */
 export function DissolveGroupConversation(meta: $models.RequestMeta, conversationID: string): $CancellablePromise<$models.GroupConversation> {

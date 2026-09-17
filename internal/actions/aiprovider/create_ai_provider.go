@@ -34,11 +34,11 @@ func (a *CreateAIProviderAction) Execute(ctx context.Context, identity *servermo
 		}
 		provider = servermodels.AIProvider{
 			OrganizationID: identity.Organization.ID, Brand: string(input.Brand), Name: input.Name,
-			APIKey: input.APIKey, APIURL: input.APIURL,
+			CredentialType: string(input.CredentialType), APIKey: input.APIKey, APIURL: input.APIURL,
 		}
 		if _, err := tx.NewInsert().
 			Model(&provider).
-			Column("organization_id", "brand", "name", "api_key", "api_url").
+			Column("organization_id", "brand", "name", "credential_type", "api_key", "api_url").
 			Returning("*").
 			Exec(ctx); err != nil {
 			return err

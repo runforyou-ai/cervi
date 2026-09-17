@@ -34,7 +34,8 @@ func newExecutionScopeFixture(t *testing.T) executionScopeFixture {
 	ctx := context.Background()
 	f := newCustomerReadFixture(t)
 	provider, err := aiprovideraction.NewCreateAIProviderAction(f.db).Execute(ctx, f.owner, aiprovideraction.Input{
-		Brand: domain.AIProviderBrandOpenAI, Name: uuid.NewV7().String(), APIKey: "test-key", APIURL: "https://models.test/v1",
+		CredentialType: domain.AIProviderCredentialTypeAPIKey,
+		Brand:          domain.AIProviderBrandOpenAI, Name: uuid.NewV7().String(), APIKey: "test-key", APIURL: "https://models.test/v1",
 		Models: []aiprovideraction.Model{{
 			Identifier: "chat-a", Name: "对话 A", Type: domain.AIModelTypeChat,
 			InputModalities: []domain.AIModelInputModality{domain.AIModelInputModalityText}, ContextWindow: 8192, MaxOutputTokens: 4096,

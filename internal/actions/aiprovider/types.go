@@ -7,18 +7,20 @@ import "github.com/runforyou-ai/cervi/internal/domain"
 
 // Input 定义模型服务供应商可编辑字段。
 type Input struct {
-	Brand  domain.AIProviderBrand
-	Name   string
-	APIKey string
-	APIURL string
-	Models []Model
+	Brand          domain.AIProviderBrand
+	Name           string
+	CredentialType domain.AIProviderCredentialType
+	APIKey         string
+	APIURL         string
+	Models         []Model
 }
 
-// ConnectionInput 定义测试模型服务连接需要的草稿配置。
+// ConnectionInput 定义测试模型服务连接和发现模型需要的草稿配置。
 type ConnectionInput struct {
-	Brand  domain.AIProviderBrand
-	APIKey string
-	APIURL string
+	Brand          domain.AIProviderBrand
+	CredentialType domain.AIProviderCredentialType
+	APIKey         string
+	APIURL         string
 }
 
 // Model 定义供应商模型目录项。
@@ -33,12 +35,13 @@ type Model struct {
 
 // Record 定义模型服务供应商及其模型目录。
 type Record struct {
-	ID     string
-	Brand  domain.AIProviderBrand
-	Name   string
-	APIKey string
-	APIURL string
-	Models []Model
+	ID             string
+	Brand          domain.AIProviderBrand
+	Name           string
+	CredentialType domain.AIProviderCredentialType
+	APIKey         string
+	APIURL         string
+	Models         []Model
 }
 
 // ModelSummary 定义供应商列表中的模型目录摘要。

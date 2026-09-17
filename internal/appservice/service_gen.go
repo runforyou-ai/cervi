@@ -719,6 +719,11 @@ func (s *Service) ListAvailableAIModels(ctx context.Context, meta RequestMeta, b
 	return withNormalizedSlices(s.backend.ListAvailableAIModels(ctx, meta, brand))
 }
 
+// DiscoverAIProviderModels 读取模型服务实例当前可用的模型目录。
+func (s *Service) DiscoverAIProviderModels(ctx context.Context, meta RequestMeta, input AIProviderConnectionInput) (AIProviderModelList, error) {
+	return withNormalizedSlices(s.backend.DiscoverAIProviderModels(ctx, meta, input))
+}
+
 // TestAIProviderConnection 测试模型服务供应商草稿配置。
 func (s *Service) TestAIProviderConnection(ctx context.Context, meta RequestMeta, input AIProviderConnectionInput) error {
 	return s.backend.TestAIProviderConnection(ctx, meta, input)

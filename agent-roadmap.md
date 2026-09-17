@@ -26,7 +26,8 @@
 - Web、桌面端与移动端创建群聊和添加成员支持同企业活跃 Agent，成员列表展示 AI 员工标识。群主仍由真人担任；群内 `@Agent` 或引用 Agent 的消息触发该 Agent 按点名顺序轮流发言，回复正文中的点名形成接力，群内有效成员可停止单个 Agent 的发言，规则见 `group-agent-collaboration-plan.md`。
 - Agent 已保存模型选择、系统指令、知识库绑定和不可变配置版本，`agents.active_revision_id` 指向当前版本。
 - AI 员工编辑页的运行配置支持通过三列卡片模态框选择 MCP 服务，确认只回写表单，页面保存时整体提交。创建页保留必要字段。MCP 服务选择随 Revision 保存；删除服务时在同一事务为受影响员工生成移除该服务的新版本，不测试远端可用性，也不改写历史 Revision。Run 开始时按本次 Revision 绑定的服务建立会话、读取工具目录并把远端工具注册给模型，过大的工具结果按上下文治理规则转存；服务不可用、目录读取失败或工具名与内置工具重复时跳过该部分工具，本次运行继续执行。
-- AI Provider 和模型目录已经存在，可以保存企业配置的模型服务；模型使用现有复合键 `(provider_id, identifier)`。
+- AI Provider 和模型目录已经存在，可以保存企业配置的模型服务；模型使用现有复合键 `(provider_id, identifier)`。供应商保存凭据类型，自建或本机部署的服务可以选择无凭据，连接探测、向量与重排调用在无凭据时不携带鉴权头。
+- 模型目录支持两种来源：固定品牌使用预设清单，Ollama 与通用 OpenAI 兼容服务在保存前从服务实例读取。Ollama 经 `/api/tags` 与 `/api/show` 按模型能力映射用途和输入模态，上下文窗口只取 Modelfile 中的 `num_ctx`，模型元信息中的 `context_length` 是模型支持的上限而非运行窗口，未设定时留空由用户按部署实际情况填写；OpenAI 兼容服务只提供模型标识，其余字段由用户补全。Ollama 的对话、向量与重排调用统一走 `/v1` 兼容入口。
 - 服务端已有 PostgreSQL、NATS JetStream、`task_runs + task_outbox`、数据库租约、心跳和至少一次任务执行能力。
 - Web、桌面端与移动端已有企业成员文本单聊、统一消息时间线和前台轮询；`direct_conversations` 已用企业内规范身份对唯一约束收敛首发，Agent 复用同一 ChatSubject、Participant 和 Message 路径。
 - 客户会话右侧栏的 AI 助手提供 Copilot 线程：线程是独立的 `copilot` 类型会话，按所属客户会话授权，执行范围为线程本身，每次认领输入时只读引用客户会话的最新背景，回复写回线程，不进入消息列表、搜索和个人会话状态；客服写回复为不创建运行的单次模型调用。详见 [客服 AI 辅助方案](customer-ai-assist-plan.md)。

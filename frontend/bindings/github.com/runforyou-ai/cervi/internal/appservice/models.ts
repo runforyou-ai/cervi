@@ -37,6 +37,7 @@ export interface AIProvider {
     "id": string;
     "brand": AIProviderBrand;
     "name": string;
+    "credentialType": AIProviderCredentialType;
     "apiKey": string;
     "apiUrl": string;
     "models": AIProviderModel[] | null;
@@ -62,16 +63,36 @@ export enum AIProviderBrand {
     AIProviderBrandMiniMax = "minimax",
     AIProviderBrandXAI = "xai",
     AIProviderBrandMistral = "mistral",
+
+    /**
+     * 以下品牌为自建或本机部署的模型服务，可以不配置凭据。
+     */
+    AIProviderBrandOllama = "ollama",
+    AIProviderBrandOpenAICompatible = "openai_compatible",
 };
 
 /**
- * AIProviderConnectionInput 定义测试模型服务连接需要的草稿配置。
+ * AIProviderConnectionInput 定义测试模型服务连接和发现模型需要的草稿配置。
  */
 export interface AIProviderConnectionInput {
     "brand": AIProviderBrand;
+    "credentialType": AIProviderCredentialType;
     "apiKey": string;
     "apiUrl": string;
 }
+
+/**
+ * AIProviderCredentialType 表示访问模型服务所需的凭据类型。
+ */
+export enum AIProviderCredentialType {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    AIProviderCredentialTypeAPIKey = "api_key",
+    AIProviderCredentialTypeNone = "none",
+};
 
 /**
  * AIProviderInput 定义模型服务供应商可编辑字段。
@@ -79,6 +100,7 @@ export interface AIProviderConnectionInput {
 export interface AIProviderInput {
     "brand": AIProviderBrand;
     "name": string;
+    "credentialType": AIProviderCredentialType;
     "apiKey": string;
     "apiUrl": string;
     "models": AIProviderModel[] | null;
@@ -104,7 +126,7 @@ export interface AIProviderModel {
 }
 
 /**
- * AIProviderModelList 定义指定品牌的预设模型目录。
+ * AIProviderModelList 定义预设或从服务实例发现的模型目录。
  */
 export interface AIProviderModelList {
     "models": AIProviderModel[] | null;

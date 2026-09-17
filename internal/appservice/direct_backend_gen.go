@@ -1438,6 +1438,16 @@ func (b *DirectBackend) ListAvailableAIModels(ctx context.Context, meta RequestM
 	return b.ops.ListAvailableAIModels(ctx, meta, identity, brand)
 }
 
+// DiscoverAIProviderModels 读取模型服务实例当前可用的模型目录。
+func (b *DirectBackend) DiscoverAIProviderModels(ctx context.Context, meta RequestMeta, input AIProviderConnectionInput) (AIProviderModelList, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero AIProviderModelList
+		return zero, err
+	}
+	return b.ops.DiscoverAIProviderModels(ctx, meta, identity, input)
+}
+
 // TestAIProviderConnection 测试模型服务供应商草稿配置。
 func (b *DirectBackend) TestAIProviderConnection(ctx context.Context, meta RequestMeta, input AIProviderConnectionInput) error {
 	identity, err := b.ops.authenticate(ctx, meta)

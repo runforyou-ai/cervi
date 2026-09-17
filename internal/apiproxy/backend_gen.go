@@ -1099,6 +1099,14 @@ func (b *Backend) ListAvailableAIModels(ctx context.Context, meta appservice.Req
 	return output, err
 }
 
+// DiscoverAIProviderModels 读取模型服务实例当前可用的模型目录。
+func (b *Backend) DiscoverAIProviderModels(ctx context.Context, meta appservice.RequestMeta, input appservice.AIProviderConnectionInput) (appservice.AIProviderModelList, error) {
+	var output appservice.AIProviderModelList
+	err := b.do(ctx, meta, http.MethodPost, "/integrations/model-services/discover-models", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // TestAIProviderConnection 测试模型服务供应商草稿配置。
 func (b *Backend) TestAIProviderConnection(ctx context.Context, meta appservice.RequestMeta, input appservice.AIProviderConnectionInput) error {
 	return b.do(ctx, meta, http.MethodPost, "/integrations/model-services/test", nil, input, nil)

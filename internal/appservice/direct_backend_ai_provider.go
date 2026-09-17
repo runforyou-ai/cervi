@@ -48,24 +48,35 @@ func (o *directOperations) GetAIProvider(ctx context.Context, meta RequestMeta, 
 	return aiProviderFromAction(*provider), nil
 }
 
-// ListAvailableAIModels 返回指定品牌的预设模型目录。
+// ListAvailableAIModels 返回指定品牌的预设模型目录，模型目录由服务实例决定的品牌返回空目录。
 func (o *directOperations) ListAvailableAIModels(ctx context.Context, meta RequestMeta, _ *servermodels.Identity, brand AIProviderBrand) (AIProviderModelList, error) {
-	models := aiprovideraction.AvailableModels(domain.AIProviderBrand(brand))
-	if len(models) == 0 {
+	if !domain.ValidAIProviderBrand(domain.AIProviderBrand(brand)) {
 		fields := map[string]cervii18n.Key{"brand": cervii18n.FieldAIProviderBrandInvalid}
 		return AIProviderModelList{}, InvalidError(meta, cervii18n.ErrorValidationFailed, fields)
+	}
+	return AIProviderModelList{Models: aiProviderModelsFromAction(aiprovideraction.AvailableModels(domain.AIProviderBrand(brand)))}, nil
+}
+
+// DiscoverAIProviderModels 读取模型服务实例当前可用的模型目录。
+func (o *directOperations) DiscoverAIProviderModels(ctx context.Context, meta RequestMeta, _ *servermodels.Identity, input AIProviderConnectionInput) (AIProviderModelList, error) {
+	models, err := o.discoverAIProviderModels.Execute(ctx, aiProviderConnectionInput(input))
+	if err != nil {
+		return AIProviderModelList{}, o.aiProviderConnectionError(ctx, meta, err, input.Brand)
 	}
 	return AIProviderModelList{Models: aiProviderModelsFromAction(models)}, nil
 }
 
 // TestAIProviderConnection 测试模型服务供应商草稿配置。
 func (o *directOperations) TestAIProviderConnection(ctx context.Context, meta RequestMeta, _ *servermodels.Identity, input AIProviderConnectionInput) error {
-	err := o.testAIProviderConnection.Execute(ctx, aiprovideraction.ConnectionInput{
-		Brand: domain.AIProviderBrand(input.Brand), APIKey: input.APIKey, APIURL: input.APIURL,
-	})
+	err := o.testAIProviderConnection.Execute(ctx, aiProviderConnectionInput(input))
 	if err == nil {
 		return nil
 	}
+	return o.aiProviderConnectionError(ctx, meta, err, input.Brand)
+}
+
+// aiProviderConnectionError 转换访问模型服务实例产生的校验和连接错误。
+func (o *directOperations) aiProviderConnectionError(ctx context.Context, meta RequestMeta, err error, brand AIProviderBrand) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
@@ -74,7 +85,7 @@ func (o *directOperations) TestAIProviderConnection(ctx context.Context, meta Re
 	}
 	_, kind, classified := connectiontest.Details(err)
 	if !classified {
-		slog.Warn("模型服务连接测试返回未分类错误", "brand", input.Brand)
+		slog.Warn("模型服务调用返回未分类错误", "brand", brand)
 		return UnavailableError(meta, cervii18n.ErrorAIProviderConnectionTestFailed, nil)
 	}
 	switch kind {
@@ -86,6 +97,16 @@ func (o *directOperations) TestAIProviderConnection(ctx context.Context, meta Re
 		return UnavailableError(meta, cervii18n.ErrorAIProviderRateLimited, nil)
 	default:
 		return UnavailableError(meta, cervii18n.ErrorAIProviderConnectionTestFailed, nil)
+	}
+}
+
+// aiProviderConnectionInput 转换模型服务连接草稿配置。
+func aiProviderConnectionInput(input AIProviderConnectionInput) aiprovideraction.ConnectionInput {
+	return aiprovideraction.ConnectionInput{
+		Brand:          domain.AIProviderBrand(input.Brand),
+		CredentialType: domain.AIProviderCredentialType(input.CredentialType),
+		APIKey:         input.APIKey,
+		APIURL:         input.APIURL,
 	}
 }
 
@@ -161,14 +182,18 @@ func aiProviderInput(input AIProviderInput) aiprovideraction.Input {
 		})
 	}
 	return aiprovideraction.Input{
-		Brand: domain.AIProviderBrand(input.Brand), Name: input.Name, APIKey: input.APIKey, APIURL: input.APIURL, Models: models,
+		Brand: domain.AIProviderBrand(input.Brand), Name: input.Name,
+		CredentialType: domain.AIProviderCredentialType(input.CredentialType),
+		APIKey:         input.APIKey, APIURL: input.APIURL, Models: models,
 	}
 }
 
 // aiProviderFromAction 转换模型服务供应商输出。
 func aiProviderFromAction(input aiprovideraction.Record) AIProvider {
 	return AIProvider{
-		ID: input.ID, Brand: AIProviderBrand(input.Brand), Name: input.Name, APIKey: input.APIKey, APIURL: input.APIURL,
+		ID: input.ID, Brand: AIProviderBrand(input.Brand), Name: input.Name,
+		CredentialType: AIProviderCredentialType(input.CredentialType),
+		APIKey:         input.APIKey, APIURL: input.APIURL,
 		Models: aiProviderModelsFromAction(input.Models),
 	}
 }
@@ -194,16 +219,17 @@ func aiProviderModelsFromAction(input []aiprovideraction.Model) []AIProviderMode
 // aiProviderFieldKeys 映射模型服务供应商校验错误。
 func aiProviderFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key {
 	keys := map[common.FieldCode]cervii18n.Key{
-		aiprovideraction.ValidationBrandInvalid:   cervii18n.FieldAIProviderBrandInvalid,
-		aiprovideraction.ValidationNameRequired:   cervii18n.FieldAIProviderNameRequired,
-		aiprovideraction.ValidationNameTooLong:    cervii18n.FieldAIProviderNameTooLong,
-		aiprovideraction.ValidationNameDuplicate:  cervii18n.FieldAIProviderNameDuplicate,
-		aiprovideraction.ValidationAPIKeyRequired: cervii18n.FieldAIProviderAPIKeyRequired,
-		aiprovideraction.ValidationAPIKeyTooLong:  cervii18n.FieldAIProviderAPIKeyTooLong,
-		aiprovideraction.ValidationAPIURLRequired: cervii18n.FieldAIProviderAPIURLRequired,
-		aiprovideraction.ValidationAPIURLInvalid:  cervii18n.FieldAIProviderAPIURLInvalid,
-		aiprovideraction.ValidationModelsInvalid:  cervii18n.FieldAIProviderModelsInvalid,
-		aiprovideraction.ValidationModelsInUse:    cervii18n.FieldAIProviderModelsInUse,
+		aiprovideraction.ValidationBrandInvalid:          cervii18n.FieldAIProviderBrandInvalid,
+		aiprovideraction.ValidationCredentialTypeInvalid: cervii18n.FieldAIProviderCredentialTypeInvalid,
+		aiprovideraction.ValidationNameRequired:          cervii18n.FieldAIProviderNameRequired,
+		aiprovideraction.ValidationNameTooLong:           cervii18n.FieldAIProviderNameTooLong,
+		aiprovideraction.ValidationNameDuplicate:         cervii18n.FieldAIProviderNameDuplicate,
+		aiprovideraction.ValidationAPIKeyRequired:        cervii18n.FieldAIProviderAPIKeyRequired,
+		aiprovideraction.ValidationAPIKeyTooLong:         cervii18n.FieldAIProviderAPIKeyTooLong,
+		aiprovideraction.ValidationAPIURLRequired:        cervii18n.FieldAIProviderAPIURLRequired,
+		aiprovideraction.ValidationAPIURLInvalid:         cervii18n.FieldAIProviderAPIURLInvalid,
+		aiprovideraction.ValidationModelsInvalid:         cervii18n.FieldAIProviderModelsInvalid,
+		aiprovideraction.ValidationModelsInUse:           cervii18n.FieldAIProviderModelsInUse,
 	}
 	return translateValidationFields(fields, keys)
 }
