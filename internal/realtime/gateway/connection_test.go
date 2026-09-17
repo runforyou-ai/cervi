@@ -12,7 +12,7 @@ import (
 
 // TestConnectionQueue 验证发送队列按会话与种类保留最高版本，失权事件不合并，溢出时清空队列并结束事件流。
 func TestConnectionQueue(t *testing.T) {
-	current := newConnection(New(nil, "test", Options{QueueSize: 4}), func() {})
+	current := newConnection(New(nil, nil, "test", Options{QueueSize: 4}), func() {}, streamRoute{allowed: memberFrameTypes})
 	current.send(protocol.ConversationChanged{ConversationID: "a", Version: 2})
 	current.send(protocol.ConversationChanged{ConversationID: "a", Version: 1})
 	current.send(protocol.ConversationStateChanged{ConversationID: "a", Version: 5})
@@ -39,10 +39,23 @@ func TestConnectionQueue(t *testing.T) {
 
 // TestConnectionRevokeDiscardsQueue 验证撤销清除未发送的事件并进入关闭状态。
 func TestConnectionRevokeDiscardsQueue(t *testing.T) {
-	current := newConnection(New(nil, "test", Options{QueueSize: 4}), func() {})
+	current := newConnection(New(nil, nil, "test", Options{QueueSize: 4}), func() {}, streamRoute{allowed: memberFrameTypes})
 	current.send(protocol.ConversationChanged{ConversationID: "a", Version: 1})
 	current.revoke(realtime.KindSessionLoggedOut)
 	if !current.closing || len(current.queue) != 0 || current.epoch != 1 {
 		t.Fatalf("closing = %v, queue = %#v, epoch = %d", current.closing, current.queue, current.epoch)
+	}
+}
+
+// TestVisitorConnectionDropsInternalFrames 验证访客事件流只下发公开事件，成员专用事件直接丢弃。
+func TestVisitorConnectionDropsInternalFrames(t *testing.T) {
+	current := newConnection(New(nil, nil, "test", Options{QueueSize: 4}), func() {}, streamRoute{allowed: visitorFrameTypes})
+	current.send(protocol.ConversationStateChanged{ConversationID: "a", Version: 1})
+	current.send(protocol.ConversationRemoved{ConversationID: "a"})
+	current.send(protocol.IdentityProfileChanged{Version: 1})
+	current.send(protocol.ConversationChanged{ConversationID: "a", Version: 7})
+	want := []protocol.Frame{protocol.ConversationChanged{ConversationID: "a", Version: 7}}
+	if !reflect.DeepEqual(current.queue, want) {
+		t.Fatalf("queue = %#v, want %#v", current.queue, want)
 	}
 }

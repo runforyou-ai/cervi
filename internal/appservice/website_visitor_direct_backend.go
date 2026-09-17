@@ -15,11 +15,19 @@ import (
 
 var _ WebsiteVisitorBackend = (*WebsiteVisitorDirectBackend)(nil)
 
+// WebsiteVisitorAudience 是网站访客事件流的受众标识，渠道身份记录 ID 用于构造受众 Subject。
+type WebsiteVisitorAudience struct {
+	OrganizationID    string
+	ChannelID         string
+	ChannelIdentityID string
+}
+
 // WebsiteVisitorDirectBackend 在服务端进程内调用匿名访客 Action 和 Query。
 type WebsiteVisitorDirectBackend struct {
 	listConversations *conversationaction.ListWebsiteConversationsQuery
 	sendTextMessage   *conversationaction.ReceiveWebsiteCustomerTextMessageAction
 	listMessages      *conversationaction.ListWebsiteMessagesQuery
+	authorizeVisitor  *conversationaction.AuthorizeWebsiteVisitorQuery
 }
 
 // NewWebsiteVisitorDirectBackend 创建匿名网站访客直接后端。
@@ -28,7 +36,17 @@ func NewWebsiteVisitorDirectBackend(db *bun.DB, agentScheduler conversationactio
 		listConversations: conversationaction.NewListWebsiteConversationsQuery(db),
 		sendTextMessage:   conversationaction.NewReceiveWebsiteCustomerTextMessageAction(db, agentScheduler),
 		listMessages:      conversationaction.NewListWebsiteMessagesQuery(db),
+		authorizeVisitor:  conversationaction.NewAuthorizeWebsiteVisitorQuery(db),
 	}
+}
+
+// AuthenticateVisitor 解析访客事件流受众；渠道停用或尚未建立业务身份时返回与访客 HTTP 接口一致的错误。
+func (b *WebsiteVisitorDirectBackend) AuthenticateVisitor(ctx context.Context, meta WebsiteVisitorMeta, channelID, externalID string) (WebsiteVisitorAudience, error) {
+	audience, err := b.authorizeVisitor.Execute(ctx, channelID, externalID)
+	if err != nil {
+		return WebsiteVisitorAudience{}, websiteVisitorError(ctx, meta, err, cervii18n.ErrorWebsiteMessengerLoadFailed, "authenticate_visitor", "channel_id", channelID)
+	}
+	return WebsiteVisitorAudience{OrganizationID: audience.OrganizationID, ChannelID: audience.ChannelID, ChannelIdentityID: audience.ChannelIdentityID}, nil
 }
 
 // ListConversations 返回网站访客的客户会话列表。

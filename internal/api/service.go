@@ -27,10 +27,17 @@ type apiError struct {
 	Reason  string                  `json:"reason,omitempty"`
 }
 
+// WebsiteVisitorRealtime 输出已通过访客授权的网站访客实时事件流。
+type WebsiteVisitorRealtime interface {
+	// ServeVisitor 按渠道与访客外部编号解析受众并输出事件流，直到事件流结束。
+	ServeVisitor(writer http.ResponseWriter, request *http.Request, channelID, externalID string)
+}
+
 // Service 是企业服务端对外提供的 Gin HTTP 适配器。
 type Service struct {
 	application         *appservice.Service
 	websiteVisitor      *appservice.WebsiteVisitorService
+	visitorRealtime     WebsiteVisitorRealtime
 	telegramWebhook     TelegramWebhookReceiver
 	trustForwardedProto bool
 	router              *gin.Engine
@@ -44,6 +51,13 @@ func WithWebsiteVisitor(visitor *appservice.WebsiteVisitorService, trustForwarde
 	return func(service *Service) {
 		service.websiteVisitor = visitor
 		service.trustForwardedProto = trustForwardedProto
+	}
+}
+
+// WithWebsiteVisitorRealtime 注入网站访客实时事件流。
+func WithWebsiteVisitorRealtime(realtime WebsiteVisitorRealtime) ServiceOption {
+	return func(service *Service) {
+		service.visitorRealtime = realtime
 	}
 }
 

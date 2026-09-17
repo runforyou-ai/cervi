@@ -375,6 +375,19 @@
 - **验收：** 缺失、无效或已登出的令牌得到 401 且错误体与业务接口一致；同一用户两条事件流均收到用户受众与客服共享受众通知；订阅与探针读取之间提交的变化在 `server_hello` 或后续通知中至少出现一次；登出只结束对应登录会话的事件流，停用结束该用户全部事件流且重连得到 401；撤销事务回滚不结束事件流；到达最长存活时间后结束且凭据有效时可重连；停止读取的事件流被有界结束，其他事件流照常收到通知；事件流在超过 Wails 默认读写超时后仍持续下发；服务端下线时事件流在时限内结束；原生端按服务器地址路径拼接并投递事件与流结束。
 - **验证记录：** 2026-09-15 通过 `wails3 task test:server`（含 SSE 网关集成测试：同一用户两条事件流的用户受众与客服共享受众投递、撤销事务回滚、登出与停用结束事件流并重连得到 401、认证与订阅之间登出、服务器 1 秒读写超时下持续心跳与通知、最长存活时间、服务端下线与慢连接）、`wails3 task test:desktop`（含原生端事件投递、流结束与 401 清除本地凭据）、`wails3 task test:frontend`（100 项）与 `wails3 task build:server`。以本机 `bin/cervi-server`（Wails v3.0.0-beta.21 服务端模式，默认 30 秒读写超时）实测：未携带令牌返回 401 与业务错误体；`server_hello` 在 0.04 秒内到达，第 25 秒收到 `ping`，事件流持续 40 秒未被服务器超时中断，响应头为 `text/event-stream`、`Cache-Control: no-cache` 与 `X-Accel-Buffering: no`；事件流打开时发送 SIGTERM，事件流 0.02 秒内结束、服务端进程 0.04 秒内退出。未验证 Cloudflare Tunnel、自动 HTTPS `ingress` 与 iOS／Android。验证结束后本轮服务端进程已退出，8080 端口已释放。
 
+### PR26：访客事件流受众
+
+- **依赖：** 无（PR21 已交付，PR25、PR25A 已合并）。
+- **范围：** 访客在同源 iframe 中请求访客事件流：Cookie 模式使用 `EventSource` 携带渠道 Cookie，Header 恢复模式用 fetch 流式读取并携带同一 Header；服务端恢复渠道身份后订阅独立访客 Subject，只发送公开事件白名单；渠道停用撤销事件流。
+- **落点：** `api/website_visitor.go`、`website_visitor_direct_backend.go`、渠道停用入口与 Gateway 访客认证 adapter。
+- **实施：** 受众使用数据库渠道身份 ID，不使用 Cookie 原值或可逆外部标识构造 Subject。先验证渠道与访客归属，再允许其目录与会话公开投影；认证失败沿用访客 HTTP 接口的错误体与状态码。尚无业务身份时不建立事件流，也不为请求创建联系人。
+- **验收：** 请求中指定 conversationId 不能扩大接收范围；独立链接、嵌入、Header 恢复与预览互相隔离；成员 Bearer 不能用于访客事件流；停用渠道后已有事件流结束，重新请求被拒绝。
+- **验证步骤：** 抓取访客事件与 Subject，不能出现原始 Cookie 值；跨身份指定线程失败；停用渠道后重新请求被拒。
+
+- **实现记录：** 公开路由新增 `GET /public/website-channels/:channelID/realtime`，与发送、目录、历史共用 PR21 的 `authorizeWebsiteVisitor` 中间件读取访客 Token 并写入渠道外部编号，Gin 处理器只把响应交给 Gateway 的 `ServeVisitor`。`AuthorizeWebsiteVisitorQuery` 按启用的网站渠道和外部编号解析渠道身份：渠道停用或不存在返回渠道未找到，尚未建立业务身份返回会话未找到，读操作不创建联系人；`WebsiteVisitorDirectBackend.AuthenticateVisitor` 把它映射为与访客 HTTP 接口一致的本地化错误体与状态码。Gateway 的成员与访客事件流收敛到同一条 `stream` 实现，差异由 `streamRoute` 表达：受众 Subject、可下发事件白名单、撤销标识、最长存活时间与订阅生效后的问候构造。访客受众为 `visitor_directory.<渠道身份记录 ID>` 与 `website_channel.<渠道 ID>`，Subject 只使用数据库内部 ID，访客 Token 与 Cookie 原值不进入 Subject。连接按白名单过滤发送队列：访客只下发 `visitor_hello` 与 `conversation_changed`，成员专用的个人状态、失权与身份资料事件直接丢弃。协议新增 `visitor_hello` 事件（只含连接编号，访客没有同步探针），Go、TypeScript 与共用夹具同步。渠道停用入口 `UpdateMessageChannelStatusAction` 改用 `realtime.RunInTx`，停用网站渠道时登记 `channel_disabled` 撤销控制发往渠道受众，Gateway 收到后结束该渠道全部访客事件流；受众 ID 取更新结果中的规范渠道 ID，请求参数中大小写不同的 UUID 同样发往订阅所用的 Subject。事件流的授权到期时间以绝对时间保存在 `streamRoute` 中，存活时长在计时器启动时结算，握手耗时计入授权到期时间之内。
+- **验证记录（2026-09-16）：** `wails3 task test:server` 全量通过，`wails3 task test:desktop`、`wails3 task test:frontend`（155 项）、`wails3 task build:server`、`wails3 task common:build:frontend` 与 `wails3 task darwin:build ARCH=arm64` 通过；`go generate ./internal/appservice` 无差异（访客服务不在 `Backend` 契约内），构建改写的 `frontend/bindings` 已还原。新增 `TestVisitorRealtimeStream`（经真实 Gin 路由与 HTTP 服务端，服务器读写超时设为 1 秒以确认长响应不受其约束）：尚未建立身份的访客请求被拒（404）；只携带成员 Bearer 而无访客 Token 的请求被拒（400）；客服回复后本访客事件流收到该线程的 `conversation_changed`，另一访客身份即使在请求中指定他人线程编号也收不到任何事件；访客事件流持续超过服务器 1 秒读写超时后仍存活并按 300 毫秒间隔收到心跳，其后的客服回复照常送达；本轮发布的全部 Subject 经 NATS 通配订阅抓取，确认使用渠道身份记录 ID 且不含访客 Token 原值；用大小写不同的渠道 ID 停用渠道后两条访客事件流均结束，重新请求被拒（404）。新增 `TestVisitorConnectionDropsInternalFrames` 验证访客白名单丢弃成员专用事件。
+- **未验证：** 挂件尚未建立事件流，`internal/publicweb/chat.js` 仍按现有三秒轮询工作，浏览器中的 `EventSource`／fetch 恢复模式、预览隔离与重连退避由 PR32 验收。
+
 ### PR27：共享客户端事件流与会话代次
 
 - **依赖：** 无（PR25、PR25A 已合并）。

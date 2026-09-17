@@ -1,6 +1,6 @@
 //go:build server
 
-// Package gateway 在企业服务端内提供成员实时 SSE 事件流，按已认证身份订阅受众通知并转发为实时事件。
+// Package gateway 在企业服务端内提供成员与网站访客的实时 SSE 事件流，按已认证身份订阅受众通知并转发为实时事件。
 package gateway
 
 import (
@@ -30,6 +30,12 @@ const RunPath = "/api/realtime/runs/"
 
 // flushTimeout 是等待 NATS 确认订阅生效的上限。
 const flushTimeout = 5 * time.Second
+
+// VisitorBackend 解析网站访客的渠道身份。
+type VisitorBackend interface {
+	// AuthenticateVisitor 校验启用的网站渠道与访客身份并返回事件流受众，渠道停用或尚未建立身份时返回访客业务错误。
+	AuthenticateVisitor(ctx context.Context, meta appservice.WebsiteVisitorMeta, channelID, externalID string) (appservice.WebsiteVisitorAudience, error)
+}
 
 // MemberBackend 解析成员登录令牌并读取同步探针值。
 type MemberBackend interface {
@@ -71,9 +77,31 @@ func DefaultOptions() Options {
 	}
 }
 
-// Gateway 管理本节点的成员实时事件流与受众订阅。
+// memberFrameTypes 是成员事件流可下发的变更通知事件。
+var memberFrameTypes = []protocol.Type{
+	protocol.TypeServerHello, protocol.TypeConversationChanged, protocol.TypeConversationRemoved,
+	protocol.TypeConversationStateChanged, protocol.TypeIdentityProfileChanged,
+}
+
+// visitorFrameTypes 是网站访客事件流可下发的公开事件。
+var visitorFrameTypes = []protocol.Type{protocol.TypeVisitorHello, protocol.TypeConversationChanged}
+
+// streamRoute 是一条已授权事件流的受众、撤销标识、可下发事件与授权到期时间。
+type streamRoute struct {
+	subjects       []string
+	allowed        []protocol.Type
+	tokenSessionID string
+	// expiresAt 是事件流授权的绝对到期时间，零值表示只受最长存活时间约束。
+	expiresAt  time.Time
+	attributes []any
+	// greet 在受众订阅生效后复核授权并返回首个事件。
+	greet func(ctx context.Context, connectionID string) (protocol.Frame, error)
+}
+
+// Gateway 管理本节点的实时事件流与受众订阅。
 type Gateway struct {
 	backend   MemberBackend
+	visitor   VisitorBackend
 	namespace string
 	options   Options
 
@@ -106,10 +134,11 @@ type audience struct {
 	streams      map[audienceStream]struct{}
 }
 
-// New 创建使用指定 NATS 命名空间的成员实时网关。
-func New(backend MemberBackend, namespace string, options Options) *Gateway {
+// New 创建使用指定 NATS 命名空间的实时网关，visitor 为 nil 时不提供访客事件流。
+func New(backend MemberBackend, visitor VisitorBackend, namespace string, options Options) *Gateway {
 	return &Gateway{
 		backend:   backend,
+		visitor:   visitor,
 		namespace: namespace,
 		options:   options,
 		streams:   map[audienceStream]struct{}{},
@@ -130,7 +159,10 @@ func (g *Gateway) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.Method == http.MethodGet {
 			if request.URL.Path == Path {
-				g.serve(writer, request)
+				meta := appservice.RequestMeta{Token: bearerToken(request.Header.Get("Authorization")), Locale: appservice.Locale(request.Header.Get("Accept-Language"))}
+				g.stream(writer, request, meta, func(ctx context.Context) (streamRoute, error) {
+					return g.memberRoute(ctx, meta)
+				})
 				return
 			}
 			if runID, ok := strings.CutPrefix(request.URL.Path, RunPath); ok && runID != "" && !strings.Contains(runID, "/") {
@@ -139,6 +171,14 @@ func (g *Gateway) Middleware(next http.Handler) http.Handler {
 			}
 		}
 		next.ServeHTTP(writer, request)
+	})
+}
+
+// ServeVisitor 处理已通过访客授权的网站访客事件流请求，channelID 与 externalID 由公开路由的访客授权得到。
+func (g *Gateway) ServeVisitor(writer http.ResponseWriter, request *http.Request, channelID, externalID string) {
+	visitorMeta := appservice.WebsiteVisitorMeta{Locale: appservice.Locale(request.Header.Get("Accept-Language"))}
+	g.stream(writer, request, appservice.RequestMeta{Locale: visitorMeta.Locale}, func(ctx context.Context) (streamRoute, error) {
+		return g.visitorRoute(ctx, visitorMeta, channelID, externalID)
 	})
 }
 
@@ -174,24 +214,76 @@ func (g *Gateway) Shutdown() {
 	})
 }
 
-// serve 认证请求、安装受众订阅并读取同步探针后输出事件流，直到事件流结束。
-func (g *Gateway) serve(writer http.ResponseWriter, request *http.Request) {
-	meta := appservice.RequestMeta{Token: bearerToken(request.Header.Get("Authorization")), Locale: appservice.Locale(request.Header.Get("Accept-Language"))}
-	identity, err := g.backend.AuthenticateMember(request.Context(), meta)
+// memberRoute 认证成员登录令牌，返回本人用户受众与本企业客服共享受众。
+func (g *Gateway) memberRoute(ctx context.Context, meta appservice.RequestMeta) (streamRoute, error) {
+	identity, err := g.backend.AuthenticateMember(ctx, meta)
+	if err != nil {
+		return streamRoute{}, err
+	}
+	organizationID := identity.Organization.ID
+	return streamRoute{
+		subjects: []string{
+			realtime.Subject(g.namespace, organizationID, realtime.AudienceUser, identity.User.ID),
+			// 当前阶段所有成员均可阅读客户会话，成员连接都接收客服共享受众通知。
+			realtime.Subject(g.namespace, organizationID, realtime.AudienceCustomerInbox, organizationID),
+		},
+		allowed:        memberFrameTypes,
+		tokenSessionID: identity.Token.ID,
+		// 事件流最长存活时间不晚于登录会话到期。
+		expiresAt:  identity.Token.ExpiresAt,
+		attributes: []any{"organization_id", organizationID, "user_id", identity.User.ID},
+		greet: func(ctx context.Context, connectionID string) (protocol.Frame, error) {
+			// 订阅生效后再次校验登录会话，之后提交的登出或停用经受众通知送达。
+			if _, err := g.backend.AuthenticateMember(ctx, meta); err != nil {
+				return nil, err
+			}
+			heads, err := g.backend.MemberSyncHeads(ctx, identity)
+			if err != nil {
+				return nil, err
+			}
+			return protocol.ServerHello{ConnectionID: connectionID, SyncHeads: heads}, nil
+		},
+	}, nil
+}
+
+// visitorRoute 解析访客渠道身份，返回其访客目录受众与所在渠道的撤销受众。
+func (g *Gateway) visitorRoute(ctx context.Context, meta appservice.WebsiteVisitorMeta, channelID, externalID string) (streamRoute, error) {
+	if g.visitor == nil {
+		return streamRoute{}, appservice.UnavailableError(appservice.RequestMeta{Locale: meta.Locale}, cervii18n.ErrorServerUnavailable, nil).WithStatus(http.StatusServiceUnavailable)
+	}
+	target, err := g.visitor.AuthenticateVisitor(ctx, meta, channelID, externalID)
+	if err != nil {
+		return streamRoute{}, err
+	}
+	return streamRoute{
+		subjects: []string{
+			realtime.Subject(g.namespace, target.OrganizationID, realtime.AudienceVisitorDirectory, target.ChannelIdentityID),
+			// 渠道停用的撤销控制按渠道发送，该渠道全部访客事件流据此结束。
+			realtime.Subject(g.namespace, target.OrganizationID, realtime.AudienceWebsiteChannel, target.ChannelID),
+		},
+		allowed:    visitorFrameTypes,
+		attributes: []any{"organization_id", target.OrganizationID, "channel_id", target.ChannelID, "channel_identity_id", target.ChannelIdentityID},
+		greet: func(ctx context.Context, connectionID string) (protocol.Frame, error) {
+			// 订阅生效后再次校验渠道与访客身份，之后提交的渠道停用经受众通知送达。
+			if _, err := g.visitor.AuthenticateVisitor(ctx, meta, channelID, externalID); err != nil {
+				return nil, err
+			}
+			return protocol.VisitorHello{ConnectionID: connectionID}, nil
+		},
+	}, nil
+}
+
+// stream 按 authorize 得到的受众安装订阅并复核授权后输出事件流，直到事件流结束。
+func (g *Gateway) stream(writer http.ResponseWriter, request *http.Request, meta appservice.RequestMeta, authorize func(context.Context) (streamRoute, error)) {
+	route, err := authorize(request.Context())
 	if err != nil {
 		writeError(writer, meta, err)
 		return
 	}
 	ctx, cancel := context.WithCancel(request.Context())
 	defer cancel()
-	current := newConnection(g, cancel)
-	current.tokenSessionID = identity.Token.ID
-	organizationID := identity.Organization.ID
-	current.subjects = []string{
-		realtime.Subject(g.namespace, organizationID, realtime.AudienceUser, identity.User.ID),
-		// 当前阶段所有成员均可阅读客户会话，成员连接都接收客服共享受众通知。
-		realtime.Subject(g.namespace, organizationID, realtime.AudienceCustomerInbox, organizationID),
-	}
+	current := newConnection(g, cancel, route)
+	attributes := append([]any{"connection_id", current.id}, route.attributes...)
 	if !g.register(current) {
 		writeUnavailable(writer, meta)
 		return
@@ -199,16 +291,11 @@ func (g *Gateway) serve(writer http.ResponseWriter, request *http.Request) {
 	defer g.unregister(current)
 
 	if err := g.joinAudiences(ctx, current); err != nil {
-		slog.Warn("实时受众订阅失败", "connection_id", current.id, "user_id", identity.User.ID, "error", err)
+		slog.Warn("实时受众订阅失败", append(attributes, "error", err)...)
 		writeUnavailable(writer, meta)
 		return
 	}
-	// 订阅生效后再次校验登录会话，之后提交的登出或停用经受众通知送达。
-	if _, err := g.backend.AuthenticateMember(ctx, meta); err != nil {
-		writeError(writer, meta, err)
-		return
-	}
-	heads, err := g.backend.MemberSyncHeads(ctx, identity)
+	hello, err := route.greet(ctx, current.id)
 	if err != nil {
 		writeError(writer, meta, err)
 		return
@@ -229,18 +316,21 @@ func (g *Gateway) serve(writer http.ResponseWriter, request *http.Request) {
 	writer.Header().Set("Cache-Control", "no-cache")
 	writer.Header().Set("X-Accel-Buffering", "no")
 	writer.WriteHeader(http.StatusOK)
-	current.send(protocol.ServerHello{ConnectionID: current.id, SyncHeads: heads})
+	current.send(hello)
 
-	// 事件流最长存活时间不晚于登录会话到期。
-	lifetime := min(g.options.MaxLifetime, time.Until(identity.Token.ExpiresAt))
+	// 存活时长在计时器启动时结算，握手耗时计入授权到期时间之内。
+	lifetime := g.options.MaxLifetime
+	if !route.expiresAt.IsZero() {
+		lifetime = min(lifetime, time.Until(route.expiresAt))
+	}
 	expiry := time.AfterFunc(lifetime, func() {
 		slog.Info("实时事件流到达最长存活时间", "connection_id", current.id)
 		current.close(true)
 	})
 	defer expiry.Stop()
-	slog.Info("实时事件流已就绪", "connection_id", current.id, "organization_id", identity.Organization.ID, "user_id", identity.User.ID, "lifetime", lifetime)
+	slog.Info("实时事件流已就绪", append(attributes, "lifetime", lifetime)...)
 	current.run(ctx, writer, controller)
-	slog.Info("实时事件流已结束", "connection_id", current.id, "user_id", identity.User.ID)
+	slog.Info("实时事件流已结束", attributes...)
 }
 
 // bearerToken 从 Authorization 头解析 Bearer 令牌，格式不符时返回空串。
@@ -374,7 +464,7 @@ func (g *Gateway) deliver(subject string, data []byte) {
 			}
 		}
 		return
-	case realtime.KindUserDisabled:
+	case realtime.KindUserDisabled, realtime.KindChannelDisabled:
 		for _, current := range targets {
 			current.revoke(payload.Kind)
 		}

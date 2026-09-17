@@ -34,6 +34,7 @@ func (s *Service) registerWebsiteVisitorRoutes(router *gin.Engine) {
 	const messagesPath = "/public/website-channels/:channelID/messages"
 	const directoryPath = "/public/website-channels/:channelID/conversations"
 	const historyPath = "/public/website-channels/:channelID/conversations/:conversationID/messages"
+	const realtimePath = "/public/website-channels/:channelID/realtime"
 	router.GET(messengerPath, s.initializeWebsiteMessenger)
 	router.POST(messagesPath, authorizeWebsiteVisitor, s.sendWebsiteVisitorMessage)
 	router.GET(directoryPath, authorizeWebsiteVisitor, s.listWebsiteVisitorConversations)
@@ -42,6 +43,16 @@ func (s *Service) registerWebsiteVisitorRoutes(router *gin.Engine) {
 	router.Match([]string{http.MethodGet, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace}, messagesPath, websiteVisitorMethodNotAllowed(http.MethodPost))
 	router.Match([]string{http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace}, directoryPath, websiteVisitorMethodNotAllowed(http.MethodGet))
 	router.Match([]string{http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace}, historyPath, websiteVisitorMethodNotAllowed(http.MethodGet))
+	if s.visitorRealtime == nil {
+		return
+	}
+	router.GET(realtimePath, authorizeWebsiteVisitor, s.serveWebsiteVisitorRealtime)
+	router.Match([]string{http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace}, realtimePath, websiteVisitorMethodNotAllowed(http.MethodGet))
+}
+
+// serveWebsiteVisitorRealtime 输出网站访客实时事件流，事件流结束前由网关独占响应写入。
+func (s *Service) serveWebsiteVisitorRealtime(c *gin.Context) {
+	s.visitorRealtime.ServeVisitor(c.Writer, c.Request, c.Param("channelID"), c.GetString(websiteVisitorExternalKey))
 }
 
 // authorizeWebsiteVisitor 统一处理需要访客 Token 的公开路由：禁止缓存，按 Header、Cookie 读取 Token 并写入渠道外部编号，Token 缺失或格式非法按公开错误体拒绝。

@@ -28,6 +28,7 @@ const expectedFrames: Record<string, RealtimeServerFrame> = {
     connectionId: "conn-01",
     syncHeads: { conversationCount: 3, conversationChecksum: "18446744073709551615", identityProfileVersion: "9223372036854775807" },
   },
+  visitor_hello: { type: "visitor_hello", connectionId: "conn-02" },
   ping: { type: "ping" },
   conversation_changed: { type: "conversation_changed", conversationId, version: 9223372036854775807n },
   conversation_state_changed: { type: "conversation_state_changed", conversationId, version: 42n },

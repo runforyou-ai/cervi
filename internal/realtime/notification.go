@@ -16,6 +16,7 @@ const (
 	AudienceUser             AudienceKind = "user"
 	AudienceCustomerInbox    AudienceKind = "customer_inbox"
 	AudienceVisitorDirectory AudienceKind = "visitor_directory"
+	AudienceWebsiteChannel   AudienceKind = "website_channel"
 )
 
 // Kind 定义通知种类。
@@ -28,6 +29,7 @@ const (
 	KindIdentityProfileChanged   Kind = "identity_profile_changed"
 	KindSessionLoggedOut         Kind = "session_logged_out"
 	KindUserDisabled             Kind = "user_disabled"
+	KindChannelDisabled          Kind = "channel_disabled"
 )
 
 // Notification 表示发往单个受众的变更通知或撤销控制，载荷含通知种类、会话 ID、版本与登录会话 ID，零值字段省略。
@@ -69,6 +71,11 @@ func UserConversationStateChanged(organizationID, userID, conversationID string,
 // UserIdentityProfileChanged 构造发往本人受众的身份资料通知。
 func UserIdentityProfileChanged(organizationID, userID string, version int64) Notification {
 	return Notification{OrganizationID: organizationID, AudienceKind: AudienceUser, AudienceID: userID, Kind: KindIdentityProfileChanged, Version: version}
+}
+
+// WebsiteChannelDisabled 构造网站渠道停用撤销控制，Gateway 据此结束该渠道全部访客事件流；受众 ID 为渠道 ID。
+func WebsiteChannelDisabled(organizationID, channelID string) Notification {
+	return Notification{OrganizationID: organizationID, AudienceKind: AudienceWebsiteChannel, AudienceID: channelID, Kind: KindChannelDisabled}
 }
 
 // UserSessionLoggedOut 构造登出撤销控制，Gateway 据此关闭该登录会话的连接。

@@ -9,6 +9,7 @@ import (
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -29,7 +30,7 @@ func (a *UpdateMessageChannelStatusAction) Execute(ctx context.Context, identity
 		return nil, ErrNotFound
 	}
 	var channel *servermodels.Channel
-	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
@@ -52,6 +53,10 @@ func (a *UpdateMessageChannelStatusAction) Execute(ctx context.Context, identity
 		}
 		if rows == 0 {
 			return ErrNotFound
+		}
+		// 停用网站渠道时结束该渠道全部访客事件流，受众 ID 取更新结果中的规范渠道 ID。
+		if !enabled && domain.ChannelType(channel.Type) == domain.ChannelTypeWebsite {
+			realtime.Notify(ctx, realtime.WebsiteChannelDisabled(identity.Organization.ID, channel.ID))
 		}
 		return nil
 	})

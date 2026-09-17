@@ -120,10 +120,10 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	// 组装企业成员与网站匿名访客各自的业务入口。
 	directBackend := appservice.NewDirectBackend(appStorage.DB(), localFiles, tenantResolver, agentRunScheduler, executeAgentRun, tasks, documentConverter, customerReplySuggestions)
 	boundService := appservice.New(directBackend)
-	// 成员实时网关复用业务调用的身份解析与同步探针。
-	realtimeGateway := gateway.New(directBackend, config.NATS.Namespace, gateway.DefaultOptions())
 	websiteVisitorBackend := appservice.NewWebsiteVisitorDirectBackend(appStorage.DB(), agentRunScheduler)
 	websiteVisitorService := appservice.NewWebsiteVisitorService(websiteVisitorBackend)
+	// 实时网关复用成员业务调用的身份解析与同步探针，以及访客的渠道身份解析。
+	realtimeGateway := gateway.New(directBackend, websiteVisitorBackend, config.NATS.Namespace, gateway.DefaultOptions())
 
 	// 注册客户消息发送与扫描任务，每五秒扫描一次待投递消息。
 	telegramAPI := telegramintegration.NewClient(connectiontest.NewHTTPClient())
@@ -157,6 +157,7 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	httpAPI := api.NewService(
 		boundService,
 		api.WithWebsiteVisitor(websiteVisitorService, config.TLS.Mode != "off"),
+		api.WithWebsiteVisitorRealtime(realtimeGateway),
 		api.WithTelegramWebhook(telegramWebhook),
 	)
 	publicLookup := channelaction.NewGetPublicWebsiteChannelQuery(appStorage.DB()).Execute
