@@ -2803,11 +2803,13 @@ export interface TeamListInput {
 }
 
 /**
- * TeamMember 定义团队成员信息。
+ * TeamMember 定义团队成员信息。UserID 与 AgentID 按身份类型二选一，另一个为空字符串。
  */
 export interface TeamMember {
     "identityId": string;
     "identityType": OrganizationIdentityType;
+    "userId": string;
+    "agentId": string;
     "displayName": string;
     "workStatus": WorkStatus;
     "joinedAt": string;

@@ -22,10 +22,15 @@ import {
   MobileMePage,
   MobileMeSettingsPage,
 } from "@/apps/mobile/mobile-me-page"
+import { MobileContactsPage } from "@/apps/mobile/mobile-contacts-page"
 import {
-  MobileContactCategoryPage,
-  MobileContactsPage,
-} from "@/apps/mobile/mobile-contacts-page"
+  MobileExternalContactPage,
+  MobileExternalContactsPage,
+} from "@/apps/mobile/mobile-external-contacts-page"
+import {
+  MobileTeamMembersPage,
+  MobileTeamsPage,
+} from "@/apps/mobile/mobile-teams-page"
 import {
   MobileDetailLayout,
   MobileTabLayout,
@@ -108,6 +113,16 @@ export default function MobileApp() {
               </Route>
             </Route>
             <Route
+              path="/inbox/agent/new"
+              element={
+                <MobileDirectoryPage
+                  key="agent-new"
+                  kind="agents"
+                  purpose="newConversation"
+                />
+              }
+            />
+            <Route
               path="/inbox/agent/:conversationID"
               element={<MobileAgentConversationPage />}
             />
@@ -155,9 +170,18 @@ export default function MobileApp() {
               path="/contacts/ai-employees/:agentID/chat"
               element={<MobileAgentChatPage />}
             />
+            <Route path="/contacts/teams" element={<MobileTeamsPage />} />
             <Route
-              path="/contacts/:category"
-              element={<MobileContactCategoryPage />}
+              path="/contacts/teams/:teamID"
+              element={<MobileTeamMembersPage />}
+            />
+            <Route
+              path="/contacts/external"
+              element={<MobileExternalContactsPage />}
+            />
+            <Route
+              path="/contacts/external/:contactID"
+              element={<MobileExternalContactPage />}
             />
           </Route>
         </Route>

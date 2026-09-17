@@ -1,6 +1,5 @@
 /** 简体中文·移动端文案。 */
 const mobile = {
-  unavailable: "暂未开放",
   refreshFailed: "刷新失败",
   apply: "应用筛选",
   logout: "退出登录",
@@ -26,7 +25,22 @@ const mobile = {
     agents: "AI 员工",
     teams: "团队",
     external: "外部联系人",
-    unavailableDescription: "移动端通讯录功能暂未开放。",
+  },
+  teams: {
+    loadError: "无法加载团队，请重试。",
+    empty: "还没有团队",
+    allLoaded: "已显示全部团队",
+    memberCount: "{{count}} 人",
+    membersLoadError: "无法加载团队成员，请重试。",
+    membersEmpty: "没有找到团队成员",
+    joinedAt: "{{time}} 加入",
+  },
+  external: {
+    loadError: "无法加载外部联系人，请重试。",
+    empty: "没有找到外部联系人",
+    allLoaded: "已显示全部联系人",
+    detail: "联系人资料",
+    notFound: "该联系人不存在或无法访问。",
   },
   agents: {
     search: "搜索 AI 员工姓名",

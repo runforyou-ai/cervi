@@ -66,8 +66,17 @@ func (o *directOperations) ListTeamMembers(ctx context.Context, meta RequestMeta
 	}
 	members := make([]TeamMember, 0, len(output.Members))
 	for _, member := range output.Members {
+		// 真人成员只有 users.id，AI 员工只有 agents.id，另一端为空。
+		userID, agentID := "", ""
+		if member.UserID != nil {
+			userID = *member.UserID
+		}
+		if member.AgentID != nil {
+			agentID = *member.AgentID
+		}
 		members = append(members, TeamMember{
 			IdentityID: member.IdentityID, IdentityType: OrganizationIdentityType(member.IdentityType),
+			UserID: userID, AgentID: agentID,
 			DisplayName: member.DisplayName, WorkStatus: WorkStatus(member.WorkStatus), JoinedAt: member.JoinedAt,
 		})
 	}

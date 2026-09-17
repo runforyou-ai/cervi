@@ -10,6 +10,7 @@ import {
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import type {
   User,
+  UserList,
   UserListInput,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import { bind } from "@/api/client"
@@ -18,6 +19,8 @@ import type { NonNullArrays } from "@/api/normalize"
 export type UserListQuery = Partial<UserListInput>
 
 export type UserData = NonNullArrays<User>
+
+export type UserListData = NonNullArrays<UserList>
 
 const listUsersBound = bind(ListUsers)
 

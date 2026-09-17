@@ -1,6 +1,5 @@
 /** 美式英语·移动端文案。 */
 const mobile = {
-  unavailable: "Not available yet",
   refreshFailed: "Refresh failed",
   apply: "Apply filters",
   logout: "Log out",
@@ -26,7 +25,22 @@ const mobile = {
     agents: "AI employees",
     teams: "Teams",
     external: "External contacts",
-    unavailableDescription: "The mobile directory is not available yet.",
+  },
+  teams: {
+    loadError: "Could not load teams. Please try again.",
+    empty: "No teams yet",
+    allLoaded: "All teams shown",
+    memberCount: "{{count}} members",
+    membersLoadError: "Could not load team members. Please try again.",
+    membersEmpty: "No team members found",
+    joinedAt: "Joined {{time}}",
+  },
+  external: {
+    loadError: "Could not load external contacts. Please try again.",
+    empty: "No external contacts found",
+    allLoaded: "All contacts shown",
+    detail: "Contact profile",
+    notFound: "This contact does not exist or is unavailable.",
   },
   agents: {
     search: "Search AI employees by name",
