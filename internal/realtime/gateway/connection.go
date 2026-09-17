@@ -26,8 +26,9 @@ type connection struct {
 	id      string
 	cancel  context.CancelFunc
 
-	// subjects 与 tokenSessionID 在加入受众时写入，之后只读。
+	// subjects、allowed 与 tokenSessionID 在建立连接时写入，之后只读。
 	subjects       []string
+	allowed        map[protocol.Type]bool
 	tokenSessionID string
 
 	mu         sync.Mutex
@@ -41,13 +42,20 @@ type connection struct {
 }
 
 // newConnection 创建尚未输出事件流的连接，cancel 结束该连接的请求处理。
-func newConnection(gateway *Gateway, cancel context.CancelFunc) *connection {
+func newConnection(gateway *Gateway, cancel context.CancelFunc, route streamRoute) *connection {
+	allowed := make(map[protocol.Type]bool, len(route.allowed))
+	for _, frameType := range route.allowed {
+		allowed[frameType] = true
+	}
 	return &connection{
-		gateway: gateway,
-		id:      uuid.NewV7().String(),
-		cancel:  cancel,
-		merged:  map[mergeKey]int{},
-		wake:    make(chan struct{}, 1),
+		gateway:        gateway,
+		id:             uuid.NewV7().String(),
+		cancel:         cancel,
+		subjects:       route.subjects,
+		allowed:        allowed,
+		tokenSessionID: route.tokenSessionID,
+		merged:         map[mergeKey]int{},
+		wake:           make(chan struct{}, 1),
 	}
 }
 
@@ -117,11 +125,11 @@ func (c *connection) write(writer http.ResponseWriter, controller *http.Response
 	return true
 }
 
-// send 把事件加入发送队列；变更通知按会话与种类保留最高版本，队列溢出时按慢连接结束事件流。
+// send 把事件加入发送队列；受众可下发事件之外的事件直接丢弃，变更通知按会话与种类保留最高版本，队列溢出时按慢连接结束事件流。
 func (c *connection) send(frame protocol.Frame) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if c.closing {
+	if c.closing || !c.allowed[frame.FrameType()] {
 		return
 	}
 	key, version, mergeable := mergeTarget(frame)
@@ -164,7 +172,7 @@ func (c *connection) audienceSubjects() []string { return c.subjects }
 
 // revoke 清除未发送的事件并结束事件流。
 func (c *connection) revoke(kind realtime.Kind) {
-	slog.Info("实时事件流登录会话已撤销", "connection_id", c.id, "kind", kind)
+	slog.Info("实时事件流已撤销", "connection_id", c.id, "kind", kind)
 	c.close(true)
 }
 

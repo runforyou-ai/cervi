@@ -15,7 +15,7 @@ import (
 
 // newTestRunStream 创建带指定分片预算与待发文本上限的运行过程流。
 func newTestRunStream(partBytes, pendingBytes int) *runStream {
-	return newRunStream(New(nil, "test", Options{RunSnapshotPartBytes: partBytes, RunPendingTextBytes: pendingBytes}), "run-1", func() {})
+	return newRunStream(New(nil, nil, "test", Options{RunSnapshotPartBytes: partBytes, RunPendingTextBytes: pendingBytes}), "run-1", func() {})
 }
 
 // textDelta 构造一条向指定块追加文本的增量。
