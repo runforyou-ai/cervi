@@ -117,14 +117,14 @@ func testAgentDirectReplies(t *testing.T, db *bun.DB, identity *servermodels.Ide
 	if first.Conversation.Agent.PreviewSenderIdentityType == nil || *first.Conversation.Agent.PreviewSenderIdentityType != domain.OrganizationIdentityTypeUser {
 		t.Fatalf("first message preview identity = %#v", first.Conversation)
 	}
-	// 运行状态与成功回复从同一 AI 身份读取头像。
+	// 排队运行状态与成功回复从同一 AI 身份读取头像。
 	avatarID := uuid.NewV7().String()
 	if _, err := db.NewUpdate().Model((*servermodels.OrganizationIdentity)(nil)).Set("avatar_file_id = ?", avatarID).Where("id = ?", created.IdentityID).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
 	queuedHistory, err := conversationaction.NewListConversationMessagesQuery(db).Execute(ctx, identity, conversationaction.ConversationMessageHistoryInput{ConversationID: first.Conversation.ID})
-	if err != nil || queuedHistory.LatestAgentRun == nil || queuedHistory.LatestAgentRun.AgentAvatarFileID == nil || *queuedHistory.LatestAgentRun.AgentAvatarFileID != avatarID {
-		t.Fatalf("queued agent avatar = %#v, error = %v", queuedHistory.LatestAgentRun, err)
+	if err != nil || len(queuedHistory.AgentRuns) != 1 || queuedHistory.AgentRuns[0].AgentAvatarFileID == nil || *queuedHistory.AgentRuns[0].AgentAvatarFileID != avatarID {
+		t.Fatalf("queued agent avatar = %#v, error = %v", queuedHistory.AgentRuns, err)
 	}
 	runtime := &testDirectReplyRuntime{t: t}
 	execute := agentrunaction.NewExecuteAction(db, tasks, runtime, testAttachmentReader(db), nil)
@@ -151,8 +151,9 @@ func testAgentDirectReplies(t *testing.T, db *bun.DB, identity *servermodels.Ide
 	if err != nil || len(history.Messages) != 2 || history.Messages[0].Sender == nil || history.Messages[0].Sender.IdentityType == nil || *history.Messages[0].Sender.IdentityType != domain.OrganizationIdentityTypeUser || history.Messages[1].Sender == nil || history.Messages[1].Sender.IdentityType == nil || *history.Messages[1].Sender.IdentityType != domain.OrganizationIdentityTypeAgent {
 		t.Fatalf("message sender identities = %#v, error = %v", history.Messages, err)
 	}
-	if history.LatestAgentRun == nil || history.LatestAgentRun.AgentAvatarFileID == nil || *history.LatestAgentRun.AgentAvatarFileID != avatarID || history.Messages[1].Sender == nil || history.Messages[1].Sender.AvatarFileID == nil || *history.Messages[1].Sender.AvatarFileID != avatarID {
-		t.Fatalf("completed agent avatars = %#v, sender = %#v", history.LatestAgentRun, history.Messages[1].Sender)
+	// 成功运行由回复消息表达，不再出现在运行状态集合中。
+	if len(history.AgentRuns) != 0 || history.Messages[1].Sender == nil || history.Messages[1].Sender.AvatarFileID == nil || *history.Messages[1].Sender.AvatarFileID != avatarID {
+		t.Fatalf("completed agent runs = %#v, sender = %#v", history.AgentRuns, history.Messages[1].Sender)
 	}
 	send := conversationaction.NewSendAgentTextMessageAction(db, scheduler)
 	for i := range 101 {

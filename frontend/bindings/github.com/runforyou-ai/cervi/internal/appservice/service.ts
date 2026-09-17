@@ -374,7 +374,7 @@ export function GetAgent(meta: $models.RequestMeta, agentID: string): $Cancellab
 }
 
 /**
- * GetAgentRunProcess 返回一次成功运行的有序过程内容和模型用量。
+ * GetAgentRunProcess 返回一次已完成运行的有序过程内容和模型用量。
  */
 export function GetAgentRunProcess(meta: $models.RequestMeta, runID: string): $CancellablePromise<$models.AgentRunProcess> {
     return $Call.ByID(1895048241, meta, runID);

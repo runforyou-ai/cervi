@@ -620,7 +620,7 @@ func (b *DirectBackend) StopGroupAgentReply(ctx context.Context, meta RequestMet
 	return b.ops.StopGroupAgentReply(ctx, meta, identity, conversationID, runID)
 }
 
-// GetAgentRunProcess 返回一次成功运行的有序过程内容和模型用量。
+// GetAgentRunProcess 返回一次已完成运行的有序过程内容和模型用量。
 func (b *DirectBackend) GetAgentRunProcess(ctx context.Context, meta RequestMeta, runID string) (AgentRunProcess, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
 	if err != nil {

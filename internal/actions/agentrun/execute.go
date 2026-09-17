@@ -155,6 +155,10 @@ func (a *ExecuteAction) Execute(ctx context.Context, input RunInput) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
+	// 失败与被取消的运行同样保留已产生的过程内容，先于终态写入，成员按终态读取时过程已可展开。
+	if processErr := a.persistPartialProcess(ctx, &execution.Run, result); processErr != nil {
+		return fmt.Errorf("agent run failed: %v; persist partial process: %w", err, processErr)
+	}
 	terminal, failErr := a.fail(ctx, execution.Run.ID, err)
 	if failErr != nil {
 		return fmt.Errorf("agent run failed: %v; persist failure: %w", err, failErr)
@@ -408,6 +412,57 @@ func (a *ExecuteAction) complete(ctx context.Context, execution executionContext
 		logCompletedRun(execution, result.EndSeq, messageID)
 	}
 	return nil
+}
+
+// persistPartialProcess 在运行失败或被取消后保留已产生的过程内容与用量，并推进会话版本让成员重读。
+func (a *ExecuteAction) persistPartialProcess(ctx context.Context, initial *servermodels.AgentRun, partial agentruntime.RunResult) error {
+	if len(partial.Blocks) == 0 {
+		return nil
+	}
+	usage, err := json.Marshal(partial.Usage)
+	if err != nil {
+		return fmt.Errorf("encode partial agent run usage: %w", err)
+	}
+	blocks := make([]servermodels.AgentRunBlock, 0, len(partial.Blocks))
+	for _, block := range partial.Blocks {
+		payload, err := json.Marshal(block.Payload)
+		if err != nil {
+			return fmt.Errorf("encode partial agent run block: %w", err)
+		}
+		blocks = append(blocks, servermodels.AgentRunBlock{
+			ID: block.ID, OrganizationID: initial.OrganizationID, AgentRunID: initial.ID,
+			Position: block.Position, ModelCallID: block.ModelCallID, Kind: string(block.Kind), Payload: payload,
+		})
+	}
+	return realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
+		conversation, err := chatstate.LockConversation(ctx, tx, initial.OrganizationID, initial.ConversationID)
+		if err != nil {
+			return err
+		}
+		run := &servermodels.AgentRun{}
+		if err := tx.NewSelect().Model(run).Where("agr.id = ?", initial.ID).For("UPDATE").Scan(ctx); err != nil {
+			return fmt.Errorf("lock agent run for partial process: %w", err)
+		}
+		// 成功运行在结果事务中写入完整过程；同一运行的重复执行尝试只保留最早写入的一份。
+		written, err := tx.NewSelect().Model((*servermodels.AgentRunBlock)(nil)).
+			Where("arb.organization_id = ? AND arb.agent_run_id = ?", initial.OrganizationID, initial.ID).Exists(ctx)
+		if err != nil {
+			return fmt.Errorf("check persisted agent run blocks: %w", err)
+		}
+		if written || run.Status == string(domain.AgentRunStatusSucceeded) {
+			return nil
+		}
+		if _, err := tx.NewInsert().Model(&blocks).Exec(ctx); err != nil {
+			return fmt.Errorf("persist partial agent run blocks: %w", err)
+		}
+		if _, err := tx.NewUpdate().Model(run).
+			Set("usage = ?::jsonb", string(usage)).
+			Set("updated_at = now()").
+			WherePK().Exec(ctx); err != nil {
+			return fmt.Errorf("persist partial agent run usage: %w", err)
+		}
+		return chatstate.TouchConversation(ctx, tx, conversation)
+	})
 }
 
 // logCompletedRun 记录关联客服周期的 Agent 完成结果。

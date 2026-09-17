@@ -284,7 +284,7 @@ function AgentRunStreamProcess({ state, incoming }: { state: RunStreamState; inc
   )
 }
 
-/** 显示最近一次运行的等待、思考或取消状态，运行中默认展开实时过程。 */
+/** 显示一次尚未由消息表达的运行的等待、思考或取消状态，运行中默认展开实时过程，取消运行可展开中断前的过程。 */
 export function AgentRunState({ run, incoming, conversationID, group, copilot, onStopped }: { run: ConversationAgentRun; incoming: boolean; conversationID?: string; group?: boolean; copilot?: boolean; onStopped: () => Promise<unknown> }) {
   const { t } = useTranslation("inbox")
   const stream = useAgentRunStream(run.id, run.status === AgentRunStatus.AgentRunStatusRunning, onStopped)
@@ -358,11 +358,14 @@ export function AgentRunState({ run, incoming, conversationID, group, copilot, o
             </CollapsibleContent>
           </Collapsible>
         ) : (
-          <div className="flex items-center gap-1.5">
-            {cancelled ? <BrainIcon aria-hidden className="size-4" /> : null}
-            <span>{label}</span>
-            {conversationID && !cancelled ? <AgentReplyStopButton conversationID={conversationID} runID={run.id} group={group} copilot={copilot} onStopped={onStopped} /> : null}
-          </div>
+          <>
+            {run.process ? <AgentProcess process={run.process} incoming={incoming} /> : null}
+            <div className="flex items-center gap-1.5">
+              {cancelled ? <BrainIcon aria-hidden className="size-4" /> : null}
+              <span>{label}</span>
+              {conversationID && !cancelled ? <AgentReplyStopButton conversationID={conversationID} runID={run.id} group={group} copilot={copilot} onStopped={onStopped} /> : null}
+            </div>
+          </>
         )}
         {cancelled && reason ? (
           <p className="mt-1 whitespace-pre-wrap break-all">{reason}</p>

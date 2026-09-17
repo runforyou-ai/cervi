@@ -13,7 +13,7 @@ import (
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
-// GetAgentRunProcess 返回一次成功运行的有序过程内容和模型用量。
+// GetAgentRunProcess 返回一次已完成运行的有序过程内容和模型用量。
 func (o *directOperations) GetAgentRunProcess(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, runID string) (AgentRunProcess, error) {
 	process, err := o.getAgentRunProcess.Execute(ctx, identity, runID)
 	if err != nil {
@@ -46,7 +46,7 @@ func agentRunProcessError(ctx context.Context, meta RequestMeta, err error, orga
 	return FailedError(meta, cervii18n.ErrorAgentRunProcessReadFailed)
 }
 
-// conversationAgentProcessFromAction 转换消息携带的运行引用和模型用量。
+// conversationAgentProcessFromAction 转换已完成运行的过程引用和模型用量。
 func conversationAgentProcessFromAction(process *conversationaction.ConversationAgentProcess) *ConversationAgentProcess {
 	if process == nil {
 		return nil

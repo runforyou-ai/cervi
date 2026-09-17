@@ -239,3 +239,36 @@ func TestAgentExecutionScopeHandoverKeepsSingleRun(t *testing.T) {
 		}
 	}
 }
+
+// TestAgentExecutionScopeReturnsUnrepresentedRuns 验证负责人变化取消的运行与新负责人的运行同时返回，新消息到达后取消提示不再返回。
+func TestAgentExecutionScopeReturnsUnrepresentedRuns(t *testing.T) {
+	f := newExecutionScopeFixture(t)
+	ctx := context.Background()
+	f.transferToAgent(t, ctx)
+	// 真人领取取消 AI 运行且不写结果消息，再次转交后新运行开始。
+	if _, err := f.claim.Execute(ctx, f.owner, f.conversationID); err != nil {
+		t.Fatalf("领取周期失败：%v", err)
+	}
+	f.transferToAgent(t, ctx)
+	query := conversationaction.NewListConversationMessagesQuery(f.db)
+	history, err := query.Execute(ctx, f.owner, conversationaction.ConversationMessageHistoryInput{ConversationID: f.conversationID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(history.AgentRuns) != 2 || history.AgentRuns[0].Status != domain.AgentRunStatusCancelled ||
+		history.AgentRuns[0].ErrorCode == nil || *history.AgentRuns[0].ErrorCode != string(domain.AgentRunErrorCodeAssigneeChanged) ||
+		history.AgentRuns[1].Status != domain.AgentRunStatusQueued {
+		t.Fatalf("运行集合 = %#v", history.AgentRuns)
+	}
+	// 访客在同一线程追加消息，取消提示被新消息取代。
+	if _, err := f.receive.Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
+		ChannelID: f.channelID, ExternalID: "web-session:0123456789abcdef0123456789abcdef",
+		ConversationID: &f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "客户追加消息",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	history, err = query.Execute(ctx, f.owner, conversationaction.ConversationMessageHistoryInput{ConversationID: f.conversationID})
+	if err != nil || len(history.AgentRuns) != 1 || history.AgentRuns[0].Status != domain.AgentRunStatusQueued {
+		t.Fatalf("新消息后运行集合 = %#v，错误 = %v", history.AgentRuns, err)
+	}
+}

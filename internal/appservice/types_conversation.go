@@ -215,7 +215,7 @@ type ConversationMessage struct {
 
 // ConversationMessageList 定义成员消息页。
 type ConversationMessageList struct {
-	LatestAgentRun *ConversationAgentRun      `json:"latestAgentRun"`
+	AgentRuns      []ConversationAgentRun     `json:"agentRuns"`
 	PendingAgents  []ConversationPendingAgent `json:"pendingAgents"`
 	HasEarlier     bool                       `json:"hasEarlier"`
 	HasLater       bool                       `json:"hasLater"`

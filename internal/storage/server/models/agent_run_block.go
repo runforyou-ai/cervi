@@ -8,7 +8,7 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// AgentRunBlock 保存成功运行的一个完整中间内容块。
+// AgentRunBlock 保存已完成运行的一个完整中间内容块。
 type AgentRunBlock struct {
 	bun.BaseModel  `bun:"table:agent_run_blocks,alias:arb"`
 	ID             string          `bun:"id,pk"`

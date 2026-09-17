@@ -248,13 +248,13 @@ type ConversationMessageHistoryInput struct {
 
 // ConversationMessageHistory 定义成员消息历史和下一页边界。
 type ConversationMessageHistory struct {
-	LatestAgentRun *ConversationAgentRun
-	PendingAgents  []ConversationPendingAgent
-	HasEarlier     bool
-	HasLater       bool
-	Messages       []ConversationMessage
-	Before         *MessageCursorPoint
-	After          *MessageCursorPoint
+	AgentRuns     []ConversationAgentRun
+	PendingAgents []ConversationPendingAgent
+	HasEarlier    bool
+	HasLater      bool
+	Messages      []ConversationMessage
+	Before        *MessageCursorPoint
+	After         *MessageCursorPoint
 }
 
 // ConversationPendingAgent 定义已收到输入、等待轮转执行的 AI 员工。
@@ -264,14 +264,14 @@ type ConversationPendingAgent struct {
 	AvatarFileID *string
 }
 
-// ConversationAgentProcess 定义成功回复的运行引用和模型用量。
+// ConversationAgentProcess 定义已完成运行的过程引用和模型用量。
 type ConversationAgentProcess struct {
 	ID                   string
 	DurationMilliseconds int64
 	Usage                agentruntime.Usage
 }
 
-// AgentRunProcess 定义一次成功运行的有序过程内容和模型用量。
+// AgentRunProcess 定义一次已完成运行的有序过程内容和模型用量。
 type AgentRunProcess struct {
 	ID                   string
 	DurationMilliseconds int64
@@ -279,14 +279,16 @@ type AgentRunProcess struct {
 	Blocks               []agentruntime.Block
 }
 
-// ConversationAgentRun 定义会话最近一次运行的状态。
+// ConversationAgentRun 定义尚未由结果消息表达的运行状态，取消运行携带自身过程引用。
 type ConversationAgentRun struct {
 	AgentAvatarFileID *string
 	AgentName         string
 	ID                string
+	AgentIdentityID   string
 	Status            domain.AgentRunStatus
 	ErrorCode         *string
 	LastError         *string
+	Process           *ConversationAgentProcess
 }
 
 // CustomerTextMessageInput 定义成员发送的客户会话文本消息。

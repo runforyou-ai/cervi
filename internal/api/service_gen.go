@@ -702,7 +702,7 @@ func (s *Service) stopGroupAgentReply(c *gin.Context) {
 	writeResult(c, http.StatusOK, output, err)
 }
 
-// getAgentRunProcess 返回一次成功运行的有序过程内容和模型用量。
+// getAgentRunProcess 返回一次已完成运行的有序过程内容和模型用量。
 func (s *Service) getAgentRunProcess(c *gin.Context) {
 	output, err := s.application.GetAgentRunProcess(c.Request.Context(), requestMeta(c), c.Param("runID"))
 	writeResult(c, http.StatusOK, output, err)
