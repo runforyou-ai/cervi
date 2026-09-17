@@ -43,7 +43,6 @@ export type InboxListPorts = {
   interacting: () => boolean
   restore: (anchor: InboxListAnchor | null, moved: Set<string>, top: boolean) => void
   unavailable: (ids: string[]) => void
-  unread: (count: number) => void
 }
 
 /** 管理页面查询的读取队列，查询切换后丢弃旧结果。 */
@@ -258,7 +257,6 @@ export class InboxListController {
       this.applyWindow(next, initial)
     }
     if (unavailable.length) this.ports.unavailable(unavailable)
-    if (head) this.ports.unread(head.attentionUnreadCount)
     if (initial) console.info("收件箱窗口已加载", { query: this.query, conversationCount: next.ids.length })
   }
 

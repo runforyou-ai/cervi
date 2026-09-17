@@ -40,7 +40,6 @@ function fixture(locateId: string | null = null) {
     interacting: () => interacting,
     restore: (...args) => { restored = args },
     unavailable: (ids) => { unavailable.push(...ids) },
-    unread: () => {},
   }
   const controller = new InboxListController(ports, { scope: "all", customerView: "queue", assigneeIdentityId: "" } as InboxQuery, undefined, false, locateId)
   return { controller, ports, trace, records, unavailable, top: (value: boolean) => { top = value }, interact: (value: boolean) => { interacting = value }, restored: () => restored }

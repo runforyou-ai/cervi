@@ -1,8 +1,8 @@
 /** 移动端身份入口、一级导航和详情布局。 */
-import { createContext, useCallback, useContext, useState } from "react"
+import { createContext, useContext } from "react"
 import { ContactRoundIcon, InboxIcon, UserRoundIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { Navigate, NavLink, Outlet, useLocation } from "react-router"
+import { Navigate, NavLink, Outlet } from "react-router"
 
 import { loadInbox, type Identity } from "@/api"
 import {
@@ -28,11 +28,6 @@ import { useResource } from "@/hooks/use-resource"
 import { cn } from "@/lib/utils"
 
 const MobileWorkspaceContext = createContext<Identity | null>(null)
-
-/** 一级页面向底部导航提供的回调。 */
-export type MobileTabContext = {
-  reportInboxAttention: (count: number) => void
-}
 
 /** 加载当前身份并为所有移动端页面提供公共上下文。 */
 export function MobileWorkspaceLayout() {
@@ -80,19 +75,11 @@ export function MobileTabLayout() {
   const { t } = useTranslation(["mobile", "inbox"])
   const { inboxURL } = useMobileNavigation()
   const { identity } = useMobileWorkspace()
-  const { pathname } = useLocation()
   const pollingActive = useMemberChatPollingActive({
     requireWindowFocus: false,
   })
   const realtime = useRealtimeSyncActive()
-  const [listAttention, setListAttention] = useState<{
-    count: number
-    at: number
-  } | null>(null)
-  const reportInboxAttention = useCallback((count: number) => {
-    setListAttention({ count, at: Date.now() })
-  }, [])
-  // 消息页由收件箱列表上报提醒总数，其他一级页面读取一条会话取得总数。
+  // 提醒总数按权威查询读取，会话变化由同步协调器失效该查询。
   const attention = useResource(
     resourceKeys.inboxAttention({
       organizationId: identity.organization.id,
@@ -100,16 +87,11 @@ export function MobileTabLayout() {
     }),
     async () => (await loadInbox({ limit: 1 })).attentionUnreadCount,
     {
-      enabled: pathname !== "/inbox",
       refetchInterval:
         pollingActive && !realtime ? memberChatPollingInterval : false,
     },
   )
-  // 采用列表上报与页签读取中较新的提醒总数。
-  const attentionUnreadCount =
-    listAttention && listAttention.at > attention.dataUpdatedAt
-      ? listAttention.count
-      : (attention.data ?? 0)
+  const attentionUnreadCount = attention.data ?? 0
   const tabs = [
     {
       path: inboxURL,
@@ -123,9 +105,7 @@ export function MobileTabLayout() {
   return (
     <>
       <main className="min-h-0 flex-1 overflow-hidden bg-background">
-        <Outlet
-          context={{ reportInboxAttention } satisfies MobileTabContext}
-        />
+        <Outlet />
       </main>
       <nav
         aria-label={t("tabs.label")}

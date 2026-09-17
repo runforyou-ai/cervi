@@ -34,13 +34,12 @@ export function InboxRoute() {
   const selectedConversationId = searchParams.get("conversation") ?? ""
   const query = inboxQueryFromSearch(searchParams)
   const viewport = useInboxListViewport()
-  const { identity, beginUnreadSnapshot, applyUnreadSnapshot } = useWorkspace()
+  const { identity } = useWorkspace()
   const { queue } = useAttachmentQueue()
   const outgoingStore = useOutgoingMessageStore()
   const active = useMemberChatPollingActive()
   const list = useInboxList(query, viewport, {
     identity, active, selectedConversationId,
-    unread: (count) => applyUnreadSnapshot(count, beginUnreadSnapshot()),
     unavailable: (id) => {
       queue?.forgetConversation(id)
       outgoingStore.forgetConversation(id)

@@ -59,7 +59,6 @@ function setup() {
     interacting: () => false,
     restore: () => {},
     unavailable: () => {},
-    unread: () => {},
   }
   const controller = new InboxListController(ports, { scope: "all", customerView: "queue", assigneeIdentityId: "" } as InboxQuery)
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } })

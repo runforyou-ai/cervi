@@ -15,7 +15,6 @@ export type InboxListViewport = ReturnType<typeof useInboxListViewport>
 type InboxListOptions = {
   identity: Identity
   active: boolean
-  unread?: (count: number) => void
   unavailable?: (id: string) => void
   history?: Map<string, InboxListBookmark>
   selectedConversationId?: string
@@ -68,9 +67,6 @@ export function useInboxList(input: InboxQuery, viewport: InboxListViewport, opt
         clearConversationResources(client, id)
         void client.resetQueries({ queryKey: resourceKeys.conversationSummary(id) })
       }
-    },
-    unread: (count) => {
-      callbacks.current.options.unread?.(count)
     },
   }, query, bookmark, cached, locateId)
   }, [client, owner, query, read, history, historyKey])
