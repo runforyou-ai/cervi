@@ -63,7 +63,7 @@ export function useNewMessageNotifications(
         try {
           return await getInboxConversation(conversationId)
         } catch (error) {
-          // 失去阅读资格时不再保留该会话的基线。
+          // 失去阅读资格的会话按不可读处理，由观察器清除其基线。
           if (isNotFoundApiError(error)) return null
           throw error
         }
@@ -82,10 +82,14 @@ export function useNewMessageNotifications(
         watcher.receive(event.frame)
       }
     })
+    // 订阅时事件流可能已经建立，此时不会再收到问候事件，直接取一次基线。
+    if (realtimeClient.state === "ready") {
+      watcher.start()
+    }
     return () => {
       unsubscribe()
       watcher.dispose()
     }
-    // deliver 是稳定的 Effect Event，不进入依赖，避免每次渲染重建观察器。
+    // deliver 是稳定的 Effect Event，依赖只保留 identityId，观察器在登录期间只创建一次并持续持有基线与去重集合。
   }, [identityId])
 }

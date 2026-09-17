@@ -121,7 +121,11 @@ export function WorkspaceLayout() {
   const unreadCount = attention.data ?? 0
 
   // 实时确认的新消息按通知策略投递，投递成功即进入待处理提醒。
-  useNewMessageNotifications(identity, () => setAttentionPending(true))
+  const deliveredAt = useRef(0)
+  useNewMessageNotifications(identity, () => {
+    deliveredAt.current = Date.now()
+    setAttentionPending(true)
+  })
 
   /** 同步桌面端未读数和提醒状态。 */
   useEffect(() => {
@@ -129,7 +133,9 @@ export function WorkspaceLayout() {
       return
     }
 
-    if ((!attentionEnabled || unreadCount === 0) && attentionPending) {
+    // 提醒总数的快照早于最近一次投递时仍是旧值，等待失效后的重读结果再判断是否清除待处理提醒。
+    const settled = attention.dataUpdatedAt >= deliveredAt.current
+    if ((!attentionEnabled || (unreadCount === 0 && settled)) && attentionPending) {
       setAttentionPending(false)
       return
     }
@@ -145,7 +151,7 @@ export function WorkspaceLayout() {
         error,
       })
     })
-  }, [userId, attentionEnabled, unreadCount, attentionPending])
+  }, [userId, attentionEnabled, unreadCount, attentionPending, attention.dataUpdatedAt])
 
   /** 用户重新查看应用时停止托盘闪烁。 */
   useEffect(() => {
