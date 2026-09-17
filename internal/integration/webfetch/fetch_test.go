@@ -9,6 +9,8 @@ import (
 	"net/http/httptest"
 	"strings"
 	"testing"
+
+	"golang.org/x/text/encoding/simplifiedchinese"
 )
 
 // TestNormalize 验证地址校验与片段清除。
@@ -28,14 +30,17 @@ func TestNormalize(t *testing.T) {
 func TestFetch(t *testing.T) {
 	ctx := context.Background()
 	cases := []struct {
-		name        string
-		contentType string
-		body        string
-		status      int
-		wantName    string
-		wantCode    string
+		name         string
+		contentType  string
+		body         string
+		encodeGBK    bool
+		status       int
+		wantName     string
+		wantContains string
+		wantCode     string
 	}{
-		{name: "html", contentType: "text/html; charset=utf-8", body: "<h1>退款</h1>", status: 200, wantName: "page.html"},
+		{name: "html", contentType: "text/html; charset=utf-8", body: helpPage, status: 200, wantName: "page.html", wantContains: "七个自然日"},
+		{name: "html gbk", contentType: "text/html; charset=gbk", body: helpPage, encodeGBK: true, status: 200, wantName: "page.html", wantContains: "七个自然日"},
 		{name: "plain", contentType: "text/plain", body: "退款说明\n<tag> 不是标记", status: 200, wantName: "page.txt"},
 		{name: "pdf", contentType: "application/pdf", body: "%PDF", status: 200, wantCode: "url_content_unsupported"},
 		{name: "missing type", contentType: "", body: "内容", status: 200, wantCode: "url_content_unsupported"},
@@ -54,7 +59,15 @@ func TestFetch(t *testing.T) {
 					writer.Header()["Content-Type"] = nil
 				}
 				writer.WriteHeader(test.status)
-				_, _ = writer.Write([]byte(test.body))
+				body := []byte(test.body)
+				if test.encodeGBK {
+					encoded, err := simplifiedchinese.GBK.NewEncoder().Bytes(body)
+					if err != nil {
+						t.Errorf("encode: %v", err)
+					}
+					body = encoded
+				}
+				_, _ = writer.Write(body)
 			}))
 			defer server.Close()
 			page, err := NewClient().Fetch(ctx, server.URL+"/help")
@@ -65,8 +78,17 @@ func TestFetch(t *testing.T) {
 				}
 				return
 			}
-			if err != nil || page.Name != test.wantName || string(page.Body) != test.body {
+			if err != nil || page.Name != test.wantName {
 				t.Fatalf("page=%+v err=%v", page, err)
+			}
+			if test.wantContains != "" {
+				if !strings.Contains(string(page.Body), test.wantContains) {
+					t.Fatalf("body=%q want %q", page.Body, test.wantContains)
+				}
+				return
+			}
+			if string(page.Body) != test.body {
+				t.Fatalf("body=%q", page.Body)
 			}
 		})
 	}

@@ -102,8 +102,9 @@
 - 按响应内容类型选择转换文件名：`text/html` 与 `application/xhtml+xml` 用 `.html`，`text/plain` 用 `.txt`，其余返回 `url_content_unsupported`。内容类型缺省时按 `url_content_unsupported` 处理，不做内容嗅探。PDF 与 Office 文件仍按上传原件入库。
 - 固定 User-Agent 标识来自 Cervi 知识库导入。
 - 不执行 JavaScript。依赖前端渲染的帮助中心会得到空壳并以 `empty_content` 失败，属于本轮已知限制。浏览器渲染服务暂不引入：触发条件是出现必须导入的客户端渲染站点，在此之前多拉一个 Chromium 量级容器的部署成本高于收益，静态抓取已覆盖服务端渲染与预渲染的文档站点，其余内容可以另存为 HTML 上传或用在线文档录入。引入时只替换 `webfetch.Client.Fetch` 的实现并增加对应配置，快照语义与处理分支不变。
-- 转换整页 HTML，不做正文提取，导航、页脚等页面结构会一并进入正文，属于本轮已知限制。
-- 非 UTF-8 编码的页面本轮不做转码，按 markitdown 的输出结果入库。
+- HTML 页面在送转换前先按 `golang.org/x/net/html/charset` 的判定顺序（BOM、页面内声明、响应头 charset）解码为 UTF-8，`text/plain` 同样解码；判定失败时保留原字节。
+- 解码后由 `github.com/go-shiori/go-readability` 提取正文主体，导航、侧栏、页脚不进入正文，正文内的标题层级、表格和代码块保留，页面内的相对链接改写为绝对地址。提取结果包成完整 HTML 文档后送转换服务。解析失败或提取不到正文时送整页，前端渲染的空壳页据此仍按 `empty_content` 失败。
+- 提取按整页正文结构判定，不保证逐站点准确：结构异常的站点可能保留部分页面结构或丢失次要区块。判定规则由 readability 提供，本轮不在其之上叠加站点规则。
 
 不做内网地址与私有网段拦截：私有化部署的企业内网文档站点是本能力的实际来源之一。SSRF 与抓取频率控制列入上线前的安全与容量专项。
 
@@ -176,6 +177,7 @@ POST   /knowledge-bases/:knowledgeBaseID/documents/:documentID/refetch  { source
 
 - `wails3 task test:server` 通过。新增 `TestKnowledgeDocumentSourceWithoutFile` 覆盖无原件文档在列表、详情、关键词过滤和混合召回中按标题呈现；`TestKnowledgeTextDocumentLifecycle` 覆盖在线文档的创建投递、索引发布、只改名称不投递、正文未变化不投递、正文变化替换批次并清除旧分段、来源限制与删除清理；`TestKnowledgeWebDocumentLifecycle` 覆盖地址校验、重复导入拒绝、首次抓取写快照、重试读快照不出网、重新抓取替换快照与批次、更新页面地址、抓取失败保留上一批次与上一快照、在线文档不支持重新抓取。`internal/integration/webfetch` 的单元测试覆盖地址规范化、HTML 与纯文本的文件名选择、非 2xx、内容类型不支持、体积上限与连接失败。
 - 前端 `common:build:frontend` 与 `test:frontend` 通过。
+- 2026-09-16 网页正文提取与编码：`internal/integration/webfetch` 新增单元测试，覆盖带导航、侧栏、页脚的帮助中心页面提取后保留标题、表格与代码块并去掉页面结构，空壳页回退整页，GBK 页面按响应头与页面内声明两种判定解码，以及 GBK 页面经 `Fetch` 全程解码。真实页面对照 markitdown 转换结果：`https://zh.wikipedia.org/wiki/Markdown` 由 37844 字符降到 21942 字符，跳转到内容、分类索引、互助客栈、隐私政策、维基媒体基金会等页面结构不再出现，正文与 CommonMark 等内容保留；`https://docs.python.org/zh-cn/3/tutorial/introduction.html` 由 14253 字符降到 11505 字符，导航、上一页、页脚版权不再出现，`## `、`### ` 标题与围栏代码块保留。`wails3 task test:server` 通过。
 - 2026-09-15 浏览器界面验证（通义千问 `qwen3.7-text-embedding` 1536 维与 `qwen3-rerank`）：「添加文档」下拉包含上传文件、编写文档、导入网页三项；在线编写「在线编写验证」经工具栏插入标题、正文、无序列表和 3×3 表格后保存，约 9 秒内完成索引，列表来源列显示「在线编写」、类型列显示 MD、主操作为「编辑」，重新打开后标题、列表与表格结构保持一致；名称与正文的必填提示均由浏览器显示在对应控件上；导入 `https://zh.wikipedia.org/wiki/Markdown` 后来源列显示「网页导入」，约 30 秒内完成索引并落库 97 段，详情页正文按 Markdown 渲染；网页文档的「重新抓取」可用，在线文档的同一菜单项禁用。
 - 界面验证期间发现并修复：承载正文必填的隐藏控件带 `readonly` 时不参与约束校验，且 `onFocus` 转移焦点会取消浏览器气泡；改为透明、覆盖编辑区且接收字段 ref 的控件后提示正常显示。
 - 代码审查后的修复与复验：编辑页在表单未编辑时同步最新名称与正文并重建编辑器；网页详情页在处理期间轮询正文、无正文时按索引状态显示占位并展示来源地址；重试与重新抓取一并失效正文缓存；「编写文档」入口保留列表筛选与页码；导入弹窗每次打开重置；尚无快照的网页重试按出网处理并先检查转换服务连接；回滚迁移先清除非上传来源的文档与分段，在含在线文档和网页文档的开发库上验证了回滚与重新前滚。
