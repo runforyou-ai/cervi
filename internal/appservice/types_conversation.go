@@ -192,7 +192,9 @@ type ConversationSystemEvent struct {
 
 // ConversationMessage 定义成员可见的会话消息。
 type ConversationMessage struct {
-	CanReply bool `json:"canReply"`
+	// CanReply 表示可以在对客回复中引用该消息，CanNoteReply 表示可以在内部备注中引用该消息。
+	CanReply     bool `json:"canReply"`
+	CanNoteReply bool `json:"canNoteReply"`
 	// ClientMessageID 仅向原发送身份返回。
 	ClientMessageID *string                          `json:"clientMessageId"`
 	Attachment      *MessageAttachment               `json:"attachment"`
@@ -437,9 +439,10 @@ type ConversationMessageReferenceListInput struct {
 
 // ConversationMessageReferenceState 定义一条消息的最新引用与回复可用状态。
 type ConversationMessageReferenceState struct {
-	MessageID string                        `json:"messageId"`
-	CanReply  bool                          `json:"canReply"`
-	ReplyTo   *ConversationMessageReference `json:"replyTo"`
+	MessageID    string                        `json:"messageId"`
+	CanReply     bool                          `json:"canReply"`
+	CanNoteReply bool                          `json:"canNoteReply"`
+	ReplyTo      *ConversationMessageReference `json:"replyTo"`
 }
 
 // ConversationMessageReferenceList 返回窗口内的引用状态。

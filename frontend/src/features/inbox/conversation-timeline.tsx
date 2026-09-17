@@ -79,6 +79,7 @@ type TimelineMessage = Pick<
   | "systemEvent"
   | "replyTo"
   | "canReply"
+  | "canNoteReply"
   | "mentions"
   | "mentionAll"
   | "agentProcess"
@@ -147,6 +148,7 @@ function mergeTimelineMessages(
       systemEvent: null,
       replyTo: message.replyTo,
       canReply: false,
+      canNoteReply: false,
       mentions: message.mentionSubjectIDs.flatMap((subjectID) => {
         const participant = participantsBySubjectID.get(subjectID)
         return participant
@@ -260,9 +262,10 @@ function ConversationTimelineContent({
   outgoingMessages,
   onRetryFailedMessage,
   retryFailedMessageDisabled = false,
-  noteRetryDisabled = false,
   onReplyMessage,
   noteReplyEnabled = false,
+  customerReplyUnavailable = false,
+  replyVisibility = MessageVisibility.MessageVisibilityCustomerVisible,
   groupParticipants,
   onReadMessage,
   readThroughMessageID,
@@ -282,9 +285,13 @@ function ConversationTimelineContent({
   outgoingMessages: OutgoingConversationMessage[]
   onRetryFailedMessage?: (message: OutgoingConversationDraft) => void
   retryFailedMessageDisabled?: boolean
-  noteRetryDisabled?: boolean
-  onReplyMessage?: (message: ConversationMessageReference) => void
+  onReplyMessage?: (
+    message: ConversationMessageReference,
+    visibility: MessageVisibility,
+  ) => void
   noteReplyEnabled?: boolean
+  customerReplyUnavailable?: boolean
+  replyVisibility?: MessageVisibility
   groupParticipants?: GroupParticipant[]
   onReadMessage?: (messageID: string) => void
   readThroughMessageID?: string | null
@@ -298,9 +305,10 @@ function ConversationTimelineContent({
 }) {
   const currentIdentityID = currentUser.identityId
   // 有文本发送中时禁用文本重试，附件重试由上传队列排队。
-  const textRetryDisabled =
-    retryFailedMessageDisabled ||
-    outgoingMessages.some((message) => message.status === "sending" && !message.attachment)
+  const sendingText = outgoingMessages.some(
+    (message) => message.status === "sending" && !message.attachment,
+  )
+  const textRetryDisabled = retryFailedMessageDisabled || sendingText
   // 移动端气泡禁止文本选择，消息菜单项使用触屏尺寸，回复入口只通过长按菜单提供。
   const mobile = resolveAppPlatform() === "mobile"
   const menuItemClassName = cn(mobile && "min-h-11")
@@ -741,7 +749,7 @@ function ConversationTimelineContent({
             {visibleMessages.map((storedMessage, index) => {
               // 引用状态独立刷新，保留当前窗口、正文位置和滚动上下文。
               const referenceState = referencesByMessage.get(storedMessage.id)
-              const message = referenceState ? { ...storedMessage, canReply: referenceState.canReply, replyTo: referenceState.replyTo } : storedMessage
+              const message = referenceState ? { ...storedMessage, canReply: referenceState.canReply, canNoteReply: referenceState.canNoteReply, replyTo: referenceState.replyTo } : storedMessage
               const previous = visibleMessages[index - 1]
               const next = visibleMessages[index + 1]
               const agentError = message.type === MessageType.MessageTypeAgentError
@@ -799,8 +807,20 @@ function ConversationTimelineContent({
               const referenceBody = message.body || message.attachment?.name || ""
               const internalNote =
                 message.visibility === MessageVisibility.MessageVisibilityInternalOnly
-              // 重试资格按消息自身的可见范围判断。
-              const messageRetryDisabled = internalNote ? noteRetryDisabled : textRetryDisabled
+              // 内部备注的重试不受对客发送资格限制，仍与发送中的文本互斥。
+              const messageRetryDisabled = internalNote ? sendingText : textRetryDisabled
+              // 引用落入的输入模式：当前处于备注模式，或这条消息不能用于对客回复时，都写入内部备注。
+              const quoteAsNote =
+                noteReplyEnabled &&
+                (replyVisibility === MessageVisibility.MessageVisibilityInternalOnly ||
+                  customerReplyUnavailable ||
+                  !message.canReply)
+              const quoteDisabled = quoteAsNote
+                ? !message.canNoteReply
+                : !message.canReply
+              const quoteVisibility = quoteAsNote
+                ? MessageVisibility.MessageVisibilityInternalOnly
+                : MessageVisibility.MessageVisibilityCustomerVisible
               // 文字气泡与附件气泡共用同一套方向配色和组尾圆角，内部备注使用区别于对客消息的常驻样式。
               const bubbleClassName = cn(
                 internalNote
@@ -923,17 +943,20 @@ function ConversationTimelineContent({
                                 {incoming && !agentNotice && onReplyMessage && !mobile ? (
                                   <button
                                     type="button"
-                                    disabled={!message.canReply}
+                                    disabled={quoteDisabled}
                                     className="disabled:cursor-not-allowed disabled:opacity-50 pointer-events-none absolute top-0 -right-2 z-10 -translate-y-1/2 whitespace-nowrap rounded-lg border bg-background px-2 py-1 text-xs text-foreground opacity-0 shadow-sm transition-opacity group-focus-within/message:pointer-events-auto group-focus-within/message:opacity-100 group-hover/message:pointer-events-auto group-hover/message:opacity-100 focus-visible:pointer-events-auto focus-visible:opacity-100"
                                     onClick={() =>
-                                      onReplyMessage({
-                                        id: message.id,
-                                        type: message.type,
-                                        visibility: message.visibility,
-                                        body: referenceBody,
-                                        sender: message.sender,
-                                        deleted: false,
-                                      })
+                                      onReplyMessage(
+                                        {
+                                          id: message.id,
+                                          type: message.type,
+                                          visibility: message.visibility,
+                                          body: referenceBody,
+                                          sender: message.sender,
+                                          deleted: false,
+                                        },
+                                        quoteVisibility,
+                                      )
                                     }
                                   >
                                     {t("messageReply")}
@@ -1058,16 +1081,19 @@ function ConversationTimelineContent({
                         {!message.local && !agentNotice && onReplyMessage ? (
                           <ContextMenuItem
                             className={menuItemClassName}
-                            disabled={!message.canReply || (internalNote && !noteReplyEnabled)}
+                            disabled={quoteDisabled}
                             onSelect={() =>
-                              onReplyMessage({
-                                id: message.id,
-                                type: message.type,
-                                visibility: message.visibility,
-                                body: referenceBody,
-                                sender: message.sender,
-                                deleted: false,
-                              })
+                              onReplyMessage(
+                                {
+                                  id: message.id,
+                                  type: message.type,
+                                  visibility: message.visibility,
+                                  body: referenceBody,
+                                  sender: message.sender,
+                                  deleted: false,
+                                },
+                                quoteVisibility,
+                              )
                             }
                           >
                             {t("messageReply")}

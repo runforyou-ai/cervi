@@ -12,6 +12,7 @@ import {
   isGroupInboxConversation,
   ConversationStatus,
   MessageType,
+  MessageVisibility,
   ServiceSessionStatus,
   type CustomerInboxConversationData,
   type AgentInboxConversationData,
@@ -126,7 +127,7 @@ function MobileConversationRow({
       : "bg-muted text-muted-foreground"
 
   if (!summary) return null
-  const preview =
+  const previewBody =
     groupConversation?.group.status ===
     ConversationStatus.ConversationStatusArchived
       ? t("groupDissolved")
@@ -141,6 +142,12 @@ function MobileConversationRow({
             (groupConversation && conversation.lastMessageId
               ? t("groupSystemUpdated")
               : t("messagesEmpty"))
+  // 客户会话的末条消息是内部备注时，摘要标明来源。
+  const preview =
+    customerConversation?.customer.previewVisibility ===
+    MessageVisibility.MessageVisibilityInternalOnly
+      ? t("previewInternalNote", { preview: previewBody })
+      : previewBody
   const formattedTime = formatTime(summary.lastMessageAt)
   const internalConversation =
     directConversation ??

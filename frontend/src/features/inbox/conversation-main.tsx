@@ -18,10 +18,7 @@ import { ConversationContextPane } from "@/features/inbox/conversation-context-p
 import { ConversationHeader } from "@/features/inbox/conversation-header"
 import { ConversationThread } from "@/features/inbox/conversation-thread"
 import type { ConversationLocateTarget } from "@/features/inbox/conversation-timeline"
-import {
-  customerNoteDisabledReason,
-  customerReplyDisabledReason,
-} from "@/features/inbox/customer-session-actions"
+import { customerReplyDisabledReason } from "@/features/inbox/customer-session-actions"
 import { DirectConversationDraftHeader } from "@/features/inbox/direct-conversation-draft-header"
 import { sessionStatusLabel } from "@/features/inbox/session-status-label"
 import { useAccountDisabledReason } from "@/features/inbox/use-account-disabled-reason"
@@ -128,9 +125,6 @@ export function ConversationMain({
   const sessionStatus = customerConversation
     ? sessionStatusLabel(customerConversation.customer.serviceSessionStatus, t)
     : ""
-  const noteDisabledReason = customerConversation
-    ? customerNoteDisabledReason(customerConversation.customer, t)
-    : null
   const replyDisabledReason = customerConversation
     ? customerReplyDisabledReason(
         customerConversation.customer,
@@ -182,7 +176,6 @@ export function ConversationMain({
             selection.kind === "agent-draft" ? selection.conversationId : ""
           }
           replyDisabledReason={replyDisabledReason}
-          noteDisabledReason={noteDisabledReason}
           onConversationChanged={() => {
             if (validConversation) onConversationChanged(validConversation.id)
           }}

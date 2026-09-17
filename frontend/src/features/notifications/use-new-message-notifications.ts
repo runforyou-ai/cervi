@@ -3,6 +3,7 @@ import { useEffect, useEffectEvent } from "react"
 import { useTranslation } from "react-i18next"
 
 import {
+  MessageVisibility,
   getInboxConversation,
   isNotFoundApiError,
   listConversationMessages,
@@ -42,9 +43,13 @@ export function useNewMessageNotifications(
       const delivered = await notifyNewMessage({
         id: message.id,
         title: conversationName(conversation),
-        body: conversation.group
-          ? t("notificationGroupBody", { sender, preview })
-          : preview,
+        // 内部备注标明来源，与客户消息区分。
+        body:
+          message.visibility === MessageVisibility.MessageVisibilityInternalOnly
+            ? t("notificationInternalNoteBody", { sender, preview })
+            : conversation.group
+              ? t("notificationGroupBody", { sender, preview })
+              : preview,
         scope: { organizationId, userId },
       })
       if (delivered) {

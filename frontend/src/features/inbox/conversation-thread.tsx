@@ -44,7 +44,6 @@ export function ConversationThread({
   directTarget,
   groupParticipants,
   replyDisabledReason,
-  noteDisabledReason,
   onConversationChanged,
   onChatStarted,
   locateMessage,
@@ -60,7 +59,6 @@ export function ConversationThread({
   groupParticipants: GroupParticipant[] | undefined
   agentDraftID: string
   replyDisabledReason: string | null
-  noteDisabledReason: string | null
   onConversationChanged: () => void
   onChatStarted: (
     conversation: DirectInboxConversationData | AgentInboxConversationData,
@@ -110,12 +108,11 @@ export function ConversationThread({
   >({})
   const replyTo = replyTargets[visibility] ?? null
 
-  /** 保存当前模式的引用目标，引用内部备注时切到内部备注模式。 */
-  function selectReplyTarget(message: ConversationMessageReference | null) {
-    const target =
-      message?.visibility === MessageVisibility.MessageVisibilityInternalOnly
-        ? MessageVisibility.MessageVisibilityInternalOnly
-        : visibility
+  /** 按时间线给出的输入模式保存引用目标并切到该模式。 */
+  function selectReplyTarget(
+    message: ConversationMessageReference | null,
+    target: MessageVisibility,
+  ) {
     setVisibility(target)
     setReplyTargets((current) => ({ ...current, [target]: message }))
   }
@@ -136,6 +133,8 @@ export function ConversationThread({
     conversation && isGroupInboxConversation(conversation) ? conversation : null
   const customerConversation =
     conversation && isCustomerInboxConversation(conversation) ? conversation : null
+  // 渠道不支持、周期已关闭或由他人负责时都不能对客回复。
+  const customerReplyUnavailable = !replySupported || Boolean(replyDisabledReason)
 
   return (
     <>
@@ -151,15 +150,17 @@ export function ConversationThread({
           setReplyTargets((current) => ({ ...current, [draft.visibility]: draft.replyTo }))
           setRetryDraft(draft)
         }}
-        retryFailedMessageDisabled={!replySupported || Boolean(replyDisabledReason)}
-        noteRetryDisabled={Boolean(noteDisabledReason)}
+        retryFailedMessageDisabled={customerReplyUnavailable}
         groupParticipants={groupParticipants}
         onReplyMessage={
-          conversation && ((replySupported && !replyDisabledReason) || !noteDisabledReason)
+          conversation &&
+          ((replySupported && !replyDisabledReason) || Boolean(customerConversation))
             ? selectReplyTarget
             : undefined
         }
-        noteReplyEnabled={Boolean(customerConversation) && !noteDisabledReason}
+        noteReplyEnabled={Boolean(customerConversation)}
+        customerReplyUnavailable={customerReplyUnavailable}
+        replyVisibility={visibility}
         onReadMessage={conversation ? markRead : undefined}
         readThroughMessageID={conversation?.lastReadMessageId}
         enabled={Boolean(conversation)}
@@ -185,7 +186,6 @@ export function ConversationThread({
         }
         visibility={visibility}
         onVisibilityChange={customerConversation ? setVisibility : undefined}
-        noteDisabledReason={noteDisabledReason}
         onSending={outgoing.start}
         onSent={outgoing.succeed}
         onFailed={(clientMessageID) => {

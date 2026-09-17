@@ -9,12 +9,16 @@ import (
 	"uuid"
 
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
+	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
+	"github.com/runforyou-ai/cervi/internal/tenant"
 )
 
 // TestCustomerInternalNotes 验证内部备注的写入资格、周期摘要、客户侧隔离和引用边界。
@@ -53,6 +57,25 @@ func TestCustomerInternalNotes(t *testing.T) {
 	}
 	if conversation.LastMessageID == nil || *conversation.LastMessageID != note.ID {
 		t.Fatalf("conversation summary = %+v, want note %s", conversation.LastMessageID, note.ID)
+	}
+	// 成员收件箱摘要取到内部备注时标明可见范围。
+	inboxPage, _, err := inboxaction.NewLoadInboxQuery(f.db).Execute(ctx, f.owner, inboxaction.LoadInput{Scope: domain.InboxScopeCustomer, CustomerView: domain.CustomerInboxViewQueue, ServiceStatus: domain.ServiceSessionStatusOpen})
+	if err != nil {
+		t.Fatal(err)
+	}
+	listed := false
+	for _, row := range inboxPage.Conversations {
+		if row.ID != f.conversationID {
+			continue
+		}
+		listed = true
+		if row.Customer == nil || row.Customer.Preview == nil || *row.Customer.Preview != noteInput.Body ||
+			row.Customer.PreviewVisibility == nil || *row.Customer.PreviewVisibility != domain.MessageVisibilityInternalOnly {
+			t.Fatalf("inbox preview = %+v", row.Customer)
+		}
+	}
+	if !listed {
+		t.Fatal("customer conversation missing from inbox")
 	}
 
 	history, err := conversationaction.NewListConversationMessagesQuery(f.db).Execute(ctx, f.owner, conversationaction.ConversationMessageHistoryInput{ConversationID: f.conversationID})
@@ -120,6 +143,31 @@ func TestCustomerInternalNotes(t *testing.T) {
 		}
 	})
 
+	t.Run("对客引用资格排除内部备注", func(t *testing.T) {
+		login, err := authaction.NewLoginAction(f.db).Execute(ctx, authaction.LoginInput{OrganizationID: f.owner.Organization.ID, Email: "member@navigation.test", Password: "password123"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		backend := appservice.NewDirectBackend(f.db, nil, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil)
+		window, err := backend.ListConversationMessages(tenant.WithAccessHost(ctx, f.owner.Organization.AccessHost), appservice.RequestMeta{Token: login.Token}, f.conversationID, appservice.ConversationMessageListInput{})
+		if err != nil {
+			t.Fatal(err)
+		}
+		checked := false
+		for _, message := range window.Messages {
+			if message.ID != note.ID {
+				continue
+			}
+			checked = true
+			if message.CanReply || !message.CanNoteReply {
+				t.Fatalf("note reply eligibility = %+v", message)
+			}
+		}
+		if !checked {
+			t.Fatal("internal note missing from member timeline")
+		}
+	})
+
 	t.Run("客户不能引用内部备注", func(t *testing.T) {
 		_, err := f.receive.Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
 			ChannelID: f.channelID, ExternalID: externalID, ConversationID: &f.conversationID,
@@ -145,19 +193,34 @@ func TestCustomerInternalNotes(t *testing.T) {
 		}
 	})
 
-	t.Run("关闭周期后不能留内部备注", func(t *testing.T) {
+	t.Run("关闭周期后仍可补记内部备注", func(t *testing.T) {
 		tasks := servertask.New(f.db, serverconfig.NATSConfig{})
 		closeSession := conversationaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, tasks, nil, testAttachmentReader(f.db), nil))
 		if _, err := closeSession.Execute(ctx, f.owner, f.conversationID); err != nil {
 			t.Fatal(err)
 		}
-		_, err := send.Execute(ctx, f.owner, conversationaction.CustomerTextMessageInput{
+		saved, err := send.Execute(ctx, f.owner, conversationaction.CustomerTextMessageInput{
 			ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(),
 			Body: "补一条备注", Visibility: domain.MessageVisibilityInternalOnly,
 		})
+		if err != nil || saved.Visibility != domain.MessageVisibilityInternalOnly {
+			t.Fatalf("closed session note=%+v err=%v", saved, err)
+		}
+		// 补记不重开周期，也不推进周期摘要。
+		closed := &servermodels.ServiceSession{}
+		if err := f.db.NewSelect().Model(closed).Where("ss.conversation_id = ?", f.conversationID).Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if closed.Status != string(domain.ServiceSessionStatusClosed) || closed.LastMessageID == saved.ID {
+			t.Fatalf("closed session changed by note: %+v", closed)
+		}
+		// 对客回复仍然要求先重新打开周期。
+		_, err = send.Execute(ctx, f.owner, conversationaction.CustomerTextMessageInput{
+			ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "已为您加急",
+		})
 		var conflict *conversationaction.ConflictError
 		if !errors.As(err, &conflict) || conflict.Reason != conversationaction.ConflictReasonServiceSessionNotReplyable {
-			t.Fatalf("closed session note = %v", err)
+			t.Fatalf("closed session reply = %v", err)
 		}
 	})
 }

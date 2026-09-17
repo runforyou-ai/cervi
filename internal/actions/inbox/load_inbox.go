@@ -55,6 +55,7 @@ type CustomerConversationSummary struct {
 	ChannelName               string
 	Preview                   *string
 	PreviewSenderIdentityType *domain.OrganizationIdentityType
+	PreviewVisibility         *domain.MessageVisibility
 	LastMessageAt             *time.Time
 	ServiceSessionStatus      domain.ServiceSessionStatus
 	ServiceSessionID          string
@@ -136,6 +137,7 @@ type customerConversationRow struct {
 	ChannelName               string                           `bun:"channel_name"`
 	Preview                   *string                          `bun:"preview"`
 	PreviewSenderIdentityType *domain.OrganizationIdentityType `bun:"preview_sender_identity_type"`
+	PreviewVisibility         *domain.MessageVisibility        `bun:"preview_visibility"`
 	LastMessageAt             *time.Time                       `bun:"last_message_at"`
 	ServiceSessionStatus      string                           `bun:"service_session_status"`
 	ServiceSessionID          string                           `bun:"service_session_id"`
@@ -295,6 +297,7 @@ func (q *LoadInboxQuery) customerConversationDetailsQuery(organizationID, curren
 		ColumnExpr("? AS preview", messagequery.Summary("msg")).
 		ColumnExpr("msg.type AS last_message_type").
 		ColumnExpr("preview_oi.type AS preview_sender_identity_type").
+		ColumnExpr("msg.visibility AS preview_visibility").
 		ColumnExpr("cv.last_message_at AS last_message_at").
 		ColumnExpr("cv.last_message_id::text AS last_message_id").
 		ColumnExpr("current.status AS service_session_status").
@@ -500,7 +503,7 @@ func (row customerConversationRow) summary() ConversationSummary {
 		Customer: &CustomerConversationSummary{
 			Title: row.Title, ContactName: row.ContactName, ContactAvatarFileID: row.ContactAvatarFileID,
 			ChannelType: domain.ChannelType(row.ChannelType), ChannelName: row.ChannelName,
-			Preview: row.Preview, PreviewSenderIdentityType: row.PreviewSenderIdentityType, LastMessageAt: row.LastMessageAt,
+			Preview: row.Preview, PreviewSenderIdentityType: row.PreviewSenderIdentityType, PreviewVisibility: row.PreviewVisibility, LastMessageAt: row.LastMessageAt,
 			ServiceSessionID: row.ServiceSessionID, ServiceSessionStatus: domain.ServiceSessionStatus(row.ServiceSessionStatus), Assignee: assignee,
 		},
 	}

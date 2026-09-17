@@ -139,7 +139,8 @@ func inboxConversationFromAction(summary inboxaction.ConversationSummary, avatar
 			Title: summary.Customer.Title, ContactName: summary.Customer.ContactName,
 			ContactAvatarURL: optionalFileURL(avatarURLs, summary.Customer.ContactAvatarFileID),
 			ChannelType:      ChannelType(summary.Customer.ChannelType), ChannelName: summary.Customer.ChannelName,
-			Preview: summary.Customer.Preview, PreviewSenderIdentityType: (*OrganizationIdentityType)(summary.Customer.PreviewSenderIdentityType), LastMessageAt: summary.Customer.LastMessageAt,
+			Preview: summary.Customer.Preview, PreviewSenderIdentityType: (*OrganizationIdentityType)(summary.Customer.PreviewSenderIdentityType),
+			PreviewVisibility: (*MessageVisibility)(summary.Customer.PreviewVisibility), LastMessageAt: summary.Customer.LastMessageAt,
 			ServiceSessionID: summary.Customer.ServiceSessionID, ServiceSessionStatus: ServiceSessionStatus(summary.Customer.ServiceSessionStatus), Assignee: assignee,
 		}
 	}

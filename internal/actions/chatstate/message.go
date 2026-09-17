@@ -73,7 +73,8 @@ func AppendMessage(ctx context.Context, db bun.IDB, conversation *servermodels.C
 	if err := query.Returning("last_activity_at").Scan(ctx); err != nil {
 		return nil, false, fmt.Errorf("update conversation summary: %w", err)
 	}
-	if err := NotifyConversationChanged(ctx, db, conversation); err != nil {
+	// 内部备注不推进客户可见事实，不登记网站访客受众的变更通知。
+	if err := notifyConversationChanged(ctx, db, conversation, message.Visibility != string(domain.MessageVisibilityInternalOnly)); err != nil {
 		return nil, false, err
 	}
 	return message, true, nil
@@ -92,9 +93,14 @@ func TouchConversation(ctx context.Context, db bun.IDB, conversation *servermode
 
 // NotifyConversationChanged 按会话当前版本登记变更通知：客户会话及其 Copilot 线程通知企业客服共享受众，网站客户会话同时通知所属渠道身份受众，内部会话通知当前真人成员。
 func NotifyConversationChanged(ctx context.Context, db bun.IDB, conversation *servermodels.Conversation) error {
+	return notifyConversationChanged(ctx, db, conversation, true)
+}
+
+// notifyConversationChanged 按受众登记会话变更通知，notifyVisitor 为假时跳过网站访客受众。
+func notifyConversationChanged(ctx context.Context, db bun.IDB, conversation *servermodels.Conversation, notifyVisitor bool) error {
 	if conversation.Type == string(domain.ConversationTypeCustomer) || conversation.Type == string(domain.ConversationTypeCopilot) {
 		realtime.Notify(ctx, realtime.CustomerInboxConversationChanged(conversation.OrganizationID, conversation.ID, conversation.Version))
-		if conversation.Type != string(domain.ConversationTypeCustomer) {
+		if conversation.Type != string(domain.ConversationTypeCustomer) || !notifyVisitor {
 			return nil
 		}
 		// 仅网站客户会话按所属渠道身份登记访客目录受众通知。

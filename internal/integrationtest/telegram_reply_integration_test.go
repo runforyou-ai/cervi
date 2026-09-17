@@ -92,7 +92,7 @@ func TestTelegramReplyRoundTrip(t *testing.T) {
 	}
 }
 
-// TestTelegramInternalNoteReplyEligibility 验证 Telegram 客户会话中的内部备注可被引用且不产生投递。
+// TestTelegramInternalNoteReplyEligibility 验证 Telegram 客户会话中的内部备注可被引用、不产生投递，且备注引用不受渠道投递条件限制。
 func TestTelegramInternalNoteReplyEligibility(t *testing.T) {
 	f := newCustomerDeliveryFixture(t)
 	ctx := context.Background()
@@ -123,6 +123,35 @@ func TestTelegramInternalNoteReplyEligibility(t *testing.T) {
 	if err != nil || quoted.ReplyTo == nil || quoted.ReplyTo.ID != note.ID {
 		t.Fatalf("telegram note reply = %+v err=%v", quoted.ReplyTo, err)
 	}
+
+	t.Run("尚未投递的对客消息仍可被内部备注引用", func(t *testing.T) {
+		send := conversationaction.NewSendCustomerTextMessageAction(f.db, nil)
+		pending, err := send.Execute(ctx, f.owner, conversationaction.CustomerTextMessageInput{
+			ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "稍等，我确认一下",
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		states, err := conversationaction.NewListConversationMessagesQuery(f.db).ListReferences(ctx, f.owner, f.conversationID, []string{pending.ID})
+		if err != nil || len(states) != 1 || !states[0].ReplyUnavailable {
+			t.Fatalf("pending state=%+v err=%v", states, err)
+		}
+		_, err = send.Execute(ctx, f.owner, conversationaction.CustomerTextMessageInput{
+			ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(),
+			Body: "继续跟进", ReplyToMessageID: pending.ID,
+		})
+		var conflict *conversationaction.ConflictError
+		if !errors.As(err, &conflict) || conflict.Reason != conversationaction.ConflictReasonReplyTargetInvalid {
+			t.Fatalf("customer visible reply to pending message = %v", err)
+		}
+		noteQuote, err := send.Execute(ctx, f.owner, conversationaction.CustomerTextMessageInput{
+			ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(),
+			Body: "这条还没发出去", ReplyToMessageID: pending.ID, Visibility: domain.MessageVisibilityInternalOnly,
+		})
+		if err != nil || noteQuote.ReplyTo == nil || noteQuote.ReplyTo.ID != pending.ID {
+			t.Fatalf("note reply to pending message = %+v err=%v", noteQuote.ReplyTo, err)
+		}
+	})
 }
 
 // TestTelegramReplyLateMapping 验证乱序原消息、迟到回执、引用快照和重放关联稳定。
