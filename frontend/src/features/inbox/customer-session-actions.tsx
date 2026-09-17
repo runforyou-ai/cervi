@@ -61,19 +61,6 @@ export function customerReplyDisabledReason(
   return null
 }
 
-/** 按处理状态返回当前客服不能写内部备注的原因。 */
-export function customerNoteDisabledReason(
-  customer: CustomerSummary,
-  t: TFunction<"inbox">,
-) {
-  if (
-    customer.serviceSessionStatus ===
-    ServiceSessionStatus.ServiceSessionStatusClosed
-  )
-    return t("noteClosedUnavailable")
-  return null
-}
-
 /** 管理客服处理周期命令的执行状态、可用操作和关闭确认。 */
 export function useCustomerSessionActions(
   conversation: CustomerInboxConversationData | null,

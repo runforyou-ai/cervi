@@ -262,6 +262,7 @@ const inbox = {
   sessionBoundaryClosed: "Closed",
   unknownSender: "Unknown sender",
   notificationGroupBody: "{{sender}}: {{preview}}",
+  notificationInternalNoteBody: "Internal note · {{sender}}: {{preview}}",
   notificationAttachment: "[Attachment] {{name}}",
   conversationClaim: "Claim",
   conversationTakeover: "Take over",
@@ -303,8 +304,7 @@ const inbox = {
   internalNoteLabel: "Internal note",
   internalNoteSave: "Post note",
   internalNoteSender: "Internal note · {{name}}",
-  noteClosedUnavailable:
-    "This conversation is closed. Reopen it to add internal notes.",
+  previewInternalNote: "Internal note · {{preview}}",
   replyClosedUnavailable: "This conversation is closed. Reopen it to reply.",
   replyAssignedUnavailable:
     "{{name}} is handling this conversation. Take it over to reply.",

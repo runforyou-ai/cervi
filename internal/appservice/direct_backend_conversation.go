@@ -571,8 +571,11 @@ func conversationMessageFromAction(message conversationaction.ConversationMessag
 	if message.Attachment != nil {
 		attachment = &MessageAttachment{File: File{ID: message.Attachment.ID, Name: message.Attachment.Name, ContentType: message.Attachment.ContentType, ByteSize: message.Attachment.ByteSize}, ImageWidth: message.Attachment.ImageWidth, ImageHeight: message.Attachment.ImageHeight}
 	}
+	// 文本和附件消息可以被引用；对客回复只能引用对客可见且渠道能够投递该引用的消息。
+	quotable := message.Type == domain.MessageTypeText || message.Type == domain.MessageTypeAttachment
 	return ConversationMessage{
-		CanReply:        !message.ReplyUnavailable && (message.Type == domain.MessageTypeText || message.Type == domain.MessageTypeAttachment),
+		CanReply:        quotable && !message.ReplyUnavailable && message.Visibility != domain.MessageVisibilityInternalOnly,
+		CanNoteReply:    quotable,
 		ClientMessageID: message.ClientMessageID,
 		Attachment:      attachment,
 		AgentProcess:    conversationAgentProcessFromAction(message.AgentProcess),

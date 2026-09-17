@@ -6,6 +6,7 @@ import { useNavigate } from "react-router"
 import {
   ConversationStatus,
   MessageType,
+  MessageVisibility,
   isAgentInboxConversation,
   isCustomerInboxConversation,
   isDirectInboxConversation,
@@ -78,7 +79,7 @@ export function InboxConversationList({
             isGroupInboxConversation(conversation) &&
             conversation.group.status ===
               ConversationStatus.ConversationStatusArchived
-          const preview = groupDissolved
+          const previewBody = groupDissolved
             ? t("groupDissolved")
             : conversation.lastMessageType === MessageType.MessageTypeAgentCancelled
               ? t("agentReplyStopped")
@@ -91,6 +92,13 @@ export function InboxConversationList({
                   (isGroupInboxConversation(conversation) && summary.lastMessageAt
                     ? t("groupSystemUpdated")
                     : t("messagesEmpty"))
+          // 客户会话的末条消息是内部备注时，摘要标明来源。
+          const preview =
+            isCustomerInboxConversation(conversation) &&
+            conversation.customer.previewVisibility ===
+              MessageVisibility.MessageVisibilityInternalOnly
+              ? t("previewInternalNote", { preview: previewBody })
+              : previewBody
           const formattedTime = formatTime(summary.lastMessageAt)
           const isInternal = isInternalInboxConversation(conversation)
           return (

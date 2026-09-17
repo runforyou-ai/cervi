@@ -174,11 +174,12 @@ func (a *SendCustomerTextMessageAction) executeTransaction(ctx context.Context, 
 	originatedAt := time.Now().UTC()
 	// 计算成员回复对应的客服周期状态迁移。
 	status := domain.ServiceSessionStatus(session.Status)
-	if status == domain.ServiceSessionStatusClosed {
-		return ConversationMessage{}, &ConflictError{Reason: ConflictReasonServiceSessionNotReplyable}
-	}
-	if status != domain.ServiceSessionStatusOpen {
+	if status != domain.ServiceSessionStatusOpen && status != domain.ServiceSessionStatusClosed {
 		return ConversationMessage{}, ErrDataInvariant
+	}
+	// 对客回复要求周期开放，内部备注可以补记到已关闭周期。
+	if !internalNote && status == domain.ServiceSessionStatusClosed {
+		return ConversationMessage{}, &ConflictError{Reason: ConflictReasonServiceSessionNotReplyable}
 	}
 	// 对客回复要求周期无人负责或由本人负责，内部备注对能读取该会话的成员开放。
 	if !internalNote && session.AssigneeIdentityID != nil && *session.AssigneeIdentityID != identity.OrganizationIdentity.ID {

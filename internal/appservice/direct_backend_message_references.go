@@ -36,7 +36,7 @@ func (o *directOperations) ListConversationMessageReferences(ctx context.Context
 	states := make([]ConversationMessageReferenceState, 0, len(messages))
 	for _, message := range messages {
 		mapped := conversationMessageFromAction(message, avatars)
-		states = append(states, ConversationMessageReferenceState{MessageID: message.ID, CanReply: mapped.CanReply, ReplyTo: mapped.ReplyTo})
+		states = append(states, ConversationMessageReferenceState{MessageID: message.ID, CanReply: mapped.CanReply, CanNoteReply: mapped.CanNoteReply, ReplyTo: mapped.ReplyTo})
 	}
 	return ConversationMessageReferenceList{States: states}, nil
 }

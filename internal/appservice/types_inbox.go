@@ -120,10 +120,12 @@ type CustomerInboxConversation struct {
 	ChannelName               string                    `json:"channelName"`
 	Preview                   *string                   `json:"preview"`
 	PreviewSenderIdentityType *OrganizationIdentityType `json:"previewSenderIdentityType"`
-	LastMessageAt             *time.Time                `json:"lastMessageAt"`
-	ServiceSessionStatus      ServiceSessionStatus      `json:"serviceSessionStatus"`
-	ServiceSessionID          string                    `json:"serviceSessionId"`
-	Assignee                  *InboxAssignee            `json:"assignee"`
+	// PreviewVisibility 标明摘要取自对客消息还是内部备注。
+	PreviewVisibility    *MessageVisibility   `json:"previewVisibility"`
+	LastMessageAt        *time.Time           `json:"lastMessageAt"`
+	ServiceSessionStatus ServiceSessionStatus `json:"serviceSessionStatus"`
+	ServiceSessionID     string               `json:"serviceSessionId"`
+	Assignee             *InboxAssignee       `json:"assignee"`
 }
 
 // DirectInboxConversation 定义内部单聊摘要。

@@ -106,7 +106,6 @@ export function ConversationComposer({
   submitOnEnter = false,
   refocusAfterSubmit = false,
   disabledReason: replyDisabledReason = null,
-  noteDisabledReason = null,
   visibility = MessageVisibility.MessageVisibilityCustomerVisible,
   onVisibilityChange,
   retryFailedMessage = false,
@@ -136,7 +135,6 @@ export function ConversationComposer({
   submitOnEnter?: boolean
   refocusAfterSubmit?: boolean
   disabledReason?: string | null
-  noteDisabledReason?: string | null
   visibility?: MessageVisibility
   onVisibilityChange?: (visibility: MessageVisibility) => void
   retryFailedMessage?: boolean
@@ -202,7 +200,8 @@ export function ConversationComposer({
   const bodyField = form.register("body")
   const internalNote =
     visibility === MessageVisibility.MessageVisibilityInternalOnly
-  const disabledReason = internalNote ? noteDisabledReason : replyDisabledReason
+  // 内部备注不经渠道投递，不受对客发送资格限制。
+  const disabledReason = internalNote ? null : replyDisabledReason
   // 对客草稿与内部备注草稿各自保留，切换页签时互不覆盖。
   const draftsRef = useRef<Partial<Record<MessageVisibility, string>>>({})
   const appliedVisibilityRef = useRef(visibility)

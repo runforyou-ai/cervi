@@ -744,7 +744,11 @@ export enum ConversationMentionReviewOutcome {
  * ConversationMessage 定义成员可见的会话消息。
  */
 export interface ConversationMessage {
+    /**
+     * CanReply 表示可以在对客回复中引用该消息，CanNoteReply 表示可以在内部备注中引用该消息。
+     */
     "canReply": boolean;
+    "canNoteReply": boolean;
 
     /**
      * ClientMessageID 仅向原发送身份返回。
@@ -835,6 +839,7 @@ export interface ConversationMessageReferenceListInput {
 export interface ConversationMessageReferenceState {
     "messageId": string;
     "canReply": boolean;
+    "canNoteReply": boolean;
     "replyTo": ConversationMessageReference | null;
 }
 
@@ -1131,6 +1136,11 @@ export interface CustomerInboxConversation {
     "channelName": string;
     "preview": string | null;
     "previewSenderIdentityType": OrganizationIdentityType | null;
+
+    /**
+     * PreviewVisibility 标明摘要取自对客消息还是内部备注。
+     */
+    "previewVisibility": MessageVisibility | null;
     "lastMessageAt": string | null;
     "serviceSessionStatus": ServiceSessionStatus;
     "serviceSessionId": string;
