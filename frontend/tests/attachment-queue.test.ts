@@ -45,6 +45,7 @@ function host(overrides: Record<string, (...args: any[]) => any> = {}) {
   let transfers = 0
   const api: Record<string, any> = {
     FilePurpose: { FilePurposeMessageAttachment: "message_attachment" },
+    MessageVisibility: { MessageVisibilityCustomerVisible: "customer_visible" },
     createFileUpload: async (input: any) => ({
       file: { id: `file-${input.fileName}` },
       partSize: 0,

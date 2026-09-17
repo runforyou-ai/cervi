@@ -460,6 +460,7 @@
   "field.message_body_required": "请输入消息内容。",
   "field.message_body_too_long": "消息最多 4000 个字符。",
   "field.message_cursor_invalid": "消息位置无效，请重新打开会话。",
+  "field.message_visibility_invalid": "消息的可见范围无效。",
   "error.agent_run_process_read_failed": "读取运行过程失败，请重试。",
   "error.agent_run_process_unavailable": "运行过程已无法查看",
   "error.conversation_message_unavailable": "原消息已删除或无法查看",

@@ -3,6 +3,7 @@ import type {
   ConversationMessageData,
   MessageAttachment,
   ConversationMessageReference,
+  MessageVisibility,
 } from "@/api"
 import type { MentionAllToken } from "@/lib/mention-token"
 
@@ -11,6 +12,7 @@ export const conversationSendingIndicatorDelay = 300
 export type OutgoingConversationDraft = {
   clientMessageID: string
   attachment?: MessageAttachment
+  visibility: MessageVisibility
   body: string
   originatedAt: string
   replyTo: ConversationMessageReference | null

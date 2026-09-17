@@ -21,6 +21,7 @@ type Message struct {
 	ServiceSessionID    *string         `bun:"service_session_id"`
 	SenderParticipantID *string         `bun:"sender_participant_id"`
 	Type                string          `bun:"type"`
+	Visibility          string          `bun:"visibility"`
 	Body                string          `bun:"body"`
 	SearchVector        string          `bun:"search_vector"`
 	SystemEventType     *string         `bun:"system_event_type"`

@@ -381,6 +381,7 @@ const (
 	FieldMessageBodyRequired              Key = "field.message_body_required"
 	FieldMessageBodyTooLong               Key = "field.message_body_too_long"
 	FieldMessageCursorInvalid             Key = "field.message_cursor_invalid"
+	FieldMessageVisibilityInvalid         Key = "field.message_visibility_invalid"
 )
 
 const (

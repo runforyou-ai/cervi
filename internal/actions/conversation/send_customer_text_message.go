@@ -48,22 +48,23 @@ type memberReplySessionPlan struct {
 }
 
 type idempotentMemberMessageRow struct {
-	ClientMessageID        *string    `bun:"client_message_id"`
-	ReplyToMessageID       *string    `bun:"reply_to_message_id"`
-	MessageSeq             int64      `bun:"message_seq"`
-	ID                     string     `bun:"id"`
-	CreatedAt              time.Time  `bun:"created_at"`
-	ConversationID         string     `bun:"conversation_id"`
-	ServiceSessionID       *string    `bun:"service_session_id"`
-	SenderParticipantID    *string    `bun:"sender_participant_id"`
-	Type                   string     `bun:"type"`
-	Body                   string     `bun:"body"`
-	OriginatedAt           time.Time  `bun:"originated_at"`
-	DeletedAt              *time.Time `bun:"deleted_at"`
-	SenderSubjectID        *string    `bun:"sender_subject_id"`
-	SenderSubjectKind      *string    `bun:"sender_subject_kind"`
-	SenderSubjectSourceID  *string    `bun:"sender_subject_source_id"`
-	JoinedServiceSessionID *string    `bun:"joined_service_session_id"`
+	ClientMessageID        *string                  `bun:"client_message_id"`
+	ReplyToMessageID       *string                  `bun:"reply_to_message_id"`
+	MessageSeq             int64                    `bun:"message_seq"`
+	ID                     string                   `bun:"id"`
+	CreatedAt              time.Time                `bun:"created_at"`
+	ConversationID         string                   `bun:"conversation_id"`
+	ServiceSessionID       *string                  `bun:"service_session_id"`
+	SenderParticipantID    *string                  `bun:"sender_participant_id"`
+	Type                   string                   `bun:"type"`
+	Visibility             domain.MessageVisibility `bun:"visibility"`
+	Body                   string                   `bun:"body"`
+	OriginatedAt           time.Time                `bun:"originated_at"`
+	DeletedAt              *time.Time               `bun:"deleted_at"`
+	SenderSubjectID        *string                  `bun:"sender_subject_id"`
+	SenderSubjectKind      *string                  `bun:"sender_subject_kind"`
+	SenderSubjectSourceID  *string                  `bun:"sender_subject_source_id"`
+	JoinedServiceSessionID *string                  `bun:"joined_service_session_id"`
 }
 
 // NewSendCustomerTextMessageAction 创建成员客户会话回复操作。
@@ -119,29 +120,35 @@ func (a *SendCustomerTextMessageAction) executeTransaction(ctx context.Context, 
 	if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 		return ConversationMessage{}, err
 	}
-	route, err := deliveryaction.Prepare(ctx, tx, identity.Organization.ID, input.ConversationID)
-	if errors.Is(err, deliveryaction.ErrUnavailable) {
-		return ConversationMessage{}, ErrConversationNotFound
-	}
-	if err != nil {
-		return ConversationMessage{}, err
+	// 渠道投递路由只用于对客消息。
+	internalNote := input.Visibility == domain.MessageVisibilityInternalOnly
+	var route deliveryaction.Route
+	var err error
+	if !internalNote {
+		route, err = deliveryaction.Prepare(ctx, tx, identity.Organization.ID, input.ConversationID)
+		if errors.Is(err, deliveryaction.ErrUnavailable) {
+			return ConversationMessage{}, ErrConversationNotFound
+		}
+		if err != nil {
+			return ConversationMessage{}, err
+		}
 	}
 	conversation, err := chatstate.LockCustomerConversation(ctx, tx, identity.Organization.ID, input.ConversationID)
 	if err != nil {
 		return ConversationMessage{}, err
 	}
-	if route.ChannelType != domain.ChannelTypeWebsite && route.ChannelType != domain.ChannelTypeTelegram {
+	if !internalNote && route.ChannelType != domain.ChannelTypeWebsite && route.ChannelType != domain.ChannelTypeTelegram {
 		return ConversationMessage{}, &ConflictError{Reason: ConflictReasonChannelOutboundUnsupported}
 	}
 	session, err := chatstate.LockCurrentServiceSession(ctx, tx, identity.Organization.ID, conversation.ID)
 	if err != nil {
 		return ConversationMessage{}, err
 	}
-	if saved, found, err := loadIdempotentMemberMessage(ctx, tx, identity, input.ConversationID, input.Body, input.ReplyToMessageID, idempotencyKey, true); err != nil || found {
+	if saved, found, err := loadIdempotentMemberMessage(ctx, tx, identity, input.ConversationID, input.Body, input.ReplyToMessageID, idempotencyKey, input.Visibility, true); err != nil || found {
 		return saved, err
 	}
 
-	if route.ChannelType == domain.ChannelTypeTelegram {
+	if !internalNote && route.ChannelType == domain.ChannelTypeTelegram {
 		if !route.Enabled || route.BotID == nil {
 			return ConversationMessage{}, &ConflictError{Reason: ConflictReasonChannelOutboundUnavailable}
 		}
@@ -173,16 +180,23 @@ func (a *SendCustomerTextMessageAction) executeTransaction(ctx context.Context, 
 	if status != domain.ServiceSessionStatusOpen {
 		return ConversationMessage{}, ErrDataInvariant
 	}
-	if session.AssigneeIdentityID != nil && *session.AssigneeIdentityID != identity.OrganizationIdentity.ID {
+	// 对客回复要求周期无人负责或由本人负责，内部备注对能读取该会话的成员开放。
+	if !internalNote && session.AssigneeIdentityID != nil && *session.AssigneeIdentityID != identity.OrganizationIdentity.ID {
 		return ConversationMessage{}, &ConflictError{Reason: ConflictReasonServiceSessionOwned}
 	}
 	replyTo, err := loadConversationReplyTarget(ctx, tx, identity.Organization.ID, conversation.ID, input.ReplyToMessageID)
 	if err != nil {
 		return ConversationMessage{}, err
 	}
-	plan := memberReplySessionPlan{assign: session.AssigneeIdentityID == nil}
-	if err := applyMemberReplySessionPlan(ctx, tx, session, identity.OrganizationIdentity.ID, originatedAt, plan); err != nil {
-		return ConversationMessage{}, err
+	// 对客消息只能引用对客可见的消息。
+	if !internalNote && replyTo != nil && replyTo.Visibility == domain.MessageVisibilityInternalOnly {
+		return ConversationMessage{}, &ConflictError{Reason: ConflictReasonReplyTargetInvalid}
+	}
+	if !internalNote {
+		plan := memberReplySessionPlan{assign: session.AssigneeIdentityID == nil}
+		if err := applyMemberReplySessionPlan(ctx, tx, session, identity.OrganizationIdentity.ID, originatedAt, plan); err != nil {
+			return ConversationMessage{}, err
+		}
 	}
 	// 取得或创建当前企业成员的聊天主体。
 	subject, err := chatstate.EnsureOrganizationIdentityChatSubject(ctx, tx, identity.Organization.ID, identity.OrganizationIdentity.ID, ids.subject)
@@ -197,7 +211,7 @@ func (a *SendCustomerTextMessageAction) executeTransaction(ctx context.Context, 
 	message := &servermodels.Message{
 		ID: ids.message, OrganizationID: identity.Organization.ID, ConversationID: conversation.ID,
 		ServiceSessionID: &session.ID, SenderParticipantID: &participant.ID,
-		Type: string(domain.MessageTypeText), Body: input.Body, ClientMessageID: &input.ClientMessageID, IdempotencyKey: &idempotencyKey, OriginatedAt: originatedAt,
+		Type: string(domain.MessageTypeText), Visibility: string(input.Visibility), Body: input.Body, ClientMessageID: &input.ClientMessageID, IdempotencyKey: &idempotencyKey, OriginatedAt: originatedAt,
 	}
 	if replyTo != nil {
 		message.ReplyToMessageID = &replyTo.ID
@@ -207,22 +221,24 @@ func (a *SendCustomerTextMessageAction) executeTransaction(ctx context.Context, 
 		return ConversationMessage{}, err
 	}
 	if !inserted {
-		saved, _, err := loadIdempotentMemberMessage(ctx, tx, identity, input.ConversationID, input.Body, input.ReplyToMessageID, idempotencyKey, true)
+		saved, _, err := loadIdempotentMemberMessage(ctx, tx, identity, input.ConversationID, input.Body, input.ReplyToMessageID, idempotencyKey, input.Visibility, true)
 		return saved, err
 	}
-	if route.ChannelType == domain.ChannelTypeTelegram {
-		if err := deliveryaction.Enqueue(ctx, tx, a.enqueuer, route, message); err != nil {
-			return ConversationMessage{}, err
+	if !internalNote {
+		if route.ChannelType == domain.ChannelTypeTelegram {
+			if err := deliveryaction.Enqueue(ctx, tx, a.enqueuer, route, message); err != nil {
+				return ConversationMessage{}, err
+			}
 		}
-	}
-	// 只记录客服处理周期的首次成员响应时间。
-	if _, err := tx.NewUpdate().Model(session).
-		Set("first_response_at = COALESCE(first_response_at, ?)", originatedAt).
-		Set("updated_at = now()").
-		WherePK().
-		Where("organization_id = ?", session.OrganizationID).
-		Exec(ctx); err != nil {
-		return ConversationMessage{}, fmt.Errorf("record first member response: %w", err)
+		// 只记录客服处理周期的首次成员响应时间。
+		if _, err := tx.NewUpdate().Model(session).
+			Set("first_response_at = COALESCE(first_response_at, ?)", originatedAt).
+			Set("updated_at = now()").
+			WherePK().
+			Where("organization_id = ?", session.OrganizationID).
+			Exec(ctx); err != nil {
+			return ConversationMessage{}, fmt.Errorf("record first member response: %w", err)
+		}
 	}
 	result := memberConversationMessage(message, subject.ID, identity.OrganizationIdentity)
 	result.ReplyTo = replyTo
@@ -253,11 +269,17 @@ func normalizeCustomerTextMessageInput(input CustomerTextMessageInput) (Customer
 	} else if utf8.RuneCountInString(input.Body) > 4000 {
 		fields["body"] = ValidationBodyTooLong
 	}
+	if input.Visibility == "" {
+		input.Visibility = domain.MessageVisibilityCustomerVisible
+	}
+	if input.Visibility != domain.MessageVisibilityCustomerVisible && input.Visibility != domain.MessageVisibilityInternalOnly {
+		fields["visibility"] = ValidationMessageVisibilityInvalid
+	}
 	return input, fields
 }
 
 // loadIdempotentMemberMessage 校验并返回已经保存的成员消息。
-func loadIdempotentMemberMessage(ctx context.Context, db bun.IDB, identity *servermodels.Identity, conversationID, body, replyToMessageID, idempotencyKey string, requireServiceSession bool) (ConversationMessage, bool, error) {
+func loadIdempotentMemberMessage(ctx context.Context, db bun.IDB, identity *servermodels.Identity, conversationID, body, replyToMessageID, idempotencyKey string, visibility domain.MessageVisibility, requireServiceSession bool) (ConversationMessage, bool, error) {
 	row := idempotentMemberMessageRow{}
 	err := db.NewSelect().
 		TableExpr("messages AS msg").
@@ -268,6 +290,7 @@ func loadIdempotentMemberMessage(ctx context.Context, db bun.IDB, identity *serv
 		ColumnExpr("msg.service_session_id AS service_session_id").
 		ColumnExpr("msg.sender_participant_id AS sender_participant_id").
 		ColumnExpr("msg.type AS type").
+		ColumnExpr("msg.visibility AS visibility").
 		ColumnExpr("msg.body AS body").
 		ColumnExpr("msg.reply_to_message_id AS reply_to_message_id").
 		ColumnExpr("msg.originated_at AS originated_at").
@@ -298,7 +321,7 @@ func loadIdempotentMemberMessage(ctx context.Context, db bun.IDB, identity *serv
 	if requireServiceSession {
 		serviceSessionMatches = row.ServiceSessionID != nil && row.JoinedServiceSessionID != nil && *row.ServiceSessionID == *row.JoinedServiceSessionID
 	}
-	messageMatches := storedReply == replyToMessageID && row.ConversationID == conversationID && row.Body == body && row.Type == string(domain.MessageTypeText) && row.DeletedAt == nil &&
+	messageMatches := storedReply == replyToMessageID && row.ConversationID == conversationID && row.Body == body && row.Type == string(domain.MessageTypeText) && row.Visibility == visibility && row.DeletedAt == nil &&
 		serviceSessionMatches &&
 		row.SenderParticipantID != nil && row.SenderSubjectID != nil && row.SenderSubjectKind != nil && row.SenderSubjectSourceID != nil &&
 		*row.SenderSubjectKind == string(domain.ChatSubjectKindOrganizationIdentity) && *row.SenderSubjectSourceID == identity.OrganizationIdentity.ID
@@ -308,7 +331,7 @@ func loadIdempotentMemberMessage(ctx context.Context, db bun.IDB, identity *serv
 	message := &servermodels.Message{
 		ClientMessageID: row.ClientMessageID, ID: row.ID, CreatedAt: row.CreatedAt, ConversationID: row.ConversationID,
 		ServiceSessionID: row.ServiceSessionID, SenderParticipantID: row.SenderParticipantID,
-		Type: row.Type, Body: row.Body, OriginatedAt: row.OriginatedAt, DeletedAt: row.DeletedAt, MessageSeq: row.MessageSeq,
+		Type: row.Type, Visibility: string(row.Visibility), Body: row.Body, OriginatedAt: row.OriginatedAt, DeletedAt: row.DeletedAt, MessageSeq: row.MessageSeq,
 	}
 	result := memberConversationMessage(message, *row.SenderSubjectID, identity.OrganizationIdentity)
 	if storedReply != "" {
@@ -390,7 +413,7 @@ func memberConversationMessage(message *servermodels.Message, subjectID string, 
 	name := identity.DisplayName
 	identityType := domain.OrganizationIdentityType(identity.Type)
 	return ConversationMessage{
-		ClientMessageID: message.ClientMessageID, ID: message.ID, Type: domain.MessageType(message.Type), Body: message.Body,
+		ClientMessageID: message.ClientMessageID, ID: message.ID, Type: domain.MessageType(message.Type), Visibility: domain.MessageVisibility(message.Visibility), Body: message.Body,
 		OriginatedAt: message.OriginatedAt, SourceOrder: message.SourceOrder, CreatedAt: message.CreatedAt, MentionAll: message.MentionAll, MessageSeq: message.MessageSeq,
 		Sender: &ConversationMessageSender{
 			ChatSubjectID: subjectID, Kind: domain.ChatSubjectKindOrganizationIdentity,

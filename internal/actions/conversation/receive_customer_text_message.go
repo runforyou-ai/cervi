@@ -100,6 +100,10 @@ func ReceiveInboundCustomerTextMessage(ctx context.Context, db bun.IDB, channel 
 	if err != nil {
 		return InboundCustomerTextMessageResult{}, err
 	}
+	// 客户只能引用对客可见的消息。
+	if replyTo != nil && replyTo.Visibility == domain.MessageVisibilityInternalOnly {
+		return InboundCustomerTextMessageResult{}, &ConflictError{Reason: ConflictReasonReplyTargetInvalid}
+	}
 
 	var session *servermodels.ServiceSession
 	var createSession bool

@@ -14,6 +14,7 @@ import (
 
 type messageReferenceRow struct {
 	Type          domain.MessageType               `bun:"type"`
+	Visibility    domain.MessageVisibility         `bun:"visibility"`
 	Deleted       bool                             `bun:"deleted"`
 	MessageID     string                           `bun:"message_id"`
 	Body          string                           `bun:"body"`
@@ -45,7 +46,7 @@ func loadMessageReference(ctx context.Context, db bun.IDB, organizationID, conve
 	row := messageReferenceRow{}
 	err := db.NewSelect().
 		TableExpr("messages AS msg").
-		ColumnExpr("msg.id AS message_id, msg.type").
+		ColumnExpr("msg.id AS message_id, msg.type, msg.visibility").
 		ColumnExpr("? AS body", messagequery.Summary("msg")).
 		ColumnExpr("msg.deleted_at IS NOT NULL AS deleted").
 		ColumnExpr("cs.id AS chat_subject_id").
@@ -69,13 +70,13 @@ func loadMessageReference(ctx context.Context, db bun.IDB, organizationID, conve
 		return nil, err
 	}
 	if row.Deleted {
-		return &ConversationMessageReference{ID: row.MessageID, Type: row.Type, Deleted: true}, nil
+		return &ConversationMessageReference{ID: row.MessageID, Type: row.Type, Visibility: row.Visibility, Deleted: true}, nil
 	}
 	if row.ChatSubjectID == nil || row.Kind == nil || row.SourceID == nil {
 		return nil, ErrDataInvariant
 	}
 	return &ConversationMessageReference{
-		ID: row.MessageID, Type: row.Type, Body: row.Body,
+		ID: row.MessageID, Type: row.Type, Visibility: row.Visibility, Body: row.Body,
 		Sender: &ConversationMessageSender{
 			ChatSubjectID: *row.ChatSubjectID, Kind: domain.ChatSubjectKind(*row.Kind),
 			SourceID: *row.SourceID, DisplayName: row.DisplayName, AvatarFileID: row.AvatarFileID, IdentityType: row.IdentityType,

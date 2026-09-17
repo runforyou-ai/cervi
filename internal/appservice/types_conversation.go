@@ -25,6 +25,14 @@ const (
 	MessageTypeAttachment     MessageType = MessageType(domain.MessageTypeAttachment)
 )
 
+// MessageVisibility 表示消息在客户会话中的可见范围。
+type MessageVisibility string
+
+const (
+	MessageVisibilityCustomerVisible MessageVisibility = MessageVisibility(domain.MessageVisibilityCustomerVisible)
+	MessageVisibilityInternalOnly    MessageVisibility = MessageVisibility(domain.MessageVisibilityInternalOnly)
+)
+
 // ConversationStatus 表示会话生命周期状态。
 type ConversationStatus string
 
@@ -70,6 +78,8 @@ type CustomerTextMessageInput struct {
 	ReplyToMessageID string `json:"replyToMessageId"`
 	ClientMessageID  string `json:"clientMessageId"`
 	Body             string `json:"body"`
+	// Visibility 为空时按对客消息处理。
+	Visibility MessageVisibility `json:"visibility"`
 }
 
 // CustomerReplyMode 表示 AI 写回复的生成方式。
@@ -143,6 +153,7 @@ type ConversationMessageReference struct {
 	// ExternalSenderName 仅未关联本地原消息的引用返回平台名称，此时 ID 为空。
 	ExternalSenderName string                     `json:"externalSenderName,omitempty"`
 	Type               MessageType                `json:"type"`
+	Visibility         MessageVisibility          `json:"visibility"`
 	Deleted            bool                       `json:"deleted"`
 	ID                 string                     `json:"id"`
 	Body               string                     `json:"body"`
@@ -189,6 +200,7 @@ type ConversationMessage struct {
 	MessageSeq      string                           `json:"messageSeq"`
 	ID              string                           `json:"id"`
 	Type            MessageType                      `json:"type"`
+	Visibility      MessageVisibility                `json:"visibility"`
 	Body            string                           `json:"body"`
 	OriginatedAt    time.Time                        `json:"originatedAt"`
 	SourceOrder     int64                            `json:"sourceOrder"`

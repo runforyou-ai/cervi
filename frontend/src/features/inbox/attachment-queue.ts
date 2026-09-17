@@ -5,6 +5,7 @@ import {
   cancelFileUpload,
   completeFileUpload,
   createFileUpload,
+  MessageVisibility,
   sendAttachmentMessage,
   type InboxConversation,
   type MessageAttachment,
@@ -117,6 +118,7 @@ export class AttachmentQueue {
       this.outgoing.start(scopeID, {
         clientMessageID: selected.id,
         attachment,
+        visibility: MessageVisibility.MessageVisibilityCustomerVisible,
         body: selected.body.trim(),
         originatedAt: new Date(now + index).toISOString(),
         replyTo: null,

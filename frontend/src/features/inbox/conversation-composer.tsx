@@ -20,6 +20,7 @@ import { toast } from "sonner"
 import {
   ChatSubjectKind,
   ConversationType,
+  MessageVisibility,
   isApiError,
   sendCustomerTextMessage,
   sendAgentTextMessage,
@@ -104,7 +105,10 @@ export function ConversationComposer({
   conversationType,
   submitOnEnter = false,
   refocusAfterSubmit = false,
-  disabledReason = null,
+  disabledReason: replyDisabledReason = null,
+  noteDisabledReason = null,
+  visibility = MessageVisibility.MessageVisibilityCustomerVisible,
+  onVisibilityChange,
   retryFailedMessage = false,
   retryDraft = null,
   replyTo = null,
@@ -132,6 +136,9 @@ export function ConversationComposer({
   submitOnEnter?: boolean
   refocusAfterSubmit?: boolean
   disabledReason?: string | null
+  noteDisabledReason?: string | null
+  visibility?: MessageVisibility
+  onVisibilityChange?: (visibility: MessageVisibility) => void
   retryFailedMessage?: boolean
   retryDraft?: OutgoingConversationDraft | null
   replyTo?: ConversationMessageReference | null
@@ -174,6 +181,8 @@ export function ConversationComposer({
   const refocusPendingRef = useRef(false)
   const replyToRef = useRef(replyTo)
   replyToRef.current = replyTo
+  const visibilityRef = useRef(visibility)
+  visibilityRef.current = visibility
   const [mentionSubjectIDs, setMentionSubjectIDs] = useState<string[]>([])
   const [mentionAllToken, setMentionAllToken] =
     useState<MentionAllToken | null>(null)
@@ -191,6 +200,36 @@ export function ConversationComposer({
   const bodyValue = form.watch("body")
   const isBodyEmpty = !bodyValue.trim()
   const bodyField = form.register("body")
+  const internalNote =
+    visibility === MessageVisibility.MessageVisibilityInternalOnly
+  const disabledReason = internalNote ? noteDisabledReason : replyDisabledReason
+  // 对客草稿与内部备注草稿各自保留，切换页签时互不覆盖。
+  const draftsRef = useRef<Partial<Record<MessageVisibility, string>>>({})
+  const appliedVisibilityRef = useRef(visibility)
+  const focusAfterSwitchRef = useRef(false)
+
+  // 页签切换和引用、填入回复引起的模式变化共用同一套草稿保存与载入。
+  useEffect(() => {
+    const previous = appliedVisibilityRef.current
+    if (previous === visibility) return
+    appliedVisibilityRef.current = visibility
+    draftsRef.current[previous] = form.getValues("body")
+    form.setValue("body", draftsRef.current[visibility] ?? "")
+    delete draftsRef.current[visibility]
+    const focus = focusAfterSwitchRef.current
+    focusAfterSwitchRef.current = false
+    window.requestAnimationFrame(() => {
+      resizeComposerInput(inputRef.current, manualInputHeightRef.current)
+      if (focus) form.setFocus("body")
+    })
+  }, [form, visibility])
+
+  /** 切换输入模式并把焦点留在输入框。 */
+  function switchVisibility(next: MessageVisibility) {
+    if (next === visibility) return
+    focusAfterSwitchRef.current = true
+    onVisibilityChange?.(next)
+  }
 
   useEffect(() => {
     aliveRef.current = true
@@ -205,6 +244,11 @@ export function ConversationComposer({
     onRetryDraftHandled?.()
     if (isSubmitting) return
     retryRef.current = retryDraft
+    // 失败消息回到发送时的可见范围，当前页签属于另一种可见范围时先存入对应草稿。
+    if (retryDraft.visibility !== visibility) {
+      draftsRef.current[retryDraft.visibility] = retryDraft.body
+      return
+    }
     form.setValue("body", retryDraft.body, { shouldDirty: true })
     setMentionSubjectIDs(retryDraft.mentionSubjectIDs)
     setMentionAllToken(retryDraft.mentionAllToken)
@@ -218,6 +262,7 @@ export function ConversationComposer({
     onReplyToChange,
     retryDraft,
     retryFailedMessage,
+    visibility,
   ])
 
   const mentionCandidates = useMemo<MentionCandidate[]>(() => {
@@ -414,6 +459,7 @@ export function ConversationComposer({
     const retry =
       retryFailedMessage &&
       retryRef.current?.body === body &&
+      retryRef.current.visibility === visibility &&
       retryRef.current.replyTo?.id === replyTo?.id &&
       retryRef.current.mentionAll === mentionAll &&
       retryRef.current.mentionSubjectIDs.join("\u0000") ===
@@ -422,6 +468,7 @@ export function ConversationComposer({
         : null
     const draft = {
       clientMessageID: retry?.clientMessageID ?? window.crypto.randomUUID(),
+      visibility,
       body,
       originatedAt: retry?.originatedAt ?? new Date().toISOString(),
       replyTo: replyTo,
@@ -468,6 +515,7 @@ export function ConversationComposer({
           message = await sendCustomerTextMessage(conversationID, {
             ...messageInput,
             replyToMessageId: replyTo?.id ?? "",
+            visibility,
           })
           break
         default:
@@ -480,7 +528,8 @@ export function ConversationComposer({
       setMentionSubjectIDs([])
       setMentionAllToken(null)
       setMentionQuery(null)
-      if (replyToRef.current?.id === replyTo?.id) {
+      // 发送期间切换了页签时，引用目标属于另一种可见范围，保持原样。
+      if (visibilityRef.current === draft.visibility && replyToRef.current?.id === replyTo?.id) {
         onReplyToChange?.(null)
       }
       refocusPendingRef.current = refocusAfterSubmit
@@ -503,9 +552,14 @@ export function ConversationComposer({
       )
       if (retryFailedMessage) {
         retryRef.current = draft
-        form.setValue("body", body, { shouldDirty: true })
-        setMentionAllToken(draft.mentionAllToken)
-        resizeComposerInput(inputRef.current, manualInputHeightRef.current)
+        // 发送期间切换了页签时，失败正文回到发送时的可见范围。
+        if (draft.visibility !== visibilityRef.current) {
+          draftsRef.current[draft.visibility] = body
+        } else {
+          form.setValue("body", body, { shouldDirty: true })
+          setMentionAllToken(draft.mentionAllToken)
+          resizeComposerInput(inputRef.current, manualInputHeightRef.current)
+        }
       }
       refocusPendingRef.current = refocusAfterSubmit
     }
@@ -513,24 +567,34 @@ export function ConversationComposer({
 
   /** 用 AI 生成的回复替换当前对客草稿并聚焦输入框。 */
   const applyReplySuggestion = useCallback((reply: string) => {
+    // 候选回复始终填入对客草稿，内部备注模式下先切回对客页签。
+    if (visibility === MessageVisibility.MessageVisibilityInternalOnly) {
+      draftsRef.current[MessageVisibility.MessageVisibilityCustomerVisible] = reply
+      focusAfterSwitchRef.current = true
+      onVisibilityChange?.(MessageVisibility.MessageVisibilityCustomerVisible)
+      return
+    }
     form.setValue("body", reply, { shouldDirty: true })
     window.requestAnimationFrame(() => {
       resizeComposerInput(inputRef.current, manualInputHeightRef.current)
       form.setFocus("body")
     })
-  }, [form])
+  }, [form, onVisibilityChange, visibility])
 
   useEffect(() => {
     if (!draftBridgeRef) return
-    // 向 AI 助手提供读取和替换当前草稿的入口。
+    // 向 AI 助手提供读取和替换对客草稿的入口。
     draftBridgeRef.current = {
-      read: () => form.getValues("body"),
+      read: () =>
+        internalNote
+          ? (draftsRef.current[MessageVisibility.MessageVisibilityCustomerVisible] ?? "")
+          : form.getValues("body"),
       replace: applyReplySuggestion,
     }
     return () => {
       draftBridgeRef.current = null
     }
-  }, [applyReplySuggestion, draftBridgeRef, form])
+  }, [applyReplySuggestion, draftBridgeRef, form, internalNote])
 
   /** 在桌面键盘上提交消息，并保留 Shift+Enter 换行。 */
   function submitFromKeyboard(event: KeyboardEvent<HTMLTextAreaElement>) {
@@ -636,7 +700,9 @@ export function ConversationComposer({
   const [showSubmitting, setShowSubmitting] = useState(false)
   // 客户会话在输入区工具栏提供 AI 写回复入口，不可对客发送时保留显示并禁用。
   const replyAssistant =
-    conversationType === ConversationType.ConversationTypeCustomer && conversationID ? (
+    conversationType === ConversationType.ConversationTypeCustomer &&
+    conversationID &&
+    !internalNote ? (
       <CustomerReplyAssistant
         mobile={mobile}
         conversationID={conversationID}
@@ -668,6 +734,44 @@ export function ConversationComposer({
       onSubmit={form.handleSubmit(send)}
       noValidate
     >
+      {onVisibilityChange ? (
+        <div role="tablist" aria-label={t("composerMode")} className="mb-2 flex items-center gap-1">
+          <button
+            type="button"
+            role="tab"
+            aria-selected={!internalNote}
+            className={cn(
+              "rounded-md px-2 py-1 text-xs font-medium",
+              mobile && "min-h-11 px-3 text-sm",
+              internalNote
+                ? "text-muted-foreground hover:text-foreground"
+                : "bg-muted text-foreground",
+            )}
+            onClick={() =>
+              switchVisibility(MessageVisibility.MessageVisibilityCustomerVisible)
+            }
+          >
+            {t("composerModeCustomer")}
+          </button>
+          <button
+            type="button"
+            role="tab"
+            aria-selected={internalNote}
+            className={cn(
+              "rounded-md px-2 py-1 text-xs font-medium",
+              mobile && "min-h-11 px-3 text-sm",
+              internalNote
+                ? "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200"
+                : "text-muted-foreground hover:text-foreground",
+            )}
+            onClick={() =>
+              switchVisibility(MessageVisibility.MessageVisibilityInternalOnly)
+            }
+          >
+            {t("composerModeNote")}
+          </button>
+        </div>
+      ) : null}
       <div className="relative">
         {!disabledReason && mentionQuery && mentionCandidates.length > 0 ? (
           <div
@@ -709,7 +813,14 @@ export function ConversationComposer({
             onKeyDown={resizeInputFromKeyboard}
           />
         )}
-        <div className="overflow-hidden rounded-xl border border-input bg-background shadow-xs">
+        <div
+          className={cn(
+            "overflow-hidden rounded-xl border shadow-xs",
+            internalNote
+              ? "border-amber-500/70 bg-amber-50/60 dark:bg-amber-950/30"
+              : "border-input bg-background",
+          )}
+        >
           {replyTo ? (
             <div className="flex items-start justify-between gap-3 border-b px-3 py-2 text-xs">
               <div className="min-w-0">
@@ -749,7 +860,7 @@ export function ConversationComposer({
             disabled={isSubmitting}
             readOnly={Boolean(disabledReason)}
             rows={mobile ? 1 : 3}
-            aria-label={t("replyLabel")}
+            aria-label={t(internalNote ? "internalNoteLabel" : "replyLabel")}
             aria-describedby={disabledReason ? `${inputID}-reason` : undefined}
             aria-invalid={form.formState.errors.body ? true : undefined}
             className={cn(
@@ -882,7 +993,7 @@ export function ConversationComposer({
               ) : null}
               {isSubmitting && showSubmitting
                 ? t("messageSending")
-                : t("messageSend")}
+                : t(internalNote ? "internalNoteSave" : "messageSend")}
             </Button>
           </div>
         </div>

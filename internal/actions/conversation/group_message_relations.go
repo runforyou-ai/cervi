@@ -128,7 +128,7 @@ func createMessageMentions(ctx context.Context, db bun.IDB, organizationID, mess
 
 // loadIdempotentGroupMessage 校验群消息的完整发送意图。
 func loadIdempotentGroupMessage(ctx context.Context, db bun.IDB, identity *servermodels.Identity, input GroupTextMessageInput, idempotencyKey string) (ConversationMessage, bool, error) {
-	saved, found, err := loadIdempotentMemberMessage(ctx, db, identity, input.ConversationID, input.Body, input.ReplyToMessageID, idempotencyKey, false)
+	saved, found, err := loadIdempotentMemberMessage(ctx, db, identity, input.ConversationID, input.Body, input.ReplyToMessageID, idempotencyKey, domain.MessageVisibilityCustomerVisible, false)
 	if err != nil || !found {
 		return saved, found, err
 	}

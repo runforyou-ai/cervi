@@ -32,6 +32,7 @@ const (
 	ValidationLastReadMessageIDInvalid ValidationCode = "last_read_message_id_invalid"
 	ValidationReplyToMessageIDInvalid  ValidationCode = "reply_to_message_id_invalid"
 	ValidationMentionSubjectIDsInvalid ValidationCode = "mention_subject_ids_invalid"
+	ValidationMessageVisibilityInvalid ValidationCode = "message_visibility_invalid"
 	ValidationBodyRequired             ValidationCode = "body_required"
 	ValidationBodyTooLong              ValidationCode = "body_too_long"
 	ValidationCursorInvalid            ValidationCode = "cursor_invalid"
@@ -175,6 +176,7 @@ type ConversationMessageSender struct {
 type ConversationMessageReference struct {
 	ExternalSenderName string
 	Type               domain.MessageType
+	Visibility         domain.MessageVisibility
 	Deleted            bool
 	ID                 string
 	Body               string
@@ -221,6 +223,7 @@ type ConversationMessage struct {
 	MessageSeq       int64
 	ID               string
 	Type             domain.MessageType
+	Visibility       domain.MessageVisibility
 	Body             string
 	OriginatedAt     time.Time
 	SourceOrder      int64
@@ -292,6 +295,7 @@ type CustomerTextMessageInput struct {
 	ConversationID   string
 	ClientMessageID  string
 	Body             string
+	Visibility       domain.MessageVisibility
 }
 
 // FirstDirectTextMessageInput 定义成员向目标身份发送的首条单聊消息。

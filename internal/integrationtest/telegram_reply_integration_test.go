@@ -92,6 +92,39 @@ func TestTelegramReplyRoundTrip(t *testing.T) {
 	}
 }
 
+// TestTelegramInternalNoteReplyEligibility 验证 Telegram 客户会话中的内部备注可被引用且不产生投递。
+func TestTelegramInternalNoteReplyEligibility(t *testing.T) {
+	f := newCustomerDeliveryFixture(t)
+	ctx := context.Background()
+	f.receiveReply(t, 5001, "客户问题", nil)
+	note, err := conversationaction.NewSendCustomerTextMessageAction(f.db, nil).Execute(ctx, f.owner, conversationaction.CustomerTextMessageInput{
+		ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(),
+		Body: "内部备注：核对过工单", Visibility: domain.MessageVisibilityInternalOnly,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	messages := f.replyHistory(t)
+	saved := messages[len(messages)-1]
+	if saved.ID != note.ID || saved.ReplyUnavailable {
+		t.Fatalf("telegram internal note = %+v", saved)
+	}
+	deliveries, err := f.db.NewSelect().Model((*models.CustomerMessageDelivery)(nil)).Where("message_id = ?", note.ID).Count(ctx)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if deliveries != 0 {
+		t.Fatalf("telegram internal note deliveries = %d", deliveries)
+	}
+	quoted, err := conversationaction.NewSendCustomerTextMessageAction(f.db, nil).Execute(ctx, f.owner, conversationaction.CustomerTextMessageInput{
+		ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(),
+		Body: "补充一点", ReplyToMessageID: note.ID, Visibility: domain.MessageVisibilityInternalOnly,
+	})
+	if err != nil || quoted.ReplyTo == nil || quoted.ReplyTo.ID != note.ID {
+		t.Fatalf("telegram note reply = %+v err=%v", quoted.ReplyTo, err)
+	}
+}
+
 // TestTelegramReplyLateMapping 验证乱序原消息、迟到回执、引用快照和重放关联稳定。
 func TestTelegramReplyLateMapping(t *testing.T) {
 	f := newCustomerDeliveryFixture(t)

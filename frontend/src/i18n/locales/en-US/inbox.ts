@@ -297,6 +297,14 @@ const inbox = {
   messageSending: "Sending",
   messageSendError: "Failed to send",
   messageRetry: "Retry",
+  composerMode: "Reply mode",
+  composerModeCustomer: "Reply to customer",
+  composerModeNote: "Internal note",
+  internalNoteLabel: "Internal note",
+  internalNoteSave: "Post note",
+  internalNoteSender: "Internal note · {{name}}",
+  noteClosedUnavailable:
+    "This conversation is closed. Reopen it to add internal notes.",
   replyClosedUnavailable: "This conversation is closed. Reopen it to reply.",
   replyAssignedUnavailable:
     "{{name}} is handling this conversation. Take it over to reply.",

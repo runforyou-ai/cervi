@@ -36,6 +36,8 @@ type conversationMessageRow struct {
 	ReplyToType                    domain.MessageType               `bun:"reply_to_type"`
 	ID                             string                           `bun:"id"`
 	Type                           string                           `bun:"type"`
+	Visibility                     domain.MessageVisibility         `bun:"visibility"`
+	ReplyToVisibility              domain.MessageVisibility         `bun:"reply_to_visibility"`
 	Body                           string                           `bun:"body"`
 	SystemEventType                *string                          `bun:"system_event_type"`
 	SystemEventPayload             json.RawMessage                  `bun:"system_event_payload"`
@@ -123,9 +125,10 @@ func conversationMessagesQuery(db bun.IDB, identity *servermodels.Identity, conv
 		TableExpr("messages AS msg").
 		ColumnExpr("msg.id AS id").
 		ColumnExpr("cm.reply_provider_message_id AS external_reply_id, cm.reply_body AS external_reply_body, cm.reply_sender_name AS external_reply_sender_name").
-		ColumnExpr("COALESCE(ch.type = ? AND (cm.message_id IS NULL OR cm.provider_account_id <> tcs.bot_id::text OR tcs.bot_id IS NULL OR cm.channel_id <> ch.id OR cm.provider_conversation_id <> route_cci.external_id OR msg.type <> ?), FALSE) AS reply_unavailable", domain.ChannelTypeTelegram, domain.MessageTypeText).
+		ColumnExpr("COALESCE(msg.visibility = ? AND ch.type = ? AND (cm.message_id IS NULL OR cm.provider_account_id <> tcs.bot_id::text OR tcs.bot_id IS NULL OR cm.channel_id <> ch.id OR cm.provider_conversation_id <> route_cci.external_id OR msg.type <> ?), FALSE) AS reply_unavailable", domain.MessageVisibilityCustomerVisible, domain.ChannelTypeTelegram, domain.MessageTypeText).
 		ColumnExpr("CASE WHEN cs.kind = ? AND cs.source_id = ? THEN msg.client_message_id END AS client_message_id", domain.ChatSubjectKindOrganizationIdentity, identity.OrganizationIdentity.ID).
 		ColumnExpr("msg.type AS type").
+		ColumnExpr("msg.visibility AS visibility").
 		ColumnExpr("msg.body AS body").
 		ColumnExpr("msg.system_event_type AS system_event_type").
 		ColumnExpr("msg.system_event_payload AS system_event_payload").
@@ -142,7 +145,7 @@ func conversationMessagesQuery(db bun.IDB, identity *servermodels.Identity, conv
 		ColumnExpr("msg.reply_to_message_id AS reply_to_message_id").
 		ColumnExpr("msg.mention_all AS mention_all").
 		ColumnExpr("? AS reply_to_body", messagequery.Summary("reply_msg")).
-		ColumnExpr("reply_msg.deleted_at IS NOT NULL AS reply_to_deleted, reply_msg.type AS reply_to_type").
+		ColumnExpr("reply_msg.deleted_at IS NOT NULL AS reply_to_deleted, reply_msg.type AS reply_to_type, reply_msg.visibility AS reply_to_visibility").
 		ColumnExpr("reply_cs.id AS reply_to_sender_subject_id").
 		ColumnExpr("reply_cs.kind AS reply_to_sender_kind").
 		ColumnExpr("reply_cs.source_id AS reply_to_sender_source_id").
@@ -335,7 +338,7 @@ func buildConversationMessageHistory(rows []conversationMessageRow) (Conversatio
 	messages := make([]ConversationMessage, 0, len(rows))
 	for _, row := range rows {
 		message := ConversationMessage{
-			ReplyUnavailable: row.ReplyUnavailable, ClientMessageID: row.ClientMessageID, ID: row.ID, Type: domain.MessageType(row.Type), Body: row.Body,
+			ReplyUnavailable: row.ReplyUnavailable, ClientMessageID: row.ClientMessageID, ID: row.ID, Type: domain.MessageType(row.Type), Visibility: row.Visibility, Body: row.Body,
 			OriginatedAt: row.OriginatedAt, SourceOrder: row.SourceOrder, CreatedAt: row.CreatedAt, MentionAll: row.MentionAll, MessageSeq: row.MessageSeq,
 		}
 		if message.Type == domain.MessageTypeSystem {
@@ -360,13 +363,13 @@ func buildConversationMessageHistory(rows []conversationMessageRow) (Conversatio
 			message.ReplyTo = &ConversationMessageReference{Type: domain.MessageTypeText, Body: row.ExternalReplyBody, ExternalSenderName: row.ExternalReplySenderName}
 		}
 		if row.ReplyToMessageID != nil && row.ReplyToDeleted {
-			message.ReplyTo = &ConversationMessageReference{ID: *row.ReplyToMessageID, Type: row.ReplyToType, Deleted: true}
+			message.ReplyTo = &ConversationMessageReference{ID: *row.ReplyToMessageID, Type: row.ReplyToType, Visibility: row.ReplyToVisibility, Deleted: true}
 		} else if row.ReplyToMessageID != nil {
 			if row.ReplyToBody == nil || row.ReplyToSenderSubjectID == nil || row.ReplyToSenderKind == nil || row.ReplyToSenderSourceID == nil {
 				return ConversationMessageHistory{}, fmt.Errorf("load conversation reply reference: %w", ErrDataInvariant)
 			}
 			message.ReplyTo = &ConversationMessageReference{
-				ID: *row.ReplyToMessageID, Type: row.ReplyToType, Body: *row.ReplyToBody,
+				ID: *row.ReplyToMessageID, Type: row.ReplyToType, Visibility: row.ReplyToVisibility, Body: *row.ReplyToBody,
 				Sender: &ConversationMessageSender{
 					ChatSubjectID: *row.ReplyToSenderSubjectID,
 					Kind:          domain.ChatSubjectKind(*row.ReplyToSenderKind),
