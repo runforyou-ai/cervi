@@ -164,6 +164,11 @@ func (s *Service) SendCustomerTextMessage(ctx context.Context, meta RequestMeta,
 	return withNormalizedSlices(s.backend.SendCustomerTextMessage(ctx, meta, conversationID, input))
 }
 
+// SendCustomerAttachmentMessage 发送客户会话附件消息。
+func (s *Service) SendCustomerAttachmentMessage(ctx context.Context, meta RequestMeta, conversationID string, input CustomerAttachmentMessageInput) (ConversationMessage, error) {
+	return withNormalizedSlices(s.backend.SendCustomerAttachmentMessage(ctx, meta, conversationID, input))
+}
+
 // ListCustomerReplyAgents 返回可用于 AI 写回复的 AI 员工。
 func (s *Service) ListCustomerReplyAgents(ctx context.Context, meta RequestMeta) (CustomerReplyAgentList, error) {
 	return withNormalizedSlices(s.backend.ListCustomerReplyAgents(ctx, meta))

@@ -1040,6 +1040,18 @@ export interface CurrentUser {
 }
 
 /**
+ * CustomerAttachmentMessageInput 定义成员发送的客户会话附件消息。
+ */
+export interface CustomerAttachmentMessageInput {
+    "replyToMessageId": string;
+    "clientMessageId": string;
+    "fileId": string;
+    "body": string;
+    "imageWidth": number;
+    "imageHeight": number;
+}
+
+/**
  * CustomerCopilotTextMessageInput 定义发给 Copilot 线程的成员提问。
  */
 export interface CustomerCopilotTextMessageInput {
@@ -1145,6 +1157,21 @@ export interface CustomerInboxConversation {
     "serviceSessionStatus": ServiceSessionStatus;
     "serviceSessionId": string;
     "assignee": InboxAssignee | null;
+
+    /**
+     * AttachmentSupported 表示来源渠道当前支持向客户发送附件。
+     */
+    "attachmentSupported": boolean;
+
+    /**
+     * AttachmentByteLimit 是来源渠道单个外发附件的字节上限。
+     */
+    "attachmentByteLimit": number;
+
+    /**
+     * AttachmentCaptionLimit 是来源渠道附件说明的字符上限。
+     */
+    "attachmentCaptionLimit": number;
 }
 
 /**
@@ -2366,7 +2393,7 @@ export interface MemberOptionListInput {
 }
 
 /**
- * MessageAttachment 定义消息的文件信息与图片尺寸。
+ * MessageAttachment 定义消息的文件信息、图片尺寸与内容取回状态。
  */
 export interface MessageAttachment {
     "id": string;
@@ -2374,9 +2401,24 @@ export interface MessageAttachment {
     "contentType": string;
     "byteSize": number;
     "contentUrl": string;
+    "transferStatus": MessageAttachmentTransferStatus;
     "imageWidth": number;
     "imageHeight": number;
 }
+
+/**
+ * MessageAttachmentTransferStatus 表示附件内容的取回状态。
+ */
+export enum MessageAttachmentTransferStatus {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    MessageAttachmentTransferReady = "ready",
+    MessageAttachmentTransferPending = "pending",
+    MessageAttachmentTransferFailed = "failed",
+};
 
 /**
  * MessageChannelInput 定义消息渠道可编辑的通用字段。

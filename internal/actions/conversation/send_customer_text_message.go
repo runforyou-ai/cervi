@@ -18,6 +18,7 @@ import (
 	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
+	"github.com/runforyou-ai/cervi/internal/common/searchtext"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -65,6 +66,69 @@ type idempotentMemberMessageRow struct {
 	SenderSubjectKind      *string                  `bun:"sender_subject_kind"`
 	SenderSubjectSourceID  *string                  `bun:"sender_subject_source_id"`
 	JoinedServiceSessionID *string                  `bun:"joined_service_session_id"`
+	AttachmentFileID       *string                  `bun:"attachment_file_id"`
+	AttachmentName         *string                  `bun:"attachment_name"`
+	AttachmentContentType  *string                  `bun:"attachment_content_type"`
+	AttachmentByteSize     *int64                   `bun:"attachment_byte_size"`
+	AttachmentImageWidth   *int                     `bun:"attachment_image_width"`
+	AttachmentImageHeight  *int                     `bun:"attachment_image_height"`
+	AttachmentTransfer     *string                  `bun:"attachment_transfer_status"`
+}
+
+// memberMessageExpectation 定义幂等命中时必须完全一致的成员发送意图。
+type memberMessageExpectation struct {
+	Attachment            *attachmentExpectation
+	ConversationID        string
+	Body                  string
+	ReplyToMessageID      string
+	Type                  domain.MessageType
+	Visibility            domain.MessageVisibility
+	RequireServiceSession bool
+}
+
+// attachmentExpectation 定义附件消息幂等核对所需的文件事实。
+type attachmentExpectation struct {
+	FileID      string
+	ImageWidth  int
+	ImageHeight int
+}
+
+// customerMessagePayload 定义一次成员客户会话发送的消息内容。
+type customerMessagePayload struct {
+	Attachment       *customerAttachmentPayload
+	ConversationID   string
+	ClientMessageID  string
+	Body             string
+	ReplyToMessageID string
+	Type             domain.MessageType
+	Visibility       domain.MessageVisibility
+}
+
+// customerAttachmentPayload 定义附件消息待关联的上传文件。
+type customerAttachmentPayload struct {
+	FileID      string
+	ImageWidth  int
+	ImageHeight int
+}
+
+// expectation 返回该次发送对应的幂等核对意图。
+func (p customerMessagePayload) expectation() memberMessageExpectation {
+	result := memberMessageExpectation{
+		ConversationID: p.ConversationID, Body: p.Body, ReplyToMessageID: p.ReplyToMessageID,
+		Type: p.Type, Visibility: p.Visibility, RequireServiceSession: true,
+	}
+	if p.Attachment != nil {
+		result.Attachment = &attachmentExpectation{FileID: p.Attachment.FileID, ImageWidth: p.Attachment.ImageWidth, ImageHeight: p.Attachment.ImageHeight}
+	}
+	return result
+}
+
+// internalTextExpectation 构造内部会话文本消息的幂等核对意图。
+func internalTextExpectation(conversationID, body, replyToMessageID string) memberMessageExpectation {
+	return memberMessageExpectation{
+		ConversationID: conversationID, Body: body, ReplyToMessageID: replyToMessageID,
+		Type: domain.MessageTypeText, Visibility: domain.MessageVisibilityCustomerVisible,
+	}
 }
 
 // NewSendCustomerTextMessageAction 创建成员客户会话回复操作。
@@ -86,12 +150,17 @@ func (a *SendCustomerTextMessageAction) Execute(ctx context.Context, identity *s
 	ids := memberMessageIDs{subject: values[0], participant: values[1], message: values[2]}
 	var err error
 	idempotencyKey := "mmsg:" + identity.OrganizationIdentity.ID + ":" + normalized.ClientMessageID
+	payload := customerMessagePayload{
+		ConversationID: normalized.ConversationID, ClientMessageID: normalized.ClientMessageID,
+		Body: normalized.Body, ReplyToMessageID: normalized.ReplyToMessageID, Type: domain.MessageTypeText,
+		Visibility: normalized.Visibility,
+	}
 
 	for attempt := 0; attempt < maxWriteAttempts; attempt++ {
 		var result ConversationMessage
 		err = realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 			var executeErr error
-			result, executeErr = a.executeTransaction(ctx, tx, identity, normalized, ids, idempotencyKey)
+			result, executeErr = sendCustomerMessage(ctx, tx, identity, a.enqueuer, payload, ids, idempotencyKey)
 			return executeErr
 		})
 		if err == nil {
@@ -115,8 +184,8 @@ func (a *SendCustomerTextMessageAction) Execute(ctx context.Context, identity *s
 	return ConversationMessage{}, fmt.Errorf("send customer message retries exhausted: %w", err)
 }
 
-// executeTransaction 执行一次完整的成员客户会话回复事务。
-func (a *SendCustomerTextMessageAction) executeTransaction(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, input CustomerTextMessageInput, ids memberMessageIDs, idempotencyKey string) (ConversationMessage, error) {
+// sendCustomerMessage 执行一次完整的成员客户会话回复事务，文本与附件共用客服周期、引用和外发语义。
+func sendCustomerMessage(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, enqueuer servertask.TxEnqueuer, input customerMessagePayload, ids memberMessageIDs, idempotencyKey string) (ConversationMessage, error) {
 	if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 		return ConversationMessage{}, err
 	}
@@ -144,8 +213,18 @@ func (a *SendCustomerTextMessageAction) executeTransaction(ctx context.Context, 
 	if err != nil {
 		return ConversationMessage{}, err
 	}
-	if saved, found, err := loadIdempotentMemberMessage(ctx, tx, identity, input.ConversationID, input.Body, input.ReplyToMessageID, idempotencyKey, input.Visibility, true); err != nil || found {
+	expectation := input.expectation()
+	if saved, found, err := loadIdempotentMemberMessage(ctx, tx, identity, expectation, idempotencyKey); err != nil || found {
 		return saved, err
+	}
+	// 附件按来源渠道的外发能力、字节上限和说明上限校验。
+	if input.Attachment != nil {
+		if !domain.ChannelSupportsOutboundAttachment(route.ChannelType) {
+			return ConversationMessage{}, &ConflictError{Reason: ConflictReasonChannelAttachmentUnsupported}
+		}
+		if utf8.RuneCountInString(input.Body) > domain.ChannelCaptionLimit(route.ChannelType) {
+			return ConversationMessage{}, &ConflictError{Reason: ConflictReasonCaptionTooLong}
+		}
 	}
 
 	if !internalNote && route.ChannelType == domain.ChannelTypeTelegram {
@@ -160,7 +239,7 @@ func (a *SendCustomerTextMessageAction) executeTransaction(ctx context.Context, 
 				Join("JOIN messages AS msg ON msg.id = cm.message_id AND msg.organization_id = cm.organization_id AND msg.conversation_id = cm.conversation_id").
 				Where("cm.organization_id = ? AND cm.conversation_id = ? AND cm.message_id = ?", identity.Organization.ID, conversation.ID, input.ReplyToMessageID).
 				Where("cm.channel_id = ? AND cm.provider_account_id = ? AND cci.id = ?", route.ChannelID, strconv.FormatInt(*route.BotID, 10), route.IdentityID).
-				Where("msg.type = ? AND msg.deleted_at IS NULL", domain.MessageTypeText).Scan(ctx, &providerID)
+				Where("msg.type IN (?) AND msg.deleted_at IS NULL", bun.In([]domain.MessageType{domain.MessageTypeText, domain.MessageTypeAttachment})).Scan(ctx, &providerID)
 			if errors.Is(err, sql.ErrNoRows) {
 				return ConversationMessage{}, &ConflictError{Reason: ConflictReasonReplyTargetInvalid}
 			}
@@ -212,22 +291,35 @@ func (a *SendCustomerTextMessageAction) executeTransaction(ctx context.Context, 
 	message := &servermodels.Message{
 		ID: ids.message, OrganizationID: identity.Organization.ID, ConversationID: conversation.ID,
 		ServiceSessionID: &session.ID, SenderParticipantID: &participant.ID,
-		Type: string(domain.MessageTypeText), Visibility: string(input.Visibility), Body: input.Body, ClientMessageID: &input.ClientMessageID, IdempotencyKey: &idempotencyKey, OriginatedAt: originatedAt,
+		Type: string(input.Type), Visibility: string(input.Visibility), Body: input.Body, ClientMessageID: &input.ClientMessageID, IdempotencyKey: &idempotencyKey, OriginatedAt: originatedAt,
 	}
 	if replyTo != nil {
 		message.ReplyToMessageID = &replyTo.ID
+	}
+	var attachment *MessageAttachment
+	if input.Attachment != nil {
+		attachment, err = lockCustomerAttachmentFile(ctx, tx, identity, route.ChannelType, *input.Attachment)
+		if err != nil {
+			return ConversationMessage{}, err
+		}
+		message.SearchVector = searchtext.Vector(input.Body, attachment.Name)
 	}
 	message, inserted, err := chatstate.AppendMessage(ctx, tx, conversation, message)
 	if err != nil {
 		return ConversationMessage{}, err
 	}
 	if !inserted {
-		saved, _, err := loadIdempotentMemberMessage(ctx, tx, identity, input.ConversationID, input.Body, input.ReplyToMessageID, idempotencyKey, input.Visibility, true)
+		saved, _, err := loadIdempotentMemberMessage(ctx, tx, identity, expectation, idempotencyKey)
 		return saved, err
+	}
+	if attachment != nil {
+		if err := saveCustomerAttachment(ctx, tx, identity.Organization.ID, message.ID, *attachment); err != nil {
+			return ConversationMessage{}, err
+		}
 	}
 	if !internalNote {
 		if route.ChannelType == domain.ChannelTypeTelegram {
-			if err := deliveryaction.Enqueue(ctx, tx, a.enqueuer, route, message); err != nil {
+			if err := deliveryaction.Enqueue(ctx, tx, enqueuer, route, message); err != nil {
 				return ConversationMessage{}, err
 			}
 		}
@@ -243,6 +335,7 @@ func (a *SendCustomerTextMessageAction) executeTransaction(ctx context.Context, 
 	}
 	result := memberConversationMessage(message, subject.ID, identity.OrganizationIdentity)
 	result.ReplyTo = replyTo
+	result.Attachment = attachment
 	return result, nil
 }
 
@@ -280,7 +373,7 @@ func normalizeCustomerTextMessageInput(input CustomerTextMessageInput) (Customer
 }
 
 // loadIdempotentMemberMessage 校验并返回已经保存的成员消息。
-func loadIdempotentMemberMessage(ctx context.Context, db bun.IDB, identity *servermodels.Identity, conversationID, body, replyToMessageID, idempotencyKey string, visibility domain.MessageVisibility, requireServiceSession bool) (ConversationMessage, bool, error) {
+func loadIdempotentMemberMessage(ctx context.Context, db bun.IDB, identity *servermodels.Identity, expectation memberMessageExpectation, idempotencyKey string) (ConversationMessage, bool, error) {
 	row := idempotentMemberMessageRow{}
 	err := db.NewSelect().
 		TableExpr("messages AS msg").
@@ -301,6 +394,14 @@ func loadIdempotentMemberMessage(ctx context.Context, db bun.IDB, identity *serv
 		ColumnExpr("cs.kind AS sender_subject_kind").
 		ColumnExpr("cs.source_id AS sender_subject_source_id").
 		ColumnExpr("ss.id AS joined_service_session_id").
+		ColumnExpr("ma.file_id::text AS attachment_file_id").
+		ColumnExpr("ma.name AS attachment_name").
+		ColumnExpr("ma.content_type AS attachment_content_type").
+		ColumnExpr("ma.byte_size AS attachment_byte_size").
+		ColumnExpr("ma.image_width AS attachment_image_width").
+		ColumnExpr("ma.image_height AS attachment_image_height").
+		ColumnExpr("ma.transfer_status AS attachment_transfer_status").
+		Join("LEFT JOIN message_attachments AS ma ON ma.message_id = msg.id AND ma.organization_id = msg.organization_id").
 		Join("LEFT JOIN conversation_participants AS cp ON cp.id = msg.sender_participant_id AND cp.organization_id = msg.organization_id AND cp.conversation_id = msg.conversation_id").
 		Join("LEFT JOIN chat_subjects AS cs ON cs.id = cp.subject_id AND cs.organization_id = cp.organization_id").
 		Join("LEFT JOIN service_sessions AS ss ON ss.id = msg.service_session_id AND ss.organization_id = msg.organization_id AND ss.conversation_id = msg.conversation_id").
@@ -319,11 +420,19 @@ func loadIdempotentMemberMessage(ctx context.Context, db bun.IDB, identity *serv
 		storedReply = *row.ReplyToMessageID
 	}
 	serviceSessionMatches := row.ServiceSessionID == nil && row.JoinedServiceSessionID == nil
-	if requireServiceSession {
+	if expectation.RequireServiceSession {
 		serviceSessionMatches = row.ServiceSessionID != nil && row.JoinedServiceSessionID != nil && *row.ServiceSessionID == *row.JoinedServiceSessionID
 	}
-	messageMatches := storedReply == replyToMessageID && row.ConversationID == conversationID && row.Body == body && row.Type == string(domain.MessageTypeText) && row.Visibility == visibility && row.DeletedAt == nil &&
-		serviceSessionMatches &&
+	// 附件消息额外核对文件与图片尺寸，文本消息不得关联附件。
+	attachmentMatches := row.AttachmentFileID == nil
+	if expectation.Attachment != nil {
+		attachmentMatches = row.AttachmentFileID != nil && *row.AttachmentFileID == expectation.Attachment.FileID &&
+			row.AttachmentImageWidth != nil && *row.AttachmentImageWidth == expectation.Attachment.ImageWidth &&
+			row.AttachmentImageHeight != nil && *row.AttachmentImageHeight == expectation.Attachment.ImageHeight
+	}
+	messageMatches := storedReply == expectation.ReplyToMessageID && row.ConversationID == expectation.ConversationID && row.Body == expectation.Body &&
+		row.Type == string(expectation.Type) && row.Visibility == expectation.Visibility && row.DeletedAt == nil &&
+		serviceSessionMatches && attachmentMatches &&
 		row.SenderParticipantID != nil && row.SenderSubjectID != nil && row.SenderSubjectKind != nil && row.SenderSubjectSourceID != nil &&
 		*row.SenderSubjectKind == string(domain.ChatSubjectKindOrganizationIdentity) && *row.SenderSubjectSourceID == identity.OrganizationIdentity.ID
 	if !messageMatches {
@@ -335,8 +444,16 @@ func loadIdempotentMemberMessage(ctx context.Context, db bun.IDB, identity *serv
 		Type: row.Type, Visibility: string(row.Visibility), Body: row.Body, OriginatedAt: row.OriginatedAt, DeletedAt: row.DeletedAt, MessageSeq: row.MessageSeq,
 	}
 	result := memberConversationMessage(message, *row.SenderSubjectID, identity.OrganizationIdentity)
+	// 附件行存在时其余列均非空。
+	if row.AttachmentFileID != nil {
+		result.Attachment = &MessageAttachment{
+			ID: *row.AttachmentFileID, Name: *row.AttachmentName, ContentType: *row.AttachmentContentType,
+			ByteSize: *row.AttachmentByteSize, ImageWidth: *row.AttachmentImageWidth, ImageHeight: *row.AttachmentImageHeight,
+			TransferStatus: domain.MessageAttachmentTransferStatus(*row.AttachmentTransfer),
+		}
+	}
 	if storedReply != "" {
-		result.ReplyTo, err = loadMessageReference(ctx, db, identity.Organization.ID, conversationID, storedReply)
+		result.ReplyTo, err = loadMessageReference(ctx, db, identity.Organization.ID, expectation.ConversationID, storedReply)
 		if err != nil {
 			return ConversationMessage{}, true, fmt.Errorf("load idempotent message reference: %w", err)
 		}

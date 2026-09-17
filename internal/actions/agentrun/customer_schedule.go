@@ -102,7 +102,7 @@ func loadCustomerInputSender(ctx context.Context, db bun.IDB, session *servermod
 		Where("msg.organization_id = ?", session.OrganizationID).
 		Where("msg.conversation_id = ?", session.ConversationID).
 		Where("msg.service_session_id = ?", session.ID).
-		Where("msg.type = ?", domain.MessageTypeText).
+		Where("msg.type IN (?)", bun.In([]domain.MessageType{domain.MessageTypeText, domain.MessageTypeAttachment})).
 		Where("msg.deleted_at IS NULL").
 		Where("cs.kind = ?", domain.ChatSubjectKindContact).
 		Scan(ctx, &subjectID)

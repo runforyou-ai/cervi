@@ -7,7 +7,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { toast } from "sonner"
-import type { InboxConversation } from "@/api"
+import type { ConversationMessageReference, InboxConversation } from "@/api"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -19,6 +19,7 @@ import { FieldLabel } from "@/components/ui/field"
 import { ScrollBar } from "@/components/ui/scroll-area"
 import { Textarea } from "@/components/ui/textarea"
 import { resolveAppPlatform } from "@/platform/app-platform"
+import { formatFileSize } from "@/lib/file-size"
 import { cn } from "@/lib/utils"
 import { AttachmentContent } from "./attachment-content"
 import { useAttachmentQueue } from "./attachment-queue-context"
@@ -30,17 +31,27 @@ export function ConversationAttachmentUpload({
   targetIdentityID = "",
   agentIdentityID = "",
   customerConversationID = "",
+  customer = false,
+  byteLimit = 0,
+  captionLimit = 4000,
+  replyTo = null,
   disabled,
   onCreated,
   onBeforeSend,
+  onSent,
 }: {
   conversationID: string
   targetIdentityID?: string
   agentIdentityID?: string
   customerConversationID?: string
+  customer?: boolean
+  byteLimit?: number
+  captionLimit?: number
+  replyTo?: ConversationMessageReference | null
   disabled: boolean
   onCreated: (conversation: InboxConversation | null, conversationID: string) => void
   onBeforeSend?: () => Promise<boolean>
+  onSent?: () => void
 }) {
   const { t } = useTranslation("inbox")
   const { t: tCommon } = useTranslation("common")
@@ -60,7 +71,7 @@ export function ConversationAttachmentUpload({
     defaultValues: { description: "" },
     resolver: zodResolver(
       z.object({
-        description: z.string().max(4000, t("attachmentDescriptionTooLong")),
+        description: z.string().max(captionLimit, t("attachmentDescriptionTooLong")),
       }),
     ),
     shouldUseNativeValidation: true,
@@ -100,6 +111,15 @@ export function ConversationAttachmentUpload({
     if (selectedRef.current.length + files.length > 100) {
       toast.error(t("attachmentLimit"))
       return
+    }
+    // 超过渠道字节上限的文件不进入上传队列。
+    if (byteLimit > 0) {
+      const oversized = files.filter((file) => file.size > byteLimit)
+      if (oversized.length > 0) {
+        toast.error(t("attachmentTooLarge", { size: formatFileSize(byteLimit) }))
+        files = files.filter((file) => file.size <= byteLimit)
+        if (files.length === 0) return
+      }
     }
     selectingRef.current = true
     setSelecting(true)
@@ -154,7 +174,7 @@ export function ConversationAttachmentUpload({
         ...item,
         body: index === selectedRef.current.length - 1 ? values.description : "",
       })),
-      { conversationID, targetIdentityID, agentIdentityID, customerConversationID },
+      { conversationID, targetIdentityID, agentIdentityID, customerConversationID, customer, replyTo },
       (conversation, conversationID) => {
         if (aliveRef.current) onCreated(conversation, conversationID)
       },
@@ -162,6 +182,7 @@ export function ConversationAttachmentUpload({
     selectedRef.current = []
     setSelected([])
     form.reset()
+    onSent?.()
   }
 
   return (

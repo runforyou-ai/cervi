@@ -8,6 +8,9 @@ const inbox = {
   attachmentSend: "发送附件",
   attachmentCancel: "取消",
   attachmentUploadFailed: "上传失败，请重试",
+  attachmentTooLarge: "附件超过 {{size}}，无法在当前渠道发送",
+  attachmentTransferPending: "正在接收",
+  attachmentTransferFailed: "接收失败",
   attachmentDownload: "下载",
   attachmentDownloadFailed: "下载失败，请重试",
 

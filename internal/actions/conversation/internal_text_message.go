@@ -20,7 +20,7 @@ import (
 // saveInternalTextMessage 在会话与成员已锁定的事务内幂等保存消息、个人状态和 Agent 输入。
 func saveInternalTextMessage(ctx context.Context, db bun.IDB, identity *servermodels.Identity, input InternalTextMessageInput, sendContext internalMessageContext, agentScheduler AgentChatMessageScheduler) (ConversationMessage, error) {
 	idempotencyKey := "mmsg:" + identity.OrganizationIdentity.ID + ":" + input.ClientMessageID
-	if saved, found, err := loadIdempotentMemberMessage(ctx, db, identity, input.ConversationID, input.Body, input.ReplyToMessageID, idempotencyKey, domain.MessageVisibilityCustomerVisible, false); err != nil || found {
+	if saved, found, err := loadIdempotentMemberMessage(ctx, db, identity, internalTextExpectation(input.ConversationID, input.Body, input.ReplyToMessageID), idempotencyKey); err != nil || found {
 		return saved, err
 	}
 	replyTo, err := loadConversationReplyTarget(ctx, db, identity.Organization.ID, input.ConversationID, input.ReplyToMessageID)
@@ -41,7 +41,7 @@ func saveInternalTextMessage(ctx context.Context, db bun.IDB, identity *servermo
 		return ConversationMessage{}, err
 	}
 	if !inserted {
-		saved, _, err := loadIdempotentMemberMessage(ctx, db, identity, input.ConversationID, input.Body, input.ReplyToMessageID, idempotencyKey, domain.MessageVisibilityCustomerVisible, false)
+		saved, _, err := loadIdempotentMemberMessage(ctx, db, identity, internalTextExpectation(input.ConversationID, input.Body, input.ReplyToMessageID), idempotencyKey)
 		return saved, err
 	}
 	// Copilot 线程不维护个人会话状态，其余会话推进本人阅读水位。

@@ -29,6 +29,61 @@ func ChannelSupportsAgentAssignee(channelType ChannelType) bool {
 	return channelType == ChannelTypeWebsite || channelType == ChannelTypeTelegram
 }
 
+// 渠道附件上限，照片按 Telegram 的独立限制取值。
+const (
+	websiteAttachmentLimit        int64 = 20 * 1024 * 1024
+	telegramInboundLimit          int64 = 20 * 1024 * 1024
+	telegramOutboundPhotoLimit    int64 = 10 * 1024 * 1024
+	telegramOutboundDocumentLimit int64 = 50 * 1024 * 1024
+	websiteCaptionLimit                 = 4000
+	telegramCaptionLimit                = 1024
+)
+
+// ChannelSupportsInboundAttachment 判断渠道是否接收客户发来的附件。
+func ChannelSupportsInboundAttachment(channelType ChannelType) bool {
+	return channelType == ChannelTypeWebsite || channelType == ChannelTypeTelegram
+}
+
+// ChannelSupportsOutboundAttachment 判断渠道是否支持向客户发送附件。
+func ChannelSupportsOutboundAttachment(channelType ChannelType) bool {
+	return channelType == ChannelTypeWebsite
+}
+
+// ChannelAttachmentLimit 返回渠道对该类型单个附件的平台字节上限，渠道没有附件能力时为 0。外发是否开放由 ChannelSupportsOutboundAttachment 单独决定。
+func ChannelAttachmentLimit(channelType ChannelType, contentType string) int64 {
+	switch channelType {
+	case ChannelTypeWebsite:
+		return websiteAttachmentLimit
+	case ChannelTypeTelegram:
+		if AttachmentIsPhoto(contentType) {
+			return telegramOutboundPhotoLimit
+		}
+		return telegramOutboundDocumentLimit
+	default:
+		return 0
+	}
+}
+
+// ChannelInboundAttachmentLimit 返回渠道单个入站附件的字节上限。
+func ChannelInboundAttachmentLimit(channelType ChannelType) int64 {
+	switch channelType {
+	case ChannelTypeWebsite:
+		return websiteAttachmentLimit
+	case ChannelTypeTelegram:
+		return telegramInboundLimit
+	default:
+		return 0
+	}
+}
+
+// ChannelCaptionLimit 返回渠道附件说明的字符上限。
+func ChannelCaptionLimit(channelType ChannelType) int {
+	if channelType == ChannelTypeTelegram {
+		return telegramCaptionLimit
+	}
+	return websiteCaptionLimit
+}
+
 // ChannelRoutingTargetType 定义渠道会话流转目标类型。
 type ChannelRoutingTargetType string
 

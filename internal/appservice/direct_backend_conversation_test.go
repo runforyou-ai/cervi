@@ -8,6 +8,8 @@ import (
 	"testing"
 
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
+	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 )
 
 // TestConversationMessageCursorRoundTrip 验证成员消息游标绑定会话并可稳定还原。
@@ -68,5 +70,18 @@ func TestMessageCursorPreservesSequence(t *testing.T) {
 	}
 	if got := messageSeqString(&sequence); got == nil || *got != "9007199254740993" {
 		t.Fatalf("sequence=%v", got)
+	}
+}
+
+// TestCustomerMessageErrorMapsFileNotFound 验证附件文件无效时对外返回文件未找到，而不是笼统的发送失败。
+func TestCustomerMessageErrorMapsFileNotFound(t *testing.T) {
+	err := customerTextMessageError(context.Background(), RequestMeta{}, fileaction.ErrFileNotFound, "org", "conversation")
+	applicationError, ok := errors.AsType[*Error](err)
+	if !ok || applicationError.Kind != ErrorKindNotFound {
+		t.Fatalf("mapped error = %#v", err)
+	}
+	expected, _ := cervii18n.Localize("", cervii18n.ErrorFileNotFound)
+	if applicationError.Message != expected {
+		t.Fatalf("message = %q", applicationError.Message)
 	}
 }

@@ -43,9 +43,24 @@ function host(overrides: Record<string, (...args: any[]) => any> = {}) {
   const cancelled: string[] = []
   const errors: unknown[] = []
   let transfers = 0
+  const customerSends: any[] = []
   const api: Record<string, any> = {
     FilePurpose: { FilePurposeMessageAttachment: "message_attachment" },
     MessageVisibility: { MessageVisibilityCustomerVisible: "customer_visible" },
+    MessageAttachmentTransferStatus: {
+      MessageAttachmentTransferReady: "ready",
+      MessageAttachmentTransferPending: "pending",
+      MessageAttachmentTransferFailed: "failed",
+    },
+    sendCustomerAttachmentMessage: async (conversationId: string, input: any) => {
+      customerSends.push({ conversationId, ...input })
+      return {
+        id: `saved-${input.clientMessageId}`,
+        body: input.body,
+        originatedAt: new Date().toISOString(),
+        attachment: { id: input.fileId, transferStatus: "ready" },
+      }
+    },
     createFileUpload: async (input: any) => ({
       file: { id: `file-${input.fileName}` },
       partSize: 0,
@@ -122,6 +137,7 @@ function host(overrides: Record<string, (...args: any[]) => any> = {}) {
     job: (id: string) => queue.snapshot().find((item: any) => item.id === id),
     files,
     sends,
+    customerSends,
     cancelled,
     errors,
     transfers: () => transfers,
@@ -374,4 +390,31 @@ test("离开页面后未发送的附件标记失败且不再发送", async () =>
   assert.equal(h.sends.length, 0)
   assert.equal(h.sent().map((item: any) => item.status).join(","), "failed,failed")
   assert.deepEqual([...h.cancelled].sort(), ["file-1.csv", "file-2.csv"])
+})
+
+test("客户会话附件走对客发送接口，引用只挂在首条附件上", async () => {
+  const context = host()
+  context.queue.start()
+  context.queue.enqueue(
+    context.files,
+    {
+      conversationID: "conversation",
+      customer: true,
+      replyTo: { id: "origin-message", body: "客户原话", deleted: false },
+    },
+    () => {},
+  )
+  await settled(() => context.customerSends.length === 2)
+  assert.equal(context.sends.length, 0, "不应调用内部附件接口")
+  assert.deepEqual(
+    context.customerSends.map((item) => [item.conversationId, item.replyToMessageId, item.body]),
+    [
+      ["conversation", "origin-message", ""],
+      ["conversation", "", "说明"],
+    ],
+  )
+  const localReplies = context.sent().map((item: any) => item.replyTo?.id ?? "")
+  assert.equal(localReplies.length, 2)
+  assert.equal(localReplies[0], "origin-message", "首条本地气泡保留引用")
+  assert.equal(localReplies[1], "", "其余附件不重复引用")
 })

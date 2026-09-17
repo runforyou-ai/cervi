@@ -28,6 +28,7 @@ import {
   ReopenServiceSession,
   SearchInbox,
   RemoveGroupConversationMember,
+  SendCustomerAttachmentMessage,
   SendCustomerTextMessage,
   GenerateCustomerReplySuggestions,
   ListCustomerReplyAgents,
@@ -61,6 +62,7 @@ import type {
   ConversationNotificationSettings,
   ConversationNotificationSettingsInput,
   ConversationUnreadMarkInput,
+  CustomerAttachmentMessageInput,
   CustomerTextMessageInput,
   CustomerReplySuggestionsInput,
   DirectInboxConversation,
@@ -95,6 +97,7 @@ import {
   CustomerInboxView,
   InboxScope,
   InboxSearchRange,
+  MessageAttachmentTransferStatus,
   ServiceSessionStatus,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import { bind } from "@/api/client"
@@ -157,6 +160,7 @@ const markConversationMentionReviewedBound = bind(
   MarkConversationMentionReviewed,
 )
 const sendCustomerTextMessageBound = bind(SendCustomerTextMessage)
+const sendCustomerAttachmentMessageBound = bind(SendCustomerAttachmentMessage)
 const generateCustomerReplySuggestionsBound = bind(GenerateCustomerReplySuggestions)
 const listCustomerReplyAgentsBound = bind(ListCustomerReplyAgents)
 const sendFirstAgentTextMessageBound = bind(SendFirstAgentTextMessage)
@@ -343,9 +347,22 @@ export function markConversationRead(
   return markConversationReadBound(conversationID, input)
 }
 
+export type MessageAttachmentTransferStatusId = Exclude<
+  MessageAttachmentTransferStatus,
+  MessageAttachmentTransferStatus.$zero
+>
+
 /** 发送成员客户会话文本消息。 */
 export function sendCustomerTextMessage(conversationID: string, input: CustomerTextMessageInput) {
   return sendCustomerTextMessageBound(conversationID, input)
+}
+
+/** 发送成员客户会话附件消息。 */
+export function sendCustomerAttachmentMessage(
+  conversationID: string,
+  input: CustomerAttachmentMessageInput,
+) {
+  return sendCustomerAttachmentMessageBound(conversationID, input)
 }
 
 /** 返回可用于 AI 写回复的 AI 员工。 */

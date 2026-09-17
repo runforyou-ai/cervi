@@ -259,6 +259,14 @@ func (b *Backend) SendCustomerTextMessage(ctx context.Context, meta appservice.R
 	return output, err
 }
 
+// SendCustomerAttachmentMessage 发送客户会话附件消息。
+func (b *Backend) SendCustomerAttachmentMessage(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.CustomerAttachmentMessageInput) (appservice.ConversationMessage, error) {
+	var output appservice.ConversationMessage
+	err := b.do(ctx, meta, http.MethodPost, "/conversations/"+url.PathEscape(conversationID)+"/attachment-messages", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // ListCustomerReplyAgents 返回可用于 AI 写回复的 AI 员工。
 func (b *Backend) ListCustomerReplyAgents(ctx context.Context, meta appservice.RequestMeta) (appservice.CustomerReplyAgentList, error) {
 	var output appservice.CustomerReplyAgentList
