@@ -6,7 +6,7 @@ require (
 	github.com/aws/aws-sdk-go-v2 v1.47.0
 	github.com/aws/aws-sdk-go-v2/credentials v1.20.4
 	github.com/aws/aws-sdk-go-v2/service/s3 v1.113.0
-	github.com/cloudwego/eino v0.10.0-alpha.33
+	github.com/cloudwego/eino v0.10.0-alpha.34
 	github.com/cloudwego/eino-ext/components/model/agenticark v0.2.4
 	github.com/cloudwego/eino-ext/components/model/agenticclaude v0.1.5
 	github.com/cloudwego/eino-ext/components/model/agenticdeepseek v0.1.0
@@ -30,7 +30,7 @@ require (
 	github.com/uptrace/bun/dialect/sqlitedialect v1.2.18
 	github.com/uptrace/bun/driver/pgdriver v1.2.18
 	github.com/volcengine/volcengine-go-sdk v1.2.34
-	github.com/wailsapp/wails/v3 v3.0.0-beta.21
+	github.com/wailsapp/wails/v3 v3.0.0-beta.23
 	github.com/yuin/goldmark v1.8.6
 	golang.org/x/crypto v0.57.0
 	golang.org/x/text v0.42.0
