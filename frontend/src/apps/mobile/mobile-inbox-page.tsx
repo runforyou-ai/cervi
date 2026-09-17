@@ -2,7 +2,7 @@
 import { BellOffIcon, PlusIcon, SearchIcon } from "lucide-react"
 import { messagePreview } from "@/lib/message-preview"
 import { useTranslation } from "react-i18next"
-import { useNavigate, useOutletContext } from "react-router"
+import { useNavigate } from "react-router"
 
 import {
   isCustomerInboxConversation,
@@ -47,10 +47,7 @@ import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
 import {
   useMemberChatPollingActive,
 } from "@/features/inbox/use-member-chat-polling"
-import {
-  useMobileWorkspace,
-  type MobileTabContext,
-} from "./mobile-workspace-layout"
+import { useMobileWorkspace } from "./mobile-workspace-layout"
 import {
   mobileConversationPath,
   mobileSearchPath,
@@ -246,13 +243,11 @@ function MobileInboxList({ query, changeQuery }: ReturnType<typeof useMobileInbo
     requireWindowFocus: false,
   })
   const { identity } = useMobileWorkspace()
-  const { reportInboxAttention } = useOutletContext<MobileTabContext>()
   const { inboxWindows } = useMobileNavigation()
   const viewport = useInboxListViewport()
   const list = useInboxList(query, viewport, {
     identity,
     active: pollingActive,
-    unread: reportInboxAttention,
     history: inboxWindows,
   })
   const actions = useConversationListActions()

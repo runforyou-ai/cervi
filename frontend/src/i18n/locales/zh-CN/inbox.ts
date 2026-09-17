@@ -255,6 +255,8 @@ const inbox = {
   sessionBoundaryOngoing: "进行中",
   sessionBoundaryClosed: "已关闭",
   unknownSender: "未知发送者",
+  notificationGroupBody: "{{sender}}：{{preview}}",
+  notificationAttachment: "[附件] {{name}}",
   conversationClaim: "接管",
   conversationTakeover: "接管",
   conversationTransfer: "转给同事",

@@ -1,10 +1,10 @@
 /** Web 与桌面端工作台布局。 */
-import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react"
+import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { Navigate, useLocation, useNavigate } from "react-router"
 import { toast } from "sonner"
 
-import { logout, WorkStatus } from "@/api"
+import { loadInbox, logout, WorkStatus } from "@/api"
 import { AttachmentQueueProvider } from "@/features/inbox/attachment-queue-context"
 import { OutgoingMessageProvider } from "@/features/inbox/outgoing-message-context"
 import { LoadingIndicator } from "@/components/loading-indicator"
@@ -13,14 +13,11 @@ import { UserPreferencesProvider } from "@/contexts/user-preferences"
 import {
   activateNotificationPolicy,
   deactivateNotificationPolicy,
-  notifyNewMessage as deliverNewMessageNotification,
 } from "@/features/notifications/new-message-notifications"
+import { useNewMessageNotifications } from "@/features/notifications/use-new-message-notifications"
 import { useIdentityLoader } from "@/features/session/use-identity-loader"
 import { useRealtimeConnection } from "@/features/session/use-realtime-connection"
-import type {
-  WorkspaceNewMessageNotification,
-  WorkspaceOutletContext,
-} from "@/contexts/workspace-context"
+import type { WorkspaceOutletContext } from "@/contexts/workspace-context"
 import { WorkspaceNavigationGuard } from "@/features/workspace/workspace-navigation-guard"
 import { WorkspaceNavigation } from "@/features/workspace/workspace-navigation"
 import {
@@ -30,13 +27,10 @@ import {
 } from "@/features/workspace/workspace-page-routes"
 import { WorkspaceSinglePage } from "@/features/workspace/workspace-single-page"
 import { WorkspaceTabs } from "@/features/workspace/workspace-tabs"
+import { resourceKeys } from "@/hooks/resource-keys"
+import { useResource } from "@/hooks/use-resource"
 import { resolveAppPlatform } from "@/platform/app-platform"
 import { updateNotificationUnreadIndicator } from "@/platform/notifications"
-
-type WorkspaceUnreadState = {
-  count: number
-  attentionPending: boolean
-}
 
 /** 页面导航后清除非编辑区域的文字选区。 */
 function useClearSelectionOnNavigation() {
@@ -62,11 +56,7 @@ export function WorkspaceLayout() {
   const { t } = useTranslation(["workspace", "common"])
   const navigate = useNavigate()
   const [loggingOut, setLoggingOut] = useState(false)
-  const [unreadState, setUnreadState] = useState<WorkspaceUnreadState>({
-    count: 0,
-    attentionPending: false,
-  })
-  const unreadRevisionRef = useRef(0)
+  const [attentionPending, setAttentionPending] = useState(false)
   const { status, identity, redirectPath } = useIdentityLoader()
   const workspaceLocation = resolveWorkspaceLocation(location)
   const fallbackTabRef = useRef<ResolvedWorkspaceTab>(defaultWorkspaceTab)
@@ -122,32 +112,40 @@ export function WorkspaceLayout() {
     Boolean(messageNotificationsEnabled) &&
     workStatus === WorkStatus.WorkStatusWorking
 
+  // 提醒总数按权威查询读取，会话变化由同步协调器失效该查询。
+  const attention = useResource(
+    resourceKeys.inboxAttention({ organizationId, userId }),
+    async () => (await loadInbox({ limit: 1 })).attentionUnreadCount,
+    { enabled: Boolean(organizationId && userId) },
+  )
+  const unreadCount = attention.data ?? 0
+
+  // 实时确认的新消息按通知策略投递，投递成功即进入待处理提醒。
+  useNewMessageNotifications(identity, () => setAttentionPending(true))
+
   /** 同步桌面端未读数和提醒状态。 */
   useEffect(() => {
     if (!userId || resolveAppPlatform() !== "desktop") {
       return
     }
 
-    if (!attentionEnabled && unreadState.attentionPending) {
-      setUnreadState((current) => ({
-        ...current,
-        attentionPending: false,
-      }))
+    if ((!attentionEnabled || unreadCount === 0) && attentionPending) {
+      setAttentionPending(false)
       return
     }
     void updateNotificationUnreadIndicator({
-      count: unreadState.count,
+      count: unreadCount,
       attentionEnabled,
-      attentionPending: unreadState.attentionPending,
+      attentionPending,
     }).catch((error) => {
       console.warn("同步桌面端未读状态失败", {
-        count: unreadState.count,
+        count: unreadCount,
         attention_enabled: attentionEnabled,
-        attention_pending: unreadState.attentionPending,
+        attention_pending: attentionPending,
         error,
       })
     })
-  }, [userId, attentionEnabled, unreadState.count, unreadState.attentionPending])
+  }, [userId, attentionEnabled, unreadCount, attentionPending])
 
   /** 用户重新查看应用时停止托盘闪烁。 */
   useEffect(() => {
@@ -163,11 +161,7 @@ export function WorkspaceLayout() {
       ) {
         return
       }
-      setUnreadState((current) =>
-        current.attentionPending
-          ? { ...current, attentionPending: false }
-          : current,
-      )
+      setAttentionPending(false)
     }
 
     window.addEventListener("focus", clearAttention)
@@ -189,24 +183,20 @@ export function WorkspaceLayout() {
   useEffect(() => {
     if (
       location.pathname !== "/inbox" ||
-      !unreadState.attentionPending ||
+      !attentionPending ||
       document.visibilityState !== "visible" ||
       !document.hasFocus()
     ) {
       return
     }
-    setUnreadState((current) => ({
-      ...current,
-      attentionPending: false,
-    }))
-  }, [location.pathname, unreadState.attentionPending])
+    setAttentionPending(false)
+  }, [location.pathname, attentionPending])
 
   /** 退出登录并回到登录页。 */
   async function handleLogout() {
     setLoggingOut(true)
     deactivateNotificationPolicy()
-    unreadRevisionRef.current += 1
-    setUnreadState({ count: 0, attentionPending: false })
+    setAttentionPending(false)
     // 先离开工作台，登出清空查询缓存时外壳已经卸载。
     navigate("/login", { replace: true })
     try {
@@ -219,57 +209,6 @@ export function WorkspaceLayout() {
       setLoggingOut(false)
     }
   }
-
-  /** 返回当前未读状态修订号。 */
-  const beginUnreadSnapshot = useCallback(function beginUnreadSnapshot() {
-    return unreadRevisionRef.current
-  }, [])
-
-  /** 应用未被实时消息覆盖的未读快照。 */
-  const applyUnreadSnapshot = useCallback(function applyUnreadSnapshot(
-    count: number,
-    revision: number,
-  ) {
-    if (revision !== unreadRevisionRef.current) {
-      return
-    }
-    const normalizedCount = Math.max(0, count)
-    setUnreadState((current) => ({
-      count: normalizedCount,
-      attentionPending:
-        normalizedCount > 0 && current.attentionPending,
-    }))
-  }, [])
-
-  /** 更新实时未读数并处理新消息提醒。 */
-  const notifyNewMessage = useCallback(async function notifyNewMessage(
-    notification: WorkspaceNewMessageNotification,
-  ) {
-    if (!organizationId || !userId) {
-      return false
-    }
-
-    unreadRevisionRef.current += 1
-    const unreadCount = Math.max(0, notification.unreadCount)
-    const alreadyVisible =
-      document.visibilityState === "visible" && document.hasFocus()
-    setUnreadState({
-      count: unreadCount,
-      attentionPending:
-        unreadCount > 0 && attentionEnabled && !alreadyVisible,
-    })
-
-    if (unreadCount === 0) {
-      return false
-    }
-
-    return deliverNewMessageNotification({
-      id: notification.id,
-      title: notification.title,
-      body: notification.body,
-      scope: { organizationId, userId },
-    })
-  }, [organizationId, userId, attentionEnabled])
 
   if (status === "anonymous") return <Navigate to="/login" replace />
   if (status === "redirect" && redirectPath) {
@@ -289,12 +228,7 @@ export function WorkspaceLayout() {
       </main>
     )
   }
-  const workspaceContext = {
-    identity,
-    beginUnreadSnapshot,
-    applyUnreadSnapshot,
-    notifyNewMessage,
-  } satisfies WorkspaceOutletContext
+  const workspaceContext = { identity } satisfies WorkspaceOutletContext
   const currentTab = workspaceLocation.tab ?? fallbackTabRef.current
 
   return (

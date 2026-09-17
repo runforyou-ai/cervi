@@ -1,21 +1,10 @@
 /** 提供工作台页面共享数据。 */
 import { createContext, createElement, useContext, type ReactNode } from "react"
 
-import type { Identity, MessageNotificationInput } from "@/api"
-
-/** 工作台实时消息入口需要的通知内容和最新未读数。 */
-export type WorkspaceNewMessageNotification = Omit<
-  MessageNotificationInput,
-  "soundEnabled"
-> & { unreadCount: number }
+import type { Identity } from "@/api"
 
 export type WorkspaceOutletContext = {
   identity: Identity
-  beginUnreadSnapshot: () => number
-  applyUnreadSnapshot: (count: number, revision: number) => void
-  notifyNewMessage: (
-    notification: WorkspaceNewMessageNotification,
-  ) => Promise<boolean>
 }
 
 const WorkspaceContext = createContext<WorkspaceOutletContext | null>(null)

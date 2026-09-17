@@ -261,6 +261,8 @@ const inbox = {
   sessionBoundaryOngoing: "In progress",
   sessionBoundaryClosed: "Closed",
   unknownSender: "Unknown sender",
+  notificationGroupBody: "{{sender}}: {{preview}}",
+  notificationAttachment: "[Attachment] {{name}}",
   conversationClaim: "Claim",
   conversationTakeover: "Take over",
   conversationTransfer: "Transfer",
