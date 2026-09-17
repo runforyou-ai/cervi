@@ -165,6 +165,8 @@ export function AgentProcess({ process, incoming }: { process: ConversationAgent
         <CollapsibleTrigger className={cn(
           "group flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-sm py-1 text-left text-xs focus-visible:outline focus-visible:outline-ring",
           incoming ? "justify-start text-muted-foreground" : "justify-end text-primary-foreground/75",
+          // 移动端按触屏点击区域抬高行高，点击区不与引用块和正文重叠。
+          resolveAppPlatform() === "mobile" && "py-2",
         )}>
           <LightbulbIcon aria-hidden className="size-4 shrink-0 text-yellow-400 dark:text-yellow-300" />
           <span className="truncate">{t("agentThoughtCompleted", { seconds })}</span>
@@ -326,8 +328,16 @@ export function AgentRunState({ run, incoming, conversationID, group, copilot, o
         ) : null}
         {thinking ? (
           <Collapsible defaultOpen className="min-w-0">
-            <div className="flex items-center gap-1.5">
-              <CollapsibleTrigger className="group flex min-w-0 cursor-pointer items-center gap-1.5 rounded-sm text-left focus-visible:outline focus-visible:outline-ring">
+            <div className={cn(
+              "flex items-center gap-1.5",
+              // 移动端留出停止按钮触屏区域向左溢出的宽度，两个点击区域不重叠。
+              resolveAppPlatform() === "mobile" && "gap-3",
+            )}>
+              <CollapsibleTrigger className={cn(
+                "group flex min-w-0 cursor-pointer items-center gap-1.5 rounded-sm text-left focus-visible:outline focus-visible:outline-ring",
+                // 移动端按触屏点击区域抬高行高，点击区不与展开的过程内容重叠。
+                resolveAppPlatform() === "mobile" && "py-2",
+              )}>
                 <span className="truncate">{label}</span>
                 <ChevronDownIcon aria-hidden className="size-3.5 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
               </CollapsibleTrigger>
