@@ -72,7 +72,6 @@ export function MobileCreateGroupPage() {
       })
       if (!mounted.current) return
       void invalidate(resourceKeys.inbox())
-      console.info("移动端创建群聊成功", { conversationID: conversation.id })
       void navigate(`/inbox/group/${conversation.id}`, {
         replace: true,
         state: {

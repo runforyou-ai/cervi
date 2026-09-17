@@ -91,11 +91,6 @@ export function AgentsPanel({
         changingAgentStatus.status === UserStatus.UserStatusActive
           ? await deactivateAgent(changingAgentStatus.id)
           : await reactivateAgent(changingAgentStatus.id)
-      console.info("AI 员工账号状态已修改", {
-        identity_id: saved.identityId,
-        agent_id: saved.id,
-        status: saved.status,
-      })
       toast.success(
         t(
           changingAgentStatus.status === UserStatus.UserStatusActive

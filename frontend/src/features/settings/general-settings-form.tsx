@@ -75,10 +75,6 @@ export function GeneralSettingsForm({
         name: organization.name,
         allowArbitraryUrl: organization.allowArbitraryUrl,
       })
-      console.info("企业通用设置已更新", {
-        organization_id: organization.id,
-        allow_arbitrary_url: organization.allowArbitraryUrl,
-      })
       toast.success(t("general.saveSuccess"))
     } catch (error) {
       if (!mounted.current) return

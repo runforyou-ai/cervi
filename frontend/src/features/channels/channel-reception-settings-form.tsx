@@ -63,10 +63,6 @@ export function ChannelReceptionSettingsForm({
         fallbackTarget: updated.fallbackTarget,
       })
       onUpdated(updated)
-      console.info("消息渠道接待设置已保存", {
-        channel_id: channel.id,
-        channel_type: channel.type,
-      })
       toast.success(t("routing.saved"))
     } catch (error) {
       if (recoverSession(error, navigate)) return

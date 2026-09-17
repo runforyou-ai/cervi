@@ -31,7 +31,6 @@ export function NotificationPermissionSettings() {
       if (!nextStatus) {
         return
       }
-      console.info("通知权限申请完成", { status: nextStatus })
       if (canSendNotification(nextStatus)) {
         toast.success(t("preferences.notifications.permission.allowSuccess"))
         return
@@ -50,7 +49,6 @@ export function NotificationPermissionSettings() {
 
     try {
       if (await openNotificationPermissionSettings()) {
-        console.info("已打开 macOS 通知设置")
         return
       }
     } catch (error) {

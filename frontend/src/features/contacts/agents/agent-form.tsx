@@ -105,13 +105,6 @@ export function AgentForm({
       })
       void invalidateContact("agent")
       if (!mounted.current) return
-      console.info("AI 员工已创建", {
-        agent_id: created.id,
-        execution_mode: created.execution.mode,
-        revision_id: created.execution.revisionId,
-        provider_id: created.execution.managed.providerId,
-        model_identifier: created.execution.managed.modelIdentifier,
-      })
       toast.success(t("agents.form.created"))
       dirty.current = false
       form.reset(values)

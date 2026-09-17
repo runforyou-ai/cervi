@@ -65,7 +65,6 @@ export function SetupForm() {
             startup.state === SessionState.SessionStateReady &&
             startup.organizationName
           ) {
-            console.info("企业已完成初始化，进入登录页")
             completeStartup(startup.organizationName)
             navigate("/login", { replace: true })
             return

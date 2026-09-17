@@ -115,10 +115,9 @@ export function MCPServerFormPage({ mode }: { mode: "create" | "edit" }) {
   async function save(values: MCPServerFormValues) {
     if (testing) return
     try {
-      const saved =
-        mode === "create"
-          ? await createMCPServer(values)
-          : await updateMCPServer(mcpServerId, values)
+      await (mode === "create"
+        ? createMCPServer(values)
+        : updateMCPServer(mcpServerId, values))
       if (mode === "edit") {
         void invalidateResource(resourceKeys.mcpServer(mcpServerId))
       }
@@ -126,10 +125,6 @@ export function MCPServerFormPage({ mode }: { mode: "create" | "edit" }) {
       void invalidateResource(resourceKeys.agentMCPServerOptions())
       if (!mounted.current) return
       form.reset(values)
-      console.info(mode === "create" ? "MCP 服务已创建" : "MCP 服务已保存", {
-        mcp_server_id: saved.id,
-        server_type: saved.serverType,
-      })
       toast.success(
         mode === "create"
           ? t("mcpServer.form.createSuccess")

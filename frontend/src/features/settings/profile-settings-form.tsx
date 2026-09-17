@@ -121,7 +121,6 @@ export function ProfileSettingsForm({ user }: { user: CurrentUser }) {
         email: updated.email,
       })
       avatar.clear()
-      console.info("个人资料已保存", { user_id: updated.id })
       void invalidate(resourceKeys.identity())
       toast.success(t("profile.saveSuccess"))
     } catch (error) {

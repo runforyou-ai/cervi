@@ -257,7 +257,6 @@ export class InboxListController {
       this.applyWindow(next, initial)
     }
     if (unavailable.length) this.ports.unavailable(unavailable)
-    if (initial) console.info("收件箱窗口已加载", { query: this.query, conversationCount: next.ids.length })
   }
 
 }

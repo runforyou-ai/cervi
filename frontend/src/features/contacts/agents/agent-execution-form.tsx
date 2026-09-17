@@ -85,10 +85,6 @@ export function AgentExecutionForm({
       if (!mounted.current) return
       dirty.current = false
       form.reset({ ...values, mcpServerIds: saved.execution.mcpServerIds })
-      console.info("AI 员工运行配置已保存", {
-        agent_id: saved.id,
-        revision_id: saved.execution.revisionId,
-      })
       toast.success(t("agents.form.saved"))
     } catch (error) {
       if (!mounted.current || recoverSession(error, navigate)) return

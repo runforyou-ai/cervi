@@ -44,7 +44,6 @@ export function AppsPage() {
   async function openBusinessSystem(system: BusinessSystem) {
     try {
       await openExternalPage({ title: system.name, url: system.url })
-      console.info("业务系统已打开", { business_system_id: system.id })
     } catch (error) {
       if (recoverSession(error, navigate)) return
       console.warn("业务系统打开失败", {

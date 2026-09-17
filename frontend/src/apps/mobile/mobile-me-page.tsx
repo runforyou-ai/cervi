@@ -61,7 +61,6 @@ export function MobileMePage() {
     setChangingWorkStatus(true)
     try {
       await updateUserWorkStatus({ workStatus })
-      console.info("工作状态已切换", { work_status: workStatus })
       await invalidate(resourceKeys.identity())
     } catch (error) {
       if (!recoverSession(error, navigate)) {
@@ -80,7 +79,6 @@ export function MobileMePage() {
     navigate("/login", { replace: true })
     try {
       await logout()
-      console.info("用户退出登录")
     } catch (error) {
       console.warn("退出登录失败", error)
       toast.error(t("logoutError"))

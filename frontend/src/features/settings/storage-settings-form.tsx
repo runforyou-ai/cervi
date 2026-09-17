@@ -213,7 +213,6 @@ export function StorageSettingsForm() {
       setEditing(false)
       form.reset(saved)
       void refresh()
-      console.info("对象存储设置已保存")
       toast.success(t("storage.saveSuccess"))
     } catch (error) {
       handleRequestError(error, t("storage.saveError"))
@@ -227,7 +226,6 @@ export function StorageSettingsForm() {
     setPendingAction("test")
     try {
       await testS3Setting(values)
-      console.info("对象存储连接测试成功")
       toast.success(t("storage.testSuccess"))
     } catch (error) {
       handleRequestError(error, t("storage.testError"))
@@ -259,7 +257,6 @@ export function StorageSettingsForm() {
       setSavedSetting(enabledSetting)
       form.reset(enabledSetting)
       void refresh()
-      console.info("对象存储已启用")
       toast.success(t("storage.enableSuccess"))
     } catch (error) {
       handleRequestError(error, t("storage.enableError"))
@@ -279,7 +276,6 @@ export function StorageSettingsForm() {
       setEditing(false)
       form.reset(disabledSetting)
       void refresh()
-      console.info("对象存储已停用")
       toast.success(t("storage.disableSuccess"))
     } catch (error) {
       handleRequestError(error, t("storage.disableError"))

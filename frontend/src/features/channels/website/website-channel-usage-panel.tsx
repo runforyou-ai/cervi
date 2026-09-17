@@ -248,10 +248,6 @@ export function WebsiteChannelUsagePanel({
       await navigator.clipboard.writeText(value)
       setCopied(target)
       setCopyFailed(false)
-      console.info("网站渠道使用内容已复制", {
-        channel_id: channel.id,
-        target,
-      })
     } catch (copyError) {
       console.warn("复制网站渠道使用内容失败", copyError)
       setCopied("")
@@ -267,9 +263,6 @@ export function WebsiteChannelUsagePanel({
       })
       form.reset({ allowedHosts: updated.allowedHosts.join("\n") })
       onUpdated(updated)
-      console.info("网站渠道允许使用的网站已保存", {
-        channel_id: channel.id,
-      })
       toast.success(t("usage.saved"))
     } catch (submitError) {
       if (recoverSession(submitError, navigate)) {

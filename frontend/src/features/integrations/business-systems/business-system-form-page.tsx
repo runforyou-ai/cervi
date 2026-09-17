@@ -92,20 +92,15 @@ export function BusinessSystemFormPage({ mode }: { mode: "create" | "edit" }) {
   /** 创建或保存业务系统。 */
   async function save(values: BusinessSystemFormValues) {
     try {
-      const saved =
-        mode === "create"
-          ? await createBusinessSystem(values)
-          : await updateBusinessSystem(businessSystemId, values)
+      await (mode === "create"
+        ? createBusinessSystem(values)
+        : updateBusinessSystem(businessSystemId, values))
       if (mode === "edit") {
         void invalidateResource(resourceKeys.businessSystem(businessSystemId))
       }
       void invalidateResource(resourceKeys.businessSystems())
       if (!mounted.current) return
       form.reset(values)
-      console.info(mode === "create" ? "业务系统已创建" : "业务系统已保存", {
-        business_system_id: saved.id,
-        enabled: saved.enabled,
-      })
       toast.success(
         mode === "create"
           ? t("businessSystem.form.createSuccess")

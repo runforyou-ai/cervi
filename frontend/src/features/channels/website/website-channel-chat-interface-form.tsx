@@ -105,7 +105,6 @@ export function WebsiteChannelChatInterfaceForm({
         themeColor: updated.themeColor,
       })
       onUpdated(updated)
-      console.info("网站渠道聊天界面已保存", { channel_id: channel.id })
       toast.success(t("chatInterface.saved"))
     } catch (error) {
       if (recoverSession(error, navigate)) {

@@ -43,7 +43,6 @@ export function useIntegrationDeletion<T extends { id: string }>({
       void invalidate(listKey)
       void invalidate(detailKey(item.id))
       for (const key of relatedKeys) void invalidate(key)
-      console.info(`${entityName}已删除`, { id: item.id })
       if (!save.isCurrent(request)) return
       setItem(null)
       toast.success(successMessage)
