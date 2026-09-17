@@ -216,8 +216,9 @@
         !conversation.historyLoading
       ) {
         loadConversationHistory(conversation);
+      } else if (conversation.historyLoaded) {
+        refreshActiveConversationMessages();
       }
-      refreshActiveConversationMessages();
       return;
     }
     referenceNavigationSeq += 1;
@@ -249,8 +250,9 @@
       !activeConversation.historyLoaded
     ) {
       loadConversationHistory(activeConversation);
+    } else if (activeConversation.historyLoaded) {
+      refreshActiveConversationMessages();
     }
-    refreshActiveConversationMessages();
   }
 
   function beginNewConversation() {
@@ -747,6 +749,16 @@
     preferredConversation,
   ) {
     var conversation = conversationByID[summary.id];
+    if (
+      conversation &&
+      preferredConversation &&
+      conversation !== preferredConversation &&
+      conversation !== activeConversation
+    ) {
+      // 该线程已由目录刷新建立占位对象时，由发送中的会话接管，保留其消息节点和草稿。
+      conversationItems.splice(conversationItems.indexOf(conversation), 1);
+      conversation = null;
+    }
     if (!conversation) {
       conversation = preferredConversation || createConversation(summary);
       conversation.id = summary.id;
@@ -1216,6 +1228,7 @@
     realtimeAttempt += 1;
     window.clearTimeout(realtimeTimer);
     realtimeTimer = null;
+    clearRefreshRetry();
     var close = realtimeClose;
     realtimeClose = null;
     if (close) {
@@ -1245,8 +1258,10 @@
     }
     if (event.type === "visitor_hello") {
       realtimeFailures = 0;
+      refreshFailures = 0;
       realtimeState = "ready";
       // 事件流建立之前提交的变更经重新拉取目录与当前线程窗口收敛。
+      clearRefreshRetry();
       refreshConversationDirectory();
       refreshActiveConversationMessages();
       return;
@@ -1285,11 +1300,10 @@
     if (!conversation) {
       return;
     }
-    if (conversation.historyLoading) {
-      conversation.refreshPending = true;
-      return;
-    }
-    if (conversation === activeConversation && conversation.historyLoaded) {
+    if (
+      conversation.historyLoading ||
+      (conversation === activeConversation && conversation.historyLoaded)
+    ) {
       refreshConversationMessages(conversation);
     }
   }
@@ -1313,8 +1327,22 @@
       syncVisitorRealtime();
       return;
     }
+    clearRefreshRetry();
     refreshConversationDirectory();
     refreshActiveConversationMessages();
+  }
+
+  // 取消待重试的拉取；调用方随即执行的完整拉取取代它。
+  function clearRefreshRetry() {
+    window.clearTimeout(refreshRetryTimer);
+    refreshRetryTimer = null;
+  }
+
+  // 一次拉取成功且没有待重试时结束退避计数。
+  function noteRefreshSuccess() {
+    if (refreshRetryTimer === null) {
+      refreshFailures = 0;
+    }
   }
 
   // 拉取失败后按抖动退避重试，直到一次成功；断网期间到达的通知据此收敛，事件流停止后不再重试。
@@ -1354,7 +1382,7 @@
         "/conversations",
     )
       .then(function (result) {
-        refreshFailures = 0;
+        noteRefreshSuccess();
         result.conversations.forEach(function (summary) {
           upsertRealConversation(summary, null);
         });
@@ -1378,17 +1406,16 @@
     if (
       previewMode ||
       !activeConversation.id ||
-      !activeConversation.historyLoaded ||
-      activeConversation.historyLoading
+      (!activeConversation.historyLoaded && !activeConversation.historyLoading)
     ) {
       return;
     }
     refreshConversationMessages(activeConversation);
   }
 
-  // 使用服务端 after 游标增量补拉指定访客会话；在途时结束后补拉一次。
+  // 使用服务端 after 游标增量补拉指定访客会话；历史加载或在途时登记，结束后补读。
   function refreshConversationMessages(conversation) {
-    if (conversation.refreshing) {
+    if (conversation.historyLoading || conversation.refreshing) {
       conversation.refreshPending = true;
       return;
     }
@@ -1406,7 +1433,7 @@
     conversation.refreshing = true;
     requestWebsiteJSON(path)
       .then(function (result) {
-        refreshFailures = 0;
+        noteRefreshSuccess();
         if (
           conversation.refreshSeq !== requestSeq ||
           (requestAfter && conversation.after !== requestAfter)
@@ -1423,6 +1450,8 @@
         if (result.messages.length === 0) {
           return;
         }
+        // 服务端按页返回，本页取满时继续沿游标补拉到线程尾端。
+        conversation.refreshPending = true;
         if (result.after) {
           conversation.after = result.after;
         }
