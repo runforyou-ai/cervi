@@ -92,6 +92,7 @@ export function MobileAddGroupMembersPage() {
             </p>
           ) : null}
           <MobileGroupMemberPicker
+            label={t("group.selectMembers")}
             showSelectionSummary={false}
             currentIdentityID={identity.user.identityId}
             excludedIdentityIDs={existingIDs}

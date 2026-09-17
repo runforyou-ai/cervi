@@ -97,22 +97,9 @@ export function MobileCreateGroupPage() {
 
   return (
     <section className="flex h-full min-h-0 flex-col">
-      <MobilePageHeader
-        title={t("group.create")}
-        backTo={inboxURL}
-        actions={
-          <Button
-            type="submit"
-            form="mobile-create-group"
-            disabled={saving || !title.trim() || field.value.length === 0}
-          >
-            {t("group.complete")}
-          </Button>
-        }
-      />
+      <MobilePageHeader title={t("group.create")} backTo={inboxURL} />
       <form
-        id="mobile-create-group"
-        className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4"
+        className="min-h-0 flex-1 space-y-9 overflow-y-auto overscroll-contain p-4"
         noValidate
         onSubmit={form.handleSubmit(create)}
       >
@@ -139,6 +126,15 @@ export function MobileCreateGroupPage() {
             inputRef={field.ref}
             disabled={saving}
           />
+        </div>
+        <div>
+          <Button
+            type="submit"
+            className="min-h-11 w-full"
+            disabled={saving || !title.trim() || field.value.length === 0}
+          >
+            {t("group.complete")}
+          </Button>
         </div>
       </form>
     </section>

@@ -147,7 +147,7 @@ function MobileGroupFieldEditor({
                   required
                   maxLength={groupTitleMaxLength}
                   disabled={disabled}
-                  className="min-h-11"
+                  className="min-h-11 md:text-base"
                 />
               ) : (
                 <Textarea
@@ -156,6 +156,7 @@ function MobileGroupFieldEditor({
                   maxLength={groupDescriptionMaxLength}
                   rows={6}
                   disabled={disabled}
+                  className="md:text-base"
                 />
               )}
             </>

@@ -33,7 +33,8 @@ import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 import { cn } from "@/lib/utils"
 
-const scopes = [
+/** 消息范围页签的展示顺序，页签和左右滑动共用。 */
+export const inboxScopes = [
   { value: InboxScope.InboxScopeAll, label: "scopeAll" },
   { value: InboxScope.InboxScopeCustomer, label: "scopeCustomer" },
   { value: InboxScope.InboxScopeInternal, label: "scopeInternal" },
@@ -84,7 +85,7 @@ export function MobileInboxScopes({
       aria-label={t("scopeRailLabel")}
       className="grid shrink-0 grid-cols-3 border-b px-4"
     >
-      {scopes.map(({ value, label }) => (
+      {inboxScopes.map(({ value, label }) => (
         <button
           key={value}
           type="button"
@@ -206,9 +207,9 @@ export function MobileInboxFilter({
     (item) => item.identityId === query.assigneeIdentityId,
   )
   const options = inboxKindOptionsForScope(query.scope)
-  const viewLabel = customerViews.find(
-    (item) => item.value === query.customerView,
-  )!.label
+  const viewLabel =
+    customerViews.find((item) => item.value === query.customerView)?.label ??
+    customerViews[0].label
   const summary = customer
     ? [
         t(viewLabel),
@@ -249,9 +250,9 @@ export function MobileInboxFilter({
           className="min-h-11 min-w-0 max-w-full justify-start overflow-hidden px-4 text-xs"
         >
           <span className="min-w-0 truncate">
-            {tMobile("inbox.filter")}
-            {"："}
-            {summary.filter(Boolean).join(" · ")}
+            {tMobile("inbox.filterSummary", {
+              summary: summary.filter(Boolean).join(" · "),
+            })}
           </span>
         </Button>
       </SheetTrigger>

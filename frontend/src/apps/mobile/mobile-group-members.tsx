@@ -50,10 +50,7 @@ export function MobileGroupMembersPreview({
               }
               className="size-12 rounded-xl"
             />
-            <span
-              className="w-full truncate text-center text-xs"
-              title={member.displayName}
-            >
+            <span className="w-full truncate text-center text-xs">
               {member.displayName}
             </span>
           </li>
@@ -136,7 +133,7 @@ export function MobileGroupMemberList({
         <Input
           id={searchID}
           type="search"
-          className="min-h-11"
+          className="min-h-11 md:text-base"
           value={search}
           onChange={(event) => setSearch(event.target.value)}
         />
@@ -184,12 +181,14 @@ export function MobileGroupMemberList({
 
 /** 在独立页面搜索和展示全部群成员及群主身份。 */
 export function MobileGroupMembersPage() {
-  const { t } = useTranslation("inbox")
+  const { t } = useTranslation(["inbox", "mobile"])
   const { group } = useOutletContext<MobileGroupDetailsContext>()
   return (
     <section className="flex h-full min-h-0 flex-col bg-background">
       <MobilePageHeader
-        title={`${t("contextGroupMembersTab")} (${group.participants.length})`}
+        title={`${t("contextGroupMembersTab")}${t("mobile:group.memberCount", {
+          count: group.participants.length,
+        })}`}
         backTo={`/inbox/group/${group.id}/details`}
       />
       <MobileGroupMemberList
