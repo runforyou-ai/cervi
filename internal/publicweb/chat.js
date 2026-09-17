@@ -16,6 +16,7 @@
   });
   window.addEventListener("pagehide", function (event) {
     if (event.persisted) return;
+    haltVisitorRealtime("stopped");
     messageResizeObserver.disconnect();
     CerviMarkdown.unmount(messages);
     conversationItems.forEach(function (conversation) { CerviMarkdown.unmount(conversation.fragment); });
@@ -27,7 +28,10 @@
   var COMPOSER_MAX_HEIGHT = 200;
   var COMPOSER_MIN_HEIGHT = 26;
   var COMPOSER_KEYBOARD_RESIZE_STEP = 16;
-  var MESSAGE_POLL_INTERVAL = 3000;
+  var REALTIME_PROTOCOL_VERSION = 1;
+  var REALTIME_IDLE_TIMEOUT = 60000;
+  var REALTIME_BACKOFF_BASE = 1000;
+  var REALTIME_BACKOFF_MAX = 30000;
   var previewMode = messenger.getAttribute("data-preview") === "true";
   var channelID = messenger.getAttribute("data-channel-id");
   var visitorToken = "";
@@ -40,8 +44,15 @@
   var conversationReturnRoute = "home";
   var activeConversation = createConversation();
   var recentConversation = null;
-  var messagePollingTimer = null;
-  var messagePollingConversation = null;
+  var realtimeState = "idle";
+  var realtimeAttempt = 0;
+  var realtimeFailures = 0;
+  var realtimeClose = null;
+  var realtimeTimer = null;
+  var directoryRefreshing = false;
+  var directoryRefreshQueued = false;
+  var refreshRetryTimer = null;
+  var refreshFailures = 0;
   var recordingStartedAt = 0;
   var recordingTimer = null;
   var lightbox = null;
@@ -139,7 +150,6 @@
         }, 0);
       }
     }
-    syncRealMessagePolling();
   }
 
   function createConversation(summary) {
@@ -159,8 +169,9 @@
       before: "",
       replyTo: null,
       pendingReplyToID: "",
-      polling: false,
-      pollSeq: 0,
+      refreshing: false,
+      refreshSeq: 0,
+      refreshPending: false,
       lastMessageSeq: summary ? summary.lastMessageSeq : "0",
       replyState: "none",
       typingNode: null,
@@ -205,8 +216,9 @@
         !conversation.historyLoading
       ) {
         loadConversationHistory(conversation);
+      } else if (conversation.historyLoaded) {
+        refreshActiveConversationMessages();
       }
-      syncRealMessagePolling();
       return;
     }
     referenceNavigationSeq += 1;
@@ -238,8 +250,9 @@
       !activeConversation.historyLoaded
     ) {
       loadConversationHistory(activeConversation);
+    } else if (activeConversation.historyLoaded) {
+      refreshActiveConversationMessages();
     }
-    syncRealMessagePolling();
   }
 
   function beginNewConversation() {
@@ -736,6 +749,16 @@
     preferredConversation,
   ) {
     var conversation = conversationByID[summary.id];
+    if (
+      conversation &&
+      preferredConversation &&
+      conversation !== preferredConversation &&
+      conversation !== activeConversation
+    ) {
+      // 该线程已由目录刷新建立占位对象时，由发送中的会话接管，保留其消息节点和草稿。
+      conversationItems.splice(conversationItems.indexOf(conversation), 1);
+      conversation = null;
+    }
     if (!conversation) {
       conversation = preferredConversation || createConversation(summary);
       conversation.id = summary.id;
@@ -795,7 +818,7 @@
       .finally(function () {
         initializationPending = false;
         updateSendState();
-        syncRealMessagePolling();
+        syncVisitorRealtime();
       });
   }
 
@@ -874,7 +897,11 @@
         if (conversation === activeConversation) {
           updateSendState();
         }
-        syncRealMessagePolling();
+        // 加载期间到达的会话变更在加载结束后补拉。
+        if (conversation.refreshPending) {
+          conversation.refreshPending = false;
+          refreshConversationMessages(conversation);
+        }
       });
   }
 
@@ -1062,65 +1089,338 @@
     }
   }
 
-  // 返回当前允许访客消息轮询的会话。
-  function realMessagePollingTarget() {
+  // 返回当前渠道身份是否已在服务端建立。
+  function hasVisitorIdentity() {
+    return conversationItems.length > 0;
+  }
+
+  // 打开访客实时事件流，事件按行交给 onFrame，流结束交给 onClosed；返回幂等的关闭函数。
+  function openVisitorEventStream(onFrame, onClosed) {
+    var controller = new AbortController();
+    var finished = false;
+    var idleTimer = null;
+
+    function finish(error) {
+      if (finished) {
+        return;
+      }
+      finished = true;
+      window.clearTimeout(idleTimer);
+      controller.abort();
+      onClosed(error);
+    }
+
+    // 服务端每 25 秒发送心跳，超过空闲时限未收到数据按网络错误结束。
+    function refreshIdle() {
+      window.clearTimeout(idleTimer);
+      idleTimer = window.setTimeout(function () {
+        finish(new Error("visitor event stream idle timeout"));
+      }, REALTIME_IDLE_TIMEOUT);
+    }
+
+    var headers = {
+      Accept: "text/event-stream",
+      "Accept-Language": document.documentElement.lang,
+    };
+    if (visitorToken) {
+      headers["X-Cervi-Visitor-Token"] = visitorToken;
+    }
+    refreshIdle();
+    window
+      .fetch(
+        "/api/public/website-channels/" +
+          encodeURIComponent(channelID) +
+          "/realtime",
+        { headers: headers, signal: controller.signal, cache: "no-store" },
+      )
+      .then(function (response) {
+        if (!response.ok || !response.body) {
+          // 渠道、身份与访客 Token 错误重试不会改变结果，只有服务不可用按退避重连。
+          var rejected = new Error("visitor event stream rejected");
+          rejected.retryable = response.status >= 500;
+          finish(rejected);
+          return;
+        }
+        var reader = response.body.getReader();
+        var decoder = new TextDecoder();
+        var buffer = "";
+        function read() {
+          reader
+            .read()
+            .then(function (result) {
+              if (finished) {
+                return;
+              }
+              if (result.done) {
+                finish();
+                return;
+              }
+              refreshIdle();
+              // 按行切分并保留跨数据块的半行；服务端每个事件只有一行 data，空行不处理。
+              var lines = (
+                buffer + decoder.decode(result.value, { stream: true })
+              ).split("\n");
+              buffer = lines.pop();
+              lines.forEach(function (line) {
+                if (finished) {
+                  return;
+                }
+                var text =
+                  line.charAt(line.length - 1) === "\r"
+                    ? line.slice(0, -1)
+                    : line;
+                if (text.indexOf("data: ") === 0) {
+                  onFrame(text.slice(6));
+                }
+              });
+              read();
+            })
+            .catch(finish);
+        }
+        read();
+      })
+      .catch(finish);
+
+    return function () {
+      if (finished) {
+        return;
+      }
+      finished = true;
+      window.clearTimeout(idleTimer);
+      controller.abort();
+    };
+  }
+
+  // 按当前身份建立访客实时事件流；预览模式、尚无身份和已停止时不连接。
+  function syncVisitorRealtime() {
     if (
       previewMode ||
       !initialized ||
-      !messengerVisible ||
-      document.visibilityState !== "visible" ||
-      activeRoute !== "conversation" ||
-      !activeConversation.id ||
-      !activeConversation.historyLoaded ||
-      activeConversation.historyLoading
-    ) {
-      return null;
-    }
-    return activeConversation;
-  }
-
-  // 停止访客消息轮询定时器。
-  function stopRealMessagePolling() {
-    if (messagePollingTimer !== null) {
-      window.clearInterval(messagePollingTimer);
-      messagePollingTimer = null;
-    }
-    messagePollingConversation = null;
-  }
-
-  // 根据当前页面和挂件状态同步访客消息轮询。
-  function syncRealMessagePolling() {
-    var conversation = realMessagePollingTarget();
-    if (
-      conversation &&
-      messagePollingTimer !== null &&
-      messagePollingConversation === conversation
+      !hasVisitorIdentity() ||
+      realtimeState !== "idle"
     ) {
       return;
     }
-    stopRealMessagePolling();
+    connectVisitorRealtime();
+  }
+
+  // 发起一次事件流连接，只接收属于本次尝试的回调。
+  function connectVisitorRealtime() {
+    realtimeAttempt += 1;
+    var attempt = realtimeAttempt;
+    realtimeState = "connecting";
+    realtimeClose = openVisitorEventStream(
+      function (text) {
+        if (attempt === realtimeAttempt) {
+          receiveVisitorFrame(text);
+        }
+      },
+      function (error) {
+        if (attempt === realtimeAttempt) {
+          closeVisitorRealtime(error);
+        }
+      },
+    );
+  }
+
+  // 使当前连接尝试失效，关闭事件流并取消等待中的重连。
+  function haltVisitorRealtime(state) {
+    realtimeAttempt += 1;
+    window.clearTimeout(realtimeTimer);
+    realtimeTimer = null;
+    clearRefreshRetry();
+    var close = realtimeClose;
+    realtimeClose = null;
+    if (close) {
+      close();
+    }
+    realtimeState = state;
+  }
+
+  // 解码并处理一条访客实时事件。
+  function receiveVisitorFrame(text) {
+    var event = null;
+    try {
+      event = JSON.parse(text);
+    } catch (error) {
+      console.warn("忽略无法解析的访客实时事件", error);
+      return;
+    }
+    if (!event || typeof event.type !== "string") {
+      return;
+    }
+    if (event.v !== REALTIME_PROTOCOL_VERSION) {
+      console.warn("访客实时事件流协议主版本不受支持，停止重连", {
+        version: event.v,
+      });
+      haltVisitorRealtime("stopped");
+      return;
+    }
+    if (event.type === "visitor_hello") {
+      realtimeFailures = 0;
+      refreshFailures = 0;
+      realtimeState = "ready";
+      // 事件流建立之前提交的变更经重新拉取目录与当前线程窗口收敛。
+      clearRefreshRetry();
+      refreshConversationDirectory();
+      refreshActiveConversationMessages();
+      return;
+    }
+    if (event.type === "conversation_changed") {
+      applyVisitorConversationChanged(event.data ? event.data.conversationId : "");
+    }
+  }
+
+  // 处理事件流结束：不可重试的拒绝停止重连，其余按抖动退避重连。
+  function closeVisitorRealtime(error) {
+    realtimeClose = null;
+    if (error && error.retryable === false) {
+      console.warn("访客实时事件流被拒绝，停止重连", error);
+      haltVisitorRealtime("stopped");
+      return;
+    }
+    realtimeFailures += 1;
+    var ceiling = Math.min(
+      REALTIME_BACKOFF_MAX,
+      REALTIME_BACKOFF_BASE * Math.pow(2, realtimeFailures - 1),
+    );
+    // 等待时间取上限的一半到上限之间，多个挂件同时断开时错开重连。
+    var delay = ceiling / 2 + (Math.random() * ceiling) / 2;
+    realtimeState = "backoff";
+    realtimeTimer = window.setTimeout(function () {
+      realtimeTimer = null;
+      connectVisitorRealtime();
+    }, delay);
+  }
+
+  // 按会话变更通知重新拉取目录，并补拉当前打开线程的增量消息。
+  function applyVisitorConversationChanged(conversationID) {
+    refreshConversationDirectory();
+    var conversation = conversationID ? conversationByID[conversationID] : null;
     if (!conversation) {
       return;
     }
-    messagePollingConversation = conversation;
-    pollConversationMessages(conversation);
-    messagePollingTimer = window.setInterval(function () {
-      var current = realMessagePollingTarget();
-      if (current !== messagePollingConversation) {
-        syncRealMessagePolling();
-        return;
-      }
-      pollConversationMessages(current);
-    }, MESSAGE_POLL_INTERVAL);
+    if (
+      conversation.historyLoading ||
+      (conversation === activeConversation && conversation.historyLoaded)
+    ) {
+      refreshConversationMessages(conversation);
+    }
   }
 
-  // 使用服务端 after 游标增量补拉指定访客会话。
-  function pollConversationMessages(conversation) {
-    if (conversation.polling) {
+  // 页面回到前台或挂件重新显示时跳过剩余退避并重新拉取。
+  function handleVisitorForeground() {
+    if (
+      previewMode ||
+      !messengerVisible ||
+      document.visibilityState !== "visible"
+    ) {
+      return;
+    }
+    if (realtimeState === "backoff") {
+      window.clearTimeout(realtimeTimer);
+      realtimeTimer = null;
+      connectVisitorRealtime();
+      return;
+    }
+    if (realtimeState !== "ready") {
+      syncVisitorRealtime();
+      return;
+    }
+    clearRefreshRetry();
+    refreshConversationDirectory();
+    refreshActiveConversationMessages();
+  }
+
+  // 取消待重试的拉取；调用方随即执行的完整拉取取代它。
+  function clearRefreshRetry() {
+    window.clearTimeout(refreshRetryTimer);
+    refreshRetryTimer = null;
+  }
+
+  // 一次拉取成功且没有待重试时结束退避计数。
+  function noteRefreshSuccess() {
+    if (refreshRetryTimer === null) {
+      refreshFailures = 0;
+    }
+  }
+
+  // 拉取失败后按抖动退避重试，直到一次成功；断网期间到达的通知据此收敛，事件流停止后不再重试。
+  function scheduleRefreshRetry() {
+    if (refreshRetryTimer !== null || realtimeState === "stopped") {
+      return;
+    }
+    refreshFailures += 1;
+    var ceiling = Math.min(
+      REALTIME_BACKOFF_MAX,
+      REALTIME_BACKOFF_BASE * Math.pow(2, refreshFailures - 1),
+    );
+    var delay = ceiling / 2 + (Math.random() * ceiling) / 2;
+    refreshRetryTimer = window.setTimeout(function () {
+      refreshRetryTimer = null;
+      if (realtimeState === "stopped") {
+        return;
+      }
+      refreshConversationDirectory();
+      refreshActiveConversationMessages();
+    }, delay);
+  }
+
+  // 重新拉取访客线程目录，发现新线程并更新既有摘要；在途时结束后补拉一次。
+  function refreshConversationDirectory() {
+    if (previewMode || !initialized) {
+      return;
+    }
+    if (directoryRefreshing) {
+      directoryRefreshQueued = true;
+      return;
+    }
+    directoryRefreshing = true;
+    requestWebsiteJSON(
+      "/api/public/website-channels/" +
+        encodeURIComponent(channelID) +
+        "/conversations",
+    )
+      .then(function (result) {
+        noteRefreshSuccess();
+        result.conversations.forEach(function (summary) {
+          upsertRealConversation(summary, null);
+        });
+        renderRecentConversation();
+      })
+      .catch(function (error) {
+        console.warn("拉取网站访客线程目录失败", error);
+        scheduleRefreshRetry();
+      })
+      .finally(function () {
+        directoryRefreshing = false;
+        if (directoryRefreshQueued) {
+          directoryRefreshQueued = false;
+          refreshConversationDirectory();
+        }
+      });
+  }
+
+  // 补拉当前打开线程的增量消息。
+  function refreshActiveConversationMessages() {
+    if (
+      previewMode ||
+      !activeConversation.id ||
+      (!activeConversation.historyLoaded && !activeConversation.historyLoading)
+    ) {
+      return;
+    }
+    refreshConversationMessages(activeConversation);
+  }
+
+  // 使用服务端 after 游标增量补拉指定访客会话；历史加载或在途时登记，结束后补读。
+  function refreshConversationMessages(conversation) {
+    if (conversation.historyLoading || conversation.refreshing) {
+      conversation.refreshPending = true;
       return;
     }
     var requestAfter = conversation.after;
-    var requestSeq = conversation.pollSeq;
+    var requestSeq = conversation.refreshSeq;
     var path =
       "/api/public/website-channels/" +
       encodeURIComponent(channelID) +
@@ -1130,11 +1430,12 @@
     if (requestAfter) {
       path += "?after=" + encodeURIComponent(requestAfter);
     }
-    conversation.polling = true;
+    conversation.refreshing = true;
     requestWebsiteJSON(path)
       .then(function (result) {
+        noteRefreshSuccess();
         if (
-          conversation.pollSeq !== requestSeq ||
+          conversation.refreshSeq !== requestSeq ||
           (requestAfter && conversation.after !== requestAfter)
         ) {
           return;
@@ -1149,6 +1450,8 @@
         if (result.messages.length === 0) {
           return;
         }
+        // 服务端按页返回，本页取满时继续沿游标补拉到线程尾端。
+        conversation.refreshPending = true;
         if (result.after) {
           conversation.after = result.after;
         }
@@ -1161,13 +1464,18 @@
         );
       })
       .catch(function (error) {
-        console.warn("轮询网站访客会话消息失败", {
+        console.warn("拉取网站访客会话消息失败", {
           conversationId: conversation.id,
           error: error,
         });
+        scheduleRefreshRetry();
       })
       .finally(function () {
-        conversation.polling = false;
+        conversation.refreshing = false;
+        if (conversation.refreshPending) {
+          conversation.refreshPending = false;
+          refreshConversationMessages(conversation);
+        }
       });
   }
 
@@ -1188,8 +1496,7 @@
     var conversation = activeConversation;
     var startsConversation = conversation.id === null;
     var replyToID = conversation.replyTo ? conversation.replyTo.id : "";
-    conversation.pollSeq += 1;
-    stopRealMessagePolling();
+    conversation.refreshSeq += 1;
     if (
       conversation.pendingBody !== text ||
       conversation.pendingReplyToID !== replyToID ||
@@ -1250,6 +1557,8 @@
           autosize();
         }
         renderRecentConversation();
+        // 首条消息建立渠道身份后开始接收实时事件。
+        syncVisitorRealtime();
       })
       .catch(function (error) {
         if (conversation === activeConversation) {
@@ -1261,8 +1570,6 @@
       .finally(function () {
         messageRequestPending = false;
         updateSendState();
-        stopRealMessagePolling();
-        syncRealMessagePolling();
         if (conversation === activeConversation) {
           input.focus();
         }
@@ -1609,7 +1916,7 @@
       clearUnread();
     }
     autosize();
-    syncRealMessagePolling();
+    handleVisitorForeground();
   }
 
   syncMoreAvailability();
@@ -1860,7 +2167,8 @@
       postToParent({ type: "cervi:preview-ready" });
     }
   });
-  document.addEventListener("visibilitychange", syncRealMessagePolling);
+  document.addEventListener("visibilitychange", handleVisitorForeground);
+  window.addEventListener("online", handleVisitorForeground);
   window.addEventListener("resize", autosize);
   if (!previewMode) {
     $("cv-attach").disabled = true;
