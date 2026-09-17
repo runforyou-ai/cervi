@@ -21,6 +21,9 @@ const (
 	maxRedirects = 5
 	// userAgent 标识抓取来自 Cervi 知识库导入。
 	userAgent = "Cervi-KnowledgeImport/1.0"
+	// htmlPageName 与 textPageName 是送转换服务的文件名，决定转换器的选择。
+	htmlPageName = "page.html"
+	textPageName = "page.txt"
 )
 
 // Error 定义网页抓取的语言无关失败原因码。
@@ -55,25 +58,34 @@ func NewClient() *Client {
 
 // Normalize 校验并规范化页面地址，只接受 http 与 https 的绝对地址并去掉片段。
 func Normalize(target string) (string, error) {
+	parsed, err := parseTarget(target)
+	if err != nil {
+		return "", err
+	}
+	return parsed.String(), nil
+}
+
+// parseTarget 解析页面地址并去掉片段。
+func parseTarget(target string) (*url.URL, error) {
 	parsed, err := url.Parse(strings.TrimSpace(target))
 	if err != nil || !parsed.IsAbs() || parsed.Host == "" {
-		return "", &Error{Code: "url_invalid"}
+		return nil, &Error{Code: "url_invalid"}
 	}
 	if parsed.Scheme != "http" && parsed.Scheme != "https" {
-		return "", &Error{Code: "url_invalid"}
+		return nil, &Error{Code: "url_invalid"}
 	}
 	parsed.Fragment = ""
 	parsed.RawFragment = ""
-	return parsed.String(), nil
+	return parsed, nil
 }
 
 // Fetch 读取页面内容，按响应内容类型决定送转换服务的文件名。
 func (c *Client) Fetch(ctx context.Context, target string) (Page, error) {
-	address, err := Normalize(target)
+	parsed, err := parseTarget(target)
 	if err != nil {
 		return Page{}, err
 	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, address, nil)
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, parsed.String(), nil)
 	if err != nil {
 		return Page{}, &Error{Code: "url_unreachable"}
 	}
@@ -101,6 +113,10 @@ func (c *Client) Fetch(ctx context.Context, target string) (Page, error) {
 	if len(body) > maxResponseBytes {
 		return Page{}, &Error{Code: "url_content_too_large"}
 	}
+	body = decodeUTF8(body, response.Header.Get("Content-Type"))
+	if name == htmlPageName {
+		body = extractArticle(body, parsed)
+	}
 	return Page{Name: name, Body: body}, nil
 }
 
@@ -112,9 +128,9 @@ func documentName(contentType string) (string, error) {
 	}
 	switch media {
 	case "text/html", "application/xhtml+xml":
-		return "page.html", nil
+		return htmlPageName, nil
 	case "text/plain":
-		return "page.txt", nil
+		return textPageName, nil
 	default:
 		return "", &Error{Code: "url_content_unsupported"}
 	}
