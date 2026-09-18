@@ -20,7 +20,9 @@ func (o *directOperations) GetAgentRunProcess(ctx context.Context, meta RequestM
 		return AgentRunProcess{}, agentRunProcessError(ctx, meta, err, identity.Organization.ID, runID)
 	}
 	result := AgentRunProcess{ID: process.ID, DurationMilliseconds: process.DurationMilliseconds,
-		InputTokens: process.Usage.PromptTokens, OutputTokens: process.Usage.CompletionTokens, Blocks: make([]AgentRunContentBlock, 0, len(process.Blocks))}
+		InputTokens: process.Usage.PromptTokens, OutputTokens: process.Usage.CompletionTokens,
+		Outcome: (*AgentRunOutcome)(process.Outcome), OutcomeReason: (*AgentHandoffReason)(process.OutcomeReason),
+		Blocks: make([]AgentRunContentBlock, 0, len(process.Blocks))}
 	for _, block := range process.Blocks {
 		item := AgentRunContentBlock{ID: block.ID, Position: block.Position, Kind: AgentRunBlockKind(block.Kind), Text: block.Payload.Text}
 		if call := block.Payload.ToolCall; call != nil {
@@ -46,11 +48,12 @@ func agentRunProcessError(ctx context.Context, meta RequestMeta, err error, orga
 	return FailedError(meta, cervii18n.ErrorAgentRunProcessReadFailed)
 }
 
-// conversationAgentProcessFromAction 转换已完成运行的过程引用和模型用量。
+// conversationAgentProcessFromAction 转换已完成运行的过程引用、模型用量和结果。
 func conversationAgentProcessFromAction(process *conversationaction.ConversationAgentProcess) *ConversationAgentProcess {
 	if process == nil {
 		return nil
 	}
 	return &ConversationAgentProcess{ID: process.ID, DurationMilliseconds: process.DurationMilliseconds,
-		InputTokens: process.Usage.PromptTokens, OutputTokens: process.Usage.CompletionTokens}
+		InputTokens: process.Usage.PromptTokens, OutputTokens: process.Usage.CompletionTokens,
+		Outcome: (*AgentRunOutcome)(process.Outcome), OutcomeReason: (*AgentHandoffReason)(process.OutcomeReason)}
 }

@@ -54,11 +54,18 @@ func (s *Scheduler) ScheduleCustomerAuto(ctx context.Context, db bun.IDB, organi
 		return false, err
 	}
 	if !eligible {
-		slog.Warn("客户会话负责人不满足 Agent 执行资格",
+		// 负责人是已失去接客资格的 AI 员工时，在本次入站事务内把周期交给人工。
+		cancelled, err := handOffUnavailableAgentSession(ctx, db, s.enqueuer, organizationID, conversationID, session.ID,
+			*session.AssigneeIdentityID, "handoff:"+session.ID+":"+messageID, false)
+		if err != nil {
+			return false, err
+		}
+		slog.Warn("客户会话负责人不满足 Agent 执行资格，已转交人工",
 			"organization_id", organizationID,
 			"conversation_id", conversationID,
 			"service_session_id", serviceSessionID,
 			"assignee_identity_id", *session.AssigneeIdentityID,
+			"cancelled_run_ids", cancelled,
 		)
 		return false, nil
 	}

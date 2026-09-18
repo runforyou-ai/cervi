@@ -51,7 +51,27 @@ const (
 	ConversationSystemEventGroupMemberLeft       ConversationSystemEventType = ConversationSystemEventType(domain.ConversationSystemEventGroupMemberLeft)
 	ConversationSystemEventGroupOwnerTransferred ConversationSystemEventType = ConversationSystemEventType(domain.ConversationSystemEventGroupOwnerTransferred)
 	ConversationSystemEventGroupDissolved        ConversationSystemEventType = ConversationSystemEventType(domain.ConversationSystemEventGroupDissolved)
+	// ConversationSystemEventServiceSessionHandedOff 表示 AI 员工把客服处理周期转交人工。
+	ConversationSystemEventServiceSessionHandedOff ConversationSystemEventType = ConversationSystemEventType(domain.ConversationSystemEventServiceSessionHandedOff)
 )
+
+// ServiceSessionHandoffTargetKind 表示转交人工的去向类型。
+type ServiceSessionHandoffTargetKind string
+
+const (
+	ServiceSessionHandoffTargetPublicQueue ServiceSessionHandoffTargetKind = ServiceSessionHandoffTargetKind(domain.ServiceSessionHandoffTargetPublicQueue)
+	ServiceSessionHandoffTargetTeam        ServiceSessionHandoffTargetKind = ServiceSessionHandoffTargetKind(domain.ServiceSessionHandoffTargetTeam)
+	ServiceSessionHandoffTargetMember      ServiceSessionHandoffTargetKind = ServiceSessionHandoffTargetKind(domain.ServiceSessionHandoffTargetMember)
+)
+
+// ServiceSessionHandoffTarget 定义转交人工的去向及名称快照。
+type ServiceSessionHandoffTarget struct {
+	Kind        ServiceSessionHandoffTargetKind `json:"kind"`
+	TeamID      *string                         `json:"teamId"`
+	TeamName    *string                         `json:"teamName"`
+	IdentityID  *string                         `json:"identityId"`
+	DisplayName *string                         `json:"displayName"`
+}
 
 // GroupParticipantRole 表示群聊成员角色。
 type GroupParticipantRole string
@@ -198,6 +218,14 @@ type ConversationSystemEvent struct {
 	Targets       []ConversationSystemEventParticipant `json:"targets"`
 	PreviousTitle *string                              `json:"previousTitle"`
 	Title         *string                              `json:"title"`
+	// 以下字段只由转人工事件携带：原 AI 员工、去向、原因与成员可见的原因说明。
+	ServiceSessionID *string                      `json:"serviceSessionId"`
+	FromIdentityID   *string                      `json:"fromIdentityId"`
+	FromDisplayName  *string                      `json:"fromDisplayName"`
+	HandoffTarget    *ServiceSessionHandoffTarget `json:"handoffTarget"`
+	HandoffReason    *AgentHandoffReason          `json:"handoffReason"`
+	ReasonText       *string                      `json:"reasonText"`
+	AgentRunID       *string                      `json:"agentRunId"`
 }
 
 // ConversationMessage 定义成员可见的会话消息。

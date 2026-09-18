@@ -53,7 +53,7 @@ func (p agentChatRunPolicy) loadMessages(ctx context.Context, db bun.IDB, run *s
 
 // persistMessage 追加独立 AI 会话的结果消息。
 func (p agentChatRunPolicy) persistMessage(ctx context.Context, db bun.IDB, policyContext agentRunPolicyContext, run *servermodels.AgentRun, messageID string, messageType domain.MessageType, content string) error {
-	_, _, err := appendAgentMessage(ctx, db, policyContext.Conversation, run, messageID, policyContext.AgentParticipantID, messageType, content, nil)
+	_, _, err := appendAgentMessage(ctx, db, policyContext.Conversation, agentResultMessage(run, messageID, policyContext.AgentParticipantID, messageType, content, nil))
 	return err
 }
 

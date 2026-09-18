@@ -21,7 +21,9 @@ import {
   stopAgentReply,
   stopCustomerCopilotReply,
   stopGroupAgentReply,
+  AgentHandoffReason,
   AgentRunBlockKind,
+  AgentRunOutcome,
   AgentRunStatus,
   AgentToolCallStatus,
   type AgentToolCall,
@@ -39,6 +41,24 @@ import {
 import { usePortalContainer } from "@/components/ui/portal-container"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
+
+/** 返回转人工原因对应的 inbox 词条键。 */
+export function handoffReasonKey(reason: AgentHandoffReason | null | undefined) {
+  switch (reason) {
+    case AgentHandoffReason.AgentHandoffReasonModelRequested:
+      return "handoffReasonModelRequested" as const
+    case AgentHandoffReason.AgentHandoffReasonInsufficientEvidence:
+      return "handoffReasonInsufficientEvidence" as const
+    case AgentHandoffReason.AgentHandoffReasonBudgetExhausted:
+      return "handoffReasonBudgetExhausted" as const
+    case AgentHandoffReason.AgentHandoffReasonTimeout:
+      return "handoffReasonTimeout" as const
+    case AgentHandoffReason.AgentHandoffReasonAgentUnavailable:
+      return "agentUnavailable" as const
+    default:
+      return "handoffReasonRuntimeFailed" as const
+  }
+}
 
 /** 在截断末尾提供更多按钮，点击后浮层展示完整原文。 */
 function ToolValue({ value }: { value: string }) {
@@ -183,6 +203,12 @@ export function AgentProcess({ process, incoming, onPrimary }: { process: Conver
           onPrimary ? "text-primary-foreground/75" : "text-muted-foreground",
           mobile && (incoming ? "self-start" : "self-end"),
         )}>
+          {/* 追问与转人工在用量前标出运行结果，转人工同时给出原因。 */}
+          {process.outcome === AgentRunOutcome.AgentRunOutcomeAskCustomer ? (
+            <span>{t("agentOutcomeAskCustomer")}</span>
+          ) : process.outcome === AgentRunOutcome.AgentRunOutcomeHandoff ? (
+            <span>{t("agentOutcomeHandoff")} · {t(handoffReasonKey(process.outcomeReason))}</span>
+          ) : null}
           <span>{t("agentUsageInput", { count: process.inputTokens })}</span>
           <span>{t("agentUsageOutput", { count: process.outputTokens })}</span>
         </div>
@@ -309,7 +335,9 @@ export function AgentRunState({ run, incoming, conversationID, group, copilot, o
         ? t("agentRunBotChanged")
         : run.errorCode === "agent_removed"
           ? t("agentRunAgentRemoved")
-          : run.lastError
+          : run.errorCode === "agent_unavailable"
+            ? t("agentUnavailable")
+            : run.lastError
   return (
     <div
       className={cn("mt-3 flex min-w-0 text-xs text-muted-foreground", incoming ? "justify-start" : "justify-end")}

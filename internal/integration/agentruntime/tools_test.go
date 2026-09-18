@@ -10,7 +10,7 @@ import (
 	"github.com/cloudwego/eino/components/tool"
 )
 
-// TestAssembleToolsByScene 验证开发期计算器只在内部场景注册，客服场景只保留业务工具。
+// TestAssembleToolsByScene 验证开发期计算器只在内部场景注册，客服场景只保留业务工具和终止工具。
 func TestAssembleToolsByScene(t *testing.T) {
 	calculator, err := newCalculatorTool()
 	if err != nil {
@@ -22,12 +22,16 @@ func TestAssembleToolsByScene(t *testing.T) {
 		scene Scene
 		want  []string
 	}{
-		{SceneCustomer, []string{"search_customer_history"}},
+		{SceneCustomer, []string{"search_customer_history", "ask_customer", "handoff_to_human"}},
 		{SceneAgentChat, []string{"calculator", "search_customer_history"}},
 		{SceneGroup, []string{"calculator", "search_customer_history"}},
 	} {
 		t.Run(string(scenario.scene), func(t *testing.T) {
-			tools, release, err := runtime.assembleTools(context.Background(), RunRequest{Scene: scenario.scene, CustomerHistorySearch: history})
+			var terminal *terminalTools
+			if scenario.scene == SceneCustomer {
+				terminal = newTerminalTools()
+			}
+			tools, release, err := runtime.assembleTools(context.Background(), RunRequest{Scene: scenario.scene, CustomerHistorySearch: history}, terminal)
 			if err != nil {
 				t.Fatal(err)
 			}

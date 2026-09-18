@@ -13,7 +13,7 @@ import (
 )
 
 // behaviorRulesVersion 是角色基线与场景规则的规则版本，基线或场景规则增删时加一；措辞调整只体现在指令哈希上。
-const behaviorRulesVersion = 1
+const behaviorRulesVersion = 2
 
 const customerServiceBaseline = `你是企业「%s」的 AI 员工%s，专业领域是客户服务。
 工作原则：
@@ -33,10 +33,15 @@ const knowledgeToolGuidance = "- search_knowledge：检索企业资料，回答�
 
 const customerHistoryToolGuidance = "- search_customer_history：查看同一客户以往的沟通记录。"
 
+const askCustomerToolGuidance = "- ask_customer：需要客户补充信息、确认，或只需要问候时，用它发送要说的话并等待客户回复。"
+
+const handoffToolGuidance = "- handoff_to_human：无法从资料得到答案、客户明确要求真人、客户投诉或涉及退款赔偿等需要人工判断时，用它写明转交原因；系统会通知客户并交给人工客服。"
+
 // behaviorTools 表示本次运行实际注册的内置工具，场景规则据此说明工具用法。
 type behaviorTools struct {
 	Knowledge       bool
 	CustomerHistory bool
+	Terminal        bool // 客服场景的 ask_customer 与 handoff_to_human。
 }
 
 // BehaviorSnapshot 记录一次运行实际使用的角色基线、场景、拼接完成的指令、模型参数、内置工具与绑定的 MCP 服务；MCP 服务的工具在运行期连接后才确定。
@@ -62,6 +67,9 @@ type behaviorSnapshotModel struct {
 func BehaviorProfile(kind domain.RoleKind, organizationName string) (string, []string, bool) {
 	if kind == domain.RoleKindAdmin {
 		return "", nil, false
+	}
+	if kind == domain.RoleKindCustomerService {
+		return roleBaseline(kind, organizationName, ""), []string{"search_knowledge", "ask_customer", "handoff_to_human", "mcp"}, true
 	}
 	return roleBaseline(kind, organizationName, ""), []string{"search_knowledge", "mcp"}, true
 }
@@ -96,12 +104,15 @@ func joinSections(sections ...string) string {
 
 // toolGuidance 按本次运行实际注册的内置工具生成场景规则中的工具说明，没有内置工具时返回空串。
 func toolGuidance(tools behaviorTools) string {
-	lines := make([]string, 0, 2)
+	lines := make([]string, 0, 4)
 	if tools.Knowledge {
 		lines = append(lines, knowledgeToolGuidance)
 	}
 	if tools.CustomerHistory {
 		lines = append(lines, customerHistoryToolGuidance)
+	}
+	if tools.Terminal {
+		lines = append(lines, askCustomerToolGuidance, handoffToolGuidance)
 	}
 	if len(lines) == 0 {
 		return ""

@@ -36,7 +36,7 @@ func testDisabledAgentConversation(t *testing.T, db *bun.DB, identity *servermod
 	if err != nil || before.Attention == 0 {
 		t.Fatalf("unread counts before disable=%+v %v", before, err)
 	}
-	updateStatus := agentaction.NewUpdateStatusAction(db)
+	updateStatus := agentaction.NewUpdateStatusAction(db, testServiceSessionHandoff(db))
 	if _, err := updateStatus.Execute(ctx, identity, agentID, domain.UserStatusInactive); err != nil {
 		t.Fatal(err)
 	}

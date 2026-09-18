@@ -42,9 +42,9 @@ func newAgentOps(db *bun.DB, agentCoordinator *agentrunaction.ExecuteAction, cus
 		createAgent:               agentaction.NewCreateAgentAction(db),
 		listAgents:                agentaction.NewListAgentsQuery(db),
 		getAgent:                  agentaction.NewGetAgentQuery(db),
-		updateAgent:               agentaction.NewUpdateAgentAction(db),
+		updateAgent:               agentaction.NewUpdateAgentAction(db, agentCoordinator),
 		updateAgentExecution:      agentaction.NewUpdateExecutionAction(db),
-		updateAgentStatus:         agentaction.NewUpdateStatusAction(db),
+		updateAgentStatus:         agentaction.NewUpdateStatusAction(db, agentCoordinator),
 	}
 }
 

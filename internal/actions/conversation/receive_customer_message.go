@@ -78,6 +78,11 @@ type InboundCustomerMessageResult struct {
 // ReceiveInboundCustomerMessage 在调用方事务中幂等写入客户文本或附件消息。
 func ReceiveInboundCustomerMessage(ctx context.Context, db bun.IDB, channel *servermodels.Channel, input InboundCustomerMessageInput) (InboundCustomerMessageResult, error) {
 	ids := generateIDs()
+	// 路由目标身份在渠道身份与会话锁之前取共享锁，与停用、改角色等资格变更串行。
+	route, err := chatstate.ResolveNewSessionRoute(ctx, db, channel)
+	if err != nil {
+		return InboundCustomerMessageResult{}, err
+	}
 	ensured, err := contactaction.EnsureChannelIdentity(ctx, db, contactaction.EnsureChannelIdentityInput{
 		OrganizationID: channel.OrganizationID,
 		ChannelID:      channel.ID,
@@ -182,18 +187,18 @@ func ReceiveInboundCustomerMessage(ctx context.Context, db bun.IDB, channel *ser
 	}
 
 	if createSession {
-		route, err := resolveRouteSnapshot(ctx, db, channel, input.OriginatedAt)
-		if err != nil {
-			return InboundCustomerMessageResult{}, err
+		var assignedAt *time.Time
+		if route.AssigneeIdentityID != nil {
+			assignedAt = &input.OriginatedAt
 		}
 		session = &servermodels.ServiceSession{
 			ID: ids.serviceSession, OrganizationID: channel.OrganizationID,
 			ConversationID: conversation.ID, ContactChannelIdentityID: identity.ID,
 			Sequence: session.Sequence, Status: string(domain.ServiceSessionStatusOpen),
-			TeamID: route.teamID, AssigneeIdentityID: route.assigneeIdentityID,
+			TeamID: route.TeamID, AssigneeIdentityID: route.AssigneeIdentityID,
 			OpeningMessageID: ids.message, LastMessageID: ids.message,
 			LastMessageAt: input.OriginatedAt,
-			AssignedAt:    route.assignedAt, StatusChangedAt: input.OriginatedAt,
+			AssignedAt:    assignedAt, StatusChangedAt: input.OriginatedAt,
 		}
 		if _, err := db.NewInsert().Model(session).
 			Column("id", "organization_id", "conversation_id", "contact_channel_identity_id", "sequence", "status", "team_id", "assignee_identity_id", "opening_message_id", "last_message_id", "last_message_at", "assigned_at", "status_changed_at").

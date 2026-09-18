@@ -40,6 +40,8 @@
 
   "error.agent_reply_stop_failed": "停止 AI 回复失败，请重试。",
   "error.agent_unavailable": "这个 AI 员工当前不可用。",
+  "agent.customer_handoff_fallback": "已为您转接人工客服，人工客服会继续为您处理。",
+  "agent.customer_failure_fallback": "抱歉，暂时无法自动处理您的问题，已为您转接人工客服，人工客服会继续为您处理。",
   "error.customer_reply_suggest_failed": "生成回复失败，请重试。",
   "error.customer_copilot_thread_list_failed": "读取 AI 助手对话失败，请重试。",
   "field.agent_identity_id_invalid": "请选择有效的 AI 员工。",

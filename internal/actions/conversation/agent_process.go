@@ -53,9 +53,10 @@ const agentRunHasProcessCondition = `EXISTS (
 	WHERE arb.organization_id = agr.organization_id AND arb.agent_run_id = agr.id
 )`
 
-// conversationAgentProcess 按运行的起止时间和模型用量构造过程引用。
+// conversationAgentProcess 按运行的起止时间、模型用量和结果构造过程引用。
 func conversationAgentProcess(run *servermodels.AgentRun) (*ConversationAgentProcess, error) {
-	process := &ConversationAgentProcess{ID: run.ID, DurationMilliseconds: run.CompletedAt.Sub(*run.StartedAt).Milliseconds()}
+	process := &ConversationAgentProcess{ID: run.ID, DurationMilliseconds: run.CompletedAt.Sub(*run.StartedAt).Milliseconds(),
+		Outcome: (*domain.AgentRunOutcome)(run.Outcome), OutcomeReason: (*domain.AgentHandoffReason)(run.OutcomeReason)}
 	if err := json.Unmarshal(run.Usage, &process.Usage); err != nil {
 		return nil, fmt.Errorf("decode agent usage: %w", err)
 	}

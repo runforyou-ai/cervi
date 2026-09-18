@@ -9,12 +9,10 @@ import (
 	"fmt"
 	"log/slog"
 	"strings"
-	"time"
 	"unicode/utf8"
 	"uuid"
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
-	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/realtime"
@@ -64,12 +62,6 @@ type generatedIDs struct {
 	participant     string
 	serviceSession  string
 	message         string
-}
-
-type routeSnapshot struct {
-	teamID             *string
-	assigneeIdentityID *string
-	assignedAt         *time.Time
 }
 
 // NewReceiveWebsiteCustomerMessageAction 创建网站访客消息操作。
@@ -397,63 +389,6 @@ func selectServiceSession(ctx context.Context, db bun.IDB, organizationID, conve
 		return &servermodels.ServiceSession{Sequence: session.Sequence + 1}, true, nil
 	default:
 		return nil, false, ErrDataInvariant
-	}
-}
-
-// resolveRouteSnapshot 解析新客服处理周期的渠道路由快照。
-func resolveRouteSnapshot(ctx context.Context, db bun.IDB, channel *servermodels.Channel, now time.Time) (routeSnapshot, error) {
-	channelType := domain.ChannelType(channel.Type)
-	if route, available, err := availableRoute(ctx, db, channel.OrganizationID, channelType, domain.ChannelRoutingTargetType(channel.InitialRoutingTargetType), channel.InitialRoutingTargetID, now); err != nil {
-		return routeSnapshot{}, fmt.Errorf("resolve message channel initial route: %w", err)
-	} else if available {
-		return route, nil
-	}
-	slog.Warn("消息渠道初始路由不可用", "organization_id", channel.OrganizationID, "channel_id", channel.ID, "target_type", channel.InitialRoutingTargetType)
-	if route, available, err := availableRoute(ctx, db, channel.OrganizationID, channelType, domain.ChannelRoutingTargetType(channel.FallbackRoutingTargetType), channel.FallbackRoutingTargetID, now); err != nil {
-		return routeSnapshot{}, fmt.Errorf("resolve message channel fallback route: %w", err)
-	} else if available {
-		return route, nil
-	}
-	slog.Warn("消息渠道失败路由不可用，进入公共队列", "organization_id", channel.OrganizationID, "channel_id", channel.ID, "target_type", channel.FallbackRoutingTargetType)
-	return routeSnapshot{}, nil
-}
-
-// availableRoute 判断路由目标当前是否可用。
-func availableRoute(ctx context.Context, db bun.IDB, organizationID string, channelType domain.ChannelType, targetType domain.ChannelRoutingTargetType, targetID *string, now time.Time) (routeSnapshot, bool, error) {
-	switch targetType {
-	case domain.ChannelRoutingTargetTypePublicQueue:
-		return routeSnapshot{}, true, nil
-	case domain.ChannelRoutingTargetTypeTeam:
-		if targetID == nil {
-			return routeSnapshot{}, false, nil
-		}
-		available, err := db.NewSelect().Model((*servermodels.Team)(nil)).
-			Where("organization_id = ?", organizationID).
-			Where("id = ?", *targetID).
-			Exists(ctx)
-		return routeSnapshot{teamID: targetID}, available, err
-	case domain.ChannelRoutingTargetTypeMember:
-		if targetID == nil {
-			return routeSnapshot{}, false, nil
-		}
-		identity, err := identityaction.LoadActiveCustomerServiceIdentity(ctx, db, organizationID, *targetID)
-		if errors.Is(err, sql.ErrNoRows) {
-			return routeSnapshot{}, false, nil
-		}
-		if err != nil {
-			return routeSnapshot{}, false, err
-		}
-		if domain.OrganizationIdentityType(identity.Type) == domain.OrganizationIdentityTypeAgent && !domain.ChannelSupportsAgentAssignee(channelType) {
-			slog.Warn("消息渠道不支持 AI 员工作为负责人",
-				"organization_id", organizationID,
-				"channel_type", channelType,
-				"agent_identity_id", identity.ID,
-			)
-			return routeSnapshot{}, false, nil
-		}
-		return routeSnapshot{assigneeIdentityID: targetID, assignedAt: &now}, true, nil
-	default:
-		return routeSnapshot{}, false, nil
 	}
 }
 

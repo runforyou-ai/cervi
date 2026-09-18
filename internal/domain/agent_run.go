@@ -40,3 +40,36 @@ const (
 	AgentRunErrorCodeBotChanged      AgentRunErrorCode = "bot_changed"
 	AgentRunErrorCodeAgentRemoved    AgentRunErrorCode = "agent_removed"
 )
+
+// AgentRunErrorCodeAgentUnavailable 表示 AI 员工被停用或失去接客资格，由管理操作取消运行。
+const AgentRunErrorCodeAgentUnavailable AgentRunErrorCode = "agent_unavailable"
+
+// AgentRunOutcome 定义一次 Agent 运行的结束方式。
+type AgentRunOutcome string
+
+const (
+	AgentRunOutcomeReply       AgentRunOutcome = "reply"
+	AgentRunOutcomeAskCustomer AgentRunOutcome = "ask_customer"
+	AgentRunOutcomeHandoff     AgentRunOutcome = "handoff"
+)
+
+// AgentHandoffReason 定义 AI 客服把会话转交人工的原因。
+type AgentHandoffReason string
+
+const (
+	AgentHandoffReasonModelRequested       AgentHandoffReason = "model_requested"
+	AgentHandoffReasonInsufficientEvidence AgentHandoffReason = "insufficient_evidence"
+	AgentHandoffReasonBudgetExhausted      AgentHandoffReason = "budget_exhausted"
+	AgentHandoffReasonRuntimeFailed        AgentHandoffReason = "runtime_failed"
+	AgentHandoffReasonTimeout              AgentHandoffReason = "timeout"
+	AgentHandoffReasonAgentUnavailable     AgentHandoffReason = "agent_unavailable"
+)
+
+// AgentAskCustomerPurpose 定义 AI 客服向客户发问的用途，只用于审计与统计。
+type AgentAskCustomerPurpose string
+
+const (
+	AgentAskCustomerPurposeGreeting AgentAskCustomerPurpose = "greeting"
+	AgentAskCustomerPurposeClarify  AgentAskCustomerPurpose = "clarify"
+	AgentAskCustomerPurposeConfirm  AgentAskCustomerPurpose = "confirm"
+)

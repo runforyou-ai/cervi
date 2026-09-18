@@ -7,6 +7,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"slices"
 	"strings"
 	"testing"
 	"uuid"
@@ -125,7 +126,7 @@ func TestAgentRoleBehavior(t *testing.T) {
 		t.Fatalf("behavior snapshot = %s, error = %v", run.BehaviorSnapshot, err)
 	}
 	sum := sha256.Sum256([]byte(captured.Instruction))
-	if snapshot.RoleKind != string(domain.RoleKindCustomerService) || snapshot.Scene != string(agentruntime.SceneAgentChat) || snapshot.RulesVersion != 1 ||
+	if snapshot.RoleKind != string(domain.RoleKindCustomerService) || snapshot.Scene != string(agentruntime.SceneAgentChat) || snapshot.RulesVersion != 2 ||
 		snapshot.Instruction != captured.Instruction || snapshot.InstructionSHA256 != hex.EncodeToString(sum[:]) ||
 		snapshot.Model.ProviderID != provider.ID || snapshot.Model.Identifier != "chat" || snapshot.Model.ContextWindow != 32000 ||
 		len(snapshot.Tools) != 1 || snapshot.Tools[0] != "calculator" || len(snapshot.MCPServers) != 0 {
@@ -166,7 +167,8 @@ func TestAgentRoleBehavior(t *testing.T) {
 	}
 	runQueuedAgentRun(t, db, execute, inbound.Conversation.ID)
 	if captured.Scene != agentruntime.SceneCustomer || !strings.HasPrefix(captured.Instruction, baselinePrefix) ||
-		!strings.Contains(captured.Instruction, "\n\n本次是客户会话") || !strings.HasSuffix(captured.Instruction, "如实告知客户暂时无法确认，不要猜测。") ||
+		!strings.Contains(captured.Instruction, "\n\n本次是客户会话") || !strings.HasSuffix(captured.Instruction, "追问、转人工与其他工具不在同一次输出中同时调用。") ||
+		!strings.Contains(captured.Instruction, "- ask_customer：") || !strings.Contains(captured.Instruction, "- handoff_to_human：") ||
 		strings.Contains(captured.Instruction, "search_customer_history") || strings.Contains(captured.Instruction, "人工客服跟进") {
 		t.Fatalf("customer instruction = scene %q, %q", captured.Scene, captured.Instruction)
 	}
@@ -177,7 +179,7 @@ func TestAgentRoleBehavior(t *testing.T) {
 	if err := json.Unmarshal(customerRun.BehaviorSnapshot, &snapshot); err != nil {
 		t.Fatal(err)
 	}
-	if snapshot.Scene != string(agentruntime.SceneCustomer) || len(snapshot.Tools) != 0 {
+	if snapshot.Scene != string(agentruntime.SceneCustomer) || !slices.Equal(snapshot.Tools, []string{"ask_customer", "handoff_to_human"}) {
 		t.Fatalf("customer behavior snapshot = %+v", snapshot)
 	}
 }

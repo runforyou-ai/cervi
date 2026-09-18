@@ -16,6 +16,10 @@ function agentToolLabel(tool: string, t: ReturnType<typeof useTranslation<"commo
       return t("agentTools.searchKnowledge")
     case "search_customer_history":
       return t("agentTools.searchCustomerHistory")
+    case "ask_customer":
+      return t("agentTools.askCustomer")
+    case "handoff_to_human":
+      return t("agentTools.handoffToHuman")
     case "mcp":
       return t("agentTools.mcp")
     default:

@@ -614,6 +614,13 @@ func conversationMessageFromAction(message conversationaction.ConversationMessag
 				IdentityID: message.SystemEvent.Actor.IdentityID, DisplayName: message.SystemEvent.Actor.DisplayName,
 			},
 			Targets: targets, PreviousTitle: message.SystemEvent.PreviousTitle, Title: message.SystemEvent.Title,
+			ServiceSessionID: message.SystemEvent.ServiceSessionID, FromIdentityID: message.SystemEvent.FromIdentityID,
+			FromDisplayName: message.SystemEvent.FromDisplayName, HandoffReason: (*AgentHandoffReason)(message.SystemEvent.Reason),
+			ReasonText: message.SystemEvent.ReasonText, AgentRunID: message.SystemEvent.AgentRunID,
+		}
+		if target := message.SystemEvent.Target; target != nil {
+			systemEvent.HandoffTarget = &ServiceSessionHandoffTarget{Kind: ServiceSessionHandoffTargetKind(target.Kind),
+				TeamID: target.TeamID, TeamName: target.TeamName, IdentityID: target.IdentityID, DisplayName: target.DisplayName}
 		}
 	}
 	var replyTo *ConversationMessageReference
