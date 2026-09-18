@@ -5,14 +5,18 @@ package integrationtest
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"strings"
 	"sync"
 	"testing"
+	"time"
 	"uuid"
 
 	agentaction "github.com/runforyou-ai/cervi/internal/actions/agent"
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
+	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
+	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
 	teamaction "github.com/runforyou-ai/cervi/internal/actions/team"
@@ -20,6 +24,7 @@ import (
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
+	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
@@ -168,6 +173,8 @@ func testAgentHandoffs(t *testing.T, db *bun.DB, identity *servermodels.Identity
 	t.Run("入站路由与资格变更交错", func(t *testing.T) { testInboundRoutingVersusEligibility(t, f) })
 	t.Run("入站发现负责人失效", func(t *testing.T) { testInboundUnavailableAssignee(t, f) })
 	t.Run("Telegram 主动转人工", func(t *testing.T) { testTelegramModelHandoff(t, f) })
+	t.Run("渠道编辑与停用交错", func(t *testing.T) { testChannelEditVersusDeactivation(t, f) })
+	t.Run("Telegram 入站失效交接与运行收尾交错", func(t *testing.T) { testTelegramInboundHandoffVersusRunFailure(t, f) })
 }
 
 // testModelHandoffRoundTrip 验证最终认领后到达的消息随交接结算，人工转回 AI 后只处理新消息。
@@ -505,5 +512,122 @@ func testTelegramModelHandoff(t *testing.T, f handoffFixture) {
 	if fixture.run.ResponseMessageID == nil || len(deliveries) != 1 || deliveries[0].MessageID != *fixture.run.ResponseMessageID ||
 		len(handoffEvents(t, f.db, fixture.run.ConversationID)) != 1 {
 		t.Fatalf("run = %+v, deliveries = %+v", fixture.run, deliveries)
+	}
+}
+
+// testChannelEditVersusDeactivation 验证停用 AI 员工持有身份锁时，以其为路由目标的渠道编辑先等待身份锁再锁渠道，两者不形成循环等待。
+func testChannelEditVersusDeactivation(t *testing.T, f handoffFixture) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	agent := f.newAgent(t, "渠道编辑并发客服")
+	channelID := f.newChannel(t, agent.IdentityID, channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue})
+	// 渠道编辑由另一名成员发起，两个操作人各自持有自己的账号锁。
+	email := "channel-editor-" + uuid.NewV7().String()[:8] + "@handoff.test"
+	if _, err := useraction.NewCreateUserAction(f.db).Execute(ctx, f.identity, useraction.CreateInput{
+		DisplayName: "渠道编辑成员", Email: email, Password: "password123", RoleID: f.identity.OrganizationIdentity.RoleID,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	editor, err := authaction.NewLoginAction(f.db).Execute(ctx, authaction.LoginInput{OrganizationID: f.identity.Organization.ID, Email: email, Password: "password123"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	gated := bun.NewDB(f.db.DB, f.db.Dialect())
+	gated.AddQueryHook(chatQueryHook{})
+	// 停用事务取得 AI 员工身份排他锁后暂停。
+	gate := newChatQueryGate(t, false, 1, func(event *bun.QueryEvent) bool {
+		return strings.Contains(event.Query, "organization_identities") && strings.Contains(event.Query, "FOR UPDATE OF oi")
+	})
+	deactivated, edited := make(chan error, 1), make(chan error, 1)
+	go func() {
+		_, err := agentaction.NewUpdateStatusAction(gated, testServiceSessionHandoff(f.db)).Execute(context.WithValue(ctx, chatQueryGateKey{}, gate), f.identity, agent.ID, domain.UserStatusInactive)
+		deactivated <- err
+	}()
+	waitChatSignal(t, ctx, gate.reached)
+	go func() {
+		_, err := channelaction.NewUpdateMessageChannelAction(f.db).Execute(ctx, editor.Identity, channelID, channelaction.MessageChannelInput{
+			Name: "渠道编辑并发", DefaultLocale: domain.LocaleChineseSimplified,
+			NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypeMember, ID: agent.IdentityID},
+			FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
+		})
+		edited <- err
+	}()
+	waitChatDatabaseLock(t, ctx, f.db, "organization_identities", agent.IdentityID)
+	gate.open()
+	if err := waitChatResult(t, ctx, deactivated); err != nil {
+		t.Fatalf("deactivate agent: %v", err)
+	}
+	// 渠道编辑在停用提交后校验目标，AI 员工已不可用时按校验失败返回。
+	var validation *channelaction.ValidationError
+	if err := waitChatResult(t, ctx, edited); err != nil && !errors.As(err, &validation) {
+		t.Fatalf("edit channel: %v", err)
+	}
+	channel := servermodels.Channel{}
+	if err := f.db.NewSelect().Model(&channel).Where("c.id = ?", channelID).Scan(ctx); err != nil ||
+		channel.InitialRoutingTargetType != string(domain.ChannelRoutingTargetTypePublicQueue) {
+		t.Fatalf("channel = %+v, error = %v", channel, err)
+	}
+}
+
+// testTelegramInboundHandoffVersusRunFailure 验证已持有会话锁的入站事务发现负责人失效时，交接只读取外发目标，与先锁渠道身份的运行收尾不形成循环等待。
+func testTelegramInboundHandoffVersusRunFailure(t *testing.T, f handoffFixture) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	fixture := newAgentTelegramFixture(t, f.db, f.identity, f.roleID, f.providerID, f.modelID)
+	if _, err := f.db.NewUpdate().Model((*servermodels.Agent)(nil)).Set("status = ?", domain.UserStatusInactive).
+		Where("identity_id = ?", fixture.run.AgentIdentityID).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	var messageID string
+	if err := f.db.NewSelect().Model((*servermodels.Message)(nil)).Column("id").
+		Where("msg.conversation_id = ? AND msg.type = ?", fixture.run.ConversationID, domain.MessageTypeText).
+		OrderExpr("msg.message_seq DESC").Limit(1).Scan(ctx, &messageID); err != nil {
+		t.Fatal(err)
+	}
+	gated := bun.NewDB(f.db.DB, f.db.Dialect())
+	gated.AddQueryHook(chatQueryHook{})
+	// 运行失败收尾取得渠道身份锁后、申请会话锁前暂停。
+	gate := newChatQueryGate(t, false, 1, func(event *bun.QueryEvent) bool {
+		return strings.Contains(event.Query, "contact_channel_identities") && strings.Contains(event.Query, "FOR UPDATE")
+	})
+	failed, scheduled := make(chan error, 1), make(chan error, 1)
+	go func() {
+		executor := agentrunaction.NewExecuteAction(gated, fixture.tasks, nil, testAttachmentReader(f.db), nil)
+		failed <- executor.FinalizeFailure(context.WithValue(ctx, chatQueryGateKey{}, gate), agentrunaction.RunInput{RunID: fixture.run.ID}, errors.New("运行失败"))
+	}()
+	waitChatSignal(t, ctx, gate.reached)
+	go func() {
+		scheduled <- realtime.RunInTx(ctx, f.db, func(ctx context.Context, tx bun.Tx) error {
+			_, session, err := chatstate.LockCustomerServiceSession(ctx, tx, fixture.run.OrganizationID, fixture.run.ConversationID)
+			if err != nil {
+				return err
+			}
+			_, err = agentrunaction.NewScheduler(fixture.tasks).ScheduleCustomerAuto(ctx, tx, fixture.run.OrganizationID, fixture.run.ConversationID, session.ID, messageID)
+			return err
+		})
+	}()
+	// 入站事务在运行收尾暂停期间独立完成交接。
+	select {
+	case err := <-scheduled:
+		if err != nil {
+			t.Fatalf("inbound handoff: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		gate.open()
+		t.Fatal("inbound handoff waited for the channel identity lock held by run failure")
+	}
+	gate.open()
+	if err := waitChatResult(t, ctx, failed); err != nil {
+		t.Fatalf("finalize run failure: %v", err)
+	}
+	fixture.reload(t)
+	var deliveries []servermodels.CustomerMessageDelivery
+	if err := f.db.NewSelect().Model(&deliveries).Where("cmd.conversation_id = ?", fixture.run.ConversationID).Scan(ctx); err != nil {
+		t.Fatal(err)
+	}
+	events := handoffEvents(t, f.db, fixture.run.ConversationID)
+	if fixture.run.Status != string(domain.AgentRunStatusCancelled) || len(events) != 1 ||
+		events[0].Reason != domain.AgentHandoffReasonAgentUnavailable || len(deliveries) != 1 {
+		t.Fatalf("run = %+v, events = %+v, deliveries = %+v", fixture.run, events, deliveries)
 	}
 }

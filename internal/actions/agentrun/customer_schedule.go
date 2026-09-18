@@ -54,7 +54,7 @@ func (s *Scheduler) ScheduleCustomerAuto(ctx context.Context, db bun.IDB, organi
 		return false, err
 	}
 	if !eligible {
-		// 负责人是已失去接客资格的 AI 员工时，在本次入站事务内把周期交给人工。
+		// 负责人是已失去接客资格的 AI 员工时，在本次入站事务内把周期交给人工；本事务已持有会话锁，交接只读取目标身份与外发目标。
 		cancelled, err := handOffUnavailableAgentSession(ctx, db, s.enqueuer, organizationID, conversationID, session.ID,
 			*session.AssigneeIdentityID, "handoff:"+session.ID+":"+messageID, false)
 		if err != nil {

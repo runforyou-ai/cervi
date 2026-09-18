@@ -40,13 +40,13 @@ func (a *UpdateMessageChannelAction) Execute(ctx context.Context, identity *serv
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		if err := tx.NewSelect().Model(channel).
+		// 锁序为先路由目标身份、后渠道，与停用 AI 员工和转人工一致；渠道类型不可变，校验前按不加锁读取。
+		query := tx.NewSelect().Model(channel).
 			Column("id", "type").
 			Where("c.id = ?", channelID).
 			Where("c.organization_id = ?", identity.Organization.ID).
-			Where("c.type IN (?)", bun.In(domain.MessageChannelTypes())).
-			For("UPDATE").
-			Scan(ctx); errors.Is(err, sql.ErrNoRows) {
+			Where("c.type IN (?)", bun.In(domain.MessageChannelTypes()))
+		if err := query.Scan(ctx); errors.Is(err, sql.ErrNoRows) {
 			return ErrNotFound
 		} else if err != nil {
 			return err
@@ -56,6 +56,11 @@ func (a *UpdateMessageChannelAction) Execute(ctx context.Context, identity *serv
 			return err
 		}
 		if err := validateRoutingTarget(ctx, tx, identity.Organization.ID, channelType, "fallbackTarget", input.FallbackTarget); err != nil {
+			return err
+		}
+		if err := query.For("UPDATE").Scan(ctx); errors.Is(err, sql.ErrNoRows) {
+			return ErrNotFound
+		} else if err != nil {
 			return err
 		}
 		var description *string

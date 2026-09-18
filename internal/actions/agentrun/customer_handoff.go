@@ -326,7 +326,8 @@ func (a *ExecuteAction) HandOffAgentServiceSessions(ctx context.Context, db bun.
 	return cancelled, nil
 }
 
-// handOffUnavailableAgentSession 把失去接客资格的 AI 员工负责的指定周期交给人工，周期已变化时跳过；lock 为 true 时转交目标身份取 FOR KEY SHARE，调用方已持有会话锁时传 false。
+// handOffUnavailableAgentSession 把失去接客资格的 AI 员工负责的指定周期交给人工，周期已变化时跳过。
+// lock 为 true 时按转交目标身份、渠道身份、会话的锁序加锁；调用方已持有会话锁时传 false，目标身份与外发目标只读取不加锁。
 func handOffUnavailableAgentSession(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer, organizationID, conversationID, serviceSessionID, agentIdentityID, key string, lock bool) ([]string, error) {
 	channel, err := chatstate.LoadConversationChannel(ctx, db, organizationID, conversationID)
 	if err != nil {
@@ -336,7 +337,11 @@ func handOffUnavailableAgentSession(ctx context.Context, db bun.IDB, enqueuer se
 	if err != nil {
 		return nil, err
 	}
-	deliveryRoute, err := deliveryaction.Prepare(ctx, db, organizationID, conversationID)
+	loadDeliveryRoute := deliveryaction.LoadRoute
+	if lock {
+		loadDeliveryRoute = deliveryaction.Prepare
+	}
+	deliveryRoute, err := loadDeliveryRoute(ctx, db, organizationID, conversationID)
 	if err != nil {
 		return nil, err
 	}

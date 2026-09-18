@@ -204,6 +204,7 @@ const inbox = {
   handoffReasonModelRequested: "AI requested a human",
   handoffReasonInsufficientEvidence: "no supporting information",
   handoffReasonBudgetExhausted: "step limit reached",
+  handoffReasonInvalidOutput: "AI couldn't produce a valid result",
   handoffReasonRuntimeFailed: "AI run failed",
   handoffReasonTimeout: "AI run timed out",
   groupSystemListSeparator: ", ",

@@ -64,7 +64,7 @@ func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels
 			return err
 		}
 		if status == domain.UserStatusInactive {
-			// 先锁定身份，与以该身份为目标的入站路由和转交串行。
+			// 先锁定身份再改渠道与会话，与以该身份为目标的渠道编辑、入站路由和转交串行。
 			if err := lockAgentIdentity(ctx, tx, identity.Organization.ID, updatedAgent.IdentityID, nil); err != nil {
 				return err
 			}

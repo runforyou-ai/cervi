@@ -199,6 +199,7 @@ const inbox = {
   handoffReasonModelRequested: "AI 判断需要人工处理",
   handoffReasonInsufficientEvidence: "缺少可依据的资料",
   handoffReasonBudgetExhausted: "处理步骤已用尽",
+  handoffReasonInvalidOutput: "AI 未能给出有效结果",
   handoffReasonRuntimeFailed: "AI 运行出错",
   handoffReasonTimeout: "AI 运行超时",
   groupSystemListSeparator: "、",

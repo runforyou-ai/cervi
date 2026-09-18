@@ -60,6 +60,7 @@ const (
 	AgentHandoffReasonModelRequested       AgentHandoffReason = "model_requested"
 	AgentHandoffReasonInsufficientEvidence AgentHandoffReason = "insufficient_evidence"
 	AgentHandoffReasonBudgetExhausted      AgentHandoffReason = "budget_exhausted"
+	AgentHandoffReasonInvalidOutput        AgentHandoffReason = "invalid_output"
 	AgentHandoffReasonRuntimeFailed        AgentHandoffReason = "runtime_failed"
 	AgentHandoffReasonTimeout              AgentHandoffReason = "timeout"
 	AgentHandoffReasonAgentUnavailable     AgentHandoffReason = "agent_unavailable"

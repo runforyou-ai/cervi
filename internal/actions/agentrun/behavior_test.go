@@ -43,6 +43,13 @@ func TestToolGuidance(t *testing.T) {
 	if only := toolGuidance(behaviorTools{Knowledge: true}); strings.Contains(only, "search_customer_history") {
 		t.Fatalf("未注册的工具不应出现：%q", only)
 	}
+	if only := toolGuidance(behaviorTools{Knowledge: true}); strings.Contains(only, "ask_customer") || strings.Contains(only, "handoff_to_human") {
+		t.Fatalf("内部场景不应出现终止工具：%q", only)
+	}
+	terminal := toolGuidance(behaviorTools{Terminal: true})
+	if !strings.HasPrefix(terminal, "可用工具：\n") || !strings.Contains(terminal, "- ask_customer：") || !strings.Contains(terminal, "- handoff_to_human：") {
+		t.Fatalf("终止工具说明 = %q", terminal)
+	}
 }
 
 // TestNewBehaviorSnapshot 验证快照记录角色、场景、规则版本、完整指令与哈希。

@@ -38,6 +38,16 @@ type Route struct {
 
 // Prepare 读取外发目标，Telegram 在客服周期之前锁定渠道身份。
 func Prepare(ctx context.Context, db bun.IDB, organizationID, conversationID string) (Route, error) {
+	return loadRoute(ctx, db, organizationID, conversationID, true)
+}
+
+// LoadRoute 只读取外发目标，供已持有会话锁的事务使用；同一 Telegram 渠道身份的外发与机器人更换都先持有该会话锁。
+func LoadRoute(ctx context.Context, db bun.IDB, organizationID, conversationID string) (Route, error) {
+	return loadRoute(ctx, db, organizationID, conversationID, false)
+}
+
+// loadRoute 读取外发目标，lock 为 true 时对 Telegram 渠道取共享锁并锁定渠道身份。
+func loadRoute(ctx context.Context, db bun.IDB, organizationID, conversationID string, lock bool) (Route, error) {
 	var route Route
 	query := db.NewSelect().TableExpr("customer_conversations AS cc").
 		ColumnExpr("cci.id AS identity_id, ch.id AS channel_id, ch.type AS channel_type, ch.enabled, tcs.bot_id").
@@ -52,7 +62,7 @@ func Prepare(ctx context.Context, db bun.IDB, organizationID, conversationID str
 	if err != nil {
 		return route, err
 	}
-	if route.ChannelType == domain.ChannelTypeTelegram {
+	if lock && route.ChannelType == domain.ChannelTypeTelegram {
 		// 持有渠道共享锁直至入队完成。
 		if err := query.For("SHARE OF ch").Scan(ctx, &route); err != nil {
 			return route, err

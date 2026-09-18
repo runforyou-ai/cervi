@@ -111,7 +111,7 @@ func TestCustomerTerminalDecisions(t *testing.T) {
 			func() *schema.AgenticMessage {
 				return assistantReply("", terminalCall("ask-2", askCustomerToolName, `{}`))
 			},
-		}, wantKind: domain.AgentRunOutcomeHandoff, wantReason: domain.AgentHandoffReasonInsufficientEvidence, wantContent: "", wantCalls: 2},
+		}, wantKind: domain.AgentRunOutcomeHandoff, wantReason: domain.AgentHandoffReasonInvalidOutput, wantContent: "", wantCalls: 2},
 	} {
 		t.Run(scenario.name, func(t *testing.T) {
 			ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

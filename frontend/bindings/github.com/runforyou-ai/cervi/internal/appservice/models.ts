@@ -227,6 +227,7 @@ export enum AgentHandoffReason {
     AgentHandoffReasonModelRequested = "model_requested",
     AgentHandoffReasonInsufficientEvidence = "insufficient_evidence",
     AgentHandoffReasonBudgetExhausted = "budget_exhausted",
+    AgentHandoffReasonInvalidOutput = "invalid_output",
     AgentHandoffReasonRuntimeFailed = "runtime_failed",
     AgentHandoffReasonTimeout = "timeout",
     AgentHandoffReasonAgentUnavailable = "agent_unavailable",

@@ -30,14 +30,17 @@ func LoadActiveCustomerServiceIdentity(ctx context.Context, db bun.IDB, organiza
 	return identity, err
 }
 
-// LockActiveCustomerServiceIdentity 锁定并返回指定的有效客服身份。
+// LockActiveCustomerServiceIdentity 对指定身份取 FOR KEY SHARE，再以锁后的语句快照返回有效客服身份，锁等待期间提交的停用或改角色随之生效。
 func LockActiveCustomerServiceIdentity(ctx context.Context, db bun.IDB, organizationID, identityID string) (*servermodels.OrganizationIdentity, error) {
-	identity := &servermodels.OrganizationIdentity{}
-	err := activeCustomerServiceIdentityQuery(db, identity, organizationID).
-		Where("oi.id = ?", identityID).
-		For("KEY SHARE OF oi").
-		Scan(ctx)
-	return identity, err
+	var lockedID string
+	if err := db.NewSelect().Model((*servermodels.OrganizationIdentity)(nil)).
+		Column("oi.id").
+		Where("oi.organization_id = ? AND oi.id = ?", organizationID, identityID).
+		For("KEY SHARE").
+		Scan(ctx, &lockedID); err != nil {
+		return &servermodels.OrganizationIdentity{}, err
+	}
+	return LoadActiveCustomerServiceIdentity(ctx, db, organizationID, identityID)
 }
 
 // activeCustomerServiceIdentityQuery 构造统一的有效客服身份查询。

@@ -37,6 +37,7 @@ const (
 	AgentHandoffReasonModelRequested       AgentHandoffReason = AgentHandoffReason(domain.AgentHandoffReasonModelRequested)
 	AgentHandoffReasonInsufficientEvidence AgentHandoffReason = AgentHandoffReason(domain.AgentHandoffReasonInsufficientEvidence)
 	AgentHandoffReasonBudgetExhausted      AgentHandoffReason = AgentHandoffReason(domain.AgentHandoffReasonBudgetExhausted)
+	AgentHandoffReasonInvalidOutput        AgentHandoffReason = AgentHandoffReason(domain.AgentHandoffReasonInvalidOutput)
 	AgentHandoffReasonRuntimeFailed        AgentHandoffReason = AgentHandoffReason(domain.AgentHandoffReasonRuntimeFailed)
 	AgentHandoffReasonTimeout              AgentHandoffReason = AgentHandoffReason(domain.AgentHandoffReasonTimeout)
 	AgentHandoffReasonAgentUnavailable     AgentHandoffReason = AgentHandoffReason(domain.AgentHandoffReasonAgentUnavailable)

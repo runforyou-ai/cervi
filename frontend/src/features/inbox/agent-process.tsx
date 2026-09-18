@@ -51,6 +51,8 @@ export function handoffReasonKey(reason: AgentHandoffReason | null | undefined) 
       return "handoffReasonInsufficientEvidence" as const
     case AgentHandoffReason.AgentHandoffReasonBudgetExhausted:
       return "handoffReasonBudgetExhausted" as const
+    case AgentHandoffReason.AgentHandoffReasonInvalidOutput:
+      return "handoffReasonInvalidOutput" as const
     case AgentHandoffReason.AgentHandoffReasonTimeout:
       return "handoffReasonTimeout" as const
     case AgentHandoffReason.AgentHandoffReasonAgentUnavailable:

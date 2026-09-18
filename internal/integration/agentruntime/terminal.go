@@ -214,7 +214,7 @@ func (t *terminalTools) reject(ctx context.Context, issue string) error {
 		return fmt.Errorf("%s。需要客户补充信息或只是问候请单独调用 ask_customer；无法解答请单独调用 handoff_to_human", issue)
 	}
 	if t.forced == nil {
-		t.forced = &terminalIntent{decision: TerminalDecision{Kind: domain.AgentRunOutcomeHandoff, Reason: domain.AgentHandoffReasonInsufficientEvidence}}
+		t.forced = &terminalIntent{decision: TerminalDecision{Kind: domain.AgentRunOutcomeHandoff, Reason: domain.AgentHandoffReasonInvalidOutput}}
 		t.handoff = true
 	}
 	t.mu.Unlock()

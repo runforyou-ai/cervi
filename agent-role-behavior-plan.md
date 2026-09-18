@@ -190,7 +190,7 @@ Runtime 用内部 `TerminalDecision` 表达一次执行的结束方式，Eino �
 
 两个终止工具注册为 Eino ADK 的直接返回工具，但直接返回的输出是工具结果而不是 assistant 正文，`onAgentEvents` 需要按成功工具调用的 `callID` 提取终止决定。工具执行本身不发消息、不改负责人，只在 Runtime 内记录意图；发送消息与修改负责人统一留到终态事务。
 
-执行一批工具调用前先校验：至多一个终止工具，且终止工具不与其他工具混调。非法组合视同一次需要纠正的输出，消耗第 7 节的纠正额度；额度耗尽进入受控转人工。参数校验失败同样按此处理。
+执行一批工具调用前先校验：至多一个终止工具，且终止工具不与其他工具混调。非法组合视同一次需要纠正的输出，消耗第 7 节的纠正额度；额度耗尽进入受控转人工，原因 `invalid_output`。参数校验失败同样按此处理。
 
 ### 5.3 转人工不可降级
 
@@ -237,6 +237,7 @@ Runtime 用内部 `TerminalDecision` 表达一次执行的结束方式，Eino �
 | 模型主动转人工 | `succeeded` | `handoff` | `model_requested` | 真人或队列 |
 | 纠正后仍无依据 | `succeeded` | `handoff` | `insufficient_evidence` | 真人或队列 |
 | 预算耗尽仍无依据 | `succeeded` | `handoff` | `budget_exhausted` | 真人或队列 |
+| 纠正后仍输出无效的终止调用 | `succeeded` | `handoff` | `invalid_output` | 真人或队列 |
 | 模型错误、超时、开始执行前失败 | `failed` | `handoff` | `runtime_failed`、`timeout` | 真人或队列 |
 | 人工接管、关闭、主动停止先提交 | `cancelled` | 空 | 现有取消码 | 服从已提交的业务操作 |
 | AI 被停用或角色失去接客资格 | `cancelled` | 空 | `agent_unavailable` | 由管理操作交接，见 6.4 |
@@ -287,7 +288,7 @@ payload
 ├── serviceSessionId
 ├── fromIdentityId          -- 原 AI 员工身份
 ├── target                  -- { kind: public_queue | team | member, teamId?, identityId? }
-├── reason                  -- model_requested | insufficient_evidence | budget_exhausted | runtime_failed | timeout | agent_unavailable
+├── reason                  -- model_requested | insufficient_evidence | budget_exhausted | invalid_output | runtime_failed | timeout | agent_unavailable
 ├── reasonText              -- 模型写的转交原因，或运行错误摘要；仅成员可见
 └── agentRunId              -- 管理操作交接时为空
 ```
@@ -347,7 +348,7 @@ payload
 agent_runs
 ├── behavior_snapshot     jsonb    -- 运行行为快照，begin 首次解析时写入并固定
 ├── outcome               text     -- reply | ask_customer | handoff
-├── outcome_reason        text     -- model_requested | insufficient_evidence | budget_exhausted | runtime_failed | timeout
+├── outcome_reason        text     -- model_requested | insufficient_evidence | budget_exhausted | invalid_output | runtime_failed | timeout
 └── handoff_settled_seq   bigint   -- 转人工时旧 Lane 结算到的 desired_seq
 ```
 
