@@ -6,11 +6,12 @@ import { Link, useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import { logout, updateUserWorkStatus, type WorkStatus } from "@/api"
-import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
 import {
   MobilePageHeader,
   MobileScrollArea,
 } from "@/apps/mobile/mobile-page"
+import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
+import { deactivateNotificationPolicy } from "@/features/notifications/new-message-notifications"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -75,6 +76,7 @@ export function MobileMePage() {
   /** 退出登录并回到登录页。 */
   async function handleLogout() {
     setLoggingOut(true)
+    deactivateNotificationPolicy()
     // 先离开工作区，登出清空查询缓存时外壳已经卸载。
     navigate("/login", { replace: true })
     try {

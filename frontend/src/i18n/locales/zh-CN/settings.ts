@@ -73,7 +73,7 @@ const settings = {
       title: "通知",
       newMessages: "新消息提醒",
       newMessagesDescription:
-        "开启后，Web 和桌面端会在你上班时提醒新消息；休息一下或下班后自动暂停。",
+        "开启后，Cervi 会在你上班时提醒新消息；休息一下或下班后自动暂停。",
       sound: "播放系统默认通知声音",
       soundDescription:
         "仅影响当前设备，有新消息时播放系统默认通知声音。",
