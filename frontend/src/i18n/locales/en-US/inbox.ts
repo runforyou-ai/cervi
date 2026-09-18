@@ -116,6 +116,7 @@ const inbox = {
   chatTargetLoading: "Opening chat",
   chatTargetUnavailable: "This employee is unavailable for chat",
   directLookupError: "Could not open the internal chat. Try again.",
+  conversationWindowOpenError: "Could not open the conversation window. Try again.",
   groupCreateTitle: "New group chat",
   groupCreateDescription: "Add group details and select its initial members.",
   groupImageLabel: "Group image",

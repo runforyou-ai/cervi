@@ -260,8 +260,18 @@ body,
   height: var(--cervi-macos-titlebar-height);
 }
 
-[data-native-os="darwin"]:has(.cervi-workspace-shell) > .cervi-window-drag-region {
+[data-native-os="darwin"]:has(.cervi-workspace-shell, .cervi-conversation-window) > .cervi-window-drag-region {
   display: none;
+}
+
+/* 会话独立窗口在 macOS 隐藏标题栏后为窗口按钮保留可拖动的顶部空间。 */
+[data-native-os="darwin"][data-window-fullscreen="false"] .cervi-conversation-window {
+  --wails-draggable: drag;
+  padding-top: var(--cervi-macos-titlebar-height);
+}
+
+[data-native-os="darwin"] .cervi-conversation-window > * {
+  --wails-draggable: no-drag;
 }
 
 /* 工作台底层以轻渐变连接一级栏和主内容区内缩间隙。 */

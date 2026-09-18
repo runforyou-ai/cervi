@@ -116,6 +116,7 @@ const inbox = {
   chatTargetLoading: "正在打开聊天",
   chatTargetUnavailable: "该员工当前无法发起聊天",
   directLookupError: "无法打开内部单聊，请重试",
+  conversationWindowOpenError: "无法打开会话窗口，请重试",
   groupCreateTitle: "创建群聊",
   groupCreateDescription: "填写群资料并选择初始成员。",
   groupImageLabel: "群聊图片",

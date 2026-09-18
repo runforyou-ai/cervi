@@ -48,10 +48,10 @@ export function ConversationMain({
   onSessionChanged: (conversationID: string) => void
   onConversationChanged: (conversationID: string) => void
   onGroupLeft: (conversationID: string) => void
-  onChatStarted: (
+  onChatStarted?: (
     conversation: DirectInboxConversationData | AgentInboxConversationData,
   ) => void
-  onSearchConversation: (conversationID: string) => void
+  onSearchConversation?: (conversationID: string) => void
   locateMessage: ({ conversationId: string } & ConversationLocateTarget) | null
   narrowViewport?: boolean
 }) {
@@ -161,7 +161,11 @@ export function ConversationMain({
             onSessionChanged={() => {
               if (customerConversation) onSessionChanged(customerConversation.id)
             }}
-            onSearch={() => onSearchConversation(validConversation.id)}
+            onSearch={
+              onSearchConversation
+                ? () => onSearchConversation(validConversation.id)
+                : undefined
+            }
             narrowViewport={narrowViewport}
           />
         ) : directTarget ? (

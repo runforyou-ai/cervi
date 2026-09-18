@@ -808,6 +808,13 @@ export function MoveKnowledgeDocument(meta: $models.RequestMeta, knowledgeBaseID
 }
 
 /**
+ * OpenConversationWindow 在桌面端独立窗口打开指定会话，同一会话已打开时聚焦现有窗口。
+ */
+export function OpenConversationWindow(meta: $models.RequestMeta, input: $models.ConversationWindowInput): $CancellablePromise<void> {
+    return $Call.ByID(1941707737, meta, input);
+}
+
+/**
  * OpenExternalPage 在原生端应用内新窗口打开外部页面。
  */
 export function OpenExternalPage(meta: $models.RequestMeta, input: $models.ExternalPageInput): $CancellablePromise<void> {

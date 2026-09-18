@@ -102,6 +102,12 @@ type ExternalPageInput struct {
 	URL   string `json:"url"`
 }
 
+// ConversationWindowInput 定义桌面端打开会话独立窗口的输入。
+type ConversationWindowInput struct {
+	ConversationID string `json:"conversationId"`
+	Title          string `json:"title"`
+}
+
 // MessageNotificationInput 定义当前设备的新消息通知内容。
 type MessageNotificationInput struct {
 	ID           string `json:"id"`

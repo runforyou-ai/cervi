@@ -16,10 +16,12 @@ import {
   isApiError,
   listCustomerServiceAssignees,
   listInboxChannels,
+  openConversationWindow,
   sessionPath,
   type AgentInboxConversationData,
   type DirectInboxConversationData,
   type GroupInboxConversationData,
+  type InboxConversation,
   type MemberOption,
 } from "@/api"
 import { LoadingIndicator } from "@/components/loading-indicator"
@@ -69,6 +71,7 @@ import {
   useResourceReader,
 } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
+import { resolveAppPlatform } from "@/platform/app-platform"
 
 /** 新建后需要切换到的内部会话。 */
 type InternalInboxConversationData =
@@ -284,6 +287,16 @@ export function InboxPage({
     setIsNarrowDetailOpen(isNarrowViewport)
   }
 
+  /** 桌面端在独立窗口打开会话，窗口标题取会话名称。 */
+  async function openConversationInWindow(conversation: InboxConversation, name: string) {
+    try {
+      await openConversationWindow({ conversationId: conversation.id, title: name })
+    } catch (error) {
+      console.warn("打开会话独立窗口失败", { conversationId: conversation.id, error })
+      toast.error(isApiError(error) ? apiErrorMessage(error) : t("conversationWindowOpenError"))
+    }
+  }
+
   /** 消息或客服处理保存后刷新列表与详情，保持当前筛选和选择。 */
   function refreshConversationAfterMessage(conversationID: string) {
     void invalidate(resourceKeys.inbox())
@@ -386,6 +399,11 @@ export function InboxPage({
               onMenuChange={listViewport.setMenu}
               selectedId={selectedConversation?.id}
               onSelect={selectConversation}
+              onOpenInWindow={
+                resolveAppPlatform() === "desktop"
+                  ? (conversation, name) => void openConversationInWindow(conversation, name)
+                  : undefined
+              }
             />
           </InboxListPanel>
         )}
