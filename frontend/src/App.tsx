@@ -13,11 +13,12 @@ const MobileApp = lazy(() => import("@/apps/mobile/mobile-app"))
 /** 根应用，按平台渲染对应入口。 */
 function App({ platform }: { platform: AppPlatform }) {
   const mobile = platform === "mobile"
+  // 移动端轻提示容器横跨视口，胶囊在容器内水平居中。
   const mobileToastOffset = mobile
     ? {
-        top: "calc(env(safe-area-inset-top) + 1rem)",
-        right: "1rem",
-        left: "1rem",
+        top: "calc(env(safe-area-inset-top) + 0.75rem)",
+        right: "0px",
+        left: "0px",
       }
     : undefined
 
@@ -45,21 +46,17 @@ function App({ platform }: { platform: AppPlatform }) {
         mobileOffset={mobileToastOffset}
         closeButton={!mobile}
         style={
-          mobile
-            ? ({
-                "--width": "100%",
-                "--border-radius": "calc(var(--radius) + 6px)",
-              } as CSSProperties)
-            : undefined
+          mobile ? ({ "--width": "100vw" } as CSSProperties) : undefined
         }
         toastOptions={
           mobile
             ? {
                 classNames: {
-                  toast: "gap-3! px-4! py-3.5! shadow-lg",
-                  title: "text-[15px]! leading-6!",
-                  description: "text-sm! leading-5!",
-                  icon: "[&>svg]:size-5!",
+                  toast:
+                    "inset-x-0! mx-auto! w-fit! max-w-[calc(100%-2rem)]! rounded-full! border-0! bg-neutral-900/85! px-4! py-2.5! text-white! shadow-[0_4px_24px_rgb(0_0_0/0.16)]! backdrop-blur-md! dark:bg-neutral-700/90!",
+                  title: "text-sm! leading-5! font-medium!",
+                  description: "text-[13px]! leading-5! text-white/70!",
+                  icon: "hidden!",
                 },
               }
             : undefined
