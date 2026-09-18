@@ -1,6 +1,9 @@
-/** 移动端统一会话摘要列表、阅读状态菜单和内部聊天入口。 */
-import { useRef } from "react"
-import { BellOffIcon, PlusIcon, SearchIcon } from "lucide-react"
+/** 移动端统一会话摘要列表、阅读状态与置顶菜单、置顶排序和内部聊天入口。 */
+import { useRef, useState } from "react"
+import type { TFunction } from "i18next"
+import { useSortable } from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
+import { BellOffIcon, GripVerticalIcon, PlusIcon, SearchIcon } from "lucide-react"
 import { messagePreview } from "@/lib/message-preview"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
@@ -36,6 +39,7 @@ import {
   useConversationListActions,
 } from "@/features/inbox/conversation-list-menu"
 import { ConversationUnreadBadge } from "@/features/inbox/conversation-unread-badge"
+import { PinnedSortArea, pinMoveCommand } from "@/features/inbox/pinned-sort"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -57,7 +61,7 @@ import {
   useMobileNavigation,
 } from "@/apps/mobile/mobile-navigation"
 import { InboxListPanel } from "@/features/inbox/inbox-list-panel"
-import { useInboxList } from "@/features/inbox/use-inbox-list"
+import { usePartitionedInboxList } from "@/features/inbox/use-inbox-list"
 import { useInboxListViewport } from "@/features/inbox/use-inbox-list-viewport"
 import { cn } from "@/lib/utils"
 
@@ -79,18 +83,42 @@ function isMobileInboxConversation(
   )
 }
 
-/** 渲染会话摘要和未读角标，点击进入会话详情，长按打开阅读状态菜单。 */
-function MobileConversationRow({
-  conversation,
-  actions,
-  onMenuChange,
-  onOpen,
-}: {
+/** 返回移动端会话行展示的名称。 */
+function mobileConversationName(conversation: MobileInboxConversation, t: TFunction<"inbox">) {
+  if (isCustomerInboxConversation(conversation))
+    return conversation.customer.contactName ?? t("anonymousVisitor")
+  const name = isDirectInboxConversation(conversation)
+    ? conversation.direct.peerName
+    : isAgentInboxConversation(conversation)
+      ? `${conversation.agent.agentName} · ${conversation.agent.title}`
+      : conversation.group.title
+  return name?.trim() || t("unknownSender")
+}
+
+type MobileConversationRowProps = {
   conversation: MobileInboxConversation
+  name: string
   actions: ReturnType<typeof useConversationListActions>
+  pinOrderVersion: string
+  pinMoves?: NonNullable<Parameters<typeof ConversationListMenu>[0]["pinMoves"]>
+  sorting: boolean
   onMenuChange: (open: boolean) => void
   onOpen: (conversation: MobileInboxConversation) => void
-}) {
+  sortable?: ReturnType<typeof useSortable>
+}
+
+/** 渲染会话摘要和未读角标，点击进入会话详情，长按打开阅读状态与置顶菜单；排序模式下置顶行只响应拖动手柄。 */
+function MobileConversationRow({
+  conversation,
+  name,
+  actions,
+  pinOrderVersion,
+  pinMoves,
+  sorting,
+  onMenuChange,
+  onOpen,
+  sortable,
+}: MobileConversationRowProps) {
   const { t } = useTranslation("inbox")
   const formatTime = useConversationTime()
   const customerConversation = isCustomerInboxConversation(conversation)
@@ -105,14 +133,6 @@ function MobileConversationRow({
   const groupConversation = isGroupInboxConversation(conversation)
     ? conversation
     : null
-  const name = customerConversation
-    ? (customerConversation.customer.contactName ?? t("anonymousVisitor"))
-    : (
-        directConversation?.direct.peerName ??
-        (agent
-          ? `${agent.agentName} · ${agent.title}`
-          : groupConversation?.group.title)
-      )?.trim() || t("unknownSender")
   const summary =
     customerConversation?.customer ??
     directConversation?.direct ??
@@ -214,25 +234,82 @@ function MobileConversationRow({
     </>
   )
 
+  const button = (
+    <button
+      type="button"
+      className={cn(
+        "flex w-full min-w-0 gap-3 px-4 py-3 text-left outline-none transition-colors select-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+        !sorting && "active:bg-muted",
+      )}
+      aria-label={name}
+      aria-disabled={sorting || undefined}
+      onClick={() => {
+        // 排序模式只调整顺序，不进入会话。
+        if (!sorting) onOpen(conversation)
+      }}
+    >
+      {content}
+    </button>
+  )
+
   return (
-    <li data-inbox-id={conversation.id} className="border-b last:border-b-0">
-      <ConversationListMenu
-        conversation={conversation}
-        actions={actions}
-        itemClassName="min-h-11"
-        onOpenChange={onMenuChange}
-      >
+    <li
+      ref={sortable?.setNodeRef}
+      style={
+        sortable
+          ? {
+              transform: CSS.Translate.toString(sortable.transform),
+              transition: sortable.transition,
+            }
+          : undefined
+      }
+      data-inbox-id={conversation.id}
+      data-pinned={conversation.pinned || undefined}
+      className={cn(
+        "flex min-w-0 items-center border-b last:border-b-0",
+        conversation.pinned && "bg-muted",
+        sortable?.isDragging && "relative z-10 shadow-md",
+      )}
+    >
+      <div className="min-w-0 flex-1">
+        {sorting ? button : (
+          <ConversationListMenu
+            conversation={conversation}
+            actions={actions}
+            itemClassName="min-h-11"
+            pinOrderVersion={pinOrderVersion}
+            pinMoves={pinMoves}
+            onOpenChange={onMenuChange}
+          >
+            {button}
+          </ConversationListMenu>
+        )}
+      </div>
+      {sorting && sortable ? (
         <button
           type="button"
-          className="flex w-full min-w-0 gap-3 px-4 py-3 text-left outline-none transition-colors select-none active:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-          aria-label={name}
-          onClick={() => onOpen(conversation)}
+          ref={sortable.setActivatorNodeRef}
+          {...sortable.attributes}
+          {...sortable.listeners}
+          className="flex size-11 shrink-0 touch-none items-center justify-center text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+          aria-label={t("pinSortHandle", { name })}
         >
-          {content}
+          <GripVerticalIcon className="size-5" />
         </button>
-      </ConversationListMenu>
+      ) : null}
     </li>
   )
+}
+
+/** 置顶区内的移动端会话行，只在排序模式且未保存时可拖动。 */
+function SortableMobileConversationRow(props: MobileConversationRowProps) {
+  const { t } = useTranslation("inbox")
+  const sortable = useSortable({
+    id: props.conversation.id,
+    disabled: !props.sorting || props.actions.saving,
+    attributes: { roleDescription: t("pinSortRole") },
+  })
+  return <MobileConversationRow {...props} sortable={sortable} />
 }
 
 /** 加载当前范围的真实会话摘要并恢复列表浏览位置。 */
@@ -244,6 +321,7 @@ export function MobileInboxPage() {
 /** 每个移动筛选独立挂载窗口，离开时保存原邻域。 */
 function MobileInboxList({ query, changeQuery }: ReturnType<typeof useMobileInboxQuery>) {
   const { t } = useTranslation(["mobile", "inbox", "common"])
+  const { t: inboxT } = useTranslation("inbox")
   const navigate = useNavigate()
   const pollingActive = useMemberChatPollingActive({
     requireWindowFocus: false,
@@ -251,22 +329,49 @@ function MobileInboxList({ query, changeQuery }: ReturnType<typeof useMobileInbo
   const { identity } = useMobileWorkspace()
   const { inboxWindows } = useMobileNavigation()
   const viewport = useInboxListViewport()
-  const list = useInboxList(query, viewport, {
+  const list = usePartitionedInboxList(query, viewport, {
     identity,
     active: pollingActive,
     history: inboxWindows,
   })
-  const actions = useConversationListActions()
+  const actions = useConversationListActions(list.settlePin)
+  const [sorting, setSorting] = useState(false)
   const swipeStart = useRef<{ x: number; y: number } | null>(null)
   useMinuteTick()
   const conversations = list.conversations.filter(isMobileInboxConversation)
+  const names = new Map(
+    conversations.map((conversation) => [
+      conversation.id,
+      mobileConversationName(conversation, inboxT),
+    ]),
+  )
   const initial = list.revision === 0
+  const row = (conversation: MobileInboxConversation) => ({
+    conversation,
+    name: names.get(conversation.id) ?? "",
+    actions,
+    pinOrderVersion: list.pinOrderVersion,
+    sorting,
+    onMenuChange: viewport.setMenu,
+    onOpen: (conversation: MobileInboxConversation) =>
+      navigate(mobileConversationPath(conversation), {
+        state: { conversation, mobileBack: true },
+      }),
+  })
 
   return (
     <section className="flex h-full min-h-0 flex-col">
       <MobilePageHeader
         title={t("inbox.title")}
-        actions={
+        actions={sorting ? (
+          <Button
+            variant="ghost"
+            className="-mr-2 min-h-11"
+            onClick={() => setSorting(false)}
+          >
+            {t("inbox:pinSortDone")}
+          </Button>
+        ) : (
           <>
             <Button
               variant="ghost"
@@ -310,7 +415,7 @@ function MobileInboxList({ query, changeQuery }: ReturnType<typeof useMobileInbo
               </DropdownMenuContent>
             </DropdownMenu>
           </>
-        }
+        )}
       />
       <MobileInboxScopes
         scope={query.scope}
@@ -323,10 +428,10 @@ function MobileInboxList({ query, changeQuery }: ReturnType<typeof useMobileInbo
       <div
         className="flex min-h-0 flex-1 flex-col"
         onTouchStart={(event) => {
-          // 菜单打开期间的触摸只服务于菜单本身。
+          // 菜单打开或排序期间的触摸不切换范围。
           const touch = event.touches[0]
           swipeStart.current =
-            touch && !viewport.interaction.current.menu
+            touch && !sorting && !viewport.interaction.current.menu
               ? { x: touch.clientX, y: touch.clientY }
               : null
         }}
@@ -373,19 +478,32 @@ function MobileInboxList({ query, changeQuery }: ReturnType<typeof useMobileInbo
           ) : null}
           {conversations.length > 0 ? (
             <ul>
-              {conversations.map((conversation) => (
-                <MobileConversationRow
-                  key={conversation.id}
-                  conversation={conversation}
-                  actions={actions}
-                  onMenuChange={viewport.setMenu}
-                  onOpen={(conversation) =>
-                    navigate(mobileConversationPath(conversation), {
-                      state: { conversation, mobileBack: true },
-                    })
-                  }
-                />
-              ))}
+              <PinnedSortArea
+                conversations={conversations}
+                pinnedIds={list.pinnedIds}
+                names={names}
+                pinOrderVersion={list.pinOrderVersion}
+                actions={actions}
+                onDraggingChange={viewport.setDragging}
+              >
+                {(order) => order.flatMap((id, index) => {
+                  const conversation = conversations.find((item) => item.id === id)
+                  return conversation ? [
+                    <SortableMobileConversationRow
+                      key={id}
+                      {...row(conversation)}
+                      pinMoves={{
+                        up: pinMoveCommand(order, id, index - 1, list.pinOrderVersion),
+                        down: pinMoveCommand(order, id, index + 1, list.pinOrderVersion),
+                        sort: () => setSorting(true),
+                      }}
+                    />,
+                  ] : []
+                })}
+              </PinnedSortArea>
+              {conversations.flatMap((conversation) => list.pinnedIds.includes(conversation.id) ? [] : [
+                <MobileConversationRow key={conversation.id} {...row(conversation)} />,
+              ])}
             </ul>
           ) : null}
         </InboxListPanel>

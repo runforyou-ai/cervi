@@ -115,12 +115,13 @@ export function useConversationListActions(onPinSettled?: (pinned: boolean) => P
   }
 }
 
-/** 为会话列表项提供阅读状态、静音与置顶菜单，右键或长按触发，没有可用操作时不打开；传入 pinOrderVersion 时提供置顶操作。 */
+/** 为会话列表项提供阅读状态、静音与置顶菜单，右键或长按触发，没有可用操作时不打开；传入 pinOrderVersion 时提供置顶操作，置顶项再传入 pinMoves 时提供移动与排序入口。 */
 export function ConversationListMenu({
   conversation,
   actions,
   itemClassName,
   pinOrderVersion,
+  pinMoves,
   onOpenChange,
   children,
 }: {
@@ -128,6 +129,11 @@ export function ConversationListMenu({
   actions: ReturnType<typeof useConversationListActions>
   itemClassName?: string
   pinOrderVersion?: string
+  pinMoves?: {
+    up: ConversationPinCommand | null
+    down: ConversationPinCommand | null
+    sort: () => void
+  }
   onOpenChange: (open: boolean) => void
   children: ReactElement
 }) {
@@ -181,6 +187,25 @@ export function ConversationListMenu({
           >
             {t(conversation.pinned ? "conversationUnpin" : "conversationPin")}
           </ContextMenuItem>
+        ) : null}
+        {pinOrderVersion !== undefined && conversation.pinned && pinMoves ? (
+          <>
+            {([["pinMoveUp", pinMoves.up], ["pinMoveDown", pinMoves.down]] as const).map(([label, command]) => (
+              <ContextMenuItem
+                key={label}
+                className={itemClassName}
+                disabled={actions.saving || !command}
+                onSelect={() => {
+                  if (command) void actions.updatePin(conversation, command)
+                }}
+              >
+                {t(label)}
+              </ContextMenuItem>
+            ))}
+            <ContextMenuItem className={itemClassName} onSelect={pinMoves.sort}>
+              {t("pinSortStart")}
+            </ContextMenuItem>
+          </>
         ) : null}
       </ContextMenuContent>
     </ContextMenu>
