@@ -26,8 +26,6 @@
 
   var MAX_ATTACHMENT_COUNT = 10;
   var COMPOSER_MAX_HEIGHT = 200;
-  var COMPOSER_MIN_HEIGHT = 26;
-  var COMPOSER_KEYBOARD_RESIZE_STEP = 16;
   var REALTIME_PROTOCOL_VERSION = 1;
   var REALTIME_IDLE_TIMEOUT = 60000;
   var REALTIME_BACKOFF_BASE = 1000;
@@ -101,14 +99,11 @@
   var sendButton = document.getElementById("cv-send");
   var fileInput = document.getElementById("cv-file-input");
   var composerMain = document.getElementById("cv-composer-main");
-  var composerResize = document.getElementById("cv-composer-resize");
   var recording = document.getElementById("cv-recording");
   var recordTime = document.getElementById("cv-record-time");
   var intro = document.getElementById("cv-conversation-intro");
   var unreadDot = document.getElementById("cv-unread-dot");
   var emojis = window.CERVI_COMPOSER_EMOJIS;
-  var composerManualHeight = null;
-  var composerResizeStart = null;
   if (parentOrigin === "null") {
     parentOrigin = "";
   }
@@ -371,71 +366,10 @@
       input.scrollHeight,
       COMPOSER_MAX_HEIGHT,
     );
-    input.style.height =
-      Math.max(contentHeight, composerManualHeight || 0) + "px";
+    input.style.height = contentHeight + "px";
     var renderedHeight = input.getBoundingClientRect().height;
     input.style.overflowY =
       input.scrollHeight > renderedHeight ? "auto" : "hidden";
-  }
-
-  // 应用访客选择的消息输入框高度。
-  function setComposerManualHeight(height) {
-    composerManualHeight = Math.min(
-      COMPOSER_MAX_HEIGHT,
-      Math.max(COMPOSER_MIN_HEIGHT, height),
-    );
-    autosize();
-  }
-
-  // 在清空消息内容前保留输入框当前高度。
-  function preserveComposerHeight() {
-    setComposerManualHeight(input.getBoundingClientRect().height);
-  }
-
-  // 开始拖动访客消息输入框。
-  function startComposerResize(event) {
-    event.preventDefault();
-    composerResize.setPointerCapture(event.pointerId);
-    composerResizeStart = {
-      pointerY: event.clientY,
-      inputHeight: input.getBoundingClientRect().height,
-    };
-  }
-
-  // 按指针位置调整访客消息输入框高度。
-  function resizeComposer(event) {
-    if (
-      !composerResizeStart ||
-      !composerResize.hasPointerCapture(event.pointerId)
-    ) {
-      return;
-    }
-    setComposerManualHeight(
-      composerResizeStart.inputHeight +
-        composerResizeStart.pointerY -
-        event.clientY,
-    );
-  }
-
-  // 结束拖动访客消息输入框。
-  function stopComposerResize(event) {
-    composerResizeStart = null;
-    if (composerResize.hasPointerCapture(event.pointerId)) {
-      composerResize.releasePointerCapture(event.pointerId);
-    }
-  }
-
-  // 使用方向键调整访客消息输入框高度。
-  function resizeComposerFromKeyboard(event) {
-    if (event.key !== "ArrowUp" && event.key !== "ArrowDown") {
-      return;
-    }
-    event.preventDefault();
-    var direction = event.key === "ArrowUp" ? 1 : -1;
-    setComposerManualHeight(
-      input.getBoundingClientRect().height +
-        direction * COMPOSER_KEYBOARD_RESIZE_STEP,
-    );
   }
 
   function updateSendState() {
@@ -445,7 +379,15 @@
         messageRequestPending ||
         activeConversation.historyLoading ||
         activeConversation.creating !== null);
-    sendButton.disabled = input.value.trim() === "" || blocked;
+    var empty = input.value.trim() === "";
+    sendButton.disabled = empty || blocked;
+    // 输入内容后附件和录音入口换成发送按钮，输入框宽度变化后重新计算高度。
+    if (sendButton.hidden !== empty) {
+      sendButton.hidden = empty;
+      $("cv-attach").hidden = !empty;
+      $("cv-voice").hidden = !empty;
+      autosize();
+    }
     if (!previewMode) {
       $("cv-attach").disabled = !initialized || activeConversation.historyLoading;
     }
@@ -737,7 +679,6 @@
       return;
     }
     appendVisitorMessage(text, []);
-    preserveComposerHeight();
     input.value = "";
     autosize();
     updateSendState();
@@ -1679,7 +1620,6 @@
         }
         if (conversation === activeConversation) {
           if (sentDraft) {
-            preserveComposerHeight();
             input.value = "";
           }
           intro.hidden = true;
@@ -1793,7 +1733,6 @@
     });
     startConversationIntro(conversation);
     if (consumesDraft) {
-      preserveComposerHeight();
       input.value = "";
       conversation.draft = "";
       conversation.replyTo = null;
@@ -2485,11 +2424,6 @@
     event.preventDefault();
     sendMessage();
   });
-  composerResize.addEventListener("pointerdown", startComposerResize);
-  composerResize.addEventListener("pointermove", resizeComposer);
-  composerResize.addEventListener("pointerup", stopComposerResize);
-  composerResize.addEventListener("pointercancel", stopComposerResize);
-  composerResize.addEventListener("keydown", resizeComposerFromKeyboard);
   input.addEventListener("paste", function (event) {
     var files = pastedImageFiles(event);
     if (files.length === 0) {
