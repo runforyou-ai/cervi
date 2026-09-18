@@ -29,6 +29,7 @@ const inbox = {
   deliveryError_invalid_message: "消息内容无效",
   deliveryError_recipient_unavailable: "对方拒绝接收消息或机器人已被拉黑",
   deliveryError_message_rejected: "Telegram 拒绝了这条消息",
+  deliveryError_attachment_unavailable: "附件内容无法读取，请重试或重新发送",
   deliveryError_unknown_result: "对方可能已收到，请确认后处理",
   deliveryError_rate_limited: "Telegram 要求稍后重试",
   deliveryError_channel_disabled: "渠道已停用，恢复后继续发送",

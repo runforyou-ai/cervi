@@ -29,6 +29,7 @@ const inbox = {
   deliveryError_invalid_message: "Invalid message",
   deliveryError_recipient_unavailable: "The recipient cannot receive messages or has blocked the bot",
   deliveryError_message_rejected: "Telegram rejected this message",
+  deliveryError_attachment_unavailable: "The attachment could not be read. Retry or send it again",
   deliveryError_unknown_result: "The recipient may have received this message. Review before proceeding",
   deliveryError_rate_limited: "Telegram requires a delay before retrying",
   deliveryError_channel_disabled: "Sending will resume when the channel is enabled",

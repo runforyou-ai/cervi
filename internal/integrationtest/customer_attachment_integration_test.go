@@ -94,14 +94,24 @@ func TestCustomerAttachmentChannelLimits(t *testing.T) {
 	if validation, ok := errors.AsType[*conversationaction.ValidationError](err); !ok || validation.Fields["body"] != conversationaction.ValidationBodyTooLong {
 		t.Fatalf("long caption accepted: %v", err)
 	}
-	// 尚不支持外发附件的渠道拒绝发送。
+	// Telegram 渠道按平台的说明上限拒绝发送。
 	if _, err := f.db.NewUpdate().Table("channels").Set("type = ?", domain.ChannelTypeTelegram).Where("id = ?", f.channelID).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	_, err = send.Execute(ctx, f.owner, conversationaction.CustomerAttachmentMessageInput{
+		ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), FileID: fileID, Body: string(long[:domain.ChannelCaptionLimit(domain.ChannelTypeTelegram)+1]),
+	})
+	if !errors.As(err, &conflict) || conflict.Reason != conversationaction.ConflictReasonCaptionTooLong {
+		t.Fatalf("long telegram caption accepted: %v", err)
+	}
+	// 不支持对外回复的渠道拒绝附件。
+	if _, err := f.db.NewUpdate().Table("channels").Set("type = ?", domain.ChannelTypeWeChatOfficialAccount).Where("id = ?", f.channelID).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
 	_, err = send.Execute(ctx, f.owner, conversationaction.CustomerAttachmentMessageInput{
 		ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), FileID: fileID,
 	})
-	if !errors.As(err, &conflict) || conflict.Reason != conversationaction.ConflictReasonChannelAttachmentUnsupported {
+	if !errors.As(err, &conflict) || conflict.Reason != conversationaction.ConflictReasonChannelOutboundUnsupported {
 		t.Fatalf("unsupported channel accepted: %v", err)
 	}
 	// 被拒绝的附件不进入外部投递队列。
@@ -117,7 +127,7 @@ func TestCustomerAttachmentByteLimit(t *testing.T) {
 	ctx := context.Background()
 	send := conversationaction.NewSendCustomerAttachmentMessageAction(f.db, nil)
 	fileID := uploadedAttachment(t, f.db, f.owner, "超大附件.bin", "application/octet-stream")
-	limit := domain.ChannelAttachmentLimit(domain.ChannelTypeWebsite, "application/octet-stream")
+	limit := domain.ChannelAttachmentLimit(domain.ChannelTypeWebsite)
 	if _, err := f.db.NewUpdate().Table("files").Set("byte_size = ?", limit+1).Where("id = ?", fileID).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}

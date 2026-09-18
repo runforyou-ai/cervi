@@ -127,7 +127,7 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 
 	// 注册客户消息发送与扫描任务，每五秒扫描一次待投递消息。
 	telegramAPI := telegramintegration.NewClient(connectiontest.NewHTTPClient())
-	deliveryWorker := deliveryaction.NewWorker(appStorage.DB(), telegramAPI, tasks)
+	deliveryWorker := deliveryaction.NewWorker(appStorage.DB(), telegramAPI, fileReader, tasks)
 	if err := tasks.Registry().RegisterJSON(deliveryaction.SendActionName, deliveryWorker.Execute); err != nil {
 		return nil, nil, err
 	}

@@ -5,6 +5,9 @@ package integrationtest
 import (
 	"context"
 	"errors"
+	"io"
+	"os"
+	"strings"
 	"sync"
 	"testing"
 	"time"
@@ -26,12 +29,35 @@ type customerDeliveryFixture struct {
 	customerReadFixture
 	sender *deliverySender
 	worker *deliveryaction.Worker
+	files  deliveryFiles
 }
 type deliverySender struct {
 	mu      sync.Mutex
 	bodies  []string
 	replies []*string
+	media   []sentMedia
 	err     error
+	// onMedia 在媒体发送进行中回调，供测试观察认领状态。
+	onMedia func()
+}
+
+// sentMedia 记录一次媒体投递的文件元数据与实际读取到的内容。
+type sentMedia struct {
+	name, contentType, content string
+	width, height              int
+}
+
+// deliveryFiles 按存储键返回测试附件内容，未登记的键视为存储读取失败。
+type deliveryFiles map[string]string
+
+// Open 返回登记的附件内容，失败时与本地存储读取器一样携带空的具体类型值。
+func (f deliveryFiles) Open(_ context.Context, file *models.File) (io.ReadCloser, error) {
+	content, ok := f[file.StorageKey]
+	if !ok {
+		var missing *os.File
+		return missing, errors.New("object missing")
+	}
+	return io.NopCloser(strings.NewReader(content)), nil
 }
 
 // SendText 记录平台调用并返回可控制的发送结果。
@@ -40,6 +66,26 @@ func (s *deliverySender) SendText(_ context.Context, _ string, message telegram.
 	defer s.mu.Unlock()
 	s.bodies = append(s.bodies, message.Body)
 	s.replies = append(s.replies, message.ReplyMessageID)
+	if message.ChatID != "12345" {
+		return 0, errors.New("unexpected recipient")
+	}
+	return int64(1000 + len(s.bodies)), s.err
+}
+
+// SendMedia 记录媒体调用，说明与引用和文本共用记录序列。
+func (s *deliverySender) SendMedia(_ context.Context, _ string, message telegram.MediaMessage) (int64, error) {
+	if s.onMedia != nil {
+		s.onMedia()
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	content, err := io.ReadAll(message.Content)
+	if err != nil {
+		return 0, err
+	}
+	s.bodies = append(s.bodies, message.Caption)
+	s.replies = append(s.replies, message.ReplyMessageID)
+	s.media = append(s.media, sentMedia{message.FileName, message.ContentType, string(content), message.ImageWidth, message.ImageHeight})
 	if message.ChatID != "12345" {
 		return 0, errors.New("unexpected recipient")
 	}
@@ -76,11 +122,12 @@ func newCustomerDeliveryFixture(t *testing.T) customerDeliveryFixture {
 	}
 	sender := &deliverySender{}
 	runtime := servertask.New(f.db, serverconfig.NATSConfig{})
-	worker := deliveryaction.NewWorker(f.db, sender, runtime)
+	files := deliveryFiles{}
+	worker := deliveryaction.NewWorker(f.db, sender, files, runtime)
 	if err := runtime.Registry().RegisterJSON(deliveryaction.SendActionName, worker.Execute); err != nil {
 		t.Fatal(err)
 	}
-	return customerDeliveryFixture{f, sender, worker}
+	return customerDeliveryFixture{f, sender, worker, files}
 }
 
 // send 保存一条客服消息并读取对应投递。
@@ -442,5 +489,137 @@ func TestCustomerDeliveryCurrentCapabilities(t *testing.T) {
 	rows, err = manager.List(ctx, f.owner.Organization.ID, f.conversationID, []string{first.MessageID})
 	if err != nil || rows[0].CanRetry || rows[0].Status != domain.CustomerDeliveryNeedsReview {
 		t.Fatalf("changed bot capabilities=%+v err=%v", rows, err)
+	}
+}
+
+// sendAttachment 保存一条客服附件消息，登记其存储内容并读取对应投递。
+func (f customerDeliveryFixture) sendAttachment(t *testing.T, input conversationaction.CustomerAttachmentMessageInput, content string) models.CustomerMessageDelivery {
+	t.Helper()
+	ctx := context.Background()
+	input.ConversationID, input.ClientMessageID = f.conversationID, uuid.NewV7().String()
+	message, err := conversationaction.NewSendCustomerAttachmentMessageAction(f.db, nil).Execute(ctx, f.owner, input)
+	if err != nil {
+		t.Fatal(err)
+	}
+	var storageKey string
+	if err := f.db.NewSelect().Table("files").Column("storage_key").Where("id = ?", input.FileID).Scan(ctx, &storageKey); err != nil {
+		t.Fatal(err)
+	}
+	if content != "" {
+		f.files[storageKey] = content
+	}
+	var delivery models.CustomerMessageDelivery
+	if err := f.db.NewSelect().Model(&delivery).Where("message_id = ?", message.ID).Scan(ctx); err != nil {
+		t.Fatal(err)
+	}
+	return delivery
+}
+
+// TestCustomerDeliveryMedia 验证附件消息携带文件内容、说明和引用送达 Telegram，并与文本保持同一发送顺序。
+func TestCustomerDeliveryMedia(t *testing.T) {
+	f := newCustomerDeliveryFixture(t)
+	ctx := context.Background()
+	text := f.send(t, "先发文字", uuid.NewV7().String())
+	// 引用客户入站的首条消息。
+	var inboundID string
+	if err := f.db.NewSelect().Table("channel_messages").Column("message_id").Where("conversation_id = ? AND provider_message_id = '1'", f.conversationID).Scan(ctx, &inboundID); err != nil {
+		t.Fatal(err)
+	}
+	photo := f.sendAttachment(t, conversationaction.CustomerAttachmentMessageInput{
+		FileID: uploadedAttachment(t, f.db, f.owner, "截图.png", "image/png"), Body: "请看截图", ReplyToMessageID: inboundID, ImageWidth: 320, ImageHeight: 200,
+	}, "png-bytes")
+	// 队头文本未完成时附件不越过发送。
+	if got := f.execute(t, photo.ID); got.Status != domain.CustomerDeliveryPending || len(f.sender.media) != 0 {
+		t.Fatalf("media overtook text: %+v", got)
+	}
+	f.execute(t, text.ID)
+	got := f.execute(t, photo.ID)
+	if got.Status != domain.CustomerDeliverySent || got.ProviderMessageID == nil || *got.ProviderMessageID != 1002 {
+		t.Fatalf("media result=%+v", got)
+	}
+	if len(f.sender.media) != 1 || f.sender.media[0] != (sentMedia{"截图.png", "image/png", "png-bytes", 320, 200}) {
+		t.Fatalf("media=%+v", f.sender.media)
+	}
+	if f.sender.bodies[1] != "请看截图" || f.sender.replies[1] == nil || *f.sender.replies[1] != "1" {
+		t.Fatalf("caption=%q reply=%v", f.sender.bodies[1], f.sender.replies[1])
+	}
+	// 没有说明和引用的附件只携带文件。
+	plain := f.sendAttachment(t, conversationaction.CustomerAttachmentMessageInput{FileID: uploadedAttachment(t, f.db, f.owner, "合同.pdf", "application/pdf")}, "pdf-bytes")
+	if got := f.execute(t, plain.ID); got.Status != domain.CustomerDeliverySent || f.sender.bodies[2] != "" || f.sender.replies[2] != nil || f.sender.media[1].content != "pdf-bytes" {
+		t.Fatalf("plain result=%+v media=%+v", got, f.sender.media)
+	}
+	// 送达的附件取得平台消息映射，可被后续消息引用。
+	mapped, err := f.db.NewSelect().Table("channel_messages").Where("message_id = ? AND provider_message_id = '1002'", photo.MessageID).Exists(ctx)
+	if err != nil || !mapped {
+		t.Fatalf("mapped=%t err=%v", mapped, err)
+	}
+}
+
+// TestCustomerDeliveryMediaFailures 验证媒体发送的平台拒绝、结果未知和内容不可读各自进入对应状态。
+func TestCustomerDeliveryMediaFailures(t *testing.T) {
+	f := newCustomerDeliveryFixture(t)
+	input := func(name string) conversationaction.CustomerAttachmentMessageInput {
+		return conversationaction.CustomerAttachmentMessageInput{FileID: uploadedAttachment(t, f.db, f.owner, name, "application/pdf")}
+	}
+	// 平台明确拒绝进入失败并可重试。
+	f.sender.err = &telegram.SendError{Code: "message_rejected"}
+	rejected := f.sendAttachment(t, input("拒绝.pdf"), "pdf")
+	if got := f.execute(t, rejected.ID); got.Status != domain.CustomerDeliveryFailed || got.LastError != "message_rejected" {
+		t.Fatalf("rejected=%+v", got)
+	}
+	// 网络失败无法确认平台是否受理，等待人工确认。
+	f.sender.err = &telegram.SendError{Code: "unknown_result"}
+	unknown := f.sendAttachment(t, input("未知.pdf"), "pdf")
+	if got := f.execute(t, unknown.ID); got.Status != domain.CustomerDeliveryUncertain || got.UncertainUntil == nil {
+		t.Fatalf("unknown=%+v", got)
+	}
+	if _, err := f.db.ExecContext(context.Background(), "UPDATE customer_message_deliveries SET status = 'failed' WHERE id = ?", unknown.ID); err != nil {
+		t.Fatal(err)
+	}
+	// 存储内容不可读时平台未收到请求，投递直接失败。
+	f.sender.err = nil
+	calls := len(f.sender.media)
+	missing := f.sendAttachment(t, input("缺失.pdf"), "")
+	if got := f.execute(t, missing.ID); got.Status != domain.CustomerDeliveryFailed || got.LastError != "attachment_unavailable" || len(f.sender.media) != calls {
+		t.Fatalf("missing=%+v calls=%d", got, len(f.sender.media))
+	}
+	// 文件已清理或附件记录缺失的附件消息同样失败，带说明时也不按文本发出。
+	ctx := context.Background()
+	cleaned := f.sendAttachment(t, input("已清理.pdf"), "pdf")
+	if _, err := f.db.ExecContext(ctx, "UPDATE message_attachments SET file_id = NULL, transfer_status = 'failed' WHERE message_id = ?", cleaned.MessageID); err != nil {
+		t.Fatal(err)
+	}
+	orphanInput := input("无记录.pdf")
+	orphanInput.Body = "附件说明"
+	orphan := f.sendAttachment(t, orphanInput, "pdf")
+	if _, err := f.db.ExecContext(ctx, "DELETE FROM message_attachments WHERE message_id = ?", orphan.MessageID); err != nil {
+		t.Fatal(err)
+	}
+	texts := len(f.sender.bodies)
+	for _, delivery := range []models.CustomerMessageDelivery{cleaned, orphan} {
+		if got := f.execute(t, delivery.ID); got.Status != domain.CustomerDeliveryFailed || got.LastError != "attachment_unavailable" {
+			t.Fatalf("unavailable=%+v", got)
+		}
+	}
+	if len(f.sender.bodies) != texts {
+		t.Fatalf("attachment sent as text: %v", f.sender.bodies[texts:])
+	}
+}
+
+// TestCustomerDeliveryMediaLease 验证附件投递的认领租约覆盖媒体发送超时。
+func TestCustomerDeliveryMediaLease(t *testing.T) {
+	f := newCustomerDeliveryFixture(t)
+	delivery := f.sendAttachment(t, conversationaction.CustomerAttachmentMessageInput{FileID: uploadedAttachment(t, f.db, f.owner, "视频.mp4", "video/mp4")}, "mp4")
+	var lease time.Duration
+	f.sender.onMedia = func() {
+		if sending := f.load(t, delivery.ID); sending.LeaseExpiresAt != nil {
+			lease = time.Until(*sending.LeaseExpiresAt)
+		}
+	}
+	if got := f.execute(t, delivery.ID); got.Status != domain.CustomerDeliverySent {
+		t.Fatalf("result=%+v", got)
+	}
+	if lease <= 5*time.Minute {
+		t.Fatalf("lease=%s", lease)
 	}
 }

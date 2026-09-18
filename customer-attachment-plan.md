@@ -64,7 +64,7 @@
 
 - `ChannelSupportsInboundAttachment(channelType)`：网站与 Telegram 返回 `true`。
 - `ChannelSupportsOutboundAttachment(channelType)`：网站返回 `true`；Telegram 在外发媒体交付前返回 `false`，PR4 改为 `true`。
-- `ChannelAttachmentLimit(channelType, contentType)`：返回单个附件的字节上限。网站取 20 MiB；Telegram 入站取 20 MiB（`getFile` 硬上限），外发照片取 10 MiB、其他类型取 50 MiB。
+- `ChannelAttachmentLimit(channelType)`：返回单个外发附件的字节上限。网站取 20 MiB，Telegram 取 50 MiB；Telegram 入站取 20 MiB（`getFile` 硬上限）。Telegram 照片接口的 10 MiB 与尺寸限制由发送适配层处理，超限图片按文件发送。
 - `ChannelCaptionLimit(channelType)`：返回附件说明上限。网站取 4000，Telegram 取 1024。
 
 能力判定作用于三处，服务端是权威：

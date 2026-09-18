@@ -29,12 +29,13 @@ import {
 } from "@/components/ui/alert-dialog"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
+import { cn } from "@/lib/utils"
 import { MessageSendState } from "./message-send-state"
 
 /** 在气泡内的时间右侧展示投递状态和处理入口。 */
 export function CustomerDeliveryState({
   conversationID, delivery, loadingError, onRefresh, localFailed = false,
-  onRetryLocal, retryLocalDisabled = false,
+  onRetryLocal, retryLocalDisabled = false, className,
 }: {
   conversationID: string
   delivery?: CustomerMessageDelivery
@@ -43,6 +44,7 @@ export function CustomerDeliveryState({
   localFailed?: boolean
   onRetryLocal?: () => void
   retryLocalDisabled?: boolean
+  className?: string
 }) {
   const { t } = useTranslation(["inbox", "common"])
   const invalidate = useResourceInvalidator()
@@ -91,7 +93,7 @@ export function CustomerDeliveryState({
     : t("messageSendError")
 
   return (
-    <div className="inline-flex items-center gap-1.5 text-[11px]">
+    <div className={cn("inline-flex items-center gap-1.5 text-[11px]", className)}>
       <MessageSendState state={state} detail={detail} />
       {localFailed && onRetryLocal ? (
         <button type="button" disabled={retryLocalDisabled} onClick={onRetryLocal}>{t("messageRetry")}</button>

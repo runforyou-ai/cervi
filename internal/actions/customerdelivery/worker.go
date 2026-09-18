@@ -6,6 +6,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"io"
 	"log/slog"
 	"strconv"
 	"time"
@@ -23,19 +24,50 @@ import (
 )
 
 const sendTimeout = 20 * time.Second
-const leaseDuration = 45 * time.Second
+
+// mediaSendTimeout 按 50 MiB 渠道上限与约 2 Mbps 上行带宽设定。
+const mediaSendTimeout = 5 * time.Minute
+
+// leaseMargin 是认领租约在发送超时之外保留的结果保存时间。
+const leaseMargin = 25 * time.Second
 const uncertaintyWindow = 30 * time.Second
+
+// ContentOpener 按文件记录中的存储类型打开附件内容。
+type ContentOpener interface {
+	Open(context.Context, *models.File) (io.ReadCloser, error)
+}
 
 // Worker 按渠道身份队头投递消息并恢复中断的发送。
 type Worker struct {
 	db       *bun.DB
-	sender   telegram.TextSender
+	sender   telegram.Sender
+	files    ContentOpener
 	enqueuer servertask.Enqueuer
 }
 
+// claimedDelivery 保存认领成功后本次发送所需的凭据、目标和消息内容。
+type claimedDelivery struct {
+	delivery  *models.CustomerMessageDelivery
+	token     string
+	recipient string
+	body      string
+	// attachment 在附件消息上有值，文本消息为空。
+	attachment *claimedAttachment
+}
+
+// claimedAttachment 保存附件消息的展示元数据与存储位置，附件记录缺失或文件已清理时 file 为空。
+type claimedAttachment struct {
+	name        string
+	contentType string
+	byteSize    int64
+	imageWidth  int
+	imageHeight int
+	file        *models.File
+}
+
 // NewWorker 创建持久投递执行器。
-func NewWorker(db *bun.DB, sender telegram.TextSender, enqueuer servertask.Enqueuer) *Worker {
-	return &Worker{db: db, sender: sender, enqueuer: enqueuer}
+func NewWorker(db *bun.DB, sender telegram.Sender, files ContentOpener, enqueuer servertask.Enqueuer) *Worker {
+	return &Worker{db: db, sender: sender, files: files, enqueuer: enqueuer}
 }
 
 // Scan 为到期队头补充幂等唤醒，HTTP 发送由独立任务执行。
@@ -74,13 +106,36 @@ func (w *Worker) Execute(ctx context.Context, input Input) error {
 		return err
 	}
 	return channelstate.TryTelegramLock(ctx, w.db, channelID, func(conn bun.Conn) error {
-		delivery, token, recipient, body, err := w.claim(ctx, conn, input.DeliveryID)
-		if err != nil || delivery == nil {
+		claimed, err := w.claim(ctx, conn, input.DeliveryID)
+		if err != nil || claimed == nil {
 			return err
 		}
-		sendCtx, cancel := context.WithTimeout(ctx, sendTimeout)
-		messageID, sendErr := w.sender.SendText(sendCtx, token, telegram.TextMessage{ChatID: recipient, Body: body, ReplyMessageID: delivery.ReplyProviderMessageID})
-		cancel()
+		delivery, recipient := claimed.delivery, claimed.recipient
+		var messageID int64
+		var sendErr error
+		if attachment := claimed.attachment; attachment == nil {
+			sendCtx, cancel := context.WithTimeout(ctx, sendTimeout)
+			messageID, sendErr = w.sender.SendText(sendCtx, claimed.token, telegram.TextMessage{ChatID: recipient, Body: claimed.body, ReplyMessageID: delivery.ReplyProviderMessageID})
+			cancel()
+		} else {
+			sendCtx, cancel := context.WithTimeout(ctx, mediaSendTimeout)
+			// 附件记录缺失、文件已清理或存储读取失败时平台未收到请求，投递直接失败并可人工重试。
+			sendErr = &telegram.SendError{Code: "attachment_unavailable"}
+			if attachment.file != nil {
+				content, openErr := w.files.Open(sendCtx, attachment.file)
+				if openErr != nil {
+					slog.Warn("客户消息附件内容读取失败", "delivery_id", delivery.ID, "file_id", attachment.file.ID, "error", openErr)
+				} else {
+					messageID, sendErr = w.sender.SendMedia(sendCtx, claimed.token, telegram.MediaMessage{
+						ChatID: recipient, FileName: attachment.name, ContentType: attachment.contentType, ByteSize: attachment.byteSize,
+						ImageWidth: attachment.imageWidth, ImageHeight: attachment.imageHeight,
+						Content: content, Caption: claimed.body, ReplyMessageID: delivery.ReplyProviderMessageID,
+					})
+					content.Close()
+				}
+			}
+			cancel()
+		}
 		// 请求结束或服务关闭后使用独立上下文保存平台结果。
 		saveCtx, saveCancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
 		defer saveCancel()
@@ -89,9 +144,8 @@ func (w *Worker) Execute(ctx context.Context, input Input) error {
 }
 
 // claim 只认领身份管道的最小非终态投递。
-func (w *Worker) claim(ctx context.Context, conn bun.Conn, id string) (*models.CustomerMessageDelivery, string, string, string, error) {
-	var claimed *models.CustomerMessageDelivery
-	var token, recipient, body string
+func (w *Worker) claim(ctx context.Context, conn bun.Conn, id string) (*claimedDelivery, error) {
+	var claimed *claimedDelivery
 	err := realtime.RunInTx(ctx, conn, func(ctx context.Context, tx bun.Tx) error {
 		delivery := &models.CustomerMessageDelivery{}
 		if err := tx.NewSelect().Model(delivery).Where("cmd.id = ?", id).Scan(ctx); err != nil {
@@ -145,11 +199,24 @@ func (w *Worker) claim(ctx context.Context, conn bun.Conn, id string) (*models.C
 			Token     *string `bun:"bot_token"`
 			Recipient string  `bun:"external_id"`
 			Body      string  `bun:"body"`
+			Type      string  `bun:"type"`
+			// 附件列只在附件消息上有值，文件列在文件已清理时为空。
+			AttachmentName        *string `bun:"attachment_name"`
+			AttachmentContentType *string `bun:"attachment_content_type"`
+			AttachmentByteSize    *int64  `bun:"attachment_byte_size"`
+			ImageWidth            *int    `bun:"image_width"`
+			ImageHeight           *int    `bun:"image_height"`
+			FileID                *string `bun:"file_id"`
+			StorageBackend        *string `bun:"storage_backend"`
+			StorageKey            *string `bun:"storage_key"`
 		}
-		if err := tx.NewSelect().TableExpr("channels AS ch").ColumnExpr("ch.enabled, tcs.bot_id, tcs.bot_token, cci.external_id, msg.body").
+		if err := tx.NewSelect().TableExpr("channels AS ch").ColumnExpr("ch.enabled, tcs.bot_id, tcs.bot_token, cci.external_id, msg.body, msg.type").
+			ColumnExpr("ma.name AS attachment_name, ma.content_type AS attachment_content_type, ma.byte_size AS attachment_byte_size, ma.image_width, ma.image_height, f.id AS file_id, f.storage_backend, f.storage_key").
 			Join("JOIN telegram_channel_settings AS tcs ON tcs.channel_id = ch.id AND tcs.organization_id = ch.organization_id").
 			Join("JOIN contact_channel_identities AS cci ON cci.channel_id = ch.id AND cci.organization_id = ch.organization_id AND cci.id = ?", delivery.ContactChannelIdentityID).
 			Join("JOIN messages AS msg ON msg.id = ? AND msg.organization_id = ch.organization_id AND msg.conversation_id = ?", delivery.MessageID, delivery.ConversationID).
+			Join("LEFT JOIN message_attachments AS ma ON ma.message_id = msg.id AND ma.organization_id = msg.organization_id").
+			Join("LEFT JOIN files AS f ON f.id = ma.file_id AND f.organization_id = ma.organization_id").
 			Where("ch.id = ? AND ch.organization_id = ? AND ch.type = ?", delivery.ChannelID, delivery.OrganizationID, domain.ChannelTypeTelegram).Scan(ctx, &route); err != nil {
 			return err
 		}
@@ -175,17 +242,33 @@ func (w *Worker) claim(ctx context.Context, conn bun.Conn, id string) (*models.C
 		if err != nil || blocked {
 			return err
 		}
-		worker, expires := uuid.NewV7().String(), now.Add(leaseDuration)
+		// 租约覆盖本次消息类型的发送超时。
+		timeout := sendTimeout
+		if route.Type == string(domain.MessageTypeAttachment) {
+			timeout = mediaSendTimeout
+		}
+		worker, expires := uuid.NewV7().String(), now.Add(timeout+leaseMargin)
 		delivery.Status, delivery.LeaseWorker, delivery.LeaseExpiresAt = domain.CustomerDeliverySending, &worker, &expires
 		delivery.Attempt++
 		delivery.LastError = ""
 		if err := saveDelivery(ctx, tx, conversation, delivery); err != nil {
 			return err
 		}
-		claimed, token, recipient, body = delivery, *route.Token, route.Recipient, route.Body
+		claimed = &claimedDelivery{delivery: delivery, token: *route.Token, recipient: route.Recipient, body: route.Body}
+		// 附件消息始终按附件投递，附件记录或文件缺失时不携带存储位置。
+		if route.Type == string(domain.MessageTypeAttachment) {
+			claimed.attachment = &claimedAttachment{}
+			if route.AttachmentName != nil && route.FileID != nil {
+				claimed.attachment = &claimedAttachment{
+					name: *route.AttachmentName, contentType: *route.AttachmentContentType, byteSize: *route.AttachmentByteSize,
+					imageWidth: *route.ImageWidth, imageHeight: *route.ImageHeight,
+					file: &models.File{ID: *route.FileID, OrganizationID: delivery.OrganizationID, StorageBackend: *route.StorageBackend, StorageKey: *route.StorageKey},
+				}
+			}
+		}
 		return nil
 	})
-	return claimed, token, recipient, body, err
+	return claimed, err
 }
 
 // finish 保存带认领标识的平台结果，未知结果绝不自动重发。
@@ -232,7 +315,7 @@ func (w *Worker) finish(ctx context.Context, conn bun.Conn, delivery *models.Cus
      VALUES (?, ?, ?) ON CONFLICT (channel_id) DO UPDATE SET flood_wait_until = GREATEST(customer_channel_send_gates.flood_wait_until, EXCLUDED.flood_wait_until), updated_at = now()`, current.ChannelID, current.OrganizationID, current.AvailableAt); err != nil {
 					return err
 				}
-			case "invalid_token", "invalid_recipient", "invalid_message", "recipient_unavailable", "message_rejected":
+			case "invalid_token", "invalid_recipient", "invalid_message", "recipient_unavailable", "message_rejected", "attachment_unavailable":
 				current.Status = domain.CustomerDeliveryFailed
 			default:
 				until := now.Add(uncertaintyWindow)
