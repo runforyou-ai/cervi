@@ -5,7 +5,6 @@ const mobile = {
   logout: "退出登录",
   loggingOut: "正在退出…",
   logoutError: "退出登录失败，请重试。",
-  identityLoadError: "无法读取登录状态。",
   contacts: {
     loadingMore: "正在加载更多…",
     loadMoreError: "加载失败",

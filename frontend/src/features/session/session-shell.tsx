@@ -12,15 +12,17 @@ import { OutgoingMessageProvider } from "@/features/inbox/outgoing-message-conte
 import { useIdentityLoader } from "@/features/session/use-identity-loader"
 import { useRealtimeConnection } from "@/features/session/use-realtime-connection"
 
-/** 身份就绪后把登录身份交给宿主渲染，未登录或需要切换入口时跳转。 */
+/** 身份就绪后把登录身份交给宿主渲染，未登录或需要切换入口时跳转；restartOnResume 在回到前台时重建实时事件流。 */
 export function SessionShell({
+  restartOnResume = false,
   children,
 }: {
+  restartOnResume?: boolean
   children: (identity: Identity) => ReactNode
 }) {
   const { t } = useTranslation(["workspace", "common"])
   const { status, identity, redirectPath } = useIdentityLoader()
-  useRealtimeConnection(Boolean(identity?.user.id))
+  useRealtimeConnection(Boolean(identity?.user.id), { restartOnResume })
 
   if (status === "anonymous") return <Navigate to="/login" replace />
   if (status === "redirect" && redirectPath) {
@@ -28,7 +30,7 @@ export function SessionShell({
   }
   if (status === "failed") {
     return (
-      <main className="flex min-h-svh items-center justify-center text-sm text-muted-foreground">
+      <main className="flex min-h-svh items-center justify-center px-6 text-center text-sm text-muted-foreground">
         {t("identityLoadError")}
       </main>
     )

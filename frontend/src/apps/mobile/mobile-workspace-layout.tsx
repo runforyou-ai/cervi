@@ -2,71 +2,39 @@
 import { createContext, useContext } from "react"
 import { ContactRoundIcon, InboxIcon, UserRoundIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { Navigate, NavLink, Outlet } from "react-router"
+import { NavLink, Outlet } from "react-router"
 
 import { loadInbox, type Identity } from "@/api"
 import {
   MobileNavigationProvider,
   useMobileNavigation,
 } from "@/apps/mobile/mobile-navigation"
-import { LoadingIndicator } from "@/components/loading-indicator"
-import {
-  RealtimeSyncProvider,
-  useRealtimeSyncActive,
-} from "@/contexts/realtime-sync-context"
-import { UserPreferencesProvider } from "@/contexts/user-preferences"
-import { AttachmentQueueProvider } from "@/features/inbox/attachment-queue-context"
-import { OutgoingMessageProvider } from "@/features/inbox/outgoing-message-context"
+import { useRealtimeSyncActive } from "@/contexts/realtime-sync-context"
 import {
   memberChatPollingInterval,
   useMemberChatPollingActive,
 } from "@/features/inbox/use-member-chat-polling"
-import { useIdentityLoader } from "@/features/session/use-identity-loader"
-import { useRealtimeConnection } from "@/features/session/use-realtime-connection"
+import { SessionShell } from "@/features/session/session-shell"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 import { cn } from "@/lib/utils"
 
 const MobileWorkspaceContext = createContext<Identity | null>(null)
 
-/** 加载当前身份并为所有移动端页面提供公共上下文。 */
+/** 在登录外壳内为所有移动端页面提供身份和导航上下文，回到前台时重建实时事件流。 */
 export function MobileWorkspaceLayout() {
-  const { t } = useTranslation(["mobile", "common"])
-  const { status, identity, redirectPath } = useIdentityLoader()
-  useRealtimeConnection(Boolean(identity?.user.id), { restartOnResume: true })
-  if (status === "anonymous") return <Navigate to="/login" replace />
-  if (status === "redirect" && redirectPath)
-    return <Navigate to={redirectPath} replace />
-  if (status === "failed") {
-    return (
-      <main className="flex min-h-dvh items-center justify-center px-6 text-center text-sm text-muted-foreground">
-        {t("identityLoadError")}
-      </main>
-    )
-  }
-  if (!identity) {
-    return (
-      <main className="flex min-h-dvh items-center justify-center">
-        <LoadingIndicator>{t("common:status.loading")}</LoadingIndicator>
-      </main>
-    )
-  }
   return (
-    <MobileWorkspaceContext value={identity}>
-      <UserPreferencesProvider user={identity.user}>
-        <MobileNavigationProvider>
-          <OutgoingMessageProvider key={identity.user.id}>
-            <RealtimeSyncProvider>
-              <AttachmentQueueProvider>
-                <div className="flex h-dvh min-h-0 flex-col overflow-hidden bg-sidebar pt-[env(safe-area-inset-top)]">
-                  <Outlet />
-                </div>
-              </AttachmentQueueProvider>
-            </RealtimeSyncProvider>
-          </OutgoingMessageProvider>
-        </MobileNavigationProvider>
-      </UserPreferencesProvider>
-    </MobileWorkspaceContext>
+    <SessionShell restartOnResume>
+      {(identity) => (
+        <MobileWorkspaceContext value={identity}>
+          <MobileNavigationProvider>
+            <div className="flex h-dvh min-h-0 flex-col overflow-hidden bg-sidebar pt-[env(safe-area-inset-top)]">
+              <Outlet />
+            </div>
+          </MobileNavigationProvider>
+        </MobileWorkspaceContext>
+      )}
+    </SessionShell>
   )
 }
 
