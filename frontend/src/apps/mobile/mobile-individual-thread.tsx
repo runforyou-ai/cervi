@@ -5,6 +5,7 @@ import {
   ConversationType,
   type ConversationMessageData,
   type ConversationMessageReference,
+  type CustomerInboxConversationData,
   type DirectTextMessageInput,
   type InboxConversation,
 } from "@/api"
@@ -33,6 +34,7 @@ export function MobileIndividualThread({
   disabledReason = null,
   lastReadMessageID = null,
   customerDeliveries = false,
+  customerAttachment = null,
   locateMessage = null,
 }: {
   conversationID: string
@@ -44,6 +46,10 @@ export function MobileIndividualThread({
   disabledReason?: string | null
   lastReadMessageID?: string | null
   customerDeliveries?: boolean
+  customerAttachment?: Pick<
+    CustomerInboxConversationData["customer"],
+    "attachmentSupported" | "attachmentByteLimit" | "attachmentCaptionLimit"
+  > | null
   locateMessage?: ConversationLocateTarget | null
   sendIndividualMessage?: (
     input: DirectTextMessageInput,
@@ -112,6 +118,9 @@ export function MobileIndividualThread({
         onRetryDraftHandled={() => setRetryDraft(null)}
         onReplyToChange={setReplyTo}
         sendIndividualMessage={sendIndividualMessage}
+        customerAttachmentSupported={Boolean(customerAttachment?.attachmentSupported)}
+        customerAttachmentByteLimit={customerAttachment?.attachmentByteLimit ?? 0}
+        customerAttachmentCaptionLimit={customerAttachment?.attachmentCaptionLimit ?? 4000}
         onSucceeded={() => {
           void invalidate(resourceKeys.inbox())
           // 发送结果可能改变客服负责人与处理状态，同时刷新会话摘要。

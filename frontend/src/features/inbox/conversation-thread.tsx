@@ -35,7 +35,6 @@ import { useOutgoingMessages } from "@/features/inbox/outgoing-message-context"
 import type { OutgoingConversationDraft } from "@/features/inbox/outgoing-message-store"
 import { useConversationReadMarker } from "@/features/inbox/use-conversation-read-marker"
 import { resourceKeys } from "@/hooks/resource-keys"
-import { resolveAppPlatform } from "@/platform/app-platform"
 import { useResourceInvalidator } from "@/hooks/use-resource"
 
 /** 连接时间线与回复区，处理已读、发送和草稿转正会话。 */
@@ -136,11 +135,8 @@ export function ConversationThread({
     conversation && isCustomerInboxConversation(conversation) ? conversation : null
   // 渠道不支持、周期已关闭或由他人负责时都不能对客回复。
   const customerReplyUnavailable = !replySupported || Boolean(replyDisabledReason)
-  // 客户会话的附件入口按渠道外发能力开放，移动端留待独立交付。
+  // 客户会话的附件入口按渠道外发能力开放。
   const customerAttachment = customerConversation?.customer ?? null
-  const customerAttachmentSupported = Boolean(
-    customerAttachment?.attachmentSupported && resolveAppPlatform() !== "mobile",
-  )
 
   return (
     <>
@@ -202,7 +198,7 @@ export function ConversationThread({
             void invalidate(resourceKeys.groupConversation(groupConversation.id))
         }}
         onSucceeded={onConversationChanged}
-        customerAttachmentSupported={customerAttachmentSupported}
+        customerAttachmentSupported={Boolean(customerAttachment?.attachmentSupported)}
         customerAttachmentByteLimit={customerAttachment?.attachmentByteLimit ?? 0}
         customerAttachmentCaptionLimit={customerAttachment?.attachmentCaptionLimit ?? 4000}
         attachmentTargetIdentityID={directTarget && !agentDraftID ? directTarget.id : undefined}
