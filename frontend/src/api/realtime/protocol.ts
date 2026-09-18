@@ -51,6 +51,7 @@ export type RealtimeServerFrame =
   | { type: "conversation_removed"; conversationId: string }
   | { type: "conversation_state_changed"; conversationId: string; version: bigint }
   | { type: "identity_profile_changed"; version: bigint }
+  | { type: "pin_order_changed"; version: bigint }
   | {
       type: "run_stream_snapshot"
       runId: string
@@ -121,6 +122,7 @@ function decodeServerData(type: string, data: FrameData): RealtimeServerFrame | 
           conversationCount: syncHeads.conversationCount as number,
           conversationChecksum: readString(syncHeads, "conversationChecksum"),
           identityProfileVersion: readString(syncHeads, "identityProfileVersion"),
+          pinOrderVersion: readString(syncHeads, "pinOrderVersion"),
         },
       }
     }
@@ -132,6 +134,7 @@ function decodeServerData(type: string, data: FrameData): RealtimeServerFrame | 
     case "conversation_removed":
       return { type, conversationId: readString(data, "conversationId") }
     case "identity_profile_changed":
+    case "pin_order_changed":
       return { type, version: readInt64(data, "version") }
     case "run_stream_snapshot":
       return {

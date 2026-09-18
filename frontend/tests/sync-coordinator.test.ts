@@ -4,7 +4,7 @@ import { test, type TestContext } from "node:test"
 import type { SyncHeads } from "../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import { SyncCoordinator } from "../src/features/session/sync-coordinator.ts"
 
-const heads: SyncHeads = { conversationCount: 2, conversationChecksum: "11", identityProfileVersion: "3" }
+const heads: SyncHeads = { conversationCount: 2, conversationChecksum: "11", identityProfileVersion: "3", pinOrderVersion: "4" }
 
 /** 等待已排队的微任务执行完毕。 */
 function flush() {
@@ -218,4 +218,26 @@ test("探针与问候成功后在合并窗口结束时重试失败的同步读�
   await flush()
   t.mock.timers.tick(300)
   assert.equal(retries.count, 2)
+})
+
+test("置顶顺序变更通知与探针差异都整区重读收件箱，不牵动会话内容", async (t) => {
+  const { coordinator, invalidated, probes } = setup(t)
+  coordinator.receive({ type: "server_hello", connectionId: "conn", syncHeads: heads })
+  t.mock.timers.tick(300)
+  invalidated.length = 0
+
+  coordinator.receive({ type: "pin_order_changed", version: 5n })
+  t.mock.timers.tick(300)
+  assert.equal(count(invalidated, ["inbox"]), 1)
+  assert.equal(count(invalidated, ["inbox-attention"]), 1)
+  assert.equal(count(invalidated, ["conversation-messages"]), 0)
+
+  invalidated.length = 0
+  coordinator.start()
+  probes[0].resolve({ ...heads, pinOrderVersion: "6" })
+  await flush()
+  t.mock.timers.tick(300)
+  assert.equal(count(invalidated, ["inbox"]), 1)
+  assert.equal(count(invalidated, ["identity"]), 0)
+  assert.equal(count(invalidated, ["conversation-summary"]), 0)
 })

@@ -32,6 +32,7 @@ const (
 	TypeConversationRemoved      Type = "conversation_removed"
 	TypeConversationStateChanged Type = "conversation_state_changed"
 	TypeIdentityProfileChanged   Type = "identity_profile_changed"
+	TypePinOrderChanged          Type = "pin_order_changed"
 	TypeRunStreamSnapshot        Type = "run_stream_snapshot"
 	TypeRunStreamDelta           Type = "run_stream_delta"
 	TypeRunStreamEnded           Type = "run_stream_ended"
@@ -88,6 +89,11 @@ type ConversationStateChanged struct {
 
 // IdentityProfileChanged 表示本人身份资料变到了指定版本。
 type IdentityProfileChanged struct {
+	Version int64 `json:"version,string"`
+}
+
+// PinOrderChanged 表示本人的个人置顶顺序变到了指定版本，置顶区需要整区重读。
+type PinOrderChanged struct {
 	Version int64 `json:"version,string"`
 }
 
@@ -165,6 +171,9 @@ func (ConversationStateChanged) FrameType() Type { return TypeConversationStateC
 // FrameType 返回身份资料变更事件种类。
 func (IdentityProfileChanged) FrameType() Type { return TypeIdentityProfileChanged }
 
+// FrameType 返回个人置顶顺序变更事件种类。
+func (PinOrderChanged) FrameType() Type { return TypePinOrderChanged }
+
 // FrameType 返回运行过程流快照分片事件种类。
 func (RunStreamSnapshot) FrameType() Type { return TypeRunStreamSnapshot }
 
@@ -193,6 +202,7 @@ var decoders = map[Type]decoder{
 	TypeConversationRemoved:      decodeAs[ConversationRemoved],
 	TypeConversationStateChanged: decodeAs[ConversationStateChanged],
 	TypeIdentityProfileChanged:   decodeAs[IdentityProfileChanged],
+	TypePinOrderChanged:          decodeAs[PinOrderChanged],
 	TypeRunStreamSnapshot:        decodeAs[RunStreamSnapshot],
 	TypeRunStreamDelta:           decodeAs[RunStreamDelta],
 	TypeRunStreamEnded:           decodeAs[RunStreamEnded],

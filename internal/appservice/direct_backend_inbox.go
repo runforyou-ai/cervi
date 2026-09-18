@@ -42,7 +42,8 @@ func inboxLoadInput(query InboxQuery) inboxaction.LoadInput {
 		kinds = append(kinds, domain.ConversationType(kind))
 	}
 	return inboxaction.LoadInput{
-		Scope: domain.InboxScope(query.Scope), CustomerView: domain.CustomerInboxView(query.CustomerView),
+		Partition: domain.InboxPartition(query.Partition),
+		Scope:     domain.InboxScope(query.Scope), CustomerView: domain.CustomerInboxView(query.CustomerView),
 		AssigneeIdentityID: query.AssigneeIdentityID, ChannelID: query.ChannelID,
 		ServiceStatus: domain.ServiceSessionStatus(query.ServiceStatus), Kinds: kinds,
 	}
@@ -60,7 +61,12 @@ func (o *directOperations) LoadInbox(ctx context.Context, meta RequestMeta, iden
 	if err != nil {
 		return Inbox{}, err
 	}
-	return Inbox{StartCursor: page.StartCursor, EndCursor: page.EndCursor, HasBefore: page.HasBefore, Conversations: conversations, NextCursor: page.NextCursor, HasMore: page.HasMore, UnreadCount: unreadCounts.Unread, AttentionUnreadCount: unreadCounts.Attention}, nil
+	return Inbox{
+		StartCursor: page.StartCursor, EndCursor: page.EndCursor, HasBefore: page.HasBefore,
+		PinOrderVersion: strconv.FormatInt(page.PinOrderVersion, 10), Conversations: conversations,
+		NextCursor: page.NextCursor, HasMore: page.HasMore,
+		UnreadCount: unreadCounts.Unread, AttentionUnreadCount: unreadCounts.Attention,
+	}, nil
 }
 
 // inboxConversationsFromActions 为会话摘要统一解析头像并转换传输契约。
@@ -129,7 +135,7 @@ func (o *directOperations) ListCustomerServiceAssignees(ctx context.Context, met
 
 // inboxConversationFromAction 转换完整会话摘要并填充头像地址。
 func inboxConversationFromAction(summary inboxaction.ConversationSummary, avatarURLs map[string]string) InboxConversation {
-	conversation := InboxConversation{PositionCursor: summary.PositionCursor, ID: summary.ID, LastActivityAt: summary.LastActivityAt, Type: ConversationType(summary.Type), UnreadCount: summary.UnreadCount, MentionedUnreadCount: summary.MentionedUnreadCount, Muted: summary.Muted, MarkedUnread: summary.MarkedUnread, LastMessageID: summary.LastMessageID, LastMessageType: (*MessageType)(summary.LastMessageType), LastReadMessageID: summary.LastReadMessageID}
+	conversation := InboxConversation{PositionCursor: summary.PositionCursor, ID: summary.ID, LastActivityAt: summary.LastActivityAt, Type: ConversationType(summary.Type), UnreadCount: summary.UnreadCount, MentionedUnreadCount: summary.MentionedUnreadCount, Muted: summary.Muted, MarkedUnread: summary.MarkedUnread, Pinned: summary.Pinned, LastMessageID: summary.LastMessageID, LastMessageType: (*MessageType)(summary.LastMessageType), LastReadMessageID: summary.LastReadMessageID}
 	if summary.Customer != nil {
 		var assignee *InboxAssignee
 		if summary.Customer.Assignee != nil {
@@ -264,6 +270,7 @@ func (o *directOperations) GetSyncHeads(ctx context.Context, meta RequestMeta, i
 	return SyncHeads{
 		ConversationCount: heads.ConversationCount, ConversationChecksum: heads.ConversationChecksum,
 		IdentityProfileVersion: strconv.FormatInt(heads.IdentityProfileVersion, 10),
+		PinOrderVersion:        strconv.FormatInt(heads.PinOrderVersion, 10),
 	}, nil
 }
 

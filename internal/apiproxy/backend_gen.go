@@ -243,6 +243,14 @@ func (b *Backend) UpdateConversationUnreadMark(ctx context.Context, meta appserv
 	return b.do(ctx, meta, http.MethodPatch, "/conversations/"+url.PathEscape(conversationID)+"/unread-mark", nil, input, nil)
 }
 
+// UpdateConversationPin 保存当前用户的会话置顶事实与置顶顺序。
+func (b *Backend) UpdateConversationPin(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.ConversationPinInput) (appservice.ConversationPinState, error) {
+	var output appservice.ConversationPinState
+	err := b.do(ctx, meta, http.MethodPatch, "/conversations/"+url.PathEscape(conversationID)+"/pin", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // UpdateConversationNotificationSettings 保存当前用户的原生会话提醒设置。
 func (b *Backend) UpdateConversationNotificationSettings(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.ConversationNotificationSettingsInput) (appservice.ConversationNotificationSettings, error) {
 	var output appservice.ConversationNotificationSettings
@@ -1347,6 +1355,7 @@ func encodeKnowledgeQAListInputQuery(input appservice.KnowledgeQAListInput) url.
 // encodeLoadInboxInputQuery 将 appservice.LoadInboxInput 编码为查询参数。
 func encodeLoadInboxInputQuery(input appservice.LoadInboxInput) url.Values {
 	query := url.Values{}
+	setQuery(query, "partition", string(input.Partition))
 	setQuery(query, "scope", string(input.Scope))
 	setQuery(query, "customerView", string(input.CustomerView))
 	setQuery(query, "assigneeIdentityId", input.AssigneeIdentityID)

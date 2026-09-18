@@ -426,12 +426,12 @@ func TestGroupSequenceCommitBarrier(t *testing.T) {
 	}
 }
 
-// waitForNavigationLock 等待指定会话确实发生数据库锁竞争。
-func waitForNavigationLock(t *testing.T, ctx context.Context, db *bun.DB, conversationID string) {
+// waitForNavigationLock 等待语句中带有指定编号的写入确实发生数据库锁竞争。
+func waitForNavigationLock(t *testing.T, ctx context.Context, db *bun.DB, lockedID string) {
 	t.Helper()
 	for {
 		var waiting bool
-		err := db.NewSelect().TableExpr("pg_stat_activity").ColumnExpr("EXISTS (SELECT 1 FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND query LIKE ?)", "%"+conversationID+"%").Limit(1).Scan(ctx, &waiting)
+		err := db.NewSelect().TableExpr("pg_stat_activity").ColumnExpr("EXISTS (SELECT 1 FROM pg_stat_activity WHERE wait_event_type = 'Lock' AND query LIKE ?)", "%"+lockedID+"%").Limit(1).Scan(ctx, &waiting)
 		if err != nil {
 			t.Fatal(err)
 		}

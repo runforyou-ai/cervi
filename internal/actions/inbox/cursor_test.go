@@ -25,7 +25,7 @@ func TestInboxCursor(t *testing.T) {
 	activity := time.Date(2026, 9, 9, 0, 0, 0, 123456000, time.UTC)
 	for _, value := range []*time.Time{nil, &activity} {
 		point := inboxCursorPoint{ID: "019d4e1c-40a5-77dd-82e6-6951f9957ba6", LastActivityAt: value}
-		encoded, err := encodeInboxCursor(identity, input, point)
+		encoded, err := encodeInboxCursor(identity, input, 0, point)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -60,6 +60,7 @@ func TestInboxCursor(t *testing.T) {
 			func(c *inboxCursor) { c.ChannelID = "" },
 			func(c *inboxCursor) { c.ServiceStatus = domain.ServiceSessionStatusOpen },
 			func(c *inboxCursor) { c.Kinds = []domain.ConversationType{domain.ConversationTypeGroup} },
+			func(c *inboxCursor) { c.Partition = domain.InboxPartitionPinned },
 			func(c *inboxCursor) { c.ID = "bad" },
 		} {
 			changed := *decoded
@@ -77,5 +78,44 @@ func TestInboxCursor(t *testing.T) {
 		if _, err := decodeInboxCursor(value, identity, input); !errors.Is(err, ErrCursorInvalid) {
 			t.Fatalf("accepted malformed cursor=%s err=%v", value, err)
 		}
+	}
+}
+
+// TestPinnedInboxCursor 验证置顶区游标绑定个人顺序版本，版本变化或缺少顺序值时要求重读。
+func TestPinnedInboxCursor(t *testing.T) {
+	identity := &servermodels.Identity{Organization: servermodels.Organization{ID: "organization"}, User: servermodels.User{ID: "user"}}
+	input := LoadInput{Scope: domain.InboxScopeAll, Partition: domain.InboxPartitionPinned}
+	rank := int64(1 << 20)
+	point := inboxCursorPoint{ID: "019d4e1c-40a5-77dd-82e6-6951f9957ba6", PinRank: &rank}
+	encoded, err := encodeInboxCursor(identity, input, 7, point)
+	if err != nil {
+		t.Fatal(err)
+	}
+	cursor, err := decodeInboxCursor(encoded, identity, input)
+	if err != nil || cursor.PinRank == nil || *cursor.PinRank != rank || cursor.PinOrderVersion != 7 {
+		t.Fatalf("pinned cursor=%+v err=%v", cursor, err)
+	}
+	if err := authorizeInboxCursor(cursor, domain.InboxPartitionPinned, 7); err != nil {
+		t.Fatalf("rejected current pin order version: %v", err)
+	}
+	if err := authorizeInboxCursor(cursor, domain.InboxPartitionPinned, 8); !errors.Is(err, ErrCursorInvalid) {
+		t.Fatalf("accepted stale pin order version: %v", err)
+	}
+	// 普通活动序游标进入置顶区时没有顺序值，同样要求整区重读。
+	regular := LoadInput{Scope: domain.InboxScopeAll}
+	activity := time.Date(2026, 9, 9, 0, 0, 0, 0, time.UTC)
+	encoded, err = encodeInboxCursor(identity, regular, 0, inboxCursorPoint{ID: point.ID, LastActivityAt: &activity})
+	if err != nil {
+		t.Fatal(err)
+	}
+	cursor, err = decodeInboxCursor(encoded, identity, regular)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := authorizeInboxCursor(cursor, domain.InboxPartitionPinned, 0); !errors.Is(err, ErrCursorInvalid) {
+		t.Fatalf("accepted cursor without pin rank: %v", err)
+	}
+	if err := authorizeInboxCursor(cursor, domain.InboxPartitionAll, 3); err != nil {
+		t.Fatalf("rejected activity cursor outside pinned partition: %v", err)
 	}
 }

@@ -46,6 +46,7 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.POST("/conversations/:conversationID/mentions/review", s.markConversationMentionReviewed)
 	router.POST("/conversations/:conversationID/read", s.markConversationRead)
 	router.PATCH("/conversations/:conversationID/unread-mark", s.updateConversationUnreadMark)
+	router.PATCH("/conversations/:conversationID/pin", s.updateConversationPin)
 	router.PATCH("/conversations/:conversationID/notification-settings", s.updateConversationNotificationSettings)
 	router.POST("/conversations/:conversationID/messages", s.sendCustomerTextMessage)
 	router.POST("/conversations/:conversationID/attachment-messages", s.sendCustomerAttachmentMessage)
@@ -451,6 +452,16 @@ func (s *Service) updateConversationUnreadMark(c *gin.Context) {
 		return
 	}
 	writeEmpty(c, s.application.UpdateConversationUnreadMark(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input))
+}
+
+// updateConversationPin 保存当前用户的会话置顶事实与置顶顺序。
+func (s *Service) updateConversationPin(c *gin.Context) {
+	var input appservice.ConversationPinInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.UpdateConversationPin(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
+	writeResult(c, http.StatusOK, output, err)
 }
 
 // updateConversationNotificationSettings 保存当前用户的原生会话提醒设置。
@@ -1661,6 +1672,7 @@ func bindLoadInboxInputQuery(c *gin.Context) (appservice.LoadInboxInput, bool) {
 		return appservice.LoadInboxInput{}, false
 	}
 	return appservice.LoadInboxInput{
+		Partition:          appservice.InboxPartition(c.Query("partition")),
 		Scope:              appservice.InboxScope(c.Query("scope")),
 		CustomerView:       appservice.CustomerInboxView(c.Query("customerView")),
 		AssigneeIdentityID: c.Query("assigneeIdentityId"),

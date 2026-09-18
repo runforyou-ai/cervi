@@ -122,6 +122,10 @@ export class SyncCoordinator {
       case "identity_profile_changed":
         this.enqueue([resourceKeys.identity()])
         return
+      case "pin_order_changed":
+        // 个人置顶顺序变化使置顶区游标失效，两个分区一并整区重读。
+        this.enqueue(inboxKeys())
+        return
     }
   }
 
@@ -170,6 +174,9 @@ export class SyncCoordinator {
     }
     if (!previous || previous.identityProfileVersion !== heads.identityProfileVersion) {
       this.enqueue([resourceKeys.identity()])
+    }
+    if (!previous || previous.pinOrderVersion !== heads.pinOrderVersion) {
+      this.enqueue(inboxKeys())
     }
     // 探针值一致时同样开启合并窗口，窗口结束时重试上次失败的同步读取。
     this.enqueue([])

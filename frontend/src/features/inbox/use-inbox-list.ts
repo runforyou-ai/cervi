@@ -25,7 +25,7 @@ export function useInboxList(input: InboxQuery, viewport: InboxListViewport, opt
   const { identity, active, history } = options
   const client = useQueryClient()
   const realtime = useRealtimeSyncActive()
-  const query = useMemo(() => input, [input.scope, input.customerView, input.assigneeIdentityId, input.channelId, input.serviceStatus, input.kinds?.join(",")])
+  const query = useMemo(() => input, [input.partition, input.scope, input.customerView, input.assigneeIdentityId, input.channelId, input.serviceStatus, input.kinds?.join(",")])
   const owner = useMemo(() => ({ organizationId: identity.organization.id, userId: identity.user.id }), [identity.organization.id, identity.user.id])
   const view = useId()
   const headKey = resourceKeys.inbox({ ...owner, ...query })
