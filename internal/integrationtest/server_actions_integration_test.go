@@ -430,7 +430,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		telegramAvatarFiles := fileaction.NewImportAction(db, func(context.Context, string) (domain.FileStorageBackend, error) {
 			return domain.FileStorageBackendLocal, nil
 		}, importedAvatarWriter)
-		receiveTelegram := channelaction.NewReceiveTelegramWebhookAction(db, agentrunaction.NewScheduler(servertask.New(db, serverconfig.NATSConfig{})), telegramAvatarAPI, telegramAvatarFiles)
+		receiveTelegram := channelaction.NewReceiveTelegramWebhookAction(db, agentrunaction.NewScheduler(servertask.New(db, serverconfig.NATSConfig{})), telegramAvatarAPI, telegramAvatarFiles, nil, nil)
 		if err := receiveTelegram.Preflight(context.Background(), telegramChannel.ID, "wrong-secret"); !errors.Is(err, channelaction.ErrTelegramWebhookUnauthorized) {
 			t.Fatalf("wrong secret error = %v", err)
 		}

@@ -55,10 +55,12 @@ func (a *ScanExpiredAction) Execute(ctx context.Context, _ ScanExpiredInput) err
 	var cursorID string
 	for {
 		records := make([]candidate, 0, cleanupBatchSize)
+		// 外部渠道仍在取回的附件文件由取回任务推进终态后再回收。
 		query := a.db.NewSelect().Table("files").
 			Column("id", "expires_at").
 			Where("status IN (?, ?, ?)", domain.FileStatusPending, domain.FileStatusUploaded, domain.FileStatusDeleting).
 			Where("expires_at <= ?", time.Now().UTC()).
+			Where("NOT EXISTS (SELECT 1 FROM message_attachments AS ma WHERE ma.file_id = files.id AND ma.transfer_status = ?)", domain.MessageAttachmentTransferPending).
 			OrderExpr("expires_at ASC, id ASC").
 			Limit(cleanupBatchSize)
 		if !cursorExpiresAt.IsZero() {
@@ -100,7 +102,7 @@ func NewDeleteExpiredAction(db *bun.DB, deleter ContentDeleter) *DeleteExpiredAc
 	return &DeleteExpiredAction{db: db, deleter: deleter}
 }
 
-// Execute 重新校验文件状态后删除内容和元数据。
+// Execute 重新校验文件状态后删除内容和元数据，外部渠道仍在取回的附件文件留给取回任务推进终态。
 func (a *DeleteExpiredAction) Execute(ctx context.Context, input DeleteExpiredInput) error {
 	if input.FileID == "" {
 		return task.Permanent(errors.New("file id is required"))
@@ -112,9 +114,10 @@ func (a *DeleteExpiredAction) Execute(ctx context.Context, input DeleteExpiredIn
 		WHERE id = ?
 			AND expires_at <= now()
 			AND status IN (?, ?, ?)
+			AND NOT EXISTS (SELECT 1 FROM message_attachments AS ma WHERE ma.file_id = files.id AND ma.transfer_status = ?)
 		RETURNING *
 	`, domain.FileStatusDeleting, input.FileID,
-		domain.FileStatusPending, domain.FileStatusUploaded, domain.FileStatusDeleting).Scan(ctx, &record)
+		domain.FileStatusPending, domain.FileStatusUploaded, domain.FileStatusDeleting, domain.MessageAttachmentTransferPending).Scan(ctx, &record)
 	if errors.Is(err, sql.ErrNoRows) {
 		return nil
 	}
@@ -125,7 +128,8 @@ func (a *DeleteExpiredAction) Execute(ctx context.Context, input DeleteExpiredIn
 		return err
 	}
 	if err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if _, err := tx.NewRaw("UPDATE message_attachments SET file_id = NULL WHERE file_id = ?", record.ID).Exec(ctx); err != nil {
+		// 仍引用该文件的附件失去内容，转为取回失败。
+		if _, err := tx.NewRaw("UPDATE message_attachments SET file_id = NULL, transfer_status = ? WHERE file_id = ?", domain.MessageAttachmentTransferFailed, record.ID).Exec(ctx); err != nil {
 			return err
 		}
 		if _, err := tx.NewDelete().Model((*servermodels.File)(nil)).

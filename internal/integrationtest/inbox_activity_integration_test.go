@@ -283,7 +283,7 @@ func TestInboxTelegramActivity(t *testing.T) {
 		t.Fatal(err)
 	}
 	source := before.Add(-24 * time.Hour)
-	receiver := channelaction.NewReceiveTelegramWebhookAction(f.db, agentrunaction.NewScheduler(servertask.New(f.db, serverconfig.NATSConfig{})), nil, nil)
+	receiver := channelaction.NewReceiveTelegramWebhookAction(f.db, agentrunaction.NewScheduler(servertask.New(f.db, serverconfig.NATSConfig{})), nil, nil, nil, nil)
 	input := channelaction.TelegramWebhookInput{Secret: "secret", UpdateID: 1, Message: &channelaction.TelegramWebhookMessage{ChatID: 12345, SenderID: 12345, MessageID: 1, DisplayName: "晚到客户", Body: "昨天的消息", OriginatedAt: source}}
 	if err := receiver.Execute(ctx, channel.ID, input); err != nil {
 		t.Fatal(err)

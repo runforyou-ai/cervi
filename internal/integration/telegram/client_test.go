@@ -270,3 +270,51 @@ type httpDoerFunc func(*http.Request) (*http.Response, error)
 func (f httpDoerFunc) Do(request *http.Request) (*http.Response, error) {
 	return f(request)
 }
+
+// TestDownloadMedia 验证媒体取回每次重新调用 getFile 并按上限读取内容。
+func TestDownloadMedia(t *testing.T) {
+	var getFileCalls int
+	server := httptest.NewTestServer(t, http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		switch request.URL.Path {
+		case "/bot" + testBotToken + "/getFile":
+			getFileCalls++
+			body, _ := io.ReadAll(request.Body)
+			if string(body) != `{"file_id":"media-1"}` {
+				t.Fatalf("request body = %s", body)
+			}
+			_, _ = writer.Write([]byte(`{"ok":true,"result":{"file_id":"media-1","file_unique_id":"u","file_size":9,"file_path":"documents/file_1.pdf"}}`))
+		case "/file/bot" + testBotToken + "/documents/file_1.pdf":
+			_, _ = writer.Write([]byte("PDF-BYTES"))
+		default:
+			t.Fatalf("unexpected request: %s %s", request.Method, request.URL.Path)
+		}
+	}))
+	client := NewClient(server.Client(), WithBaseURL(server.URL))
+	data, err := client.DownloadMedia(context.Background(), testBotToken, "media-1", 1<<20)
+	if err != nil || string(data) != "PDF-BYTES" {
+		t.Fatalf("data=%q err=%v", data, err)
+	}
+	if _, err := client.DownloadMedia(context.Background(), testBotToken, "media-1", 8); err == nil {
+		t.Fatal("oversized media accepted")
+	} else if _, kind, _ := connectiontest.Details(err); kind != connectiontest.FailureProtocol {
+		t.Fatalf("oversized kind=%s", kind)
+	}
+	if getFileCalls != 2 {
+		t.Fatalf("getFile calls=%d", getFileCalls)
+	}
+}
+
+// TestDownloadMediaRejected 验证平台拒绝文件时返回协议错误而不是传输错误。
+func TestDownloadMediaRejected(t *testing.T) {
+	server := httptest.NewTestServer(t, http.HandlerFunc(func(writer http.ResponseWriter, _ *http.Request) {
+		writer.WriteHeader(http.StatusBadRequest)
+		_, _ = writer.Write([]byte(`{"ok":false,"error_code":400,"description":"Bad Request: file is too big"}`))
+	}))
+	_, err := NewClient(server.Client(), WithBaseURL(server.URL)).DownloadMedia(context.Background(), testBotToken, "media-2", 1<<20)
+	if err == nil {
+		t.Fatal("rejected media accepted")
+	}
+	if _, kind, ok := connectiontest.Details(err); !ok || kind == connectiontest.FailureUnavailable || kind == connectiontest.FailureTimeout || kind == connectiontest.FailureNetwork {
+		t.Fatalf("kind=%s ok=%t", kind, ok)
+	}
+}
