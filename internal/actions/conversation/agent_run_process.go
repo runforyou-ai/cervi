@@ -52,7 +52,8 @@ func (q *GetAgentRunProcessQuery) Execute(ctx context.Context, identity *serverm
 			}
 			return err
 		}
-		process = AgentRunProcess{ID: run.ID, DurationMilliseconds: run.CompletedAt.Sub(*run.StartedAt).Milliseconds(), Blocks: []agentruntime.Block{}}
+		process = AgentRunProcess{ID: run.ID, DurationMilliseconds: run.CompletedAt.Sub(*run.StartedAt).Milliseconds(), Blocks: []agentruntime.Block{},
+			Outcome: (*domain.AgentRunOutcome)(run.Outcome), OutcomeReason: (*domain.AgentHandoffReason)(run.OutcomeReason)}
 		if err := json.Unmarshal(run.Usage, &process.Usage); err != nil {
 			return fmt.Errorf("decode agent usage: %w", err)
 		}

@@ -62,6 +62,8 @@ const common = {
   agentTools: {
     searchKnowledge: "Knowledge base search",
     searchCustomerHistory: "Customer conversation history",
+    askCustomer: "Ask the customer",
+    handoffToHuman: "Hand off to a human",
     mcp: "MCP service tools",
   },
 }

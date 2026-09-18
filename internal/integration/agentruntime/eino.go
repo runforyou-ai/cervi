@@ -61,7 +61,12 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 	if err != nil {
 		return RunResult{}, err
 	}
-	tools, releaseSessions, err := r.assembleTools(ctx, request)
+	// 客服场景注册终止工具，其纠正额度在同一执行尝试内的重新执行之间共用。
+	var terminal *terminalTools
+	if request.Scene == SceneCustomer {
+		terminal = newTerminalTools()
+	}
+	tools, releaseSessions, err := r.assembleTools(ctx, request, terminal)
 	if err != nil {
 		return RunResult{}, err
 	}
@@ -84,10 +89,15 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 	trackedModel := &mediaTrackingModel{AgenticModel: chatModel, rejected: &atomic.Bool{}}
 	handlers := append([]adk.TypedChatModelAgentMiddleware[*schema.AgenticMessage]{recorder, newFinalIterationGuard(maxIterations)}, reductionHandlers...)
 	handlers = append(handlers, &toolArgumentsNormalizer{})
+	toolMiddlewares := []compose.ToolMiddleware{toolExecutionMiddleware(recorder)}
+	if terminal != nil {
+		handlers = append(handlers, terminal)
+		toolMiddlewares = append(toolMiddlewares, terminal.middleware())
+	}
 	agent, err := adk.NewTypedChatModelAgent(ctx, &adk.TypedChatModelAgentConfig[*schema.AgenticMessage]{
 		Name: request.Name, Instruction: request.Instruction, Model: trackedModel,
 		ToolsConfig: adk.ToolsConfig{ToolsNodeConfig: compose.ToolsNodeConfig{
-			Tools: tools, ToolCallMiddlewares: []compose.ToolMiddleware{toolExecutionMiddleware(recorder)},
+			Tools: tools, ToolCallMiddlewares: toolMiddlewares,
 		}},
 		Handlers:      handlers,
 		MaxIterations: maxIterations,
@@ -100,7 +110,8 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 	var carriedUsage Usage
 	for emptyRetries := 0; ; {
 		execution := &einoExecution{
-			inputs: &turnInputs{feed: feed}, recorder: recorder, maxTurns: request.MaxTurns, contextWindow: window, media: media,
+			inputs: &turnInputs{feed: feed, holdPreempt: terminal.handoffFixed}, recorder: recorder, terminal: terminal,
+			maxTurns: request.MaxTurns, contextWindow: window, media: media,
 		}
 		execution.inputs.loop = adk.NewTurnLoop(adk.TurnLoopConfig[Trigger, *schema.AgenticMessage]{
 			GenInput: execution.genInput,
@@ -130,7 +141,7 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 		if err != nil {
 			return RunResult{Usage: carriedUsage, Blocks: recorder.partialBlocks()}, err
 		}
-		if execution.result.Content == "" || execution.inputs.claimedSeq <= 0 {
+		if !execution.finished || execution.inputs.claimedSeq <= 0 {
 			return RunResult{Usage: carriedUsage, Blocks: recorder.partialBlocks()},
 				errors.New("agent run stopped without a stable response")
 		}
@@ -141,9 +152,9 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 	}
 }
 
-// assembleTools 按场景与请求装配本次运行的工具：开发期计算器只在内部场景注册，远程 MCP 工具在内置工具之后连接并跳过重名。
-func (r *EinoRuntime) assembleTools(ctx context.Context, request RunRequest) ([]tool.BaseTool, func(), error) {
-	tools := make([]tool.BaseTool, 0, len(r.tools)+2)
+// assembleTools 按场景与请求装配本次运行的工具：开发期计算器只在内部场景注册，终止工具只在客服场景注册，远程 MCP 工具在内置工具之后连接并跳过重名。
+func (r *EinoRuntime) assembleTools(ctx context.Context, request RunRequest, terminal *terminalTools) ([]tool.BaseTool, func(), error) {
+	tools := make([]tool.BaseTool, 0, len(r.tools)+4)
 	if request.Scene != SceneCustomer {
 		tools = append(tools, r.tools...)
 	}
@@ -160,6 +171,9 @@ func (r *EinoRuntime) assembleTools(ctx context.Context, request RunRequest) ([]
 			return nil, nil, fmt.Errorf("create customer history tool: %w", err)
 		}
 		tools = append(tools, historyTool)
+	}
+	if terminal != nil {
+		tools = append(tools, terminal.tools()...)
 	}
 	release := func() {}
 	if len(request.MCPServers) > 0 {
@@ -184,17 +198,22 @@ type einoExecution struct {
 	inputs        *turnInputs
 	history       turnHistory
 	recorder      *processRecorder
+	terminal      *terminalTools
 	maxTurns      int
 	contextWindow int
 	media         mediaInput
 	turns         int
 	result        RunResult
+	finished      bool
 }
 
 // genInput 认领新输入，并在已有执行上下文后追加尚未消费的会话消息。
 func (e *einoExecution) genInput(ctx context.Context, _ *adk.TurnLoop[Trigger, *schema.AgenticMessage], items []Trigger) (*adk.GenInputResult[Trigger, *schema.AgenticMessage], error) {
 	e.turns++
 	e.recorder.resetCandidate()
+	if e.terminal != nil {
+		e.terminal.beginTurn()
+	}
 	if e.maxTurns > 0 && e.turns > e.maxTurns {
 		return nil, fmt.Errorf("agent turn limit %d exceeded", e.maxTurns)
 	}
@@ -223,6 +242,7 @@ func (e *einoExecution) genInput(ctx context.Context, _ *adk.TurnLoop[Trigger, *
 // onAgentEvents 保存完整中间消息，并由输入协调器决定继续下一轮或收尾。
 func (e *einoExecution) onAgentEvents(ctx context.Context, turn *adk.TurnContext[Trigger, *schema.AgenticMessage], events *adk.AsyncIterator[*adk.TypedAgentEvent[*schema.AgenticMessage]]) error {
 	candidate := ""
+	var resultCallIDs []string
 	var intermediates []*schema.AgenticMessage
 	for {
 		event, ok := events.Next()
@@ -248,6 +268,11 @@ func (e *einoExecution) onAgentEvents(ctx context.Context, turn *adk.TurnContext
 		}
 		intermediates = append(intermediates, message)
 		if message.Role != schema.AgenticRoleTypeAssistant {
+			for _, block := range message.ContentBlocks {
+				if block.Type == schema.ContentBlockTypeFunctionToolResult {
+					resultCallIDs = append(resultCallIDs, block.FunctionToolResult.CallID)
+				}
+			}
 			continue
 		}
 		if message.ResponseMeta != nil && message.ResponseMeta.TokenUsage != nil {
@@ -260,12 +285,18 @@ func (e *einoExecution) onAgentEvents(ctx context.Context, turn *adk.TurnContext
 		}
 	}
 	e.history.appendOutput(intermediates)
-	finished, err := e.inputs.finish(ctx, turn, candidate)
+	// 终止工具的意图按本轮成功返回的调用编号取得，没有终止意图时以正文作为回答。
+	var decision TerminalDecision
+	content := candidate
+	if intent, ok := e.terminal.decision(resultCallIDs); ok {
+		decision, content = intent.decision, intent.message
+	}
+	finished, err := e.inputs.finish(ctx, turn, decision, content)
 	if err != nil {
 		return err
 	}
 	if finished {
-		e.result.Content = candidate
+		e.result.Content, e.result.Decision, e.finished = content, decision, true
 	}
 	return nil
 }

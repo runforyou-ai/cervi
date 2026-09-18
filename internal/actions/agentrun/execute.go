@@ -156,6 +156,10 @@ func (a *ExecuteAction) Execute(ctx context.Context, input RunInput) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
+	// 运行时限到期时统一以超时原因收尾。
+	if errors.Is(runCtx.Err(), context.DeadlineExceeded) && !errors.Is(err, context.DeadlineExceeded) {
+		err = fmt.Errorf("%w: %w", err, context.DeadlineExceeded)
+	}
 	terminal, failErr := a.fail(ctx, execution.Run.ID, err)
 	if failErr != nil {
 		return fmt.Errorf("agent run failed: %v; persist failure: %w", err, failErr)
@@ -265,13 +269,16 @@ func (a *ExecuteAction) resolveBehaviorSnapshot(ctx context.Context, execution e
 	if err != nil {
 		return BehaviorSnapshot{}, fmt.Errorf("build agent run scene rules: %w", err)
 	}
-	// 按注册顺序收集内置工具，开发期计算器只在内部场景注册；MCP 服务只记录绑定的服务名称。
-	names := make([]string, 0, 2)
+	// 按注册顺序收集内置工具，开发期计算器只在内部场景注册，终止工具只在客服场景注册；MCP 服务只记录绑定的服务名称。
+	names := make([]string, 0, 3)
 	if scene != agentruntime.SceneCustomer {
 		names = append(names, "calculator")
 	}
 	if tools.Knowledge {
 		names = append(names, "search_knowledge")
+	}
+	if scene == agentruntime.SceneCustomer {
+		names = append(names, "ask_customer", "handoff_to_human")
 	}
 	serverNames := make([]string, 0, len(mcpServers))
 	for _, server := range mcpServers {
@@ -360,22 +367,37 @@ func (a *ExecuteAction) policyForRun(ctx context.Context, run *servermodels.Agen
 	}
 }
 
-// appendAgentMessage 在 Run 终态门禁通过后追加结果消息，与运行终态共用事务。
-func appendAgentMessage(ctx context.Context, db bun.IDB, conversation *servermodels.Conversation, run *servermodels.AgentRun, messageID, participantID string, messageType domain.MessageType, content string, serviceSessionID *string) (*servermodels.Message, bool, error) {
+// agentResultMessage 构造 Run 的主结果消息，幂等键为 agent:<run_id>。
+func agentResultMessage(run *servermodels.AgentRun, messageID, participantID string, messageType domain.MessageType, content string, serviceSessionID *string) *servermodels.Message {
 	idempotencyKey := "agent:" + run.ID
-	message := &servermodels.Message{
+	return &servermodels.Message{
 		ID: messageID, OrganizationID: run.OrganizationID, ConversationID: run.ConversationID,
 		ServiceSessionID: serviceSessionID, SenderParticipantID: &participantID,
 		Type: string(messageType), Body: content, IdempotencyKey: &idempotencyKey,
-		OriginatedAt: time.Now().UTC(),
 	}
-	return chatstate.AppendMessage(ctx, db, conversation, message)
+}
+
+// appendAgentMessage 在 Run 终态门禁通过后追加结果消息，与运行终态共用事务；幂等重放时核对已有消息的类型与正文，不把另一类消息当作本次写入。
+func appendAgentMessage(ctx context.Context, db bun.IDB, conversation *servermodels.Conversation, message *servermodels.Message) (*servermodels.Message, bool, error) {
+	message.OriginatedAt = time.Now().UTC()
+	appended, inserted, err := chatstate.AppendMessage(ctx, db, conversation, message)
+	if err != nil {
+		return nil, false, err
+	}
+	if !inserted && (appended.Type != message.Type || appended.Body != message.Body) {
+		return nil, false, fmt.Errorf("agent message idempotency key %q holds a different message", *message.IdempotencyKey)
+	}
+	return appended, inserted, nil
 }
 
 // complete 按运行策略抑制失效结果或原子写入回复并推进消费序号。
 func (a *ExecuteAction) complete(ctx context.Context, execution executionContext, policy agentRunPolicy, result agentruntime.RunResult) error {
 	content := strings.TrimSpace(result.Content)
-	if content == "" || result.EndSeq <= 0 {
+	handoff := result.Decision.Kind == domain.AgentRunOutcomeHandoff
+	if handoff && domain.AgentExecutionScopeKind(execution.Run.ScopeKind) != domain.AgentExecutionScopeServiceSession {
+		return errors.New("agent runtime returned a handoff outside customer service")
+	}
+	if (content == "" && !handoff) || result.EndSeq <= 0 {
 		return errors.New("agent runtime returned an invalid result")
 	}
 	usage, err := json.Marshal(result.Usage)
@@ -394,6 +416,9 @@ func (a *ExecuteAction) complete(ctx context.Context, execution executionContext
 			ID: block.ID, OrganizationID: execution.Run.OrganizationID, AgentRunID: execution.Run.ID,
 			Position: block.Position, ModelCallID: block.ModelCallID, Kind: string(block.Kind), Payload: payload,
 		})
+	}
+	if handoff {
+		return a.completeCustomerHandoff(ctx, execution, policy, result, usage, blocks)
 	}
 	suppressed := false
 	completed := false
@@ -436,6 +461,7 @@ func (a *ExecuteAction) complete(ctx context.Context, execution executionContext
 		}
 		if _, err := tx.NewUpdate().Model(run).
 			Set("status = ?", domain.AgentRunStatusSucceeded).
+			Set("outcome = ?", result.Decision.Outcome()).
 			Set("response_message_id = ?", messageID).
 			Set("usage = ?::jsonb", string(usage)).
 			Set("last_error = NULL").
@@ -542,7 +568,7 @@ func logCompletedRun(execution executionContext, endSeq int64, messageID string)
 	)
 }
 
-// fail 按运行策略取消失效运行或标记失败，并为剩余输入补建下一次运行。
+// fail 按运行策略取消失效运行或标记失败：客服运行转交人工，其他运行写入错误消息并为剩余输入补建下一次运行。
 func (a *ExecuteAction) fail(ctx context.Context, runID string, runErr error) (bool, error) {
 	// 限制持久化错误详情长度。
 	message := "agent run failed"
@@ -563,6 +589,13 @@ func (a *ExecuteAction) fail(ctx context.Context, runID string, runErr error) (b
 	policy, err := a.policyForRun(ctx, initial)
 	if err != nil {
 		return false, err
+	}
+	if domain.AgentExecutionScopeKind(initial.ScopeKind) == domain.AgentExecutionScopeServiceSession {
+		reason := domain.AgentHandoffReasonRuntimeFailed
+		if errors.Is(runErr, context.DeadlineExceeded) {
+			reason = domain.AgentHandoffReasonTimeout
+		}
+		return a.failCustomerRun(ctx, initial, policy, message, reason)
 	}
 	terminal := false
 	err = realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {

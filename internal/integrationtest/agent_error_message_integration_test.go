@@ -11,7 +11,6 @@ import (
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
-	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -113,7 +112,7 @@ func testAgentFailureMessages(t *testing.T, db *bun.DB, identity *servermodels.I
 	}
 }
 
-// testCustomerFailureMessage 验证客服失败消息进入成员历史，访客摘要和历史仅展示正常消息。
+// testCustomerFailureMessage 验证开始执行前失败的客服运行转交人工：错误消息只在成员历史中可见，访客只看到对客通知，重复收尾各类消息只写一次。
 func testCustomerFailureMessage(t *testing.T, db *bun.DB, identity *servermodels.Identity, tasks *servertask.Runtime, agentID string) {
 	t.Helper()
 	ctx := context.Background()
@@ -135,48 +134,60 @@ func testCustomerFailureMessage(t *testing.T, db *bun.DB, identity *servermodels
 	if err := db.NewSelect().Model(&run).Where("agr.conversation_id = ? AND agr.status = ?", sent.Conversation.ID, domain.AgentRunStatusQueued).Scan(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if err := agentrunaction.NewExecuteAction(db, tasks, nil, testAttachmentReader(db), nil).FinalizeFailure(ctx, agentrunaction.RunInput{RunID: run.ID}, errors.New("model failure details")); err != nil {
+	executor := agentrunaction.NewExecuteAction(db, tasks, nil, testAttachmentReader(db), nil)
+	for range 2 {
+		if err := executor.FinalizeFailure(ctx, agentrunaction.RunInput{RunID: run.ID}, errors.New("model failure details")); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := db.NewSelect().Model(&run).WherePK().Scan(ctx); err != nil {
 		t.Fatal(err)
+	}
+	if run.Status != string(domain.AgentRunStatusFailed) || run.Outcome == nil || *run.Outcome != string(domain.AgentRunOutcomeHandoff) ||
+		run.OutcomeReason == nil || *run.OutcomeReason != string(domain.AgentHandoffReasonRuntimeFailed) || run.HandoffSettledSeq == nil || *run.HandoffSettledSeq != 1 {
+		t.Fatalf("failed run = %+v", run)
 	}
 	var session servermodels.ServiceSession
 	if err := db.NewSelect().Model(&session).Where("ss.id = ?", run.ScopeID).Scan(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if session.FirstResponseAt != nil {
-		t.Fatal("failure counted as first customer response")
+	if session.AssigneeIdentityID != nil || session.TeamID != nil || session.Status != string(domain.ServiceSessionStatusOpen) {
+		t.Fatalf("handed off session = %+v", session)
 	}
 
 	history, err := conversationaction.NewListConversationMessagesQuery(db).Execute(ctx, identity, conversationaction.ConversationMessageHistoryInput{ConversationID: sent.Conversation.ID})
-	if err != nil || len(history.Messages) == 0 || history.Messages[len(history.Messages)-1].Type != domain.MessageTypeAgentError {
-		t.Fatalf("member error history = %+v, %v", history, err)
-	}
-	inboxPage, _, err := inboxaction.NewLoadInboxQuery(db).Execute(ctx, identity, inboxaction.LoadInput{Scope: domain.InboxScopeCustomer, CustomerView: domain.CustomerInboxViewCoworkers, AssigneeIdentityID: run.AgentIdentityID})
-	inbox := inboxPage.Conversations
 	if err != nil {
 		t.Fatal(err)
 	}
-	found := false
-	for _, row := range inbox {
-		if row.ID == sent.Conversation.ID {
-			found = true
-			if row.LastMessageType == nil || *row.LastMessageType != domain.MessageTypeAgentError || row.UnreadCount != 2 {
-				t.Fatalf("error preview = %+v", row)
+	counts := map[domain.MessageType]int{}
+	for _, message := range history.Messages {
+		counts[message.Type]++
+		switch message.Type {
+		case domain.MessageTypeAgentError:
+			if message.Visibility != domain.MessageVisibilityInternalOnly {
+				t.Fatalf("agent error visibility = %q", message.Visibility)
+			}
+		case domain.MessageTypeSystem:
+			event := message.SystemEvent
+			if event == nil || event.Type != domain.ConversationSystemEventServiceSessionHandedOff || event.Reason == nil ||
+				*event.Reason != domain.AgentHandoffReasonRuntimeFailed || event.Target == nil || event.Target.Kind != domain.ServiceSessionTargetPublicQueue ||
+				event.ReasonText == nil || *event.ReasonText != "model failure details" || event.AgentRunID == nil || *event.AgentRunID != run.ID {
+				t.Fatalf("handoff event = %+v", event)
 			}
 		}
 	}
-	if !found {
-		t.Fatal("customer conversation missing from inbox")
+	last := history.Messages[len(history.Messages)-1]
+	if counts[domain.MessageTypeAgentError] != 1 || counts[domain.MessageTypeSystem] != 1 || counts[domain.MessageTypeText] != 2 ||
+		last.ID != *run.ResponseMessageID || last.Type != domain.MessageTypeText || last.AgentProcess != nil {
+		t.Fatalf("member history = %+v", history.Messages)
 	}
+
 	visible, err := conversationaction.NewListWebsiteConversationsQuery(db).Execute(ctx, input.ChannelID, input.ExternalID)
-	if err != nil || len(visible) != 1 || visible[0].Preview != input.Body {
+	if err != nil || len(visible) != 1 || visible[0].Preview != last.Body {
 		t.Fatalf("visitor preview = %+v, %v", visible, err)
 	}
-	replay, err := receive.Execute(ctx, input)
-	if err != nil || replay.Conversation.Preview != input.Body {
-		t.Fatalf("visitor replay preview = %+v, %v", replay, err)
-	}
 	messages, err := conversationaction.NewListWebsiteMessagesQuery(db).Execute(ctx, conversationaction.MessageHistoryInput{ChannelID: input.ChannelID, ExternalID: input.ExternalID, ConversationID: sent.Conversation.ID})
-	if err != nil || len(messages.Messages) == 0 || messages.Messages[len(messages.Messages)-1].ID != sent.Message.ID {
+	if err != nil || len(messages.Messages) != 2 || messages.Messages[1].ID != last.ID {
 		t.Fatalf("visitor history = %+v, %v", messages, err)
 	}
 }

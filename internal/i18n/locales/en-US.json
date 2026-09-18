@@ -40,6 +40,8 @@
 
   "error.agent_reply_stop_failed": "Failed to stop the AI reply. Please try again.",
   "error.agent_unavailable": "This AI employee is currently unavailable.",
+  "agent.customer_handoff_fallback": "I've transferred you to our support team, and a team member will continue helping you.",
+  "agent.customer_failure_fallback": "Sorry, I can't handle your request automatically right now. I've transferred you to our support team, and a team member will continue helping you.",
   "error.customer_reply_suggest_failed": "Could not generate replies. Try again.",
   "error.customer_copilot_thread_list_failed": "Could not load AI Assistant conversations. Try again.",
   "field.agent_identity_id_invalid": "Select a valid AI employee.",

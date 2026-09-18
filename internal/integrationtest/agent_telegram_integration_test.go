@@ -287,19 +287,35 @@ func testAgentTelegramReplies(t *testing.T, db *bun.DB, identity *models.Identit
 				t.Fatalf("execution err=%v", err)
 			}
 			f.reload(t)
-			if n, err := db.NewSelect().Table("customer_message_deliveries").Where("conversation_id = ?", f.run.ConversationID).Count(ctx); err != nil || n != 0 {
-				t.Fatalf("deliveries=%d err=%v", n, err)
-			}
+			// 失败转人工只投递一次对客通知，重复收尾保持一条；其余场景没有投递。
 			if scenario == "失败" {
-				if f.run.Status != string(domain.AgentRunStatusFailed) || f.run.ResponseMessageID == nil {
-					t.Fatalf("run=%+v", f.run)
-				}
-				var message models.Message
-				if err := db.NewSelect().Model(&message).Where("msg.id = ?", *f.run.ResponseMessageID).Scan(ctx); err != nil {
+				if err := agentrunaction.NewExecuteAction(db, enqueuer, model, testAttachmentReader(db), nil).FinalizeFailure(ctx, agentrunaction.RunInput{RunID: f.run.ID}, errors.New("重复收尾")); err != nil {
 					t.Fatal(err)
 				}
-				if message.Type != string(domain.MessageTypeAgentError) || message.Body != "" {
-					t.Fatalf("failure=%+v", message)
+			}
+			var deliveries []models.CustomerMessageDelivery
+			if err := db.NewSelect().Model(&deliveries).Where("cmd.conversation_id = ?", f.run.ConversationID).Scan(ctx); err != nil {
+				t.Fatal(err)
+			}
+			if (scenario == "失败") != (len(deliveries) == 1) || len(deliveries) > 1 {
+				t.Fatalf("deliveries=%+v", deliveries)
+			}
+			if scenario == "失败" {
+				if f.run.Status != string(domain.AgentRunStatusFailed) || f.run.ResponseMessageID == nil || deliveries[0].MessageID != *f.run.ResponseMessageID ||
+					f.run.Outcome == nil || *f.run.Outcome != string(domain.AgentRunOutcomeHandoff) ||
+					f.run.OutcomeReason == nil || *f.run.OutcomeReason != string(domain.AgentHandoffReasonRuntimeFailed) {
+					t.Fatalf("run=%+v", f.run)
+				}
+				var notice, failure models.Message
+				if err := db.NewSelect().Model(&notice).Where("msg.id = ?", *f.run.ResponseMessageID).Scan(ctx); err != nil {
+					t.Fatal(err)
+				}
+				if err := db.NewSelect().Model(&failure).Where("msg.idempotency_key = ?", "agent:"+f.run.ID+":error").Scan(ctx); err != nil {
+					t.Fatal(err)
+				}
+				if notice.Type != string(domain.MessageTypeText) || notice.Body == "" ||
+					failure.Type != string(domain.MessageTypeAgentError) || failure.Visibility != string(domain.MessageVisibilityInternalOnly) {
+					t.Fatalf("notice=%+v failure=%+v", notice, failure)
 				}
 			} else if scenario == "投递入队失败" {
 				if !failing.observedAtomicRows || f.run.ResponseMessageID != nil || f.run.Status != string(domain.AgentRunStatusRunning) {

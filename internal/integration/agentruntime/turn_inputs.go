@@ -10,6 +10,7 @@ import (
 
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/schema"
+	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
 const triggerPollInterval = 200 * time.Millisecond
@@ -19,8 +20,9 @@ var errEmptyFinalResponse = errors.New("agent returned an empty final response")
 
 // turnInputs 统一管理持久输入的投递、认领边界和循环停止决策。
 type turnInputs struct {
-	feed InputFeed
-	loop *adk.TurnLoop[Trigger, *schema.AgenticMessage]
+	feed        InputFeed
+	loop        *adk.TurnLoop[Trigger, *schema.AgenticMessage]
+	holdPreempt func() bool // 返回 true 时新输入只入队不抢占，用于保持已固定的转人工决定。
 
 	mu           sync.Mutex
 	maxPushedSeq int64
@@ -94,7 +96,7 @@ func (i *turnInputs) poll(ctx context.Context, preempt bool) error {
 				continue
 			}
 			var accepted bool
-			if preempt && ack == nil {
+			if preempt && ack == nil && (i.holdPreempt == nil || !i.holdPreempt()) {
 				accepted, ack = i.loop.Push(trigger, adk.WithPreempt[Trigger, *schema.AgenticMessage](adk.AnySafePoint))
 			} else {
 				accepted, _ = i.loop.Push(trigger)
@@ -129,8 +131,17 @@ func (i *turnInputs) claim(ctx context.Context, throughSeq int64) (ClaimedInput,
 	return claimed, nil
 }
 
-// finish 在锁内根据已投递序号决定是否收尾。
-func (i *turnInputs) finish(ctx context.Context, turn *adk.TurnContext[Trigger, *schema.AgenticMessage], candidate string) (bool, error) {
+// finish 在锁内根据已投递序号决定是否收尾；转人工决定不可降级，直接收尾，之后到达的输入留给人工处理。
+func (i *turnInputs) finish(ctx context.Context, turn *adk.TurnContext[Trigger, *schema.AgenticMessage], decision TerminalDecision, content string) (bool, error) {
+	if decision.Kind == domain.AgentRunOutcomeHandoff {
+		i.mu.Lock()
+		defer i.mu.Unlock()
+		if !i.closed {
+			i.closed = true
+			i.loop.Stop()
+		}
+		return true, nil
+	}
 	select {
 	case <-turn.Preempted:
 		return false, nil
@@ -144,7 +155,7 @@ func (i *turnInputs) finish(ctx context.Context, turn *adk.TurnContext[Trigger, 
 	if i.closed || i.maxPushedSeq > i.claimedSeq {
 		return false, nil
 	}
-	if candidate == "" {
+	if content == "" {
 		return false, errEmptyFinalResponse
 	}
 	i.closed = true

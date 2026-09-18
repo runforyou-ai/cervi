@@ -216,6 +216,24 @@ export interface AgentExecutionSummary {
 }
 
 /**
+ * AgentHandoffReason 定义 AI 客服转交人工的原因。
+ */
+export enum AgentHandoffReason {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    AgentHandoffReasonModelRequested = "model_requested",
+    AgentHandoffReasonInsufficientEvidence = "insufficient_evidence",
+    AgentHandoffReasonBudgetExhausted = "budget_exhausted",
+    AgentHandoffReasonInvalidOutput = "invalid_output",
+    AgentHandoffReasonRuntimeFailed = "runtime_failed",
+    AgentHandoffReasonTimeout = "timeout",
+    AgentHandoffReasonAgentUnavailable = "agent_unavailable",
+};
+
+/**
  * AgentInboxConversation 定义 AI 聊天摘要。
  */
 export interface AgentInboxConversation {
@@ -354,6 +372,20 @@ export interface AgentRunContentBlock {
 }
 
 /**
+ * AgentRunOutcome 定义 Agent 运行的结束方式。
+ */
+export enum AgentRunOutcome {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    AgentRunOutcomeReply = "reply",
+    AgentRunOutcomeAskCustomer = "ask_customer",
+    AgentRunOutcomeHandoff = "handoff",
+};
+
+/**
  * AgentRunProcess 定义一次已完成运行的有序过程内容和模型用量。
  */
 export interface AgentRunProcess {
@@ -361,6 +393,8 @@ export interface AgentRunProcess {
     "durationMilliseconds": number;
     "inputTokens": number;
     "outputTokens": number;
+    "outcome": AgentRunOutcome | null;
+    "outcomeReason": AgentHandoffReason | null;
     "blocks": AgentRunContentBlock[] | null;
 }
 
@@ -710,6 +744,8 @@ export interface ConversationAgentProcess {
     "durationMilliseconds": number;
     "inputTokens": number;
     "outputTokens": number;
+    "outcome": AgentRunOutcome | null;
+    "outcomeReason": AgentHandoffReason | null;
 }
 
 /**
@@ -979,6 +1015,17 @@ export interface ConversationSystemEvent {
     "targets": ConversationSystemEventParticipant[] | null;
     "previousTitle": string | null;
     "title": string | null;
+
+    /**
+     * 以下字段只由客服处理周期事件携带：原负责人、去向，以及转人工的原因与成员可见的原因说明；操作人写入 Actor。
+     */
+    "serviceSessionId": string | null;
+    "fromIdentityId": string | null;
+    "fromDisplayName": string | null;
+    "sessionTarget": ServiceSessionTarget | null;
+    "handoffReason": AgentHandoffReason | null;
+    "reasonText": string | null;
+    "agentRunId": string | null;
 }
 
 /**
@@ -1004,6 +1051,20 @@ export enum ConversationSystemEventType {
     ConversationSystemEventGroupMemberLeft = "group_member_left",
     ConversationSystemEventGroupOwnerTransferred = "group_owner_transferred",
     ConversationSystemEventGroupDissolved = "group_dissolved",
+
+    /**
+     * ConversationSystemEventServiceSessionHandedOff 表示 AI 员工把客服处理周期转交人工。
+     */
+    ConversationSystemEventServiceSessionHandedOff = "service_session_handed_off",
+
+    /**
+     * 以下事件表示成员领取、接管、转交、关闭与重开客服处理周期。
+     */
+    ConversationSystemEventServiceSessionClaimed = "service_session_claimed",
+    ConversationSystemEventServiceSessionTakenOver = "service_session_taken_over",
+    ConversationSystemEventServiceSessionTransferred = "service_session_transferred",
+    ConversationSystemEventServiceSessionClosed = "service_session_closed",
+    ConversationSystemEventServiceSessionReopened = "service_session_reopened",
 };
 
 /**
@@ -2856,6 +2917,31 @@ export enum ServiceSessionStatus {
 
     ServiceSessionStatusOpen = "open",
     ServiceSessionStatusClosed = "closed",
+};
+
+/**
+ * ServiceSessionTarget 定义客服处理周期流转的去向及名称快照。
+ */
+export interface ServiceSessionTarget {
+    "kind": ServiceSessionTargetKind;
+    "teamId": string | null;
+    "teamName": string | null;
+    "identityId": string | null;
+    "displayName": string | null;
+}
+
+/**
+ * ServiceSessionTargetKind 表示客服处理周期流转去向的类型。
+ */
+export enum ServiceSessionTargetKind {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    ServiceSessionTargetPublicQueue = "public_queue",
+    ServiceSessionTargetTeam = "team",
+    ServiceSessionTargetMember = "member",
 };
 
 /**

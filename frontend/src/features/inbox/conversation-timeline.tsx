@@ -9,6 +9,7 @@ import {
   listConversationMessageReferences,
   ChatSubjectKind,
   ConversationSystemEventType,
+  ServiceSessionTargetKind,
   ConversationType,
   MessageType,
   MessageVisibility,
@@ -64,7 +65,7 @@ import { useConversationReading } from "./use-conversation-reading"
 import { useConversationMessageNavigation } from "./use-conversation-message-navigation"
 import { useConversationMentionNavigation } from "./use-conversation-mention-navigation"
 import { ConversationMentionNavigator } from "./conversation-mention-navigator"
-import { AgentProcess, AgentQueueState, AgentRunState } from "./agent-process"
+import { AgentProcess, AgentQueueState, AgentRunState, handoffReasonKey } from "./agent-process"
 
 type TimelineMessage = Pick<
   ConversationMessageData,
@@ -602,10 +603,27 @@ function ConversationTimelineContent({
     return `${previousNames}${t("groupSystemListFinalSeparator")}${names[names.length - 1]}`
   }
 
-  /** 将类型化群聊系统事件转换为当前语言的时间线文案。 */
-  function formatGroupSystemEvent(
+  /** 将类型化系统事件转换为当前语言的时间线文案。 */
+  function formatSystemEvent(
     event: NonNullable<ConversationMessageData["systemEvent"]>,
   ) {
+    // 转人工事件按去向与原因码本地化，名称取事件写入时的快照。
+    if (event.type === ConversationSystemEventType.ConversationSystemEventServiceSessionHandedOff) {
+      const target = event.sessionTarget
+      const targetText =
+        target?.kind === ServiceSessionTargetKind.ServiceSessionTargetMember
+          ? target.identityId === currentIdentityID
+            ? t("messageSenderYou")
+            : (target.displayName ?? "")
+          : target?.kind === ServiceSessionTargetKind.ServiceSessionTargetTeam
+            ? t("handoffTargetTeam", { name: target.teamName ?? "" })
+            : t("handoffTargetPublicQueue")
+      return t("serviceSessionHandedOff", {
+        agent: event.fromDisplayName ?? t("unknownSender"),
+        target: targetText,
+        reason: t(handoffReasonKey(event.handoffReason)),
+      })
+    }
     const participantName = (
       participant: ConversationSystemEventParticipant,
     ) =>
@@ -617,6 +635,28 @@ function ConversationTimelineContent({
       event.targets.map(participantName),
     )
     switch (event.type) {
+      case ConversationSystemEventType.ConversationSystemEventServiceSessionClaimed:
+        return t("serviceSessionClaimed", { actor })
+      case ConversationSystemEventType.ConversationSystemEventServiceSessionTakenOver:
+        return t("serviceSessionTakenOver", {
+          actor,
+          from:
+            event.fromIdentityId === currentIdentityID
+              ? t("messageSenderYou")
+              : (event.fromDisplayName ?? t("unknownSender")),
+        })
+      case ConversationSystemEventType.ConversationSystemEventServiceSessionTransferred:
+        return t("serviceSessionTransferred", {
+          actor,
+          target:
+            event.sessionTarget?.identityId === currentIdentityID
+              ? t("messageSenderYou")
+              : (event.sessionTarget?.displayName ?? t("unknownSender")),
+        })
+      case ConversationSystemEventType.ConversationSystemEventServiceSessionClosed:
+        return t("serviceSessionClosed", { actor })
+      case ConversationSystemEventType.ConversationSystemEventServiceSessionReopened:
+        return t("serviceSessionReopened", { actor })
       case ConversationSystemEventType.ConversationSystemEventGroupRenamed:
         return t("groupSystemRenamed", {
           actor,
@@ -845,7 +885,7 @@ function ConversationTimelineContent({
               )
               const systemEvent = message.systemEvent
               const systemEventText = systemEvent
-                ? formatGroupSystemEvent(systemEvent)
+                ? formatSystemEvent(systemEvent)
                 : null
 
               return (
@@ -890,12 +930,19 @@ function ConversationTimelineContent({
                         index > 0 && "mt-3",
                       )}
                     >
-                      <span
-                        className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground"
-                        title={dateFormatters.full.format(date)}
-                      >
-                        {systemEventText}
-                      </span>
+                      <div className="flex max-w-full flex-col items-center gap-1">
+                        <span
+                          className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground"
+                          title={dateFormatters.full.format(date)}
+                        >
+                          {systemEventText}
+                        </span>
+                        {systemEvent?.reasonText ? (
+                          <span className="max-w-full break-words text-xs text-muted-foreground">
+                            {systemEvent.reasonText}
+                          </span>
+                        ) : null}
+                      </div>
                     </div>
                   ) : (
                     <ContextMenu>

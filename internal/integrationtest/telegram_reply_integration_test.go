@@ -38,7 +38,14 @@ func (f customerDeliveryFixture) replyHistory(t *testing.T) []conversationaction
 	if err != nil {
 		t.Fatal(err)
 	}
-	return history.Messages
+	// 客服周期系统事件不参与引用与投递断言。
+	messages := make([]conversationaction.ConversationMessage, 0, len(history.Messages))
+	for _, message := range history.Messages {
+		if message.Type != domain.MessageTypeSystem {
+			messages = append(messages, message)
+		}
+	}
+	return messages
 }
 
 // sendReply 保存引用回复并读取其固定投递目标。

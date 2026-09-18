@@ -23,7 +23,7 @@ import (
 
 const customerSceneRules = `本次是客户会话，你的输出会直接发送给客户，使用与客户最近消息相同的语言。`
 
-const customerSceneFallbackRule = `无法从资料得到答案时，如实告知客户暂时无法确认，不要猜测。`
+const customerSceneDecisionRule = `直接输出正文表示给出最终回答，只有在本轮已经通过工具取得依据时才这样做；追问、转人工与其他工具不在同一次输出中同时调用。`
 
 type customerRunPolicy struct {
 	enqueuer servertask.TxEnqueuer
@@ -81,33 +81,35 @@ func (p customerRunPolicy) persistMessage(ctx context.Context, db bun.IDB, polic
 	if err != nil {
 		return err
 	}
-	message, inserted, err := appendAgentMessage(
-		ctx, db, policyContext.Conversation, run, messageID, participantID, messageType, content, &policyContext.ServiceSession.ID,
-	)
-	if err != nil || !inserted {
-		return err
-	}
-	// 在回复事务中为正常回复安排持久投递。
-	if messageType == domain.MessageTypeText && policyContext.DeliveryRoute.ChannelType == domain.ChannelTypeTelegram {
-		if err := deliveryaction.Enqueue(ctx, db, p.enqueuer, policyContext.DeliveryRoute, message); err != nil {
-			return err
-		}
-	}
-	// 为推进周期摘要的正常回复记录首响。
-	if message.Type == string(domain.MessageTypeText) {
-		if _, err := db.NewUpdate().Model(policyContext.ServiceSession).
-			Set("first_response_at = COALESCE(first_response_at, ?)", message.OriginatedAt).
-			WherePK().Where("organization_id = ? AND status = ? AND last_message_id = ?", message.OrganizationID, domain.ServiceSessionStatusOpen, message.ID).
-			Exec(ctx); err != nil {
-			return fmt.Errorf("record customer agent first response: %w", err)
-		}
-	}
-	return nil
+	_, err = appendCustomerAgentMessage(ctx, db, p.enqueuer, policyContext, agentResultMessage(run, messageID, participantID, messageType, content, &policyContext.ServiceSession.ID))
+	return err
 }
 
-// sceneRules 给出客户会话的对客说明与工具用法。
+// appendCustomerAgentMessage 在客服事务中追加 AI 客服消息：对客文本同事务安排渠道投递并记录有效首响，内部消息只写入时间线。
+func appendCustomerAgentMessage(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer, policyContext agentRunPolicyContext, message *servermodels.Message) (*servermodels.Message, error) {
+	message, inserted, err := appendAgentMessage(ctx, db, policyContext.Conversation, message)
+	if err != nil || !inserted || message.Type != string(domain.MessageTypeText) || message.Visibility == string(domain.MessageVisibilityInternalOnly) {
+		return message, err
+	}
+	if policyContext.DeliveryRoute.ChannelType == domain.ChannelTypeTelegram {
+		if err := deliveryaction.Enqueue(ctx, db, enqueuer, policyContext.DeliveryRoute, message); err != nil {
+			return nil, err
+		}
+	}
+	// 为推进周期摘要的对客文本记录首响。
+	if _, err := db.NewUpdate().Model(policyContext.ServiceSession).
+		Set("first_response_at = COALESCE(first_response_at, ?)", message.OriginatedAt).
+		WherePK().Where("organization_id = ? AND status = ? AND last_message_id = ?", message.OrganizationID, domain.ServiceSessionStatusOpen, message.ID).
+		Exec(ctx); err != nil {
+		return nil, fmt.Errorf("record customer agent first response: %w", err)
+	}
+	return message, nil
+}
+
+// sceneRules 给出客户会话的对客说明、工具用法与结束方式，终止工具在客服场景始终注册。
 func (p customerRunPolicy) sceneRules(_ context.Context, _ bun.IDB, _ executionContext, tools behaviorTools) (agentruntime.Scene, string, error) {
-	return agentruntime.SceneCustomer, joinSections(customerSceneRules, toolGuidance(tools), customerSceneFallbackRule), nil
+	tools.Terminal = true
+	return agentruntime.SceneCustomer, joinSections(customerSceneRules, toolGuidance(tools), customerSceneDecisionRule), nil
 }
 
 // laneRevision 在当前负责人仍合格时返回客户 Agent 的配置版本。

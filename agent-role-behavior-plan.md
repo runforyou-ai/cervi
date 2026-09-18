@@ -190,7 +190,7 @@ Runtime 用内部 `TerminalDecision` 表达一次执行的结束方式，Eino �
 
 两个终止工具注册为 Eino ADK 的直接返回工具，但直接返回的输出是工具结果而不是 assistant 正文，`onAgentEvents` 需要按成功工具调用的 `callID` 提取终止决定。工具执行本身不发消息、不改负责人，只在 Runtime 内记录意图；发送消息与修改负责人统一留到终态事务。
 
-执行一批工具调用前先校验：至多一个终止工具，且终止工具不与其他工具混调。非法组合视同一次需要纠正的输出，消耗第 7 节的纠正额度；额度耗尽进入受控转人工。参数校验失败同样按此处理。
+执行一批工具调用前先校验：至多一个终止工具，且终止工具不与其他工具混调。非法组合视同一次需要纠正的输出，消耗第 7 节的纠正额度；额度耗尽进入受控转人工，原因 `invalid_output`。参数校验失败同样按此处理。
 
 ### 5.3 转人工不可降级
 
@@ -237,6 +237,7 @@ Runtime 用内部 `TerminalDecision` 表达一次执行的结束方式，Eino �
 | 模型主动转人工 | `succeeded` | `handoff` | `model_requested` | 真人或队列 |
 | 纠正后仍无依据 | `succeeded` | `handoff` | `insufficient_evidence` | 真人或队列 |
 | 预算耗尽仍无依据 | `succeeded` | `handoff` | `budget_exhausted` | 真人或队列 |
+| 纠正后仍输出无效的终止调用 | `succeeded` | `handoff` | `invalid_output` | 真人或队列 |
 | 模型错误、超时、开始执行前失败 | `failed` | `handoff` | `runtime_failed`、`timeout` | 真人或队列 |
 | 人工接管、关闭、主动停止先提交 | `cancelled` | 空 | 现有取消码 | 服从已提交的业务操作 |
 | AI 被停用或角色失去接客资格 | `cancelled` | 空 | `agent_unavailable` | 由管理操作交接，见 6.4 |
@@ -287,14 +288,14 @@ payload
 ├── serviceSessionId
 ├── fromIdentityId          -- 原 AI 员工身份
 ├── target                  -- { kind: public_queue | team | member, teamId?, identityId? }
-├── reason                  -- model_requested | insufficient_evidence | budget_exhausted | runtime_failed | timeout | agent_unavailable
+├── reason                  -- model_requested | insufficient_evidence | budget_exhausted | invalid_output | runtime_failed | timeout | agent_unavailable
 ├── reasonText              -- 模型写的转交原因，或运行错误摘要；仅成员可见
 └── agentRunId              -- 管理操作交接时为空
 ```
 
 写入沿用 `chatstate.AppendMessage`，携带 6.6 节的幂等键；群事件会推进操作人的已读水位，转人工没有操作人，跳过该步骤。系统事件不进入访客查询（访客只读 `text` 与 `attachment`），不创建渠道投递，不改变客户侧最后消息摘要与首响。前端在 `conversation-timeline.tsx` 增加该事件类型的渲染，按 `reason` 本地化文案并展示去向与 `reasonText`；运行过程详情通过 `agentRunId` 关联。
 
-**同族事件后续补齐。** 领取（`service_session_claimed`）、人工接管（`service_session_taken_over`）、转交真人或 AI（`service_session_transferred`）、关闭（`service_session_closed`）、重开（`service_session_reopened`）应使用同一 `service_session_*` 家族和同样的 payload 风格（周期编号、操作人身份、来源与目标），在各自的操作事务内写入，让客服在时间线上看到一个周期的完整流转。本方案只交付 `service_session_handed_off`，其余事件在客服协作或指标方案中一并补齐，届时不得另起一套事件结构。
+**同族事件。** 领取（`service_session_claimed`，含成员回复无人负责的周期）、人工接管（`service_session_taken_over`）、转交真人或 AI（`service_session_transferred`）、关闭（`service_session_closed`）、重开（`service_session_reopened`）使用同一 `service_session_*` 家族，在各自的操作事务内写入，payload 为周期编号、操作人身份与名称快照、原负责人与转交目标（`serviceSessionId`、`actorIdentityId`、`actorDisplayName`、`fromIdentityId`、`fromDisplayName`、`target`），与转人工事件一起在 PR B 交付。客服周期的系统事件仅成员可见，只推进会话版本并通知受众，不改变会话最后消息、活动时间、周期摘要与首响。
 
 ## 7. 依据门禁
 
@@ -347,7 +348,7 @@ payload
 agent_runs
 ├── behavior_snapshot     jsonb    -- 运行行为快照，begin 首次解析时写入并固定
 ├── outcome               text     -- reply | ask_customer | handoff
-├── outcome_reason        text     -- model_requested | insufficient_evidence | budget_exhausted | runtime_failed | timeout
+├── outcome_reason        text     -- model_requested | insufficient_evidence | budget_exhausted | invalid_output | runtime_failed | timeout
 └── handoff_settled_seq   bigint   -- 转人工时旧 Lane 结算到的 desired_seq
 ```
 
@@ -391,7 +392,7 @@ agent_runs
 | PR | 范围 | 必须通过的验收 |
 | --- | --- | --- |
 | A | 角色与场景分层、企业指令选填、`behavior_snapshot`、群聊与 Copilot 后缀改写、权限目录 `appliesTo` 与角色页分组、表单与角色页只读展示 | 三条已上线链路除指令前缀外行为不变；空指令完整读写执行；客服角色在单聊、群聊和 Copilot 中受众与工具一致；快照与实际指令、工具一致；重复执行尝试沿用同一快照；角色页成员权限与 AI 能力分组显示且现有权限分配行为不变 |
-| B | `TerminalDecision`、终止工具、交接事务、三键幂等、转人工系统事件与时间线渲染、Lane 结算、失败交接、管理操作交接、路由解析下沉、i18n 文案、摘要与详情契约 | 主动及失败转人工；三类消息重试各一条；转人工事件行显示去向与原因；内部原因不外发；真人接管与 AI 交接双向并发各只保留先提交者；最终认领后新消息入队 → 转人工 → 人工处理 → 转回同一 AI → 新消息不重放；直接返回事件、无效参数、追问与转人工同批、终止工具与 MCP 同批各自按预期处理；网站与 Telegram 都覆盖正常交接、失败交接与重试，Telegram 只产生一次对客投递；公共队列、团队、真人、失败目标为 AI、无效目标分别验证负责人与团队字段；AI 停用、角色改为非客服分别覆盖有在途 Run 与无在途 Run；入站路由与停用、改角色交错时会话不会留在失效 AI 名下；开始执行前失败最终也能交接 |
+| B | `TerminalDecision`、终止工具、交接事务、三键幂等、转人工与同族 `service_session_*` 系统事件及时间线渲染、Lane 结算、失败交接、管理操作交接、路由解析下沉、i18n 文案、摘要与详情契约 | 主动及失败转人工；三类消息重试各一条；转人工事件行显示去向与原因；内部原因不外发；真人接管与 AI 交接双向并发各只保留先提交者；最终认领后新消息入队 → 转人工 → 人工处理 → 转回同一 AI → 新消息不重放；直接返回事件、无效参数、追问与转人工同批、终止工具与 MCP 同批各自按预期处理；网站与 Telegram 都覆盖正常交接、失败交接与重试，Telegram 只产生一次对客投递；公共队列、团队、真人、失败目标为 AI、无效目标分别验证负责人与团队字段；AI 停用、角色改为非客服分别覆盖有在途 Run 与无在途 Run；入站路由与停用、改角色交错时会话不会留在失效 AI 名下；开始执行前失败最终也能交接 |
 | C | 有效依据登记与边界、纠正与预算、严格门禁、预算末端保留终止工具 | 空知识结果、错误 MCP、客户换问题、历史不可用时不放行；纠正只发生一次且不重置预算；上下文裁剪后旧依据不放行；有依据的正文不受影响；追问与转交不需要依据 |
 
 A 可以单独交付。B 作为内部能力交付时不对外宣称已具备依据保证；面向客户的完整能力在 B、C 都通过后验收。

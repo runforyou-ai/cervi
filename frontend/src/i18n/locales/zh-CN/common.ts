@@ -62,6 +62,8 @@ const common = {
   agentTools: {
     searchKnowledge: "知识库检索",
     searchCustomerHistory: "客户历史沟通",
+    askCustomer: "追问客户",
+    handoffToHuman: "转交人工",
     mcp: "MCP 服务工具",
   },
 }

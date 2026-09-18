@@ -21,12 +21,36 @@ const (
 	AgentToolCallFailed    AgentToolCallStatus = AgentToolCallStatus(domain.AgentToolCallFailed)
 )
 
+// AgentRunOutcome 定义 Agent 运行的结束方式。
+type AgentRunOutcome string
+
+const (
+	AgentRunOutcomeReply       AgentRunOutcome = AgentRunOutcome(domain.AgentRunOutcomeReply)
+	AgentRunOutcomeAskCustomer AgentRunOutcome = AgentRunOutcome(domain.AgentRunOutcomeAskCustomer)
+	AgentRunOutcomeHandoff     AgentRunOutcome = AgentRunOutcome(domain.AgentRunOutcomeHandoff)
+)
+
+// AgentHandoffReason 定义 AI 客服转交人工的原因。
+type AgentHandoffReason string
+
+const (
+	AgentHandoffReasonModelRequested       AgentHandoffReason = AgentHandoffReason(domain.AgentHandoffReasonModelRequested)
+	AgentHandoffReasonInsufficientEvidence AgentHandoffReason = AgentHandoffReason(domain.AgentHandoffReasonInsufficientEvidence)
+	AgentHandoffReasonBudgetExhausted      AgentHandoffReason = AgentHandoffReason(domain.AgentHandoffReasonBudgetExhausted)
+	AgentHandoffReasonInvalidOutput        AgentHandoffReason = AgentHandoffReason(domain.AgentHandoffReasonInvalidOutput)
+	AgentHandoffReasonRuntimeFailed        AgentHandoffReason = AgentHandoffReason(domain.AgentHandoffReasonRuntimeFailed)
+	AgentHandoffReasonTimeout              AgentHandoffReason = AgentHandoffReason(domain.AgentHandoffReasonTimeout)
+	AgentHandoffReasonAgentUnavailable     AgentHandoffReason = AgentHandoffReason(domain.AgentHandoffReasonAgentUnavailable)
+)
+
 // ConversationAgentProcess 定义已完成运行的过程引用和模型用量，过程内容按运行编号单独读取。
 type ConversationAgentProcess struct {
-	ID                   string `json:"id"`
-	DurationMilliseconds int64  `json:"durationMilliseconds"`
-	InputTokens          int    `json:"inputTokens"`
-	OutputTokens         int    `json:"outputTokens"`
+	ID                   string              `json:"id"`
+	DurationMilliseconds int64               `json:"durationMilliseconds"`
+	InputTokens          int                 `json:"inputTokens"`
+	OutputTokens         int                 `json:"outputTokens"`
+	Outcome              *AgentRunOutcome    `json:"outcome"`
+	OutcomeReason        *AgentHandoffReason `json:"outcomeReason"`
 }
 
 // AgentRunProcess 定义一次已完成运行的有序过程内容和模型用量。
@@ -35,6 +59,8 @@ type AgentRunProcess struct {
 	DurationMilliseconds int64                  `json:"durationMilliseconds"`
 	InputTokens          int                    `json:"inputTokens"`
 	OutputTokens         int                    `json:"outputTokens"`
+	Outcome              *AgentRunOutcome       `json:"outcome"`
+	OutcomeReason        *AgentHandoffReason    `json:"outcomeReason"`
 	Blocks               []AgentRunContentBlock `json:"blocks"`
 }
 

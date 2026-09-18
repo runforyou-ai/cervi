@@ -296,7 +296,14 @@ func TestCustomerConversationDelayedMessage(t *testing.T) {
 				t.Fatal(err)
 			}
 			history, err := conversationaction.NewListConversationMessagesQuery(f.db).Execute(ctx, f.member, conversationaction.ConversationMessageHistoryInput{ConversationID: f.conversationID, After: &conversationaction.MessageCursorPoint{ID: earlier.ID, MessageSeq: earlier.MessageSeq}})
-			if err != nil || len(history.Messages) != 1 {
+			// 延迟提交的成员回复同时领取周期，领取事件不计入对话消息。
+			conversational := 0
+			for _, message := range history.Messages {
+				if message.Type != domain.MessageTypeSystem {
+					conversational++
+				}
+			}
+			if err != nil || conversational != 1 {
 				t.Fatalf("late commit missing from after: %+v %v", history, err)
 			}
 		})

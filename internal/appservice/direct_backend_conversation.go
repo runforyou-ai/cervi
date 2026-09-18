@@ -614,6 +614,17 @@ func conversationMessageFromAction(message conversationaction.ConversationMessag
 				IdentityID: message.SystemEvent.Actor.IdentityID, DisplayName: message.SystemEvent.Actor.DisplayName,
 			},
 			Targets: targets, PreviousTitle: message.SystemEvent.PreviousTitle, Title: message.SystemEvent.Title,
+			ServiceSessionID: message.SystemEvent.ServiceSessionID, FromIdentityID: message.SystemEvent.FromIdentityID,
+			FromDisplayName: message.SystemEvent.FromDisplayName, HandoffReason: (*AgentHandoffReason)(message.SystemEvent.Reason),
+			ReasonText: message.SystemEvent.ReasonText, AgentRunID: message.SystemEvent.AgentRunID,
+		}
+		// 客服处理周期事件的操作人按群聊事件的 actor 结构返回。
+		if message.SystemEvent.ActorIdentityID != nil && message.SystemEvent.ActorDisplayName != nil {
+			systemEvent.Actor = ConversationSystemEventParticipant{IdentityID: *message.SystemEvent.ActorIdentityID, DisplayName: *message.SystemEvent.ActorDisplayName}
+		}
+		if target := message.SystemEvent.Target; target != nil {
+			systemEvent.SessionTarget = &ServiceSessionTarget{Kind: ServiceSessionTargetKind(target.Kind),
+				TeamID: target.TeamID, TeamName: target.TeamName, IdentityID: target.IdentityID, DisplayName: target.DisplayName}
 		}
 	}
 	var replyTo *ConversationMessageReference

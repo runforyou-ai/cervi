@@ -48,6 +48,8 @@ const (
 
 	ErrorAgentReplyStopFailed            Key = "error.agent_reply_stop_failed"
 	ErrorAgentUnavailable                Key = "error.agent_unavailable"
+	AgentCustomerHandoffFallback         Key = "agent.customer_handoff_fallback"
+	AgentCustomerFailureFallback         Key = "agent.customer_failure_fallback"
 	ErrorCustomerReplySuggestFailed      Key = "error.customer_reply_suggest_failed"
 	ErrorCustomerCopilotThreadListFailed Key = "error.customer_copilot_thread_list_failed"
 	FieldAgentIdentityIDInvalid          Key = "field.agent_identity_id_invalid"

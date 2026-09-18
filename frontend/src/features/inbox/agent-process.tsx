@@ -21,6 +21,7 @@ import {
   stopAgentReply,
   stopCustomerCopilotReply,
   stopGroupAgentReply,
+  AgentHandoffReason,
   AgentRunBlockKind,
   AgentRunStatus,
   AgentToolCallStatus,
@@ -39,6 +40,26 @@ import {
 import { usePortalContainer } from "@/components/ui/portal-container"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { cn } from "@/lib/utils"
+
+/** 返回转人工原因对应的 inbox 词条键。 */
+export function handoffReasonKey(reason: AgentHandoffReason | null | undefined) {
+  switch (reason) {
+    case AgentHandoffReason.AgentHandoffReasonModelRequested:
+      return "handoffReasonModelRequested" as const
+    case AgentHandoffReason.AgentHandoffReasonInsufficientEvidence:
+      return "handoffReasonInsufficientEvidence" as const
+    case AgentHandoffReason.AgentHandoffReasonBudgetExhausted:
+      return "handoffReasonBudgetExhausted" as const
+    case AgentHandoffReason.AgentHandoffReasonInvalidOutput:
+      return "handoffReasonInvalidOutput" as const
+    case AgentHandoffReason.AgentHandoffReasonTimeout:
+      return "handoffReasonTimeout" as const
+    case AgentHandoffReason.AgentHandoffReasonAgentUnavailable:
+      return "agentUnavailable" as const
+    default:
+      return "handoffReasonRuntimeFailed" as const
+  }
+}
 
 /** 在截断末尾提供更多按钮，点击后浮层展示完整原文。 */
 function ToolValue({ value }: { value: string }) {
@@ -309,7 +330,9 @@ export function AgentRunState({ run, incoming, conversationID, group, copilot, o
         ? t("agentRunBotChanged")
         : run.errorCode === "agent_removed"
           ? t("agentRunAgentRemoved")
-          : run.lastError
+          : run.errorCode === "agent_unavailable"
+            ? t("agentUnavailable")
+            : run.lastError
   return (
     <div
       className={cn("mt-3 flex min-w-0 text-xs text-muted-foreground", incoming ? "justify-start" : "justify-end")}

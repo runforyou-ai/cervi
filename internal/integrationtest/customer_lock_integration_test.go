@@ -100,7 +100,11 @@ func testCustomerAgentLocking(t *testing.T, db *bun.DB, identity *models.Identit
 			if err := waitChatResult(t, ctx, received); err != nil {
 				t.Fatal(err)
 			}
-			assertAgentLockResult(t, ctx, db, run, phase.failure || phase.finalize)
+			if phase.failure || phase.finalize {
+				assertCustomerFailureHandoff(t, ctx, db, run)
+			} else {
+				assertAgentLockResult(t, ctx, db, run, false)
+			}
 			assertCustomerLockSummary(t, ctx, db, first.Conversation.ID)
 		})
 	}
@@ -112,6 +116,36 @@ func testCustomerAgentLocking(t *testing.T, db *bun.DB, identity *models.Identit
 			}
 			t.Run("客服并发/"+change+"/"+name, func(t *testing.T) { testCustomerLateResult(t, db, identity, agentID, tasks, change, aiFirst) })
 		}
+	}
+}
+
+// assertCustomerFailureHandoff 核对失败的客服运行已转交人工：对客通知为主结果，等待会话锁的后续消息在交接后由人工处理，AI 输入队列保持结算边界。
+func assertCustomerFailureHandoff(t *testing.T, ctx context.Context, db *bun.DB, run models.AgentRun) {
+	t.Helper()
+	if err := db.NewSelect().Model(&run).WherePK().Scan(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if run.Status != string(domain.AgentRunStatusFailed) || run.ResponseMessageID == nil || run.Outcome == nil ||
+		*run.Outcome != string(domain.AgentRunOutcomeHandoff) || run.HandoffSettledSeq == nil || *run.HandoffSettledSeq != 1 {
+		t.Fatalf("terminal run=%+v", run)
+	}
+	var notice models.Message
+	if err := db.NewSelect().Model(&notice).Where("msg.id = ?", *run.ResponseMessageID).Scan(ctx); err != nil || notice.Type != string(domain.MessageTypeText) {
+		t.Fatalf("notice=%+v err=%v", notice, err)
+	}
+	var state models.AgentLane
+	if err := db.NewSelect().Model(&state).Where("al.conversation_id = ?", run.ConversationID).Scan(ctx); err != nil || state.DesiredSeq != 1 || state.ProcessedSeq != 1 {
+		t.Fatalf("input state=%+v err=%v", state, err)
+	}
+	active, err := db.NewSelect().Model((*models.AgentRun)(nil)).Where("agr.conversation_id = ? AND agr.status IN (?)", run.ConversationID,
+		bun.In([]domain.AgentRunStatus{domain.AgentRunStatusQueued, domain.AgentRunStatusRunning})).Count(ctx)
+	if err != nil || active != 0 {
+		t.Fatalf("active runs=%d err=%v", active, err)
+	}
+	// 两条客户消息、内部错误消息、转人工事件和对客通知。
+	count, err := db.NewSelect().Model((*models.Message)(nil)).Where("msg.conversation_id = ?", run.ConversationID).Count(ctx)
+	if err != nil || count != 5 {
+		t.Fatalf("messages=%d err=%v", count, err)
 	}
 }
 

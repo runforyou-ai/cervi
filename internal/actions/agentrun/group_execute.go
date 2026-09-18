@@ -84,7 +84,7 @@ func (p groupMentionRunPolicy) loadMessages(ctx context.Context, db bun.IDB, run
 
 // persistMessage 以 Agent 成员身份追加群聊结果消息。
 func (p groupMentionRunPolicy) persistMessage(ctx context.Context, db bun.IDB, policyContext agentRunPolicyContext, run *servermodels.AgentRun, messageID string, messageType domain.MessageType, content string) error {
-	_, _, err := appendAgentMessage(ctx, db, policyContext.Conversation, run, messageID, policyContext.AgentParticipantID, messageType, content, nil)
+	_, _, err := appendAgentMessage(ctx, db, policyContext.Conversation, agentResultMessage(run, messageID, policyContext.AgentParticipantID, messageType, content, nil))
 	return err
 }
 

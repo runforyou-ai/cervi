@@ -79,7 +79,7 @@ func (p copilotRunPolicy) loadMessages(ctx context.Context, db bun.IDB, run *ser
 
 // persistMessage 以 AI 员工参与者身份追加线程回复。
 func (p copilotRunPolicy) persistMessage(ctx context.Context, db bun.IDB, policyContext agentRunPolicyContext, run *servermodels.AgentRun, messageID string, messageType domain.MessageType, content string) error {
-	_, _, err := appendAgentMessage(ctx, db, policyContext.Conversation, run, messageID, policyContext.AgentParticipantID, messageType, content, nil)
+	_, _, err := appendAgentMessage(ctx, db, policyContext.Conversation, agentResultMessage(run, messageID, policyContext.AgentParticipantID, messageType, content, nil))
 	return err
 }
 
