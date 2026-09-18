@@ -21,10 +21,11 @@ const (
 
 // Message 定义带持久编号的上下文消息，编号用于跨轮次去重。
 type Message struct {
-	ID      string
-	Role    MessageRole
-	Content string
-	Media   *Media // 非空表示消息携带附件，模型支持该附件格式时在预算内随消息直传。
+	ID       string
+	Revision string // 消息内容的修订标识，同一编号在修订变化后重新进入运行期轮次历史。
+	Role     MessageRole
+	Content  string
+	Media    *Media // 非空表示消息携带附件，模型支持该附件格式时在预算内随消息直传。
 }
 
 // Media 定义上下文消息的附件格式和大小，内容在直传给模型时按消息编号读取。

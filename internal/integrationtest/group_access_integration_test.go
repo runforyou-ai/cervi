@@ -126,8 +126,9 @@ func (b *groupSettingsBarrier) AfterQuery(ctx context.Context, event *bun.QueryE
 	if event.Model == nil {
 		return
 	}
+	// 只按模型指向实际写入值的语句判断，按类型限定的语句不带个人状态。
 	state, ok := event.Model.Value().(*servermodels.ConversationUserState)
-	if !ok || state.UserID != b.userID || event.Operation() != "INSERT" || event.Err != nil {
+	if !ok || state == nil || state.UserID != b.userID || event.Operation() != "INSERT" || event.Err != nil {
 		return
 	}
 	b.once.Do(func() {

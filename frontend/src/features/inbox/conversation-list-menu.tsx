@@ -1,4 +1,4 @@
-/** 会话列表项的阅读状态、静音操作及右键与长按菜单。 */
+/** 会话列表项的阅读状态、静音与置顶操作及右键与长按菜单。 */
 import type { ReactElement } from "react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
@@ -9,7 +9,9 @@ import {
   isInternalInboxConversation,
   markConversationRead,
   updateConversationNotificationSettings,
+  updateConversationPin,
   updateConversationUnreadMark,
+  type ConversationPinCommand,
   type InboxConversation,
 } from "@/api"
 import {
@@ -29,8 +31,8 @@ const readStateFailure = {
   message: "conversationReadStateError",
 } as const
 
-/** 串行保存列表中的会话个人设置，成功后重新读取统一收件箱。 */
-export function useConversationListActions() {
+/** 串行保存列表中的会话个人设置，成功后重新读取统一收件箱；onPinSettled 在置顶写入成功后按目标分区优先的顺序重读列表。 */
+export function useConversationListActions(onPinSettled?: (pinned: boolean) => Promise<void>) {
   const { t } = useTranslation("inbox")
   const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
@@ -42,7 +44,11 @@ export function useConversationListActions() {
     update: () => Promise<unknown>,
     failure: {
       log: string
-      message: "conversationReadStateError" | "conversationMuteError"
+      message:
+        | "conversationReadStateError"
+        | "conversationMuteError"
+        | "conversationPinError"
+      reload?: boolean
     },
   ) {
     const request = settingsSave.begin()
@@ -53,6 +59,8 @@ export function useConversationListActions() {
     } catch (error) {
       if (!settingsSave.isCurrent(request)) return
       console.warn(failure.log, { conversationId: conversation.id, error })
+      // 置顶写入失败后重读列表，恢复权威的置顶顺序与顺序版本。
+      if (failure.reload) void invalidate(resourceKeys.inbox())
       if (!recoverSession(error, navigate)) {
         toast.error(isApiError(error) ? apiErrorMessage(error) : t(failure.message))
       }
@@ -94,20 +102,32 @@ export function useConversationListActions() {
           }),
         { log: "更新会话静音设置失败", message: "conversationMuteError" },
       ),
+    // 置顶、取消置顶与按邻居移动共用同一条写入，顺序版本冲突由服务端拒绝。
+    updatePin: (conversation: InboxConversation, command: ConversationPinCommand) =>
+      save(conversation, async () => {
+        await updateConversationPin(conversation.id, command)
+        await onPinSettled?.(command.pinned)
+      }, {
+        log: "更新会话置顶失败",
+        message: "conversationPinError",
+        reload: true,
+      }),
   }
 }
 
-/** 为会话列表项提供阅读状态与静音菜单，右键或长按触发，没有可用操作时不打开。 */
+/** 为会话列表项提供阅读状态、静音与置顶菜单，右键或长按触发，没有可用操作时不打开；传入 pinOrderVersion 时提供置顶操作。 */
 export function ConversationListMenu({
   conversation,
   actions,
   itemClassName,
+  pinOrderVersion,
   onOpenChange,
   children,
 }: {
   conversation: InboxConversation
   actions: ReturnType<typeof useConversationListActions>
   itemClassName?: string
+  pinOrderVersion?: string
   onOpenChange: (open: boolean) => void
   children: ReactElement
 }) {
@@ -117,7 +137,7 @@ export function ConversationListMenu({
 
   return (
     <ContextMenu onOpenChange={onOpenChange}>
-      <ContextMenuTrigger asChild disabled={!internal && !hasUnread}>
+      <ContextMenuTrigger asChild disabled={!internal && !hasUnread && pinOrderVersion === undefined}>
         {children}
       </ContextMenuTrigger>
       <ContextMenuContent>
@@ -146,6 +166,20 @@ export function ConversationListMenu({
             onSelect={() => void actions.toggleMuted(conversation)}
           >
             {t(conversation.muted ? "conversationUnmute" : "conversationMute")}
+          </ContextMenuItem>
+        ) : null}
+        {pinOrderVersion !== undefined ? (
+          <ContextMenuItem
+            className={itemClassName}
+            disabled={actions.saving}
+            onSelect={() =>
+              void actions.updatePin(conversation, {
+                pinned: !conversation.pinned,
+                expectedPinOrderVersion: pinOrderVersion,
+              })
+            }
+          >
+            {t(conversation.pinned ? "conversationUnpin" : "conversationPin")}
           </ContextMenuItem>
         ) : null}
       </ContextMenuContent>

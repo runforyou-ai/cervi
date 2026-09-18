@@ -19,7 +19,7 @@ import {
   normalizeInboxQuery,
   writeInboxQuerySearch,
 } from "./inbox-query"
-import { useInboxList } from "./use-inbox-list"
+import { usePartitionedInboxList } from "./use-inbox-list"
 import { useInboxListViewport } from "./use-inbox-list-viewport"
 
 /** 以规范化查询作为选择历史的保存键。 */
@@ -38,7 +38,7 @@ export function InboxRoute() {
   const { queue } = useAttachmentQueue()
   const outgoingStore = useOutgoingMessageStore()
   const active = useMemberChatPollingActive()
-  const list = useInboxList(query, viewport, {
+  const list = usePartitionedInboxList(query, viewport, {
     identity, active, selectedConversationId,
     unavailable: (id) => {
       queue?.forgetConversation(id)

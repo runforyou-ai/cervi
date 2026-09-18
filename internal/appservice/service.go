@@ -18,6 +18,7 @@ type Service struct {
 	nativeNotification  NativeNotification
 	unreadIndicator     UnreadIndicator
 	externalPageOpener  ExternalPageOpener
+	conversationWindows ConversationWindowOpener
 }
 
 // Option 配置平台专属的应用服务能力。
@@ -55,6 +56,13 @@ func WithUnreadIndicator(indicator UnreadIndicator) Option {
 func WithExternalPageOpener(opener ExternalPageOpener) Option {
 	return func(service *Service) {
 		service.externalPageOpener = opener
+	}
+}
+
+// WithConversationWindowOpener 注入桌面端会话独立窗口能力。
+func WithConversationWindowOpener(opener ConversationWindowOpener) Option {
+	return func(service *Service) {
+		service.conversationWindows = opener
 	}
 }
 
@@ -136,6 +144,19 @@ func (s *Service) OpenExternalPage(ctx context.Context, meta RequestMeta, input 
 
 // maxExternalPageURLBytes 是外部页面地址的最大字节数。
 const maxExternalPageURLBytes = 2048
+
+// OpenConversationWindow 在桌面端独立窗口打开指定会话，同一会话已打开时聚焦现有窗口。
+func (s *Service) OpenConversationWindow(ctx context.Context, meta RequestMeta, input ConversationWindowInput) error {
+	if s.conversationWindows == nil {
+		return methodNotAllowedError(meta, "OpenConversationWindow")
+	}
+	input.ConversationID = strings.TrimSpace(input.ConversationID)
+	input.Title = strings.TrimSpace(input.Title)
+	if input.ConversationID == "" {
+		return InvalidError(meta, cervii18n.FieldConversationIDInvalid, nil)
+	}
+	return s.conversationWindows.OpenConversationWindow(ctx, meta, input)
+}
 
 // CheckNotificationPermission 返回当前设备的系统通知授权状态。
 func (s *Service) CheckNotificationPermission(ctx context.Context, meta RequestMeta) (NotificationPermissionStatus, error) {

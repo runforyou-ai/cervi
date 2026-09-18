@@ -916,6 +916,39 @@ export interface ConversationPendingAgent {
 }
 
 /**
+ * ConversationPinInput 定义个人置顶写入；position 为空表示新置顶追加到末尾、已置顶保持原位，取消置顶不接受位置指令。
+ */
+export interface ConversationPinInput {
+    "pinned": boolean;
+    "neighborId": string;
+    "position": ConversationPinPosition;
+    "expectedPinOrderVersion": string;
+}
+
+/**
+ * ConversationPinPosition 表示置顶顺序中的落点：before 与 after 相对邻居会话，start 与 end 指整个置顶区的首尾。
+ */
+export enum ConversationPinPosition {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    ConversationPinPositionBefore = "before",
+    ConversationPinPositionAfter = "after",
+    ConversationPinPositionStart = "start",
+    ConversationPinPositionEnd = "end",
+};
+
+/**
+ * ConversationPinState 返回写入后的个人置顶事实与顺序版本。
+ */
+export interface ConversationPinState {
+    "pinned": boolean;
+    "pinOrderVersion": string;
+}
+
+/**
  * ConversationReadState 定义用户会话的已读水位。
  */
 export interface ConversationReadState {
@@ -994,6 +1027,14 @@ export enum ConversationType {
  */
 export interface ConversationUnreadMarkInput {
     "markedUnread": boolean;
+}
+
+/**
+ * ConversationWindowInput 定义桌面端打开会话独立窗口的输入。
+ */
+export interface ConversationWindowInput {
+    "conversationId": string;
+    "title": string;
 }
 
 /**
@@ -1591,6 +1632,11 @@ export interface ImageFile {
 export interface Inbox {
     "startCursor": string;
     "endCursor": string;
+
+    /**
+     * PinOrderVersion 是本人置顶顺序的当前版本，置顶写入以它作为并发校验依据。
+     */
+    "pinOrderVersion": string;
     "hasBefore": boolean;
     "conversations": InboxConversation[] | null;
     "nextCursor": string;
@@ -1661,6 +1707,11 @@ export interface InboxConversation {
     "mentionedUnreadCount": number;
     "markedUnread": boolean;
     "muted": boolean;
+
+    /**
+     * Pinned 表示当前用户已把该会话放入个人置顶区。
+     */
+    "pinned": boolean;
     "lastMessageId": string | null;
     "lastReadMessageId": string | null;
     "agent": AgentInboxConversation | null;
@@ -1700,9 +1751,24 @@ export interface InboxConversationResults {
 }
 
 /**
+ * InboxPartition 表示统一收件箱的置顶分区。
+ */
+export enum InboxPartition {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    InboxPartitionAll = "all",
+    InboxPartitionPinned = "pinned",
+    InboxPartitionRegular = "regular",
+};
+
+/**
  * InboxQuery 定义与分页边界无关的会话筛选。
  */
 export interface InboxQuery {
+    "partition": InboxPartition;
     "scope": InboxScope;
     "customerView": CustomerInboxView;
     "assigneeIdentityId": string;
@@ -1817,6 +1883,7 @@ export interface InboxWindow {
     "conversations": InboxConversation[] | null;
     "startCursor": string;
     "endCursor": string;
+    "pinOrderVersion": string;
     "hasBefore": boolean;
     "hasAfter": boolean;
 }
@@ -2263,6 +2330,7 @@ export interface KnowledgeWebDocumentInput {
  * LoadInboxInput 定义统一收件箱筛选和分页边界。
  */
 export interface LoadInboxInput {
+    "partition": InboxPartition;
     "scope": InboxScope;
     "customerView": CustomerInboxView;
     "assigneeIdentityId": string;
@@ -2842,6 +2910,7 @@ export interface SyncHeads {
     "conversationCount": number;
     "conversationChecksum": string;
     "identityProfileVersion": string;
+    "pinOrderVersion": string;
 }
 
 /**

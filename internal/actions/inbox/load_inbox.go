@@ -25,6 +25,7 @@ type LoadInput struct {
 	Cursor             string
 	BeforeCursor       string
 	Limit              int
+	Partition          domain.InboxPartition
 	Scope              domain.InboxScope
 	CustomerView       domain.CustomerInboxView
 	AssigneeIdentityID string
@@ -109,6 +110,7 @@ type ConversationSummary struct {
 	MentionedUnreadCount int
 	Muted                bool
 	MarkedUnread         bool
+	Pinned               bool
 	LastMessageID        *string
 	LastReadMessageID    *string
 	Customer             *CustomerConversationSummary
@@ -150,6 +152,7 @@ type customerConversationRow struct {
 	LastReadMessageID         *string                          `bun:"last_read_message_id"`
 	LastMessageID             *string                          `bun:"last_message_id"`
 	LastMessageType           *domain.MessageType              `bun:"last_message_type"`
+	Pinned                    bool                             `bun:"pinned"`
 }
 
 type directConversationRow struct {
@@ -169,6 +172,7 @@ type directConversationRow struct {
 	LastReadMessageID         *string                          `bun:"last_read_message_id"`
 	Muted                     bool                             `bun:"muted"`
 	MarkedUnread              bool                             `bun:"marked_unread"`
+	Pinned                    bool                             `bun:"pinned"`
 }
 
 type agentConversationRow struct {
@@ -189,6 +193,7 @@ type agentConversationRow struct {
 	LastReadMessageID         *string                          `bun:"last_read_message_id"`
 	Muted                     bool                             `bun:"muted"`
 	MarkedUnread              bool                             `bun:"marked_unread"`
+	Pinned                    bool                             `bun:"pinned"`
 }
 
 type groupConversationRow struct {
@@ -208,6 +213,7 @@ type groupConversationRow struct {
 	LastReadMessageID         *string                          `bun:"last_read_message_id"`
 	Muted                     bool                             `bun:"muted"`
 	MarkedUnread              bool                             `bun:"marked_unread"`
+	Pinned                    bool                             `bun:"pinned"`
 }
 
 // NewLoadInboxQuery 创建成员收件箱查询。
@@ -249,8 +255,16 @@ func (q *LoadInboxQuery) Execute(ctx context.Context, identity *servermodels.Ide
 	var counts UnreadCounts
 	err = q.db.RunInTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true}, func(ctx context.Context, tx bun.Tx) error {
 		snapshot := NewLoadInboxQuery(tx)
-		var err error
-		page, err = snapshot.loadConversationPage(ctx, identity, input, boundary)
+		pinOrderVersion, err := snapshot.pinOrderVersion(ctx, identity)
+		if err != nil {
+			return err
+		}
+		if boundary != nil {
+			if err := authorizeInboxCursor(boundary, input.Partition, pinOrderVersion); err != nil {
+				return err
+			}
+		}
+		page, err = snapshot.loadConversationPage(ctx, identity, input, pinOrderVersion, boundary)
 		if err != nil {
 			return err
 		}
@@ -261,7 +275,7 @@ func (q *LoadInboxQuery) Execute(ctx context.Context, identity *servermodels.Ide
 }
 
 // loadConversationPage 按精确活动边界取整页，边界行移除不影响后续读取。
-func (q *LoadInboxQuery) loadConversationPage(ctx context.Context, identity *servermodels.Identity, input LoadInput, boundary *inboxCursor) (ConversationPage, error) {
+func (q *LoadInboxQuery) loadConversationPage(ctx context.Context, identity *servermodels.Identity, input LoadInput, pinOrderVersion int64, boundary *inboxCursor) (ConversationPage, error) {
 	var start, end *inboxCursorPoint
 	if boundary != nil {
 		start, end = &boundary.inboxCursorPoint, &boundary.inboxCursorPoint
@@ -273,7 +287,7 @@ func (q *LoadInboxQuery) loadConversationPage(ctx context.Context, identity *ser
 	if len(points) > 0 {
 		start, end = &points[0], &points[len(points)-1]
 	}
-	window, err := q.buildConversationWindow(ctx, identity, input, points, start, end)
+	window, err := q.buildConversationWindow(ctx, identity, input, pinOrderVersion, points, start, end)
 	if err != nil {
 		return ConversationPage{}, err
 	}
@@ -289,6 +303,7 @@ func (q *LoadInboxQuery) customerConversationDetailsQuery(organizationID, curren
 	return q.customerConversationAccessQuery(organizationID).
 		ColumnExpr("unread.unread_count AS unread_count").
 		ColumnExpr("state.last_read_message_id::text AS last_read_message_id").
+		ColumnExpr("state.pin_rank IS NOT NULL AS pinned").
 		ColumnExpr("cv.title AS title").
 		ColumnExpr("COALESCE(cci.display_name, c.display_name) AS contact_name").
 		ColumnExpr("cci.avatar_file_id AS contact_avatar_file_id").
@@ -377,6 +392,7 @@ func withIndividualConversationDetails(query *bun.SelectQuery, identityID, userI
 		ColumnExpr("state.last_read_message_id::text AS last_read_message_id").
 		ColumnExpr("COALESCE(state.muted, false) AS muted").
 		ColumnExpr("COALESCE(state.marked_unread, false) AS marked_unread").
+		ColumnExpr("state.pin_rank IS NOT NULL AS pinned").
 		Join("LEFT JOIN messages AS msg ON msg.organization_id = cv.organization_id AND msg.conversation_id = cv.id AND msg.id = cv.last_message_id AND msg.deleted_at IS NULL").
 		Join("LEFT JOIN conversation_participants AS preview_cp ON preview_cp.id = msg.sender_participant_id AND preview_cp.organization_id = msg.organization_id AND preview_cp.conversation_id = msg.conversation_id").
 		Join("LEFT JOIN chat_subjects AS preview_cs ON preview_cs.id = preview_cp.subject_id AND preview_cs.organization_id = preview_cp.organization_id").
@@ -428,6 +444,7 @@ func (q *LoadInboxQuery) groupConversationsQuery(organizationID, identityID, use
 		ColumnExpr("state.last_read_message_id::text AS last_read_message_id").
 		ColumnExpr("COALESCE(state.muted, false) AS muted").
 		ColumnExpr("COALESCE(state.marked_unread, false) AS marked_unread").
+		ColumnExpr("state.pin_rank IS NOT NULL AS pinned").
 		Join("JOIN LATERAL (SELECT count(*) AS member_count FROM conversation_participants AS member_cp WHERE member_cp.organization_id = cv.organization_id AND member_cp.conversation_id = cv.id AND member_cp.left_at IS NULL) AS members ON TRUE").
 		Join("LEFT JOIN messages AS msg ON msg.organization_id = cv.organization_id AND msg.conversation_id = cv.id AND msg.id = cv.last_message_id AND msg.deleted_at IS NULL").
 		Join("LEFT JOIN conversation_participants AS preview_cp ON preview_cp.id = msg.sender_participant_id AND preview_cp.organization_id = msg.organization_id AND preview_cp.conversation_id = msg.conversation_id").
@@ -474,7 +491,7 @@ func (row agentConversationRow) summary() ConversationSummary {
 		agentRunStatus = &status
 	}
 	return ConversationSummary{
-		ID: row.ID, Type: domain.ConversationTypeAgent, UnreadCount: row.UnreadCount, Muted: row.Muted, MarkedUnread: row.MarkedUnread, LastMessageID: row.LastMessageID, LastMessageType: row.LastMessageType, LastReadMessageID: row.LastReadMessageID, LastActivityAt: row.LastActivityAt,
+		ID: row.ID, Type: domain.ConversationTypeAgent, UnreadCount: row.UnreadCount, Muted: row.Muted, MarkedUnread: row.MarkedUnread, Pinned: row.Pinned, LastMessageID: row.LastMessageID, LastMessageType: row.LastMessageType, LastReadMessageID: row.LastReadMessageID, LastActivityAt: row.LastActivityAt,
 		Agent: &AgentConversationSummary{
 			Title: row.Title, AgentIdentityID: row.AgentIdentityID, AgentName: row.AgentName, AgentAvatarFileID: row.AgentAvatarFileID, AgentStatus: row.AgentStatus,
 			Preview: row.Preview, PreviewSenderIdentityType: row.PreviewSenderIdentityType, LastMessageAt: row.LastMessageAt, AgentRunStatus: agentRunStatus,
@@ -499,7 +516,7 @@ func (row customerConversationRow) summary() ConversationSummary {
 		assignee = &AssigneeSummary{IdentityID: *row.AssigneeIdentityID, Type: domain.OrganizationIdentityType(*row.AssigneeType), DisplayName: *row.AssigneeDisplayName, AvatarFileID: row.AssigneeAvatarFileID}
 	}
 	return ConversationSummary{
-		ID: row.ID, Type: domain.ConversationTypeCustomer, UnreadCount: row.UnreadCount, LastMessageID: row.LastMessageID, LastMessageType: row.LastMessageType, LastReadMessageID: row.LastReadMessageID, LastActivityAt: row.LastActivityAt,
+		ID: row.ID, Type: domain.ConversationTypeCustomer, UnreadCount: row.UnreadCount, Pinned: row.Pinned, LastMessageID: row.LastMessageID, LastMessageType: row.LastMessageType, LastReadMessageID: row.LastReadMessageID, LastActivityAt: row.LastActivityAt,
 		Customer: &CustomerConversationSummary{
 			Title: row.Title, ContactName: row.ContactName, ContactAvatarFileID: row.ContactAvatarFileID,
 			ChannelType: domain.ChannelType(row.ChannelType), ChannelName: row.ChannelName,
@@ -512,7 +529,7 @@ func (row customerConversationRow) summary() ConversationSummary {
 // summary 转换真人单聊会话的统一摘要。
 func (row directConversationRow) summary() ConversationSummary {
 	return ConversationSummary{
-		ID: row.ID, Type: domain.ConversationTypeDirect, UnreadCount: row.UnreadCount, Muted: row.Muted, MarkedUnread: row.MarkedUnread, LastMessageID: row.LastMessageID, LastMessageType: row.LastMessageType, LastReadMessageID: row.LastReadMessageID, LastActivityAt: row.LastActivityAt,
+		ID: row.ID, Type: domain.ConversationTypeDirect, UnreadCount: row.UnreadCount, Muted: row.Muted, MarkedUnread: row.MarkedUnread, Pinned: row.Pinned, LastMessageID: row.LastMessageID, LastMessageType: row.LastMessageType, LastReadMessageID: row.LastReadMessageID, LastActivityAt: row.LastActivityAt,
 		Direct: &DirectConversationSummary{
 			PeerIdentityID: row.PeerIdentityID, PeerType: domain.OrganizationIdentityType(row.PeerType), PeerName: row.PeerName, PeerAvatarFileID: row.PeerAvatarFileID, PeerStatus: row.PeerStatus,
 			Preview: row.Preview, PreviewSenderIdentityType: row.PreviewSenderIdentityType, LastMessageAt: row.LastMessageAt,
@@ -523,7 +540,7 @@ func (row directConversationRow) summary() ConversationSummary {
 // summary 转换群聊会话的统一摘要。
 func (row groupConversationRow) summary() ConversationSummary {
 	return ConversationSummary{
-		ID: row.ID, Type: domain.ConversationTypeGroup, UnreadCount: row.UnreadCount, MentionedUnreadCount: row.MentionedUnreadCount, Muted: row.Muted, MarkedUnread: row.MarkedUnread, LastMessageID: row.LastMessageID, LastMessageType: row.LastMessageType, LastReadMessageID: row.LastReadMessageID, LastActivityAt: row.LastActivityAt,
+		ID: row.ID, Type: domain.ConversationTypeGroup, UnreadCount: row.UnreadCount, MentionedUnreadCount: row.MentionedUnreadCount, Muted: row.Muted, MarkedUnread: row.MarkedUnread, Pinned: row.Pinned, LastMessageID: row.LastMessageID, LastMessageType: row.LastMessageType, LastReadMessageID: row.LastReadMessageID, LastActivityAt: row.LastActivityAt,
 		Group: &GroupConversationSummary{
 			Title: row.Title, ImageFileID: row.ImageFileID, Status: domain.ConversationStatus(row.Status), Preview: row.Preview, PreviewSenderIdentityType: row.PreviewSenderIdentityType,
 			LastMessageAt: row.LastMessageAt, MemberCount: row.MemberCount,
@@ -579,6 +596,13 @@ func normalizeLoadInput(input LoadInput) (LoadInput, error) {
 		input.Scope = domain.InboxScopeAll
 	}
 	if input.Scope != domain.InboxScopeAll && input.Scope != domain.InboxScopeCustomer && input.Scope != domain.InboxScopeInternal {
+		return input, ErrQueryInvalid
+	}
+	input.Partition = domain.InboxPartition(strings.TrimSpace(string(input.Partition)))
+	if input.Partition == "" {
+		input.Partition = domain.InboxPartitionAll
+	}
+	if input.Partition != domain.InboxPartitionAll && input.Partition != domain.InboxPartitionPinned && input.Partition != domain.InboxPartitionRegular {
 		return input, ErrQueryInvalid
 	}
 	kinds, err := normalizeInboxKinds(input.Scope, input.Kinds)

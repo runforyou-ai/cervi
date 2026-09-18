@@ -275,7 +275,7 @@ func loadClaimedGroupMessages(ctx context.Context, db bun.IDB, run *servermodels
 		if err != nil {
 			return nil, fmt.Errorf("encode group conversation context: %w", err)
 		}
-		messages = append(messages, agentruntime.Message{ID: row.ID, Role: agentruntime.MessageRoleUser, Content: string(encoded), Media: row.media()})
+		messages = append(messages, agentruntime.Message{ID: row.ID, Revision: row.revision(), Role: agentruntime.MessageRoleUser, Content: string(encoded), Media: row.media()})
 	}
 	return messages, nil
 }

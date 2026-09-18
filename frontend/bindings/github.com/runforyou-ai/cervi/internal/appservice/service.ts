@@ -808,6 +808,13 @@ export function MoveKnowledgeDocument(meta: $models.RequestMeta, knowledgeBaseID
 }
 
 /**
+ * OpenConversationWindow 在桌面端独立窗口打开指定会话，同一会话已打开时聚焦现有窗口。
+ */
+export function OpenConversationWindow(meta: $models.RequestMeta, input: $models.ConversationWindowInput): $CancellablePromise<void> {
+    return $Call.ByID(1941707737, meta, input);
+}
+
+/**
  * OpenExternalPage 在原生端应用内新窗口打开外部页面。
  */
 export function OpenExternalPage(meta: $models.RequestMeta, input: $models.ExternalPageInput): $CancellablePromise<void> {
@@ -1169,6 +1176,13 @@ export function UpdateContact(meta: $models.RequestMeta, contactID: string, inpu
  */
 export function UpdateConversationNotificationSettings(meta: $models.RequestMeta, conversationID: string, input: $models.ConversationNotificationSettingsInput): $CancellablePromise<$models.ConversationNotificationSettings> {
     return $Call.ByID(379824806, meta, conversationID, input);
+}
+
+/**
+ * UpdateConversationPin 保存当前用户的会话置顶事实与置顶顺序。
+ */
+export function UpdateConversationPin(meta: $models.RequestMeta, conversationID: string, input: $models.ConversationPinInput): $CancellablePromise<$models.ConversationPinState> {
+    return $Call.ByID(617730515, meta, conversationID, input);
 }
 
 /**

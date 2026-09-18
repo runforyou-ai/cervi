@@ -5,7 +5,6 @@ const mobile = {
   logout: "Log out",
   loggingOut: "Logging out…",
   logoutError: "Could not log out. Please try again.",
-  identityLoadError: "Could not load the login status.",
   contacts: {
     loadingMore: "Loading more…",
     loadMoreError: "Could not load members",

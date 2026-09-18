@@ -31,21 +31,30 @@ func (q *LoadInboxQuery) ReadWindow(ctx context.Context, identity *servermodels.
 	if err != nil {
 		return ConversationWindow{}, err
 	}
-	if compareInboxPoints(start.inboxCursorPoint, end.inboxCursorPoint) > 0 {
+	if compareInboxPoints(query.Partition, start.inboxCursorPoint, end.inboxCursorPoint) > 0 {
 		return ConversationWindow{}, ErrQueryInvalid
 	}
 	var window ConversationWindow
 	err = q.db.RunInTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true}, func(ctx context.Context, tx bun.Tx) error {
 		snapshot := NewLoadInboxQuery(tx)
-		candidates := constrainInboxPoint(snapshot.candidatePointsQuery(identity, query), start.inboxCursorPoint, false, true)
-		candidates = constrainInboxPoint(candidates, end.inboxCursorPoint, true, true)
-		var points []inboxCursorPoint
-		if err := candidates.OrderExpr("last_activity_at DESC NULLS LAST, id DESC").Scan(ctx, &points); err != nil {
+		pinOrderVersion, err := snapshot.pinOrderVersion(ctx, identity)
+		if err != nil {
 			return err
 		}
-		var err error
+		if err := authorizeInboxCursor(start, query.Partition, pinOrderVersion); err != nil {
+			return err
+		}
+		if err := authorizeInboxCursor(end, query.Partition, pinOrderVersion); err != nil {
+			return err
+		}
+		candidates := constrainInboxPoint(snapshot.candidatePointsQuery(identity, query), query.Partition, start.inboxCursorPoint, false, true)
+		candidates = constrainInboxPoint(candidates, query.Partition, end.inboxCursorPoint, true, true)
+		var points []inboxCursorPoint
+		if err := orderInboxPoints(candidates, query.Partition, false).Scan(ctx, &points); err != nil {
+			return err
+		}
 		// 保留请求的范围，空区间也能继续重试或向两侧查找邻域。
-		window, err = snapshot.buildConversationWindow(ctx, identity, query, points, &start.inboxCursorPoint, &end.inboxCursorPoint)
+		window, err = snapshot.buildConversationWindow(ctx, identity, query, pinOrderVersion, points, &start.inboxCursorPoint, &end.inboxCursorPoint)
 		return err
 	})
 	return window, err

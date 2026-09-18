@@ -37,6 +37,9 @@ const (
 	ValidationBodyTooLong              ValidationCode = "body_too_long"
 	ValidationCursorInvalid            ValidationCode = "cursor_invalid"
 	ValidationFileIDInvalid            ValidationCode = "file_id_invalid"
+	ValidationNeighborIDInvalid        ValidationCode = "neighbor_id_invalid"
+	ValidationPinPositionInvalid       ValidationCode = "pin_position_invalid"
+	ValidationPinOrderVersionInvalid   ValidationCode = "pin_order_version_invalid"
 )
 
 const (
@@ -70,6 +73,10 @@ const (
 	ConflictReasonAttachmentTooLarge = "attachment_too_large"
 	// ConflictReasonCaptionTooLong 表示附件说明超过来源渠道的字符上限。
 	ConflictReasonCaptionTooLong = "caption_too_long"
+	// ConflictReasonPinOrderVersionStale 表示提交的置顶顺序版本不是当前版本。
+	ConflictReasonPinOrderVersionStale = "pin_order_version_stale"
+	// ConflictReasonPinNeighborNotPinned 表示置顶顺序的邻居会话当前不在置顶区。
+	ConflictReasonPinNeighborNotPinned = "pin_neighbor_not_pinned"
 )
 
 // ServiceSessionAssignee 定义客服处理周期负责人。
@@ -104,6 +111,28 @@ type WebsiteCustomerTextMessageInput struct {
 	Body             string
 }
 
+// WebsiteCustomerAttachmentMessageInput 定义网站访客发送的附件消息。
+type WebsiteCustomerAttachmentMessageInput struct {
+	ReplyToMessageID string
+	ChannelID        string
+	ExternalID       string
+	ConversationID   *string
+	ClientMessageID  string
+	FileID           string
+	Body             string
+	ImageWidth       int
+	ImageHeight      int
+}
+
+// WebsiteVisitorUploadInput 定义网站访客附件上传的渠道归属与文件元数据。
+type WebsiteVisitorUploadInput struct {
+	ChannelID   string
+	ExternalID  string
+	FileName    string
+	ContentType string
+	ByteSize    int64
+}
+
 // ConversationSummary 定义访客可见会话摘要。
 type ConversationSummary struct {
 	LastMessageSeq            int64
@@ -130,6 +159,7 @@ type Message struct {
 	ClientMessageID    *string
 	MessageSeq         int64
 	ReplyTo            *MessageReference
+	Attachment         *VisitorAttachment
 	ID                 string
 	Author             domain.MessageAuthor
 	SenderIdentityType *domain.OrganizationIdentityType
@@ -139,8 +169,9 @@ type Message struct {
 	CreatedAt          time.Time
 }
 
-// ReceiveWebsiteCustomerTextMessageResult 定义网站消息写入结果。
-type ReceiveWebsiteCustomerTextMessageResult struct {
+// ReceiveWebsiteCustomerMessageResult 定义网站消息写入结果。
+type ReceiveWebsiteCustomerMessageResult struct {
+	OrganizationID          string
 	Conversation            ConversationSummary
 	CreatedConversation     bool
 	OpenedNewServiceSession bool
@@ -164,9 +195,10 @@ type MessageHistoryInput struct {
 
 // MessageHistory 定义消息历史和下一页边界。
 type MessageHistory struct {
-	Messages []Message
-	Before   *MessageCursorPoint
-	After    *MessageCursorPoint
+	OrganizationID string
+	Messages       []Message
+	Before         *MessageCursorPoint
+	After          *MessageCursorPoint
 }
 
 // ConversationMessageSender 定义成员可见的消息发送主体。
@@ -430,6 +462,13 @@ type MessageAttachment struct {
 	ContentType    string                                 `bun:"content_type"`
 	ByteSize       int64                                  `bun:"byte_size"`
 	TransferStatus domain.MessageAttachmentTransferStatus `bun:"transfer_status"`
+}
+
+// VisitorAttachment 定义访客可见的附件元数据与内容存储位置。
+type VisitorAttachment struct {
+	MessageAttachment
+	StorageBackend domain.FileStorageBackend `bun:"storage_backend"`
+	StorageKey     string                    `bun:"storage_key"`
 }
 
 // CustomerAttachmentMessageInput 定义成员发送的客户会话附件消息。

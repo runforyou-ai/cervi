@@ -51,6 +51,7 @@ func applicationServices(
 		appservice.WithNativeNotification(notification),
 		appservice.WithUnreadIndicator(unreadIndicator),
 		appservice.WithExternalPageOpener(appservicenative.NewExternalPageOpener()),
+		appservice.WithConversationWindowOpener(appservicenative.NewConversationWindowOpener()),
 	)
 	return []application.Service{
 		application.NewServiceWithOptions(service, application.ServiceOptions{

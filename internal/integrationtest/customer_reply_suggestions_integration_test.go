@@ -56,7 +56,7 @@ func testCustomerReplySuggestions(t *testing.T, db *bun.DB, identity *servermode
 	if err != nil {
 		t.Fatal(err)
 	}
-	receive := conversationaction.NewReceiveWebsiteCustomerTextMessageAction(db, agentrunaction.NewScheduler(tasks))
+	receive := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, agentrunaction.NewScheduler(tasks))
 	visitor := conversationaction.WebsiteCustomerTextMessageInput{ChannelID: channel.ID, ExternalID: "web-session:" + strings.ReplaceAll(uuid.NewV7().String(), "-", ""), ClientMessageID: uuid.NewV7().String(), Body: "上一轮的问题"}
 	earlier, err := receive.Execute(ctx, visitor)
 	if err != nil {

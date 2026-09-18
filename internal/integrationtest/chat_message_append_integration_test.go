@@ -137,7 +137,7 @@ func TestTelegramAppendUsesLocalSequence(t *testing.T) {
 	input := channelaction.TelegramWebhookInput{Secret: "secret", UpdateID: 2, Message: &channelaction.TelegramWebhookMessage{
 		ChatID: 12345, SenderID: 12345, MessageID: 2, DisplayName: "Telegram 客户", Body: "晚到的旧消息", OriginatedAt: before.LastMessageAt.Add(-time.Hour),
 	}}
-	receive := channelaction.NewReceiveTelegramWebhookAction(f.db, agentrunaction.NewScheduler(servertask.New(f.db, serverconfig.NATSConfig{})), nil, nil)
+	receive := channelaction.NewReceiveTelegramWebhookAction(f.db, agentrunaction.NewScheduler(servertask.New(f.db, serverconfig.NATSConfig{})), nil, nil, nil, nil)
 	for range 2 {
 		if err := receive.Execute(ctx, f.channelID, input); err != nil {
 			t.Fatal(err)
@@ -173,7 +173,7 @@ func testWebsiteAppendRollback(t *testing.T, db *bun.DB, identity *servermodels.
 		t.Fatal(err)
 	}
 	failing := &failingMessageScheduler{inner: agentrunaction.NewScheduler(tasks), failure: errors.New("rollback visitor input")}
-	_, err = conversationaction.NewReceiveWebsiteCustomerTextMessageAction(db, failing).Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
+	_, err = conversationaction.NewReceiveWebsiteCustomerMessageAction(db, failing).Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
 		ChannelID: channel.ID, ExternalID: "web-session:0123456789abcdef0123456789abcdef", ClientMessageID: uuid.NewV7().String(), Body: "访客首发",
 	})
 	if !errors.Is(err, failing.failure) || len(failing.taskIDs) != 1 || failing.conversationID == "" {

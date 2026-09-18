@@ -2,6 +2,7 @@
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react"
 
 import {
+  InboxPartition,
   InboxScope,
   InboxSearchRange,
   readInboxConversations,
@@ -10,6 +11,7 @@ import {
   type InboxQuery,
   type InboxSearchResultData,
 } from "@/api"
+import type { InboxQueryInput } from "@/features/inbox/inbox-query"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 
@@ -42,7 +44,7 @@ export function useInboxSearchResults({
   range: InboxSearchRange
   conversationId: string
   type: InboxSearchType
-  query: InboxQuery
+  query: InboxQueryInput
   recentConversationIds: string[]
 }) {
   const trimmedText = text.trim()
@@ -78,9 +80,11 @@ export function useInboxSearchResults({
     { enabled: active && searchedText !== "", staleTime: 0 },
   )
   const showRecent = active && trimmedText === "" && !conversationRange
+  // 最近会话只核对当前筛选下的列表资格，不受置顶分区限制。
+  const recentQuery: InboxQuery = { ...query, partition: InboxPartition.InboxPartitionAll }
   const recent = useResource(
-    resourceKeys.recentConversations({ query, conversationIds: recentConversationIds }),
-    (signal) => readInboxConversations({ query, conversationIds: recentConversationIds }, signal),
+    resourceKeys.recentConversations({ query: recentQuery, conversationIds: recentConversationIds }),
+    (signal) => readInboxConversations({ query: recentQuery, conversationIds: recentConversationIds }, signal),
     { enabled: showRecent && recentConversationIds.length > 0, staleTime: 0 },
   )
 
@@ -110,7 +114,7 @@ export function useInboxSearch({
   recentConversationIds,
   onOpen,
 }: {
-  query: InboxQuery
+  query: InboxQueryInput
   recentConversationIds: string[]
   onOpen: (item: InboxSearchItem) => void
 }) {

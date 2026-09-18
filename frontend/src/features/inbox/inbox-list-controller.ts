@@ -25,6 +25,7 @@ export type InboxListState = {
   hasBefore: boolean
   hasAfter: boolean
   attentionUnreadCount: number
+  pinOrderVersion: string
   status: "initial" | "ready" | "loadingMore" | "refreshing"
   operation: InboxListOperation | null
   error: InboxListOperation | null
@@ -32,6 +33,9 @@ export type InboxListState = {
 }
 
 export type InboxListBookmark = { state: InboxListState; anchor: InboxListAnchor | null }
+
+/** bookmark 与 cached 恢复上次浏览窗口，locateId 指定进入列表时定位的会话，region 表示按置顶顺序整区读取。 */
+export type InboxListControllerOptions = { bookmark?: InboxListBookmark; cached?: boolean; locateId?: string | null; region?: boolean }
 
 export type InboxListPorts = {
   page: (cursor?: string, beforeCursor?: string) => Promise<Page>
@@ -50,7 +54,7 @@ export class InboxListController {
   private state: InboxListState = {
     ids: [], positions: [], rowIds: [], unavailableIds: [], startCursor: "", endCursor: "",
     hasBefore: false, hasAfter: false,
-    attentionUnreadCount: 0, status: "initial", operation: null, error: null, revision: 0,
+    attentionUnreadCount: 0, pinOrderVersion: "", status: "initial", operation: null, error: null, revision: 0,
   }
   private listeners = new Set<() => void>()
   private queue: InboxListOperation[] = []
@@ -61,11 +65,13 @@ export class InboxListController {
   private returnAnchor: InboxListAnchor | null = null
   private ports: InboxListPorts
   private query: InboxQuery
+  private region: boolean
 
-  /** 绑定当前页面的读取和视口适配器，locateId 指定进入列表时定位的会话。 */
-  constructor(ports: InboxListPorts, query: InboxQuery, bookmark?: InboxListBookmark, cached = false, locateId: string | null = null) {
+  /** 绑定当前页面的读取和视口适配器。 */
+  constructor(ports: InboxListPorts, query: InboxQuery, { bookmark, cached = false, locateId = null, region = false }: InboxListControllerOptions = {}) {
     this.ports = ports
     this.query = query
+    this.region = region
     // 定位锚点没有原位置，按邻居补偿把该会话对齐到窗口顶部。
     this.returnAnchor = bookmark?.anchor ?? (locateId ? { id: locateId, cursor: "", width: 0, height: 0, neighbors: [{ id: locateId, offset: 0 }] } : null)
     if (bookmark && cached) {
@@ -90,9 +96,13 @@ export class InboxListController {
   /** 以原后继、前驱替代已移动的锚点并保持阅读位置。 */
   private applyWindow(next: InboxListState, initial: boolean) {
     const positions = new Map(next.positions.map((row) => [row.id, row]))
-    const moved = new Set(this.state.positions.filter((row) => positions.get(row.id)?.lastActivityAt !== row.lastActivityAt).map((row) => row.id))
+    // 置顶区以前驱变化识别被移动的行，普通区以活动时间变化识别上浮的行。
+    const predecessors = new Map(next.positions.map((row, index) => [row.id, next.positions[index - 1]?.id]))
+    const moved = new Set(this.state.positions.filter((row, index) => this.region
+      ? predecessors.get(row.id) !== this.state.positions[index - 1]?.id
+      : positions.get(row.id)?.lastActivityAt !== row.lastActivityAt).map((row) => row.id))
     const anchor = initial ? this.returnAnchor : this.ports.capture()
-    if (anchor?.cursor && positions.has(anchor.id) && positions.get(anchor.id)!.positionCursor !== anchor.cursor) moved.add(anchor.id)
+    if (!this.region && anchor?.cursor && positions.has(anchor.id) && positions.get(anchor.id)!.positionCursor !== anchor.cursor) moved.add(anchor.id)
     const top = initial ? !anchor : !this.state.hasBefore && this.ports.atTop()
     this.ports.restore(anchor, moved, top)
     this.publish({ ...next, status: this.state.status, operation: this.state.operation, error: this.state.error, revision: this.state.revision + 1 })
@@ -183,6 +193,28 @@ export class InboxListController {
     }
   }
 
+  /** 按同一置顶顺序版本读取整个置顶区，途中版本变化或游标失效时舍弃本轮并从首页重读。 */
+  private async readRegion(): Promise<{ head: Page; window: Window }> {
+    let failure: unknown = new Error("置顶顺序持续变化")
+    for (let attempt = 0; attempt < 3; attempt++) {
+      const head = await this.ports.page()
+      const conversations = [...head.conversations]
+      let page = head
+      try {
+        while (page.hasMore && page.pinOrderVersion === head.pinOrderVersion) {
+          page = await this.ports.page(page.endCursor)
+          conversations.push(...page.conversations)
+        }
+      } catch (error) {
+        failure = error
+        continue
+      }
+      if (page.pinOrderVersion !== head.pinOrderVersion) continue
+      return { head, window: { ...head, conversations, endCursor: page.endCursor, hasBefore: false, hasAfter: false } }
+    }
+    throw failure
+  }
+
   /** 串行重读连续窗口，已覆盖顶部的窗口自动扩展到最新首页。 */
   private async execute(operation: InboxListOperation, generation: number) {
     const base = this.deferred ?? this.state
@@ -192,7 +224,9 @@ export class InboxListController {
     let head: Page | undefined
     let appendIds: string[] = []
     let window: Window
-    if (initial && this.returnAnchor) {
+    if (this.region) {
+      ({ head, window } = await this.readRegion())
+    } else if (initial && this.returnAnchor) {
       window = await this.ports.context(this.returnAnchor)
       // 定位锚点无法定位时读取首页，并从顶部展示；带原位置的锚点保留空邻域。
       if (!window.conversations.length && !this.returnAnchor.cursor) {
@@ -219,7 +253,7 @@ export class InboxListController {
       }
     }
     // 空区间只按本窗口内的锚点恢复。
-    if (!initial && !window.conversations.length && anchor && base.positions.some((row) => row.id === anchor.id)) window = await this.ports.context(anchor)
+    if (!this.region && !initial && !window.conversations.length && anchor && base.positions.some((row) => row.id === anchor.id)) window = await this.ports.context(anchor)
     if (generation !== this.generation) return
     const rowIds = [...new Set([...this.state.ids, ...window.conversations.map((row) => row.id)])].sort()
     const rows = await this.ports.rows(rowIds)
@@ -237,6 +271,7 @@ export class InboxListController {
       startCursor: window.startCursor, endCursor: window.endCursor,
       hasBefore: window.hasBefore, hasAfter: window.hasAfter,
       attentionUnreadCount: head?.attentionUnreadCount ?? this.state.attentionUnreadCount,
+      pinOrderVersion: window.pinOrderVersion,
       error: null,
     }
     const unavailable = rows.results.filter((row) => row.availability === "unavailable" && this.state.ids.includes(row.id)).map((row) => row.id)
@@ -250,6 +285,7 @@ export class InboxListController {
         ids: [...this.state.ids.filter((id) => matching.has(id)), ...tail.map((row) => row.id)],
         positions: [...this.state.positions.filter((row) => matching.has(row.id)), ...tail],
         ...(appendIds.length ? { endCursor: next.endCursor, hasAfter: next.hasAfter } : {}),
+        // 顺序版本随待应用的顺序一起提交，展示中的顺序与写入使用的版本始终是同一份快照。
         rowIds, attentionUnreadCount: next.attentionUnreadCount,
       })
     } else {

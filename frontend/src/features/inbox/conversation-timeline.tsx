@@ -809,6 +809,19 @@ function ConversationTimelineContent({
                 message.visibility === MessageVisibility.MessageVisibilityInternalOnly
               // 内部备注的重试不受对客发送资格限制，仍与发送中的文本互斥。
               const messageRetryDisabled = internalNote ? sendingText : textRetryDisabled
+              // 成员发往外部渠道的文本与附件共用同一份投递状态。
+              const renderDeliveryState = customerDeliveries && !agentNotice && !internalNote && (message.local || message.sender?.kind === ChatSubjectKind.ChatSubjectKindOrganizationIdentity) ? (className?: string) => (
+                <CustomerDeliveryState
+                  className={className}
+                  conversationID={conversationID}
+                  delivery={message.persistedMessageID ? deliveriesByMessage.get(message.persistedMessageID) : undefined}
+                  loadingError={Boolean(message.persistedMessageID && deliveries.error)}
+                  onRefresh={() => void deliveries.refresh()}
+                  localFailed={!message.attachment && message.deliveryStatus === "failed"}
+                  onRetryLocal={failedDraft && onRetryFailedMessage ? () => onRetryFailedMessage(failedDraft) : undefined}
+                  retryLocalDisabled={messageRetryDisabled}
+                />
+              ) : undefined
               // 引用落入的输入模式：当前处于备注模式，或这条消息不能用于对客回复时，都写入内部备注。
               const quoteAsNote =
                 noteReplyEnabled &&
@@ -1013,7 +1026,7 @@ function ConversationTimelineContent({
                                       <span className={agentError ? "text-destructive" : "text-muted-foreground"}>{t(agentError ? "agentRunFailed" : "agentReplyStopped")}</span>
                                     ) : message.attachment ? (
                                       <ConversationAttachment retryDisabled={retryFailedMessageDisabled} body={message.body} attachment={message.attachment} conversationID={conversationID} messageID={message.persistedMessageID ?? message.id}
-                                        originatedAt={message.originatedAt} timeLabel={dateFormatters.clock.format(date)} timeTitle={dateFormatters.full.format(date)} incoming={incoming} bubbleClassName={bubbleClassName} />
+                                        originatedAt={message.originatedAt} timeLabel={dateFormatters.clock.format(date)} timeTitle={dateFormatters.full.format(date)} incoming={incoming} bubbleClassName={bubbleClassName} renderDeliveryState={renderDeliveryState} />
                                     ) : message.sender?.identityType === OrganizationIdentityType.OrganizationIdentityTypeAgent ? (
                                       <div className="min-w-0 flex-1">
                                         <MessageMarkdown
@@ -1042,17 +1055,8 @@ function ConversationTimelineContent({
                                       >
                                         {dateFormatters.clock.format(date)}
                                       </time>
-                                      {customerDeliveries && !agentNotice && !internalNote && (message.local || message.sender?.kind === ChatSubjectKind.ChatSubjectKindOrganizationIdentity) ? (
-                                        <CustomerDeliveryState
-                                          conversationID={conversationID}
-                                          delivery={message.persistedMessageID ? deliveriesByMessage.get(message.persistedMessageID) : undefined}
-                                          loadingError={Boolean(message.persistedMessageID && deliveries.error)}
-                                          onRefresh={() => void deliveries.refresh()}
-                                          localFailed={message.deliveryStatus === "failed"}
-                                          onRetryLocal={failedDraft && onRetryFailedMessage ? () => onRetryFailedMessage(failedDraft) : undefined}
-                                          retryLocalDisabled={messageRetryDisabled}
-                                        />
-                                      ) : message.deliveryStatus ? (
+                                      {renderDeliveryState ? renderDeliveryState()
+                                      : message.deliveryStatus ? (
                                         <div className="inline-flex items-center gap-1.5 text-[11px]">
                                           <MessageSendState
                                             state={message.deliveryStatus === "failed" ? "attention" : "sending"}

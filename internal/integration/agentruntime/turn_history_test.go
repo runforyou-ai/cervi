@@ -61,3 +61,17 @@ func TestTurnHistoryDropsUnansweredCalls(t *testing.T) {
 		t.Fatal("history modified original events")
 	}
 }
+
+// TestTurnHistoryReappendsRevisedMessage 验证同一消息在修订变化后重新进入历史，修订未变时仍按编号去重。
+func TestTurnHistoryReappendsRevisedMessage(t *testing.T) {
+	history := &turnHistory{}
+	pending := Message{ID: "1", Revision: "pending", Role: MessageRoleUser, Content: "照片接收中"}
+	history.appendInput(context.Background(), []Message{pending}, mediaInput{})
+	history.appendOutput([]*schema.AgenticMessage{assistantReply("请稍等")})
+	ready := Message{ID: "1", Revision: "ready", Role: MessageRoleUser, Content: "照片已就绪"}
+	got := history.appendInput(context.Background(), []Message{pending, ready}, mediaInput{})
+	want := []*schema.AgenticMessage{schema.UserAgenticMessage("照片接收中"), assistantReply("请稍等"), schema.UserAgenticMessage("照片已就绪")}
+	if !reflect.DeepEqual(got, want) {
+		t.Fatalf("history = %#v, want %#v", got, want)
+	}
+}

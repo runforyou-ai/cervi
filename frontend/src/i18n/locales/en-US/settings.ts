@@ -74,7 +74,7 @@ const settings = {
       title: "Notifications",
       newMessages: "New message notifications",
       newMessagesDescription:
-        "Web and desktop notify you about new messages while you are working. Notifications pause while you are taking a break or off work.",
+        "Cervi notifies you about new messages while you are working. Notifications pause while you are taking a break or off work.",
       sound: "Play the system default notification sound",
       soundDescription:
         "Only affects this device and plays the system default sound for new messages.",

@@ -585,6 +585,9 @@ button.cv-message-reference { cursor: pointer; }
 .cv-file-asset audio { display: block; width: 100%; }
 .cv-file-asset strong { display: block; overflow: hidden; font-size: 12px; text-overflow: ellipsis; white-space: nowrap; }
 .cv-file-asset span { display: block; margin-top: 3px; color: var(--cv-muted-foreground); font-size: 10px; }
+.cv-attachment-meta { display: flex; align-items: center; gap: 8px; }
+.cv-attachment-status { color: var(--cv-muted-foreground); font-size: 10px; }
+.cv-attachment-action { border: 0; padding: 0; background: transparent; color: var(--cv-theme); font-size: 10px; cursor: pointer; }
 .cv-voice-message { display: flex; min-width: 190px; align-items: center; gap: 10px; }
 .cv-voice-play { display: grid; width: 30px; height: 30px; flex: 0 0 auto; place-items: center; border: 0; border-radius: 999px; background: currentColor; cursor: pointer; }
 .cv-voice-play::before { content: ""; margin-left: 2px; border-top: 5px solid transparent; border-bottom: 5px solid transparent; border-left: 7px solid var(--cv-theme); }
@@ -615,35 +618,21 @@ button.cv-message-reference { cursor: pointer; }
 }
 .cv-composer-main,
 .cv-recording {
-  min-height: 96px;
+  min-height: 44px;
   border: 1px solid #d8d8dd;
   border-radius: 22px;
   background: #fff;
   box-shadow: 0 4px 20px -16px rgba(15, 23, 42, 0.45);
 }
-.cv-composer-main { position: relative; display: flex; flex-direction: column; padding: 10px 10px 8px 14px; }
-.cv-composer-resize {
-  position: absolute;
-  z-index: 2;
-  top: 0;
-  right: 0;
-  left: 0;
-  height: 14px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  cursor: row-resize;
-  touch-action: none;
-  transform: translateY(-50%);
-}
+.cv-composer-main { position: relative; display: flex; flex-direction: column; padding: 3px; }
 #cv-input {
   display: block;
-  width: 100%;
-  min-height: 26px;
+  min-width: 0;
+  min-height: 36px;
   max-height: 200px;
-  flex: 0 0 auto;
-  margin: 1px 0 3px;
-  padding: 0 2px 0 0;
+  flex: 1 1 auto;
+  margin: 0;
+  padding: 7px 4px;
   overflow-y: hidden;
   border: 0;
   outline: 0;
@@ -652,12 +641,13 @@ button.cv-message-reference { cursor: pointer; }
   line-height: 22px;
   resize: none;
 }
-.cv-composer-bar { display: flex; align-items: center; justify-content: space-between; }
-.cv-composer-tools { display: flex; align-items: center; gap: 1px; }
+.cv-composer-bar { display: flex; align-items: flex-end; gap: 1px; }
 .cv-emoji-tool { position: relative; display: flex; flex: 0 0 auto; }
-.cv-tool { width: 40px; height: 40px; color: #73737c; }
-.cv-tool svg { width: 19px; height: 19px; }
-.cv-send { width: 36px; height: 36px; border-radius: 999px; background: var(--cv-theme); color: var(--cv-on-theme); }
+.cv-tool { position: relative; width: 36px; height: 36px; border-radius: 999px; color: #73737c; }
+.cv-tool::after,
+.cv-send::after { position: absolute; inset: -4px; content: ""; }
+.cv-tool svg { width: 20px; height: 20px; }
+.cv-send { position: relative; width: 36px; height: 36px; border-radius: 999px; background: var(--cv-theme); color: var(--cv-on-theme); }
 .cv-send svg { width: 18px; height: 18px; }
 .cv-send:disabled { background: var(--cv-surface-strong); color: #b0b0b7; cursor: default; transform: none; }
 .cv-tool:disabled { opacity: 0.4; cursor: default; }
@@ -665,7 +655,7 @@ button.cv-message-reference { cursor: pointer; }
   position: absolute;
   z-index: 14;
   bottom: calc(100% + 8px);
-  left: -41px;
+  left: -4px;
   display: grid;
   width: min(292px, calc(100vw - 28px));
   max-height: 206px;
@@ -682,12 +672,11 @@ button.cv-message-reference { cursor: pointer; }
 .cv-picker > button:hover { background: var(--cv-surface-strong); }
 .cv-recording {
   display: flex;
-  min-height: 68px;
   align-items: center;
   gap: 10px;
-  padding: 9px 10px 9px 12px;
+  padding: 3px 3px 3px 6px;
 }
-.cv-record-action { width: 38px; height: 38px; }
+.cv-record-action { width: 36px; height: 36px; }
 .cv-waveform { display: flex; min-width: 0; flex: 1; align-items: center; gap: 3px; }
 .cv-waveform i { width: 2px; height: 12px; border-radius: 999px; background: color-mix(in srgb, var(--cv-theme) 65%, #71717a); animation: cv-wave 720ms ease-in-out infinite alternate; }
 .cv-waveform i:nth-child(2n) { height: 22px; animation-delay: -180ms; }
@@ -695,7 +684,7 @@ button.cv-message-reference { cursor: pointer; }
 .cv-waveform i:nth-child(5n) { height: 28px; animation-delay: -480ms; }
 @keyframes cv-wave { from { transform: scaleY(0.45); } to { transform: scaleY(1); } }
 .cv-recording time { width: 34px; color: var(--cv-muted-foreground); font-size: 10px; font-variant-numeric: tabular-nums; }
-.cv-record-stop { width: 42px; height: 42px; border-radius: 999px; background: var(--cv-theme); }
+.cv-record-stop { width: 36px; height: 36px; border-radius: 999px; background: var(--cv-theme); }
 .cv-record-stop span { width: 12px; height: 12px; border-radius: 3px; background: var(--cv-on-theme); }
 
 /* 媒体与不可用页面 */
@@ -769,7 +758,7 @@ html.cv-preview body { background: transparent; }
 .cv-message-menu { position: fixed; z-index: 40; min-width: 120px; padding: 4px; border: 1px solid var(--cv-border); border-radius: 8px; background: var(--cv-background); box-shadow: 0 4px 16px #0002; }
 .cv-message-menu button { width: 100%; border: 0; border-radius: 4px; padding: 8px; background: transparent; color: var(--cv-foreground); text-align: left; cursor: pointer; }
 .cv-message-menu button:hover, .cv-message-menu button:focus-visible { background: var(--cv-surface-strong); }
-.cv-composer-reference { display: flex; align-items: flex-start; gap: 12px; margin: 4px 0 10px; border-left: 2px solid var(--cv-theme); padding-left: 8px; font-size: 12px; line-height: 18px; }
+.cv-composer-reference { display: flex; align-items: flex-start; gap: 12px; margin: 7px 10px 5px 12px; border-left: 2px solid var(--cv-theme); padding-left: 8px; font-size: 12px; line-height: 18px; }
 .cv-composer-reference > div { min-width: 0; flex: 1; overflow-wrap: anywhere; white-space: pre-wrap; }
 .cv-composer-reference button { flex-shrink: 0; border: 0; background: transparent; color: var(--cv-muted-foreground); font-size: 12px; cursor: pointer; }
 .cv-message-highlight .cv-message-bubble { outline: 2px solid var(--cv-theme); outline-offset: 3px; }

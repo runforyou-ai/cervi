@@ -311,7 +311,7 @@ func loadClaimedConversationMessages(ctx context.Context, db bun.IDB, run *serve
 			}{Sender: sender, Body: row.Body, Attachment: attachment, ReplyTo: replyTo})
 			content = string(encoded)
 		}
-		messages = append(messages, agentruntime.Message{ID: row.ID, Role: role, Content: content, Media: row.media()})
+		messages = append(messages, agentruntime.Message{ID: row.ID, Revision: row.revision(), Role: role, Content: content, Media: row.media()})
 	}
 	return messages, nil
 }

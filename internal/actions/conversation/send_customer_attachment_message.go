@@ -129,7 +129,7 @@ func lockCustomerAttachmentFile(ctx context.Context, tx bun.Tx, identity *server
 	if file.Status != string(domain.FileStatusUploaded) || file.Expired {
 		return nil, fileaction.ErrFileNotFound
 	}
-	if limit := domain.ChannelAttachmentLimit(channelType, file.ContentType); limit > 0 && file.ByteSize > limit {
+	if limit := domain.ChannelAttachmentLimit(channelType); limit > 0 && file.ByteSize > limit {
 		return nil, &ConflictError{Reason: ConflictReasonAttachmentTooLarge}
 	}
 	if _, err := tx.NewUpdate().Model(file).Set("status = ?", domain.FileStatusActive).Set("expires_at = NULL").Set("updated_at = now()").WherePK().Exec(ctx); err != nil {
@@ -142,11 +142,11 @@ func lockCustomerAttachmentFile(ctx context.Context, tx bun.Tx, identity *server
 }
 
 // saveCustomerAttachment 写入客户会话消息的附件关联。
-func saveCustomerAttachment(ctx context.Context, tx bun.Tx, organizationID, messageID string, attachment MessageAttachment) error {
+func saveCustomerAttachment(ctx context.Context, tx bun.IDB, organizationID, messageID string, attachment MessageAttachment) error {
 	if _, err := tx.NewRaw(`INSERT INTO message_attachments
  (message_id, organization_id, file_id, name, content_type, byte_size, image_width, image_height, transfer_status)
  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		messageID, organizationID, attachment.ID, attachment.Name, attachment.ContentType, attachment.ByteSize,
+		messageID, organizationID, common.OptionalString(attachment.ID), attachment.Name, attachment.ContentType, attachment.ByteSize,
 		attachment.ImageWidth, attachment.ImageHeight, attachment.TransferStatus).Exec(ctx); err != nil {
 		return fmt.Errorf("save customer message attachment: %w", err)
 	}

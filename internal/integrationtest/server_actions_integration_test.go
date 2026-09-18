@@ -430,7 +430,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		telegramAvatarFiles := fileaction.NewImportAction(db, func(context.Context, string) (domain.FileStorageBackend, error) {
 			return domain.FileStorageBackendLocal, nil
 		}, importedAvatarWriter)
-		receiveTelegram := channelaction.NewReceiveTelegramWebhookAction(db, agentrunaction.NewScheduler(servertask.New(db, serverconfig.NATSConfig{})), telegramAvatarAPI, telegramAvatarFiles)
+		receiveTelegram := channelaction.NewReceiveTelegramWebhookAction(db, agentrunaction.NewScheduler(servertask.New(db, serverconfig.NATSConfig{})), telegramAvatarAPI, telegramAvatarFiles, nil, nil)
 		if err := receiveTelegram.Preflight(context.Background(), telegramChannel.ID, "wrong-secret"); !errors.Is(err, channelaction.ErrTelegramWebhookUnauthorized) {
 			t.Fatalf("wrong secret error = %v", err)
 		}
@@ -1682,7 +1682,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		publicQueueInbound, err := conversationaction.NewReceiveWebsiteCustomerTextMessageAction(db, scheduler).Execute(context.Background(), conversationaction.WebsiteCustomerTextMessageInput{
+		publicQueueInbound, err := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, scheduler).Execute(context.Background(), conversationaction.WebsiteCustomerTextMessageInput{
 			ChannelID: channel.ID, ExternalID: "web-session:fedcba9876543210fedcba9876543210",
 			ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f92", Body: "需要人工接待",
 		})
@@ -1760,11 +1760,11 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			ChannelID: channel.ID, ExternalID: "web-session:0123456789abcdef0123456789abcdef",
 			ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f80", Body: "需要 AI 接待",
 		}
-		websiteInbound, err := conversationaction.NewReceiveWebsiteCustomerTextMessageAction(db, scheduler).Execute(context.Background(), websiteMessageInput)
+		websiteInbound, err := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, scheduler).Execute(context.Background(), websiteMessageInput)
 		if err != nil {
 			t.Fatal(err)
 		}
-		websiteRetried, err := conversationaction.NewReceiveWebsiteCustomerTextMessageAction(db, scheduler).Execute(context.Background(), websiteMessageInput)
+		websiteRetried, err := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, scheduler).Execute(context.Background(), websiteMessageInput)
 		if err != nil || websiteRetried.Message.ID != websiteInbound.Message.ID {
 			t.Fatalf("idempotent website message = %#v, error = %v", websiteRetried, err)
 		}
@@ -1936,7 +1936,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatalf("direct run scope fields = %#v", run)
 		}
 		websiteConversationID := websiteInbound.Conversation.ID
-		if _, err := conversationaction.NewReceiveWebsiteCustomerTextMessageAction(db, scheduler).Execute(context.Background(), conversationaction.WebsiteCustomerTextMessageInput{
+		if _, err := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, scheduler).Execute(context.Background(), conversationaction.WebsiteCustomerTextMessageInput{
 			ChannelID: channel.ID, ExternalID: "web-session:0123456789abcdef0123456789abcdef",
 			ConversationID: &websiteConversationID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f81", Body: "接管前的新问题",
 		}); err != nil {
@@ -2022,7 +2022,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			if firstClaim.EndSeq != 4 || len(firstClaim.Messages) == 0 || firstClaim.Messages[len(firstClaim.Messages)-1].Content != "接管前的新问题" {
 				return agentruntime.RunResult{}, fmt.Errorf("unexpected initial customer claim: %#v", firstClaim)
 			}
-			if _, err := conversationaction.NewReceiveWebsiteCustomerTextMessageAction(db, scheduler).Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
+			if _, err := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, scheduler).Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
 				ChannelID: channel.ID, ExternalID: "web-session:0123456789abcdef0123456789abcdef",
 				ConversationID: &websiteConversationID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f84", Body: "运行中的补充信息",
 			}); err != nil {

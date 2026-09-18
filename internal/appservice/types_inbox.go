@@ -43,8 +43,42 @@ const (
 	CustomerInboxViewCoworkers CustomerInboxView = CustomerInboxView(domain.CustomerInboxViewCoworkers)
 )
 
+// InboxPartition 表示统一收件箱的置顶分区。
+type InboxPartition string
+
+const (
+	InboxPartitionAll     InboxPartition = InboxPartition(domain.InboxPartitionAll)
+	InboxPartitionPinned  InboxPartition = InboxPartition(domain.InboxPartitionPinned)
+	InboxPartitionRegular InboxPartition = InboxPartition(domain.InboxPartitionRegular)
+)
+
+// ConversationPinPosition 表示置顶顺序中的落点：before 与 after 相对邻居会话，start 与 end 指整个置顶区的首尾。
+type ConversationPinPosition string
+
+const (
+	ConversationPinPositionBefore ConversationPinPosition = ConversationPinPosition(domain.ConversationPinPositionBefore)
+	ConversationPinPositionAfter  ConversationPinPosition = ConversationPinPosition(domain.ConversationPinPositionAfter)
+	ConversationPinPositionStart  ConversationPinPosition = ConversationPinPosition(domain.ConversationPinPositionStart)
+	ConversationPinPositionEnd    ConversationPinPosition = ConversationPinPosition(domain.ConversationPinPositionEnd)
+)
+
+// ConversationPinInput 定义个人置顶写入；position 为空表示新置顶追加到末尾、已置顶保持原位，取消置顶不接受位置指令。
+type ConversationPinInput struct {
+	Pinned                  bool                    `json:"pinned"`
+	NeighborID              string                  `json:"neighborId"`
+	Position                ConversationPinPosition `json:"position"`
+	ExpectedPinOrderVersion string                  `json:"expectedPinOrderVersion"`
+}
+
+// ConversationPinState 返回写入后的个人置顶事实与顺序版本。
+type ConversationPinState struct {
+	Pinned          bool   `json:"pinned"`
+	PinOrderVersion string `json:"pinOrderVersion"`
+}
+
 // InboxQuery 定义与分页边界无关的会话筛选。
 type InboxQuery struct {
+	Partition          InboxPartition       `json:"partition" query:"partition"`
 	Scope              InboxScope           `json:"scope" query:"scope"`
 	CustomerView       CustomerInboxView    `json:"customerView" query:"customerView"`
 	AssigneeIdentityID string               `json:"assigneeIdentityId" query:"assigneeIdentityId"`
@@ -55,6 +89,7 @@ type InboxQuery struct {
 
 // LoadInboxInput 定义统一收件箱筛选和分页边界。
 type LoadInboxInput struct {
+	Partition          InboxPartition       `json:"partition" query:"partition"`
 	Scope              InboxScope           `json:"scope" query:"scope"`
 	CustomerView       CustomerInboxView    `json:"customerView" query:"customerView"`
 	AssigneeIdentityID string               `json:"assigneeIdentityId" query:"assigneeIdentityId"`
@@ -69,7 +104,8 @@ type LoadInboxInput struct {
 // query 返回不含分页边界的会话筛选。
 func (input LoadInboxInput) query() InboxQuery {
 	return InboxQuery{
-		Scope: input.Scope, CustomerView: input.CustomerView, AssigneeIdentityID: input.AssigneeIdentityID,
+		Partition: input.Partition,
+		Scope:     input.Scope, CustomerView: input.CustomerView, AssigneeIdentityID: input.AssigneeIdentityID,
 		ChannelID: input.ChannelID, ServiceStatus: input.ServiceStatus, Kinds: input.Kinds,
 	}
 }
@@ -173,27 +209,31 @@ type GroupInboxConversation struct {
 // InboxConversation 定义成员统一收件箱列表项。
 type InboxConversation struct {
 	// PositionCursor 保存列表窗口和匹配锚点的查询位置。
-	PositionCursor       string                     `json:"positionCursor"`
-	LastActivityAt       *time.Time                 `json:"lastActivityAt"`
-	LastMessageType      *MessageType               `json:"lastMessageType"`
-	ID                   string                     `json:"id"`
-	Type                 ConversationType           `json:"type"`
-	UnreadCount          int                        `json:"unreadCount"`
-	MentionedUnreadCount int                        `json:"mentionedUnreadCount"`
-	MarkedUnread         bool                       `json:"markedUnread"`
-	Muted                bool                       `json:"muted"`
-	LastMessageID        *string                    `json:"lastMessageId"`
-	LastReadMessageID    *string                    `json:"lastReadMessageId"`
-	Agent                *AgentInboxConversation    `json:"agent"`
-	Customer             *CustomerInboxConversation `json:"customer"`
-	Direct               *DirectInboxConversation   `json:"direct"`
-	Group                *GroupInboxConversation    `json:"group"`
+	PositionCursor       string           `json:"positionCursor"`
+	LastActivityAt       *time.Time       `json:"lastActivityAt"`
+	LastMessageType      *MessageType     `json:"lastMessageType"`
+	ID                   string           `json:"id"`
+	Type                 ConversationType `json:"type"`
+	UnreadCount          int              `json:"unreadCount"`
+	MentionedUnreadCount int              `json:"mentionedUnreadCount"`
+	MarkedUnread         bool             `json:"markedUnread"`
+	Muted                bool             `json:"muted"`
+	// Pinned 表示当前用户已把该会话放入个人置顶区。
+	Pinned            bool                       `json:"pinned"`
+	LastMessageID     *string                    `json:"lastMessageId"`
+	LastReadMessageID *string                    `json:"lastReadMessageId"`
+	Agent             *AgentInboxConversation    `json:"agent"`
+	Customer          *CustomerInboxConversation `json:"customer"`
+	Direct            *DirectInboxConversation   `json:"direct"`
+	Group             *GroupInboxConversation    `json:"group"`
 }
 
 // Inbox 定义成员收件箱查询结果。
 type Inbox struct {
-	StartCursor          string              `json:"startCursor"`
-	EndCursor            string              `json:"endCursor"`
+	StartCursor string `json:"startCursor"`
+	EndCursor   string `json:"endCursor"`
+	// PinOrderVersion 是本人置顶顺序的当前版本，置顶写入以它作为并发校验依据。
+	PinOrderVersion      string              `json:"pinOrderVersion"`
 	HasBefore            bool                `json:"hasBefore"`
 	Conversations        []InboxConversation `json:"conversations"`
 	NextCursor           string              `json:"nextCursor"`
@@ -247,11 +287,12 @@ type InboxWindowInput struct {
 
 // InboxWindow 保存连续范围和双向续读位置，空范围仍可保留原边界。
 type InboxWindow struct {
-	Conversations []InboxConversation `json:"conversations"`
-	StartCursor   string              `json:"startCursor"`
-	EndCursor     string              `json:"endCursor"`
-	HasBefore     bool                `json:"hasBefore"`
-	HasAfter      bool                `json:"hasAfter"`
+	Conversations   []InboxConversation `json:"conversations"`
+	StartCursor     string              `json:"startCursor"`
+	EndCursor       string              `json:"endCursor"`
+	PinOrderVersion string              `json:"pinOrderVersion"`
+	HasBefore       bool                `json:"hasBefore"`
+	HasAfter        bool                `json:"hasAfter"`
 }
 
 // InboxContext 独立返回锚点资格，列表只渲染 Window，Anchor 可与窗口行重叠。
@@ -265,6 +306,7 @@ type SyncHeads struct {
 	ConversationCount      int    `json:"conversationCount"`
 	ConversationChecksum   string `json:"conversationChecksum"`
 	IdentityProfileVersion string `json:"identityProfileVersion"`
+	PinOrderVersion        string `json:"pinOrderVersion"`
 }
 
 // InboxSearchRange 表示收件箱检索范围。

@@ -34,6 +34,7 @@ import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceRemover } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { cn } from "@/lib/utils"
+import { mobileComposerToolClass } from "@/features/inbox/mobile-composer-tool"
 
 const replySourceDebounceDelay = 600
 
@@ -219,7 +220,7 @@ export function CustomerReplyAssistant({
       type="button"
       variant="ghost"
       size="icon-sm"
-      className={mobile ? "size-11" : undefined}
+      className={mobile ? mobileComposerToolClass : undefined}
       disabled={disabled}
       aria-label={t("replyAssistant")}
       title={t("replyAssistant")}

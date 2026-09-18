@@ -120,14 +120,14 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	// 组装企业成员与网站匿名访客各自的业务入口。
 	directBackend := appservice.NewDirectBackend(appStorage.DB(), localFiles, tenantResolver, agentRunScheduler, executeAgentRun, tasks, documentConverter, customerReplySuggestions)
 	boundService := appservice.New(directBackend)
-	websiteVisitorBackend := appservice.NewWebsiteVisitorDirectBackend(appStorage.DB(), agentRunScheduler)
+	websiteVisitorBackend := appservice.NewWebsiteVisitorDirectBackend(appStorage.DB(), agentRunScheduler, localFiles)
 	websiteVisitorService := appservice.NewWebsiteVisitorService(websiteVisitorBackend)
 	// 实时网关复用成员业务调用的身份解析与同步探针，以及访客的渠道身份解析。
 	realtimeGateway := gateway.New(directBackend, websiteVisitorBackend, config.NATS.Namespace, gateway.DefaultOptions())
 
 	// 注册客户消息发送与扫描任务，每五秒扫描一次待投递消息。
 	telegramAPI := telegramintegration.NewClient(connectiontest.NewHTTPClient())
-	deliveryWorker := deliveryaction.NewWorker(appStorage.DB(), telegramAPI, tasks)
+	deliveryWorker := deliveryaction.NewWorker(appStorage.DB(), telegramAPI, fileReader, tasks)
 	if err := tasks.Registry().RegisterJSON(deliveryaction.SendActionName, deliveryWorker.Execute); err != nil {
 		return nil, nil, err
 	}
@@ -139,9 +139,9 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 		Payload: struct{}{}, CronExpression: "@every 5s", Timezone: "UTC", Enabled: true, MaxAttempts: 1, StartImmediately: true,
 	})
 
-	// 按企业存储设置导入 Telegram 头像，并接入渠道 Webhook。
+	// 按企业存储设置导入 Telegram 头像与入站媒体，注册媒体取回任务及最终失败时的附件终态，并接入渠道 Webhook。
 	getS3Setting := settingaction.NewGetS3SettingQuery(appStorage.DB())
-	telegramAvatarFiles := fileaction.NewImportAction(appStorage.DB(), func(ctx context.Context, organizationID string) (domain.FileStorageBackend, error) {
+	resolveStorageBackend := func(ctx context.Context, organizationID string) (domain.FileStorageBackend, error) {
 		setting, err := getS3Setting.ExecuteForOrganization(ctx, organizationID)
 		if err != nil {
 			return "", err
@@ -150,8 +150,14 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 			return domain.FileStorageBackendS3, nil
 		}
 		return domain.FileStorageBackendLocal, nil
-	}, serverfilecontent.NewWriter(localFiles, resolveFileS3))
-	telegramWebhook := channelaction.NewReceiveTelegramWebhookAction(appStorage.DB(), agentRunScheduler, telegramAPI, telegramAvatarFiles)
+	}
+	fileWriter := serverfilecontent.NewWriter(localFiles, resolveFileS3)
+	telegramAvatarFiles := fileaction.NewImportAction(appStorage.DB(), resolveStorageBackend, fileWriter)
+	retrieveTelegramMedia := channelaction.NewRetrieveTelegramMediaAction(appStorage.DB(), telegramAPI, fileWriter, agentRunScheduler)
+	if err := tasks.Registry().RegisterJSONWithTerminalFailure(channelaction.RetrieveTelegramMediaActionName, retrieveTelegramMedia.Execute, retrieveTelegramMedia.FinalizeFailure); err != nil {
+		return nil, nil, err
+	}
+	telegramWebhook := channelaction.NewReceiveTelegramWebhookAction(appStorage.DB(), agentRunScheduler, telegramAPI, telegramAvatarFiles, resolveStorageBackend, tasks)
 
 	// 将业务入口适配为 HTTP API，并为公开网站渠道提供配置查询。
 	httpAPI := api.NewService(

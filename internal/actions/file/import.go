@@ -109,3 +109,35 @@ func (a *ImportAction) Execute(ctx context.Context, input ImportInput) (*serverm
 	}
 	return record, nil
 }
+
+// CreateExternalAttachment 在调用方事务内写入外部渠道媒体取回前的 pending 消息附件文件记录，内容由取回任务写入后激活。
+func CreateExternalAttachment(ctx context.Context, db bun.IDB, organizationID, createdByUserID, externalID string, backend domain.FileStorageBackend, input UploadInput) (*servermodels.File, error) {
+	if !common.ValidUUID(organizationID) || !common.ValidUUID(createdByUserID) {
+		return nil, errors.New("invalid external attachment owner")
+	}
+	externalID = strings.TrimSpace(externalID)
+	if externalID == "" {
+		return nil, errors.New("external attachment external ID is required")
+	}
+	if backend != domain.FileStorageBackendLocal && backend != domain.FileStorageBackendS3 {
+		return nil, fmt.Errorf("invalid external attachment storage backend %q", backend)
+	}
+	metadata, fields := normalizeFileInput(input, domain.FilePurposeMessageAttachment)
+	if len(fields) > 0 {
+		return nil, &ValidationError{Fields: fields}
+	}
+	fileID := uuid.NewV7()
+	record := &servermodels.File{
+		ID: fileID.String(), OrganizationID: organizationID, CreatedByUserID: createdByUserID,
+		Purpose: string(domain.FilePurposeMessageAttachment), ExternalID: &externalID, StorageBackend: string(backend),
+		StorageKey:   storageKey(organizationID, fileID.String(), metadata.FileName, metadata.ContentType),
+		OriginalName: metadata.FileName, ContentType: metadata.ContentType, ByteSize: metadata.ByteSize,
+		Status: string(domain.FileStatusPending),
+	}
+	if _, err := db.NewInsert().Model(record).
+		Value("expires_at", "now() + make_interval(secs => ?)", temporaryFileLifetime.Seconds()).
+		Returning("expires_at, created_at, updated_at").Exec(ctx); err != nil {
+		return nil, fmt.Errorf("create external attachment file: %w", err)
+	}
+	return record, nil
+}

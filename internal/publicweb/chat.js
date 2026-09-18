@@ -26,8 +26,6 @@
 
   var MAX_ATTACHMENT_COUNT = 10;
   var COMPOSER_MAX_HEIGHT = 200;
-  var COMPOSER_MIN_HEIGHT = 26;
-  var COMPOSER_KEYBOARD_RESIZE_STEP = 16;
   var REALTIME_PROTOCOL_VERSION = 1;
   var REALTIME_IDLE_TIMEOUT = 60000;
   var REALTIME_BACKOFF_BASE = 1000;
@@ -83,6 +81,14 @@
     agent: messenger.getAttribute("data-reference-agent"),
   };
   var requestFailedLabel = messenger.getAttribute("data-request-failed");
+  var attachmentLabels = {
+    uploading: messenger.getAttribute("data-attachment-uploading"),
+    failed: messenger.getAttribute("data-attachment-failed"),
+    cancel: messenger.getAttribute("data-attachment-cancel"),
+    receiving: messenger.getAttribute("data-attachment-receiving"),
+    unavailable: messenger.getAttribute("data-attachment-unavailable"),
+    retry: messenger.getAttribute("data-retry"),
+  };
   var sessionLabels = {
     open: messenger.getAttribute("data-session-open"),
     closed: messenger.getAttribute("data-session-closed"),
@@ -93,14 +99,11 @@
   var sendButton = document.getElementById("cv-send");
   var fileInput = document.getElementById("cv-file-input");
   var composerMain = document.getElementById("cv-composer-main");
-  var composerResize = document.getElementById("cv-composer-resize");
   var recording = document.getElementById("cv-recording");
   var recordTime = document.getElementById("cv-record-time");
   var intro = document.getElementById("cv-conversation-intro");
   var unreadDot = document.getElementById("cv-unread-dot");
   var emojis = window.CERVI_COMPOSER_EMOJIS;
-  var composerManualHeight = null;
-  var composerResizeStart = null;
   if (parentOrigin === "null") {
     parentOrigin = "";
   }
@@ -180,6 +183,9 @@
       messageIDs: Object.create(null),
       pendingMessageID: "",
       pendingBody: "",
+      pendingAttachments: [],
+      attachmentSending: false,
+      creating: null,
     };
   }
 
@@ -360,80 +366,31 @@
       input.scrollHeight,
       COMPOSER_MAX_HEIGHT,
     );
-    input.style.height =
-      Math.max(contentHeight, composerManualHeight || 0) + "px";
+    input.style.height = contentHeight + "px";
     var renderedHeight = input.getBoundingClientRect().height;
     input.style.overflowY =
       input.scrollHeight > renderedHeight ? "auto" : "hidden";
   }
 
-  // 应用访客选择的消息输入框高度。
-  function setComposerManualHeight(height) {
-    composerManualHeight = Math.min(
-      COMPOSER_MAX_HEIGHT,
-      Math.max(COMPOSER_MIN_HEIGHT, height),
-    );
-    autosize();
-  }
-
-  // 在清空消息内容前保留输入框当前高度。
-  function preserveComposerHeight() {
-    setComposerManualHeight(input.getBoundingClientRect().height);
-  }
-
-  // 开始拖动访客消息输入框。
-  function startComposerResize(event) {
-    event.preventDefault();
-    composerResize.setPointerCapture(event.pointerId);
-    composerResizeStart = {
-      pointerY: event.clientY,
-      inputHeight: input.getBoundingClientRect().height,
-    };
-  }
-
-  // 按指针位置调整访客消息输入框高度。
-  function resizeComposer(event) {
-    if (
-      !composerResizeStart ||
-      !composerResize.hasPointerCapture(event.pointerId)
-    ) {
-      return;
-    }
-    setComposerManualHeight(
-      composerResizeStart.inputHeight +
-        composerResizeStart.pointerY -
-        event.clientY,
-    );
-  }
-
-  // 结束拖动访客消息输入框。
-  function stopComposerResize(event) {
-    composerResizeStart = null;
-    if (composerResize.hasPointerCapture(event.pointerId)) {
-      composerResize.releasePointerCapture(event.pointerId);
-    }
-  }
-
-  // 使用方向键调整访客消息输入框高度。
-  function resizeComposerFromKeyboard(event) {
-    if (event.key !== "ArrowUp" && event.key !== "ArrowDown") {
-      return;
-    }
-    event.preventDefault();
-    var direction = event.key === "ArrowUp" ? 1 : -1;
-    setComposerManualHeight(
-      input.getBoundingClientRect().height +
-        direction * COMPOSER_KEYBOARD_RESIZE_STEP,
-    );
-  }
-
   function updateSendState() {
-    sendButton.disabled =
-      input.value.trim() === "" ||
-      (!previewMode &&
-        (!initialized ||
-          messageRequestPending ||
-          activeConversation.historyLoading));
+    var blocked =
+      !previewMode &&
+      (!initialized ||
+        messageRequestPending ||
+        activeConversation.historyLoading ||
+        activeConversation.creating !== null);
+    var empty = input.value.trim() === "";
+    sendButton.disabled = empty || blocked;
+    // 输入内容后附件和录音入口换成发送按钮，输入框宽度变化后重新计算高度。
+    if (sendButton.hidden !== empty) {
+      sendButton.hidden = empty;
+      $("cv-attach").hidden = !empty;
+      $("cv-voice").hidden = !empty;
+      autosize();
+    }
+    if (!previewMode) {
+      $("cv-attach").disabled = !initialized || activeConversation.historyLoading;
+    }
   }
 
   function formatTime(date) {
@@ -674,6 +631,14 @@
     return button;
   }
 
+  // 返回消息在会话列表中的摘要，纯附件消息取文件名。
+  function messagePreview(message) {
+    if (!message.body && message.attachment) {
+      return message.attachment.name;
+    }
+    return CerviMarkdown.preview(message.body, message.senderIdentityType);
+  }
+
   // 更新指定会话的摘要、时间和未读状态。
   function updateConversationSummary(conversation, preview, date, messageSeq) {
     var originatedAt =
@@ -714,7 +679,6 @@
       return;
     }
     appendVisitorMessage(text, []);
-    preserveComposerHeight();
     input.value = "";
     autosize();
     updateSendState();
@@ -876,7 +840,7 @@
           var lastMessage = result.messages[result.messages.length - 1];
           updateConversationSummary(
             conversation,
-            CerviMarkdown.preview(lastMessage.body, lastMessage.senderIdentityType),
+            messagePreview(lastMessage),
             lastMessage.originatedAt,
             lastMessage.messageSeq,
           );
@@ -980,11 +944,18 @@
       }
       bubble.appendChild(reference);
     }
-    var body = document.createElement("div");
-    bubble.appendChild(body);
-    CerviMarkdown.render(body, value.body, value.senderIdentityType);
-    messageResizeObserver.observe(bubble);
-    row.appendChild(bubble);
+    // 只有说明或引用的附件消息才渲染气泡，纯附件直接展示内容。
+    if (!value.attachment || value.body || value.replyTo) {
+      var body = document.createElement("div");
+      bubble.appendChild(body);
+      CerviMarkdown.render(body, value.body, value.senderIdentityType);
+      messageResizeObserver.observe(bubble);
+      row.appendChild(bubble);
+    }
+    if (value.attachment) {
+      row.classList.add("cv-message-row-with-assets");
+      row.appendChild(serverAssetList(conversation, value));
+    }
     message.appendChild(row);
     message.appendChild(messageMeta(new Date(value.originatedAt)));
     // 收到的消息悬停显示回复操作，双方消息均支持右键引用。
@@ -1018,6 +989,99 @@
       conversation,
       message,
       value.messageSeq,
+    );
+  }
+
+  // 渲染服务端附件：图片内联预览并可点开灯箱，其余显示文件名、大小和下载入口。
+  function serverAssetList(conversation, value) {
+    var assets = document.createElement("div");
+    assets.className = "cv-message-assets";
+    var attachment = value.attachment;
+    if (attachment.transferStatus !== "ready") {
+      var pending = document.createElement("div");
+      pending.className = "cv-asset cv-file-asset";
+      var pendingName = document.createElement("strong");
+      pendingName.textContent = attachment.name;
+      var pendingStatus = document.createElement("span");
+      pendingStatus.textContent =
+        attachment.transferStatus === "pending"
+          ? attachmentLabels.receiving
+          : attachmentLabels.unavailable;
+      pending.appendChild(pendingName);
+      pending.appendChild(pendingStatus);
+      assets.appendChild(pending);
+      return assets;
+    }
+    if (fileKind(attachment.contentType) === "image") {
+      var imageButton = document.createElement("button");
+      imageButton.type = "button";
+      imageButton.className = "cv-asset";
+      var image = document.createElement("img");
+      image.src = attachment.previewUrl;
+      image.alt = attachment.name;
+      var resigned = false;
+      image.addEventListener("error", function () {
+        if (resigned) {
+          return;
+        }
+        // 预览地址过期后重新签发一次。
+        resigned = true;
+        refreshAttachmentLinks(conversation, value)
+          .then(function (links) {
+            image.src = links.previewUrl;
+          })
+          .catch(function () {});
+      });
+      imageButton.appendChild(image);
+      imageButton.addEventListener("click", function () {
+        openLightbox(image.src, attachment.name);
+      });
+      assets.appendChild(imageButton);
+      return assets;
+    }
+    var fileLink = document.createElement("a");
+    fileLink.className = "cv-asset cv-file-asset";
+    fileLink.href = attachment.downloadUrl;
+    fileLink.download = attachment.name;
+    fileLink.addEventListener("click", function (event) {
+      event.preventDefault();
+      // 下载前重新签发地址。
+      refreshAttachmentLinks(conversation, value)
+        .then(function (links) {
+          downloadAttachment(links.downloadUrl, attachment.name);
+        })
+        .catch(function () {
+          downloadAttachment(fileLink.href, attachment.name);
+        });
+    });
+    var name = document.createElement("strong");
+    name.textContent = attachment.name;
+    var size = document.createElement("span");
+    size.textContent = formatSize(attachment.byteSize);
+    fileLink.appendChild(name);
+    fileLink.appendChild(size);
+    assets.appendChild(fileLink);
+    return assets;
+  }
+
+  // 在挂件文档之外取得附件内容，保留当前聊天界面。
+  function downloadAttachment(url, name) {
+    var link = document.createElement("a");
+    link.href = url;
+    link.download = name;
+    link.target = "_blank";
+    link.rel = "noopener";
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+  }
+
+  // 重新签发指定消息附件的预览与下载地址。
+  function refreshAttachmentLinks(conversation, value) {
+    return requestWebsiteJSON(
+      "/api/public/website-channels/" + encodeURIComponent(channelID) +
+      "/conversations/" + encodeURIComponent(conversation.id) +
+      "/messages/" + encodeURIComponent(value.id) + "/attachment",
     );
   }
 
@@ -1458,7 +1522,7 @@
         var lastMessage = result.messages[result.messages.length - 1];
         updateConversationSummary(
           conversation,
-          CerviMarkdown.preview(lastMessage.body, lastMessage.senderIdentityType),
+          messagePreview(lastMessage),
           lastMessage.originatedAt,
           lastMessage.messageSeq,
         );
@@ -1489,12 +1553,21 @@
     if (
       !initialized ||
       messageRequestPending ||
-      activeConversation.historyLoading
+      activeConversation.historyLoading ||
+      activeConversation.creating !== null
     ) {
       return;
     }
     var conversation = activeConversation;
     var startsConversation = conversation.id === null;
+    // 首条消息由文本或附件先到者创建会话，另一路等待会话编号后复用。
+    var creatingConversation = conversation;
+    var settleCreation = null;
+    if (startsConversation) {
+      conversation.creating = new Promise(function (resolve) {
+        settleCreation = resolve;
+      });
+    }
     var replyToID = conversation.replyTo ? conversation.replyTo.id : "";
     conversation.refreshSeq += 1;
     if (
@@ -1547,7 +1620,6 @@
         }
         if (conversation === activeConversation) {
           if (sentDraft) {
-            preserveComposerHeight();
             input.value = "";
           }
           intro.hidden = true;
@@ -1569,6 +1641,10 @@
       })
       .finally(function () {
         messageRequestPending = false;
+        if (settleCreation) {
+          creatingConversation.creating = null;
+          settleCreation();
+        }
         updateSendState();
         if (conversation === activeConversation) {
           input.focus();
@@ -1604,14 +1680,15 @@
     });
   }
 
-  function fileKind(file) {
-    if (file.type.indexOf("image/") === 0) {
+  function fileKind(contentType) {
+    contentType = contentType || "";
+    if (contentType.indexOf("image/") === 0) {
       return "image";
     }
-    if (file.type.indexOf("video/") === 0) {
+    if (contentType.indexOf("video/") === 0) {
       return "video";
     }
-    if (file.type.indexOf("audio/") === 0) {
+    if (contentType.indexOf("audio/") === 0) {
       return "audio";
     }
     return "file";
@@ -1627,16 +1704,334 @@
   }
 
   function addFiles(fileList) {
-    if (!previewMode) {
-      return;
-    }
     var files = listFiles(fileList);
     if (files.length === 0) {
       return;
     }
-    appendVisitorMessage("", files);
-    scheduleDemoReply();
+    if (previewMode) {
+      appendVisitorMessage("", files);
+      scheduleDemoReply();
+      input.focus();
+      return;
+    }
+    if (!initialized || activeConversation.historyLoading) {
+      return;
+    }
+    var conversation = activeConversation;
+    // 正文和引用正在作为文本消息发送时由该次发送持有，不重复挂到附件上。
+    var consumesDraft = !messageRequestPending;
+    var body = consumesDraft ? input.value.trim() : "";
+    var replyTo = consumesDraft ? conversation.replyTo : null;
+    // 每个文件各自成为一条消息，说明随最后一个发送，引用只挂在第一个上。
+    files.forEach(function (file, index) {
+      conversation.pendingAttachments.push(
+        createPendingAttachment(conversation, file, {
+          body: index === files.length - 1 ? body : "",
+          replyTo: index === 0 ? replyTo : null,
+        }),
+      );
+    });
+    startConversationIntro(conversation);
+    if (consumesDraft) {
+      input.value = "";
+      conversation.draft = "";
+      conversation.replyTo = null;
+      renderComposerReference();
+      autosize();
+    }
+    updateSendState();
     input.focus();
+    processAttachmentQueue(conversation);
+  }
+
+  // 首个附件发出后隐藏会话引导区。
+  function startConversationIntro(conversation) {
+    if (conversation === activeConversation) {
+      intro.hidden = true;
+    }
+  }
+
+  // 创建待发送附件及其本地气泡。
+  function createPendingAttachment(conversation, file, options) {
+    var entry = {
+      file: file,
+      body: options.body,
+      replyTo: options.replyTo,
+      replyToID: options.replyTo ? options.replyTo.id : "",
+      clientMessageID: createClientMessageID(),
+      fileID: "",
+      state: "pending",
+      progress: 0,
+      canceled: false,
+      request: null,
+      error: "",
+      node: messageContainer("visitor"),
+      status: document.createElement("span"),
+      action: document.createElement("button"),
+    };
+    var row = document.createElement("div");
+    row.className = "cv-message-row cv-message-row-with-assets";
+    if (entry.body || entry.replyTo) {
+      var bubble = document.createElement("div");
+      bubble.className = "cv-message-bubble";
+      if (entry.replyTo) {
+        var reference = document.createElement("blockquote");
+        reference.className = "cv-message-reference";
+        var author = document.createElement("strong");
+        author.textContent = referenceLabels[entry.replyTo.author];
+        var excerpt = document.createElement("span");
+        excerpt.className = "cv-message-reference-body";
+        excerpt.textContent = CerviMarkdown.preview(entry.replyTo.body, entry.replyTo.senderIdentityType);
+        reference.appendChild(author);
+        reference.appendChild(excerpt);
+        bubble.appendChild(reference);
+      }
+      if (entry.body) {
+        var paragraph = document.createElement("div");
+        paragraph.textContent = entry.body;
+        bubble.appendChild(paragraph);
+      }
+      row.appendChild(bubble);
+    }
+    row.appendChild(assetList([file]));
+    entry.node.appendChild(row);
+    var meta = document.createElement("div");
+    meta.className = "cv-message-meta cv-attachment-meta";
+    entry.status.className = "cv-attachment-status";
+    entry.action.type = "button";
+    entry.action.className = "cv-attachment-action";
+    entry.action.addEventListener("click", function () {
+      if (entry.state !== "failed") {
+        cancelPendingAttachment(conversation, entry);
+        return;
+      }
+      entry.state = "pending";
+      entry.error = "";
+      renderAttachmentStatus(entry);
+      processAttachmentQueue(conversation);
+    });
+    meta.appendChild(entry.status);
+    meta.appendChild(entry.action);
+    entry.node.appendChild(meta);
+    appendConversationNode(conversation, entry.node);
+    renderAttachmentStatus(entry);
+    return entry;
+  }
+
+  // 同步待发送附件的状态文字和操作。
+  function renderAttachmentStatus(entry) {
+    entry.action.disabled = false;
+    if (entry.state === "failed") {
+      entry.status.textContent = entry.error || attachmentLabels.failed;
+      entry.action.textContent = attachmentLabels.retry;
+      return;
+    }
+    entry.status.textContent =
+      entry.progress > 0 && entry.progress < 100
+        ? attachmentLabels.uploading + " " + entry.progress + "%"
+        : attachmentLabels.uploading;
+    entry.action.textContent = attachmentLabels.cancel;
+  }
+
+  // 取消待发送附件并移除本地气泡，未关联的临时文件由服务端按过期清理。
+  function cancelPendingAttachment(conversation, entry) {
+    entry.canceled = true;
+    if (entry.request) {
+      entry.request.abort();
+    }
+    var index = conversation.pendingAttachments.indexOf(entry);
+    if (index >= 0) {
+      conversation.pendingAttachments.splice(index, 1);
+    }
+    entry.node.remove();
+  }
+
+  // 按选择顺序上传并发送当前会话的待发送附件。
+  async function processAttachmentQueue(conversation) {
+    if (conversation.attachmentSending) {
+      return;
+    }
+    conversation.attachmentSending = true;
+    try {
+      while (true) {
+        var entry = conversation.pendingAttachments.find(function (item) {
+          return item.state === "pending";
+        });
+        if (!entry) {
+          return;
+        }
+        entry.state = "uploading";
+        entry.progress = 0;
+        renderAttachmentStatus(entry);
+        var target = conversation;
+        try {
+          target = await sendPendingAttachment(conversation, entry);
+        } catch (error) {
+          if (entry.canceled) {
+            continue;
+          }
+          entry.state = "failed";
+          entry.error = error.message || requestFailedLabel;
+          renderAttachmentStatus(entry);
+          continue;
+        }
+        if (target !== conversation) {
+          // 线程编号已由目录刷新建立占位对象时，剩余附件跟随接管后的会话继续发送。
+          target.pendingAttachments = target.pendingAttachments.concat(conversation.pendingAttachments);
+          conversation.pendingAttachments = [];
+          processAttachmentQueue(target);
+          return;
+        }
+      }
+    } finally {
+      conversation.attachmentSending = false;
+    }
+  }
+
+  // 完成一个附件的上传与发送，返回承载该消息的会话。
+  async function sendPendingAttachment(conversation, entry) {
+    var attachmentsPath =
+      "/api/public/website-channels/" + encodeURIComponent(channelID) + "/attachments";
+    if (!entry.fileID) {
+      var upload = await requestWebsiteJSON(attachmentsPath, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          fileName: entry.file.name,
+          contentType: entry.file.type || "application/octet-stream",
+          byteSize: entry.file.size,
+        }),
+      });
+      if (entry.canceled) {
+        return conversation;
+      }
+      await uploadAttachmentContent(entry, upload.request);
+      await requestWebsiteJSON(
+        attachmentsPath + "/" + encodeURIComponent(upload.fileId),
+        { method: "POST" },
+      );
+      entry.fileID = upload.fileId;
+    }
+    var size = await readImageSize(entry.file);
+    if (entry.canceled) {
+      return conversation;
+    }
+    // 首条消息由文本或附件先到者创建会话，另一路等待会话编号后复用。
+    if (conversation.creating) {
+      await conversation.creating;
+    }
+    var startsConversation = conversation.id === null;
+    var settleCreation = null;
+    if (startsConversation) {
+      conversation.creating = new Promise(function (resolve) {
+        settleCreation = resolve;
+      });
+      updateSendState();
+    }
+    // 消息提交后无法撤回，提交期间关闭取消入口。
+    entry.action.disabled = true;
+    var result;
+    try {
+      result = await requestWebsiteJSON(
+        "/api/public/website-channels/" + encodeURIComponent(channelID) + "/attachment-messages",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            clientMessageId: entry.clientMessageID,
+            replyToMessageId: entry.replyToID,
+            conversationId: conversation.id,
+            fileId: entry.fileID,
+            body: entry.body,
+            imageWidth: size.width,
+            imageHeight: size.height,
+          }),
+        },
+      );
+    } finally {
+      if (settleCreation) {
+        conversation.creating = null;
+        settleCreation();
+      }
+      updateSendState();
+    }
+    var target = upsertRealConversation(result.conversation, conversation);
+    var index = conversation.pendingAttachments.indexOf(entry);
+    if (index >= 0) {
+      conversation.pendingAttachments.splice(index, 1);
+    }
+    entry.node.remove();
+    appendServerMessage(target, result.message);
+    if (startsConversation) {
+      target.historyLoaded = true;
+    } else if (!target.historyLoaded) {
+      loadConversationHistory(target);
+    }
+    if (target === activeConversation) {
+      intro.hidden = true;
+      scrollToBottom();
+    }
+    renderRecentConversation();
+    // 首条消息建立渠道身份后开始接收实时事件。
+    syncVisitorRealtime();
+    return target;
+  }
+
+  // 以可取消并带进度的请求直传附件内容。
+  function uploadAttachmentContent(entry, request) {
+    return new Promise(function (resolve, reject) {
+      var transfer = new XMLHttpRequest();
+      entry.request = transfer;
+      transfer.open(request.method, request.url, true);
+      Object.keys(request.headers || {}).forEach(function (name) {
+        transfer.setRequestHeader(name, request.headers[name]);
+      });
+      transfer.upload.addEventListener("progress", function (event) {
+        if (!event.lengthComputable) {
+          return;
+        }
+        entry.progress = Math.round((event.loaded / event.total) * 100);
+        renderAttachmentStatus(entry);
+      });
+      transfer.addEventListener("load", function () {
+        entry.request = null;
+        if (transfer.status >= 200 && transfer.status < 300) {
+          resolve();
+          return;
+        }
+        reject(new Error(requestFailedLabel));
+      });
+      transfer.addEventListener("error", function () {
+        entry.request = null;
+        reject(new Error(requestFailedLabel));
+      });
+      transfer.addEventListener("abort", function () {
+        entry.request = null;
+        reject(new Error(requestFailedLabel));
+      });
+      transfer.send(entry.file);
+    });
+  }
+
+  // 读取图片附件的像素尺寸，非图片或无法解码时为 0。
+  function readImageSize(file) {
+    return new Promise(function (resolve) {
+      if (fileKind(file.type) !== "image") {
+        resolve({ width: 0, height: 0 });
+        return;
+      }
+      var url = URL.createObjectURL(file);
+      var image = new Image();
+      image.addEventListener("load", function () {
+        resolve({ width: image.naturalWidth, height: image.naturalHeight });
+        URL.revokeObjectURL(url);
+      });
+      image.addEventListener("error", function () {
+        resolve({ width: 0, height: 0 });
+        URL.revokeObjectURL(url);
+      });
+      image.src = url;
+    });
   }
 
   function assetList(files) {
@@ -1649,7 +2044,7 @@
   }
 
   function mediaNode(file) {
-    var kind = fileKind(file);
+    var kind = fileKind(file.type);
     var url = URL.createObjectURL(file);
     if (kind === "image") {
       var imageButton = document.createElement("button");
@@ -2029,15 +2424,7 @@
     event.preventDefault();
     sendMessage();
   });
-  composerResize.addEventListener("pointerdown", startComposerResize);
-  composerResize.addEventListener("pointermove", resizeComposer);
-  composerResize.addEventListener("pointerup", stopComposerResize);
-  composerResize.addEventListener("pointercancel", stopComposerResize);
-  composerResize.addEventListener("keydown", resizeComposerFromKeyboard);
   input.addEventListener("paste", function (event) {
-    if (!previewMode) {
-      return;
-    }
     var files = pastedImageFiles(event);
     if (files.length === 0) {
       return;
@@ -2051,9 +2438,6 @@
   });
 
   $("cv-attach").addEventListener("click", function () {
-    if (!previewMode) {
-      return;
-    }
     fileInput.click();
   });
   fileInput.addEventListener("change", function () {
@@ -2171,7 +2555,6 @@
   window.addEventListener("online", handleVisitorForeground);
   window.addEventListener("resize", autosize);
   if (!previewMode) {
-    $("cv-attach").disabled = true;
     $("cv-voice").disabled = true;
     setNewConversationAvailability(false);
     initializeRealMessenger();

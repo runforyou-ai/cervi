@@ -125,7 +125,7 @@ func conversationMessagesQuery(db bun.IDB, identity *servermodels.Identity, conv
 		TableExpr("messages AS msg").
 		ColumnExpr("msg.id AS id").
 		ColumnExpr("cm.reply_provider_message_id AS external_reply_id, cm.reply_body AS external_reply_body, cm.reply_sender_name AS external_reply_sender_name").
-		ColumnExpr("COALESCE(msg.visibility = ? AND ch.type = ? AND (cm.message_id IS NULL OR cm.provider_account_id <> tcs.bot_id::text OR tcs.bot_id IS NULL OR cm.channel_id <> ch.id OR cm.provider_conversation_id <> route_cci.external_id OR msg.type <> ?), FALSE) AS reply_unavailable", domain.MessageVisibilityCustomerVisible, domain.ChannelTypeTelegram, domain.MessageTypeText).
+		ColumnExpr("COALESCE(msg.visibility = ? AND ch.type = ? AND (cm.message_id IS NULL OR cm.provider_account_id <> tcs.bot_id::text OR tcs.bot_id IS NULL OR cm.channel_id <> ch.id OR cm.provider_conversation_id <> route_cci.external_id OR msg.type NOT IN (?, ?)), FALSE) AS reply_unavailable", domain.MessageVisibilityCustomerVisible, domain.ChannelTypeTelegram, domain.MessageTypeText, domain.MessageTypeAttachment).
 		ColumnExpr("CASE WHEN cs.kind = ? AND cs.source_id = ? THEN msg.client_message_id END AS client_message_id", domain.ChatSubjectKindOrganizationIdentity, identity.OrganizationIdentity.ID).
 		ColumnExpr("msg.type AS type").
 		ColumnExpr("msg.visibility AS visibility").

@@ -322,6 +322,16 @@ func (b *DirectBackend) UpdateConversationUnreadMark(ctx context.Context, meta R
 	return b.ops.UpdateConversationUnreadMark(ctx, meta, identity, conversationID, input)
 }
 
+// UpdateConversationPin 保存当前用户的会话置顶事实与置顶顺序。
+func (b *DirectBackend) UpdateConversationPin(ctx context.Context, meta RequestMeta, conversationID string, input ConversationPinInput) (ConversationPinState, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero ConversationPinState
+		return zero, err
+	}
+	return b.ops.UpdateConversationPin(ctx, meta, identity, conversationID, input)
+}
+
 // UpdateConversationNotificationSettings 保存当前用户的原生会话提醒设置。
 func (b *DirectBackend) UpdateConversationNotificationSettings(ctx context.Context, meta RequestMeta, conversationID string, input ConversationNotificationSettingsInput) (ConversationNotificationSettings, error) {
 	identity, err := b.ops.authenticate(ctx, meta)

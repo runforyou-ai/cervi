@@ -51,6 +51,11 @@ type ProfilePhotoAPI interface {
 	DownloadPhoto(context.Context, string, string) (DownloadedPhoto, error)
 }
 
+// MediaDownloader 定义客户入站媒体取回依赖的 Telegram 能力。
+type MediaDownloader interface {
+	DownloadMedia(context.Context, string, string, int64) ([]byte, error)
+}
+
 // Webhook 定义 setWebhook 所需字段。
 type Webhook struct {
 	URL    string
@@ -158,44 +163,9 @@ func (c *Client) GetUserProfilePhoto(ctx context.Context, token string, userID i
 
 // DownloadPhoto 通过 getFile 下载并校验 Telegram 头像内容。
 func (c *Client) DownloadPhoto(ctx context.Context, token, fileID string) (DownloadedPhoto, error) {
-	fileID = strings.TrimSpace(fileID)
-	if fileID == "" || len(fileID) > 512 {
-		return DownloadedPhoto{}, protocolError()
-	}
-	file := struct {
-		FileSize *int64 `json:"file_size"`
-		FilePath string `json:"file_path"`
-	}{}
-	if err := c.call(ctx, token, "getFile", struct {
-		FileID string `json:"file_id"`
-	}{FileID: fileID}, &file); err != nil {
+	data, err := c.downloadFile(ctx, token, fileID, maxAvatarSize)
+	if err != nil {
 		return DownloadedPhoto{}, err
-	}
-	if file.FileSize != nil && (*file.FileSize <= 0 || *file.FileSize > maxAvatarSize) {
-		return DownloadedPhoto{}, protocolError()
-	}
-	endpoint, err := c.fileURL(token, file.FilePath)
-	if err != nil {
-		return DownloadedPhoto{}, protocolError()
-	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
-	if err != nil {
-		return DownloadedPhoto{}, protocolError()
-	}
-	response, err := c.downloadClient.Do(request)
-	if err != nil {
-		return DownloadedPhoto{}, safeTransportError(err)
-	}
-	defer response.Body.Close()
-	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
-		return DownloadedPhoto{}, connectiontest.HTTPStatusError(response.StatusCode)
-	}
-	data, err := io.ReadAll(io.LimitReader(response.Body, maxAvatarSize+1))
-	if err != nil {
-		return DownloadedPhoto{}, protocolError()
-	}
-	if len(data) == 0 || len(data) > maxAvatarSize {
-		return DownloadedPhoto{}, protocolError()
 	}
 	// 按文件魔数识别允许的静态头像格式。
 	contentType := ""
@@ -211,6 +181,55 @@ func (c *Client) DownloadPhoto(ctx context.Context, token, fileID string) (Downl
 		return DownloadedPhoto{}, protocolError()
 	}
 	return DownloadedPhoto{ContentType: contentType, Data: data}, nil
+}
+
+// DownloadMedia 通过 getFile 取回客户发送的媒体内容，超过 maxSize 字节返回协议错误。
+func (c *Client) DownloadMedia(ctx context.Context, token, fileID string, maxSize int64) ([]byte, error) {
+	return c.downloadFile(ctx, token, fileID, maxSize)
+}
+
+// downloadFile 每次调用重新执行 getFile 取得下载路径，再按大小上限读取文件内容。
+func (c *Client) downloadFile(ctx context.Context, token, fileID string, maxSize int64) ([]byte, error) {
+	fileID = strings.TrimSpace(fileID)
+	if fileID == "" || len(fileID) > 512 || maxSize <= 0 {
+		return nil, protocolError()
+	}
+	file := struct {
+		FileSize *int64 `json:"file_size"`
+		FilePath string `json:"file_path"`
+	}{}
+	if err := c.call(ctx, token, "getFile", struct {
+		FileID string `json:"file_id"`
+	}{FileID: fileID}, &file); err != nil {
+		return nil, err
+	}
+	if file.FileSize != nil && (*file.FileSize <= 0 || *file.FileSize > maxSize) {
+		return nil, protocolError()
+	}
+	endpoint, err := c.fileURL(token, file.FilePath)
+	if err != nil {
+		return nil, protocolError()
+	}
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, endpoint, nil)
+	if err != nil {
+		return nil, protocolError()
+	}
+	response, err := c.downloadClient.Do(request)
+	if err != nil {
+		return nil, safeTransportError(err)
+	}
+	defer response.Body.Close()
+	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+		return nil, connectiontest.HTTPStatusError(response.StatusCode)
+	}
+	data, err := io.ReadAll(io.LimitReader(response.Body, maxSize+1))
+	if err != nil {
+		return nil, safeTransportError(err)
+	}
+	if len(data) == 0 || int64(len(data)) > maxSize {
+		return nil, protocolError()
+	}
+	return data, nil
 }
 
 // SetWebhook 注册当前渠道的 Webhook。

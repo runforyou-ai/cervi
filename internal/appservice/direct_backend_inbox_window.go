@@ -4,6 +4,7 @@ package appservice
 
 import (
 	"context"
+	"strconv"
 
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -38,7 +39,8 @@ func (o *directOperations) GetInboxContext(ctx context.Context, meta RequestMeta
 	}
 	return InboxContext{Anchor: anchor, Window: InboxWindow{
 		Conversations: conversations, StartCursor: result.Window.StartCursor, EndCursor: result.Window.EndCursor,
-		HasBefore: result.Window.HasBefore, HasAfter: result.Window.HasAfter,
+		PinOrderVersion: strconv.FormatInt(result.Window.PinOrderVersion, 10),
+		HasBefore:       result.Window.HasBefore, HasAfter: result.Window.HasAfter,
 	}}, nil
 }
 
@@ -55,5 +57,8 @@ func (o *directOperations) ReadInboxWindow(ctx context.Context, meta RequestMeta
 	if err != nil {
 		return InboxWindow{}, err
 	}
-	return InboxWindow{Conversations: conversations, StartCursor: window.StartCursor, EndCursor: window.EndCursor, HasBefore: window.HasBefore, HasAfter: window.HasAfter}, nil
+	return InboxWindow{
+		Conversations: conversations, StartCursor: window.StartCursor, EndCursor: window.EndCursor,
+		PinOrderVersion: strconv.FormatInt(window.PinOrderVersion, 10), HasBefore: window.HasBefore, HasAfter: window.HasAfter,
+	}, nil
 }

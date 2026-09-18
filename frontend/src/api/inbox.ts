@@ -50,12 +50,15 @@ import {
   TransferGroupConversationOwner,
   UpdateGroupConversation,
   UpdateConversationNotificationSettings,
+  UpdateConversationPin,
   UpdateConversationUnreadMark,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import type {
   CustomerInboxConversation,
   ConversationMessage,
   ConversationAgentProcess,
+  ConversationPinInput,
+  ConversationPinState,
   ConversationMessageList,
   ConversationMessageListInput,
   ConversationMessageWindowInput,
@@ -95,6 +98,8 @@ import type {
 import {
   ConversationType,
   CustomerInboxView,
+  ConversationPinPosition,
+  InboxPartition,
   InboxScope,
   InboxSearchRange,
   MessageAttachmentTransferStatus,
@@ -190,6 +195,29 @@ const reopenServiceSessionBound = bind(ReopenServiceSession)
 export type LoadInboxQuery = Partial<InboxQuery>
 
 const updateConversationUnreadMarkBound = bind(UpdateConversationUnreadMark)
+const updateConversationPinBound = bind(UpdateConversationPin)
+
+/** 置顶写入命令；未给出位置时新置顶追加到置顶末尾，已置顶保持原位。 */
+export type ConversationPinCommand = Pick<
+  ConversationPinInput,
+  "pinned" | "expectedPinOrderVersion"
+> & {
+  position?: Exclude<ConversationPinPosition, ConversationPinPosition.$zero>
+  neighborId?: string
+}
+
+/** 保存当前用户的会话置顶事实与置顶顺序。 */
+export function updateConversationPin(
+  conversationID: string,
+  command: ConversationPinCommand,
+): Promise<ConversationPinState> {
+  return updateConversationPinBound(conversationID, {
+    pinned: command.pinned,
+    position: command.position ?? ConversationPinPosition.$zero,
+    neighborId: command.neighborId ?? "",
+    expectedPinOrderVersion: command.expectedPinOrderVersion,
+  })
+}
 
 /** 保存独立于阅读水位的个人未读标记。 */
 export function updateConversationUnreadMark(
@@ -267,6 +295,7 @@ export async function loadInbox(
   query: Partial<LoadInboxInput> = {},
 ): Promise<InboxData> {
   const inbox = await loadInboxBound({
+    partition: query.partition ?? InboxPartition.InboxPartitionAll,
     scope: query.scope ?? InboxScope.InboxScopeAll,
     customerView:
       query.customerView ?? CustomerInboxView.CustomerInboxViewQueue,

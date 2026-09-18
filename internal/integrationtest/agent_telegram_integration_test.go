@@ -63,7 +63,7 @@ func newAgentTelegramFixture(t *testing.T, db *bun.DB, identity *models.Identity
 	if err := tasks.Registry().RegisterJSON(deliveryaction.SendActionName, func(context.Context, deliveryaction.Input) error { return nil }); err != nil {
 		t.Fatal(err)
 	}
-	f := agentTelegramFixture{db: db, identity: identity, channel: channel, tasks: tasks, receiver: channelaction.NewReceiveTelegramWebhookAction(db, agentrunaction.NewScheduler(tasks), nil, nil)}
+	f := agentTelegramFixture{db: db, identity: identity, channel: channel, tasks: tasks, receiver: channelaction.NewReceiveTelegramWebhookAction(db, agentrunaction.NewScheduler(tasks), nil, nil, nil, nil)}
 	f.input = channelaction.TelegramWebhookInput{Secret: "secret", UpdateID: 1, Message: &channelaction.TelegramWebhookMessage{ChatID: 12345, SenderID: 12345, MessageID: 1, DisplayName: "Telegram 客户", Body: "请介绍产品", OriginatedAt: time.Now().UTC()}}
 	if err := f.receiver.Execute(ctx, channel.ID, f.input); err != nil {
 		t.Fatal(err)
@@ -220,7 +220,7 @@ func testAgentTelegramReplies(t *testing.T, db *bun.DB, identity *models.Identit
 			t.Fatal(err)
 		}
 		sender := &deliverySender{}
-		worker := deliveryaction.NewWorker(db, sender, f.tasks)
+		worker := deliveryaction.NewWorker(db, sender, deliveryFiles{}, f.tasks)
 		for range 2 {
 			if err := worker.Execute(ctx, deliveryaction.Input{DeliveryID: deliveries[0].ID}); err != nil {
 				t.Fatal(err)

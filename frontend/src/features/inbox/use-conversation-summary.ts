@@ -23,6 +23,9 @@ export async function readConversationSummary(conversationID: string, signal?: A
   }
 }
 
+/** 会话摘要读取结果，由会话详情及其宿主共用。 */
+export type ConversationSummaryResource = ReturnType<typeof useConversationSummary>
+
 /** 当前会话按变更通知或前台轮询发现资料变化，恢复前台后立即重读。 */
 export function useConversationSummary(conversationID: string, requireWindowFocus = true) {
   const client = useQueryClient()
