@@ -277,6 +277,7 @@ function MobileConversationRow({
         <button
           type="button"
           ref={sortable.setActivatorNodeRef}
+          data-pin-sort-handle
           {...sortable.attributes}
           {...sortable.listeners}
           className="flex size-11 shrink-0 touch-none items-center justify-center text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
@@ -324,6 +325,7 @@ function MobileInboxList({ query, changeQuery }: ReturnType<typeof useMobileInbo
   })
   const actions = useConversationListActions(list.settlePin)
   const [sorting, setSorting] = useState(false)
+  const exitSortingOnMenuClose = useRef(false)
   const swipeStart = useRef<{ x: number; y: number } | null>(null)
   useMinuteTick()
   useEffect(() => {
@@ -344,6 +346,7 @@ function MobileInboxList({ query, changeQuery }: ReturnType<typeof useMobileInbo
       mobileConversationName(conversation, inboxT),
     ]),
   )
+  const rows = new Map(conversations.map((conversation) => [conversation.id, conversation]))
   const initial = list.revision === 0
   const row = (conversation: MobileInboxConversation) => ({
     conversation,
@@ -351,9 +354,10 @@ function MobileInboxList({ query, changeQuery }: ReturnType<typeof useMobileInbo
     actions,
     pinOrderVersion: list.pinOrderVersion,
     sorting,
-    // 打开菜单即结束排序，菜单操作照常生效。
+    // 排序中打开的菜单在关闭后结束排序，菜单打开期间手柄保持占位。
     onMenuChange: (open: boolean) => {
-      if (open) setSorting(false)
+      if (open) exitSortingOnMenuClose.current = sorting
+      else if (exitSortingOnMenuClose.current) setSorting(false)
       viewport.setMenu(open)
     },
     onOpen: (conversation: MobileInboxConversation) => {
@@ -433,10 +437,13 @@ function MobileInboxList({ query, changeQuery }: ReturnType<typeof useMobileInbo
       <div
         className="flex min-h-0 flex-1 flex-col"
         onTouchStart={(event) => {
-          // 菜单打开期间的触摸只服务于菜单本身。
+          // 菜单打开期间的触摸只服务于菜单本身，从排序手柄开始的触摸只用于拖动。
           const touch = event.touches[0]
+          const onHandle =
+            event.target instanceof Element &&
+            event.target.closest("[data-pin-sort-handle]") !== null
           swipeStart.current =
-            touch && !viewport.interaction.current.menu
+            touch && !onHandle && !viewport.interaction.current.menu
               ? { x: touch.clientX, y: touch.clientY }
               : null
         }}
@@ -491,20 +498,20 @@ function MobileInboxList({ query, changeQuery }: ReturnType<typeof useMobileInbo
                 actions={actions}
                 onDraggingChange={viewport.setDragging}
               >
-                {(order) => order.flatMap((id, index) => {
-                  const conversation = conversations.find((item) => item.id === id)
-                  return conversation ? [
-                    <SortableMobileConversationRow
-                      key={id}
-                      {...row(conversation)}
-                      pinMoves={{
-                        up: pinMoveCommand(order, id, index - 1, list.pinOrderVersion),
-                        down: pinMoveCommand(order, id, index + 1, list.pinOrderVersion),
-                        sort: () => setSorting(true),
-                      }}
-                    />,
-                  ] : []
-                })}
+                {(order) => order.flatMap((id, index) => rows.has(id) ? [
+                  <SortableMobileConversationRow
+                    key={id}
+                    {...row(rows.get(id)!)}
+                    pinMoves={{
+                      up: pinMoveCommand(order, id, index - 1, list.pinOrderVersion),
+                      down: pinMoveCommand(order, id, index + 1, list.pinOrderVersion),
+                      sort: () => {
+                        exitSortingOnMenuClose.current = false
+                        setSorting(true)
+                      },
+                    }}
+                  />,
+                ] : [])}
               </PinnedSortArea>
               {conversations.flatMap((conversation) => list.pinnedIds.includes(conversation.id) ? [] : [
                 <MobileConversationRow key={conversation.id} {...row(conversation)} />,

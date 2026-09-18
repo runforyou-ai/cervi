@@ -95,6 +95,8 @@ export function PinnedSortArea({
       collisionDetection={closestCenter}
       modifiers={[({ transform }) => ({ ...transform, x: 0 })]}
       accessibility={{
+        // 读屏说明与播报节点挂到 body，列表容器只含会话行。
+        container: document.body,
         screenReaderInstructions: { draggable: t("pinSortInstructions") },
         announcements: {
           onDragStart: ({ active }) => announce("pinSortPicked", active.id),

@@ -153,7 +153,7 @@ export function useInboxList(input: InboxQuery, viewport: InboxListViewport, opt
 
 export type InboxList = ReturnType<typeof useInboxList>
 
-/** 置顶区与普通区各自读取，合并为先置顶后普通的一条列表；settlePin 在置顶写入后先重读目标分区，会话不在两区之间短暂消失，重读结果不因列表操作中而暂缓。 */
+/** 置顶区与普通区各自读取，合并为先置顶后普通的一条列表；settlePin 在置顶写入后先重读目标分区，会话不在两区之间短暂消失，本人写入后的重读立即提交顺序与版本。 */
 export function usePartitionedInboxList(input: InboxQuery, viewport: InboxListViewport, options: InboxListOptions) {
   const located = useRef({ pinnedIds: [] as string[], locateId: "" })
   const regularViewport = useMemo(() => ({

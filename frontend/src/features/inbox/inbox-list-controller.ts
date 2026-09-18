@@ -62,7 +62,7 @@ export class InboxListController {
   private completion = Promise.resolve()
   private generation = 0
   private deferred: InboxListState | null = null
-  private ownWrites = 0
+  private ownWritePending = false
   private returnAnchor: InboxListAnchor | null = null
   private ports: InboxListPorts
   private query: InboxQuery
@@ -130,6 +130,7 @@ export class InboxListController {
     this.generation++
     this.queue = []
     this.deferred = null
+    this.ownWritePending = false
     this.publish({ operation: null })
   }
 
@@ -139,6 +140,7 @@ export class InboxListController {
     this.generation++
     this.queue = []
     this.deferred = null
+    this.ownWritePending = false
     this.ports.restore(this.ports.capture(), new Set([id]), false)
     this.publish({
       ids: this.state.ids.filter((value) => value !== id),
@@ -162,14 +164,13 @@ export class InboxListController {
     return this.completion
   }
 
-  /** 本人写入成功后重读，完成前提交的结果不因列表操作中而暂缓，界面顺序与顺序版本立即跟上本人写入。 */
-  refreshOwnWrite = async () => {
-    this.ownWrites++
-    try {
-      await this.request("refresh")
-    } finally {
-      this.ownWrites--
-    }
+  /** 本人写入成功后排入一次写入之后发起的重读，该次重读的结果立即提交顺序与版本。 */
+  refreshOwnWrite = (): Promise<void> => {
+    this.ownWritePending = true
+    // 尚未开始的重读必定在写入之后读取，可以合并；在途重读可能早于写入，另排一次。
+    if (!this.queue.includes("refresh")) this.queue.push("refresh")
+    if (!this.running) this.completion = this.drain()
+    return this.completion
   }
 
   /** 重试上次失败的操作，没有失败记录时重读原窗口。 */
@@ -183,6 +184,8 @@ export class InboxListController {
     try {
       while (this.queue.length && generation === this.generation) {
         const operation = this.queue.shift()!
+        const ownWrite = operation === "refresh" && this.ownWritePending
+        if (ownWrite) this.ownWritePending = false
         const window = this.deferred ?? this.state
         if ((operation === "before" && !window.hasBefore) || (operation === "after" && !window.hasAfter)) continue
         this.publish({
@@ -190,7 +193,7 @@ export class InboxListController {
           status: this.state.revision === 0 ? "initial" : operation === "before" || operation === "after" ? "loadingMore" : "refreshing",
         })
         try {
-          await this.execute(operation, generation)
+          await this.execute(operation, generation, ownWrite)
         } catch (error) {
           if (generation !== this.generation) return
           console.warn("读取收件箱窗口失败", { query: this.query, operation, error })
@@ -227,7 +230,7 @@ export class InboxListController {
   }
 
   /** 串行重读连续窗口，已覆盖顶部的窗口自动扩展到最新首页。 */
-  private async execute(operation: InboxListOperation, generation: number) {
+  private async execute(operation: InboxListOperation, generation: number, ownWrite: boolean) {
     const base = this.deferred ?? this.state
     const initial = this.state.revision === 0
     const anchor = this.returnAnchor ?? this.ports.capture()
@@ -269,11 +272,11 @@ export class InboxListController {
     const rowIds = [...new Set([...this.state.ids, ...window.conversations.map((row) => row.id)])].sort()
     const rows = await this.ports.rows(rowIds)
     if (generation !== this.generation) return
-    this.commit(window, rows, rowIds, head, initial, appendIds)
+    this.commit(window, rows, rowIds, head, initial, appendIds, ownWrite)
   }
 
   /** 内容与资格立即更新，操作期间仅延后列表顺序和边界的布局提交。 */
-  private commit(window: Window, rows: RowResults, rowIds: string[], head: Page | undefined, initial: boolean, appendIds: string[]) {
+  private commit(window: Window, rows: RowResults, rowIds: string[], head: Page | undefined, initial: boolean, appendIds: string[], ownWrite: boolean) {
     const matching = new Set(rows.results.filter((row) => row.availability === "matching" && row.conversation).map((row) => row.id))
     const incoming = window.conversations.filter((row) => matching.has(row.id))
     const next: InboxListState = {
@@ -286,7 +289,7 @@ export class InboxListController {
       error: null,
     }
     const unavailable = rows.results.filter((row) => row.availability === "unavailable" && this.state.ids.includes(row.id)).map((row) => row.id)
-    if (!initial && !this.ownWrites && this.ports.interacting()) {
+    if (!initial && !ownWrite && this.ports.interacting()) {
       this.deferred = next
       const removed = new Set(this.state.ids.filter((id) => !matching.has(id)))
       if (removed.size) this.ports.restore(this.ports.capture(), removed, false)

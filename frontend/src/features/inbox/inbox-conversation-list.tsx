@@ -271,6 +271,7 @@ export function InboxConversationList({
         : conversationName(conversation),
     ]),
   )
+  const rows = new Map(conversations.map((conversation) => [conversation.id, conversation]))
   const row = (conversation: InboxConversation) => ({
     conversation,
     name: names.get(conversation.id) ?? "",
@@ -291,10 +292,7 @@ export function InboxConversationList({
         actions={actions}
         onDraggingChange={onDraggingChange}
       >
-        {(order) => order.flatMap((id) => {
-          const conversation = conversations.find((item) => item.id === id)
-          return conversation ? [<SortableConversationRow key={id} {...row(conversation)} />] : []
-        })}
+        {(order) => order.flatMap((id) => rows.has(id) ? [<SortableConversationRow key={id} {...row(rows.get(id)!)} />] : [])}
       </PinnedSortArea>
       {conversations.flatMap((conversation) => pinnedIds.includes(conversation.id) ? [] : [<ConversationRow key={conversation.id} {...row(conversation)} />])}
     </>

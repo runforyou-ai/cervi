@@ -634,3 +634,20 @@ test("本人置顶写入后的重读在操作中立即应用，连续拖动使�
   assert.deepEqual(f.controller.getSnapshot().ids, ["2", "1", "3"])
   assert.equal(f.controller.getSnapshot().pinOrderVersion, "8")
 })
+
+test("写入前已在途的重读不代替本人写入后的重读，只有写入后的结果立即应用", async () => {
+  const f = pinnedFixture([
+    { version: "7", pages: [[1, 2, 3]] },
+    { version: "8", pages: [[2, 1, 3]] },
+    { version: "9", pages: [[2, 3, 1]] },
+  ])
+  await f.controller.request("initial")
+  f.interact(true)
+  // 版本 8 的重读在写入前发出，写入完成后再请求本人写入的重读。
+  const earlier = f.controller.request("refresh")
+  const own = f.controller.refreshOwnWrite()
+  await Promise.all([earlier, own])
+  assert.deepEqual(f.trace, ["page:7:0", "page:8:0", "page:9:0"])
+  assert.deepEqual(f.controller.getSnapshot().ids, ["2", "3", "1"])
+  assert.equal(f.controller.getSnapshot().pinOrderVersion, "9")
+})
