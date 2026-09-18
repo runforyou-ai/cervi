@@ -3,9 +3,10 @@ module github.com/runforyou-ai/cervi
 go 1.27.1
 
 require (
+	codeberg.org/readeck/go-readability/v2 v2.1.2
 	github.com/aws/aws-sdk-go-v2 v1.47.0
-	github.com/aws/aws-sdk-go-v2/credentials v1.20.4
-	github.com/aws/aws-sdk-go-v2/service/s3 v1.113.0
+	github.com/aws/aws-sdk-go-v2/credentials v1.20.5
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.113.1
 	github.com/cloudwego/eino v0.10.0-alpha.34
 	github.com/cloudwego/eino-ext/components/model/agenticark v0.2.4
 	github.com/cloudwego/eino-ext/components/model/agenticclaude v0.1.5
@@ -17,7 +18,6 @@ require (
 	github.com/eino-contrib/jsonschema v1.0.3
 	github.com/gin-gonic/gin v1.12.0
 	github.com/go-ego/gse v1.1.0
-	github.com/go-shiori/go-readability v0.0.0-20251205110129-5db1dc9836f0
 	github.com/goccy/go-yaml v1.19.2
 	github.com/mattn/go-sqlite3 v1.14.52
 	github.com/modelcontextprotocol/go-sdk v1.8.0
@@ -30,13 +30,13 @@ require (
 	github.com/uptrace/bun/dialect/pgdialect v1.2.18
 	github.com/uptrace/bun/dialect/sqlitedialect v1.2.18
 	github.com/uptrace/bun/driver/pgdriver v1.2.18
-	github.com/volcengine/volcengine-go-sdk v1.2.34
+	github.com/volcengine/volcengine-go-sdk v1.2.53
 	github.com/wailsapp/wails/v3 v3.0.0-beta.23
 	github.com/yuin/goldmark v1.8.6
 	golang.org/x/crypto v0.57.0
-	golang.org/x/net v0.58.0
+	golang.org/x/net v0.59.0
 	golang.org/x/text v0.42.0
-	google.golang.org/genai v1.70.0
+	google.golang.org/genai v1.71.0
 )
 
 require (
@@ -50,7 +50,6 @@ require (
 	github.com/adrg/xdg v0.5.3 // indirect
 	github.com/andybalholm/cascadia v1.3.3 // indirect
 	github.com/anthropics/anthropic-sdk-go v1.56.0 // indirect
-	github.com/araddon/dateparse v0.0.0-20210429162001-6b43995a97de // indirect
 	github.com/aws/aws-sdk-go-v2/aws/protocol/eventstream v1.7.20 // indirect
 	github.com/aws/aws-sdk-go-v2/config v1.27.27 // indirect
 	github.com/aws/aws-sdk-go-v2/feature/ec2/imds v1.20.0 // indirect
@@ -64,7 +63,7 @@ require (
 	github.com/aws/aws-sdk-go-v2/service/internal/s3shared v1.20.3 // indirect
 	github.com/aws/aws-sdk-go-v2/service/sso v1.38.0 // indirect
 	github.com/aws/aws-sdk-go-v2/service/ssooidc v1.43.0 // indirect
-	github.com/aws/aws-sdk-go-v2/service/sts v1.50.0 // indirect
+	github.com/aws/aws-sdk-go-v2/service/sts v1.51.0 // indirect
 	github.com/aws/smithy-go v1.28.1 // indirect
 	github.com/bahlo/generic-list-go v0.2.0 // indirect
 	github.com/bmatcuk/doublestar/v4 v4.10.0 // indirect
@@ -100,6 +99,7 @@ require (
 	github.com/goph/emperror v0.17.2 // indirect
 	github.com/gorilla/websocket v1.5.3 // indirect
 	github.com/invopop/jsonschema v0.14.0 // indirect
+	github.com/itlightning/dateparse v0.2.1 // indirect
 	github.com/jinzhu/inflection v1.0.0 // indirect
 	github.com/jmespath/go-jmespath v0.4.0 // indirect
 	github.com/json-iterator/go v1.1.12 // indirect
