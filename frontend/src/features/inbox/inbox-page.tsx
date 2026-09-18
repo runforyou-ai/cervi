@@ -13,6 +13,7 @@ import {
   ServiceSessionStatus,
   findDirectConversation,
   isApiError,
+  isCustomerInboxConversation,
   listCustomerServiceAssignees,
   listInboxChannels,
   openConversationWindow,
@@ -53,7 +54,7 @@ import {
   useConversationSummary,
 } from "@/features/inbox/use-conversation-summary"
 import { useInboxSearch, type InboxSearchItem } from "@/features/inbox/use-inbox-search"
-import type { InboxList } from "@/features/inbox/use-inbox-list"
+import type { PartitionedInboxList } from "@/features/inbox/use-inbox-list"
 import { useRecentConversations } from "@/features/inbox/use-recent-conversations"
 import type { useInboxListViewport } from "@/features/inbox/use-inbox-list-viewport"
 import { resourceKeys } from "@/hooks/resource-keys"
@@ -87,7 +88,7 @@ export function InboxPage({
   onSelectedConversationChange,
   onQueryChange,
 }: {
-  list: InboxList
+  list: PartitionedInboxList
   listViewport: ReturnType<typeof useInboxListViewport>
   scope: InboxScope
   customerView: CustomerInboxView
@@ -294,6 +295,32 @@ export function InboxPage({
     onSelectedConversationChange("", true)
   }
 
+  /** 本人关闭客户会话后取消选中并清空主区；接管、发消息、转交或重开后，客户列表的归属筛选跟随该会话的去向。 */
+  function followCustomerConversation(conversation: InboxConversation) {
+    if (!isCustomerInboxConversation(conversation) || conversation.id !== selectedConversationId) return
+    if (conversation.customer.serviceSessionStatus === ServiceSessionStatus.ServiceSessionStatusClosed) {
+      // 操作前仍在处理中即本次操作是关闭；已关闭会话里的其他操作保持选中。
+      const closing = selectedConversation && isCustomerInboxConversation(selectedConversation) &&
+        selectedConversation.customer.serviceSessionStatus === ServiceSessionStatus.ServiceSessionStatusOpen
+      if (closing) {
+        setIsNarrowDetailOpen(false)
+        onQueryChange({ conversationId: "" })
+      }
+      return
+    }
+    if (scope !== InboxScope.InboxScopeCustomer) return
+    const assigneeId = conversation.customer.assignee?.identityId ?? ""
+    const nextView = !assigneeId
+      ? CustomerInboxView.CustomerInboxViewQueue
+      : assigneeId === identity.user.identityId
+        ? CustomerInboxView.CustomerInboxViewMine
+        : CustomerInboxView.CustomerInboxViewCoworkers
+    // 同事视图已按其他客服筛选时改为新的负责人，未筛选时保持查看全部同事。
+    const nextAssignee = nextView === CustomerInboxView.CustomerInboxViewCoworkers && assigneeIdentityId ? assigneeId : ""
+    if (nextView === customerView && nextAssignee === assigneeIdentityId && serviceStatus === ServiceSessionStatus.ServiceSessionStatusOpen) return
+    onQueryChange({ customerView: nextView, assigneeIdentityId: nextAssignee, serviceStatus: ServiceSessionStatus.ServiceSessionStatusOpen, conversationId: conversation.id })
+  }
+
   /** 按当前聊天草稿或选中会话渲染主区内容。 */
   function renderConversation(narrowViewport: boolean) {
     if (activeChatDraft) {
@@ -313,6 +340,7 @@ export function InboxPage({
         conversationId={selectedConversationId}
         summary={summary}
         onGroupLeft={showConversationAfterGroupLeft}
+        onLocalChange={followCustomerConversation}
         onSearchConversation={searchConversation}
         locateMessage={messageTarget}
         narrowViewport={narrowViewport}
@@ -385,7 +413,11 @@ export function InboxPage({
           <InboxListPanel list={list} viewport={listViewport} detailError={Boolean(summary.error)} retryDetail={() => void summary.refresh()}>
             <InboxConversationList
               conversations={conversations}
+              pinnedIds={list.pinnedIds}
+              pinOrderVersion={list.pinOrderVersion}
               onMenuChange={listViewport.setMenu}
+              onDraggingChange={listViewport.setDragging}
+              onPinSettled={list.settlePin}
               selectedId={selectedConversation?.id}
               onSelect={selectConversation}
               onOpenInWindow={

@@ -41,7 +41,7 @@ function fixture(locateId: string | null = null) {
     restore: (...args) => { restored = args },
     unavailable: (ids) => { unavailable.push(...ids) },
   }
-  const controller = new InboxListController(ports, { scope: "all", customerView: "queue", assigneeIdentityId: "" } as InboxQuery, undefined, false, locateId)
+  const controller = new InboxListController(ports, { scope: "all", customerView: "queue", assigneeIdentityId: "" } as InboxQuery, { locateId })
   return { controller, ports, trace, records, unavailable, top: (value: boolean) => { top = value }, interact: (value: boolean) => { interacting = value }, restored: () => restored }
 }
 
@@ -184,7 +184,7 @@ test("带原位置的书签锚点读到空邻域时保留空窗口，不回落�
   const anchor = { id: "80", cursor: "p80", width: 390, height: 844, neighbors: [{ id: "80", offset: -10 }] }
   const f = fixture()
   const bookmark = { state: { ...f.controller.getSnapshot() }, anchor }
-  const controller = new InboxListController(f.ports, { scope: "all", customerView: "queue", assigneeIdentityId: "" } as InboxQuery, bookmark)
+  const controller = new InboxListController(f.ports, { scope: "all", customerView: "queue", assigneeIdentityId: "" } as InboxQuery, { bookmark })
   f.ports.context = async () => { f.trace.push("context"); return { conversations: [], startCursor: "", endCursor: "", hasBefore: true, hasAfter: true } }
   await controller.request("initial")
   assert.ok(f.trace.includes("context"))
@@ -369,13 +369,13 @@ test("返回时缓存保留则重读原完整窗口，缓存缺失则直接定�
   f.top(false)
   const bookmark = f.controller.remember()
   const query = { scope: "all", customerView: "queue", assigneeIdentityId: "" } as InboxQuery
-  const cached = new InboxListController(f.ports, query, bookmark, true)
+  const cached = new InboxListController(f.ports, query, { bookmark, cached: true })
   assert.equal(cached.getSnapshot().ids.length, 150)
   await cached.request("initial")
   assert.equal(cached.getSnapshot().ids.length, 150)
   assert.ok(f.trace.includes("window:p1:p150"))
   f.trace.length = 0
-  const evicted = new InboxListController(f.ports, query, bookmark, false)
+  const evicted = new InboxListController(f.ports, query, { bookmark })
   await evicted.request("initial")
   assert.deepEqual(f.trace, ["context"])
   assert.equal(evicted.getSnapshot().ids[0], "81")
@@ -503,4 +503,116 @@ test("列表加载到尾端后新增的会话仍可经变更通知发现", async
   assert.equal(state.ids.length, 51)
   assert.equal(state.hasBefore, false)
   assert.deepEqual(f.trace.filter((call) => call.startsWith("window:")), ["window:p1:p50", "window:top:p50"])
+})
+
+/** 创建按置顶顺序整区读取的控制器，pages 给出每次首页读取对应的分页序列。 */
+function pinnedFixture(rounds: { version: string; pages: number[][]; failAfterFirst?: boolean; laterVersion?: string }[]) {
+  const trace: string[] = []
+  let round = -1
+  let interacting = false
+  let restored: Parameters<InboxListPorts["restore"]> | undefined
+  const ports = {
+    page: async (cursor = "") => {
+      if (!cursor) round = Math.min(round + 1, rounds.length - 1)
+      const current = rounds[round]
+      const index = cursor ? Number(cursor.split(":")[1]) + 1 : 0
+      trace.push(`page:${current.version}:${index}`)
+      if (index > 0 && current.failAfterFirst) throw new Error("inbox_cursor_invalid")
+      // 续页读取期间顺序已变化时，续页携带变化后的顺序版本。
+      const version = index > 0 && current.laterVersion ? current.laterVersion : current.version
+      return {
+        conversations: (current.pages[index] ?? []).map(row), startCursor: `${current.version}:0`, endCursor: `${current.version}:${index}`,
+        hasBefore: false, hasMore: index < current.pages.length - 1, pinOrderVersion: version, attentionUnreadCount: 0,
+      }
+    },
+    window: async () => { throw new Error("置顶区不按游标区间重读") },
+    context: async () => { throw new Error("置顶区不读取锚点上下文") },
+    rows: async (ids: string[]) => ({ results: ids.map((id) => ({ id, availability: "matching", conversation: row(Number(id)) })) }),
+    capture: () => ({ id: "2", cursor: "", width: 390, height: 844, neighbors: [{ id: "2", offset: 0 }, { id: "3", offset: 68 }] }),
+    atTop: () => false,
+    interacting: () => interacting,
+    restore: (...args: Parameters<InboxListPorts["restore"]>) => { restored = args },
+    unavailable: () => {},
+  } as unknown as InboxListPorts
+  const controller = new InboxListController(ports, { partition: "pinned", scope: "all" } as InboxQuery, { region: true })
+  return { controller, trace, restored: () => restored, interact: (value: boolean) => { interacting = value } }
+}
+
+test("置顶区按同一顺序版本读完全部分页，不保留分页边界", async () => {
+  const f = pinnedFixture([{ version: "7", pages: [[1, 2], [3, 4], [5]] }])
+  await f.controller.request("initial")
+  const state = f.controller.getSnapshot()
+  assert.deepEqual(state.ids, ["1", "2", "3", "4", "5"])
+  assert.equal(state.pinOrderVersion, "7")
+  assert.equal(state.hasBefore, false)
+  assert.equal(state.hasAfter, false)
+  assert.deepEqual(f.trace, ["page:7:0", "page:7:1", "page:7:2"])
+})
+
+test("置顶区续页游标失效时舍弃本轮，从新版本首页整区重读", async () => {
+  const f = pinnedFixture([
+    { version: "7", pages: [[1, 2], [3]], failAfterFirst: true },
+    { version: "8", pages: [[3, 1], [2]] },
+  ])
+  await f.controller.request("initial")
+  const state = f.controller.getSnapshot()
+  assert.deepEqual(state.ids, ["3", "1", "2"])
+  assert.equal(state.pinOrderVersion, "8")
+  assert.equal(state.error, null)
+  assert.deepEqual(f.trace, ["page:7:0", "page:7:1", "page:8:0", "page:8:1"])
+})
+
+test("置顶区续页携带新的顺序版本时舍弃本轮候选，不与旧顺序混排", async () => {
+  const f = pinnedFixture([
+    { version: "7", pages: [[1, 2], [3]], laterVersion: "8" },
+    { version: "8", pages: [[2, 3], [1]] },
+  ])
+  await f.controller.request("initial")
+  assert.deepEqual(f.controller.getSnapshot().ids, ["2", "3", "1"])
+  assert.equal(f.controller.getSnapshot().pinOrderVersion, "8")
+  assert.deepEqual(f.trace, ["page:7:0", "page:7:1", "page:8:0", "page:8:1"])
+})
+
+test("置顶区持续读取失败时保留已确认顺序并记录错误", async () => {
+  const f = pinnedFixture([
+    { version: "7", pages: [[1, 2]] },
+    { version: "8", pages: [[2, 1], [3]], failAfterFirst: true },
+  ])
+  await f.controller.request("initial")
+  await f.controller.request("poll")
+  const state = f.controller.getSnapshot()
+  assert.deepEqual(state.ids, ["1", "2"])
+  assert.equal(state.pinOrderVersion, "7")
+  assert.equal(state.error, "poll")
+})
+
+test("置顶区重排以前驱变化识别被移动的行，保位锚点落在未移动的邻居", async () => {
+  const f = pinnedFixture([
+    { version: "7", pages: [[1, 2, 3]] },
+    { version: "8", pages: [[3, 1, 2]] },
+  ])
+  await f.controller.request("initial")
+  await f.controller.request("poll")
+  assert.deepEqual(f.controller.getSnapshot().ids, ["3", "1", "2"])
+  const moved = f.restored()![1]
+  assert.ok(moved.has("3"))
+  assert.ok(moved.has("1"))
+  assert.ok(!moved.has("2"))
+  assert.equal(f.restored()![2], false)
+})
+
+test("拖动期间到达的远端重排不提前发布顺序版本，展示顺序与写入版本保持同一份快照", async () => {
+  const f = pinnedFixture([
+    { version: "7", pages: [[1, 2, 3]] },
+    { version: "8", pages: [[3, 1, 2]] },
+  ])
+  await f.controller.request("initial")
+  f.interact(true)
+  await f.controller.request("poll")
+  assert.deepEqual(f.controller.getSnapshot().ids, ["1", "2", "3"])
+  assert.equal(f.controller.getSnapshot().pinOrderVersion, "7")
+  f.interact(false)
+  f.controller.settle()
+  assert.deepEqual(f.controller.getSnapshot().ids, ["3", "1", "2"])
+  assert.equal(f.controller.getSnapshot().pinOrderVersion, "8")
 })
