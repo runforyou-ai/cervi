@@ -7,8 +7,14 @@ import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import { isApiError, updateAgentExecution, type AgentData } from "@/api"
+import { AgentBehaviorSummary } from "@/components/agent-behavior-summary"
 import { Button } from "@/components/ui/button"
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field"
 import { Textarea } from "@/components/ui/textarea"
 import { AgentKnowledgeField } from "@/features/contacts/agents/agent-knowledge-field"
 import { AgentMCPField } from "@/features/contacts/agents/agent-mcp-field"
@@ -41,7 +47,6 @@ export function AgentExecutionForm({
     () =>
       createAgentExecutionSchema({
         modelRequired: t("agents.validation.modelRequired"),
-        instructionRequired: t("agents.validation.instructionRequired"),
         instructionTooLong: t("agents.validation.instructionTooLong"),
       }),
     [t],
@@ -117,20 +122,26 @@ export function AgentExecutionForm({
           control={form.control}
           render={({ field, fieldState }) => (
             <Field data-invalid={fieldState.invalid}>
-              <FieldLabel htmlFor="agent-execution-instruction" required>
+              <FieldLabel htmlFor="agent-execution-instruction">
                 {t("agents.execution.instruction")}
               </FieldLabel>
               <Textarea
                 {...field}
                 id="agent-execution-instruction"
                 rows={10}
-                required
                 aria-invalid={fieldState.invalid}
                 disabled={form.formState.isSubmitting}
               />
+              <FieldDescription>
+                {t("agents.execution.instructionHelp")}
+              </FieldDescription>
             </Field>
           )}
         />
+        <Field>
+          <FieldLabel>{t("agents.execution.behavior")}</FieldLabel>
+          <AgentBehaviorSummary behavior={agent.behavior} />
+        </Field>
         <Controller
           name="knowledgeBaseIds"
           control={form.control}

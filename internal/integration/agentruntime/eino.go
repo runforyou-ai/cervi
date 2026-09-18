@@ -61,35 +61,11 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 	if err != nil {
 		return RunResult{}, err
 	}
-	tools := append([]tool.BaseTool(nil), r.tools...)
-	if request.KnowledgeSearch != nil {
-		knowledgeTool, toolErr := newKnowledgeSearchTool(request.KnowledgeSearch)
-		if toolErr != nil {
-			return RunResult{}, fmt.Errorf("create knowledge search tool: %w", toolErr)
-		}
-		tools = append(tools, knowledgeTool)
+	tools, releaseSessions, err := r.assembleTools(ctx, request)
+	if err != nil {
+		return RunResult{}, err
 	}
-	if request.CustomerHistorySearch != nil {
-		historyTool, toolErr := newCustomerHistoryTool(request.CustomerHistorySearch)
-		if toolErr != nil {
-			return RunResult{}, fmt.Errorf("create customer history tool: %w", toolErr)
-		}
-		tools = append(tools, historyTool)
-	}
-	if len(request.MCPServers) > 0 {
-		// 收齐本次运行的内置工具名称，远程工具重名时由 openMCPTools 跳过。
-		registered := map[string]struct{}{offloadedResultToolName: {}}
-		for _, existing := range tools {
-			info, infoErr := existing.Info(ctx)
-			if infoErr != nil {
-				return RunResult{}, fmt.Errorf("read registered tool info: %w", infoErr)
-			}
-			registered[info.Name] = struct{}{}
-		}
-		mcpTools, releaseSessions := openMCPTools(ctx, request.RunID, request.MCPServers, registered)
-		defer releaseSessions()
-		tools = append(tools, mcpTools...)
-	}
+	defer releaseSessions()
 	window := ContextWindowTokens(request.Model)
 	reductionHandlers, err := newContextReductionHandlers(ctx, window)
 	if err != nil {
@@ -163,6 +139,44 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 		execution.result.Blocks = recorder.blocks()
 		return execution.result, nil
 	}
+}
+
+// assembleTools 按场景与请求装配本次运行的工具：开发期计算器只在内部场景注册，远程 MCP 工具在内置工具之后连接并跳过重名。
+func (r *EinoRuntime) assembleTools(ctx context.Context, request RunRequest) ([]tool.BaseTool, func(), error) {
+	tools := make([]tool.BaseTool, 0, len(r.tools)+2)
+	if request.Scene != SceneCustomer {
+		tools = append(tools, r.tools...)
+	}
+	if request.KnowledgeSearch != nil {
+		knowledgeTool, err := newKnowledgeSearchTool(request.KnowledgeSearch)
+		if err != nil {
+			return nil, nil, fmt.Errorf("create knowledge search tool: %w", err)
+		}
+		tools = append(tools, knowledgeTool)
+	}
+	if request.CustomerHistorySearch != nil {
+		historyTool, err := newCustomerHistoryTool(request.CustomerHistorySearch)
+		if err != nil {
+			return nil, nil, fmt.Errorf("create customer history tool: %w", err)
+		}
+		tools = append(tools, historyTool)
+	}
+	release := func() {}
+	if len(request.MCPServers) > 0 {
+		// 收齐本次运行的内置工具名称，远程工具重名时由 openMCPTools 跳过。
+		registered := map[string]struct{}{offloadedResultToolName: {}}
+		for _, existing := range tools {
+			info, err := existing.Info(ctx)
+			if err != nil {
+				return nil, nil, fmt.Errorf("read registered tool info: %w", err)
+			}
+			registered[info.Name] = struct{}{}
+		}
+		var mcpTools []tool.BaseTool
+		mcpTools, release = openMCPTools(ctx, request.RunID, request.MCPServers, registered)
+		tools = append(tools, mcpTools...)
+	}
+	return tools, release, nil
 }
 
 // einoExecution 保存单次运行的上下文、轮次和结果，回调按轮次顺序访问。

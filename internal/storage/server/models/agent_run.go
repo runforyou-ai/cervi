@@ -26,6 +26,7 @@ type AgentRun struct {
 	InputEndSeq       *int64          `bun:"input_end_seq"`
 	ResponseMessageID *string         `bun:"response_message_id"`
 	Usage             json.RawMessage `bun:"usage,type:jsonb"`
+	BehaviorSnapshot  json.RawMessage `bun:"behavior_snapshot,type:jsonb,nullzero"`
 	LastError         *string         `bun:"last_error"`
 	ErrorCode         *string         `bun:"error_code"`
 	StartedAt         *time.Time      `bun:"started_at"`

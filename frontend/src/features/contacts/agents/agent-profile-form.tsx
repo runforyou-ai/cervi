@@ -1,7 +1,7 @@
 /** AI 员工基本资料表单。 */
 import { useEffect, useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { Controller, useForm } from "react-hook-form"
+import { Controller, useForm, useWatch } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -70,6 +70,7 @@ export function AgentProfileForm({
     },
   })
   const { mounted, dirty } = useFormLifetime(form.formState.isDirty)
+  const selectedRoleId = useWatch({ control: form.control, name: "roleId" })
 
   // 资料刷新时同步未修改的表单，保留正在编辑的草稿。
   useEffect(() => {
@@ -129,6 +130,12 @@ export function AgentProfileForm({
               disabled={form.formState.isSubmitting}
               roles={roles.filter(
                 (role) => role.kind !== RoleKind.RoleKindAdmin,
+              )}
+              hint={t(
+                roles.find((role) => role.id === selectedRoleId)?.kind ===
+                  RoleKind.RoleKindCustomerService
+                  ? "agents.roleHint.customerService"
+                  : "agents.roleHint.member",
               )}
             />
           )}

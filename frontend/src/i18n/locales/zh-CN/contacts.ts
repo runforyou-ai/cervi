@@ -146,8 +146,11 @@ const contacts = {
       nameRequired: "请输入 AI 员工名称。",
       nameInvalid: "AI 员工名称只能包含文字、数字、空格和 · - _ . 符号。",
       modelRequired: "请选择对话模型。",
-      instructionRequired: "请输入工作指令。",
-      instructionTooLong: "工作指令不能超过 20000 个字符。",
+      instructionTooLong: "企业指令不能超过 20000 个字符。",
+    },
+    roleHint: {
+      customerService: "可以作为客服接待客户，按客服工作规则运行。",
+      member: "只参与企业内部协作，按成员工作规则运行。",
     },
     mcp: {
       services: "MCP 服务",
@@ -167,7 +170,10 @@ const contacts = {
 
       title: "运行配置",
       model: "对话模型",
-      instruction: "工作指令",
+      instruction: "企业指令",
+      instructionHelp:
+        "内置工作规则已包含通用要求，这里只写企业特有的业务背景、语气称呼、特殊政策和禁止事项。",
+      behavior: "内置工作规则",
       saveError: "保存运行配置失败，请重试。",
       modelSelect: "选择对话模型",
       modelLoading: "正在加载模型…",

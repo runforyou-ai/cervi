@@ -132,7 +132,7 @@ func testCustomerCopilotThreads(t *testing.T, db *bun.DB, identity *servermodels
 		if err != nil {
 			return agentruntime.RunResult{}, err
 		}
-		if !strings.HasPrefix(request.Instruction, "你是售后专家") || !strings.Contains(request.Instruction, "customer_conversation_background") ||
+		if !strings.HasPrefix(request.Instruction, "你是企业「") || !strings.Contains(request.Instruction, "\n\n你是售后专家") || !strings.Contains(request.Instruction, "customer_conversation_background") ||
 			!strings.Contains(request.Instruction, "customer-reply") || !strings.Contains(request.Instruction, "与客户最近消息相同的语言") {
 			t.Errorf("copilot instruction = %q", request.Instruction)
 		}

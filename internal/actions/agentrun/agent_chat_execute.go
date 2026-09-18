@@ -14,6 +14,8 @@ import (
 	"github.com/uptrace/bun"
 )
 
+const agentChatSceneRules = `本次是企业内部对话，提问者是企业同事，你的回答只提供给同事。可以给出分析和建议，但不要宣称已经向客户发送消息或已经转交人工。`
+
 type agentChatRunPolicy struct{}
 
 // lockContext 锁定 AI 会话及其固定 Agent 的有效参与关系。
@@ -55,9 +57,9 @@ func (p agentChatRunPolicy) persistMessage(ctx context.Context, db bun.IDB, poli
 	return err
 }
 
-// instruction 沿用 AI 会话配置的系统提示词。
-func (p agentChatRunPolicy) instruction(_ context.Context, _ bun.IDB, execution executionContext) (string, error) {
-	return execution.Instruction, nil
+// sceneRules 给出企业内部对话的受众说明与工具用法。
+func (p agentChatRunPolicy) sceneRules(_ context.Context, _ bun.IDB, _ executionContext, tools behaviorTools) (agentruntime.Scene, string, error) {
+	return agentruntime.SceneAgentChat, joinSections(agentChatSceneRules, toolGuidance(tools)), nil
 }
 
 // laneRevision 读取 AI 聊天 Agent 当前生效的配置版本。

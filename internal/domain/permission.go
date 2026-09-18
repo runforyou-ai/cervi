@@ -38,26 +38,36 @@ const (
 	PermissionLevelManage PermissionLevel = "manage"
 )
 
+// PermissionAppliesTo 定义权限适用的企业身份类型：管理台操作只对成员生效，查看类权限同时作为 AI 员工只读工具的门槛。
+type PermissionAppliesTo string
+
+const (
+	PermissionAppliesToMember PermissionAppliesTo = "member"
+	PermissionAppliesToAgent  PermissionAppliesTo = "agent"
+	PermissionAppliesToBoth   PermissionAppliesTo = "both"
+)
+
 // PermissionDefinition 描述一项预定义权限。
 type PermissionDefinition struct {
-	Code     PermissionCode
-	Resource PermissionResource
-	Level    PermissionLevel
+	Code      PermissionCode
+	Resource  PermissionResource
+	Level     PermissionLevel
+	AppliesTo PermissionAppliesTo
 }
 
 var permissionDefinitions = []PermissionDefinition{
-	{Code: PermissionExternalContactsView, Resource: PermissionResourceExternalContacts, Level: PermissionLevelView},
-	{Code: PermissionExternalContactsManage, Resource: PermissionResourceExternalContacts, Level: PermissionLevelManage},
-	{Code: PermissionTeamMembersView, Resource: PermissionResourceTeamMembers, Level: PermissionLevelView},
-	{Code: PermissionTeamMembersManage, Resource: PermissionResourceTeamMembers, Level: PermissionLevelManage},
-	{Code: PermissionChannelsView, Resource: PermissionResourceChannels, Level: PermissionLevelView},
-	{Code: PermissionChannelsManage, Resource: PermissionResourceChannels, Level: PermissionLevelManage},
-	{Code: PermissionRolesView, Resource: PermissionResourceRoles, Level: PermissionLevelView},
-	{Code: PermissionRolesManage, Resource: PermissionResourceRoles, Level: PermissionLevelManage},
-	{Code: PermissionOrganizationView, Resource: PermissionResourceOrganization, Level: PermissionLevelView},
-	{Code: PermissionOrganizationManage, Resource: PermissionResourceOrganization, Level: PermissionLevelManage},
-	{Code: PermissionStorageView, Resource: PermissionResourceStorage, Level: PermissionLevelView},
-	{Code: PermissionStorageManage, Resource: PermissionResourceStorage, Level: PermissionLevelManage},
+	{Code: PermissionExternalContactsView, Resource: PermissionResourceExternalContacts, Level: PermissionLevelView, AppliesTo: PermissionAppliesToBoth},
+	{Code: PermissionExternalContactsManage, Resource: PermissionResourceExternalContacts, Level: PermissionLevelManage, AppliesTo: PermissionAppliesToMember},
+	{Code: PermissionTeamMembersView, Resource: PermissionResourceTeamMembers, Level: PermissionLevelView, AppliesTo: PermissionAppliesToBoth},
+	{Code: PermissionTeamMembersManage, Resource: PermissionResourceTeamMembers, Level: PermissionLevelManage, AppliesTo: PermissionAppliesToMember},
+	{Code: PermissionChannelsView, Resource: PermissionResourceChannels, Level: PermissionLevelView, AppliesTo: PermissionAppliesToBoth},
+	{Code: PermissionChannelsManage, Resource: PermissionResourceChannels, Level: PermissionLevelManage, AppliesTo: PermissionAppliesToMember},
+	{Code: PermissionRolesView, Resource: PermissionResourceRoles, Level: PermissionLevelView, AppliesTo: PermissionAppliesToMember},
+	{Code: PermissionRolesManage, Resource: PermissionResourceRoles, Level: PermissionLevelManage, AppliesTo: PermissionAppliesToMember},
+	{Code: PermissionOrganizationView, Resource: PermissionResourceOrganization, Level: PermissionLevelView, AppliesTo: PermissionAppliesToMember},
+	{Code: PermissionOrganizationManage, Resource: PermissionResourceOrganization, Level: PermissionLevelManage, AppliesTo: PermissionAppliesToMember},
+	{Code: PermissionStorageView, Resource: PermissionResourceStorage, Level: PermissionLevelView, AppliesTo: PermissionAppliesToMember},
+	{Code: PermissionStorageManage, Resource: PermissionResourceStorage, Level: PermissionLevelManage, AppliesTo: PermissionAppliesToMember},
 }
 
 // PermissionDefinitions 返回按界面顺序排列的权限目录。

@@ -37,7 +37,7 @@ type agentRunPolicy interface {
 	loadMessages(context.Context, bun.IDB, *servermodels.AgentRun, int64, attachmentLinks) ([]agentruntime.Message, error)
 	persistMessage(context.Context, bun.IDB, agentRunPolicyContext, *servermodels.AgentRun, string, domain.MessageType, string) error
 	laneRevision(context.Context, bun.IDB, agentRunPolicyContext, *servermodels.AgentLane) (string, bool, error)
-	instruction(context.Context, bun.IDB, executionContext) (string, error)
+	sceneRules(context.Context, bun.IDB, executionContext, behaviorTools) (agentruntime.Scene, string, error)
 }
 
 // mentionReplyPolicy 由从回复正文提取点名成员的执行范围实现。

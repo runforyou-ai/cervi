@@ -16,11 +16,13 @@ import {
   RoleKind,
   updateRole,
   updateRoleAssignments,
+  PermissionAppliesTo,
   type PermissionCode,
   type PermissionDefinition,
   type PermissionResource,
   type RoleData,
 } from "@/api"
+import { AgentBehaviorSummary } from "@/components/agent-behavior-summary"
 import { FormInputField } from "@/components/form/form-input-field"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { PageContent } from "@/components/page-content"
@@ -264,7 +266,17 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
       : role
         ? roleDisplayName(role, tCommon)
         : t("roles.form.detailTitle")
-  const rows = permissionRows(definitions)
+  // 成员权限只列出适用于成员的权限；AI 员工能力本期由角色类型内置，只读展示。
+  const rows = permissionRows(
+    definitions.filter(
+      (definition) =>
+        definition.appliesTo !== PermissionAppliesTo.PermissionAppliesToAgent,
+    ),
+  )
+  const agentBehavior =
+    role?.agentBehavior ??
+    roles.find((item) => item.kind === RoleKind.RoleKindMember)?.agentBehavior ??
+    null
   const pendingRoleIDs = useMemo(
     () =>
       Object.fromEntries(
@@ -368,7 +380,7 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
 
               <section>
                 <div className="mb-3">
-                  <h3 className="font-medium">{t("roles.permissions.title")}</h3>
+                  <h3 className="font-medium">{t("roles.permissions.memberTitle")}</h3>
                   {admin ? (
                     <p className="mt-1 text-sm text-muted-foreground">
                       {t("roles.permissions.adminDescription")}
@@ -440,6 +452,21 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
                 </div>
               </section>
 
+              <section>
+                <div className="mb-3">
+                  <h3 className="font-medium">{t("roles.permissions.agentTitle")}</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {admin
+                      ? t("roles.permissions.agentNotApplicable")
+                      : custom
+                        ? t("roles.permissions.agentCustomNote")
+                        : t("roles.permissions.agentDescription")}
+                  </p>
+                </div>
+                {!admin && agentBehavior ? (
+                  <AgentBehaviorSummary behavior={agentBehavior} />
+                ) : null}
+              </section>
             </div>
 
             <div className="flex items-center gap-2">

@@ -56,15 +56,14 @@ func (o *directOperations) CreateAgent(ctx context.Context, meta RequestMeta, id
 	})
 	if err != nil {
 		return Agent{}, o.agentError(ctx, meta, err, cervii18n.ErrorAgentCreateFailed, identity.Organization.ID, "", map[common.FieldCode]cervii18n.Key{
-			agentaction.ValidationDisplayNameRequired:       cervii18n.FieldAgentNameRequired,
-			agentaction.ValidationDisplayNameInvalid:        cervii18n.FieldDisplayNameInvalid,
-			agentaction.ValidationRoleInvalid:               cervii18n.FieldMemberRoleInvalid,
-			agentaction.ValidationTeamInvalid:               cervii18n.FieldTeamInvalid,
-			agentaction.ValidationExecutionInvalid:          cervii18n.FieldAgentExecutionInvalid,
-			agentaction.ValidationKnowledgeBaseInvalid:      cervii18n.FieldAgentKnowledgeBaseInvalid,
-			agentaction.ValidationModelInvalid:              cervii18n.FieldAgentModelInvalid,
-			agentaction.ValidationSystemInstructionRequired: cervii18n.FieldAgentSystemInstructionRequired,
-			agentaction.ValidationSystemInstructionTooLong:  cervii18n.FieldAgentSystemInstructionTooLong,
+			agentaction.ValidationDisplayNameRequired:      cervii18n.FieldAgentNameRequired,
+			agentaction.ValidationDisplayNameInvalid:       cervii18n.FieldDisplayNameInvalid,
+			agentaction.ValidationRoleInvalid:              cervii18n.FieldMemberRoleInvalid,
+			agentaction.ValidationTeamInvalid:              cervii18n.FieldTeamInvalid,
+			agentaction.ValidationExecutionInvalid:         cervii18n.FieldAgentExecutionInvalid,
+			agentaction.ValidationKnowledgeBaseInvalid:     cervii18n.FieldAgentKnowledgeBaseInvalid,
+			agentaction.ValidationModelInvalid:             cervii18n.FieldAgentModelInvalid,
+			agentaction.ValidationSystemInstructionTooLong: cervii18n.FieldAgentSystemInstructionTooLong,
 		})
 	}
 	slog.Info("AI 员工创建成功",
@@ -77,7 +76,7 @@ func (o *directOperations) CreateAgent(ctx context.Context, meta RequestMeta, id
 		"model_identifier", created.Execution.Managed.ModelIdentifier,
 		"knowledge_base_count", len(created.Execution.Managed.KnowledgeBaseIDs),
 	)
-	return agentFromAction(*created), nil
+	return agentFromAction(*created, identity.Organization.Name), nil
 }
 
 // ListAgentMCPServerOptions 读取企业 MCP 服务摘要。
@@ -147,7 +146,7 @@ func (o *directOperations) GetAgent(ctx context.Context, meta RequestMeta, ident
 	if err != nil {
 		return Agent{}, o.agentError(ctx, meta, err, cervii18n.ErrorAgentReadFailed, identity.Organization.ID, agentID, nil)
 	}
-	return agentFromAction(*agent), nil
+	return agentFromAction(*agent, identity.Organization.Name), nil
 }
 
 // UpdateAgent 保存企业 AI 员工基本资料和工作状态。
@@ -164,7 +163,7 @@ func (o *directOperations) UpdateAgent(ctx context.Context, meta RequestMeta, id
 		})
 	}
 	slog.Info("AI 员工已保存", "organization_id", identity.Organization.ID, "identity_id", agent.IdentityID, "agent_id", agentID, "work_status", agent.WorkStatus)
-	return agentFromAction(*agent), nil
+	return agentFromAction(*agent, identity.Organization.Name), nil
 }
 
 // UpdateAgentExecution 修改企业 AI 员工的执行配置。
@@ -175,12 +174,11 @@ func (o *directOperations) UpdateAgentExecution(ctx context.Context, meta Reques
 	})
 	if err != nil {
 		return Agent{}, o.agentError(ctx, meta, err, cervii18n.ErrorAgentExecutionUpdateFailed, identity.Organization.ID, agentID, map[common.FieldCode]cervii18n.Key{
-			agentaction.ValidationMCPServerInvalid:          cervii18n.FieldAgentMCPServerInvalid,
-			agentaction.ValidationExecutionInvalid:          cervii18n.FieldAgentExecutionInvalid,
-			agentaction.ValidationKnowledgeBaseInvalid:      cervii18n.FieldAgentKnowledgeBaseInvalid,
-			agentaction.ValidationModelInvalid:              cervii18n.FieldAgentModelInvalid,
-			agentaction.ValidationSystemInstructionRequired: cervii18n.FieldAgentSystemInstructionRequired,
-			agentaction.ValidationSystemInstructionTooLong:  cervii18n.FieldAgentSystemInstructionTooLong,
+			agentaction.ValidationMCPServerInvalid:         cervii18n.FieldAgentMCPServerInvalid,
+			agentaction.ValidationExecutionInvalid:         cervii18n.FieldAgentExecutionInvalid,
+			agentaction.ValidationKnowledgeBaseInvalid:     cervii18n.FieldAgentKnowledgeBaseInvalid,
+			agentaction.ValidationModelInvalid:             cervii18n.FieldAgentModelInvalid,
+			agentaction.ValidationSystemInstructionTooLong: cervii18n.FieldAgentSystemInstructionTooLong,
 		})
 	}
 	slog.Info("AI 员工执行配置已保存",
@@ -194,7 +192,7 @@ func (o *directOperations) UpdateAgentExecution(ctx context.Context, meta Reques
 		"knowledge_base_count", len(agent.Execution.Managed.KnowledgeBaseIDs),
 		"mcp_server_count", len(agent.Execution.MCPServerIDs),
 	)
-	return agentFromAction(*agent), nil
+	return agentFromAction(*agent, identity.Organization.Name), nil
 }
 
 // DeactivateAgent 禁用企业 AI 员工账号。
@@ -216,11 +214,11 @@ func (o *directOperations) changeAgentStatus(ctx context.Context, meta RequestMe
 		})
 	}
 	slog.Info("AI 员工账号状态已修改", "organization_id", identity.Organization.ID, "identity_id", agent.IdentityID, "agent_id", agentID, "status", status)
-	return agentFromAction(*agent), nil
+	return agentFromAction(*agent, identity.Organization.Name), nil
 }
 
-// agentFromAction 转换 AI 员工契约。
-func agentFromAction(agent agentaction.Agent) Agent {
+// agentFromAction 转换 AI 员工契约，并按当前角色附上内置工作规则。
+func agentFromAction(agent agentaction.Agent, organizationName string) Agent {
 	teams := make([]TeamSummary, 0, len(agent.Teams))
 	for _, team := range agent.Teams {
 		teams = append(teams, TeamSummary{ID: team.ID, Name: team.Name})
@@ -236,7 +234,11 @@ func agentFromAction(agent agentaction.Agent) Agent {
 		}
 	}
 	execution := AgentExecution{MCPServerIDs: agent.Execution.MCPServerIDs, RevisionID: agent.Execution.RevisionID, Mode: AgentExecutionMode(agent.Execution.Mode), Managed: managed}
-	return Agent{ID: agent.ID, IdentityID: agent.IdentityID, DisplayName: agent.DisplayName, Role: RoleSummary{ID: agent.RoleID, Kind: RoleKind(agent.RoleKind), Name: agent.RoleName}, Status: UserStatus(agent.Status), WorkStatus: WorkStatus(agent.WorkStatus), Teams: teams, Execution: execution, CreatedAt: agent.CreatedAt}
+	behavior := AgentBehaviorProfile{Tools: []string{}}
+	if profile := agentBehaviorProfile(agent.RoleKind, organizationName); profile != nil {
+		behavior = *profile
+	}
+	return Agent{ID: agent.ID, IdentityID: agent.IdentityID, DisplayName: agent.DisplayName, Role: RoleSummary{ID: agent.RoleID, Kind: RoleKind(agent.RoleKind), Name: agent.RoleName}, Status: UserStatus(agent.Status), WorkStatus: WorkStatus(agent.WorkStatus), Teams: teams, Execution: execution, Behavior: behavior, CreatedAt: agent.CreatedAt}
 }
 
 // agentExecutionInput 转换 AI 员工执行配置输入。

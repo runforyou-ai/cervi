@@ -54,6 +54,16 @@ const common = {
     customerService: "Customer service",
     member: "Member",
   },
+  agentBehavior: {
+    tools: "Available tools",
+    show: "Show built-in rules",
+    hide: "Hide built-in rules",
+  },
+  agentTools: {
+    searchKnowledge: "Knowledge base search",
+    searchCustomerHistory: "Customer conversation history",
+    mcp: "MCP service tools",
+  },
 }
 
 export default common

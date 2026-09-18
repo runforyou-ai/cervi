@@ -70,17 +70,18 @@ type AgentListInput struct {
 	PageSize int         `json:"pageSize" query:"pageSize,default=50"`
 }
 
-// Agent 定义 AI 员工信息。
+// Agent 定义 AI 员工信息，Behavior 是当前角色对该员工的内置工作规则与可用工具。
 type Agent struct {
-	ID          string         `json:"id"`
-	IdentityID  string         `json:"identityId"`
-	DisplayName string         `json:"displayName"`
-	Role        RoleSummary    `json:"role"`
-	Status      UserStatus     `json:"status"`
-	WorkStatus  WorkStatus     `json:"workStatus"`
-	Teams       []TeamSummary  `json:"teams"`
-	Execution   AgentExecution `json:"execution"`
-	CreatedAt   time.Time      `json:"createdAt"`
+	ID          string               `json:"id"`
+	IdentityID  string               `json:"identityId"`
+	DisplayName string               `json:"displayName"`
+	Role        RoleSummary          `json:"role"`
+	Status      UserStatus           `json:"status"`
+	WorkStatus  WorkStatus           `json:"workStatus"`
+	Teams       []TeamSummary        `json:"teams"`
+	Execution   AgentExecution       `json:"execution"`
+	Behavior    AgentBehaviorProfile `json:"behavior"`
+	CreatedAt   time.Time            `json:"createdAt"`
 }
 
 // AgentListItem 定义 AI 员工目录项。

@@ -272,7 +272,6 @@ const (
 	FieldAgentMCPServerInvalid            Key = "field.agent_mcp_server_invalid"
 	FieldAgentKnowledgeBaseInvalid        Key = "field.agent_knowledge_base_invalid"
 	FieldAgentModelInvalid                Key = "field.agent_model_invalid"
-	FieldAgentSystemInstructionRequired   Key = "field.agent_system_instruction_required"
 	FieldAgentSystemInstructionTooLong    Key = "field.agent_system_instruction_too_long"
 	FieldEmailInvalid                     Key = "field.email_invalid"
 	FieldEmailDuplicate                   Key = "field.email_duplicate"

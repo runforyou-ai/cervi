@@ -1,0 +1,63 @@
+%% 客服会话状态流转图 · 审核建议稿。
+%% Q、A、H 为开放周期的派生视图；具体契约与字段尚未实现。
+flowchart TB
+  subgraph SESSION["01 会话周期与负责人 · 长期 Conversation 内的 ServiceSession"]
+    direction TB
+    R["R 新周期路由<br/>首条客户消息建立周期<br/>渠道初始 → 失败 → 公共队列"]
+    Q["Q 等待分配<br/>status = open<br/>assignee = null；team 可空"]
+    A["A AI 负责<br/>status = open<br/>assignee = 合格 agent"]
+    H["H 真人负责<br/>status = open<br/>assignee = user"]
+    C["C 本周期已关闭<br/>status = closed"]
+    RN["R 新周期路由<br/>建立新周期 · sequence + 1<br/>按相同规则选择 Q / A / H"]
+
+    R -->|路由到队列| Q
+    R -->|路由到合格 AI| A
+    R -->|路由到真人| H
+    Q -->|2 真人领取 / 首次回复| H
+    A -->|3 AI 转人工 / 管理操作交接：团队 / 公共队列| Q
+    A -->|4 人工接管 / 转交真人 / AI 转人工或管理操作交接到真人| H
+    H -->|5 显式转交合格 AI| A
+    H -->|转交其他真人| H
+    Q -->|6 关闭| C
+    H -->|6 关闭| C
+    C -->|7 显式重开同一周期| H
+    C -->|8 客户新消息| RN
+
+    SN["状态与路由规则<br/>ServiceSession.status 仅有 open / closed；Q、A、H 不新增状态枚举。<br/>AI 转人工的失败路由仅接受真人 / 团队；AI 目标或无效目标进入公共队列。<br/>A 先被真人接管再关闭；无新增 AI 自动关闭。<br/>H → A 时末条消息来自客户则立即调度，否则等下一条客户消息。<br/>A 回复 / 追问保持 A；Q、H 收到客户消息保持负责人；AI 不自动抢回。"]
+  end
+
+  subgraph EXECUTION["02 AI Run 执行与终态"]
+    direction TB
+    INPUT["A + 客户消息<br/>合格 AI 被显式调度"] --> QUEUED["queued<br/>等待任务执行"]
+    QUEUED --> RUNNING["running<br/>模型 / 工具循环"]
+
+    RUNNING --> CANDIDATE["回复 / 追问候选<br/>尚未提交客户消息"]
+    CANDIDATE --> CLAIM{"最终输入认领检查"}
+    CLAIM -->|有新增输入：更新依据检查边界| RUNNING
+    CLAIM -->|无新增输入 → 依据门禁| REPLY_COMMIT["资格复核 + 事务提交<br/>写消息并推进 processed_seq"]
+    REPLY_COMMIT --> REPLIED["status = succeeded<br/>outcome = reply / ask_customer<br/>保持 A，等待客户消息"]
+
+    RUNNING --> HANDOFF["有效转人工意图已确认<br/>自愿 handoff；或无依据纠正一次后仍无依据 / 预算耗尽<br/>确认后不被后来输入覆盖"]
+    RUNNING --> MODEL_FAILED["运行最终失败<br/>模型错误 / 超时 / 预算耗尽<br/>保留失败记录 / agent_error"]
+    HANDOFF --> HANDOFF_COMMIT["转人工资格复核 + 同一事务提交<br/>对客消息、内部原因、负责人 / 队列变化、Run 终态<br/>旧 Lane 结算到锁内 desired_seq<br/>本路径不套用模型可用等接客资格门禁"]
+    MODEL_FAILED --> HANDOFF_COMMIT
+    HANDOFF_COMMIT --> HANDED_OFF["outcome = handoff；原因独立记录<br/>succeeded：model_requested / insufficient_evidence / budget_exhausted<br/>failed：runtime_failed / timeout<br/>资格失效由管理操作交接，见脚注<br/>回到主面板 Q / H"]
+
+    QUEUED -.->|人工接管 / 周期失效 / 主动停止| CANCELLED
+    RUNNING -.->|人工接管 / 周期失效 / 主动停止| CANCELLED
+    CANCELLED["status = cancelled<br/>取消运行并抑制旧结果<br/>主动停止仅结束本次 Run；负责人保持<br/>后续客户消息可触发"]
+    EN["提交共同门槛<br/>当前周期、开放状态、原负责人、Run 状态、Task 租约；操作权失效时抑制旧结果。<br/>人工接管、周期关闭或主动停止先提交时 cancelled；租约丢失的旧执行器不能再提交。<br/>AI 被停用或改为非客服角色时，管理操作交接其全部开放周期：在途 Run cancelled / agent_unavailable，无在途 Run 时同样交接；分配入口与资格变更以身份锁互斥。<br/>转人工将旧 Lane 的 processed_seq 结算到锁内 desired_seq；Run 保留实际 input_end_seq。<br/>依据约束作用于客户可见正文；追问与转人工可无证据；并入新输入后按新边界重新检查。"]
+  end
+
+  classDef queue fill:#fff6e5,stroke:#e6c27d,color:#24364a;
+  classDef ai fill:#eef0ff,stroke:#a5b0ee,color:#24364a;
+  classDef human fill:#e9f7f1,stroke:#8bcebc,color:#24364a;
+  classDef closed fill:#edf1f6,stroke:#afbfce,color:#24364a;
+  classDef route fill:#f5f8fc,stroke:#b7c8da,color:#24364a;
+  classDef cancel fill:#fff1ef,stroke:#e1a9a4,color:#24364a;
+  class Q,HANDOFF,HANDOFF_COMMIT queue;
+  class A,INPUT,RUNNING ai;
+  class H,REPLIED,HANDED_OFF human;
+  class C closed;
+  class R,RN,QUEUED,CANDIDATE,CLAIM,REPLY_COMMIT,SN,EN route;
+  class CANCELLED,MODEL_FAILED cancel;
