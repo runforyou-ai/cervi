@@ -616,3 +616,21 @@ test("拖动期间到达的远端重排不提前发布顺序版本，展示顺�
   assert.deepEqual(f.controller.getSnapshot().ids, ["3", "1", "2"])
   assert.equal(f.controller.getSnapshot().pinOrderVersion, "8")
 })
+
+test("本人置顶写入后的重读在操作中立即应用，连续拖动使用最新顺序版本", async () => {
+  const f = pinnedFixture([
+    { version: "7", pages: [[1, 2, 3]] },
+    { version: "8", pages: [[2, 1, 3]] },
+    { version: "9", pages: [[2, 3, 1]] },
+  ])
+  await f.controller.request("initial")
+  // 手指已按上下一个手柄时，本人写入后的重读仍立即更新顺序与版本。
+  f.interact(true)
+  await f.controller.refreshOwnWrite()
+  assert.deepEqual(f.controller.getSnapshot().ids, ["2", "1", "3"])
+  assert.equal(f.controller.getSnapshot().pinOrderVersion, "8")
+  // 本人写入的重读结束后，远端变化仍在操作中暂缓。
+  await f.controller.request("poll")
+  assert.deepEqual(f.controller.getSnapshot().ids, ["2", "1", "3"])
+  assert.equal(f.controller.getSnapshot().pinOrderVersion, "8")
+})

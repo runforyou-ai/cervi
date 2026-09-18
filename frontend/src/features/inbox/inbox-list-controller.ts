@@ -62,6 +62,7 @@ export class InboxListController {
   private completion = Promise.resolve()
   private generation = 0
   private deferred: InboxListState | null = null
+  private ownWrites = 0
   private returnAnchor: InboxListAnchor | null = null
   private ports: InboxListPorts
   private query: InboxQuery
@@ -159,6 +160,16 @@ export class InboxListController {
     this.queue.push(operation)
     if (!this.running) this.completion = this.drain()
     return this.completion
+  }
+
+  /** 本人写入成功后重读，完成前提交的结果不因列表操作中而暂缓，界面顺序与顺序版本立即跟上本人写入。 */
+  refreshOwnWrite = async () => {
+    this.ownWrites++
+    try {
+      await this.request("refresh")
+    } finally {
+      this.ownWrites--
+    }
   }
 
   /** 重试上次失败的操作，没有失败记录时重读原窗口。 */
@@ -275,7 +286,7 @@ export class InboxListController {
       error: null,
     }
     const unavailable = rows.results.filter((row) => row.availability === "unavailable" && this.state.ids.includes(row.id)).map((row) => row.id)
-    if (!initial && this.ports.interacting()) {
+    if (!initial && !this.ownWrites && this.ports.interacting()) {
       this.deferred = next
       const removed = new Set(this.state.ids.filter((id) => !matching.has(id)))
       if (removed.size) this.ports.restore(this.ports.capture(), removed, false)
