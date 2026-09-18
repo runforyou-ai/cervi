@@ -14,6 +14,7 @@ import {
   type RoleData,
   type AgentData,
 } from "@/api"
+import { AgentBehaviorSummary } from "@/components/agent-behavior-summary"
 import { FormInputField } from "@/components/form/form-input-field"
 import { Button } from "@/components/ui/button"
 import {
@@ -169,6 +170,12 @@ export function AgentForm({
             />
           )}
         />
+        {selectedRole?.agentBehavior ? (
+          <Field>
+            <FieldLabel>{t("agents.execution.behavior")}</FieldLabel>
+            <AgentBehaviorSummary behavior={selectedRole.agentBehavior} />
+          </Field>
+        ) : null}
         <AgentManagedExecutionFields
           control={form.control}
           disabled={form.formState.isSubmitting}

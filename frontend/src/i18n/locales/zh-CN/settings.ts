@@ -156,7 +156,6 @@ const settings = {
       saveError: "保存角色失败，请重试。",
     },
     permissions: {
-      title: "权限配置",
       memberTitle: "成员权限",
       agentTitle: "AI 员工能力",
       agentDescription: "由 Cervi 按角色内置，随产品版本更新。",

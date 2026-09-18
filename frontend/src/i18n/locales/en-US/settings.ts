@@ -162,7 +162,6 @@ const settings = {
       saveError: "Could not save the role. Try again.",
     },
     permissions: {
-      title: "Permissions",
       memberTitle: "Member permissions",
       agentTitle: "AI employee capabilities",
       agentDescription: "Built into each role by Cervi and updated with product releases.",

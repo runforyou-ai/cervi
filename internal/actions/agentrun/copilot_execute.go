@@ -85,7 +85,7 @@ func (p copilotRunPolicy) persistMessage(ctx context.Context, db bun.IDB, policy
 
 // sceneRules 给出协助客服的场景说明、背景资料格式与工具用法。
 func (p copilotRunPolicy) sceneRules(_ context.Context, _ bun.IDB, _ executionContext, tools behaviorTools) (agentruntime.Scene, string, error) {
-	return agentruntime.SceneCopilot, composeInstruction(copilotSceneRules, toolGuidance(tools), ""), nil
+	return agentruntime.SceneCopilot, joinSections(copilotSceneRules, toolGuidance(tools)), nil
 }
 
 // laneRevision 读取线程固定 AI 员工当前生效的配置版本。

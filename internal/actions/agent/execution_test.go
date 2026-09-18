@@ -51,7 +51,7 @@ func TestNormalizeExecutionInputRejectsRequiredFields(t *testing.T) {
 	}
 }
 
-// TestNormalizeExecutionInputRejectsLongInstruction 验证工作指令使用字符数限制。
+// TestNormalizeExecutionInputRejectsLongInstruction 验证企业指令使用字符数限制。
 func TestNormalizeExecutionInputRejectsLongInstruction(t *testing.T) {
 	fields := executionValidationFields(t, ExecutionInput{
 		Mode: domain.AgentExecutionModeManaged,

@@ -14,6 +14,7 @@ import (
 	agentaction "github.com/runforyou-ai/cervi/internal/actions/agent"
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	aiprovideraction "github.com/runforyou-ai/cervi/internal/actions/aiprovider"
+	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -113,6 +114,7 @@ func TestAgentRoleBehavior(t *testing.T) {
 		Instruction       string   `json:"instruction"`
 		InstructionSHA256 string   `json:"instructionSha256"`
 		Tools             []string `json:"tools"`
+		MCPServers        []string `json:"mcpServers"`
 		Model             struct {
 			ProviderID    string `json:"providerId"`
 			Identifier    string `json:"identifier"`
@@ -126,7 +128,7 @@ func TestAgentRoleBehavior(t *testing.T) {
 	if snapshot.RoleKind != string(domain.RoleKindCustomerService) || snapshot.Scene != string(agentruntime.SceneAgentChat) || snapshot.RulesVersion != 1 ||
 		snapshot.Instruction != captured.Instruction || snapshot.InstructionSHA256 != hex.EncodeToString(sum[:]) ||
 		snapshot.Model.ProviderID != provider.ID || snapshot.Model.Identifier != "chat" || snapshot.Model.ContextWindow != 32000 ||
-		len(snapshot.Tools) != 1 || snapshot.Tools[0] != "calculator" {
+		len(snapshot.Tools) != 1 || snapshot.Tools[0] != "calculator" || len(snapshot.MCPServers) != 0 {
 		t.Fatalf("behavior snapshot = %+v", snapshot)
 	}
 
@@ -144,7 +146,38 @@ func TestAgentRoleBehavior(t *testing.T) {
 		t.Fatal(err)
 	}
 	runQueuedAgentRun(t, db, execute, first.Conversation.ID)
-	if captured.Instruction != "已固定的指令" {
-		t.Fatalf("instruction after snapshot reuse = %q", captured.Instruction)
+	if captured.Instruction != "已固定的指令" || captured.Scene != agentruntime.SceneAgentChat {
+		t.Fatalf("request after snapshot reuse = scene %q, instruction %q", captured.Scene, captured.Instruction)
+	}
+
+	// 客服场景使用客服场景规则，不注册计算器，占位的客户历史工具不进入工具说明与快照。
+	channel, err := channelaction.NewCreateMessageChannelAction(db).Execute(ctx, identity, channelaction.CreateMessageChannelInput{
+		Type: domain.ChannelTypeWebsite, Name: "行为验证渠道", DefaultLocale: domain.LocaleChineseSimplified,
+		NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypeMember, ID: agent.IdentityID}, FallbackTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	inbound, err := conversationaction.NewReceiveWebsiteCustomerTextMessageAction(db, scheduler).Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
+		ChannelID: channel.ID, ExternalID: "web-session:0123456789abcdef0123456789abcdef", ClientMessageID: uuid.NewV7().String(), Body: "你们的退货政策是什么",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	runQueuedAgentRun(t, db, execute, inbound.Conversation.ID)
+	if captured.Scene != agentruntime.SceneCustomer || !strings.HasPrefix(captured.Instruction, baselinePrefix) ||
+		!strings.Contains(captured.Instruction, "\n\n本次是客户会话") || !strings.HasSuffix(captured.Instruction, "如实告知客户暂时无法确认，不要猜测。") ||
+		strings.Contains(captured.Instruction, "search_customer_history") || strings.Contains(captured.Instruction, "人工客服跟进") {
+		t.Fatalf("customer instruction = scene %q, %q", captured.Scene, captured.Instruction)
+	}
+	customerRun := &servermodels.AgentRun{}
+	if err := db.NewSelect().Model(customerRun).Where("agr.conversation_id = ?", inbound.Conversation.ID).Scan(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if err := json.Unmarshal(customerRun.BehaviorSnapshot, &snapshot); err != nil {
+		t.Fatal(err)
+	}
+	if snapshot.Scene != string(agentruntime.SceneCustomer) || len(snapshot.Tools) != 0 {
+		t.Fatalf("customer behavior snapshot = %+v", snapshot)
 	}
 }

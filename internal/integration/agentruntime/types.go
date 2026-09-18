@@ -91,7 +91,7 @@ const (
 type RunRequest struct {
 	RunID                 string
 	Name                  string
-	Scene                 Scene // 客户会话场景不注册开发期计算器工具。
+	Scene                 Scene // 本次运行所属的业务场景。
 	Instruction           string
 	Model                 ModelConfig
 	KnowledgeSearch       KnowledgeSearch

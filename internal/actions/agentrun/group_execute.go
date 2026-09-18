@@ -113,7 +113,7 @@ func (p groupMentionRunPolicy) sceneRules(ctx context.Context, db bun.IDB, execu
 	if len(names) > 0 {
 		candidates = strings.Join(names, "、")
 	}
-	return agentruntime.SceneGroup, composeInstruction(fmt.Sprintf(groupSceneRules, title, candidates), toolGuidance(tools), ""), nil
+	return agentruntime.SceneGroup, joinSections(fmt.Sprintf(groupSceneRules, title, candidates), toolGuidance(tools)), nil
 }
 
 // laneRevision 在目标 Agent 仍是有效群成员时返回其配置版本。

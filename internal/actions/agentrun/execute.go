@@ -112,20 +112,16 @@ func (a *ExecuteAction) Execute(ctx context.Context, input RunInput) error {
 	if err != nil {
 		return fmt.Errorf("load agent run knowledge bases: %w", err)
 	}
-	tools := behaviorTools{Knowledge: knowledgeSearch != nil, CustomerHistory: customerHistorySearch != nil}
-	scene, sceneRules, err := policy.sceneRules(ctx, a.db, execution, tools)
-	if err != nil {
-		return fmt.Errorf("build agent run scene rules: %w", err)
-	}
-	snapshot, err := a.resolveBehaviorSnapshot(ctx, execution, scene, sceneRules, tools, mcpServers)
+	snapshot, err := a.resolveBehaviorSnapshot(ctx, execution, policy, behaviorTools{Knowledge: knowledgeSearch != nil}, mcpServers)
 	if err != nil {
 		return err
 	}
+	// 场景、指令与模型参数以快照为准，凭据与输入模态取当前供应商配置。
 	result, err := a.runtime.Run(runCtx, agentruntime.RunRequest{
-		RunID: execution.Run.ID, Name: execution.AgentName, Scene: scene, Instruction: snapshot.Instruction,
+		RunID: execution.Run.ID, Name: execution.AgentName, Scene: snapshot.Scene, Instruction: snapshot.Instruction,
 		Model: agentruntime.ModelConfig{
 			Brand: execution.Brand, APIKey: execution.APIKey, BaseURL: execution.APIURL,
-			Identifier: execution.ModelIdentifier, MaxOutputTokens: int(execution.MaxOutputTokens), ContextWindow: int(execution.ContextWindow),
+			Identifier: snapshot.Model.Identifier, MaxOutputTokens: int(snapshot.Model.MaxOutputTokens), ContextWindow: int(snapshot.Model.ContextWindow),
 			InputModalities: execution.InputModalities,
 		},
 		KnowledgeSearch:       knowledgeSearch,
@@ -255,8 +251,9 @@ func (a *ExecuteAction) begin(ctx context.Context, runID string) (executionConte
 	return execution, false, nil
 }
 
-// resolveBehaviorSnapshot 首次执行时拼接运行指令并固定快照；重复执行尝试沿用已写入的快照，不重新拼接。
-func (a *ExecuteAction) resolveBehaviorSnapshot(ctx context.Context, execution executionContext, scene agentruntime.Scene, sceneRules string, tools behaviorTools, mcpServers []agentruntime.MCPServer) (BehaviorSnapshot, error) {
+// resolveBehaviorSnapshot 首次执行时取场景规则、拼接运行指令并固定快照；重复执行尝试直接沿用已写入的快照，不再查询场景规则。
+// 客服入口当前只注册不可用的客户历史占位工具，工具说明与快照都不把它算作可用工具。
+func (a *ExecuteAction) resolveBehaviorSnapshot(ctx context.Context, execution executionContext, policy agentRunPolicy, tools behaviorTools, mcpServers []agentruntime.MCPServer) (BehaviorSnapshot, error) {
 	snapshot := BehaviorSnapshot{}
 	if len(execution.Run.BehaviorSnapshot) > 0 {
 		if err := json.Unmarshal(execution.Run.BehaviorSnapshot, &snapshot); err != nil {
@@ -264,21 +261,23 @@ func (a *ExecuteAction) resolveBehaviorSnapshot(ctx context.Context, execution e
 		}
 		return snapshot, nil
 	}
-	// 按注册顺序收集本次运行的工具清单，开发期计算器只在内部场景注册。
-	names := make([]string, 0, 3+len(mcpServers))
+	scene, sceneRules, err := policy.sceneRules(ctx, a.db, execution, tools)
+	if err != nil {
+		return BehaviorSnapshot{}, fmt.Errorf("build agent run scene rules: %w", err)
+	}
+	// 按注册顺序收集内置工具，开发期计算器只在内部场景注册；MCP 服务只记录绑定的服务名称。
+	names := make([]string, 0, 2)
 	if scene != agentruntime.SceneCustomer {
 		names = append(names, "calculator")
 	}
 	if tools.Knowledge {
 		names = append(names, "search_knowledge")
 	}
-	if tools.CustomerHistory {
-		names = append(names, "search_customer_history")
-	}
+	serverNames := make([]string, 0, len(mcpServers))
 	for _, server := range mcpServers {
-		names = append(names, "mcp:"+server.Name)
+		serverNames = append(serverNames, server.Name)
 	}
-	snapshot = newBehaviorSnapshot(execution, scene, sceneRules, names)
+	snapshot = newBehaviorSnapshot(execution, scene, sceneRules, names, serverNames)
 	encoded, err := json.Marshal(snapshot)
 	if err != nil {
 		return BehaviorSnapshot{}, fmt.Errorf("encode agent run behavior snapshot: %w", err)

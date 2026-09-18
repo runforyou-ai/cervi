@@ -59,7 +59,7 @@ func (p agentChatRunPolicy) persistMessage(ctx context.Context, db bun.IDB, poli
 
 // sceneRules 给出企业内部对话的受众说明与工具用法。
 func (p agentChatRunPolicy) sceneRules(_ context.Context, _ bun.IDB, _ executionContext, tools behaviorTools) (agentruntime.Scene, string, error) {
-	return agentruntime.SceneAgentChat, composeInstruction(agentChatSceneRules, toolGuidance(tools), ""), nil
+	return agentruntime.SceneAgentChat, joinSections(agentChatSceneRules, toolGuidance(tools)), nil
 }
 
 // laneRevision 读取 AI 聊天 Agent 当前生效的配置版本。
