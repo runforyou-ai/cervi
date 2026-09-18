@@ -27,6 +27,10 @@ type websiteMessageRow struct {
 	ID                      string                           `bun:"id"`
 	Body                    string                           `bun:"body"`
 	SenderIdentityType      *domain.OrganizationIdentityType `bun:"sender_identity_type"`
+	SenderIdentityID        *string                          `bun:"sender_identity_id"`
+	SenderDisplayName       *string                          `bun:"sender_display_name"`
+	SenderAvatarBackend     *string                          `bun:"sender_avatar_storage_backend"`
+	SenderAvatarStorageKey  *string                          `bun:"sender_avatar_storage_key"`
 	OriginatedAt            time.Time                        `bun:"originated_at"`
 	SourceOrder             int64                            `bun:"source_order"`
 	CreatedAt               time.Time                        `bun:"created_at"`
@@ -90,6 +94,10 @@ func (q *ListWebsiteMessagesQuery) Execute(ctx context.Context, input MessageHis
 		ColumnExpr("msg.message_seq").
 		ColumnExpr("msg.body AS body").
 		ColumnExpr("oi.type AS sender_identity_type").
+		ColumnExpr("oi.id::text AS sender_identity_id").
+		ColumnExpr("oi.display_name AS sender_display_name").
+		ColumnExpr("sav.storage_backend AS sender_avatar_storage_backend").
+		ColumnExpr("sav.storage_key AS sender_avatar_storage_key").
 		ColumnExpr("msg.originated_at AS originated_at").
 		ColumnExpr("msg.source_order AS source_order").
 		ColumnExpr("msg.created_at AS created_at").
@@ -114,6 +122,7 @@ func (q *ListWebsiteMessagesQuery) Execute(ctx context.Context, input MessageHis
 		Join("JOIN conversation_participants AS cp ON cp.id = msg.sender_participant_id AND cp.organization_id = msg.organization_id AND cp.conversation_id = msg.conversation_id").
 		Join("JOIN chat_subjects AS cs ON cs.id = cp.subject_id AND cs.organization_id = cp.organization_id").
 		Join("LEFT JOIN organization_identities AS oi ON oi.id = cs.source_id AND oi.organization_id = cs.organization_id AND cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
+		Join("LEFT JOIN files AS sav ON sav.id = oi.avatar_file_id AND sav.organization_id = oi.organization_id AND sav.status = ?", domain.FileStatusActive).
 		Join("LEFT JOIN messages AS reply ON reply.id = msg.reply_to_message_id AND reply.organization_id = msg.organization_id AND reply.conversation_id = msg.conversation_id AND reply.type IN (?, ?) AND reply.visibility = ?", domain.MessageTypeText, domain.MessageTypeAttachment, domain.MessageVisibilityCustomerVisible).
 		Join("LEFT JOIN conversation_participants AS reply_cp ON reply_cp.id = reply.sender_participant_id AND reply_cp.organization_id = reply.organization_id AND reply_cp.conversation_id = reply.conversation_id").
 		Join("LEFT JOIN chat_subjects AS reply_cs ON reply_cs.id = reply_cp.subject_id AND reply_cs.organization_id = reply_cp.organization_id").
@@ -182,6 +191,14 @@ func buildMessageHistory(rows []websiteMessageRow, input MessageHistoryInput) Me
 		message := Message{
 			ClientMessageID: row.ClientMessageID, MessageSeq: row.MessageSeq, ID: row.ID, Author: author, Body: row.Body, SenderIdentityType: row.SenderIdentityType,
 			OriginatedAt: row.OriginatedAt, SourceOrder: row.SourceOrder, CreatedAt: row.CreatedAt,
+		}
+		// 组织身份发送的消息附带发送身份、名称和可用头像位置。
+		if row.SenderIdentityID != nil && row.SenderDisplayName != nil {
+			message.SenderIdentityID = *row.SenderIdentityID
+			message.SenderDisplayName = *row.SenderDisplayName
+		}
+		if row.SenderAvatarBackend != nil && row.SenderAvatarStorageKey != nil {
+			message.SenderAvatar = &FileLocation{StorageBackend: domain.FileStorageBackend(*row.SenderAvatarBackend), StorageKey: *row.SenderAvatarStorageKey}
 		}
 		// 附件行存在时其余列均非空；取回失败的附件没有文件编号和存储位置。
 		if row.AttachmentName != nil {

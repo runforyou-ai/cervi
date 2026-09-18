@@ -73,6 +73,31 @@ func TestCustomerReplies(t *testing.T) {
 	if r := page.Messages[len(page.Messages)-1].ReplyTo; r == nil || r.Author != "agent" || r.Body != input.Body || r.SenderIdentityType == nil || *r.SenderIdentityType != appservice.OrganizationIdentityTypeUser {
 		t.Fatalf("agent reference=%+v", r)
 	}
+	if m := page.Messages[len(page.Messages)-1]; m.SenderIdentityID != f.owner.OrganizationIdentity.ID || m.SenderName != f.owner.OrganizationIdentity.DisplayName || m.SenderAvatarURL != "" {
+		t.Fatalf("agent sender=%+v", m)
+	}
+	if m := page.Messages[0]; m.Author != "visitor" || m.SenderIdentityID != "" || m.SenderName != "" || m.SenderAvatarURL != "" {
+		t.Fatalf("visitor sender=%+v", m)
+	}
+	// 访客历史按发送身份当前的有效头像返回公开地址。
+	avatar := &servermodels.File{
+		ID: uuid.NewV7().String(), OrganizationID: f.owner.Organization.ID, CreatedByUserID: f.owner.User.ID, Purpose: string(domain.FilePurposeUserAvatar),
+		StorageBackend: string(domain.FileStorageBackendLocal), StorageKey: "avatars/" + uuid.NewV7().String() + ".png",
+		OriginalName: "avatar.png", ContentType: "image/png", ByteSize: 1, Status: string(domain.FileStatusActive),
+	}
+	if _, err := f.db.NewInsert().Model(avatar).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := f.db.NewUpdate().Model((*servermodels.OrganizationIdentity)(nil)).Set("avatar_file_id = ?", avatar.ID).Where("id = ?", f.owner.OrganizationIdentity.ID).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	page, err = visitor.ListMessages(ctx, appservice.WebsiteVisitorMeta{}, f.channelID, "web-session:0123456789abcdef0123456789abcdef", f.conversationID, appservice.WebsiteVisitorMessageHistoryInput{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if m := page.Messages[len(page.Messages)-1]; m.SenderAvatarURL != "/storage/"+avatar.StorageKey {
+		t.Fatalf("agent avatar=%q", m.SenderAvatarURL)
+	}
 	if _, err := f.db.NewUpdate().Model((*servermodels.Message)(nil)).Set("deleted_at = now()").Where("id = ?", original.Message.ID).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}

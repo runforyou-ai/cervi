@@ -163,10 +163,20 @@ type Message struct {
 	ID                 string
 	Author             domain.MessageAuthor
 	SenderIdentityType *domain.OrganizationIdentityType
-	Body               string
-	OriginatedAt       time.Time
-	SourceOrder        int64
-	CreatedAt          time.Time
+	// SenderIdentityID、SenderDisplayName 和 SenderAvatar 仅在组织身份发送时有值。
+	SenderIdentityID  string
+	SenderDisplayName string
+	SenderAvatar      *FileLocation
+	Body              string
+	OriginatedAt      time.Time
+	SourceOrder       int64
+	CreatedAt         time.Time
+}
+
+// FileLocation 定义文件的存储位置。
+type FileLocation struct {
+	StorageBackend domain.FileStorageBackend
+	StorageKey     string
 }
 
 // ReceiveWebsiteCustomerMessageResult 定义网站消息写入结果。

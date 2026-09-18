@@ -8,6 +8,9 @@
     if (followingMessages) messages.scrollTop = messages.scrollHeight;
     previousMessagesHeight = messages.scrollHeight;
   });
+  // 当前会话消息增删后重新划分消息组。
+  var messageGroupObserver = new MutationObserver(refreshMessageGroups);
+  messageGroupObserver.observe(messages, { childList: true });
   messages.addEventListener("scroll", function () {
     if (messages.scrollHeight === previousMessagesHeight) {
       followingMessages = messages.scrollHeight - messages.scrollTop - messages.clientHeight <= 48;
@@ -18,6 +21,7 @@
     if (event.persisted) return;
     haltVisitorRealtime("stopped");
     messageResizeObserver.disconnect();
+    messageGroupObserver.disconnect();
     CerviMarkdown.unmount(messages);
     conversationItems.forEach(function (conversation) { CerviMarkdown.unmount(conversation.fragment); });
   });
@@ -444,20 +448,119 @@
     messages.scrollTop = messages.scrollHeight;
   }
 
-  function messageContainer(author) {
+  var MESSAGE_GROUP_INTERVAL = 5 * 60 * 1000;
+  var AGENT_AVATAR_ICON =
+    '<svg viewBox="0 0 24 24"><path d="M12 8V4H8" /><rect width="16" height="12" x="4" y="8" rx="2" /><path d="M2 14h2M20 14h2M15 13v2M9 13v2" /></svg>';
+  var PERSON_AVATAR_ICON =
+    '<svg viewBox="0 0 24 24"><circle cx="12" cy="8" r="5" /><path d="M20 21a8 8 0 0 0-16 0" /></svg>';
+
+  // 创建带发送人资料和发送时间的消息节点。
+  function messageContainer(author, date, sender) {
     var message = document.createElement("article");
     message.className = "cv-message cv-message-" + author;
+    sender = sender || {};
+    message.setAttribute("data-sender-key", author + ":" + (sender.key || ""));
+    message.setAttribute("data-sender-name", sender.name || "");
+    message.setAttribute("data-sender-avatar", sender.avatarURL || "");
+    message.setAttribute("data-sender-fallback", sender.fallback || (author === "visitor" ? "person" : "agent"));
+    message.setAttribute("data-originated-at", String(date.getTime()));
     return message;
   }
 
+  // 创建消息时间标签。
+  function messageTime(date) {
+    var time = document.createElement("time");
+    time.className = "cv-message-time";
+    time.dateTime = date.toISOString();
+    time.textContent = formatTime(date);
+    return time;
+  }
+
+  // 创建气泡外的消息时间行，用于无气泡的纯附件消息。
   function messageMeta(date) {
     var meta = document.createElement("div");
     meta.className = "cv-message-meta";
-    var time = document.createElement("time");
-    time.dateTime = date.toISOString();
-    time.textContent = formatTime(date);
-    meta.appendChild(time);
+    meta.appendChild(messageTime(date));
     return meta;
+  }
+
+  // 创建气泡正文区，时间在正文右侧底部对齐显示。
+  function bubbleContent(body, date) {
+    var content = document.createElement("div");
+    content.className = "cv-message-content";
+    body.classList.add("cv-message-body");
+    content.appendChild(body);
+    content.appendChild(messageTime(date));
+    return content;
+  }
+
+  // 判断两条相邻消息是否属于同一发送人的连续消息组。
+  function sameMessageGroup(previous, next) {
+    if (!previous || !next || previous.getAttribute("data-sender-key") !== next.getAttribute("data-sender-key")) {
+      return false;
+    }
+    var previousTime = Number(previous.getAttribute("data-originated-at"));
+    var nextTime = Number(next.getAttribute("data-originated-at"));
+    var interval = nextTime - previousTime;
+    return (
+      new Date(previousTime).toDateString() === new Date(nextTime).toDateString() &&
+      interval >= 0 &&
+      interval <= MESSAGE_GROUP_INTERVAL
+    );
+  }
+
+  // 按发送人和时间间隔划分当前会话消息组，只在组内最后一条显示头像。
+  function refreshMessageGroups() {
+    var items = Array.from(messages.children).filter(function (node) {
+      return node.classList.contains("cv-message");
+    });
+    items.forEach(function (message, index) {
+      var endsGroup = !sameMessageGroup(message, items[index + 1]);
+      message.toggleAttribute("data-group-start", !sameMessageGroup(items[index - 1], message));
+      message.toggleAttribute("data-group-end", endsGroup);
+      var row = message.querySelector(".cv-message-row");
+      var avatar = row && row.querySelector(":scope > .cv-message-avatar");
+      if (endsGroup && row && !avatar) {
+        row.appendChild(messageAvatar(message));
+      } else if (!endsGroup && avatar) {
+        avatar.remove();
+      }
+    });
+  }
+
+  // 按发送人资料生成头像，图片不可用时显示默认图案或姓名首字。
+  function messageAvatar(message) {
+    var avatar = document.createElement("span");
+    avatar.className = "cv-message-avatar";
+    avatar.setAttribute("aria-hidden", "true");
+    var name = message.getAttribute("data-sender-name").trim();
+    var imageURL = message.getAttribute("data-sender-avatar");
+    var fallback = message.getAttribute("data-sender-fallback");
+    if (name) {
+      avatar.title = name;
+    }
+    var showFallback = function () {
+      var initial = Array.from(name)[0];
+      avatar.textContent = "";
+      if (fallback === "person" && initial) {
+        var letter = document.createElement("span");
+        letter.textContent = initial.toLocaleUpperCase();
+        avatar.appendChild(letter);
+        return;
+      }
+      avatar.innerHTML = fallback === "agent" ? AGENT_AVATAR_ICON : PERSON_AVATAR_ICON;
+    };
+    if (!imageURL) {
+      showFallback();
+      return avatar;
+    }
+    var image = document.createElement("img");
+    image.alt = "";
+    image.draggable = false;
+    image.src = imageURL;
+    image.addEventListener("error", showFallback);
+    avatar.appendChild(image);
+    return avatar;
   }
 
   function startConversation() {
@@ -480,7 +583,7 @@
     }
     startConversation();
     var now = new Date();
-    var message = messageContainer("visitor");
+    var message = messageContainer("visitor", now, { key: "self" });
     var row = document.createElement("div");
     row.className = "cv-message-row";
     if (text) {
@@ -488,7 +591,7 @@
       bubble.className = "cv-message-bubble";
       var paragraph = document.createElement("div");
       paragraph.textContent = text;
-      bubble.appendChild(paragraph);
+      bubble.appendChild(bubbleContent(paragraph, now));
       row.appendChild(bubble);
     }
     if (files.length > 0) {
@@ -496,7 +599,9 @@
       row.appendChild(assetList(files));
     }
     message.appendChild(row);
-    message.appendChild(messageMeta(now));
+    if (!text) {
+      message.appendChild(messageMeta(now));
+    }
     messages.appendChild(message);
     updateConversationSummary(activeConversation, text || files[0].name, now);
     scrollToBottom();
@@ -508,7 +613,7 @@
       return;
     }
     var now = new Date();
-    var message = messageContainer("assistant");
+    var message = messageContainer("assistant", now, { key: "channel" });
     if (greeting) {
       message.setAttribute("data-greeting", "true");
     }
@@ -516,11 +621,12 @@
     row.className = "cv-message-row";
     var bubble = document.createElement("div");
     bubble.className = "cv-message-bubble";
-    CerviMarkdown.render(bubble, text, greeting ? null : "agent");
+    var body = document.createElement("div");
+    CerviMarkdown.render(body, text, greeting ? null : "agent");
+    bubble.appendChild(bubbleContent(body, now));
     messageResizeObserver.observe(bubble);
     row.appendChild(bubble);
     message.appendChild(row);
-    message.appendChild(messageMeta(now));
     appendConversationNode(conversation, message);
     if (!greeting) {
       updateConversationSummary(conversation, CerviMarkdown.preview(text, "agent"), now);
@@ -529,11 +635,14 @@
 
   // 向指定会话追加正在输入提示。
   function appendTyping(conversation) {
-    var message = messageContainer("assistant");
+    var message = messageContainer("assistant", new Date(), { key: "channel" });
+    var row = document.createElement("div");
+    row.className = "cv-message-row";
     var typing = document.createElement("div");
     typing.className = "cv-typing";
     typing.innerHTML = "<i></i><i></i><i></i>";
-    message.appendChild(typing);
+    row.appendChild(typing);
+    message.appendChild(row);
     conversation.typingNode = message;
     appendConversationNode(conversation, message);
   }
@@ -914,8 +1023,19 @@
     if (conversation.messageIDs[value.id]) {
       return;
     }
+    var originatedAt = new Date(value.originatedAt);
+    // 访客消息归入本人，客服消息按发送身份区分发送人。
     var message = messageContainer(
       value.author === "visitor" ? "visitor" : "assistant",
+      originatedAt,
+      value.author === "visitor"
+        ? { key: "self" }
+        : {
+            key: value.senderIdentityId,
+            name: value.senderName,
+            avatarURL: value.senderAvatarUrl,
+            fallback: value.senderIdentityType === "agent" ? "agent" : "person",
+          },
     );
     message.setAttribute("data-message-id", value.id);
     message.tabIndex = 0;
@@ -944,11 +1064,12 @@
       }
       bubble.appendChild(reference);
     }
-    // 只有说明或引用的附件消息才渲染气泡，纯附件直接展示内容。
-    if (!value.attachment || value.body || value.replyTo) {
+    // 只有说明或引用的附件消息才渲染气泡，纯附件直接展示内容并在下方显示时间。
+    var withBubble = !value.attachment || value.body || value.replyTo;
+    if (withBubble) {
       var body = document.createElement("div");
-      bubble.appendChild(body);
       CerviMarkdown.render(body, value.body, value.senderIdentityType);
+      bubble.appendChild(bubbleContent(body, originatedAt));
       messageResizeObserver.observe(bubble);
       row.appendChild(bubble);
     }
@@ -957,7 +1078,9 @@
       row.appendChild(serverAssetList(conversation, value));
     }
     message.appendChild(row);
-    message.appendChild(messageMeta(new Date(value.originatedAt)));
+    if (!withBubble) {
+      message.appendChild(messageMeta(originatedAt));
+    }
     // 收到的消息悬停显示回复操作，双方消息均支持右键引用。
     if (value.author === "agent") {
       var replyButton = document.createElement("button");
@@ -1765,7 +1888,7 @@
       canceled: false,
       request: null,
       error: "",
-      node: messageContainer("visitor"),
+      node: messageContainer("visitor", new Date(), { key: "self" }),
       status: document.createElement("span"),
       action: document.createElement("button"),
     };
@@ -1789,7 +1912,7 @@
       if (entry.body) {
         var paragraph = document.createElement("div");
         paragraph.textContent = entry.body;
-        bubble.appendChild(paragraph);
+        bubble.appendChild(bubbleContent(paragraph, new Date()));
       }
       row.appendChild(bubble);
     }
@@ -2166,7 +2289,9 @@
     resetRecording();
     startConversation();
     var now = new Date();
-    var message = messageContainer("visitor");
+    var message = messageContainer("visitor", now, { key: "self" });
+    var row = document.createElement("div");
+    row.className = "cv-message-row";
     var bubble = document.createElement("div");
     bubble.className = "cv-message-bubble cv-voice-message";
     var play = document.createElement("button");
@@ -2177,7 +2302,8 @@
     play.setAttribute("aria-pressed", "false");
     var line = document.createElement("span");
     line.className = "cv-voice-line";
-    var time = document.createElement("time");
+    var time = document.createElement("span");
+    time.className = "cv-voice-duration";
     time.textContent = formatDuration(duration);
     var playbackTimer = null;
     play.style.setProperty("--cv-voice-duration", duration + "s");
@@ -2207,8 +2333,9 @@
     bubble.appendChild(play);
     bubble.appendChild(line);
     bubble.appendChild(time);
-    message.appendChild(bubble);
-    message.appendChild(messageMeta(now));
+    bubble.appendChild(messageTime(now));
+    row.appendChild(bubble);
+    message.appendChild(row);
     messages.appendChild(message);
     updateConversationSummary(
       activeConversation,
@@ -2266,7 +2393,7 @@
       node.textContent = greeting || defaultGreeting;
     });
     forEachConversationNode(
-      '[data-greeting="true"] .cv-message-bubble',
+      '[data-greeting="true"] .cv-message-body',
       function (node) {
         node.textContent = greeting || defaultGreeting;
       },
