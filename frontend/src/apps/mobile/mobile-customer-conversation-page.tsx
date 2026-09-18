@@ -215,6 +215,7 @@ export function MobileCustomerConversationPage() {
           customerDeliveries={
             conversation.customer.channelType === ChannelType.ChannelTypeTelegram
           }
+          customerAttachment={conversation.customer}
           disabledReason={disabledReason}
           lastReadMessageID={conversation.lastReadMessageId}
           locateMessage={locationState?.locateMessage}
