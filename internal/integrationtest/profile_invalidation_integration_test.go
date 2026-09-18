@@ -1,0 +1,488 @@
+//go:build server
+
+package integrationtest
+
+import (
+	"context"
+	"encoding/json"
+	"runtime"
+	"strings"
+	"sync"
+	"testing"
+	"time"
+	"uuid"
+
+	agentaction "github.com/runforyou-ai/cervi/internal/actions/agent"
+	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
+	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
+	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
+	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
+	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
+	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
+	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/realtime"
+	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	servertask "github.com/runforyou-ai/cervi/internal/task/server"
+	"github.com/uptrace/bun"
+)
+
+// profileFixture 保存成员出现在单聊、群聊、已退出群聊和客户会话中的资料失效场景。
+type profileFixture struct {
+	customerReadFixture
+	directID, leftGroupID string
+}
+
+// newProfileFixture 建立成员与群主的单聊、成员已退出的群聊，并由成员领取网站客户会话。
+func newProfileFixture(t *testing.T) profileFixture {
+	t.Helper()
+	f := newCustomerReadFixture(t)
+	ctx := context.Background()
+	direct, err := conversationaction.NewSendFirstDirectTextMessageAction(f.db).Execute(ctx, f.owner, conversationaction.FirstDirectTextMessageInput{
+		TargetIdentityID: f.member.OrganizationIdentity.ID, ClientMessageID: uuid.NewV7().String(), Body: "单聊",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	left, err := conversationaction.NewCreateGroupConversationAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationInput{Title: "已退出的群", MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := newGroupSendAction(f.db).Execute(ctx, f.member, conversationaction.GroupTextMessageInput{ConversationID: left.ID, ClientMessageID: uuid.NewV7().String(), Body: "退出前的发言"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := conversationaction.NewLeaveGroupConversationAction(f.db).Execute(ctx, f.member, left.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.member, f.conversationID); err != nil {
+		t.Fatal(err)
+	}
+	return profileFixture{customerReadFixture: f, directID: direct.Conversation.ID, leftGroupID: left.ID}
+}
+
+// versions 读取成员资料所在四个会话的当前版本。
+func (f profileFixture) versions(t *testing.T) map[string]int64 {
+	t.Helper()
+	return map[string]int64{
+		f.groupID:        loadConversationVersion(t, f.db, f.groupID),
+		f.directID:       loadConversationVersion(t, f.db, f.directID),
+		f.leftGroupID:    loadConversationVersion(t, f.db, f.leftGroupID),
+		f.conversationID: loadConversationVersion(t, f.db, f.conversationID),
+	}
+}
+
+// expectVersions 断言各会话版本相对基线推进了指定次数。
+func (f profileFixture) expectVersions(t *testing.T, step string, before map[string]int64, delta int64) {
+	t.Helper()
+	for conversationID, version := range f.versions(t) {
+		if version != before[conversationID]+delta {
+			t.Fatalf("%s: 会话 %s 版本 = %d，want %d", step, conversationID, version, before[conversationID]+delta)
+		}
+	}
+}
+
+// TestMemberProfileConversationInvalidation 验证成员名称、头像与账号状态实际变化时推进展示该成员的会话版本，已退出的成员不接收通知，相同值不推进。
+func TestMemberProfileConversationInvalidation(t *testing.T) {
+	f := newProfileFixture(t)
+	ctx := context.Background()
+	// 群主恢复管理员角色，管理员修改成员与停用成员需要企业保留有效管理员。
+	if _, err := f.db.NewUpdate().Table("organization_identities").
+		Set("role_id = (SELECT id FROM roles WHERE organization_id = ? AND kind = ?)", f.owner.Organization.ID, domain.RoleKindAdmin).
+		Where("id = ?", f.owner.OrganizationIdentity.ID).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	// 成员只负责客户会话、尚未发言，客户会话仅经当前负责人关联到成员。
+	participated, err := f.db.NewSelect().TableExpr("conversation_participants AS cp").
+		Join("JOIN chat_subjects AS cs ON cs.id = cp.subject_id").
+		Where("cp.conversation_id = ? AND cs.source_id = ?", f.conversationID, f.member.OrganizationIdentity.ID).
+		Exists(ctx)
+	if err != nil || participated {
+		t.Fatalf("成员已是客户会话参与者 participated=%v err=%v", participated, err)
+	}
+	feed := startRealtimeFeed(t, f.owner.Organization.ID)
+	profile := useraction.NewUpdateProfileAction(f.db)
+	before := f.versions(t)
+	visitorIdentityID := loadChannelIdentityID(t, f.db, f.conversationID)
+	// changedNotices 构造成员资料变化后四个会话的期望通知，网站客户会话同时通知访客目录受众。
+	changedNotices := func() []receivedNotification {
+		current := f.versions(t)
+		return []receivedNotification{
+			feed.notice(f.owner.User.ID, realtime.KindConversationChanged, f.groupID, current[f.groupID]),
+			feed.notice(f.member.User.ID, realtime.KindConversationChanged, f.groupID, current[f.groupID]),
+			feed.notice(f.owner.User.ID, realtime.KindConversationChanged, f.directID, current[f.directID]),
+			feed.notice(f.member.User.ID, realtime.KindConversationChanged, f.directID, current[f.directID]),
+			feed.notice(f.owner.User.ID, realtime.KindConversationChanged, f.leftGroupID, current[f.leftGroupID]),
+			feed.customerInbox(f.conversationID, current[f.conversationID]),
+			feed.visitorDirectory(visitorIdentityID, f.conversationID, current[f.conversationID]),
+		}
+	}
+
+	// 本人改名：身份资料只通知本人，会话变化通知当前成员、客服共享受众与网站访客目录受众，已退出的成员不接收。
+	if _, err := profile.Execute(ctx, f.member, useraction.ProfileInput{DisplayName: "成员新名", Email: f.member.User.Email}); err != nil {
+		t.Fatal(err)
+	}
+	f.expectVersions(t, "本人改名", before, 1)
+	after := f.versions(t)
+	feed.expect(t, append(changedNotices(), feed.notice(f.member.User.ID, realtime.KindIdentityProfileChanged, "", loadProfileVersion(t, f.db, f.member.User.ID)))...)
+
+	// 本人只换头像同样推进。
+	avatar, err := fileaction.NewCreateUploadAction(f.db).Execute(ctx, f.member, domain.FileStorageBackendLocal, fileaction.UploadInput{
+		Purpose: domain.FilePurposeUserAvatar, FileName: "avatar.png", ContentType: "image/png", ByteSize: 1024,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fileaction.NewMarkUploadedAction(f.db).Execute(ctx, f.member, avatar.ID, ""); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := profile.Execute(ctx, f.member, useraction.ProfileInput{DisplayName: "成员新名", Email: f.member.User.Email, AvatarFileID: avatar.ID}); err != nil {
+		t.Fatal(err)
+	}
+	f.expectVersions(t, "本人换头像", after, 1)
+	after = f.versions(t)
+	feed.expect(t, append(changedNotices(), feed.notice(f.member.User.ID, realtime.KindIdentityProfileChanged, "", loadProfileVersion(t, f.db, f.member.User.ID)))...)
+
+	// 相同名称与仅邮箱变化都不推进会话版本。
+	if _, err := profile.Execute(ctx, f.member, useraction.ProfileInput{DisplayName: "成员新名", Email: f.member.User.Email}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := useraction.NewUpdateUserAction(f.db).Execute(ctx, f.owner, f.member.User.ID, useraction.UpdateInput{DisplayName: "成员新名", Email: "profile-renamed@navigation.test", RoleID: f.member.OrganizationIdentity.RoleID}); err != nil {
+		t.Fatal(err)
+	}
+	f.expectVersions(t, "名称未变", after, 0)
+	feed.expect(t, feed.notice(f.member.User.ID, realtime.KindIdentityProfileChanged, "", loadProfileVersion(t, f.db, f.member.User.ID)))
+
+	// 管理员改名同样推进。
+	if _, err := useraction.NewUpdateUserAction(f.db).Execute(ctx, f.owner, f.member.User.ID, useraction.UpdateInput{DisplayName: "管理员改的名", Email: "profile-renamed@navigation.test", RoleID: f.member.OrganizationIdentity.RoleID}); err != nil {
+		t.Fatal(err)
+	}
+	f.expectVersions(t, "管理员改名", after, 1)
+	feed.expect(t, append(changedNotices(), feed.notice(f.member.User.ID, realtime.KindIdentityProfileChanged, "", loadProfileVersion(t, f.db, f.member.User.ID)))...)
+
+	// 停用与恢复改变列表展示的账号状态，重复停用不推进；停用另发连接撤销控制，本段只核对版本。
+	status := useraction.NewUpdateStatusAction(f.db)
+	before = f.versions(t)
+	for _, step := range []struct {
+		status domain.UserStatus
+		delta  int64
+	}{{domain.UserStatusInactive, 1}, {domain.UserStatusInactive, 1}, {domain.UserStatusActive, 2}} {
+		if _, err := status.Execute(ctx, f.owner, f.member.User.ID, step.status); err != nil {
+			t.Fatal(err)
+		}
+		f.expectVersions(t, "账号状态 "+string(step.status), before, step.delta)
+	}
+}
+
+// TestAgentProfileConversationInvalidation 验证 AI 员工与 Copilot 创建人的资料变化推进 Agent 聊天、Copilot 线程及其所属客户会话的版本，只改工作状态或重复停用不推进。
+func TestAgentProfileConversationInvalidation(t *testing.T) {
+	f := newCustomerReadFixture(t)
+	ctx := context.Background()
+	roleID := f.owner.OrganizationIdentity.RoleID
+	provider := &servermodels.AIProvider{
+		OrganizationID: f.owner.Organization.ID, Brand: string(domain.AIProviderBrandOpenAI), Name: "资料失效测试模型服务",
+		CredentialType: string(domain.AIProviderCredentialTypeAPIKey), APIKey: "test-key", APIURL: "https://example.com/v1",
+	}
+	if _, err := f.db.NewInsert().Model(provider).Column("organization_id", "brand", "name", "credential_type", "api_key", "api_url").Returning("id").Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	model := &servermodels.AIProviderModel{
+		ProviderID: provider.ID, OrganizationID: f.owner.Organization.ID, Identifier: "chat-model", Name: "测试对话模型", Type: string(domain.AIModelTypeChat),
+		InputModalities: json.RawMessage(`["text"]`), ContextWindow: 128000, MaxOutputTokens: 4096,
+	}
+	if _, err := f.db.NewInsert().Model(model).Column("provider_id", "organization_id", "identifier", "name", "model_type", "input_modalities", "context_window", "max_output_tokens").Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	created, err := agentaction.NewCreateAgentAction(f.db).Execute(ctx, f.owner, agentaction.CreateInput{
+		DisplayName: "资料助手", RoleID: roleID,
+		Execution: agentaction.ExecutionInput{Mode: domain.AgentExecutionModeManaged, Managed: &agentaction.ManagedExecutionInput{ProviderID: provider.ID, ModelIdentifier: model.Identifier, SystemInstruction: "回答问题"}},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	tasks := servertask.New(f.db, serverconfig.NATSConfig{})
+	if err := tasks.Registry().RegisterJSON(agentrunaction.RunActionName, func(context.Context, agentrunaction.RunInput) error { return nil }); err != nil {
+		t.Fatal(err)
+	}
+	scheduler := agentrunaction.NewScheduler(tasks)
+	chat, err := conversationaction.NewSendFirstAgentTextMessageAction(f.db, scheduler).Execute(ctx, f.owner, conversationaction.FirstAgentTextMessageInput{
+		ConversationID: uuid.NewV7().String(), AgentIdentityID: created.IdentityID, ClientMessageID: uuid.NewV7().String(), Body: "你好",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	// 成员在客户会话中与 AI 员工开启 Copilot 线程；成员不参与客户会话，只以线程创建人出现在线程列表中。
+	threadID := uuid.NewV7().String()
+	if _, err := conversationaction.NewSendFirstCustomerCopilotMessageAction(f.db, scheduler).Execute(ctx, f.member, conversationaction.FirstCustomerCopilotMessageInput{
+		ThreadID: threadID, CustomerConversationID: f.conversationID, AgentIdentityID: created.IdentityID, ClientMessageID: uuid.NewV7().String(), Body: "帮我看看",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	conversations := []string{chat.Conversation.ID, f.conversationID, threadID}
+	visitorIdentityID := loadChannelIdentityID(t, f.db, f.conversationID)
+	// versions 读取 Agent 聊天、客户会话与 Copilot 线程的当前版本。
+	versions := func() []int64 {
+		values := make([]int64, 0, len(conversations))
+		for _, conversationID := range conversations {
+			values = append(values, loadConversationVersion(t, f.db, conversationID))
+		}
+		return values
+	}
+	feed := startRealtimeFeed(t, f.owner.Organization.ID)
+	update := agentaction.NewUpdateAgentAction(f.db, testServiceSessionHandoff(f.db))
+	status := agentaction.NewUpdateStatusAction(f.db, testServiceSessionHandoff(f.db))
+	rename := func(name string, workStatus domain.WorkStatus) error {
+		_, err := update.Execute(ctx, f.owner, created.ID, agentaction.UpdateInput{DisplayName: name, RoleID: roleID, WorkStatus: workStatus})
+		return err
+	}
+	for _, step := range []struct {
+		name   string
+		change func() error
+		deltas []int64
+	}{
+		{"改名", func() error { return rename("资料助手新名", domain.WorkStatusWorking) }, []int64{1, 1, 1}},
+		{"只改工作状态", func() error { return rename("资料助手新名", domain.WorkStatusAway) }, []int64{0, 0, 0}},
+		{"Copilot 创建人改名", func() error {
+			_, err := useraction.NewUpdateProfileAction(f.db).Execute(ctx, f.member, useraction.ProfileInput{DisplayName: "线程创建人", Email: f.member.User.Email})
+			return err
+		}, []int64{0, 1, 1}},
+		// 删除 Agent 聊天中 AI 员工的参与记录，只保留其运行记录。
+		{"仅有运行记录时改名", func() error {
+			if _, err := f.db.NewDelete().TableExpr("conversation_participants AS cp").
+				Where("cp.conversation_id = ?", chat.Conversation.ID).
+				Where("cp.subject_id IN (SELECT id FROM chat_subjects WHERE source_id = ?)", created.IdentityID).
+				Exec(ctx); err != nil {
+				return err
+			}
+			return rename("只剩运行记录", domain.WorkStatusAway)
+		}, []int64{1, 1, 1}},
+		{"停用", func() error {
+			_, err := status.Execute(ctx, f.owner, created.ID, domain.UserStatusInactive)
+			return err
+		}, []int64{1, 1, 1}},
+		{"重复停用", func() error {
+			_, err := status.Execute(ctx, f.owner, created.ID, domain.UserStatusInactive)
+			return err
+		}, []int64{0, 0, 0}},
+	} {
+		before := versions()
+		if err := step.change(); err != nil {
+			t.Fatalf("%s: %v", step.name, err)
+		}
+		after := versions()
+		var want []receivedNotification
+		for index, delta := range step.deltas {
+			if after[index] != before[index]+delta {
+				t.Fatalf("%s: 会话 %s 版本 = %d，want %d", step.name, conversations[index], after[index], before[index]+delta)
+			}
+			if delta == 0 {
+				continue
+			}
+			// Agent 聊天通知当前真人成员，客户会话与 Copilot 线程各以自身会话 ID 通知客服共享受众，网站客户会话另通知访客目录受众。
+			switch index {
+			case 0:
+				want = append(want, feed.notice(f.owner.User.ID, realtime.KindConversationChanged, conversations[index], after[index]))
+			case 1:
+				want = append(want, feed.customerInbox(conversations[index], after[index]), feed.visitorDirectory(visitorIdentityID, conversations[index], after[index]))
+			default:
+				want = append(want, feed.customerInbox(conversations[index], after[index]))
+			}
+		}
+		// 创建人另在夹具群中，改名同时通知群成员与本人身份资料。
+		if step.name == "Copilot 创建人改名" {
+			groupVersion := loadConversationVersion(t, f.db, f.groupID)
+			want = append(want,
+				feed.notice(f.owner.User.ID, realtime.KindConversationChanged, f.groupID, groupVersion),
+				feed.notice(f.member.User.ID, realtime.KindConversationChanged, f.groupID, groupVersion),
+				feed.notice(f.member.User.ID, realtime.KindIdentityProfileChanged, "", loadProfileVersion(t, f.db, f.member.User.ID)),
+			)
+		}
+		if len(want) > 0 {
+			feed.expect(t, want...)
+		}
+	}
+	// 以一次本人静音收尾，确认无变化的步骤没有留下通知。
+	if _, err := conversationaction.NewUpdateConversationNotificationSettingsAction(f.db).Execute(ctx, f.owner, chat.Conversation.ID, true); err != nil {
+		t.Fatal(err)
+	}
+	feed.expect(t, feed.notice(f.owner.User.ID, realtime.KindConversationStateChanged, chat.Conversation.ID, loadConversationStateVersion(t, f.db, chat.Conversation.ID, f.owner.User.ID)))
+}
+
+// TestCustomerProfileConversationInvalidation 验证联系人与渠道名称实际变化时只通知企业客服共享受众，相同值不推进。
+func TestCustomerProfileConversationInvalidation(t *testing.T) {
+	f := newCustomerReadFixture(t)
+	ctx := context.Background()
+	var contact struct {
+		ID    string              `bun:"contact_id"`
+		Stage domain.ContactStage `bun:"stage"`
+	}
+	if err := f.db.NewSelect().TableExpr("customer_conversations AS cc").
+		ColumnExpr("cci.contact_id, c.stage").
+		Join("JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id").
+		Join("JOIN contacts AS c ON c.id = cci.contact_id").
+		Where("cc.conversation_id = ?", f.conversationID).
+		Scan(ctx, &contact); err != nil {
+		t.Fatal(err)
+	}
+	feed := startRealtimeFeed(t, f.owner.Organization.ID)
+	updateContact := contactaction.NewUpdateContactAction(f.db)
+	updateChannel := channelaction.NewUpdateMessageChannelAction(f.db)
+	// renameChannel 只修改渠道名称。
+	renameChannel := func(name string) error {
+		_, err := updateChannel.Execute(ctx, f.owner, f.channelID, channelaction.MessageChannelInput{
+			Name: name, DefaultLocale: domain.LocaleChineseSimplified,
+			NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
+			FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
+		})
+		return err
+	}
+	for _, step := range []struct {
+		name   string
+		change func() error
+		delta  int64
+	}{
+		{"联系人改名", func() error {
+			_, err := updateContact.Execute(ctx, f.owner, contact.ID, contactaction.ContactInput{DisplayName: "访客新名", ChannelID: f.channelID, Stage: contact.Stage})
+			return err
+		}, 1},
+		{"联系人名称未变", func() error {
+			_, err := updateContact.Execute(ctx, f.owner, contact.ID, contactaction.ContactInput{DisplayName: "访客新名", ChannelID: f.channelID, Stage: contact.Stage, Notes: "只改备注"})
+			return err
+		}, 0},
+		{"联系人再次改名", func() error {
+			_, err := updateContact.Execute(ctx, f.owner, contact.ID, contactaction.ContactInput{DisplayName: "访客第二个名字", ChannelID: f.channelID, Stage: contact.Stage})
+			return err
+		}, 1},
+		{"渠道改名", func() error { return renameChannel("客服未读测试新名") }, 1},
+		{"渠道名称未变", func() error { return renameChannel("客服未读测试新名") }, 0},
+	} {
+		before := loadConversationVersion(t, f.db, f.conversationID)
+		if err := step.change(); err != nil {
+			t.Fatalf("%s: %v", step.name, err)
+		}
+		after := loadConversationVersion(t, f.db, f.conversationID)
+		if after != before+step.delta {
+			t.Fatalf("%s: 会话版本 = %d，want %d", step.name, after, before+step.delta)
+		}
+		if step.delta > 0 {
+			feed.expect(t, feed.customerInbox(f.conversationID, after))
+		}
+	}
+	// 渠道身份自带名称时，联系人改名不改变客户展示名称，不推进。
+	if _, err := f.db.NewUpdate().Table("contact_channel_identities").Set("display_name = ?", "渠道身份名称").Where("contact_id = ?", contact.ID).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	before := loadConversationVersion(t, f.db, f.conversationID)
+	if _, err := updateContact.Execute(ctx, f.owner, contact.ID, contactaction.ContactInput{DisplayName: "不展示的联系人名", ChannelID: f.channelID, Stage: contact.Stage}); err != nil {
+		t.Fatal(err)
+	}
+	if after := loadConversationVersion(t, f.db, f.conversationID); after != before {
+		t.Fatalf("渠道身份有名称时联系人改名推进了版本 %d -> %d", before, after)
+	}
+	// 以一次渠道改名收尾，确认无变化的步骤没有留下通知。
+	if err := renameChannel("客服未读测试收尾"); err != nil {
+		t.Fatal(err)
+	}
+	feed.expect(t, feed.customerInbox(f.conversationID, loadConversationVersion(t, f.db, f.conversationID)))
+}
+
+// profileConversationBarrier 在资料写入锁定会话集合之后暂停该事务。
+type profileConversationBarrier struct {
+	entered, release chan struct{}
+	once             sync.Once
+}
+
+// BeforeQuery 保留资料写入的上下文。
+func (b *profileConversationBarrier) BeforeQuery(ctx context.Context, _ *bun.QueryEvent) context.Context {
+	return ctx
+}
+
+// AfterQuery 在资料写入按会话 ID 顺序锁定会话后暂停，让其他写入在等待会话锁时与之交叠。
+func (b *profileConversationBarrier) AfterQuery(_ context.Context, event *bun.QueryEvent) {
+	if event.Err != nil || !strings.Contains(event.Query, "ORDER BY cv.id FOR UPDATE") {
+		return
+	}
+	b.once.Do(func() {
+		close(b.entered)
+		<-b.release
+	})
+}
+
+// TestProfileInvalidationLockOrder 验证成员改名持有资料与会话锁时，其他成员的群消息与转交给该成员按统一锁序等待，不产生死锁。
+func TestProfileInvalidationLockOrder(t *testing.T) {
+	f := newProfileFixture(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
+	defer cancel()
+	// 成员回复客户后成为会话参与者，再把会话转交给群主，由群主在并发中转交回来。
+	if _, err := conversationaction.NewSendCustomerTextMessageAction(f.db, nil).Execute(ctx, f.member, conversationaction.CustomerTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "成员回复"}); err != nil {
+		t.Fatal(err)
+	}
+	// 转交会追加系统事件，按实测记录一次转交对客户会话版本的推进次数。
+	beforeTransfer := loadConversationVersion(t, f.db, f.conversationID)
+	if _, err := conversationaction.NewTransferServiceSessionAction(f.db, newGroupAgentCoordinator(f.db), nil).Execute(ctx, f.member, conversationaction.TransferServiceSessionInput{ConversationID: f.conversationID, AssigneeIdentityID: f.owner.OrganizationIdentity.ID}); err != nil {
+		t.Fatal(err)
+	}
+	transferDelta := loadConversationVersion(t, f.db, f.conversationID) - beforeTransfer
+	// 第三名成员入群，群消息与转交分别由不同账号发起，互不在账号行上等待。
+	sender := newChatLockUser(t, f.db, f.owner)
+	if _, err := conversationaction.NewAddGroupConversationMembersAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationMembersInput{ConversationID: f.groupID, MemberIdentityIDs: []string{sender.OrganizationIdentity.ID}}); err != nil {
+		t.Fatal(err)
+	}
+	before := f.versions(t)
+	barrier := &profileConversationBarrier{entered: make(chan struct{}), release: make(chan struct{})}
+	f.db.AddQueryHook(barrier)
+	var release sync.Once
+	defer release.Do(func() { close(barrier.release) })
+
+	renamed := make(chan error, 1)
+	go func() {
+		_, err := useraction.NewUpdateProfileAction(f.db).Execute(ctx, f.member, useraction.ProfileInput{DisplayName: "并发改名", Email: f.member.User.Email})
+		renamed <- err
+	}()
+	select {
+	case <-barrier.entered:
+	case <-ctx.Done():
+		t.Fatal(ctx.Err())
+	}
+	// 群消息先锁发送者账号行再锁会话，转交先共享锁定目标身份再锁会话，二者都等待改名事务提交。
+	sent := make(chan error, 1)
+	go func() {
+		_, err := newGroupSendAction(f.db).Execute(ctx, sender, conversationaction.GroupTextMessageInput{ConversationID: f.groupID, ClientMessageID: uuid.NewV7().String(), Body: "改名期间的消息"})
+		sent <- err
+	}()
+	transferred := make(chan error, 1)
+	go func() {
+		_, err := conversationaction.NewTransferServiceSessionAction(f.db, newGroupAgentCoordinator(f.db), nil).Execute(ctx, f.owner, conversationaction.TransferServiceSessionInput{ConversationID: f.conversationID, AssigneeIdentityID: f.member.OrganizationIdentity.ID})
+		transferred <- err
+	}()
+	// 两个写入都进入锁等待后再放行改名事务。
+	for {
+		var blocked int
+		if err := f.db.NewRaw(`SELECT count(*) FROM pg_stat_activity
+			WHERE datname = current_database() AND pid <> pg_backend_pid()
+				AND wait_event_type = 'Lock' AND cardinality(pg_blocking_pids(pid)) > 0`).Scan(ctx, &blocked); err != nil {
+			t.Fatal(err)
+		}
+		if blocked >= 2 {
+			break
+		}
+		if ctx.Err() != nil {
+			t.Fatal(ctx.Err())
+		}
+		runtime.Gosched()
+	}
+	release.Do(func() { close(barrier.release) })
+	for name, done := range map[string]<-chan error{"改名": renamed, "群消息": sent, "转交": transferred} {
+		select {
+		case err := <-done:
+			if err != nil {
+				t.Fatalf("%s失败: %v", name, err)
+			}
+		case <-ctx.Done():
+			t.Fatalf("%s等待超时: %v", name, ctx.Err())
+		}
+	}
+	after := f.versions(t)
+	if after[f.groupID] != before[f.groupID]+2 || after[f.conversationID] != before[f.conversationID]+1+transferDelta || after[f.directID] != before[f.directID]+1 {
+		t.Fatalf("并发写入后的会话版本 before=%v after=%v", before, after)
+	}
+}

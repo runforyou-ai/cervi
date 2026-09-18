@@ -590,6 +590,8 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if messageCountAfterReply != messageCountBeforeReply+1 {
 			t.Fatalf("Telegram message count after reply = %d, want %d", messageCountAfterReply, messageCountBeforeReply+1)
 		}
+		// 头像未变化的消息只因追加消息推进一次会话版本。
+		versionBeforeSameAvatar := loadConversationVersion(t, db, telegramConversation.ID)
 		sameAvatarMessage := *telegramMessage.Message
 		sameAvatarMessage.MessageID = 43
 		sameAvatarMessage.Body = "头像未变化的 Telegram 消息"
@@ -607,6 +609,9 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		}
 		if telegramIdentity.AvatarFileID == nil || *telegramIdentity.AvatarFileID != telegramAvatarFilesInDatabase[1].ID || importedAvatarWriter.saved != 2 {
 			t.Fatalf("unchanged Telegram avatar = %#v, writes = %d", telegramIdentity, importedAvatarWriter.saved)
+		}
+		if version := loadConversationVersion(t, db, telegramConversation.ID); version != versionBeforeSameAvatar+1 {
+			t.Fatalf("unchanged Telegram avatar conversation version = %d, want %d", version, versionBeforeSameAvatar+1)
 		}
 		noAvatarMessage := *telegramMessage.Message
 		noAvatarMessage.MessageID = 44
@@ -626,6 +631,36 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		}
 		if telegramIdentity.AvatarFileID != nil {
 			t.Fatalf("deleted Telegram avatar = %#v", telegramIdentity)
+		}
+		// 追加消息与头像删除各推进一次会话版本。
+		if version := loadConversationVersion(t, db, telegramConversation.ID); version != versionBeforeSameAvatar+3 {
+			t.Fatalf("deleted Telegram avatar conversation version = %d, want %d", version, versionBeforeSameAvatar+3)
+		}
+		// 幂等重放带来新名称时更新渠道身份并推进会话版本，名称不变的重放不推进。
+		renamedReplay := noAvatarMessage
+		renamedReplay.DisplayName = "Telegram 重放名称"
+		for _, step := range []struct {
+			updateID int64
+			want     int64
+		}{{7, versionBeforeSameAvatar + 4}, {8, versionBeforeSameAvatar + 4}} {
+			if err := receiveTelegram.Execute(context.Background(), telegramChannel.ID, channelaction.TelegramWebhookInput{
+				Secret: savedTelegram.Connection.WebhookSecret, UpdateID: step.updateID, Message: &renamedReplay,
+			}); err != nil {
+				t.Fatal(err)
+			}
+			if version := loadConversationVersion(t, db, telegramConversation.ID); version != step.want {
+				t.Fatalf("Telegram replay %d conversation version = %d, want %d", step.updateID, version, step.want)
+			}
+		}
+		telegramIdentity = servermodels.ContactChannelIdentity{}
+		if err := db.NewSelect().Model(&telegramIdentity).
+			Where("cci.channel_id = ?", telegramChannel.ID).
+			Where("cci.external_id = ?", "998877").
+			Scan(context.Background()); err != nil {
+			t.Fatal(err)
+		}
+		if telegramIdentity.DisplayName == nil || *telegramIdentity.DisplayName != "Telegram 重放名称" {
+			t.Fatalf("renamed Telegram identity = %#v", telegramIdentity)
 		}
 		activeTelegramAvatarCount, err := db.NewSelect().Model((*servermodels.File)(nil)).
 			Where("organization_id = ?", loggedIn.Identity.Organization.ID).

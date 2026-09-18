@@ -9,6 +9,7 @@ import (
 	"fmt"
 
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
+	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -40,14 +41,17 @@ func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels
 		if err != nil {
 			return err
 		}
-		updatedUser := &servermodels.User{}
-		err = tx.NewUpdate().Model(updatedUser).
+		var updatedUser struct {
+			IdentityID string `bun:"identity_id"`
+			Changed    bool   `bun:"changed"`
+		}
+		err = tx.NewUpdate().Model((*servermodels.User)(nil)).
 			Set("status = ?", status).
 			Set("updated_at = now()").
 			Where("organization_id = ?", identity.Organization.ID).
 			Where("id = ?", userID).
-			Returning("identity_id").
-			Scan(ctx)
+			Returning("new.identity_id, old.status <> new.status AS changed").
+			Scan(ctx, &updatedUser)
 		if errors.Is(err, sql.ErrNoRows) {
 			return ErrNotFound
 		}
@@ -55,7 +59,7 @@ func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels
 			return err
 		}
 		if status == domain.UserStatusInactive {
-			if err := identityaction.UpdateUserIdentity(ctx, tx, identity.Organization.ID, updatedUser.IdentityID, tx.NewUpdate().Model((*servermodels.OrganizationIdentity)(nil)).
+			if _, err := identityaction.UpdateUserIdentity(ctx, tx, identity.Organization.ID, updatedUser.IdentityID, tx.NewUpdate().Model((*servermodels.OrganizationIdentity)(nil)).
 				Set("work_status = ?", domain.WorkStatusOffDuty).
 				Set("work_status_updated_at = now()").
 				Set("updated_at = now()")); err != nil {
@@ -66,6 +70,12 @@ func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels
 			}
 			// 提交后通知 Gateway 关闭该用户的全部实时连接。
 			realtime.Notify(ctx, realtime.UserDisabled(identity.Organization.ID, userID))
+		}
+		// 会话列表展示对方账号状态，状态实际变化时推进展示该成员的会话版本。
+		if updatedUser.Changed {
+			if err := chatstate.TouchIdentityConversations(ctx, tx, identity.Organization.ID, updatedUser.IdentityID); err != nil {
+				return err
+			}
 		}
 		if err := ensureActiveAdministratorRemains(ctx, tx, identity.Organization.ID, administratorRoleID); err != nil {
 			return err

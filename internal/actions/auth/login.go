@@ -74,7 +74,7 @@ func (a *LoginAction) Execute(ctx context.Context, input LoginInput) (LoginOutpu
 		if _, err := tx.NewSelect().Model((*servermodels.User)(nil)).Column("id").Where("id = ?", user.ID).For("NO KEY UPDATE").Exec(ctx); err != nil {
 			return err
 		}
-		if err := identityaction.UpdateUserIdentity(ctx, tx, user.OrganizationID, user.IdentityID, tx.NewUpdate().Model((*servermodels.OrganizationIdentity)(nil)).
+		if _, err := identityaction.UpdateUserIdentity(ctx, tx, user.OrganizationID, user.IdentityID, tx.NewUpdate().Model((*servermodels.OrganizationIdentity)(nil)).
 			Set("work_status = ?", domain.WorkStatusWorking).
 			Set("work_status_updated_at = now()").
 			Set("updated_at = now()")); err != nil {

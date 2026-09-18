@@ -10,6 +10,7 @@ import (
 	"strings"
 	"uuid"
 
+	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	roleaction "github.com/runforyou-ai/cervi/internal/actions/role"
 	teamaction "github.com/runforyou-ai/cervi/internal/actions/team"
@@ -84,7 +85,8 @@ func (a *UpdateAgentAction) Execute(ctx context.Context, identity *servermodels.
 		if err := lockAgentIdentity(ctx, tx, identity.Organization.ID, storedAgent.IdentityID, &previousKind); err != nil {
 			return err
 		}
-		_, err = tx.NewUpdate().Model((*servermodels.OrganizationIdentity)(nil)).
+		var displayChanged bool
+		err = tx.NewUpdate().Model((*servermodels.OrganizationIdentity)(nil)).
 			Set("display_name = ?", input.DisplayName).
 			Set("role_id = ?", input.RoleID).
 			Set("work_status_updated_at = CASE WHEN work_status <> ? THEN now() ELSE work_status_updated_at END", input.WorkStatus).
@@ -93,7 +95,8 @@ func (a *UpdateAgentAction) Execute(ctx context.Context, identity *servermodels.
 			Where("organization_id = ?", identity.Organization.ID).
 			Where("id = ?", storedAgent.IdentityID).
 			Where("type = ?", domain.OrganizationIdentityTypeAgent).
-			Exec(ctx)
+			Returning("old.display_name IS DISTINCT FROM new.display_name").
+			Scan(ctx, &displayChanged)
 		if err != nil {
 			return err
 		}
@@ -103,6 +106,12 @@ func (a *UpdateAgentAction) Execute(ctx context.Context, identity *servermodels.
 		if previousKind == domain.RoleKindCustomerService && domain.RoleKind(role.Kind) != domain.RoleKindCustomerService {
 			cancelledRunIDs, err = a.handoff.HandOffAgentServiceSessions(ctx, tx, identity.Organization.ID, storedAgent.IdentityID, uuid.NewV7().String())
 			if err != nil {
+				return err
+			}
+		}
+		// 名称实际变化时，在资料写入与交接完成后推进展示该 AI 员工的会话版本；交接已按目标身份、渠道身份、会话的锁序锁定其负责的会话。
+		if displayChanged {
+			if err := chatstate.TouchIdentityConversations(ctx, tx, identity.Organization.ID, storedAgent.IdentityID); err != nil {
 				return err
 			}
 		}

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/realtime"
@@ -65,10 +66,11 @@ func (a *UpdateUserAction) Execute(ctx context.Context, identity *servermodels.I
 		if err != nil {
 			return err
 		}
-		if err := identityaction.UpdateUserIdentity(ctx, tx, identity.Organization.ID, identityID, tx.NewUpdate().Model((*servermodels.OrganizationIdentity)(nil)).
+		displayChanged, err := identityaction.UpdateUserIdentity(ctx, tx, identity.Organization.ID, identityID, tx.NewUpdate().Model((*servermodels.OrganizationIdentity)(nil)).
 			Set("display_name = ?", input.DisplayName).
 			Set("role_id = ?", input.RoleID).
-			Set("updated_at = now()")); err != nil {
+			Set("updated_at = now()"))
+		if err != nil {
 			return err
 		}
 		if err := ensureActiveAdministratorRemains(ctx, tx, identity.Organization.ID, administratorRoleID); err != nil {
@@ -76,6 +78,12 @@ func (a *UpdateUserAction) Execute(ctx context.Context, identity *servermodels.I
 		}
 		if err := replaceUserTeams(ctx, tx, identity, identityID, input.TeamIDs); err != nil {
 			return err
+		}
+		// 名称实际变化时，在成员资料写入完成后推进展示该成员的会话版本。
+		if displayChanged {
+			if err := chatstate.TouchIdentityConversations(ctx, tx, identity.Organization.ID, identityID); err != nil {
+				return err
+			}
 		}
 		output, err = loadUser(ctx, tx, identity.Organization.ID, userID)
 		return err

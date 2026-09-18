@@ -162,7 +162,7 @@ func (a *UpdateAssignmentsAction) Execute(ctx context.Context, identity *serverm
 				Set("role_id = ?", change.RoleID).
 				Set("updated_at = now()")
 			if identityTypes[change.IdentityID] == domain.OrganizationIdentityTypeUser {
-				err = identityaction.UpdateUserIdentity(ctx, tx, identity.Organization.ID, change.IdentityID, query)
+				_, err = identityaction.UpdateUserIdentity(ctx, tx, identity.Organization.ID, change.IdentityID, query)
 			} else {
 				_, err = query.Where("organization_id = ? AND id = ?", identity.Organization.ID, change.IdentityID).Exec(ctx)
 			}

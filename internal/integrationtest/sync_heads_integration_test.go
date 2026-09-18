@@ -220,7 +220,9 @@ func TestSyncHeadsIdentityProfile(t *testing.T) {
 	}
 	lonely := login.Identity
 	workStatus := useraction.NewUpdateWorkStatusAction(f.db)
-	// expectProfile 执行变化后核对身份资料版本是否推进，会话数量与校验和保持不变。
+	// renamed 记录名称是否在本步实际变化，名称变化推进所在会话版本并改变会话校验和。
+	renamed := false
+	// expectProfile 执行变化后核对身份资料版本是否推进，会话数量不变，校验和只随名称变化改变。
 	expectProfile := func(name string, changed bool, change func() error) {
 		t.Helper()
 		before := loadSyncHeads(t, f.db, lonely)
@@ -228,7 +230,7 @@ func TestSyncHeadsIdentityProfile(t *testing.T) {
 			t.Fatalf("%s: %v", name, err)
 		}
 		after := loadSyncHeads(t, f.db, lonely)
-		if (after.IdentityProfileVersion != before.IdentityProfileVersion) != changed || after.ConversationCount != before.ConversationCount || after.ConversationChecksum != before.ConversationChecksum {
+		if (after.IdentityProfileVersion != before.IdentityProfileVersion) != changed || after.ConversationCount != before.ConversationCount || (after.ConversationChecksum != before.ConversationChecksum) != renamed {
 			t.Fatalf("%s: before=%+v after=%+v", name, before, after)
 		}
 	}
@@ -239,7 +241,7 @@ func TestSyncHeadsIdentityProfile(t *testing.T) {
 		_, err := workStatus.Execute(ctx, lonely, useraction.WorkStatusInput{WorkStatus: domain.WorkStatusOffDuty})
 		return err
 	})
-	// 加入群后在已有会话上验证资料变化不改变会话校验和。
+	// 加入群后在已有会话上验证资料变化：名称变化推进所在会话版本并改变会话校验和，其余资料变化不改变。
 	if _, err := conversationaction.NewAddGroupConversationMembersAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationMembersInput{ConversationID: f.groupID, MemberIdentityIDs: []string{lonely.OrganizationIdentity.ID}}); err != nil {
 		t.Fatal(err)
 	}
@@ -266,10 +268,12 @@ func TestSyncHeadsIdentityProfile(t *testing.T) {
 			return err
 		}},
 	} {
-		// 首次保存改变资料，重复保存同一值不推进版本。
+		// 首次保存改变资料，重复保存同一值不推进版本；只有个人资料一步修改名称。
 		for attempt, changed := range []bool{true, false} {
+			renamed = step.name == "个人资料" && changed
 			expectProfile(step.name+strconv.Itoa(attempt), changed, step.change)
 		}
+		renamed = false
 	}
 
 	var accessHost string

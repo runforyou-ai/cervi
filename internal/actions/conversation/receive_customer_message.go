@@ -98,6 +98,7 @@ func ReceiveInboundCustomerMessage(ctx context.Context, db bun.IDB, channel *ser
 	if input.ClientMessageID != nil {
 		input.IdempotencyKey = "chmsg:" + identity.ID + ":" + *input.ClientMessageID
 	}
+	// 渠道身份名称变化时同时推进其所在客户会话的版本，重放与幂等冲突同样覆盖。
 	if input.DisplayName != nil && (identity.DisplayName == nil || *identity.DisplayName != *input.DisplayName) {
 		if _, err := db.NewUpdate().Model(identity).
 			Set("display_name = ?", *input.DisplayName).
@@ -108,6 +109,9 @@ func ReceiveInboundCustomerMessage(ctx context.Context, db bun.IDB, channel *ser
 			return InboundCustomerMessageResult{}, fmt.Errorf("update channel identity display name: %w", err)
 		}
 		identity.DisplayName = input.DisplayName
+		if err := chatstate.TouchChannelIdentityConversations(ctx, db, channel.OrganizationID, identity.ID); err != nil {
+			return InboundCustomerMessageResult{}, err
+		}
 	}
 	if saved, found, err := loadInboundCustomerMessage(ctx, db, channel, identity, input); err != nil || found {
 		return saved, err
