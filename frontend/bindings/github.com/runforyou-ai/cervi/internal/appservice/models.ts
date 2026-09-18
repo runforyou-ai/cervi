@@ -153,7 +153,7 @@ export interface AIProviderSummary {
 }
 
 /**
- * Agent 定义 AI 员工信息。
+ * Agent 定义 AI 员工信息，Behavior 是当前角色对该员工的内置工作规则与可用工具。
  */
 export interface Agent {
     "id": string;
@@ -164,7 +164,16 @@ export interface Agent {
     "workStatus": WorkStatus;
     "teams": TeamSummary[] | null;
     "execution": AgentExecution;
+    "behavior": AgentBehaviorProfile;
     "createdAt": string;
+}
+
+/**
+ * AgentBehaviorProfile 定义角色对 AI 员工的内置工作规则与可用工具。
+ */
+export interface AgentBehaviorProfile {
+    "instruction": string;
+    "tools": string[] | null;
 }
 
 /**
@@ -2558,6 +2567,20 @@ export interface PendingConversationMentions {
 }
 
 /**
+ * PermissionAppliesTo 表示权限适用的企业身份类型。
+ */
+export enum PermissionAppliesTo {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    PermissionAppliesToMember = "member",
+    PermissionAppliesToAgent = "agent",
+    PermissionAppliesToBoth = "both",
+};
+
+/**
  * PermissionCode 表示一项预定义权限。
  */
 export enum PermissionCode {
@@ -2587,6 +2610,7 @@ export interface PermissionDefinition {
     "code": PermissionCode;
     "resource": PermissionResource;
     "level": PermissionLevel;
+    "appliesTo": PermissionAppliesTo;
 }
 
 /**
@@ -2652,7 +2676,7 @@ export interface RequestMeta {
 }
 
 /**
- * Role 定义企业角色及其权限。
+ * Role 定义企业角色及其权限；AgentBehavior 为空表示该角色不适用于 AI 员工。
  */
 export interface Role {
     "id": string;
@@ -2661,6 +2685,7 @@ export interface Role {
     "description": string;
     "permissions": PermissionCode[] | null;
     "memberCount": number;
+    "agentBehavior"?: AgentBehaviorProfile | null;
     "createdAt": string;
     "updatedAt": string;
 }

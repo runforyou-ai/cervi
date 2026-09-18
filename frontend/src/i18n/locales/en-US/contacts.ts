@@ -148,8 +148,11 @@ const contacts = {
       nameRequired: "Enter an AI employee name.",
       nameInvalid: "AI employee names can only contain letters, numbers, spaces, and · - _ . characters.",
       modelRequired: "Select a chat model.",
-      instructionRequired: "Enter work instructions.",
-      instructionTooLong: "Work instructions cannot exceed 20,000 characters.",
+      instructionTooLong: "Company instructions cannot exceed 20,000 characters.",
+    },
+    roleHint: {
+      customerService: "Can serve customers and follows the customer service work rules.",
+      member: "Collaborates internally only and follows the member work rules.",
     },
     mcp: {
       services: "MCP services",
@@ -169,7 +172,10 @@ const contacts = {
 
       title: "Execution settings",
       model: "Chat model",
-      instruction: "Work instructions",
+      instruction: "Company instructions",
+      instructionHelp:
+        "The built-in work rules already cover general requirements. Add only company-specific background, tone, policies, and restrictions here.",
+      behavior: "Built-in work rules",
       saveError: "Could not save execution settings. Try again.",
       modelSelect: "Select a chat model",
       modelLoading: "Loading models…",

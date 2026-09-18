@@ -40,13 +40,13 @@ func TestNormalizeExecutionInputRejectsInvalidEnvelope(t *testing.T) {
 	}
 }
 
-// TestNormalizeExecutionInputRejectsRequiredFields 验证无效模型和空工作指令会被拒绝。
+// TestNormalizeExecutionInputRejectsRequiredFields 验证无效模型和知识库会被拒绝，企业指令允许为空。
 func TestNormalizeExecutionInputRejectsRequiredFields(t *testing.T) {
 	fields := executionValidationFields(t, ExecutionInput{
 		Mode:    domain.AgentExecutionModeManaged,
 		Managed: &ManagedExecutionInput{ProviderID: "invalid", KnowledgeBaseIDs: []string{"invalid"}},
 	})
-	if fields["knowledgeBaseIds"] != ValidationKnowledgeBaseInvalid || fields["providerId"] != ValidationModelInvalid || fields["modelIdentifier"] != ValidationModelInvalid || fields["systemInstruction"] != ValidationSystemInstructionRequired {
+	if fields["knowledgeBaseIds"] != ValidationKnowledgeBaseInvalid || fields["providerId"] != ValidationModelInvalid || fields["modelIdentifier"] != ValidationModelInvalid || fields["systemInstruction"] != "" {
 		t.Fatalf("normalizeExecutionInput() fields = %#v", fields)
 	}
 }

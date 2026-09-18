@@ -1,7 +1,7 @@
 /** 新建 AI 员工表单。 */
 import { useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { Controller, useForm, type Control } from "react-hook-form"
+import { Controller, useForm, useWatch, type Control } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -16,7 +16,12 @@ import {
 } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
 import { Button } from "@/components/ui/button"
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
+import {
+  Field,
+  FieldDescription,
+  FieldGroup,
+  FieldLabel,
+} from "@/components/ui/field"
 import { Textarea } from "@/components/ui/textarea"
 import { AgentModelField } from "@/features/contacts/agents/agent-model-field"
 import { parseAgentModelSelection } from "@/features/contacts/agents/agent-model-selection"
@@ -53,7 +58,6 @@ export function AgentForm({
         nameInvalid: t("agents.validation.nameInvalid"),
         roleRequired: t("members.validation.roleRequired"),
         modelRequired: t("agents.validation.modelRequired"),
-        instructionRequired: t("agents.validation.instructionRequired"),
         instructionTooLong: t("agents.validation.instructionTooLong"),
       }),
     [t],
@@ -83,6 +87,8 @@ export function AgentForm({
     },
   })
   const { mounted, dirty } = useFormLifetime(form.formState.isDirty)
+  const selectedRoleId = useWatch({ control: form.control, name: "roleId" })
+  const selectedRole = assignableRoles.find((role) => role.id === selectedRoleId)
 
   /** 提交 AI 员工表单。 */
   async function submit(values: AgentFormValues) {
@@ -155,6 +161,11 @@ export function AgentForm({
               disabled={form.formState.isSubmitting}
               aria-invalid={fieldState.invalid}
               roles={assignableRoles}
+              hint={t(
+                selectedRole?.kind === RoleKind.RoleKindCustomerService
+                  ? "agents.roleHint.customerService"
+                  : "agents.roleHint.member",
+              )}
             />
           )}
         />
@@ -203,7 +214,7 @@ function AgentManagedExecutionFields({
         control={control}
         render={({ field, fieldState }) => (
           <Field data-invalid={fieldState.invalid}>
-            <FieldLabel htmlFor="agent-system-instruction" required>
+            <FieldLabel htmlFor="agent-system-instruction">
               {t("agents.execution.instruction")}
             </FieldLabel>
             <Textarea
@@ -211,9 +222,11 @@ function AgentManagedExecutionFields({
               id="agent-system-instruction"
               rows={6}
               disabled={disabled}
-              required
               aria-invalid={fieldState.invalid}
             />
+            <FieldDescription>
+              {t("agents.execution.instructionHelp")}
+            </FieldDescription>
           </Field>
         )}
       />

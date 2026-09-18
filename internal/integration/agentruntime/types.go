@@ -77,10 +77,21 @@ type CustomerHistoryResult struct {
 	Message   string `json:"message"`
 }
 
+// Scene 表示一次运行所属的业务场景。
+type Scene string
+
+const (
+	SceneCustomer  Scene = "customer"
+	SceneAgentChat Scene = "agent_chat"
+	SceneGroup     Scene = "group"
+	SceneCopilot   Scene = "copilot"
+)
+
 // RunRequest 定义一次有界 Agent 业务运行。
 type RunRequest struct {
 	RunID                 string
 	Name                  string
+	Scene                 Scene // 客户会话场景不注册开发期计算器工具。
 	Instruction           string
 	Model                 ModelConfig
 	KnowledgeSearch       KnowledgeSearch

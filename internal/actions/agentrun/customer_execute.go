@@ -21,6 +21,10 @@ import (
 	"github.com/uptrace/bun"
 )
 
+const customerSceneRules = `本次是客户会话，你的输出会直接发送给客户，使用与客户最近消息相同的语言。`
+
+const customerSceneFallbackRule = `无法从资料得到答案时，如实告知客户暂时无法确认并说明会由人工客服跟进，不要猜测。`
+
 type customerRunPolicy struct {
 	enqueuer servertask.TxEnqueuer
 }
@@ -101,9 +105,9 @@ func (p customerRunPolicy) persistMessage(ctx context.Context, db bun.IDB, polic
 	return nil
 }
 
-// instruction 沿用客服会话配置的系统提示词。
-func (p customerRunPolicy) instruction(_ context.Context, _ bun.IDB, execution executionContext) (string, error) {
-	return execution.Instruction, nil
+// sceneRules 给出客户会话的对客说明与工具用法。
+func (p customerRunPolicy) sceneRules(_ context.Context, _ bun.IDB, _ executionContext, tools behaviorTools) (agentruntime.Scene, string, error) {
+	return agentruntime.SceneCustomer, composeInstruction(customerSceneRules, toolGuidance(tools), customerSceneFallbackRule), nil
 }
 
 // laneRevision 在当前负责人仍合格时返回客户 Agent 的配置版本。

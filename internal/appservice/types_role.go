@@ -54,23 +54,40 @@ const (
 	PermissionLevelManage PermissionLevel = PermissionLevel(domain.PermissionLevelManage)
 )
 
+// PermissionAppliesTo 表示权限适用的企业身份类型。
+type PermissionAppliesTo string
+
+const (
+	PermissionAppliesToMember PermissionAppliesTo = PermissionAppliesTo(domain.PermissionAppliesToMember)
+	PermissionAppliesToAgent  PermissionAppliesTo = PermissionAppliesTo(domain.PermissionAppliesToAgent)
+	PermissionAppliesToBoth   PermissionAppliesTo = PermissionAppliesTo(domain.PermissionAppliesToBoth)
+)
+
 // PermissionDefinition 定义权限目录中的一项权限。
 type PermissionDefinition struct {
-	Code     PermissionCode     `json:"code"`
-	Resource PermissionResource `json:"resource"`
-	Level    PermissionLevel    `json:"level"`
+	Code      PermissionCode      `json:"code"`
+	Resource  PermissionResource  `json:"resource"`
+	Level     PermissionLevel     `json:"level"`
+	AppliesTo PermissionAppliesTo `json:"appliesTo"`
 }
 
-// Role 定义企业角色及其权限。
+// AgentBehaviorProfile 定义角色对 AI 员工的内置工作规则与可用工具。
+type AgentBehaviorProfile struct {
+	Instruction string   `json:"instruction"`
+	Tools       []string `json:"tools"`
+}
+
+// Role 定义企业角色及其权限；AgentBehavior 为空表示该角色不适用于 AI 员工。
 type Role struct {
-	ID          string           `json:"id"`
-	Kind        RoleKind         `json:"kind"`
-	Name        string           `json:"name"`
-	Description string           `json:"description"`
-	Permissions []PermissionCode `json:"permissions"`
-	MemberCount int              `json:"memberCount"`
-	CreatedAt   time.Time        `json:"createdAt"`
-	UpdatedAt   time.Time        `json:"updatedAt"`
+	ID            string                `json:"id"`
+	Kind          RoleKind              `json:"kind"`
+	Name          string                `json:"name"`
+	Description   string                `json:"description"`
+	Permissions   []PermissionCode      `json:"permissions"`
+	MemberCount   int                   `json:"memberCount"`
+	AgentBehavior *AgentBehaviorProfile `json:"agentBehavior,omitempty"`
+	CreatedAt     time.Time             `json:"createdAt"`
+	UpdatedAt     time.Time             `json:"updatedAt"`
 }
 
 // RoleSummary 定义成员关联角色的精简字段。

@@ -163,6 +163,11 @@ const settings = {
     },
     permissions: {
       title: "Permissions",
+      memberTitle: "Member permissions",
+      agentTitle: "AI employee capabilities",
+      agentDescription: "Built into each role by Cervi and updated with product releases.",
+      agentNotApplicable: "The administrator role cannot be assigned to AI employees.",
+      agentCustomNote: "AI employees in custom roles follow the member work rules.",
       adminDescription: "Administrators always have every permission.",
       label: "{{level}} {{resource}}",
       toggle: "{{resource}}: {{level}}",

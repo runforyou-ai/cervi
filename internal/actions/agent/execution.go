@@ -130,9 +130,7 @@ func normalizeManagedExecutionInput(input ManagedExecutionInput) (ManagedExecuti
 	if input.ModelIdentifier == "" {
 		fields["modelIdentifier"] = ValidationModelInvalid
 	}
-	if input.SystemInstruction == "" {
-		fields["systemInstruction"] = ValidationSystemInstructionRequired
-	} else if utf8.RuneCountInString(input.SystemInstruction) > maxSystemInstructionLength {
+	if utf8.RuneCountInString(input.SystemInstruction) > maxSystemInstructionLength {
 		fields["systemInstruction"] = ValidationSystemInstructionTooLong
 	}
 	if len(fields) > 0 {
@@ -233,7 +231,6 @@ func decodeRevisionExecution(revision servermodels.AgentRevision) (Execution, er
 		strings.TrimSpace(configuration.Model.ProviderName) == "" ||
 		strings.TrimSpace(configuration.Model.Identifier) == "" ||
 		strings.TrimSpace(configuration.Model.Name) == "" ||
-		strings.TrimSpace(configuration.SystemInstruction) == "" ||
 		utf8.RuneCountInString(configuration.SystemInstruction) > maxSystemInstructionLength {
 		return Execution{}, errors.New("managed execution configuration is invalid")
 	}

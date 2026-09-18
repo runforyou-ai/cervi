@@ -54,6 +54,16 @@ const common = {
     customerService: "客服",
     member: "成员",
   },
+  agentBehavior: {
+    tools: "可用工具",
+    show: "查看内置规则",
+    hide: "收起内置规则",
+  },
+  agentTools: {
+    searchKnowledge: "知识库检索",
+    searchCustomerHistory: "客户历史沟通",
+    mcp: "MCP 服务工具",
+  },
 }
 
 export default common

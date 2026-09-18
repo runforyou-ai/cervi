@@ -61,7 +61,10 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 	if err != nil {
 		return RunResult{}, err
 	}
-	tools := append([]tool.BaseTool(nil), r.tools...)
+	tools := make([]tool.BaseTool, 0, len(r.tools)+2)
+	if request.Scene != SceneCustomer {
+		tools = append(tools, r.tools...)
+	}
 	if request.KnowledgeSearch != nil {
 		knowledgeTool, toolErr := newKnowledgeSearchTool(request.KnowledgeSearch)
 		if toolErr != nil {

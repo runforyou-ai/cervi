@@ -7,6 +7,7 @@ import (
 	"errors"
 	"log/slog"
 
+	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	roleaction "github.com/runforyou-ai/cervi/internal/actions/role"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -22,12 +23,13 @@ func (o *directOperations) ListRoles(ctx context.Context, meta RequestMeta, iden
 	}
 	roles := make([]Role, 0, len(output.Roles))
 	for _, role := range output.Roles {
-		roles = append(roles, roleFromAction(role))
+		roles = append(roles, roleFromAction(role, identity.Organization.Name))
 	}
 	permissions := make([]PermissionDefinition, 0, len(output.Permissions))
 	for _, permission := range output.Permissions {
 		permissions = append(permissions, PermissionDefinition{
-			Code: PermissionCode(permission.Code), Resource: PermissionResource(permission.Resource), Level: PermissionLevel(permission.Level),
+			Code: PermissionCode(permission.Code), Resource: PermissionResource(permission.Resource),
+			Level: PermissionLevel(permission.Level), AppliesTo: PermissionAppliesTo(permission.AppliesTo),
 		})
 	}
 	return RoleList{Roles: roles, Permissions: permissions, Maximum: roleaction.MaxRolesPerOrganization}, nil
@@ -39,7 +41,7 @@ func (o *directOperations) GetRole(ctx context.Context, meta RequestMeta, identi
 	if err != nil {
 		return Role{}, o.roleError(ctx, meta, err, cervii18n.ErrorRoleReadFailed, identity.Organization.ID, "role_id", roleID)
 	}
-	return roleFromAction(*role), nil
+	return roleFromAction(*role, identity.Organization.Name), nil
 }
 
 // CreateRole 创建自定义角色。
@@ -49,7 +51,7 @@ func (o *directOperations) CreateRole(ctx context.Context, meta RequestMeta, ide
 		return Role{}, o.roleMutationError(ctx, meta, err, cervii18n.ErrorRoleCreateFailed, identity.Organization.ID)
 	}
 	slog.Info("角色创建成功", "organization_id", identity.Organization.ID, "role_id", role.ID, "permission_count", len(role.Permissions))
-	return roleFromAction(*role), nil
+	return roleFromAction(*role, identity.Organization.Name), nil
 }
 
 // UpdateRole 修改角色信息和权限。
@@ -59,7 +61,7 @@ func (o *directOperations) UpdateRole(ctx context.Context, meta RequestMeta, ide
 		return Role{}, o.roleMutationError(ctx, meta, err, cervii18n.ErrorRoleUpdateFailed, identity.Organization.ID, "role_id", roleID)
 	}
 	slog.Info("角色保存成功", "organization_id", identity.Organization.ID, "role_id", role.ID, "role_kind", role.Kind, "permission_count", len(role.Permissions))
-	return roleFromAction(*role), nil
+	return roleFromAction(*role, identity.Organization.Name), nil
 }
 
 // DeleteRole 删除自定义角色。
@@ -141,14 +143,24 @@ func roleInput(input RoleInput) roleaction.Input {
 	return roleaction.Input{Name: input.Name, Description: input.Description, Permissions: permissions}
 }
 
-// roleFromAction 转换角色输出。
-func roleFromAction(input roleaction.Record) Role {
+// roleFromAction 转换角色输出，并附上该角色对 AI 员工的内置工作规则。
+func roleFromAction(input roleaction.Record, organizationName string) Role {
 	permissions := make([]PermissionCode, 0, len(input.Permissions))
 	for _, permission := range input.Permissions {
 		permissions = append(permissions, PermissionCode(permission))
 	}
 	return Role{
 		ID: input.ID, Kind: RoleKind(input.Kind), Name: input.Name, Description: input.Description,
-		Permissions: permissions, MemberCount: input.MemberCount, CreatedAt: input.CreatedAt, UpdatedAt: input.UpdatedAt,
+		Permissions: permissions, MemberCount: input.MemberCount, AgentBehavior: agentBehaviorProfile(input.Kind, organizationName),
+		CreatedAt: input.CreatedAt, UpdatedAt: input.UpdatedAt,
 	}
+}
+
+// agentBehaviorProfile 读取角色对 AI 员工的内置工作规则，管理员角色返回空。
+func agentBehaviorProfile(kind domain.RoleKind, organizationName string) *AgentBehaviorProfile {
+	instruction, tools, applicable := agentrunaction.BehaviorProfile(kind, organizationName)
+	if !applicable {
+		return nil
+	}
+	return &AgentBehaviorProfile{Instruction: instruction, Tools: tools}
 }

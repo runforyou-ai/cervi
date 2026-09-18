@@ -26,7 +26,7 @@ import (
 	"github.com/yuin/goldmark/text"
 )
 
-const groupInstructionSuffix = `你是企业 AI 员工「%s」，当前在群聊「%s」中与其他成员一起工作。
+const groupSceneRules = `本次在群聊「%s」中与其他成员一起工作。
 群内其他成员的发言以 JSON 提供：sender.name 是发送者名称，sender.kind 为 user 表示真人、为 agent 表示另一位 AI 员工，mentions 是这条消息点名的成员，replyTo 是被引用的原消息，attachment 是消息携带的附件；你自己的历史发言是纯文本。
 addressedToYou 为 true 的消息是本次需要你处理的请求，其余消息是群内上下文。
 你的最终回复会原样发到群里。需要某位成员回应时，在正文中写「@成员名」：@ 前留空格（位于行首时除外），成员名后接空格或标点；被点名的 AI 员工会接着发言。可点名的成员：%s。`
@@ -88,18 +88,18 @@ func (p groupMentionRunPolicy) persistMessage(ctx context.Context, db bun.IDB, p
 	return err
 }
 
-// instruction 在配置指令后补充本次运行的身份与群聊场景说明。
-func (p groupMentionRunPolicy) instruction(ctx context.Context, db bun.IDB, execution executionContext) (string, error) {
+// sceneRules 给出群聊场景、消息格式、可点名成员与工具用法。
+func (p groupMentionRunPolicy) sceneRules(ctx context.Context, db bun.IDB, execution executionContext, tools behaviorTools) (agentruntime.Scene, string, error) {
 	title := ""
 	if err := db.NewSelect().Model((*servermodels.Conversation)(nil)).
 		ColumnExpr("COALESCE(cv.title, '')").
 		Where("cv.organization_id = ? AND cv.id = ?", execution.Run.OrganizationID, execution.Run.ConversationID).
 		Scan(ctx, &title); err != nil {
-		return "", fmt.Errorf("load group title for instruction: %w", err)
+		return "", "", fmt.Errorf("load group title for scene rules: %w", err)
 	}
 	participants, err := loadGroupMentionParticipants(ctx, db, execution.Run.OrganizationID, execution.Run.ConversationID, execution.Run.AgentIdentityID)
 	if err != nil {
-		return "", err
+		return "", "", err
 	}
 	// 按名称排序列出群内名称唯一的可点名成员，没有可点名成员时明确告知。
 	names := make([]string, 0, len(participants))
@@ -113,11 +113,7 @@ func (p groupMentionRunPolicy) instruction(ctx context.Context, db bun.IDB, exec
 	if len(names) > 0 {
 		candidates = strings.Join(names, "、")
 	}
-	suffix := fmt.Sprintf(groupInstructionSuffix, execution.AgentName, title, candidates)
-	if strings.TrimSpace(execution.Instruction) == "" {
-		return suffix, nil
-	}
-	return execution.Instruction + "\n\n" + suffix, nil
+	return agentruntime.SceneGroup, composeInstruction(fmt.Sprintf(groupSceneRules, title, candidates), toolGuidance(tools), ""), nil
 }
 
 // laneRevision 在目标 Agent 仍是有效群成员时返回其配置版本。

@@ -14,7 +14,6 @@ export interface AgentValidationMessages {
   nameInvalid: string
   roleRequired: string
   modelRequired: string
-  instructionRequired: string
   instructionTooLong: string
 }
 
@@ -49,7 +48,6 @@ export function createAgentManagedExecutionSchema(
     systemInstruction: z
       .string()
       .trim()
-      .min(1, messages.instructionRequired)
       .refine((value) => {
         // 校验系统指令的 Unicode 字符数上限。
         return [...value].length <= maxSystemInstructionLength

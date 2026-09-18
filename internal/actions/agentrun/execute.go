@@ -54,6 +54,9 @@ type executionContext struct {
 	InputModalities  []domain.AIModelInputModality `bun:"input_modalities,type:jsonb"`
 	Instruction      string                        `bun:"instruction"`
 	KnowledgeBaseIDs []string                      `bun:"knowledge_base_ids,type:jsonb"`
+	ProviderID       string                        `bun:"provider_id"`
+	RoleKind         string                        `bun:"role_kind"`
+	OrganizationName string                        `bun:"organization_name"`
 }
 
 // NewExecuteAction 创建 Agent Worker Action。
@@ -101,10 +104,6 @@ func (a *ExecuteAction) Execute(ctx context.Context, input RunInput) error {
 			}, nil
 		}
 	}
-	instruction, err := policy.instruction(ctx, a.db, execution)
-	if err != nil {
-		return fmt.Errorf("build agent run instruction: %w", err)
-	}
 	mcpServers, err := loadRunMCPServers(ctx, a.db, &execution.Run)
 	if err != nil {
 		return fmt.Errorf("load agent run mcp servers: %w", err)
@@ -113,8 +112,17 @@ func (a *ExecuteAction) Execute(ctx context.Context, input RunInput) error {
 	if err != nil {
 		return fmt.Errorf("load agent run knowledge bases: %w", err)
 	}
+	tools := behaviorTools{Knowledge: knowledgeSearch != nil, CustomerHistory: customerHistorySearch != nil}
+	scene, sceneRules, err := policy.sceneRules(ctx, a.db, execution, tools)
+	if err != nil {
+		return fmt.Errorf("build agent run scene rules: %w", err)
+	}
+	snapshot, err := a.resolveBehaviorSnapshot(ctx, execution, scene, sceneRules, tools, mcpServers)
+	if err != nil {
+		return err
+	}
 	result, err := a.runtime.Run(runCtx, agentruntime.RunRequest{
-		RunID: execution.Run.ID, Name: execution.AgentName, Instruction: instruction,
+		RunID: execution.Run.ID, Name: execution.AgentName, Scene: scene, Instruction: snapshot.Instruction,
 		Model: agentruntime.ModelConfig{
 			Brand: execution.Brand, APIKey: execution.APIKey, BaseURL: execution.APIURL,
 			Identifier: execution.ModelIdentifier, MaxOutputTokens: int(execution.MaxOutputTokens), ContextWindow: int(execution.ContextWindow),
@@ -221,10 +229,13 @@ func (a *ExecuteAction) begin(ctx context.Context, runID string) (executionConte
 		ColumnExpr("oi.display_name AS agent_name").
 		ColumnExpr("aipm.input_modalities").
 		ColumnExpr("ar.configuration->'knowledgeBaseIds' AS knowledge_base_ids").
+		ColumnExpr("aip.id::text AS provider_id, r.kind AS role_kind, o.name AS organization_name").
 		Join("JOIN agents AS a ON a.identity_id = agr.agent_identity_id AND a.organization_id = agr.organization_id").
+		Join("JOIN organizations AS o ON o.id = agr.organization_id").
 		Apply(func(query *bun.SelectQuery) *bun.SelectQuery {
 			return withManagedAgentConfiguration(query, "agr.agent_revision_id")
 		}).
+		Join("JOIN roles AS r ON r.id = oi.role_id AND r.organization_id = oi.organization_id").
 		Where("agr.id = ?", runID).
 		Where("agr.status = ?", domain.AgentRunStatusRunning).
 		Scan(ctx, &execution)
@@ -242,6 +253,58 @@ func (a *ExecuteAction) begin(ctx context.Context, runID string) (executionConte
 		return executionContext{}, false, fmt.Errorf("load agent run execution: %w", err)
 	}
 	return execution, false, nil
+}
+
+// resolveBehaviorSnapshot 首次执行时拼接运行指令并固定快照；重复执行尝试沿用已写入的快照，不重新拼接。
+func (a *ExecuteAction) resolveBehaviorSnapshot(ctx context.Context, execution executionContext, scene agentruntime.Scene, sceneRules string, tools behaviorTools, mcpServers []agentruntime.MCPServer) (BehaviorSnapshot, error) {
+	snapshot := BehaviorSnapshot{}
+	if len(execution.Run.BehaviorSnapshot) > 0 {
+		if err := json.Unmarshal(execution.Run.BehaviorSnapshot, &snapshot); err != nil {
+			return BehaviorSnapshot{}, fmt.Errorf("decode agent run behavior snapshot: %w", err)
+		}
+		return snapshot, nil
+	}
+	// 按注册顺序收集本次运行的工具清单，开发期计算器只在内部场景注册。
+	names := make([]string, 0, 3+len(mcpServers))
+	if scene != agentruntime.SceneCustomer {
+		names = append(names, "calculator")
+	}
+	if tools.Knowledge {
+		names = append(names, "search_knowledge")
+	}
+	if tools.CustomerHistory {
+		names = append(names, "search_customer_history")
+	}
+	for _, server := range mcpServers {
+		names = append(names, "mcp:"+server.Name)
+	}
+	snapshot = newBehaviorSnapshot(execution, scene, sceneRules, names)
+	encoded, err := json.Marshal(snapshot)
+	if err != nil {
+		return BehaviorSnapshot{}, fmt.Errorf("encode agent run behavior snapshot: %w", err)
+	}
+	result, err := a.db.NewUpdate().Model((*servermodels.AgentRun)(nil)).
+		Set("behavior_snapshot = ?::jsonb", string(encoded)).
+		Set("updated_at = now()").
+		Where("agr.id = ?", execution.Run.ID).
+		Where("agr.behavior_snapshot IS NULL").
+		Exec(ctx)
+	if err != nil {
+		return BehaviorSnapshot{}, fmt.Errorf("persist agent run behavior snapshot: %w", err)
+	}
+	if affected, _ := result.RowsAffected(); affected > 0 {
+		return snapshot, nil
+	}
+	// 并发的执行尝试已先写入快照，沿用那一份。
+	var persisted json.RawMessage
+	if err := a.db.NewSelect().Model((*servermodels.AgentRun)(nil)).
+		Column("behavior_snapshot").Where("agr.id = ?", execution.Run.ID).Scan(ctx, &persisted); err != nil {
+		return BehaviorSnapshot{}, fmt.Errorf("reload agent run behavior snapshot: %w", err)
+	}
+	if err := json.Unmarshal(persisted, &snapshot); err != nil {
+		return BehaviorSnapshot{}, fmt.Errorf("decode persisted agent run behavior snapshot: %w", err)
+	}
+	return snapshot, nil
 }
 
 // withManagedAgentConfiguration 为已关联 agents AS a 的查询补充指定配置版本的模型和系统指令列，只保留有效的托管对话模型配置。
