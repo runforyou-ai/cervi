@@ -270,7 +270,7 @@ func (a *RemoveGroupConversationMemberAction) Execute(ctx context.Context, ident
 		if err := leaveGroupParticipant(ctx, tx, identity.Organization.ID, target.ParticipantID); err != nil {
 			return err
 		}
-		// 被移出的真人成员收到会话失权通知。
+		// 被移出的真人成员收到会话失权通知，并清除该会话的个人置顶。
 		removedUserIDs := make([]string, 0, 1)
 		if err := tx.NewSelect().Table("users").Column("id").
 			Where("organization_id = ? AND identity_id = ?", identity.Organization.ID, target.IdentityID).
@@ -279,6 +279,9 @@ func (a *RemoveGroupConversationMemberAction) Execute(ctx context.Context, ident
 		}
 		for _, userID := range removedUserIDs {
 			realtime.Notify(ctx, realtime.UserConversationRemoved(identity.Organization.ID, userID, conversationID))
+			if _, err := clearConversationPin(ctx, tx, identity.Organization.ID, userID, conversationID); err != nil {
+				return err
+			}
 		}
 		cancelledRunIDs, err = a.coordinator.CancelForGroupAgent(ctx, tx, identity.Organization.ID, conversationID, memberID)
 		if err != nil {
@@ -362,6 +365,9 @@ func (a *LeaveGroupConversationAction) Execute(ctx context.Context, identity *se
 			return err
 		}
 		realtime.Notify(ctx, realtime.UserConversationRemoved(identity.Organization.ID, identity.User.ID, conversationID))
+		if _, err := clearConversationPin(ctx, tx, identity.Organization.ID, identity.User.ID, conversationID); err != nil {
+			return err
+		}
 		_, err = createGroupSystemEvent(ctx, tx, identity, group.Conversation, ConversationSystemEvent{
 			Type: domain.ConversationSystemEventGroupMemberLeft, Actor: groupActorSnapshot(identity),
 		})

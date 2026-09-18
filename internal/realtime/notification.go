@@ -27,6 +27,7 @@ const (
 	KindConversationRemoved      Kind = "conversation_removed"
 	KindConversationStateChanged Kind = "conversation_state_changed"
 	KindIdentityProfileChanged   Kind = "identity_profile_changed"
+	KindPinOrderChanged          Kind = "pin_order_changed"
 	KindSessionLoggedOut         Kind = "session_logged_out"
 	KindUserDisabled             Kind = "user_disabled"
 	KindChannelDisabled          Kind = "channel_disabled"
@@ -71,6 +72,11 @@ func UserConversationStateChanged(organizationID, userID, conversationID string,
 // UserIdentityProfileChanged 构造发往本人受众的身份资料通知。
 func UserIdentityProfileChanged(organizationID, userID string, version int64) Notification {
 	return Notification{OrganizationID: organizationID, AudienceKind: AudienceUser, AudienceID: userID, Kind: KindIdentityProfileChanged, Version: version}
+}
+
+// UserPinOrderChanged 构造发往本人受众的个人置顶顺序通知，载荷不含会话。
+func UserPinOrderChanged(organizationID, userID string, version int64) Notification {
+	return Notification{OrganizationID: organizationID, AudienceKind: AudienceUser, AudienceID: userID, Kind: KindPinOrderChanged, Version: version}
 }
 
 // WebsiteChannelDisabled 构造网站渠道停用撤销控制，Gateway 据此结束该渠道全部访客事件流；受众 ID 为渠道 ID。

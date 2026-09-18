@@ -12,7 +12,7 @@ type FakeStream = { handlers: RealtimeStreamHandlers; closed: boolean }
 const hello = JSON.stringify({
   v: 1,
   type: "server_hello",
-  data: { connectionId: "conn", syncHeads: { conversationCount: 0, conversationChecksum: "0", identityProfileVersion: "0" } },
+  data: { connectionId: "conn", syncHeads: { conversationCount: 0, conversationChecksum: "0", identityProfileVersion: "0", pinOrderVersion: "0" } },
 })
 const sessionError = new Error("login required")
 

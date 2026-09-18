@@ -2,6 +2,7 @@
 import {
   ConversationType,
   CustomerInboxView,
+  InboxPartition,
   InboxScope,
   ServiceSessionStatus,
   type InboxQuery,
@@ -57,13 +58,18 @@ export function toggleInboxKinds(
 /** 已按范围规范化的列表筛选，会话类型一律为数组。 */
 export type NormalizedInboxQuery = InboxQuery & { kinds: ConversationType[] }
 
+/** 规范化前的列表筛选，未指定分区时按完整活动序读取。 */
+export type InboxQueryInput = Omit<InboxQuery, "partition"> & { partition?: InboxPartition }
+
 /** 按当前范围规范化筛选，范围外条件取默认值。 */
-export function normalizeInboxQuery(query: InboxQuery): NormalizedInboxQuery {
+export function normalizeInboxQuery(query: InboxQueryInput): NormalizedInboxQuery {
   const customer = query.scope === InboxScope.InboxScopeCustomer
   const customerView = customer
     ? query.customerView
     : CustomerInboxView.CustomerInboxViewQueue
   return {
+    // 分区由启用置顶的调用方显式指定，其余调用方继续读取完整活动序。
+    partition: query.partition ?? InboxPartition.InboxPartitionAll,
     scope: query.scope,
     customerView,
     assigneeIdentityId:

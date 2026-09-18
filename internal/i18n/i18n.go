@@ -229,6 +229,8 @@ const (
 	ErrorConversationMessageListFailed    Key = "error.conversation_message_list_failed"
 	ErrorConversationReadUpdateFailed     Key = "error.conversation_read_update_failed"
 	ErrorConversationNotifyUpdateFailed   Key = "error.conversation_notification_update_failed"
+	ErrorConversationPinUpdateFailed      Key = "error.conversation_pin_update_failed"
+	ErrorConversationPinOrderStale        Key = "error.conversation_pin_order_stale"
 	ErrorMessageSendFailed                Key = "error.message_send_failed"
 	ErrorMessageConflict                  Key = "error.message_conflict"
 	ErrorDirectTargetNotFound             Key = "error.direct_target_not_found"
@@ -385,6 +387,7 @@ const (
 	FieldMessageBodyTooLong               Key = "field.message_body_too_long"
 	FieldMessageCursorInvalid             Key = "field.message_cursor_invalid"
 	FieldMessageVisibilityInvalid         Key = "field.message_visibility_invalid"
+	FieldConversationPinTargetInvalid     Key = "field.conversation_pin_target_invalid"
 )
 
 const (

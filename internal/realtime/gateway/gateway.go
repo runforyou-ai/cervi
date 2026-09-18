@@ -457,6 +457,8 @@ func (g *Gateway) deliver(subject string, data []byte) {
 		frame = protocol.ConversationStateChanged{ConversationID: payload.ConversationID, Version: payload.Version}
 	case realtime.KindIdentityProfileChanged:
 		frame = protocol.IdentityProfileChanged{Version: payload.Version}
+	case realtime.KindPinOrderChanged:
+		frame = protocol.PinOrderChanged{Version: payload.Version}
 	case realtime.KindSessionLoggedOut:
 		for _, current := range targets {
 			if current.tokenSession() == payload.TokenSessionID {

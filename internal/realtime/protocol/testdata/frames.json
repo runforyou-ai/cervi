@@ -3,7 +3,7 @@
     "name": "server_hello",
     "result": "frame",
     "encode": true,
-    "wire": {"v": 1, "type": "server_hello", "data": {"connectionId": "conn-01", "syncHeads": {"conversationCount": 3, "conversationChecksum": "18446744073709551615", "identityProfileVersion": "9223372036854775807"}}}
+    "wire": {"v": 1, "type": "server_hello", "data": {"connectionId": "conn-01", "syncHeads": {"conversationCount": 3, "conversationChecksum": "18446744073709551615", "identityProfileVersion": "9223372036854775807", "pinOrderVersion": "12"}}}
   },
   {
     "name": "visitor_hello",
@@ -34,6 +34,12 @@
     "result": "frame",
     "encode": true,
     "wire": {"v": 1, "type": "identity_profile_changed", "data": {"version": "9007199254740993"}}
+  },
+  {
+    "name": "pin_order_changed",
+    "result": "frame",
+    "encode": true,
+    "wire": {"v": 1, "type": "pin_order_changed", "data": {"version": "5"}}
   },
   {
     "name": "conversation_removed",

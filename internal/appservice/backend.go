@@ -116,6 +116,9 @@ type Backend interface {
 	// UpdateConversationUnreadMark 保存当前用户独立于阅读水位的未读标记。
 	//cervi:route PATCH /conversations/:conversationID/unread-mark
 	UpdateConversationUnreadMark(context.Context, RequestMeta, string, ConversationUnreadMarkInput) error
+	// UpdateConversationPin 保存当前用户的会话置顶事实与置顶顺序。
+	//cervi:route PATCH /conversations/:conversationID/pin
+	UpdateConversationPin(context.Context, RequestMeta, string, ConversationPinInput) (ConversationPinState, error)
 	// UpdateConversationNotificationSettings 保存当前用户的原生会话提醒设置。
 	//cervi:route PATCH /conversations/:conversationID/notification-settings
 	UpdateConversationNotificationSettings(context.Context, RequestMeta, string, ConversationNotificationSettingsInput) (ConversationNotificationSettings, error)

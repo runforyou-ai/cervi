@@ -24,5 +24,6 @@ type ConversationUserState struct {
 	LastReadAt                   *time.Time `bun:"last_read_at"`
 	MarkedUnread                 bool       `bun:"marked_unread"`
 	Version                      int64      `bun:"version"`
+	PinRank                      *int64     `bun:"pin_rank"`
 	Muted                        bool       `bun:"muted"`
 }

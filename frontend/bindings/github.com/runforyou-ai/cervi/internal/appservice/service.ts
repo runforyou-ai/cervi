@@ -1179,6 +1179,13 @@ export function UpdateConversationNotificationSettings(meta: $models.RequestMeta
 }
 
 /**
+ * UpdateConversationPin 保存当前用户的会话置顶事实与置顶顺序。
+ */
+export function UpdateConversationPin(meta: $models.RequestMeta, conversationID: string, input: $models.ConversationPinInput): $CancellablePromise<$models.ConversationPinState> {
+    return $Call.ByID(617730515, meta, conversationID, input);
+}
+
+/**
  * UpdateConversationUnreadMark 保存当前用户独立于阅读水位的未读标记。
  */
 export function UpdateConversationUnreadMark(meta: $models.RequestMeta, conversationID: string, input: $models.ConversationUnreadMarkInput): $CancellablePromise<void> {

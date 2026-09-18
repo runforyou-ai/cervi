@@ -26,6 +26,7 @@ type conversationOps struct {
 	sendAttachmentMessage           *conversationaction.SendAttachmentMessageAction
 	listConversationMessages        *conversationaction.ListConversationMessagesQuery
 	updateConversationUnreadMark    *conversationaction.UpdateConversationUnreadMarkAction
+	updateConversationPin           *conversationaction.UpdateConversationPinAction
 	markConversationRead            *conversationaction.MarkConversationReadAction
 	conversationNavigation          *conversationaction.GetConversationNavigationStateQuery
 	pendingConversationMentions     *conversationaction.ListPendingConversationMentionsQuery
@@ -64,6 +65,7 @@ func newConversationOps(db *bun.DB, agentScheduler conversationaction.AgentMessa
 		sendAttachmentMessage:           conversationaction.NewSendAttachmentMessageAction(db, agentScheduler),
 		listConversationMessages:        conversationaction.NewListConversationMessagesQuery(db),
 		updateConversationUnreadMark:    conversationaction.NewUpdateConversationUnreadMarkAction(db),
+		updateConversationPin:           conversationaction.NewUpdateConversationPinAction(db),
 		markConversationRead:            conversationaction.NewMarkConversationReadAction(db),
 		conversationNavigation:          conversationaction.NewGetConversationNavigationStateQuery(db),
 		pendingConversationMentions:     conversationaction.NewListPendingConversationMentionsQuery(db),
@@ -504,6 +506,45 @@ func (o *directOperations) UpdateConversationUnreadMark(ctx context.Context, met
 	return nil
 }
 
+// UpdateConversationPin 保存个人置顶事实与置顶顺序，并返回写入后的顺序版本。
+func (o *directOperations) UpdateConversationPin(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, input ConversationPinInput) (ConversationPinState, error) {
+	expectedVersion, err := strconv.ParseInt(input.ExpectedPinOrderVersion, 10, 64)
+	if input.ExpectedPinOrderVersion == "" || err != nil {
+		return ConversationPinState{}, InvalidError(meta, cervii18n.ErrorValidationFailed,
+			map[string]cervii18n.Key{"expectedPinOrderVersion": cervii18n.FieldConversationPinTargetInvalid})
+	}
+	state, err := o.updateConversationPin.Execute(ctx, identity, conversationaction.ConversationPinInput{
+		ConversationID: conversationID, Pinned: input.Pinned, NeighborID: input.NeighborID,
+		Position: domain.ConversationPinPosition(input.Position), ExpectedPinOrderVersion: expectedVersion,
+	})
+	if err != nil {
+		return ConversationPinState{}, conversationPinError(ctx, meta, err, identity.Organization.ID, conversationID)
+	}
+	slog.Info("会话置顶已保存", "organization_id", identity.Organization.ID, "conversation_id", conversationID, "user_id", identity.User.ID, "pinned", state.Pinned)
+	return ConversationPinState{Pinned: state.Pinned, PinOrderVersion: strconv.FormatInt(state.PinOrderVersion, 10)}, nil
+}
+
+// conversationPinError 转换个人置顶写入错误，顺序版本过期与邻居失效都要求客户端整区重读。
+func conversationPinError(ctx context.Context, meta RequestMeta, err error, organizationID, conversationID string) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	if errors.Is(err, common.ErrIdentityInvalid) {
+		return SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+	}
+	if errors.Is(err, conversationaction.ErrConversationNotFound) {
+		return NotFoundError(meta, cervii18n.ErrorConversationNotFound)
+	}
+	if validationError, ok := errors.AsType[*conversationaction.ValidationError](err); ok {
+		return InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, conversationMessageValidationKeys))
+	}
+	if conflictError, ok := errors.AsType[*conversationaction.ConflictError](err); ok {
+		return ConflictError(meta, cervii18n.ErrorConversationPinOrderStale, conflictError.Reason)
+	}
+	slog.Warn("更新会话置顶失败", "organization_id", organizationID, "conversation_id", conversationID, "error", err)
+	return FailedError(meta, cervii18n.ErrorConversationPinUpdateFailed)
+}
+
 // UpdateConversationNotificationSettings 保存当前用户的原生会话提醒设置。
 func (o *directOperations) UpdateConversationNotificationSettings(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, input ConversationNotificationSettingsInput) (ConversationNotificationSettings, error) {
 	settings, err := o.updateConversationNotifications.Execute(ctx, identity, conversationID, input.Muted)
@@ -826,6 +867,9 @@ var conversationMessageValidationKeys = map[conversationaction.ValidationCode]ce
 	conversationaction.ValidationGroupMemberIDsInvalid:    cervii18n.FieldGroupMemberIDsInvalid,
 	conversationaction.ValidationGroupMemberIDInvalid:     cervii18n.FieldGroupMemberIDInvalid,
 	conversationaction.ValidationGroupOwnerIDInvalid:      cervii18n.FieldGroupOwnerIDInvalid,
+	conversationaction.ValidationNeighborIDInvalid:        cervii18n.FieldConversationPinTargetInvalid,
+	conversationaction.ValidationPinPositionInvalid:       cervii18n.FieldConversationPinTargetInvalid,
+	conversationaction.ValidationPinOrderVersionInvalid:   cervii18n.FieldConversationPinTargetInvalid,
 }
 
 // conversationMessageListFromAction 共用成员消息窗口及游标转换。

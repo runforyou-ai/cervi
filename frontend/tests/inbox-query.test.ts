@@ -29,12 +29,19 @@ const ServiceSessionStatus = {
   ServiceSessionStatusOpen: "open",
   ServiceSessionStatusClosed: "closed",
 }
+const InboxPartition = {
+  $zero: "",
+  InboxPartitionAll: "all",
+  InboxPartitionPinned: "pinned",
+  InboxPartitionRegular: "regular",
+}
 const optionalWailsEnum = (values: Record<string, string>, value: string | null) =>
   value === null || value === values.$zero || !Object.values(values).includes(value)
     ? undefined
     : value
 
 type InboxQuery = {
+  partition?: string
   scope: string
   customerView: string
   assigneeIdentityId: string
@@ -53,7 +60,7 @@ const module: {
 runInNewContext(
   stripTypeScriptTypes(source).replace(/^import\s[\s\S]*?from "[^"]+"\n/gm, "").replaceAll("export ", "") +
     "\nObject.assign(module, { normalizeInboxQuery, inboxQueryFromSearch, writeInboxQuerySearch, toggleInboxKinds })",
-  { module, ConversationType, InboxScope, CustomerInboxView, ServiceSessionStatus, optionalWailsEnum, URLSearchParams },
+  { module, ConversationType, InboxScope, InboxPartition, CustomerInboxView, ServiceSessionStatus, optionalWailsEnum, URLSearchParams },
 )
 const { normalizeInboxQuery, inboxQueryFromSearch, writeInboxQuerySearch, toggleInboxKinds } = module as Required<typeof module>
 
@@ -65,11 +72,11 @@ function plain<Value>(value: Value): Value {
 test("范围外的客户条件和会话类型按空值规范化", () => {
   assert.deepEqual(
     plain(normalizeInboxQuery({ scope: "internal", customerView: "coworkers", assigneeIdentityId: "someone", channelId: "channel", serviceStatus: "closed", kinds: ["customer", "group"] })),
-    { scope: "internal", customerView: "queue", assigneeIdentityId: "", channelId: "", serviceStatus: "open", kinds: ["group"] },
+    { partition: "all", scope: "internal", customerView: "queue", assigneeIdentityId: "", channelId: "", serviceStatus: "open", kinds: ["group"] },
   )
   assert.deepEqual(
     plain(normalizeInboxQuery({ scope: "customer", customerView: "mine", assigneeIdentityId: "someone", channelId: "channel", serviceStatus: "closed", kinds: ["group"] })),
-    { scope: "customer", customerView: "mine", assigneeIdentityId: "", channelId: "channel", serviceStatus: "closed", kinds: [] },
+    { partition: "all", scope: "customer", customerView: "mine", assigneeIdentityId: "", channelId: "channel", serviceStatus: "closed", kinds: [] },
   )
 })
 
@@ -82,7 +89,7 @@ test("勾满当前范围全部类型等同不限类型", () => {
 test("地址参数往返保持规范化结果，默认值不写入", () => {
   const original = new URLSearchParams("scope=customer&view=coworkers&assignee=peer&channel=web&status=closed&conversation=kept")
   const query = inboxQueryFromSearch(original)
-  assert.deepEqual(plain(query), { scope: "customer", customerView: "coworkers", assigneeIdentityId: "peer", channelId: "web", serviceStatus: "closed", kinds: [] })
+  assert.deepEqual(plain(query), { partition: "all", scope: "customer", customerView: "coworkers", assigneeIdentityId: "peer", channelId: "web", serviceStatus: "closed", kinds: [] })
   const written = new URLSearchParams(original)
   writeInboxQuerySearch(written, query)
   assert.equal(written.toString(), original.toString())
@@ -90,4 +97,8 @@ test("地址参数往返保持规范化结果，默认值不写入", () => {
   const internal = new URLSearchParams(original)
   writeInboxQuerySearch(internal, normalizeInboxQuery({ ...query, scope: "internal", kinds: ["customer"] }))
   assert.equal(internal.toString(), "scope=internal&conversation=kept")
+  // 置顶分区由列表控制器决定，不进入地址参数。
+  const pinned = new URLSearchParams(original)
+  writeInboxQuerySearch(pinned, normalizeInboxQuery({ ...query, partition: "pinned" }))
+  assert.equal(pinned.toString(), original.toString())
 })

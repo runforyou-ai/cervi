@@ -154,6 +154,11 @@ func (s *Service) UpdateConversationUnreadMark(ctx context.Context, meta Request
 	return s.backend.UpdateConversationUnreadMark(ctx, meta, conversationID, input)
 }
 
+// UpdateConversationPin 保存当前用户的会话置顶事实与置顶顺序。
+func (s *Service) UpdateConversationPin(ctx context.Context, meta RequestMeta, conversationID string, input ConversationPinInput) (ConversationPinState, error) {
+	return withNormalizedSlices(s.backend.UpdateConversationPin(ctx, meta, conversationID, input))
+}
+
 // UpdateConversationNotificationSettings 保存当前用户的原生会话提醒设置。
 func (s *Service) UpdateConversationNotificationSettings(ctx context.Context, meta RequestMeta, conversationID string, input ConversationNotificationSettingsInput) (ConversationNotificationSettings, error) {
 	return withNormalizedSlices(s.backend.UpdateConversationNotificationSettings(ctx, meta, conversationID, input))

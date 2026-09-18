@@ -5,6 +5,7 @@ package inbox
 import (
 	"context"
 	"database/sql"
+	"fmt"
 	"strings"
 
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -45,6 +46,7 @@ func (q *LoadInboxQuery) ReadContext(ctx context.Context, identity *servermodels
 		input.AfterLimit = 25
 	}
 	var original *inboxCursorPoint
+	var originalCursor *inboxCursor
 	if input.AnchorCursor != "" {
 		cursor, err := decodeInboxCursor(input.AnchorCursor, identity, query)
 		if err != nil {
@@ -53,25 +55,36 @@ func (q *LoadInboxQuery) ReadContext(ctx context.Context, identity *servermodels
 		if cursor.ID != input.AnchorID {
 			return ConversationContext{}, ErrCursorInvalid
 		}
-		original = &cursor.inboxCursorPoint
+		originalCursor, original = cursor, &cursor.inboxCursorPoint
 	}
 	result := ConversationContext{Anchor: ConversationResult{ID: input.AnchorID}, Window: ConversationWindow{Conversations: []ConversationSummary{}}}
 	err = q.db.RunInTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true}, func(ctx context.Context, tx bun.Tx) error {
 		snapshot := NewLoadInboxQuery(tx)
+		pinOrderVersion, err := snapshot.pinOrderVersion(ctx, identity)
+		if err != nil {
+			return err
+		}
+		result.Window.PinOrderVersion = pinOrderVersion
+		if original != nil {
+			if err := authorizeInboxCursor(originalCursor, query.Partition, pinOrderVersion); err != nil {
+				return err
+			}
+		}
 		summaries, err := snapshot.readSummaries(ctx, identity, []string{input.AnchorID})
 		if err != nil {
 			return err
 		}
-		matches, err := snapshot.matchInboxIDs(ctx, identity, []string{input.AnchorID}, query)
-		if err != nil {
-			return err
+		// 锚点候选点同时给出当前分区资格和该分区的排序位置。
+		var anchorPoints []inboxCursorPoint
+		if err := snapshot.candidatePointsQuery(identity, query).Where("candidates.id = ?", input.AnchorID).Scan(ctx, &anchorPoints); err != nil {
+			return fmt.Errorf("read inbox anchor point: %w", err)
 		}
 		result.Anchor.Conversation = summaries[input.AnchorID]
-		result.Anchor.MatchesQuery = matches[input.AnchorID]
+		result.Anchor.MatchesQuery = len(anchorPoints) > 0 && result.Anchor.Conversation != nil
 		var current *inboxCursorPoint
 		if result.Anchor.MatchesQuery {
-			current = &inboxCursorPoint{ID: input.AnchorID, LastActivityAt: result.Anchor.Conversation.LastActivityAt}
-			result.Anchor.Conversation.PositionCursor, err = encodeInboxCursor(identity, query, *current)
+			current = &anchorPoints[0]
+			result.Anchor.Conversation.PositionCursor, err = encodeInboxCursor(identity, query, pinOrderVersion, *current)
 			if err != nil {
 				return err
 			}
@@ -101,11 +114,11 @@ func (q *LoadInboxQuery) ReadContext(ctx context.Context, identity *servermodels
 		}
 		points := before
 		// 原位置未变的锚点补入中心；已移动的锚点只按当前排序出现在前后邻域。
-		if current != nil && compareInboxPoints(*current, *point) == 0 {
+		if current != nil && compareInboxPoints(query.Partition, *current, *point) == 0 {
 			points = append(points, *current)
 		}
 		points = append(points, after...)
-		result.Window, err = snapshot.buildConversationWindow(ctx, identity, query, points, start, end)
+		result.Window, err = snapshot.buildConversationWindow(ctx, identity, query, pinOrderVersion, points, start, end)
 		return err
 	})
 	return result, err

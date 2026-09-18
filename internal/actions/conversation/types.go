@@ -37,6 +37,9 @@ const (
 	ValidationBodyTooLong              ValidationCode = "body_too_long"
 	ValidationCursorInvalid            ValidationCode = "cursor_invalid"
 	ValidationFileIDInvalid            ValidationCode = "file_id_invalid"
+	ValidationNeighborIDInvalid        ValidationCode = "neighbor_id_invalid"
+	ValidationPinPositionInvalid       ValidationCode = "pin_position_invalid"
+	ValidationPinOrderVersionInvalid   ValidationCode = "pin_order_version_invalid"
 )
 
 const (
@@ -70,6 +73,10 @@ const (
 	ConflictReasonAttachmentTooLarge = "attachment_too_large"
 	// ConflictReasonCaptionTooLong 表示附件说明超过来源渠道的字符上限。
 	ConflictReasonCaptionTooLong = "caption_too_long"
+	// ConflictReasonPinOrderVersionStale 表示提交的置顶顺序版本不是当前版本。
+	ConflictReasonPinOrderVersionStale = "pin_order_version_stale"
+	// ConflictReasonPinNeighborNotPinned 表示置顶顺序的邻居会话当前不在置顶区。
+	ConflictReasonPinNeighborNotPinned = "pin_neighbor_not_pinned"
 )
 
 // ServiceSessionAssignee 定义客服处理周期负责人。

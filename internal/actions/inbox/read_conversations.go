@@ -97,10 +97,11 @@ func (q *LoadInboxQuery) readSummaries(ctx context.Context, identity *servermode
 	return summaries, nil
 }
 
-// matchInboxIDs 复用列表筛选核对指定 ID，不受分页边界限制。
+// matchInboxIDs 复用列表筛选与置顶分区核对指定 ID，不受分页边界限制。
 func (q *LoadInboxQuery) matchInboxIDs(ctx context.Context, identity *servermodels.Identity, ids []string, input LoadInput) (map[string]bool, error) {
 	var matched []string
-	if err := q.db.NewSelect().TableExpr("(?) AS candidates", q.listCandidates(identity, input)).ColumnExpr("id").Where("id IN (?)", bun.In(ids)).Scan(ctx, &matched); err != nil {
+	points := q.candidatePointsQuery(identity, input).Where("candidates.id IN (?)", bun.In(ids))
+	if err := q.db.NewSelect().TableExpr("(?) AS points", points).ColumnExpr("id").Scan(ctx, &matched); err != nil {
 		return nil, err
 	}
 	matches := make(map[string]bool, len(matched))
