@@ -1,7 +1,7 @@
-/** 验证置顶区与普通区的合并规则，以及两个分区对同一视口首次定位的协调。 */
+/** 验证置顶区与普通区的合并规则、两个分区对同一视口首次定位的协调，以及置顶移动落点。 */
 import assert from "node:assert/strict"
 import { test } from "node:test"
-import { combineInboxPartitions, regularPartitionRestore, type InboxPartitionSnapshot } from "../src/features/inbox/inbox-partitions.ts"
+import { combineInboxPartitions, pinMoveTarget, regularPartitionRestore, type InboxPartitionSnapshot } from "../src/features/inbox/inbox-partitions.ts"
 import type { InboxListPorts, InboxListState } from "../src/features/inbox/inbox-list-controller.ts"
 import type { InboxConversation } from "../src/api/index.ts"
 
@@ -71,4 +71,19 @@ test("定位目标不在置顶区或普通区带有锚点时，普通区的恢�
   restore(anchor, new Set(["x"]), true)
   assert.deepEqual(calls.map((call) => call[2]), [true, true])
   assert.equal(calls[1][0], anchor)
+})
+
+test("上移与下移落在相对可见邻居的前后，隐藏项不参与", () => {
+  // 全局顺序 A,X,B 中 X 被筛掉，可见顺序为 A,B。
+  const order = ["A", "B"]
+  assert.deepEqual(pinMoveTarget(order, "B", 0), { before: true, neighborId: "A" })
+  assert.deepEqual(pinMoveTarget(order, "A", 1), { before: false, neighborId: "B" })
+})
+
+test("首项上移、末项下移、原位与不在置顶区的会话没有落点", () => {
+  const order = ["A", "B", "C"]
+  assert.equal(pinMoveTarget(order, "A", -1), null)
+  assert.equal(pinMoveTarget(order, "C", 3), null)
+  assert.equal(pinMoveTarget(order, "B", 1), null)
+  assert.equal(pinMoveTarget(order, "Z", 0), null)
 })

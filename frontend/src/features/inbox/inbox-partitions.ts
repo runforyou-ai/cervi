@@ -1,4 +1,4 @@
-/** 把置顶区与普通区的窗口状态合并为一条列表，并协调两个分区对同一视口的首次定位。 */
+/** 把置顶区与普通区的窗口状态合并为一条列表，协调两个分区对同一视口的首次定位，并生成相对可见邻居的置顶位置命令。 */
 import type { InboxConversation } from "@/api"
 import type { InboxListPorts, InboxListState } from "./inbox-list-controller"
 
@@ -33,4 +33,11 @@ export function combineInboxPartitions(pinned: InboxPartitionSnapshot, regular: 
 /** 普通区的视口恢复入口：定位目标属于置顶区时，普通区读不到锚点而回到首页的置顶意图不生效，定位由置顶区完成。 */
 export function regularPartitionRestore(restore: InboxListPorts["restore"], pinnedIds: () => string[], locateId: () => string): InboxListPorts["restore"] {
   return (anchor, moved, top) => restore(anchor, moved, top && !(anchor === null && pinnedIds().includes(locateId())))
+}
+
+/** 把置顶会话在可见置顶顺序中移到 to 位置时的落点：放到 neighborId 之前或之后；位置无效或不变时返回 null。 */
+export function pinMoveTarget(order: string[], conversationId: string, to: number) {
+  const from = order.indexOf(conversationId)
+  if (from < 0 || to < 0 || to >= order.length || from === to) return null
+  return { before: from > to, neighborId: order[to] }
 }

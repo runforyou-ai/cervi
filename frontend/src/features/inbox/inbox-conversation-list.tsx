@@ -1,29 +1,12 @@
 /** 消息页中栏的会话列表项、右键操作与置顶区排序。 */
-import { useState } from "react"
 import type { TFunction } from "i18next"
-import {
-  DndContext,
-  KeyboardSensor,
-  PointerSensor,
-  closestCenter,
-  useSensor,
-  useSensors,
-  type DragEndEvent,
-} from "@dnd-kit/core"
-import {
-  SortableContext,
-  arrayMove,
-  sortableKeyboardCoordinates,
-  useSortable,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable"
+import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { BellOffIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 
 import {
-  ConversationPinPosition,
   ConversationStatus,
   MessageType,
   MessageVisibility,
@@ -42,6 +25,7 @@ import {
   useConversationListActions,
 } from "@/features/inbox/conversation-list-menu"
 import { ConversationUnreadBadge } from "@/features/inbox/conversation-unread-badge"
+import { PinnedSortArea } from "@/features/inbox/pinned-sort"
 import { useConversationName } from "@/features/inbox/use-conversation-name"
 import {
   useConversationTime,
@@ -275,17 +259,8 @@ export function InboxConversationList({
   onSelect: (conversationId: string) => void
   onOpenInWindow?: (conversation: InboxConversation, name: string) => void
 }) {
-  const { t } = useTranslation("inbox")
   const conversationName = useConversationName()
   const actions = useConversationListActions(onPinSettled)
-  const [pendingOrder, setPendingOrder] = useState<string[] | null>(null)
-  const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
-    useSensor(KeyboardSensor, {
-      coordinateGetter: sortableKeyboardCoordinates,
-      keyboardCodes: { start: ["Space"], cancel: ["Escape"], end: ["Space", "Enter"] },
-    }),
-  )
   useMinuteTick()
 
   const names = new Map(
@@ -297,11 +272,6 @@ export function InboxConversationList({
     ]),
   )
   const rows = new Map(conversations.map((conversation) => [conversation.id, conversation]))
-  // 拖动放下后先按临时顺序展示，置顶区权威顺序重读完成或保存失败后撤销。
-  const pinnedOrder =
-    pendingOrder?.length === pinnedIds.length && pendingOrder.every((id) => pinnedIds.includes(id))
-      ? pendingOrder
-      : pinnedIds
   const row = (conversation: InboxConversation) => ({
     conversation,
     name: names.get(conversation.id) ?? "",
@@ -312,53 +282,18 @@ export function InboxConversationList({
     onSelect,
     onOpenInWindow,
   })
-  const announce = (key: "pinSortPicked" | "pinSortMoved" | "pinSortDropped" | "pinSortCancelled", id: string | number, overId?: string | number) =>
-    t(key, { name: names.get(String(id)) ?? "", position: pinnedOrder.indexOf(String(overId ?? id)) + 1, total: pinnedOrder.length })
-
-  /** 把放下位置转成相对可见邻居的位置命令并保存。 */
-  function dropPinned({ active, over }: DragEndEvent) {
-    onDraggingChange(false)
-    const from = pinnedOrder.indexOf(String(active.id))
-    const to = over ? pinnedOrder.indexOf(String(over.id)) : -1
-    const conversation = rows.get(String(active.id))
-    if (!conversation || from < 0 || to < 0 || from === to) return
-    setPendingOrder(arrayMove(pinnedOrder, from, to))
-    void actions
-      .updatePin(conversation, {
-        pinned: true,
-        position:
-          from > to
-            ? ConversationPinPosition.ConversationPinPositionBefore
-            : ConversationPinPosition.ConversationPinPositionAfter,
-        neighborId: pinnedOrder[to],
-        expectedPinOrderVersion: pinOrderVersion,
-      })
-      .finally(() => setPendingOrder(null))
-  }
-
   return (
     <>
-      <DndContext
-        sensors={sensors}
-        collisionDetection={closestCenter}
-        modifiers={[({ transform }) => ({ ...transform, x: 0 })]}
-        accessibility={{
-          screenReaderInstructions: { draggable: t("pinSortInstructions") },
-          announcements: {
-            onDragStart: ({ active }) => announce("pinSortPicked", active.id),
-            onDragOver: ({ active, over }) => over ? announce("pinSortMoved", active.id, over.id) : undefined,
-            onDragEnd: ({ active, over }) => announce("pinSortDropped", active.id, over?.id),
-            onDragCancel: ({ active }) => announce("pinSortCancelled", active.id),
-          },
-        }}
-        onDragStart={() => onDraggingChange(true)}
-        onDragEnd={dropPinned}
-        onDragCancel={() => onDraggingChange(false)}
+      <PinnedSortArea
+        conversations={conversations}
+        pinnedIds={pinnedIds}
+        names={names}
+        pinOrderVersion={pinOrderVersion}
+        actions={actions}
+        onDraggingChange={onDraggingChange}
       >
-        <SortableContext items={pinnedOrder} strategy={verticalListSortingStrategy}>
-          {pinnedOrder.flatMap((id) => rows.has(id) ? [<SortableConversationRow key={id} {...row(rows.get(id)!)} />] : [])}
-        </SortableContext>
-      </DndContext>
+        {(order) => order.flatMap((id) => rows.has(id) ? [<SortableConversationRow key={id} {...row(rows.get(id)!)} />] : [])}
+      </PinnedSortArea>
       {conversations.flatMap((conversation) => pinnedIds.includes(conversation.id) ? [] : [<ConversationRow key={conversation.id} {...row(conversation)} />])}
     </>
   )
