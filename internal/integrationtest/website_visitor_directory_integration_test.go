@@ -90,7 +90,7 @@ func TestWebsiteVisitorDirectoryHTTP(t *testing.T) {
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	scheduler := agentrunaction.NewScheduler(servertask.New(f.db, serverconfig.NATSConfig{}))
-	visitorService := appservice.NewWebsiteVisitorService(appservice.NewWebsiteVisitorDirectBackend(f.db, scheduler))
+	visitorService := appservice.NewWebsiteVisitorService(appservice.NewWebsiteVisitorDirectBackend(f.db, scheduler, nil))
 	application := appservice.New(appservice.NewDirectBackend(f.db, nil, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil))
 	client := websiteVisitorHTTP{service: api.NewService(application, api.WithWebsiteVisitor(visitorService, false))}
 	directoryPath := "/public/website-channels/" + f.channelID + "/conversations"

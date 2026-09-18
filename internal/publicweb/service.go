@@ -391,6 +391,11 @@ var messengerCopyMessageKeys = map[string]cervii18n.Key{
 	"referenceUnavailable":      cervii18n.MessengerReferenceUnavailable,
 	"referenceLatest":           cervii18n.MessengerReferenceLatest,
 	"requestFailed":             cervii18n.MessengerRequestFailed,
+	"attachmentUploading":       cervii18n.MessengerAttachmentUploading,
+	"attachmentFailed":          cervii18n.MessengerAttachmentFailed,
+	"attachmentCancel":          cervii18n.MessengerAttachmentCancel,
+	"attachmentReceiving":       cervii18n.MessengerAttachmentReceiving,
+	"attachmentUnavailable":     cervii18n.MessengerAttachmentUnavailable,
 	"sessionOpen":               cervii18n.MessengerSessionOpen,
 	"sessionClosed":             cervii18n.MessengerSessionClosed,
 }

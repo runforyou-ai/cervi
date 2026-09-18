@@ -24,7 +24,7 @@ import (
 )
 
 // createCustomerLockRun 创建自动路由到指定 Agent 的网站会话及首个输入。
-func createCustomerLockRun(t *testing.T, ctx context.Context, db *bun.DB, identity *models.Identity, agentID string, tasks *servertask.Runtime) (conversationaction.ReceiveWebsiteCustomerTextMessageResult, conversationaction.WebsiteCustomerTextMessageInput, models.AgentRun) {
+func createCustomerLockRun(t *testing.T, ctx context.Context, db *bun.DB, identity *models.Identity, agentID string, tasks *servertask.Runtime) (conversationaction.ReceiveWebsiteCustomerMessageResult, conversationaction.WebsiteCustomerTextMessageInput, models.AgentRun) {
 	t.Helper()
 	channel, err := channelaction.NewCreateMessageChannelAction(db).Execute(ctx, identity, channelaction.CreateMessageChannelInput{
 		Type: domain.ChannelTypeWebsite, Name: "客服锁序", DefaultLocale: domain.LocaleChineseSimplified,
@@ -35,7 +35,7 @@ func createCustomerLockRun(t *testing.T, ctx context.Context, db *bun.DB, identi
 		t.Fatal(err)
 	}
 	input := conversationaction.WebsiteCustomerTextMessageInput{ChannelID: channel.ID, ExternalID: "web-session:0123456789abcdef0123456789abcdef", ClientMessageID: uuid.NewV7().String(), Body: "首个输入"}
-	first, err := conversationaction.NewReceiveWebsiteCustomerTextMessageAction(db, agentrunaction.NewScheduler(tasks)).Execute(ctx, input)
+	first, err := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, agentrunaction.NewScheduler(tasks)).Execute(ctx, input)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -89,7 +89,7 @@ func testCustomerAgentLocking(t *testing.T, db *bun.DB, identity *models.Identit
 			}()
 			waitChatSignal(t, ctx, gate.reached)
 			go func() {
-				_, err := conversationaction.NewReceiveWebsiteCustomerTextMessageAction(db, agentrunaction.NewScheduler(tasks)).Execute(ctx, input)
+				_, err := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, agentrunaction.NewScheduler(tasks)).Execute(ctx, input)
 				received <- err
 			}()
 			waitConversationLock(t, ctx, db, first.Conversation.ID)
@@ -165,7 +165,7 @@ func testCustomerLateResult(t *testing.T, db *bun.DB, identity *models.Identity,
 			case "关闭续开":
 				_, err = conversationaction.NewCloseServiceSessionAction(db, coordinator).Execute(ctx, identity, first.Conversation.ID)
 				if err == nil {
-					_, err = conversationaction.NewReceiveWebsiteCustomerTextMessageAction(db, agentrunaction.NewScheduler(tasks)).Execute(ctx, input)
+					_, err = conversationaction.NewReceiveWebsiteCustomerMessageAction(db, agentrunaction.NewScheduler(tasks)).Execute(ctx, input)
 				}
 			}
 		}
@@ -286,7 +286,7 @@ func TestWebsiteFirstMessageConverges(t *testing.T) {
 	gate := newChatQueryGate(t, false, 1, func(event *bun.QueryEvent) bool {
 		return event.Operation() == "INSERT" && strings.Contains(event.Query, `"contact_channel_identities"`)
 	})
-	results := make([]conversationaction.ReceiveWebsiteCustomerTextMessageResult, 2)
+	results := make([]conversationaction.ReceiveWebsiteCustomerMessageResult, 2)
 	done := make(chan error, 2)
 	go func() {
 		var err error

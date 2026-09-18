@@ -241,7 +241,7 @@ func TestMessageSequenceHTTPContract(t *testing.T) {
 			}
 		})
 	}
-	visitor := appservice.NewWebsiteVisitorDirectBackend(f.db, nil)
+	visitor := appservice.NewWebsiteVisitorDirectBackend(f.db, nil, nil)
 	page, err := visitor.ListMessages(ctx, appservice.WebsiteVisitorMeta{}, f.channelID, "web-session:0123456789abcdef0123456789abcdef", f.conversationID, appservice.WebsiteVisitorMessageHistoryInput{})
 	if err != nil || page.Messages[len(page.Messages)-1].MessageSeq != "9007199254740993" {
 		t.Fatalf("visitor=%+v err=%v", page, err)

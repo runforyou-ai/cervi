@@ -18,11 +18,12 @@ import (
 )
 
 const (
-	websiteVisitorHeader      = "X-Cervi-Visitor-Token"
+	websiteVisitorHeader      = appservice.WebsiteVisitorTokenHeader
 	websiteVisitorTokenSize   = 32
 	websiteVisitorBodyLimit   = 16 * 1024
 	websiteVisitorCookieAge   = 365 * 24 * 60 * 60
 	websiteVisitorExternalKey = "cervi_website_visitor_external_id"
+	websiteVisitorTokenKey    = "cervi_website_visitor_token"
 )
 
 // registerWebsiteVisitorRoutes 注册匿名网站 Messenger 路由。
@@ -35,10 +36,22 @@ func (s *Service) registerWebsiteVisitorRoutes(router *gin.Engine) {
 	const directoryPath = "/public/website-channels/:channelID/conversations"
 	const historyPath = "/public/website-channels/:channelID/conversations/:conversationID/messages"
 	const realtimePath = "/public/website-channels/:channelID/realtime"
+	const attachmentsPath = "/public/website-channels/:channelID/attachments"
+	const attachmentUploadPath = "/public/website-channels/:channelID/attachments/:fileID"
+	const attachmentMessagesPath = "/public/website-channels/:channelID/attachment-messages"
+	const messageAttachmentPath = "/public/website-channels/:channelID/conversations/:conversationID/messages/:messageID/attachment"
 	router.GET(messengerPath, s.initializeWebsiteMessenger)
 	router.POST(messagesPath, authorizeWebsiteVisitor, s.sendWebsiteVisitorMessage)
 	router.GET(directoryPath, authorizeWebsiteVisitor, s.listWebsiteVisitorConversations)
 	router.GET(historyPath, authorizeWebsiteVisitor, s.listWebsiteVisitorMessages)
+	router.POST(attachmentsPath, authorizeWebsiteVisitor, s.createWebsiteVisitorAttachmentUpload)
+	router.POST(attachmentUploadPath, authorizeWebsiteVisitor, s.completeWebsiteVisitorAttachmentUpload)
+	router.POST(attachmentMessagesPath, authorizeWebsiteVisitor, s.sendWebsiteVisitorAttachmentMessage)
+	router.GET(messageAttachmentPath, authorizeWebsiteVisitor, s.getWebsiteVisitorMessageAttachment)
+	router.Match([]string{http.MethodGet, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace}, attachmentsPath, websiteVisitorMethodNotAllowed(http.MethodPost))
+	router.Match([]string{http.MethodGet, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace}, attachmentUploadPath, websiteVisitorMethodNotAllowed(http.MethodPost))
+	router.Match([]string{http.MethodGet, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace}, attachmentMessagesPath, websiteVisitorMethodNotAllowed(http.MethodPost))
+	router.Match([]string{http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace}, messageAttachmentPath, websiteVisitorMethodNotAllowed(http.MethodGet))
 	router.Match([]string{http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace}, messengerPath, websiteVisitorMethodNotAllowed(http.MethodGet))
 	router.Match([]string{http.MethodGet, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace}, messagesPath, websiteVisitorMethodNotAllowed(http.MethodPost))
 	router.Match([]string{http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace}, directoryPath, websiteVisitorMethodNotAllowed(http.MethodGet))
@@ -65,6 +78,7 @@ func authorizeWebsiteVisitor(c *gin.Context) {
 		return
 	}
 	c.Set(websiteVisitorExternalKey, websiteVisitorExternalID(token))
+	c.Set(websiteVisitorTokenKey, token)
 }
 
 // initializeWebsiteMessenger 签发或恢复访客 Token 并返回会话列表。
@@ -109,6 +123,50 @@ func (s *Service) sendWebsiteVisitorMessage(c *gin.Context) {
 		return
 	}
 	result, err := s.websiteVisitor.SendTextMessage(c.Request.Context(), websiteVisitorMeta(c), c.Param("channelID"), c.GetString(websiteVisitorExternalKey), input)
+	if writeApplicationError(c, err) {
+		return
+	}
+	writeWebsiteVisitorResult(c, http.StatusOK, result)
+}
+
+// createWebsiteVisitorAttachmentUpload 创建网站访客附件的上传请求。
+func (s *Service) createWebsiteVisitorAttachmentUpload(c *gin.Context) {
+	var input appservice.WebsiteVisitorUploadInput
+	if !bindWebsiteVisitorJSON(c, &input) {
+		return
+	}
+	result, err := s.websiteVisitor.CreateAttachmentUpload(c.Request.Context(), websiteVisitorMeta(c), c.Param("channelID"), c.GetString(websiteVisitorExternalKey), input)
+	if writeApplicationError(c, err) {
+		return
+	}
+	writeWebsiteVisitorResult(c, http.StatusOK, result)
+}
+
+// completeWebsiteVisitorAttachmentUpload 核验网站访客上传的附件内容。
+func (s *Service) completeWebsiteVisitorAttachmentUpload(c *gin.Context) {
+	err := s.websiteVisitor.CompleteAttachmentUpload(c.Request.Context(), websiteVisitorMeta(c), c.Param("channelID"), c.GetString(websiteVisitorExternalKey), c.Param("fileID"))
+	if writeApplicationError(c, err) {
+		return
+	}
+	writeWebsiteVisitorResult(c, http.StatusOK, struct{}{})
+}
+
+// sendWebsiteVisitorAttachmentMessage 接收网站访客附件消息。
+func (s *Service) sendWebsiteVisitorAttachmentMessage(c *gin.Context) {
+	var input appservice.WebsiteVisitorAttachmentMessageInput
+	if !bindWebsiteVisitorJSON(c, &input) {
+		return
+	}
+	result, err := s.websiteVisitor.SendAttachmentMessage(c.Request.Context(), websiteVisitorMeta(c), c.Param("channelID"), c.GetString(websiteVisitorExternalKey), input)
+	if writeApplicationError(c, err) {
+		return
+	}
+	writeWebsiteVisitorResult(c, http.StatusOK, result)
+}
+
+// getWebsiteVisitorMessageAttachment 重新签发网站访客消息附件的预览与下载地址。
+func (s *Service) getWebsiteVisitorMessageAttachment(c *gin.Context) {
+	result, err := s.websiteVisitor.GetMessageAttachment(c.Request.Context(), websiteVisitorMeta(c), c.Param("channelID"), c.GetString(websiteVisitorExternalKey), c.Param("conversationID"), c.Param("messageID"))
 	if writeApplicationError(c, err) {
 		return
 	}
@@ -200,7 +258,7 @@ func websiteVisitorExternalID(token string) string { return "web-session:" + tok
 
 // websiteVisitorMeta 构造不含成员认证的访客调用元信息。
 func websiteVisitorMeta(c *gin.Context) appservice.WebsiteVisitorMeta {
-	return appservice.WebsiteVisitorMeta{Locale: appservice.Locale(c.GetHeader("Accept-Language"))}
+	return appservice.WebsiteVisitorMeta{Locale: appservice.Locale(c.GetHeader("Accept-Language")), Token: c.GetString(websiteVisitorTokenKey)}
 }
 
 // websiteVisitorRequestMeta 构造公开错误本地化所需的应用元信息。

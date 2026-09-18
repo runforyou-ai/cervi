@@ -16,6 +16,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
+	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/runforyou-ai/cervi/internal/tenant"
 	"github.com/uptrace/bun"
 )
@@ -42,7 +43,7 @@ func (s *LocalObjectService) ServeHTTP(writer http.ResponseWriter, request *http
 	// 允许原生端 WebView 直传和读取企业服务器对象。
 	writer.Header().Set("Access-Control-Allow-Origin", "*")
 	writer.Header().Set("Access-Control-Allow-Methods", "GET, HEAD, PUT, OPTIONS")
-	writer.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type")
+	writer.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, "+websiteVisitorHeader)
 	if request.Method == http.MethodOptions {
 		writer.WriteHeader(http.StatusNoContent)
 		return
@@ -86,29 +87,42 @@ func (s *LocalObjectService) ServeHTTP(writer http.ResponseWriter, request *http
 	}
 }
 
-// uploadLocalObject 将认证后的请求内容保存到本地最终对象目录。
+// uploadLocalObject 将认证后的请求内容保存到本地最终对象目录，渠道访客按访客令牌校验文件归属。
 func (s *LocalObjectService) uploadLocalObject(writer http.ResponseWriter, request *http.Request, storageKey string) {
-	scope, err := s.resolveTenant.Resolve(request.Context(), tenant.AccessHost(request.Context()))
-	if errors.Is(err, tenant.ErrNotFound) {
-		http.Error(writer, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
-		return
+	var record *servermodels.File
+	var err error
+	if visitorToken := strings.TrimSpace(request.Header.Get(websiteVisitorHeader)); visitorToken != "" {
+		if !validWebsiteVisitorToken(visitorToken) {
+			http.Error(writer, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			return
+		}
+		record, err = s.getFile.VisitorPendingByStorageKey(request.Context(), websiteVisitorExternalID(visitorToken), storageKey)
+	} else {
+		scope, tenantErr := s.resolveTenant.Resolve(request.Context(), tenant.AccessHost(request.Context()))
+		if errors.Is(tenantErr, tenant.ErrNotFound) {
+			http.Error(writer, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			return
+		}
+		if tenantErr != nil {
+			slog.Warn("文件上传企业解析失败", "error", tenantErr)
+			http.Error(writer, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+		identity, identityErr := s.resolveIdentity.Execute(request.Context(), scope.OrganizationID, bearerToken(request.Header.Get("Authorization")))
+		if errors.Is(identityErr, authaction.ErrIdentityNotFound) {
+			http.Error(writer, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			return
+		}
+		if identityErr != nil {
+			slog.Warn("文件上传认证失败", "error", identityErr)
+			http.Error(writer, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
+			return
+		}
+		record, err = s.getFile.ExecuteByStorageKey(request.Context(), identity, storageKey)
+		if err == nil && record.CreatedByUserID != identity.User.ID {
+			err = fileaction.ErrFileNotFound
+		}
 	}
-	if err != nil {
-		slog.Warn("文件上传企业解析失败", "error", err)
-		http.Error(writer, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return
-	}
-	identity, err := s.resolveIdentity.Execute(request.Context(), scope.OrganizationID, bearerToken(request.Header.Get("Authorization")))
-	if errors.Is(err, authaction.ErrIdentityNotFound) {
-		http.Error(writer, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
-		return
-	}
-	if err != nil {
-		slog.Warn("文件上传认证失败", "error", err)
-		http.Error(writer, http.StatusText(http.StatusInternalServerError), http.StatusInternalServerError)
-		return
-	}
-	record, err := s.getFile.ExecuteByStorageKey(request.Context(), identity, storageKey)
 	if err != nil {
 		// 输出本地对象元数据错误。
 		if errors.Is(err, fileaction.ErrFileNotFound) {
@@ -121,10 +135,6 @@ func (s *LocalObjectService) uploadLocalObject(writer http.ResponseWriter, reque
 	}
 	if record.StorageBackend != string(domain.FileStorageBackendLocal) || record.Status != string(domain.FileStatusPending) || record.Expired {
 		http.Error(writer, http.StatusText(http.StatusConflict), http.StatusConflict)
-		return
-	}
-	if record.CreatedByUserID != identity.User.ID {
-		http.Error(writer, http.StatusText(http.StatusNotFound), http.StatusNotFound)
 		return
 	}
 	expectedSize := record.ByteSize

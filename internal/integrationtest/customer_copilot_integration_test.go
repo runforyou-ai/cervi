@@ -44,7 +44,7 @@ func testCustomerCopilotThreads(t *testing.T, db *bun.DB, identity *servermodels
 	if err != nil {
 		t.Fatal(err)
 	}
-	inbound, err := conversationaction.NewReceiveWebsiteCustomerTextMessageAction(db, scheduler).Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
+	inbound, err := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, scheduler).Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
 		ChannelID: channel.ID, ExternalID: "web-session:" + strings.ReplaceAll(uuid.NewV7().String(), "-", ""), ClientMessageID: uuid.NewV7().String(), Body: "包裹显示签收但没收到",
 	})
 	if err != nil {
