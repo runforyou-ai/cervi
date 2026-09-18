@@ -5,16 +5,21 @@ package integrationtest
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
+	"time"
 	"uuid"
 
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
+	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
+	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
+	"github.com/uptrace/bun"
 )
 
 // TestCustomerNoteMentions 验证内部备注提醒建立协作者、@我的视图、提及计数和周期关闭后的移出。
@@ -205,4 +210,64 @@ func TestCustomerNoteMentions(t *testing.T) {
 			t.Fatalf("new session inherits previous mentions: %+v", row)
 		}
 	})
+}
+
+// TestCustomerNoteMentionsCreateSubjectsInOrder 验证尚无聊天主体的两名成员在不同客户会话中同时互相提醒时都能发送成功。
+func TestCustomerNoteMentionsCreateSubjectsInOrder(t *testing.T) {
+	f := newCustomerReadFixture(t)
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	identities := make([]*servermodels.Identity, 0, 2)
+	for index, email := range []string{"first-note@navigation.test", "second-note@navigation.test"} {
+		if _, err := useraction.NewCreateUserAction(f.db).Execute(ctx, f.owner, useraction.CreateInput{DisplayName: []string{"备注成员甲", "备注成员乙"}[index], Email: email, Password: "password123", RoleID: f.owner.OrganizationIdentity.RoleID}); err != nil {
+			t.Fatal(err)
+		}
+		login, err := authaction.NewLoginAction(f.db).Execute(ctx, authaction.LoginInput{OrganizationID: f.owner.Organization.ID, Email: email, Password: "password123"})
+		if err != nil {
+			t.Fatal(err)
+		}
+		identities = append(identities, login.Identity)
+	}
+	// high 的身份编号较大，旧顺序下两个事务会先创建各自的主体再等待对方。
+	low, high := identities[0], identities[1]
+	if low.OrganizationIdentity.ID > high.OrganizationIdentity.ID {
+		low, high = high, low
+	}
+	other, err := f.receive.Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
+		ChannelID: f.channelID, ExternalID: "web-session:fedcba9876543210fedcba9876543210", ClientMessageID: uuid.NewV7().String(), Body: "另一位客户",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	f.db.AddQueryHook(chatQueryHook{})
+	gate := newChatQueryGate(t, false, 1, func(event *bun.QueryEvent) bool {
+		return strings.Contains(event.Query, `INSERT INTO "chat_subjects"`)
+	})
+	send := conversationaction.NewSendCustomerTextMessageAction(f.db, nil)
+	// note 构造提醒对方的内部备注。
+	note := func(conversationID string, target *servermodels.Identity) conversationaction.CustomerTextMessageInput {
+		return conversationaction.CustomerTextMessageInput{
+			ConversationID: conversationID, ClientMessageID: uuid.NewV7().String(), Body: "请协助",
+			Visibility: domain.MessageVisibilityInternalOnly, MentionIdentityIDs: []string{target.OrganizationIdentity.ID},
+		}
+	}
+	first, second := make(chan error, 1), make(chan error, 1)
+	go func() {
+		_, err := send.Execute(context.WithValue(ctx, chatQueryGateKey{}, gate), high, note(f.conversationID, low))
+		first <- err
+	}()
+	waitChatSignal(t, ctx, gate.reached)
+	go func() {
+		_, err := send.Execute(ctx, low, note(other.Conversation.ID, high))
+		second <- err
+	}()
+	// 第二个事务等待第一个事务已写入的同一个主体后再放行。
+	waitChatDatabaseLock(t, ctx, f.db, `INSERT INTO "chat_subjects"`, low.OrganizationIdentity.ID)
+	gate.open()
+	if err := waitChatResult(t, ctx, first); err != nil {
+		t.Fatal(err)
+	}
+	if err := waitChatResult(t, ctx, second); err != nil {
+		t.Fatal(err)
+	}
 }

@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
 	"slices"
 	"strconv"
 	"strings"
@@ -280,8 +281,8 @@ func sendCustomerMessage(ctx context.Context, tx bun.Tx, identity *servermodels.
 			return ConversationMessage{}, err
 		}
 	}
-	// 取得或创建当前企业成员的聊天主体。
-	subject, err := chatstate.EnsureOrganizationIdentityChatSubject(ctx, tx, identity.Organization.ID, identity.OrganizationIdentity.ID, ids.subject)
+	// 取得或创建发送者与提醒成员的聊天主体，再建立发送者参与者和协作者关系。
+	subject, mentions, err := ensureNoteSubjects(ctx, tx, identity, ids.subject, input.MentionIdentityIDs)
 	if err != nil {
 		return ConversationMessage{}, err
 	}
@@ -289,9 +290,10 @@ func sendCustomerMessage(ctx context.Context, tx bun.Tx, identity *servermodels.
 	if err != nil {
 		return ConversationMessage{}, err
 	}
-	mentions, err := ensureNoteMentionTargets(ctx, tx, identity, conversation.ID, input.MentionIdentityIDs)
-	if err != nil {
-		return ConversationMessage{}, err
+	for _, mention := range mentions {
+		if _, err := ensureMemberConversationParticipant(ctx, tx, identity.Organization.ID, conversation.ID, mention.ChatSubjectID, uuid.NewV7().String()); err != nil {
+			return ConversationMessage{}, err
+		}
 	}
 
 	message := &servermodels.Message{
@@ -349,48 +351,52 @@ func sendCustomerMessage(ctx context.Context, tx bun.Tx, identity *servermodels.
 	return result, nil
 }
 
-// ensureNoteMentionTargets 校验内部备注提醒的企业成员，并把他们加入会话成为协作者。
-func ensureNoteMentionTargets(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, conversationID string, identityIDs []string) ([]ConversationMessageMention, error) {
-	mentions := make([]ConversationMessageMention, 0, len(identityIDs))
-	if len(identityIDs) == 0 {
-		return mentions, nil
-	}
+// ensureNoteSubjects 校验内部备注提醒的企业成员，按身份编号顺序取得或创建发送者与提醒成员的聊天主体，提醒按正文顺序返回。
+func ensureNoteSubjects(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, senderSubjectID string, identityIDs []string) (*servermodels.ChatSubject, []ConversationMessageMention, error) {
 	var rows []struct {
 		ID          string `bun:"id"`
 		DisplayName string `bun:"display_name"`
 	}
-	if err := tx.NewSelect().TableExpr("organization_identities AS oi").
-		ColumnExpr("oi.id, oi.display_name").
-		Join("JOIN users AS u ON u.organization_id = oi.organization_id AND u.identity_id = oi.id").
-		Where("oi.organization_id = ? AND oi.id IN (?)", identity.Organization.ID, bun.In(identityIDs)).
-		Where("oi.type = ? AND u.status = ?", domain.OrganizationIdentityTypeUser, domain.UserStatusActive).
-		Where("oi.id <> ?", identity.OrganizationIdentity.ID).
-		Scan(ctx, &rows); err != nil {
-		return nil, fmt.Errorf("load note mention targets: %w", err)
-	}
-	if len(rows) != len(identityIDs) {
-		return nil, &ConflictError{Reason: ConflictReasonNoteMentionTargetInvalid}
+	if len(identityIDs) > 0 {
+		if err := tx.NewSelect().TableExpr("organization_identities AS oi").
+			ColumnExpr("oi.id, oi.display_name").
+			Join("JOIN users AS u ON u.organization_id = oi.organization_id AND u.identity_id = oi.id").
+			Where("oi.organization_id = ? AND oi.id IN (?)", identity.Organization.ID, bun.In(identityIDs)).
+			Where("oi.type = ? AND u.status = ?", domain.OrganizationIdentityTypeUser, domain.UserStatusActive).
+			Where("oi.id <> ?", identity.OrganizationIdentity.ID).
+			Scan(ctx, &rows); err != nil {
+			return nil, nil, fmt.Errorf("load note mention targets: %w", err)
+		}
+		if len(rows) != len(identityIDs) {
+			return nil, nil, &ConflictError{Reason: ConflictReasonNoteMentionTargetInvalid}
+		}
 	}
 	names := make(map[string]string, len(rows))
 	for _, row := range rows {
 		names[row.ID] = row.DisplayName
 	}
-	// 按正文中的提醒顺序建立聊天主体与参与者关系。
+	// 并发互相提醒的事务按同一身份编号顺序创建聊天主体，唯一约束等待不会形成循环。
+	newSubjectIDs := map[string]string{identity.OrganizationIdentity.ID: senderSubjectID}
 	for _, identityID := range identityIDs {
-		subject, err := chatstate.EnsureOrganizationIdentityChatSubject(ctx, tx, identity.Organization.ID, identityID, uuid.NewV7().String())
+		newSubjectIDs[identityID] = uuid.NewV7().String()
+	}
+	subjects := make(map[string]*servermodels.ChatSubject, len(newSubjectIDs))
+	for _, identityID := range slices.Sorted(maps.Keys(newSubjectIDs)) {
+		subject, err := chatstate.EnsureOrganizationIdentityChatSubject(ctx, tx, identity.Organization.ID, identityID, newSubjectIDs[identityID])
 		if err != nil {
-			return nil, err
+			return nil, nil, err
 		}
-		if _, err := ensureMemberConversationParticipant(ctx, tx, identity.Organization.ID, conversationID, subject.ID, uuid.NewV7().String()); err != nil {
-			return nil, err
-		}
+		subjects[identityID] = subject
+	}
+	mentions := make([]ConversationMessageMention, 0, len(identityIDs))
+	for _, identityID := range identityIDs {
 		name := names[identityID]
 		mentions = append(mentions, ConversationMessageMention{
-			ChatSubjectID: subject.ID, Kind: domain.ChatSubjectKindOrganizationIdentity,
+			ChatSubjectID: subjects[identityID].ID, Kind: domain.ChatSubjectKindOrganizationIdentity,
 			SourceID: identityID, DisplayName: &name, IdentityType: domain.OrganizationIdentityTypeUser,
 		})
 	}
-	return mentions, nil
+	return subjects[identity.OrganizationIdentity.ID], mentions, nil
 }
 
 // loadIdempotentCustomerMessage 校验成员客户消息的完整发送意图，包括内部备注提醒的成员。
