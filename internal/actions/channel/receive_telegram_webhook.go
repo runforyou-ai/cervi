@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/runforyou-ai/cervi/internal/actions/channelmessage"
+	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -298,13 +299,13 @@ func (a *ReceiveTelegramWebhookAction) findTelegramContactAvatarFile(ctx context
 	return record, nil
 }
 
-// applyTelegramContactAvatar 原子切换头像文件引用并回收旧文件。
+// applyTelegramContactAvatar 原子切换头像文件引用、回收旧文件，并推进该渠道身份所在客户会话的版本。
 func (a *ReceiveTelegramWebhookAction) applyTelegramContactAvatar(
 	ctx context.Context,
 	channelID, organizationID, identityID string,
 	next *servermodels.File,
 ) error {
-	return a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	return realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		current := &servermodels.ContactChannelIdentity{}
 		if err := tx.NewSelect().Model(current).
 			Column("id", "organization_id", "channel_id", "avatar_file_id").
@@ -393,7 +394,7 @@ func (a *ReceiveTelegramWebhookAction) applyTelegramContactAvatar(
 				return fmt.Errorf("retire previous Telegram contact avatar: %w", err)
 			}
 		}
-		return nil
+		return chatstate.TouchChannelIdentityConversations(ctx, tx, organizationID, identityID)
 	})
 }
 

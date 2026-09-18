@@ -10,6 +10,7 @@ import (
 	"uuid"
 
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
+	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -49,14 +50,17 @@ func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		updatedAgent := &servermodels.Agent{}
-		err := tx.NewUpdate().Model(updatedAgent).
+		var updatedAgent struct {
+			IdentityID string `bun:"identity_id"`
+			Changed    bool   `bun:"changed"`
+		}
+		err := tx.NewUpdate().Model((*servermodels.Agent)(nil)).
 			Set("status = ?", status).
 			Set("updated_at = now()").
 			Where("organization_id = ?", identity.Organization.ID).
 			Where("id = ?", agentID).
-			Returning("identity_id").
-			Scan(ctx)
+			Returning("new.identity_id, old.status <> new.status AS changed").
+			Scan(ctx, &updatedAgent)
 		if errors.Is(err, sql.ErrNoRows) {
 			return ErrNotFound
 		}
@@ -83,6 +87,12 @@ func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels
 			}
 			cancelledRunIDs, err = a.handoff.HandOffAgentServiceSessions(ctx, tx, identity.Organization.ID, updatedAgent.IdentityID, uuid.NewV7().String())
 			if err != nil {
+				return err
+			}
+		}
+		// 会话列表展示 AI 员工账号状态，状态实际变化时在交接完成后推进展示该 AI 员工的会话版本。
+		if updatedAgent.Changed {
+			if err := chatstate.TouchIdentityConversations(ctx, tx, identity.Organization.ID, updatedAgent.IdentityID); err != nil {
 				return err
 			}
 		}

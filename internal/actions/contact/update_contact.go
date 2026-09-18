@@ -8,8 +8,10 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
+	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -35,24 +37,28 @@ func (a *UpdateContactAction) Execute(ctx context.Context, identity *servermodel
 	}
 
 	var detail *ContactDetail
-	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		var sourceChannelID string
+		var stored struct {
+			SourceChannelID string `bun:"source_channel_id"`
+			DisplayName     string `bun:"display_name"`
+		}
 		if err := tx.NewSelect().
 			Table("contacts").
 			Column("source_channel_id").
+			ColumnExpr("COALESCE(display_name, '') AS display_name").
 			Where("id = ?", contactID).
 			Where("organization_id = ?", identity.Organization.ID).
 			Where("deleted_at IS NULL").
 			For("UPDATE").
-			Scan(ctx, &sourceChannelID); errors.Is(err, sql.ErrNoRows) {
+			Scan(ctx, &stored); errors.Is(err, sql.ErrNoRows) {
 			return ErrNotFound
 		} else if err != nil {
 			return err
 		}
-		if sourceChannelID != input.ChannelID {
+		if stored.SourceChannelID != input.ChannelID {
 			return &ValidationError{Fields: map[string]ValidationCode{"channelId": ValidationChannelImmutable}}
 		}
 		query := tx.NewUpdate().
@@ -79,6 +85,12 @@ func (a *UpdateContactAction) Execute(ctx context.Context, identity *servermodel
 		}
 		if err := replaceMethods(ctx, tx, identity.Organization.ID, contactID, input.Methods); err != nil {
 			return err
+		}
+		// 联系人名称实际变化时，在联系人写入完成后推进以联系人名称展示客户的会话版本。
+		if stored.DisplayName != input.DisplayName {
+			if err := chatstate.TouchContactConversations(ctx, tx, identity.Organization.ID, contactID); err != nil {
+				return err
+			}
 		}
 		loaded, err := loadContactDetail(ctx, tx, identity.Organization.ID, contactID)
 		if err != nil {

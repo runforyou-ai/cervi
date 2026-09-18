@@ -315,12 +315,18 @@ func TestDirectSendAcceptedBeforeTargetDisabled(t *testing.T) {
 		done <- err
 	}()
 	waitChatSignal(t, ctx, gate.reached)
-	if _, err := useraction.NewUpdateStatusAction(f.db).Execute(ctx, f.member, f.member.User.ID, domain.UserStatusInactive); err != nil {
-		t.Fatal(err)
-	}
+	// 停用在会话锁上等待已通过校验的发送提交，再推进展示该成员的会话版本。
+	disabled := make(chan error, 1)
+	go func() {
+		_, err := useraction.NewUpdateStatusAction(f.db).Execute(ctx, f.member, f.member.User.ID, domain.UserStatusInactive)
+		disabled <- err
+	}()
+	waitChatDatabaseLock(t, ctx, f.db, `FROM "conversations"`, f.member.OrganizationIdentity.ID)
 	gate.open()
-	if err := waitChatResult(t, ctx, done); err != nil {
-		t.Fatal(err)
+	for _, result := range []<-chan error{done, disabled} {
+		if err := waitChatResult(t, ctx, result); err != nil {
+			t.Fatal(err)
+		}
 	}
 	// 核验消息重放时的账号发送资格校验。
 	if _, err := send.Execute(ctx, f.owner, input); !errors.Is(err, conversationaction.ErrConversationNotFound) {

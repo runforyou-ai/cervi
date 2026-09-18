@@ -9,6 +9,7 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -106,7 +107,8 @@ func (a *UpdateProfileAction) Execute(ctx context.Context, identity *servermodel
 		if err != nil {
 			return err
 		}
-		if err := identityaction.UpdateUserIdentity(ctx, tx, identity.Organization.ID, identity.User.IdentityID, identityQuery); err != nil {
+		displayChanged, err := identityaction.UpdateUserIdentity(ctx, tx, identity.Organization.ID, identity.User.IdentityID, identityQuery)
+		if err != nil {
 			return err
 		}
 		if previousAvatarFileID != nil && *previousAvatarFileID != input.AvatarFileID {
@@ -118,6 +120,12 @@ func (a *UpdateProfileAction) Execute(ctx context.Context, identity *servermodel
 				Where("organization_id = ?", identity.Organization.ID).
 				Where("status = ?", domain.FileStatusActive).
 				Exec(ctx); err != nil {
+				return err
+			}
+		}
+		// 名称或头像实际变化时，在资料与头像文件写入完成后推进展示本人的会话版本。
+		if displayChanged {
+			if err := chatstate.TouchIdentityConversations(ctx, tx, identity.Organization.ID, identity.User.IdentityID); err != nil {
 				return err
 			}
 		}

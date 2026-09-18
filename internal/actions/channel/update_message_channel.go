@@ -8,9 +8,11 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -36,13 +38,13 @@ func (a *UpdateMessageChannelAction) Execute(ctx context.Context, identity *serv
 	}
 
 	channel := &servermodels.Channel{}
-	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
 		// 锁序为先路由目标身份、后渠道，与停用 AI 员工和转人工一致；渠道类型不可变，校验前按不加锁读取。
 		query := tx.NewSelect().Model(channel).
-			Column("id", "type").
+			Column("id", "type", "name").
 			Where("c.id = ?", channelID).
 			Where("c.organization_id = ?", identity.Organization.ID).
 			Where("c.type IN (?)", bun.In(domain.MessageChannelTypes()))
@@ -63,6 +65,8 @@ func (a *UpdateMessageChannelAction) Execute(ctx context.Context, identity *serv
 		} else if err != nil {
 			return err
 		}
+		// 渠道名称在渠道锁内读取，与写入后的名称比较。
+		previousName := channel.Name
 		var description *string
 		if input.Description != "" {
 			description = &input.Description
@@ -91,6 +95,10 @@ func (a *UpdateMessageChannelAction) Execute(ctx context.Context, identity *serv
 		}
 		if rows == 0 {
 			return ErrNotFound
+		}
+		// 渠道名称实际变化时，在渠道写入完成后推进该渠道下客户会话的版本。
+		if previousName != input.Name {
+			return chatstate.TouchChannelConversations(ctx, tx, identity.Organization.ID, channelID)
 		}
 		return nil
 	})

@@ -58,7 +58,7 @@ func (a *UpdateWorkStatusAction) Execute(ctx context.Context, identity *servermo
 		if err != nil {
 			return err
 		}
-		if err := identityaction.UpdateUserIdentity(ctx, tx, identity.Organization.ID, storedUser.IdentityID, tx.NewUpdate().
+		if _, err := identityaction.UpdateUserIdentity(ctx, tx, identity.Organization.ID, storedUser.IdentityID, tx.NewUpdate().
 			Model((*servermodels.OrganizationIdentity)(nil)).
 			Set("work_status = ?", input.WorkStatus).
 			Set("work_status_updated_at = now()").
