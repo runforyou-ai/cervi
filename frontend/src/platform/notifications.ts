@@ -29,11 +29,13 @@ export type NotificationDeviceScope = {
 export type NotificationDevicePreferences = {
   soundEnabled: boolean
   permissionMenuClickedOn: string
+  permissionAutoRequested: boolean
 }
 
 const defaultNotificationDevicePreferences: NotificationDevicePreferences = {
   soundEnabled: true,
   permissionMenuClickedOn: "",
+  permissionAutoRequested: false,
 }
 
 /** 返回当前企业用户的通知偏好存储键。 */
@@ -62,6 +64,7 @@ export function readNotificationDevicePreferences(
     return {
       soundEnabled: parsed.soundEnabled,
       permissionMenuClickedOn: parsed.permissionMenuClickedOn,
+      permissionAutoRequested: parsed.permissionAutoRequested === true,
     }
   } catch (error) {
     console.warn("读取本机通知偏好失败", { storage_key: storageKey, error })
@@ -90,6 +93,16 @@ export function setNotificationSoundEnabled(
   writeNotificationDevicePreferences(scope, {
     ...readNotificationDevicePreferences(scope),
     soundEnabled,
+  })
+}
+
+/** 记录当前设备已经为该用户自动申请过通知权限。 */
+export function markNotificationPermissionRequested(
+  scope: NotificationDeviceScope,
+) {
+  writeNotificationDevicePreferences(scope, {
+    ...readNotificationDevicePreferences(scope),
+    permissionAutoRequested: true,
   })
 }
 

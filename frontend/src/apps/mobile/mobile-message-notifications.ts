@@ -1,12 +1,23 @@
 /** 移动端新消息系统通知与应用角标。 */
 import { useEffect, useLayoutEffect } from "react"
 
-import { loadInbox, WorkStatus, type Identity } from "@/api"
+import {
+  loadInbox,
+  NotificationPermissionStatus,
+  WorkStatus,
+  type Identity,
+} from "@/api"
 import { activateNotificationPolicy } from "@/features/notifications/new-message-notifications"
 import { useNewMessageNotifications } from "@/features/notifications/use-new-message-notifications"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
-import { updateNotificationUnreadIndicator } from "@/platform/notifications"
+import {
+  checkNotificationPermission,
+  markNotificationPermissionRequested,
+  readNotificationDevicePreferences,
+  requestNotificationPermission,
+  updateNotificationUnreadIndicator,
+} from "@/platform/notifications"
 
 /** 按当前身份投递新消息通知，并把提醒总数同步到应用角标。 */
 export function useMobileMessageNotifications(identity: Identity | null) {
@@ -37,6 +48,31 @@ export function useMobileMessageNotifications(identity: Identity | null) {
     messageNotificationsEnabled,
     workStatus,
   ])
+
+  /** 登录后为本设备自动申请一次系统通知授权，之后交给偏好设置。 */
+  useEffect(() => {
+    if (!notificationOrganizationId || !userId) {
+      return
+    }
+    const scope = { organizationId: notificationOrganizationId, userId }
+    if (readNotificationDevicePreferences(scope).permissionAutoRequested) {
+      return
+    }
+    void (async () => {
+      const status = await checkNotificationPermission()
+      // 仅在系统尚未记录选择时申请，已授权或已拒绝都不再打扰。
+      if (
+        status !==
+        NotificationPermissionStatus.NotificationPermissionStatusPrompt
+      ) {
+        return
+      }
+      markNotificationPermissionRequested(scope)
+      await requestNotificationPermission()
+    })().catch((error) => {
+      console.warn("申请移动端通知权限失败", error)
+    })
+  }, [notificationOrganizationId, userId])
 
   useNewMessageNotifications(identity, () => {})
 
