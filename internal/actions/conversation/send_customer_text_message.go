@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -102,6 +103,8 @@ type customerMessagePayload struct {
 	ReplyToMessageID string
 	Type             domain.MessageType
 	Visibility       domain.MessageVisibility
+	// MentionIdentityIDs 是内部备注提醒的企业成员身份。
+	MentionIdentityIDs []string
 }
 
 // customerAttachmentPayload 定义附件消息待关联的上传文件。
@@ -153,7 +156,7 @@ func (a *SendCustomerTextMessageAction) Execute(ctx context.Context, identity *s
 	payload := customerMessagePayload{
 		ConversationID: normalized.ConversationID, ClientMessageID: normalized.ClientMessageID,
 		Body: normalized.Body, ReplyToMessageID: normalized.ReplyToMessageID, Type: domain.MessageTypeText,
-		Visibility: normalized.Visibility,
+		Visibility: normalized.Visibility, MentionIdentityIDs: normalized.MentionIdentityIDs,
 	}
 
 	for attempt := 0; attempt < maxWriteAttempts; attempt++ {
@@ -213,8 +216,7 @@ func sendCustomerMessage(ctx context.Context, tx bun.Tx, identity *servermodels.
 	if err != nil {
 		return ConversationMessage{}, err
 	}
-	expectation := input.expectation()
-	if saved, found, err := loadIdempotentMemberMessage(ctx, tx, identity, expectation, idempotencyKey); err != nil || found {
+	if saved, found, err := loadIdempotentCustomerMessage(ctx, tx, identity, input, idempotencyKey); err != nil || found {
 		return saved, err
 	}
 	// 附件按来源渠道的外发能力、字节上限和说明上限校验。
@@ -287,6 +289,10 @@ func sendCustomerMessage(ctx context.Context, tx bun.Tx, identity *servermodels.
 	if err != nil {
 		return ConversationMessage{}, err
 	}
+	mentions, err := ensureNoteMentionTargets(ctx, tx, identity, conversation.ID, input.MentionIdentityIDs)
+	if err != nil {
+		return ConversationMessage{}, err
+	}
 
 	message := &servermodels.Message{
 		ID: ids.message, OrganizationID: identity.Organization.ID, ConversationID: conversation.ID,
@@ -309,8 +315,11 @@ func sendCustomerMessage(ctx context.Context, tx bun.Tx, identity *servermodels.
 		return ConversationMessage{}, err
 	}
 	if !inserted {
-		saved, _, err := loadIdempotentMemberMessage(ctx, tx, identity, expectation, idempotencyKey)
+		saved, _, err := loadIdempotentCustomerMessage(ctx, tx, identity, input, idempotencyKey)
 		return saved, err
+	}
+	if err := createMessageMentions(ctx, tx, identity.Organization.ID, message.ID, mentions); err != nil {
+		return ConversationMessage{}, err
 	}
 	if attachment != nil {
 		if err := saveCustomerAttachment(ctx, tx, identity.Organization.ID, message.ID, *attachment); err != nil {
@@ -336,7 +345,75 @@ func sendCustomerMessage(ctx context.Context, tx bun.Tx, identity *servermodels.
 	result := memberConversationMessage(message, subject.ID, identity.OrganizationIdentity)
 	result.ReplyTo = replyTo
 	result.Attachment = attachment
+	result.Mentions = mentions
 	return result, nil
+}
+
+// ensureNoteMentionTargets 校验内部备注提醒的企业成员，并把他们加入会话成为协作者。
+func ensureNoteMentionTargets(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, conversationID string, identityIDs []string) ([]ConversationMessageMention, error) {
+	mentions := make([]ConversationMessageMention, 0, len(identityIDs))
+	if len(identityIDs) == 0 {
+		return mentions, nil
+	}
+	var rows []struct {
+		ID          string `bun:"id"`
+		DisplayName string `bun:"display_name"`
+	}
+	if err := tx.NewSelect().TableExpr("organization_identities AS oi").
+		ColumnExpr("oi.id, oi.display_name").
+		Join("JOIN users AS u ON u.organization_id = oi.organization_id AND u.identity_id = oi.id").
+		Where("oi.organization_id = ? AND oi.id IN (?)", identity.Organization.ID, bun.In(identityIDs)).
+		Where("oi.type = ? AND u.status = ?", domain.OrganizationIdentityTypeUser, domain.UserStatusActive).
+		Where("oi.id <> ?", identity.OrganizationIdentity.ID).
+		Scan(ctx, &rows); err != nil {
+		return nil, fmt.Errorf("load note mention targets: %w", err)
+	}
+	if len(rows) != len(identityIDs) {
+		return nil, &ConflictError{Reason: ConflictReasonNoteMentionTargetInvalid}
+	}
+	names := make(map[string]string, len(rows))
+	for _, row := range rows {
+		names[row.ID] = row.DisplayName
+	}
+	// 按正文中的提醒顺序建立聊天主体与参与者关系。
+	for _, identityID := range identityIDs {
+		subject, err := chatstate.EnsureOrganizationIdentityChatSubject(ctx, tx, identity.Organization.ID, identityID, uuid.NewV7().String())
+		if err != nil {
+			return nil, err
+		}
+		if _, err := ensureMemberConversationParticipant(ctx, tx, identity.Organization.ID, conversationID, subject.ID, uuid.NewV7().String()); err != nil {
+			return nil, err
+		}
+		name := names[identityID]
+		mentions = append(mentions, ConversationMessageMention{
+			ChatSubjectID: subject.ID, Kind: domain.ChatSubjectKindOrganizationIdentity,
+			SourceID: identityID, DisplayName: &name, IdentityType: domain.OrganizationIdentityTypeUser,
+		})
+	}
+	return mentions, nil
+}
+
+// loadIdempotentCustomerMessage 校验成员客户消息的完整发送意图，包括内部备注提醒的成员。
+func loadIdempotentCustomerMessage(ctx context.Context, db bun.IDB, identity *servermodels.Identity, input customerMessagePayload, idempotencyKey string) (ConversationMessage, bool, error) {
+	saved, found, err := loadIdempotentMemberMessage(ctx, db, identity, input.expectation(), idempotencyKey)
+	if err != nil || !found {
+		return saved, found, err
+	}
+	saved.Mentions, err = loadPersistedMessageMentions(ctx, db, identity.Organization.ID, saved.ID)
+	if err != nil {
+		return ConversationMessage{}, true, err
+	}
+	stored := make([]string, 0, len(saved.Mentions))
+	for _, mention := range saved.Mentions {
+		stored = append(stored, mention.SourceID)
+	}
+	sent := slices.Clone(input.MentionIdentityIDs)
+	slices.Sort(stored)
+	slices.Sort(sent)
+	if !slices.Equal(stored, sent) {
+		return ConversationMessage{}, true, &ConflictError{Reason: ConflictReasonIdempotencyMismatch}
+	}
+	return saved, true, nil
 }
 
 // normalizeCustomerTextMessageInput 规范化并校验成员客户消息输入。
@@ -369,6 +446,20 @@ func normalizeCustomerTextMessageInput(input CustomerTextMessageInput) (Customer
 	if input.Visibility != domain.MessageVisibilityCustomerVisible && input.Visibility != domain.MessageVisibilityInternalOnly {
 		fields["visibility"] = ValidationMessageVisibilityInvalid
 	}
+	// 只有内部备注可以提醒企业成员，同一成员只提醒一次。
+	if len(input.MentionIdentityIDs) > 0 && input.Visibility != domain.MessageVisibilityInternalOnly {
+		fields["mentionIdentityIds"] = ValidationMentionIdentityIDsInvalid
+	}
+	mentionIdentityIDs := make([]string, 0, len(input.MentionIdentityIDs))
+	for _, identityID := range input.MentionIdentityIDs {
+		normalized, valid := common.NormalizeUUID(identityID)
+		if !valid || slices.Contains(mentionIdentityIDs, normalized) {
+			fields["mentionIdentityIds"] = ValidationMentionIdentityIDsInvalid
+			continue
+		}
+		mentionIdentityIDs = append(mentionIdentityIDs, normalized)
+	}
+	input.MentionIdentityIDs = mentionIdentityIDs
 	return input, fields
 }
 

@@ -21,6 +21,7 @@ import {
   ChatSubjectKind,
   ConversationType,
   MessageVisibility,
+  OrganizationIdentityType,
   isApiError,
   sendCustomerTextMessage,
   sendAgentTextMessage,
@@ -32,6 +33,7 @@ import {
   type DirectTextMessageInput,
   type GroupParticipant,
   type InboxConversation,
+  type MemberOption,
 } from "@/api"
 import { Button } from "@/components/ui/button"
 import {
@@ -51,6 +53,7 @@ import {
 } from "@/lib/mention-token"
 import {
   conversationSendingIndicatorDelay,
+  type MentionTarget,
   type OutgoingConversationDraft,
 } from "@/features/inbox/outgoing-message-store"
 import { ConversationAttachmentUpload } from "./conversation-attachment-upload"
@@ -74,7 +77,7 @@ export type ComposerDraftBridge = {
 
 type MentionCandidate =
   | { kind: "all"; displayName: string }
-  | { kind: "member"; displayName: string; participant: GroupParticipant }
+  | { kind: "member"; displayName: string; target: MentionTarget }
 
 /** 统计正文中仍然存在的完整 @ 姓名标记。 */
 function countMentionTokens(body: string, displayName: string) {
@@ -112,6 +115,7 @@ export function ConversationComposer({
   retryDraft = null,
   replyTo = null,
   groupParticipants,
+  noteMentionMembers,
   currentIdentityID = "",
   onRetryDraftHandled,
   onReplyToChange,
@@ -147,6 +151,7 @@ export function ConversationComposer({
   retryDraft?: OutgoingConversationDraft | null
   replyTo?: ConversationMessageReference | null
   groupParticipants?: GroupParticipant[]
+  noteMentionMembers?: MemberOption[]
   currentIdentityID?: string
   onRetryDraftHandled?: () => void
   onReplyToChange?: (message: ConversationMessageReference | null) => void
@@ -187,7 +192,9 @@ export function ConversationComposer({
   replyToRef.current = replyTo
   const visibilityRef = useRef(visibility)
   visibilityRef.current = visibility
-  const [mentionSubjectIDs, setMentionSubjectIDs] = useState<string[]>([])
+  const [mentions, setMentions] = useState<MentionTarget[]>([])
+  const mentionsRef = useRef(mentions)
+  mentionsRef.current = mentions
   const [mentionAllToken, setMentionAllToken] =
     useState<MentionAllToken | null>(null)
   const mentionAll = mentionAllToken !== null
@@ -208,8 +215,9 @@ export function ConversationComposer({
     visibility === MessageVisibility.MessageVisibilityInternalOnly
   // 内部备注不经渠道投递，不受对客发送资格限制。
   const disabledReason = internalNote ? null : replyDisabledReason
-  // 对客草稿与内部备注草稿各自保留，切换页签时互不覆盖。
+  // 对客草稿与内部备注草稿各自保留正文和提醒成员，切换页签时互不覆盖。
   const draftsRef = useRef<Partial<Record<MessageVisibility, string>>>({})
+  const draftMentionsRef = useRef<Partial<Record<MessageVisibility, MentionTarget[]>>>({})
   const appliedVisibilityRef = useRef(visibility)
   const focusAfterSwitchRef = useRef(false)
 
@@ -219,8 +227,12 @@ export function ConversationComposer({
     if (previous === visibility) return
     appliedVisibilityRef.current = visibility
     draftsRef.current[previous] = form.getValues("body")
+    draftMentionsRef.current[previous] = mentionsRef.current
     form.setValue("body", draftsRef.current[visibility] ?? "")
+    setMentions(draftMentionsRef.current[visibility] ?? [])
+    setMentionQuery(null)
     delete draftsRef.current[visibility]
+    delete draftMentionsRef.current[visibility]
     const focus = focusAfterSwitchRef.current
     focusAfterSwitchRef.current = false
     window.requestAnimationFrame(() => {
@@ -252,10 +264,11 @@ export function ConversationComposer({
     // 失败消息回到发送时的可见范围，当前页签属于另一种可见范围时先存入对应草稿。
     if (retryDraft.visibility !== visibility) {
       draftsRef.current[retryDraft.visibility] = retryDraft.body
+      draftMentionsRef.current[retryDraft.visibility] = retryDraft.mentions
       return
     }
     form.setValue("body", retryDraft.body, { shouldDirty: true })
-    setMentionSubjectIDs(retryDraft.mentionSubjectIDs)
+    setMentions(retryDraft.mentions)
     setMentionAllToken(retryDraft.mentionAllToken)
     onReplyToChange?.(retryDraft.replyTo)
     resizeComposerInput(inputRef.current, manualInputHeightRef.current)
@@ -270,41 +283,62 @@ export function ConversationComposer({
     visibility,
   ])
 
+  const groupConversation = conversationType === ConversationType.ConversationTypeGroup
+  const customerConversation = conversationType === ConversationType.ConversationTypeCustomer
+  // 群聊提醒当前成员，客户会话的内部备注提醒企业真人成员。
+  const mentionTargets = useMemo<MentionTarget[]>(() => {
+    if (groupConversation) {
+      return (groupParticipants ?? []).map((participant) => ({
+        identityID: participant.identityId,
+        chatSubjectID: participant.chatSubjectId,
+        displayName: participant.displayName,
+      }))
+    }
+    if (!customerConversation || !internalNote) return []
+    return (noteMentionMembers ?? [])
+      .filter((member) => member.type === OrganizationIdentityType.OrganizationIdentityTypeUser)
+      .map((member) => ({ identityID: member.id, chatSubjectID: null, displayName: member.displayName }))
+  }, [customerConversation, groupConversation, groupParticipants, internalNote, noteMentionMembers])
+
   const mentionCandidates = useMemo<MentionCandidate[]>(() => {
-    if (!mentionQuery || !groupParticipants) return []
+    if (!mentionQuery) return []
     const query = mentionQuery.value.toLocaleLowerCase()
     const candidates: MentionCandidate[] = []
-    if (!mentionAll && t("messageMentionAll").toLocaleLowerCase().includes(query)) {
+    if (groupConversation && !mentionAll && t("messageMentionAll").toLocaleLowerCase().includes(query)) {
       candidates.push({ kind: "all", displayName: t("messageMentionAll") })
     }
     candidates.push(
-      ...groupParticipants
+      ...mentionTargets
         .filter(
-          (participant) =>
-            participant.identityId !== currentIdentityID &&
-            !mentionSubjectIDs.includes(participant.chatSubjectId) &&
-            participant.displayName.toLocaleLowerCase().includes(query),
+          (target) =>
+            target.identityID !== currentIdentityID &&
+            !mentions.some((mention) => mention.identityID === target.identityID) &&
+            target.displayName.toLocaleLowerCase().includes(query),
         )
-        .map((participant) => ({
+        .map((target) => ({
           kind: "member" as const,
-          displayName: participant.displayName,
-          participant,
+          displayName: target.displayName,
+          target,
         })),
     )
     return candidates.slice(0, 8)
   }, [
     currentIdentityID,
-    groupParticipants,
+    groupConversation,
+    mentionTargets,
     mentionQuery,
-    mentionSubjectIDs,
+    mentions,
     mentionAll,
     t,
   ])
+  // 对客模式输入 @ 时提示切换到内部备注提醒同事。
+  const noteMentionHint =
+    customerConversation && !internalNote && Boolean(onVisibilityChange) && mentionQuery !== null
 
   /** 根据光标前文本更新 @ 候选查询。 */
   function updateMentionQuery(value: string, selectionStart: number | null) {
     if (
-      conversationType !== ConversationType.ConversationTypeGroup ||
+      (!groupConversation && !customerConversation) ||
       selectionStart === null
     ) {
       setMentionQuery(null)
@@ -325,25 +359,20 @@ export function ConversationComposer({
   }
 
   /** 删除正文中已经不存在的结构化提醒目标。 */
-  function reconcileMentionSubjects(value: string) {
-    if (!groupParticipants) return
-    setMentionSubjectIDs((current) => {
+  function reconcileMentions(value: string) {
+    setMentions((current) => {
       const remainingByName = new Map<string, number>()
-      return current.filter((subjectID) => {
-        const participant = groupParticipants.find(
-          (candidate) => candidate.chatSubjectId === subjectID,
-        )
-        if (!participant) return false
+      return current.filter((mention) => {
         const remaining =
-          remainingByName.get(participant.displayName) ??
-          countMentionTokens(value, participant.displayName)
-        remainingByName.set(participant.displayName, Math.max(remaining - 1, 0))
+          remainingByName.get(mention.displayName) ??
+          countMentionTokens(value, mention.displayName)
+        remainingByName.set(mention.displayName, Math.max(remaining - 1, 0))
         return remaining > 0
       })
     })
   }
 
-  /** 在正文光标处插入选中的群成员或所有人标记。 */
+  /** 在正文光标处插入选中的成员或所有人标记。 */
   function selectMention(candidate: MentionCandidate) {
     const query = mentionQuery
     const input = inputRef.current
@@ -360,9 +389,11 @@ export function ConversationComposer({
       setMentionAllToken((current) =>
         reconcileMentionAllToken(current, body, nextBody, nextCaret),
       )
-      const subjectID = candidate.participant.chatSubjectId
-      setMentionSubjectIDs((current) =>
-        current.includes(subjectID) ? current : [...current, subjectID],
+      const { target } = candidate
+      setMentions((current) =>
+        current.some((mention) => mention.identityID === target.identityID)
+          ? current
+          : [...current, target],
       )
     }
     setMentionQuery(null)
@@ -386,7 +417,7 @@ export function ConversationComposer({
       reconcileMentionAllToken(current, body, nextBody, nextCaret),
     )
     form.setValue("body", nextBody, { shouldDirty: true })
-    reconcileMentionSubjects(nextBody)
+    reconcileMentions(nextBody)
     resizeComposerInput(input, manualInputHeightRef.current)
     emojiCaretRef.current = nextCaret
     setEmojiOpen(false)
@@ -447,28 +478,24 @@ export function ConversationComposer({
       : null
     // 提醒顺序决定被点名 AI 员工的发言先后，按正文中标记出现的位置排序。
     const mentionPositions = new Map(
-      mentionSubjectIDs.map((subjectID) => {
-        const participant = groupParticipants?.find(
-          (candidate) => candidate.chatSubjectId === subjectID,
-        )
-        const match = participant
-          ? body.match(new RegExp(mentionTokenPattern([participant.displayName]), "u"))
-          : null
-        return [subjectID, match?.index ?? Number.MAX_SAFE_INTEGER] as const
+      mentions.map((mention) => {
+        const match = body.match(new RegExp(mentionTokenPattern([mention.displayName]), "u"))
+        return [mention.identityID, match?.index ?? Number.MAX_SAFE_INTEGER] as const
       }),
     )
-    const normalizedMentionSubjectIDs = [...mentionSubjectIDs].sort(
+    const orderedMentions = [...mentions].sort(
       (left, right) =>
-        (mentionPositions.get(left) ?? 0) - (mentionPositions.get(right) ?? 0),
+        (mentionPositions.get(left.identityID) ?? 0) - (mentionPositions.get(right.identityID) ?? 0),
     )
+    const mentionKey = (targets: MentionTarget[]) =>
+      targets.map((mention) => mention.identityID).join("\u0000")
     const retry =
       retryFailedMessage &&
       retryRef.current?.body === body &&
       retryRef.current.visibility === visibility &&
       retryRef.current.replyTo?.id === replyTo?.id &&
       retryRef.current.mentionAll === mentionAll &&
-      retryRef.current.mentionSubjectIDs.join("\u0000") ===
-        normalizedMentionSubjectIDs.join("\u0000")
+      mentionKey(retryRef.current.mentions) === mentionKey(orderedMentions)
         ? retryRef.current
         : null
     const draft = {
@@ -477,7 +504,7 @@ export function ConversationComposer({
       body,
       originatedAt: retry?.originatedAt ?? new Date().toISOString(),
       replyTo: replyTo,
-      mentionSubjectIDs: normalizedMentionSubjectIDs,
+      mentions: orderedMentions,
       mentionAll,
       mentionAllToken: draftMentionAllToken,
     }
@@ -488,6 +515,9 @@ export function ConversationComposer({
     const input = inputRef.current
     if (input && !mobile) setManualInputHeight(input.getBoundingClientRect().height)
     form.resetField("body")
+    // 提醒状态随正文一起清空，发送失败时按草稿所属可见范围恢复。
+    setMentions([])
+    setMentionAllToken(null)
     resizeComposerInput(inputRef.current, manualInputHeightRef.current)
     try {
       const messageInput = { clientMessageId: clientMessageID, body }
@@ -513,7 +543,9 @@ export function ConversationComposer({
           message = await sendGroupTextMessage(conversationID, {
             ...messageInput,
             replyToMessageId: replyTo?.id ?? "",
-            mentionSubjectIds: normalizedMentionSubjectIDs,
+            mentionSubjectIds: orderedMentions.flatMap((mention) =>
+              mention.chatSubjectID ? [mention.chatSubjectID] : [],
+            ),
             mentionAll,
           })
           break
@@ -522,6 +554,9 @@ export function ConversationComposer({
             ...messageInput,
             replyToMessageId: replyTo?.id ?? "",
             visibility,
+            mentionIdentityIds: internalNote
+              ? orderedMentions.map((mention) => mention.identityID)
+              : [],
           })
           break
         default:
@@ -531,8 +566,6 @@ export function ConversationComposer({
       // 按发送逻辑编号写入发送结果。
       onSent(clientMessageID, message)
       if (!aliveRef.current) return
-      setMentionSubjectIDs([])
-      setMentionAllToken(null)
       setMentionQuery(null)
       // 发送期间切换了页签时，引用目标属于另一种可见范围，保持原样。
       if (visibilityRef.current === draft.visibility && replyToRef.current?.id === replyTo?.id) {
@@ -552,6 +585,7 @@ export function ConversationComposer({
           ? apiErrorMessage(error, [
               "replyToMessageId",
               "mentionSubjectIds",
+              "mentionIdentityIds",
               "body",
             ])
           : t("messageSendError"),
@@ -561,8 +595,10 @@ export function ConversationComposer({
         // 发送期间切换了页签时，失败正文回到发送时的可见范围。
         if (draft.visibility !== visibilityRef.current) {
           draftsRef.current[draft.visibility] = body
+          draftMentionsRef.current[draft.visibility] = draft.mentions
         } else {
           form.setValue("body", body, { shouldDirty: true })
+          setMentions(draft.mentions)
           setMentionAllToken(draft.mentionAllToken)
           resizeComposerInput(inputRef.current, manualInputHeightRef.current)
         }
@@ -631,6 +667,13 @@ export function ConversationComposer({
         setMentionQuery(null)
         return
       }
+    }
+    // 提示可见时 Enter 切到内部备注，Escape 关闭提示，均不发送对客消息。
+    if (!composing && noteMentionHint && (event.key === "Escape" || (event.key === "Enter" && !event.shiftKey))) {
+      event.preventDefault()
+      if (event.key === "Enter") switchVisibility(MessageVisibility.MessageVisibilityInternalOnly)
+      else setMentionQuery(null)
+      return
     }
     if (
       !submitOnEnter ||
@@ -764,7 +807,7 @@ export function ConversationComposer({
           ),
         )
         bodyField.onChange(event)
-        reconcileMentionSubjects(event.currentTarget.value)
+        reconcileMentions(event.currentTarget.value)
         updateMentionQuery(
           event.currentTarget.value,
           event.currentTarget.selectionStart,
@@ -919,7 +962,7 @@ export function ConversationComposer({
         {!disabledReason && mentionQuery && mentionCandidates.length > 0 ? (
           <div
             role="listbox"
-            aria-label={t("messageMentionCandidates")}
+            aria-label={t(groupConversation ? "messageMentionCandidates" : "noteMentionCandidates")}
             className="absolute bottom-full left-2 z-30 mb-1 max-h-56 min-w-56 overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
           >
             {mentionCandidates.map((candidate, index) => (
@@ -927,7 +970,7 @@ export function ConversationComposer({
                 key={
                   candidate.kind === "all"
                     ? "all"
-                    : candidate.participant.chatSubjectId
+                    : candidate.target.identityID
                 }
                 type="button"
                 role="option"
@@ -942,6 +985,25 @@ export function ConversationComposer({
                 {candidate.displayName}
               </button>
             ))}
+          </div>
+        ) : null}
+        {!disabledReason && noteMentionHint ? (
+          <div
+            role="status"
+            className="absolute bottom-full left-2 z-30 mb-1 flex items-center gap-3 rounded-md border bg-popover py-1.5 pr-1.5 pl-3 text-sm text-popover-foreground shadow-md"
+          >
+            {t("noteMentionHint")}
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onPointerDown={(event) => event.preventDefault()}
+              onClick={() =>
+                switchVisibility(MessageVisibility.MessageVisibilityInternalOnly)
+              }
+            >
+              {t("noteMentionSwitch")}
+            </Button>
           </div>
         ) : null}
         {mobile ? null : (

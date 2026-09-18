@@ -9,6 +9,13 @@ import type { MentionAllToken } from "@/lib/mention-token"
 
 export const conversationSendingIndicatorDelay = 300
 
+/** 输入区结构化提醒的企业成员，群聊成员同时带有聊天主体编号。 */
+export type MentionTarget = {
+  identityID: string
+  chatSubjectID: string | null
+  displayName: string
+}
+
 export type OutgoingConversationDraft = {
   clientMessageID: string
   attachment?: MessageAttachment
@@ -16,7 +23,7 @@ export type OutgoingConversationDraft = {
   body: string
   originatedAt: string
   replyTo: ConversationMessageReference | null
-  mentionSubjectIDs: string[]
+  mentions: MentionTarget[]
   mentionAll: boolean
   mentionAllToken: MentionAllToken | null
 }

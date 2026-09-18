@@ -61,6 +61,8 @@ type CustomerConversationSummary struct {
 	ServiceSessionStatus      domain.ServiceSessionStatus
 	ServiceSessionID          string
 	Assignee                  *AssigneeSummary
+	// UnansweredMentionCount 是当前客服周期内被提醒成员尚未在会话中发言的内部提醒数。
+	UnansweredMentionCount int
 }
 
 // DirectConversationSummary 定义收件箱中的内部单聊详情。
@@ -124,10 +126,11 @@ type LoadInboxQuery struct {
 	db bun.IDB
 }
 
-// UnreadCounts 定义内部会话的客观未读和提醒未读总数。
+// UnreadCounts 定义内部会话的客观未读和提醒未读总数，以及处理中客户会话里提醒本人的未读数。
 type UnreadCounts struct {
-	Unread    int `bun:"unread_count"`
-	Attention int `bun:"attention_unread_count"`
+	Unread            int `bun:"unread_count"`
+	Attention         int `bun:"attention_unread_count"`
+	CustomerMentioned int `bun:"-"`
 }
 
 type customerConversationRow struct {
@@ -149,6 +152,8 @@ type customerConversationRow struct {
 	AssigneeAvatarFileID      *string                          `bun:"assignee_avatar_file_id"`
 	LastActivityAt            *time.Time                       `bun:"last_activity_at"`
 	UnreadCount               int                              `bun:"unread_count"`
+	MentionedUnreadCount      int                              `bun:"mentioned_unread_count"`
+	UnansweredMentionCount    int                              `bun:"unanswered_mention_count"`
 	LastReadMessageID         *string                          `bun:"last_read_message_id"`
 	LastMessageID             *string                          `bun:"last_message_id"`
 	LastMessageType           *domain.MessageType              `bun:"last_message_type"`
@@ -269,6 +274,10 @@ func (q *LoadInboxQuery) Execute(ctx context.Context, identity *servermodels.Ide
 			return err
 		}
 		counts, err = snapshot.loadUnreadCounts(ctx, identity.Organization.ID, identity.OrganizationIdentity.ID, identity.User.ID)
+		if err != nil {
+			return err
+		}
+		counts.CustomerMentioned, err = snapshot.countCustomerMentionedUnread(ctx, identity)
 		return err
 	})
 	return page, counts, err
@@ -302,6 +311,8 @@ func (q *LoadInboxQuery) loadConversationPage(ctx context.Context, identity *ser
 func (q *LoadInboxQuery) customerConversationDetailsQuery(organizationID, currentIdentityID, userID string) *bun.SelectQuery {
 	return q.customerConversationAccessQuery(organizationID).
 		ColumnExpr("unread.unread_count AS unread_count").
+		ColumnExpr("unread.mentioned_unread_count AS mentioned_unread_count").
+		ColumnExpr("unanswered.unanswered_mention_count AS unanswered_mention_count").
 		ColumnExpr("state.last_read_message_id::text AS last_read_message_id").
 		ColumnExpr("state.pin_rank IS NOT NULL AS pinned").
 		ColumnExpr("cv.title AS title").
@@ -327,7 +338,8 @@ func (q *LoadInboxQuery) customerConversationDetailsQuery(organizationID, curren
 		Join("LEFT JOIN organization_identities AS assignee ON assignee.organization_id = cv.organization_id AND assignee.id = current.assignee_identity_id").
 		Join("LEFT JOIN conversation_user_states AS state ON state.organization_id = cv.organization_id AND state.conversation_id = cv.id AND state.user_id = ?", userID).
 		Join(`JOIN LATERAL (
-			SELECT count(*) AS unread_count
+			SELECT count(*) AS unread_count,
+				count(*) FILTER (WHERE EXISTS (?)) AS mentioned_unread_count
 			FROM messages AS unread_msg
 			JOIN conversation_participants AS sender_cp ON sender_cp.organization_id = unread_msg.organization_id AND sender_cp.conversation_id = unread_msg.conversation_id AND sender_cp.id = unread_msg.sender_participant_id
 			JOIN chat_subjects AS sender_cs ON sender_cs.organization_id = sender_cp.organization_id AND sender_cs.id = sender_cp.subject_id
@@ -335,7 +347,28 @@ func (q *LoadInboxQuery) customerConversationDetailsQuery(organizationID, curren
 				AND unread_msg.type IN (?) AND unread_msg.deleted_at IS NULL
 				AND NOT (sender_cs.kind = ? AND sender_cs.source_id = ?)
 				AND unread_msg.message_seq > COALESCE(state.read_seq, 0)
-		) AS unread ON TRUE`, bun.In([]domain.MessageType{domain.MessageTypeText, domain.MessageTypeAttachment, domain.MessageTypeAgentError}), domain.ChatSubjectKindOrganizationIdentity, currentIdentityID)
+		) AS unread ON TRUE`, messageMentionsIdentity(q.db, "unread_msg", currentIdentityID), bun.In([]domain.MessageType{domain.MessageTypeText, domain.MessageTypeAttachment, domain.MessageTypeAgentError}), domain.ChatSubjectKindOrganizationIdentity, currentIdentityID).
+		// 统计当前周期内被提醒成员之后尚未在会话中发言的提醒。
+		Join(`JOIN LATERAL (
+			SELECT count(*) AS unanswered_mention_count
+			FROM message_mentions AS note_mention
+			JOIN messages AS note ON note.organization_id = note_mention.organization_id AND note.id = note_mention.message_id
+			WHERE note.organization_id = cv.organization_id AND note.conversation_id = cv.id AND note.service_session_id = current.id AND note.deleted_at IS NULL
+				AND NOT EXISTS (
+					SELECT 1 FROM messages AS answer
+					JOIN conversation_participants AS answer_cp ON answer_cp.organization_id = answer.organization_id AND answer_cp.conversation_id = answer.conversation_id AND answer_cp.id = answer.sender_participant_id
+					WHERE answer.organization_id = note.organization_id AND answer.conversation_id = note.conversation_id
+						AND answer.message_seq > note.message_seq AND answer.deleted_at IS NULL AND answer_cp.subject_id = note_mention.subject_id
+				)
+		) AS unanswered ON TRUE`)
+}
+
+// messageMentionsIdentity 构造指定消息提醒了某个企业身份的存在性子查询。
+func messageMentionsIdentity(db bun.IDB, messageAlias, identityID string) *bun.SelectQuery {
+	return db.NewSelect().TableExpr("message_mentions AS mention").ColumnExpr("1").
+		Join("JOIN chat_subjects AS mention_cs ON mention_cs.organization_id = mention.organization_id AND mention_cs.id = mention.subject_id").
+		Where("mention.organization_id = ?.organization_id AND mention.message_id = ?.id", bun.Ident(messageAlias), bun.Ident(messageAlias)).
+		Where("mention_cs.kind = ? AND mention_cs.source_id = ?", domain.ChatSubjectKindOrganizationIdentity, identityID)
 }
 
 // filterCustomerInbox 为客户摘要追加当前列表的筛选条件。
@@ -375,6 +408,13 @@ func filterCustomerInbox(query *bun.SelectQuery, currentIdentityID string, input
 			if input.AssigneeIdentityID != "" {
 				query = query.Where("current.assignee_identity_id = ?", input.AssigneeIdentityID)
 			}
+		case domain.CustomerInboxViewMentioned:
+			// 当前客服周期内有内部备注提醒本人。
+			query = query.Where(`EXISTS (
+				SELECT 1 FROM messages AS note
+				WHERE note.organization_id = cv.organization_id AND note.conversation_id = cv.id
+					AND note.service_session_id = current.id AND note.deleted_at IS NULL AND EXISTS (?)
+			)`, messageMentionsIdentity(query.DB(), "note", currentIdentityID))
 		}
 	}
 	return query
@@ -483,6 +523,22 @@ func (q *LoadInboxQuery) loadUnreadCounts(ctx context.Context, organizationID, i
 	return counts, nil
 }
 
+// countCustomerMentionedUnread 统计处理中客户会话的当前周期内提醒本人且尚未读到的消息数，范围与默认的 @我的 视图一致。
+func (q *LoadInboxQuery) countCustomerMentionedUnread(ctx context.Context, identity *servermodels.Identity) (int, error) {
+	count, err := q.db.NewSelect().TableExpr("messages AS msg").
+		Join("JOIN customer_conversations AS cc ON cc.organization_id = msg.organization_id AND cc.conversation_id = msg.conversation_id AND cc.current_service_session_id = msg.service_session_id").
+		Join("JOIN service_sessions AS current ON current.organization_id = cc.organization_id AND current.id = cc.current_service_session_id AND current.status = ?", domain.ServiceSessionStatusOpen).
+		Join("LEFT JOIN conversation_user_states AS state ON state.organization_id = msg.organization_id AND state.conversation_id = msg.conversation_id AND state.user_id = ?", identity.User.ID).
+		Where("msg.organization_id = ? AND msg.deleted_at IS NULL", identity.Organization.ID).
+		Where("msg.message_seq > COALESCE(state.read_seq, 0)").
+		Where("EXISTS (?)", messageMentionsIdentity(q.db, "msg", identity.OrganizationIdentity.ID)).
+		Count(ctx)
+	if err != nil {
+		return 0, fmt.Errorf("count customer mentioned unread messages: %w", err)
+	}
+	return count, nil
+}
+
 // summary 将 AI 会话查询结果转换为统一摘要。
 func (row agentConversationRow) summary() ConversationSummary {
 	var agentRunStatus *domain.AgentRunStatus
@@ -516,12 +572,13 @@ func (row customerConversationRow) summary() ConversationSummary {
 		assignee = &AssigneeSummary{IdentityID: *row.AssigneeIdentityID, Type: domain.OrganizationIdentityType(*row.AssigneeType), DisplayName: *row.AssigneeDisplayName, AvatarFileID: row.AssigneeAvatarFileID}
 	}
 	return ConversationSummary{
-		ID: row.ID, Type: domain.ConversationTypeCustomer, UnreadCount: row.UnreadCount, Pinned: row.Pinned, LastMessageID: row.LastMessageID, LastMessageType: row.LastMessageType, LastReadMessageID: row.LastReadMessageID, LastActivityAt: row.LastActivityAt,
+		ID: row.ID, Type: domain.ConversationTypeCustomer, UnreadCount: row.UnreadCount, MentionedUnreadCount: row.MentionedUnreadCount, Pinned: row.Pinned, LastMessageID: row.LastMessageID, LastMessageType: row.LastMessageType, LastReadMessageID: row.LastReadMessageID, LastActivityAt: row.LastActivityAt,
 		Customer: &CustomerConversationSummary{
 			Title: row.Title, ContactName: row.ContactName, ContactAvatarFileID: row.ContactAvatarFileID,
 			ChannelType: domain.ChannelType(row.ChannelType), ChannelName: row.ChannelName,
 			Preview: row.Preview, PreviewSenderIdentityType: row.PreviewSenderIdentityType, PreviewVisibility: row.PreviewVisibility, LastMessageAt: row.LastMessageAt,
 			ServiceSessionID: row.ServiceSessionID, ServiceSessionStatus: domain.ServiceSessionStatus(row.ServiceSessionStatus), Assignee: assignee,
+			UnansweredMentionCount: row.UnansweredMentionCount,
 		},
 	}
 }
@@ -621,7 +678,7 @@ func normalizeLoadInput(input LoadInput) (LoadInput, error) {
 	if input.ServiceStatus == "" {
 		input.ServiceStatus = domain.ServiceSessionStatusOpen
 	}
-	if (input.CustomerView != domain.CustomerInboxViewQueue && input.CustomerView != domain.CustomerInboxViewMine && input.CustomerView != domain.CustomerInboxViewCoworkers) ||
+	if !slices.Contains([]domain.CustomerInboxView{domain.CustomerInboxViewQueue, domain.CustomerInboxViewMine, domain.CustomerInboxViewCoworkers, domain.CustomerInboxViewMentioned}, input.CustomerView) ||
 		(input.ServiceStatus != domain.ServiceSessionStatusOpen && input.ServiceStatus != domain.ServiceSessionStatusClosed) ||
 		(input.ChannelID != "" && !common.ValidUUID(input.ChannelID)) ||
 		(input.AssigneeIdentityID != "" && (input.CustomerView != domain.CustomerInboxViewCoworkers || !common.ValidUUID(input.AssigneeIdentityID))) {

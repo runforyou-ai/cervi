@@ -82,7 +82,11 @@ export function useMobileMessageNotifications(identity: Identity | null) {
       organizationId: organizationId ?? "",
       userId: userId ?? "",
     }),
-    async () => (await loadInbox({ limit: 1 })).attentionUnreadCount,
+    async () => {
+      // 应用角标合计内部会话提醒与客户会话中提醒本人的未读。
+      const inbox = await loadInbox({ limit: 1 })
+      return inbox.attentionUnreadCount + inbox.customerMentionedUnreadCount
+    },
     { enabled: Boolean(organizationId && userId) },
   )
   const unreadCount = attention.data

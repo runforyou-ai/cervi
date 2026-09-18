@@ -41,6 +41,7 @@ const (
 	CustomerInboxViewQueue     CustomerInboxView = CustomerInboxView(domain.CustomerInboxViewQueue)
 	CustomerInboxViewMine      CustomerInboxView = CustomerInboxView(domain.CustomerInboxViewMine)
 	CustomerInboxViewCoworkers CustomerInboxView = CustomerInboxView(domain.CustomerInboxViewCoworkers)
+	CustomerInboxViewMentioned CustomerInboxView = CustomerInboxView(domain.CustomerInboxViewMentioned)
 )
 
 // InboxPartition 表示统一收件箱的置顶分区。
@@ -168,6 +169,8 @@ type CustomerInboxConversation struct {
 	AttachmentByteLimit int64 `json:"attachmentByteLimit"`
 	// AttachmentCaptionLimit 是来源渠道附件说明的字符上限。
 	AttachmentCaptionLimit int `json:"attachmentCaptionLimit"`
+	// UnansweredMentionCount 是当前客服周期内被提醒成员尚未在会话中发言的内部提醒数。
+	UnansweredMentionCount int `json:"unansweredMentionCount"`
 }
 
 // DirectInboxConversation 定义内部单聊摘要。
@@ -240,6 +243,8 @@ type Inbox struct {
 	HasMore              bool                `json:"hasMore"`
 	UnreadCount          int                 `json:"unreadCount"`
 	AttentionUnreadCount int                 `json:"attentionUnreadCount"`
+	// CustomerMentionedUnreadCount 是处理中客户会话的当前周期内提醒本人且尚未读到的消息数。
+	CustomerMentionedUnreadCount int `json:"customerMentionedUnreadCount"`
 }
 
 // InboxConversationAvailability 表示指定会话的阅读和列表资格。

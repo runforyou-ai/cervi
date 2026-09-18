@@ -47,6 +47,10 @@ const customerViews = [
   },
   { value: CustomerInboxView.CustomerInboxViewMine, label: "queueFilterMine" },
   {
+    value: CustomerInboxView.CustomerInboxViewMentioned,
+    label: "queueFilterMentions",
+  },
+  {
     value: CustomerInboxView.CustomerInboxViewCoworkers,
     label: "queueFilterColleague",
   },
@@ -73,10 +77,12 @@ export type MobileInboxQuery = ReturnType<typeof useMobileInboxQuery>["query"]
 export function MobileInboxScopes({
   scope,
   attentionUnreadCount,
+  customerMentionedUnreadCount,
   onChange,
 }: {
   scope: InboxScope
   attentionUnreadCount: number
+  customerMentionedUnreadCount: number
   onChange: (query: LoadInboxQuery) => void
 }) {
   const { t } = useTranslation("inbox")
@@ -106,6 +112,15 @@ export function MobileInboxScopes({
                 role="status"
                 aria-label={t("internalAttentionUnread", {
                   count: attentionUnreadCount,
+                })}
+              />
+            ) : null}
+            {value === InboxScope.InboxScopeCustomer && customerMentionedUnreadCount > 0 ? (
+              <span
+                className="absolute -top-0.5 -right-2 size-2 rounded-full bg-destructive"
+                role="status"
+                aria-label={t("customerMentionUnread", {
+                  count: customerMentionedUnreadCount,
                 })}
               />
             ) : null}
@@ -289,9 +304,6 @@ export function MobileInboxFilter({
                     {t(item.label)}
                   </Button>
                 ))}
-                <Button variant="outline" className="min-h-11" disabled>
-                  {t("queueFilterMentions")}
-                </Button>
               </div>
               {view === CustomerInboxView.CustomerInboxViewCoworkers ? (
                 <MobileCustomerAssignee value={assignee} onChange={setAssignee} />

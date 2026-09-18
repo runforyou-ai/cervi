@@ -80,6 +80,8 @@ type CustomerTextMessageInput struct {
 	Body             string `json:"body"`
 	// Visibility 为空时按对客消息处理。
 	Visibility MessageVisibility `json:"visibility"`
+	// MentionIdentityIDs 是内部备注提醒的企业成员身份，按正文出现顺序排列；对客消息不得携带。
+	MentionIdentityIDs []string `json:"mentionIdentityIds"`
 }
 
 // CustomerAttachmentMessageInput 定义成员发送的客户会话附件消息。

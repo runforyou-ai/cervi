@@ -315,6 +315,7 @@ function MobileInboxList({ query, changeQuery }: ReturnType<typeof useMobileInbo
       <MobileInboxScopes
         scope={query.scope}
         attentionUnreadCount={list.attentionUnreadCount}
+        customerMentionedUnreadCount={list.customerMentionedUnreadCount}
         onChange={changeQuery}
       />
       <div className="flex h-11 shrink-0 items-center border-b">

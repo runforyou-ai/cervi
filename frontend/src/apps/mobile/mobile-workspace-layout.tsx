@@ -61,7 +61,11 @@ export function MobileTabLayout() {
       organizationId: identity.organization.id,
       userId: identity.user.id,
     }),
-    async () => (await loadInbox({ limit: 1 })).attentionUnreadCount,
+    async () => {
+      // 应用角标合计内部会话提醒与客户会话中提醒本人的未读。
+      const inbox = await loadInbox({ limit: 1 })
+      return inbox.attentionUnreadCount + inbox.customerMentionedUnreadCount
+    },
     {
       refetchInterval:
         pollingActive && !realtime ? memberChatPollingInterval : false,
@@ -106,7 +110,7 @@ export function MobileTabLayout() {
                   <span className="absolute -top-1.5 left-3 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] leading-4 font-semibold text-destructive-foreground ring-2 ring-sidebar">
                     <span aria-hidden="true">{badge > 99 ? "99+" : badge}</span>
                     <span className="sr-only">
-                      {t("inbox:internalAttentionUnread", { count: badge })}
+                      {t("inbox:messageAttentionUnread", { count: badge })}
                     </span>
                   </span>
                 ) : null}

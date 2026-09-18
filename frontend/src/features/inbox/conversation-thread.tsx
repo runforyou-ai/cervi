@@ -31,11 +31,12 @@ import {
   type ConversationLocateTarget,
 } from "@/features/inbox/conversation-timeline"
 import { customerReplySupported } from "@/features/inbox/customer-session-actions"
+import { listAllMemberOptions } from "@/features/inbox/list-all-member-options"
 import { useOutgoingMessages } from "@/features/inbox/outgoing-message-context"
 import type { OutgoingConversationDraft } from "@/features/inbox/outgoing-message-store"
 import { useConversationReadMarker } from "@/features/inbox/use-conversation-read-marker"
 import { resourceKeys } from "@/hooks/resource-keys"
-import { useResourceInvalidator } from "@/hooks/use-resource"
+import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 
 /** 连接时间线与回复区，处理已读、发送和草稿转正会话。 */
 export function ConversationThread({
@@ -137,6 +138,10 @@ export function ConversationThread({
   const customerReplyUnavailable = !replySupported || Boolean(replyDisabledReason)
   // 客户会话的附件入口按渠道外发能力开放。
   const customerAttachment = customerConversation?.customer ?? null
+  // 客户会话的内部备注可以提醒企业成员。
+  const noteMentionMembers = useResource(resourceKeys.memberOptions(), listAllMemberOptions, {
+    enabled: Boolean(customerConversation),
+  })
 
   return (
     <>
@@ -153,7 +158,6 @@ export function ConversationThread({
           setRetryDraft(draft)
         }}
         retryFailedMessageDisabled={customerReplyUnavailable}
-        groupParticipants={groupParticipants}
         onReplyMessage={
           conversation &&
           ((replySupported && !replyDisabledReason) || Boolean(customerConversation))
@@ -181,6 +185,7 @@ export function ConversationThread({
         retryDraft={retryDraft}
         replyTo={replyTo}
         groupParticipants={groupParticipants}
+        noteMentionMembers={noteMentionMembers.data}
         currentIdentityID={identity.user.identityId}
         onRetryDraftHandled={() => setRetryDraft(null)}
         onReplyToChange={(message) =>
