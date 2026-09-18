@@ -29,14 +29,13 @@ func ChannelSupportsAgentAssignee(channelType ChannelType) bool {
 	return channelType == ChannelTypeWebsite || channelType == ChannelTypeTelegram
 }
 
-// 渠道附件上限，照片按 Telegram 的独立限制取值。
+// 渠道附件的字节上限与说明字符上限。
 const (
-	websiteAttachmentLimit        int64 = 20 * 1024 * 1024
-	telegramInboundLimit          int64 = 20 * 1024 * 1024
-	telegramOutboundPhotoLimit    int64 = 10 * 1024 * 1024
-	telegramOutboundDocumentLimit int64 = 50 * 1024 * 1024
-	websiteCaptionLimit                 = 4000
-	telegramCaptionLimit                = 1024
+	websiteAttachmentLimit int64 = 20 * 1024 * 1024
+	telegramInboundLimit   int64 = 20 * 1024 * 1024
+	telegramOutboundLimit  int64 = 50 * 1024 * 1024
+	websiteCaptionLimit          = 4000
+	telegramCaptionLimit         = 1024
 )
 
 // ChannelSupportsInboundAttachment 判断渠道是否接收客户发来的附件。
@@ -46,19 +45,16 @@ func ChannelSupportsInboundAttachment(channelType ChannelType) bool {
 
 // ChannelSupportsOutboundAttachment 判断渠道是否支持向客户发送附件。
 func ChannelSupportsOutboundAttachment(channelType ChannelType) bool {
-	return channelType == ChannelTypeWebsite
+	return channelType == ChannelTypeWebsite || channelType == ChannelTypeTelegram
 }
 
-// ChannelAttachmentLimit 返回渠道对该类型单个附件的平台字节上限，渠道没有附件能力时为 0。外发是否开放由 ChannelSupportsOutboundAttachment 单独决定。
-func ChannelAttachmentLimit(channelType ChannelType, contentType string) int64 {
+// ChannelAttachmentLimit 返回渠道单个外发附件的平台字节上限，渠道没有附件能力时为 0。
+func ChannelAttachmentLimit(channelType ChannelType) int64 {
 	switch channelType {
 	case ChannelTypeWebsite:
 		return websiteAttachmentLimit
 	case ChannelTypeTelegram:
-		if AttachmentIsPhoto(contentType) {
-			return telegramOutboundPhotoLimit
-		}
-		return telegramOutboundDocumentLimit
+		return telegramOutboundLimit
 	default:
 		return 0
 	}

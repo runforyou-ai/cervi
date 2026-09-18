@@ -145,7 +145,7 @@ func inboxConversationFromAction(summary inboxaction.ConversationSummary, avatar
 		attachmentSupported := domain.ChannelSupportsOutboundAttachment(summary.Customer.ChannelType)
 		attachmentByteLimit := int64(0)
 		if attachmentSupported {
-			attachmentByteLimit = domain.ChannelAttachmentLimit(summary.Customer.ChannelType, "")
+			attachmentByteLimit = domain.ChannelAttachmentLimit(summary.Customer.ChannelType)
 		}
 		conversation.Customer = &CustomerInboxConversation{
 			Title: summary.Customer.Title, ContactName: summary.Customer.ContactName,

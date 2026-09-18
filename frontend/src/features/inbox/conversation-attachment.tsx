@@ -1,7 +1,7 @@
 /** 在时间线中展示附件、图片、说明和发送方本地的上传状态。 */
 import { ClockIcon, RotateCcwIcon, XIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { useState } from "react"
+import { useState, type ReactNode } from "react"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -32,6 +32,7 @@ export function ConversationAttachment({
   incoming,
   bubbleClassName,
   retryDisabled = false,
+  renderDeliveryState,
 }: {
   attachment: MessageAttachment
   body: string
@@ -43,6 +44,7 @@ export function ConversationAttachment({
   incoming: boolean
   bubbleClassName: string
   retryDisabled?: boolean
+  renderDeliveryState?: (className?: string) => ReactNode
 }) {
   const { t } = useTranslation("inbox")
   const navigate = useNavigate()
@@ -149,12 +151,15 @@ export function ConversationAttachment({
       )}
     </div>
   )
+  // 无正文图片的投递状态在图片下方独立展示。
+  const deliveryBelowImage = image && !body
   const footer = (
     <span className="inline-flex items-center gap-1 whitespace-nowrap text-[10px]">
       <time dateTime={originatedAt} title={timeTitle}>
         {timeLabel}
       </time>
       {!incoming && !ready ? <ClockIcon className="size-3.5" /> : null}
+      {ready && !deliveryBelowImage ? renderDeliveryState?.() : null}
     </span>
   )
   const detail = !ready
@@ -211,6 +216,9 @@ export function ConversationAttachment({
             {failedLabel}
           </p>
         ) : null}
+        {ready && deliveryBelowImage
+          ? renderDeliveryState?.("rounded-full bg-primary px-2 py-0.5 text-primary-foreground")
+          : null}
         {image && preview.error ? (
           <button
             type="button"

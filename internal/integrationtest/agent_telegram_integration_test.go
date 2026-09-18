@@ -220,7 +220,7 @@ func testAgentTelegramReplies(t *testing.T, db *bun.DB, identity *models.Identit
 			t.Fatal(err)
 		}
 		sender := &deliverySender{}
-		worker := deliveryaction.NewWorker(db, sender, f.tasks)
+		worker := deliveryaction.NewWorker(db, sender, deliveryFiles{}, f.tasks)
 		for range 2 {
 			if err := worker.Execute(ctx, deliveryaction.Input{DeliveryID: deliveries[0].ID}); err != nil {
 				t.Fatal(err)

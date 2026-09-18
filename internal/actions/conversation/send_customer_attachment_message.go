@@ -129,7 +129,7 @@ func lockCustomerAttachmentFile(ctx context.Context, tx bun.Tx, identity *server
 	if file.Status != string(domain.FileStatusUploaded) || file.Expired {
 		return nil, fileaction.ErrFileNotFound
 	}
-	if limit := domain.ChannelAttachmentLimit(channelType, file.ContentType); limit > 0 && file.ByteSize > limit {
+	if limit := domain.ChannelAttachmentLimit(channelType); limit > 0 && file.ByteSize > limit {
 		return nil, &ConflictError{Reason: ConflictReasonAttachmentTooLarge}
 	}
 	if _, err := tx.NewUpdate().Model(file).Set("status = ?", domain.FileStatusActive).Set("expires_at = NULL").Set("updated_at = now()").WherePK().Exec(ctx); err != nil {
