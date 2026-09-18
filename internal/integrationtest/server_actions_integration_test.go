@@ -872,7 +872,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if createdMember.IdentityID == "" || createdMember.IdentityID == createdMember.ID {
 			t.Fatalf("member identity id = %q, user id = %q", createdMember.IdentityID, createdMember.ID)
 		}
-		updateRoles := roleaction.NewUpdateAssignmentsAction(db)
+		updateRoles := roleaction.NewUpdateAssignmentsAction(db, testServiceSessionHandoff(db))
 		if err := updateRoles.Execute(context.Background(), loggedIn.Identity, []roleaction.AssignmentInput{{IdentityID: loggedIn.Identity.OrganizationIdentity.ID, RoleID: memberRole.ID}}); !errors.Is(err, roleaction.ErrLastActiveAdministrator) {
 			t.Fatalf("remove last active administrator error = %v", err)
 		}

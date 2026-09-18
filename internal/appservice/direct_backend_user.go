@@ -5,6 +5,7 @@ package appservice
 import (
 	"context"
 	"errors"
+	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	"log/slog"
 
 	memberaction "github.com/runforyou-ai/cervi/internal/actions/member"
@@ -49,14 +50,14 @@ type directoryOps struct {
 }
 
 // newDirectoryOps 创建企业成员、团队、角色与组织的业务实现依赖。
-func newDirectoryOps(db *bun.DB) directoryOps {
+func newDirectoryOps(db *bun.DB, agentCoordinator *agentrunaction.ExecuteAction) directoryOps {
 	return directoryOps{
 		listMemberOptions:        memberaction.NewListOptionsQuery(db),
 		listUsers:                useraction.NewListUsersQuery(db),
 		getUser:                  useraction.NewGetUserQuery(db),
 		createUser:               useraction.NewCreateUserAction(db),
 		updateUser:               useraction.NewUpdateUserAction(db),
-		updateRoleAssignments:    roleaction.NewUpdateAssignmentsAction(db),
+		updateRoleAssignments:    roleaction.NewUpdateAssignmentsAction(db, agentCoordinator),
 		updateUserStatus:         useraction.NewUpdateStatusAction(db),
 		listTeams:                teamaction.NewListTeamsQuery(db),
 		createTeam:               teamaction.NewCreateTeamAction(db),

@@ -56,6 +56,19 @@ func ResolveNewSessionRoute(ctx context.Context, db bun.IDB, channel *servermode
 
 // ResolveHandoffRoute 只按渠道失败目标解析 AI 转交人工的去向：目标不可用、为 AI 员工或无效时进入公共队列；lock 为 true 时目标身份取 FOR KEY SHARE。
 func ResolveHandoffRoute(ctx context.Context, db bun.IDB, channel *servermodels.Channel, lock bool) (RouteSnapshot, error) {
+	// 身份类型不可变，失败目标为 AI 员工时不加锁直接进入公共队列，交接只锁定人工目标。
+	if domain.ChannelRoutingTargetType(channel.FallbackRoutingTargetType) == domain.ChannelRoutingTargetTypeMember && channel.FallbackRoutingTargetID != nil {
+		var identityType domain.OrganizationIdentityType
+		err := db.NewSelect().Model((*servermodels.OrganizationIdentity)(nil)).Column("type").
+			Where("oi.organization_id = ? AND oi.id = ?", channel.OrganizationID, *channel.FallbackRoutingTargetID).
+			Scan(ctx, &identityType)
+		if errors.Is(err, sql.ErrNoRows) || identityType == domain.OrganizationIdentityTypeAgent {
+			return RouteSnapshot{}, nil
+		}
+		if err != nil {
+			return RouteSnapshot{}, fmt.Errorf("load message channel handoff target type: %w", err)
+		}
+	}
 	route, available, err := availableRoute(ctx, db, channel.OrganizationID, domain.ChannelType(channel.Type),
 		domain.ChannelRoutingTargetType(channel.FallbackRoutingTargetType), channel.FallbackRoutingTargetID, lock)
 	if err != nil {

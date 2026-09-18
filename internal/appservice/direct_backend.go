@@ -78,7 +78,7 @@ func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, tena
 		inboxOps:        newInboxOps(db, taskEnqueuer),
 		channelOps:      newChannelOps(db, connectionRunner, telegramAPI),
 		contactOps:      newContactOps(db),
-		directoryOps:    newDirectoryOps(db),
+		directoryOps:    newDirectoryOps(db, agentCoordinator),
 		agentOps:        newAgentOps(db, agentCoordinator, customerReplySuggestions),
 		knowledgeOps:    newKnowledgeOps(db, taskEnqueuer, documentQuery, documentConverter),
 		integrationOps:  newIntegrationOps(db, connectionRunner, modelProviderRegistry, mcpTest, mcpScheduler),

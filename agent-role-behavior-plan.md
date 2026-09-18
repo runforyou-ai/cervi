@@ -295,7 +295,7 @@ payload
 
 写入沿用 `chatstate.AppendMessage`，携带 6.6 节的幂等键；群事件会推进操作人的已读水位，转人工没有操作人，跳过该步骤。系统事件不进入访客查询（访客只读 `text` 与 `attachment`），不创建渠道投递，不改变客户侧最后消息摘要与首响。前端在 `conversation-timeline.tsx` 增加该事件类型的渲染，按 `reason` 本地化文案并展示去向与 `reasonText`；运行过程详情通过 `agentRunId` 关联。
 
-**同族事件。** 领取（`service_session_claimed`，含成员回复无人负责的周期）、人工接管（`service_session_taken_over`）、转交真人或 AI（`service_session_transferred`）、关闭（`service_session_closed`）、重开（`service_session_reopened`）使用同一 `service_session_*` 家族，在各自的操作事务内写入，payload 为周期编号、操作人身份与名称快照、原负责人与转交目标（`serviceSessionId`、`actorIdentityId`、`actorDisplayName`、`fromIdentityId`、`fromDisplayName`、`target`），与转人工事件一起在 PR B 交付。客服周期的系统事件仅成员可见，只推进会话版本并通知受众，不改变会话最后消息、活动时间、周期摘要与首响。
+**同族事件。** 领取（`service_session_claimed`，含成员回复无人负责的周期）、人工接管（`service_session_taken_over`）、转交真人或 AI（`service_session_transferred`）、关闭（`service_session_closed`）、重开（`service_session_reopened`）使用同一 `service_session_*` 家族，在各自的操作事务内写入，payload 为周期编号、操作人身份与名称快照、原负责人与转交目标（`serviceSessionId`、`actorIdentityId`、`actorDisplayName`、`fromIdentityId`、`fromDisplayName`、`target`），与转人工事件一起在 PR B 交付。中文界面按钮统一称「接管」，`service_session_claimed` 的中文文案同为「接管了会话」，事件类型仍区分从无人负责状态接手与从他人处接管。客服周期的系统事件仅成员可见，只推进会话版本并通知受众，不改变会话最后消息、活动时间、周期摘要与首响。
 
 ## 7. 依据门禁
 
@@ -374,10 +374,10 @@ agent_runs
 | `internal/integration/agentruntime` | `TerminalDecision`、终止工具与直接返回适配、批次校验、依据登记与边界、纠正触发、预算末端保留终止工具；`RunRequest` 增加场景与依据策略 |
 | `internal/i18n` | 第 6.7 节四个词条 |
 | `internal/storage/server` | 迁移与 `AgentRun` 模型字段 |
-| `internal/appservice` | `Agent` 详情返回角色基线摘要；Run 摘要与详情增加结果与原因；按流程生成适配层与绑定 |
+| `internal/appservice` | `Agent` 详情返回角色基线摘要；Run 摘要与详情接口返回结果与原因字段；按流程生成适配层与绑定 |
 | `frontend/src/features/contacts/agents` | 企业指令选填、标签与帮助文案；角色选择只展示该角色对 AI 的含义；只读展示当前角色的内置规则与工具集 |
 | `frontend/src/features/roles` | 权限按 `appliesTo` 分为「成员权限」与「AI 员工能力」两组，后者本期只读展示工作规则与工具集 |
-| `frontend/src/features/inbox` | `conversation-timeline.tsx` 渲染转人工事件行；运行摘要展示结果与原因 |
+| `frontend/src/features/inbox` | `conversation-timeline.tsx` 渲染转人工与同族客服周期事件行 |
 | `frontend/src/i18n` | 对应词条，删除 `instructionRequired` |
 
 ## 11. 界面
@@ -385,7 +385,7 @@ agent_runs
 - AI 员工执行配置页：「工作指令」改为「企业指令」，选填；字段下方以折叠区块只读展示当前角色的基线文本与工具集。资料页的角色选择项显示该角色对 AI 的含义（能否接待客户），不显示成员权限。
 - 角色详情页：权限区按 `appliesTo` 分为「成员权限」与「AI 员工能力」两组；后者本期只读，展示该角色的工作规则与工具集，自定义角色显示「按成员规则工作」。成员管理页不展示 AI 能力。
 - 客户会话：转人工后时间线出现「已转人工」事件行（去向、原因，成员可见），负责人区域随现有逻辑更新，收件箱按现有视图规则归位；不新增按钮或状态。
-- 运行过程详情：`ask_customer` 与 `handoff_to_human` 作为普通工具调用展示参数；运行摘要显示结果与原因。
+- 运行过程详情：`ask_customer` 与 `handoff_to_human` 作为普通工具调用展示参数。消息气泡与运行摘要不展示结果文案，追问即一条普通 AI 回复，转人工的去向与原因由事件行展示。
 
 ## 12. 交付顺序
 
