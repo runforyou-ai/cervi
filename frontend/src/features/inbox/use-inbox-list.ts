@@ -1,12 +1,13 @@
 /** 将列表控制器接入统一 Query 缓存、变更失效和会话资源清理。 */
-import { useEffect, useId, useLayoutEffect, useMemo, useRef, useSyncExternalStore } from "react"
+import { useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useSyncExternalStore } from "react"
 import { useQueryClient } from "@tanstack/react-query"
-import { getInboxContext, loadInbox, readInboxConversations, readInboxWindow, type InboxQuery, type Identity, type InboxConversationResults } from "@/api"
+import { InboxPartition, getInboxContext, loadInbox, readInboxConversations, readInboxWindow, type InboxQuery, type Identity, type InboxConversationResults } from "@/api"
 import { useRealtimeSyncActive } from "@/contexts/realtime-sync-context"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceReader } from "@/hooks/use-resource"
 import { clearConversationResources } from "./conversation-resources"
-import { InboxListController, type InboxListBookmark } from "./inbox-list-controller"
+import { InboxListController, type InboxListBookmark, type InboxListOperation } from "./inbox-list-controller"
+import { combineInboxPartitions, regularPartitionRestore } from "./inbox-partitions"
 import { memberChatPollingInterval } from "./use-member-chat-polling"
 
 import type { useInboxListViewport } from "./use-inbox-list-viewport"
@@ -20,8 +21,8 @@ type InboxListOptions = {
   selectedConversationId?: string
 }
 
-/** 每个查询持有独立浏览状态，业务摘要仅从当前批量 Query 读取。 */
-export function useInboxList(input: InboxQuery, viewport: InboxListViewport, options: InboxListOptions) {
+/** 每个分区查询持有独立控制器与浏览状态，业务摘要仅从当前批量 Query 读取；region 表示按置顶顺序整区读取。 */
+function useInboxPartition(input: InboxQuery, viewport: InboxListViewport, options: InboxListOptions, region = false) {
   const { identity, active, history } = options
   const client = useQueryClient()
   const realtime = useRealtimeSyncActive()
@@ -68,8 +69,8 @@ export function useInboxList(input: InboxQuery, viewport: InboxListViewport, opt
         void client.resetQueries({ queryKey: resourceKeys.conversationSummary(id) })
       }
     },
-  }, query, bookmark, cached, locateId)
-  }, [client, owner, query, read, history, historyKey])
+  }, query, { bookmark, cached, locateId, region })
+  }, [client, owner, query, read, history, historyKey, region])
   const state = useSyncExternalStore(controller.subscribe, controller.getSnapshot)
   const rows = useResource(
     resourceKeys.inboxConversations({ ...owner, query, conversationIds: state.rowIds }),
@@ -77,17 +78,6 @@ export function useInboxList(input: InboxQuery, viewport: InboxListViewport, opt
     { enabled: false },
   )
 
-  viewport.positions.current = state.positions
-  viewport.events.current = {
-    idle: controller.settle,
-    scroll: (container, enteredTop) => {
-      const current = controller.getSnapshot()
-      if (current.error || !container.clientHeight) return
-      if (container.scrollTop <= 120 && current.hasBefore) void controller.request("before")
-      else if (enteredTop) void controller.request("refresh")
-      else if (container.scrollHeight - container.scrollTop - container.clientHeight <= 120 && current.hasAfter) void controller.request("after")
-    },
-  }
   useLayoutEffect(() => () => {
     if (history) history.set(historyKey, controller.remember())
   }, [controller, history, historyKey])
@@ -128,12 +118,68 @@ export function useInboxList(input: InboxQuery, viewport: InboxListViewport, opt
   }, [active, realtime, refresh])
 
   const conversations = new Map(rows.data?.results.flatMap((row) => row.availability === "matching" && row.conversation ? [[row.id, row.conversation] as const] : []) ?? [])
+  return { state, controller, conversations: state.ids.flatMap((id) => conversations.has(id) ? [conversations.get(id)!] : []) }
+}
+
+type InboxPartitionView = ReturnType<typeof useInboxPartition>
+
+/** 把已展示行的位置与滚动、空闲事件接到视口；分页由 paging 分区负责，回到顶部时全部分区重读。 */
+function bindViewport(viewport: InboxListViewport, positions: InboxPartitionView["state"]["positions"], partitions: InboxPartitionView[], paging: InboxPartitionView) {
+  viewport.positions.current = positions
+  viewport.events.current = {
+    idle: () => partitions.forEach((partition) => partition.controller.settle()),
+    scroll: (container, enteredTop) => {
+      const current = paging.controller.getSnapshot()
+      if (current.error || !container.clientHeight) return
+      if (container.scrollTop <= 120 && current.hasBefore) void paging.controller.request("before")
+      else if (enteredTop) partitions.forEach((partition) => void partition.controller.request("refresh"))
+      else if (container.scrollHeight - container.scrollTop - container.clientHeight <= 120 && current.hasAfter) void paging.controller.request("after")
+    },
+  }
+}
+
+/** 按完整活动序读取一条列表，不区分置顶。 */
+export function useInboxList(input: InboxQuery, viewport: InboxListViewport, options: InboxListOptions) {
+  const list = useInboxPartition(input, viewport, options)
+  bindViewport(viewport, list.state.positions, [list], list)
   return {
-    ...state,
-    conversations: state.ids.flatMap((id) => conversations.has(id) ? [conversations.get(id)!] : []),
-    request: controller.request,
-    retry: controller.retry,
+    ...list.state,
+    conversations: list.conversations,
+    pinnedIds: [] as string[],
+    request: list.controller.request,
+    retry: list.controller.retry,
   }
 }
 
 export type InboxList = ReturnType<typeof useInboxList>
+
+/** 置顶区与普通区各自读取，合并为先置顶后普通的一条列表；settlePin 在置顶写入后先重读目标分区，会话不在两区之间短暂消失。 */
+export function usePartitionedInboxList(input: InboxQuery, viewport: InboxListViewport, options: InboxListOptions) {
+  const located = useRef({ pinnedIds: [] as string[], locateId: "" })
+  const regularViewport = useMemo(() => ({
+    ...viewport,
+    restore: regularPartitionRestore(viewport.restore, () => located.current.pinnedIds, () => located.current.locateId),
+  }), [viewport])
+  const pinned = useInboxPartition({ ...input, partition: InboxPartition.InboxPartitionPinned }, viewport, options, true)
+  const regular = useInboxPartition({ ...input, partition: InboxPartition.InboxPartitionRegular }, regularViewport, options)
+  located.current = { pinnedIds: pinned.state.ids, locateId: options.selectedConversationId ?? "" }
+  const combined = combineInboxPartitions(pinned, regular)
+  bindViewport(viewport, combined.positions, [pinned, regular], regular)
+  const pinnedController = pinned.controller
+  const regularController = regular.controller
+  const request = useCallback((operation: InboxListOperation) => operation === "before" || operation === "after"
+    ? regularController.request(operation)
+    : Promise.all([pinnedController.request(operation), regularController.request(operation)]).then(() => undefined), [pinnedController, regularController])
+  const retry = useCallback(() => {
+    if (pinnedController.getSnapshot().error) void pinnedController.retry()
+    return regularController.retry()
+  }, [pinnedController, regularController])
+  const settlePin = useCallback(async (nowPinned: boolean) => {
+    const [first, second] = nowPinned ? [pinnedController, regularController] : [regularController, pinnedController]
+    await first.request("refresh")
+    await second.request("refresh")
+  }, [pinnedController, regularController])
+  return { ...combined, request, retry, settlePin }
+}
+
+export type PartitionedInboxList = ReturnType<typeof usePartitionedInboxList>

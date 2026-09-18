@@ -53,7 +53,7 @@ import {
   useConversationSummary,
 } from "@/features/inbox/use-conversation-summary"
 import { useInboxSearch, type InboxSearchItem } from "@/features/inbox/use-inbox-search"
-import type { InboxList } from "@/features/inbox/use-inbox-list"
+import type { PartitionedInboxList } from "@/features/inbox/use-inbox-list"
 import { useRecentConversations } from "@/features/inbox/use-recent-conversations"
 import type { useInboxListViewport } from "@/features/inbox/use-inbox-list-viewport"
 import { resourceKeys } from "@/hooks/resource-keys"
@@ -87,7 +87,7 @@ export function InboxPage({
   onSelectedConversationChange,
   onQueryChange,
 }: {
-  list: InboxList
+  list: PartitionedInboxList
   listViewport: ReturnType<typeof useInboxListViewport>
   scope: InboxScope
   customerView: CustomerInboxView
@@ -385,7 +385,11 @@ export function InboxPage({
           <InboxListPanel list={list} viewport={listViewport} detailError={Boolean(summary.error)} retryDetail={() => void summary.refresh()}>
             <InboxConversationList
               conversations={conversations}
+              pinnedIds={list.pinnedIds}
+              pinOrderVersion={list.pinOrderVersion}
               onMenuChange={listViewport.setMenu}
+              onDraggingChange={listViewport.setDragging}
+              onPinSettled={list.settlePin}
               selectedId={selectedConversation?.id}
               onSelect={selectConversation}
               onOpenInWindow={

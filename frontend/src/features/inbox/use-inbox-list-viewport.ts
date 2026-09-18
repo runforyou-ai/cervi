@@ -8,7 +8,7 @@ export function useInboxListViewport() {
   const positions = useRef<InboxListState["positions"]>([])
   const lastAnchor = useRef<InboxListAnchor | null>(null)
   const pending = useRef<{ anchor: InboxListAnchor | null; moved: Set<string>; top: boolean } | null>(null)
-  const interaction = useRef({ scrollingUntil: 0, pointer: false, menu: false, covered: false, keyboard: false })
+  const interaction = useRef({ scrollingUntil: 0, pointer: false, menu: false, covered: false, keyboard: false, dragging: false })
   const events = useRef({ idle: () => {}, scroll: (_element: HTMLElement, _enteredTop: boolean) => {} })
   const wake = useRef(() => {})
   const programmatic = useRef<number | null>(null)
@@ -30,10 +30,13 @@ export function useInboxListViewport() {
       return lastAnchor.current
     },
     atTop: (): boolean => (viewport.element()?.scrollTop ?? 0) <= 2,
-    interacting: () => interaction.current.pointer || interaction.current.menu || interaction.current.covered || interaction.current.keyboard || performance.now() < interaction.current.scrollingUntil,
-    restore: (anchor: InboxListAnchor | null, moved: Set<string>, top: boolean) => { pending.current = { anchor, moved, top } },
+    interacting: () => interaction.current.pointer || interaction.current.menu || interaction.current.covered || interaction.current.keyboard || interaction.current.dragging || performance.now() < interaction.current.scrollingUntil,
+    /** 登记最新的恢复意图；尚未应用的已移动行并入本次，两个分区的重排共用一次补偿。 */
+    restore: (anchor: InboxListAnchor | null, moved: Set<string>, top: boolean) => { pending.current = { anchor, moved: new Set([...(pending.current?.moved ?? []), ...moved]), top } },
     /** 菜单和窄屏详情打开时保护底层列表，关闭后恢复顺序。 */
     setMenu: (open: boolean) => { interaction.current.menu = open; wake.current() },
+    /** 置顶排序拖动期间保护列表顺序，结束后恢复。 */
+    setDragging: (active: boolean) => { interaction.current.dragging = active; wake.current() },
     /** 窄屏详情覆盖时保留底层列表原位。 */
     setCovered: (open: boolean) => { interaction.current.covered = open; wake.current() },
   }), [])
@@ -76,7 +79,7 @@ export function useInboxListViewport() {
       window.clearTimeout(timer)
       timer = window.setTimeout(() => {
         const input = interaction.current
-        if (input.pointer || input.menu || input.covered || input.keyboard) return
+        if (input.pointer || input.menu || input.covered || input.keyboard || input.dragging) return
         if (viewport.interacting()) { settle(); return }
         applyRef.current()
         events.current.idle()

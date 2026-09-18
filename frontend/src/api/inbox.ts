@@ -98,6 +98,7 @@ import type {
 import {
   ConversationType,
   CustomerInboxView,
+  ConversationPinPosition,
   InboxPartition,
   InboxScope,
   InboxSearchRange,
@@ -196,12 +197,26 @@ export type LoadInboxQuery = Partial<InboxQuery>
 const updateConversationUnreadMarkBound = bind(UpdateConversationUnreadMark)
 const updateConversationPinBound = bind(UpdateConversationPin)
 
-/** 保存当前用户的会话置顶事实与置顶顺序；邻居为空表示追加到置顶末尾。 */
+/** 置顶写入命令；未给出位置时新置顶追加到置顶末尾，已置顶保持原位。 */
+export type ConversationPinCommand = Pick<
+  ConversationPinInput,
+  "pinned" | "expectedPinOrderVersion"
+> & {
+  position?: Exclude<ConversationPinPosition, ConversationPinPosition.$zero>
+  neighborId?: string
+}
+
+/** 保存当前用户的会话置顶事实与置顶顺序。 */
 export function updateConversationPin(
   conversationID: string,
-  input: ConversationPinInput,
+  command: ConversationPinCommand,
 ): Promise<ConversationPinState> {
-  return updateConversationPinBound(conversationID, input)
+  return updateConversationPinBound(conversationID, {
+    pinned: command.pinned,
+    position: command.position ?? ConversationPinPosition.$zero,
+    neighborId: command.neighborId ?? "",
+    expectedPinOrderVersion: command.expectedPinOrderVersion,
+  })
 }
 
 /** 保存独立于阅读水位的个人未读标记。 */
