@@ -241,22 +241,43 @@ func (l *visitorAttachmentLinker) links(ctx context.Context, backend domain.File
 		}
 		return WebsiteVisitorAttachmentLinks{PreviewURL: contentURL + "?inline=1", DownloadURL: contentURL + "?download=" + url.QueryEscape(fileName)}, nil
 	}
-	if l.setting == nil {
-		setting, err := l.backend.getS3Setting.ExecuteForOrganization(ctx, l.organizationID)
-		if err != nil {
-			return WebsiteVisitorAttachmentLinks{}, err
-		}
-		l.setting = &setting
-	}
-	preview, err := serverfilecontent.PresignDownload(ctx, s3FileConfig(*l.setting), storageKey, "inline")
+	setting, err := l.s3Setting(ctx)
 	if err != nil {
 		return WebsiteVisitorAttachmentLinks{}, err
 	}
-	download, err := serverfilecontent.PresignDownload(ctx, s3FileConfig(*l.setting), storageKey, mime.FormatMediaType("attachment", map[string]string{"filename": fileName}))
+	preview, err := serverfilecontent.PresignDownload(ctx, s3FileConfig(setting), storageKey, "inline")
+	if err != nil {
+		return WebsiteVisitorAttachmentLinks{}, err
+	}
+	download, err := serverfilecontent.PresignDownload(ctx, s3FileConfig(setting), storageKey, mime.FormatMediaType("attachment", map[string]string{"filename": fileName}))
 	if err != nil {
 		return WebsiteVisitorAttachmentLinks{}, err
 	}
 	return WebsiteVisitorAttachmentLinks{PreviewURL: preview.URL, DownloadURL: download.URL}, nil
+}
+
+// avatarURL 返回头像文件的稳定公开地址。
+func (l *visitorAttachmentLinker) avatarURL(ctx context.Context, location conversationaction.FileLocation) (string, error) {
+	if location.StorageBackend == domain.FileStorageBackendLocal {
+		return fileContentURL(location.StorageBackend, location.StorageKey, "")
+	}
+	setting, err := l.s3Setting(ctx)
+	if err != nil {
+		return "", err
+	}
+	return fileContentURL(location.StorageBackend, location.StorageKey, setting.PublicBaseURL)
+}
+
+// s3Setting 返回企业对象存储配置，同一次转换内只读取一次。
+func (l *visitorAttachmentLinker) s3Setting(ctx context.Context) (settingaction.S3Setting, error) {
+	if l.setting == nil {
+		setting, err := l.backend.getS3Setting.ExecuteForOrganization(ctx, l.organizationID)
+		if err != nil {
+			return settingaction.S3Setting{}, err
+		}
+		l.setting = &setting
+	}
+	return *l.setting, nil
 }
 
 // ListMessages 返回网站访客指定客户线程的消息历史。
@@ -389,11 +410,19 @@ func websiteVisitorMessageFromAction(ctx context.Context, linker *visitorAttachm
 			attachment.PreviewURL, attachment.DownloadURL = links.PreviewURL, links.DownloadURL
 		}
 	}
+	senderAvatarURL := ""
+	if value.SenderAvatar != nil {
+		avatarURL, err := linker.avatarURL(ctx, *value.SenderAvatar)
+		if err != nil {
+			return WebsiteVisitorMessage{}, err
+		}
+		senderAvatarURL = avatarURL
+	}
 	return WebsiteVisitorMessage{
-		ClientMessageID: value.ClientMessageID,
-		ReplyTo:         replyTo,
-		Attachment:      attachment,
-		ID:              value.ID, Author: string(value.Author), Body: value.Body, SenderIdentityType: (*OrganizationIdentityType)(value.SenderIdentityType),
+		ClientMessageID: value.ClientMessageID, SenderIdentityID: value.SenderIdentityID, SenderName: value.SenderDisplayName, SenderAvatarURL: senderAvatarURL,
+		ReplyTo:    replyTo,
+		Attachment: attachment,
+		ID:         value.ID, Author: string(value.Author), Body: value.Body, SenderIdentityType: (*OrganizationIdentityType)(value.SenderIdentityType),
 		MessageSeq: strconv.FormatInt(value.MessageSeq, 10), OriginatedAt: value.OriginatedAt, CreatedAt: value.CreatedAt,
 	}, nil
 }

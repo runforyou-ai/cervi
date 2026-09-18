@@ -116,8 +116,12 @@ type WebsiteVisitorMessage struct {
 	Author             string                          `json:"author"`
 	Body               string                          `json:"body"`
 	SenderIdentityType *OrganizationIdentityType       `json:"senderIdentityType"`
-	OriginatedAt       time.Time                       `json:"originatedAt"`
-	CreatedAt          time.Time                       `json:"createdAt"`
+	// SenderIdentityID、SenderName 和 SenderAvatarURL 仅在企业成员或 AI 员工发送时有值。
+	SenderIdentityID string    `json:"senderIdentityId"`
+	SenderName       string    `json:"senderName"`
+	SenderAvatarURL  string    `json:"senderAvatarUrl"`
+	OriginatedAt     time.Time `json:"originatedAt"`
+	CreatedAt        time.Time `json:"createdAt"`
 }
 
 // WebsiteVisitorMessageResult 定义网站访客消息写入结果。
