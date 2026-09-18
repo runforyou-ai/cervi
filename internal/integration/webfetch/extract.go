@@ -8,7 +8,7 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/go-shiori/go-readability"
+	"codeberg.org/readeck/go-readability/v2"
 	"golang.org/x/net/html"
 	"golang.org/x/net/html/charset"
 )
@@ -39,8 +39,19 @@ func extractArticle(page []byte, pageURL *url.URL) []byte {
 		return page
 	}
 	article, err := readability.FromDocument(document, pageURL)
-	if err != nil || strings.TrimSpace(article.TextContent) == "" {
+	if err != nil {
 		return page
 	}
-	return []byte(articlePrefix + article.Content + articleSuffix)
+	// 正文文本为空或渲染失败时返回原始页面。
+	var text strings.Builder
+	if err := article.RenderText(&text); err != nil || strings.TrimSpace(text.String()) == "" {
+		return page
+	}
+	var content bytes.Buffer
+	content.WriteString(articlePrefix)
+	if err := article.RenderHTML(&content); err != nil {
+		return page
+	}
+	content.WriteString(articleSuffix)
+	return content.Bytes()
 }
