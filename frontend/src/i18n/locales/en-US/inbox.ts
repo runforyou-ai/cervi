@@ -226,8 +226,6 @@ const inbox = {
   agentRunWaiting: "Waiting to reply: {{names}}",
   agentThoughtRunning: "Thinking",
   agentThoughtCompleted: "Thought for {{seconds}}s",
-  agentOutcomeAskCustomer: "Asked the customer",
-  agentOutcomeHandoff: "Handed off to a human",
   agentProcessLoadFailed: "Could not load the run process",
   agentToolQueued: "Queued",
   agentToolRunning: "Running",

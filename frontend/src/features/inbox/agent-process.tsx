@@ -23,7 +23,6 @@ import {
   stopGroupAgentReply,
   AgentHandoffReason,
   AgentRunBlockKind,
-  AgentRunOutcome,
   AgentRunStatus,
   AgentToolCallStatus,
   type AgentToolCall,
@@ -205,12 +204,6 @@ export function AgentProcess({ process, incoming, onPrimary }: { process: Conver
           onPrimary ? "text-primary-foreground/75" : "text-muted-foreground",
           mobile && (incoming ? "self-start" : "self-end"),
         )}>
-          {/* 追问与转人工在用量前标出运行结果，转人工同时给出原因。 */}
-          {process.outcome === AgentRunOutcome.AgentRunOutcomeAskCustomer ? (
-            <span>{t("agentOutcomeAskCustomer")}</span>
-          ) : process.outcome === AgentRunOutcome.AgentRunOutcomeHandoff ? (
-            <span>{t("agentOutcomeHandoff")} · {t(handoffReasonKey(process.outcomeReason))}</span>
-          ) : null}
           <span>{t("agentUsageInput", { count: process.inputTokens })}</span>
           <span>{t("agentUsageOutput", { count: process.outputTokens })}</span>
         </div>
