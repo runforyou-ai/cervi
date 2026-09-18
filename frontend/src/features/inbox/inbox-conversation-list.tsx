@@ -96,7 +96,7 @@ type ConversationRowProps = {
   sortable?: ReturnType<typeof useSortable>
 }
 
-/** 会话列表项；置顶项使用浅色底，传入 sortable 时接入拖动与键盘排序。 */
+/** 会话列表项；置顶项使用与悬停一致的底色，传入 sortable 时接入拖动与键盘排序。 */
 function ConversationRow({
   conversation,
   name,
@@ -160,7 +160,7 @@ function ConversationRow({
             selected
               ? "bg-accent text-accent-foreground"
               : conversation.pinned
-                ? "bg-muted/60 hover:bg-muted"
+                ? "bg-muted"
                 : "hover:bg-muted",
             sortable?.isDragging && "relative z-10 shadow-md",
           )}

@@ -1,4 +1,5 @@
 /** 会话详情：按摘要读取结果渲染加载中、不可用、读取失败或会话主区，并统一处理消息后刷新与退群清理。 */
+import type { InboxConversation } from "@/api"
 import { useQueryClient } from "@tanstack/react-query"
 import { useTranslation } from "react-i18next"
 
@@ -13,11 +14,12 @@ import type { ConversationSummaryResource } from "@/features/inbox/use-conversat
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
 
-/** 渲染指定会话的详情；退群清理完成后由宿主通过 onGroupLeft 决定去向。 */
+/** 渲染指定会话的详情；退群清理完成后由宿主通过 onGroupLeft 决定去向，本人发送消息或处理客服会话并重读摘要后通过 onLocalChange 交给宿主。 */
 export function ConversationDetail({
   conversationId,
   summary,
   onGroupLeft,
+  onLocalChange,
   onSearchConversation,
   locateMessage = null,
   narrowViewport = false,
@@ -25,6 +27,7 @@ export function ConversationDetail({
   conversationId: string
   summary: ConversationSummaryResource
   onGroupLeft: (conversationID: string) => void
+  onLocalChange?: (conversation: InboxConversation) => void
   onSearchConversation?: (conversationID: string) => void
   locateMessage?: ({ conversationId: string } & ConversationLocateTarget) | null
   narrowViewport?: boolean
@@ -39,7 +42,10 @@ export function ConversationDetail({
   /** 消息或客服处理保存后刷新列表与详情。 */
   function refreshConversation(conversationID: string) {
     void invalidate(resourceKeys.inbox())
-    void invalidate(resourceKeys.conversationSummary(conversationID))
+    void invalidate(resourceKeys.conversationSummary(conversationID)).then(() => {
+      const current = queryClient.getQueryData<InboxConversation | null>(resourceKeys.conversationSummary(conversationID))
+      if (current) onLocalChange?.(current)
+    })
   }
 
   /** 主动退群后清理该会话的本地资源，再交给宿主处理去向。 */
