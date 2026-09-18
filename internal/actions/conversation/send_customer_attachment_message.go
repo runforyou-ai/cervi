@@ -146,7 +146,7 @@ func saveCustomerAttachment(ctx context.Context, tx bun.IDB, organizationID, mes
 	if _, err := tx.NewRaw(`INSERT INTO message_attachments
  (message_id, organization_id, file_id, name, content_type, byte_size, image_width, image_height, transfer_status)
  VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		messageID, organizationID, attachment.ID, attachment.Name, attachment.ContentType, attachment.ByteSize,
+		messageID, organizationID, common.OptionalString(attachment.ID), attachment.Name, attachment.ContentType, attachment.ByteSize,
 		attachment.ImageWidth, attachment.ImageHeight, attachment.TransferStatus).Exec(ctx); err != nil {
 		return fmt.Errorf("save customer message attachment: %w", err)
 	}

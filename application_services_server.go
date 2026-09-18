@@ -139,9 +139,9 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 		Payload: struct{}{}, CronExpression: "@every 5s", Timezone: "UTC", Enabled: true, MaxAttempts: 1, StartImmediately: true,
 	})
 
-	// 按企业存储设置导入 Telegram 头像，并接入渠道 Webhook。
+	// 按企业存储设置导入 Telegram 头像与入站媒体，注册媒体取回任务及最终失败时的附件终态，并接入渠道 Webhook。
 	getS3Setting := settingaction.NewGetS3SettingQuery(appStorage.DB())
-	telegramAvatarFiles := fileaction.NewImportAction(appStorage.DB(), func(ctx context.Context, organizationID string) (domain.FileStorageBackend, error) {
+	resolveStorageBackend := func(ctx context.Context, organizationID string) (domain.FileStorageBackend, error) {
 		setting, err := getS3Setting.ExecuteForOrganization(ctx, organizationID)
 		if err != nil {
 			return "", err
@@ -150,8 +150,14 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 			return domain.FileStorageBackendS3, nil
 		}
 		return domain.FileStorageBackendLocal, nil
-	}, serverfilecontent.NewWriter(localFiles, resolveFileS3))
-	telegramWebhook := channelaction.NewReceiveTelegramWebhookAction(appStorage.DB(), agentRunScheduler, telegramAPI, telegramAvatarFiles)
+	}
+	fileWriter := serverfilecontent.NewWriter(localFiles, resolveFileS3)
+	telegramAvatarFiles := fileaction.NewImportAction(appStorage.DB(), resolveStorageBackend, fileWriter)
+	retrieveTelegramMedia := channelaction.NewRetrieveTelegramMediaAction(appStorage.DB(), telegramAPI, fileWriter, agentRunScheduler)
+	if err := tasks.Registry().RegisterJSONWithTerminalFailure(channelaction.RetrieveTelegramMediaActionName, retrieveTelegramMedia.Execute, retrieveTelegramMedia.FinalizeFailure); err != nil {
+		return nil, nil, err
+	}
+	telegramWebhook := channelaction.NewReceiveTelegramWebhookAction(appStorage.DB(), agentRunScheduler, telegramAPI, telegramAvatarFiles, resolveStorageBackend, tasks)
 
 	// 将业务入口适配为 HTTP API，并为公开网站渠道提供配置查询。
 	httpAPI := api.NewService(

@@ -16,17 +16,18 @@ type turnHistory struct {
 	mediaBytes int64
 }
 
-// appendInput 按消息编号去重，把新消息追加在上一轮中间结果之后；模型支持的附件由新到旧在预算内随消息直传。
+// appendInput 按消息编号与修订去重，把新消息追加在上一轮中间结果之后；模型支持的附件由新到旧在预算内随消息直传。
 func (h *turnHistory) appendInput(ctx context.Context, messages []Message, media mediaInput) []*schema.AgenticMessage {
 	if h.seen == nil {
 		h.seen = make(map[string]struct{})
 	}
 	fresh := make([]Message, 0, len(messages))
 	for _, message := range messages {
-		if _, exists := h.seen[message.ID]; exists {
+		key := message.ID + "@" + message.Revision
+		if _, exists := h.seen[key]; exists {
 			continue
 		}
-		h.seen[message.ID] = struct{}{}
+		h.seen[key] = struct{}{}
 		fresh = append(fresh, message)
 	}
 	// 由新到旧读取模型支持格式的用户附件，读取成功才计入数量和字节预算，其余附件只保留正文中的链接。

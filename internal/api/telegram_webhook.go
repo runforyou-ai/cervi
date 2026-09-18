@@ -16,6 +16,7 @@ import (
 
 	"github.com/gin-gonic/gin"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
+	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
 const telegramWebhookBodyLimit = 64 << 10
@@ -24,8 +25,31 @@ const telegramTextLimit = 4096
 
 const telegramMaxCursorUnixSecond = int64(9223372036)
 
+const (
+	telegramMediaFileIDLimit   = 512
+	telegramMediaFileNameLimit = 255
+)
+
+// telegramWebhookFile 定义 Telegram 各类媒体共有的文件引用与元数据。
+type telegramWebhookFile struct {
+	FileID       string `json:"file_id"`
+	FileUniqueID string `json:"file_unique_id"`
+	FileName     string `json:"file_name"`
+	MimeType     string `json:"mime_type"`
+	FileSize     int64  `json:"file_size"`
+	Width        int    `json:"width"`
+	Height       int    `json:"height"`
+}
+
 type telegramWebhookMessage struct {
 	ReplyTo   *telegramWebhookMessage `json:"reply_to_message"`
+	Photo     []telegramWebhookFile   `json:"photo"`
+	Document  *telegramWebhookFile    `json:"document"`
+	Voice     *telegramWebhookFile    `json:"voice"`
+	Video     *telegramWebhookFile    `json:"video"`
+	VideoNote *telegramWebhookFile    `json:"video_note"`
+	Audio     *telegramWebhookFile    `json:"audio"`
+	Animation *telegramWebhookFile    `json:"animation"`
 	Caption   string                  `json:"caption"`
 	MessageID int64                   `json:"message_id"`
 	Date      int64                   `json:"date"`
@@ -118,12 +142,23 @@ func normalizeTelegramWebhookMessage(message telegramWebhookMessage) (*channelac
 	if message.From == nil || message.From.IsBot || message.From.ID <= 0 || message.Chat.ID <= 0 || message.Chat.ID != message.From.ID || message.MessageID <= 0 || message.Date <= 0 || message.Date > telegramMaxCursorUnixSecond {
 		return nil, "invalid_private_message"
 	}
-	if message.Text == nil {
-		return nil, "non_text"
-	}
-	body := strings.TrimSpace(*message.Text)
-	if body == "" || !utf8.ValidString(body) || utf8.RuneCountInString(body) > telegramTextLimit {
-		return nil, "invalid_text"
+	var body string
+	var media *channelaction.TelegramWebhookMedia
+	if message.Text != nil {
+		body = strings.TrimSpace(*message.Text)
+		if body == "" || !utf8.ValidString(body) || utf8.RuneCountInString(body) > telegramTextLimit {
+			return nil, "invalid_text"
+		}
+	} else {
+		var ignoredReason string
+		media, ignoredReason = normalizeTelegramWebhookMedia(message)
+		if ignoredReason != "" {
+			return nil, ignoredReason
+		}
+		body = strings.TrimSpace(message.Caption)
+		if !utf8.ValidString(body) || utf8.RuneCountInString(body) > domain.ChannelCaptionLimit(domain.ChannelTypeTelegram) {
+			return nil, "invalid_caption"
+		}
 	}
 	displayName := strings.TrimSpace(strings.Join([]string{message.From.FirstName, message.From.LastName}, " "))
 	if displayName == "" {
@@ -143,10 +178,63 @@ func normalizeTelegramWebhookMessage(message telegramWebhookMessage) (*channelac
 	}
 	originatedAt := time.Unix(message.Date, 0).UTC()
 	return &channelaction.TelegramWebhookMessage{
-		ChatID: message.Chat.ID, MessageID: message.MessageID, Reply: reply,
+		ChatID: message.Chat.ID, MessageID: message.MessageID, Reply: reply, Media: media,
 		SenderID: message.From.ID, DisplayName: displayName,
 		Body: body, OriginatedAt: originatedAt,
 	}, ""
+}
+
+// normalizeTelegramWebhookMedia 按动画、文件、照片、语音、视频、视频留言、音乐的顺序取出消息携带的单个媒体，缺少文件名或类型时按种类补默认值。
+func normalizeTelegramWebhookMedia(message telegramWebhookMessage) (*channelaction.TelegramWebhookMedia, string) {
+	var file *telegramWebhookFile
+	var defaultName, defaultType string
+	switch {
+	case message.Animation != nil:
+		// 动画消息同时携带 document 字段，按动画处理。
+		file, defaultName, defaultType = message.Animation, "animation.mp4", "video/mp4"
+	case message.Document != nil:
+		file, defaultName, defaultType = message.Document, "document", "application/octet-stream"
+	case len(message.Photo) > 0:
+		// 照片取像素面积最大的档位。
+		for index := range message.Photo {
+			size := &message.Photo[index]
+			if size.Width <= 0 || size.Height <= 0 {
+				continue
+			}
+			if file == nil || size.Width*size.Height > file.Width*file.Height {
+				file = size
+			}
+		}
+		defaultName, defaultType = "photo.jpg", "image/jpeg"
+	case message.Voice != nil:
+		file, defaultName, defaultType = message.Voice, "voice.ogg", "audio/ogg"
+	case message.Video != nil:
+		file, defaultName, defaultType = message.Video, "video.mp4", "video/mp4"
+	case message.VideoNote != nil:
+		file, defaultName, defaultType = message.VideoNote, "video-note.mp4", "video/mp4"
+	case message.Audio != nil:
+		file, defaultName, defaultType = message.Audio, "audio.mp3", "audio/mpeg"
+	default:
+		return nil, "unsupported_content"
+	}
+	if file == nil || file.FileID == "" || len(file.FileID) > telegramMediaFileIDLimit || file.FileUniqueID == "" || file.FileSize < 0 || file.Width < 0 || file.Height < 0 {
+		return nil, "invalid_media"
+	}
+	media := &channelaction.TelegramWebhookMedia{
+		FileID: file.FileID, UniqueID: file.FileUniqueID, ByteSize: file.FileSize,
+		FileName: strings.TrimSpace(file.FileName), ContentType: strings.TrimSpace(file.MimeType),
+	}
+	if media.FileName == "" || !utf8.ValidString(media.FileName) || utf8.RuneCountInString(media.FileName) > telegramMediaFileNameLimit {
+		media.FileName = defaultName
+	}
+	if media.ContentType == "" {
+		media.ContentType = defaultType
+	}
+	// 只有照片按图片尺寸内联展示，视频和动画的尺寸不作为图片宽高。
+	if len(message.Photo) > 0 && message.Animation == nil && message.Document == nil {
+		media.Width, media.Height = file.Width, file.Height
+	}
+	return media, ""
 }
 
 // writeTelegramWebhookError 映射公开回调错误并返回是否已经响应。

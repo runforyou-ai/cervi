@@ -21,6 +21,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/integration/telegram"
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
 )
 
@@ -42,9 +43,21 @@ type TelegramWebhookReply struct {
 	SenderIsBot bool
 }
 
-// TelegramWebhookMessage 定义已归一化的 Telegram 私聊文本消息。
+// TelegramWebhookMedia 定义随 Telegram 消息送达、内容待取回的单个媒体文件。
+type TelegramWebhookMedia struct {
+	FileID      string
+	UniqueID    string
+	FileName    string
+	ContentType string
+	ByteSize    int64
+	Width       int
+	Height      int
+}
+
+// TelegramWebhookMessage 定义已归一化的 Telegram 私聊消息，Media 非空时 Body 为媒体说明。
 type TelegramWebhookMessage struct {
 	Reply        *TelegramWebhookReply
+	Media        *TelegramWebhookMedia
 	ChatID       int64
 	MessageID    int64
 	SenderID     int64
@@ -64,11 +77,13 @@ type ReceiveTelegramWebhookAction struct {
 	agentScheduler conversationaction.CustomerAgentMessageScheduler
 	avatarAPI      telegram.ProfilePhotoAPI
 	avatarFiles    telegramContactAvatarImporter
+	mediaBackend   fileaction.StorageBackendResolver
+	mediaTasks     servertask.TxEnqueuer
 }
 
-// NewReceiveTelegramWebhookAction 创建 Telegram Webhook 接收操作。
-func NewReceiveTelegramWebhookAction(db *bun.DB, agentScheduler conversationaction.CustomerAgentMessageScheduler, avatarAPI telegram.ProfilePhotoAPI, avatarFiles telegramContactAvatarImporter) *ReceiveTelegramWebhookAction {
-	return &ReceiveTelegramWebhookAction{db: db, agentScheduler: agentScheduler, avatarAPI: avatarAPI, avatarFiles: avatarFiles}
+// NewReceiveTelegramWebhookAction 创建 Telegram Webhook 接收操作，mediaBackend 决定入站媒体的存储类型，mediaTasks 在入站事务内投递取回任务。
+func NewReceiveTelegramWebhookAction(db *bun.DB, agentScheduler conversationaction.CustomerAgentMessageScheduler, avatarAPI telegram.ProfilePhotoAPI, avatarFiles telegramContactAvatarImporter, mediaBackend fileaction.StorageBackendResolver, mediaTasks servertask.TxEnqueuer) *ReceiveTelegramWebhookAction {
+	return &ReceiveTelegramWebhookAction{db: db, agentScheduler: agentScheduler, avatarAPI: avatarAPI, avatarFiles: avatarFiles, mediaBackend: mediaBackend, mediaTasks: mediaTasks}
 }
 
 // Preflight 在读取请求体前校验渠道和当前 Secret。
@@ -118,13 +133,25 @@ func (a *ReceiveTelegramWebhookAction) Execute(ctx context.Context, channelID st
 			if reply := input.Message.Reply; reply != nil {
 				platformMessage.Reply = &channelmessage.Reply{MessageID: strconv.FormatInt(reply.MessageID, 10), Body: reply.Body, SenderName: reply.SenderName, SenderIsBot: reply.SenderIsBot}
 			}
-			received, err := conversationaction.ReceiveInboundCustomerMessage(ctx, tx, channel, conversationaction.InboundCustomerMessageInput{
+			inbound := conversationaction.InboundCustomerMessageInput{
 				ExternalID: strconv.FormatInt(input.Message.SenderID, 10), DisplayName: &displayName,
 				ChannelMessage:     platformMessage,
 				SingleConversation: true, Body: input.Message.Body,
 				IdempotencyKey: "chmsg:" + channelID + ":tg:" + strconv.FormatInt(*setting.BotID, 10) + ":" + strconv.FormatInt(input.Message.ChatID, 10) + ":" + strconv.FormatInt(input.Message.MessageID, 10),
 				OriginatedAt:   input.Message.OriginatedAt, SourceOrder: input.Message.MessageID,
-			})
+			}
+			// 媒体按企业当前存储配置建立取回中的文件记录，内容由取回任务写入。
+			if media := input.Message.Media; media != nil {
+				backend, err := a.mediaBackend(ctx, channel.OrganizationID)
+				if err != nil {
+					return fmt.Errorf("resolve Telegram media storage: %w", err)
+				}
+				inbound.ExternalMedia = &conversationaction.InboundExternalMedia{
+					ExternalID: media.UniqueID, FileName: media.FileName, ContentType: media.ContentType, ByteSize: media.ByteSize,
+					ImageWidth: media.Width, ImageHeight: media.Height, StorageBackend: backend,
+				}
+			}
+			received, err := conversationaction.ReceiveInboundCustomerMessage(ctx, tx, channel, inbound)
 			if err != nil {
 				var conflict *conversationaction.ConflictError
 				if !errors.As(err, &conflict) || conflict.Reason != conversationaction.ConflictReasonIdempotencyMismatch {
@@ -132,8 +159,18 @@ func (a *ReceiveTelegramWebhookAction) Execute(ctx context.Context, channelID st
 				}
 				ignoredConflict = true
 			} else {
-				// 仅新入站消息触发 AI 客服，回调重放不追加运行输入。
-				if received.Inserted {
+				// 仅新入站消息触发 AI 客服，回调重放不追加运行输入；取回中的媒体由取回任务在终态时调度。
+				if received.Inserted && received.Attachment != nil && received.Attachment.TransferStatus == domain.MessageAttachmentTransferPending {
+					if _, err := a.mediaTasks.EnqueueIn(ctx, tx, RetrieveTelegramMediaActionName, RetrieveTelegramMediaInput{
+						OrganizationID: channel.OrganizationID, ChannelID: channelID, ConversationID: received.Message.ConversationID,
+						MessageID: received.Message.ID, FileID: received.Attachment.ID, BotID: *setting.BotID, TelegramFileID: input.Message.Media.FileID,
+					}, servertask.EnqueueOptions{
+						Queue: "files", MaxAttempts: telegramMediaRetrieveMaxAttempts,
+						IdempotencyKey: "tgmedia:" + received.Attachment.ID, TriggerType: servertask.TriggerBusiness,
+					}); err != nil {
+						return fmt.Errorf("enqueue Telegram media retrieval: %w", err)
+					}
+				} else if received.Inserted {
 					if _, err := a.agentScheduler.ScheduleCustomerAuto(ctx, tx, channel.OrganizationID, received.Message.ConversationID, received.Session.ID, received.Message.ID); err != nil {
 						return fmt.Errorf("schedule Telegram customer agent: %w", err)
 					}

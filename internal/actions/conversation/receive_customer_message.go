@@ -24,6 +24,7 @@ type InboundCustomerMessageInput struct {
 	ChannelMessage          *channelmessage.Inbound
 	ClientMessageID         *string
 	Attachment              *InboundCustomerAttachment
+	ExternalMedia           *InboundExternalMedia
 	ReplyToMessageID        string
 	ExternalID              string
 	DisplayName             *string
@@ -42,9 +43,20 @@ type InboundCustomerAttachment struct {
 	ImageHeight int
 }
 
+// InboundExternalMedia 定义外部平台随消息送达、内容尚待取回的媒体附件。
+type InboundExternalMedia struct {
+	ExternalID     string
+	FileName       string
+	ContentType    string
+	ByteSize       int64
+	ImageWidth     int
+	ImageHeight    int
+	StorageBackend domain.FileStorageBackend
+}
+
 // messageType 返回本次入站写入的消息类型。
 func (i InboundCustomerMessageInput) messageType() domain.MessageType {
-	if i.Attachment != nil {
+	if i.Attachment != nil || i.ExternalMedia != nil {
 		return domain.MessageTypeAttachment
 	}
 	return domain.MessageTypeText
@@ -96,7 +108,7 @@ func ReceiveInboundCustomerMessage(ctx context.Context, db bun.IDB, channel *ser
 		return saved, err
 	}
 
-	// 附件在会话之前锁定并激活，文件名用于新会话标题和检索向量。
+	// 访客上传的附件在会话之前锁定并激活，外部媒体先建立取回中的文件记录；文件名用于新会话标题和检索向量。
 	var attachment *VisitorAttachment
 	titleSource := input.Body
 	if input.Attachment != nil {
@@ -104,9 +116,14 @@ func ReceiveInboundCustomerMessage(ctx context.Context, db bun.IDB, channel *ser
 		if err != nil {
 			return InboundCustomerMessageResult{}, err
 		}
-		if titleSource == "" {
-			titleSource = attachment.Name
+	} else if input.ExternalMedia != nil {
+		attachment, err = createExternalMediaAttachment(ctx, db, channel, *input.ExternalMedia)
+		if err != nil {
+			return InboundCustomerMessageResult{}, err
 		}
+	}
+	if attachment != nil && titleSource == "" {
+		titleSource = attachment.Name
 	}
 
 	subject, err := ensureContactSubject(ctx, db, channel.OrganizationID, ensured.Contact.ID, ids.subject)
@@ -269,7 +286,7 @@ func loadInboundCustomerMessage(ctx context.Context, db bun.IDB, channel *server
 		return InboundCustomerMessageResult{}, true, &ConflictError{Reason: ConflictReasonIdempotencyMismatch}
 	}
 	var attachment *VisitorAttachment
-	if input.Attachment != nil {
+	if input.Attachment != nil || input.ExternalMedia != nil {
 		attachment = &VisitorAttachment{}
 		if err := db.NewSelect().TableExpr("message_attachments AS ma").
 			ColumnExpr("COALESCE(ma.file_id::text, '') AS id").
@@ -280,7 +297,11 @@ func loadInboundCustomerMessage(ctx context.Context, db bun.IDB, channel *server
 			Scan(ctx, attachment); err != nil {
 			return InboundCustomerMessageResult{}, true, fmt.Errorf("load idempotent inbound attachment: %w", err)
 		}
-		if attachment.ID != input.Attachment.FileID || attachment.ImageWidth != input.Attachment.ImageWidth || attachment.ImageHeight != input.Attachment.ImageHeight {
+		// 访客附件核对文件编号，外部媒体的文件记录随取回结果变化，只核对文件名、类型与图片尺寸。
+		if input.Attachment != nil && (attachment.ID != input.Attachment.FileID || attachment.ImageWidth != input.Attachment.ImageWidth || attachment.ImageHeight != input.Attachment.ImageHeight) {
+			return InboundCustomerMessageResult{}, true, &ConflictError{Reason: ConflictReasonIdempotencyMismatch}
+		}
+		if media := input.ExternalMedia; media != nil && (attachment.Name != media.FileName || attachment.ContentType != media.ContentType || attachment.ImageWidth != media.ImageWidth || attachment.ImageHeight != media.ImageHeight) {
 			return InboundCustomerMessageResult{}, true, &ConflictError{Reason: ConflictReasonIdempotencyMismatch}
 		}
 	}
@@ -394,4 +415,25 @@ func lockInboundAttachmentFile(ctx context.Context, db bun.IDB, channel *serverm
 		},
 		StorageBackend: domain.FileStorageBackend(file.StorageBackend), StorageKey: file.StorageKey,
 	}, nil
+}
+
+// createExternalMediaAttachment 为外部平台媒体建立取回中的文件记录，超过渠道入站上限的媒体直接落为取回失败。
+func createExternalMediaAttachment(ctx context.Context, db bun.IDB, channel *servermodels.Channel, media InboundExternalMedia) (*VisitorAttachment, error) {
+	attachment := &VisitorAttachment{MessageAttachment: MessageAttachment{
+		Name: media.FileName, ContentType: media.ContentType, ByteSize: media.ByteSize,
+		ImageWidth: media.ImageWidth, ImageHeight: media.ImageHeight, TransferStatus: domain.MessageAttachmentTransferFailed,
+	}}
+	if limit := domain.ChannelInboundAttachmentLimit(domain.ChannelType(channel.Type)); media.ByteSize > limit {
+		return attachment, nil
+	}
+	file, err := fileaction.CreateExternalAttachment(ctx, db, channel.OrganizationID, channel.CreatedByUserID, media.ExternalID, media.StorageBackend, fileaction.UploadInput{
+		Purpose: domain.FilePurposeMessageAttachment, FileName: media.FileName, ContentType: media.ContentType, ByteSize: media.ByteSize,
+	})
+	if err != nil {
+		return nil, err
+	}
+	attachment.ID, attachment.Name, attachment.ContentType = file.ID, file.OriginalName, file.ContentType
+	attachment.TransferStatus = domain.MessageAttachmentTransferPending
+	attachment.StorageBackend, attachment.StorageKey = domain.FileStorageBackend(file.StorageBackend), file.StorageKey
+	return attachment, nil
 }

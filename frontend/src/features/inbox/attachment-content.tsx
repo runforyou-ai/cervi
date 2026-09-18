@@ -5,7 +5,7 @@ import { formatFileSize } from "@/lib/file-size"
 import { cn } from "@/lib/utils"
 import { AttachmentName } from "@/components/attachment-name"
 
-/** 展示图片预览或文件图标、名称与大小。 */
+/** 展示图片预览或文件图标、名称与大小，图片没有预览地址时在原位置显示状态说明。 */
 export function AttachmentContent({
   name,
   byteSize,
@@ -52,7 +52,10 @@ export function AttachmentContent({
             onLoad={onImageLoad}
           />
         ) : (
-          <div className="size-full min-h-20" />
+          // 没有预览地址时在图片位置显示接收中或接收失败等状态。
+          <div className="flex size-full min-h-20 items-center justify-center bg-muted px-3 text-center text-xs text-muted-foreground">
+            {detail}
+          </div>
         )}
         {onOpen ? (
           <button
