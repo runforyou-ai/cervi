@@ -195,7 +195,7 @@ const inbox = {
   groupSystemUpdated: "群聊资料已更新",
   serviceSessionHandedOff: "{{agent}} 已将会话转交{{target}}（{{reason}}）",
   handoffTargetPublicQueue: "公共队列",
-  serviceSessionClaimed: "{{actor}} 领取了会话",
+  serviceSessionClaimed: "{{actor}} 接管了会话",
   serviceSessionTakenOver: "{{actor}} 接管了 {{from}} 负责的会话",
   serviceSessionTransferred: "{{actor}} 将会话转交给 {{target}}",
   serviceSessionClosed: "{{actor}} 关闭了会话",
