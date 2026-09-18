@@ -45,9 +45,9 @@ export function ConversationMain({
   narrowViewport = false,
 }: {
   selection: ConversationSelection
-  onSessionChanged: (conversationID: string) => void
-  onConversationChanged: (conversationID: string) => void
-  onGroupLeft: (conversationID: string) => void
+  onSessionChanged?: (conversationID: string) => void
+  onConversationChanged?: (conversationID: string) => void
+  onGroupLeft?: (conversationID: string) => void
   onChatStarted?: (
     conversation: DirectInboxConversationData | AgentInboxConversationData,
   ) => void
@@ -159,7 +159,7 @@ export function ConversationMain({
             sessionStatus={sessionStatus}
             currentIdentityId={identity.user.identityId}
             onSessionChanged={() => {
-              if (customerConversation) onSessionChanged(customerConversation.id)
+              if (customerConversation) onSessionChanged?.(customerConversation.id)
             }}
             onSearch={
               onSearchConversation
@@ -181,7 +181,7 @@ export function ConversationMain({
           }
           replyDisabledReason={replyDisabledReason}
           onConversationChanged={() => {
-            if (validConversation) onConversationChanged(validConversation.id)
+            if (validConversation) onConversationChanged?.(validConversation.id)
           }}
           onChatStarted={onChatStarted}
           locateMessage={
@@ -200,7 +200,7 @@ export function ConversationMain({
         replyDisabledReason={replyDisabledReason}
         customerDraftRef={customerDraftRef}
         onGroupLeft={() => {
-          if (validConversation) onGroupLeft(validConversation.id)
+          if (validConversation) onGroupLeft?.(validConversation.id)
         }}
         visible={!contextCollapsed}
         onToggle={() => setContextCollapsed((collapsed) => !collapsed)}
