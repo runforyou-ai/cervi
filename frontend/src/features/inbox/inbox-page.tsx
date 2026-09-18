@@ -1,6 +1,5 @@
 /** 消息页中栏（范围纵栏 + 会话列表）和会话主区。 */
 import { useEffect, useRef, useState } from "react"
-import { useQueryClient } from "@tanstack/react-query"
 import { MessagesSquareIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
@@ -16,15 +15,16 @@ import {
   isApiError,
   listCustomerServiceAssignees,
   listInboxChannels,
+  openConversationWindow,
   sessionPath,
   type AgentInboxConversationData,
   type DirectInboxConversationData,
   type GroupInboxConversationData,
+  type InboxConversation,
   type MemberOption,
 } from "@/api"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { PageSplit } from "@/components/page-split"
-import { Button } from "@/components/ui/button"
 import {
   Sheet,
   SheetContent,
@@ -33,11 +33,9 @@ import {
   SheetTitle,
 } from "@/components/ui/sheet"
 import { useWorkspace } from "@/contexts/workspace-context"
-import { useAttachmentQueue } from "@/features/inbox/attachment-queue-context"
-import { useOutgoingMessageStore } from "@/features/inbox/outgoing-message-context"
+import { ConversationDetail } from "@/features/inbox/conversation-detail"
 import { ConversationMain } from "@/features/inbox/conversation-main"
 import type { ConversationLocateTarget } from "@/features/inbox/conversation-timeline"
-import { clearConversationResources } from "@/features/inbox/conversation-resources"
 import { ConversationTargetPickerDialog } from "@/features/inbox/conversation-target-picker-dialog"
 import { CreateGroupConversationDialog } from "@/features/inbox/create-group-conversation-dialog"
 import { InboxConversationList } from "@/features/inbox/inbox-conversation-list"
@@ -48,10 +46,7 @@ import { InboxListPanel } from "@/features/inbox/inbox-list-panel"
 import { InboxPaneTop } from "@/features/inbox/inbox-pane-top"
 import { InboxScopeRail } from "@/features/inbox/inbox-scope-rail"
 import { InboxSearchPanel } from "@/features/inbox/inbox-search-panel"
-import type {
-  ChatDraft,
-  ConversationSelection,
-} from "@/features/inbox/inbox-selection"
+import type { ChatDraft } from "@/features/inbox/inbox-selection"
 import { useConversationName } from "@/features/inbox/use-conversation-name"
 import {
   readConversationSummary,
@@ -69,6 +64,7 @@ import {
   useResourceReader,
 } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
+import { resolveAppPlatform } from "@/platform/app-platform"
 
 /** 新建后需要切换到的内部会话。 */
 type InternalInboxConversationData =
@@ -124,9 +120,6 @@ export function InboxPage({
   const isNarrowViewport = useIsNarrowViewport()
   const invalidate = useResourceInvalidator()
   const readResource = useResourceReader()
-  const queryClient = useQueryClient()
-  const { queue } = useAttachmentQueue()
-  const outgoingStore = useOutgoingMessageStore()
   const [railCollapsed, setRailCollapsed] = useState(false)
   const paneRef = useRef<HTMLDivElement>(null)
   const railToggledRef = useRef(false)
@@ -284,39 +277,48 @@ export function InboxPage({
     setIsNarrowDetailOpen(isNarrowViewport)
   }
 
-  /** 消息或客服处理保存后刷新列表与详情，保持当前筛选和选择。 */
-  function refreshConversationAfterMessage(conversationID: string) {
-    void invalidate(resourceKeys.inbox())
-    void invalidate(resourceKeys.conversationSummary(conversationID))
+  /** 桌面端在独立窗口打开会话，窗口标题取会话名称。 */
+  async function openConversationInWindow(conversation: InboxConversation, name: string) {
+    try {
+      await openConversationWindow({ conversationId: conversation.id, title: name })
+    } catch (error) {
+      console.warn("打开会话独立窗口失败", { conversationId: conversation.id, error })
+      toast.error(isApiError(error) ? apiErrorMessage(error) : t("conversationWindowOpenError"))
+    }
   }
 
   /** 主动退群后清空选择并关闭窄屏详情，不打开其他会话。 */
-  function showConversationAfterGroupLeft(conversationID: string) {
-    queue?.forgetConversation(conversationID)
-    outgoingStore.forgetConversation(conversationID)
-    clearConversationResources(queryClient, conversationID)
-    void queryClient.resetQueries({ queryKey: resourceKeys.conversationSummary(conversationID) })
+  function showConversationAfterGroupLeft() {
     setChatDraft(null)
     setIsNarrowDetailOpen(false)
     onSelectedConversationChange("", true)
   }
 
-  const selection: ConversationSelection | null = activeChatDraft
-    ? activeChatDraft
-    : selectedConversation
-      ? { kind: "conversation", conversation: selectedConversation }
-      : null
-
-  const detailState = selectedConversationId && !selection ? (
-    <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-3 p-6 text-sm text-muted-foreground">
-      {summary.loading ? <LoadingIndicator>{t("messagesLoading")}</LoadingIndicator> : (
-        <>
-          <p>{t(summary.data === null ? "conversationUnavailable" : "conversationLoadError")}</p>
-          {summary.data !== null ? <Button variant="outline" size="sm" onClick={() => void summary.refresh()}>{t("common:actions.retry")}</Button> : null}
-        </>
-      )}
-    </div>
-  ) : null
+  /** 按当前聊天草稿或选中会话渲染主区内容。 */
+  function renderConversation(narrowViewport: boolean) {
+    if (activeChatDraft) {
+      return (
+        <ConversationMain
+          selection={activeChatDraft}
+          onChatStarted={showStartedConversation}
+          onSearchConversation={searchConversation}
+          locateMessage={messageTarget}
+          narrowViewport={narrowViewport}
+        />
+      )
+    }
+    if (!selectedConversationId) return null
+    return (
+      <ConversationDetail
+        conversationId={selectedConversationId}
+        summary={summary}
+        onGroupLeft={showConversationAfterGroupLeft}
+        onSearchConversation={searchConversation}
+        locateMessage={messageTarget}
+        narrowViewport={narrowViewport}
+      />
+    )
+  }
 
   // 收起和展开由两个位置的按钮分别承担，切换后把焦点交给新出现的那个。
   useEffect(() => {
@@ -386,6 +388,11 @@ export function InboxPage({
               onMenuChange={listViewport.setMenu}
               selectedId={selectedConversation?.id}
               onSelect={selectConversation}
+              onOpenInWindow={
+                resolveAppPlatform() === "desktop"
+                  ? (conversation, name) => void openConversationInWindow(conversation, name)
+                  : undefined
+              }
             />
           </InboxListPanel>
         )}
@@ -406,17 +413,9 @@ export function InboxPage({
           <LoadingIndicator className="flex-1 justify-center">
             {t("chatTargetLoading")}
           </LoadingIndicator>
-        ) : detailState ? detailState : selection ? (
-          <section className="min-h-0 flex-1">
-            <ConversationMain
-              selection={selection}
-              onSessionChanged={refreshConversationAfterMessage}
-              onConversationChanged={refreshConversationAfterMessage}
-              onGroupLeft={showConversationAfterGroupLeft}
-              onChatStarted={showStartedConversation}
-              onSearchConversation={searchConversation}
-              locateMessage={messageTarget}
-            />
+        ) : activeChatDraft || selectedConversationId ? (
+          <section className="flex min-h-0 flex-1 flex-col">
+            {renderConversation(false)}
           </section>
         ) : (
           <div className="cervi-inbox-empty-main flex min-h-0 flex-1 items-center justify-center p-6">
@@ -438,7 +437,7 @@ export function InboxPage({
         )}
       </PageSplit>
 
-      {isNarrowViewport && (selection || detailState) ? (
+      {isNarrowViewport && (activeChatDraft || selectedConversationId) ? (
         <Sheet
           open={isNarrowDetailOpen}
           onOpenChange={(open) => {
@@ -467,18 +466,7 @@ export function InboxPage({
               </SheetTitle>
               <SheetDescription>{t("detailDescription")}</SheetDescription>
             </SheetHeader>
-            {selection ? (
-            <ConversationMain
-              selection={selection}
-              onSessionChanged={refreshConversationAfterMessage}
-              onConversationChanged={refreshConversationAfterMessage}
-              onGroupLeft={showConversationAfterGroupLeft}
-              onChatStarted={showStartedConversation}
-              onSearchConversation={searchConversation}
-              locateMessage={messageTarget}
-              narrowViewport
-            />
-            ) : detailState}
+            {renderConversation(true)}
           </SheetContent>
         </Sheet>
       ) : null}

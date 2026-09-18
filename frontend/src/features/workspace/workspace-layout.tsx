@@ -1,23 +1,17 @@
 /** Web 与桌面端工作台布局。 */
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
-import { Navigate, useLocation, useNavigate } from "react-router"
+import { useLocation, useNavigate } from "react-router"
 import { toast } from "sonner"
 
-import { loadInbox, logout, WorkStatus } from "@/api"
-import { AttachmentQueueProvider } from "@/features/inbox/attachment-queue-context"
-import { OutgoingMessageProvider } from "@/features/inbox/outgoing-message-context"
-import { LoadingIndicator } from "@/components/loading-indicator"
-import { RealtimeSyncProvider } from "@/contexts/realtime-sync-context"
-import { UserPreferencesProvider } from "@/contexts/user-preferences"
+import { loadInbox, logout, WorkStatus, type Identity } from "@/api"
+import type { WorkspaceOutletContext } from "@/contexts/workspace-context"
 import {
   activateNotificationPolicy,
   deactivateNotificationPolicy,
 } from "@/features/notifications/new-message-notifications"
 import { useNewMessageNotifications } from "@/features/notifications/use-new-message-notifications"
-import { useIdentityLoader } from "@/features/session/use-identity-loader"
-import { useRealtimeConnection } from "@/features/session/use-realtime-connection"
-import type { WorkspaceOutletContext } from "@/contexts/workspace-context"
+import { SessionShell } from "@/features/session/session-shell"
 import { WorkspaceNavigationGuard } from "@/features/workspace/workspace-navigation-guard"
 import { WorkspaceNavigation } from "@/features/workspace/workspace-navigation"
 import {
@@ -49,15 +43,23 @@ function useClearSelectionOnNavigation() {
   }, [location.key])
 }
 
-/** 读取登录身份并渲染工作台导航和子页面。 */
+/** 在登录外壳内渲染工作台。 */
 export function WorkspaceLayout() {
+  return (
+    <SessionShell>
+      {(identity) => <WorkspaceShell identity={identity} />}
+    </SessionShell>
+  )
+}
+
+/** 按登录身份渲染工作台导航、子页面和桌面端提醒状态。 */
+function WorkspaceShell({ identity }: { identity: Identity }) {
   useClearSelectionOnNavigation()
   const location = useLocation()
-  const { t } = useTranslation(["workspace", "common"])
+  const { t } = useTranslation("workspace")
   const navigate = useNavigate()
   const [loggingOut, setLoggingOut] = useState(false)
   const [attentionPending, setAttentionPending] = useState(false)
-  const { status, identity, redirectPath } = useIdentityLoader()
   const workspaceLocation = resolveWorkspaceLocation(location)
   const fallbackTabRef = useRef<ResolvedWorkspaceTab>(defaultWorkspaceTab)
   const currentHref = `${location.pathname}${location.search}${location.hash}`
@@ -68,55 +70,45 @@ export function WorkspaceLayout() {
     fallbackTabRef.current = workspaceLocation.tab
   }
 
-  const organizationId = identity?.user.organizationId
-  const userId = identity?.user.id
-  const messageNotificationsEnabled = identity?.user.messageNotificationsEnabled
-  const workStatus = identity?.user.workStatus
-  useRealtimeConnection(Boolean(userId))
+  const organizationId = identity.user.organizationId
+  const userId = identity.user.id
+  const messageNotificationsEnabled = identity.user.messageNotificationsEnabled
+  const workStatus = identity.user.workStatus
 
   /** 修正规范工作台地址。 */
   useLayoutEffect(() => {
     if (
-      !userId ||
-      (workspaceLocation.tab && workspaceLocation.canonicalHref === currentHref)
+      workspaceLocation.tab &&
+      workspaceLocation.canonicalHref === currentHref
     ) {
       return
     }
     navigate(workspaceLocation.canonicalHref, { replace: true })
   }, [
     currentHref,
-    userId,
     navigate,
     workspaceLocation.canonicalHref,
     workspaceLocation.tab,
   ])
 
   /** 同步当前用户的新消息通知策略。 */
-  useLayoutEffect(() => {
-    if (
-      !organizationId ||
-      !userId ||
-      messageNotificationsEnabled === undefined ||
-      workStatus === undefined
-    ) {
-      return
-    }
-    return activateNotificationPolicy(
-      { organizationId, userId },
-      messageNotificationsEnabled,
-      workStatus,
-    )
-  }, [organizationId, userId, messageNotificationsEnabled, workStatus])
+  useLayoutEffect(
+    () =>
+      activateNotificationPolicy(
+        { organizationId, userId },
+        messageNotificationsEnabled,
+        workStatus,
+      ),
+    [organizationId, userId, messageNotificationsEnabled, workStatus],
+  )
 
   const attentionEnabled =
-    Boolean(messageNotificationsEnabled) &&
-    workStatus === WorkStatus.WorkStatusWorking
+    messageNotificationsEnabled && workStatus === WorkStatus.WorkStatusWorking
 
   // 提醒总数按权威查询读取，会话变化由同步协调器失效该查询。
   const attention = useResource(
     resourceKeys.inboxAttention({ organizationId, userId }),
     async () => (await loadInbox({ limit: 1 })).attentionUnreadCount,
-    { enabled: Boolean(organizationId && userId) },
   )
   const unreadCount = attention.data ?? 0
 
@@ -129,7 +121,7 @@ export function WorkspaceLayout() {
 
   /** 同步桌面端未读数和提醒状态。 */
   useEffect(() => {
-    if (!userId || resolveAppPlatform() !== "desktop") {
+    if (resolveAppPlatform() !== "desktop") {
       return
     }
 
@@ -151,7 +143,7 @@ export function WorkspaceLayout() {
         error,
       })
     })
-  }, [userId, attentionEnabled, unreadCount, attentionPending, attention.dataUpdatedAt])
+  }, [attentionEnabled, unreadCount, attentionPending, attention.dataUpdatedAt])
 
   /** 用户重新查看应用时停止托盘闪烁。 */
   useEffect(() => {
@@ -215,63 +207,32 @@ export function WorkspaceLayout() {
     }
   }
 
-  if (status === "anonymous") return <Navigate to="/login" replace />
-  if (status === "redirect" && redirectPath) {
-    return <Navigate to={redirectPath} replace />
-  }
-  if (status === "failed") {
-    return (
-      <main className="flex min-h-svh items-center justify-center text-sm text-muted-foreground">
-        {t("identityLoadError")}
-      </main>
-    )
-  }
-  if (!identity) {
-    return (
-      <main className="flex min-h-svh items-center justify-center">
-        <LoadingIndicator>{t("common:status.loading")}</LoadingIndicator>
-      </main>
-    )
-  }
   const workspaceContext = { identity } satisfies WorkspaceOutletContext
   const currentTab = workspaceLocation.tab ?? fallbackTabRef.current
 
   return (
-    <UserPreferencesProvider user={identity.user}>
-      <WorkspaceNavigationGuard
-        tabsEnabled={identity.user.workspaceTabsEnabled}
-      >
-        <OutgoingMessageProvider key={identity.user.id}>
-          <RealtimeSyncProvider>
-            <AttachmentQueueProvider key={identity.user.id}>
-              <div className="cervi-workspace-shell relative flex h-svh min-h-0 w-full overflow-hidden">
-                <WorkspaceNavigation
-                  identity={identity}
-                  onLogout={handleLogout}
-                  loggingOut={loggingOut}
-                />
-                <div
-                  aria-hidden="true"
-                  className="cervi-workspace-top-drag-region"
-                />
-                <div className="cervi-workspace-content-frame flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl bg-background shadow-sm">
-                  {identity.user.workspaceTabsEnabled ? (
-                    <WorkspaceTabs
-                      currentTab={currentTab}
-                      context={workspaceContext}
-                    />
-                  ) : (
-                    <WorkspaceSinglePage
-                      href={currentTab.href}
-                      context={workspaceContext}
-                    />
-                  )}
-                </div>
-              </div>
-            </AttachmentQueueProvider>
-          </RealtimeSyncProvider>
-        </OutgoingMessageProvider>
-      </WorkspaceNavigationGuard>
-    </UserPreferencesProvider>
+    <WorkspaceNavigationGuard tabsEnabled={identity.user.workspaceTabsEnabled}>
+      <div className="cervi-workspace-shell relative flex h-svh min-h-0 w-full overflow-hidden">
+        <WorkspaceNavigation
+          identity={identity}
+          onLogout={handleLogout}
+          loggingOut={loggingOut}
+        />
+        <div
+          aria-hidden="true"
+          className="cervi-workspace-top-drag-region"
+        />
+        <div className="cervi-workspace-content-frame flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl bg-background shadow-sm">
+          {identity.user.workspaceTabsEnabled ? (
+            <WorkspaceTabs currentTab={currentTab} context={workspaceContext} />
+          ) : (
+            <WorkspaceSinglePage
+              href={currentTab.href}
+              context={workspaceContext}
+            />
+          )}
+        </div>
+      </div>
+    </WorkspaceNavigationGuard>
   )
 }

@@ -559,6 +559,11 @@ type ExternalPageOpener interface {
 	OpenExternalPage(context.Context, RequestMeta, ExternalPageInput) error
 }
 
+// ConversationWindowOpener 由支持多窗口的平台实现，在独立窗口打开指定会话。
+type ConversationWindowOpener interface {
+	OpenConversationWindow(context.Context, RequestMeta, ConversationWindowInput) error
+}
+
 // NativeLocaleUpdater 同步当前设备上的原生界面语言。
 type NativeLocaleUpdater interface {
 	SetLocale(Locale)

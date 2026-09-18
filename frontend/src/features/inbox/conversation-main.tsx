@@ -45,13 +45,13 @@ export function ConversationMain({
   narrowViewport = false,
 }: {
   selection: ConversationSelection
-  onSessionChanged: (conversationID: string) => void
-  onConversationChanged: (conversationID: string) => void
-  onGroupLeft: (conversationID: string) => void
-  onChatStarted: (
+  onSessionChanged?: (conversationID: string) => void
+  onConversationChanged?: (conversationID: string) => void
+  onGroupLeft?: (conversationID: string) => void
+  onChatStarted?: (
     conversation: DirectInboxConversationData | AgentInboxConversationData,
   ) => void
-  onSearchConversation: (conversationID: string) => void
+  onSearchConversation?: (conversationID: string) => void
   locateMessage: ({ conversationId: string } & ConversationLocateTarget) | null
   narrowViewport?: boolean
 }) {
@@ -159,9 +159,13 @@ export function ConversationMain({
             sessionStatus={sessionStatus}
             currentIdentityId={identity.user.identityId}
             onSessionChanged={() => {
-              if (customerConversation) onSessionChanged(customerConversation.id)
+              if (customerConversation) onSessionChanged?.(customerConversation.id)
             }}
-            onSearch={() => onSearchConversation(validConversation.id)}
+            onSearch={
+              onSearchConversation
+                ? () => onSearchConversation(validConversation.id)
+                : undefined
+            }
             narrowViewport={narrowViewport}
           />
         ) : directTarget ? (
@@ -177,7 +181,7 @@ export function ConversationMain({
           }
           replyDisabledReason={replyDisabledReason}
           onConversationChanged={() => {
-            if (validConversation) onConversationChanged(validConversation.id)
+            if (validConversation) onConversationChanged?.(validConversation.id)
           }}
           onChatStarted={onChatStarted}
           locateMessage={
@@ -196,7 +200,7 @@ export function ConversationMain({
         replyDisabledReason={replyDisabledReason}
         customerDraftRef={customerDraftRef}
         onGroupLeft={() => {
-          if (validConversation) onGroupLeft(validConversation.id)
+          if (validConversation) onGroupLeft?.(validConversation.id)
         }}
         visible={!contextCollapsed}
         onToggle={() => setContextCollapsed((collapsed) => !collapsed)}

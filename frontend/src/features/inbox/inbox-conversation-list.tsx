@@ -33,17 +33,19 @@ import { messagePreview } from "@/lib/message-preview"
 import { recoverSession } from "@/lib/session-navigation"
 import { cn } from "@/lib/utils"
 
-/** 会话列表。 */
+/** 会话列表；传入 onOpenInWindow 时双击会话项在独立窗口打开该会话。 */
 export function InboxConversationList({
   conversations,
   onMenuChange,
   selectedId,
   onSelect,
+  onOpenInWindow,
 }: {
   conversations: InboxConversation[]
   onMenuChange: (open: boolean) => void
   selectedId?: string
   onSelect: (conversationId: string) => void
+  onOpenInWindow?: (conversation: InboxConversation, name: string) => void
 }) {
   const { t } = useTranslation("inbox")
   const conversationName = useConversationName()
@@ -136,6 +138,11 @@ export function InboxConversationList({
                     }
                     onSelect(conversation.id)
                   }}
+                  onDoubleClick={
+                    onOpenInWindow
+                      ? () => onOpenInWindow(conversation, name)
+                      : undefined
+                  }
                 >
                   <span className="relative shrink-0">
                     <ConversationAvatar conversation={conversation} />

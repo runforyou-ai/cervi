@@ -61,7 +61,7 @@ export function ConversationThread({
   agentDraftID: string
   replyDisabledReason: string | null
   onConversationChanged: () => void
-  onChatStarted: (
+  onChatStarted?: (
     conversation: DirectInboxConversationData | AgentInboxConversationData,
   ) => void
   locateMessage: ConversationLocateTarget | null
@@ -213,7 +213,7 @@ export function ConversationThread({
           if (directTarget && !agentDraftID) void invalidate(resourceKeys.directConversation(directTarget.id))
           void invalidate(resourceKeys.conversationMessages(created.id))
           // 附件首发成功后切到新建的单聊或 AI 聊天。
-          if (aliveRef.current && (isDirectInboxConversation(created) || isAgentInboxConversation(created))) onChatStarted(created)
+          if (aliveRef.current && (isDirectInboxConversation(created) || isAgentInboxConversation(created))) onChatStarted?.(created)
         }}
         sendIndividualMessage={
           directTarget
@@ -238,7 +238,7 @@ export function ConversationThread({
                 )
                 // 首条发送成功后切到新建会话；线程已卸载时只刷新列表。
                 if (aliveRef.current) {
-                  onChatStarted(result.conversation)
+                  onChatStarted?.(result.conversation)
                 } else {
                   void invalidate(resourceKeys.inbox())
                 }

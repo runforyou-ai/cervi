@@ -39,7 +39,7 @@ export function ConversationHeader({
   sessionStatus: string
   currentIdentityId: string
   onSessionChanged: () => void
-  onSearch: () => void
+  onSearch?: () => void
   narrowViewport?: boolean
 }) {
   const { t } = useTranslation(["inbox", "common"])
@@ -118,17 +118,19 @@ export function ConversationHeader({
             ) : null}
           </div>
         </div>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          className="shrink-0 text-muted-foreground"
-          aria-label={t("searchCurrentConversation")}
-          title={t("searchCurrentConversation")}
-          onClick={onSearch}
-        >
-          <SearchIcon />
-        </Button>
+        {onSearch ? (
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className="shrink-0 text-muted-foreground"
+            aria-label={t("searchCurrentConversation")}
+            title={t("searchCurrentConversation")}
+            onClick={onSearch}
+          >
+            <SearchIcon />
+          </Button>
+        ) : null}
         {customer ? (
           <div
             data-slot="conversation-actions"

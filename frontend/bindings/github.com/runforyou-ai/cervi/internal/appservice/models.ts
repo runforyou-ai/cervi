@@ -988,6 +988,14 @@ export interface ConversationUnreadMarkInput {
 }
 
 /**
+ * ConversationWindowInput 定义桌面端打开会话独立窗口的输入。
+ */
+export interface ConversationWindowInput {
+    "conversationId": string;
+    "title": string;
+}
+
+/**
  * CreateAgentInput 定义新增 AI 员工字段。
  */
 export interface CreateAgentInput {

@@ -130,6 +130,7 @@ export type {
     ConversationSystemEvent,
     ConversationSystemEventParticipant,
     ConversationUnreadMarkInput,
+    ConversationWindowInput,
     CreateAgentInput,
     CreateMessageChannelInput,
     CreateUserInput,
