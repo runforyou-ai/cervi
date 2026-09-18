@@ -63,15 +63,17 @@ func AppendMessage(ctx context.Context, db bun.IDB, conversation *servermodels.C
 			return nil, false, fmt.Errorf("update service session summary: %w", err)
 		}
 	}
-	// 活动时间取锁内数据库时钟，保留同会话已提交的较大值。
-	query := db.NewUpdate().Model(conversation).
-		Set("last_activity_at = GREATEST(last_activity_at, clock_timestamp())").
-		Set("last_message_id = ?", message.ID).
-		Set("last_message_at = ?", message.OriginatedAt).
-		Set("updated_at = now()").
-		WherePK().Where("organization_id = ?", conversation.OrganizationID)
-	if err := query.Returning("last_activity_at").Scan(ctx); err != nil {
-		return nil, false, fmt.Errorf("update conversation summary: %w", err)
+	// 活动时间取锁内数据库时钟，保留同会话已提交的较大值；客服处理周期的系统事件只记录流转，不改变会话摘要与活动时间。
+	if message.Type != string(domain.MessageTypeSystem) || message.ServiceSessionID == nil {
+		query := db.NewUpdate().Model(conversation).
+			Set("last_activity_at = GREATEST(last_activity_at, clock_timestamp())").
+			Set("last_message_id = ?", message.ID).
+			Set("last_message_at = ?", message.OriginatedAt).
+			Set("updated_at = now()").
+			WherePK().Where("organization_id = ?", conversation.OrganizationID)
+		if err := query.Returning("last_activity_at").Scan(ctx); err != nil {
+			return nil, false, fmt.Errorf("update conversation summary: %w", err)
+		}
 	}
 	// 内部备注不推进客户可见事实，不登记网站访客受众的变更通知。
 	if err := notifyConversationChanged(ctx, db, conversation, message.Visibility != string(domain.MessageVisibilityInternalOnly)); err != nil {

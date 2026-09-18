@@ -561,6 +561,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		messageCountBeforeReply, err := db.NewSelect().Model((*servermodels.Message)(nil)).
 			Where("organization_id = ?", loggedIn.Identity.Organization.ID).
 			Where("conversation_id = ?", telegramConversation.ID).
+			Where("type <> ?", domain.MessageTypeSystem).
 			Count(context.Background())
 		if err != nil {
 			t.Fatal(err)
@@ -581,6 +582,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		messageCountAfterReply, err := db.NewSelect().Model((*servermodels.Message)(nil)).
 			Where("organization_id = ?", loggedIn.Identity.Organization.ID).
 			Where("conversation_id = ?", telegramConversation.ID).
+			Where("type <> ?", domain.MessageTypeSystem).
 			Count(context.Background())
 		if err != nil {
 			t.Fatal(err)

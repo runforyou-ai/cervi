@@ -232,10 +232,17 @@ func assertClientAssociationHTTP(t *testing.T, f navigationFixture, conversation
 		response := httptest.NewRecorder()
 		service.ServeHTTP(response, request)
 		var page appservice.ConversationMessageList
-		if response.Code != http.StatusOK || json.Unmarshal(response.Body.Bytes(), &page) != nil || len(page.Messages) != 2 {
+		if response.Code != http.StatusOK || json.Unmarshal(response.Body.Bytes(), &page) != nil || len(page.Messages) != 3 {
 			t.Fatalf("HTTP status=%d body=%s", response.Code, response.Body.String())
 		}
 		for _, message := range page.Messages {
+			// 成员回复领取周期时写入的系统事件不带发送编号。
+			if message.Type == appservice.MessageTypeSystem {
+				if message.ClientMessageID != nil || message.SystemEvent == nil || message.SystemEvent.Type != appservice.ConversationSystemEventServiceSessionClaimed {
+					t.Fatalf("HTTP claim event=%+v", message)
+				}
+				continue
+			}
 			if message.ID == visitorMessageID || email != "owner@navigation.test" {
 				if message.ClientMessageID != nil {
 					t.Fatalf("HTTP association leaked: %+v", message)

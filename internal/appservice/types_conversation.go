@@ -53,24 +53,30 @@ const (
 	ConversationSystemEventGroupDissolved        ConversationSystemEventType = ConversationSystemEventType(domain.ConversationSystemEventGroupDissolved)
 	// ConversationSystemEventServiceSessionHandedOff 表示 AI 员工把客服处理周期转交人工。
 	ConversationSystemEventServiceSessionHandedOff ConversationSystemEventType = ConversationSystemEventType(domain.ConversationSystemEventServiceSessionHandedOff)
+	// 以下事件表示成员领取、接管、转交、关闭与重开客服处理周期。
+	ConversationSystemEventServiceSessionClaimed     ConversationSystemEventType = ConversationSystemEventType(domain.ConversationSystemEventServiceSessionClaimed)
+	ConversationSystemEventServiceSessionTakenOver   ConversationSystemEventType = ConversationSystemEventType(domain.ConversationSystemEventServiceSessionTakenOver)
+	ConversationSystemEventServiceSessionTransferred ConversationSystemEventType = ConversationSystemEventType(domain.ConversationSystemEventServiceSessionTransferred)
+	ConversationSystemEventServiceSessionClosed      ConversationSystemEventType = ConversationSystemEventType(domain.ConversationSystemEventServiceSessionClosed)
+	ConversationSystemEventServiceSessionReopened    ConversationSystemEventType = ConversationSystemEventType(domain.ConversationSystemEventServiceSessionReopened)
 )
 
-// ServiceSessionHandoffTargetKind 表示转交人工的去向类型。
-type ServiceSessionHandoffTargetKind string
+// ServiceSessionTargetKind 表示客服处理周期流转去向的类型。
+type ServiceSessionTargetKind string
 
 const (
-	ServiceSessionHandoffTargetPublicQueue ServiceSessionHandoffTargetKind = ServiceSessionHandoffTargetKind(domain.ServiceSessionHandoffTargetPublicQueue)
-	ServiceSessionHandoffTargetTeam        ServiceSessionHandoffTargetKind = ServiceSessionHandoffTargetKind(domain.ServiceSessionHandoffTargetTeam)
-	ServiceSessionHandoffTargetMember      ServiceSessionHandoffTargetKind = ServiceSessionHandoffTargetKind(domain.ServiceSessionHandoffTargetMember)
+	ServiceSessionTargetPublicQueue ServiceSessionTargetKind = ServiceSessionTargetKind(domain.ServiceSessionTargetPublicQueue)
+	ServiceSessionTargetTeam        ServiceSessionTargetKind = ServiceSessionTargetKind(domain.ServiceSessionTargetTeam)
+	ServiceSessionTargetMember      ServiceSessionTargetKind = ServiceSessionTargetKind(domain.ServiceSessionTargetMember)
 )
 
-// ServiceSessionHandoffTarget 定义转交人工的去向及名称快照。
-type ServiceSessionHandoffTarget struct {
-	Kind        ServiceSessionHandoffTargetKind `json:"kind"`
-	TeamID      *string                         `json:"teamId"`
-	TeamName    *string                         `json:"teamName"`
-	IdentityID  *string                         `json:"identityId"`
-	DisplayName *string                         `json:"displayName"`
+// ServiceSessionTarget 定义客服处理周期流转的去向及名称快照。
+type ServiceSessionTarget struct {
+	Kind        ServiceSessionTargetKind `json:"kind"`
+	TeamID      *string                  `json:"teamId"`
+	TeamName    *string                  `json:"teamName"`
+	IdentityID  *string                  `json:"identityId"`
+	DisplayName *string                  `json:"displayName"`
 }
 
 // GroupParticipantRole 表示群聊成员角色。
@@ -218,14 +224,14 @@ type ConversationSystemEvent struct {
 	Targets       []ConversationSystemEventParticipant `json:"targets"`
 	PreviousTitle *string                              `json:"previousTitle"`
 	Title         *string                              `json:"title"`
-	// 以下字段只由转人工事件携带：原 AI 员工、去向、原因与成员可见的原因说明。
-	ServiceSessionID *string                      `json:"serviceSessionId"`
-	FromIdentityID   *string                      `json:"fromIdentityId"`
-	FromDisplayName  *string                      `json:"fromDisplayName"`
-	HandoffTarget    *ServiceSessionHandoffTarget `json:"handoffTarget"`
-	HandoffReason    *AgentHandoffReason          `json:"handoffReason"`
-	ReasonText       *string                      `json:"reasonText"`
-	AgentRunID       *string                      `json:"agentRunId"`
+	// 以下字段只由客服处理周期事件携带：原负责人、去向，以及转人工的原因与成员可见的原因说明；操作人写入 Actor。
+	ServiceSessionID *string               `json:"serviceSessionId"`
+	FromIdentityID   *string               `json:"fromIdentityId"`
+	FromDisplayName  *string               `json:"fromDisplayName"`
+	SessionTarget    *ServiceSessionTarget `json:"sessionTarget"`
+	HandoffReason    *AgentHandoffReason   `json:"handoffReason"`
+	ReasonText       *string               `json:"reasonText"`
+	AgentRunID       *string               `json:"agentRunId"`
 }
 
 // ConversationMessage 定义成员可见的会话消息。

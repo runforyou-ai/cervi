@@ -251,14 +251,16 @@ type ConversationSystemEvent struct {
 	Targets       []ConversationSystemEventParticipant `json:"targets"`
 	PreviousTitle *string                              `json:"previousTitle,omitempty"`
 	Title         *string                              `json:"title,omitempty"`
-	// 以下字段只由 service_session_handed_off 事件携带，结构与 domain.ServiceSessionHandedOffEvent 一致。
-	ServiceSessionID *string                             `json:"serviceSessionId,omitempty"`
-	FromIdentityID   *string                             `json:"fromIdentityId,omitempty"`
-	FromDisplayName  *string                             `json:"fromDisplayName,omitempty"`
-	Target           *domain.ServiceSessionHandoffTarget `json:"target,omitempty"`
-	Reason           *domain.AgentHandoffReason          `json:"reason,omitempty"`
-	ReasonText       *string                             `json:"reasonText,omitempty"`
-	AgentRunID       *string                             `json:"agentRunId,omitempty"`
+	// 以下字段只由 service_session_* 事件携带，结构与 domain.ServiceSessionHandedOffEvent、domain.ServiceSessionOperatedEvent 一致。
+	ServiceSessionID *string                      `json:"serviceSessionId,omitempty"`
+	ActorIdentityID  *string                      `json:"actorIdentityId,omitempty"`
+	ActorDisplayName *string                      `json:"actorDisplayName,omitempty"`
+	FromIdentityID   *string                      `json:"fromIdentityId,omitempty"`
+	FromDisplayName  *string                      `json:"fromDisplayName,omitempty"`
+	Target           *domain.ServiceSessionTarget `json:"target,omitempty"`
+	Reason           *domain.AgentHandoffReason   `json:"reason,omitempty"`
+	ReasonText       *string                      `json:"reasonText,omitempty"`
+	AgentRunID       *string                      `json:"agentRunId,omitempty"`
 }
 
 // ConversationMessage 定义成员可见的会话消息。

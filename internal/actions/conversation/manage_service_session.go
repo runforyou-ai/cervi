@@ -56,6 +56,7 @@ func (a *ClaimServiceSessionAction) Execute(ctx context.Context, identity *serve
 		}
 		now := time.Now().UTC()
 		if session.AssigneeIdentityID == nil || *session.AssigneeIdentityID != identity.OrganizationIdentity.ID {
+			previousAssigneeID := session.AssigneeIdentityID
 			if session.AssigneeIdentityID != nil {
 				cancelledRunIDs, err = a.coordinator.CancelForServiceSession(
 					ctx, tx, session.OrganizationID, session.ID,
@@ -77,6 +78,14 @@ func (a *ClaimServiceSessionAction) Execute(ctx context.Context, identity *serve
 			}
 			assigneeIdentityID := identity.OrganizationIdentity.ID
 			session.AssigneeIdentityID = &assigneeIdentityID
+			// 无人负责时记为领取，已有负责人时记为接管。
+			eventType := domain.ConversationSystemEventServiceSessionClaimed
+			if previousAssigneeID != nil {
+				eventType = domain.ConversationSystemEventServiceSessionTakenOver
+			}
+			if err := appendServiceSessionEvent(ctx, tx, identity, conversation, session, eventType, previousAssigneeID, nil); err != nil {
+				return err
+			}
 			if err := chatstate.TouchConversation(ctx, tx, conversation); err != nil {
 				return err
 			}
@@ -171,6 +180,10 @@ func (a *TransferServiceSessionAction) Execute(ctx context.Context, identity *se
 			return err
 		}
 		session.AssigneeIdentityID = &target.ID
+		if err := appendServiceSessionEvent(ctx, tx, identity, conversation, session, domain.ConversationSystemEventServiceSessionTransferred,
+			&identity.OrganizationIdentity.ID, &domain.ServiceSessionTarget{Kind: domain.ServiceSessionTargetMember, IdentityID: &target.ID, DisplayName: &target.DisplayName}); err != nil {
+			return err
+		}
 		if err := chatstate.TouchConversation(ctx, tx, conversation); err != nil {
 			return err
 		}
@@ -286,6 +299,9 @@ func (a *CloseServiceSessionAction) Execute(ctx context.Context, identity *serve
 		}
 		session.Status = string(domain.ServiceSessionStatusClosed)
 		session.ClosedAt = &now
+		if err := appendServiceSessionEvent(ctx, tx, identity, conversation, session, domain.ConversationSystemEventServiceSessionClosed, nil, nil); err != nil {
+			return err
+		}
 		if err := chatstate.TouchConversation(ctx, tx, conversation); err != nil {
 			return err
 		}
@@ -358,6 +374,9 @@ func (a *ReopenServiceSessionAction) Execute(ctx context.Context, identity *serv
 		session.Status = string(domain.ServiceSessionStatusOpen)
 		session.AssigneeIdentityID = &assigneeIdentityID
 		session.ClosedAt = nil
+		if err := appendServiceSessionEvent(ctx, tx, identity, conversation, session, domain.ConversationSystemEventServiceSessionReopened, nil, nil); err != nil {
+			return err
+		}
 		if err := chatstate.TouchConversation(ctx, tx, conversation); err != nil {
 			return err
 		}

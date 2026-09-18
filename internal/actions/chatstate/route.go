@@ -24,15 +24,15 @@ type RouteSnapshot struct {
 	AssigneeType       domain.OrganizationIdentityType
 }
 
-// HandoffTarget 返回路由快照对应的转交去向与名称快照。
-func (r RouteSnapshot) HandoffTarget() domain.ServiceSessionHandoffTarget {
+// SessionTarget 返回路由快照对应的转交去向与名称快照。
+func (r RouteSnapshot) Target() domain.ServiceSessionTarget {
 	switch {
 	case r.AssigneeIdentityID != nil:
-		return domain.ServiceSessionHandoffTarget{Kind: domain.ServiceSessionHandoffTargetMember, IdentityID: r.AssigneeIdentityID, DisplayName: r.AssigneeName}
+		return domain.ServiceSessionTarget{Kind: domain.ServiceSessionTargetMember, IdentityID: r.AssigneeIdentityID, DisplayName: r.AssigneeName}
 	case r.TeamID != nil:
-		return domain.ServiceSessionHandoffTarget{Kind: domain.ServiceSessionHandoffTargetTeam, TeamID: r.TeamID, TeamName: r.TeamName}
+		return domain.ServiceSessionTarget{Kind: domain.ServiceSessionTargetTeam, TeamID: r.TeamID, TeamName: r.TeamName}
 	default:
-		return domain.ServiceSessionHandoffTarget{Kind: domain.ServiceSessionHandoffTargetPublicQueue}
+		return domain.ServiceSessionTarget{Kind: domain.ServiceSessionTargetPublicQueue}
 	}
 }
 

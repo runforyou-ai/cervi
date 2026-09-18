@@ -59,7 +59,7 @@ func applyCustomerHandoff(ctx context.Context, db bun.IDB, enqueuer servertask.T
 	}
 	payload, err := json.Marshal(domain.ServiceSessionHandedOffEvent{
 		ServiceSessionID: session.ID, FromIdentityID: handoff.AgentIdentityID, FromDisplayName: agentName,
-		Target: handoff.Route.HandoffTarget(), Reason: handoff.Reason, ReasonText: string(reasonText), AgentRunID: handoff.AgentRunID,
+		Target: handoff.Route.Target(), Reason: handoff.Reason, ReasonText: string(reasonText), AgentRunID: handoff.AgentRunID,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("encode service session handoff event: %w", err)
@@ -99,7 +99,7 @@ func applyCustomerHandoff(ctx context.Context, db bun.IDB, enqueuer servertask.T
 	slog.Info("客户会话已由 AI 员工转交人工",
 		"organization_id", session.OrganizationID, "conversation_id", session.ConversationID,
 		"service_session_id", session.ID, "agent_identity_id", handoff.AgentIdentityID,
-		"target_kind", handoff.Route.HandoffTarget().Kind, "reason", handoff.Reason)
+		"target_kind", handoff.Route.Target().Kind, "reason", handoff.Reason)
 	return notice, nil
 }
 

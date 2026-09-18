@@ -1017,12 +1017,12 @@ export interface ConversationSystemEvent {
     "title": string | null;
 
     /**
-     * 以下字段只由转人工事件携带：原 AI 员工、去向、原因与成员可见的原因说明。
+     * 以下字段只由客服处理周期事件携带：原负责人、去向，以及转人工的原因与成员可见的原因说明；操作人写入 Actor。
      */
     "serviceSessionId": string | null;
     "fromIdentityId": string | null;
     "fromDisplayName": string | null;
-    "handoffTarget": ServiceSessionHandoffTarget | null;
+    "sessionTarget": ServiceSessionTarget | null;
     "handoffReason": AgentHandoffReason | null;
     "reasonText": string | null;
     "agentRunId": string | null;
@@ -1056,6 +1056,15 @@ export enum ConversationSystemEventType {
      * ConversationSystemEventServiceSessionHandedOff 表示 AI 员工把客服处理周期转交人工。
      */
     ConversationSystemEventServiceSessionHandedOff = "service_session_handed_off",
+
+    /**
+     * 以下事件表示成员领取、接管、转交、关闭与重开客服处理周期。
+     */
+    ConversationSystemEventServiceSessionClaimed = "service_session_claimed",
+    ConversationSystemEventServiceSessionTakenOver = "service_session_taken_over",
+    ConversationSystemEventServiceSessionTransferred = "service_session_transferred",
+    ConversationSystemEventServiceSessionClosed = "service_session_closed",
+    ConversationSystemEventServiceSessionReopened = "service_session_reopened",
 };
 
 /**
@@ -2898,31 +2907,6 @@ export interface S3SettingInput {
 }
 
 /**
- * ServiceSessionHandoffTarget 定义转交人工的去向及名称快照。
- */
-export interface ServiceSessionHandoffTarget {
-    "kind": ServiceSessionHandoffTargetKind;
-    "teamId": string | null;
-    "teamName": string | null;
-    "identityId": string | null;
-    "displayName": string | null;
-}
-
-/**
- * ServiceSessionHandoffTargetKind 表示转交人工的去向类型。
- */
-export enum ServiceSessionHandoffTargetKind {
-    /**
-     * The Go zero value for the underlying type of the enum.
-     */
-    $zero = "",
-
-    ServiceSessionHandoffTargetPublicQueue = "public_queue",
-    ServiceSessionHandoffTargetTeam = "team",
-    ServiceSessionHandoffTargetMember = "member",
-};
-
-/**
  * ServiceSessionStatus 表示客服处理状态。
  */
 export enum ServiceSessionStatus {
@@ -2933,6 +2917,31 @@ export enum ServiceSessionStatus {
 
     ServiceSessionStatusOpen = "open",
     ServiceSessionStatusClosed = "closed",
+};
+
+/**
+ * ServiceSessionTarget 定义客服处理周期流转的去向及名称快照。
+ */
+export interface ServiceSessionTarget {
+    "kind": ServiceSessionTargetKind;
+    "teamId": string | null;
+    "teamName": string | null;
+    "identityId": string | null;
+    "displayName": string | null;
+}
+
+/**
+ * ServiceSessionTargetKind 表示客服处理周期流转去向的类型。
+ */
+export enum ServiceSessionTargetKind {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    ServiceSessionTargetPublicQueue = "public_queue",
+    ServiceSessionTargetTeam = "team",
+    ServiceSessionTargetMember = "member",
 };
 
 /**

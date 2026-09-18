@@ -174,6 +174,7 @@ func testAgentHandoffs(t *testing.T, db *bun.DB, identity *servermodels.Identity
 	t.Run("入站发现负责人失效", func(t *testing.T) { testInboundUnavailableAssignee(t, f) })
 	t.Run("Telegram 主动转人工", func(t *testing.T) { testTelegramModelHandoff(t, f) })
 	t.Run("渠道编辑与停用交错", func(t *testing.T) { testChannelEditVersusDeactivation(t, f) })
+	t.Run("成员操作客服周期事件", func(t *testing.T) { testServiceSessionOperationEvents(t, f) })
 	t.Run("Telegram 入站失效交接与运行收尾交错", func(t *testing.T) { testTelegramInboundHandoffVersusRunFailure(t, f) })
 }
 
@@ -209,7 +210,7 @@ func testModelHandoffRoundTrip(t *testing.T, f handoffFixture) {
 		t.Fatalf("session = %+v", session)
 	}
 	events := handoffEvents(t, f.db, first.Conversation.ID)
-	if len(events) != 1 || events[0].Target.Kind != domain.ServiceSessionHandoffTargetPublicQueue || events[0].ReasonText != "客户要求退款" ||
+	if len(events) != 1 || events[0].Target.Kind != domain.ServiceSessionTargetPublicQueue || events[0].ReasonText != "客户要求退款" ||
 		events[0].FromDisplayName != "转人工客服" || events[0].AgentRunID == nil || *events[0].AgentRunID != run.ID {
 		t.Fatalf("events = %+v", events)
 	}
@@ -274,14 +275,14 @@ func testHandoffTargets(t *testing.T, f handoffFixture) {
 		name         string
 		fallback     channelaction.RoutingTarget
 		invalid      bool
-		wantKind     domain.ServiceSessionHandoffTargetKind
+		wantKind     domain.ServiceSessionTargetKind
 		wantTeam     *string
 		wantAssignee *string
 	}{
-		{name: "团队", fallback: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypeTeam, ID: team.ID}, wantKind: domain.ServiceSessionHandoffTargetTeam, wantTeam: &team.ID},
-		{name: "真人", fallback: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypeMember, ID: human.IdentityID}, wantKind: domain.ServiceSessionHandoffTargetMember, wantAssignee: &human.IdentityID},
-		{name: "AI 员工", fallback: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypeMember, ID: fallbackAgent.IdentityID}, wantKind: domain.ServiceSessionHandoffTargetPublicQueue},
-		{name: "无效目标", fallback: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypeTeam, ID: team.ID}, invalid: true, wantKind: domain.ServiceSessionHandoffTargetPublicQueue},
+		{name: "团队", fallback: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypeTeam, ID: team.ID}, wantKind: domain.ServiceSessionTargetTeam, wantTeam: &team.ID},
+		{name: "真人", fallback: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypeMember, ID: human.IdentityID}, wantKind: domain.ServiceSessionTargetMember, wantAssignee: &human.IdentityID},
+		{name: "AI 员工", fallback: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypeMember, ID: fallbackAgent.IdentityID}, wantKind: domain.ServiceSessionTargetPublicQueue},
+		{name: "无效目标", fallback: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypeTeam, ID: team.ID}, invalid: true, wantKind: domain.ServiceSessionTargetPublicQueue},
 	} {
 		t.Run(scenario.name, func(t *testing.T) {
 			channelID := f.newChannel(t, agent.IdentityID, scenario.fallback)
@@ -304,8 +305,8 @@ func testHandoffTargets(t *testing.T, f handoffFixture) {
 			}
 			events := handoffEvents(t, f.db, first.Conversation.ID)
 			if len(events) != 1 || events[0].Target.Kind != scenario.wantKind ||
-				(scenario.wantKind == domain.ServiceSessionHandoffTargetTeam && (events[0].Target.TeamName == nil || *events[0].Target.TeamName != team.Name)) ||
-				(scenario.wantKind == domain.ServiceSessionHandoffTargetMember && (events[0].Target.DisplayName == nil || *events[0].Target.DisplayName != "人工客服")) {
+				(scenario.wantKind == domain.ServiceSessionTargetTeam && (events[0].Target.TeamName == nil || *events[0].Target.TeamName != team.Name)) ||
+				(scenario.wantKind == domain.ServiceSessionTargetMember && (events[0].Target.DisplayName == nil || *events[0].Target.DisplayName != "人工客服")) {
 				t.Fatalf("events = %+v", events)
 			}
 			// 模型未提供说明时使用渠道语言的内置通知。
@@ -629,5 +630,118 @@ func testTelegramInboundHandoffVersusRunFailure(t *testing.T, f handoffFixture) 
 	if fixture.run.Status != string(domain.AgentRunStatusCancelled) || len(events) != 1 ||
 		events[0].Reason != domain.AgentHandoffReasonAgentUnavailable || len(deliveries) != 1 {
 		t.Fatalf("run = %+v, events = %+v, deliveries = %+v", fixture.run, events, deliveries)
+	}
+}
+
+// testServiceSessionOperationEvents 验证领取、接管、转交、关闭与重开各写一条仅成员可见的周期事件，且不改变会话摘要与活动时间。
+func testServiceSessionOperationEvents(t *testing.T, f handoffFixture) {
+	ctx := context.Background()
+	agent := f.newAgent(t, "周期事件客服")
+	channel, err := channelaction.NewCreateMessageChannelAction(f.db).Execute(ctx, f.identity, channelaction.CreateMessageChannelInput{
+		Type: domain.ChannelTypeWebsite, Name: "周期事件验证", DefaultLocale: domain.LocaleChineseSimplified,
+		NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
+		FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	email := "session-events-" + uuid.NewV7().String()[:8] + "@handoff.test"
+	if _, err := useraction.NewCreateUserAction(f.db).Execute(ctx, f.identity, useraction.CreateInput{
+		DisplayName: "接管成员", Email: email, Password: "password123", RoleID: f.roleID,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	other, err := authaction.NewLoginAction(f.db).Execute(ctx, authaction.LoginInput{OrganizationID: f.identity.Organization.ID, Email: email, Password: "password123"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	input := visitorInput(channel.ID, "")
+	first := f.receive(t, &input, "有人吗")
+	conversationID := first.Conversation.ID
+	coordinator := testServiceSessionHandoff(f.db)
+	scheduler := agentrunaction.NewScheduler(f.tasks)
+	owner, member := f.identity.OrganizationIdentity.ID, other.Identity.OrganizationIdentity.ID
+	// 成员回复无人负责的周期即领取。
+	reply, err := conversationaction.NewSendCustomerTextMessageAction(f.db, nil).Execute(ctx, f.identity, conversationaction.CustomerTextMessageInput{
+		ConversationID: conversationID, ClientMessageID: uuid.NewV7().String(), Body: "在的",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	summary := servermodels.Conversation{}
+	if err := f.db.NewSelect().Model(&summary).Where("cv.id = ?", conversationID).Scan(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, coordinator).Execute(ctx, other.Identity, conversationID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conversationaction.NewTransferServiceSessionAction(f.db, coordinator, scheduler).Execute(ctx, other.Identity, conversationaction.TransferServiceSessionInput{
+		ConversationID: conversationID, AssigneeIdentityID: agent.IdentityID,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, coordinator).Execute(ctx, f.identity, conversationID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, coordinator).Execute(ctx, f.identity, conversationID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conversationaction.NewReopenServiceSessionAction(f.db).Execute(ctx, f.identity, conversationID); err != nil {
+		t.Fatal(err)
+	}
+
+	var messages []servermodels.Message
+	if err := f.db.NewSelect().Model(&messages).
+		Where("msg.conversation_id = ? AND msg.type = ?", conversationID, domain.MessageTypeSystem).
+		OrderExpr("msg.message_seq").Scan(ctx); err != nil {
+		t.Fatal(err)
+	}
+	want := []struct {
+		eventType domain.ConversationSystemEventType
+		actor     string
+		from      *string
+		target    *string
+	}{
+		{domain.ConversationSystemEventServiceSessionClaimed, owner, nil, nil},
+		{domain.ConversationSystemEventServiceSessionTakenOver, member, &owner, nil},
+		{domain.ConversationSystemEventServiceSessionTransferred, member, &member, &agent.IdentityID},
+		{domain.ConversationSystemEventServiceSessionTakenOver, owner, &agent.IdentityID, nil},
+		{domain.ConversationSystemEventServiceSessionClosed, owner, nil, nil},
+		{domain.ConversationSystemEventServiceSessionReopened, owner, nil, nil},
+	}
+	if len(messages) != len(want) {
+		t.Fatalf("service session events = %d, want %d", len(messages), len(want))
+	}
+	for index, message := range messages {
+		event := domain.ServiceSessionOperatedEvent{}
+		if err := json.Unmarshal(message.SystemEventPayload, &event); err != nil {
+			t.Fatal(err)
+		}
+		expected := want[index]
+		if message.SystemEventType == nil || *message.SystemEventType != string(expected.eventType) ||
+			message.Visibility != string(domain.MessageVisibilityInternalOnly) || message.ServiceSessionID == nil ||
+			event.ActorIdentityID != expected.actor || event.ActorDisplayName == "" ||
+			(expected.from == nil) != (event.FromIdentityID == nil) || (expected.from != nil && (*event.FromIdentityID != *expected.from || event.FromDisplayName == nil)) ||
+			(expected.target == nil) != (event.Target == nil) || (expected.target != nil && (event.Target.IdentityID == nil || *event.Target.IdentityID != *expected.target)) {
+			t.Fatalf("event %d = %s %+v", index, *message.SystemEventType, event)
+		}
+	}
+	// 周期事件不改变会话摘要与活动时间。
+	after := servermodels.Conversation{}
+	if err := f.db.NewSelect().Model(&after).Where("cv.id = ?", conversationID).Scan(ctx); err != nil {
+		t.Fatal(err)
+	}
+	if after.LastMessageID == nil || *after.LastMessageID != reply.ID || after.LastActivityAt == nil || summary.LastActivityAt == nil || !after.LastActivityAt.Equal(*summary.LastActivityAt) {
+		t.Fatalf("conversation summary before = %+v, after = %+v", summary, after)
+	}
+	// 成员历史按群聊事件的 actor 结构返回操作人。
+	history, err := conversationaction.NewListConversationMessagesQuery(f.db).Execute(ctx, f.identity, conversationaction.ConversationMessageHistoryInput{ConversationID: conversationID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, message := range history.Messages {
+		if message.SystemEvent != nil && (message.SystemEvent.ActorIdentityID == nil || message.SystemEvent.ServiceSessionID == nil) {
+			t.Fatalf("history event = %+v", message.SystemEvent)
+		}
 	}
 }

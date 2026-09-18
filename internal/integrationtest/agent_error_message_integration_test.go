@@ -170,7 +170,7 @@ func testCustomerFailureMessage(t *testing.T, db *bun.DB, identity *servermodels
 		case domain.MessageTypeSystem:
 			event := message.SystemEvent
 			if event == nil || event.Type != domain.ConversationSystemEventServiceSessionHandedOff || event.Reason == nil ||
-				*event.Reason != domain.AgentHandoffReasonRuntimeFailed || event.Target == nil || event.Target.Kind != domain.ServiceSessionHandoffTargetPublicQueue ||
+				*event.Reason != domain.AgentHandoffReasonRuntimeFailed || event.Target == nil || event.Target.Kind != domain.ServiceSessionTargetPublicQueue ||
 				event.ReasonText == nil || *event.ReasonText != "model failure details" || event.AgentRunID == nil || *event.AgentRunID != run.ID {
 				t.Fatalf("handoff event = %+v", event)
 			}

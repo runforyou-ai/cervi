@@ -618,8 +618,12 @@ func conversationMessageFromAction(message conversationaction.ConversationMessag
 			FromDisplayName: message.SystemEvent.FromDisplayName, HandoffReason: (*AgentHandoffReason)(message.SystemEvent.Reason),
 			ReasonText: message.SystemEvent.ReasonText, AgentRunID: message.SystemEvent.AgentRunID,
 		}
+		// 客服处理周期事件的操作人按群聊事件的 actor 结构返回。
+		if message.SystemEvent.ActorIdentityID != nil && message.SystemEvent.ActorDisplayName != nil {
+			systemEvent.Actor = ConversationSystemEventParticipant{IdentityID: *message.SystemEvent.ActorIdentityID, DisplayName: *message.SystemEvent.ActorDisplayName}
+		}
 		if target := message.SystemEvent.Target; target != nil {
-			systemEvent.HandoffTarget = &ServiceSessionHandoffTarget{Kind: ServiceSessionHandoffTargetKind(target.Kind),
+			systemEvent.SessionTarget = &ServiceSessionTarget{Kind: ServiceSessionTargetKind(target.Kind),
 				TeamID: target.TeamID, TeamName: target.TeamName, IdentityID: target.IdentityID, DisplayName: target.DisplayName}
 		}
 	}

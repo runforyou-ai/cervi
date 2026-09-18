@@ -277,6 +277,12 @@ func sendCustomerMessage(ctx context.Context, tx bun.Tx, identity *servermodels.
 		if err := applyMemberReplySessionPlan(ctx, tx, session, identity.OrganizationIdentity.ID, originatedAt, plan); err != nil {
 			return ConversationMessage{}, err
 		}
+		// 回复无人负责的周期即领取该周期。
+		if plan.assign {
+			if err := appendServiceSessionEvent(ctx, tx, identity, conversation, session, domain.ConversationSystemEventServiceSessionClaimed, nil, nil); err != nil {
+				return ConversationMessage{}, err
+			}
+		}
 	}
 	// 取得或创建当前企业成员的聊天主体。
 	subject, err := chatstate.EnsureOrganizationIdentityChatSubject(ctx, tx, identity.Organization.ID, identity.OrganizationIdentity.ID, ids.subject)

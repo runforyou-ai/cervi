@@ -9,7 +9,7 @@ import {
   listConversationMessageReferences,
   ChatSubjectKind,
   ConversationSystemEventType,
-  ServiceSessionHandoffTargetKind,
+  ServiceSessionTargetKind,
   ConversationType,
   MessageType,
   MessageVisibility,
@@ -609,13 +609,13 @@ function ConversationTimelineContent({
   ) {
     // 转人工事件按去向与原因码本地化，名称取事件写入时的快照。
     if (event.type === ConversationSystemEventType.ConversationSystemEventServiceSessionHandedOff) {
-      const target = event.handoffTarget
+      const target = event.sessionTarget
       const targetText =
-        target?.kind === ServiceSessionHandoffTargetKind.ServiceSessionHandoffTargetMember
+        target?.kind === ServiceSessionTargetKind.ServiceSessionTargetMember
           ? target.identityId === currentIdentityID
             ? t("messageSenderYou")
             : (target.displayName ?? "")
-          : target?.kind === ServiceSessionHandoffTargetKind.ServiceSessionHandoffTargetTeam
+          : target?.kind === ServiceSessionTargetKind.ServiceSessionTargetTeam
             ? t("handoffTargetTeam", { name: target.teamName ?? "" })
             : t("handoffTargetPublicQueue")
       return t("serviceSessionHandedOff", {
@@ -635,6 +635,28 @@ function ConversationTimelineContent({
       event.targets.map(participantName),
     )
     switch (event.type) {
+      case ConversationSystemEventType.ConversationSystemEventServiceSessionClaimed:
+        return t("serviceSessionClaimed", { actor })
+      case ConversationSystemEventType.ConversationSystemEventServiceSessionTakenOver:
+        return t("serviceSessionTakenOver", {
+          actor,
+          from:
+            event.fromIdentityId === currentIdentityID
+              ? t("messageSenderYou")
+              : (event.fromDisplayName ?? t("unknownSender")),
+        })
+      case ConversationSystemEventType.ConversationSystemEventServiceSessionTransferred:
+        return t("serviceSessionTransferred", {
+          actor,
+          target:
+            event.sessionTarget?.identityId === currentIdentityID
+              ? t("messageSenderYou")
+              : (event.sessionTarget?.displayName ?? t("unknownSender")),
+        })
+      case ConversationSystemEventType.ConversationSystemEventServiceSessionClosed:
+        return t("serviceSessionClosed", { actor })
+      case ConversationSystemEventType.ConversationSystemEventServiceSessionReopened:
+        return t("serviceSessionReopened", { actor })
       case ConversationSystemEventType.ConversationSystemEventGroupRenamed:
         return t("groupSystemRenamed", {
           actor,
