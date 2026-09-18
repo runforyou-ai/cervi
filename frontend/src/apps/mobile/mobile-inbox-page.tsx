@@ -1,5 +1,5 @@
 /** 移动端统一会话摘要列表、阅读状态与置顶菜单、置顶排序和内部聊天入口。 */
-import { useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import type { TFunction } from "i18next"
 import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
@@ -107,7 +107,7 @@ type MobileConversationRowProps = {
   sortable?: ReturnType<typeof useSortable>
 }
 
-/** 渲染会话摘要和未读角标，点击进入会话详情，长按打开阅读状态与置顶菜单；排序模式下置顶行只响应拖动手柄。 */
+/** 渲染会话摘要和未读角标，点击进入会话详情，长按打开阅读状态与置顶菜单；排序模式下置顶行右侧显示拖动手柄。 */
 function MobileConversationRow({
   conversation,
   name,
@@ -234,23 +234,6 @@ function MobileConversationRow({
     </>
   )
 
-  const button = (
-    <button
-      type="button"
-      className={cn(
-        "flex w-full min-w-0 gap-3 px-4 py-3 text-left outline-none transition-colors select-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
-        !sorting && "active:bg-muted",
-      )}
-      aria-label={name}
-      aria-disabled={sorting || undefined}
-      onClick={() => {
-        // 排序模式只调整顺序，不进入会话。
-        if (!sorting) onOpen(conversation)
-      }}
-    >
-      {content}
-    </button>
-  )
 
   return (
     <li
@@ -272,18 +255,23 @@ function MobileConversationRow({
       )}
     >
       <div className="min-w-0 flex-1">
-        {sorting ? button : (
-          <ConversationListMenu
-            conversation={conversation}
-            actions={actions}
-            itemClassName="min-h-11"
-            pinOrderVersion={pinOrderVersion}
-            pinMoves={pinMoves}
-            onOpenChange={onMenuChange}
+        <ConversationListMenu
+          conversation={conversation}
+          actions={actions}
+          itemClassName="min-h-11"
+          pinOrderVersion={pinOrderVersion}
+          pinMoves={pinMoves}
+          onOpenChange={onMenuChange}
+        >
+          <button
+            type="button"
+            className="flex w-full min-w-0 gap-3 px-4 py-3 text-left outline-none transition-colors select-none active:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+            aria-label={name}
+            onClick={() => onOpen(conversation)}
           >
-            {button}
-          </ConversationListMenu>
-        )}
+            {content}
+          </button>
+        </ConversationListMenu>
       </div>
       {sorting && sortable ? (
         <button
@@ -338,6 +326,17 @@ function MobileInboxList({ query, changeQuery }: ReturnType<typeof useMobileInbo
   const [sorting, setSorting] = useState(false)
   const swipeStart = useRef<{ x: number; y: number } | null>(null)
   useMinuteTick()
+  useEffect(() => {
+    if (!sorting) return
+    // 排序期间系统返回先退出排序模式。
+    const exitSorting = (event: Event) => {
+      if (event.defaultPrevented) return
+      event.preventDefault()
+      setSorting(false)
+    }
+    window.addEventListener("cervi:back", exitSorting)
+    return () => window.removeEventListener("cervi:back", exitSorting)
+  }, [sorting])
   const conversations = list.conversations.filter(isMobileInboxConversation)
   const names = new Map(
     conversations.map((conversation) => [
@@ -352,11 +351,17 @@ function MobileInboxList({ query, changeQuery }: ReturnType<typeof useMobileInbo
     actions,
     pinOrderVersion: list.pinOrderVersion,
     sorting,
-    onMenuChange: viewport.setMenu,
-    onOpen: (conversation: MobileInboxConversation) =>
+    // 打开菜单即结束排序，菜单操作照常生效。
+    onMenuChange: (open: boolean) => {
+      if (open) setSorting(false)
+      viewport.setMenu(open)
+    },
+    onOpen: (conversation: MobileInboxConversation) => {
+      setSorting(false)
       navigate(mobileConversationPath(conversation), {
         state: { conversation, mobileBack: true },
-      }),
+      })
+    },
   })
 
   return (
@@ -428,10 +433,10 @@ function MobileInboxList({ query, changeQuery }: ReturnType<typeof useMobileInbo
       <div
         className="flex min-h-0 flex-1 flex-col"
         onTouchStart={(event) => {
-          // 菜单打开或排序期间的触摸不切换范围。
+          // 菜单打开期间的触摸只服务于菜单本身。
           const touch = event.touches[0]
           swipeStart.current =
-            touch && !sorting && !viewport.interaction.current.menu
+            touch && !viewport.interaction.current.menu
               ? { x: touch.clientX, y: touch.clientY }
               : null
         }}
