@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"uuid"
 
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -72,15 +73,24 @@ func EnsureActiveAdministratorRemains(ctx context.Context, db bun.IDB, organizat
 	return nil
 }
 
-// UpdateAssignmentsAction 批量调整真人和 AI 员工的企业角色。
-type UpdateAssignmentsAction struct{ db *bun.DB }
-
-// NewUpdateAssignmentsAction 创建企业身份角色批量调整操作。
-func NewUpdateAssignmentsAction(db *bun.DB) *UpdateAssignmentsAction {
-	return &UpdateAssignmentsAction{db: db}
+// ServiceSessionHandoff 在角色调整事务中把失去客服角色的 AI 员工负责的开放客服周期交给人工，并在提交后中断被取消的模型调用。
+type ServiceSessionHandoff interface {
+	HandOffAgentServiceSessions(ctx context.Context, db bun.IDB, organizationID, agentIdentityID, operationID string) ([]string, error)
+	CancelRunContexts([]string)
 }
 
-// Execute 校验企业身份和角色后一次性保存全部调整。
+// UpdateAssignmentsAction 批量调整真人和 AI 员工的企业角色。
+type UpdateAssignmentsAction struct {
+	db      *bun.DB
+	handoff ServiceSessionHandoff
+}
+
+// NewUpdateAssignmentsAction 创建企业身份角色批量调整操作。
+func NewUpdateAssignmentsAction(db *bun.DB, handoff ServiceSessionHandoff) *UpdateAssignmentsAction {
+	return &UpdateAssignmentsAction{db: db, handoff: handoff}
+}
+
+// Execute 校验企业身份和角色后一次性保存全部调整；AI 员工由客服改为其他角色时，把其负责的开放客服周期交给人工。
 func (a *UpdateAssignmentsAction) Execute(ctx context.Context, identity *servermodels.Identity, changes []AssignmentInput) error {
 	identityIDs := make([]string, 0, len(changes))
 	roleIDs := make([]string, 0, len(changes))
@@ -105,6 +115,7 @@ func (a *UpdateAssignmentsAction) Execute(ctx context.Context, identity *serverm
 		}
 	}
 
+	var cancelledRunIDs []string
 	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
@@ -138,13 +149,20 @@ func (a *UpdateAssignmentsAction) Execute(ctx context.Context, identity *serverm
 			OrderExpr("id").For("NO KEY UPDATE").Exec(ctx); err != nil {
 			return err
 		}
-		var identities []servermodels.OrganizationIdentity
-		if err := tx.NewSelect().Model(&identities).
-			Column("id", "type").
-			Where("organization_id = ?", identity.Organization.ID).
-			Where("id IN (?)", bun.In(identityIDs)).
-			For("UPDATE").
-			Scan(ctx); err != nil {
+		// 多个企业身份按编号顺序加锁，同时读取调整前的角色类型。
+		var identities []struct {
+			ID       string          `bun:"id"`
+			Type     string          `bun:"type"`
+			RoleKind domain.RoleKind `bun:"role_kind"`
+		}
+		if err := tx.NewSelect().TableExpr("organization_identities AS oi").
+			ColumnExpr("oi.id, oi.type, r.kind AS role_kind").
+			Join("JOIN roles AS r ON r.id = oi.role_id AND r.organization_id = oi.organization_id").
+			Where("oi.organization_id = ?", identity.Organization.ID).
+			Where("oi.id IN (?)", bun.In(identityIDs)).
+			OrderExpr("oi.id").
+			For("UPDATE OF oi").
+			Scan(ctx, &identities); err != nil {
 			return err
 		}
 		if len(identities) != len(identityIDs) {
@@ -170,10 +188,28 @@ func (a *UpdateAssignmentsAction) Execute(ctx context.Context, identity *serverm
 				return err
 			}
 		}
+		// 身份均已锁定后，按编号顺序交接失去客服角色的 AI 员工负责的开放周期。
+		operationID := uuid.NewV7().String()
+		newKinds := make(map[string]domain.RoleKind, len(changes))
+		for _, change := range changes {
+			newKinds[change.IdentityID] = roleKinds[change.RoleID]
+		}
+		for _, stored := range identities {
+			if domain.OrganizationIdentityType(stored.Type) != domain.OrganizationIdentityTypeAgent ||
+				stored.RoleKind != domain.RoleKindCustomerService || newKinds[stored.ID] == domain.RoleKindCustomerService {
+				continue
+			}
+			runIDs, err := a.handoff.HandOffAgentServiceSessions(ctx, tx, identity.Organization.ID, stored.ID, operationID)
+			if err != nil {
+				return err
+			}
+			cancelledRunIDs = append(cancelledRunIDs, runIDs...)
+		}
 		return EnsureActiveAdministratorRemains(ctx, tx, identity.Organization.ID, administratorRoleID)
 	})
 	if err != nil {
 		return fmt.Errorf("update role assignments: %w", err)
 	}
+	a.handoff.CancelRunContexts(cancelledRunIDs)
 	return nil
 }

@@ -19,6 +19,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
+	roleaction "github.com/runforyou-ai/cervi/internal/actions/role"
 	teamaction "github.com/runforyou-ai/cervi/internal/actions/team"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
@@ -175,6 +176,7 @@ func testAgentHandoffs(t *testing.T, db *bun.DB, identity *servermodels.Identity
 	t.Run("Telegram 主动转人工", func(t *testing.T) { testTelegramModelHandoff(t, f) })
 	t.Run("渠道编辑与停用交错", func(t *testing.T) { testChannelEditVersusDeactivation(t, f) })
 	t.Run("成员操作客服周期事件", func(t *testing.T) { testServiceSessionOperationEvents(t, f) })
+	t.Run("互为失败路由的 AI 同时改角色", func(t *testing.T) { testMutualFallbackRoleChanges(t, f) })
 	t.Run("Telegram 入站失效交接与运行收尾交错", func(t *testing.T) { testTelegramInboundHandoffVersusRunFailure(t, f) })
 }
 
@@ -279,6 +281,7 @@ func testHandoffTargets(t *testing.T, f handoffFixture) {
 		wantTeam     *string
 		wantAssignee *string
 	}{
+		{name: "公共队列", fallback: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue}, wantKind: domain.ServiceSessionTargetPublicQueue},
 		{name: "团队", fallback: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypeTeam, ID: team.ID}, wantKind: domain.ServiceSessionTargetTeam, wantTeam: &team.ID},
 		{name: "真人", fallback: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypeMember, ID: human.IdentityID}, wantKind: domain.ServiceSessionTargetMember, wantAssignee: &human.IdentityID},
 		{name: "AI 员工", fallback: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypeMember, ID: fallbackAgent.IdentityID}, wantKind: domain.ServiceSessionTargetPublicQueue},
@@ -356,10 +359,10 @@ func testHandoffCommitOrder(t *testing.T, f handoffFixture) {
 	}
 }
 
-// testManagementHandoff 验证停用 AI 员工与改为非客服角色时，其负责的开放周期连同在途运行一并交给人工。
+// testManagementHandoff 验证停用 AI 员工、编辑时改为非客服角色和在角色页批量改角色时，其负责的开放周期连同在途运行一并交给人工。
 func testManagementHandoff(t *testing.T, f handoffFixture) {
 	ctx := context.Background()
-	for _, change := range []string{"停用", "改角色"} {
+	for _, change := range []string{"停用", "改角色", "批量改角色"} {
 		t.Run(change, func(t *testing.T) {
 			agent := f.newAgent(t, change+"客服")
 			channelID := f.newChannel(t, agent.IdentityID, channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue})
@@ -375,18 +378,23 @@ func testManagementHandoff(t *testing.T, f handoffFixture) {
 			}}, testAttachmentReader(f.db), nil), idle.Conversation.ID)
 
 			handoff := testServiceSessionHandoff(f.db)
-			if change == "停用" {
+			memberRole := servermodels.Role{}
+			if err := f.db.NewSelect().Model(&memberRole).Where("organization_id = ? AND kind = ?", f.identity.Organization.ID, domain.RoleKindMember).Scan(ctx); err != nil {
+				t.Fatal(err)
+			}
+			switch change {
+			case "停用":
 				if _, err := agentaction.NewUpdateStatusAction(f.db, handoff).Execute(ctx, f.identity, agent.ID, domain.UserStatusInactive); err != nil {
 					t.Fatal(err)
 				}
-			} else {
-				memberRole := servermodels.Role{}
-				if err := f.db.NewSelect().Model(&memberRole).Where("organization_id = ? AND kind = ?", f.identity.Organization.ID, domain.RoleKindMember).Scan(ctx); err != nil {
-					t.Fatal(err)
-				}
+			case "改角色":
 				if _, err := agentaction.NewUpdateAgentAction(f.db, handoff).Execute(ctx, f.identity, agent.ID, agentaction.UpdateInput{
 					DisplayName: agent.DisplayName, RoleID: memberRole.ID, TeamIDs: []string{}, WorkStatus: domain.WorkStatusWorking,
 				}); err != nil {
+					t.Fatal(err)
+				}
+			default:
+				if err := roleaction.NewUpdateAssignmentsAction(f.db, handoff).Execute(ctx, f.identity, []roleaction.AssignmentInput{{IdentityID: agent.IdentityID, RoleID: memberRole.ID}}); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -742,6 +750,73 @@ func testServiceSessionOperationEvents(t *testing.T, f handoffFixture) {
 	for _, message := range history.Messages {
 		if message.SystemEvent != nil && (message.SystemEvent.ActorIdentityID == nil || message.SystemEvent.ServiceSessionID == nil) {
 			t.Fatalf("history event = %+v", message.SystemEvent)
+		}
+	}
+}
+
+// testMutualFallbackRoleChanges 验证两个互为失败路由的 AI 员工同时改为非客服角色时，交接不锁定必然排除的 AI 目标，两个事务互不等待。
+func testMutualFallbackRoleChanges(t *testing.T, f handoffFixture) {
+	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+	defer cancel()
+	first, second := f.newAgent(t, "互为失败路由甲"), f.newAgent(t, "互为失败路由乙")
+	firstChannel := f.newChannel(t, first.IdentityID, channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypeMember, ID: second.IdentityID})
+	secondChannel := f.newChannel(t, second.IdentityID, channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypeMember, ID: first.IdentityID})
+	firstInput, secondInput := visitorInput(firstChannel, ""), visitorInput(secondChannel, "")
+	firstConversation := f.receive(t, &firstInput, "甲负责的会话")
+	secondConversation := f.receive(t, &secondInput, "乙负责的会话")
+	memberRole := servermodels.Role{}
+	if err := f.db.NewSelect().Model(&memberRole).Where("organization_id = ? AND kind = ?", f.identity.Organization.ID, domain.RoleKindMember).Scan(ctx); err != nil {
+		t.Fatal(err)
+	}
+	// 两次改角色由不同成员发起，各自持有自己的账号锁。
+	email := "role-editor-" + uuid.NewV7().String()[:8] + "@handoff.test"
+	if _, err := useraction.NewCreateUserAction(f.db).Execute(ctx, f.identity, useraction.CreateInput{
+		DisplayName: "改角色成员", Email: email, Password: "password123", RoleID: f.identity.OrganizationIdentity.RoleID,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	editor, err := authaction.NewLoginAction(f.db).Execute(ctx, authaction.LoginInput{OrganizationID: f.identity.Organization.ID, Email: email, Password: "password123"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	gated := bun.NewDB(f.db.DB, f.db.Dialect())
+	gated.AddQueryHook(chatQueryHook{})
+	// 甲的改角色事务锁定甲的身份后暂停。
+	gate := newChatQueryGate(t, false, 1, func(event *bun.QueryEvent) bool {
+		return strings.Contains(event.Query, "organization_identities") && strings.Contains(event.Query, "FOR UPDATE OF oi")
+	})
+	firstDone, secondDone := make(chan error, 1), make(chan error, 1)
+	go func() {
+		_, err := agentaction.NewUpdateAgentAction(gated, testServiceSessionHandoff(f.db)).Execute(context.WithValue(ctx, chatQueryGateKey{}, gate), f.identity, first.ID, agentaction.UpdateInput{
+			DisplayName: first.DisplayName, RoleID: memberRole.ID, TeamIDs: []string{}, WorkStatus: domain.WorkStatusWorking,
+		})
+		firstDone <- err
+	}()
+	waitChatSignal(t, ctx, gate.reached)
+	go func() {
+		_, err := agentaction.NewUpdateAgentAction(f.db, testServiceSessionHandoff(f.db)).Execute(ctx, editor.Identity, second.ID, agentaction.UpdateInput{
+			DisplayName: second.DisplayName, RoleID: memberRole.ID, TeamIDs: []string{}, WorkStatus: domain.WorkStatusWorking,
+		})
+		secondDone <- err
+	}()
+	// 乙的交接以甲为失败路由，不等待甲的身份锁即可完成。
+	select {
+	case err := <-secondDone:
+		if err != nil {
+			t.Fatalf("second role change: %v", err)
+		}
+	case <-time.After(5 * time.Second):
+		gate.open()
+		t.Fatal("handoff waited for the lock of an excluded AI fallback target")
+	}
+	gate.open()
+	if err := waitChatResult(t, ctx, firstDone); err != nil {
+		t.Fatalf("first role change: %v", err)
+	}
+	for _, conversationID := range []string{firstConversation.Conversation.ID, secondConversation.Conversation.ID} {
+		events := handoffEvents(t, f.db, conversationID)
+		if len(events) != 1 || events[0].Target.Kind != domain.ServiceSessionTargetPublicQueue {
+			t.Fatalf("events = %+v", events)
 		}
 	}
 }

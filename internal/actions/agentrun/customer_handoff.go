@@ -39,7 +39,7 @@ type customerHandoff struct {
 	AgentRunID      *string
 }
 
-// applyCustomerHandoff 在调用方持有会话锁的事务中写入转人工事件与对客通知，按去向更新负责人与团队，并推进会话版本。
+// applyCustomerHandoff 在调用方持有会话锁的事务中写入转人工事件与对客通知，按去向更新负责人与团队；对客通知已推进会话版本并通知全部受众。
 func applyCustomerHandoff(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer, handoff customerHandoff) (*servermodels.Message, error) {
 	session := handoff.PolicyContext.ServiceSession
 	participantID, err := ensureCustomerAgentParticipant(ctx, db, session.OrganizationID, session.ConversationID, handoff.AgentIdentityID)
@@ -93,9 +93,6 @@ func applyCustomerHandoff(ctx context.Context, db bun.IDB, enqueuer servertask.T
 		return nil, fmt.Errorf("hand off service session: %w", err)
 	}
 	session.AssigneeIdentityID, session.TeamID = handoff.Route.AssigneeIdentityID, handoff.Route.TeamID
-	if err := chatstate.TouchConversation(ctx, db, handoff.PolicyContext.Conversation); err != nil {
-		return nil, err
-	}
 	slog.Info("客户会话已由 AI 员工转交人工",
 		"organization_id", session.OrganizationID, "conversation_id", session.ConversationID,
 		"service_session_id", session.ID, "agent_identity_id", handoff.AgentIdentityID,
