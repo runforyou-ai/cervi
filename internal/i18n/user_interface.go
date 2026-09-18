@@ -13,7 +13,6 @@ const (
 	MessengerMessages                  Key = "messenger.messages"
 	MessengerHelp                      Key = "messenger.help"
 	MessengerMessage                   Key = "messenger.message"
-	MessengerResizeMessageInput        Key = "messenger.resize_message_input"
 	MessengerClose                     Key = "messenger.close"
 	MessengerAttach                    Key = "messenger.attach"
 	MessengerEmoji                     Key = "messenger.emoji"
