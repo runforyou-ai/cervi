@@ -3,16 +3,21 @@
 package systemtray
 
 import (
+	"encoding/json"
+
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
-// SetUnreadState 按未读总数维护 Android 通知，角标由未读通知本身呈现。
+// SetUnreadState 把未读总数交给原生通知桥接，角标由未读通知本身呈现。
 func (*Controller) SetUnreadState(state appservice.UnreadIndicatorState) error {
-	if state.Count > 0 {
-		return nil
+	payload, err := json.Marshal(map[string]any{
+		"action": "unread",
+		"count":  state.Count,
+	})
+	if err != nil {
+		return err
 	}
-	// 未读归零和退出登录时撤回已投递的消息通知。
-	application.Android.Notify(`{"action":"clear"}`)
+	application.Android.Notify(string(payload))
 	return nil
 }
