@@ -113,7 +113,7 @@ export function InboxPage({
     replace?: boolean
   }) => void
 }) {
-  const { conversations, attentionUnreadCount } = list
+  const { conversations, attentionUnreadCount, customerMentionedUnreadCount } = list
   // 根据当前窗口、前后分页资格和首次读取状态判断会话列表是否有效。
   const hasConversations = conversations.length > 0 || list.hasBefore || list.hasAfter || list.revision === 0
   const { t } = useTranslation(["inbox", "common"])
@@ -310,6 +310,8 @@ export function InboxPage({
     }
     if (scope !== InboxScope.InboxScopeCustomer) return
     const assigneeId = conversation.customer.assignee?.identityId ?? ""
+    // 在 @我的 视图中留言或由他人负责时保持当前视图，本人接手后跟随到我负责的。
+    if (customerView === CustomerInboxView.CustomerInboxViewMentioned && assigneeId !== identity.user.identityId) return
     const nextView = !assigneeId
       ? CustomerInboxView.CustomerInboxViewQueue
       : assigneeId === identity.user.identityId
@@ -369,6 +371,7 @@ export function InboxPage({
         <InboxScopeRail
           scope={scope}
           attentionUnreadCount={attentionUnreadCount}
+          customerMentionedUnreadCount={customerMentionedUnreadCount}
           onScopeChange={(nextScope) => {
             setChatDraft(null)
             onQueryChange({ scope: nextScope })

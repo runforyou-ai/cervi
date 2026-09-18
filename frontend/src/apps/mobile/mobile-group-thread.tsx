@@ -65,7 +65,6 @@ export function MobileGroupThread({
         onUnavailable={onUnavailable}
         onReadMessage={markRead}
         onReplyMessage={archived ? undefined : setReplyTo}
-        groupParticipants={conversation.participants}
         prepareSendRef={prepareSendRef}
         outgoingMessages={outgoing.messages}
         onRetryFailedMessage={setRetryDraft}

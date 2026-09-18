@@ -25,6 +25,7 @@ export type InboxListState = {
   hasBefore: boolean
   hasAfter: boolean
   attentionUnreadCount: number
+  customerMentionedUnreadCount: number
   pinOrderVersion: string
   status: "initial" | "ready" | "loadingMore" | "refreshing"
   operation: InboxListOperation | null
@@ -54,7 +55,7 @@ export class InboxListController {
   private state: InboxListState = {
     ids: [], positions: [], rowIds: [], unavailableIds: [], startCursor: "", endCursor: "",
     hasBefore: false, hasAfter: false,
-    attentionUnreadCount: 0, pinOrderVersion: "", status: "initial", operation: null, error: null, revision: 0,
+    attentionUnreadCount: 0, customerMentionedUnreadCount: 0, pinOrderVersion: "", status: "initial", operation: null, error: null, revision: 0,
   }
   private listeners = new Set<() => void>()
   private queue: InboxListOperation[] = []
@@ -285,6 +286,7 @@ export class InboxListController {
       startCursor: window.startCursor, endCursor: window.endCursor,
       hasBefore: window.hasBefore, hasAfter: window.hasAfter,
       attentionUnreadCount: head?.attentionUnreadCount ?? this.state.attentionUnreadCount,
+      customerMentionedUnreadCount: head?.customerMentionedUnreadCount ?? this.state.customerMentionedUnreadCount,
       pinOrderVersion: window.pinOrderVersion,
       error: null,
     }
@@ -300,7 +302,7 @@ export class InboxListController {
         positions: [...this.state.positions.filter((row) => matching.has(row.id)), ...tail],
         ...(appendIds.length ? { endCursor: next.endCursor, hasAfter: next.hasAfter } : {}),
         // 顺序版本随待应用的顺序一起提交，展示中的顺序与写入使用的版本始终是同一份快照。
-        rowIds, attentionUnreadCount: next.attentionUnreadCount,
+        rowIds, attentionUnreadCount: next.attentionUnreadCount, customerMentionedUnreadCount: next.customerMentionedUnreadCount,
       })
     } else {
       this.deferred = null

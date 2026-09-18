@@ -127,6 +127,7 @@ export function useCustomerSessionActions(
     transferCandidates,
     closeConfirmationOpen,
     setCloseConfirmationOpen,
+    unansweredMentionCount: customer?.unansweredMentionCount ?? 0,
     reopen: () =>
       run("reopen", reopenServiceSession, t("conversationReopenSuccess")),
     claim: () =>
@@ -172,6 +173,11 @@ export function CustomerSessionCloseDialog({
           <AlertDialogTitle>{t("conversationCloseConfirmTitle")}</AlertDialogTitle>
           <AlertDialogDescription>
             {t("conversationCloseConfirmDescription")}
+            {actions.unansweredMentionCount > 0 ? (
+              <span className="mt-1 block text-foreground">
+                {t("conversationCloseUnansweredMentions", { count: actions.unansweredMentionCount })}
+              </span>
+            ) : null}
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>

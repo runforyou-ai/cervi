@@ -138,7 +138,7 @@ export class AttachmentQueue {
         body: selected.body.trim(),
         originatedAt: new Date(now + index).toISOString(),
         replyTo: index === 0 ? replyTo : null,
-        mentionSubjectIDs: [],
+        mentions: [],
         mentionAll: false,
         mentionAllToken: null,
       })

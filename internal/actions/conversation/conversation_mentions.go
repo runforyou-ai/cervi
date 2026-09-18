@@ -11,12 +11,13 @@ import (
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
+	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
 
-// ConversationNavigationState 表示群聊可见尾端及个人提及进度。
+// ConversationNavigationState 表示会话可见尾端及个人提及进度。
 type ConversationNavigationState struct {
 	PendingMentionCount      int
 	ReviewedThroughMessageID *string
@@ -38,16 +39,16 @@ type ConversationMentionReview struct {
 	Outcome                  string
 }
 
-// GetConversationNavigationStateQuery 读取群聊导航状态。
+// GetConversationNavigationStateQuery 读取群聊或客户会话的导航状态。
 type GetConversationNavigationStateQuery struct{ db *bun.DB }
 
 // ListPendingConversationMentionsQuery 读取尚未查看的提及。
 type ListPendingConversationMentionsQuery struct{ db *bun.DB }
 
-// MarkConversationMentionReviewedAction 确认个人已查看的群聊提及。
+// MarkConversationMentionReviewedAction 确认个人已查看的会话提及。
 type MarkConversationMentionReviewedAction struct{ db *bun.DB }
 
-// NewGetConversationNavigationStateQuery 创建群聊导航状态查询。
+// NewGetConversationNavigationStateQuery 创建会话导航状态查询。
 func NewGetConversationNavigationStateQuery(db *bun.DB) *GetConversationNavigationStateQuery {
 	return &GetConversationNavigationStateQuery{db: db}
 }
@@ -62,11 +63,18 @@ func NewMarkConversationMentionReviewedAction(db *bun.DB) *MarkConversationMenti
 	return &MarkConversationMentionReviewedAction{db: db}
 }
 
-// groupNavigationQuery 限定当前用户可阅读的群聊并关联提及水位。
-func groupNavigationQuery(db bun.IDB, identity *servermodels.Identity, conversationID string) *bun.SelectQuery {
-	return chatstate.GroupQuery(db, identity, conversationID).
+// mentionNavigationQuery 限定当前用户可阅读的群聊或客户会话，并关联本人聊天主体和提及水位。
+func mentionNavigationQuery(db bun.IDB, identity *servermodels.Identity, conversationID string) *bun.SelectQuery {
+	return db.NewSelect().TableExpr("conversations AS cv").
+		Join("LEFT JOIN chat_subjects AS mine ON mine.organization_id = cv.organization_id AND mine.kind = ? AND mine.source_id = ?", domain.ChatSubjectKindOrganizationIdentity, identity.OrganizationIdentity.ID).
 		Join("LEFT JOIN conversation_user_states AS state ON state.organization_id = cv.organization_id AND state.conversation_id = cv.id AND state.user_id = ?", identity.User.ID).
-		Join("LEFT JOIN messages AS reviewed ON reviewed.organization_id = cv.organization_id AND reviewed.conversation_id = cv.id AND reviewed.id = state.last_reviewed_mention_message_id")
+		Join("LEFT JOIN messages AS reviewed ON reviewed.organization_id = cv.organization_id AND reviewed.conversation_id = cv.id AND reviewed.id = state.last_reviewed_mention_message_id").
+		Where("cv.organization_id = ? AND cv.id = ?", identity.Organization.ID, conversationID).
+		// 群聊要求本人仍是成员，客户会话按企业边界阅读。
+		Where(`cv.type = ? OR (cv.type = ? AND cv.status IN (?, ?) AND EXISTS (
+			SELECT 1 FROM conversation_participants AS member
+			WHERE member.organization_id = cv.organization_id AND member.conversation_id = cv.id AND member.subject_id = mine.id AND member.left_at IS NULL
+		))`, domain.ConversationTypeCustomer, domain.ConversationTypeGroup, domain.ConversationStatusActive, domain.ConversationStatusArchived)
 }
 
 // pendingMentionsQuery 共用提及资格，排除本人消息、连续已查看范围和单条查看记录。
@@ -74,10 +82,10 @@ func pendingMentionsQuery(db bun.IDB, userID string) *bun.SelectQuery {
 	return db.NewSelect().TableExpr("messages AS pending").
 		Join("JOIN conversation_participants AS sender ON sender.organization_id = pending.organization_id AND sender.conversation_id = pending.conversation_id AND sender.id = pending.sender_participant_id").
 		Where("pending.organization_id = cv.organization_id AND pending.conversation_id = cv.id").
-		Where("pending.deleted_at IS NULL AND sender.subject_id <> mine.subject_id").
+		Where("pending.deleted_at IS NULL AND sender.subject_id <> mine.id").
 		Where("pending.message_seq > COALESCE(reviewed.message_seq, 0)").
 		Where("NOT EXISTS (SELECT 1 FROM conversation_mention_reviews AS receipt WHERE receipt.organization_id = pending.organization_id AND receipt.conversation_id = pending.conversation_id AND receipt.user_id = ? AND receipt.message_id = pending.id)", userID).
-		Where(`pending.mention_all OR EXISTS (SELECT 1 FROM message_mentions AS mention WHERE mention.organization_id = pending.organization_id AND mention.message_id = pending.id AND mention.subject_id = mine.subject_id)`)
+		Where(`pending.mention_all OR EXISTS (SELECT 1 FROM message_mentions AS mention WHERE mention.organization_id = pending.organization_id AND mention.message_id = pending.id AND mention.subject_id = mine.id)`)
 }
 
 // Execute 在单个查询快照内统计待查看提及并读取最新可见消息。
@@ -86,7 +94,7 @@ func (q *GetConversationNavigationStateQuery) Execute(ctx context.Context, ident
 		return ConversationNavigationState{}, &ValidationError{Fields: map[string]ValidationCode{"conversationId": ValidationConversationIDInvalid}}
 	}
 	var result ConversationNavigationState
-	err := groupNavigationQuery(q.db, identity, conversationID).
+	err := mentionNavigationQuery(q.db, identity, conversationID).
 		ColumnExpr("(?) AS pending_mention_count", pendingMentionsQuery(q.db, identity.User.ID).ColumnExpr("count(*)")).
 		ColumnExpr("state.last_reviewed_mention_message_id AS reviewed_through_message_id").
 		ColumnExpr("COALESCE(reviewed.message_seq, 0) AS reviewed_through_sequence").
@@ -111,7 +119,7 @@ func (q *ListPendingConversationMentionsQuery) Execute(ctx context.Context, iden
 		ID       *string
 		Sequence *int64
 	}
-	err := groupNavigationQuery(q.db, identity, conversationID).
+	err := mentionNavigationQuery(q.db, identity, conversationID).
 		ColumnExpr("targets.id, targets.message_seq AS sequence").
 		Join("LEFT JOIN LATERAL (?) AS targets ON TRUE", pendingMentionsQuery(q.db, identity.User.ID).ColumnExpr("pending.id, pending.message_seq")).
 		OrderExpr("targets.message_seq ASC").Scan(ctx, &rows)
@@ -141,9 +149,15 @@ func (a *MarkConversationMentionReviewedAction) Execute(ctx context.Context, ide
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		_, err := chatstate.LockGroup(ctx, tx, identity, conversationID, chatstate.GroupReadable)
+		if _, err := chatstate.LockConversation(ctx, tx, identity.Organization.ID, conversationID); err != nil {
+			return err
+		}
+		readable, err := mentionNavigationQuery(tx, identity, conversationID).Exists(ctx)
 		if err != nil {
 			return err
+		}
+		if !readable {
+			return ErrConversationNotFound
 		}
 		var target struct {
 			Sequence int64
@@ -151,12 +165,12 @@ func (a *MarkConversationMentionReviewedAction) Execute(ctx context.Context, ide
 			Eligible bool
 			Reviewed bool
 		}
-		err = groupNavigationQuery(tx, identity, conversationID).
+		err = mentionNavigationQuery(tx, identity, conversationID).
 			Join("JOIN messages AS target ON target.organization_id = cv.organization_id AND target.conversation_id = cv.id AND target.id = ?", messageID).
 			Join("JOIN conversation_participants AS sender ON sender.organization_id = target.organization_id AND sender.conversation_id = target.conversation_id AND sender.id = target.sender_participant_id").
 			ColumnExpr("target.message_seq AS sequence, target.deleted_at IS NOT NULL AS deleted").
 			ColumnExpr("EXISTS (SELECT 1 FROM conversation_mention_reviews AS receipt WHERE receipt.organization_id = cv.organization_id AND receipt.conversation_id = cv.id AND receipt.user_id = ? AND receipt.message_id = target.id) AS reviewed", identity.User.ID).
-			ColumnExpr("sender.subject_id <> mine.subject_id AND (target.mention_all OR EXISTS (SELECT 1 FROM message_mentions AS mention WHERE mention.organization_id = target.organization_id AND mention.message_id = target.id AND mention.subject_id = mine.subject_id)) AS eligible").Scan(ctx, &target)
+			ColumnExpr("COALESCE(sender.subject_id <> mine.id AND (target.mention_all OR EXISTS (SELECT 1 FROM message_mentions AS mention WHERE mention.organization_id = target.organization_id AND mention.message_id = target.id AND mention.subject_id = mine.id)), FALSE) AS eligible").Scan(ctx, &target)
 		if errors.Is(err, sql.ErrNoRows) {
 			return ErrMentionTargetInvalid
 		}
@@ -166,7 +180,7 @@ func (a *MarkConversationMentionReviewedAction) Execute(ctx context.Context, ide
 		if !target.Eligible {
 			return ErrMentionTargetInvalid
 		}
-		if err := groupNavigationQuery(tx, identity, conversationID).
+		if err := mentionNavigationQuery(tx, identity, conversationID).
 			ColumnExpr("state.last_reviewed_mention_message_id AS reviewed_through_message_id, COALESCE(reviewed.message_seq, 0) AS reviewed_through_sequence").Scan(ctx, &result); err != nil {
 			return err
 		}
@@ -204,7 +218,7 @@ func (a *MarkConversationMentionReviewedAction) Execute(ctx context.Context, ide
 // advanceMentionReviewState 把未跳过待查看提及的单条记录合并到连续水位。
 func advanceMentionReviewState(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, conversationID string, result *ConversationMentionReview) error {
 	var firstPending *int64
-	if err := groupNavigationQuery(tx, identity, conversationID).
+	if err := mentionNavigationQuery(tx, identity, conversationID).
 		ColumnExpr("(?)", pendingMentionsQuery(tx, identity.User.ID).ColumnExpr("min(pending.message_seq)")).Scan(ctx, &firstPending); err != nil {
 		return err
 	}

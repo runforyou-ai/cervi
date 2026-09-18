@@ -66,6 +66,7 @@ func (o *directOperations) LoadInbox(ctx context.Context, meta RequestMeta, iden
 		PinOrderVersion: strconv.FormatInt(page.PinOrderVersion, 10), Conversations: conversations,
 		NextCursor: page.NextCursor, HasMore: page.HasMore,
 		UnreadCount: unreadCounts.Unread, AttentionUnreadCount: unreadCounts.Attention,
+		CustomerMentionedUnreadCount: unreadCounts.CustomerMentioned,
 	}, nil
 }
 
@@ -157,6 +158,7 @@ func inboxConversationFromAction(summary inboxaction.ConversationSummary, avatar
 			AttachmentSupported:    attachmentSupported,
 			AttachmentByteLimit:    attachmentByteLimit,
 			AttachmentCaptionLimit: domain.ChannelCaptionLimit(summary.Customer.ChannelType),
+			UnansweredMentionCount: summary.Customer.UnansweredMentionCount,
 		}
 	}
 	if summary.Direct != nil {

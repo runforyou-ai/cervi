@@ -37,7 +37,7 @@ export const resourceKeys = {
     scopedListKey("customer-deliveries", conversationId, messageIds === undefined ? undefined : { messageIds }),
   /** 收件箱数据。 */
   inbox: (parameters?: KeyParameters) => listKey("inbox", parameters),
-  /** 当前用户的内部提醒总数。 */
+  /** 当前用户应用角标的提醒总数，合计内部会话提醒与处理中客户会话里提醒本人的未读。 */
   inboxAttention: (parameters?: KeyParameters) => listKey("inbox-attention", parameters),
   /** 原查询位置及前后窗口大小限定的会话邻域。 */
   inboxContext: (parameters?: KeyParameters) => listKey("inbox-context", parameters),

@@ -30,7 +30,7 @@ function fixture(locateId: string | null = null) {
       trace.push(`page:${cursor}:${before}`)
       const start = cursor ? Number(cursor.slice(1)) + 1 : before ? Math.max(1, Number(before.slice(1)) - 50) : 1
       const window = windowPage(start, before ? Number(before.slice(1)) - 1 : Math.min(start + 49, 220))
-      return { ...window, hasMore: window.hasAfter, nextCursor: window.endCursor, unreadCount: 99, attentionUnreadCount: 88 }
+      return { ...window, hasMore: window.hasAfter, nextCursor: window.endCursor, unreadCount: 99, attentionUnreadCount: 88, customerMentionedUnreadCount: 0 }
     },
     window: async (start, end) => { trace.push(`window:${start}:${end}`); return windowPage(Number(start.slice(1)), Number(end.slice(1))) },
     context: async () => { trace.push("context"); return windowPage(81, 130) },
@@ -149,7 +149,7 @@ test("空区间恢复原邻域，失权立即移除并清理详情", async () =>
 test("切换查询后残留的锚点不参与空区间恢复", async () => {
   const f = fixture()
   // 新查询首屏为空，视口仍持有上一个查询滚动到的第 80 条锚点。
-  f.ports.page = async () => ({ ...windowPage(1, 0), startCursor: "", endCursor: "", hasBefore: false, hasAfter: false, hasMore: false, nextCursor: "", unreadCount: 0, attentionUnreadCount: 0 })
+  f.ports.page = async () => ({ ...windowPage(1, 0), startCursor: "", endCursor: "", hasBefore: false, hasAfter: false, hasMore: false, nextCursor: "", unreadCount: 0, attentionUnreadCount: 0, customerMentionedUnreadCount: 0 })
   await f.controller.request("initial")
   await f.controller.request("refresh")
   assert.equal(f.trace.includes("context"), false)
@@ -406,10 +406,10 @@ test("补页读取期间上浮的未加载会话只能由随后的变更通知�
   const moved = { ...row(150), positionCursor: "top", lastActivityAt: "2026-09-10T00:00:00.000001Z" }
   f.ports.page = async (cursor = "", before = "") => {
     f.trace.push(`page:${cursor}:${before}`)
-    if (cursor === "p50") return { ...windowPage(51, 100), hasMore: true, nextCursor: "p100", unreadCount: 99, attentionUnreadCount: 88 }
+    if (cursor === "p50") return { ...windowPage(51, 100), hasMore: true, nextCursor: "p100", unreadCount: 99, attentionUnreadCount: 88, customerMentionedUnreadCount: 0 }
     const base = windowPage(1, 50)
     const page = surfaced ? { ...base, conversations: [moved, ...base.conversations], startCursor: "top" } : base
-    return { ...page, hasMore: true, nextCursor: page.endCursor, unreadCount: 99, attentionUnreadCount: 88 }
+    return { ...page, hasMore: true, nextCursor: page.endCursor, unreadCount: 99, attentionUnreadCount: 88, customerMentionedUnreadCount: 0 }
   }
   const gate = Promise.withResolvers<ReturnType<typeof windowPage>>()
   f.ports.window = async (start, end) => {
@@ -451,7 +451,7 @@ test("尚未开始的重读合并重复通知，在途读取不吞掉新到达�
   const first = f.controller.request("poll")
   void f.controller.request("poll")
   void f.controller.request("poll")
-  gate.resolve({ ...windowPage(1, 50), hasMore: true, nextCursor: "p50", unreadCount: 99, attentionUnreadCount: 88 })
+  gate.resolve({ ...windowPage(1, 50), hasMore: true, nextCursor: "p50", unreadCount: 99, attentionUnreadCount: 88, customerMentionedUnreadCount: 0 })
   await first
   // 在途读取之后只补读一次，其余重复通知合并到该次读取。
   assert.equal(f.trace.filter((call) => call === "page::").length, 2)
@@ -483,7 +483,7 @@ test("列表加载到尾端后新增的会话仍可经变更通知发现", async
     f.trace.push("page::")
     const base = loaded()
     const page = added ? { ...base, conversations: [created, ...base.conversations], startCursor: "top" } : base
-    return { ...page, hasMore: false, nextCursor: page.endCursor, unreadCount: 0, attentionUnreadCount: 0 }
+    return { ...page, hasMore: false, nextCursor: page.endCursor, unreadCount: 0, attentionUnreadCount: 0, customerMentionedUnreadCount: 0 }
   }
   f.ports.window = async (start, end) => {
     f.trace.push(`window:${start}:${end}`)
@@ -522,7 +522,7 @@ function pinnedFixture(rounds: { version: string; pages: number[][]; failAfterFi
       const version = index > 0 && current.laterVersion ? current.laterVersion : current.version
       return {
         conversations: (current.pages[index] ?? []).map(row), startCursor: `${current.version}:0`, endCursor: `${current.version}:${index}`,
-        hasBefore: false, hasMore: index < current.pages.length - 1, pinOrderVersion: version, attentionUnreadCount: 0,
+        hasBefore: false, hasMore: index < current.pages.length - 1, pinOrderVersion: version, attentionUnreadCount: 0, customerMentionedUnreadCount: 0,
       }
     },
     window: async () => { throw new Error("置顶区不按游标区间重读") },

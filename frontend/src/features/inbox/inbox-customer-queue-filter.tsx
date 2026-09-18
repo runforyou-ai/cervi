@@ -45,6 +45,10 @@ export function InboxCustomerQueueFilter({
       id: CustomerInboxView.CustomerInboxViewMine,
       label: t("queueFilterMine"),
     },
+    {
+      id: CustomerInboxView.CustomerInboxViewMentioned,
+      label: t("queueFilterMentions"),
+    },
   ] as const
 
   function tabClass(active: boolean) {
@@ -87,9 +91,6 @@ export function InboxCustomerQueueFilter({
           </button>
         )
       })}
-      <button type="button" role="tab" aria-selected={false} disabled className={tabClass(false)}>
-        <span className="block truncate">{t("queueFilterMentions")}</span>
-      </button>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button

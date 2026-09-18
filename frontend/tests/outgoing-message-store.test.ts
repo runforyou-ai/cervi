@@ -37,7 +37,7 @@ function draft(clientMessageID: string, body = "你好") {
     body,
     originatedAt: "2026-09-11T00:00:00.000Z",
     replyTo: null,
-    mentionSubjectIDs: [],
+    mentions: [],
     mentionAll: false,
     mentionAllToken: null,
   }

@@ -8,6 +8,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
+	"slices"
 	"strconv"
 	"strings"
 	"time"
@@ -102,6 +104,8 @@ type customerMessagePayload struct {
 	ReplyToMessageID string
 	Type             domain.MessageType
 	Visibility       domain.MessageVisibility
+	// MentionIdentityIDs 是内部备注提醒的企业成员身份。
+	MentionIdentityIDs []string
 }
 
 // customerAttachmentPayload 定义附件消息待关联的上传文件。
@@ -153,7 +157,7 @@ func (a *SendCustomerTextMessageAction) Execute(ctx context.Context, identity *s
 	payload := customerMessagePayload{
 		ConversationID: normalized.ConversationID, ClientMessageID: normalized.ClientMessageID,
 		Body: normalized.Body, ReplyToMessageID: normalized.ReplyToMessageID, Type: domain.MessageTypeText,
-		Visibility: normalized.Visibility,
+		Visibility: normalized.Visibility, MentionIdentityIDs: normalized.MentionIdentityIDs,
 	}
 
 	for attempt := 0; attempt < maxWriteAttempts; attempt++ {
@@ -213,8 +217,7 @@ func sendCustomerMessage(ctx context.Context, tx bun.Tx, identity *servermodels.
 	if err != nil {
 		return ConversationMessage{}, err
 	}
-	expectation := input.expectation()
-	if saved, found, err := loadIdempotentMemberMessage(ctx, tx, identity, expectation, idempotencyKey); err != nil || found {
+	if saved, found, err := loadIdempotentCustomerMessage(ctx, tx, identity, input, idempotencyKey); err != nil || found {
 		return saved, err
 	}
 	// 附件按来源渠道的外发能力、字节上限和说明上限校验。
@@ -284,14 +287,19 @@ func sendCustomerMessage(ctx context.Context, tx bun.Tx, identity *servermodels.
 			}
 		}
 	}
-	// 取得或创建当前企业成员的聊天主体。
-	subject, err := chatstate.EnsureOrganizationIdentityChatSubject(ctx, tx, identity.Organization.ID, identity.OrganizationIdentity.ID, ids.subject)
+	// 取得或创建发送者与提醒成员的聊天主体，再建立发送者参与者和协作者关系。
+	subject, mentions, err := ensureNoteSubjects(ctx, tx, identity, ids.subject, input.MentionIdentityIDs)
 	if err != nil {
 		return ConversationMessage{}, err
 	}
 	participant, err := ensureMemberConversationParticipant(ctx, tx, identity.Organization.ID, conversation.ID, subject.ID, ids.participant)
 	if err != nil {
 		return ConversationMessage{}, err
+	}
+	for _, mention := range mentions {
+		if _, err := ensureMemberConversationParticipant(ctx, tx, identity.Organization.ID, conversation.ID, mention.ChatSubjectID, uuid.NewV7().String()); err != nil {
+			return ConversationMessage{}, err
+		}
 	}
 
 	message := &servermodels.Message{
@@ -315,8 +323,11 @@ func sendCustomerMessage(ctx context.Context, tx bun.Tx, identity *servermodels.
 		return ConversationMessage{}, err
 	}
 	if !inserted {
-		saved, _, err := loadIdempotentMemberMessage(ctx, tx, identity, expectation, idempotencyKey)
+		saved, _, err := loadIdempotentCustomerMessage(ctx, tx, identity, input, idempotencyKey)
 		return saved, err
+	}
+	if err := createMessageMentions(ctx, tx, identity.Organization.ID, message.ID, mentions); err != nil {
+		return ConversationMessage{}, err
 	}
 	if attachment != nil {
 		if err := saveCustomerAttachment(ctx, tx, identity.Organization.ID, message.ID, *attachment); err != nil {
@@ -342,7 +353,79 @@ func sendCustomerMessage(ctx context.Context, tx bun.Tx, identity *servermodels.
 	result := memberConversationMessage(message, subject.ID, identity.OrganizationIdentity)
 	result.ReplyTo = replyTo
 	result.Attachment = attachment
+	result.Mentions = mentions
 	return result, nil
+}
+
+// ensureNoteSubjects 校验内部备注提醒的企业成员，按身份编号顺序取得或创建发送者与提醒成员的聊天主体，提醒按正文顺序返回。
+func ensureNoteSubjects(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, senderSubjectID string, identityIDs []string) (*servermodels.ChatSubject, []ConversationMessageMention, error) {
+	var rows []struct {
+		ID          string `bun:"id"`
+		DisplayName string `bun:"display_name"`
+	}
+	if len(identityIDs) > 0 {
+		if err := tx.NewSelect().TableExpr("organization_identities AS oi").
+			ColumnExpr("oi.id, oi.display_name").
+			Join("JOIN users AS u ON u.organization_id = oi.organization_id AND u.identity_id = oi.id").
+			Where("oi.organization_id = ? AND oi.id IN (?)", identity.Organization.ID, bun.In(identityIDs)).
+			Where("oi.type = ? AND u.status = ?", domain.OrganizationIdentityTypeUser, domain.UserStatusActive).
+			Where("oi.id <> ?", identity.OrganizationIdentity.ID).
+			Scan(ctx, &rows); err != nil {
+			return nil, nil, fmt.Errorf("load note mention targets: %w", err)
+		}
+		if len(rows) != len(identityIDs) {
+			return nil, nil, &ConflictError{Reason: ConflictReasonNoteMentionTargetInvalid}
+		}
+	}
+	names := make(map[string]string, len(rows))
+	for _, row := range rows {
+		names[row.ID] = row.DisplayName
+	}
+	// 并发互相提醒的事务按同一身份编号顺序创建聊天主体，唯一约束等待不会形成循环。
+	newSubjectIDs := map[string]string{identity.OrganizationIdentity.ID: senderSubjectID}
+	for _, identityID := range identityIDs {
+		newSubjectIDs[identityID] = uuid.NewV7().String()
+	}
+	subjects := make(map[string]*servermodels.ChatSubject, len(newSubjectIDs))
+	for _, identityID := range slices.Sorted(maps.Keys(newSubjectIDs)) {
+		subject, err := chatstate.EnsureOrganizationIdentityChatSubject(ctx, tx, identity.Organization.ID, identityID, newSubjectIDs[identityID])
+		if err != nil {
+			return nil, nil, err
+		}
+		subjects[identityID] = subject
+	}
+	mentions := make([]ConversationMessageMention, 0, len(identityIDs))
+	for _, identityID := range identityIDs {
+		name := names[identityID]
+		mentions = append(mentions, ConversationMessageMention{
+			ChatSubjectID: subjects[identityID].ID, Kind: domain.ChatSubjectKindOrganizationIdentity,
+			SourceID: identityID, DisplayName: &name, IdentityType: domain.OrganizationIdentityTypeUser,
+		})
+	}
+	return subjects[identity.OrganizationIdentity.ID], mentions, nil
+}
+
+// loadIdempotentCustomerMessage 校验成员客户消息的完整发送意图，包括内部备注提醒的成员。
+func loadIdempotentCustomerMessage(ctx context.Context, db bun.IDB, identity *servermodels.Identity, input customerMessagePayload, idempotencyKey string) (ConversationMessage, bool, error) {
+	saved, found, err := loadIdempotentMemberMessage(ctx, db, identity, input.expectation(), idempotencyKey)
+	if err != nil || !found {
+		return saved, found, err
+	}
+	saved.Mentions, err = loadPersistedMessageMentions(ctx, db, identity.Organization.ID, saved.ID)
+	if err != nil {
+		return ConversationMessage{}, true, err
+	}
+	stored := make([]string, 0, len(saved.Mentions))
+	for _, mention := range saved.Mentions {
+		stored = append(stored, mention.SourceID)
+	}
+	sent := slices.Clone(input.MentionIdentityIDs)
+	slices.Sort(stored)
+	slices.Sort(sent)
+	if !slices.Equal(stored, sent) {
+		return ConversationMessage{}, true, &ConflictError{Reason: ConflictReasonIdempotencyMismatch}
+	}
+	return saved, true, nil
 }
 
 // normalizeCustomerTextMessageInput 规范化并校验成员客户消息输入。
@@ -375,6 +458,20 @@ func normalizeCustomerTextMessageInput(input CustomerTextMessageInput) (Customer
 	if input.Visibility != domain.MessageVisibilityCustomerVisible && input.Visibility != domain.MessageVisibilityInternalOnly {
 		fields["visibility"] = ValidationMessageVisibilityInvalid
 	}
+	// 只有内部备注可以提醒企业成员，同一成员只提醒一次。
+	if len(input.MentionIdentityIDs) > 0 && input.Visibility != domain.MessageVisibilityInternalOnly {
+		fields["mentionIdentityIds"] = ValidationMentionIdentityIDsInvalid
+	}
+	mentionIdentityIDs := make([]string, 0, len(input.MentionIdentityIDs))
+	for _, identityID := range input.MentionIdentityIDs {
+		normalized, valid := common.NormalizeUUID(identityID)
+		if !valid || slices.Contains(mentionIdentityIDs, normalized) {
+			fields["mentionIdentityIds"] = ValidationMentionIdentityIDsInvalid
+			continue
+		}
+		mentionIdentityIDs = append(mentionIdentityIDs, normalized)
+	}
+	input.MentionIdentityIDs = mentionIdentityIDs
 	return input, fields
 }
 

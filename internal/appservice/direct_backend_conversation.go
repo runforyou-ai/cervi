@@ -103,7 +103,7 @@ func newConversationOps(db *bun.DB, agentScheduler conversationaction.AgentMessa
 func (o *directOperations) SendCustomerTextMessage(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, input CustomerTextMessageInput) (ConversationMessage, error) {
 	message, err := o.sendCustomerTextMessage.Execute(ctx, identity, conversationaction.CustomerTextMessageInput{
 		ConversationID: conversationID, ClientMessageID: input.ClientMessageID, Body: input.Body, ReplyToMessageID: input.ReplyToMessageID,
-		Visibility: domain.MessageVisibility(input.Visibility),
+		Visibility: domain.MessageVisibility(input.Visibility), MentionIdentityIDs: input.MentionIdentityIDs,
 	})
 	if err != nil {
 		return ConversationMessage{}, customerTextMessageError(ctx, meta, err, identity.Organization.ID, conversationID)
@@ -853,34 +853,37 @@ func customerReplyConflictMessageKey(reason string) cervii18n.Key {
 		return cervii18n.ErrorAttachmentTooLarge
 	case conversationaction.ConflictReasonCaptionTooLong:
 		return cervii18n.ErrorAttachmentCaptionTooLong
+	case conversationaction.ConflictReasonNoteMentionTargetInvalid:
+		return cervii18n.ErrorNoteMentionTargetInvalid
 	}
 	return cervii18n.ErrorMessageConflict
 }
 
 var conversationMessageValidationKeys = map[conversationaction.ValidationCode]cervii18n.Key{
-	conversationaction.ValidationConversationIDInvalid:    cervii18n.FieldConversationIDInvalid,
-	conversationaction.ValidationClientMessageIDInvalid:   cervii18n.FieldClientMessageIDInvalid,
-	conversationaction.ValidationLastReadMessageIDInvalid: cervii18n.FieldClientMessageIDInvalid,
-	conversationaction.ValidationReplyToMessageIDInvalid:  cervii18n.FieldReplyToMessageIDInvalid,
-	conversationaction.ValidationMentionSubjectIDsInvalid: cervii18n.FieldMentionSubjectIDsInvalid,
-	conversationaction.ValidationBodyRequired:             cervii18n.FieldMessageBodyRequired,
-	conversationaction.ValidationBodyTooLong:              cervii18n.FieldMessageBodyTooLong,
-	conversationaction.ValidationCursorInvalid:            cervii18n.FieldMessageCursorInvalid,
-	conversationaction.ValidationMessageVisibilityInvalid: cervii18n.FieldMessageVisibilityInvalid,
-	conversationaction.ValidationFileIDInvalid:            cervii18n.ErrorFileNotFound,
-	conversationaction.ValidationTargetIdentityIDInvalid:  cervii18n.FieldTargetIdentityIDInvalid,
-	conversationaction.ValidationGroupTitleRequired:       cervii18n.FieldGroupTitleRequired,
-	conversationaction.ValidationGroupTitleTooLong:        cervii18n.FieldGroupTitleTooLong,
-	conversationaction.ValidationGroupDescriptionTooLong:  cervii18n.FieldGroupDescriptionTooLong,
-	conversationaction.ValidationGroupImageFileIDInvalid:  cervii18n.FieldGroupImageFileIDInvalid,
-	conversationaction.ValidationGroupMembersRequired:     cervii18n.FieldGroupMembersRequired,
-	conversationaction.ValidationGroupMembersTooMany:      cervii18n.FieldGroupMembersTooMany,
-	conversationaction.ValidationGroupMemberIDsInvalid:    cervii18n.FieldGroupMemberIDsInvalid,
-	conversationaction.ValidationGroupMemberIDInvalid:     cervii18n.FieldGroupMemberIDInvalid,
-	conversationaction.ValidationGroupOwnerIDInvalid:      cervii18n.FieldGroupOwnerIDInvalid,
-	conversationaction.ValidationNeighborIDInvalid:        cervii18n.FieldConversationPinTargetInvalid,
-	conversationaction.ValidationPinPositionInvalid:       cervii18n.FieldConversationPinTargetInvalid,
-	conversationaction.ValidationPinOrderVersionInvalid:   cervii18n.FieldConversationPinTargetInvalid,
+	conversationaction.ValidationConversationIDInvalid:     cervii18n.FieldConversationIDInvalid,
+	conversationaction.ValidationClientMessageIDInvalid:    cervii18n.FieldClientMessageIDInvalid,
+	conversationaction.ValidationLastReadMessageIDInvalid:  cervii18n.FieldClientMessageIDInvalid,
+	conversationaction.ValidationReplyToMessageIDInvalid:   cervii18n.FieldReplyToMessageIDInvalid,
+	conversationaction.ValidationMentionSubjectIDsInvalid:  cervii18n.FieldMentionSubjectIDsInvalid,
+	conversationaction.ValidationMentionIdentityIDsInvalid: cervii18n.FieldMentionIdentityIDsInvalid,
+	conversationaction.ValidationBodyRequired:              cervii18n.FieldMessageBodyRequired,
+	conversationaction.ValidationBodyTooLong:               cervii18n.FieldMessageBodyTooLong,
+	conversationaction.ValidationCursorInvalid:             cervii18n.FieldMessageCursorInvalid,
+	conversationaction.ValidationMessageVisibilityInvalid:  cervii18n.FieldMessageVisibilityInvalid,
+	conversationaction.ValidationFileIDInvalid:             cervii18n.ErrorFileNotFound,
+	conversationaction.ValidationTargetIdentityIDInvalid:   cervii18n.FieldTargetIdentityIDInvalid,
+	conversationaction.ValidationGroupTitleRequired:        cervii18n.FieldGroupTitleRequired,
+	conversationaction.ValidationGroupTitleTooLong:         cervii18n.FieldGroupTitleTooLong,
+	conversationaction.ValidationGroupDescriptionTooLong:   cervii18n.FieldGroupDescriptionTooLong,
+	conversationaction.ValidationGroupImageFileIDInvalid:   cervii18n.FieldGroupImageFileIDInvalid,
+	conversationaction.ValidationGroupMembersRequired:      cervii18n.FieldGroupMembersRequired,
+	conversationaction.ValidationGroupMembersTooMany:       cervii18n.FieldGroupMembersTooMany,
+	conversationaction.ValidationGroupMemberIDsInvalid:     cervii18n.FieldGroupMemberIDsInvalid,
+	conversationaction.ValidationGroupMemberIDInvalid:      cervii18n.FieldGroupMemberIDInvalid,
+	conversationaction.ValidationGroupOwnerIDInvalid:       cervii18n.FieldGroupOwnerIDInvalid,
+	conversationaction.ValidationNeighborIDInvalid:         cervii18n.FieldConversationPinTargetInvalid,
+	conversationaction.ValidationPinPositionInvalid:        cervii18n.FieldConversationPinTargetInvalid,
+	conversationaction.ValidationPinOrderVersionInvalid:    cervii18n.FieldConversationPinTargetInvalid,
 }
 
 // conversationMessageListFromAction 共用成员消息窗口及游标转换。

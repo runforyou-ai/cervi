@@ -28,11 +28,13 @@ const scopes = [
 export function InboxScopeRail({
   scope,
   attentionUnreadCount,
+  customerMentionedUnreadCount,
   onScopeChange,
   onCollapse,
 }: {
   scope: InboxScope
   attentionUnreadCount: number
+  customerMentionedUnreadCount: number
   onScopeChange: (scope: InboxScope) => void
   onCollapse: () => void
 }) {
@@ -78,6 +80,16 @@ export function InboxScopeRail({
                   role="status"
                   aria-label={t("internalAttentionUnread", {
                     count: attentionUnreadCount,
+                  })}
+                />
+              ) : null}
+              {item.id === InboxScope.InboxScopeCustomer &&
+              customerMentionedUnreadCount > 0 ? (
+                <span
+                  className="absolute -top-0.5 -right-1 size-2 rounded-full bg-destructive"
+                  role="status"
+                  aria-label={t("customerMentionUnread", {
+                    count: customerMentionedUnreadCount,
                   })}
                 />
               ) : null}

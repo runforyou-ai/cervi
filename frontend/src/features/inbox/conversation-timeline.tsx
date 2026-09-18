@@ -21,7 +21,6 @@ import {
   type ConversationMessageData,
   type ConversationMessageReference,
   type ConversationSystemEventParticipant,
-  type GroupParticipant,
 } from "@/api"
 import { CustomerDeliveryState } from "./customer-delivery-state"
 import { ConversationAttachment } from "./conversation-attachment"
@@ -87,7 +86,7 @@ type TimelineMessage = Pick<
 > & {
   persistedMessageID: string | null
   clientMessageID: string | null
-  mentionSubjectIDs: string[]
+  draftMentions: OutgoingConversationDraft["mentions"]
   mentionAllToken: OutgoingConversationDraft["mentionAllToken"]
   local: boolean
   deliveryStatus: "sending" | "failed" | null
@@ -114,19 +113,12 @@ function timelineSenderKey(
 function mergeTimelineMessages(
   current: ConversationMessageData[],
   outgoing: OutgoingConversationMessage[],
-  groupParticipants: GroupParticipant[] = [],
 ) {
-  const participantsBySubjectID = new Map(
-    groupParticipants.map((participant) => [
-      participant.chatSubjectId,
-      participant,
-    ]),
-  )
   const messages: TimelineMessage[] = [...current].sort(compareConversationMessages).map((message) => ({
     ...message,
     persistedMessageID: message.id,
     clientMessageID: null,
-    mentionSubjectIDs: [],
+    draftMentions: [],
     mentionAllToken: null,
     local: false,
     deliveryStatus: null,
@@ -150,21 +142,14 @@ function mergeTimelineMessages(
       replyTo: message.replyTo,
       canReply: false,
       canNoteReply: false,
-      mentions: message.mentionSubjectIDs.flatMap((subjectID) => {
-        const participant = participantsBySubjectID.get(subjectID)
-        return participant
-          ? [
-              {
-                chatSubjectId: participant.chatSubjectId,
-                kind: ChatSubjectKind.ChatSubjectKindOrganizationIdentity,
-                sourceId: participant.identityId,
-                displayName: participant.displayName,
-              },
-            ]
-          : []
-      }),
+      mentions: message.mentions.map((mention) => ({
+        chatSubjectId: mention.chatSubjectID ?? "",
+        kind: ChatSubjectKind.ChatSubjectKindOrganizationIdentity,
+        sourceId: mention.identityID,
+        displayName: mention.displayName,
+      })),
       clientMessageID: message.clientMessageID,
-      mentionSubjectIDs: message.mentionSubjectIDs,
+      draftMentions: message.mentions,
       mentionAll: message.mentionAll,
       mentionAllToken: message.mentionAllToken,
       local: true,
@@ -267,7 +252,6 @@ function ConversationTimelineContent({
   noteReplyEnabled = false,
   customerReplyUnavailable = false,
   replyVisibility = MessageVisibility.MessageVisibilityCustomerVisible,
-  groupParticipants,
   onReadMessage,
   readThroughMessageID,
   prepareSendRef,
@@ -293,7 +277,6 @@ function ConversationTimelineContent({
   noteReplyEnabled?: boolean
   customerReplyUnavailable?: boolean
   replyVisibility?: MessageVisibility
-  groupParticipants?: GroupParticipant[]
   onReadMessage?: (messageID: string) => void
   readThroughMessageID?: string | null
   prepareSendRef?: RefObject<(() => Promise<boolean>) | null>
@@ -345,7 +328,6 @@ function ConversationTimelineContent({
   const visibleMessages = mergeTimelineMessages(
     currentPage?.messages ?? [],
     timeline.mode === "latest" ? outgoingMessages : [],
-    groupParticipants,
   )
   // 使用窗口内持久消息编号查询投递，历史窗口也能刷新原有消息的状态。
   const deliveryMessageIDs = visibleMessages
@@ -421,7 +403,8 @@ function ConversationTimelineContent({
     enabled:
       enabled &&
       mentionNavigation &&
-      conversationType === ConversationType.ConversationTypeGroup,
+      (conversationType === ConversationType.ConversationTypeGroup ||
+        conversationType === ConversationType.ConversationTypeCustomer),
     pollingActive,
     root: scrollRootRef,
     page: currentPage,
@@ -838,7 +821,7 @@ function ConversationTimelineContent({
                       body: message.body,
                       originatedAt: message.originatedAt,
                       replyTo: message.replyTo,
-                      mentionSubjectIDs: message.mentionSubjectIDs,
+                      mentions: message.draftMentions,
                       mentionAll: message.mentionAll,
                       mentionAllToken: message.mentionAllToken,
                     }

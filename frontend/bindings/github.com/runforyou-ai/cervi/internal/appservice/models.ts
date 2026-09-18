@@ -1283,6 +1283,11 @@ export interface CustomerInboxConversation {
      * AttachmentCaptionLimit 是来源渠道附件说明的字符上限。
      */
     "attachmentCaptionLimit": number;
+
+    /**
+     * UnansweredMentionCount 是当前客服周期内被提醒成员尚未在会话中发言的内部提醒数。
+     */
+    "unansweredMentionCount": number;
 }
 
 /**
@@ -1297,6 +1302,7 @@ export enum CustomerInboxView {
     CustomerInboxViewQueue = "queue",
     CustomerInboxViewMine = "mine",
     CustomerInboxViewCoworkers = "coworkers",
+    CustomerInboxViewMentioned = "mentioned",
 };
 
 /**
@@ -1401,6 +1407,11 @@ export interface CustomerTextMessageInput {
      * Visibility 为空时按对客消息处理。
      */
     "visibility": MessageVisibility;
+
+    /**
+     * MentionIdentityIDs 是内部备注提醒的企业成员身份，按正文出现顺序排列；对客消息不得携带。
+     */
+    "mentionIdentityIds": string[] | null;
 }
 
 /**
@@ -1704,6 +1715,11 @@ export interface Inbox {
     "hasMore": boolean;
     "unreadCount": number;
     "attentionUnreadCount": number;
+
+    /**
+     * CustomerMentionedUnreadCount 是处理中客户会话的当前周期内提醒本人且尚未读到的消息数。
+     */
+    "customerMentionedUnreadCount": number;
 }
 
 /**

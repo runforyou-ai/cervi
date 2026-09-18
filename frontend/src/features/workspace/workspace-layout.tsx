@@ -108,7 +108,11 @@ function WorkspaceShell({ identity }: { identity: Identity }) {
   // 提醒总数按权威查询读取，会话变化由同步协调器失效该查询。
   const attention = useResource(
     resourceKeys.inboxAttention({ organizationId, userId }),
-    async () => (await loadInbox({ limit: 1 })).attentionUnreadCount,
+    async () => {
+      // 应用角标合计内部会话提醒与客户会话中提醒本人的未读。
+      const inbox = await loadInbox({ limit: 1 })
+      return inbox.attentionUnreadCount + inbox.customerMentionedUnreadCount
+    },
   )
   const unreadCount = attention.data ?? 0
 

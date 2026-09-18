@@ -15,31 +15,32 @@ import (
 type ValidationCode = common.FieldCode
 
 const (
-	ValidationChannelIDInvalid         ValidationCode = "channel_id_invalid"
-	ValidationExternalIDInvalid        ValidationCode = "external_id_invalid"
-	ValidationConversationIDInvalid    ValidationCode = "conversation_id_invalid"
-	ValidationTargetIdentityIDInvalid  ValidationCode = "target_identity_id_invalid"
-	ValidationGroupTitleRequired       ValidationCode = "group_title_required"
-	ValidationGroupTitleTooLong        ValidationCode = "group_title_too_long"
-	ValidationGroupDescriptionTooLong  ValidationCode = "group_description_too_long"
-	ValidationGroupImageFileIDInvalid  ValidationCode = "group_image_file_id_invalid"
-	ValidationGroupMembersRequired     ValidationCode = "group_members_required"
-	ValidationGroupMembersTooMany      ValidationCode = "group_members_too_many"
-	ValidationGroupMemberIDsInvalid    ValidationCode = "group_member_ids_invalid"
-	ValidationGroupMemberIDInvalid     ValidationCode = "group_member_id_invalid"
-	ValidationGroupOwnerIDInvalid      ValidationCode = "group_owner_id_invalid"
-	ValidationClientMessageIDInvalid   ValidationCode = "client_message_id_invalid"
-	ValidationLastReadMessageIDInvalid ValidationCode = "last_read_message_id_invalid"
-	ValidationReplyToMessageIDInvalid  ValidationCode = "reply_to_message_id_invalid"
-	ValidationMentionSubjectIDsInvalid ValidationCode = "mention_subject_ids_invalid"
-	ValidationMessageVisibilityInvalid ValidationCode = "message_visibility_invalid"
-	ValidationBodyRequired             ValidationCode = "body_required"
-	ValidationBodyTooLong              ValidationCode = "body_too_long"
-	ValidationCursorInvalid            ValidationCode = "cursor_invalid"
-	ValidationFileIDInvalid            ValidationCode = "file_id_invalid"
-	ValidationNeighborIDInvalid        ValidationCode = "neighbor_id_invalid"
-	ValidationPinPositionInvalid       ValidationCode = "pin_position_invalid"
-	ValidationPinOrderVersionInvalid   ValidationCode = "pin_order_version_invalid"
+	ValidationChannelIDInvalid          ValidationCode = "channel_id_invalid"
+	ValidationExternalIDInvalid         ValidationCode = "external_id_invalid"
+	ValidationConversationIDInvalid     ValidationCode = "conversation_id_invalid"
+	ValidationTargetIdentityIDInvalid   ValidationCode = "target_identity_id_invalid"
+	ValidationGroupTitleRequired        ValidationCode = "group_title_required"
+	ValidationGroupTitleTooLong         ValidationCode = "group_title_too_long"
+	ValidationGroupDescriptionTooLong   ValidationCode = "group_description_too_long"
+	ValidationGroupImageFileIDInvalid   ValidationCode = "group_image_file_id_invalid"
+	ValidationGroupMembersRequired      ValidationCode = "group_members_required"
+	ValidationGroupMembersTooMany       ValidationCode = "group_members_too_many"
+	ValidationGroupMemberIDsInvalid     ValidationCode = "group_member_ids_invalid"
+	ValidationGroupMemberIDInvalid      ValidationCode = "group_member_id_invalid"
+	ValidationGroupOwnerIDInvalid       ValidationCode = "group_owner_id_invalid"
+	ValidationClientMessageIDInvalid    ValidationCode = "client_message_id_invalid"
+	ValidationLastReadMessageIDInvalid  ValidationCode = "last_read_message_id_invalid"
+	ValidationReplyToMessageIDInvalid   ValidationCode = "reply_to_message_id_invalid"
+	ValidationMentionSubjectIDsInvalid  ValidationCode = "mention_subject_ids_invalid"
+	ValidationMentionIdentityIDsInvalid ValidationCode = "mention_identity_ids_invalid"
+	ValidationMessageVisibilityInvalid  ValidationCode = "message_visibility_invalid"
+	ValidationBodyRequired              ValidationCode = "body_required"
+	ValidationBodyTooLong               ValidationCode = "body_too_long"
+	ValidationCursorInvalid             ValidationCode = "cursor_invalid"
+	ValidationFileIDInvalid             ValidationCode = "file_id_invalid"
+	ValidationNeighborIDInvalid         ValidationCode = "neighbor_id_invalid"
+	ValidationPinPositionInvalid        ValidationCode = "pin_position_invalid"
+	ValidationPinOrderVersionInvalid    ValidationCode = "pin_order_version_invalid"
 )
 
 const (
@@ -67,6 +68,8 @@ const (
 	ConflictReasonReplyTargetInvalid = "reply_target_invalid"
 	// ConflictReasonGroupMentionTargetInvalid 表示当前群聊的提醒目标校验失败。
 	ConflictReasonGroupMentionTargetInvalid = "group_mention_target_invalid"
+	// ConflictReasonNoteMentionTargetInvalid 表示内部备注的提醒目标不是本企业有效成员。
+	ConflictReasonNoteMentionTargetInvalid = "note_mention_target_invalid"
 	// ConflictReasonChannelAttachmentUnsupported 表示来源渠道尚不支持外发附件。
 	ConflictReasonChannelAttachmentUnsupported = "channel_attachment_unsupported"
 	// ConflictReasonAttachmentTooLarge 表示附件超过来源渠道的字节上限。
@@ -361,6 +364,8 @@ type CustomerTextMessageInput struct {
 	ClientMessageID  string
 	Body             string
 	Visibility       domain.MessageVisibility
+	// MentionIdentityIDs 是内部备注提醒的企业成员身份，按正文出现顺序排列。
+	MentionIdentityIDs []string
 }
 
 // FirstDirectTextMessageInput 定义成员向目标身份发送的首条单聊消息。

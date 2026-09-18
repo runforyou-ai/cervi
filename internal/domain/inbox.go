@@ -16,6 +16,7 @@ const (
 	CustomerInboxViewQueue     CustomerInboxView = "queue"
 	CustomerInboxViewMine      CustomerInboxView = "mine"
 	CustomerInboxViewCoworkers CustomerInboxView = "coworkers"
+	CustomerInboxViewMentioned CustomerInboxView = "mentioned"
 )
 
 // InboxPartition 定义统一收件箱的置顶分区，未指定时按完整活动序返回全部会话。
