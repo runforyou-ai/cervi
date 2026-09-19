@@ -2,7 +2,7 @@
 
 ## 执行约定
 
-PR01–PR22、PR25、PR25A、PR26、PR27、PR28、PR29、PR30、PR32、PR33、PR34、PR36、PR37、PR38、PR40、PR41 与 PR42 已交付，原始范围与验证记录见 `chat-realtime-completed.md`。本文只保留共用契约和尚未交付的范围。2026-09-10 对原路线图做过一次范围削减评审，结论见「本轮范围削减」；原清单的 PR00 已改编为 PR16 并交付。2026-09-13 对通知发布、兜底探针和 AI 流传输做了第二轮调整，结论见「第二轮调整」，与第一轮结论冲突处以第二轮为准。2026-09-15 对授权复核、客户端版本追赶、帧优先级和非主线范围做了第三轮调整，结论见「第三轮调整」，与前两轮冲突处以第三轮为准。同日 PR25 合入后把实时传输从 WebSocket 改为 SSE，结论见「第四轮调整」，与前三轮冲突处以第四轮为准。
+PR01–PR22、PR25、PR25A、PR26、PR27、PR28、PR29、PR30、PR32、PR33、PR34、PR36、PR37、PR38、PR40、PR41、PR42 与 PR43 已交付，原始范围与验证记录见 `chat-realtime-completed.md`。本文只保留共用契约和尚未交付的范围。2026-09-10 对原路线图做过一次范围削减评审，结论见「本轮范围削减」；原清单的 PR00 已改编为 PR16 并交付。2026-09-13 对通知发布、兜底探针和 AI 流传输做了第二轮调整，结论见「第二轮调整」，与第一轮结论冲突处以第二轮为准。2026-09-15 对授权复核、客户端版本追赶、帧优先级和非主线范围做了第三轮调整，结论见「第三轮调整」，与前两轮冲突处以第三轮为准。同日 PR25 合入后把实时传输从 WebSocket 改为 SSE，结论见「第四轮调整」，与前三轮冲突处以第四轮为准。
 
 - 一个 PR 交付一个明确行为；后端能力可用真实数据库与应用服务测试独立验收。正确性耦合的迁移、写入、读取及绑定一起提交，不拆成无法运行的中间版本。
 - 保留 Conversation、ChatSubject、Participant、ServiceSession、Agent Run 和 appservice 边界。持久命令与临时上报走 HTTP／Wails；SSE 事件流只下行推送版本通知和 AI 流等临时事件，撤销与到期直接结束事件流，客户端通过业务 Query 读权威数据。
@@ -77,11 +77,11 @@ PR01–PR22、PR25、PR25A、PR26、PR27、PR28、PR29、PR30、PR32、PR33、PR
 | 部署约束（PR25、PR35） | Web 端部署要求 HTTPS／HTTP2，接受 HTTP/1.1 下同源 6 连接上限对多标签页的限制；反向代理对 `/api/realtime` 关闭响应缓冲并允许长响应；删除 Upgrade 配置与 `permessage-deflate` 评估 | SSE 在 HTTP/2 下与业务请求共用连接；服务端 25 秒心跳维持代理空闲超时 |
 | 优雅下线（PR25） | 删除 `server_going_away`；收到 SIGINT／SIGTERM 即拒绝新的事件流请求（503）并结束全部事件流，5 秒内未结束的强制断开，之后停止通知发布器 | Wails 服务端先执行 `http.Server.Shutdown` 并等待进行中的长响应，之后才停止各服务；被劫持的 WebSocket 不在等待范围内，SSE 长响应在 |
 
-PR25 原文与 WebSocket 平台探针结论保留在 `chat-realtime-completed.md` 作为交付记录；Cloudflare Tunnel 下的 SSE 实时下发在 PR27 实际接入时记录；PR33 已在桌面开发的移动端预览窗验证原生端 SSE 长响应，iOS 与 Android 真机结论待各自接入时补记。PR20、PR25、PR25A、PR27 已合并，PR21、PR22、PR26、PR28、PR29、PR30、PR32、PR33、PR34、PR36、PR38、PR40、PR41、PR42 已交付；剩余 3 个可交付 PR（不含标注推迟的 PR31、PR35、PR39；PR44 已并入 PR43），其中 PR43 于 2026-09-18 开启，PR45、PR46 按证据开启。
+PR25 原文与 WebSocket 平台探针结论保留在 `chat-realtime-completed.md` 作为交付记录；Cloudflare Tunnel 下的 SSE 实时下发在 PR27 实际接入时记录；PR33 已在桌面开发的移动端预览窗验证原生端 SSE 长响应，iOS 与 Android 真机结论待各自接入时补记。PR20、PR25、PR25A、PR27 已合并，PR21、PR22、PR26、PR28、PR29、PR30、PR32、PR33、PR34、PR36、PR38、PR40、PR41、PR42、PR43 已交付；剩余 2 个可交付 PR（不含标注推迟的 PR31、PR35、PR39；PR44 已并入 PR43），PR45、PR46 均按证据开启。
 
 ## 已交付基线
 
-PR01–PR22、PR25、PR25A、PR26、PR27、PR28、PR29、PR30、PR32、PR33、PR34、PR36、PR37、PR38、PR40、PR41 与 PR42 已交付以下能力，后续 PR 直接依赖，不重复定义。
+PR01–PR22、PR25、PR25A、PR26、PR27、PR28、PR29、PR30、PR32、PR33、PR34、PR36、PR37、PR38、PR40、PR41、PR42 与 PR43 已交付以下能力，后续 PR 直接依赖，不重复定义。
 
 - **锁序：** `internal/actions/chatstate` 提供会话授权与锁定入口，覆盖真人单聊、独立 AI 聊天、群聊和客户会话；可读、可发、可管理三种资格在锁后判断。
 - **`message_seq`：** 全部会话类型统一，会话锁内分配，`last_message_seq` 保存已提交位置；HTTP 用字符串、TS 用 bigint。`read_seq` 为阅读基线，服务端单调推进。
@@ -113,6 +113,7 @@ PR01–PR22、PR25、PR25A、PR26、PR27、PR28、PR29、PR30、PR32、PR33、PR
 - **个人置顶：** `conversation_user_states.pin_rank`（空即未置顶）保存本人全局置顶顺序，`users.pin_order_version` 为顺序版本。`UpdateConversationPin` 覆盖置顶、取消与移动并返回新版本：`position` 为空时新置顶追加末尾、已置顶保持原位，`before`／`after` 带邻居，`start`／`end` 指整个置顶区首尾，取消置顶不接受位置指令；`expectedPinOrderVersion` 不匹配返回 `pin_order_version_stale` 冲突且不部分写入，重复置顶、重复取消与落点等于原位置不推进版本。本人置顶写入由 `LockActiveUser` 锁定的用户账号行串行，不逐会话加锁；顺序值按 2^20 留间隔，取不到中点时同事务整区重编号。`LoadInput.partition` 未指定时按完整活动序返回全部会话，`pinned` 按顺序值排序且游标绑定 `pinOrderVersion`，顺序变化后旧游标以 `inbox_cursor_invalid` 要求整区重读，`regular` 只含未置顶会话；按 ID 核对列表资格与锚点上下文同样应用分区。`GetSyncHeads` 与列表、窗口、锚点查询返回当前 `pinOrderVersion`；`pin_order_changed` 只通知本人受众，同步协调器收到该事件或探针发现版本变化时整区失效收件箱类查询。失权清理只清除该会话的 `pinRank` 并推进本人会话状态版本，重入不恢复置顶。Web／桌面端置顶交互由 PR41 交付，移动端由 PR42 交付，见下两条。
 - **Web／桌面置顶交互：** `usePartitionedInboxList` 为置顶区与普通区各建一个 `InboxListController`，经纯函数 `inbox-partitions.ts` 合并为先置顶后普通、同一会话只出现一次的单滚动列表；普通区停在深处窗口时只展示普通区，置顶区首次读取结束后才接上普通区。置顶区按同一 `pinOrderVersion` 整区读取，续页游标失效或带回新版本时从首页重读（最多三轮），以前驱变化识别被移动的行，滚动补页只作用于普通区。行菜单提供置顶与取消置顶（客户会话同样可置顶）；置顶区用 `@dnd-kit` 排序，指针移动 6px 后开始拖动，键盘空格拿起、方向键移动、空格或回车放下、Esc 取消。放下后提交相对可见邻居的 `before`／`after` 命令，`ConversationPinCommand` 在 `src/api` 内收敛位置枚举零值。拖动或菜单打开期间到达的远端重排连同顺序版本一起暂缓，放下仍携带旧版本并由服务端以冲突拒绝，前端提示后重读；写入成功后先重读目标分区再重读另一分区。两个分区共用一个视口，定位目标属于置顶区时由置顶区完成定位。移动端同样经 `usePartitionedInboxList` 读取，见下一条。
 - **移动端置顶交互：** 移动端收件箱经 `usePartitionedInboxList` 读取，与 Web／桌面端合并规则一致。长按菜单提供置顶、取消置顶，置顶会话另有「上移」「下移」与「调整置顶顺序」：上移、下移提交相对可见邻居的 `before`／`after` 命令，首项上移与末项下移保留显示并停用；排序模式下只有按住拖动手柄才开始拖动，点击、长按、左右滑动与安卓系统返回照常生效并同时结束排序。两端的拖动排序共用 `pinned-sort.tsx` 的 `PinnedSortArea` 与 `pinMoveCommand`，落点计算 `pinMoveTarget` 在 `inbox-partitions.ts`。本人置顶写入成功后经 `InboxListController.refreshOwnWrite` 另排一次写入之后发起的重读，这一次的结果不受列表操作暂缓、立即提交顺序与版本；远端通知、探针与补页触发的重读仍按原规则暂缓。
+- **会话名称搜索：** `LoadInput` 的 `search` 与 `searchRange` 承担会话名称搜索：搜索词经 NFKC 规范化、去首尾空白并合并连续空白，会话名称在 SQL 中按同一规则规范化后以 `ILIKE` 匹配，`%`、`_` 与 `\` 按字面匹配；`list` 沿用当前列表筛选，`readable` 覆盖全部可读会话且不带其他列表筛选，搜索只接受完整活动序，搜索词与范围写入游标。`matchConversationNames` 由列表分页、窗口重读、锚点上下文、按 ID 资格核对与检索会话分组共用，分组即分页首页的前 6 条。Web、桌面与移动端检索的会话分组「查看全部」经 `InboxSearchConversationList` 复用 `useInboxList` 分页展示，修改或清空检索词回到分组结果，移动端接入列表窗口历史；搜索结果并入同步协调器的收件箱类失效。
 
 ## 变更版本与通知契约
 
@@ -216,22 +217,7 @@ PR01–PR22、PR25、PR25A、PR26、PR27、PR28、PR29、PR30、PR32、PR33、PR
 
 ## 三、按证据跟进
 
-本节各项不阻塞实时主线：搜索分页于 2026-09-18 开启，虚拟化和容量验证按实测证据开启。
-
-### PR43：会话名称搜索分页与「查看全部」
-
-- **依赖：** 无（PR22、PR40 已交付）。原 PR44 并入本条，编号 PR44 空缺。
-- **调整（2026-09-18）：** 原 PR43／PR44 写于全文检索之前。消息页搜索模式（Web／桌面 Ctrl/⌘ K，移动端独立检索页）已由 `LoadInboxQuery.Search` 在当前身份有权阅读的全部候选中按名称匹配会话，每组最多 6 条，「查看全部」保留显示并禁用，搜索结果不随实时通知失效。本条改为给会话分组提供可分页、可重读的名称搜索并启用「查看全部」，复用收件箱列表的分页、窗口重读、锚点与按 ID 资格核对，不另建一套搜索分页；输入防抖与旧输入结果隔离沿用现有实现。正文全文搜索、消息与人员分组的分页不在范围内。
-- **范围：**
-  - `LoadInput` 增加搜索词与搜索范围：`list` 沿用当前列表筛选；`readable` 按当前身份可阅读的全部会话读取（含归档会话与不在当前处理队列的客户会话），并要求其余列表筛选为空，与检索的两种范围一致。
-  - 搜索词在服务端规范化（NFKC、首尾去空白、连续空白合并为一个空格），规范化后为空视为未搜索；匹配规则收进一个函数，由列表候选与 `Search` 的会话分组共用，按 `ILIKE` 匹配并转义 `%`、`_` 与 `\`。匹配字段保持现有会话分组：群名、单聊对方姓名、AI 会话标题或 AI 员工名称、客户会话的渠道身份名称（为空时取联系人名称）。
-  - 带搜索词时只接受 `partition = all`，结果按 `lastActivityAt DESC NULLS LAST, conversationId DESC` 排序，不拆置顶区。
-  - 会话分组达到 6 条时「查看全部」可用，进入后分页展示全部命中会话，滚动到底自动续页；返回分组视图保留搜索词、范围和原选中项。消息与人员分组的「查看全部」保持禁用。
-  - 同步协调器的 `conversation_changed`、`conversation_state_changed`、`conversation_removed` 同时失效搜索结果，已打开的分组结果与分页列表在改名、失权后随重读更新。
-- **落点：** `internal/actions/inbox` 的 `LoadInput`、`normalizeLoadInput`、`listCandidates`、游标与 `search.go`；`internal/appservice/types_inbox.go`、生成器与 Wails 绑定；`inbox-search-panel.tsx`、`use-inbox-search.ts`、`mobile-inbox-search-page.tsx`、`sync-coordinator.ts`、`resource-keys.ts`、双语 inbox 文案；`fulltext-search-plan.md` 第 9 节。
-- **实施：** 搜索词与范围写入游标和查询身份，任一不同即 `inbox_cursor_invalid`。`LoadInbox`、`ReadInboxWindow`、`GetInboxContext` 与按 ID 核对资格经同一候选投影应用匹配条件，名称变化后重读即重新计算匹配资格，锚点不匹配时返回 `outside_query`。`Search` 的会话分组读取同一候选投影的前 6 条，分组结果与「查看全部」首页一致。「查看全部」复用 `InboxListController` 与现有会话行渲染，窗口重读登记为挂载中的查询，由同步协调器失效触发；清空或修改搜索词时离开分页视图，旧词结果不可操作。
-- **验收：** 第 100 条才匹配的会话可在首页之外找到并续页读完；改名导致匹配进入、退出在窗口重读、按 ID 核对和已打开的搜索结果中正确；搜索词中的 `%`、`_` 按字面匹配，中间多个空白与单个空白等价；不同搜索词或范围的游标被拒绝；`readable` 覆盖归档会话与非当前处理队列的客户会话，`list` 只在当前筛选内；跨企业、失权会话与已退出的群不命中；快速改词时新词标题下不出现旧词结果。
-- **验证步骤：** 在真实数据库集成测试中构造超过一页的匹配会话，分页读完且无重复遗漏；改名后重读窗口，匹配进入与退出正确；用 A 词游标请求 B 词被拒绝。构造 20 个同名前缀会话，在 Web、桌面与移动端进入「查看全部」滚动读完；另一账号把其中一个群改名为不匹配，结果随即移除；把未命中的群改名为匹配，重读后出现。
+本节各项不阻塞实时主线，虚拟化和容量验证按实测证据开启；会话名称搜索分页（PR43，已并入原 PR44）已交付。
 
 ### PR45：列表虚拟化与窗口裁剪（测量后决定）
 
@@ -277,5 +263,5 @@ PR01–PR22、PR25、PR25A、PR26、PR27、PR28、PR29、PR30、PR32、PR33、PR
 
 - **变更版本可独立验证：** PR17–PR22 通过 HTTP 与兜底探针验收，实时通知丢失不影响最终数据；PR18 验证发布失败不影响业务写入。
 - **端到端最薄一刀：** PR17、PR18、PR25、PR27、PR28、PR29、PR30 已完成，Web／桌面端的成员消息窗口与会话列表跑通「提交 → 通知 → 重读」并删除该端轮询；移动端由 PR33、网站访客挂件由 PR32 接入并各自删除轮询，业务消息轮询已全部移除。
-- **增强独立交付：** 个人置顶由 PR40–PR42 交付，与已交付的 AI 流互不依赖；搜索与虚拟化不阻塞实时主线。
+- **增强独立交付：** 个人置顶由 PR40–PR42 交付，与已交付的 AI 流互不依赖；会话名称搜索分页由 PR43 交付；虚拟化不阻塞实时主线。
 - **不在本清单实现：** 图片／文件消息、Telegram 外发 Delivery、群聊 @Agent 策略、移动建群、输入／在线状态、后台系统推送、离线发送队列、设备执行、WebRTC、联邦、大群 Shared Fanout。消息置顶、团队共享置顶、普通区手排、会话分组与未读筛选也不随个人置顶加入。
