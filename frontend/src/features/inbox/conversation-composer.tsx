@@ -789,7 +789,7 @@ export function ConversationComposer({
       className={cn(
         "max-h-[200px] resize-none rounded-none border-0 bg-transparent shadow-none caret-primary focus-visible:ring-0 dark:bg-transparent",
         mobile
-          ? cn("min-h-9 min-w-0 flex-1 px-1.5 py-1.5 md:text-base", disabledReason && "pl-3")
+          ? cn("min-h-9 min-w-0 flex-1 px-0.5 py-1.5 md:text-base", disabledReason && "pl-3")
           : "min-h-20 py-2",
       )}
       onInput={(event) => {
@@ -1061,7 +1061,7 @@ export function ConversationComposer({
               {disabledReason ? (
                 <p id={`${inputID}-reason`} className="truncate border-b px-3 py-1.5 text-xs text-muted-foreground">{disabledReason}</p>
               ) : null}
-              <div className="flex items-end gap-0.5 p-0.5">
+              <div className="flex items-end p-0.5">
                 {disabledReason ? null : emojiTool}
                 {bodyInput}
                 {replyAssistant}
@@ -1072,7 +1072,7 @@ export function ConversationComposer({
                   <Button
                     type="submit"
                     size="icon"
-                    className="relative rounded-full after:absolute after:-inset-1 after:content-[''] [&_svg:not([class*='size-'])]:size-5"
+                    className="relative ml-1 rounded-full after:absolute after:-inset-1 after:content-[''] [&_svg:not([class*='size-'])]:size-5"
                     disabled={isSubmitting || Boolean(disabledReason) || isBodyEmpty || replyTo?.deleted}
                     aria-label={t(internalNote ? "internalNoteSave" : "messageSend")}
                   >

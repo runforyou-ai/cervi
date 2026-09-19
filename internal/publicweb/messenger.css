@@ -664,7 +664,7 @@ button.cv-message-reference { cursor: pointer; }
   max-height: 200px;
   flex: 1 1 auto;
   margin: 0;
-  padding: 7px 4px;
+  padding: 7px 2px;
   overflow-y: hidden;
   border: 0;
   outline: 0;
@@ -673,13 +673,13 @@ button.cv-message-reference { cursor: pointer; }
   line-height: 22px;
   resize: none;
 }
-.cv-composer-bar { display: flex; align-items: flex-end; gap: 1px; }
+.cv-composer-bar { display: flex; align-items: flex-end; }
 .cv-emoji-tool { position: relative; display: flex; flex: 0 0 auto; }
-.cv-tool { position: relative; width: 36px; height: 36px; border-radius: 999px; color: #73737c; }
+.cv-tool { position: relative; width: 30px; height: 36px; border-radius: 999px; color: #73737c; }
 .cv-tool::after,
 .cv-send::after { position: absolute; inset: -4px; content: ""; }
 .cv-tool svg { width: 20px; height: 20px; }
-.cv-send { position: relative; width: 36px; height: 36px; border-radius: 999px; background: var(--cv-theme); color: var(--cv-on-theme); }
+.cv-send { position: relative; margin-left: 4px; width: 36px; height: 36px; border-radius: 999px; background: var(--cv-theme); color: var(--cv-on-theme); }
 .cv-send svg { width: 18px; height: 18px; }
 .cv-send:disabled { background: var(--cv-surface-strong); color: #b0b0b7; cursor: default; transform: none; }
 .cv-tool:disabled { opacity: 0.4; cursor: default; }
