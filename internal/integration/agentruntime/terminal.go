@@ -21,7 +21,7 @@ import (
 const (
 	askCustomerToolName = "ask_customer"
 	handoffToolName     = "handoff_to_human"
-	// correctionLimit 是一次执行尝试内允许纠正无效终止输出的次数。
+	// correctionLimit 是一次执行尝试内允许纠正无效终止输出或无依据正文的次数。
 	correctionLimit = 1
 	// handoffReasonTextMaxRunes 限制转交原因写入系统事件的长度。
 	handoffReasonTextMaxRunes = 500
@@ -67,8 +67,9 @@ type terminalTools struct {
 	batchSeen   bool   // 当前批次的违规已计入纠正额度。
 	corrections int
 	intents     map[string]terminalIntent
-	forced      *terminalIntent // 纠正额度用尽后由 Runtime 构造的转人工。
+	forced      *terminalIntent // 纠正额度或迭代预算用尽后由 Runtime 构造的转人工。
 	handoff     bool            // 本次执行已固定转人工决定。
+	budgetSpent func() bool     // 返回 true 表示当前规划已在迭代预算末端，无效输出不再纠正。
 }
 
 // newTerminalTools 创建一次执行尝试共用的终止工具状态。
@@ -178,7 +179,7 @@ func (t *terminalTools) AfterModelRewriteState(ctx context.Context, state *adk.T
 	return ctx, state, nil
 }
 
-// middleware 拦截同批违规的工具调用并处理终止工具参数错误：纠正额度内把错误交回模型，额度用尽时构造转人工并直接结束。
+// middleware 拦截同批违规的工具调用并处理终止工具参数错误：纠正额度内把错误交回模型，额度用尽或已在预算末端时构造转人工并直接结束。
 func (t *terminalTools) middleware() compose.ToolMiddleware {
 	return compose.ToolMiddleware{
 		Invokable: func(next compose.InvokableToolEndpoint) compose.InvokableToolEndpoint {
@@ -204,25 +205,41 @@ func (t *terminalTools) middleware() compose.ToolMiddleware {
 	}
 }
 
-// reject 消耗一次纠正额度并返回交给模型的错误；额度用尽时登记 Runtime 构造的转人工并请求直接结束。
+// reject 消耗一次纠正额度并返回交给模型的错误；额度用尽或已在迭代预算末端时登记 Runtime 构造的转人工并请求直接结束。
 func (t *terminalTools) reject(ctx context.Context, issue string) error {
+	exhausted := t.budgetSpent != nil && t.budgetSpent()
 	t.mu.Lock()
-	if t.corrections < correctionLimit {
+	if !exhausted && t.corrections < correctionLimit {
 		t.corrections++
 		t.mu.Unlock()
 		slog.Warn("Agent 终止输出无效，要求模型纠正", "agent_run_id", runIDFromContext(ctx), "issue", issue)
 		return fmt.Errorf("%s。需要客户补充信息或只是问候请单独调用 ask_customer；无法解答请单独调用 handoff_to_human", issue)
 	}
+	reason := domain.AgentHandoffReasonInvalidOutput
+	if exhausted {
+		reason = domain.AgentHandoffReasonBudgetExhausted
+	}
 	if t.forced == nil {
-		t.forced = &terminalIntent{decision: TerminalDecision{Kind: domain.AgentRunOutcomeHandoff, Reason: domain.AgentHandoffReasonInvalidOutput}}
+		t.forced = &terminalIntent{decision: TerminalDecision{Kind: domain.AgentRunOutcomeHandoff, Reason: reason}}
 		t.handoff = true
 	}
 	t.mu.Unlock()
-	slog.Warn("Agent 纠正后仍输出无效终止调用，转交人工", "agent_run_id", runIDFromContext(ctx), "issue", issue)
+	slog.Warn("Agent 终止调用无效且无法纠正，转交人工", "agent_run_id", runIDFromContext(ctx), "issue", issue, "reason", reason)
 	if err := adk.SetToolReturnDirectly(ctx); err != nil {
 		slog.Warn("终止工具请求直接返回失败", "agent_run_id", runIDFromContext(ctx), "error", err)
 	}
 	return errors.New(issue)
+}
+
+// takeCorrection 消耗一次与无效终止输出共用的纠正额度，额度已用尽时返回 false。
+func (t *terminalTools) takeCorrection() bool {
+	t.mu.Lock()
+	defer t.mu.Unlock()
+	if t.corrections >= correctionLimit {
+		return false
+	}
+	t.corrections++
+	return true
 }
 
 // beginTurn 在认领新输入时清空上一轮的非转人工意图。

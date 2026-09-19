@@ -74,11 +74,14 @@ func newContextReductionHandlers(ctx context.Context, window int) ([]adk.TypedCh
 		ClearRetentionSuffixLimit: clearRetentionRounds,
 		TokenCounter:              countContextTokens,
 		GenTruncOffloadFilePath: func(ctx context.Context, detail *reduction.ToolDetail) (string, error) {
-			path := "/trunc/" + detail.ToolContext.CallID
+			path := truncOffloadDir + detail.ToolContext.CallID
 			slog.Warn("Agent 工具结果过大，已转存并保留预览",
 				"agent_run_id", runIDFromContext(ctx), "tool_name", detail.ToolContext.Name,
 				"tool_call_id", detail.ToolContext.CallID, "file_path", path, "offload_threshold_bytes", offloadBytes)
 			return path, nil
+		},
+		GenClearOffloadFilePath: func(_ context.Context, detail *reduction.ToolDetail) (string, error) {
+			return clearOffloadDir + detail.ToolContext.CallID, nil
 		},
 		ClearPostProcess: func(ctx context.Context, state *adk.TypedChatModelAgentState[*schema.AgenticMessage]) context.Context {
 			tokens, _ := countContextTokens(ctx, state.Messages, state.ToolInfos)

@@ -1391,6 +1391,7 @@ PR03 的停用生效边界已确认：目标停用只拒绝之后资格校验的
 - ServiceSession 的负责人是唯一客服状态：网站首次入站只在当前负责人是合格 Agent 时创建 `customer_auto` Trigger；转交给 Agent 时，最后消息来自客户则补触发，来自企业身份则等待下一条客户消息。
 - queued Run 只冻结起点，运行中到达的新消息在 Eino 下一个 Tool 或模型安全点由同一 Run 的下一 Turn Claim；最终仍只写入一条 Agent Message。
 - 人工接管、转交和关闭继续使用现有通用命令，不增加 AI 专属暂停、恢复或接管状态；写入最终回复前重新校验当前 ServiceSession、负责人、Agent 资格、Run Revision 和消费边界，阻止迟到回复。
+- AI 发起的转交沿用转交命令语义与渠道失败路由，只交给真人或队列；AI 停用或角色失去接客资格时，由管理操作交接其负责的开放周期。规则见 `agent-roadmap.md`「AI 客服角色行为与转人工」。
 - 本子阶段只验收网站客户会话边界；Agent Runtime 由 `agent-roadmap.md` 定义，第三方平台仍使用各自的 Delivery。
 
 #### 阶段 2E：统一实时、通知与离线同步

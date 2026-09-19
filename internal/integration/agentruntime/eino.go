@@ -7,6 +7,8 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"maps"
+	"slices"
 	"strings"
 	"sync/atomic"
 
@@ -61,10 +63,18 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 	if err != nil {
 		return RunResult{}, err
 	}
-	// 客服场景注册终止工具，其纠正额度在同一执行尝试内的重新执行之间共用。
+	// 客服场景注册终止工具，其纠正额度在同一执行尝试内的重新执行之间共用；严格依据策略按本次注册的工具登记依据来源。
 	var terminal *terminalTools
+	var gate *groundingGate
 	if request.Scene == SceneCustomer {
 		terminal = newTerminalTools()
+		if request.Grounding == GroundingStrict {
+			judges := make(map[string]evidenceJudge)
+			if request.KnowledgeSearch != nil {
+				judges[knowledgeToolName] = knowledgeEvidence
+			}
+			gate = newGroundingGate(judges)
+		}
 	}
 	tools, releaseSessions, err := r.assembleTools(ctx, request, terminal)
 	if err != nil {
@@ -87,12 +97,19 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 		media.maxCount = max(1, window*mediaWindowPercent/100/mediaTokens)
 	}
 	trackedModel := &mediaTrackingModel{AgenticModel: chatModel, rejected: &atomic.Bool{}}
-	handlers := append([]adk.TypedChatModelAgentMiddleware[*schema.AgenticMessage]{recorder, newFinalIterationGuard(maxIterations)}, reductionHandlers...)
+	guard := newFinalIterationGuard(maxIterations, terminal != nil)
+	if terminal != nil {
+		terminal.budgetSpent = guard.budgetExhausted
+	}
+	handlers := append([]adk.TypedChatModelAgentMiddleware[*schema.AgenticMessage]{recorder, guard}, reductionHandlers...)
 	handlers = append(handlers, &toolArgumentsNormalizer{})
 	toolMiddlewares := []compose.ToolMiddleware{toolExecutionMiddleware(recorder)}
 	if terminal != nil {
 		handlers = append(handlers, terminal)
 		toolMiddlewares = append(toolMiddlewares, terminal.middleware())
+	}
+	if gate != nil {
+		handlers = append(handlers, gate)
 	}
 	agent, err := adk.NewTypedChatModelAgent(ctx, &adk.TypedChatModelAgentConfig[*schema.AgenticMessage]{
 		Name: request.Name, Instruction: request.Instruction, Model: trackedModel,
@@ -110,7 +127,7 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 	var carriedUsage Usage
 	for emptyRetries := 0; ; {
 		execution := &einoExecution{
-			inputs: &turnInputs{feed: feed, holdPreempt: terminal.handoffFixed}, recorder: recorder, terminal: terminal,
+			inputs: &turnInputs{feed: feed, holdPreempt: terminal.handoffFixed}, recorder: recorder, terminal: terminal, gate: gate, guard: guard,
 			maxTurns: request.MaxTurns, contextWindow: window, media: media,
 		}
 		execution.inputs.loop = adk.NewTurnLoop(adk.TurnLoopConfig[Trigger, *schema.AgenticMessage]{
@@ -199,6 +216,9 @@ type einoExecution struct {
 	history       turnHistory
 	recorder      *processRecorder
 	terminal      *terminalTools
+	gate          *groundingGate
+	guard         *finalIterationGuard
+	rejected      []*schema.AgenticMessage // 被依据门禁拦下、只进入下一次纠正重新执行的正文。
 	maxTurns      int
 	contextWindow int
 	media         mediaInput
@@ -207,27 +227,56 @@ type einoExecution struct {
 	finished      bool
 }
 
-// genInput 认领新输入，并在已有执行上下文后追加尚未消费的会话消息。
+// genInput 认领新输入，并在已有执行上下文后追加尚未消费的会话消息；只有依据纠正信号时在当前边界内追加纠正提示重新执行。
 func (e *einoExecution) genInput(ctx context.Context, _ *adk.TurnLoop[Trigger, *schema.AgenticMessage], items []Trigger) (*adk.GenInputResult[Trigger, *schema.AgenticMessage], error) {
-	e.turns++
 	e.recorder.resetCandidate()
-	if e.terminal != nil {
-		e.terminal.beginTurn()
-	}
-	if e.maxTurns > 0 && e.turns > e.maxTurns {
-		return nil, fmt.Errorf("agent turn limit %d exceeded", e.maxTurns)
-	}
 	var throughSeq int64
+	claiming := false
 	for _, item := range items {
-		throughSeq = max(throughSeq, item.Seq)
+		if !item.Correction {
+			throughSeq, claiming = max(throughSeq, item.Seq), true
+		}
 	}
-	claimed, err := e.inputs.claim(ctx, throughSeq)
-	if err != nil {
-		return nil, err
+	var messages []*schema.AgenticMessage
+	switch {
+	case claiming:
+		if e.terminal != nil {
+			e.terminal.beginTurn()
+		}
+		e.turns++
+		if e.maxTurns > 0 && e.turns > e.maxTurns {
+			return nil, fmt.Errorf("agent turn limit %d exceeded", e.maxTurns)
+		}
+		if e.gate != nil {
+			e.gate.resetBoundary(e.history.messages)
+		}
+		e.rejected = nil
+		claimed, err := e.inputs.claim(ctx, throughSeq)
+		if err != nil {
+			return nil, err
+		}
+		messages = e.history.appendInput(ctx, trimClaimedHistory(ctx, claimed.Messages, e.contextWindow), e.media)
+	case e.gate != nil:
+		// 纠正重新执行不认领输入、不计轮次，沿用当前边界的依据与剩余迭代预算。
+		lookup := ""
+		// 按名称顺序列出本次登记的依据来源工具。
+		if tools := slices.Sorted(maps.Keys(e.gate.judges)); len(tools) > 0 {
+			lookup = "涉及企业具体信息请先调用 " + strings.Join(tools, "、") + " 查证；"
+		}
+		correction := "【系统提示】上面的回答没有取得依据，不会发给客户。" + lookup + "需要客户补充信息或只是问候请调用 ask_customer；无法解答请调用 handoff_to_human。"
+		// 被拦下的回答与纠正提示只进入本次重新执行的输入，不写入后续轮次的历史。
+		if len(e.rejected) == 0 {
+			return nil, errors.New("grounding correction has no rejected response")
+		}
+		messages = append(append(append([]*schema.AgenticMessage(nil), e.history.messages...), e.rejected...), schema.UserAgenticMessage(correction))
+		e.rejected = nil
+		e.guard.carryBudget()
+	default:
+		return nil, errors.New("agent turn loop received a correction without grounding gate")
 	}
 	return &adk.GenInputResult[Trigger, *schema.AgenticMessage]{
 		Input: &adk.TypedAgentInput[*schema.AgenticMessage]{
-			Messages:        e.history.appendInput(ctx, trimClaimedHistory(ctx, claimed.Messages, e.contextWindow), e.media),
+			Messages:        messages,
 			EnableStreaming: true,
 		},
 		RunOpts: []adk.AgentRunOption{
@@ -291,12 +340,72 @@ func (e *einoExecution) onAgentEvents(ctx context.Context, turn *adk.TurnContext
 	if intent, ok := e.terminal.decision(resultCallIDs); ok {
 		decision, content = intent.decision, intent.message
 	}
+	// 严格依据策略下，确认没有新输入后才检查正文依据：纠正额度内重新执行一次，额度或迭代预算用尽时转人工。
+	if e.gate != nil && decision.Kind == "" && content != "" && !e.gate.verdict() {
+		pending, err := e.inputs.pending(ctx, turn)
+		if err != nil {
+			return err
+		}
+		if pending {
+			e.takeUnsent(decision, content)
+			return nil
+		}
+		exhausted := e.guard.budgetExhausted()
+		if !exhausted && e.terminal.takeCorrection() {
+			slog.Warn("Agent 正文缺少依据，要求模型纠正", "agent_run_id", runIDFromContext(ctx))
+			e.rejected = e.takeUnsent(decision, content)
+			return e.inputs.rerun()
+		}
+		reason := domain.AgentHandoffReasonInsufficientEvidence
+		if exhausted {
+			reason = domain.AgentHandoffReasonBudgetExhausted
+		}
+		slog.Warn("Agent 正文缺少依据，转交人工", "agent_run_id", runIDFromContext(ctx), "reason", reason)
+		decision, content = TerminalDecision{Kind: domain.AgentRunOutcomeHandoff, Reason: reason}, ""
+	}
 	finished, err := e.inputs.finish(ctx, turn, decision, content)
 	if err != nil {
 		return err
 	}
 	if finished {
 		e.result.Content, e.result.Decision, e.finished = content, decision, true
+		return nil
+	}
+	e.takeUnsent(decision, content)
+	return nil
+}
+
+// takeUnsent 在客服场景从共享历史末尾取出本轮未发给客户的正文或追问调用及其结果，返回取出的消息；其他场景保留历史。
+func (e *einoExecution) takeUnsent(decision TerminalDecision, content string) []*schema.AgenticMessage {
+	messages := e.history.messages
+	if e.terminal == nil || content == "" || len(messages) == 0 {
+		return nil
+	}
+	last := len(messages) - 1
+	switch decision.Kind {
+	case "":
+		// 正文是末尾一条只含正文的模型输出。
+		if messages[last].Role != schema.AgenticRoleTypeAssistant || hasToolCalls(messages[last]) ||
+			strings.TrimSpace(assistantText(messages[last])) != content {
+			return nil
+		}
+		e.history.messages = messages[:last]
+		return messages[last:]
+	case domain.AgentRunOutcomeAskCustomer:
+		// 追问是末尾一条只调用 ask_customer 的模型输出及其工具结果。
+		if last < 1 || messages[last-1].Role != schema.AgenticRoleTypeAssistant || messages[last].Role == schema.AgenticRoleTypeAssistant {
+			return nil
+		}
+		for _, block := range messages[last-1].ContentBlocks {
+			if block.Type == schema.ContentBlockTypeFunctionToolCall && block.FunctionToolCall.Name != askCustomerToolName {
+				return nil
+			}
+		}
+		if !hasToolCalls(messages[last-1]) {
+			return nil
+		}
+		e.history.messages = messages[:last-1]
+		return messages[last-1:]
 	}
 	return nil
 }
