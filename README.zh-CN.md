@@ -1,25 +1,158 @@
 # Cervi（鹿行）
 
-> 让人与智能体并肩工作。
+Cervi 是一款开源、以私有化部署为主的 AI 原生企业协作产品。项目使用 Go、Wails v3 和 React 开发，同一套代码支持服务端、Web、桌面端和移动端。
 
-Cervi 是一款开源、私有化部署优先的 AI 原生企业协作产品。它希望让员工与智能体成为同等的组织成员，在消息、客户和业务流程中共同完成工作。
+## 环境要求
 
-## 产品方向
+- Go 与 Wails v3 CLI，CLI 版本与 `go.mod` 中的 `github.com/wailsapp/wails/v3` 一致。
+- Node.js 24.0.0 或更高版本。
+- Docker，用于运行 PostgreSQL、NATS 和交叉编译工具链。
 
-- 统一接入企业内外部消息渠道
-- 让智能体加入团队、处理任务并与员工协作
-- 支持知识检索、工具调用、人工确认和任务转交
-- 同一套代码覆盖服务端、Web、桌面端和移动端
-- 企业数据和 AI 能力可部署在自己的环境中
+按 `go.mod` 安装 Wails CLI：
 
-## 愿景
+```bash
+go install github.com/wailsapp/wails/v3/cmd/wails3@$(go list -m -f '{{.Version}}' github.com/wailsapp/wails/v3)
+```
 
-Cervi 不只提供一个 AI 对话框，而是成为企业中人与智能体共同工作的协作入口。
+## 初始化工作区
 
-项目仍在持续建设中，文档和功能将逐步完善。
+所有命令从仓库根目录通过 Wails v3 和 Task 执行；Task 自动加载当前 worktree 的 `.env`。
 
-## 开源协议
+```bash
+cp .env.example .env
+docker compose up -d postgres nats
+wails3 task db:ensure
+wails3 task migrate
+```
 
-Copyright 2026 武汉润予科技有限公司
+每个 worktree 使用独立的 Server、Vite 端口、PostgreSQL 数据库和 NATS 命名空间；PostgreSQL 和 NATS 仅在主工作区共享启动。
 
-本项目基于 [Apache License 2.0](LICENSE) 开源。
+## 开发与运行
+
+```bash
+# 服务端
+wails3 task run:server
+
+# 桌面端开发；dev:mcp 同时启用 Wails MCP
+wails3 task dev
+wails3 task dev:mcp
+
+# 移动端依赖与运行
+wails3 task ios:install:deps
+wails3 task android:install:deps
+wails3 task ios:run
+wails3 task android:run
+wails3 task android:run:device
+```
+
+真机在连接页手动输入可访问的企业服务端地址。Cloudflare Tunnel 由 Dashboard 管理路由，本机使用 `~/.cloudflared/cervi-dev.token` 启动一份 connector。
+
+## 构建与打包
+
+```bash
+# 当前宿主平台的桌面端构建与打包
+wails3 task build
+wails3 task package
+
+# 交叉编译准备；之后照常调用目标平台的 *:build Task
+wails3 task setup:docker
+
+# 服务端与容器
+wails3 task build:server
+wails3 task build:docker CGO_ENABLED=0
+```
+
+各平台构建和打包：
+
+```bash
+wails3 task darwin:build ARCH=arm64
+wails3 task darwin:package ARCH=arm64
+wails3 task darwin:package:universal
+wails3 task darwin:create:dmg
+wails3 task windows:build ARCH=amd64
+wails3 task windows:package ARCH=amd64 INSTALL_SCOPE=machine
+wails3 task windows:package ARCH=amd64 INSTALL_SCOPE=user
+wails3 task linux:build ARCH=amd64
+wails3 task linux:package ARCH=amd64
+wails3 task ios:package
+wails3 task ios:package IOS_PLATFORM=device CODESIGN_IDENTITY="Apple Development: ..."
+wails3 task ios:package:ipa IOS_PLATFORM=device CODESIGN_IDENTITY="Apple Development: ..."
+wails3 task ios:xcode
+wails3 task android:package
+wails3 task android:package:fat
+wails3 task android:bundle
+wails3 task android:bundle:fat
+```
+
+- `darwin:build`、`windows:build` 和 `linux:build` 按宿主环境选择原生或 Docker 工具链。交叉编译只生成二进制或未签名应用包；正式桌面安装包在目标系统或同平台 Runner 构建。
+- Linux 不支持异架构桌面端交叉编译，Windows 宿主不支持交叉构建其他平台，WSL 按 Linux 处理。
+- macOS 的 DMG、签名和公证在 macOS 完成；Windows 安装包在原生 Windows 或 Windows Runner 完成；iOS 在 macOS 完成。
+- 服务端多平台归档由 `.github/workflows/release.yml` 的 `server-assets` 作业生成。
+
+## 代码组织
+
+```text
+cervi/
+├── main.go                         # 应用入口和 Wails 配置
+├── application_services_*.go       # 按原生端和服务端注册服务
+├── internal/                       # 后端业务、存储和平台能力
+├── frontend/                       # Web、桌面端和移动端前端
+└── build/                          # Wails 多平台构建配置
+```
+
+```text
+frontend/
+├── bindings/                       # Wails 自动生成的 TypeScript 绑定
+└── src/
+    ├── api/                        # 认证与按业务域拆分的绑定调用和边界归一化
+    ├── apps/
+    │   ├── shared-app-routes.tsx   # Web 与桌面端共用的业务路由
+    │   ├── web/                    # Web 应用入口和路由
+    │   ├── desktop/                # 桌面端应用入口和路由
+    │   └── mobile/                 # 移动端独立入口、路由和页面
+    ├── components/                 # 跨 feature 共享的展示组件
+    │   ├── form/                   # 通用表单展示组件
+    │   └── ui/                     # 基础 UI 组件
+    ├── contexts/                   # 跨 feature 共享的 React 上下文
+    ├── features/                   # Web 与桌面端共用的业务功能，按业务域分目录
+    ├── hooks/                      # 通用 hooks，含统一数据读取 useResource
+    ├── i18n/                       # 国际化资源，按语言目录和 namespace 分文件
+    ├── lib/                        # 通用纯函数工具
+    └── platform/                   # 运行平台识别
+```
+
+```text
+internal/
+├── actions/                        # 按领域组织的 Action 与 Query
+├── api/                            # Gin 对外 HTTP API 适配器
+├── apiproxy/                       # 原生端到企业服务端的类型化 API 代理
+├── appservice/                     # 跨平台应用服务、传输契约和平台 Backend
+│   └── native/                     # 原生端应用服务平台能力实现
+├── clientsession/                  # 原生端当前登录凭据管理
+├── common/                         # 无存储、无传输、无平台依赖的通用能力
+├── config/
+│   └── server/                     # 企业服务端运行配置加载与校验
+├── domain/                         # 各层共用的领域值
+├── i18n/                           # 后端本地化能力和翻译词条
+├── ingress/                        # 企业服务端 HTTPS 与公网流量入口
+├── integration/
+│   ├── connectiontest/             # 外部连接探测的通用执行语义
+│   └── modelprovider/              # 模型服务供应商连接探测适配器
+├── integrationtest/                # 跨 Action、应用服务和存储的真实数据库集成测试
+├── publicweb/                      # 网站渠道公开嵌入脚本和访客聊天页
+├── servertest/                     # 服务端集成测试共用的测试数据库配置
+├── storage/
+│   ├── server/                     # PostgreSQL 连接、迁移、服务端模型和存储适配器
+│   ├── desktop/                    # 桌面端 SQLite 存储、迁移和模型
+│   └── mobile/                     # 移动端 SQLite 存储、迁移和模型
+├── task/                           # 可靠任务能力
+│   ├── task.go                     # 跨平台共享的最小执行语义
+│   ├── client/                     # 客户端 SQLite 可靠任务方案与实现
+│   └── server/                     # 服务端 PostgreSQL、NATS 与 Cron 实现
+└── tools/
+    └── appservicegen/              # 从 Backend 接口生成各层适配样板
+```
+
+## 开发约定
+
+AI Agent 与开发者共同遵循的开发约定见 [AGENTS.md](AGENTS.md)。
