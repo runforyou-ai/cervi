@@ -45,7 +45,13 @@ wails3 task android:run
 wails3 task android:run:device
 ```
 
-真机在连接页手动输入可访问的企业服务端地址。Cloudflare Tunnel 由 Dashboard 管理路由，本机使用 `~/.cloudflared/cervi-dev.token` 启动一份 connector。
+开发、测试和验证统一通过公网域名访问服务端，不使用内网地址，因为企业按访问域名识别。每个 worktree 的域名为 `https://<worktree 目录名>-dev.runforyou.app`，在 Cloudflare Dashboard 中路由到该 worktree 的 `WAILS_SERVER_PORT`。本机常驻一份 connector：
+
+```bash
+cloudflared tunnel --protocol http2 run --token-file ~/.cloudflared/cervi-dev.token
+```
+
+桌面端和真机在连接页填写该域名。
 
 ## 构建与打包
 

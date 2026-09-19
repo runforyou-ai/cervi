@@ -14,6 +14,7 @@ Cervi 是开源、以私有化部署为主的 AI 原生企业协作产品，使�
 
 - 所有命令从仓库根目录通过 `wails3 task` 执行，Task 自动加载当前 worktree 的 `.env`。不直接调用底层构建工具。
 - 每个 worktree 使用独立的 Server、Vite 端口、PostgreSQL 数据库和 NATS 命名空间；PostgreSQL 和 NATS 为共享实例。
+- 开发、测试和界面验证统一通过当前 worktree 的公网域名 `https://<worktree 目录名>-dev.runforyou.app` 访问服务端，不使用 `127.0.0.1`、局域网 IP 等内网地址；企业按访问域名识别，换地址访问会进入另一个企业。该域名经常驻的 Cloudflare Tunnel 转发到该 worktree 的 `WAILS_SERVER_PORT`，由用户手动启动。
 - 客户端构建使用平台 Task（如 `darwin:build`、`windows:package`），目标架构只传 `ARCH`，不自行设置 `GOOS`、`GOARCH`、`CGO_ENABLED`。客户端固定启用 CGO；纯静态服务端镜像使用 `CGO_ENABLED=0`。
 - 每次测试或界面验证结束后，关闭本次启动的服务端、客户端、Vite、MCP 等进程及其子进程，并确认端口已释放；用户明确要求保留时除外。只清理本次启动的进程，不关闭其他 worktree 的进程或共享的 PostgreSQL、NATS。
 
