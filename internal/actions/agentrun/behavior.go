@@ -44,16 +44,17 @@ type behaviorTools struct {
 	Terminal        bool // 客服场景的 ask_customer 与 handoff_to_human。
 }
 
-// BehaviorSnapshot 记录一次运行实际使用的角色基线、场景、拼接完成的指令、模型参数、内置工具与绑定的 MCP 服务；MCP 服务的工具在运行期连接后才确定。
+// BehaviorSnapshot 记录一次运行实际使用的角色基线、场景、拼接完成的指令、模型参数、内置工具、绑定的 MCP 服务与依据策略；MCP 服务的工具在运行期连接后才确定。
 type BehaviorSnapshot struct {
-	RoleKind          domain.RoleKind       `json:"roleKind"`
-	Scene             agentruntime.Scene    `json:"scene"`
-	RulesVersion      int                   `json:"rulesVersion"`
-	Instruction       string                `json:"instruction"`
-	InstructionSHA256 string                `json:"instructionSha256"`
-	Model             behaviorSnapshotModel `json:"model"`
-	Tools             []string              `json:"tools"`
-	MCPServers        []string              `json:"mcpServers"`
+	RoleKind          domain.RoleKind              `json:"roleKind"`
+	Scene             agentruntime.Scene           `json:"scene"`
+	RulesVersion      int                          `json:"rulesVersion"`
+	Instruction       string                       `json:"instruction"`
+	InstructionSHA256 string                       `json:"instructionSha256"`
+	Model             behaviorSnapshotModel        `json:"model"`
+	Tools             []string                     `json:"tools"`
+	MCPServers        []string                     `json:"mcpServers"`
+	Grounding         agentruntime.GroundingPolicy `json:"grounding,omitempty"` // 对客正文的依据检查策略，客服场景为严格策略。
 }
 
 type behaviorSnapshotModel struct {
@@ -125,6 +126,10 @@ func newBehaviorSnapshot(execution executionContext, scene agentruntime.Scene, s
 	kind := domain.RoleKind(execution.RoleKind)
 	instruction := composeInstruction(roleBaseline(kind, execution.OrganizationName, execution.AgentName), execution.Instruction, sceneRules)
 	sum := sha256.Sum256([]byte(instruction))
+	var grounding agentruntime.GroundingPolicy
+	if scene == agentruntime.SceneCustomer {
+		grounding = agentruntime.GroundingStrict
+	}
 	return BehaviorSnapshot{
 		RoleKind: kind, Scene: scene, RulesVersion: behaviorRulesVersion,
 		Instruction: instruction, InstructionSHA256: hex.EncodeToString(sum[:]),
@@ -132,6 +137,6 @@ func newBehaviorSnapshot(execution executionContext, scene agentruntime.Scene, s
 			ProviderID: execution.ProviderID, Identifier: execution.ModelIdentifier,
 			MaxOutputTokens: execution.MaxOutputTokens, ContextWindow: execution.ContextWindow,
 		},
-		Tools: tools, MCPServers: mcpServers,
+		Tools: tools, MCPServers: mcpServers, Grounding: grounding,
 	}
 }

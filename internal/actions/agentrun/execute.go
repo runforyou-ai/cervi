@@ -116,9 +116,9 @@ func (a *ExecuteAction) Execute(ctx context.Context, input RunInput) error {
 	if err != nil {
 		return err
 	}
-	// 场景、指令与模型参数以快照为准，凭据与输入模态取当前供应商配置。
+	// 场景、依据策略、指令与模型参数以快照为准，凭据与输入模态取当前供应商配置。
 	result, err := a.runtime.Run(runCtx, agentruntime.RunRequest{
-		RunID: execution.Run.ID, Name: execution.AgentName, Scene: snapshot.Scene, Instruction: snapshot.Instruction,
+		RunID: execution.Run.ID, Name: execution.AgentName, Scene: snapshot.Scene, Grounding: snapshot.Grounding, Instruction: snapshot.Instruction,
 		Model: agentruntime.ModelConfig{
 			Brand: execution.Brand, APIKey: execution.APIKey, BaseURL: execution.APIURL,
 			Identifier: snapshot.Model.Identifier, MaxOutputTokens: int(snapshot.Model.MaxOutputTokens), ContextWindow: int(snapshot.Model.ContextWindow),

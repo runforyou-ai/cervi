@@ -36,7 +36,8 @@ type Media struct {
 
 // Trigger 定义等待 TurnLoop 消费的输入信号。
 type Trigger struct {
-	Seq int64
+	Seq        int64
+	Correction bool // 为 true 表示 Runtime 发起的依据纠正重新执行，不认领持久输入。
 }
 
 // ClaimedInput 定义一次 GenInput 已持久化认领的模型输入。
@@ -88,11 +89,18 @@ const (
 	SceneCopilot   Scene = "copilot"
 )
 
+// GroundingPolicy 表示对客正文的依据检查策略。
+type GroundingPolicy string
+
+// GroundingStrict 要求直接输出的正文在当前输入边界内取得有效依据，否则纠正一次后转人工。
+const GroundingStrict GroundingPolicy = "strict"
+
 // RunRequest 定义一次有界 Agent 业务运行。
 type RunRequest struct {
 	RunID                 string
 	Name                  string
-	Scene                 Scene // 本次运行所属的业务场景。
+	Scene                 Scene           // 本次运行所属的业务场景。
+	Grounding             GroundingPolicy // 依据检查策略，空值不检查；只在注册终止工具的客服场景生效。
 	Instruction           string
 	Model                 ModelConfig
 	KnowledgeSearch       KnowledgeSearch

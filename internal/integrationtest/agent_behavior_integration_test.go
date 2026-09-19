@@ -116,6 +116,7 @@ func TestAgentRoleBehavior(t *testing.T) {
 		InstructionSHA256 string   `json:"instructionSha256"`
 		Tools             []string `json:"tools"`
 		MCPServers        []string `json:"mcpServers"`
+		Grounding         string   `json:"grounding"`
 		Model             struct {
 			ProviderID    string `json:"providerId"`
 			Identifier    string `json:"identifier"`
@@ -129,7 +130,7 @@ func TestAgentRoleBehavior(t *testing.T) {
 	if snapshot.RoleKind != string(domain.RoleKindCustomerService) || snapshot.Scene != string(agentruntime.SceneAgentChat) || snapshot.RulesVersion != 2 ||
 		snapshot.Instruction != captured.Instruction || snapshot.InstructionSHA256 != hex.EncodeToString(sum[:]) ||
 		snapshot.Model.ProviderID != provider.ID || snapshot.Model.Identifier != "chat" || snapshot.Model.ContextWindow != 32000 ||
-		len(snapshot.Tools) != 1 || snapshot.Tools[0] != "calculator" || len(snapshot.MCPServers) != 0 {
+		len(snapshot.Tools) != 1 || snapshot.Tools[0] != "calculator" || len(snapshot.MCPServers) != 0 || snapshot.Grounding != "" {
 		t.Fatalf("behavior snapshot = %+v", snapshot)
 	}
 
@@ -166,7 +167,7 @@ func TestAgentRoleBehavior(t *testing.T) {
 		t.Fatal(err)
 	}
 	runQueuedAgentRun(t, db, execute, inbound.Conversation.ID)
-	if captured.Scene != agentruntime.SceneCustomer || !strings.HasPrefix(captured.Instruction, baselinePrefix) ||
+	if captured.Scene != agentruntime.SceneCustomer || captured.Grounding != agentruntime.GroundingStrict || !strings.HasPrefix(captured.Instruction, baselinePrefix) ||
 		!strings.Contains(captured.Instruction, "\n\n本次是客户会话") || !strings.HasSuffix(captured.Instruction, "追问、转人工与其他工具不在同一次输出中同时调用。") ||
 		!strings.Contains(captured.Instruction, "- ask_customer：") || !strings.Contains(captured.Instruction, "- handoff_to_human：") ||
 		strings.Contains(captured.Instruction, "search_customer_history") || strings.Contains(captured.Instruction, "人工客服跟进") {
@@ -179,7 +180,8 @@ func TestAgentRoleBehavior(t *testing.T) {
 	if err := json.Unmarshal(customerRun.BehaviorSnapshot, &snapshot); err != nil {
 		t.Fatal(err)
 	}
-	if snapshot.Scene != string(agentruntime.SceneCustomer) || !slices.Equal(snapshot.Tools, []string{"ask_customer", "handoff_to_human"}) {
+	if snapshot.Scene != string(agentruntime.SceneCustomer) || !slices.Equal(snapshot.Tools, []string{"ask_customer", "handoff_to_human"}) ||
+		snapshot.Grounding != string(agentruntime.GroundingStrict) {
 		t.Fatalf("customer behavior snapshot = %+v", snapshot)
 	}
 }

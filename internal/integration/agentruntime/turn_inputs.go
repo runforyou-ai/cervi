@@ -142,12 +142,7 @@ func (i *turnInputs) finish(ctx context.Context, turn *adk.TurnContext[Trigger, 
 		}
 		return true, nil
 	}
-	select {
-	case <-turn.Preempted:
-		return false, nil
-	default:
-	}
-	if err := i.poll(ctx, false); err != nil {
+	if pending, err := i.pending(ctx, turn); pending || err != nil {
 		return false, err
 	}
 	i.mu.Lock()
@@ -161,4 +156,32 @@ func (i *turnInputs) finish(ctx context.Context, turn *adk.TurnContext[Trigger, 
 	i.closed = true
 	i.loop.Stop()
 	return true, nil
+}
+
+// pending 判断本轮是否已被抢占或有尚未认领的新输入，是则当前候选作废并进入下一轮。
+func (i *turnInputs) pending(ctx context.Context, turn *adk.TurnContext[Trigger, *schema.AgenticMessage]) (bool, error) {
+	select {
+	case <-turn.Preempted:
+		return true, nil
+	default:
+	}
+	if err := i.poll(ctx, false); err != nil {
+		return false, err
+	}
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	return i.closed || i.maxPushedSeq > i.claimedSeq, nil
+}
+
+// rerun 投递一次不认领持久输入的纠正信号，让循环在当前边界内重新执行。
+func (i *turnInputs) rerun() error {
+	i.mu.Lock()
+	defer i.mu.Unlock()
+	if i.closed {
+		return nil
+	}
+	if accepted, _ := i.loop.Push(Trigger{Correction: true}); !accepted {
+		return errors.New("agent turn loop rejected grounding correction")
+	}
+	return nil
 }

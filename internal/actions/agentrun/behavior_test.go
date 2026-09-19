@@ -59,7 +59,8 @@ func TestNewBehaviorSnapshot(t *testing.T) {
 		ProviderID: "provider", ModelIdentifier: "model", MaxOutputTokens: 1024, ContextWindow: 8192,
 	}
 	snapshot := newBehaviorSnapshot(execution, agentruntime.SceneCustomer, customerSceneRules, []string{"search_knowledge"}, []string{"工单系统"})
-	if snapshot.RoleKind != domain.RoleKindCustomerService || snapshot.Scene != agentruntime.SceneCustomer || snapshot.RulesVersion != behaviorRulesVersion {
+	if snapshot.RoleKind != domain.RoleKindCustomerService || snapshot.Scene != agentruntime.SceneCustomer || snapshot.RulesVersion != behaviorRulesVersion ||
+		snapshot.Grounding != agentruntime.GroundingStrict {
 		t.Fatalf("快照 = %+v", snapshot)
 	}
 	if !strings.Contains(snapshot.Instruction, "只回答售后问题。") || !strings.HasSuffix(snapshot.Instruction, customerSceneRules) {
@@ -68,7 +69,11 @@ func TestNewBehaviorSnapshot(t *testing.T) {
 	if len(snapshot.InstructionSHA256) != 64 || snapshot.Model.ProviderID != "provider" || snapshot.Model.ContextWindow != 8192 || len(snapshot.Tools) != 1 || len(snapshot.MCPServers) != 1 {
 		t.Fatalf("快照元数据 = %+v", snapshot)
 	}
-	if other := newBehaviorSnapshot(execution, agentruntime.SceneAgentChat, agentChatSceneRules, nil, nil); other.InstructionSHA256 == snapshot.InstructionSHA256 {
+	other := newBehaviorSnapshot(execution, agentruntime.SceneAgentChat, agentChatSceneRules, nil, nil)
+	if other.InstructionSHA256 == snapshot.InstructionSHA256 {
 		t.Fatal("不同指令应产生不同哈希")
+	}
+	if other.Grounding != "" {
+		t.Fatalf("内部场景依据策略 = %q", other.Grounding)
 	}
 }
