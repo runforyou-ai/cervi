@@ -1,17 +1,19 @@
-/** 收件箱检索结果读取，以及消息页中栏搜索模式的状态与键盘选择。 */
+/** 收件箱检索结果与会话名称搜索分页查询，以及消息页中栏搜索模式的状态与键盘选择。 */
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react"
 
 import {
+  CustomerInboxView,
   InboxPartition,
   InboxScope,
   InboxSearchRange,
+  ServiceSessionStatus,
   readInboxConversations,
   searchInbox,
   type InboxConversation,
   type InboxQuery,
   type InboxSearchResultData,
 } from "@/api"
-import type { InboxQueryInput } from "@/features/inbox/inbox-query"
+import { normalizeInboxQuery, type InboxQueryInput } from "@/features/inbox/inbox-query"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 
@@ -29,7 +31,7 @@ export type InboxSearchItem =
 
 export type InboxSearchState = ReturnType<typeof useInboxSearch>
 
-/** 按检索文本、范围和类型读取分组结果与最近打开会话，只返回与当前输入一致的结果。 */
+/** 按检索文本、范围和类型读取分组结果与最近打开会话，只返回与当前输入一致的结果；会话类型给出名称搜索分页查询。 */
 export function useInboxSearchResults({
   active,
   text,
@@ -57,6 +59,8 @@ export function useInboxSearchResults({
       ? InboxSearchRange.InboxSearchRangeReadable
       : selectedRange
   const conversationRange = range === InboxSearchRange.InboxSearchRangeConversation
+  // 会话类型下按名称搜索分页读取全部命中会话，不读取分组检索结果。
+  const paged = !conversationRange && type === "conversations"
 
   useEffect(() => {
     // 输入停顿后再检索；清空输入立即结束上一次检索。
@@ -77,11 +81,27 @@ export function useInboxSearchResults({
   const results = useResource(
     resourceKeys.inboxSearch(searchParameters),
     (signal) => searchInbox(searchParameters, signal),
-    { enabled: active && searchedText !== "", staleTime: 0 },
+    { enabled: active && searchedText !== "" && !paged, staleTime: 0 },
   )
+  // 名称搜索沿用检索范围：列表范围带当前筛选，可读范围不带其他列表筛选。
+  const nameQuery = normalizeInboxQuery({
+    ...(range === InboxSearchRange.InboxSearchRangeList
+      ? query
+      : {
+          scope: InboxScope.InboxScopeAll,
+          customerView: CustomerInboxView.CustomerInboxViewQueue,
+          assigneeIdentityId: "",
+          channelId: "",
+          serviceStatus: ServiceSessionStatus.ServiceSessionStatusOpen,
+          kinds: [],
+        }),
+    partition: InboxPartition.InboxPartitionAll,
+    search: searchedText,
+    searchRange: range,
+  })
   const showRecent = active && trimmedText === "" && !conversationRange
   // 最近会话只核对当前筛选下的列表资格，不受置顶分区限制。
-  const recentQuery: InboxQuery = { ...query, partition: InboxPartition.InboxPartitionAll }
+  const recentQuery: InboxQuery = normalizeInboxQuery({ ...query, partition: InboxPartition.InboxPartitionAll })
   const recent = useResource(
     resourceKeys.recentConversations({ query: recentQuery, conversationIds: recentConversationIds }),
     (signal) => readInboxConversations({ query: recentQuery, conversationIds: recentConversationIds }, signal),
@@ -90,20 +110,22 @@ export function useInboxSearchResults({
 
   // 只展示与当前输入一致的检索结果。
   const current = active && trimmedText !== "" && trimmedText === searchedText
-  const data = current ? results.data : undefined
+  const data = current && !paged ? results.data : undefined
   return {
     listRange,
     range,
     searchedText,
     showRecent,
+    paged: active && paged && trimmedText !== "",
+    nameQuery,
     recentConversations: showRecent
       ? (recent.data?.results ?? []).flatMap((result) => (result.conversation ? [result.conversation] : []))
       : [],
     conversations: data && !conversationRange && (type === "all" || type === "conversations") ? data.conversations : [],
     messages: data && (conversationRange || type === "all" || type === "messages") ? data.messages : [],
     people: data && !conversationRange && (type === "all" || type === "people") ? data.people : [],
-    pending: trimmedText !== "" && (!current || results.loading),
-    error: current ? results.error : null,
+    pending: trimmedText !== "" && (!current || (!paged && results.loading)),
+    error: current && !paged ? results.error : null,
     retry: results.refresh,
   }
 }
@@ -126,6 +148,8 @@ export function useInboxSearch({
   const [conversationId, setConversationId] = useState("")
   const [type, setType] = useState<InboxSearchType>("all")
   const [activeIndex, setActiveIndex] = useState(0)
+  const [pagedConversations, setPagedConversations] = useState<InboxConversation[]>([])
+  const typeIndexes = useRef(new Map<InboxSearchType, number>())
   const results = useInboxSearchResults({
     active,
     text,
@@ -137,7 +161,7 @@ export function useInboxSearch({
   })
   const { listRange, range, searchedText, showRecent } = results
   const items: InboxSearchItem[] = [
-    ...(showRecent ? results.recentConversations : results.conversations).map((conversation) => ({
+    ...(showRecent ? results.recentConversations : results.paged ? pagedConversations : results.conversations).map((conversation) => ({
       kind: "conversation" as const,
       conversation,
     })),
@@ -147,8 +171,31 @@ export function useInboxSearch({
   const selectedIndex = Math.min(activeIndex, items.length - 1)
 
   useEffect(() => {
+    typeIndexes.current.clear()
     setActiveIndex(0)
-  }, [searchedText, type, range, showRecent])
+  }, [searchedText, range, showRecent])
+
+  /** 修改检索词；处于会话分页时回到分组结果。 */
+  const changeText = useCallback(
+    (value: string) => {
+      setText(value)
+      if (type === "conversations") {
+        typeIndexes.current.clear()
+        setType("all")
+      }
+    },
+    [type],
+  )
+
+  /** 切换结果类型，回到查看过的类型时恢复其原选中项。 */
+  const selectType = useCallback(
+    (next: InboxSearchType) => {
+      typeIndexes.current.set(type, selectedIndex)
+      setType(next)
+      setActiveIndex(typeIndexes.current.get(next) ?? 0)
+    },
+    [type, selectedIndex],
+  )
 
   const enter = useCallback(
     (targetConversationId = "") => {
@@ -174,6 +221,7 @@ export function useInboxSearch({
     setText("")
     setConversationId("")
     setType("all")
+    typeIndexes.current.clear()
     inputRef.current?.blur()
   }, [])
 
@@ -226,14 +274,17 @@ export function useInboxSearch({
     inputRef,
     active,
     text,
-    setText,
+    setText: changeText,
     range,
     setRange,
     listRange,
     conversationId,
     type,
-    setType,
+    setType: selectType,
     showRecent,
+    paged: results.paged,
+    nameQuery: results.nameQuery,
+    setPagedConversations,
     recentConversations: results.recentConversations,
     conversations: results.conversations,
     messages: results.messages,

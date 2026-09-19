@@ -46,6 +46,7 @@ func inboxLoadInput(query InboxQuery) inboxaction.LoadInput {
 		Scope:     domain.InboxScope(query.Scope), CustomerView: domain.CustomerInboxView(query.CustomerView),
 		AssigneeIdentityID: query.AssigneeIdentityID, ChannelID: query.ChannelID,
 		ServiceStatus: domain.ServiceSessionStatus(query.ServiceStatus), Kinds: kinds,
+		Search: query.Search, SearchRange: inboxaction.SearchRange(query.SearchRange),
 	}
 }
 

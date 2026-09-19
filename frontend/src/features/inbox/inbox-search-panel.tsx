@@ -1,4 +1,4 @@
-/** 消息页中栏的搜索结果：范围与类型切换、分组结果、最近打开和快捷键提示。 */
+/** 消息页中栏的搜索结果：范围与类型切换、分组结果、会话分页列表、最近打开和快捷键提示。 */
 import { useEffect, useRef, type MouseEvent, type ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 
@@ -8,12 +8,14 @@ import {
   InboxSearchRange,
   OrganizationIdentityType,
   isAgentInboxConversation,
+  type Identity,
   type InboxConversation,
 } from "@/api"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { ProfileAvatar } from "@/components/profile-avatar"
 import { Button } from "@/components/ui/button"
 import { ConversationAvatar } from "@/features/inbox/conversation-avatar"
+import { InboxSearchConversationList } from "@/features/inbox/inbox-search-conversation-list"
 import { useConversationName } from "@/features/inbox/use-conversation-name"
 import { useConversationTime } from "@/features/inbox/use-conversation-time"
 import type { InboxSearchMessageData, InboxSearchState, InboxSearchType } from "@/features/inbox/use-inbox-search"
@@ -58,15 +60,35 @@ export function InboxSearchExcerpt({ message }: { message: InboxSearchMessageDat
   )
 }
 
-/** 搜索结果分组；传入查看全部文案且结果达到上限时显示查看全部入口。 */
-function SearchGroup({ title, count, viewAllLabel, children }: { title: string; count: number; viewAllLabel?: string; children: ReactNode }) {
+/** 搜索结果分组；传入查看全部文案且结果达到上限时显示查看全部入口，未传入 onViewAll 时入口停用。 */
+function SearchGroup({
+  title,
+  count,
+  viewAllLabel,
+  onViewAll,
+  children,
+}: {
+  title: string
+  count: number
+  viewAllLabel?: string
+  onViewAll?: () => void
+  children: ReactNode
+}) {
   if (count === 0) return null
   return (
     <section>
       <h3 className="px-3 pt-2.5 pb-1 text-[11px] font-semibold text-muted-foreground">{title}</h3>
       {children}
       {viewAllLabel && count >= searchGroupLimit ? (
-        <Button type="button" variant="ghost" size="xs" disabled className="ml-1 text-primary">
+        <Button
+          type="button"
+          variant="ghost"
+          size="xs"
+          disabled={!onViewAll}
+          className="ml-1 text-primary"
+          onMouseDown={keepSearchFocus}
+          onClick={onViewAll}
+        >
           {viewAllLabel}
         </Button>
       ) : null}
@@ -74,9 +96,10 @@ function SearchGroup({ title, count, viewAllLabel, children }: { title: string; 
   )
 }
 
-/** 搜索结果行，选中态跟随键盘和鼠标。 */
+/** 搜索结果行，选中态跟随键盘和鼠标；会话行携带 inboxId 供分页列表滚动补偿定位。 */
 function SearchResultRow({
   index,
+  inboxId,
   selected,
   disabled = false,
   avatar,
@@ -87,6 +110,7 @@ function SearchResultRow({
   onOpen,
 }: {
   index: number
+  inboxId?: string
   selected: boolean
   disabled?: boolean
   avatar: ReactNode
@@ -103,6 +127,7 @@ function SearchResultRow({
       aria-selected={selected}
       aria-disabled={disabled}
       data-search-index={index}
+      data-inbox-id={inboxId}
       className={cn(
         "flex w-full min-w-0 items-center gap-2.5 rounded-md px-3 py-1.5 text-left",
         selected ? "bg-accent text-accent-foreground" : "hover:bg-muted",
@@ -126,8 +151,8 @@ function SearchResultRow({
   )
 }
 
-/** 按搜索模式状态渲染范围、类型、分组结果和快捷键提示。 */
-export function InboxSearchPanel({ search, scope }: { search: InboxSearchState; scope: InboxScope }) {
+/** 按搜索模式状态渲染范围、类型、分组结果或会话分页列表和快捷键提示。 */
+export function InboxSearchPanel({ search, scope, identity }: { search: InboxSearchState; scope: InboxScope; identity: Identity }) {
   const { t } = useTranslation(["inbox", "common"])
   const conversationName = useConversationName()
   const formatTime = useConversationTime()
@@ -157,6 +182,7 @@ export function InboxSearchPanel({ search, scope }: { search: InboxSearchState; 
       <SearchResultRow
         key={conversation.id}
         index={index}
+        inboxId={conversation.id}
         selected={search.selectedIndex === index}
         avatar={<ConversationAvatar conversation={conversation} className="size-7" />}
         title={highlightName(
@@ -178,6 +204,12 @@ export function InboxSearchPanel({ search, scope }: { search: InboxSearchState; 
         {conversationRows(search.recentConversations)}
       </SearchGroup>
     )
+  } else if (query && search.paged && !search.pending) {
+    body = (
+      <InboxSearchConversationList identity={identity} query={search.nameQuery} onConversationsChange={search.setPagedConversations}>
+        {conversationRows}
+      </InboxSearchConversationList>
+    )
   } else if (query && search.pending) {
     body = <LoadingIndicator className="justify-center py-10">{t("searchLoading")}</LoadingIndicator>
   } else if (query && search.error) {
@@ -194,7 +226,12 @@ export function InboxSearchPanel({ search, scope }: { search: InboxSearchState; 
   } else if (query) {
     body = (
       <>
-        <SearchGroup title={t("searchGroupConversations")} count={search.conversations.length} viewAllLabel={t("searchViewAll")}>
+        <SearchGroup
+          title={t("searchGroupConversations")}
+          count={search.conversations.length}
+          viewAllLabel={t("searchViewAll")}
+          onViewAll={() => search.setType("conversations")}
+        >
           {conversationRows(search.conversations)}
         </SearchGroup>
         <SearchGroup title={t("searchGroupMessages")} count={search.messages.length} viewAllLabel={t("searchViewAll")}>
@@ -277,7 +314,12 @@ export function InboxSearchPanel({ search, scope }: { search: InboxSearchState; 
           </div>
         )}
       </div>
-      <div ref={listRef} role="listbox" aria-label={t("searchLabel")} className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
+      <div
+        ref={listRef}
+        role="listbox"
+        aria-label={t("searchLabel")}
+        className={cn("min-h-0 flex-1 px-2 pb-2", search.paged ? "flex flex-col" : "overflow-y-auto")}
+      >
         {body}
       </div>
       <div className="flex shrink-0 gap-3 border-t px-3.5 py-2 text-[11px] text-muted-foreground">

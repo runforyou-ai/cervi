@@ -35,6 +35,12 @@ const InboxPartition = {
   InboxPartitionPinned: "pinned",
   InboxPartitionRegular: "regular",
 }
+const InboxSearchRange = {
+  $zero: "",
+  InboxSearchRangeList: "list",
+  InboxSearchRangeReadable: "readable",
+  InboxSearchRangeConversation: "conversation",
+}
 const optionalWailsEnum = (values: Record<string, string>, value: string | null) =>
   value === null || value === values.$zero || !Object.values(values).includes(value)
     ? undefined
@@ -48,6 +54,8 @@ type InboxQuery = {
   channelId: string
   serviceStatus: string
   kinds: string[]
+  search?: string
+  searchRange?: string
 }
 
 const source = readFileSync(new URL("../src/features/inbox/inbox-query.ts", import.meta.url), "utf8")
@@ -60,7 +68,7 @@ const module: {
 runInNewContext(
   stripTypeScriptTypes(source).replace(/^import\s[\s\S]*?from "[^"]+"\n/gm, "").replaceAll("export ", "") +
     "\nObject.assign(module, { normalizeInboxQuery, inboxQueryFromSearch, writeInboxQuerySearch, toggleInboxKinds })",
-  { module, ConversationType, InboxScope, InboxPartition, CustomerInboxView, ServiceSessionStatus, optionalWailsEnum, URLSearchParams },
+  { module, ConversationType, InboxScope, InboxPartition, InboxSearchRange, CustomerInboxView, ServiceSessionStatus, optionalWailsEnum, URLSearchParams },
 )
 const { normalizeInboxQuery, inboxQueryFromSearch, writeInboxQuerySearch, toggleInboxKinds } = module as Required<typeof module>
 
@@ -72,11 +80,11 @@ function plain<Value>(value: Value): Value {
 test("范围外的客户条件和会话类型按空值规范化", () => {
   assert.deepEqual(
     plain(normalizeInboxQuery({ scope: "internal", customerView: "coworkers", assigneeIdentityId: "someone", channelId: "channel", serviceStatus: "closed", kinds: ["customer", "group"] })),
-    { partition: "all", scope: "internal", customerView: "queue", assigneeIdentityId: "", channelId: "", serviceStatus: "open", kinds: ["group"] },
+    { partition: "all", scope: "internal", customerView: "queue", assigneeIdentityId: "", channelId: "", serviceStatus: "open", kinds: ["group"], search: "", searchRange: "list" },
   )
   assert.deepEqual(
     plain(normalizeInboxQuery({ scope: "customer", customerView: "mine", assigneeIdentityId: "someone", channelId: "channel", serviceStatus: "closed", kinds: ["group"] })),
-    { partition: "all", scope: "customer", customerView: "mine", assigneeIdentityId: "", channelId: "channel", serviceStatus: "closed", kinds: [] },
+    { partition: "all", scope: "customer", customerView: "mine", assigneeIdentityId: "", channelId: "channel", serviceStatus: "closed", kinds: [], search: "", searchRange: "list" },
   )
 })
 
@@ -89,7 +97,7 @@ test("勾满当前范围全部类型等同不限类型", () => {
 test("地址参数往返保持规范化结果，默认值不写入", () => {
   const original = new URLSearchParams("scope=customer&view=coworkers&assignee=peer&channel=web&status=closed&conversation=kept")
   const query = inboxQueryFromSearch(original)
-  assert.deepEqual(plain(query), { partition: "all", scope: "customer", customerView: "coworkers", assigneeIdentityId: "peer", channelId: "web", serviceStatus: "closed", kinds: [] })
+  assert.deepEqual(plain(query), { partition: "all", scope: "customer", customerView: "coworkers", assigneeIdentityId: "peer", channelId: "web", serviceStatus: "closed", kinds: [], search: "", searchRange: "list" })
   const written = new URLSearchParams(original)
   writeInboxQuerySearch(written, query)
   assert.equal(written.toString(), original.toString())
@@ -101,4 +109,8 @@ test("地址参数往返保持规范化结果，默认值不写入", () => {
   const pinned = new URLSearchParams(original)
   writeInboxQuerySearch(pinned, normalizeInboxQuery({ ...query, partition: "pinned" }))
   assert.equal(pinned.toString(), original.toString())
+  // 会话名称搜索只用于搜索模式的分页列表，不进入列表地址参数。
+  const searched = new URLSearchParams(original)
+  writeInboxQuerySearch(searched, normalizeInboxQuery({ ...query, search: "周报", searchRange: "readable" }))
+  assert.equal(searched.toString(), original.toString())
 })

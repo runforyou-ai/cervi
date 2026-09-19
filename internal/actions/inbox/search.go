@@ -110,7 +110,17 @@ func (q *LoadInboxQuery) Search(ctx context.Context, identity *servermodels.Iden
 	if text == "" {
 		return result, nil
 	}
-	err := q.db.RunInTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true}, func(ctx context.Context, tx bun.Tx) error {
+	// 会话分组与会话名称搜索分页共用同一候选投影，分组即分页首页的前几条。
+	names := LoadInput{Search: text, SearchRange: SearchRangeReadable}
+	if input.Range == SearchRangeList {
+		names = input.List
+		names.Search, names.SearchRange = text, SearchRangeList
+	}
+	names, err := normalizeLoadInput(names)
+	if err != nil {
+		return result, err
+	}
+	err = q.db.RunInTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true}, func(ctx context.Context, tx bun.Tx) error {
 		snapshot := NewLoadInboxQuery(tx)
 		candidates := snapshot.readableCandidates(identity)
 		if input.Range == SearchRangeList {
@@ -135,9 +145,12 @@ func (q *LoadInboxQuery) Search(ctx context.Context, identity *servermodels.Iden
 		}
 		var conversationIDs []string
 		if input.Range != SearchRangeConversation {
-			var err error
-			if conversationIDs, err = snapshot.searchConversationNames(ctx, identity, candidates, text); err != nil {
+			points, err := snapshot.readNeighborPoints(ctx, identity, names, nil, false, searchResultLimit)
+			if err != nil {
 				return err
+			}
+			for _, point := range points {
+				conversationIDs = append(conversationIDs, point.ID)
 			}
 			if result.People, err = snapshot.searchPeople(ctx, identity, text); err != nil {
 				return err
@@ -208,31 +221,6 @@ func (q *LoadInboxQuery) searchMessages(ctx context.Context, identity *servermod
 		return nil, err
 	}
 	return rows, nil
-}
-
-// searchConversationNames 按列表展示的会话名称匹配候选会话，按最近活动倒序。
-func (q *LoadInboxQuery) searchConversationNames(ctx context.Context, identity *servermodels.Identity, candidates *bun.SelectQuery, text string) ([]string, error) {
-	pattern := "%" + text + "%"
-	var ids []string
-	err := q.db.NewSelect().TableExpr("(?) AS candidates", candidates).
-		ColumnExpr("cv.id::text").
-		Join("JOIN conversations AS cv ON cv.organization_id = ? AND cv.id = candidates.id", identity.Organization.ID).
-		Join("LEFT JOIN direct_conversations AS dc ON dc.organization_id = cv.organization_id AND dc.conversation_id = cv.id").
-		Join("LEFT JOIN organization_identities AS peer_oi ON peer_oi.organization_id = dc.organization_id AND peer_oi.id = CASE WHEN dc.first_identity_id = ? THEN dc.second_identity_id ELSE dc.first_identity_id END", identity.OrganizationIdentity.ID).
-		Join("LEFT JOIN agent_conversations AS ac ON ac.organization_id = cv.organization_id AND ac.conversation_id = cv.id").
-		Join("LEFT JOIN organization_identities AS agent_oi ON agent_oi.organization_id = ac.organization_id AND agent_oi.id = ac.agent_identity_id").
-		Join("LEFT JOIN customer_conversations AS cc ON cc.organization_id = cv.organization_id AND cc.conversation_id = cv.id").
-		Join("LEFT JOIN contact_channel_identities AS cci ON cci.organization_id = cc.organization_id AND cci.id = cc.contact_channel_identity_id").
-		Join("LEFT JOIN contacts AS c ON c.organization_id = cci.organization_id AND c.id = cci.contact_id").
-		Where(`(cv.type = ? AND cv.title ILIKE ?) OR (cv.type = ? AND peer_oi.display_name ILIKE ?)
-			OR (cv.type = ? AND (cv.title ILIKE ? OR agent_oi.display_name ILIKE ?))
-			OR (cv.type = ? AND COALESCE(cci.display_name, c.display_name) ILIKE ?)`,
-			domain.ConversationTypeGroup, pattern, domain.ConversationTypeDirect, pattern,
-			domain.ConversationTypeAgent, pattern, pattern, domain.ConversationTypeCustomer, pattern).
-		OrderExpr("cv.last_activity_at DESC NULLS LAST, cv.id DESC").
-		Limit(searchResultLimit).
-		Scan(ctx, &ids)
-	return ids, err
 }
 
 // searchPeople 在全企业通讯录中匹配活跃成员、AI 员工和外部联系人，不随会话范围收窄；成员优先，外部联系人补足剩余名额。

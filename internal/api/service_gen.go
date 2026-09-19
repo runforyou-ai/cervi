@@ -1679,6 +1679,8 @@ func bindLoadInboxInputQuery(c *gin.Context) (appservice.LoadInboxInput, bool) {
 		ChannelID:          c.Query("channelId"),
 		ServiceStatus:      appservice.ServiceSessionStatus(c.Query("serviceStatus")),
 		Kinds:              enumList[appservice.ConversationType](c.QueryArray("kinds")),
+		Search:             c.Query("search"),
+		SearchRange:        appservice.InboxSearchRange(c.Query("searchRange")),
 		Cursor:             c.Query("cursor"),
 		BeforeCursor:       c.Query("beforeCursor"),
 		Limit:              limit,

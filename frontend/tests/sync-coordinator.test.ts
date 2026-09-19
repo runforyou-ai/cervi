@@ -185,7 +185,7 @@ test("销毁后丢弃待合并失效、在途探针结果和后续通知", async
   assert.equal(probes.length, 1)
 })
 
-test("会话探针不一致时失效检索结果，会话变更通知不失效检索结果", async (t) => {
+test("会话探针不一致、会话变更与本人会话状态变化都失效检索结果", async (t) => {
   const { coordinator, invalidated, probes } = setup(t)
   coordinator.receive({ type: "server_hello", connectionId: "conn", syncHeads: heads })
   t.mock.timers.tick(300)
@@ -194,8 +194,14 @@ test("会话探针不一致时失效检索结果，会话变更通知不失效�
   invalidated.length = 0
   coordinator.receive({ type: "conversation_changed", conversationId: "c1", version: 2n })
   t.mock.timers.tick(300)
-  assert.equal(count(invalidated, ["inbox-search"]), 0)
+  assert.equal(count(invalidated, ["inbox-search"]), 1)
 
+  invalidated.length = 0
+  coordinator.receive({ type: "conversation_state_changed", conversationId: "c1", version: 3n })
+  t.mock.timers.tick(300)
+  assert.equal(count(invalidated, ["inbox-search"]), 1)
+
+  invalidated.length = 0
   coordinator.start()
   probes[0].resolve({ ...heads, conversationChecksum: "12" })
   await flush()

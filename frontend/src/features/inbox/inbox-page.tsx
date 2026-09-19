@@ -396,7 +396,7 @@ export function InboxPage({
           search={search}
         />
         {search.active ? (
-          <InboxSearchPanel search={search} scope={scope} />
+          <InboxSearchPanel search={search} scope={scope} identity={identity} />
         ) : null}
         {!search.active && scope === InboxScope.InboxScopeCustomer ? (
           <InboxCustomerQueueFilter

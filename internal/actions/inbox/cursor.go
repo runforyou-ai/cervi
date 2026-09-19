@@ -60,7 +60,7 @@ type inboxCursorPoint struct {
 	PinRank        *int64     `json:"pinRank" bun:"pin_rank"`
 }
 
-// inboxCursor 将排序边界绑定到当前企业、用户、规范化筛选和置顶分区。
+// inboxCursor 将排序边界绑定到当前企业、用户、规范化筛选、搜索词和置顶分区。
 type inboxCursor struct {
 	inboxCursorPoint
 	Version            int                         `json:"version"`
@@ -74,9 +74,11 @@ type inboxCursor struct {
 	ChannelID          string                      `json:"channelId"`
 	ServiceStatus      domain.ServiceSessionStatus `json:"serviceStatus"`
 	Kinds              []domain.ConversationType   `json:"kinds"`
+	Search             string                      `json:"search"`
+	SearchRange        SearchRange                 `json:"searchRange"`
 }
 
-// encodeInboxCursor 编码原始排序边界、身份范围、分区与排序版本；置顶区另外绑定个人顺序版本。
+// encodeInboxCursor 编码原始排序边界、身份范围、搜索词、分区与排序版本；置顶区另外绑定个人顺序版本。
 func encodeInboxCursor(identity *servermodels.Identity, input LoadInput, pinOrderVersion int64, point inboxCursorPoint) (string, error) {
 	if input.Partition != domain.InboxPartitionPinned {
 		pinOrderVersion = 0
@@ -87,6 +89,7 @@ func encodeInboxCursor(identity *servermodels.Identity, input LoadInput, pinOrde
 		Partition: input.Partition, PinOrderVersion: pinOrderVersion,
 		Scope: input.Scope, CustomerView: input.CustomerView, AssigneeIdentityID: input.AssigneeIdentityID,
 		ChannelID: input.ChannelID, ServiceStatus: input.ServiceStatus, Kinds: input.Kinds,
+		Search: input.Search, SearchRange: input.SearchRange,
 	})
 	if err != nil {
 		return "", err
@@ -106,6 +109,7 @@ func decodeInboxCursor(value string, identity *servermodels.Identity, input Load
 		cursor.Partition != input.Partition ||
 		cursor.Scope != input.Scope || cursor.CustomerView != input.CustomerView || cursor.AssigneeIdentityID != input.AssigneeIdentityID ||
 		cursor.ChannelID != input.ChannelID || cursor.ServiceStatus != input.ServiceStatus || !slices.Equal(cursor.Kinds, input.Kinds) ||
+		cursor.Search != input.Search || cursor.SearchRange != input.SearchRange ||
 		!common.ValidUUID(cursor.ID) {
 		return nil, ErrCursorInvalid
 	}

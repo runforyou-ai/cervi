@@ -77,7 +77,7 @@ type ConversationPinState struct {
 	PinOrderVersion string `json:"pinOrderVersion"`
 }
 
-// InboxQuery 定义与分页边界无关的会话筛选。
+// InboxQuery 定义与分页边界无关的会话筛选；search 非空时按会话名称搜索，searchRange 为 list 时沿用列表筛选，为 readable 时覆盖全部可读会话且不带其他列表筛选。
 type InboxQuery struct {
 	Partition          InboxPartition       `json:"partition" query:"partition"`
 	Scope              InboxScope           `json:"scope" query:"scope"`
@@ -86,9 +86,11 @@ type InboxQuery struct {
 	ChannelID          string               `json:"channelId" query:"channelId"`
 	ServiceStatus      ServiceSessionStatus `json:"serviceStatus" query:"serviceStatus"`
 	Kinds              []ConversationType   `json:"kinds" query:"kinds"`
+	Search             string               `json:"search" query:"search"`
+	SearchRange        InboxSearchRange     `json:"searchRange" query:"searchRange"`
 }
 
-// LoadInboxInput 定义统一收件箱筛选和分页边界。
+// LoadInboxInput 定义统一收件箱筛选、会话名称搜索和分页边界。
 type LoadInboxInput struct {
 	Partition          InboxPartition       `json:"partition" query:"partition"`
 	Scope              InboxScope           `json:"scope" query:"scope"`
@@ -97,6 +99,8 @@ type LoadInboxInput struct {
 	ChannelID          string               `json:"channelId" query:"channelId"`
 	ServiceStatus      ServiceSessionStatus `json:"serviceStatus" query:"serviceStatus"`
 	Kinds              []ConversationType   `json:"kinds" query:"kinds"`
+	Search             string               `json:"search" query:"search"`
+	SearchRange        InboxSearchRange     `json:"searchRange" query:"searchRange"`
 	Cursor             string               `json:"cursor" query:"cursor"`
 	BeforeCursor       string               `json:"beforeCursor" query:"beforeCursor"`
 	Limit              int                  `json:"limit" query:"limit,default=50"`
@@ -108,6 +112,7 @@ func (input LoadInboxInput) query() InboxQuery {
 		Partition: input.Partition,
 		Scope:     input.Scope, CustomerView: input.CustomerView, AssigneeIdentityID: input.AssigneeIdentityID,
 		ChannelID: input.ChannelID, ServiceStatus: input.ServiceStatus, Kinds: input.Kinds,
+		Search: input.Search, SearchRange: input.SearchRange,
 	}
 }
 
