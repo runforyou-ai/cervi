@@ -35,6 +35,16 @@ function inboxKeys(): ResourceKey[] {
   ]
 }
 
+/** 返回本人身份资料变化时需要重读的资源 key，包括展示本人名称和头像的成员目录。 */
+function identityProfileKeys(): ResourceKey[] {
+  return [
+    resourceKeys.identity(),
+    resourceKeys.users(),
+    resourceKeys.user(),
+    resourceKeys.teamMembers(),
+  ]
+}
+
 /** 返回单个会话内容变化时需要重读的资源 key，省略会话编号时返回全部会话的前缀。 */
 function conversationKeys(conversationId?: string): ResourceKey[] {
   return [
@@ -121,7 +131,7 @@ export class SyncCoordinator {
         ])
         return
       case "identity_profile_changed":
-        this.enqueue([resourceKeys.identity()])
+        this.enqueue(identityProfileKeys())
         return
       case "pin_order_changed":
         // 个人置顶顺序变化使置顶区游标失效，两个分区一并整区重读。
@@ -174,7 +184,7 @@ export class SyncCoordinator {
       this.enqueue([...conversationKeys(), resourceKeys.inboxSearch()])
     }
     if (!previous || previous.identityProfileVersion !== heads.identityProfileVersion) {
-      this.enqueue([resourceKeys.identity()])
+      this.enqueue(identityProfileKeys())
     }
     if (!previous || previous.pinOrderVersion !== heads.pinOrderVersion) {
       this.enqueue(inboxKeys())

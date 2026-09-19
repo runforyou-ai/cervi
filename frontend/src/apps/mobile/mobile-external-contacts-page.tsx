@@ -132,7 +132,10 @@ function MobileExternalContactList({
                   state={{ mobileBack: true }}
                   className="flex min-h-18 items-center gap-3 px-4 py-3 outline-none active:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
                 >
-                  <ProfileAvatar name={contact.displayName} />
+                  <ProfileAvatar
+                    name={contact.displayName}
+                    imageURL={contact.avatarUrl}
+                  />
                   <span className="min-w-0 flex-1">
                     <span className="flex min-w-0 items-center gap-2">
                       <span className="truncate text-[15px] font-medium">
@@ -232,6 +235,7 @@ export function MobileExternalContactPage() {
             <div className="flex items-center gap-3 pb-6">
               <ProfileAvatar
                 name={detail.contact.displayName}
+                imageURL={detail.avatarUrl}
                 className="size-14 text-xl"
               />
               <div className="min-w-0 space-y-2">

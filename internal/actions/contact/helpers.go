@@ -139,6 +139,9 @@ func replaceMethods(ctx context.Context, tx bun.Tx, organizationID, contactID st
 	return err
 }
 
+// contactAvatarFileIDColumn 读取联系人头像：取最近更新且带头像的渠道身份头像，联系人表别名为 c。
+const contactAvatarFileIDColumn = "(SELECT cci.avatar_file_id::text FROM contact_channel_identities AS cci WHERE cci.organization_id = c.organization_id AND cci.contact_id = c.id AND cci.avatar_file_id IS NOT NULL ORDER BY cci.updated_at DESC, cci.id DESC LIMIT 1) AS avatar_file_id"
+
 // loadContact 读取当前企业中未删除的联系人。
 func loadContact(ctx context.Context, db bun.IDB, organizationID, contactID string) (*ContactRecord, error) {
 	if !common.ValidUUID(contactID) {

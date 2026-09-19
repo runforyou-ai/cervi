@@ -63,10 +63,11 @@ type ContactListInput struct {
 	Deleted    bool               `json:"deleted" query:"-"`
 }
 
-// ContactSummary 定义联系人列表项。
+// ContactSummary 定义联系人列表项。AvatarURL 为最近更新且带头像的渠道身份头像。
 type ContactSummary struct {
 	ID                string       `json:"id"`
 	DisplayName       *string      `json:"displayName"`
+	AvatarURL         string       `json:"avatarUrl"`
 	Stage             ContactStage `json:"stage"`
 	PrimaryEmail      *string      `json:"primaryEmail"`
 	PrimaryPhone      *string      `json:"primaryPhone"`
@@ -108,9 +109,10 @@ type ContactSourceChannel struct {
 	Name string      `json:"name"`
 }
 
-// Contact 定义联系人完整详情。
+// Contact 定义联系人完整详情。AvatarURL 为最近更新且带头像的渠道身份头像。
 type Contact struct {
 	Contact           ContactRecord            `json:"contact"`
+	AvatarURL         string                   `json:"avatarUrl"`
 	SourceChannel     ContactSourceChannel     `json:"sourceChannel"`
 	Methods           []ContactMethod          `json:"methods"`
 	ChannelIdentities []ContactChannelIdentity `json:"channelIdentities"`

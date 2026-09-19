@@ -65,17 +65,18 @@ type WorkStatusInput struct {
 
 // User 定义企业成员信息。
 type User struct {
-	ID          string `bun:"id"`
-	IdentityID  string `bun:"identity_id"`
-	Email       string
-	DisplayName string
-	RoleID      string          `bun:"role_id"`
-	RoleKind    domain.RoleKind `bun:"role_kind"`
-	RoleName    string          `bun:"role_name"`
-	Status      domain.UserStatus
-	WorkStatus  domain.WorkStatus
-	Teams       []TeamSummary
-	CreatedAt   time.Time
+	ID           string `bun:"id"`
+	IdentityID   string `bun:"identity_id"`
+	Email        string
+	DisplayName  string
+	AvatarFileID *string         `bun:"avatar_file_id"`
+	RoleID       string          `bun:"role_id"`
+	RoleKind     domain.RoleKind `bun:"role_kind"`
+	RoleName     string          `bun:"role_name"`
+	Status       domain.UserStatus
+	WorkStatus   domain.WorkStatus
+	Teams        []TeamSummary
+	CreatedAt    time.Time
 }
 
 // TeamSummary 定义成员所属团队的精简字段。

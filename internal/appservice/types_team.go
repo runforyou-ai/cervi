@@ -52,6 +52,7 @@ type TeamMember struct {
 	UserID       string                   `json:"userId"`
 	AgentID      string                   `json:"agentId"`
 	DisplayName  string                   `json:"displayName"`
+	AvatarURL    string                   `json:"avatarUrl"`
 	WorkStatus   WorkStatus               `json:"workStatus"`
 	JoinedAt     time.Time                `json:"joinedAt"`
 }
