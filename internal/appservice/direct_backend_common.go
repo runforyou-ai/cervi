@@ -89,6 +89,20 @@ func fileContentURL(backend domain.FileStorageBackend, storageKey, publicBaseURL
 	return serverfilecontent.PublicURL(baseURL, storageKey)
 }
 
+// optionalFileURLs 批量解析可选文件编号的公开地址，跳过空编号。
+func (o *directOperations) optionalFileURLs(ctx context.Context, identity *servermodels.Identity, fileIDs ...*string) (map[string]string, error) {
+	ids := make([]string, 0, len(fileIDs))
+	for _, fileID := range fileIDs {
+		if fileID != nil && *fileID != "" {
+			ids = append(ids, *fileID)
+		}
+	}
+	if len(ids) == 0 {
+		return map[string]string{}, nil
+	}
+	return o.activeFileURLs(ctx, identity, ids)
+}
+
 // optionalFileURL 返回可选文件编号对应的公开地址。
 func optionalFileURL(urls map[string]string, fileID *string) string {
 	if fileID == nil {

@@ -69,7 +69,7 @@ func (q *ListUsersQuery) Execute(ctx context.Context, identity *servermodels.Ide
 	users := make([]User, 0)
 	if err := applyFilters(q.db.NewSelect().TableExpr("users AS u")).
 		ColumnExpr("u.id::text AS id, u.identity_id::text AS identity_id").
-		ColumnExpr("u.email, u.status, oi.display_name, oi.work_status, oi.created_at").
+		ColumnExpr("u.email, u.status, oi.display_name, oi.avatar_file_id::text AS avatar_file_id, oi.work_status, oi.created_at").
 		ColumnExpr("r.id::text AS role_id, r.kind AS role_kind, r.name AS role_name").
 		Join("JOIN organization_identities AS oi ON oi.id = u.identity_id AND oi.organization_id = u.organization_id AND oi.type = ?", domain.OrganizationIdentityTypeUser).
 		Join("JOIN roles AS r ON r.id = oi.role_id AND r.organization_id = oi.organization_id").

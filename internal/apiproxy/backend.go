@@ -116,6 +116,7 @@ func (b *Backend) ListContacts(ctx context.Context, meta appservice.RequestMeta,
 	setPositiveQuery(query, "pageSize", input.PageSize)
 	var output appservice.ContactList
 	err := b.do(ctx, meta, http.MethodGet, path, query, nil, &output)
+	b.normalizeOutput(&output)
 	return output, err
 }
 
@@ -146,6 +147,26 @@ func (b *Backend) normalizeOutput(output any) {
 	case *appservice.MemberOptionList:
 		for index := range value.Members {
 			value.Members[index].AvatarURL = b.absoluteContentURL(value.Members[index].AvatarURL)
+		}
+	case *appservice.User:
+		value.AvatarURL = b.absoluteContentURL(value.AvatarURL)
+	case *appservice.UserList:
+		for index := range value.Users {
+			value.Users[index].AvatarURL = b.absoluteContentURL(value.Users[index].AvatarURL)
+		}
+	case *appservice.AgentList:
+		for index := range value.Agents {
+			value.Agents[index].AvatarURL = b.absoluteContentURL(value.Agents[index].AvatarURL)
+		}
+	case *appservice.TeamMemberList:
+		for index := range value.Members {
+			value.Members[index].AvatarURL = b.absoluteContentURL(value.Members[index].AvatarURL)
+		}
+	case *appservice.Contact:
+		value.AvatarURL = b.absoluteContentURL(value.AvatarURL)
+	case *appservice.ContactList:
+		for index := range value.Contacts {
+			value.Contacts[index].AvatarURL = b.absoluteContentURL(value.Contacts[index].AvatarURL)
 		}
 	case *appservice.TeamMemberCandidateList:
 		for index := range value.Members {

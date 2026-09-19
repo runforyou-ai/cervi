@@ -89,6 +89,7 @@ type AgentListItem struct {
 	ID          string                `json:"id"`
 	IdentityID  string                `json:"identityId"`
 	DisplayName string                `json:"displayName"`
+	AvatarURL   string                `json:"avatarUrl"`
 	Role        RoleSummary           `json:"role"`
 	Status      UserStatus            `json:"status"`
 	WorkStatus  WorkStatus            `json:"workStatus"`

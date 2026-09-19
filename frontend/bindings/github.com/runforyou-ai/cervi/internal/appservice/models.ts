@@ -273,6 +273,7 @@ export interface AgentListItem {
     "id": string;
     "identityId": string;
     "displayName": string;
+    "avatarUrl": string;
     "role": RoleSummary;
     "status": UserStatus;
     "workStatus": WorkStatus;
@@ -586,10 +587,11 @@ export enum ChatSubjectKind {
 };
 
 /**
- * Contact 定义联系人完整详情。
+ * Contact 定义联系人完整详情。AvatarURL 为最近更新且带头像的渠道身份头像。
  */
 export interface Contact {
     "contact": ContactRecord;
+    "avatarUrl": string;
     "sourceChannel": ContactSourceChannel;
     "methods": ContactMethod[] | null;
     "channelIdentities": ContactChannelIdentity[] | null;
@@ -723,11 +725,12 @@ export enum ContactStage {
 };
 
 /**
- * ContactSummary 定义联系人列表项。
+ * ContactSummary 定义联系人列表项。AvatarURL 为最近更新且带头像的渠道身份头像。
  */
 export interface ContactSummary {
     "id": string;
     "displayName": string | null;
+    "avatarUrl": string;
     "stage": ContactStage;
     "primaryEmail": string | null;
     "primaryPhone": string | null;
@@ -3061,6 +3064,7 @@ export interface TeamMember {
     "userId": string;
     "agentId": string;
     "displayName": string;
+    "avatarUrl": string;
     "workStatus": WorkStatus;
     "joinedAt": string;
 }
@@ -3247,6 +3251,7 @@ export interface User {
     "identityId": string;
     "email": string;
     "displayName": string;
+    "avatarUrl": string;
     "role": RoleSummary;
     "status": UserStatus;
     "workStatus": WorkStatus;

@@ -64,6 +64,14 @@ func (o *directOperations) ListTeamMembers(ctx context.Context, meta RequestMeta
 	if err != nil {
 		return TeamMemberList{}, o.teamError(ctx, meta, err, cervii18n.ErrorTeamMemberListFailed, identity.Organization.ID, teamID)
 	}
+	avatarFileIDs := make([]*string, 0, len(output.Members))
+	for _, member := range output.Members {
+		avatarFileIDs = append(avatarFileIDs, member.AvatarFileID)
+	}
+	avatarURLs, err := o.optionalFileURLs(ctx, identity, avatarFileIDs...)
+	if err != nil {
+		return TeamMemberList{}, o.teamError(ctx, meta, err, cervii18n.ErrorTeamMemberListFailed, identity.Organization.ID, teamID)
+	}
 	members := make([]TeamMember, 0, len(output.Members))
 	for _, member := range output.Members {
 		// 真人成员只有 users.id，AI 员工只有 agents.id，另一端为空。
@@ -77,7 +85,7 @@ func (o *directOperations) ListTeamMembers(ctx context.Context, meta RequestMeta
 		members = append(members, TeamMember{
 			IdentityID: member.IdentityID, IdentityType: OrganizationIdentityType(member.IdentityType),
 			UserID: userID, AgentID: agentID,
-			DisplayName: member.DisplayName, WorkStatus: WorkStatus(member.WorkStatus), JoinedAt: member.JoinedAt,
+			DisplayName: member.DisplayName, AvatarURL: optionalFileURL(avatarURLs, member.AvatarFileID), WorkStatus: WorkStatus(member.WorkStatus), JoinedAt: member.JoinedAt,
 		})
 	}
 	return TeamMemberList{Members: members, Page: PageInfo{Number: output.Page.Number, Size: output.Page.Size, Total: output.Page.Total}}, nil

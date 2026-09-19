@@ -45,6 +45,7 @@ type PageInfo = common.PageInfo
 type ContactSummary struct {
 	ID                string              `bun:"id" json:"id"`
 	DisplayName       *string             `bun:"display_name" json:"displayName"`
+	AvatarFileID      *string             `bun:"avatar_file_id" json:"avatarFileId"`
 	Stage             domain.ContactStage `bun:"stage" json:"stage"`
 	PrimaryEmail      *string             `bun:"primary_email" json:"primaryEmail"`
 	PrimaryPhone      *string             `bun:"primary_phone" json:"primaryPhone"`
@@ -89,6 +90,7 @@ type SourceChannel struct {
 // ContactDetail 定义外部联系人完整详情。
 type ContactDetail struct {
 	Contact           ContactRecord     `json:"contact"`
+	AvatarFileID      *string           `json:"avatarFileId"`
 	SourceChannel     SourceChannel     `json:"sourceChannel"`
 	Methods           []ContactMethod   `json:"methods"`
 	ChannelIdentities []ChannelIdentity `json:"channelIdentities"`

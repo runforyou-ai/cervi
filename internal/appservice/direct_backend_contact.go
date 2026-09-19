@@ -49,10 +49,18 @@ func (o *directOperations) ListContacts(ctx context.Context, meta RequestMeta, i
 	if err != nil {
 		return ContactList{}, o.contactError(ctx, meta, err, cervii18n.ErrorContactListFailed)
 	}
+	avatarFileIDs := make([]*string, 0, len(output.Contacts))
+	for _, contact := range output.Contacts {
+		avatarFileIDs = append(avatarFileIDs, contact.AvatarFileID)
+	}
+	avatarURLs, err := o.optionalFileURLs(ctx, identity, avatarFileIDs...)
+	if err != nil {
+		return ContactList{}, o.contactError(ctx, meta, err, cervii18n.ErrorContactListFailed)
+	}
 	contacts := make([]ContactSummary, 0, len(output.Contacts))
 	for _, contact := range output.Contacts {
 		contacts = append(contacts, ContactSummary{
-			ID: contact.ID, DisplayName: contact.DisplayName, Stage: ContactStage(contact.Stage), PrimaryEmail: contact.PrimaryEmail,
+			ID: contact.ID, DisplayName: contact.DisplayName, AvatarURL: optionalFileURL(avatarURLs, contact.AvatarFileID), Stage: ContactStage(contact.Stage), PrimaryEmail: contact.PrimaryEmail,
 			PrimaryPhone: contact.PrimaryPhone, SourceChannelName: contact.SourceChannelName, CreatedAt: contact.CreatedAt, DeletedAt: contact.DeletedAt,
 		})
 	}
@@ -65,7 +73,7 @@ func (o *directOperations) GetContact(ctx context.Context, meta RequestMeta, ide
 	if err != nil {
 		return Contact{}, o.contactError(ctx, meta, err, cervii18n.ErrorContactReadFailed)
 	}
-	return contactFromAction(contact), nil
+	return o.contactWithAvatar(ctx, meta, identity, contact, cervii18n.ErrorContactReadFailed)
 }
 
 // CreateContact 创建联系人。
@@ -75,7 +83,7 @@ func (o *directOperations) CreateContact(ctx context.Context, meta RequestMeta, 
 		return Contact{}, o.contactMutationError(ctx, meta, err, cervii18n.ErrorContactCreateFailed)
 	}
 	slog.Info("联系人创建成功", "organization_id", identity.Organization.ID, "contact_id", contact.Contact.ID)
-	return contactFromAction(contact), nil
+	return o.contactWithAvatar(ctx, meta, identity, contact, cervii18n.ErrorContactCreateFailed)
 }
 
 // UpdateContact 修改联系人。
@@ -85,7 +93,7 @@ func (o *directOperations) UpdateContact(ctx context.Context, meta RequestMeta, 
 		return Contact{}, o.contactMutationError(ctx, meta, err, cervii18n.ErrorContactUpdateFailed)
 	}
 	slog.Info("联系人更新成功", "organization_id", identity.Organization.ID, "contact_id", contact.Contact.ID)
-	return contactFromAction(contact), nil
+	return o.contactWithAvatar(ctx, meta, identity, contact, cervii18n.ErrorContactUpdateFailed)
 }
 
 // DeleteContact 将联系人移入回收站。
@@ -104,7 +112,7 @@ func (o *directOperations) RestoreContact(ctx context.Context, meta RequestMeta,
 		return Contact{}, o.contactError(ctx, meta, err, cervii18n.ErrorContactRestoreFailed)
 	}
 	slog.Info("联系人恢复成功", "organization_id", identity.Organization.ID, "contact_id", contact.Contact.ID)
-	return contactFromAction(contact), nil
+	return o.contactWithAvatar(ctx, meta, identity, contact, cervii18n.ErrorContactRestoreFailed)
 }
 
 // contactMutationError 转换联系人写入校验和操作错误。
@@ -140,6 +148,17 @@ func contactInput(input ContactInput) contactaction.ContactInput {
 		methods = append(methods, contactaction.MethodInput{Type: domain.ContactMethodType(method.Type), Value: method.Value, Label: method.Label, IsPrimary: method.IsPrimary})
 	}
 	return contactaction.ContactInput{DisplayName: input.DisplayName, ChannelID: input.ChannelID, Stage: domain.ContactStage(input.Stage), Notes: input.Notes, Methods: methods}
+}
+
+// contactWithAvatar 解析联系人头像地址并转换详情契约。
+func (o *directOperations) contactWithAvatar(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, contact *contactaction.ContactDetail, failureKey cervii18n.Key) (Contact, error) {
+	avatarURLs, err := o.optionalFileURLs(ctx, identity, contact.AvatarFileID)
+	if err != nil {
+		return Contact{}, o.contactError(ctx, meta, err, failureKey)
+	}
+	output := contactFromAction(contact)
+	output.AvatarURL = optionalFileURL(avatarURLs, contact.AvatarFileID)
+	return output, nil
 }
 
 // contactFromAction 把联系人详情转换为应用契约。

@@ -29,6 +29,7 @@ type Member struct {
 	UserID       *string                         `bun:"user_id"`
 	AgentID      *string                         `bun:"agent_id"`
 	DisplayName  string                          `bun:"display_name"`
+	AvatarFileID *string                         `bun:"avatar_file_id"`
 	WorkStatus   domain.WorkStatus               `bun:"work_status"`
 	JoinedAt     time.Time                       `bun:"joined_at"`
 }
@@ -88,7 +89,7 @@ func (q *ListMembersQuery) Execute(ctx context.Context, identity *servermodels.I
 	}
 	members := make([]Member, 0)
 	if err := applyFilters(base()).
-		ColumnExpr("oi.id::text AS identity_id, oi.type AS identity_type, u.id::text AS user_id, a.id::text AS agent_id, oi.display_name, oi.work_status, tm.created_at AS joined_at").
+		ColumnExpr("oi.id::text AS identity_id, oi.type AS identity_type, u.id::text AS user_id, a.id::text AS agent_id, oi.display_name, oi.avatar_file_id::text AS avatar_file_id, oi.work_status, tm.created_at AS joined_at").
 		OrderExpr("lower(oi.display_name) ASC, oi.id ASC").
 		Limit(input.PageSize).
 		Offset((input.Page-1)*input.PageSize).
