@@ -76,7 +76,7 @@ export function AgentProfileForm({
     purpose: FilePurpose.FilePurposeAgentAvatar,
     onError: (error) => {
       console.warn("上传 AI 员工头像失败", { agent_id: agent.id, error })
-      if (!recoverSession(error, navigate)) toast.error(t("agents.form.avatarUploadError"))
+      if (!recoverSession(error, navigate)) toast.error(t("avatar.uploadError"))
     },
   })
   const { mounted, dirty } = useFormLifetime(
@@ -131,11 +131,11 @@ export function AgentProfileForm({
     <form className="space-y-9" onSubmit={form.handleSubmit(submit)} noValidate>
       <FieldGroup>
         <Field>
-          <FieldLabel>{t("agents.form.avatar")}</FieldLabel>
+          <FieldLabel>{t("avatar.label")}</FieldLabel>
           <ImagePicker
             imageURL={avatar.pending?.previewURL || agent.avatarUrl}
             fallback="agent"
-            label={t("agents.form.avatarChoose")}
+            label={t("avatar.choose")}
             disabled={form.formState.isSubmitting}
             loading={avatar.pending?.status === "uploading"}
             onSelect={avatar.select}

@@ -91,6 +91,11 @@ const contacts = {
     active: "正常",
     inactive: "禁用",
   },
+  avatar: {
+    label: "头像",
+    choose: "选择头像",
+    uploadError: "上传头像失败，请重试。",
+  },
   members: {
     create: "添加企业成员",
     createDescription: "创建可以登录当前企业的成员账号。",
@@ -135,9 +140,6 @@ const contacts = {
     create: "添加 AI 员工",
     form: {
       name: "AI 员工名称",
-      avatar: "头像",
-      avatarChoose: "选择头像",
-      avatarUploadError: "上传头像失败，请重试。",
       teams: "所属团队",
       noTeams: "还没有可选择的团队。",
       created: "AI 员工已添加",

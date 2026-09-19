@@ -173,7 +173,7 @@ func TestMemberProfileConversationInvalidation(t *testing.T) {
 	}
 }
 
-// TestAgentProfileConversationInvalidation 验证 AI 员工改名、换头像与 Copilot 创建人的资料变化推进 Agent 聊天、Copilot 线程及其所属客户会话的版本，只改工作状态或重复停用不推进。
+// TestAgentProfileConversationInvalidation 验证带头像创建的 AI 员工改名、换头像与 Copilot 创建人的资料变化推进 Agent 聊天、Copilot 线程及其所属客户会话的版本，只改工作状态或重复停用不推进。
 func TestAgentProfileConversationInvalidation(t *testing.T) {
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
@@ -192,12 +192,26 @@ func TestAgentProfileConversationInvalidation(t *testing.T) {
 	if _, err := f.db.NewInsert().Model(model).Column("provider_id", "organization_id", "identifier", "name", "model_type", "input_modalities", "context_window", "max_output_tokens").Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
+	// uploadAvatar 上传一张待关联的 AI 员工头像。
+	uploadAvatar := func() string {
+		file, err := fileaction.NewCreateUploadAction(f.db).Execute(ctx, f.owner, domain.FileStorageBackendLocal, fileaction.UploadInput{
+			Purpose: domain.FilePurposeAgentAvatar, FileName: "agent.png", ContentType: "image/png", ByteSize: 1024,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := fileaction.NewMarkUploadedAction(f.db).Execute(ctx, f.owner, file.ID, ""); err != nil {
+			t.Fatal(err)
+		}
+		return file.ID
+	}
+	createdAvatarID := uploadAvatar()
 	created, err := agentaction.NewCreateAgentAction(f.db).Execute(ctx, f.owner, agentaction.CreateInput{
-		DisplayName: "资料助手", RoleID: roleID,
+		DisplayName: "资料助手", RoleID: roleID, AvatarFileID: createdAvatarID,
 		Execution: agentaction.ExecutionInput{Mode: domain.AgentExecutionModeManaged, Managed: &agentaction.ManagedExecutionInput{ProviderID: provider.ID, ModelIdentifier: model.Identifier, SystemInstruction: "回答问题"}},
 	})
-	if err != nil {
-		t.Fatal(err)
+	if err != nil || created.AvatarFileID == nil || *created.AvatarFileID != createdAvatarID {
+		t.Fatalf("created=%+v err=%v", created, err)
 	}
 	tasks := servertask.New(f.db, serverconfig.NATSConfig{})
 	if err := tasks.Registry().RegisterJSON(agentrunaction.RunActionName, func(context.Context, agentrunaction.RunInput) error { return nil }); err != nil {
@@ -233,19 +247,6 @@ func TestAgentProfileConversationInvalidation(t *testing.T) {
 	rename := func(name string, workStatus domain.WorkStatus) error {
 		_, err := update.Execute(ctx, f.owner, created.ID, agentaction.UpdateInput{DisplayName: name, RoleID: roleID, WorkStatus: workStatus})
 		return err
-	}
-	// uploadAvatar 上传一张待关联的 AI 员工头像。
-	uploadAvatar := func() string {
-		file, err := fileaction.NewCreateUploadAction(f.db).Execute(ctx, f.owner, domain.FileStorageBackendLocal, fileaction.UploadInput{
-			Purpose: domain.FilePurposeAgentAvatar, FileName: "agent.png", ContentType: "image/png", ByteSize: 1024,
-		})
-		if err != nil {
-			t.Fatal(err)
-		}
-		if _, err := fileaction.NewMarkUploadedAction(f.db).Execute(ctx, f.owner, file.ID, ""); err != nil {
-			t.Fatal(err)
-		}
-		return file.ID
 	}
 	firstAvatarID, secondAvatarID := uploadAvatar(), uploadAvatar()
 	// changeAvatar 保持名称与工作状态，只提交头像。
@@ -327,7 +328,7 @@ func TestAgentProfileConversationInvalidation(t *testing.T) {
 	if err != nil || agent.AvatarFileID == nil || *agent.AvatarFileID != secondAvatarID {
 		t.Fatalf("agent=%+v err=%v", agent, err)
 	}
-	for fileID, want := range map[string]domain.FileStatus{firstAvatarID: domain.FileStatusDeleting, secondAvatarID: domain.FileStatusActive} {
+	for fileID, want := range map[string]domain.FileStatus{createdAvatarID: domain.FileStatusDeleting, firstAvatarID: domain.FileStatusDeleting, secondAvatarID: domain.FileStatusActive} {
 		var status string
 		if err := f.db.NewSelect().TableExpr("files").Column("status").Where("id = ?", fileID).Scan(ctx, &status); err != nil || status != string(want) {
 			t.Fatalf("file %s status=%q err=%v, want %s", fileID, status, err, want)

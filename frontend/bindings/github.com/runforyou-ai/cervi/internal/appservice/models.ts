@@ -1103,12 +1103,13 @@ export interface ConversationWindowInput {
 }
 
 /**
- * CreateAgentInput 定义新增 AI 员工字段。
+ * CreateAgentInput 定义新增 AI 员工字段，AvatarFileID 为空时不设置头像。
  */
 export interface CreateAgentInput {
     "displayName": string;
     "roleId": string;
     "teamIds": string[] | null;
+    "avatarFileId": string;
     "execution": AgentExecutionInput;
 }
 
@@ -1125,7 +1126,7 @@ export interface CreateMessageChannelInput {
 }
 
 /**
- * CreateUserInput 定义新增企业成员字段。
+ * CreateUserInput 定义新增企业成员字段，AvatarFileID 为空时不设置头像。
  */
 export interface CreateUserInput {
     "displayName": string;
@@ -1133,6 +1134,7 @@ export interface CreateUserInput {
     "password": string;
     "roleId": string;
     "teamIds": string[] | null;
+    "avatarFileId": string;
 }
 
 /**

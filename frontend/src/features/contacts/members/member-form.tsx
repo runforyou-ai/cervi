@@ -1,12 +1,13 @@
 /** 新建企业成员表单。 */
 import { useEffect, useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { Controller, useForm } from "react-hook-form"
+import { Controller, useForm, useWatch } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
+  FilePurpose,
   RoleKind,
   createUser,
   isApiError,
@@ -14,8 +15,10 @@ import {
   type Team,
 } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
+import { ImagePicker } from "@/components/image-picker"
 import { Button } from "@/components/ui/button"
-import { FieldGroup } from "@/components/ui/field"
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { usePendingImageUpload } from "@/hooks/use-pending-image-upload"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 import { RoleSelectField } from "@/features/contacts/role-select-field"
@@ -25,7 +28,7 @@ import {
   type MemberFormValues,
 } from "@/features/contacts/members/member-schema"
 
-/** 创建企业成员。 */
+/** 创建企业成员，可同时设置头像。 */
 export function MemberForm({
   teams,
   roles,
@@ -74,25 +77,40 @@ export function MemberForm({
       teamIds: defaultTeamIds,
     },
   })
+  const displayName = useWatch({ control: form.control, name: "displayName" })
+  const avatar = usePendingImageUpload({
+    purpose: FilePurpose.FilePurposeUserAvatar,
+    onError: (error) => {
+      console.warn("上传企业成员头像失败", error)
+      if (!recoverSession(error, navigate)) toast.error(t("avatar.uploadError"))
+    },
+  })
   useEffect(() => {
     if (!form.getValues("roleId") && defaultRoleID) {
       form.setValue("roleId", defaultRoleID)
     }
   }, [defaultRoleID, form])
 
-  /** 提交企业成员表单。 */
+  /** 上传待保存的头像后提交企业成员表单。 */
   async function submit(values: MemberFormValues) {
+    let uploadingAvatar = false
     try {
+      uploadingAvatar = Boolean(avatar.pending && !avatar.pending.fileID)
+      const avatarFileId = await avatar.ensureUploaded()
+      uploadingAvatar = false
       await createUser({
         displayName: values.displayName,
         email: values.email,
         password: values.password,
         roleId: values.roleId,
         teamIds: values.teamIds,
+        avatarFileId,
       })
       toast.success(t("members.form.created"))
       onSaved()
     } catch (error) {
+      // 上传失败已由共享上传回调提示，保存只处理资料提交错误。
+      if (uploadingAvatar) return
       if (recoverSession(error, navigate)) return
       console.warn("保存企业成员失败", error)
       toast.error(
@@ -116,6 +134,20 @@ export function MemberForm({
       noValidate
     >
       <FieldGroup className="gap-5">
+        <Field>
+          <FieldLabel>{t("avatar.label")}</FieldLabel>
+          <ImagePicker
+            imageURL={avatar.pending?.previewURL}
+            name={displayName}
+            fallback="person"
+            label={t("avatar.choose")}
+            className="rounded-full"
+            avatarClassName="rounded-full text-2xl"
+            disabled={form.formState.isSubmitting}
+            loading={avatar.pending?.status === "uploading"}
+            onSelect={avatar.select}
+          />
+        </Field>
         <FormInputField
           name="displayName"
           control={form.control}

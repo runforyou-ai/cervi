@@ -8,6 +8,7 @@ import (
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	"log/slog"
 
+	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	memberaction "github.com/runforyou-ai/cervi/internal/actions/member"
 	organizationaction "github.com/runforyou-ai/cervi/internal/actions/organization"
 	roleaction "github.com/runforyou-ai/cervi/internal/actions/role"
@@ -222,7 +223,7 @@ func (o *directOperations) GetUser(ctx context.Context, meta RequestMeta, identi
 
 // CreateUser 创建企业成员账号。
 func (o *directOperations) CreateUser(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input CreateUserInput) (User, error) {
-	user, err := o.createUser.Execute(ctx, identity, useraction.CreateInput{DisplayName: input.DisplayName, Email: input.Email, Password: input.Password, RoleID: input.RoleID, TeamIDs: input.TeamIDs})
+	user, err := o.createUser.Execute(ctx, identity, useraction.CreateInput{DisplayName: input.DisplayName, Email: input.Email, Password: input.Password, RoleID: input.RoleID, TeamIDs: input.TeamIDs, AvatarFileID: input.AvatarFileID})
 	if err != nil {
 		return User{}, o.userMutationError(ctx, meta, err, cervii18n.ErrorUserCreateFailed, identity.Organization.ID, "")
 	}
@@ -291,6 +292,9 @@ func (o *directOperations) userMutationError(ctx context.Context, meta RequestMe
 	}
 	if errors.Is(err, useraction.ErrNotFound) {
 		return NotFoundError(meta, cervii18n.ErrorUserNotFound)
+	}
+	if errors.Is(err, fileaction.ErrLinkedImageNotFound) {
+		return NotFoundError(meta, cervii18n.ErrorFileNotFound)
 	}
 	if errors.Is(err, useraction.ErrLastActiveAdministrator) {
 		return InvalidError(meta, cervii18n.ErrorUserLastActiveAdministrator, nil)

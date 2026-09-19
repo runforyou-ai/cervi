@@ -4,12 +4,15 @@ package integrationtest
 
 import (
 	"context"
+	"errors"
 	"testing"
 	"time"
 	"uuid"
 
 	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
+	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
+	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -58,6 +61,36 @@ func TestMemberAndContactAvatars(t *testing.T) {
 		t.Fatal(err)
 	}
 	assertContactAvatar(t, f.db, f.owner, existing.ContactID, newerAvatarID)
+}
+
+// TestCreateMemberWithAvatar 验证新增企业成员时激活并关联已上传的头像，不可用的头像拒绝创建。
+func TestCreateMemberWithAvatar(t *testing.T) {
+	f := newNavigationFixture(t)
+	ctx := context.Background()
+	avatar, err := fileaction.NewCreateUploadAction(f.db).Execute(ctx, f.owner, domain.FileStorageBackendLocal, fileaction.UploadInput{
+		Purpose: domain.FilePurposeUserAvatar, FileName: "member.png", ContentType: "image/png", ByteSize: 1024,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := fileaction.NewMarkUploadedAction(f.db).Execute(ctx, f.owner, avatar.ID, ""); err != nil {
+		t.Fatal(err)
+	}
+	create := useraction.NewCreateUserAction(f.db)
+	input := useraction.CreateInput{DisplayName: "带头像成员", Email: "avatar-member@navigation.test", Password: "password123", RoleID: f.owner.OrganizationIdentity.RoleID, AvatarFileID: avatar.ID}
+	created, err := create.Execute(ctx, f.owner, input)
+	if err != nil || created.AvatarFileID == nil || *created.AvatarFileID != avatar.ID {
+		t.Fatalf("created=%+v err=%v", created, err)
+	}
+	var status string
+	if err := f.db.NewSelect().TableExpr("files").Column("status").Where("id = ?", avatar.ID).Scan(ctx, &status); err != nil || status != string(domain.FileStatusActive) {
+		t.Fatalf("avatar status=%q err=%v", status, err)
+	}
+	// 已被关联的头像不能再用于新成员。
+	input.Email, input.DisplayName = "avatar-member-2@navigation.test", "第二个成员"
+	if _, err := create.Execute(ctx, f.owner, input); !errors.Is(err, fileaction.ErrLinkedImageNotFound) {
+		t.Fatalf("reuse avatar err=%v", err)
+	}
 }
 
 // assertContactAvatar 检查联系人列表与详情返回同一个头像。

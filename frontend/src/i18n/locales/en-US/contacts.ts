@@ -91,6 +91,11 @@ const contacts = {
     active: "Normal",
     inactive: "Disabled",
   },
+  avatar: {
+    label: "Profile image",
+    choose: "Choose profile image",
+    uploadError: "Could not upload the profile image. Try again.",
+  },
   members: {
     create: "Add company member",
     createDescription: "Create a member account that can sign in to this company.",
@@ -137,9 +142,6 @@ const contacts = {
     create: "Add AI employee",
     form: {
       name: "AI employee name",
-      avatar: "Profile image",
-      avatarChoose: "Choose profile image",
-      avatarUploadError: "Could not upload the profile image. Try again.",
       teams: "Teams",
       noTeams: "There are no teams to select.",
       created: "AI employee added",

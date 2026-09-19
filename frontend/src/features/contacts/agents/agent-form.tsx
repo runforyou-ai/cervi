@@ -8,6 +8,7 @@ import { toast } from "sonner"
 
 import {
   AgentExecutionMode,
+  FilePurpose,
   RoleKind,
   createAgent,
   isApiError,
@@ -16,6 +17,7 @@ import {
 } from "@/api"
 import { AgentBehaviorSummary } from "@/components/agent-behavior-summary"
 import { FormInputField } from "@/components/form/form-input-field"
+import { ImagePicker } from "@/components/image-picker"
 import { Button } from "@/components/ui/button"
 import {
   Field,
@@ -32,11 +34,12 @@ import {
 } from "@/features/contacts/agents/agent-schema"
 import { useContactInvalidator } from "@/features/contacts/use-contact-invalidator"
 import { useFormLifetime } from "@/hooks/use-form-lifetime"
+import { usePendingImageUpload } from "@/hooks/use-pending-image-upload"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 import { RoleSelectField } from "@/features/contacts/role-select-field"
 
-/** 创建 AI 员工。 */
+/** 创建 AI 员工，可同时设置头像。 */
 export function AgentForm({
   roles,
   defaultTeamIds = [],
@@ -87,20 +90,34 @@ export function AgentForm({
       },
     },
   })
-  const { mounted, dirty } = useFormLifetime(form.formState.isDirty)
+  const avatar = usePendingImageUpload({
+    purpose: FilePurpose.FilePurposeAgentAvatar,
+    onError: (error) => {
+      console.warn("上传 AI 员工头像失败", error)
+      if (!recoverSession(error, navigate)) toast.error(t("avatar.uploadError"))
+    },
+  })
+  const { mounted, dirty } = useFormLifetime(
+    form.formState.isDirty || avatar.pending !== null,
+  )
   const selectedRoleId = useWatch({ control: form.control, name: "roleId" })
   const selectedRole = assignableRoles.find((role) => role.id === selectedRoleId)
 
-  /** 提交 AI 员工表单。 */
+  /** 上传待保存的头像后提交 AI 员工表单。 */
   async function submit(values: AgentFormValues) {
+    let uploadingAvatar = false
     try {
       const model = parseAgentModelSelection(
         values.execution.managed.modelSelection,
       )
+      uploadingAvatar = Boolean(avatar.pending && !avatar.pending.fileID)
+      const avatarFileId = await avatar.ensureUploaded()
+      uploadingAvatar = false
       const created = await createAgent({
         displayName: values.displayName,
         roleId: values.roleId,
         teamIds: values.teamIds,
+        avatarFileId,
         execution: {
           mode: values.execution.mode,
           managed: {
@@ -115,8 +132,11 @@ export function AgentForm({
       toast.success(t("agents.form.created"))
       dirty.current = false
       form.reset(values)
+      avatar.clear()
       onSaved(created)
     } catch (error) {
+      // 上传失败已由共享上传回调提示，保存只处理资料提交错误。
+      if (uploadingAvatar) return
       if (!mounted.current || recoverSession(error, navigate)) return
       console.warn("创建 AI 员工失败", { error })
       toast.error(
@@ -143,6 +163,17 @@ export function AgentForm({
       noValidate
     >
       <FieldGroup>
+        <Field>
+          <FieldLabel>{t("avatar.label")}</FieldLabel>
+          <ImagePicker
+            imageURL={avatar.pending?.previewURL}
+            fallback="agent"
+            label={t("avatar.choose")}
+            disabled={form.formState.isSubmitting}
+            loading={avatar.pending?.status === "uploading"}
+            onSelect={avatar.select}
+          />
+        </Field>
         <FormInputField
           name="displayName"
           id="agent-create-name"

@@ -10,12 +10,13 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
-// CreateInput 定义新增 AI 员工字段。
+// CreateInput 定义新增 AI 员工字段，AvatarFileID 为空时不设置头像。
 type CreateInput struct {
-	DisplayName string
-	RoleID      string
-	TeamIDs     []string
-	Execution   ExecutionInput
+	DisplayName  string
+	RoleID       string
+	TeamIDs      []string
+	AvatarFileID string
+	Execution    ExecutionInput
 }
 
 // UpdateInput 定义 AI 员工可编辑字段，AvatarFileID 为空时保留当前头像。

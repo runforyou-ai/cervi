@@ -13,12 +13,13 @@ const (
 	AgentExecutionModeManaged AgentExecutionMode = AgentExecutionMode(domain.AgentExecutionModeManaged)
 )
 
-// CreateAgentInput 定义新增 AI 员工字段。
+// CreateAgentInput 定义新增 AI 员工字段，AvatarFileID 为空时不设置头像。
 type CreateAgentInput struct {
-	DisplayName string              `json:"displayName"`
-	RoleID      string              `json:"roleId"`
-	TeamIDs     []string            `json:"teamIds"`
-	Execution   AgentExecutionInput `json:"execution"`
+	DisplayName  string              `json:"displayName"`
+	RoleID       string              `json:"roleId"`
+	TeamIDs      []string            `json:"teamIds"`
+	AvatarFileID string              `json:"avatarFileId"`
+	Execution    AgentExecutionInput `json:"execution"`
 }
 
 // UpdateAgentInput 定义 AI 员工可编辑字段，AvatarFileID 为空时保留当前头像。

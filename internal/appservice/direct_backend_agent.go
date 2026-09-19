@@ -52,7 +52,7 @@ func newAgentOps(db *bun.DB, agentCoordinator *agentrunaction.ExecuteAction, cus
 // CreateAgent 创建企业 AI 员工。
 func (o *directOperations) CreateAgent(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input CreateAgentInput) (Agent, error) {
 	created, err := o.createAgent.Execute(ctx, identity, agentaction.CreateInput{
-		DisplayName: input.DisplayName, RoleID: input.RoleID, TeamIDs: input.TeamIDs,
+		DisplayName: input.DisplayName, RoleID: input.RoleID, TeamIDs: input.TeamIDs, AvatarFileID: input.AvatarFileID,
 		Execution: agentExecutionInput(input.Execution),
 	})
 	if err != nil {
