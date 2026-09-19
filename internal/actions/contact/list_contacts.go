@@ -38,6 +38,7 @@ func (q *ListContactsQuery) Execute(ctx context.Context, identity *servermodels.
 	query := applyContactFilters(q.db.NewSelect().TableExpr("contacts AS c"), identity.Organization.ID, input).
 		ColumnExpr("c.id::text AS id").
 		ColumnExpr("c.display_name").
+		ColumnExpr(contactAvatarFileIDColumn).
 		ColumnExpr("c.stage").
 		ColumnExpr("c.created_at").
 		ColumnExpr("c.deleted_at").

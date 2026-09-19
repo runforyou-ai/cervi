@@ -178,6 +178,7 @@ function MobileTeamMemberList({
                 >
                   <ProfileAvatar
                     name={member.displayName}
+                    imageURL={member.avatarUrl}
                     fallback={agent ? "agent" : "person"}
                   />
                   <span className="min-w-0 flex-1">

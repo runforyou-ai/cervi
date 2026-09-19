@@ -68,5 +68,15 @@ func loadContactDetail(ctx context.Context, db bun.IDB, organizationID, contactI
 		return nil, fmt.Errorf("list contact channel identities: %w", err)
 	}
 
-	return &ContactDetail{Contact: *contact, SourceChannel: sourceChannel, Methods: methods, ChannelIdentities: identities}, nil
+	var avatarFileID *string
+	if err := db.NewSelect().
+		TableExpr("contacts AS c").
+		ColumnExpr(contactAvatarFileIDColumn).
+		Where("c.organization_id = ?", organizationID).
+		Where("c.id = ?", contactID).
+		Scan(ctx, &avatarFileID); err != nil {
+		return nil, fmt.Errorf("read contact avatar: %w", err)
+	}
+
+	return &ContactDetail{Contact: *contact, AvatarFileID: avatarFileID, SourceChannel: sourceChannel, Methods: methods, ChannelIdentities: identities}, nil
 }

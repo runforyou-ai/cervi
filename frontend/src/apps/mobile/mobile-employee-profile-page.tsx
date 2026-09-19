@@ -73,6 +73,7 @@ export function MobileEmployeeProfilePage() {
               <div className="flex items-center gap-3 pb-6">
                 <ProfileAvatar
                   name={user.displayName}
+                  imageURL={user.avatarUrl}
                   className="size-14 text-xl"
                 />
                 <div className="min-w-0 space-y-2">

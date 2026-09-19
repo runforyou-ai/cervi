@@ -177,9 +177,21 @@ func (o *directOperations) ListUsers(ctx context.Context, meta RequestMeta, iden
 		slog.Warn("读取企业成员列表失败", "organization_id", identity.Organization.ID, "error", err)
 		return UserList{}, FailedError(meta, cervii18n.ErrorUserListFailed)
 	}
+	avatarFileIDs := make([]*string, 0, len(output.Users))
+	for _, user := range output.Users {
+		avatarFileIDs = append(avatarFileIDs, user.AvatarFileID)
+	}
+	avatarURLs, err := o.optionalFileURLs(ctx, identity, avatarFileIDs...)
+	if err != nil {
+		if ctx.Err() != nil {
+			return UserList{}, ctx.Err()
+		}
+		slog.Warn("读取企业成员头像失败", "organization_id", identity.Organization.ID, "error", err)
+		return UserList{}, FailedError(meta, cervii18n.ErrorUserListFailed)
+	}
 	users := make([]User, 0, len(output.Users))
 	for _, user := range output.Users {
-		users = append(users, userFromAction(user))
+		users = append(users, userFromAction(user, avatarURLs))
 	}
 	return UserList{Users: users, Page: PageInfo{Number: output.Page.Number, Size: output.Page.Size, Total: output.Page.Total}}, nil
 }
@@ -197,7 +209,15 @@ func (o *directOperations) GetUser(ctx context.Context, meta RequestMeta, identi
 		slog.Warn("读取企业成员失败", "organization_id", identity.Organization.ID, "user_id", userID, "error", err)
 		return User{}, FailedError(meta, cervii18n.ErrorUserReadFailed)
 	}
-	return userFromAction(*user), nil
+	output, err := o.userWithAvatar(ctx, identity, *user)
+	if err != nil {
+		if ctx.Err() != nil {
+			return User{}, ctx.Err()
+		}
+		slog.Warn("读取企业成员头像失败", "organization_id", identity.Organization.ID, "user_id", userID, "error", err)
+		return User{}, FailedError(meta, cervii18n.ErrorUserReadFailed)
+	}
+	return output, nil
 }
 
 // CreateUser 创建企业成员账号。
@@ -207,7 +227,7 @@ func (o *directOperations) CreateUser(ctx context.Context, meta RequestMeta, ide
 		return User{}, o.userMutationError(ctx, meta, err, cervii18n.ErrorUserCreateFailed, identity.Organization.ID, "")
 	}
 	slog.Info("企业成员创建成功", "organization_id", identity.Organization.ID, "identity_id", user.IdentityID, "user_id", user.ID, "role_id", user.RoleID)
-	return userFromAction(*user), nil
+	return o.userMutationResult(ctx, meta, identity, *user, cervii18n.ErrorUserCreateFailed)
 }
 
 // UpdateUser 修改企业成员资料、角色和所属团队。
@@ -217,7 +237,7 @@ func (o *directOperations) UpdateUser(ctx context.Context, meta RequestMeta, ide
 		return User{}, o.userMutationError(ctx, meta, err, cervii18n.ErrorUserUpdateFailed, identity.Organization.ID, userID)
 	}
 	slog.Info("企业成员更新成功", "organization_id", identity.Organization.ID, "identity_id", user.IdentityID, "user_id", userID, "role_id", user.RoleID)
-	return userFromAction(*user), nil
+	return o.userMutationResult(ctx, meta, identity, *user, cervii18n.ErrorUserUpdateFailed)
 }
 
 // DeactivateUser 禁用企业成员账号。
@@ -237,7 +257,7 @@ func (o *directOperations) changeUserStatus(ctx context.Context, meta RequestMet
 		return User{}, o.userMutationError(ctx, meta, err, cervii18n.ErrorUserStatusUpdateFailed, identity.Organization.ID, userID)
 	}
 	slog.Info("企业成员账号状态已修改", "organization_id", identity.Organization.ID, "identity_id", user.IdentityID, "user_id", userID, "status", status)
-	return userFromAction(*user), nil
+	return o.userMutationResult(ctx, meta, identity, *user, cervii18n.ErrorUserStatusUpdateFailed)
 }
 
 // currentUserError 转换当前用户资料、密码、偏好和工作状态操作错误。
@@ -283,13 +303,31 @@ func (o *directOperations) userMutationError(ctx context.Context, meta RequestMe
 	return FailedError(meta, failureKey)
 }
 
+// userMutationResult 补齐写入后企业成员的头像地址。
+func (o *directOperations) userMutationResult(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, user useraction.User, failureKey cervii18n.Key) (User, error) {
+	output, err := o.userWithAvatar(ctx, identity, user)
+	if err != nil {
+		return User{}, o.userMutationError(ctx, meta, err, failureKey, identity.Organization.ID, user.ID)
+	}
+	return output, nil
+}
+
+// userWithAvatar 解析单个企业成员的头像地址并转换契约。
+func (o *directOperations) userWithAvatar(ctx context.Context, identity *servermodels.Identity, user useraction.User) (User, error) {
+	avatarURLs, err := o.optionalFileURLs(ctx, identity, user.AvatarFileID)
+	if err != nil {
+		return User{}, err
+	}
+	return userFromAction(user, avatarURLs), nil
+}
+
 // userFromAction 转换企业成员契约。
-func userFromAction(user useraction.User) User {
+func userFromAction(user useraction.User, avatarURLs map[string]string) User {
 	teams := make([]TeamSummary, 0, len(user.Teams))
 	for _, team := range user.Teams {
 		teams = append(teams, TeamSummary{ID: team.ID, Name: team.Name})
 	}
-	return User{ID: user.ID, IdentityID: user.IdentityID, Email: user.Email, DisplayName: user.DisplayName, Role: RoleSummary{ID: user.RoleID, Kind: RoleKind(user.RoleKind), Name: user.RoleName}, Status: UserStatus(user.Status), WorkStatus: WorkStatus(user.WorkStatus), Teams: teams, CreatedAt: user.CreatedAt}
+	return User{ID: user.ID, IdentityID: user.IdentityID, Email: user.Email, DisplayName: user.DisplayName, AvatarURL: optionalFileURL(avatarURLs, user.AvatarFileID), Role: RoleSummary{ID: user.RoleID, Kind: RoleKind(user.RoleKind), Name: user.RoleName}, Status: UserStatus(user.Status), WorkStatus: WorkStatus(user.WorkStatus), Teams: teams, CreatedAt: user.CreatedAt}
 }
 
 // userFieldKeys 把企业成员校验错误码映射为本地化文案键。

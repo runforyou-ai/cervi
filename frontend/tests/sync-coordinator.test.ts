@@ -60,11 +60,14 @@ test("持续到达的通知按固定窗口分批失效，不被后续通知一�
   assert.equal(count(invalidated, ["conversation-summary", "c1"]), 3)
 })
 
+// 本人身份资料变化时失效身份与展示本人名称、头像的成员目录。
+const identityProfileKeys = [["identity"], ["users"], ["user"], ["team-members"]].map((key) => JSON.stringify(key))
+
 test("通知种类映射到对应资源", (t) => {
   const { coordinator, invalidated } = setup(t)
   coordinator.receive({ type: "identity_profile_changed", version: 4n })
   t.mock.timers.tick(300)
-  assert.deepEqual(invalidated, [JSON.stringify(["identity"])])
+  assert.deepEqual(invalidated, identityProfileKeys)
 
   invalidated.length = 0
   coordinator.receive({ type: "conversation_state_changed", conversationId: "c1", version: 2n })
@@ -121,7 +124,7 @@ test("探针值首次取得时重读，之后只重读不一致的部分", async
   invalidated.length = 0
   coordinator.receive({ type: "server_hello", connectionId: "conn", syncHeads: { ...heads, conversationChecksum: "12", identityProfileVersion: "4" } })
   t.mock.timers.tick(300)
-  assert.deepEqual(invalidated, [JSON.stringify(["identity"])])
+  assert.deepEqual(invalidated, identityProfileKeys)
 })
 
 test("连接问候与探针共用上次返回值，数量变化同样判为不一致", async (t) => {

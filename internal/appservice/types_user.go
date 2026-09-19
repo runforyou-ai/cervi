@@ -99,6 +99,7 @@ type User struct {
 	IdentityID  string        `json:"identityId"`
 	Email       string        `json:"email"`
 	DisplayName string        `json:"displayName"`
+	AvatarURL   string        `json:"avatarUrl"`
 	Role        RoleSummary   `json:"role"`
 	Status      UserStatus    `json:"status"`
 	WorkStatus  WorkStatus    `json:"workStatus"`

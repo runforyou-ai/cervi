@@ -413,6 +413,42 @@ func TestConversationAvatarURLs(t *testing.T) {
 	}
 }
 
+// TestDirectoryAvatarURLs 验证成员、AI 员工、团队成员和联系人响应补全本地头像地址并保留对象存储地址。
+func TestDirectoryAvatarURLs(t *testing.T) {
+	const serverURL = "https://company.example.com/cervi"
+	const avatarPath = "/storage/avatar.png"
+	const objectURL = "https://objects.example.com/avatar.png"
+	backend, err := newTestBackend(&memoryStore{serverURL: serverURL})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, sourceURL := range []string{avatarPath, objectURL, ""} {
+		t.Run(sourceURL, func(t *testing.T) {
+			want := sourceURL
+			if sourceURL == avatarPath {
+				want = serverURL + avatarPath
+			}
+			user := appservice.User{AvatarURL: sourceURL}
+			users := appservice.UserList{Users: []appservice.User{{AvatarURL: sourceURL}}}
+			agents := appservice.AgentList{Agents: []appservice.AgentListItem{{AvatarURL: sourceURL}}}
+			members := appservice.TeamMemberList{Members: []appservice.TeamMember{{AvatarURL: sourceURL}}}
+			contact := appservice.Contact{AvatarURL: sourceURL}
+			contacts := appservice.ContactList{Contacts: []appservice.ContactSummary{{AvatarURL: sourceURL}}}
+			for _, output := range []any{&user, &users, &agents, &members, &contact, &contacts} {
+				backend.normalizeOutput(output)
+			}
+			for name, got := range map[string]string{
+				"user": user.AvatarURL, "users": users.Users[0].AvatarURL, "agents": agents.Agents[0].AvatarURL,
+				"members": members.Members[0].AvatarURL, "contact": contact.AvatarURL, "contacts": contacts.Contacts[0].AvatarURL,
+			} {
+				if got != want {
+					t.Fatalf("%s avatar=%q, want=%q", name, got, want)
+				}
+			}
+		})
+	}
+}
+
 // TestFileRequestURLs 验证分片序号和下载文件名在补全企业地址后保持查询参数。
 func TestFileRequestURLs(t *testing.T) {
 	backend, err := newTestBackend(&memoryStore{serverURL: "https://company.example.com/cervi"})

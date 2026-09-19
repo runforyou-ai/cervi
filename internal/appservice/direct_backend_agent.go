@@ -119,6 +119,14 @@ func (o *directOperations) ListAgents(ctx context.Context, meta RequestMeta, ide
 	if err != nil {
 		return AgentList{}, o.agentError(ctx, meta, err, cervii18n.ErrorAgentListFailed, identity.Organization.ID, "", nil)
 	}
+	avatarFileIDs := make([]*string, 0, len(output.Agents))
+	for _, agent := range output.Agents {
+		avatarFileIDs = append(avatarFileIDs, agent.AvatarFileID)
+	}
+	avatarURLs, err := o.optionalFileURLs(ctx, identity, avatarFileIDs...)
+	if err != nil {
+		return AgentList{}, o.agentError(ctx, meta, err, cervii18n.ErrorAgentListFailed, identity.Organization.ID, "", nil)
+	}
 	agents := make([]AgentListItem, 0, len(output.Agents))
 	for _, agent := range output.Agents {
 		// 转换 AI 员工目录项契约。
@@ -135,7 +143,7 @@ func (o *directOperations) ListAgents(ctx context.Context, meta RequestMeta, ide
 			}
 		}
 		execution := AgentExecutionSummary{RevisionID: agent.Execution.RevisionID, Mode: AgentExecutionMode(agent.Execution.Mode), Managed: managed}
-		agents = append(agents, AgentListItem{ID: agent.ID, IdentityID: agent.IdentityID, DisplayName: agent.DisplayName, Role: RoleSummary{ID: agent.RoleID, Kind: RoleKind(agent.RoleKind), Name: agent.RoleName}, Status: UserStatus(agent.Status), WorkStatus: WorkStatus(agent.WorkStatus), Teams: teams, Execution: execution, CreatedAt: agent.CreatedAt})
+		agents = append(agents, AgentListItem{ID: agent.ID, IdentityID: agent.IdentityID, DisplayName: agent.DisplayName, AvatarURL: optionalFileURL(avatarURLs, agent.AvatarFileID), Role: RoleSummary{ID: agent.RoleID, Kind: RoleKind(agent.RoleKind), Name: agent.RoleName}, Status: UserStatus(agent.Status), WorkStatus: WorkStatus(agent.WorkStatus), Teams: teams, Execution: execution, CreatedAt: agent.CreatedAt})
 	}
 	return AgentList{Agents: agents, Page: PageInfo{Number: output.Page.Number, Size: output.Page.Size, Total: output.Page.Total}}, nil
 }

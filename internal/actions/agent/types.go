@@ -54,17 +54,18 @@ type Agent struct {
 
 // ListItem 定义 AI 员工目录项。
 type ListItem struct {
-	ID          string            `bun:"id"`
-	IdentityID  string            `bun:"identity_id"`
-	DisplayName string            `bun:"display_name"`
-	RoleID      string            `bun:"role_id"`
-	RoleKind    domain.RoleKind   `bun:"role_kind"`
-	RoleName    string            `bun:"role_name"`
-	Status      domain.UserStatus `bun:"status"`
-	WorkStatus  domain.WorkStatus `bun:"work_status"`
-	Teams       []TeamSummary
-	Execution   ExecutionSummary
-	CreatedAt   time.Time `bun:"created_at"`
+	ID           string            `bun:"id"`
+	IdentityID   string            `bun:"identity_id"`
+	DisplayName  string            `bun:"display_name"`
+	AvatarFileID *string           `bun:"avatar_file_id"`
+	RoleID       string            `bun:"role_id"`
+	RoleKind     domain.RoleKind   `bun:"role_kind"`
+	RoleName     string            `bun:"role_name"`
+	Status       domain.UserStatus `bun:"status"`
+	WorkStatus   domain.WorkStatus `bun:"work_status"`
+	Teams        []TeamSummary
+	Execution    ExecutionSummary
+	CreatedAt    time.Time `bun:"created_at"`
 }
 
 // ListOutput 定义 AI 员工分页结果。
