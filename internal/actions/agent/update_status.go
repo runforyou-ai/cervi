@@ -69,7 +69,7 @@ func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels
 		}
 		if status == domain.UserStatusInactive {
 			// 锁序为 AI 员工记录、企业身份、渠道、会话，与编辑 AI 员工一致；身份锁与以该身份为目标的渠道编辑、入站路由和转交串行。
-			if err := lockAgentIdentity(ctx, tx, identity.Organization.ID, updatedAgent.IdentityID, nil); err != nil {
+			if _, err := lockAgentIdentity(ctx, tx, identity.Organization.ID, updatedAgent.IdentityID); err != nil {
 				return err
 			}
 			if _, err := tx.NewUpdate().Model((*servermodels.OrganizationIdentity)(nil)).
@@ -106,19 +106,22 @@ func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels
 	return output, nil
 }
 
-// lockAgentIdentity 对 AI 员工身份取 FOR UPDATE，roleKind 非空时返回锁定时的角色类型。
-func lockAgentIdentity(ctx context.Context, db bun.IDB, organizationID, identityID string, roleKind *domain.RoleKind) error {
-	var kind domain.RoleKind
+// lockedAgentIdentity 表示锁定时 AI 员工身份的角色类型与头像。
+type lockedAgentIdentity struct {
+	RoleKind     domain.RoleKind `bun:"role_kind"`
+	AvatarFileID *string         `bun:"avatar_file_id"`
+}
+
+// lockAgentIdentity 对 AI 员工身份取 FOR UPDATE，并返回锁定时的角色类型与头像。
+func lockAgentIdentity(ctx context.Context, db bun.IDB, organizationID, identityID string) (lockedAgentIdentity, error) {
+	var locked lockedAgentIdentity
 	if err := db.NewSelect().TableExpr("organization_identities AS oi").
-		ColumnExpr("r.kind").
+		ColumnExpr("r.kind AS role_kind, oi.avatar_file_id::text AS avatar_file_id").
 		Join("JOIN roles AS r ON r.id = oi.role_id AND r.organization_id = oi.organization_id").
 		Where("oi.organization_id = ? AND oi.id = ? AND oi.type = ?", organizationID, identityID, domain.OrganizationIdentityTypeAgent).
 		For("UPDATE OF oi").
-		Scan(ctx, &kind); err != nil {
-		return fmt.Errorf("lock agent identity: %w", err)
+		Scan(ctx, &locked); err != nil {
+		return lockedAgentIdentity{}, fmt.Errorf("lock agent identity: %w", err)
 	}
-	if roleKind != nil {
-		*roleKind = kind
-	}
-	return nil
+	return locked, nil
 }

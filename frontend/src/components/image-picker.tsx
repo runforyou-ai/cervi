@@ -93,7 +93,8 @@ export function ImagePicker({
         className="sr-only"
         type="file"
         accept={imageFileAccept}
-        aria-label={label}
+        tabIndex={-1}
+        aria-hidden="true"
         onChange={selectBrowserImage}
       />
       <button

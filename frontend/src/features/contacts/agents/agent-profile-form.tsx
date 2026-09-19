@@ -36,7 +36,7 @@ import { usePendingImageUpload } from "@/hooks/use-pending-image-upload"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
-/** 单独保存 AI 员工名称、角色、工作状态和所属团队。 */
+/** 单独保存 AI 员工头像、名称、角色、工作状态和所属团队。 */
 export function AgentProfileForm({
   agent,
   roles,

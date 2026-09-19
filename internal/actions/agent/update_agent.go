@@ -82,24 +82,18 @@ func (a *UpdateAgentAction) Execute(ctx context.Context, identity *servermodels.
 			return &common.FieldError{Fields: map[string]common.FieldCode{"workStatus": ValidationWorkStatusUnavailable}}
 		}
 		// 先锁定身份，与以该身份为目标的入站路由和转交串行。
-		var previousKind domain.RoleKind
-		if err := lockAgentIdentity(ctx, tx, identity.Organization.ID, storedAgent.IdentityID, &previousKind); err != nil {
+		locked, err := lockAgentIdentity(ctx, tx, identity.Organization.ID, storedAgent.IdentityID)
+		if err != nil {
 			return err
 		}
 		// 传入新头像时激活该图片，替换下来的旧头像交给清理任务。
-		var previousAvatarFileID, nextAvatarFileID *string
+		var nextAvatarFileID *string
 		if input.AvatarFileID != "" {
-			if err := tx.NewSelect().TableExpr("organization_identities AS oi").
-				ColumnExpr("oi.avatar_file_id::text").
-				Where("oi.organization_id = ? AND oi.id = ?", identity.Organization.ID, storedAgent.IdentityID).
-				Scan(ctx, &previousAvatarFileID); err != nil {
-				return err
-			}
-			nextAvatarFileID, err = fileaction.ActivateLinkedImage(ctx, tx, identity.Organization.ID, domain.FilePurposeAgentAvatar, input.AvatarFileID, previousAvatarFileID)
+			nextAvatarFileID, err = fileaction.ActivateLinkedImage(ctx, tx, identity.Organization.ID, domain.FilePurposeAgentAvatar, input.AvatarFileID, locked.AvatarFileID)
 			if err != nil {
 				return err
 			}
-			if err := fileaction.RetireLinkedImage(ctx, tx, identity.Organization.ID, previousAvatarFileID, nextAvatarFileID); err != nil {
+			if err := fileaction.RetireLinkedImage(ctx, tx, identity.Organization.ID, locked.AvatarFileID, nextAvatarFileID); err != nil {
 				return err
 			}
 		}
@@ -122,7 +116,7 @@ func (a *UpdateAgentAction) Execute(ctx context.Context, identity *servermodels.
 		if err := teamaction.ReplaceIdentityTeams(ctx, tx, identity, storedAgent.IdentityID, teamIDs); err != nil {
 			return err
 		}
-		if previousKind == domain.RoleKindCustomerService && domain.RoleKind(role.Kind) != domain.RoleKindCustomerService {
+		if locked.RoleKind == domain.RoleKindCustomerService && domain.RoleKind(role.Kind) != domain.RoleKindCustomerService {
 			cancelledRunIDs, err = a.handoff.HandOffAgentServiceSessions(ctx, tx, identity.Organization.ID, storedAgent.IdentityID, uuid.NewV7().String())
 			if err != nil {
 				return err
