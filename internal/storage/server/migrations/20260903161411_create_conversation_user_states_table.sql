@@ -12,8 +12,15 @@ CREATE TABLE conversation_user_states (
     muted                             boolean NOT NULL DEFAULT false,
     last_reviewed_mention_message_id  uuid,
     marked_unread                     boolean NOT NULL DEFAULT false,
-    read_seq                          bigint NOT NULL DEFAULT 0
+    read_seq                          bigint NOT NULL DEFAULT 0,
+    pin_rank                          bigint,
+    version                           bigint NOT NULL DEFAULT 0
 );
+
+-- 约束延迟到提交时检查，顺序值间隔耗尽后可在同一事务内整区重编号。
+ALTER TABLE conversation_user_states
+    ADD CONSTRAINT conversation_user_states_user_pin_rank_unique
+    UNIQUE (organization_id, user_id, pin_rank) DEFERRABLE INITIALLY DEFERRED;
 
 CREATE UNIQUE INDEX conversation_user_states_org_conversation_user_unique
     ON conversation_user_states (organization_id, conversation_id, user_id);
@@ -34,6 +41,10 @@ COMMENT ON COLUMN conversation_user_states.muted IS '是否降低当前用户在
 COMMENT ON COLUMN conversation_user_states.last_reviewed_mention_message_id IS '已连续查看的提及或本轮入群基线消息编号';
 COMMENT ON COLUMN conversation_user_states.marked_unread IS '用户主动设置的独立未读标记';
 COMMENT ON COLUMN conversation_user_states.read_seq IS '用户已阅读的会话消息序号';
+COMMENT ON COLUMN conversation_user_states.pin_rank IS '个人置顶顺序值，按升序排列，未置顶时为空';
+COMMENT ON COLUMN conversation_user_states.version IS '用户会话个人状态版本，已读、提及确认、静音和手动未读实际变化时推进';
+COMMENT ON CONSTRAINT conversation_user_states_user_pin_rank_unique ON conversation_user_states
+    IS '企业用户置顶顺序值唯一约束';
 COMMENT ON INDEX conversation_user_states_org_conversation_user_unique
     IS '企业会话用户状态唯一索引';
 COMMENT ON INDEX conversation_user_states_organization_user_index

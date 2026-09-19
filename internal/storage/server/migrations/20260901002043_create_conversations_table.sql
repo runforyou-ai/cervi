@@ -14,7 +14,8 @@ CREATE TABLE conversations (
     description            text,
     image_file_id          uuid,
     last_message_seq       bigint NOT NULL DEFAULT 0,
-    last_activity_at       timestamptz
+    last_activity_at       timestamptz,
+    version                bigint NOT NULL DEFAULT 0
 );
 
 COMMENT ON TABLE conversations IS '聊天会话';
@@ -22,7 +23,7 @@ COMMENT ON COLUMN conversations.id IS '会话编号';
 COMMENT ON COLUMN conversations.created_at IS '创建时间';
 COMMENT ON COLUMN conversations.updated_at IS '更新时间';
 COMMENT ON COLUMN conversations.organization_id IS '所属企业编号';
-COMMENT ON COLUMN conversations.type IS '会话类型：direct、group、customer';
+COMMENT ON COLUMN conversations.type IS '会话类型：direct、group、agent、customer、copilot';
 COMMENT ON COLUMN conversations.status IS '会话生命周期状态：active、archived';
 COMMENT ON COLUMN conversations.title IS '会话标题';
 COMMENT ON COLUMN conversations.created_by_subject_id IS '创建聊天主体编号';
@@ -32,6 +33,7 @@ COMMENT ON COLUMN conversations.description IS '群聊描述';
 COMMENT ON COLUMN conversations.image_file_id IS '群聊图片文件编号';
 COMMENT ON COLUMN conversations.last_message_seq IS '会话已提交分配的最大消息序号，不随摘要重算回退';
 COMMENT ON COLUMN conversations.last_activity_at IS '会话最后消息追加活动时间';
+COMMENT ON COLUMN conversations.version IS '会话可见变化版本，在会话锁内单调推进';
 
 -- +goose Down
 DROP TABLE conversations;
