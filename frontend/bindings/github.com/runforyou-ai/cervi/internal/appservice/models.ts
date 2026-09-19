@@ -1842,7 +1842,7 @@ export enum InboxPartition {
 };
 
 /**
- * InboxQuery 定义与分页边界无关的会话筛选。
+ * InboxQuery 定义与分页边界无关的会话筛选；search 非空时按会话名称搜索，searchRange 为 list 时沿用列表筛选，为 readable 时覆盖全部可读会话且不带其他列表筛选。
  */
 export interface InboxQuery {
     "partition": InboxPartition;
@@ -1852,6 +1852,8 @@ export interface InboxQuery {
     "channelId": string;
     "serviceStatus": ServiceSessionStatus;
     "kinds": ConversationType[] | null;
+    "search": string;
+    "searchRange": InboxSearchRange;
 }
 
 /**
@@ -2404,7 +2406,7 @@ export interface KnowledgeWebDocumentInput {
 }
 
 /**
- * LoadInboxInput 定义统一收件箱筛选和分页边界。
+ * LoadInboxInput 定义统一收件箱筛选、会话名称搜索和分页边界。
  */
 export interface LoadInboxInput {
     "partition": InboxPartition;
@@ -2414,6 +2416,8 @@ export interface LoadInboxInput {
     "channelId": string;
     "serviceStatus": ServiceSessionStatus;
     "kinds": ConversationType[] | null;
+    "search": string;
+    "searchRange": InboxSearchRange;
     "cursor": string;
     "beforeCursor": string;
     "limit": number;

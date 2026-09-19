@@ -1362,6 +1362,8 @@ func encodeLoadInboxInputQuery(input appservice.LoadInboxInput) url.Values {
 	setQuery(query, "channelId", input.ChannelID)
 	setQuery(query, "serviceStatus", string(input.ServiceStatus))
 	setListQuery(query, "kinds", input.Kinds)
+	setQuery(query, "search", input.Search)
+	setQuery(query, "searchRange", string(input.SearchRange))
 	setQuery(query, "cursor", input.Cursor)
 	setQuery(query, "beforeCursor", input.BeforeCursor)
 	setPositiveQuery(query, "limit", input.Limit)

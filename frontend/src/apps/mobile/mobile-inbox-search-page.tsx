@@ -1,4 +1,4 @@
-/** 移动端收件箱检索：范围与类型切换、分组结果、最近打开和结果跳转。 */
+/** 移动端收件箱检索：范围与类型切换、分组结果、会话分页列表、最近打开和结果跳转。 */
 import { SearchIcon, XIcon } from "lucide-react"
 import { useRef, useState, type ReactNode } from "react"
 import { useTranslation } from "react-i18next"
@@ -25,6 +25,7 @@ import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ConversationAvatar } from "@/features/inbox/conversation-avatar"
 import { inboxQueryFromSearch } from "@/features/inbox/inbox-query"
+import { InboxSearchConversationList } from "@/features/inbox/inbox-search-conversation-list"
 import { highlightName, InboxSearchExcerpt } from "@/features/inbox/inbox-search-panel"
 import { useConversationName } from "@/features/inbox/use-conversation-name"
 import { useConversationTime } from "@/features/inbox/use-conversation-time"
@@ -37,9 +38,11 @@ import { useRecentConversations } from "@/features/inbox/use-recent-conversation
 import { optionalWailsEnum } from "@/lib/wails-enum"
 
 const searchTypes: InboxSearchType[] = ["all", "conversations", "messages", "people"]
+const searchGroupLimit = 6
 
-/** 触屏检索结果行，不可打开的结果保留显示并禁用。 */
+/** 触屏检索结果行，不可打开的结果保留显示并禁用；会话行携带 inboxId 供分页列表滚动补偿定位。 */
 function MobileSearchRow({
+  inboxId,
   avatar,
   title,
   detail,
@@ -47,6 +50,7 @@ function MobileSearchRow({
   disabled = false,
   onOpen,
 }: {
+  inboxId?: string
   avatar: ReactNode
   title: ReactNode
   detail?: ReactNode
@@ -55,7 +59,7 @@ function MobileSearchRow({
   onOpen: () => void
 }) {
   return (
-    <li>
+    <li data-inbox-id={inboxId}>
       <button
         type="button"
         disabled={disabled}
@@ -75,15 +79,58 @@ function MobileSearchRow({
   )
 }
 
-/** 检索结果分组，没有结果时不渲染。 */
-function MobileSearchGroup({ title, count, children }: { title: string; count: number; children: ReactNode }) {
+/** 检索结果分组，没有结果时不渲染；传入 onViewAll 且结果达到上限时显示查看全部入口。 */
+function MobileSearchGroup({
+  title,
+  count,
+  onViewAll,
+  children,
+}: {
+  title: string
+  count: number
+  onViewAll?: () => void
+  children: ReactNode
+}) {
+  const { t } = useTranslation("inbox")
   if (count === 0) return null
   return (
     <section>
       <h2 className="px-4 pt-4 pb-1 text-xs font-medium text-muted-foreground">{title}</h2>
       <ul>{children}</ul>
+      {onViewAll && count >= searchGroupLimit ? (
+        <Button type="button" variant="ghost" size="sm" className="ml-2 text-primary" onClick={onViewAll}>
+          {t("searchViewAll")}
+        </Button>
+      ) : null}
     </section>
   )
+}
+
+/** 会话结果行，名称按检索词高亮。 */
+function MobileConversationRows({
+  conversations,
+  highlight,
+  onOpen,
+}: {
+  conversations: InboxConversation[]
+  highlight: string
+  onOpen: (conversation: InboxConversation) => void
+}) {
+  const conversationName = useConversationName()
+  return conversations.map((conversation) => (
+    <MobileSearchRow
+      key={conversation.id}
+      inboxId={conversation.id}
+      avatar={<ConversationAvatar conversation={conversation} className="size-10" />}
+      title={highlightName(
+        isAgentInboxConversation(conversation)
+          ? `${conversation.agent.agentName} · ${conversation.agent.title}`
+          : conversationName(conversation),
+        highlight,
+      )}
+      onOpen={() => onOpen(conversation)}
+    />
+  ))
 }
 
 /** 按检索状态渲染最近打开、加载、失败、无结果或分组结果。 */
@@ -92,34 +139,22 @@ function MobileSearchResults({
   query,
   onOpenConversation,
   onOpenPerson,
+  onViewAllConversations,
 }: {
   search: ReturnType<typeof useInboxSearchResults>
   query: string
   onOpenConversation: (conversation: InboxConversation, messageId?: string) => void
   onOpenPerson: (person: InboxSearchPersonData) => void
+  onViewAllConversations: () => void
 }) {
   const { t } = useTranslation("inbox")
   const conversationName = useConversationName()
   const formatTime = useConversationTime()
-  const conversationRows = (conversations: InboxConversation[], highlight: string) =>
-    conversations.map((conversation) => (
-      <MobileSearchRow
-        key={conversation.id}
-        avatar={<ConversationAvatar conversation={conversation} className="size-10" />}
-        title={highlightName(
-          isAgentInboxConversation(conversation)
-            ? `${conversation.agent.agentName} · ${conversation.agent.title}`
-            : conversationName(conversation),
-          highlight,
-        )}
-        onOpen={() => onOpenConversation(conversation)}
-      />
-    ))
 
   if (search.showRecent) {
     return (
       <MobileSearchGroup title={t("searchRecent")} count={search.recentConversations.length}>
-        {conversationRows(search.recentConversations, "")}
+        <MobileConversationRows conversations={search.recentConversations} highlight="" onOpen={onOpenConversation} />
       </MobileSearchGroup>
     )
   }
@@ -133,8 +168,12 @@ function MobileSearchResults({
   }
   return (
     <>
-      <MobileSearchGroup title={t("searchGroupConversations")} count={search.conversations.length}>
-        {conversationRows(search.conversations, query)}
+      <MobileSearchGroup
+        title={t("searchGroupConversations")}
+        count={search.conversations.length}
+        onViewAll={onViewAllConversations}
+      >
+        <MobileConversationRows conversations={search.conversations} highlight={query} onOpen={onOpenConversation} />
       </MobileSearchGroup>
       <MobileSearchGroup title={t("searchGroupMessages")} count={search.messages.length}>
         {search.messages.map((message) => (
@@ -338,14 +377,25 @@ export function MobileInboxSearchPage() {
           </div>
         ))}
       </div>
-      <MobileScrollArea storageKey={`inbox-search:${params.toString()}`} ready={!search.pending}>
-        <MobileSearchResults
-          search={search}
-          query={query}
-          onOpenConversation={openConversation}
-          onOpenPerson={openPerson}
-        />
-      </MobileScrollArea>
+      {search.paged && !search.pending ? (
+        <InboxSearchConversationList identity={identity} query={search.nameQuery} mobile>
+          {(conversations) => (
+            <ul>
+              <MobileConversationRows conversations={conversations} highlight={query} onOpen={openConversation} />
+            </ul>
+          )}
+        </InboxSearchConversationList>
+      ) : (
+        <MobileScrollArea storageKey={`inbox-search:${params.toString()}`} ready={!search.pending}>
+          <MobileSearchResults
+            search={search}
+            query={query}
+            onOpenConversation={openConversation}
+            onOpenPerson={openPerson}
+            onViewAllConversations={() => updateParams({ type: "conversations" })}
+          />
+        </MobileScrollArea>
+      )}
     </section>
   )
 }

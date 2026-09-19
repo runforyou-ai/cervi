@@ -16,11 +16,12 @@ import (
 	"github.com/runforyou-ai/cervi/internal/storage/server/messagequery"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
+	"golang.org/x/text/unicode/norm"
 )
 
 const defaultInboxPageSize = 50
 
-// LoadInput 定义统一收件箱筛选、页大小和分页边界。
+// LoadInput 定义统一收件箱筛选、会话名称搜索、页大小和分页边界；Search 规范化后为空表示不搜索，SearchRange 只在搜索时生效。
 type LoadInput struct {
 	Cursor             string
 	BeforeCursor       string
@@ -32,6 +33,8 @@ type LoadInput struct {
 	ChannelID          string
 	ServiceStatus      domain.ServiceSessionStatus
 	Kinds              []domain.ConversationType
+	Search             string
+	SearchRange        SearchRange
 }
 
 // includesKind 判断会话类型是否属于当前筛选，未选类型表示不限类型。
@@ -667,6 +670,19 @@ func normalizeLoadInput(input LoadInput) (LoadInput, error) {
 		return input, err
 	}
 	input.Kinds = kinds
+	// 搜索词按 NFKC 规范化并合并连续空白；搜索只读取完整活动序，可读范围不附加其他列表筛选。
+	input.Search = strings.Join(strings.Fields(norm.NFKC.String(input.Search)), " ")
+	if input.Search == "" {
+		input.SearchRange = ""
+	} else {
+		if input.SearchRange == "" {
+			input.SearchRange = SearchRangeList
+		}
+		if input.Partition != domain.InboxPartitionAll || (input.SearchRange != SearchRangeList && input.SearchRange != SearchRangeReadable) ||
+			(input.SearchRange == SearchRangeReadable && (input.Scope != domain.InboxScopeAll || len(input.Kinds) > 0)) {
+			return input, ErrQueryInvalid
+		}
+	}
 	if input.Scope != domain.InboxScopeCustomer {
 		// 处理归属、渠道和服务状态只描述客户队列，其他范围一律按空条件读取。
 		input.CustomerView, input.AssigneeIdentityID, input.ChannelID, input.ServiceStatus = "", "", "", ""

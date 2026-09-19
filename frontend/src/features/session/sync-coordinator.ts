@@ -25,13 +25,14 @@ const defaultTiming: SyncCoordinatorTiming = {
   probeIntervalMs: 30_000,
 }
 
-/** 返回收件箱列表、列表行、提醒总数与最近会话摘要的失效前缀。 */
+/** 返回收件箱列表、列表行、提醒总数、最近会话摘要与搜索结果的失效前缀。 */
 function inboxKeys(): ResourceKey[] {
   return [
     resourceKeys.inbox(),
     resourceKeys.inboxConversations(),
     resourceKeys.inboxAttention(),
     resourceKeys.recentConversations(),
+    resourceKeys.inboxSearch(),
   ]
 }
 
@@ -117,7 +118,6 @@ export class SyncCoordinator {
           ...inboxKeys(),
           resourceKeys.conversationSummary(frame.conversationId),
           resourceKeys.groupConversation(frame.conversationId),
-          resourceKeys.inboxSearch(),
         ])
         return
       case "identity_profile_changed":
@@ -171,7 +171,7 @@ export class SyncCoordinator {
       previous.conversationCount !== heads.conversationCount ||
       previous.conversationChecksum !== heads.conversationChecksum
     ) {
-      this.enqueue([...conversationKeys(), resourceKeys.inboxSearch()])
+      this.enqueue(conversationKeys())
     }
     if (!previous || previous.identityProfileVersion !== heads.identityProfileVersion) {
       this.enqueue([resourceKeys.identity()])

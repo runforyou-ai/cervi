@@ -4,6 +4,7 @@ import {
   CustomerInboxView,
   InboxPartition,
   InboxScope,
+  InboxSearchRange,
   ServiceSessionStatus,
   type InboxQuery,
 } from "@/api"
@@ -58,8 +59,12 @@ export function toggleInboxKinds(
 /** 已按范围规范化的列表筛选，会话类型一律为数组。 */
 export type NormalizedInboxQuery = InboxQuery & { kinds: ConversationType[] }
 
-/** 规范化前的列表筛选，未指定分区时按完整活动序读取。 */
-export type InboxQueryInput = Omit<InboxQuery, "partition"> & { partition?: InboxPartition }
+/** 规范化前的列表筛选，未指定分区时按完整活动序读取，未指定搜索词时不按名称搜索。 */
+export type InboxQueryInput = Omit<InboxQuery, "partition" | "search" | "searchRange"> & {
+  partition?: InboxPartition
+  search?: string
+  searchRange?: InboxSearchRange
+}
 
 /** 按当前范围规范化筛选，范围外条件取默认值。 */
 export function normalizeInboxQuery(query: InboxQueryInput): NormalizedInboxQuery {
@@ -83,6 +88,8 @@ export function normalizeInboxQuery(query: InboxQueryInput): NormalizedInboxQuer
         ? ServiceSessionStatus.ServiceSessionStatusClosed
         : ServiceSessionStatus.ServiceSessionStatusOpen,
     kinds: normalizeInboxKinds(query.scope, query.kinds ?? []),
+    search: query.search ?? "",
+    searchRange: query.searchRange ?? InboxSearchRange.InboxSearchRangeList,
   }
 }
 

@@ -303,6 +303,8 @@ export async function loadInbox(
     channelId: query.channelId ?? "",
     serviceStatus: query.serviceStatus ?? ServiceSessionStatus.ServiceSessionStatusOpen,
     kinds: query.kinds ?? [],
+    search: query.search ?? "",
+    searchRange: query.searchRange ?? InboxSearchRange.InboxSearchRangeList,
     cursor: query.cursor ?? "",
     beforeCursor: query.beforeCursor ?? "",
     limit: query.limit ?? 50,

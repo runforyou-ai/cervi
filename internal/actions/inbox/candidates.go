@@ -3,6 +3,8 @@
 package inbox
 
 import (
+	"strings"
+
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -67,8 +69,11 @@ func (q *LoadInboxQuery) agentConversationsQuery(organizationID, identityID stri
 	return q.agentConversationAccessQuery(organizationID, identityID).Where("cv.status = ?", domain.ConversationStatusActive)
 }
 
-// listCandidates 共用列表分页与按 ID 资格判断的最小候选投影。
+// listCandidates 共用列表分页与按 ID 资格判断的最小候选投影；带搜索词时按范围取候选后再匹配会话名称。
 func (q *LoadInboxQuery) listCandidates(identity *servermodels.Identity, input LoadInput) *bun.SelectQuery {
+	if input.SearchRange == SearchRangeReadable {
+		return q.matchConversationNames(identity, q.readableCandidates(identity), input.Search)
+	}
 	organizationID, identityID := identity.Organization.ID, identity.OrganizationIdentity.ID
 	queries := make([]*bun.SelectQuery, 0, 4)
 	if input.Scope != domain.InboxScopeInternal && input.includesKind(domain.ConversationTypeCustomer) {
@@ -89,5 +94,28 @@ func (q *LoadInboxQuery) listCandidates(identity *servermodels.Identity, input L
 	for _, query := range queries[1:] {
 		candidate = candidate.UnionAll(query)
 	}
+	if input.Search != "" {
+		return q.matchConversationNames(identity, candidate, input.Search)
+	}
 	return candidate
+}
+
+// matchConversationNames 按列表展示的会话名称筛选候选，搜索词中的通配符按字面匹配，返回与候选相同的最小投影。
+func (q *LoadInboxQuery) matchConversationNames(identity *servermodels.Identity, candidates *bun.SelectQuery, search string) *bun.SelectQuery {
+	pattern := "%" + strings.NewReplacer(`\`, `\\`, "%", `\%`, "_", `\_`).Replace(search) + "%"
+	return q.db.NewSelect().TableExpr("(?) AS candidates", candidates).
+		ColumnExpr("candidates.id, candidates.last_activity_at").
+		Join("JOIN conversations AS cv ON cv.organization_id = ? AND cv.id = candidates.id", identity.Organization.ID).
+		Join("LEFT JOIN direct_conversations AS dc ON dc.organization_id = cv.organization_id AND dc.conversation_id = cv.id").
+		Join("LEFT JOIN organization_identities AS peer_oi ON peer_oi.organization_id = dc.organization_id AND peer_oi.id = CASE WHEN dc.first_identity_id = ? THEN dc.second_identity_id ELSE dc.first_identity_id END", identity.OrganizationIdentity.ID).
+		Join("LEFT JOIN agent_conversations AS ac ON ac.organization_id = cv.organization_id AND ac.conversation_id = cv.id").
+		Join("LEFT JOIN organization_identities AS agent_oi ON agent_oi.organization_id = ac.organization_id AND agent_oi.id = ac.agent_identity_id").
+		Join("LEFT JOIN customer_conversations AS cc ON cc.organization_id = cv.organization_id AND cc.conversation_id = cv.id").
+		Join("LEFT JOIN contact_channel_identities AS cci ON cci.organization_id = cc.organization_id AND cci.id = cc.contact_channel_identity_id").
+		Join("LEFT JOIN contacts AS c ON c.organization_id = cci.organization_id AND c.id = cci.contact_id").
+		Where(`(cv.type = ? AND cv.title ILIKE ?) OR (cv.type = ? AND peer_oi.display_name ILIKE ?)
+			OR (cv.type = ? AND (cv.title ILIKE ? OR agent_oi.display_name ILIKE ?))
+			OR (cv.type = ? AND COALESCE(cci.display_name, c.display_name) ILIKE ?)`,
+			domain.ConversationTypeGroup, pattern, domain.ConversationTypeDirect, pattern,
+			domain.ConversationTypeAgent, pattern, pattern, domain.ConversationTypeCustomer, pattern)
 }
