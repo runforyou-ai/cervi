@@ -12,7 +12,9 @@ CREATE TABLE users (
     locale                  text NOT NULL DEFAULT 'zh-CN',
     time_zone               text NOT NULL DEFAULT 'Asia/Shanghai',
     message_notifications_enabled boolean NOT NULL DEFAULT true,
-    workspace_tabs_enabled  boolean NOT NULL DEFAULT false
+    workspace_tabs_enabled  boolean NOT NULL DEFAULT false,
+    profile_version         bigint NOT NULL DEFAULT 0,
+    pin_order_version       bigint NOT NULL DEFAULT 0
 );
 
 CREATE UNIQUE INDEX users_organization_email_unique
@@ -34,6 +36,8 @@ COMMENT ON COLUMN users.locale IS '界面语言';
 COMMENT ON COLUMN users.time_zone IS '日期时间显示时区';
 COMMENT ON COLUMN users.message_notifications_enabled IS '是否启用新消息提醒';
 COMMENT ON COLUMN users.workspace_tabs_enabled IS '是否启用工作台多标签页';
+COMMENT ON COLUMN users.profile_version IS '用户身份资料与账户偏好版本，登录态可见字段实际变化时推进';
+COMMENT ON COLUMN users.pin_order_version IS '个人置顶顺序版本，置顶、取消置顶与调整顺序时推进';
 
 -- +goose Down
 DROP TABLE users;

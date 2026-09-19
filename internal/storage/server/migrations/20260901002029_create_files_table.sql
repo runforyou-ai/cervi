@@ -6,6 +6,7 @@ CREATE TABLE files (
     updated_at          timestamptz NOT NULL DEFAULT now(),
     organization_id     uuid NOT NULL,
     created_by_user_id  uuid NOT NULL,
+    uploader_channel_identity_id uuid,
     purpose             text NOT NULL,
     external_id         text,
     storage_backend     text NOT NULL,
@@ -30,6 +31,7 @@ COMMENT ON COLUMN files.created_at IS '创建时间';
 COMMENT ON COLUMN files.updated_at IS '更新时间';
 COMMENT ON COLUMN files.organization_id IS '所属企业编号';
 COMMENT ON COLUMN files.created_by_user_id IS '上传用户编号';
+COMMENT ON COLUMN files.uploader_channel_identity_id IS '上传该文件的渠道访客身份编号，成员上传为空';
 COMMENT ON COLUMN files.purpose IS '文件用途：user_avatar 用户头像、contact_avatar 联系人头像、group_image 群图片、message_attachment 消息附件';
 COMMENT ON COLUMN files.external_id IS '外部来源的文件唯一标识';
 COMMENT ON COLUMN files.storage_backend IS '本地或对象存储类型';

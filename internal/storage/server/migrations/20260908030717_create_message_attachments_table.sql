@@ -8,8 +8,7 @@ CREATE TABLE message_attachments (
     byte_size bigint NOT NULL,
     image_width integer NOT NULL DEFAULT 0,
     image_height integer NOT NULL DEFAULT 0,
-    upload_status text NOT NULL,
-    upload_expires_at timestamptz
+    transfer_status text NOT NULL
 );
 COMMENT ON TABLE message_attachments IS '附件消息关联的文件';
 COMMENT ON COLUMN message_attachments.message_id IS '消息编号';
@@ -20,8 +19,7 @@ COMMENT ON COLUMN message_attachments.content_type IS '内容类型';
 COMMENT ON COLUMN message_attachments.byte_size IS '文件字节数';
 COMMENT ON COLUMN message_attachments.image_width IS '图片宽度，非图片为 0';
 COMMENT ON COLUMN message_attachments.image_height IS '图片高度，非图片为 0';
-COMMENT ON COLUMN message_attachments.upload_status IS '上传状态：uploading、ready、failed、cancelled';
-COMMENT ON COLUMN message_attachments.upload_expires_at IS '上传活跃期限';
+COMMENT ON COLUMN message_attachments.transfer_status IS '附件内容取回状态：ready 已就绪、pending 取回中、failed 取回失败';
 COMMENT ON INDEX message_attachments_file_id_key IS '一个上传文件仅关联一条消息';
 
 -- +goose Down

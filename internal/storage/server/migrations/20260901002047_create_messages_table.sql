@@ -21,8 +21,12 @@ CREATE TABLE messages (
     system_event_payload   jsonb,
     mention_all            boolean NOT NULL DEFAULT false,
     message_seq            bigint NOT NULL,
-    client_message_id      uuid
+    client_message_id      uuid,
+    visibility             text NOT NULL DEFAULT 'customer_visible',
+    search_vector          tsvector NOT NULL DEFAULT ''::tsvector
 );
+
+ALTER TABLE messages ALTER COLUMN search_vector SET STATISTICS 3000;
 
 CREATE UNIQUE INDEX messages_organization_idempotency_unique
     ON messages (organization_id, idempotency_key)
@@ -30,6 +34,9 @@ CREATE UNIQUE INDEX messages_organization_idempotency_unique
 
 CREATE UNIQUE INDEX messages_message_seq_unique
     ON messages (organization_id, conversation_id, message_seq);
+
+CREATE INDEX messages_search_vector ON messages USING gin (search_vector);
+CREATE INDEX messages_organization_originated ON messages (organization_id, originated_at, id);
 
 COMMENT ON TABLE messages IS '会话消息';
 COMMENT ON COLUMN messages.id IS '消息编号';
@@ -53,6 +60,8 @@ COMMENT ON COLUMN messages.system_event_payload IS '系统事件的类型化审�
 COMMENT ON COLUMN messages.mention_all IS '是否提醒群聊中的所有成员';
 COMMENT ON COLUMN messages.message_seq IS '会话内的消息写入顺序';
 COMMENT ON COLUMN messages.client_message_id IS '发送方客户端消息编号';
+COMMENT ON COLUMN messages.visibility IS '消息可见范围：customer_visible 对客户可见，internal_only 仅企业成员可见';
+COMMENT ON COLUMN messages.search_vector IS '消息检索词元：正文与附件文件名的单字、字母数字片段和汉字全拼读音';
 COMMENT ON INDEX messages_organization_idempotency_unique
     IS '企业消息幂等标识唯一索引';
 COMMENT ON INDEX messages_message_seq_unique IS '会话内消息序号唯一约束';

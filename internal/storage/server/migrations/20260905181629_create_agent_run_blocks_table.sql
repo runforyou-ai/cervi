@@ -12,7 +12,7 @@ CREATE TABLE agent_run_blocks (
 CREATE UNIQUE INDEX agent_run_blocks_run_position_unique
     ON agent_run_blocks (agent_run_id, position);
 
-COMMENT ON TABLE agent_run_blocks IS '成功 Agent 运行的有序中间内容';
+COMMENT ON TABLE agent_run_blocks IS '已完成 Agent 运行的有序中间内容';
 COMMENT ON COLUMN agent_run_blocks.id IS '运行时生成的内容块编号';
 COMMENT ON COLUMN agent_run_blocks.organization_id IS '所属企业编号';
 COMMENT ON COLUMN agent_run_blocks.agent_run_id IS '所属 Agent 运行编号';
