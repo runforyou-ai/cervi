@@ -175,6 +175,18 @@ export function useInboxSearch({
     setActiveIndex(0)
   }, [searchedText, range, showRecent])
 
+  /** 修改检索词；处于会话分页时回到分组结果。 */
+  const changeText = useCallback(
+    (value: string) => {
+      setText(value)
+      if (type === "conversations") {
+        typeIndexes.current.clear()
+        setType("all")
+      }
+    },
+    [type],
+  )
+
   /** 切换结果类型，回到查看过的类型时恢复其原选中项。 */
   const selectType = useCallback(
     (next: InboxSearchType) => {
@@ -262,7 +274,7 @@ export function useInboxSearch({
     inputRef,
     active,
     text,
-    setText,
+    setText: changeText,
     range,
     setRange,
     listRange,

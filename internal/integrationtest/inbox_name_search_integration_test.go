@@ -184,6 +184,16 @@ func TestInboxNameSearchRules(t *testing.T) {
 	if ids := load(f.owner, readable("_")); !slices.Equal(ids, []string{underscore.ID}) {
 		t.Fatalf("_ 应按字面匹配：%v", ids)
 	}
+	// 名称与搜索词采用同一规范化规则，全角字符与连续空白的完整名称可以直接搜索。
+	fullWidth, err := createGroup.Execute(ctx, f.owner, conversationaction.GroupConversationInput{Title: "PR378 ＡＢＣ　 复核", MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID}})
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, text := range []string{"PR378 ＡＢＣ　 复核", "abc 复核"} {
+		if ids := load(f.owner, readable(text)); !slices.Equal(ids, []string{fullWidth.ID}) {
+			t.Fatalf("搜索 %q 应命中全角名称：%v", text, ids)
+		}
+	}
 	if ids := load(f.owner, readable("   ")); len(ids) <= 2 {
 		t.Fatalf("空白搜索词应按未搜索读取完整列表：%v", ids)
 	}

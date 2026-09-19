@@ -3,27 +3,31 @@ import { useEffect, type ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 
 import type { Identity, InboxConversation, InboxQuery } from "@/api"
+import { Button } from "@/components/ui/button"
+import type { InboxListBookmark } from "./inbox-list-controller"
 import { InboxListPanel } from "./inbox-list-panel"
 import { useInboxList } from "./use-inbox-list"
 import { useInboxListViewport } from "./use-inbox-list-viewport"
 
-/** 按名称搜索查询分页展示全部命中会话，行元素需带 data-inbox-id 供滚动补偿定位。 */
+/** 按名称搜索查询分页展示全部命中会话，行元素需带 data-inbox-id 供滚动补偿定位；传入 history 时离开后恢复已加载窗口与滚动锚点。 */
 export function InboxSearchConversationList({
   identity,
   query,
+  history,
   mobile = false,
   onConversationsChange,
   children,
 }: {
   identity: Identity
   query: InboxQuery
+  history?: Map<string, InboxListBookmark>
   mobile?: boolean
   onConversationsChange?: (conversations: InboxConversation[]) => void
   children: (conversations: InboxConversation[]) => ReactNode
 }) {
-  const { t } = useTranslation("inbox")
+  const { t } = useTranslation(["inbox", "common"])
   const viewport = useInboxListViewport()
-  const list = useInboxList(query, viewport, { identity, active: true })
+  const list = useInboxList(query, viewport, { identity, active: true, history })
   const { conversations } = list
   const ids = conversations.map((conversation) => conversation.id).join(",")
 
@@ -36,7 +40,15 @@ export function InboxSearchConversationList({
   const empty = list.revision > 0 && !list.error && !list.ids.length && !list.hasBefore && !list.hasAfter
   return (
     <InboxListPanel list={list} viewport={viewport} mobile={mobile}>
-      {empty ? (
+      {mobile && list.revision === 0 && list.error ? (
+        // 移动端列表面板不展示首次读取失败，由此处提供重试。
+        <div className="flex flex-col items-center gap-3 px-6 py-10 text-sm text-muted-foreground">
+          <p>{t("searchError")}</p>
+          <Button type="button" variant="outline" size="sm" onClick={() => void list.retry()}>
+            {t("common:actions.retry")}
+          </Button>
+        </div>
+      ) : empty ? (
         <p className="px-6 py-10 text-center text-[13px] text-muted-foreground">{t("searchNoResults", { query: query.search })}</p>
       ) : (
         children(conversations)

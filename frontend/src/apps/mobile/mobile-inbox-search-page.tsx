@@ -224,7 +224,7 @@ export function MobileInboxSearchPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const [params, setParams] = useSearchParams()
-  const { inboxURL } = useMobileNavigation()
+  const { inboxURL, inboxWindows } = useMobileNavigation()
   const { identity } = useMobileWorkspace()
   const back = useMobileBack(inboxURL)
   const { ids: recentConversationIds } = useRecentConversations(identity.user.identityId)
@@ -313,7 +313,8 @@ export function MobileInboxSearchPage() {
             className="h-9 pr-9 pl-9 md:text-base [&::-webkit-search-cancel-button]:hidden"
             onChange={(event) => {
               setText(event.target.value)
-              updateParams({ q: event.target.value.trim() ? event.target.value : "" })
+              // 修改检索词时离开会话分页，回到分组结果。
+              updateParams({ q: event.target.value.trim() ? event.target.value : "", ...(type === "conversations" ? { type: "" } : {}) })
             }}
             onKeyDown={(event) => {
               // 键盘搜索键只收起键盘，结果随输入实时更新。
@@ -329,7 +330,7 @@ export function MobileInboxSearchPage() {
               aria-label={t("mobile:inbox.clearSearch")}
               onClick={() => {
                 setText("")
-                updateParams({ q: "" })
+                updateParams({ q: "", ...(type === "conversations" ? { type: "" } : {}) })
                 inputRef.current?.focus()
               }}
             >
@@ -378,7 +379,7 @@ export function MobileInboxSearchPage() {
         ))}
       </div>
       {search.paged && !search.pending ? (
-        <InboxSearchConversationList identity={identity} query={search.nameQuery} mobile>
+        <InboxSearchConversationList identity={identity} query={search.nameQuery} history={inboxWindows} mobile>
           {(conversations) => (
             <ul>
               <MobileConversationRows conversations={conversations} highlight={query} onOpen={openConversation} />

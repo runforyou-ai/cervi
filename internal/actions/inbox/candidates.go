@@ -100,9 +100,13 @@ func (q *LoadInboxQuery) listCandidates(identity *servermodels.Identity, input L
 	return candidate
 }
 
-// matchConversationNames 按列表展示的会话名称筛选候选，搜索词中的通配符按字面匹配，返回与候选相同的最小投影。
+// matchConversationNames 按列表展示的会话名称筛选候选，名称与搜索词同样经 NFKC 规范化并合并连续空白，搜索词中的通配符按字面匹配，返回与候选相同的最小投影。
 func (q *LoadInboxQuery) matchConversationNames(identity *servermodels.Identity, candidates *bun.SelectQuery, search string) *bun.SelectQuery {
 	pattern := "%" + strings.NewReplacer(`\`, `\\`, "%", `\%`, "_", `\_`).Replace(search) + "%"
+	// 名称按搜索词的规则规范化后再匹配。
+	name := func(column string) string {
+		return "regexp_replace(normalize(" + column + ", NFKC), '[[:space:]]+', ' ', 'g')"
+	}
 	return q.db.NewSelect().TableExpr("(?) AS candidates", candidates).
 		ColumnExpr("candidates.id, candidates.last_activity_at").
 		Join("JOIN conversations AS cv ON cv.organization_id = ? AND cv.id = candidates.id", identity.Organization.ID).
@@ -113,9 +117,9 @@ func (q *LoadInboxQuery) matchConversationNames(identity *servermodels.Identity,
 		Join("LEFT JOIN customer_conversations AS cc ON cc.organization_id = cv.organization_id AND cc.conversation_id = cv.id").
 		Join("LEFT JOIN contact_channel_identities AS cci ON cci.organization_id = cc.organization_id AND cci.id = cc.contact_channel_identity_id").
 		Join("LEFT JOIN contacts AS c ON c.organization_id = cci.organization_id AND c.id = cci.contact_id").
-		Where(`(cv.type = ? AND cv.title ILIKE ?) OR (cv.type = ? AND peer_oi.display_name ILIKE ?)
-			OR (cv.type = ? AND (cv.title ILIKE ? OR agent_oi.display_name ILIKE ?))
-			OR (cv.type = ? AND COALESCE(cci.display_name, c.display_name) ILIKE ?)`,
+		Where(`(cv.type = ? AND `+name("cv.title")+` ILIKE ?) OR (cv.type = ? AND `+name("peer_oi.display_name")+` ILIKE ?)
+			OR (cv.type = ? AND (`+name("cv.title")+` ILIKE ? OR `+name("agent_oi.display_name")+` ILIKE ?))
+			OR (cv.type = ? AND `+name("COALESCE(cci.display_name, c.display_name)")+` ILIKE ?)`,
 			domain.ConversationTypeGroup, pattern, domain.ConversationTypeDirect, pattern,
 			domain.ConversationTypeAgent, pattern, pattern, domain.ConversationTypeCustomer, pattern)
 }
