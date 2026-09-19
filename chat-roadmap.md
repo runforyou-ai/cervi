@@ -8,7 +8,7 @@
 
 本文档还确定客户端同步和实时传输的长期边界，包括 SSE 事件流、HTTP、PostgreSQL 任务 Outbox、Core NATS 与 JetStream 的分工，避免聊天开发后再用多套协议补洞。
 
-聊天重构与实时能力按 [PR 实施清单](chat-realtime-pr-plan.md) 交付。PR01 以 `707fdff` 为代码核对基线，仅对齐本文及 Agent 路线图；下文定义统一消息顺序、同步、列表和置顶规则的交付目标，第 13 章保留各次交付时的历史边界。PR06 已统一各类会话的消息序号、分页和阅读水位；PR08–11 已提供统一列表活动时间、独立摘要、游标分页和锚点窗口查询，PR12 接通 Web／桌面端列表分页与滚动锚点，PR13 接通移动端分页和返回恢复，并统一三端自动排序、自然向上浏览。当前仍使用前台轮询，完整筛选历史、实时同步和个人置顶按后续 PR 交付。PR 清单已于 2026-09-10 削减范围：删除持久受众水位表与离线重建，会话变更日志降级为 `conversations.version`，Protobuf 降级为 JSON 帧，取消一次性连接票据；2026-09-13 第二轮调整删除 `realtime_outbox` 与租约发布器，改为事务提交后直接发布 Core NATS，兜底探针改用可见会话版本与本人会话状态版本的哈希和，多节点验收推迟到拆分部署；2026-09-15 第四轮调整把实时传输从 WebSocket 改为 SSE，认证改用请求头 Bearer，AI 流改为按 runId 的独立运行过程流；已合并 PR 的原文移入 `chat-realtime-completed.md`。
+聊天重构与实时能力已交付：各类会话统一消息序号、分页和阅读水位，列表使用统一活动时间、独立摘要、游标分页与锚点窗口，变更版本、兜底校验、SSE 事件流、运行过程流、个人置顶和会话名称搜索均已接入 Web、桌面与移动端。第 10.8–10.14 节定义同步、实时传输、列表、置顶与锁序的现行规则，第 13 章保留各次交付时的历史边界；按需求或实测证据才开启的事项见 [聊天实时同步后续事项](chat-realtime-followup-plan.md)。
 
 第 7 至第 10 章以及后续阶段中的状态机、协议、表字段和基础设施设计，作为对应阶段的实现基线。进入实现前，结合目标平台官方能力、当前代码和容量验证做增量修正。
 
@@ -279,7 +279,7 @@ Ticket ── TicketConversationLink ── Conversation / Message 范围
 
 参与者不保存个人视图状态。已读、置顶、归档和静音具有不同的所有者：
 
-- Cervi 原生用户视图：已使用 `conversation_user_states` 保存阅读、静音和手动未读；个人置顶 rank 与本人成员身份行上的顺序版本由 PR40 增加。
+- Cervi 原生用户视图：已使用 `conversation_user_states` 保存阅读、静音和手动未读；个人置顶 rank 保存在同一张表，置顶顺序版本保存在本人用户账号行（`users.pin_order_version`）。
 - 第三方账号视图：未来使用 `conversation_account_states`。
 - AI 处理进度：单聊与网站客服已使用 `agent_lanes`；群聊尚无 Agent 输入与 Run。
 
@@ -310,7 +310,7 @@ Ticket ── TicketConversationLink ── Conversation / Message 范围
 
 会话内序号由唯一约束保证。事务回滚允许未提交编号重用，已提交分配器不得因摘要重算或删除消息而回退。消息追加、Conversation／ServiceSession 摘要、Agent Trigger 和任务投递在同一事务提交；幂等命中返回已有事实，不再次分配或触发。摘要可以按现存消息重算，预览不得暴露已删除内容；普通列表独立使用 `lastActivityAt`，纯资料更新、已读和静音不改变活动顺序。
 
-PR06 在一个 PR 中切换迁移、全部写入、读取、绑定和各端比较，删除群专属顺序及来源三元排序。使用空库或可丢弃测试库验收；已有开发库停服后按仓库流程重建，不提供旧消息序号回填、默认零值或双顺序兼容。
+统一序号不保留群专属顺序或来源三元排序，也不提供旧消息序号回填、默认零值或双顺序兼容。
 
 文件、语音、卡片、反应、@ 提醒和系统事件使用独立关系或类型化载荷扩展。`messages` 仍是时间线内容事实来源；消息序号不能发现旧消息编辑、删除和资料变化，这些变化由第 10.8 节的同步索引恢复，不把消息表变成事件总线。
 
@@ -998,7 +998,8 @@ conversation_user_states.version
 - `conversations.version` 在会话锁内随消息追加、参与者变化、共享会话设置变化和 Run 终态推进，与业务行同事务提交。幂等重放、摘要重算和纯读取不推进。
 - `conversation_user_states.version` 随本人已读、提及确认、静音和手动未读推进，与个人状态同事务提交，不推进 `conversations.version`；尚无个人状态行时按 0 计。
 - 通知只携带 conversationId、通知种类和对应版本，不携带正文、姓名或未读数；客户端收到通知即失效对应 Query 并重读。业务实体当前状态始终从对应业务表读取。
-- 本人身份资料与账户级偏好使用独立的 `identityProfileVersion`，保存在本人成员身份行上。
+- 本人身份资料与账户级偏好使用独立的 `identityProfileVersion`，保存在本人用户账号行（`users.profile_version`），由 `identity.UpdateUserIdentity` 与用户账号更新按实际变化推进，修改密码与团队不推进。
+- 成员与 AI 员工的名称、头像和账号状态，联系人、客户渠道身份与渠道名称实际变化时，在资料写入事务末尾按会话 ID 顺序锁定展示该资料的会话并推进 `conversations.version`：成员与 AI 员工身份覆盖其参与过的会话（含已退出的参与记录）、当前负责的客户会话、以其为 Agent 或创建人的 Copilot 线程所属客户会话，以及其运行记录与待执行队列所在会话。相同值不推进。成员与 AI 员工身份变化同时通知访客目录受众，客户与渠道资料只通知成员与企业客服共享受众；同步只重读当前资料，不改写历史消息。
 - 客户端不保存实体版本，收到通知即失效对应 Query，同一 Query 的失效按短窗口防抖合并；失效后发起新的读取，最终以失效后的重读为准；未挂载的 Query 不处理，打开时直接读最新。通知携带的版本用于 Gateway 发送队列合并与日志。
 - 用户被移出会话或会话删除时，仍向变更前受众发仅含会话 ID 的 `conversation_removed` 通知，不返回正文或当前成员；该种类不与会话变更合并。
 - 服务端不保存每设备消费游标。各端业务投影与探针上次返回值只保存在内存；刷新、退出或缓存清空后重新建立基线。真正引入离线库时再把投影与游标原子持久化，并在那时评估是否需要持久变更日志与持久受众水位。
@@ -1117,7 +1118,7 @@ cervi.<namespace>.realtime.<organizationId>.<audienceKind>.<audienceId>
 ├── conversation_removed（conversationId，仅发往变更前受众，不合并）
 ├── conversation_state_changed（conversationId ＋ 本人会话状态 version，仅本人受众）
 ├── identity_profile_changed
-├── pin_order_changed（PR40 增加）
+├── pin_order_changed
 └── device_work_advanced（设备阶段增加）
 
 访客事件流 GET /public/website-channels/{channelId}/realtime
@@ -1125,7 +1126,7 @@ cervi.<namespace>.realtime.<organizationId>.<audienceKind>.<audienceId>
 ├── ping（服务端每 25 秒一次）
 └── conversation_changed（conversationId ＋ version）
 
-运行过程流 GET /api/realtime/runs/{runId}（PR38 增加）
+运行过程流 GET /api/realtime/runs/{runId}
 ├── run_stream_snapshot（按块拆分为多个事件）
 ├── run_stream_delta
 └── run_stream_ended（完成、失败或取消）
@@ -1170,13 +1171,13 @@ Wails 服务端收到 SIGINT／SIGTERM 后先执行 `http.Server.Shutdown`，该
 
 Gateway 为每条成员事件流维护单写协程和一条有界发送队列（256）：变更通知按同一会话同一种类只保留最高版本，会话失权与撤销控制不合并；队列溢出时结束响应并记录 `WARN`，单次写入超过 10 秒说明对端停止读取，直接断开；客户端重连后按探针同步。运行过程流各自使用独立发送队列，规则见第 10.11 节。typing、presence 等下发事件随真实功能加入时再确定合并与丢弃规则。
 
-单事件大小约束随 PR38 运行快照分块定义；不通过事件流发送附件、历史列表或会话与消息快照。Web 端部署使用 HTTPS 与 HTTP/2；HTTP/1.1 下浏览器同源 6 连接上限会限制多标签页。反向代理对 `/api/realtime` 关闭响应缓冲并允许长响应，服务端 25 秒心跳维持代理空闲超时；自动 HTTPS `ingress` 的 Go ReverseProxy 对 `text/event-stream` 响应立即刷新。部署文档需配置响应缓冲、空闲超时、最大连接数和优雅关闭；认证失败、慢连接结束与 NATS 发布失败记录 `WARN`，连接数、队列深度与各事件类型流量等指标在出现真实部署后建设。
+运行过程流快照按文本预算拆分为多个事件，单事件大小随此约束；不通过事件流发送附件、历史列表或会话与消息快照。Web 端部署使用 HTTPS 与 HTTP/2；HTTP/1.1 下浏览器同源 6 连接上限会限制多标签页。反向代理对 `/api/realtime` 关闭响应缓冲并允许长响应，服务端 25 秒心跳维持代理空闲超时；自动 HTTPS `ingress` 的 Go ReverseProxy 对 `text/event-stream` 响应立即刷新。部署文档需配置响应缓冲、空闲超时、最大连接数和优雅关闭；认证失败、慢连接结束与 NATS 发布失败记录 `WARN`，连接数、队列深度与各事件类型流量等指标在出现真实部署后建设。
 
 ### 10.13 列表、个人置顶与通知行为
 
-列表详情通过独立 Query 授权，不以当前列表是否包含它判定存在性。PR08–14 建立分页、窗口和选择行为，PR30 接入实时，PR40–42 交付个人置顶。置顶是本人跨端同步的全局手动顺序，新消息不改变顺序；新增置顶追加末尾，取消回普通活动序，再次置顶重新追加。失权清除置顶且重入不恢复，解散后仍可读则保留。各端滚动位置、焦点和选择不上传。
+列表详情通过独立 Query 授权，不以当前列表是否包含它判定存在性。置顶是本人跨端同步的全局手动顺序，新消息不改变顺序；新增置顶追加末尾，取消回普通活动序，再次置顶重新追加。失权清除置顶且重入不恢复，解散后仍可读则保留。各端滚动位置、焦点和选择不上传。
 
-PR08 的 lastActivityAt 取消息追加事务中数据库当前时间与该会话旧值的较大值；新文本和系统消息更新活动，客服状态、纯资料更新、token、已读和静音不更新；群改名等操作若追加系统消息，则由该消息更新活动。预览显示来源时间；列表行和总数在同一只读快照中读取，前端按服务端顺序展示。
+lastActivityAt 取消息追加事务中数据库当前时间与该会话旧值的较大值；新文本和系统消息更新活动，客服状态、纯资料更新、token、已读和静音不更新；群改名等操作若追加系统消息，则由该消息更新活动。预览显示来源时间；列表行和总数在同一只读快照中读取，前端按服务端顺序展示。
 
 查询身份包含企业、用户、scope、customerView、assigneeIdentityId，启用后再加入分区和规范化搜索词；数据 key 共享，页面实例的选择与滚动位置各自保存。普通区按 `lastActivityAt DESC NULLS LAST, conversationId DESC` 排序；时间使用数据库精度，游标携带原值。置顶区按本人顺序升序，不采用活动时间。
 
@@ -1200,7 +1201,7 @@ PR08 的 lastActivityAt 取消息追加事务中数据库当前时间与该会�
 
 “隐藏项”包括被当前筛选排除及尚未加载的置顶项。移动只改变目标相对位置，其余项之间相对顺序保持；如全局 `A,X,B`、当前仅看见 A/B，将 B 移到 A 前，结果必须是 `B,A,X`。前端只提交位置命令，不能把可见 ID 数组当成全量个人顺序保存。rank 重编号只是存储实现变化，不改变逻辑顺序。
 
-任意改变置顶集合／顺序的事务（含失权清理及随操作发生的重编号）推进 pinOrderVersion 并写本人受众通知，客户端据此重读最新顺序版本。客户端发现版本变化时让整个置顶分区及其游标失效，重新取得同一版本的权威窗口；不得把单条新 pinRank 与缓存旧 rank 混排。多页重读途中版本再次变化，舍弃该轮候选并从新版本恢复锚点；已展示内容可保留为待更新视图，但不能提交使用旧版本的排序。新消息只推进会话版本，不推进置顶顺序版本。
+本人提交的置顶、取消和移动（含随操作发生的重编号）推进 pinOrderVersion 并写本人受众通知，客户端据此重读最新顺序版本；重复置顶、重复取消与落点等于原位置不推进。失权清理由他人的事务执行，只清除该会话的 pinRank 并推进本人会话状态版本，不推进 pinOrderVersion：推进它需要在他人的事务里写本人用户账号行，与「先锁本人账号行再锁会话」的置顶写入构成循环等待；失权由同一受众的 `conversation_removed` 通知触发整区重读，效果与版本变化一致。客户端发现版本变化时让整个置顶分区及其游标失效，重新取得同一版本的权威窗口；不得把单条新 pinRank 与缓存旧 rank 混排。多页重读途中版本再次变化，舍弃该轮候选并从新版本恢复锚点；已展示内容可保留为待更新视图，但不能提交使用旧版本的排序。新消息只推进会话版本，不推进置顶顺序版本。
 
 #### 阅读与通知边界
 
@@ -1210,13 +1211,13 @@ PR08 的 lastActivityAt 取消息追加事务中数据库当前时间与该会�
 
 ### 10.14 写入口、守卫与锁序
 
-以下表初始按 `707fdff` 追踪，PR03 基于 `7c64c07` 更新真人单聊、独立 AI 聊天、共享主体和 Agent 执行入口，PR04 基于 `6dc3bdc` 并同步 `8f96135` 更新客服入站、周期管理、Agent 与 Telegram 外发交叉路径；本轮锁序、幂等、停用／归档和任务租约用例已于 2026-09-08 通过服务端全量测试，构建及界面回归记录见 PR 实施清单。当前列记录事务路径，目标列是 PR02–04、PR17–22、PR25–26、PR40 要实现的约束；PR17 已接入变更版本，PR18 已接入消息追加（含附件消息）、本人会话状态与身份资料的受众通知，PR19 已接入群关系与成员会话 AI 运行状态的通知，PR20 已接入客服收发、服务周期、客服 AI 运行、Telegram 投递状态、渠道启停与更换机器人的企业客服 Inbox 通知，访客与资料引用的通知由 PR21–22 接入。`U` 表示本人或有效内部真人受众，`C` 表示企业客服 Inbox，`V` 表示受影响网站渠道身份的访客目录；V 只允许公开投影。
+下表记录各写入口的守卫、锁定顺序、事实写入与通知受众，锁序、幂等、停用／归档和任务租约由服务端集成测试以数据库屏障覆盖。`U` 表示本人或有效内部真人受众，`C` 表示企业客服 Inbox，`V` 表示受影响网站渠道身份的访客目录；V 只允许公开投影。
 
-共用目标顺序：入口守卫／稳定定位 → 按 conversationId 排序锁定业务会话集合 → 每会话的 CustomerConversation／ServiceSession（客服才需要）→ 个人状态 → AgentState → Run → 任务执行记录 → 本人成员身份行（置顶顺序版本）。仅获取本次需要的锁；多 Agent 按 agentIdentityId、Run 按 runId 排序。受众通知只在事务内登记，不取受众锁。个人置顶顺序版本在本人成员身份行上，不新增独立顺序锁。
+共用顺序：入口守卫（当前用户写事务先由 LockActiveUser 锁本人用户账号行）／稳定定位 → 按 conversationId 排序锁定业务会话集合 → 每会话的 CustomerConversation／ServiceSession（客服才需要）→ 个人状态 → AgentState → Run → 任务执行记录。仅获取本次需要的锁；多 Agent 按 agentIdentityId、Run 按 runId 排序。受众通知只在事务内登记，不取受众锁。置顶顺序版本在已由 LockActiveUser 锁定的本人用户账号行上，不新增独立顺序锁；其他用户的事务不写该行。
 
 参与关系的顺序按会话路径明确：内部会话在 Conversation 后锁已有 Participant，再处理个人状态和 Agent 状态；客服会话在 Conversation → CustomerConversation → ServiceSession 后处理本次需要的个人状态／AgentState／Run／Task，最后确保回复所需 ChatSubject／Participant 并追加消息。接管不发消息时不建 Participant，AI 被抑制时不提交新的发送关系。所有已有会话的参与者写入都必须先持有同一 Conversation 锁；不得有先锁客服 Participant 再反向等待周期或 Run 的路径。首次创建主体与会话按稳定唯一键定位后进入对应路径。
 
-PR03 的停用生效边界已确认：目标停用只拒绝之后资格校验的新发送，已通过事务内资格校验的发送可提交；不新增目标账号锁。Agent 停用或 AI 会话归档不取消已经提交的排队、运行中和尚待消费的输入，结果仍写回原 Conversation。真人归档会话只在显式首发时恢复；AI 草稿重试不恢复归档，也不新增归档／恢复操作。幂等重放不能绕过当前发送资格。
+停用生效边界：目标停用只拒绝之后资格校验的新发送，已通过事务内资格校验的发送可提交；不新增目标账号锁。Agent 停用或 AI 会话归档不取消已经提交的排队、运行中和尚待消费的输入，结果仍写回原 Conversation。真人归档会话只在显式首发时恢复；AI 草稿重试不恢复归档，也不新增归档／恢复操作。幂等重放不能绕过当前发送资格。
 
 共享企业身份主体按身份 ID 升序创建，唯一冲突后使用独立查询读取已提交主体，不通过无变化 UPDATE 取回记录。真人／AI 首发、群创建和增员使用同一创建顺序，群内显示顺序保持原规则。已有会话先锁 Conversation，再进行参与关系和业务写入；新建会话的主体准备发生在创建新行之前。
 
@@ -1224,32 +1225,32 @@ PR03 的停用生效边界已确认：目标停用只拒绝之后资格校验的
 
 当前用户写事务先调用 `LockActiveUser`（users 的 `NO KEY UPDATE`）。渠道回调使用渠道凭据、身份守卫，Agent 使用任务上下文与 attempt／worker／租约守卫，不伪造当前用户。任务上下文可以前置解析，但数据库 `LockExecution` 放在会话、State、Run 之后，锁后重新确认租约。Query 信任应用服务已解析身份，校验会话资格但不为读取额外加写锁。
 
-| 入口与实际函数 | 守卫 | 当前锁定对象与顺序 | 目标调整与事实写入 | 受众 |
+| 入口与实际函数 | 守卫 | 锁定对象与顺序 | 事实写入与约束 | 受众 |
 | --- | --- | --- | --- | --- |
-| 真人单聊首发：[SendFirstDirectTextMessageAction.Execute](internal/actions/conversation/direct_conversation.go) | LockActiveUser；同企业活跃真人目标 | 读取规范身份对；新建时按身份 ID 确保主体 → 新 Conversation／唯一关系／Participant；统一锁 Conversation → Participant → 锁后资格 → Message／摘要 → 个人已读 | 唯一冲突后整笔事务重试；显式首发可恢复归档，普通发送和幂等重放需通过当前授权；PR05–06 集中消息追加及序号 | 有效真人 U |
+| 真人单聊首发：[SendFirstDirectTextMessageAction.Execute](internal/actions/conversation/direct_conversation.go) | LockActiveUser；同企业活跃真人目标 | 读取规范身份对；新建时按身份 ID 确保主体 → 新 Conversation／唯一关系／Participant；统一锁 Conversation → Participant → 锁后资格 → Message／摘要 → 个人已读 | 唯一冲突后整笔事务重试；显式首发可恢复归档，普通发送和幂等重放需通过当前授权；消息与序号经 chatstate.AppendMessage 追加 | 有效真人 U |
 | 真人单聊后续：[SendDirectTextMessageAction.Execute → sendDirectTextMessage](internal/actions/conversation/direct_conversation.go) | LockActiveUser；规范身份对与活跃目标资格 | Conversation → Participant → 锁后资格 → Message／摘要 → 个人已读 | 已通过事务内资格校验的发送允许完成；停用之后重新校验的新发送拒绝，不在会话锁后获取目标账号锁 | 有效真人 U |
-| AI 聊天首发／后续：[SendFirstAgentTextMessageAction / SendAgentTextMessageAction](internal/actions/conversation/agent_conversation.go) | LockActiveUser；固定用户与 Agent 归属、活跃 Agent 及有效参与关系 | 草稿按 conversationId 收敛；新建按身份 ID 确保主体并建会话／扩展／Participant；Conversation → Participant → 资格／幂等 → Message／摘要 → 个人已读 → State／Trigger／Run／Task | 同草稿和消息编号重试确认已有结果，不同草稿保持独立；新建会话不取消旧 Run；PR05–06 集中追加与序号 | 所属真人 U |
-| 群创建／发送：[CreateGroupConversationAction、SendGroupTextMessageAction.Execute](internal/actions/conversation/group_conversation.go) | LockActiveUser；活跃成员／可发资格 | 创建时头像激活 → 按身份 ID 确保创建者与全部成员主体 → 新 Conversation／Participant；发送经 chatstate.LockGroup 锁 Conversation／Participant 并重查资格 | 保留成员展示顺序；系统与文本追加仍归 PR05–06；创建空群不伪造消息基线，增员时按系统消息设基线，不触发群 Agent | 当前真人 U |
+| AI 聊天首发／后续：[SendFirstAgentTextMessageAction / SendAgentTextMessageAction](internal/actions/conversation/agent_conversation.go) | LockActiveUser；固定用户与 Agent 归属、活跃 Agent 及有效参与关系 | 草稿按 conversationId 收敛；新建按身份 ID 确保主体并建会话／扩展／Participant；Conversation → Participant → 资格／幂等 → Message／摘要 → 个人已读 → State／Trigger／Run／Task | 同草稿和消息编号重试确认已有结果，不同草稿保持独立；新建会话不取消旧 Run；消息与序号经 chatstate.AppendMessage 追加 | 所属真人 U |
+| 群创建／发送：[CreateGroupConversationAction、SendGroupTextMessageAction.Execute](internal/actions/conversation/group_conversation.go) | LockActiveUser；活跃成员／可发资格 | 创建时头像激活 → 按身份 ID 确保创建者与全部成员主体 → 新 Conversation／Participant；发送经 chatstate.LockGroup 锁 Conversation／Participant 并重查资格 | 保留成员展示顺序；系统与文本消息经 chatstate.AppendMessage 追加；创建空群不伪造消息基线，增员时按系统消息设基线，不触发群 Agent | 当前真人 U |
 | 群资料／增员：[UpdateGroupConversationAction、AddGroupConversationMembersAction.Execute](internal/actions/conversation/group_management.go) | LockActiveUser；chatstate.LockGroup；群主 | Conversation → 参与者／头像文件或新主体 → 群系统消息／个人阅读基线 | 保留头像激活与关联事务；重入复用 Participant、重设阅读及提及基线，保留静音 | 变更前后真人 U |
-| 群移除／转让／退出／解散：[RemoveGroupConversationMemberAction、TransferGroupConversationOwnerAction、LeaveGroupConversationAction、DissolveGroupConversationAction.Execute](internal/actions/conversation/group_management.go) | LockActiveUser；群主或本人资格 | chatstate.LockGroup（内调 chatstate.LockMember，依次锁 Conversation／本人 Participant）→ loadActiveGroupParticipant（UPDATE OF cp）→ 参与者修改 → createGroupSystemEvent | PR19 为旧受众写移除；PR40 失权清 pin 并推进本人顺序版本；解散可读则保留，不因列表移除伪造失权 | 变更前后真人 U，移出者仅移除标记 |
-| 真人客服回复：[SendCustomerTextMessageAction.executeTransaction](internal/actions/conversation/send_customer_text_message.go) | LockActiveUser；企业及 website／Telegram 外发能力；当前周期负责人规则 | Telegram 先 Prepare 锁 Channel／渠道身份；随后 Conversation → CustomerConversation → ServiceSession → Participant／Message／Delivery → 摘要 | PR04 共用 chatstate 会话／周期锁；保留隐式领取、引用、首次响应、首次回复 Participant、消息与投递同事务 | C、V |
-| 客服领取／转交／关闭／重开：[ClaimServiceSessionAction 等 Execute](internal/actions/conversation/manage_service_session.go) | LockActiveUser；周期状态；转交目标 LockActiveCustomerServiceIdentity | 目标身份（转交）→ Conversation → CustomerConversation → ServiceSession → AgentState → Run；提交后取消内存 context | PR04 已将转交目标身份移到 Conversation 前，再锁会话、扩展与周期并复核资格；PR19–20 原子提交周期和取消／补触发事实，不能以进程取消代替数据库门禁 | C、V（公开状态） |
-| 网站入站：[ReceiveWebsiteCustomerTextMessageAction.executeTransaction](internal/actions/conversation/receive_website_customer_text_message.go) → [ReceiveInboundCustomerTextMessage](internal/actions/conversation/receive_customer_text_message.go) | 公开层解析 Cookie/Header；渠道启用、渠道身份及线程归属；无当前用户 | EnsureChannelIdentity 锁渠道身份 → 联系人恢复／主体 → 创建或锁 Conversation → CustomerConversation → ServiceSession → Participant → Message／摘要 → ScheduleCustomerAuto | PR04 已稳定定位渠道身份后锁 Conversation；联系人 Participant 在周期后，AI 回复 Participant 在 State／Run／Task 门禁后，均受同一会话锁串行保护；幂等消息不重复 Trigger，首发前初始化不建业务记录 | C、该身份 V |
-| Telegram 入站：[ReceiveTelegramWebhookAction.Execute](internal/actions/channel/receive_telegram_webhook.go) → ReceiveInboundCustomerTextMessage | Preflight 后事务内重验当前 Secret、启用状态；无当前用户 | Telegram 设置（UPDATE OF tcs）→ 渠道身份 → 联系人／主体 → 锁单线程 Conversation → CustomerConversation → ServiceSession → Message／摘要 | PR04 已补会话前置锁并交叉检查凭据、真人外发与投递任务路径；保留来源幂等及来源时间，PR06 按本地 message_seq 展示，新消息在同事务按 AI 负责人调度 customer_auto，回调重放不触发 | C |
-| Agent 调度：[Scheduler.Schedule / ScheduleCustomerAuto](internal/actions/agentrun/schedule.go)、[customer_schedule.go](internal/actions/agentrun/customer_schedule.go) | 继承调用方事务守卫；客服负责人、渠道及 Agent 资格 | AI 聊天继承已锁 Conversation／Participant，个人已读在 State 前；State 分配 Trigger，再写 Run／Task；客服先锁 Conversation → CustomerConversation → ServiceSession | Trigger、Run 与 task_outbox 原子提交；客服会话前置锁由 PR04 实现 | AI 聊天 U；客服 C、V（公开状态） |
-| AI 开始／认领／成功／失败：[ExecuteAction.begin / complete / fail / FinalizeFailure](internal/actions/agentrun/execute.go)、[databaseInputFeed.Claim → lockAgentRun](internal/actions/agentrun/input_feed.go) | 可靠任务上下文；锁后 LockExecution 校验尝试与租约；无当前用户 | agentChatRunPolicy 先 Conversation／Agent Participant；客服策略先 Prepare（Telegram 锁 Channel／渠道身份），再 Conversation／CustomerConversation／ServiceSession；随后 State → Run → Task，锁后判断终态 | 成功 text 或失败 agent_error、Run 终态及消费水位同事务；停用／归档不取消 AI 聊天已提交输入；客服会话前置锁由 PR04 实现，会话版本推进归 PR19 | AI 聊天 U；客服 C、V（公开投影） |
-| 客服 AI 写回／取消：[customerRunPolicy.prepareLocked / persistMessage](internal/actions/agentrun/customer_execute.go)、[CancelForServiceSession](internal/actions/agentrun/cancellation.go) | 锁后核对 serviceSessionId、负责人、website／已连接 Bot 的 Telegram、Agent 资格、Revision、消费边界；取消继承成员事务 | 执行先 Prepare（Telegram 锁 Channel／渠道身份），再 Conversation → CustomerConversation → ServiceSession → AgentState → Run → Task；取消继承会话锁且不锁 Task；persistMessage 确保 Participant，经 AppendMessage 追加消息与摘要，Telegram 成功文本同事务入队 | PR04 已先锁 Conversation，再按客服扩展／周期 → State → Run → Task 锁后复核资格，最后确保回复 Participant；抑制结果不建关系。接管先提交则旧结果被抑制，反向只保留已提交一次回复；跨进程取消只是加速 | C、V；内部过程不进入 V |
-| 个人已读／提及／静音／手动未读：[MarkConversationReadAction](internal/actions/conversation/mark_conversation_read.go)、[MarkConversationMentionReviewedAction](internal/actions/conversation/conversation_mentions.go)、[UpdateConversationNotificationSettingsAction](internal/actions/conversation/update_notification_settings.go)、[UpdateConversationUnreadMarkAction](internal/actions/conversation/update_unread_mark.go) | LockActiveUser；当前会话可读资格 | 内部普通已读、提及和手动未读先锁 Conversation；客服已读及静音仍需补锁后资格检查；更新个人状态／提及确认记录 | PR02、PR18、PR20 统一 Conversation → 个人状态 → 本人受众通知；阅读不创建 Participant 或改变负责人，不推进活动序，不广播其他用户 | 本人 U，客户共享 C 不因个人已读推进 |
-| 个人置顶／取消／移动（PR40 新增） | LockActiveUser；目标／邻居当前可读且满足置顶条件；expectedPinOrderVersion | 当前没有写入口或顺序字段 | 锁所涉 Conversation（ID 排序）及个人状态 → 本人成员身份行；校验版本后写 rank 与顺序版本并登记本人通知，隐藏项不被全量覆盖 | 本人 U |
-| 真人资料／头像：[UpdateProfileAction](internal/actions/user/update_profile.go)、[UpdateUserAction](internal/actions/user/update_user.go)；[Agent 资料](internal/actions/agent/update_agent.go)；[联系人资料](internal/actions/contact/update_contact.go)；[渠道资料](internal/actions/channel/update_message_channel.go) | LockActiveUser；对象企业与文件用途 | 各自业务对象及头像文件锁／UPDATE；尚无会话集合与同步写入 | PR22 按实际 Query JOIN 列出字段依赖；稳定定位对象及相关会话集合，完成业务锁后统一推进会话版本并写通知；只失效当前资料，不改消息来源快照或活动序 | 受影响 U／C；V 仅公开资料 |
-| 系统头像完成：[refreshTelegramContactAvatar → applyTelegramContactAvatar](internal/actions/channel/receive_telegram_webhook.go) | 消息事务后独立入口；企业、渠道身份、文件用途及有效状态；无当前用户 | 事务外下载／导入 → 新事务渠道身份 → 按 ID 锁新旧文件 → 新文件激活／头像引用 → 旧文件回收 | PR22 在最终落库事务锁相关会话并写变化；createdByUserId 是文件归属信息，不能当成当前用户守卫 | C；不向其他渠道访客泄露资料 |
-| 用户／Agent 停用及工作状态：[user/update_status.go](internal/actions/user/update_status.go)、[agent/update_status.go](internal/actions/agent/update_status.go)、[user/update_work_status.go](internal/actions/user/update_work_status.go)、[agent/update_work_status.go](internal/actions/agent/update_work_status.go) | LockActiveUser；目标企业及各自业务守卫 | 用户／Agent、OrganizationIdentity、ResetRoutingTarget 的渠道行 | PR22、PR25 纳入资格及资料变化；目标用户、转交目标与渠道锁必须在写通知前处理，不能持有其他锁再调用 ResetRoutingTarget | 本人会话撤销及受影响 U／C／V 的授权投影 |
-| 渠道停用／凭据／公开设置：[UpdateMessageChannelStatusAction](internal/actions/channel/update_message_channel_status.go)、[UpdateTelegramChannelStatusAction](internal/actions/channel/update_telegram_channel_status.go)、[SaveTelegramConnectionAction](internal/actions/channel/save_telegram_connection.go)、[网站访问设置](internal/actions/channel/update_website_channel_access.go) | 成员事务 LockActiveUser；Telegram 另有渠道／Bot advisory 串行锁 | Telegram 外层渠道锁 → 按稳定 Bot ID 锁 → 事务用户守卫 → 渠道及设置；网站更新渠道／设置 | PR04、PR26 与回调 tcs → 渠道身份路径一起检查，不把外层串行锁移到写通知之后；渠道失效写撤销控制，访客停止公开读取与旧流 | C、受影响 V；控制不合并成普通通知 |
-| 退出登录／偏好：[LogoutAction.Execute](internal/actions/auth/logout.go)、[UpdatePreferencesAction.Execute](internal/actions/user/update_preferences.go) | Logout 按企业与令牌 hash 定位，不接收当前 Identity；偏好使用 LockActiveUser | Logout 删除对应 token；偏好更新本人 User | PR25 为撤销建立同事务 tokenSessionId 控制；PR17 通知偏好推进身份资料版本，不伪造会话消息或已读 | 本人 U；撤销只影响对应会话凭据 |
+| 群移除／转让／退出／解散：[RemoveGroupConversationMemberAction、TransferGroupConversationOwnerAction、LeaveGroupConversationAction、DissolveGroupConversationAction.Execute](internal/actions/conversation/group_management.go) | LockActiveUser；群主或本人资格 | chatstate.LockGroup（内调 chatstate.LockMember，依次锁 Conversation／本人 Participant）→ loadActiveGroupParticipant（UPDATE OF cp）→ 参与者修改 → createGroupSystemEvent | 失去阅读资格的真人收到 `conversation_removed`；失权只清除该会话的 pinRank 并推进本人会话状态版本；解散后仍可读则保留，不因列表移除伪造失权 | 变更前后真人 U，移出者仅移除标记 |
+| 真人客服回复：[SendCustomerTextMessageAction.executeTransaction](internal/actions/conversation/send_customer_text_message.go) | LockActiveUser；企业及 website／Telegram 外发能力；当前周期负责人规则 | Telegram 先 Prepare 锁 Channel／渠道身份；随后 Conversation → CustomerConversation → ServiceSession → Participant／Message／Delivery → 摘要 | 共用 chatstate 会话／周期锁；隐式领取、引用、首次响应、首次回复 Participant、消息与投递同事务 | C、V |
+| 客服领取／转交／关闭／重开：[ClaimServiceSessionAction 等 Execute](internal/actions/conversation/manage_service_session.go) | LockActiveUser；周期状态；转交目标 LockActiveCustomerServiceIdentity | 目标身份（转交）→ Conversation → CustomerConversation → ServiceSession → AgentState → Run；提交后取消内存 context | 转交目标身份在 Conversation 前锁定，再锁会话、扩展与周期并复核资格；周期与取消／补触发事实原子提交，不能以进程取消代替数据库门禁 | C、V（公开状态） |
+| 网站入站：[ReceiveWebsiteCustomerTextMessageAction.executeTransaction](internal/actions/conversation/receive_website_customer_text_message.go) → [ReceiveInboundCustomerTextMessage](internal/actions/conversation/receive_customer_text_message.go) | 公开层解析 Cookie/Header；渠道启用、渠道身份及线程归属；无当前用户 | EnsureChannelIdentity 锁渠道身份 → 联系人恢复／主体 → 创建或锁 Conversation → CustomerConversation → ServiceSession → Participant → Message／摘要 → ScheduleCustomerAuto | 稳定定位渠道身份后锁 Conversation；联系人 Participant 在周期后，AI 回复 Participant 在 State／Run／Task 门禁后，均受同一会话锁串行保护；幂等消息不重复 Trigger，首发前初始化不建业务记录 | C、该身份 V |
+| Telegram 入站：[ReceiveTelegramWebhookAction.Execute](internal/actions/channel/receive_telegram_webhook.go) → ReceiveInboundCustomerTextMessage | Preflight 后事务内重验当前 Secret、启用状态；无当前用户 | Telegram 设置（UPDATE OF tcs）→ 渠道身份 → 联系人／主体 → 锁单线程 Conversation → CustomerConversation → ServiceSession → Message／摘要 | 会话前置锁与凭据、真人外发及投递任务路径一致；保留来源幂等及来源时间，按本地 message_seq 展示；渠道身份改名在锁定单个会话之前推进相关会话版本；新消息在同事务按 AI 负责人调度 customer_auto，回调重放不触发 | C |
+| Agent 调度：[Scheduler.Schedule / ScheduleCustomerAuto](internal/actions/agentrun/schedule.go)、[customer_schedule.go](internal/actions/agentrun/customer_schedule.go) | 继承调用方事务守卫；客服负责人、渠道及 Agent 资格 | AI 聊天继承已锁 Conversation／Participant，个人已读在 State 前；State 分配 Trigger，再写 Run／Task；客服先锁 Conversation → CustomerConversation → ServiceSession | Trigger、Run 与 task_outbox 原子提交 | AI 聊天 U；客服 C、V（公开状态） |
+| AI 开始／认领／成功／失败：[ExecuteAction.begin / complete / fail / FinalizeFailure](internal/actions/agentrun/execute.go)、[databaseInputFeed.Claim → lockAgentRun](internal/actions/agentrun/input_feed.go) | 可靠任务上下文；锁后 LockExecution 校验尝试与租约；无当前用户 | agentChatRunPolicy 先 Conversation／Agent Participant；客服策略先 Prepare（Telegram 锁 Channel／渠道身份），再 Conversation／CustomerConversation／ServiceSession；随后 State → Run → Task，锁后判断终态 | 成功 text 或失败 agent_error、Run 终态及消费水位同事务；停用／归档不取消 AI 聊天已提交输入；Run 开始、终态与失效取消推进会话版本 | AI 聊天 U；客服 C、V（公开投影） |
+| 客服 AI 写回／取消：[customerRunPolicy.prepareLocked / persistMessage](internal/actions/agentrun/customer_execute.go)、[CancelForServiceSession](internal/actions/agentrun/cancellation.go) | 锁后核对 serviceSessionId、负责人、website／已连接 Bot 的 Telegram、Agent 资格、Revision、消费边界；取消继承成员事务 | 执行先 Prepare（Telegram 锁 Channel／渠道身份），再 Conversation → CustomerConversation → ServiceSession → AgentState → Run → Task；取消继承会话锁且不锁 Task；persistMessage 确保 Participant，经 AppendMessage 追加消息与摘要，Telegram 成功文本同事务入队 | 先锁 Conversation，再按客服扩展／周期 → State → Run → Task 锁后复核资格，最后确保回复 Participant；抑制结果不建关系。接管先提交则旧结果被抑制，反向只保留已提交一次回复；跨进程取消只是加速 | C、V；内部过程不进入 V |
+| 个人已读／提及／静音／手动未读：[MarkConversationReadAction](internal/actions/conversation/mark_conversation_read.go)、[MarkConversationMentionReviewedAction](internal/actions/conversation/conversation_mentions.go)、[UpdateConversationNotificationSettingsAction](internal/actions/conversation/update_notification_settings.go)、[UpdateConversationUnreadMarkAction](internal/actions/conversation/update_unread_mark.go) | LockActiveUser；当前会话可读资格 | 内部会话经 chatstate.LockMember 锁 Conversation／本人 Participant；客服会话按企业内历史访问范围授权；更新个人状态／提及确认记录 | 个人状态与本人会话状态版本同事务提交，只写本人受众通知；阅读不创建 Participant 或改变负责人，不推进活动序，不广播其他用户 | 本人 U，客户共享 C 不因个人已读推进 |
+| 个人置顶／取消／移动：[UpdateConversationPinAction](internal/actions/conversation/update_conversation_pin.go) | LockActiveUser（本人用户账号行）；目标／邻居当前可读；expectedPinOrderVersion | 本人用户账号行 → 内部会话经 chatstate.LockMember 锁目标会话，客服会话按历史访问范围授权 → 个人状态 | 本人置顶写入由账号行串行，不逐个置顶会话加锁；版本不符返回冲突且不部分写入，写 rank、推进顺序版本并登记本人通知，隐藏项不被全量覆盖 | 本人 U |
+| 真人资料／头像：[UpdateProfileAction](internal/actions/user/update_profile.go)、[UpdateUserAction](internal/actions/user/update_user.go)；[Agent 资料](internal/actions/agent/update_agent.go)；[联系人资料](internal/actions/contact/update_contact.go)；[渠道资料](internal/actions/channel/update_message_channel.go) | LockActiveUser；对象企业与文件用途 | 各自业务对象及头像文件锁／UPDATE → 事务末尾按会话 ID 排序锁定展示该资料的会话集合 | 名称或头像实际变化时经 chatstate 的 Touch*Conversations 推进会话版本并写通知；只失效当前资料，不改消息来源快照或活动序 | 受影响 U／C；V 仅公开资料 |
+| 系统头像完成：[refreshTelegramContactAvatar → applyTelegramContactAvatar](internal/actions/channel/receive_telegram_webhook.go) | 消息事务后独立入口；企业、渠道身份、文件用途及有效状态；无当前用户 | 事务外下载／导入 → 新事务渠道身份 → 按 ID 锁新旧文件 → 新文件激活／头像引用 → 旧文件回收 | 最终落库事务末尾锁相关会话并推进版本；createdByUserId 是文件归属信息，不能当成当前用户守卫 | C；不向其他渠道访客泄露资料 |
+| 用户／Agent 停用及工作状态：[user/update_status.go](internal/actions/user/update_status.go)、[agent/update_status.go](internal/actions/agent/update_status.go)、[user/update_work_status.go](internal/actions/user/update_work_status.go)、[agent/update_work_status.go](internal/actions/agent/update_work_status.go) | LockActiveUser；目标企业及各自业务守卫 | 用户／Agent、OrganizationIdentity、ResetRoutingTarget 的渠道行 | 账号状态实际变化时推进相关会话版本，AI 员工改角色或停用在转人工交接之后推进；停用登记 `user_disabled` 撤销控制；目标用户、转交目标与渠道锁在锁会话集合前处理，不能持有其他锁再调用 ResetRoutingTarget | 本人会话撤销及受影响 U／C／V 的授权投影 |
+| 渠道停用／凭据／公开设置：[UpdateMessageChannelStatusAction](internal/actions/channel/update_message_channel_status.go)、[UpdateTelegramChannelStatusAction](internal/actions/channel/update_telegram_channel_status.go)、[SaveTelegramConnectionAction](internal/actions/channel/save_telegram_connection.go)、[网站访问设置](internal/actions/channel/update_website_channel_access.go) | 成员事务 LockActiveUser；Telegram 另有渠道／Bot advisory 串行锁 | Telegram 外层渠道锁 → 按稳定 Bot ID 锁 → 事务用户守卫 → 渠道及设置；网站更新渠道／设置 | 外层串行锁与回调 tcs → 渠道身份路径一致，不移到写通知之后；渠道名称变化推进该渠道全部客户会话版本；网站渠道停用登记 `channel_disabled` 撤销控制，访客停止公开读取与旧流 | C、受影响 V；控制不合并成普通通知 |
+| 退出登录／偏好：[LogoutAction.Execute](internal/actions/auth/logout.go)、[UpdatePreferencesAction.Execute](internal/actions/user/update_preferences.go) | Logout 按企业与令牌 hash 定位，不接收当前 Identity；偏好使用 LockActiveUser | Logout 删除对应 token；偏好更新本人 User | 登出在删除令牌的事务内登记携带 tokenSessionId 的撤销控制；偏好推进身份资料版本，不伪造会话消息或已读 | 本人 U；撤销只影响对应会话凭据 |
 
-锁序交叉检查不能只检查显式 `FOR UPDATE`：INSERT 的唯一冲突等待、UPDATE、头像文件激活、身份停用和渠道路由重置也会取锁。PR03 检查规范身份对与 ChatSubject 的创建顺序；PR04 共用 chatstate 的企业身份主体创建能力，并检查渠道／Bot 外层锁、凭据设置、渠道身份／联系人恢复、转交目标身份和文件前置关系；PR22 检查资料对象到多会话集合的顺序，禁止新增反向获取这些前置对象的路径。文件锁按稳定 ID 排序，网络下载和模型执行在事务外完成。上述现状中尚未满足目标的路径由对应 PR 修正，本次不宣称已经消除死锁。
+锁序交叉检查不能只检查显式 `FOR UPDATE`：INSERT 的唯一冲突等待、UPDATE、头像文件激活、身份停用和渠道路由重置也会取锁。规范身份对与 ChatSubject 按身份 ID 顺序创建；企业身份主体统一经 chatstate 创建；渠道／Bot 外层锁、凭据设置、渠道身份／联系人恢复、转交目标身份和文件属于会话锁之前的前置对象，资料对象在写入完成后才锁定多会话集合，禁止新增反向获取这些前置对象的路径。文件锁按稳定 ID 排序，网络下载和模型执行在事务外完成。AI 员工改角色或停用时，转人工交接逐个锁定其负责的会话后，资料失效再按 ID 批量锁定相关会话，若另一资料变更事务同时覆盖同一批会话，可能被 PostgreSQL 死锁检测中止并需重试。
 
-三条验收追踪：群移除沿 `RemoveGroupConversationMemberAction.Execute → chatstate.LockGroup → chatstate.LockMember → loadActiveGroupParticipant → leaveGroupParticipant → createGroupSystemEvent`；客服接管沿 `ClaimServiceSessionAction.Execute → lockOpenServiceSession → CancelForServiceSession`，提交后再调用 `finishServiceSessionAgentCancellation`；AI 写回沿 `ExecuteAction.complete → lockAgentRun → policy.prepareLocked → policy.persistMessage`，客服策略再进入 `ensureCustomerAgentParticipant → appendAgentMessage → chatstate.AppendMessage`。PR03 已用数据库屏障覆盖真人单聊和独立 AI 聊天的发送与执行交错；PR04 已统一客服接管和写回的完整锁序，验证记录见 PR 实施清单。
+三条验收追踪：群移除沿 `RemoveGroupConversationMemberAction.Execute → chatstate.LockGroup → chatstate.LockMember → loadActiveGroupParticipant → leaveGroupParticipant → createGroupSystemEvent`；客服接管沿 `ClaimServiceSessionAction.Execute → lockOpenServiceSession → CancelForServiceSession`，提交后再调用 `finishServiceSessionAgentCancellation`；AI 写回沿 `ExecuteAction.complete → lockAgentRun → policy.prepareLocked → policy.persistMessage`，客服策略再进入 `ensureCustomerAgentParticipant → appendAgentMessage → chatstate.AppendMessage`。真人单聊和独立 AI 聊天的发送与执行交错、客服接管与写回的完整锁序均由数据库屏障集成测试覆盖。
 
 ## 11. 数据隔离与长期规则
 
@@ -1400,7 +1401,7 @@ PR03 的停用生效边界已确认：目标停用只拒绝之后资格校验的
 
 - 增加 `conversations.version`、本人身份资料版本和同步探针查询。
 - 新消息、编辑、删除、参与者、会话设置、反应和回执变化与 `conversations.version` 在同一事务提交，提交后向变更前后受众发布通知。
-- 使用手写 JSON 事件与 SSE 事件流，先交付请求头认证、Hello、心跳、变更通知与撤销；AI 流随 PR38 以按 runId 的运行过程流交付。
+- 使用手写 JSON 事件与 SSE 事件流，先交付请求头认证、Hello、心跳、变更通知与撤销；AI 流以按 runId 的运行过程流交付。
 - Realtime Gateway 先内嵌 Server，业务事务提交后向 Core NATS 定向发布；客户端不连接 NATS，JetStream 继续只承担可靠任务。
 - 客户端重连或定期兜底校验时先读取同步探针值，再按会话版本重读已加载窗口。
 - 小群使用每用户 Fanout，客服收件箱与访客目录使用共享受众；容量与故障验证按实际部署证据另行开展，不提前设人数上限。
@@ -1567,7 +1568,7 @@ POST /api/direct-conversations/{conversationID}/messages
 GET  /api/conversations/{conversationID}/messages?before={cursor}&after={cursor}
 ```
 
-阶段 2A 交付时发起单聊只接受当前企业的活跃用户身份；阶段 2C 扩展为同时接受活跃 Agent 身份，仍不接受自己、联系人、跨企业或停用身份。当前实现已由 `direct_conversations` 的企业内规范身份对唯一约束收敛首发，替代早期 advisory lock 与 Participant 集合匹配方案；主体按身份 ID 顺序取得，唯一冲突后重试读取会话。已有归档会话只在显式发起时恢复为 `active`。当前真人 direct 与独立 AI 聊天已分开，PR03 的首发与已有会话锁序实现见第 10.14 节。
+阶段 2A 交付时发起单聊只接受当前企业的活跃用户身份；阶段 2C 扩展为同时接受活跃 Agent 身份，仍不接受自己、联系人、跨企业或停用身份。当前实现已由 `direct_conversations` 的企业内规范身份对唯一约束收敛首发，替代早期 advisory lock 与 Participant 集合匹配方案；主体按身份 ID 顺序取得，唯一冲突后重试读取会话。已有归档会话只在显式发起时恢复为 `active`。当前真人 direct 与独立 AI 聊天已分开，首发与已有会话的锁序见第 10.14 节。
 
 Direct 发送只允许现有双方有效 Participant，不自动加入、恢复 Participant 或恢复归档 Conversation；消息继续使用 `mmsg:<organization_identity_id>:<client_message_id>` 幂等键，且不关联 ServiceSession。成员历史查询按 Conversation 类型严格分叉：Customer 保持企业与客户扩展授权，Direct 要求当前身份是未离开的 Participant；阶段 2A 交付时其他类型不开放，阶段 2B-G1 已按相同 Participant 规则开放 Group。
 
