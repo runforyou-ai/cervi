@@ -154,6 +154,8 @@ func (b *Backend) normalizeOutput(output any) {
 		for index := range value.Users {
 			value.Users[index].AvatarURL = b.absoluteContentURL(value.Users[index].AvatarURL)
 		}
+	case *appservice.Agent:
+		value.AvatarURL = b.absoluteContentURL(value.AvatarURL)
 	case *appservice.AgentList:
 		for index := range value.Agents {
 			value.Agents[index].AvatarURL = b.absoluteContentURL(value.Agents[index].AvatarURL)

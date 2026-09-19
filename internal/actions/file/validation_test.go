@@ -44,6 +44,10 @@ func TestNormalizeUploadInput(t *testing.T) {
 	if len(fields) != 0 {
 		t.Fatalf("group image fields = %#v, want empty", fields)
 	}
+	_, fields = NormalizeUploadInput(UploadInput{Purpose: domain.FilePurposeAgentAvatar, FileName: "agent.png", ContentType: "image/png", ByteSize: 2048})
+	if len(fields) != 0 {
+		t.Fatalf("agent avatar fields = %#v, want empty", fields)
+	}
 
 	_, fields = NormalizeUploadInput(UploadInput{Purpose: domain.FilePurposeUserAvatar, FileName: "avatar.svg", ContentType: "image/svg+xml", ByteSize: maxImageByteSize + 1})
 	if fields["contentType"] != ValidationContentTypeInvalid || fields["byteSize"] != ValidationByteSizeInvalid {

@@ -1,6 +1,6 @@
 /** 移动端统一标题、列表滚动区域和页面状态。 */
 import { useEffect, useLayoutEffect, useRef, type ReactNode } from "react"
-import { ArrowLeftIcon } from "lucide-react"
+import { ArrowLeftIcon, SearchIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
 import {
@@ -8,6 +8,7 @@ import {
   useMobileNavigation,
 } from "@/apps/mobile/mobile-navigation"
 import { Button } from "@/components/ui/button"
+import { Input } from "@/components/ui/input"
 import { cn } from "@/lib/utils"
 
 /** 居中显示移动端标题，两侧保留等宽的返回和操作空间。 */
@@ -86,6 +87,36 @@ export function MobilePageHeader({
         {actions}
       </div>
     </header>
+  )
+}
+
+/** 在列表顶部显示带放大镜图标的单行搜索框，标签只供读屏使用。 */
+export function MobileSearchBar({
+  label,
+  value,
+  onChange,
+}: {
+  label: string
+  value: string
+  onChange: (value: string) => void
+}) {
+  return (
+    <div className="shrink-0 border-b px-4 py-2">
+      <div className="relative">
+        <SearchIcon
+          className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground"
+          aria-hidden="true"
+        />
+        <Input
+          type="search"
+          enterKeyHint="search"
+          aria-label={label}
+          className="min-h-11 pl-9 md:text-base"
+          value={value}
+          onChange={(event) => onChange(event.target.value)}
+        />
+      </div>
+    </div>
   )
 }
 

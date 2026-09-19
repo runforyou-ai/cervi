@@ -91,6 +91,11 @@ const contacts = {
     active: "正常",
     inactive: "禁用",
   },
+  avatar: {
+    label: "头像",
+    choose: "选择头像",
+    uploadError: "上传头像失败，请重试。",
+  },
   members: {
     create: "添加企业成员",
     createDescription: "创建可以登录当前企业的成员账号。",

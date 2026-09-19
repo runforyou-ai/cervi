@@ -16,13 +16,12 @@ import {
   MobilePageHeader,
   MobilePageState,
   MobileScrollArea,
+  MobileSearchBar,
 } from "@/apps/mobile/mobile-page"
 import { MobilePagedList } from "@/apps/mobile/mobile-paged-list"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { ProfileAvatar } from "@/components/profile-avatar"
 import { Button } from "@/components/ui/button"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useDateTime } from "@/hooks/use-date-time"
 import { useResource } from "@/hooks/use-resource"
@@ -74,16 +73,11 @@ export function MobileExternalContactsPage() {
         title={t("mobile:contacts.external")}
         backTo="/contacts"
       />
-      <div className="shrink-0 space-y-2 border-b px-4 py-3">
-        <Label htmlFor="mobile-external-search">{t("search.external")}</Label>
-        <Input
-          id="mobile-external-search"
-          type="search"
-          className="min-h-11 md:text-base"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-        />
-      </div>
+      <MobileSearchBar
+        label={t("search.external")}
+        value={search}
+        onChange={setSearch}
+      />
       <MobileExternalContactList
         key={`external:${queryText.trim()}`}
         queryText={queryText.trim()}

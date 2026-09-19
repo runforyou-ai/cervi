@@ -6,6 +6,7 @@ import (
 	"context"
 	"fmt"
 
+	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	commonpassword "github.com/runforyou-ai/cervi/internal/common/password"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -44,8 +45,16 @@ func (a *CreateUserAction) Execute(ctx context.Context, identity *servermodels.I
 			DisplayName:    input.DisplayName,
 			WorkStatus:     string(domain.WorkStatusWorking),
 		}
+		// 传入头像时激活已上传的图片并随身份一起写入。
+		if input.AvatarFileID != "" {
+			avatarFileID, err := fileaction.ActivateLinkedImage(ctx, tx, identity.Organization.ID, domain.FilePurposeUserAvatar, input.AvatarFileID, nil)
+			if err != nil {
+				return err
+			}
+			organizationIdentity.AvatarFileID = avatarFileID
+		}
 		_, err := tx.NewInsert().Model(organizationIdentity).
-			Column("organization_id", "type", "role_id", "display_name", "work_status").Returning("id").Exec(ctx)
+			Column("organization_id", "type", "role_id", "display_name", "avatar_file_id", "work_status").Returning("id").Exec(ctx)
 		if err != nil {
 			return err
 		}

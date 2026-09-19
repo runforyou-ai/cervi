@@ -14,12 +14,10 @@ import {
   type UserListData,
 } from "@/api"
 import { useMobileNavigation } from "@/apps/mobile/mobile-navigation"
-import { MobilePageHeader } from "@/apps/mobile/mobile-page"
+import { MobilePageHeader, MobileSearchBar } from "@/apps/mobile/mobile-page"
 import { MobilePagedList } from "@/apps/mobile/mobile-paged-list"
 import { ProfileAvatar } from "@/components/profile-avatar"
 import { WorkStatusBadge } from "@/components/work-status"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { resourceKeys } from "@/hooks/resource-keys"
 
 type DirectoryKind = "employees" | "agents"
@@ -73,18 +71,11 @@ export function MobileDirectoryPage({
         )}
         backTo={newConversation ? "/inbox" : "/contacts"}
       />
-      <div className="shrink-0 space-y-2 border-b px-4 py-3">
-        <Label htmlFor="mobile-directory-search">
-          {t(kind === "agents" ? "agents.search" : "contacts.search")}
-        </Label>
-        <Input
-          id="mobile-directory-search"
-          type="search"
-          className="min-h-11 md:text-base"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-        />
-      </div>
+      <MobileSearchBar
+        label={t(kind === "agents" ? "agents.search" : "contacts.search")}
+        value={search}
+        onChange={setSearch}
+      />
       <MobileDirectoryList
         key={`${listKey}:${queryText.trim()}`}
         kind={kind}

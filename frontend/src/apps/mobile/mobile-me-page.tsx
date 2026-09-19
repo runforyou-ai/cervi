@@ -44,7 +44,7 @@ import { useResourceInvalidator } from "@/hooks/use-resource"
 import { recoverSession } from "@/lib/session-navigation"
 
 const rowClassName =
-  "flex min-h-14 w-full items-center gap-3 text-left text-sm outline-none active:bg-muted focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50"
+  "flex min-h-14 w-full items-center gap-3 px-4 text-left text-sm outline-none active:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring disabled:opacity-50"
 
 /** 展示个人资料、工作状态、设置入口和退出操作。 */
 export function MobileMePage() {
@@ -92,121 +92,119 @@ export function MobileMePage() {
   return (
     <section className="flex h-full min-h-0 flex-col">
       <MobilePageHeader title={t("me.title")} />
-      <MobileScrollArea storageKey="me" className="px-4 pt-2 pb-6">
-        <div className="mx-auto max-w-lg">
-          <Link
-            to="/me/profile"
-            state={{ mobileBack: true }}
-            aria-label={t("me.profile")}
-            className="flex items-center gap-3 py-4 text-left outline-none active:bg-muted focus-visible:ring-2 focus-visible:ring-ring"
-          >
-            <span className="relative shrink-0">
-              <UserAvatar
-                user={identity.user}
-                className="size-16 text-xl"
-              />
-              <WorkStatusDot
-                status={identity.user.workStatus}
-                className="absolute -right-0.5 -bottom-0.5 size-3.5 ring-2 ring-background"
-              />
-            </span>
-            <span className="min-w-0 flex-1">
-              <span className="block truncate text-base font-semibold">
-                {identity.user.displayName}
-              </span>
-              <span className="mt-1 block truncate text-sm text-muted-foreground">
-                {identity.user.email}
-              </span>
-            </span>
-            <ChevronRightIcon
-              className="size-5 shrink-0 text-muted-foreground"
-              aria-hidden="true"
+      <MobileScrollArea storageKey="me" className="pt-2 pb-6">
+        <Link
+          to="/me/profile"
+          state={{ mobileBack: true }}
+          aria-label={t("me.profile")}
+          className="flex items-center gap-3 px-4 py-4 text-left outline-none active:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+        >
+          <span className="relative shrink-0">
+            <UserAvatar
+              user={identity.user}
+              className="size-16 text-xl"
             />
-          </Link>
-          <div className="divide-y border-y">
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  className={rowClassName}
-                  disabled={changingWorkStatus}
-                >
-                  <span className="flex-1">{t("workspace:workStatus")}</span>
-                  <span className="flex items-center gap-2 text-muted-foreground">
-                    <WorkStatusDot status={identity.user.workStatus} />
-                    {workStatusLabel(identity.user.workStatus, tCommon)}
-                  </span>
-                  <ChevronRightIcon
-                    className="size-5 shrink-0 text-muted-foreground"
-                    aria-hidden="true"
-                  />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-44">
-                {selectableWorkStatuses.map((workStatus) => (
-                  <DropdownMenuItem
-                    key={workStatus}
-                    className="min-h-11"
-                    onSelect={() => void changeWorkStatus(workStatus)}
-                  >
-                    <WorkStatusDot status={workStatus} className="size-2" />
-                    <span className="flex-1">
-                      {workStatusLabel(workStatus, tCommon)}
-                    </span>
-                    {identity.user.workStatus === workStatus ? (
-                      <CheckIcon className="text-primary" />
-                    ) : null}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            {(["security", "preferences"] as const).map((section) => (
-              <Link
-                key={section}
-                to={`/me/${section}`}
-                state={{ mobileBack: true }}
+            <WorkStatusDot
+              status={identity.user.workStatus}
+              className="absolute -right-0.5 -bottom-0.5 size-3.5 ring-2 ring-background"
+            />
+          </span>
+          <span className="min-w-0 flex-1">
+            <span className="block truncate text-base font-semibold">
+              {identity.user.displayName}
+            </span>
+            <span className="mt-1 block truncate text-sm text-muted-foreground">
+              {identity.user.email}
+            </span>
+          </span>
+          <ChevronRightIcon
+            className="size-5 shrink-0 text-muted-foreground"
+            aria-hidden="true"
+          />
+        </Link>
+        <div className="divide-y border-y">
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button
+                type="button"
                 className={rowClassName}
+                disabled={changingWorkStatus}
               >
-                <span className="flex-1">{t(`me.${section}`)}</span>
+                <span className="flex-1">{t("workspace:workStatus")}</span>
+                <span className="flex items-center gap-2 text-muted-foreground">
+                  <WorkStatusDot status={identity.user.workStatus} />
+                  {workStatusLabel(identity.user.workStatus, tCommon)}
+                </span>
                 <ChevronRightIcon
                   className="size-5 shrink-0 text-muted-foreground"
                   aria-hidden="true"
                 />
-              </Link>
-            ))}
-          </div>
-          <div className="mt-9">
-            <AlertDialog>
-              <AlertDialogTrigger asChild>
-                <Button
-                  className="min-h-11 w-full"
-                  variant="destructive"
-                  disabled={loggingOut}
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              {selectableWorkStatuses.map((workStatus) => (
+                <DropdownMenuItem
+                  key={workStatus}
+                  className="min-h-11"
+                  onSelect={() => void changeWorkStatus(workStatus)}
                 >
-                  {loggingOut ? t("loggingOut") : t("logout")}
-                </Button>
-              </AlertDialogTrigger>
-              <AlertDialogContent>
-                <AlertDialogHeader>
-                  <AlertDialogTitle>{t("me.logoutTitle")}</AlertDialogTitle>
-                  <AlertDialogDescription>
-                    {t("me.logoutDescription")}
-                  </AlertDialogDescription>
-                </AlertDialogHeader>
-                <AlertDialogFooter>
-                  <AlertDialogCancel className="min-h-11">
-                    {t("common:actions.cancel")}
-                  </AlertDialogCancel>
-                  <AlertDialogAction
-                    className="min-h-11"
-                    onClick={() => void handleLogout()}
-                  >
-                    {t("logout")}
-                  </AlertDialogAction>
-                </AlertDialogFooter>
-              </AlertDialogContent>
-            </AlertDialog>
-          </div>
+                  <WorkStatusDot status={workStatus} className="size-2" />
+                  <span className="flex-1">
+                    {workStatusLabel(workStatus, tCommon)}
+                  </span>
+                  {identity.user.workStatus === workStatus ? (
+                    <CheckIcon className="text-primary" />
+                  ) : null}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          {(["security", "preferences"] as const).map((section) => (
+            <Link
+              key={section}
+              to={`/me/${section}`}
+              state={{ mobileBack: true }}
+              className={rowClassName}
+            >
+              <span className="flex-1">{t(`me.${section}`)}</span>
+              <ChevronRightIcon
+                className="size-5 shrink-0 text-muted-foreground"
+                aria-hidden="true"
+              />
+            </Link>
+          ))}
+        </div>
+        <div className="mt-9 px-4">
+          <AlertDialog>
+            <AlertDialogTrigger asChild>
+              <Button
+                className="min-h-11 w-full"
+                variant="destructive"
+                disabled={loggingOut}
+              >
+                {loggingOut ? t("loggingOut") : t("logout")}
+              </Button>
+            </AlertDialogTrigger>
+            <AlertDialogContent>
+              <AlertDialogHeader>
+                <AlertDialogTitle>{t("me.logoutTitle")}</AlertDialogTitle>
+                <AlertDialogDescription>
+                  {t("me.logoutDescription")}
+                </AlertDialogDescription>
+              </AlertDialogHeader>
+              <AlertDialogFooter>
+                <AlertDialogCancel className="min-h-11">
+                  {t("common:actions.cancel")}
+                </AlertDialogCancel>
+                <AlertDialogAction
+                  className="min-h-11"
+                  onClick={() => void handleLogout()}
+                >
+                  {t("logout")}
+                </AlertDialogAction>
+              </AlertDialogFooter>
+            </AlertDialogContent>
+          </AlertDialog>
         </div>
       </MobileScrollArea>
     </section>

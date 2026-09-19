@@ -20,13 +20,14 @@ type ListInput struct {
 	PageSize int
 }
 
-// CreateInput 定义新增企业成员字段。
+// CreateInput 定义新增企业成员字段，AvatarFileID 为空时不设置头像。
 type CreateInput struct {
-	DisplayName string
-	Email       string
-	Password    string
-	RoleID      string
-	TeamIDs     []string
+	DisplayName  string
+	Email        string
+	Password     string
+	RoleID       string
+	TeamIDs      []string
+	AvatarFileID string
 }
 
 // UpdateInput 定义企业成员可编辑字段。

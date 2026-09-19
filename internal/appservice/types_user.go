@@ -76,13 +76,14 @@ type UserListInput struct {
 	PageSize int         `json:"pageSize" query:"pageSize,default=50"`
 }
 
-// CreateUserInput 定义新增企业成员字段。
+// CreateUserInput 定义新增企业成员字段，AvatarFileID 为空时不设置头像。
 type CreateUserInput struct {
-	DisplayName string   `json:"displayName"`
-	Email       string   `json:"email"`
-	Password    string   `json:"password"`
-	RoleID      string   `json:"roleId"`
-	TeamIDs     []string `json:"teamIds"`
+	DisplayName  string   `json:"displayName"`
+	Email        string   `json:"email"`
+	Password     string   `json:"password"`
+	RoleID       string   `json:"roleId"`
+	TeamIDs      []string `json:"teamIds"`
+	AvatarFileID string   `json:"avatarFileId"`
 }
 
 // UpdateUserInput 定义企业成员可编辑字段。

@@ -21,6 +21,7 @@ import {
   type MemberOption,
 } from "@/api"
 import { DetailEditActions, DetailEditRow } from "@/components/form/detail-edit-row"
+import { ImagePicker } from "@/components/image-picker"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { Button } from "@/components/ui/button"
 import {
@@ -34,7 +35,7 @@ import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { GroupParticipantList } from "@/features/inbox/group-participant-list"
-import { GroupAvatar, GroupImagePicker } from "@/features/inbox/group-avatar"
+import { GroupAvatar } from "@/features/inbox/group-avatar"
 import { useDateTime } from "@/hooks/use-date-time"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
@@ -220,7 +221,9 @@ function GroupConversationProfile({
         </div>
         <div className="min-w-0 flex-1">
           {canManage ? (
-            <GroupImagePicker
+            <ImagePicker
+              fallback="group"
+              label={t("groupImageChoose")}
               imageURL={image.pending?.previewURL || group.imageUrl}
               className="size-16 rounded-xl"
               disabled={profileBusy}

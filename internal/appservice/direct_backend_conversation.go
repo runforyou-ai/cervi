@@ -723,7 +723,7 @@ func groupConversationError(ctx context.Context, meta RequestMeta, err error, or
 	if errors.Is(err, conversationaction.ErrGroupMemberNotFound) {
 		return NotFoundError(meta, cervii18n.ErrorGroupMemberNotFound)
 	}
-	if errors.Is(err, conversationaction.ErrGroupImageFileNotFound) {
+	if errors.Is(err, fileaction.ErrLinkedImageNotFound) {
 		return NotFoundError(meta, cervii18n.ErrorFileNotFound)
 	}
 	if errors.Is(err, conversationaction.ErrGroupOwnerRequired) {

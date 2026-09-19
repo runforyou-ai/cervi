@@ -91,6 +91,11 @@ const contacts = {
     active: "Normal",
     inactive: "Disabled",
   },
+  avatar: {
+    label: "Profile image",
+    choose: "Choose profile image",
+    uploadError: "Could not upload the profile image. Try again.",
+  },
   members: {
     create: "Add company member",
     createDescription: "Create a member account that can sign in to this company.",

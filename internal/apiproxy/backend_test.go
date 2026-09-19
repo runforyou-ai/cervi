@@ -430,15 +430,16 @@ func TestDirectoryAvatarURLs(t *testing.T) {
 			}
 			user := appservice.User{AvatarURL: sourceURL}
 			users := appservice.UserList{Users: []appservice.User{{AvatarURL: sourceURL}}}
+			agent := appservice.Agent{AvatarURL: sourceURL}
 			agents := appservice.AgentList{Agents: []appservice.AgentListItem{{AvatarURL: sourceURL}}}
 			members := appservice.TeamMemberList{Members: []appservice.TeamMember{{AvatarURL: sourceURL}}}
 			contact := appservice.Contact{AvatarURL: sourceURL}
 			contacts := appservice.ContactList{Contacts: []appservice.ContactSummary{{AvatarURL: sourceURL}}}
-			for _, output := range []any{&user, &users, &agents, &members, &contact, &contacts} {
+			for _, output := range []any{&user, &users, &agent, &agents, &members, &contact, &contacts} {
 				backend.normalizeOutput(output)
 			}
 			for name, got := range map[string]string{
-				"user": user.AvatarURL, "users": users.Users[0].AvatarURL, "agents": agents.Agents[0].AvatarURL,
+				"user": user.AvatarURL, "users": users.Users[0].AvatarURL, "agent": agent.AvatarURL, "agents": agents.Agents[0].AvatarURL,
 				"members": members.Members[0].AvatarURL, "contact": contact.AvatarURL, "contacts": contacts.Contacts[0].AvatarURL,
 			} {
 				if got != want {

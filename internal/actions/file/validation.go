@@ -66,6 +66,8 @@ func NormalizeUploadInput(input UploadInput) (UploadInput, map[string]Validation
 		return normalizeFileInput(input, domain.FilePurposeUserAvatar)
 	case domain.FilePurposeGroupImage:
 		return normalizeFileInput(input, domain.FilePurposeGroupImage)
+	case domain.FilePurposeAgentAvatar:
+		return normalizeFileInput(input, domain.FilePurposeAgentAvatar)
 	default:
 		normalized, fields := normalizeFileInput(input, domain.FilePurposeUserAvatar)
 		fields["purpose"] = ValidationPurposeInvalid

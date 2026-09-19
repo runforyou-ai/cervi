@@ -32,8 +32,8 @@ import {
   groupDescriptionMaxLength,
   groupAdditionalMemberMaxCount,
 } from "@/features/inbox/group-conversation-schema"
+import { ImagePicker } from "@/components/image-picker"
 import { GroupMemberPicker } from "@/features/inbox/group-member-picker"
-import { GroupImagePicker } from "@/features/inbox/group-avatar"
 import { listAllMemberOptions } from "@/features/inbox/list-all-member-options"
 import { usePendingImageUpload } from "@/hooks/use-pending-image-upload"
 import { resourceKeys } from "@/hooks/resource-keys"
@@ -163,7 +163,9 @@ export function CreateGroupConversationDialog({
             <div className="space-y-1.5">
               <span className="block text-sm font-medium">{t("groupImageLabel")}</span>
               <div className="flex items-center gap-3">
-                <GroupImagePicker
+                <ImagePicker
+                  fallback="group"
+                  label={t("groupImageChoose")}
                   imageURL={pendingImage?.previewURL}
                   disabled={form.formState.isSubmitting}
                   loading={pendingImage?.status === "uploading"}

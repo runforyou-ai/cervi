@@ -13,20 +13,22 @@ const (
 	AgentExecutionModeManaged AgentExecutionMode = AgentExecutionMode(domain.AgentExecutionModeManaged)
 )
 
-// CreateAgentInput 定义新增 AI 员工字段。
+// CreateAgentInput 定义新增 AI 员工字段，AvatarFileID 为空时不设置头像。
 type CreateAgentInput struct {
-	DisplayName string              `json:"displayName"`
-	RoleID      string              `json:"roleId"`
-	TeamIDs     []string            `json:"teamIds"`
-	Execution   AgentExecutionInput `json:"execution"`
+	DisplayName  string              `json:"displayName"`
+	RoleID       string              `json:"roleId"`
+	TeamIDs      []string            `json:"teamIds"`
+	AvatarFileID string              `json:"avatarFileId"`
+	Execution    AgentExecutionInput `json:"execution"`
 }
 
-// UpdateAgentInput 定义 AI 员工可编辑字段。
+// UpdateAgentInput 定义 AI 员工可编辑字段，AvatarFileID 为空时保留当前头像。
 type UpdateAgentInput struct {
-	DisplayName string     `json:"displayName"`
-	RoleID      string     `json:"roleId"`
-	TeamIDs     []string   `json:"teamIds"`
-	WorkStatus  WorkStatus `json:"workStatus"`
+	DisplayName  string     `json:"displayName"`
+	RoleID       string     `json:"roleId"`
+	TeamIDs      []string   `json:"teamIds"`
+	WorkStatus   WorkStatus `json:"workStatus"`
+	AvatarFileID string     `json:"avatarFileId"`
 }
 
 // AgentExecutionInput 定义 AI 员工执行配置输入。
@@ -75,6 +77,7 @@ type Agent struct {
 	ID          string               `json:"id"`
 	IdentityID  string               `json:"identityId"`
 	DisplayName string               `json:"displayName"`
+	AvatarURL   string               `json:"avatarUrl"`
 	Role        RoleSummary          `json:"role"`
 	Status      UserStatus           `json:"status"`
 	WorkStatus  WorkStatus           `json:"workStatus"`

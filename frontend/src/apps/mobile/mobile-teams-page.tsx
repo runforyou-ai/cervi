@@ -6,12 +6,10 @@ import { Link, useParams, useSearchParams } from "react-router"
 
 import { listTeamMembers, listTeams, OrganizationIdentityType } from "@/api"
 import { useMobileNavigation } from "@/apps/mobile/mobile-navigation"
-import { MobilePageHeader } from "@/apps/mobile/mobile-page"
+import { MobilePageHeader, MobileSearchBar } from "@/apps/mobile/mobile-page"
 import { MobilePagedList } from "@/apps/mobile/mobile-paged-list"
 import { ProfileAvatar } from "@/components/profile-avatar"
 import { WorkStatusBadge } from "@/components/work-status"
-import { Input } from "@/components/ui/input"
-import { Label } from "@/components/ui/label"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useDateTime } from "@/hooks/use-date-time"
 import { useResource } from "@/hooks/use-resource"
@@ -108,18 +106,11 @@ export function MobileTeamMembersPage() {
         title={teamName ?? t("contacts.teams")}
         backTo="/contacts/teams"
       />
-      <div className="shrink-0 space-y-2 border-b px-4 py-3">
-        <Label htmlFor="mobile-team-member-search">
-          {t("contacts:search.teamMembers")}
-        </Label>
-        <Input
-          id="mobile-team-member-search"
-          type="search"
-          className="min-h-11 md:text-base"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-        />
-      </div>
+      <MobileSearchBar
+        label={t("contacts:search.teamMembers")}
+        value={search}
+        onChange={setSearch}
+      />
       <MobileTeamMemberList
         key={`team:${teamID}:${queryText.trim()}`}
         teamID={teamID}

@@ -159,6 +159,7 @@ export interface Agent {
     "id": string;
     "identityId": string;
     "displayName": string;
+    "avatarUrl": string;
     "role": RoleSummary;
     "status": UserStatus;
     "workStatus": WorkStatus;
@@ -1102,12 +1103,13 @@ export interface ConversationWindowInput {
 }
 
 /**
- * CreateAgentInput 定义新增 AI 员工字段。
+ * CreateAgentInput 定义新增 AI 员工字段，AvatarFileID 为空时不设置头像。
  */
 export interface CreateAgentInput {
     "displayName": string;
     "roleId": string;
     "teamIds": string[] | null;
+    "avatarFileId": string;
     "execution": AgentExecutionInput;
 }
 
@@ -1124,7 +1126,7 @@ export interface CreateMessageChannelInput {
 }
 
 /**
- * CreateUserInput 定义新增企业成员字段。
+ * CreateUserInput 定义新增企业成员字段，AvatarFileID 为空时不设置头像。
  */
 export interface CreateUserInput {
     "displayName": string;
@@ -1132,6 +1134,7 @@ export interface CreateUserInput {
     "password": string;
     "roleId": string;
     "teamIds": string[] | null;
+    "avatarFileId": string;
 }
 
 /**
@@ -1494,6 +1497,7 @@ export enum FilePurpose {
     FilePurposeKnowledgeDocument = "knowledge_document",
     FilePurposeUserAvatar = "user_avatar",
     FilePurposeGroupImage = "group_image",
+    FilePurposeAgentAvatar = "agent_avatar",
 };
 
 /**
@@ -3228,13 +3232,14 @@ export interface UpdateAgentExecutionInput {
 }
 
 /**
- * UpdateAgentInput 定义 AI 员工可编辑字段。
+ * UpdateAgentInput 定义 AI 员工可编辑字段，AvatarFileID 为空时保留当前头像。
  */
 export interface UpdateAgentInput {
     "displayName": string;
     "roleId": string;
     "teamIds": string[] | null;
     "workStatus": WorkStatus;
+    "avatarFileId": string;
 }
 
 /**

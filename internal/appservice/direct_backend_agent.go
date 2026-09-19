@@ -9,6 +9,7 @@ import (
 
 	agentaction "github.com/runforyou-ai/cervi/internal/actions/agent"
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
+	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
@@ -51,7 +52,7 @@ func newAgentOps(db *bun.DB, agentCoordinator *agentrunaction.ExecuteAction, cus
 // CreateAgent 创建企业 AI 员工。
 func (o *directOperations) CreateAgent(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input CreateAgentInput) (Agent, error) {
 	created, err := o.createAgent.Execute(ctx, identity, agentaction.CreateInput{
-		DisplayName: input.DisplayName, RoleID: input.RoleID, TeamIDs: input.TeamIDs,
+		DisplayName: input.DisplayName, RoleID: input.RoleID, TeamIDs: input.TeamIDs, AvatarFileID: input.AvatarFileID,
 		Execution: agentExecutionInput(input.Execution),
 	})
 	if err != nil {
@@ -76,7 +77,7 @@ func (o *directOperations) CreateAgent(ctx context.Context, meta RequestMeta, id
 		"model_identifier", created.Execution.Managed.ModelIdentifier,
 		"knowledge_base_count", len(created.Execution.Managed.KnowledgeBaseIDs),
 	)
-	return agentFromAction(*created, identity.Organization.Name), nil
+	return o.agentWithAvatar(ctx, meta, identity, *created, cervii18n.ErrorAgentCreateFailed)
 }
 
 // ListAgentMCPServerOptions 读取企业 MCP 服务摘要。
@@ -154,12 +155,12 @@ func (o *directOperations) GetAgent(ctx context.Context, meta RequestMeta, ident
 	if err != nil {
 		return Agent{}, o.agentError(ctx, meta, err, cervii18n.ErrorAgentReadFailed, identity.Organization.ID, agentID, nil)
 	}
-	return agentFromAction(*agent, identity.Organization.Name), nil
+	return o.agentWithAvatar(ctx, meta, identity, *agent, cervii18n.ErrorAgentReadFailed)
 }
 
-// UpdateAgent 保存企业 AI 员工基本资料和工作状态。
+// UpdateAgent 保存企业 AI 员工基本资料、头像和工作状态。
 func (o *directOperations) UpdateAgent(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, agentID string, input UpdateAgentInput) (Agent, error) {
-	agent, err := o.updateAgent.Execute(ctx, identity, agentID, agentaction.UpdateInput{DisplayName: input.DisplayName, RoleID: input.RoleID, TeamIDs: input.TeamIDs, WorkStatus: domain.WorkStatus(input.WorkStatus)})
+	agent, err := o.updateAgent.Execute(ctx, identity, agentID, agentaction.UpdateInput{DisplayName: input.DisplayName, RoleID: input.RoleID, TeamIDs: input.TeamIDs, WorkStatus: domain.WorkStatus(input.WorkStatus), AvatarFileID: input.AvatarFileID})
 	if err != nil {
 		return Agent{}, o.agentError(ctx, meta, err, cervii18n.ErrorAgentUpdateFailed, identity.Organization.ID, agentID, map[common.FieldCode]cervii18n.Key{
 			agentaction.ValidationDisplayNameRequired:   cervii18n.FieldAgentNameRequired,
@@ -171,7 +172,7 @@ func (o *directOperations) UpdateAgent(ctx context.Context, meta RequestMeta, id
 		})
 	}
 	slog.Info("AI 员工已保存", "organization_id", identity.Organization.ID, "identity_id", agent.IdentityID, "agent_id", agentID, "work_status", agent.WorkStatus)
-	return agentFromAction(*agent, identity.Organization.Name), nil
+	return o.agentWithAvatar(ctx, meta, identity, *agent, cervii18n.ErrorAgentUpdateFailed)
 }
 
 // UpdateAgentExecution 修改企业 AI 员工的执行配置。
@@ -200,7 +201,7 @@ func (o *directOperations) UpdateAgentExecution(ctx context.Context, meta Reques
 		"knowledge_base_count", len(agent.Execution.Managed.KnowledgeBaseIDs),
 		"mcp_server_count", len(agent.Execution.MCPServerIDs),
 	)
-	return agentFromAction(*agent, identity.Organization.Name), nil
+	return o.agentWithAvatar(ctx, meta, identity, *agent, cervii18n.ErrorAgentExecutionUpdateFailed)
 }
 
 // DeactivateAgent 禁用企业 AI 员工账号。
@@ -222,7 +223,18 @@ func (o *directOperations) changeAgentStatus(ctx context.Context, meta RequestMe
 		})
 	}
 	slog.Info("AI 员工账号状态已修改", "organization_id", identity.Organization.ID, "identity_id", agent.IdentityID, "agent_id", agentID, "status", status)
-	return agentFromAction(*agent, identity.Organization.Name), nil
+	return o.agentWithAvatar(ctx, meta, identity, *agent, cervii18n.ErrorAgentStatusUpdateFailed)
+}
+
+// agentWithAvatar 解析 AI 员工头像地址并转换详情契约。
+func (o *directOperations) agentWithAvatar(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, agent agentaction.Agent, failureKey cervii18n.Key) (Agent, error) {
+	avatarURLs, err := o.optionalFileURLs(ctx, identity, agent.AvatarFileID)
+	if err != nil {
+		return Agent{}, o.agentError(ctx, meta, err, failureKey, identity.Organization.ID, agent.ID, nil)
+	}
+	output := agentFromAction(agent, identity.Organization.Name)
+	output.AvatarURL = optionalFileURL(avatarURLs, agent.AvatarFileID)
+	return output, nil
 }
 
 // agentFromAction 转换 AI 员工契约，并按当前角色附上内置工作规则。
@@ -275,6 +287,9 @@ func (o *directOperations) agentError(ctx context.Context, meta RequestMeta, err
 	}
 	if errors.Is(err, agentaction.ErrNotFound) {
 		return NotFoundError(meta, cervii18n.ErrorAgentNotFound)
+	}
+	if errors.Is(err, fileaction.ErrLinkedImageNotFound) {
+		return NotFoundError(meta, cervii18n.ErrorFileNotFound)
 	}
 	attributes := []any{"organization_id", organizationID, "failure", failureKey, "error", err}
 	if agentID != "" {

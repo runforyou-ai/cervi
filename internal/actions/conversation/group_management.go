@@ -15,6 +15,7 @@ import (
 	"uuid"
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
+	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -111,7 +112,7 @@ func (a *UpdateGroupConversationAction) Execute(ctx context.Context, identity *s
 		nextImageFileID := group.Conversation.ImageFileID
 		imageChanged := false
 		if normalized.ImageFileID != nil {
-			nextImageFileID, err = activateGroupImage(ctx, tx, identity.Organization.ID, *normalized.ImageFileID, group.Conversation.ImageFileID)
+			nextImageFileID, err = fileaction.ActivateLinkedImage(ctx, tx, identity.Organization.ID, domain.FilePurposeGroupImage, *normalized.ImageFileID, group.Conversation.ImageFileID)
 			if err != nil {
 				return err
 			}
@@ -132,7 +133,7 @@ func (a *UpdateGroupConversationAction) Execute(ctx context.Context, identity *s
 				return err
 			}
 			if imageChanged {
-				if err := retireGroupImage(ctx, tx, identity.Organization.ID, group.Conversation.ImageFileID, nextImageFileID); err != nil {
+				if err := fileaction.RetireLinkedImage(ctx, tx, identity.Organization.ID, group.Conversation.ImageFileID, nextImageFileID); err != nil {
 					return err
 				}
 			}
