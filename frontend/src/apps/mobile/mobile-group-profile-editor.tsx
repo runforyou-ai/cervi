@@ -10,11 +10,11 @@ import { ConversationStatus, FilePurpose, updateGroupConversation } from "@/api"
 import type { MobileGroupDetailsContext } from "@/apps/mobile/mobile-group-context"
 import { useMobileBack } from "@/apps/mobile/mobile-navigation"
 import { MobilePageHeader } from "@/apps/mobile/mobile-page"
+import { ImagePicker } from "@/components/image-picker"
 import { Button } from "@/components/ui/button"
 import { FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { GroupImagePicker } from "@/features/inbox/group-avatar"
 import { usePendingImageUpload } from "@/hooks/use-pending-image-upload"
 import {
   createGroupProfileSchema,
@@ -126,7 +126,9 @@ function MobileGroupFieldEditor({
         <div className="space-y-2">
           {field === "image" ? (
             <div className="flex flex-col items-center gap-2 text-center">
-              <GroupImagePicker
+              <ImagePicker
+                fallback="group"
+                label={t("groupImageChoose")}
                 imageURL={image.pending?.previewURL || group.imageUrl}
                 className="size-24"
                 disabled={disabled}

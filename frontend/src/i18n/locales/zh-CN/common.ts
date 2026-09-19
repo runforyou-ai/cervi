@@ -43,6 +43,12 @@ const common = {
   status: {
     loading: "正在加载…",
   },
+  image: {
+    change: "更换",
+    chooseError: "无法选择图片，请重试",
+    typeError: "请选择 JPEG、PNG 或 WebP 图片",
+    sizeError: "图片不能超过 5 MB",
+  },
   comingSoon: "即将支持",
   workStatuses: {
     working: "工作中",

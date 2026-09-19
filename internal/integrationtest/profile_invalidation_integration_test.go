@@ -173,7 +173,7 @@ func TestMemberProfileConversationInvalidation(t *testing.T) {
 	}
 }
 
-// TestAgentProfileConversationInvalidation 验证 AI 员工与 Copilot 创建人的资料变化推进 Agent 聊天、Copilot 线程及其所属客户会话的版本，只改工作状态或重复停用不推进。
+// TestAgentProfileConversationInvalidation 验证 AI 员工改名、换头像与 Copilot 创建人的资料变化推进 Agent 聊天、Copilot 线程及其所属客户会话的版本，只改工作状态或重复停用不推进。
 func TestAgentProfileConversationInvalidation(t *testing.T) {
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
@@ -234,6 +234,25 @@ func TestAgentProfileConversationInvalidation(t *testing.T) {
 		_, err := update.Execute(ctx, f.owner, created.ID, agentaction.UpdateInput{DisplayName: name, RoleID: roleID, WorkStatus: workStatus})
 		return err
 	}
+	// uploadAvatar 上传一张待关联的 AI 员工头像。
+	uploadAvatar := func() string {
+		file, err := fileaction.NewCreateUploadAction(f.db).Execute(ctx, f.owner, domain.FileStorageBackendLocal, fileaction.UploadInput{
+			Purpose: domain.FilePurposeAgentAvatar, FileName: "agent.png", ContentType: "image/png", ByteSize: 1024,
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := fileaction.NewMarkUploadedAction(f.db).Execute(ctx, f.owner, file.ID, ""); err != nil {
+			t.Fatal(err)
+		}
+		return file.ID
+	}
+	firstAvatarID, secondAvatarID := uploadAvatar(), uploadAvatar()
+	// changeAvatar 保持名称与工作状态，只提交头像。
+	changeAvatar := func(fileID string) error {
+		_, err := update.Execute(ctx, f.owner, created.ID, agentaction.UpdateInput{DisplayName: "资料助手新名", RoleID: roleID, WorkStatus: domain.WorkStatusAway, AvatarFileID: fileID})
+		return err
+	}
 	for _, step := range []struct {
 		name   string
 		change func() error
@@ -241,6 +260,9 @@ func TestAgentProfileConversationInvalidation(t *testing.T) {
 	}{
 		{"改名", func() error { return rename("资料助手新名", domain.WorkStatusWorking) }, []int64{1, 1, 1}},
 		{"只改工作状态", func() error { return rename("资料助手新名", domain.WorkStatusAway) }, []int64{0, 0, 0}},
+		{"换头像", func() error { return changeAvatar(firstAvatarID) }, []int64{1, 1, 1}},
+		{"提交相同头像", func() error { return changeAvatar(firstAvatarID) }, []int64{0, 0, 0}},
+		{"替换头像", func() error { return changeAvatar(secondAvatarID) }, []int64{1, 1, 1}},
 		{"Copilot 创建人改名", func() error {
 			_, err := useraction.NewUpdateProfileAction(f.db).Execute(ctx, f.member, useraction.ProfileInput{DisplayName: "线程创建人", Email: f.member.User.Email})
 			return err
@@ -298,6 +320,17 @@ func TestAgentProfileConversationInvalidation(t *testing.T) {
 		}
 		if len(want) > 0 {
 			feed.expect(t, want...)
+		}
+	}
+	// 替换后的头像保持关联，被替换的旧头像交给清理任务。
+	agent, err := agentaction.NewGetAgentQuery(f.db).Execute(ctx, f.owner, created.ID)
+	if err != nil || agent.AvatarFileID == nil || *agent.AvatarFileID != secondAvatarID {
+		t.Fatalf("agent=%+v err=%v", agent, err)
+	}
+	for fileID, want := range map[string]domain.FileStatus{firstAvatarID: domain.FileStatusDeleting, secondAvatarID: domain.FileStatusActive} {
+		var status string
+		if err := f.db.NewSelect().TableExpr("files").Column("status").Where("id = ?", fileID).Scan(ctx, &status); err != nil || status != string(want) {
+			t.Fatalf("file %s status=%q err=%v, want %s", fileID, status, err, want)
 		}
 	}
 	// 以一次本人静音收尾，确认无变化的步骤没有留下通知。

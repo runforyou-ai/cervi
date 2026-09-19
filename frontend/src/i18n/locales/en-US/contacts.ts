@@ -137,6 +137,9 @@ const contacts = {
     create: "Add AI employee",
     form: {
       name: "AI employee name",
+      avatar: "Profile image",
+      avatarChoose: "Choose profile image",
+      avatarUploadError: "Could not upload the profile image. Try again.",
       teams: "Teams",
       noTeams: "There are no teams to select.",
       created: "AI employee added",

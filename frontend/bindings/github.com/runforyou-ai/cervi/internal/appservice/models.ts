@@ -159,6 +159,7 @@ export interface Agent {
     "id": string;
     "identityId": string;
     "displayName": string;
+    "avatarUrl": string;
     "role": RoleSummary;
     "status": UserStatus;
     "workStatus": WorkStatus;
@@ -1494,6 +1495,7 @@ export enum FilePurpose {
     FilePurposeKnowledgeDocument = "knowledge_document",
     FilePurposeUserAvatar = "user_avatar",
     FilePurposeGroupImage = "group_image",
+    FilePurposeAgentAvatar = "agent_avatar",
 };
 
 /**
@@ -3224,13 +3226,14 @@ export interface UpdateAgentExecutionInput {
 }
 
 /**
- * UpdateAgentInput 定义 AI 员工可编辑字段。
+ * UpdateAgentInput 定义 AI 员工可编辑字段，AvatarFileID 为空时保留当前头像。
  */
 export interface UpdateAgentInput {
     "displayName": string;
     "roleId": string;
     "teamIds": string[] | null;
     "workStatus": WorkStatus;
+    "avatarFileId": string;
 }
 
 /**

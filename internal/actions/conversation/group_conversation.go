@@ -14,6 +14,7 @@ import (
 	"uuid"
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
+	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -97,7 +98,7 @@ func (a *CreateGroupConversationAction) Execute(ctx context.Context, identity *s
 		}
 		var imageFileID *string
 		if normalized.ImageFileID != "" {
-			imageFileID, err = activateGroupImage(ctx, tx, identity.Organization.ID, normalized.ImageFileID, nil)
+			imageFileID, err = fileaction.ActivateLinkedImage(ctx, tx, identity.Organization.ID, domain.FilePurposeGroupImage, normalized.ImageFileID, nil)
 			if err != nil {
 				return err
 			}

@@ -11,6 +11,7 @@ import (
 	"uuid"
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
+	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	roleaction "github.com/runforyou-ai/cervi/internal/actions/role"
 	teamaction "github.com/runforyou-ai/cervi/internal/actions/team"
@@ -32,7 +33,7 @@ func NewUpdateAgentAction(db *bun.DB, handoff ServiceSessionHandoff) *UpdateAgen
 	return &UpdateAgentAction{db: db, handoff: handoff}
 }
 
-// Execute 在事务中保存 AI 员工基本资料和工作状态；角色改为非客服时把其负责的开放客服周期交给人工。
+// Execute 在事务中保存 AI 员工基本资料、头像和工作状态；角色改为非客服时把其负责的开放客服周期交给人工。
 func (a *UpdateAgentAction) Execute(ctx context.Context, identity *servermodels.Identity, agentID string, input UpdateInput) (*Agent, error) {
 	input.DisplayName = strings.TrimSpace(input.DisplayName)
 	if input.DisplayName == "" {
@@ -85,9 +86,27 @@ func (a *UpdateAgentAction) Execute(ctx context.Context, identity *servermodels.
 		if err := lockAgentIdentity(ctx, tx, identity.Organization.ID, storedAgent.IdentityID, &previousKind); err != nil {
 			return err
 		}
+		// 传入新头像时激活该图片，替换下来的旧头像交给清理任务。
+		var previousAvatarFileID, nextAvatarFileID *string
+		if input.AvatarFileID != "" {
+			if err := tx.NewSelect().TableExpr("organization_identities AS oi").
+				ColumnExpr("oi.avatar_file_id::text").
+				Where("oi.organization_id = ? AND oi.id = ?", identity.Organization.ID, storedAgent.IdentityID).
+				Scan(ctx, &previousAvatarFileID); err != nil {
+				return err
+			}
+			nextAvatarFileID, err = fileaction.ActivateLinkedImage(ctx, tx, identity.Organization.ID, domain.FilePurposeAgentAvatar, input.AvatarFileID, previousAvatarFileID)
+			if err != nil {
+				return err
+			}
+			if err := fileaction.RetireLinkedImage(ctx, tx, identity.Organization.ID, previousAvatarFileID, nextAvatarFileID); err != nil {
+				return err
+			}
+		}
 		var displayChanged bool
 		err = tx.NewUpdate().Model((*servermodels.OrganizationIdentity)(nil)).
 			Set("display_name = ?", input.DisplayName).
+			Set("avatar_file_id = COALESCE(?, avatar_file_id)", nextAvatarFileID).
 			Set("role_id = ?", input.RoleID).
 			Set("work_status_updated_at = CASE WHEN work_status <> ? THEN now() ELSE work_status_updated_at END", input.WorkStatus).
 			Set("work_status = ?", input.WorkStatus).
@@ -95,7 +114,7 @@ func (a *UpdateAgentAction) Execute(ctx context.Context, identity *servermodels.
 			Where("organization_id = ?", identity.Organization.ID).
 			Where("id = ?", storedAgent.IdentityID).
 			Where("type = ?", domain.OrganizationIdentityTypeAgent).
-			Returning("old.display_name IS DISTINCT FROM new.display_name").
+			Returning("(old.display_name, old.avatar_file_id) IS DISTINCT FROM (new.display_name, new.avatar_file_id)").
 			Scan(ctx, &displayChanged)
 		if err != nil {
 			return err
@@ -109,7 +128,7 @@ func (a *UpdateAgentAction) Execute(ctx context.Context, identity *servermodels.
 				return err
 			}
 		}
-		// 名称实际变化时，在资料写入与交接完成后推进展示该 AI 员工的会话版本；交接已按目标身份、渠道身份、会话的锁序锁定其负责的会话。
+		// 名称或头像实际变化时，在资料写入与交接完成后推进展示该 AI 员工的会话版本；交接已按目标身份、渠道身份、会话的锁序锁定其负责的会话。
 		if displayChanged {
 			if err := chatstate.TouchIdentityConversations(ctx, tx, identity.Organization.ID, storedAgent.IdentityID); err != nil {
 				return err

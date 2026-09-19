@@ -19,11 +19,7 @@ const settings = {
     email: "Email",
     avatar: "Profile image",
     avatarChoose: "Choose image",
-    avatarChange: "Change",
-    avatarChooseError: "Could not choose the image. Try again.",
     avatarUploadError: "Could not upload the profile image. Try again.",
-    avatarTypeError: "Select a JPEG, PNG, or WebP image.",
-    avatarSizeError: "The image cannot exceed 5 MB.",
     saveSuccess: "Profile saved.",
     saveError: "Could not save the profile. Try again.",
     validation: {

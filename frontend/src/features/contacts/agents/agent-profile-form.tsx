@@ -7,6 +7,7 @@ import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
+  FilePurpose,
   RoleKind,
   UserStatus,
   isApiError,
@@ -16,6 +17,7 @@ import {
   type Team,
 } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
+import { ImagePicker } from "@/components/image-picker"
 import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { NativeSelect } from "@/components/ui/native-select"
@@ -30,6 +32,7 @@ import {
   type AgentProfileFormValues,
 } from "@/features/contacts/agents/agent-schema"
 import { useFormLifetime } from "@/hooks/use-form-lifetime"
+import { usePendingImageUpload } from "@/hooks/use-pending-image-upload"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
@@ -69,7 +72,16 @@ export function AgentProfileForm({
       teamIds: agent.teams.map((team) => team.id),
     },
   })
-  const { mounted, dirty } = useFormLifetime(form.formState.isDirty)
+  const avatar = usePendingImageUpload({
+    purpose: FilePurpose.FilePurposeAgentAvatar,
+    onError: (error) => {
+      console.warn("上传 AI 员工头像失败", { agent_id: agent.id, error })
+      if (!recoverSession(error, navigate)) toast.error(t("agents.form.avatarUploadError"))
+    },
+  })
+  const { mounted, dirty } = useFormLifetime(
+    form.formState.isDirty || avatar.pending !== null,
+  )
   const selectedRoleId = useWatch({ control: form.control, name: "roleId" })
 
   // 资料刷新时同步未修改的表单，保留正在编辑的草稿。
@@ -83,16 +95,23 @@ export function AgentProfileForm({
     })
   }, [agent, dirty, form])
 
-  /** 提交基本资料并保留其他页签的编辑内容。 */
+  /** 提交基本资料和待保存的头像，并保留其他页签的编辑内容。 */
   async function submit(values: AgentProfileFormValues) {
+    let uploadingAvatar = false
     try {
-      await updateAgent(agent.id, values)
+      uploadingAvatar = Boolean(avatar.pending && !avatar.pending.fileID)
+      const avatarFileId = await avatar.ensureUploaded()
+      uploadingAvatar = false
+      await updateAgent(agent.id, { ...values, avatarFileId })
       onSaved()
       if (!mounted.current) return
       dirty.current = false
       form.reset(values)
+      avatar.clear()
       toast.success(t("agents.form.saved"))
     } catch (error) {
+      // 上传失败已由共享上传回调提示，保存只处理资料提交错误。
+      if (uploadingAvatar) return
       if (!mounted.current || recoverSession(error, navigate)) return
       console.warn("保存 AI 员工基本资料失败", { agent_id: agent.id, error })
       toast.error(
@@ -111,6 +130,17 @@ export function AgentProfileForm({
   return (
     <form className="space-y-9" onSubmit={form.handleSubmit(submit)} noValidate>
       <FieldGroup>
+        <Field>
+          <FieldLabel>{t("agents.form.avatar")}</FieldLabel>
+          <ImagePicker
+            imageURL={avatar.pending?.previewURL || agent.avatarUrl}
+            fallback="agent"
+            label={t("agents.form.avatarChoose")}
+            disabled={form.formState.isSubmitting}
+            loading={avatar.pending?.status === "uploading"}
+            onSelect={avatar.select}
+          />
+        </Field>
         <FormInputField
           name="displayName"
           id="agent-profile-name"

@@ -56,6 +56,17 @@ const customerViews = [
   },
 ] as const
 
+const serviceStatuses = [
+  {
+    value: ServiceSessionStatus.ServiceSessionStatusOpen,
+    label: "filterServiceStatusOpen",
+  },
+  {
+    value: ServiceSessionStatus.ServiceSessionStatusClosed,
+    label: "filterServiceStatusClosed",
+  },
+] as const
+
 /** 从地址派生与服务端及桌面端一致的完整消息查询。 */
 export function useMobileInboxQuery() {
   const [params, setParams] = useSearchParams()
@@ -328,23 +339,27 @@ export function MobileInboxFilter({
                   ))}
                 </select>
               </div>
-              <div className="space-y-2">
-                <label className="block text-sm font-medium" htmlFor="mobile-inbox-status">
+              <div
+                role="group"
+                aria-labelledby="mobile-inbox-status"
+                className="space-y-2"
+              >
+                <p id="mobile-inbox-status" className="text-sm font-medium">
                   {t("filterServiceStatus")}
-                </label>
-                <select
-                  id="mobile-inbox-status"
-                  className="h-11 w-full rounded-md border bg-background px-3 text-sm"
-                  value={status}
-                  onChange={(event) => setStatus(event.target.value as ServiceSessionStatus)}
-                >
-                  <option value={ServiceSessionStatus.ServiceSessionStatusOpen}>
-                    {t("filterServiceStatusOpen")}
-                  </option>
-                  <option value={ServiceSessionStatus.ServiceSessionStatusClosed}>
-                    {t("filterServiceStatusClosed")}
-                  </option>
-                </select>
+                </p>
+                <div className="grid grid-cols-2 gap-2">
+                  {serviceStatuses.map((item) => (
+                    <Button
+                      key={item.value}
+                      variant={status === item.value ? "default" : "outline"}
+                      className="min-h-11"
+                      aria-pressed={status === item.value}
+                      onClick={() => setStatus(item.value)}
+                    >
+                      {t(item.label)}
+                    </Button>
+                  ))}
+                </div>
               </div>
             </div>
           ) : (

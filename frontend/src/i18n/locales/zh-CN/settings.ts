@@ -19,11 +19,7 @@ const settings = {
     email: "邮箱",
     avatar: "头像",
     avatarChoose: "选择图片",
-    avatarChange: "更换",
-    avatarChooseError: "无法选择图片，请重试。",
     avatarUploadError: "上传头像失败，请重试。",
-    avatarTypeError: "请选择 JPEG、PNG 或 WebP 图片。",
-    avatarSizeError: "图片大小不能超过 5 MB。",
     saveSuccess: "个人资料已保存。",
     saveError: "保存个人资料失败，请重试。",
     validation: {

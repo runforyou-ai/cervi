@@ -28,8 +28,6 @@ var (
 	ErrDirectTargetNotFound = errors.New("direct conversation target not found")
 	// ErrGroupMemberNotFound 表示待加入群聊的成员不存在或不可用。
 	ErrGroupMemberNotFound = errors.New("group conversation member not found")
-	// ErrGroupImageFileNotFound 表示群聊图片文件不可关联。
-	ErrGroupImageFileNotFound = errors.New("group conversation image file not found")
 	// ErrGroupOwnerRequired 表示群主身份校验失败。
 	ErrGroupOwnerRequired = chatstate.ErrGroupOwnerRequired
 	// ErrDataInvariant 表示聊天持久关系不完整或互相矛盾。

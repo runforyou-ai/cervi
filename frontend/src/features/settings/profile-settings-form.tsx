@@ -1,5 +1,5 @@
 /** 个人资料设置表单。 */
-import { useMemo, useRef, useState, type ChangeEvent } from "react"
+import { useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { LoaderCircleIcon } from "lucide-react"
 import { Controller, useForm } from "react-hook-form"
@@ -10,7 +10,6 @@ import { toast } from "sonner"
 import {
   FilePurpose,
   isApiError,
-  selectImage,
   updateProfile,
   type CurrentUser,
 } from "@/api"
@@ -26,12 +25,8 @@ import {
   type ProfileSettingsFormValues,
 } from "@/features/settings/profile-settings-schema"
 import { apiErrorMessage } from "@/lib/form-errors"
-import { UserAvatar } from "@/components/user-avatar"
+import { ImagePicker } from "@/components/image-picker"
 import { resolveAppPlatform } from "@/platform/app-platform"
-
-const avatarContentTypes = new Set(["image/jpeg", "image/png", "image/webp"])
-const maxAvatarByteSize = 5 * 1024 * 1024
-const avatarFileAccept = ".jpg,.jpeg,.png,.webp,image/jpeg,image/png,image/webp"
 
 /** 修改当前用户的头像、姓名和邮箱，移动端使用触屏尺寸的整行保存按钮。 */
 export function ProfileSettingsForm({ user }: { user: CurrentUser }) {
@@ -39,7 +34,6 @@ export function ProfileSettingsForm({ user }: { user: CurrentUser }) {
   const mobile = resolveAppPlatform() === "mobile"
   const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
-  const fileInputRef = useRef<HTMLInputElement>(null)
   const avatar = usePendingImageUpload({
     purpose: FilePurpose.FilePurposeUserAvatar,
     onError: (error) => {
@@ -48,7 +42,6 @@ export function ProfileSettingsForm({ user }: { user: CurrentUser }) {
     },
   })
   const pendingAvatar = avatar.pending
-  const [selectingAvatar, setSelectingAvatar] = useState(false)
   const schema = useMemo(() => createProfileSettingsSchema(t), [t])
   const form = useForm<ProfileSettingsFormValues>({
     resolver: zodResolver(schema),
@@ -58,56 +51,6 @@ export function ProfileSettingsForm({ user }: { user: CurrentUser }) {
       email: user.email,
     },
   })
-  /** 校验、预览并上传新的用户头像。 */
-  function prepareAvatar(selected: File) {
-    if (!avatarContentTypes.has(selected.type)) {
-      toast.error(t("profile.avatarTypeError"))
-      return
-    }
-    if (selected.size <= 0 || selected.size > maxAvatarByteSize) {
-      toast.error(t("profile.avatarSizeError"))
-      return
-    }
-    avatar.select(selected)
-  }
-
-  /** 处理 Web 文件选择器返回的头像图片。 */
-  function selectBrowserAvatar(event: ChangeEvent<HTMLInputElement>) {
-    const selected = event.target.files?.[0]
-    event.target.value = ""
-    if (selected) {
-      prepareAvatar(selected)
-    }
-  }
-
-  /** 按当前平台打开头像图片选择器。 */
-  async function chooseAvatar() {
-    if (resolveAppPlatform() !== "desktop") {
-      fileInputRef.current?.click()
-      return
-    }
-    setSelectingAvatar(true)
-    try {
-      const selected = await selectImage()
-      if (!selected.name) {
-        return
-      }
-      const binary = window.atob(selected.dataBase64)
-      const content = new Uint8Array(binary.length)
-      for (let index = 0; index < binary.length; index += 1) {
-        content[index] = binary.charCodeAt(index)
-      }
-      prepareAvatar(
-        new File([content], selected.name, { type: selected.contentType }),
-      )
-    } catch (error) {
-      console.warn("选择用户头像失败", error)
-      toast.error(t("profile.avatarChooseError"))
-    } finally {
-      setSelectingAvatar(false)
-    }
-  }
-
   /** 保存个人资料并刷新当前身份。 */
   async function save(values: ProfileSettingsFormValues) {
     let uploadingAvatar = false
@@ -150,39 +93,17 @@ export function ProfileSettingsForm({ user }: { user: CurrentUser }) {
       <FieldGroup>
         <Field>
           <FieldLabel>{t("profile.avatar")}</FieldLabel>
-          <div>
-            <input
-              ref={fileInputRef}
-              className="sr-only"
-              type="file"
-              accept={avatarFileAccept}
-              aria-label={t("profile.avatarChoose")}
-              onChange={selectBrowserAvatar}
-            />
-            <button
-              className="group relative size-20 overflow-hidden rounded-full outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
-              type="button"
-              aria-label={t("profile.avatarChoose")}
-              disabled={selectingAvatar || isSubmitting}
-              onClick={() => void chooseAvatar()}
-            >
-              <UserAvatar
-                user={
-                  pendingAvatar
-                    ? { ...user, avatarUrl: pendingAvatar.previewURL }
-                    : user
-                }
-                className="size-full rounded-full text-2xl"
-              />
-              <span className="absolute inset-0 flex items-center justify-center bg-black/55 text-xs font-medium text-white opacity-0 transition-opacity group-hover:opacity-100 group-focus-visible:opacity-100">
-                {selectingAvatar || pendingAvatar?.status === "uploading" ? (
-                  <LoaderCircleIcon className="animate-spin" />
-                ) : (
-                  t("profile.avatarChange")
-                )}
-              </span>
-            </button>
-          </div>
+          <ImagePicker
+            imageURL={pendingAvatar?.previewURL || user.avatarUrl}
+            name={user.displayName}
+            fallback="person"
+            label={t("profile.avatarChoose")}
+            className="rounded-full"
+            avatarClassName="rounded-full text-2xl"
+            disabled={isSubmitting}
+            loading={pendingAvatar?.status === "uploading"}
+            onSelect={avatar.select}
+          />
         </Field>
         <Controller
           name="displayName"

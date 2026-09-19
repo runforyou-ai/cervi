@@ -10,6 +10,7 @@ const (
 	FilePurposeKnowledgeDocument FilePurpose = FilePurpose(domain.FilePurposeKnowledgeDocument)
 	FilePurposeUserAvatar        FilePurpose = FilePurpose(domain.FilePurposeUserAvatar)
 	FilePurposeGroupImage        FilePurpose = FilePurpose(domain.FilePurposeGroupImage)
+	FilePurposeAgentAvatar       FilePurpose = FilePurpose(domain.FilePurposeAgentAvatar)
 )
 
 // FileUploadInput 定义创建上传所需的文件元数据。

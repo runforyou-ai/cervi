@@ -43,6 +43,12 @@ const common = {
   status: {
     loading: "Loading…",
   },
+  image: {
+    change: "Change",
+    chooseError: "Could not choose the image. Try again.",
+    typeError: "Select a JPEG, PNG, or WebP image.",
+    sizeError: "The image cannot exceed 5 MB.",
+  },
   comingSoon: "Soon",
   workStatuses: {
     working: "Working",

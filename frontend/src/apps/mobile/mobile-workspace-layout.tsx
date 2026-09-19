@@ -99,7 +99,7 @@ export function MobileTabLayout() {
               replace
               className={({ isActive }) =>
                 cn(
-                  "flex min-h-14 flex-col items-center justify-center gap-0.5 px-3 text-[11px] font-medium text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+                  "flex min-h-14 flex-col items-center justify-center gap-0.5 px-3 text-xs font-medium text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
                   isActive && "text-primary",
                 )
               }

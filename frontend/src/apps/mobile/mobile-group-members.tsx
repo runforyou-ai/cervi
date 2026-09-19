@@ -1,5 +1,5 @@
 /** 移动端群成员头像预览、成员搜索列表和成员查看页。 */
-import { useId, useState, type ReactNode } from "react"
+import { useState, type ReactNode } from "react"
 import { ChevronRightIcon, MinusIcon, PlusIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Link, useNavigate, useOutletContext } from "react-router"
@@ -10,9 +10,12 @@ import {
   type GroupParticipant,
 } from "@/api"
 import type { MobileGroupDetailsContext } from "@/apps/mobile/mobile-group-context"
-import { MobilePageHeader, MobileScrollArea } from "@/apps/mobile/mobile-page"
+import {
+  MobilePageHeader,
+  MobileScrollArea,
+  MobileSearchBar,
+} from "@/apps/mobile/mobile-page"
 import { ProfileAvatar } from "@/components/profile-avatar"
-import { Input } from "@/components/ui/input"
 
 /** 展示最多两行头像，以及群主添加和移除成员入口。 */
 export function MobileGroupMembersPreview({
@@ -118,7 +121,6 @@ export function MobileGroupMemberList({
   trailing: (member: GroupParticipant) => ReactNode
 }) {
   const { t } = useTranslation("inbox")
-  const searchID = useId()
   const [search, setSearch] = useState("")
   const query = search.trim().toLocaleLowerCase()
   const visible = members.filter((member) =>
@@ -126,18 +128,11 @@ export function MobileGroupMemberList({
   )
   return (
     <>
-      <div className="space-y-2 border-b p-4">
-        <label htmlFor={searchID} className="block text-sm">
-          {t("groupMemberSearch")}
-        </label>
-        <Input
-          id={searchID}
-          type="search"
-          className="min-h-11 md:text-base"
-          value={search}
-          onChange={(event) => setSearch(event.target.value)}
-        />
-      </div>
+      <MobileSearchBar
+        label={t("groupMemberSearch")}
+        value={search}
+        onChange={setSearch}
+      />
       <MobileScrollArea storageKey={`${storageKey}:${search}`}>
         <ul className="divide-y">
           {visible.map((member) => (
