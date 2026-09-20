@@ -345,7 +345,7 @@ func TestRealtimeIdentityProfileNotifications(t *testing.T) {
 			return err
 		}},
 		{"账户偏好", func() error {
-			_, err := preferences.Execute(ctx, f.member, useraction.PreferencesInput{Locale: domain.Locale(f.member.User.Locale), TimeZone: "Asia/Shanghai", MessageNotificationsEnabled: f.member.User.MessageNotificationsEnabled, WorkspaceTabsEnabled: f.member.User.WorkspaceTabsEnabled})
+			_, err := preferences.Execute(ctx, f.member, useraction.PreferencesInput{Locale: domain.Locale(f.member.User.Locale), TimeZone: "Asia/Shanghai", MessageNotificationsEnabled: f.member.User.MessageNotificationsEnabled})
 			return err
 		}},
 		{"管理员修改邮箱", func() error {

@@ -1,4 +1,4 @@
-/** 工作台左侧模块轨和用户菜单。 */
+/** 工作台左侧模块栏和用户菜单。 */
 import { useRef, useState } from "react"
 import {
   CheckIcon,
@@ -42,7 +42,7 @@ import { UserAvatar } from "@/components/user-avatar"
 import { cn } from "@/lib/utils"
 import { requestNotificationPermissionFromMessageMenu } from "@/platform/notifications"
 
-/** 模块轨导航项。 */
+/** 模块栏导航项。 */
 function WorkspaceRailItem({
   to,
   icon: Icon,
@@ -61,20 +61,20 @@ function WorkspaceRailItem({
       to={to}
       onClick={onClick}
       className={cn(
-        "my-px flex h-12 w-full flex-col items-center justify-center gap-0.5 rounded-md px-1 text-[10.5px] leading-tight",
+        "my-px flex h-9 w-full items-center gap-2.5 rounded-md px-2.5 text-sm",
         "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
         "focus-visible:ring-2 focus-visible:ring-sidebar-ring",
         active &&
           "bg-sidebar-accent font-medium text-sidebar-accent-foreground",
       )}
     >
-      <Icon className="size-[18px]" />
-      <span className="line-clamp-2 text-center break-words">{label}</span>
+      <Icon className="size-[18px] shrink-0" />
+      <span className="min-w-0 flex-1 truncate">{label}</span>
     </NavLink>
   )
 }
 
-/** 模块轨导航。 */
+/** 模块栏导航。 */
 function WorkspaceMenu({
   onInboxClick,
 }: {
@@ -124,7 +124,7 @@ function WorkspaceMenu({
   )
 }
 
-/** 渲染模块轨和用户菜单。 */
+/** 渲染模块栏和用户菜单。 */
 export function WorkspaceNavigation({
   identity,
   onLogout,
@@ -191,27 +191,35 @@ export function WorkspaceNavigation({
   return (
     <aside className="cervi-workspace-rail flex h-full shrink-0 flex-col text-sidebar-foreground">
       <WorkspaceMenu onInboxClick={requestMessageNotificationPermission} />
-      <div className="flex justify-center pt-1 pr-0 pb-2.5 pl-1.5">
+      <div className="pt-1 pr-0 pb-2.5 pl-1.5">
         <DropdownMenu open={userMenuOpen} onOpenChange={setUserMenuOpen}>
           <DropdownMenuTrigger asChild>
             <button
               ref={userMenuTriggerRef}
               type="button"
-              className="relative flex size-8 items-center justify-center rounded-lg outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+              className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left outline-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring"
               aria-label={t("openUserMenu", {
                 name: identity.user.displayName,
               })}
             >
-              <UserAvatar user={identity.user} className="size-full rounded-lg" />
-              <WorkStatusDot
-                status={identity.user.workStatus}
-                className="absolute -right-0.5 -bottom-0.5 ring-2 ring-sidebar"
-              />
+              <span className="relative size-8 shrink-0">
+                <UserAvatar
+                  user={identity.user}
+                  className="size-full rounded-lg"
+                />
+                <WorkStatusDot
+                  status={identity.user.workStatus}
+                  className="absolute -right-0.5 -bottom-0.5 ring-2 ring-sidebar"
+                />
+              </span>
+              <span className="min-w-0 flex-1 truncate text-sm">
+                {identity.user.displayName}
+              </span>
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent
-            side="right"
-            align="end"
+            side="top"
+            align="start"
             className="w-56"
             onCloseAutoFocus={(event) => {
               if (!skipUserMenuFocusRestoreRef.current) {
@@ -281,7 +289,7 @@ export function WorkspaceNavigation({
               disabled={loggingOut}
               onSelect={async () => {
                 setUserMenuOpen(false)
-                if (unsavedChanges && !(await unsavedChanges.confirmTabs())) return
+                if (unsavedChanges && !(await unsavedChanges.confirmDiscard())) return
                 onLogout()
               }}
             >

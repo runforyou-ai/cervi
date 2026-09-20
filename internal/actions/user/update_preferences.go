@@ -44,12 +44,11 @@ func (a *UpdatePreferencesAction) Execute(ctx context.Context, identity *serverm
 		}
 		if _, err := identityaction.UpdateUserAccount(ctx, identity.Organization.ID, tx.NewUpdate().
 			Model((*servermodels.User)(nil)).
-			Set("profile_version = profile_version + CASE WHEN (locale, time_zone, message_notifications_enabled, workspace_tabs_enabled) IS DISTINCT FROM (?, ?, ?, ?) THEN 1 ELSE 0 END",
-				input.Locale, input.TimeZone, input.MessageNotificationsEnabled, input.WorkspaceTabsEnabled).
+			Set("profile_version = profile_version + CASE WHEN (locale, time_zone, message_notifications_enabled) IS DISTINCT FROM (?, ?, ?) THEN 1 ELSE 0 END",
+				input.Locale, input.TimeZone, input.MessageNotificationsEnabled).
 			Set("locale = ?", input.Locale).
 			Set("time_zone = ?", input.TimeZone).
 			Set("message_notifications_enabled = ?", input.MessageNotificationsEnabled).
-			Set("workspace_tabs_enabled = ?", input.WorkspaceTabsEnabled).
 			Set("updated_at = now()").
 			Where("u.id = ?", identity.User.ID).
 			Where("u.organization_id = ?", identity.Organization.ID)); err != nil {

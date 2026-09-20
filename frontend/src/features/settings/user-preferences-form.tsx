@@ -69,7 +69,6 @@ export function UserPreferencesForm({ user }: { user: CurrentUser }) {
       locale: user.locale as UserPreferencesFormValues["locale"],
       timeZone: user.timeZone,
       theme: (theme ?? "system") as ThemePreference,
-      workspaceTabsEnabled: user.workspaceTabsEnabled,
       messageNotificationsEnabled: user.messageNotificationsEnabled,
       notificationSoundEnabled:
         readNotificationDevicePreferences(notificationScope).soundEnabled,
@@ -90,7 +89,6 @@ export function UserPreferencesForm({ user }: { user: CurrentUser }) {
       const updated = await updateUserPreferences({
         locale: values.locale,
         timeZone: values.timeZone,
-        workspaceTabsEnabled: values.workspaceTabsEnabled,
         messageNotificationsEnabled: values.messageNotificationsEnabled,
       })
       setTheme(values.theme)
@@ -102,7 +100,6 @@ export function UserPreferencesForm({ user }: { user: CurrentUser }) {
         locale: values.locale,
         timeZone: updated.timeZone,
         theme: values.theme,
-        workspaceTabsEnabled: updated.workspaceTabsEnabled,
         messageNotificationsEnabled: updated.messageNotificationsEnabled,
         notificationSoundEnabled: values.notificationSoundEnabled,
       })
@@ -196,40 +193,6 @@ export function UserPreferencesForm({ user }: { user: CurrentUser }) {
             </Field>
           )}
         />
-        {mobile ? null : (
-          <section
-            className="grid gap-4 border-t pt-5"
-            aria-labelledby="workspace-preferences-title"
-          >
-            <h3 id="workspace-preferences-title" className="font-medium">
-              {t("preferences.workspace.title")}
-            </h3>
-            <Controller
-              name="workspaceTabsEnabled"
-              control={form.control}
-              render={({ field }) => (
-                <Field orientation="horizontal">
-                  <FieldContent>
-                    <FieldLabel htmlFor={field.name}>
-                      {t("preferences.workspace.tabs")}
-                    </FieldLabel>
-                    <FieldDescription>
-                      {t("preferences.workspace.tabsDescription")}
-                    </FieldDescription>
-                  </FieldContent>
-                  <Switch
-                    id={field.name}
-                    name={field.name}
-                    checked={field.value}
-                    onBlur={field.onBlur}
-                    onCheckedChange={field.onChange}
-                    ref={field.ref}
-                  />
-                </Field>
-              )}
-            />
-          </section>
-        )}
         <section
           className="grid gap-4 border-t pt-5"
           aria-labelledby="notification-preferences-title"
