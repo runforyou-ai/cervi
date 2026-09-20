@@ -1659,3 +1659,32 @@ func (b *DirectBackend) UpdateOrganization(ctx context.Context, meta RequestMeta
 	}
 	return b.ops.UpdateOrganization(ctx, meta, identity, input)
 }
+
+// RegisterDevice 注册当前用户的本机设备。
+func (b *DirectBackend) RegisterDevice(ctx context.Context, meta RequestMeta, input DeviceRegistrationInput) (Device, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero Device
+		return zero, err
+	}
+	return b.ops.RegisterDevice(ctx, meta, identity, input)
+}
+
+// ListDevices 返回当前用户已注册的设备。
+func (b *DirectBackend) ListDevices(ctx context.Context, meta RequestMeta) (DeviceList, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero DeviceList
+		return zero, err
+	}
+	return b.ops.ListDevices(ctx, meta, identity)
+}
+
+// RevokeDevice 撤销当前用户的设备。
+func (b *DirectBackend) RevokeDevice(ctx context.Context, meta RequestMeta, deviceID string) error {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		return err
+	}
+	return b.ops.RevokeDevice(ctx, meta, identity, deviceID)
+}

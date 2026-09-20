@@ -6,6 +6,7 @@ import { PageContent } from "@/components/page-content"
 import { PagePaneLink, PagePaneNav, PageSplit } from "@/components/page-split"
 import { PageHeader } from "@/components/page-header"
 import { ChangePasswordForm } from "@/features/settings/change-password-form"
+import { DeviceListPage } from "@/features/settings/device-list-page"
 import { GeneralSettingsForm } from "@/features/settings/general-settings-form"
 import { ProfileSettingsForm } from "@/features/settings/profile-settings-form"
 import { RoleListPage } from "@/features/roles/role-list-page"
@@ -16,7 +17,7 @@ import { useWorkspace } from "@/contexts/workspace-context"
 export function PersonalSettingsPage({
   section,
 }: {
-  section: "profile" | "security" | "preferences"
+  section: "profile" | "security" | "preferences" | "devices"
 }) {
   const { t } = useTranslation("settings")
   const { identity } = useWorkspace()
@@ -40,6 +41,9 @@ export function PersonalSettingsPage({
           <PagePaneLink to="/account/preferences">
             {t("navigation.preferences")}
           </PagePaneLink>
+          <PagePaneLink to="/account/devices">
+            {t("navigation.devices")}
+          </PagePaneLink>
         </PagePaneNav>
       }
     >
@@ -49,6 +53,8 @@ export function PersonalSettingsPage({
           <ProfileSettingsForm user={identity.user} />
         ) : section === "security" ? (
           <ChangePasswordForm />
+        ) : section === "devices" ? (
+          <DeviceListPage />
         ) : (
           <UserPreferencesForm user={identity.user} />
         )}

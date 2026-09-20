@@ -527,6 +527,16 @@ type Backend interface {
 	// UpdateOrganization 修改当前企业通用设置。
 	//cervi:route PUT /settings/organization
 	UpdateOrganization(context.Context, RequestMeta, OrganizationInput) (Organization, error)
+
+	// RegisterDevice 注册当前用户的本机设备。
+	//cervi:route POST /devices
+	RegisterDevice(context.Context, RequestMeta, DeviceRegistrationInput) (Device, error)
+	// ListDevices 返回当前用户已注册的设备。
+	//cervi:route GET /devices
+	ListDevices(context.Context, RequestMeta) (DeviceList, error)
+	// RevokeDevice 撤销当前用户的设备。
+	//cervi:route DELETE /devices/:deviceID
+	RevokeDevice(context.Context, RequestMeta, string) error
 }
 
 // WorkspaceInstaller 由服务端 Backend 实现，用于企业初始化。
@@ -562,6 +572,11 @@ type ExternalPageOpener interface {
 // ConversationWindowOpener 由支持多窗口的平台实现，在独立窗口打开指定会话。
 type ConversationWindowOpener interface {
 	OpenConversationWindow(context.Context, RequestMeta, ConversationWindowInput) error
+}
+
+// LocalDeviceReporter 由把本机注册为设备的原生端实现。
+type LocalDeviceReporter interface {
+	CurrentDevice(context.Context, RequestMeta) (LocalDevice, error)
 }
 
 // NativeLocaleUpdater 同步当前设备上的原生界面语言。

@@ -8,6 +8,7 @@ const settings = {
     profile: "个人资料",
     security: "登录与安全",
     preferences: "偏好设置",
+    devices: "设备",
     general: "通用设置",
     roles: "角色与权限",
   },
@@ -48,6 +49,32 @@ const settings = {
   },
   security: {
     title: "登录与安全",
+  },
+  devices: {
+    title: "设备",
+    list: {
+      columns: {
+        name: "设备名称",
+        platform: "平台",
+        createdAt: "注册时间",
+      },
+      current: "本机",
+      empty: "还没有设备。在电脑上安装并登录 Cervi 桌面端后，这台电脑会出现在这里。",
+      loadError: "加载设备列表失败。",
+    },
+    platforms: {
+      macos: "macOS",
+      windows: "Windows",
+      linux: "Linux",
+    },
+    revoke: {
+      action: "撤销设备",
+      title: "撤销「{{name}}」？",
+      description: "撤销后这台设备不再受信任。该设备下次启动或重新登录时会重新注册。",
+      pending: "正在撤销…",
+      success: "设备已撤销。",
+      error: "撤销设备失败，请重试。",
+    },
   },
   preferences: {
     title: "偏好设置",

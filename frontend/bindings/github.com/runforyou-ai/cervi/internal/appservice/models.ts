@@ -1471,6 +1471,47 @@ export enum DeploymentMode {
 };
 
 /**
+ * Device 定义成员注册到企业的本机设备。
+ */
+export interface Device {
+    "id": string;
+    "name": string;
+    "platform": DevicePlatform;
+    "createdAt": string;
+    "updatedAt": string;
+}
+
+/**
+ * DeviceList 定义当前用户的设备列表。
+ */
+export interface DeviceList {
+    "devices": Device[] | null;
+}
+
+/**
+ * DevicePlatform 定义注册设备的运行平台。
+ */
+export enum DevicePlatform {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    DevicePlatformMacOS = "macos",
+    DevicePlatformWindows = "windows",
+    DevicePlatformLinux = "linux",
+};
+
+/**
+ * DeviceRegistrationInput 定义设备注册上报的本机信息。
+ */
+export interface DeviceRegistrationInput {
+    "installId": string;
+    "name": string;
+    "platform": DevicePlatform;
+}
+
+/**
  * DirectConversationLookup 定义按目标身份查找单聊的结果。
  */
 export interface DirectConversationLookup {
@@ -2486,6 +2527,13 @@ export interface LoadInboxInput {
     "cursor": string;
     "beforeCursor": string;
     "limit": number;
+}
+
+/**
+ * LocalDevice 定义本机在当前企业服务器上的设备注册状态，设备编号为空表示尚未注册。
+ */
+export interface LocalDevice {
+    "deviceId": string;
 }
 
 /**
