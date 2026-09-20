@@ -106,12 +106,6 @@ type Identity struct {
 	User         CurrentUser  `json:"user"`
 }
 
-// ExternalPageInput 定义原生端打开外部页面窗口的输入。
-type ExternalPageInput struct {
-	Title string `json:"title"`
-	URL   string `json:"url"`
-}
-
 // ConversationWindowInput 定义桌面端打开会话独立窗口的输入。
 type ConversationWindowInput struct {
 	ConversationID string `json:"conversationId"`

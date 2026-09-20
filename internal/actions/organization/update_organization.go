@@ -29,8 +29,7 @@ type ValidationError = common.FieldError
 
 // Input 定义企业通用设置修改输入。
 type Input struct {
-	Name              string
-	AllowArbitraryURL bool
+	Name string
 }
 
 // UpdateOrganizationAction 修改企业通用设置。
@@ -62,13 +61,12 @@ func (a *UpdateOrganizationAction) Execute(ctx context.Context, identity *server
 			return err
 		}
 		organization = &servermodels.Organization{
-			ID:                identity.Organization.ID,
-			Name:              input.Name,
-			AllowArbitraryURL: input.AllowArbitraryURL,
+			ID:   identity.Organization.ID,
+			Name: input.Name,
 		}
 		_, err := tx.NewUpdate().
 			Model(organization).
-			Column("name", "allow_arbitrary_url").
+			Column("name").
 			Set("updated_at = now()").
 			WherePK().
 			Returning("*").

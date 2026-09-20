@@ -338,7 +338,7 @@ export function MessageChannelFormPage({
   /** 编辑模式下拦截无效的渠道类型参数。 */
   useEffect(() => {
     if (mode === "edit" && !isMessageChannelType(channelType)) {
-      navigate("/integrations/channels", { replace: true })
+      navigate("/settings/channels", { replace: true })
     }
   }, [channelType, mode, navigate])
 
@@ -347,7 +347,7 @@ export function MessageChannelFormPage({
     if (!loadedChannel) return
     if (loadedChannel.type !== channelType) {
       navigate(
-        `/integrations/channels/${loadedChannel.type}/${loadedChannel.id}`,
+        `/settings/channels/${loadedChannel.type}/${loadedChannel.id}`,
         { replace: true },
       )
       return
@@ -379,7 +379,7 @@ export function MessageChannelFormPage({
         channel_id: channelId,
         channel_type: channelType,
       })
-      navigate("/integrations/channels", { replace: true })
+      navigate("/settings/channels", { replace: true })
     }
   }, [channelId, channelType, detailError, navigate])
 

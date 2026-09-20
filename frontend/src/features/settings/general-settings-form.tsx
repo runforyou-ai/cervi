@@ -1,27 +1,16 @@
 /** 企业通用设置表单。 */
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useRef } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { LoaderCircleIcon } from "lucide-react"
-import { Controller, useForm } from "react-hook-form"
+import { useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import { isApiError, updateOrganization, type Organization } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Switch } from "@/components/ui/switch"
+import { FieldGroup } from "@/components/ui/field"
 import {
   createGeneralSettingsSchema,
   type GeneralSettingsFormValues,
@@ -41,7 +30,6 @@ export function GeneralSettingsForm({
   const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
   const mounted = useRef(true)
-  const [confirmingArbitraryURL, setConfirmingArbitraryURL] = useState(false)
   const schema = useMemo(
     () =>
       createGeneralSettingsSchema({
@@ -55,7 +43,6 @@ export function GeneralSettingsForm({
     shouldUseNativeValidation: true,
     defaultValues: {
       name: organization.name,
-      allowArbitraryUrl: organization.allowArbitraryUrl,
     },
   })
   useEffect(() => {
@@ -71,10 +58,7 @@ export function GeneralSettingsForm({
       const organization = await updateOrganization(values)
       void invalidate(resourceKeys.identity())
       if (!mounted.current) return
-      form.reset({
-        name: organization.name,
-        allowArbitraryUrl: organization.allowArbitraryUrl,
-      })
+      form.reset({ name: organization.name })
       toast.success(t("general.saveSuccess"))
     } catch (error) {
       if (!mounted.current) return
@@ -96,80 +80,25 @@ export function GeneralSettingsForm({
   const { isSubmitting } = form.formState
 
   return (
-    <>
-      <form
-        className="w-full max-w-xl space-y-9"
-        onSubmit={form.handleSubmit(save)}
-        noValidate
-      >
-        <FieldGroup>
-          <FormInputField
-            name="name"
-            control={form.control}
-            label={t("general.form.name")}
-            autoFocus
-          />
-          <Controller
-            name="allowArbitraryUrl"
-            control={form.control}
-            render={({ field }) => (
-              <Field orientation="horizontal">
-                <FieldLabel htmlFor={field.name}>
-                  {t("general.form.allowArbitraryUrl")}
-                </FieldLabel>
-                <Switch
-                  id={field.name}
-                  name={field.name}
-                  checked={field.value}
-                  onBlur={field.onBlur}
-                  onCheckedChange={(checked) => {
-                    if (checked) {
-                      setConfirmingArbitraryURL(true)
-                      return
-                    }
-                    field.onChange(false)
-                  }}
-                  ref={field.ref}
-                />
-              </Field>
-            )}
-          />
-        </FieldGroup>
-        <div>
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? (
-              <LoaderCircleIcon className="animate-spin" />
-            ) : null}
-            {isSubmitting ? t("common:actions.saving") : t("common:actions.save")}
-          </Button>
-        </div>
-      </form>
-
-      <AlertDialog
-        open={confirmingArbitraryURL}
-        onOpenChange={setConfirmingArbitraryURL}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t("general.confirm.title")}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("general.confirm.description")}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t("common:actions.cancel")}</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                form.setValue("allowArbitraryUrl", true, {
-                  shouldDirty: true,
-                })
-              }}
-            >
-              {t("common:actions.confirm")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-    </>
+    <form
+      className="w-full max-w-xl space-y-9"
+      onSubmit={form.handleSubmit(save)}
+      noValidate
+    >
+      <FieldGroup>
+        <FormInputField
+          name="name"
+          control={form.control}
+          label={t("general.form.name")}
+          autoFocus
+        />
+      </FieldGroup>
+      <div>
+        <Button type="submit" disabled={isSubmitting}>
+          {isSubmitting ? <LoaderCircleIcon className="animate-spin" /> : null}
+          {isSubmitting ? t("common:actions.saving") : t("common:actions.save")}
+        </Button>
+      </div>
+    </form>
   )
 }

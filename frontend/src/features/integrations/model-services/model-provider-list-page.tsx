@@ -96,7 +96,7 @@ export function ModelProviderListPage({ section }: { section: ModelServiceSectio
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <PageHeader title={t("modelServices.title")}>
         <Button size="sm" asChild>
-          <Link to={`/integrations/model-services/${section}/new`}>
+          <Link to={`/settings/model-services/${section}/new`}>
             {t("modelServices.list.create")}
           </Link>
         </Button>
@@ -104,7 +104,7 @@ export function ModelProviderListPage({ section }: { section: ModelServiceSectio
       <PageContent>
         <Tabs
           value={section}
-          onValueChange={(value) => navigate(`/integrations/model-services/${value}`)}
+          onValueChange={(value) => navigate(`/settings/model-services/${value}`)}
         >
           <TabsList>
             {modelServiceSectionOrder.map((item) => (
@@ -165,7 +165,7 @@ export function ModelProviderListPage({ section }: { section: ModelServiceSectio
                   primary: (
                     <Button variant="outline" size="sm" asChild>
                       <Link
-                        to={`/integrations/model-services/${section}/${provider.id}`}
+                        to={`/settings/model-services/${section}/${provider.id}`}
                       >
                         {t("common:actions.edit")}
                       </Link>

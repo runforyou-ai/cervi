@@ -118,7 +118,7 @@ export function MessageChannelListPage() {
     <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden">
       <PageHeader title={t("list.title")}>
         <Button size="sm" asChild>
-          <Link to="/integrations/channels/new">{t("list.create")}</Link>
+          <Link to="/settings/channels/new">{t("list.create")}</Link>
         </Button>
       </PageHeader>
 
@@ -214,7 +214,7 @@ export function MessageChannelListPage() {
                 primary: (
                   <Button variant="outline" size="sm" asChild>
                     <Link
-                      to={`/integrations/channels/${channel.type}/${channel.id}`}
+                      to={`/settings/channels/${channel.type}/${channel.id}`}
                     >
                       {t("common:actions.edit")}
                     </Link>

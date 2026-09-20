@@ -270,7 +270,7 @@ export function WebsiteChannelUsagePanel({
       }
       if (isNotFoundApiError(submitError)) {
         console.warn("网站渠道不存在", { channel_id: channel.id })
-        navigate("/integrations/channels", { replace: true })
+        navigate("/settings/channels", { replace: true })
         return
       }
       if (isApiError(submitError)) {

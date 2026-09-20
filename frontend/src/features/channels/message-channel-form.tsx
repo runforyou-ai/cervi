@@ -104,7 +104,7 @@ export function MessageChannelForm({
       void invalidateResource(resourceKeys.channelOptions())
       form.reset(values)
       navigate(
-        `/integrations/channels/${created.type}/${created.id}?tab=basic`,
+        `/settings/channels/${created.type}/${created.id}?tab=basic`,
         { replace: true },
       )
     } catch (error) {
@@ -113,7 +113,7 @@ export function MessageChannelForm({
       }
       if (channel && isNotFoundApiError(error)) {
         console.warn("消息渠道不存在", { channel_id: channel.id })
-        navigate("/integrations/channels", { replace: true })
+        navigate("/settings/channels", { replace: true })
         return
       }
       if (isApiError(error)) {
@@ -233,7 +233,7 @@ export function MessageChannelForm({
           {isSubmitting ? t("common:actions.saving") : t("common:actions.save")}
         </Button>
         <Button variant="outline" asChild>
-          <Link to="/integrations/channels">{t("common:actions.cancel")}</Link>
+          <Link to="/settings/channels">{t("common:actions.cancel")}</Link>
         </Button>
       </div>
     </form>

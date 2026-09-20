@@ -1105,7 +1105,7 @@ func (b *Backend) DeleteRole(ctx context.Context, meta appservice.RequestMeta, r
 // ListAIProviders 返回当前企业的模型服务供应商列表。
 func (b *Backend) ListAIProviders(ctx context.Context, meta appservice.RequestMeta) (appservice.AIProviderList, error) {
 	var output appservice.AIProviderList
-	err := b.do(ctx, meta, http.MethodGet, "/integrations/model-services", nil, nil, &output)
+	err := b.do(ctx, meta, http.MethodGet, "/settings/model-services", nil, nil, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }
@@ -1113,7 +1113,7 @@ func (b *Backend) ListAIProviders(ctx context.Context, meta appservice.RequestMe
 // GetAIProvider 返回当前企业中的模型服务供应商详情。
 func (b *Backend) GetAIProvider(ctx context.Context, meta appservice.RequestMeta, providerID string) (appservice.AIProvider, error) {
 	var output appservice.AIProvider
-	err := b.do(ctx, meta, http.MethodGet, "/integrations/model-services/"+url.PathEscape(providerID), nil, nil, &output)
+	err := b.do(ctx, meta, http.MethodGet, "/settings/model-services/"+url.PathEscape(providerID), nil, nil, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }
@@ -1123,7 +1123,7 @@ func (b *Backend) ListAvailableAIModels(ctx context.Context, meta appservice.Req
 	query := url.Values{}
 	query.Set("brand", string(brand))
 	var output appservice.AIProviderModelList
-	err := b.do(ctx, meta, http.MethodGet, "/integrations/model-services/models", query, nil, &output)
+	err := b.do(ctx, meta, http.MethodGet, "/settings/model-services/models", query, nil, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }
@@ -1131,20 +1131,20 @@ func (b *Backend) ListAvailableAIModels(ctx context.Context, meta appservice.Req
 // DiscoverAIProviderModels 读取模型服务实例当前可用的模型目录。
 func (b *Backend) DiscoverAIProviderModels(ctx context.Context, meta appservice.RequestMeta, input appservice.AIProviderConnectionInput) (appservice.AIProviderModelList, error) {
 	var output appservice.AIProviderModelList
-	err := b.do(ctx, meta, http.MethodPost, "/integrations/model-services/discover-models", nil, input, &output)
+	err := b.do(ctx, meta, http.MethodPost, "/settings/model-services/discover-models", nil, input, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }
 
 // TestAIProviderConnection 测试模型服务供应商草稿配置。
 func (b *Backend) TestAIProviderConnection(ctx context.Context, meta appservice.RequestMeta, input appservice.AIProviderConnectionInput) error {
-	return b.do(ctx, meta, http.MethodPost, "/integrations/model-services/test", nil, input, nil)
+	return b.do(ctx, meta, http.MethodPost, "/settings/model-services/test", nil, input, nil)
 }
 
 // CreateAIProvider 创建模型服务供应商。
 func (b *Backend) CreateAIProvider(ctx context.Context, meta appservice.RequestMeta, input appservice.AIProviderInput) (appservice.AIProvider, error) {
 	var output appservice.AIProvider
-	err := b.do(ctx, meta, http.MethodPost, "/integrations/model-services", nil, input, &output)
+	err := b.do(ctx, meta, http.MethodPost, "/settings/model-services", nil, input, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }
@@ -1152,57 +1152,20 @@ func (b *Backend) CreateAIProvider(ctx context.Context, meta appservice.RequestM
 // UpdateAIProvider 修改模型服务供应商。
 func (b *Backend) UpdateAIProvider(ctx context.Context, meta appservice.RequestMeta, providerID string, input appservice.AIProviderInput) (appservice.AIProvider, error) {
 	var output appservice.AIProvider
-	err := b.do(ctx, meta, http.MethodPut, "/integrations/model-services/"+url.PathEscape(providerID), nil, input, &output)
+	err := b.do(ctx, meta, http.MethodPut, "/settings/model-services/"+url.PathEscape(providerID), nil, input, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }
 
 // DeleteAIProvider 删除模型服务供应商。
 func (b *Backend) DeleteAIProvider(ctx context.Context, meta appservice.RequestMeta, providerID string) error {
-	return b.do(ctx, meta, http.MethodDelete, "/integrations/model-services/"+url.PathEscape(providerID), nil, nil, nil)
-}
-
-// ListBusinessSystems 返回当前企业配置的业务系统。
-func (b *Backend) ListBusinessSystems(ctx context.Context, meta appservice.RequestMeta) (appservice.BusinessSystemList, error) {
-	var output appservice.BusinessSystemList
-	err := b.do(ctx, meta, http.MethodGet, "/integrations/business-systems", nil, nil, &output)
-	b.normalizeOutput(&output)
-	return output, err
-}
-
-// GetBusinessSystem 返回当前企业中的业务系统详情。
-func (b *Backend) GetBusinessSystem(ctx context.Context, meta appservice.RequestMeta, businessSystemID string) (appservice.BusinessSystem, error) {
-	var output appservice.BusinessSystem
-	err := b.do(ctx, meta, http.MethodGet, "/integrations/business-systems/"+url.PathEscape(businessSystemID), nil, nil, &output)
-	b.normalizeOutput(&output)
-	return output, err
-}
-
-// CreateBusinessSystem 创建业务系统。
-func (b *Backend) CreateBusinessSystem(ctx context.Context, meta appservice.RequestMeta, input appservice.BusinessSystemInput) (appservice.BusinessSystem, error) {
-	var output appservice.BusinessSystem
-	err := b.do(ctx, meta, http.MethodPost, "/integrations/business-systems", nil, input, &output)
-	b.normalizeOutput(&output)
-	return output, err
-}
-
-// UpdateBusinessSystem 修改业务系统。
-func (b *Backend) UpdateBusinessSystem(ctx context.Context, meta appservice.RequestMeta, businessSystemID string, input appservice.BusinessSystemInput) (appservice.BusinessSystem, error) {
-	var output appservice.BusinessSystem
-	err := b.do(ctx, meta, http.MethodPut, "/integrations/business-systems/"+url.PathEscape(businessSystemID), nil, input, &output)
-	b.normalizeOutput(&output)
-	return output, err
-}
-
-// DeleteBusinessSystem 删除业务系统。
-func (b *Backend) DeleteBusinessSystem(ctx context.Context, meta appservice.RequestMeta, businessSystemID string) error {
-	return b.do(ctx, meta, http.MethodDelete, "/integrations/business-systems/"+url.PathEscape(businessSystemID), nil, nil, nil)
+	return b.do(ctx, meta, http.MethodDelete, "/settings/model-services/"+url.PathEscape(providerID), nil, nil, nil)
 }
 
 // ListMCPServers 返回当前企业配置的 MCP 服务。
 func (b *Backend) ListMCPServers(ctx context.Context, meta appservice.RequestMeta) (appservice.MCPServerList, error) {
 	var output appservice.MCPServerList
-	err := b.do(ctx, meta, http.MethodGet, "/integrations/mcp-servers", nil, nil, &output)
+	err := b.do(ctx, meta, http.MethodGet, "/settings/mcp-servers", nil, nil, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }
@@ -1210,30 +1173,30 @@ func (b *Backend) ListMCPServers(ctx context.Context, meta appservice.RequestMet
 // GetMCPServer 返回当前企业中的 MCP 服务详情。
 func (b *Backend) GetMCPServer(ctx context.Context, meta appservice.RequestMeta, mcpServerID string) (appservice.MCPServer, error) {
 	var output appservice.MCPServer
-	err := b.do(ctx, meta, http.MethodGet, "/integrations/mcp-servers/"+url.PathEscape(mcpServerID), nil, nil, &output)
+	err := b.do(ctx, meta, http.MethodGet, "/settings/mcp-servers/"+url.PathEscape(mcpServerID), nil, nil, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }
 
 // TestMCPServerConnection 测试 MCP 草稿连接配置。
 func (b *Backend) TestMCPServerConnection(ctx context.Context, meta appservice.RequestMeta, input appservice.MCPServerConnectionInput) error {
-	return b.do(ctx, meta, http.MethodPost, "/integrations/mcp-servers/test-connection", nil, input, nil)
+	return b.do(ctx, meta, http.MethodPost, "/settings/mcp-servers/test-connection", nil, input, nil)
 }
 
 // TestSavedMCPServerConnection 测试已保存的 MCP 服务。
 func (b *Backend) TestSavedMCPServerConnection(ctx context.Context, meta appservice.RequestMeta, mcpServerID string) error {
-	return b.do(ctx, meta, http.MethodPost, "/integrations/mcp-servers/"+url.PathEscape(mcpServerID)+"/test-connection", nil, nil, nil)
+	return b.do(ctx, meta, http.MethodPost, "/settings/mcp-servers/"+url.PathEscape(mcpServerID)+"/test-connection", nil, nil, nil)
 }
 
 // RefreshMCPServerTools 提交当前企业的 MCP 工具更新任务。
 func (b *Backend) RefreshMCPServerTools(ctx context.Context, meta appservice.RequestMeta) error {
-	return b.do(ctx, meta, http.MethodPost, "/integrations/mcp-servers/refresh-tools", nil, nil, nil)
+	return b.do(ctx, meta, http.MethodPost, "/settings/mcp-servers/refresh-tools", nil, nil, nil)
 }
 
 // CreateMCPServer 创建 MCP 服务。
 func (b *Backend) CreateMCPServer(ctx context.Context, meta appservice.RequestMeta, input appservice.MCPServerInput) (appservice.MCPServer, error) {
 	var output appservice.MCPServer
-	err := b.do(ctx, meta, http.MethodPost, "/integrations/mcp-servers", nil, input, &output)
+	err := b.do(ctx, meta, http.MethodPost, "/settings/mcp-servers", nil, input, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }
@@ -1241,14 +1204,14 @@ func (b *Backend) CreateMCPServer(ctx context.Context, meta appservice.RequestMe
 // UpdateMCPServer 修改 MCP 服务。
 func (b *Backend) UpdateMCPServer(ctx context.Context, meta appservice.RequestMeta, mcpServerID string, input appservice.MCPServerInput) (appservice.MCPServer, error) {
 	var output appservice.MCPServer
-	err := b.do(ctx, meta, http.MethodPut, "/integrations/mcp-servers/"+url.PathEscape(mcpServerID), nil, input, &output)
+	err := b.do(ctx, meta, http.MethodPut, "/settings/mcp-servers/"+url.PathEscape(mcpServerID), nil, input, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }
 
 // DeleteMCPServer 删除 MCP 服务。
 func (b *Backend) DeleteMCPServer(ctx context.Context, meta appservice.RequestMeta, mcpServerID string) error {
-	return b.do(ctx, meta, http.MethodDelete, "/integrations/mcp-servers/"+url.PathEscape(mcpServerID), nil, nil, nil)
+	return b.do(ctx, meta, http.MethodDelete, "/settings/mcp-servers/"+url.PathEscape(mcpServerID), nil, nil, nil)
 }
 
 // UpdateOrganization 修改当前企业通用设置。

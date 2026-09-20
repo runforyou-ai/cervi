@@ -9,8 +9,6 @@ const workspace = {
   inbox: "消息",
   contacts: "通讯录",
   knowledgeBases: "知识库",
-  integrations: "集成",
-  apps: "应用",
   settings: "设置",
   openUserMenu: "打开 {{name}} 的用户菜单",
   workStatus: "工作状态",

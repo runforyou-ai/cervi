@@ -460,69 +460,53 @@ type Backend interface {
 	//cervi:route DELETE /settings/roles/:roleID
 	DeleteRole(context.Context, RequestMeta, string) error
 	// ListAIProviders 返回当前企业的模型服务供应商列表。
-	//cervi:route GET /integrations/model-services
+	//cervi:route GET /settings/model-services
 	ListAIProviders(context.Context, RequestMeta) (AIProviderList, error)
 	// GetAIProvider 返回当前企业中的模型服务供应商详情。
-	//cervi:route GET /integrations/model-services/:providerID
+	//cervi:route GET /settings/model-services/:providerID
 	GetAIProvider(context.Context, RequestMeta, string) (AIProvider, error)
 	// ListAvailableAIModels 返回指定品牌的预设模型目录。
-	//cervi:route GET /integrations/model-services/models query=brand
+	//cervi:route GET /settings/model-services/models query=brand
 	ListAvailableAIModels(context.Context, RequestMeta, AIProviderBrand) (AIProviderModelList, error)
 	// DiscoverAIProviderModels 读取模型服务实例当前可用的模型目录。
-	//cervi:route POST /integrations/model-services/discover-models
+	//cervi:route POST /settings/model-services/discover-models
 	DiscoverAIProviderModels(context.Context, RequestMeta, AIProviderConnectionInput) (AIProviderModelList, error)
 	// TestAIProviderConnection 测试模型服务供应商草稿配置。
-	//cervi:route POST /integrations/model-services/test
+	//cervi:route POST /settings/model-services/test
 	TestAIProviderConnection(context.Context, RequestMeta, AIProviderConnectionInput) error
 	// CreateAIProvider 创建模型服务供应商。
-	//cervi:route POST /integrations/model-services status=201
+	//cervi:route POST /settings/model-services status=201
 	CreateAIProvider(context.Context, RequestMeta, AIProviderInput) (AIProvider, error)
 	// UpdateAIProvider 修改模型服务供应商。
-	//cervi:route PUT /integrations/model-services/:providerID
+	//cervi:route PUT /settings/model-services/:providerID
 	UpdateAIProvider(context.Context, RequestMeta, string, AIProviderInput) (AIProvider, error)
 	// DeleteAIProvider 删除模型服务供应商。
-	//cervi:route DELETE /integrations/model-services/:providerID
+	//cervi:route DELETE /settings/model-services/:providerID
 	DeleteAIProvider(context.Context, RequestMeta, string) error
-	// ListBusinessSystems 返回当前企业配置的业务系统。
-	//cervi:route GET /integrations/business-systems
-	ListBusinessSystems(context.Context, RequestMeta) (BusinessSystemList, error)
-	// GetBusinessSystem 返回当前企业中的业务系统详情。
-	//cervi:route GET /integrations/business-systems/:businessSystemID
-	GetBusinessSystem(context.Context, RequestMeta, string) (BusinessSystem, error)
-	// CreateBusinessSystem 创建业务系统。
-	//cervi:route POST /integrations/business-systems status=201
-	CreateBusinessSystem(context.Context, RequestMeta, BusinessSystemInput) (BusinessSystem, error)
-	// UpdateBusinessSystem 修改业务系统。
-	//cervi:route PUT /integrations/business-systems/:businessSystemID
-	UpdateBusinessSystem(context.Context, RequestMeta, string, BusinessSystemInput) (BusinessSystem, error)
-	// DeleteBusinessSystem 删除业务系统。
-	//cervi:route DELETE /integrations/business-systems/:businessSystemID
-	DeleteBusinessSystem(context.Context, RequestMeta, string) error
-
 	// ListMCPServers 返回当前企业配置的 MCP 服务。
-	//cervi:route GET /integrations/mcp-servers
+	//cervi:route GET /settings/mcp-servers
 	ListMCPServers(context.Context, RequestMeta) (MCPServerList, error)
 	// GetMCPServer 返回当前企业中的 MCP 服务详情。
-	//cervi:route GET /integrations/mcp-servers/:mcpServerID
+	//cervi:route GET /settings/mcp-servers/:mcpServerID
 	GetMCPServer(context.Context, RequestMeta, string) (MCPServer, error)
 	// TestMCPServerConnection 测试 MCP 草稿连接配置。
-	//cervi:route POST /integrations/mcp-servers/test-connection
+	//cervi:route POST /settings/mcp-servers/test-connection
 	TestMCPServerConnection(context.Context, RequestMeta, MCPServerConnectionInput) error
 	// TestSavedMCPServerConnection 测试已保存的 MCP 服务。
-	//cervi:route POST /integrations/mcp-servers/:mcpServerID/test-connection
+	//cervi:route POST /settings/mcp-servers/:mcpServerID/test-connection
 	TestSavedMCPServerConnection(context.Context, RequestMeta, string) error
 	// RefreshMCPServerTools 提交当前企业的 MCP 工具更新任务。
-	//cervi:route POST /integrations/mcp-servers/refresh-tools
+	//cervi:route POST /settings/mcp-servers/refresh-tools
 	RefreshMCPServerTools(context.Context, RequestMeta) error
 
 	// CreateMCPServer 创建 MCP 服务。
-	//cervi:route POST /integrations/mcp-servers status=201
+	//cervi:route POST /settings/mcp-servers status=201
 	CreateMCPServer(context.Context, RequestMeta, MCPServerInput) (MCPServer, error)
 	// UpdateMCPServer 修改 MCP 服务。
-	//cervi:route PUT /integrations/mcp-servers/:mcpServerID
+	//cervi:route PUT /settings/mcp-servers/:mcpServerID
 	UpdateMCPServer(context.Context, RequestMeta, string, MCPServerInput) (MCPServer, error)
 	// DeleteMCPServer 删除 MCP 服务。
-	//cervi:route DELETE /integrations/mcp-servers/:mcpServerID
+	//cervi:route DELETE /settings/mcp-servers/:mcpServerID
 	DeleteMCPServer(context.Context, RequestMeta, string) error
 	// UpdateOrganization 修改当前企业通用设置。
 	//cervi:route PUT /settings/organization
@@ -562,11 +546,6 @@ type RealtimeConnector interface {
 // ImageSelector 由支持原生文件对话框的平台实现。
 type ImageSelector interface {
 	SelectImage(context.Context, RequestMeta) (ImageFile, error)
-}
-
-// ExternalPageOpener 由支持多窗口的平台实现，在应用内新窗口打开外部页面。
-type ExternalPageOpener interface {
-	OpenExternalPage(context.Context, RequestMeta, ExternalPageInput) error
 }
 
 // ConversationWindowOpener 由支持多窗口的平台实现，在独立窗口打开指定会话。

@@ -115,7 +115,7 @@ export function ModelProviderFormPage({
   const [loadingModels, setLoadingModels] = useState(false)
   const [testingConnection, setTestingConnection] = useState(false)
   const mounted = useRef(true)
-  const listPath = `/integrations/model-services/${returnSection}`
+  const listPath = `/settings/model-services/${returnSection}`
   const initialBrand = modelServiceSectionConfigs[returnSection].defaultBrand
   const schema = useMemo(
     () =>

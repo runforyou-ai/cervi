@@ -9,8 +9,6 @@ const workspace = {
   inbox: "Messages",
   contacts: "Contacts",
   knowledgeBases: "Knowledge bases",
-  integrations: "Integrations",
-  apps: "Apps",
   settings: "Settings",
   openUserMenu: "Open the user menu for {{name}}",
   workStatus: "Work status",

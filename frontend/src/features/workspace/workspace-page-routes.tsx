@@ -7,10 +7,6 @@ import { MessageChannelListPage } from "@/features/channels/message-channel-list
 import { AgentFormPage } from "@/features/contacts/agents/agent-form-page"
 import { ContactsPage } from "@/features/contacts/contacts-page"
 import { InboxRoute } from "@/features/inbox/inbox-route"
-import { AppsPage } from "@/features/apps/apps-page"
-import { IntegrationsLayout } from "@/features/integrations/integrations-layout"
-import { BusinessSystemFormPage } from "@/features/integrations/business-systems/business-system-form-page"
-import { BusinessSystemListPage } from "@/features/integrations/business-systems/business-system-list-page"
 import { MCPServerFormPage } from "@/features/integrations/mcp-servers/mcp-server-form-page"
 import { MCPServerListPage } from "@/features/integrations/mcp-servers/mcp-server-list-page"
 import { ModelProviderFormPage } from "@/features/integrations/model-services/model-provider-form-page"
@@ -29,7 +25,6 @@ import { SettingsPage } from "@/features/settings/settings-page"
 /** 需要公共外壳的路由前缀，同一前缀下的页面渲染在对应布局内。 */
 const workspaceRouteLayouts = [
   { prefix: "/knowledge-bases", element: <KnowledgeBaseLayout /> },
-  { prefix: "/integrations", element: <IntegrationsLayout /> },
 ]
 
 /** 工作台路由清单，地址解析与页面渲染共用同一份定义。 */
@@ -147,78 +142,125 @@ const workspaceRouteDefinitions = [
     path: "/knowledge-bases",
     element: <KnowledgeBaseIndexPage />,
   },
-  { path: "/apps", element: <AppsPage /> },
   {
-    path: "/integrations/channels/new",
-    element: <MessageChannelFormPage mode="create" />,
+    path: "/settings/channels/new",
+    element: (
+      <SettingsPage section="channels">
+        <MessageChannelFormPage mode="create" />
+      </SettingsPage>
+    ),
   },
   {
-    path: "/integrations/channels/:channelType/:channelId",
-    element: <MessageChannelFormPage mode="edit" />,
+    path: "/settings/channels/:channelType/:channelId",
+    element: (
+      <SettingsPage section="channels">
+        <MessageChannelFormPage mode="edit" />
+      </SettingsPage>
+    ),
   },
   {
-    path: "/integrations/channels",
-    element: <MessageChannelListPage />,
+    path: "/settings/channels",
+    element: (
+      <SettingsPage section="channels">
+        <MessageChannelListPage />
+      </SettingsPage>
+    ),
   },
   {
-    path: "/integrations/business-systems/new",
-    element: <BusinessSystemFormPage mode="create" />,
+    path: "/settings/mcp-servers/new",
+    element: (
+      <SettingsPage section="mcpServers">
+        <MCPServerFormPage mode="create" />
+      </SettingsPage>
+    ),
   },
   {
-    path: "/integrations/business-systems/:businessSystemId",
-    element: <BusinessSystemFormPage mode="edit" />,
+    path: "/settings/mcp-servers/:mcpServerId",
+    element: (
+      <SettingsPage section="mcpServers">
+        <MCPServerFormPage mode="edit" />
+      </SettingsPage>
+    ),
   },
   {
-    path: "/integrations/business-systems",
-    element: <BusinessSystemListPage />,
+    path: "/settings/mcp-servers",
+    element: (
+      <SettingsPage section="mcpServers">
+        <MCPServerListPage />
+      </SettingsPage>
+    ),
   },
   {
-    path: "/integrations/mcp-servers/new",
-    element: <MCPServerFormPage mode="create" />,
+    path: "/settings/model-services/chat/new",
+    element: (
+      <SettingsPage section="modelServices">
+        <ModelProviderFormPage mode="create" returnSection="chat" />
+      </SettingsPage>
+    ),
   },
   {
-    path: "/integrations/mcp-servers/:mcpServerId",
-    element: <MCPServerFormPage mode="edit" />,
+    path: "/settings/model-services/chat/:providerId",
+    element: (
+      <SettingsPage section="modelServices">
+        <ModelProviderFormPage mode="edit" returnSection="chat" />
+      </SettingsPage>
+    ),
   },
   {
-    path: "/integrations/mcp-servers",
-    element: <MCPServerListPage />,
+    path: "/settings/model-services/chat",
+    element: (
+      <SettingsPage section="modelServices">
+        <ModelProviderListPage section="chat" />
+      </SettingsPage>
+    ),
   },
   {
-    path: "/integrations/model-services/chat/new",
-    element: <ModelProviderFormPage mode="create" returnSection="chat" />,
+    path: "/settings/model-services/embedding/new",
+    element: (
+      <SettingsPage section="modelServices">
+        <ModelProviderFormPage mode="create" returnSection="embedding" />
+      </SettingsPage>
+    ),
   },
   {
-    path: "/integrations/model-services/chat/:providerId",
-    element: <ModelProviderFormPage mode="edit" returnSection="chat" />,
+    path: "/settings/model-services/embedding/:providerId",
+    element: (
+      <SettingsPage section="modelServices">
+        <ModelProviderFormPage mode="edit" returnSection="embedding" />
+      </SettingsPage>
+    ),
   },
   {
-    path: "/integrations/model-services/chat",
-    element: <ModelProviderListPage section="chat" />,
+    path: "/settings/model-services/embedding",
+    element: (
+      <SettingsPage section="modelServices">
+        <ModelProviderListPage section="embedding" />
+      </SettingsPage>
+    ),
   },
   {
-    path: "/integrations/model-services/embedding/new",
-    element: <ModelProviderFormPage mode="create" returnSection="embedding" />,
+    path: "/settings/model-services/rerank/new",
+    element: (
+      <SettingsPage section="modelServices">
+        <ModelProviderFormPage mode="create" returnSection="rerank" />
+      </SettingsPage>
+    ),
   },
   {
-    path: "/integrations/model-services/embedding/:providerId",
-    element: <ModelProviderFormPage mode="edit" returnSection="embedding" />,
+    path: "/settings/model-services/rerank/:providerId",
+    element: (
+      <SettingsPage section="modelServices">
+        <ModelProviderFormPage mode="edit" returnSection="rerank" />
+      </SettingsPage>
+    ),
   },
   {
-    path: "/integrations/model-services/embedding",
-    element: <ModelProviderListPage section="embedding" />,
-  },
-  {
-    path: "/integrations/model-services/rerank/new",
-    element: <ModelProviderFormPage mode="create" returnSection="rerank" />,
-  },
-  {
-    path: "/integrations/model-services/rerank/:providerId",
-    element: <ModelProviderFormPage mode="edit" returnSection="rerank" />,
-  },
-  {
-    path: "/integrations/model-services/rerank",
-    element: <ModelProviderListPage section="rerank" />,
+    path: "/settings/model-services/rerank",
+    element: (
+      <SettingsPage section="modelServices">
+        <ModelProviderListPage section="rerank" />
+      </SettingsPage>
+    ),
   },
 ] as const satisfies readonly {
   path: string
@@ -261,8 +303,7 @@ const workspaceRouteObjects: RouteObject[] = [
 const workspaceRedirects: Readonly<Record<string, string>> = {
   "/settings": "/settings/profile",
   "/contacts": "/contacts/employees",
-  "/integrations": "/integrations/channels",
-  "/integrations/model-services": "/integrations/model-services/chat",
+  "/settings/model-services": "/settings/model-services/chat",
 }
 
 export type ResolvedWorkspaceLocation = {

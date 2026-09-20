@@ -764,31 +764,6 @@ func (s *Service) DeleteAIProvider(ctx context.Context, meta RequestMeta, provid
 	return s.backend.DeleteAIProvider(ctx, meta, providerID)
 }
 
-// ListBusinessSystems 返回当前企业配置的业务系统。
-func (s *Service) ListBusinessSystems(ctx context.Context, meta RequestMeta) (BusinessSystemList, error) {
-	return withNormalizedSlices(s.backend.ListBusinessSystems(ctx, meta))
-}
-
-// GetBusinessSystem 返回当前企业中的业务系统详情。
-func (s *Service) GetBusinessSystem(ctx context.Context, meta RequestMeta, businessSystemID string) (BusinessSystem, error) {
-	return withNormalizedSlices(s.backend.GetBusinessSystem(ctx, meta, businessSystemID))
-}
-
-// CreateBusinessSystem 创建业务系统。
-func (s *Service) CreateBusinessSystem(ctx context.Context, meta RequestMeta, input BusinessSystemInput) (BusinessSystem, error) {
-	return withNormalizedSlices(s.backend.CreateBusinessSystem(ctx, meta, input))
-}
-
-// UpdateBusinessSystem 修改业务系统。
-func (s *Service) UpdateBusinessSystem(ctx context.Context, meta RequestMeta, businessSystemID string, input BusinessSystemInput) (BusinessSystem, error) {
-	return withNormalizedSlices(s.backend.UpdateBusinessSystem(ctx, meta, businessSystemID, input))
-}
-
-// DeleteBusinessSystem 删除业务系统。
-func (s *Service) DeleteBusinessSystem(ctx context.Context, meta RequestMeta, businessSystemID string) error {
-	return s.backend.DeleteBusinessSystem(ctx, meta, businessSystemID)
-}
-
 // ListMCPServers 返回当前企业配置的 MCP 服务。
 func (s *Service) ListMCPServers(ctx context.Context, meta RequestMeta) (MCPServerList, error) {
 	return withNormalizedSlices(s.backend.ListMCPServers(ctx, meta))
