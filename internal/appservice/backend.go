@@ -161,7 +161,7 @@ type Backend interface {
 	// ClaimServiceSession 领取或接管客户会话最新处理周期。
 	//cervi:route POST /conversations/:conversationID/claim
 	ClaimServiceSession(context.Context, RequestMeta, string) (CustomerServiceSession, error)
-	// TransferServiceSession 把当前负责的处理周期转给另一位客服。
+	// TransferServiceSession 把当前负责的处理周期转给成员、团队队列或公共队列。
 	//cervi:route POST /conversations/:conversationID/transfer
 	TransferServiceSession(context.Context, RequestMeta, string, TransferServiceSessionInput) (CustomerServiceSession, error)
 	// CloseServiceSession 关闭客户会话最新处理周期。

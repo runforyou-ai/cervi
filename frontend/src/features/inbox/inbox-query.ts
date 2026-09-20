@@ -85,7 +85,7 @@ export function normalizeInboxQuery(query: InboxQueryInput): NormalizedInboxQuer
     ? query.customerView
     : CustomerInboxView.CustomerInboxViewQueue
   const queue =
-    customerView === CustomerInboxView.CustomerInboxViewQueue
+    customer && customerView === CustomerInboxView.CustomerInboxViewQueue
       ? normalizeQueueFilter(query.queueFilter, query.queueTeamId)
       : { queueFilter: CustomerQueueFilter.$zero, queueTeamId: "" }
   return {

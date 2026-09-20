@@ -314,7 +314,7 @@ const inbox = {
   conversationTransferCoworkers: "Teammates",
   conversationTransferTeams: "Teams",
   conversationTransferPublicQueue: "Return to public queue",
-  conversationTransferTeamUnavailable: "No member in this team handles customers",
+  conversationTransferTeamUnavailable: "No one handling",
   conversationMore: "More conversation actions",
   conversationClose: "Close",
   conversationReopen: "Reopen",

@@ -357,7 +357,7 @@ func (b *Backend) ClaimServiceSession(ctx context.Context, meta appservice.Reque
 	return output, err
 }
 
-// TransferServiceSession 把当前负责的处理周期转给另一位客服。
+// TransferServiceSession 把当前负责的处理周期转给成员、团队队列或公共队列。
 func (b *Backend) TransferServiceSession(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.TransferServiceSessionInput) (appservice.CustomerServiceSession, error) {
 	var output appservice.CustomerServiceSession
 	err := b.do(ctx, meta, http.MethodPost, "/conversations/"+url.PathEscape(conversationID)+"/transfer", nil, input, &output)

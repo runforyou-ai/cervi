@@ -1123,7 +1123,7 @@ export function TransferGroupConversationOwner(meta: $models.RequestMeta, conver
 }
 
 /**
- * TransferServiceSession 把当前负责的处理周期转给另一位客服。
+ * TransferServiceSession 把当前负责的处理周期转给成员、团队队列或公共队列。
  */
 export function TransferServiceSession(meta: $models.RequestMeta, conversationID: string, input: $models.TransferServiceSessionInput): $CancellablePromise<$models.CustomerServiceSession> {
     return $Call.ByID(2034510468, meta, conversationID, input);

@@ -122,6 +122,7 @@ export function TeamPanel({
 
   /** 团队或成员关系变化后，失效内嵌所属团队的成员和 AI 员工缓存。 */
   function invalidateMembershipCaches() {
+    void invalidate(resourceKeys.serviceQueueTeams())
     void invalidate(resourceKeys.users())
     void invalidate(resourceKeys.user())
     void invalidate(resourceKeys.agents())

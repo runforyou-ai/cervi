@@ -230,10 +230,14 @@ export function CustomerTransferMenuItems({
               key={team.id}
               className={itemClassName}
               disabled={!team.available}
-              title={team.available ? undefined : t("conversationTransferTeamUnavailable")}
               onSelect={() => void actions.transferToTeam(team)}
             >
-              {team.name}
+              <span className="min-w-0 flex-1 truncate">{team.name}</span>
+              {team.available ? null : (
+                <span className="text-xs text-muted-foreground">
+                  {t("conversationTransferTeamUnavailable")}
+                </span>
+              )}
             </DropdownMenuItem>
           ))}
           <DropdownMenuSeparator />

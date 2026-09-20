@@ -470,7 +470,7 @@ func (b *DirectBackend) ClaimServiceSession(ctx context.Context, meta RequestMet
 	return b.ops.ClaimServiceSession(ctx, meta, identity, conversationID)
 }
 
-// TransferServiceSession 把当前负责的处理周期转给另一位客服。
+// TransferServiceSession 把当前负责的处理周期转给成员、团队队列或公共队列。
 func (b *DirectBackend) TransferServiceSession(ctx context.Context, meta RequestMeta, conversationID string, input TransferServiceSessionInput) (CustomerServiceSession, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
 	if err != nil {

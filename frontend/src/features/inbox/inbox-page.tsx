@@ -332,7 +332,7 @@ export function InboxPage({
         : CustomerInboxView.CustomerInboxViewCoworkers
     // 同事视图已按其他客服筛选时改为新的负责人，未筛选时保持查看全部同事。
     const nextAssignee = nextView === CustomerInboxView.CustomerInboxViewCoworkers && assigneeIdentityId ? assigneeId : ""
-    // 会话回到队列后所属队列可能已改变，按全部队列跟随，保证仍能看到它。
+    // 跟随到「待分配」时一律按全部队列。
     const nextQueueFilter = nextView === CustomerInboxView.CustomerInboxViewQueue
       ? CustomerQueueFilter.CustomerQueueFilterAll
       : CustomerQueueFilter.$zero
@@ -439,6 +439,7 @@ export function InboxPage({
             <InboxConversationList
               conversations={conversations}
               showQueueTeam={
+                scope === InboxScope.InboxScopeCustomer &&
                 customerView === CustomerInboxView.CustomerInboxViewQueue &&
                 queueFilter === CustomerQueueFilter.CustomerQueueFilterAll
               }

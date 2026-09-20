@@ -229,7 +229,7 @@ func (s *Service) ClaimServiceSession(ctx context.Context, meta RequestMeta, con
 	return withNormalizedSlices(s.backend.ClaimServiceSession(ctx, meta, conversationID))
 }
 
-// TransferServiceSession 把当前负责的处理周期转给另一位客服。
+// TransferServiceSession 把当前负责的处理周期转给成员、团队队列或公共队列。
 func (s *Service) TransferServiceSession(ctx context.Context, meta RequestMeta, conversationID string, input TransferServiceSessionInput) (CustomerServiceSession, error) {
 	return withNormalizedSlices(s.backend.TransferServiceSession(ctx, meta, conversationID, input))
 }

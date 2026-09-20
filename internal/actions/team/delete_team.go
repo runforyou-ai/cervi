@@ -28,6 +28,10 @@ func (a *DeleteTeamAction) Execute(ctx context.Context, identity *servermodels.I
 		if _, err := loadTeam(ctx, tx, identity.Organization.ID, teamID); err != nil {
 			return err
 		}
+		// 先锁定团队行，与转交给团队的共享锁互斥，队列清理后不会再有新的周期写入该团队。
+		if err := lockTeam(ctx, tx, identity.Organization.ID, teamID); err != nil {
+			return err
+		}
 		if _, err := tx.NewDelete().Model((*servermodels.TeamMember)(nil)).
 			Where("organization_id = ?", identity.Organization.ID).
 			Where("team_id = ?", teamID).

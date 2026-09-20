@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	"testing"
+	"time"
 	"uuid"
 
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
@@ -17,6 +18,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
+	"github.com/uptrace/bun"
 )
 
 // loadServiceSessionQueue 读取客户会话当前处理周期的负责人与所属队列。
@@ -104,12 +106,24 @@ func TestServiceSessionTeamQueue(t *testing.T) {
 		t.Fatalf("全部队列筛选缺少会话或团队标签 = %v", name)
 	}
 
-	// 领取不改变队列，退回公共队列同时清空负责人与队列。
+	// 领取与转交给个人都不改变队列，退回公共队列同时清空负责人与队列。
 	if _, err := claim.Execute(ctx, f.member, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
 	if _, teamID := loadServiceSessionQueue(t, f, f.conversationID); teamID == nil || *teamID != staffed.ID {
 		t.Fatalf("领取后队列 = %v", teamID)
+	}
+	if _, err := transfer.Execute(ctx, f.member, conversationaction.TransferServiceSessionInput{
+		ConversationID: f.conversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: f.owner.OrganizationIdentity.ID,
+	}); err != nil {
+		t.Fatalf("转交给个人 = %v", err)
+	}
+	assignee, teamID = loadServiceSessionQueue(t, f, f.conversationID)
+	if assignee == nil || *assignee != f.owner.OrganizationIdentity.ID || teamID == nil || *teamID != staffed.ID {
+		t.Fatalf("转交给个人后归属 = %v, %v", assignee, teamID)
+	}
+	if _, err := claim.Execute(ctx, f.member, f.conversationID); err != nil {
+		t.Fatal(err)
 	}
 	if _, err := transfer.Execute(ctx, f.member, conversationaction.TransferServiceSessionInput{
 		ConversationID: f.conversationID, TargetKind: domain.ServiceSessionTargetPublicQueue,
@@ -160,5 +174,73 @@ func TestServiceSessionTeamQueue(t *testing.T) {
 	}
 	if _, teamID := loadServiceSessionQueue(t, f, teamConversationID); teamID != nil {
 		t.Fatalf("删除团队后队列 = %v", *teamID)
+	}
+}
+
+// TestDeleteTeamWaitsForTransfer 验证删除团队与转交给团队互斥：转交持有团队共享锁并写入队列后，删除等待其提交，仍把该周期并入公共队列。
+func TestDeleteTeamWaitsForTransfer(t *testing.T) {
+	f := newCustomerReadFixture(t)
+	ctx := context.Background()
+	team, err := teamaction.NewCreateTeamAction(f.db).Execute(ctx, f.owner, teamaction.Input{Name: "并发删除团队"})
+	if err != nil {
+		t.Fatal(err)
+	}
+	written, commit := make(chan string, 1), make(chan struct{})
+	transferred := make(chan error, 1)
+	go func() {
+		transferred <- f.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+			// 与转交给团队相同的锁顺序：先对团队行取共享锁，再写入周期所属队列。
+			var lockedID string
+			if err := tx.NewSelect().TableExpr("teams AS t").Column("id").
+				Where("t.organization_id = ? AND t.id = ?", f.owner.Organization.ID, team.ID).
+				For("KEY SHARE").Scan(ctx, &lockedID); err != nil {
+				return err
+			}
+			if _, err := tx.NewUpdate().Table("service_sessions").Set("team_id = ?", team.ID).
+				Where("organization_id = ? AND conversation_id = ?", f.owner.Organization.ID, f.conversationID).
+				Exec(ctx); err != nil {
+				return err
+			}
+			var xid string
+			if err := tx.NewSelect().ColumnExpr("pg_current_xact_id()::text").Scan(ctx, &xid); err != nil {
+				return err
+			}
+			written <- xid
+			<-commit
+			return nil
+		})
+	}()
+
+	xid := <-written
+	deleted := make(chan error, 1)
+	go func() {
+		deleted <- teamaction.NewDeleteTeamAction(f.db).Execute(ctx, f.owner, team.ID)
+	}()
+	// 等删除在该事务上排队，确保队列清理发生在转交提交之后。
+	deadline := time.Now().Add(10 * time.Second)
+	for {
+		var waiting int
+		if err := f.db.NewSelect().TableExpr("pg_locks").ColumnExpr("count(*)").
+			Where("NOT granted AND locktype = 'transactionid' AND transactionid::text = ?", xid).
+			Scan(ctx, &waiting); err != nil {
+			t.Fatal(err)
+		}
+		if waiting > 0 {
+			break
+		}
+		if time.Now().After(deadline) {
+			t.Fatal("删除团队没有等待转交事务")
+		}
+		time.Sleep(10 * time.Millisecond)
+	}
+	close(commit)
+	if err := <-transferred; err != nil {
+		t.Fatal(err)
+	}
+	if err := <-deleted; err != nil {
+		t.Fatal(err)
+	}
+	if _, teamID := loadServiceSessionQueue(t, f, f.conversationID); teamID != nil {
+		t.Fatalf("删除团队后仍指向已删团队，队列 = %v", *teamID)
 	}
 }
