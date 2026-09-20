@@ -85,7 +85,8 @@ function WorkspaceMenu({
 
   return (
     <nav
-      className="flex flex-1 flex-col items-stretch gap-0.5 px-1.5 pt-1"
+      // 右侧留白由主内容区的内缩间隙承担，使选中块与两侧可见边界等距。
+      className="flex flex-1 flex-col items-stretch gap-0.5 pt-1 pr-0 pl-1.5"
       aria-label={t("navigationGroup")}
     >
       <WorkspaceRailItem
@@ -197,7 +198,7 @@ export function WorkspaceNavigation({
 
   return (
     <aside className="cervi-workspace-rail flex h-full shrink-0 flex-col text-sidebar-foreground">
-      <div className="flex justify-center px-3 pt-2.5 pb-1">
+      <div className="flex justify-center pt-2.5 pr-0 pb-1 pl-1.5">
         <DropdownMenu open={userMenuOpen} onOpenChange={setUserMenuOpen}>
           <DropdownMenuTrigger asChild>
             <button
