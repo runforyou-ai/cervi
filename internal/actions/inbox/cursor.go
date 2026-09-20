@@ -70,6 +70,8 @@ type inboxCursor struct {
 	PinOrderVersion    int64                       `json:"pinOrderVersion"`
 	Scope              domain.InboxScope           `json:"scope"`
 	CustomerView       domain.CustomerInboxView    `json:"customerView"`
+	QueueFilter        domain.CustomerQueueFilter  `json:"queueFilter"`
+	QueueTeamID        string                      `json:"queueTeamId"`
 	AssigneeIdentityID string                      `json:"assigneeIdentityId"`
 	ChannelID          string                      `json:"channelId"`
 	ServiceStatus      domain.ServiceSessionStatus `json:"serviceStatus"`
@@ -88,6 +90,7 @@ func encodeInboxCursor(identity *servermodels.Identity, input LoadInput, pinOrde
 		OrganizationID: identity.Organization.ID, UserID: identity.User.ID,
 		Partition: input.Partition, PinOrderVersion: pinOrderVersion,
 		Scope: input.Scope, CustomerView: input.CustomerView, AssigneeIdentityID: input.AssigneeIdentityID,
+		QueueFilter: input.QueueFilter, QueueTeamID: input.QueueTeamID,
 		ChannelID: input.ChannelID, ServiceStatus: input.ServiceStatus, Kinds: input.Kinds,
 		Search: input.Search, SearchRange: input.SearchRange,
 	})
@@ -108,6 +111,7 @@ func decodeInboxCursor(value string, identity *servermodels.Identity, input Load
 		cursor.OrganizationID != identity.Organization.ID || cursor.UserID != identity.User.ID ||
 		cursor.Partition != input.Partition ||
 		cursor.Scope != input.Scope || cursor.CustomerView != input.CustomerView || cursor.AssigneeIdentityID != input.AssigneeIdentityID ||
+		cursor.QueueFilter != input.QueueFilter || cursor.QueueTeamID != input.QueueTeamID ||
 		cursor.ChannelID != input.ChannelID || cursor.ServiceStatus != input.ServiceStatus || !slices.Equal(cursor.Kinds, input.Kinds) ||
 		cursor.Search != input.Search || cursor.SearchRange != input.SearchRange ||
 		!common.ValidUUID(cursor.ID) {

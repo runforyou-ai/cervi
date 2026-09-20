@@ -29,6 +29,8 @@ type LoadInput struct {
 	Partition          domain.InboxPartition
 	Scope              domain.InboxScope
 	CustomerView       domain.CustomerInboxView
+	QueueFilter        domain.CustomerQueueFilter
+	QueueTeamID        string
 	AssigneeIdentityID string
 	ChannelID          string
 	ServiceStatus      domain.ServiceSessionStatus
@@ -64,6 +66,9 @@ type CustomerConversationSummary struct {
 	ServiceSessionStatus      domain.ServiceSessionStatus
 	ServiceSessionID          string
 	Assignee                  *AssigneeSummary
+	// TeamID 与 TeamName 是处理周期所属的团队队列，为空表示公共队列。
+	TeamID   *string
+	TeamName *string
 	// UnansweredMentionCount 是当前客服周期内被提醒成员尚未在会话中发言的内部提醒数。
 	UnansweredMentionCount int
 }
@@ -154,6 +159,8 @@ type customerConversationRow struct {
 	AssigneeType              *string                          `bun:"assignee_type"`
 	AssigneeDisplayName       *string                          `bun:"assignee_display_name"`
 	AssigneeAvatarFileID      *string                          `bun:"assignee_avatar_file_id"`
+	TeamID                    *string                          `bun:"team_id"`
+	TeamName                  *string                          `bun:"team_name"`
 	LastActivityAt            *time.Time                       `bun:"last_activity_at"`
 	UnreadCount               int                              `bun:"unread_count"`
 	MentionedUnreadCount      int                              `bun:"mentioned_unread_count"`
@@ -337,10 +344,13 @@ func (q *LoadInboxQuery) customerConversationDetailsQuery(organizationID, curren
 		ColumnExpr("assignee.type AS assignee_type").
 		ColumnExpr("assignee.display_name AS assignee_display_name").
 		ColumnExpr("assignee.avatar_file_id::text AS assignee_avatar_file_id").
+		ColumnExpr("current.team_id::text AS team_id").
+		ColumnExpr("team.name AS team_name").
 		Join("LEFT JOIN conversation_participants AS preview_cp ON preview_cp.id = msg.sender_participant_id AND preview_cp.organization_id = msg.organization_id AND preview_cp.conversation_id = msg.conversation_id").
 		Join("LEFT JOIN chat_subjects AS preview_cs ON preview_cs.id = preview_cp.subject_id AND preview_cs.organization_id = preview_cp.organization_id").
 		Join("LEFT JOIN organization_identities AS preview_oi ON preview_oi.id = preview_cs.source_id AND preview_oi.organization_id = preview_cs.organization_id AND preview_cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
 		Join("LEFT JOIN organization_identities AS assignee ON assignee.organization_id = cv.organization_id AND assignee.id = current.assignee_identity_id").
+		Join("LEFT JOIN teams AS team ON team.organization_id = cv.organization_id AND team.id = current.team_id").
 		Join("LEFT JOIN conversation_user_states AS state ON state.organization_id = cv.organization_id AND state.conversation_id = cv.id AND state.user_id = ?", userID).
 		Join(`JOIN LATERAL (
 			SELECT count(*) AS unread_count,
@@ -405,6 +415,12 @@ func filterCustomerInbox(query *bun.SelectQuery, currentIdentityID string, input
 		switch input.CustomerView {
 		case domain.CustomerInboxViewQueue:
 			query = query.Where("current.assignee_identity_id IS NULL")
+			switch input.QueueFilter {
+			case domain.CustomerQueueFilterPublic:
+				query = query.Where("current.team_id IS NULL")
+			case domain.CustomerQueueFilterTeam:
+				query = query.Where("current.team_id = ?", input.QueueTeamID)
+			}
 		case domain.CustomerInboxViewMine:
 			query = query.Where("current.assignee_identity_id = ?", currentIdentityID)
 		case domain.CustomerInboxViewCoworkers:
@@ -583,6 +599,7 @@ func (row customerConversationRow) summary() ConversationSummary {
 			ChannelType: domain.ChannelType(row.ChannelType), ChannelName: row.ChannelName,
 			Preview: row.Preview, PreviewSenderIdentityType: row.PreviewSenderIdentityType, PreviewVisibility: row.PreviewVisibility, LastMessageAt: row.LastMessageAt,
 			ServiceSessionID: row.ServiceSessionID, ServiceSessionStatus: domain.ServiceSessionStatus(row.ServiceSessionStatus), Assignee: assignee,
+			TeamID: row.TeamID, TeamName: row.TeamName,
 			UnansweredMentionCount: row.UnansweredMentionCount,
 		},
 	}
@@ -647,11 +664,36 @@ func normalizeInboxKinds(scope domain.InboxScope, kinds []domain.ConversationTyp
 	return normalized, nil
 }
 
+// validateQueueFilter 校验队列筛选：只在「待分配」视图生效，指定团队时须带有效团队编号。
+func validateQueueFilter(input LoadInput) error {
+	if input.CustomerView != domain.CustomerInboxViewQueue {
+		if input.QueueFilter != "" || input.QueueTeamID != "" {
+			return ErrQueryInvalid
+		}
+		return nil
+	}
+	switch input.QueueFilter {
+	case domain.CustomerQueueFilterAll, domain.CustomerQueueFilterPublic:
+		if input.QueueTeamID != "" {
+			return ErrQueryInvalid
+		}
+	case domain.CustomerQueueFilterTeam:
+		if !common.ValidUUID(input.QueueTeamID) {
+			return ErrQueryInvalid
+		}
+	default:
+		return ErrQueryInvalid
+	}
+	return nil
+}
+
 // normalizeLoadInput 规范化并校验收件箱筛选。
 func normalizeLoadInput(input LoadInput) (LoadInput, error) {
 	input.Scope = domain.InboxScope(strings.TrimSpace(string(input.Scope)))
 	input.CustomerView = domain.CustomerInboxView(strings.TrimSpace(string(input.CustomerView)))
 	input.ServiceStatus = domain.ServiceSessionStatus(strings.TrimSpace(string(input.ServiceStatus)))
+	input.QueueFilter = domain.CustomerQueueFilter(strings.TrimSpace(string(input.QueueFilter)))
+	input.QueueTeamID = strings.TrimSpace(input.QueueTeamID)
 	input.AssigneeIdentityID = strings.TrimSpace(input.AssigneeIdentityID)
 	input.ChannelID = strings.TrimSpace(input.ChannelID)
 	if input.Scope == "" {
@@ -688,6 +730,7 @@ func normalizeLoadInput(input LoadInput) (LoadInput, error) {
 	if input.Scope != domain.InboxScopeCustomer {
 		// 处理归属、渠道和服务状态只描述客户队列，其他范围一律按空条件读取。
 		input.CustomerView, input.AssigneeIdentityID, input.ChannelID, input.ServiceStatus = "", "", "", ""
+		input.QueueFilter, input.QueueTeamID = "", ""
 		return input, nil
 	}
 	if input.CustomerView == "" {
@@ -695,6 +738,12 @@ func normalizeLoadInput(input LoadInput) (LoadInput, error) {
 	}
 	if input.ServiceStatus == "" {
 		input.ServiceStatus = domain.ServiceSessionStatusOpen
+	}
+	if input.CustomerView == domain.CustomerInboxViewQueue && input.QueueFilter == "" {
+		input.QueueFilter = domain.CustomerQueueFilterAll
+	}
+	if err := validateQueueFilter(input); err != nil {
+		return input, err
 	}
 	if !slices.Contains([]domain.CustomerInboxView{domain.CustomerInboxViewQueue, domain.CustomerInboxViewMine, domain.CustomerInboxViewCoworkers, domain.CustomerInboxViewMentioned}, input.CustomerView) ||
 		(input.ServiceStatus != domain.ServiceSessionStatusOpen && input.ServiceStatus != domain.ServiceSessionStatusClosed) ||

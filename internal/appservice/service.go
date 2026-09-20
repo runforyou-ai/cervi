@@ -19,6 +19,7 @@ type Service struct {
 	unreadIndicator     UnreadIndicator
 	externalPageOpener  ExternalPageOpener
 	conversationWindows ConversationWindowOpener
+	localDevice         LocalDeviceReporter
 }
 
 // Option 配置平台专属的应用服务能力。
@@ -63,6 +64,13 @@ func WithExternalPageOpener(opener ExternalPageOpener) Option {
 func WithConversationWindowOpener(opener ConversationWindowOpener) Option {
 	return func(service *Service) {
 		service.conversationWindows = opener
+	}
+}
+
+// WithLocalDevice 注入原生端本机设备注册状态。
+func WithLocalDevice(reporter LocalDeviceReporter) Option {
+	return func(service *Service) {
+		service.localDevice = reporter
 	}
 }
 
@@ -188,6 +196,14 @@ func (s *Service) UpdateUnreadIndicator(_ context.Context, meta RequestMeta, sta
 		return methodNotAllowedError(meta, "UpdateUnreadIndicator")
 	}
 	return s.unreadIndicator.SetUnreadState(state)
+}
+
+// CurrentDevice 返回本机在当前企业服务器上的设备注册状态；不注册设备的平台返回空设备编号。
+func (s *Service) CurrentDevice(ctx context.Context, meta RequestMeta) (LocalDevice, error) {
+	if s.localDevice == nil {
+		return LocalDevice{}, nil
+	}
+	return withNormalizedSlices(s.localDevice.CurrentDevice(ctx, meta))
 }
 
 // ServerURL 返回原生端当前配置的企业服务器地址。

@@ -19,13 +19,17 @@ type DeleteTeamAction struct{ db *bun.DB }
 // NewDeleteTeamAction 创建团队删除操作。
 func NewDeleteTeamAction(db *bun.DB) *DeleteTeamAction { return &DeleteTeamAction{db: db} }
 
-// Execute 删除团队及其成员关系，并把渠道关联重置到公共队列。
+// Execute 删除团队及其成员关系，并把渠道关联和团队队列中的客服处理周期重置到公共队列。
 func (a *DeleteTeamAction) Execute(ctx context.Context, identity *servermodels.Identity, teamID string) error {
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
 		if _, err := loadTeam(ctx, tx, identity.Organization.ID, teamID); err != nil {
+			return err
+		}
+		// 先锁定团队行，与转交给团队的共享锁互斥，队列清理后不会再有新的周期写入该团队。
+		if err := lockTeam(ctx, tx, identity.Organization.ID, teamID); err != nil {
 			return err
 		}
 		if _, err := tx.NewDelete().Model((*servermodels.TeamMember)(nil)).
@@ -35,6 +39,15 @@ func (a *DeleteTeamAction) Execute(ctx context.Context, identity *servermodels.I
 			return err
 		}
 		if err := channelaction.ResetRoutingTarget(ctx, tx, identity.Organization.ID, domain.ChannelRoutingTargetTypeTeam, teamID); err != nil {
+			return err
+		}
+		// 已关闭周期重开后仍读取队列，团队的全部客服处理周期并入公共队列。
+		if _, err := tx.NewUpdate().Model((*servermodels.ServiceSession)(nil)).
+			Set("team_id = NULL").
+			Set("updated_at = now()").
+			Where("organization_id = ?", identity.Organization.ID).
+			Where("team_id = ?", teamID).
+			Exec(ctx); err != nil {
 			return err
 		}
 		_, err := tx.NewDelete().Model((*servermodels.Team)(nil)).

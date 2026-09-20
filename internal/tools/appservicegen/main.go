@@ -1,6 +1,9 @@
-// appservicegen 从 appservice.Backend 接口的 cervi:route 指令生成各层适配样板：
-// appservice.Service 的委托方法、服务端 DirectBackend 的认证分发方法、
-// Gin 路由与 Handler、原生端 API Proxy 转发方法。
+// appservicegen 从 appservice.Backend 和 appservice.OperatorBackend 接口的 cervi:route
+// 指令生成各层适配样板：appservice.Service 的委托方法、服务端 DirectBackend 与
+// OperatorDirectBackend 的认证分发方法、Gin 路由与 Handler、原生端 API Proxy 转发方法。
+//
+// Backend 面向各端客户端并生成全部层，OperatorBackend 面向 SaaS 后端的服务间调用，
+// 只生成运营认证分发和 Gin 适配。
 package main
 
 import (
@@ -44,8 +47,10 @@ type route struct {
 	path       string
 	status     int
 	queryName  string
-	public     bool
-	manual     map[string]bool
+	// authSet 记录指令是否显式给出 auth 选项，public 只表达解析后的取值。
+	authSet bool
+	public  bool
+	manual  map[string]bool
 }
 
 // method 描述一个带指令的 Backend 方法。
@@ -83,6 +88,48 @@ type queryStruct struct {
 	untaggedFields []string
 }
 
+// apiTarget 描述一套 Gin 适配代码的接收器、请求元数据构造、参数绑定和输出函数。
+//
+// 绑定失败与调用失败使用同一套错误输出，各契约的错误体形态因此保持一致。
+// 查询绑定函数带各契约独立的前缀，同一个查询类型被两套契约使用时仍生成不同的函数名。
+type apiTarget struct {
+	comment      string
+	receiver     string
+	register     string
+	requestMeta  string
+	writeResult  string
+	writeEmpty   string
+	bindPrefix   string
+	bindJSON     string
+	queryInteger string
+}
+
+// businessAPITarget 生成企业业务的 Gin 适配代码。
+var businessAPITarget = apiTarget{
+	comment:      "registerGeneratedRoutes 注册由 appservicegen 生成的业务路由。",
+	receiver:     "s *Service",
+	register:     "registerGeneratedRoutes",
+	requestMeta:  "requestMeta(c)",
+	writeResult:  "writeResult",
+	writeEmpty:   "writeEmpty",
+	bindPrefix:   "bind",
+	bindJSON:     "bindJSON",
+	queryInteger: "positiveQueryInteger",
+}
+
+// operatorAPITarget 生成运营接口的 Gin 适配代码。
+var operatorAPITarget = apiTarget{
+	comment:      "registerGeneratedOperatorRoutes 注册由 appservicegen 生成的运营路由。",
+	receiver:     "s *OperatorService",
+	register:     "registerGeneratedOperatorRoutes",
+	requestMeta:  "operatorRequestMeta(c)",
+	writeResult:  "writeOperatorResult",
+	writeEmpty:   "writeOperatorEmpty",
+	bindPrefix:   "bindOperator",
+	bindJSON:     "bindOperatorJSON",
+	queryInteger: "positiveOperatorQueryInteger",
+}
+
 // main 解析 Backend 接口并写出各层生成文件。
 func main() {
 	if err := run(); err != nil {
@@ -97,7 +144,11 @@ func run() error {
 	if err != nil {
 		return err
 	}
-	methods, err := parseBackend(filepath.Join(root, "internal", "appservice", "backend.go"))
+	methods, err := parseInterface(filepath.Join(root, "internal", "appservice", "backend.go"), "Backend", "RequestMeta")
+	if err != nil {
+		return err
+	}
+	operatorMethods, err := parseInterface(filepath.Join(root, "internal", "appservice", "operator_backend.go"), "OperatorBackend", "OperatorRequestMeta")
 	if err != nil {
 		return err
 	}
@@ -108,11 +159,16 @@ func run() error {
 	if err := validate(methods, queryStructs); err != nil {
 		return err
 	}
+	if err := validateOperator(operatorMethods, queryStructs); err != nil {
+		return err
+	}
 	files := map[string][]byte{
-		filepath.Join(root, "internal", "appservice", "service_gen.go"):        generateService(methods),
-		filepath.Join(root, "internal", "appservice", "direct_backend_gen.go"): generateDirectBackend(methods),
-		filepath.Join(root, "internal", "api", "service_gen.go"):               generateAPI(methods, queryStructs),
-		filepath.Join(root, "internal", "apiproxy", "backend_gen.go"):          generateProxy(methods, queryStructs),
+		filepath.Join(root, "internal", "appservice", "service_gen.go"):                 generateService(methods),
+		filepath.Join(root, "internal", "appservice", "direct_backend_gen.go"):          generateDirectBackend(methods),
+		filepath.Join(root, "internal", "appservice", "operator_direct_backend_gen.go"): generateOperatorDirectBackend(operatorMethods),
+		filepath.Join(root, "internal", "api", "service_gen.go"):                        generateAPI(methods, queryStructs, businessAPITarget),
+		filepath.Join(root, "internal", "api", "operator_service_gen.go"):               generateAPI(operatorMethods, queryStructs, operatorAPITarget),
+		filepath.Join(root, "internal", "apiproxy", "backend_gen.go"):                   generateProxy(methods, queryStructs),
 	}
 	for path, source := range files {
 		formatted, err := format.Source(source)
@@ -144,8 +200,8 @@ func moduleRoot() (string, error) {
 	}
 }
 
-// parseBackend 解析 Backend 接口的方法、注释和指令。
-func parseBackend(path string) ([]method, error) {
+// parseInterface 解析指定契约接口的方法、注释和指令，metaType 为第二个参数要求的类型名。
+func parseInterface(path, interfaceName, metaType string) ([]method, error) {
 	fileSet := token.NewFileSet()
 	file, err := parser.ParseFile(fileSet, path, nil, parser.ParseComments)
 	if err != nil {
@@ -159,21 +215,21 @@ func parseBackend(path string) ([]method, error) {
 		}
 		for _, spec := range genDecl.Specs {
 			typeSpec, ok := spec.(*ast.TypeSpec)
-			if !ok || typeSpec.Name.Name != "Backend" {
+			if !ok || typeSpec.Name.Name != interfaceName {
 				continue
 			}
 			interfaceType, _ = typeSpec.Type.(*ast.InterfaceType)
 		}
 	}
 	if interfaceType == nil {
-		return nil, fmt.Errorf("interface Backend not found in %s", path)
+		return nil, fmt.Errorf("interface %s not found in %s", interfaceName, path)
 	}
 	var methods []method
 	for _, field := range interfaceType.Methods.List {
 		if len(field.Names) != 1 {
-			return nil, fmt.Errorf("interface Backend: embedded interfaces are not supported")
+			return nil, fmt.Errorf("interface %s: embedded interfaces are not supported", interfaceName)
 		}
-		item, err := parseMethod(field)
+		item, err := parseMethod(field, metaType)
 		if err != nil {
 			return nil, err
 		}
@@ -183,7 +239,7 @@ func parseBackend(path string) ([]method, error) {
 }
 
 // parseMethod 解析单个接口方法的签名和指令。
-func parseMethod(field *ast.Field) (method, error) {
+func parseMethod(field *ast.Field, metaType string) (method, error) {
 	name := field.Names[0].Name
 	item := method{name: name}
 	if field.Doc == nil {
@@ -210,7 +266,7 @@ func parseMethod(field *ast.Field) (method, error) {
 	if !ok {
 		return item, fmt.Errorf("method %s: not a function", name)
 	}
-	if err := parseSignature(&item, functionType); err != nil {
+	if err := parseSignature(&item, functionType, metaType); err != nil {
 		return item, fmt.Errorf("method %s: %w", name, err)
 	}
 	return item, nil
@@ -241,6 +297,7 @@ func parseRoute(directive string) (route, error) {
 		case "query":
 			parsed.queryName = value
 		case "auth":
+			parsed.authSet = true
 			switch value {
 			case "member":
 				parsed.public = false
@@ -266,8 +323,8 @@ func parseRoute(directive string) (route, error) {
 }
 
 // parseSignature 按路径占位符和指令归类方法参数并解析返回值。
-func parseSignature(item *method, functionType *ast.FuncType) error {
-	if err := validateLeadingParams(functionType.Params.List); err != nil {
+func parseSignature(item *method, functionType *ast.FuncType, metaType string) error {
+	if err := validateLeadingParams(functionType.Params.List, metaType); err != nil {
 		return err
 	}
 	// 读取路径中的占位符名称。
@@ -280,7 +337,7 @@ func parseSignature(item *method, functionType *ast.FuncType) error {
 	pathIndex := 0
 	for index, parameter := range functionType.Params.List {
 		if index < 2 {
-			continue // 已校验为 context.Context 和 RequestMeta。
+			continue // 已校验为 context.Context 和请求元数据。
 		}
 		typeName, err := typeString(parameter.Type)
 		if err != nil {
@@ -326,10 +383,10 @@ func parseSignature(item *method, functionType *ast.FuncType) error {
 	return nil
 }
 
-// validateLeadingParams 校验方法前两个参数依次是 context.Context 和 RequestMeta。
-func validateLeadingParams(params []*ast.Field) error {
+// validateLeadingParams 校验方法前两个参数依次是 context.Context 和契约的请求元数据类型。
+func validateLeadingParams(params []*ast.Field, metaType string) error {
 	if len(params) < 2 {
-		return fmt.Errorf("expected leading context.Context and RequestMeta parameters")
+		return fmt.Errorf("expected leading context.Context and %s parameters", metaType)
 	}
 	selector, ok := params[0].Type.(*ast.SelectorExpr)
 	if !ok {
@@ -340,8 +397,8 @@ func validateLeadingParams(params []*ast.Field) error {
 		return fmt.Errorf("first parameter must be context.Context")
 	}
 	ident, ok := params[1].Type.(*ast.Ident)
-	if !ok || ident.Name != "RequestMeta" {
-		return fmt.Errorf("second parameter must be RequestMeta")
+	if !ok || ident.Name != metaType {
+		return fmt.Errorf("second parameter must be %s", metaType)
 	}
 	return nil
 }
@@ -488,6 +545,22 @@ func validate(methods []method, queryStructs map[string]queryStruct) error {
 	return nil
 }
 
+// validateOperator 校验运营契约的指令选项和查询结构体声明。
+//
+// 运营调用一律校验运营服务凭据，生成范围固定为认证分发和 Gin 适配，
+// 指令因此只接受 status 和 query 选项。
+func validateOperator(methods []method, queryStructs map[string]queryStruct) error {
+	for _, item := range methods {
+		if item.route.authSet {
+			return fmt.Errorf("operator method %s: auth option is not supported", item.name)
+		}
+		if len(item.route.manual) > 0 {
+			return fmt.Errorf("operator method %s: manual option is not supported", item.name)
+		}
+	}
+	return validate(methods, queryStructs)
+}
+
 // lowerFirst 将标识符首字母转为小写。
 func lowerFirst(name string) string {
 	first, size := utf8.DecodeRuneInString(name)
@@ -526,10 +599,11 @@ var httpMethodConstants = map[string]string{
 	"DELETE": "http.MethodDelete",
 }
 
-// delegation 描述一层委托方法的接收器、转发目标、认证注入方式和结果归一化。
+// delegation 描述一层委托方法的接收器、转发目标、请求元数据类型、认证注入方式和结果归一化。
 type delegation struct {
 	receiver        string
 	target          string
+	metaType        string
 	skipManual      string
 	injectIdentity  bool
 	normalizeSlices bool
@@ -550,7 +624,7 @@ func emitDelegations(builder *strings.Builder, methods []method, layer delegatio
 		for _, parameter := range item.params {
 			arguments = append(arguments, parameter.name)
 		}
-		parameterList := "ctx context.Context, meta RequestMeta"
+		parameterList := "ctx context.Context, meta " + layer.metaType
 		if extra := signature(item.params, ""); extra != "" {
 			parameterList += ", " + extra
 		}
@@ -583,7 +657,7 @@ func generateService(methods []method) []byte {
 	builder.WriteString("// Code generated by appservicegen. DO NOT EDIT.\n\n")
 	builder.WriteString("package appservice\n\n")
 	builder.WriteString("import \"context\"\n\n")
-	emitDelegations(builder, methods, delegation{receiver: "s *Service", target: "s.backend", skipManual: "service", normalizeSlices: true})
+	emitDelegations(builder, methods, delegation{receiver: "s *Service", target: "s.backend", metaType: "RequestMeta", skipManual: "service", normalizeSlices: true})
 	return []byte(builder.String())
 }
 
@@ -597,20 +671,32 @@ func generateDirectBackend(methods []method) []byte {
 	builder.WriteString("//go:build server\n\n")
 	builder.WriteString("package appservice\n\n")
 	builder.WriteString("import \"context\"\n\n")
-	emitDelegations(builder, methods, delegation{receiver: "b *DirectBackend", target: "b.ops", injectIdentity: true})
+	emitDelegations(builder, methods, delegation{receiver: "b *DirectBackend", target: "b.ops", metaType: "RequestMeta", injectIdentity: true})
+	return []byte(builder.String())
+}
+
+// generateOperatorDirectBackend 生成运营后端的认证分发层。
+//
+// 每个方法先校验运营服务凭据，再把运营身份交给 operatorOperations 中的业务实现；
+// 业务实现不重复处理认证。
+func generateOperatorDirectBackend(methods []method) []byte {
+	builder := &strings.Builder{}
+	builder.WriteString("// Code generated by appservicegen. DO NOT EDIT.\n\n")
+	builder.WriteString("//go:build server\n\n")
+	builder.WriteString("package appservice\n\n")
+	builder.WriteString("import \"context\"\n\n")
+	emitDelegations(builder, methods, delegation{
+		receiver: "b *OperatorDirectBackend", target: "b.ops", metaType: "OperatorRequestMeta",
+		injectIdentity: true, normalizeSlices: true,
+	})
 	return []byte(builder.String())
 }
 
 // generateAPI 生成 Gin 路由注册、Handler 和查询参数绑定函数。
-func generateAPI(methods []method, queryStructs map[string]queryStruct) []byte {
+func generateAPI(methods []method, queryStructs map[string]queryStruct, target apiTarget) []byte {
 	builder := &strings.Builder{}
-	builder.WriteString("// Code generated by appservicegen. DO NOT EDIT.\n\n")
-	builder.WriteString("//go:build server\n\n")
-	builder.WriteString("package api\n\n")
-	builder.WriteString("import (\n\t\"net/http\"\n\n\t\"github.com/gin-gonic/gin\"\n\t\"github.com/runforyou-ai/cervi/internal/appservice\"\n)\n\n")
-
-	builder.WriteString("// registerGeneratedRoutes 注册由 appservicegen 生成的业务路由。\n")
-	builder.WriteString("func (s *Service) registerGeneratedRoutes(router *gin.Engine) {\n")
+	fmt.Fprintf(builder, "// %s\n", target.comment)
+	fmt.Fprintf(builder, "func (%s) %s(router *gin.Engine) {\n", target.receiver, target.register)
 	for _, item := range methods {
 		if item.route.manual["api"] {
 			continue
@@ -626,8 +712,8 @@ func generateAPI(methods []method, queryStructs map[string]queryStruct) []byte {
 		}
 		handlerName := lowerFirst(item.name)
 		docComment(builder, item.doc, item.name, handlerName)
-		fmt.Fprintf(builder, "func (s *Service) %s(c *gin.Context) {\n", handlerName)
-		arguments := []string{"c.Request.Context()", "requestMeta(c)"}
+		fmt.Fprintf(builder, "func (%s) %s(c *gin.Context) {\n", target.receiver, handlerName)
+		arguments := []string{"c.Request.Context()", target.requestMeta}
 		for _, parameter := range item.params {
 			switch parameter.kind {
 			case paramPath:
@@ -636,16 +722,16 @@ func generateAPI(methods []method, queryStructs map[string]queryStruct) []byte {
 				arguments = append(arguments, fmt.Sprintf("appservice.%s(c.Query(%q))", parameter.typ, parameter.name))
 			case paramQueryStruct:
 				usedQueryStructs[parameter.typ] = true
-				fmt.Fprintf(builder, "\tinput, ok := bind%sQuery(c)\n\tif !ok {\n\t\treturn\n\t}\n", parameter.typ)
+				fmt.Fprintf(builder, "\tinput, ok := %s%sQuery(c)\n\tif !ok {\n\t\treturn\n\t}\n", target.bindPrefix, parameter.typ)
 				arguments = append(arguments, "input")
 			case paramBody:
-				fmt.Fprintf(builder, "\tvar input appservice.%s\n\tif !bindJSON(c, &input) {\n\t\treturn\n\t}\n", parameter.typ)
+				fmt.Fprintf(builder, "\tvar input appservice.%s\n\tif !%s(c, &input) {\n\t\treturn\n\t}\n", parameter.typ, target.bindJSON)
 				arguments = append(arguments, "input")
 			}
 		}
 		call := fmt.Sprintf("s.application.%s(%s)", item.name, strings.Join(arguments, ", "))
 		if item.output == "" {
-			fmt.Fprintf(builder, "\twriteEmpty(c, %s)\n", call)
+			fmt.Fprintf(builder, "\t%s(c, %s)\n", target.writeEmpty, call)
 		} else {
 			fmt.Fprintf(builder, "\toutput, err := %s\n", call)
 			// 返回 net/http 中的状态码常量名。
@@ -656,19 +742,19 @@ func generateAPI(methods []method, queryStructs map[string]queryStruct) []byte {
 			case 201:
 				status = "http.StatusCreated"
 			}
-			fmt.Fprintf(builder, "\twriteResult(c, %s, output, err)\n", status)
+			fmt.Fprintf(builder, "\t%s(c, %s, output, err)\n", target.writeResult, status)
 		}
 		builder.WriteString("}\n\n")
 	}
 
 	for _, structName := range sortedKeys(usedQueryStructs) {
 		fields := queryStructs[structName].fields
-		fmt.Fprintf(builder, "// bind%sQuery 从查询参数解析 appservice.%s。\n", structName, structName)
-		fmt.Fprintf(builder, "func bind%sQuery(c *gin.Context) (appservice.%s, bool) {\n", structName, structName)
+		fmt.Fprintf(builder, "// %s%sQuery 从查询参数解析 appservice.%s。\n", target.bindPrefix, structName, structName)
+		fmt.Fprintf(builder, "func %s%sQuery(c *gin.Context) (appservice.%s, bool) {\n", target.bindPrefix, structName, structName)
 		for _, field := range fields {
 			if field.kind == queryInt {
-				fmt.Fprintf(builder, "\t%s, ok := positiveQueryInteger(c, %q, %d)\n\tif !ok {\n\t\treturn appservice.%s{}, false\n\t}\n",
-					lowerFirst(field.fieldName), field.queryName, field.defaultValue, structName)
+				fmt.Fprintf(builder, "\t%s, ok := %s(c, %q, %d)\n\tif !ok {\n\t\treturn appservice.%s{}, false\n\t}\n",
+					lowerFirst(field.fieldName), target.queryInteger, field.queryName, field.defaultValue, structName)
 			}
 		}
 		fmt.Fprintf(builder, "\treturn appservice.%s{\n", structName)
@@ -688,7 +774,23 @@ func generateAPI(methods []method, queryStructs map[string]queryStruct) []byte {
 		}
 		builder.WriteString("\t}, true\n}\n\n")
 	}
-	return []byte(builder.String())
+
+	body := builder.String()
+	header := &strings.Builder{}
+	header.WriteString("// Code generated by appservicegen. DO NOT EDIT.\n\n")
+	header.WriteString("//go:build server\n\n")
+	header.WriteString("package api\n\n")
+	// 只引入生成内容实际使用的包。
+	header.WriteString("import (\n")
+	if strings.Contains(body, "http.") {
+		header.WriteString("\t\"net/http\"\n\n")
+	}
+	header.WriteString("\t\"github.com/gin-gonic/gin\"\n")
+	if strings.Contains(body, "appservice.") {
+		header.WriteString("\t\"github.com/runforyou-ai/cervi/internal/appservice\"\n")
+	}
+	header.WriteString(")\n\n")
+	return []byte(header.String() + body)
 }
 
 // generateProxy 生成原生端 API Proxy 转发方法和查询参数编码函数。

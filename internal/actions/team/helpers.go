@@ -26,6 +26,19 @@ func withActiveMemberCount(query *bun.SelectQuery) *bun.SelectQuery {
 	) AS member_count`, domain.OrganizationIdentityTypeUser, domain.UserStatusActive, domain.OrganizationIdentityTypeAgent, domain.UserStatusActive)
 }
 
+// lockTeam 对当前企业中的团队行取 FOR UPDATE。
+func lockTeam(ctx context.Context, db bun.IDB, organizationID, teamID string) error {
+	var lockedID string
+	err := db.NewSelect().TableExpr("teams AS t").Column("id").
+		Where("t.organization_id = ? AND t.id = ?", organizationID, teamID).
+		For("UPDATE").
+		Scan(ctx, &lockedID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return ErrNotFound
+	}
+	return err
+}
+
 // loadTeam 读取当前企业中的团队。
 func loadTeam(ctx context.Context, db bun.IDB, organizationID, teamID string) (*TeamRecord, error) {
 	if !common.ValidUUID(teamID) {

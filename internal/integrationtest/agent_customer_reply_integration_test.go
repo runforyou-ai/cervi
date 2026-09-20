@@ -88,7 +88,7 @@ func testAgentCustomerReplies(t *testing.T, db *bun.DB, identity *servermodels.I
 					t.Fatal(err)
 				}
 			}
-			if _, err := conversationaction.NewTransferServiceSessionAction(db, coordinator, scheduler).Execute(ctx, identity, conversationaction.TransferServiceSessionInput{ConversationID: original.Conversation.ID, AssigneeIdentityID: created.IdentityID}); err != nil {
+			if _, err := conversationaction.NewTransferServiceSessionAction(db, coordinator, scheduler).Execute(ctx, identity, conversationaction.TransferServiceSessionInput{ConversationID: original.Conversation.ID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: created.IdentityID}); err != nil {
 				t.Fatal(err)
 			}
 			input.ClientMessageID, input.Body = uuid.NewV7().String(), "请接着解释"

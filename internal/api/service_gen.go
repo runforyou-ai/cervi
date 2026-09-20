@@ -35,6 +35,7 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.POST("/inbox/conversations/query", s.readInboxConversations)
 	router.GET("/inbox/search", s.searchInbox)
 	router.GET("/inbox/assignees", s.listCustomerServiceAssignees)
+	router.GET("/inbox/queue-teams", s.listServiceQueueTeams)
 	router.GET("/inbox/channels", s.listInboxChannels)
 	router.GET("/sync/heads", s.getSyncHeads)
 	router.GET("/conversations/:conversationID/messages", s.listConversationMessages)
@@ -180,6 +181,9 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.PUT("/integrations/mcp-servers/:mcpServerID", s.updateMCPServer)
 	router.DELETE("/integrations/mcp-servers/:mcpServerID", s.deleteMCPServer)
 	router.PUT("/settings/organization", s.updateOrganization)
+	router.POST("/devices", s.registerDevice)
+	router.GET("/devices", s.listDevices)
+	router.DELETE("/devices/:deviceID", s.revokeDevice)
 }
 
 // installationStatus 返回服务端初始化状态和公开企业名称。
@@ -360,6 +364,12 @@ func (s *Service) searchInbox(c *gin.Context) {
 // listCustomerServiceAssignees 返回有效真人和 AI 客服。
 func (s *Service) listCustomerServiceAssignees(c *gin.Context) {
 	output, err := s.application.ListCustomerServiceAssignees(c.Request.Context(), requestMeta(c))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// listServiceQueueTeams 返回可作为客服队列的团队，本人所在团队排在前面。
+func (s *Service) listServiceQueueTeams(c *gin.Context) {
+	output, err := s.application.ListServiceQueueTeams(c.Request.Context(), requestMeta(c))
 	writeResult(c, http.StatusOK, output, err)
 }
 
@@ -574,7 +584,7 @@ func (s *Service) claimServiceSession(c *gin.Context) {
 	writeResult(c, http.StatusOK, output, err)
 }
 
-// transferServiceSession 把当前负责的处理周期转给另一位客服。
+// transferServiceSession 把当前负责的处理周期转给成员、团队队列或公共队列。
 func (s *Service) transferServiceSession(c *gin.Context) {
 	var input appservice.TransferServiceSessionInput
 	if !bindJSON(c, &input) {
@@ -1530,6 +1540,27 @@ func (s *Service) updateOrganization(c *gin.Context) {
 	writeResult(c, http.StatusOK, output, err)
 }
 
+// registerDevice 注册当前用户的本机设备。
+func (s *Service) registerDevice(c *gin.Context) {
+	var input appservice.DeviceRegistrationInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.RegisterDevice(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// listDevices 返回当前用户已注册的设备。
+func (s *Service) listDevices(c *gin.Context) {
+	output, err := s.application.ListDevices(c.Request.Context(), requestMeta(c))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// revokeDevice 撤销当前用户的设备。
+func (s *Service) revokeDevice(c *gin.Context) {
+	writeEmpty(c, s.application.RevokeDevice(c.Request.Context(), requestMeta(c), c.Param("deviceID")))
+}
+
 // bindAgentListInputQuery 从查询参数解析 appservice.AgentListInput。
 func bindAgentListInputQuery(c *gin.Context) (appservice.AgentListInput, bool) {
 	page, ok := positiveQueryInteger(c, "page", 1)
@@ -1586,6 +1617,8 @@ func bindInboxSearchInputQuery(c *gin.Context) (appservice.InboxSearchInput, boo
 		ConversationID:     c.Query("conversationId"),
 		Scope:              appservice.InboxScope(c.Query("scope")),
 		CustomerView:       appservice.CustomerInboxView(c.Query("customerView")),
+		QueueFilter:        appservice.CustomerQueueFilter(c.Query("queueFilter")),
+		QueueTeamID:        c.Query("queueTeamId"),
 		AssigneeIdentityID: c.Query("assigneeIdentityId"),
 		ChannelID:          c.Query("channelId"),
 		ServiceStatus:      appservice.ServiceSessionStatus(c.Query("serviceStatus")),
@@ -1657,6 +1690,8 @@ func bindLoadInboxInputQuery(c *gin.Context) (appservice.LoadInboxInput, bool) {
 		Partition:          appservice.InboxPartition(c.Query("partition")),
 		Scope:              appservice.InboxScope(c.Query("scope")),
 		CustomerView:       appservice.CustomerInboxView(c.Query("customerView")),
+		QueueFilter:        appservice.CustomerQueueFilter(c.Query("queueFilter")),
+		QueueTeamID:        c.Query("queueTeamId"),
 		AssigneeIdentityID: c.Query("assigneeIdentityId"),
 		ChannelID:          c.Query("channelId"),
 		ServiceStatus:      appservice.ServiceSessionStatus(c.Query("serviceStatus")),

@@ -31,6 +31,7 @@ const workspace = {
       profile: "Profile",
       security: "Account security",
       preferences: "Preferences",
+      devices: "Devices",
       general: "General settings",
       roles: "Roles",
       employees: "Employees",

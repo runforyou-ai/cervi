@@ -76,7 +76,7 @@ func (f executionScopeFixture) transferToAgent(t *testing.T, ctx context.Context
 		t.Fatalf("领取周期失败：%v", err)
 	}
 	session, err := f.transfer.Execute(ctx, f.owner, conversationaction.TransferServiceSessionInput{
-		ConversationID: f.conversationID, AssigneeIdentityID: f.agentIdentityID,
+		ConversationID: f.conversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: f.agentIdentityID,
 	})
 	if err != nil {
 		t.Fatalf("转交给 AI 客服失败：%#v", err)

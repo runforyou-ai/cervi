@@ -60,6 +60,7 @@ type directOperations struct {
 	agentOps
 	knowledgeOps
 	integrationOps
+	deviceOps
 	fileOps
 }
 
@@ -84,6 +85,7 @@ func NewDirectBackend(db *bun.DB, deploymentMode domain.DeploymentMode, localFil
 		agentOps:        newAgentOps(db, agentCoordinator, customerReplySuggestions),
 		knowledgeOps:    newKnowledgeOps(db, taskEnqueuer, documentQuery, documentConverter),
 		integrationOps:  newIntegrationOps(db, connectionRunner, modelProviderRegistry, mcpTest, mcpScheduler),
+		deviceOps:       newDeviceOps(db),
 		fileOps:         newFileOps(db, localFiles, s3),
 	}
 	return &DirectBackend{ops: ops}

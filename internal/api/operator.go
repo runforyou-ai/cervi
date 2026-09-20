@@ -3,56 +3,39 @@
 package api
 
 import (
-	"crypto/subtle"
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
+	"github.com/runforyou-ai/cervi/internal/appservice"
 	"uuid"
-)
-
-// 运营接口的稳定错误码，供 SaaS 按语义处理。
-const (
-	operatorCodeInvalidCredential = "invalid_operator_credential"
 )
 
 // requestIDHeader 是运营调用方传入的请求关联标识。
 const requestIDHeader = "X-Request-Id"
 
+// operatorRequestMetaKey 在请求上下文中保存本次运营调用的请求元数据。
+const operatorRequestMetaKey = "operatorRequestMeta"
+
 type operatorErrorBody struct {
-	Error operatorError `json:"error"`
-}
-
-type operatorError struct {
-	Code      string `json:"code"`
-	Message   string `json:"message"`
-	RequestID string `json:"requestId"`
-}
-
-// Deployment 描述本部署的形态与企业域名后缀。
-type Deployment struct {
-	Mode                string `json:"mode"`
-	ManagedDomainSuffix string `json:"managedDomainSuffix"`
+	Error *appservice.OperatorError `json:"error"`
 }
 
 // OperatorService 是官方托管运营接口的 Gin 适配器，仅在托管部署注册。
 type OperatorService struct {
-	deployment Deployment
-	credential string
-	router     *gin.Engine
+	application appservice.OperatorBackend
+	router      *gin.Engine
 }
 
 // NewOperatorService 创建运营接口适配器。
-func NewOperatorService(deployment Deployment, credential string) *OperatorService {
-	service := &OperatorService{deployment: deployment, credential: credential}
+func NewOperatorService(application appservice.OperatorBackend) *OperatorService {
+	service := &OperatorService{application: application}
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
-	router.Use(gin.Recovery(), service.authenticate)
-	// 返回部署形态和企业域名后缀，供 SaaS 确认调用目标。
-	router.GET("/deployment", func(c *gin.Context) {
-		c.JSON(http.StatusOK, service.deployment)
-	})
+	router.Use(gin.Recovery())
+	service.registerGeneratedOperatorRoutes(router)
 	service.router = router
 	return service
 }
@@ -62,20 +45,79 @@ func (s *OperatorService) ServeHTTP(writer http.ResponseWriter, request *http.Re
 	s.router.ServeHTTP(writer, request)
 }
 
-// authenticate 校验运营服务凭据，凭据是运营接口的唯一访问控制手段。
-func (s *OperatorService) authenticate(c *gin.Context) {
+// operatorRequestMeta 从请求头提取运营凭据、请求关联标识和语言，缺少标识时生成一个。
+//
+// 同一次请求的业务调用、日志和错误响应使用同一个请求标识。
+func operatorRequestMeta(c *gin.Context) appservice.OperatorRequestMeta {
+	if cached, ok := c.Get(operatorRequestMetaKey); ok {
+		return cached.(appservice.OperatorRequestMeta)
+	}
 	requestID := strings.TrimSpace(c.GetHeader(requestIDHeader))
 	if requestID == "" {
 		requestID = uuid.New().String()
 	}
-	c.Set(requestIDHeader, requestID)
-	credential := strings.TrimPrefix(c.GetHeader("Authorization"), "Bearer ")
-	if subtle.ConstantTimeCompare([]byte(strings.TrimSpace(credential)), []byte(s.credential)) != 1 {
-		slog.Warn("运营凭据无效", "request_id", requestID, "path", c.Request.URL.Path)
-		c.AbortWithStatusJSON(http.StatusUnauthorized, operatorErrorBody{Error: operatorError{
-			Code: operatorCodeInvalidCredential, Message: "运营凭据无效。", RequestID: requestID,
-		}})
+	meta := appservice.OperatorRequestMeta{
+		Credential: bearerToken(c.GetHeader("Authorization")),
+		RequestID:  requestID,
+		Locale:     appservice.Locale(c.GetHeader("Accept-Language")),
+	}
+	c.Set(operatorRequestMetaKey, meta)
+	return meta
+}
+
+// bindOperatorJSON 绑定运营请求体，失败时写入运营错误响应并返回 false。
+func bindOperatorJSON(c *gin.Context, output any) bool {
+	if err := c.ShouldBindJSON(output); err != nil {
+		writeOperatorError(c, appservice.NewOperatorInvalidRequestError(operatorRequestMeta(c)))
+		return false
+	}
+	return true
+}
+
+// positiveOperatorQueryInteger 解析运营请求的正整数查询参数，缺省时返回默认值，非法时写入运营错误响应。
+func positiveOperatorQueryInteger(c *gin.Context, name string, defaultValue int) (int, bool) {
+	value := c.Query(name)
+	if value == "" {
+		return defaultValue, true
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed <= 0 {
+		writeOperatorError(c, appservice.NewOperatorInvalidRequestError(operatorRequestMeta(c)))
+		return 0, false
+	}
+	return parsed, true
+}
+
+// writeOperatorResult 无错误时按状态码写入 JSON 结果，否则写入运营错误响应。
+func writeOperatorResult(c *gin.Context, status int, result any, err error) {
+	if writeOperatorError(c, err) {
 		return
 	}
-	c.Next()
+	c.JSON(status, result)
+}
+
+// writeOperatorEmpty 无错误时返回 204 空响应，否则写入运营错误响应。
+func writeOperatorEmpty(c *gin.Context, err error) {
+	if writeOperatorError(c, err) {
+		return
+	}
+	c.Status(http.StatusNoContent)
+}
+
+// writeOperatorError 把运营调用错误写成带稳定错误码的响应体，返回是否已处理错误。
+func writeOperatorError(c *gin.Context, err error) bool {
+	if err == nil {
+		return false
+	}
+	if c.Request.Context().Err() != nil {
+		return true
+	}
+	operatorError, ok := appservice.OperatorErrorOf(err)
+	if !ok {
+		operatorError = appservice.NewOperatorInternalError(operatorRequestMeta(c))
+	}
+	slog.Warn("运营调用失败", "request_id", operatorError.RequestID, "path", c.Request.URL.Path,
+		"code", operatorError.Code, "error", err)
+	c.JSON(operatorError.HTTPStatus(), operatorErrorBody{Error: operatorError})
+	return true
 }

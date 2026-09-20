@@ -19,12 +19,12 @@ import {
 import { Button } from "@/components/ui/button"
 import {
   CustomerSessionCloseDialog,
+  CustomerTransferMenuItems,
   useCustomerSessionActions,
 } from "@/features/inbox/customer-session-actions"
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
@@ -124,7 +124,7 @@ export function ConversationHeader({
     handlesCustomers,
     onSessionChanged,
   )
-  const { operation, transferCandidates } = actions
+  const { operation } = actions
 
   return (
     <>
@@ -211,20 +211,7 @@ export function ConversationHeader({
                 <TooltipContent>{t("conversationTransfer")}</TooltipContent>
               </Tooltip>
               <DropdownMenuContent align="end" className="min-w-48">
-                {transferCandidates.length === 0 ? (
-                  <DropdownMenuItem disabled>
-                    {t("conversationTransferEmpty")}
-                  </DropdownMenuItem>
-                ) : (
-                  transferCandidates.map((assignee) => (
-                    <DropdownMenuItem
-                      key={assignee.identityId}
-                      onSelect={() => void actions.transfer(assignee)}
-                    >
-                      {assignee.displayName}
-                    </DropdownMenuItem>
-                  ))
-                )}
+                <CustomerTransferMenuItems actions={actions} />
               </DropdownMenuContent>
             </DropdownMenu>
           ) : null}

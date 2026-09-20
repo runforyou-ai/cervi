@@ -57,6 +57,11 @@ const workspaceRouteDefinitions = [
     element: <PersonalSettingsPage section="preferences" />,
   },
   {
+    path: "/account/devices",
+    titleKey: "tabs.routes.devices",
+    element: <PersonalSettingsPage section="devices" />,
+  },
+  {
     path: "/settings/general",
     titleKey: "tabs.routes.general",
     element: <SystemSettingsPage section="general" />,

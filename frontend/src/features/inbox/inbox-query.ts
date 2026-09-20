@@ -2,6 +2,7 @@
 import {
   ConversationType,
   CustomerInboxView,
+  CustomerQueueFilter,
   InboxPartition,
   InboxScope,
   InboxSearchRange,
@@ -66,17 +67,33 @@ export type InboxQueryInput = Omit<InboxQuery, "partition" | "search" | "searchR
   searchRange?: InboxSearchRange
 }
 
+/** 规范化「待分配」视图的队列筛选，指定队列缺少团队编号时按全部队列处理。 */
+function normalizeQueueFilter(filter: CustomerQueueFilter, teamId: string) {
+  if (filter === CustomerQueueFilter.CustomerQueueFilterTeam && teamId) {
+    return { queueFilter: filter, queueTeamId: teamId }
+  }
+  if (filter === CustomerQueueFilter.CustomerQueueFilterPublic) {
+    return { queueFilter: filter, queueTeamId: "" }
+  }
+  return { queueFilter: CustomerQueueFilter.CustomerQueueFilterAll, queueTeamId: "" }
+}
+
 /** 按当前范围规范化筛选，范围外条件取默认值。 */
 export function normalizeInboxQuery(query: InboxQueryInput): NormalizedInboxQuery {
   const customer = query.scope === InboxScope.InboxScopeCustomer
   const customerView = customer
     ? query.customerView
     : CustomerInboxView.CustomerInboxViewQueue
+  const queue =
+    customer && customerView === CustomerInboxView.CustomerInboxViewQueue
+      ? normalizeQueueFilter(query.queueFilter, query.queueTeamId)
+      : { queueFilter: CustomerQueueFilter.$zero, queueTeamId: "" }
   return {
     // 分区由启用置顶的调用方显式指定，其余调用方继续读取完整活动序。
     partition: query.partition ?? InboxPartition.InboxPartitionAll,
     scope: query.scope,
     customerView,
+    ...queue,
     assigneeIdentityId:
       customerView === CustomerInboxView.CustomerInboxViewCoworkers
         ? query.assigneeIdentityId
@@ -102,6 +119,16 @@ export function inboxQueryFromSearch(params: URLSearchParams): NormalizedInboxQu
     customerView:
       optionalWailsEnum(CustomerInboxView, params.get("view")) ??
       CustomerInboxView.CustomerInboxViewQueue,
+    queueFilter:
+      params.get("queue") === CustomerQueueFilter.CustomerQueueFilterPublic
+        ? CustomerQueueFilter.CustomerQueueFilterPublic
+        : params.get("queue")
+          ? CustomerQueueFilter.CustomerQueueFilterTeam
+          : CustomerQueueFilter.CustomerQueueFilterAll,
+    queueTeamId:
+      params.get("queue") === CustomerQueueFilter.CustomerQueueFilterPublic
+        ? ""
+        : (params.get("queue") ?? ""),
     assigneeIdentityId: params.get("assignee") ?? "",
     channelId: params.get("channel") ?? "",
     serviceStatus:
@@ -125,6 +152,14 @@ export function writeInboxQuerySearch(
     query.customerView === CustomerInboxView.CustomerInboxViewQueue
       ? ""
       : query.customerView,
+  )
+  write(
+    "queue",
+    query.queueFilter === CustomerQueueFilter.CustomerQueueFilterPublic
+      ? CustomerQueueFilter.CustomerQueueFilterPublic
+      : query.queueFilter === CustomerQueueFilter.CustomerQueueFilterTeam
+        ? query.queueTeamId
+        : "",
   )
   write("assignee", query.assigneeIdentityId)
   write("channel", query.channelId)

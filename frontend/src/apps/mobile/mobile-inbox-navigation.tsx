@@ -6,10 +6,12 @@ import { useSearchParams } from "react-router"
 import {
   ConversationType,
   CustomerInboxView,
+  CustomerQueueFilter,
   InboxScope,
   ServiceSessionStatus,
   listCustomerServiceAssignees,
   listInboxChannels,
+  listServiceQueueTeams,
   type LoadInboxQuery,
 } from "@/api"
 import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
@@ -200,6 +202,28 @@ function MobileCustomerAssignee({
   )
 }
 
+/** 把队列筛选读成选择器的单值：空为全部队列，public 为公共队列，其余为团队编号。 */
+function queueValue(query: MobileInboxQuery) {
+  if (query.queueFilter === CustomerQueueFilter.CustomerQueueFilterPublic) {
+    return CustomerQueueFilter.CustomerQueueFilterPublic
+  }
+  return query.queueTeamId
+}
+
+/** 把选择器的单值写回队列筛选，只在待分配视图生效。 */
+function queueChange(view: CustomerInboxView, queue: string) {
+  if (view !== CustomerInboxView.CustomerInboxViewQueue) {
+    return { queueFilter: CustomerQueueFilter.$zero, queueTeamId: "" }
+  }
+  if (queue === CustomerQueueFilter.CustomerQueueFilterPublic) {
+    return { queueFilter: CustomerQueueFilter.CustomerQueueFilterPublic, queueTeamId: "" }
+  }
+  if (queue) {
+    return { queueFilter: CustomerQueueFilter.CustomerQueueFilterTeam, queueTeamId: queue }
+  }
+  return { queueFilter: CustomerQueueFilter.CustomerQueueFilterAll, queueTeamId: "" }
+}
+
 /** 在底部面板中按当前范围选择筛选条件，取消时保留原筛选。 */
 export function MobileInboxFilter({
   query,
@@ -215,6 +239,8 @@ export function MobileInboxFilter({
   const customer = query.scope === InboxScope.InboxScopeCustomer
   const [open, setOpen] = useState(false)
   const [view, setView] = useState(query.customerView)
+  // 队列筛选用单值表示：空为全部队列，public 为公共队列，其余为团队编号。
+  const [queue, setQueue] = useState(queueValue(query))
   const [assignee, setAssignee] = useState(query.assigneeIdentityId)
   const [channel, setChannel] = useState(query.channelId)
   const [status, setStatus] = useState(query.serviceStatus)
@@ -229,6 +255,11 @@ export function MobileInboxFilter({
     listInboxChannels,
     { enabled: customer, staleTime: 0 },
   )
+  const { data: queueTeams = [] } = useResource(
+    resourceKeys.serviceQueueTeams(),
+    listServiceQueueTeams,
+    { enabled: customer, staleTime: 0 },
+  )
   const selected = data?.find(
     (item) => item.identityId === query.assigneeIdentityId,
   )
@@ -236,9 +267,14 @@ export function MobileInboxFilter({
   const viewLabel =
     customerViews.find((item) => item.value === query.customerView)?.label ??
     customerViews[0].label
+  const queueLabel =
+    query.queueFilter === CustomerQueueFilter.CustomerQueueFilterPublic
+      ? t("queueFilterPublicQueue")
+      : (queueTeams.find((item) => item.id === query.queueTeamId)?.name ?? "")
   const summary = customer
     ? [
         t(viewLabel),
+        queueLabel,
         query.assigneeIdentityId
           ? (selected?.displayName ?? tMobile("inbox.selectedAssignee"))
           : "",
@@ -261,6 +297,7 @@ export function MobileInboxFilter({
       onOpenChange={(next) => {
         if (next) {
           setView(query.customerView)
+          setQueue(queueValue(query))
           setAssignee(query.assigneeIdentityId)
           setChannel(query.channelId)
           setStatus(query.serviceStatus)
@@ -316,6 +353,29 @@ export function MobileInboxFilter({
                   </Button>
                 ))}
               </div>
+              {view === CustomerInboxView.CustomerInboxViewQueue ? (
+                <div className="space-y-2">
+                  <label className="block text-sm font-medium" htmlFor="mobile-inbox-queue">
+                    {t("queueFilterLabel")}
+                  </label>
+                  <select
+                    id="mobile-inbox-queue"
+                    className="h-11 w-full rounded-md border bg-background px-3 text-sm"
+                    value={queue}
+                    onChange={(event) => setQueue(event.target.value)}
+                  >
+                    <option value="">{t("queueFilterAllQueues")}</option>
+                    <option value={CustomerQueueFilter.CustomerQueueFilterPublic}>
+                      {t("queueFilterPublicQueue")}
+                    </option>
+                    {queueTeams.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : null}
               {view === CustomerInboxView.CustomerInboxViewCoworkers ? (
                 <MobileCustomerAssignee value={assignee} onChange={setAssignee} />
               ) : null}
@@ -387,6 +447,7 @@ export function MobileInboxFilter({
                 customer
                   ? {
                       customerView: view,
+                      ...queueChange(view, queue),
                       assigneeIdentityId:
                         view === CustomerInboxView.CustomerInboxViewCoworkers ? assignee : "",
                       channelId: channel,

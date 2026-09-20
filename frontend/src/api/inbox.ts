@@ -18,6 +18,7 @@ import {
   ListConversationMessages,
   MarkConversationRead,
   ListCustomerServiceAssignees,
+  ListServiceQueueTeams,
   ListInboxChannels,
   LoadInbox,
   GetInboxContext,
@@ -94,11 +95,14 @@ import type {
   InboxSearchInput,
   InboxSearchResult,
   MarkConversationReadInput,
+  ServiceQueueTeam,
   TransferServiceSessionInput,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import {
   ConversationType,
   CustomerInboxView,
+  CustomerQueueFilter,
+  ServiceSessionTargetKind,
   ConversationPinPosition,
   InboxPartition,
   InboxScope,
@@ -187,6 +191,7 @@ const leaveGroupConversationBound = bind(LeaveGroupConversation)
 const dissolveGroupConversationBound = bind(DissolveGroupConversation)
 const sendGroupTextMessageBound = bind(SendGroupTextMessage)
 const listCustomerServiceAssigneesBound = bind(ListCustomerServiceAssignees)
+const listServiceQueueTeamsBound = bind(ListServiceQueueTeams)
 const listInboxChannelsBound = bind(ListInboxChannels)
 const claimServiceSessionBound = bind(ClaimServiceSession)
 const transferServiceSessionBound = bind(TransferServiceSession)
@@ -306,6 +311,8 @@ export async function loadInbox(
     scope: query.scope ?? InboxScope.InboxScopeAll,
     customerView:
       query.customerView ?? CustomerInboxView.CustomerInboxViewQueue,
+    queueFilter: query.queueFilter ?? CustomerQueueFilter.CustomerQueueFilterAll,
+    queueTeamId: query.queueTeamId ?? "",
     assigneeIdentityId: query.assigneeIdentityId ?? "",
     channelId: query.channelId ?? "",
     serviceStatus: query.serviceStatus ?? ServiceSessionStatus.ServiceSessionStatusOpen,
@@ -325,6 +332,12 @@ export async function listCustomerServiceAssignees() {
   return output.assignees
 }
 
+/** 读取可作为客服队列的团队，本人所在团队排在前面。 */
+export async function listServiceQueueTeams(): Promise<ServiceQueueTeam[]> {
+  const output = await listServiceQueueTeamsBound()
+  return output.teams
+}
+
 /** 读取渠道筛选候选，含已停用渠道。 */
 export async function listInboxChannels(): Promise<InboxChannel[]> {
   const output = await listInboxChannelsBound()
@@ -336,11 +349,22 @@ export function claimServiceSession(conversationId: string) {
   return claimServiceSessionBound(conversationId)
 }
 
-/** 把当前负责的处理周期转给另一位客服。 */
+/** 客服处理周期的转交去向。 */
+export type ServiceSessionTransferTarget =
+  | { kind: typeof ServiceSessionTargetKind.ServiceSessionTargetMember; identityId: string }
+  | { kind: typeof ServiceSessionTargetKind.ServiceSessionTargetTeam; teamId: string }
+  | { kind: typeof ServiceSessionTargetKind.ServiceSessionTargetPublicQueue }
+
+/** 把当前负责的处理周期转给成员、团队队列或公共队列。 */
 export function transferServiceSession(
   conversationId: string,
-  input: TransferServiceSessionInput,
+  target: ServiceSessionTransferTarget,
 ) {
+  const input: TransferServiceSessionInput = {
+    kind: target.kind,
+    teamId: "teamId" in target ? target.teamId : "",
+    identityId: "identityId" in target ? target.identityId : "",
+  }
   return transferServiceSessionBound(conversationId, input)
 }
 
@@ -627,6 +651,8 @@ export function searchInbox(input: Partial<InboxSearchInput>, signal?: AbortSign
     conversationId: input.conversationId ?? "",
     scope: input.scope ?? InboxScope.InboxScopeAll,
     customerView: input.customerView ?? CustomerInboxView.CustomerInboxViewQueue,
+    queueFilter: input.queueFilter ?? CustomerQueueFilter.CustomerQueueFilterAll,
+    queueTeamId: input.queueTeamId ?? "",
     assigneeIdentityId: input.assigneeIdentityId ?? "",
     channelId: input.channelId ?? "",
     serviceStatus: input.serviceStatus ?? ServiceSessionStatus.ServiceSessionStatusOpen,

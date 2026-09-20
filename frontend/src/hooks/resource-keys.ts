@@ -49,6 +49,8 @@ export const resourceKeys = {
   recentConversations: (parameters?: KeyParameters) => listKey("recent-conversations", parameters),
   /** 客服筛选候选。 */
   customerServiceAssignees: () => ["customer-service-assignees"],
+  /** 客服队列团队。 */
+  serviceQueueTeams: () => ["service-queue-teams"],
   /** 渠道筛选候选。 */
   inboxChannels: () => ["inbox-channels"],
   /** 附件下载与图片读取地址。 */
@@ -121,6 +123,10 @@ export const resourceKeys = {
   mcpServers: () => ["mcp-servers"],
   /** 单个 MCP 服务。 */
   mcpServer: (id?: string) => itemKey("mcp-server", id),
+  /** 当前用户已注册的设备列表。 */
+  devices: () => ["devices"],
+  /** 本机在当前企业服务器上的设备注册状态。 */
+  currentDevice: () => ["current-device"],
   /** 知识库列表。 */
   knowledgeBases: () => ["knowledge-bases"],
   /** 单个知识库。 */

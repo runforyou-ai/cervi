@@ -113,6 +113,15 @@ func availableRoute(ctx context.Context, db bun.IDB, organizationID string, chan
 		if err != nil {
 			return RouteSnapshot{}, false, err
 		}
+		// 团队队列须由真人承接，团队内没有开启接待的真人成员时视为不可用。
+		available, err := identityaction.TeamHasCustomerHandler(ctx, db, organizationID, team.ID)
+		if err != nil {
+			return RouteSnapshot{}, false, err
+		}
+		if !available {
+			slog.Warn("消息渠道路由的团队没有可接待的真人成员", "organization_id", organizationID, "team_id", team.ID)
+			return RouteSnapshot{}, false, nil
+		}
 		return RouteSnapshot{TeamID: &team.ID, TeamName: &team.Name}, true, nil
 	case domain.ChannelRoutingTargetTypeMember:
 		if targetID == nil {

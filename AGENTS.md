@@ -154,6 +154,8 @@ wails3 task build:server
 - Gin 只输出 Backend 给出的状态和错误体，不定义前端业务类型和主要调用契约。
 - `Service` 的每个带结果方法都对结果调用 `normalizeSlices`，nil 切片输出为空数组；`manual=service` 的手写方法同样遵守。
 - `appservice/backend.go` 的 `Backend` 接口是业务调用的唯一契约源，每个方法必须带 `cervi:route` 指令。`Service` 委托、服务端认证分发、Gin 路由与 Handler、API Proxy 转发由 `go generate ./internal/appservice` 生成到各包的 `*_gen.go`，禁止手改。
+- `appservice/operator_backend.go` 的 `OperatorBackend` 接口是官方托管运营调用的契约源，同一条生成命令按其指令生成运营认证分发和 Gin 适配，不生成 `Service` 委托、API Proxy 和 Wails 绑定。`Backend` 面向各端客户端，`OperatorBackend` 面向 SaaS 后端的服务间调用，新增方法按消费者归入其中一个，不跨契约暴露。
+- 运营指令不接受 `auth` 和 `manual` 选项：分发层一律先校验运营服务凭据，再把运营身份交给 `operatorOperations` 中的业务实现。运营错误使用带稳定错误码的 `OperatorError`，目标企业只取自路径或请求体中显式给出的企业编号。
 - 新增业务方法：在 `Backend` 补方法与指令（GET 的查询结构体在 `types.go` 为每个字段显式加 `query` 标签，不传输的字段用 `query:"-"`），运行生成器，然后只手写 `directOperations` 实现和 Action。无法按统一模式生成的层用 `manual=service,api,proxy` 标记并在对应包手写；API Proxy 的 `normalizeOutput` 只按响应类型补全企业服务器文件地址，不重复切片归一化。
 - 认证由 `direct_backend_gen.go` 生成的分发层统一处理：`auth` 默认 `member`，先解析登录身份再调用业务实现；无需登录的方法标记 `auth=public`。
 - `directOperations` 直接接收已解析的 `identity`，不重复认证，只负责把 Action 返回的语言无关错误码转成结构化、本地化错误并调用 Action。其 Action 与 Query 字段按业务域分组在 `<域>Ops` 结构体中，新增依赖只改对应实现文件。

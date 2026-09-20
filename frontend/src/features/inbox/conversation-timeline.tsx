@@ -619,24 +619,29 @@ function ConversationTimelineContent({
     return `${previousNames}${t("groupSystemListFinalSeparator")}${names[names.length - 1]}`
   }
 
+  /** 客服处理周期去向的时间线文案：成员取名称快照，团队与公共队列按队列文案展示。 */
+  function sessionTargetText(
+    target: NonNullable<ConversationMessageData["systemEvent"]>["sessionTarget"],
+  ) {
+    if (target?.kind === ServiceSessionTargetKind.ServiceSessionTargetMember) {
+      return target.identityId === currentIdentityID
+        ? t("messageSenderYou")
+        : (target.displayName ?? t("unknownSender"))
+    }
+    return target?.kind === ServiceSessionTargetKind.ServiceSessionTargetTeam
+      ? t("handoffTargetTeam", { name: target.teamName ?? "" })
+      : t("handoffTargetPublicQueue")
+  }
+
   /** 将类型化系统事件转换为当前语言的时间线文案。 */
   function formatSystemEvent(
     event: NonNullable<ConversationMessageData["systemEvent"]>,
   ) {
     // 转人工事件按去向与原因码本地化，名称取事件写入时的快照。
     if (event.type === ConversationSystemEventType.ConversationSystemEventServiceSessionHandedOff) {
-      const target = event.sessionTarget
-      const targetText =
-        target?.kind === ServiceSessionTargetKind.ServiceSessionTargetMember
-          ? target.identityId === currentIdentityID
-            ? t("messageSenderYou")
-            : (target.displayName ?? "")
-          : target?.kind === ServiceSessionTargetKind.ServiceSessionTargetTeam
-            ? t("handoffTargetTeam", { name: target.teamName ?? "" })
-            : t("handoffTargetPublicQueue")
       return t("serviceSessionHandedOff", {
         agent: event.fromDisplayName ?? t("unknownSender"),
-        target: targetText,
+        target: sessionTargetText(event.sessionTarget),
         reason: t(handoffReasonKey(event.handoffReason)),
       })
     }
@@ -645,16 +650,12 @@ function ConversationTimelineContent({
       event.type ===
       ConversationSystemEventType.ConversationSystemEventServiceSessionReturned
     ) {
-      const target = event.sessionTarget
       return t("serviceSessionReturned", {
         from:
           event.fromIdentityId === currentIdentityID
             ? t("messageSenderYou")
             : (event.fromDisplayName ?? t("unknownSender")),
-        target:
-          target?.kind === ServiceSessionTargetKind.ServiceSessionTargetTeam
-            ? t("handoffTargetTeam", { name: target.teamName ?? "" })
-            : t("handoffTargetPublicQueue"),
+        target: sessionTargetText(event.sessionTarget),
       })
     }
     const participantName = (
@@ -681,10 +682,7 @@ function ConversationTimelineContent({
       case ConversationSystemEventType.ConversationSystemEventServiceSessionTransferred:
         return t("serviceSessionTransferred", {
           actor,
-          target:
-            event.sessionTarget?.identityId === currentIdentityID
-              ? t("messageSenderYou")
-              : (event.sessionTarget?.displayName ?? t("unknownSender")),
+          target: sessionTargetText(event.sessionTarget),
         })
       case ConversationSystemEventType.ConversationSystemEventServiceSessionClosed:
         return t("serviceSessionClosed", { actor })

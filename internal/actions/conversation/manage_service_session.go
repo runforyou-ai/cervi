@@ -100,7 +100,7 @@ func (a *ClaimServiceSessionAction) Execute(ctx context.Context, identity *serve
 	return output, nil
 }
 
-// TransferServiceSessionAction 把当前负责的处理周期转给另一位客服。
+// TransferServiceSessionAction 把当前负责的处理周期转给成员、团队队列或公共队列。
 type TransferServiceSessionAction struct {
 	db          *bun.DB
 	coordinator ServiceSessionAgentRunCoordinator
@@ -112,33 +112,21 @@ func NewTransferServiceSessionAction(db *bun.DB, coordinator ServiceSessionAgent
 	return &TransferServiceSessionAction{db: db, coordinator: coordinator, scheduler: scheduler}
 }
 
-// Execute 校验当前负责人和目标客服后保存转交。
+// Execute 校验当前负责人和转交去向后把处理周期交给成员、团队队列或公共队列。
 func (a *TransferServiceSessionAction) Execute(ctx context.Context, identity *servermodels.Identity, input TransferServiceSessionInput) (ServiceSessionResult, error) {
-	var conversationValid, assigneeValid bool
-	input.ConversationID, conversationValid = common.NormalizeUUID(input.ConversationID)
-	input.AssigneeIdentityID, assigneeValid = common.NormalizeUUID(input.AssigneeIdentityID)
-	fields := map[string]ValidationCode{}
-	if !conversationValid {
-		fields["conversationId"] = ValidationConversationIDInvalid
-	}
-	if !assigneeValid || input.AssigneeIdentityID == identity.OrganizationIdentity.ID {
-		fields["assigneeIdentityId"] = ValidationTargetIdentityIDInvalid
-	}
-	if len(fields) > 0 {
-		return ServiceSessionResult{}, &ValidationError{Fields: fields}
+	input, err := normalizeTransferServiceSessionInput(identity, input)
+	if err != nil {
+		return ServiceSessionResult{}, err
 	}
 	var output ServiceSessionResult
 	var cancelledRunIDs []string
 	var cancelledSession *servermodels.ServiceSession
-	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
+	err = realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		if err := lockActiveCustomerHandler(ctx, tx, identity); err != nil {
 			return err
 		}
-		// 按转交目标身份、会话的顺序取锁。
-		target, err := identityaction.LockActiveCustomerHandlingIdentity(ctx, tx, identity.Organization.ID, input.AssigneeIdentityID)
-		if errors.Is(err, sql.ErrNoRows) {
-			return &ValidationError{Fields: map[string]ValidationCode{"assigneeIdentityId": ValidationTargetIdentityIDInvalid}}
-		}
+		// 按转交目标、会话的顺序取锁。
+		target, targetIdentity, err := lockTransferTarget(ctx, tx, identity, input)
 		if err != nil {
 			return err
 		}
@@ -149,18 +137,20 @@ func (a *TransferServiceSessionAction) Execute(ctx context.Context, identity *se
 		if session.AssigneeIdentityID == nil || *session.AssigneeIdentityID != identity.OrganizationIdentity.ID {
 			return &ConflictError{Reason: ConflictReasonServiceSessionOwned}
 		}
-		// 读取客服处理周期所属的消息渠道类型。
-		var channelType domain.ChannelType
-		if err := tx.NewSelect().TableExpr("contact_channel_identities AS cci").
-			ColumnExpr("c.type").
-			Join("JOIN channels AS c ON c.id = cci.channel_id AND c.organization_id = cci.organization_id").
-			Where("cci.id = ?", session.ContactChannelIdentityID).
-			Where("cci.organization_id = ?", session.OrganizationID).
-			Scan(ctx, &channelType); err != nil {
-			return err
-		}
-		if domain.OrganizationIdentityType(target.Type) == domain.OrganizationIdentityTypeAgent && !domain.ChannelSupportsAgentAssignee(channelType) {
-			return &ValidationError{Fields: map[string]ValidationCode{"assigneeIdentityId": ValidationTargetIdentityIDInvalid}}
+		if targetIdentity != nil && domain.OrganizationIdentityType(targetIdentity.Type) == domain.OrganizationIdentityTypeAgent {
+			// 读取客服处理周期所属的消息渠道类型，确认该渠道支持 AI 员工承接。
+			var channelType domain.ChannelType
+			if err := tx.NewSelect().TableExpr("contact_channel_identities AS cci").
+				ColumnExpr("c.type").
+				Join("JOIN channels AS c ON c.id = cci.channel_id AND c.organization_id = cci.organization_id").
+				Where("cci.id = ?", session.ContactChannelIdentityID).
+				Where("cci.organization_id = ?", session.OrganizationID).
+				Scan(ctx, &channelType); err != nil {
+				return err
+			}
+			if !domain.ChannelSupportsAgentAssignee(channelType) {
+				return &ValidationError{Fields: map[string]ValidationCode{"identityId": ValidationTargetIdentityIDInvalid}}
+			}
 		}
 		cancelledRunIDs, err = a.coordinator.CancelForServiceSession(
 			ctx, tx, session.OrganizationID, session.ID,
@@ -170,24 +160,18 @@ func (a *TransferServiceSessionAction) Execute(ctx context.Context, identity *se
 			return err
 		}
 		cancelledSession = session
-		if _, err := tx.NewUpdate().Model(session).
-			Set("assignee_identity_id = ?", target.ID).
-			Set("assigned_at = COALESCE(assigned_at, ?)", time.Now().UTC()).
-			Set("updated_at = now()").
-			WherePK().
-			Where("organization_id = ?", identity.Organization.ID).
-			Exec(ctx); err != nil {
+		previousAssigneeID := *session.AssigneeIdentityID
+		if err := applyTransferTarget(ctx, tx, identity, session, target, targetIdentity); err != nil {
 			return err
 		}
-		session.AssigneeIdentityID = &target.ID
-		if err := appendServiceSessionEvent(ctx, tx, identity, conversation, session, domain.ConversationSystemEventServiceSessionTransferred,
-			&identity.OrganizationIdentity.ID, &domain.ServiceSessionTarget{Kind: domain.ServiceSessionTargetMember, IdentityID: &target.ID, DisplayName: &target.DisplayName}); err != nil {
+		if err := appendServiceSessionEvent(ctx, tx, identity, conversation, session,
+			domain.ConversationSystemEventServiceSessionTransferred, &previousAssigneeID, &target); err != nil {
 			return err
 		}
 		if err := chatstate.TouchConversation(ctx, tx, conversation); err != nil {
 			return err
 		}
-		if domain.OrganizationIdentityType(target.Type) == domain.OrganizationIdentityTypeAgent {
+		if targetIdentity != nil && domain.OrganizationIdentityType(targetIdentity.Type) == domain.OrganizationIdentityTypeAgent {
 			kind, messageID, err := loadServiceSessionLastMessageSender(ctx, tx, session)
 			if err != nil {
 				return err
@@ -203,11 +187,11 @@ func (a *TransferServiceSessionAction) Execute(ctx context.Context, identity *se
 					return err
 				}
 				if !scheduled {
-					return &ValidationError{Fields: map[string]ValidationCode{"assigneeIdentityId": ValidationTargetIdentityIDInvalid}}
+					return &ValidationError{Fields: map[string]ValidationCode{"identityId": ValidationTargetIdentityIDInvalid}}
 				}
 			}
 		}
-		output = serviceSessionResult(session, target)
+		output = serviceSessionResult(session, targetIdentity)
 		return nil
 	})
 	if err != nil {
@@ -215,6 +199,101 @@ func (a *TransferServiceSessionAction) Execute(ctx context.Context, identity *se
 	}
 	finishServiceSessionAgentCancellation(a.coordinator, cancelledRunIDs, cancelledSession, domain.AgentRunErrorCodeAssigneeChanged)
 	return output, nil
+}
+
+// normalizeTransferServiceSessionInput 规范化转交输入并校验各类去向所需的编号。
+func normalizeTransferServiceSessionInput(identity *servermodels.Identity, input TransferServiceSessionInput) (TransferServiceSessionInput, error) {
+	fields := map[string]ValidationCode{}
+	conversationID, valid := common.NormalizeUUID(input.ConversationID)
+	if !valid {
+		fields["conversationId"] = ValidationConversationIDInvalid
+	}
+	input.ConversationID = conversationID
+	switch input.TargetKind {
+	case domain.ServiceSessionTargetMember:
+		identityID, valid := common.NormalizeUUID(input.IdentityID)
+		if !valid || identityID == identity.OrganizationIdentity.ID {
+			fields["identityId"] = ValidationTargetIdentityIDInvalid
+		}
+		input.IdentityID = identityID
+	case domain.ServiceSessionTargetTeam:
+		teamID, valid := common.NormalizeUUID(input.TeamID)
+		if !valid {
+			fields["teamId"] = ValidationTargetTeamIDInvalid
+		}
+		input.TeamID = teamID
+	case domain.ServiceSessionTargetPublicQueue:
+	default:
+		fields["kind"] = ValidationTransferTargetKindInvalid
+	}
+	if len(fields) > 0 {
+		return input, &ValidationError{Fields: fields}
+	}
+	return input, nil
+}
+
+// lockTransferTarget 锁定转交去向并返回其名称快照；成员去向同时返回目标身份。
+func lockTransferTarget(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, input TransferServiceSessionInput) (domain.ServiceSessionTarget, *servermodels.OrganizationIdentity, error) {
+	switch input.TargetKind {
+	case domain.ServiceSessionTargetMember:
+		target, err := identityaction.LockActiveCustomerHandlingIdentity(ctx, tx, identity.Organization.ID, input.IdentityID)
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.ServiceSessionTarget{}, nil, &ValidationError{Fields: map[string]ValidationCode{"identityId": ValidationTargetIdentityIDInvalid}}
+		}
+		if err != nil {
+			return domain.ServiceSessionTarget{}, nil, err
+		}
+		return domain.ServiceSessionTarget{Kind: domain.ServiceSessionTargetMember, IdentityID: &target.ID, DisplayName: &target.DisplayName}, target, nil
+	case domain.ServiceSessionTargetTeam:
+		team := &servermodels.Team{}
+		err := tx.NewSelect().Model(team).Column("t.id", "t.name").
+			Where("t.organization_id = ? AND t.id = ?", identity.Organization.ID, input.TeamID).
+			For("KEY SHARE").
+			Scan(ctx)
+		if errors.Is(err, sql.ErrNoRows) {
+			return domain.ServiceSessionTarget{}, nil, &ValidationError{Fields: map[string]ValidationCode{"teamId": ValidationTargetTeamIDInvalid}}
+		}
+		if err != nil {
+			return domain.ServiceSessionTarget{}, nil, err
+		}
+		available, err := identityaction.TeamHasCustomerHandler(ctx, tx, identity.Organization.ID, team.ID)
+		if err != nil {
+			return domain.ServiceSessionTarget{}, nil, err
+		}
+		if !available {
+			return domain.ServiceSessionTarget{}, nil, &ConflictError{Reason: ConflictReasonTransferTeamUnavailable}
+		}
+		return domain.ServiceSessionTarget{Kind: domain.ServiceSessionTargetTeam, TeamID: &team.ID, TeamName: &team.Name}, nil, nil
+	default:
+		return domain.ServiceSessionTarget{Kind: domain.ServiceSessionTargetPublicQueue}, nil, nil
+	}
+}
+
+// applyTransferTarget 按转交去向写入负责人与所属队列；转给团队或公共队列时清空负责人，转给成员时保持原队列。
+func applyTransferTarget(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, session *servermodels.ServiceSession, target domain.ServiceSessionTarget, targetIdentity *servermodels.OrganizationIdentity) error {
+	update := tx.NewUpdate().Model(session).Set("updated_at = now()").
+		WherePK().Where("organization_id = ?", identity.Organization.ID)
+	switch target.Kind {
+	case domain.ServiceSessionTargetMember:
+		update = update.Set("assignee_identity_id = ?", targetIdentity.ID).
+			Set("assigned_at = COALESCE(assigned_at, ?)", time.Now().UTC())
+	case domain.ServiceSessionTargetTeam:
+		update = update.Set("assignee_identity_id = NULL").Set("team_id = ?", target.TeamID)
+	default:
+		update = update.Set("assignee_identity_id = NULL").Set("team_id = NULL")
+	}
+	if _, err := update.Exec(ctx); err != nil {
+		return err
+	}
+	switch target.Kind {
+	case domain.ServiceSessionTargetMember:
+		session.AssigneeIdentityID = &targetIdentity.ID
+	case domain.ServiceSessionTargetTeam:
+		session.AssigneeIdentityID, session.TeamID = nil, target.TeamID
+	default:
+		session.AssigneeIdentityID, session.TeamID = nil, nil
+	}
+	return nil
 }
 
 // loadServiceSessionLastMessageSender 读取当前处理周期最后消息的发送主体类型。
