@@ -1,4 +1,4 @@
-/** 群聊资料栏中的成员列表和成员管理交互。 */
+/** 群聊侧边面板中的成员列表和成员管理交互。 */
 import { useId, useMemo, useState } from "react"
 import {
   CrownIcon,

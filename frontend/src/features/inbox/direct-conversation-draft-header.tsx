@@ -66,7 +66,7 @@ export function DirectConversationDraftHeader({
       </div>
       {onToggleContext && !contextVisible ? (
         <HeaderAction
-          label={t("contextOpen")}
+          label={t("sidePanelOpen")}
           icon={PanelRightOpenIcon}
           onClick={onToggleContext}
         />

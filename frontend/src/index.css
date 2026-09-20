@@ -340,7 +340,7 @@ body,
 }
 
 [data-native-os="darwin"][data-window-fullscreen="false"]
-  .cervi-conversation-context-pane [data-slot="tabs-list"] {
+  .cervi-conversation-side-panel [data-slot="tabs-list"] {
   --wails-draggable: drag;
 }
 
@@ -376,7 +376,7 @@ body,
 }
 
 [data-native-os="darwin"]
-  .cervi-conversation-context-pane [data-slot="tabs-trigger"] {
+  .cervi-conversation-side-panel [data-slot="tabs-trigger"] {
   --wails-draggable: no-drag;
 }
 

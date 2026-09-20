@@ -227,7 +227,7 @@ export function ConversationHeader({
           ) : null}
           {onToggleContext && !contextVisible ? (
             <HeaderAction
-              label={t("contextOpen")}
+              label={t("sidePanelOpen")}
               icon={PanelRightOpenIcon}
               onClick={onToggleContext}
             />

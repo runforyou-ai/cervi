@@ -14,7 +14,7 @@ import {
 } from "@/api"
 import { useWorkspace } from "@/contexts/workspace-context"
 import type { ComposerDraftBridge } from "@/features/inbox/conversation-composer"
-import { ConversationContextPane } from "@/features/inbox/conversation-context-pane"
+import { ConversationSidePanel } from "@/features/inbox/conversation-side-panel"
 import { ConversationHeader } from "@/features/inbox/conversation-header"
 import { ConversationThread } from "@/features/inbox/conversation-thread"
 import type { ConversationLocateTarget } from "@/features/inbox/conversation-timeline"
@@ -196,7 +196,7 @@ export function ConversationMain({
           customerDraftRef={customerConversation ? customerDraftRef : undefined}
         />
       </div>
-      <ConversationContextPane
+      <ConversationSidePanel
         conversation={validConversation}
         directTarget={directTarget}
         displayName={contactName}
