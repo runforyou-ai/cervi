@@ -962,7 +962,7 @@ export function ConversationComposer({
             </p>
           ) : null}
           {/* 输入区整体铺底色，正文单独用白底并与上下边缘留出间距。 */}
-          <div className="flex items-end gap-2 bg-foreground/5 px-2 py-1">
+          <div className="flex items-end gap-2 bg-foreground/[0.03] px-2 py-1">
             {disabledReason ? null : (
               <div className="mb-0.5 flex items-end gap-0.5">
                 {onVisibilityChange ? (
