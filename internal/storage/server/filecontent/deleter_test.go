@@ -21,7 +21,7 @@ func TestDeleterDeleteLocalFile(t *testing.T) {
 	if err := local.Save(context.Background(), key, strings.NewReader("avatar"), 6); err != nil {
 		t.Fatal(err)
 	}
-	deleter := NewDeleter(local, nil)
+	deleter := NewDeleter(local, S3Config{})
 	if err := deleter.Delete(context.Background(), &servermodels.File{
 		StorageBackend: string(domain.FileStorageBackendLocal), StorageKey: key,
 	}); err != nil {

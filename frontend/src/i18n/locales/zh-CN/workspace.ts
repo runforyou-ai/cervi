@@ -33,7 +33,6 @@ const workspace = {
       preferences: "个人偏好",
       general: "通用设置",
       roles: "角色管理",
-      storage: "文件存储",
       employees: "员工",
       aiEmployees: "AI 员工",
       team: "团队",

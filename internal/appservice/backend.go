@@ -524,15 +524,6 @@ type Backend interface {
 	// UpdateOrganization 修改当前企业通用设置。
 	//cervi:route PUT /settings/organization
 	UpdateOrganization(context.Context, RequestMeta, OrganizationInput) (Organization, error)
-	// GetS3Setting 返回当前企业的对象存储设置。
-	//cervi:route GET /settings/storage/s3
-	GetS3Setting(context.Context, RequestMeta) (S3Setting, error)
-	// SaveS3Setting 保存当前企业的对象存储设置。
-	//cervi:route PUT /settings/storage/s3
-	SaveS3Setting(context.Context, RequestMeta, S3SettingInput) (S3Setting, error)
-	// TestS3Setting 测试对象存储连接。
-	//cervi:route POST /settings/storage/s3/test
-	TestS3Setting(context.Context, RequestMeta, S3SettingInput) error
 }
 
 // WorkspaceInstaller 由服务端 Backend 实现，用于企业初始化。

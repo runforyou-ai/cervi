@@ -60,7 +60,6 @@ export {
     ServiceSessionStatus,
     ServiceSessionTargetKind,
     SessionState,
-    StorageProvider,
     TelegramWebhookStatus,
     UserStatus,
     WorkStatus
@@ -271,8 +270,6 @@ export type {
     RoleInput,
     RoleList,
     RoleSummary,
-    S3Setting,
-    S3SettingInput,
     ServiceSessionTarget,
     Startup,
     SyncHeads,

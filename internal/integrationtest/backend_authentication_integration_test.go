@@ -13,6 +13,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servertest "github.com/runforyou-ai/cervi/internal/servertest"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
+	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	"github.com/runforyou-ai/cervi/internal/tenant"
 )
 
@@ -44,7 +45,7 @@ func TestBackendMethodsRequireAuthentication(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	backend := appservice.NewDirectBackend(db, nil, serverstorage.NewTenantResolver(db), nil, nil, nil, nil, nil)
+	backend := appservice.NewDirectBackend(db, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(db), nil, nil, nil, nil, nil)
 	tenantContext := tenant.WithAccessHost(ctx, accessHost)
 	backendValue := reflect.ValueOf(backend)
 	backendInterface := reflect.TypeFor[appservice.Backend]()

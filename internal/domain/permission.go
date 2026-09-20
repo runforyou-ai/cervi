@@ -14,8 +14,6 @@ const (
 	PermissionRolesManage            PermissionCode = "roles.manage"
 	PermissionOrganizationView       PermissionCode = "organization.view"
 	PermissionOrganizationManage     PermissionCode = "organization.manage"
-	PermissionStorageView            PermissionCode = "storage.view"
-	PermissionStorageManage          PermissionCode = "storage.manage"
 )
 
 // PermissionResource 定义权限所属功能。
@@ -27,7 +25,6 @@ const (
 	PermissionResourceChannels         PermissionResource = "channels"
 	PermissionResourceRoles            PermissionResource = "roles"
 	PermissionResourceOrganization     PermissionResource = "organization"
-	PermissionResourceStorage          PermissionResource = "storage"
 )
 
 // PermissionLevel 定义权限操作层级。
@@ -66,8 +63,6 @@ var permissionDefinitions = []PermissionDefinition{
 	{Code: PermissionRolesManage, Resource: PermissionResourceRoles, Level: PermissionLevelManage, AppliesTo: PermissionAppliesToMember},
 	{Code: PermissionOrganizationView, Resource: PermissionResourceOrganization, Level: PermissionLevelView, AppliesTo: PermissionAppliesToMember},
 	{Code: PermissionOrganizationManage, Resource: PermissionResourceOrganization, Level: PermissionLevelManage, AppliesTo: PermissionAppliesToMember},
-	{Code: PermissionStorageView, Resource: PermissionResourceStorage, Level: PermissionLevelView, AppliesTo: PermissionAppliesToMember},
-	{Code: PermissionStorageManage, Resource: PermissionResourceStorage, Level: PermissionLevelManage, AppliesTo: PermissionAppliesToMember},
 }
 
 // PermissionDefinitions 返回按界面顺序排列的权限目录。

@@ -14,7 +14,6 @@ import (
 	"github.com/runforyou-ai/cervi/internal/actions/filemaintenance"
 	knowledgeaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
 	mcpserveraction "github.com/runforyou-ai/cervi/internal/actions/mcpserver"
-	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
 	"github.com/runforyou-ai/cervi/internal/api"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/common/searchtext"
@@ -35,7 +34,6 @@ import (
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
-	"github.com/uptrace/bun"
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
@@ -45,12 +43,12 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	tenantResolver := serverstorage.NewTenantResolver(appStorage.DB())
 	httpsEntry := ingress.NewHTTPSEntry(config.TLS, config.Server, serverstorage.NewACMECache(appStorage.DB()), tenantResolver)
 
-	// 初始化本地文件存储和按企业读取的对象存储配置。
+	// 初始化本地文件存储和部署级对象存储配置。
 	localFiles, err := serverfilecontent.NewLocalStore(config.Storage.LocalDirectory)
 	if err != nil {
 		return nil, nil, err
 	}
-	resolveFileS3 := newFileContentS3ConfigResolver(appStorage.DB())
+	fileS3 := fileContentS3Config(config.Storage.S3)
 
 	// 创建提交后发布受众通知的实时发布器，由服务生命周期统一启停。
 	realtimePublisher := realtime.NewPublisher(config.NATS)
@@ -60,7 +58,7 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 
 	// 注册文档处理任务及最终失败时的状态处理。
 	documentConverter := documentconvert.NewClient(config.MarkitdownURL)
-	fileReader := serverfilecontent.NewReader(localFiles, resolveFileS3)
+	fileReader := serverfilecontent.NewReader(localFiles, fileS3)
 	// 上下文附件链接与企业访问入口使用同一协议。
 	attachmentScheme := "http"
 	if config.TLS.Mode != "off" {
@@ -93,7 +91,7 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 		return nil, nil, err
 	}
 	agentRunScheduler := agentrunaction.NewScheduler(tasks)
-	agentAttachments := agentrunaction.NewAttachmentReader(appStorage.DB(), fileReader, attachmentScheme)
+	agentAttachments := agentrunaction.NewAttachmentReader(appStorage.DB(), fileReader, attachmentScheme, fileS3.PublicBaseURL)
 	executeAgentRun := agentrunaction.NewExecuteAction(appStorage.DB(), tasks, agentRuntime, agentAttachments,
 		knowledgeaction.NewRetrievalService(appStorage.DB(), embedding.NewClient(), rerank.NewClient()))
 	// 客服 AI 写回复复用模型构造和附件链接，以单次模型调用同步生成回复候选。
@@ -104,7 +102,7 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 
 	// 注册过期文件扫描与删除任务，每小时触发一次扫描。
 	scanExpired := filemaintenance.NewScanExpiredAction(appStorage.DB(), tasks)
-	deleteExpired := filemaintenance.NewDeleteExpiredAction(appStorage.DB(), serverfilecontent.NewDeleter(localFiles, resolveFileS3))
+	deleteExpired := filemaintenance.NewDeleteExpiredAction(appStorage.DB(), serverfilecontent.NewDeleter(localFiles, fileS3))
 	if err := tasks.Registry().RegisterJSON(filemaintenance.ScanExpiredActionName, scanExpired.Execute); err != nil {
 		return nil, nil, err
 	}
@@ -118,9 +116,9 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	})
 
 	// 组装企业成员与网站匿名访客各自的业务入口。
-	directBackend := appservice.NewDirectBackend(appStorage.DB(), localFiles, tenantResolver, agentRunScheduler, executeAgentRun, tasks, documentConverter, customerReplySuggestions)
+	directBackend := appservice.NewDirectBackend(appStorage.DB(), localFiles, fileS3, tenantResolver, agentRunScheduler, executeAgentRun, tasks, documentConverter, customerReplySuggestions)
 	boundService := appservice.New(directBackend)
-	websiteVisitorBackend := appservice.NewWebsiteVisitorDirectBackend(appStorage.DB(), agentRunScheduler, localFiles)
+	websiteVisitorBackend := appservice.NewWebsiteVisitorDirectBackend(appStorage.DB(), agentRunScheduler, localFiles, fileS3)
 	websiteVisitorService := appservice.NewWebsiteVisitorService(websiteVisitorBackend)
 	// 实时网关复用成员业务调用的身份解析与同步探针，以及访客的渠道身份解析。
 	realtimeGateway := gateway.New(directBackend, websiteVisitorBackend, config.NATS.Namespace, gateway.DefaultOptions())
@@ -139,19 +137,14 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 		Payload: struct{}{}, CronExpression: "@every 5s", Timezone: "UTC", Enabled: true, MaxAttempts: 1, StartImmediately: true,
 	})
 
-	// 按企业存储设置导入 Telegram 头像与入站媒体，注册媒体取回任务及最终失败时的附件终态，并接入渠道 Webhook。
-	getS3Setting := settingaction.NewGetS3SettingQuery(appStorage.DB())
-	resolveStorageBackend := func(ctx context.Context, organizationID string) (domain.FileStorageBackend, error) {
-		setting, err := getS3Setting.ExecuteForOrganization(ctx, organizationID)
-		if err != nil {
-			return "", err
-		}
-		if setting.Enabled {
+	// 按部署级存储配置导入 Telegram 头像与入站媒体，注册媒体取回任务及最终失败时的附件终态，并接入渠道 Webhook。
+	resolveStorageBackend := func(context.Context, string) (domain.FileStorageBackend, error) {
+		if fileS3.Enabled {
 			return domain.FileStorageBackendS3, nil
 		}
 		return domain.FileStorageBackendLocal, nil
 	}
-	fileWriter := serverfilecontent.NewWriter(localFiles, resolveFileS3)
+	fileWriter := serverfilecontent.NewWriter(localFiles, fileS3)
 	telegramAvatarFiles := fileaction.NewImportAction(appStorage.DB(), resolveStorageBackend, fileWriter)
 	retrieveTelegramMedia := channelaction.NewRetrieveTelegramMediaAction(appStorage.DB(), telegramAPI, fileWriter, agentRunScheduler)
 	if err := tasks.Registry().RegisterJSONWithTerminalFailure(channelaction.RetrieveTelegramMediaActionName, retrieveTelegramMedia.Execute, retrieveTelegramMedia.FinalizeFailure); err != nil {
@@ -193,19 +186,12 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	}, realtimeGateway.Middleware, nil
 }
 
-// newFileContentS3ConfigResolver 创建读取企业对象存储配置的解析器。
-func newFileContentS3ConfigResolver(db *bun.DB) serverfilecontent.S3ConfigResolver {
-	getS3Setting := settingaction.NewGetS3SettingQuery(db)
-	return func(ctx context.Context, organizationID string) (serverfilecontent.S3Config, error) {
-		setting, err := getS3Setting.ExecuteForOrganization(ctx, organizationID)
-		if err != nil {
-			return serverfilecontent.S3Config{}, err
-		}
-		return serverfilecontent.S3Config{
-			Endpoint: setting.Endpoint, Region: setting.Region, Bucket: setting.Bucket,
-			AccessKeyID: setting.AccessKeyID, SecretAccessKey: setting.SecretAccessKey,
-			ForcePathStyle: setting.ForcePathStyle,
-		}, nil
+// fileContentS3Config 把部署级对象存储配置转换为文件内容层配置。
+func fileContentS3Config(config serverconfig.S3Config) serverfilecontent.S3Config {
+	return serverfilecontent.S3Config{
+		Enabled: config.Enabled, Endpoint: config.Endpoint, PublicBaseURL: config.PublicBaseURL,
+		Region: config.Region, Bucket: config.Bucket, AccessKeyID: config.AccessKeyID,
+		SecretAccessKey: config.SecretAccessKey, ForcePathStyle: config.ForcePathStyle,
 	}
 }
 

@@ -9,7 +9,6 @@ import { ChangePasswordForm } from "@/features/settings/change-password-form"
 import { GeneralSettingsForm } from "@/features/settings/general-settings-form"
 import { ProfileSettingsForm } from "@/features/settings/profile-settings-form"
 import { RoleListPage } from "@/features/roles/role-list-page"
-import { StorageSettingsForm } from "@/features/settings/storage-settings-form"
 import { UserPreferencesForm } from "@/features/settings/user-preferences-form"
 import { useWorkspace } from "@/contexts/workspace-context"
 
@@ -63,7 +62,7 @@ export function SystemSettingsPage({
   section,
   children,
 }: {
-  section: "general" | "roles" | "storage"
+  section: "general" | "roles"
   children?: ReactNode
 }) {
   const { t } = useTranslation("settings")
@@ -85,9 +84,6 @@ export function SystemSettingsPage({
           <PagePaneLink to="/settings/roles">
             {t("navigation.roles")}
           </PagePaneLink>
-          <PagePaneLink to="/settings/storage">
-            {t("navigation.storage")}
-          </PagePaneLink>
         </PagePaneNav>
       }
     >
@@ -97,11 +93,7 @@ export function SystemSettingsPage({
         <>
           <PageHeader title={title} />
           <PageContent>
-            {section === "general" ? (
-              <GeneralSettingsForm organization={identity.organization} />
-            ) : (
-              <StorageSettingsForm />
-            )}
+            <GeneralSettingsForm organization={identity.organization} />
           </PageContent>
         </>
       )}

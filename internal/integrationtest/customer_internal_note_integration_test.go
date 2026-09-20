@@ -16,6 +16,7 @@ import (
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
+	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/runforyou-ai/cervi/internal/tenant"
@@ -87,7 +88,7 @@ func TestCustomerInternalNotes(t *testing.T) {
 		t.Fatalf("member timeline last message = %+v", last)
 	}
 
-	visitor := appservice.NewWebsiteVisitorDirectBackend(f.db, nil, nil)
+	visitor := appservice.NewWebsiteVisitorDirectBackend(f.db, nil, nil, serverfilecontent.S3Config{})
 	externalID := "web-session:0123456789abcdef0123456789abcdef"
 	page, err := visitor.ListMessages(ctx, appservice.WebsiteVisitorMeta{}, f.channelID, externalID, f.conversationID, appservice.WebsiteVisitorMessageHistoryInput{})
 	if err != nil {
@@ -148,7 +149,7 @@ func TestCustomerInternalNotes(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		backend := appservice.NewDirectBackend(f.db, nil, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil)
+		backend := appservice.NewDirectBackend(f.db, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil)
 		window, err := backend.ListConversationMessages(tenant.WithAccessHost(ctx, f.owner.Organization.AccessHost), appservice.RequestMeta{Token: login.Token}, f.conversationID, appservice.ConversationMessageListInput{})
 		if err != nil {
 			t.Fatal(err)

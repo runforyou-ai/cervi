@@ -18,6 +18,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
+	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	"github.com/runforyou-ai/cervi/internal/tenant"
 )
 
@@ -109,7 +110,7 @@ func TestInboxChannelFilter(t *testing.T) {
 	if err := f.db.NewSelect().Table("organizations").Column("access_host").Where("id = ?", f.owner.Organization.ID).Scan(ctx, &accessHost); err != nil {
 		t.Fatal(err)
 	}
-	backend := appservice.NewDirectBackend(f.db, nil, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil)
+	backend := appservice.NewDirectBackend(f.db, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil)
 	candidates, err := backend.ListInboxChannels(tenant.WithAccessHost(ctx, accessHost), appservice.RequestMeta{Token: login.Token})
 	if err != nil || len(candidates.Channels) != 2 {
 		t.Fatalf("channel candidates=%+v err=%v", candidates.Channels, err)

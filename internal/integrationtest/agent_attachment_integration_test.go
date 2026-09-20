@@ -33,7 +33,7 @@ func (testAttachmentFiles) Open(_ context.Context, file *servermodels.File) (io.
 
 // testAttachmentReader 创建以 http 生成附件链接、按原件名称返回内容的附件读取器。
 func testAttachmentReader(db *bun.DB) *agentrunaction.AttachmentReader {
-	return agentrunaction.NewAttachmentReader(db, testAttachmentFiles{}, "http")
+	return agentrunaction.NewAttachmentReader(db, testAttachmentFiles{}, "http", "")
 }
 
 type contextAttachmentContent struct {

@@ -20,6 +20,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
+	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/runforyou-ai/cervi/internal/tenant"
@@ -154,7 +155,7 @@ func TestDirectClientMessageAssociation(t *testing.T) {
 func TestWebsiteClientMessageAssociation(t *testing.T) {
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
-	visitor := appservice.NewWebsiteVisitorDirectBackend(f.db, agentrunaction.NewScheduler(servertask.New(f.db, serverconfig.NATSConfig{})), nil)
+	visitor := appservice.NewWebsiteVisitorDirectBackend(f.db, agentrunaction.NewScheduler(servertask.New(f.db, serverconfig.NATSConfig{})), nil, serverfilecontent.S3Config{})
 	const visitorA = "web-session:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	const visitorB = "web-session:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 	clientID := uuid.NewV7().String()
@@ -219,7 +220,7 @@ func TestWebsiteClientMessageAssociation(t *testing.T) {
 // assertClientAssociationHTTP 验证登录会话之间的公开响应隔离且不泄露内部幂等键。
 func assertClientAssociationHTTP(t *testing.T, f navigationFixture, conversationID, visitorMessageID, memberMessageID, clientID string) {
 	t.Helper()
-	service := api.NewService(appservice.New(appservice.NewDirectBackend(f.db, nil, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil)))
+	service := api.NewService(appservice.New(appservice.NewDirectBackend(f.db, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil)))
 	// 两次独立登录验证本人关联不绑定某个登录令牌。
 	for _, email := range []string{"owner@navigation.test", "owner@navigation.test", "member@navigation.test"} {
 		login, err := authaction.NewLoginAction(f.db).Execute(context.Background(), authaction.LoginInput{OrganizationID: f.owner.Organization.ID, Email: email, Password: "password123"})

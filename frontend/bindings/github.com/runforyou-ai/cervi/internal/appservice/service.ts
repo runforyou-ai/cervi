@@ -493,13 +493,6 @@ export function GetRole(meta: $models.RequestMeta, roleID: string): $Cancellable
 }
 
 /**
- * GetS3Setting 返回当前企业的对象存储设置。
- */
-export function GetS3Setting(meta: $models.RequestMeta): $CancellablePromise<$models.S3Setting> {
-    return $Call.ByID(3937581736, meta);
-}
-
-/**
  * GetSyncHeads 返回当前用户可见会话与身份资料的同步探针值。
  */
 export function GetSyncHeads(meta: $models.RequestMeta): $CancellablePromise<$models.SyncHeads> {
@@ -962,13 +955,6 @@ export function RetryKnowledgeQAEntry(meta: $models.RequestMeta, knowledgeBaseID
 }
 
 /**
- * SaveS3Setting 保存当前企业的对象存储设置。
- */
-export function SaveS3Setting(meta: $models.RequestMeta, input: $models.S3SettingInput): $CancellablePromise<$models.S3Setting> {
-    return $Call.ByID(2631396075, meta, input);
-}
-
-/**
  * SaveTelegramChannelConnection 保存 Telegram 机器人和 Webhook 设置。
  */
 export function SaveTelegramChannelConnection(meta: $models.RequestMeta, channelID: string, input: $models.TelegramChannelConnectionInput): $CancellablePromise<$models.TelegramChannel> {
@@ -1106,13 +1092,6 @@ export function TestAIProviderConnection(meta: $models.RequestMeta, input: $mode
  */
 export function TestMCPServerConnection(meta: $models.RequestMeta, input: $models.MCPServerConnectionInput): $CancellablePromise<void> {
     return $Call.ByID(2900402005, meta, input);
-}
-
-/**
- * TestS3Setting 测试对象存储连接。
- */
-export function TestS3Setting(meta: $models.RequestMeta, input: $models.S3SettingInput): $CancellablePromise<void> {
-    return $Call.ByID(944621916, meta, input);
 }
 
 /**

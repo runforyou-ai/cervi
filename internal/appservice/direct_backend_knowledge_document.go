@@ -150,11 +150,7 @@ func (o *directOperations) GetKnowledgeDocumentPreview(ctx context.Context, meta
 		}
 		return KnowledgeDocumentPreviewRequest{URL: url, Headers: map[string]string{"Authorization": "Bearer " + meta.Token}}, nil
 	}
-	setting, err := o.getS3Setting.ExecuteForOrganization(ctx, record.OrganizationID)
-	if err != nil {
-		return KnowledgeDocumentPreviewRequest{}, o.fileOperationError(ctx, meta, err, cervii18n.ErrorKnowledgeDocumentReadFailed)
-	}
-	request, err := filecontent.PresignDownload(ctx, s3FileConfig(setting), record.StorageKey, "inline")
+	request, err := filecontent.PresignDownload(ctx, o.s3, record.StorageKey, "inline")
 	if err != nil {
 		return KnowledgeDocumentPreviewRequest{}, o.fileOperationError(ctx, meta, err, cervii18n.ErrorKnowledgeDocumentReadFailed)
 	}
