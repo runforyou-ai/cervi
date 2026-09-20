@@ -1043,61 +1043,68 @@ export function ConversationComposer({
               {disabledReason}
             </p>
           ) : null}
-          <div className="flex items-end gap-1 px-2 py-1.5">
-            {onVisibilityChange && !disabledReason ? (
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-pressed={internalNote}
-                    className={cn(
-                      composerToolClass,
-                      internalNote &&
-                        "bg-amber-100 text-amber-900 hover:bg-amber-100 hover:text-amber-900 dark:bg-amber-950 dark:text-amber-200 dark:hover:bg-amber-950 dark:hover:text-amber-200",
-                    )}
-                    aria-label={t("composerModeNote")}
-                    onClick={() =>
-                      switchVisibility(
-                        internalNote
-                          ? MessageVisibility.MessageVisibilityCustomerVisible
-                          : MessageVisibility.MessageVisibilityInternalOnly,
-                      )
-                    }
-                  >
-                    <StickyNoteIcon />
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>{t("composerModeNote")}</TooltipContent>
-              </Tooltip>
-            ) : null}
-            {disabledReason ? null : attachmentTool}
-            {bodyInput}
-            {disabledReason ? null : emojiTool}
-            {replyAssistant}
-            {showSend ? (
-              <Button
-                type="submit"
-                size="icon"
-                className="relative size-9 rounded-full after:absolute after:-inset-1 after:content-[''] [&_svg:not([class*='size-'])]:size-5"
-                disabled={isSubmitting || Boolean(disabledReason) || isBodyEmpty || replyTo?.deleted}
-                aria-label={t(internalNote ? "internalNoteSave" : "messageSend")}
-              >
-                {showSubmitting ? <LoaderCircleIcon className="animate-spin" /> : <ArrowUpIcon />}
-              </Button>
-            ) : (
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon-sm"
-                className={composerToolClass}
-                disabled
-                aria-label={t("voiceMessage")}
-              >
-                <MicIcon />
-              </Button>
+          {/* 左右图标区铺到输入区边缘并撑满行高，与中间输入区区分。 */}
+          <div className="flex items-end gap-2">
+            {disabledReason ? null : (
+              <div className="flex items-end gap-1 self-stretch bg-foreground/5 px-2">
+                {onVisibilityChange ? (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon-sm"
+                        aria-pressed={internalNote}
+                        className={cn(
+                          composerToolClass,
+                          internalNote &&
+                            "bg-amber-100 text-amber-900 hover:bg-amber-100 hover:text-amber-900 dark:bg-amber-950 dark:text-amber-200 dark:hover:bg-amber-950 dark:hover:text-amber-200",
+                        )}
+                        aria-label={t("composerModeNote")}
+                        onClick={() =>
+                          switchVisibility(
+                            internalNote
+                              ? MessageVisibility.MessageVisibilityCustomerVisible
+                              : MessageVisibility.MessageVisibilityInternalOnly,
+                          )
+                        }
+                      >
+                        <StickyNoteIcon />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>{t("composerModeNote")}</TooltipContent>
+                  </Tooltip>
+                ) : null}
+                {attachmentTool}
+              </div>
             )}
+            {bodyInput}
+            <div className="flex items-end gap-1 self-stretch bg-foreground/5 px-2">
+              {disabledReason ? null : emojiTool}
+              {replyAssistant}
+              {showSend ? (
+                <Button
+                  type="submit"
+                  size="icon"
+                  className="relative size-9 rounded-full after:absolute after:-inset-1 after:content-[''] [&_svg:not([class*='size-'])]:size-5"
+                  disabled={isSubmitting || Boolean(disabledReason) || isBodyEmpty || replyTo?.deleted}
+                  aria-label={t(internalNote ? "internalNoteSave" : "messageSend")}
+                >
+                  {showSubmitting ? <LoaderCircleIcon className="animate-spin" /> : <ArrowUpIcon />}
+                </Button>
+              ) : (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  className={composerToolClass}
+                  disabled
+                  aria-label={t("voiceMessage")}
+                >
+                  <MicIcon />
+                </Button>
+              )}
+            </div>
           </div>
         </div>
       </div>
