@@ -164,7 +164,7 @@ function ConversationSidePanelContent({
       <HeaderAction
         label={t("sidePanelClose")}
         icon={PanelRightCloseIcon}
-        className="absolute top-1.5 right-2 z-10"
+        className="absolute top-2.5 right-2 z-10"
         onClick={onClose}
       />
       {conversation && customer ? (
@@ -176,7 +176,7 @@ function ConversationSidePanelContent({
         >
           <TabsList
             aria-label={t("contextTabsLabel")}
-            className="h-auto shrink-0 justify-start gap-1 border-b-0 px-3 py-2"
+            className="h-auto min-h-12 shrink-0 justify-start gap-1 border-b-0 px-3 py-2"
           >
             <TabsTrigger
               value="profile"
@@ -264,7 +264,7 @@ function ConversationSidePanelContent({
         >
           <TabsList
             aria-label={t("contextTabsLabel")}
-            className="h-auto shrink-0 justify-start gap-1 border-b-0 px-3 py-2"
+            className="h-auto min-h-12 shrink-0 justify-start gap-1 border-b-0 px-3 py-2"
           >
             <TabsTrigger
               value="profile"

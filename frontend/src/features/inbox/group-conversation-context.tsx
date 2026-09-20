@@ -446,7 +446,7 @@ export function GroupConversationContext({
     <Tabs key={conversationID} defaultValue="profile" className="min-h-0 flex-1">
       <TabsList
         aria-label={t("contextTabsLabel")}
-        className="h-auto shrink-0 justify-start gap-1 border-b-0 px-3 py-2"
+        className="h-auto min-h-12 shrink-0 justify-start gap-1 border-b-0 px-3 py-2"
       >
         <TabsTrigger
           value="profile"
