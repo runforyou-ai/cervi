@@ -19,6 +19,8 @@ const (
 	ValidationExternalIDInvalid         ValidationCode = "external_id_invalid"
 	ValidationConversationIDInvalid     ValidationCode = "conversation_id_invalid"
 	ValidationTargetIdentityIDInvalid   ValidationCode = "target_identity_id_invalid"
+	ValidationTargetTeamIDInvalid       ValidationCode = "target_team_id_invalid"
+	ValidationTransferTargetKindInvalid ValidationCode = "transfer_target_kind_invalid"
 	ValidationGroupTitleRequired        ValidationCode = "group_title_required"
 	ValidationGroupTitleTooLong         ValidationCode = "group_title_too_long"
 	ValidationGroupDescriptionTooLong   ValidationCode = "group_description_too_long"
@@ -50,6 +52,8 @@ const (
 	ConflictReasonCustomerHandlingRequired = "customer_handling_required"
 	// ConflictReasonServiceSessionOwned 表示客服处理周期已由其他主体负责。
 	ConflictReasonServiceSessionOwned = "service_session_owned"
+	// ConflictReasonTransferTeamUnavailable 表示转交目标团队内没有开启接待的真人成员。
+	ConflictReasonTransferTeamUnavailable = "transfer_team_unavailable"
 	// ConflictReasonServiceSessionNotReplyable 表示客服处理周期当前不可回复。
 	ConflictReasonServiceSessionNotReplyable = "service_session_not_replyable"
 	// ConflictReasonChannelOutboundUnavailable 表示来源渠道已停用或尚未配置。
@@ -100,10 +104,12 @@ type ServiceSessionResult struct {
 	ClosedAt *time.Time
 }
 
-// TransferServiceSessionInput 定义客服处理周期转交目标。
+// TransferServiceSessionInput 定义客服处理周期的转交去向；成员去向用 IdentityID，团队去向用 TeamID，公共队列两者都不填。
 type TransferServiceSessionInput struct {
-	ConversationID     string
-	AssigneeIdentityID string
+	ConversationID string
+	TargetKind     domain.ServiceSessionTargetKind
+	TeamID         string
+	IdentityID     string
 }
 
 // WebsiteCustomerTextMessageInput 定义网站客户文本消息。

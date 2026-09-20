@@ -195,7 +195,7 @@ func testCustomerLateResult(t *testing.T, db *bun.DB, identity *models.Identity,
 		if err == nil {
 			switch change {
 			case "转交":
-				_, err = conversationaction.NewTransferServiceSessionAction(db, coordinator, agentrunaction.NewScheduler(tasks)).Execute(ctx, identity, conversationaction.TransferServiceSessionInput{ConversationID: first.Conversation.ID, AssigneeIdentityID: agentID})
+				_, err = conversationaction.NewTransferServiceSessionAction(db, coordinator, agentrunaction.NewScheduler(tasks)).Execute(ctx, identity, conversationaction.TransferServiceSessionInput{ConversationID: first.Conversation.ID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: agentID})
 			case "关闭续开":
 				_, err = conversationaction.NewCloseServiceSessionAction(db, coordinator).Execute(ctx, identity, first.Conversation.ID)
 				if err == nil {
@@ -283,7 +283,7 @@ func TestCustomerInboundAndManagementLocks(t *testing.T) {
 				case "领取":
 					_, err = conversationaction.NewClaimServiceSessionAction(f.db, coordinator).Execute(gated, f.owner, f.conversationID)
 				case "转交":
-					_, err = conversationaction.NewTransferServiceSessionAction(f.db, coordinator, nil).Execute(gated, f.owner, conversationaction.TransferServiceSessionInput{ConversationID: f.conversationID, AssigneeIdentityID: f.member.OrganizationIdentity.ID})
+					_, err = conversationaction.NewTransferServiceSessionAction(f.db, coordinator, nil).Execute(gated, f.owner, conversationaction.TransferServiceSessionInput{ConversationID: f.conversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: f.member.OrganizationIdentity.ID})
 				case "关闭":
 					_, err = conversationaction.NewCloseServiceSessionAction(f.db, coordinator).Execute(gated, f.owner, f.conversationID)
 				case "重开":

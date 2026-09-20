@@ -256,7 +256,7 @@ func testModelHandoffRoundTrip(t *testing.T, f handoffFixture) {
 		t.Fatal(err)
 	}
 	if _, err := conversationaction.NewTransferServiceSessionAction(f.db, coordinator, agentrunaction.NewScheduler(f.tasks)).Execute(ctx, f.identity, conversationaction.TransferServiceSessionInput{
-		ConversationID: first.Conversation.ID, AssigneeIdentityID: agent.IdentityID,
+		ConversationID: first.Conversation.ID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: agent.IdentityID,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -292,6 +292,12 @@ func testHandoffTargets(t *testing.T, f handoffFixture) {
 		HandlesCustomers: true, DisplayName: "人工客服", Email: "handoff-" + uuid.NewV7().String()[:8] + "@handoff.test", Password: "password123", RoleID: f.roleID,
 	})
 	if err != nil {
+		t.Fatal(err)
+	}
+	// 团队队列须有开启接待的真人成员才可用。
+	if _, err := teamaction.NewAddMembersAction(f.db).Execute(ctx, f.identity, team.ID, []teamaction.MemberIdentity{
+		{IdentityType: domain.OrganizationIdentityTypeUser, IdentityID: human.IdentityID},
+	}); err != nil {
 		t.Fatal(err)
 	}
 	for _, scenario := range []struct {
@@ -694,7 +700,7 @@ func testServiceSessionOperationEvents(t *testing.T, f handoffFixture) {
 		t.Fatal(err)
 	}
 	if _, err := conversationaction.NewTransferServiceSessionAction(f.db, coordinator, scheduler).Execute(ctx, other.Identity, conversationaction.TransferServiceSessionInput{
-		ConversationID: conversationID, AssigneeIdentityID: agent.IdentityID,
+		ConversationID: conversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: agent.IdentityID,
 	}); err != nil {
 		t.Fatal(err)
 	}

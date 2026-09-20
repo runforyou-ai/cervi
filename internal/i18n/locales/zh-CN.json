@@ -37,7 +37,6 @@
   "error.knowledge_page_unreachable": "读取网页失败，请检查地址是否可访问。",
   "error.knowledge_page_unsupported": "该地址返回的内容不是网页或纯文本。",
   "error.knowledge_page_too_large": "网页内容超过 10 MB。",
-
   "error.agent_reply_stop_failed": "停止 AI 回复失败，请重试。",
   "error.agent_unavailable": "这个 AI 员工当前不可用。",
   "agent.customer_handoff_fallback": "已为您转接人工客服，人工客服会继续为您处理。",
@@ -51,7 +50,6 @@
   "error.customer_delivery_conflict": "投递状态已变化或渠道当前无法发送，请刷新后重试。",
   "error.customer_delivery_failed": "处理消息投递失败，请重试。",
   "error.channel_outbound_unavailable": "渠道已停用或尚未配置机器人，无法发送。",
-
   "error.knowledge_qa_not_found": "问答不存在或已删除。",
   "error.knowledge_qa_unsupported": "只有本地问答知识库支持此操作。",
   "error.knowledge_base_has_content": "知识库已有内容，无法切换类型。",
@@ -324,6 +322,7 @@
   "error.attachment_too_large": "附件超过当前消息渠道允许的大小。",
   "error.attachment_caption_too_long": "附件说明超过当前消息渠道允许的长度。",
   "error.service_session_already_open": "这条会话已经重新打开。",
+  "error.transfer_team_unavailable": "该团队没有可接待客户的成员。",
   "error.service_session_update_failed": "客服会话更新失败，请重试。",
   "error.website_messenger_load_failed": "读取聊天内容失败，请重试。",
   "field.http_url_invalid": "请输入完整的 HTTP 或 HTTPS 地址，且不要包含账号密码。",
@@ -411,6 +410,8 @@
   "field.channel_default_locale_invalid": "请选择支持的默认语言。",
   "field.channel_routing_target_invalid": "请选择有效的团队或成员。",
   "field.target_identity_id_invalid": "请选择有效的企业成员。",
+  "field.target_team_id_invalid": "请选择有效的团队。",
+  "field.transfer_target_invalid": "请选择有效的转交去向。",
   "field.group_title_required": "请输入群聊名称。",
   "field.group_title_too_long": "群聊名称不能超过 100 个字符。",
   "field.group_description_too_long": "群聊描述不能超过 500 个字符。",

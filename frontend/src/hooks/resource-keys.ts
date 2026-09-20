@@ -49,6 +49,8 @@ export const resourceKeys = {
   recentConversations: (parameters?: KeyParameters) => listKey("recent-conversations", parameters),
   /** 客服筛选候选。 */
   customerServiceAssignees: () => ["customer-service-assignees"],
+  /** 客服队列团队。 */
+  serviceQueueTeams: () => ["service-queue-teams"],
   /** 渠道筛选候选。 */
   inboxChannels: () => ["inbox-channels"],
   /** 附件下载与图片读取地址。 */

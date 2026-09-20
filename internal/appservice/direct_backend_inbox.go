@@ -24,6 +24,7 @@ type inboxOps struct {
 	customerDeliveries           *deliveryaction.Manager
 	loadInbox                    *inboxaction.LoadInboxQuery
 	listCustomerServiceAssignees *inboxaction.ListCustomerServiceAssigneesQuery
+	listServiceQueueTeams        *inboxaction.ListServiceQueueTeamsQuery
 }
 
 // newInboxOps 创建收件箱与客户投递的业务实现依赖。
@@ -32,6 +33,7 @@ func newInboxOps(db *bun.DB, taskEnqueuer servertask.TxEnqueuer) inboxOps {
 		customerDeliveries:           deliveryaction.NewManager(db, taskEnqueuer),
 		loadInbox:                    inboxaction.NewLoadInboxQuery(db),
 		listCustomerServiceAssignees: inboxaction.NewListCustomerServiceAssigneesQuery(db),
+		listServiceQueueTeams:        inboxaction.NewListServiceQueueTeamsQuery(db),
 	}
 }
 
@@ -44,6 +46,8 @@ func inboxLoadInput(query InboxQuery) inboxaction.LoadInput {
 	return inboxaction.LoadInput{
 		Partition: domain.InboxPartition(query.Partition),
 		Scope:     domain.InboxScope(query.Scope), CustomerView: domain.CustomerInboxView(query.CustomerView),
+		QueueFilter:        domain.CustomerQueueFilter(query.QueueFilter),
+		QueueTeamID:        query.QueueTeamID,
 		AssigneeIdentityID: query.AssigneeIdentityID, ChannelID: query.ChannelID,
 		ServiceStatus: domain.ServiceSessionStatus(query.ServiceStatus), Kinds: kinds,
 		Search: query.Search, SearchRange: inboxaction.SearchRange(query.SearchRange),
@@ -107,6 +111,23 @@ func (o *directOperations) inboxConversationsFromActions(ctx context.Context, me
 	return conversations, nil
 }
 
+// ListServiceQueueTeams 返回可作为客服队列的团队，本人所在团队排在前面。
+func (o *directOperations) ListServiceQueueTeams(ctx context.Context, meta RequestMeta, identity *servermodels.Identity) (ServiceQueueTeamList, error) {
+	items, err := o.listServiceQueueTeams.Execute(ctx, identity)
+	if err != nil {
+		if ctx.Err() != nil {
+			return ServiceQueueTeamList{}, ctx.Err()
+		}
+		slog.Warn("读取客服队列团队失败", "organization_id", identity.Organization.ID, "error", err)
+		return ServiceQueueTeamList{}, FailedError(meta, cervii18n.ErrorTeamListFailed)
+	}
+	teams := make([]ServiceQueueTeam, 0, len(items))
+	for _, item := range items {
+		teams = append(teams, ServiceQueueTeam{ID: item.ID, Name: item.Name, Mine: item.Mine, Available: item.Available})
+	}
+	return ServiceQueueTeamList{Teams: teams}, nil
+}
+
 // ListCustomerServiceAssignees 返回有效真人和 AI 客服。
 func (o *directOperations) ListCustomerServiceAssignees(ctx context.Context, meta RequestMeta, identity *servermodels.Identity) (CustomerServiceAssigneeList, error) {
 	items, err := o.listCustomerServiceAssignees.Execute(ctx, identity)
@@ -156,6 +177,7 @@ func inboxConversationFromAction(summary inboxaction.ConversationSummary, avatar
 			Preview: summary.Customer.Preview, PreviewSenderIdentityType: (*OrganizationIdentityType)(summary.Customer.PreviewSenderIdentityType),
 			PreviewVisibility: (*MessageVisibility)(summary.Customer.PreviewVisibility), LastMessageAt: summary.Customer.LastMessageAt,
 			ServiceSessionID: summary.Customer.ServiceSessionID, ServiceSessionStatus: ServiceSessionStatus(summary.Customer.ServiceSessionStatus), Assignee: assignee,
+			TeamID: summary.Customer.TeamID, TeamName: summary.Customer.TeamName,
 			AttachmentSupported:    attachmentSupported,
 			AttachmentByteLimit:    attachmentByteLimit,
 			AttachmentCaptionLimit: domain.ChannelCaptionLimit(summary.Customer.ChannelType),
@@ -296,6 +318,7 @@ func inboxReadError(ctx context.Context, meta RequestMeta, organizationID, opera
 func (o *directOperations) SearchInbox(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input InboxSearchInput) (InboxSearchResult, error) {
 	list := inboxLoadInput(InboxQuery{
 		Scope: input.Scope, CustomerView: input.CustomerView, AssigneeIdentityID: input.AssigneeIdentityID,
+		QueueFilter: input.QueueFilter, QueueTeamID: input.QueueTeamID,
 		ChannelID: input.ChannelID, ServiceStatus: input.ServiceStatus, Kinds: input.Kinds,
 	})
 	result, err := o.loadInbox.Search(ctx, identity, inboxaction.SearchInput{

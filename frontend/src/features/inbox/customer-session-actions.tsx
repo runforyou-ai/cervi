@@ -9,15 +9,24 @@ import {
   ChannelType,
   OrganizationIdentityType,
   ServiceSessionStatus,
+  ServiceSessionTargetKind,
   claimServiceSession,
   closeServiceSession,
   isApiError,
   listCustomerServiceAssignees,
+  listServiceQueueTeams,
   reopenServiceSession,
   transferServiceSession,
   type CustomerInboxConversationData,
   type CustomerServiceSession,
+  type InboxAssignee,
+  type ServiceQueueTeam,
 } from "@/api"
+import {
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+} from "@/components/ui/dropdown-menu"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -85,6 +94,11 @@ export function useCustomerSessionActions(
     () => listCustomerServiceAssignees(),
     { enabled: Boolean(customer && sessionOpen && assignedToCurrentUser) },
   )
+  const { data: transferTeams = [] } = useResource(
+    resourceKeys.serviceQueueTeams(),
+    () => listServiceQueueTeams(),
+    { enabled: Boolean(customer && sessionOpen && assignedToCurrentUser) },
+  )
   // 网站和 Telegram 会话可转给 AI 员工，其他渠道只转给真人客服。
   const transferCandidates = assignees.filter(
     (assignee) =>
@@ -132,6 +146,7 @@ export function useCustomerSessionActions(
     closable:
       sessionOpen && (!customer?.assignee || assignedToCurrentUser) && handlesCustomers,
     transferCandidates,
+    transferTeams,
     closeConfirmationOpen,
     setCloseConfirmationOpen,
     unansweredMentionCount: customer?.unansweredMentionCount ?? 0,
@@ -145,14 +160,34 @@ export function useCustomerSessionActions(
           ? t("conversationTakeoverSuccess")
           : t("conversationClaimSuccess"),
       ),
-    transfer: (assignee: (typeof transferCandidates)[number]) =>
+    transferToMember: (assignee: InboxAssignee) =>
       run(
         `transfer:${assignee.identityId}`,
         (conversationID) =>
           transferServiceSession(conversationID, {
-            assigneeIdentityId: assignee.identityId,
+            kind: ServiceSessionTargetKind.ServiceSessionTargetMember,
+            identityId: assignee.identityId,
           }),
         t("conversationTransferSuccess", { name: assignee.displayName }),
+      ),
+    transferToTeam: (team: ServiceQueueTeam) =>
+      run(
+        `transfer:${team.id}`,
+        (conversationID) =>
+          transferServiceSession(conversationID, {
+            kind: ServiceSessionTargetKind.ServiceSessionTargetTeam,
+            teamId: team.id,
+          }),
+        t("conversationTransferSuccess", { name: team.name }),
+      ),
+    transferToPublicQueue: () =>
+      run(
+        "transfer:public-queue",
+        (conversationID) =>
+          transferServiceSession(conversationID, {
+            kind: ServiceSessionTargetKind.ServiceSessionTargetPublicQueue,
+          }),
+        t("conversationTransferQueueSuccess"),
       ),
     close: () =>
       run("close", closeServiceSession, t("conversationCloseSuccess")),
@@ -160,6 +195,59 @@ export function useCustomerSessionActions(
 }
 
 export type CustomerSessionActions = ReturnType<typeof useCustomerSessionActions>
+
+/** 转交去向菜单项：同事、团队队列和公共队列分组展示。 */
+export function CustomerTransferMenuItems({
+  actions,
+  itemClassName,
+}: {
+  actions: CustomerSessionActions
+  itemClassName?: string
+}) {
+  const { t } = useTranslation("inbox")
+  return (
+    <>
+      {actions.transferCandidates.length > 0 ? (
+        <>
+          <DropdownMenuLabel>{t("conversationTransferCoworkers")}</DropdownMenuLabel>
+          {actions.transferCandidates.map((assignee) => (
+            <DropdownMenuItem
+              key={assignee.identityId}
+              className={itemClassName}
+              onSelect={() => void actions.transferToMember(assignee)}
+            >
+              {assignee.displayName}
+            </DropdownMenuItem>
+          ))}
+          <DropdownMenuSeparator />
+        </>
+      ) : null}
+      {actions.transferTeams.length > 0 ? (
+        <>
+          <DropdownMenuLabel>{t("conversationTransferTeams")}</DropdownMenuLabel>
+          {actions.transferTeams.map((team) => (
+            <DropdownMenuItem
+              key={team.id}
+              className={itemClassName}
+              disabled={!team.available}
+              title={team.available ? undefined : t("conversationTransferTeamUnavailable")}
+              onSelect={() => void actions.transferToTeam(team)}
+            >
+              {team.name}
+            </DropdownMenuItem>
+          ))}
+          <DropdownMenuSeparator />
+        </>
+      ) : null}
+      <DropdownMenuItem
+        className={itemClassName}
+        onSelect={() => void actions.transferToPublicQueue()}
+      >
+        {t("conversationTransferPublicQueue")}
+      </DropdownMenuItem>
+    </>
+  )
+}
 
 /** 关闭客户会话处理周期前的确认弹窗。 */
 export function CustomerSessionCloseDialog({

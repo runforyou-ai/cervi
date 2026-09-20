@@ -83,6 +83,9 @@ type Backend interface {
 	// ListCustomerServiceAssignees 返回有效真人和 AI 客服。
 	//cervi:route GET /inbox/assignees
 	ListCustomerServiceAssignees(context.Context, RequestMeta) (CustomerServiceAssigneeList, error)
+	// ListServiceQueueTeams 返回可作为客服队列的团队，本人所在团队排在前面。
+	//cervi:route GET /inbox/queue-teams
+	ListServiceQueueTeams(context.Context, RequestMeta) (ServiceQueueTeamList, error)
 	// ListInboxChannels 返回收件箱渠道筛选候选，含已停用渠道。
 	//cervi:route GET /inbox/channels
 	ListInboxChannels(context.Context, RequestMeta) (InboxChannelList, error)

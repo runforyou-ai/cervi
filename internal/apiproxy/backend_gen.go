@@ -158,6 +158,14 @@ func (b *Backend) ListCustomerServiceAssignees(ctx context.Context, meta appserv
 	return output, err
 }
 
+// ListServiceQueueTeams 返回可作为客服队列的团队，本人所在团队排在前面。
+func (b *Backend) ListServiceQueueTeams(ctx context.Context, meta appservice.RequestMeta) (appservice.ServiceQueueTeamList, error) {
+	var output appservice.ServiceQueueTeamList
+	err := b.do(ctx, meta, http.MethodGet, "/inbox/queue-teams", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // ListInboxChannels 返回收件箱渠道筛选候选，含已停用渠道。
 func (b *Backend) ListInboxChannels(ctx context.Context, meta appservice.RequestMeta) (appservice.InboxChannelList, error) {
 	var output appservice.InboxChannelList
@@ -1299,6 +1307,8 @@ func encodeInboxSearchInputQuery(input appservice.InboxSearchInput) url.Values {
 	setQuery(query, "conversationId", input.ConversationID)
 	setQuery(query, "scope", string(input.Scope))
 	setQuery(query, "customerView", string(input.CustomerView))
+	setQuery(query, "queueFilter", string(input.QueueFilter))
+	setQuery(query, "queueTeamId", input.QueueTeamID)
 	setQuery(query, "assigneeIdentityId", input.AssigneeIdentityID)
 	setQuery(query, "channelId", input.ChannelID)
 	setQuery(query, "serviceStatus", string(input.ServiceStatus))
@@ -1342,6 +1352,8 @@ func encodeLoadInboxInputQuery(input appservice.LoadInboxInput) url.Values {
 	setQuery(query, "partition", string(input.Partition))
 	setQuery(query, "scope", string(input.Scope))
 	setQuery(query, "customerView", string(input.CustomerView))
+	setQuery(query, "queueFilter", string(input.QueueFilter))
+	setQuery(query, "queueTeamId", input.QueueTeamID)
 	setQuery(query, "assigneeIdentityId", input.AssigneeIdentityID)
 	setQuery(query, "channelId", input.ChannelID)
 	setQuery(query, "serviceStatus", string(input.ServiceStatus))

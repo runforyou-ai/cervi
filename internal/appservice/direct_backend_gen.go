@@ -213,6 +213,16 @@ func (b *DirectBackend) ListCustomerServiceAssignees(ctx context.Context, meta R
 	return b.ops.ListCustomerServiceAssignees(ctx, meta, identity)
 }
 
+// ListServiceQueueTeams 返回可作为客服队列的团队，本人所在团队排在前面。
+func (b *DirectBackend) ListServiceQueueTeams(ctx context.Context, meta RequestMeta) (ServiceQueueTeamList, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero ServiceQueueTeamList
+		return zero, err
+	}
+	return b.ops.ListServiceQueueTeams(ctx, meta, identity)
+}
+
 // ListInboxChannels 返回收件箱渠道筛选候选，含已停用渠道。
 func (b *DirectBackend) ListInboxChannels(ctx context.Context, meta RequestMeta) (InboxChannelList, error) {
 	identity, err := b.ops.authenticate(ctx, meta)

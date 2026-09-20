@@ -17,6 +17,7 @@ import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
 import { ConversationAvatar } from "@/features/inbox/conversation-avatar"
 import {
   CustomerSessionCloseDialog,
+  CustomerTransferMenuItems,
   useCustomerSessionActions,
 } from "@/features/inbox/customer-session-actions"
 import {
@@ -76,7 +77,7 @@ export function ConversationHeader({
     handlesCustomers,
     onSessionChanged,
   )
-  const { operation, transferCandidates } = actions
+  const { operation } = actions
 
   return (
     <>
@@ -210,20 +211,7 @@ export function ConversationHeader({
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="min-w-48">
-                  {transferCandidates.length === 0 ? (
-                    <DropdownMenuItem disabled>
-                      {t("conversationTransferEmpty")}
-                    </DropdownMenuItem>
-                  ) : (
-                    transferCandidates.map((assignee) => (
-                      <DropdownMenuItem
-                        key={assignee.identityId}
-                        onSelect={() => void actions.transfer(assignee)}
-                      >
-                        {assignee.displayName}
-                      </DropdownMenuItem>
-                    ))
-                  )}
+                  <CustomerTransferMenuItems actions={actions} />
                 </DropdownMenuContent>
               </DropdownMenu>
             ) : null}
@@ -285,21 +273,8 @@ export function ConversationHeader({
                       ? t("conversationTakeover")
                       : t("conversationClaim")}
                   </DropdownMenuItem>
-                ) : !actions.transferable ? null : transferCandidates.length === 0 ? (
-                  <DropdownMenuItem disabled>
-                    {t("conversationTransferEmpty")}
-                  </DropdownMenuItem>
-                ) : (
-                  transferCandidates.map((assignee) => (
-                    <DropdownMenuItem
-                      key={assignee.identityId}
-                      onSelect={() => void actions.transfer(assignee)}
-                    >
-                      {t("conversationTransferTo", {
-                        name: assignee.displayName,
-                      })}
-                    </DropdownMenuItem>
-                  ))
+                ) : !actions.transferable ? null : (
+                  <CustomerTransferMenuItems actions={actions} />
                 )}
                 {actions.closable ? (
                   <DropdownMenuItem

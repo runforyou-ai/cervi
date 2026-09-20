@@ -35,6 +35,7 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.POST("/inbox/conversations/query", s.readInboxConversations)
 	router.GET("/inbox/search", s.searchInbox)
 	router.GET("/inbox/assignees", s.listCustomerServiceAssignees)
+	router.GET("/inbox/queue-teams", s.listServiceQueueTeams)
 	router.GET("/inbox/channels", s.listInboxChannels)
 	router.GET("/sync/heads", s.getSyncHeads)
 	router.GET("/conversations/:conversationID/messages", s.listConversationMessages)
@@ -360,6 +361,12 @@ func (s *Service) searchInbox(c *gin.Context) {
 // listCustomerServiceAssignees 返回有效真人和 AI 客服。
 func (s *Service) listCustomerServiceAssignees(c *gin.Context) {
 	output, err := s.application.ListCustomerServiceAssignees(c.Request.Context(), requestMeta(c))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// listServiceQueueTeams 返回可作为客服队列的团队，本人所在团队排在前面。
+func (s *Service) listServiceQueueTeams(c *gin.Context) {
+	output, err := s.application.ListServiceQueueTeams(c.Request.Context(), requestMeta(c))
 	writeResult(c, http.StatusOK, output, err)
 }
 
@@ -1586,6 +1593,8 @@ func bindInboxSearchInputQuery(c *gin.Context) (appservice.InboxSearchInput, boo
 		ConversationID:     c.Query("conversationId"),
 		Scope:              appservice.InboxScope(c.Query("scope")),
 		CustomerView:       appservice.CustomerInboxView(c.Query("customerView")),
+		QueueFilter:        appservice.CustomerQueueFilter(c.Query("queueFilter")),
+		QueueTeamID:        c.Query("queueTeamId"),
 		AssigneeIdentityID: c.Query("assigneeIdentityId"),
 		ChannelID:          c.Query("channelId"),
 		ServiceStatus:      appservice.ServiceSessionStatus(c.Query("serviceStatus")),
@@ -1657,6 +1666,8 @@ func bindLoadInboxInputQuery(c *gin.Context) (appservice.LoadInboxInput, bool) {
 		Partition:          appservice.InboxPartition(c.Query("partition")),
 		Scope:              appservice.InboxScope(c.Query("scope")),
 		CustomerView:       appservice.CustomerInboxView(c.Query("customerView")),
+		QueueFilter:        appservice.CustomerQueueFilter(c.Query("queueFilter")),
+		QueueTeamID:        c.Query("queueTeamId"),
 		AssigneeIdentityID: c.Query("assigneeIdentityId"),
 		ChannelID:          c.Query("channelId"),
 		ServiceStatus:      appservice.ServiceSessionStatus(c.Query("serviceStatus")),

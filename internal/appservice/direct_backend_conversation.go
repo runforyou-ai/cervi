@@ -148,9 +148,12 @@ func (o *directOperations) ClaimServiceSession(ctx context.Context, meta Request
 	return customerServiceSessionFromAction(result), nil
 }
 
-// TransferServiceSession 把当前负责的处理周期转给另一位客服。
+// TransferServiceSession 把当前负责的处理周期转给成员、团队队列或公共队列。
 func (o *directOperations) TransferServiceSession(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, input TransferServiceSessionInput) (CustomerServiceSession, error) {
-	result, err := o.transferServiceSession.Execute(ctx, identity, conversationaction.TransferServiceSessionInput{ConversationID: conversationID, AssigneeIdentityID: input.AssigneeIdentityID})
+	result, err := o.transferServiceSession.Execute(ctx, identity, conversationaction.TransferServiceSessionInput{
+		ConversationID: conversationID, TargetKind: domain.ServiceSessionTargetKind(input.Kind),
+		TeamID: input.TeamID, IdentityID: input.IdentityID,
+	})
 	if err != nil {
 		return CustomerServiceSession{}, serviceSessionMutationError(ctx, meta, err, identity.Organization.ID, conversationID)
 	}
@@ -207,6 +210,8 @@ func serviceSessionMutationError(ctx context.Context, meta RequestMeta, err erro
 			messageKey = cervii18n.ErrorServiceSessionOwned
 		case conversationaction.ConflictReasonServiceSessionAlreadyOpen:
 			messageKey = cervii18n.ErrorServiceSessionAlreadyOpen
+		case conversationaction.ConflictReasonTransferTeamUnavailable:
+			messageKey = cervii18n.ErrorTransferTeamUnavailable
 		}
 		return ConflictError(meta, messageKey, conflictError.Reason)
 	}
@@ -895,6 +900,8 @@ var conversationMessageValidationKeys = map[conversationaction.ValidationCode]ce
 	conversationaction.ValidationMessageVisibilityInvalid:  cervii18n.FieldMessageVisibilityInvalid,
 	conversationaction.ValidationFileIDInvalid:             cervii18n.ErrorFileNotFound,
 	conversationaction.ValidationTargetIdentityIDInvalid:   cervii18n.FieldTargetIdentityIDInvalid,
+	conversationaction.ValidationTargetTeamIDInvalid:       cervii18n.FieldTargetTeamIDInvalid,
+	conversationaction.ValidationTransferTargetKindInvalid: cervii18n.FieldTransferTargetInvalid,
 	conversationaction.ValidationGroupTitleRequired:        cervii18n.FieldGroupTitleRequired,
 	conversationaction.ValidationGroupTitleTooLong:         cervii18n.FieldGroupTitleTooLong,
 	conversationaction.ValidationGroupDescriptionTooLong:   cervii18n.FieldGroupDescriptionTooLong,

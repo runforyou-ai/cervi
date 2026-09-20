@@ -7,6 +7,7 @@ import { toast } from "sonner"
 import {
   ConversationType,
   CustomerInboxView,
+  CustomerQueueFilter,
   InboxScope,
   InboxSearchPersonKind,
   OrganizationIdentityType,
@@ -16,6 +17,7 @@ import {
   isCustomerInboxConversation,
   listCustomerServiceAssignees,
   listInboxChannels,
+  listServiceQueueTeams,
   openConversationWindow,
   sessionPath,
   type AgentInboxConversationData,
@@ -79,6 +81,8 @@ export function InboxPage({
   listViewport,
   scope,
   customerView,
+  queueFilter,
+  queueTeamId,
   assigneeIdentityId,
   channelId,
   serviceStatus,
@@ -92,6 +96,8 @@ export function InboxPage({
   listViewport: ReturnType<typeof useInboxListViewport>
   scope: InboxScope
   customerView: CustomerInboxView
+  queueFilter: CustomerQueueFilter
+  queueTeamId: string
   assigneeIdentityId: string
   channelId: string
   serviceStatus: ServiceSessionStatus
@@ -105,6 +111,8 @@ export function InboxPage({
   onQueryChange: (changes: {
     scope?: InboxScope
     customerView?: CustomerInboxView
+    queueFilter?: CustomerQueueFilter
+    queueTeamId?: string
     assigneeIdentityId?: string
     channelId?: string
     serviceStatus?: ServiceSessionStatus
@@ -137,7 +145,7 @@ export function InboxPage({
   const locateNonce = useRef(0)
   const [messageTarget, setMessageTarget] = useState<({ conversationId: string } & ConversationLocateTarget) | null>(null)
   const search = useInboxSearch({
-    query: { scope, customerView, assigneeIdentityId, channelId, serviceStatus, kinds },
+    query: { scope, customerView, queueFilter, queueTeamId, assigneeIdentityId, channelId, serviceStatus, kinds },
     recentConversationIds: recentConversations.ids,
     onOpen: (item) => void openSearchItem(item),
   })
@@ -160,6 +168,11 @@ export function InboxPage({
   const { data: customerServiceAssignees = [] } = useResource(
     resourceKeys.customerServiceAssignees(),
     () => listCustomerServiceAssignees(),
+    { enabled: scope === InboxScope.InboxScopeCustomer },
+  )
+  const { data: queueTeams = [] } = useResource(
+    resourceKeys.serviceQueueTeams(),
+    () => listServiceQueueTeams(),
     { enabled: scope === InboxScope.InboxScopeCustomer },
   )
   const { data: channels = [] } = useResource(
@@ -319,8 +332,12 @@ export function InboxPage({
         : CustomerInboxView.CustomerInboxViewCoworkers
     // 同事视图已按其他客服筛选时改为新的负责人，未筛选时保持查看全部同事。
     const nextAssignee = nextView === CustomerInboxView.CustomerInboxViewCoworkers && assigneeIdentityId ? assigneeId : ""
-    if (nextView === customerView && nextAssignee === assigneeIdentityId && serviceStatus === ServiceSessionStatus.ServiceSessionStatusOpen) return
-    onQueryChange({ customerView: nextView, assigneeIdentityId: nextAssignee, serviceStatus: ServiceSessionStatus.ServiceSessionStatusOpen, conversationId: conversation.id })
+    // 会话回到队列后所属队列可能已改变，按全部队列跟随，保证仍能看到它。
+    const nextQueueFilter = nextView === CustomerInboxView.CustomerInboxViewQueue
+      ? CustomerQueueFilter.CustomerQueueFilterAll
+      : CustomerQueueFilter.$zero
+    if (nextView === customerView && nextAssignee === assigneeIdentityId && nextQueueFilter === queueFilter && serviceStatus === ServiceSessionStatus.ServiceSessionStatusOpen) return
+    onQueryChange({ customerView: nextView, assigneeIdentityId: nextAssignee, queueFilter: nextQueueFilter, queueTeamId: "", serviceStatus: ServiceSessionStatus.ServiceSessionStatusOpen, conversationId: conversation.id })
   }
 
   /** 按当前聊天草稿或选中会话渲染主区内容。 */
@@ -401,13 +418,18 @@ export function InboxPage({
         {!search.active && scope === InboxScope.InboxScopeCustomer ? (
           <InboxCustomerQueueFilter
             view={customerView}
+            queueFilter={queueFilter}
+            queueTeamId={queueTeamId}
+            queueTeams={queueTeams}
             assigneeIdentityId={assigneeIdentityId}
             assignees={customerServiceAssignees}
             currentIdentityId={identity.user.identityId}
-            onChange={(nextView, nextAssigneeIdentityId = "") =>
+            onChange={(change) =>
               onQueryChange({
-                customerView: nextView,
-                assigneeIdentityId: nextAssigneeIdentityId,
+                customerView: change.customerView,
+                assigneeIdentityId: change.assigneeIdentityId ?? "",
+                queueFilter: change.queueFilter ?? CustomerQueueFilter.$zero,
+                queueTeamId: change.queueTeamId ?? "",
               })
             }
           />
@@ -416,6 +438,10 @@ export function InboxPage({
           <InboxListPanel list={list} viewport={listViewport} detailError={Boolean(summary.error)} retryDetail={() => void summary.refresh()}>
             <InboxConversationList
               conversations={conversations}
+              showQueueTeam={
+                customerView === CustomerInboxView.CustomerInboxViewQueue &&
+                queueFilter === CustomerQueueFilter.CustomerQueueFilterAll
+              }
               pinnedIds={list.pinnedIds}
               pinOrderVersion={list.pinOrderVersion}
               onMenuChange={listViewport.setMenu}

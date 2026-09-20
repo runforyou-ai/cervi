@@ -71,6 +71,7 @@ function conversationPreview(
 type ConversationRowProps = {
   conversation: InboxConversation
   name: string
+  showQueueTeam: boolean
   selected: boolean
   actions: ReturnType<typeof useConversationListActions>
   pinOrderVersion: string
@@ -84,6 +85,7 @@ type ConversationRowProps = {
 function ConversationRow({
   conversation,
   name,
+  showQueueTeam,
   selected,
   actions,
   pinOrderVersion,
@@ -113,6 +115,11 @@ function ConversationRow({
     t,
   )
   const preview = conversationPreview(conversation, summary, t)
+  // 按全部队列查看待分配会话时标明所属团队队列，公共队列不加标签。
+  const queueTeamName =
+    showQueueTeam && isCustomerInboxConversation(conversation)
+      ? conversation.customer.teamName
+      : null
   const formattedTime = formatTime(summary.lastMessageAt)
   const isInternal = isInternalInboxConversation(conversation)
   return (
@@ -186,6 +193,11 @@ function ConversationRow({
                     {agentRunLabel}
                   </span>
                 ) : null}
+                {queueTeamName ? (
+                  <span className="max-w-24 shrink-0 truncate text-[10px] text-muted-foreground">
+                    {queueTeamName}
+                  </span>
+                ) : null}
               </span>
               <span className="flex shrink-0 items-center gap-1.5">
                 {formattedTime ? (
@@ -237,9 +249,10 @@ function SortableConversationRow(props: ConversationRowProps) {
   return <ConversationRow {...props} sortable={sortable} />
 }
 
-/** 会话列表，置顶区在前且可在区内排序；传入 onOpenInWindow 时双击会话项在独立窗口打开该会话。 */
+/** 会话列表，置顶区在前且可在区内排序；showQueueTeam 为真时客户会话名称后显示所属团队队列，传入 onOpenInWindow 时双击会话项在独立窗口打开该会话。 */
 export function InboxConversationList({
   conversations,
+  showQueueTeam,
   pinnedIds,
   pinOrderVersion,
   onMenuChange,
@@ -250,6 +263,7 @@ export function InboxConversationList({
   onOpenInWindow,
 }: {
   conversations: InboxConversation[]
+  showQueueTeam: boolean
   pinnedIds: string[]
   pinOrderVersion: string
   onMenuChange: (open: boolean) => void
@@ -275,6 +289,7 @@ export function InboxConversationList({
   const row = (conversation: InboxConversation) => ({
     conversation,
     name: names.get(conversation.id) ?? "",
+    showQueueTeam,
     selected: selectedId === conversation.id,
     actions,
     pinOrderVersion,
