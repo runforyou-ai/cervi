@@ -25,6 +25,7 @@ import { GroupConversationContext } from "@/features/inbox/group-conversation-co
 import { cn } from "@/lib/utils"
 
 const contextPanelMinWidth = 320
+const contextPanelDefaultWidth = 384
 const contextPanelMaxWidth = 640
 // 展开资料栏后为会话区保留的宽度，空间不足时资料栏最多占一半。
 const conversationMinWidth = 420
@@ -300,8 +301,8 @@ export function ConversationContextPane({
   const { t } = useTranslation("inbox")
   const trackRef = useRef<HTMLDivElement>(null)
   const [rowWidth, setRowWidth] = useState(0)
-  // 展开宽度默认取当前允许的最大值，剩余空间不足时按会话区的保留宽度收窄。
-  const [desiredWidth, setDesiredWidth] = useState(contextPanelMaxWidth)
+  // 展开宽度默认取默认档位，剩余空间不足时按会话区的保留宽度收窄。
+  const [desiredWidth, setDesiredWidth] = useState(contextPanelDefaultWidth)
   const maxWidth = rowWidth
     ? Math.min(contextPanelMaxWidth, Math.max(Math.round(rowWidth / 2), rowWidth - conversationMinWidth))
     : contextPanelMaxWidth
