@@ -95,19 +95,17 @@ type GroundingPolicy string
 // GroundingStrict 要求直接输出的正文在当前输入边界内取得有效依据，否则纠正一次后转人工。
 const GroundingStrict GroundingPolicy = "strict"
 
-// ModelCredentials 定义调用模型所需的供应商凭据与当前输入能力，由执行侧注入，不进入有效配置。
+// ModelCredentials 定义调用模型所需的供应商凭据，由执行侧注入，不进入有效配置。
 type ModelCredentials struct {
-	Brand           string
-	APIKey          string
-	BaseURL         string
-	InputModalities []domain.AIModelInputModality
+	APIKey  string
+	BaseURL string
 }
 
 // RunRequest 定义一次有界 Agent 业务运行。
 type RunRequest struct {
 	RunID                 string
 	Assignment            Assignment       // 本次运行的有效配置，由 ResolveAssignment 产出并固定在运行快照中。
-	Credentials           ModelCredentials // 模型供应商凭据与当前输入能力。
+	Credentials           ModelCredentials // 模型供应商凭据。
 	KnowledgeSearch       KnowledgeSearch
 	CustomerHistorySearch CustomerHistorySearch
 	ReadAttachment        AttachmentContent
@@ -122,13 +120,13 @@ type RunRequest struct {
 // modelConfig 合并有效配置中的模型参数与执行侧注入的凭据。
 func (r RunRequest) modelConfig() ModelConfig {
 	return ModelConfig{
-		Brand:           r.Credentials.Brand,
+		Brand:           r.Assignment.Model.Brand,
 		APIKey:          r.Credentials.APIKey,
 		BaseURL:         r.Credentials.BaseURL,
 		Identifier:      r.Assignment.Model.Identifier,
 		MaxOutputTokens: int(r.Assignment.Model.MaxOutputTokens),
 		ContextWindow:   int(r.Assignment.Model.ContextWindow),
-		InputModalities: r.Credentials.InputModalities,
+		InputModalities: r.Assignment.Model.InputModalities,
 	}
 }
 

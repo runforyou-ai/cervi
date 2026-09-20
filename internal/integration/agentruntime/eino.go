@@ -89,7 +89,7 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 	}
 	// 模型声明文本以外的输入模态时，按窗口推导随消息直传的附件数量上限，至少直传一个。
 	media := mediaInput{read: request.ReadAttachment, modalities: make(map[domain.AIModelInputModality]bool)}
-	for _, modality := range request.Credentials.InputModalities {
+	for _, modality := range request.Assignment.Model.InputModalities {
 		if modality != domain.AIModelInputModalityText {
 			media.modalities[modality] = true
 		}
@@ -171,6 +171,7 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 }
 
 // assembleTools 按场景与请求装配本次运行的工具：开发期计算器只在内部场景注册，终止工具只在客服场景注册，远程 MCP 工具在内置工具之后连接并跳过重名。
+// 工具集合由本次运行注入的依赖决定，调用方必须让注入的依赖与有效配置中的工具清单一致。
 func (r *EinoRuntime) assembleTools(ctx context.Context, request RunRequest, terminal *terminalTools) ([]tool.BaseTool, func(), error) {
 	tools := make([]tool.BaseTool, 0, len(r.tools)+4)
 	if request.Assignment.Scene != SceneCustomer {

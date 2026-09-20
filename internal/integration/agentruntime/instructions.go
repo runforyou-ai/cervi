@@ -106,7 +106,7 @@ func sceneRules(scene SceneContext, tools builtinTools) string {
 	case SceneCustomer:
 		return joinSections(customerSceneRules, toolGuidance(tools), customerSceneDecisionRule)
 	case SceneGroup:
-		// 群内名称唯一的可点名成员按读取顺序列出，没有可点名成员时明确告知。
+		// 群内名称唯一的可点名成员按名称顺序列出，没有可点名成员时明确告知。
 		candidates := "无"
 		if len(scene.MentionCandidates) > 0 {
 			candidates = strings.Join(scene.MentionCandidates, "、")

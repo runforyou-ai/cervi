@@ -66,15 +66,15 @@ func NewExecuteAction(db *bun.DB, enqueuer servertask.TxEnqueuer, runtime agentr
 
 // runAssignment 表示一次已认领运行的执行指派：有效配置、运行期依赖与本次执行的取消与流式句柄。
 type runAssignment struct {
-	Execution  executionContext
-	Policy     agentRunPolicy
-	Assignment agentruntime.Assignment
-	MCPServers []agentruntime.MCPServer
-	Knowledge  agentruntime.KnowledgeSearch
-	History    agentruntime.CustomerHistorySearch
-	Running    *runningAgentRun
-	RunCtx     context.Context
-	Release    func() // 结束本次执行的访客提示、取消注册与运行 context。
+	Execution      executionContext
+	Policy         agentRunPolicy
+	Assignment     agentruntime.Assignment
+	MCPConnections []agentruntime.MCPServer
+	Knowledge      agentruntime.KnowledgeSearch
+	History        agentruntime.CustomerHistorySearch
+	Running        *runningAgentRun
+	RunCtx         context.Context
+	Release        func() // 结束本次执行的访客提示、取消注册与运行 context。
 }
 
 // Execute 取得执行指派、运行 TurnLoop 并收尾，只保存吸收完当前输入后的稳定回复。
@@ -134,7 +134,7 @@ func (a *ExecuteAction) assign(ctx context.Context, runID string) (runAssignment
 			}, nil
 		}
 	}
-	assigned.MCPServers, err = loadRunMCPServers(ctx, a.db, &execution.Run)
+	assigned.MCPConnections, err = loadRunMCPServers(ctx, a.db, &execution.Run)
 	if err != nil {
 		return assigned, fmt.Errorf("load agent run mcp servers: %w", err)
 	}
@@ -142,8 +142,8 @@ func (a *ExecuteAction) assign(ctx context.Context, runID string) (runAssignment
 	if err != nil {
 		return assigned, fmt.Errorf("load agent run knowledge bases: %w", err)
 	}
-	serverNames := make([]string, 0, len(assigned.MCPServers))
-	for _, server := range assigned.MCPServers {
+	serverNames := make([]string, 0, len(assigned.MCPConnections))
+	for _, server := range assigned.MCPConnections {
 		serverNames = append(serverNames, server.Name)
 	}
 	assigned.Assignment, err = a.resolveAssignment(ctx, execution, assigned.Policy,
@@ -158,20 +158,17 @@ func (a *ExecuteAction) assign(ctx context.Context, runID string) (runAssignment
 func (a *ExecuteAction) runAssigned(assigned runAssignment) (agentruntime.RunResult, error) {
 	execution, running := assigned.Execution, assigned.Running
 	feed := &databaseInputFeed{db: a.db, enqueuer: a.enqueuer, execution: execution, policy: assigned.Policy, attachments: a.attachments}
-	// 场景、依据策略、指令与模型参数以有效配置为准，凭据与输入模态取当前供应商配置。
+	// 场景、依据策略、指令、模型参数与输入模态以有效配置为准，供应商凭据取当前配置。
 	result, err := a.runtime.Run(assigned.RunCtx, agentruntime.RunRequest{
-		RunID:      execution.Run.ID,
-		Assignment: assigned.Assignment,
-		Credentials: agentruntime.ModelCredentials{
-			Brand: execution.Brand, APIKey: execution.APIKey, BaseURL: execution.APIURL,
-			InputModalities: execution.InputModalities,
-		},
+		RunID:                 execution.Run.ID,
+		Assignment:            assigned.Assignment,
+		Credentials:           agentruntime.ModelCredentials{APIKey: execution.APIKey, BaseURL: execution.APIURL},
 		KnowledgeSearch:       assigned.Knowledge,
 		CustomerHistorySearch: assigned.History,
 		ReadAttachment: func(ctx context.Context, messageID string) ([]byte, error) {
 			return a.attachments.Content(ctx, &execution.Run, messageID)
 		},
-		MCPConnections: assigned.MCPServers,
+		MCPConnections: assigned.MCPConnections,
 		StreamID:       running.streamID,
 		Attempt:        running.attempt,
 		OnStream: func(delta agentruntime.StreamDelta) {

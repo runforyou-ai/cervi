@@ -5,6 +5,7 @@ package agentruntime
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"slices"
 
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
@@ -16,15 +17,17 @@ const AssignmentRulesVersion = 2
 type SceneContext struct {
 	Scene             Scene
 	GroupTitle        string
-	MentionCandidates []string // 群内名称唯一的可点名成员，按展示顺序排列。
+	MentionCandidates []string // 群内名称唯一的可点名成员，按名称排序。
 }
 
-// AssignmentModel 记录一次运行固定使用的模型标识与参数，不含供应商凭据。
+// AssignmentModel 记录一次运行固定使用的模型标识、品牌、参数与输入模态，不含供应商凭据。
 type AssignmentModel struct {
-	ProviderID      string `json:"providerId"`
-	Identifier      string `json:"identifier"`
-	MaxOutputTokens int64  `json:"maxOutputTokens"`
-	ContextWindow   int64  `json:"contextWindow"`
+	ProviderID      string                        `json:"providerId"`
+	Brand           string                        `json:"brand"`
+	Identifier      string                        `json:"identifier"`
+	MaxOutputTokens int64                         `json:"maxOutputTokens"`
+	ContextWindow   int64                         `json:"contextWindow"`
+	InputModalities []domain.AIModelInputModality `json:"inputModalities"`
 }
 
 // AssignmentFacts 表示解析有效配置所需的业务事实，由服务端从运行、配置版本与会话读出。
@@ -57,7 +60,7 @@ type Assignment struct {
 	Grounding         GroundingPolicy `json:"grounding,omitempty"` // 对客正文的依据检查策略，客服场景为严格策略。
 }
 
-// ResolveAssignment 按业务事实与执行侧能力产出一次运行的有效配置，同一份事实在两端只允许工具清单不同。
+// ResolveAssignment 按业务事实与执行侧能力产出一次运行的有效配置；执行侧能力只影响工具清单、指令中的工具说明和 MCP 服务名称。
 func ResolveAssignment(facts AssignmentFacts, capabilities Capabilities) Assignment {
 	scene := facts.Scene.Scene
 	tools := builtinTools{Knowledge: capabilities.Knowledge, Terminal: scene == SceneCustomer}
@@ -80,9 +83,17 @@ func ResolveAssignment(facts AssignmentFacts, capabilities Capabilities) Assignm
 		InstructionSHA256: hex.EncodeToString(sum[:]),
 		Model:             facts.Model,
 		Tools:             builtinToolNames(scene, capabilities),
-		MCPServers:        capabilities.MCPServers,
+		MCPServers:        mcpServerNames(capabilities),
 		Grounding:         grounding,
 	}
+}
+
+// mcpServerNames 按名称排序复制执行侧提供的 MCP 服务名称，没有服务时输出空数组。
+func mcpServerNames(capabilities Capabilities) []string {
+	names := make([]string, len(capabilities.MCPServers))
+	copy(names, capabilities.MCPServers)
+	slices.Sort(names)
+	return names
 }
 
 // builtinToolNames 按注册顺序列出本次运行的内置工具，开发期计算器只在内部场景注册，终止工具只在客服场景注册。

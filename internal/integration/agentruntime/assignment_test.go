@@ -14,7 +14,10 @@ import (
 func customerFacts() AssignmentFacts {
 	return AssignmentFacts{
 		RoleKind: domain.RoleKindCustomerService, OrganizationName: "鹿行", AgentName: "小鹿", Instruction: "只回答售后问题。",
-		Model: AssignmentModel{ProviderID: "provider", Identifier: "model", MaxOutputTokens: 1024, ContextWindow: 8192},
+		Model: AssignmentModel{
+			ProviderID: "provider", Brand: "deepseek", Identifier: "model", MaxOutputTokens: 1024, ContextWindow: 8192,
+			InputModalities: []domain.AIModelInputModality{domain.AIModelInputModalityText},
+		},
 		Scene: SceneContext{Scene: SceneCustomer},
 	}
 }
@@ -82,8 +85,9 @@ func TestResolveAssignment(t *testing.T) {
 	if !strings.Contains(assignment.Instruction, "只回答售后问题。") || !strings.HasSuffix(assignment.Instruction, customerSceneDecisionRule) {
 		t.Fatalf("有效配置指令 = %q", assignment.Instruction)
 	}
-	if len(assignment.InstructionSHA256) != 64 || assignment.AgentName != "小鹿" ||
-		assignment.Model.ProviderID != "provider" || assignment.Model.ContextWindow != 8192 || len(assignment.MCPServers) != 1 {
+	if len(assignment.InstructionSHA256) != 64 || assignment.AgentName != "小鹿" || assignment.Model.Brand != "deepseek" ||
+		assignment.Model.ProviderID != "provider" || assignment.Model.ContextWindow != 8192 ||
+		len(assignment.Model.InputModalities) != 1 || len(assignment.MCPServers) != 1 {
 		t.Fatalf("有效配置元数据 = %+v", assignment)
 	}
 	// 客服场景注册知识检索与终止工具，不注册开发期计算器。
@@ -127,5 +131,24 @@ func TestResolveAssignmentDeterministic(t *testing.T) {
 	}
 	if string(aligned) != string(expected) {
 		t.Fatalf("能力差异影响了工具清单以外的配置：\n%s\n%s", aligned, expected)
+	}
+}
+
+// TestResolveAssignmentNormalizesMCPServers 验证 MCP 服务名称由解析器按名称排序并收敛为数组，执行侧的传入顺序与空值不影响结果。
+func TestResolveAssignmentNormalizesMCPServers(t *testing.T) {
+	facts := customerFacts()
+	if servers := ResolveAssignment(facts, Capabilities{MCPServers: []string{"ticket", "billing"}}).MCPServers; strings.Join(servers, ",") != "billing,ticket" {
+		t.Fatalf("mcp 服务名称 = %v", servers)
+	}
+	fromNil, err := json.Marshal(ResolveAssignment(facts, Capabilities{}))
+	if err != nil {
+		t.Fatalf("序列化有效配置：%v", err)
+	}
+	fromEmpty, err := json.Marshal(ResolveAssignment(facts, Capabilities{MCPServers: []string{}}))
+	if err != nil {
+		t.Fatalf("序列化有效配置：%v", err)
+	}
+	if string(fromNil) != string(fromEmpty) || !strings.Contains(string(fromNil), `"mcpServers":[]`) {
+		t.Fatalf("没有 MCP 服务时的快照：\n%s\n%s", fromNil, fromEmpty)
 	}
 }

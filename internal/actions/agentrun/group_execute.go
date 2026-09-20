@@ -90,7 +90,7 @@ func (p groupMentionRunPolicy) sceneContext(ctx context.Context, db bun.IDB, exe
 		ColumnExpr("COALESCE(cv.title, '')").
 		Where("cv.organization_id = ? AND cv.id = ?", execution.Run.OrganizationID, execution.Run.ConversationID).
 		Scan(ctx, &title); err != nil {
-		return agentruntime.SceneContext{}, fmt.Errorf("load group title for scene rules: %w", err)
+		return agentruntime.SceneContext{}, fmt.Errorf("load group title for scene context: %w", err)
 	}
 	participants, err := loadGroupMentionParticipants(ctx, db, execution.Run.OrganizationID, execution.Run.ConversationID, execution.Run.AgentIdentityID)
 	if err != nil {
