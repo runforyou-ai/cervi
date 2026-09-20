@@ -64,90 +64,135 @@ func NewExecuteAction(db *bun.DB, enqueuer servertask.TxEnqueuer, runtime agentr
 	return &ExecuteAction{db: db, enqueuer: enqueuer, runtime: runtime, attachments: attachments, knowledge: knowledge, runningRuns: make(map[string]*runningAgentRun)}
 }
 
-// Execute 运行 TurnLoop，并只保存吸收完当前输入后的稳定回复。
+// runAssignment 表示一次已认领运行的执行指派：有效配置、运行期依赖与本次执行的取消与流式句柄。
+type runAssignment struct {
+	Execution      executionContext
+	Policy         agentRunPolicy
+	Assignment     agentruntime.Assignment
+	MCPConnections []agentruntime.MCPServer
+	Knowledge      agentruntime.KnowledgeSearch
+	History        agentruntime.CustomerHistorySearch
+	Running        *runningAgentRun
+	RunCtx         context.Context
+	Release        func() // 结束本次执行的访客提示、取消注册与运行 context。
+}
+
+// Execute 取得执行指派、运行 TurnLoop 并收尾，只保存吸收完当前输入后的稳定回复。
 func (a *ExecuteAction) Execute(ctx context.Context, input RunInput) error {
 	if !common.ValidUUID(input.RunID) {
 		return task.Permanent(errors.New("agent run id is invalid"))
 	}
-	execution, terminal, err := a.begin(ctx, input.RunID)
-	if err != nil {
-		return err
+	assigned, assignErr := a.assign(ctx, input.RunID)
+	if assigned.Release != nil {
+		defer assigned.Release()
 	}
-	if terminal {
-		return nil
+	if assignErr != nil || assigned.Running == nil {
+		return assignErr
+	}
+	result, runErr := a.runAssigned(assigned)
+	return a.settle(ctx, assigned, result, runErr)
+}
+
+// assign 取得一次运行的执行指派：标记运行中、注册取消句柄、解析有效配置并装配运行期依赖；运行已进入终态时返回空指派。
+func (a *ExecuteAction) assign(ctx context.Context, runID string) (runAssignment, error) {
+	execution, terminal, err := a.begin(ctx, runID)
+	if err != nil || terminal {
+		return runAssignment{}, err
 	}
 	runCtx, cancel := context.WithTimeout(ctx, agentRunTimeout)
-	defer cancel()
 	running, unregister, err := a.registerRunContext(ctx, execution.Run.ID, cancel)
 	if err != nil {
-		return err
+		cancel()
+		return runAssignment{}, err
 	}
-	defer unregister()
 	// 网站客户会话在生成期间向访客提示 AI 正在回复。
 	stopVisitorTyping := a.startVisitorTyping(runCtx, &execution.Run)
-	defer stopVisitorTyping()
+	assigned := runAssignment{
+		Execution: execution, Running: running, RunCtx: runCtx,
+		Release: func() {
+			stopVisitorTyping()
+			unregister()
+			cancel()
+		},
+	}
 	if running.attempt > 1 {
 		taskExecution, _ := servertask.CurrentExecution(ctx)
 		slog.Warn("Agent 任务重新计算", "agent_run_id", execution.Run.ID, "task_run_id", taskExecution.TaskRunID,
 			"attempt", running.attempt, "stream_id", running.streamID)
 	}
-	policy, err := a.policyForRun(ctx, &execution.Run)
+	assigned.Policy, err = a.policyForRun(ctx, &execution.Run)
 	if err != nil {
-		return task.Permanent(err)
+		return assigned, task.Permanent(err)
 	}
-	feed := &databaseInputFeed{db: a.db, enqueuer: a.enqueuer, execution: execution, policy: policy, attachments: a.attachments}
-	var customerHistorySearch agentruntime.CustomerHistorySearch
 	if domain.AgentExecutionScopeKind(execution.Run.ScopeKind) == domain.AgentExecutionScopeServiceSession {
 		// TODO：接入本企业、本 Conversation 内已关闭 ServiceSession 的全文历史查询。
 		// 向模型返回历史查询功能不可用的占位结果。
-		customerHistorySearch = func(context.Context, string) (agentruntime.CustomerHistoryResult, error) {
+		assigned.History = func(context.Context, string) (agentruntime.CustomerHistoryResult, error) {
 			return agentruntime.CustomerHistoryResult{
 				Available: false,
 				Message:   "历史消息查询暂未开放，无法确认以往的沟通内容。请根据本轮消息回答，必要时请客户补充信息；不要重复调用此工具。",
 			}, nil
 		}
 	}
-	mcpServers, err := loadRunMCPServers(ctx, a.db, &execution.Run)
+	assigned.MCPConnections, err = loadRunMCPServers(ctx, a.db, &execution.Run)
 	if err != nil {
-		return fmt.Errorf("load agent run mcp servers: %w", err)
+		return assigned, fmt.Errorf("load agent run mcp servers: %w", err)
 	}
-	knowledgeSearch, err := loadRunKnowledgeSearch(ctx, a.db, a.knowledge, execution)
+	assigned.Knowledge, err = loadRunKnowledgeSearch(ctx, a.db, a.knowledge, execution)
 	if err != nil {
-		return fmt.Errorf("load agent run knowledge bases: %w", err)
+		return assigned, fmt.Errorf("load agent run knowledge bases: %w", err)
 	}
-	snapshot, err := a.resolveBehaviorSnapshot(ctx, execution, policy, behaviorTools{Knowledge: knowledgeSearch != nil}, mcpServers)
+	serverNames := make([]string, 0, len(assigned.MCPConnections))
+	for _, server := range assigned.MCPConnections {
+		serverNames = append(serverNames, server.Name)
+	}
+	assigned.Assignment, err = a.resolveAssignment(ctx, execution, assigned.Policy,
+		agentruntime.Capabilities{Knowledge: assigned.Knowledge != nil, MCPServers: serverNames})
 	if err != nil {
-		return err
+		return assigned, err
 	}
-	// 场景、依据策略、指令与模型参数以快照为准，凭据与输入模态取当前供应商配置。
-	result, err := a.runtime.Run(runCtx, agentruntime.RunRequest{
-		RunID: execution.Run.ID, Name: execution.AgentName, Scene: snapshot.Scene, Grounding: snapshot.Grounding, Instruction: snapshot.Instruction,
-		Model: agentruntime.ModelConfig{
-			Brand: execution.Brand, APIKey: execution.APIKey, BaseURL: execution.APIURL,
-			Identifier: snapshot.Model.Identifier, MaxOutputTokens: int(snapshot.Model.MaxOutputTokens), ContextWindow: int(snapshot.Model.ContextWindow),
-			InputModalities: execution.InputModalities,
-		},
-		KnowledgeSearch:       knowledgeSearch,
-		CustomerHistorySearch: customerHistorySearch,
+	return assigned, nil
+}
+
+// runAssigned 按执行指派运行 TurnLoop，运行时限到期时统一以超时原因返回。
+func (a *ExecuteAction) runAssigned(assigned runAssignment) (agentruntime.RunResult, error) {
+	execution, running := assigned.Execution, assigned.Running
+	feed := &databaseInputFeed{db: a.db, enqueuer: a.enqueuer, execution: execution, policy: assigned.Policy, attachments: a.attachments}
+	// 场景、依据策略、指令、模型参数与输入模态以有效配置为准，供应商凭据取当前配置。
+	result, err := a.runtime.Run(assigned.RunCtx, agentruntime.RunRequest{
+		RunID:                 execution.Run.ID,
+		Assignment:            assigned.Assignment,
+		Credentials:           agentruntime.ModelCredentials{APIKey: execution.APIKey, BaseURL: execution.APIURL},
+		KnowledgeSearch:       assigned.Knowledge,
+		CustomerHistorySearch: assigned.History,
 		ReadAttachment: func(ctx context.Context, messageID string) ([]byte, error) {
 			return a.attachments.Content(ctx, &execution.Run, messageID)
 		},
-		MCPServers: mcpServers,
-		StreamID:   running.streamID,
-		Attempt:    running.attempt,
+		MCPConnections: assigned.MCPConnections,
+		StreamID:       running.streamID,
+		Attempt:        running.attempt,
 		OnStream: func(delta agentruntime.StreamDelta) {
 			// 运行 context 已取消时丢弃增量。
-			if runCtx.Err() == nil {
+			if assigned.RunCtx.Err() == nil {
 				running.stream.publish(delta)
 			}
 		},
 	}, feed)
-	if errors.Is(err, errAgentRunSuppressed) {
+	if err != nil && errors.Is(assigned.RunCtx.Err(), context.DeadlineExceeded) && !errors.Is(err, context.DeadlineExceeded) {
+		err = fmt.Errorf("%w: %w", err, context.DeadlineExceeded)
+	}
+	return result, err
+}
+
+// settle 按运行结果收尾：抑制失效结果、原子写入回复或标记失败，并保留已产生的过程内容。
+func (a *ExecuteAction) settle(ctx context.Context, assigned runAssignment, result agentruntime.RunResult, runErr error) error {
+	execution := assigned.Execution
+	if errors.Is(runErr, errAgentRunSuppressed) {
 		// 运行吸收后续输入时已失去资格，保留此前已产生的过程内容。
 		return a.persistPartialProcess(ctx, &execution.Run, result)
 	}
-	if err == nil {
-		if completeErr := a.complete(ctx, execution, policy, result); completeErr != nil {
+	if runErr == nil {
+		if completeErr := a.complete(ctx, execution, assigned.Policy, result); completeErr != nil {
 			if ctx.Err() != nil {
 				return ctx.Err()
 			}
@@ -159,22 +204,18 @@ func (a *ExecuteAction) Execute(ctx context.Context, input RunInput) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
-	// 运行时限到期时统一以超时原因收尾。
-	if errors.Is(runCtx.Err(), context.DeadlineExceeded) && !errors.Is(err, context.DeadlineExceeded) {
-		err = fmt.Errorf("%w: %w", err, context.DeadlineExceeded)
-	}
-	terminal, failErr := a.fail(ctx, execution.Run.ID, err)
+	terminal, failErr := a.fail(ctx, execution.Run.ID, runErr)
 	if failErr != nil {
-		return fmt.Errorf("agent run failed: %v; persist failure: %w", err, failErr)
+		return fmt.Errorf("agent run failed: %v; persist failure: %w", runErr, failErr)
 	}
 	// 失败与被取消的运行同样保留已产生的过程内容。
 	if processErr := a.persistPartialProcess(ctx, &execution.Run, result); processErr != nil {
-		return fmt.Errorf("agent run failed: %v; persist partial process: %w", err, processErr)
+		return fmt.Errorf("agent run failed: %v; persist partial process: %w", runErr, processErr)
 	}
 	if terminal {
 		return nil
 	}
-	return task.Permanent(fmt.Errorf("execute agent run: %w", err))
+	return task.Permanent(fmt.Errorf("execute agent run: %w", runErr))
 }
 
 // begin 将待执行或崩溃恢复中的业务运行标记为运行中并读取配置。
@@ -255,64 +296,6 @@ func (a *ExecuteAction) begin(ctx context.Context, runID string) (executionConte
 		return executionContext{}, false, fmt.Errorf("load agent run execution: %w", err)
 	}
 	return execution, false, nil
-}
-
-// resolveBehaviorSnapshot 首次执行时取场景规则、拼接运行指令并固定快照；重复执行尝试直接沿用已写入的快照，不再查询场景规则。
-// 客服入口当前只注册不可用的客户历史占位工具，工具说明与快照都不把它算作可用工具。
-func (a *ExecuteAction) resolveBehaviorSnapshot(ctx context.Context, execution executionContext, policy agentRunPolicy, tools behaviorTools, mcpServers []agentruntime.MCPServer) (BehaviorSnapshot, error) {
-	snapshot := BehaviorSnapshot{}
-	if len(execution.Run.BehaviorSnapshot) > 0 {
-		if err := json.Unmarshal(execution.Run.BehaviorSnapshot, &snapshot); err != nil {
-			return BehaviorSnapshot{}, fmt.Errorf("decode agent run behavior snapshot: %w", err)
-		}
-		return snapshot, nil
-	}
-	scene, sceneRules, err := policy.sceneRules(ctx, a.db, execution, tools)
-	if err != nil {
-		return BehaviorSnapshot{}, fmt.Errorf("build agent run scene rules: %w", err)
-	}
-	// 按注册顺序收集内置工具，开发期计算器只在内部场景注册，终止工具只在客服场景注册；MCP 服务只记录绑定的服务名称。
-	names := make([]string, 0, 3)
-	if scene != agentruntime.SceneCustomer {
-		names = append(names, "calculator")
-	}
-	if tools.Knowledge {
-		names = append(names, "search_knowledge")
-	}
-	if scene == agentruntime.SceneCustomer {
-		names = append(names, "ask_customer", "handoff_to_human")
-	}
-	serverNames := make([]string, 0, len(mcpServers))
-	for _, server := range mcpServers {
-		serverNames = append(serverNames, server.Name)
-	}
-	snapshot = newBehaviorSnapshot(execution, scene, sceneRules, names, serverNames)
-	encoded, err := json.Marshal(snapshot)
-	if err != nil {
-		return BehaviorSnapshot{}, fmt.Errorf("encode agent run behavior snapshot: %w", err)
-	}
-	result, err := a.db.NewUpdate().Model((*servermodels.AgentRun)(nil)).
-		Set("behavior_snapshot = ?::jsonb", string(encoded)).
-		Set("updated_at = now()").
-		Where("agr.id = ?", execution.Run.ID).
-		Where("agr.behavior_snapshot IS NULL").
-		Exec(ctx)
-	if err != nil {
-		return BehaviorSnapshot{}, fmt.Errorf("persist agent run behavior snapshot: %w", err)
-	}
-	if affected, _ := result.RowsAffected(); affected > 0 {
-		return snapshot, nil
-	}
-	// 并发的执行尝试已先写入快照，沿用那一份。
-	var persisted json.RawMessage
-	if err := a.db.NewSelect().Model((*servermodels.AgentRun)(nil)).
-		Column("behavior_snapshot").Where("agr.id = ?", execution.Run.ID).Scan(ctx, &persisted); err != nil {
-		return BehaviorSnapshot{}, fmt.Errorf("reload agent run behavior snapshot: %w", err)
-	}
-	if err := json.Unmarshal(persisted, &snapshot); err != nil {
-		return BehaviorSnapshot{}, fmt.Errorf("decode persisted agent run behavior snapshot: %w", err)
-	}
-	return snapshot, nil
 }
 
 // withManagedAgentConfiguration 为已关联 agents AS a 的查询补充指定配置版本的模型和系统指令列，只保留有效的托管对话模型配置。

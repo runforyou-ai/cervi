@@ -300,7 +300,7 @@ func testGroupAgentMentionReplies(t *testing.T, db *bun.DB, identity *servermode
 		run := f.activeRun(t)
 		captured := ""
 		runtime := testAgentRuntime{run: func(ctx context.Context, request agentruntime.RunRequest, feed agentruntime.InputFeed) (agentruntime.RunResult, error) {
-			captured = request.Instruction
+			captured = request.Assignment.Instruction
 			triggers, err := feed.Peek(ctx, 0)
 			if err != nil {
 				return agentruntime.RunResult{}, err

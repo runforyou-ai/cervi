@@ -154,7 +154,7 @@ func TestRunRecordsToolCorrection(t *testing.T) {
 	feed := &testInputFeed{}
 	feed.appendUser("开始计算")
 	var deltas []StreamDelta
-	result, err := runtime.Run(context.Background(), RunRequest{RunID: "run", Name: "test", StreamID: "stream", Attempt: 2, OnStream: func(delta StreamDelta) {
+	result, err := runtime.Run(context.Background(), RunRequest{RunID: "run", Assignment: Assignment{AgentName: "test"}, StreamID: "stream", Attempt: 2, OnStream: func(delta StreamDelta) {
 		deltas = append(deltas, delta)
 	}}, feed)
 	if err != nil {
@@ -254,7 +254,7 @@ func TestRunStreamsModelChunks(t *testing.T) {
 	runtime.newModel = func(context.Context, ModelConfig) (model.AgenticModel, error) { return chatModel, nil }
 	feed := &testInputFeed{}
 	feed.appendUser("1 加 2")
-	result, err := runtime.Run(ctx, RunRequest{RunID: "run", Name: "test", StreamID: "stream", OnStream: func(delta StreamDelta) {
+	result, err := runtime.Run(ctx, RunRequest{RunID: "run", Assignment: Assignment{AgentName: "test"}, StreamID: "stream", OnStream: func(delta StreamDelta) {
 		mu.Lock()
 		defer mu.Unlock()
 		if applied, err := snapshot.Apply(delta); !applied || err != nil {
@@ -306,7 +306,7 @@ func TestRunCancellationKeepsPartialProcess(t *testing.T) {
 	runtime.newModel = func(context.Context, ModelConfig) (model.AgenticModel, error) { return chatModel, nil }
 	feed := &testInputFeed{}
 	feed.appendUser("计算")
-	result, err := runtime.Run(ctx, RunRequest{Name: "test", OnStream: func(delta StreamDelta) {
+	result, err := runtime.Run(ctx, RunRequest{Assignment: Assignment{AgentName: "test"}, OnStream: func(delta StreamDelta) {
 		for _, operation := range delta.Operations {
 			if operation.Block != nil && operation.Block.ToolCall != nil && operation.Block.ToolCall.Status == domain.AgentToolCallRunning {
 				cancel()

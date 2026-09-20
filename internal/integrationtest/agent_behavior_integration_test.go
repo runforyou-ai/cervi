@@ -96,13 +96,13 @@ func TestAgentRoleBehavior(t *testing.T) {
 	runQueuedAgentRun(t, db, execute, first.Conversation.ID)
 
 	// 指令由客服基线与内部对话场景规则拼成，空企业指令不占位，没有绑定知识库时不出现工具说明。
-	if captured.Scene != agentruntime.SceneAgentChat {
-		t.Fatalf("scene = %q", captured.Scene)
+	if captured.Assignment.Scene != agentruntime.SceneAgentChat {
+		t.Fatalf("scene = %q", captured.Assignment.Scene)
 	}
 	baselinePrefix := "你是企业「行为测试」的 AI 员工「行为助手」，专业领域是客户服务。"
-	if !strings.HasPrefix(captured.Instruction, baselinePrefix) || !strings.Contains(captured.Instruction, "\n\n本次是企业内部对话") ||
-		strings.Contains(captured.Instruction, "\n\n\n") || strings.Contains(captured.Instruction, "可用工具") {
-		t.Fatalf("instruction = %q", captured.Instruction)
+	if !strings.HasPrefix(captured.Assignment.Instruction, baselinePrefix) || !strings.Contains(captured.Assignment.Instruction, "\n\n本次是企业内部对话") ||
+		strings.Contains(captured.Assignment.Instruction, "\n\n\n") || strings.Contains(captured.Assignment.Instruction, "可用工具") {
+		t.Fatalf("instruction = %q", captured.Assignment.Instruction)
 	}
 	run := &servermodels.AgentRun{}
 	if err := db.NewSelect().Model(run).Where("agr.conversation_id = ?", first.Conversation.ID).Scan(ctx); err != nil {
@@ -126,9 +126,9 @@ func TestAgentRoleBehavior(t *testing.T) {
 	if err := json.Unmarshal(run.BehaviorSnapshot, &snapshot); err != nil {
 		t.Fatalf("behavior snapshot = %s, error = %v", run.BehaviorSnapshot, err)
 	}
-	sum := sha256.Sum256([]byte(captured.Instruction))
+	sum := sha256.Sum256([]byte(captured.Assignment.Instruction))
 	if !snapshot.HandlesCustomers || snapshot.Scene != string(agentruntime.SceneAgentChat) || snapshot.RulesVersion != 2 ||
-		snapshot.Instruction != captured.Instruction || snapshot.InstructionSHA256 != hex.EncodeToString(sum[:]) ||
+		snapshot.Instruction != captured.Assignment.Instruction || snapshot.InstructionSHA256 != hex.EncodeToString(sum[:]) ||
 		snapshot.Model.ProviderID != provider.ID || snapshot.Model.Identifier != "chat" || snapshot.Model.ContextWindow != 32000 ||
 		len(snapshot.Tools) != 1 || snapshot.Tools[0] != "calculator" || len(snapshot.MCPServers) != 0 || snapshot.Grounding != "" {
 		t.Fatalf("behavior snapshot = %+v", snapshot)
@@ -144,12 +144,12 @@ func TestAgentRoleBehavior(t *testing.T) {
 	if err := db.NewSelect().Model(queued).Where("agr.conversation_id = ? AND agr.status = ?", first.Conversation.ID, domain.AgentRunStatusQueued).Scan(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.NewUpdate().Model(queued).Set("behavior_snapshot = ?::jsonb", `{"roleKind":"customer_service","scene":"agent_chat","rulesVersion":1,"instruction":"已固定的指令","instructionSha256":"","model":{},"tools":[]}`).WherePK().Exec(ctx); err != nil {
+	if _, err := db.NewUpdate().Model(queued).Set("behavior_snapshot = ?::jsonb", `{"handlesCustomers":true,"scene":"agent_chat","rulesVersion":1,"instruction":"已固定的指令","instructionSha256":"","model":{},"tools":[]}`).WherePK().Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
 	runQueuedAgentRun(t, db, execute, first.Conversation.ID)
-	if captured.Instruction != "已固定的指令" || captured.Scene != agentruntime.SceneAgentChat {
-		t.Fatalf("request after snapshot reuse = scene %q, instruction %q", captured.Scene, captured.Instruction)
+	if captured.Assignment.Instruction != "已固定的指令" || captured.Assignment.Scene != agentruntime.SceneAgentChat {
+		t.Fatalf("request after snapshot reuse = scene %q, instruction %q", captured.Assignment.Scene, captured.Assignment.Instruction)
 	}
 
 	// 客服场景使用客服场景规则，不注册计算器，占位的客户历史工具不进入工具说明与快照。
@@ -167,11 +167,11 @@ func TestAgentRoleBehavior(t *testing.T) {
 		t.Fatal(err)
 	}
 	runQueuedAgentRun(t, db, execute, inbound.Conversation.ID)
-	if captured.Scene != agentruntime.SceneCustomer || captured.Grounding != agentruntime.GroundingStrict || !strings.HasPrefix(captured.Instruction, baselinePrefix) ||
-		!strings.Contains(captured.Instruction, "\n\n本次是客户会话") || !strings.HasSuffix(captured.Instruction, "追问、转人工与其他工具不在同一次输出中同时调用。") ||
-		!strings.Contains(captured.Instruction, "- ask_customer：") || !strings.Contains(captured.Instruction, "- handoff_to_human：") ||
-		strings.Contains(captured.Instruction, "search_customer_history") || strings.Contains(captured.Instruction, "人工客服跟进") {
-		t.Fatalf("customer instruction = scene %q, %q", captured.Scene, captured.Instruction)
+	if captured.Assignment.Scene != agentruntime.SceneCustomer || captured.Assignment.Grounding != agentruntime.GroundingStrict || !strings.HasPrefix(captured.Assignment.Instruction, baselinePrefix) ||
+		!strings.Contains(captured.Assignment.Instruction, "\n\n本次是客户会话") || !strings.HasSuffix(captured.Assignment.Instruction, "追问、转人工与其他工具不在同一次输出中同时调用。") ||
+		!strings.Contains(captured.Assignment.Instruction, "- ask_customer：") || !strings.Contains(captured.Assignment.Instruction, "- handoff_to_human：") ||
+		strings.Contains(captured.Assignment.Instruction, "search_customer_history") || strings.Contains(captured.Assignment.Instruction, "人工客服跟进") {
+		t.Fatalf("customer instruction = scene %q, %q", captured.Assignment.Scene, captured.Assignment.Instruction)
 	}
 	customerRun := &servermodels.AgentRun{}
 	if err := db.NewSelect().Model(customerRun).Where("agr.conversation_id = ?", inbound.Conversation.ID).Scan(ctx); err != nil {

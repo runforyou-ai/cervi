@@ -64,7 +64,7 @@ func TestCustomerHistoryTool(t *testing.T) {
 				return assistantReply("单聊回答"), nil
 			}}
 			runtime.newModel = func(context.Context, ModelConfig) (model.AgenticModel, error) { return chatModel, nil }
-			request := RunRequest{RunID: "history-test", Name: "客服助手"}
+			request := RunRequest{RunID: "history-test", Assignment: Assignment{AgentName: "客服助手"}}
 			if enabled {
 				request.CustomerHistorySearch = func(_ context.Context, query string) (CustomerHistoryResult, error) {
 					searchCalls++

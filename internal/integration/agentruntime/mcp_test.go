@@ -93,8 +93,8 @@ func TestRuntimeCallsMCPTools(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	result, err := runtime.Run(ctx, RunRequest{
-		RunID: "mcp-run", Name: "test-agent", MaxTurns: 2,
-		MCPServers: []MCPServer{unavailable, newMCPTestServer(t)},
+		RunID: "mcp-run", Assignment: Assignment{AgentName: "test-agent"}, MaxTurns: 2,
+		MCPConnections: []MCPServer{unavailable, newMCPTestServer(t)},
 	}, feed)
 	if err != nil {
 		t.Fatal(err)
@@ -188,8 +188,8 @@ func TestLargeToolResultOffloaded(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	result, err := runtime.Run(ctx, RunRequest{
-		RunID: "offload-run", Name: "test-agent", MaxIterations: 5, MaxTurns: 2,
-		MCPServers: []MCPServer{{Name: "大结果服务", Config: mcp.Config{URL: endpoint.URL, ServerType: domain.MCPServerTypeStreamableHTTP}}},
+		RunID: "offload-run", Assignment: Assignment{AgentName: "test-agent"}, MaxIterations: 5, MaxTurns: 2,
+		MCPConnections: []MCPServer{{Name: "大结果服务", Config: mcp.Config{URL: endpoint.URL, ServerType: domain.MCPServerTypeStreamableHTTP}}},
 	}, feed)
 	if err != nil || result.Content != "已读取" {
 		t.Fatalf("result = %#v, err = %v", result, err)

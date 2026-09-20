@@ -77,7 +77,7 @@ func testGroupAgentHandoff(t *testing.T, db *bun.DB, identity *servermodels.Iden
 		f := newGroupAgentFixture(t, db, identity, agents)
 		f.post(t, "请看一下", []string{f.agents[0].IdentityID}, "")
 		f.submitReply(t, "看过了", func(request agentruntime.RunRequest) {
-			_, candidates, found := strings.Cut(request.Instruction, "可点名的成员：")
+			_, candidates, found := strings.Cut(request.Assignment.Instruction, "可点名的成员：")
 			if !found || !strings.Contains(candidates, f.agents[1].DisplayName) ||
 				!strings.Contains(candidates, identity.OrganizationIdentity.DisplayName) ||
 				strings.Contains(candidates, f.agents[0].DisplayName) {

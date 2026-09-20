@@ -2151,7 +2151,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		var successfulBlocks []agentruntime.Block
 		executedRuntime := testAgentRuntime{run: func(ctx context.Context, request agentruntime.RunRequest, feed agentruntime.InputFeed) (agentruntime.RunResult, error) {
 			executionStreams = append(executionStreams, request.StreamID)
-			if request.Name != "售前智能体" || request.Model.Identifier != model.Identifier {
+			if request.Assignment.AgentName != "售前智能体" || request.Assignment.Model.Identifier != model.Identifier {
 				return agentruntime.RunResult{}, errors.New("unexpected agent runtime request")
 			}
 			pending, err := feed.Peek(ctx, 0)
