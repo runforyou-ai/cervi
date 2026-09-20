@@ -1044,9 +1044,9 @@ export function ConversationComposer({
             </p>
           ) : null}
           {/* 输入区整体铺底色，正文单独用白底并与上下边缘留出间距。 */}
-          <div className="flex items-end gap-2 bg-foreground/5 px-2 py-2.5">
+          <div className="flex items-end gap-2 bg-foreground/5 px-2 py-2">
             {disabledReason ? null : (
-              <div className="flex items-end gap-1 self-stretch">
+              <div className="flex items-end gap-0.5 self-stretch">
                 {onVisibilityChange ? (
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -1081,7 +1081,7 @@ export function ConversationComposer({
             <div className="flex min-w-0 flex-1 items-end rounded-md bg-background px-2">
               {bodyInput}
             </div>
-            <div className="flex items-end gap-1 self-stretch">
+            <div className="flex items-end gap-0.5 self-stretch">
               {disabledReason ? null : emojiTool}
               {replyAssistant}
               {showSend ? (
