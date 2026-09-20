@@ -42,7 +42,7 @@ export function InboxScopeRail({
 
   return (
     <div className="flex w-16 shrink-0 flex-col border-r border-border/70 bg-muted/30">
-      <div className="flex h-12 shrink-0 items-center justify-center border-b border-border/60">
+      <div className="flex h-12 shrink-0 items-center justify-center">
         <Button
           data-slot="rail-toggle"
           variant="ghost"

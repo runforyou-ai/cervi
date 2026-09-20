@@ -35,7 +35,7 @@ export function InboxPaneTop({
   return (
     <div
       data-slot="inbox-pane-header"
-      className="flex h-12 shrink-0 items-center gap-1.5 border-b border-border/60 px-2.5"
+      className="flex h-12 shrink-0 items-center gap-1.5 px-2.5"
     >
       {railCollapsed ? (
         <Button

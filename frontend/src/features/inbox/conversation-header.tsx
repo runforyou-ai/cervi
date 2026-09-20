@@ -147,7 +147,7 @@ export function ConversationHeader({
       <header
         data-slot="conversation-header"
         className={cn(
-          "flex shrink-0 items-center gap-2.5 border-b px-3 py-2",
+          "flex shrink-0 items-center gap-2.5 px-3 py-2",
           narrowViewport && "pr-14",
         )}
       >
