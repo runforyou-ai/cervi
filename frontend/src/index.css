@@ -308,6 +308,11 @@ body,
     );
 }
 
+/* macOS 隐藏标题栏后为左上角窗口按钮保留横向空间。 */
+[data-native-os="darwin"] .cervi-workspace-shell {
+  --cervi-workspace-rail-width: 76px;
+}
+
 .cervi-workspace-rail {
   width: var(--cervi-workspace-rail-width);
 }
