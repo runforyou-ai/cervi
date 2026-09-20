@@ -115,6 +115,7 @@ const (
 	ErrorInstallationRequired             Key = "error.installation_required"
 	ErrorOrganizationAddressInvalid       Key = "error.organization_address_invalid"
 	ErrorInstallationNotAvailable         Key = "error.installation_not_available"
+	ErrorOperatorCredentialInvalid        Key = "error.operator_credential_invalid"
 	ErrorAuthenticationStatusFailed       Key = "error.authentication_status_failed"
 	ErrorAuthenticationRequired           Key = "error.authentication_required"
 	ErrorValidationFailed                 Key = "error.validation_failed"

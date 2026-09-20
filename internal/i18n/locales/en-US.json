@@ -179,6 +179,7 @@
   "error.installation_required": "Cervi has not been initialized.",
   "error.organization_address_invalid": "This workspace address is not valid.",
   "error.installation_not_available": "This deployment does not provide workspace setup.",
+  "error.operator_credential_invalid": "The operator credential is not valid.",
   "error.authentication_status_failed": "Could not read the authentication status.",
   "error.authentication_required": "Please log in first.",
   "error.validation_failed": "Check the information you entered.",
