@@ -737,7 +737,7 @@ export function ConversationComposer({
       aria-invalid={form.formState.errors.body ? true : undefined}
       className={cn(
         // 行高贴近字体自然行高，避免换行前后光标高度跳变；上下内边距之和保持 16px，下伸部留空由上多下少补偿。
-        "max-h-[200px] min-h-9 min-w-0 flex-1 resize-none rounded-none border-0 bg-transparent px-0.5 pt-[9px] pb-[7px] leading-5 shadow-none focus-visible:ring-0 dark:bg-transparent",
+        "max-h-[200px] min-h-10 min-w-0 flex-1 resize-none rounded-none border-0 bg-transparent px-0.5 pt-[11px] pb-[9px] leading-5 shadow-none focus-visible:ring-0 dark:bg-transparent",
         // 正文与 20px 工具图标配比；窄屏保持 16px，避免移动端聚焦时缩放。
         "md:text-[15px]",
         disabledReason && "pl-3",
@@ -964,7 +964,7 @@ export function ConversationComposer({
           {/* 输入区整体铺底色，正文单独用白底并与上下边缘留出间距。 */}
           <div className="flex items-end gap-2 bg-foreground/[0.03] px-2 py-1">
             {disabledReason ? null : (
-              <div className="mb-0.5 flex items-end gap-0.5">
+              <div className="mb-1 flex items-end gap-0.5">
                 {onVisibilityChange ? (
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -999,7 +999,7 @@ export function ConversationComposer({
             <div className="flex min-w-0 flex-1 items-end rounded-md bg-background px-2">
               {bodyInput}
             </div>
-            <div className="mb-0.5 flex items-end gap-0.5">
+            <div className="mb-1 flex items-end gap-0.5">
               {disabledReason ? null : emojiTool}
               {replyAssistant}
               {showSend ? (
