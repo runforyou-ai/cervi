@@ -1577,7 +1577,7 @@ Cervi Gateway
 | 登录态或鉴权页面 | 抓取只发送固定 User-Agent，不携带凭据 | 出现企业内部需要鉴权的文档站点；需要先确定凭据保存与企业隔离方式 |
 | 音频与视频转写 | 包装服务对 `.wav`、`.mp3`、`.m4a`、`.mp4` 直接返回 `unsupported_file`，`markitdown[all]` 自带的转写调用 Google 识别服务 | 出现音视频资料入库需求；实现时改为自托管 ASR |
 | YouTube 来源 | 对应转换器只接受 URI，包装服务只接受上传的字节 | 与站点抓取一并评估；需要在包装服务中单开接口并明确出网边界 |
-| Azure Document Intelligence 与 Content Understanding | 镜像装有依赖，不开放入口 | 与私有化部署定位冲突，暂不启动 |
+| Azure Document Intelligence 与 Content Understanding | 镜像装有依赖，不开放入口 | 与自托管定位冲突，暂不启动 |
 | 在线文档图片 | 编辑器不注册图片节点，粘贴与拖入的图片不进入文档 | 出现图文混排的资料录入需求；需要先确定图片存储与召回中的表达 |
 | XLSX 数值改写 | 单元格经 pandas 类型推断，编号前导零与金额小数尾零丢失，检索按改写后的字面值进行 | 认定改写不可接受时，把该格式的分派改回 Go 侧 excelize，只影响 `ProcessDocumentAction` 中一处按扩展名的分派 |
 
@@ -1599,7 +1599,7 @@ Cervi Gateway
 ### 部署与安全
 
 - markitdown 镜像随 Release 发布到 `ghcr.io/<repo>-markitdown`，标签与服务端镜像一致。需要在 `internal/server-deployment.md` 中说明该镜像的拉取、版本对齐和 `MARKITDOWN_URL` 配置。
-- 网页抓取不拦截内网地址与私有网段，私有化部署的企业内网文档站点是该能力的实际来源之一。SSRF 与抓取频率控制列入上线前的安全与容量专项。
+- 网页抓取不拦截内网地址与私有网段，自托管的企业内网文档站点是该能力的实际来源之一。SSRF 与抓取频率控制列入上线前的安全与容量专项。
 - 知识库的可见与编辑范围随角色权限统一建设，当前只校验已登录。
 
 ### 与其他能力的衔接
