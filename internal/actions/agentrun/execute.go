@@ -55,7 +55,7 @@ type executionContext struct {
 	Instruction      string                        `bun:"instruction"`
 	KnowledgeBaseIDs []string                      `bun:"knowledge_base_ids,type:jsonb"`
 	ProviderID       string                        `bun:"provider_id"`
-	RoleKind         string                        `bun:"role_kind"`
+	HandlesCustomers bool                          `bun:"handles_customers"`
 	OrganizationName string                        `bun:"organization_name"`
 }
 
@@ -232,13 +232,12 @@ func (a *ExecuteAction) begin(ctx context.Context, runID string) (executionConte
 		ColumnExpr("oi.display_name AS agent_name").
 		ColumnExpr("aipm.input_modalities").
 		ColumnExpr("ar.configuration->'knowledgeBaseIds' AS knowledge_base_ids").
-		ColumnExpr("aip.id::text AS provider_id, r.kind AS role_kind, o.name AS organization_name").
+		ColumnExpr("aip.id::text AS provider_id, oi.handles_customers, o.name AS organization_name").
 		Join("JOIN agents AS a ON a.identity_id = agr.agent_identity_id AND a.organization_id = agr.organization_id").
 		Join("JOIN organizations AS o ON o.id = agr.organization_id").
 		Apply(func(query *bun.SelectQuery) *bun.SelectQuery {
 			return withManagedAgentConfiguration(query, "agr.agent_revision_id")
 		}).
-		Join("JOIN roles AS r ON r.id = oi.role_id AND r.organization_id = oi.organization_id").
 		Where("agr.id = ?", runID).
 		Where("agr.status = ?", domain.AgentRunStatusRunning).
 		Scan(ctx, &execution)

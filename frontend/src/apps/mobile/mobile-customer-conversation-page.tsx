@@ -50,13 +50,13 @@ function MobileCustomerSessionMenu({
   const actions = useCustomerSessionActions(
     conversation,
     identity.user.identityId,
+    identity.user.handlesCustomers,
     () => {
       void invalidate(resourceKeys.inbox())
       void invalidate(resourceKeys.conversationSummary(conversation.id))
     },
   )
-  const { operation, sessionClosed, assignedToCurrentUser, transferCandidates } =
-    actions
+  const { operation, transferCandidates } = actions
 
   return (
     <>
@@ -77,14 +77,14 @@ function MobileCustomerSessionMenu({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="min-w-48">
-          {sessionClosed ? (
+          {actions.reopenable ? (
             <DropdownMenuItem
               className="min-h-11"
               onSelect={() => void actions.reopen()}
             >
               {t("conversationReopen")}
             </DropdownMenuItem>
-          ) : !assignedToCurrentUser ? (
+          ) : actions.claimable ? (
             <DropdownMenuItem
               className="min-h-11"
               onSelect={() => void actions.claim()}
@@ -93,7 +93,7 @@ function MobileCustomerSessionMenu({
                 ? t("conversationTakeover")
                 : t("conversationClaim")}
             </DropdownMenuItem>
-          ) : transferCandidates.length === 0 ? (
+          ) : !actions.transferable ? null : transferCandidates.length === 0 ? (
             <DropdownMenuItem className="min-h-11" disabled>
               {t("conversationTransferEmpty")}
             </DropdownMenuItem>
@@ -150,7 +150,12 @@ export function MobileCustomerConversationPage() {
   const customer = conversation?.customer
   const disabledReason = customer
     ? customerReplySupported(customer)
-      ? customerReplyDisabledReason(customer, identity.user.identityId, t)
+      ? customerReplyDisabledReason(
+          customer,
+          identity.user.identityId,
+          identity.user.handlesCustomers,
+          t,
+        )
       : t("channelReplyUnsupported")
     : null
 

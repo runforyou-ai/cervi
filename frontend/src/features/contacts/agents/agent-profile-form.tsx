@@ -1,7 +1,7 @@
 /** AI 员工基本资料表单。 */
 import { useEffect, useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { Controller, useForm, useWatch } from "react-hook-form"
+import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -21,6 +21,7 @@ import { ImagePicker } from "@/components/image-picker"
 import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { NativeSelect } from "@/components/ui/native-select"
+import { Switch } from "@/components/ui/switch"
 import {
   selectableWorkStatuses,
   workStatusLabel,
@@ -70,6 +71,7 @@ export function AgentProfileForm({
       roleId: agent.role.id,
       workStatus: agent.workStatus,
       teamIds: agent.teams.map((team) => team.id),
+      handlesCustomers: agent.handlesCustomers,
     },
   })
   const avatar = usePendingImageUpload({
@@ -82,7 +84,6 @@ export function AgentProfileForm({
   const { mounted, dirty } = useFormLifetime(
     form.formState.isDirty || avatar.pending !== null,
   )
-  const selectedRoleId = useWatch({ control: form.control, name: "roleId" })
 
   // 资料刷新时同步未修改的表单，保留正在编辑的草稿。
   useEffect(() => {
@@ -92,6 +93,7 @@ export function AgentProfileForm({
       roleId: agent.role.id,
       workStatus: agent.workStatus,
       teamIds: agent.teams.map((team) => team.id),
+      handlesCustomers: agent.handlesCustomers,
     })
   }, [agent, dirty, form])
 
@@ -121,6 +123,7 @@ export function AgentProfileForm({
               "roleId",
               "workStatus",
               "teamIds",
+              "handlesCustomers",
             ])
           : t("agents.form.networkError"),
       )
@@ -161,13 +164,27 @@ export function AgentProfileForm({
               roles={roles.filter(
                 (role) => role.kind !== RoleKind.RoleKindAdmin,
               )}
-              hint={t(
-                roles.find((role) => role.id === selectedRoleId)?.kind ===
-                  RoleKind.RoleKindCustomerService
-                  ? "agents.roleHint.customerService"
-                  : "agents.roleHint.member",
-              )}
             />
+          )}
+        />
+        <Controller
+          name="handlesCustomers"
+          control={form.control}
+          render={({ field }) => (
+            <Field orientation="horizontal">
+              <FieldLabel htmlFor="agent-profile-handles-customers">
+                {t("agents.form.handlesCustomers")}
+              </FieldLabel>
+              <Switch
+                id="agent-profile-handles-customers"
+                name={field.name}
+                checked={field.value}
+                disabled={form.formState.isSubmitting}
+                onBlur={field.onBlur}
+                onCheckedChange={field.onChange}
+                ref={field.ref}
+              />
+            </Field>
           )}
         />
         <Controller

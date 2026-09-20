@@ -190,11 +190,16 @@ func (a *SendCustomerTextMessageAction) Execute(ctx context.Context, identity *s
 
 // sendCustomerMessage 执行一次完整的成员客户会话回复事务，文本与附件共用客服周期、引用和外发语义。
 func sendCustomerMessage(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, enqueuer servertask.TxEnqueuer, input customerMessagePayload, ids memberMessageIDs, idempotencyKey string) (ConversationMessage, error) {
-	if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
+	// 内部备注不要求接待资格，对客回复只有开启接待的成员可以发送。
+	internalNote := input.Visibility == domain.MessageVisibilityInternalOnly
+	lock := identityaction.LockActiveUser
+	if !internalNote {
+		lock = lockActiveCustomerHandler
+	}
+	if err := lock(ctx, tx, identity); err != nil {
 		return ConversationMessage{}, err
 	}
 	// 渠道投递路由只用于对客消息。
-	internalNote := input.Visibility == domain.MessageVisibilityInternalOnly
 	var route deliveryaction.Route
 	var err error
 	if !internalNote {

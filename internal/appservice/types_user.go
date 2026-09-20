@@ -36,6 +36,7 @@ type CurrentUser struct {
 	TimeZone                    string     `json:"timeZone"`
 	MessageNotificationsEnabled bool       `json:"messageNotificationsEnabled"`
 	WorkspaceTabsEnabled        bool       `json:"workspaceTabsEnabled"`
+	HandlesCustomers            bool       `json:"handlesCustomers"`
 	WorkStatus                  WorkStatus `json:"workStatus"`
 	AvatarURL                   string     `json:"avatarUrl"`
 }
@@ -78,34 +79,37 @@ type UserListInput struct {
 
 // CreateUserInput 定义新增企业成员字段，AvatarFileID 为空时不设置头像。
 type CreateUserInput struct {
-	DisplayName  string   `json:"displayName"`
-	Email        string   `json:"email"`
-	Password     string   `json:"password"`
-	RoleID       string   `json:"roleId"`
-	TeamIDs      []string `json:"teamIds"`
-	AvatarFileID string   `json:"avatarFileId"`
+	DisplayName      string   `json:"displayName"`
+	Email            string   `json:"email"`
+	Password         string   `json:"password"`
+	RoleID           string   `json:"roleId"`
+	TeamIDs          []string `json:"teamIds"`
+	HandlesCustomers bool     `json:"handlesCustomers"`
+	AvatarFileID     string   `json:"avatarFileId"`
 }
 
 // UpdateUserInput 定义企业成员可编辑字段。
 type UpdateUserInput struct {
-	DisplayName string   `json:"displayName"`
-	Email       string   `json:"email"`
-	RoleID      string   `json:"roleId"`
-	TeamIDs     []string `json:"teamIds"`
+	DisplayName      string   `json:"displayName"`
+	Email            string   `json:"email"`
+	RoleID           string   `json:"roleId"`
+	TeamIDs          []string `json:"teamIds"`
+	HandlesCustomers bool     `json:"handlesCustomers"`
 }
 
 // User 定义企业成员信息。
 type User struct {
-	ID          string        `json:"id"`
-	IdentityID  string        `json:"identityId"`
-	Email       string        `json:"email"`
-	DisplayName string        `json:"displayName"`
-	AvatarURL   string        `json:"avatarUrl"`
-	Role        RoleSummary   `json:"role"`
-	Status      UserStatus    `json:"status"`
-	WorkStatus  WorkStatus    `json:"workStatus"`
-	Teams       []TeamSummary `json:"teams"`
-	CreatedAt   time.Time     `json:"createdAt"`
+	ID               string        `json:"id"`
+	IdentityID       string        `json:"identityId"`
+	Email            string        `json:"email"`
+	DisplayName      string        `json:"displayName"`
+	AvatarURL        string        `json:"avatarUrl"`
+	Role             RoleSummary   `json:"role"`
+	HandlesCustomers bool          `json:"handlesCustomers"`
+	Status           UserStatus    `json:"status"`
+	WorkStatus       WorkStatus    `json:"workStatus"`
+	Teams            []TeamSummary `json:"teams"`
+	CreatedAt        time.Time     `json:"createdAt"`
 }
 
 // UserList 定义企业成员分页结果。

@@ -49,6 +49,7 @@ const contacts = {
     joinedAt: "加入时间",
     stage: "阶段",
     channels: "渠道",
+    handlesCustomers: "接待客户",
     createdAt: "创建时间",
     addedAt: "添加时间",
     updatedAt: "更新时间",
@@ -104,6 +105,7 @@ const contacts = {
       email: "邮箱",
       password: "初始密码",
       role: "企业角色",
+      handlesCustomers: "接待客户",
       teams: "所属团队",
       noTeams: "还没有可选择的团队。",
       created: "企业成员已添加",
@@ -140,6 +142,7 @@ const contacts = {
     create: "添加 AI 员工",
     form: {
       name: "AI 员工名称",
+      handlesCustomers: "接待客户",
       teams: "所属团队",
       noTeams: "还没有可选择的团队。",
       created: "AI 员工已添加",
@@ -152,10 +155,6 @@ const contacts = {
       nameInvalid: "AI 员工名称只能包含文字、数字、空格和 · - _ . 符号。",
       modelRequired: "请选择对话模型。",
       instructionTooLong: "企业指令不能超过 20000 个字符。",
-    },
-    roleHint: {
-      customerService: "可以作为客服接待客户，按客服工作规则运行。",
-      member: "只参与企业内部协作，按成员工作规则运行。",
     },
     mcp: {
       services: "MCP 服务",

@@ -19,24 +19,24 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// ServiceSessionHandoff 在管理操作事务中把 AI 员工负责的开放客服周期交给人工，并在提交后中断被取消的模型调用。
-type ServiceSessionHandoff interface {
-	HandOffAgentServiceSessions(ctx context.Context, db bun.IDB, organizationID, agentIdentityID, operationID string) ([]string, error)
+// ServiceSessionReturner 在管理操作事务中把失去接待资格的身份负责的开放客服周期退回原队列，并在提交后中断被取消的模型调用。
+type ServiceSessionReturner interface {
+	ReturnServiceSessionsToQueue(ctx context.Context, db bun.IDB, organizationID, identityID, operationID string) ([]string, error)
 	CancelRunContexts([]string)
 }
 
 // UpdateStatusAction 修改 AI 员工状态。
 type UpdateStatusAction struct {
-	db      *bun.DB
-	handoff ServiceSessionHandoff
+	db       *bun.DB
+	returner ServiceSessionReturner
 }
 
 // NewUpdateStatusAction 创建 AI 员工状态修改操作。
-func NewUpdateStatusAction(db *bun.DB, handoff ServiceSessionHandoff) *UpdateStatusAction {
-	return &UpdateStatusAction{db: db, handoff: handoff}
+func NewUpdateStatusAction(db *bun.DB, returner ServiceSessionReturner) *UpdateStatusAction {
+	return &UpdateStatusAction{db: db, returner: returner}
 }
 
-// Execute 禁用或恢复 AI 员工账号，禁用时清理渠道分配并把其负责的开放客服周期交给人工。
+// Execute 禁用或恢复 AI 员工账号，禁用时清理渠道分配并把其负责的开放客服周期退回原队列。
 func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels.Identity, agentID string, status domain.UserStatus) (*Agent, error) {
 	if !common.ValidUUID(agentID) {
 		return nil, ErrNotFound
@@ -85,12 +85,12 @@ func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels
 			if err := channelaction.ResetRoutingTarget(ctx, tx, identity.Organization.ID, domain.ChannelRoutingTargetTypeMember, updatedAgent.IdentityID); err != nil {
 				return err
 			}
-			cancelledRunIDs, err = a.handoff.HandOffAgentServiceSessions(ctx, tx, identity.Organization.ID, updatedAgent.IdentityID, uuid.NewV7().String())
+			cancelledRunIDs, err = a.returner.ReturnServiceSessionsToQueue(ctx, tx, identity.Organization.ID, updatedAgent.IdentityID, uuid.NewV7().String())
 			if err != nil {
 				return err
 			}
 		}
-		// 会话列表展示 AI 员工账号状态，状态实际变化时在交接完成后推进展示该 AI 员工的会话版本。
+		// 会话列表展示 AI 员工账号状态，状态实际变化时在退回完成后推进展示该 AI 员工的会话版本。
 		if updatedAgent.Changed {
 			if err := chatstate.TouchIdentityConversations(ctx, tx, identity.Organization.ID, updatedAgent.IdentityID); err != nil {
 				return err
@@ -102,22 +102,21 @@ func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels
 	if err != nil {
 		return nil, fmt.Errorf("update agent status: %w", err)
 	}
-	a.handoff.CancelRunContexts(cancelledRunIDs)
+	a.returner.CancelRunContexts(cancelledRunIDs)
 	return output, nil
 }
 
-// lockedAgentIdentity 表示锁定时 AI 员工身份的角色类型与头像。
+// lockedAgentIdentity 表示锁定时 AI 员工身份的接待开关与头像。
 type lockedAgentIdentity struct {
-	RoleKind     domain.RoleKind `bun:"role_kind"`
-	AvatarFileID *string         `bun:"avatar_file_id"`
+	HandlesCustomers bool    `bun:"handles_customers"`
+	AvatarFileID     *string `bun:"avatar_file_id"`
 }
 
-// lockAgentIdentity 对 AI 员工身份取 FOR UPDATE，并返回锁定时的角色类型与头像。
+// lockAgentIdentity 对 AI 员工身份取 FOR UPDATE，并返回锁定时的接待开关与头像。
 func lockAgentIdentity(ctx context.Context, db bun.IDB, organizationID, identityID string) (lockedAgentIdentity, error) {
 	var locked lockedAgentIdentity
 	if err := db.NewSelect().TableExpr("organization_identities AS oi").
-		ColumnExpr("r.kind AS role_kind, oi.avatar_file_id::text AS avatar_file_id").
-		Join("JOIN roles AS r ON r.id = oi.role_id AND r.organization_id = oi.organization_id").
+		ColumnExpr("oi.handles_customers, oi.avatar_file_id::text AS avatar_file_id").
 		Where("oi.organization_id = ? AND oi.id = ? AND oi.type = ?", organizationID, identityID, domain.OrganizationIdentityTypeAgent).
 		For("UPDATE OF oi").
 		Scan(ctx, &locked); err != nil {

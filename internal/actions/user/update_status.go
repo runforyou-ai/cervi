@@ -7,6 +7,7 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"uuid"
 
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
@@ -19,12 +20,17 @@ import (
 )
 
 // UpdateStatusAction 修改用户账号状态。
-type UpdateStatusAction struct{ db *bun.DB }
+type UpdateStatusAction struct {
+	db       *bun.DB
+	returner ServiceSessionReturner
+}
 
 // NewUpdateStatusAction 创建用户账号状态修改操作。
-func NewUpdateStatusAction(db *bun.DB) *UpdateStatusAction { return &UpdateStatusAction{db: db} }
+func NewUpdateStatusAction(db *bun.DB, returner ServiceSessionReturner) *UpdateStatusAction {
+	return &UpdateStatusAction{db: db, returner: returner}
+}
 
-// Execute 禁用或恢复用户账号，并在禁用时清理渠道分配。
+// Execute 禁用或恢复用户账号，并在禁用时清理渠道分配、把其负责的开放客服周期退回原队列。
 func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels.Identity, userID string, status domain.UserStatus) (*User, error) {
 	if !common.ValidUUID(userID) {
 		return nil, ErrNotFound
@@ -33,6 +39,7 @@ func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels
 		return nil, &ValidationError{Fields: map[string]ValidationCode{"status": ValidationStatusInvalid}}
 	}
 	var output *User
+	var cancelledRunIDs []string
 	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
@@ -68,6 +75,10 @@ func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels
 			if err := channelaction.ResetRoutingTarget(ctx, tx, identity.Organization.ID, domain.ChannelRoutingTargetTypeMember, updatedUser.IdentityID); err != nil {
 				return err
 			}
+			cancelledRunIDs, err = a.returner.ReturnServiceSessionsToQueue(ctx, tx, identity.Organization.ID, updatedUser.IdentityID, uuid.NewV7().String())
+			if err != nil {
+				return err
+			}
 			// 提交后通知 Gateway 关闭该用户的全部实时连接。
 			realtime.Notify(ctx, realtime.UserDisabled(identity.Organization.ID, userID))
 		}
@@ -86,5 +97,6 @@ func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels
 	if err != nil {
 		return nil, fmt.Errorf("update user status: %w", err)
 	}
+	a.returner.CancelRunContexts(cancelledRunIDs)
 	return output, nil
 }

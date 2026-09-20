@@ -19,7 +19,6 @@ import (
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
-	roleaction "github.com/runforyou-ai/cervi/internal/actions/role"
 	teamaction "github.com/runforyou-ai/cervi/internal/actions/team"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
@@ -31,8 +30,8 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// testServiceSessionHandoff 创建管理操作交接客服周期所用的运行协调器。
-func testServiceSessionHandoff(db *bun.DB) *agentrunaction.ExecuteAction {
+// testServiceSessionReturner 创建管理操作退回客服周期所用的运行协调器。
+func testServiceSessionReturner(db *bun.DB) *agentrunaction.ExecuteAction {
 	tasks := servertask.New(db, serverconfig.NATSConfig{})
 	if err := tasks.Registry().RegisterJSON(deliveryaction.SendActionName, func(context.Context, deliveryaction.Input) error { return nil }); err != nil {
 		panic(err)
@@ -50,11 +49,11 @@ type handoffFixture struct {
 	modelID    string
 }
 
-// newAgent 创建一个客服角色的 AI 员工。
+// newAgent 创建一个开启接待客户的 AI 员工。
 func (f handoffFixture) newAgent(t *testing.T, name string) *agentaction.Agent {
 	t.Helper()
 	created, err := agentaction.NewCreateAgentAction(f.db).Execute(context.Background(), f.identity, agentaction.CreateInput{
-		DisplayName: name, RoleID: f.roleID,
+		DisplayName: name, RoleID: f.roleID, HandlesCustomers: true,
 		Execution: agentaction.ExecutionInput{Mode: domain.AgentExecutionModeManaged, Managed: &agentaction.ManagedExecutionInput{ProviderID: f.providerID, ModelIdentifier: f.modelID}},
 	})
 	if err != nil {
@@ -150,6 +149,29 @@ func handoffEvents(t *testing.T, db *bun.DB, conversationID string) []domain.Ser
 	return events
 }
 
+// returnedEvents 读取会话中的周期退回队列事件。
+func returnedEvents(t *testing.T, db *bun.DB, conversationID string) []domain.ServiceSessionReturnedEvent {
+	t.Helper()
+	var messages []servermodels.Message
+	if err := db.NewSelect().Model(&messages).
+		Where("msg.conversation_id = ? AND msg.system_event_type = ?", conversationID, domain.ConversationSystemEventServiceSessionReturned).
+		OrderExpr("msg.message_seq").Scan(context.Background()); err != nil {
+		t.Fatal(err)
+	}
+	events := make([]domain.ServiceSessionReturnedEvent, 0, len(messages))
+	for _, message := range messages {
+		if message.Visibility != string(domain.MessageVisibilityInternalOnly) || message.SenderParticipantID != nil {
+			t.Fatalf("returned event message = %+v", message)
+		}
+		event := domain.ServiceSessionReturnedEvent{}
+		if err := json.Unmarshal(message.SystemEventPayload, &event); err != nil {
+			t.Fatal(err)
+		}
+		events = append(events, event)
+	}
+	return events
+}
+
 // loadSession 读取客服周期的当前状态。
 func loadSession(t *testing.T, db *bun.DB, sessionID string) servermodels.ServiceSession {
 	t.Helper()
@@ -170,14 +192,13 @@ func testAgentHandoffs(t *testing.T, db *bun.DB, identity *servermodels.Identity
 	t.Run("主动转人工后转回同一 AI", func(t *testing.T) { testModelHandoffRoundTrip(t, f) })
 	t.Run("失败路由去向", func(t *testing.T) { testHandoffTargets(t, f) })
 	t.Run("人工接管与交接先后", func(t *testing.T) { testHandoffCommitOrder(t, f) })
-	t.Run("停用与改角色交接", func(t *testing.T) { testManagementHandoff(t, f) })
+	t.Run("停用与关闭接待退回队列", func(t *testing.T) { testManagementReturn(t, f) })
 	t.Run("入站路由与资格变更交错", func(t *testing.T) { testInboundRoutingVersusEligibility(t, f) })
 	t.Run("入站发现负责人失效", func(t *testing.T) { testInboundUnavailableAssignee(t, f) })
 	t.Run("Telegram 主动转人工", func(t *testing.T) { testTelegramModelHandoff(t, f) })
 	t.Run("渠道编辑与停用交错", func(t *testing.T) { testChannelEditVersusDeactivation(t, f) })
 	t.Run("成员操作客服周期事件", func(t *testing.T) { testServiceSessionOperationEvents(t, f) })
-	t.Run("互为失败路由的 AI 同时改角色", func(t *testing.T) { testMutualFallbackRoleChanges(t, f) })
-	t.Run("Telegram 入站失效交接与运行收尾交错", func(t *testing.T) { testTelegramInboundHandoffVersusRunFailure(t, f) })
+	t.Run("Telegram 入站失效退回与运行收尾交错", func(t *testing.T) { testTelegramInboundReturnVersusRunFailure(t, f) })
 }
 
 // testModelHandoffRoundTrip 验证最终认领后到达的消息随交接结算，人工转回 AI 后只处理新消息。
@@ -230,7 +251,7 @@ func testModelHandoffRoundTrip(t *testing.T, f handoffFixture) {
 		}
 	}
 	// 成员领取后转回同一 AI，新消息只触发新输入。
-	coordinator := testServiceSessionHandoff(f.db)
+	coordinator := testServiceSessionReturner(f.db)
 	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, coordinator).Execute(ctx, f.identity, first.Conversation.ID); err != nil {
 		t.Fatal(err)
 	}
@@ -268,7 +289,7 @@ func testHandoffTargets(t *testing.T, f handoffFixture) {
 		t.Fatal(err)
 	}
 	human, err := useraction.NewCreateUserAction(f.db).Execute(ctx, f.identity, useraction.CreateInput{
-		DisplayName: "人工客服", Email: "handoff-" + uuid.NewV7().String()[:8] + "@handoff.test", Password: "password123", RoleID: f.roleID,
+		HandlesCustomers: true, DisplayName: "人工客服", Email: "handoff-" + uuid.NewV7().String()[:8] + "@handoff.test", Password: "password123", RoleID: f.roleID,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -326,7 +347,7 @@ func testHandoffCommitOrder(t *testing.T, f handoffFixture) {
 	ctx := context.Background()
 	agent := f.newAgent(t, "先后验证客服")
 	channelID := f.newChannel(t, agent.IdentityID, channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue})
-	coordinator := testServiceSessionHandoff(f.db)
+	coordinator := testServiceSessionReturner(f.db)
 
 	input := visitorInput(channelID, "")
 	first := f.receive(t, &input, "人工先接管")
@@ -359,10 +380,10 @@ func testHandoffCommitOrder(t *testing.T, f handoffFixture) {
 	}
 }
 
-// testManagementHandoff 验证停用 AI 员工、编辑时改为非客服角色和在角色页批量改角色时，其负责的开放周期连同在途运行一并交给人工。
-func testManagementHandoff(t *testing.T, f handoffFixture) {
+// testManagementReturn 验证停用 AI 员工和关闭其接待开关时，负责的开放周期连同在途运行一并退回原队列并补发对客通知。
+func testManagementReturn(t *testing.T, f handoffFixture) {
 	ctx := context.Background()
-	for _, change := range []string{"停用", "改角色", "批量改角色"} {
+	for _, change := range []string{"停用", "关闭接待"} {
 		t.Run(change, func(t *testing.T) {
 			agent := f.newAgent(t, change+"客服")
 			channelID := f.newChannel(t, agent.IdentityID, channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue})
@@ -377,24 +398,16 @@ func testManagementHandoff(t *testing.T, f handoffFixture) {
 				return agentruntime.RunResult{Content: "已回答", EndSeq: claimed.EndSeq}, err
 			}}, testAttachmentReader(f.db), nil), idle.Conversation.ID)
 
-			handoff := testServiceSessionHandoff(f.db)
-			memberRole := servermodels.Role{}
-			if err := f.db.NewSelect().Model(&memberRole).Where("organization_id = ? AND kind = ?", f.identity.Organization.ID, domain.RoleKindMember).Scan(ctx); err != nil {
-				t.Fatal(err)
-			}
+			returner := testServiceSessionReturner(f.db)
 			switch change {
 			case "停用":
-				if _, err := agentaction.NewUpdateStatusAction(f.db, handoff).Execute(ctx, f.identity, agent.ID, domain.UserStatusInactive); err != nil {
-					t.Fatal(err)
-				}
-			case "改角色":
-				if _, err := agentaction.NewUpdateAgentAction(f.db, handoff).Execute(ctx, f.identity, agent.ID, agentaction.UpdateInput{
-					DisplayName: agent.DisplayName, RoleID: memberRole.ID, TeamIDs: []string{}, WorkStatus: domain.WorkStatusWorking,
-				}); err != nil {
+				if _, err := agentaction.NewUpdateStatusAction(f.db, returner).Execute(ctx, f.identity, agent.ID, domain.UserStatusInactive); err != nil {
 					t.Fatal(err)
 				}
 			default:
-				if err := roleaction.NewUpdateAssignmentsAction(f.db, handoff).Execute(ctx, f.identity, []roleaction.AssignmentInput{{IdentityID: agent.IdentityID, RoleID: memberRole.ID}}); err != nil {
+				if _, err := agentaction.NewUpdateAgentAction(f.db, returner).Execute(ctx, f.identity, agent.ID, agentaction.UpdateInput{
+					DisplayName: agent.DisplayName, RoleID: agent.RoleID, TeamIDs: []string{}, HandlesCustomers: false, WorkStatus: domain.WorkStatusWorking,
+				}); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -403,19 +416,20 @@ func testManagementHandoff(t *testing.T, f handoffFixture) {
 				t.Fatalf("pending run = %+v, error = %v", pendingRun, err)
 			}
 			for _, conversationID := range []string{pending.Conversation.ID, idle.Conversation.ID} {
-				events := handoffEvents(t, f.db, conversationID)
-				if len(events) != 1 || events[0].Reason != domain.AgentHandoffReasonAgentUnavailable || events[0].AgentRunID != nil {
+				events := returnedEvents(t, f.db, conversationID)
+				if len(events) != 1 || events[0].Reason != domain.ServiceSessionReturnAssigneeUnavailable ||
+					events[0].FromIdentityID != agent.IdentityID || events[0].Target.Kind != domain.ServiceSessionTargetPublicQueue {
 					t.Fatalf("events = %+v", events)
 				}
 				session := loadSession(t, f.db, events[0].ServiceSessionID)
-				if session.AssigneeIdentityID != nil {
+				if session.AssigneeIdentityID != nil || session.TeamID != nil {
 					t.Fatalf("session = %+v", session)
 				}
 				notices, err := f.db.NewSelect().Model((*servermodels.Message)(nil)).
-					Where("msg.conversation_id = ? AND msg.idempotency_key LIKE ?", conversationID, "handoff:"+session.ID+":%").
+					Where("msg.conversation_id = ? AND msg.idempotency_key LIKE ?", conversationID, "returned:"+session.ID+":%").
 					Where("msg.type = ?", domain.MessageTypeText).Count(ctx)
 				if err != nil || notices != 1 {
-					t.Fatalf("handoff notices = %d, error = %v", notices, err)
+					t.Fatalf("return notices = %d, error = %v", notices, err)
 				}
 			}
 			lane := servermodels.AgentLane{}
@@ -426,14 +440,10 @@ func testManagementHandoff(t *testing.T, f handoffFixture) {
 	}
 }
 
-// testInboundRoutingVersusEligibility 验证新访客入站与停用、改角色并发交错后，没有开放周期留在失去资格的 AI 员工名下。
+// testInboundRoutingVersusEligibility 验证新访客入站与停用、关闭接待并发交错后，没有开放周期留在失去接待资格的 AI 员工名下。
 func testInboundRoutingVersusEligibility(t *testing.T, f handoffFixture) {
 	ctx := context.Background()
-	memberRole := servermodels.Role{}
-	if err := f.db.NewSelect().Model(&memberRole).Where("organization_id = ? AND kind = ?", f.identity.Organization.ID, domain.RoleKindMember).Scan(ctx); err != nil {
-		t.Fatal(err)
-	}
-	for _, change := range []string{"停用", "改角色"} {
+	for _, change := range []string{"停用", "关闭接待"} {
 		t.Run(change, func(t *testing.T) {
 			agent := f.newAgent(t, change+"并发客服")
 			channelID := f.newChannel(t, agent.IdentityID, channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue})
@@ -453,10 +463,10 @@ func testInboundRoutingVersusEligibility(t *testing.T, f handoffFixture) {
 						defer wait.Done()
 						var err error
 						if change == "停用" {
-							_, err = agentaction.NewUpdateStatusAction(f.db, testServiceSessionHandoff(f.db)).Execute(ctx, f.identity, agent.ID, domain.UserStatusInactive)
+							_, err = agentaction.NewUpdateStatusAction(f.db, testServiceSessionReturner(f.db)).Execute(ctx, f.identity, agent.ID, domain.UserStatusInactive)
 						} else {
-							_, err = agentaction.NewUpdateAgentAction(f.db, testServiceSessionHandoff(f.db)).Execute(ctx, f.identity, agent.ID, agentaction.UpdateInput{
-								DisplayName: agent.DisplayName, RoleID: memberRole.ID, TeamIDs: []string{}, WorkStatus: domain.WorkStatusWorking,
+							_, err = agentaction.NewUpdateAgentAction(f.db, testServiceSessionReturner(f.db)).Execute(ctx, f.identity, agent.ID, agentaction.UpdateInput{
+								DisplayName: agent.DisplayName, RoleID: agent.RoleID, TeamIDs: []string{}, HandlesCustomers: false, WorkStatus: domain.WorkStatusWorking,
 							})
 						}
 						errs <- err
@@ -479,7 +489,7 @@ func testInboundRoutingVersusEligibility(t *testing.T, f handoffFixture) {
 	}
 }
 
-// testInboundUnavailableAssignee 验证负责人在管理操作之外失去接客资格时，下一条客户消息在入站事务内触发交接。
+// testInboundUnavailableAssignee 验证负责人在管理操作之外失去接待资格时，下一条客户消息在入站事务内把周期退回队列。
 func testInboundUnavailableAssignee(t *testing.T, f handoffFixture) {
 	ctx := context.Background()
 	agent := f.newAgent(t, "失效负责人客服")
@@ -491,8 +501,8 @@ func testInboundUnavailableAssignee(t *testing.T, f handoffFixture) {
 		t.Fatal(err)
 	}
 	f.receive(t, &input, "第二条")
-	events := handoffEvents(t, f.db, first.Conversation.ID)
-	if len(events) != 1 || events[0].Reason != domain.AgentHandoffReasonAgentUnavailable {
+	events := returnedEvents(t, f.db, first.Conversation.ID)
+	if len(events) != 1 || events[0].Reason != domain.ServiceSessionReturnAssigneeUnavailable {
 		t.Fatalf("events = %+v", events)
 	}
 	if session := loadSession(t, f.db, run.ScopeID); session.AssigneeIdentityID != nil {
@@ -533,7 +543,7 @@ func testChannelEditVersusDeactivation(t *testing.T, f handoffFixture) {
 	// 渠道编辑由另一名成员发起，两个操作人各自持有自己的账号锁。
 	email := "channel-editor-" + uuid.NewV7().String()[:8] + "@handoff.test"
 	if _, err := useraction.NewCreateUserAction(f.db).Execute(ctx, f.identity, useraction.CreateInput{
-		DisplayName: "渠道编辑成员", Email: email, Password: "password123", RoleID: f.identity.OrganizationIdentity.RoleID,
+		HandlesCustomers: true, DisplayName: "渠道编辑成员", Email: email, Password: "password123", RoleID: f.identity.OrganizationIdentity.RoleID,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -549,7 +559,7 @@ func testChannelEditVersusDeactivation(t *testing.T, f handoffFixture) {
 	})
 	deactivated, edited := make(chan error, 1), make(chan error, 1)
 	go func() {
-		_, err := agentaction.NewUpdateStatusAction(gated, testServiceSessionHandoff(f.db)).Execute(context.WithValue(ctx, chatQueryGateKey{}, gate), f.identity, agent.ID, domain.UserStatusInactive)
+		_, err := agentaction.NewUpdateStatusAction(gated, testServiceSessionReturner(f.db)).Execute(context.WithValue(ctx, chatQueryGateKey{}, gate), f.identity, agent.ID, domain.UserStatusInactive)
 		deactivated <- err
 	}()
 	waitChatSignal(t, ctx, gate.reached)
@@ -578,8 +588,8 @@ func testChannelEditVersusDeactivation(t *testing.T, f handoffFixture) {
 	}
 }
 
-// testTelegramInboundHandoffVersusRunFailure 验证已持有会话锁的入站事务发现负责人失效时，交接只读取外发目标，与先锁渠道身份的运行收尾不形成循环等待。
-func testTelegramInboundHandoffVersusRunFailure(t *testing.T, f handoffFixture) {
+// testTelegramInboundReturnVersusRunFailure 验证已持有会话锁的入站事务发现负责人失效时，退回只读取外发目标，与先锁渠道身份的运行收尾不形成循环等待。
+func testTelegramInboundReturnVersusRunFailure(t *testing.T, f handoffFixture) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
 	fixture := newAgentTelegramFixture(t, f.db, f.identity, f.roleID, f.providerID, f.modelID)
@@ -615,15 +625,15 @@ func testTelegramInboundHandoffVersusRunFailure(t *testing.T, f handoffFixture) 
 			return err
 		})
 	}()
-	// 入站事务在运行收尾暂停期间独立完成交接。
+	// 入站事务在运行收尾暂停期间独立完成退回。
 	select {
 	case err := <-scheduled:
 		if err != nil {
-			t.Fatalf("inbound handoff: %v", err)
+			t.Fatalf("inbound return: %v", err)
 		}
 	case <-time.After(5 * time.Second):
 		gate.open()
-		t.Fatal("inbound handoff waited for the channel identity lock held by run failure")
+		t.Fatal("inbound return waited for the channel identity lock held by run failure")
 	}
 	gate.open()
 	if err := waitChatResult(t, ctx, failed); err != nil {
@@ -634,9 +644,9 @@ func testTelegramInboundHandoffVersusRunFailure(t *testing.T, f handoffFixture) 
 	if err := f.db.NewSelect().Model(&deliveries).Where("cmd.conversation_id = ?", fixture.run.ConversationID).Scan(ctx); err != nil {
 		t.Fatal(err)
 	}
-	events := handoffEvents(t, f.db, fixture.run.ConversationID)
+	events := returnedEvents(t, f.db, fixture.run.ConversationID)
 	if fixture.run.Status != string(domain.AgentRunStatusCancelled) || len(events) != 1 ||
-		events[0].Reason != domain.AgentHandoffReasonAgentUnavailable || len(deliveries) != 1 {
+		events[0].Reason != domain.ServiceSessionReturnAssigneeUnavailable || len(deliveries) != 1 {
 		t.Fatalf("run = %+v, events = %+v, deliveries = %+v", fixture.run, events, deliveries)
 	}
 }
@@ -655,7 +665,7 @@ func testServiceSessionOperationEvents(t *testing.T, f handoffFixture) {
 	}
 	email := "session-events-" + uuid.NewV7().String()[:8] + "@handoff.test"
 	if _, err := useraction.NewCreateUserAction(f.db).Execute(ctx, f.identity, useraction.CreateInput{
-		DisplayName: "接管成员", Email: email, Password: "password123", RoleID: f.roleID,
+		HandlesCustomers: true, DisplayName: "接管成员", Email: email, Password: "password123", RoleID: f.roleID,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -666,7 +676,7 @@ func testServiceSessionOperationEvents(t *testing.T, f handoffFixture) {
 	input := visitorInput(channel.ID, "")
 	first := f.receive(t, &input, "有人吗")
 	conversationID := first.Conversation.ID
-	coordinator := testServiceSessionHandoff(f.db)
+	coordinator := testServiceSessionReturner(f.db)
 	scheduler := agentrunaction.NewScheduler(f.tasks)
 	owner, member := f.identity.OrganizationIdentity.ID, other.Identity.OrganizationIdentity.ID
 	// 成员回复无人负责的周期即领取。
@@ -750,73 +760,6 @@ func testServiceSessionOperationEvents(t *testing.T, f handoffFixture) {
 	for _, message := range history.Messages {
 		if message.SystemEvent != nil && (message.SystemEvent.ActorIdentityID == nil || message.SystemEvent.ServiceSessionID == nil) {
 			t.Fatalf("history event = %+v", message.SystemEvent)
-		}
-	}
-}
-
-// testMutualFallbackRoleChanges 验证两个互为失败路由的 AI 员工同时改为非客服角色时，交接不锁定必然排除的 AI 目标，两个事务互不等待。
-func testMutualFallbackRoleChanges(t *testing.T, f handoffFixture) {
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
-	defer cancel()
-	first, second := f.newAgent(t, "互为失败路由甲"), f.newAgent(t, "互为失败路由乙")
-	firstChannel := f.newChannel(t, first.IdentityID, channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypeMember, ID: second.IdentityID})
-	secondChannel := f.newChannel(t, second.IdentityID, channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypeMember, ID: first.IdentityID})
-	firstInput, secondInput := visitorInput(firstChannel, ""), visitorInput(secondChannel, "")
-	firstConversation := f.receive(t, &firstInput, "甲负责的会话")
-	secondConversation := f.receive(t, &secondInput, "乙负责的会话")
-	memberRole := servermodels.Role{}
-	if err := f.db.NewSelect().Model(&memberRole).Where("organization_id = ? AND kind = ?", f.identity.Organization.ID, domain.RoleKindMember).Scan(ctx); err != nil {
-		t.Fatal(err)
-	}
-	// 两次改角色由不同成员发起，各自持有自己的账号锁。
-	email := "role-editor-" + uuid.NewV7().String()[:8] + "@handoff.test"
-	if _, err := useraction.NewCreateUserAction(f.db).Execute(ctx, f.identity, useraction.CreateInput{
-		DisplayName: "改角色成员", Email: email, Password: "password123", RoleID: f.identity.OrganizationIdentity.RoleID,
-	}); err != nil {
-		t.Fatal(err)
-	}
-	editor, err := authaction.NewLoginAction(f.db).Execute(ctx, authaction.LoginInput{OrganizationID: f.identity.Organization.ID, Email: email, Password: "password123"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	gated := bun.NewDB(f.db.DB, f.db.Dialect())
-	gated.AddQueryHook(chatQueryHook{})
-	// 甲的改角色事务锁定甲的身份后暂停。
-	gate := newChatQueryGate(t, false, 1, func(event *bun.QueryEvent) bool {
-		return strings.Contains(event.Query, "organization_identities") && strings.Contains(event.Query, "FOR UPDATE OF oi")
-	})
-	firstDone, secondDone := make(chan error, 1), make(chan error, 1)
-	go func() {
-		_, err := agentaction.NewUpdateAgentAction(gated, testServiceSessionHandoff(f.db)).Execute(context.WithValue(ctx, chatQueryGateKey{}, gate), f.identity, first.ID, agentaction.UpdateInput{
-			DisplayName: first.DisplayName, RoleID: memberRole.ID, TeamIDs: []string{}, WorkStatus: domain.WorkStatusWorking,
-		})
-		firstDone <- err
-	}()
-	waitChatSignal(t, ctx, gate.reached)
-	go func() {
-		_, err := agentaction.NewUpdateAgentAction(f.db, testServiceSessionHandoff(f.db)).Execute(ctx, editor.Identity, second.ID, agentaction.UpdateInput{
-			DisplayName: second.DisplayName, RoleID: memberRole.ID, TeamIDs: []string{}, WorkStatus: domain.WorkStatusWorking,
-		})
-		secondDone <- err
-	}()
-	// 乙的交接以甲为失败路由，不等待甲的身份锁即可完成。
-	select {
-	case err := <-secondDone:
-		if err != nil {
-			t.Fatalf("second role change: %v", err)
-		}
-	case <-time.After(5 * time.Second):
-		gate.open()
-		t.Fatal("handoff waited for the lock of an excluded AI fallback target")
-	}
-	gate.open()
-	if err := waitChatResult(t, ctx, firstDone); err != nil {
-		t.Fatalf("first role change: %v", err)
-	}
-	for _, conversationID := range []string{firstConversation.Conversation.ID, secondConversation.Conversation.ID} {
-		events := handoffEvents(t, f.db, conversationID)
-		if len(events) != 1 || events[0].Target.Kind != domain.ServiceSessionTargetPublicQueue {
-			t.Fatalf("events = %+v", events)
 		}
 	}
 }

@@ -57,6 +57,7 @@ func resolveIdentity(ctx context.Context, db bun.IDB, organizationID string, val
 			oi.role_id::text,
 			oi.display_name,
 			oi.avatar_file_id::text,
+			oi.handles_customers,
 			oi.work_status,
 			token.id::text,
 			token.expires_at
@@ -87,6 +88,7 @@ func resolveIdentity(ctx context.Context, db bun.IDB, organizationID string, val
 		&identity.OrganizationIdentity.RoleID,
 		&identity.OrganizationIdentity.DisplayName,
 		&identity.OrganizationIdentity.AvatarFileID,
+		&identity.OrganizationIdentity.HandlesCustomers,
 		&identity.OrganizationIdentity.WorkStatus,
 		&identity.Token.ID,
 		&identity.Token.ExpiresAt,

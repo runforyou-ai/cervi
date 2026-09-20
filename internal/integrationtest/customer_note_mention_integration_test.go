@@ -219,7 +219,7 @@ func TestCustomerNoteMentionsCreateSubjectsInOrder(t *testing.T) {
 	defer cancel()
 	identities := make([]*servermodels.Identity, 0, 2)
 	for index, email := range []string{"first-note@navigation.test", "second-note@navigation.test"} {
-		if _, err := useraction.NewCreateUserAction(f.db).Execute(ctx, f.owner, useraction.CreateInput{DisplayName: []string{"备注成员甲", "备注成员乙"}[index], Email: email, Password: "password123", RoleID: f.owner.OrganizationIdentity.RoleID}); err != nil {
+		if _, err := useraction.NewCreateUserAction(f.db).Execute(ctx, f.owner, useraction.CreateInput{HandlesCustomers: true, DisplayName: []string{"备注成员甲", "备注成员乙"}[index], Email: email, Password: "password123", RoleID: f.owner.OrganizationIdentity.RoleID}); err != nil {
 			t.Fatal(err)
 		}
 		login, err := authaction.NewLoginAction(f.db).Execute(ctx, authaction.LoginInput{OrganizationID: f.owner.Organization.ID, Email: email, Password: "password123"})

@@ -640,6 +640,23 @@ function ConversationTimelineContent({
         reason: t(handoffReasonKey(event.handoffReason)),
       })
     }
+    // 退回队列事件没有操作人，只展示原负责人与退回去向。
+    if (
+      event.type ===
+      ConversationSystemEventType.ConversationSystemEventServiceSessionReturned
+    ) {
+      const target = event.sessionTarget
+      return t("serviceSessionReturned", {
+        from:
+          event.fromIdentityId === currentIdentityID
+            ? t("messageSenderYou")
+            : (event.fromDisplayName ?? t("unknownSender")),
+        target:
+          target?.kind === ServiceSessionTargetKind.ServiceSessionTargetTeam
+            ? t("handoffTargetTeam", { name: target.teamName ?? "" })
+            : t("handoffTargetPublicQueue"),
+      })
+    }
     const participantName = (
       participant: ConversationSystemEventParticipant,
     ) =>

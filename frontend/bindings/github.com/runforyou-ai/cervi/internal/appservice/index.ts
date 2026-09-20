@@ -57,6 +57,7 @@ export {
     PermissionLevel,
     PermissionResource,
     RoleKind,
+    ServiceSessionReturnReason,
     ServiceSessionStatus,
     ServiceSessionTargetKind,
     SessionState,

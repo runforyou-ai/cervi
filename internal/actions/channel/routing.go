@@ -27,7 +27,7 @@ func validateRoutingTarget(ctx context.Context, db bun.IDB, organizationID strin
 			Where("id = ?", target.ID).
 			Exists(ctx)
 	case domain.ChannelRoutingTargetTypeMember:
-		identity, loadErr := identityaction.LockActiveCustomerServiceIdentity(ctx, db, organizationID, target.ID)
+		identity, loadErr := identityaction.LockActiveCustomerHandlingIdentity(ctx, db, organizationID, target.ID)
 		if errors.Is(loadErr, sql.ErrNoRows) {
 			break
 		}

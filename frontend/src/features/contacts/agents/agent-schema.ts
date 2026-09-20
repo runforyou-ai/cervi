@@ -32,6 +32,7 @@ export function createAgentProfileSchema(messages: {
     roleId: z.string().uuid(messages.roleRequired),
     workStatus: requiredWailsEnum(WorkStatus),
     teamIds: z.array(z.string().uuid()),
+    handlesCustomers: z.boolean(),
   })
 }
 

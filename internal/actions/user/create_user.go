@@ -39,11 +39,12 @@ func (a *CreateUserAction) Execute(ctx context.Context, identity *servermodels.I
 			return err
 		}
 		organizationIdentity := &servermodels.OrganizationIdentity{
-			OrganizationID: identity.Organization.ID,
-			Type:           string(domain.OrganizationIdentityTypeUser),
-			RoleID:         input.RoleID,
-			DisplayName:    input.DisplayName,
-			WorkStatus:     string(domain.WorkStatusWorking),
+			OrganizationID:   identity.Organization.ID,
+			Type:             string(domain.OrganizationIdentityTypeUser),
+			RoleID:           input.RoleID,
+			DisplayName:      input.DisplayName,
+			HandlesCustomers: input.HandlesCustomers,
+			WorkStatus:       string(domain.WorkStatusWorking),
 		}
 		// 传入头像时激活已上传的图片并随身份一起写入。
 		if input.AvatarFileID != "" {
@@ -54,7 +55,7 @@ func (a *CreateUserAction) Execute(ctx context.Context, identity *servermodels.I
 			organizationIdentity.AvatarFileID = avatarFileID
 		}
 		_, err := tx.NewInsert().Model(organizationIdentity).
-			Column("organization_id", "type", "role_id", "display_name", "avatar_file_id", "work_status").Returning("id").Exec(ctx)
+			Column("organization_id", "type", "role_id", "display_name", "avatar_file_id", "handles_customers", "work_status").Returning("id").Exec(ctx)
 		if err != nil {
 			return err
 		}

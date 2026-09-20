@@ -24,16 +24,16 @@ import (
 
 // UpdateAgentAction 修改企业 AI 员工。
 type UpdateAgentAction struct {
-	db      *bun.DB
-	handoff ServiceSessionHandoff
+	db       *bun.DB
+	returner ServiceSessionReturner
 }
 
 // NewUpdateAgentAction 创建 AI 员工修改操作。
-func NewUpdateAgentAction(db *bun.DB, handoff ServiceSessionHandoff) *UpdateAgentAction {
-	return &UpdateAgentAction{db: db, handoff: handoff}
+func NewUpdateAgentAction(db *bun.DB, returner ServiceSessionReturner) *UpdateAgentAction {
+	return &UpdateAgentAction{db: db, returner: returner}
 }
 
-// Execute 在事务中保存 AI 员工基本资料、头像和工作状态；角色改为非客服时把其负责的开放客服周期交给人工。
+// Execute 在事务中保存 AI 员工基本资料、接待开关、头像和工作状态；关闭接待开关时把其负责的开放客服周期退回原队列。
 func (a *UpdateAgentAction) Execute(ctx context.Context, identity *servermodels.Identity, agentID string, input UpdateInput) (*Agent, error) {
 	input.DisplayName = strings.TrimSpace(input.DisplayName)
 	if input.DisplayName == "" {
@@ -54,7 +54,7 @@ func (a *UpdateAgentAction) Execute(ctx context.Context, identity *servermodels.
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		role, err := roleaction.ValidateAssignment(ctx, tx, identity.Organization.ID, input.RoleID, domain.OrganizationIdentityTypeAgent)
+		_, err := roleaction.ValidateAssignment(ctx, tx, identity.Organization.ID, input.RoleID, domain.OrganizationIdentityTypeAgent)
 		if errors.Is(err, roleaction.ErrAssignmentInvalid) || errors.Is(err, roleaction.ErrAgentAdministrator) {
 			return &common.FieldError{Fields: map[string]common.FieldCode{"roleId": ValidationRoleInvalid}}
 		}
@@ -102,6 +102,7 @@ func (a *UpdateAgentAction) Execute(ctx context.Context, identity *servermodels.
 			Set("display_name = ?", input.DisplayName).
 			Set("avatar_file_id = COALESCE(?, avatar_file_id)", nextAvatarFileID).
 			Set("role_id = ?", input.RoleID).
+			Set("handles_customers = ?", input.HandlesCustomers).
 			Set("work_status_updated_at = CASE WHEN work_status <> ? THEN now() ELSE work_status_updated_at END", input.WorkStatus).
 			Set("work_status = ?", input.WorkStatus).
 			Set("updated_at = now()").
@@ -116,13 +117,13 @@ func (a *UpdateAgentAction) Execute(ctx context.Context, identity *servermodels.
 		if err := teamaction.ReplaceIdentityTeams(ctx, tx, identity, storedAgent.IdentityID, teamIDs); err != nil {
 			return err
 		}
-		if locked.RoleKind == domain.RoleKindCustomerService && domain.RoleKind(role.Kind) != domain.RoleKindCustomerService {
-			cancelledRunIDs, err = a.handoff.HandOffAgentServiceSessions(ctx, tx, identity.Organization.ID, storedAgent.IdentityID, uuid.NewV7().String())
+		if locked.HandlesCustomers && !input.HandlesCustomers {
+			cancelledRunIDs, err = a.returner.ReturnServiceSessionsToQueue(ctx, tx, identity.Organization.ID, storedAgent.IdentityID, uuid.NewV7().String())
 			if err != nil {
 				return err
 			}
 		}
-		// 名称或头像实际变化时，在资料写入与交接完成后推进展示该 AI 员工的会话版本；交接已按目标身份、渠道身份、会话的锁序锁定其负责的会话。
+		// 名称或头像实际变化时，在资料写入与退回完成后推进展示该 AI 员工的会话版本；退回已按渠道身份、会话的锁序锁定其负责的会话。
 		if displayChanged {
 			if err := chatstate.TouchIdentityConversations(ctx, tx, identity.Organization.ID, storedAgent.IdentityID); err != nil {
 				return err
@@ -134,6 +135,6 @@ func (a *UpdateAgentAction) Execute(ctx context.Context, identity *servermodels.
 	if err != nil {
 		return nil, fmt.Errorf("update agent: %w", err)
 	}
-	a.handoff.CancelRunContexts(cancelledRunIDs)
+	a.returner.CancelRunContexts(cancelledRunIDs)
 	return output, nil
 }

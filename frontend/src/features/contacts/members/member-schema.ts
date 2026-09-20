@@ -40,6 +40,7 @@ export function createMemberSchema(
           ),
     roleId: z.string().uuid(messages.roleRequired),
     teamIds: z.array(z.string().uuid()),
+    handlesCustomers: z.boolean(),
   })
 }
 

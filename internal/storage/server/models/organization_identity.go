@@ -18,6 +18,7 @@ type OrganizationIdentity struct {
 	RoleID              string    `bun:"role_id"`
 	DisplayName         string    `bun:"display_name"`
 	AvatarFileID        *string   `bun:"avatar_file_id"`
+	HandlesCustomers    bool      `bun:"handles_customers"`
 	WorkStatus          string    `bun:"work_status"`
 	WorkStatusUpdatedAt time.Time `bun:"work_status_updated_at"`
 	CreatedAt           time.Time `bun:"created_at"`

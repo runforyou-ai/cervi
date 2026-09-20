@@ -8,7 +8,6 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 )
 
@@ -44,9 +43,9 @@ type behaviorTools struct {
 	Terminal        bool // 客服场景的 ask_customer 与 handoff_to_human。
 }
 
-// BehaviorSnapshot 记录一次运行实际使用的角色基线、场景、拼接完成的指令、模型参数、内置工具、绑定的 MCP 服务与依据策略；MCP 服务的工具在运行期连接后才确定。
+// BehaviorSnapshot 记录一次运行实际使用的基线、场景、拼接完成的指令、模型参数、内置工具、绑定的 MCP 服务与依据策略；MCP 服务的工具在运行期连接后才确定。
 type BehaviorSnapshot struct {
-	RoleKind          domain.RoleKind              `json:"roleKind"`
+	HandlesCustomers  bool                         `json:"handlesCustomers"`
 	Scene             agentruntime.Scene           `json:"scene"`
 	RulesVersion      int                          `json:"rulesVersion"`
 	Instruction       string                       `json:"instruction"`
@@ -64,24 +63,21 @@ type behaviorSnapshotModel struct {
 	ContextWindow   int64  `json:"contextWindow"`
 }
 
-// BehaviorProfile 返回角色对 AI 员工的内置工作规则与可用工具，供管理界面只读展示；管理员角色不适用于 AI 员工。
-func BehaviorProfile(kind domain.RoleKind, organizationName string) (string, []string, bool) {
-	if kind == domain.RoleKindAdmin {
-		return "", nil, false
+// BehaviorProfile 返回 AI 员工按当前接待开关适用的内置工作规则与可用工具，供管理界面只读展示。
+func BehaviorProfile(handlesCustomers bool, organizationName string) (string, []string) {
+	if handlesCustomers {
+		return agentBaseline(handlesCustomers, organizationName, ""), []string{"search_knowledge", "ask_customer", "handoff_to_human", "mcp"}
 	}
-	if kind == domain.RoleKindCustomerService {
-		return roleBaseline(kind, organizationName, ""), []string{"search_knowledge", "ask_customer", "handoff_to_human", "mcp"}, true
-	}
-	return roleBaseline(kind, organizationName, ""), []string{"search_knowledge", "mcp"}, true
+	return agentBaseline(handlesCustomers, organizationName, ""), []string{"search_knowledge", "mcp"}
 }
 
-// roleBaseline 渲染角色基线，自定义角色按成员基线处理；AI 员工名称为空时省略名称。
-func roleBaseline(kind domain.RoleKind, organizationName, agentName string) string {
+// agentBaseline 按接待开关渲染 AI 员工基线；AI 员工名称为空时省略名称。
+func agentBaseline(handlesCustomers bool, organizationName, agentName string) string {
 	name := ""
 	if agentName != "" {
 		name = "「" + agentName + "」"
 	}
-	if kind == domain.RoleKindCustomerService {
+	if handlesCustomers {
 		return fmt.Sprintf(customerServiceBaseline, organizationName, name)
 	}
 	return fmt.Sprintf(memberBaseline, organizationName, name)
@@ -123,15 +119,14 @@ func toolGuidance(tools behaviorTools) string {
 
 // newBehaviorSnapshot 拼接运行指令并生成快照。
 func newBehaviorSnapshot(execution executionContext, scene agentruntime.Scene, sceneRules string, tools, mcpServers []string) BehaviorSnapshot {
-	kind := domain.RoleKind(execution.RoleKind)
-	instruction := composeInstruction(roleBaseline(kind, execution.OrganizationName, execution.AgentName), execution.Instruction, sceneRules)
+	instruction := composeInstruction(agentBaseline(execution.HandlesCustomers, execution.OrganizationName, execution.AgentName), execution.Instruction, sceneRules)
 	sum := sha256.Sum256([]byte(instruction))
 	var grounding agentruntime.GroundingPolicy
 	if scene == agentruntime.SceneCustomer {
 		grounding = agentruntime.GroundingStrict
 	}
 	return BehaviorSnapshot{
-		RoleKind: kind, Scene: scene, RulesVersion: behaviorRulesVersion,
+		HandlesCustomers: execution.HandlesCustomers, Scene: scene, RulesVersion: behaviorRulesVersion,
 		Instruction: instruction, InstructionSHA256: hex.EncodeToString(sum[:]),
 		Model: behaviorSnapshotModel{
 			ProviderID: execution.ProviderID, Identifier: execution.ModelIdentifier,
