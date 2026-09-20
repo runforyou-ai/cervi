@@ -931,12 +931,12 @@ export function ConversationComposer({
     <form
       data-slot="conversation-composer"
       data-conversation-id={conversationID}
-      className={cn("shrink-0 bg-background px-2", mobile ? "py-2" : "py-2.5")}
+      className={cn("shrink-0 bg-background", mobile ? "px-2 py-2" : "")}
       onSubmit={form.handleSubmit(send)}
       noValidate
     >
       {onVisibilityChange ? (
-        <div role="tablist" aria-label={t("composerMode")} className="mb-2 flex items-center gap-1">
+        <div role="tablist" aria-label={t("composerMode")} className={cn("flex items-center gap-1", mobile ? "mb-2" : "px-2 pt-2 pb-1.5")}>
           <button
             type="button"
             role="tab"
@@ -1035,8 +1035,9 @@ export function ConversationComposer({
         )}
         <div
           className={cn(
-            "border shadow-xs",
-            "overflow-hidden rounded-[21px]",
+            mobile
+              ? "overflow-hidden rounded-[21px] border shadow-xs"
+              : "border-t",
             internalNote
               ? "border-amber-500/70 bg-amber-50/60 dark:bg-amber-950/30"
               : "border-input bg-background",
@@ -1079,7 +1080,7 @@ export function ConversationComposer({
               {disabledReason}
             </p>
           ) : null}
-          <div className="flex items-end p-0.5">
+          <div className={cn("flex items-end", mobile ? "p-0.5" : "px-2 py-1.5")}>
             {disabledReason ? null : emojiTool}
             {replyAssistant}
             {bodyInput}
