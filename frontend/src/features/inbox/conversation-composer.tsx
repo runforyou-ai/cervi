@@ -1076,7 +1076,7 @@ export function ConversationComposer({
               {disabledReason}
             </p>
           ) : null}
-          <div className="flex items-end px-2 py-1.5">
+          <div className="flex items-end gap-1 px-2 py-1.5">
             {disabledReason ? null : attachmentTool}
             {bodyInput}
             {disabledReason ? null : emojiTool}
@@ -1085,7 +1085,7 @@ export function ConversationComposer({
               <Button
                 type="submit"
                 size="icon"
-                className="relative ml-1 size-9 rounded-full after:absolute after:-inset-1 after:content-[''] [&_svg:not([class*='size-'])]:size-5"
+                className="relative size-9 rounded-full after:absolute after:-inset-1 after:content-[''] [&_svg:not([class*='size-'])]:size-5"
                 disabled={isSubmitting || Boolean(disabledReason) || isBodyEmpty || replyTo?.deleted}
                 aria-label={t(internalNote ? "internalNoteSave" : "messageSend")}
               >
@@ -1096,7 +1096,7 @@ export function ConversationComposer({
                 type="button"
                 variant="ghost"
                 size="icon-sm"
-                className={cn(composerToolClass, "ml-1 w-9")}
+                className={cn(composerToolClass, "w-9")}
                 disabled
                 aria-label={t("voiceMessage")}
               >
