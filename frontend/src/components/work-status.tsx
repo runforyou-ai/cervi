@@ -43,6 +43,36 @@ function workStatusDotClass(status: WorkStatus) {
   }
 }
 
+/** 返回工作状态文字使用的语义颜色。 */
+export function workStatusTextClass(status: WorkStatus) {
+  switch (status) {
+    case WorkStatus.WorkStatusWorking:
+      return "text-success"
+    case WorkStatus.WorkStatusAway:
+      return "text-warning"
+    case WorkStatus.WorkStatusOffDuty:
+      return "text-muted-foreground"
+    default:
+      console.warn("未知的工作状态颜色", status)
+      return ""
+  }
+}
+
+/** 返回工作状态文字块使用的语义底色。 */
+export function workStatusTintClass(status: WorkStatus) {
+  switch (status) {
+    case WorkStatus.WorkStatusWorking:
+      return "bg-success/12 hover:bg-success/20"
+    case WorkStatus.WorkStatusAway:
+      return "bg-warning/12 hover:bg-warning/20"
+    case WorkStatus.WorkStatusOffDuty:
+      return "bg-muted hover:bg-muted/70"
+    default:
+      console.warn("未知的工作状态颜色", status)
+      return ""
+  }
+}
+
 /** 用小圆点显示当前工作状态。 */
 export function WorkStatusDot({
   status,
