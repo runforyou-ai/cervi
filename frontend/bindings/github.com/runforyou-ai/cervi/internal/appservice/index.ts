@@ -33,6 +33,7 @@ export {
     CustomerInboxView,
     CustomerReplyMode,
     CustomerReplyTone,
+    DeploymentMode,
     FilePurpose,
     GroupParticipantRole,
     InboxConversationAvailability,

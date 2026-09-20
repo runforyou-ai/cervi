@@ -113,6 +113,8 @@ const (
 	ErrorInstallationStatusReadFailed     Key = "error.installation_status_read_failed"
 	ErrorAlreadyInitialized               Key = "error.already_initialized"
 	ErrorInstallationRequired             Key = "error.installation_required"
+	ErrorOrganizationAddressInvalid       Key = "error.organization_address_invalid"
+	ErrorInstallationNotAvailable         Key = "error.installation_not_available"
 	ErrorAuthenticationStatusFailed       Key = "error.authentication_status_failed"
 	ErrorAuthenticationRequired           Key = "error.authentication_required"
 	ErrorValidationFailed                 Key = "error.validation_failed"

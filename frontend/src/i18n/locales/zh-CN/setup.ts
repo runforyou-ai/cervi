@@ -1,5 +1,7 @@
 /** 简体中文·初始化文案。 */
 const setup = {
+  addressInvalidTitle: "企业地址无效",
+  addressInvalidDescription: "该地址没有对应的企业，请确认企业地址后重新访问。",
   title: "初始化 Cervi",
   description: "创建企业和第一个管理员账号。",
   organizationNameLabel: "企业名称",

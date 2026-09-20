@@ -85,10 +85,11 @@ func TestNativeLocaleFollowsAuthenticationAndPreferences(t *testing.T) {
 
 type startupBackend struct {
 	Backend
-	installed     bool
-	orgName       string
-	statusErr     error
-	identityCalls int
+	installed      bool
+	orgName        string
+	deploymentMode DeploymentMode
+	statusErr      error
+	identityCalls  int
 }
 
 // InstallationStatus 返回测试指定的企业初始化状态。
@@ -96,7 +97,7 @@ func (b *startupBackend) InstallationStatus(context.Context, RequestMeta) (Insta
 	if b.statusErr != nil {
 		return InstallationStatus{}, b.statusErr
 	}
-	return InstallationStatus{Installed: b.installed, OrganizationName: b.orgName}, nil
+	return InstallationStatus{Installed: b.installed, OrganizationName: b.orgName, DeploymentMode: b.deploymentMode}, nil
 }
 
 // LoadIdentity 返回空身份并累计调用次数。
@@ -142,6 +143,21 @@ func TestLoadStartupResolvesWebEntry(t *testing.T) {
 	}
 	if calls := backend.identityCalls; calls != 0 {
 		t.Fatalf("web startup identity calls = %d, want 0", calls)
+	}
+}
+
+// TestLoadStartupResolvesManagedWebEntry 验证托管部署的未登记访问地址进入企业地址无效入口。
+func TestLoadStartupResolvesManagedWebEntry(t *testing.T) {
+	backend := &startupBackend{deploymentMode: DeploymentModeManaged}
+	startup, err := New(backend).LoadStartup(context.Background(), RequestMeta{})
+	if err != nil || startup.State != SessionStateInvalidAddress {
+		t.Fatalf("unknown managed startup = %+v, err = %v", startup, err)
+	}
+
+	backend = &startupBackend{installed: true, orgName: "鹿行", deploymentMode: DeploymentModeManaged}
+	startup, err = New(backend).LoadStartup(context.Background(), RequestMeta{})
+	if err != nil || startup.State != SessionStateReady || startup.OrganizationName != "鹿行" {
+		t.Fatalf("ready managed startup = %+v, err = %v", startup, err)
 	}
 }
 

@@ -177,6 +177,8 @@
   "error.installation_status_read_failed": "读取安装状态失败。",
   "error.already_initialized": "Cervi 已经完成初始化。",
   "error.installation_required": "Cervi 尚未完成初始化。",
+  "error.organization_address_invalid": "该企业地址无效。",
+  "error.installation_not_available": "当前部署不提供企业初始化。",
   "error.authentication_status_failed": "读取登录状态失败。",
   "error.authentication_required": "请先登录。",
   "error.validation_failed": "请检查填写内容。",

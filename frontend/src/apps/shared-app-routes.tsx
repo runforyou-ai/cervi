@@ -2,6 +2,7 @@
 import { Navigate, Route, Routes } from "react-router"
 
 import { LoginPage } from "@/features/auth/login-page"
+import { InvalidAddressPage } from "@/features/installation/invalid-address-page"
 import { SetupPage } from "@/features/installation/setup-page"
 import { ServerConnectionPage } from "@/features/server-connection/server-connection-page"
 import { ConversationWindowLayout } from "@/features/workspace/conversation-window-layout"
@@ -28,6 +29,9 @@ export function SharedAppRoutes({ platform }: { platform: "web" | "desktop" }) {
       ) : null}
       {platform === "web" ? (
         <Route path="/setup" element={<SetupPage />} />
+      ) : null}
+      {platform === "web" ? (
+        <Route path="/invalid-address" element={<InvalidAddressPage />} />
       ) : null}
       <Route
         path="/login"

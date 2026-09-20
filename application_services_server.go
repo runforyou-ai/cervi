@@ -116,7 +116,7 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	})
 
 	// 组装企业成员与网站匿名访客各自的业务入口。
-	directBackend := appservice.NewDirectBackend(appStorage.DB(), localFiles, fileS3, tenantResolver, agentRunScheduler, executeAgentRun, tasks, documentConverter, customerReplySuggestions)
+	directBackend := appservice.NewDirectBackend(appStorage.DB(), config.Deployment.Mode, localFiles, fileS3, tenantResolver, agentRunScheduler, executeAgentRun, tasks, documentConverter, customerReplySuggestions)
 	boundService := appservice.New(directBackend)
 	websiteVisitorBackend := appservice.NewWebsiteVisitorDirectBackend(appStorage.DB(), agentRunScheduler, localFiles, fileS3)
 	websiteVisitorService := appservice.NewWebsiteVisitorService(websiteVisitorBackend)
@@ -162,7 +162,7 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	publicLookup := channelaction.NewGetPublicWebsiteChannelQuery(appStorage.DB()).Execute
 
 	// 注册健康检查、业务与文件路由、公开聊天入口及后台服务生命周期。
-	return []application.Service{
+	services := []application.Service{
 		application.NewServiceWithOptions(api.NewLiveness(), application.ServiceOptions{Route: "/healthz"}),
 		application.NewServiceWithOptions(api.NewReadiness(appStorage.DB()), application.ServiceOptions{Route: "/readyz"}),
 		application.NewService(&realtimeLifecycle{publisher: realtimePublisher, gateway: realtimeGateway}),
@@ -183,7 +183,18 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 		application.NewServiceWithOptions(publicweb.NewChatService(publicLookup), application.ServiceOptions{
 			Route: "/chat/",
 		}),
-	}, realtimeGateway.Middleware, nil
+	}
+	// 运营接口只在托管部署注册，凭据认证是其唯一访问控制手段。
+	if config.Deployment.Mode.Managed() {
+		operator := api.NewOperatorService(api.Deployment{
+			Mode:                string(config.Deployment.Mode),
+			ManagedDomainSuffix: config.Deployment.ManagedDomainSuffix,
+		}, config.Deployment.OperatorCredential)
+		services = append(services, application.NewServiceWithOptions(operator, application.ServiceOptions{
+			Route: "/operator/v1",
+		}))
+	}
+	return services, realtimeGateway.Middleware, nil
 }
 
 // fileContentS3Config 把部署级对象存储配置转换为文件内容层配置。
