@@ -142,7 +142,6 @@ export function AgentFormPage({ mode }: { mode: "create" | "edit" }) {
                 onSaved={() => {
                   void invalidateContact("agent", agent.id)
                 }}
-                onCancel={() => navigate(returnTo)}
               />
             </TabsContent>
             <TabsContent
@@ -155,7 +154,6 @@ export function AgentFormPage({ mode }: { mode: "create" | "edit" }) {
                 onSaved={() => {
                   void invalidateContact("agent", agent.id)
                 }}
-                onCancel={() => navigate(returnTo)}
               />
             </TabsContent>
           </Tabs>

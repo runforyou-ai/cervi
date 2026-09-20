@@ -27,7 +27,6 @@ const settings = {
     avatar: "头像",
     avatarChoose: "选择图片",
     avatarUploadError: "上传头像失败，请重试。",
-    saveSuccess: "个人资料已保存。",
     saveError: "保存个人资料失败，请重试。",
     validation: {
       displayNameRequired: "请输入姓名。",
@@ -113,7 +112,6 @@ const settings = {
         settingsOpenError: "无法打开系统通知设置，请手动前往系统设置。",
       },
     },
-    saveSuccess: "偏好设置已保存。",
     saveError: "保存偏好设置失败，请重试。",
     validation: {
       timeZoneRequired: "请选择时区。",
@@ -130,7 +128,6 @@ const settings = {
   general: {
     title: "通用设置",
     saveError: "保存通用设置失败，请重试。",
-    saveSuccess: "通用设置已保存。",
     form: {
       name: "企业名称",
     },

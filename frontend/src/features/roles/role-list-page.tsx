@@ -1,5 +1,6 @@
 /** 角色与权限列表页。 */
 import { useEffect, useRef, useState } from "react"
+import { EyeIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Link, useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -12,9 +13,8 @@ import {
   type PermissionDefinition,
   type RoleData,
 } from "@/api"
-import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
-import { ResourceContent } from "@/components/resource-content"
+import { ResourceListLayout } from "@/components/resource-list"
 import { ResourceTable } from "@/components/resource-table"
 import {
   AlertDialog,
@@ -125,75 +125,76 @@ export function RoleListPage() {
           </Button>
         )}
       </PageHeader>
-      <PageContent>
-        <ResourceContent
-          loading={showLoading}
-          error={Boolean(error)}
-          errorMessage={t("roles.list.loadError")}
-          onRetry={() => void refresh()}
-        >
-          <div className="@container overflow-hidden rounded-lg border bg-card">
-            <ResourceTable
-              columns={[
-                {
-                  key: "name",
-                  header: t("roles.list.columns.name"),
-                  cellClassName: "font-medium",
-                  cell: (role) => roleDisplayName(role, tCommon),
-                },
-                {
-                  key: "description",
-                  header: t("roles.list.columns.description"),
-                  className: "hidden @3xl:table-cell",
-                  headerClassName: "w-64",
-                  cellClassName: "max-w-64 text-muted-foreground",
-                  cell: (role) => {
-                    const description = roleDescription(role, t)
-                    return (
-                      <span className="block truncate" title={description}>
-                        {description}
-                      </span>
-                    )
-                  },
-                },
-                {
-                  key: "memberCount",
-                  header: t("roles.list.columns.memberCount"),
-                  cell: (role) => role.memberCount,
-                },
-                {
-                  key: "permissions",
-                  header: t("roles.list.columns.permissions"),
-                  className: "hidden @3xl:table-cell",
-                  cellClassName: "text-muted-foreground",
-                  cell: (role) => permissionSummary(role, permissions, t),
-                },
-              ]}
-              rows={roles}
-              rowKey={(role) => role.id}
-              empty={t("roles.list.empty")}
-              actions={(role) => ({
-                primary: (
-                  <Button variant="outline" size="sm" asChild>
-                    <Link to={`/settings/roles/${role.id}`}>
-                      {tCommon("actions.view")}
-                    </Link>
-                  </Button>
-                ),
-                menu: (
-                  <DropdownMenuItem
-                    destructive
-                    disabled={role.kind !== RoleKind.RoleKindCustom}
-                    onSelect={() => setDeletingRole(role)}
-                  >
-                    {tCommon("actions.delete")}
-                  </DropdownMenuItem>
-                ),
-              })}
-            />
-          </div>
-        </ResourceContent>
-      </PageContent>
+      <ResourceListLayout
+        loading={showLoading}
+        error={Boolean(error)}
+        errorMessage={t("roles.list.loadError")}
+        onRetry={() => void refresh()}
+        frameClassName="@container"
+      >
+        <ResourceTable
+          columns={[
+            {
+              key: "name",
+              header: t("roles.list.columns.name"),
+              cellClassName: "font-medium",
+              cell: (role) => roleDisplayName(role, tCommon),
+            },
+            {
+              key: "description",
+              header: t("roles.list.columns.description"),
+              className: "hidden @3xl:table-cell",
+              headerClassName: "w-64",
+              cellClassName: "max-w-64 text-muted-foreground",
+              cell: (role) => {
+                const description = roleDescription(role, t)
+                return (
+                  <span className="block truncate" title={description}>
+                    {description}
+                  </span>
+                )
+              },
+            },
+            {
+              key: "memberCount",
+              header: t("roles.list.columns.memberCount"),
+              cell: (role) => role.memberCount,
+            },
+            {
+              key: "permissions",
+              header: t("roles.list.columns.permissions"),
+              className: "hidden @3xl:table-cell",
+              cellClassName: "text-muted-foreground",
+              cell: (role) => permissionSummary(role, permissions, t),
+            },
+          ]}
+          rows={roles}
+          rowKey={(role) => role.id}
+          empty={t("roles.list.empty")}
+          actions={(role) => ({
+            primary: (
+              <Button variant="outline" size="icon-sm" asChild>
+                <Link
+                  to={`/settings/roles/${role.id}`}
+                  aria-label={tCommon("actions.view")}
+                  title={tCommon("actions.view")}
+                >
+                  <EyeIcon />
+                </Link>
+              </Button>
+            ),
+            menu: (
+              <DropdownMenuItem
+                destructive
+                disabled={role.kind !== RoleKind.RoleKindCustom}
+                onSelect={() => setDeletingRole(role)}
+              >
+                {tCommon("actions.delete")}
+              </DropdownMenuItem>
+            ),
+          })}
+        />
+      </ResourceListLayout>
 
       <AlertDialog
         open={deletingRole !== null}

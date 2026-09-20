@@ -62,7 +62,6 @@ const channels = {
     name: "Channel name",
     description: "Description",
     defaultLocale: "Default service language",
-    saved: "Basic information saved.",
     loadError: "Could not load the message channel.",
     networkError: "Could not connect to the server. Try again later.",
   },
@@ -73,7 +72,6 @@ const channels = {
     person: "Company member",
     agent: "AI employee",
     loadError: "Could not load teams and members. Try again.",
-    saved: "Reception settings saved.",
     targetLabels: {
       newConversation: {
         team: "Receiving team",
@@ -107,12 +105,9 @@ const channels = {
   telegramConnection: {
     form: {
       botToken: "Bot token",
-      showToken: "Show token",
-      hideToken: "Hide token",
       test: "Test connection",
       testing: "Testing…",
     },
-    saved: "Telegram connection saved.",
     tested: "Connection test succeeded.",
     saveError: "Could not save the Telegram connection. Try again later.",
     testError: "Connection test failed. Try again later.",
@@ -192,7 +187,6 @@ const channels = {
     },
   },
   chatInterface: {
-    saved: "Chat interface saved.",
     form: {
       title: "Chat title",
       subtitle: "Subtitle",

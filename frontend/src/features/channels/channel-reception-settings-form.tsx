@@ -3,7 +3,7 @@ import { useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
-import { Link, useNavigate } from "react-router"
+import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
@@ -12,13 +12,13 @@ import {
   updateMessageChannel,
   type MessageChannelSummary,
 } from "@/api"
-import { Button } from "@/components/ui/button"
 import { FieldGroup } from "@/components/ui/field"
 import { ChannelReceptionSettingsFields } from "@/features/channels/reception/channel-reception-settings-fields"
 import {
   createChannelReceptionSchema,
   type ChannelReceptionSettingsFormValues,
 } from "@/features/channels/reception/channel-reception-schema"
+import { useAutoSave } from "@/hooks/use-auto-save"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
@@ -44,12 +44,15 @@ export function ChannelReceptionSettingsForm({
   const form = useForm<ChannelReceptionSettingsFormValues>({
     resolver: zodResolver(schema),
     shouldUseNativeValidation: true,
+    mode: "onBlur",
     defaultValues: {
       newConversationTarget: channel.newConversationTarget,
       fallbackTarget: channel.fallbackTarget,
     },
   })
   /** 保存消息渠道接待设置。 */
+  const markSaved = useAutoSave({ form, schema, save: submit })
+
   async function submit(values: ChannelReceptionSettingsFormValues) {
     try {
       const updated = await updateMessageChannel(channel.id, {
@@ -58,12 +61,13 @@ export function ChannelReceptionSettingsForm({
         defaultLocale: channel.defaultLocale,
         ...values,
       })
-      form.reset({
+      const next = {
         newConversationTarget: updated.newConversationTarget,
         fallbackTarget: updated.fallbackTarget,
-      })
+      }
+      form.reset(next)
+      markSaved(next)
       onUpdated(updated)
-      toast.success(t("routing.saved"))
     } catch (error) {
       if (recoverSession(error, navigate)) return
       if (isNotFoundApiError(error)) {
@@ -85,7 +89,7 @@ export function ChannelReceptionSettingsForm({
 
   return (
     <form
-      className="w-full max-w-2xl space-y-9"
+      className="w-full max-w-2xl"
       onSubmit={form.handleSubmit(submit)}
       noValidate
     >
@@ -95,14 +99,6 @@ export function ChannelReceptionSettingsForm({
           channelType={channel.type}
         />
       </FieldGroup>
-      <div className="flex items-center gap-2">
-        <Button type="submit" disabled={form.formState.isSubmitting}>
-          {form.formState.isSubmitting ? t("common:actions.saving") : t("common:actions.save")}
-        </Button>
-        <Button variant="outline" asChild>
-          <Link to="/settings/channels">{t("common:actions.cancel")}</Link>
-        </Button>
-      </div>
     </form>
   )
 }

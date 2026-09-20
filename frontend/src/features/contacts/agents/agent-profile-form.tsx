@@ -18,7 +18,6 @@ import {
 } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
 import { ImagePicker } from "@/components/image-picker"
-import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { NativeSelect } from "@/components/ui/native-select"
 import { Switch } from "@/components/ui/switch"
@@ -35,6 +34,7 @@ import {
 import { useFormLifetime } from "@/hooks/use-form-lifetime"
 import { usePendingImageUpload } from "@/hooks/use-pending-image-upload"
 import { apiErrorMessage } from "@/lib/form-errors"
+import { useAutoSave } from "@/hooks/use-auto-save"
 import { recoverSession } from "@/lib/session-navigation"
 
 /** 单独保存 AI 员工头像、名称、角色、工作状态和所属团队。 */
@@ -43,13 +43,11 @@ export function AgentProfileForm({
   roles,
   teams,
   onSaved,
-  onCancel,
 }: {
   agent: AgentData
   roles: RoleData[]
   teams: Team[]
   onSaved: () => void
-  onCancel: () => void
 }) {
   const { t } = useTranslation(["contacts", "common"])
   const { t: tCommon } = useTranslation("common")
@@ -66,6 +64,7 @@ export function AgentProfileForm({
   const form = useForm<AgentProfileFormValues>({
     resolver: zodResolver(schema),
     shouldUseNativeValidation: true,
+    mode: "onBlur",
     defaultValues: {
       displayName: agent.displayName,
       roleId: agent.role.id,
@@ -98,6 +97,8 @@ export function AgentProfileForm({
   }, [agent, dirty, form])
 
   /** 提交基本资料和待保存的头像，并保留其他页签的编辑内容。 */
+  const markSaved = useAutoSave({ form, schema, save: submit })
+
   async function submit(values: AgentProfileFormValues) {
     let uploadingAvatar = false
     try {
@@ -109,8 +110,8 @@ export function AgentProfileForm({
       if (!mounted.current) return
       dirty.current = false
       form.reset(values)
+      markSaved(values)
       avatar.clear()
-      toast.success(t("agents.form.saved"))
     } catch (error) {
       // 上传失败已由共享上传回调提示，保存只处理资料提交错误。
       if (uploadingAvatar) return
@@ -131,7 +132,7 @@ export function AgentProfileForm({
   }
 
   return (
-    <form className="space-y-9" onSubmit={form.handleSubmit(submit)} noValidate>
+    <form onSubmit={form.handleSubmit(submit)} noValidate>
       <FieldGroup>
         <Field>
           <FieldLabel>{t("avatar.label")}</FieldLabel>
@@ -230,23 +231,6 @@ export function AgentProfileForm({
           )}
         />
       </FieldGroup>
-      <div className="flex items-center gap-2">
-        <Button type="submit" disabled={form.formState.isSubmitting}>
-          {t(
-            form.formState.isSubmitting
-              ? "common:actions.saving"
-              : "common:actions.save",
-          )}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          disabled={form.formState.isSubmitting}
-          onClick={onCancel}
-        >
-          {t("common:actions.cancel")}
-        </Button>
-      </div>
     </form>
   )
 }

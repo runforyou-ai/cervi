@@ -1,5 +1,6 @@
 /** 列表共用的总数、页码和翻页操作。 */
 import type { ReactNode } from "react"
+import { ChevronLeftIcon, ChevronRightIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
 import type { PageInfo } from "@/api"
@@ -25,34 +26,38 @@ export function PageControls({
   return (
     <div
       className={cn(
-        "flex items-center justify-between gap-3 border-t px-3 py-2 text-xs text-muted-foreground",
+        "flex items-center justify-between gap-3 px-3 pt-3 text-xs text-muted-foreground",
         className,
       )}
     >
       <span>{totalLabel ?? t("pagination.total", { count: page.total })}</span>
-      <div className="flex items-center gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={disabled || page.number <= 1}
-          onClick={() => onPageChange(page.number - 1)}
-        >
-          {t("pagination.previous")}
-        </Button>
-        <span>
-          {t("pagination.page", { current: page.number, total: totalPages })}
-        </span>
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          disabled={disabled || page.number >= totalPages}
-          onClick={() => onPageChange(page.number + 1)}
-        >
-          {t("pagination.next")}
-        </Button>
-      </div>
+      {totalPages > 1 ? (
+        <div className="flex items-center gap-1">
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label={t("pagination.previous")}
+            disabled={disabled || page.number <= 1}
+            onClick={() => onPageChange(page.number - 1)}
+          >
+            <ChevronLeftIcon />
+          </Button>
+          <span className="px-1">
+            {t("pagination.page", { current: page.number, total: totalPages })}
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            aria-label={t("pagination.next")}
+            disabled={disabled || page.number >= totalPages}
+            onClick={() => onPageChange(page.number + 1)}
+          >
+            <ChevronRightIcon />
+          </Button>
+        </div>
+      ) : null}
     </div>
   )
 }

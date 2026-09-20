@@ -146,7 +146,6 @@ const contacts = {
       teams: "所属团队",
       noTeams: "还没有可选择的团队。",
       created: "AI 员工已添加",
-      saved: "AI 员工已保存",
       loadError: "AI 员工配置加载失败，请重试。",
       networkError: "无法连接服务器，请稍后重试。",
     },

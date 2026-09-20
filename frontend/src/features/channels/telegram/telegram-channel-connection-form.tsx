@@ -4,7 +4,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { LoaderCircleIcon } from "lucide-react"
 import { useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
-import { Link, useNavigate } from "react-router"
+import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
@@ -15,7 +15,7 @@ import {
   testTelegramChannelConnection,
   type TelegramChannel,
 } from "@/api"
-import { FormInputField } from "@/components/form/form-input-field"
+import { InlineEditField } from "@/components/form/inline-edit-field"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,7 +27,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
-import { FieldGroup } from "@/components/ui/field"
 import { resolveChannelServerURL } from "@/features/channels/channel-server-url"
 import {
   createTelegramChannelConnectionSchema,
@@ -83,7 +82,6 @@ export function TelegramChannelConnectionForm({
       })
       form.reset({ botToken: updated.connection.botToken })
       onUpdated(updated)
-      toast.success(t("telegramConnection.saved"))
     } catch (error) {
       if (recoverSession(error, navigate)) return
       if (isNotFoundApiError(error)) {
@@ -151,46 +149,37 @@ export function TelegramChannelConnectionForm({
   return (
     <>
       <form
-        className="w-full max-w-2xl space-y-9"
+        className="w-full max-w-2xl space-y-6"
         onSubmit={form.handleSubmit((values) => save(values))}
         noValidate
       >
-        <FieldGroup>
-          <FormInputField
-            name="botToken"
-            control={form.control}
-            label={t("telegramConnection.form.botToken")}
-            autoFocus
-            autoComplete="off"
-            maxLength={512}
-            passwordVisibilityLabels={{
-              show: t("telegramConnection.form.showToken"),
-              hide: t("telegramConnection.form.hideToken"),
-            }}
-          />
-        </FieldGroup>
+        <InlineEditField
+          name="botToken"
+          control={form.control}
+          label={t("telegramConnection.form.botToken")}
+          required
+          autoComplete="off"
+          maxLength={512}
+          format={(value) => {
+            // Token 只展示冒号前的机器人编号，密钥部分打码。
+            const separator = value.indexOf(":")
+            return separator > 0
+              ? `${value.slice(0, separator)}:${"•".repeat(8)}`
+              : "•".repeat(8)
+          }}
+          onCommit={() => void form.handleSubmit((values) => save(values))()}
+        />
         <div className="flex items-center gap-2">
-          <Button type="submit" disabled={saving || testing}>
-            {saving ? <LoaderCircleIcon className="animate-spin" /> : null}
-            {saving
-              ? t("common:actions.saving")
-              : t("common:actions.save")}
-          </Button>
           <Button
             type="button"
             variant="outline"
             disabled={testing || saving}
-            onClick={form.handleSubmit(test)}
+            onClick={form.handleSubmit((values) => test(values))}
           >
             {testing ? <LoaderCircleIcon className="animate-spin" /> : null}
             {testing
               ? t("telegramConnection.form.testing")
               : t("telegramConnection.form.test")}
-          </Button>
-          <Button type="button" variant="outline" asChild>
-            <Link to="/settings/channels">
-              {t("common:actions.cancel")}
-            </Link>
           </Button>
         </div>
       </form>

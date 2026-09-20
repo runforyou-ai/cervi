@@ -1,5 +1,6 @@
 /** 消息渠道列表页，统一展示当前支持的渠道。 */
 import { useMemo, useState } from "react"
+import { PencilIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Link, useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -17,9 +18,8 @@ import {
   ListToolbarReset,
   ListToolbarSearch,
 } from "@/components/list-toolbar"
-import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
-import { ResourceContent } from "@/components/resource-content"
+import { ResourceListLayout } from "@/components/resource-list"
 import { ResourceTable } from "@/components/resource-table"
 import {
   AlertDialog,
@@ -41,6 +41,7 @@ import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
+import { cn } from "@/lib/utils"
 
 type ChannelEnabledStatus = "enabled" | "disabled"
 
@@ -162,80 +163,94 @@ export function MessageChannelListPage() {
         ) : null}
       </ListToolbar>
 
-      <PageContent>
-        <ResourceContent
-          loading={showLoading}
-          error={Boolean(error)}
-          errorMessage={t("list.loadError")}
-          onRetry={() => void refresh()}
-        >
-          <div className="overflow-hidden rounded-lg border bg-card">
-            <ResourceTable
-              columns={[
-                {
-                  key: "name",
-                  header: t("list.columns.name"),
-                  cellClassName: "min-w-44 font-medium",
-                  cell: (channel) => channel.name,
-                },
-                {
-                  key: "category",
-                  header: t("list.columns.category"),
-                  cellClassName: "whitespace-nowrap",
-                  cell: (channel) => {
-                    const typeDefinition = messageChannelTypeDefinition(
-                      channel.type,
-                    )
-                    if (!typeDefinition) {
-                      console.warn("未知的消息渠道类型", channel.type)
-                      return ""
-                    }
-                    return t(`types.${typeDefinition.translationKey}`)
-                  },
-                },
-                {
-                  key: "language",
-                  header: t("list.columns.language"),
-                  cellClassName: "whitespace-nowrap",
-                  cell: (channel) =>
-                    t(
-                      `locales.${channel.defaultLocale === "zh-CN" ? "zhCN" : "enUS"}`,
-                    ),
-                },
-              ]}
-              rows={filteredChannels}
-              rowKey={(channel) => channel.id}
-              empty={
-                channels.length === 0
-                  ? t("list.emptyTitle")
-                  : t("list.emptyFiltered")
-              }
-              actions={(channel) => ({
-                primary: (
-                  <Button variant="outline" size="sm" asChild>
-                    <Link
-                      to={`/settings/channels/${channel.type}/${channel.id}`}
+      <ResourceListLayout
+        loading={showLoading}
+        error={Boolean(error)}
+        errorMessage={t("list.loadError")}
+        onRetry={() => void refresh()}
+      >
+        <ResourceTable
+          columns={[
+            {
+              key: "name",
+              header: t("list.columns.name"),
+              cellClassName: "min-w-44 font-medium",
+              cell: (channel) => {
+                const definition = messageChannelTypeDefinition(channel.type)
+                return (
+                  <div className="flex items-center gap-2.5">
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        "flex size-7 shrink-0 items-center justify-center rounded-lg",
+                        definition?.softClassName ?? "bg-muted text-muted-foreground",
+                      )}
                     >
-                      {t("common:actions.edit")}
-                    </Link>
-                  </Button>
+                      {definition ? <definition.icon className="size-4" /> : null}
+                    </span>
+                    <span className="truncate">{channel.name}</span>
+                  </div>
+                )
+              },
+            },
+            {
+              key: "category",
+              header: t("list.columns.category"),
+              cellClassName: "whitespace-nowrap",
+              cell: (channel) => {
+                const typeDefinition = messageChannelTypeDefinition(
+                  channel.type,
+                )
+                if (!typeDefinition) {
+                  console.warn("未知的消息渠道类型", channel.type)
+                  return ""
+                }
+                return t(`types.${typeDefinition.translationKey}`)
+              },
+            },
+            {
+              key: "language",
+              header: t("list.columns.language"),
+              cellClassName: "whitespace-nowrap",
+              cell: (channel) =>
+                t(
+                  `locales.${channel.defaultLocale === "zh-CN" ? "zhCN" : "enUS"}`,
                 ),
-                menu: (
-                  <DropdownMenuItem
-                    destructive={channel.enabled}
-                    disabled={updatingChannelId === channel.id}
-                    onSelect={() => requestStatusChange(channel)}
-                  >
-                    {channel.enabled
-                      ? t("list.deactivate")
-                      : t("list.activate")}
-                  </DropdownMenuItem>
-                ),
-              })}
-            />
-          </div>
-        </ResourceContent>
-      </PageContent>
+            },
+          ]}
+          rows={filteredChannels}
+          rowKey={(channel) => channel.id}
+          empty={
+            channels.length === 0
+              ? t("list.emptyTitle")
+              : t("list.emptyFiltered")
+          }
+          actions={(channel) => ({
+            primary: (
+              <Button variant="outline" size="icon-sm" asChild>
+                <Link
+                  to={`/settings/channels/${channel.type}/${channel.id}`}
+                  aria-label={t("common:actions.edit")}
+                  title={t("common:actions.edit")}
+                >
+                  <PencilIcon />
+                </Link>
+              </Button>
+            ),
+            menu: (
+              <DropdownMenuItem
+                destructive={channel.enabled}
+                disabled={updatingChannelId === channel.id}
+                onSelect={() => requestStatusChange(channel)}
+              >
+                {channel.enabled
+                  ? t("list.deactivate")
+                  : t("list.activate")}
+              </DropdownMenuItem>
+            ),
+          })}
+        />
+      </ResourceListLayout>
 
       {confirmingChannel ? (
         <AlertDialog

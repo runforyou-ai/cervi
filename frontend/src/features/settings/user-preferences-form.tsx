@@ -1,7 +1,6 @@
 /** 用户偏好设置表单。 */
 import { useEffect, useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { LoaderCircleIcon } from "lucide-react"
 import { useTheme } from "next-themes"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
@@ -15,7 +14,6 @@ import {
   type CurrentUser,
 } from "@/api"
 import { recoverSession } from "@/lib/session-navigation"
-import { Button } from "@/components/ui/button"
 import {
   Field,
   FieldContent,
@@ -34,12 +32,12 @@ import {
   createUserPreferencesSchema,
   type UserPreferencesFormValues,
 } from "@/features/settings/user-preferences-schema"
+import { useAutoSave } from "@/hooks/use-auto-save"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
 import { changeAppLanguage } from "@/i18n"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { supportedTimeZones } from "@/lib/time-zones"
-import { resolveAppPlatform } from "@/platform/app-platform"
 import {
   readNotificationDevicePreferences,
   setNotificationSoundEnabled,
@@ -49,7 +47,6 @@ import {
 /** 修改当前用户偏好设置，移动端不展示多标签页设置。 */
 export function UserPreferencesForm({ user }: { user: CurrentUser }) {
   const { t } = useTranslation(["settings", "common"])
-  const mobile = resolveAppPlatform() === "mobile"
   const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
   const { theme, setTheme } = useTheme()
@@ -65,6 +62,7 @@ export function UserPreferencesForm({ user }: { user: CurrentUser }) {
   const form = useForm<UserPreferencesFormValues>({
     resolver: zodResolver(schema),
     shouldUseNativeValidation: true,
+    mode: "onBlur",
     defaultValues: {
       locale: user.locale as UserPreferencesFormValues["locale"],
       timeZone: user.timeZone,
@@ -84,6 +82,8 @@ export function UserPreferencesForm({ user }: { user: CurrentUser }) {
   }, [form, theme])
 
   /** 保存账号与本机偏好设置。 */
+  const markSaved = useAutoSave({ form, schema, save })
+
   async function save(values: UserPreferencesFormValues) {
     try {
       const updated = await updateUserPreferences({
@@ -96,16 +96,17 @@ export function UserPreferencesForm({ user }: { user: CurrentUser }) {
         notificationScope,
         values.notificationSoundEnabled,
       )
-      form.reset({
+      const next = {
         locale: values.locale,
         timeZone: updated.timeZone,
         theme: values.theme,
         messageNotificationsEnabled: updated.messageNotificationsEnabled,
         notificationSoundEnabled: values.notificationSoundEnabled,
-      })
+      }
+      form.reset(next)
+      markSaved(next)
       void invalidate(resourceKeys.identity())
       await changeAppLanguage(updated.locale)
-      toast.success(t("preferences.saveSuccess"))
     } catch (error) {
       if (recoverSession(error, navigate)) {
         return
@@ -125,11 +126,10 @@ export function UserPreferencesForm({ user }: { user: CurrentUser }) {
     }
   }
 
-  const { isSubmitting } = form.formState
 
   return (
     <form
-      className="w-full max-w-2xl space-y-9"
+      className="w-full max-w-2xl"
       aria-label={t("preferences.formLabel")}
       onSubmit={form.handleSubmit(save)}
       noValidate
@@ -251,16 +251,6 @@ export function UserPreferencesForm({ user }: { user: CurrentUser }) {
           <NotificationPermissionSettings />
         </section>
       </FieldGroup>
-      <div>
-        <Button
-          type="submit"
-          className={mobile ? "min-h-11 w-full" : undefined}
-          disabled={isSubmitting}
-        >
-          {isSubmitting ? <LoaderCircleIcon className="animate-spin" /> : null}
-          {isSubmitting ? t("common:actions.saving") : t("common:actions.save")}
-        </Button>
-      </div>
     </form>
   )
 }

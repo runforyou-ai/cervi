@@ -1,7 +1,6 @@
 /** 个人资料设置表单。 */
 import { useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { LoaderCircleIcon } from "lucide-react"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
@@ -13,11 +12,11 @@ import {
   updateProfile,
   type CurrentUser,
 } from "@/api"
+import { useAutoSave } from "@/hooks/use-auto-save"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { usePendingImageUpload } from "@/hooks/use-pending-image-upload"
 import { useResourceInvalidator } from "@/hooks/use-resource"
 import { recoverSession } from "@/lib/session-navigation"
-import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import {
@@ -46,12 +45,15 @@ export function ProfileSettingsForm({ user }: { user: CurrentUser }) {
   const form = useForm<ProfileSettingsFormValues>({
     resolver: zodResolver(schema),
     shouldUseNativeValidation: true,
+    mode: "onBlur",
     defaultValues: {
       displayName: user.displayName,
       email: user.email,
     },
   })
   /** 保存个人资料并刷新当前身份。 */
+  const markSaved = useAutoSave({ form, schema, save })
+
   async function save(values: ProfileSettingsFormValues) {
     let uploadingAvatar = false
     try {
@@ -59,13 +61,14 @@ export function ProfileSettingsForm({ user }: { user: CurrentUser }) {
       const avatarFileId = await avatar.ensureUploaded()
       uploadingAvatar = false
       const updated = await updateProfile({ ...values, avatarFileId })
-      form.reset({
+      const next = {
         displayName: updated.displayName,
         email: updated.email,
-      })
+      }
+      form.reset(next)
+      markSaved(next)
       avatar.clear()
       void invalidate(resourceKeys.identity())
-      toast.success(t("profile.saveSuccess"))
     } catch (error) {
       // 上传失败已由共享上传回调提示，保存只处理资料提交错误。
       if (uploadingAvatar) return
@@ -85,7 +88,7 @@ export function ProfileSettingsForm({ user }: { user: CurrentUser }) {
 
   return (
     <form
-      className="w-full max-w-xl space-y-9"
+      className="w-full max-w-xl"
       aria-label={t("profile.formLabel")}
       onSubmit={form.handleSubmit(save)}
       noValidate
@@ -144,18 +147,6 @@ export function ProfileSettingsForm({ user }: { user: CurrentUser }) {
           )}
         />
       </FieldGroup>
-      <div>
-        <Button
-          type="submit"
-          className={mobile ? "min-h-11 w-full" : undefined}
-          disabled={isSubmitting}
-        >
-          {isSubmitting ? (
-            <LoaderCircleIcon className="animate-spin" />
-          ) : null}
-          {isSubmitting ? t("common:actions.saving") : t("common:actions.save")}
-        </Button>
-      </div>
     </form>
   )
 }

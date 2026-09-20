@@ -27,10 +27,12 @@ import {
   type MessageChannelFormValues,
 } from "@/features/channels/message-channel-schema"
 import { messageChannelTypeDefinitions } from "@/lib/message-channel-types"
+import { useAutoSave } from "@/hooks/use-auto-save"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
+import { cn } from "@/lib/utils"
 
 /** 创建或修改消息渠道基础信息。 */
 export function MessageChannelForm({
@@ -58,6 +60,7 @@ export function MessageChannelForm({
   const form = useForm<MessageChannelFormValues>({
     resolver: zodResolver(schema),
     shouldUseNativeValidation: true,
+    mode: "onBlur",
     defaultValues: {
       type: channel?.type ?? ChannelType.ChannelTypeWebsite,
       name: channel?.name ?? "",
@@ -74,6 +77,14 @@ export function MessageChannelForm({
     },
   })
   /** 提交消息渠道基础信息。 */
+  // 已有渠道时边改边存，新建仍由底部按钮提交。
+  const markSaved = useAutoSave({
+    form,
+    schema,
+    save: submit,
+    enabled: Boolean(channel),
+  })
+
   async function submit(values: MessageChannelFormValues) {
     try {
       if (channel) {
@@ -84,18 +95,19 @@ export function MessageChannelForm({
           newConversationTarget: channel.newConversationTarget,
           fallbackTarget: channel.fallbackTarget,
         })
-        form.reset({
+        const next = {
           type: updated.type,
           name: updated.name,
           description: updated.description ?? "",
           defaultLocale: updated.defaultLocale,
           newConversationTarget: updated.newConversationTarget,
           fallbackTarget: updated.fallbackTarget,
-        })
+        }
+        form.reset(next)
+        markSaved(next)
         onUpdated?.(updated)
         void invalidateResource(resourceKeys.messageChannels())
         void invalidateResource(resourceKeys.channelOptions())
-        toast.success(t("form.saved"))
         return
       }
 
@@ -140,7 +152,7 @@ export function MessageChannelForm({
 
   return (
     <form
-      className="w-full max-w-2xl space-y-9"
+      className={cn("w-full max-w-2xl", channel ? undefined : "space-y-9")}
       onSubmit={form.handleSubmit(submit)}
       noValidate
     >
@@ -228,14 +240,16 @@ export function MessageChannelForm({
         ) : null}
 
       </FieldGroup>
-      <div className="flex items-center gap-2">
-        <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? t("common:actions.saving") : t("common:actions.save")}
-        </Button>
-        <Button variant="outline" asChild>
-          <Link to="/settings/channels">{t("common:actions.cancel")}</Link>
-        </Button>
-      </div>
+      {channel ? null : (
+        <div className="flex items-center gap-2">
+          <Button type="submit" disabled={isSubmitting}>
+            {isSubmitting ? t("common:actions.saving") : t("common:actions.save")}
+          </Button>
+          <Button variant="outline" asChild>
+            <Link to="/settings/channels">{t("common:actions.cancel")}</Link>
+          </Button>
+        </div>
+      )}
     </form>
   )
 }

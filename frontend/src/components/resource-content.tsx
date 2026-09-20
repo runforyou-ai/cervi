@@ -22,13 +22,13 @@ export function ResourceContent({
   const { t } = useTranslation("common")
   if (loading)
     return (
-      <LoadingIndicator className="min-h-48 justify-center rounded-lg border">
+      <LoadingIndicator className="min-h-48 justify-center">
         {t("status.loading")}
       </LoadingIndicator>
     )
   if (error)
     return (
-      <div className="flex min-h-48 flex-col items-center justify-center rounded-lg border text-center">
+      <div className="flex min-h-48 flex-col items-center justify-center text-center">
         <p className="text-sm text-muted-foreground">{errorMessage}</p>
         <Button type="button" className="mt-4" variant="outline" onClick={onRetry}>
           {t("actions.retry")}

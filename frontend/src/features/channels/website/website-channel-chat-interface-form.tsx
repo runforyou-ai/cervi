@@ -3,7 +3,7 @@ import { useEffect, useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm, useWatch } from "react-hook-form"
 import { useTranslation } from "react-i18next"
-import { Link, useNavigate } from "react-router"
+import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
@@ -16,7 +16,6 @@ import {
 } from "@/api"
 import { recoverSession } from "@/lib/session-navigation"
 import { FormInputField } from "@/components/form/form-input-field"
-import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
@@ -26,6 +25,7 @@ import {
   isWebsiteChannelThemeColor,
   type WebsiteChannelChatInterfaceFormValues,
 } from "@/features/channels/website/website-channel-chat-interface-schema"
+import { useAutoSave } from "@/hooks/use-auto-save"
 import { apiErrorMessage } from "@/lib/form-errors"
 
 const presetColors = [
@@ -62,6 +62,7 @@ export function WebsiteChannelChatInterfaceForm({
   const form = useForm<WebsiteChannelChatInterfaceFormValues>({
     resolver: zodResolver(schema),
     shouldUseNativeValidation: true,
+    mode: "onBlur",
     defaultValues: {
       title: channel.chatInterface.title,
       subtitle: channel.chatInterface.subtitle ?? "",
@@ -94,18 +95,21 @@ export function WebsiteChannelChatInterfaceForm({
     previewValue.title,
   ])
 
+  const markSaved = useAutoSave({ form, schema, save: submit })
+
   /** 提交聊天界面设置。 */
   async function submit(values: WebsiteChannelChatInterfaceFormValues) {
     try {
       const updated = await updateWebsiteChannelChatInterface(channel.id, values)
-      form.reset({
+      const next = {
         title: updated.title,
         subtitle: updated.subtitle ?? "",
         greetingMessage: updated.greetingMessage ?? "",
         themeColor: updated.themeColor,
-      })
+      }
+      form.reset(next)
+      markSaved(next)
       onUpdated(updated)
-      toast.success(t("chatInterface.saved"))
     } catch (error) {
       if (recoverSession(error, navigate)) {
         return
@@ -132,11 +136,10 @@ export function WebsiteChannelChatInterfaceForm({
     }
   }
 
-  const { isSubmitting } = form.formState
 
   return (
     <form
-      className="w-full max-w-2xl space-y-9"
+      className="w-full max-w-2xl"
       onSubmit={form.handleSubmit(submit)}
       noValidate
     >
@@ -222,14 +225,6 @@ export function WebsiteChannelChatInterfaceForm({
         />
 
       </FieldGroup>
-      <div className="flex items-center gap-2">
-        <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? t("common:actions.saving") : t("common:actions.save")}
-        </Button>
-        <Button variant="outline" asChild>
-          <Link to="/settings/channels">{t("common:actions.cancel")}</Link>
-        </Button>
-      </div>
     </form>
   )
 }

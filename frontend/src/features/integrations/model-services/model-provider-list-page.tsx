@@ -1,4 +1,5 @@
 /** 模型服务供应商列表页。 */
+import { PencilIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Link, useNavigate } from "react-router"
 
@@ -9,6 +10,7 @@ import {
   type AIProviderSummaryData,
 } from "@/api"
 import { ResourceContent } from "@/components/resource-content"
+import { ResourceListFrame } from "@/components/resource-list"
 import { ResourceTable } from "@/components/resource-table"
 import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
@@ -122,7 +124,7 @@ export function ModelProviderListPage({ section }: { section: ModelServiceSectio
             errorMessage={t("modelServices.list.loadError")}
             onRetry={() => void refresh()}
           >
-            <div className="overflow-hidden rounded-lg border bg-card">
+            <ResourceListFrame>
               <ResourceTable
                 columns={[
                   {
@@ -163,11 +165,13 @@ export function ModelProviderListPage({ section }: { section: ModelServiceSectio
                 })}
                 actions={(provider) => ({
                   primary: (
-                    <Button variant="outline" size="sm" asChild>
+                    <Button variant="outline" size="icon-sm" asChild>
                       <Link
                         to={`/settings/model-services/${section}/${provider.id}`}
+                        aria-label={t("common:actions.edit")}
+                        title={t("common:actions.edit")}
                       >
-                        {t("common:actions.edit")}
+                        <PencilIcon />
                       </Link>
                     </Button>
                   ),
@@ -181,7 +185,7 @@ export function ModelProviderListPage({ section }: { section: ModelServiceSectio
                   ),
                 })}
               />
-            </div>
+            </ResourceListFrame>
           </ResourceContent>
         </div>
       </PageContent>

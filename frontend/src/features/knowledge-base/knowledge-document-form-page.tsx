@@ -22,6 +22,7 @@ import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { useAutoSave } from "@/hooks/use-auto-save"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
@@ -136,6 +137,7 @@ function KnowledgeDocumentForm({
   const form = useForm<DocumentFormValues>({
     resolver: zodResolver(schema),
     shouldUseNativeValidation: true,
+    mode: "onBlur",
     defaultValues: {
       title: stored?.document.name ?? "",
       content: stored?.content ?? "",
@@ -161,7 +163,15 @@ function KnowledgeDocumentForm({
   }, [stored, form])
 
   /** 提交表单并失效该文档的列表、详情和正文缓存。 */
-  async function save(values: DocumentFormValues) {
+  // 编辑已有文档时边改边存，新建仍由底部按钮提交并跳回列表。
+  const markSaved = useAutoSave({
+    form,
+    schema,
+    enabled: Boolean(stored),
+    save: (values) => save(values, true),
+  })
+
+  async function save(values: DocumentFormValues, autoSaved = false) {
     try {
       const saved = stored
         ? await updateKnowledgeDocumentContent(baseId, stored.document.id, values)
@@ -172,6 +182,10 @@ function KnowledgeDocumentForm({
         invalidate(resourceKeys.knowledgeDocumentContent(baseId, saved.id)),
       ])
       if (!mounted.current) return
+      if (autoSaved) {
+        markSaved(values)
+        return
+      }
       toast.success(t("documents.saveSuccess"))
       navigate(returnPath, { replace: true })
     } catch (error) {
@@ -184,7 +198,7 @@ function KnowledgeDocumentForm({
 
   const disabled = form.formState.isSubmitting
   return (
-    <form className="max-w-3xl space-y-9" onSubmit={form.handleSubmit(save)}>
+    <form className="max-w-3xl space-y-9" onSubmit={form.handleSubmit((values) => save(values))}>
       <FieldGroup>
         <FormInputField
           control={form.control}
@@ -214,19 +228,21 @@ function KnowledgeDocumentForm({
           )}
         />
       </FieldGroup>
-      <div className="flex gap-3">
-        <Button type="submit" disabled={disabled}>
-          {t(disabled ? "common:actions.saving" : "common:actions.save")}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          disabled={disabled}
-          onClick={() => navigate(returnPath, { replace: true })}
-        >
-          {t("common:actions.cancel")}
-        </Button>
-      </div>
+      {stored ? null : (
+        <div className="flex gap-3">
+          <Button type="submit" disabled={disabled}>
+            {t(disabled ? "common:actions.saving" : "common:actions.save")}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={disabled}
+            onClick={() => navigate(returnPath, { replace: true })}
+          >
+            {t("common:actions.cancel")}
+          </Button>
+        </div>
+      )}
     </form>
   )
 }
