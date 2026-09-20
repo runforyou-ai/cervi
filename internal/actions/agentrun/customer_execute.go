@@ -21,10 +21,6 @@ import (
 	"github.com/uptrace/bun"
 )
 
-const customerSceneRules = `本次是客户会话，你的输出会直接发送给客户，使用与客户最近消息相同的语言。`
-
-const customerSceneDecisionRule = `直接输出正文表示给出最终回答，只有在本轮已经通过工具取得依据时才这样做；追问、转人工与其他工具不在同一次输出中同时调用。`
-
 type customerRunPolicy struct {
 	enqueuer servertask.TxEnqueuer
 }
@@ -106,10 +102,9 @@ func appendCustomerAgentMessage(ctx context.Context, db bun.IDB, enqueuer server
 	return message, nil
 }
 
-// sceneRules 给出客户会话的对客说明、工具用法与结束方式，终止工具在客服场景始终注册。
-func (p customerRunPolicy) sceneRules(_ context.Context, _ bun.IDB, _ executionContext, tools behaviorTools) (agentruntime.Scene, string, error) {
-	tools.Terminal = true
-	return agentruntime.SceneCustomer, joinSections(customerSceneRules, toolGuidance(tools), customerSceneDecisionRule), nil
+// sceneContext 给出客户会话场景。
+func (p customerRunPolicy) sceneContext(context.Context, bun.IDB, executionContext) (agentruntime.SceneContext, error) {
+	return agentruntime.SceneContext{Scene: agentruntime.SceneCustomer}, nil
 }
 
 // laneRevision 在当前负责人仍合格时返回客户 Agent 的配置版本。

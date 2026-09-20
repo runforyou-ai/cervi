@@ -59,16 +59,17 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 	if maxIterations <= 0 {
 		maxIterations = defaultMaxIterations
 	}
-	chatModel, err := r.newModel(ctx, request.Model)
+	modelConfig := request.modelConfig()
+	chatModel, err := r.newModel(ctx, modelConfig)
 	if err != nil {
 		return RunResult{}, err
 	}
 	// 客服场景注册终止工具，其纠正额度在同一执行尝试内的重新执行之间共用；严格依据策略按本次注册的工具登记依据来源。
 	var terminal *terminalTools
 	var gate *groundingGate
-	if request.Scene == SceneCustomer {
+	if request.Assignment.Scene == SceneCustomer {
 		terminal = newTerminalTools()
-		if request.Grounding == GroundingStrict {
+		if request.Assignment.Grounding == GroundingStrict {
 			judges := make(map[string]evidenceJudge)
 			if request.KnowledgeSearch != nil {
 				judges[knowledgeToolName] = knowledgeEvidence
@@ -81,14 +82,14 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 		return RunResult{}, err
 	}
 	defer releaseSessions()
-	window := ContextWindowTokens(request.Model)
+	window := ContextWindowTokens(modelConfig)
 	reductionHandlers, err := newContextReductionHandlers(ctx, window)
 	if err != nil {
 		return RunResult{}, err
 	}
 	// 模型声明文本以外的输入模态时，按窗口推导随消息直传的附件数量上限，至少直传一个。
 	media := mediaInput{read: request.ReadAttachment, modalities: make(map[domain.AIModelInputModality]bool)}
-	for _, modality := range request.Model.InputModalities {
+	for _, modality := range request.Credentials.InputModalities {
 		if modality != domain.AIModelInputModalityText {
 			media.modalities[modality] = true
 		}
@@ -112,7 +113,7 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 		handlers = append(handlers, gate)
 	}
 	agent, err := adk.NewTypedChatModelAgent(ctx, &adk.TypedChatModelAgentConfig[*schema.AgenticMessage]{
-		Name: request.Name, Instruction: request.Instruction, Model: trackedModel,
+		Name: request.Assignment.AgentName, Instruction: request.Assignment.Instruction, Model: trackedModel,
 		ToolsConfig: adk.ToolsConfig{ToolsNodeConfig: compose.ToolsNodeConfig{
 			Tools: tools, ToolCallMiddlewares: toolMiddlewares,
 		}},
@@ -172,7 +173,7 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 // assembleTools 按场景与请求装配本次运行的工具：开发期计算器只在内部场景注册，终止工具只在客服场景注册，远程 MCP 工具在内置工具之后连接并跳过重名。
 func (r *EinoRuntime) assembleTools(ctx context.Context, request RunRequest, terminal *terminalTools) ([]tool.BaseTool, func(), error) {
 	tools := make([]tool.BaseTool, 0, len(r.tools)+4)
-	if request.Scene != SceneCustomer {
+	if request.Assignment.Scene != SceneCustomer {
 		tools = append(tools, r.tools...)
 	}
 	if request.KnowledgeSearch != nil {
@@ -193,7 +194,7 @@ func (r *EinoRuntime) assembleTools(ctx context.Context, request RunRequest, ter
 		tools = append(tools, terminal.tools()...)
 	}
 	release := func() {}
-	if len(request.MCPServers) > 0 {
+	if len(request.MCPConnections) > 0 {
 		// 收齐本次运行的内置工具名称，远程工具重名时由 openMCPTools 跳过。
 		registered := map[string]struct{}{offloadedResultToolName: {}}
 		for _, existing := range tools {
@@ -204,7 +205,7 @@ func (r *EinoRuntime) assembleTools(ctx context.Context, request RunRequest, ter
 			registered[info.Name] = struct{}{}
 		}
 		var mcpTools []tool.BaseTool
-		mcpTools, release = openMCPTools(ctx, request.RunID, request.MCPServers, registered)
+		mcpTools, release = openMCPTools(ctx, request.RunID, request.MCPConnections, registered)
 		tools = append(tools, mcpTools...)
 	}
 	return tools, release, nil

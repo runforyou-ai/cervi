@@ -61,8 +61,8 @@ func TestEinoRuntimeRetriesWithoutRejectedMedia(t *testing.T) {
 				Media: &Media{MIMEType: "image/png", ByteSize: 16},
 			}}}
 			result, err := runtime.Run(context.Background(), RunRequest{
-				RunID: "media-fallback", Name: "test-agent", MaxTurns: 2,
-				Model: ModelConfig{InputModalities: []domain.AIModelInputModality{domain.AIModelInputModalityText, domain.AIModelInputModalityImage}},
+				RunID: "media-fallback", Assignment: Assignment{AgentName: "test-agent"}, MaxTurns: 2,
+				Credentials: ModelCredentials{InputModalities: []domain.AIModelInputModality{domain.AIModelInputModalityText, domain.AIModelInputModalityImage}},
 				ReadAttachment: func(context.Context, string) ([]byte, error) {
 					return []byte("image"), nil
 				},

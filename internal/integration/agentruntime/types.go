@@ -95,23 +95,41 @@ type GroundingPolicy string
 // GroundingStrict 要求直接输出的正文在当前输入边界内取得有效依据，否则纠正一次后转人工。
 const GroundingStrict GroundingPolicy = "strict"
 
+// ModelCredentials 定义调用模型所需的供应商凭据与当前输入能力，由执行侧注入，不进入有效配置。
+type ModelCredentials struct {
+	Brand           string
+	APIKey          string
+	BaseURL         string
+	InputModalities []domain.AIModelInputModality
+}
+
 // RunRequest 定义一次有界 Agent 业务运行。
 type RunRequest struct {
 	RunID                 string
-	Name                  string
-	Scene                 Scene           // 本次运行所属的业务场景。
-	Grounding             GroundingPolicy // 依据检查策略，空值不检查；只在注册终止工具的客服场景生效。
-	Instruction           string
-	Model                 ModelConfig
+	Assignment            Assignment       // 本次运行的有效配置，由 ResolveAssignment 产出并固定在运行快照中。
+	Credentials           ModelCredentials // 模型供应商凭据与当前输入能力。
 	KnowledgeSearch       KnowledgeSearch
 	CustomerHistorySearch CustomerHistorySearch
 	ReadAttachment        AttachmentContent
-	MCPServers            []MCPServer // 本次运行配置版本绑定的远程 MCP 服务。
+	MCPConnections        []MCPServer // 有效配置中远程 MCP 服务对应的连接配置。
 	MaxIterations         int         // 单轮模型与工具迭代上限，零值使用默认值。
 	MaxTurns              int         // 吸收新输入的轮次上限，零值不限制，由运行 context 控制生命周期。
 	StreamID              string
 	Attempt               int
 	OnStream              func(StreamDelta) // 串行接收合并后的运行流增量，实现不得阻塞。
+}
+
+// modelConfig 合并有效配置中的模型参数与执行侧注入的凭据。
+func (r RunRequest) modelConfig() ModelConfig {
+	return ModelConfig{
+		Brand:           r.Credentials.Brand,
+		APIKey:          r.Credentials.APIKey,
+		BaseURL:         r.Credentials.BaseURL,
+		Identifier:      r.Assignment.Model.Identifier,
+		MaxOutputTokens: int(r.Assignment.Model.MaxOutputTokens),
+		ContextWindow:   int(r.Assignment.Model.ContextWindow),
+		InputModalities: r.Credentials.InputModalities,
+	}
 }
 
 // Usage 定义一次业务运行累计的模型用量。

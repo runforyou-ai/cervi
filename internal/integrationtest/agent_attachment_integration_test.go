@@ -152,7 +152,7 @@ func TestAgentAttachmentInputs(t *testing.T) {
 	}
 	// 一次运行认领两条附件输入，图片可直传读取，跨会话附件不可读取。
 	runQueued(func(request agentruntime.RunRequest, input agentruntime.ClaimedInput) error {
-		if !slices.Contains(request.Model.InputModalities, domain.AIModelInputModalityImage) || len(input.Messages) != 2 {
+		if !slices.Contains(request.Credentials.InputModalities, domain.AIModelInputModalityImage) || len(input.Messages) != 2 {
 			return errors.New("attachment inputs were not claimed together")
 		}
 		content, err := request.ReadAttachment(ctx, image.ID)

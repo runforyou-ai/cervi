@@ -1,0 +1,131 @@
+//go:build server
+
+package agentruntime
+
+import (
+	"encoding/json"
+	"strings"
+	"testing"
+
+	"github.com/runforyou-ai/cervi/internal/domain"
+)
+
+// customerFacts 构造一份客服场景的业务事实。
+func customerFacts() AssignmentFacts {
+	return AssignmentFacts{
+		RoleKind: domain.RoleKindCustomerService, OrganizationName: "鹿行", AgentName: "小鹿", Instruction: "只回答售后问题。",
+		Model: AssignmentModel{ProviderID: "provider", Identifier: "model", MaxOutputTokens: 1024, ContextWindow: 8192},
+		Scene: SceneContext{Scene: SceneCustomer},
+	}
+}
+
+// TestComposeInstruction 验证角色基线、企业指令与场景规则的拼接顺序和空段落处理。
+func TestComposeInstruction(t *testing.T) {
+	baseline := RoleBaseline(domain.RoleKindCustomerService, "鹿行", "小鹿")
+	if !strings.HasPrefix(baseline, "你是企业「鹿行」的 AI 员工「小鹿」，专业领域是客户服务。") {
+		t.Fatalf("客服基线 = %q", baseline)
+	}
+	if generic := RoleBaseline(domain.RoleKindCustomerService, "鹿行", ""); !strings.HasPrefix(generic, "你是企业「鹿行」的 AI 员工，专业领域是客户服务。") {
+		t.Fatalf("省略名称的基线 = %q", generic)
+	}
+	if custom := RoleBaseline(domain.RoleKindCustom, "鹿行", "小鹿"); custom != RoleBaseline(domain.RoleKindMember, "鹿行", "小鹿") {
+		t.Fatalf("自定义角色应按成员基线处理：%q", custom)
+	}
+	full := composeInstruction(baseline, "  只回答售后问题。 ", agentChatSceneRules)
+	if !strings.HasPrefix(full, baseline+"\n\n只回答售后问题。\n\n"+agentChatSceneRules) {
+		t.Fatalf("拼接结果 = %q", full)
+	}
+	if noEnterprise := composeInstruction(baseline, "   ", agentChatSceneRules); noEnterprise != baseline+"\n\n"+agentChatSceneRules {
+		t.Fatalf("空企业指令不应占位：%q", noEnterprise)
+	}
+}
+
+// TestToolGuidance 验证场景规则只描述本次运行实际注册的工具。
+func TestToolGuidance(t *testing.T) {
+	if guidance := toolGuidance(builtinTools{}); guidance != "" {
+		t.Fatalf("没有内置工具时不应生成说明：%q", guidance)
+	}
+	guidance := toolGuidance(builtinTools{Knowledge: true, CustomerHistory: true})
+	if !strings.HasPrefix(guidance, "可用工具：\n") || !strings.Contains(guidance, "search_knowledge") || !strings.Contains(guidance, "search_customer_history") {
+		t.Fatalf("工具说明 = %q", guidance)
+	}
+	if only := toolGuidance(builtinTools{Knowledge: true}); strings.Contains(only, "search_customer_history") {
+		t.Fatalf("未注册的工具不应出现：%q", only)
+	}
+	if only := toolGuidance(builtinTools{Knowledge: true}); strings.Contains(only, "ask_customer") || strings.Contains(only, "handoff_to_human") {
+		t.Fatalf("内部场景不应出现终止工具：%q", only)
+	}
+	terminal := toolGuidance(builtinTools{Terminal: true})
+	if !strings.HasPrefix(terminal, "可用工具：\n") || !strings.Contains(terminal, "- ask_customer：") || !strings.Contains(terminal, "- handoff_to_human：") {
+		t.Fatalf("终止工具说明 = %q", terminal)
+	}
+}
+
+// TestSceneRules 验证群聊场景列出可点名成员，没有可点名成员时明确告知。
+func TestSceneRules(t *testing.T) {
+	rules := sceneRules(SceneContext{Scene: SceneGroup, GroupTitle: "售后组", MentionCandidates: []string{"小鹿", "老王"}}, builtinTools{})
+	if !strings.Contains(rules, "群聊「售后组」") || !strings.Contains(rules, "小鹿、老王") {
+		t.Fatalf("群聊场景规则 = %q", rules)
+	}
+	if empty := sceneRules(SceneContext{Scene: SceneGroup}, builtinTools{}); !strings.Contains(empty, "可点名的成员：无") {
+		t.Fatalf("无可点名成员时的场景规则 = %q", empty)
+	}
+}
+
+// TestResolveAssignment 验证有效配置记录角色、场景、规则版本、完整指令、哈希与工具清单。
+func TestResolveAssignment(t *testing.T) {
+	assignment := ResolveAssignment(customerFacts(), Capabilities{Knowledge: true, MCPServers: []string{"工单系统"}})
+	if assignment.RoleKind != domain.RoleKindCustomerService || assignment.Scene != SceneCustomer ||
+		assignment.RulesVersion != AssignmentRulesVersion || assignment.Grounding != GroundingStrict {
+		t.Fatalf("有效配置 = %+v", assignment)
+	}
+	if !strings.Contains(assignment.Instruction, "只回答售后问题。") || !strings.HasSuffix(assignment.Instruction, customerSceneDecisionRule) {
+		t.Fatalf("有效配置指令 = %q", assignment.Instruction)
+	}
+	if len(assignment.InstructionSHA256) != 64 || assignment.AgentName != "小鹿" ||
+		assignment.Model.ProviderID != "provider" || assignment.Model.ContextWindow != 8192 || len(assignment.MCPServers) != 1 {
+		t.Fatalf("有效配置元数据 = %+v", assignment)
+	}
+	// 客服场景注册知识检索与终止工具，不注册开发期计算器。
+	if strings.Join(assignment.Tools, ",") != "search_knowledge,ask_customer,handoff_to_human" {
+		t.Fatalf("客服工具清单 = %v", assignment.Tools)
+	}
+	internal := ResolveAssignment(AssignmentFacts{RoleKind: domain.RoleKindMember, Scene: SceneContext{Scene: SceneAgentChat}}, Capabilities{})
+	if strings.Join(internal.Tools, ",") != "calculator" || internal.Grounding != "" {
+		t.Fatalf("内部场景有效配置 = %+v", internal)
+	}
+	if internal.InstructionSHA256 == assignment.InstructionSHA256 {
+		t.Fatal("不同指令应产生不同哈希")
+	}
+}
+
+// TestResolveAssignmentDeterministic 验证同一份业务事实与执行侧能力在任意执行位置解析出逐字节相同的有效配置。
+func TestResolveAssignmentDeterministic(t *testing.T) {
+	facts, capabilities := customerFacts(), Capabilities{Knowledge: true, MCPServers: []string{"工单系统"}}
+	first, err := json.Marshal(ResolveAssignment(facts, capabilities))
+	if err != nil {
+		t.Fatalf("序列化有效配置：%v", err)
+	}
+	second, err := json.Marshal(ResolveAssignment(facts, capabilities))
+	if err != nil {
+		t.Fatalf("序列化有效配置：%v", err)
+	}
+	if string(first) != string(second) {
+		t.Fatalf("同一份事实解析结果不一致：\n%s\n%s", first, second)
+	}
+	// 执行侧能力不同时只允许工具清单及其在指令中的说明随之变化。
+	without := ResolveAssignment(facts, Capabilities{MCPServers: capabilities.MCPServers})
+	with := ResolveAssignment(facts, capabilities)
+	without.Tools, without.Instruction, without.InstructionSHA256 = with.Tools, with.Instruction, with.InstructionSHA256
+	aligned, err := json.Marshal(without)
+	if err != nil {
+		t.Fatalf("序列化有效配置：%v", err)
+	}
+	expected, err := json.Marshal(with)
+	if err != nil {
+		t.Fatalf("序列化有效配置：%v", err)
+	}
+	if string(aligned) != string(expected) {
+		t.Fatalf("能力差异影响了工具清单以外的配置：\n%s\n%s", aligned, expected)
+	}
+}

@@ -129,7 +129,7 @@ func TestCustomerTerminalDecisions(t *testing.T) {
 			historyCalls := 0
 			runtime := &EinoRuntime{newModel: func(context.Context, ModelConfig) (model.AgenticModel, error) { return chatModel, nil }}
 			result, err := runtime.Run(ctx, RunRequest{
-				RunID: "terminal-run", Name: "客服", Scene: SceneCustomer, MaxIterations: 5, MaxTurns: 3,
+				RunID: "terminal-run", Assignment: Assignment{AgentName: "客服", Scene: SceneCustomer}, MaxIterations: 5, MaxTurns: 3,
 				CustomerHistorySearch: func(context.Context, string) (CustomerHistoryResult, error) {
 					historyCalls++
 					return CustomerHistoryResult{}, nil
@@ -169,7 +169,7 @@ func TestInternalSceneHasNoTerminalTools(t *testing.T) {
 		func() *schema.AgenticMessage { return assistantReply("你好，有什么需要") },
 	}}
 	runtime := &EinoRuntime{newModel: func(context.Context, ModelConfig) (model.AgenticModel, error) { return chatModel, nil }}
-	result, err := runtime.Run(ctx, RunRequest{RunID: "internal-run", Name: "助理", Scene: SceneAgentChat}, feed)
+	result, err := runtime.Run(ctx, RunRequest{RunID: "internal-run", Assignment: Assignment{AgentName: "助理", Scene: SceneAgentChat}}, feed)
 	if err != nil {
 		t.Fatal(err)
 	}

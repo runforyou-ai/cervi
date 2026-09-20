@@ -239,7 +239,7 @@ func TestEinoRuntimeSteersBeforeNextModelCall(t *testing.T) {
 	}()
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	result, err := runtime.Run(ctx, RunRequest{RunID: "test-run-id", Name: "test-agent", MaxTurns: 4}, feed)
+	result, err := runtime.Run(ctx, RunRequest{RunID: "test-run-id", Assignment: Assignment{AgentName: "test-agent"}, MaxTurns: 4}, feed)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -290,7 +290,7 @@ func TestEinoRuntimeIgnoresWatcherCancellationAfterSuccess(t *testing.T) {
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
 	defer cancel()
-	result, err := runtime.Run(ctx, RunRequest{Name: "test-agent", MaxTurns: 2}, feed)
+	result, err := runtime.Run(ctx, RunRequest{Assignment: Assignment{AgentName: "test-agent"}, MaxTurns: 2}, feed)
 	if err != nil {
 		t.Fatal(err)
 	}
