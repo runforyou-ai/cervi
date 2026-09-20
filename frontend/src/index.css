@@ -362,7 +362,6 @@ body,
   [data-slot="page-header"] :is(a, button, input, select),
   [data-slot="conversation-actions"],
   [data-slot="conversation-header-title"],
-  [data-slot="conversation-header-detail"],
   [data-slot="conversation-header"] :is(a, button, input, select),
   [data-slot="inbox-pane-header"] :is(a, button, input, select),
   :is(.cervi-inbox-empty-main, .cervi-knowledge-base-index)

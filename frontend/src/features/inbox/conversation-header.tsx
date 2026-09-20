@@ -11,17 +11,12 @@ import {
 import { useTranslation } from "react-i18next"
 
 import {
-  ConversationStatus,
   isCustomerInboxConversation,
-  isAgentInboxConversation,
-  isDirectInboxConversation,
   isGroupInboxConversation,
-  UserStatus,
   type GroupParticipant,
   type InboxConversation,
 } from "@/api"
 import { Button } from "@/components/ui/button"
-import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
 import {
   CustomerSessionCloseDialog,
   useCustomerSessionActions,
@@ -39,7 +34,6 @@ import {
 } from "@/components/ui/tooltip"
 import { useConversationAgentReplyLabel } from "@/features/inbox/conversation-agent-activity"
 import { useConversationTypingLabel } from "@/features/inbox/use-conversation-typing"
-import { workStatusLabel } from "@/components/work-status"
 import { cn } from "@/lib/utils"
 
 /** 会话头的图标操作按钮，悬停显示操作名称。 */
@@ -86,11 +80,10 @@ export function HeaderAction({
   )
 }
 
-/** 按 Helmdesk 会话头布局展示当前联系人、会话状态和操作区。 */
+/** 展示当前会话名称、正在输入状态和操作区。 */
 export function ConversationHeader({
   conversation,
   contactName,
-  sessionStatus,
   currentIdentityId,
   onSessionChanged,
   onSearch,
@@ -101,7 +94,6 @@ export function ConversationHeader({
 }: {
   conversation: InboxConversation
   contactName: string
-  sessionStatus: string
   currentIdentityId: string
   onSessionChanged: () => void
   onSearch?: () => void
@@ -111,16 +103,12 @@ export function ConversationHeader({
   onToggleContext?: () => void
 }) {
   const { t } = useTranslation(["inbox", "common"])
-  const { t: tCommon } = useTranslation("common")
   const customerConversation = isCustomerInboxConversation(conversation)
     ? conversation
     : null
   const customer = customerConversation?.customer ?? null
-  const agent = isAgentInboxConversation(conversation) ? conversation.agent : null
-  const direct = isDirectInboxConversation(conversation) ? conversation.direct : null
   const group = isGroupInboxConversation(conversation) ? conversation.group : null
-  const agentRunLabel = agentRunStatusLabel(agent?.agentRunStatus ?? null, t)
-  // 正在输入提示占用副标题位置：群聊替换人数，单聊替换对方工作状态，客户会话补在状态徽章之后。
+  // 正在输入提示紧接标题右侧展示。
   const typingLabel = useConversationTypingLabel(
     conversation.id,
     group ? (groupParticipants ?? []) : null,
@@ -150,66 +138,23 @@ export function ConversationHeader({
           narrowViewport && "pr-14",
         )}
       >
-        <div className="min-w-0 flex-1">
-          <div className="flex min-w-0 items-center gap-2">
-            <Tooltip>
-              <TooltipTrigger asChild>
-                <h2
-                  data-slot="conversation-header-title"
-                  className="min-w-0 truncate text-sm font-semibold"
-                >
-                  {contactName}
-                </h2>
-              </TooltipTrigger>
-              <TooltipContent className="max-w-80">{contactName}</TooltipContent>
-            </Tooltip>
-            {activityLabel ? (
-              <span className="shrink-0 text-xs text-muted-foreground">
-                {activityLabel}
-              </span>
-            ) : null}
-          </div>
-          {customer ? (
-            <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
-              <span
-                data-slot="conversation-header-detail"
-                className="inline-flex h-5 shrink-0 items-center rounded-md border px-1.5 text-[10px]"
+        {/* 标题只占文字宽度，右侧留白保持窗口可拖动。 */}
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <h2
+                data-slot="conversation-header-title"
+                className="min-w-0 truncate text-sm font-semibold"
               >
-                {sessionStatus}
-              </span>
-              <span
-                data-slot="conversation-header-detail"
-                className="inline-flex h-5 min-w-0 items-center truncate rounded-md border px-1.5 text-[10px]"
-                title={customer.title}
-              >
-                {customer.title}
-              </span>
-            </div>
-          ) : group ? (
-            <p
-              data-slot="conversation-header-detail"
-              className="w-fit max-w-full truncate text-xs text-muted-foreground"
-            >
-              {group.status === ConversationStatus.ConversationStatusArchived
-                ? t("groupDissolved")
-                : t("groupMemberCount", { count: group.memberCount })}
-            </p>
-          ) : direct ? (
-            <p
-              data-slot="conversation-header-detail"
-              className="w-fit max-w-full truncate text-xs text-muted-foreground"
-            >
-              {direct.peerStatus === UserStatus.UserStatusInactive
-                ? t("directPeerDisabled")
-                : workStatusLabel(direct.peerWorkStatus, tCommon)}
-            </p>
-          ) : agentRunLabel ? (
-            <p
-              data-slot="conversation-header-detail"
-              className="w-fit max-w-full truncate text-xs text-muted-foreground"
-            >
-              {agentRunLabel}
-            </p>
+                {contactName}
+              </h2>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-80">{contactName}</TooltipContent>
+          </Tooltip>
+          {activityLabel ? (
+            <span className="shrink-0 text-xs text-muted-foreground">
+              {activityLabel}
+            </span>
           ) : null}
         </div>
         <div

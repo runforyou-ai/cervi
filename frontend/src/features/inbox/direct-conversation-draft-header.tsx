@@ -46,15 +46,24 @@ export function DirectConversationDraftHeader({
   const { t } = useTranslation("inbox")
 
   return (
-    <header className="flex min-h-12 shrink-0 items-center gap-2.5 px-3 py-2">
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <h2 className="min-w-0 flex-1 truncate text-sm font-semibold">
-            {member.displayName}
-          </h2>
-        </TooltipTrigger>
-        <TooltipContent className="max-w-80">{member.displayName}</TooltipContent>
-      </Tooltip>
+    <header
+      data-slot="conversation-header"
+      className="flex min-h-12 shrink-0 items-center gap-2.5 px-3 py-2"
+    >
+      {/* 标题只占文字宽度，右侧留白保持窗口可拖动。 */}
+      <div className="flex min-w-0 flex-1 items-center">
+        <Tooltip>
+          <TooltipTrigger asChild>
+            <h2
+              data-slot="conversation-header-title"
+              className="min-w-0 truncate text-sm font-semibold"
+            >
+              {member.displayName}
+            </h2>
+          </TooltipTrigger>
+          <TooltipContent className="max-w-80">{member.displayName}</TooltipContent>
+        </Tooltip>
+      </div>
       {onToggleContext ? (
         <HeaderAction
           label={contextVisible ? t("contextClose") : t("contextOpen")}
