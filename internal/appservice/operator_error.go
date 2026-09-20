@@ -14,6 +14,7 @@ type OperatorErrorCode string
 
 const (
 	OperatorErrorCodeInvalidCredential OperatorErrorCode = "invalid_operator_credential"
+	OperatorErrorCodeInvalidRequest    OperatorErrorCode = "invalid_request"
 	OperatorErrorCodeInternal          OperatorErrorCode = "internal"
 )
 
@@ -43,6 +44,11 @@ func OperatorErrorOf(err error) (*OperatorError, bool) {
 // NewOperatorInternalError 返回运营调用的内部失败，供 HTTP 适配层收敛未分类错误。
 func NewOperatorInternalError(meta OperatorRequestMeta) *OperatorError {
 	return newOperatorError(meta, http.StatusInternalServerError, OperatorErrorCodeInternal, cervii18n.ErrorInternal)
+}
+
+// NewOperatorInvalidRequestError 返回运营请求参数无效的错误，供 HTTP 适配层在参数绑定失败时使用。
+func NewOperatorInvalidRequestError(meta OperatorRequestMeta) *OperatorError {
+	return newOperatorError(meta, http.StatusBadRequest, OperatorErrorCodeInvalidRequest, cervii18n.ErrorValidationFailed)
 }
 
 // invalidOperatorCredentialError 返回运营凭据无效的错误。

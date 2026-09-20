@@ -5,6 +5,7 @@ package api
 import (
 	"log/slog"
 	"net/http"
+	"strconv"
 	"strings"
 
 	"github.com/gin-gonic/gin"
@@ -64,6 +65,29 @@ func operatorRequestMeta(c *gin.Context) appservice.OperatorRequestMeta {
 	return meta
 }
 
+// bindOperatorJSON 绑定运营请求体，失败时写入运营错误响应并返回 false。
+func bindOperatorJSON(c *gin.Context, output any) bool {
+	if err := c.ShouldBindJSON(output); err != nil {
+		writeOperatorError(c, appservice.NewOperatorInvalidRequestError(operatorRequestMeta(c)))
+		return false
+	}
+	return true
+}
+
+// positiveOperatorQueryInteger 解析运营请求的正整数查询参数，缺省时返回默认值，非法时写入运营错误响应。
+func positiveOperatorQueryInteger(c *gin.Context, name string, defaultValue int) (int, bool) {
+	value := c.Query(name)
+	if value == "" {
+		return defaultValue, true
+	}
+	parsed, err := strconv.Atoi(value)
+	if err != nil || parsed <= 0 {
+		writeOperatorError(c, appservice.NewOperatorInvalidRequestError(operatorRequestMeta(c)))
+		return 0, false
+	}
+	return parsed, true
+}
+
 // writeOperatorResult 无错误时按状态码写入 JSON 结果，否则写入运营错误响应。
 func writeOperatorResult(c *gin.Context, status int, result any, err error) {
 	if writeOperatorError(c, err) {
@@ -90,10 +114,10 @@ func writeOperatorError(c *gin.Context, err error) bool {
 	}
 	operatorError, ok := appservice.OperatorErrorOf(err)
 	if !ok {
-		meta := operatorRequestMeta(c)
-		slog.Warn("运营调用失败", "request_id", meta.RequestID, "path", c.Request.URL.Path, "error", err)
-		operatorError = appservice.NewOperatorInternalError(meta)
+		operatorError = appservice.NewOperatorInternalError(operatorRequestMeta(c))
 	}
+	slog.Warn("运营调用失败", "request_id", operatorError.RequestID, "path", c.Request.URL.Path,
+		"code", operatorError.Code, "error", err)
 	c.JSON(operatorError.HTTPStatus(), operatorErrorBody{Error: operatorError})
 	return true
 }

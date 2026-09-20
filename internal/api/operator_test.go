@@ -6,8 +6,10 @@ import (
 	"encoding/json"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
+	"github.com/gin-gonic/gin"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 )
 
@@ -75,12 +77,57 @@ func TestOperatorErrorCarriesRequestID(t *testing.T) {
 	request.Header.Set(requestIDHeader, "provisioning-request")
 	recorder := httptest.NewRecorder()
 	service.ServeHTTP(recorder, request)
+	if recorder.Code != http.StatusUnauthorized {
+		t.Fatalf("返回了 %d", recorder.Code)
+	}
 	var body operatorErrorBody
 	if err := json.Unmarshal(recorder.Body.Bytes(), &body); err != nil {
 		t.Fatal(err)
 	}
-	if body.Error.RequestID != "provisioning-request" {
-		t.Fatalf("请求标识不正确: %#v", body.Error)
+	if body.Error.Code != appservice.OperatorErrorCodeInvalidCredential || body.Error.RequestID != "provisioning-request" {
+		t.Fatalf("错误体不正确: %#v", body.Error)
+	}
+}
+
+// TestOperatorBindJSONWritesOperatorError 验证请求体绑定失败返回运营错误契约。
+func TestOperatorBindJSONWritesOperatorError(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodPost, "/organizations", strings.NewReader("{"))
+	c.Request.Header.Set(requestIDHeader, "provisioning-request")
+	var input struct {
+		Name string `json:"name"`
+	}
+	if bindOperatorJSON(c, &input) {
+		t.Fatal("非法请求体被接受")
+	}
+	assertInvalidOperatorRequest(t, recorder)
+}
+
+// TestOperatorQueryIntegerWritesOperatorError 验证查询参数非法时返回运营错误契约。
+func TestOperatorQueryIntegerWritesOperatorError(t *testing.T) {
+	recorder := httptest.NewRecorder()
+	c, _ := gin.CreateTestContext(recorder)
+	c.Request = httptest.NewRequest(http.MethodGet, "/organizations?page=bad", nil)
+	c.Request.Header.Set(requestIDHeader, "provisioning-request")
+	if _, ok := positiveOperatorQueryInteger(c, "page", 1); ok {
+		t.Fatal("非法分页参数被接受")
+	}
+	assertInvalidOperatorRequest(t, recorder)
+}
+
+// assertInvalidOperatorRequest 断言响应是带稳定错误码和请求标识的参数无效错误。
+func assertInvalidOperatorRequest(t *testing.T, recorder *httptest.ResponseRecorder) {
+	t.Helper()
+	if recorder.Code != http.StatusBadRequest {
+		t.Fatalf("返回了 %d", recorder.Code)
+	}
+	var body operatorErrorBody
+	if err := json.Unmarshal(recorder.Body.Bytes(), &body); err != nil {
+		t.Fatal(err)
+	}
+	if body.Error.Code != appservice.OperatorErrorCodeInvalidRequest || body.Error.RequestID != "provisioning-request" || body.Error.Message == "" {
+		t.Fatalf("错误体不正确: %#v", body.Error)
 	}
 }
 

@@ -47,8 +47,10 @@ type route struct {
 	path       string
 	status     int
 	queryName  string
-	public     bool
-	manual     map[string]bool
+	// authSet 记录指令是否显式给出 auth 选项，public 只表达解析后的取值。
+	authSet bool
+	public  bool
+	manual  map[string]bool
 }
 
 // method 描述一个带指令的 Backend 方法。
@@ -86,37 +88,42 @@ type queryStruct struct {
 	untaggedFields []string
 }
 
-// apiTarget 描述一套 Gin 适配代码的接收器、请求元数据构造和输出函数。
+// apiTarget 描述一套 Gin 适配代码的接收器、请求元数据构造、参数绑定和输出函数。
+//
+// 绑定失败与调用失败使用同一套错误输出，各契约的错误体形态因此保持一致。
 type apiTarget struct {
-	comment     string
-	receiver    string
-	register    string
-	requestMeta string
-	writeResult string
-	writeEmpty  string
-	bindPrefix  string
+	comment      string
+	receiver     string
+	register     string
+	requestMeta  string
+	writeResult  string
+	writeEmpty   string
+	bindJSON     string
+	queryInteger string
 }
 
 // businessAPITarget 生成企业业务的 Gin 适配代码。
 var businessAPITarget = apiTarget{
-	comment:     "registerGeneratedRoutes 注册由 appservicegen 生成的业务路由。",
-	receiver:    "s *Service",
-	register:    "registerGeneratedRoutes",
-	requestMeta: "requestMeta(c)",
-	writeResult: "writeResult",
-	writeEmpty:  "writeEmpty",
-	bindPrefix:  "bind",
+	comment:      "registerGeneratedRoutes 注册由 appservicegen 生成的业务路由。",
+	receiver:     "s *Service",
+	register:     "registerGeneratedRoutes",
+	requestMeta:  "requestMeta(c)",
+	writeResult:  "writeResult",
+	writeEmpty:   "writeEmpty",
+	bindJSON:     "bindJSON",
+	queryInteger: "positiveQueryInteger",
 }
 
 // operatorAPITarget 生成运营接口的 Gin 适配代码。
 var operatorAPITarget = apiTarget{
-	comment:     "registerGeneratedOperatorRoutes 注册由 appservicegen 生成的运营路由。",
-	receiver:    "s *OperatorService",
-	register:    "registerGeneratedOperatorRoutes",
-	requestMeta: "operatorRequestMeta(c)",
-	writeResult: "writeOperatorResult",
-	writeEmpty:  "writeOperatorEmpty",
-	bindPrefix:  "bindOperator",
+	comment:      "registerGeneratedOperatorRoutes 注册由 appservicegen 生成的运营路由。",
+	receiver:     "s *OperatorService",
+	register:     "registerGeneratedOperatorRoutes",
+	requestMeta:  "operatorRequestMeta(c)",
+	writeResult:  "writeOperatorResult",
+	writeEmpty:   "writeOperatorEmpty",
+	bindJSON:     "bindOperatorJSON",
+	queryInteger: "positiveOperatorQueryInteger",
 }
 
 // main 解析 Backend 接口并写出各层生成文件。
@@ -286,6 +293,7 @@ func parseRoute(directive string) (route, error) {
 		case "query":
 			parsed.queryName = value
 		case "auth":
+			parsed.authSet = true
 			switch value {
 			case "member":
 				parsed.public = false
@@ -535,10 +543,11 @@ func validate(methods []method, queryStructs map[string]queryStruct) error {
 
 // validateOperator 校验运营契约的指令选项和查询结构体声明。
 //
-// 运营调用一律校验运营服务凭据并生成全部层，指令因此不接受 auth 和 manual 选项。
+// 运营调用一律校验运营服务凭据，生成范围固定为认证分发和 Gin 适配，
+// 指令因此只接受 status 和 query 选项。
 func validateOperator(methods []method, queryStructs map[string]queryStruct) error {
 	for _, item := range methods {
-		if item.route.public {
+		if item.route.authSet {
 			return fmt.Errorf("operator method %s: auth option is not supported", item.name)
 		}
 		if len(item.route.manual) > 0 {
@@ -709,10 +718,10 @@ func generateAPI(methods []method, queryStructs map[string]queryStruct, target a
 				arguments = append(arguments, fmt.Sprintf("appservice.%s(c.Query(%q))", parameter.typ, parameter.name))
 			case paramQueryStruct:
 				usedQueryStructs[parameter.typ] = true
-				fmt.Fprintf(builder, "\tinput, ok := %s%sQuery(c)\n\tif !ok {\n\t\treturn\n\t}\n", target.bindPrefix, parameter.typ)
+				fmt.Fprintf(builder, "\tinput, ok := bind%sQuery(c)\n\tif !ok {\n\t\treturn\n\t}\n", parameter.typ)
 				arguments = append(arguments, "input")
 			case paramBody:
-				fmt.Fprintf(builder, "\tvar input appservice.%s\n\tif !bindJSON(c, &input) {\n\t\treturn\n\t}\n", parameter.typ)
+				fmt.Fprintf(builder, "\tvar input appservice.%s\n\tif !%s(c, &input) {\n\t\treturn\n\t}\n", parameter.typ, target.bindJSON)
 				arguments = append(arguments, "input")
 			}
 		}
@@ -736,12 +745,12 @@ func generateAPI(methods []method, queryStructs map[string]queryStruct, target a
 
 	for _, structName := range sortedKeys(usedQueryStructs) {
 		fields := queryStructs[structName].fields
-		fmt.Fprintf(builder, "// %s%sQuery 从查询参数解析 appservice.%s。\n", target.bindPrefix, structName, structName)
-		fmt.Fprintf(builder, "func %s%sQuery(c *gin.Context) (appservice.%s, bool) {\n", target.bindPrefix, structName, structName)
+		fmt.Fprintf(builder, "// bind%sQuery 从查询参数解析 appservice.%s。\n", structName, structName)
+		fmt.Fprintf(builder, "func bind%sQuery(c *gin.Context) (appservice.%s, bool) {\n", structName, structName)
 		for _, field := range fields {
 			if field.kind == queryInt {
-				fmt.Fprintf(builder, "\t%s, ok := positiveQueryInteger(c, %q, %d)\n\tif !ok {\n\t\treturn appservice.%s{}, false\n\t}\n",
-					lowerFirst(field.fieldName), field.queryName, field.defaultValue, structName)
+				fmt.Fprintf(builder, "\t%s, ok := %s(c, %q, %d)\n\tif !ok {\n\t\treturn appservice.%s{}, false\n\t}\n",
+					lowerFirst(field.fieldName), target.queryInteger, field.queryName, field.defaultValue, structName)
 			}
 		}
 		fmt.Fprintf(builder, "\treturn appservice.%s{\n", structName)

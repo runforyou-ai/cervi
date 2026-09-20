@@ -5,7 +5,6 @@ package appservice
 import (
 	"context"
 	"crypto/subtle"
-	"log/slog"
 )
 
 var _ OperatorBackend = (*OperatorDirectBackend)(nil)
@@ -18,7 +17,6 @@ type operatorGuard struct {
 // authenticate 按常量时间比较运营服务凭据，凭据是运营接口的唯一访问控制手段。
 func (g operatorGuard) authenticate(_ context.Context, meta OperatorRequestMeta) (OperatorIdentity, error) {
 	if subtle.ConstantTimeCompare([]byte(meta.Credential), []byte(g.credential)) != 1 {
-		slog.Warn("运营凭据无效", "request_id", meta.RequestID)
 		return OperatorIdentity{}, invalidOperatorCredentialError(meta)
 	}
 	return OperatorIdentity{RequestID: meta.RequestID}, nil
