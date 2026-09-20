@@ -740,7 +740,6 @@ export function ConversationComposer({
         "max-h-[200px] min-h-10 min-w-0 flex-1 resize-none rounded-none border-0 bg-transparent px-0.5 pt-[11px] pb-[9px] leading-5 shadow-none focus-visible:ring-0 dark:bg-transparent",
         // 正文与 20px 工具图标配比；窄屏保持 16px，避免移动端聚焦时缩放。
         "md:text-[15px]",
-        disabledReason && "pl-3",
       )}
       onInput={(event) => {
         resizeComposerInput(event.currentTarget)
@@ -953,14 +952,6 @@ export function ConversationComposer({
               </button>
             </div>
           ) : null}
-          {disabledReason ? (
-            <p
-              id={`${inputID}-reason`}
-              className="truncate border-b px-3 py-1.5 text-xs text-muted-foreground"
-            >
-              {disabledReason}
-            </p>
-          ) : null}
           {/* 输入区整体铺底色，正文单独用白底并与上下边缘留出间距。 */}
           <div className="flex items-end gap-2 bg-foreground/[0.03] px-2 py-1">
             {disabledReason ? null : (
@@ -997,7 +988,16 @@ export function ConversationComposer({
               </div>
             )}
             <div className="flex min-w-0 flex-1 items-end rounded-md bg-background px-2">
-              {bodyInput}
+              {disabledReason ? (
+                <p
+                  id={`${inputID}-reason`}
+                  className="min-w-0 flex-1 truncate py-[10px] text-xs leading-5 text-muted-foreground"
+                >
+                  {disabledReason}
+                </p>
+              ) : (
+                bodyInput
+              )}
             </div>
             <div className="mb-1 flex items-end gap-0.5">
               {disabledReason ? null : emojiTool}
