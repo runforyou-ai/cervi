@@ -327,6 +327,7 @@ const inbox = {
   attachmentLimit: "Select up to 100 files or images",
   attachmentPreview: "Preview {{name}}",
   attachmentPreviewRetry: "Image could not load. Retry",
+  voiceMessage: "Voice message",
   attachmentAdd: "Add attachment",
   emojiPick: "Choose emoji",
   messageBodyTooLong: "Messages can contain up to 4,000 characters",

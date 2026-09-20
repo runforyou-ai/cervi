@@ -320,6 +320,7 @@ const inbox = {
   attachmentLimit: "一次最多选择 100 个附件或图片",
   attachmentPreview: "预览 {{name}}",
   attachmentPreviewRetry: "图片加载失败，点击重试",
+  voiceMessage: "语音消息",
   attachmentAdd: "添加附件",
   emojiPick: "选择表情",
   messageBodyTooLong: "消息最多 4000 个字符",

@@ -10,7 +10,7 @@ import {
   type RefObject,
 } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { ArrowUpIcon, LoaderCircleIcon, PaperclipIcon, SmileIcon } from "lucide-react"
+import { ArrowUpIcon, LoaderCircleIcon, MicIcon, PaperclipIcon, SmileIcon } from "lucide-react"
 import { useForm } from "react-hook-form"
 import { messagePreview } from "@/lib/message-preview"
 import { useTranslation } from "react-i18next"
@@ -800,8 +800,8 @@ export function ConversationComposer({
       className={cn(
         // 行高贴近字体自然行高，避免换行前后光标高度跳变；与上下内边距之和等于单行高度，正文与工具图标同一水平线。
         "max-h-[200px] min-h-9 min-w-0 flex-1 resize-none rounded-none border-0 bg-transparent px-0.5 py-2 leading-5 shadow-none caret-primary focus-visible:ring-0 dark:bg-transparent",
-        // 正文与 20px 工具图标配比；移动端保持 16px，避免聚焦时缩放。
-        mobile ? "md:text-base" : "md:text-[15px]",
+        // 正文与 20px 工具图标配比；窄屏保持 16px，避免移动端聚焦时缩放。
+        "md:text-[15px]",
         disabledReason && "pl-3",
       )}
       onInput={(event) => {
@@ -929,12 +929,12 @@ export function ConversationComposer({
     <form
       data-slot="conversation-composer"
       data-conversation-id={conversationID}
-      className={cn("shrink-0 bg-background", mobile ? "px-2 py-2" : "")}
+      className="shrink-0 bg-background"
       onSubmit={form.handleSubmit(send)}
       noValidate
     >
       {onVisibilityChange ? (
-        <div role="tablist" aria-label={t("composerMode")} className={cn("flex items-center gap-1", mobile ? "mb-2" : "px-2 pt-2 pb-1.5")}>
+        <div role="tablist" aria-label={t("composerMode")} className="flex items-center gap-1 px-2 pt-2 pb-1.5">
           <button
             type="button"
             role="tab"
@@ -1033,9 +1033,7 @@ export function ConversationComposer({
         )}
         <div
           className={cn(
-            mobile
-              ? "overflow-hidden rounded-[21px] border shadow-xs"
-              : "border-t",
+            "border-t",
             internalNote
               ? "border-amber-500/70 bg-amber-50/60 dark:bg-amber-950/30"
               : "border-input bg-background",
@@ -1078,13 +1076,11 @@ export function ConversationComposer({
               {disabledReason}
             </p>
           ) : null}
-          <div className={cn("flex items-end", mobile ? "p-0.5" : "px-2 py-1.5")}>
+          <div className="flex items-end px-2 py-1.5">
+            {disabledReason ? null : attachmentTool}
+            {bodyInput}
             {disabledReason ? null : emojiTool}
             {replyAssistant}
-            {bodyInput}
-            {disabledReason ? null : (
-              <div className={cn("flex", showSend && "hidden")}>{attachmentTool}</div>
-            )}
             {showSend ? (
               <Button
                 type="submit"
@@ -1095,7 +1091,18 @@ export function ConversationComposer({
               >
                 {showSubmitting ? <LoaderCircleIcon className="animate-spin" /> : <ArrowUpIcon />}
               </Button>
-            ) : null}
+            ) : (
+              <Button
+                type="button"
+                variant="ghost"
+                size="icon-sm"
+                className={cn(composerToolClass, "ml-1 w-9")}
+                disabled
+                aria-label={t("voiceMessage")}
+              >
+                <MicIcon />
+              </Button>
+            )}
           </div>
         </div>
       </div>
