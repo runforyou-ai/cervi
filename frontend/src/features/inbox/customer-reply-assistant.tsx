@@ -227,7 +227,7 @@ export function CustomerReplyAssistant({
       {open && generating ? (
         <LoaderCircleIcon className="animate-spin" />
       ) : (
-        <span aria-hidden="true" className="text-[15px] leading-none font-semibold tracking-tight">
+        <span aria-hidden="true" className="text-[11px] leading-none font-semibold tracking-tight">
           AI
         </span>
       )}

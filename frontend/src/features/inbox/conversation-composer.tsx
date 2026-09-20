@@ -816,7 +816,7 @@ export function ConversationComposer({
           disabled={isSubmitting || Boolean(disabledReason)}
           aria-label={t("emojiPick")}
         >
-          <SmileIcon className="size-5" />
+          <SmileIcon />
         </Button>
       </PopoverTrigger>
       <PopoverContent
@@ -826,10 +826,8 @@ export function ConversationComposer({
         aria-label={t("emojiPick")}
         className={cn(
           "grid max-h-64 gap-0.5 overflow-y-auto p-1.5",
-          // 移动端面板不超过可用宽度，列数按 44px 触控按钮自动填充。
-          mobile
-            ? "w-[min(22rem,var(--radix-popover-content-available-width))] grid-cols-[repeat(auto-fill,2.75rem)]"
-            : "w-auto grid-cols-8",
+          // 面板不超过可用宽度，列数按 36px 按钮自动填充。
+          "w-[min(19rem,var(--radix-popover-content-available-width))] grid-cols-[repeat(auto-fill,2.25rem)]",
         )}
         onCloseAutoFocus={(event) => {
           // 选中表情后焦点回到输入框并定位到插入内容之后。
@@ -847,8 +845,7 @@ export function ConversationComposer({
             key={emoji}
             type="button"
             className={cn(
-              "flex items-center justify-center rounded-md text-xl leading-none outline-none hover:bg-accent focus-visible:bg-accent",
-              mobile ? "size-11" : "size-8",
+              "flex size-9 items-center justify-center rounded-md text-xl leading-none outline-none hover:bg-accent focus-visible:bg-accent",
             )}
             onClick={() => insertEmoji(emoji)}
           >
@@ -885,8 +882,7 @@ export function ConversationComposer({
                 role="option"
                 aria-selected={index === activeMentionIndex}
                 className={cn(
-                  "flex w-full items-center rounded-sm px-2 py-1.5 text-left text-sm outline-none hover:bg-accent aria-selected:bg-accent",
-                  mobile && "min-h-11",
+                  "flex min-h-9 w-full items-center rounded-sm px-2 py-1.5 text-left text-sm outline-none hover:bg-accent aria-selected:bg-accent",
                 )}
                 onPointerDown={(event) => event.preventDefault()}
                 onClick={() => selectMention(candidate)}
@@ -942,8 +938,7 @@ export function ConversationComposer({
               <button
                 type="button"
                 className={cn(
-                  "shrink-0 text-muted-foreground hover:text-foreground",
-                  mobile && "-my-2 min-h-11 px-2",
+                  "-my-1 min-h-8 shrink-0 px-2 text-muted-foreground hover:text-foreground",
                 )}
                 disabled={Boolean(disabledReason)}
                 onClick={() => onReplyToChange?.(null)}
@@ -954,7 +949,7 @@ export function ConversationComposer({
           ) : null}
           {/* 输入区整体铺底色，正文单独用白底并与上下边缘留出间距。 */}
           <div className="flex items-end gap-2 bg-foreground/[0.03] px-2 py-1">
-            <div className="mb-1 flex items-end gap-0.5">
+            <div className="mb-1.5 flex items-end gap-0.5">
               {onVisibilityChange ? (
                 <Tooltip>
                   <TooltipTrigger asChild>
@@ -997,14 +992,14 @@ export function ConversationComposer({
                 bodyInput
               )}
             </div>
-            <div className="mb-1 flex items-end gap-0.5">
+            <div className="mb-1.5 flex items-end gap-0.5">
               {emojiTool}
               {replyAssistant}
               {showSend ? (
                 <Button
                   type="submit"
-                  size="icon"
-                  className="relative size-8 rounded-full after:absolute after:-inset-1 after:content-[''] [&_svg:not([class*='size-'])]:size-[18px]"
+                  size="icon-sm"
+                  className="relative rounded-full after:absolute after:-inset-1 after:content-['']"
                   disabled={isSubmitting || Boolean(disabledReason) || isBodyEmpty || replyTo?.deleted}
                   aria-label={t(internalNote ? "internalNoteSave" : "messageSend")}
                 >
