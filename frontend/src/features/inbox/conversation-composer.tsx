@@ -1043,10 +1043,10 @@ export function ConversationComposer({
               {disabledReason}
             </p>
           ) : null}
-          {/* 左右图标区铺到输入区边缘并撑满行高，与中间输入区区分。 */}
-          <div className="flex items-end gap-2">
+          {/* 输入区整体铺底色，正文单独用白底并与上下边缘留出间距。 */}
+          <div className="flex items-end gap-2 bg-foreground/5 px-2 py-2.5">
             {disabledReason ? null : (
-              <div className="flex items-end gap-1 self-stretch bg-foreground/5 px-2">
+              <div className="flex items-end gap-1 self-stretch">
                 {onVisibilityChange ? (
                   <Tooltip>
                     <TooltipTrigger asChild>
@@ -1078,8 +1078,10 @@ export function ConversationComposer({
                 {attachmentTool}
               </div>
             )}
-            {bodyInput}
-            <div className="flex items-end gap-1 self-stretch bg-foreground/5 px-2">
+            <div className="flex min-w-0 flex-1 items-end rounded-md bg-background px-2">
+              {bodyInput}
+            </div>
+            <div className="flex items-end gap-1 self-stretch">
               {disabledReason ? null : emojiTool}
               {replyAssistant}
               {showSend ? (
