@@ -48,6 +48,8 @@ import {
   selectableWorkStatuses,
   WorkStatusDot,
   workStatusLabel,
+  workStatusTextClass,
+  workStatusTintClass,
 } from "@/components/work-status"
 import { UserAvatar } from "@/components/user-avatar"
 import { cn } from "@/lib/utils"
@@ -189,6 +191,53 @@ function WorkspaceSettingsMenu({ appHref }: { appHref: string }) {
   )
 }
 
+/** 用当前工作状态文字触发的状态选择菜单。 */
+function WorkStatusPicker({
+  status,
+  onChange,
+}: {
+  status: WorkStatus
+  onChange: (workStatus: WorkStatus) => void
+}) {
+  const { t } = useTranslation("workspace")
+  const { t: tCommon } = useTranslation("common")
+
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          className={cn(
+            "w-fit max-w-full truncate rounded-full px-2.5 text-left text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring",
+            workStatusTextClass(status),
+            workStatusTintClass(status),
+          )}
+          aria-label={t("workStatus")}
+        >
+          {workStatusLabel(status, tCommon)}
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent side="bottom" align="start" className="w-36">
+        {selectableWorkStatuses.map((workStatus) => (
+          <DropdownMenuItem
+            key={workStatus}
+            onSelect={(event) => {
+              event.preventDefault()
+              onChange(workStatus)
+            }}
+          >
+            <WorkStatusDot status={workStatus} />
+            <span className="flex-1">{workStatusLabel(workStatus, tCommon)}</span>
+            {workStatus === status ? (
+              <CheckIcon className="text-primary" />
+            ) : null}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  )
+}
+
 /** 渲染模块栏和用户菜单。 */
 export function WorkspaceNavigation({
   identity,
@@ -204,7 +253,6 @@ export function WorkspaceNavigation({
   loggingOut: boolean
 }) {
   const { t } = useTranslation("workspace")
-  const { t: tCommon } = useTranslation("common")
   const navigate = useNavigate()
   const unsavedChanges = useUnsavedChangesContext()
   const invalidate = useResourceInvalidator()
@@ -287,8 +335,13 @@ export function WorkspaceNavigation({
                     className="absolute -right-0.5 -bottom-0.5 ring-2 ring-sidebar"
                   />
                 </span>
-                <span className="min-w-0 flex-1 truncate text-sm">
-                  {identity.user.displayName}
+                <span className="grid min-w-0 flex-1 gap-0.5 leading-tight">
+                  <span className="truncate text-sm font-medium">
+                    {identity.user.displayName}
+                  </span>
+                  <span className="truncate text-xs text-muted-foreground">
+                    {identity.user.email}
+                  </span>
                 </span>
               </button>
             </DropdownMenuTrigger>
@@ -307,50 +360,28 @@ export function WorkspaceNavigation({
               }}
             >
               <DropdownMenuLabel className="p-2 font-normal">
-                <div className="flex items-center gap-3">
-                  <div className="relative size-10 shrink-0">
+                <div className="flex items-center gap-2.5">
+                  <div className="relative size-9 shrink-0">
                     <UserAvatar
                       user={identity.user}
-                      className="size-10 rounded-lg text-sm"
+                      className="size-9 rounded-lg text-sm"
                     />
                     <WorkStatusDot
                       status={identity.user.workStatus}
                       className="absolute -right-0.5 -bottom-0.5 ring-2 ring-popover"
                     />
                   </div>
-                  <div className="grid min-w-0 gap-1 leading-tight">
-                    <span className="truncate font-medium">
+                  <div className="grid min-w-0 flex-1 translate-y-0.5 gap-0.5 leading-tight">
+                    <span className="truncate text-base font-medium">
                       {identity.user.displayName}
                     </span>
-                    <span className="truncate text-xs text-muted-foreground">
-                      {identity.user.email}
-                    </span>
+                    <WorkStatusPicker
+                      status={identity.user.workStatus}
+                      onChange={changeWorkStatus}
+                    />
                   </div>
                 </div>
               </DropdownMenuLabel>
-              <DropdownMenuSeparator />
-              <DropdownMenuLabel className="text-sm text-muted-foreground">
-                {t("workStatus")}
-              </DropdownMenuLabel>
-              {selectableWorkStatuses.map((workStatus) => {
-                const selected = identity.user.workStatus === workStatus
-                return (
-                  <DropdownMenuItem
-                    key={workStatus}
-                    className="text-xs"
-                    onSelect={(event) => {
-                      event.preventDefault()
-                      void changeWorkStatus(workStatus)
-                    }}
-                  >
-                    <WorkStatusDot status={workStatus} className="size-2" />
-                    <span className="flex-1">
-                      {workStatusLabel(workStatus, tCommon)}
-                    </span>
-                    {selected ? <CheckIcon className="text-primary" /> : null}
-                  </DropdownMenuItem>
-                )
-              })}
               <DropdownMenuSeparator />
               <DropdownMenuItem
                 onSelect={() => navigateFromUserMenu("/settings/profile")}
