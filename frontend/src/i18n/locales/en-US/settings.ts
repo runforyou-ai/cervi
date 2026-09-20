@@ -1,9 +1,11 @@
 /** 美式英语·设置文案。 */
 const settings = {
-  personalTitle: "Personal settings",
-  personalNavigationLabel: "Personal settings menu",
-  systemTitle: "System settings",
-  systemNavigationLabel: "System settings menu",
+  title: "Settings",
+  navigationLabel: "Settings menu",
+  groups: {
+    personal: "Personal",
+    organization: "Organization",
+  },
   navigation: {
     profile: "Profile",
     security: "Login & security",

@@ -1,5 +1,6 @@
 /** 页面内容区的左右分栏。 */
 import type { ReactNode } from "react"
+import type { LucideIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { NavLink, useLocation } from "react-router"
 
@@ -111,10 +112,12 @@ export function PagePaneNav({
 export function PagePaneLink({
   to,
   activePath,
+  icon: Icon,
   children,
 }: {
   to?: string
   activePath?: string
+  icon?: LucideIcon
   children: ReactNode
 }) {
   const { t } = useTranslation("common")
@@ -132,6 +135,7 @@ export function PagePaneLink({
         aria-disabled="true"
         title={t("comingSoon")}
       >
+        {Icon ? <Icon className="size-4 shrink-0" /> : null}
         <span className="min-w-0 flex-1 truncate">{children}</span>
         <StatusBadge variant="muted">{t("comingSoon")}</StatusBadge>
       </span>
@@ -150,7 +154,26 @@ export function PagePaneLink({
         )
       }
     >
+      {Icon ? <Icon className="size-4 shrink-0" /> : null}
       <span className="min-w-0 flex-1 truncate">{children}</span>
     </NavLink>
+  )
+}
+
+/** 分栏左栏导航分组，分组标题下是同组导航项。 */
+export function PagePaneGroup({
+  title,
+  children,
+}: {
+  title: string
+  children: ReactNode
+}) {
+  return (
+    <div className="flex flex-col gap-0.5">
+      <span className="px-2.5 pt-2.5 pb-0.5 text-[11px] font-semibold tracking-[0.12em] text-muted-foreground/70 uppercase">
+        {title}
+      </span>
+      {children}
+    </div>
   )
 }

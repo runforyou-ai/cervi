@@ -24,10 +24,7 @@ import { KnowledgeBaseFormPage } from "@/features/knowledge-base/knowledge-base-
 import { KnowledgeBaseIndexPage } from "@/features/knowledge-base/knowledge-base-index-page"
 import { KnowledgeBaseLayout } from "@/features/knowledge-base/knowledge-base-layout"
 import { RoleFormPage } from "@/features/roles/role-form-page"
-import {
-  PersonalSettingsPage,
-  SystemSettingsPage,
-} from "@/features/settings/settings-page"
+import { SettingsPage } from "@/features/settings/settings-page"
 
 /** 需要公共外壳的路由前缀，同一前缀下的页面渲染在对应布局内。 */
 const workspaceRouteLayouts = [
@@ -42,38 +39,38 @@ const workspaceRouteLayouts = [
 const workspaceRouteDefinitions = [
   { path: "/inbox", titleKey: "tabs.routes.inbox", element: <InboxRoute /> },
   {
-    path: "/account/profile",
+    path: "/settings/profile",
     titleKey: "tabs.routes.profile",
-    element: <PersonalSettingsPage section="profile" />,
+    element: <SettingsPage section="profile" />,
   },
   {
-    path: "/account/security",
+    path: "/settings/security",
     titleKey: "tabs.routes.security",
-    element: <PersonalSettingsPage section="security" />,
+    element: <SettingsPage section="security" />,
   },
   {
-    path: "/account/preferences",
+    path: "/settings/preferences",
     titleKey: "tabs.routes.preferences",
-    element: <PersonalSettingsPage section="preferences" />,
+    element: <SettingsPage section="preferences" />,
   },
   {
-    path: "/account/devices",
+    path: "/settings/devices",
     titleKey: "tabs.routes.devices",
-    element: <PersonalSettingsPage section="devices" />,
+    element: <SettingsPage section="devices" />,
   },
   {
     path: "/settings/general",
     titleKey: "tabs.routes.general",
-    element: <SystemSettingsPage section="general" />,
+    element: <SettingsPage section="general" />,
   },
   {
     path: "/settings/roles/new",
     tabPath: "/settings/roles",
     titleKey: "tabs.routes.roles",
     element: (
-      <SystemSettingsPage section="roles">
+      <SettingsPage section="roles">
         <RoleFormPage mode="create" />
-      </SystemSettingsPage>
+      </SettingsPage>
     ),
   },
   {
@@ -81,15 +78,15 @@ const workspaceRouteDefinitions = [
     tabPath: "/settings/roles",
     titleKey: "tabs.routes.roles",
     element: (
-      <SystemSettingsPage section="roles">
+      <SettingsPage section="roles">
         <RoleFormPage mode="detail" />
-      </SystemSettingsPage>
+      </SettingsPage>
     ),
   },
   {
     path: "/settings/roles",
     titleKey: "tabs.routes.roles",
-    element: <SystemSettingsPage section="roles" />,
+    element: <SettingsPage section="roles" />,
   },
   {
     path: "/contacts/employees",
@@ -341,8 +338,7 @@ const workspaceRouteObjects: RouteObject[] = [
 ]
 
 const workspaceRedirects: Readonly<Record<string, string>> = {
-  "/account": "/account/profile",
-  "/settings": "/settings/general",
+  "/settings": "/settings/profile",
   "/contacts": "/contacts/employees",
   "/integrations": "/integrations/channels",
   "/integrations/model-services": "/integrations/model-services/chat",

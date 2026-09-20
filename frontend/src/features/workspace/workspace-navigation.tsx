@@ -120,14 +120,6 @@ function WorkspaceMenu({
         label={t("apps")}
         active={location.pathname.startsWith("/apps")}
       />
-      <div className="mt-auto pb-1">
-        <WorkspaceRailItem
-          to="/settings/general"
-          icon={SettingsIcon}
-          label={t("systemSettings")}
-          active={location.pathname.startsWith("/settings")}
-        />
-      </div>
     </nav>
   )
 }
@@ -198,7 +190,8 @@ export function WorkspaceNavigation({
 
   return (
     <aside className="cervi-workspace-rail flex h-full shrink-0 flex-col text-sidebar-foreground">
-      <div className="flex justify-center pt-2.5 pr-0 pb-1 pl-1.5">
+      <WorkspaceMenu onInboxClick={requestMessageNotificationPermission} />
+      <div className="flex justify-center pt-1 pr-0 pb-2.5 pl-1.5">
         <DropdownMenu open={userMenuOpen} onOpenChange={setUserMenuOpen}>
           <DropdownMenuTrigger asChild>
             <button
@@ -218,7 +211,7 @@ export function WorkspaceNavigation({
           </DropdownMenuTrigger>
           <DropdownMenuContent
             side="right"
-            align="start"
+            align="end"
             className="w-56"
             onCloseAutoFocus={(event) => {
               if (!skipUserMenuFocusRestoreRef.current) {
@@ -230,10 +223,7 @@ export function WorkspaceNavigation({
               userMenuTriggerRef.current?.blur()
             }}
           >
-            <DropdownMenuItem
-              className="p-2"
-              onSelect={() => navigateFromUserMenu("/account/profile")}
-            >
+            <DropdownMenuLabel className="p-2 font-normal">
               <div className="flex items-center gap-3">
                 <div className="relative size-10 shrink-0">
                   <UserAvatar
@@ -254,7 +244,7 @@ export function WorkspaceNavigation({
                   </span>
                 </div>
               </div>
-            </DropdownMenuItem>
+            </DropdownMenuLabel>
             <DropdownMenuSeparator />
             <DropdownMenuLabel className="text-sm text-muted-foreground">
               {t("workStatus")}
@@ -280,6 +270,13 @@ export function WorkspaceNavigation({
             })}
             <DropdownMenuSeparator />
             <DropdownMenuItem
+              onSelect={() => navigateFromUserMenu("/settings/profile")}
+            >
+              <SettingsIcon />
+              {t("settings")}
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem
               destructive
               disabled={loggingOut}
               onSelect={async () => {
@@ -298,7 +295,6 @@ export function WorkspaceNavigation({
           </DropdownMenuContent>
         </DropdownMenu>
       </div>
-      <WorkspaceMenu onInboxClick={requestMessageNotificationPermission} />
     </aside>
   )
 }
