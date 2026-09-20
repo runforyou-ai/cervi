@@ -1096,7 +1096,7 @@ export function ConversationComposer({
                 type="button"
                 variant="ghost"
                 size="icon-sm"
-                className={cn(composerToolClass, "w-9")}
+                className={composerToolClass}
                 disabled
                 aria-label={t("voiceMessage")}
               >
