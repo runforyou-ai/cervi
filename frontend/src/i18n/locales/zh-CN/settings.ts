@@ -1,9 +1,11 @@
 /** 简体中文·设置文案。 */
 const settings = {
-  personalTitle: "个人设置",
-  personalNavigationLabel: "个人设置菜单",
-  systemTitle: "系统设置",
-  systemNavigationLabel: "系统设置菜单",
+  title: "设置",
+  navigationLabel: "设置菜单",
+  groups: {
+    personal: "个人",
+    organization: "企业",
+  },
   navigation: {
     profile: "个人资料",
     security: "登录与安全",
