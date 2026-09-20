@@ -165,7 +165,7 @@ export function GeneralSettingsForm({
                 })
               }}
             >
-              {t("general.confirm.enable")}
+              {t("common:actions.confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

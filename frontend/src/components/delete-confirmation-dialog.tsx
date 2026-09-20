@@ -50,7 +50,7 @@ export function DeleteConfirmationDialog({
               onConfirm()
             }}
           >
-            {pending ? t("actions.deleting") : t("actions.delete")}
+            {pending ? t("actions.deleting") : t("actions.confirm")}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

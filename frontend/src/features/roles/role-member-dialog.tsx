@@ -326,7 +326,7 @@ export function RoleMemberDialog({
             disabled={loading || error}
             onClick={confirmChanges}
           >
-            {t("roles.members.confirm")}
+            {tCommon("actions.confirm")}
           </Button>
         </div>
       </DialogContent>

@@ -137,7 +137,7 @@ export function CustomerDeliveryState({
               event.preventDefault()
               void resolve(CustomerDeliveryResolution.CustomerDeliveryRetry, true)
             }}>
-              {t("messageRetry")}
+              {t("common:actions.confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

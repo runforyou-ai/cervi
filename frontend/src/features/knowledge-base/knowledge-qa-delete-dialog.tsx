@@ -94,7 +94,7 @@ export function KnowledgeQADeleteDialog({
               void confirmDelete()
             }}
           >
-            {busy ? t("common:actions.deleting") : t("common:actions.delete")}
+            {busy ? t("common:actions.deleting") : t("common:actions.confirm")}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

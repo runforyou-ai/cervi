@@ -44,12 +44,10 @@ const channels = {
   deactivation: {
     title: "Deactivate “{{name}}”?",
     description: "You can activate it again later.",
-    confirm: "Deactivate",
   },
   activation: {
     title: "Activate “{{name}}”?",
     description: "The channel status will change to enabled.",
-    confirm: "Activate",
   },
   create: {
     title: "Add channel",
@@ -122,7 +120,6 @@ const channels = {
       title: "Reuse this Telegram bot?",
       description:
         "This bot is already used by another channel. Continuing will switch its Telegram webhook to this channel, and the previous channel will stop receiving updates.",
-      confirm: "Continue saving",
     },
     info: {
       title: "Connection information",

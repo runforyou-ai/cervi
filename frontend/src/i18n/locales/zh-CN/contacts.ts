@@ -247,7 +247,6 @@ const contacts = {
       action: "删除团队",
       title: "删除“{{name}}”？",
       description: "{{count}} 名成员将退出该团队，成员账号不会被删除。",
-      confirm: "删除团队",
       success: "团队已删除",
       error: "删除团队失败，请重试。",
     },
@@ -293,7 +292,6 @@ const contacts = {
   delete: {
     title: "将“{{name}}”移入回收站？",
     description: "联系人将从当前列表移除，可稍后从回收站恢复。",
-    confirm: "移入回收站",
     success: "联系人已移入回收站",
     error: "删除联系人失败，请重试。",
   },
@@ -303,7 +301,6 @@ const contacts = {
     restore: "恢复",
     restoreTitle: "恢复“{{name}}”？",
     restoreDescription: "联系人将离开回收站并重新出现在正常联系人列表中。",
-    restoreConfirm: "恢复联系人",
     restoring: "正在恢复…",
     restored: "联系人已恢复",
     restoreError: "恢复联系人失败，请重试。",

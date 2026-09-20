@@ -111,7 +111,6 @@ const settings = {
       title: "允许打开任意网址？",
       description:
         "开启后，成员可以访问未经企业配置和验证的网站，可能面临钓鱼网站、恶意内容或敏感信息泄露风险。请确认企业已制定相应的使用规范。",
-      enable: "确认开启",
     },
     validation: {
       nameRequired: "请输入企业名称。",
@@ -188,7 +187,6 @@ const settings = {
       assignedTo: "已属于“{{role}}”",
       aiEmployee: "AI 员工",
       add: "加入",
-      confirm: "确定",
     },
     validation: {
       nameRequired: "请输入角色名称。",

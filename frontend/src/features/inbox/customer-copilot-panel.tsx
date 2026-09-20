@@ -271,7 +271,7 @@ export function CustomerCopilotPanel({
                 setPendingReply(null)
               }}
             >
-              {t("copilotApplyReplyConfirm")}
+              {t("common:actions.confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

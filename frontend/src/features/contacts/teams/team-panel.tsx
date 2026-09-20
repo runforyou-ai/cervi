@@ -510,7 +510,7 @@ export function TeamPanel({
               disabled={deleting}
               onClick={() => void removeCurrentTeam()}
             >
-              {t("teams.delete.confirm")}
+              {tCommon("actions.confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -545,7 +545,7 @@ export function TeamPanel({
               disabled={deleting}
               onClick={() => void removeMembersFromCurrentTeam()}
             >
-              {t("teams.members.remove")}
+              {tCommon("actions.confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

@@ -313,7 +313,7 @@ export function GroupParticipantList({
               disabled={acting}
               onClick={() => void transferOwner()}
             >
-              {t("groupTransferOwnerConfirm")}
+              {t("common:actions.confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -342,7 +342,7 @@ export function GroupParticipantList({
               disabled={acting}
               onClick={() => void removeMember()}
             >
-              {t("groupRemoveMemberConfirm")}
+              {t("common:actions.confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -370,7 +370,7 @@ export function GroupParticipantList({
                 void leaveGroup()
               }}
             >
-              {t("groupLeaveConfirm")}
+              {t("common:actions.confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

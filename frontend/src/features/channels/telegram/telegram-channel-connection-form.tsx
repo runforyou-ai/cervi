@@ -217,7 +217,7 @@ export function TelegramChannelConnectionForm({
               className="bg-primary text-primary-foreground hover:bg-primary/90"
               onClick={confirmBotReuse}
             >
-              {t("telegramConnection.reuseConfirmation.confirm")}
+              {t("common:actions.confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

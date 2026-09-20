@@ -201,7 +201,6 @@ const knowledgeBase = {
     noRerankModels: "请先在模型服务中配置重排模型。",
     reindexTitle: "重新索引知识库？",
     reindexDescription: "保存后将清空此知识库的全部索引，并按新设置重新处理资料，每条资料处理完成后恢复检索。",
-    confirmSave: "确认保存",
 
     createTitle: "新建知识库",
     editTitle: "编辑知识库",

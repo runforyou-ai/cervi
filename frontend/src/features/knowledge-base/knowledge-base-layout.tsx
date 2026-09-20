@@ -329,7 +329,7 @@ export function KnowledgeBaseLayout() {
               disabled={deleting}
               onClick={() => void confirmDeleteKnowledgeBase()}
             >
-              {deleting ? t("common:actions.deleting") : t("common:actions.delete")}
+              {deleting ? t("common:actions.deleting") : t("common:actions.confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -354,7 +354,7 @@ export function KnowledgeBaseLayout() {
               disabled={deleting}
               onClick={() => void confirmDeleteGroup()}
             >
-              {deleting ? t("common:actions.deleting") : t("common:actions.delete")}
+              {deleting ? t("common:actions.deleting") : t("common:actions.confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

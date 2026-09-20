@@ -188,7 +188,7 @@ export function CustomerSessionCloseDialog({
             className={buttonClassName}
             onClick={() => void actions.close()}
           >
-            {t("conversationCloseConfirm")}
+            {t("common:actions.confirm")}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
