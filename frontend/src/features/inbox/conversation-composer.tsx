@@ -10,7 +10,7 @@ import {
   type RefObject,
 } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { ArrowUpIcon, LoaderCircleIcon, MicIcon, PaperclipIcon, SmileIcon } from "lucide-react"
+import { ArrowUpIcon, LoaderCircleIcon, MicIcon, PaperclipIcon, SmileIcon, StickyNoteIcon } from "lucide-react"
 import { useForm } from "react-hook-form"
 import { messagePreview } from "@/lib/message-preview"
 import { useTranslation } from "react-i18next"
@@ -42,6 +42,11 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import { Textarea } from "@/components/ui/textarea"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import {
   createConversationComposerSchema,
   type ConversationComposerValues,
@@ -933,44 +938,6 @@ export function ConversationComposer({
       onSubmit={form.handleSubmit(send)}
       noValidate
     >
-      {onVisibilityChange ? (
-        <div role="tablist" aria-label={t("composerMode")} className="flex items-center gap-1 px-2 pt-2 pb-1.5">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={!internalNote}
-            className={cn(
-              "rounded-md px-2 py-1 text-xs font-medium",
-              mobile && "min-h-11 px-3 text-sm",
-              internalNote
-                ? "text-muted-foreground hover:text-foreground"
-                : "bg-muted text-foreground",
-            )}
-            onClick={() =>
-              switchVisibility(MessageVisibility.MessageVisibilityCustomerVisible)
-            }
-          >
-            {t("composerModeCustomer")}
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={internalNote}
-            className={cn(
-              "rounded-md px-2 py-1 text-xs font-medium",
-              mobile && "min-h-11 px-3 text-sm",
-              internalNote
-                ? "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-            onClick={() =>
-              switchVisibility(MessageVisibility.MessageVisibilityInternalOnly)
-            }
-          >
-            {t("composerModeNote")}
-          </button>
-        </div>
-      ) : null}
       <div className="relative">
         {!disabledReason && mentionQuery && mentionCandidates.length > 0 ? (
           <div
@@ -1077,6 +1044,34 @@ export function ConversationComposer({
             </p>
           ) : null}
           <div className="flex items-end gap-1 px-2 py-1.5">
+            {onVisibilityChange && !disabledReason ? (
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    aria-pressed={internalNote}
+                    className={cn(
+                      composerToolClass,
+                      internalNote &&
+                        "bg-amber-100 text-amber-900 hover:bg-amber-100 hover:text-amber-900 dark:bg-amber-950 dark:text-amber-200 dark:hover:bg-amber-950 dark:hover:text-amber-200",
+                    )}
+                    aria-label={t("composerModeNote")}
+                    onClick={() =>
+                      switchVisibility(
+                        internalNote
+                          ? MessageVisibility.MessageVisibilityCustomerVisible
+                          : MessageVisibility.MessageVisibilityInternalOnly,
+                      )
+                    }
+                  >
+                    <StickyNoteIcon />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>{t("composerModeNote")}</TooltipContent>
+              </Tooltip>
+            ) : null}
             {disabledReason ? null : attachmentTool}
             {bodyInput}
             {disabledReason ? null : emojiTool}

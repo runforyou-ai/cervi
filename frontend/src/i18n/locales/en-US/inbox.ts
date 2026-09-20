@@ -336,8 +336,6 @@ const inbox = {
   messageSending: "Sending",
   messageSendError: "Failed to send",
   messageRetry: "Retry",
-  composerMode: "Reply mode",
-  composerModeCustomer: "Reply to customer",
   composerModeNote: "Internal note",
   internalNoteLabel: "Internal note",
   internalNoteSave: "Post note",

@@ -329,8 +329,6 @@ const inbox = {
   messageSending: "发送中",
   messageSendError: "发送失败",
   messageRetry: "重试",
-  composerMode: "回复方式",
-  composerModeCustomer: "回复客户",
   composerModeNote: "内部备注",
   internalNoteLabel: "内部备注",
   internalNoteSave: "留言",
