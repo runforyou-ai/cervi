@@ -16,7 +16,7 @@ export function useConversationName() {
   return useCallback(
     (conversation: InboxConversation) => {
       if (isAgentInboxConversation(conversation))
-        return conversation.agent.title
+        return `${conversation.agent.agentName} · ${conversation.agent.title}`
       if (isDirectInboxConversation(conversation)) {
         return conversation.direct.peerName.trim() || t("unknownSender")
       }

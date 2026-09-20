@@ -22,7 +22,6 @@ import {
 } from "@/api"
 import { Button } from "@/components/ui/button"
 import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
-import { ConversationAvatar } from "@/features/inbox/conversation-avatar"
 import {
   CustomerSessionCloseDialog,
   useCustomerSessionActions,
@@ -147,66 +146,71 @@ export function ConversationHeader({
       <header
         data-slot="conversation-header"
         className={cn(
-          "flex shrink-0 items-center gap-2.5 px-3 py-2",
+          "flex min-h-12 shrink-0 items-center gap-2.5 px-3 py-2",
           narrowViewport && "pr-14",
         )}
       >
-        <ConversationAvatar conversation={conversation} className="size-8" />
         <div className="min-w-0 flex-1">
-          <div className="w-fit max-w-full">
-            <h2
-              data-slot="conversation-header-title"
-              className="w-fit max-w-full truncate text-sm font-semibold"
-              title={contactName}
-            >
-              {contactName}
-            </h2>
-            {customer ? (
-              <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
-                <span
-                  data-slot="conversation-header-detail"
-                  className="inline-flex h-5 shrink-0 items-center rounded-md border px-1.5 text-[10px]"
+          <div className="flex min-w-0 items-center gap-2">
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <h2
+                  data-slot="conversation-header-title"
+                  className="min-w-0 truncate text-sm font-semibold"
                 >
-                  {sessionStatus}
-                </span>
-                <span
-                  data-slot="conversation-header-detail"
-                  className="inline-flex h-5 min-w-0 items-center truncate rounded-md border px-1.5 text-[10px]"
-                  title={customer.title}
-                >
-                  {customer.title}
-                </span>
-                {activityLabel ? <span className="min-w-0 truncate">{activityLabel}</span> : null}
-              </div>
-            ) : group ? (
-              <p
-                data-slot="conversation-header-detail"
-                className="w-fit max-w-full truncate text-xs text-muted-foreground"
-              >
-                {group.status === ConversationStatus.ConversationStatusArchived
-                  ? t("groupDissolved")
-                  : activityLabel || t("groupMemberCount", { count: group.memberCount })}
-              </p>
-            ) : direct ? (
-              <p
-                data-slot="conversation-header-detail"
-                className="w-fit max-w-full truncate text-xs text-muted-foreground"
-              >
-                {activityLabel ||
-                  (direct.peerStatus === UserStatus.UserStatusInactive
-                    ? t("directPeerDisabled")
-                    : workStatusLabel(direct.peerWorkStatus, tCommon))}
-              </p>
-            ) : agent ? (
-              <div
-                data-slot="conversation-header-detail"
-                className="w-fit max-w-full text-xs text-muted-foreground"
-              >
-                {agent.agentName}
-                {agentRunLabel ? ` · ${agentRunLabel}` : ""}
-              </div>
+                  {contactName}
+                </h2>
+              </TooltipTrigger>
+              <TooltipContent className="max-w-80">{contactName}</TooltipContent>
+            </Tooltip>
+            {activityLabel ? (
+              <span className="shrink-0 text-xs text-muted-foreground">
+                {activityLabel}
+              </span>
             ) : null}
           </div>
+          {customer ? (
+            <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
+              <span
+                data-slot="conversation-header-detail"
+                className="inline-flex h-5 shrink-0 items-center rounded-md border px-1.5 text-[10px]"
+              >
+                {sessionStatus}
+              </span>
+              <span
+                data-slot="conversation-header-detail"
+                className="inline-flex h-5 min-w-0 items-center truncate rounded-md border px-1.5 text-[10px]"
+                title={customer.title}
+              >
+                {customer.title}
+              </span>
+            </div>
+          ) : group ? (
+            <p
+              data-slot="conversation-header-detail"
+              className="w-fit max-w-full truncate text-xs text-muted-foreground"
+            >
+              {group.status === ConversationStatus.ConversationStatusArchived
+                ? t("groupDissolved")
+                : t("groupMemberCount", { count: group.memberCount })}
+            </p>
+          ) : direct ? (
+            <p
+              data-slot="conversation-header-detail"
+              className="w-fit max-w-full truncate text-xs text-muted-foreground"
+            >
+              {direct.peerStatus === UserStatus.UserStatusInactive
+                ? t("directPeerDisabled")
+                : workStatusLabel(direct.peerWorkStatus, tCommon)}
+            </p>
+          ) : agentRunLabel ? (
+            <p
+              data-slot="conversation-header-detail"
+              className="w-fit max-w-full truncate text-xs text-muted-foreground"
+            >
+              {agentRunLabel}
+            </p>
+          ) : null}
         </div>
         <div
           data-slot="conversation-actions"

@@ -266,9 +266,7 @@ export function InboxConversationList({
   const names = new Map(
     conversations.map((conversation) => [
       conversation.id,
-      isAgentInboxConversation(conversation)
-        ? `${conversation.agent.agentName} · ${conversation.agent.title}`
-        : conversationName(conversation),
+      conversationName(conversation),
     ]),
   )
   const rows = new Map(conversations.map((conversation) => [conversation.id, conversation]))

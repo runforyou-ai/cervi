@@ -7,7 +7,6 @@ import {
   InboxSearchPersonKind,
   InboxSearchRange,
   OrganizationIdentityType,
-  isAgentInboxConversation,
   type Identity,
   type InboxConversation,
 } from "@/api"
@@ -186,7 +185,7 @@ export function InboxSearchPanel({ search, scope, identity }: { search: InboxSea
         selected={search.selectedIndex === index}
         avatar={<ConversationAvatar conversation={conversation} className="size-7" />}
         title={highlightName(
-          isAgentInboxConversation(conversation) ? `${conversation.agent.agentName} · ${conversation.agent.title}` : conversationName(conversation),
+          conversationName(conversation),
           search.showRecent ? "" : query,
         )}
         onSelect={search.setActiveIndex}
