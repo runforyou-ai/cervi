@@ -389,7 +389,7 @@ export function WorkspaceNavigation({
         </div>
       )}
       {showAppVersion ? (
-        <span className="pt-1 pr-0 pb-2.5 pl-4 text-xs text-muted-foreground">
+        <span className="pt-1 pr-0 pb-2.5 pl-4 text-[11px] text-muted-foreground/70">
           {t("appVersion", { version: __APP_VERSION__ })}
         </span>
       ) : null}
