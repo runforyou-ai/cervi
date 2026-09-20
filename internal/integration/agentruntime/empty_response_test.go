@@ -53,7 +53,7 @@ func TestEmptyFinalResponseRetryIsBounded(t *testing.T) {
 			feed.appendUser("群里的问题")
 			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 			defer cancel()
-			result, err := runtime.Run(ctx, RunRequest{RunID: "test-run-id", Name: "群协作助手"}, feed)
+			result, err := runtime.Run(ctx, RunRequest{RunID: "test-run-id", Assignment: Assignment{AgentName: "群协作助手"}}, feed)
 			if scenario.wantErr && err == nil {
 				t.Fatalf("期望达到上限后失败，实际结果 = %#v", result)
 			}
