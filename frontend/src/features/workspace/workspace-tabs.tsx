@@ -323,7 +323,7 @@ function WorkspaceTabButton({
     <div
       data-active={active}
       className={cn(
-        "cervi-workspace-tab relative isolate mt-1 flex h-10 w-40 shrink-0 items-center",
+        "cervi-workspace-tab relative isolate mt-1 flex h-9 w-36 shrink-0 items-center",
         active
           ? "z-10 rounded-t-[10px] bg-sidebar-accent text-sidebar-accent-foreground"
           : "text-foreground",
@@ -339,7 +339,7 @@ function WorkspaceTabButton({
         tabIndex={active ? 0 : -1}
         title={title}
         className={cn(
-          "flex h-full min-w-0 flex-1 items-center gap-2 rounded-t-[10px] px-3 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+          "flex h-full min-w-0 flex-1 items-center gap-1.5 rounded-t-[10px] px-2.5 text-left text-sm outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
           active && "font-medium",
         )}
         onClick={() => onActivate(tab.id)}
@@ -359,7 +359,7 @@ function WorkspaceTabButton({
       {closable ? (
         <button
           type="button"
-          className="mr-2 flex size-6 shrink-0 items-center justify-center rounded-sm text-muted-foreground opacity-70 outline-none transition-[background-color,color,opacity] hover:bg-background/70 hover:text-foreground hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring"
+          className="mr-1.5 flex size-5 shrink-0 items-center justify-center rounded-sm text-muted-foreground opacity-70 outline-none transition-[background-color,color,opacity] hover:bg-background/70 hover:text-foreground hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-ring"
           aria-label={t("tabs.close", { title })}
           title={t("tabs.close", { title })}
           onClick={() => onClose(tab.id)}
@@ -537,11 +537,11 @@ export function WorkspaceTabs({
 
   return (
     <div className="flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background">
-      <div className="cervi-workspace-tabs flex h-11 shrink-0 border-b bg-background px-2">
+      <div className="cervi-workspace-tabs flex h-10 shrink-0 border-b bg-background px-2">
         <div
           role="tablist"
           aria-label={t("tabs.label")}
-          className="flex min-w-0 flex-1 items-end overflow-x-auto px-2.5 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
+          className="flex min-w-0 flex-1 items-end overflow-x-auto px-2 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden"
         >
           {state.tabs.map((tab, index) => (
             <ContextMenu key={tab.id}>

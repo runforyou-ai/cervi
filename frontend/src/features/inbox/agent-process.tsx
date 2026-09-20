@@ -343,7 +343,7 @@ export function AgentRunState({ run, incoming, conversationID, group, copilot, o
         "relative flex min-h-8 max-w-[75%] flex-col justify-center py-2",
         // 运行中的过程与最终消息气泡同宽，结束后替换为消息时不再重新换行。
         thinking && "max-w-[min(36rem,85%)] sm:max-w-[min(36rem,75%)]",
-        incoming ? "ml-10" : "mr-10",
+        incoming ? "ml-9" : "mr-9",
       )}>
         <ProfileAvatar
           imageURL={run.agentAvatarUrl}
@@ -351,7 +351,7 @@ export function AgentRunState({ run, incoming, conversationID, group, copilot, o
           fallback="agent"
           title={senderName}
           className={cn(
-            "absolute bottom-0 size-8 text-xs",
+            "absolute bottom-0 size-7 text-xs",
             incoming ? "right-full mr-2" : "left-full ml-2",
           )}
         />
@@ -411,7 +411,7 @@ export function AgentQueueState({ agents, incoming }: { agents: ConversationPend
       className={cn("mt-2 flex min-w-0 text-xs text-muted-foreground", incoming ? "justify-start" : "justify-end")}
       role="status"
     >
-      <span className={cn("max-w-[75%] break-all", incoming ? "ml-10" : "mr-10")}>
+      <span className={cn("max-w-[75%] break-all", incoming ? "ml-9" : "mr-9")}>
         {t("agentRunWaiting", { names })}
       </span>
     </div>

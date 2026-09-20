@@ -25,7 +25,7 @@ export function PageControls({
   return (
     <div
       className={cn(
-        "flex items-center justify-between gap-3 border-t px-4 py-3 text-sm text-muted-foreground",
+        "flex items-center justify-between gap-3 border-t px-3 py-2 text-xs text-muted-foreground",
         className,
       )}
     >

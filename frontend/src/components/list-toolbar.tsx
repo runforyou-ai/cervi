@@ -22,7 +22,7 @@ export type ListToolbarOption = {
 /** 列表工具栏容器。 */
 export function ListToolbar({ children }: { children: ReactNode }) {
   return (
-    <div className="flex flex-wrap items-center gap-2 border-b px-4 py-3 select-none sm:px-6">
+    <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2 select-none sm:px-5">
       {children}
     </div>
   )
@@ -35,8 +35,8 @@ export function ListToolbarSearch({
 }: InputHTMLAttributes<HTMLInputElement>) {
   return (
     <div className={cn("relative w-full sm:w-64", className)}>
-      <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
-      <Input {...props} className="h-8 pl-8" />
+      <SearchIcon className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" />
+      <Input {...props} className="h-7 pl-7.5" />
     </div>
   )
 }

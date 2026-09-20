@@ -34,7 +34,7 @@ export function InboxListPanel({ list, viewport, detailError = false, retryDetai
         <p className="px-3 py-6 text-center text-sm text-muted-foreground">{t("listWindowEmpty")}</p>
       ) : null}
       {showFooter ? (
-        <div className="flex h-11 items-center justify-center gap-2 text-xs text-muted-foreground" data-slot="inbox-list-footer" role="status">
+        <div className="flex h-10 items-center justify-center gap-2 text-xs text-muted-foreground" data-slot="inbox-list-footer" role="status">
           {previous ? (
             <Button variant="outline" size="sm" onClick={() => void list.request("before")}>{t("common:pagination.previous")}</Button>
           ) : null}

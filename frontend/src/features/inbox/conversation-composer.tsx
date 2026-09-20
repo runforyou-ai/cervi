@@ -916,7 +916,7 @@ export function ConversationComposer({
     <form
       data-slot="conversation-composer"
       data-conversation-id={conversationID}
-      className={cn("shrink-0 bg-background px-2", mobile ? "py-2" : "py-3")}
+      className={cn("shrink-0 bg-background px-2", mobile ? "py-2" : "py-2.5")}
       onSubmit={form.handleSubmit(send)}
       noValidate
     >

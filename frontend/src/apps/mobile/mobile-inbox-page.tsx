@@ -177,7 +177,7 @@ function MobileConversationRow({
   const content = (
     <>
       <span className="relative shrink-0">
-        <ConversationAvatar conversation={conversation} />
+        <ConversationAvatar conversation={conversation} className="size-10" />
         <ConversationUnreadBadge conversation={conversation} />
       </span>
       <div className="min-w-0 flex-1 overflow-hidden">

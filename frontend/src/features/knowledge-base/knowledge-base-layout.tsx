@@ -400,7 +400,7 @@ function KnowledgeBaseTree({
       >
         <Link
           to={path}
-          className="flex h-9 min-w-0 flex-1 items-center gap-2 px-2.5 text-sm"
+          className="flex h-8 min-w-0 flex-1 items-center gap-2 px-2.5 text-sm"
           title={knowledgeBase.name}
         >
           {isQA ? <CircleHelpIcon /> : <FileTextIcon />}

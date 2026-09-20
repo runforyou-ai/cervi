@@ -61,14 +61,14 @@ function WorkspaceRailItem({
       to={to}
       onClick={onClick}
       className={cn(
-        "my-0.5 flex h-14 w-full flex-col items-center justify-center gap-1 rounded-md px-1 text-[11px] leading-tight",
+        "my-px flex h-12 w-full flex-col items-center justify-center gap-0.5 rounded-md px-1 text-[10.5px] leading-tight",
         "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
         "focus-visible:ring-2 focus-visible:ring-sidebar-ring",
         active &&
           "bg-sidebar-accent font-medium text-sidebar-accent-foreground",
       )}
     >
-      <Icon className="size-5" />
+      <Icon className="size-[18px]" />
       <span className="line-clamp-2 text-center break-words">{label}</span>
     </NavLink>
   )
@@ -85,7 +85,7 @@ function WorkspaceMenu({
 
   return (
     <nav
-      className="flex flex-1 flex-col items-stretch gap-1 px-1.5 pt-1"
+      className="flex flex-1 flex-col items-stretch gap-0.5 px-1.5 pt-1"
       aria-label={t("navigationGroup")}
     >
       <WorkspaceRailItem
@@ -197,13 +197,13 @@ export function WorkspaceNavigation({
 
   return (
     <aside className="cervi-workspace-rail flex h-full shrink-0 flex-col text-sidebar-foreground">
-      <div className="flex justify-center px-3 pt-2.5 pb-1.5">
+      <div className="flex justify-center px-3 pt-2.5 pb-1">
         <DropdownMenu open={userMenuOpen} onOpenChange={setUserMenuOpen}>
           <DropdownMenuTrigger asChild>
             <button
               ref={userMenuTriggerRef}
               type="button"
-              className="relative flex size-10 items-center justify-center rounded-lg outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+              className="relative flex size-8 items-center justify-center rounded-lg outline-none hover:opacity-90 focus-visible:ring-2 focus-visible:ring-sidebar-ring"
               aria-label={t("openUserMenu", {
                 name: identity.user.displayName,
               })}

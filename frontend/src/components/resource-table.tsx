@@ -75,7 +75,7 @@ export function ResourceTable<T>({
           <TableRow className="hover:bg-transparent">
             <TableCell
               colSpan={columns.length + (actions ? 1 : 0)}
-              className="h-32 text-center text-muted-foreground"
+              className="h-28 text-center text-muted-foreground"
             >
               {empty}
             </TableCell>

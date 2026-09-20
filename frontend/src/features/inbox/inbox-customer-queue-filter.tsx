@@ -53,7 +53,7 @@ export function InboxCustomerQueueFilter({
 
   function tabClass(active: boolean) {
     return cn(
-      "relative h-9 min-w-0 flex-1 rounded-md px-1 text-center text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50",
+      "relative h-8 min-w-0 flex-1 rounded-md px-1 text-center text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50",
       active
         ? "text-foreground"
         : "text-muted-foreground hover:text-foreground",

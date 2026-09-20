@@ -738,7 +738,7 @@ function ConversationTimelineContent({
         // 将 Radix Viewport 的内联 table 布局覆盖为块级布局。
         className="h-full min-h-0 bg-background [&>[data-slot=scroll-area-viewport]>div]:!flex [&>[data-slot=scroll-area-viewport]>div]:!min-h-full [&>[data-slot=scroll-area-viewport]>div]:!flex-col"
       >
-        <div className="flex w-full flex-1 flex-col px-4 pb-3 md:px-6">
+        <div className="flex w-full flex-1 flex-col px-3.5 pb-2.5 md:px-5">
           {currentPage?.hasEarlier || timeline.pageError === "before" ? (
             <div className="flex items-center justify-center py-2">
               {currentPage?.hasEarlier ? (
@@ -945,7 +945,7 @@ function ConversationTimelineContent({
                           className={cn(
                             "flex min-w-0 max-w-[75%] flex-col gap-1",
                             message.agentProcess && "max-w-[min(36rem,85%)] sm:max-w-[min(36rem,75%)]",
-                            incoming ? "ml-10 items-start" : "mr-10 items-end",
+                            incoming ? "ml-9 items-start" : "mr-9 items-end",
                           )}
                         >
                           {(conversationType === ConversationType.ConversationTypeGroup ||
@@ -976,7 +976,7 @@ function ConversationTimelineContent({
                                   ? "agent"
                                   : "person"}
                                 className={cn(
-                                  "absolute bottom-0 size-8 text-xs",
+                                  "absolute bottom-0 size-7 text-xs",
                                   incoming ? "right-full mr-2" : "left-full ml-2",
                                 )}
                               />
@@ -1051,14 +1051,18 @@ function ConversationTimelineContent({
                                   {message.agentProcess ? (
                                     <AgentProcess process={message.agentProcess} incoming={incoming} onPrimary={!incoming && !agentNotice} />
                                   ) : null}
-                                  <div className="flex min-w-0 items-end gap-2">
+                                  {/* 时间跟随正文末行，正文按整行宽度排版。 */}
+                                  <div
+                                    className="cervi-message-body relative min-w-0 after:block after:clear-both after:content-['']"
+                                    data-delivery={Boolean(renderDeliveryState || message.deliveryStatus) || undefined}
+                                  >
                                     {agentNotice ? (
                                       <span className={agentError ? "text-destructive" : "text-muted-foreground"}>{t(agentError ? "agentRunFailed" : "agentReplyStopped")}</span>
                                     ) : message.attachment ? (
                                       <ConversationAttachment retryDisabled={retryFailedMessageDisabled} body={message.body} attachment={message.attachment} conversationID={conversationID} messageID={message.persistedMessageID ?? message.id}
                                         originatedAt={message.originatedAt} timeLabel={dateFormatters.clock.format(date)} timeTitle={dateFormatters.full.format(date)} incoming={incoming} bubbleClassName={bubbleClassName} renderDeliveryState={renderDeliveryState} />
                                     ) : message.sender?.identityType === OrganizationIdentityType.OrganizationIdentityTypeAgent ? (
-                                      <div className="min-w-0 flex-1">
+                                      <div className="min-w-0">
                                         <MessageMarkdown
                                           locale={i18n.language}
                                           mentions={messageMentionNames(message)}
@@ -1069,11 +1073,11 @@ function ConversationTimelineContent({
                                         </MessageMarkdown>
                                       </div>
                                     ) : (
-                                      <span className="min-w-0 whitespace-pre-wrap">{renderMessageBody(message)}</span>
+                                      <span className="whitespace-pre-wrap">{renderMessageBody(message)}</span>
                                     )}
                                     {!message.attachment ? <div
                                       className={cn(
-                                        "inline-flex shrink-0 translate-y-0.5 items-center gap-1 whitespace-nowrap text-[10px]",
+                                        "cervi-message-time float-right ml-2 inline-flex translate-y-0.5 items-center gap-1 whitespace-nowrap text-[10px]",
                                         incoming || agentNotice || internalNote
                                           ? "text-muted-foreground"
                                           : "text-primary-foreground/75",

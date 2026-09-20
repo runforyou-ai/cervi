@@ -27,7 +27,7 @@ export function ProfileAvatar({
       aria-hidden="true"
       title={title}
       className={cn(
-        "flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-primary/10 text-sm font-medium text-primary",
+        "flex size-9 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-primary/10 text-sm font-medium text-primary",
         className,
       )}
     >

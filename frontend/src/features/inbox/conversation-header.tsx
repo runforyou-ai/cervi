@@ -68,11 +68,11 @@ export function ConversationHeader({
       <header
         data-slot="conversation-header"
         className={cn(
-          "flex shrink-0 items-center gap-3 border-b px-4 py-3",
+          "flex shrink-0 items-center gap-2.5 border-b px-3 py-2",
           narrowViewport && "pr-14",
         )}
       >
-        <ConversationAvatar conversation={conversation} className="size-9" />
+        <ConversationAvatar conversation={conversation} className="size-8" />
         <div className="min-w-0 flex-1">
           <div className="w-fit max-w-full">
             <h2

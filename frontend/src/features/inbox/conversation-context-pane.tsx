@@ -84,10 +84,10 @@ function InternalConversationProfile({
   return (
     <dl className="space-y-1 text-sm">
       <div className="grid grid-cols-[4.75rem_minmax(0,1fr)] items-start gap-2">
-        <dt className="flex min-h-8 items-center text-xs text-muted-foreground">
+        <dt className="flex min-h-7 items-center text-xs text-muted-foreground">
           {t("contextContactName")}
         </dt>
-        <dd className="flex min-h-8 min-w-0 items-center gap-2">
+        <dd className="flex min-h-7 min-w-0 items-center gap-2">
           {conversation ? (
             <ConversationAvatar
               conversation={conversation}
@@ -109,18 +109,18 @@ function InternalConversationProfile({
       </div>
       {direct || agent || directTarget ? (
         <div className="grid grid-cols-[4.75rem_minmax(0,1fr)] items-start gap-2">
-          <dt className="flex min-h-8 items-center text-xs text-muted-foreground">
+          <dt className="flex min-h-7 items-center text-xs text-muted-foreground">
             {t("contextIdentityType")}
           </dt>
-          <dd className="flex min-h-8 items-center">{identityType}</dd>
+          <dd className="flex min-h-7 items-center">{identityType}</dd>
         </div>
       ) : null}
       {agent && agentStatus ? (
         <div className="grid grid-cols-[4.75rem_minmax(0,1fr)] items-start gap-2">
-          <dt className="flex min-h-8 items-center text-xs text-muted-foreground">
+          <dt className="flex min-h-7 items-center text-xs text-muted-foreground">
             {t("contextAgentStatus")}
           </dt>
-          <dd className="flex min-h-8 items-center">{agentStatus}</dd>
+          <dd className="flex min-h-7 items-center">{agentStatus}</dd>
         </div>
       ) : null}
     </dl>
@@ -195,10 +195,10 @@ function ConversationContextContent({
             <section className="space-y-2">
               <dl className="space-y-1 text-sm">
                 <div className="grid grid-cols-[4.75rem_minmax(0,1fr)] items-start gap-2">
-                  <dt className="flex min-h-8 min-w-0 items-center text-xs text-muted-foreground">
+                  <dt className="flex min-h-7 min-w-0 items-center text-xs text-muted-foreground">
                     {t("contextContactName")}
                   </dt>
-                  <dd className="flex min-h-8 min-w-0 items-center gap-2">
+                  <dd className="flex min-h-7 min-w-0 items-center gap-2">
                     <ConversationAvatar
                       conversation={conversation}
                       className="size-7 text-xs"

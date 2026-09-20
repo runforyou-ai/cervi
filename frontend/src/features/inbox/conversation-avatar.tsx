@@ -72,7 +72,7 @@ export function ConversationAvatar({
         <span
           aria-hidden="true"
           className={cn(
-            "absolute -right-0.5 -bottom-0.5 flex size-4 items-center justify-center rounded-full border-2 border-background text-white",
+            "absolute -right-0.5 -bottom-0.5 flex size-3.5 items-center justify-center rounded-full border-2 border-background text-white",
             badge.className,
           )}
         >

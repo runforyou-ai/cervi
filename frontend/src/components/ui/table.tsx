@@ -60,7 +60,7 @@ function TableHead({ className, children, ...props }: React.ComponentProps<"th">
     <th
       data-slot="table-head"
       className={cn(
-        "h-10 px-4 text-left align-middle text-xs font-medium whitespace-nowrap text-muted-foreground",
+        "h-9 px-3 text-left align-middle text-xs font-medium whitespace-nowrap text-muted-foreground",
         className
       )}
       {...props}
@@ -74,7 +74,7 @@ function TableCell({ className, children, ...props }: React.ComponentProps<"td">
   return (
     <td
       data-slot="table-cell"
-      className={cn("px-4 py-3 align-middle", className)}
+      className={cn("px-3 py-2 align-middle", className)}
       {...props}
     >
       {selectableText(children)}

@@ -8,11 +8,11 @@ import { ScrollArea } from "@/components/ui/scroll-area"
 import { cn } from "@/lib/utils"
 
 const paneWidthClass = {
-  sm: "md:w-52",
-  md: "md:w-60",
-  lg: "md:w-80",
-  /* 消息页中栏：80px 范围纵栏 + 312px 会话列表（列表宽与 helmdesk 中栏一致）。 */
-  inbox: "md:w-98",
+  sm: "md:w-48",
+  md: "md:w-56",
+  lg: "md:w-72",
+  /* 消息页中栏：64px 范围纵栏 + 312px 会话列表（列表宽与 helmdesk 中栏一致）。 */
+  inbox: "md:w-94",
   /* 消息页中栏收起范围纵栏后只保留会话列表。 */
   inboxCollapsed: "md:w-78",
 } as const
@@ -91,15 +91,15 @@ export function PagePaneNav({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {title ? (
-        <div className="flex shrink-0 items-center gap-2 px-4 pt-5 pb-2">
-          <h2 className="min-w-0 flex-1 truncate text-xl font-semibold tracking-tight">
+        <div className="flex shrink-0 items-center gap-2 px-3.5 pt-4 pb-1.5">
+          <h2 className="min-w-0 flex-1 truncate text-lg font-semibold tracking-tight">
             {title}
           </h2>
           {action}
         </div>
       ) : null}
       <ScrollArea className="min-h-0 flex-1">
-        <nav className="flex flex-col gap-1 p-3" aria-label={label}>
+        <nav className="flex flex-col gap-0.5 p-2.5" aria-label={label}>
           {children}
         </nav>
       </ScrollArea>
@@ -123,7 +123,7 @@ export function PagePaneLink({
     activePath !== undefined &&
     (pathname === activePath || pathname.startsWith(`${activePath}/`))
   const className =
-    "flex h-9 w-full items-center gap-2 rounded-md px-2.5 text-left text-sm transition-colors"
+    "flex h-8 w-full items-center gap-2 rounded-md px-2.5 text-left text-sm transition-colors"
 
   if (!to) {
     return (

@@ -12,7 +12,7 @@ export function PageContent({
     <div
       data-slot="page-content"
       className={cn(
-        "min-h-0 flex-1 overflow-auto p-4 sm:p-6",
+        "min-h-0 flex-1 overflow-auto p-3.5 sm:p-5",
         className,
       )}
       {...props}
