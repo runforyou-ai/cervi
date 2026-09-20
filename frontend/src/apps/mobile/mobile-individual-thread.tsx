@@ -2,6 +2,7 @@
 import { useEffect, useRef, useState } from "react"
 
 import {
+  ChannelType,
   ConversationType,
   type ConversationMessageData,
   type ConversationMessageReference,
@@ -48,7 +49,7 @@ export function MobileIndividualThread({
   customerDeliveries?: boolean
   customerAttachment?: Pick<
     CustomerInboxConversationData["customer"],
-    "attachmentSupported" | "attachmentByteLimit" | "attachmentCaptionLimit"
+    "attachmentSupported" | "attachmentByteLimit" | "attachmentCaptionLimit" | "channelType"
   > | null
   locateMessage?: ConversationLocateTarget | null
   sendIndividualMessage?: (
@@ -119,6 +120,7 @@ export function MobileIndividualThread({
         onReplyToChange={setReplyTo}
         sendIndividualMessage={sendIndividualMessage}
         customerAttachmentSupported={Boolean(customerAttachment?.attachmentSupported)}
+        customerTypingSupported={customerAttachment?.channelType === ChannelType.ChannelTypeWebsite}
         customerAttachmentByteLimit={customerAttachment?.attachmentByteLimit ?? 0}
         customerAttachmentCaptionLimit={customerAttachment?.attachmentCaptionLimit ?? 4000}
         onSucceeded={() => {

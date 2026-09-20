@@ -164,7 +164,7 @@ func inboxConversationFromAction(summary inboxaction.ConversationSummary, avatar
 	}
 	if summary.Direct != nil {
 		conversation.Direct = &DirectInboxConversation{
-			PeerIdentityID: summary.Direct.PeerIdentityID, PeerType: OrganizationIdentityType(summary.Direct.PeerType), PeerName: summary.Direct.PeerName, PeerAvatarURL: optionalFileURL(avatarURLs, summary.Direct.PeerAvatarFileID), PeerStatus: UserStatus(summary.Direct.PeerStatus),
+			PeerIdentityID: summary.Direct.PeerIdentityID, PeerType: OrganizationIdentityType(summary.Direct.PeerType), PeerName: summary.Direct.PeerName, PeerAvatarURL: optionalFileURL(avatarURLs, summary.Direct.PeerAvatarFileID), PeerStatus: UserStatus(summary.Direct.PeerStatus), PeerWorkStatus: WorkStatus(summary.Direct.PeerWorkStatus),
 			Preview: summary.Direct.Preview, PreviewSenderIdentityType: (*OrganizationIdentityType)(summary.Direct.PreviewSenderIdentityType), LastMessageAt: summary.Direct.LastMessageAt,
 		}
 	}

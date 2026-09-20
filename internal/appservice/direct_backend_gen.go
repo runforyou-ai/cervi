@@ -313,6 +313,15 @@ func (b *DirectBackend) MarkConversationRead(ctx context.Context, meta RequestMe
 	return b.ops.MarkConversationRead(ctx, meta, identity, conversationID, input)
 }
 
+// ReportConversationTyping 发布当前用户的输入状态：单聊与群聊发给其他真人成员，网站渠道客户会话发给该线程访客。
+func (b *DirectBackend) ReportConversationTyping(ctx context.Context, meta RequestMeta, conversationID string, input ConversationTypingInput) error {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		return err
+	}
+	return b.ops.ReportConversationTyping(ctx, meta, identity, conversationID, input)
+}
+
 // UpdateConversationUnreadMark 保存当前用户独立于阅读水位的未读标记。
 func (b *DirectBackend) UpdateConversationUnreadMark(ctx context.Context, meta RequestMeta, conversationID string, input ConversationUnreadMarkInput) error {
 	identity, err := b.ops.authenticate(ctx, meta)

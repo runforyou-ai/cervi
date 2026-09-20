@@ -59,6 +59,7 @@ import {
 import { ConversationAttachmentUpload } from "./conversation-attachment-upload"
 import { CustomerReplyAssistant } from "@/features/inbox/customer-reply-assistant"
 import { mobileComposerToolClass } from "@/features/inbox/mobile-composer-tool"
+import { useConversationTypingReport } from "@/features/inbox/use-conversation-typing"
 import { resolveAppPlatform } from "@/platform/app-platform"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
@@ -128,6 +129,7 @@ export function ConversationComposer({
   attachmentTargetIdentityID,
   attachmentAgentDraft,
   customerAttachmentSupported = false,
+  customerTypingSupported = false,
   customerAttachmentByteLimit = 0,
   customerAttachmentCaptionLimit = 4000,
   onAttachmentConversationCreated,
@@ -136,6 +138,7 @@ export function ConversationComposer({
   attachmentTargetIdentityID?: string
   attachmentAgentDraft?: { conversationID: string; agentIdentityID: string; customerConversationID?: string }
   customerAttachmentSupported?: boolean
+  customerTypingSupported?: boolean
   customerAttachmentByteLimit?: number
   customerAttachmentCaptionLimit?: number
   onAttachmentConversationCreated?: (conversation: InboxConversation | null, conversationID: string) => void
@@ -285,6 +288,14 @@ export function ConversationComposer({
 
   const groupConversation = conversationType === ConversationType.ConversationTypeGroup
   const customerConversation = conversationType === ConversationType.ConversationTypeCustomer
+  // 单聊与群聊向其他成员上报本人正在输入；客户会话只有网站渠道在对客回复时向访客上报。
+  const typingReport = useConversationTypingReport(
+    conversationID,
+    (groupConversation ||
+      conversationType === ConversationType.ConversationTypeDirect ||
+      (customerConversation && customerTypingSupported && !internalNote)) &&
+      !disabledReason,
+  )
   // 群聊提醒当前成员，客户会话的内部备注提醒企业真人成员。
   const mentionTargets = useMemo<MentionTarget[]>(() => {
     if (groupConversation) {
@@ -383,6 +394,7 @@ export function ConversationComposer({
     const nextBody = `${body.slice(0, query.start)}${token}${body.slice(caret)}`
     const nextCaret = query.start + token.length
     form.setValue("body", nextBody, { shouldDirty: true })
+    typingReport.input(nextBody)
     if (candidate.kind === "all") {
       setMentionAllToken({ start: query.start, text: token.trimEnd() })
     } else {
@@ -417,6 +429,7 @@ export function ConversationComposer({
       reconcileMentionAllToken(current, body, nextBody, nextCaret),
     )
     form.setValue("body", nextBody, { shouldDirty: true })
+    typingReport.input(nextBody)
     reconcileMentions(nextBody)
     resizeComposerInput(input, manualInputHeightRef.current)
     emojiCaretRef.current = nextCaret
@@ -515,6 +528,7 @@ export function ConversationComposer({
     const input = inputRef.current
     if (input && !mobile) setManualInputHeight(input.getBoundingClientRect().height)
     form.resetField("body")
+    typingReport.stop()
     // 提醒状态随正文一起清空，发送失败时按草稿所属可见范围恢复。
     setMentions([])
     setMentionAllToken(null)
@@ -807,6 +821,7 @@ export function ConversationComposer({
           ),
         )
         bodyField.onChange(event)
+        typingReport.input(event.currentTarget.value)
         reconcileMentions(event.currentTarget.value)
         updateMentionQuery(
           event.currentTarget.value,

@@ -45,6 +45,7 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.GET("/conversations/:conversationID/mentions/pending", s.listPendingConversationMentions)
 	router.POST("/conversations/:conversationID/mentions/review", s.markConversationMentionReviewed)
 	router.POST("/conversations/:conversationID/read", s.markConversationRead)
+	router.POST("/conversations/:conversationID/typing", s.reportConversationTyping)
 	router.PATCH("/conversations/:conversationID/unread-mark", s.updateConversationUnreadMark)
 	router.PATCH("/conversations/:conversationID/pin", s.updateConversationPin)
 	router.PATCH("/conversations/:conversationID/notification-settings", s.updateConversationNotificationSettings)
@@ -440,6 +441,15 @@ func (s *Service) markConversationRead(c *gin.Context) {
 	}
 	output, err := s.application.MarkConversationRead(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
 	writeResult(c, http.StatusOK, output, err)
+}
+
+// reportConversationTyping 发布当前用户的输入状态：单聊与群聊发给其他真人成员，网站渠道客户会话发给该线程访客。
+func (s *Service) reportConversationTyping(c *gin.Context) {
+	var input appservice.ConversationTypingInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	writeEmpty(c, s.application.ReportConversationTyping(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input))
 }
 
 // updateConversationUnreadMark 保存当前用户独立于阅读水位的未读标记。

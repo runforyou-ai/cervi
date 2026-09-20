@@ -8,6 +8,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -63,6 +64,10 @@ func (a *UpdateWorkStatusAction) Execute(ctx context.Context, identity *servermo
 			Set("work_status = ?", input.WorkStatus).
 			Set("work_status_updated_at = now()").
 			Set("updated_at = now()")); err != nil {
+			return err
+		}
+		// 工作状态只在单聊页头展示，通知对端重读摘要即可。
+		if err := chatstate.NotifyDirectPeersWorkStatusChanged(ctx, tx, identity.Organization.ID, storedUser.IdentityID); err != nil {
 			return err
 		}
 		updatedIdentity, err = loadCurrentIdentity(ctx, tx, identity.Organization, identity.User.ID)

@@ -113,6 +113,9 @@ type Backend interface {
 	// MarkConversationRead 单调推进当前用户的会话已读水位。
 	//cervi:route POST /conversations/:conversationID/read
 	MarkConversationRead(context.Context, RequestMeta, string, MarkConversationReadInput) (ConversationReadState, error)
+	// ReportConversationTyping 发布当前用户的输入状态：单聊与群聊发给其他真人成员，网站渠道客户会话发给该线程访客。
+	//cervi:route POST /conversations/:conversationID/typing
+	ReportConversationTyping(context.Context, RequestMeta, string, ConversationTypingInput) error
 	// UpdateConversationUnreadMark 保存当前用户独立于阅读水位的未读标记。
 	//cervi:route PATCH /conversations/:conversationID/unread-mark
 	UpdateConversationUnreadMark(context.Context, RequestMeta, string, ConversationUnreadMarkInput) error

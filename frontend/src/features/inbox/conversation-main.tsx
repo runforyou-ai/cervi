@@ -166,6 +166,7 @@ export function ConversationMain({
                 ? () => onSearchConversation(validConversation.id)
                 : undefined
             }
+            groupParticipants={group?.participants}
             narrowViewport={narrowViewport}
           />
         ) : directTarget ? (

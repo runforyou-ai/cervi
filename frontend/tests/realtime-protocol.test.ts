@@ -21,6 +21,7 @@ const fixtures = JSON.parse(
 const conversationId = "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8b"
 const runId = "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8b"
 const streamId = "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8c"
+const senderSubjectId = "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8d"
 
 const expectedFrames: Record<string, RealtimeServerFrame> = {
   server_hello: {
@@ -40,6 +41,9 @@ const expectedFrames: Record<string, RealtimeServerFrame> = {
   identity_profile_changed: { type: "identity_profile_changed", version: 9007199254740993n },
   pin_order_changed: { type: "pin_order_changed", version: 5n },
   conversation_removed: { type: "conversation_removed", conversationId },
+  conversation_typing: { type: "conversation_typing", conversationId, senderSubjectId, active: true },
+  conversation_typing_stopped: { type: "conversation_typing", conversationId, senderSubjectId, active: false },
+  visitor_typing: { type: "visitor_typing", conversationId, active: true },
   conversation_changed_extra_fields: { type: "conversation_changed", conversationId, version: 7n },
   ping_without_data: { type: "ping" },
   run_stream_snapshot: {

@@ -183,6 +183,7 @@ const inbox = {
     "This group has been dissolved. Its message history is read-only.",
   agentDisabledUnavailable:
     "This AI employee is disabled. New messages can't be sent.",
+  directPeerDisabled: "Disabled",
   directPeerDisabledUnavailable:
     "This member is disabled. New messages can't be sent.",
   groupSystemRenamed:
@@ -215,6 +216,12 @@ const inbox = {
   agentRunQueued: "Thinking",
   agentRunRunning: "Working",
   agentRunFailed: "Something went wrong",
+  typingDirect: "Typing…",
+  typingOne: "{{name}} is typing…",
+  typingTwo: "{{first}} and {{second}} are typing…",
+  typingMany: "{{count}} people are typing…",
+  agentReplyingOne: "{{name}} is replying…",
+  agentReplyingMany: "{{count}} AI employees are replying…",
   agentReplyStopped: "Reply stopped",
   agentStopReply: "Stop reply",
   agentStopFailed: "Failed to stop the reply. Please try again.",

@@ -7,6 +7,7 @@ import (
 	"fmt"
 
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -56,6 +57,28 @@ func TouchChannelConversations(ctx context.Context, db bun.IDB, organizationID, 
 		Column("cc.conversation_id").
 		Join("JOIN contact_channel_identities AS cci ON cci.organization_id = cc.organization_id AND cci.id = cc.contact_channel_identity_id").
 		Where("cc.organization_id = ? AND cci.channel_id = ?", organizationID, channelID), false)
+}
+
+// NotifyDirectPeersWorkStatusChanged 通知单聊对端重读会话摘要，用于只在单聊展示的工作状态变化；不推进会话版本。
+func NotifyDirectPeersWorkStatusChanged(ctx context.Context, db bun.IDB, organizationID, identityID string) error {
+	var rows []struct {
+		ConversationID string `bun:"conversation_id"`
+		Version        int64  `bun:"version"`
+		PeerUserID     string `bun:"peer_user_id"`
+	}
+	if err := db.NewSelect().TableExpr("direct_conversations AS dc").
+		ColumnExpr("cv.id AS conversation_id, cv.version, peer_u.id AS peer_user_id").
+		Join("JOIN conversations AS cv ON cv.organization_id = dc.organization_id AND cv.id = dc.conversation_id").
+		Join("JOIN organization_identities AS peer_oi ON peer_oi.organization_id = dc.organization_id AND peer_oi.id = CASE WHEN dc.first_identity_id = ? THEN dc.second_identity_id ELSE dc.first_identity_id END", identityID).
+		Join("JOIN users AS peer_u ON peer_u.organization_id = peer_oi.organization_id AND peer_u.identity_id = peer_oi.id AND peer_u.status = ?", domain.UserStatusActive).
+		Where("dc.organization_id = ? AND ? IN (dc.first_identity_id, dc.second_identity_id)", organizationID, identityID).
+		Scan(ctx, &rows); err != nil {
+		return fmt.Errorf("load direct peers for work status: %w", err)
+	}
+	for _, row := range rows {
+		realtime.Notify(ctx, realtime.UserConversationChanged(organizationID, row.PeerUserID, row.ConversationID, row.Version))
+	}
+	return nil
 }
 
 // touchProfileConversations 按会话 ID 顺序锁定资料展示所在的会话，推进版本并登记成员与客服受众通知；notifyVisitor 为真时同时登记网站访客目录受众。

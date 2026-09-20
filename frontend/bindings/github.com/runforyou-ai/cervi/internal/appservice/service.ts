@@ -906,6 +906,13 @@ export function ReopenServiceSession(meta: $models.RequestMeta, conversationID: 
 }
 
 /**
+ * ReportConversationTyping 发布当前用户的输入状态：单聊与群聊发给其他真人成员，网站渠道客户会话发给该线程访客。
+ */
+export function ReportConversationTyping(meta: $models.RequestMeta, conversationID: string, input: $models.ConversationTypingInput): $CancellablePromise<void> {
+    return $Call.ByID(494479584, meta, conversationID, input);
+}
+
+/**
  * RequestNotificationPermission 请求当前设备允许发送系统通知。
  */
 export function RequestNotificationPermission(meta: $models.RequestMeta): $CancellablePromise<$models.NotificationPermissionStatus> {
