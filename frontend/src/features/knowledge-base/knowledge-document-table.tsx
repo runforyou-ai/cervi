@@ -7,9 +7,10 @@ import { useResourceInvalidator } from "@/hooks/use-resource"
 import { recoverSession } from "@/lib/session-navigation"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { Link, useNavigate, useParams } from "react-router"
+import { EyeIcon, PencilIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import type { KnowledgeDocumentData, KnowledgeDocumentListData } from "@/api"
-import { PageControls } from "@/components/page-controls"
+import { ResourceListFrame } from "@/components/resource-list"
 import { ResourceTable } from "@/components/resource-table"
 import { SelectableText } from "@/components/selectable-text"
 import { Button } from "@/components/ui/button"
@@ -71,7 +72,7 @@ export function KnowledgeDocumentTable({
   }
 
   return (
-    <div className="overflow-hidden rounded-lg border bg-card" aria-busy={refreshing}>
+    <ResourceListFrame aria-busy={refreshing} page={data.page} disabled={refreshing} onPageChange={onPage}>
       <ResourceTable
         columns={[
           {
@@ -118,15 +119,23 @@ export function KnowledgeDocumentTable({
         empty={t(filtered ? "documents.filteredEmpty" : "documents.empty")}
         actions={(document) => ({
           primary: (
-            <Button variant="outline" size="sm" asChild>
+            <Button variant="outline" size="icon-sm" asChild>
               {document.sourceKind ===
               KnowledgeDocumentSourceKind.KnowledgeDocumentSourceText ? (
-                <Link to={`${listPath}/${document.id}/edit${search}`}>
-                  {t("common:actions.edit")}
+                <Link
+                  to={`${listPath}/${document.id}/edit${search}`}
+                  aria-label={t("common:actions.edit")}
+                  title={t("common:actions.edit")}
+                >
+                  <PencilIcon />
                 </Link>
               ) : (
-                <Link to={`${listPath}/${document.id}${search}`}>
-                  {t("common:actions.view")}
+                <Link
+                  to={`${listPath}/${document.id}${search}`}
+                  aria-label={t("common:actions.view")}
+                  title={t("common:actions.view")}
+                >
+                  <EyeIcon />
                 </Link>
               )}
             </Button>
@@ -182,7 +191,6 @@ export function KnowledgeDocumentTable({
           ),
         })}
       />
-      <PageControls page={data.page} disabled={refreshing} onPageChange={onPage} />
-    </div>
+    </ResourceListFrame>
   )
 }

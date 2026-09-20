@@ -1,21 +1,19 @@
 /** 企业通用设置表单。 */
 import { useEffect, useMemo, useRef } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { LoaderCircleIcon } from "lucide-react"
 import { useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import { isApiError, updateOrganization, type Organization } from "@/api"
-import { FormInputField } from "@/components/form/form-input-field"
-import { Button } from "@/components/ui/button"
-import { FieldGroup } from "@/components/ui/field"
+import { InlineEditField } from "@/components/form/inline-edit-field"
 import {
   createGeneralSettingsSchema,
   type GeneralSettingsFormValues,
 } from "@/features/settings/general-settings-schema"
 import { resourceKeys } from "@/hooks/resource-keys"
+import { useAutoSave } from "@/hooks/use-auto-save"
 import { useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
@@ -41,6 +39,7 @@ export function GeneralSettingsForm({
   const form = useForm<GeneralSettingsFormValues>({
     resolver: zodResolver(schema),
     shouldUseNativeValidation: true,
+    mode: "onBlur",
     defaultValues: {
       name: organization.name,
     },
@@ -51,15 +50,17 @@ export function GeneralSettingsForm({
       mounted.current = false
     }
   }, [])
+  const markSaved = useAutoSave({ form, schema, save })
 
   /** 保存企业通用设置。 */
   async function save(values: GeneralSettingsFormValues) {
     try {
-      const organization = await updateOrganization(values)
+      const saved = await updateOrganization(values)
       void invalidate(resourceKeys.identity())
       if (!mounted.current) return
-      form.reset({ name: organization.name })
-      toast.success(t("general.saveSuccess"))
+      const next = { name: saved.name }
+      form.reset(next)
+      markSaved(next)
     } catch (error) {
       if (!mounted.current) return
       if (recoverSession(error, navigate)) {
@@ -77,28 +78,18 @@ export function GeneralSettingsForm({
     }
   }
 
-  const { isSubmitting } = form.formState
-
   return (
     <form
-      className="w-full max-w-xl space-y-9"
+      className="w-full max-w-xl"
       onSubmit={form.handleSubmit(save)}
       noValidate
     >
-      <FieldGroup>
-        <FormInputField
-          name="name"
-          control={form.control}
-          label={t("general.form.name")}
-          autoFocus
-        />
-      </FieldGroup>
-      <div>
-        <Button type="submit" disabled={isSubmitting}>
-          {isSubmitting ? <LoaderCircleIcon className="animate-spin" /> : null}
-          {isSubmitting ? t("common:actions.saving") : t("common:actions.save")}
-        </Button>
-      </div>
+      <InlineEditField
+        name="name"
+        control={form.control}
+        label={t("general.form.name")}
+        required
+      />
     </form>
   )
 }

@@ -1,12 +1,13 @@
 /** 详情页通用的字段级展示和编辑操作。 */
 import type { ReactNode } from "react"
+import { PencilIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
 import { Button } from "@/components/ui/button"
 import { FieldRequiredMark } from "@/components/ui/field"
 import { cn } from "@/lib/utils"
 
-/** 详情行，支持进入字段编辑。 */
+/** 详情行；给出 onEdit 时悬停显示编辑入口，始终处于编辑态时直接渲染控件。 */
 export function DetailEditRow({
   label,
   value,
@@ -23,11 +24,11 @@ export function DetailEditRow({
   editEnabled: boolean
   required?: boolean
   compact?: boolean
-  onEdit: () => void
+  onEdit?: () => void
   children: ReactNode
 }) {
   const { t } = useTranslation("common")
-  const showEdit = !editing && editEnabled
+  const showEdit = !editing && editEnabled && Boolean(onEdit)
 
   return (
     <div
@@ -53,16 +54,17 @@ export function DetailEditRow({
             <div className="pt-1 text-sm break-words">{value}</div>
           )}
         </div>
-        <div className="flex w-14 shrink-0 justify-end">
+        <div className="flex w-8 shrink-0 justify-end">
           {showEdit ? (
             <Button
               variant="ghost"
-              size="sm"
+              size="icon-sm"
               className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
               aria-label={t("actions.editField", { field: label })}
+              title={t("actions.editField", { field: label })}
               onClick={onEdit}
             >
-              {t("actions.modify")}
+              <PencilIcon />
             </Button>
           ) : null}
         </div>

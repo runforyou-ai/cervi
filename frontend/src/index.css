@@ -430,3 +430,17 @@ body,
     background-color: color-mix(in oklch, var(--primary) 16%, transparent);
   }
 }
+
+/*
+  主内容区的水平留白：窗口变宽时左右留白同步增长，把标题、工具栏和内容收在同一列内居中。
+  需要更宽内容的页面在根元素覆盖 --page-max。
+*/
+.cervi-page-gutter {
+  padding-inline: max(0.875rem, calc((100% - var(--page-max, 48rem)) / 2));
+}
+
+@media (min-width: 40rem) {
+  .cervi-page-gutter {
+    padding-inline: max(1.25rem, calc((100% - var(--page-max, 48rem)) / 2));
+  }
+}

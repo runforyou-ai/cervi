@@ -27,7 +27,6 @@ const settings = {
     avatar: "Profile image",
     avatarChoose: "Choose image",
     avatarUploadError: "Could not upload the profile image. Try again.",
-    saveSuccess: "Profile saved.",
     saveError: "Could not save the profile. Try again.",
     validation: {
       displayNameRequired: "Enter your name.",
@@ -118,7 +117,6 @@ const settings = {
           "Could not open notification settings. Open them manually in system settings.",
       },
     },
-    saveSuccess: "Preferences saved.",
     saveError: "Could not save preferences. Try again.",
     validation: {
       timeZoneRequired: "Select a time zone.",
@@ -135,7 +133,6 @@ const settings = {
   general: {
     title: "General",
     saveError: "Could not save general settings. Try again.",
-    saveSuccess: "General settings saved.",
     form: {
       name: "Company name",
     },

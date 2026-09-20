@@ -1,6 +1,7 @@
 /** 列表页工具栏、搜索框和筛选器。 */
 import type { InputHTMLAttributes, ReactNode } from "react"
-import { CheckIcon, SearchIcon } from "lucide-react"
+import { CheckIcon, ChevronDownIcon, SearchIcon, XIcon } from "lucide-react"
+import { useTranslation } from "react-i18next"
 
 import { Button } from "@/components/ui/button"
 import {
@@ -22,7 +23,7 @@ export type ListToolbarOption = {
 /** 列表工具栏容器。 */
 export function ListToolbar({ children }: { children: ReactNode }) {
   return (
-    <div className="flex flex-wrap items-center gap-2 border-b px-3 py-2 select-none sm:px-5">
+    <div className="cervi-page-gutter flex flex-wrap items-center gap-2 py-2 select-none">
       {children}
     </div>
   )
@@ -41,7 +42,7 @@ export function ListToolbarSearch({
   )
 }
 
-/** 列表筛选下拉。 */
+/** 列表筛选下拉；可清空的筛选选中后高亮并提供移除入口。 */
 export function ListToolbarFilter({
   label,
   allLabel,
@@ -59,44 +60,70 @@ export function ListToolbarFilter({
   align?: "start" | "center" | "end"
   contentClassName?: string
 }) {
+  const { t } = useTranslation("common")
   const selected = options.find((option) => option.value === value)
+  // 没有「全部」选项的筛选始终带值，作为视图切换保持中性样式。
+  const active = Boolean(allLabel) && Boolean(value)
 
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="outline" size="sm">
-          {label}
-          {selected ? (
-            <>
-              <span className="h-4 w-px bg-border" />
-              <span className="font-normal">{selected.label}</span>
-            </>
+    <div
+      className={cn(
+        "inline-flex h-7 items-center rounded-full border text-sm transition-colors",
+        active
+          ? "border-transparent bg-accent text-accent-foreground"
+          : "bg-background hover:bg-accent hover:text-accent-foreground",
+      )}
+    >
+      <DropdownMenu>
+        <DropdownMenuTrigger
+          className={cn(
+            "inline-flex h-full items-center gap-1.5 rounded-full px-2.5 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
+            active && "pr-1",
+          )}
+        >
+          <span className={active ? "text-accent-foreground/70" : "text-muted-foreground"}>
+            {label}
+          </span>
+          {selected ? <span className="font-medium">{selected.label}</span> : null}
+          {active ? null : (
+            <ChevronDownIcon className="size-3 text-muted-foreground" />
+          )}
+        </DropdownMenuTrigger>
+        <DropdownMenuContent
+          align={align}
+          className={cn("min-w-44", contentClassName)}
+        >
+          <DropdownMenuLabel>{label}</DropdownMenuLabel>
+          <DropdownMenuSeparator />
+          {allLabel ? (
+            <DropdownMenuItem onSelect={() => onValueChange("")}>
+              <CheckIcon className={cn(!value && "opacity-100", value && "opacity-0")} />
+              {allLabel}
+            </DropdownMenuItem>
           ) : null}
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent
-        align={align}
-        className={cn("min-w-44", contentClassName)}
-      >
-        <DropdownMenuLabel>{label}</DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        {allLabel ? (
-          <DropdownMenuItem onSelect={() => onValueChange("")}>
-            <CheckIcon className={cn(!value && "opacity-100", value && "opacity-0")} />
-            {allLabel}
-          </DropdownMenuItem>
-        ) : null}
-        {options.map((option) => (
-          <DropdownMenuItem
-            key={option.value}
-            onSelect={() => onValueChange(option.value)}
-          >
-            <CheckIcon className={cn(value === option.value ? "opacity-100" : "opacity-0")} />
-            {option.label}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+          {options.map((option) => (
+            <DropdownMenuItem
+              key={option.value}
+              onSelect={() => onValueChange(option.value)}
+            >
+              <CheckIcon className={cn(value === option.value ? "opacity-100" : "opacity-0")} />
+              {option.label}
+            </DropdownMenuItem>
+          ))}
+        </DropdownMenuContent>
+      </DropdownMenu>
+      {active ? (
+        <button
+          type="button"
+          aria-label={`${t("actions.remove")} ${label}`}
+          title={`${t("actions.remove")} ${label}`}
+          className="mr-1.5 inline-flex size-4 items-center justify-center rounded-full text-accent-foreground/70 transition-colors hover:bg-accent-foreground/10 hover:text-accent-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+          onClick={() => onValueChange("")}
+        >
+          <XIcon className="size-3" />
+        </button>
+      ) : null}
+    </div>
   )
 }
 
@@ -109,7 +136,7 @@ export function ListToolbarReset({
   onClick: () => void
 }) {
   return (
-    <Button variant="ghost" size="sm" onClick={onClick}>
+    <Button variant="ghost" size="sm" className="rounded-full" onClick={onClick}>
       {children}
     </Button>
   )

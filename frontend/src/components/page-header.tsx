@@ -16,7 +16,7 @@ export function PageHeader({
   return (
     <header
       data-slot="page-header"
-      className="flex min-h-12 shrink-0 flex-wrap items-center gap-2.5 px-3 py-2.5 select-none sm:px-5 md:h-12 md:flex-nowrap md:py-0"
+      className="cervi-page-gutter flex min-h-12 shrink-0 flex-wrap items-center gap-2.5 py-2.5 select-none md:h-12 md:flex-nowrap md:py-0"
     >
       {beforeTitle}
       <div className="mr-auto min-w-0 flex-1">

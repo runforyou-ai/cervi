@@ -1,5 +1,6 @@
 /** 已保存 MCP 服务的行内连接测试。 */
 import { useEffect, useRef, useState } from "react"
+import { Loader2Icon, PlugZapIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -36,8 +37,15 @@ export function MCPServerTestButton({ serverId }: { serverId: string }) {
   }
 
   return (
-    <Button variant="outline" size="sm" disabled={testing} onClick={() => void testConnection()}>
-      {testing ? t("mcpServer.connection.testing") : t("mcpServer.connection.test")}
+    <Button
+      variant="outline"
+      size="icon-sm"
+      aria-label={testing ? t("mcpServer.connection.testing") : t("mcpServer.connection.test")}
+      title={testing ? t("mcpServer.connection.testing") : t("mcpServer.connection.test")}
+      disabled={testing}
+      onClick={() => void testConnection()}
+    >
+      {testing ? <Loader2Icon className="animate-spin" /> : <PlugZapIcon />}
     </Button>
   )
 }

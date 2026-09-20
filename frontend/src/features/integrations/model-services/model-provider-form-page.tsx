@@ -24,6 +24,7 @@ import {
 import { FormActions } from "@/components/form/form-actions"
 import { FormInputField } from "@/components/form/form-input-field"
 import { FormValidationMessage } from "@/components/form/form-validation-message"
+import { ResourceListFrame } from "@/components/resource-list"
 import { ResourceContent } from "@/components/resource-content"
 import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
@@ -558,7 +559,7 @@ export function ModelProviderFormPage({
                   </Button>
                 </div>
               </div>
-              <div className="overflow-hidden rounded-lg border bg-card">
+              <ResourceListFrame>
                 <Table>
                   <TableHeader>
                     <TableRow className="hover:bg-transparent">
@@ -751,7 +752,7 @@ export function ModelProviderFormPage({
                     )}
                   </TableBody>
                 </Table>
-              </div>
+              </ResourceListFrame>
               {/* 校验提示使用表单分区间距，不改变操作按钮位置。 */}
               <FormValidationMessage
                 className="absolute top-full right-0 left-0 mt-2"

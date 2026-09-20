@@ -10,7 +10,7 @@ import {
   type KnowledgeQAListData,
   type KnowledgeQASummaryData,
 } from "@/api"
-import { PageControls } from "@/components/page-controls"
+import { ResourceListFrame } from "@/components/resource-list"
 import { Button } from "@/components/ui/button"
 import {
   Table,
@@ -82,7 +82,13 @@ export function KnowledgeQATable({
   }
 
   return (
-    <div className="overflow-hidden rounded-lg border bg-card" aria-busy={loading}>
+    <ResourceListFrame
+      aria-busy={loading}
+      page={data.page}
+      disabled={loading}
+      totalLabel={t("qa.total", { count: data.page.total })}
+      onPageChange={onPageChange}
+    >
       <Table className="min-w-[960px] table-fixed">
         {/* 固定辅助列宽，标准问题和答案均分剩余空间。 */}
         <colgroup>
@@ -129,13 +135,7 @@ export function KnowledgeQATable({
           )}
         </TableBody>
       </Table>
-      <PageControls
-        page={data.page}
-        disabled={loading}
-        totalLabel={t("qa.total", { count: data.page.total })}
-        onPageChange={onPageChange}
-      />
-    </div>
+    </ResourceListFrame>
   )
 }
 

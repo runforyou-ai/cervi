@@ -2,13 +2,13 @@
 const common = {
   notifications: "通知",
   closeNotification: "关闭通知",
+  notSet: "未设置",
   actions: {
     refresh: "刷新",
     loadMore: "加载更多",
     close: "关闭",
     back: "返回",
     edit: "编辑",
-    modify: "修改",
     editField: "修改{{field}}",
     view: "详情",
     new: "新建",

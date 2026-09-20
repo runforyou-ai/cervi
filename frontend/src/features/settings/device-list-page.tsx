@@ -12,6 +12,7 @@ import {
   type DeviceData,
 } from "@/api"
 import { ResourceContent } from "@/components/resource-content"
+import { ResourceListFrame } from "@/components/resource-list"
 import { ResourceTable } from "@/components/resource-table"
 import { StatusBadge } from "@/components/status-badge"
 import {
@@ -90,7 +91,7 @@ export function DeviceListPage() {
         errorMessage={t("devices.list.loadError")}
         onRetry={() => void refresh()}
       >
-        <div className="overflow-hidden rounded-lg border bg-card">
+        <ResourceListFrame>
           <ResourceTable
             columns={[
               {
@@ -139,7 +140,7 @@ export function DeviceListPage() {
               ),
             })}
           />
-        </div>
+        </ResourceListFrame>
       </ResourceContent>
 
       <AlertDialog

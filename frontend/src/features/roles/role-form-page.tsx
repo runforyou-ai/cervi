@@ -28,6 +28,7 @@ import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { ResourceListFrame } from "@/components/resource-list"
 import {
   Table,
   TableBody,
@@ -382,7 +383,7 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
                     </p>
                   ) : null}
                 </div>
-                <div className="overflow-hidden rounded-lg border bg-card">
+                <ResourceListFrame>
                   <Table>
                     <TableHeader>
                       <TableRow className="hover:bg-transparent">
@@ -444,7 +445,7 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
                       ))}
                     </TableBody>
                   </Table>
-                </div>
+                </ResourceListFrame>
               </section>
             </div>
 

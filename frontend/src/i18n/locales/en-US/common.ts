@@ -2,13 +2,13 @@
 const common = {
   notifications: "Notifications",
   closeNotification: "Close notification",
+  notSet: "Not set",
   actions: {
     refresh: "Refresh",
     loadMore: "Load more",
     close: "Close",
     back: "Back",
     edit: "Edit",
-    modify: "Edit",
     editField: "Edit {{field}}",
     view: "Details",
     new: "New",

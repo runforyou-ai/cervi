@@ -207,7 +207,7 @@ export function TeamMemberPicker({
         <span className="text-sm text-muted-foreground">
           {t("teams.members.selected", { count: selected.size })}
         </span>
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-end gap-2">
           <Button type="button" variant="outline" onClick={onCancel}>
             {t("common:actions.cancel")}
           </Button>
