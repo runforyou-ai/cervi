@@ -3,7 +3,7 @@ import {
   ArchiveIcon,
   ArrowRightLeftIcon,
   LoaderCircleIcon,
-  MoreVerticalIcon,
+  PanelRightOpenIcon,
   RotateCcwIcon,
   SearchIcon,
   UserRoundPlusIcon,
@@ -225,10 +225,10 @@ export function ConversationHeader({
               onClick={() => actions.setCloseConfirmationOpen(true)}
             />
           ) : null}
-          {onToggleContext ? (
+          {onToggleContext && !contextVisible ? (
             <HeaderAction
-              label={contextVisible ? t("contextClose") : t("contextOpen")}
-              icon={MoreVerticalIcon}
+              label={t("contextOpen")}
+              icon={PanelRightOpenIcon}
               onClick={onToggleContext}
             />
           ) : null}

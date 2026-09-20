@@ -1,5 +1,5 @@
 /** 展示尚未创建会话的单聊目标。 */
-import { MoreVerticalIcon } from "lucide-react"
+import { PanelRightOpenIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
 import { OrganizationIdentityType, type MemberOption } from "@/api"
@@ -64,10 +64,10 @@ export function DirectConversationDraftHeader({
           <TooltipContent className="max-w-80">{member.displayName}</TooltipContent>
         </Tooltip>
       </div>
-      {onToggleContext ? (
+      {onToggleContext && !contextVisible ? (
         <HeaderAction
-          label={contextVisible ? t("contextClose") : t("contextOpen")}
-          icon={MoreVerticalIcon}
+          label={t("contextOpen")}
+          icon={PanelRightOpenIcon}
           onClick={onToggleContext}
         />
       ) : null}
