@@ -803,8 +803,8 @@ export function ConversationComposer({
       aria-describedby={disabledReason ? `${inputID}-reason` : undefined}
       aria-invalid={form.formState.errors.body ? true : undefined}
       className={cn(
-        // 行高贴近字体自然行高，避免换行前后光标高度跳变；与上下内边距之和等于单行高度，正文与工具图标同一水平线。
-        "max-h-[200px] min-h-9 min-w-0 flex-1 resize-none rounded-none border-0 bg-transparent px-0.5 py-2 leading-5 shadow-none caret-primary focus-visible:ring-0 dark:bg-transparent",
+        // 行高贴近字体自然行高，避免换行前后光标高度跳变；上下内边距之和保持 16px，下伸部留空由上多下少补偿。
+        "max-h-[200px] min-h-9 min-w-0 flex-1 resize-none rounded-none border-0 bg-transparent px-0.5 pt-[9px] pb-[7px] leading-5 shadow-none caret-primary focus-visible:ring-0 dark:bg-transparent",
         // 正文与 20px 工具图标配比；窄屏保持 16px，避免移动端聚焦时缩放。
         "md:text-[15px]",
         disabledReason && "pl-3",
