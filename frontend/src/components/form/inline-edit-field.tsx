@@ -11,7 +11,7 @@ import { useTranslation } from "react-i18next"
 import { DetailEditRow } from "@/components/form/detail-edit-row"
 import { Input } from "@/components/ui/input"
 
-/** 默认展示字段值，悬停出现编辑入口，点击后就地编辑，失焦或回车退出编辑。 */
+/** 默认展示字段值，悬停出现编辑入口，点击后就地编辑，失焦或回车退出编辑并触发 onCommit。 */
 export function InlineEditField<T extends FieldValues>({
   control,
   name,
@@ -19,6 +19,7 @@ export function InlineEditField<T extends FieldValues>({
   required = false,
   format,
   compact,
+  onCommit,
   ...input
 }: {
   control: Control<T>
@@ -27,6 +28,7 @@ export function InlineEditField<T extends FieldValues>({
   required?: boolean
   format?: (value: string) => ReactNode
   compact?: boolean
+  onCommit?: () => void
 } & Omit<
   ComponentProps<typeof Input>,
   "name" | "value" | "defaultValue" | "onChange" | "onBlur" | "ref" | "required"
@@ -65,6 +67,7 @@ export function InlineEditField<T extends FieldValues>({
             onBlur={() => {
               field.onBlur()
               setEditing(false)
+              onCommit?.()
             }}
             onKeyDown={(event) => {
               if (event.key === "Enter" || event.key === "Escape") {

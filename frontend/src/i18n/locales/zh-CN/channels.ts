@@ -104,12 +104,9 @@ const channels = {
   telegramConnection: {
     form: {
       botToken: "Bot Token",
-      showToken: "显示 Token",
-      hideToken: "隐藏 Token",
       test: "测试连接",
       testing: "正在测试…",
     },
-    saved: "Telegram 连接已保存。",
     tested: "连接测试成功。",
     saveError: "无法保存 Telegram 连接，请稍后重试。",
     testError: "连接测试失败，请稍后重试。",

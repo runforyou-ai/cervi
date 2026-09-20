@@ -105,12 +105,9 @@ const channels = {
   telegramConnection: {
     form: {
       botToken: "Bot token",
-      showToken: "Show token",
-      hideToken: "Hide token",
       test: "Test connection",
       testing: "Testing…",
     },
-    saved: "Telegram connection saved.",
     tested: "Connection test succeeded.",
     saveError: "Could not save the Telegram connection. Try again later.",
     testError: "Connection test failed. Try again later.",
