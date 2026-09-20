@@ -33,7 +33,6 @@ const workspace = {
       preferences: "Preferences",
       general: "General settings",
       roles: "Roles",
-      storage: "File storage",
       employees: "Employees",
       aiEmployees: "AI employees",
       team: "Team",

@@ -30,6 +30,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/realtime/protocol"
 	"github.com/runforyou-ai/cervi/internal/servertest"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
+	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/runforyou-ai/cervi/internal/tenant"
 	"github.com/uptrace/bun"
@@ -61,7 +62,7 @@ func startRealtimeGateway(t *testing.T, f navigationFixture, options gateway.Opt
 	}
 	t.Cleanup(func() { _ = publisher.Stop() })
 
-	backend := appservice.NewDirectBackend(f.db, nil, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil)
+	backend := appservice.NewDirectBackend(f.db, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil)
 	var member gateway.MemberBackend = backend
 	if wrap != nil {
 		member = wrap(backend)

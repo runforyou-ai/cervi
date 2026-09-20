@@ -179,9 +179,6 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.PUT("/integrations/mcp-servers/:mcpServerID", s.updateMCPServer)
 	router.DELETE("/integrations/mcp-servers/:mcpServerID", s.deleteMCPServer)
 	router.PUT("/settings/organization", s.updateOrganization)
-	router.GET("/settings/storage/s3", s.getS3Setting)
-	router.PUT("/settings/storage/s3", s.saveS3Setting)
-	router.POST("/settings/storage/s3/test", s.testS3Setting)
 }
 
 // installationStatus 返回服务端初始化状态和公开企业名称。
@@ -1521,31 +1518,6 @@ func (s *Service) updateOrganization(c *gin.Context) {
 	}
 	output, err := s.application.UpdateOrganization(c.Request.Context(), requestMeta(c), input)
 	writeResult(c, http.StatusOK, output, err)
-}
-
-// getS3Setting 返回当前企业的对象存储设置。
-func (s *Service) getS3Setting(c *gin.Context) {
-	output, err := s.application.GetS3Setting(c.Request.Context(), requestMeta(c))
-	writeResult(c, http.StatusOK, output, err)
-}
-
-// saveS3Setting 保存当前企业的对象存储设置。
-func (s *Service) saveS3Setting(c *gin.Context) {
-	var input appservice.S3SettingInput
-	if !bindJSON(c, &input) {
-		return
-	}
-	output, err := s.application.SaveS3Setting(c.Request.Context(), requestMeta(c), input)
-	writeResult(c, http.StatusOK, output, err)
-}
-
-// testS3Setting 测试对象存储连接。
-func (s *Service) testS3Setting(c *gin.Context) {
-	var input appservice.S3SettingInput
-	if !bindJSON(c, &input) {
-		return
-	}
-	writeEmpty(c, s.application.TestS3Setting(c.Request.Context(), requestMeta(c), input))
 }
 
 // bindAgentListInputQuery 从查询参数解析 appservice.AgentListInput。

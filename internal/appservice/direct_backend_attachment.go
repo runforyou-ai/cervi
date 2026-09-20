@@ -63,15 +63,11 @@ func (o *directOperations) GetAttachmentDownload(ctx context.Context, meta Reque
 		}
 		return FileDownload{URL: contentURL + "?download=" + url.QueryEscape(record.OriginalName), PreviewURL: contentURL + "?inline=1"}, nil
 	}
-	setting, err := o.getS3Setting.ExecuteForOrganization(ctx, record.OrganizationID)
+	request, err := serverfilecontent.PresignDownload(ctx, o.s3, record.StorageKey, mime.FormatMediaType("attachment", map[string]string{"filename": record.OriginalName}))
 	if err != nil {
 		return FileDownload{}, o.fileOperationError(ctx, meta, err, cervii18n.ErrorFileNotFound)
 	}
-	request, err := serverfilecontent.PresignDownload(ctx, s3FileConfig(setting), record.StorageKey, mime.FormatMediaType("attachment", map[string]string{"filename": record.OriginalName}))
-	if err != nil {
-		return FileDownload{}, o.fileOperationError(ctx, meta, err, cervii18n.ErrorFileNotFound)
-	}
-	preview, err := serverfilecontent.PresignDownload(ctx, s3FileConfig(setting), record.StorageKey, "inline")
+	preview, err := serverfilecontent.PresignDownload(ctx, o.s3, record.StorageKey, "inline")
 	if err != nil {
 		return FileDownload{}, o.fileOperationError(ctx, meta, err, cervii18n.ErrorFileNotFound)
 	}

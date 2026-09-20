@@ -30,8 +30,6 @@ const (
 	PermissionRolesManage            PermissionCode = PermissionCode(domain.PermissionRolesManage)
 	PermissionOrganizationView       PermissionCode = PermissionCode(domain.PermissionOrganizationView)
 	PermissionOrganizationManage     PermissionCode = PermissionCode(domain.PermissionOrganizationManage)
-	PermissionStorageView            PermissionCode = PermissionCode(domain.PermissionStorageView)
-	PermissionStorageManage          PermissionCode = PermissionCode(domain.PermissionStorageManage)
 )
 
 // PermissionResource 表示权限所属功能。
@@ -43,7 +41,6 @@ const (
 	PermissionResourceChannels         PermissionResource = PermissionResource(domain.PermissionResourceChannels)
 	PermissionResourceRoles            PermissionResource = PermissionResource(domain.PermissionResourceRoles)
 	PermissionResourceOrganization     PermissionResource = PermissionResource(domain.PermissionResourceOrganization)
-	PermissionResourceStorage          PermissionResource = PermissionResource(domain.PermissionResourceStorage)
 )
 
 // PermissionLevel 表示权限操作层级。

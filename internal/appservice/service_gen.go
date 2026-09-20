@@ -823,18 +823,3 @@ func (s *Service) DeleteMCPServer(ctx context.Context, meta RequestMeta, mcpServ
 func (s *Service) UpdateOrganization(ctx context.Context, meta RequestMeta, input OrganizationInput) (Organization, error) {
 	return withNormalizedSlices(s.backend.UpdateOrganization(ctx, meta, input))
 }
-
-// GetS3Setting 返回当前企业的对象存储设置。
-func (s *Service) GetS3Setting(ctx context.Context, meta RequestMeta) (S3Setting, error) {
-	return withNormalizedSlices(s.backend.GetS3Setting(ctx, meta))
-}
-
-// SaveS3Setting 保存当前企业的对象存储设置。
-func (s *Service) SaveS3Setting(ctx context.Context, meta RequestMeta, input S3SettingInput) (S3Setting, error) {
-	return withNormalizedSlices(s.backend.SaveS3Setting(ctx, meta, input))
-}
-
-// TestS3Setting 测试对象存储连接。
-func (s *Service) TestS3Setting(ctx context.Context, meta RequestMeta, input S3SettingInput) error {
-	return s.backend.TestS3Setting(ctx, meta, input)
-}

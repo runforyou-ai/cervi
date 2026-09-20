@@ -1246,27 +1246,6 @@ func (b *Backend) UpdateOrganization(ctx context.Context, meta appservice.Reques
 	return output, err
 }
 
-// GetS3Setting 返回当前企业的对象存储设置。
-func (b *Backend) GetS3Setting(ctx context.Context, meta appservice.RequestMeta) (appservice.S3Setting, error) {
-	var output appservice.S3Setting
-	err := b.do(ctx, meta, http.MethodGet, "/settings/storage/s3", nil, nil, &output)
-	b.normalizeOutput(&output)
-	return output, err
-}
-
-// SaveS3Setting 保存当前企业的对象存储设置。
-func (b *Backend) SaveS3Setting(ctx context.Context, meta appservice.RequestMeta, input appservice.S3SettingInput) (appservice.S3Setting, error) {
-	var output appservice.S3Setting
-	err := b.do(ctx, meta, http.MethodPut, "/settings/storage/s3", nil, input, &output)
-	b.normalizeOutput(&output)
-	return output, err
-}
-
-// TestS3Setting 测试对象存储连接。
-func (b *Backend) TestS3Setting(ctx context.Context, meta appservice.RequestMeta, input appservice.S3SettingInput) error {
-	return b.do(ctx, meta, http.MethodPost, "/settings/storage/s3/test", nil, input, nil)
-}
-
 // encodeAgentListInputQuery 将 appservice.AgentListInput 编码为查询参数。
 func encodeAgentListInputQuery(input appservice.AgentListInput) url.Values {
 	query := url.Values{}

@@ -38,14 +38,10 @@ func (o *directOperations) CreateFilePartUpload(ctx context.Context, meta Reques
 		return FileUploadRequest{Method: http.MethodPut, URL: contentURL + "?partNumber=" + strconv.Itoa(int(input.PartNumber)),
 			Headers: map[string]string{"Authorization": "Bearer " + meta.Token}}, nil
 	}
-	setting, err := o.getS3Setting.ExecuteForOrganization(ctx, record.OrganizationID)
-	if err != nil {
-		return FileUploadRequest{}, o.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCreateFailed)
-	}
 	if record.MultipartUploadID == nil {
 		return FileUploadRequest{}, o.fileOperationError(ctx, meta, fileaction.ErrFileNotFound, cervii18n.ErrorFileUploadCreateFailed)
 	}
-	request, err := serverfilecontent.PresignPart(ctx, s3FileConfig(setting), record.StorageKey, *record.MultipartUploadID, input.PartNumber, size)
+	request, err := serverfilecontent.PresignPart(ctx, o.s3, record.StorageKey, *record.MultipartUploadID, input.PartNumber, size)
 	if err != nil {
 		return FileUploadRequest{}, o.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCreateFailed)
 	}
@@ -60,14 +56,10 @@ func (o *directOperations) finalizeFileContent(ctx context.Context, record *serv
 				return "", 0, err
 			}
 		} else {
-			setting, err := o.getS3Setting.ExecuteForOrganization(ctx, record.OrganizationID)
-			if err != nil {
-				return "", 0, err
-			}
 			if record.MultipartUploadID == nil {
 				return "", 0, fileaction.ErrFileNotFound
 			}
-			err = serverfilecontent.CompleteMultipart(ctx, s3FileConfig(setting), record.StorageKey, *record.MultipartUploadID, record.ByteSize, record.PartSize)
+			err := serverfilecontent.CompleteMultipart(ctx, o.s3, record.StorageKey, *record.MultipartUploadID, record.ByteSize, record.PartSize)
 			var missing *types.NoSuchUpload
 			// 合并响应丢失后，最终对象用于确认上一次合并结果。
 			if err != nil && !errors.As(err, &missing) {

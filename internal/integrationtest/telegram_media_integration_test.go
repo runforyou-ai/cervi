@@ -68,7 +68,7 @@ func newTelegramMediaFixture(t *testing.T) *telegramMediaFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	writer := serverfilecontent.NewWriter(local, nil)
+	writer := serverfilecontent.NewWriter(local, serverfilecontent.S3Config{})
 	scheduler := &countingAgentScheduler{}
 	downloader := &mediaDownloaderStub{data: []byte("JPEGDATA")}
 	tasks := servertask.New(base.db, serverconfig.NATSConfig{})
@@ -280,7 +280,7 @@ func TestTelegramInboundMediaFailure(t *testing.T) {
 		t.Fatalf("schedules=%d", f.scheduler.calls)
 	}
 	// 过期清理删除已回收的文件记录。
-	if err := filemaintenance.NewDeleteExpiredAction(f.db, serverfilecontent.NewDeleter(f.local, nil)).Execute(ctx, filemaintenance.DeleteExpiredInput{FileID: file.ID}); err != nil {
+	if err := filemaintenance.NewDeleteExpiredAction(f.db, serverfilecontent.NewDeleter(f.local, serverfilecontent.S3Config{})).Execute(ctx, filemaintenance.DeleteExpiredInput{FileID: file.ID}); err != nil {
 		t.Fatal(err)
 	}
 	if exists, err := f.db.NewSelect().Table("files").Where("id = ?", file.ID).Exists(ctx); err != nil || exists {
@@ -297,7 +297,7 @@ func TestTelegramInboundMediaExpiredCleanup(t *testing.T) {
 	if _, err := f.db.ExecContext(ctx, "UPDATE files SET expires_at = now() - interval '1 minute' WHERE id = ?", file.ID); err != nil {
 		t.Fatal(err)
 	}
-	cleanup := filemaintenance.NewDeleteExpiredAction(f.db, serverfilecontent.NewDeleter(f.local, nil))
+	cleanup := filemaintenance.NewDeleteExpiredAction(f.db, serverfilecontent.NewDeleter(f.local, serverfilecontent.S3Config{}))
 	if err := cleanup.Execute(ctx, filemaintenance.DeleteExpiredInput{FileID: file.ID}); err != nil {
 		t.Fatal(err)
 	}

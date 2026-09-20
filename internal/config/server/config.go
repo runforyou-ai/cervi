@@ -13,6 +13,7 @@ import (
 	"strings"
 
 	"github.com/goccy/go-yaml"
+	"github.com/runforyou-ai/cervi/internal/common"
 )
 
 var natsNamespacePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*$`)
@@ -55,9 +56,22 @@ type TLSConfig struct {
 	ACMEEmail string `yaml:"acmeEmail"`
 }
 
-// StorageConfig 定义企业服务端本地文件存储配置。
+// StorageConfig 定义企业服务端文件存储配置。
 type StorageConfig struct {
-	LocalDirectory string `yaml:"localDirectory"`
+	LocalDirectory string   `yaml:"localDirectory"`
+	S3             S3Config `yaml:"s3"`
+}
+
+// S3Config 定义 S3 兼容对象存储配置，关闭时文件写入本地目录。
+type S3Config struct {
+	Enabled         bool   `yaml:"enabled"`
+	Endpoint        string `yaml:"endpoint"`
+	PublicBaseURL   string `yaml:"publicBaseURL"`
+	Region          string `yaml:"region"`
+	Bucket          string `yaml:"bucket"`
+	AccessKeyID     string `yaml:"accessKeyID"`
+	SecretAccessKey string `yaml:"secretAccessKey"`
+	ForcePathStyle  bool   `yaml:"forcePathStyle"`
 }
 
 // Load 从显式配置文件和环境变量加载服务端配置。
@@ -96,6 +110,12 @@ func (config *Config) normalize() {
 	config.TLS.Mode = strings.ToLower(strings.TrimSpace(config.TLS.Mode))
 	config.TLS.ACMEEmail = strings.TrimSpace(config.TLS.ACMEEmail)
 	config.Storage.LocalDirectory = strings.TrimSpace(config.Storage.LocalDirectory)
+	config.Storage.S3.Endpoint = strings.TrimRight(strings.TrimSpace(config.Storage.S3.Endpoint), "/")
+	config.Storage.S3.PublicBaseURL = strings.TrimRight(strings.TrimSpace(config.Storage.S3.PublicBaseURL), "/")
+	config.Storage.S3.Region = strings.TrimSpace(config.Storage.S3.Region)
+	config.Storage.S3.Bucket = strings.TrimSpace(config.Storage.S3.Bucket)
+	config.Storage.S3.AccessKeyID = strings.TrimSpace(config.Storage.S3.AccessKeyID)
+	config.Storage.S3.SecretAccessKey = strings.TrimSpace(config.Storage.S3.SecretAccessKey)
 }
 
 // defaultConfig 返回服务端默认配置。
@@ -119,6 +139,12 @@ func applyEnvironment(config *Config) error {
 	applyStringEnvironment("TLS_MODE", &config.TLS.Mode)
 	applyStringEnvironment("TLS_ACME_EMAIL", &config.TLS.ACMEEmail)
 	applyStringEnvironment("FILE_STORAGE_PATH", &config.Storage.LocalDirectory)
+	applyStringEnvironment("S3_ENDPOINT", &config.Storage.S3.Endpoint)
+	applyStringEnvironment("S3_PUBLIC_BASE_URL", &config.Storage.S3.PublicBaseURL)
+	applyStringEnvironment("S3_REGION", &config.Storage.S3.Region)
+	applyStringEnvironment("S3_BUCKET", &config.Storage.S3.Bucket)
+	applyStringEnvironment("S3_ACCESS_KEY_ID", &config.Storage.S3.AccessKeyID)
+	applyStringEnvironment("S3_SECRET_ACCESS_KEY", &config.Storage.S3.SecretAccessKey)
 	applyStringEnvironment("POSTGRES_HOST", &config.Database.Host)
 	applyStringEnvironment("POSTGRES_USER", &config.Database.User)
 	applyStringEnvironment("POSTGRES_PASSWORD", &config.Database.Password)
@@ -137,6 +163,12 @@ func applyEnvironment(config *Config) error {
 		return err
 	}
 	config.Database.Port = databasePort
+	if err := applyBoolEnvironment("S3_ENABLED", &config.Storage.S3.Enabled); err != nil {
+		return err
+	}
+	if err := applyBoolEnvironment("S3_FORCE_PATH_STYLE", &config.Storage.S3.ForcePathStyle); err != nil {
+		return err
+	}
 	return nil
 }
 
@@ -200,6 +232,26 @@ func (config Config) validate() error {
 	if config.Storage.LocalDirectory == "" {
 		return fmt.Errorf("必须配置本地文件存储目录")
 	}
+	if config.Storage.S3.Enabled {
+		if !common.ValidHTTPBaseURL(config.Storage.S3.Endpoint) {
+			return fmt.Errorf("storage.s3.endpoint 必须是完整的 HTTP 地址")
+		}
+		if !common.ValidHTTPBaseURL(config.Storage.S3.PublicBaseURL) {
+			return fmt.Errorf("storage.s3.publicBaseURL 必须是客户端可访问的完整 HTTP 地址")
+		}
+		if config.Storage.S3.Region == "" {
+			return fmt.Errorf("必须配置 storage.s3.region 或 S3_REGION")
+		}
+		if config.Storage.S3.Bucket == "" {
+			return fmt.Errorf("必须配置 storage.s3.bucket 或 S3_BUCKET")
+		}
+		if config.Storage.S3.AccessKeyID == "" {
+			return fmt.Errorf("必须配置 storage.s3.accessKeyID 或 S3_ACCESS_KEY_ID")
+		}
+		if config.Storage.S3.SecretAccessKey == "" {
+			return fmt.Errorf("必须配置 storage.s3.secretAccessKey 或 S3_SECRET_ACCESS_KEY")
+		}
+	}
 	return nil
 }
 
@@ -209,6 +261,20 @@ func applyStringEnvironment(name string, target *string) {
 	if ok && strings.TrimSpace(value) != "" {
 		*target = strings.TrimSpace(value)
 	}
+}
+
+// applyBoolEnvironment 覆盖非空布尔环境变量。
+func applyBoolEnvironment(name string, target *bool) error {
+	value, ok := os.LookupEnv(name)
+	if !ok || strings.TrimSpace(value) == "" {
+		return nil
+	}
+	parsed, err := strconv.ParseBool(strings.TrimSpace(value))
+	if err != nil {
+		return fmt.Errorf("%s 必须是布尔值", name)
+	}
+	*target = parsed
+	return nil
 }
 
 // intEnvironment 读取整数环境变量。

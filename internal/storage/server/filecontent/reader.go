@@ -15,13 +15,13 @@ import (
 
 // Reader 按原件记录中的存储类型流式读取文件。
 type Reader struct {
-	local     *LocalStore
-	resolveS3 S3ConfigResolver
+	local *LocalStore
+	s3    S3Config
 }
 
 // NewReader 创建后台原件读取器。
-func NewReader(local *LocalStore, resolveS3 S3ConfigResolver) *Reader {
-	return &Reader{local: local, resolveS3: resolveS3}
+func NewReader(local *LocalStore, s3 S3Config) *Reader {
+	return &Reader{local: local, s3: s3}
 }
 
 // Open 打开本地原件或对象存储响应体，由调用方关闭。
@@ -31,11 +31,7 @@ func (r *Reader) Open(ctx context.Context, file *servermodels.File) (io.ReadClos
 		content, _, err := r.local.Open(ctx, file.StorageKey)
 		return content, err
 	case domain.FileStorageBackendS3:
-		config, err := r.resolveS3(ctx, file.OrganizationID)
-		if err != nil {
-			return nil, err
-		}
-		output, err := newS3Client(config).GetObject(ctx, &s3.GetObjectInput{Bucket: aws.String(config.Bucket), Key: aws.String(file.StorageKey)})
+		output, err := newS3Client(r.s3).GetObject(ctx, &s3.GetObjectInput{Bucket: aws.String(r.s3.Bucket), Key: aws.String(file.StorageKey)})
 		if err != nil {
 			return nil, err
 		}

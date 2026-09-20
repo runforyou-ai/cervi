@@ -19,6 +19,7 @@ import (
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
+	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/runforyou-ai/cervi/internal/tenant"
 	"github.com/uptrace/bun"
@@ -37,7 +38,7 @@ func TestInboxIndependentConversation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	backend := appservice.NewDirectBackend(f.db, nil, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil)
+	backend := appservice.NewDirectBackend(f.db, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil)
 	meta := appservice.RequestMeta{Token: login.Token}
 	inbox, err := backend.LoadInbox(ctx, meta, appservice.LoadInboxInput{Scope: appservice.InboxScopeInternal})
 	if err != nil || len(inbox.Conversations) != 50 || !inbox.HasMore || inbox.NextCursor == "" {

@@ -1640,32 +1640,3 @@ func (b *DirectBackend) UpdateOrganization(ctx context.Context, meta RequestMeta
 	}
 	return b.ops.UpdateOrganization(ctx, meta, identity, input)
 }
-
-// GetS3Setting 返回当前企业的对象存储设置。
-func (b *DirectBackend) GetS3Setting(ctx context.Context, meta RequestMeta) (S3Setting, error) {
-	identity, err := b.ops.authenticate(ctx, meta)
-	if err != nil {
-		var zero S3Setting
-		return zero, err
-	}
-	return b.ops.GetS3Setting(ctx, meta, identity)
-}
-
-// SaveS3Setting 保存当前企业的对象存储设置。
-func (b *DirectBackend) SaveS3Setting(ctx context.Context, meta RequestMeta, input S3SettingInput) (S3Setting, error) {
-	identity, err := b.ops.authenticate(ctx, meta)
-	if err != nil {
-		var zero S3Setting
-		return zero, err
-	}
-	return b.ops.SaveS3Setting(ctx, meta, identity, input)
-}
-
-// TestS3Setting 测试对象存储连接。
-func (b *DirectBackend) TestS3Setting(ctx context.Context, meta RequestMeta, input S3SettingInput) error {
-	identity, err := b.ops.authenticate(ctx, meta)
-	if err != nil {
-		return err
-	}
-	return b.ops.TestS3Setting(ctx, meta, identity, input)
-}
