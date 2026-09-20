@@ -1,6 +1,6 @@
 /** 简体中文·设置文案。 */
 const settings = {
-  title: "设置",
+  backToApp: "返回应用",
   navigationLabel: "设置菜单",
   groups: {
     personal: "个人",

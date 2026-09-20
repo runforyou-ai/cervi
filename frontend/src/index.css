@@ -297,7 +297,7 @@ body,
   --cervi-workspace-content-inset: 6px;
   --cervi-workspace-content-gutter: 10px;
   --cervi-workspace-content-top: 28px;
-  --cervi-workspace-rail-top: 52px;
+  --cervi-workspace-rail-top: 40px;
   --cervi-workspace-titlebar-height: 40px;
   --cervi-workspace-titlebar-inset: 8px;
   --cervi-workspace-titlebar-offset: 0px;
@@ -340,7 +340,7 @@ body,
 /* macOS 主窗口使用带工具栏的隐藏标题栏，顶部按整条工具栏高度留白。 */
 [data-native-os="darwin"][data-window-fullscreen="false"] .cervi-workspace-shell {
   --cervi-workspace-content-top: 40px;
-  --cervi-workspace-rail-top: 64px;
+  --cervi-workspace-rail-top: 52px;
   --cervi-workspace-titlebar-height: 52px;
   --cervi-workspace-titlebar-inset: 84px;
   --cervi-workspace-titlebar-offset: 2px;

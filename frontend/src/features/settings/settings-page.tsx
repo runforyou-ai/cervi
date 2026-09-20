@@ -1,22 +1,8 @@
-/** 设置页。 */
+/** 设置页内容；设置导航在工作台一级栏中显示。 */
 import type { ReactNode } from "react"
-import {
-  Building2Icon,
-  LockKeyholeIcon,
-  MonitorSmartphoneIcon,
-  ShieldCheckIcon,
-  SlidersHorizontalIcon,
-  UserRoundIcon,
-} from "lucide-react"
 import { useTranslation } from "react-i18next"
 
 import { PageContent } from "@/components/page-content"
-import {
-  PagePaneGroup,
-  PagePaneLink,
-  PagePaneNav,
-  PageSplit,
-} from "@/components/page-split"
 import { PageHeader } from "@/components/page-header"
 import { ChangePasswordForm } from "@/features/settings/change-password-form"
 import { DeviceListPage } from "@/features/settings/device-list-page"
@@ -34,7 +20,7 @@ export type SettingsSection =
   | "general"
   | "roles"
 
-/** 设置导航和当前设置页面。 */
+/** 渲染当前设置页面。 */
 export function SettingsPage({
   section,
   children,
@@ -44,44 +30,14 @@ export function SettingsPage({
 }) {
   const { t } = useTranslation("settings")
   const { identity } = useWorkspace()
-  const title = t(`${section}.title`)
 
   return (
-    <PageSplit
-      paneWidth="md"
-      paneVariant="nav"
-      pane={
-        <PagePaneNav label={t("navigationLabel")} title={t("title")}>
-          <PagePaneGroup title={t("groups.personal")}>
-            <PagePaneLink to="/settings/profile" icon={UserRoundIcon}>
-              {t("navigation.profile")}
-            </PagePaneLink>
-            <PagePaneLink to="/settings/security" icon={LockKeyholeIcon}>
-              {t("navigation.security")}
-            </PagePaneLink>
-            <PagePaneLink to="/settings/preferences" icon={SlidersHorizontalIcon}>
-              {t("navigation.preferences")}
-            </PagePaneLink>
-            <PagePaneLink to="/settings/devices" icon={MonitorSmartphoneIcon}>
-              {t("navigation.devices")}
-            </PagePaneLink>
-          </PagePaneGroup>
-          <PagePaneGroup title={t("groups.organization")}>
-            <PagePaneLink to="/settings/general" icon={Building2Icon}>
-              {t("navigation.general")}
-            </PagePaneLink>
-            <PagePaneLink to="/settings/roles" icon={ShieldCheckIcon}>
-              {t("navigation.roles")}
-            </PagePaneLink>
-          </PagePaneGroup>
-        </PagePaneNav>
-      }
-    >
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       {section === "roles" ? (
         (children ?? <RoleListPage />)
       ) : (
         <>
-          <PageHeader title={title} />
+          <PageHeader title={t(`${section}.title`)} />
           <PageContent>
             {section === "profile" ? (
               <ProfileSettingsForm user={identity.user} />
@@ -97,6 +53,6 @@ export function SettingsPage({
           </PageContent>
         </>
       )}
-    </PageSplit>
+    </div>
   )
 }

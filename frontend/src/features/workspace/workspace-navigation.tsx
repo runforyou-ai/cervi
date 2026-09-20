@@ -1,15 +1,22 @@
 /** 工作台左侧模块栏和用户菜单。 */
 import { useRef, useState } from "react"
 import {
+  Building2Icon,
   CheckIcon,
+  ChevronLeftIcon,
   ContactRoundIcon,
   InboxIcon,
   LayoutGridIcon,
   LibraryIcon,
   LoaderCircleIcon,
+  LockKeyholeIcon,
   LogOutIcon,
+  MonitorSmartphoneIcon,
   PlugIcon,
   SettingsIcon,
+  ShieldCheckIcon,
+  SlidersHorizontalIcon,
+  UserRoundIcon,
   type LucideIcon,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
@@ -21,6 +28,7 @@ import {
   type Identity,
   type WorkStatus,
 } from "@/api"
+import { PagePaneGroup } from "@/components/page-split"
 import { useUnsavedChangesContext } from "@/contexts/unsaved-changes-context"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
@@ -124,13 +132,77 @@ function WorkspaceMenu({
   )
 }
 
+/** 设置导航，进入设置后替换模块栏内容。 */
+function WorkspaceSettingsMenu({ appHref }: { appHref: string }) {
+  const { t } = useTranslation("settings")
+  const location = useLocation()
+
+  return (
+    <nav
+      className="flex flex-1 flex-col items-stretch gap-0.5 pt-1 pr-0 pl-1.5"
+      aria-label={t("navigationLabel")}
+    >
+      <WorkspaceRailItem
+        to={appHref}
+        icon={ChevronLeftIcon}
+        label={t("backToApp")}
+        active={false}
+      />
+      <PagePaneGroup title={t("groups.personal")}>
+        <WorkspaceRailItem
+          to="/settings/profile"
+          icon={UserRoundIcon}
+          label={t("navigation.profile")}
+          active={location.pathname === "/settings/profile"}
+        />
+        <WorkspaceRailItem
+          to="/settings/security"
+          icon={LockKeyholeIcon}
+          label={t("navigation.security")}
+          active={location.pathname === "/settings/security"}
+        />
+        <WorkspaceRailItem
+          to="/settings/preferences"
+          icon={SlidersHorizontalIcon}
+          label={t("navigation.preferences")}
+          active={location.pathname === "/settings/preferences"}
+        />
+        <WorkspaceRailItem
+          to="/settings/devices"
+          icon={MonitorSmartphoneIcon}
+          label={t("navigation.devices")}
+          active={location.pathname === "/settings/devices"}
+        />
+      </PagePaneGroup>
+      <PagePaneGroup title={t("groups.organization")}>
+        <WorkspaceRailItem
+          to="/settings/general"
+          icon={Building2Icon}
+          label={t("navigation.general")}
+          active={location.pathname === "/settings/general"}
+        />
+        <WorkspaceRailItem
+          to="/settings/roles"
+          icon={ShieldCheckIcon}
+          label={t("navigation.roles")}
+          active={location.pathname.startsWith("/settings/roles")}
+        />
+      </PagePaneGroup>
+    </nav>
+  )
+}
+
 /** 渲染模块栏和用户菜单。 */
 export function WorkspaceNavigation({
   identity,
+  inSettings,
+  appHref,
   onLogout,
   loggingOut,
 }: {
   identity: Identity
+  inSettings: boolean
+  appHref: string
   onLogout: () => void
   loggingOut: boolean
 }) {
@@ -190,7 +262,11 @@ export function WorkspaceNavigation({
 
   return (
     <aside className="cervi-workspace-rail flex h-full shrink-0 flex-col text-sidebar-foreground">
-      <WorkspaceMenu onInboxClick={requestMessageNotificationPermission} />
+      {inSettings ? (
+        <WorkspaceSettingsMenu appHref={appHref} />
+      ) : (
+        <WorkspaceMenu onInboxClick={requestMessageNotificationPermission} />
+      )}
       <div className="pt-1 pr-0 pb-2.5 pl-1.5">
         <DropdownMenu open={userMenuOpen} onOpenChange={setUserMenuOpen}>
           <DropdownMenuTrigger asChild>
