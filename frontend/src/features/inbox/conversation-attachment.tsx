@@ -217,7 +217,7 @@ export function ConversationAttachment({
           </p>
         ) : null}
         {ready && deliveryBelowImage
-          ? renderDeliveryState?.("rounded-full bg-primary px-2 py-0.5 text-primary-foreground")
+          ? renderDeliveryState?.("rounded-full bg-accent px-2 py-0.5 text-accent-foreground")
           : null}
         {image && preview.error ? (
           <button
@@ -232,7 +232,7 @@ export function ConversationAttachment({
           // 图片正文单独成气泡，非图片正文留在附件气泡内，时间与正文同行。
           <div className={cn("min-w-0 after:block after:clear-both after:content-['']", image ? cn("max-w-80", bubble) : "pt-2")}>
             <span className="whitespace-pre-wrap [overflow-wrap:anywhere]">{body}</span>
-            <div className={cn("float-right ml-2 translate-y-0.5", incoming ? "text-muted-foreground" : "text-primary-foreground/75")}>{footer}</div>
+            <div className={cn("float-right ml-2 translate-y-0.5", incoming ? "text-muted-foreground" : "text-accent-foreground/75")}>{footer}</div>
           </div>
         ) : null}
       </div>

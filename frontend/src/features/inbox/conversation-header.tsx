@@ -141,7 +141,7 @@ export function ConversationHeader({
             <TooltipTrigger asChild>
               <h2
                 data-slot="conversation-header-title"
-                className="min-w-0 truncate text-sm font-semibold"
+                className="min-w-0 truncate text-xl font-semibold"
               >
                 {contactName}
               </h2>

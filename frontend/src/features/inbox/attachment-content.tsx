@@ -88,7 +88,7 @@ export function AttachmentContent({
       <div
         className={cn(
           "relative flex size-12 shrink-0 items-center justify-center rounded-full",
-          inverted ? "bg-primary-foreground/20 text-primary-foreground" : "bg-primary/15 text-primary",
+          inverted ? "bg-accent-foreground/15 text-accent-foreground" : "bg-primary/15 text-primary",
         )}
       >
         {action ?? (
@@ -117,7 +117,7 @@ export function AttachmentContent({
         <div
           className={cn(
             "grid grid-cols-[minmax(0,1fr)_auto] items-end gap-2 text-xs",
-            inverted ? "text-primary-foreground/75" : "text-muted-foreground",
+            inverted ? "text-accent-foreground/75" : "text-muted-foreground",
           )}
         >
           <span className="truncate tabular-nums">
