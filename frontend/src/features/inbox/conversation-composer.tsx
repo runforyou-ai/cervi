@@ -58,7 +58,7 @@ import {
 } from "@/features/inbox/outgoing-message-store"
 import { ConversationAttachmentUpload } from "./conversation-attachment-upload"
 import { CustomerReplyAssistant } from "@/features/inbox/customer-reply-assistant"
-import { mobileComposerToolClass } from "@/features/inbox/mobile-composer-tool"
+import { composerToolClass } from "@/features/inbox/composer-tool"
 import { useConversationTypingReport } from "@/features/inbox/use-conversation-typing"
 import { resolveAppPlatform } from "@/platform/app-platform"
 import { apiErrorMessage } from "@/lib/form-errors"
@@ -866,7 +866,7 @@ export function ConversationComposer({
         type="button"
         variant="ghost"
         size="icon-sm"
-        className={mobile ? mobileComposerToolClass : undefined}
+        className={composerToolClass}
         disabled
         aria-label={t("attachmentAdd")}
       >
@@ -880,7 +880,7 @@ export function ConversationComposer({
           type="button"
           variant="ghost"
           size="icon-sm"
-          className={mobile ? mobileComposerToolClass : undefined}
+          className={composerToolClass}
           disabled={isSubmitting}
           aria-label={t("emojiPick")}
         >
@@ -1090,7 +1090,7 @@ export function ConversationComposer({
               <Button
                 type="submit"
                 size="icon"
-                className="relative ml-1 rounded-full after:absolute after:-inset-1 after:content-[''] [&_svg:not([class*='size-'])]:size-5"
+                className="relative ml-1 size-9 rounded-full after:absolute after:-inset-1 after:content-[''] [&_svg:not([class*='size-'])]:size-5"
                 disabled={isSubmitting || Boolean(disabledReason) || isBodyEmpty || replyTo?.deleted}
                 aria-label={t(internalNote ? "internalNoteSave" : "messageSend")}
               >
