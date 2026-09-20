@@ -1,6 +1,11 @@
 /** 美式英语·工作台文案。 */
 const workspace = {
   navigationGroup: "Workspace",
+  resizeNavigation: "Resize the navigation sidebar",
+  railClose: "Collapse the navigation sidebar",
+  railOpen: "Expand the navigation sidebar",
+  historyBack: "Back",
+  historyForward: "Forward",
   inbox: "Messages",
   contacts: "Contacts",
   knowledgeBases: "Knowledge bases",
@@ -15,36 +20,6 @@ const workspace = {
   logoutError: "Could not log out. Please try again.",
   identityLoadError: "Could not load the login status.",
   inboxLoadError: "Could not load messages.",
-  tabs: {
-    label: "Open pages",
-    close: "Close {{title}}",
-    closeTab: "Close tab",
-    closeOthers: "Close other tabs",
-    closeRight: "Close tabs to the right",
-    reload: "Reload",
-    pin: "Pin",
-    unpin: "Unpin",
-    pinnedTab: "{{title}}, pinned",
-    routes: {
-      inbox: "Messages",
-      profile: "Profile",
-      security: "Account security",
-      preferences: "Preferences",
-      devices: "Devices",
-      general: "General settings",
-      roles: "Roles",
-      employees: "Employees",
-      aiEmployees: "AI employees",
-      team: "Team",
-      externalContacts: "External contacts",
-      knowledgeBases: "Knowledge bases",
-      apps: "Apps",
-      channels: "Message channels",
-      businessSystems: "Business systems",
-      mcpServers: "MCP servers",
-      modelServices: "Model services",
-    },
-  },
 }
 
 export default workspace

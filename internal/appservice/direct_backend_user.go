@@ -127,7 +127,6 @@ func (o *directOperations) UpdateUserPreferences(ctx context.Context, meta Reque
 		Locale:                      domain.Locale(input.Locale),
 		TimeZone:                    input.TimeZone,
 		MessageNotificationsEnabled: input.MessageNotificationsEnabled,
-		WorkspaceTabsEnabled:        input.WorkspaceTabsEnabled,
 	})
 	if err != nil {
 		return CurrentUser{}, o.currentUserError(ctx, meta, err, cervii18n.ErrorPreferencesUpdateFailed, preferencesFieldKeys, identity.Organization.ID, identity.User.ID)
@@ -138,7 +137,6 @@ func (o *directOperations) UpdateUserPreferences(ctx context.Context, meta Reque
 		"locale", input.Locale,
 		"time_zone", input.TimeZone,
 		"message_notifications_enabled", input.MessageNotificationsEnabled,
-		"workspace_tabs_enabled", input.WorkspaceTabsEnabled,
 	)
 	user, err := o.currentUserFromIdentity(ctx, updatedIdentity)
 	if err != nil {

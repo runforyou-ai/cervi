@@ -8,7 +8,7 @@ export type UnsavedForm = {
 
 export const UnsavedChangesContext = createContext<{
   register: (id: symbol, form: UnsavedForm) => () => void
-  confirmTabs: (ids?: string[]) => Promise<boolean>
+  confirmDiscard: () => Promise<boolean>
 } | null>(null)
 
 /** 读取当前工作台的未保存内容管理入口。 */

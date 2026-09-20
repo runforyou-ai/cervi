@@ -249,7 +249,7 @@ func TestSyncHeadsIdentityProfile(t *testing.T) {
 	preferences := useraction.NewUpdatePreferencesAction(f.db)
 	profile := useraction.NewUpdateProfileAction(f.db)
 	updateUser := useraction.NewUpdateUserAction(f.db, testServiceSessionReturner(f.db))
-	shanghai := useraction.PreferencesInput{Locale: domain.Locale(lonely.User.Locale), TimeZone: "Asia/Shanghai", MessageNotificationsEnabled: lonely.User.MessageNotificationsEnabled, WorkspaceTabsEnabled: lonely.User.WorkspaceTabsEnabled}
+	shanghai := useraction.PreferencesInput{Locale: domain.Locale(lonely.User.Locale), TimeZone: "Asia/Shanghai", MessageNotificationsEnabled: lonely.User.MessageNotificationsEnabled}
 	for _, step := range []struct {
 		name   string
 		change func() error

@@ -83,7 +83,7 @@ func run(_ []string) error {
 		BackgroundColour: application.NewRGB(250, 250, 250),
 		URL:              "/",
 		Mac: application.MacWindow{
-			TitleBar: application.MacTitleBarHidden,
+			TitleBar: application.MacTitleBarHiddenInset,
 		},
 	})
 	trayController.Setup(nativesystemtray.Options{
