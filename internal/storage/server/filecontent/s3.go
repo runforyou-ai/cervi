@@ -15,9 +15,11 @@ import (
 
 const signedRequestLifetime = 15 * time.Minute
 
-// S3Config 定义访问 S3 兼容对象存储所需配置。
+// S3Config 定义访问 S3 兼容对象存储所需配置，关闭时新文件写入本地存储。
 type S3Config struct {
+	Enabled         bool
 	Endpoint        string
+	PublicBaseURL   string
 	Region          string
 	Bucket          string
 	AccessKeyID     string

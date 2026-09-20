@@ -13,7 +13,6 @@ import (
 
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
-	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
@@ -42,13 +41,12 @@ type WebsiteVisitorDirectBackend struct {
 	createUpload      *conversationaction.CreateWebsiteVisitorUploadAction
 	completeUpload    *conversationaction.CompleteWebsiteVisitorUploadAction
 	getAttachment     *conversationaction.GetWebsiteVisitorAttachmentQuery
-	getS3Setting      *settingaction.GetS3SettingQuery
 	localFiles        *serverfilecontent.LocalStore
+	s3                serverfilecontent.S3Config
 }
 
 // NewWebsiteVisitorDirectBackend 创建匿名网站访客直接后端。
-func NewWebsiteVisitorDirectBackend(db *bun.DB, agentScheduler conversationaction.CustomerAgentMessageScheduler, localFiles *serverfilecontent.LocalStore) *WebsiteVisitorDirectBackend {
-	getS3Setting := settingaction.NewGetS3SettingQuery(db)
+func NewWebsiteVisitorDirectBackend(db *bun.DB, agentScheduler conversationaction.CustomerAgentMessageScheduler, localFiles *serverfilecontent.LocalStore, s3 serverfilecontent.S3Config) *WebsiteVisitorDirectBackend {
 	backend := &WebsiteVisitorDirectBackend{
 		listConversations: conversationaction.NewListWebsiteConversationsQuery(db),
 		sendMessage:       conversationaction.NewReceiveWebsiteCustomerMessageAction(db, agentScheduler),
@@ -56,15 +54,11 @@ func NewWebsiteVisitorDirectBackend(db *bun.DB, agentScheduler conversationactio
 		authorizeVisitor:  conversationaction.NewAuthorizeWebsiteVisitorQuery(db),
 		completeUpload:    conversationaction.NewCompleteWebsiteVisitorUploadAction(db),
 		getAttachment:     conversationaction.NewGetWebsiteVisitorAttachmentQuery(db),
-		getS3Setting:      getS3Setting,
 		localFiles:        localFiles,
+		s3:                s3,
 	}
-	backend.createUpload = conversationaction.NewCreateWebsiteVisitorUploadAction(db, func(ctx context.Context, organizationID string) (domain.FileStorageBackend, error) {
-		setting, err := getS3Setting.ExecuteForOrganization(ctx, organizationID)
-		if err != nil {
-			return "", err
-		}
-		if setting.Enabled {
+	backend.createUpload = conversationaction.NewCreateWebsiteVisitorUploadAction(db, func(context.Context, string) (domain.FileStorageBackend, error) {
+		if s3.Enabled {
 			return domain.FileStorageBackendS3, nil
 		}
 		return domain.FileStorageBackendLocal, nil
@@ -121,7 +115,7 @@ func (b *WebsiteVisitorDirectBackend) SendAttachmentMessage(ctx context.Context,
 
 // sentMessageResult 转换访客消息写入结果并记录保存日志。
 func (b *WebsiteVisitorDirectBackend) sentMessageResult(ctx context.Context, meta WebsiteVisitorMeta, channelID, operation string, result conversationaction.ReceiveWebsiteCustomerMessageResult) (WebsiteVisitorMessageResult, error) {
-	linker := visitorAttachmentLinker{backend: b, organizationID: result.OrganizationID}
+	linker := visitorAttachmentLinker{s3: b.s3}
 	message, err := websiteVisitorMessageFromAction(ctx, &linker, result.Message)
 	if err != nil {
 		return WebsiteVisitorMessageResult{}, websiteVisitorError(ctx, meta, err, cervii18n.ErrorMessageSendFailed, operation, "channel_id", channelID)
@@ -174,7 +168,7 @@ func (b *WebsiteVisitorDirectBackend) GetMessageAttachment(ctx context.Context, 
 	if err != nil {
 		return WebsiteVisitorAttachmentLinks{}, websiteVisitorError(ctx, meta, err, cervii18n.ErrorFileNotFound, "get_message_attachment", "channel_id", channelID, "message_id", messageID)
 	}
-	linker := visitorAttachmentLinker{backend: b, organizationID: record.OrganizationID}
+	linker := visitorAttachmentLinker{s3: b.s3}
 	links, err := linker.links(ctx, domain.FileStorageBackend(record.StorageBackend), record.StorageKey, record.OriginalName)
 	if err != nil {
 		return WebsiteVisitorAttachmentLinks{}, websiteVisitorError(ctx, meta, err, cervii18n.ErrorFileNotFound, "get_message_attachment", "channel_id", channelID, "message_id", messageID)
@@ -194,11 +188,7 @@ func (b *WebsiteVisitorDirectBackend) visitorUploadRequest(ctx context.Context, 
 			Headers: map[string]string{WebsiteVisitorTokenHeader: meta.Token, "Content-Type": record.ContentType},
 		}, nil
 	}
-	setting, err := b.getS3Setting.ExecuteForOrganization(ctx, record.OrganizationID)
-	if err != nil {
-		return WebsiteVisitorUploadRequest{}, err
-	}
-	signed, err := serverfilecontent.PresignPut(ctx, s3FileConfig(setting), record.StorageKey, record.ContentType)
+	signed, err := serverfilecontent.PresignPut(ctx, b.s3, record.StorageKey, record.ContentType)
 	if err != nil {
 		return WebsiteVisitorUploadRequest{}, err
 	}
@@ -214,22 +204,16 @@ func (b *WebsiteVisitorDirectBackend) statVisitorFile(ctx context.Context, recor
 		}
 		return "", info.Size(), nil
 	}
-	setting, err := b.getS3Setting.ExecuteForOrganization(ctx, record.OrganizationID)
-	if err != nil {
-		return "", 0, err
-	}
-	info, err := serverfilecontent.Stat(ctx, s3FileConfig(setting), record.StorageKey)
+	info, err := serverfilecontent.Stat(ctx, b.s3, record.StorageKey)
 	if err != nil {
 		return "", 0, err
 	}
 	return info.ETag, info.ByteSize, nil
 }
 
-// visitorAttachmentLinker 按企业对象存储配置签发访客附件地址，S3 配置在首次需要时读取一次。
+// visitorAttachmentLinker 按部署级对象存储配置签发访客附件地址。
 type visitorAttachmentLinker struct {
-	backend        *WebsiteVisitorDirectBackend
-	setting        *settingaction.S3Setting
-	organizationID string
+	s3 serverfilecontent.S3Config
 }
 
 // links 返回附件的预览与下载地址。
@@ -241,15 +225,11 @@ func (l *visitorAttachmentLinker) links(ctx context.Context, backend domain.File
 		}
 		return WebsiteVisitorAttachmentLinks{PreviewURL: contentURL + "?inline=1", DownloadURL: contentURL + "?download=" + url.QueryEscape(fileName)}, nil
 	}
-	setting, err := l.s3Setting(ctx)
+	preview, err := serverfilecontent.PresignDownload(ctx, l.s3, storageKey, "inline")
 	if err != nil {
 		return WebsiteVisitorAttachmentLinks{}, err
 	}
-	preview, err := serverfilecontent.PresignDownload(ctx, s3FileConfig(setting), storageKey, "inline")
-	if err != nil {
-		return WebsiteVisitorAttachmentLinks{}, err
-	}
-	download, err := serverfilecontent.PresignDownload(ctx, s3FileConfig(setting), storageKey, mime.FormatMediaType("attachment", map[string]string{"filename": fileName}))
+	download, err := serverfilecontent.PresignDownload(ctx, l.s3, storageKey, mime.FormatMediaType("attachment", map[string]string{"filename": fileName}))
 	if err != nil {
 		return WebsiteVisitorAttachmentLinks{}, err
 	}
@@ -257,27 +237,8 @@ func (l *visitorAttachmentLinker) links(ctx context.Context, backend domain.File
 }
 
 // avatarURL 返回头像文件的稳定公开地址。
-func (l *visitorAttachmentLinker) avatarURL(ctx context.Context, location conversationaction.FileLocation) (string, error) {
-	if location.StorageBackend == domain.FileStorageBackendLocal {
-		return fileContentURL(location.StorageBackend, location.StorageKey, "")
-	}
-	setting, err := l.s3Setting(ctx)
-	if err != nil {
-		return "", err
-	}
-	return fileContentURL(location.StorageBackend, location.StorageKey, setting.PublicBaseURL)
-}
-
-// s3Setting 返回企业对象存储配置，同一次转换内只读取一次。
-func (l *visitorAttachmentLinker) s3Setting(ctx context.Context) (settingaction.S3Setting, error) {
-	if l.setting == nil {
-		setting, err := l.backend.getS3Setting.ExecuteForOrganization(ctx, l.organizationID)
-		if err != nil {
-			return settingaction.S3Setting{}, err
-		}
-		l.setting = &setting
-	}
-	return *l.setting, nil
+func (l *visitorAttachmentLinker) avatarURL(_ context.Context, location conversationaction.FileLocation) (string, error) {
+	return fileContentURL(location.StorageBackend, location.StorageKey, l.s3.PublicBaseURL)
 }
 
 // ListMessages 返回网站访客指定客户线程的消息历史。
@@ -307,7 +268,7 @@ func (b *WebsiteVisitorDirectBackend) ListMessages(ctx context.Context, meta Web
 		return WebsiteVisitorMessageHistory{}, websiteVisitorError(ctx, meta, err, cervii18n.ErrorConversationMessageListFailed, "list_messages", "channel_id", channelID, "conversation_id", conversationID)
 	}
 	result := WebsiteVisitorMessageHistory{Messages: make([]WebsiteVisitorMessage, 0, len(page.Messages))}
-	linker := visitorAttachmentLinker{backend: b, organizationID: page.OrganizationID}
+	linker := visitorAttachmentLinker{s3: b.s3}
 	for _, message := range page.Messages {
 		converted, err := websiteVisitorMessageFromAction(ctx, &linker, message)
 		if err != nil {

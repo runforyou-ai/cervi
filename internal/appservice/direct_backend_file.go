@@ -11,50 +11,40 @@ import (
 
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	"github.com/runforyou-ai/cervi/internal/actions/filemaintenance"
-	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
-	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
 
-// fileOps 持有文件存储与对象存储设置的 Action 和 Query。
+// fileOps 持有文件存储的 Action、Query 和部署级存储配置。
 type fileOps struct {
-	getS3Setting       *settingaction.GetS3SettingQuery
-	saveS3Setting      *settingaction.SaveS3SettingAction
-	testS3Setting      *settingaction.TestS3SettingAction
 	createFileUpload   *fileaction.CreateUploadAction
 	cancelFileUpload   *filemaintenance.CancelUploadAction
 	completeFileUpload *fileaction.CompleteUploadAction
 	getFile            *fileaction.GetQuery
 	localFiles         *serverfilecontent.LocalStore
+	s3                 serverfilecontent.S3Config
 }
 
-// newFileOps 创建文件存储与对象存储设置的业务实现依赖。
-func newFileOps(db *bun.DB, connectionRunner *connectiontest.Runner, localFiles *serverfilecontent.LocalStore) fileOps {
+// newFileOps 创建文件存储的业务实现依赖。
+func newFileOps(db *bun.DB, localFiles *serverfilecontent.LocalStore, s3 serverfilecontent.S3Config) fileOps {
 	return fileOps{
-		getS3Setting:       settingaction.NewGetS3SettingQuery(db),
-		saveS3Setting:      settingaction.NewSaveS3SettingAction(db),
-		testS3Setting:      settingaction.NewTestS3SettingAction(connectionRunner),
 		createFileUpload:   fileaction.NewCreateUploadAction(db),
 		cancelFileUpload:   filemaintenance.NewCancelUploadAction(db),
 		completeFileUpload: fileaction.NewCompleteUploadAction(db),
 		getFile:            fileaction.NewGetQuery(db),
 		localFiles:         localFiles,
+		s3:                 s3,
 	}
 }
 
 // CreateFileUpload 创建当前存储开关对应的文件上传请求。
 func (o *directOperations) CreateFileUpload(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input FileUploadInput) (FileUpload, error) {
-	setting, err := o.getS3Setting.Execute(ctx, identity)
-	if err != nil {
-		return FileUpload{}, o.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCreateFailed)
-	}
 	backend := domain.FileStorageBackendLocal
-	if setting.Enabled {
+	if o.s3.Enabled {
 		backend = domain.FileStorageBackendS3
 	}
 	record, err := o.createFileUpload.Execute(ctx, identity, backend, fileaction.UploadInput{
@@ -66,7 +56,7 @@ func (o *directOperations) CreateFileUpload(ctx context.Context, meta RequestMet
 	if err != nil {
 		return FileUpload{}, o.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCreateFailed)
 	}
-	return o.prepareFileUpload(ctx, meta, identity, record, setting)
+	return o.prepareFileUpload(ctx, meta, identity, record)
 }
 
 // PrepareFileUpload 在实际开始传输时取得上传请求，并复用已创建的分片会话。
@@ -78,29 +68,25 @@ func (o *directOperations) PrepareFileUpload(ctx context.Context, meta RequestMe
 	if err != nil {
 		return FileUpload{}, o.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCreateFailed)
 	}
-	setting, err := o.getS3Setting.ExecuteForOrganization(ctx, record.OrganizationID)
-	if err != nil {
-		return FileUpload{}, o.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCreateFailed)
-	}
-	return o.prepareFileUpload(ctx, meta, identity, record, setting)
+	return o.prepareFileUpload(ctx, meta, identity, record)
 }
 
 // prepareFileUpload 为已解析的文件位置准备普通上传请求或分片会话。
-func (o *directOperations) prepareFileUpload(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, record *servermodels.File, setting settingaction.S3Setting) (FileUpload, error) {
-	contentURL, err := fileContentURL(domain.FileStorageBackend(record.StorageBackend), record.StorageKey, setting.PublicBaseURL)
+func (o *directOperations) prepareFileUpload(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, record *servermodels.File) (FileUpload, error) {
+	contentURL, err := fileContentURL(domain.FileStorageBackend(record.StorageBackend), record.StorageKey, o.s3.PublicBaseURL)
 	if err != nil {
 		return FileUpload{}, o.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCreateFailed)
 	}
 	if record.PartSize > 0 {
 		if record.StorageBackend == string(domain.FileStorageBackendS3) && record.MultipartUploadID == nil {
-			uploadID, err := serverfilecontent.CreateMultipart(ctx, s3FileConfig(setting), record.StorageKey, record.ContentType)
+			uploadID, err := serverfilecontent.CreateMultipart(ctx, o.s3, record.StorageKey, record.ContentType)
 			if err != nil {
 				return FileUpload{}, o.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCreateFailed)
 			}
 			stored, saveErr := o.createFileUpload.SetMultipartUpload(ctx, identity, record.ID, uploadID)
 			if !stored {
 				// 并发准备只保留一个会话，未采用的远端会话立即清理。
-				if cleanupErr := serverfilecontent.AbortMultipart(context.WithoutCancel(ctx), s3FileConfig(setting), record.StorageKey, uploadID); cleanupErr != nil {
+				if cleanupErr := serverfilecontent.AbortMultipart(context.WithoutCancel(ctx), o.s3, record.StorageKey, uploadID); cleanupErr != nil {
 					slog.Warn("清除未保存的分片会话失败", "file_id", record.ID, "error", cleanupErr)
 				}
 				if saveErr != nil {
@@ -118,7 +104,7 @@ func (o *directOperations) prepareFileUpload(ctx context.Context, meta RequestMe
 		}
 		return FileUpload{File: fileFromModel(record, contentURL), PartSize: record.PartSize}, nil
 	}
-	request, err := o.fileUploadRequest(ctx, meta, record, setting, contentURL)
+	request, err := o.fileUploadRequest(ctx, meta, record, contentURL)
 	if err != nil {
 		return FileUpload{}, o.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCreateFailed)
 	}
@@ -137,16 +123,7 @@ func (o *directOperations) CompleteFileUpload(ctx context.Context, meta RequestM
 
 // completedFile 为已完成的上传生成文件地址并记录结果。
 func (o *directOperations) completedFile(ctx context.Context, meta RequestMeta, record *servermodels.File) (File, error) {
-	// 按文件记录和所属企业设置生成公开地址。
-	publicBaseURL := ""
-	if record.StorageBackend == string(domain.FileStorageBackendS3) {
-		setting, settingErr := o.getS3Setting.ExecuteForOrganization(ctx, record.OrganizationID)
-		if settingErr != nil {
-			return File{}, o.fileOperationError(ctx, meta, settingErr, cervii18n.ErrorFileUploadCompleteFailed)
-		}
-		publicBaseURL = setting.PublicBaseURL
-	}
-	contentURL, err := fileContentURL(domain.FileStorageBackend(record.StorageBackend), record.StorageKey, publicBaseURL)
+	contentURL, err := fileContentURL(domain.FileStorageBackend(record.StorageBackend), record.StorageKey, o.s3.PublicBaseURL)
 	if err != nil {
 		return File{}, o.fileOperationError(ctx, meta, err, cervii18n.ErrorFileUploadCompleteFailed)
 	}
@@ -155,14 +132,14 @@ func (o *directOperations) completedFile(ctx context.Context, meta RequestMeta, 
 }
 
 // fileUploadRequest 返回本地上传地址或 S3 预签名请求。
-func (o *directOperations) fileUploadRequest(ctx context.Context, meta RequestMeta, record *servermodels.File, setting settingaction.S3Setting, contentURL string) (FileUploadRequest, error) {
+func (o *directOperations) fileUploadRequest(ctx context.Context, meta RequestMeta, record *servermodels.File, contentURL string) (FileUploadRequest, error) {
 	if record.StorageBackend == string(domain.FileStorageBackendLocal) {
 		return FileUploadRequest{
 			Method: http.MethodPut, URL: contentURL,
 			Headers: map[string]string{"Authorization": "Bearer " + meta.Token, "Content-Type": record.ContentType},
 		}, nil
 	}
-	signed, err := serverfilecontent.PresignPut(ctx, s3FileConfig(setting), record.StorageKey, record.ContentType)
+	signed, err := serverfilecontent.PresignPut(ctx, o.s3, record.StorageKey, record.ContentType)
 	if err != nil {
 		return FileUploadRequest{}, fmt.Errorf("presign S3 file upload: %w", err)
 	}
@@ -178,11 +155,7 @@ func (o *directOperations) statFile(ctx context.Context, record *servermodels.Fi
 		}
 		return "", info.Size(), nil
 	}
-	setting, err := o.getS3Setting.ExecuteForOrganization(ctx, record.OrganizationID)
-	if err != nil {
-		return "", 0, err
-	}
-	info, err := serverfilecontent.Stat(ctx, s3FileConfig(setting), record.StorageKey)
+	info, err := serverfilecontent.Stat(ctx, o.s3, record.StorageKey)
 	if err != nil {
 		return "", 0, fmt.Errorf("stat S3 file: %w", err)
 	}
@@ -218,14 +191,6 @@ func (o *directOperations) fileOperationError(ctx context.Context, meta RequestM
 // fileFromModel 把存储文件转换为应用契约。
 func fileFromModel(record *servermodels.File, contentURL string) File {
 	return File{ID: record.ID, Name: record.OriginalName, ContentType: record.ContentType, ByteSize: record.ByteSize, ContentURL: contentURL}
-}
-
-// s3FileConfig 转换文件存储使用的 S3 配置。
-func s3FileConfig(setting settingaction.S3Setting) serverfilecontent.S3Config {
-	return serverfilecontent.S3Config{
-		Endpoint: setting.Endpoint, Region: setting.Region, Bucket: setting.Bucket,
-		AccessKeyID: setting.AccessKeyID, SecretAccessKey: setting.SecretAccessKey, ForcePathStyle: setting.ForcePathStyle,
-	}
 }
 
 // cleanupCompletedParts 清除已经合并且已确认完成的本地分片。

@@ -298,6 +298,14 @@ tasks:
         -e NATS_NAMESPACE
         -e TLS_MODE
         -e TLS_ACME_EMAIL
+        -e S3_ENABLED
+        -e S3_ENDPOINT
+        -e S3_PUBLIC_BASE_URL
+        -e S3_REGION
+        -e S3_BUCKET
+        -e S3_ACCESS_KEY_ID
+        -e S3_SECRET_ACCESS_KEY
+        -e S3_FORCE_PATH_STYLE
         -e WAILS_SERVER_PORT={{.SERVER_PORT}}
         -p {{.SERVER_PORT}}:{{.SERVER_PORT}}
         {{if eq .TLS_MODE "auto"}}-p 80:80 -p 443:443{{end}}

@@ -1,8 +1,11 @@
-# 桌面端本地 Agent 运行实施方案
+# Cervi 桌面端本地 Agent 运行实施方案
 
-日期：2026-09-20。
+状态：待实施  
+日期：2026-09-20  
+范围：桌面端本地 Agent 运行（P4），覆盖 AI 单聊和只有群主一个真人的群聊  
+关联：本文是 [Cervi 路线图](roadmap.md) 登记的独立方案，设计细节只保留在本文
 
-用户坐在自己电脑前，让 AI 员工在本机读写代码、执行命令和操作界面，覆盖 AI 单聊和只有群主一个真人的群聊。本文是 `docs/roadmap.md` 中「桌面端本地 Agent 运行（P4）」的完整实施方案，交付完成后连同总览中的对应条目一并删除。本文是主要参考，不构成强制约束，实施中按更合适的做法调整并同步更新。
+用户坐在自己电脑前，让 AI 员工在本机读写代码、执行命令和操作界面。本文是主要参考，不构成强制约束，实施中按更合适的做法调整并同步更新；交付完成后连同路线图中的对应条目一并删除。
 
 ## 架构
 
@@ -37,7 +40,7 @@
 
 服务端新增三张表，每张表一个建表迁移；`agent_runs` 的列与索引变更单独一个迁移。
 
-`devices` 的列清单与认证要求见 `docs/roadmap.md` 的「设备注册与认证」。P4 落地 `id`、`organization_id`、`user_id`、`name`、`platform`、`work_seq`、`last_seen_at`、`revoked_at` 和时间戳，并增加三列：`install_id` 由桌面端首次安装时生成并保存在本地，配合唯一索引 `(organization_id, user_id, install_id)` 使同一台机器重装后不产生重复设备；`runtime_version` 是设备侧运行时版本；`tool_manifest jsonb` 是设备最近一次上报的本机工具能力广告，不是允许集。`trust_level` 与服务端 Agent 调用设备用的 `capability_manifest` 仍随 P2 增加。
+`devices` 的列清单与认证要求见路线图的「设备注册与认证」。P4 落地 `id`、`organization_id`、`user_id`、`name`、`platform`、`work_seq`、`last_seen_at`、`revoked_at` 和时间戳，并增加三列：`install_id` 由桌面端首次安装时生成并保存在本地，配合唯一索引 `(organization_id, user_id, install_id)` 使同一台机器重装后不产生重复设备；`runtime_version` 是设备侧运行时版本；`tool_manifest jsonb` 是设备最近一次上报的本机工具能力广告，不是允许集。`trust_level` 与服务端 Agent 调用设备用的 `capability_manifest` 仍随 P2 增加。
 
 `device_workspaces`：`id`、`organization_id`、`device_id`、`label`、`last_used_at`、时间戳。工作区是一等实体，一台设备可注册多个工作区，一个工作区可被多个会话绑定。
 

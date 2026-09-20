@@ -18,7 +18,6 @@ import (
 	"github.com/runforyou-ai/cervi/internal/actions/filemaintenance"
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
 	knowledgeaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
-	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
 	"github.com/runforyou-ai/cervi/internal/api"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
@@ -298,11 +297,8 @@ func TestKnowledgeDocumentS3Preview(t *testing.T) {
 		_, _ = io.WriteString(w, "S3 preview")
 	}))
 	defer endpoint.Close()
-	setting := settingaction.S3Setting{Enabled: true, Provider: domain.StorageProviderAWS, Endpoint: endpoint.URL, PublicBaseURL: endpoint.URL + "/cervi", Region: "us-east-1", Bucket: "cervi", AccessKeyID: "test-access", SecretAccessKey: "test-secret", ForcePathStyle: true}
-	if _, err := settingaction.NewSaveS3SettingAction(db).Execute(ctx, owner.Identity, setting); err != nil {
-		t.Fatal(err)
-	}
-	backend := appservice.NewDirectBackend(db, nil, serverstorage.NewTenantResolver(db), nil, nil, nil, nil, nil)
+	s3 := filecontent.S3Config{Enabled: true, Endpoint: endpoint.URL, PublicBaseURL: endpoint.URL + "/cervi", Region: "us-east-1", Bucket: "cervi", AccessKeyID: "test-access", SecretAccessKey: "test-secret", ForcePathStyle: true}
+	backend := appservice.NewDirectBackend(db, nil, s3, serverstorage.NewTenantResolver(db), nil, nil, nil, nil, nil)
 	meta := appservice.RequestMeta{Token: owner.Token, Locale: appservice.LocaleChineseSimplified}
 	files := make([]*servermodels.File, 2)
 	for i := range files {
@@ -320,17 +316,10 @@ func TestKnowledgeDocumentS3Preview(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	setting.Enabled = false
-	if _, err := settingaction.NewSaveS3SettingAction(db).Execute(ctx, owner.Identity, setting); err != nil {
-		t.Fatal(err)
-	}
-	config := filecontent.S3Config{Endpoint: setting.Endpoint, Region: setting.Region, Bucket: setting.Bucket, AccessKeyID: setting.AccessKeyID, SecretAccessKey: setting.SecretAccessKey, ForcePathStyle: true}
-	cleanup := filemaintenance.NewDeleteExpiredAction(db, filecontent.NewDeleter(nil, func(_ context.Context, orgID string) (filecontent.S3Config, error) {
-		if orgID != owner.Identity.Organization.ID {
-			t.Error("wrong cleanup organization")
-		}
-		return config, nil
-	}))
+	// 存储开关关闭时按文件记录中的存储类型签发预览并清理。
+	s3.Enabled = false
+	backend = appservice.NewDirectBackend(db, nil, s3, serverstorage.NewTenantResolver(db), nil, nil, nil, nil, nil)
+	cleanup := filemaintenance.NewDeleteExpiredAction(db, filecontent.NewDeleter(nil, s3))
 	for i, doc := range docs {
 		request, err := backend.GetKnowledgeDocumentPreview(ctx, meta, base.ID, doc.ID)
 		if err != nil {

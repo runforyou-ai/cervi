@@ -45,11 +45,37 @@ tls:
 
 storage:
   localDirectory: /var/lib/cervi/files
+  s3:
+    enabled: false
 ```
 
 服务端依赖 PostgreSQL、启用 JetStream 的 NATS 和 markitdown 原件转换服务。PostgreSQL 使用 `build/docker/Dockerfile.postgres` 构建的 pgvector 镜像；镜像首次初始化时通过 `00-init-schemas.sql` 在默认库和 `template1` 中启用 `vector`、`pg_trgm`，后续新建数据库自动继承；已有数据卷需手动执行该脚本。`wails3 task db:ensure` 创建工作区数据库。
 
 markitdown 由 `markitdown/Dockerfile` 构建，镜像固定 `markitdown[all]` 与包装依赖的精确版本；传递依赖随构建浮动，完全可复现需另行提交依赖锁。转换器行为变化会改变分段正文，升级前需评估已发布批次。服务无状态、不接触数据库，所有工作区共享同一实例，通过 `MARKITDOWN_URL` 指向其 `POST /convert` 与 `GET /status` 入口。该入口只接受上传的原件字节，不接受任何 URI，不得暴露到企业网络之外。
+
+## 对象存储
+
+`storage.s3.enabled` 为 `false` 时，文件写入 `storage.localDirectory`；为 `true` 时，客户端按服务端签发的预签名请求直传对象存储。整个部署使用同一套对象存储，所有企业共用一个存储桶，对象键以 `organizations/<企业编号>/` 开头。已写入的文件按记录中的存储类型读取，切换开关不影响既有文件。因此部署中存在对象存储文件时，即使把 `enabled` 改回 `false`，也必须保留 `endpoint`、`publicBaseURL`、`region`、`bucket` 和密钥，否则这些文件的读取、下载和清理都会失败。
+
+```yaml
+storage:
+  localDirectory: /var/lib/cervi/files
+  s3:
+    enabled: true
+    endpoint: https://s3.us-east-1.amazonaws.com
+    publicBaseURL: https://files.example.com
+    region: us-east-1
+    bucket: cervi
+    accessKeyID: 请替换 Access Key ID
+    secretAccessKey: 请替换 Secret Access Key
+    forcePathStyle: false
+```
+
+`endpoint` 是服务端签名使用的 S3 API 地址，`publicBaseURL` 是客户端读取文件使用的公开地址，两者都必须是客户端可访问的完整 HTTP 或 HTTPS 地址。MinIO、RustFS 等按路径寻址的服务设置 `forcePathStyle: true`。存储桶需要允许浏览器直传：任意来源的 `PUT` 以及上传请求携带的请求头，对象读取按 `publicBaseURL` 的访问方式开放。
+
+`enabled` 为 `true` 时，`endpoint`、`publicBaseURL`、`region`、`bucket`、`accessKeyID` 和 `secretAccessKey` 必填，缺失或地址无效时服务端启动失败。`-check-config` 校验这些字段，不连接对象存储。
+
+各字段对应的环境变量为 `S3_ENABLED`、`S3_ENDPOINT`、`S3_PUBLIC_BASE_URL`、`S3_REGION`、`S3_BUCKET`、`S3_ACCESS_KEY_ID`、`S3_SECRET_ACCESS_KEY` 和 `S3_FORCE_PATH_STYLE`，已设置时覆盖 YAML 中的同名字段。
 
 ## Linux systemd
 

@@ -107,6 +107,8 @@ func clearServerEnvironment(t *testing.T) {
 		"POSTGRES_HOST", "POSTGRES_PORT", "POSTGRES_USER", "POSTGRES_PASSWORD", "POSTGRES_DB", "POSTGRES_SSLMODE",
 		"NATS_URL", "NATS_NAMESPACE",
 		"TLS_MODE", "TLS_ACME_EMAIL", "FILE_STORAGE_PATH",
+		"S3_ENABLED", "S3_ENDPOINT", "S3_PUBLIC_BASE_URL", "S3_REGION", "S3_BUCKET",
+		"S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY", "S3_FORCE_PATH_STYLE",
 	} {
 		t.Setenv(name, "")
 		if err := os.Unsetenv(name); err != nil {
@@ -155,6 +157,89 @@ func TestMarkitdownServiceURL(t *testing.T) {
 		config.MarkitdownURL = address
 		if err := config.validate(); err == nil {
 			t.Fatalf("accepted %q", address)
+		}
+	}
+}
+
+// TestStorageS3Environment 验证对象存储环境变量覆盖文件配置。
+func TestStorageS3Environment(t *testing.T) {
+	clearServerEnvironment(t)
+	path := filepath.Join(t.TempDir(), "cervi.yaml")
+	data := []byte(`
+database:
+  host: 127.0.0.1
+  port: 5432
+  user: cervi
+  password: secret
+  name: cervi
+  sslMode: disable
+nats:
+  url: nats://127.0.0.1:4222
+  namespace: cervi
+storage:
+  localDirectory: data/files
+  s3:
+    endpoint: https://file.example.com
+    region: file-region
+`)
+	if err := os.WriteFile(path, data, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("S3_ENABLED", "true")
+	t.Setenv("S3_ENDPOINT", "https://s3.example.com/")
+	t.Setenv("S3_PUBLIC_BASE_URL", "https://cdn.example.com/")
+	t.Setenv("S3_REGION", "us-east-1")
+	t.Setenv("S3_BUCKET", "cervi")
+	t.Setenv("S3_ACCESS_KEY_ID", "access-key")
+	t.Setenv("S3_SECRET_ACCESS_KEY", "secret-key")
+	t.Setenv("S3_FORCE_PATH_STYLE", "true")
+
+	config, err := Load(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	want := S3Config{
+		Enabled: true, Endpoint: "https://s3.example.com", PublicBaseURL: "https://cdn.example.com",
+		Region: "us-east-1", Bucket: "cervi", AccessKeyID: "access-key", SecretAccessKey: "secret-key", ForcePathStyle: true,
+	}
+	if config.Storage.S3 != want {
+		t.Fatalf("对象存储配置 = %#v, want %#v", config.Storage.S3, want)
+	}
+}
+
+// TestValidationRequiresCompleteS3Setting 验证启用对象存储时必须填写完整配置。
+func TestValidationRequiresCompleteS3Setting(t *testing.T) {
+	complete := S3Config{
+		Enabled: true, Endpoint: "https://s3.example.com", PublicBaseURL: "https://cdn.example.com",
+		Region: "us-east-1", Bucket: "cervi", AccessKeyID: "access-key", SecretAccessKey: "secret-key",
+	}
+	config := validTestConfig()
+	config.Storage.S3 = complete
+	config.normalize()
+	if err := config.validate(); err != nil {
+		t.Fatal(err)
+	}
+	// Enabled 为 false 时其余 S3 字段无需填写。
+	config = validTestConfig()
+	config.Storage.S3 = S3Config{Endpoint: "relative"}
+	config.normalize()
+	if err := config.validate(); err != nil {
+		t.Fatal(err)
+	}
+	for _, broken := range []S3Config{
+		{Enabled: true, PublicBaseURL: complete.PublicBaseURL, Region: complete.Region, Bucket: complete.Bucket, AccessKeyID: complete.AccessKeyID, SecretAccessKey: complete.SecretAccessKey},
+		{Enabled: true, Endpoint: "cdn.example.com", PublicBaseURL: complete.PublicBaseURL, Region: complete.Region, Bucket: complete.Bucket, AccessKeyID: complete.AccessKeyID, SecretAccessKey: complete.SecretAccessKey},
+		{Enabled: true, Endpoint: complete.Endpoint, Region: complete.Region, Bucket: complete.Bucket, AccessKeyID: complete.AccessKeyID, SecretAccessKey: complete.SecretAccessKey},
+		{Enabled: true, Endpoint: complete.Endpoint, PublicBaseURL: complete.PublicBaseURL, Bucket: complete.Bucket, AccessKeyID: complete.AccessKeyID, SecretAccessKey: complete.SecretAccessKey},
+		{Enabled: true, Endpoint: complete.Endpoint, PublicBaseURL: complete.PublicBaseURL, Region: complete.Region, AccessKeyID: complete.AccessKeyID, SecretAccessKey: complete.SecretAccessKey},
+		{Enabled: true, Endpoint: complete.Endpoint, PublicBaseURL: complete.PublicBaseURL, Region: complete.Region, Bucket: complete.Bucket, SecretAccessKey: complete.SecretAccessKey},
+		{Enabled: true, Endpoint: complete.Endpoint, PublicBaseURL: complete.PublicBaseURL, Region: complete.Region, Bucket: complete.Bucket, AccessKeyID: complete.AccessKeyID},
+	} {
+		config := validTestConfig()
+		config.Storage.S3 = broken
+		config.normalize()
+		if err := config.validate(); err == nil {
+			t.Fatalf("接受了不完整的对象存储配置: %#v", broken)
 		}
 	}
 }

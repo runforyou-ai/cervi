@@ -87,11 +87,6 @@ const workspaceRouteDefinitions = [
     element: <SystemSettingsPage section="roles" />,
   },
   {
-    path: "/settings/storage",
-    titleKey: "tabs.routes.storage",
-    element: <SystemSettingsPage section="storage" />,
-  },
-  {
     path: "/contacts/employees",
     titleKey: "tabs.routes.employees",
     element: <ContactsPage scope="employees" />,
