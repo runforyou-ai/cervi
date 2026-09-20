@@ -64,7 +64,7 @@ export function MobileGroupLeaveDialog({
               if (success) onClose()
             }}
           >
-            {t("groupLeaveConfirm")}
+            {tCommon("actions.confirm")}
           </Button>
         </AlertDialogFooter>
       </AlertDialogContent>

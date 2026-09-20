@@ -35,7 +35,7 @@ export function InboxPaneTop({
   return (
     <div
       data-slot="inbox-pane-header"
-      className="flex h-14 shrink-0 items-center gap-2 border-b border-border/60 px-3"
+      className="flex h-12 shrink-0 items-center gap-1.5 px-2.5"
     >
       {railCollapsed ? (
         <Button
@@ -47,18 +47,18 @@ export function InboxPaneTop({
           title={t("scopeRailExpand")}
           onClick={onRailExpand}
         >
-          <PanelLeftIcon className="size-5" />
+          <PanelLeftIcon className="size-[18px]" />
         </Button>
       ) : null}
       <div className="relative min-w-0 flex-1">
-        <SearchIcon className="pointer-events-none absolute top-1/2 left-2.5 size-4 -translate-y-1/2 text-muted-foreground" />
+        <SearchIcon className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" />
         <Input
           ref={search.inputRef}
           type="text"
           value={search.text}
           aria-label={t("searchLabel")}
           title={t("searchShortcut")}
-          className={cn("h-8 pl-8", search.active && "pr-8")}
+          className={cn("h-7 pl-7.5", search.active && "pr-7")}
           onFocus={search.handleFocus}
           onChange={(event) => search.setText(event.target.value)}
           onKeyDown={search.handleKeyDown}

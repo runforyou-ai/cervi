@@ -201,7 +201,6 @@ const knowledgeBase = {
     noRerankModels: "Configure a rerank model in model services first.",
     reindexTitle: "Reindex knowledge base?",
     reindexDescription: "Saving clears all indexes in this knowledge base and reprocesses its content with the new settings. Each item becomes searchable again once it finishes processing.",
-    confirmSave: "Confirm save",
 
     createTitle: "New knowledge base",
     editTitle: "Edit knowledge base",

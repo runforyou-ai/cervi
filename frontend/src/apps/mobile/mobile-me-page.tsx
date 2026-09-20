@@ -200,7 +200,7 @@ export function MobileMePage() {
                   className="min-h-11"
                   onClick={() => void handleLogout()}
                 >
-                  {t("logout")}
+                  {tCommon("actions.confirm")}
                 </AlertDialogAction>
               </AlertDialogFooter>
             </AlertDialogContent>

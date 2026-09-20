@@ -147,7 +147,7 @@ function ConversationRow({
           aria-pressed={selected}
           aria-label={name}
           className={cn(
-            "flex h-[68px] w-full min-w-0 items-start gap-3 px-3 py-2.5 text-left transition-colors",
+            "flex h-[56px] w-full min-w-0 items-start gap-2.5 px-2.5 py-2 text-left transition-colors",
             selected
               ? "bg-accent text-accent-foreground"
               : conversation.pinned
@@ -179,17 +179,17 @@ function ConversationRow({
           }
         >
           <span className="relative shrink-0">
-            <ConversationAvatar conversation={conversation} />
+            <ConversationAvatar conversation={conversation} className="size-8" />
             <ConversationUnreadBadge conversation={conversation} />
           </span>
           <span className="min-w-0 flex-1 overflow-hidden">
-            <span className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-              <span className="flex min-w-0 items-center gap-2">
+            <span className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5">
+              <span className="flex min-w-0 items-center gap-1.5">
                 <span className="min-w-0 flex-1 truncate text-sm font-medium">
                   {name}
                 </span>
                 {agentRunLabel ? (
-                  <span className="shrink-0 text-[10px] text-muted-foreground">
+                  <span className="shrink-0 text-[10.5px] text-muted-foreground">
                     {agentRunLabel}
                   </span>
                 ) : null}
@@ -204,7 +204,7 @@ function ConversationRow({
                   <time
                     dateTime={summary.lastMessageAt ?? undefined}
                     className={cn(
-                      "shrink-0 text-xs text-muted-foreground",
+                      "shrink-0 text-[10.5px] text-muted-foreground",
                       selected &&
                         "text-accent-foreground/75",
                     )}
@@ -214,7 +214,7 @@ function ConversationRow({
                 ) : null}
               </span>
             </span>
-            <span className="mt-0.5 flex min-w-0 items-center gap-2">
+            <span className="mt-px flex min-w-0 items-center gap-1.5">
               <span
                 title={preview}
                 className={cn(
@@ -227,7 +227,7 @@ function ConversationRow({
               </span>
               {isInternal && conversation.muted ? (
                 <BellOffIcon
-                  className="size-3.5 shrink-0 text-muted-foreground"
+                  className="size-3 shrink-0 text-muted-foreground"
                   aria-label={t("conversationMuted")}
                 />
               ) : null}
@@ -280,9 +280,7 @@ export function InboxConversationList({
   const names = new Map(
     conversations.map((conversation) => [
       conversation.id,
-      isAgentInboxConversation(conversation)
-        ? `${conversation.agent.agentName} · ${conversation.agent.title}`
-        : conversationName(conversation),
+      conversationName(conversation),
     ]),
   )
   const rows = new Map(conversations.map((conversation) => [conversation.id, conversation]))

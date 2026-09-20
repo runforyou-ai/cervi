@@ -16,6 +16,22 @@
   to { height: 0; }
 }
 
+/* 字号刻度整体收紧一档，正文基准 13px，用于管理界面的信息密度。 */
+@theme {
+    --text-xs: 0.6875rem;
+    --text-xs--line-height: 1rem;
+    --text-sm: 0.8125rem;
+    --text-sm--line-height: 1.25rem;
+    --text-base: 0.90625rem;
+    --text-base--line-height: 1.375rem;
+    --text-lg: 1rem;
+    --text-lg--line-height: 1.5rem;
+    --text-xl: 1.125rem;
+    --text-xl--line-height: 1.625rem;
+    --text-2xl: 1.25rem;
+    --text-2xl--line-height: 1.75rem;
+}
+
 @theme inline {
     --font-sans: 'Inter Variable', Inter, 'PingFang SC', 'HarmonyOS Sans SC', system-ui, sans-serif;
     --font-mono: 'JetBrains Mono Variable', 'JetBrains Mono', monospace;
@@ -188,7 +204,7 @@
     @apply border-border outline-ring/50;
     }
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground text-sm;
     }
   button:not(:disabled), [role="button"]:not(:disabled) {
     cursor: pointer;
@@ -276,7 +292,7 @@ body,
 
 /* 工作台底层以轻渐变连接一级栏和主内容区内缩间隙。 */
 .cervi-workspace-shell {
-  --cervi-workspace-rail-width: 68px;
+  --cervi-workspace-rail-width: 64px;
   --cervi-workspace-content-inset: 6px;
   background:
     radial-gradient(
@@ -290,6 +306,11 @@ body,
       var(--sidebar) 52%,
       color-mix(in oklab, var(--sidebar), var(--sidebar-primary) 3%) 100%
     );
+}
+
+/* macOS 隐藏标题栏后为左上角窗口按钮保留横向空间。 */
+[data-native-os="darwin"] .cervi-workspace-shell {
+  --cervi-workspace-rail-width: 76px;
 }
 
 .cervi-workspace-rail {
@@ -319,7 +340,7 @@ body,
 }
 
 [data-native-os="darwin"][data-window-fullscreen="false"]
-  .cervi-conversation-context-pane [data-slot="tabs-list"] {
+  .cervi-conversation-side-panel [data-slot="tabs-list"] {
   --wails-draggable: drag;
 }
 
@@ -346,7 +367,6 @@ body,
   [data-slot="page-header"] :is(a, button, input, select),
   [data-slot="conversation-actions"],
   [data-slot="conversation-header-title"],
-  [data-slot="conversation-header-detail"],
   [data-slot="conversation-header"] :is(a, button, input, select),
   [data-slot="inbox-pane-header"] :is(a, button, input, select),
   :is(.cervi-inbox-empty-main, .cervi-knowledge-base-index)
@@ -356,16 +376,16 @@ body,
 }
 
 [data-native-os="darwin"]
-  .cervi-conversation-context-pane [data-slot="tabs-trigger"] {
+  .cervi-conversation-side-panel [data-slot="tabs-trigger"] {
   --wails-draggable: no-drag;
 }
 
 /* 普通标签用竖线分隔，选中标签底部以凹形肩部连接标签栏。 */
 .cervi-workspace-tab[data-active="false"]::after {
   position: absolute;
-  top: 10px;
+  top: 8px;
   right: 0;
-  bottom: 10px;
+  bottom: 8px;
   width: 1px;
   content: "";
   background: var(--border);
@@ -427,6 +447,40 @@ body,
     transparent 0 9.5px,
     var(--sidebar-accent) 10px
   );
+}
+
+/*
+  消息气泡正文与时间的收尾排版。时间默认浮动在正文末行右端；
+  Markdown 正文以段落或列表结尾时改为贴气泡右下角，并在末行尾部插入等宽占位。
+*/
+.cervi-message-body {
+  --cervi-message-time-space: 3.2em;
+}
+
+.cervi-message-body[data-delivery="true"] {
+  --cervi-message-time-space: 5em;
+}
+
+.cervi-message-body:has(
+    .message-markdown > p:last-child,
+    .message-markdown > :is(ul, ol):last-child > li:last-child
+  )
+  .cervi-message-time {
+  position: absolute;
+  right: 0;
+  bottom: 0;
+  float: none;
+  margin-left: 0;
+}
+
+.cervi-message-body
+  :is(
+    .message-markdown > p:last-child,
+    .message-markdown > :is(ul, ol):last-child > li:last-child
+  )::after {
+  display: inline-block;
+  width: var(--cervi-message-time-space);
+  content: "";
 }
 
 @keyframes message-location-highlight {

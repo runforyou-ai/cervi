@@ -220,7 +220,7 @@ export function RoleListPage() {
               disabled={deleting}
               onClick={() => void confirmDelete()}
             >
-              {deleting ? tCommon("actions.deleting") : tCommon("actions.delete")}
+              {deleting ? tCommon("actions.deleting") : tCommon("actions.confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

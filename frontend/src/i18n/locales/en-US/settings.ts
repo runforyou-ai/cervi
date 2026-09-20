@@ -143,7 +143,6 @@ const settings = {
       title: "Allow opening any URL?",
       description:
         "Members will be able to visit sites that the company has not configured or verified. This may expose them to phishing, malicious content, or sensitive-data leaks. Confirm that your company has appropriate usage policies.",
-      enable: "Enable",
     },
     validation: {
       nameRequired: "Enter the company name.",
@@ -217,7 +216,6 @@ const settings = {
       assignedTo: "Already in “{{role}}”",
       aiEmployee: "AI employee",
       add: "Add",
-      confirm: "Confirm",
     },
     validation: {
       nameRequired: "Enter a role name.",

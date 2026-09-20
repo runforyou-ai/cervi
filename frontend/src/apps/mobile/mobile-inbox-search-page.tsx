@@ -9,7 +9,6 @@ import {
   InboxSearchPersonKind,
   InboxSearchRange,
   OrganizationIdentityType,
-  isAgentInboxConversation,
   type InboxConversation,
 } from "@/api"
 import {
@@ -122,12 +121,7 @@ function MobileConversationRows({
       key={conversation.id}
       inboxId={conversation.id}
       avatar={<ConversationAvatar conversation={conversation} className="size-10" />}
-      title={highlightName(
-        isAgentInboxConversation(conversation)
-          ? `${conversation.agent.agentName} · ${conversation.agent.title}`
-          : conversationName(conversation),
-        highlight,
-      )}
+      title={highlightName(conversationName(conversation), highlight)}
       onOpen={() => onOpen(conversation)}
     />
   ))

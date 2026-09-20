@@ -465,7 +465,7 @@ export function ExternalContactsPanel({
               disabled={deleting}
               onClick={() => void removeContact()}
             >
-              {deleting ? t("common:actions.deleting") : t("delete.confirm")}
+              {deleting ? t("common:actions.deleting") : t("common:actions.confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -492,7 +492,7 @@ export function ExternalContactsPanel({
               disabled={deleting}
               onClick={() => void restore()}
             >
-              {deleting ? t("trash.restoring") : t("trash.restoreConfirm")}
+              {deleting ? t("trash.restoring") : t("common:actions.confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

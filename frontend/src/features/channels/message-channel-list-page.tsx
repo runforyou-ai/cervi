@@ -277,9 +277,7 @@ export function MessageChannelListPage() {
                 disabled={updatingChannelId !== ""}
                 onClick={() => void handleStatusChange(confirmingChannel)}
               >
-                {confirmingChannel.enabled
-                  ? t("deactivation.confirm")
-                  : t("activation.confirm")}
+                {t("common:actions.confirm")}
               </AlertDialogAction>
             </AlertDialogFooter>
           </AlertDialogContent>

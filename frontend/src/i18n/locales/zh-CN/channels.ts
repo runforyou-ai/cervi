@@ -44,12 +44,10 @@ const channels = {
   deactivation: {
     title: "停用“{{name}}”？",
     description: "停用后仍可重新启用。",
-    confirm: "停用",
   },
   activation: {
     title: "启用“{{name}}”？",
     description: "渠道状态将变为已启用。",
-    confirm: "启用",
   },
   create: {
     title: "添加渠道",
@@ -121,7 +119,6 @@ const channels = {
       title: "确认复用 Telegram Bot？",
       description:
         "这个 Bot 已被其他渠道使用。继续保存后，Telegram 会把 Webhook 切换到当前渠道，旧渠道将无法继续接收通知。",
-      confirm: "继续保存",
     },
     info: {
       title: "连接信息",

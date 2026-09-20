@@ -131,12 +131,12 @@ function useToolStatusLabel() {
 }
 
 /** 展示单次工具调用并按需展开完整参数、结果或错误。 */
-function AgentTool({ call }: { call: AgentToolCall }) {
+function AgentTool({ call, onToggle }: { call: AgentToolCall; onToggle: () => void }) {
   const { t } = useTranslation("inbox")
   const failed = call.status === AgentToolCallStatus.AgentToolCallFailed
   const statusLabel = useToolStatusLabel()(call.status)
   return (
-    <Collapsible className="min-w-0 rounded-md bg-muted text-foreground">
+    <Collapsible className="min-w-0 rounded-md bg-muted text-foreground" onOpenChange={onToggle}>
       <CollapsibleTrigger className="group flex w-full min-w-0 items-center gap-3 rounded-md px-3 py-2 text-left text-xs focus-visible:outline focus-visible:outline-ring">
         <span className="min-w-0 flex-1 break-all font-medium">{call.name}</span>
         <span className={cn("shrink-0 text-muted-foreground", failed && "text-destructive")}>
@@ -169,8 +169,8 @@ function AgentTool({ call }: { call: AgentToolCall }) {
   )
 }
 
-/** 沿头像侧对齐思考标题、右上角显示本次模型用量，首次展开时按运行编号读取过程内容。onPrimary 表示内容位于主色气泡内，决定配色；incoming 只决定对齐方向。 */
-export function AgentProcess({ process, incoming, onPrimary }: { process: ConversationAgentProcessData; incoming: boolean; onPrimary: boolean }) {
+/** 沿头像侧对齐思考标题、右上角显示本次模型用量，首次展开时按运行编号读取过程内容。onPrimary 表示内容位于主色气泡内，决定配色；incoming 只决定对齐方向；onToggle 在展开或收起时暂停消息视口自动贴底。 */
+export function AgentProcess({ process, incoming, onPrimary, onToggle }: { process: ConversationAgentProcessData; incoming: boolean; onPrimary: boolean; onToggle: () => void }) {
   const { t, i18n } = useTranslation(["inbox", "common"])
   const [opened, setOpened] = useState(false)
   const mobile = resolveAppPlatform() === "mobile"
@@ -182,18 +182,14 @@ export function AgentProcess({ process, incoming, onPrimary }: { process: Conver
     { enabled: opened, staleTime: Infinity },
   )
   return (
-    <Collapsible className="mb-3 min-w-0" onOpenChange={(open) => open && setOpened(true)}>
-      <div className={cn(
-        "flex gap-3",
-        // 移动端窄屏把用量换到下一行，思考标题保持完整。
-        mobile ? "flex-col gap-1" : "items-center",
-      )}>
+    <Collapsible className="mb-3 min-w-0" onOpenChange={(open) => { onToggle(); if (open) setOpened(true) }}>
+      <div className="flex items-center gap-2">
         <CollapsibleTrigger className={cn(
           "group flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-sm py-1 text-left text-xs focus-visible:outline focus-visible:outline-ring",
           incoming ? "justify-start" : "justify-end",
           onPrimary ? "text-primary-foreground/75" : "text-muted-foreground",
-          // 移动端按触屏点击区域抬高行高并占满气泡宽度，点击区不与引用块和正文重叠。
-          mobile && "w-full py-2",
+          // 移动端按触屏点击区域抬高行高，点击区不与引用块和正文重叠。
+          mobile && "py-2",
         )}>
           <LightbulbIcon aria-hidden className="size-4 shrink-0 text-yellow-400 dark:text-yellow-300" />
           <span className="truncate">{t("agentThoughtCompleted", { seconds })}</span>
@@ -202,7 +198,6 @@ export function AgentProcess({ process, incoming, onPrimary }: { process: Conver
         <div className={cn(
           "flex shrink-0 gap-2 text-[11px]",
           onPrimary ? "text-primary-foreground/75" : "text-muted-foreground",
-          mobile && (incoming ? "self-start" : "self-end"),
         )}>
           <span>{t("agentUsageInput", { count: process.inputTokens })}</span>
           <span>{t("agentUsageOutput", { count: process.outputTokens })}</span>
@@ -216,7 +211,7 @@ export function AgentProcess({ process, incoming, onPrimary }: { process: Conver
       )}>
         {detail.data ? detail.data.blocks.map((block) =>
           block.kind === AgentRunBlockKind.AgentRunBlockToolCall && block.toolCall ? (
-            <AgentTool key={block.id} call={block.toolCall} />
+            <AgentTool key={block.id} call={block.toolCall} onToggle={onToggle} />
           ) : (
             <div
               key={block.id}
@@ -309,7 +304,7 @@ function AgentRunStreamProcess({ state }: { state: RunStreamState }) {
 }
 
 /** 显示一次尚未由消息表达的运行的等待、思考或取消状态，运行中默认展开实时过程，取消运行可展开中断前的过程。 */
-export function AgentRunState({ run, incoming, conversationID, group, copilot, onStopped }: { run: ConversationAgentRun; incoming: boolean; conversationID?: string; group?: boolean; copilot?: boolean; onStopped: () => Promise<unknown> }) {
+export function AgentRunState({ run, incoming, conversationID, group, copilot, onStopped, onToggle }: { run: ConversationAgentRun; incoming: boolean; conversationID?: string; group?: boolean; copilot?: boolean; onStopped: () => Promise<unknown>; onToggle: () => void }) {
   const { t } = useTranslation("inbox")
   const stream = useAgentRunStream(run.id, run.status === AgentRunStatus.AgentRunStatusRunning, onStopped)
   if (run.status === AgentRunStatus.AgentRunStatusSucceeded || run.status === AgentRunStatus.AgentRunStatusFailed ||
@@ -343,7 +338,7 @@ export function AgentRunState({ run, incoming, conversationID, group, copilot, o
         "relative flex min-h-8 max-w-[75%] flex-col justify-center py-2",
         // 运行中的过程与最终消息气泡同宽，结束后替换为消息时不再重新换行。
         thinking && "max-w-[min(36rem,85%)] sm:max-w-[min(36rem,75%)]",
-        incoming ? "ml-10" : "mr-10",
+        incoming ? "ml-9" : "mr-9",
       )}>
         <ProfileAvatar
           imageURL={run.agentAvatarUrl}
@@ -351,7 +346,7 @@ export function AgentRunState({ run, incoming, conversationID, group, copilot, o
           fallback="agent"
           title={senderName}
           className={cn(
-            "absolute bottom-0 size-8 text-xs",
+            "absolute bottom-0 size-7 text-xs",
             incoming ? "right-full mr-2" : "left-full ml-2",
           )}
         />
@@ -385,7 +380,7 @@ export function AgentRunState({ run, incoming, conversationID, group, copilot, o
           </Collapsible>
         ) : (
           <>
-            {run.process ? <AgentProcess process={run.process} incoming={incoming} onPrimary={false} /> : null}
+            {run.process ? <AgentProcess process={run.process} incoming={incoming} onPrimary={false} onToggle={onToggle} /> : null}
             <div className="flex items-center gap-1.5">
               {cancelled ? <BrainIcon aria-hidden className="size-4" /> : null}
               <span>{label}</span>
@@ -411,7 +406,7 @@ export function AgentQueueState({ agents, incoming }: { agents: ConversationPend
       className={cn("mt-2 flex min-w-0 text-xs text-muted-foreground", incoming ? "justify-start" : "justify-end")}
       role="status"
     >
-      <span className={cn("max-w-[75%] break-all", incoming ? "ml-10" : "mr-10")}>
+      <span className={cn("max-w-[75%] break-all", incoming ? "ml-9" : "mr-9")}>
         {t("agentRunWaiting", { names })}
       </span>
     </div>

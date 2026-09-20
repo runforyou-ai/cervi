@@ -14,13 +14,12 @@ import {
 } from "@/api"
 import { useWorkspace } from "@/contexts/workspace-context"
 import type { ComposerDraftBridge } from "@/features/inbox/conversation-composer"
-import { ConversationContextPane } from "@/features/inbox/conversation-context-pane"
+import { ConversationSidePanel } from "@/features/inbox/conversation-side-panel"
 import { ConversationHeader } from "@/features/inbox/conversation-header"
 import { ConversationThread } from "@/features/inbox/conversation-thread"
 import type { ConversationLocateTarget } from "@/features/inbox/conversation-timeline"
 import { customerReplyDisabledReason } from "@/features/inbox/customer-session-actions"
 import { DirectConversationDraftHeader } from "@/features/inbox/direct-conversation-draft-header"
-import { sessionStatusLabel } from "@/features/inbox/session-status-label"
 import { useAccountDisabledReason } from "@/features/inbox/use-account-disabled-reason"
 import type { ConversationSelection } from "@/features/inbox/inbox-selection"
 import { useConversationName } from "@/features/inbox/use-conversation-name"
@@ -122,9 +121,6 @@ export function ConversationMain({
       ? displayedConversation
       : null
   const accountDisabledReason = useAccountDisabledReason(displayedConversation)
-  const sessionStatus = customerConversation
-    ? sessionStatusLabel(customerConversation.customer.serviceSessionStatus, t)
-    : ""
   const replyDisabledReason = customerConversation
     ? customerReplyDisabledReason(
         customerConversation.customer,
@@ -157,7 +153,6 @@ export function ConversationMain({
           <ConversationHeader
             conversation={validConversation}
             contactName={contactName}
-            sessionStatus={sessionStatus}
             currentIdentityId={identity.user.identityId}
             handlesCustomers={identity.user.handlesCustomers}
             onSessionChanged={() => {
@@ -170,9 +165,15 @@ export function ConversationMain({
             }
             groupParticipants={group?.participants}
             narrowViewport={narrowViewport}
+            contextVisible={!contextCollapsed}
+            onToggleContext={() => setContextCollapsed((collapsed) => !collapsed)}
           />
         ) : directTarget ? (
-          <DirectConversationDraftHeader member={directTarget} />
+          <DirectConversationDraftHeader
+            member={directTarget}
+            contextVisible={!contextCollapsed}
+            onToggleContext={() => setContextCollapsed((collapsed) => !collapsed)}
+          />
         ) : null}
         <ConversationThread
           key={threadKey}
@@ -195,7 +196,7 @@ export function ConversationMain({
           customerDraftRef={customerConversation ? customerDraftRef : undefined}
         />
       </div>
-      <ConversationContextPane
+      <ConversationSidePanel
         conversation={validConversation}
         directTarget={directTarget}
         displayName={contactName}
@@ -206,7 +207,7 @@ export function ConversationMain({
           if (validConversation) onGroupLeft?.(validConversation.id)
         }}
         visible={!contextCollapsed}
-        onToggle={() => setContextCollapsed((collapsed) => !collapsed)}
+        onClose={() => setContextCollapsed(true)}
       />
     </div>
   )

@@ -1,20 +1,22 @@
-/** 成员会话头与操作菜单。 */
-import { ChevronDownIcon, LoaderCircleIcon, MoreHorizontalIcon, SearchIcon } from "lucide-react"
+/** 成员会话头与图标操作区。 */
+import {
+  ArchiveIcon,
+  ArrowRightLeftIcon,
+  LoaderCircleIcon,
+  PanelRightOpenIcon,
+  RotateCcwIcon,
+  SearchIcon,
+  UserRoundPlusIcon,
+} from "lucide-react"
 import { useTranslation } from "react-i18next"
 
 import {
-  ConversationStatus,
   isCustomerInboxConversation,
-  isAgentInboxConversation,
-  isDirectInboxConversation,
   isGroupInboxConversation,
-  UserStatus,
   type GroupParticipant,
   type InboxConversation,
 } from "@/api"
 import { Button } from "@/components/ui/button"
-import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
-import { ConversationAvatar } from "@/features/inbox/conversation-avatar"
 import {
   CustomerSessionCloseDialog,
   CustomerTransferMenuItems,
@@ -23,54 +25,99 @@ import {
 import {
   DropdownMenu,
   DropdownMenuContent,
-  DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { useConversationAgentReplyLabel } from "@/features/inbox/conversation-agent-activity"
 import { useConversationTypingLabel } from "@/features/inbox/use-conversation-typing"
-import { workStatusLabel } from "@/components/work-status"
 import { cn } from "@/lib/utils"
 
-/** 按 Helmdesk 会话头布局展示当前联系人、会话状态和操作区。 */
+/** 会话头的图标操作按钮，悬停显示操作名称。 */
+export function HeaderAction({
+  label,
+  icon: Icon,
+  busy = false,
+  disabled = false,
+  destructive = false,
+  className,
+  onClick,
+}: {
+  label: string
+  icon: typeof SearchIcon
+  busy?: boolean
+  disabled?: boolean
+  destructive?: boolean
+  className?: string
+  onClick: () => void
+}) {
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className={cn(
+            "shrink-0",
+            destructive
+              ? "text-destructive hover:bg-destructive/10 hover:text-destructive"
+              : "text-muted-foreground",
+            className,
+          )}
+          aria-label={label}
+          disabled={disabled}
+          onClick={onClick}
+        >
+          {busy ? <LoaderCircleIcon className="animate-spin" /> : <Icon />}
+        </Button>
+      </TooltipTrigger>
+      <TooltipContent>{label}</TooltipContent>
+    </Tooltip>
+  )
+}
+
+/** 展示当前会话名称、正在输入状态和操作区。 */
 export function ConversationHeader({
   conversation,
   contactName,
-  sessionStatus,
   currentIdentityId,
   handlesCustomers,
   onSessionChanged,
   onSearch,
   groupParticipants,
   narrowViewport = false,
+  contextVisible = false,
+  onToggleContext,
 }: {
   conversation: InboxConversation
   contactName: string
-  sessionStatus: string
   currentIdentityId: string
   handlesCustomers: boolean
   onSessionChanged: () => void
   onSearch?: () => void
   groupParticipants?: GroupParticipant[]
   narrowViewport?: boolean
+  contextVisible?: boolean
+  onToggleContext?: () => void
 }) {
   const { t } = useTranslation(["inbox", "common"])
-  const { t: tCommon } = useTranslation("common")
   const customerConversation = isCustomerInboxConversation(conversation)
     ? conversation
     : null
   const customer = customerConversation?.customer ?? null
-  const agent = isAgentInboxConversation(conversation) ? conversation.agent : null
-  const direct = isDirectInboxConversation(conversation) ? conversation.direct : null
   const group = isGroupInboxConversation(conversation) ? conversation.group : null
-  const agentRunLabel = agentRunStatusLabel(agent?.agentRunStatus ?? null, t)
-  // 正在输入提示占用副标题位置：群聊替换人数，单聊替换对方工作状态，客户会话补在状态徽章之后。
+  // 正在输入提示紧接标题右侧展示。
   const typingLabel = useConversationTypingLabel(
     conversation.id,
     group ? (groupParticipants ?? []) : null,
   )
   const agentReplyLabel = useConversationAgentReplyLabel(conversation.id)
-  // 真人正在输入优先于 AI 员工正在回复。
-  const activityLabel = typingLabel || agentReplyLabel
+  // 真人正在输入优先于 AI 员工正在回复；群聊不展示正在输入。
+  const activityLabel = (group ? "" : typingLabel) || agentReplyLabel
   const actions = useCustomerSessionActions(
     customerConversation,
     currentIdentityId,
@@ -84,210 +131,108 @@ export function ConversationHeader({
       <header
         data-slot="conversation-header"
         className={cn(
-          "flex shrink-0 items-center gap-3 border-b px-4 py-3",
+          "flex min-h-12 shrink-0 items-center gap-2.5 px-3 py-2",
           narrowViewport && "pr-14",
         )}
       >
-        <ConversationAvatar conversation={conversation} className="size-9" />
-        <div className="min-w-0 flex-1">
-          <div className="w-fit max-w-full">
-            <h2
-              data-slot="conversation-header-title"
-              className="w-fit max-w-full truncate text-sm font-semibold"
-              title={contactName}
-            >
-              {contactName}
-            </h2>
-            {customer ? (
-              <div className="flex min-w-0 items-center gap-2 text-xs text-muted-foreground">
-                <span
-                  data-slot="conversation-header-detail"
-                  className="inline-flex h-5 shrink-0 items-center rounded-md border px-1.5 text-[10px]"
-                >
-                  {sessionStatus}
-                </span>
-                <span
-                  data-slot="conversation-header-detail"
-                  className="inline-flex h-5 min-w-0 items-center truncate rounded-md border px-1.5 text-[10px]"
-                  title={customer.title}
-                >
-                  {customer.title}
-                </span>
-                {activityLabel ? <span className="min-w-0 truncate">{activityLabel}</span> : null}
-              </div>
-            ) : group ? (
-              <p
-                data-slot="conversation-header-detail"
-                className="w-fit max-w-full truncate text-xs text-muted-foreground"
+        {/* 标题只占文字宽度，右侧留白保持窗口可拖动。 */}
+        <div className="flex min-w-0 flex-1 items-center gap-2">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <h2
+                data-slot="conversation-header-title"
+                className="min-w-0 truncate text-sm font-semibold"
               >
-                {group.status === ConversationStatus.ConversationStatusArchived
-                  ? t("groupDissolved")
-                  : activityLabel || t("groupMemberCount", { count: group.memberCount })}
-              </p>
-            ) : direct ? (
-              <p
-                data-slot="conversation-header-detail"
-                className="w-fit max-w-full truncate text-xs text-muted-foreground"
-              >
-                {activityLabel ||
-                  (direct.peerStatus === UserStatus.UserStatusInactive
-                    ? t("directPeerDisabled")
-                    : workStatusLabel(direct.peerWorkStatus, tCommon))}
-              </p>
-            ) : agent ? (
-              <div
-                data-slot="conversation-header-detail"
-                className="w-fit max-w-full text-xs text-muted-foreground"
-              >
-                {agent.agentName}
-                {agentRunLabel ? ` · ${agentRunLabel}` : ""}
-              </div>
-            ) : null}
-          </div>
+                {contactName}
+              </h2>
+            </TooltipTrigger>
+            <TooltipContent className="max-w-80">{contactName}</TooltipContent>
+          </Tooltip>
+          {activityLabel ? (
+            <span className="shrink-0 text-xs text-muted-foreground">
+              {activityLabel}
+            </span>
+          ) : null}
         </div>
-        {onSearch ? (
-          <Button
-            type="button"
-            variant="ghost"
-            size="icon-sm"
-            className="shrink-0 text-muted-foreground"
-            aria-label={t("searchCurrentConversation")}
-            title={t("searchCurrentConversation")}
-            onClick={onSearch}
-          >
-            <SearchIcon />
-          </Button>
-        ) : null}
-        {customer ? (
-          <div
-            data-slot="conversation-actions"
-            className="flex shrink-0 items-center gap-2"
-          >
-            {actions.reopenable ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="hidden lg:inline-flex"
-                disabled={operation !== ""}
-                onClick={() => void actions.reopen()}
-              >
-                {operation === "reopen" ? (
-                  <LoaderCircleIcon className="animate-spin" />
-                ) : null}
-                {t("conversationReopen")}
-              </Button>
-            ) : null}
-            {actions.claimable ? (
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="hidden lg:inline-flex"
-                disabled={operation !== ""}
-                onClick={() => void actions.claim()}
-              >
-                {operation === "claim" ? (
-                  <LoaderCircleIcon className="animate-spin" />
-                ) : null}
-                {customer.assignee ? t("conversationTakeover") : t("conversationClaim")}
-              </Button>
-            ) : null}
-            {actions.transferable ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="outline"
-                    size="sm"
-                    className="hidden lg:inline-flex"
-                    disabled={operation !== ""}
-                  >
-                    {operation.startsWith("transfer:") ? (
-                      <LoaderCircleIcon className="animate-spin" />
-                    ) : null}
-                    {t("conversationTransfer")}
-                    <ChevronDownIcon />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end" className="min-w-48">
-                  <CustomerTransferMenuItems actions={actions} />
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : null}
-            {actions.closable ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="icon-sm"
-                    className="hidden lg:inline-flex"
-                    disabled={operation !== ""}
-                    aria-label={t("conversationMore")}
-                    title={t("conversationMore")}
-                  >
-                    {operation === "close" ? (
-                      <LoaderCircleIcon className="animate-spin" />
-                    ) : (
-                      <MoreHorizontalIcon />
-                    )}
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem
-                    className="text-destructive focus:text-destructive"
-                    onSelect={() => actions.setCloseConfirmationOpen(true)}
-                  >
-                    {t("conversationClose")}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : null}
+        <div
+          data-slot="conversation-actions"
+          className="flex shrink-0 items-center gap-0.5"
+        >
+          {onSearch ? (
+            <HeaderAction
+              label={t("searchCurrentConversation")}
+              icon={SearchIcon}
+              onClick={onSearch}
+            />
+          ) : null}
+          {customer && actions.reopenable ? (
+            <HeaderAction
+              label={t("conversationReopen")}
+              icon={RotateCcwIcon}
+              busy={operation === "reopen"}
+              disabled={operation !== ""}
+              onClick={() => void actions.reopen()}
+            />
+          ) : null}
+          {customer && actions.claimable ? (
+            <HeaderAction
+              label={
+                customer.assignee
+                  ? t("conversationTakeover")
+                  : t("conversationClaim")
+              }
+              icon={UserRoundPlusIcon}
+              busy={operation === "claim"}
+              disabled={operation !== ""}
+              onClick={() => void actions.claim()}
+            />
+          ) : null}
+          {customer && actions.transferable ? (
             <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  className="lg:hidden"
-                  disabled={operation !== ""}
-                  aria-label={t("conversationMore")}
-                  title={t("conversationMore")}
-                >
-                  {operation ? (
-                    <LoaderCircleIcon className="animate-spin" />
-                  ) : (
-                    <MoreHorizontalIcon />
-                  )}
-                </Button>
-              </DropdownMenuTrigger>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      className="shrink-0 text-muted-foreground"
+                      disabled={operation !== ""}
+                      aria-label={t("conversationTransfer")}
+                    >
+                      {operation.startsWith("transfer:") ? (
+                        <LoaderCircleIcon className="animate-spin" />
+                      ) : (
+                        <ArrowRightLeftIcon />
+                      )}
+                    </Button>
+                  </DropdownMenuTrigger>
+                </TooltipTrigger>
+                <TooltipContent>{t("conversationTransfer")}</TooltipContent>
+              </Tooltip>
               <DropdownMenuContent align="end" className="min-w-48">
-                {actions.reopenable ? (
-                  <DropdownMenuItem onSelect={() => void actions.reopen()}>
-                    {t("conversationReopen")}
-                  </DropdownMenuItem>
-                ) : actions.claimable ? (
-                  <DropdownMenuItem onSelect={() => void actions.claim()}>
-                    {customer.assignee
-                      ? t("conversationTakeover")
-                      : t("conversationClaim")}
-                  </DropdownMenuItem>
-                ) : !actions.transferable ? null : (
-                  <CustomerTransferMenuItems actions={actions} />
-                )}
-                {actions.closable ? (
-                  <DropdownMenuItem
-                    className="text-destructive focus:text-destructive"
-                    onSelect={() => actions.setCloseConfirmationOpen(true)}
-                  >
-                    {t("conversationClose")}
-                  </DropdownMenuItem>
-                ) : null}
+                <CustomerTransferMenuItems actions={actions} />
               </DropdownMenuContent>
             </DropdownMenu>
-          </div>
-        ) : null}
+          ) : null}
+          {customer && actions.closable ? (
+            <HeaderAction
+              label={t("conversationClose")}
+              icon={ArchiveIcon}
+              destructive
+              busy={operation === "close"}
+              disabled={operation !== ""}
+              onClick={() => actions.setCloseConfirmationOpen(true)}
+            />
+          ) : null}
+          {onToggleContext && !contextVisible ? (
+            <HeaderAction
+              label={t("sidePanelOpen")}
+              icon={PanelRightOpenIcon}
+              onClick={onToggleContext}
+            />
+          ) : null}
+        </div>
       </header>
       <CustomerSessionCloseDialog actions={actions} />
     </>

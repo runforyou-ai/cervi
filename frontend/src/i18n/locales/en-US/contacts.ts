@@ -251,7 +251,6 @@ const contacts = {
       title: "Delete “{{name}}”?",
       description:
         "{{count}} members will leave this team. Their accounts will not be deleted.",
-      confirm: "Delete team",
       success: "Team deleted",
       error: "Could not delete the team. Try again.",
     },
@@ -298,7 +297,6 @@ const contacts = {
     title: "Move “{{name}}” to trash?",
     description:
       "The contact will leave this list and can be restored from trash later.",
-    confirm: "Move to trash",
     success: "Contact moved to trash",
     error: "Could not delete the contact. Try again.",
   },
@@ -309,7 +307,6 @@ const contacts = {
     restoreTitle: "Restore “{{name}}”?",
     restoreDescription:
       "The contact will leave trash and return to the current contacts list.",
-    restoreConfirm: "Restore contact",
     restoring: "Restoring…",
     restored: "Contact restored",
     restoreError: "Could not restore the contact. Try again.",

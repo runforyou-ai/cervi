@@ -16,7 +16,6 @@ import {
   ConversationStatus,
   MessageType,
   MessageVisibility,
-  ServiceSessionStatus,
   type CustomerInboxConversationData,
   type AgentInboxConversationData,
   type DirectInboxConversationData,
@@ -48,7 +47,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { LoadingIndicator } from "@/components/loading-indicator"
-import { sessionStatusLabel } from "@/features/inbox/session-status-label"
 import { useConversationTime, useMinuteTick } from "@/features/inbox/use-conversation-time"
 import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
 import {
@@ -139,12 +137,6 @@ function MobileConversationRow({
     agent ??
     groupConversation?.group
   const agentRunLabel = agentRunStatusLabel(agent?.agentRunStatus ?? null, t)
-  // 返回客服处理状态的移动端颜色。
-  const customerSessionStatusClass =
-    customerConversation?.customer.serviceSessionStatus ===
-    ServiceSessionStatus.ServiceSessionStatusOpen
-      ? "bg-primary/10 text-primary"
-      : "bg-muted text-muted-foreground"
 
   if (!summary) return null
   const previewBody =
@@ -177,7 +169,7 @@ function MobileConversationRow({
   const content = (
     <>
       <span className="relative shrink-0">
-        <ConversationAvatar conversation={conversation} />
+        <ConversationAvatar conversation={conversation} className="size-10" />
         <ConversationUnreadBadge conversation={conversation} />
       </span>
       <div className="min-w-0 flex-1 overflow-hidden">
@@ -212,24 +204,6 @@ function MobileConversationRow({
             />
           ) : null}
         </div>
-        {customerConversation ? (
-          <div className="mt-1.5 flex min-w-0 items-center gap-2">
-            <span className="truncate text-xs text-muted-foreground">
-              {customerConversation.customer.channelName}
-            </span>
-            <span
-              className={cn(
-                "ml-auto shrink-0 rounded-full px-2 py-0.5 text-[11px] font-medium",
-                customerSessionStatusClass,
-              )}
-            >
-              {sessionStatusLabel(
-                customerConversation.customer.serviceSessionStatus,
-                t,
-              )}
-            </span>
-          </div>
-        ) : null}
       </div>
     </>
   )

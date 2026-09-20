@@ -329,7 +329,7 @@ export function KnowledgeBaseLayout() {
               disabled={deleting}
               onClick={() => void confirmDeleteKnowledgeBase()}
             >
-              {deleting ? t("common:actions.deleting") : t("common:actions.delete")}
+              {deleting ? t("common:actions.deleting") : t("common:actions.confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -354,7 +354,7 @@ export function KnowledgeBaseLayout() {
               disabled={deleting}
               onClick={() => void confirmDeleteGroup()}
             >
-              {deleting ? t("common:actions.deleting") : t("common:actions.delete")}
+              {deleting ? t("common:actions.deleting") : t("common:actions.confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -400,7 +400,7 @@ function KnowledgeBaseTree({
       >
         <Link
           to={path}
-          className="flex h-9 min-w-0 flex-1 items-center gap-2 px-2.5 text-sm"
+          className="flex h-8 min-w-0 flex-1 items-center gap-2 px-2.5 text-sm"
           title={knowledgeBase.name}
         >
           {isQA ? <CircleHelpIcon /> : <FileTextIcon />}

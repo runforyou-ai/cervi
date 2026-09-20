@@ -1,4 +1,4 @@
-/** 群聊资料栏中的资料编辑和成员管理交互。 */
+/** 群聊侧边面板中的资料编辑和成员管理交互。 */
 import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react"
 import { MoreHorizontalIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
@@ -361,7 +361,7 @@ function GroupResourceState({
   )
 }
 
-/** 在现有资料栏框架内协调群资料和成员管理状态。 */
+/** 在现有侧边面板框架内协调群资料和成员管理状态。 */
 export function GroupConversationContext({
   conversationID,
   currentIdentityID,
@@ -446,7 +446,7 @@ export function GroupConversationContext({
     <Tabs key={conversationID} defaultValue="profile" className="min-h-0 flex-1">
       <TabsList
         aria-label={t("contextTabsLabel")}
-        className="h-auto shrink-0 justify-start gap-1 px-3 py-2"
+        className="h-auto min-h-12 shrink-0 justify-start gap-1 border-b-0 px-3 py-2"
       >
         <TabsTrigger
           value="profile"

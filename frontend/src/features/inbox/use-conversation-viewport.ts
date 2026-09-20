@@ -157,11 +157,17 @@ export function useConversationViewport({
     setPositionRevision((revision) => revision + 1)
   }, [root, readPosition])
 
+  /** 气泡内展开或收起内容时暂停自动贴底，保持被点击位置稳定。 */
+  const stopFollowing = useCallback(() => {
+    following.current = false
+    readPosition()
+  }, [readPosition])
+
   /** 根据当前布局判断消息阅读位置。 */
   const getAtBottom = useCallback(() => {
     const viewport = conversationViewport(root.current)
     return Boolean(viewport && isAtBottom(viewport))
   }, [root])
 
-  return { atBottom, getAtBottom, holdForLocation, releaseLocation, revealMessage, preservePosition, keepReadingPosition, followLatest }
+  return { atBottom, getAtBottom, holdForLocation, releaseLocation, revealMessage, preservePosition, keepReadingPosition, followLatest, stopFollowing }
 }

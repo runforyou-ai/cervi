@@ -160,7 +160,7 @@ export function ContactScopeSidebar({
           <button
             type="button"
             className={cn(
-              "group flex h-9 w-full items-center gap-2 rounded-md px-2.5 text-left text-sm transition-colors",
+              "group flex h-8 w-full items-center gap-2 rounded-md px-2.5 text-left text-sm transition-colors",
               contactNavHoverClass,
               scope !== "external" && contactNavPathActiveClass,
             )}
@@ -220,7 +220,7 @@ export function ContactScopeSidebar({
           <button
             type="button"
             className={cn(
-              "group flex h-9 w-full items-center gap-2 rounded-md px-2.5 text-left text-sm transition-colors",
+              "group flex h-8 w-full items-center gap-2 rounded-md px-2.5 text-left text-sm transition-colors",
               contactNavHoverClass,
               scope === "external" && contactNavPathActiveClass,
             )}

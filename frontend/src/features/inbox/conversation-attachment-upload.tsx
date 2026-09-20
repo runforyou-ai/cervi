@@ -21,7 +21,7 @@ import { Textarea } from "@/components/ui/textarea"
 import { resolveAppPlatform } from "@/platform/app-platform"
 import { formatFileSize } from "@/lib/file-size"
 import { cn } from "@/lib/utils"
-import { mobileComposerToolClass } from "@/features/inbox/mobile-composer-tool"
+import { composerToolClass } from "@/features/inbox/composer-tool"
 import { AttachmentContent } from "./attachment-content"
 import { useAttachmentQueue } from "./attachment-queue-context"
 import type { SelectedAttachment } from "./attachment-queue"
@@ -204,7 +204,7 @@ export function ConversationAttachmentUpload({
         type="button"
         variant="ghost"
         size="icon-sm"
-        className={mobile ? mobileComposerToolClass : undefined}
+        className={composerToolClass}
         disabled={disabled || selecting || form.formState.isSubmitting || !queue}
         aria-label={t("attachmentAdd")}
         onClick={() => inputRef.current?.click()}

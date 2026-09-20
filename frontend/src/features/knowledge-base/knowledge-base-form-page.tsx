@@ -405,7 +405,7 @@ export function KnowledgeBaseFormPage({
                 void form.handleSubmit(save)()
               }}
             >
-              {form.formState.isSubmitting ? t("common:actions.saving") : t("form.confirmSave")}
+              {form.formState.isSubmitting ? t("common:actions.saving") : t("common:actions.confirm")}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

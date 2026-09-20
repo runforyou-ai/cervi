@@ -61,7 +61,7 @@ export function MobileGroupMemberActionPage({
           t("group.removeMember", { name: memberName }),
         confirmTitle: t("inbox:groupRemoveMemberTitle", { name }),
         confirmDescription: t("inbox:groupRemoveMemberDescription"),
-        confirmButton: t("inbox:groupRemoveMemberConfirm"),
+        confirmButton: t("common:actions.confirm"),
         confirmVariant: "destructive" as const,
         submit: (identityID: string) =>
           removeGroupConversationMember(group.id, {
@@ -79,7 +79,7 @@ export function MobileGroupMemberActionPage({
           t("group.transferOwnerTo", { name: memberName }),
         confirmTitle: t("inbox:groupTransferOwnerTitle", { name }),
         confirmDescription: t("inbox:groupTransferOwnerDescription"),
-        confirmButton: t("inbox:groupTransferOwnerConfirm"),
+        confirmButton: t("common:actions.confirm"),
         confirmVariant: "default" as const,
         submit: (identityID: string) =>
           transferGroupConversationOwner(group.id, {

@@ -32,7 +32,6 @@ import {
   customerReplySupported,
   useCustomerSessionActions,
 } from "@/features/inbox/customer-session-actions"
-import { sessionStatusLabel } from "@/features/inbox/session-status-label"
 import { useConversationAgentReplyLabel } from "@/features/inbox/conversation-agent-activity"
 import { useConversationTypingLabel } from "@/features/inbox/use-conversation-typing"
 import { useConversationSummary } from "@/features/inbox/use-conversation-summary"
@@ -153,18 +152,11 @@ export function MobileCustomerConversationPage() {
       <MobilePageHeader
         backTo={inboxURL}
         title={
-          <span className="block min-w-0">
-            <span className="block truncate">
-              {customer
+          <span className="block min-w-0 truncate">
+            {activityLabel ||
+              (customer
                 ? (customer.contactName ?? t("anonymousVisitor"))
-                : t("unknownSender")}
-            </span>
-            {customer ? (
-              <span className="block truncate text-xs font-normal text-muted-foreground">
-                {activityLabel ||
-                  `${sessionStatusLabel(customer.serviceSessionStatus, t)} · ${customer.channelName}`}
-              </span>
-            ) : null}
+                : t("unknownSender"))}
           </span>
         }
         actions={

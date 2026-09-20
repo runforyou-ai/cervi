@@ -6,11 +6,10 @@ import {
   useRef,
   useState,
   type KeyboardEvent,
-  type PointerEvent as ReactPointerEvent,
   type RefObject,
 } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { ArrowUpIcon, LoaderCircleIcon, PaperclipIcon, SmileIcon } from "lucide-react"
+import { ArrowUpIcon, LoaderCircleIcon, MicIcon, PaperclipIcon, SmileIcon, StickyNoteIcon } from "lucide-react"
 import { useForm } from "react-hook-form"
 import { messagePreview } from "@/lib/message-preview"
 import { useTranslation } from "react-i18next"
@@ -43,6 +42,11 @@ import {
 } from "@/components/ui/popover"
 import { Textarea } from "@/components/ui/textarea"
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+import {
   createConversationComposerSchema,
   type ConversationComposerValues,
 } from "@/features/inbox/conversation-composer-schema"
@@ -58,7 +62,7 @@ import {
 } from "@/features/inbox/outgoing-message-store"
 import { ConversationAttachmentUpload } from "./conversation-attachment-upload"
 import { CustomerReplyAssistant } from "@/features/inbox/customer-reply-assistant"
-import { mobileComposerToolClass } from "@/features/inbox/mobile-composer-tool"
+import { composerToolClass } from "@/features/inbox/composer-tool"
 import { useConversationTypingReport } from "@/features/inbox/use-conversation-typing"
 import { resolveAppPlatform } from "@/platform/app-platform"
 import { apiErrorMessage } from "@/lib/form-errors"
@@ -67,8 +71,6 @@ import { cn } from "@/lib/utils"
 import composerEmojis from "../../../../internal/publicweb/composer-emojis.json"
 
 const conversationComposerMaxHeight = 200
-const conversationComposerMinHeight = 80
-const conversationComposerKeyboardResizeStep = 16
 
 /** 读取和替换回复输入框草稿的入口。 */
 export type ComposerDraftBridge = {
@@ -87,18 +89,11 @@ function countMentionTokens(body: string, displayName: string) {
   ).length
 }
 
-/** 根据文本内容和手动高度调整消息输入框。 */
-function resizeComposerInput(
-  input: HTMLTextAreaElement | null,
-  manualHeight: number | null,
-) {
+/** 根据文本内容调整消息输入框高度。 */
+function resizeComposerInput(input: HTMLTextAreaElement | null) {
   if (!input) return
   input.style.height = "auto"
-  const contentHeight = Math.min(
-    input.scrollHeight,
-    conversationComposerMaxHeight,
-  )
-  input.style.height = `${Math.max(contentHeight, manualHeight ?? 0)}px`
+  input.style.height = `${Math.min(input.scrollHeight, conversationComposerMaxHeight)}px`
   const renderedHeight = input.getBoundingClientRect().height
   input.style.overflowY = input.scrollHeight > renderedHeight ? "auto" : "hidden"
 }
@@ -184,11 +179,6 @@ export function ConversationComposer({
   })
   const inputID = `conversation-reply-${conversationID}`
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
-  const manualInputHeightRef = useRef<number | null>(null)
-  const resizeStartRef = useRef<{
-    pointerY: number
-    inputHeight: number
-  } | null>(null)
   const retryRef = useRef<OutgoingConversationDraft | null>(null)
   const refocusPendingRef = useRef(false)
   const replyToRef = useRef(replyTo)
@@ -239,7 +229,7 @@ export function ConversationComposer({
     const focus = focusAfterSwitchRef.current
     focusAfterSwitchRef.current = false
     window.requestAnimationFrame(() => {
-      resizeComposerInput(inputRef.current, manualInputHeightRef.current)
+      resizeComposerInput(inputRef.current)
       if (focus) form.setFocus("body")
     })
   }, [form, visibility])
@@ -253,7 +243,7 @@ export function ConversationComposer({
 
   useEffect(() => {
     aliveRef.current = true
-    resizeComposerInput(inputRef.current, manualInputHeightRef.current)
+    resizeComposerInput(inputRef.current)
     return () => {
       aliveRef.current = false
     }
@@ -274,7 +264,7 @@ export function ConversationComposer({
     setMentions(retryDraft.mentions)
     setMentionAllToken(retryDraft.mentionAllToken)
     onReplyToChange?.(retryDraft.replyTo)
-    resizeComposerInput(inputRef.current, manualInputHeightRef.current)
+    resizeComposerInput(inputRef.current)
     form.setFocus("body")
   }, [
     form,
@@ -412,7 +402,7 @@ export function ConversationComposer({
     window.requestAnimationFrame(() => {
       input.focus()
       input.setSelectionRange(nextCaret, nextCaret)
-      resizeComposerInput(input, manualInputHeightRef.current)
+      resizeComposerInput(input)
     })
   }
 
@@ -431,7 +421,7 @@ export function ConversationComposer({
     form.setValue("body", nextBody, { shouldDirty: true })
     typingReport.input(nextBody)
     reconcileMentions(nextBody)
-    resizeComposerInput(input, manualInputHeightRef.current)
+    resizeComposerInput(input)
     emojiCaretRef.current = nextCaret
     setEmojiOpen(false)
   }
@@ -524,15 +514,12 @@ export function ConversationComposer({
     retryRef.current = null
     onSending(draft)
     const { clientMessageID } = draft
-    // 桌面端发送后保持当前输入框高度，移动端回到单行。
-    const input = inputRef.current
-    if (input && !mobile) setManualInputHeight(input.getBoundingClientRect().height)
     form.resetField("body")
     typingReport.stop()
     // 提醒状态随正文一起清空，发送失败时按草稿所属可见范围恢复。
     setMentions([])
     setMentionAllToken(null)
-    resizeComposerInput(inputRef.current, manualInputHeightRef.current)
+    resizeComposerInput(inputRef.current)
     try {
       const messageInput = { clientMessageId: clientMessageID, body }
       let message: ConversationMessageData
@@ -614,7 +601,7 @@ export function ConversationComposer({
           form.setValue("body", body, { shouldDirty: true })
           setMentions(draft.mentions)
           setMentionAllToken(draft.mentionAllToken)
-          resizeComposerInput(inputRef.current, manualInputHeightRef.current)
+          resizeComposerInput(inputRef.current)
         }
       }
       refocusPendingRef.current = refocusAfterSubmit
@@ -632,7 +619,7 @@ export function ConversationComposer({
     }
     form.setValue("body", reply, { shouldDirty: true })
     window.requestAnimationFrame(() => {
-      resizeComposerInput(inputRef.current, manualInputHeightRef.current)
+      resizeComposerInput(inputRef.current)
       form.setFocus("body")
     })
   }, [form, onVisibilityChange, visibility])
@@ -703,58 +690,6 @@ export function ConversationComposer({
     }
   }
 
-  /** 应用用户选择的消息输入框高度。 */
-  function setManualInputHeight(height: number) {
-    const input = inputRef.current
-    if (!input) return
-    const nextHeight = Math.min(
-      conversationComposerMaxHeight,
-      Math.max(conversationComposerMinHeight, height),
-    )
-    manualInputHeightRef.current = nextHeight
-    resizeComposerInput(input, nextHeight)
-  }
-
-  /** 开始拖动消息输入框。 */
-  function startInputResize(event: ReactPointerEvent<HTMLButtonElement>) {
-    const input = inputRef.current
-    if (!input) return
-    event.preventDefault()
-    event.currentTarget.setPointerCapture(event.pointerId)
-    resizeStartRef.current = {
-      pointerY: event.clientY,
-      inputHeight: input.getBoundingClientRect().height,
-    }
-  }
-
-  /** 按指针位置调整消息输入框高度。 */
-  function resizeInput(event: ReactPointerEvent<HTMLButtonElement>) {
-    const start = resizeStartRef.current
-    if (!start || !event.currentTarget.hasPointerCapture(event.pointerId)) return
-    setManualInputHeight(start.inputHeight + start.pointerY - event.clientY)
-  }
-
-  /** 结束拖动消息输入框。 */
-  function stopInputResize(event: ReactPointerEvent<HTMLButtonElement>) {
-    resizeStartRef.current = null
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId)
-    }
-  }
-
-  /** 使用方向键调整消息输入框高度。 */
-  function resizeInputFromKeyboard(event: KeyboardEvent<HTMLButtonElement>) {
-    if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return
-    const input = inputRef.current
-    if (!input) return
-    event.preventDefault()
-    const direction = event.key === "ArrowUp" ? 1 : -1
-    setManualInputHeight(
-      input.getBoundingClientRect().height +
-        direction * conversationComposerKeyboardResizeStep,
-    )
-  }
-
   const [showSubmitting, setShowSubmitting] = useState(false)
   // 客户会话在输入区工具栏提供 AI 写回复入口，不可对客发送时保留显示并禁用。
   const replyAssistant =
@@ -784,8 +719,8 @@ export function ConversationComposer({
     return () => window.clearTimeout(timer)
   }, [isSubmitting])
 
-  // 移动端输入内容后附件入口换成发送按钮，并保持到本次发送结束。
-  const showMobileSend = !isBodyEmpty || isSubmitting
+  // 输入内容后附件入口换成发送按钮，并保持到本次发送结束。
+  const showSend = !isBodyEmpty || isSubmitting
   const bodyInput = (
     <Textarea
       {...bodyField}
@@ -796,21 +731,18 @@ export function ConversationComposer({
       id={inputID}
       disabled={isSubmitting}
       readOnly={Boolean(disabledReason)}
-      rows={mobile ? 1 : 3}
+      rows={1}
       aria-label={t(internalNote ? "internalNoteLabel" : "replyLabel")}
       aria-describedby={disabledReason ? `${inputID}-reason` : undefined}
       aria-invalid={form.formState.errors.body ? true : undefined}
       className={cn(
-        "max-h-[200px] resize-none rounded-none border-0 bg-transparent shadow-none caret-primary focus-visible:ring-0 dark:bg-transparent",
-        mobile
-          ? cn("min-h-9 min-w-0 flex-1 px-0.5 py-1.5 md:text-base", disabledReason && "pl-3")
-          : "min-h-20 py-2",
+        // 行高贴近字体自然行高，避免换行前后光标高度跳变；上下内边距之和保持 16px，下伸部留空由上多下少补偿。
+        "max-h-[200px] min-h-10 min-w-0 flex-1 resize-none rounded-none border-0 bg-transparent px-0.5 pt-[11px] pb-[9px] leading-5 shadow-none focus-visible:ring-0 dark:bg-transparent",
+        // 正文与 20px 工具图标配比；窄屏保持 16px，避免移动端聚焦时缩放。
+        "md:text-[15px]",
       )}
       onInput={(event) => {
-        resizeComposerInput(
-          event.currentTarget,
-          manualInputHeightRef.current,
-        )
+        resizeComposerInput(event.currentTarget)
       }}
       onChange={(event) => {
         const previousBody = form.getValues("body")
@@ -857,7 +789,7 @@ export function ConversationComposer({
         captionLimit={customerAttachmentCaptionLimit}
         replyTo={replyTo ?? null}
         onSent={() => onReplyToChange?.(null)}
-        disabled={isSubmitting}
+        disabled={isSubmitting || Boolean(disabledReason)}
         onBeforeSend={onBeforeSend}
         onCreated={(conversation, conversationID) => onAttachmentConversationCreated?.(conversation, conversationID)}
       />
@@ -866,7 +798,7 @@ export function ConversationComposer({
         type="button"
         variant="ghost"
         size="icon-sm"
-        className={mobile ? mobileComposerToolClass : undefined}
+        className={composerToolClass}
         disabled
         aria-label={t("attachmentAdd")}
       >
@@ -880,8 +812,8 @@ export function ConversationComposer({
           type="button"
           variant="ghost"
           size="icon-sm"
-          className={mobile ? mobileComposerToolClass : undefined}
-          disabled={isSubmitting}
+          className={composerToolClass}
+          disabled={isSubmitting || Boolean(disabledReason)}
           aria-label={t("emojiPick")}
         >
           <SmileIcon />
@@ -894,10 +826,8 @@ export function ConversationComposer({
         aria-label={t("emojiPick")}
         className={cn(
           "grid max-h-64 gap-0.5 overflow-y-auto p-1.5",
-          // 移动端面板不超过可用宽度，列数按 44px 触控按钮自动填充。
-          mobile
-            ? "w-[min(22rem,var(--radix-popover-content-available-width))] grid-cols-[repeat(auto-fill,2.75rem)]"
-            : "w-auto grid-cols-8",
+          // 面板不超过可用宽度，列数按 36px 按钮自动填充。
+          "w-[min(19rem,var(--radix-popover-content-available-width))] grid-cols-[repeat(auto-fill,2.25rem)]",
         )}
         onCloseAutoFocus={(event) => {
           // 选中表情后焦点回到输入框并定位到插入内容之后。
@@ -915,8 +845,7 @@ export function ConversationComposer({
             key={emoji}
             type="button"
             className={cn(
-              "flex items-center justify-center rounded-md text-xl leading-none outline-none hover:bg-accent focus-visible:bg-accent",
-              mobile ? "size-11" : "size-8",
+              "flex size-9 items-center justify-center rounded-md text-xl leading-none outline-none hover:bg-accent focus-visible:bg-accent",
             )}
             onClick={() => insertEmoji(emoji)}
           >
@@ -931,48 +860,10 @@ export function ConversationComposer({
     <form
       data-slot="conversation-composer"
       data-conversation-id={conversationID}
-      className={cn("shrink-0 bg-background px-2", mobile ? "py-2" : "py-3")}
+      className="shrink-0 bg-background"
       onSubmit={form.handleSubmit(send)}
       noValidate
     >
-      {onVisibilityChange ? (
-        <div role="tablist" aria-label={t("composerMode")} className="mb-2 flex items-center gap-1">
-          <button
-            type="button"
-            role="tab"
-            aria-selected={!internalNote}
-            className={cn(
-              "rounded-md px-2 py-1 text-xs font-medium",
-              mobile && "min-h-11 px-3 text-sm",
-              internalNote
-                ? "text-muted-foreground hover:text-foreground"
-                : "bg-muted text-foreground",
-            )}
-            onClick={() =>
-              switchVisibility(MessageVisibility.MessageVisibilityCustomerVisible)
-            }
-          >
-            {t("composerModeCustomer")}
-          </button>
-          <button
-            type="button"
-            role="tab"
-            aria-selected={internalNote}
-            className={cn(
-              "rounded-md px-2 py-1 text-xs font-medium",
-              mobile && "min-h-11 px-3 text-sm",
-              internalNote
-                ? "bg-amber-100 text-amber-900 dark:bg-amber-950 dark:text-amber-200"
-                : "text-muted-foreground hover:text-foreground",
-            )}
-            onClick={() =>
-              switchVisibility(MessageVisibility.MessageVisibilityInternalOnly)
-            }
-          >
-            {t("composerModeNote")}
-          </button>
-        </div>
-      ) : null}
       <div className="relative">
         {!disabledReason && mentionQuery && mentionCandidates.length > 0 ? (
           <div
@@ -991,8 +882,7 @@ export function ConversationComposer({
                 role="option"
                 aria-selected={index === activeMentionIndex}
                 className={cn(
-                  "flex w-full items-center rounded-sm px-2 py-1.5 text-left text-sm outline-none hover:bg-accent aria-selected:bg-accent",
-                  mobile && "min-h-11",
+                  "flex min-h-9 w-full items-center rounded-sm px-2 py-1.5 text-left text-sm outline-none hover:bg-accent aria-selected:bg-accent",
                 )}
                 onPointerDown={(event) => event.preventDefault()}
                 onClick={() => selectMention(candidate)}
@@ -1021,25 +911,11 @@ export function ConversationComposer({
             </Button>
           </div>
         ) : null}
-        {mobile ? null : (
-          <button
-            type="button"
-            className="absolute inset-x-0 top-0 z-10 h-3 -translate-y-1/2 cursor-row-resize touch-none border-0 bg-transparent p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            aria-label={t("composerResize")}
-            onPointerDown={startInputResize}
-            onPointerMove={resizeInput}
-            onPointerUp={stopInputResize}
-            onPointerCancel={stopInputResize}
-            onKeyDown={resizeInputFromKeyboard}
-          />
-        )}
         <div
           className={cn(
-            "border shadow-xs",
-            mobile ? "rounded-[21px]" : "overflow-hidden rounded-xl",
             internalNote
-              ? "border-amber-500/70 bg-amber-50/60 dark:bg-amber-950/30"
-              : "border-input bg-background",
+              ? "bg-amber-50/60 dark:bg-amber-950/30"
+              : "bg-background",
           )}
         >
           {replyTo ? (
@@ -1061,8 +937,7 @@ export function ConversationComposer({
               <button
                 type="button"
                 className={cn(
-                  "shrink-0 text-muted-foreground hover:text-foreground",
-                  mobile && "-my-2 min-h-11 px-2",
+                  "-my-1 min-h-8 shrink-0 px-2 text-muted-foreground hover:text-foreground",
                 )}
                 disabled={Boolean(disabledReason)}
                 onClick={() => onReplyToChange?.(null)}
@@ -1071,58 +946,78 @@ export function ConversationComposer({
               </button>
             </div>
           ) : null}
-          {mobile ? (
-            <>
-              {disabledReason ? (
-                <p id={`${inputID}-reason`} className="truncate border-b px-3 py-1.5 text-xs text-muted-foreground">{disabledReason}</p>
+          {/* 输入区整体铺底色，正文单独用白底并与上下边缘留出间距。 */}
+          <div className="flex items-end gap-2 bg-foreground/[0.03] px-2 py-1">
+            <div className="mb-1.5 flex items-end">
+              {onVisibilityChange ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-pressed={internalNote}
+                      className={cn(
+                        composerToolClass,
+                        internalNote &&
+                          "bg-amber-100 text-amber-900 hover:bg-amber-100 hover:text-amber-900 dark:bg-amber-950 dark:text-amber-200 dark:hover:bg-amber-950 dark:hover:text-amber-200",
+                      )}
+                      aria-label={t("composerModeNote")}
+                      onClick={() =>
+                        switchVisibility(
+                          internalNote
+                            ? MessageVisibility.MessageVisibilityCustomerVisible
+                            : MessageVisibility.MessageVisibilityInternalOnly,
+                        )
+                      }
+                    >
+                      <StickyNoteIcon />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{t("composerModeNote")}</TooltipContent>
+                </Tooltip>
               ) : null}
-              <div className="flex items-end p-0.5">
-                {disabledReason ? null : emojiTool}
-                {bodyInput}
-                {replyAssistant}
-                {disabledReason ? null : (
-                  <div className={cn("flex", showMobileSend && "hidden")}>{attachmentTool}</div>
-                )}
-                {showMobileSend ? (
-                  <Button
-                    type="submit"
-                    size="icon"
-                    className="relative ml-1 rounded-full after:absolute after:-inset-1 after:content-[''] [&_svg:not([class*='size-'])]:size-5"
-                    disabled={isSubmitting || Boolean(disabledReason) || isBodyEmpty || replyTo?.deleted}
-                    aria-label={t(internalNote ? "internalNoteSave" : "messageSend")}
-                  >
-                    {showSubmitting ? <LoaderCircleIcon className="animate-spin" /> : <ArrowUpIcon />}
-                  </Button>
-                ) : null}
-              </div>
-            </>
-          ) : (
-            <>
-              {bodyInput}
-              <div className="flex items-center justify-between gap-3 px-2.5 pb-2.5">
-                {disabledReason ? (
-                  <div className="flex min-w-0 items-center gap-1">
-                    {replyAssistant}
-                    <p id={`${inputID}-reason`} className="truncate text-xs text-muted-foreground">{disabledReason}</p>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-1">
-                    {attachmentTool}
-                    {emojiTool}
-                    {replyAssistant}
-                  </div>
-                )}
-                <Button type="submit" size="sm" disabled={isSubmitting || Boolean(disabledReason) || isBodyEmpty || replyTo?.deleted}>
-                  {isSubmitting && showSubmitting ? (
-                    <LoaderCircleIcon className="animate-spin" />
-                  ) : null}
-                  {isSubmitting && showSubmitting
-                    ? t("messageSending")
-                    : t(internalNote ? "internalNoteSave" : "messageSend")}
+              {attachmentTool}
+            </div>
+            <div className="flex min-w-0 flex-1 items-end rounded-md bg-background px-2">
+              {disabledReason ? (
+                <p
+                  id={`${inputID}-reason`}
+                  className="min-w-0 flex-1 truncate py-[10px] text-xs leading-5 text-muted-foreground"
+                >
+                  {disabledReason}
+                </p>
+              ) : (
+                bodyInput
+              )}
+            </div>
+            <div className="mb-1.5 flex items-end">
+              {emojiTool}
+              {replyAssistant}
+              {showSend ? (
+                <Button
+                  type="submit"
+                  size="icon-sm"
+                  className="relative rounded-full after:absolute after:-inset-1 after:content-['']"
+                  disabled={isSubmitting || Boolean(disabledReason) || isBodyEmpty || replyTo?.deleted}
+                  aria-label={t(internalNote ? "internalNoteSave" : "messageSend")}
+                >
+                  {showSubmitting ? <LoaderCircleIcon className="animate-spin" /> : <ArrowUpIcon />}
                 </Button>
-              </div>
-            </>
-          )}
+              ) : (
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon-sm"
+                  className={composerToolClass}
+                  disabled
+                  aria-label={t("voiceMessage")}
+                >
+                  <MicIcon />
+                </Button>
+              )}
+            </div>
+          </div>
         </div>
       </div>
     </form>
