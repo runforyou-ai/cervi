@@ -23,6 +23,7 @@ import { WorkspaceNavigationGuard } from "@/features/workspace/workspace-navigat
 import { WorkspaceNavigation } from "@/features/workspace/workspace-navigation"
 import {
   defaultWorkspaceHref,
+  isSettingsHref,
   resolveWorkspaceLocation,
   WorkspacePageRoutes,
 } from "@/features/workspace/workspace-page-routes"
@@ -74,9 +75,13 @@ function WorkspaceShell({ identity }: { identity: Identity }) {
   const [attentionPending, setAttentionPending] = useState(false)
   const workspaceLocation = resolveWorkspaceLocation(location)
   const fallbackHrefRef = useRef(defaultWorkspaceHref)
+  const appHrefRef = useRef(defaultWorkspaceHref)
   const currentHref = `${location.pathname}${location.search}${location.hash}`
   if (workspaceLocation.matched && workspaceLocation.canonicalHref === currentHref) {
     fallbackHrefRef.current = currentHref
+    if (!isSettingsHref(currentHref)) {
+      appHrefRef.current = currentHref
+    }
   }
 
   const organizationId = identity.user.organizationId
@@ -221,6 +226,7 @@ function WorkspaceShell({ identity }: { identity: Identity }) {
   const pageHref = workspaceLocation.matched
     ? workspaceLocation.canonicalHref
     : fallbackHrefRef.current
+  const inSettings = isSettingsHref(pageHref)
 
   return (
     <WorkspaceNavigationGuard>
@@ -239,6 +245,8 @@ function WorkspaceShell({ identity }: { identity: Identity }) {
           <>
             <WorkspaceNavigation
               identity={identity}
+              inSettings={inSettings}
+              appHref={appHrefRef.current}
               onLogout={handleLogout}
               loggingOut={loggingOut}
             />
@@ -257,10 +265,7 @@ function WorkspaceShell({ identity }: { identity: Identity }) {
             onForward={history.goForward}
           />
         </div>
-        <div
-          aria-hidden="true"
-          className="cervi-workspace-top-drag-region"
-        />
+        <div aria-hidden="true" className="cervi-workspace-top-drag-region" />
         <div className="cervi-workspace-content-frame relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl bg-background shadow-sm">
           <WorkspaceProvider value={workspaceContext}>
             <WorkspacePageRoutes location={pageHref} />

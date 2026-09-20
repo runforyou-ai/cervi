@@ -1,6 +1,6 @@
 /** 美式英语·设置文案。 */
 const settings = {
-  title: "Settings",
+  backToApp: "Back to app",
   navigationLabel: "Settings menu",
   groups: {
     personal: "Personal",

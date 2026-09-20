@@ -1,13 +1,25 @@
 /** 工作台左侧模块栏和用户菜单。 */
 import { useRef, useState } from "react"
 import {
+  BrainCircuitIcon,
+  Building2Icon,
   CheckIcon,
+  ChevronLeftIcon,
+  CodeXmlIcon,
   ContactRoundIcon,
   InboxIcon,
   LibraryIcon,
   LoaderCircleIcon,
+  LockKeyholeIcon,
   LogOutIcon,
+  MessagesSquareIcon,
+  MonitorSmartphoneIcon,
+  PlugIcon,
   SettingsIcon,
+  ShieldCheckIcon,
+  SlidersHorizontalIcon,
+  UserRoundIcon,
+  WebhookIcon,
   type LucideIcon,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
@@ -19,6 +31,7 @@ import {
   type Identity,
   type WorkStatus,
 } from "@/api"
+import { PagePaneGroup, PagePaneLink } from "@/components/page-split"
 import { useUnsavedChangesContext } from "@/contexts/unsaved-changes-context"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
@@ -40,6 +53,7 @@ import {
 } from "@/components/work-status"
 import { UserAvatar } from "@/components/user-avatar"
 import { cn } from "@/lib/utils"
+import { resolveAppPlatform } from "@/platform/app-platform"
 import { requestNotificationPermissionFromMessageMenu } from "@/platform/notifications"
 
 /** 模块栏导航项。 */
@@ -49,26 +63,29 @@ function WorkspaceRailItem({
   label,
   active,
   onClick,
+  className,
 }: {
   to: string
   icon: LucideIcon
   label: string
   active: boolean
   onClick?: () => void
+  className?: string
 }) {
   return (
     <NavLink
       to={to}
       onClick={onClick}
       className={cn(
-        "my-px flex h-9 w-full items-center gap-2.5 rounded-md px-2.5 text-sm",
+        "flex h-8 w-full items-center gap-2 rounded-md px-2.5 text-sm",
         "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
         "focus-visible:ring-2 focus-visible:ring-sidebar-ring",
         active &&
           "bg-sidebar-accent font-medium text-sidebar-accent-foreground",
+        className,
       )}
     >
-      <Icon className="size-[18px] shrink-0" />
+      <Icon className="size-4 shrink-0" />
       <span className="min-w-0 flex-1 truncate">{label}</span>
     </NavLink>
   )
@@ -108,6 +125,68 @@ function WorkspaceMenu({
         label={t("knowledgeBases")}
         active={location.pathname.startsWith("/knowledge-bases")}
       />
+    </nav>
+  )
+}
+
+/** 设置导航，进入设置后替换模块栏内容。 */
+function WorkspaceSettingsMenu({ appHref }: { appHref: string }) {
+  const { t } = useTranslation("settings")
+
+  return (
+    <nav
+      className="flex min-h-0 flex-1 flex-col items-stretch gap-0.5 overflow-y-auto pt-1 pr-0 pl-1.5"
+      aria-label={t("navigationLabel")}
+    >
+      <WorkspaceRailItem
+        to={appHref}
+        icon={ChevronLeftIcon}
+        label={t("backToApp")}
+        active={false}
+        // 左箭头字形本身内缩，整行左移抵消，与下方导航项视觉左对齐。
+        className="-ml-1"
+      />
+      <PagePaneGroup title={t("groups.personal")}>
+        <PagePaneLink to="/settings/profile" icon={UserRoundIcon}>
+          {t("navigation.profile")}
+        </PagePaneLink>
+        <PagePaneLink to="/settings/security" icon={LockKeyholeIcon}>
+          {t("navigation.security")}
+        </PagePaneLink>
+        <PagePaneLink to="/settings/preferences" icon={SlidersHorizontalIcon}>
+          {t("navigation.preferences")}
+        </PagePaneLink>
+        <PagePaneLink to="/settings/devices" icon={MonitorSmartphoneIcon}>
+          {t("navigation.devices")}
+        </PagePaneLink>
+      </PagePaneGroup>
+      <PagePaneGroup title={t("groups.organization")}>
+        <PagePaneLink to="/settings/general" icon={Building2Icon}>
+          {t("navigation.general")}
+        </PagePaneLink>
+        <PagePaneLink
+          to="/settings/roles"
+          activePath="/settings/roles"
+          icon={ShieldCheckIcon}
+        >
+          {t("navigation.roles")}
+        </PagePaneLink>
+        <PagePaneLink to="/settings/channels" icon={MessagesSquareIcon}>
+          {t("navigation.channels")}
+        </PagePaneLink>
+        <PagePaneLink
+          to="/settings/model-services/chat"
+          activePath="/settings/model-services"
+          icon={BrainCircuitIcon}
+        >
+          {t("navigation.modelServices")}
+        </PagePaneLink>
+        <PagePaneLink to="/settings/mcp-servers" icon={PlugIcon}>
+          {t("navigation.mcpServers")}
+        </PagePaneLink>
+        <PagePaneLink icon={WebhookIcon}>{t("navigation.webhooks")}</PagePaneLink>
+        <PagePaneLink icon={CodeXmlIcon}>{t("navigation.openApi")}</PagePaneLink>
+      </PagePaneGroup>
     </nav>
   )
 }
@@ -162,10 +241,14 @@ function WorkStatusPicker({
 /** 渲染模块栏和用户菜单。 */
 export function WorkspaceNavigation({
   identity,
+  inSettings,
+  appHref,
   onLogout,
   loggingOut,
 }: {
   identity: Identity
+  inSettings: boolean
+  appHref: string
   onLogout: () => void
   loggingOut: boolean
 }) {
@@ -177,6 +260,7 @@ export function WorkspaceNavigation({
   const changingWorkStatusRef = useRef(false)
   const userMenuTriggerRef = useRef<HTMLButtonElement>(null)
   const skipUserMenuFocusRestoreRef = useRef(false)
+  const showAppVersion = inSettings && resolveAppPlatform() === "desktop"
 
   /** 从用户菜单进入页面，并清除头像触发器的选中效果。 */
   function navigateFromUserMenu(path: string) {
@@ -224,102 +308,113 @@ export function WorkspaceNavigation({
 
   return (
     <aside className="cervi-workspace-rail flex h-full shrink-0 flex-col text-sidebar-foreground">
-      <WorkspaceMenu onInboxClick={requestMessageNotificationPermission} />
-      <div className="pt-1 pr-0 pb-2.5 pl-1.5">
-        <DropdownMenu open={userMenuOpen} onOpenChange={setUserMenuOpen}>
-          <DropdownMenuTrigger asChild>
-            <button
-              ref={userMenuTriggerRef}
-              type="button"
-              className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left outline-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring"
-              aria-label={t("openUserMenu", {
-                name: identity.user.displayName,
-              })}
-            >
-              <span className="relative size-8 shrink-0">
-                <UserAvatar
-                  user={identity.user}
-                  className="size-full rounded-lg"
-                />
-                <WorkStatusDot
-                  status={identity.user.workStatus}
-                  className="absolute -right-0.5 -bottom-0.5 ring-2 ring-sidebar"
-                />
-              </span>
-              <span className="grid min-w-0 flex-1 gap-0.5 leading-tight">
-                <span className="truncate text-sm font-medium">
-                  {identity.user.displayName}
-                </span>
-                <span className="truncate text-xs text-muted-foreground">
-                  {identity.user.email}
-                </span>
-              </span>
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent
-            side="top"
-            align="start"
-            className="w-56"
-            onCloseAutoFocus={(event) => {
-              if (!skipUserMenuFocusRestoreRef.current) {
-                return
-              }
-
-              event.preventDefault()
-              skipUserMenuFocusRestoreRef.current = false
-              userMenuTriggerRef.current?.blur()
-            }}
-          >
-            <DropdownMenuLabel className="p-2 font-normal">
-              <div className="flex items-center gap-2.5">
-                <div className="relative size-9 shrink-0">
+      {inSettings ? (
+        <WorkspaceSettingsMenu appHref={appHref} />
+      ) : (
+        <WorkspaceMenu onInboxClick={requestMessageNotificationPermission} />
+      )}
+      {inSettings ? null : (
+        <div className="pt-1 pr-0 pb-2.5 pl-1.5">
+          <DropdownMenu open={userMenuOpen} onOpenChange={setUserMenuOpen}>
+            <DropdownMenuTrigger asChild>
+              <button
+                ref={userMenuTriggerRef}
+                type="button"
+                className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left outline-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+                aria-label={t("openUserMenu", {
+                  name: identity.user.displayName,
+                })}
+              >
+                <span className="relative size-8 shrink-0">
                   <UserAvatar
                     user={identity.user}
-                    className="size-9 rounded-lg text-sm"
+                    className="size-full rounded-lg"
                   />
                   <WorkStatusDot
                     status={identity.user.workStatus}
-                    className="absolute -right-0.5 -bottom-0.5 ring-2 ring-popover"
+                    className="absolute -right-0.5 -bottom-0.5 ring-2 ring-sidebar"
                   />
-                </div>
-                <div className="grid min-w-0 flex-1 translate-y-0.5 gap-0.5 leading-tight">
-                  <span className="truncate text-base font-medium">
+                </span>
+                <span className="grid min-w-0 flex-1 gap-0.5 leading-tight">
+                  <span className="truncate text-sm font-medium">
                     {identity.user.displayName}
                   </span>
-                  <WorkStatusPicker
-                    status={identity.user.workStatus}
-                    onChange={changeWorkStatus}
-                  />
-                </div>
-              </div>
-            </DropdownMenuLabel>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              onSelect={() => navigateFromUserMenu("/settings/profile")}
-            >
-              <SettingsIcon />
-              {t("settings")}
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              destructive
-              disabled={loggingOut}
-              onSelect={async () => {
-                setUserMenuOpen(false)
-                if (unsavedChanges && !(await unsavedChanges.confirmDiscard())) return
-                onLogout()
+                  <span className="truncate text-xs text-muted-foreground">
+                    {identity.user.email}
+                  </span>
+                </span>
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent
+              side="top"
+              align="start"
+              className="w-56"
+              onCloseAutoFocus={(event) => {
+                if (!skipUserMenuFocusRestoreRef.current) {
+                  return
+                }
+
+                event.preventDefault()
+                skipUserMenuFocusRestoreRef.current = false
+                userMenuTriggerRef.current?.blur()
               }}
             >
-              {loggingOut ? (
-                <LoaderCircleIcon className="animate-spin" />
-              ) : (
-                <LogOutIcon />
-              )}
-              {loggingOut ? t("loggingOut") : t("logout")}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+              <DropdownMenuLabel className="p-2 font-normal">
+                <div className="flex items-center gap-2.5">
+                  <div className="relative size-9 shrink-0">
+                    <UserAvatar
+                      user={identity.user}
+                      className="size-9 rounded-lg text-sm"
+                    />
+                    <WorkStatusDot
+                      status={identity.user.workStatus}
+                      className="absolute -right-0.5 -bottom-0.5 ring-2 ring-popover"
+                    />
+                  </div>
+                  <div className="grid min-w-0 flex-1 translate-y-0.5 gap-0.5 leading-tight">
+                    <span className="truncate text-base font-medium">
+                      {identity.user.displayName}
+                    </span>
+                    <WorkStatusPicker
+                      status={identity.user.workStatus}
+                      onChange={changeWorkStatus}
+                    />
+                  </div>
+                </div>
+              </DropdownMenuLabel>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                onSelect={() => navigateFromUserMenu("/settings/profile")}
+              >
+                <SettingsIcon />
+                {t("settings")}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                destructive
+                disabled={loggingOut}
+                onSelect={async () => {
+                  setUserMenuOpen(false)
+                  if (unsavedChanges && !(await unsavedChanges.confirmDiscard())) return
+                  onLogout()
+                }}
+              >
+                {loggingOut ? (
+                  <LoaderCircleIcon className="animate-spin" />
+                ) : (
+                  <LogOutIcon />
+                )}
+                {loggingOut ? t("loggingOut") : t("logout")}
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
+      )}
+      {showAppVersion ? (
+        <span className="pt-1 pr-0 pb-2.5 pl-4 text-[11px] text-muted-foreground/70">
+          {t("appVersion", { version: __APP_VERSION__ })}
+        </span>
+      ) : null}
     </aside>
   )
 }

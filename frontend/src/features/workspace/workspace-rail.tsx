@@ -117,7 +117,7 @@ export function WorkspaceRailResizer({
       <button
         type="button"
         // 手柄居中于一级导航与主内容卡片之间的内缩间隙。
-        className="absolute top-0 left-0 z-20 h-full w-2 -translate-x-px cursor-col-resize touch-none"
+        className="absolute top-0 left-0 z-30 h-full w-2 -translate-x-px cursor-col-resize touch-none"
         aria-label={t("resizeNavigation")}
         onPointerDown={(event) => {
           // 开始拖动一级导航。

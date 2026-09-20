@@ -313,6 +313,11 @@ export type ResolvedWorkspaceLocation = {
 
 export const defaultWorkspaceHref = "/inbox"
 
+/** 判断地址是否属于设置页。 */
+export function isSettingsHref(href: string) {
+  return href === "/settings" || href.startsWith("/settings/")
+}
+
 /** 把当前地址解析为规范地址；别名地址给出跳转目标，未知地址回到消息页。 */
 export function resolveWorkspaceLocation(
   location: Pick<Location, "pathname" | "search" | "hash">,

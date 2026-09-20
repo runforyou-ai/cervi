@@ -1,27 +1,8 @@
-/** 设置页。 */
+/** 设置页内容；设置导航在工作台一级栏中显示。 */
 import type { ReactNode } from "react"
-import {
-  BrainCircuitIcon,
-  Building2Icon,
-  CodeXmlIcon,
-  LockKeyholeIcon,
-  MessagesSquareIcon,
-  MonitorSmartphoneIcon,
-  PlugIcon,
-  ShieldCheckIcon,
-  SlidersHorizontalIcon,
-  UserRoundIcon,
-  WebhookIcon,
-} from "lucide-react"
 import { useTranslation } from "react-i18next"
 
 import { PageContent } from "@/components/page-content"
-import {
-  PagePaneGroup,
-  PagePaneLink,
-  PagePaneNav,
-  PageSplit,
-} from "@/components/page-split"
 import { PageHeader } from "@/components/page-header"
 import { ChangePasswordForm } from "@/features/settings/change-password-form"
 import { DeviceListPage } from "@/features/settings/device-list-page"
@@ -54,7 +35,7 @@ function isFormSection(section: SettingsSection): section is SettingsFormSection
   return (formSections as readonly string[]).includes(section)
 }
 
-/** 设置导航和当前设置页面。 */
+/** 渲染当前设置页面。 */
 export function SettingsPage({
   section,
   children,
@@ -66,55 +47,7 @@ export function SettingsPage({
   const { identity } = useWorkspace()
 
   return (
-    <PageSplit
-      paneWidth="md"
-      paneVariant="nav"
-      pane={
-        <PagePaneNav label={t("navigationLabel")} title={t("title")}>
-          <PagePaneGroup title={t("groups.personal")}>
-            <PagePaneLink to="/settings/profile" icon={UserRoundIcon}>
-              {t("navigation.profile")}
-            </PagePaneLink>
-            <PagePaneLink to="/settings/security" icon={LockKeyholeIcon}>
-              {t("navigation.security")}
-            </PagePaneLink>
-            <PagePaneLink to="/settings/preferences" icon={SlidersHorizontalIcon}>
-              {t("navigation.preferences")}
-            </PagePaneLink>
-            <PagePaneLink to="/settings/devices" icon={MonitorSmartphoneIcon}>
-              {t("navigation.devices")}
-            </PagePaneLink>
-          </PagePaneGroup>
-          <PagePaneGroup title={t("groups.organization")}>
-            <PagePaneLink to="/settings/general" icon={Building2Icon}>
-              {t("navigation.general")}
-            </PagePaneLink>
-            <PagePaneLink to="/settings/roles" icon={ShieldCheckIcon}>
-              {t("navigation.roles")}
-            </PagePaneLink>
-            <PagePaneLink to="/settings/channels" icon={MessagesSquareIcon}>
-              {t("navigation.channels")}
-            </PagePaneLink>
-            <PagePaneLink
-              to="/settings/model-services/chat"
-              activePath="/settings/model-services"
-              icon={BrainCircuitIcon}
-            >
-              {t("navigation.modelServices")}
-            </PagePaneLink>
-            <PagePaneLink to="/settings/mcp-servers" icon={PlugIcon}>
-              {t("navigation.mcpServers")}
-            </PagePaneLink>
-            <PagePaneLink icon={WebhookIcon}>
-              {t("navigation.webhooks")}
-            </PagePaneLink>
-            <PagePaneLink icon={CodeXmlIcon}>
-              {t("navigation.openApi")}
-            </PagePaneLink>
-          </PagePaneGroup>
-        </PagePaneNav>
-      }
-    >
+    <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       {children ? (
         children
       ) : isFormSection(section) ? (
@@ -137,6 +70,6 @@ export function SettingsPage({
       ) : (
         <RoleListPage />
       )}
-    </PageSplit>
+    </div>
   )
 }
