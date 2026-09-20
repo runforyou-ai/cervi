@@ -31,6 +31,7 @@ const workspace = {
       profile: "个人资料",
       security: "账号安全",
       preferences: "个人偏好",
+      devices: "设备",
       general: "通用设置",
       roles: "角色管理",
       employees: "员工",

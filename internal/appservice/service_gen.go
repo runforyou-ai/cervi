@@ -828,3 +828,18 @@ func (s *Service) DeleteMCPServer(ctx context.Context, meta RequestMeta, mcpServ
 func (s *Service) UpdateOrganization(ctx context.Context, meta RequestMeta, input OrganizationInput) (Organization, error) {
 	return withNormalizedSlices(s.backend.UpdateOrganization(ctx, meta, input))
 }
+
+// RegisterDevice 注册当前用户的本机设备。
+func (s *Service) RegisterDevice(ctx context.Context, meta RequestMeta, input DeviceRegistrationInput) (Device, error) {
+	return withNormalizedSlices(s.backend.RegisterDevice(ctx, meta, input))
+}
+
+// ListDevices 返回当前用户已注册的设备。
+func (s *Service) ListDevices(ctx context.Context, meta RequestMeta) (DeviceList, error) {
+	return withNormalizedSlices(s.backend.ListDevices(ctx, meta))
+}
+
+// RevokeDevice 撤销当前用户的设备。
+func (s *Service) RevokeDevice(ctx context.Context, meta RequestMeta, deviceID string) error {
+	return s.backend.RevokeDevice(ctx, meta, deviceID)
+}

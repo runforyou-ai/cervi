@@ -227,6 +227,13 @@ export function CreateUser(meta: $models.RequestMeta, input: $models.CreateUserI
 }
 
 /**
+ * CurrentDevice 返回本机在当前企业服务器上的设备注册状态；不注册设备的平台返回空设备编号。
+ */
+export function CurrentDevice(meta: $models.RequestMeta): $CancellablePromise<$models.LocalDevice> {
+    return $Call.ByID(4090697417, meta);
+}
+
+/**
  * DeactivateAgent 禁用企业 AI 员工账号。
  */
 export function DeactivateAgent(meta: $models.RequestMeta, agentID: string): $CancellablePromise<$models.Agent> {
@@ -640,6 +647,13 @@ export function ListCustomerServiceAssignees(meta: $models.RequestMeta): $Cancel
 }
 
 /**
+ * ListDevices 返回当前用户已注册的设备。
+ */
+export function ListDevices(meta: $models.RequestMeta): $CancellablePromise<$models.DeviceList> {
+    return $Call.ByID(3085172233, meta);
+}
+
+/**
  * ListInboxChannels 返回收件箱渠道筛选候选，含已停用渠道。
  */
 export function ListInboxChannels(meta: $models.RequestMeta): $CancellablePromise<$models.InboxChannelList> {
@@ -878,6 +892,13 @@ export function RefreshMCPServerTools(meta: $models.RequestMeta): $CancellablePr
 }
 
 /**
+ * RegisterDevice 注册当前用户的本机设备。
+ */
+export function RegisterDevice(meta: $models.RequestMeta, input: $models.DeviceRegistrationInput): $CancellablePromise<$models.Device> {
+    return $Call.ByID(2919513041, meta, input);
+}
+
+/**
  * RemoveGroupConversationMember 移除单个群聊成员。
  */
 export function RemoveGroupConversationMember(meta: $models.RequestMeta, conversationID: string, input: $models.GroupConversationMemberInput): $CancellablePromise<$models.GroupConversation> {
@@ -952,6 +973,13 @@ export function RetryKnowledgeDocument(meta: $models.RequestMeta, knowledgeBaseI
  */
 export function RetryKnowledgeQAEntry(meta: $models.RequestMeta, knowledgeBaseID: string, entryID: string): $CancellablePromise<void> {
     return $Call.ByID(3560499234, meta, knowledgeBaseID, entryID);
+}
+
+/**
+ * RevokeDevice 撤销当前用户的设备。
+ */
+export function RevokeDevice(meta: $models.RequestMeta, deviceID: string): $CancellablePromise<void> {
+    return $Call.ByID(689496250, meta, deviceID);
 }
 
 /**

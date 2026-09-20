@@ -14,22 +14,25 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
-// nativeStorage 组合原生端连接和登录凭据存储能力。
-type nativeStorage interface {
-	apiproxy.Store
-	clientsession.Store
+// deviceRegistrar 把本机注册为企业设备；不注册设备的原生平台为空。
+type deviceRegistrar interface {
+	appservice.LocalDeviceReporter
+	// Start 开始注册循环。
+	Start()
+	// Stop 结束注册循环并等待其退出。
+	Stop()
 }
 
-// applicationServices 创建原生端使用的远程应用服务。
+// applicationServices 创建原生端使用的远程应用服务和本机设备注册器。
 func applicationServices(
 	appStorage nativeStorage,
 	nativeLocaleUpdater appservice.NativeLocaleUpdater,
 	notification appservice.NativeNotification,
 	unreadIndicator appservice.UnreadIndicator,
-) ([]application.Service, error) {
+) ([]application.Service, deviceRegistrar, error) {
 	sessions, err := clientsession.NewManager(context.Background(), appStorage)
 	if err != nil {
-		return nil, fmt.Errorf("initialize client session: %w", err)
+		return nil, nil, fmt.Errorf("initialize client session: %w", err)
 	}
 	backend, err := apiproxy.NewBackend(appStorage, sessions, func(name string, data any) {
 		application.Get().Event.Emit(name, data)
@@ -42,20 +45,24 @@ func applicationServices(
 		return strconv.FormatUint(uint64(window.ID()), 10)
 	})
 	if err != nil {
-		return nil, fmt.Errorf("initialize remote application backend: %w", err)
+		return nil, nil, fmt.Errorf("initialize remote application backend: %w", err)
 	}
-	service := appservice.New(
-		backend,
+	options := []appservice.Option{
 		appservice.WithImageSelector(appservicenative.NewImageSelector()),
 		appservice.WithNativeLocaleUpdater(nativeLocaleUpdater),
 		appservice.WithNativeNotification(notification),
 		appservice.WithUnreadIndicator(unreadIndicator),
 		appservice.WithExternalPageOpener(appservicenative.NewExternalPageOpener()),
 		appservice.WithConversationWindowOpener(appservicenative.NewConversationWindowOpener()),
-	)
+	}
+	registrar := newDeviceRegistrar(appStorage, backend, sessions)
+	if registrar != nil {
+		options = append(options, appservice.WithLocalDevice(registrar))
+	}
+	service := appservice.New(backend, options...)
 	return []application.Service{
 		application.NewServiceWithOptions(service, application.ServiceOptions{
 			MarshalError: appservice.MarshalError,
 		}),
-	}, nil
+	}, registrar, nil
 }

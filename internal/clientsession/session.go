@@ -5,6 +5,7 @@ import (
 	"context"
 	"fmt"
 	"log/slog"
+	"slices"
 	"sync"
 	"time"
 )
@@ -33,6 +34,9 @@ type Manager struct {
 	store   Store
 	mu      sync.Mutex
 	current *Credential
+
+	observerMu sync.Mutex
+	observers  []func()
 }
 
 // NewManager 从持久化存储恢复原生端当前登录凭据。
@@ -56,6 +60,23 @@ func NewManager(ctx context.Context, store Store) (*Manager, error) {
 	manager.current = &credential
 	slog.Info("已恢复原生端登录会话", "server_url", credential.ServerURL, "organization_id", credential.OrganizationID, "user_id", credential.UserID, "expires_at", credential.ExpiresAt)
 	return manager, nil
+}
+
+// Subscribe 登记登录凭据变化的观察者；观察者在建立和清除凭据后被调用，必须立即返回且不得回调 Manager。
+func (m *Manager) Subscribe(observer func()) {
+	m.observerMu.Lock()
+	defer m.observerMu.Unlock()
+	m.observers = append(m.observers, observer)
+}
+
+// notify 通知全部观察者登录凭据已变化。
+func (m *Manager) notify() {
+	m.observerMu.Lock()
+	observers := slices.Clone(m.observers)
+	m.observerMu.Unlock()
+	for _, observer := range observers {
+		observer()
+	}
 }
 
 // Current 返回指定企业服务器当前有效的登录凭据。
@@ -86,6 +107,7 @@ func (m *Manager) Establish(ctx context.Context, credential Credential) error {
 		return fmt.Errorf("save client session: %w", err)
 	}
 	m.current = &credential
+	m.notify()
 	slog.Info("原生端登录会话已建立", "server_url", credential.ServerURL, "organization_id", credential.OrganizationID, "user_id", credential.UserID, "expires_at", credential.ExpiresAt)
 	return nil
 }
@@ -99,6 +121,7 @@ func (m *Manager) Clear(ctx context.Context) error {
 		return fmt.Errorf("delete client session: %w", err)
 	}
 	m.current = nil
+	m.notify()
 	if credential != nil {
 		slog.Info("原生端登录会话已清除", "server_url", credential.ServerURL, "organization_id", credential.OrganizationID, "user_id", credential.UserID)
 	}
@@ -118,6 +141,7 @@ func (m *Manager) ClearIfCurrent(ctx context.Context, rejected Credential) error
 		return fmt.Errorf("delete rejected client session: %w", err)
 	}
 	m.current = nil
+	m.notify()
 	slog.Info("服务端拒绝原生端登录凭据，已清除会话", "server_url", rejected.ServerURL, "organization_id", rejected.OrganizationID, "user_id", rejected.UserID)
 	return nil
 }

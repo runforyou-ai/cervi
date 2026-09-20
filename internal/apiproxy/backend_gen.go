@@ -1251,6 +1251,27 @@ func (b *Backend) UpdateOrganization(ctx context.Context, meta appservice.Reques
 	return output, err
 }
 
+// RegisterDevice 注册当前用户的本机设备。
+func (b *Backend) RegisterDevice(ctx context.Context, meta appservice.RequestMeta, input appservice.DeviceRegistrationInput) (appservice.Device, error) {
+	var output appservice.Device
+	err := b.do(ctx, meta, http.MethodPost, "/devices", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// ListDevices 返回当前用户已注册的设备。
+func (b *Backend) ListDevices(ctx context.Context, meta appservice.RequestMeta) (appservice.DeviceList, error) {
+	var output appservice.DeviceList
+	err := b.do(ctx, meta, http.MethodGet, "/devices", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// RevokeDevice 撤销当前用户的设备。
+func (b *Backend) RevokeDevice(ctx context.Context, meta appservice.RequestMeta, deviceID string) error {
+	return b.do(ctx, meta, http.MethodDelete, "/devices/"+url.PathEscape(deviceID), nil, nil, nil)
+}
+
 // encodeAgentListInputQuery 将 appservice.AgentListInput 编码为查询参数。
 func encodeAgentListInputQuery(input appservice.AgentListInput) url.Values {
 	query := url.Values{}

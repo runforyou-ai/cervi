@@ -121,6 +121,10 @@ export const resourceKeys = {
   mcpServers: () => ["mcp-servers"],
   /** 单个 MCP 服务。 */
   mcpServer: (id?: string) => itemKey("mcp-server", id),
+  /** 当前用户已注册的设备列表。 */
+  devices: () => ["devices"],
+  /** 本机在当前企业服务器上的设备注册状态。 */
+  currentDevice: () => ["current-device"],
   /** 知识库列表。 */
   knowledgeBases: () => ["knowledge-bases"],
   /** 单个知识库。 */

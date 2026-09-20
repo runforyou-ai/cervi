@@ -180,6 +180,9 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.PUT("/integrations/mcp-servers/:mcpServerID", s.updateMCPServer)
 	router.DELETE("/integrations/mcp-servers/:mcpServerID", s.deleteMCPServer)
 	router.PUT("/settings/organization", s.updateOrganization)
+	router.POST("/devices", s.registerDevice)
+	router.GET("/devices", s.listDevices)
+	router.DELETE("/devices/:deviceID", s.revokeDevice)
 }
 
 // installationStatus 返回服务端初始化状态和公开企业名称。
@@ -1528,6 +1531,27 @@ func (s *Service) updateOrganization(c *gin.Context) {
 	}
 	output, err := s.application.UpdateOrganization(c.Request.Context(), requestMeta(c), input)
 	writeResult(c, http.StatusOK, output, err)
+}
+
+// registerDevice 注册当前用户的本机设备。
+func (s *Service) registerDevice(c *gin.Context) {
+	var input appservice.DeviceRegistrationInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.RegisterDevice(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// listDevices 返回当前用户已注册的设备。
+func (s *Service) listDevices(c *gin.Context) {
+	output, err := s.application.ListDevices(c.Request.Context(), requestMeta(c))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// revokeDevice 撤销当前用户的设备。
+func (s *Service) revokeDevice(c *gin.Context) {
+	writeEmpty(c, s.application.RevokeDevice(c.Request.Context(), requestMeta(c), c.Param("deviceID")))
 }
 
 // bindAgentListInputQuery 从查询参数解析 appservice.AgentListInput。

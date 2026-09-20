@@ -8,6 +8,7 @@ const settings = {
     profile: "Profile",
     security: "Login & security",
     preferences: "Preferences",
+    devices: "Devices",
     general: "General",
     roles: "Roles and permissions",
   },
@@ -49,6 +50,33 @@ const settings = {
   },
   security: {
     title: "Login & security",
+  },
+  devices: {
+    title: "Devices",
+    list: {
+      columns: {
+        name: "Device",
+        platform: "Platform",
+        runtimeVersion: "Client version",
+        createdAt: "Registered",
+      },
+      current: "This device",
+      empty: "No devices yet. Install the Cervi desktop app on a computer and sign in, and it will show up here.",
+      loadError: "Could not load your devices.",
+    },
+    platforms: {
+      macos: "macOS",
+      windows: "Windows",
+      linux: "Linux",
+    },
+    revoke: {
+      action: "Revoke device",
+      title: "Revoke “{{name}}”?",
+      description: "The device is no longer trusted once revoked. Signing in to Cervi again on that device registers it anew.",
+      pending: "Revoking…",
+      success: "Device revoked.",
+      error: "Could not revoke the device. Try again.",
+    },
   },
   preferences: {
     title: "Preferences",
