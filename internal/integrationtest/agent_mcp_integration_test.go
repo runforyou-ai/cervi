@@ -418,7 +418,7 @@ func testAgentRunMCPServices(t *testing.T, db *bun.DB, owner *servermodels.Ident
 		if err != nil {
 			return agentruntime.RunResult{}, err
 		}
-		servers = request.MCPServers
+		servers = request.MCPConnections
 		return agentruntime.RunResult{Content: "已调用工具", EndSeq: claimed.EndSeq}, nil
 	}}
 	if err := agentrunaction.NewExecuteAction(db, tasks, runtime, testAttachmentReader(db), nil).Execute(ctx, agentrunaction.RunInput{RunID: run.ID}); err != nil {
