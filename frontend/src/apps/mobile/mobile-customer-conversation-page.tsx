@@ -27,6 +27,7 @@ import {
 } from "@/components/ui/dropdown-menu"
 import {
   CustomerSessionCloseDialog,
+  CustomerTransferMenuItems,
   customerReplyDisabledReason,
   customerReplySupported,
   useCustomerSessionActions,
@@ -56,7 +57,7 @@ function MobileCustomerSessionMenu({
       void invalidate(resourceKeys.conversationSummary(conversation.id))
     },
   )
-  const { operation, transferCandidates } = actions
+  const { operation } = actions
 
   return (
     <>
@@ -93,20 +94,8 @@ function MobileCustomerSessionMenu({
                 ? t("conversationTakeover")
                 : t("conversationClaim")}
             </DropdownMenuItem>
-          ) : !actions.transferable ? null : transferCandidates.length === 0 ? (
-            <DropdownMenuItem className="min-h-11" disabled>
-              {t("conversationTransferEmpty")}
-            </DropdownMenuItem>
-          ) : (
-            transferCandidates.map((assignee) => (
-              <DropdownMenuItem
-                key={assignee.identityId}
-                className="min-h-11"
-                onSelect={() => void actions.transfer(assignee)}
-              >
-                {t("conversationTransferTo", { name: assignee.displayName })}
-              </DropdownMenuItem>
-            ))
+          ) : !actions.transferable ? null : (
+            <CustomerTransferMenuItems actions={actions} itemClassName="min-h-11" />
           )}
           {actions.closable ? (
             <DropdownMenuItem

@@ -89,3 +89,18 @@ func customerHandlingIdentityQuery(db bun.IDB, model any, organizationID string)
 		Column("oi.id", "oi.organization_id", "oi.type", "oi.role_id", "oi.display_name", "oi.avatar_file_id", "oi.handles_customers").
 		Where("oi.organization_id = ?", organizationID))
 }
+
+// TeamCustomerHandlerQuery 构造团队内开启接待真人成员的存在性查询，调用方以 oi 与 tm 别名追加企业和团队条件。
+func TeamCustomerHandlerQuery(db bun.IDB) *bun.SelectQuery {
+	return ApplyCustomerHandlingConditions(db.NewSelect().
+		TableExpr("organization_identities AS oi").ColumnExpr("1").
+		Join("JOIN team_members AS tm ON tm.organization_id = oi.organization_id AND tm.identity_id = oi.id").
+		Where("oi.type = ?", domain.OrganizationIdentityTypeUser))
+}
+
+// TeamHasCustomerHandler 判断团队内是否存在开启接待的有效真人成员。
+func TeamHasCustomerHandler(ctx context.Context, db bun.IDB, organizationID, teamID string) (bool, error) {
+	return TeamCustomerHandlerQuery(db).
+		Where("oi.organization_id = ? AND tm.team_id = ?", organizationID, teamID).
+		Exists(ctx)
+}

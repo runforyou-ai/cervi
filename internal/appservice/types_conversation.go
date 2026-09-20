@@ -172,9 +172,11 @@ type CustomerReplySuggestions struct {
 	Candidates []string `json:"candidates"`
 }
 
-// TransferServiceSessionInput 定义客服处理周期转交目标。
+// TransferServiceSessionInput 定义客服处理周期的转交去向；成员去向填 identityId，团队去向填 teamId，公共队列两者都不填。
 type TransferServiceSessionInput struct {
-	AssigneeIdentityID string `json:"assigneeIdentityId"`
+	Kind       ServiceSessionTargetKind `json:"kind"`
+	TeamID     string                   `json:"teamId"`
+	IdentityID string                   `json:"identityId"`
 }
 
 // CustomerServiceSession 定义客户会话最新客服处理周期。

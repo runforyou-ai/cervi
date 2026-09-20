@@ -5,6 +5,7 @@ import { useSearchParams } from "react-router"
 import {
   ConversationType,
   CustomerInboxView,
+  CustomerQueueFilter,
   InboxScope,
   ServiceSessionStatus,
   type InboxQuery,
@@ -50,6 +51,8 @@ export function InboxRoute() {
   function updateQuery(changes: {
     scope?: InboxScope
     customerView?: CustomerInboxView
+    queueFilter?: CustomerQueueFilter
+    queueTeamId?: string
     assigneeIdentityId?: string
     channelId?: string
     serviceStatus?: ServiceSessionStatus
@@ -90,6 +93,8 @@ export function InboxRoute() {
       listViewport={viewport}
       scope={query.scope}
       customerView={query.customerView}
+      queueFilter={query.queueFilter}
+      queueTeamId={query.queueTeamId}
       assigneeIdentityId={query.assigneeIdentityId}
       channelId={query.channelId}
       serviceStatus={query.serviceStatus}

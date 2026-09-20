@@ -3,6 +3,7 @@ import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "re
 
 import {
   CustomerInboxView,
+  CustomerQueueFilter,
   InboxPartition,
   InboxScope,
   InboxSearchRange,
@@ -90,6 +91,8 @@ export function useInboxSearchResults({
       : {
           scope: InboxScope.InboxScopeAll,
           customerView: CustomerInboxView.CustomerInboxViewQueue,
+          queueFilter: CustomerQueueFilter.CustomerQueueFilterAll,
+          queueTeamId: "",
           assigneeIdentityId: "",
           channelId: "",
           serviceStatus: ServiceSessionStatus.ServiceSessionStatusOpen,

@@ -234,7 +234,7 @@ func testAgentTelegramReplies(t *testing.T, db *bun.DB, identity *models.Identit
 		if n, err := db.NewSelect().Model((*models.AgentRun)(nil)).Where("agr.conversation_id = ?", f.run.ConversationID).Count(ctx); err != nil || n != 1 {
 			t.Fatalf("human runs=%d err=%v", n, err)
 		}
-		if _, err := conversationaction.NewTransferServiceSessionAction(db, executor, agentrunaction.NewScheduler(f.tasks)).Execute(ctx, identity, conversationaction.TransferServiceSessionInput{ConversationID: f.run.ConversationID, AssigneeIdentityID: f.run.AgentIdentityID}); err != nil {
+		if _, err := conversationaction.NewTransferServiceSessionAction(db, executor, agentrunaction.NewScheduler(f.tasks)).Execute(ctx, identity, conversationaction.TransferServiceSessionInput{ConversationID: f.run.ConversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: f.run.AgentIdentityID}); err != nil {
 			t.Fatal(err)
 		}
 		if n, err := db.NewSelect().Model((*models.AgentRun)(nil)).Where("agr.conversation_id = ? AND agr.status = ?", f.run.ConversationID, domain.AgentRunStatusQueued).Count(ctx); err != nil || n != 1 {

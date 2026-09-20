@@ -482,7 +482,7 @@ func TestProfileInvalidationLockOrder(t *testing.T) {
 	}
 	// 转交会追加系统事件，按实测记录一次转交对客户会话版本的推进次数。
 	beforeTransfer := loadConversationVersion(t, f.db, f.conversationID)
-	if _, err := conversationaction.NewTransferServiceSessionAction(f.db, newGroupAgentCoordinator(f.db), nil).Execute(ctx, f.member, conversationaction.TransferServiceSessionInput{ConversationID: f.conversationID, AssigneeIdentityID: f.owner.OrganizationIdentity.ID}); err != nil {
+	if _, err := conversationaction.NewTransferServiceSessionAction(f.db, newGroupAgentCoordinator(f.db), nil).Execute(ctx, f.member, conversationaction.TransferServiceSessionInput{ConversationID: f.conversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: f.owner.OrganizationIdentity.ID}); err != nil {
 		t.Fatal(err)
 	}
 	transferDelta := loadConversationVersion(t, f.db, f.conversationID) - beforeTransfer
@@ -515,7 +515,7 @@ func TestProfileInvalidationLockOrder(t *testing.T) {
 	}()
 	transferred := make(chan error, 1)
 	go func() {
-		_, err := conversationaction.NewTransferServiceSessionAction(f.db, newGroupAgentCoordinator(f.db), nil).Execute(ctx, f.owner, conversationaction.TransferServiceSessionInput{ConversationID: f.conversationID, AssigneeIdentityID: f.member.OrganizationIdentity.ID})
+		_, err := conversationaction.NewTransferServiceSessionAction(f.db, newGroupAgentCoordinator(f.db), nil).Execute(ctx, f.owner, conversationaction.TransferServiceSessionInput{ConversationID: f.conversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: f.member.OrganizationIdentity.ID})
 		transferred <- err
 	}()
 	// 两个写入都进入锁等待后再放行改名事务。

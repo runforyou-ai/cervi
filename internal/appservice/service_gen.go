@@ -99,6 +99,11 @@ func (s *Service) ListCustomerServiceAssignees(ctx context.Context, meta Request
 	return withNormalizedSlices(s.backend.ListCustomerServiceAssignees(ctx, meta))
 }
 
+// ListServiceQueueTeams 返回可作为客服队列的团队，本人所在团队排在前面。
+func (s *Service) ListServiceQueueTeams(ctx context.Context, meta RequestMeta) (ServiceQueueTeamList, error) {
+	return withNormalizedSlices(s.backend.ListServiceQueueTeams(ctx, meta))
+}
+
 // ListInboxChannels 返回收件箱渠道筛选候选，含已停用渠道。
 func (s *Service) ListInboxChannels(ctx context.Context, meta RequestMeta) (InboxChannelList, error) {
 	return withNormalizedSlices(s.backend.ListInboxChannels(ctx, meta))
@@ -224,7 +229,7 @@ func (s *Service) ClaimServiceSession(ctx context.Context, meta RequestMeta, con
 	return withNormalizedSlices(s.backend.ClaimServiceSession(ctx, meta, conversationID))
 }
 
-// TransferServiceSession 把当前负责的处理周期转给另一位客服。
+// TransferServiceSession 把当前负责的处理周期转给成员、团队队列或公共队列。
 func (s *Service) TransferServiceSession(ctx context.Context, meta RequestMeta, conversationID string, input TransferServiceSessionInput) (CustomerServiceSession, error) {
 	return withNormalizedSlices(s.backend.TransferServiceSession(ctx, meta, conversationID, input))
 }

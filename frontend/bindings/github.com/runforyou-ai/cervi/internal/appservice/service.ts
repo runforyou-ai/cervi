@@ -717,6 +717,13 @@ export function ListRoles(meta: $models.RequestMeta): $CancellablePromise<$model
 }
 
 /**
+ * ListServiceQueueTeams 返回可作为客服队列的团队，本人所在团队排在前面。
+ */
+export function ListServiceQueueTeams(meta: $models.RequestMeta): $CancellablePromise<$models.ServiceQueueTeamList> {
+    return $Call.ByID(1365762758, meta);
+}
+
+/**
  * ListTeamMemberCandidates 返回尚未加入团队的企业身份。
  */
 export function ListTeamMemberCandidates(meta: $models.RequestMeta, teamID: string, input: $models.TeamMemberCandidateInput): $CancellablePromise<$models.TeamMemberCandidateList> {
@@ -1116,7 +1123,7 @@ export function TransferGroupConversationOwner(meta: $models.RequestMeta, conver
 }
 
 /**
- * TransferServiceSession 把当前负责的处理周期转给另一位客服。
+ * TransferServiceSession 把当前负责的处理周期转给成员、团队队列或公共队列。
  */
 export function TransferServiceSession(meta: $models.RequestMeta, conversationID: string, input: $models.TransferServiceSessionInput): $CancellablePromise<$models.CustomerServiceSession> {
     return $Call.ByID(2034510468, meta, conversationID, input);

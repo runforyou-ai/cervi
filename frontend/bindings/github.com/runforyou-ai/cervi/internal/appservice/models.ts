@@ -1293,6 +1293,12 @@ export interface CustomerInboxConversation {
     "assignee": InboxAssignee | null;
 
     /**
+     * TeamID 与 TeamName 是处理周期所属的团队队列，为空表示公共队列。
+     */
+    "teamId": string | null;
+    "teamName": string | null;
+
+    /**
      * AttachmentSupported 表示来源渠道当前支持向客户发送附件。
      */
     "attachmentSupported": boolean;
@@ -1339,6 +1345,20 @@ export interface CustomerMessageDelivery {
     "status": CustomerDeliveryStatus;
     "lastError": string;
 }
+
+/**
+ * CustomerQueueFilter 表示「待分配」视图的队列筛选。
+ */
+export enum CustomerQueueFilter {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    CustomerQueueFilterAll = "all",
+    CustomerQueueFilterPublic = "public",
+    CustomerQueueFilterTeam = "team",
+};
 
 /**
  * CustomerReplyAgent 定义可用于 AI 写回复的 AI 员工。
@@ -1886,6 +1906,8 @@ export interface InboxQuery {
     "partition": InboxPartition;
     "scope": InboxScope;
     "customerView": CustomerInboxView;
+    "queueFilter": CustomerQueueFilter;
+    "queueTeamId": string;
     "assigneeIdentityId": string;
     "channelId": string;
     "serviceStatus": ServiceSessionStatus;
@@ -1917,6 +1939,8 @@ export interface InboxSearchInput {
     "conversationId": string;
     "scope": InboxScope;
     "customerView": CustomerInboxView;
+    "queueFilter": CustomerQueueFilter;
+    "queueTeamId": string;
     "assigneeIdentityId": string;
     "channelId": string;
     "serviceStatus": ServiceSessionStatus;
@@ -2451,6 +2475,8 @@ export interface LoadInboxInput {
     "partition": InboxPartition;
     "scope": InboxScope;
     "customerView": CustomerInboxView;
+    "queueFilter": CustomerQueueFilter;
+    "queueTeamId": string;
     "assigneeIdentityId": string;
     "channelId": string;
     "serviceStatus": ServiceSessionStatus;
@@ -2932,6 +2958,31 @@ export interface RoleSummary {
 }
 
 /**
+ * ServiceQueueTeam 定义可作为客服队列的团队。
+ */
+export interface ServiceQueueTeam {
+    "id": string;
+    "name": string;
+
+    /**
+     * Mine 表示当前成员属于该团队。
+     */
+    "mine": boolean;
+
+    /**
+     * Available 表示团队内有开启接待的真人成员，可以承接队列会话。
+     */
+    "available": boolean;
+}
+
+/**
+ * ServiceQueueTeamList 定义客服队列团队列表。
+ */
+export interface ServiceQueueTeamList {
+    "teams": ServiceQueueTeam[] | null;
+}
+
+/**
  * ServiceSessionReturnReason 表示客服处理周期退回队列的原因。
  */
 export enum ServiceSessionReturnReason {
@@ -3196,10 +3247,12 @@ export enum TelegramWebhookStatus {
 };
 
 /**
- * TransferServiceSessionInput 定义客服处理周期转交目标。
+ * TransferServiceSessionInput 定义客服处理周期的转交去向；成员去向填 identityId，团队去向填 teamId，公共队列两者都不填。
  */
 export interface TransferServiceSessionInput {
-    "assigneeIdentityId": string;
+    "kind": ServiceSessionTargetKind;
+    "teamId": string;
+    "identityId": string;
 }
 
 /**

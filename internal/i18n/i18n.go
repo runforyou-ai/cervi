@@ -258,6 +258,7 @@ const (
 	ErrorAttachmentTooLarge               Key = "error.attachment_too_large"
 	ErrorAttachmentCaptionTooLong         Key = "error.attachment_caption_too_long"
 	ErrorServiceSessionAlreadyOpen        Key = "error.service_session_already_open"
+	ErrorTransferTeamUnavailable          Key = "error.transfer_team_unavailable"
 	ErrorServiceSessionUpdateFailed       Key = "error.service_session_update_failed"
 	ErrorWebsiteMessengerLoadFailed       Key = "error.website_messenger_load_failed"
 
@@ -360,6 +361,8 @@ const (
 	FieldChannelIDInvalid                 Key = "field.channel_id_invalid"
 	FieldConversationIDInvalid            Key = "field.conversation_id_invalid"
 	FieldTargetIdentityIDInvalid          Key = "field.target_identity_id_invalid"
+	FieldTargetTeamIDInvalid              Key = "field.target_team_id_invalid"
+	FieldTransferTargetInvalid            Key = "field.transfer_target_invalid"
 	FieldGroupTitleRequired               Key = "field.group_title_required"
 	FieldGroupTitleTooLong                Key = "field.group_title_too_long"
 	FieldGroupDescriptionTooLong          Key = "field.group_description_too_long"

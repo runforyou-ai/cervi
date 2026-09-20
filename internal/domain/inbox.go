@@ -19,6 +19,15 @@ const (
 	CustomerInboxViewMentioned CustomerInboxView = "mentioned"
 )
 
+// CustomerQueueFilter 定义「待分配」视图的队列筛选：all 为全部队列，public 为公共队列，team 为指定团队。
+type CustomerQueueFilter string
+
+const (
+	CustomerQueueFilterAll    CustomerQueueFilter = "all"
+	CustomerQueueFilterPublic CustomerQueueFilter = "public"
+	CustomerQueueFilterTeam   CustomerQueueFilter = "team"
+)
+
 // InboxPartition 定义统一收件箱的置顶分区，未指定时按完整活动序返回全部会话。
 type InboxPartition string
 

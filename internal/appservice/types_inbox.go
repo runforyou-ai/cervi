@@ -77,11 +77,22 @@ type ConversationPinState struct {
 	PinOrderVersion string `json:"pinOrderVersion"`
 }
 
+// CustomerQueueFilter 表示「待分配」视图的队列筛选。
+type CustomerQueueFilter string
+
+const (
+	CustomerQueueFilterAll    CustomerQueueFilter = CustomerQueueFilter(domain.CustomerQueueFilterAll)
+	CustomerQueueFilterPublic CustomerQueueFilter = CustomerQueueFilter(domain.CustomerQueueFilterPublic)
+	CustomerQueueFilterTeam   CustomerQueueFilter = CustomerQueueFilter(domain.CustomerQueueFilterTeam)
+)
+
 // InboxQuery 定义与分页边界无关的会话筛选；search 非空时按会话名称搜索，searchRange 为 list 时沿用列表筛选，为 readable 时覆盖全部可读会话且不带其他列表筛选。
 type InboxQuery struct {
 	Partition          InboxPartition       `json:"partition" query:"partition"`
 	Scope              InboxScope           `json:"scope" query:"scope"`
 	CustomerView       CustomerInboxView    `json:"customerView" query:"customerView"`
+	QueueFilter        CustomerQueueFilter  `json:"queueFilter" query:"queueFilter"`
+	QueueTeamID        string               `json:"queueTeamId" query:"queueTeamId"`
 	AssigneeIdentityID string               `json:"assigneeIdentityId" query:"assigneeIdentityId"`
 	ChannelID          string               `json:"channelId" query:"channelId"`
 	ServiceStatus      ServiceSessionStatus `json:"serviceStatus" query:"serviceStatus"`
@@ -95,6 +106,8 @@ type LoadInboxInput struct {
 	Partition          InboxPartition       `json:"partition" query:"partition"`
 	Scope              InboxScope           `json:"scope" query:"scope"`
 	CustomerView       CustomerInboxView    `json:"customerView" query:"customerView"`
+	QueueFilter        CustomerQueueFilter  `json:"queueFilter" query:"queueFilter"`
+	QueueTeamID        string               `json:"queueTeamId" query:"queueTeamId"`
 	AssigneeIdentityID string               `json:"assigneeIdentityId" query:"assigneeIdentityId"`
 	ChannelID          string               `json:"channelId" query:"channelId"`
 	ServiceStatus      ServiceSessionStatus `json:"serviceStatus" query:"serviceStatus"`
@@ -111,6 +124,7 @@ func (input LoadInboxInput) query() InboxQuery {
 	return InboxQuery{
 		Partition: input.Partition,
 		Scope:     input.Scope, CustomerView: input.CustomerView, AssigneeIdentityID: input.AssigneeIdentityID,
+		QueueFilter: input.QueueFilter, QueueTeamID: input.QueueTeamID,
 		ChannelID: input.ChannelID, ServiceStatus: input.ServiceStatus, Kinds: input.Kinds,
 		Search: input.Search, SearchRange: input.SearchRange,
 	}
@@ -127,6 +141,21 @@ type InboxAssignee struct {
 // CustomerServiceAssigneeList 定义客服筛选候选列表。
 type CustomerServiceAssigneeList struct {
 	Assignees []InboxAssignee `json:"assignees"`
+}
+
+// ServiceQueueTeam 定义可作为客服队列的团队。
+type ServiceQueueTeam struct {
+	ID   string `json:"id"`
+	Name string `json:"name"`
+	// Mine 表示当前成员属于该团队。
+	Mine bool `json:"mine"`
+	// Available 表示团队内有开启接待的真人成员，可以承接队列会话。
+	Available bool `json:"available"`
+}
+
+// ServiceQueueTeamList 定义客服队列团队列表。
+type ServiceQueueTeamList struct {
+	Teams []ServiceQueueTeam `json:"teams"`
 }
 
 // InboxChannel 定义收件箱渠道筛选候选。
@@ -168,6 +197,9 @@ type CustomerInboxConversation struct {
 	ServiceSessionStatus ServiceSessionStatus `json:"serviceSessionStatus"`
 	ServiceSessionID     string               `json:"serviceSessionId"`
 	Assignee             *InboxAssignee       `json:"assignee"`
+	// TeamID 与 TeamName 是处理周期所属的团队队列，为空表示公共队列。
+	TeamID   *string `json:"teamId"`
+	TeamName *string `json:"teamName"`
 	// AttachmentSupported 表示来源渠道当前支持向客户发送附件。
 	AttachmentSupported bool `json:"attachmentSupported"`
 	// AttachmentByteLimit 是来源渠道单个外发附件的字节上限。
@@ -336,6 +368,8 @@ type InboxSearchInput struct {
 	ConversationID     string               `json:"conversationId" query:"conversationId"`
 	Scope              InboxScope           `json:"scope" query:"scope"`
 	CustomerView       CustomerInboxView    `json:"customerView" query:"customerView"`
+	QueueFilter        CustomerQueueFilter  `json:"queueFilter" query:"queueFilter"`
+	QueueTeamID        string               `json:"queueTeamId" query:"queueTeamId"`
 	AssigneeIdentityID string               `json:"assigneeIdentityId" query:"assigneeIdentityId"`
 	ChannelID          string               `json:"channelId" query:"channelId"`
 	ServiceStatus      ServiceSessionStatus `json:"serviceStatus" query:"serviceStatus"`

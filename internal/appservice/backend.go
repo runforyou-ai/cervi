@@ -83,6 +83,9 @@ type Backend interface {
 	// ListCustomerServiceAssignees 返回有效真人和 AI 客服。
 	//cervi:route GET /inbox/assignees
 	ListCustomerServiceAssignees(context.Context, RequestMeta) (CustomerServiceAssigneeList, error)
+	// ListServiceQueueTeams 返回可作为客服队列的团队，本人所在团队排在前面。
+	//cervi:route GET /inbox/queue-teams
+	ListServiceQueueTeams(context.Context, RequestMeta) (ServiceQueueTeamList, error)
 	// ListInboxChannels 返回收件箱渠道筛选候选，含已停用渠道。
 	//cervi:route GET /inbox/channels
 	ListInboxChannels(context.Context, RequestMeta) (InboxChannelList, error)
@@ -158,7 +161,7 @@ type Backend interface {
 	// ClaimServiceSession 领取或接管客户会话最新处理周期。
 	//cervi:route POST /conversations/:conversationID/claim
 	ClaimServiceSession(context.Context, RequestMeta, string) (CustomerServiceSession, error)
-	// TransferServiceSession 把当前负责的处理周期转给另一位客服。
+	// TransferServiceSession 把当前负责的处理周期转给成员、团队队列或公共队列。
 	//cervi:route POST /conversations/:conversationID/transfer
 	TransferServiceSession(context.Context, RequestMeta, string, TransferServiceSessionInput) (CustomerServiceSession, error)
 	// CloseServiceSession 关闭客户会话最新处理周期。

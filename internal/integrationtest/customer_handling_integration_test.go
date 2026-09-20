@@ -68,17 +68,17 @@ func TestCustomerHandlingAuthorization(t *testing.T) {
 	}
 	transfer := conversationaction.NewTransferServiceSessionAction(f.db, coordinator, agentrunaction.NewScheduler(servertask.New(f.db, serverconfig.NATSConfig{})))
 	_, err = transfer.Execute(ctx, f.owner, conversationaction.TransferServiceSessionInput{
-		ConversationID: f.conversationID, AssigneeIdentityID: f.member.OrganizationIdentity.ID,
+		ConversationID: f.conversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: f.member.OrganizationIdentity.ID,
 	})
 	var validation *conversationaction.ValidationError
-	if !errors.As(err, &validation) || validation.Fields["assigneeIdentityId"] != conversationaction.ValidationTargetIdentityIDInvalid {
+	if !errors.As(err, &validation) || validation.Fields["identityId"] != conversationaction.ValidationTargetIdentityIDInvalid {
 		t.Fatalf("转交给未开启接待的成员 = %v", err)
 	}
 
 	// 开启接待后领取、关闭与重开都可用。
 	setHandlesCustomers(true)
 	if _, err := transfer.Execute(ctx, f.owner, conversationaction.TransferServiceSessionInput{
-		ConversationID: f.conversationID, AssigneeIdentityID: f.member.OrganizationIdentity.ID,
+		ConversationID: f.conversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: f.member.OrganizationIdentity.ID,
 	}); err != nil {
 		t.Fatalf("转交给开启接待的成员 = %v", err)
 	}

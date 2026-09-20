@@ -1705,7 +1705,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatal(err)
 		}
 		_, err = transferServiceSession.Execute(context.Background(), loggedIn.Identity, conversationaction.TransferServiceSessionInput{
-			ConversationID: telegramConversationID, AssigneeIdentityID: createdAgent.IdentityID,
+			ConversationID: telegramConversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: createdAgent.IdentityID,
 		})
 		if err != nil {
 			t.Fatalf("Telegram agent transfer error = %#v", err)
@@ -1863,7 +1863,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		}
 		assertInboxConversationPresence(t, allAfterWebsiteClaim, websiteInbound.Conversation.ID, true)
 		transferredWithoutReply, err := transferServiceSession.Execute(context.Background(), loggedIn.Identity, conversationaction.TransferServiceSessionInput{
-			ConversationID: websiteInbound.Conversation.ID, AssigneeIdentityID: createdAgent.IdentityID,
+			ConversationID: websiteInbound.Conversation.ID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: createdAgent.IdentityID,
 		})
 		if err != nil || transferredWithoutReply.Assignee == nil || transferredWithoutReply.Assignee.IdentityID != createdAgent.IdentityID {
 			t.Fatalf("transfer unparticipated website session = %#v, error = %v", transferredWithoutReply, err)
@@ -1884,7 +1884,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatal(err)
 		}
 		transferredWebsite, err := transferServiceSession.Execute(context.Background(), loggedIn.Identity, conversationaction.TransferServiceSessionInput{
-			ConversationID: websiteInbound.Conversation.ID, AssigneeIdentityID: createdAgent.IdentityID,
+			ConversationID: websiteInbound.Conversation.ID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: createdAgent.IdentityID,
 		})
 		if err != nil || transferredWebsite.Assignee == nil || transferredWebsite.Assignee.IdentityID != createdAgent.IdentityID {
 			t.Fatalf("transfer website session to agent = %#v, error = %v", transferredWebsite, err)
@@ -1949,7 +1949,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatal(err)
 		}
 		if _, err := transferServiceSession.Execute(context.Background(), loggedIn.Identity, conversationaction.TransferServiceSessionInput{
-			ConversationID: websiteInbound.Conversation.ID, AssigneeIdentityID: createdAgent.IdentityID,
+			ConversationID: websiteInbound.Conversation.ID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: createdAgent.IdentityID,
 		}); err != nil {
 			t.Fatal(err)
 		}
@@ -2050,7 +2050,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatalf("cancelled run finalizer error = %v", err)
 		}
 		transferredForCustomerRun, err := transferServiceSession.Execute(context.Background(), loggedIn.Identity, conversationaction.TransferServiceSessionInput{
-			ConversationID: websiteInbound.Conversation.ID, AssigneeIdentityID: createdAgent.IdentityID,
+			ConversationID: websiteInbound.Conversation.ID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: createdAgent.IdentityID,
 		})
 		if err != nil || transferredForCustomerRun.Assignee == nil || transferredForCustomerRun.Assignee.IdentityID != createdAgent.IdentityID {
 			t.Fatalf("transfer website session for customer run = %#v, error = %v", transferredForCustomerRun, err)

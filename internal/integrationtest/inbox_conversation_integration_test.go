@@ -136,7 +136,7 @@ func TestInboxCustomerDetailSnapshot(t *testing.T) {
 		done <- err
 	}()
 	waitChatSignal(t, ctx, gate.reached)
-	if _, err := conversationaction.NewTransferServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil), agentrunaction.NewScheduler(servertask.New(f.db, serverconfig.NATSConfig{}))).Execute(ctx, f.owner, conversationaction.TransferServiceSessionInput{ConversationID: f.conversationID, AssigneeIdentityID: f.member.OrganizationIdentity.ID}); err != nil {
+	if _, err := conversationaction.NewTransferServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil), agentrunaction.NewScheduler(servertask.New(f.db, serverconfig.NATSConfig{}))).Execute(ctx, f.owner, conversationaction.TransferServiceSessionInput{ConversationID: f.conversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: f.member.OrganizationIdentity.ID}); err != nil {
 		t.Fatal(err)
 	}
 	gate.open()

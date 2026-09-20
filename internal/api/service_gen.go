@@ -35,6 +35,7 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.POST("/inbox/conversations/query", s.readInboxConversations)
 	router.GET("/inbox/search", s.searchInbox)
 	router.GET("/inbox/assignees", s.listCustomerServiceAssignees)
+	router.GET("/inbox/queue-teams", s.listServiceQueueTeams)
 	router.GET("/inbox/channels", s.listInboxChannels)
 	router.GET("/sync/heads", s.getSyncHeads)
 	router.GET("/conversations/:conversationID/messages", s.listConversationMessages)
@@ -363,6 +364,12 @@ func (s *Service) listCustomerServiceAssignees(c *gin.Context) {
 	writeResult(c, http.StatusOK, output, err)
 }
 
+// listServiceQueueTeams 返回可作为客服队列的团队，本人所在团队排在前面。
+func (s *Service) listServiceQueueTeams(c *gin.Context) {
+	output, err := s.application.ListServiceQueueTeams(c.Request.Context(), requestMeta(c))
+	writeResult(c, http.StatusOK, output, err)
+}
+
 // listInboxChannels 返回收件箱渠道筛选候选，含已停用渠道。
 func (s *Service) listInboxChannels(c *gin.Context) {
 	output, err := s.application.ListInboxChannels(c.Request.Context(), requestMeta(c))
@@ -574,7 +581,7 @@ func (s *Service) claimServiceSession(c *gin.Context) {
 	writeResult(c, http.StatusOK, output, err)
 }
 
-// transferServiceSession 把当前负责的处理周期转给另一位客服。
+// transferServiceSession 把当前负责的处理周期转给成员、团队队列或公共队列。
 func (s *Service) transferServiceSession(c *gin.Context) {
 	var input appservice.TransferServiceSessionInput
 	if !bindJSON(c, &input) {
@@ -1586,6 +1593,8 @@ func bindInboxSearchInputQuery(c *gin.Context) (appservice.InboxSearchInput, boo
 		ConversationID:     c.Query("conversationId"),
 		Scope:              appservice.InboxScope(c.Query("scope")),
 		CustomerView:       appservice.CustomerInboxView(c.Query("customerView")),
+		QueueFilter:        appservice.CustomerQueueFilter(c.Query("queueFilter")),
+		QueueTeamID:        c.Query("queueTeamId"),
 		AssigneeIdentityID: c.Query("assigneeIdentityId"),
 		ChannelID:          c.Query("channelId"),
 		ServiceStatus:      appservice.ServiceSessionStatus(c.Query("serviceStatus")),
@@ -1657,6 +1666,8 @@ func bindLoadInboxInputQuery(c *gin.Context) (appservice.LoadInboxInput, bool) {
 		Partition:          appservice.InboxPartition(c.Query("partition")),
 		Scope:              appservice.InboxScope(c.Query("scope")),
 		CustomerView:       appservice.CustomerInboxView(c.Query("customerView")),
+		QueueFilter:        appservice.CustomerQueueFilter(c.Query("queueFilter")),
+		QueueTeamID:        c.Query("queueTeamId"),
 		AssigneeIdentityID: c.Query("assigneeIdentityId"),
 		ChannelID:          c.Query("channelId"),
 		ServiceStatus:      appservice.ServiceSessionStatus(c.Query("serviceStatus")),

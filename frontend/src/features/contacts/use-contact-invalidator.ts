@@ -14,6 +14,7 @@ export function useContactInvalidator() {
       resourceKeys.roles(),
       resourceKeys.roleMembers(),
       resourceKeys.customerServiceAssignees(),
+      resourceKeys.serviceQueueTeams(),
       resourceKeys.memberOptions(),
     ]
     // AI 员工的名称、状态和知识库绑定变化后刷新知识库的员工列表。
