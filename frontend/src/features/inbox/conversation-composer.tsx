@@ -784,8 +784,8 @@ export function ConversationComposer({
     return () => window.clearTimeout(timer)
   }, [isSubmitting])
 
-  // 移动端输入内容后附件入口换成发送按钮，并保持到本次发送结束。
-  const showMobileSend = !isBodyEmpty || isSubmitting
+  // 输入内容后附件入口换成发送按钮，并保持到本次发送结束。
+  const showSend = !isBodyEmpty || isSubmitting
   const bodyInput = (
     <Textarea
       {...bodyField}
@@ -796,15 +796,15 @@ export function ConversationComposer({
       id={inputID}
       disabled={isSubmitting}
       readOnly={Boolean(disabledReason)}
-      rows={mobile ? 1 : 3}
+      rows={1}
       aria-label={t(internalNote ? "internalNoteLabel" : "replyLabel")}
       aria-describedby={disabledReason ? `${inputID}-reason` : undefined}
       aria-invalid={form.formState.errors.body ? true : undefined}
       className={cn(
-        "max-h-[200px] resize-none rounded-none border-0 bg-transparent shadow-none caret-primary focus-visible:ring-0 dark:bg-transparent",
-        mobile
-          ? cn("min-h-9 min-w-0 flex-1 px-0.5 py-1.5 md:text-base", disabledReason && "pl-3")
-          : "min-h-20 py-2",
+        "max-h-[200px] min-h-9 min-w-0 flex-1 resize-none rounded-none border-0 bg-transparent px-0.5 py-1.5 shadow-none caret-primary focus-visible:ring-0 dark:bg-transparent",
+        // 移动端正文保持 16px，避免聚焦时缩放。
+        mobile && "md:text-base",
+        disabledReason && "pl-3",
       )}
       onInput={(event) => {
         resizeComposerInput(
@@ -1036,7 +1036,7 @@ export function ConversationComposer({
         <div
           className={cn(
             "border shadow-xs",
-            mobile ? "rounded-[21px]" : "overflow-hidden rounded-xl",
+            "overflow-hidden rounded-[21px]",
             internalNote
               ? "border-amber-500/70 bg-amber-50/60 dark:bg-amber-950/30"
               : "border-input bg-background",
@@ -1071,58 +1071,33 @@ export function ConversationComposer({
               </button>
             </div>
           ) : null}
-          {mobile ? (
-            <>
-              {disabledReason ? (
-                <p id={`${inputID}-reason`} className="truncate border-b px-3 py-1.5 text-xs text-muted-foreground">{disabledReason}</p>
-              ) : null}
-              <div className="flex items-end p-0.5">
-                {disabledReason ? null : emojiTool}
-                {bodyInput}
-                {replyAssistant}
-                {disabledReason ? null : (
-                  <div className={cn("flex", showMobileSend && "hidden")}>{attachmentTool}</div>
-                )}
-                {showMobileSend ? (
-                  <Button
-                    type="submit"
-                    size="icon"
-                    className="relative ml-1 rounded-full after:absolute after:-inset-1 after:content-[''] [&_svg:not([class*='size-'])]:size-5"
-                    disabled={isSubmitting || Boolean(disabledReason) || isBodyEmpty || replyTo?.deleted}
-                    aria-label={t(internalNote ? "internalNoteSave" : "messageSend")}
-                  >
-                    {showSubmitting ? <LoaderCircleIcon className="animate-spin" /> : <ArrowUpIcon />}
-                  </Button>
-                ) : null}
-              </div>
-            </>
-          ) : (
-            <>
-              {bodyInput}
-              <div className="flex items-center justify-between gap-3 px-2.5 pb-2.5">
-                {disabledReason ? (
-                  <div className="flex min-w-0 items-center gap-1">
-                    {replyAssistant}
-                    <p id={`${inputID}-reason`} className="truncate text-xs text-muted-foreground">{disabledReason}</p>
-                  </div>
-                ) : (
-                  <div className="flex items-center gap-1">
-                    {attachmentTool}
-                    {emojiTool}
-                    {replyAssistant}
-                  </div>
-                )}
-                <Button type="submit" size="sm" disabled={isSubmitting || Boolean(disabledReason) || isBodyEmpty || replyTo?.deleted}>
-                  {isSubmitting && showSubmitting ? (
-                    <LoaderCircleIcon className="animate-spin" />
-                  ) : null}
-                  {isSubmitting && showSubmitting
-                    ? t("messageSending")
-                    : t(internalNote ? "internalNoteSave" : "messageSend")}
-                </Button>
-              </div>
-            </>
-          )}
+          {disabledReason ? (
+            <p
+              id={`${inputID}-reason`}
+              className="truncate border-b px-3 py-1.5 text-xs text-muted-foreground"
+            >
+              {disabledReason}
+            </p>
+          ) : null}
+          <div className="flex items-end p-0.5">
+            {disabledReason ? null : emojiTool}
+            {bodyInput}
+            {replyAssistant}
+            {disabledReason ? null : (
+              <div className={cn("flex", showSend && "hidden")}>{attachmentTool}</div>
+            )}
+            {showSend ? (
+              <Button
+                type="submit"
+                size="icon"
+                className="relative ml-1 rounded-full after:absolute after:-inset-1 after:content-[''] [&_svg:not([class*='size-'])]:size-5"
+                disabled={isSubmitting || Boolean(disabledReason) || isBodyEmpty || replyTo?.deleted}
+                aria-label={t(internalNote ? "internalNoteSave" : "messageSend")}
+              >
+                {showSubmitting ? <LoaderCircleIcon className="animate-spin" /> : <ArrowUpIcon />}
+              </Button>
+            ) : null}
+          </div>
         </div>
       </div>
     </form>
