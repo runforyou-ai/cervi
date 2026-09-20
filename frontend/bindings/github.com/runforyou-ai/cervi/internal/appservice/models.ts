@@ -1457,7 +1457,6 @@ export interface Device {
     "id": string;
     "name": string;
     "platform": DevicePlatform;
-    "runtimeVersion": string;
     "createdAt": string;
     "updatedAt": string;
 }
@@ -1490,7 +1489,6 @@ export interface DeviceRegistrationInput {
     "installId": string;
     "name": string;
     "platform": DevicePlatform;
-    "runtimeVersion": string;
 }
 
 /**

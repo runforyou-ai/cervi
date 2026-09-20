@@ -34,7 +34,6 @@ func (a *RegisterDeviceAction) Execute(ctx context.Context, identity *servermode
 		InstallID:      input.InstallID,
 		Name:           input.Name,
 		Platform:       input.Platform,
-		RuntimeVersion: input.RuntimeVersion,
 	}
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
@@ -42,11 +41,10 @@ func (a *RegisterDeviceAction) Execute(ctx context.Context, identity *servermode
 		}
 		_, err := tx.NewInsert().
 			Model(&device).
-			Column("organization_id", "user_id", "install_id", "name", "platform", "runtime_version").
+			Column("organization_id", "user_id", "install_id", "name", "platform").
 			On("CONFLICT (organization_id, user_id, install_id) DO UPDATE").
 			Set("name = EXCLUDED.name").
 			Set("platform = EXCLUDED.platform").
-			Set("runtime_version = EXCLUDED.runtime_version").
 			Set("revoked_at = NULL").
 			Set("updated_at = now()").
 			Returning("*").

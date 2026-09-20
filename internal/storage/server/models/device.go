@@ -19,7 +19,6 @@ type Device struct {
 	InstallID      string                `bun:"install_id"`
 	Name           string                `bun:"name"`
 	Platform       domain.DevicePlatform `bun:"platform"`
-	RuntimeVersion string                `bun:"runtime_version"`
 	RevokedAt      *time.Time            `bun:"revoked_at"`
 	CreatedAt      time.Time             `bun:"created_at"`
 	UpdatedAt      time.Time             `bun:"updated_at"`

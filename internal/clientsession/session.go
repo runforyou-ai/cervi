@@ -62,7 +62,7 @@ func NewManager(ctx context.Context, store Store) (*Manager, error) {
 	return manager, nil
 }
 
-// Subscribe 登记登录凭据变化的观察者；观察者在建立和清除凭据后被调用，必须立即返回且不得回调 Manager。
+// Subscribe 登记登录凭据变化的观察者；观察者在凭据锁释放后被调用，必须尽快返回。
 func (m *Manager) Subscribe(observer func()) {
 	m.observerMu.Lock()
 	defer m.observerMu.Unlock()
@@ -102,46 +102,50 @@ func (m *Manager) Current(ctx context.Context, serverURL string) (Credential, bo
 // Establish 保存并启用新的原生端登录凭据。
 func (m *Manager) Establish(ctx context.Context, credential Credential) error {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	if err := m.store.SaveClientSession(ctx, credential); err != nil {
+		m.mu.Unlock()
 		return fmt.Errorf("save client session: %w", err)
 	}
 	m.current = &credential
-	m.notify()
+	m.mu.Unlock()
 	slog.Info("原生端登录会话已建立", "server_url", credential.ServerURL, "organization_id", credential.OrganizationID, "user_id", credential.UserID, "expires_at", credential.ExpiresAt)
+	m.notify()
 	return nil
 }
 
 // Clear 删除原生端当前登录凭据。
 func (m *Manager) Clear(ctx context.Context) error {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	credential := m.current
 	if err := m.store.DeleteClientSession(ctx); err != nil {
+		m.mu.Unlock()
 		return fmt.Errorf("delete client session: %w", err)
 	}
 	m.current = nil
-	m.notify()
+	m.mu.Unlock()
 	if credential != nil {
 		slog.Info("原生端登录会话已清除", "server_url", credential.ServerURL, "organization_id", credential.OrganizationID, "user_id", credential.UserID)
 	}
+	m.notify()
 	return nil
 }
 
 // ClearIfCurrent 仅在被拒绝的凭据仍是当前会话时删除它。
 func (m *Manager) ClearIfCurrent(ctx context.Context, rejected Credential) error {
 	m.mu.Lock()
-	defer m.mu.Unlock()
 	if m.current == nil ||
 		m.current.ServerURL != rejected.ServerURL ||
 		m.current.Token != rejected.Token {
+		m.mu.Unlock()
 		return nil
 	}
 	if err := m.store.DeleteClientSession(ctx); err != nil {
+		m.mu.Unlock()
 		return fmt.Errorf("delete rejected client session: %w", err)
 	}
 	m.current = nil
-	m.notify()
+	m.mu.Unlock()
 	slog.Info("服务端拒绝原生端登录凭据，已清除会话", "server_url", rejected.ServerURL, "organization_id", rejected.OrganizationID, "user_id", rejected.UserID)
+	m.notify()
 	return nil
 }

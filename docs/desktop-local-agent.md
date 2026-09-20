@@ -40,9 +40,9 @@
 
 服务端新增三张表，每张表一个建表迁移；`agent_runs` 的列与索引变更单独一个迁移。
 
-`devices` 的列清单与认证要求见路线图的「设备注册与认证」。列按批次落地：设备注册批建 `id`、`organization_id`、`user_id`、`install_id`、`name`、`platform`、`runtime_version`、`revoked_at` 和时间戳，`install_id` 由桌面端首次需要时生成并保存在本地，配合唯一索引 `(organization_id, user_id, install_id)` 使同一台机器重装后不产生重复设备；`work_seq` 与 `last_seen_at` 随派发批增量迁移；`tool_manifest jsonb` 是设备最近一次上报的本机工具能力广告、不是允许集，随只读本机工具批增加。`trust_level` 与服务端 Agent 调用设备用的 `capability_manifest` 仍随 P2 增加。
+`devices` 的列清单与认证要求见路线图的「设备注册与认证」。列按批次落地：设备注册批建 `id`、`organization_id`、`user_id`、`install_id`、`name`、`platform`、`revoked_at` 和时间戳，`install_id` 由桌面端首次需要时生成并保存在应用设置中，唯一索引 `(organization_id, user_id, install_id)` 保证同一安装重复注册指向同一台设备；清除应用数据或换一份安装会得到新的安装标识，旧设备仍在列表中，由用户自行撤销。`work_seq` 与 `last_seen_at` 随派发批增量迁移；`runtime_version` 供工具的最低运行时版本判断使用，与 `tool_manifest jsonb`（设备最近一次上报的本机工具能力广告、不是允许集）一并随只读本机工具批增加。`trust_level` 与服务端 Agent 调用设备用的 `capability_manifest` 仍随 P2 增加。
 
-同一安装重新注册即重新授权，撤销标记随之清除；撤销只终止当前授权，设备记录保留，下次登录前该设备不受信任。
+同一安装重新注册即重新授权，撤销标记随之清除；撤销只终止当前授权，设备记录保留，该设备下次启动或重新登录并完成注册前不受信任。
 
 `device_workspaces`：`id`、`organization_id`、`device_id`、`label`、`last_used_at`、时间戳。工作区是一等实体，一台设备可注册多个工作区，一个工作区可被多个会话绑定。
 
@@ -59,7 +59,7 @@
 
 新增唯一索引 `agent_runs_running_workspace_unique`：`(organization_id, execution_workspace_id) WHERE execution_workspace_id IS NOT NULL AND status = 'running'`。同一工作区同一时刻只有一个运行中的 Run，跨会话绑定同一目录时由数据库串行化，设备稍后重试领取。既有的 `agent_runs_active_scope_unique` 继续承担执行范围互斥，不新建第二套。
 
-桌面端 SQLite 新增两张表：`device_registrations`（`server_url`、`organization_id`、`device_id`、`registered_at`，主键为前两列）和 `agent_workspaces`（`workspace_id` 主键、`server_url`、`organization_id`、`path`、`created_at`）。本机安装标识与企业无关，保存在桌面端应用设置的 `device_install_id` 中，一台机器只有一份。桌面端与移动端 SQLite 迁移各自独立，移动端不建这两张表。
+桌面端 SQLite 新增两张表：`device_registrations`（`server_url`、`organization_id`、`user_id`、`device_id`、`registered_at`，主键为前三列；同一台机器上切换账号不互相覆盖）和 `agent_workspaces`（`workspace_id` 主键、`server_url`、`organization_id`、`path`、`created_at`）。本机安装标识与企业无关，保存在桌面端应用设置的 `device_install_id` 中，一台机器只有一份。桌面端与移动端 SQLite 迁移各自独立，移动端不建这两张表。
 
 ## 契约
 
@@ -173,7 +173,7 @@
 
 ## 交付批次
 
-**第 1 批 设备注册与管理。** `devices` 表；设备注册、列表、撤销；桌面端安装标识、登录后自动注册、本机设备状态；个人设置中的设备列表与撤销。验收：同一安装重复注册指向同一台设备并更新上报信息；设备属于注册它的成员，其他成员既看不到也撤销不了；撤销后设备离开列表，同一安装重新注册即恢复；未知平台的注册按字段校验失败。
+**第 1 批 设备注册与管理。** `devices` 表；设备注册、列表、撤销；桌面端安装标识、登录后自动注册（失败按退避重试）、本机设备状态；个人设置中的设备列表与撤销。验收：同一安装重复注册指向同一台设备并更新上报信息；设备属于注册它的成员，其他成员既看不到也撤销不了；撤销后设备离开列表，同一安装重新注册即恢复；未知平台的注册按字段校验失败。
 
 **第 2 批 派发与领取。** `device_workspaces`、`conversation_device_bindings` 两张表，`devices` 增加 `work_seq` 与 `last_seen_at`，`agent_runs` 列变更；工作水位、事件流通知、领取、续租、租约过期失败；运行期与收尾路由连同设备头校验和租约校验一起上线；工作区注册与 AI 单聊会话绑定。取指派一段中与执行位置无关的部分在本批分出，访客提示、进程内取消登记与服务端运行时限留在服务端一侧。桌面端先跑返回固定文本的假运行时，把分布式正确性与运行时可移植性分开验证。验收：设备离线时 Run 排队不丢、上线后领取执行；杀掉桌面端后 Run 按租约失败且群聊轮转继续；停止后本机循环终止；设备撤销后不能领取。
 

@@ -9,7 +9,6 @@ CREATE TABLE devices (
     install_id      text NOT NULL,
     name            text NOT NULL,
     platform        text NOT NULL,
-    runtime_version text NOT NULL DEFAULT '',
     revoked_at      timestamptz
 );
 
@@ -25,7 +24,6 @@ COMMENT ON COLUMN devices.user_id IS '设备主人编号';
 COMMENT ON COLUMN devices.install_id IS '客户端安装标识，同一安装重复注册指向同一设备';
 COMMENT ON COLUMN devices.name IS '设备名称';
 COMMENT ON COLUMN devices.platform IS '设备平台';
-COMMENT ON COLUMN devices.runtime_version IS '设备侧运行时版本';
 COMMENT ON COLUMN devices.revoked_at IS '撤销时间，非空表示该设备当前不受信任';
 
 -- +goose Down

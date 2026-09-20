@@ -17,20 +17,18 @@ const (
 
 // Device 定义成员注册到企业的本机设备。
 type Device struct {
-	ID             string         `json:"id"`
-	Name           string         `json:"name"`
-	Platform       DevicePlatform `json:"platform"`
-	RuntimeVersion string         `json:"runtimeVersion"`
-	CreatedAt      time.Time      `json:"createdAt"`
-	UpdatedAt      time.Time      `json:"updatedAt"`
+	ID        string         `json:"id"`
+	Name      string         `json:"name"`
+	Platform  DevicePlatform `json:"platform"`
+	CreatedAt time.Time      `json:"createdAt"`
+	UpdatedAt time.Time      `json:"updatedAt"`
 }
 
 // DeviceRegistrationInput 定义设备注册上报的本机信息。
 type DeviceRegistrationInput struct {
-	InstallID      string         `json:"installId"`
-	Name           string         `json:"name"`
-	Platform       DevicePlatform `json:"platform"`
-	RuntimeVersion string         `json:"runtimeVersion"`
+	InstallID string         `json:"installId"`
+	Name      string         `json:"name"`
+	Platform  DevicePlatform `json:"platform"`
 }
 
 // DeviceList 定义当前用户的设备列表。

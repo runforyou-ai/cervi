@@ -22,14 +22,14 @@ type stubStore struct {
 func (s *stubStore) DeviceInstallID(context.Context) (string, error) { return s.installID, nil }
 
 // LoadDeviceRegistration 读取内存中的设备编号。
-func (s *stubStore) LoadDeviceRegistration(_ context.Context, serverURL, organizationID string) (string, bool, error) {
-	deviceID, found := s.registrations[serverURL+"|"+organizationID]
+func (s *stubStore) LoadDeviceRegistration(_ context.Context, serverURL, organizationID, userID string) (string, bool, error) {
+	deviceID, found := s.registrations[serverURL+"|"+organizationID+"|"+userID]
 	return deviceID, found, nil
 }
 
 // SaveDeviceRegistration 保存内存中的设备编号。
-func (s *stubStore) SaveDeviceRegistration(_ context.Context, serverURL, organizationID, deviceID string) error {
-	s.registrations[serverURL+"|"+organizationID] = deviceID
+func (s *stubStore) SaveDeviceRegistration(_ context.Context, serverURL, organizationID, userID, deviceID string) error {
+	s.registrations[serverURL+"|"+organizationID+"|"+userID] = deviceID
 	return nil
 }
 
@@ -92,10 +92,10 @@ func newTestRegistrar(t *testing.T, store *stubStore, client *stubClient) (*Regi
 	return registrar, sessions
 }
 
-// credentialFor 构造指定企业和令牌的登录凭据。
-func credentialFor(serverURL, organizationID, token string) clientsession.Credential {
+// credentialFor 构造指定企业、用户和令牌的登录凭据。
+func credentialFor(serverURL, organizationID, userID, token string) clientsession.Credential {
 	return clientsession.Credential{
-		ServerURL: serverURL, OrganizationID: organizationID, UserID: "user-1",
+		ServerURL: serverURL, OrganizationID: organizationID, UserID: userID,
 		Token: token, ExpiresAt: time.Now().Add(time.Hour),
 	}
 }
@@ -120,7 +120,7 @@ func TestRegisterOncePerLoginSession(t *testing.T) {
 	client := &stubClient{serverURL: serverURL, deviceID: "device-1"}
 	registrar, sessions := newTestRegistrar(t, store, client)
 
-	if err := sessions.Establish(ctx, credentialFor(serverURL, "org-1", "token-1")); err != nil {
+	if err := sessions.Establish(ctx, credentialFor(serverURL, "org-1", "user-1", "token-1")); err != nil {
 		t.Fatal(err)
 	}
 	registrar.register()
@@ -132,7 +132,7 @@ func TestRegisterOncePerLoginSession(t *testing.T) {
 		t.Fatalf("上报的安装标识 = %q", client.calls[0].InstallID)
 	}
 
-	if err := sessions.Establish(ctx, credentialFor(serverURL, "org-1", "token-2")); err != nil {
+	if err := sessions.Establish(ctx, credentialFor(serverURL, "org-1", "user-1", "token-2")); err != nil {
 		t.Fatal(err)
 	}
 	registrar.register()
@@ -148,7 +148,7 @@ func TestRegisterRetriesAfterFailure(t *testing.T) {
 	store := &stubStore{installID: "install-1", registrations: map[string]string{}}
 	client := &stubClient{serverURL: serverURL, deviceID: "device-1", failure: errors.New("服务器不可达")}
 	registrar, sessions := newTestRegistrar(t, store, client)
-	if err := sessions.Establish(ctx, credentialFor(serverURL, "org-1", "token-1")); err != nil {
+	if err := sessions.Establish(ctx, credentialFor(serverURL, "org-1", "user-1", "token-1")); err != nil {
 		t.Fatal(err)
 	}
 
@@ -174,7 +174,7 @@ func TestCurrentDeviceWithoutRegistration(t *testing.T) {
 	const serverURL = "https://cervi.example.com"
 	store := &stubStore{installID: "install-1", registrations: map[string]string{}}
 	registrar, sessions := newTestRegistrar(t, store, &stubClient{serverURL: serverURL, deviceID: "device-1"})
-	if err := sessions.Establish(ctx, credentialFor(serverURL, "org-1", "token-1")); err != nil {
+	if err := sessions.Establish(ctx, credentialFor(serverURL, "org-1", "user-1", "token-1")); err != nil {
 		t.Fatal(err)
 	}
 
@@ -184,5 +184,33 @@ func TestCurrentDeviceWithoutRegistration(t *testing.T) {
 	}
 	if device.DeviceID != "" {
 		t.Fatalf("尚未注册时的设备编号 = %q", device.DeviceID)
+	}
+}
+
+// TestCurrentDeviceSeparatesAccounts 验证同一台机器切换账号后不返回上一账号的设备编号。
+func TestCurrentDeviceSeparatesAccounts(t *testing.T) {
+	ctx := context.Background()
+	const serverURL = "https://cervi.example.com"
+	store := &stubStore{installID: "install-1", registrations: map[string]string{}}
+	client := &stubClient{serverURL: serverURL, deviceID: "device-1"}
+	registrar, sessions := newTestRegistrar(t, store, client)
+	if err := sessions.Establish(ctx, credentialFor(serverURL, "org-1", "user-1", "token-1")); err != nil {
+		t.Fatal(err)
+	}
+	registrar.register()
+
+	// 切换到同一企业的另一个账号，该账号的注册尚未成功。
+	client.failure = errors.New("服务器不可达")
+	if err := sessions.Establish(ctx, credentialFor(serverURL, "org-1", "user-2", "token-2")); err != nil {
+		t.Fatal(err)
+	}
+	registrar.register()
+
+	device, err := registrar.CurrentDevice(ctx, appservice.RequestMeta{})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if device.DeviceID != "" {
+		t.Fatalf("切换账号后的本机设备编号 = %q", device.DeviceID)
 	}
 }

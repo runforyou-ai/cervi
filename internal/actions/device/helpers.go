@@ -7,7 +7,7 @@ import servermodels "github.com/runforyou-ai/cervi/internal/storage/server/model
 // recordFromModel 转换设备存储模型。
 func recordFromModel(input servermodels.Device) Record {
 	return Record{
-		ID: input.ID, Name: input.Name, Platform: input.Platform, RuntimeVersion: input.RuntimeVersion,
+		ID: input.ID, Name: input.Name, Platform: input.Platform,
 		CreatedAt: input.CreatedAt, UpdatedAt: input.UpdatedAt,
 	}
 }

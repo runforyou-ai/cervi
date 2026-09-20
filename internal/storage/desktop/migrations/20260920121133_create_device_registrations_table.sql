@@ -3,9 +3,10 @@
 CREATE TABLE device_registrations (
     server_url      text NOT NULL,
     organization_id text NOT NULL,
+    user_id         text NOT NULL,
     device_id       text NOT NULL,
     registered_at   text NOT NULL,
-    PRIMARY KEY (server_url, organization_id)
+    PRIMARY KEY (server_url, organization_id, user_id)
 );
 
 -- +goose Down

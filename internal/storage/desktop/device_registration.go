@@ -51,13 +51,14 @@ func (s *Store) DeviceInstallID(ctx context.Context) (string, error) {
 	return stored.Value, nil
 }
 
-// LoadDeviceRegistration 读取本机在指定企业服务器上的设备编号。
-func (s *Store) LoadDeviceRegistration(ctx context.Context, serverURL, organizationID string) (string, bool, error) {
+// LoadDeviceRegistration 读取本机在指定企业服务器上为指定用户注册的设备编号。
+func (s *Store) LoadDeviceRegistration(ctx context.Context, serverURL, organizationID, userID string) (string, bool, error) {
 	registration := &desktopmodels.DeviceRegistration{}
 	err := s.db.NewSelect().
 		Model(registration).
 		Where("server_url = ?", serverURL).
 		Where("organization_id = ?", organizationID).
+		Where("user_id = ?", userID).
 		Scan(ctx)
 	if errors.Is(err, sql.ErrNoRows) {
 		return "", false, nil
@@ -68,18 +69,19 @@ func (s *Store) LoadDeviceRegistration(ctx context.Context, serverURL, organizat
 	return registration.DeviceID, true, nil
 }
 
-// SaveDeviceRegistration 保存本机在指定企业服务器上的设备编号。
-func (s *Store) SaveDeviceRegistration(ctx context.Context, serverURL, organizationID, deviceID string) error {
+// SaveDeviceRegistration 保存本机在指定企业服务器上为指定用户注册的设备编号。
+func (s *Store) SaveDeviceRegistration(ctx context.Context, serverURL, organizationID, userID, deviceID string) error {
 	registration := &desktopmodels.DeviceRegistration{
 		ServerURL:      serverURL,
 		OrganizationID: organizationID,
+		UserID:         userID,
 		DeviceID:       deviceID,
 		RegisteredAt:   time.Now().UTC().Format(time.RFC3339Nano),
 	}
 	_, err := s.db.NewInsert().
 		Model(registration).
-		Column("server_url", "organization_id", "device_id", "registered_at").
-		On("CONFLICT (server_url, organization_id) DO UPDATE").
+		Column("server_url", "organization_id", "user_id", "device_id", "registered_at").
+		On("CONFLICT (server_url, organization_id, user_id) DO UPDATE").
 		Set("device_id = EXCLUDED.device_id").
 		Set("registered_at = EXCLUDED.registered_at").
 		Exec(ctx)

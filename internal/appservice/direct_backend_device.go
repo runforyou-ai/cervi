@@ -34,8 +34,7 @@ func newDeviceOps(db *bun.DB) deviceOps {
 // RegisterDevice 注册当前用户的本机设备。
 func (o *directOperations) RegisterDevice(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input DeviceRegistrationInput) (Device, error) {
 	record, err := o.registerDevice.Execute(ctx, identity, deviceaction.RegisterInput{
-		InstallID: input.InstallID, Name: input.Name,
-		Platform: domain.DevicePlatform(input.Platform), RuntimeVersion: input.RuntimeVersion,
+		InstallID: input.InstallID, Name: input.Name, Platform: domain.DevicePlatform(input.Platform),
 	})
 	if err != nil {
 		return Device{}, o.deviceError(ctx, meta, err, cervii18n.ErrorDeviceRegisterFailed, identity.Organization.ID)
@@ -89,6 +88,6 @@ func (o *directOperations) deviceError(ctx context.Context, meta RequestMeta, er
 func deviceFromAction(input deviceaction.Record) Device {
 	return Device{
 		ID: input.ID, Name: input.Name, Platform: DevicePlatform(input.Platform),
-		RuntimeVersion: input.RuntimeVersion, CreatedAt: input.CreatedAt, UpdatedAt: input.UpdatedAt,
+		CreatedAt: input.CreatedAt, UpdatedAt: input.UpdatedAt,
 	}
 }

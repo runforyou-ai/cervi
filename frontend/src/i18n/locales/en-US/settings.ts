@@ -57,7 +57,6 @@ const settings = {
       columns: {
         name: "Device",
         platform: "Platform",
-        runtimeVersion: "Client version",
         createdAt: "Registered",
       },
       current: "This device",
@@ -72,7 +71,7 @@ const settings = {
     revoke: {
       action: "Revoke device",
       title: "Revoke “{{name}}”?",
-      description: "The device is no longer trusted once revoked. Signing in to Cervi again on that device registers it anew.",
+      description: "The device is no longer trusted once revoked. It registers again the next time it starts up or signs in.",
       pending: "Revoking…",
       success: "Device revoked.",
       error: "Could not revoke the device. Try again.",

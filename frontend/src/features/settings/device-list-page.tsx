@@ -1,5 +1,5 @@
 /** 个人设置中的设备列表。 */
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -40,6 +40,9 @@ export function DeviceListPage() {
   const invalidate = useResourceInvalidator()
   const save = useImmediateSave()
   const [revoking, setRevoking] = useState<DeviceData | null>(null)
+  const menuTriggers = useRef(new Map<string, HTMLButtonElement>())
+  // 确认框关闭后把焦点交回该行的三点菜单；设备已撤销时该行不再存在，按默认行为处理。
+  const returnFocusTo = useRef<string | null>(null)
   const {
     data,
     loading,
@@ -53,7 +56,7 @@ export function DeviceListPage() {
   const { data: local } = useResource(
     resourceKeys.currentDevice(),
     () => currentDevice(),
-    { staleTime: 0 },
+    { staleTime: 0, refetchOnWindowFocus: true },
   )
   const devices = data?.devices ?? []
   const showLoading = loading || (Boolean(loadError) && !data && refreshing)
@@ -65,6 +68,7 @@ export function DeviceListPage() {
     if (request === null) return
     try {
       await revokeDevice(revoking.id)
+      returnFocusTo.current = null
       void invalidate(resourceKeys.devices())
       void invalidate(resourceKeys.currentDevice())
       if (!save.isCurrent(request)) return
@@ -108,12 +112,6 @@ export function DeviceListPage() {
                 cell: (device) => t(`devices.platforms.${device.platform}`),
               },
               {
-                key: "runtimeVersion",
-                header: t("devices.list.columns.runtimeVersion"),
-                cellClassName: "text-muted-foreground",
-                cell: (device) => device.runtimeVersion || "—",
-              },
-              {
                 key: "createdAt",
                 header: t("devices.list.columns.createdAt"),
                 cellClassName: "text-muted-foreground",
@@ -124,8 +122,18 @@ export function DeviceListPage() {
             rowKey={(device) => device.id}
             empty={t("devices.list.empty")}
             actions={(device) => ({
+              menuTriggerRef: (node) => {
+                if (node) menuTriggers.current.set(device.id, node)
+                else menuTriggers.current.delete(device.id)
+              },
               menu: (
-                <DropdownMenuItem destructive onSelect={() => setRevoking(device)}>
+                <DropdownMenuItem
+                  destructive
+                  onSelect={() => {
+                    returnFocusTo.current = device.id
+                    setRevoking(device)
+                  }}
+                >
                   {t("devices.revoke.action")}
                 </DropdownMenuItem>
               ),
@@ -140,7 +148,16 @@ export function DeviceListPage() {
           if (!open && !save.saving) setRevoking(null)
         }}
       >
-        <AlertDialogContent>
+        <AlertDialogContent
+          onCloseAutoFocus={(event) => {
+            const trigger = returnFocusTo.current
+              ? menuTriggers.current.get(returnFocusTo.current)
+              : undefined
+            if (!trigger) return
+            event.preventDefault()
+            trigger.focus()
+          }}
+        >
           <AlertDialogHeader>
             <AlertDialogTitle>
               {t("devices.revoke.title", { name: revoking?.name ?? "" })}

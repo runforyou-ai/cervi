@@ -19,7 +19,6 @@ const (
 	ValidationNameRequired      ValidationCode = "DEVICE_NAME_REQUIRED"
 	ValidationNameTooLong       ValidationCode = "DEVICE_NAME_TOO_LONG"
 	ValidationPlatformInvalid   ValidationCode = "DEVICE_PLATFORM_INVALID"
-	ValidationRuntimeTooLong    ValidationCode = "DEVICE_RUNTIME_VERSION_TOO_LONG"
 )
 
 // ValidationError 表示设备字段校验失败。
@@ -30,15 +29,12 @@ const (
 	maxInstallIDLength = 64
 	// maxNameLength 是设备名称的最大字符数。
 	maxNameLength = 100
-	// maxRuntimeVersionLength 是设备侧运行时版本的最大字符数。
-	maxRuntimeVersionLength = 64
 )
 
 // normalizeRegisterInput 归一化并校验设备注册输入。
 func normalizeRegisterInput(input RegisterInput) (RegisterInput, map[string]ValidationCode) {
 	input.InstallID = strings.TrimSpace(input.InstallID)
 	input.Name = strings.TrimSpace(input.Name)
-	input.RuntimeVersion = strings.TrimSpace(input.RuntimeVersion)
 	fields := make(map[string]ValidationCode)
 	if input.InstallID == "" {
 		fields["installId"] = ValidationInstallIDRequired
@@ -52,9 +48,6 @@ func normalizeRegisterInput(input RegisterInput) (RegisterInput, map[string]Vali
 	}
 	if !domain.ValidDevicePlatform(input.Platform) {
 		fields["platform"] = ValidationPlatformInvalid
-	}
-	if utf8.RuneCountInString(input.RuntimeVersion) > maxRuntimeVersionLength {
-		fields["runtimeVersion"] = ValidationRuntimeTooLong
 	}
 	return input, fields
 }

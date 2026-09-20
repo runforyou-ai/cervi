@@ -11,18 +11,16 @@ import (
 
 // RegisterInput 定义设备注册上报的本机信息。
 type RegisterInput struct {
-	InstallID      string
-	Name           string
-	Platform       domain.DevicePlatform
-	RuntimeVersion string
+	InstallID string
+	Name      string
+	Platform  domain.DevicePlatform
 }
 
 // Record 定义设备记录。
 type Record struct {
-	ID             string
-	Name           string
-	Platform       domain.DevicePlatform
-	RuntimeVersion string
-	CreatedAt      time.Time
-	UpdatedAt      time.Time
+	ID        string
+	Name      string
+	Platform  domain.DevicePlatform
+	CreatedAt time.Time
+	UpdatedAt time.Time
 }

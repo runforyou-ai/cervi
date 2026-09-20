@@ -56,7 +56,6 @@ const settings = {
       columns: {
         name: "设备名称",
         platform: "平台",
-        runtimeVersion: "客户端版本",
         createdAt: "注册时间",
       },
       current: "本机",
@@ -71,7 +70,7 @@ const settings = {
     revoke: {
       action: "撤销设备",
       title: "撤销「{{name}}」？",
-      description: "撤销后这台设备不再受信任。在该设备上重新登录 Cervi 可以重新注册。",
+      description: "撤销后这台设备不再受信任。该设备下次启动或重新登录时会重新注册。",
       pending: "正在撤销…",
       success: "设备已撤销。",
       error: "撤销设备失败，请重试。",

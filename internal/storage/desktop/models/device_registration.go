@@ -10,6 +10,7 @@ type DeviceRegistration struct {
 
 	ServerURL      string `bun:"server_url,pk"`
 	OrganizationID string `bun:"organization_id,pk"`
+	UserID         string `bun:"user_id,pk"`
 	DeviceID       string `bun:"device_id"`
 	RegisteredAt   string `bun:"registered_at"`
 }

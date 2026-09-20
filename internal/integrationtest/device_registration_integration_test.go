@@ -66,13 +66,13 @@ func TestDeviceRegistrationIsIdempotentPerInstall(t *testing.T) {
 	installID := uuid.NewV7().String()
 
 	first, err := register.Execute(ctx, f.owner, deviceaction.RegisterInput{
-		InstallID: installID, Name: "工作本", Platform: domain.DevicePlatformMacOS, RuntimeVersion: "v1",
+		InstallID: installID, Name: "工作本", Platform: domain.DevicePlatformMacOS,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	second, err := register.Execute(ctx, f.owner, deviceaction.RegisterInput{
-		InstallID: installID, Name: "改名后的工作本", Platform: domain.DevicePlatformMacOS, RuntimeVersion: "v2",
+		InstallID: installID, Name: "改名后的工作本", Platform: domain.DevicePlatformMacOS,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -80,8 +80,8 @@ func TestDeviceRegistrationIsIdempotentPerInstall(t *testing.T) {
 	if second.ID != first.ID {
 		t.Fatalf("同一安装注册出两台设备：%s 与 %s", first.ID, second.ID)
 	}
-	if second.Name != "改名后的工作本" || second.RuntimeVersion != "v2" {
-		t.Fatalf("重复注册未更新上报信息：name = %q，runtimeVersion = %q", second.Name, second.RuntimeVersion)
+	if second.Name != "改名后的工作本" {
+		t.Fatalf("重复注册未更新上报的名称：%q", second.Name)
 	}
 	if devices := listDevices(t, f.db, f.owner); len(devices) != 1 {
 		t.Fatalf("设备列表数量 = %d", len(devices))
