@@ -29,6 +29,7 @@ import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { NativeSelect } from "@/components/ui/native-select"
 import { Textarea } from "@/components/ui/textarea"
+import { useAutoSave } from "@/hooks/use-auto-save"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
@@ -123,6 +124,7 @@ function KnowledgeQAForm({
   const form = useForm<QAFormValues>({
     resolver: zodResolver(schema),
     shouldUseNativeValidation: true,
+    mode: "onBlur",
     defaultValues: {
       question: entry?.question ?? "",
       answer: entry?.answer ?? "",
@@ -149,7 +151,15 @@ function KnowledgeQAForm({
   }, [entry, form])
 
   /** 提交表单并失效该知识库下的问答缓存。 */
-  async function save(values: QAFormValues) {
+  // 编辑已有问答时边改边存，新建仍由底部按钮提交并跳回列表。
+  const markSaved = useAutoSave({
+    form,
+    schema,
+    enabled: Boolean(entry),
+    save: (values) => save(values, true),
+  })
+
+  async function save(values: QAFormValues, autoSaved = false) {
     try {
       const saved = entry
         ? await updateKnowledgeQAEntry(knowledgeBase.id, entry.id, values)
@@ -159,6 +169,10 @@ function KnowledgeQAForm({
         invalidate(resourceKeys.knowledgeQAEntry(knowledgeBase.id, saved.id)),
       ])
       if (!mounted.current) return
+      if (autoSaved) {
+        markSaved(values)
+        return
+      }
       const savedGroup = knowledgeBase.groups
         .flatMap((group) => [group, ...group.children])
         .find((group) => group.id === saved.groupId)
@@ -181,25 +195,27 @@ function KnowledgeQAForm({
   }
 
   return (
-    <form className="max-w-3xl space-y-9" onSubmit={form.handleSubmit(save)}>
+    <form className="max-w-3xl space-y-9" onSubmit={form.handleSubmit((values) => save(values))}>
       <QAFormFields
         control={form.control}
         disabled={form.formState.isSubmitting}
         knowledgeBase={knowledgeBase}
       />
-      <div className="flex gap-3">
-        <Button type="submit" disabled={form.formState.isSubmitting}>
-          {t(form.formState.isSubmitting ? "common:actions.saving" : "common:actions.save")}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          disabled={form.formState.isSubmitting}
-          onClick={() => navigate(returnPath, { replace: true })}
-        >
-          {t("common:actions.cancel")}
-        </Button>
-      </div>
+      {entry ? null : (
+        <div className="flex gap-3">
+          <Button type="submit" disabled={form.formState.isSubmitting}>
+            {t(form.formState.isSubmitting ? "common:actions.saving" : "common:actions.save")}
+          </Button>
+          <Button
+            type="button"
+            variant="outline"
+            disabled={form.formState.isSubmitting}
+            onClick={() => navigate(returnPath, { replace: true })}
+          >
+            {t("common:actions.cancel")}
+          </Button>
+        </div>
+      )}
     </form>
   )
 }

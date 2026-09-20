@@ -48,6 +48,7 @@ import {
 } from "@/features/knowledge-base/knowledge-base-schema"
 import { KnowledgeBaseSettingsFields } from "./knowledge-base-settings-fields"
 import { useKnowledgeBaseContext } from "@/features/knowledge-base/knowledge-base-context"
+import { useAutoSave } from "@/hooks/use-auto-save"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
@@ -95,6 +96,7 @@ export function KnowledgeBaseFormPage({
   const form = useForm<KnowledgeBaseFormValues>({
     resolver: zodResolver(schema),
     shouldUseNativeValidation: true,
+    mode: "onBlur",
     defaultValues: {
       name: "",
       description: "",
@@ -176,7 +178,16 @@ export function KnowledgeBaseFormPage({
     : "/knowledge-bases"
 
   /** 保存知识库。 */
-  async function save(values: KnowledgeBaseFormValues) {
+  // 编辑已有知识库时边改边存；重建索引的确认沿用 submit 的判断。
+  const reindexAutoSaved = useRef(false)
+  const markSaved = useAutoSave({
+    form,
+    schema,
+    enabled: mode === "edit",
+    save: (values) => submit(values, true),
+  })
+
+  async function save(values: KnowledgeBaseFormValues, autoSaved = false) {
     try {
       let knowledgeBase: KnowledgeBaseData
       // 保存供应商与模型标识，并按知识库类型提交分段配置。
@@ -208,6 +219,10 @@ export function KnowledgeBaseFormPage({
       setConfirmReindex(false)
       form.reset(values)
       upsertKnowledgeBase(knowledgeBase)
+      if (autoSaved) {
+        markSaved(values)
+        return
+      }
       toast.success(
         mode === "create"
           ? t("form.createSuccess")
@@ -245,16 +260,17 @@ export function KnowledgeBaseFormPage({
   }
 
   /** 编辑页变更向量模型、维度或分段参数时，保存前确认重新索引。 */
-  async function submit(values: KnowledgeBaseFormValues) {
+  async function submit(values: KnowledgeBaseFormValues, autoSaved = false) {
     if (mode === "edit" && loadedKnowledgeBase && (
       values.embeddingModel !== JSON.stringify([loadedKnowledgeBase.embeddingProviderId, loadedKnowledgeBase.embeddingModelIdentifier]) ||
       Number(values.embeddingDimension) !== loadedKnowledgeBase.embeddingDimension ||
       (!isQA && (Number(values.chunkLength) !== loadedKnowledgeBase.chunkLength || Number(values.chunkOverlap) !== loadedKnowledgeBase.chunkOverlap))
     )) {
+      reindexAutoSaved.current = autoSaved
       setConfirmReindex(true)
       return
     }
-    await save(values)
+    await save(values, autoSaved)
   }
 
   const title =
@@ -288,7 +304,7 @@ export function KnowledgeBaseFormPage({
         ) : (
           <form
             className="w-full max-w-3xl space-y-9"
-            onSubmit={form.handleSubmit(submit)}
+            onSubmit={form.handleSubmit((values) => submit(values))}
             noValidate
           >
             <FieldGroup>
@@ -367,22 +383,22 @@ export function KnowledgeBaseFormPage({
               />
               <KnowledgeBaseSettingsFields control={form.control} isQA={isQA} providers={providers.data?.providers ?? []} />
             </FieldGroup>
-            <div className="flex items-center gap-3">
-              <Button
-                ref={saveButton}
-                type="submit"
-                disabled={form.formState.isSubmitting}
-              >
-                {form.formState.isSubmitting
-                  ? t("common:actions.saving")
-                  : mode === "create"
-                    ? t("common:actions.create")
-                    : t("common:actions.save")}
-              </Button>
-              <Button type="button" variant="outline" asChild>
-                <Link to={cancelPath}>{t("common:actions.cancel")}</Link>
-              </Button>
-            </div>
+            {mode === "create" ? (
+              <div className="flex items-center gap-3">
+                <Button
+                  ref={saveButton}
+                  type="submit"
+                  disabled={form.formState.isSubmitting}
+                >
+                  {form.formState.isSubmitting
+                    ? t("common:actions.saving")
+                    : t("common:actions.create")}
+                </Button>
+                <Button type="button" variant="outline" asChild>
+                  <Link to={cancelPath}>{t("common:actions.cancel")}</Link>
+                </Button>
+              </div>
+            ) : null}
           </form>
         )}
       </PageContent>
@@ -402,7 +418,9 @@ export function KnowledgeBaseFormPage({
               disabled={form.formState.isSubmitting}
               onClick={(event) => {
                 event.preventDefault()
-                void form.handleSubmit(save)()
+                void form.handleSubmit((values) =>
+                  save(values, reindexAutoSaved.current),
+                )()
               }}
             >
               {form.formState.isSubmitting ? t("common:actions.saving") : t("common:actions.confirm")}

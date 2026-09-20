@@ -52,6 +52,7 @@ import {
   RoleMemberDialog,
   type RoleMemberChange,
 } from "@/features/roles/role-member-dialog"
+import { useAutoSave } from "@/hooks/use-auto-save"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
@@ -116,6 +117,7 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
   const form = useForm<RoleSettingsFormValues>({
     resolver: zodResolver(schema),
     shouldUseNativeValidation: true,
+    mode: "onBlur",
     defaultValues: { name: "", description: "", permissions: [] },
   })
   const selected = useWatch({ control: form.control, name: "permissions" })
@@ -201,7 +203,20 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
   }
 
   /** 保存角色资料、权限和成员配置。 */
-  async function save(values: RoleSettingsFormValues) {
+  // 详情页边改边存；内置管理员角色不可改，成员分配不在表单值内，单独触发保存。
+  const autoSaveEnabled = mode === "detail" && !admin
+  const markSaved = useAutoSave({
+    form,
+    schema,
+    enabled: autoSaveEnabled,
+    save: (values) => save(values, true),
+  })
+  useEffect(() => {
+    if (!autoSaveEnabled || memberChanges.length === 0) return
+    void save(form.getValues(), true)
+  }, [autoSaveEnabled, memberChanges, form])
+
+  async function save(values: RoleSettingsFormValues, autoSaved = false) {
     let createdRoleID = ""
     let targetRoleID = roleId
     try {
@@ -235,6 +250,10 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
       if (!mounted.current) return
       form.reset(values)
       setMemberChanges([])
+      if (autoSaved) {
+        markSaved(values)
+        return
+      }
       toast.success(
         mode === "create"
           ? t("roles.form.createSuccess")
@@ -323,7 +342,7 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
         ) : (
           <form
             className="w-full max-w-3xl space-y-9"
-            onSubmit={form.handleSubmit(save)}
+            onSubmit={form.handleSubmit((values) => save(values))}
             noValidate
           >
             <div className="space-y-5">
@@ -449,27 +468,29 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
               </section>
             </div>
 
-            <div className="flex items-center gap-2">
-              <Button
-                type="submit"
-                disabled={form.formState.isSubmitting}
-              >
-                {form.formState.isSubmitting ? (
-                  <LoaderCircleIcon className="animate-spin" />
-                ) : null}
-                {form.formState.isSubmitting
-                  ? tCommon("actions.saving")
-                  : tCommon("actions.save")}
-              </Button>
-              <Button
-                type="button"
-                variant="outline"
-                disabled={form.formState.isSubmitting}
-                onClick={cancel}
-              >
-                {tCommon("actions.cancel")}
-              </Button>
-            </div>
+            {autoSaveEnabled ? null : (
+              <div className="flex items-center gap-2">
+                <Button
+                  type="submit"
+                  disabled={form.formState.isSubmitting}
+                >
+                  {form.formState.isSubmitting ? (
+                    <LoaderCircleIcon className="animate-spin" />
+                  ) : null}
+                  {form.formState.isSubmitting
+                    ? tCommon("actions.saving")
+                    : tCommon("actions.save")}
+                </Button>
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={form.formState.isSubmitting}
+                  onClick={cancel}
+                >
+                  {tCommon("actions.cancel")}
+                </Button>
+              </div>
+            )}
           </form>
         )}
       </PageContent>

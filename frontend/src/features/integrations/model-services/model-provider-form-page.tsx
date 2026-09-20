@@ -57,6 +57,7 @@ import {
   parseTokenCount,
   type AIProviderFormValues,
 } from "@/features/integrations/model-services/model-provider-schema"
+import { useAutoSave } from "@/hooks/use-auto-save"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
@@ -146,6 +147,7 @@ export function ModelProviderFormPage({
   const form = useForm<AIProviderFormValues>({
     resolver: zodResolver(schema),
     shouldUseNativeValidation: true,
+    mode: "onBlur",
     defaultValues: {
       brand: initialBrand,
       name: "",
@@ -316,7 +318,15 @@ export function ModelProviderFormPage({
   }
 
   /** 创建或保存模型服务供应商。 */
-  async function save(values: AIProviderFormValues) {
+  // 编辑已有供应商时边改边存，新建仍由底部按钮提交并跳回列表。
+  const markSaved = useAutoSave({
+    form,
+    schema,
+    enabled: mode === "edit",
+    save: (values) => save(values, true),
+  })
+
+  async function save(values: AIProviderFormValues, autoSaved = false) {
     const input = {
       brand: values.brand,
       name: values.name,
@@ -344,6 +354,10 @@ export function ModelProviderFormPage({
       }
       void invalidateResource(resourceKeys.aiProviders())
       if (!mounted.current) return
+      if (autoSaved) {
+        markSaved(values)
+        return
+      }
       form.reset(values)
       toast.success(
         mode === "create"
@@ -400,7 +414,7 @@ export function ModelProviderFormPage({
         >
           <form
             className="w-full space-y-9"
-            onSubmit={form.handleSubmit(save)}
+            onSubmit={form.handleSubmit((values) => save(values))}
             noValidate
           >
             <FieldGroup className="max-w-2xl">
@@ -764,6 +778,7 @@ export function ModelProviderFormPage({
               saving={form.formState.isSubmitting}
               disabled={testingConnection}
               cancelTo={listPath}
+              submit={mode === "create"}
             >
               <Button
                 type="button"

@@ -8,7 +8,6 @@ import { toast } from "sonner"
 
 import { isApiError, updateAgentExecution, type AgentData } from "@/api"
 import { AgentBehaviorSummary } from "@/components/agent-behavior-summary"
-import { Button } from "@/components/ui/button"
 import {
   Field,
   FieldDescription,
@@ -29,17 +28,16 @@ import {
 } from "@/features/contacts/agents/agent-schema"
 import { useFormLifetime } from "@/hooks/use-form-lifetime"
 import { apiErrorMessage } from "@/lib/form-errors"
+import { useAutoSave } from "@/hooks/use-auto-save"
 import { recoverSession } from "@/lib/session-navigation"
 
 /** 整体保存模型、指令、知识库和 MCP 服务绑定。 */
 export function AgentExecutionForm({
   agent,
   onSaved,
-  onCancel,
 }: {
   agent: AgentData
   onSaved: () => void
-  onCancel: () => void
 }) {
   const { t } = useTranslation(["contacts", "common"])
   const navigate = useNavigate()
@@ -55,6 +53,7 @@ export function AgentExecutionForm({
   const form = useForm<AgentExecutionFormValues>({
     resolver: zodResolver(schema),
     shouldUseNativeValidation: true,
+    mode: "onBlur",
     defaultValues: {
       modelSelection: agentModelSelection(
         managed.providerId,
@@ -75,6 +74,8 @@ export function AgentExecutionForm({
   }, [agent.execution.mcpServerIds, form])
 
   /** 提交当前运行配置并生成一个生效版本。 */
+  const markSaved = useAutoSave({ form, schema, save: submit })
+
   async function submit(values: AgentExecutionFormValues) {
     try {
       const saved = await updateAgentExecution(agent.id, {
@@ -89,8 +90,9 @@ export function AgentExecutionForm({
       onSaved()
       if (!mounted.current) return
       dirty.current = false
-      form.reset({ ...values, mcpServerIds: saved.execution.mcpServerIds })
-      toast.success(t("agents.form.saved"))
+      const next = { ...values, mcpServerIds: saved.execution.mcpServerIds }
+      form.reset(next)
+      markSaved(next)
     } catch (error) {
       if (!mounted.current || recoverSession(error, navigate)) return
       console.warn("保存 AI 员工运行配置失败", { agent_id: agent.id, error })
@@ -110,7 +112,7 @@ export function AgentExecutionForm({
   }
 
   return (
-    <form className="space-y-9" onSubmit={form.handleSubmit(submit)} noValidate>
+    <form onSubmit={form.handleSubmit(submit)} noValidate>
       <FieldGroup>
         <AgentModelField
           control={form.control}
@@ -167,26 +169,6 @@ export function AgentExecutionForm({
           )}
         />
       </FieldGroup>
-      <div className="flex items-center gap-2">
-        <Button
-          type="submit"
-          disabled={form.formState.isSubmitting}
-        >
-          {t(
-            form.formState.isSubmitting
-              ? "common:actions.saving"
-              : "common:actions.save",
-          )}
-        </Button>
-        <Button
-          type="button"
-          variant="outline"
-          disabled={form.formState.isSubmitting}
-          onClick={onCancel}
-        >
-          {t("common:actions.cancel")}
-        </Button>
-      </div>
     </form>
   )
 }
