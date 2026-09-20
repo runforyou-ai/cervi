@@ -26,7 +26,7 @@ import (
 func testCustomerCopilotThreads(t *testing.T, db *bun.DB, identity *servermodels.Identity, roleID, providerID, modelID string) {
 	ctx := context.Background()
 	created, err := agentaction.NewCreateAgentAction(db).Execute(ctx, identity, agentaction.CreateInput{
-		DisplayName: "Copilot 助手", RoleID: roleID,
+		HandlesCustomers: true, DisplayName: "Copilot 助手", RoleID: roleID,
 		Execution: agentaction.ExecutionInput{Mode: domain.AgentExecutionModeManaged, Managed: &agentaction.ManagedExecutionInput{ProviderID: providerID, ModelIdentifier: modelID, SystemInstruction: "你是售后专家"}},
 	})
 	if err != nil {

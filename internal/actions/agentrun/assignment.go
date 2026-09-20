@@ -7,26 +7,22 @@ import (
 	"encoding/json"
 	"fmt"
 
-	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
-// BehaviorProfile 返回角色对 AI 员工的内置工作规则与可用工具，供管理界面只读展示；管理员角色不适用于 AI 员工。
-func BehaviorProfile(kind domain.RoleKind, organizationName string) (string, []string, bool) {
-	if kind == domain.RoleKindAdmin {
-		return "", nil, false
+// BehaviorProfile 返回 AI 员工按当前接待开关适用的内置工作规则与可用工具，供管理界面只读展示。
+func BehaviorProfile(handlesCustomers bool, organizationName string) (string, []string) {
+	if handlesCustomers {
+		return agentruntime.AgentBaseline(handlesCustomers, organizationName, ""), []string{"search_knowledge", "ask_customer", "handoff_to_human", "mcp"}
 	}
-	if kind == domain.RoleKindCustomerService {
-		return agentruntime.RoleBaseline(kind, organizationName, ""), []string{"search_knowledge", "ask_customer", "handoff_to_human", "mcp"}, true
-	}
-	return agentruntime.RoleBaseline(kind, organizationName, ""), []string{"search_knowledge", "mcp"}, true
+	return agentruntime.AgentBaseline(handlesCustomers, organizationName, ""), []string{"search_knowledge", "mcp"}
 }
 
 // assignmentFacts 汇总解析有效配置所需的业务事实。
 func (e executionContext) assignmentFacts(scene agentruntime.SceneContext) agentruntime.AssignmentFacts {
 	return agentruntime.AssignmentFacts{
-		RoleKind:         domain.RoleKind(e.RoleKind),
+		HandlesCustomers: e.HandlesCustomers,
 		OrganizationName: e.OrganizationName,
 		AgentName:        e.AgentName,
 		Instruction:      e.Instruction,

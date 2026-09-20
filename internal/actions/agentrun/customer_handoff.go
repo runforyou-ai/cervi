@@ -4,6 +4,7 @@ package agentrun
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -298,23 +299,30 @@ func (a *ExecuteAction) failCustomerRun(ctx context.Context, initial *servermode
 	return terminal, err
 }
 
-// HandOffAgentServiceSessions 在管理操作事务中把 AI 员工仍负责的开放客服周期交给人工：取消在途运行并结算输入队列，写入事件与对客通知并改派负责人。
-// 调用方已对该 AI 员工身份取 FOR UPDATE；返回被取消的运行编号，调用方在提交后中断本进程中的模型调用。
-func (a *ExecuteAction) HandOffAgentServiceSessions(ctx context.Context, db bun.IDB, organizationID, agentIdentityID, operationID string) ([]string, error) {
+// ReturnServiceSessionsToQueue 在管理操作事务中把失去接待资格的身份负责的开放客服周期退回原队列：取消在途运行并结算输入队列，写入退回事件；原负责人是 AI 员工时补发对客通知。
+// 调用方已对该身份取 FOR UPDATE；返回被取消的运行编号，调用方在提交后中断本进程中的模型调用。
+func (a *ExecuteAction) ReturnServiceSessionsToQueue(ctx context.Context, db bun.IDB, organizationID, identityID, operationID string) ([]string, error) {
+	assignee := &servermodels.OrganizationIdentity{}
+	if err := db.NewSelect().Model(assignee).
+		Column("oi.id", "oi.type", "oi.display_name").
+		Where("oi.organization_id = ? AND oi.id = ?", organizationID, identityID).
+		Scan(ctx); err != nil {
+		return nil, fmt.Errorf("load unavailable service session assignee: %w", err)
+	}
 	var sessions []struct {
 		ID             string `bun:"id"`
 		ConversationID string `bun:"conversation_id"`
 	}
 	if err := db.NewSelect().Model((*servermodels.ServiceSession)(nil)).
 		Column("ss.id", "ss.conversation_id").
-		Where("ss.organization_id = ? AND ss.assignee_identity_id = ? AND ss.status = ?", organizationID, agentIdentityID, domain.ServiceSessionStatusOpen).
+		Where("ss.organization_id = ? AND ss.assignee_identity_id = ? AND ss.status = ?", organizationID, identityID, domain.ServiceSessionStatusOpen).
 		OrderExpr("ss.conversation_id").
 		Scan(ctx, &sessions); err != nil {
-		return nil, fmt.Errorf("load agent open service sessions: %w", err)
+		return nil, fmt.Errorf("load assignee open service sessions: %w", err)
 	}
 	cancelled := make([]string, 0)
 	for _, row := range sessions {
-		runIDs, err := handOffUnavailableAgentSession(ctx, db, a.enqueuer, organizationID, row.ConversationID, row.ID, agentIdentityID, "handoff:"+row.ID+":"+operationID, true)
+		runIDs, err := returnUnavailableAssigneeSession(ctx, db, a.enqueuer, organizationID, row.ConversationID, row.ID, assignee, "returned:"+row.ID+":"+operationID, true)
 		if err != nil {
 			return nil, err
 		}
@@ -323,44 +331,131 @@ func (a *ExecuteAction) HandOffAgentServiceSessions(ctx context.Context, db bun.
 	return cancelled, nil
 }
 
-// handOffUnavailableAgentSession 把失去接客资格的 AI 员工负责的指定周期交给人工，周期已变化时跳过。
-// lock 为 true 时按转交目标身份、渠道身份、会话的锁序加锁；调用方已持有会话锁时传 false，目标身份与外发目标只读取不加锁。
-func handOffUnavailableAgentSession(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer, organizationID, conversationID, serviceSessionID, agentIdentityID, key string, lock bool) ([]string, error) {
-	channel, err := chatstate.LoadConversationChannel(ctx, db, organizationID, conversationID)
-	if err != nil {
-		return nil, err
-	}
-	route, err := chatstate.ResolveHandoffRoute(ctx, db, channel, lock)
-	if err != nil {
-		return nil, err
-	}
-	loadDeliveryRoute := deliveryaction.LoadRoute
-	if lock {
-		loadDeliveryRoute = deliveryaction.Prepare
-	}
-	deliveryRoute, err := loadDeliveryRoute(ctx, db, organizationID, conversationID)
-	if err != nil {
-		return nil, err
+// returnUnavailableAssigneeSession 把失去接待资格的负责人所负责的指定周期退回原队列，周期已变化时跳过。
+// lock 为 true 时按渠道身份、会话的锁序加锁；调用方已持有会话锁时传 false，外发目标只读取不加锁。
+func returnUnavailableAssigneeSession(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer, organizationID, conversationID, serviceSessionID string, assignee *servermodels.OrganizationIdentity, key string, lock bool) ([]string, error) {
+	isAgent := domain.OrganizationIdentityType(assignee.Type) == domain.OrganizationIdentityTypeAgent
+	// 只有 AI 员工负责的周期补发对客通知，据此读取渠道文案与外发目标。
+	var channel *servermodels.Channel
+	var deliveryRoute deliveryaction.Route
+	if isAgent {
+		var err error
+		channel, err = chatstate.LoadConversationChannel(ctx, db, organizationID, conversationID)
+		if err != nil {
+			return nil, err
+		}
+		loadDeliveryRoute := deliveryaction.LoadRoute
+		if lock {
+			loadDeliveryRoute = deliveryaction.Prepare
+		}
+		deliveryRoute, err = loadDeliveryRoute(ctx, db, organizationID, conversationID)
+		if err != nil {
+			return nil, err
+		}
 	}
 	conversation, session, err := chatstate.LockCustomerServiceSession(ctx, db, organizationID, conversationID)
 	if err != nil {
 		return nil, err
 	}
 	if session.ID != serviceSessionID || domain.ServiceSessionStatus(session.Status) != domain.ServiceSessionStatusOpen ||
-		session.AssigneeIdentityID == nil || *session.AssigneeIdentityID != agentIdentityID {
+		session.AssigneeIdentityID == nil || *session.AssigneeIdentityID != assignee.ID {
 		return nil, nil
 	}
-	runIDs, err := cancelServiceSessionRuns(ctx, db, organizationID, session.ID, agentIdentityID, domain.AgentRunErrorCodeAgentUnavailable)
-	if err != nil {
-		return nil, err
+	var runIDs []string
+	if isAgent {
+		runIDs, err = cancelServiceSessionRuns(ctx, db, organizationID, session.ID, assignee.ID, domain.AgentRunErrorCodeAgentUnavailable)
+		if err != nil {
+			return nil, err
+		}
 	}
-	notice, _ := cervii18n.Localize(channel.DefaultLocale, cervii18n.AgentCustomerFailureFallback)
-	if _, err := applyCustomerHandoff(ctx, db, enqueuer, customerHandoff{
-		PolicyContext:   agentRunPolicyContext{Conversation: conversation, ServiceSession: session, DeliveryRoute: deliveryRoute},
-		AgentIdentityID: agentIdentityID, Route: route,
-		NoticeKey: key, EventKey: key + ":event", Notice: notice, Reason: domain.AgentHandoffReasonAgentUnavailable,
+	if err := applyServiceSessionReturn(ctx, db, enqueuer, serviceSessionReturn{
+		Conversation: conversation, ServiceSession: session, DeliveryRoute: deliveryRoute,
+		Assignee: assignee, Channel: channel, EventKey: key + ":event", NoticeKey: key,
 	}); err != nil {
 		return nil, err
 	}
 	return runIDs, nil
+}
+
+// serviceSessionReturn 描述一次把客服处理周期从失效负责人退回原队列的事实；Channel 为空表示不补发对客通知。
+type serviceSessionReturn struct {
+	Conversation   *servermodels.Conversation
+	ServiceSession *servermodels.ServiceSession
+	DeliveryRoute  deliveryaction.Route
+	Assignee       *servermodels.OrganizationIdentity
+	Channel        *servermodels.Channel
+	EventKey       string
+	NoticeKey      string
+}
+
+// applyServiceSessionReturn 在调用方持有会话锁的事务中写入退回事件并清空负责人，所属队列保持不变。
+func applyServiceSessionReturn(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer, returned serviceSessionReturn) error {
+	session := returned.ServiceSession
+	target, err := serviceSessionQueueTarget(ctx, db, session)
+	if err != nil {
+		return err
+	}
+	payload, err := json.Marshal(domain.ServiceSessionReturnedEvent{
+		ServiceSessionID: session.ID, FromIdentityID: returned.Assignee.ID, FromDisplayName: returned.Assignee.DisplayName,
+		Target: target, Reason: domain.ServiceSessionReturnAssigneeUnavailable,
+	})
+	if err != nil {
+		return fmt.Errorf("encode service session returned event: %w", err)
+	}
+	eventType := string(domain.ConversationSystemEventServiceSessionReturned)
+	// 系统事件先于对客通知写入，会话最后消息保持为对客文本。
+	if _, _, err := appendAgentMessage(ctx, db, returned.Conversation, &servermodels.Message{
+		ID: uuid.NewV7().String(), OrganizationID: session.OrganizationID, ConversationID: session.ConversationID,
+		ServiceSessionID: &session.ID, Type: string(domain.MessageTypeSystem), Visibility: string(domain.MessageVisibilityInternalOnly),
+		SystemEventType: &eventType, SystemEventPayload: payload, IdempotencyKey: &returned.EventKey,
+	}); err != nil {
+		return fmt.Errorf("append service session returned event: %w", err)
+	}
+	if returned.Channel != nil {
+		participantID, err := ensureCustomerAgentParticipant(ctx, db, session.OrganizationID, session.ConversationID, returned.Assignee.ID)
+		if err != nil {
+			return err
+		}
+		notice, _ := cervii18n.Localize(returned.Channel.DefaultLocale, cervii18n.AgentCustomerFailureFallback)
+		if _, err := appendCustomerAgentMessage(ctx, db, enqueuer, agentRunPolicyContext{
+			Conversation: returned.Conversation, ServiceSession: session, DeliveryRoute: returned.DeliveryRoute,
+		}, &servermodels.Message{
+			ID: uuid.NewV7().String(), OrganizationID: session.OrganizationID, ConversationID: session.ConversationID,
+			ServiceSessionID: &session.ID, SenderParticipantID: &participantID,
+			Type: string(domain.MessageTypeText), Body: notice, IdempotencyKey: &returned.NoticeKey,
+		}); err != nil {
+			return fmt.Errorf("append customer service session return notice: %w", err)
+		}
+	}
+	if _, err := db.NewUpdate().Model(session).
+		Set("assignee_identity_id = NULL").
+		Set("updated_at = now()").
+		WherePK().Where("organization_id = ?", session.OrganizationID).
+		Exec(ctx); err != nil {
+		return fmt.Errorf("return service session to queue: %w", err)
+	}
+	session.AssigneeIdentityID = nil
+	slog.Info("客户会话负责人失去接待资格，周期已退回队列",
+		"organization_id", session.OrganizationID, "conversation_id", session.ConversationID,
+		"service_session_id", session.ID, "assignee_identity_id", returned.Assignee.ID,
+		"target_kind", target.Kind)
+	return nil
+}
+
+// serviceSessionQueueTarget 返回客服处理周期当前所属队列的去向快照，团队已删除时按公共队列处理。
+func serviceSessionQueueTarget(ctx context.Context, db bun.IDB, session *servermodels.ServiceSession) (domain.ServiceSessionTarget, error) {
+	if session.TeamID == nil {
+		return domain.ServiceSessionTarget{Kind: domain.ServiceSessionTargetPublicQueue}, nil
+	}
+	var name string
+	err := db.NewSelect().Model((*servermodels.Team)(nil)).Column("t.name").
+		Where("t.organization_id = ? AND t.id = ?", session.OrganizationID, *session.TeamID).
+		Scan(ctx, &name)
+	if errors.Is(err, sql.ErrNoRows) {
+		return domain.ServiceSessionTarget{Kind: domain.ServiceSessionTargetPublicQueue}, nil
+	}
+	if err != nil {
+		return domain.ServiceSessionTarget{}, fmt.Errorf("load service session queue team: %w", err)
+	}
+	return domain.ServiceSessionTarget{Kind: domain.ServiceSessionTargetTeam, TeamID: session.TeamID, TeamName: &name}, nil
 }

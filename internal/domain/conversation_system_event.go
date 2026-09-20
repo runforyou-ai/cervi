@@ -17,6 +17,14 @@ const (
 	ConversationSystemEventServiceSessionTransferred ConversationSystemEventType = "service_session_transferred"
 	ConversationSystemEventServiceSessionClosed      ConversationSystemEventType = "service_session_closed"
 	ConversationSystemEventServiceSessionReopened    ConversationSystemEventType = "service_session_reopened"
+	ConversationSystemEventServiceSessionReturned    ConversationSystemEventType = "service_session_returned"
+)
+
+// ServiceSessionReturnReason 定义客服处理周期退回队列的原因。
+type ServiceSessionReturnReason string
+
+const (
+	ServiceSessionReturnAssigneeUnavailable ServiceSessionReturnReason = "assignee_unavailable"
 )
 
 // ServiceSessionTargetKind 定义客服处理周期流转去向的类型。
@@ -56,4 +64,13 @@ type ServiceSessionOperatedEvent struct {
 	FromIdentityID   *string               `json:"fromIdentityId,omitempty"`
 	FromDisplayName  *string               `json:"fromDisplayName,omitempty"`
 	Target           *ServiceSessionTarget `json:"target,omitempty"`
+}
+
+// ServiceSessionReturnedEvent 是 service_session_returned 事件的结构化内容：原负责人、退回的队列与原因。
+type ServiceSessionReturnedEvent struct {
+	ServiceSessionID string                     `json:"serviceSessionId"`
+	FromIdentityID   string                     `json:"fromIdentityId"`
+	FromDisplayName  string                     `json:"fromDisplayName"`
+	Target           ServiceSessionTarget       `json:"target"`
+	Reason           ServiceSessionReturnReason `json:"returnReason"`
 }

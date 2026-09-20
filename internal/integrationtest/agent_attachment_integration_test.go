@@ -66,7 +66,7 @@ func TestAgentAttachmentInputs(t *testing.T) {
 		t.Fatal(err)
 	}
 	agent, err := agentaction.NewCreateAgentAction(f.db).Execute(ctx, f.owner, agentaction.CreateInput{
-		DisplayName: "附件助手", RoleID: roleID,
+		HandlesCustomers: true, DisplayName: "附件助手", RoleID: roleID,
 		Execution: agentaction.ExecutionInput{Mode: domain.AgentExecutionModeManaged, Managed: &agentaction.ManagedExecutionInput{
 			ProviderID: provider.ID, ModelIdentifier: "vision", SystemInstruction: "阅读附件并回答",
 		}},

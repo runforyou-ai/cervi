@@ -18,6 +18,7 @@ import { FormInputField } from "@/components/form/form-input-field"
 import { ImagePicker } from "@/components/image-picker"
 import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { Switch } from "@/components/ui/switch"
 import { usePendingImageUpload } from "@/hooks/use-pending-image-upload"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
@@ -75,6 +76,7 @@ export function MemberForm({
       password: "",
       roleId: defaultRoleID,
       teamIds: defaultTeamIds,
+      handlesCustomers: false,
     },
   })
   const displayName = useWatch({ control: form.control, name: "displayName" })
@@ -104,6 +106,7 @@ export function MemberForm({
         password: values.password,
         roleId: values.roleId,
         teamIds: values.teamIds,
+        handlesCustomers: values.handlesCustomers,
         avatarFileId,
       })
       toast.success(t("members.form.created"))
@@ -176,6 +179,25 @@ export function MemberForm({
               aria-invalid={fieldState.invalid}
               roles={roles}
             />
+          )}
+        />
+        <Controller
+          name="handlesCustomers"
+          control={form.control}
+          render={({ field }) => (
+            <Field orientation="horizontal">
+              <FieldLabel htmlFor={field.name}>
+                {t("members.form.handlesCustomers")}
+              </FieldLabel>
+              <Switch
+                id={field.name}
+                name={field.name}
+                checked={field.value}
+                onBlur={field.onBlur}
+                onCheckedChange={field.onChange}
+                ref={field.ref}
+              />
+            </Field>
           )}
         />
         <Controller

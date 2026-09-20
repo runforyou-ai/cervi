@@ -1,7 +1,7 @@
 /** 新建 AI 员工表单。 */
 import { useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { Controller, useForm, useWatch, type Control } from "react-hook-form"
+import { Controller, useForm, type Control } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -15,7 +15,6 @@ import {
   type RoleData,
   type AgentData,
 } from "@/api"
-import { AgentBehaviorSummary } from "@/components/agent-behavior-summary"
 import { FormInputField } from "@/components/form/form-input-field"
 import { ImagePicker } from "@/components/image-picker"
 import { Button } from "@/components/ui/button"
@@ -25,6 +24,7 @@ import {
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field"
+import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { AgentModelField } from "@/features/contacts/agents/agent-model-field"
 import { parseAgentModelSelection } from "@/features/contacts/agents/agent-model-selection"
@@ -80,6 +80,7 @@ export function AgentForm({
       displayName: "",
       roleId: defaultRoleID,
       teamIds: defaultTeamIds,
+      handlesCustomers: false,
       execution: {
         mode: AgentExecutionMode.AgentExecutionModeManaged,
         managed: {
@@ -100,8 +101,6 @@ export function AgentForm({
   const { mounted, dirty } = useFormLifetime(
     form.formState.isDirty || avatar.pending !== null,
   )
-  const selectedRoleId = useWatch({ control: form.control, name: "roleId" })
-  const selectedRole = assignableRoles.find((role) => role.id === selectedRoleId)
 
   /** 上传待保存的头像后提交 AI 员工表单。 */
   async function submit(values: AgentFormValues) {
@@ -117,6 +116,7 @@ export function AgentForm({
         displayName: values.displayName,
         roleId: values.roleId,
         teamIds: values.teamIds,
+        handlesCustomers: values.handlesCustomers,
         avatarFileId,
         execution: {
           mode: values.execution.mode,
@@ -193,20 +193,29 @@ export function AgentForm({
               disabled={form.formState.isSubmitting}
               aria-invalid={fieldState.invalid}
               roles={assignableRoles}
-              hint={t(
-                selectedRole?.kind === RoleKind.RoleKindCustomerService
-                  ? "agents.roleHint.customerService"
-                  : "agents.roleHint.member",
-              )}
             />
           )}
         />
-        {selectedRole?.agentBehavior ? (
-          <Field>
-            <FieldLabel>{t("agents.execution.behavior")}</FieldLabel>
-            <AgentBehaviorSummary behavior={selectedRole.agentBehavior} />
-          </Field>
-        ) : null}
+        <Controller
+          name="handlesCustomers"
+          control={form.control}
+          render={({ field }) => (
+            <Field orientation="horizontal">
+              <FieldLabel htmlFor={field.name}>
+                {t("agents.form.handlesCustomers")}
+              </FieldLabel>
+              <Switch
+                id={field.name}
+                name={field.name}
+                checked={field.value}
+                disabled={form.formState.isSubmitting}
+                onBlur={field.onBlur}
+                onCheckedChange={field.onChange}
+                ref={field.ref}
+              />
+            </Field>
+          )}
+        />
         <AgentManagedExecutionFields
           control={form.control}
           disabled={form.formState.isSubmitting}

@@ -26,7 +26,7 @@ import (
 func testAgentCustomerReplies(t *testing.T, db *bun.DB, identity *servermodels.Identity, roleID, providerID, modelID string) {
 	ctx := context.Background()
 	created, err := agentaction.NewCreateAgentAction(db).Execute(ctx, identity, agentaction.CreateInput{
-		DisplayName: "客服引用助手", RoleID: roleID,
+		HandlesCustomers: true, DisplayName: "客服引用助手", RoleID: roleID,
 		Execution: agentaction.ExecutionInput{Mode: domain.AgentExecutionModeManaged, Managed: &agentaction.ManagedExecutionInput{ProviderID: providerID, ModelIdentifier: modelID, SystemInstruction: "结合引用回答"}},
 	})
 	if err != nil {

@@ -10,7 +10,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
-// AssignmentRulesVersion 是角色基线与场景规则的规则版本，基线或场景规则增删时加一；措辞调整只体现在指令哈希上。
+// AssignmentRulesVersion 是基线与场景规则的规则版本，基线或场景规则增删时加一；措辞调整只体现在指令哈希上。
 const AssignmentRulesVersion = 2
 
 // SceneContext 表示拼接场景规则所需的运行期事实，群聊字段只在群聊场景取值。
@@ -32,7 +32,7 @@ type AssignmentModel struct {
 
 // AssignmentFacts 表示解析有效配置所需的业务事实，由服务端从运行、配置版本与会话读出。
 type AssignmentFacts struct {
-	RoleKind         domain.RoleKind
+	HandlesCustomers bool
 	OrganizationName string
 	AgentName        string
 	Instruction      string // 配置版本中的企业指令。
@@ -48,7 +48,7 @@ type Capabilities struct {
 
 // Assignment 是一次运行的有效配置，同时作为运行时入参、运行审计快照和设备执行指派。
 type Assignment struct {
-	RoleKind          domain.RoleKind `json:"roleKind"`
+	HandlesCustomers  bool            `json:"handlesCustomers"`
 	AgentName         string          `json:"agentName"`
 	Scene             Scene           `json:"scene"`
 	RulesVersion      int             `json:"rulesVersion"`
@@ -65,7 +65,7 @@ func ResolveAssignment(facts AssignmentFacts, capabilities Capabilities) Assignm
 	scene := facts.Scene.Scene
 	tools := builtinTools{Knowledge: capabilities.Knowledge, Terminal: scene == SceneCustomer}
 	instruction := composeInstruction(
-		RoleBaseline(facts.RoleKind, facts.OrganizationName, facts.AgentName),
+		AgentBaseline(facts.HandlesCustomers, facts.OrganizationName, facts.AgentName),
 		facts.Instruction,
 		sceneRules(facts.Scene, tools),
 	)
@@ -75,7 +75,7 @@ func ResolveAssignment(facts AssignmentFacts, capabilities Capabilities) Assignm
 		grounding = GroundingStrict
 	}
 	return Assignment{
-		RoleKind:          facts.RoleKind,
+		HandlesCustomers:  facts.HandlesCustomers,
 		AgentName:         facts.AgentName,
 		Scene:             scene,
 		RulesVersion:      AssignmentRulesVersion,

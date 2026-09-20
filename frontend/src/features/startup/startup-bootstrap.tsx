@@ -11,8 +11,15 @@ import { useStartupLoader } from "@/features/startup/use-startup-loader"
 function resolveStartupPath(startup: Startup, pathname: string) {
   if (startup.state === SessionState.SessionStateSetup) return "/setup"
   if (startup.state === SessionState.SessionStateConnect) return "/connect"
+  if (startup.state === SessionState.SessionStateInvalidAddress) {
+    return "/invalid-address"
+  }
   if (startup.state === SessionState.SessionStateReady) {
-    return pathname === "/setup" || pathname === "/connect" ? "/" : pathname
+    return pathname === "/setup" ||
+      pathname === "/connect" ||
+      pathname === "/invalid-address"
+      ? "/"
+      : pathname
   }
   return null
 }

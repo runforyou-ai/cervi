@@ -122,15 +122,17 @@ func (a *InstallWorkspaceAction) Execute(ctx context.Context, input InstallWorks
 			}
 		}
 
+		// 企业创建者默认开启接待客户，企业初始化后即可处理客户会话。
 		organizationIdentity := &servermodels.OrganizationIdentity{
-			OrganizationID: organization.ID,
-			Type:           string(domain.OrganizationIdentityTypeUser),
-			RoleID:         adminRoleID,
-			DisplayName:    input.DisplayName,
-			WorkStatus:     string(domain.WorkStatusWorking),
+			OrganizationID:   organization.ID,
+			Type:             string(domain.OrganizationIdentityTypeUser),
+			RoleID:           adminRoleID,
+			DisplayName:      input.DisplayName,
+			HandlesCustomers: true,
+			WorkStatus:       string(domain.WorkStatusWorking),
 		}
 		if _, err := tx.NewInsert().Model(organizationIdentity).
-			Column("organization_id", "type", "role_id", "display_name", "work_status").
+			Column("organization_id", "type", "role_id", "display_name", "handles_customers", "work_status").
 			Returning("id, work_status, work_status_updated_at").Exec(ctx); err != nil {
 			return err
 		}

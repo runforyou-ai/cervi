@@ -20,7 +20,7 @@ func loadAgent(ctx context.Context, db bun.IDB, organizationID, agentID string) 
 	}
 	agent := &Agent{}
 	err := db.NewSelect().TableExpr("agents AS a").
-		ColumnExpr("a.id::text AS id, a.identity_id::text AS identity_id, oi.display_name, oi.avatar_file_id::text AS avatar_file_id, a.status, oi.work_status, oi.created_at").
+		ColumnExpr("a.id::text AS id, a.identity_id::text AS identity_id, oi.display_name, oi.avatar_file_id::text AS avatar_file_id, oi.handles_customers, a.status, oi.work_status, oi.created_at").
 		ColumnExpr("r.id::text AS role_id, r.kind AS role_kind, r.name AS role_name").
 		Join("JOIN organization_identities AS oi ON oi.id = a.identity_id AND oi.organization_id = a.organization_id AND oi.type = ?", domain.OrganizationIdentityTypeAgent).
 		Join("JOIN roles AS r ON r.id = oi.role_id AND r.organization_id = oi.organization_id").

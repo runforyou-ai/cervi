@@ -45,12 +45,14 @@ export function customerReplySupported(customer: CustomerSummary) {
   )
 }
 
-/** 按处理状态和负责人返回当前客服不能回复的原因。 */
+/** 按接待资格、处理状态和负责人返回当前成员不能对客回复的原因。 */
 export function customerReplyDisabledReason(
   customer: CustomerSummary,
   currentIdentityId: string,
+  handlesCustomers: boolean,
   t: TFunction<"inbox">,
 ) {
+  if (!handlesCustomers) return t("replyHandlingUnavailable")
   if (
     customer.serviceSessionStatus ===
     ServiceSessionStatus.ServiceSessionStatusClosed
@@ -61,10 +63,11 @@ export function customerReplyDisabledReason(
   return null
 }
 
-/** 管理客服处理周期命令的执行状态、可用操作和关闭确认。 */
+/** 管理客服处理周期命令的执行状态、可用操作和关闭确认；只有开启接待的成员可以领取、转交、关闭与重开。 */
 export function useCustomerSessionActions(
   conversation: CustomerInboxConversationData | null,
   currentIdentityId: string,
+  handlesCustomers: boolean,
   onChanged: () => void,
 ) {
   const { t } = useTranslation("inbox")
@@ -122,8 +125,12 @@ export function useCustomerSessionActions(
     sessionOpen,
     sessionClosed,
     assignedToCurrentUser,
+    reopenable: sessionClosed && handlesCustomers,
+    claimable: sessionOpen && !assignedToCurrentUser && handlesCustomers,
+    transferable: sessionOpen && assignedToCurrentUser && handlesCustomers,
     // 未分配或由本人负责的开放会话可以关闭。
-    closable: sessionOpen && (!customer?.assignee || assignedToCurrentUser),
+    closable:
+      sessionOpen && (!customer?.assignee || assignedToCurrentUser) && handlesCustomers,
     transferCandidates,
     closeConfirmationOpen,
     setCloseConfirmationOpen,

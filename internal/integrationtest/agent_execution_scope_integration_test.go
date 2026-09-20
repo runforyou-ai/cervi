@@ -47,7 +47,7 @@ func newExecutionScopeFixture(t *testing.T) executionScopeFixture {
 		t.Fatalf("创建模型服务失败：%v", err)
 	}
 	agent, err := agentaction.NewCreateAgentAction(f.db).Execute(ctx, f.owner, agentaction.CreateInput{
-		DisplayName: "执行范围助手", RoleID: f.owner.OrganizationIdentity.RoleID,
+		HandlesCustomers: true, DisplayName: "执行范围助手", RoleID: f.owner.OrganizationIdentity.RoleID,
 		Execution: agentaction.ExecutionInput{Mode: domain.AgentExecutionModeManaged, Managed: &agentaction.ManagedExecutionInput{
 			ProviderID: provider.ID, ModelIdentifier: "chat-a", SystemInstruction: "回答客户问题",
 		}},

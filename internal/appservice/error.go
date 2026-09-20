@@ -42,6 +42,8 @@ func (e *Error) HTTPStatus() int {
 		return http.StatusConflict
 	case SessionStateConnect:
 		return http.StatusPreconditionRequired
+	case SessionStateInvalidAddress:
+		return http.StatusNotFound
 	}
 	switch e.Kind {
 	case ErrorKindInvalid:

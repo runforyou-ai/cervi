@@ -22,20 +22,22 @@ type ListInput struct {
 
 // CreateInput 定义新增企业成员字段，AvatarFileID 为空时不设置头像。
 type CreateInput struct {
-	DisplayName  string
-	Email        string
-	Password     string
-	RoleID       string
-	TeamIDs      []string
-	AvatarFileID string
+	DisplayName      string
+	Email            string
+	Password         string
+	RoleID           string
+	TeamIDs          []string
+	HandlesCustomers bool
+	AvatarFileID     string
 }
 
 // UpdateInput 定义企业成员可编辑字段。
 type UpdateInput struct {
-	DisplayName string
-	Email       string
-	RoleID      string
-	TeamIDs     []string
+	DisplayName      string
+	Email            string
+	RoleID           string
+	TeamIDs          []string
+	HandlesCustomers bool
 }
 
 // ProfileInput 定义当前用户可编辑的个人资料字段。
@@ -66,18 +68,19 @@ type WorkStatusInput struct {
 
 // User 定义企业成员信息。
 type User struct {
-	ID           string `bun:"id"`
-	IdentityID   string `bun:"identity_id"`
-	Email        string
-	DisplayName  string
-	AvatarFileID *string         `bun:"avatar_file_id"`
-	RoleID       string          `bun:"role_id"`
-	RoleKind     domain.RoleKind `bun:"role_kind"`
-	RoleName     string          `bun:"role_name"`
-	Status       domain.UserStatus
-	WorkStatus   domain.WorkStatus
-	Teams        []TeamSummary
-	CreatedAt    time.Time
+	ID               string `bun:"id"`
+	IdentityID       string `bun:"identity_id"`
+	Email            string
+	DisplayName      string
+	AvatarFileID     *string         `bun:"avatar_file_id"`
+	RoleID           string          `bun:"role_id"`
+	RoleKind         domain.RoleKind `bun:"role_kind"`
+	RoleName         string          `bun:"role_name"`
+	HandlesCustomers bool            `bun:"handles_customers"`
+	Status           domain.UserStatus
+	WorkStatus       domain.WorkStatus
+	Teams            []TeamSummary
+	CreatedAt        time.Time
 }
 
 // TeamSummary 定义成员所属团队的精简字段。

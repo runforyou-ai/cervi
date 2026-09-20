@@ -85,6 +85,7 @@ export function ConversationHeader({
   conversation,
   contactName,
   currentIdentityId,
+  handlesCustomers,
   onSessionChanged,
   onSearch,
   groupParticipants,
@@ -95,6 +96,7 @@ export function ConversationHeader({
   conversation: InboxConversation
   contactName: string
   currentIdentityId: string
+  handlesCustomers: boolean
   onSessionChanged: () => void
   onSearch?: () => void
   groupParticipants?: GroupParticipant[]
@@ -119,15 +121,10 @@ export function ConversationHeader({
   const actions = useCustomerSessionActions(
     customerConversation,
     currentIdentityId,
+    handlesCustomers,
     onSessionChanged,
   )
-  const {
-    operation,
-    sessionOpen,
-    sessionClosed,
-    assignedToCurrentUser,
-    transferCandidates,
-  } = actions
+  const { operation, transferCandidates } = actions
 
   return (
     <>
@@ -168,7 +165,7 @@ export function ConversationHeader({
               onClick={onSearch}
             />
           ) : null}
-          {customer && sessionClosed ? (
+          {customer && actions.reopenable ? (
             <HeaderAction
               label={t("conversationReopen")}
               icon={RotateCcwIcon}
@@ -177,7 +174,7 @@ export function ConversationHeader({
               onClick={() => void actions.reopen()}
             />
           ) : null}
-          {customer && sessionOpen && !assignedToCurrentUser ? (
+          {customer && actions.claimable ? (
             <HeaderAction
               label={
                 customer.assignee
@@ -190,7 +187,7 @@ export function ConversationHeader({
               onClick={() => void actions.claim()}
             />
           ) : null}
-          {customer && sessionOpen && assignedToCurrentUser ? (
+          {customer && actions.transferable ? (
             <DropdownMenu>
               <Tooltip>
                 <TooltipTrigger asChild>

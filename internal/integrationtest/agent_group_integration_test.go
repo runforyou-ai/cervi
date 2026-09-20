@@ -137,7 +137,7 @@ func testGroupAgentEligibility(t *testing.T, db *bun.DB, identity *servermodels.
 			t.Fatal(err)
 		}
 		if !active {
-			if _, err := agentaction.NewUpdateStatusAction(db, testServiceSessionHandoff(db)).Execute(ctx, identity, agent.ID, domain.UserStatusInactive); err != nil {
+			if _, err := agentaction.NewUpdateStatusAction(db, testServiceSessionReturner(db)).Execute(ctx, identity, agent.ID, domain.UserStatusInactive); err != nil {
 				t.Fatal(err)
 			}
 		}
@@ -155,7 +155,7 @@ func testGroupAgentEligibility(t *testing.T, db *bun.DB, identity *servermodels.
 	if !errors.Is(err, conversationaction.ErrGroupMemberNotFound) {
 		t.Fatalf("inactive create error=%v", err)
 	}
-	if _, err := agentaction.NewUpdateStatusAction(db, testServiceSessionHandoff(db)).Execute(ctx, identity, agent.ID, domain.UserStatusActive); err != nil {
+	if _, err := agentaction.NewUpdateStatusAction(db, testServiceSessionReturner(db)).Execute(ctx, identity, agent.ID, domain.UserStatusActive); err != nil {
 		t.Fatal(err)
 	}
 	foreign := newNavigationFixture(t)

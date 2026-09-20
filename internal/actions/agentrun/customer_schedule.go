@@ -11,6 +11,7 @@ import (
 	"log/slog"
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
+	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
@@ -54,13 +55,20 @@ func (s *Scheduler) ScheduleCustomerAuto(ctx context.Context, db bun.IDB, organi
 		return false, err
 	}
 	if !eligible {
-		// 负责人是已失去接客资格的 AI 员工时，在本次入站事务内把周期交给人工；本事务已持有会话锁，交接只读取目标身份与外发目标。
-		cancelled, err := handOffUnavailableAgentSession(ctx, db, s.enqueuer, organizationID, conversationID, session.ID,
-			*session.AssigneeIdentityID, "handoff:"+session.ID+":"+messageID, false)
+		// 负责人是已失去接待资格的 AI 员工时，在本次入站事务内把周期退回原队列；本事务已持有会话锁，退回只读取外发目标。
+		assignee := &servermodels.OrganizationIdentity{}
+		if err := db.NewSelect().Model(assignee).
+			Column("oi.id", "oi.type", "oi.display_name").
+			Where("oi.organization_id = ? AND oi.id = ?", organizationID, *session.AssigneeIdentityID).
+			Scan(ctx); err != nil {
+			return false, fmt.Errorf("load unavailable customer agent identity: %w", err)
+		}
+		cancelled, err := returnUnavailableAssigneeSession(ctx, db, s.enqueuer, organizationID, conversationID, session.ID,
+			assignee, "returned:"+session.ID+":"+messageID, false)
 		if err != nil {
 			return false, err
 		}
-		slog.Warn("客户会话负责人不满足 Agent 执行资格，已转交人工",
+		slog.Warn("客户会话负责人不满足 Agent 执行资格，周期已退回队列",
 			"organization_id", organizationID,
 			"conversation_id", conversationID,
 			"service_session_id", serviceSessionID,
@@ -128,10 +136,9 @@ func loadCustomerAgentEligibility(ctx context.Context, db bun.IDB, session *serv
 		return customerAgentEligibility{}, false, nil
 	}
 	row := customerAgentEligibility{}
-	query := db.NewSelect().
-		TableExpr("organization_identities AS oi").
-		Join("JOIN roles AS r ON r.id = oi.role_id AND r.organization_id = oi.organization_id AND r.kind = ?", domain.RoleKindCustomerService).
-		Join("JOIN agents AS a ON a.identity_id = oi.id AND a.organization_id = oi.organization_id AND a.status = ?", domain.UserStatusActive).
+	query := identityaction.ApplyCustomerHandlingConditions(db.NewSelect().
+		TableExpr("organization_identities AS oi")).
+		Join("JOIN agents AS a ON a.identity_id = oi.id AND a.organization_id = oi.organization_id").
 		Join("JOIN contact_channel_identities AS cci ON cci.id = ? AND cci.organization_id = oi.organization_id", session.ContactChannelIdentityID).
 		Join("JOIN channels AS c ON c.id = cci.channel_id AND c.organization_id = cci.organization_id").
 		Join("LEFT JOIN telegram_channel_settings AS tcs ON tcs.channel_id = c.id AND tcs.organization_id = c.organization_id").
@@ -140,9 +147,8 @@ func loadCustomerAgentEligibility(ctx context.Context, db bun.IDB, session *serv
 		Where("oi.id = ?", *session.AssigneeIdentityID).
 		Where("oi.type = ?", domain.OrganizationIdentityTypeAgent)
 	if runRevisionID == "" {
-		query = query.
-			ColumnExpr("a.active_revision_id AS revision_id").
-			Join("JOIN agent_revisions AS ar ON ar.id = a.active_revision_id AND ar.agent_id = a.id AND ar.organization_id = a.organization_id AND ar.execution_mode = ? AND ar.schema_version = 1", domain.AgentExecutionModeManaged)
+		// 接待资格已校验当前 Revision 可执行。
+		query = query.ColumnExpr("a.active_revision_id AS revision_id")
 	} else {
 		query = query.
 			ColumnExpr("? AS revision_id", runRevisionID).

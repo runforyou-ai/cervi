@@ -153,7 +153,7 @@ export interface AIProviderSummary {
 }
 
 /**
- * Agent 定义 AI 员工信息，Behavior 是当前角色对该员工的内置工作规则与可用工具。
+ * Agent 定义 AI 员工信息，Behavior 是该员工当前生效的内置工作规则与可用工具。
  */
 export interface Agent {
     "id": string;
@@ -161,6 +161,7 @@ export interface Agent {
     "displayName": string;
     "avatarUrl": string;
     "role": RoleSummary;
+    "handlesCustomers": boolean;
     "status": UserStatus;
     "workStatus": WorkStatus;
     "teams": TeamSummary[] | null;
@@ -170,7 +171,7 @@ export interface Agent {
 }
 
 /**
- * AgentBehaviorProfile 定义角色对 AI 员工的内置工作规则与可用工具。
+ * AgentBehaviorProfile 定义 AI 员工的内置工作规则与可用工具。
  */
 export interface AgentBehaviorProfile {
     "instruction": string;
@@ -1021,13 +1022,14 @@ export interface ConversationSystemEvent {
     "title": string | null;
 
     /**
-     * 以下字段只由客服处理周期事件携带：原负责人、去向，以及转人工的原因与成员可见的原因说明；操作人写入 Actor。
+     * 以下字段只由客服处理周期事件携带：原负责人、去向，以及转人工或退回队列的原因与成员可见的原因说明；操作人写入 Actor。
      */
     "serviceSessionId": string | null;
     "fromIdentityId": string | null;
     "fromDisplayName": string | null;
     "sessionTarget": ServiceSessionTarget | null;
     "handoffReason": AgentHandoffReason | null;
+    "returnReason": ServiceSessionReturnReason | null;
     "reasonText": string | null;
     "agentRunId": string | null;
 }
@@ -1069,6 +1071,11 @@ export enum ConversationSystemEventType {
     ConversationSystemEventServiceSessionTransferred = "service_session_transferred",
     ConversationSystemEventServiceSessionClosed = "service_session_closed",
     ConversationSystemEventServiceSessionReopened = "service_session_reopened",
+
+    /**
+     * ConversationSystemEventServiceSessionReturned 表示失去接待资格的负责人所负责的客服处理周期退回队列。
+     */
+    ConversationSystemEventServiceSessionReturned = "service_session_returned",
 };
 
 /**
@@ -1116,6 +1123,7 @@ export interface CreateAgentInput {
     "displayName": string;
     "roleId": string;
     "teamIds": string[] | null;
+    "handlesCustomers": boolean;
     "avatarFileId": string;
     "execution": AgentExecutionInput;
 }
@@ -1141,6 +1149,7 @@ export interface CreateUserInput {
     "password": string;
     "roleId": string;
     "teamIds": string[] | null;
+    "handlesCustomers": boolean;
     "avatarFileId": string;
 }
 
@@ -1159,6 +1168,7 @@ export interface CurrentUser {
     "timeZone": string;
     "messageNotificationsEnabled": boolean;
     "workspaceTabsEnabled": boolean;
+    "handlesCustomers": boolean;
     "workStatus": WorkStatus;
     "avatarUrl": string;
 }
@@ -1426,6 +1436,19 @@ export interface CustomerTextMessageInput {
      */
     "mentionIdentityIds": string[] | null;
 }
+
+/**
+ * DeploymentMode 表示服务端部署形态。
+ */
+export enum DeploymentMode {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    DeploymentModeSelfHosted = "self_hosted",
+    DeploymentModeManaged = "managed",
+};
 
 /**
  * DirectConversationLookup 定义按目标身份查找单聊的结果。
@@ -2004,11 +2027,12 @@ export interface InstallWorkspaceInput {
 }
 
 /**
- * InstallationStatus 定义企业初始化状态和公开企业名称。
+ * InstallationStatus 定义企业初始化状态、公开企业名称和服务端部署形态。
  */
 export interface InstallationStatus {
     "installed": boolean;
     "organizationName": string;
+    "deploymentMode": DeploymentMode;
 }
 
 /**
@@ -2837,7 +2861,7 @@ export interface RequestMeta {
 }
 
 /**
- * Role 定义企业角色及其权限；AgentBehavior 为空表示该角色不适用于 AI 员工。
+ * Role 定义企业角色及其权限。
  */
 export interface Role {
     "id": string;
@@ -2846,7 +2870,6 @@ export interface Role {
     "description": string;
     "permissions": PermissionCode[] | null;
     "memberCount": number;
-    "agentBehavior"?: AgentBehaviorProfile | null;
     "createdAt": string;
     "updatedAt": string;
 }
@@ -2909,6 +2932,18 @@ export interface RoleSummary {
 }
 
 /**
+ * ServiceSessionReturnReason 表示客服处理周期退回队列的原因。
+ */
+export enum ServiceSessionReturnReason {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    ServiceSessionReturnAssigneeUnavailable = "assignee_unavailable",
+};
+
+/**
  * ServiceSessionStatus 表示客服处理状态。
  */
 export enum ServiceSessionStatus {
@@ -2959,6 +2994,7 @@ export enum SessionState {
     SessionStateLogin = "login",
     SessionStateSetup = "setup",
     SessionStateConnect = "connect",
+    SessionStateInvalidAddress = "invalid_address",
 };
 
 /**
@@ -3191,6 +3227,7 @@ export interface UpdateAgentInput {
     "displayName": string;
     "roleId": string;
     "teamIds": string[] | null;
+    "handlesCustomers": boolean;
     "workStatus": WorkStatus;
     "avatarFileId": string;
 }
@@ -3203,6 +3240,7 @@ export interface UpdateUserInput {
     "email": string;
     "roleId": string;
     "teamIds": string[] | null;
+    "handlesCustomers": boolean;
 }
 
 /**
@@ -3215,6 +3253,7 @@ export interface User {
     "displayName": string;
     "avatarUrl": string;
     "role": RoleSummary;
+    "handlesCustomers": boolean;
     "status": UserStatus;
     "workStatus": WorkStatus;
     "teams": TeamSummary[] | null;

@@ -210,7 +210,7 @@ func TestSyncHeadsConversationChanges(t *testing.T) {
 func TestSyncHeadsIdentityProfile(t *testing.T) {
 	f := newNavigationFixture(t)
 	ctx := context.Background()
-	if _, err := useraction.NewCreateUserAction(f.db).Execute(ctx, f.owner, useraction.CreateInput{DisplayName: "无会话成员", Email: "lonely@navigation.test", Password: "password123", RoleID: f.owner.OrganizationIdentity.RoleID}); err != nil {
+	if _, err := useraction.NewCreateUserAction(f.db).Execute(ctx, f.owner, useraction.CreateInput{HandlesCustomers: true, DisplayName: "无会话成员", Email: "lonely@navigation.test", Password: "password123", RoleID: f.owner.OrganizationIdentity.RoleID}); err != nil {
 		t.Fatal(err)
 	}
 	loginAction := authaction.NewLoginAction(f.db)
@@ -248,7 +248,7 @@ func TestSyncHeadsIdentityProfile(t *testing.T) {
 	}
 	preferences := useraction.NewUpdatePreferencesAction(f.db)
 	profile := useraction.NewUpdateProfileAction(f.db)
-	updateUser := useraction.NewUpdateUserAction(f.db)
+	updateUser := useraction.NewUpdateUserAction(f.db, testServiceSessionReturner(f.db))
 	shanghai := useraction.PreferencesInput{Locale: domain.Locale(lonely.User.Locale), TimeZone: "Asia/Shanghai", MessageNotificationsEnabled: lonely.User.MessageNotificationsEnabled, WorkspaceTabsEnabled: lonely.User.WorkspaceTabsEnabled}
 	for _, step := range []struct {
 		name   string
@@ -281,7 +281,7 @@ func TestSyncHeadsIdentityProfile(t *testing.T) {
 	if err := f.db.NewSelect().Table("organizations").Column("access_host").Where("id = ?", f.owner.Organization.ID).Scan(ctx, &accessHost); err != nil {
 		t.Fatal(err)
 	}
-	backend := appservice.NewDirectBackend(f.db, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil)
+	backend := appservice.NewDirectBackend(f.db, domain.DeploymentModeSelfHosted, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil)
 	heads, err := backend.GetSyncHeads(tenant.WithAccessHost(ctx, accessHost), appservice.RequestMeta{Token: login.Token})
 	stored := loadSyncHeads(t, f.db, lonely)
 	if err != nil || heads.ConversationCount != 1 || heads.ConversationChecksum != stored.ConversationChecksum || heads.IdentityProfileVersion != strconv.FormatInt(stored.IdentityProfileVersion, 10) {

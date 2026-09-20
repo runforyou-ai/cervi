@@ -132,7 +132,7 @@ func newChatLockUser(t *testing.T, db *bun.DB, owner *servermodels.Identity) *se
 	ctx := context.Background()
 	id := uuid.NewV7().String()
 	email := id + "@chat-lock.test"
-	_, err := useraction.NewCreateUserAction(db).Execute(ctx, owner, useraction.CreateInput{DisplayName: "锁定成员 " + id, Email: email, Password: "password123", RoleID: owner.OrganizationIdentity.RoleID})
+	_, err := useraction.NewCreateUserAction(db).Execute(ctx, owner, useraction.CreateInput{HandlesCustomers: true, DisplayName: "锁定成员 " + id, Email: email, Password: "password123", RoleID: owner.OrganizationIdentity.RoleID})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -318,7 +318,7 @@ func TestDirectSendAcceptedBeforeTargetDisabled(t *testing.T) {
 	// 停用在会话锁上等待已通过校验的发送提交，再推进展示该成员的会话版本。
 	disabled := make(chan error, 1)
 	go func() {
-		_, err := useraction.NewUpdateStatusAction(f.db).Execute(ctx, f.member, f.member.User.ID, domain.UserStatusInactive)
+		_, err := useraction.NewUpdateStatusAction(f.db, testServiceSessionReturner(f.db)).Execute(ctx, f.member, f.member.User.ID, domain.UserStatusInactive)
 		disabled <- err
 	}()
 	waitChatDatabaseLock(t, ctx, f.db, `FROM "conversations"`, f.member.OrganizationIdentity.ID)

@@ -13,6 +13,7 @@ import (
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	knowledgebaseaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
 	mcpserveraction "github.com/runforyou-ai/cervi/internal/actions/mcpserver"
+	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
@@ -34,6 +35,7 @@ var (
 
 // sessionGuard 解析请求所属企业并校验登录令牌。
 type sessionGuard struct {
+	deploymentMode  domain.DeploymentMode
 	resolveTenant   tenant.Resolver
 	resolveIdentity *authaction.ResolveIdentityQuery
 }
@@ -62,14 +64,14 @@ type directOperations struct {
 }
 
 // NewDirectBackend 创建直接访问服务端存储的应用后端。
-func NewDirectBackend(db *bun.DB, localFiles *serverfilecontent.LocalStore, s3 serverfilecontent.S3Config, tenantResolver tenant.Resolver, agentScheduler conversationaction.AgentMessageScheduler, agentCoordinator *agentrunaction.ExecuteAction, taskEnqueuer servertask.TxEnqueuer, documentConverter *documentconvert.Client, customerReplySuggestions *agentrunaction.GenerateCustomerReplySuggestionsAction) *DirectBackend {
+func NewDirectBackend(db *bun.DB, deploymentMode domain.DeploymentMode, localFiles *serverfilecontent.LocalStore, s3 serverfilecontent.S3Config, tenantResolver tenant.Resolver, agentScheduler conversationaction.AgentMessageScheduler, agentCoordinator *agentrunaction.ExecuteAction, taskEnqueuer servertask.TxEnqueuer, documentConverter *documentconvert.Client, customerReplySuggestions *agentrunaction.GenerateCustomerReplySuggestionsAction) *DirectBackend {
 	connectionRunner := connectiontest.NewRunner(10 * time.Second)
 	connectionClient := connectiontest.NewHTTPClient()
 	modelProviderRegistry := modelprovider.NewRegistry(connectionClient)
 	telegramAPI := telegram.NewClient(connectionClient)
 	mcpTest := mcpserveraction.NewTestConnectionAction(mcpintegration.NewClient())
 	mcpScheduler := mcpserveraction.NewToolsScheduler(taskEnqueuer)
-	guard := sessionGuard{resolveTenant: tenantResolver, resolveIdentity: authaction.NewResolveIdentityQuery(db)}
+	guard := sessionGuard{deploymentMode: deploymentMode, resolveTenant: tenantResolver, resolveIdentity: authaction.NewResolveIdentityQuery(db)}
 	documentQuery := knowledgebaseaction.NewDocumentQuery(db)
 	ops := &directOperations{
 		sessionGuard:    guard,
@@ -126,6 +128,10 @@ func (b *DirectBackend) SubscribeAgentRunStream(runID string,
 func (g sessionGuard) requireInitialized(ctx context.Context, meta RequestMeta) (tenant.Scope, error) {
 	scope, err := g.resolveTenant.Resolve(ctx, tenant.AccessHost(ctx))
 	if errors.Is(err, tenant.ErrNotFound) {
+		// 托管部署不提供初始化入口，未登记的访问地址按企业地址无效收敛。
+		if g.deploymentMode.Managed() {
+			return tenant.Scope{}, SessionError(meta, SessionStateInvalidAddress, cervii18n.ErrorOrganizationAddressInvalid)
+		}
 		return tenant.Scope{}, SessionError(meta, SessionStateSetup, cervii18n.ErrorInstallationRequired)
 	}
 	if err != nil {

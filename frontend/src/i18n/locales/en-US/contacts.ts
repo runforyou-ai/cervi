@@ -49,6 +49,7 @@ const contacts = {
     joinedAt: "Joined",
     stage: "Stage",
     channels: "Channels",
+    handlesCustomers: "Handles customers",
     createdAt: "Created",
     addedAt: "Added",
     updatedAt: "Updated",
@@ -104,6 +105,7 @@ const contacts = {
       email: "Email",
       password: "Initial password",
       role: "Company role",
+      handlesCustomers: "Handles customers",
       teams: "Teams",
       noTeams: "There are no teams to select.",
       created: "Company member added",
@@ -142,6 +144,7 @@ const contacts = {
     create: "Add AI employee",
     form: {
       name: "AI employee name",
+      handlesCustomers: "Handles customers",
       teams: "Teams",
       noTeams: "There are no teams to select.",
       created: "AI employee added",
@@ -154,10 +157,6 @@ const contacts = {
       nameInvalid: "AI employee names can only contain letters, numbers, spaces, and · - _ . characters.",
       modelRequired: "Select a chat model.",
       instructionTooLong: "Company instructions cannot exceed 20,000 characters.",
-    },
-    roleHint: {
-      customerService: "Can serve customers and follows the customer service work rules.",
-      member: "Collaborates internally only and follows the member work rules.",
     },
     mcp: {
       services: "MCP services",

@@ -52,7 +52,8 @@ func newAgentOps(db *bun.DB, agentCoordinator *agentrunaction.ExecuteAction, cus
 // CreateAgent 创建企业 AI 员工。
 func (o *directOperations) CreateAgent(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input CreateAgentInput) (Agent, error) {
 	created, err := o.createAgent.Execute(ctx, identity, agentaction.CreateInput{
-		DisplayName: input.DisplayName, RoleID: input.RoleID, TeamIDs: input.TeamIDs, AvatarFileID: input.AvatarFileID,
+		DisplayName: input.DisplayName, RoleID: input.RoleID, TeamIDs: input.TeamIDs,
+		HandlesCustomers: input.HandlesCustomers, AvatarFileID: input.AvatarFileID,
 		Execution: agentExecutionInput(input.Execution),
 	})
 	if err != nil {
@@ -160,7 +161,7 @@ func (o *directOperations) GetAgent(ctx context.Context, meta RequestMeta, ident
 
 // UpdateAgent 保存企业 AI 员工基本资料、头像和工作状态。
 func (o *directOperations) UpdateAgent(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, agentID string, input UpdateAgentInput) (Agent, error) {
-	agent, err := o.updateAgent.Execute(ctx, identity, agentID, agentaction.UpdateInput{DisplayName: input.DisplayName, RoleID: input.RoleID, TeamIDs: input.TeamIDs, WorkStatus: domain.WorkStatus(input.WorkStatus), AvatarFileID: input.AvatarFileID})
+	agent, err := o.updateAgent.Execute(ctx, identity, agentID, agentaction.UpdateInput{DisplayName: input.DisplayName, RoleID: input.RoleID, TeamIDs: input.TeamIDs, HandlesCustomers: input.HandlesCustomers, WorkStatus: domain.WorkStatus(input.WorkStatus), AvatarFileID: input.AvatarFileID})
 	if err != nil {
 		return Agent{}, o.agentError(ctx, meta, err, cervii18n.ErrorAgentUpdateFailed, identity.Organization.ID, agentID, map[common.FieldCode]cervii18n.Key{
 			agentaction.ValidationDisplayNameRequired:   cervii18n.FieldAgentNameRequired,
@@ -254,11 +255,9 @@ func agentFromAction(agent agentaction.Agent, organizationName string) Agent {
 		}
 	}
 	execution := AgentExecution{MCPServerIDs: agent.Execution.MCPServerIDs, RevisionID: agent.Execution.RevisionID, Mode: AgentExecutionMode(agent.Execution.Mode), Managed: managed}
-	behavior := AgentBehaviorProfile{Tools: []string{}}
-	if profile := agentBehaviorProfile(agent.RoleKind, organizationName); profile != nil {
-		behavior = *profile
-	}
-	return Agent{ID: agent.ID, IdentityID: agent.IdentityID, DisplayName: agent.DisplayName, Role: RoleSummary{ID: agent.RoleID, Kind: RoleKind(agent.RoleKind), Name: agent.RoleName}, Status: UserStatus(agent.Status), WorkStatus: WorkStatus(agent.WorkStatus), Teams: teams, Execution: execution, Behavior: behavior, CreatedAt: agent.CreatedAt}
+	instruction, tools := agentrunaction.BehaviorProfile(agent.HandlesCustomers, organizationName)
+	behavior := AgentBehaviorProfile{Instruction: instruction, Tools: tools}
+	return Agent{ID: agent.ID, IdentityID: agent.IdentityID, DisplayName: agent.DisplayName, Role: RoleSummary{ID: agent.RoleID, Kind: RoleKind(agent.RoleKind), Name: agent.RoleName}, HandlesCustomers: agent.HandlesCustomers, Status: UserStatus(agent.Status), WorkStatus: WorkStatus(agent.WorkStatus), Teams: teams, Execution: execution, Behavior: behavior, CreatedAt: agent.CreatedAt}
 }
 
 // agentExecutionInput 转换 AI 员工执行配置输入。

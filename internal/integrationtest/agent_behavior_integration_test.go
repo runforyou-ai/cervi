@@ -56,7 +56,7 @@ func TestAgentRoleBehavior(t *testing.T) {
 
 	// 空企业指令可以创建、读取详情并再次保存。
 	agent, err := agentaction.NewCreateAgentAction(db).Execute(ctx, identity, agentaction.CreateInput{
-		DisplayName: "行为助手", RoleID: roleID,
+		HandlesCustomers: true, DisplayName: "行为助手", RoleID: roleID,
 		Execution: agentaction.ExecutionInput{Mode: domain.AgentExecutionModeManaged, Managed: &agentaction.ManagedExecutionInput{ProviderID: provider.ID, ModelIdentifier: "chat", SystemInstruction: "   "}},
 	})
 	if err != nil {
@@ -109,7 +109,7 @@ func TestAgentRoleBehavior(t *testing.T) {
 		t.Fatal(err)
 	}
 	var snapshot struct {
-		RoleKind          string   `json:"roleKind"`
+		HandlesCustomers  bool     `json:"handlesCustomers"`
 		Scene             string   `json:"scene"`
 		RulesVersion      int      `json:"rulesVersion"`
 		Instruction       string   `json:"instruction"`
@@ -127,7 +127,7 @@ func TestAgentRoleBehavior(t *testing.T) {
 		t.Fatalf("behavior snapshot = %s, error = %v", run.BehaviorSnapshot, err)
 	}
 	sum := sha256.Sum256([]byte(captured.Assignment.Instruction))
-	if snapshot.RoleKind != string(domain.RoleKindCustomerService) || snapshot.Scene != string(agentruntime.SceneAgentChat) || snapshot.RulesVersion != 2 ||
+	if !snapshot.HandlesCustomers || snapshot.Scene != string(agentruntime.SceneAgentChat) || snapshot.RulesVersion != 2 ||
 		snapshot.Instruction != captured.Assignment.Instruction || snapshot.InstructionSHA256 != hex.EncodeToString(sum[:]) ||
 		snapshot.Model.ProviderID != provider.ID || snapshot.Model.Identifier != "chat" || snapshot.Model.ContextWindow != 32000 ||
 		len(snapshot.Tools) != 1 || snapshot.Tools[0] != "calculator" || len(snapshot.MCPServers) != 0 || snapshot.Grounding != "" {
@@ -144,7 +144,7 @@ func TestAgentRoleBehavior(t *testing.T) {
 	if err := db.NewSelect().Model(queued).Where("agr.conversation_id = ? AND agr.status = ?", first.Conversation.ID, domain.AgentRunStatusQueued).Scan(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := db.NewUpdate().Model(queued).Set("behavior_snapshot = ?::jsonb", `{"roleKind":"customer_service","scene":"agent_chat","rulesVersion":1,"instruction":"已固定的指令","instructionSha256":"","model":{},"tools":[]}`).WherePK().Exec(ctx); err != nil {
+	if _, err := db.NewUpdate().Model(queued).Set("behavior_snapshot = ?::jsonb", `{"handlesCustomers":true,"scene":"agent_chat","rulesVersion":1,"instruction":"已固定的指令","instructionSha256":"","model":{},"tools":[]}`).WherePK().Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
 	runQueuedAgentRun(t, db, execute, first.Conversation.ID)

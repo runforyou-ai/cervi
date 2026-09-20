@@ -7,22 +7,36 @@ import (
 	"database/sql"
 	"errors"
 	"fmt"
+	"uuid"
 
+	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
+	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
 
+// ServiceSessionReturner 在管理操作事务中把失去接待资格的成员负责的开放客服周期退回原队列，并在提交后中断被取消的模型调用。
+type ServiceSessionReturner interface {
+	ReturnServiceSessionsToQueue(ctx context.Context, db bun.IDB, organizationID, identityID, operationID string) ([]string, error)
+	CancelRunContexts([]string)
+}
+
 // UpdateUserAction 修改企业成员账号。
-type UpdateUserAction struct{ db *bun.DB }
+type UpdateUserAction struct {
+	db       *bun.DB
+	returner ServiceSessionReturner
+}
 
 // NewUpdateUserAction 创建企业成员修改操作。
-func NewUpdateUserAction(db *bun.DB) *UpdateUserAction { return &UpdateUserAction{db: db} }
+func NewUpdateUserAction(db *bun.DB, returner ServiceSessionReturner) *UpdateUserAction {
+	return &UpdateUserAction{db: db, returner: returner}
+}
 
-// Execute 修改企业成员资料、角色和所属团队。
+// Execute 修改企业成员资料、角色、接待开关和所属团队；关闭接待开关时重置其渠道路由并把负责的开放客服周期退回原队列。
 func (a *UpdateUserAction) Execute(ctx context.Context, identity *servermodels.Identity, userID string, input UpdateInput) (*User, error) {
 	// 规范化并校验企业成员字段。
 	profile, fields := normalizeProfileInput(ProfileInput{DisplayName: input.DisplayName, Email: input.Email})
@@ -40,6 +54,7 @@ func (a *UpdateUserAction) Execute(ctx context.Context, identity *servermodels.I
 		return nil, ErrNotFound
 	}
 	var output *User
+	var cancelledRunIDs []string
 	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
@@ -66,12 +81,30 @@ func (a *UpdateUserAction) Execute(ctx context.Context, identity *servermodels.I
 		if err != nil {
 			return err
 		}
+		// 企业身份更新语句锁定该身份行，退回客服周期与重置渠道路由在锁后执行。
+		var handledCustomers bool
+		if err := tx.NewSelect().Model((*servermodels.OrganizationIdentity)(nil)).
+			Column("oi.handles_customers").
+			Where("oi.organization_id = ? AND oi.id = ?", identity.Organization.ID, identityID).
+			Scan(ctx, &handledCustomers); err != nil {
+			return err
+		}
 		displayChanged, err := identityaction.UpdateUserIdentity(ctx, tx, identity.Organization.ID, identityID, tx.NewUpdate().Model((*servermodels.OrganizationIdentity)(nil)).
 			Set("display_name = ?", input.DisplayName).
 			Set("role_id = ?", input.RoleID).
+			Set("handles_customers = ?", input.HandlesCustomers).
 			Set("updated_at = now()"))
 		if err != nil {
 			return err
+		}
+		if handledCustomers && !input.HandlesCustomers {
+			if err := channelaction.ResetRoutingTarget(ctx, tx, identity.Organization.ID, domain.ChannelRoutingTargetTypeMember, identityID); err != nil {
+				return err
+			}
+			cancelledRunIDs, err = a.returner.ReturnServiceSessionsToQueue(ctx, tx, identity.Organization.ID, identityID, uuid.NewV7().String())
+			if err != nil {
+				return err
+			}
 		}
 		if err := ensureActiveAdministratorRemains(ctx, tx, identity.Organization.ID, administratorRoleID); err != nil {
 			return err
@@ -91,5 +124,6 @@ func (a *UpdateUserAction) Execute(ctx context.Context, identity *servermodels.I
 	if err != nil {
 		return nil, fmt.Errorf("update user: %w", err)
 	}
+	a.returner.CancelRunContexts(cancelledRunIDs)
 	return output, nil
 }

@@ -59,6 +59,15 @@ const (
 	ConversationSystemEventServiceSessionTransferred ConversationSystemEventType = ConversationSystemEventType(domain.ConversationSystemEventServiceSessionTransferred)
 	ConversationSystemEventServiceSessionClosed      ConversationSystemEventType = ConversationSystemEventType(domain.ConversationSystemEventServiceSessionClosed)
 	ConversationSystemEventServiceSessionReopened    ConversationSystemEventType = ConversationSystemEventType(domain.ConversationSystemEventServiceSessionReopened)
+	// ConversationSystemEventServiceSessionReturned 表示失去接待资格的负责人所负责的客服处理周期退回队列。
+	ConversationSystemEventServiceSessionReturned ConversationSystemEventType = ConversationSystemEventType(domain.ConversationSystemEventServiceSessionReturned)
+)
+
+// ServiceSessionReturnReason 表示客服处理周期退回队列的原因。
+type ServiceSessionReturnReason string
+
+const (
+	ServiceSessionReturnAssigneeUnavailable ServiceSessionReturnReason = ServiceSessionReturnReason(domain.ServiceSessionReturnAssigneeUnavailable)
 )
 
 // ServiceSessionTargetKind 表示客服处理周期流转去向的类型。
@@ -226,14 +235,15 @@ type ConversationSystemEvent struct {
 	Targets       []ConversationSystemEventParticipant `json:"targets"`
 	PreviousTitle *string                              `json:"previousTitle"`
 	Title         *string                              `json:"title"`
-	// 以下字段只由客服处理周期事件携带：原负责人、去向，以及转人工的原因与成员可见的原因说明；操作人写入 Actor。
-	ServiceSessionID *string               `json:"serviceSessionId"`
-	FromIdentityID   *string               `json:"fromIdentityId"`
-	FromDisplayName  *string               `json:"fromDisplayName"`
-	SessionTarget    *ServiceSessionTarget `json:"sessionTarget"`
-	HandoffReason    *AgentHandoffReason   `json:"handoffReason"`
-	ReasonText       *string               `json:"reasonText"`
-	AgentRunID       *string               `json:"agentRunId"`
+	// 以下字段只由客服处理周期事件携带：原负责人、去向，以及转人工或退回队列的原因与成员可见的原因说明；操作人写入 Actor。
+	ServiceSessionID *string                     `json:"serviceSessionId"`
+	FromIdentityID   *string                     `json:"fromIdentityId"`
+	FromDisplayName  *string                     `json:"fromDisplayName"`
+	SessionTarget    *ServiceSessionTarget       `json:"sessionTarget"`
+	HandoffReason    *AgentHandoffReason         `json:"handoffReason"`
+	ReturnReason     *ServiceSessionReturnReason `json:"returnReason"`
+	ReasonText       *string                     `json:"reasonText"`
+	AgentRunID       *string                     `json:"agentRunId"`
 }
 
 // ConversationMessage 定义成员可见的会话消息。

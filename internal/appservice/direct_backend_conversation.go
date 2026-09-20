@@ -201,6 +201,8 @@ func serviceSessionMutationError(ctx context.Context, meta RequestMeta, err erro
 	if conflictError, ok := errors.AsType[*conversationaction.ConflictError](err); ok {
 		messageKey := cervii18n.ErrorServiceSessionNotReplyable
 		switch conflictError.Reason {
+		case conversationaction.ConflictReasonCustomerHandlingRequired:
+			messageKey = cervii18n.ErrorCustomerHandlingRequired
 		case conversationaction.ConflictReasonServiceSessionOwned:
 			messageKey = cervii18n.ErrorServiceSessionOwned
 		case conversationaction.ConflictReasonServiceSessionAlreadyOpen:
@@ -634,7 +636,8 @@ func conversationMessageFromAction(message conversationaction.ConversationMessag
 			Targets: targets, PreviousTitle: message.SystemEvent.PreviousTitle, Title: message.SystemEvent.Title,
 			ServiceSessionID: message.SystemEvent.ServiceSessionID, FromIdentityID: message.SystemEvent.FromIdentityID,
 			FromDisplayName: message.SystemEvent.FromDisplayName, HandoffReason: (*AgentHandoffReason)(message.SystemEvent.Reason),
-			ReasonText: message.SystemEvent.ReasonText, AgentRunID: message.SystemEvent.AgentRunID,
+			ReturnReason: (*ServiceSessionReturnReason)(message.SystemEvent.ReturnReason),
+			ReasonText:   message.SystemEvent.ReasonText, AgentRunID: message.SystemEvent.AgentRunID,
 		}
 		// 客服处理周期事件的操作人按群聊事件的 actor 结构返回。
 		if message.SystemEvent.ActorIdentityID != nil && message.SystemEvent.ActorDisplayName != nil {
@@ -855,6 +858,8 @@ func customerTextMessageError(ctx context.Context, meta RequestMeta, err error, 
 // customerReplyConflictMessageKey 返回对客回复资格冲突的本地化文案键。
 func customerReplyConflictMessageKey(reason string) cervii18n.Key {
 	switch reason {
+	case conversationaction.ConflictReasonCustomerHandlingRequired:
+		return cervii18n.ErrorCustomerHandlingRequired
 	case conversationaction.ConflictReasonServiceSessionOwned:
 		return cervii18n.ErrorServiceSessionOwned
 	case conversationaction.ConflictReasonServiceSessionNotReplyable:

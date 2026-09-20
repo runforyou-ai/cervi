@@ -63,20 +63,28 @@ func newProfileFixture(t *testing.T) profileFixture {
 // versions 读取成员资料所在四个会话的当前版本。
 func (f profileFixture) versions(t *testing.T) map[string]int64 {
 	t.Helper()
+	versions := f.internalVersions(t)
+	versions[f.conversationID] = loadConversationVersion(t, f.db, f.conversationID)
+	return versions
+}
+
+// internalVersions 读取成员资料所在三个内部会话的当前版本。
+func (f profileFixture) internalVersions(t *testing.T) map[string]int64 {
+	t.Helper()
 	return map[string]int64{
-		f.groupID:        loadConversationVersion(t, f.db, f.groupID),
-		f.directID:       loadConversationVersion(t, f.db, f.directID),
-		f.leftGroupID:    loadConversationVersion(t, f.db, f.leftGroupID),
-		f.conversationID: loadConversationVersion(t, f.db, f.conversationID),
+		f.groupID:     loadConversationVersion(t, f.db, f.groupID),
+		f.directID:    loadConversationVersion(t, f.db, f.directID),
+		f.leftGroupID: loadConversationVersion(t, f.db, f.leftGroupID),
 	}
 }
 
-// expectVersions 断言各会话版本相对基线推进了指定次数。
+// expectVersions 断言基线中各会话的版本相对基线推进了指定次数。
 func (f profileFixture) expectVersions(t *testing.T, step string, before map[string]int64, delta int64) {
 	t.Helper()
-	for conversationID, version := range f.versions(t) {
-		if version != before[conversationID]+delta {
-			t.Fatalf("%s: 会话 %s 版本 = %d，want %d", step, conversationID, version, before[conversationID]+delta)
+	current := f.versions(t)
+	for conversationID, version := range before {
+		if current[conversationID] != version+delta {
+			t.Fatalf("%s: 会话 %s 版本 = %d，want %d", step, conversationID, current[conversationID], version+delta)
 		}
 	}
 }
@@ -146,22 +154,24 @@ func TestMemberProfileConversationInvalidation(t *testing.T) {
 	if _, err := profile.Execute(ctx, f.member, useraction.ProfileInput{DisplayName: "成员新名", Email: f.member.User.Email}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := useraction.NewUpdateUserAction(f.db).Execute(ctx, f.owner, f.member.User.ID, useraction.UpdateInput{DisplayName: "成员新名", Email: "profile-renamed@navigation.test", RoleID: f.member.OrganizationIdentity.RoleID}); err != nil {
+	if _, err := useraction.NewUpdateUserAction(f.db, testServiceSessionReturner(f.db)).Execute(ctx, f.owner, f.member.User.ID, useraction.UpdateInput{DisplayName: "成员新名", Email: "profile-renamed@navigation.test", RoleID: f.member.OrganizationIdentity.RoleID, HandlesCustomers: true}); err != nil {
 		t.Fatal(err)
 	}
 	f.expectVersions(t, "名称未变", after, 0)
 	feed.expect(t, feed.notice(f.member.User.ID, realtime.KindIdentityProfileChanged, "", loadProfileVersion(t, f.db, f.member.User.ID)))
 
 	// 管理员改名同样推进。
-	if _, err := useraction.NewUpdateUserAction(f.db).Execute(ctx, f.owner, f.member.User.ID, useraction.UpdateInput{DisplayName: "管理员改的名", Email: "profile-renamed@navigation.test", RoleID: f.member.OrganizationIdentity.RoleID}); err != nil {
+	if _, err := useraction.NewUpdateUserAction(f.db, testServiceSessionReturner(f.db)).Execute(ctx, f.owner, f.member.User.ID, useraction.UpdateInput{DisplayName: "管理员改的名", Email: "profile-renamed@navigation.test", RoleID: f.member.OrganizationIdentity.RoleID, HandlesCustomers: true}); err != nil {
 		t.Fatal(err)
 	}
 	f.expectVersions(t, "管理员改名", after, 1)
 	feed.expect(t, append(changedNotices(), feed.notice(f.member.User.ID, realtime.KindIdentityProfileChanged, "", loadProfileVersion(t, f.db, f.member.User.ID)))...)
 
 	// 停用与恢复改变列表展示的账号状态，重复停用不推进；停用另发连接撤销控制，本段只核对版本。
-	status := useraction.NewUpdateStatusAction(f.db)
-	before = f.versions(t)
+	status := useraction.NewUpdateStatusAction(f.db, testServiceSessionReturner(f.db))
+	// 停用把该成员负责的客服周期退回公共队列，客户会话随退回事件推进一次后不再展示该成员。
+	before = f.internalVersions(t)
+	customerBefore := loadConversationVersion(t, f.db, f.conversationID)
 	for _, step := range []struct {
 		status domain.UserStatus
 		delta  int64
@@ -170,6 +180,26 @@ func TestMemberProfileConversationInvalidation(t *testing.T) {
 			t.Fatal(err)
 		}
 		f.expectVersions(t, "账号状态 "+string(step.status), before, step.delta)
+	}
+	if version := loadConversationVersion(t, f.db, f.conversationID); version != customerBefore+1 {
+		t.Fatalf("停用后客户会话版本 = %d，want %d", version, customerBefore+1)
+	}
+	returnedSession := servermodels.ServiceSession{}
+	if err := f.db.NewSelect().Model(&returnedSession).Where("ss.conversation_id = ?", f.conversationID).Scan(ctx); err != nil ||
+		returnedSession.AssigneeIdentityID != nil || returnedSession.TeamID != nil {
+		t.Fatalf("停用后客服周期 = %+v, error = %v", returnedSession, err)
+	}
+	events := returnedEvents(t, f.db, f.conversationID)
+	if len(events) != 1 || events[0].FromIdentityID != f.member.OrganizationIdentity.ID ||
+		events[0].Reason != domain.ServiceSessionReturnAssigneeUnavailable || events[0].Target.Kind != domain.ServiceSessionTargetPublicQueue {
+		t.Fatalf("停用后退回事件 = %+v", events)
+	}
+	// 真人退回队列不向客户发送通知。
+	notices, err := f.db.NewSelect().Model((*servermodels.Message)(nil)).
+		Where("msg.conversation_id = ? AND msg.idempotency_key LIKE ?", f.conversationID, "returned:%").
+		Where("msg.type = ?", domain.MessageTypeText).Count(ctx)
+	if err != nil || notices != 0 {
+		t.Fatalf("停用后对客通知 = %d, error = %v", notices, err)
 	}
 }
 
@@ -207,7 +237,7 @@ func TestAgentProfileConversationInvalidation(t *testing.T) {
 	}
 	createdAvatarID := uploadAvatar()
 	created, err := agentaction.NewCreateAgentAction(f.db).Execute(ctx, f.owner, agentaction.CreateInput{
-		DisplayName: "资料助手", RoleID: roleID, AvatarFileID: createdAvatarID,
+		HandlesCustomers: true, DisplayName: "资料助手", RoleID: roleID, AvatarFileID: createdAvatarID,
 		Execution: agentaction.ExecutionInput{Mode: domain.AgentExecutionModeManaged, Managed: &agentaction.ManagedExecutionInput{ProviderID: provider.ID, ModelIdentifier: model.Identifier, SystemInstruction: "回答问题"}},
 	})
 	if err != nil || created.AvatarFileID == nil || *created.AvatarFileID != createdAvatarID {
@@ -242,8 +272,8 @@ func TestAgentProfileConversationInvalidation(t *testing.T) {
 		return values
 	}
 	feed := startRealtimeFeed(t, f.owner.Organization.ID)
-	update := agentaction.NewUpdateAgentAction(f.db, testServiceSessionHandoff(f.db))
-	status := agentaction.NewUpdateStatusAction(f.db, testServiceSessionHandoff(f.db))
+	update := agentaction.NewUpdateAgentAction(f.db, testServiceSessionReturner(f.db))
+	status := agentaction.NewUpdateStatusAction(f.db, testServiceSessionReturner(f.db))
 	rename := func(name string, workStatus domain.WorkStatus) error {
 		_, err := update.Execute(ctx, f.owner, created.ID, agentaction.UpdateInput{DisplayName: name, RoleID: roleID, WorkStatus: workStatus})
 		return err

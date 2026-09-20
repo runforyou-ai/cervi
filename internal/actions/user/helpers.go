@@ -20,7 +20,7 @@ func loadCurrentIdentity(ctx context.Context, db bun.IDB, organization servermod
 	identity := &servermodels.Identity{Organization: organization}
 	err := db.NewSelect().TableExpr("users AS u").
 		ColumnExpr("u.id::text, u.identity_id::text, u.organization_id::text, u.email, u.status, u.locale, u.time_zone, u.message_notifications_enabled, u.workspace_tabs_enabled").
-		ColumnExpr("oi.id::text, oi.organization_id::text, oi.type, oi.role_id::text, oi.display_name, oi.avatar_file_id::text, oi.work_status").
+		ColumnExpr("oi.id::text, oi.organization_id::text, oi.type, oi.role_id::text, oi.display_name, oi.avatar_file_id::text, oi.handles_customers, oi.work_status").
 		Join("JOIN organization_identities AS oi ON oi.id = u.identity_id AND oi.organization_id = u.organization_id AND oi.type = ?", domain.OrganizationIdentityTypeUser).
 		Where("u.organization_id = ?", organization.ID).
 		Where("u.id = ?", userID).
@@ -40,6 +40,7 @@ func loadCurrentIdentity(ctx context.Context, db bun.IDB, organization servermod
 			&identity.OrganizationIdentity.RoleID,
 			&identity.OrganizationIdentity.DisplayName,
 			&identity.OrganizationIdentity.AvatarFileID,
+			&identity.OrganizationIdentity.HandlesCustomers,
 			&identity.OrganizationIdentity.WorkStatus,
 		)
 	return identity, err
@@ -53,7 +54,7 @@ func loadUser(ctx context.Context, db bun.IDB, organizationID, userID string) (*
 	user := &User{}
 	err := db.NewSelect().TableExpr("users AS u").
 		ColumnExpr("u.id::text AS id, u.identity_id::text AS identity_id").
-		ColumnExpr("u.email, u.status, oi.display_name, oi.avatar_file_id::text AS avatar_file_id, oi.work_status, oi.created_at").
+		ColumnExpr("u.email, u.status, oi.display_name, oi.avatar_file_id::text AS avatar_file_id, oi.handles_customers, oi.work_status, oi.created_at").
 		ColumnExpr("r.id::text AS role_id, r.kind AS role_kind, r.name AS role_name").
 		Join("JOIN organization_identities AS oi ON oi.id = u.identity_id AND oi.organization_id = u.organization_id AND oi.type = ?", domain.OrganizationIdentityTypeUser).
 		Join("JOIN roles AS r ON r.id = oi.role_id AND r.organization_id = oi.organization_id").

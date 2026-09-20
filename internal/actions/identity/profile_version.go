@@ -24,7 +24,7 @@ type profileVersionRow struct {
 func UpdateUserIdentity(ctx context.Context, db bun.IDB, organizationID, identityID string, query *bun.UpdateQuery) (bool, error) {
 	query = query.
 		Where("oi.organization_id = ? AND oi.id = ? AND oi.type = ?", organizationID, identityID, domain.OrganizationIdentityTypeUser).
-		Returning("new.organization_id, new.id, (old.display_name, old.avatar_file_id, old.role_id, old.work_status) IS DISTINCT FROM (new.display_name, new.avatar_file_id, new.role_id, new.work_status) AS changed, (old.display_name, old.avatar_file_id) IS DISTINCT FROM (new.display_name, new.avatar_file_id) AS display_changed")
+		Returning("new.organization_id, new.id, (old.display_name, old.avatar_file_id, old.role_id, old.handles_customers, old.work_status) IS DISTINCT FROM (new.display_name, new.avatar_file_id, new.role_id, new.handles_customers, new.work_status) AS changed, (old.display_name, old.avatar_file_id) IS DISTINCT FROM (new.display_name, new.avatar_file_id) AS display_changed")
 	var rows []profileVersionRow
 	if err := db.NewUpdate().With("identity_change", query).
 		Model((*servermodels.User)(nil)).

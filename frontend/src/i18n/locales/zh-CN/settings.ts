@@ -151,10 +151,6 @@ const settings = {
     },
     permissions: {
       memberTitle: "成员权限",
-      agentTitle: "AI 员工能力",
-      agentDescription: "由 Cervi 按角色内置，随产品版本更新。",
-      agentNotApplicable: "管理员角色不能分配给 AI 员工。",
-      agentCustomNote: "自定义角色的 AI 员工按成员规则工作。",
       adminDescription: "管理员固定拥有全部权限。",
       label: "{{level}}{{resource}}",
       toggle: "{{resource}}：{{level}}",
