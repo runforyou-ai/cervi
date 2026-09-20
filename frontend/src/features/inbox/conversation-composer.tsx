@@ -887,7 +887,7 @@ export function ConversationComposer({
           disabled={isSubmitting}
           aria-label={t("emojiPick")}
         >
-          <SmileIcon className="size-[18px]" />
+          <SmileIcon className="size-5" />
         </Button>
       </PopoverTrigger>
       <PopoverContent
@@ -1088,7 +1088,7 @@ export function ConversationComposer({
                 <Button
                   type="submit"
                   size="icon"
-                  className="relative size-9 rounded-full after:absolute after:-inset-1 after:content-[''] [&_svg:not([class*='size-'])]:size-5"
+                  className="relative size-9 rounded-full after:absolute after:-inset-1 after:content-[''] [&_svg:not([class*='size-'])]:size-[22px]"
                   disabled={isSubmitting || Boolean(disabledReason) || isBodyEmpty || replyTo?.deleted}
                   aria-label={t(internalNote ? "internalNoteSave" : "messageSend")}
                 >
