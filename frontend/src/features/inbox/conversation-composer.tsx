@@ -884,7 +884,7 @@ export function ConversationComposer({
           disabled={isSubmitting}
           aria-label={t("emojiPick")}
         >
-          <SmileIcon />
+          <SmileIcon className="size-[18px]" />
         </Button>
       </PopoverTrigger>
       <PopoverContent
@@ -1081,8 +1081,8 @@ export function ConversationComposer({
           ) : null}
           <div className="flex items-end p-0.5">
             {disabledReason ? null : emojiTool}
-            {bodyInput}
             {replyAssistant}
+            {bodyInput}
             {disabledReason ? null : (
               <div className={cn("flex", showSend && "hidden")}>{attachmentTool}</div>
             )}
