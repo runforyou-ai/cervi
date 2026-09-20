@@ -12,6 +12,7 @@ const workspace = {
   integrations: "Integrations",
   apps: "Apps",
   settings: "Settings",
+  appVersion: "Version {{version}}",
   openUserMenu: "Open the user menu for {{name}}",
   workStatus: "Work status",
   workStatusUpdateError: "Could not change the work status. Try again.",

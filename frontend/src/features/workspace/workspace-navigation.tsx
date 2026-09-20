@@ -48,6 +48,7 @@ import {
 } from "@/components/work-status"
 import { UserAvatar } from "@/components/user-avatar"
 import { cn } from "@/lib/utils"
+import { resolveAppPlatform } from "@/platform/app-platform"
 import { requestNotificationPermissionFromMessageMenu } from "@/platform/notifications"
 
 /** 模块栏导航项。 */
@@ -57,12 +58,14 @@ function WorkspaceRailItem({
   label,
   active,
   onClick,
+  className,
 }: {
   to: string
   icon: LucideIcon
   label: string
   active: boolean
   onClick?: () => void
+  className?: string
 }) {
   return (
     <NavLink
@@ -74,6 +77,7 @@ function WorkspaceRailItem({
         "focus-visible:ring-2 focus-visible:ring-sidebar-ring",
         active &&
           "bg-sidebar-accent font-medium text-sidebar-accent-foreground",
+        className,
       )}
     >
       <Icon className="size-4 shrink-0" />
@@ -147,6 +151,8 @@ function WorkspaceSettingsMenu({ appHref }: { appHref: string }) {
         icon={ChevronLeftIcon}
         label={t("backToApp")}
         active={false}
+        // 左箭头字形本身内缩，整行左移抵消，与下方导航项视觉左对齐。
+        className="-ml-1"
       />
       <PagePaneGroup title={t("groups.personal")}>
         <WorkspaceRailItem
@@ -215,6 +221,7 @@ export function WorkspaceNavigation({
   const changingWorkStatusRef = useRef(false)
   const userMenuTriggerRef = useRef<HTMLButtonElement>(null)
   const skipUserMenuFocusRestoreRef = useRef(false)
+  const showAppVersion = inSettings && resolveAppPlatform() === "desktop"
 
   /** 从用户菜单进入页面，并清除头像触发器的选中效果。 */
   function navigateFromUserMenu(path: string) {
@@ -381,6 +388,11 @@ export function WorkspaceNavigation({
           </DropdownMenu>
         </div>
       )}
+      {showAppVersion ? (
+        <span className="pt-1 pr-0 pb-2.5 pl-4 text-xs text-muted-foreground">
+          {t("appVersion", { version: __APP_VERSION__ })}
+        </span>
+      ) : null}
     </aside>
   )
 }
