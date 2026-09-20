@@ -91,6 +91,7 @@ type queryStruct struct {
 // apiTarget 描述一套 Gin 适配代码的接收器、请求元数据构造、参数绑定和输出函数。
 //
 // 绑定失败与调用失败使用同一套错误输出，各契约的错误体形态因此保持一致。
+// 查询绑定函数带各契约独立的前缀，同一个查询类型被两套契约使用时仍生成不同的函数名。
 type apiTarget struct {
 	comment      string
 	receiver     string
@@ -98,6 +99,7 @@ type apiTarget struct {
 	requestMeta  string
 	writeResult  string
 	writeEmpty   string
+	bindPrefix   string
 	bindJSON     string
 	queryInteger string
 }
@@ -110,6 +112,7 @@ var businessAPITarget = apiTarget{
 	requestMeta:  "requestMeta(c)",
 	writeResult:  "writeResult",
 	writeEmpty:   "writeEmpty",
+	bindPrefix:   "bind",
 	bindJSON:     "bindJSON",
 	queryInteger: "positiveQueryInteger",
 }
@@ -122,6 +125,7 @@ var operatorAPITarget = apiTarget{
 	requestMeta:  "operatorRequestMeta(c)",
 	writeResult:  "writeOperatorResult",
 	writeEmpty:   "writeOperatorEmpty",
+	bindPrefix:   "bindOperator",
 	bindJSON:     "bindOperatorJSON",
 	queryInteger: "positiveOperatorQueryInteger",
 }
@@ -718,7 +722,7 @@ func generateAPI(methods []method, queryStructs map[string]queryStruct, target a
 				arguments = append(arguments, fmt.Sprintf("appservice.%s(c.Query(%q))", parameter.typ, parameter.name))
 			case paramQueryStruct:
 				usedQueryStructs[parameter.typ] = true
-				fmt.Fprintf(builder, "\tinput, ok := bind%sQuery(c)\n\tif !ok {\n\t\treturn\n\t}\n", parameter.typ)
+				fmt.Fprintf(builder, "\tinput, ok := %s%sQuery(c)\n\tif !ok {\n\t\treturn\n\t}\n", target.bindPrefix, parameter.typ)
 				arguments = append(arguments, "input")
 			case paramBody:
 				fmt.Fprintf(builder, "\tvar input appservice.%s\n\tif !%s(c, &input) {\n\t\treturn\n\t}\n", parameter.typ, target.bindJSON)
@@ -745,8 +749,8 @@ func generateAPI(methods []method, queryStructs map[string]queryStruct, target a
 
 	for _, structName := range sortedKeys(usedQueryStructs) {
 		fields := queryStructs[structName].fields
-		fmt.Fprintf(builder, "// bind%sQuery 从查询参数解析 appservice.%s。\n", structName, structName)
-		fmt.Fprintf(builder, "func bind%sQuery(c *gin.Context) (appservice.%s, bool) {\n", structName, structName)
+		fmt.Fprintf(builder, "// %s%sQuery 从查询参数解析 appservice.%s。\n", target.bindPrefix, structName, structName)
+		fmt.Fprintf(builder, "func %s%sQuery(c *gin.Context) (appservice.%s, bool) {\n", target.bindPrefix, structName, structName)
 		for _, field := range fields {
 			if field.kind == queryInt {
 				fmt.Fprintf(builder, "\t%s, ok := %s(c, %q, %d)\n\tif !ok {\n\t\treturn appservice.%s{}, false\n\t}\n",
