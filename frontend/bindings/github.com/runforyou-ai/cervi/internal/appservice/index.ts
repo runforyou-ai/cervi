@@ -138,6 +138,7 @@ export type {
     ConversationReadState,
     ConversationSystemEvent,
     ConversationSystemEventParticipant,
+    ConversationTypingInput,
     ConversationUnreadMarkInput,
     ConversationWindowInput,
     CreateAgentInput,

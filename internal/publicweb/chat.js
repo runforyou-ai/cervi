@@ -34,6 +34,10 @@
   var REALTIME_IDLE_TIMEOUT = 60000;
   var REALTIME_BACKOFF_BASE = 1000;
   var REALTIME_BACKOFF_MAX = 30000;
+  var TYPING_EXPIRY = 6000;
+  var TYPING_REFRESH = 3000;
+  var TYPING_IDLE = 5000;
+  var TYPING_STOP_GRACE = 4000;
   var previewMode = messenger.getAttribute("data-preview") === "true";
   var channelID = messenger.getAttribute("data-channel-id");
   var visitorToken = "";
@@ -41,6 +45,9 @@
   var initializationPending = false;
   var messageRequestPending = false;
   var conversationItems = [];
+  var typingConversation = null;
+  var typingReportedAt = 0;
+  var typingIdleTimer = 0;
   var conversationByID = Object.create(null);
   var activeRoute = "home";
   var conversationReturnRoute = "home";
@@ -182,6 +189,7 @@
       lastMessageSeq: summary ? summary.lastMessageSeq : "0",
       replyState: "none",
       typingNode: null,
+      typingTimer: 0,
       historyLoaded: false,
       historyLoading: false,
       messageIDs: Object.create(null),
@@ -209,6 +217,7 @@
   }
 
   function stashActiveConversation() {
+    stopTypingReport();
     activeConversation.draft = input.value;
     Array.from(messages.children).forEach(function (node) {
       if (node !== intro) {
@@ -647,6 +656,41 @@
     appendConversationNode(conversation, message);
   }
 
+  // 按收到的输入状态显示或清除指定会话的正在输入提示。
+  // 访客事件不携带发送者，客服与 AI 员工共用同一个提示：停止时保留一个长于刷新间隔的宽限期，
+  // 仍在准备回复的一方会在宽限期内把提示续上，都停止后到期清除。
+  function applyConversationTyping(conversation, active) {
+    if (!active && !conversation.typingNode) {
+      return;
+    }
+    window.clearTimeout(conversation.typingTimer);
+    if (active) {
+      if (conversation.typingNode) {
+        // 提示始终留在消息列表末尾。
+        conversationMessageContainer(conversation).appendChild(conversation.typingNode);
+        if (conversation === activeConversation && followingMessages) {
+          scrollToBottom();
+        }
+      } else {
+        appendTyping(conversation);
+      }
+    }
+    conversation.typingTimer = window.setTimeout(function () {
+      removeConversationTyping(conversation);
+    }, active ? TYPING_EXPIRY : TYPING_STOP_GRACE);
+  }
+
+  // 清除指定会话的正在输入提示。
+  function removeConversationTyping(conversation) {
+    window.clearTimeout(conversation.typingTimer);
+    conversation.typingTimer = 0;
+    if (!conversation.typingNode) {
+      return;
+    }
+    conversation.typingNode.remove();
+    conversation.typingNode = null;
+  }
+
   // 为当前会话安排互不干扰的演示回复。
   function scheduleDemoReply() {
     if (!demoReply || activeConversation.replyState !== "none") {
@@ -658,10 +702,7 @@
       appendTyping(conversation);
     }, 320);
     window.setTimeout(function () {
-      if (conversation.typingNode) {
-        conversation.typingNode.remove();
-        conversation.typingNode = null;
-      }
+      removeConversationTyping(conversation);
       conversation.replyState = "sent";
       appendAssistantMessage(conversation, demoReply, false);
     }, 980);
@@ -783,6 +824,7 @@
     if (!text) {
       return;
     }
+    stopTypingReport();
     if (!previewMode) {
       sendRealMessage(text);
       return;
@@ -793,6 +835,56 @@
     updateSendState();
     scheduleDemoReply();
     input.focus();
+  }
+
+  // 上报访客在指定线程中的输入状态，失败由接收端到期清除兜底。
+  function postVisitorTyping(conversation, active) {
+    requestWebsiteJSON(
+      "/api/public/website-channels/" +
+        encodeURIComponent(channelID) +
+        "/conversations/" +
+        encodeURIComponent(conversation.id) +
+        "/typing",
+      {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ active: active }),
+      },
+    ).catch(function () {});
+  }
+
+  // 按输入内容变化上报开始输入，持续输入按间隔刷新，内容为空时上报停止。
+  function reportTypingInput() {
+    if (previewMode) {
+      return;
+    }
+    if (typingConversation && typingConversation !== activeConversation) {
+      stopTypingReport();
+    }
+    if (!activeConversation.id || !input.value.trim()) {
+      stopTypingReport();
+      return;
+    }
+    var now = Date.now();
+    if (!typingConversation || now - typingReportedAt >= TYPING_REFRESH) {
+      typingConversation = activeConversation;
+      typingReportedAt = now;
+      postVisitorTyping(activeConversation, true);
+    }
+    window.clearTimeout(typingIdleTimer);
+    typingIdleTimer = window.setTimeout(stopTypingReport, TYPING_IDLE);
+  }
+
+  // 结束本次输入，之前上报过开始输入时上报停止。
+  function stopTypingReport() {
+    window.clearTimeout(typingIdleTimer);
+    typingIdleTimer = 0;
+    if (!typingConversation) {
+      return;
+    }
+    var conversation = typingConversation;
+    typingConversation = null;
+    postVisitorTyping(conversation, false);
   }
 
   // 请求网站访客 JSON 接口。
@@ -980,6 +1072,7 @@
 
   // 清空指定会话现有的真实消息节点。
   function clearConversationMessages(conversation) {
+    removeConversationTyping(conversation);
     CerviMarkdown.unmount(conversationMessageContainer(conversation));
     conversationMessageContainer(conversation).querySelectorAll(".cv-message-bubble").forEach(function (bubble) {
       messageResizeObserver.unobserve(bubble);
@@ -1113,6 +1206,14 @@
       message,
       value.messageSeq,
     );
+    if (value.author === "visitor") {
+      // 本人消息插入后把对方的正在输入提示重新放回末尾。
+      if (conversation.typingNode) {
+        conversationMessageContainer(conversation).appendChild(conversation.typingNode);
+      }
+      return;
+    }
+    removeConversationTyping(conversation);
   }
 
   // 渲染服务端附件：图片内联预览并可点开灯箱，其余显示文件名、大小和下载入口。
@@ -1455,6 +1556,14 @@
     }
     if (event.type === "conversation_changed") {
       applyVisitorConversationChanged(event.data ? event.data.conversationId : "");
+      return;
+    }
+    if (event.type === "visitor_typing") {
+      var typing = event.data || {};
+      var target = conversationByID[typing.conversationId];
+      if (target) {
+        applyConversationTyping(target, typing.active === true);
+      }
     }
   }
 
@@ -1786,6 +1895,7 @@
     input.focus();
     autosize();
     updateSendState();
+    reportTypingInput();
   }
 
   function fillEmojiPanel() {
@@ -2543,6 +2653,7 @@
     }
     autosize();
     updateSendState();
+    reportTypingInput();
   });
   input.addEventListener("keydown", function (event) {
     if (event.key !== "Enter" || event.shiftKey || event.isComposing) {
@@ -2678,7 +2789,12 @@
       postToParent({ type: "cervi:preview-ready" });
     }
   });
-  document.addEventListener("visibilitychange", handleVisitorForeground);
+  document.addEventListener("visibilitychange", function () {
+    if (document.visibilityState !== "visible") {
+      stopTypingReport();
+    }
+    handleVisitorForeground();
+  });
   window.addEventListener("online", handleVisitorForeground);
   window.addEventListener("resize", autosize);
   if (!previewMode) {

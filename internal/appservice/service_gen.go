@@ -149,6 +149,11 @@ func (s *Service) MarkConversationRead(ctx context.Context, meta RequestMeta, co
 	return withNormalizedSlices(s.backend.MarkConversationRead(ctx, meta, conversationID, input))
 }
 
+// ReportConversationTyping 发布当前用户的输入状态：单聊与群聊发给其他真人成员，网站渠道客户会话发给该线程访客。
+func (s *Service) ReportConversationTyping(ctx context.Context, meta RequestMeta, conversationID string, input ConversationTypingInput) error {
+	return s.backend.ReportConversationTyping(ctx, meta, conversationID, input)
+}
+
 // UpdateConversationUnreadMark 保存当前用户独立于阅读水位的未读标记。
 func (s *Service) UpdateConversationUnreadMark(ctx context.Context, meta RequestMeta, conversationID string, input ConversationUnreadMarkInput) error {
 	return s.backend.UpdateConversationUnreadMark(ctx, meta, conversationID, input)

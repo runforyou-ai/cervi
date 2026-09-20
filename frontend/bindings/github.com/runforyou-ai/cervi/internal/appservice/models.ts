@@ -1088,6 +1088,13 @@ export enum ConversationType {
 };
 
 /**
+ * ConversationTypingInput 定义当前用户在会话中的输入状态。
+ */
+export interface ConversationTypingInput {
+    "active": boolean;
+}
+
+/**
  * ConversationUnreadMarkInput 定义当前用户的独立未读标记。
  */
 export interface ConversationUnreadMarkInput {
@@ -1436,6 +1443,7 @@ export interface DirectInboxConversation {
     "peerName": string;
     "peerAvatarUrl": string;
     "peerStatus": UserStatus;
+    "peerWorkStatus": WorkStatus;
     "preview": string | null;
     "previewSenderIdentityType": OrganizationIdentityType | null;
     "lastMessageAt": string | null;

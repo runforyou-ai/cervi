@@ -28,6 +28,7 @@ type conversationOps struct {
 	updateConversationUnreadMark    *conversationaction.UpdateConversationUnreadMarkAction
 	updateConversationPin           *conversationaction.UpdateConversationPinAction
 	markConversationRead            *conversationaction.MarkConversationReadAction
+	reportConversationTyping        *conversationaction.ReportConversationTypingAction
 	conversationNavigation          *conversationaction.GetConversationNavigationStateQuery
 	pendingConversationMentions     *conversationaction.ListPendingConversationMentionsQuery
 	reviewConversationMention       *conversationaction.MarkConversationMentionReviewedAction
@@ -67,6 +68,7 @@ func newConversationOps(db *bun.DB, agentScheduler conversationaction.AgentMessa
 		updateConversationUnreadMark:    conversationaction.NewUpdateConversationUnreadMarkAction(db),
 		updateConversationPin:           conversationaction.NewUpdateConversationPinAction(db),
 		markConversationRead:            conversationaction.NewMarkConversationReadAction(db),
+		reportConversationTyping:        conversationaction.NewReportConversationTypingAction(db),
 		conversationNavigation:          conversationaction.NewGetConversationNavigationStateQuery(db),
 		pendingConversationMentions:     conversationaction.NewListPendingConversationMentionsQuery(db),
 		reviewConversationMention:       conversationaction.NewMarkConversationMentionReviewedAction(db),
@@ -493,6 +495,22 @@ func (o *directOperations) MarkConversationRead(ctx context.Context, meta Reques
 		return ConversationReadState{}, conversationReadError(ctx, meta, err, identity.Organization.ID, conversationID)
 	}
 	return ConversationReadState{ReadSeq: strconv.FormatInt(state.ReadSeq, 10), LastReadMessageID: state.LastReadMessageID, LastReadAt: state.LastReadAt}, nil
+}
+
+// ReportConversationTyping 按会话类型校验发送资格后发布当前用户的输入状态。
+func (o *directOperations) ReportConversationTyping(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, input ConversationTypingInput) error {
+	err := o.reportConversationTyping.Execute(ctx, identity, conversationID, input.Active)
+	if err == nil {
+		return nil
+	}
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	if errors.Is(err, conversationaction.ErrConversationNotFound) {
+		return NotFoundError(meta, cervii18n.ErrorConversationNotFound)
+	}
+	slog.Warn("发布会话输入状态失败", "organization_id", identity.Organization.ID, "conversation_id", conversationID, "error", err)
+	return UnavailableError(meta, cervii18n.ErrorServerUnavailable, nil).WithStatus(http.StatusServiceUnavailable)
 }
 
 // UpdateConversationUnreadMark 保存个人未读标记并保留已读和提及查看水位。

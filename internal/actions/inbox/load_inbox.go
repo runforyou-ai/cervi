@@ -75,6 +75,7 @@ type DirectConversationSummary struct {
 	PeerName                  string
 	PeerAvatarFileID          *string
 	PeerStatus                domain.UserStatus
+	PeerWorkStatus            domain.WorkStatus
 	Preview                   *string
 	PreviewSenderIdentityType *domain.OrganizationIdentityType
 	LastMessageAt             *time.Time
@@ -170,6 +171,7 @@ type directConversationRow struct {
 	PeerName                  string                           `bun:"peer_name"`
 	PeerAvatarFileID          *string                          `bun:"peer_avatar_file_id"`
 	PeerStatus                domain.UserStatus                `bun:"peer_status"`
+	PeerWorkStatus            domain.WorkStatus                `bun:"peer_work_status"`
 	Preview                   *string                          `bun:"preview"`
 	PreviewSenderIdentityType *domain.OrganizationIdentityType `bun:"preview_sender_identity_type"`
 	LastMessageAt             *time.Time                       `bun:"last_message_at"`
@@ -455,7 +457,7 @@ func withIndividualConversationDetails(query *bun.SelectQuery, identityID, userI
 // directConversationDetailsQuery 按真人身份对及有效成员关系读取长期单聊。
 func (q *LoadInboxQuery) directConversationDetailsQuery(organizationID, identityID, userID string) *bun.SelectQuery {
 	return withIndividualConversationDetails(q.directConversationAccessQuery(organizationID, identityID), identityID, userID).
-		ColumnExpr("peer_oi.id AS peer_identity_id, peer_oi.type AS peer_type, peer_oi.display_name AS peer_name, peer_oi.avatar_file_id AS peer_avatar_file_id, peer_u.status AS peer_status")
+		ColumnExpr("peer_oi.id AS peer_identity_id, peer_oi.type AS peer_type, peer_oi.display_name AS peer_name, peer_oi.avatar_file_id AS peer_avatar_file_id, peer_u.status AS peer_status, peer_oi.work_status AS peer_work_status")
 }
 
 // agentConversationDetailsQuery 按业务归属和有效成员关系读取独立 AI 聊天。
@@ -591,7 +593,7 @@ func (row directConversationRow) summary() ConversationSummary {
 	return ConversationSummary{
 		ID: row.ID, Type: domain.ConversationTypeDirect, UnreadCount: row.UnreadCount, Muted: row.Muted, MarkedUnread: row.MarkedUnread, Pinned: row.Pinned, LastMessageID: row.LastMessageID, LastMessageType: row.LastMessageType, LastReadMessageID: row.LastReadMessageID, LastActivityAt: row.LastActivityAt,
 		Direct: &DirectConversationSummary{
-			PeerIdentityID: row.PeerIdentityID, PeerType: domain.OrganizationIdentityType(row.PeerType), PeerName: row.PeerName, PeerAvatarFileID: row.PeerAvatarFileID, PeerStatus: row.PeerStatus,
+			PeerIdentityID: row.PeerIdentityID, PeerType: domain.OrganizationIdentityType(row.PeerType), PeerName: row.PeerName, PeerAvatarFileID: row.PeerAvatarFileID, PeerStatus: row.PeerStatus, PeerWorkStatus: row.PeerWorkStatus,
 			Preview: row.Preview, PreviewSenderIdentityType: row.PreviewSenderIdentityType, LastMessageAt: row.LastMessageAt,
 		},
 	}

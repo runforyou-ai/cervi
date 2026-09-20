@@ -6,7 +6,10 @@ import {
   ConversationStatus,
   isCustomerInboxConversation,
   isAgentInboxConversation,
+  isDirectInboxConversation,
   isGroupInboxConversation,
+  UserStatus,
+  type GroupParticipant,
   type InboxConversation,
 } from "@/api"
 import { Button } from "@/components/ui/button"
@@ -22,6 +25,9 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { useConversationAgentReplyLabel } from "@/features/inbox/conversation-agent-activity"
+import { useConversationTypingLabel } from "@/features/inbox/use-conversation-typing"
+import { workStatusLabel } from "@/components/work-status"
 import { cn } from "@/lib/utils"
 
 /** 按 Helmdesk 会话头布局展示当前联系人、会话状态和操作区。 */
@@ -32,6 +38,7 @@ export function ConversationHeader({
   currentIdentityId,
   onSessionChanged,
   onSearch,
+  groupParticipants,
   narrowViewport = false,
 }: {
   conversation: InboxConversation
@@ -40,16 +47,27 @@ export function ConversationHeader({
   currentIdentityId: string
   onSessionChanged: () => void
   onSearch?: () => void
+  groupParticipants?: GroupParticipant[]
   narrowViewport?: boolean
 }) {
   const { t } = useTranslation(["inbox", "common"])
+  const { t: tCommon } = useTranslation("common")
   const customerConversation = isCustomerInboxConversation(conversation)
     ? conversation
     : null
   const customer = customerConversation?.customer ?? null
   const agent = isAgentInboxConversation(conversation) ? conversation.agent : null
+  const direct = isDirectInboxConversation(conversation) ? conversation.direct : null
   const group = isGroupInboxConversation(conversation) ? conversation.group : null
   const agentRunLabel = agentRunStatusLabel(agent?.agentRunStatus ?? null, t)
+  // 正在输入提示占用副标题位置：群聊替换人数，单聊替换对方工作状态，客户会话补在状态徽章之后。
+  const typingLabel = useConversationTypingLabel(
+    conversation.id,
+    group ? (groupParticipants ?? []) : null,
+  )
+  const agentReplyLabel = useConversationAgentReplyLabel(conversation.id)
+  // 真人正在输入优先于 AI 员工正在回复。
+  const activityLabel = typingLabel || agentReplyLabel
   const actions = useCustomerSessionActions(
     customerConversation,
     currentIdentityId,
@@ -97,15 +115,26 @@ export function ConversationHeader({
                 >
                   {customer.title}
                 </span>
+                {activityLabel ? <span className="min-w-0 truncate">{activityLabel}</span> : null}
               </div>
             ) : group ? (
               <p
                 data-slot="conversation-header-detail"
-                className="w-fit max-w-full text-xs text-muted-foreground"
+                className="w-fit max-w-full truncate text-xs text-muted-foreground"
               >
                 {group.status === ConversationStatus.ConversationStatusArchived
                   ? t("groupDissolved")
-                  : t("groupMemberCount", { count: group.memberCount })}
+                  : activityLabel || t("groupMemberCount", { count: group.memberCount })}
+              </p>
+            ) : direct ? (
+              <p
+                data-slot="conversation-header-detail"
+                className="w-fit max-w-full truncate text-xs text-muted-foreground"
+              >
+                {activityLabel ||
+                  (direct.peerStatus === UserStatus.UserStatusInactive
+                    ? t("directPeerDisabled")
+                    : workStatusLabel(direct.peerWorkStatus, tCommon))}
               </p>
             ) : agent ? (
               <div

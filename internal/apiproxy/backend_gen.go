@@ -238,6 +238,11 @@ func (b *Backend) MarkConversationRead(ctx context.Context, meta appservice.Requ
 	return output, err
 }
 
+// ReportConversationTyping 发布当前用户的输入状态：单聊与群聊发给其他真人成员，网站渠道客户会话发给该线程访客。
+func (b *Backend) ReportConversationTyping(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.ConversationTypingInput) error {
+	return b.do(ctx, meta, http.MethodPost, "/conversations/"+url.PathEscape(conversationID)+"/typing", nil, input, nil)
+}
+
 // UpdateConversationUnreadMark 保存当前用户独立于阅读水位的未读标记。
 func (b *Backend) UpdateConversationUnreadMark(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.ConversationUnreadMarkInput) error {
 	return b.do(ctx, meta, http.MethodPatch, "/conversations/"+url.PathEscape(conversationID)+"/unread-mark", nil, input, nil)

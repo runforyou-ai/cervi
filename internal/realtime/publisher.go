@@ -28,12 +28,14 @@ type Publisher struct {
 	done       chan struct{}
 }
 
-// Payload 是 NATS 通知消息体。
+// Payload 是 NATS 通知消息体；零值字段省略，输入状态停止时同样省略 active，接收方按零值处理。
 type Payload struct {
-	Kind           Kind   `json:"kind"`
-	ConversationID string `json:"conversationId,omitempty"`
-	Version        int64  `json:"version,string,omitempty"`
-	TokenSessionID string `json:"tokenSessionId,omitempty"`
+	Kind            Kind   `json:"kind"`
+	ConversationID  string `json:"conversationId,omitempty"`
+	Version         int64  `json:"version,string,omitempty"`
+	TokenSessionID  string `json:"tokenSessionId,omitempty"`
+	SenderSubjectID string `json:"senderSubjectId,omitempty"`
+	Active          bool   `json:"active,omitempty"`
 }
 
 // NewPublisher 创建使用指定 NATS 命名空间的通知发布器。
@@ -105,6 +107,13 @@ func (p *Publisher) Stop() error {
 	return nil
 }
 
+// Publish 不经写事务直接把通知放入发布队列，发布器未启动时丢弃。
+func Publish(notifications ...Notification) {
+	if publisher := active.Load(); publisher != nil && len(notifications) > 0 {
+		publisher.enqueue(notifications)
+	}
+}
+
 // enqueue 把一个已提交事务的通知放入发布队列，队列已满时丢弃。
 func (p *Publisher) enqueue(notifications []Notification) {
 	select {
@@ -131,7 +140,10 @@ func (p *Publisher) run() {
 
 // publish 发布单条通知，失败时记录 WARN 日志。
 func (p *Publisher) publish(notification Notification) {
-	data, err := json.Marshal(Payload{Kind: notification.Kind, ConversationID: notification.ConversationID, Version: notification.Version, TokenSessionID: notification.TokenSessionID})
+	data, err := json.Marshal(Payload{
+		Kind: notification.Kind, ConversationID: notification.ConversationID, Version: notification.Version,
+		TokenSessionID: notification.TokenSessionID, SenderSubjectID: notification.SenderSubjectID, Active: notification.Active,
+	})
 	if err == nil {
 		err = p.send(Subject(p.config.Namespace, notification.OrganizationID, notification.AudienceKind, notification.AudienceID), data)
 	}
