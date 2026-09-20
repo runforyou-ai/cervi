@@ -4,7 +4,6 @@ import {
   LoaderCircleIcon,
   PencilLineIcon,
   RefreshCwIcon,
-  WandSparklesIcon,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
@@ -228,7 +227,9 @@ export function CustomerReplyAssistant({
       {open && generating ? (
         <LoaderCircleIcon className="animate-spin" />
       ) : (
-        <WandSparklesIcon />
+        <span aria-hidden="true" className="text-[13px] leading-none font-semibold tracking-tight">
+          AI
+        </span>
       )}
     </Button>
   )
