@@ -76,8 +76,8 @@ func TestContextClearsOldToolResults(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	result, err := runtime.Run(ctx, RunRequest{
-		RunID: "clear-run", Name: "test-agent", MaxIterations: 6, MaxTurns: 2,
-		Model: ModelConfig{ContextWindow: 40},
+		RunID: "clear-run", Assignment: Assignment{AgentName: "test-agent", Model: AssignmentModel{ContextWindow: 40}},
+		MaxIterations: 6, MaxTurns: 2,
 	}, feed)
 	if err != nil || result.Content != "算完了" {
 		t.Fatalf("result = %#v, err = %v", result, err)

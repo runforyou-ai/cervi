@@ -75,7 +75,8 @@ func runGrounded(t *testing.T, chatModel *groundingModel, feed *testInputFeed, r
 	t.Helper()
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	request.RunID, request.Name, request.Scene, request.Grounding = "grounding-run", "客服", SceneCustomer, GroundingStrict
+	request.RunID = "grounding-run"
+	request.Assignment.AgentName, request.Assignment.Scene, request.Assignment.Grounding = "客服", SceneCustomer, GroundingStrict
 	if request.MaxIterations == 0 {
 		request.MaxIterations = 6
 	}
@@ -247,7 +248,7 @@ func TestGroundingFollowsOffloadedEvidence(t *testing.T) {
 		reply(groundedAnswer),
 	}}
 	result := runGrounded(t, chatModel, feed, RunRequest{
-		Model:           ModelConfig{ContextWindow: 1000},
+		Assignment:      Assignment{Model: AssignmentModel{ContextWindow: 1000}},
 		KnowledgeSearch: matchedKnowledge("退货期限为 7 天。" + strings.Repeat("x", 6000)),
 	})
 	if result.Decision.Kind != "" || result.Content != groundedAnswer || chatModel.calls != 4 {

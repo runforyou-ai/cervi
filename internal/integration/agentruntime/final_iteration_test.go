@@ -64,7 +64,7 @@ func TestFinalIterationAnswersWithoutTools(t *testing.T) {
 	feed.appendUser("帮我查一下")
 	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
-	result, err := runtime.Run(ctx, RunRequest{RunID: "budget-run", Name: "test-agent", MaxIterations: 3, MaxTurns: 2}, feed)
+	result, err := runtime.Run(ctx, RunRequest{RunID: "budget-run", Assignment: Assignment{AgentName: "test-agent"}, MaxIterations: 3, MaxTurns: 2}, feed)
 	if err != nil {
 		t.Fatal(err)
 	}

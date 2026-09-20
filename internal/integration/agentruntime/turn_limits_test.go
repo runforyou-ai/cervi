@@ -40,7 +40,7 @@ func TestRunFollowUpsDoNotConsumeIterationBudget(t *testing.T) {
 			runtime := &EinoRuntime{newModel: func(context.Context, ModelConfig) (model.AgenticModel, error) { return chatModel, nil }}
 			ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 			defer cancel()
-			result, err := runtime.Run(ctx, RunRequest{Name: "test", MaxIterations: 1, MaxTurns: maxTurns}, feed)
+			result, err := runtime.Run(ctx, RunRequest{Assignment: Assignment{AgentName: "test"}, MaxIterations: 1, MaxTurns: maxTurns}, feed)
 			if maxTurns > 0 {
 				if err == nil || !strings.Contains(err.Error(), "agent turn limit 3 exceeded") || calls != 3 {
 					t.Fatalf("limited calls = %d, error = %v", calls, err)
@@ -84,7 +84,7 @@ func TestRunRetainsToolsAcrossRepeatedPreemption(t *testing.T) {
 	seen := make(map[string]bool)
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	result, err := runtime.Run(ctx, RunRequest{Name: "test", MaxIterations: 2, OnStream: func(delta StreamDelta) {
+	result, err := runtime.Run(ctx, RunRequest{Assignment: Assignment{AgentName: "test"}, MaxIterations: 2, OnStream: func(delta StreamDelta) {
 		for _, operation := range delta.Operations {
 			if operation.Block == nil {
 				continue
@@ -116,7 +116,7 @@ func TestRunIterationLimitStillStopsToolLoop(t *testing.T) {
 	feed.appendUser("计算")
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	_, err = runtime.Run(ctx, RunRequest{Name: "test", MaxIterations: 2, MaxTurns: 20}, feed)
+	_, err = runtime.Run(ctx, RunRequest{Assignment: Assignment{AgentName: "test"}, MaxIterations: 2, MaxTurns: 20}, feed)
 	if err == nil || calls > 2 || calls == 0 || ctx.Err() != nil {
 		t.Fatalf("calls = %d, error = %v, context error = %v", calls, err, ctx.Err())
 	}
