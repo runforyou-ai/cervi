@@ -801,7 +801,8 @@ export function ConversationComposer({
       aria-describedby={disabledReason ? `${inputID}-reason` : undefined}
       aria-invalid={form.formState.errors.body ? true : undefined}
       className={cn(
-        "max-h-[200px] min-h-9 min-w-0 flex-1 resize-none rounded-none border-0 bg-transparent px-0.5 py-1.5 shadow-none caret-primary focus-visible:ring-0 dark:bg-transparent",
+        // 上下内边距与行高之和等于单行高度，正文与工具图标同一水平线。
+        "max-h-[200px] min-h-9 min-w-0 flex-1 resize-none rounded-none border-0 bg-transparent px-0.5 py-2 shadow-none caret-primary focus-visible:ring-0 dark:bg-transparent",
         // 移动端正文保持 16px，避免聚焦时缩放。
         mobile && "md:text-base",
         disabledReason && "pl-3",
