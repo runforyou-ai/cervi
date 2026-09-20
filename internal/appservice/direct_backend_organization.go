@@ -15,17 +15,11 @@ import (
 
 // UpdateOrganization 修改企业通用设置。
 func (o *directOperations) UpdateOrganization(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input OrganizationInput) (Organization, error) {
-	organization, err := o.updateOrganization.Execute(ctx, identity, organizationaction.Input{
-		Name: input.Name, AllowArbitraryURL: input.AllowArbitraryURL,
-	})
+	organization, err := o.updateOrganization.Execute(ctx, identity, organizationaction.Input{Name: input.Name})
 	if err != nil {
 		return Organization{}, o.organizationMutationError(ctx, meta, err, cervii18n.ErrorOrganizationUpdateFailed, identity.Organization.ID)
 	}
-	slog.Info(
-		"企业通用设置更新成功",
-		"organization_id", organization.ID,
-		"allow_arbitrary_url", organization.AllowArbitraryURL,
-	)
+	slog.Info("企业通用设置更新成功", "organization_id", organization.ID)
 	return organizationFromModel(*organization), nil
 }
 

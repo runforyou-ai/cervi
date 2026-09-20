@@ -12,7 +12,6 @@ export function createGeneralSettingsSchema(messages: {
       .trim()
       .min(1, messages.nameRequired)
       .max(32, messages.nameTooLong),
-    allowArbitraryUrl: z.boolean(),
   })
 }
 

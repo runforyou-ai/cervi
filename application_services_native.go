@@ -52,7 +52,6 @@ func applicationServices(
 		appservice.WithNativeLocaleUpdater(nativeLocaleUpdater),
 		appservice.WithNativeNotification(notification),
 		appservice.WithUnreadIndicator(unreadIndicator),
-		appservice.WithExternalPageOpener(appservicenative.NewExternalPageOpener()),
 		appservice.WithConversationWindowOpener(appservicenative.NewConversationWindowOpener()),
 	}
 	registrar := newDeviceRegistrar(appStorage, backend, sessions)

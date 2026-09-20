@@ -1,22 +1,25 @@
 /** 工作台左侧模块栏和用户菜单。 */
 import { useRef, useState } from "react"
 import {
+  BrainCircuitIcon,
   Building2Icon,
   CheckIcon,
   ChevronLeftIcon,
+  CodeXmlIcon,
   ContactRoundIcon,
   InboxIcon,
-  LayoutGridIcon,
   LibraryIcon,
   LoaderCircleIcon,
   LockKeyholeIcon,
   LogOutIcon,
+  MessagesSquareIcon,
   MonitorSmartphoneIcon,
   PlugIcon,
   SettingsIcon,
   ShieldCheckIcon,
   SlidersHorizontalIcon,
   UserRoundIcon,
+  WebhookIcon,
   type LucideIcon,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
@@ -28,7 +31,7 @@ import {
   type Identity,
   type WorkStatus,
 } from "@/api"
-import { PagePaneGroup } from "@/components/page-split"
+import { PagePaneGroup, PagePaneLink } from "@/components/page-split"
 import { useUnsavedChangesContext } from "@/contexts/unsaved-changes-context"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
@@ -120,18 +123,6 @@ function WorkspaceMenu({
         label={t("knowledgeBases")}
         active={location.pathname.startsWith("/knowledge-bases")}
       />
-      <WorkspaceRailItem
-        to="/integrations/channels"
-        icon={PlugIcon}
-        label={t("integrations")}
-        active={location.pathname.startsWith("/integrations")}
-      />
-      <WorkspaceRailItem
-        to="/apps"
-        icon={LayoutGridIcon}
-        label={t("apps")}
-        active={location.pathname.startsWith("/apps")}
-      />
     </nav>
   )
 }
@@ -139,11 +130,10 @@ function WorkspaceMenu({
 /** 设置导航，进入设置后替换模块栏内容。 */
 function WorkspaceSettingsMenu({ appHref }: { appHref: string }) {
   const { t } = useTranslation("settings")
-  const location = useLocation()
 
   return (
     <nav
-      className="flex flex-1 flex-col items-stretch gap-0.5 pt-1 pr-0 pl-1.5"
+      className="flex min-h-0 flex-1 flex-col items-stretch gap-0.5 overflow-y-auto pt-1 pr-0 pl-1.5"
       aria-label={t("navigationLabel")}
     >
       <WorkspaceRailItem
@@ -155,44 +145,45 @@ function WorkspaceSettingsMenu({ appHref }: { appHref: string }) {
         className="-ml-1"
       />
       <PagePaneGroup title={t("groups.personal")}>
-        <WorkspaceRailItem
-          to="/settings/profile"
-          icon={UserRoundIcon}
-          label={t("navigation.profile")}
-          active={location.pathname === "/settings/profile"}
-        />
-        <WorkspaceRailItem
-          to="/settings/security"
-          icon={LockKeyholeIcon}
-          label={t("navigation.security")}
-          active={location.pathname === "/settings/security"}
-        />
-        <WorkspaceRailItem
-          to="/settings/preferences"
-          icon={SlidersHorizontalIcon}
-          label={t("navigation.preferences")}
-          active={location.pathname === "/settings/preferences"}
-        />
-        <WorkspaceRailItem
-          to="/settings/devices"
-          icon={MonitorSmartphoneIcon}
-          label={t("navigation.devices")}
-          active={location.pathname === "/settings/devices"}
-        />
+        <PagePaneLink to="/settings/profile" icon={UserRoundIcon}>
+          {t("navigation.profile")}
+        </PagePaneLink>
+        <PagePaneLink to="/settings/security" icon={LockKeyholeIcon}>
+          {t("navigation.security")}
+        </PagePaneLink>
+        <PagePaneLink to="/settings/preferences" icon={SlidersHorizontalIcon}>
+          {t("navigation.preferences")}
+        </PagePaneLink>
+        <PagePaneLink to="/settings/devices" icon={MonitorSmartphoneIcon}>
+          {t("navigation.devices")}
+        </PagePaneLink>
       </PagePaneGroup>
       <PagePaneGroup title={t("groups.organization")}>
-        <WorkspaceRailItem
-          to="/settings/general"
-          icon={Building2Icon}
-          label={t("navigation.general")}
-          active={location.pathname === "/settings/general"}
-        />
-        <WorkspaceRailItem
+        <PagePaneLink to="/settings/general" icon={Building2Icon}>
+          {t("navigation.general")}
+        </PagePaneLink>
+        <PagePaneLink
           to="/settings/roles"
+          activePath="/settings/roles"
           icon={ShieldCheckIcon}
-          label={t("navigation.roles")}
-          active={location.pathname.startsWith("/settings/roles")}
-        />
+        >
+          {t("navigation.roles")}
+        </PagePaneLink>
+        <PagePaneLink to="/settings/channels" icon={MessagesSquareIcon}>
+          {t("navigation.channels")}
+        </PagePaneLink>
+        <PagePaneLink
+          to="/settings/model-services/chat"
+          activePath="/settings/model-services"
+          icon={BrainCircuitIcon}
+        >
+          {t("navigation.modelServices")}
+        </PagePaneLink>
+        <PagePaneLink to="/settings/mcp-servers" icon={PlugIcon}>
+          {t("navigation.mcpServers")}
+        </PagePaneLink>
+        <PagePaneLink icon={WebhookIcon}>{t("navigation.webhooks")}</PagePaneLink>
+        <PagePaneLink icon={CodeXmlIcon}>{t("navigation.openApi")}</PagePaneLink>
       </PagePaneGroup>
     </nav>
   )

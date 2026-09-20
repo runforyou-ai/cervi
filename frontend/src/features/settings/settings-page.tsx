@@ -12,13 +12,28 @@ import { RoleListPage } from "@/features/roles/role-list-page"
 import { UserPreferencesForm } from "@/features/settings/user-preferences-form"
 import { useWorkspace } from "@/contexts/workspace-context"
 
+/** 由设置外壳直接渲染表单的设置项。 */
+const formSections = [
+  "profile",
+  "security",
+  "preferences",
+  "devices",
+  "general",
+] as const
+
+type SettingsFormSection = (typeof formSections)[number]
+
 export type SettingsSection =
-  | "profile"
-  | "security"
-  | "preferences"
-  | "devices"
-  | "general"
+  | SettingsFormSection
   | "roles"
+  | "channels"
+  | "modelServices"
+  | "mcpServers"
+
+/** 判断设置项的内容是否由设置外壳内的表单渲染。 */
+function isFormSection(section: SettingsSection): section is SettingsFormSection {
+  return (formSections as readonly string[]).includes(section)
+}
 
 /** 渲染当前设置页面。 */
 export function SettingsPage({
@@ -33,9 +48,9 @@ export function SettingsPage({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      {section === "roles" ? (
-        (children ?? <RoleListPage />)
-      ) : (
+      {children ? (
+        children
+      ) : isFormSection(section) ? (
         <>
           <PageHeader title={t(`${section}.title`)} />
           <PageContent>
@@ -52,6 +67,8 @@ export function SettingsPage({
             )}
           </PageContent>
         </>
+      ) : (
+        <RoleListPage />
       )}
     </div>
   )

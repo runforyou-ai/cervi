@@ -1525,55 +1525,6 @@ func (b *DirectBackend) DeleteAIProvider(ctx context.Context, meta RequestMeta, 
 	return b.ops.DeleteAIProvider(ctx, meta, identity, providerID)
 }
 
-// ListBusinessSystems 返回当前企业配置的业务系统。
-func (b *DirectBackend) ListBusinessSystems(ctx context.Context, meta RequestMeta) (BusinessSystemList, error) {
-	identity, err := b.ops.authenticate(ctx, meta)
-	if err != nil {
-		var zero BusinessSystemList
-		return zero, err
-	}
-	return b.ops.ListBusinessSystems(ctx, meta, identity)
-}
-
-// GetBusinessSystem 返回当前企业中的业务系统详情。
-func (b *DirectBackend) GetBusinessSystem(ctx context.Context, meta RequestMeta, businessSystemID string) (BusinessSystem, error) {
-	identity, err := b.ops.authenticate(ctx, meta)
-	if err != nil {
-		var zero BusinessSystem
-		return zero, err
-	}
-	return b.ops.GetBusinessSystem(ctx, meta, identity, businessSystemID)
-}
-
-// CreateBusinessSystem 创建业务系统。
-func (b *DirectBackend) CreateBusinessSystem(ctx context.Context, meta RequestMeta, input BusinessSystemInput) (BusinessSystem, error) {
-	identity, err := b.ops.authenticate(ctx, meta)
-	if err != nil {
-		var zero BusinessSystem
-		return zero, err
-	}
-	return b.ops.CreateBusinessSystem(ctx, meta, identity, input)
-}
-
-// UpdateBusinessSystem 修改业务系统。
-func (b *DirectBackend) UpdateBusinessSystem(ctx context.Context, meta RequestMeta, businessSystemID string, input BusinessSystemInput) (BusinessSystem, error) {
-	identity, err := b.ops.authenticate(ctx, meta)
-	if err != nil {
-		var zero BusinessSystem
-		return zero, err
-	}
-	return b.ops.UpdateBusinessSystem(ctx, meta, identity, businessSystemID, input)
-}
-
-// DeleteBusinessSystem 删除业务系统。
-func (b *DirectBackend) DeleteBusinessSystem(ctx context.Context, meta RequestMeta, businessSystemID string) error {
-	identity, err := b.ops.authenticate(ctx, meta)
-	if err != nil {
-		return err
-	}
-	return b.ops.DeleteBusinessSystem(ctx, meta, identity, businessSystemID)
-}
-
 // ListMCPServers 返回当前企业配置的 MCP 服务。
 func (b *DirectBackend) ListMCPServers(ctx context.Context, meta RequestMeta) (MCPServerList, error) {
 	identity, err := b.ops.authenticate(ctx, meta)

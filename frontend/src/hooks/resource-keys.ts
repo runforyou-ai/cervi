@@ -115,10 +115,6 @@ export const resourceKeys = {
   agentModelOptions: () => ["agent-model-options"],
   /** AI 员工配置使用的 MCP 服务摘要。 */
   agentMCPServerOptions: () => ["agent-mcp-server-options"],
-  /** 业务系统列表。 */
-  businessSystems: () => ["business-systems"],
-  /** 单个业务系统。 */
-  businessSystem: (id?: string) => itemKey("business-system", id),
   /** MCP 服务列表。 */
   mcpServers: () => ["mcp-servers"],
   /** 单个 MCP 服务。 */

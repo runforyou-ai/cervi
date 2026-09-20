@@ -4,7 +4,6 @@ import (
 	"context"
 	"strings"
 
-	"github.com/runforyou-ai/cervi/internal/common"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 )
 
@@ -17,7 +16,6 @@ type Service struct {
 	nativeLocaleUpdater NativeLocaleUpdater
 	nativeNotification  NativeNotification
 	unreadIndicator     UnreadIndicator
-	externalPageOpener  ExternalPageOpener
 	conversationWindows ConversationWindowOpener
 	localDevice         LocalDeviceReporter
 }
@@ -50,13 +48,6 @@ func WithNativeNotification(notification NativeNotification) Option {
 func WithUnreadIndicator(indicator UnreadIndicator) Option {
 	return func(service *Service) {
 		service.unreadIndicator = indicator
-	}
-}
-
-// WithExternalPageOpener 注入原生端外部页面窗口能力。
-func WithExternalPageOpener(opener ExternalPageOpener) Option {
-	return func(service *Service) {
-		service.externalPageOpener = opener
 	}
 }
 
@@ -136,22 +127,6 @@ func (s *Service) SelectImage(ctx context.Context, meta RequestMeta) (ImageFile,
 	}
 	return withNormalizedSlices(s.imageSelector.SelectImage(ctx, meta))
 }
-
-// OpenExternalPage 在原生端应用内新窗口打开外部页面。
-func (s *Service) OpenExternalPage(ctx context.Context, meta RequestMeta, input ExternalPageInput) error {
-	if s.externalPageOpener == nil {
-		return methodNotAllowedError(meta, "OpenExternalPage")
-	}
-	input.Title = strings.TrimSpace(input.Title)
-	input.URL = strings.TrimSpace(input.URL)
-	if len(input.URL) > maxExternalPageURLBytes || !common.ValidHTTPURL(input.URL) {
-		return InvalidError(meta, cervii18n.FieldHTTPURLInvalid, nil)
-	}
-	return s.externalPageOpener.OpenExternalPage(ctx, meta, input)
-}
-
-// maxExternalPageURLBytes 是外部页面地址的最大字节数。
-const maxExternalPageURLBytes = 2048
 
 // OpenConversationWindow 在桌面端独立窗口打开指定会话，同一会话已打开时聚焦现有窗口。
 func (s *Service) OpenConversationWindow(ctx context.Context, meta RequestMeta, input ConversationWindowInput) error {

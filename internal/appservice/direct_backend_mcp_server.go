@@ -8,7 +8,6 @@ import (
 	"log/slog"
 
 	aiprovideraction "github.com/runforyou-ai/cervi/internal/actions/aiprovider"
-	businesssystemaction "github.com/runforyou-ai/cervi/internal/actions/businesssystem"
 	mcpserveraction "github.com/runforyou-ai/cervi/internal/actions/mcpserver"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -19,7 +18,7 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// integrationOps 持有模型服务、业务系统与 MCP 的 Action 和 Query。
+// integrationOps 持有模型服务与 MCP 的 Action 和 Query。
 type integrationOps struct {
 	listAIProviders          *aiprovideraction.ListAIProvidersQuery
 	getAIProvider            *aiprovideraction.GetAIProviderQuery
@@ -28,11 +27,6 @@ type integrationOps struct {
 	createAIProvider         *aiprovideraction.CreateAIProviderAction
 	updateAIProvider         *aiprovideraction.UpdateAIProviderAction
 	deleteAIProvider         *aiprovideraction.DeleteAIProviderAction
-	listBusinessSystems      *businesssystemaction.ListBusinessSystemsQuery
-	getBusinessSystem        *businesssystemaction.GetBusinessSystemQuery
-	createBusinessSystem     *businesssystemaction.CreateBusinessSystemAction
-	updateBusinessSystem     *businesssystemaction.UpdateBusinessSystemAction
-	deleteBusinessSystem     *businesssystemaction.DeleteBusinessSystemAction
 	listMCPServers           *mcpserveraction.ListMCPServersQuery
 	getMCPServer             *mcpserveraction.GetMCPServerQuery
 	createMCPServer          *mcpserveraction.CreateMCPServerAction
@@ -42,7 +36,7 @@ type integrationOps struct {
 	refreshMCPServerTools    *mcpserveraction.RefreshToolsAction
 }
 
-// newIntegrationOps 创建模型服务、业务系统与 MCP 的业务实现依赖。
+// newIntegrationOps 创建模型服务与 MCP 的业务实现依赖。
 func newIntegrationOps(db *bun.DB, connectionRunner *connectiontest.Runner, modelProviderRegistry *modelprovider.Registry, mcpTest *mcpserveraction.TestConnectionAction, mcpScheduler *mcpserveraction.ToolsScheduler) integrationOps {
 	return integrationOps{
 		listAIProviders:          aiprovideraction.NewListAIProvidersQuery(db),
@@ -52,11 +46,6 @@ func newIntegrationOps(db *bun.DB, connectionRunner *connectiontest.Runner, mode
 		createAIProvider:         aiprovideraction.NewCreateAIProviderAction(db),
 		updateAIProvider:         aiprovideraction.NewUpdateAIProviderAction(db),
 		deleteAIProvider:         aiprovideraction.NewDeleteAIProviderAction(db),
-		listBusinessSystems:      businesssystemaction.NewListBusinessSystemsQuery(db),
-		getBusinessSystem:        businesssystemaction.NewGetBusinessSystemQuery(db),
-		createBusinessSystem:     businesssystemaction.NewCreateBusinessSystemAction(db),
-		updateBusinessSystem:     businesssystemaction.NewUpdateBusinessSystemAction(db),
-		deleteBusinessSystem:     businesssystemaction.NewDeleteBusinessSystemAction(db),
 		listMCPServers:           mcpserveraction.NewListMCPServersQuery(db),
 		getMCPServer:             mcpserveraction.NewGetMCPServerQuery(db),
 		createMCPServer:          mcpserveraction.NewCreateMCPServerAction(db, mcpTest, mcpScheduler),

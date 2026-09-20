@@ -102,7 +102,7 @@ export function AgentModelField<TValues extends FieldValues>({
           ) : !loading && models.length === 0 ? (
             <FieldDescription>
               {t("agents.execution.noModels")}{" "}
-              <Link to="/integrations/model-services/chat">
+              <Link to="/settings/model-services/chat">
                 {t("agents.execution.configureModels")}
               </Link>
             </FieldDescription>

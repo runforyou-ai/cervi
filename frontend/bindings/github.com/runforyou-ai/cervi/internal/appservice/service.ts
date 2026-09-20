@@ -115,13 +115,6 @@ export function CreateAgent(meta: $models.RequestMeta, input: $models.CreateAgen
 }
 
 /**
- * CreateBusinessSystem 创建业务系统。
- */
-export function CreateBusinessSystem(meta: $models.RequestMeta, input: $models.BusinessSystemInput): $CancellablePromise<$models.BusinessSystem> {
-    return $Call.ByID(1032860109, meta, input);
-}
-
-/**
  * CreateContact 创建联系人。
  */
 export function CreateContact(meta: $models.RequestMeta, input: $models.ContactInput): $CancellablePromise<$models.Contact> {
@@ -262,13 +255,6 @@ export function DeleteAIProvider(meta: $models.RequestMeta, providerID: string):
 }
 
 /**
- * DeleteBusinessSystem 删除业务系统。
- */
-export function DeleteBusinessSystem(meta: $models.RequestMeta, businessSystemID: string): $CancellablePromise<void> {
-    return $Call.ByID(1285278122, meta, businessSystemID);
-}
-
-/**
  * DeleteContact 将联系人移入回收站。
  */
 export function DeleteContact(meta: $models.RequestMeta, contactID: string): $CancellablePromise<void> {
@@ -392,13 +378,6 @@ export function GetAgentRunProcess(meta: $models.RequestMeta, runID: string): $C
  */
 export function GetAttachmentDownload(meta: $models.RequestMeta, conversationID: string, messageID: string): $CancellablePromise<$models.FileDownload> {
     return $Call.ByID(2610529071, meta, conversationID, messageID);
-}
-
-/**
- * GetBusinessSystem 返回当前企业中的业务系统详情。
- */
-export function GetBusinessSystem(meta: $models.RequestMeta, businessSystemID: string): $CancellablePromise<$models.BusinessSystem> {
-    return $Call.ByID(2775361573, meta, businessSystemID);
 }
 
 /**
@@ -581,13 +560,6 @@ export function ListAgents(meta: $models.RequestMeta, input: $models.AgentListIn
  */
 export function ListAvailableAIModels(meta: $models.RequestMeta, brand: $models.AIProviderBrand): $CancellablePromise<$models.AIProviderModelList> {
     return $Call.ByID(3483353293, meta, brand);
-}
-
-/**
- * ListBusinessSystems 返回当前企业配置的业务系统。
- */
-export function ListBusinessSystems(meta: $models.RequestMeta): $CancellablePromise<$models.BusinessSystemList> {
-    return $Call.ByID(1520541682, meta);
 }
 
 /**
@@ -826,13 +798,6 @@ export function MoveKnowledgeDocument(meta: $models.RequestMeta, knowledgeBaseID
  */
 export function OpenConversationWindow(meta: $models.RequestMeta, input: $models.ConversationWindowInput): $CancellablePromise<void> {
     return $Call.ByID(1941707737, meta, input);
-}
-
-/**
- * OpenExternalPage 在原生端应用内新窗口打开外部页面。
- */
-export function OpenExternalPage(meta: $models.RequestMeta, input: $models.ExternalPageInput): $CancellablePromise<void> {
-    return $Call.ByID(1306697186, meta, input);
 }
 
 /**
@@ -1176,13 +1141,6 @@ export function UpdateAgent(meta: $models.RequestMeta, agentID: string, input: $
  */
 export function UpdateAgentExecution(meta: $models.RequestMeta, agentID: string, input: $models.UpdateAgentExecutionInput): $CancellablePromise<$models.Agent> {
     return $Call.ByID(3177846414, meta, agentID, input);
-}
-
-/**
- * UpdateBusinessSystem 修改业务系统。
- */
-export function UpdateBusinessSystem(meta: $models.RequestMeta, businessSystemID: string, input: $models.BusinessSystemInput): $CancellablePromise<$models.BusinessSystem> {
-    return $Call.ByID(1302951044, meta, businessSystemID, input);
 }
 
 /**

@@ -1,55 +1,5 @@
 /** 美式英语·集成文案。 */
 const integrations = {
-  title: "Integrations",
-  navigation: "Integration navigation",
-  messageChannels: "Message channels",
-  businessSystems: "Business systems",
-  businessSystem: {
-    title: "Business systems",
-    status: {
-      enabled: "Enabled",
-      disabled: "Disabled",
-    },
-    list: {
-      create: "Add business system",
-      loadError: "Could not load business systems.",
-      empty: "No business systems configured",
-      columns: {
-        name: "Name",
-        url: "Website URL",
-        status: "Status",
-      },
-    },
-    form: {
-      createTitle: "Add business system",
-      editTitle: "Edit business system",
-      name: "Name",
-      description: "Description",
-      url: "Website URL",
-      enabled: "Enable business system",
-      createSuccess: "Business system added.",
-      updateSuccess: "Business system saved.",
-      saveError: "Could not save the business system. Try again.",
-      loadError: "Could not load the business system.",
-    },
-    delete: {
-      title: "Delete “{{name}}”?",
-      description: "This business system configuration cannot be recovered.",
-      success: "Business system deleted.",
-      error: "Could not delete the business system. Try again.",
-    },
-    validation: {
-      nameRequired: "Enter a business system name.",
-      nameTooLong: "The business system name cannot exceed 100 characters.",
-      descriptionTooLong:
-        "The business system description cannot exceed 200 characters.",
-      urlRequired: "Enter the business system URL.",
-      urlTooLong: "The business system URL cannot exceed 2048 characters.",
-      urlInvalid:
-        "Enter a complete HTTP or HTTPS URL without embedded credentials.",
-    },
-  },
-  mcpServers: "MCP servers",
   mcpServer: {
     title: "MCP servers",
     list: {
@@ -109,10 +59,7 @@ const integrations = {
         "Enter a complete HTTP or HTTPS URL without embedded credentials.",
     },
   },
-  webhooks: "Webhooks",
-  openApi: "Developer API",
   modelServices: {
-    navigation: "Model services",
     title: "Model services",
     tabs: {
       chat: "Chat models",

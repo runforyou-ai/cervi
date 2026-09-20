@@ -68,7 +68,7 @@ export function ChannelReceptionSettingsForm({
       if (recoverSession(error, navigate)) return
       if (isNotFoundApiError(error)) {
         console.warn("消息渠道不存在", { channel_id: channel.id })
-        navigate("/integrations/channels", { replace: true })
+        navigate("/settings/channels", { replace: true })
         return
       }
       if (isApiError(error)) {
@@ -100,7 +100,7 @@ export function ChannelReceptionSettingsForm({
           {form.formState.isSubmitting ? t("common:actions.saving") : t("common:actions.save")}
         </Button>
         <Button variant="outline" asChild>
-          <Link to="/integrations/channels">{t("common:actions.cancel")}</Link>
+          <Link to="/settings/channels">{t("common:actions.cancel")}</Link>
         </Button>
       </div>
     </form>

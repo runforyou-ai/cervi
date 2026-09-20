@@ -486,36 +486,6 @@ export interface Auth {
 }
 
 /**
- * BusinessSystem 定义企业配置的业务系统。
- */
-export interface BusinessSystem {
-    "id": string;
-    "name": string;
-    "description": string;
-    "url": string;
-    "enabled": boolean;
-    "createdAt": string;
-    "updatedAt": string;
-}
-
-/**
- * BusinessSystemInput 定义业务系统可编辑字段。
- */
-export interface BusinessSystemInput {
-    "name": string;
-    "description": string;
-    "url": string;
-    "enabled": boolean;
-}
-
-/**
- * BusinessSystemList 定义企业业务系统列表。
- */
-export interface BusinessSystemList {
-    "businessSystems": BusinessSystem[] | null;
-}
-
-/**
  * ChangePasswordInput 定义当前用户修改密码所需字段。
  */
 export interface ChangePasswordInput {
@@ -1539,14 +1509,6 @@ export interface DirectTextMessageInput {
     "clientMessageId": string;
     "body": string;
     "replyToMessageId": string;
-}
-
-/**
- * ExternalPageInput 定义原生端打开外部页面窗口的输入。
- */
-export interface ExternalPageInput {
-    "title": string;
-    "url": string;
 }
 
 /**
@@ -2786,7 +2748,6 @@ export enum NotificationPermissionStatus {
 export interface Organization {
     "id": string;
     "name": string;
-    "allowArbitraryUrl": boolean;
 }
 
 /**
@@ -2807,7 +2768,6 @@ export enum OrganizationIdentityType {
  */
 export interface OrganizationInput {
     "name": string;
-    "allowArbitraryUrl": boolean;
 }
 
 /**

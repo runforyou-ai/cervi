@@ -12,13 +12,11 @@ const (
 
 // Organization 定义当前企业及其通用设置。
 type Organization struct {
-	ID                string `json:"id"`
-	Name              string `json:"name"`
-	AllowArbitraryURL bool   `json:"allowArbitraryUrl"`
+	ID   string `json:"id"`
+	Name string `json:"name"`
 }
 
 // OrganizationInput 定义企业通用设置修改输入。
 type OrganizationInput struct {
-	Name              string `json:"name"`
-	AllowArbitraryURL bool   `json:"allowArbitraryUrl"`
+	Name string `json:"name"`
 }
