@@ -257,10 +257,7 @@ function WorkspaceShell({ identity }: { identity: Identity }) {
             onForward={history.goForward}
           />
         </div>
-        <div
-          aria-hidden="true"
-          className="cervi-workspace-top-drag-region"
-        />
+        <div aria-hidden="true" className="cervi-workspace-top-drag-region" />
         <div className="cervi-workspace-content-frame relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl bg-background shadow-sm">
           <WorkspaceProvider value={workspaceContext}>
             <WorkspacePageRoutes location={pageHref} />

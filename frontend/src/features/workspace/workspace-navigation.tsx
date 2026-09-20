@@ -61,14 +61,14 @@ function WorkspaceRailItem({
       to={to}
       onClick={onClick}
       className={cn(
-        "my-px flex h-9 w-full items-center gap-2.5 rounded-md px-2.5 text-sm",
+        "flex h-8 w-full items-center gap-2 rounded-md px-2.5 text-sm",
         "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
         "focus-visible:ring-2 focus-visible:ring-sidebar-ring",
         active &&
           "bg-sidebar-accent font-medium text-sidebar-accent-foreground",
       )}
     >
-      <Icon className="size-[18px] shrink-0" />
+      <Icon className="size-4 shrink-0" />
       <span className="min-w-0 flex-1 truncate">{label}</span>
     </NavLink>
   )

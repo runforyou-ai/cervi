@@ -290,11 +290,15 @@ body,
   --wails-draggable: no-drag;
 }
 
-/* 工作台底层以轻渐变连接一级栏和主内容区内缩间隙。 */
+/* 工作台底层顶部略深，向下过渡回一级栏底色。 */
 .cervi-workspace-shell {
+  --cervi-workspace-chrome-top: color-mix(in oklab, var(--sidebar), black 3.5%);
   --cervi-workspace-rail-width: 220px;
   --cervi-workspace-content-inset: 6px;
-  --cervi-workspace-rail-top: 40px;
+  --cervi-workspace-content-gutter: 10px;
+  --cervi-workspace-content-top: 28px;
+  --cervi-workspace-rail-top: 52px;
+  --cervi-workspace-titlebar-height: 40px;
   --cervi-workspace-titlebar-inset: 8px;
   --cervi-workspace-titlebar-offset: 0px;
   background:
@@ -305,10 +309,14 @@ body,
     ),
     linear-gradient(
       180deg,
-      color-mix(in oklab, var(--sidebar), var(--sidebar-primary) 2%) 0%,
-      var(--sidebar) 52%,
-      color-mix(in oklab, var(--sidebar), var(--sidebar-primary) 3%) 100%
+      var(--cervi-workspace-chrome-top) 0px,
+      var(--sidebar) 120px,
+      var(--sidebar) 100%
     );
+}
+
+.dark .cervi-workspace-shell {
+  --cervi-workspace-chrome-top: color-mix(in oklab, var(--sidebar), black 20%);
 }
 
 .cervi-workspace-rail {
@@ -316,51 +324,47 @@ body,
   padding-top: var(--cervi-workspace-rail-top);
 }
 
+/* 主内容卡片上沿略高于一级栏内容起点，右侧与底部留白一致。 */
 .cervi-workspace-content-frame {
-  margin: var(--cervi-workspace-content-inset);
+  margin: var(--cervi-workspace-content-top) var(--cervi-workspace-content-gutter)
+    var(--cervi-workspace-content-gutter) var(--cervi-workspace-content-inset);
 }
 
 /* 标题栏操作与窗口按钮同一水平线，macOS 上向右让开窗口按钮。 */
 .cervi-workspace-titlebar-actions {
-  height: var(--cervi-workspace-rail-top);
+  height: var(--cervi-workspace-titlebar-height);
   padding-top: var(--cervi-workspace-titlebar-offset);
   padding-left: var(--cervi-workspace-titlebar-inset);
 }
 
-/* 一级导航收起后主内容卡片下移，顶部空出窗口按钮所在的高度。 */
-.cervi-workspace-shell[data-rail-collapsed="true"] .cervi-workspace-content-frame {
-  margin-top: var(--cervi-workspace-rail-top);
-}
-
 /* macOS 主窗口使用带工具栏的隐藏标题栏，顶部按整条工具栏高度留白。 */
 [data-native-os="darwin"][data-window-fullscreen="false"] .cervi-workspace-shell {
-  --cervi-workspace-rail-top: 52px;
+  --cervi-workspace-content-top: 40px;
+  --cervi-workspace-rail-top: 64px;
+  --cervi-workspace-titlebar-height: 52px;
   --cervi-workspace-titlebar-inset: 84px;
   --cervi-workspace-titlebar-offset: 2px;
 }
 
-/* 工作台一级栏、页面顶部和空态主区用于拖动窗口。 */
+/* 一级栏收起后主内容卡片上沿下移，让开标题栏操作与窗口按钮。 */
+.cervi-workspace-shell[data-rail-collapsed="true"] {
+  --cervi-workspace-content-top: var(--cervi-workspace-titlebar-height);
+}
+
+[data-native-os="darwin"][data-window-fullscreen="false"]
+  .cervi-workspace-shell[data-rail-collapsed="true"] {
+  --cervi-workspace-content-top: var(--cervi-workspace-titlebar-height);
+}
+
+/* 一级栏整体和主内容卡片上方的空白区域用于拖动窗口。 */
 [data-native-os="darwin"][data-window-fullscreen="false"] .cervi-workspace-rail {
   --wails-draggable: drag;
 }
 
-[data-native-os="darwin"][data-window-fullscreen="false"] :is(
-  [data-slot="page-header"],
-  [data-slot="page-header-actions"],
-  [data-slot="conversation-header"],
-  [data-slot="inbox-pane-header"],
-  .cervi-knowledge-base-index,
-  .cervi-inbox-empty-main
-) {
-  --wails-draggable: drag;
+[data-native-os="darwin"] .cervi-workspace-rail :is(a, button, input) {
+  --wails-draggable: no-drag;
 }
 
-[data-native-os="darwin"][data-window-fullscreen="false"]
-  .cervi-conversation-side-panel [data-slot="tabs-list"] {
-  --wails-draggable: drag;
-}
-
-/* 主内容卡片上方的内缩间隙保持可拖动。 */
 .cervi-workspace-top-drag-region {
   display: none;
 }
@@ -369,37 +373,12 @@ body,
   .cervi-workspace-top-drag-region {
   --wails-draggable: drag;
   position: absolute;
-  inset: 0 0 auto var(--cervi-workspace-rail-width);
+  top: 0;
+  right: 0;
+  left: var(--cervi-workspace-rail-width);
   z-index: 20;
   display: block;
-  height: var(--cervi-workspace-content-inset);
-}
-
-[data-native-os="darwin"][data-window-fullscreen="false"]
-  .cervi-workspace-shell[data-rail-collapsed="true"]
-  .cervi-workspace-top-drag-region {
-  height: var(--cervi-workspace-rail-top);
-}
-
-[data-native-os="darwin"] :is(
-  .cervi-workspace-rail :is(a, button),
-  .cervi-workspace-titlebar-actions button,
-  [data-slot="page-split-pane"],
-  [data-slot="page-header-title"],
-  [data-slot="page-header"] :is(a, button, input, select),
-  [data-slot="conversation-actions"],
-  [data-slot="conversation-header-title"],
-  [data-slot="conversation-header"] :is(a, button, input, select),
-  [data-slot="inbox-pane-header"] :is(a, button, input, select),
-  :is(.cervi-inbox-empty-main, .cervi-knowledge-base-index)
-    [data-slot="empty-state-content"]
-) {
-  --wails-draggable: no-drag;
-}
-
-[data-native-os="darwin"]
-  .cervi-conversation-side-panel [data-slot="tabs-trigger"] {
-  --wails-draggable: no-drag;
+  height: var(--cervi-workspace-content-top);
 }
 
 /*
