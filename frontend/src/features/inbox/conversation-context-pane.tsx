@@ -2,8 +2,6 @@
 import {
   BotIcon,
   BriefcaseBusinessIcon,
-  ChevronLeftIcon,
-  ChevronRightIcon,
 } from "lucide-react"
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from "react"
 import { useTranslation } from "react-i18next"
@@ -289,7 +287,6 @@ export function ConversationContextPane({
   customerDraftRef,
   onGroupLeft,
   visible,
-  onToggle,
 }: {
   conversation: InboxConversation | null
   directTarget: MemberOption | null
@@ -299,7 +296,6 @@ export function ConversationContextPane({
   customerDraftRef: RefObject<ComposerDraftBridge | null>
   onGroupLeft: () => void
   visible: boolean
-  onToggle: () => void
 }) {
   const { t } = useTranslation("inbox")
   const trackRef = useRef<HTMLDivElement>(null)
@@ -353,19 +349,6 @@ export function ConversationContextPane({
             onPointerCancel={stopContextPanelResize}
           />
         ) : null}
-        <button
-          type="button"
-          className="absolute top-1/2 right-0 z-30 flex h-12 w-4 -translate-y-1/2 items-center justify-center rounded-l-md border border-r-0 border-border bg-muted text-muted-foreground shadow-sm transition-colors hover:bg-muted/80 hover:text-foreground"
-          aria-label={visible ? t("contextClose") : t("contextOpen")}
-          title={visible ? t("contextClose") : t("contextOpen")}
-          onClick={onToggle}
-        >
-          {visible ? (
-            <ChevronRightIcon className="size-3" />
-          ) : (
-            <ChevronLeftIcon className="size-3" />
-          )}
-        </button>
       </div>
 
       <aside

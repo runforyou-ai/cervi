@@ -3,6 +3,7 @@ import {
   ArrowRightLeftIcon,
   CircleXIcon,
   LoaderCircleIcon,
+  MoreVerticalIcon,
   RotateCcwIcon,
   SearchIcon,
   UserRoundPlusIcon,
@@ -43,7 +44,7 @@ import { workStatusLabel } from "@/components/work-status"
 import { cn } from "@/lib/utils"
 
 /** 会话头的图标操作按钮，悬停显示操作名称。 */
-function HeaderAction({
+export function HeaderAction({
   label,
   icon: Icon,
   busy = false,
@@ -93,6 +94,8 @@ export function ConversationHeader({
   onSearch,
   groupParticipants,
   narrowViewport = false,
+  contextVisible = false,
+  onToggleContext,
 }: {
   conversation: InboxConversation
   contactName: string
@@ -102,6 +105,8 @@ export function ConversationHeader({
   onSearch?: () => void
   groupParticipants?: GroupParticipant[]
   narrowViewport?: boolean
+  contextVisible?: boolean
+  onToggleContext?: () => void
 }) {
   const { t } = useTranslation(["inbox", "common"])
   const { t: tCommon } = useTranslation("common")
@@ -282,6 +287,13 @@ export function ConversationHeader({
               busy={operation === "close"}
               disabled={operation !== ""}
               onClick={() => actions.setCloseConfirmationOpen(true)}
+            />
+          ) : null}
+          {onToggleContext ? (
+            <HeaderAction
+              label={contextVisible ? t("contextClose") : t("contextOpen")}
+              icon={MoreVerticalIcon}
+              onClick={onToggleContext}
             />
           ) : null}
         </div>

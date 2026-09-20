@@ -168,9 +168,15 @@ export function ConversationMain({
             }
             groupParticipants={group?.participants}
             narrowViewport={narrowViewport}
+            contextVisible={!contextCollapsed}
+            onToggleContext={() => setContextCollapsed((collapsed) => !collapsed)}
           />
         ) : directTarget ? (
-          <DirectConversationDraftHeader member={directTarget} />
+          <DirectConversationDraftHeader
+            member={directTarget}
+            contextVisible={!contextCollapsed}
+            onToggleContext={() => setContextCollapsed((collapsed) => !collapsed)}
+          />
         ) : null}
         <ConversationThread
           key={threadKey}
@@ -204,7 +210,6 @@ export function ConversationMain({
           if (validConversation) onGroupLeft?.(validConversation.id)
         }}
         visible={!contextCollapsed}
-        onToggle={() => setContextCollapsed((collapsed) => !collapsed)}
       />
     </div>
   )
