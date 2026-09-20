@@ -2755,8 +2755,6 @@ export enum PermissionCode {
     PermissionRolesManage = "roles.manage",
     PermissionOrganizationView = "organization.view",
     PermissionOrganizationManage = "organization.manage",
-    PermissionStorageView = "storage.view",
-    PermissionStorageManage = "storage.manage",
 };
 
 /**
@@ -2796,7 +2794,6 @@ export enum PermissionResource {
     PermissionResourceChannels = "channels",
     PermissionResourceRoles = "roles",
     PermissionResourceOrganization = "organization",
-    PermissionResourceStorage = "storage",
 };
 
 /**
@@ -2904,36 +2901,6 @@ export interface RoleSummary {
 }
 
 /**
- * S3Setting 定义 S3 兼容对象存储配置。
- */
-export interface S3Setting {
-    "enabled": boolean;
-    "provider": StorageProvider;
-    "endpoint": string;
-    "publicBaseUrl": string;
-    "region": string;
-    "bucket": string;
-    "accessKeyId": string;
-    "secretAccessKey": string;
-    "forcePathStyle": boolean;
-}
-
-/**
- * S3SettingInput 定义保存和测试对象存储配置的输入。
- */
-export interface S3SettingInput {
-    "enabled": boolean;
-    "provider": StorageProvider;
-    "endpoint": string;
-    "publicBaseUrl": string;
-    "region": string;
-    "bucket": string;
-    "accessKeyId": string;
-    "secretAccessKey": string;
-    "forcePathStyle": boolean;
-}
-
-/**
  * ServiceSessionStatus 表示客服处理状态。
  */
 export enum ServiceSessionStatus {
@@ -2993,28 +2960,6 @@ export interface Startup {
     "state": SessionState;
     "organizationName"?: string;
 }
-
-/**
- * StorageProvider 表示 S3 兼容对象存储提供商。
- */
-export enum StorageProvider {
-    /**
-     * The Go zero value for the underlying type of the enum.
-     */
-    $zero = "",
-
-    StorageProviderGeneric = "generic",
-    StorageProviderAWS = "aws",
-    StorageProviderR2 = "r2",
-    StorageProviderAliyun = "aliyun",
-    StorageProviderTencent = "tencent",
-    StorageProviderBaidu = "baidu",
-    StorageProviderQiniu = "qiniu",
-    StorageProviderHuawei = "huawei",
-    StorageProviderUCloud = "ucloud",
-    StorageProviderMinIO = "minio",
-    StorageProviderRustFS = "rustfs",
-};
 
 /**
  * SyncHeads 保存同步探针的不透明比较值，客户端只判断与上次返回是否相同。

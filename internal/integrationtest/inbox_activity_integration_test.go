@@ -23,6 +23,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
+	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/runforyou-ai/cervi/internal/tenant"
@@ -138,7 +139,7 @@ func TestInboxSnapshot(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	backend := appservice.NewDirectBackend(f.db, nil, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil)
+	backend := appservice.NewDirectBackend(f.db, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil)
 	ctx = tenant.WithAccessHost(ctx, f.owner.Organization.AccessHost)
 	f.db.AddQueryHook(chatQueryHook{})
 	gate := newChatQueryGate(t, false, 1, func(event *bun.QueryEvent) bool {

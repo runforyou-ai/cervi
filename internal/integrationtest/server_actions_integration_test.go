@@ -25,7 +25,6 @@ import (
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
 	organizationaction "github.com/runforyou-ai/cervi/internal/actions/organization"
 	roleaction "github.com/runforyou-ai/cervi/internal/actions/role"
-	settingaction "github.com/runforyou-ai/cervi/internal/actions/setting"
 	teamaction "github.com/runforyou-ai/cervi/internal/actions/team"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -2580,7 +2579,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		cleanup := filemaintenance.NewDeleteExpiredAction(db, serverfilecontent.NewDeleter(localFiles, nil))
+		cleanup := filemaintenance.NewDeleteExpiredAction(db, serverfilecontent.NewDeleter(localFiles, serverfilecontent.S3Config{}))
 		if err := cleanup.Execute(context.Background(), filemaintenance.DeleteExpiredInput{FileID: avatar.ID}); err != nil {
 			t.Fatal(err)
 		}
@@ -2840,50 +2839,6 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		}
 		if _, err := contactaction.NewRestoreContactAction(db).Execute(context.Background(), loggedIn.Identity, contact.Contact.ID); err != nil {
 			t.Fatal(err)
-		}
-	})
-
-	// 覆盖 S3 对象存储设置的保存、读取与停用后配置保留。
-	runStep("S3设置", func(t *testing.T) {
-		s3Setting := settingaction.S3Setting{
-			Enabled:         true,
-			Provider:        domain.StorageProviderAWS,
-			Endpoint:        "https://s3.example.com",
-			PublicBaseURL:   "https://cdn.example.com",
-			Region:          "us-east-1",
-			Bucket:          "cervi",
-			AccessKeyID:     "access-key",
-			SecretAccessKey: "secret-key",
-			ForcePathStyle:  true,
-		}
-		saveS3Setting := settingaction.NewSaveS3SettingAction(db)
-		savedS3Setting, err := saveS3Setting.Execute(context.Background(), loggedIn.Identity, s3Setting)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if savedS3Setting != s3Setting {
-			t.Fatalf("saved S3 setting = %#v, want %#v", savedS3Setting, s3Setting)
-		}
-		getS3Setting := settingaction.NewGetS3SettingQuery(db)
-		loadedS3Setting, err := getS3Setting.Execute(context.Background(), loggedIn.Identity)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if loadedS3Setting != s3Setting {
-			t.Fatalf("loaded S3 setting = %#v, want %#v", loadedS3Setting, s3Setting)
-		}
-
-		disabledS3Setting := s3Setting
-		disabledS3Setting.Enabled = false
-		if _, err := saveS3Setting.Execute(context.Background(), loggedIn.Identity, disabledS3Setting); err != nil {
-			t.Fatal(err)
-		}
-		loadedS3Setting, err = getS3Setting.Execute(context.Background(), loggedIn.Identity)
-		if err != nil {
-			t.Fatal(err)
-		}
-		if loadedS3Setting != disabledS3Setting {
-			t.Fatalf("disabled S3 setting = %#v, want preserved setting %#v", loadedS3Setting, disabledS3Setting)
 		}
 	})
 }

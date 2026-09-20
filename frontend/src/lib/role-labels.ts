@@ -65,8 +65,6 @@ export function permissionResourceLabel(
       return t("roles.permissions.resources.roles")
     case PermissionResource.PermissionResourceOrganization:
       return t("roles.permissions.resources.organization")
-    case PermissionResource.PermissionResourceStorage:
-      return t("roles.permissions.resources.storage")
     default:
       console.warn("未知的权限功能", resource)
       return String(resource)

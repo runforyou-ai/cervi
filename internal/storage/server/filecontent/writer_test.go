@@ -21,7 +21,7 @@ func TestWriterSavesLocalImportedFile(t *testing.T) {
 		StorageBackend: string(domain.FileStorageBackendLocal),
 		StorageKey:     "organizations/org/files/avatar.jpg", ByteSize: 3,
 	}
-	if _, err := NewWriter(local, nil).Save(context.Background(), record, []byte("jpg")); err != nil {
+	if _, err := NewWriter(local, S3Config{}).Save(context.Background(), record, []byte("jpg")); err != nil {
 		t.Fatal(err)
 	}
 	file, _, err := local.Open(context.Background(), record.StorageKey)

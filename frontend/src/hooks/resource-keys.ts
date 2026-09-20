@@ -173,6 +173,4 @@ export const resourceKeys = {
   contacts: (parameters?: KeyParameters) => listKey("contacts", parameters),
   /** 单个外部联系人。 */
   contact: (id?: string) => itemKey("contact", id),
-  /** S3 对象存储设置。 */
-  s3Setting: () => ["s3-setting"],
 }

@@ -56,20 +56,9 @@ func (o *directOperations) activeFileURLs(ctx context.Context, identity *serverm
 	if err != nil {
 		return nil, err
 	}
-	publicBaseURL := ""
-	for _, location := range locations {
-		if location.StorageBackend == domain.FileStorageBackendS3 {
-			setting, err := o.getS3Setting.Execute(ctx, identity)
-			if err != nil {
-				return nil, err
-			}
-			publicBaseURL = setting.PublicBaseURL
-			break
-		}
-	}
 	urls := make(map[string]string, len(locations))
 	for _, location := range locations {
-		contentURL, err := fileContentURL(location.StorageBackend, location.StorageKey, publicBaseURL)
+		contentURL, err := fileContentURL(location.StorageBackend, location.StorageKey, o.s3.PublicBaseURL)
 		if err != nil {
 			return nil, fmt.Errorf("build public URL for file %s: %w", location.ID, err)
 		}

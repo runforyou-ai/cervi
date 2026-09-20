@@ -23,6 +23,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
+	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/runforyou-ai/cervi/internal/storage/server/pgerr"
 	"github.com/runforyou-ai/cervi/internal/tenant"
@@ -211,7 +212,7 @@ func TestMessageSequenceHTTPContract(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	backend := appservice.NewDirectBackend(f.db, nil, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil)
+	backend := appservice.NewDirectBackend(f.db, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil)
 	service := api.NewService(appservice.New(backend))
 	for _, route := range []string{"messages", "read"} {
 		t.Run(route, func(t *testing.T) {
@@ -241,7 +242,7 @@ func TestMessageSequenceHTTPContract(t *testing.T) {
 			}
 		})
 	}
-	visitor := appservice.NewWebsiteVisitorDirectBackend(f.db, nil, nil)
+	visitor := appservice.NewWebsiteVisitorDirectBackend(f.db, nil, nil, serverfilecontent.S3Config{})
 	page, err := visitor.ListMessages(ctx, appservice.WebsiteVisitorMeta{}, f.channelID, "web-session:0123456789abcdef0123456789abcdef", f.conversationID, appservice.WebsiteVisitorMessageHistoryInput{})
 	if err != nil || page.Messages[len(page.Messages)-1].MessageSeq != "9007199254740993" {
 		t.Fatalf("visitor=%+v err=%v", page, err)
