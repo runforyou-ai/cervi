@@ -116,8 +116,8 @@ export function ConversationHeader({
     group ? (groupParticipants ?? []) : null,
   )
   const agentReplyLabel = useConversationAgentReplyLabel(conversation.id)
-  // 真人正在输入优先于 AI 员工正在回复。
-  const activityLabel = typingLabel || agentReplyLabel
+  // 真人正在输入优先于 AI 员工正在回复；群聊不展示正在输入。
+  const activityLabel = (group ? "" : typingLabel) || agentReplyLabel
   const actions = useCustomerSessionActions(
     customerConversation,
     currentIdentityId,

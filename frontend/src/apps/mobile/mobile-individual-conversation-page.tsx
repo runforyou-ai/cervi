@@ -5,7 +5,6 @@ import { Navigate, useLocation, useNavigate, useParams } from "react-router"
 
 import {
   ConversationType,
-  UserStatus,
   isAgentInboxConversation,
   isDirectInboxConversation,
   type AgentInboxConversationData,
@@ -21,8 +20,6 @@ import {
 import { Button } from "@/components/ui/button"
 import { useConversationSummary } from "@/features/inbox/use-conversation-summary"
 import { LoadingIndicator } from "@/components/loading-indicator"
-import { workStatusLabel } from "@/components/work-status"
-import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
 import { useAccountDisabledReason } from "@/features/inbox/use-account-disabled-reason"
 import { useConversationTypingLabel } from "@/features/inbox/use-conversation-typing"
 type MobileIndividualLocationState = MobileLocateState & {
@@ -40,16 +37,11 @@ export function MobileIndividualHeader({
   peerName: string
 }) {
   const { t: tInbox } = useTranslation("inbox")
-  const { t: tCommon } = useTranslation("common")
   const { inboxURL } = useMobileNavigation()
   const location = useLocation()
   const navigate = useNavigate()
   const { memberUserID, agentDirectory } =
     (location.state as MobileIndividualLocationState | null) ?? {}
-  const agentRunLabel = agentRunStatusLabel(
-    conversation?.agent?.agentRunStatus ?? null,
-    tInbox,
-  )
   const typingLabel = useConversationTypingLabel(conversation?.id ?? "", null)
 
   return (
@@ -62,22 +54,7 @@ export function MobileIndividualHeader({
             : inboxURL
       }
       title={
-        <span className="block min-w-0">
-          <span className="block truncate">{peerName}</span>
-          {conversation?.agent ? (
-            <span className="block truncate text-xs font-normal text-muted-foreground">
-              {conversation.agent.agentName}
-              {agentRunLabel ? ` · ${agentRunLabel}` : ""}
-            </span>
-          ) : conversation?.direct ? (
-            <span className="block truncate text-xs font-normal text-muted-foreground">
-              {typingLabel ||
-                (conversation.direct.peerStatus === UserStatus.UserStatusInactive
-                  ? tInbox("directPeerDisabled")
-                  : workStatusLabel(conversation.direct.peerWorkStatus, tCommon))}
-            </span>
-          ) : null}
-        </span>
+        <span className="block min-w-0 truncate">{typingLabel || peerName}</span>
       }
       actions={
         <Button
