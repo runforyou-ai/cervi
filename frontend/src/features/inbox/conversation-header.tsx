@@ -36,6 +36,7 @@ export function ConversationHeader({
   contactName,
   sessionStatus,
   currentIdentityId,
+  handlesCustomers,
   onSessionChanged,
   onSearch,
   groupParticipants,
@@ -45,6 +46,7 @@ export function ConversationHeader({
   contactName: string
   sessionStatus: string
   currentIdentityId: string
+  handlesCustomers: boolean
   onSessionChanged: () => void
   onSearch?: () => void
   groupParticipants?: GroupParticipant[]
@@ -71,15 +73,10 @@ export function ConversationHeader({
   const actions = useCustomerSessionActions(
     customerConversation,
     currentIdentityId,
+    handlesCustomers,
     onSessionChanged,
   )
-  const {
-    operation,
-    sessionOpen,
-    sessionClosed,
-    assignedToCurrentUser,
-    transferCandidates,
-  } = actions
+  const { operation, transferCandidates } = actions
 
   return (
     <>
@@ -165,7 +162,7 @@ export function ConversationHeader({
             data-slot="conversation-actions"
             className="flex shrink-0 items-center gap-2"
           >
-            {sessionClosed ? (
+            {actions.reopenable ? (
               <Button
                 type="button"
                 variant="outline"
@@ -180,7 +177,7 @@ export function ConversationHeader({
                 {t("conversationReopen")}
               </Button>
             ) : null}
-            {sessionOpen && !assignedToCurrentUser ? (
+            {actions.claimable ? (
               <Button
                 type="button"
                 variant="outline"
@@ -195,7 +192,7 @@ export function ConversationHeader({
                 {customer.assignee ? t("conversationTakeover") : t("conversationClaim")}
               </Button>
             ) : null}
-            {sessionOpen && assignedToCurrentUser ? (
+            {actions.transferable ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                   <Button
@@ -278,17 +275,17 @@ export function ConversationHeader({
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="min-w-48">
-                {sessionClosed ? (
+                {actions.reopenable ? (
                   <DropdownMenuItem onSelect={() => void actions.reopen()}>
                     {t("conversationReopen")}
                   </DropdownMenuItem>
-                ) : !assignedToCurrentUser ? (
+                ) : actions.claimable ? (
                   <DropdownMenuItem onSelect={() => void actions.claim()}>
                     {customer.assignee
                       ? t("conversationTakeover")
                       : t("conversationClaim")}
                   </DropdownMenuItem>
-                ) : transferCandidates.length === 0 ? (
+                ) : !actions.transferable ? null : transferCandidates.length === 0 ? (
                   <DropdownMenuItem disabled>
                     {t("conversationTransferEmpty")}
                   </DropdownMenuItem>

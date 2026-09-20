@@ -5,8 +5,6 @@ package agentruntime
 import (
 	"fmt"
 	"strings"
-
-	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
 const customerServiceBaseline = `你是企业「%s」的 AI 员工%s，专业领域是客户服务。
@@ -54,19 +52,19 @@ type builtinTools struct {
 	Terminal        bool // 客服场景的 ask_customer 与 handoff_to_human。
 }
 
-// RoleBaseline 渲染角色基线，自定义角色按成员基线处理；AI 员工名称为空时省略名称。
-func RoleBaseline(kind domain.RoleKind, organizationName, agentName string) string {
+// AgentBaseline 按接待开关渲染 AI 员工基线；AI 员工名称为空时省略名称。
+func AgentBaseline(handlesCustomers bool, organizationName, agentName string) string {
 	name := ""
 	if agentName != "" {
 		name = "「" + agentName + "」"
 	}
-	if kind == domain.RoleKindCustomerService {
+	if handlesCustomers {
 		return fmt.Sprintf(customerServiceBaseline, organizationName, name)
 	}
 	return fmt.Sprintf(memberBaseline, organizationName, name)
 }
 
-// composeInstruction 按角色基线、企业指令、场景规则的顺序拼接运行指令。
+// composeInstruction 按基线、企业指令、场景规则的顺序拼接运行指令。
 func composeInstruction(baseline, enterprise, rules string) string {
 	return joinSections(baseline, enterprise, rules)
 }

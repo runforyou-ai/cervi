@@ -64,7 +64,7 @@ func newKnowledgeAgent(t *testing.T, db *bun.DB, identity *servermodels.Identity
 		t.Fatal(err)
 	}
 	agent, err := agentaction.NewCreateAgentAction(db).Execute(ctx, identity, agentaction.CreateInput{
-		DisplayName: "资料助手", RoleID: roleID,
+		HandlesCustomers: true, DisplayName: "资料助手", RoleID: roleID,
 		Execution: agentaction.ExecutionInput{Mode: domain.AgentExecutionModeManaged, Managed: &agentaction.ManagedExecutionInput{
 			ProviderID: provider.ID, ModelIdentifier: "chat", SystemInstruction: "依据知识库回答", KnowledgeBaseIDs: knowledgeBaseIDs,
 		}},

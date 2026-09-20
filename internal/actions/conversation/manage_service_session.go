@@ -47,7 +47,7 @@ func (a *ClaimServiceSessionAction) Execute(ctx context.Context, identity *serve
 	var cancelledRunIDs []string
 	var cancelledSession *servermodels.ServiceSession
 	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
-		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
+		if err := lockActiveCustomerHandler(ctx, tx, identity); err != nil {
 			return err
 		}
 		conversation, session, err := lockOpenServiceSession(ctx, tx, identity.Organization.ID, conversationID)
@@ -131,11 +131,11 @@ func (a *TransferServiceSessionAction) Execute(ctx context.Context, identity *se
 	var cancelledRunIDs []string
 	var cancelledSession *servermodels.ServiceSession
 	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
-		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
+		if err := lockActiveCustomerHandler(ctx, tx, identity); err != nil {
 			return err
 		}
 		// 按转交目标身份、会话的顺序取锁。
-		target, err := identityaction.LockActiveCustomerServiceIdentity(ctx, tx, identity.Organization.ID, input.AssigneeIdentityID)
+		target, err := identityaction.LockActiveCustomerHandlingIdentity(ctx, tx, identity.Organization.ID, input.AssigneeIdentityID)
 		if errors.Is(err, sql.ErrNoRows) {
 			return &ValidationError{Fields: map[string]ValidationCode{"assigneeIdentityId": ValidationTargetIdentityIDInvalid}}
 		}
@@ -265,7 +265,7 @@ func (a *CloseServiceSessionAction) Execute(ctx context.Context, identity *serve
 	var cancelledRunIDs []string
 	var cancelledSession *servermodels.ServiceSession
 	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
-		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
+		if err := lockActiveCustomerHandler(ctx, tx, identity); err != nil {
 			return err
 		}
 		conversation, session, err := lockOpenServiceSession(ctx, tx, identity.Organization.ID, conversationID)
@@ -343,7 +343,7 @@ func (a *ReopenServiceSessionAction) Execute(ctx context.Context, identity *serv
 	}
 	var output ServiceSessionResult
 	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
-		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
+		if err := lockActiveCustomerHandler(ctx, tx, identity); err != nil {
 			return err
 		}
 		conversation, session, err := chatstate.LockCustomerServiceSession(ctx, tx, identity.Organization.ID, conversationID)
@@ -390,6 +390,15 @@ func (a *ReopenServiceSessionAction) Execute(ctx context.Context, identity *serv
 		return ServiceSessionResult{}, fmt.Errorf("reopen service session: %w", err)
 	}
 	return output, nil
+}
+
+// lockActiveCustomerHandler 锁定当前身份的有效账号并校验其已开启接待客户。
+func lockActiveCustomerHandler(ctx context.Context, tx bun.Tx, identity *servermodels.Identity) error {
+	err := identityaction.LockActiveCustomerHandlingUser(ctx, tx, identity)
+	if errors.Is(err, identityaction.ErrCustomerHandlingRequired) {
+		return &ConflictError{Reason: ConflictReasonCustomerHandlingRequired}
+	}
+	return err
 }
 
 // lockOpenServiceSession 锁定客户会话及其最新且未关闭的客服处理周期。

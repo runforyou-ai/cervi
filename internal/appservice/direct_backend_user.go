@@ -57,9 +57,9 @@ func newDirectoryOps(db *bun.DB, agentCoordinator *agentrunaction.ExecuteAction)
 		listUsers:                useraction.NewListUsersQuery(db),
 		getUser:                  useraction.NewGetUserQuery(db),
 		createUser:               useraction.NewCreateUserAction(db),
-		updateUser:               useraction.NewUpdateUserAction(db),
-		updateRoleAssignments:    roleaction.NewUpdateAssignmentsAction(db, agentCoordinator),
-		updateUserStatus:         useraction.NewUpdateStatusAction(db),
+		updateUser:               useraction.NewUpdateUserAction(db, agentCoordinator),
+		updateRoleAssignments:    roleaction.NewUpdateAssignmentsAction(db),
+		updateUserStatus:         useraction.NewUpdateStatusAction(db, agentCoordinator),
 		listTeams:                teamaction.NewListTeamsQuery(db),
 		createTeam:               teamaction.NewCreateTeamAction(db),
 		updateTeam:               teamaction.NewUpdateTeamAction(db),
@@ -223,7 +223,7 @@ func (o *directOperations) GetUser(ctx context.Context, meta RequestMeta, identi
 
 // CreateUser 创建企业成员账号。
 func (o *directOperations) CreateUser(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input CreateUserInput) (User, error) {
-	user, err := o.createUser.Execute(ctx, identity, useraction.CreateInput{DisplayName: input.DisplayName, Email: input.Email, Password: input.Password, RoleID: input.RoleID, TeamIDs: input.TeamIDs, AvatarFileID: input.AvatarFileID})
+	user, err := o.createUser.Execute(ctx, identity, useraction.CreateInput{DisplayName: input.DisplayName, Email: input.Email, Password: input.Password, RoleID: input.RoleID, TeamIDs: input.TeamIDs, HandlesCustomers: input.HandlesCustomers, AvatarFileID: input.AvatarFileID})
 	if err != nil {
 		return User{}, o.userMutationError(ctx, meta, err, cervii18n.ErrorUserCreateFailed, identity.Organization.ID, "")
 	}
@@ -231,9 +231,9 @@ func (o *directOperations) CreateUser(ctx context.Context, meta RequestMeta, ide
 	return o.userMutationResult(ctx, meta, identity, *user, cervii18n.ErrorUserCreateFailed)
 }
 
-// UpdateUser 修改企业成员资料、角色和所属团队。
+// UpdateUser 修改企业成员资料、角色、接待开关和所属团队。
 func (o *directOperations) UpdateUser(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, userID string, input UpdateUserInput) (User, error) {
-	user, err := o.updateUser.Execute(ctx, identity, userID, useraction.UpdateInput{DisplayName: input.DisplayName, Email: input.Email, RoleID: input.RoleID, TeamIDs: input.TeamIDs})
+	user, err := o.updateUser.Execute(ctx, identity, userID, useraction.UpdateInput{DisplayName: input.DisplayName, Email: input.Email, RoleID: input.RoleID, TeamIDs: input.TeamIDs, HandlesCustomers: input.HandlesCustomers})
 	if err != nil {
 		return User{}, o.userMutationError(ctx, meta, err, cervii18n.ErrorUserUpdateFailed, identity.Organization.ID, userID)
 	}
@@ -331,7 +331,7 @@ func userFromAction(user useraction.User, avatarURLs map[string]string) User {
 	for _, team := range user.Teams {
 		teams = append(teams, TeamSummary{ID: team.ID, Name: team.Name})
 	}
-	return User{ID: user.ID, IdentityID: user.IdentityID, Email: user.Email, DisplayName: user.DisplayName, AvatarURL: optionalFileURL(avatarURLs, user.AvatarFileID), Role: RoleSummary{ID: user.RoleID, Kind: RoleKind(user.RoleKind), Name: user.RoleName}, Status: UserStatus(user.Status), WorkStatus: WorkStatus(user.WorkStatus), Teams: teams, CreatedAt: user.CreatedAt}
+	return User{ID: user.ID, IdentityID: user.IdentityID, Email: user.Email, DisplayName: user.DisplayName, AvatarURL: optionalFileURL(avatarURLs, user.AvatarFileID), Role: RoleSummary{ID: user.RoleID, Kind: RoleKind(user.RoleKind), Name: user.RoleName}, HandlesCustomers: user.HandlesCustomers, Status: UserStatus(user.Status), WorkStatus: WorkStatus(user.WorkStatus), Teams: teams, CreatedAt: user.CreatedAt}
 }
 
 // userFieldKeys 把企业成员校验错误码映射为本地化文案键。

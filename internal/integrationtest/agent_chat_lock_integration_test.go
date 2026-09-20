@@ -213,11 +213,11 @@ func testAgentAcceptedInputs(t *testing.T, db *bun.DB, identity *servermodels.Id
 					waitChatSignal(t, ctx, entered)
 				}
 				if change == "停用" {
-					if _, err := agentaction.NewUpdateStatusAction(db, testServiceSessionHandoff(db)).Execute(ctx, identity, agentID, domain.UserStatusInactive); err != nil {
+					if _, err := agentaction.NewUpdateStatusAction(db, testServiceSessionReturner(db)).Execute(ctx, identity, agentID, domain.UserStatusInactive); err != nil {
 						t.Fatal(err)
 					}
 					t.Cleanup(func() {
-						if _, err := agentaction.NewUpdateStatusAction(db, testServiceSessionHandoff(db)).Execute(context.Background(), identity, agentID, domain.UserStatusActive); err != nil {
+						if _, err := agentaction.NewUpdateStatusAction(db, testServiceSessionReturner(db)).Execute(context.Background(), identity, agentID, domain.UserStatusActive); err != nil {
 							t.Error(err)
 						}
 					})

@@ -15,20 +15,22 @@ const (
 
 // CreateAgentInput 定义新增 AI 员工字段，AvatarFileID 为空时不设置头像。
 type CreateAgentInput struct {
-	DisplayName  string              `json:"displayName"`
-	RoleID       string              `json:"roleId"`
-	TeamIDs      []string            `json:"teamIds"`
-	AvatarFileID string              `json:"avatarFileId"`
-	Execution    AgentExecutionInput `json:"execution"`
+	DisplayName      string              `json:"displayName"`
+	RoleID           string              `json:"roleId"`
+	TeamIDs          []string            `json:"teamIds"`
+	HandlesCustomers bool                `json:"handlesCustomers"`
+	AvatarFileID     string              `json:"avatarFileId"`
+	Execution        AgentExecutionInput `json:"execution"`
 }
 
 // UpdateAgentInput 定义 AI 员工可编辑字段，AvatarFileID 为空时保留当前头像。
 type UpdateAgentInput struct {
-	DisplayName  string     `json:"displayName"`
-	RoleID       string     `json:"roleId"`
-	TeamIDs      []string   `json:"teamIds"`
-	WorkStatus   WorkStatus `json:"workStatus"`
-	AvatarFileID string     `json:"avatarFileId"`
+	DisplayName      string     `json:"displayName"`
+	RoleID           string     `json:"roleId"`
+	TeamIDs          []string   `json:"teamIds"`
+	HandlesCustomers bool       `json:"handlesCustomers"`
+	WorkStatus       WorkStatus `json:"workStatus"`
+	AvatarFileID     string     `json:"avatarFileId"`
 }
 
 // AgentExecutionInput 定义 AI 员工执行配置输入。
@@ -72,19 +74,20 @@ type AgentListInput struct {
 	PageSize int         `json:"pageSize" query:"pageSize,default=50"`
 }
 
-// Agent 定义 AI 员工信息，Behavior 是当前角色对该员工的内置工作规则与可用工具。
+// Agent 定义 AI 员工信息，Behavior 是该员工当前生效的内置工作规则与可用工具。
 type Agent struct {
-	ID          string               `json:"id"`
-	IdentityID  string               `json:"identityId"`
-	DisplayName string               `json:"displayName"`
-	AvatarURL   string               `json:"avatarUrl"`
-	Role        RoleSummary          `json:"role"`
-	Status      UserStatus           `json:"status"`
-	WorkStatus  WorkStatus           `json:"workStatus"`
-	Teams       []TeamSummary        `json:"teams"`
-	Execution   AgentExecution       `json:"execution"`
-	Behavior    AgentBehaviorProfile `json:"behavior"`
-	CreatedAt   time.Time            `json:"createdAt"`
+	ID               string               `json:"id"`
+	IdentityID       string               `json:"identityId"`
+	DisplayName      string               `json:"displayName"`
+	AvatarURL        string               `json:"avatarUrl"`
+	Role             RoleSummary          `json:"role"`
+	HandlesCustomers bool                 `json:"handlesCustomers"`
+	Status           UserStatus           `json:"status"`
+	WorkStatus       WorkStatus           `json:"workStatus"`
+	Teams            []TeamSummary        `json:"teams"`
+	Execution        AgentExecution       `json:"execution"`
+	Behavior         AgentBehaviorProfile `json:"behavior"`
+	CreatedAt        time.Time            `json:"createdAt"`
 }
 
 // AgentListItem 定义 AI 员工目录项。

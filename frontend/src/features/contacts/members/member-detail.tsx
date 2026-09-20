@@ -22,6 +22,7 @@ import { WorkStatusBadge } from "@/components/work-status"
 import { Field, FieldDescription } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { NativeSelect } from "@/components/ui/native-select"
+import { Switch } from "@/components/ui/switch"
 import { AccountStatusEditRow } from "@/features/contacts/account-status-edit-row"
 import { TeamCheckboxOptions } from "@/features/contacts/team-checkbox-options"
 import {
@@ -44,6 +45,7 @@ function valuesFromUser(user: UserData): MemberFormValues {
     password: "",
     roleId: user.role.id,
     teamIds: user.teams.map((team) => team.id),
+    handlesCustomers: user.handlesCustomers,
   }
 }
 
@@ -137,6 +139,7 @@ export function MemberDetailView({
       draft.displayName === current.displayName &&
       draft.email === current.email &&
       draft.roleId === current.roleId &&
+      draft.handlesCustomers === current.handlesCustomers &&
       sameIDs(draft.teamIds, current.teamIds)
     ) {
       setEditing(null)
@@ -150,6 +153,7 @@ export function MemberDetailView({
         email: draft.email,
         roleId: draft.roleId,
         teamIds: draft.teamIds,
+        handlesCustomers: draft.handlesCustomers,
       })
       if (!saveState.isCurrent(request)) return
       if (closeAfterSave) setEditing(null)
@@ -165,7 +169,13 @@ export function MemberDetailView({
       console.warn("保存企业成员失败", error)
       toast.error(
         isApiError(error)
-          ? apiErrorMessage(error, ["displayName", "email", "roleId", "teamIds"])
+          ? apiErrorMessage(error, [
+              "displayName",
+              "email",
+              "roleId",
+              "teamIds",
+              "handlesCustomers",
+            ])
           : t("members.form.networkError"),
       )
     } finally {
@@ -313,6 +323,20 @@ export function MemberDetailView({
             entityId={user.id}
             errorMessage={t("members.status.error")}
           />
+
+          <ReadonlyDetailRow label={t("columns.handlesCustomers")}>
+            <Switch
+              id="member-handles-customers"
+              checked={user.handlesCustomers}
+              disabled={saving || editing !== null}
+              onCheckedChange={(checked) =>
+                void saveMember(
+                  { ...form.getValues(), handlesCustomers: checked },
+                  false,
+                )
+              }
+            />
+          </ReadonlyDetailRow>
 
           <ReadonlyDetailRow label={t("columns.workStatus")}>
             <WorkStatusBadge status={workStatus} />

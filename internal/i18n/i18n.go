@@ -244,6 +244,7 @@ const (
 	ErrorReplyTargetInvalid               Key = "error.reply_target_invalid"
 	ErrorGroupMentionTargetInvalid        Key = "error.group_mention_target_invalid"
 	ErrorNoteMentionTargetInvalid         Key = "error.note_mention_target_invalid"
+	ErrorCustomerHandlingRequired         Key = "error.customer_handling_required"
 	ErrorServiceSessionOwned              Key = "error.service_session_owned"
 	ErrorServiceSessionNotReplyable       Key = "error.service_session_not_replyable"
 	ErrorCustomerDeliveryConflict         Key = "error.customer_delivery_conflict"

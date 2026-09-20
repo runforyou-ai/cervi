@@ -335,7 +335,7 @@ func TestRealtimeIdentityProfileNotifications(t *testing.T) {
 	feed := startRealtimeFeed(t, f.owner.Organization.ID)
 	workStatus := useraction.NewUpdateWorkStatusAction(f.db)
 	preferences := useraction.NewUpdatePreferencesAction(f.db)
-	updateUser := useraction.NewUpdateUserAction(f.db)
+	updateUser := useraction.NewUpdateUserAction(f.db, testServiceSessionReturner(f.db))
 	for _, step := range []struct {
 		name   string
 		change func() error

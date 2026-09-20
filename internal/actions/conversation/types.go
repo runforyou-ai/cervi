@@ -46,6 +46,8 @@ const (
 const (
 	// ConflictReasonIdempotencyMismatch 表示同一消息编号对应了不同写入意图。
 	ConflictReasonIdempotencyMismatch = "idempotency_mismatch"
+	// ConflictReasonCustomerHandlingRequired 表示当前成员未开启接待客户。
+	ConflictReasonCustomerHandlingRequired = "customer_handling_required"
 	// ConflictReasonServiceSessionOwned 表示客服处理周期已由其他主体负责。
 	ConflictReasonServiceSessionOwned = "service_session_owned"
 	// ConflictReasonServiceSessionNotReplyable 表示客服处理周期当前不可回复。
@@ -264,16 +266,17 @@ type ConversationSystemEvent struct {
 	Targets       []ConversationSystemEventParticipant `json:"targets"`
 	PreviousTitle *string                              `json:"previousTitle,omitempty"`
 	Title         *string                              `json:"title,omitempty"`
-	// 以下字段只由 service_session_* 事件携带，结构与 domain.ServiceSessionHandedOffEvent、domain.ServiceSessionOperatedEvent 一致。
-	ServiceSessionID *string                      `json:"serviceSessionId,omitempty"`
-	ActorIdentityID  *string                      `json:"actorIdentityId,omitempty"`
-	ActorDisplayName *string                      `json:"actorDisplayName,omitempty"`
-	FromIdentityID   *string                      `json:"fromIdentityId,omitempty"`
-	FromDisplayName  *string                      `json:"fromDisplayName,omitempty"`
-	Target           *domain.ServiceSessionTarget `json:"target,omitempty"`
-	Reason           *domain.AgentHandoffReason   `json:"reason,omitempty"`
-	ReasonText       *string                      `json:"reasonText,omitempty"`
-	AgentRunID       *string                      `json:"agentRunId,omitempty"`
+	// 以下字段只由 service_session_* 事件携带，结构与 domain.ServiceSessionHandedOffEvent、domain.ServiceSessionOperatedEvent、domain.ServiceSessionReturnedEvent 一致。
+	ServiceSessionID *string                            `json:"serviceSessionId,omitempty"`
+	ActorIdentityID  *string                            `json:"actorIdentityId,omitempty"`
+	ActorDisplayName *string                            `json:"actorDisplayName,omitempty"`
+	FromIdentityID   *string                            `json:"fromIdentityId,omitempty"`
+	FromDisplayName  *string                            `json:"fromDisplayName,omitempty"`
+	Target           *domain.ServiceSessionTarget       `json:"target,omitempty"`
+	Reason           *domain.AgentHandoffReason         `json:"reason,omitempty"`
+	ReturnReason     *domain.ServiceSessionReturnReason `json:"returnReason,omitempty"`
+	ReasonText       *string                            `json:"reasonText,omitempty"`
+	AgentRunID       *string                            `json:"agentRunId,omitempty"`
 }
 
 // ConversationMessage 定义成员可见的会话消息。

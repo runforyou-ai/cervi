@@ -119,7 +119,7 @@ func TestInboxSearch(t *testing.T) {
 		t.Fatal(err)
 	}
 	agent, err := agentaction.NewCreateAgentAction(f.db).Execute(ctx, f.owner, agentaction.CreateInput{
-		DisplayName: "检索助理", RoleID: customerServiceRole.ID,
+		HandlesCustomers: true, DisplayName: "检索助理", RoleID: customerServiceRole.ID,
 		Execution: agentaction.ExecutionInput{Mode: domain.AgentExecutionModeManaged, Managed: &agentaction.ManagedExecutionInput{
 			ProviderID: provider.ID, ModelIdentifier: model.Identifier, SystemInstruction: "负责检索测试。",
 		}},

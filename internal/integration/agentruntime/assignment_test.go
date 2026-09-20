@@ -13,7 +13,7 @@ import (
 // customerFacts 构造一份客服场景的业务事实。
 func customerFacts() AssignmentFacts {
 	return AssignmentFacts{
-		RoleKind: domain.RoleKindCustomerService, OrganizationName: "鹿行", AgentName: "小鹿", Instruction: "只回答售后问题。",
+		HandlesCustomers: true, OrganizationName: "鹿行", AgentName: "小鹿", Instruction: "只回答售后问题。",
 		Model: AssignmentModel{
 			ProviderID: "provider", Brand: "deepseek", Identifier: "model", MaxOutputTokens: 1024, ContextWindow: 8192,
 			InputModalities: []domain.AIModelInputModality{domain.AIModelInputModalityText},
@@ -22,17 +22,17 @@ func customerFacts() AssignmentFacts {
 	}
 }
 
-// TestComposeInstruction 验证角色基线、企业指令与场景规则的拼接顺序和空段落处理。
+// TestComposeInstruction 验证基线、企业指令与场景规则的拼接顺序和空段落处理。
 func TestComposeInstruction(t *testing.T) {
-	baseline := RoleBaseline(domain.RoleKindCustomerService, "鹿行", "小鹿")
+	baseline := AgentBaseline(true, "鹿行", "小鹿")
 	if !strings.HasPrefix(baseline, "你是企业「鹿行」的 AI 员工「小鹿」，专业领域是客户服务。") {
 		t.Fatalf("客服基线 = %q", baseline)
 	}
-	if generic := RoleBaseline(domain.RoleKindCustomerService, "鹿行", ""); !strings.HasPrefix(generic, "你是企业「鹿行」的 AI 员工，专业领域是客户服务。") {
+	if generic := AgentBaseline(true, "鹿行", ""); !strings.HasPrefix(generic, "你是企业「鹿行」的 AI 员工，专业领域是客户服务。") {
 		t.Fatalf("省略名称的基线 = %q", generic)
 	}
-	if custom := RoleBaseline(domain.RoleKindCustom, "鹿行", "小鹿"); custom != RoleBaseline(domain.RoleKindMember, "鹿行", "小鹿") {
-		t.Fatalf("自定义角色应按成员基线处理：%q", custom)
+	if member := AgentBaseline(false, "鹿行", "小鹿"); !strings.HasPrefix(member, "你是企业「鹿行」的 AI 员工「小鹿」，协助企业同事工作。") {
+		t.Fatalf("未开启接待的基线 = %q", member)
 	}
 	full := composeInstruction(baseline, "  只回答售后问题。 ", agentChatSceneRules)
 	if !strings.HasPrefix(full, baseline+"\n\n只回答售后问题。\n\n"+agentChatSceneRules) {
@@ -75,10 +75,10 @@ func TestSceneRules(t *testing.T) {
 	}
 }
 
-// TestResolveAssignment 验证有效配置记录角色、场景、规则版本、完整指令、哈希与工具清单。
+// TestResolveAssignment 验证有效配置记录接待开关、场景、规则版本、完整指令、哈希与工具清单。
 func TestResolveAssignment(t *testing.T) {
 	assignment := ResolveAssignment(customerFacts(), Capabilities{Knowledge: true, MCPServers: []string{"工单系统"}})
-	if assignment.RoleKind != domain.RoleKindCustomerService || assignment.Scene != SceneCustomer ||
+	if !assignment.HandlesCustomers || assignment.Scene != SceneCustomer ||
 		assignment.RulesVersion != AssignmentRulesVersion || assignment.Grounding != GroundingStrict {
 		t.Fatalf("有效配置 = %+v", assignment)
 	}
@@ -94,7 +94,7 @@ func TestResolveAssignment(t *testing.T) {
 	if strings.Join(assignment.Tools, ",") != "search_knowledge,ask_customer,handoff_to_human" {
 		t.Fatalf("客服工具清单 = %v", assignment.Tools)
 	}
-	internal := ResolveAssignment(AssignmentFacts{RoleKind: domain.RoleKindMember, Scene: SceneContext{Scene: SceneAgentChat}}, Capabilities{})
+	internal := ResolveAssignment(AssignmentFacts{Scene: SceneContext{Scene: SceneAgentChat}}, Capabilities{})
 	if strings.Join(internal.Tools, ",") != "calculator" || internal.Grounding != "" {
 		t.Fatalf("内部场景有效配置 = %+v", internal)
 	}

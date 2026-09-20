@@ -365,7 +365,7 @@ func TestRealtimeGatewayDelivery(t *testing.T) {
 	h.expectRejected(t, tokenA)
 
 	// 停用账号结束该用户全部事件流；同一事务的资料通知可能先于撤销送达。
-	if _, err := useraction.NewUpdateStatusAction(f.db).Execute(ctx, f.owner, f.member.User.ID, domain.UserStatusInactive); err != nil {
+	if _, err := useraction.NewUpdateStatusAction(f.db, testServiceSessionReturner(f.db)).Execute(ctx, f.owner, f.member.User.ID, domain.UserStatusInactive); err != nil {
 		t.Fatal(err)
 	}
 	timeout := time.After(5 * time.Second)

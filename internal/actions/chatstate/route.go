@@ -118,9 +118,9 @@ func availableRoute(ctx context.Context, db bun.IDB, organizationID string, chan
 		if targetID == nil {
 			return RouteSnapshot{}, false, nil
 		}
-		load := identityaction.LoadActiveCustomerServiceIdentity
+		load := identityaction.LoadActiveCustomerHandlingIdentity
 		if lock {
-			load = identityaction.LockActiveCustomerServiceIdentity
+			load = identityaction.LockActiveCustomerHandlingIdentity
 		}
 		identity, err := load(ctx, db, organizationID, *targetID)
 		if errors.Is(err, sql.ErrNoRows) {

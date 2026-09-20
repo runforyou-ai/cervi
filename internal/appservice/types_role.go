@@ -68,23 +68,22 @@ type PermissionDefinition struct {
 	AppliesTo PermissionAppliesTo `json:"appliesTo"`
 }
 
-// AgentBehaviorProfile 定义角色对 AI 员工的内置工作规则与可用工具。
+// AgentBehaviorProfile 定义 AI 员工的内置工作规则与可用工具。
 type AgentBehaviorProfile struct {
 	Instruction string   `json:"instruction"`
 	Tools       []string `json:"tools"`
 }
 
-// Role 定义企业角色及其权限；AgentBehavior 为空表示该角色不适用于 AI 员工。
+// Role 定义企业角色及其权限。
 type Role struct {
-	ID            string                `json:"id"`
-	Kind          RoleKind              `json:"kind"`
-	Name          string                `json:"name"`
-	Description   string                `json:"description"`
-	Permissions   []PermissionCode      `json:"permissions"`
-	MemberCount   int                   `json:"memberCount"`
-	AgentBehavior *AgentBehaviorProfile `json:"agentBehavior,omitempty"`
-	CreatedAt     time.Time             `json:"createdAt"`
-	UpdatedAt     time.Time             `json:"updatedAt"`
+	ID          string           `json:"id"`
+	Kind        RoleKind         `json:"kind"`
+	Name        string           `json:"name"`
+	Description string           `json:"description"`
+	Permissions []PermissionCode `json:"permissions"`
+	MemberCount int              `json:"memberCount"`
+	CreatedAt   time.Time        `json:"createdAt"`
+	UpdatedAt   time.Time        `json:"updatedAt"`
 }
 
 // RoleSummary 定义成员关联角色的精简字段。
