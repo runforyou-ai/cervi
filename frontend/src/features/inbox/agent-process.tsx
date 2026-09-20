@@ -187,7 +187,7 @@ export function AgentProcess({ process, incoming, onPrimary, onToggle }: { proce
         <CollapsibleTrigger className={cn(
           "group flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-sm py-1 text-left text-xs focus-visible:outline focus-visible:outline-ring",
           incoming ? "justify-start" : "justify-end",
-          onPrimary ? "text-primary-foreground/75" : "text-muted-foreground",
+          onPrimary ? "text-accent-foreground/75" : "text-muted-foreground",
           // 移动端按触屏点击区域抬高行高，点击区不与引用块和正文重叠。
           mobile && "py-2",
         )}>
@@ -197,7 +197,7 @@ export function AgentProcess({ process, incoming, onPrimary, onToggle }: { proce
         </CollapsibleTrigger>
         <div className={cn(
           "flex shrink-0 gap-2 text-[11px]",
-          onPrimary ? "text-primary-foreground/75" : "text-muted-foreground",
+          onPrimary ? "text-accent-foreground/75" : "text-muted-foreground",
         )}>
           <span>{t("agentUsageInput", { count: process.inputTokens })}</span>
           <span>{t("agentUsageOutput", { count: process.outputTokens })}</span>
@@ -207,7 +207,7 @@ export function AgentProcess({ process, incoming, onPrimary, onToggle }: { proce
         "mt-2 space-y-3 text-left text-sm",
         incoming ? "pl-3" : "pr-3",
         incoming ? "border-l" : "border-r",
-        onPrimary ? "border-primary-foreground/30" : "border-border",
+        onPrimary ? "border-accent-foreground/30" : "border-border",
       )}>
         {detail.data ? detail.data.blocks.map((block) =>
           block.kind === AgentRunBlockKind.AgentRunBlockToolCall && block.toolCall ? (
@@ -218,7 +218,7 @@ export function AgentProcess({ process, incoming, onPrimary, onToggle }: { proce
               className={cn(
                 "min-w-0 break-words",
                 block.kind === AgentRunBlockKind.AgentRunBlockThinking &&
-                  cn("italic", onPrimary ? "text-primary-foreground/75" : "text-muted-foreground"),
+                  cn("italic", onPrimary ? "text-accent-foreground/75" : "text-muted-foreground"),
               )}
             >
               <MessageMarkdown locale={i18n.language} onOpenLink={openExternalURL}>{block.text}</MessageMarkdown>
@@ -226,7 +226,7 @@ export function AgentProcess({ process, incoming, onPrimary, onToggle }: { proce
           ),
         ) : (
           // 读取中与读取失败共用一行占位，保持展开区域高度稳定。
-          <p className={cn("text-xs", onPrimary ? "text-primary-foreground/75" : "text-muted-foreground")}>
+          <p className={cn("text-xs", onPrimary ? "text-accent-foreground/75" : "text-muted-foreground")}>
             {detail.error && !detail.refreshing ? (
               <>
                 <span>{isApiError(detail.error) ? apiErrorMessage(detail.error) : t("agentProcessLoadFailed")}</span>

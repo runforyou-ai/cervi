@@ -24,7 +24,7 @@ export function MessageSendState({
           aria-label={detail ? `${label}：${detail}` : label}
           className={cn(
             "inline-flex size-3.5 shrink-0 items-center justify-center rounded-sm focus-visible:outline focus-visible:outline-2",
-            state === "attention" && "text-primary-foreground",
+            state === "attention" && "text-accent-foreground",
           )}
         >
           <Icon className="size-3.5" aria-hidden="true" />

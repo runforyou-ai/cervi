@@ -910,8 +910,8 @@ function ConversationTimelineContent({
                 internalNote
                   ? "border border-dashed border-amber-500/70 bg-amber-50 text-foreground dark:bg-amber-950/40"
                   : incoming || agentNotice
-                    ? "border bg-[#EEEEF0] text-foreground shadow-xs dark:bg-muted"
-                    : "bg-primary text-primary-foreground",
+                    ? "border bg-muted text-foreground shadow-xs"
+                    : "bg-accent text-accent-foreground",
                 endsGroup && (incoming ? "rounded-bl-sm" : "rounded-br-sm"),
               )
               const systemEvent = message.systemEvent
@@ -922,19 +922,15 @@ function ConversationTimelineContent({
               return (
                 <div key={message.id}>
                   {startsDay ? (
-                    <div className="my-3 flex items-center justify-center">
-                      <time
-                        dateTime={day}
-                        className="rounded-full bg-muted px-3 py-1 text-[11px] font-medium text-muted-foreground"
-                      >
-                        {formatDayLabel(date)}
-                      </time>
+                    <div className="my-3 flex items-center gap-2.5 text-[11px] font-medium text-muted-foreground">
+                      <span className="h-px flex-1 bg-border" />
+                      <time dateTime={day}>{formatDayLabel(date)}</time>
+                      <span className="h-px flex-1 bg-border" />
                     </div>
                   ) : null}
                   {message.sessionStart ? (
-                    <div className="my-3 flex items-center gap-3 text-xs font-semibold text-foreground">
-                      <span className="h-px flex-1 bg-border" />
-                      <span className="rounded-full border border-primary bg-background px-3 py-1 text-primary">
+                    <div className="my-3 text-center text-xs font-semibold text-muted-foreground">
+                      <span>
                         {t("sessionBoundary", {
                           sequence: message.sessionStart.sequence,
                           time: formatMessageTime(
@@ -948,7 +944,6 @@ function ConversationTimelineContent({
                           ? t("sessionBoundaryClosed")
                           : t("sessionBoundaryOngoing")}
                       </span>
-                      <span className="h-px flex-1 bg-border" />
                     </div>
                   ) : null}
                   {message.type === MessageType.MessageTypeSystem &&
@@ -956,24 +951,16 @@ function ConversationTimelineContent({
                     <div
                       data-message-id={message.local ? undefined : message.id}
                       tabIndex={-1}
-                      className={cn(
-                        "flex justify-center px-10 text-center",
-                        index > 0 && "mt-3",
-                      )}
+                      className="my-3 flex flex-col items-center gap-1 px-10 text-center text-xs text-muted-foreground"
                     >
-                      <div className="flex max-w-full flex-col items-center gap-1">
-                        <span
-                          className="rounded-full bg-muted px-3 py-1 text-xs text-muted-foreground"
-                          title={dateFormatters.full.format(date)}
-                        >
-                          {systemEventText}
+                      <span title={dateFormatters.full.format(date)}>
+                        {systemEventText}
+                      </span>
+                      {systemEvent?.reasonText ? (
+                        <span className="max-w-full break-words">
+                          {systemEvent.reasonText}
                         </span>
-                        {systemEvent?.reasonText ? (
-                          <span className="max-w-full break-words text-xs text-muted-foreground">
-                            {systemEvent.reasonText}
-                          </span>
-                        ) : null}
-                      </div>
+                      ) : null}
                     </div>
                   ) : (
                     <ContextMenu>
@@ -1073,7 +1060,7 @@ function ConversationTimelineContent({
                                         // 内部备注与附件消息的引用块在对客气泡外，按所在背景取色。
                                         incoming || internalNote || message.attachment
                                           ? "border-primary text-muted-foreground"
-                                          : "border-primary-foreground/60 text-primary-foreground/75",
+                                          : "border-accent-foreground/60 text-accent-foreground/75",
                                       )}
                                       aria-label={
                                         message.replyTo.deleted
@@ -1128,7 +1115,7 @@ function ConversationTimelineContent({
                                         "cervi-message-time float-right ml-2 inline-flex translate-y-0.5 items-center gap-1 whitespace-nowrap text-[10px]",
                                         incoming || agentNotice || internalNote
                                           ? "text-muted-foreground"
-                                          : "text-primary-foreground/75",
+                                          : "text-accent-foreground/75",
                                       )}
                                     >
                                       <time
