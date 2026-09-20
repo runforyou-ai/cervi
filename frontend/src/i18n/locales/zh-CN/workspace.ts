@@ -1,6 +1,11 @@
 /** 简体中文·工作台文案。 */
 const workspace = {
   navigationGroup: "工作台",
+  resizeNavigation: "调整导航栏宽度",
+  railClose: "收起导航栏",
+  railOpen: "展开导航栏",
+  historyBack: "后退",
+  historyForward: "前进",
   inbox: "消息",
   contacts: "通讯录",
   knowledgeBases: "知识库",
@@ -13,34 +18,6 @@ const workspace = {
   logoutError: "退出登录失败，请重试。",
   identityLoadError: "无法读取登录状态。",
   inboxLoadError: "消息加载失败。",
-  tabs: {
-    label: "已打开页面",
-    close: "关闭{{title}}",
-    closeTab: "关闭标签",
-    closeOthers: "关闭其他标签",
-    closeRight: "关闭右侧标签",
-    reload: "重新加载",
-    pin: "固定",
-    unpin: "取消固定",
-    pinnedTab: "{{title}}，已固定",
-    routes: {
-      inbox: "消息",
-      profile: "个人资料",
-      security: "账号安全",
-      preferences: "个人偏好",
-      devices: "设备",
-      general: "通用设置",
-      roles: "角色管理",
-      employees: "员工",
-      aiEmployees: "AI 员工",
-      team: "团队",
-      externalContacts: "外部联系人",
-      knowledgeBases: "知识库",
-      channels: "消息渠道",
-      mcpServers: "MCP 服务",
-      modelServices: "模型服务",
-    },
-  },
 }
 
 export default workspace

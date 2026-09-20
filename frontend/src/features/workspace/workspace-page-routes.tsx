@@ -1,4 +1,4 @@
-/** 定义工作台页面路由和多标签分组。 */
+/** 定义工作台页面路由。 */
 import type { ReactElement } from "react"
 import { matchRoutes, useRoutes, type Location, type RouteObject } from "react-router"
 
@@ -27,41 +27,31 @@ const workspaceRouteLayouts = [
   { prefix: "/knowledge-bases", element: <KnowledgeBaseLayout /> },
 ]
 
-/**
- * 工作台路由清单，标签解析与页面渲染共用同一份定义。
- * tabPath 把同一功能模块的页面归入同一个标签。
- */
+/** 工作台路由清单，地址解析与页面渲染共用同一份定义。 */
 const workspaceRouteDefinitions = [
-  { path: "/inbox", titleKey: "tabs.routes.inbox", element: <InboxRoute /> },
+  { path: "/inbox", element: <InboxRoute /> },
   {
     path: "/settings/profile",
-    titleKey: "tabs.routes.profile",
     element: <SettingsPage section="profile" />,
   },
   {
     path: "/settings/security",
-    titleKey: "tabs.routes.security",
     element: <SettingsPage section="security" />,
   },
   {
     path: "/settings/preferences",
-    titleKey: "tabs.routes.preferences",
     element: <SettingsPage section="preferences" />,
   },
   {
     path: "/settings/devices",
-    titleKey: "tabs.routes.devices",
     element: <SettingsPage section="devices" />,
   },
   {
     path: "/settings/general",
-    titleKey: "tabs.routes.general",
     element: <SettingsPage section="general" />,
   },
   {
     path: "/settings/roles/new",
-    tabPath: "/settings/roles",
-    titleKey: "tabs.routes.roles",
     element: (
       <SettingsPage section="roles">
         <RoleFormPage mode="create" />
@@ -70,8 +60,6 @@ const workspaceRouteDefinitions = [
   },
   {
     path: "/settings/roles/:roleId",
-    tabPath: "/settings/roles",
-    titleKey: "tabs.routes.roles",
     element: (
       <SettingsPage section="roles">
         <RoleFormPage mode="detail" />
@@ -80,23 +68,18 @@ const workspaceRouteDefinitions = [
   },
   {
     path: "/settings/roles",
-    titleKey: "tabs.routes.roles",
     element: <SettingsPage section="roles" />,
   },
   {
     path: "/contacts/employees",
-    titleKey: "tabs.routes.employees",
     element: <ContactsPage scope="employees" />,
   },
   {
     path: "/contacts/ai-employees",
-    titleKey: "tabs.routes.aiEmployees",
     element: <ContactsPage scope="agents" />,
   },
   {
     path: "/contacts/ai-employees/new",
-    tabPath: "/contacts/ai-employees",
-    titleKey: "tabs.routes.aiEmployees",
     element: (
       <ContactsPage scope="agents">
         <AgentFormPage mode="create" />
@@ -105,8 +88,6 @@ const workspaceRouteDefinitions = [
   },
   {
     path: "/contacts/ai-employees/:agentId",
-    tabPath: "/contacts/ai-employees",
-    titleKey: "tabs.routes.aiEmployees",
     element: (
       <ContactsPage scope="agents">
         <AgentFormPage mode="edit" />
@@ -115,77 +96,54 @@ const workspaceRouteDefinitions = [
   },
   {
     path: "/contacts/teams/:teamId",
-    titleKey: "tabs.routes.team",
     element: <ContactsPage scope="team" />,
   },
   {
     path: "/contacts/external",
-    titleKey: "tabs.routes.externalContacts",
     element: <ContactsPage scope="external" />,
   },
   {
     path: "/knowledge-bases/new",
-    tabPath: "/knowledge-bases",
-    titleKey: "tabs.routes.knowledgeBases",
     element: <KnowledgeBaseFormPage mode="create" />,
   },
   {
     path: "/knowledge-bases/:knowledgeBaseId",
-    tabPath: "/knowledge-bases",
-    titleKey: "tabs.routes.knowledgeBases",
     element: <KnowledgeBaseFormPage mode="edit" />,
   },
   {
     path: "/knowledge-bases/:knowledgeBaseId/groups/:groupId/qa/new",
-    tabPath: "/knowledge-bases",
-    titleKey: "tabs.routes.knowledgeBases",
     element: <KnowledgeQAFormPage mode="create" />,
   },
   {
     path: "/knowledge-bases/:knowledgeBaseId/groups/:groupId/qa/:entryId/edit",
-    tabPath: "/knowledge-bases",
-    titleKey: "tabs.routes.knowledgeBases",
     element: <KnowledgeQAFormPage mode="edit" />,
   },
   {
     path: "/knowledge-bases/:knowledgeBaseId/groups/:groupId/qa",
-    tabPath: "/knowledge-bases",
-    titleKey: "tabs.routes.knowledgeBases",
     element: <KnowledgeQAListPage />,
   },
   {
     path: "/knowledge-bases/:knowledgeBaseId/groups/:groupId/documents/new",
-    tabPath: "/knowledge-bases",
-    titleKey: "tabs.routes.knowledgeBases",
     element: <KnowledgeDocumentFormPage mode="create" />,
   },
   {
     path: "/knowledge-bases/:knowledgeBaseId/groups/:groupId/documents/:documentId/edit",
-    tabPath: "/knowledge-bases",
-    titleKey: "tabs.routes.knowledgeBases",
     element: <KnowledgeDocumentFormPage mode="edit" />,
   },
   {
     path: "/knowledge-bases/:knowledgeBaseId/groups/:groupId/documents/:documentId",
-    tabPath: "/knowledge-bases",
-    titleKey: "tabs.routes.knowledgeBases",
     element: <KnowledgeDocumentPage />,
   },
   {
     path: "/knowledge-bases/:knowledgeBaseId/groups/:groupId/documents",
-    tabPath: "/knowledge-bases",
-    titleKey: "tabs.routes.knowledgeBases",
     element: <KnowledgeDocumentListPage />,
   },
   {
     path: "/knowledge-bases",
-    titleKey: "tabs.routes.knowledgeBases",
     element: <KnowledgeBaseIndexPage />,
   },
   {
     path: "/settings/channels/new",
-    tabPath: "/settings/channels",
-    titleKey: "tabs.routes.channels",
     element: (
       <SettingsPage section="channels">
         <MessageChannelFormPage mode="create" />
@@ -194,8 +152,6 @@ const workspaceRouteDefinitions = [
   },
   {
     path: "/settings/channels/:channelType/:channelId",
-    tabPath: "/settings/channels",
-    titleKey: "tabs.routes.channels",
     element: (
       <SettingsPage section="channels">
         <MessageChannelFormPage mode="edit" />
@@ -204,7 +160,6 @@ const workspaceRouteDefinitions = [
   },
   {
     path: "/settings/channels",
-    titleKey: "tabs.routes.channels",
     element: (
       <SettingsPage section="channels">
         <MessageChannelListPage />
@@ -213,8 +168,6 @@ const workspaceRouteDefinitions = [
   },
   {
     path: "/settings/mcp-servers/new",
-    tabPath: "/settings/mcp-servers",
-    titleKey: "tabs.routes.mcpServers",
     element: (
       <SettingsPage section="mcpServers">
         <MCPServerFormPage mode="create" />
@@ -223,8 +176,6 @@ const workspaceRouteDefinitions = [
   },
   {
     path: "/settings/mcp-servers/:mcpServerId",
-    tabPath: "/settings/mcp-servers",
-    titleKey: "tabs.routes.mcpServers",
     element: (
       <SettingsPage section="mcpServers">
         <MCPServerFormPage mode="edit" />
@@ -233,7 +184,6 @@ const workspaceRouteDefinitions = [
   },
   {
     path: "/settings/mcp-servers",
-    titleKey: "tabs.routes.mcpServers",
     element: (
       <SettingsPage section="mcpServers">
         <MCPServerListPage />
@@ -242,8 +192,6 @@ const workspaceRouteDefinitions = [
   },
   {
     path: "/settings/model-services/chat/new",
-    tabPath: "/settings/model-services",
-    titleKey: "tabs.routes.modelServices",
     element: (
       <SettingsPage section="modelServices">
         <ModelProviderFormPage mode="create" returnSection="chat" />
@@ -252,8 +200,6 @@ const workspaceRouteDefinitions = [
   },
   {
     path: "/settings/model-services/chat/:providerId",
-    tabPath: "/settings/model-services",
-    titleKey: "tabs.routes.modelServices",
     element: (
       <SettingsPage section="modelServices">
         <ModelProviderFormPage mode="edit" returnSection="chat" />
@@ -262,8 +208,6 @@ const workspaceRouteDefinitions = [
   },
   {
     path: "/settings/model-services/chat",
-    tabPath: "/settings/model-services",
-    titleKey: "tabs.routes.modelServices",
     element: (
       <SettingsPage section="modelServices">
         <ModelProviderListPage section="chat" />
@@ -272,8 +216,6 @@ const workspaceRouteDefinitions = [
   },
   {
     path: "/settings/model-services/embedding/new",
-    tabPath: "/settings/model-services",
-    titleKey: "tabs.routes.modelServices",
     element: (
       <SettingsPage section="modelServices">
         <ModelProviderFormPage mode="create" returnSection="embedding" />
@@ -282,8 +224,6 @@ const workspaceRouteDefinitions = [
   },
   {
     path: "/settings/model-services/embedding/:providerId",
-    tabPath: "/settings/model-services",
-    titleKey: "tabs.routes.modelServices",
     element: (
       <SettingsPage section="modelServices">
         <ModelProviderFormPage mode="edit" returnSection="embedding" />
@@ -292,8 +232,6 @@ const workspaceRouteDefinitions = [
   },
   {
     path: "/settings/model-services/embedding",
-    tabPath: "/settings/model-services",
-    titleKey: "tabs.routes.modelServices",
     element: (
       <SettingsPage section="modelServices">
         <ModelProviderListPage section="embedding" />
@@ -302,8 +240,6 @@ const workspaceRouteDefinitions = [
   },
   {
     path: "/settings/model-services/rerank/new",
-    tabPath: "/settings/model-services",
-    titleKey: "tabs.routes.modelServices",
     element: (
       <SettingsPage section="modelServices">
         <ModelProviderFormPage mode="create" returnSection="rerank" />
@@ -312,8 +248,6 @@ const workspaceRouteDefinitions = [
   },
   {
     path: "/settings/model-services/rerank/:providerId",
-    tabPath: "/settings/model-services",
-    titleKey: "tabs.routes.modelServices",
     element: (
       <SettingsPage section="modelServices">
         <ModelProviderFormPage mode="edit" returnSection="rerank" />
@@ -322,8 +256,6 @@ const workspaceRouteDefinitions = [
   },
   {
     path: "/settings/model-services/rerank",
-    tabPath: "/settings/model-services",
-    titleKey: "tabs.routes.modelServices",
     element: (
       <SettingsPage section="modelServices">
         <ModelProviderListPage section="rerank" />
@@ -332,12 +264,8 @@ const workspaceRouteDefinitions = [
   },
 ] as const satisfies readonly {
   path: string
-  tabPath?: string
-  titleKey: string
   element: ReactElement
 }[]
-
-type WorkspaceRouteDefinition = (typeof workspaceRouteDefinitions)[number]
 
 /** 返回路由所属的外壳，无匹配前缀时在顶层渲染。 */
 function layoutOf(path: string) {
@@ -347,7 +275,7 @@ function layoutOf(path: string) {
 }
 
 /**
- * 由清单生成的路由树，标签解析与页面渲染共用。
+ * 由清单生成的路由树，地址解析与页面渲染共用。
  * 匹配按 react-router 的路径评分决定，与清单顺序无关。
  */
 const workspaceRouteObjects: RouteObject[] = [
@@ -356,7 +284,6 @@ const workspaceRouteObjects: RouteObject[] = [
     .map((definition) => ({
       path: definition.path,
       element: definition.element,
-      handle: definition,
     })),
   ...workspaceRouteLayouts.map((layout) => ({
     path: layout.prefix,
@@ -368,7 +295,6 @@ const workspaceRouteObjects: RouteObject[] = [
         return {
           ...(relative ? { path: relative } : { index: true as const }),
           element: definition.element,
-          handle: definition,
         }
       }),
   })),
@@ -380,27 +306,14 @@ const workspaceRedirects: Readonly<Record<string, string>> = {
   "/settings/model-services": "/settings/model-services/chat",
 }
 
-export type WorkspaceTabTitleKey =
-  (typeof workspaceRouteDefinitions)[number]["titleKey"]
-
-export type ResolvedWorkspaceTab = {
-  id: string
-  href: string
-  titleKey: WorkspaceTabTitleKey
-}
-
 export type ResolvedWorkspaceLocation = {
   canonicalHref: string
-  tab: ResolvedWorkspaceTab | null
+  matched: boolean
 }
 
-export const defaultWorkspaceTab = {
-  id: "/inbox",
-  href: "/inbox",
-  titleKey: "tabs.routes.inbox",
-} satisfies ResolvedWorkspaceTab
+export const defaultWorkspaceHref = "/inbox"
 
-/** 把当前地址解析为规范标签；别名地址给出跳转目标，未知地址回到消息页。 */
+/** 把当前地址解析为规范地址；别名地址给出跳转目标，未知地址回到消息页。 */
 export function resolveWorkspaceLocation(
   location: Pick<Location, "pathname" | "search" | "hash">,
 ): ResolvedWorkspaceLocation {
@@ -413,26 +326,17 @@ export function resolveWorkspaceLocation(
   if (redirectedPathname) {
     return {
       canonicalHref: `${redirectedPathname}${location.search}${location.hash}`,
-      tab: null,
+      matched: false,
     }
   }
 
-  const matches = matchRoutes(workspaceRouteObjects, pathname)
-  const definition = matches?.[matches.length - 1].route.handle as
-    | WorkspaceRouteDefinition
-    | undefined
-  if (!definition) {
-    return { canonicalHref: defaultWorkspaceTab.href, tab: null }
+  if (!matchRoutes(workspaceRouteObjects, pathname)) {
+    return { canonicalHref: defaultWorkspaceHref, matched: false }
   }
 
-  const href = `${pathname}${location.search}${location.hash}`
   return {
-    canonicalHref: href,
-    tab: {
-      id: "tabPath" in definition ? definition.tabPath : pathname,
-      href,
-      titleKey: definition.titleKey,
-    },
+    canonicalHref: `${pathname}${location.search}${location.hash}`,
+    matched: true,
   }
 }
 

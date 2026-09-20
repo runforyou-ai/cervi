@@ -33,7 +33,7 @@ func (o *directOperations) currentUserFromIdentity(ctx context.Context, identity
 	organizationIdentity := identity.OrganizationIdentity
 	user := CurrentUser{
 		ID: storedUser.ID, IdentityID: storedUser.IdentityID, OrganizationID: storedUser.OrganizationID, Email: storedUser.Email, DisplayName: organizationIdentity.DisplayName,
-		RoleID: organizationIdentity.RoleID, Status: UserStatus(storedUser.Status), Locale: Locale(storedUser.Locale), TimeZone: storedUser.TimeZone, MessageNotificationsEnabled: storedUser.MessageNotificationsEnabled, WorkspaceTabsEnabled: storedUser.WorkspaceTabsEnabled,
+		RoleID: organizationIdentity.RoleID, Status: UserStatus(storedUser.Status), Locale: Locale(storedUser.Locale), TimeZone: storedUser.TimeZone, MessageNotificationsEnabled: storedUser.MessageNotificationsEnabled,
 		HandlesCustomers: organizationIdentity.HandlesCustomers, WorkStatus: WorkStatus(organizationIdentity.WorkStatus),
 	}
 	fileID := identity.OrganizationIdentity.AvatarFileID

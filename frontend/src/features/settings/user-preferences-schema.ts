@@ -15,7 +15,6 @@ export function createUserPreferencesSchema(
     ]),
     timeZone: z.string().min(1, t("preferences.validation.timeZoneRequired")),
     theme: z.enum(themePreferences),
-    workspaceTabsEnabled: z.boolean(),
     messageNotificationsEnabled: z.boolean(),
     notificationSoundEnabled: z.boolean(),
   })

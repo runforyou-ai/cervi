@@ -134,9 +134,6 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	}); !errors.Is(err, installationaction.ErrAlreadyInstalled) {
 		t.Fatalf("duplicate access host error = %v, want ErrAlreadyInstalled", err)
 	}
-	if installed.Identity.User.WorkspaceTabsEnabled {
-		t.Fatal("workspace tabs enabled = true, want false")
-	}
 	if installed.Identity.User.IdentityID == "" || installed.Identity.User.IdentityID == installed.Identity.User.ID {
 		t.Fatalf("user identity id = %q, user id = %q", installed.Identity.User.IdentityID, installed.Identity.User.ID)
 	}
@@ -257,7 +254,6 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			Locale:                      domain.LocaleEnglishUnitedStates,
 			TimeZone:                    "America/New_York",
 			MessageNotificationsEnabled: false,
-			WorkspaceTabsEnabled:        true,
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -265,15 +261,12 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if updatedPreferences.User.MessageNotificationsEnabled {
 			t.Fatal("message notifications enabled = true, want false")
 		}
-		if !updatedPreferences.User.WorkspaceTabsEnabled {
-			t.Fatal("workspace tabs enabled = false, want true")
-		}
 		loggedIn.Identity = updatedPreferences
 		resolvedPreferences, err := resolveIdentity.Execute(context.Background(), loggedIn.Identity.Organization.ID, loggedIn.Token)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if resolvedPreferences == nil || resolvedPreferences.User.MessageNotificationsEnabled || !resolvedPreferences.User.WorkspaceTabsEnabled {
+		if resolvedPreferences == nil || resolvedPreferences.User.MessageNotificationsEnabled {
 			t.Fatalf("identity after preferences update = %#v", resolvedPreferences)
 		}
 		updatedWorkStatus, err := useraction.NewUpdateWorkStatusAction(db).Execute(context.Background(), loggedIn.Identity, useraction.WorkStatusInput{WorkStatus: domain.WorkStatusAway})

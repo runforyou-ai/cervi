@@ -1,26 +1,36 @@
 /** Web 与桌面端工作台布局。 */
-import { useEffect, useLayoutEffect, useRef, useState } from "react"
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from "react"
 import { useTranslation } from "react-i18next"
 import { useLocation, useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import { loadInbox, logout, WorkStatus, type Identity } from "@/api"
-import type { WorkspaceOutletContext } from "@/contexts/workspace-context"
+import {
+  WorkspaceProvider,
+  type WorkspaceOutletContext,
+} from "@/contexts/workspace-context"
 import {
   activateNotificationPolicy,
   deactivateNotificationPolicy,
 } from "@/features/notifications/new-message-notifications"
 import { useNewMessageNotifications } from "@/features/notifications/use-new-message-notifications"
 import { SessionShell } from "@/features/session/session-shell"
+import {
+  useWorkspaceHistory,
+  WorkspaceHistoryNav,
+} from "@/features/workspace/workspace-history-nav"
 import { WorkspaceNavigationGuard } from "@/features/workspace/workspace-navigation-guard"
 import { WorkspaceNavigation } from "@/features/workspace/workspace-navigation"
 import {
-  defaultWorkspaceTab,
+  defaultWorkspaceHref,
   resolveWorkspaceLocation,
-  type ResolvedWorkspaceTab,
+  WorkspacePageRoutes,
 } from "@/features/workspace/workspace-page-routes"
-import { WorkspaceSinglePage } from "@/features/workspace/workspace-single-page"
-import { WorkspaceTabs } from "@/features/workspace/workspace-tabs"
+import {
+  useWorkspaceRail,
+  WorkspaceRailResizer,
+  WorkspaceRailToggle,
+} from "@/features/workspace/workspace-rail"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 import { resolveAppPlatform } from "@/platform/app-platform"
@@ -59,15 +69,14 @@ function WorkspaceShell({ identity }: { identity: Identity }) {
   const { t } = useTranslation("workspace")
   const navigate = useNavigate()
   const [loggingOut, setLoggingOut] = useState(false)
+  const rail = useWorkspaceRail()
+  const history = useWorkspaceHistory()
   const [attentionPending, setAttentionPending] = useState(false)
   const workspaceLocation = resolveWorkspaceLocation(location)
-  const fallbackTabRef = useRef<ResolvedWorkspaceTab>(defaultWorkspaceTab)
+  const fallbackHrefRef = useRef(defaultWorkspaceHref)
   const currentHref = `${location.pathname}${location.search}${location.hash}`
-  if (
-    workspaceLocation.tab &&
-    workspaceLocation.canonicalHref === currentHref
-  ) {
-    fallbackTabRef.current = workspaceLocation.tab
+  if (workspaceLocation.matched && workspaceLocation.canonicalHref === currentHref) {
+    fallbackHrefRef.current = currentHref
   }
 
   const organizationId = identity.user.organizationId
@@ -77,10 +86,7 @@ function WorkspaceShell({ identity }: { identity: Identity }) {
 
   /** 修正规范工作台地址。 */
   useLayoutEffect(() => {
-    if (
-      workspaceLocation.tab &&
-      workspaceLocation.canonicalHref === currentHref
-    ) {
+    if (workspaceLocation.matched && workspaceLocation.canonicalHref === currentHref) {
       return
     }
     navigate(workspaceLocation.canonicalHref, { replace: true })
@@ -88,7 +94,7 @@ function WorkspaceShell({ identity }: { identity: Identity }) {
     currentHref,
     navigate,
     workspaceLocation.canonicalHref,
-    workspaceLocation.tab,
+    workspaceLocation.matched,
   ])
 
   /** 同步当前用户的新消息通知策略。 */
@@ -212,29 +218,53 @@ function WorkspaceShell({ identity }: { identity: Identity }) {
   }
 
   const workspaceContext = { identity } satisfies WorkspaceOutletContext
-  const currentTab = workspaceLocation.tab ?? fallbackTabRef.current
+  const pageHref = workspaceLocation.matched
+    ? workspaceLocation.canonicalHref
+    : fallbackHrefRef.current
 
   return (
-    <WorkspaceNavigationGuard tabsEnabled={identity.user.workspaceTabsEnabled}>
-      <div className="cervi-workspace-shell relative flex h-svh min-h-0 w-full overflow-hidden">
-        <WorkspaceNavigation
-          identity={identity}
-          onLogout={handleLogout}
-          loggingOut={loggingOut}
-        />
+    <WorkspaceNavigationGuard>
+      <div
+        className="cervi-workspace-shell relative flex h-svh min-h-0 w-full overflow-hidden"
+        data-rail-collapsed={rail.collapsed ? "true" : undefined}
+        style={
+          {
+            "--cervi-workspace-rail-width": rail.collapsed
+              ? "0px"
+              : `${rail.width}px`,
+          } as CSSProperties
+        }
+      >
+        {rail.collapsed ? null : (
+          <>
+            <WorkspaceNavigation
+              identity={identity}
+              onLogout={handleLogout}
+              loggingOut={loggingOut}
+            />
+            <WorkspaceRailResizer onWidthChange={rail.changeWidth} />
+          </>
+        )}
+        <div className="cervi-workspace-titlebar-actions absolute top-0 left-0 z-40 flex items-center">
+          <WorkspaceRailToggle
+            collapsed={rail.collapsed}
+            onToggle={rail.toggleCollapsed}
+          />
+          <WorkspaceHistoryNav
+            canGoBack={history.canGoBack}
+            canGoForward={history.canGoForward}
+            onBack={history.goBack}
+            onForward={history.goForward}
+          />
+        </div>
         <div
           aria-hidden="true"
           className="cervi-workspace-top-drag-region"
         />
-        <div className="cervi-workspace-content-frame flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl bg-background shadow-sm">
-          {identity.user.workspaceTabsEnabled ? (
-            <WorkspaceTabs currentTab={currentTab} context={workspaceContext} />
-          ) : (
-            <WorkspaceSinglePage
-              href={currentTab.href}
-              context={workspaceContext}
-            />
-          )}
+        <div className="cervi-workspace-content-frame relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl bg-background shadow-sm">
+          <WorkspaceProvider value={workspaceContext}>
+            <WorkspacePageRoutes location={pageHref} />
+          </WorkspaceProvider>
         </div>
       </div>
     </WorkspaceNavigationGuard>
