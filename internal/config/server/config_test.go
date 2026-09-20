@@ -5,7 +5,10 @@ package server
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
+
+	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
 // TestLoadMergesFileAndEnvironment 验证环境变量覆盖显式配置文件。
@@ -109,6 +112,7 @@ func clearServerEnvironment(t *testing.T) {
 		"TLS_MODE", "TLS_ACME_EMAIL", "FILE_STORAGE_PATH",
 		"S3_ENABLED", "S3_ENDPOINT", "S3_PUBLIC_BASE_URL", "S3_REGION", "S3_BUCKET",
 		"S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY", "S3_FORCE_PATH_STYLE",
+		"DEPLOYMENT_MODE", "DEPLOYMENT_ID", "MANAGED_DOMAIN_SUFFIX", "OPERATOR_CREDENTIAL",
 	} {
 		t.Setenv(name, "")
 		if err := os.Unsetenv(name); err != nil {
@@ -241,5 +245,84 @@ func TestValidationRequiresCompleteS3Setting(t *testing.T) {
 		if err := config.validate(); err == nil {
 			t.Fatalf("接受了不完整的对象存储配置: %#v", broken)
 		}
+	}
+}
+
+// TestDeploymentDefaultsToSelfHosted 验证未配置部署形态时使用自托管，且不接受托管专用字段。
+func TestDeploymentDefaultsToSelfHosted(t *testing.T) {
+	config := validTestConfig()
+	config.normalize()
+	if err := config.validate(); err != nil {
+		t.Fatal(err)
+	}
+	if config.Deployment.Mode != domain.DeploymentModeSelfHosted {
+		t.Fatalf("默认部署形态不是自托管: %q", config.Deployment.Mode)
+	}
+	config.Deployment.OperatorCredential = strings.Repeat("c", 32)
+	if err := config.validate(); err == nil {
+		t.Fatal("自托管模式接受了运营凭据")
+	}
+}
+
+// TestManagedDeploymentValidation 验证托管部署的标识、域名后缀和运营凭据校验。
+func TestManagedDeploymentValidation(t *testing.T) {
+	valid := func() Config {
+		config := validTestConfig()
+		config.Deployment = DeploymentConfig{
+			Mode:                domain.DeploymentModeManaged,
+			ID:                  "cervi-hosting-1",
+			ManagedDomainSuffix: "cervi.runforyou.app",
+			OperatorCredential:  strings.Repeat("c", 32),
+		}
+		return config
+	}
+	config := valid()
+	config.normalize()
+	if err := config.validate(); err != nil {
+		t.Fatal(err)
+	}
+
+	for name, mutate := range map[string]func(*Config){
+		"缺少部署标识":   func(c *Config) { c.Deployment.ID = "" },
+		"缺少域名后缀":   func(c *Config) { c.Deployment.ManagedDomainSuffix = "" },
+		"单级域名后缀":   func(c *Config) { c.Deployment.ManagedDomainSuffix = "app" },
+		"域名后缀带路径":  func(c *Config) { c.Deployment.ManagedDomainSuffix = "cervi.runforyou.app/operator" },
+		"运营凭据过短":   func(c *Config) { c.Deployment.OperatorCredential = strings.Repeat("c", 31) },
+		"部署形态取值无效": func(c *Config) { c.Deployment.Mode = "hosted" },
+	} {
+		config := valid()
+		mutate(&config)
+		config.normalize()
+		if err := config.validate(); err == nil {
+			t.Fatalf("%s 的配置通过了校验", name)
+		}
+	}
+}
+
+// TestDeploymentEnvironment 验证部署配置的环境变量覆盖与大小写规范化。
+func TestDeploymentEnvironment(t *testing.T) {
+	clearServerEnvironment(t)
+	t.Setenv("POSTGRES_HOST", "127.0.0.1")
+	t.Setenv("POSTGRES_PORT", "5432")
+	t.Setenv("POSTGRES_USER", "cervi")
+	t.Setenv("POSTGRES_PASSWORD", "secret")
+	t.Setenv("POSTGRES_DB", "cervi")
+	t.Setenv("POSTGRES_SSLMODE", "disable")
+	t.Setenv("NATS_URL", "nats://127.0.0.1:4222")
+	t.Setenv("NATS_NAMESPACE", "cervi")
+	t.Setenv("DEPLOYMENT_MODE", "Managed")
+	t.Setenv("DEPLOYMENT_ID", "cervi-hosting-1")
+	t.Setenv("MANAGED_DOMAIN_SUFFIX", "Cervi.RunForYou.App.")
+	t.Setenv("OPERATOR_CREDENTIAL", strings.Repeat("c", 40))
+
+	config, err := Load("")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if config.Deployment.Mode != domain.DeploymentModeManaged {
+		t.Fatalf("部署形态未按环境变量覆盖: %q", config.Deployment.Mode)
+	}
+	if config.Deployment.ManagedDomainSuffix != "cervi.runforyou.app" {
+		t.Fatalf("域名后缀未规范化: %q", config.Deployment.ManagedDomainSuffix)
 	}
 }

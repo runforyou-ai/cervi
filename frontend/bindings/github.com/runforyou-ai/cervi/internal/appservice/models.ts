@@ -1428,6 +1428,19 @@ export interface CustomerTextMessageInput {
 }
 
 /**
+ * DeploymentMode 表示服务端部署形态。
+ */
+export enum DeploymentMode {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    DeploymentModeSelfHosted = "self_hosted",
+    DeploymentModeManaged = "managed",
+};
+
+/**
  * DirectConversationLookup 定义按目标身份查找单聊的结果。
  */
 export interface DirectConversationLookup {
@@ -2004,11 +2017,12 @@ export interface InstallWorkspaceInput {
 }
 
 /**
- * InstallationStatus 定义企业初始化状态和公开企业名称。
+ * InstallationStatus 定义企业初始化状态、公开企业名称和服务端部署形态。
  */
 export interface InstallationStatus {
     "installed": boolean;
     "organizationName": string;
+    "deploymentMode": DeploymentMode;
 }
 
 /**
@@ -2959,6 +2973,7 @@ export enum SessionState {
     SessionStateLogin = "login",
     SessionStateSetup = "setup",
     SessionStateConnect = "connect",
+    SessionStateInvalidAddress = "invalid_address",
 };
 
 /**

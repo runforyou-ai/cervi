@@ -22,10 +22,19 @@ const (
 type SessionState string
 
 const (
-	SessionStateReady   SessionState = "ready"
-	SessionStateLogin   SessionState = "login"
-	SessionStateSetup   SessionState = "setup"
-	SessionStateConnect SessionState = "connect"
+	SessionStateReady          SessionState = "ready"
+	SessionStateLogin          SessionState = "login"
+	SessionStateSetup          SessionState = "setup"
+	SessionStateConnect        SessionState = "connect"
+	SessionStateInvalidAddress SessionState = "invalid_address"
+)
+
+// DeploymentMode 表示服务端部署形态。
+type DeploymentMode string
+
+const (
+	DeploymentModeSelfHosted DeploymentMode = DeploymentMode(domain.DeploymentModeSelfHosted)
+	DeploymentModeManaged    DeploymentMode = DeploymentMode(domain.DeploymentModeManaged)
 )
 
 // ErrorKind 表示业务失败种类。
@@ -61,10 +70,11 @@ type RequestMeta struct {
 	Locale Locale `json:"locale"`
 }
 
-// InstallationStatus 定义企业初始化状态和公开企业名称。
+// InstallationStatus 定义企业初始化状态、公开企业名称和服务端部署形态。
 type InstallationStatus struct {
-	Installed        bool   `json:"installed"`
-	OrganizationName string `json:"organizationName"`
+	Installed        bool           `json:"installed"`
+	OrganizationName string         `json:"organizationName"`
+	DeploymentMode   DeploymentMode `json:"deploymentMode"`
 }
 
 // InstallWorkspaceInput 定义企业初始化输入。

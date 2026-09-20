@@ -1,5 +1,7 @@
 /** 美式英语·初始化文案。 */
 const setup = {
+  addressInvalidTitle: "Workspace address is not valid",
+  addressInvalidDescription: "No workspace matches this address. Check the address and try again.",
   title: "Set up Cervi",
   description: "Create the company and its first administrator account.",
   organizationNameLabel: "Company name",

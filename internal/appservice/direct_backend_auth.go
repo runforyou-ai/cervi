@@ -34,11 +34,12 @@ func newAuthOps(db *bun.DB) authOps {
 	}
 }
 
-// InstallationStatus 返回服务端初始化状态和公开企业名称。
+// InstallationStatus 返回服务端初始化状态、公开企业名称和部署形态。
 func (o *directOperations) InstallationStatus(ctx context.Context, meta RequestMeta) (InstallationStatus, error) {
+	mode := DeploymentMode(o.deploymentMode)
 	scope, err := o.resolveTenant.Resolve(ctx, tenant.AccessHost(ctx))
 	if errors.Is(err, tenant.ErrNotFound) {
-		return InstallationStatus{}, nil
+		return InstallationStatus{DeploymentMode: mode}, nil
 	}
 	if err != nil {
 		if ctx.Err() != nil {
@@ -47,11 +48,15 @@ func (o *directOperations) InstallationStatus(ctx context.Context, meta RequestM
 		slog.Warn("读取初始化状态失败", "error", err)
 		return InstallationStatus{}, FailedError(meta, cervii18n.ErrorInstallationStatusReadFailed)
 	}
-	return InstallationStatus{Installed: true, OrganizationName: scope.OrganizationName}, nil
+	return InstallationStatus{Installed: true, OrganizationName: scope.OrganizationName, DeploymentMode: mode}, nil
 }
 
 // InstallWorkspace 创建企业管理员并返回登录令牌。
 func (o *directOperations) InstallWorkspace(ctx context.Context, meta RequestMeta, input InstallWorkspaceInput) (Auth, error) {
+	// 托管部署的企业由运营开通接口创建，公开初始化入口关闭。
+	if o.deploymentMode.Managed() {
+		return Auth{}, SessionError(meta, SessionStateInvalidAddress, cervii18n.ErrorInstallationNotAvailable)
+	}
 	status, err := o.InstallationStatus(ctx, meta)
 	if err != nil {
 		return Auth{}, err

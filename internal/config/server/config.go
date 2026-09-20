@@ -14,18 +14,33 @@ import (
 
 	"github.com/goccy/go-yaml"
 	"github.com/runforyou-ai/cervi/internal/common"
+	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
 var natsNamespacePattern = regexp.MustCompile(`^[a-z0-9][a-z0-9_-]*$`)
 
+var domainSuffixPattern = regexp.MustCompile(`^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$`)
+
+// operatorCredentialMinLength 是运营凭据的最小长度，运营接口经公网可达，凭据是其唯一访问控制手段。
+const operatorCredentialMinLength = 32
+
 // Config 定义服务端运行配置。
 type Config struct {
-	MarkitdownURL string         `yaml:"markitdownURL"`
-	Server        ServerConfig   `yaml:"server"`
-	Database      DatabaseConfig `yaml:"database"`
-	NATS          NATSConfig     `yaml:"nats"`
-	TLS           TLSConfig      `yaml:"tls"`
-	Storage       StorageConfig  `yaml:"storage"`
+	MarkitdownURL string           `yaml:"markitdownURL"`
+	Deployment    DeploymentConfig `yaml:"deployment"`
+	Server        ServerConfig     `yaml:"server"`
+	Database      DatabaseConfig   `yaml:"database"`
+	NATS          NATSConfig       `yaml:"nats"`
+	TLS           TLSConfig        `yaml:"tls"`
+	Storage       StorageConfig    `yaml:"storage"`
+}
+
+// DeploymentConfig 定义部署形态及官方托管所需的部署标识、域名后缀和运营凭据。
+type DeploymentConfig struct {
+	Mode                domain.DeploymentMode `yaml:"mode"`
+	ID                  string                `yaml:"id"`
+	ManagedDomainSuffix string                `yaml:"managedDomainSuffix"`
+	OperatorCredential  string                `yaml:"operatorCredential"`
 }
 
 // ServerConfig 定义 HTTP 服务监听配置。
@@ -99,6 +114,10 @@ func Load(path string) (Config, error) {
 // normalize 统一配置中的枚举和空白字符。
 func (config *Config) normalize() {
 	config.MarkitdownURL = strings.TrimRight(strings.TrimSpace(config.MarkitdownURL), "/")
+	config.Deployment.Mode = domain.DeploymentMode(strings.ToLower(strings.TrimSpace(string(config.Deployment.Mode))))
+	config.Deployment.ID = strings.TrimSpace(config.Deployment.ID)
+	config.Deployment.ManagedDomainSuffix = strings.ToLower(strings.Trim(strings.TrimSpace(config.Deployment.ManagedDomainSuffix), "."))
+	config.Deployment.OperatorCredential = strings.TrimSpace(config.Deployment.OperatorCredential)
 	config.Server.Host = strings.TrimSpace(config.Server.Host)
 	config.Database.Host = strings.TrimSpace(config.Database.Host)
 	config.Database.User = strings.TrimSpace(config.Database.User)
@@ -121,6 +140,7 @@ func (config *Config) normalize() {
 // defaultConfig 返回服务端默认配置。
 func defaultConfig() Config {
 	return Config{
+		Deployment: DeploymentConfig{Mode: domain.DeploymentModeSelfHosted},
 		Server: ServerConfig{
 			Host: "127.0.0.1",
 			Port: 8080,
@@ -135,6 +155,10 @@ func defaultConfig() Config {
 // applyEnvironment 使用已设置的环境变量覆盖文件配置。
 func applyEnvironment(config *Config) error {
 	applyStringEnvironment("MARKITDOWN_URL", &config.MarkitdownURL)
+	applyDeploymentModeEnvironment("DEPLOYMENT_MODE", &config.Deployment.Mode)
+	applyStringEnvironment("DEPLOYMENT_ID", &config.Deployment.ID)
+	applyStringEnvironment("MANAGED_DOMAIN_SUFFIX", &config.Deployment.ManagedDomainSuffix)
+	applyStringEnvironment("OPERATOR_CREDENTIAL", &config.Deployment.OperatorCredential)
 	applyStringEnvironment("WAILS_SERVER_HOST", &config.Server.Host)
 	applyStringEnvironment("TLS_MODE", &config.TLS.Mode)
 	applyStringEnvironment("TLS_ACME_EMAIL", &config.TLS.ACMEEmail)
@@ -183,6 +207,9 @@ func validServiceURL(address string) bool {
 func (config Config) validate() error {
 	if config.MarkitdownURL != "" && !validServiceURL(config.MarkitdownURL) {
 		return fmt.Errorf("markitdown 服务地址无效")
+	}
+	if err := config.Deployment.validate(); err != nil {
+		return err
 	}
 	// 校验监听主机名、IPv4 地址和带方括号的 IPv6 地址。
 	host := config.Server.Host
@@ -253,6 +280,37 @@ func (config Config) validate() error {
 		}
 	}
 	return nil
+}
+
+// validate 校验部署形态及托管部署必需的配置。
+func (config DeploymentConfig) validate() error {
+	if !config.Mode.Valid() {
+		return fmt.Errorf("deployment.mode 必须是 self_hosted 或 managed")
+	}
+	if !config.Mode.Managed() {
+		if config.ID != "" || config.ManagedDomainSuffix != "" || config.OperatorCredential != "" {
+			return fmt.Errorf("deployment.id、deployment.managedDomainSuffix 和 deployment.operatorCredential 只在 managed 模式下使用")
+		}
+		return nil
+	}
+	if config.ID == "" {
+		return fmt.Errorf("必须配置 deployment.id 或 DEPLOYMENT_ID")
+	}
+	if !domainSuffixPattern.MatchString(config.ManagedDomainSuffix) {
+		return fmt.Errorf("deployment.managedDomainSuffix 必须是多级小写域名")
+	}
+	if len([]rune(config.OperatorCredential)) < operatorCredentialMinLength {
+		return fmt.Errorf("deployment.operatorCredential 至少需要 %d 个字符", operatorCredentialMinLength)
+	}
+	return nil
+}
+
+// applyDeploymentModeEnvironment 覆盖非空部署形态环境变量。
+func applyDeploymentModeEnvironment(name string, target *domain.DeploymentMode) {
+	value, ok := os.LookupEnv(name)
+	if ok && strings.TrimSpace(value) != "" {
+		*target = domain.DeploymentMode(strings.TrimSpace(value))
+	}
 }
 
 // applyStringEnvironment 覆盖非空字符串环境变量。

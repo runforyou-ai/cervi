@@ -19,10 +19,14 @@ func (s *Service) LoadStartup(ctx context.Context, meta RequestMeta) (Startup, e
 			return Startup{}, statusErr
 		}
 		name := strings.TrimSpace(status.OrganizationName)
-		if !status.Installed || name == "" {
-			startup = Startup{State: SessionStateSetup}
-		} else {
+		switch {
+		case status.Installed && name != "":
 			startup = Startup{State: SessionStateReady, OrganizationName: name}
+		case status.DeploymentMode == DeploymentModeManaged:
+			// 托管部署的企业由官网开通，未登记的访问地址没有初始化入口。
+			startup = Startup{State: SessionStateInvalidAddress}
+		default:
+			startup = Startup{State: SessionStateSetup}
 		}
 	}
 	if err != nil {

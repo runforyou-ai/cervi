@@ -20,6 +20,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/api"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
+	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	"github.com/runforyou-ai/cervi/internal/realtime/gateway"
 	"github.com/runforyou-ai/cervi/internal/realtime/protocol"
@@ -61,7 +62,7 @@ func startVisitorRealtime(t *testing.T, f customerReadFixture, options gateway.O
 
 	scheduler := agentrunaction.NewScheduler(servertask.New(f.db, serverconfig.NATSConfig{}))
 	visitorBackend := appservice.NewWebsiteVisitorDirectBackend(f.db, scheduler, nil, serverfilecontent.S3Config{})
-	memberBackend := appservice.NewDirectBackend(f.db, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil)
+	memberBackend := appservice.NewDirectBackend(f.db, domain.DeploymentModeSelfHosted, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil)
 	realtimeGateway := gateway.New(memberBackend, visitorBackend, config.Namespace, options)
 	realtimeGateway.Start(publisher.Connection())
 	t.Cleanup(realtimeGateway.Shutdown)

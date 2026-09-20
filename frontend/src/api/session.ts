@@ -26,6 +26,8 @@ export function sessionPath(state: string) {
       return resolveAppPlatform() === "web" ? "/setup" : "/connect"
     case SessionState.SessionStateConnect:
       return "/connect"
+    case SessionState.SessionStateInvalidAddress:
+      return resolveAppPlatform() === "web" ? "/invalid-address" : "/connect"
     default:
       return null
   }
