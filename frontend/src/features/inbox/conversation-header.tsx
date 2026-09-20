@@ -1,7 +1,7 @@
 /** 成员会话头与图标操作区。 */
 import {
+  ArchiveIcon,
   ArrowRightLeftIcon,
-  CircleXIcon,
   LoaderCircleIcon,
   MoreVerticalIcon,
   RotateCcwIcon,
@@ -50,6 +50,7 @@ export function HeaderAction({
   busy = false,
   disabled = false,
   destructive = false,
+  className,
   onClick,
 }: {
   label: string
@@ -57,6 +58,7 @@ export function HeaderAction({
   busy?: boolean
   disabled?: boolean
   destructive?: boolean
+  className?: string
   onClick: () => void
 }) {
   return (
@@ -71,6 +73,7 @@ export function HeaderAction({
             destructive
               ? "text-destructive hover:bg-destructive/10 hover:text-destructive"
               : "text-muted-foreground",
+            className,
           )}
           aria-label={label}
           disabled={disabled}
@@ -282,7 +285,7 @@ export function ConversationHeader({
           {customer && actions.closable ? (
             <HeaderAction
               label={t("conversationClose")}
-              icon={CircleXIcon}
+              icon={ArchiveIcon}
               destructive
               busy={operation === "close"}
               disabled={operation !== ""}

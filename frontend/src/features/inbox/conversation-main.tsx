@@ -210,6 +210,7 @@ export function ConversationMain({
           if (validConversation) onGroupLeft?.(validConversation.id)
         }}
         visible={!contextCollapsed}
+        onClose={() => setContextCollapsed(true)}
       />
     </div>
   )

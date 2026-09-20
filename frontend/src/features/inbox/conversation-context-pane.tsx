@@ -2,6 +2,7 @@
 import {
   BotIcon,
   BriefcaseBusinessIcon,
+  PanelRightCloseIcon,
 } from "lucide-react"
 import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from "react"
 import { useTranslation } from "react-i18next"
@@ -22,6 +23,7 @@ import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
 import type { ComposerDraftBridge } from "@/features/inbox/conversation-composer"
 import { CustomerCopilotPanel } from "@/features/inbox/customer-copilot-panel"
 import { GroupConversationContext } from "@/features/inbox/group-conversation-context"
+import { HeaderAction } from "@/features/inbox/conversation-header"
 import { cn } from "@/lib/utils"
 
 const contextPanelMinWidth = 320
@@ -135,6 +137,7 @@ function ConversationContextContent({
   replyDisabledReason,
   customerDraftRef,
   onGroupLeft,
+  onClose,
 }: {
   conversation: InboxConversation | null
   directTarget: MemberOption | null
@@ -143,6 +146,7 @@ function ConversationContextContent({
   replyDisabledReason: string | null
   customerDraftRef: RefObject<ComposerDraftBridge | null>
   onGroupLeft: () => void
+  onClose: () => void
 }) {
   const { t } = useTranslation("inbox")
   const [customerTab, setCustomerTab] = useState("profile")
@@ -155,7 +159,14 @@ function ConversationContextContent({
       ? conversation.group
       : null
   return (
-    <div className="flex h-full min-h-0 min-w-0 flex-col overflow-x-visible overflow-y-hidden bg-background">
+    <div className="relative flex h-full min-h-0 min-w-0 flex-col overflow-x-visible overflow-y-hidden bg-background">
+      {/* 页签行右端常驻收起入口，三类上下文共用同一位置。 */}
+      <HeaderAction
+        label={t("contextClose")}
+        icon={PanelRightCloseIcon}
+        className="absolute top-1.5 right-2 z-10"
+        onClick={onClose}
+      />
       {conversation && customer ? (
         <Tabs
           key={conversation.id}
@@ -288,6 +299,7 @@ export function ConversationContextPane({
   customerDraftRef,
   onGroupLeft,
   visible,
+  onClose,
 }: {
   conversation: InboxConversation | null
   directTarget: MemberOption | null
@@ -297,6 +309,7 @@ export function ConversationContextPane({
   customerDraftRef: RefObject<ComposerDraftBridge | null>
   onGroupLeft: () => void
   visible: boolean
+  onClose: () => void
 }) {
   const { t } = useTranslation("inbox")
   const trackRef = useRef<HTMLDivElement>(null)
@@ -367,6 +380,7 @@ export function ConversationContextPane({
           replyDisabledReason={replyDisabledReason}
           customerDraftRef={customerDraftRef}
           onGroupLeft={onGroupLeft}
+          onClose={onClose}
         />
       </aside>
     </>
