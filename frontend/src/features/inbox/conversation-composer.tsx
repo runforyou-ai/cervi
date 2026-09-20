@@ -1088,7 +1088,7 @@ export function ConversationComposer({
                 <Button
                   type="submit"
                   size="icon"
-                  className="relative size-9 rounded-full after:absolute after:-inset-1 after:content-[''] [&_svg:not([class*='size-'])]:size-[22px]"
+                  className="relative size-8 rounded-full after:absolute after:-inset-1 after:content-[''] [&_svg:not([class*='size-'])]:size-[22px]"
                   disabled={isSubmitting || Boolean(disabledReason) || isBodyEmpty || replyTo?.deleted}
                   aria-label={t(internalNote ? "internalNoteSave" : "messageSend")}
                 >
