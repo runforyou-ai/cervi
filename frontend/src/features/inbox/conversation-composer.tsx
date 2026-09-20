@@ -6,7 +6,6 @@ import {
   useRef,
   useState,
   type KeyboardEvent,
-  type PointerEvent as ReactPointerEvent,
   type RefObject,
 } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
@@ -72,8 +71,6 @@ import { cn } from "@/lib/utils"
 import composerEmojis from "../../../../internal/publicweb/composer-emojis.json"
 
 const conversationComposerMaxHeight = 200
-const conversationComposerMinHeight = 80
-const conversationComposerKeyboardResizeStep = 16
 
 /** 读取和替换回复输入框草稿的入口。 */
 export type ComposerDraftBridge = {
@@ -92,18 +89,11 @@ function countMentionTokens(body: string, displayName: string) {
   ).length
 }
 
-/** 根据文本内容和手动高度调整消息输入框。 */
-function resizeComposerInput(
-  input: HTMLTextAreaElement | null,
-  manualHeight: number | null,
-) {
+/** 根据文本内容调整消息输入框高度。 */
+function resizeComposerInput(input: HTMLTextAreaElement | null) {
   if (!input) return
   input.style.height = "auto"
-  const contentHeight = Math.min(
-    input.scrollHeight,
-    conversationComposerMaxHeight,
-  )
-  input.style.height = `${Math.max(contentHeight, manualHeight ?? 0)}px`
+  input.style.height = `${Math.min(input.scrollHeight, conversationComposerMaxHeight)}px`
   const renderedHeight = input.getBoundingClientRect().height
   input.style.overflowY = input.scrollHeight > renderedHeight ? "auto" : "hidden"
 }
@@ -189,11 +179,6 @@ export function ConversationComposer({
   })
   const inputID = `conversation-reply-${conversationID}`
   const inputRef = useRef<HTMLTextAreaElement | null>(null)
-  const manualInputHeightRef = useRef<number | null>(null)
-  const resizeStartRef = useRef<{
-    pointerY: number
-    inputHeight: number
-  } | null>(null)
   const retryRef = useRef<OutgoingConversationDraft | null>(null)
   const refocusPendingRef = useRef(false)
   const replyToRef = useRef(replyTo)
@@ -244,7 +229,7 @@ export function ConversationComposer({
     const focus = focusAfterSwitchRef.current
     focusAfterSwitchRef.current = false
     window.requestAnimationFrame(() => {
-      resizeComposerInput(inputRef.current, manualInputHeightRef.current)
+      resizeComposerInput(inputRef.current)
       if (focus) form.setFocus("body")
     })
   }, [form, visibility])
@@ -258,7 +243,7 @@ export function ConversationComposer({
 
   useEffect(() => {
     aliveRef.current = true
-    resizeComposerInput(inputRef.current, manualInputHeightRef.current)
+    resizeComposerInput(inputRef.current)
     return () => {
       aliveRef.current = false
     }
@@ -279,7 +264,7 @@ export function ConversationComposer({
     setMentions(retryDraft.mentions)
     setMentionAllToken(retryDraft.mentionAllToken)
     onReplyToChange?.(retryDraft.replyTo)
-    resizeComposerInput(inputRef.current, manualInputHeightRef.current)
+    resizeComposerInput(inputRef.current)
     form.setFocus("body")
   }, [
     form,
@@ -417,7 +402,7 @@ export function ConversationComposer({
     window.requestAnimationFrame(() => {
       input.focus()
       input.setSelectionRange(nextCaret, nextCaret)
-      resizeComposerInput(input, manualInputHeightRef.current)
+      resizeComposerInput(input)
     })
   }
 
@@ -436,7 +421,7 @@ export function ConversationComposer({
     form.setValue("body", nextBody, { shouldDirty: true })
     typingReport.input(nextBody)
     reconcileMentions(nextBody)
-    resizeComposerInput(input, manualInputHeightRef.current)
+    resizeComposerInput(input)
     emojiCaretRef.current = nextCaret
     setEmojiOpen(false)
   }
@@ -534,7 +519,7 @@ export function ConversationComposer({
     // 提醒状态随正文一起清空，发送失败时按草稿所属可见范围恢复。
     setMentions([])
     setMentionAllToken(null)
-    resizeComposerInput(inputRef.current, manualInputHeightRef.current)
+    resizeComposerInput(inputRef.current)
     try {
       const messageInput = { clientMessageId: clientMessageID, body }
       let message: ConversationMessageData
@@ -616,7 +601,7 @@ export function ConversationComposer({
           form.setValue("body", body, { shouldDirty: true })
           setMentions(draft.mentions)
           setMentionAllToken(draft.mentionAllToken)
-          resizeComposerInput(inputRef.current, manualInputHeightRef.current)
+          resizeComposerInput(inputRef.current)
         }
       }
       refocusPendingRef.current = refocusAfterSubmit
@@ -634,7 +619,7 @@ export function ConversationComposer({
     }
     form.setValue("body", reply, { shouldDirty: true })
     window.requestAnimationFrame(() => {
-      resizeComposerInput(inputRef.current, manualInputHeightRef.current)
+      resizeComposerInput(inputRef.current)
       form.setFocus("body")
     })
   }, [form, onVisibilityChange, visibility])
@@ -705,58 +690,6 @@ export function ConversationComposer({
     }
   }
 
-  /** 应用用户选择的消息输入框高度。 */
-  function setManualInputHeight(height: number) {
-    const input = inputRef.current
-    if (!input) return
-    const nextHeight = Math.min(
-      conversationComposerMaxHeight,
-      Math.max(conversationComposerMinHeight, height),
-    )
-    manualInputHeightRef.current = nextHeight
-    resizeComposerInput(input, nextHeight)
-  }
-
-  /** 开始拖动消息输入框。 */
-  function startInputResize(event: ReactPointerEvent<HTMLButtonElement>) {
-    const input = inputRef.current
-    if (!input) return
-    event.preventDefault()
-    event.currentTarget.setPointerCapture(event.pointerId)
-    resizeStartRef.current = {
-      pointerY: event.clientY,
-      inputHeight: input.getBoundingClientRect().height,
-    }
-  }
-
-  /** 按指针位置调整消息输入框高度。 */
-  function resizeInput(event: ReactPointerEvent<HTMLButtonElement>) {
-    const start = resizeStartRef.current
-    if (!start || !event.currentTarget.hasPointerCapture(event.pointerId)) return
-    setManualInputHeight(start.inputHeight + start.pointerY - event.clientY)
-  }
-
-  /** 结束拖动消息输入框。 */
-  function stopInputResize(event: ReactPointerEvent<HTMLButtonElement>) {
-    resizeStartRef.current = null
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId)
-    }
-  }
-
-  /** 使用方向键调整消息输入框高度。 */
-  function resizeInputFromKeyboard(event: KeyboardEvent<HTMLButtonElement>) {
-    if (event.key !== "ArrowUp" && event.key !== "ArrowDown") return
-    const input = inputRef.current
-    if (!input) return
-    event.preventDefault()
-    const direction = event.key === "ArrowUp" ? 1 : -1
-    setManualInputHeight(
-      input.getBoundingClientRect().height +
-        direction * conversationComposerKeyboardResizeStep,
-    )
-  }
-
   const [showSubmitting, setShowSubmitting] = useState(false)
   // 客户会话在输入区工具栏提供 AI 写回复入口，不可对客发送时保留显示并禁用。
   const replyAssistant =
@@ -810,10 +743,7 @@ export function ConversationComposer({
         disabledReason && "pl-3",
       )}
       onInput={(event) => {
-        resizeComposerInput(
-          event.currentTarget,
-          manualInputHeightRef.current,
-        )
+        resizeComposerInput(event.currentTarget)
       }}
       onChange={(event) => {
         const previousBody = form.getValues("body")
@@ -986,18 +916,6 @@ export function ConversationComposer({
             </Button>
           </div>
         ) : null}
-        {mobile ? null : (
-          <button
-            type="button"
-            className="absolute inset-x-0 top-0 z-10 h-3 -translate-y-1/2 cursor-row-resize touch-none border-0 bg-transparent p-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-            aria-label={t("composerResize")}
-            onPointerDown={startInputResize}
-            onPointerMove={resizeInput}
-            onPointerUp={stopInputResize}
-            onPointerCancel={stopInputResize}
-            onKeyDown={resizeInputFromKeyboard}
-          />
-        )}
         <div
           className={cn(
             "border-t",

@@ -320,7 +320,6 @@ const inbox = {
   conversationReopenSuccess: "Conversation reopened and assigned to you",
   conversationActionError: "Could not update the conversation. Try again.",
   replyLabel: "Reply",
-  composerResize: "Resize message input",
   attachmentDescription: "Description",
   attachmentDescriptionTooLong: "Use at most 4,000 characters",
   attachmentRemove: "Remove {{name}}",
