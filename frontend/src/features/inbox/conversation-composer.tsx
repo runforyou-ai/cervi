@@ -789,7 +789,7 @@ export function ConversationComposer({
         captionLimit={customerAttachmentCaptionLimit}
         replyTo={replyTo ?? null}
         onSent={() => onReplyToChange?.(null)}
-        disabled={isSubmitting}
+        disabled={isSubmitting || Boolean(disabledReason)}
         onBeforeSend={onBeforeSend}
         onCreated={(conversation, conversationID) => onAttachmentConversationCreated?.(conversation, conversationID)}
       />
@@ -813,7 +813,7 @@ export function ConversationComposer({
           variant="ghost"
           size="icon-sm"
           className={composerToolClass}
-          disabled={isSubmitting}
+          disabled={isSubmitting || Boolean(disabledReason)}
           aria-label={t("emojiPick")}
         >
           <SmileIcon className="size-5" />
@@ -954,39 +954,37 @@ export function ConversationComposer({
           ) : null}
           {/* 输入区整体铺底色，正文单独用白底并与上下边缘留出间距。 */}
           <div className="flex items-end gap-2 bg-foreground/[0.03] px-2 py-1">
-            {disabledReason ? null : (
-              <div className="mb-1 flex items-end gap-0.5">
-                {onVisibilityChange ? (
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon-sm"
-                        aria-pressed={internalNote}
-                        className={cn(
-                          composerToolClass,
-                          internalNote &&
-                            "bg-amber-100 text-amber-900 hover:bg-amber-100 hover:text-amber-900 dark:bg-amber-950 dark:text-amber-200 dark:hover:bg-amber-950 dark:hover:text-amber-200",
-                        )}
-                        aria-label={t("composerModeNote")}
-                        onClick={() =>
-                          switchVisibility(
-                            internalNote
-                              ? MessageVisibility.MessageVisibilityCustomerVisible
-                              : MessageVisibility.MessageVisibilityInternalOnly,
-                          )
-                        }
-                      >
-                        <StickyNoteIcon />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>{t("composerModeNote")}</TooltipContent>
-                  </Tooltip>
-                ) : null}
-                {attachmentTool}
-              </div>
-            )}
+            <div className="mb-1 flex items-end gap-0.5">
+              {onVisibilityChange ? (
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      aria-pressed={internalNote}
+                      className={cn(
+                        composerToolClass,
+                        internalNote &&
+                          "bg-amber-100 text-amber-900 hover:bg-amber-100 hover:text-amber-900 dark:bg-amber-950 dark:text-amber-200 dark:hover:bg-amber-950 dark:hover:text-amber-200",
+                      )}
+                      aria-label={t("composerModeNote")}
+                      onClick={() =>
+                        switchVisibility(
+                          internalNote
+                            ? MessageVisibility.MessageVisibilityCustomerVisible
+                            : MessageVisibility.MessageVisibilityInternalOnly,
+                        )
+                      }
+                    >
+                      <StickyNoteIcon />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>{t("composerModeNote")}</TooltipContent>
+                </Tooltip>
+              ) : null}
+              {attachmentTool}
+            </div>
             <div className="flex min-w-0 flex-1 items-end rounded-md bg-background px-2">
               {disabledReason ? (
                 <p
@@ -1000,7 +998,7 @@ export function ConversationComposer({
               )}
             </div>
             <div className="mb-1 flex items-end gap-0.5">
-              {disabledReason ? null : emojiTool}
+              {emojiTool}
               {replyAssistant}
               {showSend ? (
                 <Button
