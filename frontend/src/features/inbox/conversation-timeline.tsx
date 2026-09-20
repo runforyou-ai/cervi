@@ -1082,7 +1082,7 @@ function ConversationTimelineContent({
                                     </button>
                                   ) : null}
                                   {message.agentProcess ? (
-                                    <AgentProcess process={message.agentProcess} incoming={incoming} onPrimary={!incoming && !agentNotice} />
+                                    <AgentProcess process={message.agentProcess} incoming={incoming} onPrimary={!incoming && !agentNotice} onToggle={viewport.stopFollowing} />
                                   ) : null}
                                   {/* 时间跟随正文末行，正文按整行宽度排版。 */}
                                   <div
@@ -1200,6 +1200,7 @@ function ConversationTimelineContent({
                 group={conversationType === ConversationType.ConversationTypeGroup}
                 copilot={conversationType === ConversationType.ConversationTypeCopilot}
                 incoming={conversationType !== ConversationType.ConversationTypeCustomer}
+                onToggle={viewport.stopFollowing}
               />
             ))
             : null}

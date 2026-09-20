@@ -131,12 +131,12 @@ function useToolStatusLabel() {
 }
 
 /** 展示单次工具调用并按需展开完整参数、结果或错误。 */
-function AgentTool({ call }: { call: AgentToolCall }) {
+function AgentTool({ call, onToggle }: { call: AgentToolCall; onToggle: () => void }) {
   const { t } = useTranslation("inbox")
   const failed = call.status === AgentToolCallStatus.AgentToolCallFailed
   const statusLabel = useToolStatusLabel()(call.status)
   return (
-    <Collapsible className="min-w-0 rounded-md bg-muted text-foreground">
+    <Collapsible className="min-w-0 rounded-md bg-muted text-foreground" onOpenChange={onToggle}>
       <CollapsibleTrigger className="group flex w-full min-w-0 items-center gap-3 rounded-md px-3 py-2 text-left text-xs focus-visible:outline focus-visible:outline-ring">
         <span className="min-w-0 flex-1 break-all font-medium">{call.name}</span>
         <span className={cn("shrink-0 text-muted-foreground", failed && "text-destructive")}>
@@ -169,8 +169,8 @@ function AgentTool({ call }: { call: AgentToolCall }) {
   )
 }
 
-/** 沿头像侧对齐思考标题、右上角显示本次模型用量，首次展开时按运行编号读取过程内容。onPrimary 表示内容位于主色气泡内，决定配色；incoming 只决定对齐方向。 */
-export function AgentProcess({ process, incoming, onPrimary }: { process: ConversationAgentProcessData; incoming: boolean; onPrimary: boolean }) {
+/** 沿头像侧对齐思考标题、右上角显示本次模型用量，首次展开时按运行编号读取过程内容。onPrimary 表示内容位于主色气泡内，决定配色；incoming 只决定对齐方向；onToggle 在展开或收起时暂停消息视口自动贴底。 */
+export function AgentProcess({ process, incoming, onPrimary, onToggle }: { process: ConversationAgentProcessData; incoming: boolean; onPrimary: boolean; onToggle: () => void }) {
   const { t, i18n } = useTranslation(["inbox", "common"])
   const [opened, setOpened] = useState(false)
   const mobile = resolveAppPlatform() === "mobile"
@@ -182,7 +182,7 @@ export function AgentProcess({ process, incoming, onPrimary }: { process: Conver
     { enabled: opened, staleTime: Infinity },
   )
   return (
-    <Collapsible className="mb-3 min-w-0" onOpenChange={(open) => open && setOpened(true)}>
+    <Collapsible className="mb-3 min-w-0" onOpenChange={(open) => { onToggle(); if (open) setOpened(true) }}>
       <div className={cn(
         "flex gap-3",
         // 移动端窄屏把用量换到下一行，思考标题保持完整。
@@ -216,7 +216,7 @@ export function AgentProcess({ process, incoming, onPrimary }: { process: Conver
       )}>
         {detail.data ? detail.data.blocks.map((block) =>
           block.kind === AgentRunBlockKind.AgentRunBlockToolCall && block.toolCall ? (
-            <AgentTool key={block.id} call={block.toolCall} />
+            <AgentTool key={block.id} call={block.toolCall} onToggle={onToggle} />
           ) : (
             <div
               key={block.id}
@@ -309,7 +309,7 @@ function AgentRunStreamProcess({ state }: { state: RunStreamState }) {
 }
 
 /** 显示一次尚未由消息表达的运行的等待、思考或取消状态，运行中默认展开实时过程，取消运行可展开中断前的过程。 */
-export function AgentRunState({ run, incoming, conversationID, group, copilot, onStopped }: { run: ConversationAgentRun; incoming: boolean; conversationID?: string; group?: boolean; copilot?: boolean; onStopped: () => Promise<unknown> }) {
+export function AgentRunState({ run, incoming, conversationID, group, copilot, onStopped, onToggle }: { run: ConversationAgentRun; incoming: boolean; conversationID?: string; group?: boolean; copilot?: boolean; onStopped: () => Promise<unknown>; onToggle: () => void }) {
   const { t } = useTranslation("inbox")
   const stream = useAgentRunStream(run.id, run.status === AgentRunStatus.AgentRunStatusRunning, onStopped)
   if (run.status === AgentRunStatus.AgentRunStatusSucceeded || run.status === AgentRunStatus.AgentRunStatusFailed ||
@@ -385,7 +385,7 @@ export function AgentRunState({ run, incoming, conversationID, group, copilot, o
           </Collapsible>
         ) : (
           <>
-            {run.process ? <AgentProcess process={run.process} incoming={incoming} onPrimary={false} /> : null}
+            {run.process ? <AgentProcess process={run.process} incoming={incoming} onPrimary={false} onToggle={onToggle} /> : null}
             <div className="flex items-center gap-1.5">
               {cancelled ? <BrainIcon aria-hidden className="size-4" /> : null}
               <span>{label}</span>
