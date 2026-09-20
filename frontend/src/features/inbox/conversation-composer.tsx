@@ -913,10 +913,9 @@ export function ConversationComposer({
         ) : null}
         <div
           className={cn(
-            "border-t",
             internalNote
-              ? "border-amber-500/70 bg-amber-50/60 dark:bg-amber-950/30"
-              : "border-input bg-background",
+              ? "bg-amber-50/60 dark:bg-amber-950/30"
+              : "bg-background",
           )}
         >
           {replyTo ? (
