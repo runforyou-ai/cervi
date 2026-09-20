@@ -90,7 +90,7 @@ export function MCPServerListPage() {
           {t("mcpServer.tools.refresh")}
         </Button>
         <Button size="sm" asChild>
-          <Link to="/integrations/mcp-servers/new">{t("mcpServer.list.create")}</Link>
+          <Link to="/settings/mcp-servers/new">{t("mcpServer.list.create")}</Link>
         </Button>
       </PageHeader>
       <PageContent>
@@ -135,7 +135,7 @@ export function MCPServerListPage() {
                   <>
                     <MCPServerTestButton serverId={mcpServer.id} />
                     <Button variant="outline" size="sm" asChild>
-                      <Link to={`/integrations/mcp-servers/${mcpServer.id}`}>
+                      <Link to={`/settings/mcp-servers/${mcpServer.id}`}>
                         {t("common:actions.edit")}
                       </Link>
                     </Button>

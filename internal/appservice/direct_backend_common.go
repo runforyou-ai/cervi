@@ -24,9 +24,7 @@ func (o *directOperations) identityFromModel(ctx context.Context, identity *serv
 
 // organizationFromModel 把存储企业转换为应用契约。
 func organizationFromModel(organization servermodels.Organization) Organization {
-	return Organization{
-		ID: organization.ID, Name: organization.Name, AllowArbitraryURL: organization.AllowArbitraryURL,
-	}
+	return Organization{ID: organization.ID, Name: organization.Name}
 }
 
 // currentUserFromIdentity 把存储身份转换为当前用户契约并补齐头像地址。

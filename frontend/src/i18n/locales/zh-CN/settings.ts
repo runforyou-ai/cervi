@@ -13,6 +13,11 @@ const settings = {
     devices: "设备",
     general: "通用设置",
     roles: "角色与权限",
+    channels: "消息渠道",
+    modelServices: "模型服务",
+    mcpServers: "MCP 服务",
+    webhooks: "Webhook",
+    openApi: "开放接口",
   },
   profile: {
     title: "个人资料",
@@ -134,12 +139,6 @@ const settings = {
     saveSuccess: "通用设置已保存。",
     form: {
       name: "企业名称",
-      allowArbitraryUrl: "允许打开任意网址",
-    },
-    confirm: {
-      title: "允许打开任意网址？",
-      description:
-        "开启后，成员可以访问未经企业配置和验证的网站，可能面临钓鱼网站、恶意内容或敏感信息泄露风险。请确认企业已制定相应的使用规范。",
     },
     validation: {
       nameRequired: "请输入企业名称。",

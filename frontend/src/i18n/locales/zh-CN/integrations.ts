@@ -1,53 +1,5 @@
 /** 简体中文·集成文案。 */
 const integrations = {
-  title: "集成",
-  navigation: "集成导航",
-  messageChannels: "消息渠道",
-  businessSystems: "业务系统",
-  businessSystem: {
-    title: "业务系统",
-    status: {
-      enabled: "已启用",
-      disabled: "已停用",
-    },
-    list: {
-      create: "添加业务系统",
-      loadError: "业务系统列表加载失败。",
-      empty: "还没有配置业务系统",
-      columns: {
-        name: "名称",
-        url: "网站地址",
-        status: "状态",
-      },
-    },
-    form: {
-      createTitle: "添加业务系统",
-      editTitle: "编辑业务系统",
-      name: "名称",
-      description: "描述",
-      url: "网站地址",
-      enabled: "启用业务系统",
-      createSuccess: "业务系统已添加。",
-      updateSuccess: "业务系统已保存。",
-      saveError: "保存业务系统失败，请重试。",
-      loadError: "业务系统加载失败。",
-    },
-    delete: {
-      title: "删除“{{name}}”？",
-      description: "删除后，该业务系统配置将无法恢复。",
-      success: "业务系统已删除。",
-      error: "删除业务系统失败，请重试。",
-    },
-    validation: {
-      nameRequired: "请输入业务系统名称。",
-      nameTooLong: "业务系统名称不能超过 100 个字符。",
-      descriptionTooLong: "业务系统描述不能超过 200 个字符。",
-      urlRequired: "请输入业务系统地址。",
-      urlTooLong: "业务系统地址不能超过 2048 个字符。",
-      urlInvalid: "请输入完整的 HTTP 或 HTTPS 地址，且不要包含账号密码。",
-    },
-  },
-  mcpServers: "MCP 服务",
   mcpServer: {
     title: "MCP 服务",
     list: {
@@ -106,10 +58,7 @@ const integrations = {
       urlInvalid: "请输入完整的 HTTP 或 HTTPS 地址，且不要包含账号密码。",
     },
   },
-  webhooks: "Webhook",
-  openApi: "开放接口",
   modelServices: {
-    navigation: "模型服务",
     title: "模型服务",
     tabs: {
       chat: "对话模型",

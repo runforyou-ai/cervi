@@ -13,6 +13,11 @@ const settings = {
     devices: "Devices",
     general: "General",
     roles: "Roles and permissions",
+    channels: "Message channels",
+    modelServices: "Model services",
+    mcpServers: "MCP servers",
+    webhooks: "Webhooks",
+    openApi: "Developer API",
   },
   profile: {
     title: "Profile",
@@ -139,12 +144,6 @@ const settings = {
     saveSuccess: "General settings saved.",
     form: {
       name: "Company name",
-      allowArbitraryUrl: "Allow opening any URL",
-    },
-    confirm: {
-      title: "Allow opening any URL?",
-      description:
-        "Members will be able to visit sites that the company has not configured or verified. This may expose them to phishing, malicious content, or sensitive-data leaks. Confirm that your company has appropriate usage policies.",
     },
     validation: {
       nameRequired: "Enter the company name.",

@@ -5,7 +5,6 @@ import auth from "./auth"
 import connection from "./connection"
 import mobile from "./mobile"
 import workspace from "./workspace"
-import apps from "./apps"
 import knowledgeBase from "./knowledge-base"
 import contacts from "./contacts"
 import integrations from "./integrations"
@@ -20,7 +19,6 @@ const enUS = {
   connection,
   mobile,
   workspace,
-  apps,
   knowledgeBase,
   contacts,
   integrations,

@@ -159,27 +159,22 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.POST("/settings/roles", s.createRole)
 	router.PUT("/settings/roles/:roleID", s.updateRole)
 	router.DELETE("/settings/roles/:roleID", s.deleteRole)
-	router.GET("/integrations/model-services", s.listAIProviders)
-	router.GET("/integrations/model-services/:providerID", s.getAIProvider)
-	router.GET("/integrations/model-services/models", s.listAvailableAIModels)
-	router.POST("/integrations/model-services/discover-models", s.discoverAIProviderModels)
-	router.POST("/integrations/model-services/test", s.testAIProviderConnection)
-	router.POST("/integrations/model-services", s.createAIProvider)
-	router.PUT("/integrations/model-services/:providerID", s.updateAIProvider)
-	router.DELETE("/integrations/model-services/:providerID", s.deleteAIProvider)
-	router.GET("/integrations/business-systems", s.listBusinessSystems)
-	router.GET("/integrations/business-systems/:businessSystemID", s.getBusinessSystem)
-	router.POST("/integrations/business-systems", s.createBusinessSystem)
-	router.PUT("/integrations/business-systems/:businessSystemID", s.updateBusinessSystem)
-	router.DELETE("/integrations/business-systems/:businessSystemID", s.deleteBusinessSystem)
-	router.GET("/integrations/mcp-servers", s.listMCPServers)
-	router.GET("/integrations/mcp-servers/:mcpServerID", s.getMCPServer)
-	router.POST("/integrations/mcp-servers/test-connection", s.testMCPServerConnection)
-	router.POST("/integrations/mcp-servers/:mcpServerID/test-connection", s.testSavedMCPServerConnection)
-	router.POST("/integrations/mcp-servers/refresh-tools", s.refreshMCPServerTools)
-	router.POST("/integrations/mcp-servers", s.createMCPServer)
-	router.PUT("/integrations/mcp-servers/:mcpServerID", s.updateMCPServer)
-	router.DELETE("/integrations/mcp-servers/:mcpServerID", s.deleteMCPServer)
+	router.GET("/settings/model-services", s.listAIProviders)
+	router.GET("/settings/model-services/:providerID", s.getAIProvider)
+	router.GET("/settings/model-services/models", s.listAvailableAIModels)
+	router.POST("/settings/model-services/discover-models", s.discoverAIProviderModels)
+	router.POST("/settings/model-services/test", s.testAIProviderConnection)
+	router.POST("/settings/model-services", s.createAIProvider)
+	router.PUT("/settings/model-services/:providerID", s.updateAIProvider)
+	router.DELETE("/settings/model-services/:providerID", s.deleteAIProvider)
+	router.GET("/settings/mcp-servers", s.listMCPServers)
+	router.GET("/settings/mcp-servers/:mcpServerID", s.getMCPServer)
+	router.POST("/settings/mcp-servers/test-connection", s.testMCPServerConnection)
+	router.POST("/settings/mcp-servers/:mcpServerID/test-connection", s.testSavedMCPServerConnection)
+	router.POST("/settings/mcp-servers/refresh-tools", s.refreshMCPServerTools)
+	router.POST("/settings/mcp-servers", s.createMCPServer)
+	router.PUT("/settings/mcp-servers/:mcpServerID", s.updateMCPServer)
+	router.DELETE("/settings/mcp-servers/:mcpServerID", s.deleteMCPServer)
 	router.PUT("/settings/organization", s.updateOrganization)
 	router.POST("/devices", s.registerDevice)
 	router.GET("/devices", s.listDevices)
@@ -1435,43 +1430,6 @@ func (s *Service) updateAIProvider(c *gin.Context) {
 // deleteAIProvider 删除模型服务供应商。
 func (s *Service) deleteAIProvider(c *gin.Context) {
 	writeEmpty(c, s.application.DeleteAIProvider(c.Request.Context(), requestMeta(c), c.Param("providerID")))
-}
-
-// listBusinessSystems 返回当前企业配置的业务系统。
-func (s *Service) listBusinessSystems(c *gin.Context) {
-	output, err := s.application.ListBusinessSystems(c.Request.Context(), requestMeta(c))
-	writeResult(c, http.StatusOK, output, err)
-}
-
-// getBusinessSystem 返回当前企业中的业务系统详情。
-func (s *Service) getBusinessSystem(c *gin.Context) {
-	output, err := s.application.GetBusinessSystem(c.Request.Context(), requestMeta(c), c.Param("businessSystemID"))
-	writeResult(c, http.StatusOK, output, err)
-}
-
-// createBusinessSystem 创建业务系统。
-func (s *Service) createBusinessSystem(c *gin.Context) {
-	var input appservice.BusinessSystemInput
-	if !bindJSON(c, &input) {
-		return
-	}
-	output, err := s.application.CreateBusinessSystem(c.Request.Context(), requestMeta(c), input)
-	writeResult(c, http.StatusCreated, output, err)
-}
-
-// updateBusinessSystem 修改业务系统。
-func (s *Service) updateBusinessSystem(c *gin.Context) {
-	var input appservice.BusinessSystemInput
-	if !bindJSON(c, &input) {
-		return
-	}
-	output, err := s.application.UpdateBusinessSystem(c.Request.Context(), requestMeta(c), c.Param("businessSystemID"), input)
-	writeResult(c, http.StatusOK, output, err)
-}
-
-// deleteBusinessSystem 删除业务系统。
-func (s *Service) deleteBusinessSystem(c *gin.Context) {
-	writeEmpty(c, s.application.DeleteBusinessSystem(c.Request.Context(), requestMeta(c), c.Param("businessSystemID")))
 }
 
 // listMCPServers 返回当前企业配置的 MCP 服务。

@@ -7,10 +7,6 @@ import { MessageChannelListPage } from "@/features/channels/message-channel-list
 import { AgentFormPage } from "@/features/contacts/agents/agent-form-page"
 import { ContactsPage } from "@/features/contacts/contacts-page"
 import { InboxRoute } from "@/features/inbox/inbox-route"
-import { AppsPage } from "@/features/apps/apps-page"
-import { IntegrationsLayout } from "@/features/integrations/integrations-layout"
-import { BusinessSystemFormPage } from "@/features/integrations/business-systems/business-system-form-page"
-import { BusinessSystemListPage } from "@/features/integrations/business-systems/business-system-list-page"
 import { MCPServerFormPage } from "@/features/integrations/mcp-servers/mcp-server-form-page"
 import { MCPServerListPage } from "@/features/integrations/mcp-servers/mcp-server-list-page"
 import { ModelProviderFormPage } from "@/features/integrations/model-services/model-provider-form-page"
@@ -29,7 +25,6 @@ import { SettingsPage } from "@/features/settings/settings-page"
 /** 需要公共外壳的路由前缀，同一前缀下的页面渲染在对应布局内。 */
 const workspaceRouteLayouts = [
   { prefix: "/knowledge-bases", element: <KnowledgeBaseLayout /> },
-  { prefix: "/integrations", element: <IntegrationsLayout /> },
 ]
 
 /**
@@ -187,111 +182,153 @@ const workspaceRouteDefinitions = [
     titleKey: "tabs.routes.knowledgeBases",
     element: <KnowledgeBaseIndexPage />,
   },
-  { path: "/apps", titleKey: "tabs.routes.apps", element: <AppsPage /> },
   {
-    path: "/integrations/channels/new",
-    tabPath: "/integrations/channels",
+    path: "/settings/channels/new",
+    tabPath: "/settings/channels",
     titleKey: "tabs.routes.channels",
-    element: <MessageChannelFormPage mode="create" />,
+    element: (
+      <SettingsPage section="channels">
+        <MessageChannelFormPage mode="create" />
+      </SettingsPage>
+    ),
   },
   {
-    path: "/integrations/channels/:channelType/:channelId",
-    tabPath: "/integrations/channels",
+    path: "/settings/channels/:channelType/:channelId",
+    tabPath: "/settings/channels",
     titleKey: "tabs.routes.channels",
-    element: <MessageChannelFormPage mode="edit" />,
+    element: (
+      <SettingsPage section="channels">
+        <MessageChannelFormPage mode="edit" />
+      </SettingsPage>
+    ),
   },
   {
-    path: "/integrations/channels",
+    path: "/settings/channels",
     titleKey: "tabs.routes.channels",
-    element: <MessageChannelListPage />,
+    element: (
+      <SettingsPage section="channels">
+        <MessageChannelListPage />
+      </SettingsPage>
+    ),
   },
   {
-    path: "/integrations/business-systems/new",
-    tabPath: "/integrations/business-systems",
-    titleKey: "tabs.routes.businessSystems",
-    element: <BusinessSystemFormPage mode="create" />,
-  },
-  {
-    path: "/integrations/business-systems/:businessSystemId",
-    tabPath: "/integrations/business-systems",
-    titleKey: "tabs.routes.businessSystems",
-    element: <BusinessSystemFormPage mode="edit" />,
-  },
-  {
-    path: "/integrations/business-systems",
-    titleKey: "tabs.routes.businessSystems",
-    element: <BusinessSystemListPage />,
-  },
-  {
-    path: "/integrations/mcp-servers/new",
-    tabPath: "/integrations/mcp-servers",
+    path: "/settings/mcp-servers/new",
+    tabPath: "/settings/mcp-servers",
     titleKey: "tabs.routes.mcpServers",
-    element: <MCPServerFormPage mode="create" />,
+    element: (
+      <SettingsPage section="mcpServers">
+        <MCPServerFormPage mode="create" />
+      </SettingsPage>
+    ),
   },
   {
-    path: "/integrations/mcp-servers/:mcpServerId",
-    tabPath: "/integrations/mcp-servers",
+    path: "/settings/mcp-servers/:mcpServerId",
+    tabPath: "/settings/mcp-servers",
     titleKey: "tabs.routes.mcpServers",
-    element: <MCPServerFormPage mode="edit" />,
+    element: (
+      <SettingsPage section="mcpServers">
+        <MCPServerFormPage mode="edit" />
+      </SettingsPage>
+    ),
   },
   {
-    path: "/integrations/mcp-servers",
+    path: "/settings/mcp-servers",
     titleKey: "tabs.routes.mcpServers",
-    element: <MCPServerListPage />,
+    element: (
+      <SettingsPage section="mcpServers">
+        <MCPServerListPage />
+      </SettingsPage>
+    ),
   },
   {
-    path: "/integrations/model-services/chat/new",
-    tabPath: "/integrations/model-services",
+    path: "/settings/model-services/chat/new",
+    tabPath: "/settings/model-services",
     titleKey: "tabs.routes.modelServices",
-    element: <ModelProviderFormPage mode="create" returnSection="chat" />,
+    element: (
+      <SettingsPage section="modelServices">
+        <ModelProviderFormPage mode="create" returnSection="chat" />
+      </SettingsPage>
+    ),
   },
   {
-    path: "/integrations/model-services/chat/:providerId",
-    tabPath: "/integrations/model-services",
+    path: "/settings/model-services/chat/:providerId",
+    tabPath: "/settings/model-services",
     titleKey: "tabs.routes.modelServices",
-    element: <ModelProviderFormPage mode="edit" returnSection="chat" />,
+    element: (
+      <SettingsPage section="modelServices">
+        <ModelProviderFormPage mode="edit" returnSection="chat" />
+      </SettingsPage>
+    ),
   },
   {
-    path: "/integrations/model-services/chat",
-    tabPath: "/integrations/model-services",
+    path: "/settings/model-services/chat",
+    tabPath: "/settings/model-services",
     titleKey: "tabs.routes.modelServices",
-    element: <ModelProviderListPage section="chat" />,
+    element: (
+      <SettingsPage section="modelServices">
+        <ModelProviderListPage section="chat" />
+      </SettingsPage>
+    ),
   },
   {
-    path: "/integrations/model-services/embedding/new",
-    tabPath: "/integrations/model-services",
+    path: "/settings/model-services/embedding/new",
+    tabPath: "/settings/model-services",
     titleKey: "tabs.routes.modelServices",
-    element: <ModelProviderFormPage mode="create" returnSection="embedding" />,
+    element: (
+      <SettingsPage section="modelServices">
+        <ModelProviderFormPage mode="create" returnSection="embedding" />
+      </SettingsPage>
+    ),
   },
   {
-    path: "/integrations/model-services/embedding/:providerId",
-    tabPath: "/integrations/model-services",
+    path: "/settings/model-services/embedding/:providerId",
+    tabPath: "/settings/model-services",
     titleKey: "tabs.routes.modelServices",
-    element: <ModelProviderFormPage mode="edit" returnSection="embedding" />,
+    element: (
+      <SettingsPage section="modelServices">
+        <ModelProviderFormPage mode="edit" returnSection="embedding" />
+      </SettingsPage>
+    ),
   },
   {
-    path: "/integrations/model-services/embedding",
-    tabPath: "/integrations/model-services",
+    path: "/settings/model-services/embedding",
+    tabPath: "/settings/model-services",
     titleKey: "tabs.routes.modelServices",
-    element: <ModelProviderListPage section="embedding" />,
+    element: (
+      <SettingsPage section="modelServices">
+        <ModelProviderListPage section="embedding" />
+      </SettingsPage>
+    ),
   },
   {
-    path: "/integrations/model-services/rerank/new",
-    tabPath: "/integrations/model-services",
+    path: "/settings/model-services/rerank/new",
+    tabPath: "/settings/model-services",
     titleKey: "tabs.routes.modelServices",
-    element: <ModelProviderFormPage mode="create" returnSection="rerank" />,
+    element: (
+      <SettingsPage section="modelServices">
+        <ModelProviderFormPage mode="create" returnSection="rerank" />
+      </SettingsPage>
+    ),
   },
   {
-    path: "/integrations/model-services/rerank/:providerId",
-    tabPath: "/integrations/model-services",
+    path: "/settings/model-services/rerank/:providerId",
+    tabPath: "/settings/model-services",
     titleKey: "tabs.routes.modelServices",
-    element: <ModelProviderFormPage mode="edit" returnSection="rerank" />,
+    element: (
+      <SettingsPage section="modelServices">
+        <ModelProviderFormPage mode="edit" returnSection="rerank" />
+      </SettingsPage>
+    ),
   },
   {
-    path: "/integrations/model-services/rerank",
-    tabPath: "/integrations/model-services",
+    path: "/settings/model-services/rerank",
+    tabPath: "/settings/model-services",
     titleKey: "tabs.routes.modelServices",
-    element: <ModelProviderListPage section="rerank" />,
+    element: (
+      <SettingsPage section="modelServices">
+        <ModelProviderListPage section="rerank" />
+      </SettingsPage>
+    ),
   },
 ] as const satisfies readonly {
   path: string
@@ -340,8 +377,7 @@ const workspaceRouteObjects: RouteObject[] = [
 const workspaceRedirects: Readonly<Record<string, string>> = {
   "/settings": "/settings/profile",
   "/contacts": "/contacts/employees",
-  "/integrations": "/integrations/channels",
-  "/integrations/model-services": "/integrations/model-services/chat",
+  "/settings/model-services": "/settings/model-services/chat",
 }
 
 export type WorkspaceTabTitleKey =

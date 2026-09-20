@@ -4,11 +4,9 @@ import {
   CheckIcon,
   ContactRoundIcon,
   InboxIcon,
-  LayoutGridIcon,
   LibraryIcon,
   LoaderCircleIcon,
   LogOutIcon,
-  PlugIcon,
   SettingsIcon,
   type LucideIcon,
 } from "lucide-react"
@@ -107,18 +105,6 @@ function WorkspaceMenu({
         icon={LibraryIcon}
         label={t("knowledgeBases")}
         active={location.pathname.startsWith("/knowledge-bases")}
-      />
-      <WorkspaceRailItem
-        to="/integrations/channels"
-        icon={PlugIcon}
-        label={t("integrations")}
-        active={location.pathname.startsWith("/integrations")}
-      />
-      <WorkspaceRailItem
-        to="/apps"
-        icon={LayoutGridIcon}
-        label={t("apps")}
-        active={location.pathname.startsWith("/apps")}
       />
     </nav>
   )

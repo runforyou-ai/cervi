@@ -1,12 +1,17 @@
 /** 设置页。 */
 import type { ReactNode } from "react"
 import {
+  BrainCircuitIcon,
   Building2Icon,
+  CodeXmlIcon,
   LockKeyholeIcon,
+  MessagesSquareIcon,
   MonitorSmartphoneIcon,
+  PlugIcon,
   ShieldCheckIcon,
   SlidersHorizontalIcon,
   UserRoundIcon,
+  WebhookIcon,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
@@ -26,13 +31,28 @@ import { RoleListPage } from "@/features/roles/role-list-page"
 import { UserPreferencesForm } from "@/features/settings/user-preferences-form"
 import { useWorkspace } from "@/contexts/workspace-context"
 
+/** 由设置外壳直接渲染表单的设置项。 */
+const formSections = [
+  "profile",
+  "security",
+  "preferences",
+  "devices",
+  "general",
+] as const
+
+type SettingsFormSection = (typeof formSections)[number]
+
 export type SettingsSection =
-  | "profile"
-  | "security"
-  | "preferences"
-  | "devices"
-  | "general"
+  | SettingsFormSection
   | "roles"
+  | "channels"
+  | "modelServices"
+  | "mcpServers"
+
+/** 判断设置项的内容是否由设置外壳内的表单渲染。 */
+function isFormSection(section: SettingsSection): section is SettingsFormSection {
+  return (formSections as readonly string[]).includes(section)
+}
 
 /** 设置导航和当前设置页面。 */
 export function SettingsPage({
@@ -44,7 +64,6 @@ export function SettingsPage({
 }) {
   const { t } = useTranslation("settings")
   const { identity } = useWorkspace()
-  const title = t(`${section}.title`)
 
   return (
     <PageSplit
@@ -73,15 +92,34 @@ export function SettingsPage({
             <PagePaneLink to="/settings/roles" icon={ShieldCheckIcon}>
               {t("navigation.roles")}
             </PagePaneLink>
+            <PagePaneLink to="/settings/channels" icon={MessagesSquareIcon}>
+              {t("navigation.channels")}
+            </PagePaneLink>
+            <PagePaneLink
+              to="/settings/model-services/chat"
+              activePath="/settings/model-services"
+              icon={BrainCircuitIcon}
+            >
+              {t("navigation.modelServices")}
+            </PagePaneLink>
+            <PagePaneLink to="/settings/mcp-servers" icon={PlugIcon}>
+              {t("navigation.mcpServers")}
+            </PagePaneLink>
+            <PagePaneLink icon={WebhookIcon}>
+              {t("navigation.webhooks")}
+            </PagePaneLink>
+            <PagePaneLink icon={CodeXmlIcon}>
+              {t("navigation.openApi")}
+            </PagePaneLink>
           </PagePaneGroup>
         </PagePaneNav>
       }
     >
-      {section === "roles" ? (
-        (children ?? <RoleListPage />)
-      ) : (
+      {children ? (
+        children
+      ) : isFormSection(section) ? (
         <>
-          <PageHeader title={title} />
+          <PageHeader title={t(`${section}.title`)} />
           <PageContent>
             {section === "profile" ? (
               <ProfileSettingsForm user={identity.user} />
@@ -96,6 +134,8 @@ export function SettingsPage({
             )}
           </PageContent>
         </>
+      ) : (
+        <RoleListPage />
       )}
     </PageSplit>
   )
