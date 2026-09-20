@@ -119,9 +119,7 @@ cervi-server 增加部署模式配置，取值为 `self_hosted` 和 `managed`。
 
 托管模式下，公开初始化接口在服务端关闭。页面入口与服务端初始化策略保持一致。
 
-新增配置包括部署 ID、托管域名后缀、运营凭据和可信官方身份服务。配置加载沿用 YAML 与环境变量方式，并由 `cervi-server -check-config` 覆盖新增字段的校验。
-
-首期所有新企业分配到一个固定部署 ID。SaaS 记录部署 ID 与运营 API 地址，为后续增加部署保留定位信息。
+新增配置包括托管域名后缀、运营凭据和可信官方身份服务。配置加载沿用 YAML 与环境变量方式，并由 `cervi-server -check-config` 覆盖新增字段的校验。
 
 ## 5. 域名与流量入口
 
@@ -389,7 +387,7 @@ SaaS 使用开通记录维护 `pending`、`provisioning`、`ready` 和 `failed` 
 
 | 方法 | 路径 | 职责 |
 | --- | --- | --- |
-| GET | /deployment | 查询部署标识、形态与企业域名后缀 |
+| GET | /deployment | 查询部署形态与企业域名后缀 |
 | GET | /domains/availability | 查询域名前缀可用性 |
 | POST | /organizations | 创建企业、初始用户与权益 |
 | GET | /provisionings/{provisioning_id} | 查询开通操作结果 |
@@ -561,7 +559,7 @@ Gin 承担 HTTP 适配，运营路由按 `/operator/v1` 前缀注册在唯一的
 
 | 现有位置 | 计划变化 |
 | --- | --- |
-| `internal/config/server` | 增加部署模式、部署 ID、托管后缀、运营凭据和身份服务配置，纳入 `-check-config` |
+| `internal/config/server` | 增加部署模式、托管后缀、运营凭据和身份服务配置，纳入 `-check-config` |
 | `run_server.go`、`application_services_server.go` | 按部署模式在唯一监听地址上注册 `/operator/v1` 运营路由并装配运营应用服务 |
 | `internal/tenant`、`internal/storage/server/tenant_resolver.go` | 扩展企业生命周期及服务状态解析 |
 | `internal/actions/installation` | 提取企业默认数据创建能力，按部署模式提供初始化入口 |
@@ -595,7 +593,7 @@ cervi-server 发布运营 API 契约和示例。SaaS 依赖该契约，与 cervi
 
 cervi-server 使用进程管理器启动，加载显式配置，配置开机启动、日志输出和退出信号处理。部署前完成配置校验及迁移，入口在就绪检查成功后开放流量。运营凭据由部署配置下发，轮换时先在 cervi-server 接受新旧两个凭据，SaaS 切换后移除旧凭据。
 
-存活探针检查进程响应，就绪探针覆盖业务必需依赖。版本接口提供版本号、构建提交和部署 ID。日志记录企业 ID、开通标识和请求标识等必要关联信息。
+存活探针检查进程响应，就绪探针覆盖业务必需依赖。版本接口提供版本号和构建提交。日志记录企业 ID、开通标识和请求标识等必要关联信息。
 
 发布使用固定版本二进制。迁移与程序版本配套验证，数据恢复使用匹配版本的程序和数据库备份。
 

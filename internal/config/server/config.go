@@ -35,10 +35,9 @@ type Config struct {
 	Storage       StorageConfig    `yaml:"storage"`
 }
 
-// DeploymentConfig 定义部署形态及官方托管所需的部署标识、域名后缀和运营凭据。
+// DeploymentConfig 定义部署形态及官方托管所需的域名后缀和运营凭据。
 type DeploymentConfig struct {
 	Mode                domain.DeploymentMode `yaml:"mode"`
-	ID                  string                `yaml:"id"`
 	ManagedDomainSuffix string                `yaml:"managedDomainSuffix"`
 	OperatorCredential  string                `yaml:"operatorCredential"`
 }
@@ -115,7 +114,6 @@ func Load(path string) (Config, error) {
 func (config *Config) normalize() {
 	config.MarkitdownURL = strings.TrimRight(strings.TrimSpace(config.MarkitdownURL), "/")
 	config.Deployment.Mode = domain.DeploymentMode(strings.ToLower(strings.TrimSpace(string(config.Deployment.Mode))))
-	config.Deployment.ID = strings.TrimSpace(config.Deployment.ID)
 	config.Deployment.ManagedDomainSuffix = strings.ToLower(strings.Trim(strings.TrimSpace(config.Deployment.ManagedDomainSuffix), "."))
 	config.Deployment.OperatorCredential = strings.TrimSpace(config.Deployment.OperatorCredential)
 	config.Server.Host = strings.TrimSpace(config.Server.Host)
@@ -156,7 +154,6 @@ func defaultConfig() Config {
 func applyEnvironment(config *Config) error {
 	applyStringEnvironment("MARKITDOWN_URL", &config.MarkitdownURL)
 	applyDeploymentModeEnvironment("DEPLOYMENT_MODE", &config.Deployment.Mode)
-	applyStringEnvironment("DEPLOYMENT_ID", &config.Deployment.ID)
 	applyStringEnvironment("MANAGED_DOMAIN_SUFFIX", &config.Deployment.ManagedDomainSuffix)
 	applyStringEnvironment("OPERATOR_CREDENTIAL", &config.Deployment.OperatorCredential)
 	applyStringEnvironment("WAILS_SERVER_HOST", &config.Server.Host)
@@ -288,13 +285,10 @@ func (config DeploymentConfig) validate() error {
 		return fmt.Errorf("deployment.mode 必须是 self_hosted 或 managed")
 	}
 	if !config.Mode.Managed() {
-		if config.ID != "" || config.ManagedDomainSuffix != "" || config.OperatorCredential != "" {
-			return fmt.Errorf("deployment.id、deployment.managedDomainSuffix 和 deployment.operatorCredential 只在 managed 模式下使用")
+		if config.ManagedDomainSuffix != "" || config.OperatorCredential != "" {
+			return fmt.Errorf("deployment.managedDomainSuffix 和 deployment.operatorCredential 只在 managed 模式下使用")
 		}
 		return nil
-	}
-	if config.ID == "" {
-		return fmt.Errorf("必须配置 deployment.id 或 DEPLOYMENT_ID")
 	}
 	if !domainSuffixPattern.MatchString(config.ManagedDomainSuffix) {
 		return fmt.Errorf("deployment.managedDomainSuffix 必须是多级小写域名")

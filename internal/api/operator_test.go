@@ -15,7 +15,6 @@ const testOperatorCredential = "operator-credential-operator-credential"
 // newTestOperatorService 创建用于测试的运营接口适配器。
 func newTestOperatorService() *OperatorService {
 	return NewOperatorService(Deployment{
-		DeploymentID:        "cervi-hosting-1",
 		Mode:                "managed",
 		ManagedDomainSuffix: "cervi.runforyou.app",
 	}, testOperatorCredential)
@@ -48,7 +47,7 @@ func TestOperatorDeploymentRequiresCredential(t *testing.T) {
 	}
 }
 
-// TestOperatorDeploymentReturnsDeployment 验证凭据有效时返回部署标识与域名后缀，并回传请求标识。
+// TestOperatorDeploymentReturnsDeployment 验证凭据有效时返回部署形态与域名后缀。
 func TestOperatorDeploymentReturnsDeployment(t *testing.T) {
 	service := newTestOperatorService()
 	request := httptest.NewRequest(http.MethodGet, "/deployment", nil)
@@ -62,7 +61,7 @@ func TestOperatorDeploymentReturnsDeployment(t *testing.T) {
 	if err := json.Unmarshal(recorder.Body.Bytes(), &deployment); err != nil {
 		t.Fatal(err)
 	}
-	if deployment.DeploymentID != "cervi-hosting-1" || deployment.ManagedDomainSuffix != "cervi.runforyou.app" {
+	if deployment.Mode != "managed" || deployment.ManagedDomainSuffix != "cervi.runforyou.app" {
 		t.Fatalf("部署信息不正确: %#v", deployment)
 	}
 }

@@ -187,7 +187,6 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	// 运营接口只在托管部署注册，凭据认证是其唯一访问控制手段。
 	if config.Deployment.Mode.Managed() {
 		operator := api.NewOperatorService(api.Deployment{
-			DeploymentID:        config.Deployment.ID,
 			Mode:                string(config.Deployment.Mode),
 			ManagedDomainSuffix: config.Deployment.ManagedDomainSuffix,
 		}, config.Deployment.OperatorCredential)

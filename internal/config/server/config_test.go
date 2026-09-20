@@ -112,7 +112,7 @@ func clearServerEnvironment(t *testing.T) {
 		"TLS_MODE", "TLS_ACME_EMAIL", "FILE_STORAGE_PATH",
 		"S3_ENABLED", "S3_ENDPOINT", "S3_PUBLIC_BASE_URL", "S3_REGION", "S3_BUCKET",
 		"S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY", "S3_FORCE_PATH_STYLE",
-		"DEPLOYMENT_MODE", "DEPLOYMENT_ID", "MANAGED_DOMAIN_SUFFIX", "OPERATOR_CREDENTIAL",
+		"DEPLOYMENT_MODE", "MANAGED_DOMAIN_SUFFIX", "OPERATOR_CREDENTIAL",
 	} {
 		t.Setenv(name, "")
 		if err := os.Unsetenv(name); err != nil {
@@ -264,13 +264,12 @@ func TestDeploymentDefaultsToSelfHosted(t *testing.T) {
 	}
 }
 
-// TestManagedDeploymentValidation 验证托管部署的标识、域名后缀和运营凭据校验。
+// TestManagedDeploymentValidation 验证托管部署的域名后缀和运营凭据校验。
 func TestManagedDeploymentValidation(t *testing.T) {
 	valid := func() Config {
 		config := validTestConfig()
 		config.Deployment = DeploymentConfig{
 			Mode:                domain.DeploymentModeManaged,
-			ID:                  "cervi-hosting-1",
 			ManagedDomainSuffix: "cervi.runforyou.app",
 			OperatorCredential:  strings.Repeat("c", 32),
 		}
@@ -283,7 +282,6 @@ func TestManagedDeploymentValidation(t *testing.T) {
 	}
 
 	for name, mutate := range map[string]func(*Config){
-		"缺少部署标识":   func(c *Config) { c.Deployment.ID = "" },
 		"缺少域名后缀":   func(c *Config) { c.Deployment.ManagedDomainSuffix = "" },
 		"单级域名后缀":   func(c *Config) { c.Deployment.ManagedDomainSuffix = "app" },
 		"域名后缀带路径":  func(c *Config) { c.Deployment.ManagedDomainSuffix = "cervi.runforyou.app/operator" },
@@ -311,7 +309,6 @@ func TestDeploymentEnvironment(t *testing.T) {
 	t.Setenv("NATS_URL", "nats://127.0.0.1:4222")
 	t.Setenv("NATS_NAMESPACE", "cervi")
 	t.Setenv("DEPLOYMENT_MODE", "Managed")
-	t.Setenv("DEPLOYMENT_ID", "cervi-hosting-1")
 	t.Setenv("MANAGED_DOMAIN_SUFFIX", "Cervi.RunForYou.App.")
 	t.Setenv("OPERATOR_CREDENTIAL", strings.Repeat("c", 40))
 

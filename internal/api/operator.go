@@ -30,9 +30,8 @@ type operatorError struct {
 	RequestID string `json:"requestId"`
 }
 
-// Deployment 描述本部署的标识、形态与企业域名后缀。
+// Deployment 描述本部署的形态与企业域名后缀。
 type Deployment struct {
-	DeploymentID        string `json:"deploymentId"`
 	Mode                string `json:"mode"`
 	ManagedDomainSuffix string `json:"managedDomainSuffix"`
 }
@@ -50,7 +49,7 @@ func NewOperatorService(deployment Deployment, credential string) *OperatorServi
 	gin.SetMode(gin.ReleaseMode)
 	router := gin.New()
 	router.Use(gin.Recovery(), service.authenticate)
-	// 返回部署标识、形态和企业域名后缀，供 SaaS 确认调用目标。
+	// 返回部署形态和企业域名后缀，供 SaaS 确认调用目标。
 	router.GET("/deployment", func(c *gin.Context) {
 		c.JSON(http.StatusOK, service.deployment)
 	})
