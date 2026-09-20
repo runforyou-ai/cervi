@@ -524,9 +524,6 @@ export function ConversationComposer({
     retryRef.current = null
     onSending(draft)
     const { clientMessageID } = draft
-    // 桌面端发送后保持当前输入框高度，移动端回到单行。
-    const input = inputRef.current
-    if (input && !mobile) setManualInputHeight(input.getBoundingClientRect().height)
     form.resetField("body")
     typingReport.stop()
     // 提醒状态随正文一起清空，发送失败时按草稿所属可见范围恢复。
