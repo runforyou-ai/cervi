@@ -83,6 +83,9 @@ func (a *ExecuteAction) Execute(ctx context.Context, input RunInput) error {
 		return err
 	}
 	defer unregister()
+	// 网站客户会话在生成期间向访客提示 AI 正在回复。
+	stopVisitorTyping := a.startVisitorTyping(runCtx, &execution.Run)
+	defer stopVisitorTyping()
 	if running.attempt > 1 {
 		taskExecution, _ := servertask.CurrentExecution(ctx)
 		slog.Warn("Agent 任务重新计算", "agent_run_id", execution.Run.ID, "task_run_id", taskExecution.TaskRunID,

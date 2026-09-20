@@ -28,6 +28,8 @@ import {
   memberChatPollingInterval,
   useMemberChatPollingActive,
 } from "@/features/inbox/use-member-chat-polling"
+import { useConversationAgentReplyLabel } from "@/features/inbox/conversation-agent-activity"
+import { useConversationTypingLabel } from "@/features/inbox/use-conversation-typing"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 
@@ -83,6 +85,10 @@ function MobileGroupConversation({
     },
   )
   const unavailable = !refreshing && isNotFoundApiError(error)
+  const typingLabel = useConversationTypingLabel(conversationID, data?.participants ?? [])
+  const agentReplyLabel = useConversationAgentReplyLabel(conversationID)
+  // 真人正在输入优先于 AI 员工正在回复。
+  const activityLabel = typingLabel || agentReplyLabel
 
   /** 失去群聊访问权时提示一次，并回到原筛选下的消息列表。 */
   const handleUnavailable = useCallback(() => {
@@ -140,22 +146,29 @@ function MobileGroupConversation({
             detailsOpen ? (
               t("group.details")
             ) : (
-              <span className="flex min-w-0 items-center">
-                <span className="truncate">
-                  {data?.title ?? t("group.title")}
-                </span>
-                {data ? (
-                  <span className="shrink-0">
-                    {t("group.memberCount", {
-                      count: data.participants.length,
-                    })}
+              <span className="block min-w-0">
+                <span className="flex min-w-0 items-center">
+                  <span className="truncate">
+                    {data?.title ?? t("group.title")}
                   </span>
-                ) : null}
-                {data?.muted ? (
-                  <BellOffIcon
-                    className="ml-1 size-3.5 shrink-0 text-muted-foreground"
-                    aria-label={t("inbox:conversationMuted")}
-                  />
+                  {data ? (
+                    <span className="shrink-0">
+                      {t("group.memberCount", {
+                        count: data.participants.length,
+                      })}
+                    </span>
+                  ) : null}
+                  {data?.muted ? (
+                    <BellOffIcon
+                      className="ml-1 size-3.5 shrink-0 text-muted-foreground"
+                      aria-label={t("inbox:conversationMuted")}
+                    />
+                  ) : null}
+                </span>
+                {activityLabel ? (
+                  <span className="block truncate text-xs font-normal text-muted-foreground">
+                    {activityLabel}
+                  </span>
                 ) : null}
               </span>
             )

@@ -26,6 +26,8 @@ const (
 	KindConversationChanged      Kind = "conversation_changed"
 	KindConversationRemoved      Kind = "conversation_removed"
 	KindConversationStateChanged Kind = "conversation_state_changed"
+	KindConversationTyping       Kind = "conversation_typing"
+	KindVisitorTyping            Kind = "visitor_typing"
 	KindIdentityProfileChanged   Kind = "identity_profile_changed"
 	KindPinOrderChanged          Kind = "pin_order_changed"
 	KindSessionLoggedOut         Kind = "session_logged_out"
@@ -33,15 +35,17 @@ const (
 	KindChannelDisabled          Kind = "channel_disabled"
 )
 
-// Notification 表示发往单个受众的变更通知或撤销控制，载荷含通知种类、会话 ID、版本与登录会话 ID，零值字段省略。
+// Notification 表示发往单个受众的变更通知、输入状态或撤销控制，载荷含通知种类、会话 ID、版本、登录会话 ID 与输入状态，零值字段省略。
 type Notification struct {
-	OrganizationID string
-	AudienceKind   AudienceKind
-	AudienceID     string
-	Kind           Kind
-	ConversationID string
-	Version        int64
-	TokenSessionID string
+	OrganizationID  string
+	AudienceKind    AudienceKind
+	AudienceID      string
+	Kind            Kind
+	ConversationID  string
+	Version         int64
+	TokenSessionID  string
+	SenderSubjectID string
+	Active          bool
 }
 
 // UserConversationChanged 构造发往用户受众的会话变更通知。
@@ -67,6 +71,21 @@ func UserConversationRemoved(organizationID, userID, conversationID string) Noti
 // UserConversationStateChanged 构造发往本人受众的个人会话状态通知。
 func UserConversationStateChanged(organizationID, userID, conversationID string, version int64) Notification {
 	return Notification{OrganizationID: organizationID, AudienceKind: AudienceUser, AudienceID: userID, Kind: KindConversationStateChanged, ConversationID: conversationID, Version: version}
+}
+
+// UserConversationTyping 构造发往用户受众的会话输入状态，发送者为会话参与主体编号。
+func UserConversationTyping(organizationID, userID, conversationID, senderSubjectID string, active bool) Notification {
+	return Notification{OrganizationID: organizationID, AudienceKind: AudienceUser, AudienceID: userID, Kind: KindConversationTyping, ConversationID: conversationID, SenderSubjectID: senderSubjectID, Active: active}
+}
+
+// CustomerInboxConversationTyping 构造发往企业客服共享受众的客户会话输入状态，发送者为访客的聊天主体编号。
+func CustomerInboxConversationTyping(organizationID, conversationID, senderSubjectID string, active bool) Notification {
+	return Notification{OrganizationID: organizationID, AudienceKind: AudienceCustomerInbox, AudienceID: organizationID, Kind: KindConversationTyping, ConversationID: conversationID, SenderSubjectID: senderSubjectID, Active: active}
+}
+
+// VisitorDirectoryTyping 构造发往网站渠道身份受众的访客可见输入状态，受众 ID 为渠道身份记录 ID。
+func VisitorDirectoryTyping(organizationID, channelIdentityID, conversationID string, active bool) Notification {
+	return Notification{OrganizationID: organizationID, AudienceKind: AudienceVisitorDirectory, AudienceID: channelIdentityID, Kind: KindVisitorTyping, ConversationID: conversationID, Active: active}
 }
 
 // UserIdentityProfileChanged 构造发往本人受众的身份资料通知。

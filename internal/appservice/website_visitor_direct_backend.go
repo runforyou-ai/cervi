@@ -41,6 +41,7 @@ type WebsiteVisitorDirectBackend struct {
 	createUpload      *conversationaction.CreateWebsiteVisitorUploadAction
 	completeUpload    *conversationaction.CompleteWebsiteVisitorUploadAction
 	getAttachment     *conversationaction.GetWebsiteVisitorAttachmentQuery
+	reportTyping      *conversationaction.ReportWebsiteVisitorTypingAction
 	localFiles        *serverfilecontent.LocalStore
 	s3                serverfilecontent.S3Config
 }
@@ -54,6 +55,7 @@ func NewWebsiteVisitorDirectBackend(db *bun.DB, agentScheduler conversationactio
 		authorizeVisitor:  conversationaction.NewAuthorizeWebsiteVisitorQuery(db),
 		completeUpload:    conversationaction.NewCompleteWebsiteVisitorUploadAction(db),
 		getAttachment:     conversationaction.NewGetWebsiteVisitorAttachmentQuery(db),
+		reportTyping:      conversationaction.NewReportWebsiteVisitorTypingAction(db),
 		localFiles:        localFiles,
 		s3:                s3,
 	}
@@ -285,6 +287,14 @@ func (b *WebsiteVisitorDirectBackend) ListMessages(ctx context.Context, meta Web
 		result.After = &value
 	}
 	return result, nil
+}
+
+// ReportTyping 向企业客服发布网站访客在客户线程中的输入状态。
+func (b *WebsiteVisitorDirectBackend) ReportTyping(ctx context.Context, meta WebsiteVisitorMeta, channelID, externalID, conversationID string, input WebsiteVisitorTypingInput) error {
+	if err := b.reportTyping.Execute(ctx, channelID, externalID, conversationID, input.Active); err != nil {
+		return websiteVisitorError(ctx, meta, err, cervii18n.ErrorServerUnavailable, "report_typing", "channel_id", channelID, "conversation_id", conversationID)
+	}
+	return nil
 }
 
 // websiteVisitorError 把语言无关访客错误映射为本地化应用错误。

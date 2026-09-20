@@ -52,6 +52,7 @@ import {
   UpdateConversationNotificationSettings,
   UpdateConversationPin,
   UpdateConversationUnreadMark,
+  ReportConversationTyping,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import type {
   CustomerInboxConversation,
@@ -196,6 +197,7 @@ export type LoadInboxQuery = Partial<InboxQuery>
 
 const updateConversationUnreadMarkBound = bind(UpdateConversationUnreadMark)
 const updateConversationPinBound = bind(UpdateConversationPin)
+const reportConversationTypingBound = bind(ReportConversationTyping)
 
 /** 置顶写入命令；未给出位置时新置顶追加到置顶末尾，已置顶保持原位。 */
 export type ConversationPinCommand = Pick<
@@ -227,6 +229,11 @@ export function updateConversationUnreadMark(
   return enqueueConversationUnreadChange(conversationID, () =>
     updateConversationUnreadMarkBound(conversationID, input),
   )
+}
+
+/** 上报当前用户的输入状态：单聊与群聊发给其他真人成员，网站渠道客户会话发给该线程访客。 */
+export function reportConversationTyping(conversationID: string, active: boolean) {
+  return reportConversationTypingBound(conversationID, { active })
 }
 
 /** 保存当前用户的原生会话提醒设置。 */

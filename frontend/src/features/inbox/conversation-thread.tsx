@@ -204,6 +204,7 @@ export function ConversationThread({
         }}
         onSucceeded={onConversationChanged}
         customerAttachmentSupported={Boolean(customerAttachment?.attachmentSupported)}
+        customerTypingSupported={customerAttachment?.channelType === ChannelType.ChannelTypeWebsite}
         customerAttachmentByteLimit={customerAttachment?.attachmentByteLimit ?? 0}
         customerAttachmentCaptionLimit={customerAttachment?.attachmentCaptionLimit ?? 4000}
         attachmentTargetIdentityID={directTarget && !agentDraftID ? directTarget.id : undefined}

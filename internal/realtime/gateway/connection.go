@@ -14,10 +14,11 @@ import (
 	"github.com/runforyou-ai/cervi/internal/realtime/protocol"
 )
 
-// mergeKey 标识发送队列中可按最高版本合并的变更通知事件。
+// mergeKey 标识发送队列中可合并的事件：变更通知按会话与种类，输入状态按会话与发送者。
 type mergeKey struct {
-	frameType      protocol.Type
-	conversationID string
+	frameType       protocol.Type
+	conversationID  string
+	senderSubjectID string
 }
 
 // connection 是一条成员实时事件流，写协程独占响应写入。
@@ -125,16 +126,17 @@ func (c *connection) write(writer http.ResponseWriter, controller *http.Response
 	return true
 }
 
-// send 把事件加入发送队列；受众可下发事件之外的事件直接丢弃，变更通知按会话与种类保留最高版本，队列溢出时按慢连接结束事件流。
+// send 把事件加入发送队列；受众可下发事件之外的事件直接丢弃，变更通知按会话与种类保留最高版本，输入状态按会话与发送者保留最新一条，队列溢出时按慢连接结束事件流。
 func (c *connection) send(frame protocol.Frame) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	if c.closing || !c.allowed[frame.FrameType()] {
 		return
 	}
-	key, version, mergeable := mergeTarget(frame)
-	if index, exists := c.merged[key]; mergeable && exists {
-		if _, current, _ := mergeTarget(c.queue[index]); version > current {
+	target := mergeTarget(frame)
+	if index, exists := c.merged[target.key]; target.mergeable && exists {
+		// 变更通知保留更高版本，输入状态没有版本，以后到事件替换。
+		if !target.versioned || target.version > mergeTarget(c.queue[index]).version {
 			c.queue[index] = frame
 		}
 		return
@@ -144,24 +146,37 @@ func (c *connection) send(frame protocol.Frame) {
 		c.beginClose(true)
 		return
 	}
-	if mergeable {
-		c.merged[key] = len(c.queue)
+	if target.mergeable {
+		c.merged[target.key] = len(c.queue)
 	}
 	c.queue = append(c.queue, frame)
 	c.signal()
 }
 
-// mergeTarget 返回变更通知事件的合并键与版本，其他事件不可合并。
-func mergeTarget(frame protocol.Frame) (mergeKey, int64, bool) {
+// mergeSource 描述事件在发送队列中的合并方式。
+type mergeSource struct {
+	key     mergeKey
+	version int64
+	// versioned 为真时只保留更高版本，否则以后到事件替换。
+	versioned bool
+	mergeable bool
+}
+
+// mergeTarget 返回变更通知与输入状态事件的合并方式，其他事件不可合并。
+func mergeTarget(frame protocol.Frame) mergeSource {
 	switch value := frame.(type) {
 	case protocol.ConversationChanged:
-		return mergeKey{protocol.TypeConversationChanged, value.ConversationID}, value.Version, true
+		return mergeSource{key: mergeKey{frameType: protocol.TypeConversationChanged, conversationID: value.ConversationID}, version: value.Version, versioned: true, mergeable: true}
 	case protocol.ConversationStateChanged:
-		return mergeKey{protocol.TypeConversationStateChanged, value.ConversationID}, value.Version, true
+		return mergeSource{key: mergeKey{frameType: protocol.TypeConversationStateChanged, conversationID: value.ConversationID}, version: value.Version, versioned: true, mergeable: true}
+	case protocol.ConversationTyping:
+		return mergeSource{key: mergeKey{protocol.TypeConversationTyping, value.ConversationID, value.SenderSubjectID}, mergeable: true}
+	case protocol.VisitorTyping:
+		return mergeSource{key: mergeKey{frameType: protocol.TypeVisitorTyping, conversationID: value.ConversationID}, mergeable: true}
 	case protocol.IdentityProfileChanged:
-		return mergeKey{frameType: protocol.TypeIdentityProfileChanged}, value.Version, true
+		return mergeSource{key: mergeKey{frameType: protocol.TypeIdentityProfileChanged}, version: value.Version, versioned: true, mergeable: true}
 	}
-	return mergeKey{}, 0, false
+	return mergeSource{}
 }
 
 // tokenSession 返回事件流所属登录会话编号。

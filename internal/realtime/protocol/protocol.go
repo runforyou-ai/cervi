@@ -31,6 +31,8 @@ const (
 	TypeConversationChanged      Type = "conversation_changed"
 	TypeConversationRemoved      Type = "conversation_removed"
 	TypeConversationStateChanged Type = "conversation_state_changed"
+	TypeConversationTyping       Type = "conversation_typing"
+	TypeVisitorTyping            Type = "visitor_typing"
 	TypeIdentityProfileChanged   Type = "identity_profile_changed"
 	TypePinOrderChanged          Type = "pin_order_changed"
 	TypeRunStreamSnapshot        Type = "run_stream_snapshot"
@@ -85,6 +87,19 @@ type ConversationRemoved struct {
 type ConversationStateChanged struct {
 	ConversationID string `json:"conversationId"`
 	Version        int64  `json:"version,string"`
+}
+
+// ConversationTyping 表示会话中另一参与主体开始或停止输入，只驱动界面临时状态。
+type ConversationTyping struct {
+	ConversationID  string `json:"conversationId"`
+	SenderSubjectID string `json:"senderSubjectId"`
+	Active          bool   `json:"active"`
+}
+
+// VisitorTyping 表示客户会话中客服或 AI 员工正在准备回复，不携带内部身份编号。
+type VisitorTyping struct {
+	ConversationID string `json:"conversationId"`
+	Active         bool   `json:"active"`
 }
 
 // IdentityProfileChanged 表示本人身份资料变到了指定版本。
@@ -168,6 +183,12 @@ func (ConversationRemoved) FrameType() Type { return TypeConversationRemoved }
 // FrameType 返回本人会话状态变更事件种类。
 func (ConversationStateChanged) FrameType() Type { return TypeConversationStateChanged }
 
+// FrameType 返回会话输入状态事件种类。
+func (ConversationTyping) FrameType() Type { return TypeConversationTyping }
+
+// FrameType 返回访客可见输入状态事件种类。
+func (VisitorTyping) FrameType() Type { return TypeVisitorTyping }
+
 // FrameType 返回身份资料变更事件种类。
 func (IdentityProfileChanged) FrameType() Type { return TypeIdentityProfileChanged }
 
@@ -201,6 +222,8 @@ var decoders = map[Type]decoder{
 	TypeConversationChanged:      decodeAs[ConversationChanged],
 	TypeConversationRemoved:      decodeAs[ConversationRemoved],
 	TypeConversationStateChanged: decodeAs[ConversationStateChanged],
+	TypeConversationTyping:       decodeAs[ConversationTyping],
+	TypeVisitorTyping:            decodeAs[VisitorTyping],
 	TypeIdentityProfileChanged:   decodeAs[IdentityProfileChanged],
 	TypePinOrderChanged:          decodeAs[PinOrderChanged],
 	TypeRunStreamSnapshot:        decodeAs[RunStreamSnapshot],

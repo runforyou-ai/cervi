@@ -80,11 +80,11 @@ func DefaultOptions() Options {
 // memberFrameTypes 是成员事件流可下发的变更通知事件。
 var memberFrameTypes = []protocol.Type{
 	protocol.TypeServerHello, protocol.TypeConversationChanged, protocol.TypeConversationRemoved,
-	protocol.TypeConversationStateChanged, protocol.TypeIdentityProfileChanged,
+	protocol.TypeConversationStateChanged, protocol.TypeConversationTyping, protocol.TypeIdentityProfileChanged,
 }
 
 // visitorFrameTypes 是网站访客事件流可下发的公开事件。
-var visitorFrameTypes = []protocol.Type{protocol.TypeVisitorHello, protocol.TypeConversationChanged}
+var visitorFrameTypes = []protocol.Type{protocol.TypeVisitorHello, protocol.TypeConversationChanged, protocol.TypeVisitorTyping}
 
 // streamRoute 是一条已授权事件流的受众、撤销标识、可下发事件与授权到期时间。
 type streamRoute struct {
@@ -455,6 +455,10 @@ func (g *Gateway) deliver(subject string, data []byte) {
 		frame = protocol.ConversationRemoved{ConversationID: payload.ConversationID}
 	case realtime.KindConversationStateChanged:
 		frame = protocol.ConversationStateChanged{ConversationID: payload.ConversationID, Version: payload.Version}
+	case realtime.KindConversationTyping:
+		frame = protocol.ConversationTyping{ConversationID: payload.ConversationID, SenderSubjectID: payload.SenderSubjectID, Active: payload.Active}
+	case realtime.KindVisitorTyping:
+		frame = protocol.VisitorTyping{ConversationID: payload.ConversationID, Active: payload.Active}
 	case realtime.KindIdentityProfileChanged:
 		frame = protocol.IdentityProfileChanged{Version: payload.Version}
 	case realtime.KindPinOrderChanged:

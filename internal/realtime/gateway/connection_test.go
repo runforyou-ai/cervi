@@ -37,6 +37,23 @@ func TestConnectionQueue(t *testing.T) {
 	}
 }
 
+// TestConnectionQueueTyping 验证输入状态按会话与发送者只保留最新一条，不同发送者分别入队。
+func TestConnectionQueueTyping(t *testing.T) {
+	current := newConnection(New(nil, nil, "test", Options{QueueSize: 4}), func() {}, streamRoute{allowed: memberFrameTypes})
+	current.send(protocol.ConversationTyping{ConversationID: "a", SenderSubjectID: "s1", Active: true})
+	current.send(protocol.ConversationTyping{ConversationID: "a", SenderSubjectID: "s2", Active: true})
+	current.send(protocol.ConversationTyping{ConversationID: "a", SenderSubjectID: "s1"})
+	current.send(protocol.ConversationTyping{ConversationID: "b", SenderSubjectID: "s1", Active: true})
+	want := []protocol.Frame{
+		protocol.ConversationTyping{ConversationID: "a", SenderSubjectID: "s1"},
+		protocol.ConversationTyping{ConversationID: "a", SenderSubjectID: "s2", Active: true},
+		protocol.ConversationTyping{ConversationID: "b", SenderSubjectID: "s1", Active: true},
+	}
+	if !reflect.DeepEqual(current.queue, want) {
+		t.Fatalf("queue = %#v, want %#v", current.queue, want)
+	}
+}
+
 // TestConnectionRevokeDiscardsQueue 验证撤销清除未发送的事件并进入关闭状态。
 func TestConnectionRevokeDiscardsQueue(t *testing.T) {
 	current := newConnection(New(nil, nil, "test", Options{QueueSize: 4}), func() {}, streamRoute{allowed: memberFrameTypes})
@@ -53,6 +70,7 @@ func TestVisitorConnectionDropsInternalFrames(t *testing.T) {
 	current.send(protocol.ConversationStateChanged{ConversationID: "a", Version: 1})
 	current.send(protocol.ConversationRemoved{ConversationID: "a"})
 	current.send(protocol.IdentityProfileChanged{Version: 1})
+	current.send(protocol.ConversationTyping{ConversationID: "a", SenderSubjectID: "s1", Active: true})
 	current.send(protocol.ConversationChanged{ConversationID: "a", Version: 7})
 	want := []protocol.Frame{protocol.ConversationChanged{ConversationID: "a", Version: 7}}
 	if !reflect.DeepEqual(current.queue, want) {

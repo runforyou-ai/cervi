@@ -50,6 +50,8 @@ export type RealtimeServerFrame =
   | { type: "conversation_changed"; conversationId: string; version: bigint }
   | { type: "conversation_removed"; conversationId: string }
   | { type: "conversation_state_changed"; conversationId: string; version: bigint }
+  | { type: "conversation_typing"; conversationId: string; senderSubjectId: string; active: boolean }
+  | { type: "visitor_typing"; conversationId: string; active: boolean }
   | { type: "identity_profile_changed"; version: bigint }
   | { type: "pin_order_changed"; version: bigint }
   | {
@@ -133,6 +135,15 @@ function decodeServerData(type: string, data: FrameData): RealtimeServerFrame | 
       return { type, conversationId: readString(data, "conversationId"), version: readInt64(data, "version") }
     case "conversation_removed":
       return { type, conversationId: readString(data, "conversationId") }
+    case "conversation_typing":
+      return {
+        type,
+        conversationId: readString(data, "conversationId"),
+        senderSubjectId: readString(data, "senderSubjectId"),
+        active: readBoolean(data, "active"),
+      }
+    case "visitor_typing":
+      return { type, conversationId: readString(data, "conversationId"), active: readBoolean(data, "active") }
     case "identity_profile_changed":
     case "pin_order_changed":
       return { type, version: readInt64(data, "version") }
@@ -223,6 +234,15 @@ function readString(data: FrameData, key: string): string {
   const value = data[key]
   if (typeof value !== "string") {
     throw new Error(`${key} is not a string`)
+  }
+  return value
+}
+
+/** 读取布尔字段。 */
+function readBoolean(data: FrameData, key: string): boolean {
+  const value = data[key]
+  if (typeof value !== "boolean") {
+    throw new Error(`${key} is not a boolean`)
   }
   return value
 }

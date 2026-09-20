@@ -47,6 +47,11 @@ type WebsiteVisitorTextMessageInput struct {
 	Body             string  `json:"body"`
 }
 
+// WebsiteVisitorTypingInput 定义网站访客在客户线程中的输入状态。
+type WebsiteVisitorTypingInput struct {
+	Active bool `json:"active"`
+}
+
 // WebsiteVisitorUploadInput 定义网站访客附件上传的文件元数据。
 type WebsiteVisitorUploadInput struct {
 	FileName    string `json:"fileName"`
@@ -154,6 +159,7 @@ type WebsiteVisitorBackend interface {
 	CompleteAttachmentUpload(context.Context, WebsiteVisitorMeta, string, string, string) error
 	GetMessageAttachment(context.Context, WebsiteVisitorMeta, string, string, string, string) (WebsiteVisitorAttachmentLinks, error)
 	ListMessages(context.Context, WebsiteVisitorMeta, string, string, string, WebsiteVisitorMessageHistoryInput) (WebsiteVisitorMessageHistory, error)
+	ReportTyping(context.Context, WebsiteVisitorMeta, string, string, string, WebsiteVisitorTypingInput) error
 }
 
 // WebsiteVisitorService 转发匿名网站访客业务调用。
@@ -207,6 +213,11 @@ func (s *WebsiteVisitorService) CompleteAttachmentUpload(ctx context.Context, me
 // GetMessageAttachment 重新签发网站访客消息附件的预览与下载地址。
 func (s *WebsiteVisitorService) GetMessageAttachment(ctx context.Context, meta WebsiteVisitorMeta, channelID, externalID, conversationID, messageID string) (WebsiteVisitorAttachmentLinks, error) {
 	return s.backend.GetMessageAttachment(ctx, meta, channelID, externalID, conversationID, messageID)
+}
+
+// ReportTyping 向企业客服发布网站访客的输入状态。
+func (s *WebsiteVisitorService) ReportTyping(ctx context.Context, meta WebsiteVisitorMeta, channelID, externalID, conversationID string, input WebsiteVisitorTypingInput) error {
+	return s.backend.ReportTyping(ctx, meta, channelID, externalID, conversationID, input)
 }
 
 // ListMessages 返回网站访客指定客户线程的消息历史。

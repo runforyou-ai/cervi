@@ -384,6 +384,11 @@ type ConversationUnreadMarkInput struct {
 	MarkedUnread bool `json:"markedUnread"`
 }
 
+// ConversationTypingInput 定义当前用户在会话中的输入状态。
+type ConversationTypingInput struct {
+	Active bool `json:"active"`
+}
+
 // ConversationNotificationSettingsInput 定义当前用户的会话提醒设置。
 type ConversationNotificationSettingsInput struct {
 	Muted bool `json:"muted"`

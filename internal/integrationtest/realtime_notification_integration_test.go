@@ -35,10 +35,12 @@ import (
 
 // receivedNotification 表示订阅端收到的一条实时通知。
 type receivedNotification struct {
-	Subject        string
-	Kind           string
-	ConversationID string
-	Version        string
+	Subject         string
+	Kind            string
+	ConversationID  string
+	Version         string
+	SenderSubjectID string
+	Active          bool
 }
 
 // realtimeFeed 订阅单个测试企业的全部受众通知。
@@ -104,29 +106,88 @@ func (f *realtimeFeed) visitorDirectory(channelIdentityID, conversationID string
 	}
 }
 
+// customerInboxTyping 构造发往企业客服共享受众的客户会话输入状态。
+func (f *realtimeFeed) customerInboxTyping(conversationID, senderSubjectID string, active bool) receivedNotification {
+	return receivedNotification{
+		Subject: realtime.Subject(f.namespace, f.organizationID, realtime.AudienceCustomerInbox, f.organizationID),
+		Kind:    string(realtime.KindConversationTyping), ConversationID: conversationID, SenderSubjectID: senderSubjectID, Active: active,
+	}
+}
+
+// visitorTyping 构造发往网站渠道身份受众的访客可见输入状态。
+func (f *realtimeFeed) visitorTyping(channelIdentityID, conversationID string, active bool) receivedNotification {
+	return receivedNotification{
+		Subject: realtime.Subject(f.namespace, f.organizationID, realtime.AudienceVisitorDirectory, channelIdentityID),
+		Kind:    string(realtime.KindVisitorTyping), ConversationID: conversationID, Active: active,
+	}
+}
+
+// next 读取并解析下一条实时通知。
+func (f *realtimeFeed) next(t *testing.T) (receivedNotification, error) {
+	t.Helper()
+	message, err := f.subscription.NextMsg(5 * time.Second)
+	if err != nil {
+		return receivedNotification{}, err
+	}
+	var fields map[string]any
+	if err := json.Unmarshal(message.Data, &fields); err != nil {
+		t.Fatalf("解析实时通知 %s: %v", message.Data, err)
+	}
+	// 载荷只允许种类、会话 ID、版本、发送者主体与输入状态。
+	for key := range fields {
+		if key != "kind" && key != "conversationId" && key != "version" && key != "senderSubjectId" && key != "active" {
+			t.Fatalf("实时通知含业务字段: %s", message.Data)
+		}
+	}
+	text := func(key string) string {
+		value, _ := fields[key].(string)
+		return value
+	}
+	active, _ := fields["active"].(bool)
+	return receivedNotification{
+		Subject: message.Subject, Kind: text("kind"), ConversationID: text("conversationId"),
+		Version: text("version"), SenderSubjectID: text("senderSubjectId"), Active: active,
+	}, nil
+}
+
+// expectTyping 只比较输入状态通知，读取期间忽略其他种类的通知。
+func (f *realtimeFeed) expectTyping(t *testing.T, want ...receivedNotification) {
+	t.Helper()
+	got := make([]receivedNotification, 0, len(want))
+	for len(got) < len(want) {
+		notification, err := f.next(t)
+		if err != nil {
+			t.Fatalf("等待输入状态通知: %v，已收到 %+v", err, got)
+		}
+		if notification.Kind == string(realtime.KindConversationTyping) || notification.Kind == string(realtime.KindVisitorTyping) {
+			got = append(got, notification)
+		}
+	}
+	compareNotifications(t, got, want)
+}
+
 // expect 读取与期望数量相同的通知，并与期望集合按任意顺序比较。
 func (f *realtimeFeed) expect(t *testing.T, want ...receivedNotification) {
 	t.Helper()
 	got := make([]receivedNotification, 0, len(want))
 	for range want {
-		message, err := f.subscription.NextMsg(5 * time.Second)
+		notification, err := f.next(t)
 		if err != nil {
 			t.Fatalf("等待实时通知: %v，已收到 %+v", err, got)
 		}
-		var fields map[string]string
-		if err := json.Unmarshal(message.Data, &fields); err != nil {
-			t.Fatalf("解析实时通知 %s: %v", message.Data, err)
-		}
-		// 载荷只允许种类、会话 ID 与版本。
-		for key := range fields {
-			if key != "kind" && key != "conversationId" && key != "version" {
-				t.Fatalf("实时通知含业务字段: %s", message.Data)
-			}
-		}
-		got = append(got, receivedNotification{Subject: message.Subject, Kind: fields["kind"], ConversationID: fields["conversationId"], Version: fields["version"]})
+		got = append(got, notification)
 	}
+	compareNotifications(t, got, want)
+}
+
+// compareNotifications 按任意顺序比较收到与期望的通知集合。
+func compareNotifications(t *testing.T, got, want []receivedNotification) {
+	t.Helper()
 	compare := func(a, b receivedNotification) int {
-		return strings.Compare(a.Subject+a.Kind+a.ConversationID+a.Version, b.Subject+b.Kind+b.ConversationID+b.Version)
+		return strings.Compare(
+			a.Subject+a.Kind+a.ConversationID+a.Version+a.SenderSubjectID+strconv.FormatBool(a.Active),
+			b.Subject+b.Kind+b.ConversationID+b.Version+b.SenderSubjectID+strconv.FormatBool(b.Active),
+		)
 	}
 	slices.SortFunc(got, compare)
 	slices.SortFunc(want, compare)
@@ -779,7 +840,10 @@ func testCustomerAgentRunNotifications(t *testing.T, db *bun.DB, identity *serve
 	feed.expect(t,
 		feed.customerInbox(first.Conversation.ID, runningVersion),
 		feed.visitorDirectory(visitorIdentityID, first.Conversation.ID, runningVersion),
+		// AI 生成期间访客看到正在回复，运行结束后收到停止。
+		feed.visitorTyping(visitorIdentityID, first.Conversation.ID, true),
 		feed.customerInbox(first.Conversation.ID, finalVersion),
 		feed.visitorDirectory(visitorIdentityID, first.Conversation.ID, finalVersion),
+		feed.visitorTyping(visitorIdentityID, first.Conversation.ID, false),
 	)
 }
