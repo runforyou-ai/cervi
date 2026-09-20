@@ -541,13 +541,9 @@ cervi-server 在事务内将企业标记为 deleting，撤销企业会话，作�
 
 ### 13.1 cervi-server 契约与分层
 
-应用服务契约仍由 `internal/appservice` 维护。企业业务调用沿用 `Backend → Service → DirectBackend / API Proxy` 路径。
+应用服务契约仍由 `internal/appservice` 维护。企业业务调用沿用 `Backend → Service → DirectBackend / API Proxy` 路径，运营调用沿用 `OperatorBackend → OperatorDirectBackend` 路径，两者的契约边界与生成范围见项目约定。
 
-运营接口使用独立的 `OperatorBackend` 契约和独立生成目标，不进入 `Backend`。`Backend` 保持为企业业务调用的唯一契约源，其生成结果继续覆盖 Service 委托、DirectBackend 分发、Gin 路由、API Proxy 与前端绑定。`OperatorBackend` 只生成运营认证分发和 Gin 适配，不生成 Service 委托、API Proxy 和 Wails 绑定，因此不需要为各调用层逐一添加排除规则。
-
-两套契约复用生成器的路由指令解析、参数绑定和错误响应能力，也复用同一批领域 Action 与错误契约。项目约定同步写明：企业业务契约面向各端客户端，运营契约面向 SaaS 后端的服务间调用，新增方法按消费者归入其中一个，不跨契约暴露。
-
-Gin 承担 HTTP 适配，运营路由按 `/operator/v1` 前缀注册在唯一的路由器上，只在 managed 模式下注册。认证分发层解析运营身份，领域 Action 执行企业创建、状态变化和权益应用。运营操作使用自己的身份校验规则，成员写操作继续遵守企业与活跃用户校验。
+运营业务实现调用领域 Action 执行企业创建、状态变化和权益应用，与企业业务复用同一批领域 Action。运营操作使用自己的身份校验规则，成员写操作继续遵守企业与活跃用户校验。
 
 成员邀请的发起、撤销和查询属于企业业务契约，使用企业成员身份。
 
@@ -570,7 +566,6 @@ Gin 承担 HTTP 适配，运营路由按 `/operator/v1` 前缀注册在唯一的
 | `internal/actions/file` | 文件记录增加存储配置标识，读取、预签名和清理按记录定位存储 |
 | `internal/actions/setting` | 托管模式下关闭企业自配对象存储 |
 | `internal/api/website_visitor.go` | 访客 Cookie 按外部访问协议选择名称，HTTPS 只用 `__Host-` 前缀形态，明文 HTTP 只用无前缀形态，读写一致且不回退 |
-| `internal/appservice`、`internal/tools/appservicegen` | 增加 `OperatorBackend` 契约、运营认证类型和独立生成目标 |
 | `internal/storage/server` | 增加开通幂等、外部身份、成员邀请、权益和删除操作模型 |
 | `internal/task/server` | 执行企业清理及需要持久化的管理任务 |
 | `internal/i18n` | 增加邀请、官方登录和企业状态相关文案键 |
@@ -607,7 +602,7 @@ SaaS 数据库恢复备份后，按 9.2 的对账流程恢复权益与官方身�
 
 | 阶段 | 交付内容 | 完成标准 |
 | --- | --- | --- |
-| 一：企业与运营契约 | 部署模式、`OperatorBackend` 契约与运营认证、域名规则、企业开通与查询、幂等记录 | 重复及并发请求满足企业和域名唯一性，托管公开初始化关闭，self_hosted 部署不注册运营路由 |
+| 一：企业与运营契约 | 域名规则、企业开通与查询、幂等记录 | 重复及并发请求满足企业和域名唯一性 |
 | 二：官方身份接入 | 外部身份模型、登录尝试、Web 与原生端授权交换、企业会话、身份停用 | 同一官方账号访问多个已绑定企业，跨企业会话被拒绝 |
 | 三：成员邀请闭环 | 邀请模型与接口、邀请页面、`accept_invitation` 授权用途与接受事务、过期收敛、托管模式关闭本地账号创建 | 第二个官方账号通过邀请加入企业并正常使用业务功能，受邀邮箱不一致时被拒绝，接受响应丢失后重试结果一致 |
 | 四：官网开通闭环 | 注册、企业表单、开通记录、企业列表、自动进入 Web | 注册到工作台流程完成，中断后可从记录恢复 |
