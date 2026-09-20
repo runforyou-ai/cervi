@@ -176,7 +176,7 @@ function ConversationContextContent({
         >
           <TabsList
             aria-label={t("contextTabsLabel")}
-            className="h-auto shrink-0 justify-start gap-1 px-3 py-2"
+            className="h-auto shrink-0 justify-start gap-1 border-b-0 px-3 py-2"
           >
             <TabsTrigger
               value="profile"
@@ -264,7 +264,7 @@ function ConversationContextContent({
         >
           <TabsList
             aria-label={t("contextTabsLabel")}
-            className="h-auto shrink-0 justify-start gap-1 px-3 py-2"
+            className="h-auto shrink-0 justify-start gap-1 border-b-0 px-3 py-2"
           >
             <TabsTrigger
               value="profile"
