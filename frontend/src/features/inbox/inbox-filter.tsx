@@ -1,5 +1,5 @@
 /** 当前列表范围的筛选浮层。 */
-import { ListFilterIcon } from "lucide-react"
+import { FilterIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
 import {
@@ -57,16 +57,16 @@ export function InboxFilter({
       <PopoverTrigger asChild>
         <Button
           variant="ghost"
-          size="icon"
+          size="icon-sm"
           className="relative shrink-0 text-muted-foreground"
           aria-label={applied ? t("filterApplied") : t("filterLabel")}
           title={t("filterLabel")}
         >
-          <ListFilterIcon className="size-5" />
+          <FilterIcon />
           {applied ? (
             <span
               aria-hidden="true"
-              className="absolute top-1.5 right-1.5 size-1.5 rounded-full bg-primary"
+              className="absolute top-1 right-1 size-1.5 rounded-full bg-primary"
             />
           ) : null}
         </Button>

@@ -1,5 +1,5 @@
 /** 消息列表路由。 */
-import { useRef } from "react"
+import { useEffect, useRef, useState } from "react"
 import { useSearchParams } from "react-router"
 
 import {
@@ -11,6 +11,7 @@ import {
   type InboxQuery,
 } from "@/api"
 import { useWorkspace } from "@/contexts/workspace-context"
+import type { ConversationLocateTarget } from "./conversation-timeline"
 import { useAttachmentQueue } from "./attachment-queue-context"
 import { useOutgoingMessageStore } from "./outgoing-message-context"
 import { useMemberChatPollingActive } from "./use-member-chat-polling"
@@ -33,6 +34,9 @@ export function InboxRoute() {
   const selections = useRef(new Map<string, string>())
   const [searchParams, setSearchParams] = useSearchParams()
   const selectedConversationId = searchParams.get("conversation") ?? ""
+  const locateMessageId = searchParams.get("message") ?? ""
+  const locateNonce = useRef(0)
+  const [locateMessage, setLocateMessage] = useState<ConversationLocateTarget | null>(null)
   const query = inboxQueryFromSearch(searchParams)
   const viewport = useInboxListViewport()
   const { identity } = useWorkspace()
@@ -46,6 +50,18 @@ export function InboxRoute() {
       outgoingStore.forgetConversation(id)
     },
   })
+
+  useEffect(() => {
+    // 搜索结果带来的消息定位一次性生效，随后从地址中移除。
+    if (!locateMessageId) return
+    locateNonce.current++
+    setLocateMessage({ messageId: locateMessageId, nonce: locateNonce.current })
+    setSearchParams((current) => {
+      const next = new URLSearchParams(current)
+      next.delete("message")
+      return next
+    }, { replace: true })
+  }, [locateMessageId, setSearchParams])
 
   /** 更新收件箱范围和客户视图查询参数。 */
   function updateQuery(changes: {
@@ -101,6 +117,7 @@ export function InboxRoute() {
       kinds={query.kinds}
       selectedConversationId={selectedConversationId}
       targetIdentityId={searchParams.get("target") ?? ""}
+      locateMessage={locateMessage}
       onSelectedConversationChange={selectConversation}
       onQueryChange={updateQuery}
     />

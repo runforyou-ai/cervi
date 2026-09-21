@@ -29,7 +29,7 @@ export type CustomerQueueFilterChange = {
 /** 页签按钮样式，选中时以底部指示条标记。 */
 function tabClass(active: boolean) {
   return cn(
-    "relative h-8 min-w-0 flex-1 rounded-md px-1 text-center text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50",
+    "relative h-8 min-w-0 flex-1 rounded-md px-0.5 text-center text-sm font-medium transition-colors outline-none focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-50",
     active ? "text-foreground" : "text-muted-foreground hover:text-foreground",
   )
 }
@@ -68,7 +68,7 @@ function DropdownTab({
         >
           <span className="flex min-w-0 items-center justify-center gap-0.5">
             <span className="truncate">{label}</span>
-            <ChevronDownIcon className="size-3.5 opacity-70" />
+            <ChevronDownIcon className="size-3 opacity-70" />
           </span>
           <ActiveIndicator active={active} />
         </button>
@@ -248,7 +248,7 @@ export function InboxCustomerQueueFilter({
     <div
       role="tablist"
       aria-label={t("queueFilterLabel")}
-      className="flex shrink-0 items-stretch border-b border-border/60 px-2 pt-2"
+      className="flex shrink-0 items-stretch border-b border-border/60 px-2 pt-0.5"
     >
       <QueueTab
         active={view === CustomerInboxView.CustomerInboxViewQueue}

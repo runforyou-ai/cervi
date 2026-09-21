@@ -1,11 +1,9 @@
-/** 消息页中栏的搜索结果：范围与类型切换、分组结果、会话分页列表、最近打开和快捷键提示。 */
+/** 全局搜索模态的搜索结果：分组结果、会话分页列表和最近打开。 */
 import { useEffect, useRef, type MouseEvent, type ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 
 import {
-  InboxScope,
   InboxSearchPersonKind,
-  InboxSearchRange,
   OrganizationIdentityType,
   type Identity,
   type InboxConversation,
@@ -17,12 +15,11 @@ import { ConversationAvatar } from "@/features/inbox/conversation-avatar"
 import { InboxSearchConversationList } from "@/features/inbox/inbox-search-conversation-list"
 import { useConversationName } from "@/features/inbox/use-conversation-name"
 import { useConversationTime } from "@/features/inbox/use-conversation-time"
-import type { InboxSearchMessageData, InboxSearchState, InboxSearchType } from "@/features/inbox/use-inbox-search"
+import type { InboxSearchMessageData, InboxSearchState } from "@/features/inbox/use-inbox-search"
 import { cn } from "@/lib/utils"
 
 const searchGroupLimit = 6
 const markClassName = "bg-transparent font-semibold text-primary"
-const keyClassName = "mr-0.5 rounded border bg-muted px-1 font-sans text-[10px]"
 
 /** 点击结果或切换项时保持搜索框焦点。 */
 function keepSearchFocus(event: MouseEvent) {
@@ -150,8 +147,8 @@ function SearchResultRow({
   )
 }
 
-/** 按搜索模式状态渲染范围、类型、分组结果或会话分页列表和快捷键提示。 */
-export function InboxSearchPanel({ search, scope, identity }: { search: InboxSearchState; scope: InboxScope; identity: Identity }) {
+/** 渲染分组结果或会话分页列表。 */
+export function InboxSearchPanel({ search, identity }: { search: InboxSearchState; identity: Identity }) {
   const { t } = useTranslation(["inbox", "common"])
   const conversationName = useConversationName()
   const formatTime = useConversationTime()
@@ -163,19 +160,6 @@ export function InboxSearchPanel({ search, scope, identity }: { search: InboxSea
     listRef.current?.querySelector(`[data-search-index="${search.selectedIndex}"]`)?.scrollIntoView({ block: "nearest" })
   }, [search.selectedIndex])
 
-  const rangeOptions = [
-    ...(search.conversationId ? [{ value: InboxSearchRange.InboxSearchRangeConversation, label: t("searchRangeConversation") }] : []),
-    ...(search.listRange
-      ? [{ value: InboxSearchRange.InboxSearchRangeList, label: t(scope === InboxScope.InboxScopeCustomer ? "scopeCustomer" : "scopeInternal") }]
-      : []),
-    { value: InboxSearchRange.InboxSearchRangeReadable, label: t("searchRangeReadable") },
-  ]
-  const typeOptions: { value: InboxSearchType; label: string }[] = [
-    { value: "all", label: t("searchTypeAll") },
-    { value: "conversations", label: t("searchTypeConversations") },
-    { value: "messages", label: t("searchTypeMessages") },
-    { value: "people", label: t("searchTypePeople") },
-  ]
   const conversationRows = (conversations: InboxConversation[]) =>
     conversations.map((conversation, index) => (
       <SearchResultRow
@@ -276,63 +260,14 @@ export function InboxSearchPanel({ search, scope, identity }: { search: InboxSea
   }
 
   return (
-    <div data-slot="inbox-search" className="flex min-h-0 flex-1 flex-col">
-      <div className="flex shrink-0 flex-col gap-1.5 px-3 py-2">
-        <div className="flex flex-wrap items-center gap-1.5">
-          {rangeOptions.map((option) => (
-            <Button
-              key={option.value}
-              type="button"
-              size="xs"
-              variant={search.range === option.value ? "secondary" : "ghost"}
-              className="rounded-full"
-              aria-pressed={search.range === option.value}
-              onMouseDown={keepSearchFocus}
-              onClick={() => search.setRange(option.value)}
-            >
-              {option.label}
-            </Button>
-          ))}
-        </div>
-        {search.range === InboxSearchRange.InboxSearchRangeConversation ? null : (
-          <div className="flex flex-wrap items-center gap-1.5">
-            {typeOptions.map((option) => (
-              <Button
-                key={option.value}
-                type="button"
-                size="xs"
-                variant={search.type === option.value ? "secondary" : "ghost"}
-                className="rounded-full"
-                aria-pressed={search.type === option.value}
-                onMouseDown={keepSearchFocus}
-                onClick={() => search.setType(option.value)}
-              >
-                {option.label}
-              </Button>
-            ))}
-          </div>
-        )}
-      </div>
-      <div
-        ref={listRef}
-        role="listbox"
-        aria-label={t("searchLabel")}
-        className={cn("min-h-0 flex-1 px-2 pb-2", search.paged ? "flex flex-col" : "overflow-y-auto")}
-      >
-        {body}
-      </div>
-      <div className="flex shrink-0 gap-3 border-t px-3.5 py-2 text-[11px] text-muted-foreground">
-        <span>
-          <kbd className={keyClassName}>↑</kbd>
-          <kbd className={keyClassName}>↓</kbd> {t("searchHintSelect")}
-        </span>
-        <span>
-          <kbd className={keyClassName}>Enter</kbd> {t("searchHintOpen")}
-        </span>
-        <span>
-          <kbd className={keyClassName}>Esc</kbd> {t("searchHintExit")}
-        </span>
-      </div>
+    <div
+      ref={listRef}
+      role="listbox"
+      aria-label={t("common:actions.search")}
+      data-slot="inbox-search"
+      className={cn("min-h-0 flex-1 px-2 py-2", search.paged ? "flex flex-col" : "overflow-y-auto")}
+    >
+      {body}
     </div>
   )
 }
