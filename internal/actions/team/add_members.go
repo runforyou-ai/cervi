@@ -7,19 +7,26 @@ import (
 	"fmt"
 
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
+	"github.com/runforyou-ai/cervi/internal/actions/serviceassignment"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
 )
 
 // AddMembersAction 将企业身份批量加入团队。
-type AddMembersAction struct{ db *bun.DB }
+type AddMembersAction struct {
+	db       *bun.DB
+	enqueuer servertask.TxEnqueuer
+}
 
 // NewAddMembersAction 创建团队成员添加操作。
-func NewAddMembersAction(db *bun.DB) *AddMembersAction { return &AddMembersAction{db: db} }
+func NewAddMembersAction(db *bun.DB, enqueuer servertask.TxEnqueuer) *AddMembersAction {
+	return &AddMembersAction{db: db, enqueuer: enqueuer}
+}
 
-// Execute 规范化并校验成员后批量建立团队关系。
+// Execute 规范化并校验成员后批量建立团队关系，并为加入的真人成员从团队队列补分配。
 func (a *AddMembersAction) Execute(ctx context.Context, identity *servermodels.Identity, teamID string, members []MemberIdentity) (*TeamRecord, error) {
 	var team *TeamRecord
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
@@ -78,6 +85,14 @@ func (a *AddMembersAction) Execute(ctx context.Context, identity *servermodels.I
 			On("CONFLICT (organization_id, team_id, identity_id) DO NOTHING").
 			Exec(ctx); err != nil {
 			return err
+		}
+		for id, identityType := range uniqueIDs {
+			if identityType != domain.OrganizationIdentityTypeUser {
+				continue
+			}
+			if err := serviceassignment.EnqueueBackfill(ctx, tx, a.enqueuer, serviceassignment.BackfillInput{OrganizationID: identity.Organization.ID, IdentityID: id}); err != nil {
+				return err
+			}
 		}
 		team, err = loadTeam(ctx, tx, identity.Organization.ID, teamID)
 		return err

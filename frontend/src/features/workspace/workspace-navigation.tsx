@@ -28,9 +28,9 @@ import { NavLink, useLocation, useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
+  WorkStatus,
   updateUserWorkStatus,
   type Identity,
-  type WorkStatus,
 } from "@/api"
 import { PagePaneGroup, PagePaneLink } from "@/components/page-split"
 import { useGlobalSearch } from "@/contexts/global-search-context"
@@ -340,12 +340,14 @@ function WorkspaceSettingsMenu({
   )
 }
 
-/** 用当前工作状态文字触发的状态选择菜单。 */
+/** 用当前工作状态文字触发的状态选择菜单，开启接待的成员在「工作中」下看到自动分配说明。 */
 function WorkStatusPicker({
   status,
+  handlesCustomers,
   onChange,
 }: {
   status: WorkStatus
+  handlesCustomers: boolean
   onChange: (workStatus: WorkStatus) => void
 }) {
   const { t } = useTranslation("workspace")
@@ -366,7 +368,7 @@ function WorkStatusPicker({
           {workStatusLabel(status, tCommon)}
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent side="bottom" align="start" className="w-36">
+      <DropdownMenuContent side="bottom" align="start" className={handlesCustomers ? "w-56" : "w-36"}>
         {selectableWorkStatuses.map((workStatus) => (
           <DropdownMenuItem
             key={workStatus}
@@ -376,7 +378,12 @@ function WorkStatusPicker({
             }}
           >
             <WorkStatusDot status={workStatus} />
-            <span className="flex-1">{workStatusLabel(workStatus, tCommon)}</span>
+            <span className="grid flex-1 gap-0.5">
+              {workStatusLabel(workStatus, tCommon)}
+              {handlesCustomers && workStatus === WorkStatus.WorkStatusWorking ? (
+                <span className="text-xs text-muted-foreground">{t("workStatusWorkingHint")}</span>
+              ) : null}
+            </span>
             {workStatus === status ? (
               <CheckIcon className="text-primary" />
             ) : null}
@@ -557,6 +564,7 @@ export function WorkspaceNavigation({
                     </span>
                     <WorkStatusPicker
                       status={identity.user.workStatus}
+                      handlesCustomers={identity.user.handlesCustomers}
                       onChange={changeWorkStatus}
                     />
                   </div>

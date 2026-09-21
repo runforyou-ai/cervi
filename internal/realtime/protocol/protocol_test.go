@@ -36,6 +36,7 @@ var expectedFrames = map[string]Frame{
 	"conversation_state_changed":        ConversationStateChanged{ConversationID: "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8b", Version: 42},
 	"identity_profile_changed":          IdentityProfileChanged{Version: 9007199254740993},
 	"pin_order_changed":                 PinOrderChanged{Version: 5},
+	"service_attention":                 ServiceAttention{ConversationID: "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8b", ServiceSessionID: "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8e", Reason: domain.ServiceAttentionAssigned},
 	"conversation_typing":               ConversationTyping{ConversationID: "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8b", SenderSubjectID: "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8d", Active: true},
 	"conversation_typing_stopped":       ConversationTyping{ConversationID: "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8b", SenderSubjectID: "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8d"},
 	"visitor_typing":                    VisitorTyping{ConversationID: "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8b", Active: true},

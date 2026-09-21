@@ -18,6 +18,7 @@ const (
 	ConversationSystemEventServiceSessionClosed      ConversationSystemEventType = "service_session_closed"
 	ConversationSystemEventServiceSessionReopened    ConversationSystemEventType = "service_session_reopened"
 	ConversationSystemEventServiceSessionReturned    ConversationSystemEventType = "service_session_returned"
+	ConversationSystemEventServiceSessionAssigned    ConversationSystemEventType = "service_session_assigned"
 )
 
 // ServiceSessionReturnReason 定义客服处理周期退回队列的原因。
@@ -73,4 +74,11 @@ type ServiceSessionReturnedEvent struct {
 	FromDisplayName  string                     `json:"fromDisplayName"`
 	Target           ServiceSessionTarget       `json:"target"`
 	Reason           ServiceSessionReturnReason `json:"returnReason"`
+}
+
+// ServiceSessionAssignedEvent 是 service_session_assigned 事件的结构化内容：自动分配的承接成员与来源队列，没有操作人。
+type ServiceSessionAssignedEvent struct {
+	ServiceSessionID string               `json:"serviceSessionId"`
+	Target           ServiceSessionTarget `json:"target"`
+	Source           ServiceSessionTarget `json:"source"`
 }

@@ -6,6 +6,7 @@ package realtime
 import (
 	"context"
 
+	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/uptrace/bun"
 )
 
@@ -33,19 +34,22 @@ const (
 	KindSessionLoggedOut         Kind = "session_logged_out"
 	KindUserDisabled             Kind = "user_disabled"
 	KindChannelDisabled          Kind = "channel_disabled"
+	KindServiceAttention         Kind = "service_attention"
 )
 
-// Notification 表示发往单个受众的变更通知、输入状态或撤销控制，载荷含通知种类、会话 ID、版本、登录会话 ID 与输入状态，零值字段省略。
+// Notification 表示发往单个受众的变更通知、输入状态、客服提醒或撤销控制，载荷含通知种类、会话 ID、版本、登录会话 ID、输入状态与客服提醒原因，零值字段省略。
 type Notification struct {
-	OrganizationID  string
-	AudienceKind    AudienceKind
-	AudienceID      string
-	Kind            Kind
-	ConversationID  string
-	Version         int64
-	TokenSessionID  string
-	SenderSubjectID string
-	Active          bool
+	OrganizationID   string
+	AudienceKind     AudienceKind
+	AudienceID       string
+	Kind             Kind
+	ConversationID   string
+	Version          int64
+	TokenSessionID   string
+	SenderSubjectID  string
+	Active           bool
+	ServiceSessionID string
+	AttentionReason  domain.ServiceAttentionReason
 }
 
 // UserConversationChanged 构造发往用户受众的会话变更通知。
@@ -113,16 +117,23 @@ func UserDisabled(organizationID, userID string) Notification {
 	return Notification{OrganizationID: organizationID, AudienceKind: AudienceUser, AudienceID: userID, Kind: KindUserDisabled}
 }
 
+// UserServiceAttention 构造发往负责成员本人受众的客服处理周期提醒。
+func UserServiceAttention(organizationID, userID, conversationID, serviceSessionID string, reason domain.ServiceAttentionReason) Notification {
+	return Notification{OrganizationID: organizationID, AudienceKind: AudienceUser, AudienceID: userID, Kind: KindServiceAttention, ConversationID: conversationID, ServiceSessionID: serviceSessionID, AttentionReason: reason}
+}
+
 type batchKey struct{}
 
-// mergeKey 标识可合并的通知：同一受众、同一种类、同一会话、同一登录会话。
+// mergeKey 标识可合并的通知：同一受众、同一种类、同一会话、同一登录会话、同一客服处理周期与提醒原因。
 type mergeKey struct {
-	organizationID string
-	audienceKind   AudienceKind
-	audienceID     string
-	kind           Kind
-	conversationID string
-	tokenSessionID string
+	organizationID   string
+	audienceKind     AudienceKind
+	audienceID       string
+	kind             Kind
+	conversationID   string
+	tokenSessionID   string
+	serviceSessionID string
+	attentionReason  domain.ServiceAttentionReason
 }
 
 // batch 按登记顺序保存一次事务内合并后的通知。
@@ -153,7 +164,7 @@ func Notify(ctx context.Context, notification Notification) {
 	if !ok {
 		panic("realtime: Notify called outside realtime.RunInTx")
 	}
-	key := mergeKey{notification.OrganizationID, notification.AudienceKind, notification.AudienceID, notification.Kind, notification.ConversationID, notification.TokenSessionID}
+	key := mergeKey{notification.OrganizationID, notification.AudienceKind, notification.AudienceID, notification.Kind, notification.ConversationID, notification.TokenSessionID, notification.ServiceSessionID, notification.AttentionReason}
 	current, exists := pending.items[key]
 	if !exists {
 		pending.order = append(pending.order, key)

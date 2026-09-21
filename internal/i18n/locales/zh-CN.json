@@ -342,6 +342,7 @@
   "field.locale_invalid": "请选择支持的语言。",
   "field.time_zone_invalid": "请选择有效的时区。",
   "field.work_status_invalid": "请选择有效的工作状态。",
+  "field.max_service_sessions_invalid": "最大接待量必须为正整数。",
   "field.agent_work_status_unavailable": "请先将 AI 员工账号恢复正常，再修改工作状态。",
   "field.member_role_invalid": "请选择有效的企业角色。",
   "field.team_invalid": "请选择当前企业中的团队。",

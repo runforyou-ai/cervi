@@ -14,11 +14,9 @@ import (
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
-	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
 )
 
@@ -45,7 +43,7 @@ func testCustomerReplySuggestions(t *testing.T, db *bun.DB, identity *servermode
 	if err != nil {
 		t.Fatal(err)
 	}
-	tasks := servertask.New(db, serverconfig.NATSConfig{})
+	tasks := newTestTasks(db)
 	if err := tasks.Registry().RegisterJSON(agentrunaction.RunActionName, func(context.Context, agentrunaction.RunInput) error { return nil }); err != nil {
 		t.Fatal(err)
 	}
@@ -56,14 +54,14 @@ func testCustomerReplySuggestions(t *testing.T, db *bun.DB, identity *servermode
 	if err != nil {
 		t.Fatal(err)
 	}
-	receive := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, agentrunaction.NewScheduler(tasks))
+	receive := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, agentrunaction.NewScheduler(tasks), newTestTasks(db))
 	visitor := conversationaction.WebsiteCustomerTextMessageInput{ChannelID: channel.ID, ExternalID: "web-session:" + strings.ReplaceAll(uuid.NewV7().String(), "-", ""), ClientMessageID: uuid.NewV7().String(), Body: "上一轮的问题"}
 	earlier, err := receive.Execute(ctx, visitor)
 	if err != nil {
 		t.Fatal(err)
 	}
 	conversationID := earlier.Conversation.ID
-	closeSession := conversationaction.NewCloseServiceSessionAction(db, agentrunaction.NewExecuteAction(db, tasks, nil, testAttachmentReader(db), nil))
+	closeSession := conversationaction.NewCloseServiceSessionAction(db, agentrunaction.NewExecuteAction(db, tasks, nil, testAttachmentReader(db), nil), newTestTasks(db))
 	if _, err := closeSession.Execute(ctx, identity, conversationID); err != nil {
 		t.Fatal(err)
 	}

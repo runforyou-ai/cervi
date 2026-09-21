@@ -18,6 +18,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
 )
 
@@ -51,13 +52,13 @@ type directoryOps struct {
 }
 
 // newDirectoryOps 创建企业成员、团队、角色与组织的业务实现依赖。
-func newDirectoryOps(db *bun.DB, agentCoordinator *agentrunaction.ExecuteAction) directoryOps {
+func newDirectoryOps(db *bun.DB, agentCoordinator *agentrunaction.ExecuteAction, taskEnqueuer servertask.TxEnqueuer) directoryOps {
 	return directoryOps{
 		listMemberOptions:        memberaction.NewListOptionsQuery(db),
 		listUsers:                useraction.NewListUsersQuery(db),
 		getUser:                  useraction.NewGetUserQuery(db),
-		createUser:               useraction.NewCreateUserAction(db),
-		updateUser:               useraction.NewUpdateUserAction(db, agentCoordinator),
+		createUser:               useraction.NewCreateUserAction(db, taskEnqueuer),
+		updateUser:               useraction.NewUpdateUserAction(db, agentCoordinator, taskEnqueuer),
 		updateRoleAssignments:    roleaction.NewUpdateAssignmentsAction(db),
 		updateUserStatus:         useraction.NewUpdateStatusAction(db, agentCoordinator),
 		listTeams:                teamaction.NewListTeamsQuery(db),
@@ -66,12 +67,12 @@ func newDirectoryOps(db *bun.DB, agentCoordinator *agentrunaction.ExecuteAction)
 		deleteTeam:               teamaction.NewDeleteTeamAction(db),
 		listTeamMembers:          teamaction.NewListMembersQuery(db),
 		listTeamMemberCandidates: teamaction.NewListMemberCandidatesQuery(db),
-		addTeamMembers:           teamaction.NewAddMembersAction(db),
+		addTeamMembers:           teamaction.NewAddMembersAction(db, taskEnqueuer),
 		removeTeamMembers:        teamaction.NewRemoveMembersAction(db),
 		updateProfile:            useraction.NewUpdateProfileAction(db),
 		changePassword:           useraction.NewChangePasswordAction(db),
 		updateUserPreferences:    useraction.NewUpdatePreferencesAction(db),
-		updateUserWorkStatus:     useraction.NewUpdateWorkStatusAction(db),
+		updateUserWorkStatus:     useraction.NewUpdateWorkStatusAction(db, taskEnqueuer),
 		listRoles:                roleaction.NewListRolesQuery(db),
 		getRole:                  roleaction.NewGetRoleQuery(db),
 		createRole:               roleaction.NewCreateRoleAction(db),
@@ -221,7 +222,7 @@ func (o *directOperations) GetUser(ctx context.Context, meta RequestMeta, identi
 
 // CreateUser 创建企业成员账号。
 func (o *directOperations) CreateUser(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input CreateUserInput) (User, error) {
-	user, err := o.createUser.Execute(ctx, identity, useraction.CreateInput{DisplayName: input.DisplayName, Email: input.Email, Password: input.Password, RoleID: input.RoleID, TeamIDs: input.TeamIDs, HandlesCustomers: input.HandlesCustomers, AvatarFileID: input.AvatarFileID})
+	user, err := o.createUser.Execute(ctx, identity, useraction.CreateInput{DisplayName: input.DisplayName, Email: input.Email, Password: input.Password, RoleID: input.RoleID, TeamIDs: input.TeamIDs, HandlesCustomers: input.HandlesCustomers, MaxServiceSessions: input.MaxServiceSessions, AvatarFileID: input.AvatarFileID})
 	if err != nil {
 		return User{}, o.userMutationError(ctx, meta, err, cervii18n.ErrorUserCreateFailed, identity.Organization.ID, "")
 	}
@@ -231,7 +232,7 @@ func (o *directOperations) CreateUser(ctx context.Context, meta RequestMeta, ide
 
 // UpdateUser 修改企业成员资料、角色、接待开关和所属团队。
 func (o *directOperations) UpdateUser(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, userID string, input UpdateUserInput) (User, error) {
-	user, err := o.updateUser.Execute(ctx, identity, userID, useraction.UpdateInput{DisplayName: input.DisplayName, Email: input.Email, RoleID: input.RoleID, TeamIDs: input.TeamIDs, HandlesCustomers: input.HandlesCustomers})
+	user, err := o.updateUser.Execute(ctx, identity, userID, useraction.UpdateInput{DisplayName: input.DisplayName, Email: input.Email, RoleID: input.RoleID, TeamIDs: input.TeamIDs, HandlesCustomers: input.HandlesCustomers, MaxServiceSessions: input.MaxServiceSessions})
 	if err != nil {
 		return User{}, o.userMutationError(ctx, meta, err, cervii18n.ErrorUserUpdateFailed, identity.Organization.ID, userID)
 	}
@@ -329,21 +330,22 @@ func userFromAction(user useraction.User, avatarURLs map[string]string) User {
 	for _, team := range user.Teams {
 		teams = append(teams, TeamSummary{ID: team.ID, Name: team.Name})
 	}
-	return User{ID: user.ID, IdentityID: user.IdentityID, Email: user.Email, DisplayName: user.DisplayName, AvatarURL: optionalFileURL(avatarURLs, user.AvatarFileID), Role: RoleSummary{ID: user.RoleID, Kind: RoleKind(user.RoleKind), Name: user.RoleName}, HandlesCustomers: user.HandlesCustomers, Status: UserStatus(user.Status), WorkStatus: WorkStatus(user.WorkStatus), Teams: teams, CreatedAt: user.CreatedAt}
+	return User{ID: user.ID, IdentityID: user.IdentityID, Email: user.Email, DisplayName: user.DisplayName, AvatarURL: optionalFileURL(avatarURLs, user.AvatarFileID), Role: RoleSummary{ID: user.RoleID, Kind: RoleKind(user.RoleKind), Name: user.RoleName}, HandlesCustomers: user.HandlesCustomers, MaxServiceSessions: user.MaxServiceSessions, Status: UserStatus(user.Status), WorkStatus: WorkStatus(user.WorkStatus), Teams: teams, CreatedAt: user.CreatedAt}
 }
 
 // userFieldKeys 把企业成员校验错误码映射为本地化文案键。
 func userFieldKeys(fields map[string]common.FieldCode) map[string]cervii18n.Key {
 	keys := map[common.FieldCode]cervii18n.Key{
-		useraction.ValidationDisplayNameRequired: cervii18n.FieldDisplayNameRequired,
-		useraction.ValidationDisplayNameInvalid:  cervii18n.FieldDisplayNameInvalid,
-		useraction.ValidationEmailInvalid:        cervii18n.FieldEmailInvalid,
-		useraction.ValidationEmailDuplicate:      cervii18n.FieldEmailDuplicate,
-		useraction.ValidationPasswordTooShort:    cervii18n.FieldPasswordTooShort,
-		useraction.ValidationPasswordTooLong:     cervii18n.FieldPasswordTooLong,
-		useraction.ValidationRoleInvalid:         cervii18n.FieldMemberRoleInvalid,
-		useraction.ValidationTeamInvalid:         cervii18n.FieldTeamInvalid,
-		useraction.ValidationStatusInvalid:       cervii18n.FieldUserStatusInvalid,
+		useraction.ValidationDisplayNameRequired:       cervii18n.FieldDisplayNameRequired,
+		useraction.ValidationDisplayNameInvalid:        cervii18n.FieldDisplayNameInvalid,
+		useraction.ValidationEmailInvalid:              cervii18n.FieldEmailInvalid,
+		useraction.ValidationEmailDuplicate:            cervii18n.FieldEmailDuplicate,
+		useraction.ValidationPasswordTooShort:          cervii18n.FieldPasswordTooShort,
+		useraction.ValidationPasswordTooLong:           cervii18n.FieldPasswordTooLong,
+		useraction.ValidationRoleInvalid:               cervii18n.FieldMemberRoleInvalid,
+		useraction.ValidationTeamInvalid:               cervii18n.FieldTeamInvalid,
+		useraction.ValidationStatusInvalid:             cervii18n.FieldUserStatusInvalid,
+		useraction.ValidationMaxServiceSessionsInvalid: cervii18n.FieldMaxServiceSessionsInvalid,
 	}
 	return translateValidationFields(fields, keys)
 }

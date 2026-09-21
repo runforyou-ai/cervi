@@ -160,7 +160,7 @@ func TestAgentRoleBehavior(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	inbound, err := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, scheduler).Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
+	inbound, err := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, scheduler, newTestTasks(db)).Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
 		ChannelID: channel.ID, ExternalID: "web-session:0123456789abcdef0123456789abcdef", ClientMessageID: uuid.NewV7().String(), Body: "你们的退货政策是什么",
 	})
 	if err != nil {

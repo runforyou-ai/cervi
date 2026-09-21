@@ -81,6 +81,7 @@ func DefaultOptions() Options {
 var memberFrameTypes = []protocol.Type{
 	protocol.TypeServerHello, protocol.TypeConversationChanged, protocol.TypeConversationRemoved,
 	protocol.TypeConversationStateChanged, protocol.TypeConversationTyping, protocol.TypeIdentityProfileChanged,
+	protocol.TypePinOrderChanged, protocol.TypeServiceAttention,
 }
 
 // visitorFrameTypes 是网站访客事件流可下发的公开事件。
@@ -463,6 +464,8 @@ func (g *Gateway) deliver(subject string, data []byte) {
 		frame = protocol.IdentityProfileChanged{Version: payload.Version}
 	case realtime.KindPinOrderChanged:
 		frame = protocol.PinOrderChanged{Version: payload.Version}
+	case realtime.KindServiceAttention:
+		frame = protocol.ServiceAttention{ConversationID: payload.ConversationID, ServiceSessionID: payload.ServiceSessionID, Reason: payload.AttentionReason}
 	case realtime.KindSessionLoggedOut:
 		for _, current := range targets {
 			if current.tokenSession() == payload.TokenSessionID {

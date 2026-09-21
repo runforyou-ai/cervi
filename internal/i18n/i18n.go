@@ -278,6 +278,7 @@ const (
 	FieldLocaleInvalid                   Key = "field.locale_invalid"
 	FieldTimeZoneInvalid                 Key = "field.time_zone_invalid"
 	FieldWorkStatusInvalid               Key = "field.work_status_invalid"
+	FieldMaxServiceSessionsInvalid       Key = "field.max_service_sessions_invalid"
 	FieldAgentWorkStatusUnavailable      Key = "field.agent_work_status_unavailable"
 	FieldMemberRoleInvalid               Key = "field.member_role_invalid"
 	FieldTeamInvalid                     Key = "field.team_invalid"

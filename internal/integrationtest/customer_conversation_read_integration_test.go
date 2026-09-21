@@ -13,10 +13,8 @@ import (
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
-	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
 )
 
@@ -49,7 +47,7 @@ func newCustomerReadFixture(t *testing.T) customerReadFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	receive := conversationaction.NewReceiveWebsiteCustomerMessageAction(f.db, agentrunaction.NewScheduler(servertask.New(f.db, serverconfig.NATSConfig{})))
+	receive := conversationaction.NewReceiveWebsiteCustomerMessageAction(f.db, agentrunaction.NewScheduler(newTestTasks(f.db)), newTestTasks(f.db))
 	result, err := receive.Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
 		ChannelID: channel.ID, ExternalID: "web-session:0123456789abcdef0123456789abcdef", ClientMessageID: uuid.NewV7().String(), Body: "客户首条消息",
 	})
@@ -127,13 +125,13 @@ func TestCustomerConversationPersonalRead(t *testing.T) {
 		}
 	}
 	coordinator := agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil)
-	if _, err := conversationaction.NewTransferServiceSessionAction(f.db, coordinator, agentrunaction.NewScheduler(servertask.New(f.db, serverconfig.NATSConfig{}))).Execute(ctx, f.owner, conversationaction.TransferServiceSessionInput{ConversationID: f.conversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: f.member.OrganizationIdentity.ID}); err != nil {
+	if _, err := conversationaction.NewTransferServiceSessionAction(f.db, coordinator, agentrunaction.NewScheduler(newTestTasks(f.db)), newTestTasks(f.db)).Execute(ctx, f.owner, conversationaction.TransferServiceSessionInput{ConversationID: f.conversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: f.member.OrganizationIdentity.ID}); err != nil {
 		t.Fatal(err)
 	}
 	if row := f.inboxRow(t, f.owner, domain.CustomerInboxViewCoworkers, domain.ServiceSessionStatusOpen); row.LastReadMessageID == nil || *row.LastReadMessageID != *first.LastMessageID {
 		t.Fatalf("transfer changed owner read: %+v", row)
 	}
-	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, coordinator).Execute(ctx, f.member, f.conversationID); err != nil {
+	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(ctx, f.member, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
 	if row := f.inboxRow(t, f.member, domain.CustomerInboxViewMine, domain.ServiceSessionStatusClosed); row.UnreadCount != 0 || *row.LastReadMessageID != reply.ID {
@@ -145,7 +143,7 @@ func TestCustomerConversationPersonalRead(t *testing.T) {
 	if row := f.inboxRow(t, f.member, domain.CustomerInboxViewMine, domain.ServiceSessionStatusOpen); *row.LastReadMessageID != reply.ID {
 		t.Fatalf("reopen changed read: %+v", row)
 	}
-	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, coordinator).Execute(ctx, f.member, f.conversationID); err != nil {
+	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(ctx, f.member, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
 	next, err := f.visitorMessage(ctx, "新的处理周期")

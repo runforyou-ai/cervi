@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next"
 import { Link, useNavigate } from "react-router"
 import { toast } from "sonner"
 
-import { logout, updateUserWorkStatus, type WorkStatus } from "@/api"
+import { WorkStatus, logout, updateUserWorkStatus } from "@/api"
 import {
   MobilePageHeader,
   MobileScrollArea,
@@ -141,7 +141,7 @@ export function MobileMePage() {
                 />
               </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-44">
+            <DropdownMenuContent align="end" className={identity.user.handlesCustomers ? "w-60" : "w-44"}>
               {selectableWorkStatuses.map((workStatus) => (
                 <DropdownMenuItem
                   key={workStatus}
@@ -149,8 +149,13 @@ export function MobileMePage() {
                   onSelect={() => void changeWorkStatus(workStatus)}
                 >
                   <WorkStatusDot status={workStatus} className="size-2" />
-                  <span className="flex-1">
+                  <span className="grid flex-1 gap-0.5">
                     {workStatusLabel(workStatus, tCommon)}
+                    {identity.user.handlesCustomers && workStatus === WorkStatus.WorkStatusWorking ? (
+                      <span className="text-xs text-muted-foreground">
+                        {t("workspace:workStatusWorkingHint")}
+                      </span>
+                    ) : null}
                   </span>
                   {identity.user.workStatus === workStatus ? (
                     <CheckIcon className="text-primary" />

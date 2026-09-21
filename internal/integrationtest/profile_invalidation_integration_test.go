@@ -19,11 +19,9 @@ import (
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
-	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
 )
 
@@ -54,7 +52,7 @@ func newProfileFixture(t *testing.T) profileFixture {
 	if err := conversationaction.NewLeaveGroupConversationAction(f.db).Execute(ctx, f.member, left.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.member, f.conversationID); err != nil {
+	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, newGroupAgentCoordinator(f.db), newTestTasks(f.db)).Execute(ctx, f.member, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
 	return profileFixture{customerReadFixture: f, directID: direct.Conversation.ID, leftGroupID: left.ID}
@@ -154,14 +152,14 @@ func TestMemberProfileConversationInvalidation(t *testing.T) {
 	if _, err := profile.Execute(ctx, f.member, useraction.ProfileInput{DisplayName: "成员新名", Email: f.member.User.Email}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := useraction.NewUpdateUserAction(f.db, testServiceSessionReturner(f.db)).Execute(ctx, f.owner, f.member.User.ID, useraction.UpdateInput{DisplayName: "成员新名", Email: "profile-renamed@navigation.test", RoleID: f.member.OrganizationIdentity.RoleID, HandlesCustomers: true}); err != nil {
+	if _, err := useraction.NewUpdateUserAction(f.db, testServiceSessionReturner(f.db), newTestTasks(f.db)).Execute(ctx, f.owner, f.member.User.ID, useraction.UpdateInput{DisplayName: "成员新名", Email: "profile-renamed@navigation.test", RoleID: f.member.OrganizationIdentity.RoleID, HandlesCustomers: true, MaxServiceSessions: 10}); err != nil {
 		t.Fatal(err)
 	}
 	f.expectVersions(t, "名称未变", after, 0)
 	feed.expect(t, feed.notice(f.member.User.ID, realtime.KindIdentityProfileChanged, "", loadProfileVersion(t, f.db, f.member.User.ID)))
 
 	// 管理员改名同样推进。
-	if _, err := useraction.NewUpdateUserAction(f.db, testServiceSessionReturner(f.db)).Execute(ctx, f.owner, f.member.User.ID, useraction.UpdateInput{DisplayName: "管理员改的名", Email: "profile-renamed@navigation.test", RoleID: f.member.OrganizationIdentity.RoleID, HandlesCustomers: true}); err != nil {
+	if _, err := useraction.NewUpdateUserAction(f.db, testServiceSessionReturner(f.db), newTestTasks(f.db)).Execute(ctx, f.owner, f.member.User.ID, useraction.UpdateInput{DisplayName: "管理员改的名", Email: "profile-renamed@navigation.test", RoleID: f.member.OrganizationIdentity.RoleID, HandlesCustomers: true, MaxServiceSessions: 10}); err != nil {
 		t.Fatal(err)
 	}
 	f.expectVersions(t, "管理员改名", after, 1)
@@ -243,7 +241,7 @@ func TestAgentProfileConversationInvalidation(t *testing.T) {
 	if err != nil || created.AvatarFileID == nil || *created.AvatarFileID != createdAvatarID {
 		t.Fatalf("created=%+v err=%v", created, err)
 	}
-	tasks := servertask.New(f.db, serverconfig.NATSConfig{})
+	tasks := newTestTasks(f.db)
 	if err := tasks.Registry().RegisterJSON(agentrunaction.RunActionName, func(context.Context, agentrunaction.RunInput) error { return nil }); err != nil {
 		t.Fatal(err)
 	}
@@ -482,7 +480,7 @@ func TestProfileInvalidationLockOrder(t *testing.T) {
 	}
 	// 转交会追加系统事件，按实测记录一次转交对客户会话版本的推进次数。
 	beforeTransfer := loadConversationVersion(t, f.db, f.conversationID)
-	if _, err := conversationaction.NewTransferServiceSessionAction(f.db, newGroupAgentCoordinator(f.db), nil).Execute(ctx, f.member, conversationaction.TransferServiceSessionInput{ConversationID: f.conversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: f.owner.OrganizationIdentity.ID}); err != nil {
+	if _, err := conversationaction.NewTransferServiceSessionAction(f.db, newGroupAgentCoordinator(f.db), nil, newTestTasks(f.db)).Execute(ctx, f.member, conversationaction.TransferServiceSessionInput{ConversationID: f.conversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: f.owner.OrganizationIdentity.ID}); err != nil {
 		t.Fatal(err)
 	}
 	transferDelta := loadConversationVersion(t, f.db, f.conversationID) - beforeTransfer
@@ -515,7 +513,7 @@ func TestProfileInvalidationLockOrder(t *testing.T) {
 	}()
 	transferred := make(chan error, 1)
 	go func() {
-		_, err := conversationaction.NewTransferServiceSessionAction(f.db, newGroupAgentCoordinator(f.db), nil).Execute(ctx, f.owner, conversationaction.TransferServiceSessionInput{ConversationID: f.conversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: f.member.OrganizationIdentity.ID})
+		_, err := conversationaction.NewTransferServiceSessionAction(f.db, newGroupAgentCoordinator(f.db), nil, newTestTasks(f.db)).Execute(ctx, f.owner, conversationaction.TransferServiceSessionInput{ConversationID: f.conversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: f.member.OrganizationIdentity.ID})
 		transferred <- err
 	}()
 	// 两个写入都进入锁等待后再放行改名事务。

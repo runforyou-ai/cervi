@@ -14,10 +14,8 @@ import (
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	teamaction "github.com/runforyou-ai/cervi/internal/actions/team"
-	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
 )
 
@@ -56,9 +54,9 @@ func TestServiceSessionTeamQueue(t *testing.T) {
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	coordinator := newGroupAgentCoordinator(f.db)
-	scheduler := agentrunaction.NewScheduler(servertask.New(f.db, serverconfig.NATSConfig{}))
-	claim := conversationaction.NewClaimServiceSessionAction(f.db, coordinator)
-	transfer := conversationaction.NewTransferServiceSessionAction(f.db, coordinator, scheduler)
+	scheduler := agentrunaction.NewScheduler(newTestTasks(f.db))
+	claim := conversationaction.NewClaimServiceSessionAction(f.db, coordinator, newTestTasks(f.db))
+	transfer := conversationaction.NewTransferServiceSessionAction(f.db, coordinator, scheduler, newTestTasks(f.db))
 	createTeam := teamaction.NewCreateTeamAction(f.db)
 
 	staffed, err := createTeam.Execute(ctx, f.owner, teamaction.Input{Name: "有人团队"})
@@ -69,7 +67,7 @@ func TestServiceSessionTeamQueue(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := teamaction.NewAddMembersAction(f.db).Execute(ctx, f.owner, staffed.ID, []teamaction.MemberIdentity{
+	if _, err := teamaction.NewAddMembersAction(f.db, newTestTasks(f.db)).Execute(ctx, f.owner, staffed.ID, []teamaction.MemberIdentity{
 		{IdentityType: domain.OrganizationIdentityTypeUser, IdentityID: f.member.OrganizationIdentity.ID},
 	}); err != nil {
 		t.Fatal(err)

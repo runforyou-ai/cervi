@@ -35,6 +35,7 @@ const (
 	TypeVisitorTyping            Type = "visitor_typing"
 	TypeIdentityProfileChanged   Type = "identity_profile_changed"
 	TypePinOrderChanged          Type = "pin_order_changed"
+	TypeServiceAttention         Type = "service_attention"
 	TypeRunStreamSnapshot        Type = "run_stream_snapshot"
 	TypeRunStreamDelta           Type = "run_stream_delta"
 	TypeRunStreamEnded           Type = "run_stream_ended"
@@ -110,6 +111,13 @@ type IdentityProfileChanged struct {
 // PinOrderChanged 表示本人的个人置顶顺序变到了指定版本，置顶区需要整区重读。
 type PinOrderChanged struct {
 	Version int64 `json:"version,string"`
+}
+
+// ServiceAttention 提醒本人处理指定客户会话的客服处理周期，只驱动本地通知；负责人与队列状态以收件箱为准。
+type ServiceAttention struct {
+	ConversationID   string                        `json:"conversationId"`
+	ServiceSessionID string                        `json:"serviceSessionId"`
+	Reason           domain.ServiceAttentionReason `json:"reason"`
 }
 
 // RunStreamToolCall 是运行过程流中的工具调用名称、状态和起止时间，完整参数与结果经过程详情查询读取。
@@ -195,6 +203,9 @@ func (IdentityProfileChanged) FrameType() Type { return TypeIdentityProfileChang
 // FrameType 返回个人置顶顺序变更事件种类。
 func (PinOrderChanged) FrameType() Type { return TypePinOrderChanged }
 
+// FrameType 返回客服处理周期提醒事件种类。
+func (ServiceAttention) FrameType() Type { return TypeServiceAttention }
+
 // FrameType 返回运行过程流快照分片事件种类。
 func (RunStreamSnapshot) FrameType() Type { return TypeRunStreamSnapshot }
 
@@ -226,6 +237,7 @@ var decoders = map[Type]decoder{
 	TypeVisitorTyping:            decodeAs[VisitorTyping],
 	TypeIdentityProfileChanged:   decodeAs[IdentityProfileChanged],
 	TypePinOrderChanged:          decodeAs[PinOrderChanged],
+	TypeServiceAttention:         decodeAs[ServiceAttention],
 	TypeRunStreamSnapshot:        decodeAs[RunStreamSnapshot],
 	TypeRunStreamDelta:           decodeAs[RunStreamDelta],
 	TypeRunStreamEnded:           decodeAs[RunStreamEnded],

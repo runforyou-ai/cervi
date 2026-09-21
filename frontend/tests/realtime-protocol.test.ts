@@ -40,6 +40,12 @@ const expectedFrames: Record<string, RealtimeServerFrame> = {
   conversation_state_changed: { type: "conversation_state_changed", conversationId, version: 42n },
   identity_profile_changed: { type: "identity_profile_changed", version: 9007199254740993n },
   pin_order_changed: { type: "pin_order_changed", version: 5n },
+  service_attention: {
+    type: "service_attention",
+    conversationId,
+    serviceSessionId: "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8e",
+    reason: "assigned",
+  },
   conversation_removed: { type: "conversation_removed", conversationId },
   conversation_typing: { type: "conversation_typing", conversationId, senderSubjectId, active: true },
   conversation_typing_stopped: { type: "conversation_typing", conversationId, senderSubjectId, active: false },

@@ -6,6 +6,7 @@ import (
 	"reflect"
 	"testing"
 
+	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	"github.com/runforyou-ai/cervi/internal/realtime/protocol"
 )
@@ -71,8 +72,25 @@ func TestVisitorConnectionDropsInternalFrames(t *testing.T) {
 	current.send(protocol.ConversationRemoved{ConversationID: "a"})
 	current.send(protocol.IdentityProfileChanged{Version: 1})
 	current.send(protocol.ConversationTyping{ConversationID: "a", SenderSubjectID: "s1", Active: true})
+	current.send(protocol.ServiceAttention{ConversationID: "a", ServiceSessionID: "s", Reason: domain.ServiceAttentionAssigned})
 	current.send(protocol.ConversationChanged{ConversationID: "a", Version: 7})
 	want := []protocol.Frame{protocol.ConversationChanged{ConversationID: "a", Version: 7}}
+	if !reflect.DeepEqual(current.queue, want) {
+		t.Fatalf("queue = %#v, want %#v", current.queue, want)
+	}
+}
+
+// TestMemberConnectionDeliversPersonalFrames 验证成员事件流下发个人置顶顺序与客服处理周期提醒，不同周期的提醒分别入队。
+func TestMemberConnectionDeliversPersonalFrames(t *testing.T) {
+	current := newConnection(New(nil, nil, "test", Options{QueueSize: 4}), func() {}, streamRoute{allowed: memberFrameTypes})
+	current.send(protocol.PinOrderChanged{Version: 3})
+	current.send(protocol.ServiceAttention{ConversationID: "a", ServiceSessionID: "s1", Reason: domain.ServiceAttentionAssigned})
+	current.send(protocol.ServiceAttention{ConversationID: "b", ServiceSessionID: "s2", Reason: domain.ServiceAttentionAssigned})
+	want := []protocol.Frame{
+		protocol.PinOrderChanged{Version: 3},
+		protocol.ServiceAttention{ConversationID: "a", ServiceSessionID: "s1", Reason: domain.ServiceAttentionAssigned},
+		protocol.ServiceAttention{ConversationID: "b", ServiceSessionID: "s2", Reason: domain.ServiceAttentionAssigned},
+	}
 	if !reflect.DeepEqual(current.queue, want) {
 		t.Fatalf("queue = %#v, want %#v", current.queue, want)
 	}

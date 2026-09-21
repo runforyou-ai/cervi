@@ -55,6 +55,7 @@ const contacts = {
     stage: "Stage",
     channels: "Channels",
     handlesCustomers: "Handles customers",
+    maxServiceSessions: "Max conversations",
     createdAt: "Created",
     addedAt: "Added",
     updatedAt: "Updated",
@@ -111,6 +112,7 @@ const contacts = {
       password: "Initial password",
       role: "Company role",
       handlesCustomers: "Handles customers",
+      maxServiceSessions: "Max conversations",
       teams: "Teams",
       noTeams: "There are no teams to select.",
       created: "Company member added",
@@ -125,6 +127,7 @@ const contacts = {
       passwordTooShort: "Password must contain at least 8 characters.",
       passwordTooLong: "Password cannot exceed 72 UTF-8 bytes.",
       roleRequired: "Select a company role.",
+      maxServiceSessionsInvalid: "Max conversations must be a positive whole number.",
     },
     status: {
       deactivate: "Disable",

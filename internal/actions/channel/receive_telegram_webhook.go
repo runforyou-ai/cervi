@@ -152,7 +152,7 @@ func (a *ReceiveTelegramWebhookAction) Execute(ctx context.Context, channelID st
 					ImageWidth: media.Width, ImageHeight: media.Height, StorageBackend: backend,
 				}
 			}
-			received, err := conversationaction.ReceiveInboundCustomerMessage(ctx, tx, channel, inbound)
+			received, err := conversationaction.ReceiveInboundCustomerMessage(ctx, tx, a.mediaTasks, channel, inbound)
 			if err != nil {
 				var conflict *conversationaction.ConflictError
 				if !errors.As(err, &conflict) || conflict.Reason != conversationaction.ConflictReasonIdempotencyMismatch {
