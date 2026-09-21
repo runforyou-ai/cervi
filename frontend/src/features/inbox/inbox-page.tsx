@@ -387,9 +387,10 @@ export function InboxPage({
   return (
     <>
       <PageSplit
-        paneWidth="inbox"
+        paneWidth="nav"
         paneOnNarrow="fill"
-        className="bg-background"
+        // 会话列表底色与通讯录、渠道、知识库的二级菜单一致。
+        paneClassName="bg-sidebar-secondary"
         pane={pane}
       >
         {isNarrowViewport ? null : targetIdentityId ? (

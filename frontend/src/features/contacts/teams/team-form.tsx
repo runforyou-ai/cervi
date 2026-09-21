@@ -100,16 +100,16 @@ export function TeamForm({
         />
       </FieldGroup>
       <div className="flex items-center justify-end gap-2">
-        <Button type="submit" disabled={form.formState.isSubmitting}>
-          {form.formState.isSubmitting
-            ? t("common:actions.saving")
-            : t("common:actions.save")}
-        </Button>
         {onCancel ? (
           <Button type="button" variant="outline" onClick={onCancel}>
             {t("common:actions.cancel")}
           </Button>
         ) : null}
+        <Button type="submit" disabled={form.formState.isSubmitting}>
+          {form.formState.isSubmitting
+            ? t("common:actions.saving")
+            : t("common:actions.save")}
+        </Button>
       </div>
     </form>
   )

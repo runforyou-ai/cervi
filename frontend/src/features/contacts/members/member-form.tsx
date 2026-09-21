@@ -15,15 +15,15 @@ import {
   type Team,
 } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
+import { SwitchCardField } from "@/components/form/switch-card-field"
 import { ImagePicker } from "@/components/image-picker"
 import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Switch } from "@/components/ui/switch"
 import { usePendingImageUpload } from "@/hooks/use-pending-image-upload"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 import { RoleSelectField } from "@/features/contacts/role-select-field"
-import { TeamCheckboxField } from "@/features/contacts/team-checkbox-field"
+import { TeamSelectField } from "@/features/contacts/team-select-field"
 import {
   createMemberSchema,
   type MemberFormValues,
@@ -185,26 +185,23 @@ export function MemberForm({
           name="handlesCustomers"
           control={form.control}
           render={({ field }) => (
-            <Field orientation="horizontal">
-              <FieldLabel htmlFor={field.name}>
-                {t("members.form.handlesCustomers")}
-              </FieldLabel>
-              <Switch
-                id={field.name}
-                name={field.name}
-                checked={field.value}
-                onBlur={field.onBlur}
-                onCheckedChange={field.onChange}
-                ref={field.ref}
-              />
-            </Field>
+            <SwitchCardField
+              id={field.name}
+              name={field.name}
+              label={t("members.form.handlesCustomers")}
+              description={t("members.form.handlesCustomersHelp")}
+              checked={field.value}
+              onBlur={field.onBlur}
+              onCheckedChange={field.onChange}
+              ref={field.ref}
+            />
           )}
         />
         <Controller
           name="teamIds"
           control={form.control}
           render={({ field }) => (
-            <TeamCheckboxField
+            <TeamSelectField
               teams={teams}
               label={t("members.form.teams")}
               emptyMessage={t("members.form.noTeams")}
@@ -216,13 +213,13 @@ export function MemberForm({
         />
       </FieldGroup>
       <div className="flex items-center justify-end gap-2">
+        <Button type="button" variant="outline" onClick={onCancel}>
+          {tCommon("actions.cancel")}
+        </Button>
         <Button type="submit" disabled={form.formState.isSubmitting}>
           {form.formState.isSubmitting
             ? tCommon("actions.saving")
             : tCommon("actions.save")}
-        </Button>
-        <Button type="button" variant="outline" onClick={onCancel}>
-          {tCommon("actions.cancel")}
         </Button>
       </div>
     </form>

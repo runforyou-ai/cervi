@@ -1,11 +1,10 @@
-/** 移动端收件箱检索：范围与类型切换、分组结果、会话分页列表、最近打开和结果跳转。 */
+/** 移动端收件箱检索：与桌面端全局搜索一致的检索范围、分组结果、会话分页列表、最近打开和结果跳转。 */
 import { SearchIcon, XIcon } from "lucide-react"
 import { useRef, useState, type ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 import { useLocation, useNavigate, useSearchParams } from "react-router"
 
 import {
-  InboxScope,
   InboxSearchPersonKind,
   InboxSearchRange,
   OrganizationIdentityType,
@@ -23,10 +22,11 @@ import { ProfileAvatar } from "@/components/profile-avatar"
 import { Button } from "@/components/ui/button"
 import { Input } from "@/components/ui/input"
 import { ConversationAvatar } from "@/features/inbox/conversation-avatar"
-import { inboxQueryFromSearch } from "@/features/inbox/inbox-query"
+import { readableInboxQuery } from "@/features/inbox/inbox-query"
 import { InboxSearchConversationList } from "@/features/inbox/inbox-search-conversation-list"
 import { highlightName, InboxSearchExcerpt } from "@/features/inbox/inbox-search-panel"
 import { useConversationName } from "@/features/inbox/use-conversation-name"
+import { useConversationSummary } from "@/features/inbox/use-conversation-summary"
 import { useConversationTime } from "@/features/inbox/use-conversation-time"
 import {
   useInboxSearchResults,
@@ -34,7 +34,6 @@ import {
   type InboxSearchType,
 } from "@/features/inbox/use-inbox-search"
 import { useRecentConversations } from "@/features/inbox/use-recent-conversations"
-import { optionalWailsEnum } from "@/lib/wails-enum"
 
 const searchTypes: InboxSearchType[] = ["all", "conversations", "messages", "people"]
 const searchGroupLimit = 6
@@ -212,7 +211,7 @@ function MobileSearchResults({
   )
 }
 
-/** 按地址参数恢复检索词、范围和类型，从结果详情返回时保留检索上下文。 */
+/** 按地址参数恢复检索词、限定会话和查看全部状态，从结果详情返回时保留检索上下文。 */
 export function MobileInboxSearchPage() {
   const { t } = useTranslation(["inbox", "mobile", "common"])
   const navigate = useNavigate()
@@ -225,34 +224,24 @@ export function MobileInboxSearchPage() {
   const inputRef = useRef<HTMLInputElement>(null)
   const [text, setText] = useState(() => params.get("q") ?? "")
   const conversationId = params.get("conversation") ?? ""
-  const listQuery = inboxQueryFromSearch(new URLSearchParams(inboxURL.split("?")[1]))
+  // 只有「查看全部」会进入会话分页，其余情况展示分组结果。
   const type = searchTypes.find((value) => value === params.get("type")) ?? "all"
   const search = useInboxSearchResults({
     active: true,
     text,
-    // 未指定范围时，会话入口限定当前会话，消息页入口沿用当前消息分类。
-    range:
-      optionalWailsEnum(InboxSearchRange, params.get("range")) ??
-      (conversationId ? InboxSearchRange.InboxSearchRangeConversation : InboxSearchRange.InboxSearchRangeList),
+    // 与桌面端一致：从会话进入时只检索该会话，其余情况检索全部可读消息。
+    range: conversationId
+      ? InboxSearchRange.InboxSearchRangeConversation
+      : InboxSearchRange.InboxSearchRangeReadable,
     conversationId,
     type,
-    query: listQuery,
+    query: readableInboxQuery,
     recentConversationIds,
   })
   const query = text.trim()
-  const rangeOptions = [
-    ...(conversationId ? [{ value: InboxSearchRange.InboxSearchRangeConversation, label: t("searchRangeConversation") }] : []),
-    ...(search.listRange
-      ? [{ value: InboxSearchRange.InboxSearchRangeList, label: t(listQuery.scope === InboxScope.InboxScopeCustomer ? "scopeCustomer" : "scopeInternal") }]
-      : []),
-    { value: InboxSearchRange.InboxSearchRangeReadable, label: t("searchRangeReadable") },
-  ]
-  const typeLabels: Record<InboxSearchType, string> = {
-    all: t("searchTypeAll"),
-    conversations: t("searchTypeConversations"),
-    messages: t("searchTypeMessages"),
-    people: t("searchTypePeople"),
-  }
+  const scopedConversation = useConversationSummary(conversationId)
+  const conversationName = useConversationName()
+  const scopedName = scopedConversation.data ? conversationName(scopedConversation.data) : ""
 
   /** 以替换方式写回检索条件，保留返回来源。 */
   function updateParams(changes: Record<string, string>) {
@@ -336,42 +325,25 @@ export function MobileInboxSearchPage() {
           {t("common:actions.cancel")}
         </Button>
       </div>
-      <div className="shrink-0 space-y-2 border-b px-4 py-2.5">
-        {[
-          rangeOptions.map((option) => ({
-            key: option.value,
-            label: option.label,
-            selected: search.range === option.value,
-            select: () => updateParams({ range: option.value }),
-          })),
-          ...(search.range === InboxSearchRange.InboxSearchRangeConversation
-            ? []
-            : [
-                searchTypes.map((value) => ({
-                  key: value,
-                  label: typeLabels[value],
-                  selected: type === value,
-                  select: () => updateParams({ type: value === "all" ? "" : value }),
-                })),
-              ]),
-        ].map((options, row) => (
-          <div key={row} className="flex flex-wrap gap-2">
-            {options.map((option) => (
-              <Button
-                key={option.key}
-                type="button"
-                size="sm"
-                variant={option.selected ? "secondary" : "ghost"}
-                className="h-9 rounded-full px-3.5"
-                aria-pressed={option.selected}
-                onClick={option.select}
-              >
-                {option.label}
-              </Button>
-            ))}
-          </div>
-        ))}
-      </div>
+      {conversationId ? (
+        <div className="flex h-10 shrink-0 items-center gap-2 border-b bg-muted pr-1 pl-4 text-sm text-muted-foreground">
+          <span className="min-w-0 flex-1 truncate">
+            {scopedName
+              ? t("searchConversationScope", { name: scopedName })
+              : t("searchCurrentConversation")}
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="icon-sm"
+            className="size-9 text-muted-foreground"
+            aria-label={t("searchConversationScopeClear")}
+            onClick={() => updateParams({ conversation: "" })}
+          >
+            <XIcon />
+          </Button>
+        </div>
+      ) : null}
       {search.paged && !search.pending ? (
         <InboxSearchConversationList identity={identity} query={search.nameQuery} history={inboxWindows} mobile>
           {(conversations) => (

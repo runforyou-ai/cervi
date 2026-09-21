@@ -99,7 +99,7 @@ export function KnowledgeDocumentFormPage({
           />
         ) : null}
       </PageHeader>
-      <PageContent>
+      <PageContent variant="form">
         {error || !ready ? (
           <KnowledgeQAFeedback
             error={error}
@@ -150,7 +150,8 @@ function KnowledgeDocumentForm({
   const form = useForm<DocumentFormValues>({
     resolver: zodResolver(schema),
     shouldUseNativeValidation: true,
-    mode: "onBlur",
+    // 编辑时离开字段即校验以便自动保存；新建时等提交再校验，避免原生校验把焦点锁在必填项上。
+    mode: stored ? "onBlur" : "onSubmit",
     defaultValues: {
       title: stored?.document.name ?? "",
       content: stored?.content ?? "",
@@ -211,7 +212,7 @@ function KnowledgeDocumentForm({
 
   const disabled = form.formState.isSubmitting
   return (
-    <form className="max-w-3xl space-y-9" onSubmit={form.handleSubmit((values) => save(values))}>
+    <form className="w-full space-y-9" onSubmit={form.handleSubmit((values) => save(values))}>
       <FieldGroup>
         <FormInputField
           control={form.control}
@@ -242,10 +243,7 @@ function KnowledgeDocumentForm({
         />
       </FieldGroup>
       {stored ? null : (
-        <div className="flex gap-3">
-          <Button type="submit" disabled={disabled}>
-            {t(disabled ? "common:actions.saving" : "common:actions.save")}
-          </Button>
+        <div className="flex items-center justify-end gap-2">
           <Button
             type="button"
             variant="outline"
@@ -253,6 +251,9 @@ function KnowledgeDocumentForm({
             onClick={() => navigate(returnPath, { replace: true })}
           >
             {t("common:actions.cancel")}
+          </Button>
+          <Button type="submit" disabled={disabled}>
+            {t(disabled ? "common:actions.saving" : "common:actions.save")}
           </Button>
         </div>
       )}

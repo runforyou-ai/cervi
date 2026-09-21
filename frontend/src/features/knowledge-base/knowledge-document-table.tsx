@@ -1,26 +1,71 @@
-/** 文档表格展示元数据、创建时间及固定操作栏。 */
-import { useRef, useState } from "react"
+/** 文档列表按单列行布局展示名称、索引状态和来源信息，文档操作通过右键菜单完成。 */
+import { useState } from "react"
 import { toast } from "sonner"
 import { refetchKnowledgeDocument, retryKnowledgeDocument, isApiError, KnowledgeDocumentSourceKind } from "@/api"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
 import { recoverSession } from "@/lib/session-navigation"
 import { apiErrorMessage } from "@/lib/form-errors"
-import { Link, useNavigate, useParams } from "react-router"
-import { EyeIcon, PencilIcon } from "lucide-react"
+import { useNavigate, useParams } from "react-router"
+import {
+  FileBracesIcon,
+  FileCodeIcon,
+  FileIcon,
+  FileSpreadsheetIcon,
+  FileTextIcon,
+  FileTypeIcon,
+  GlobeIcon,
+  PencilLineIcon,
+  PresentationIcon,
+  type LucideIcon,
+} from "lucide-react"
 import { useTranslation } from "react-i18next"
 import type { KnowledgeDocumentData, KnowledgeDocumentListData } from "@/api"
 import { ResourceListFrame } from "@/components/resource-list"
 import { ResourceTable } from "@/components/resource-table"
-import { SelectableText } from "@/components/selectable-text"
-import { Button } from "@/components/ui/button"
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
+import {
+  ContextMenuItem,
+  ContextMenuSeparator,
+} from "@/components/ui/context-menu"
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useDateTime } from "@/hooks/use-date-time"
 import { formatFileSize } from "@/lib/file-size"
+import { cn } from "@/lib/utils"
 import type { DocumentAction } from "./knowledge-document-actions"
 import { KnowledgeIndexStatus } from "./knowledge-index-status"
 
-/** 显示文档列表，操作列固定在最右侧。 */
+/** 各格式文档在行首显示的彩色图标，未列出的格式使用灰色通用文件图标。 */
+const formatIcons: Record<string, { icon: LucideIcon; className: string }> = {
+  ".pdf": { icon: FileTextIcon, className: "bg-file-pdf/12 text-file-pdf" },
+  ".docx": { icon: FileTypeIcon, className: "bg-file-word/12 text-file-word" },
+  ".pptx": { icon: PresentationIcon, className: "bg-file-slide/12 text-file-slide" },
+  ".xlsx": { icon: FileSpreadsheetIcon, className: "bg-file-sheet/12 text-file-sheet" },
+  ".csv": { icon: FileSpreadsheetIcon, className: "bg-file-sheet/12 text-file-sheet" },
+  ".json": { icon: FileBracesIcon, className: "bg-file-code/12 text-file-code" },
+  ".html": { icon: FileCodeIcon, className: "bg-file-code/12 text-file-code" },
+  ".htm": { icon: FileCodeIcon, className: "bg-file-code/12 text-file-code" },
+}
+const defaultFormatIcon = { icon: FileIcon, className: "bg-file-text/12 text-file-text" }
+
+/** 非上传来源在格式图标右下角叠加的角标；上传文件是默认来源，不加角标。 */
+const sourceBadgeIcons: Partial<Record<KnowledgeDocumentSourceKind, LucideIcon>> = {
+  [KnowledgeDocumentSourceKind.KnowledgeDocumentSourceWeb]: GlobeIcon,
+  [KnowledgeDocumentSourceKind.KnowledgeDocumentSourceText]: PencilLineIcon,
+}
+
+/** 扩展名对应的格式名称，未列出的格式显示大写扩展名。 */
+const formatNames: Record<string, string> = {
+  ".md": "Markdown",
+  ".markdown": "Markdown",
+  ".htm": "HTML",
+}
+
+/** 返回悬停在格式图标上时显示的格式名称。 */
+function formatName(format: string) {
+  return formatNames[format] ?? format.slice(1).toUpperCase()
+}
+
+/** 显示文档列表，右键行打开文档操作菜单。 */
 export function KnowledgeDocumentTable({
   data,
   listPath,
@@ -46,8 +91,6 @@ export function KnowledgeDocumentTable({
   const invalidate = useResourceInvalidator()
   const navigate = useNavigate()
   const [retryingIDs, setRetryingIDs] = useState<ReadonlySet<string>>(new Set())
-  // 记录每行三点菜单按钮，供关闭对话框后恢复焦点。
-  const triggers = useRef(new Map<string, HTMLButtonElement>())
 
   /** 提交重试或重新抓取，并在结束后刷新列表和详情中的文档状态。 */
   async function retryDocument(document: KnowledgeDocumentData, refetch = false) {
@@ -74,122 +117,105 @@ export function KnowledgeDocumentTable({
   return (
     <ResourceListFrame aria-busy={refreshing} page={data.page} disabled={refreshing} onPageChange={onPage}>
       <ResourceTable
+        hideHeader
         columns={[
           {
             key: "name",
             header: t("documents.columns.name"),
-            cellClassName: "max-w-80 truncate font-medium",
-            cell: (document) => (
-              <SelectableText title={document.name}>
-                {document.name}
-              </SelectableText>
-            ),
+            cellClassName: "min-w-0",
+            cell: (document) => {
+              const { icon: FormatIcon, className: formatClassName } =
+                formatIcons[document.format] ?? defaultFormatIcon
+              const SourceBadgeIcon = sourceBadgeIcons[document.sourceKind]
+              const label = `${formatName(document.format)} · ${t(`documents.sources.${document.sourceKind}`)}`
+              return (
+                <div className="flex min-w-0 items-center gap-3">
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <span
+                        role="img"
+                        aria-label={label}
+                        className={cn(
+                          "relative flex size-9 shrink-0 items-center justify-center rounded-full",
+                          formatClassName,
+                        )}
+                      >
+                        <FormatIcon className="size-4.5" aria-hidden="true" />
+                        {SourceBadgeIcon ? (
+                          <span className="absolute -right-0.5 -bottom-0.5 flex size-4 items-center justify-center rounded-full bg-background text-muted-foreground ring-1 ring-border">
+                            <SourceBadgeIcon className="size-2.5" aria-hidden="true" />
+                          </span>
+                        ) : null}
+                      </span>
+                    </TooltipTrigger>
+                    <TooltipContent side="top">{label}</TooltipContent>
+                  </Tooltip>
+                  <span className="grid min-w-0 justify-items-start gap-1 leading-tight">
+                    <span className="max-w-full truncate font-medium" title={document.name}>
+                      {document.name}
+                    </span>
+                    <span className="flex items-center gap-2">
+                      <KnowledgeIndexStatus status={document.status} failureMessage={document.failureMessage} />
+                      <span className="text-xs text-muted-foreground tabular-nums">
+                        {formatFileSize(document.byteSize)}
+                      </span>
+                    </span>
+                  </span>
+                </div>
+              )
+            },
           },
           {
-            key: "type",
-            header: t("documents.columns.type"),
-            cell: (document) => document.format.slice(1).toUpperCase(),
-          },
-          {
-            key: "source",
-            header: t("documents.columns.source"),
-            cellClassName: "whitespace-nowrap text-muted-foreground",
-            cell: (document) => t(`documents.sources.${document.sourceKind}`),
-          },
-          {
-            key: "size",
-            header: t("documents.columns.size"),
-            cellClassName: "whitespace-nowrap tabular-nums",
-            cell: (document) => formatFileSize(document.byteSize),
-          },
-          {
-            key: "status",
-            header: t("documents.columns.status"),
-            cell: (document) => <KnowledgeIndexStatus status={document.status} failureMessage={document.failureMessage} />,
-          },
-          {
-            key: "createdAt",
+            key: "details",
             header: t("documents.columns.createdAt"),
-            cellClassName: "whitespace-nowrap text-muted-foreground",
+            cellClassName: "w-px whitespace-nowrap text-muted-foreground tabular-nums",
             cell: (document) => formatDateTime(document.createdAt),
           },
         ]}
         rows={data.documents}
         rowKey={(document) => document.id}
         empty={t(filtered ? "documents.filteredEmpty" : "documents.empty")}
-        actions={(document) => ({
-          primary: (
-            <Button variant="outline" size="icon-sm" asChild>
-              {document.sourceKind ===
-              KnowledgeDocumentSourceKind.KnowledgeDocumentSourceText ? (
-                <Link
-                  to={`${listPath}/${document.id}/edit${search}`}
-                  aria-label={t("common:actions.edit")}
-                  title={t("common:actions.edit")}
-                >
-                  <PencilIcon />
-                </Link>
-              ) : (
-                <Link
-                  to={`${listPath}/${document.id}${search}`}
-                  aria-label={t("common:actions.view")}
-                  title={t("common:actions.view")}
-                >
-                  <EyeIcon />
-                </Link>
-              )}
-            </Button>
-          ),
-          menuLabel: t("documents.more", { name: document.name }),
-          menuTriggerRef: (node) => {
-            if (node) triggers.current.set(document.id, node)
-            else triggers.current.delete(document.id)
-          },
-          menu: (
-            <>
-              <DropdownMenuItem
+        // 在线编写的文档直接进入编辑，其余打开详情查看。
+        onRowActivate={(document) =>
+          navigate(
+            document.sourceKind === KnowledgeDocumentSourceKind.KnowledgeDocumentSourceText
+              ? `${listPath}/${document.id}/edit${search}`
+              : `${listPath}/${document.id}${search}`,
+          )
+        }
+        // 文档操作都放在右键菜单里，行内只保留信息。
+        rowMenu={(document) => (
+          <>
+            <ContextMenuItem
+              disabled={retryingIDs.has(document.id)}
+              onSelect={() => void retryDocument(document)}
+            >
+              {t("documents.reprocess")}
+            </ContextMenuItem>
+            {document.sourceKind ===
+            KnowledgeDocumentSourceKind.KnowledgeDocumentSourceWeb ? (
+              <ContextMenuItem
                 disabled={retryingIDs.has(document.id)}
-                onSelect={() => void retryDocument(document)}
-              >
-                {t("common:actions.retry")}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled={
-                  retryingIDs.has(document.id) ||
-                  document.sourceKind !==
-                    KnowledgeDocumentSourceKind.KnowledgeDocumentSourceWeb
-                }
                 onSelect={() => void retryDocument(document, true)}
               >
                 {t("documents.refetch")}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                disabled={!canMove}
-                onSelect={() =>
-                  onAction({
-                    document,
-                    kind: "move",
-                    trigger: triggers.current.get(document.id) ?? null,
-                  })
-                }
-              >
-                {t("documents.move")}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                destructive
-                onSelect={() =>
-                  onAction({
-                    document,
-                    kind: "delete",
-                    trigger: triggers.current.get(document.id) ?? null,
-                  })
-                }
-              >
-                {t("common:actions.delete")}
-              </DropdownMenuItem>
-            </>
-          ),
-        })}
+              </ContextMenuItem>
+            ) : null}
+            <ContextMenuItem
+              disabled={!canMove}
+              onSelect={() => onAction({ document, kind: "move", trigger: null })}
+            >
+              {t("documents.move")}
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+            <ContextMenuItem
+              destructive
+              onSelect={() => onAction({ document, kind: "delete", trigger: null })}
+            >
+              {t("common:actions.delete")}
+            </ContextMenuItem>
+          </>
+        )}
       />
     </ResourceListFrame>
   )

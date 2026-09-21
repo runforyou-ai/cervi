@@ -1,8 +1,8 @@
-/** 消息渠道列表页，统一展示当前支持的渠道。 */
-import { useMemo, useState } from "react"
+/** 渠道列表页，按中间栏选中的渠道类别展示该类别下的渠道。 */
+import { useEffect, useMemo, useState } from "react"
 import { PlusIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { Link, useNavigate } from "react-router"
+import { Link, useNavigate, useParams } from "react-router"
 import { toast } from "sonner"
 
 import {
@@ -33,8 +33,8 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import {
+  isMessageChannelType,
   messageChannelTypeDefinition,
-  messageChannelTypeDefinitions,
 } from "@/lib/message-channel-types"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
@@ -44,12 +44,15 @@ import { cn } from "@/lib/utils"
 
 type ChannelEnabledStatus = "enabled" | "disabled"
 
-/** 加载并管理消息渠道列表。 */
+/** 加载并管理当前类别的渠道列表。 */
 export function MessageChannelListPage() {
   const { t } = useTranslation(["channels", "common"])
   const navigate = useNavigate()
+  const { channelType = "" } = useParams()
   const invalidate = useResourceInvalidator()
-  const [category, setCategory] = useState("")
+  const typeDefinition = isMessageChannelType(channelType)
+    ? messageChannelTypeDefinition(channelType)
+    : undefined
   const [enabledStatus, setEnabledStatus] =
     useState<ChannelEnabledStatus>("enabled")
   const [updatingChannelId, setUpdatingChannelId] = useState("")
@@ -69,11 +72,19 @@ export function MessageChannelListPage() {
     () =>
       channels.filter(
         (channel) =>
-          (!category || channel.type === category) &&
+          channel.type === channelType &&
           channel.enabled === (enabledStatus === "enabled"),
       ),
-    [category, channels, enabledStatus],
+    [channelType, channels, enabledStatus],
   )
+  const typeChannelCount = channels.filter(
+    (channel) => channel.type === channelType,
+  ).length
+
+  /** 无效的类别参数回到默认渠道类别。 */
+  useEffect(() => {
+    if (!typeDefinition) navigate("/channels", { replace: true })
+  }, [navigate, typeDefinition])
 
   /** 切换消息渠道的启用状态。 */
   async function handleStatusChange(channel: MessageChannelSummary) {
@@ -113,12 +124,16 @@ export function MessageChannelListPage() {
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden">
       <PageHeader
-        title={t("list.title")}
+        title={
+          typeDefinition
+            ? t(`types.${typeDefinition.translationKey}`)
+            : t("list.title")
+        }
         description={t("list.description")}
       >
         <Button variant="ghost" size="icon-sm" asChild>
           <Link
-            to="/settings/channels/new"
+            to={`/channels/${channelType}/new`}
             aria-label={t("list.create")}
             title={t("list.create")}
           >
@@ -128,16 +143,6 @@ export function MessageChannelListPage() {
       </PageHeader>
 
       <ListToolbar>
-        <ListToolbarFilter
-          label={t("filters.category")}
-          allLabel={t("filters.allCategories")}
-          value={category}
-          options={messageChannelTypeDefinitions.map((definition) => ({
-            value: definition.type,
-            label: t(`types.${definition.translationKey}`),
-          }))}
-          onValueChange={setCategory}
-        />
         <ListToolbarFilter
           label={t("filters.status")}
           value={enabledStatus}
@@ -149,13 +154,8 @@ export function MessageChannelListPage() {
             setEnabledStatus(value as ChannelEnabledStatus)
           }
         />
-        {category || enabledStatus !== "enabled" ? (
-          <ListToolbarReset
-            onClick={() => {
-              setCategory("")
-              setEnabledStatus("enabled")
-            }}
-          >
+        {enabledStatus !== "enabled" ? (
+          <ListToolbarReset onClick={() => setEnabledStatus("enabled")}>
             {t("common:actions.clearFilters")}
           </ListToolbarReset>
         ) : null}
@@ -196,12 +196,12 @@ export function MessageChannelListPage() {
           rows={filteredChannels}
           rowKey={(channel) => channel.id}
           empty={
-            channels.length === 0
+            typeChannelCount === 0
               ? t("list.emptyTitle")
               : t("list.emptyFiltered")
           }
           onRowActivate={(channel) =>
-            navigate(`/settings/channels/${channel.type}/${channel.id}`)
+            navigate(`/channels/${channel.type}/${channel.id}`)
           }
           actions={(channel) => {
             const label = channel.enabled

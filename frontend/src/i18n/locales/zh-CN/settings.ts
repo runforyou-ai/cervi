@@ -5,15 +5,16 @@ const settings = {
   groups: {
     personal: "个人",
     organization: "企业",
+    integrations: "集成",
   },
   navigation: {
     profile: "个人资料",
     security: "登录与安全",
     preferences: "偏好设置",
+    notifications: "通知",
     devices: "设备",
     general: "通用设置",
     roles: "角色与权限",
-    channels: "消息渠道",
     modelServices: "模型服务",
     mcpServers: "MCP 服务",
     webhooks: "Webhook",
@@ -64,10 +65,9 @@ const settings = {
     list: {
       columns: {
         name: "设备名称",
-        platform: "平台",
-        createdAt: "注册时间",
       },
       current: "本机",
+      registeredAt: "注册于 {{time}}",
       empty: "还没有设备。在电脑上安装并登录 Cervi 桌面端后，这台电脑会出现在这里。",
       loadError: "加载设备列表失败。",
     },
@@ -87,7 +87,7 @@ const settings = {
   },
   preferences: {
     title: "偏好设置",
-    description: "设置语言、时区、外观和通知",
+    description: "设置语言、时区和外观",
     formLabel: "偏好设置表单",
     language: "语言",
     timeZone: "时区",
@@ -95,31 +95,34 @@ const settings = {
       zhCN: "简体中文",
       enUS: "English",
     },
-    notifications: {
-      title: "通知",
-      newMessages: "新消息提醒",
-      newMessagesDescription:
-        "开启后，Cervi 会在你上班时提醒新消息；休息一下或下班后自动暂停。",
-      sound: "播放系统默认通知声音",
-      soundDescription:
-        "仅影响当前设备，有新消息时播放系统默认通知声音。",
-      permission: {
-        label: "本设备通知权限",
-        authorized: "已授权",
-        authorizedDescription: "本设备可以显示新消息通知。",
-        unauthorizedDescription: "授权后，Cervi 才能在本设备上显示通知。",
-        allow: "允许通知",
-        allowing: "正在申请…",
-        allowSuccess: "通知权限已开启。",
-        allowDenied: "未能开启通知，请在浏览器或系统设置中允许。",
-        allowError: "无法申请通知权限，请重试。",
-        settingsOpenError: "无法打开系统通知设置，请手动前往系统设置。",
-      },
-    },
     saveError: "保存偏好设置失败，请重试。",
     validation: {
       timeZoneRequired: "请选择时区。",
     },
+  },
+  notifications: {
+    title: "通知",
+    description: "设置新消息提醒、通知声音和本设备通知权限",
+    formLabel: "通知设置表单",
+    newMessages: "新消息提醒",
+    newMessagesDescription:
+      "开启后，Cervi 会在你上班时提醒新消息；休息一下或下班后自动暂停。",
+    sound: "播放系统默认通知声音",
+    soundDescription:
+      "仅影响当前设备，有新消息时播放系统默认通知声音。",
+    permission: {
+      label: "本设备通知权限",
+      authorized: "已授权",
+      authorizedDescription: "本设备可以显示新消息通知。",
+      unauthorizedDescription: "授权后，Cervi 才能在本设备上显示通知。",
+      allow: "允许通知",
+      allowing: "正在申请…",
+      allowSuccess: "通知权限已开启。",
+      allowDenied: "未能开启通知，请在浏览器或系统设置中允许。",
+      allowError: "无法申请通知权限，请重试。",
+      settingsOpenError: "无法打开系统通知设置，请手动前往系统设置。",
+    },
+    saveError: "保存通知设置失败，请重试。",
   },
   appearance: {
     theme: "主题",
@@ -135,6 +138,7 @@ const settings = {
     saveError: "保存通用设置失败，请重试。",
     form: {
       name: "企业名称",
+      domain: "当前域名",
     },
     validation: {
       nameRequired: "请输入企业名称。",

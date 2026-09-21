@@ -53,14 +53,16 @@ type ContactInput struct {
 //
 // Deleted 由回收站路径设置，不经查询参数传输。
 type ContactListInput struct {
-	Query      string             `json:"query" query:"query"`
-	Stage      *ContactStage      `json:"stage,omitempty" query:"stage"`
-	ChannelID  string             `json:"channelId" query:"channelId"`
-	MethodType *ContactMethodType `json:"methodType,omitempty" query:"methodType"`
-	Sort       ContactSort        `json:"sort" query:"sort"`
-	Page       int                `json:"page" query:"page,default=1"`
-	PageSize   int                `json:"pageSize" query:"pageSize,default=50"`
-	Deleted    bool               `json:"deleted" query:"-"`
+	Query     string        `json:"query" query:"query"`
+	Stage     *ContactStage `json:"stage,omitempty" query:"stage"`
+	ChannelID string        `json:"channelId" query:"channelId"`
+	// ChannelType 按渠道类别筛选，与 ChannelID 同时给出时两个条件都需满足。
+	ChannelType *ChannelType       `json:"channelType,omitempty" query:"channelType"`
+	MethodType  *ContactMethodType `json:"methodType,omitempty" query:"methodType"`
+	Sort        ContactSort        `json:"sort" query:"sort"`
+	Page        int                `json:"page" query:"page,default=1"`
+	PageSize    int                `json:"pageSize" query:"pageSize,default=50"`
+	Deleted     bool               `json:"deleted" query:"-"`
 }
 
 // ContactSummary 定义联系人列表项。AvatarURL 为最近更新且带头像的渠道身份头像。

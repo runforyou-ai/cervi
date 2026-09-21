@@ -115,6 +115,7 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.POST("/teams", s.createTeam)
 	router.PUT("/teams/:teamID", s.updateTeam)
 	router.DELETE("/teams/:teamID", s.deleteTeam)
+	router.GET("/team-members", s.listAllTeamMembers)
 	router.GET("/teams/:teamID/members", s.listTeamMembers)
 	router.GET("/teams/:teamID/member-candidates", s.listTeamMemberCandidates)
 	router.POST("/teams/:teamID/members", s.addTeamMembers)
@@ -1018,6 +1019,16 @@ func (s *Service) updateTeam(c *gin.Context) {
 // deleteTeam 删除企业团队及其成员关系。
 func (s *Service) deleteTeam(c *gin.Context) {
 	writeEmpty(c, s.application.DeleteTeam(c.Request.Context(), requestMeta(c), c.Param("teamID")))
+}
+
+// listAllTeamMembers 返回企业所有团队的成员列表，同一身份只列一次。
+func (s *Service) listAllTeamMembers(c *gin.Context) {
+	input, ok := bindTeamMemberListInputQuery(c)
+	if !ok {
+		return
+	}
+	output, err := s.application.ListAllTeamMembers(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusOK, output, err)
 }
 
 // listTeamMembers 返回团队成员列表。

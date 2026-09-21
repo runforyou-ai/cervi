@@ -34,17 +34,18 @@ export function useDateTime() {
   }
 
   return {
+    /** 界面通用的时间格式：精确到分钟的短日期时间，如 09/21 11:12，不在今年时带上年份。 */
     formatDateTime(value: string) {
-      const parts = dateParts(value)
-      return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}:${parts.second}`
-    },
-    /** 输出精确到分钟的短日期时间，不在今年时带上年份。 */
-    formatShortDateTime(value: string) {
       const parts = dateParts(value)
       const date = `${parts.month}/${parts.day} ${parts.hour}:${parts.minute}`
       return parts.year === dateParts(new Date()).year
         ? date
         : `${parts.year}/${date}`
+    },
+    /** 带年份和秒的完整日期时间，只用于消息页的群聊资料。 */
+    formatFullDateTime(value: string) {
+      const parts = dateParts(value)
+      return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}:${parts.second}`
     },
   }
 }

@@ -4,7 +4,6 @@ import {
   CircleHelpIcon,
   FileTextIcon,
   FolderIcon,
-  MoreHorizontalIcon,
   PlusIcon,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
@@ -38,10 +37,16 @@ import {
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu"
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { KnowledgeBaseProvider } from "@/features/knowledge-base/knowledge-base-context"
@@ -193,10 +198,9 @@ export function KnowledgeBaseLayout() {
   return (
     <>
       <PageSplit
-        paneWidth="md"
+        paneWidth="nav"
         paneVariant="nav"
         paneOnNarrow={indexActive ? "fill" : "hide"}
-        paneClassName="md:w-68"
         mainClassName={cn(indexActive && "hidden md:flex")}
         pane={
           <PagePaneNav
@@ -208,7 +212,7 @@ export function KnowledgeBaseLayout() {
                   <Button
                     variant="ghost"
                     size="icon-sm"
-                    className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
+                    className="shrink-0 text-muted-foreground"
                     aria-label={t("common:actions.new")}
                     title={t("common:actions.new")}
                   >
@@ -392,46 +396,38 @@ function KnowledgeBaseTree({
 
   return (
     <section className="mb-2">
-      <div
-        className={cn(
-          "flex items-center rounded-md transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-          active && "bg-sidebar-accent/60 font-medium",
-        )}
-      >
-        <Link
-          to={path}
-          className="flex h-8 min-w-0 flex-1 items-center gap-2 px-2.5 text-sm"
-          title={knowledgeBase.name}
-        >
-          {isQA ? <CircleHelpIcon /> : <FileTextIcon />}
-          <span className="truncate">{knowledgeBase.name}</span>
-          <span className="ml-auto shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-normal text-muted-foreground">
-            {categoryLabel}
-          </span>
-        </Link>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon-xs"
-              className="mr-1"
-              aria-label={t("sidebar.more", { name: knowledgeBase.name })}
-              title={t("sidebar.more", { name: knowledgeBase.name })}
+      {/* 知识库操作通过右键菜单完成，菜单打开期间保持该行高亮。 */}
+      <ContextMenu>
+        <ContextMenuTrigger asChild>
+          <div
+            className={cn(
+              "flex items-center rounded-md transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[state=open]:bg-sidebar-accent",
+              active && "bg-sidebar-accent/60 font-medium",
+            )}
+          >
+            <Link
+              to={path}
+              className="flex h-8 min-w-0 flex-1 items-center gap-2 px-2.5 text-sm"
+              title={knowledgeBase.name}
             >
-              <MoreHorizontalIcon />
-            </Button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end">
-            <DropdownMenuItem onSelect={() => onCreateGroup()}>
-              {t("sidebar.addGroup")}
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem destructive onSelect={onDeleteKnowledgeBase}>
-              {t("common:actions.delete")}
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+              {isQA ? <CircleHelpIcon /> : <FileTextIcon />}
+              <span className="truncate">{knowledgeBase.name}</span>
+              <span className="ml-auto shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-normal text-muted-foreground">
+                {categoryLabel}
+              </span>
+            </Link>
+          </div>
+        </ContextMenuTrigger>
+        <ContextMenuContent>
+          <ContextMenuItem onSelect={() => onCreateGroup()}>
+            {t("sidebar.addGroup")}
+          </ContextMenuItem>
+          <ContextMenuSeparator />
+          <ContextMenuItem destructive onSelect={onDeleteKnowledgeBase}>
+            {t("common:actions.delete")}
+          </ContextMenuItem>
+        </ContextMenuContent>
+      </ContextMenu>
 
       <div className="mt-1 ml-3 border-l pl-2">
         {defaultGroup ? (
@@ -488,7 +484,7 @@ function KnowledgeBaseTree({
   )
 }
 
-/** 渲染知识库分组行及低频操作。 */
+/** 渲染知识库分组行，右键打开分组操作菜单。 */
 function KnowledgeGroupTreeRow({
   group,
   contentPath,
@@ -506,45 +502,38 @@ function KnowledgeGroupTreeRow({
 }) {
   const { t } = useTranslation(["knowledgeBase", "common"])
   return (
-    <div className="group/tree flex h-8 items-center rounded-md px-2 text-xs text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground">
-      <FolderIcon className="size-3.5 shrink-0" />
-      {contentPath ? (
-        <Link
-          to={contentPath}
-          className={cn(
-            "ml-2 min-w-0 flex-1 truncate py-2",
-            currentPath.startsWith(contentPath) &&
-              "font-medium text-sidebar-accent-foreground",
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div className="flex h-8 items-center rounded-md px-2 text-xs text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[state=open]:bg-sidebar-accent">
+          <FolderIcon className="size-3.5 shrink-0" />
+          {contentPath ? (
+            <Link
+              to={contentPath}
+              className={cn(
+                "ml-2 min-w-0 flex-1 truncate py-2",
+                currentPath.startsWith(contentPath) &&
+                  "font-medium text-sidebar-accent-foreground",
+              )}
+            >
+              {group.name}
+            </Link>
+          ) : (
+            <span className="ml-2 min-w-0 flex-1 truncate">{group.name}</span>
           )}
-        >
-          {group.name}
-        </Link>
-      ) : (
-        <span className="ml-2 min-w-0 flex-1 truncate">{group.name}</span>
-      )}
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <Button
-            variant="ghost"
-            size="icon-xs"
-            className="-mr-1 opacity-0 group-hover/tree:opacity-100 data-[state=open]:opacity-100"
-            aria-label={t("group.more", { name: group.name })}
-          >
-            <MoreHorizontalIcon />
-          </Button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end">
-          {onAddChild ? (
-            <DropdownMenuItem onSelect={onAddChild}>
-              {t("group.addChild")}
-            </DropdownMenuItem>
-          ) : null}
-          <DropdownMenuItem onSelect={onEdit}>{t("common:actions.edit")}</DropdownMenuItem>
-          <DropdownMenuItem destructive onSelect={onDelete}>
-            {t("common:actions.delete")}
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </div>
+        </div>
+      </ContextMenuTrigger>
+      <ContextMenuContent>
+        {onAddChild ? (
+          <ContextMenuItem onSelect={onAddChild}>
+            {t("group.addChild")}
+          </ContextMenuItem>
+        ) : null}
+        <ContextMenuItem onSelect={onEdit}>{t("common:actions.edit")}</ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem destructive onSelect={onDelete}>
+          {t("common:actions.delete")}
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   )
 }

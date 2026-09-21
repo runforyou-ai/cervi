@@ -172,6 +172,8 @@
   "messenger.attachment_unavailable": "Attachment unavailable",
   "messenger.session_open": "In progress",
   "messenger.session_closed": "Closed",
+  "messenger.day_today": "Today",
+  "messenger.day_yesterday": "Yesterday",
   "error.internal": "The service is temporarily unavailable. Try again later.",
   "error.method_not_allowed": "This request method is not supported.",
   "error.installation_status_read_failed": "Could not read the installation status.",

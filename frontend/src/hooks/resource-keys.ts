@@ -127,6 +127,8 @@ export const resourceKeys = {
   deviceWorkspaces: (deviceId?: string) => itemKey("device-workspaces", deviceId),
   /** 会话绑定的设备与工作区。 */
   conversationDeviceBinding: (conversationId?: string) => itemKey("conversation-device-binding", conversationId),
+  /** 当前客户端连接的企业服务器地址。 */
+  serverURL: () => ["server-url"],
   /** 知识库列表。 */
   knowledgeBases: () => ["knowledge-bases"],
   /** 单个知识库。 */

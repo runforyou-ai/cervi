@@ -6,6 +6,9 @@ const contacts = {
   all: "全部",
   create: "添加联系人",
   anonymous: "匿名访客",
+  teamSelect: {
+    placeholder: "选择团队",
+  },
   add: {
     member: "添加企业成员",
     agent: "添加 AI 员工",
@@ -111,6 +114,7 @@ const contacts = {
       password: "初始密码",
       role: "企业角色",
       handlesCustomers: "接待客户",
+      handlesCustomersHelp: "开启后可以被分配接待客户会话。",
       teams: "所属团队",
       noTeams: "还没有可选择的团队。",
       created: "企业成员已添加",
@@ -141,6 +145,7 @@ const contacts = {
   },
   agents: {
     configure: "配置",
+    nameSeparator: "、",
     editTitle: "配置 AI 员工",
     createDescription: "创建 AI 员工并配置身份与知识",
     editDescription: "调整 AI 员工的身份、知识和运行配置",
@@ -150,6 +155,7 @@ const contacts = {
     form: {
       name: "AI 员工名称",
       handlesCustomers: "接待客户",
+      handlesCustomersHelp: "开启后可以被分配接待客户会话。",
       teams: "所属团队",
       noTeams: "还没有可选择的团队。",
       created: "AI 员工已添加",
@@ -167,6 +173,8 @@ const contacts = {
       title: "配置 MCP 服务",
       unconfigured: "未配置",
       selected: "已选择 {{count}} 个服务",
+      selectedOne: "已选择{{names}}",
+      selectedNames: "已选择{{names}}等 {{count}} 个服务",
       empty: "暂无 MCP 服务",
       loadError: "MCP 服务列表加载失败，请重试。",
       tools: "{{count}} 个工具",
@@ -174,9 +182,12 @@ const contacts = {
     execution: {
       knowledgeBases: "知识库",
       knowledgeEmpty: "暂无知识库",
-      knowledgeLoading: "正在加载知识库…",
-      knowledgeLoadError: "知识库加载失败",
-      knowledgeUnavailableCount: "已失效的知识库（{{count}} 个）",
+      knowledgeTitle: "配置知识库",
+      knowledgeUnconfigured: "未配置",
+      knowledgeSelected: "已选择 {{count}} 个知识库",
+      knowledgeSelectedOne: "已选择{{names}}",
+      knowledgeSelectedNames: "已选择{{names}}等 {{count}} 个知识库",
+      knowledgeLoadError: "知识库列表加载失败，请重试。",
 
       title: "运行配置",
       model: "对话模型",
@@ -208,7 +219,6 @@ const contacts = {
   },
   teams: {
     create: "创建团队",
-    more: "更多团队操作",
     createDescription: "填写团队名称和简介。",
     editDescription: "修改团队名称和简介。",
     form: {
@@ -247,7 +257,6 @@ const contacts = {
       removeError: "移出团队成员失败，请重试。",
     },
     delete: {
-      action: "删除团队",
       title: "删除“{{name}}”？",
       description: "{{count}} 名成员将退出该团队，成员账号不会被删除。",
       success: "团队已删除",

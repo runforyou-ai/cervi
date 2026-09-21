@@ -1,6 +1,6 @@
 /** 本地知识问答的分组列表、搜索和删除操作。 */
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
-import { PlusIcon } from "lucide-react"
+import { PlusIcon, SearchCheckIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Link, useLocation, useParams } from "react-router"
 
@@ -128,11 +128,14 @@ function KnowledgeQAGroupList({
           <>
             <Button
               ref={retrievalTrigger}
-              variant="outline"
-              size="sm"
+              variant="ghost"
+              size="icon-sm"
+              className="shrink-0 text-muted-foreground"
+              aria-label={t("retrieval.action")}
+              title={t("retrieval.action")}
               onClick={() => setRetrievalOpen(true)}
             >
-              {t("retrieval.action")}
+              <SearchCheckIcon />
             </Button>
             <Button variant="ghost" size="icon-sm" asChild>
               <Link

@@ -5,15 +5,16 @@ const settings = {
   groups: {
     personal: "Personal",
     organization: "Organization",
+    integrations: "Integrations",
   },
   navigation: {
     profile: "Profile",
     security: "Login & security",
     preferences: "Preferences",
+    notifications: "Notifications",
     devices: "Devices",
     general: "General",
     roles: "Roles and permissions",
-    channels: "Message channels",
     modelServices: "Model services",
     mcpServers: "MCP servers",
     webhooks: "Webhooks",
@@ -65,10 +66,9 @@ const settings = {
     list: {
       columns: {
         name: "Device",
-        platform: "Platform",
-        createdAt: "Registered",
       },
       current: "This device",
+      registeredAt: "Registered {{time}}",
       empty: "No devices yet. Install the Cervi desktop app on a computer and sign in, and it will show up here.",
       loadError: "Could not load your devices.",
     },
@@ -88,7 +88,7 @@ const settings = {
   },
   preferences: {
     title: "Preferences",
-    description: "Language, time zone, appearance and notifications",
+    description: "Language, time zone and appearance",
     formLabel: "Preferences form",
     language: "Language",
     timeZone: "Time zone",
@@ -96,35 +96,38 @@ const settings = {
       zhCN: "简体中文",
       enUS: "English",
     },
-    notifications: {
-      title: "Notifications",
-      newMessages: "New message notifications",
-      newMessagesDescription:
-        "Cervi notifies you about new messages while you are working. Notifications pause while you are taking a break or off work.",
-      sound: "Play the system default notification sound",
-      soundDescription:
-        "Only affects this device and plays the system default sound for new messages.",
-      permission: {
-        label: "Notifications on this device",
-        authorized: "Authorized",
-        authorizedDescription:
-          "This device can show new message notifications.",
-        unauthorizedDescription:
-          "Authorize notifications before Cervi can show them on this device.",
-        allow: "Allow notifications",
-        allowing: "Requesting…",
-        allowSuccess: "Notification permission enabled.",
-        allowDenied:
-          "Notifications were not enabled. Allow them in your browser or system settings.",
-        allowError: "Could not request notification permission. Try again.",
-        settingsOpenError:
-          "Could not open notification settings. Open them manually in system settings.",
-      },
-    },
     saveError: "Could not save preferences. Try again.",
     validation: {
       timeZoneRequired: "Select a time zone.",
     },
+  },
+  notifications: {
+    title: "Notifications",
+    description: "Message alerts, sounds and this device's notification permission",
+    formLabel: "Notification settings form",
+    newMessages: "New message notifications",
+    newMessagesDescription:
+      "Cervi notifies you about new messages while you are working. Notifications pause while you are taking a break or off work.",
+    sound: "Play the system default notification sound",
+    soundDescription:
+      "Only affects this device and plays the system default sound for new messages.",
+    permission: {
+      label: "Notifications on this device",
+      authorized: "Authorized",
+      authorizedDescription:
+        "This device can show new message notifications.",
+      unauthorizedDescription:
+        "Authorize notifications before Cervi can show them on this device.",
+      allow: "Allow notifications",
+      allowing: "Requesting…",
+      allowSuccess: "Notification permission enabled.",
+      allowDenied:
+        "Notifications were not enabled. Allow them in your browser or system settings.",
+      allowError: "Could not request notification permission. Try again.",
+      settingsOpenError:
+        "Could not open notification settings. Open them manually in system settings.",
+    },
+    saveError: "Could not save notification settings. Try again.",
   },
   appearance: {
     theme: "Theme",
@@ -140,6 +143,7 @@ const settings = {
     saveError: "Could not save general settings. Try again.",
     form: {
       name: "Company name",
+      domain: "Current domain",
     },
     validation: {
       nameRequired: "Enter the company name.",

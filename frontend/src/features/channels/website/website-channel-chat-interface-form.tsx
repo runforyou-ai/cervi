@@ -116,7 +116,7 @@ export function WebsiteChannelChatInterfaceForm({
       }
       if (isNotFoundApiError(error)) {
         console.warn("网站渠道不存在", { channel_id: channel.id })
-        navigate("/settings/channels", { replace: true })
+        navigate(`/channels/${channel.type}`, { replace: true })
         return
       }
       if (isApiError(error)) {
@@ -139,7 +139,7 @@ export function WebsiteChannelChatInterfaceForm({
 
   return (
     <form
-      className="w-full max-w-2xl"
+      className="w-full"
       onSubmit={form.handleSubmit(submit)}
       noValidate
     >

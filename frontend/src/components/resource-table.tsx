@@ -5,6 +5,11 @@ import { useTranslation } from "react-i18next"
 
 import { Button } from "@/components/ui/button"
 import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu"
+import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuTrigger,
@@ -37,7 +42,7 @@ export type ResourceTableRowActions = {
   menuTriggerRef?: Ref<HTMLButtonElement>
 }
 
-/** 按列定义渲染表头和单元格，给出 actions 时在最右侧追加操作列，空列表展示占位行；给出 onRowActivate 时整行可点击或用回车触发，hideHeader 用于列含义已经一目了然的列表。 */
+/** 按列定义渲染表头和单元格，给出 actions 时在最右侧追加操作列，空列表展示占位行；给出 onRowActivate 时整行可点击或用回车触发，给出 rowMenu 时整行右键弹出菜单，hideHeader 用于列含义已经一目了然的列表。 */
 export function ResourceTable<T>({
   columns,
   rows,
@@ -45,6 +50,7 @@ export function ResourceTable<T>({
   empty,
   actions,
   onRowActivate,
+  rowMenu,
   hideHeader = false,
 }: {
   columns: readonly ResourceTableColumn<T>[]
@@ -53,6 +59,8 @@ export function ResourceTable<T>({
   empty: ReactNode
   actions?: (row: T) => ResourceTableRowActions
   onRowActivate?: (row: T) => void
+  /** 返回该行右键菜单的菜单项。 */
+  rowMenu?: (row: T) => ReactNode
   hideHeader?: boolean
 }) {
   const { t } = useTranslation("common")
@@ -87,34 +95,49 @@ export function ResourceTable<T>({
             </TableCell>
           </TableRow>
         ) : (
-          rows.map((row) => (
-            <TableRow
-              key={rowKey(row)}
-              className={cn("h-[65px]", onRowActivate && "cursor-pointer")}
-              tabIndex={onRowActivate ? 0 : undefined}
-              onClick={onRowActivate ? () => onRowActivate(row) : undefined}
-              onKeyDown={
-                onRowActivate
-                  ? (event) => {
-                      if (event.target !== event.currentTarget) return
-                      if (event.key !== "Enter" && event.key !== " ") return
-                      event.preventDefault()
-                      onRowActivate(row)
-                    }
-                  : undefined
-              }
-            >
-              {columns.map((column) => (
-                <TableCell
-                  key={column.key}
-                  className={cn(column.className, column.cellClassName)}
-                >
-                  {column.cell(row)}
-                </TableCell>
-              ))}
-              {actions ? <ResourceTableActionsCell {...actions(row)} /> : null}
-            </TableRow>
-          ))
+          rows.map((row) => {
+            const rowElement = (
+              <TableRow
+                key={rowKey(row)}
+                // 右键菜单打开期间保持该行的悬停底色，标明菜单作用的行。
+                className={cn(
+                  "h-[65px] data-[state=open]:bg-muted/40",
+                  onRowActivate && "cursor-pointer",
+                )}
+                tabIndex={onRowActivate ? 0 : undefined}
+                onClick={onRowActivate ? () => onRowActivate(row) : undefined}
+                onKeyDown={
+                  onRowActivate
+                    ? (event) => {
+                        if (event.target !== event.currentTarget) return
+                        if (event.key !== "Enter" && event.key !== " ") return
+                        event.preventDefault()
+                        onRowActivate(row)
+                      }
+                    : undefined
+                }
+              >
+                {columns.map((column) => (
+                  <TableCell
+                    key={column.key}
+                    className={cn(column.className, column.cellClassName)}
+                  >
+                    {column.cell(row)}
+                  </TableCell>
+                ))}
+                {actions ? (
+                  <ResourceTableActionsCell {...actions(row)} />
+                ) : null}
+              </TableRow>
+            )
+            if (!rowMenu) return rowElement
+            return (
+              <ContextMenu key={rowKey(row)}>
+                <ContextMenuTrigger asChild>{rowElement}</ContextMenuTrigger>
+                <ContextMenuContent>{rowMenu(row)}</ContextMenuContent>
+              </ContextMenu>
+            )
+          })
         )}
       </TableBody>
     </Table>

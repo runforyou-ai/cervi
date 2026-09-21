@@ -56,6 +56,17 @@ func (o *directOperations) DeleteTeam(ctx context.Context, meta RequestMeta, ide
 	return nil
 }
 
+// ListAllTeamMembers 返回企业所有团队的成员列表。
+func (o *directOperations) ListAllTeamMembers(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input TeamMemberListInput) (TeamMemberList, error) {
+	output, err := o.listTeamMembers.ExecuteAll(ctx, identity, teamaction.MemberListInput{
+		Query: input.Query, WorkStatus: optionalDomain[WorkStatus, domain.WorkStatus](input.WorkStatus), Page: input.Page, PageSize: input.PageSize,
+	})
+	if err != nil {
+		return TeamMemberList{}, o.teamError(ctx, meta, err, cervii18n.ErrorTeamMemberListFailed, identity.Organization.ID, "")
+	}
+	return o.teamMemberList(ctx, meta, identity, "", output)
+}
+
 // ListTeamMembers 返回团队成员列表。
 func (o *directOperations) ListTeamMembers(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, teamID string, input TeamMemberListInput) (TeamMemberList, error) {
 	output, err := o.listTeamMembers.Execute(ctx, identity, teamID, teamaction.MemberListInput{
@@ -64,6 +75,11 @@ func (o *directOperations) ListTeamMembers(ctx context.Context, meta RequestMeta
 	if err != nil {
 		return TeamMemberList{}, o.teamError(ctx, meta, err, cervii18n.ErrorTeamMemberListFailed, identity.Organization.ID, teamID)
 	}
+	return o.teamMemberList(ctx, meta, identity, teamID, output)
+}
+
+// teamMemberList 把团队成员查询结果转换为应用服务结构并补齐头像地址。
+func (o *directOperations) teamMemberList(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, teamID string, output teamaction.MemberListOutput) (TeamMemberList, error) {
 	avatarFileIDs := make([]*string, 0, len(output.Members))
 	for _, member := range output.Members {
 		avatarFileIDs = append(avatarFileIDs, member.AvatarFileID)

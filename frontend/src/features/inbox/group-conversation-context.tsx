@@ -78,7 +78,7 @@ function GroupConversationProfile({
 }) {
   const { t } = useTranslation("inbox")
   const navigate = useNavigate()
-  const { formatDateTime } = useDateTime()
+  const { formatFullDateTime } = useDateTime()
   const [dissolveOpen, setDissolveOpen] = useState(false)
   const moreTrigger = useRef<HTMLButtonElement>(null)
   const [editing, setEditing] = useState<"title" | "description" | null>(null)
@@ -320,7 +320,7 @@ function GroupConversationProfile({
         {owner?.displayName ?? "—"}
       </ReadonlyGroupRow>
       <ReadonlyGroupRow label={t("groupCreatedAt")}>
-        {createdAt ? formatDateTime(createdAt) : "—"}
+        {createdAt ? formatFullDateTime(createdAt) : "—"}
       </ReadonlyGroupRow>
     </div>
   )
