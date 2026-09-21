@@ -935,7 +935,7 @@ func (o *directOperations) conversationMessageListFromAction(ctx context.Context
 		result.AgentRuns = append(result.AgentRuns, ConversationAgentRun{ID: run.ID, AgentIdentityID: run.AgentIdentityID,
 			AgentName: run.AgentName, AgentAvatarURL: optionalFileURL(avatarURLs, run.AgentAvatarFileID),
 			Status: AgentRunStatus(run.Status), ErrorCode: run.ErrorCode, LastError: run.LastError,
-			Process: conversationAgentProcessFromAction(run.Process)})
+			Process: conversationAgentProcessFromAction(run.Process), ExecutionDeviceName: run.ExecutionDeviceName})
 	}
 	result.PendingAgents = make([]ConversationPendingAgent, 0, len(history.PendingAgents))
 	for _, agent := range history.PendingAgents {

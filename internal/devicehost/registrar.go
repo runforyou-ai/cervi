@@ -119,21 +119,42 @@ func (r *Registrar) CurrentDevice(ctx context.Context, meta appservice.RequestMe
 	if r == nil {
 		return appservice.LocalDevice{}, nil
 	}
+	session, found, err := r.currentDeviceSession(ctx, meta)
+	if err != nil || !found {
+		return appservice.LocalDevice{}, err
+	}
+	return appservice.LocalDevice{DeviceID: session.deviceID}, nil
+}
+
+// deviceSession 是当前登录会话及本机在该企业服务器上为该用户注册的设备。
+type deviceSession struct {
+	serverURL  string
+	credential clientsession.Credential
+	deviceID   string
+}
+
+// key 标识一个设备登录会话，换服、换账号、重新登录或重新注册后取值变化。
+func (s deviceSession) key() string {
+	return sessionKey(s.serverURL, s.credential) + "\n" + s.deviceID
+}
+
+// currentDeviceSession 返回当前登录会话及本机已注册的设备，尚未登录或尚未注册时返回 false。
+func (r *Registrar) currentDeviceSession(ctx context.Context, meta appservice.RequestMeta) (deviceSession, bool, error) {
 	serverURL, credential, ok := r.currentSession(ctx, meta)
 	if !ok {
-		return appservice.LocalDevice{}, nil
+		return deviceSession{}, false, nil
 	}
 	deviceID, found, err := r.store.LoadDeviceRegistration(ctx, serverURL, credential.OrganizationID, credential.UserID)
 	if err != nil {
 		if ctx.Err() != nil {
-			return appservice.LocalDevice{}, ctx.Err()
+			return deviceSession{}, false, ctx.Err()
 		}
-		return appservice.LocalDevice{}, fmt.Errorf("load device registration: %w", err)
+		return deviceSession{}, false, fmt.Errorf("load device registration: %w", err)
 	}
 	if !found {
-		return appservice.LocalDevice{}, nil
+		return deviceSession{}, false, nil
 	}
-	return appservice.LocalDevice{DeviceID: deviceID}, nil
+	return deviceSession{serverURL: serverURL, credential: credential, deviceID: deviceID}, true, nil
 }
 
 // run 在唤醒信号和重试间隔上尝试注册，直到注册器停止；注册失败按退避缩短下次尝试的等待。

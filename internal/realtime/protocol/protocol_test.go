@@ -68,7 +68,8 @@ var expectedFrames = map[string]Frame{
 			{Kind: RunStreamAppendCandidate, Text: "退款需要在 7 天内提交。"},
 		},
 	},
-	"run_stream_ended": RunStreamEnded{RunID: runStreamRunID},
+	"run_stream_ended":     RunStreamEnded{RunID: runStreamRunID},
+	"device_work_advanced": DeviceWorkAdvanced{DeviceID: "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a90", WorkSeq: 9223372036854775807},
 }
 
 // TestFrameFixtures 按共用夹具校验 Go 端解码结果，并校验编码输出与夹具线上格式一致。

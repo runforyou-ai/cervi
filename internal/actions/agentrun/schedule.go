@@ -4,17 +4,19 @@ package agentrun
 
 import (
 	"context"
+	"database/sql"
 	"errors"
 	"fmt"
 	"uuid"
 
 	"github.com/runforyou-ai/cervi/internal/domain"
+	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
 )
 
-// Scheduler 在消息事务内追加 Agent 输入并创建可靠任务。
+// Scheduler 在消息事务内追加 Agent 输入并派发运行。
 type Scheduler struct {
 	enqueuer servertask.TxEnqueuer
 }
@@ -82,7 +84,7 @@ func (s *Scheduler) appendInput(ctx context.Context, db bun.IDB, spec agentRunSp
 	if active {
 		return nil
 	}
-	_, err = insertAndEnqueueRun(ctx, db, s.enqueuer, spec, sequence.LaneID, sequence.ProcessedSeq+1)
+	_, err = insertAndDispatchRun(ctx, db, s.enqueuer, spec, sequence.LaneID, sequence.ProcessedSeq+1)
 	return err
 }
 
@@ -105,18 +107,33 @@ func advanceLaneSequence(ctx context.Context, db bun.IDB, spec agentRunSpec) (la
 	return sequence, nil
 }
 
-// insertAndEnqueueRun 创建 Agent 业务运行并投递隔离 Worker。
-func insertAndEnqueueRun(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer, spec agentRunSpec, laneID string, startSeq int64) (string, error) {
+// insertAndDispatchRun 创建 Agent 业务运行并派发执行：会话已绑定设备时交给该设备的工作区，否则投递隔离 Worker。
+func insertAndDispatchRun(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer, spec agentRunSpec, laneID string, startSeq int64) (string, error) {
 	run := &servermodels.AgentRun{
 		ID: uuid.NewV7().String(), OrganizationID: spec.OrganizationID, ConversationID: spec.ConversationID,
 		AgentIdentityID: spec.AgentIdentityID, AgentRevisionID: spec.RevisionID, LaneID: laneID,
 		ScopeKind: string(spec.ScopeKind), ScopeID: spec.ScopeID,
 		Status: string(domain.AgentRunStatusQueued), InputStartSeq: startSeq,
 	}
+	binding := &servermodels.ConversationDeviceBinding{}
+	err := db.NewSelect().Model(binding).
+		Where("cdb.organization_id = ? AND cdb.conversation_id = ?", spec.OrganizationID, spec.ConversationID).
+		Scan(ctx)
+	if err != nil && !errors.Is(err, sql.ErrNoRows) {
+		return "", fmt.Errorf("load conversation device binding: %w", err)
+	}
+	bound := err == nil
+	if bound {
+		run.ExecutionDeviceID, run.ExecutionWorkspaceID = &binding.DeviceID, &binding.WorkspaceID
+	}
 	if _, err := db.NewInsert().Model(run).
-		Column("id", "organization_id", "conversation_id", "agent_identity_id", "agent_revision_id", "lane_id", "scope_kind", "scope_id", "status", "input_start_seq").
+		Column("id", "organization_id", "conversation_id", "agent_identity_id", "agent_revision_id", "lane_id", "scope_kind", "scope_id", "status", "input_start_seq",
+			"execution_device_id", "execution_workspace_id").
 		Exec(ctx); err != nil {
 		return "", fmt.Errorf("create agent run: %w", err)
+	}
+	if bound {
+		return run.ID, advanceDeviceWork(ctx, db, spec.OrganizationID, binding.DeviceID)
 	}
 	if _, err := enqueuer.EnqueueIn(ctx, db, RunActionName, RunInput{RunID: run.ID}, servertask.EnqueueOptions{
 		Queue: servertask.QueueAgent, MaxAttempts: 3,
@@ -126,4 +143,21 @@ func insertAndEnqueueRun(ctx context.Context, db bun.IDB, enqueuer servertask.Tx
 		return "", fmt.Errorf("enqueue agent run: %w", err)
 	}
 	return run.ID, nil
+}
+
+// advanceDeviceWork 推进设备工作水位，并在事务提交后通知设备主人的该设备事件流；调用方必须处于 realtime.RunInTx 内。
+func advanceDeviceWork(ctx context.Context, db bun.IDB, organizationID, deviceID string) error {
+	var advanced struct {
+		UserID  string `bun:"user_id"`
+		WorkSeq int64  `bun:"work_seq"`
+	}
+	if err := db.NewRaw(`
+		UPDATE devices SET work_seq = work_seq + 1, updated_at = now()
+		WHERE organization_id = ? AND id = ?
+		RETURNING user_id, work_seq
+	`, organizationID, deviceID).Scan(ctx, &advanced); err != nil {
+		return fmt.Errorf("advance device work sequence: %w", err)
+	}
+	realtime.Notify(ctx, realtime.UserDeviceWorkAdvanced(organizationID, advanced.UserID, deviceID, advanced.WorkSeq))
+	return nil
 }

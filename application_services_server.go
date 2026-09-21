@@ -100,6 +100,14 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	if err := tasks.Registry().RegisterJSONWithTerminalFailure(agentrunaction.RunActionName, executeAgentRun.Execute, executeAgentRun.FinalizeFailure); err != nil {
 		return nil, nil, err
 	}
+	// 注册设备运行收敛扫描，每 15 秒把租约过期或失去执行条件的设备运行标记失败。
+	if err := tasks.Registry().RegisterJSON(agentrunaction.DeviceRunSweepActionName, executeAgentRun.SweepDeviceRuns); err != nil {
+		return nil, nil, err
+	}
+	tasks.RegisterSchedule(servertask.ScheduleDefinition{
+		Key: "agent-device-run-sweep", ActionName: agentrunaction.DeviceRunSweepActionName, Queue: "maintenance",
+		Payload: struct{}{}, CronExpression: "@every 15s", Timezone: "UTC", Enabled: true, MaxAttempts: 1, StartImmediately: true,
+	})
 
 	// 注册过期文件扫描与删除任务，每小时触发一次扫描。
 	scanExpired := filemaintenance.NewScanExpiredAction(appStorage.DB(), tasks)
@@ -165,6 +173,7 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	// 将业务入口适配为 HTTP API，并为公开网站渠道提供配置查询。
 	httpAPI := api.NewService(
 		boundService,
+		api.WithDeviceRuns(directBackend),
 		api.WithWebsiteVisitor(websiteVisitorService, config.TLS.Mode != "off"),
 		api.WithWebsiteVisitorRealtime(realtimeGateway),
 		api.WithTelegramWebhook(telegramWebhook),

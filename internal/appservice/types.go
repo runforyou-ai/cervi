@@ -64,10 +64,14 @@ type Startup struct {
 	OrganizationName string       `json:"organizationName,omitempty"`
 }
 
-// RequestMeta 携带一次应用服务调用的认证和本地化信息。
+// DeviceHeader 是设备运行期调用携带本机设备编号的请求头。
+const DeviceHeader = "X-Cervi-Device"
+
+// RequestMeta 携带一次应用服务调用的认证和本地化信息；DeviceID 只由原生端设备进程设置，经 DeviceHeader 传输。
 type RequestMeta struct {
-	Token  string `json:"token"`
-	Locale Locale `json:"locale"`
+	Token    string `json:"token"`
+	Locale   Locale `json:"locale"`
+	DeviceID string `json:"-"`
 }
 
 // InstallationStatus 定义企业初始化状态、公开企业名称和服务端部署形态。

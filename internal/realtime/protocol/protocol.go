@@ -39,6 +39,7 @@ const (
 	TypeRunStreamSnapshot        Type = "run_stream_snapshot"
 	TypeRunStreamDelta           Type = "run_stream_delta"
 	TypeRunStreamEnded           Type = "run_stream_ended"
+	TypeDeviceWorkAdvanced       Type = "device_work_advanced"
 )
 
 // RunStreamOperationKind 定义运行过程流增量中的操作类型，与 agentruntime 的运行流操作一一对应。
@@ -118,6 +119,12 @@ type ServiceAttention struct {
 	ConversationID   string                        `json:"conversationId"`
 	ServiceSessionID string                        `json:"serviceSessionId"`
 	Reason           domain.ServiceAttentionReason `json:"reason"`
+}
+
+// DeviceWorkAdvanced 表示本设备的工作水位推进到指定值，只发给携带该设备身份的事件流。
+type DeviceWorkAdvanced struct {
+	DeviceID string `json:"deviceId"`
+	WorkSeq  int64  `json:"workSeq,string"`
 }
 
 // RunStreamToolCall 是运行过程流中的工具调用名称、状态和起止时间，完整参数与结果经过程详情查询读取。
@@ -206,6 +213,9 @@ func (PinOrderChanged) FrameType() Type { return TypePinOrderChanged }
 // FrameType 返回客服处理周期提醒事件种类。
 func (ServiceAttention) FrameType() Type { return TypeServiceAttention }
 
+// FrameType 返回设备工作水位事件种类。
+func (DeviceWorkAdvanced) FrameType() Type { return TypeDeviceWorkAdvanced }
+
 // FrameType 返回运行过程流快照分片事件种类。
 func (RunStreamSnapshot) FrameType() Type { return TypeRunStreamSnapshot }
 
@@ -241,6 +251,7 @@ var decoders = map[Type]decoder{
 	TypeRunStreamSnapshot:        decodeAs[RunStreamSnapshot],
 	TypeRunStreamDelta:           decodeAs[RunStreamDelta],
 	TypeRunStreamEnded:           decodeAs[RunStreamEnded],
+	TypeDeviceWorkAdvanced:       decodeAs[DeviceWorkAdvanced],
 }
 
 // Encode 把事件编码为带协议主版本的单行 JSON 文本。

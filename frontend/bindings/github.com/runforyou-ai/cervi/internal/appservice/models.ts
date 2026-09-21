@@ -735,6 +735,29 @@ export interface ConversationAgentRun {
     "errorCode": string | null;
     "lastError": string | null;
     "process": ConversationAgentProcess | null;
+
+    /**
+     * ExecutionDeviceName 是执行该运行的设备名称，服务端执行时为空。
+     */
+    "executionDeviceName": string | null;
+}
+
+/**
+ * ConversationDeviceBinding 定义会话绑定的设备与工作区，Bound 为 false 时其余字段为空。
+ */
+export interface ConversationDeviceBinding {
+    "bound": boolean;
+    "deviceId": string;
+    "deviceName": string;
+    "workspaceId": string;
+    "workspaceLabel": string;
+}
+
+/**
+ * ConversationDeviceBindingInput 定义会话要绑定的工作区。
+ */
+export interface ConversationDeviceBindingInput {
+    "workspaceId": string;
 }
 
 /**
@@ -1484,6 +1507,31 @@ export interface DeviceRegistrationInput {
     "installId": string;
     "name": string;
     "platform": DevicePlatform;
+}
+
+/**
+ * DeviceWorkspace 定义设备上供 Agent 执行本机工具的工作区。
+ */
+export interface DeviceWorkspace {
+    "id": string;
+    "deviceId": string;
+    "label": string;
+    "lastUsedAt": string | null;
+    "createdAt": string;
+}
+
+/**
+ * DeviceWorkspaceInput 定义设备工作区的显示名。
+ */
+export interface DeviceWorkspaceInput {
+    "label": string;
+}
+
+/**
+ * DeviceWorkspaceList 定义设备上的工作区列表。
+ */
+export interface DeviceWorkspaceList {
+    "workspaces": DeviceWorkspace[] | null;
 }
 
 /**
@@ -2892,7 +2940,7 @@ export interface RealtimeConnection {
 }
 
 /**
- * RequestMeta 携带一次应用服务调用的认证和本地化信息。
+ * RequestMeta 携带一次应用服务调用的认证和本地化信息；DeviceID 只由原生端设备进程设置，经 DeviceHeader 传输。
  */
 export interface RequestMeta {
     "token": string;

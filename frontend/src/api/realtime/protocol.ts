@@ -87,6 +87,7 @@ export type RealtimeServerFrame =
       operations: RunStreamOperation[]
     }
   | { type: "run_stream_ended"; runId: string }
+  | { type: "device_work_advanced"; deviceId: string; workSeq: bigint }
 
 /** 事件解码结果：未定义的事件种类忽略，主版本不一致与结构错误分别返回。 */
 export type RealtimeServerFrameResult =
@@ -190,6 +191,8 @@ function decodeServerData(type: string, data: FrameData): RealtimeServerFrame | 
       }
     case "run_stream_ended":
       return { type, runId: readString(data, "runId") }
+    case "device_work_advanced":
+      return { type, deviceId: readString(data, "deviceId"), workSeq: readInt64(data, "workSeq") }
     default:
       return undefined
   }

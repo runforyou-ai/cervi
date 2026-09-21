@@ -41,6 +41,20 @@ const (
 	AgentRunErrorCodeAgentRemoved    AgentRunErrorCode = "agent_removed"
 )
 
+// 设备执行的运行失败原因。
+const (
+	// AgentRunErrorCodeDeviceLeaseExpired 表示执行设备未按时续租，运行以失败结束。
+	AgentRunErrorCodeDeviceLeaseExpired AgentRunErrorCode = "device_lease_expired"
+	// AgentRunErrorCodeDeviceUnavailable 表示执行设备已撤销或设备主人已停用。
+	AgentRunErrorCodeDeviceUnavailable AgentRunErrorCode = "device_unavailable"
+	// AgentRunErrorCodeDeviceUnbound 表示会话已解除或更换设备绑定。
+	AgentRunErrorCodeDeviceUnbound AgentRunErrorCode = "device_unbound"
+	// AgentRunErrorCodeWorkspaceMissing 表示执行设备上找不到绑定的工作区目录。
+	AgentRunErrorCodeWorkspaceMissing AgentRunErrorCode = "workspace_missing"
+	// AgentRunErrorCodeDeviceRunFailed 表示设备上的运行时执行失败。
+	AgentRunErrorCodeDeviceRunFailed AgentRunErrorCode = "device_run_failed"
+)
+
 // AgentRunErrorCodeAgentUnavailable 表示 AI 员工被停用或失去接客资格，由管理操作取消运行。
 const AgentRunErrorCodeAgentUnavailable AgentRunErrorCode = "agent_unavailable"
 

@@ -20,6 +20,8 @@ type Device struct {
 	Name           string                `bun:"name"`
 	Platform       domain.DevicePlatform `bun:"platform"`
 	RevokedAt      *time.Time            `bun:"revoked_at"`
+	WorkSeq        int64                 `bun:"work_seq"`
+	LastSeenAt     *time.Time            `bun:"last_seen_at"`
 	CreatedAt      time.Time             `bun:"created_at"`
 	UpdatedAt      time.Time             `bun:"updated_at"`
 }

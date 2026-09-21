@@ -364,6 +364,8 @@ type ConversationAgentRun struct {
 	ErrorCode         *string
 	LastError         *string
 	Process           *ConversationAgentProcess
+	// ExecutionDeviceName 是执行该运行的设备名称，服务端执行时为空。
+	ExecutionDeviceName *string
 }
 
 // CustomerTextMessageInput 定义成员发送的客户会话文本消息。

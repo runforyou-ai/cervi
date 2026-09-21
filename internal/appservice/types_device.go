@@ -40,3 +40,36 @@ type DeviceList struct {
 type LocalDevice struct {
 	DeviceID string `json:"deviceId"`
 }
+
+// DeviceWorkspaceInput 定义设备工作区的显示名。
+type DeviceWorkspaceInput struct {
+	Label string `json:"label"`
+}
+
+// DeviceWorkspace 定义设备上供 Agent 执行本机工具的工作区。
+type DeviceWorkspace struct {
+	ID         string     `json:"id"`
+	DeviceID   string     `json:"deviceId"`
+	Label      string     `json:"label"`
+	LastUsedAt *time.Time `json:"lastUsedAt"`
+	CreatedAt  time.Time  `json:"createdAt"`
+}
+
+// DeviceWorkspaceList 定义设备上的工作区列表。
+type DeviceWorkspaceList struct {
+	Workspaces []DeviceWorkspace `json:"workspaces"`
+}
+
+// ConversationDeviceBindingInput 定义会话要绑定的工作区。
+type ConversationDeviceBindingInput struct {
+	WorkspaceID string `json:"workspaceId"`
+}
+
+// ConversationDeviceBinding 定义会话绑定的设备与工作区，Bound 为 false 时其余字段为空。
+type ConversationDeviceBinding struct {
+	Bound          bool   `json:"bound"`
+	DeviceID       string `json:"deviceId"`
+	DeviceName     string `json:"deviceName"`
+	WorkspaceID    string `json:"workspaceId"`
+	WorkspaceLabel string `json:"workspaceLabel"`
+}

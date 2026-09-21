@@ -18,6 +18,7 @@ type Service struct {
 	unreadIndicator     UnreadIndicator
 	conversationWindows ConversationWindowOpener
 	localDevice         LocalDeviceReporter
+	localWorkspaces     LocalWorkspaceManager
 }
 
 // Option 配置平台专属的应用服务能力。
@@ -62,6 +63,13 @@ func WithConversationWindowOpener(opener ConversationWindowOpener) Option {
 func WithLocalDevice(reporter LocalDeviceReporter) Option {
 	return func(service *Service) {
 		service.localDevice = reporter
+	}
+}
+
+// WithLocalWorkspaces 注入原生端本机 Agent 工作区管理能力。
+func WithLocalWorkspaces(manager LocalWorkspaceManager) Option {
+	return func(service *Service) {
+		service.localWorkspaces = manager
 	}
 }
 
@@ -179,6 +187,14 @@ func (s *Service) CurrentDevice(ctx context.Context, meta RequestMeta) (LocalDev
 		return LocalDevice{}, nil
 	}
 	return withNormalizedSlices(s.localDevice.CurrentDevice(ctx, meta))
+}
+
+// AddLocalWorkspace 让用户选择本机目录并注册为本设备的工作区，用户取消选择时返回空工作区编号。
+func (s *Service) AddLocalWorkspace(ctx context.Context, meta RequestMeta) (DeviceWorkspace, error) {
+	if s.localWorkspaces == nil {
+		return DeviceWorkspace{}, methodNotAllowedError(meta, "AddLocalWorkspace")
+	}
+	return withNormalizedSlices(s.localWorkspaces.AddLocalWorkspace(ctx, meta))
 }
 
 // ServerURL 返回原生端当前配置的企业服务器地址。

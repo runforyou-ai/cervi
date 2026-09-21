@@ -46,7 +46,7 @@ func scheduleNextRun(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqu
 				"agent_identity_id", lane.AgentIdentityID, "lane_id", lane.ID)
 			continue
 		}
-		_, err = insertAndEnqueueRun(ctx, db, enqueuer, agentRunSpec{
+		_, err = insertAndDispatchRun(ctx, db, enqueuer, agentRunSpec{
 			OrganizationID: lane.OrganizationID, ConversationID: lane.ConversationID,
 			AgentIdentityID: lane.AgentIdentityID, RevisionID: revisionID,
 			ScopeKind: domain.AgentExecutionScopeKind(lane.ScopeKind), ScopeID: lane.ScopeID,

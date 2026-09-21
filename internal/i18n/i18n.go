@@ -407,6 +407,21 @@ const (
 	FieldKnowledgeGroupParentInvalid                 Key = "field.knowledge_group_parent_invalid"
 )
 
+const (
+	ErrorDeviceWorkspaceRegisterFailed        Key = "error.device_workspace_register_failed"
+	ErrorDeviceWorkspaceListFailed            Key = "error.device_workspace_list_failed"
+	ErrorDeviceWorkspaceNotFound              Key = "error.device_workspace_not_found"
+	ErrorConversationDeviceBindingLoadFailed  Key = "error.conversation_device_binding_load_failed"
+	ErrorConversationDeviceBindFailed         Key = "error.conversation_device_bind_failed"
+	ErrorConversationDeviceUnbindFailed       Key = "error.conversation_device_unbind_failed"
+	ErrorConversationDeviceBindingUnsupported Key = "error.conversation_device_binding_unsupported"
+	ErrorDeviceRunRequestFailed               Key = "error.device_run_request_failed"
+	ErrorDeviceRunNotFound                    Key = "error.device_run_not_found"
+	ErrorDeviceRunUnavailable                 Key = "error.device_run_unavailable"
+	ErrorDeviceWorkspaceBusy                  Key = "error.device_workspace_busy"
+	ErrorDeviceRunLeaseLost                   Key = "error.device_run_lease_lost"
+)
+
 //go:embed locales/*.json
 var localeFiles embed.FS
 

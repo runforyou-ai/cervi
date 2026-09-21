@@ -117,7 +117,7 @@
   {
     "name": "unknown_type",
     "result": "ignored",
-    "wire": {"v": 1, "type": "device_work_advanced", "data": {"deviceId": "device-01", "workSeq": "1"}}
+    "wire": {"v": 1, "type": "future_event", "data": {"id": "future-01"}}
   },
   {
     "name": "unsupported_version",
@@ -148,5 +148,11 @@
     "name": "data_not_object",
     "result": "invalid",
     "wire": {"v": 1, "type": "conversation_removed", "data": ["0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8b"]}
+  },
+  {
+    "name": "device_work_advanced",
+    "result": "frame",
+    "encode": true,
+    "wire": {"v": 1, "type": "device_work_advanced", "data": {"deviceId": "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a90", "workSeq": "9223372036854775807"}}
   }
 ]

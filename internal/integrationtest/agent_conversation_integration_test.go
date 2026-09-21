@@ -236,6 +236,9 @@ func testAgentConversations(t *testing.T, db *bun.DB, identity *servermodels.Ide
 	t.Run("运行状态实时通知", func(t *testing.T) {
 		testAgentRunNotifications(t, db, identity, agent.IdentityID, tasks)
 	})
+	t.Run("本机设备执行", func(t *testing.T) {
+		testDeviceAgentRuns(t, db, identity, agent.IdentityID, tasks)
+	})
 }
 
 // testAgentConversationAccess 验证多会话列表、阅读状态、引用和参与者访问范围。

@@ -11,6 +11,7 @@ import {
 import { useTranslation } from "react-i18next"
 
 import {
+  isAgentInboxConversation,
   isCustomerInboxConversation,
   isGroupInboxConversation,
   type GroupParticipant,
@@ -33,6 +34,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { useConversationAgentReplyLabel } from "@/features/inbox/conversation-agent-activity"
+import { ConversationDeviceBinding } from "@/features/inbox/conversation-device-binding"
 import { useConversationTypingLabel } from "@/features/inbox/use-conversation-typing"
 import { cn } from "@/lib/utils"
 
@@ -164,6 +166,9 @@ export function ConversationHeader({
               icon={SearchIcon}
               onClick={onSearch}
             />
+          ) : null}
+          {isAgentInboxConversation(conversation) ? (
+            <ConversationDeviceBinding conversationID={conversation.id} />
           ) : null}
           {customer && actions.reopenable ? (
             <HeaderAction
