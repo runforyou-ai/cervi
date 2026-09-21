@@ -1,5 +1,5 @@
 /** 工作台左侧模块栏和用户菜单。 */
-import { useRef, useState } from "react"
+import { useRef, useState, type ReactNode } from "react"
 import {
   BrainCircuitIcon,
   Building2Icon,
@@ -35,6 +35,7 @@ import {
 import { PagePaneGroup, PagePaneLink } from "@/components/page-split"
 import { useGlobalSearch } from "@/contexts/global-search-context"
 import { useUnsavedChangesContext } from "@/contexts/unsaved-changes-context"
+import { WorkspaceRailToggle } from "@/features/workspace/workspace-rail"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
 import { recoverSession } from "@/lib/session-navigation"
@@ -47,6 +48,11 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
+import {
   selectableWorkStatuses,
   WorkStatusDot,
   workStatusLabel,
@@ -58,12 +64,13 @@ import { cn } from "@/lib/utils"
 import { resolveAppPlatform } from "@/platform/app-platform"
 import { requestNotificationPermissionFromMessageMenu } from "@/platform/notifications"
 
-/** 模块栏导航项。 */
+/** 模块栏导航项，窄栏下只显示图标并由浮层提示名称。 */
 function WorkspaceRailItem({
   to,
   icon: Icon,
   label,
   active,
+  collapsed,
   onClick,
   className,
 }: {
@@ -71,15 +78,18 @@ function WorkspaceRailItem({
   icon: LucideIcon
   label: string
   active: boolean
+  collapsed?: boolean
   onClick?: () => void
   className?: string
 }) {
-  return (
+  const link = (
     <NavLink
       to={to}
       onClick={onClick}
+      aria-label={collapsed ? label : undefined}
       className={cn(
-        "flex h-8 w-full items-center gap-2 rounded-md px-2.5 text-sm",
+        "flex h-8 shrink-0 items-center rounded-md text-sm",
+        collapsed ? "w-8 justify-center" : "w-full gap-2 px-2.5",
         "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
         "focus-visible:ring-2 focus-visible:ring-sidebar-ring",
         active &&
@@ -88,33 +98,69 @@ function WorkspaceRailItem({
       )}
     >
       <Icon className="size-4 shrink-0" />
-      <span className="min-w-0 flex-1 truncate">{label}</span>
+      {collapsed ? null : <span className="min-w-0 flex-1 truncate">{label}</span>}
     </NavLink>
+  )
+
+  if (!collapsed) {
+    return link
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{link}</TooltipTrigger>
+      <TooltipContent side="right">{label}</TooltipContent>
+    </Tooltip>
   )
 }
 
-/** 打开全局搜索的入口，尺寸与导航项一致。 */
-function WorkspaceSearchEntry() {
+/** 打开全局搜索的入口，尺寸与导航项一致；窄栏下收为图标并由浮层提示。 */
+function WorkspaceSearchEntry({ collapsed }: { collapsed: boolean }) {
   const { t } = useTranslation("common")
   const globalSearch = useGlobalSearch()
 
-  return (
+  const trigger = (
     <button
       type="button"
-      className="mb-4 flex h-8 w-full items-center gap-2 rounded-full bg-background/45 px-3 text-sm text-muted-foreground/65 hover:bg-background/70 hover:text-muted-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring"
-      title={t("actions.searchShortcut")}
+      className={cn(
+        "flex h-8 shrink-0 items-center text-sm focus-visible:ring-2 focus-visible:ring-sidebar-ring",
+        collapsed
+          ? "w-8 justify-center rounded-md hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          : "w-full min-w-0 flex-1 gap-2 rounded-full bg-background/45 px-3 text-muted-foreground/65 hover:bg-background/70 hover:text-muted-foreground",
+      )}
+      title={collapsed ? undefined : t("actions.searchShortcut")}
+      aria-label={collapsed ? t("actions.searchPlaceholder") : undefined}
       onClick={() => globalSearch?.open()}
     >
       <SearchIcon className="size-4 shrink-0" />
-      <span className="min-w-0 flex-1 truncate text-left">{t("actions.searchPlaceholder")}</span>
+      {collapsed ? null : (
+        <span className="min-w-0 flex-1 truncate text-left">
+          {t("actions.searchPlaceholder")}
+        </span>
+      )}
     </button>
+  )
+
+  if (!collapsed) {
+    return trigger
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{trigger}</TooltipTrigger>
+      <TooltipContent side="right">{t("actions.searchShortcut")}</TooltipContent>
+    </Tooltip>
   )
 }
 
 /** 模块栏导航。 */
 function WorkspaceMenu({
+  collapsed,
+  railToggle,
   onInboxClick,
 }: {
+  collapsed: boolean
+  railToggle: ReactNode
   onInboxClick: () => void
 }) {
   const { t } = useTranslation("workspace")
@@ -122,17 +168,36 @@ function WorkspaceMenu({
 
   return (
     <nav
-      className="flex flex-1 flex-col items-stretch gap-0.5 pt-1 pr-0 pl-1.5"
+      // 展开时右侧留白由主内容区的内缩间隙承担，使选中块与两侧可见边界等距；窄栏下图标整列居中。
+      className={cn(
+        "flex flex-1 flex-col",
+        collapsed
+          ? "items-center gap-1.5 pt-1.5"
+          : "items-stretch gap-0.5 pt-1 pr-0 pl-1.5",
+      )}
       aria-label={t("navigationGroup")}
     >
-      <WorkspaceSearchEntry />
-      {/* 导航项右侧额外留白，选中块与主内容卡片边缘拉开距离，搜索框保持原有宽度。 */}
-      <div className="flex flex-col items-stretch gap-0.5 pr-3">
+      {collapsed ? (
+        <WorkspaceSearchEntry collapsed />
+      ) : (
+        <div className={cn("mb-4 flex items-center gap-1", railToggle && "pr-3")}>
+          <WorkspaceSearchEntry collapsed={false} />
+          {railToggle}
+        </div>
+      )}
+      {/* 展开时导航项右侧额外留白，选中块与主内容卡片边缘拉开距离，搜索框保持原有宽度。 */}
+      <div
+        className={cn(
+          "flex flex-col",
+          collapsed ? "items-center gap-1.5" : "items-stretch gap-0.5 pr-3",
+        )}
+      >
         <WorkspaceRailItem
           to="/inbox"
           icon={InboxIcon}
           label={t("inbox")}
           active={location.pathname === "/inbox"}
+          collapsed={collapsed}
           onClick={onInboxClick}
         />
         <WorkspaceRailItem
@@ -140,12 +205,14 @@ function WorkspaceMenu({
           icon={ContactRoundIcon}
           label={t("contacts")}
           active={location.pathname.startsWith("/contacts")}
+          collapsed={collapsed}
         />
         <WorkspaceRailItem
           to="/knowledge-bases"
           icon={LibraryIcon}
           label={t("knowledgeBases")}
           active={location.pathname.startsWith("/knowledge-bases")}
+          collapsed={collapsed}
         />
       </div>
     </nav>
@@ -153,62 +220,121 @@ function WorkspaceMenu({
 }
 
 /** 设置导航，进入设置后替换模块栏内容。 */
-function WorkspaceSettingsMenu({ appHref }: { appHref: string }) {
+function WorkspaceSettingsMenu({
+  appHref,
+  collapsed,
+  railToggle,
+}: {
+  appHref: string
+  collapsed: boolean
+  railToggle: ReactNode
+}) {
   const { t } = useTranslation("settings")
+
+  const backToApp = (
+    <WorkspaceRailItem
+      to={appHref}
+      icon={ChevronLeftIcon}
+      label={t("backToApp")}
+      active={false}
+      collapsed={collapsed}
+      // 左箭头字形本身内缩，展开时整行左移抵消，与下方导航项视觉左对齐。
+      className={collapsed ? undefined : "-ml-1"}
+    />
+  )
 
   return (
     <nav
-      className="flex min-h-0 flex-1 flex-col items-stretch gap-0.5 overflow-y-auto pt-1 pr-0 pl-1.5"
+      className={cn(
+        "flex min-h-0 flex-1 flex-col overflow-y-auto",
+        collapsed
+          ? "items-center gap-1.5 pt-1.5"
+          : "items-stretch gap-0.5 pt-1 pr-0 pl-1.5",
+      )}
       aria-label={t("navigationLabel")}
     >
-      <WorkspaceRailItem
-        to={appHref}
-        icon={ChevronLeftIcon}
-        label={t("backToApp")}
-        active={false}
-        // 左箭头字形本身内缩，整行左移抵消，与下方导航项视觉左对齐。
-        className="-ml-1"
-      />
-      <PagePaneGroup title={t("groups.personal")}>
-        <PagePaneLink to="/settings/profile" icon={UserRoundIcon}>
+      {railToggle ? (
+        <div className="flex items-center gap-1 pr-3">
+          <div className="min-w-0 flex-1">{backToApp}</div>
+          {railToggle}
+        </div>
+      ) : (
+        backToApp
+      )}
+      <PagePaneGroup title={t("groups.personal")} collapsed={collapsed}>
+        <PagePaneLink
+          collapsed={collapsed}
+          to="/settings/profile"
+          icon={UserRoundIcon}
+        >
           {t("navigation.profile")}
         </PagePaneLink>
-        <PagePaneLink to="/settings/security" icon={LockKeyholeIcon}>
+        <PagePaneLink
+          collapsed={collapsed}
+          to="/settings/security"
+          icon={LockKeyholeIcon}
+        >
           {t("navigation.security")}
         </PagePaneLink>
-        <PagePaneLink to="/settings/preferences" icon={SlidersHorizontalIcon}>
+        <PagePaneLink
+          collapsed={collapsed}
+          to="/settings/preferences"
+          icon={SlidersHorizontalIcon}
+        >
           {t("navigation.preferences")}
         </PagePaneLink>
-        <PagePaneLink to="/settings/devices" icon={MonitorSmartphoneIcon}>
+        <PagePaneLink
+          collapsed={collapsed}
+          to="/settings/devices"
+          icon={MonitorSmartphoneIcon}
+        >
           {t("navigation.devices")}
         </PagePaneLink>
       </PagePaneGroup>
-      <PagePaneGroup title={t("groups.organization")}>
-        <PagePaneLink to="/settings/general" icon={Building2Icon}>
+      <PagePaneGroup title={t("groups.organization")} collapsed={collapsed}>
+        <PagePaneLink
+          collapsed={collapsed}
+          to="/settings/general"
+          icon={Building2Icon}
+        >
           {t("navigation.general")}
         </PagePaneLink>
         <PagePaneLink
+          collapsed={collapsed}
           to="/settings/roles"
           activePath="/settings/roles"
           icon={ShieldCheckIcon}
         >
           {t("navigation.roles")}
         </PagePaneLink>
-        <PagePaneLink to="/settings/channels" icon={MessagesSquareIcon}>
+        <PagePaneLink
+          collapsed={collapsed}
+          to="/settings/channels"
+          icon={MessagesSquareIcon}
+        >
           {t("navigation.channels")}
         </PagePaneLink>
         <PagePaneLink
+          collapsed={collapsed}
           to="/settings/model-services/chat"
           activePath="/settings/model-services"
           icon={BrainCircuitIcon}
         >
           {t("navigation.modelServices")}
         </PagePaneLink>
-        <PagePaneLink to="/settings/mcp-servers" icon={PlugIcon}>
+        <PagePaneLink
+          collapsed={collapsed}
+          to="/settings/mcp-servers"
+          icon={PlugIcon}
+        >
           {t("navigation.mcpServers")}
         </PagePaneLink>
-        <PagePaneLink icon={WebhookIcon}>{t("navigation.webhooks")}</PagePaneLink>
-        <PagePaneLink icon={CodeXmlIcon}>{t("navigation.openApi")}</PagePaneLink>
+        <PagePaneLink collapsed={collapsed} icon={WebhookIcon}>
+          {t("navigation.webhooks")}
+        </PagePaneLink>
+        <PagePaneLink collapsed={collapsed} icon={CodeXmlIcon}>
+          {t("navigation.openApi")}
+        </PagePaneLink>
       </PagePaneGroup>
     </nav>
   )
@@ -266,12 +392,16 @@ export function WorkspaceNavigation({
   identity,
   inSettings,
   appHref,
+  collapsed,
+  onToggleRail,
   onLogout,
   loggingOut,
 }: {
   identity: Identity
   inSettings: boolean
   appHref: string
+  collapsed: boolean
+  onToggleRail: () => void
   onLogout: () => void
   loggingOut: boolean
 }) {
@@ -284,6 +414,11 @@ export function WorkspaceNavigation({
   const userMenuTriggerRef = useRef<HTMLButtonElement>(null)
   const skipUserMenuFocusRestoreRef = useRef(false)
   const showAppVersion = inSettings && resolveAppPlatform() === "desktop"
+  // Web 端展开态的收起开关与一级栏顶部行同处一行，原生端留在标题栏操作行。
+  const inlineRailToggle =
+    !collapsed && resolveAppPlatform() === "web" ? (
+      <WorkspaceRailToggle collapsed={false} onToggle={onToggleRail} />
+    ) : null
 
   /** 从用户菜单进入页面，并清除头像触发器的选中效果。 */
   function navigateFromUserMenu(path: string) {
@@ -331,19 +466,39 @@ export function WorkspaceNavigation({
 
   return (
     <aside className="cervi-workspace-rail flex h-full shrink-0 flex-col text-sidebar-foreground">
+      {collapsed ? (
+        <div className="flex shrink-0 justify-center pb-1.5">
+          <WorkspaceRailToggle collapsed onToggle={onToggleRail} />
+        </div>
+      ) : null}
       {inSettings ? (
-        <WorkspaceSettingsMenu appHref={appHref} />
+        <WorkspaceSettingsMenu
+          appHref={appHref}
+          collapsed={collapsed}
+          railToggle={inlineRailToggle}
+        />
       ) : (
-        <WorkspaceMenu onInboxClick={requestMessageNotificationPermission} />
+        <WorkspaceMenu
+          collapsed={collapsed}
+          railToggle={inlineRailToggle}
+          onInboxClick={requestMessageNotificationPermission}
+        />
       )}
       {inSettings ? null : (
-        <div className="pt-1 pr-0 pb-2.5 pl-1.5">
+        <div
+          className={cn("shrink-0 pt-1 pb-2.5", collapsed ? "px-0" : "pr-0 pl-1.5")}
+        >
           <DropdownMenu open={userMenuOpen} onOpenChange={setUserMenuOpen}>
             <DropdownMenuTrigger asChild>
               <button
                 ref={userMenuTriggerRef}
                 type="button"
-                className="flex w-full items-center gap-2.5 rounded-md px-2.5 py-1.5 text-left outline-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+                className={cn(
+                  "flex w-full items-center rounded-md text-left outline-none hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring",
+                  collapsed
+                    ? "justify-center py-1"
+                    : "gap-2.5 px-2.5 py-1.5",
+                )}
                 aria-label={t("openUserMenu", {
                   name: identity.user.displayName,
                 })}
@@ -358,14 +513,16 @@ export function WorkspaceNavigation({
                     className="absolute -right-0.5 -bottom-0.5 ring-2 ring-sidebar"
                   />
                 </span>
-                <span className="grid min-w-0 flex-1 gap-0.5 leading-tight">
-                  <span className="truncate text-sm font-medium">
-                    {identity.user.displayName}
+                {collapsed ? null : (
+                  <span className="grid min-w-0 flex-1 gap-0.5 leading-tight">
+                    <span className="truncate text-sm font-medium">
+                      {identity.user.displayName}
+                    </span>
+                    <span className="truncate text-xs text-muted-foreground">
+                      {identity.user.email}
+                    </span>
                   </span>
-                  <span className="truncate text-xs text-muted-foreground">
-                    {identity.user.email}
-                  </span>
-                </span>
+                )}
               </button>
             </DropdownMenuTrigger>
             <DropdownMenuContent
@@ -433,7 +590,7 @@ export function WorkspaceNavigation({
           </DropdownMenu>
         </div>
       )}
-      {showAppVersion ? (
+      {showAppVersion && !collapsed ? (
         <span className="pt-1 pr-0 pb-2.5 pl-4 text-[11px] text-muted-foreground/70">
           {t("appVersion", { version: __APP_VERSION__ })}
         </span>

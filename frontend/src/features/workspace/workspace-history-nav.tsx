@@ -12,7 +12,7 @@ import {
 } from "@/components/ui/tooltip"
 
 /** 跟踪工作台挂载后的地址栈，得出前进后退的可用状态。 */
-export function useWorkspaceHistory() {
+function useWorkspaceHistory() {
   const location = useLocation()
   const navigationType = useNavigationType()
   const navigate = useNavigate()
@@ -49,18 +49,9 @@ export function useWorkspaceHistory() {
 }
 
 /** 标题栏上的前进后退按钮。 */
-export function WorkspaceHistoryNav({
-  canGoBack,
-  canGoForward,
-  onBack,
-  onForward,
-}: {
-  canGoBack: boolean
-  canGoForward: boolean
-  onBack: () => void
-  onForward: () => void
-}) {
+export function WorkspaceHistoryNav() {
   const { t } = useTranslation("workspace")
+  const { canGoBack, canGoForward, goBack, goForward } = useWorkspaceHistory()
 
   return (
     <div className="flex items-center">
@@ -73,7 +64,7 @@ export function WorkspaceHistoryNav({
             className="text-muted-foreground"
             aria-label={t("historyBack")}
             disabled={!canGoBack}
-            onClick={onBack}
+            onClick={goBack}
           >
             <ChevronLeftIcon />
           </Button>
@@ -89,7 +80,7 @@ export function WorkspaceHistoryNav({
             className="text-muted-foreground"
             aria-label={t("historyForward")}
             disabled={!canGoForward}
-            onClick={onForward}
+            onClick={goForward}
           >
             <ChevronRightIcon />
           </Button>
