@@ -16,9 +16,12 @@ import (
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	"github.com/runforyou-ai/cervi/internal/appservice"
+	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
+	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/runforyou-ai/cervi/internal/tenant"
 )
 
@@ -191,5 +194,77 @@ func TestInboxKindFilter(t *testing.T) {
 	plain, _, err2 := query.Execute(ctx, f.owner, inboxaction.LoadInput{Scope: domain.InboxScopeInternal})
 	if err != nil || err2 != nil || !slices.Equal(conversationIDs(carried.Conversations), conversationIDs(plain.Conversations)) {
 		t.Fatalf("carried=%v plain=%v err=%v %v", conversationIDs(carried.Conversations), conversationIDs(plain.Conversations), err, err2)
+	}
+}
+
+// TestInboxAllScopeCurrentServiceSession 验证「全部」范围只按当前客服周期的负责与参与收录客户会话。
+func TestInboxAllScopeCurrentServiceSession(t *testing.T) {
+	f := newCustomerReadFixture(t)
+	ctx := context.Background()
+	query := inboxaction.NewLoadInboxQuery(f.db)
+	send := conversationaction.NewSendCustomerTextMessageAction(f.db, nil)
+	// inAll 判断目标会话是否出现在指定身份的「全部」范围。
+	inAll := func(identity *servermodels.Identity) bool {
+		t.Helper()
+		page, _, err := query.Execute(ctx, identity, inboxaction.LoadInput{Scope: domain.InboxScopeAll})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return slices.Contains(conversationIDs(page.Conversations), f.conversationID)
+	}
+	note := func(identity *servermodels.Identity, mentions ...string) {
+		t.Helper()
+		if _, err := send.Execute(ctx, identity, conversationaction.CustomerTextMessageInput{
+			ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "内部备注",
+			Visibility: domain.MessageVisibilityInternalOnly, MentionIdentityIDs: mentions,
+		}); err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, nil).Execute(ctx, f.owner, f.conversationID); err != nil {
+		t.Fatal(err)
+	}
+	if !inAll(f.owner) || inAll(f.member) {
+		t.Fatalf("claimed session owner=%v member=%v", inAll(f.owner), inAll(f.member))
+	}
+	// 非负责人在当前周期写内部备注即视为参与。
+	note(f.member)
+	if !inAll(f.member) {
+		t.Fatal("current session note author missing from all scope")
+	}
+	coordinator := agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil)
+	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, coordinator).Execute(ctx, f.owner, f.conversationID); err != nil {
+		t.Fatal(err)
+	}
+	next, err := f.visitorMessage(ctx, "新的处理周期")
+	if err != nil || !next.OpenedNewServiceSession {
+		t.Fatalf("new session: %+v %v", next, err)
+	}
+	// 新周期进入队列，「全部」范围只按新周期的负责与参与判断。
+	if inAll(f.owner) || inAll(f.member) {
+		t.Fatalf("history participation leaked owner=%v member=%v", inAll(f.owner), inAll(f.member))
+	}
+	// 新周期内被提醒的成员重新进入「全部」范围。
+	note(f.owner, f.member.OrganizationIdentity.ID)
+	if !inAll(f.member) || !inAll(f.owner) {
+		t.Fatalf("current session mention owner=%v member=%v", inAll(f.owner), inAll(f.member))
+	}
+	// 负责人对客回复后转给同事，仍因当前周期的回复留在「全部」范围。
+	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, nil).Execute(ctx, f.member, f.conversationID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := send.Execute(ctx, f.member, conversationaction.CustomerTextMessageInput{
+		ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "对客回复",
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := conversationaction.NewTransferServiceSessionAction(f.db, coordinator, agentrunaction.NewScheduler(servertask.New(f.db, serverconfig.NATSConfig{}))).Execute(ctx, f.member, conversationaction.TransferServiceSessionInput{
+		ConversationID: f.conversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: f.owner.OrganizationIdentity.ID,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if !inAll(f.member) {
+		t.Fatal("customer reply author missing from all scope after transfer")
 	}
 }

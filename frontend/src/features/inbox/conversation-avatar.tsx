@@ -1,5 +1,8 @@
-/** 会话列表和会话头共用的头像与渠道角标。 */
+/** 会话列表和会话头共用的头像、渠道角标与负责人小头像。 */
+import { useTranslation } from "react-i18next"
+
 import {
+  OrganizationIdentityType,
   isCustomerInboxConversation,
   isAgentInboxConversation,
   isDirectInboxConversation,
@@ -63,5 +66,35 @@ export function ConversationAvatar({
         </span>
       ) : null}
     </div>
+  )
+}
+
+/** 客户会话有负责人时展示其小头像。 */
+export function ConversationAssigneeAvatar({
+  conversation,
+  className,
+}: {
+  conversation: InboxConversation
+  className?: string
+}) {
+  const { t } = useTranslation("inbox")
+  const assignee = isCustomerInboxConversation(conversation)
+    ? conversation.customer.assignee
+    : null
+  if (!assignee) return null
+  const label = t("conversationAssignee", { name: assignee.displayName })
+  return (
+    <span role="img" aria-label={label} title={label} className="shrink-0">
+      <ProfileAvatar
+        imageURL={assignee.avatarUrl}
+        name={assignee.displayName}
+        fallback={
+          assignee.type === OrganizationIdentityType.OrganizationIdentityTypeAgent
+            ? "agent"
+            : "person"
+        }
+        className={cn("rounded-sm text-[8px]", className)}
+      />
+    </span>
   )
 }

@@ -347,7 +347,13 @@ export function MobileInboxFilter({
                     variant={view === item.value ? "default" : "outline"}
                     className="min-h-11"
                     aria-pressed={view === item.value}
-                    onClick={() => setView(item.value)}
+                    onClick={() => {
+                      setView(item.value)
+                      // 「待分配」只看未关闭会话。
+                      if (item.value === CustomerInboxView.CustomerInboxViewQueue) {
+                        setStatus(ServiceSessionStatus.ServiceSessionStatusOpen)
+                      }
+                    }}
                   >
                     {t(item.label)}
                   </Button>
@@ -414,6 +420,10 @@ export function MobileInboxFilter({
                       variant={status === item.value ? "default" : "outline"}
                       className="min-h-11"
                       aria-pressed={status === item.value}
+                      disabled={
+                        view === CustomerInboxView.CustomerInboxViewQueue &&
+                        item.value === ServiceSessionStatus.ServiceSessionStatusClosed
+                      }
                       onClick={() => setStatus(item.value)}
                     >
                       {t(item.label)}

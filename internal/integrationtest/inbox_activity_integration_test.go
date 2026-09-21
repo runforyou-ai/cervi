@@ -320,7 +320,11 @@ func TestInboxTelegramActivity(t *testing.T) {
 	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, coordinator).Execute(ctx, f.owner, telegram.ID); err != nil {
 		t.Fatal(err)
 	}
-	closedPage, counts, err := query.Execute(ctx, f.owner, inboxaction.LoadInput{Scope: domain.InboxScopeCustomer, CustomerView: domain.CustomerInboxViewQueue, ServiceStatus: domain.ServiceSessionStatusClosed})
+	// 「待分配」只接受未关闭状态；队列中关闭的会话由关闭人负责，出现在其已关闭列表。
+	if _, _, err := query.Execute(ctx, f.owner, inboxaction.LoadInput{Scope: domain.InboxScopeCustomer, CustomerView: domain.CustomerInboxViewQueue, ServiceStatus: domain.ServiceSessionStatusClosed}); !errors.Is(err, inboxaction.ErrQueryInvalid) {
+		t.Fatalf("closed queue view accepted: %v", err)
+	}
+	closedPage, counts, err := query.Execute(ctx, f.owner, inboxaction.LoadInput{Scope: domain.InboxScopeCustomer, CustomerView: domain.CustomerInboxViewMine, ServiceStatus: domain.ServiceSessionStatusClosed})
 	closed := closedPage.Conversations
 	if err != nil || len(closed) != 1 || !closed[0].LastActivityAt.Equal(*telegram.LastActivityAt) || closed[0].UnreadCount != 0 || counts.Attention != 0 {
 		t.Fatalf("closed=%+v counts=%+v err=%v", closed, counts, err)

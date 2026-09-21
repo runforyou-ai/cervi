@@ -393,22 +393,35 @@ func filterCustomerInbox(query *bun.SelectQuery, currentIdentityID string, input
 		query = query.Where("cci.channel_id = ?", input.ChannelID)
 	}
 	if input.Scope == domain.InboxScopeAll {
+		// 本人负责，或在当前客服周期内发过文本或附件消息（对客回复、内部备注）或被提醒。
 		query = query.
 			Where("current.status = ?", domain.ServiceSessionStatusOpen).
 			Where(`(
 				current.assignee_identity_id = ?
 				OR EXISTS (
 					SELECT 1
-					FROM conversation_participants AS related_cp
+					FROM messages AS related_msg
+					JOIN conversation_participants AS related_cp
+						ON related_cp.organization_id = related_msg.organization_id
+						AND related_cp.conversation_id = related_msg.conversation_id
+						AND related_cp.id = related_msg.sender_participant_id
 					JOIN chat_subjects AS related_cs
 						ON related_cs.organization_id = related_cp.organization_id
 						AND related_cs.id = related_cp.subject_id
-					WHERE related_cp.organization_id = cv.organization_id
-						AND related_cp.conversation_id = cv.id
+					WHERE related_msg.organization_id = cv.organization_id
+						AND related_msg.conversation_id = cv.id
+						AND related_msg.service_session_id = current.id
+						AND related_msg.deleted_at IS NULL
+						AND related_msg.type IN (?)
 						AND related_cs.kind = ?
 						AND related_cs.source_id = ?
 				)
-			)`, currentIdentityID, domain.ChatSubjectKindOrganizationIdentity, currentIdentityID)
+				OR EXISTS (
+					SELECT 1 FROM messages AS note
+					WHERE note.organization_id = cv.organization_id AND note.conversation_id = cv.id
+						AND note.service_session_id = current.id AND note.deleted_at IS NULL AND EXISTS (?)
+				)
+			)`, currentIdentityID, bun.In([]domain.MessageType{domain.MessageTypeText, domain.MessageTypeAttachment}), domain.ChatSubjectKindOrganizationIdentity, currentIdentityID, messageMentionsIdentity(query.DB(), "note", currentIdentityID))
 	} else {
 		// 服务状态与处理归属是两个正交条件，同时收窄同一批客户会话。
 		query = query.Where("current.status = ?", input.ServiceStatus)
@@ -747,6 +760,8 @@ func normalizeLoadInput(input LoadInput) (LoadInput, error) {
 	}
 	if !slices.Contains([]domain.CustomerInboxView{domain.CustomerInboxViewQueue, domain.CustomerInboxViewMine, domain.CustomerInboxViewCoworkers, domain.CustomerInboxViewMentioned}, input.CustomerView) ||
 		(input.ServiceStatus != domain.ServiceSessionStatusOpen && input.ServiceStatus != domain.ServiceSessionStatusClosed) ||
+		// 「待分配」只列出未关闭的会话。
+		(input.CustomerView == domain.CustomerInboxViewQueue && input.ServiceStatus != domain.ServiceSessionStatusOpen) ||
 		(input.ChannelID != "" && !common.ValidUUID(input.ChannelID)) ||
 		(input.AssigneeIdentityID != "" && (input.CustomerView != domain.CustomerInboxViewCoworkers || !common.ValidUUID(input.AssigneeIdentityID))) {
 		return input, ErrQueryInvalid

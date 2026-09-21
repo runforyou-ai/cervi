@@ -14,6 +14,8 @@ import {
   isDirectInboxConversation,
   isGroupInboxConversation,
   ConversationStatus,
+  CustomerInboxView,
+  InboxScope,
   MessageType,
   MessageVisibility,
   type CustomerInboxConversationData,
@@ -32,7 +34,10 @@ import {
   MobilePageHeader,
   MobilePageState,
 } from "@/apps/mobile/mobile-page"
-import { ConversationAvatar } from "@/features/inbox/conversation-avatar"
+import {
+  ConversationAssigneeAvatar,
+  ConversationAvatar,
+} from "@/features/inbox/conversation-avatar"
 import {
   ConversationListMenu,
   useConversationListActions,
@@ -99,6 +104,7 @@ type MobileConversationRowProps = {
   actions: ReturnType<typeof useConversationListActions>
   pinOrderVersion: string
   pinMoves?: NonNullable<Parameters<typeof ConversationListMenu>[0]["pinMoves"]>
+  showAssignee: boolean
   sorting: boolean
   onMenuChange: (open: boolean) => void
   onOpen: (conversation: MobileInboxConversation) => void
@@ -112,6 +118,7 @@ function MobileConversationRow({
   actions,
   pinOrderVersion,
   pinMoves,
+  showAssignee,
   sorting,
   onMenuChange,
   onOpen,
@@ -197,6 +204,9 @@ function MobileConversationRow({
           <p className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
             {preview}
           </p>
+          {showAssignee ? (
+            <ConversationAssigneeAvatar conversation={conversation} className="size-4" />
+          ) : null}
           {internalConversation?.muted ? (
             <BellOffIcon
               className="size-3.5 shrink-0 text-muted-foreground"
@@ -327,6 +337,11 @@ function MobileInboxList({ query, changeQuery }: ReturnType<typeof useMobileInbo
     name: names.get(conversation.id) ?? "",
     actions,
     pinOrderVersion: list.pinOrderVersion,
+    // 「全部」与「同事」视图在摘要行末显示负责人。
+    showAssignee:
+      query.scope === InboxScope.InboxScopeAll ||
+      (query.scope === InboxScope.InboxScopeCustomer &&
+        query.customerView === CustomerInboxView.CustomerInboxViewCoworkers),
     sorting,
     // 排序中打开的菜单在关闭后结束排序，菜单打开期间手柄保持占位。
     onMenuChange: (open: boolean) => {

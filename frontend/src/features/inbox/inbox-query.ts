@@ -99,8 +99,10 @@ export function normalizeInboxQuery(query: InboxQueryInput): NormalizedInboxQuer
         ? query.assigneeIdentityId
         : "",
     channelId: customer ? query.channelId : "",
+    // 「待分配」只列出等待承接的会话，服务状态固定为未关闭。
     serviceStatus:
       customer &&
+      customerView !== CustomerInboxView.CustomerInboxViewQueue &&
       query.serviceStatus === ServiceSessionStatus.ServiceSessionStatusClosed
         ? ServiceSessionStatus.ServiceSessionStatusClosed
         : ServiceSessionStatus.ServiceSessionStatusOpen,

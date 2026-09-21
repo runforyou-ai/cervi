@@ -330,6 +330,7 @@ export function InboxPage({
             scope={scope}
             value={{ channelId, serviceStatus, kinds }}
             channels={channels}
+            closedStatusDisabled={customerView === CustomerInboxView.CustomerInboxViewQueue}
             onChange={onQueryChange}
           />
         }
@@ -360,6 +361,11 @@ export function InboxPage({
             scope === InboxScope.InboxScopeCustomer &&
             customerView === CustomerInboxView.CustomerInboxViewQueue &&
             queueFilter === CustomerQueueFilter.CustomerQueueFilterAll
+          }
+          showAssignee={
+            scope === InboxScope.InboxScopeAll ||
+            (scope === InboxScope.InboxScopeCustomer &&
+              customerView === CustomerInboxView.CustomerInboxViewCoworkers)
           }
           pinnedIds={list.pinnedIds}
           pinOrderVersion={list.pinOrderVersion}
