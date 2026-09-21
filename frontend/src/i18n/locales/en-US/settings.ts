@@ -21,13 +21,13 @@ const settings = {
   },
   profile: {
     title: "Profile",
+    description: "Your avatar, name and contact details",
     formLabel: "Profile form",
     displayName: "Name",
     email: "Email",
     avatar: "Profile image",
     avatarChoose: "Choose image",
     avatarUploadError: "Could not upload the profile image. Try again.",
-    saveSuccess: "Profile saved.",
     saveError: "Could not save the profile. Try again.",
     validation: {
       displayNameRequired: "Enter your name.",
@@ -57,9 +57,11 @@ const settings = {
   },
   security: {
     title: "Login & security",
+    description: "Change your sign-in password",
   },
   devices: {
     title: "Devices",
+    description: "Review and sign out your devices",
     list: {
       columns: {
         name: "Device",
@@ -86,6 +88,7 @@ const settings = {
   },
   preferences: {
     title: "Preferences",
+    description: "Language, time zone, appearance and notifications",
     formLabel: "Preferences form",
     language: "Language",
     timeZone: "Time zone",
@@ -118,7 +121,6 @@ const settings = {
           "Could not open notification settings. Open them manually in system settings.",
       },
     },
-    saveSuccess: "Preferences saved.",
     saveError: "Could not save preferences. Try again.",
     validation: {
       timeZoneRequired: "Select a time zone.",
@@ -134,8 +136,8 @@ const settings = {
   },
   general: {
     title: "General",
+    description: "Your organization's basic information",
     saveError: "Could not save general settings. Try again.",
-    saveSuccess: "General settings saved.",
     form: {
       name: "Company name",
     },
@@ -146,6 +148,7 @@ const settings = {
   },
   roles: {
     title: "Roles and permissions",
+    description: "Control what members can do by role",
     kindsDescriptions: {
       admin: "Manages the company and can use every feature",
       customerService:
@@ -160,16 +163,18 @@ const settings = {
       permissionEmpty: "No permissions",
       permissionSeparator: ", ",
       permissionSummary: "{{items}} and {{count}} permissions total",
+      memberCount_one: "1 member",
+      memberCount_other: "{{count}} members",
       columns: {
         name: "Role",
-        description: "Description",
-        memberCount: "Members",
         permissions: "Permissions",
       },
     },
     form: {
       createTitle: "New role",
       detailTitle: "Role details",
+      createDescription: "Create a role and choose its permissions",
+      detailDescription: "Review this role's permissions and members",
       name: "Role name",
       description: "Description",
       loadError: "Could not load the role.",

@@ -10,7 +10,6 @@ const channels = {
     enUS: "English",
   },
   filters: {
-    search: "搜索渠道名称",
     category: "渠道类别",
     allCategories: "全部类别",
     status: "渠道状态",
@@ -28,6 +27,7 @@ const channels = {
   },
   list: {
     title: "消息渠道",
+    description: "管理客户发起会话的接入渠道",
     create: "添加渠道",
     activate: "启用",
     deactivate: "停用",
@@ -37,8 +37,6 @@ const channels = {
     emptyFiltered: "没有符合筛选条件的渠道",
     columns: {
       name: "名称",
-      category: "渠道类别",
-      language: "默认接待语言",
     },
   },
   deactivation: {
@@ -51,9 +49,11 @@ const channels = {
   },
   create: {
     title: "添加渠道",
+    description: "选择渠道类型并完成接入",
   },
   edit: {
     title: "{{type}}渠道设置",
+    description: "维护渠道的基础信息、接待方式和接入设置",
     fallbackTitle: "消息渠道设置",
     namedTitle: "{{type}} · {{name}}",
   },
@@ -62,7 +62,6 @@ const channels = {
     name: "渠道名称",
     description: "说明",
     defaultLocale: "默认接待语言",
-    saved: "基本信息已保存。",
     loadError: "消息渠道详情加载失败。",
     networkError: "无法连接服务器，请稍后重试。",
   },
@@ -73,7 +72,6 @@ const channels = {
     person: "企业成员",
     agent: "AI 员工",
     loadError: "团队和成员加载失败，请重试。",
-    saved: "接待设置已保存。",
     targetLabels: {
       newConversation: {
         team: "接待团队",
@@ -106,12 +104,9 @@ const channels = {
   telegramConnection: {
     form: {
       botToken: "Bot Token",
-      showToken: "显示 Token",
-      hideToken: "隐藏 Token",
       test: "测试连接",
       testing: "正在测试…",
     },
-    saved: "Telegram 连接已保存。",
     tested: "连接测试成功。",
     saveError: "无法保存 Telegram 连接，请稍后重试。",
     testError: "连接测试失败，请稍后重试。",
@@ -181,7 +176,6 @@ const channels = {
     },
   },
   chatInterface: {
-    saved: "聊天界面已保存。",
     form: {
       title: "聊天标题",
       subtitle: "副标题",

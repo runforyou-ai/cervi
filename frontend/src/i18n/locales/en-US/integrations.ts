@@ -2,6 +2,7 @@
 const integrations = {
   mcpServer: {
     title: "MCP servers",
+    description: "External tool services your AI employees can call",
     list: {
       create: "Add MCP server",
       loadError: "Could not load MCP servers.",
@@ -32,6 +33,8 @@ const integrations = {
     form: {
       createTitle: "Add MCP server",
       editTitle: "Edit MCP server",
+      createDescription: "Connect a new MCP server",
+      editDescription: "Update this server's address and authentication",
       name: "Name",
       url: "URL",
       serverType: "Server type",
@@ -61,6 +64,7 @@ const integrations = {
   },
   modelServices: {
     title: "Model services",
+    description: "Providers for chat, embedding and rerank models",
     tabs: {
       chat: "Chat models",
       embedding: "Embedding models",
@@ -86,17 +90,15 @@ const integrations = {
       loadError: "Could not load model service providers.",
       empty: "No providers support {{type}} yet",
       modelSeparator: ", ",
-      modelOverflow: ", …",
       columns: {
-        brand: "Brand",
         name: "Name",
-        models: "Models",
-        apiUrl: "API URL",
       },
     },
     form: {
       createTitle: "Add provider",
       editTitle: "Edit provider",
+      createDescription: "Add a provider and choose its models",
+      editDescription: "Update this provider's connection and models",
       brand: "Brand",
       name: "Name",
       credentialType: "Credential",

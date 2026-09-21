@@ -1,5 +1,6 @@
 /** 外部联系人列表、筛选、详情和回收站面板。 */
 import { useEffect, useState } from "react"
+import { ArchiveRestoreIcon, EyeIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -27,6 +28,8 @@ import {
   ListToolbarSearch,
 } from "@/components/list-toolbar"
 import { PageHeader } from "@/components/page-header"
+import { ProfileAvatar } from "@/components/profile-avatar"
+import { ResourceListLayout } from "@/components/resource-list"
 import { ResourceTable } from "@/components/resource-table"
 import { SelectableText } from "@/components/selectable-text"
 import { Button } from "@/components/ui/button"
@@ -43,7 +46,6 @@ import {
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import { ContactCreateDialogs } from "@/features/contacts/contact-create-dialogs"
 import { ContactDetailSheet } from "@/features/contacts/contact-detail-sheet"
-import { ContactListLayout } from "@/features/contacts/contact-list-layout"
 import { ContactScopeMobileSelect } from "@/features/contacts/contact-scope-mobile-select"
 import { ContactDetailView } from "@/features/contacts/external/contact-detail"
 import { useContactSearch } from "@/features/contacts/use-contact-search"
@@ -201,6 +203,7 @@ export function ExternalContactsPanel({
       <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <PageHeader
           title={selectedChannel?.name ?? t("scopes.external")}
+          description={t("scopeDescriptions.external")}
           beforeTitle={
             <ContactScopeMobileSelect
               scope="external"
@@ -325,9 +328,10 @@ export function ExternalContactsPanel({
           </div>
         </ListToolbar>
 
-        <ContactListLayout
+        <ResourceListLayout
           loading={list.loading}
           error={Boolean(list.error)}
+          errorMessage={t("list.loadError")}
           onRetry={() => void list.refresh()}
           page={page}
           onPageChange={(number) =>
@@ -340,7 +344,18 @@ export function ExternalContactsPanel({
                 key: "name",
                 header: t("columns.name"),
                 cellClassName: "font-medium",
-                cell: (contact) => contact.displayName || t("anonymous"),
+                cell: (contact) => (
+                  <div className="flex items-center gap-2.5">
+                    <ProfileAvatar
+                      imageURL={contact.avatarUrl}
+                      name={contact.displayName || t("anonymous")}
+                      className="size-7"
+                    />
+                    <span className="truncate">
+                      {contact.displayName || t("anonymous")}
+                    </span>
+                  </div>
+                ),
               },
               {
                 key: "stage",
@@ -385,10 +400,12 @@ export function ExternalContactsPanel({
                     primary: (
                       <Button
                         variant="outline"
-                        size="sm"
+                        size="icon-sm"
+                        aria-label={t("trash.restore")}
+                        title={t("trash.restore")}
                         onClick={() => setRestoringContact(contact)}
                       >
-                        {t("trash.restore")}
+                        <ArchiveRestoreIcon />
                       </Button>
                     ),
                   }
@@ -396,10 +413,12 @@ export function ExternalContactsPanel({
                     primary: (
                       <Button
                         variant="outline"
-                        size="sm"
+                        size="icon-sm"
+                        aria-label={t("common:actions.view")}
+                        title={t("common:actions.view")}
                         onClick={() => setParameters({ selected: contact.id })}
                       >
-                        {t("common:actions.view")}
+                        <EyeIcon />
                       </Button>
                     ),
                     menu: (
@@ -413,7 +432,7 @@ export function ExternalContactsPanel({
                   }
             }
           />
-        </ContactListLayout>
+        </ResourceListLayout>
       </section>
 
       <ContactDetailSheet

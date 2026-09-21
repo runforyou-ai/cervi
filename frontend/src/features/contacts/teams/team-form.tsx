@@ -99,7 +99,7 @@ export function TeamForm({
           )}
         />
       </FieldGroup>
-      <div className="flex items-center gap-2">
+      <div className="flex items-center justify-end gap-2">
         <Button type="submit" disabled={form.formState.isSubmitting}>
           {form.formState.isSubmitting
             ? t("common:actions.saving")

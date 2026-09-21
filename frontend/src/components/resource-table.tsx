@@ -37,52 +37,73 @@ export type ResourceTableRowActions = {
   menuTriggerRef?: Ref<HTMLButtonElement>
 }
 
-/** 按列定义渲染表头和单元格，给出 actions 时在最右侧追加操作列，空列表展示占位行。 */
+/** 按列定义渲染表头和单元格，给出 actions 时在最右侧追加操作列，空列表展示占位行；给出 onRowActivate 时整行可点击或用回车触发，hideHeader 用于列含义已经一目了然的列表。 */
 export function ResourceTable<T>({
   columns,
   rows,
   rowKey,
   empty,
   actions,
+  onRowActivate,
+  hideHeader = false,
 }: {
   columns: readonly ResourceTableColumn<T>[]
   rows: readonly T[]
   rowKey: (row: T) => string
   empty: ReactNode
   actions?: (row: T) => ResourceTableRowActions
+  onRowActivate?: (row: T) => void
+  hideHeader?: boolean
 }) {
   const { t } = useTranslation("common")
 
   return (
     <Table>
-      <TableHeader>
-        <TableRow className="hover:bg-transparent">
-          {columns.map((column) => (
-            <TableHead
-              key={column.key}
-              className={cn(column.className, column.headerClassName)}
-            >
-              {column.header}
-            </TableHead>
-          ))}
-          {actions ? (
-            <TableHead className="w-px">{t("table.actions")}</TableHead>
-          ) : null}
-        </TableRow>
-      </TableHeader>
+      {hideHeader ? null : (
+        <TableHeader>
+          <TableRow className="hover:bg-transparent">
+            {columns.map((column) => (
+              <TableHead
+                key={column.key}
+                className={cn(column.className, column.headerClassName)}
+              >
+                {column.header}
+              </TableHead>
+            ))}
+            {actions ? (
+              <TableHead className="w-px">{t("table.actions")}</TableHead>
+            ) : null}
+          </TableRow>
+        </TableHeader>
+      )}
       <TableBody>
         {rows.length === 0 ? (
           <TableRow className="hover:bg-transparent">
             <TableCell
               colSpan={columns.length + (actions ? 1 : 0)}
-              className="h-28 text-center text-muted-foreground"
+              className="h-32 text-center text-muted-foreground"
             >
               {empty}
             </TableCell>
           </TableRow>
         ) : (
           rows.map((row) => (
-            <TableRow key={rowKey(row)}>
+            <TableRow
+              key={rowKey(row)}
+              className={cn("h-[65px]", onRowActivate && "cursor-pointer")}
+              tabIndex={onRowActivate ? 0 : undefined}
+              onClick={onRowActivate ? () => onRowActivate(row) : undefined}
+              onKeyDown={
+                onRowActivate
+                  ? (event) => {
+                      if (event.target !== event.currentTarget) return
+                      if (event.key !== "Enter" && event.key !== " ") return
+                      event.preventDefault()
+                      onRowActivate(row)
+                    }
+                  : undefined
+              }
+            >
               {columns.map((column) => (
                 <TableCell
                   key={column.key}
@@ -111,8 +132,11 @@ function ResourceTableActionsCell({
   const label = menuLabel ?? t("actions.more")
 
   return (
-    <TableCell className="whitespace-nowrap">
-      <div className="inline-flex items-center gap-2">
+    <TableCell className="w-px whitespace-nowrap">
+      <div
+        className="inline-flex items-center gap-1"
+        onClick={(event) => event.stopPropagation()}
+      >
         {primary}
         {menu ? (
           <DropdownMenu>

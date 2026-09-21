@@ -21,13 +21,13 @@ const settings = {
   },
   profile: {
     title: "个人资料",
+    description: "维护你的头像、昵称和联系方式",
     formLabel: "个人资料表单",
     displayName: "姓名",
     email: "邮箱",
     avatar: "头像",
     avatarChoose: "选择图片",
     avatarUploadError: "上传头像失败，请重试。",
-    saveSuccess: "个人资料已保存。",
     saveError: "保存个人资料失败，请重试。",
     validation: {
       displayNameRequired: "请输入姓名。",
@@ -56,9 +56,11 @@ const settings = {
   },
   security: {
     title: "登录与安全",
+    description: "修改登录密码",
   },
   devices: {
     title: "设备",
+    description: "查看并退出已登录的设备",
     list: {
       columns: {
         name: "设备名称",
@@ -85,6 +87,7 @@ const settings = {
   },
   preferences: {
     title: "偏好设置",
+    description: "设置语言、时区、外观和通知",
     formLabel: "偏好设置表单",
     language: "语言",
     timeZone: "时区",
@@ -113,7 +116,6 @@ const settings = {
         settingsOpenError: "无法打开系统通知设置，请手动前往系统设置。",
       },
     },
-    saveSuccess: "偏好设置已保存。",
     saveError: "保存偏好设置失败，请重试。",
     validation: {
       timeZoneRequired: "请选择时区。",
@@ -129,8 +131,8 @@ const settings = {
   },
   general: {
     title: "通用设置",
+    description: "维护企业名称等基本信息",
     saveError: "保存通用设置失败，请重试。",
-    saveSuccess: "通用设置已保存。",
     form: {
       name: "企业名称",
     },
@@ -141,6 +143,7 @@ const settings = {
   },
   roles: {
     title: "角色与权限",
+    description: "按角色控制成员可以使用的功能",
     kindsDescriptions: {
       admin: "负责企业管理，可使用全部功能",
       customerService: "负责接待和服务客户，处理客户咨询与沟通",
@@ -154,16 +157,18 @@ const settings = {
       permissionEmpty: "无权限",
       permissionSeparator: "、",
       permissionSummary: "{{items}}等 {{count}} 个权限",
+      memberCount_one: "{{count}} 名成员",
+      memberCount_other: "{{count}} 名成员",
       columns: {
         name: "角色名称",
-        description: "角色说明",
-        memberCount: "成员数",
         permissions: "权限",
       },
     },
     form: {
       createTitle: "新建角色",
       detailTitle: "角色详情",
+      createDescription: "新建角色并选择成员权限",
+      detailDescription: "查看并调整角色的权限和成员",
       name: "角色名称",
       description: "角色说明",
       loadError: "角色加载失败。",

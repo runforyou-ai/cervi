@@ -1,4 +1,5 @@
 /** 模型服务供应商列表页。 */
+import { PlusIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Link, useNavigate } from "react-router"
 
@@ -8,15 +9,13 @@ import {
   type AIProviderModelSummaryData,
   type AIProviderSummaryData,
 } from "@/api"
-import { ResourceContent } from "@/components/resource-content"
+import { ResourceListLayout } from "@/components/resource-list"
 import { ResourceTable } from "@/components/resource-table"
-import { PageContent } from "@/components/page-content"
+import { ListActionButton } from "@/components/list-action-button"
 import { PageHeader } from "@/components/page-header"
 import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
 import { Button } from "@/components/ui/button"
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { aiProviderBrandConfigs } from "@/features/integrations/model-services/model-provider-brands"
 import {
   modelServiceSectionConfigs,
@@ -27,44 +26,32 @@ import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 import { useIntegrationDeletion } from "@/features/integrations/use-integration-deletion"
 
-const visibleModelLimit = 3
-
-/** 显示供应商当前类型的模型摘要和完整悬浮目录。 */
-function ProviderModelsCell({ models }: { models: AIProviderModelSummaryData[] }) {
+/** 显示供应商名称、品牌和当前类型的模型摘要。 */
+function ProviderCell({
+  brand,
+  name,
+  models,
+}: {
+  brand: string
+  name: string
+  models: AIProviderModelSummaryData[]
+}) {
   const { t } = useTranslation("integrations")
-  if (models.length === 0) return "—"
-
   const summary = models
-    .slice(0, visibleModelLimit)
     .map((model) => model.name)
     .join(t("modelServices.list.modelSeparator"))
-  const visibleSummary =
-    models.length > visibleModelLimit
-      ? `${summary}${t("modelServices.list.modelOverflow")}`
-      : summary
 
   return (
-    <Tooltip>
-      <TooltipTrigger asChild>
-        <span
-          tabIndex={0}
-          className="block max-w-sm cursor-help truncate outline-none focus-visible:ring-2 focus-visible:ring-ring"
-        >
-          {visibleSummary}
-        </span>
-      </TooltipTrigger>
-      <TooltipContent side="bottom" sideOffset={4} className="max-w-md">
-        <ul className="grid gap-1 text-left">
-          {models.map((model) => (
-            <li key={model.identifier} className="break-words">
-              <span className="font-mono">{model.identifier}</span>
-              <span aria-hidden="true"> — </span>
-              <span>{model.name}</span>
-            </li>
-          ))}
-        </ul>
-      </TooltipContent>
-    </Tooltip>
+    <div className="min-w-0">
+      <p className="truncate font-medium">
+        {brand}
+        <span className="text-muted-foreground"> · </span>
+        {name}
+      </p>
+      {summary ? (
+        <p className="truncate text-xs text-muted-foreground">{summary}</p>
+      ) : null}
+    </div>
   )
 }
 
@@ -94,14 +81,21 @@ export function ModelProviderListPage({ section }: { section: ModelServiceSectio
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <PageHeader title={t("modelServices.title")}>
-        <Button size="sm" asChild>
-          <Link to={`/settings/model-services/${section}/new`}>
-            {t("modelServices.list.create")}
+      <PageHeader
+        title={t("modelServices.title")}
+        description={t("modelServices.description")}
+      >
+        <Button variant="ghost" size="icon-sm" asChild>
+          <Link
+            to={`/settings/model-services/${section}/new`}
+            aria-label={t("modelServices.list.create")}
+            title={t("modelServices.list.create")}
+          >
+            <PlusIcon />
           </Link>
         </Button>
       </PageHeader>
-      <PageContent>
+      <div className="cervi-page-gutter flex h-11 shrink-0 items-end select-none">
         <Tabs
           value={section}
           onValueChange={(value) => navigate(`/settings/model-services/${value}`)}
@@ -114,77 +108,50 @@ export function ModelProviderListPage({ section }: { section: ModelServiceSectio
             ))}
           </TabsList>
         </Tabs>
-
-        <div className="mt-6">
-          <ResourceContent
-            loading={showLoading}
-            error={Boolean(error)}
-            errorMessage={t("modelServices.list.loadError")}
-            onRetry={() => void refresh()}
-          >
-            <div className="overflow-hidden rounded-lg border bg-card">
-              <ResourceTable
-                columns={[
-                  {
-                    key: "brand",
-                    header: t("modelServices.list.columns.brand"),
-                    cell: (provider) =>
-                      t(aiProviderBrandConfigs[provider.brand].nameKey),
-                  },
-                  {
-                    key: "name",
-                    header: t("modelServices.list.columns.name"),
-                    cellClassName: "font-medium",
-                    cell: (provider) => provider.name,
-                  },
-                  {
-                    key: "models",
-                    header: t("modelServices.list.columns.models"),
-                    cellClassName: "text-muted-foreground",
-                    cell: (provider) => (
-                      <ProviderModelsCell
-                        models={provider.models.filter(
-                          (model) => model.type === sectionConfig.modelType,
-                        )}
-                      />
-                    ),
-                  },
-                  {
-                    key: "apiUrl",
-                    header: t("modelServices.list.columns.apiUrl"),
-                    cellClassName: "text-muted-foreground",
-                    cell: (provider) => provider.apiUrl,
-                  },
-                ]}
-                rows={visibleProviders}
-                rowKey={(provider) => provider.id}
-                empty={t("modelServices.list.empty", {
-                  type: t(sectionConfig.nameKey),
-                })}
-                actions={(provider) => ({
-                  primary: (
-                    <Button variant="outline" size="sm" asChild>
-                      <Link
-                        to={`/settings/model-services/${section}/${provider.id}`}
-                      >
-                        {t("common:actions.edit")}
-                      </Link>
-                    </Button>
-                  ),
-                  menu: (
-                    <DropdownMenuItem
-                      destructive
-                      onSelect={() => deletion.select(provider)}
-                    >
-                      {t("common:actions.delete")}
-                    </DropdownMenuItem>
-                  ),
-                })}
-              />
-            </div>
-          </ResourceContent>
-        </div>
-      </PageContent>
+      </div>
+      <ResourceListLayout
+        loading={showLoading}
+        error={Boolean(error)}
+        errorMessage={t("modelServices.list.loadError")}
+        onRetry={() => void refresh()}
+      >
+        <ResourceTable
+          hideHeader
+          columns={[
+            {
+              key: "provider",
+              header: t("modelServices.list.columns.name"),
+              cell: (provider) => (
+                <ProviderCell
+                  brand={t(aiProviderBrandConfigs[provider.brand].nameKey)}
+                  name={provider.name}
+                  models={provider.models.filter(
+                    (model) => model.type === sectionConfig.modelType,
+                  )}
+                />
+              ),
+            },
+          ]}
+          rows={visibleProviders}
+          rowKey={(provider) => provider.id}
+          empty={t("modelServices.list.empty", {
+            type: t(sectionConfig.nameKey),
+          })}
+          onRowActivate={(provider) =>
+            navigate(`/settings/model-services/${section}/${provider.id}`)
+          }
+          actions={(provider) => ({
+            primary: (
+              <ListActionButton
+                tone="destructive"
+                onClick={() => deletion.select(provider)}
+              >
+                {t("common:actions.delete")}
+              </ListActionButton>
+            ),
+          })}
+        />
+      </ResourceListLayout>
 
       <DeleteConfirmationDialog
         open={deletion.item !== null}

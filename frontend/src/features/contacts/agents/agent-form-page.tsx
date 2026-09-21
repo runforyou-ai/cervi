@@ -11,6 +11,7 @@ import {
 import { getAgent, isNotFoundApiError, listRoles, listTeams } from "@/api"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { PageContent } from "@/components/page-content"
+import { PageBackButton } from "@/components/page-back-button"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
@@ -77,7 +78,14 @@ export function AgentFormPage({ mode }: { mode: "create" | "edit" }) {
               ? t("agents.edit", { name: agent.displayName })
               : t("agents.editTitle")
         }
-      />
+        description={t(
+          mode === "create"
+            ? "agents.createDescription"
+            : "agents.editDescription",
+        )}
+      >
+        {mode === "edit" ? <PageBackButton to={returnTo} /> : null}
+      </PageHeader>
       <PageContent>
         {loading ? (
           <LoadingIndicator className="min-h-48 justify-center">
@@ -142,7 +150,6 @@ export function AgentFormPage({ mode }: { mode: "create" | "edit" }) {
                 onSaved={() => {
                   void invalidateContact("agent", agent.id)
                 }}
-                onCancel={() => navigate(returnTo)}
               />
             </TabsContent>
             <TabsContent
@@ -155,7 +162,6 @@ export function AgentFormPage({ mode }: { mode: "create" | "edit" }) {
                 onSaved={() => {
                   void invalidateContact("agent", agent.id)
                 }}
-                onCancel={() => navigate(returnTo)}
               />
             </TabsContent>
           </Tabs>

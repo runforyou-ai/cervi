@@ -1,5 +1,6 @@
 /** 知识文档的新增入口，包含上传批次及每个原件的进度。 */
 import { useRef, useState } from "react"
+import { PlusIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Link, useLocation } from "react-router"
 import { Button } from "@/components/ui/button"
@@ -29,8 +30,15 @@ export function KnowledgeDocumentUpload({ baseId, groupId }: { baseId: string; g
     <>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <Button ref={trigger} size="sm" disabled={busy || open}>
-            {t("documents.create.action")}
+          <Button
+            ref={trigger}
+            variant="ghost"
+            size="icon-sm"
+            disabled={busy || open}
+            aria-label={t("documents.create.action")}
+            title={t("documents.create.action")}
+          >
+            <PlusIcon />
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end">

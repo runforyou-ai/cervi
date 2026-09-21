@@ -132,7 +132,6 @@ const (
 	ErrorChannelAccessUpdateFailed        Key = "error.channel_access_update_failed"
 	ErrorTelegramConnectionTestFailed     Key = "error.telegram_connection_test_failed"
 	ErrorTelegramConnectionSaveFailed     Key = "error.telegram_connection_save_failed"
-	ErrorTelegramConnectionRequired       Key = "error.telegram_connection_required"
 	ErrorContactNotFound                  Key = "error.contact_not_found"
 	ErrorContactListFailed                Key = "error.contact_list_failed"
 	ErrorContactReadFailed                Key = "error.contact_read_failed"

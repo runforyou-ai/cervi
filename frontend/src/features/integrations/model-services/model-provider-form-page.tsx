@@ -24,8 +24,10 @@ import {
 import { FormActions } from "@/components/form/form-actions"
 import { FormInputField } from "@/components/form/form-input-field"
 import { FormValidationMessage } from "@/components/form/form-validation-message"
+import { ResourceListFrame } from "@/components/resource-list"
 import { ResourceContent } from "@/components/resource-content"
 import { PageContent } from "@/components/page-content"
+import { PageBackButton } from "@/components/page-back-button"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -56,6 +58,7 @@ import {
   parseTokenCount,
   type AIProviderFormValues,
 } from "@/features/integrations/model-services/model-provider-schema"
+import { useAutoSave } from "@/hooks/use-auto-save"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
@@ -145,6 +148,7 @@ export function ModelProviderFormPage({
   const form = useForm<AIProviderFormValues>({
     resolver: zodResolver(schema),
     shouldUseNativeValidation: true,
+    mode: "onBlur",
     defaultValues: {
       brand: initialBrand,
       name: "",
@@ -315,7 +319,15 @@ export function ModelProviderFormPage({
   }
 
   /** 创建或保存模型服务供应商。 */
-  async function save(values: AIProviderFormValues) {
+  // 编辑已有供应商时边改边存，新建仍由底部按钮提交并跳回列表。
+  const markSaved = useAutoSave({
+    form,
+    schema,
+    enabled: mode === "edit",
+    save: (values) => save(values, true),
+  })
+
+  async function save(values: AIProviderFormValues, autoSaved = false) {
     const input = {
       brand: values.brand,
       name: values.name,
@@ -343,6 +355,10 @@ export function ModelProviderFormPage({
       }
       void invalidateResource(resourceKeys.aiProviders())
       if (!mounted.current) return
+      if (autoSaved) {
+        markSaved(values)
+        return
+      }
       form.reset(values)
       toast.success(
         mode === "create"
@@ -389,7 +405,16 @@ export function ModelProviderFormPage({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <PageHeader title={title} />
+      <PageHeader
+        title={title}
+        description={t(
+          mode === "create"
+            ? "modelServices.form.createDescription"
+            : "modelServices.form.editDescription",
+        )}
+      >
+        {mode === "edit" ? <PageBackButton to={listPath} /> : null}
+      </PageHeader>
       <PageContent>
         <ResourceContent
           loading={loading}
@@ -399,7 +424,7 @@ export function ModelProviderFormPage({
         >
           <form
             className="w-full space-y-9"
-            onSubmit={form.handleSubmit(save)}
+            onSubmit={form.handleSubmit((values) => save(values))}
             noValidate
           >
             <FieldGroup className="max-w-2xl">
@@ -558,7 +583,7 @@ export function ModelProviderFormPage({
                   </Button>
                 </div>
               </div>
-              <div className="overflow-hidden rounded-lg border bg-card">
+              <ResourceListFrame>
                 <Table>
                   <TableHeader>
                     <TableRow className="hover:bg-transparent">
@@ -751,7 +776,7 @@ export function ModelProviderFormPage({
                     )}
                   </TableBody>
                 </Table>
-              </div>
+              </ResourceListFrame>
               {/* 校验提示使用表单分区间距，不改变操作按钮位置。 */}
               <FormValidationMessage
                 className="absolute top-full right-0 left-0 mt-2"
@@ -763,6 +788,7 @@ export function ModelProviderFormPage({
               saving={form.formState.isSubmitting}
               disabled={testingConnection}
               cancelTo={listPath}
+              submit={mode === "create"}
             >
               <Button
                 type="button"

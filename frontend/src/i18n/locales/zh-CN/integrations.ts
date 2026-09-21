@@ -2,6 +2,7 @@
 const integrations = {
   mcpServer: {
     title: "MCP 服务",
+    description: "接入外部工具服务，供 AI 员工调用",
     list: {
       create: "添加 MCP 服务",
       loadError: "MCP 服务列表加载失败。",
@@ -32,6 +33,8 @@ const integrations = {
     form: {
       createTitle: "添加 MCP 服务",
       editTitle: "编辑 MCP 服务",
+      createDescription: "接入新的 MCP 服务",
+      editDescription: "维护 MCP 服务的地址和认证",
       name: "名称",
       url: "URL",
       serverType: "服务器类型",
@@ -60,6 +63,7 @@ const integrations = {
   },
   modelServices: {
     title: "模型服务",
+    description: "配置对话、向量和重排模型的供应商",
     tabs: {
       chat: "对话模型",
       embedding: "嵌入模型",
@@ -85,17 +89,15 @@ const integrations = {
       loadError: "模型服务供应商列表加载失败。",
       empty: "还没有配置支持{{type}}的供应商",
       modelSeparator: "、",
-      modelOverflow: "、…",
       columns: {
-        brand: "品牌",
         name: "名称",
-        models: "模型",
-        apiUrl: "API 地址",
       },
     },
     form: {
       createTitle: "添加供应商",
       editTitle: "编辑供应商",
+      createDescription: "添加供应商并选择可用模型",
+      editDescription: "维护供应商的接入信息和可用模型",
       brand: "品牌",
       name: "名称",
       credentialType: "凭据",

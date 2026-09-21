@@ -18,6 +18,7 @@ import { FormActions } from "@/components/form/form-actions"
 import { FormInputField } from "@/components/form/form-input-field"
 import { ResourceContent } from "@/components/resource-content"
 import { PageContent } from "@/components/page-content"
+import { PageBackButton } from "@/components/page-back-button"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
@@ -26,6 +27,7 @@ import {
   createMCPServerSchema,
   type MCPServerFormValues,
 } from "@/features/integrations/mcp-servers/mcp-server-schema"
+import { useAutoSave } from "@/hooks/use-auto-save"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
@@ -56,6 +58,7 @@ export function MCPServerFormPage({ mode }: { mode: "create" | "edit" }) {
   const form = useForm<MCPServerFormValues>({
     resolver: zodResolver(schema),
     shouldUseNativeValidation: true,
+    mode: "onBlur",
     defaultValues: {
       name: "",
       url: "",
@@ -112,7 +115,15 @@ export function MCPServerFormPage({ mode }: { mode: "create" | "edit" }) {
   }
 
   /** 创建或保存 MCP 服务，并由服务端提交工具更新任务。 */
-  async function save(values: MCPServerFormValues) {
+  // 编辑已有服务时边改边存，新建仍由底部按钮提交并跳回列表。
+  const markSaved = useAutoSave({
+    form,
+    schema,
+    enabled: mode === "edit",
+    save: (values) => save(values, true),
+  })
+
+  async function save(values: MCPServerFormValues, autoSaved = false) {
     if (testing) return
     try {
       await (mode === "create"
@@ -124,6 +135,10 @@ export function MCPServerFormPage({ mode }: { mode: "create" | "edit" }) {
       void invalidateResource(resourceKeys.mcpServers())
       void invalidateResource(resourceKeys.agentMCPServerOptions())
       if (!mounted.current) return
+      if (autoSaved) {
+        markSaved(values)
+        return
+      }
       form.reset(values)
       toast.success(
         mode === "create"
@@ -157,7 +172,16 @@ export function MCPServerFormPage({ mode }: { mode: "create" | "edit" }) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <PageHeader title={title} />
+      <PageHeader
+        title={title}
+        description={t(
+          mode === "create"
+            ? "mcpServer.form.createDescription"
+            : "mcpServer.form.editDescription",
+        )}
+      >
+        {mode === "edit" ? <PageBackButton to={listPath} /> : null}
+      </PageHeader>
       <PageContent>
         <ResourceContent
           loading={loading}
@@ -167,7 +191,7 @@ export function MCPServerFormPage({ mode }: { mode: "create" | "edit" }) {
         >
           <form
             className="w-full max-w-2xl space-y-9"
-            onSubmit={form.handleSubmit(save)}
+            onSubmit={form.handleSubmit((values) => save(values))}
             noValidate
           >
             <FieldGroup>
@@ -229,6 +253,7 @@ export function MCPServerFormPage({ mode }: { mode: "create" | "edit" }) {
               saving={form.formState.isSubmitting}
               disabled={testing}
               cancelTo={listPath}
+              submit={mode === "create"}
             >
               <Button
                 type="button"

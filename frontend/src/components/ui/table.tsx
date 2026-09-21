@@ -47,7 +47,7 @@ function TableRow({ className, ...props }: React.ComponentProps<"tr">) {
     <tr
       data-slot="table-row"
       className={cn(
-        "border-b transition-colors hover:bg-muted/40",
+        "border-b border-border/55 transition-colors hover:bg-muted/40",
         className
       )}
       {...props}
@@ -74,7 +74,7 @@ function TableCell({ className, children, ...props }: React.ComponentProps<"td">
   return (
     <td
       data-slot="table-cell"
-      className={cn("px-3 py-2 align-middle", className)}
+      className={cn("px-3 py-4 align-middle", className)}
       {...props}
     >
       {selectableText(children)}

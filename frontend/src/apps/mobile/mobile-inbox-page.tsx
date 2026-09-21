@@ -360,7 +360,7 @@ function MobileInboxList({ query, changeQuery }: ReturnType<typeof useMobileInbo
               variant="ghost"
               size="icon-lg"
               className="shrink-0"
-              aria-label={t("inbox:searchLabel")}
+              aria-label={t("common:actions.search")}
               onClick={() =>
                 navigate(mobileSearchPath(), { state: { mobileBack: true } })
               }

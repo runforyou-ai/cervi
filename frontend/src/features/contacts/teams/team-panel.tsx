@@ -23,6 +23,8 @@ import {
   ListToolbarSearch,
 } from "@/components/list-toolbar"
 import { PageHeader } from "@/components/page-header"
+import { ProfileAvatar } from "@/components/profile-avatar"
+import { ResourceListLayout } from "@/components/resource-list"
 import { ResourceTable } from "@/components/resource-table"
 import { Button } from "@/components/ui/button"
 import {
@@ -51,7 +53,6 @@ import {
 import { WorkStatusBadge, workStatusLabel } from "@/components/work-status"
 import { useWorkspace } from "@/contexts/workspace-context"
 import { ContactCreateDialogs } from "@/features/contacts/contact-create-dialogs"
-import { ContactListLayout } from "@/features/contacts/contact-list-layout"
 import { ContactScopeMobileSelect } from "@/features/contacts/contact-scope-mobile-select"
 import { TeamForm } from "@/features/contacts/teams/team-form"
 import { TeamMemberPicker } from "@/features/contacts/teams/team-member-picker"
@@ -229,6 +230,7 @@ export function TeamPanel({
       <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <PageHeader
           title={selectedTeam?.name ?? t("scopes.teams")}
+          description={t("scopeDescriptions.teams")}
           beforeTitle={
             <ContactScopeMobileSelect
               scope="team"
@@ -338,9 +340,10 @@ export function TeamPanel({
           ) : null}
         </ListToolbar>
 
-        <ContactListLayout
+        <ResourceListLayout
           loading={list.loading}
           error={Boolean(list.error)}
+          errorMessage={t("list.loadError")}
           onRetry={() => void list.refresh()}
           page={page}
           onPageChange={(number) =>
@@ -383,7 +386,22 @@ export function TeamPanel({
                 key: "memberName",
                 header: t("columns.memberName"),
                 cellClassName: "font-medium",
-                cell: (member) => member.displayName,
+                cell: (member) => (
+                  <div className="flex items-center gap-2.5">
+                    <ProfileAvatar
+                      imageURL={member.avatarUrl}
+                      name={member.displayName}
+                      fallback={
+                        member.identityType ===
+                        OrganizationIdentityType.OrganizationIdentityTypeAgent
+                          ? "agent"
+                          : "person"
+                      }
+                      className="size-7"
+                    />
+                    <span className="truncate">{member.displayName}</span>
+                  </div>
+                ),
               },
               {
                 key: "type",
@@ -424,7 +442,7 @@ export function TeamPanel({
               ),
             })}
           />
-        </ContactListLayout>
+        </ResourceListLayout>
       </section>
 
       <ContactCreateDialogs

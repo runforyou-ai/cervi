@@ -17,10 +17,8 @@ const paneWidthClass = {
   sm: "md:w-48",
   md: "md:w-56",
   lg: "md:w-72",
-  /* 消息页中栏：64px 范围纵栏 + 312px 会话列表（列表宽与 helmdesk 中栏一致）。 */
-  inbox: "md:w-94",
-  /* 消息页中栏收起范围纵栏后只保留会话列表。 */
-  inboxCollapsed: "md:w-78",
+  /* 消息页中栏：280px 会话列表。 */
+  inbox: "md:w-70",
 } as const
 
 const paneOnNarrowClass = {

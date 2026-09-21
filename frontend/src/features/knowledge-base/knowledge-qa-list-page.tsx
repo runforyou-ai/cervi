@@ -1,5 +1,6 @@
 /** 本地知识问答的分组列表、搜索和删除操作。 */
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
+import { PlusIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Link, useLocation, useParams } from "react-router"
 
@@ -121,6 +122,7 @@ function KnowledgeQAGroupList({
           [base.data?.name, groupName].filter(Boolean).join(" · ") ||
           t("qa.title")
         }
+        description={t("qa.description")}
       >
         {list.data && !list.error ? (
           <>
@@ -132,9 +134,13 @@ function KnowledgeQAGroupList({
             >
               {t("retrieval.action")}
             </Button>
-            <Button size="sm" asChild>
-              <Link to={`${listPath}/new${location.search}`}>
-                {t("qa.create")}
+            <Button variant="ghost" size="icon-sm" asChild>
+              <Link
+                to={`${listPath}/new${location.search}`}
+                aria-label={t("qa.create")}
+                title={t("qa.create")}
+              >
+                <PlusIcon />
               </Link>
             </Button>
           </>

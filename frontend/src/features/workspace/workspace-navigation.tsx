@@ -15,6 +15,7 @@ import {
   MessagesSquareIcon,
   MonitorSmartphoneIcon,
   PlugIcon,
+  SearchIcon,
   SettingsIcon,
   ShieldCheckIcon,
   SlidersHorizontalIcon,
@@ -32,6 +33,7 @@ import {
   type WorkStatus,
 } from "@/api"
 import { PagePaneGroup, PagePaneLink } from "@/components/page-split"
+import { useGlobalSearch } from "@/contexts/global-search-context"
 import { useUnsavedChangesContext } from "@/contexts/unsaved-changes-context"
 import { WorkspaceRailToggle } from "@/features/workspace/workspace-rail"
 import { resourceKeys } from "@/hooks/resource-keys"
@@ -112,6 +114,45 @@ function WorkspaceRailItem({
   )
 }
 
+/** 打开全局搜索的入口，尺寸与导航项一致；窄栏下收为图标并由浮层提示。 */
+function WorkspaceSearchEntry({ collapsed }: { collapsed: boolean }) {
+  const { t } = useTranslation("common")
+  const globalSearch = useGlobalSearch()
+
+  const trigger = (
+    <button
+      type="button"
+      className={cn(
+        "flex h-8 shrink-0 items-center text-sm focus-visible:ring-2 focus-visible:ring-sidebar-ring",
+        collapsed
+          ? "w-8 justify-center rounded-md hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
+          : "mb-4 w-full gap-2 rounded-full bg-background/45 px-3 text-muted-foreground/65 hover:bg-background/70 hover:text-muted-foreground",
+      )}
+      title={collapsed ? undefined : t("actions.searchShortcut")}
+      aria-label={collapsed ? t("actions.searchPlaceholder") : undefined}
+      onClick={() => globalSearch?.open()}
+    >
+      <SearchIcon className="size-4 shrink-0" />
+      {collapsed ? null : (
+        <span className="min-w-0 flex-1 truncate text-left">
+          {t("actions.searchPlaceholder")}
+        </span>
+      )}
+    </button>
+  )
+
+  if (!collapsed) {
+    return trigger
+  }
+
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>{trigger}</TooltipTrigger>
+      <TooltipContent side="right">{t("actions.searchShortcut")}</TooltipContent>
+    </Tooltip>
+  )
+}
+
 /** 模块栏导航。 */
 function WorkspaceMenu({
   collapsed,
@@ -134,28 +175,37 @@ function WorkspaceMenu({
       )}
       aria-label={t("navigationGroup")}
     >
-      <WorkspaceRailItem
-        to="/inbox"
-        icon={InboxIcon}
-        label={t("inbox")}
-        active={location.pathname === "/inbox"}
-        collapsed={collapsed}
-        onClick={onInboxClick}
-      />
-      <WorkspaceRailItem
-        to="/contacts/employees"
-        icon={ContactRoundIcon}
-        label={t("contacts")}
-        active={location.pathname.startsWith("/contacts")}
-        collapsed={collapsed}
-      />
-      <WorkspaceRailItem
-        to="/knowledge-bases"
-        icon={LibraryIcon}
-        label={t("knowledgeBases")}
-        active={location.pathname.startsWith("/knowledge-bases")}
-        collapsed={collapsed}
-      />
+      <WorkspaceSearchEntry collapsed={collapsed} />
+      {/* 展开时导航项右侧额外留白，选中块与主内容卡片边缘拉开距离，搜索框保持原有宽度。 */}
+      <div
+        className={cn(
+          "flex flex-col",
+          collapsed ? "items-center gap-1.5" : "items-stretch gap-0.5 pr-3",
+        )}
+      >
+        <WorkspaceRailItem
+          to="/inbox"
+          icon={InboxIcon}
+          label={t("inbox")}
+          active={location.pathname === "/inbox"}
+          collapsed={collapsed}
+          onClick={onInboxClick}
+        />
+        <WorkspaceRailItem
+          to="/contacts/employees"
+          icon={ContactRoundIcon}
+          label={t("contacts")}
+          active={location.pathname.startsWith("/contacts")}
+          collapsed={collapsed}
+        />
+        <WorkspaceRailItem
+          to="/knowledge-bases"
+          icon={LibraryIcon}
+          label={t("knowledgeBases")}
+          active={location.pathname.startsWith("/knowledge-bases")}
+          collapsed={collapsed}
+        />
+      </div>
     </nav>
   )
 }

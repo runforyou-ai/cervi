@@ -1,5 +1,6 @@
 /** AI 员工列表、筛选、配置入口和状态管理面板。 */
 import { useState } from "react"
+import { MessageSquareIcon, Settings2Icon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useLocation, useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -21,6 +22,8 @@ import {
   ListToolbarSearch,
 } from "@/components/list-toolbar"
 import { PageHeader } from "@/components/page-header"
+import { ProfileAvatar } from "@/components/profile-avatar"
+import { ResourceListLayout } from "@/components/resource-list"
 import { ResourceTable } from "@/components/resource-table"
 import { Button } from "@/components/ui/button"
 import {
@@ -36,14 +39,12 @@ import {
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import { WorkStatusBadge } from "@/components/work-status"
 import { ContactCreateDialogs } from "@/features/contacts/contact-create-dialogs"
-import { ContactListLayout } from "@/features/contacts/contact-list-layout"
 import { ContactScopeMobileSelect } from "@/features/contacts/contact-scope-mobile-select"
 import { userStatusLabel } from "@/features/contacts/external/contact-labels"
 import { JoinedTeamsCell } from "@/features/contacts/joined-teams-cell"
 import { useContactSearch } from "@/features/contacts/use-contact-search"
 import { UserStatusBadge } from "@/features/contacts/user-status-badge"
 import { roleDisplayName } from "@/lib/role-labels"
-import { useDateTime } from "@/hooks/use-date-time"
 import { useContactInvalidator } from "@/features/contacts/use-contact-invalidator"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
@@ -64,7 +65,6 @@ export function AgentsPanel({
   const { t: tCommon } = useTranslation("common")
   const navigate = useNavigate()
   const location = useLocation()
-  const { formatDateTime } = useDateTime()
   const invalidateContact = useContactInvalidator()
   const { searchParams, setParameters, query, search, setSearch, currentPage } =
     useContactSearch()
@@ -119,6 +119,7 @@ export function AgentsPanel({
       <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <PageHeader
           title={t("scopes.agents")}
+          description={t("scopeDescriptions.agents")}
           beforeTitle={
             <ContactScopeMobileSelect
               scope="agents"
@@ -170,9 +171,10 @@ export function AgentsPanel({
           ) : null}
         </ListToolbar>
 
-        <ContactListLayout
+        <ResourceListLayout
           loading={list.loading}
           error={Boolean(list.error)}
+          errorMessage={t("list.loadError")}
           onRetry={() => void list.refresh()}
           page={page}
           onPageChange={(number) =>
@@ -185,7 +187,17 @@ export function AgentsPanel({
                 key: "name",
                 header: t("columns.name"),
                 cellClassName: "font-medium",
-                cell: (agent) => agent.displayName,
+                cell: (agent) => (
+                  <div className="flex items-center gap-2.5">
+                    <ProfileAvatar
+                      imageURL={agent.avatarUrl}
+                      name={agent.displayName}
+                      fallback="agent"
+                      className="size-7"
+                    />
+                    <span className="truncate">{agent.displayName}</span>
+                  </div>
+                ),
               },
               {
                 key: "role",
@@ -224,12 +236,6 @@ export function AgentsPanel({
                 header: t("columns.workStatus"),
                 cell: (agent) => <WorkStatusBadge status={agent.workStatus} />,
               },
-              {
-                key: "createdAt",
-                header: t("columns.createdAt"),
-                cellClassName: "whitespace-nowrap text-muted-foreground",
-                cell: (agent) => formatDateTime(agent.createdAt),
-              },
             ]}
             rows={agents}
             rowKey={(agent) => agent.id}
@@ -238,24 +244,29 @@ export function AgentsPanel({
               primary: (
                 <>
                   <Button
-                    size="sm"
+                    variant="outline"
+                    size="icon-sm"
+                    aria-label={t("sendMessage")}
+                    title={t("sendMessage")}
                     disabled={agent.status !== UserStatus.UserStatusActive}
                     onClick={() =>
                       navigate(`/inbox?scope=internal&target=${agent.identityId}`)
                     }
                   >
-                    {t("sendMessage")}
+                    <MessageSquareIcon />
                   </Button>
                   <Button
                     variant="outline"
-                    size="sm"
+                    size="icon-sm"
+                    aria-label={t("agents.configure")}
+                    title={t("agents.configure")}
                     onClick={() =>
                       navigate(
                         `/contacts/ai-employees/${agent.id}?tab=basic&returnTo=${encodeURIComponent(location.pathname + location.search)}`,
                       )
                     }
                   >
-                    {t("agents.configure")}
+                    <Settings2Icon />
                   </Button>
                 </>
               ),
@@ -273,7 +284,7 @@ export function AgentsPanel({
               ),
             })}
           />
-        </ContactListLayout>
+        </ResourceListLayout>
       </section>
 
       <ContactCreateDialogs

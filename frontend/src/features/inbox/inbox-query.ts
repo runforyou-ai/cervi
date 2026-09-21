@@ -110,6 +110,18 @@ export function normalizeInboxQuery(query: InboxQueryInput): NormalizedInboxQuer
   }
 }
 
+/** 不带列表筛选的可读范围查询，用于全局搜索和未进入消息页时的读取。 */
+export const readableInboxQuery = normalizeInboxQuery({
+  scope: InboxScope.InboxScopeAll,
+  customerView: CustomerInboxView.CustomerInboxViewQueue,
+  queueFilter: CustomerQueueFilter.CustomerQueueFilterAll,
+  queueTeamId: "",
+  assigneeIdentityId: "",
+  channelId: "",
+  serviceStatus: ServiceSessionStatus.ServiceSessionStatusOpen,
+  kinds: [],
+})
+
 /** 从地址参数解析当前列表筛选。 */
 export function inboxQueryFromSearch(params: URLSearchParams): NormalizedInboxQuery {
   return normalizeInboxQuery({

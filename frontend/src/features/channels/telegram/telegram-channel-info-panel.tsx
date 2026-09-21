@@ -21,7 +21,7 @@ export function TelegramChannelInfoPanel({
     : "—"
 
   return (
-    <aside className="w-full max-w-[480px] xl:sticky xl:top-6 xl:self-start">
+    <aside className="w-full max-w-[360px] xl:sticky xl:top-6 xl:self-start">
       <h3 className="text-base font-medium">
         {t("telegramConnection.info.title")}
       </h3>
@@ -48,7 +48,7 @@ export function TelegramChannelInfoPanel({
           value={connection.webhookSecret || "—"}
           selectable
         />
-        <div className="grid gap-1 py-3 sm:grid-cols-[10rem_minmax(0,1fr)]">
+        <div className="grid gap-1 py-3 sm:grid-cols-[7rem_minmax(0,1fr)]">
           <dt className="text-muted-foreground">
             {t("telegramConnection.info.webhookStatus")}
           </dt>
@@ -88,7 +88,7 @@ function InfoRow({
   selectable?: boolean
 }) {
   return (
-    <div className="grid gap-1 border-b py-3 sm:grid-cols-[10rem_minmax(0,1fr)]">
+    <div className="grid gap-1 border-b py-3 sm:grid-cols-[7rem_minmax(0,1fr)]">
       <dt className="text-muted-foreground">{label}</dt>
       <dd className="min-w-0 break-all">
         {selectable ? <SelectableText>{value}</SelectableText> : value}

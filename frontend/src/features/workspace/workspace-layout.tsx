@@ -14,6 +14,7 @@ import {
   deactivateNotificationPolicy,
 } from "@/features/notifications/new-message-notifications"
 import { useNewMessageNotifications } from "@/features/notifications/use-new-message-notifications"
+import { GlobalSearchProvider } from "@/features/inbox/global-search"
 import { SessionShell } from "@/features/session/session-shell"
 import { WorkspaceHistoryNav } from "@/features/workspace/workspace-history-nav"
 import { WorkspaceNavigationGuard } from "@/features/workspace/workspace-navigation-guard"
@@ -230,45 +231,47 @@ function WorkspaceShell({ identity }: { identity: Identity }) {
 
   return (
     <WorkspaceNavigationGuard>
-      <div
-        className="cervi-workspace-shell relative flex h-svh min-h-0 w-full overflow-hidden"
-        data-rail-collapsed={railCollapsed ? "true" : undefined}
-        style={
-          railCollapsed
-            ? undefined
-            : ({
-                "--cervi-workspace-rail-width": `${rail.width}px`,
-              } as CSSProperties)
-        }
-      >
-        <WorkspaceNavigation
-          identity={identity}
-          inSettings={inSettings}
-          appHref={appHrefRef.current}
-          collapsed={railCollapsed}
-          onToggleRail={rail.toggleCollapsed}
-          onLogout={handleLogout}
-          loggingOut={loggingOut}
-        />
-        {railCollapsed ? null : (
-          <WorkspaceRailResizer onWidthChange={rail.changeWidth} />
-        )}
-        {railCollapsed ? null : (
-          <div className="cervi-workspace-titlebar-actions absolute top-0 left-0 z-40 flex items-center">
-            <WorkspaceRailToggle
-              collapsed={false}
-              onToggle={rail.toggleCollapsed}
-            />
-            {nativeHistoryNav ? <WorkspaceHistoryNav /> : null}
+      <GlobalSearchProvider identity={identity}>
+        <div
+          className="cervi-workspace-shell relative flex h-svh min-h-0 w-full overflow-hidden"
+          data-rail-collapsed={railCollapsed ? "true" : undefined}
+          style={
+            railCollapsed
+              ? undefined
+              : ({
+                  "--cervi-workspace-rail-width": `${rail.width}px`,
+                } as CSSProperties)
+          }
+        >
+          <WorkspaceNavigation
+            identity={identity}
+            inSettings={inSettings}
+            appHref={appHrefRef.current}
+            collapsed={railCollapsed}
+            onToggleRail={rail.toggleCollapsed}
+            onLogout={handleLogout}
+            loggingOut={loggingOut}
+          />
+          {railCollapsed ? null : (
+            <WorkspaceRailResizer onWidthChange={rail.changeWidth} />
+          )}
+          {railCollapsed ? null : (
+            <div className="cervi-workspace-titlebar-actions absolute top-0 left-0 z-40 flex items-center">
+              <WorkspaceRailToggle
+                collapsed={false}
+                onToggle={rail.toggleCollapsed}
+              />
+              {nativeHistoryNav ? <WorkspaceHistoryNav /> : null}
+            </div>
+          )}
+          <div aria-hidden="true" className="cervi-workspace-top-drag-region" />
+          <div className="cervi-workspace-content-frame relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl bg-background shadow-sm">
+            <WorkspaceProvider value={workspaceContext}>
+              <WorkspacePageRoutes location={pageHref} />
+            </WorkspaceProvider>
           </div>
-        )}
-        <div aria-hidden="true" className="cervi-workspace-top-drag-region" />
-        <div className="cervi-workspace-content-frame relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl bg-background shadow-sm">
-          <WorkspaceProvider value={workspaceContext}>
-            <WorkspacePageRoutes location={pageHref} />
-          </WorkspaceProvider>
         </div>
-      </div>
+      </GlobalSearchProvider>
     </WorkspaceNavigationGuard>
   )
 }

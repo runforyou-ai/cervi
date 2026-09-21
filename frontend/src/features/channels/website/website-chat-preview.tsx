@@ -109,17 +109,18 @@ export function WebsiteChatPreview({
   }
 
   return (
-    <aside className="w-full max-w-[480px] xl:sticky xl:top-6 xl:self-start">
+    <aside className="w-full max-w-[360px] xl:sticky xl:top-6 xl:self-start">
       <p className="mb-3 text-sm font-medium">
         {t("chatInterface.preview.title")}
       </p>
 
-      <div className="relative h-[800px] overflow-hidden rounded-2xl border bg-muted/30 shadow-sm">
+      {/* 挂件以真实尺寸渲染后整体缩放到预览框内。 */}
+      <div className="relative h-[600px] overflow-hidden rounded-2xl border bg-muted/30 shadow-sm">
         {previewURL ? (
           <iframe
             key={retryKey}
             ref={iframeRef}
-            className="block size-full border-0 bg-background"
+            className="block h-[800px] w-[480px] origin-top-left scale-75 border-0 bg-background"
             src={previewURL}
             title={t("chatInterface.preview.frameTitle")}
             referrerPolicy="strict-origin-when-cross-origin"

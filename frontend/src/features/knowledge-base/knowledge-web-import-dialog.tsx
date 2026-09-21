@@ -124,7 +124,7 @@ export function KnowledgeWebImportDialog({
               disabled={disabled}
             />
           </FieldGroup>
-          <div className="flex gap-3">
+          <div className="flex justify-end gap-3">
             <Button type="submit" disabled={disabled}>
               {t(
                 disabled ? "common:actions.saving" : "documents.create.import",

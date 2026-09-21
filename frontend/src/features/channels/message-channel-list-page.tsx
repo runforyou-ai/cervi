@@ -1,5 +1,6 @@
 /** 消息渠道列表页，统一展示当前支持的渠道。 */
 import { useMemo, useState } from "react"
+import { PlusIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Link, useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -15,11 +16,10 @@ import {
   ListToolbar,
   ListToolbarFilter,
   ListToolbarReset,
-  ListToolbarSearch,
 } from "@/components/list-toolbar"
-import { PageContent } from "@/components/page-content"
+import { ListActionButton } from "@/components/list-action-button"
 import { PageHeader } from "@/components/page-header"
-import { ResourceContent } from "@/components/resource-content"
+import { ResourceListLayout } from "@/components/resource-list"
 import { ResourceTable } from "@/components/resource-table"
 import {
   AlertDialog,
@@ -32,7 +32,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import {
   messageChannelTypeDefinition,
   messageChannelTypeDefinitions,
@@ -41,6 +40,7 @@ import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
+import { cn } from "@/lib/utils"
 
 type ChannelEnabledStatus = "enabled" | "disabled"
 
@@ -49,7 +49,6 @@ export function MessageChannelListPage() {
   const { t } = useTranslation(["channels", "common"])
   const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
-  const [search, setSearch] = useState("")
   const [category, setCategory] = useState("")
   const [enabledStatus, setEnabledStatus] =
     useState<ChannelEnabledStatus>("enabled")
@@ -70,13 +69,10 @@ export function MessageChannelListPage() {
     () =>
       channels.filter(
         (channel) =>
-          channel.name
-            .toLocaleLowerCase()
-            .includes(search.trim().toLocaleLowerCase()) &&
           (!category || channel.type === category) &&
           channel.enabled === (enabledStatus === "enabled"),
       ),
-    [category, channels, enabledStatus, search],
+    [category, channels, enabledStatus],
   )
 
   /** 切换消息渠道的启用状态。 */
@@ -116,18 +112,22 @@ export function MessageChannelListPage() {
 
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden">
-      <PageHeader title={t("list.title")}>
-        <Button size="sm" asChild>
-          <Link to="/settings/channels/new">{t("list.create")}</Link>
+      <PageHeader
+        title={t("list.title")}
+        description={t("list.description")}
+      >
+        <Button variant="ghost" size="icon-sm" asChild>
+          <Link
+            to="/settings/channels/new"
+            aria-label={t("list.create")}
+            title={t("list.create")}
+          >
+            <PlusIcon />
+          </Link>
         </Button>
       </PageHeader>
 
       <ListToolbar>
-        <ListToolbarSearch
-          value={search}
-          aria-label={t("filters.search")}
-          onChange={(event) => setSearch(event.target.value)}
-        />
         <ListToolbarFilter
           label={t("filters.category")}
           allLabel={t("filters.allCategories")}
@@ -149,10 +149,9 @@ export function MessageChannelListPage() {
             setEnabledStatus(value as ChannelEnabledStatus)
           }
         />
-        {search || category || enabledStatus !== "enabled" ? (
+        {category || enabledStatus !== "enabled" ? (
           <ListToolbarReset
             onClick={() => {
-              setSearch("")
               setCategory("")
               setEnabledStatus("enabled")
             }}
@@ -162,80 +161,66 @@ export function MessageChannelListPage() {
         ) : null}
       </ListToolbar>
 
-      <PageContent>
-        <ResourceContent
-          loading={showLoading}
-          error={Boolean(error)}
-          errorMessage={t("list.loadError")}
-          onRetry={() => void refresh()}
-        >
-          <div className="overflow-hidden rounded-lg border bg-card">
-            <ResourceTable
-              columns={[
-                {
-                  key: "name",
-                  header: t("list.columns.name"),
-                  cellClassName: "min-w-44 font-medium",
-                  cell: (channel) => channel.name,
-                },
-                {
-                  key: "category",
-                  header: t("list.columns.category"),
-                  cellClassName: "whitespace-nowrap",
-                  cell: (channel) => {
-                    const typeDefinition = messageChannelTypeDefinition(
-                      channel.type,
-                    )
-                    if (!typeDefinition) {
-                      console.warn("未知的消息渠道类型", channel.type)
-                      return ""
-                    }
-                    return t(`types.${typeDefinition.translationKey}`)
-                  },
-                },
-                {
-                  key: "language",
-                  header: t("list.columns.language"),
-                  cellClassName: "whitespace-nowrap",
-                  cell: (channel) =>
-                    t(
-                      `locales.${channel.defaultLocale === "zh-CN" ? "zhCN" : "enUS"}`,
-                    ),
-                },
-              ]}
-              rows={filteredChannels}
-              rowKey={(channel) => channel.id}
-              empty={
-                channels.length === 0
-                  ? t("list.emptyTitle")
-                  : t("list.emptyFiltered")
-              }
-              actions={(channel) => ({
-                primary: (
-                  <Button variant="outline" size="sm" asChild>
-                    <Link
-                      to={`/settings/channels/${channel.type}/${channel.id}`}
+      <ResourceListLayout
+        loading={showLoading}
+        error={Boolean(error)}
+        errorMessage={t("list.loadError")}
+        onRetry={() => void refresh()}
+      >
+        <ResourceTable
+          hideHeader
+          columns={[
+            {
+              key: "name",
+              header: t("list.columns.name"),
+              cellClassName: "min-w-44 font-medium",
+              cell: (channel) => {
+                const definition = messageChannelTypeDefinition(channel.type)
+                return (
+                  <div className="flex items-center gap-2.5">
+                    <span
+                      aria-hidden="true"
+                      className={cn(
+                        "flex size-7 shrink-0 items-center justify-center rounded-lg",
+                        definition?.softClassName ?? "bg-muted text-muted-foreground",
+                      )}
                     >
-                      {t("common:actions.edit")}
-                    </Link>
-                  </Button>
-                ),
-                menu: (
-                  <DropdownMenuItem
-                    destructive={channel.enabled}
-                    disabled={updatingChannelId === channel.id}
-                    onSelect={() => requestStatusChange(channel)}
-                  >
-                    {channel.enabled
-                      ? t("list.deactivate")
-                      : t("list.activate")}
-                  </DropdownMenuItem>
-                ),
-              })}
-            />
-          </div>
-        </ResourceContent>
-      </PageContent>
+                      {definition ? <definition.icon className="size-4" /> : null}
+                    </span>
+                    <span className="truncate">{channel.name}</span>
+                  </div>
+                )
+              },
+            },
+          ]}
+          rows={filteredChannels}
+          rowKey={(channel) => channel.id}
+          empty={
+            channels.length === 0
+              ? t("list.emptyTitle")
+              : t("list.emptyFiltered")
+          }
+          onRowActivate={(channel) =>
+            navigate(`/settings/channels/${channel.type}/${channel.id}`)
+          }
+          actions={(channel) => {
+            const label = channel.enabled
+              ? t("list.deactivate")
+              : t("list.activate")
+            return {
+              primary: (
+                <ListActionButton
+                  tone={channel.enabled ? "destructive" : "success"}
+                  disabled={updatingChannelId === channel.id}
+                  onClick={() => requestStatusChange(channel)}
+                >
+                  {label}
+                </ListActionButton>
+              ),
+            }
+          }}
+        />
+      </ResourceListLayout>
 
       {confirmingChannel ? (
         <AlertDialog

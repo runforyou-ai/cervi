@@ -1,5 +1,6 @@
 /** 企业成员列表、筛选、详情和账号状态管理面板。 */
 import { useEffect, useState } from "react"
+import { EyeIcon, MessageSquareIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -24,6 +25,8 @@ import {
   ListToolbarSearch,
 } from "@/components/list-toolbar"
 import { PageHeader } from "@/components/page-header"
+import { ProfileAvatar } from "@/components/profile-avatar"
+import { ResourceListLayout } from "@/components/resource-list"
 import { ResourceTable } from "@/components/resource-table"
 import { Button } from "@/components/ui/button"
 import {
@@ -41,7 +44,6 @@ import { WorkStatusBadge } from "@/components/work-status"
 import { useWorkspace } from "@/contexts/workspace-context"
 import { ContactCreateDialogs } from "@/features/contacts/contact-create-dialogs"
 import { ContactDetailSheet } from "@/features/contacts/contact-detail-sheet"
-import { ContactListLayout } from "@/features/contacts/contact-list-layout"
 import { ContactScopeMobileSelect } from "@/features/contacts/contact-scope-mobile-select"
 import { userStatusLabel } from "@/features/contacts/external/contact-labels"
 import { JoinedTeamsCell } from "@/features/contacts/joined-teams-cell"
@@ -49,7 +51,6 @@ import { MemberDetailView } from "@/features/contacts/members/member-detail"
 import { useContactSearch } from "@/features/contacts/use-contact-search"
 import { UserStatusBadge } from "@/features/contacts/user-status-badge"
 import { roleDisplayName } from "@/lib/role-labels"
-import { useDateTime } from "@/hooks/use-date-time"
 import { useContactInvalidator } from "@/features/contacts/use-contact-invalidator"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
@@ -70,7 +71,6 @@ export function MembersPanel({
   const { t: tCommon } = useTranslation("common")
   const { identity } = useWorkspace()
   const navigate = useNavigate()
-  const { formatDateTime } = useDateTime()
   const invalidateContact = useContactInvalidator()
   const invalidate = useResourceInvalidator()
   const {
@@ -173,6 +173,7 @@ export function MembersPanel({
       <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <PageHeader
           title={t("scopes.employees")}
+          description={t("scopeDescriptions.employees")}
           beforeTitle={
             <ContactScopeMobileSelect
               scope="employees"
@@ -238,9 +239,10 @@ export function MembersPanel({
           ) : null}
         </ListToolbar>
 
-        <ContactListLayout
+        <ResourceListLayout
           loading={list.loading}
           error={Boolean(list.error)}
+          errorMessage={t("list.loadError")}
           onRetry={() => void list.refresh()}
           page={page}
           onPageChange={(number) =>
@@ -253,7 +255,16 @@ export function MembersPanel({
                 key: "employeeName",
                 header: t("columns.employeeName"),
                 cellClassName: "font-medium",
-                cell: (user) => user.displayName,
+                cell: (user) => (
+                  <div className="flex items-center gap-2.5">
+                    <ProfileAvatar
+                      imageURL={user.avatarUrl}
+                      name={user.displayName}
+                      className="size-7"
+                    />
+                    <span className="truncate">{user.displayName}</span>
+                  </div>
+                ),
               },
               {
                 key: "email",
@@ -289,12 +300,6 @@ export function MembersPanel({
                   <WorkStatusBadge status={memberWorkStatus(user)} />
                 ),
               },
-              {
-                key: "createdAt",
-                header: t("columns.createdAt"),
-                cellClassName: "whitespace-nowrap text-muted-foreground",
-                cell: (user) => formatDateTime(user.createdAt),
-              },
             ]}
             rows={users}
             rowKey={(user) => user.id}
@@ -303,7 +308,10 @@ export function MembersPanel({
               primary: (
                 <>
                   <Button
-                    size="sm"
+                    variant="outline"
+                    size="icon-sm"
+                    aria-label={t("sendMessage")}
+                    title={t("sendMessage")}
                     disabled={
                       user.status !== UserStatus.UserStatusActive ||
                       user.identityId === identity.user.identityId
@@ -312,14 +320,16 @@ export function MembersPanel({
                       navigate(`/inbox?scope=internal&target=${user.identityId}`)
                     }
                   >
-                    {t("sendMessage")}
+                    <MessageSquareIcon />
                   </Button>
                   <Button
                     variant="outline"
-                    size="sm"
+                    size="icon-sm"
+                    aria-label={tCommon("actions.view")}
+                    title={tCommon("actions.view")}
                     onClick={() => setParameters({ selected: user.id })}
                   >
-                    {tCommon("actions.view")}
+                    <EyeIcon />
                   </Button>
                 </>
               ),
@@ -337,7 +347,7 @@ export function MembersPanel({
               ),
             })}
           />
-        </ContactListLayout>
+        </ResourceListLayout>
       </section>
 
       <ContactDetailSheet

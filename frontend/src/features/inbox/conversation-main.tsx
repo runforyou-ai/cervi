@@ -51,7 +51,7 @@ export function ConversationMain({
     conversation: DirectInboxConversationData | AgentInboxConversationData,
   ) => void
   onSearchConversation?: (conversationID: string) => void
-  locateMessage: ({ conversationId: string } & ConversationLocateTarget) | null
+  locateMessage: ConversationLocateTarget | null
   narrowViewport?: boolean
 }) {
   const conversation =
@@ -188,11 +188,7 @@ export function ConversationMain({
             if (validConversation) onConversationChanged?.(validConversation.id)
           }}
           onChatStarted={onChatStarted}
-          locateMessage={
-            locateMessage && locateMessage.conversationId === validConversation?.id
-              ? locateMessage
-              : null
-          }
+          locateMessage={validConversation ? locateMessage : null}
           customerDraftRef={customerConversation ? customerDraftRef : undefined}
         />
       </div>

@@ -1,4 +1,4 @@
-/** 消息页中栏（范围纵栏 + 会话列表）和会话主区。 */
+/** 消息页中栏（会话列表）和会话主区。 */
 import { useEffect, useRef, useState } from "react"
 import { MessagesSquareIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
@@ -9,17 +9,14 @@ import {
   CustomerInboxView,
   CustomerQueueFilter,
   InboxScope,
-  InboxSearchPersonKind,
   OrganizationIdentityType,
   ServiceSessionStatus,
-  findDirectConversation,
   isApiError,
   isCustomerInboxConversation,
   listCustomerServiceAssignees,
   listInboxChannels,
   listServiceQueueTeams,
   openConversationWindow,
-  sessionPath,
   type AgentInboxConversationData,
   type DirectInboxConversationData,
   type GroupInboxConversationData,
@@ -35,6 +32,7 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
+import { useGlobalSearch } from "@/contexts/global-search-context"
 import { useWorkspace } from "@/contexts/workspace-context"
 import { ConversationDetail } from "@/features/inbox/conversation-detail"
 import { ConversationMain } from "@/features/inbox/conversation-main"
@@ -47,15 +45,12 @@ import { InboxCustomerQueueFilter } from "@/features/inbox/inbox-customer-queue-
 import { InboxFilter } from "@/features/inbox/inbox-filter"
 import { InboxListPanel } from "@/features/inbox/inbox-list-panel"
 import { InboxPaneTop } from "@/features/inbox/inbox-pane-top"
-import { InboxScopeRail } from "@/features/inbox/inbox-scope-rail"
-import { InboxSearchPanel } from "@/features/inbox/inbox-search-panel"
 import type { ChatDraft } from "@/features/inbox/inbox-selection"
 import { useConversationName } from "@/features/inbox/use-conversation-name"
 import {
   readConversationSummary,
   useConversationSummary,
 } from "@/features/inbox/use-conversation-summary"
-import { useInboxSearch, type InboxSearchItem } from "@/features/inbox/use-inbox-search"
 import type { PartitionedInboxList } from "@/features/inbox/use-inbox-list"
 import { useRecentConversations } from "@/features/inbox/use-recent-conversations"
 import type { useInboxListViewport } from "@/features/inbox/use-inbox-list-viewport"
@@ -89,6 +84,7 @@ export function InboxPage({
   kinds,
   selectedConversationId,
   targetIdentityId,
+  locateMessage,
   onSelectedConversationChange,
   onQueryChange,
 }: {
@@ -104,6 +100,7 @@ export function InboxPage({
   kinds: ConversationType[]
   selectedConversationId: string
   targetIdentityId: string
+  locateMessage: ConversationLocateTarget | null
   onSelectedConversationChange: (
     conversationId: string,
     replace?: boolean,
@@ -129,9 +126,7 @@ export function InboxPage({
   const isNarrowViewport = useIsNarrowViewport()
   const invalidate = useResourceInvalidator()
   const readResource = useResourceReader()
-  const [railCollapsed, setRailCollapsed] = useState(false)
-  const paneRef = useRef<HTMLDivElement>(null)
-  const railToggledRef = useRef(false)
+  const globalSearch = useGlobalSearch()
   const [chatDraft, setChatDraft] = useState<ChatDraft | null>(null)
   const [isNarrowDetailOpen, setIsNarrowDetailOpen] = useState(false)
   const [agentDialogOpen, setAgentDialogOpen] = useState(false)
@@ -139,19 +134,16 @@ export function InboxPage({
   const navigationGeneration = useRef(0)
   const summary = useConversationSummary(targetIdentityId ? "" : selectedConversationId)
   const selectedConversation = summary.data ?? undefined
-  const recentConversations = useRecentConversations(identity.user.identityId)
-  const recordRecentConversation = recentConversations.record
+  const recordRecentConversation = useRecentConversations(identity.user.identityId).record
   const openedConversationId = selectedConversation?.id
-  const locateNonce = useRef(0)
-  const [messageTarget, setMessageTarget] = useState<({ conversationId: string } & ConversationLocateTarget) | null>(null)
-  const search = useInboxSearch({
-    query: { scope, customerView, queueFilter, queueTeamId, assigneeIdentityId, channelId, serviceStatus, kinds },
-    recentConversationIds: recentConversations.ids,
-    onOpen: (item) => void openSearchItem(item),
-  })
+  const [messageTarget, setMessageTarget] = useState<ConversationLocateTarget | null>(locateMessage)
   useEffect(() => {
     if (openedConversationId) recordRecentConversation(openedConversationId)
   }, [openedConversationId, recordRecentConversation])
+  useEffect(() => {
+    // 搜索结果带来的定位目标随地址进入，切换会话时由选择动作清除。
+    setMessageTarget(locateMessage)
+  }, [locateMessage])
 
   useEffect(() => {
     navigationGeneration.current++
@@ -204,55 +196,9 @@ export function InboxPage({
     }
   }
 
-  /** 打开搜索结果：消息结果保留搜索并定位原消息，其余结果退出搜索后打开会话或聊天草稿。 */
-  async function openSearchItem(item: InboxSearchItem) {
-    if (item.kind === "message") {
-      // 先切换会话再写入定位目标，切换会话会清除旧目标。
-      if (item.message.conversation.id !== selectedConversationId) selectConversation(item.message.conversation.id)
-      else if (isNarrowViewport) setIsNarrowDetailOpen(true)
-      locateNonce.current++
-      setMessageTarget({ conversationId: item.message.conversation.id, messageId: item.message.id, nonce: locateNonce.current })
-      return
-    }
-    if (item.kind === "conversation") {
-      search.exit()
-      selectConversation(item.conversation.id)
-      return
-    }
-    const { person } = item
-    if (person.kind === InboxSearchPersonKind.InboxSearchPersonContact) {
-      if (!person.conversationId) return
-      search.exit()
-      selectConversation(person.conversationId)
-      return
-    }
-    search.exit()
-    const member: MemberOption = {
-      id: person.id,
-      type: person.identityType ?? OrganizationIdentityType.OrganizationIdentityTypeUser,
-      displayName: person.displayName,
-      avatarUrl: person.avatarUrl,
-    }
-    if (member.type === OrganizationIdentityType.OrganizationIdentityTypeAgent) {
-      showChatDraft(member)
-      return
-    }
-    // 真人成员复用已有单聊，读取期间切换了导航时放弃本次打开。
-    const generation = navigationGeneration.current
-    try {
-      const existing = await readResource(resourceKeys.directConversation(member.id), () => findDirectConversation(member.id))
-      if (generation === navigationGeneration.current) showChatDraft(member, existing)
-    } catch (error) {
-      if (isApiError(error) && sessionPath(error.state)) return
-      console.warn("打开搜索成员聊天失败", { identityId: member.id, error })
-      toast.error(isApiError(error) ? apiErrorMessage(error) : t("directLookupError"))
-    }
-  }
-
   /** 从会话头进入当前会话的搜索范围。 */
   function searchConversation(conversationID: string) {
-    if (isNarrowViewport) setIsNarrowDetailOpen(false)
-    search.enter(conversationID)
+    globalSearch?.open(conversationID)
   }
 
   /** 新建后先读取权威摘要，再将草稿连续切换为正式会话。 */
@@ -367,108 +313,77 @@ export function InboxPage({
     )
   }
 
-  // 收起和展开由两个位置的按钮分别承担，切换后把焦点交给新出现的那个。
-  useEffect(() => {
-    if (!railToggledRef.current) return
-    railToggledRef.current = false
-    paneRef.current
-      ?.querySelector<HTMLButtonElement>("[data-slot=rail-toggle]")
-      ?.focus()
-  }, [railCollapsed])
-
-  /** 切换范围栏并标记本次由用户操作触发。 */
-  function toggleRail(collapsed: boolean) {
-    railToggledRef.current = true
-    setRailCollapsed(collapsed)
-  }
-
   const pane = (
-    <div ref={paneRef} className="flex min-h-0 flex-1">
-      {railCollapsed ? null : (
-        <InboxScopeRail
-          scope={scope}
-          attentionUnreadCount={attentionUnreadCount}
-          customerMentionedUnreadCount={customerMentionedUnreadCount}
-          onScopeChange={(nextScope) => {
-            setChatDraft(null)
-            onQueryChange({ scope: nextScope })
-          }}
-          onCollapse={() => toggleRail(true)}
-        />
-      )}
-      <div className="flex min-h-0 min-w-0 flex-1 flex-col">
-        <InboxPaneTop
-          railCollapsed={railCollapsed}
-          onRailExpand={() => toggleRail(false)}
-          onCreateGroup={() => setGroupDialogOpen(true)}
-          onCreateAgent={() => setAgentDialogOpen(true)}
-          filter={
-            <InboxFilter
-              scope={scope}
-              value={{ channelId, serviceStatus, kinds }}
-              channels={channels}
-              onChange={onQueryChange}
-            />
-          }
-          search={search}
-        />
-        {search.active ? (
-          <InboxSearchPanel search={search} scope={scope} identity={identity} />
-        ) : null}
-        {!search.active && scope === InboxScope.InboxScopeCustomer ? (
-          <InboxCustomerQueueFilter
-            view={customerView}
-            queueFilter={queueFilter}
-            queueTeamId={queueTeamId}
-            queueTeams={queueTeams}
-            assigneeIdentityId={assigneeIdentityId}
-            assignees={customerServiceAssignees}
-            currentIdentityId={identity.user.identityId}
-            onChange={(change) =>
-              onQueryChange({
-                customerView: change.customerView,
-                assigneeIdentityId: change.assigneeIdentityId ?? "",
-                queueFilter: change.queueFilter ?? CustomerQueueFilter.$zero,
-                queueTeamId: change.queueTeamId ?? "",
-              })
-            }
+    <div className="flex min-h-0 min-w-0 flex-1 flex-col">
+      <InboxPaneTop
+        scope={scope}
+        attentionUnreadCount={attentionUnreadCount}
+        customerMentionedUnreadCount={customerMentionedUnreadCount}
+        onScopeChange={(nextScope) => {
+          setChatDraft(null)
+          onQueryChange({ scope: nextScope })
+        }}
+        onCreateGroup={() => setGroupDialogOpen(true)}
+        onCreateAgent={() => setAgentDialogOpen(true)}
+        filter={
+          <InboxFilter
+            scope={scope}
+            value={{ channelId, serviceStatus, kinds }}
+            channels={channels}
+            onChange={onQueryChange}
           />
-        ) : null}
-        {search.active ? null : (
-          <InboxListPanel list={list} viewport={listViewport} detailError={Boolean(summary.error)} retryDetail={() => void summary.refresh()}>
-            <InboxConversationList
-              conversations={conversations}
-              showQueueTeam={
-                scope === InboxScope.InboxScopeCustomer &&
-                customerView === CustomerInboxView.CustomerInboxViewQueue &&
-                queueFilter === CustomerQueueFilter.CustomerQueueFilterAll
-              }
-              pinnedIds={list.pinnedIds}
-              pinOrderVersion={list.pinOrderVersion}
-              onMenuChange={listViewport.setMenu}
-              onDraggingChange={listViewport.setDragging}
-              onPinSettled={list.settlePin}
-              selectedId={selectedConversation?.id}
-              onSelect={selectConversation}
-              onOpenInWindow={
-                resolveAppPlatform() === "desktop"
-                  ? (conversation, name) => void openConversationInWindow(conversation, name)
-                  : undefined
-              }
-            />
-          </InboxListPanel>
-        )}
-      </div>
+        }
+      />
+      {scope === InboxScope.InboxScopeCustomer ? (
+        <InboxCustomerQueueFilter
+          view={customerView}
+          queueFilter={queueFilter}
+          queueTeamId={queueTeamId}
+          queueTeams={queueTeams}
+          assigneeIdentityId={assigneeIdentityId}
+          assignees={customerServiceAssignees}
+          currentIdentityId={identity.user.identityId}
+          onChange={(change) =>
+            onQueryChange({
+              customerView: change.customerView,
+              assigneeIdentityId: change.assigneeIdentityId ?? "",
+              queueFilter: change.queueFilter ?? CustomerQueueFilter.$zero,
+              queueTeamId: change.queueTeamId ?? "",
+            })
+          }
+        />
+      ) : null}
+      <InboxListPanel list={list} viewport={listViewport} detailError={Boolean(summary.error)} retryDetail={() => void summary.refresh()}>
+        <InboxConversationList
+          conversations={conversations}
+          showQueueTeam={
+            scope === InboxScope.InboxScopeCustomer &&
+            customerView === CustomerInboxView.CustomerInboxViewQueue &&
+            queueFilter === CustomerQueueFilter.CustomerQueueFilterAll
+          }
+          pinnedIds={list.pinnedIds}
+          pinOrderVersion={list.pinOrderVersion}
+          onMenuChange={listViewport.setMenu}
+          onDraggingChange={listViewport.setDragging}
+          onPinSettled={list.settlePin}
+          selectedId={selectedConversation?.id}
+          onSelect={selectConversation}
+          onOpenInWindow={
+            resolveAppPlatform() === "desktop"
+              ? (conversation, name) => void openConversationInWindow(conversation, name)
+              : undefined
+          }
+        />
+      </InboxListPanel>
     </div>
   )
 
   return (
     <>
       <PageSplit
-        paneWidth={railCollapsed ? "inboxCollapsed" : "inbox"}
+        paneWidth="inbox"
         paneOnNarrow="fill"
         className="bg-background"
-        paneClassName="transition-[width]"
         pane={pane}
       >
         {isNarrowViewport ? null : targetIdentityId ? (
@@ -507,15 +422,7 @@ export function InboxPage({
             if (!open) setChatDraft(null)
           }}
         >
-          <SheetContent
-            className="data-[side=right]:w-full p-0 sm:max-w-lg"
-            onCloseAutoFocus={(event) => {
-              // 搜索模式下关闭详情时，把焦点交给中栏搜索框。
-              if (!search.active) return
-              event.preventDefault()
-              search.inputRef.current?.focus()
-            }}
-          >
+          <SheetContent className="data-[side=right]:w-full p-0 sm:max-w-lg">
             <SheetHeader className="sr-only">
               <SheetTitle>
                 {t("conversationTitle", {

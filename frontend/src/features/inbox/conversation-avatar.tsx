@@ -1,8 +1,5 @@
 /** 会话列表和会话头共用的头像与渠道角标。 */
-import { GlobeIcon, MessageCircleIcon, SendIcon } from "lucide-react"
-
 import {
-  ChannelType,
   isCustomerInboxConversation,
   isAgentInboxConversation,
   isDirectInboxConversation,
@@ -10,24 +7,8 @@ import {
   type InboxConversation,
 } from "@/api"
 import { ProfileAvatar } from "@/components/profile-avatar"
+import { messageChannelTypeDefinition } from "@/lib/message-channel-types"
 import { cn } from "@/lib/utils"
-
-const sourceBadges: Partial<
-  Record<ChannelType, { icon: typeof GlobeIcon; className: string }>
-> = {
-  [ChannelType.ChannelTypeWebsite]: {
-    icon: GlobeIcon,
-    className: "bg-badge-website",
-  },
-  [ChannelType.ChannelTypeTelegram]: {
-    icon: SendIcon,
-    className: "bg-badge-telegram",
-  },
-  [ChannelType.ChannelTypeWeChatOfficialAccount]: {
-    icon: MessageCircleIcon,
-    className: "bg-badge-wechat",
-  },
-}
 
 /** 展示会话对象头像和客户来源渠道角标。 */
 export function ConversationAvatar({
@@ -47,7 +28,9 @@ export function ConversationAvatar({
     ? conversation.group
     : null
   const agent = isAgentInboxConversation(conversation) ? conversation.agent : null
-  const badge = customer ? sourceBadges[customer.channelType] : undefined
+  const badge = customer
+    ? messageChannelTypeDefinition(customer.channelType)
+    : undefined
   const contactName =
     customer?.contactName?.trim() ||
     direct?.peerName.trim() || agent?.agentName.trim() ||
@@ -73,7 +56,7 @@ export function ConversationAvatar({
           aria-hidden="true"
           className={cn(
             "absolute -right-0.5 -bottom-0.5 flex size-3.5 items-center justify-center rounded-full border-2 border-background text-white",
-            badge.className,
+            badge.badgeClassName,
           )}
         >
           <badge.icon className="size-2" />

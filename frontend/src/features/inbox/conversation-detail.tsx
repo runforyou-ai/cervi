@@ -29,7 +29,7 @@ export function ConversationDetail({
   onGroupLeft: (conversationID: string) => void
   onLocalChange?: (conversation: InboxConversation) => void
   onSearchConversation?: (conversationID: string) => void
-  locateMessage?: ({ conversationId: string } & ConversationLocateTarget) | null
+  locateMessage?: ConversationLocateTarget | null
   narrowViewport?: boolean
 }) {
   const { t } = useTranslation(["inbox", "common"])

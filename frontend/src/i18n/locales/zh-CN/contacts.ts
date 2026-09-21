@@ -18,6 +18,12 @@ const contacts = {
     teams: "团队",
     external: "外部联系人",
   },
+  scopeDescriptions: {
+    employees: "管理企业成员的账号、团队和角色",
+    agents: "管理 AI 员工的身份、知识和运行配置",
+    teams: "查看团队成员",
+    external: "查看各渠道接入的客户联系人",
+  },
   channelTypes: {
     website: "网站",
     telegram: "Telegram",
@@ -137,6 +143,8 @@ const contacts = {
   agents: {
     configure: "配置",
     editTitle: "配置 AI 员工",
+    createDescription: "创建 AI 员工并配置身份与知识",
+    editDescription: "调整 AI 员工的身份、知识和运行配置",
     edit: "配置 AI 员工 · {{name}}",
     basic: "基本资料",
     create: "添加 AI 员工",
@@ -146,7 +154,6 @@ const contacts = {
       teams: "所属团队",
       noTeams: "还没有可选择的团队。",
       created: "AI 员工已添加",
-      saved: "AI 员工已保存",
       loadError: "AI 员工配置加载失败，请重试。",
       networkError: "无法连接服务器，请稍后重试。",
     },

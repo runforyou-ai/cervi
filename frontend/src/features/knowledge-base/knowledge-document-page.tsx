@@ -1,7 +1,7 @@
 /** 本地知识文档预览页面，保留列表返回位置。 */
 import { useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
-import { Link, useLocation, useParams } from "react-router"
+import { useLocation, useParams } from "react-router"
 import {
   getKnowledgeDocument,
   getKnowledgeDocumentContent,
@@ -9,6 +9,7 @@ import {
 } from "@/api"
 import { MessageMarkdown } from "@/components/message-markdown"
 import { PageContent } from "@/components/page-content"
+import { PageBackButton } from "@/components/page-back-button"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { resourceKeys } from "@/hooks/resource-keys"
@@ -48,15 +49,16 @@ export function KnowledgeDocumentPage() {
   const returnSearch = returnGroupId === groupId ? location.search : ""
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <PageHeader title={document.data?.name ?? t("documents.title")}>
+      <PageHeader
+        title={document.data?.name ?? t("documents.title")}
+        description={t("documentDetail.description")}
+      >
         <Button ref={trigger} variant="outline" size="sm" disabled={!document.data?.segmentBatchId} onClick={() => setSegmentBatchId(document.data?.segmentBatchId ?? "")}>
           {t("documentDetail.viewSegments")}
         </Button>
-        <Button variant="ghost" size="sm" asChild>
-          <Link to={`/knowledge-bases/${knowledgeBaseId}/groups/${returnGroupId}/documents${returnSearch}`}>
-            {t("common:actions.back")}
-          </Link>
-        </Button>
+        <PageBackButton
+          to={`/knowledge-bases/${knowledgeBaseId}/groups/${returnGroupId}/documents${returnSearch}`}
+        />
       </PageHeader>
       {document.data?.sourceUrl ? (
         <div className="shrink-0 px-4 pt-4 text-sm text-muted-foreground sm:px-6 sm:pt-6">

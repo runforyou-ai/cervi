@@ -3,6 +3,7 @@ const knowledgeBase = {
   documents: {
     retryFailed: "Could not retry document processing.",
     title: "Documents",
+    description: "Documents your AI employees can search",
     more: "More actions for {{name}}",
     search: "Search document names",
     empty: "No documents",
@@ -33,6 +34,8 @@ const knowledgeBase = {
     importError: "Could not import the page. Try again.",
     createTitle: "Write document",
     editTitle: "Edit document",
+    createDescription: "Write a new document",
+    editDescription: "Update this document's name and content",
     name: "Document name",
     content: "Content",
     titleRequired: "Enter the document name",
@@ -112,6 +115,7 @@ const knowledgeBase = {
     },
   },
   documentDetail: {
+    description: "The document's content and its segments",
     segments: {
       position: "Segment {{position}}",
       matched: "Match",
@@ -133,6 +137,7 @@ const knowledgeBase = {
   qa: {
     movedSuccess: "Q&A entry saved and moved to “{{group}}”.",
     title: "Knowledge Q&A",
+    description: "Question and answer pairs your AI employees can quote",
     create: "Add Q&A",
     question: "Primary question",
     status: "Status",
@@ -150,6 +155,8 @@ const knowledgeBase = {
     loadError: "Failed to load Q&A entries. Please try again.",
     createTitle: "Add Q&A entry",
     editTitle: "Edit Q&A entry",
+    createDescription: "Add a question and answer pair",
+    editDescription: "Update the question, its variants and the answer",
     unsupported: "This operation is only available for local Q&A knowledge bases.",
     questionRequired: "Enter the primary question.",
     answerRequired: "Enter the answer.",
@@ -204,6 +211,8 @@ const knowledgeBase = {
 
     createTitle: "New knowledge base",
     editTitle: "Edit knowledge base",
+    createDescription: "Create a knowledge base and pick its models",
+    editDescription: "Update this knowledge base's information and retrieval settings",
     category: "Knowledge base type",
     name: "Knowledge base name",
     description: "Description",

@@ -295,6 +295,8 @@ function ConversationTimelineContent({
   applyReplyDisabledReason?: string | null
 }) {
   const currentIdentityID = currentUser.identityId
+  // 右侧 AI 助手面板宽度有限，消息不展示头像，改在气泡上方标出发送者。
+  const copilot = conversationType === ConversationType.ConversationTypeCopilot
   // 有文本发送中时禁用文本重试，附件重试由上传队列排队。
   const sendingText = outgoingMessages.some(
     (message) => message.status === "sending" && !message.attachment,
@@ -980,12 +982,12 @@ function ConversationTimelineContent({
                           className={cn(
                             "flex min-w-0 max-w-[75%] flex-col gap-1",
                             message.agentProcess && "max-w-[min(36rem,85%)] sm:max-w-[min(36rem,75%)]",
-                            incoming ? "ml-9 items-start" : "mr-9 items-end",
+                            incoming ? "items-start" : "items-end",
+                            !copilot && (incoming ? "ml-9" : "mr-9"),
                           )}
                         >
-                          {(conversationType === ConversationType.ConversationTypeGroup ||
-                            conversationType === ConversationType.ConversationTypeCopilot) &&
-                          incoming &&
+                          {(copilot ||
+                            (conversationType === ConversationType.ConversationTypeGroup && incoming)) &&
                           startsGroup ? (
                             <span className="max-w-full truncate text-xs font-medium text-foreground">
                               {senderName}
@@ -997,7 +999,7 @@ function ConversationTimelineContent({
                             </span>
                           ) : null}
                           <div className="relative min-w-0 max-w-full">
-                            {endsGroup ? (
+                            {endsGroup && !copilot ? (
                               <ProfileAvatar
                                 title={senderName}
                                 name={useCurrentUserAvatar
