@@ -58,6 +58,7 @@ const contacts = {
     stage: "阶段",
     channels: "渠道",
     handlesCustomers: "接待客户",
+    maxServiceSessions: "最大接待量",
     createdAt: "创建时间",
     addedAt: "添加时间",
     updatedAt: "更新时间",
@@ -115,6 +116,7 @@ const contacts = {
       role: "企业角色",
       handlesCustomers: "接待客户",
       handlesCustomersHelp: "开启后可以被分配接待客户会话。",
+      maxServiceSessions: "最大接待量",
       teams: "所属团队",
       noTeams: "还没有可选择的团队。",
       created: "企业成员已添加",
@@ -129,6 +131,7 @@ const contacts = {
       passwordTooShort: "密码至少需要 8 个字符。",
       passwordTooLong: "密码不能超过 72 个 UTF-8 字节。",
       roleRequired: "请选择企业角色。",
+      maxServiceSessionsInvalid: "最大接待量必须为正整数。",
     },
     status: {
       deactivate: "禁用",

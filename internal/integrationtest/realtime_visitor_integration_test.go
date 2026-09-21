@@ -19,7 +19,6 @@ import (
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	"github.com/runforyou-ai/cervi/internal/api"
 	"github.com/runforyou-ai/cervi/internal/appservice"
-	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	"github.com/runforyou-ai/cervi/internal/realtime/gateway"
@@ -27,7 +26,6 @@ import (
 	"github.com/runforyou-ai/cervi/internal/servertest"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
-	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 )
 
 // visitorRealtimeHarness 是提供公开访客路由与访客事件流的测试服务。
@@ -60,8 +58,8 @@ func startVisitorRealtime(t *testing.T, f customerReadFixture, options gateway.O
 	}
 	t.Cleanup(func() { _ = watch.Unsubscribe() })
 
-	scheduler := agentrunaction.NewScheduler(servertask.New(f.db, serverconfig.NATSConfig{}))
-	visitorBackend := appservice.NewWebsiteVisitorDirectBackend(f.db, scheduler, nil, serverfilecontent.S3Config{})
+	scheduler := agentrunaction.NewScheduler(newTestTasks(f.db))
+	visitorBackend := appservice.NewWebsiteVisitorDirectBackend(f.db, scheduler, newTestTasks(f.db), nil, serverfilecontent.S3Config{})
 	memberBackend := appservice.NewDirectBackend(f.db, domain.DeploymentModeSelfHosted, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil)
 	realtimeGateway := gateway.New(memberBackend, visitorBackend, config.Namespace, options)
 	realtimeGateway.Start(publisher.Connection())
@@ -164,7 +162,7 @@ func TestVisitorRealtimeStream(t *testing.T) {
 	client := h.connect(t, f.channelID, visitorToken, "")
 
 	// 另一个访客身份先发消息建立身份，其事件流不接收本访客线程的通知。
-	receive := conversationaction.NewReceiveWebsiteCustomerMessageAction(f.db, agentrunaction.NewScheduler(servertask.New(f.db, serverconfig.NATSConfig{})))
+	receive := conversationaction.NewReceiveWebsiteCustomerMessageAction(f.db, agentrunaction.NewScheduler(newTestTasks(f.db)), newTestTasks(f.db))
 	if _, err := receive.Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
 		ChannelID: f.channelID, ExternalID: "web-session:" + otherToken, ClientMessageID: uuid.NewV7().String(), Body: "另一位访客的问题",
 	}); err != nil {

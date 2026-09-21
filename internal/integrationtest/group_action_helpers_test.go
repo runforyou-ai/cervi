@@ -7,14 +7,13 @@ import (
 
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
-	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
 )
 
 // newGroupAgentTasks 创建已注册 Agent 运行 Action 的任务运行时。
 func newGroupAgentTasks(db *bun.DB) *servertask.Runtime {
-	tasks := servertask.New(db, serverconfig.NATSConfig{})
+	tasks := newTestTasks(db)
 	_ = tasks.Registry().RegisterJSON(agentrunaction.RunActionName, func(context.Context, agentrunaction.RunInput) error { return nil })
 	return tasks
 }

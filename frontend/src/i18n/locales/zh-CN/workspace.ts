@@ -15,6 +15,7 @@ const workspace = {
   openUserMenu: "打开 {{name}} 的用户菜单",
   workStatus: "工作状态",
   workStatusUpdateError: "切换工作状态失败，请重试。",
+  workStatusWorkingHint: "新的客户会话会自动分配给你",
   logout: "退出登录",
   loggingOut: "正在退出…",
   logoutError: "退出登录失败，请重试。",

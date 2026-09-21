@@ -12,11 +12,13 @@ import (
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
+	"github.com/runforyou-ai/cervi/internal/actions/serviceassignment"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/runforyou-ai/cervi/internal/storage/server/pgerr"
+	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
 )
 
@@ -30,14 +32,15 @@ type ServiceSessionAgentRunCoordinator interface {
 type ClaimServiceSessionAction struct {
 	db          *bun.DB
 	coordinator ServiceSessionAgentRunCoordinator
+	enqueuer    servertask.TxEnqueuer
 }
 
 // NewClaimServiceSessionAction 创建客服处理周期领取操作。
-func NewClaimServiceSessionAction(db *bun.DB, coordinator ServiceSessionAgentRunCoordinator) *ClaimServiceSessionAction {
-	return &ClaimServiceSessionAction{db: db, coordinator: coordinator}
+func NewClaimServiceSessionAction(db *bun.DB, coordinator ServiceSessionAgentRunCoordinator, enqueuer servertask.TxEnqueuer) *ClaimServiceSessionAction {
+	return &ClaimServiceSessionAction{db: db, coordinator: coordinator, enqueuer: enqueuer}
 }
 
-// Execute 把未关闭处理周期负责人设置为当前身份。
+// Execute 把未关闭处理周期负责人设置为当前身份，接管时为原负责人补分配。
 func (a *ClaimServiceSessionAction) Execute(ctx context.Context, identity *servermodels.Identity, conversationID string) (ServiceSessionResult, error) {
 	conversationID, valid := common.NormalizeUUID(conversationID)
 	if !valid {
@@ -70,6 +73,7 @@ func (a *ClaimServiceSessionAction) Execute(ctx context.Context, identity *serve
 			if _, err := tx.NewUpdate().Model(session).
 				Set("assignee_identity_id = ?", identity.OrganizationIdentity.ID).
 				Set("assigned_at = COALESCE(assigned_at, ?)", now).
+				Set("assignee_assigned_at = ?", now).
 				Set("updated_at = now()").
 				WherePK().
 				Where("organization_id = ?", identity.Organization.ID).
@@ -85,6 +89,11 @@ func (a *ClaimServiceSessionAction) Execute(ctx context.Context, identity *serve
 			}
 			if err := appendServiceSessionEvent(ctx, tx, identity, conversation, session, eventType, previousAssigneeID, nil); err != nil {
 				return err
+			}
+			if previousAssigneeID != nil {
+				if err := serviceassignment.EnqueueBackfill(ctx, tx, a.enqueuer, serviceassignment.BackfillInput{OrganizationID: session.OrganizationID, IdentityID: *previousAssigneeID}); err != nil {
+					return err
+				}
 			}
 			if err := chatstate.TouchConversation(ctx, tx, conversation); err != nil {
 				return err
@@ -105,14 +114,15 @@ type TransferServiceSessionAction struct {
 	db          *bun.DB
 	coordinator ServiceSessionAgentRunCoordinator
 	scheduler   CustomerAgentMessageScheduler
+	enqueuer    servertask.TxEnqueuer
 }
 
 // NewTransferServiceSessionAction 创建客服处理周期转交操作。
-func NewTransferServiceSessionAction(db *bun.DB, coordinator ServiceSessionAgentRunCoordinator, scheduler CustomerAgentMessageScheduler) *TransferServiceSessionAction {
-	return &TransferServiceSessionAction{db: db, coordinator: coordinator, scheduler: scheduler}
+func NewTransferServiceSessionAction(db *bun.DB, coordinator ServiceSessionAgentRunCoordinator, scheduler CustomerAgentMessageScheduler, enqueuer servertask.TxEnqueuer) *TransferServiceSessionAction {
+	return &TransferServiceSessionAction{db: db, coordinator: coordinator, scheduler: scheduler, enqueuer: enqueuer}
 }
 
-// Execute 校验当前负责人和转交去向后把处理周期交给成员、团队队列或公共队列。
+// Execute 校验当前负责人和转交去向后把处理周期交给成员、团队队列或公共队列，并为原负责人补分配；转给队列时排除原负责人重新分配本周期。
 func (a *TransferServiceSessionAction) Execute(ctx context.Context, identity *servermodels.Identity, input TransferServiceSessionInput) (ServiceSessionResult, error) {
 	input, err := normalizeTransferServiceSessionInput(identity, input)
 	if err != nil {
@@ -166,6 +176,19 @@ func (a *TransferServiceSessionAction) Execute(ctx context.Context, identity *se
 		}
 		if err := appendServiceSessionEvent(ctx, tx, identity, conversation, session,
 			domain.ConversationSystemEventServiceSessionTransferred, &previousAssigneeID, &target); err != nil {
+			return err
+		}
+		// 原负责人腾出接待量后补分配，本周期转回队列时由分配任务排除原负责人另行分配。
+		backfill := serviceassignment.BackfillInput{OrganizationID: session.OrganizationID, IdentityID: previousAssigneeID}
+		if targetIdentity == nil {
+			backfill.ExcludeServiceSessionID = session.ID
+			if err := serviceassignment.EnqueueAssign(ctx, tx, a.enqueuer, serviceassignment.AssignInput{
+				OrganizationID: session.OrganizationID, ServiceSessionID: session.ID, ExcludeIdentityID: previousAssigneeID,
+			}); err != nil {
+				return err
+			}
+		}
+		if err := serviceassignment.EnqueueBackfill(ctx, tx, a.enqueuer, backfill); err != nil {
 			return err
 		}
 		if err := chatstate.TouchConversation(ctx, tx, conversation); err != nil {
@@ -275,12 +298,14 @@ func applyTransferTarget(ctx context.Context, tx bun.Tx, identity *servermodels.
 		WherePK().Where("organization_id = ?", identity.Organization.ID)
 	switch target.Kind {
 	case domain.ServiceSessionTargetMember:
+		now := time.Now().UTC()
 		update = update.Set("assignee_identity_id = ?", targetIdentity.ID).
-			Set("assigned_at = COALESCE(assigned_at, ?)", time.Now().UTC())
+			Set("assigned_at = COALESCE(assigned_at, ?)", now).
+			Set("assignee_assigned_at = ?", now)
 	case domain.ServiceSessionTargetTeam:
-		update = update.Set("assignee_identity_id = NULL").Set("team_id = ?", target.TeamID)
+		update = update.Set("assignee_identity_id = NULL").Set("assignee_assigned_at = NULL").Set("team_id = ?", target.TeamID)
 	default:
-		update = update.Set("assignee_identity_id = NULL").Set("team_id = NULL")
+		update = update.Set("assignee_identity_id = NULL").Set("assignee_assigned_at = NULL").Set("team_id = NULL")
 	}
 	if _, err := update.Exec(ctx); err != nil {
 		return err
@@ -327,14 +352,15 @@ func loadServiceSessionLastMessageSender(ctx context.Context, db bun.IDB, sessio
 type CloseServiceSessionAction struct {
 	db          *bun.DB
 	coordinator ServiceSessionAgentRunCoordinator
+	enqueuer    servertask.TxEnqueuer
 }
 
 // NewCloseServiceSessionAction 创建客服处理周期关闭操作。
-func NewCloseServiceSessionAction(db *bun.DB, coordinator ServiceSessionAgentRunCoordinator) *CloseServiceSessionAction {
-	return &CloseServiceSessionAction{db: db, coordinator: coordinator}
+func NewCloseServiceSessionAction(db *bun.DB, coordinator ServiceSessionAgentRunCoordinator, enqueuer servertask.TxEnqueuer) *CloseServiceSessionAction {
+	return &CloseServiceSessionAction{db: db, coordinator: coordinator, enqueuer: enqueuer}
 }
 
-// Execute 关闭公共队列或当前身份负责的处理周期，无人负责的周期由关闭人成为负责人。
+// Execute 关闭公共队列或当前身份负责的处理周期，无人负责的周期由关闭人成为负责人；关闭本人负责的周期后为本人补分配。
 func (a *CloseServiceSessionAction) Execute(ctx context.Context, identity *servermodels.Identity, conversationID string) (ServiceSessionResult, error) {
 	conversationID, valid := common.NormalizeUUID(conversationID)
 	if !valid {
@@ -366,6 +392,7 @@ func (a *CloseServiceSessionAction) Execute(ctx context.Context, identity *serve
 		}
 		now := time.Now().UTC()
 		assigneeIdentityID := identity.OrganizationIdentity.ID
+		ownedBefore := session.AssigneeIdentityID != nil
 		if _, err := tx.NewUpdate().Model(session).
 			Set("status = ?", domain.ServiceSessionStatusClosed).
 			Set("status_changed_at = ?", now).
@@ -373,6 +400,8 @@ func (a *CloseServiceSessionAction) Execute(ctx context.Context, identity *serve
 			Set("closed_by_identity_id = ?", identity.OrganizationIdentity.ID).
 			Set("assignee_identity_id = ?", assigneeIdentityID).
 			Set("assigned_at = COALESCE(assigned_at, ?)", now).
+			Set("assignee_assigned_at = COALESCE(assignee_assigned_at, ?)", now).
+			Set("awaiting_reply_since = NULL").
 			Set("updated_at = now()").
 			WherePK().
 			Where("organization_id = ?", identity.Organization.ID).
@@ -387,6 +416,11 @@ func (a *CloseServiceSessionAction) Execute(ctx context.Context, identity *serve
 		}
 		if err := appendServiceSessionEvent(ctx, tx, identity, conversation, session, domain.ConversationSystemEventServiceSessionClosed, nil, nil); err != nil {
 			return err
+		}
+		if ownedBefore {
+			if err := serviceassignment.EnqueueBackfill(ctx, tx, a.enqueuer, serviceassignment.BackfillInput{OrganizationID: session.OrganizationID, IdentityID: assigneeIdentityID}); err != nil {
+				return err
+			}
 		}
 		if err := chatstate.TouchConversation(ctx, tx, conversation); err != nil {
 			return err
@@ -444,6 +478,7 @@ func (a *ReopenServiceSessionAction) Execute(ctx context.Context, identity *serv
 			Set("status = ?", domain.ServiceSessionStatusOpen).
 			Set("assignee_identity_id = ?", identity.OrganizationIdentity.ID).
 			Set("assigned_at = COALESCE(assigned_at, ?)", now).
+			Set("assignee_assigned_at = ?", now).
 			Set("status_changed_at = ?", now).
 			Set("closed_at = NULL").
 			Set("closed_by_identity_id = NULL").

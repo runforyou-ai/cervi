@@ -13,9 +13,11 @@ import (
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
+	"github.com/runforyou-ai/cervi/internal/actions/serviceassignment"
 	"github.com/runforyou-ai/cervi/internal/common/searchtext"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
 )
 
@@ -75,8 +77,8 @@ type InboundCustomerMessageResult struct {
 	OpenedServiceSession bool
 }
 
-// ReceiveInboundCustomerMessage 在调用方事务中幂等写入客户文本或附件消息。
-func ReceiveInboundCustomerMessage(ctx context.Context, db bun.IDB, channel *servermodels.Channel, input InboundCustomerMessageInput) (InboundCustomerMessageResult, error) {
+// ReceiveInboundCustomerMessage 在调用方事务中幂等写入客户文本或附件消息；新客服处理周期路由到队列时投递分配任务。
+func ReceiveInboundCustomerMessage(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer, channel *servermodels.Channel, input InboundCustomerMessageInput) (InboundCustomerMessageResult, error) {
 	ids := generateIDs()
 	// 路由目标身份在渠道身份与会话锁之前取共享锁，与停用、改角色等资格变更串行。
 	route, err := chatstate.ResolveNewSessionRoute(ctx, db, channel)
@@ -202,10 +204,10 @@ func ReceiveInboundCustomerMessage(ctx context.Context, db bun.IDB, channel *ser
 			TeamID: route.TeamID, AssigneeIdentityID: route.AssigneeIdentityID,
 			OpeningMessageID: ids.message, LastMessageID: ids.message,
 			LastMessageAt: input.OriginatedAt,
-			AssignedAt:    assignedAt, StatusChangedAt: input.OriginatedAt,
+			AssignedAt:    assignedAt, AssigneeAssignedAt: assignedAt, StatusChangedAt: input.OriginatedAt,
 		}
 		if _, err := db.NewInsert().Model(session).
-			Column("id", "organization_id", "conversation_id", "contact_channel_identity_id", "sequence", "status", "team_id", "assignee_identity_id", "opening_message_id", "last_message_id", "last_message_at", "assigned_at", "status_changed_at").
+			Column("id", "organization_id", "conversation_id", "contact_channel_identity_id", "sequence", "status", "team_id", "assignee_identity_id", "opening_message_id", "last_message_id", "last_message_at", "assigned_at", "assignee_assigned_at", "status_changed_at").
 			Returning("*").
 			Exec(ctx); err != nil {
 			return InboundCustomerMessageResult{}, fmt.Errorf("create service session: %w", err)
@@ -217,6 +219,13 @@ func ReceiveInboundCustomerMessage(ctx context.Context, db bun.IDB, channel *ser
 			Where("conversation_id = ?", conversation.ID).
 			Exec(ctx); err != nil {
 			return InboundCustomerMessageResult{}, fmt.Errorf("update current service session: %w", err)
+		}
+		if route.AssigneeIdentityID == nil {
+			if err := serviceassignment.EnqueueAssign(ctx, db, enqueuer, serviceassignment.AssignInput{
+				OrganizationID: channel.OrganizationID, ServiceSessionID: session.ID,
+			}); err != nil {
+				return InboundCustomerMessageResult{}, err
+			}
 		}
 	}
 

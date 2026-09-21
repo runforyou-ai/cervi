@@ -46,7 +46,7 @@ func newNavigationFixture(t *testing.T) navigationFixture {
 		t.Fatal(err)
 	}
 	owner := installed.Identity
-	_, err = useraction.NewCreateUserAction(db).Execute(ctx, owner, useraction.CreateInput{HandlesCustomers: true, DisplayName: "成员", Email: "member@navigation.test", Password: "password123", RoleID: owner.OrganizationIdentity.RoleID})
+	_, err = useraction.NewCreateUserAction(db, newTestTasks(db)).Execute(ctx, owner, useraction.CreateInput{HandlesCustomers: true, MaxServiceSessions: 10, DisplayName: "成员", Email: "member@navigation.test", Password: "password123", RoleID: owner.OrganizationIdentity.RoleID})
 	if err != nil {
 		t.Fatal(err)
 	}

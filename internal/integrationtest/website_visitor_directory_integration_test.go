@@ -16,12 +16,10 @@ import (
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	"github.com/runforyou-ai/cervi/internal/api"
 	"github.com/runforyou-ai/cervi/internal/appservice"
-	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 )
 
 // websiteVisitorHTTP 通过公开路由调用网站访客接口。
@@ -90,8 +88,8 @@ func visitorDirectoryIDs(t *testing.T, payload map[string]any) []string {
 func TestWebsiteVisitorDirectoryHTTP(t *testing.T) {
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
-	scheduler := agentrunaction.NewScheduler(servertask.New(f.db, serverconfig.NATSConfig{}))
-	visitorService := appservice.NewWebsiteVisitorService(appservice.NewWebsiteVisitorDirectBackend(f.db, scheduler, nil, serverfilecontent.S3Config{}))
+	scheduler := agentrunaction.NewScheduler(newTestTasks(f.db))
+	visitorService := appservice.NewWebsiteVisitorService(appservice.NewWebsiteVisitorDirectBackend(f.db, scheduler, newTestTasks(f.db), nil, serverfilecontent.S3Config{}))
 	application := appservice.New(appservice.NewDirectBackend(f.db, domain.DeploymentModeSelfHosted, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil))
 	client := websiteVisitorHTTP{service: api.NewService(application, api.WithWebsiteVisitor(visitorService, false))}
 	directoryPath := "/public/website-channels/" + f.channelID + "/conversations"

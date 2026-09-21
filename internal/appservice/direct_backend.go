@@ -81,7 +81,7 @@ func NewDirectBackend(db *bun.DB, deploymentMode domain.DeploymentMode, localFil
 		inboxOps:        newInboxOps(db, taskEnqueuer),
 		channelOps:      newChannelOps(db, connectionRunner, telegramAPI),
 		contactOps:      newContactOps(db),
-		directoryOps:    newDirectoryOps(db, agentCoordinator),
+		directoryOps:    newDirectoryOps(db, agentCoordinator, taskEnqueuer),
 		agentOps:        newAgentOps(db, agentCoordinator, customerReplySuggestions),
 		knowledgeOps:    newKnowledgeOps(db, taskEnqueuer, documentQuery, documentConverter),
 		integrationOps:  newIntegrationOps(db, connectionRunner, modelProviderRegistry, mcpTest, mcpScheduler),

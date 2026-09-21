@@ -14,6 +14,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/actions/filemaintenance"
 	knowledgeaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
 	mcpserveraction "github.com/runforyou-ai/cervi/internal/actions/mcpserver"
+	"github.com/runforyou-ai/cervi/internal/actions/serviceassignment"
 	"github.com/runforyou-ai/cervi/internal/api"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/common/searchtext"
@@ -123,10 +124,19 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 		Enabled: true, MaxAttempts: 5, StartImmediately: true,
 	})
 
+	// 注册客服处理周期的自动分配与成员补分配任务。
+	serviceAssignment := serviceassignment.NewWorker(appStorage.DB())
+	if err := tasks.Registry().RegisterJSON(serviceassignment.AssignActionName, serviceAssignment.Assign); err != nil {
+		return nil, nil, err
+	}
+	if err := tasks.Registry().RegisterJSON(serviceassignment.BackfillActionName, serviceAssignment.Backfill); err != nil {
+		return nil, nil, err
+	}
+
 	// 组装企业成员与网站匿名访客各自的业务入口。
 	directBackend := appservice.NewDirectBackend(appStorage.DB(), config.Deployment.Mode, localFiles, fileS3, tenantResolver, agentRunScheduler, executeAgentRun, tasks, documentConverter, customerReplySuggestions)
 	boundService := appservice.New(directBackend)
-	websiteVisitorBackend := appservice.NewWebsiteVisitorDirectBackend(appStorage.DB(), agentRunScheduler, localFiles, fileS3)
+	websiteVisitorBackend := appservice.NewWebsiteVisitorDirectBackend(appStorage.DB(), agentRunScheduler, tasks, localFiles, fileS3)
 	websiteVisitorService := appservice.NewWebsiteVisitorService(websiteVisitorBackend)
 	// 实时网关复用成员业务调用的身份解析与同步探针，以及访客的渠道身份解析。
 	realtimeGateway := gateway.New(directBackend, websiteVisitorBackend, config.NATS.Namespace, gateway.DefaultOptions())

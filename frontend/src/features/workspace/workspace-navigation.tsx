@@ -514,6 +514,7 @@ export function WorkspaceNavigation({
                     </span>
                     <WorkStatusPicker
                       status={identity.user.workStatus}
+                      handlesCustomers={identity.user.handlesCustomers}
                       onChange={changeWorkStatus}
                     />
                   </div>

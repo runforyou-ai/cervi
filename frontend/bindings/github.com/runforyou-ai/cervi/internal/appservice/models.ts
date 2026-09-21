@@ -1074,6 +1074,11 @@ export enum ConversationSystemEventType {
      * ConversationSystemEventServiceSessionReturned 表示失去接待资格的负责人所负责的客服处理周期退回队列。
      */
     ConversationSystemEventServiceSessionReturned = "service_session_returned",
+
+    /**
+     * ConversationSystemEventServiceSessionAssigned 表示队列中的客服处理周期自动分配给成员。
+     */
+    ConversationSystemEventServiceSessionAssigned = "service_session_assigned",
 };
 
 /**
@@ -1148,6 +1153,7 @@ export interface CreateUserInput {
     "roleId": string;
     "teamIds": string[] | null;
     "handlesCustomers": boolean;
+    "maxServiceSessions": number;
     "avatarFileId": string;
 }
 
@@ -3346,7 +3352,7 @@ export interface UpdateAgentInput {
 }
 
 /**
- * UpdateUserInput 定义企业成员可编辑字段。
+ * UpdateUserInput 定义企业成员可编辑字段，最大接待量只在开启接待时生效。
  */
 export interface UpdateUserInput {
     "displayName": string;
@@ -3354,6 +3360,7 @@ export interface UpdateUserInput {
     "roleId": string;
     "teamIds": string[] | null;
     "handlesCustomers": boolean;
+    "maxServiceSessions": number;
 }
 
 /**
@@ -3367,6 +3374,11 @@ export interface User {
     "avatarUrl": string;
     "role": RoleSummary;
     "handlesCustomers": boolean;
+
+    /**
+     * MaxServiceSessions 是自动分配时本人可负责的开放客服处理周期上限。
+     */
+    "maxServiceSessions": number;
     "status": UserStatus;
     "workStatus": WorkStatus;
     "teams": TeamSummary[] | null;

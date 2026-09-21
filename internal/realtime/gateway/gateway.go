@@ -84,6 +84,7 @@ func DefaultOptions() Options {
 var memberFrameTypes = []protocol.Type{
 	protocol.TypeServerHello, protocol.TypeConversationChanged, protocol.TypeConversationRemoved,
 	protocol.TypeConversationStateChanged, protocol.TypeConversationTyping, protocol.TypeIdentityProfileChanged,
+	protocol.TypePinOrderChanged, protocol.TypeServiceAttention,
 }
 
 // deviceFrameTypes 是携带设备身份的成员事件流额外可下发的事件。
@@ -485,6 +486,8 @@ func (g *Gateway) deliver(subject string, data []byte) {
 		frame = protocol.IdentityProfileChanged{Version: payload.Version}
 	case realtime.KindPinOrderChanged:
 		frame = protocol.PinOrderChanged{Version: payload.Version}
+	case realtime.KindServiceAttention:
+		frame = protocol.ServiceAttention{ConversationID: payload.ConversationID, ServiceSessionID: payload.ServiceSessionID, Reason: payload.AttentionReason}
 	case realtime.KindDeviceWorkAdvanced:
 		frame = protocol.DeviceWorkAdvanced{DeviceID: payload.DeviceID, WorkSeq: payload.Version}
 	case realtime.KindSessionLoggedOut:

@@ -1,4 +1,4 @@
-/** 把成员事件流确认的新消息接入各端的本地通知投递。 */
+/** 把成员事件流确认的新消息与客服处理周期提醒接入各端的本地通知投递。 */
 import { useEffect, useEffectEvent } from "react"
 import { useTranslation } from "react-i18next"
 
@@ -14,12 +14,13 @@ import {
   type Identity,
   type InboxConversation,
 } from "@/api"
+import type { RealtimeServerFrame } from "@/api/realtime/protocol"
 import { useConversationName } from "@/features/inbox/use-conversation-name"
 import { messagePreview } from "@/lib/message-preview"
 import { NewMessageWatcher } from "./new-message-watcher"
 import { notifyNewMessage } from "./new-message-notifications"
 
-/** 登录身份就绪后观察新消息并投递本地通知，投递成功时回调调用方。 */
+/** 登录身份就绪后观察新消息与客服处理周期提醒并投递本地通知，投递成功时回调调用方。 */
 export function useNewMessageNotifications(
   identity: Identity | null,
   onDelivered: () => void,
@@ -58,10 +59,37 @@ export function useNewMessageNotifications(
     },
   )
 
+  const deliverAttention = useEffectEvent(
+    async (frame: Extract<RealtimeServerFrame, { type: "service_attention" }>) => {
+      if (!organizationId || !userId) {
+        return
+      }
+      let conversation: InboxConversation
+      try {
+        conversation = await getInboxConversation(frame.conversationId)
+      } catch (error) {
+        // 会话已失去阅读资格时结束本次提醒。
+        if (isNotFoundApiError(error)) return
+        throw error
+      }
+      const delivered = await notifyNewMessage({
+        id: `service_attention:${frame.serviceSessionId}:${frame.reason}`,
+        title: conversationName(conversation),
+        body: t("notificationServiceAssigned"),
+        scope: { organizationId, userId },
+      })
+      if (delivered) {
+        onDelivered()
+      }
+    },
+  )
+
   useEffect(() => {
     if (!identityId) {
       return
     }
+    // 同一客服处理周期的同一提醒原因只通知一次。
+    const deliveredAttentions = new Set<string>()
     const watcher = new NewMessageWatcher(identityId, {
       readConversations: async () => (await loadInbox()).conversations,
       readConversation: async (conversationId) => {
@@ -83,9 +111,19 @@ export function useNewMessageNotifications(
       },
     })
     const unsubscribe = realtimeClient.subscribe((event) => {
-      if (event.type === "frame") {
-        watcher.receive(event.frame)
+      if (event.type !== "frame") {
+        return
       }
+      if (event.frame.type === "service_attention") {
+        const key = `${event.frame.serviceSessionId}:${event.frame.reason}`
+        if (deliveredAttentions.has(key)) return
+        deliveredAttentions.add(key)
+        void deliverAttention(event.frame).catch((error: unknown) => {
+          console.warn("处理客服提醒通知失败", error)
+        })
+        return
+      }
+      watcher.receive(event.frame)
     })
     // 订阅时事件流可能已经建立，此时不会再收到问候事件，直接取一次基线。
     if (realtimeClient.state === "ready") {

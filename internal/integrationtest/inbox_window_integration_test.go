@@ -312,7 +312,7 @@ func TestInboxContextCustomerTransition(t *testing.T) {
 		t.Fatalf("queue=%+v err=%v", page, err)
 	}
 	anchor := page.Conversations[1]
-	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, nil).Execute(ctx, f.owner, anchor.ID); err != nil {
+	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, nil, newTestTasks(f.db)).Execute(ctx, f.owner, anchor.ID); err != nil {
 		t.Fatal(err)
 	}
 	result, err := query.ReadContext(ctx, f.owner, inboxaction.ContextInput{Query: filter, AnchorID: anchor.ID, AnchorCursor: anchor.PositionCursor})

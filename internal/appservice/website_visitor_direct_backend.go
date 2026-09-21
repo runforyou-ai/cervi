@@ -17,6 +17,7 @@ import (
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
 )
 
@@ -47,10 +48,10 @@ type WebsiteVisitorDirectBackend struct {
 }
 
 // NewWebsiteVisitorDirectBackend 创建匿名网站访客直接后端。
-func NewWebsiteVisitorDirectBackend(db *bun.DB, agentScheduler conversationaction.CustomerAgentMessageScheduler, localFiles *serverfilecontent.LocalStore, s3 serverfilecontent.S3Config) *WebsiteVisitorDirectBackend {
+func NewWebsiteVisitorDirectBackend(db *bun.DB, agentScheduler conversationaction.CustomerAgentMessageScheduler, taskEnqueuer servertask.TxEnqueuer, localFiles *serverfilecontent.LocalStore, s3 serverfilecontent.S3Config) *WebsiteVisitorDirectBackend {
 	backend := &WebsiteVisitorDirectBackend{
 		listConversations: conversationaction.NewListWebsiteConversationsQuery(db),
-		sendMessage:       conversationaction.NewReceiveWebsiteCustomerMessageAction(db, agentScheduler),
+		sendMessage:       conversationaction.NewReceiveWebsiteCustomerMessageAction(db, agentScheduler, taskEnqueuer),
 		listMessages:      conversationaction.NewListWebsiteMessagesQuery(db),
 		authorizeVisitor:  conversationaction.NewAuthorizeWebsiteVisitorQuery(db),
 		completeUpload:    conversationaction.NewCompleteWebsiteVisitorUploadAction(db),

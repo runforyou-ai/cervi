@@ -12,13 +12,11 @@ import (
 
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	"github.com/runforyou-ai/cervi/internal/actions/filemaintenance"
-	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	models "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/runforyou-ai/cervi/internal/task"
-	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
 )
 
@@ -71,7 +69,7 @@ func newTelegramMediaFixture(t *testing.T) *telegramMediaFixture {
 	writer := serverfilecontent.NewWriter(local, serverfilecontent.S3Config{})
 	scheduler := &countingAgentScheduler{}
 	downloader := &mediaDownloaderStub{data: []byte("JPEGDATA")}
-	tasks := servertask.New(base.db, serverconfig.NATSConfig{})
+	tasks := newTestTasks(base.db)
 	retrieve := channelaction.NewRetrieveTelegramMediaAction(base.db, downloader, writer, scheduler)
 	if err := tasks.Registry().RegisterJSONWithTerminalFailure(channelaction.RetrieveTelegramMediaActionName, retrieve.Execute, retrieve.FinalizeFailure); err != nil {
 		t.Fatal(err)

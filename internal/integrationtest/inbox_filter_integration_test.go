@@ -16,12 +16,10 @@ import (
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	"github.com/runforyou-ai/cervi/internal/appservice"
-	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/runforyou-ai/cervi/internal/tenant"
 )
 
@@ -77,10 +75,10 @@ func TestInboxChannelFilter(t *testing.T) {
 		}
 	}
 	// 领取并关闭一条会话，核对渠道条件在已关闭视图同样生效。
-	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, nil).Execute(ctx, f.owner, other.Conversation.ID); err != nil {
+	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, nil, newTestTasks(f.db)).Execute(ctx, f.owner, other.Conversation.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil)).Execute(ctx, f.owner, other.Conversation.ID); err != nil {
+	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil), newTestTasks(f.db)).Execute(ctx, f.owner, other.Conversation.ID); err != nil {
 		t.Fatal(err)
 	}
 	closed := inboxaction.LoadInput{
@@ -222,7 +220,7 @@ func TestInboxAllScopeCurrentServiceSession(t *testing.T) {
 		}
 	}
 
-	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, nil).Execute(ctx, f.owner, f.conversationID); err != nil {
+	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, nil, newTestTasks(f.db)).Execute(ctx, f.owner, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
 	if !inAll(f.owner) || inAll(f.member) {
@@ -234,7 +232,7 @@ func TestInboxAllScopeCurrentServiceSession(t *testing.T) {
 		t.Fatal("current session note author missing from all scope")
 	}
 	coordinator := agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil)
-	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, coordinator).Execute(ctx, f.owner, f.conversationID); err != nil {
+	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(ctx, f.owner, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
 	next, err := f.visitorMessage(ctx, "新的处理周期")
@@ -251,7 +249,7 @@ func TestInboxAllScopeCurrentServiceSession(t *testing.T) {
 		t.Fatalf("current session mention owner=%v member=%v", inAll(f.owner), inAll(f.member))
 	}
 	// 负责人对客回复后转给同事，仍因当前周期的回复留在「全部」范围。
-	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, nil).Execute(ctx, f.member, f.conversationID); err != nil {
+	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, nil, newTestTasks(f.db)).Execute(ctx, f.member, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := send.Execute(ctx, f.member, conversationaction.CustomerTextMessageInput{
@@ -259,7 +257,7 @@ func TestInboxAllScopeCurrentServiceSession(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conversationaction.NewTransferServiceSessionAction(f.db, coordinator, agentrunaction.NewScheduler(servertask.New(f.db, serverconfig.NATSConfig{}))).Execute(ctx, f.member, conversationaction.TransferServiceSessionInput{
+	if _, err := conversationaction.NewTransferServiceSessionAction(f.db, coordinator, agentrunaction.NewScheduler(newTestTasks(f.db)), newTestTasks(f.db)).Execute(ctx, f.member, conversationaction.TransferServiceSessionInput{
 		ConversationID: f.conversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: f.owner.OrganizationIdentity.ID,
 	}); err != nil {
 		t.Fatal(err)

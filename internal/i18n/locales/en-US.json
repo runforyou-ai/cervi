@@ -358,6 +358,7 @@
   "field.locale_invalid": "Select a supported language.",
   "field.time_zone_invalid": "Select a valid time zone.",
   "field.work_status_invalid": "Select a valid work status.",
+  "field.max_service_sessions_invalid": "Max conversations must be a positive whole number.",
   "field.agent_work_status_unavailable": "Restore the AI employee account before changing its work status.",
   "field.member_role_invalid": "Select a valid company role.",
   "field.team_invalid": "Select teams in this company.",

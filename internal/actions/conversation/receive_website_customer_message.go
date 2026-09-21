@@ -19,6 +19,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/storage/server/messagequery"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/runforyou-ai/cervi/internal/storage/server/pgerr"
+	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
 )
 
@@ -40,6 +41,7 @@ var websiteMessageRetryableConstraintNames = map[string]struct{}{
 type ReceiveWebsiteCustomerMessageAction struct {
 	db             *bun.DB
 	agentScheduler CustomerAgentMessageScheduler
+	enqueuer       servertask.TxEnqueuer
 }
 
 // CustomerAgentMessageScheduler 把渠道客户消息加入当前 AI 客服的持久输入流。
@@ -65,8 +67,8 @@ type generatedIDs struct {
 }
 
 // NewReceiveWebsiteCustomerMessageAction 创建网站访客消息操作。
-func NewReceiveWebsiteCustomerMessageAction(db *bun.DB, agentScheduler CustomerAgentMessageScheduler) *ReceiveWebsiteCustomerMessageAction {
-	return &ReceiveWebsiteCustomerMessageAction{db: db, agentScheduler: agentScheduler}
+func NewReceiveWebsiteCustomerMessageAction(db *bun.DB, agentScheduler CustomerAgentMessageScheduler, enqueuer servertask.TxEnqueuer) *ReceiveWebsiteCustomerMessageAction {
+	return &ReceiveWebsiteCustomerMessageAction{db: db, agentScheduler: agentScheduler, enqueuer: enqueuer}
 }
 
 // Execute 在一个可重试事务中写入网站访客文本消息。
@@ -125,7 +127,7 @@ func (a *ReceiveWebsiteCustomerMessageAction) executeTransaction(ctx context.Con
 	if err != nil {
 		return ReceiveWebsiteCustomerMessageResult{}, err
 	}
-	received, err := ReceiveInboundCustomerMessage(ctx, tx, channel, input)
+	received, err := ReceiveInboundCustomerMessage(ctx, tx, a.enqueuer, channel, input)
 	if err != nil {
 		return ReceiveWebsiteCustomerMessageResult{}, err
 	}

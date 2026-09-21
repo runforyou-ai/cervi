@@ -28,7 +28,6 @@ import (
 	teamaction "github.com/runforyou-ai/cervi/internal/actions/team"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	"github.com/runforyou-ai/cervi/internal/common"
-	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
@@ -38,7 +37,6 @@ import (
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/runforyou-ai/cervi/internal/task"
-	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/runforyou-ai/cervi/internal/tenant"
 )
 
@@ -202,7 +200,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	if identity == nil || identity.User.Email != "admin@example.com" {
 		t.Fatalf("unexpected identity: %#v", identity)
 	}
-	if _, err := useraction.NewUpdateWorkStatusAction(db).Execute(context.Background(), identity, useraction.WorkStatusInput{WorkStatus: domain.WorkStatusAway}); err != nil {
+	if _, err := useraction.NewUpdateWorkStatusAction(db, newTestTasks(db)).Execute(context.Background(), identity, useraction.WorkStatusInput{WorkStatus: domain.WorkStatusAway}); err != nil {
 		t.Fatal(err)
 	}
 
@@ -223,8 +221,9 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	if loggedIn.Identity.User.ID != installed.Identity.User.ID {
 		t.Fatalf("login user = %q, want %q", loggedIn.Identity.User.ID, installed.Identity.User.ID)
 	}
-	if loggedIn.Identity.OrganizationIdentity.WorkStatus != string(domain.WorkStatusWorking) {
-		t.Fatalf("login work status = %q, want %q", loggedIn.Identity.OrganizationIdentity.WorkStatus, domain.WorkStatusWorking)
+	// 登录保留成员上次设置的工作状态。
+	if loggedIn.Identity.OrganizationIdentity.WorkStatus != string(domain.WorkStatusAway) {
+		t.Fatalf("login work status = %q, want %q", loggedIn.Identity.OrganizationIdentity.WorkStatus, domain.WorkStatusAway)
 	}
 
 	// 跨子测试共享：前面子测试创建的实体和操作在后续子测试中继续使用。
@@ -269,14 +268,14 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if resolvedPreferences == nil || resolvedPreferences.User.MessageNotificationsEnabled {
 			t.Fatalf("identity after preferences update = %#v", resolvedPreferences)
 		}
-		updatedWorkStatus, err := useraction.NewUpdateWorkStatusAction(db).Execute(context.Background(), loggedIn.Identity, useraction.WorkStatusInput{WorkStatus: domain.WorkStatusAway})
+		updatedWorkStatus, err := useraction.NewUpdateWorkStatusAction(db, newTestTasks(db)).Execute(context.Background(), loggedIn.Identity, useraction.WorkStatusInput{WorkStatus: domain.WorkStatusAway})
 		if err != nil {
 			t.Fatal(err)
 		}
 		if updatedWorkStatus.OrganizationIdentity.WorkStatus != string(domain.WorkStatusAway) {
 			t.Fatalf("updated work status = %q, want %q", updatedWorkStatus.OrganizationIdentity.WorkStatus, domain.WorkStatusAway)
 		}
-		if _, err := useraction.NewUpdateWorkStatusAction(db).Execute(context.Background(), loggedIn.Identity, useraction.WorkStatusInput{WorkStatus: domain.WorkStatusWorking}); err != nil {
+		if _, err := useraction.NewUpdateWorkStatusAction(db, newTestTasks(db)).Execute(context.Background(), loggedIn.Identity, useraction.WorkStatusInput{WorkStatus: domain.WorkStatusWorking}); err != nil {
 			t.Fatal(err)
 		}
 	})
@@ -422,7 +421,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		telegramAvatarFiles := fileaction.NewImportAction(db, func(context.Context, string) (domain.FileStorageBackend, error) {
 			return domain.FileStorageBackendLocal, nil
 		}, importedAvatarWriter)
-		receiveTelegram := channelaction.NewReceiveTelegramWebhookAction(db, agentrunaction.NewScheduler(servertask.New(db, serverconfig.NATSConfig{})), telegramAvatarAPI, telegramAvatarFiles, nil, nil)
+		receiveTelegram := channelaction.NewReceiveTelegramWebhookAction(db, agentrunaction.NewScheduler(newTestTasks(db)), telegramAvatarAPI, telegramAvatarFiles, nil, newTestTasks(db))
 		if err := receiveTelegram.Preflight(context.Background(), telegramChannel.ID, "wrong-secret"); !errors.Is(err, channelaction.ErrTelegramWebhookUnauthorized) {
 			t.Fatalf("wrong secret error = %v", err)
 		}
@@ -887,8 +886,8 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			Scan(context.Background()); err != nil {
 			t.Fatal(err)
 		}
-		createdMember, err = useraction.NewCreateUserAction(db).Execute(context.Background(), loggedIn.Identity, useraction.CreateInput{
-			HandlesCustomers: true, DisplayName: "团队成员", Email: "member@example.com", Password: "password123", RoleID: memberRole.ID, TeamIDs: []string{team.ID},
+		createdMember, err = useraction.NewCreateUserAction(db, newTestTasks(db)).Execute(context.Background(), loggedIn.Identity, useraction.CreateInput{
+			HandlesCustomers: true, MaxServiceSessions: 10, DisplayName: "团队成员", Email: "member@example.com", Password: "password123", RoleID: memberRole.ID, TeamIDs: []string{team.ID},
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -963,7 +962,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil || candidates.Page.Total != 1 || len(candidates.Members) != 1 || candidates.Members[0].IdentityID != createdMember.IdentityID {
 			t.Fatalf("team member candidates = %#v, error = %v", candidates, err)
 		}
-		team, err = teamaction.NewAddMembersAction(db).Execute(context.Background(), loggedIn.Identity, team.ID, []teamaction.MemberIdentity{{IdentityType: domain.OrganizationIdentityTypeUser, IdentityID: createdMember.IdentityID}})
+		team, err = teamaction.NewAddMembersAction(db, newTestTasks(db)).Execute(context.Background(), loggedIn.Identity, team.ID, []teamaction.MemberIdentity{{IdentityType: domain.OrganizationIdentityTypeUser, IdentityID: createdMember.IdentityID}})
 		if err != nil || team.MemberCount != 1 {
 			t.Fatalf("team after adding member = %#v, error = %v", team, err)
 		}
@@ -1155,8 +1154,8 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		observer, err := useraction.NewCreateUserAction(db).Execute(context.Background(), loggedIn.Identity, useraction.CreateInput{
-			HandlesCustomers: true, DisplayName: "群聊旁观者", Email: "group-observer@example.com", Password: "password123", RoleID: memberRole.ID,
+		observer, err := useraction.NewCreateUserAction(db, newTestTasks(db)).Execute(context.Background(), loggedIn.Identity, useraction.CreateInput{
+			HandlesCustomers: true, MaxServiceSessions: 10, DisplayName: "群聊旁观者", Email: "group-observer@example.com", Password: "password123", RoleID: memberRole.ID,
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -1683,7 +1682,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatalf("Telegram agent route error = %#v", err)
 		}
 
-		taskRuntime := servertask.New(db, serverconfig.NATSConfig{})
+		taskRuntime := newTestTasks(db)
 		if err := taskRuntime.Registry().RegisterJSON(agentrunaction.RunActionName, func(context.Context, agentrunaction.RunInput) error {
 			return nil
 		}); err != nil {
@@ -1691,9 +1690,9 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		}
 		scheduler := agentrunaction.NewScheduler(taskRuntime)
 		coordinator := agentrunaction.NewExecuteAction(db, taskRuntime, nil, testAttachmentReader(db), nil)
-		claimServiceSession := conversationaction.NewClaimServiceSessionAction(db, coordinator)
-		transferServiceSession := conversationaction.NewTransferServiceSessionAction(db, coordinator, scheduler)
-		closeServiceSession := conversationaction.NewCloseServiceSessionAction(db, coordinator)
+		claimServiceSession := conversationaction.NewClaimServiceSessionAction(db, coordinator, newTestTasks(db))
+		transferServiceSession := conversationaction.NewTransferServiceSessionAction(db, coordinator, scheduler, newTestTasks(db))
+		closeServiceSession := conversationaction.NewCloseServiceSessionAction(db, coordinator, newTestTasks(db))
 		if _, err := claimServiceSession.Execute(context.Background(), loggedIn.Identity, telegramConversationID); err != nil {
 			t.Fatal(err)
 		}
@@ -1712,7 +1711,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		publicQueueInbound, err := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, scheduler).Execute(context.Background(), conversationaction.WebsiteCustomerTextMessageInput{
+		publicQueueInbound, err := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, scheduler, newTestTasks(db)).Execute(context.Background(), conversationaction.WebsiteCustomerTextMessageInput{
 			ChannelID: channel.ID, ExternalID: "web-session:fedcba9876543210fedcba9876543210",
 			ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f92", Body: "需要人工接待",
 		})
@@ -1790,11 +1789,11 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			ChannelID: channel.ID, ExternalID: "web-session:0123456789abcdef0123456789abcdef",
 			ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f80", Body: "需要 AI 接待",
 		}
-		websiteInbound, err := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, scheduler).Execute(context.Background(), websiteMessageInput)
+		websiteInbound, err := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, scheduler, newTestTasks(db)).Execute(context.Background(), websiteMessageInput)
 		if err != nil {
 			t.Fatal(err)
 		}
-		websiteRetried, err := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, scheduler).Execute(context.Background(), websiteMessageInput)
+		websiteRetried, err := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, scheduler, newTestTasks(db)).Execute(context.Background(), websiteMessageInput)
 		if err != nil || websiteRetried.Message.ID != websiteInbound.Message.ID {
 			t.Fatalf("idempotent website message = %#v, error = %v", websiteRetried, err)
 		}
@@ -1985,7 +1984,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatalf("direct run scope fields = %#v", run)
 		}
 		websiteConversationID := websiteInbound.Conversation.ID
-		if _, err := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, scheduler).Execute(context.Background(), conversationaction.WebsiteCustomerTextMessageInput{
+		if _, err := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, scheduler, newTestTasks(db)).Execute(context.Background(), conversationaction.WebsiteCustomerTextMessageInput{
 			ChannelID: channel.ID, ExternalID: "web-session:0123456789abcdef0123456789abcdef",
 			ConversationID: &websiteConversationID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f81", Body: "接管前的新问题",
 		}); err != nil {
@@ -2071,7 +2070,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			if firstClaim.EndSeq != 4 || len(firstClaim.Messages) == 0 || firstClaim.Messages[len(firstClaim.Messages)-1].Content != "接管前的新问题" {
 				return agentruntime.RunResult{}, fmt.Errorf("unexpected initial customer claim: %#v", firstClaim)
 			}
-			if _, err := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, scheduler).Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
+			if _, err := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, scheduler, newTestTasks(db)).Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
 				ChannelID: channel.ID, ExternalID: "web-session:0123456789abcdef0123456789abcdef",
 				ConversationID: &websiteConversationID, ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f84", Body: "运行中的补充信息",
 			}); err != nil {
@@ -2480,7 +2479,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		}
 		assertInboxConversationPresence(t, closedInbox, websiteInbound.Conversation.ID, true)
 
-		if _, err := useraction.NewUpdateUserAction(db, testServiceSessionReturner(db)).Execute(context.Background(), loggedIn.Identity, createdMember.ID, useraction.UpdateInput{
+		if _, err := useraction.NewUpdateUserAction(db, testServiceSessionReturner(db), newTestTasks(db)).Execute(context.Background(), loggedIn.Identity, createdMember.ID, useraction.UpdateInput{
 			DisplayName: createdMember.DisplayName, Email: createdMember.Email, RoleID: createdMember.RoleID, TeamIDs: []string{team.ID},
 		}); err != nil {
 			t.Fatal(err)

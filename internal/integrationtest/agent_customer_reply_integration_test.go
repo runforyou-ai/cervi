@@ -14,11 +14,9 @@ import (
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
-	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
 )
 
@@ -32,7 +30,7 @@ func testAgentCustomerReplies(t *testing.T, db *bun.DB, identity *servermodels.I
 	if err != nil {
 		t.Fatal(err)
 	}
-	tasks := servertask.New(db, serverconfig.NATSConfig{})
+	tasks := newTestTasks(db)
 	if err := tasks.Registry().RegisterJSON(agentrunaction.RunActionName, func(context.Context, agentrunaction.RunInput) error { return nil }); err != nil {
 		t.Fatal(err)
 	}
@@ -53,7 +51,7 @@ func testAgentCustomerReplies(t *testing.T, db *bun.DB, identity *servermodels.I
 			if err != nil {
 				t.Fatal(err)
 			}
-			receive := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, scheduler)
+			receive := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, scheduler, newTestTasks(db))
 			input := conversationaction.WebsiteCustomerTextMessageInput{ChannelID: channel.ID, ExternalID: "web-session:0123456789abcdef0123456789abcdef", ClientMessageID: uuid.NewV7().String(), Body: "最早的客户问题"}
 			original, err := receive.Execute(ctx, input)
 			if err != nil {
@@ -68,7 +66,7 @@ func testAgentCustomerReplies(t *testing.T, db *bun.DB, identity *servermodels.I
 			}
 			coordinator := agentrunaction.NewExecuteAction(db, tasks, nil, testAttachmentReader(db), nil)
 			if scenario.earlierSession {
-				if _, err := conversationaction.NewCloseServiceSessionAction(db, coordinator).Execute(ctx, identity, original.Conversation.ID); err != nil {
+				if _, err := conversationaction.NewCloseServiceSessionAction(db, coordinator, newTestTasks(db)).Execute(ctx, identity, original.Conversation.ID); err != nil {
 					t.Fatal(err)
 				}
 				input.ClientMessageID, input.Body = uuid.NewV7().String(), "本轮客户问题"
@@ -88,7 +86,7 @@ func testAgentCustomerReplies(t *testing.T, db *bun.DB, identity *servermodels.I
 					t.Fatal(err)
 				}
 			}
-			if _, err := conversationaction.NewTransferServiceSessionAction(db, coordinator, scheduler).Execute(ctx, identity, conversationaction.TransferServiceSessionInput{ConversationID: original.Conversation.ID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: created.IdentityID}); err != nil {
+			if _, err := conversationaction.NewTransferServiceSessionAction(db, coordinator, scheduler, newTestTasks(db)).Execute(ctx, identity, conversationaction.TransferServiceSessionInput{ConversationID: original.Conversation.ID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: created.IdentityID}); err != nil {
 				t.Fatal(err)
 			}
 			input.ClientMessageID, input.Body = uuid.NewV7().String(), "请接着解释"

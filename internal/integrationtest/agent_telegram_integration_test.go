@@ -14,7 +14,6 @@ import (
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
-	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
@@ -56,14 +55,14 @@ func newAgentTelegramFixture(t *testing.T, db *bun.DB, identity *models.Identity
 	if _, err := db.ExecContext(ctx, "UPDATE telegram_channel_settings SET bot_id = ?, bot_token = '123:token', webhook_secret = 'secret' WHERE channel_id = ?", time.Now().UnixNano(), channel.ID); err != nil {
 		t.Fatal(err)
 	}
-	tasks := servertask.New(db, serverconfig.NATSConfig{})
+	tasks := newTestTasks(db)
 	if err := tasks.Registry().RegisterJSON(agentrunaction.RunActionName, func(context.Context, agentrunaction.RunInput) error { return nil }); err != nil {
 		t.Fatal(err)
 	}
 	if err := tasks.Registry().RegisterJSON(deliveryaction.SendActionName, func(context.Context, deliveryaction.Input) error { return nil }); err != nil {
 		t.Fatal(err)
 	}
-	f := agentTelegramFixture{db: db, identity: identity, channel: channel, tasks: tasks, receiver: channelaction.NewReceiveTelegramWebhookAction(db, agentrunaction.NewScheduler(tasks), nil, nil, nil, nil)}
+	f := agentTelegramFixture{db: db, identity: identity, channel: channel, tasks: tasks, receiver: channelaction.NewReceiveTelegramWebhookAction(db, agentrunaction.NewScheduler(tasks), nil, nil, nil, newTestTasks(db))}
 	f.input = channelaction.TelegramWebhookInput{Secret: "secret", UpdateID: 1, Message: &channelaction.TelegramWebhookMessage{ChatID: 12345, SenderID: 12345, MessageID: 1, DisplayName: "Telegram 客户", Body: "请介绍产品", OriginatedAt: time.Now().UTC()}}
 	if err := f.receiver.Execute(ctx, channel.ID, f.input); err != nil {
 		t.Fatal(err)
@@ -216,7 +215,7 @@ func testAgentTelegramReplies(t *testing.T, db *bun.DB, identity *models.Identit
 			t.Fatalf("delivery wakeup=%t err=%v", exists, err)
 		}
 		// 已提交的回复在人工接管后继续使用原投递记录。
-		if _, err := conversationaction.NewClaimServiceSessionAction(db, executor).Execute(ctx, identity, f.run.ConversationID); err != nil {
+		if _, err := conversationaction.NewClaimServiceSessionAction(db, executor, newTestTasks(db)).Execute(ctx, identity, f.run.ConversationID); err != nil {
 			t.Fatal(err)
 		}
 		sender := &deliverySender{}
@@ -234,7 +233,7 @@ func testAgentTelegramReplies(t *testing.T, db *bun.DB, identity *models.Identit
 		if n, err := db.NewSelect().Model((*models.AgentRun)(nil)).Where("agr.conversation_id = ?", f.run.ConversationID).Count(ctx); err != nil || n != 1 {
 			t.Fatalf("human runs=%d err=%v", n, err)
 		}
-		if _, err := conversationaction.NewTransferServiceSessionAction(db, executor, agentrunaction.NewScheduler(f.tasks)).Execute(ctx, identity, conversationaction.TransferServiceSessionInput{ConversationID: f.run.ConversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: f.run.AgentIdentityID}); err != nil {
+		if _, err := conversationaction.NewTransferServiceSessionAction(db, executor, agentrunaction.NewScheduler(f.tasks), newTestTasks(db)).Execute(ctx, identity, conversationaction.TransferServiceSessionInput{ConversationID: f.run.ConversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: f.run.AgentIdentityID}); err != nil {
 			t.Fatal(err)
 		}
 		if n, err := db.NewSelect().Model((*models.AgentRun)(nil)).Where("agr.conversation_id = ? AND agr.status = ?", f.run.ConversationID, domain.AgentRunStatusQueued).Count(ctx); err != nil || n != 1 {
@@ -259,10 +258,10 @@ func testAgentTelegramReplies(t *testing.T, db *bun.DB, identity *models.Identit
 				case "失败":
 					return agentruntime.RunResult{}, errors.New("模型失败详情")
 				case "接管":
-					_, err = conversationaction.NewClaimServiceSessionAction(db, coordinator).Execute(ctx, identity, f.run.ConversationID)
+					_, err = conversationaction.NewClaimServiceSessionAction(db, coordinator, newTestTasks(db)).Execute(ctx, identity, f.run.ConversationID)
 				case "关闭":
-					if _, err = conversationaction.NewClaimServiceSessionAction(db, coordinator).Execute(ctx, identity, f.run.ConversationID); err == nil {
-						_, err = conversationaction.NewCloseServiceSessionAction(db, coordinator).Execute(ctx, identity, f.run.ConversationID)
+					if _, err = conversationaction.NewClaimServiceSessionAction(db, coordinator, newTestTasks(db)).Execute(ctx, identity, f.run.ConversationID); err == nil {
+						_, err = conversationaction.NewCloseServiceSessionAction(db, coordinator, newTestTasks(db)).Execute(ctx, identity, f.run.ConversationID)
 					}
 				case "更换机器人":
 					api := &telegramBotAPIFake{bot: telegram.Bot{ID: time.Now().UnixNano(), IsBot: true, FirstName: "新机器人", Username: "new_bot"}}

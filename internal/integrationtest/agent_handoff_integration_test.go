@@ -21,7 +21,6 @@ import (
 	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
 	teamaction "github.com/runforyou-ai/cervi/internal/actions/team"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
-	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/realtime"
@@ -32,7 +31,7 @@ import (
 
 // testServiceSessionReturner 创建管理操作退回客服周期所用的运行协调器。
 func testServiceSessionReturner(db *bun.DB) *agentrunaction.ExecuteAction {
-	tasks := servertask.New(db, serverconfig.NATSConfig{})
+	tasks := newTestTasks(db)
 	if err := tasks.Registry().RegisterJSON(deliveryaction.SendActionName, func(context.Context, deliveryaction.Input) error { return nil }); err != nil {
 		panic(err)
 	}
@@ -88,7 +87,7 @@ func visitorInput(channelID, body string) conversationaction.WebsiteCustomerText
 func (f handoffFixture) receive(t *testing.T, input *conversationaction.WebsiteCustomerTextMessageInput, body string) conversationaction.ReceiveWebsiteCustomerMessageResult {
 	t.Helper()
 	input.ClientMessageID, input.Body = uuid.NewV7().String(), body
-	result, err := conversationaction.NewReceiveWebsiteCustomerMessageAction(f.db, agentrunaction.NewScheduler(f.tasks)).Execute(context.Background(), *input)
+	result, err := conversationaction.NewReceiveWebsiteCustomerMessageAction(f.db, agentrunaction.NewScheduler(f.tasks), newTestTasks(f.db)).Execute(context.Background(), *input)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -184,13 +183,15 @@ func loadSession(t *testing.T, db *bun.DB, sessionID string) servermodels.Servic
 
 // testAgentHandoffs 验证 AI 客服转人工的去向、并发边界、幂等、管理操作交接与资格变更互斥。
 func testAgentHandoffs(t *testing.T, db *bun.DB, identity *servermodels.Identity, roleID, providerID, modelID string) {
-	tasks := servertask.New(db, serverconfig.NATSConfig{})
+	tasks := newTestTasks(db)
 	if err := tasks.Registry().RegisterJSON(agentrunaction.RunActionName, func(context.Context, agentrunaction.RunInput) error { return nil }); err != nil {
 		t.Fatal(err)
 	}
 	f := handoffFixture{db: db, identity: identity, tasks: tasks, roleID: roleID, providerID: providerID, modelID: modelID}
+	disableAutoAssignment(t, db, identity.Organization.ID)
 	t.Run("主动转人工后转回同一 AI", func(t *testing.T) { testModelHandoffRoundTrip(t, f) })
 	t.Run("失败路由去向", func(t *testing.T) { testHandoffTargets(t, f) })
+	t.Run("转人工自动分配", func(t *testing.T) { testHandoffAutoAssignment(t, f) })
 	t.Run("人工接管与交接先后", func(t *testing.T) { testHandoffCommitOrder(t, f) })
 	t.Run("停用与关闭接待退回队列", func(t *testing.T) { testManagementReturn(t, f) })
 	t.Run("入站路由与资格变更交错", func(t *testing.T) { testInboundRoutingVersusEligibility(t, f) })
@@ -252,10 +253,10 @@ func testModelHandoffRoundTrip(t *testing.T, f handoffFixture) {
 	}
 	// 成员领取后转回同一 AI，新消息只触发新输入。
 	coordinator := testServiceSessionReturner(f.db)
-	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, coordinator).Execute(ctx, f.identity, first.Conversation.ID); err != nil {
+	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(ctx, f.identity, first.Conversation.ID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conversationaction.NewTransferServiceSessionAction(f.db, coordinator, agentrunaction.NewScheduler(f.tasks)).Execute(ctx, f.identity, conversationaction.TransferServiceSessionInput{
+	if _, err := conversationaction.NewTransferServiceSessionAction(f.db, coordinator, agentrunaction.NewScheduler(f.tasks), newTestTasks(f.db)).Execute(ctx, f.identity, conversationaction.TransferServiceSessionInput{
 		ConversationID: first.Conversation.ID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: agent.IdentityID,
 	}); err != nil {
 		t.Fatal(err)
@@ -288,14 +289,15 @@ func testHandoffTargets(t *testing.T, f handoffFixture) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	human, err := useraction.NewCreateUserAction(f.db).Execute(ctx, f.identity, useraction.CreateInput{
-		HandlesCustomers: true, DisplayName: "人工客服", Email: "handoff-" + uuid.NewV7().String()[:8] + "@handoff.test", Password: "password123", RoleID: f.roleID,
+	human, err := useraction.NewCreateUserAction(f.db, newTestTasks(f.db)).Execute(ctx, f.identity, useraction.CreateInput{
+		HandlesCustomers: true, MaxServiceSessions: 10, DisplayName: "人工客服", Email: "handoff-" + uuid.NewV7().String()[:8] + "@handoff.test", Password: "password123", RoleID: f.roleID,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
+	disableAutoAssignment(t, f.db, f.identity.Organization.ID)
 	// 团队队列须有开启接待的真人成员才可用。
-	if _, err := teamaction.NewAddMembersAction(f.db).Execute(ctx, f.identity, team.ID, []teamaction.MemberIdentity{
+	if _, err := teamaction.NewAddMembersAction(f.db, newTestTasks(f.db)).Execute(ctx, f.identity, team.ID, []teamaction.MemberIdentity{
 		{IdentityType: domain.OrganizationIdentityTypeUser, IdentityID: human.IdentityID},
 	}); err != nil {
 		t.Fatal(err)
@@ -348,6 +350,46 @@ func testHandoffTargets(t *testing.T, f handoffFixture) {
 	}
 }
 
+// testHandoffAutoAssignment 验证转人工进入队列时在交接事务内分配给可接待的真人成员，事件去向为实际承接成员并记录客户等待起点。
+func testHandoffAutoAssignment(t *testing.T, f handoffFixture) {
+	ctx := context.Background()
+	t.Cleanup(func() { disableAutoAssignment(t, f.db, f.identity.Organization.ID) })
+	agent := f.newAgent(t, "自动分配验证客服")
+	human, err := useraction.NewCreateUserAction(f.db, newTestTasks(f.db)).Execute(ctx, f.identity, useraction.CreateInput{
+		HandlesCustomers: true, MaxServiceSessions: 1, DisplayName: "承接客服", Email: "assign-" + uuid.NewV7().String()[:8] + "@handoff.test", Password: "password123", RoleID: f.roleID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	channelID := f.newChannel(t, agent.IdentityID, channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue})
+	handOff := func() (servermodels.ServiceSession, []domain.ServiceSessionHandedOffEvent) {
+		t.Helper()
+		input := visitorInput(channelID, "")
+		received := f.receive(t, &input, "需要人工")
+		run := f.queuedRun(t, received.Conversation.ID)
+		if err := agentrunaction.NewExecuteAction(f.db, f.tasks, handoffRuntime("", "无法确认", nil), testAttachmentReader(f.db), nil).Execute(ctx, agentrunaction.RunInput{RunID: run.ID}); err != nil {
+			t.Fatal(err)
+		}
+		return loadSession(t, f.db, run.ScopeID), handoffEvents(t, f.db, received.Conversation.ID)
+	}
+	session, events := handOff()
+	if session.AssigneeIdentityID == nil || *session.AssigneeIdentityID != human.IdentityID || session.TeamID != nil ||
+		session.AssigneeAssignedAt == nil || session.AwaitingReplySince == nil {
+		t.Fatalf("assigned handoff session = %+v", session)
+	}
+	if len(events) != 1 || events[0].Target.Kind != domain.ServiceSessionTargetMember || events[0].Target.IdentityID == nil || *events[0].Target.IdentityID != human.IdentityID {
+		t.Fatalf("assigned handoff events = %+v", events)
+	}
+	// 承接客服满员后转人工留在公共队列。
+	session, events = handOff()
+	if session.AssigneeIdentityID != nil || session.AssigneeAssignedAt != nil || session.AwaitingReplySince == nil {
+		t.Fatalf("queued handoff session = %+v", session)
+	}
+	if len(events) != 1 || events[0].Target.Kind != domain.ServiceSessionTargetPublicQueue {
+		t.Fatalf("queued handoff events = %+v", events)
+	}
+}
+
 // testHandoffCommitOrder 验证人工接管先提交时抑制迟到的转人工结果，AI 交接先提交时人工基于新负责人继续操作。
 func testHandoffCommitOrder(t *testing.T, f handoffFixture) {
 	ctx := context.Background()
@@ -359,7 +401,7 @@ func testHandoffCommitOrder(t *testing.T, f handoffFixture) {
 	first := f.receive(t, &input, "人工先接管")
 	run := f.queuedRun(t, first.Conversation.ID)
 	takeover := handoffRuntime("", "无法确认", func() {
-		if _, err := conversationaction.NewClaimServiceSessionAction(f.db, coordinator).Execute(ctx, f.identity, first.Conversation.ID); err != nil {
+		if _, err := conversationaction.NewClaimServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(ctx, f.identity, first.Conversation.ID); err != nil {
 			t.Fatal(err)
 		}
 	})
@@ -380,7 +422,7 @@ func testHandoffCommitOrder(t *testing.T, f handoffFixture) {
 	if err := agentrunaction.NewExecuteAction(f.db, f.tasks, handoffRuntime("", "无法确认", nil), testAttachmentReader(f.db), nil).Execute(ctx, agentrunaction.RunInput{RunID: run.ID}); err != nil {
 		t.Fatal(err)
 	}
-	claimed, err := conversationaction.NewClaimServiceSessionAction(f.db, coordinator).Execute(ctx, f.identity, second.Conversation.ID)
+	claimed, err := conversationaction.NewClaimServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(ctx, f.identity, second.Conversation.ID)
 	if err != nil || claimed.Assignee == nil || claimed.Assignee.IdentityID != f.identity.OrganizationIdentity.ID || len(handoffEvents(t, f.db, second.Conversation.ID)) != 1 {
 		t.Fatalf("claim after handoff = %+v, error = %v", claimed, err)
 	}
@@ -460,7 +502,7 @@ func testInboundRoutingVersusEligibility(t *testing.T, f handoffFixture) {
 				go func() {
 					defer wait.Done()
 					input := visitorInput(channelID, "并发入站")
-					_, err := conversationaction.NewReceiveWebsiteCustomerMessageAction(f.db, agentrunaction.NewScheduler(f.tasks)).Execute(ctx, input)
+					_, err := conversationaction.NewReceiveWebsiteCustomerMessageAction(f.db, agentrunaction.NewScheduler(f.tasks), newTestTasks(f.db)).Execute(ctx, input)
 					errs <- err
 				}()
 				if index == 3 {
@@ -548,11 +590,12 @@ func testChannelEditVersusDeactivation(t *testing.T, f handoffFixture) {
 	channelID := f.newChannel(t, agent.IdentityID, channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue})
 	// 渠道编辑由另一名成员发起，两个操作人各自持有自己的账号锁。
 	email := "channel-editor-" + uuid.NewV7().String()[:8] + "@handoff.test"
-	if _, err := useraction.NewCreateUserAction(f.db).Execute(ctx, f.identity, useraction.CreateInput{
-		HandlesCustomers: true, DisplayName: "渠道编辑成员", Email: email, Password: "password123", RoleID: f.identity.OrganizationIdentity.RoleID,
+	if _, err := useraction.NewCreateUserAction(f.db, newTestTasks(f.db)).Execute(ctx, f.identity, useraction.CreateInput{
+		HandlesCustomers: true, MaxServiceSessions: 10, DisplayName: "渠道编辑成员", Email: email, Password: "password123", RoleID: f.identity.OrganizationIdentity.RoleID,
 	}); err != nil {
 		t.Fatal(err)
 	}
+	disableAutoAssignment(t, f.db, f.identity.Organization.ID)
 	editor, err := authaction.NewLoginAction(f.db).Execute(ctx, authaction.LoginInput{OrganizationID: f.identity.Organization.ID, Email: email, Password: "password123"})
 	if err != nil {
 		t.Fatal(err)
@@ -670,11 +713,12 @@ func testServiceSessionOperationEvents(t *testing.T, f handoffFixture) {
 		t.Fatal(err)
 	}
 	email := "session-events-" + uuid.NewV7().String()[:8] + "@handoff.test"
-	if _, err := useraction.NewCreateUserAction(f.db).Execute(ctx, f.identity, useraction.CreateInput{
-		HandlesCustomers: true, DisplayName: "接管成员", Email: email, Password: "password123", RoleID: f.roleID,
+	if _, err := useraction.NewCreateUserAction(f.db, newTestTasks(f.db)).Execute(ctx, f.identity, useraction.CreateInput{
+		HandlesCustomers: true, MaxServiceSessions: 10, DisplayName: "接管成员", Email: email, Password: "password123", RoleID: f.roleID,
 	}); err != nil {
 		t.Fatal(err)
 	}
+	disableAutoAssignment(t, f.db, f.identity.Organization.ID)
 	other, err := authaction.NewLoginAction(f.db).Execute(ctx, authaction.LoginInput{OrganizationID: f.identity.Organization.ID, Email: email, Password: "password123"})
 	if err != nil {
 		t.Fatal(err)
@@ -696,18 +740,18 @@ func testServiceSessionOperationEvents(t *testing.T, f handoffFixture) {
 	if err := f.db.NewSelect().Model(&summary).Where("cv.id = ?", conversationID).Scan(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, coordinator).Execute(ctx, other.Identity, conversationID); err != nil {
+	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(ctx, other.Identity, conversationID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conversationaction.NewTransferServiceSessionAction(f.db, coordinator, scheduler).Execute(ctx, other.Identity, conversationaction.TransferServiceSessionInput{
+	if _, err := conversationaction.NewTransferServiceSessionAction(f.db, coordinator, scheduler, newTestTasks(f.db)).Execute(ctx, other.Identity, conversationaction.TransferServiceSessionInput{
 		ConversationID: conversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: agent.IdentityID,
 	}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, coordinator).Execute(ctx, f.identity, conversationID); err != nil {
+	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(ctx, f.identity, conversationID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, coordinator).Execute(ctx, f.identity, conversationID); err != nil {
+	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(ctx, f.identity, conversationID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := conversationaction.NewReopenServiceSessionAction(f.db).Execute(ctx, f.identity, conversationID); err != nil {

@@ -51,11 +51,17 @@ func AppendMessage(ctx context.Context, db bun.IDB, conversation *servermodels.C
 		Returning("*").Exec(ctx); err != nil {
 		return nil, false, fmt.Errorf("append conversation message: %w", err)
 	}
-	// 周期摘要只记录对客消息。
+	// 周期摘要只记录对客消息；客户消息开始或延续等待回复，成员与 AI 员工的对客消息结束等待。
 	if message.ServiceSessionID != nil && message.Visibility != string(domain.MessageVisibilityInternalOnly) {
 		if _, err := db.NewUpdate().Model((*servermodels.ServiceSession)(nil)).
 			Set("last_message_id = ?", message.ID).
 			Set("last_message_at = ?", message.OriginatedAt).
+			Set(`awaiting_reply_since = CASE WHEN EXISTS (
+				SELECT 1 FROM conversation_participants AS cp
+				JOIN chat_subjects AS cs ON cs.organization_id = cp.organization_id AND cs.id = cp.subject_id
+				WHERE cp.organization_id = ? AND cp.id = ? AND cs.kind = ?)
+				THEN COALESCE(awaiting_reply_since, ?) ELSE NULL END`,
+				conversation.OrganizationID, message.SenderParticipantID, domain.ChatSubjectKindContact, message.OriginatedAt).
 			Set("updated_at = now()").
 			Where("organization_id = ? AND conversation_id = ? AND id = ?", conversation.OrganizationID, conversation.ID, *message.ServiceSessionID).
 			Where("status = ?", domain.ServiceSessionStatusOpen).

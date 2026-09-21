@@ -210,7 +210,7 @@ func TestSyncHeadsConversationChanges(t *testing.T) {
 func TestSyncHeadsIdentityProfile(t *testing.T) {
 	f := newNavigationFixture(t)
 	ctx := context.Background()
-	if _, err := useraction.NewCreateUserAction(f.db).Execute(ctx, f.owner, useraction.CreateInput{HandlesCustomers: true, DisplayName: "无会话成员", Email: "lonely@navigation.test", Password: "password123", RoleID: f.owner.OrganizationIdentity.RoleID}); err != nil {
+	if _, err := useraction.NewCreateUserAction(f.db, newTestTasks(f.db)).Execute(ctx, f.owner, useraction.CreateInput{HandlesCustomers: true, MaxServiceSessions: 10, DisplayName: "无会话成员", Email: "lonely@navigation.test", Password: "password123", RoleID: f.owner.OrganizationIdentity.RoleID}); err != nil {
 		t.Fatal(err)
 	}
 	loginAction := authaction.NewLoginAction(f.db)
@@ -220,7 +220,7 @@ func TestSyncHeadsIdentityProfile(t *testing.T) {
 		t.Fatal(err)
 	}
 	lonely := login.Identity
-	workStatus := useraction.NewUpdateWorkStatusAction(f.db)
+	workStatus := useraction.NewUpdateWorkStatusAction(f.db, newTestTasks(f.db))
 	// renamed 记录名称是否在本步实际变化，名称变化推进所在会话版本并改变会话校验和。
 	renamed := false
 	// expectProfile 执行变化后核对身份资料版本是否推进，会话数量不变，校验和只随名称变化改变。
@@ -248,7 +248,7 @@ func TestSyncHeadsIdentityProfile(t *testing.T) {
 	}
 	preferences := useraction.NewUpdatePreferencesAction(f.db)
 	profile := useraction.NewUpdateProfileAction(f.db)
-	updateUser := useraction.NewUpdateUserAction(f.db, testServiceSessionReturner(f.db))
+	updateUser := useraction.NewUpdateUserAction(f.db, testServiceSessionReturner(f.db), newTestTasks(f.db))
 	shanghai := useraction.PreferencesInput{Locale: domain.Locale(lonely.User.Locale), TimeZone: "Asia/Shanghai", MessageNotificationsEnabled: lonely.User.MessageNotificationsEnabled}
 	for _, step := range []struct {
 		name   string
@@ -258,7 +258,10 @@ func TestSyncHeadsIdentityProfile(t *testing.T) {
 			_, err := workStatus.Execute(ctx, lonely, useraction.WorkStatusInput{WorkStatus: domain.WorkStatusAway})
 			return err
 		}},
-		{"登录恢复工作中", func() (err error) { login, err = loginAction.Execute(ctx, loginInput); return err }},
+		{"恢复工作中", func() error {
+			_, err := workStatus.Execute(ctx, lonely, useraction.WorkStatusInput{WorkStatus: domain.WorkStatusWorking})
+			return err
+		}},
 		{"账户偏好", func() error { _, err := preferences.Execute(ctx, lonely, shanghai); return err }},
 		{"个人资料", func() error {
 			_, err := profile.Execute(ctx, lonely, useraction.ProfileInput{DisplayName: "改名成员", Email: "lonely@navigation.test"})
@@ -276,6 +279,9 @@ func TestSyncHeadsIdentityProfile(t *testing.T) {
 		}
 		renamed = false
 	}
+	// 登录保持身份资料版本。
+	loginInput.Email = "renamed@navigation.test"
+	expectProfile("登录", false, func() (err error) { login, err = loginAction.Execute(ctx, loginInput); return err })
 
 	var accessHost string
 	if err := f.db.NewSelect().Table("organizations").Column("access_host").Where("id = ?", f.owner.Organization.ID).Scan(ctx, &accessHost); err != nil {

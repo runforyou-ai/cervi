@@ -62,6 +62,7 @@ export function MemberForm({
           passwordTooShort: t("members.validation.passwordTooShort"),
           passwordTooLong: t("members.validation.passwordTooLong"),
           roleRequired: t("members.validation.roleRequired"),
+          maxServiceSessionsInvalid: t("members.validation.maxServiceSessionsInvalid"),
         },
         false,
       ),
@@ -77,9 +78,11 @@ export function MemberForm({
       roleId: defaultRoleID,
       teamIds: defaultTeamIds,
       handlesCustomers: false,
+      maxServiceSessions: "10",
     },
   })
   const displayName = useWatch({ control: form.control, name: "displayName" })
+  const handlesCustomers = useWatch({ control: form.control, name: "handlesCustomers" })
   const avatar = usePendingImageUpload({
     purpose: FilePurpose.FilePurposeUserAvatar,
     onError: (error) => {
@@ -107,6 +110,7 @@ export function MemberForm({
         roleId: values.roleId,
         teamIds: values.teamIds,
         handlesCustomers: values.handlesCustomers,
+        maxServiceSessions: Number(values.maxServiceSessions),
         avatarFileId,
       })
       toast.success(t("members.form.created"))
@@ -124,6 +128,7 @@ export function MemberForm({
               "password",
               "roleId",
               "teamIds",
+              "maxServiceSessions",
             ])
           : t("members.form.networkError"),
       )
@@ -197,6 +202,17 @@ export function MemberForm({
             />
           )}
         />
+        {handlesCustomers ? (
+          <FormInputField
+            name="maxServiceSessions"
+            control={form.control}
+            label={t("members.form.maxServiceSessions")}
+            type="number"
+            inputMode="numeric"
+            min={1}
+            step={1}
+          />
+        ) : null}
         <Controller
           name="teamIds"
           control={form.control}
