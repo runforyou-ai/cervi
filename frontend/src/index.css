@@ -290,15 +290,21 @@ body,
   --wails-draggable: no-drag;
 }
 
-/* 工作台底层顶部略深，向下过渡回一级栏底色。 */
+/*
+  工作台底层顶部略深，向下过渡回一级栏底色。
+  顶部间距分两组：标题栏操作行的高度、内边距和偏移按该行自身的按钮尺寸取值；
+  一级栏上沿在此基础上让开该行。标题栏操作行始终位于一级栏内，主内容卡片
+  不受该行影响，上沿只随平台变化。此处是 Web 端取值，卡片四周留白一致。
+*/
 .cervi-workspace-shell {
   --cervi-workspace-chrome-top: color-mix(in oklab, var(--sidebar), black 3.5%);
   --cervi-workspace-rail-width: 220px;
   --cervi-workspace-content-inset: 6px;
   --cervi-workspace-content-gutter: 10px;
-  --cervi-workspace-content-top: 28px;
-  --cervi-workspace-rail-top: 40px;
-  --cervi-workspace-titlebar-height: 40px;
+  --cervi-workspace-content-top: var(--cervi-workspace-content-gutter);
+  --cervi-workspace-rail-collapsed-width: 48px;
+  --cervi-workspace-rail-top: 36px;
+  --cervi-workspace-titlebar-height: 36px;
   --cervi-workspace-titlebar-inset: 8px;
   --cervi-workspace-titlebar-offset: 0px;
   background:
@@ -324,7 +330,7 @@ body,
   padding-top: var(--cervi-workspace-rail-top);
 }
 
-/* 主内容卡片上沿略高于一级栏内容起点，右侧与底部留白一致。 */
+/* 主内容卡片上沿按平台取值，右侧与底部留白一致。 */
 .cervi-workspace-content-frame {
   margin: var(--cervi-workspace-content-top) var(--cervi-workspace-content-gutter)
     var(--cervi-workspace-content-gutter) var(--cervi-workspace-content-inset);
@@ -337,7 +343,15 @@ body,
   padding-left: var(--cervi-workspace-titlebar-inset);
 }
 
-/* macOS 主窗口使用带工具栏的隐藏标题栏，顶部按整条工具栏高度留白。 */
+/* Windows 与 Linux 桌面端使用系统标题栏，标题栏操作行另含前进后退。 */
+[data-native-os="windows"] .cervi-workspace-shell,
+[data-native-os="linux"] .cervi-workspace-shell {
+  --cervi-workspace-content-top: 28px;
+  --cervi-workspace-rail-top: 40px;
+  --cervi-workspace-titlebar-height: 40px;
+}
+
+/* macOS 主窗口使用带工具栏的隐藏标题栏，顶部按整条工具栏高度留白，左侧让开窗口按钮。 */
 [data-native-os="darwin"][data-window-fullscreen="false"] .cervi-workspace-shell {
   --cervi-workspace-content-top: 40px;
   --cervi-workspace-rail-top: 52px;
@@ -346,14 +360,35 @@ body,
   --cervi-workspace-titlebar-offset: 2px;
 }
 
-/* 一级栏收起后主内容卡片上沿下移，让开标题栏操作与窗口按钮。 */
-.cervi-workspace-shell[data-rail-collapsed="true"] {
-  --cervi-workspace-content-top: var(--cervi-workspace-titlebar-height);
+/* macOS 全屏后窗口按钮移出内容区，顶部间距只由标题栏操作行决定。 */
+[data-native-os="darwin"][data-window-fullscreen="true"] .cervi-workspace-shell {
+  --cervi-workspace-content-top: 28px;
+  --cervi-workspace-rail-top: 40px;
+  --cervi-workspace-titlebar-height: 40px;
+  --cervi-workspace-titlebar-inset: 8px;
+  --cervi-workspace-titlebar-offset: 0px;
 }
 
+/*
+  一级栏收起为仅图标窄栏，宽度固定且不可拖动调整。收起开关改由窄栏自身渲染，
+  顶部留白收敛到该开关在展开态标题栏操作行中的位置，收起前后开关不移动。
+*/
+.cervi-workspace-shell[data-rail-collapsed="true"] {
+  --cervi-workspace-rail-width: var(--cervi-workspace-rail-collapsed-width);
+  --cervi-workspace-rail-top: 4px;
+}
+
+[data-native-os="windows"] .cervi-workspace-shell[data-rail-collapsed="true"],
+[data-native-os="linux"] .cervi-workspace-shell[data-rail-collapsed="true"],
+[data-native-os="darwin"][data-window-fullscreen="true"]
+  .cervi-workspace-shell[data-rail-collapsed="true"] {
+  --cervi-workspace-rail-top: 6px;
+}
+
+/* macOS 窄栏容不下窗口按钮，窄栏内容整体下移到窗口按钮之下。 */
 [data-native-os="darwin"][data-window-fullscreen="false"]
   .cervi-workspace-shell[data-rail-collapsed="true"] {
-  --cervi-workspace-content-top: var(--cervi-workspace-titlebar-height);
+  --cervi-workspace-rail-top: 40px;
 }
 
 /* 一级栏整体和主内容卡片上方的空白区域用于拖动窗口。 */

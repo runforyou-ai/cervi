@@ -2,6 +2,8 @@
 
 export type AppPlatform = "web" | "desktop" | "mobile"
 
+export type DesktopOS = "darwin" | "windows" | "linux"
+
 type WailsWindow = Window & {
   _wails?: {
     environment?: {
@@ -60,17 +62,23 @@ export function resolveAppPlatform(): AppPlatform {
   return "web"
 }
 
-/** 判断桌面端是否运行在 macOS。 */
-export function isDesktopMacOS(): boolean {
+/** 识别桌面端运行的操作系统。 */
+export function resolveDesktopOS(): DesktopOS | null {
   if (resolveAppPlatform() !== "desktop") {
-    return false
+    return null
   }
   const wailsWindow = window as WailsWindow
-  if (wailsWindow._wails?.environment?.OS === "darwin") {
-    return true
+  const os = wailsWindow._wails?.environment?.OS
+  if (os === "darwin" || os === "windows" || os === "linux") {
+    return os
   }
-  return (
-    typeof wailsWindow.webkit?.messageHandlers?.external?.postMessage ===
-      "function" && /macintosh|mac os x/i.test(navigator.userAgent)
-  )
+  if (typeof wailsWindow.chrome?.webview?.postMessage === "function") {
+    return "windows"
+  }
+  return /macintosh|mac os x/i.test(navigator.userAgent) ? "darwin" : "linux"
+}
+
+/** 判断桌面端是否运行在 macOS。 */
+export function isDesktopMacOS(): boolean {
+  return resolveDesktopOS() === "darwin"
 }

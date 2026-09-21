@@ -15,10 +15,7 @@ import {
 } from "@/features/notifications/new-message-notifications"
 import { useNewMessageNotifications } from "@/features/notifications/use-new-message-notifications"
 import { SessionShell } from "@/features/session/session-shell"
-import {
-  useWorkspaceHistory,
-  WorkspaceHistoryNav,
-} from "@/features/workspace/workspace-history-nav"
+import { WorkspaceHistoryNav } from "@/features/workspace/workspace-history-nav"
 import { WorkspaceNavigationGuard } from "@/features/workspace/workspace-navigation-guard"
 import { WorkspaceNavigation } from "@/features/workspace/workspace-navigation"
 import {
@@ -71,7 +68,8 @@ function WorkspaceShell({ identity }: { identity: Identity }) {
   const navigate = useNavigate()
   const [loggingOut, setLoggingOut] = useState(false)
   const rail = useWorkspaceRail()
-  const history = useWorkspaceHistory()
+  // Web 端的前进后退由浏览器提供，工作台只在原生端给出入口。
+  const nativeHistoryNav = resolveAppPlatform() === "desktop"
   const [attentionPending, setAttentionPending] = useState(false)
   const workspaceLocation = resolveWorkspaceLocation(location)
   const fallbackHrefRef = useRef(defaultWorkspaceHref)
@@ -227,44 +225,43 @@ function WorkspaceShell({ identity }: { identity: Identity }) {
     ? workspaceLocation.canonicalHref
     : fallbackHrefRef.current
   const inSettings = isSettingsHref(pageHref)
+  // 窄栏下收起开关随一级栏内容渲染，整条标题栏操作行连同前进后退一并隐藏。
+  const railCollapsed = rail.collapsed
 
   return (
     <WorkspaceNavigationGuard>
       <div
         className="cervi-workspace-shell relative flex h-svh min-h-0 w-full overflow-hidden"
-        data-rail-collapsed={rail.collapsed ? "true" : undefined}
+        data-rail-collapsed={railCollapsed ? "true" : undefined}
         style={
-          {
-            "--cervi-workspace-rail-width": rail.collapsed
-              ? "0px"
-              : `${rail.width}px`,
-          } as CSSProperties
+          railCollapsed
+            ? undefined
+            : ({
+                "--cervi-workspace-rail-width": `${rail.width}px`,
+              } as CSSProperties)
         }
       >
-        {rail.collapsed ? null : (
-          <>
-            <WorkspaceNavigation
-              identity={identity}
-              inSettings={inSettings}
-              appHref={appHrefRef.current}
-              onLogout={handleLogout}
-              loggingOut={loggingOut}
-            />
-            <WorkspaceRailResizer onWidthChange={rail.changeWidth} />
-          </>
+        <WorkspaceNavigation
+          identity={identity}
+          inSettings={inSettings}
+          appHref={appHrefRef.current}
+          collapsed={railCollapsed}
+          onToggleRail={rail.toggleCollapsed}
+          onLogout={handleLogout}
+          loggingOut={loggingOut}
+        />
+        {railCollapsed ? null : (
+          <WorkspaceRailResizer onWidthChange={rail.changeWidth} />
         )}
-        <div className="cervi-workspace-titlebar-actions absolute top-0 left-0 z-40 flex items-center">
-          <WorkspaceRailToggle
-            collapsed={rail.collapsed}
-            onToggle={rail.toggleCollapsed}
-          />
-          <WorkspaceHistoryNav
-            canGoBack={history.canGoBack}
-            canGoForward={history.canGoForward}
-            onBack={history.goBack}
-            onForward={history.goForward}
-          />
-        </div>
+        {railCollapsed ? null : (
+          <div className="cervi-workspace-titlebar-actions absolute top-0 left-0 z-40 flex items-center">
+            <WorkspaceRailToggle
+              collapsed={false}
+              onToggle={rail.toggleCollapsed}
+            />
+            {nativeHistoryNav ? <WorkspaceHistoryNav /> : null}
+          </div>
+        )}
         <div aria-hidden="true" className="cervi-workspace-top-drag-region" />
         <div className="cervi-workspace-content-frame relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl bg-background shadow-sm">
           <WorkspaceProvider value={workspaceContext}>

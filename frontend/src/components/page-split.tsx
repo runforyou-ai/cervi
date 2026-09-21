@@ -6,6 +6,11 @@ import { NavLink, useLocation } from "react-router"
 
 import { StatusBadge } from "@/components/status-badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 
 const paneWidthClass = {
@@ -108,16 +113,18 @@ export function PagePaneNav({
   )
 }
 
-/** 分栏左栏导航项；activePath 按公共路径前缀保持整组页面的选中态。 */
+/** 分栏左栏导航项；activePath 按公共路径前缀保持整组页面的选中态，窄栏下只显示图标并由浮层提示名称。 */
 export function PagePaneLink({
   to,
   activePath,
   icon: Icon,
+  collapsed,
   children,
 }: {
   to?: string
   activePath?: string
   icon?: LucideIcon
+  collapsed?: boolean
   children: ReactNode
 }) {
   const { t } = useTranslation("common")
@@ -125,49 +132,79 @@ export function PagePaneLink({
   const prefixActive =
     activePath !== undefined &&
     (pathname === activePath || pathname.startsWith(`${activePath}/`))
-  const className =
-    "flex h-8 w-full items-center gap-2 rounded-md px-2.5 text-left text-sm transition-colors"
+  // 选中态按当前路径判定，className 保持字符串形式，供窄栏下的浮层触发器合并。
+  const active =
+    prefixActive ||
+    (to !== undefined && (pathname === to || pathname.startsWith(`${to}/`)))
+  const className = cn(
+    "flex h-8 shrink-0 items-center rounded-md text-left text-sm transition-colors",
+    collapsed ? "w-8 justify-center" : "w-full gap-2 px-2.5",
+  )
+  const label = collapsed ? (
+    <span className="sr-only">{children}</span>
+  ) : (
+    <span className="min-w-0 flex-1 truncate">{children}</span>
+  )
 
-  if (!to) {
-    return (
-      <span
-        className={cn(className, "cursor-default text-muted-foreground")}
-        aria-disabled="true"
-        title={t("comingSoon")}
-      >
-        {Icon ? <Icon className="size-4 shrink-0" /> : null}
-        <span className="min-w-0 flex-1 truncate">{children}</span>
+  const item = to ? (
+    <NavLink
+      to={to}
+      className={cn(
+        className,
+        "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+        active && "bg-sidebar-accent font-medium text-sidebar-accent-foreground",
+      )}
+    >
+      {Icon ? <Icon className="size-4 shrink-0" /> : null}
+      {label}
+    </NavLink>
+  ) : (
+    <span
+      className={cn(className, "cursor-default text-muted-foreground")}
+      aria-disabled="true"
+      title={collapsed ? undefined : t("comingSoon")}
+    >
+      {Icon ? <Icon className="size-4 shrink-0" /> : null}
+      {label}
+      {collapsed ? null : (
         <StatusBadge variant="muted">{t("comingSoon")}</StatusBadge>
-      </span>
-    )
+      )}
+    </span>
+  )
+
+  if (!collapsed) {
+    return item
   }
 
   return (
-    <NavLink
-      to={to}
-      className={({ isActive }) =>
-        cn(
-          className,
-          "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-          (isActive || prefixActive) &&
-            "bg-sidebar-accent font-medium text-sidebar-accent-foreground",
-        )
-      }
-    >
-      {Icon ? <Icon className="size-4 shrink-0" /> : null}
-      <span className="min-w-0 flex-1 truncate">{children}</span>
-    </NavLink>
+    <Tooltip>
+      <TooltipTrigger asChild>{item}</TooltipTrigger>
+      <TooltipContent side="right">
+        {children}
+        {to ? null : ` · ${t("comingSoon")}`}
+      </TooltipContent>
+    </Tooltip>
   )
 }
 
-/** 分栏左栏导航分组，分组标题下是同组导航项。 */
+/** 分栏左栏导航分组，分组标题下是同组导航项；窄栏下标题由分隔线代替。 */
 export function PagePaneGroup({
   title,
+  collapsed,
   children,
 }: {
   title: string
+  collapsed?: boolean
   children: ReactNode
 }) {
+  if (collapsed) {
+    return (
+      <div className="mt-1.5 flex flex-col items-center gap-4 border-t border-sidebar-border pt-2.5">
+        {children}
+      </div>
+    )
+  }
+
   return (
     <div className="flex flex-col gap-0.5">
       <span className="px-2.5 pt-2.5 pb-0.5 text-[11px] font-semibold tracking-[0.12em] text-muted-foreground/70 uppercase">

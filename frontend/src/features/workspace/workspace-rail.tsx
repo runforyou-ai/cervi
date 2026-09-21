@@ -92,7 +92,10 @@ export function WorkspaceRailToggle({
           {collapsed ? <PanelLeftOpenIcon /> : <PanelLeftCloseIcon />}
         </Button>
       </TooltipTrigger>
-      <TooltipContent>{label}</TooltipContent>
+      {/* 窄栏内的开关上方是 macOS 窗口按钮，提示改从右侧弹出。 */}
+      <TooltipContent side={collapsed ? "right" : undefined}>
+        {label}
+      </TooltipContent>
     </Tooltip>
   )
 }
