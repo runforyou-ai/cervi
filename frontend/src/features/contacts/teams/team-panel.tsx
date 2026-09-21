@@ -230,6 +230,7 @@ export function TeamPanel({
       <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <PageHeader
           title={selectedTeam?.name ?? t("scopes.teams")}
+          description={t("scopeDescriptions.teams")}
           beforeTitle={
             <ContactScopeMobileSelect
               scope="team"

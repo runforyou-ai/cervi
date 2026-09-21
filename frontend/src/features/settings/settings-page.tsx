@@ -52,7 +52,10 @@ export function SettingsPage({
         children
       ) : isFormSection(section) ? (
         <>
-          <PageHeader title={t(`${section}.title`)} />
+          <PageHeader
+            title={t(`${section}.title`)}
+            description={t(`${section}.description`)}
+          />
           <PageContent>
             {section === "profile" ? (
               <ProfileSettingsForm user={identity.user} />

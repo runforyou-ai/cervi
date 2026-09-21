@@ -18,6 +18,12 @@ const contacts = {
     teams: "Teams",
     external: "External contacts",
   },
+  scopeDescriptions: {
+    employees: "Manage member accounts, teams and roles",
+    agents: "Manage AI employees' profiles, knowledge and runtime",
+    teams: "Members of this team",
+    external: "Customer contacts from your channels",
+  },
   channelTypes: {
     website: "Websites",
     telegram: "Telegram",
@@ -139,6 +145,8 @@ const contacts = {
   agents: {
     configure: "Configure",
     editTitle: "Configure AI employee",
+    createDescription: "Create an AI employee and set up its profile",
+    editDescription: "Update this AI employee's profile, knowledge and runtime",
     edit: "Configure AI employee · {{name}}",
     basic: "Basic information",
     create: "Add AI employee",

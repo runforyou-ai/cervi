@@ -173,6 +173,7 @@ export function MembersPanel({
       <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <PageHeader
           title={t("scopes.employees")}
+          description={t("scopeDescriptions.employees")}
           beforeTitle={
             <ContactScopeMobileSelect
               scope="employees"

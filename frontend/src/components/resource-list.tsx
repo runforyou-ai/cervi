@@ -26,13 +26,12 @@ export function ResourceListFrame({
   onPageChange?: (page: number) => void
 }) {
   return (
-    // 负外边距抵消单元格内边距，使表格文本与工具栏对齐，行底色延伸到内容区边缘。
     <div
       data-slot="resource-list-frame"
-      className={cn("-mx-3", className)}
+      className={cn("flex flex-col", className)}
       {...props}
     >
-      {children}
+      <div className="overflow-hidden rounded-lg border border-border/55">{children}</div>
       {page && onPageChange ? (
         <PageControls
           page={page}

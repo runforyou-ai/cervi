@@ -20,6 +20,7 @@ import {
   type WebsiteChannelData,
 } from "@/api"
 import { LoadingIndicator } from "@/components/loading-indicator"
+import { PageBackButton } from "@/components/page-back-button"
 import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
@@ -289,12 +290,12 @@ function MessageChannelEditTabs({
         ) : null}
       </TabsList>
       {telegramChannel ? (
-        <div className="mt-6 grid gap-8 xl:grid-cols-[minmax(0,1fr)_480px]">
+        <div className="mt-6 grid gap-8 xl:grid-cols-[minmax(0,1fr)_360px]">
           {content}
           <TelegramChannelInfoPanel channel={telegramChannel} />
         </div>
       ) : websiteChannel && previewValue ? (
-        <div className="mt-6 grid gap-8 xl:grid-cols-[minmax(0,1fr)_480px]">
+        <div className="mt-6 grid gap-8 xl:grid-cols-[minmax(0,1fr)_360px]">
           {content}
           <WebsiteChatPreview value={previewValue} />
         </div>
@@ -418,7 +419,14 @@ export function MessageChannelFormPage({
               ? t("edit.namedTitle", { type: typeLabel, name: channel.name })
               : editTitle
         }
-      />
+        description={t(
+          mode === "create" ? "create.description" : "edit.description",
+        )}
+      >
+        {mode === "edit" ? (
+          <PageBackButton to="/settings/channels" />
+        ) : null}
+      </PageHeader>
       <PageContent>
         {loading ? (
           <LoadingIndicator className="min-h-48 justify-center">

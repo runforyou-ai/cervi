@@ -18,6 +18,7 @@ import { FormActions } from "@/components/form/form-actions"
 import { FormInputField } from "@/components/form/form-input-field"
 import { ResourceContent } from "@/components/resource-content"
 import { PageContent } from "@/components/page-content"
+import { PageBackButton } from "@/components/page-back-button"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
@@ -171,7 +172,16 @@ export function MCPServerFormPage({ mode }: { mode: "create" | "edit" }) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <PageHeader title={title} />
+      <PageHeader
+        title={title}
+        description={t(
+          mode === "create"
+            ? "mcpServer.form.createDescription"
+            : "mcpServer.form.editDescription",
+        )}
+      >
+        {mode === "edit" ? <PageBackButton to={listPath} /> : null}
+      </PageHeader>
       <PageContent>
         <ResourceContent
           loading={loading}

@@ -1,6 +1,6 @@
 /** 角色与权限列表页。 */
 import { useEffect, useRef, useState } from "react"
-import { EyeIcon } from "lucide-react"
+import { EyeIcon, PlusIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Link, useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -110,18 +110,33 @@ export function RoleListPage() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <PageHeader title={t("roles.title")}>
+      <PageHeader
+        title={t("roles.title")}
+        description={t("roles.description")}
+      >
         {maximum !== null && roles.length < maximum ? (
-          <Button size="sm" asChild>
-            <Link to="/settings/roles/new">{t("roles.list.create")}</Link>
+          <Button variant="ghost" size="icon-sm" asChild>
+            <Link
+              to="/settings/roles/new"
+              aria-label={t("roles.list.create")}
+              title={t("roles.list.create")}
+            >
+              <PlusIcon />
+            </Link>
           </Button>
         ) : (
           <Button
-            size="sm"
+            variant="ghost"
+            size="icon-sm"
             disabled
-            title={maximum === null ? undefined : t("roles.list.limitReached")}
+            aria-label={t("roles.list.create")}
+            title={
+              maximum === null
+                ? t("roles.list.create")
+                : t("roles.list.limitReached")
+            }
           >
-            {t("roles.list.create")}
+            <PlusIcon />
           </Button>
         )}
       </PageHeader>
