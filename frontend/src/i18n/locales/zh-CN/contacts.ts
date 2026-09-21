@@ -45,7 +45,6 @@ const contacts = {
     memberName: "成员名称",
     type: "类型",
     email: "邮箱",
-    phone: "电话",
     role: "角色",
     accountStatus: "账号状态",
     workStatus: "工作状态",

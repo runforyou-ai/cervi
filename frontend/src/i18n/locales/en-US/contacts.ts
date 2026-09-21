@@ -45,7 +45,6 @@ const contacts = {
     memberName: "Member name",
     type: "Type",
     email: "Email",
-    phone: "Phone",
     role: "Role",
     accountStatus: "Account status",
     workStatus: "Work status",
