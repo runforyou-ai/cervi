@@ -303,7 +303,7 @@ export function MobileInboxSearchPage() {
             enterKeyHint="search"
             autoFocus={!text}
             value={text}
-            aria-label={t(conversationId ? "searchCurrentConversation" : "searchLabel")}
+            aria-label={t(conversationId ? "inbox:searchCurrentConversation" : "common:actions.search")}
             className="h-9 pr-9 pl-9 md:text-base [&::-webkit-search-cancel-button]:hidden"
             onChange={(event) => {
               setText(event.target.value)

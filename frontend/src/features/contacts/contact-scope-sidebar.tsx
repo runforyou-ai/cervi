@@ -107,7 +107,7 @@ export function ContactScopeSidebar({
             <Button
               variant="ghost"
               size="icon-sm"
-              className="bg-primary text-primary-foreground hover:bg-primary/90 hover:text-primary-foreground"
+              className="shrink-0 text-muted-foreground"
               aria-label={t("common:actions.add")}
               title={t("common:actions.add")}
             >

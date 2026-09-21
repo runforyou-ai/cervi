@@ -101,7 +101,7 @@ export function MobileInboxScopes({
   const { t } = useTranslation("inbox")
   return (
     <nav
-      aria-label={t("scopeRailLabel")}
+      aria-label={t("scopeLabel")}
       className="grid shrink-0 grid-cols-3 border-b px-4"
     >
       {inboxScopes.map(({ value, label }) => (

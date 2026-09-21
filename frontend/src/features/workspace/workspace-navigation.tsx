@@ -15,6 +15,7 @@ import {
   MessagesSquareIcon,
   MonitorSmartphoneIcon,
   PlugIcon,
+  SearchIcon,
   SettingsIcon,
   ShieldCheckIcon,
   SlidersHorizontalIcon,
@@ -32,6 +33,7 @@ import {
   type WorkStatus,
 } from "@/api"
 import { PagePaneGroup, PagePaneLink } from "@/components/page-split"
+import { useGlobalSearch } from "@/contexts/global-search-context"
 import { useUnsavedChangesContext } from "@/contexts/unsaved-changes-context"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
@@ -91,6 +93,24 @@ function WorkspaceRailItem({
   )
 }
 
+/** 打开全局搜索的入口，尺寸与导航项一致。 */
+function WorkspaceSearchEntry() {
+  const { t } = useTranslation("common")
+  const globalSearch = useGlobalSearch()
+
+  return (
+    <button
+      type="button"
+      className="mb-4 flex h-8 w-full items-center gap-2 rounded-full bg-background/45 px-3 text-sm text-muted-foreground/65 hover:bg-background/70 hover:text-muted-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+      title={t("actions.searchShortcut")}
+      onClick={() => globalSearch?.open()}
+    >
+      <SearchIcon className="size-4 shrink-0" />
+      <span className="min-w-0 flex-1 truncate text-left">{t("actions.searchPlaceholder")}</span>
+    </button>
+  )
+}
+
 /** 模块栏导航。 */
 function WorkspaceMenu({
   onInboxClick,
@@ -102,29 +122,32 @@ function WorkspaceMenu({
 
   return (
     <nav
-      // 右侧留白由主内容区的内缩间隙承担，使选中块与两侧可见边界等距。
       className="flex flex-1 flex-col items-stretch gap-0.5 pt-1 pr-0 pl-1.5"
       aria-label={t("navigationGroup")}
     >
-      <WorkspaceRailItem
-        to="/inbox"
-        icon={InboxIcon}
-        label={t("inbox")}
-        active={location.pathname === "/inbox"}
-        onClick={onInboxClick}
-      />
-      <WorkspaceRailItem
-        to="/contacts/employees"
-        icon={ContactRoundIcon}
-        label={t("contacts")}
-        active={location.pathname.startsWith("/contacts")}
-      />
-      <WorkspaceRailItem
-        to="/knowledge-bases"
-        icon={LibraryIcon}
-        label={t("knowledgeBases")}
-        active={location.pathname.startsWith("/knowledge-bases")}
-      />
+      <WorkspaceSearchEntry />
+      {/* 导航项右侧额外留白，选中块与主内容卡片边缘拉开距离，搜索框保持原有宽度。 */}
+      <div className="flex flex-col items-stretch gap-0.5 pr-3">
+        <WorkspaceRailItem
+          to="/inbox"
+          icon={InboxIcon}
+          label={t("inbox")}
+          active={location.pathname === "/inbox"}
+          onClick={onInboxClick}
+        />
+        <WorkspaceRailItem
+          to="/contacts/employees"
+          icon={ContactRoundIcon}
+          label={t("contacts")}
+          active={location.pathname.startsWith("/contacts")}
+        />
+        <WorkspaceRailItem
+          to="/knowledge-bases"
+          icon={LibraryIcon}
+          label={t("knowledgeBases")}
+          active={location.pathname.startsWith("/knowledge-bases")}
+        />
+      </div>
     </nav>
   )
 }

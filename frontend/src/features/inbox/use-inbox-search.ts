@@ -1,20 +1,21 @@
-/** 收件箱检索结果与会话名称搜索分页查询，以及消息页中栏搜索模式的状态与键盘选择。 */
+/** 收件箱检索结果与会话名称搜索分页查询，以及全局搜索模态的检索状态与键盘选择。 */
 import { useCallback, useEffect, useRef, useState, type KeyboardEvent } from "react"
 
 import {
-  CustomerInboxView,
-  CustomerQueueFilter,
   InboxPartition,
   InboxScope,
   InboxSearchRange,
-  ServiceSessionStatus,
   readInboxConversations,
   searchInbox,
   type InboxConversation,
   type InboxQuery,
   type InboxSearchResultData,
 } from "@/api"
-import { normalizeInboxQuery, type InboxQueryInput } from "@/features/inbox/inbox-query"
+import {
+  normalizeInboxQuery,
+  readableInboxQuery,
+  type InboxQueryInput,
+} from "@/features/inbox/inbox-query"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 
@@ -86,18 +87,7 @@ export function useInboxSearchResults({
   )
   // 名称搜索沿用检索范围：列表范围带当前筛选，可读范围不带其他列表筛选。
   const nameQuery = normalizeInboxQuery({
-    ...(range === InboxSearchRange.InboxSearchRangeList
-      ? query
-      : {
-          scope: InboxScope.InboxScopeAll,
-          customerView: CustomerInboxView.CustomerInboxViewQueue,
-          queueFilter: CustomerQueueFilter.CustomerQueueFilterAll,
-          queueTeamId: "",
-          assigneeIdentityId: "",
-          channelId: "",
-          serviceStatus: ServiceSessionStatus.ServiceSessionStatusOpen,
-          kinds: [],
-        }),
+    ...(range === InboxSearchRange.InboxSearchRangeList ? query : readableInboxQuery),
     partition: InboxPartition.InboxPartitionAll,
     search: searchedText,
     searchRange: range,
@@ -133,36 +123,34 @@ export function useInboxSearchResults({
   }
 }
 
-/** 管理搜索模式、按范围读取结果和最近打开会话，并提供跨分组的键盘选择。 */
+/** 管理全局搜索的检索状态、按范围读取结果和最近打开会话，并提供跨分组的键盘选择。 */
 export function useInboxSearch({
-  query,
+  conversationId,
   recentConversationIds,
   onOpen,
 }: {
-  query: InboxQueryInput
+  conversationId: string
   recentConversationIds: string[]
   onOpen: (item: InboxSearchItem) => void
 }) {
-  const inputRef = useRef<HTMLInputElement>(null)
-  const activeRef = useRef(false)
-  const [active, setActive] = useState(false)
   const [text, setText] = useState("")
-  const [selectedRange, setRange] = useState<InboxSearchRange>(InboxSearchRange.InboxSearchRangeReadable)
-  const [conversationId, setConversationId] = useState("")
   const [type, setType] = useState<InboxSearchType>("all")
   const [activeIndex, setActiveIndex] = useState(0)
   const [pagedConversations, setPagedConversations] = useState<InboxConversation[]>([])
   const typeIndexes = useRef(new Map<InboxSearchType, number>())
   const results = useInboxSearchResults({
-    active,
+    active: true,
     text,
-    range: selectedRange,
+    // 从会话进入时只检索该会话，其余情况检索全部可读消息。
+    range: conversationId
+      ? InboxSearchRange.InboxSearchRangeConversation
+      : InboxSearchRange.InboxSearchRangeReadable,
     conversationId,
     type,
-    query,
+    query: readableInboxQuery,
     recentConversationIds,
   })
-  const { listRange, range, searchedText, showRecent } = results
+  const { range, searchedText, showRecent } = results
   const items: InboxSearchItem[] = [
     ...(showRecent ? results.recentConversations : results.paged ? pagedConversations : results.conversations).map((conversation) => ({
       kind: "conversation" as const,
@@ -200,66 +188,7 @@ export function useInboxSearch({
     [type, selectedIndex],
   )
 
-  const enter = useCallback(
-    (targetConversationId = "") => {
-      activeRef.current = true
-      setActive(true)
-      setConversationId(targetConversationId)
-      setRange(
-        targetConversationId
-          ? InboxSearchRange.InboxSearchRangeConversation
-          : listRange
-            ? InboxSearchRange.InboxSearchRangeList
-            : InboxSearchRange.InboxSearchRangeReadable,
-      )
-      setType("all")
-      inputRef.current?.focus()
-    },
-    [listRange],
-  )
-
-  const exit = useCallback(() => {
-    activeRef.current = false
-    setActive(false)
-    setText("")
-    setConversationId("")
-    setType("all")
-    typeIndexes.current.clear()
-    inputRef.current?.blur()
-  }, [])
-
-  useEffect(() => {
-    // Ctrl/⌘ K 在消息页任意位置进入搜索模式；搜索模式下焦点不在其他输入控件或浮层时，Esc 退出搜索。
-    function handleShortcut(event: globalThis.KeyboardEvent) {
-      if ((event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey && event.key.toLowerCase() === "k") {
-        event.preventDefault()
-        if (activeRef.current) inputRef.current?.focus()
-        else enter()
-        return
-      }
-      if (event.key !== "Escape" || event.isComposing || event.defaultPrevented || !activeRef.current) return
-      const focused = document.activeElement
-      if (
-        focused instanceof HTMLElement &&
-        focused !== inputRef.current &&
-        (focused.isContentEditable ||
-          ["INPUT", "TEXTAREA", "SELECT"].includes(focused.tagName) ||
-          focused.closest("[data-radix-popper-content-wrapper],[role='dialog']"))
-      )
-        return
-      event.preventDefault()
-      exit()
-    }
-    window.addEventListener("keydown", handleShortcut)
-    return () => window.removeEventListener("keydown", handleShortcut)
-  }, [enter, exit])
-
-  /** 聚焦搜索框时进入搜索模式，已在搜索模式时保留当前范围。 */
-  function handleFocus() {
-    if (!activeRef.current) enter()
-  }
-
-  /** 在搜索框内用方向键跨分组选择，Enter 打开；Esc 由文档级快捷键统一处理。 */
+  /** 在搜索框内用方向键跨分组选择，Enter 打开。 */
   function handleKeyDown(event: KeyboardEvent<HTMLInputElement>) {
     if (event.nativeEvent.isComposing) return
     if (event.key === "ArrowDown" || event.key === "ArrowUp") {
@@ -274,15 +203,8 @@ export function useInboxSearch({
   }
 
   return {
-    inputRef,
-    active,
     text,
     setText: changeText,
-    range,
-    setRange,
-    listRange,
-    conversationId,
-    type,
     setType: selectType,
     showRecent,
     paged: results.paged,
@@ -299,9 +221,6 @@ export function useInboxSearch({
     error: results.error,
     retry: results.retry,
     open: onOpen,
-    enter,
-    exit,
-    handleFocus,
     handleKeyDown,
   }
 }
