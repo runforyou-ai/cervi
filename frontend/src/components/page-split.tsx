@@ -199,7 +199,7 @@ export function PagePaneGroup({
 }) {
   if (collapsed) {
     return (
-      <div className="mt-1.5 flex flex-col items-center gap-4 border-t border-sidebar-border pt-2.5">
+      <div className="mt-1.5 flex flex-col items-center gap-1.5 border-t border-sidebar-border pt-1.5">
         {children}
       </div>
     )

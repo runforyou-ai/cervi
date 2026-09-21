@@ -127,8 +127,10 @@ function WorkspaceMenu({
     <nav
       // 展开时右侧留白由主内容区的内缩间隙承担，使选中块与两侧可见边界等距；窄栏下图标整列居中。
       className={cn(
-        "flex flex-1 flex-col pt-1",
-        collapsed ? "items-center gap-4" : "items-stretch gap-0.5 pr-0 pl-1.5",
+        "flex flex-1 flex-col",
+        collapsed
+          ? "items-center gap-1.5 pt-1.5"
+          : "items-stretch gap-0.5 pt-1 pr-0 pl-1.5",
       )}
       aria-label={t("navigationGroup")}
     >
@@ -171,8 +173,10 @@ function WorkspaceSettingsMenu({
   return (
     <nav
       className={cn(
-        "flex min-h-0 flex-1 flex-col overflow-y-auto pt-1",
-        collapsed ? "items-center gap-4" : "items-stretch gap-0.5 pr-0 pl-1.5",
+        "flex min-h-0 flex-1 flex-col overflow-y-auto",
+        collapsed
+          ? "items-center gap-1.5 pt-1.5"
+          : "items-stretch gap-0.5 pt-1 pr-0 pl-1.5",
       )}
       aria-label={t("navigationLabel")}
     >
@@ -386,7 +390,7 @@ export function WorkspaceNavigation({
   return (
     <aside className="cervi-workspace-rail flex h-full shrink-0 flex-col text-sidebar-foreground">
       {collapsed ? (
-        <div className="flex shrink-0 justify-center pb-1">
+        <div className="flex shrink-0 justify-center pb-1.5">
           <WorkspaceRailToggle collapsed onToggle={onToggleRail} />
         </div>
       ) : null}
