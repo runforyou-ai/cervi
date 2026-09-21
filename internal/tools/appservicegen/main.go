@@ -188,12 +188,12 @@ func run() error {
 		return err
 	}
 	files := map[string][]byte{
-		filepath.Join(root, "internal", "appservice", "service_gen.go"):                 generateService(methods),
-		filepath.Join(root, "internal", "appservice", "direct_backend_gen.go"):          generateDirectBackend(methods),
-		filepath.Join(root, "internal", "appservice", "operator_direct_backend_gen.go"): generateOperatorDirectBackend(operatorMethods),
-		filepath.Join(root, "internal", "api", "service_gen.go"):                        generateAPI(methods, queryStructs, businessAPITarget),
-		filepath.Join(root, "internal", "api", "operator_service_gen.go"):               generateAPI(operatorMethods, queryStructs, operatorAPITarget),
-		filepath.Join(root, "internal", "apiproxy", "backend_gen.go"):                   generateProxy(methods, queryStructs),
+		filepath.Join(root, "internal", "appservice", "service_gen.go"):                   generateService(methods),
+		filepath.Join(root, "internal", "appservice", "direct_backend_gen.go"):            generateDirectBackend(methods),
+		filepath.Join(root, "internal", "appservice", "operator_direct_backend_gen.go"):   generateOperatorDirectBackend(operatorMethods),
+		filepath.Join(root, "internal", "api", "service_gen.go"):                          generateAPI(methods, queryStructs, businessAPITarget),
+		filepath.Join(root, "internal", "api", "operator_service_gen.go"):                 generateAPI(operatorMethods, queryStructs, operatorAPITarget),
+		filepath.Join(root, "internal", "apiproxy", "backend_gen.go"):                     generateProxy(methods, queryStructs),
 		filepath.Join(root, "internal", "appservice", "device_run_direct_backend_gen.go"): generateDeviceRunDirectBackend(deviceRunMethods),
 		filepath.Join(root, "internal", "api", "device_run_service_gen.go"):               generateAPI(deviceRunMethods, queryStructs, deviceRunAPITarget),
 		filepath.Join(root, "internal", "apiproxy", "device_run_backend_gen.go"):          generateProxy(deviceRunMethods, queryStructs),
