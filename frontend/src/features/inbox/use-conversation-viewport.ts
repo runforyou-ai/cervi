@@ -10,7 +10,7 @@ export function conversationViewport(root: HTMLDivElement | null) {
 
 /** 用统一阈值判断视口是否已到尾端。 */
 function isAtBottom(viewport: HTMLElement) {
-  return viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight <= 48
+  return viewport.scrollHeight - viewport.scrollTop - viewport.clientHeight <= 80
 }
 
 /** 让各类导航共享唯一的滚动位置和跟随意图。 */
