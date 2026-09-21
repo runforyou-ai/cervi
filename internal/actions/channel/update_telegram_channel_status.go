@@ -67,17 +67,17 @@ func (a *UpdateTelegramChannelStatusAction) Execute(ctx context.Context, identit
 						return err
 					}
 				}
-				if enabled {
-					if token == "" || detail.Connection.WebhookBaseURL == "" {
-						return ErrTelegramConnectionRequired
-					}
+				// 尚未保存连接配置时仍可启用，Webhook 留待保存连接后注册。
+				if enabled && token != "" && detail.Connection.WebhookBaseURL != "" {
 					webhookURL, err = telegramWebhookURL(detail.Connection.WebhookBaseURL, channelID)
 					if err != nil {
-						return ErrTelegramConnectionRequired
-					}
-					secret, err = newTelegramWebhookSecret()
-					if err != nil {
-						return fmt.Errorf("generate Telegram webhook secret: %w", err)
+						slog.Warn("Telegram Webhook 地址无效，跳过注册", "channel_id", channelID, "error", err)
+						webhookURL = ""
+					} else {
+						secret, err = newTelegramWebhookSecret()
+						if err != nil {
+							return fmt.Errorf("generate Telegram webhook secret: %w", err)
+						}
 					}
 				}
 
@@ -127,7 +127,7 @@ func (a *UpdateTelegramChannelStatusAction) Execute(ctx context.Context, identit
 					Set("webhook_connected_at = NULL").
 					Where("channel_id = ?", channelID).
 					Where("organization_id = ?", identity.Organization.ID)
-				if enabled {
+				if secret != "" {
 					query = query.
 						Set("webhook_secret = ?", secret).
 						Set("webhook_status = ?", domain.TelegramWebhookStatusWaiting)
@@ -153,13 +153,13 @@ func (a *UpdateTelegramChannelStatusAction) Execute(ctx context.Context, identit
 				return err
 			}
 
-			if enabled {
+			if webhookURL != "" {
 				if err := runTelegramSetWebhook(ctx, a.runner, a.api, token, webhookURL, secret); err != nil {
 					logTelegramRemoteFailure("注册 Telegram Webhook 失败", channelID, err)
 				} else {
 					slog.Info("Telegram Webhook 注册成功", "channel_id", channelID)
 				}
-			} else if token != "" && !botUsedByOtherChannel {
+			} else if !enabled && token != "" && !botUsedByOtherChannel {
 				if err := runTelegramDeleteWebhook(ctx, a.runner, a.api, token); err != nil {
 					logTelegramRemoteFailure("删除 Telegram Webhook 失败", channelID, err)
 				}

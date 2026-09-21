@@ -194,7 +194,6 @@
   "error.channel_access_update_failed": "Could not save the allowed websites.",
   "error.telegram_connection_test_failed": "Could not connect to Telegram. Try again later.",
   "error.telegram_connection_save_failed": "Could not save the Telegram connection.",
-  "error.telegram_connection_required": "Save the Telegram connection before activating this channel.",
   "error.contact_not_found": "This contact could not be found.",
   "error.contact_list_failed": "Could not load contacts.",
   "error.contact_read_failed": "Could not load the contact.",

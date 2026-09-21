@@ -194,7 +194,6 @@
   "error.channel_access_update_failed": "保存允许使用的网站失败。",
   "error.telegram_connection_test_failed": "无法连接 Telegram，请稍后重试。",
   "error.telegram_connection_save_failed": "保存 Telegram 连接配置失败。",
-  "error.telegram_connection_required": "请先保存 Telegram 连接配置。",
   "error.contact_not_found": "没有找到这个联系人。",
   "error.contact_list_failed": "读取联系人列表失败。",
   "error.contact_read_failed": "读取联系人详情失败。",
