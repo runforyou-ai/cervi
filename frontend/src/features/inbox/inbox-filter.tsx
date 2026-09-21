@@ -40,11 +40,14 @@ export function InboxFilter({
   scope,
   value,
   channels,
+  closedStatusDisabled,
   onChange,
 }: {
   scope: InboxScope
   value: InboxFilterValue
   channels: InboxChannel[]
+  /** 「待分配」视图只看未关闭会话，已关闭选项置灰。 */
+  closedStatusDisabled: boolean
   onChange: (changes: Partial<InboxFilterValue>) => void
 }) {
   const { t } = useTranslation("inbox")
@@ -110,7 +113,10 @@ export function InboxFilter({
                 <option value={ServiceSessionStatus.ServiceSessionStatusOpen}>
                   {t("filterServiceStatusOpen")}
                 </option>
-                <option value={ServiceSessionStatus.ServiceSessionStatusClosed}>
+                <option
+                  value={ServiceSessionStatus.ServiceSessionStatusClosed}
+                  disabled={closedStatusDisabled}
+                >
                   {t("filterServiceStatusClosed")}
                 </option>
               </NativeSelect>

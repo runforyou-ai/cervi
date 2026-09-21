@@ -218,6 +218,7 @@ const inbox = {
   agentStopFailed: "停止回复失败，请重试。",
   agentRunCancelled: "已中断",
   agentRunAssigneeChanged: "会话已转交",
+  conversationAssignee: "负责人：{{name}}",
   agentRunSessionClosed: "会话已关闭",
   agentRunBotChanged: "机器人已更换",
   agentRunAgentRemoved: "AI 员工已退出群聊",

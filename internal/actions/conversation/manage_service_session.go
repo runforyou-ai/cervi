@@ -334,7 +334,7 @@ func NewCloseServiceSessionAction(db *bun.DB, coordinator ServiceSessionAgentRun
 	return &CloseServiceSessionAction{db: db, coordinator: coordinator}
 }
 
-// Execute 关闭公共队列或当前身份负责的处理周期。
+// Execute 关闭公共队列或当前身份负责的处理周期，无人负责的周期由关闭人成为负责人。
 func (a *CloseServiceSessionAction) Execute(ctx context.Context, identity *servermodels.Identity, conversationID string) (ServiceSessionResult, error) {
 	conversationID, valid := common.NormalizeUUID(conversationID)
 	if !valid {
@@ -365,11 +365,14 @@ func (a *CloseServiceSessionAction) Execute(ctx context.Context, identity *serve
 			cancelledSession = session
 		}
 		now := time.Now().UTC()
+		assigneeIdentityID := identity.OrganizationIdentity.ID
 		if _, err := tx.NewUpdate().Model(session).
 			Set("status = ?", domain.ServiceSessionStatusClosed).
 			Set("status_changed_at = ?", now).
 			Set("closed_at = ?", now).
 			Set("closed_by_identity_id = ?", identity.OrganizationIdentity.ID).
+			Set("assignee_identity_id = ?", assigneeIdentityID).
+			Set("assigned_at = COALESCE(assigned_at, ?)", now).
 			Set("updated_at = now()").
 			WherePK().
 			Where("organization_id = ?", identity.Organization.ID).
@@ -378,23 +381,24 @@ func (a *CloseServiceSessionAction) Execute(ctx context.Context, identity *serve
 		}
 		session.Status = string(domain.ServiceSessionStatusClosed)
 		session.ClosedAt = &now
+		session.AssigneeIdentityID = &assigneeIdentityID
+		if session.AssignedAt == nil {
+			session.AssignedAt = &now
+		}
 		if err := appendServiceSessionEvent(ctx, tx, identity, conversation, session, domain.ConversationSystemEventServiceSessionClosed, nil, nil); err != nil {
 			return err
 		}
 		if err := chatstate.TouchConversation(ctx, tx, conversation); err != nil {
 			return err
 		}
-		var assignee *servermodels.OrganizationIdentity
-		if session.AssigneeIdentityID != nil {
-			// 读取处理周期负责人身份。
-			assignee = &servermodels.OrganizationIdentity{}
-			if err := tx.NewSelect().Model(assignee).
-				Column("oi.id", "oi.type", "oi.display_name", "oi.avatar_file_id").
-				Where("oi.organization_id = ?", identity.Organization.ID).
-				Where("oi.id = ?", *session.AssigneeIdentityID).
-				Scan(ctx); err != nil {
-				return err
-			}
+		// 读取处理周期负责人身份。
+		assignee := &servermodels.OrganizationIdentity{}
+		if err := tx.NewSelect().Model(assignee).
+			Column("oi.id", "oi.type", "oi.display_name", "oi.avatar_file_id").
+			Where("oi.organization_id = ?", identity.Organization.ID).
+			Where("oi.id = ?", assigneeIdentityID).
+			Scan(ctx); err != nil {
+			return err
 		}
 		output = serviceSessionResult(session, assignee)
 		return nil

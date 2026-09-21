@@ -96,6 +96,11 @@ test("范围外的客户条件和会话类型按空值规范化", () => {
   )
 })
 
+test("待分配视图的服务状态固定为未关闭", () => {
+  assert.equal(normalizeInboxQuery({ scope: "customer", customerView: "queue", queueFilter: "", queueTeamId: "", assigneeIdentityId: "", channelId: "", serviceStatus: "closed", kinds: [] }).serviceStatus, "open")
+  assert.equal(inboxQueryFromSearch(new URLSearchParams("scope=customer&view=queue&status=closed")).serviceStatus, "open")
+})
+
 test("勾满当前范围全部类型等同不限类型", () => {
   assert.deepEqual(plain(toggleInboxKinds("internal", ["direct", "group"], "agent", true)), [])
   assert.deepEqual(plain(toggleInboxKinds("internal", ["direct", "group"], "direct", false)), ["group"])

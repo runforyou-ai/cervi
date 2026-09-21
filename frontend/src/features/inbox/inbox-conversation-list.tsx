@@ -19,7 +19,10 @@ import {
   type InboxConversation,
 } from "@/api"
 import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
-import { ConversationAvatar } from "@/features/inbox/conversation-avatar"
+import {
+  ConversationAssigneeAvatar,
+  ConversationAvatar,
+} from "@/features/inbox/conversation-avatar"
 import {
   ConversationListMenu,
   useConversationListActions,
@@ -72,6 +75,7 @@ type ConversationRowProps = {
   conversation: InboxConversation
   name: string
   showQueueTeam: boolean
+  showAssignee: boolean
   selected: boolean
   actions: ReturnType<typeof useConversationListActions>
   pinOrderVersion: string
@@ -86,6 +90,7 @@ function ConversationRow({
   conversation,
   name,
   showQueueTeam,
+  showAssignee,
   selected,
   actions,
   pinOrderVersion,
@@ -225,6 +230,9 @@ function ConversationRow({
               >
                 {preview}
               </span>
+              {showAssignee ? (
+                <ConversationAssigneeAvatar conversation={conversation} className="size-4" />
+              ) : null}
               {isInternal && conversation.muted ? (
                 <BellOffIcon
                   className="size-3 shrink-0 text-muted-foreground"
@@ -249,10 +257,11 @@ function SortableConversationRow(props: ConversationRowProps) {
   return <ConversationRow {...props} sortable={sortable} />
 }
 
-/** 会话列表，置顶区在前且可在区内排序；showQueueTeam 为真时客户会话名称后显示所属团队队列，传入 onOpenInWindow 时双击会话项在独立窗口打开该会话。 */
+/** 会话列表，置顶区在前且可在区内排序；showQueueTeam 为真时客户会话名称后显示所属团队队列，showAssignee 为真时客户会话摘要行末显示负责人小头像，传入 onOpenInWindow 时双击会话项在独立窗口打开该会话。 */
 export function InboxConversationList({
   conversations,
   showQueueTeam,
+  showAssignee,
   pinnedIds,
   pinOrderVersion,
   onMenuChange,
@@ -264,6 +273,7 @@ export function InboxConversationList({
 }: {
   conversations: InboxConversation[]
   showQueueTeam: boolean
+  showAssignee: boolean
   pinnedIds: string[]
   pinOrderVersion: string
   onMenuChange: (open: boolean) => void
@@ -288,6 +298,7 @@ export function InboxConversationList({
     conversation,
     name: names.get(conversation.id) ?? "",
     showQueueTeam,
+    showAssignee,
     selected: selectedId === conversation.id,
     actions,
     pinOrderVersion,

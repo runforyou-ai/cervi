@@ -223,6 +223,7 @@ const inbox = {
   agentStopFailed: "Failed to stop the reply. Please try again.",
   agentRunCancelled: "Interrupted",
   agentRunAssigneeChanged: "Conversation reassigned",
+  conversationAssignee: "Assignee: {{name}}",
   agentRunSessionClosed: "Conversation closed",
   agentRunBotChanged: "Bot replaced",
   agentRunAgentRemoved: "The AI teammate left the group",
