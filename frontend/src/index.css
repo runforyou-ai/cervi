@@ -303,7 +303,8 @@ body,
   --cervi-workspace-content-gutter: 10px;
   --cervi-workspace-content-top: var(--cervi-workspace-content-gutter);
   --cervi-workspace-rail-collapsed-width: 44px;
-  --cervi-workspace-rail-top: var(--cervi-workspace-content-gutter);
+  --cervi-workspace-rail-top-expanded: var(--cervi-workspace-content-gutter);
+  --cervi-workspace-rail-top: var(--cervi-workspace-rail-top-expanded);
   --cervi-workspace-titlebar-height: 36px;
   --cervi-workspace-titlebar-inset: 8px;
   --cervi-workspace-titlebar-offset: 0px;
@@ -347,14 +348,14 @@ body,
 [data-native-os="windows"] .cervi-workspace-shell,
 [data-native-os="linux"] .cervi-workspace-shell {
   --cervi-workspace-content-top: 28px;
-  --cervi-workspace-rail-top: 40px;
+  --cervi-workspace-rail-top-expanded: 40px;
   --cervi-workspace-titlebar-height: 40px;
 }
 
 /* macOS 主窗口隐藏标题栏，窗口按钮位于标准位置，顶部按其所占高度留白，左侧让开窗口按钮。 */
 [data-native-os="darwin"][data-window-fullscreen="false"] .cervi-workspace-shell {
   --cervi-workspace-content-top: 36px;
-  --cervi-workspace-rail-top: 41px;
+  --cervi-workspace-rail-top-expanded: 41px;
   --cervi-workspace-titlebar-height: 34px;
   --cervi-workspace-titlebar-inset: 80px;
   --cervi-workspace-titlebar-offset: 0px;
@@ -363,7 +364,7 @@ body,
 /* macOS 全屏后窗口按钮移出内容区，主内容卡片四周留白一致，顶部间距只由标题栏操作行决定。 */
 [data-native-os="darwin"][data-window-fullscreen="true"] .cervi-workspace-shell {
   --cervi-workspace-content-top: var(--cervi-workspace-content-gutter);
-  --cervi-workspace-rail-top: 40px;
+  --cervi-workspace-rail-top-expanded: 40px;
   --cervi-workspace-titlebar-height: 40px;
   --cervi-workspace-titlebar-inset: 8px;
   --cervi-workspace-titlebar-offset: 0px;
