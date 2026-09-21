@@ -193,9 +193,6 @@ func (o *directOperations) setMessageChannelEnabled(ctx context.Context, meta Re
 		channel, err = o.updateMessageChannelStatus.Execute(ctx, identity, channelID, enabled)
 	}
 	if err != nil {
-		if errors.Is(err, channelaction.ErrTelegramConnectionRequired) {
-			return MessageChannelSummary{}, InvalidError(meta, cervii18n.ErrorTelegramConnectionRequired, nil)
-		}
 		return MessageChannelSummary{}, o.channelError(ctx, meta, err, cervii18n.ErrorChannelUpdateFailed, identity.Organization.ID, channelID)
 	}
 	slog.Info("消息渠道状态已更新", "organization_id", identity.Organization.ID, "channel_id", channel.ID, "channel_type", channel.Type, "enabled", enabled)

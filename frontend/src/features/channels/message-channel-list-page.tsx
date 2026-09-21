@@ -1,6 +1,6 @@
 /** 消息渠道列表页，统一展示当前支持的渠道。 */
 import { useMemo, useState } from "react"
-import { PencilIcon } from "lucide-react"
+import { PlusIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Link, useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -16,8 +16,8 @@ import {
   ListToolbar,
   ListToolbarFilter,
   ListToolbarReset,
-  ListToolbarSearch,
 } from "@/components/list-toolbar"
+import { ListActionButton } from "@/components/list-action-button"
 import { PageHeader } from "@/components/page-header"
 import { ResourceListLayout } from "@/components/resource-list"
 import { ResourceTable } from "@/components/resource-table"
@@ -32,7 +32,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import {
   messageChannelTypeDefinition,
   messageChannelTypeDefinitions,
@@ -50,7 +49,6 @@ export function MessageChannelListPage() {
   const { t } = useTranslation(["channels", "common"])
   const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
-  const [search, setSearch] = useState("")
   const [category, setCategory] = useState("")
   const [enabledStatus, setEnabledStatus] =
     useState<ChannelEnabledStatus>("enabled")
@@ -71,13 +69,10 @@ export function MessageChannelListPage() {
     () =>
       channels.filter(
         (channel) =>
-          channel.name
-            .toLocaleLowerCase()
-            .includes(search.trim().toLocaleLowerCase()) &&
           (!category || channel.type === category) &&
           channel.enabled === (enabledStatus === "enabled"),
       ),
-    [category, channels, enabledStatus, search],
+    [category, channels, enabledStatus],
   )
 
   /** 切换消息渠道的启用状态。 */
@@ -117,18 +112,22 @@ export function MessageChannelListPage() {
 
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden">
-      <PageHeader title={t("list.title")}>
-        <Button size="sm" asChild>
-          <Link to="/settings/channels/new">{t("list.create")}</Link>
+      <PageHeader
+        title={t("list.title")}
+        description={t("list.description")}
+      >
+        <Button variant="ghost" size="icon-sm" asChild>
+          <Link
+            to="/settings/channels/new"
+            aria-label={t("list.create")}
+            title={t("list.create")}
+          >
+            <PlusIcon />
+          </Link>
         </Button>
       </PageHeader>
 
       <ListToolbar>
-        <ListToolbarSearch
-          value={search}
-          aria-label={t("filters.search")}
-          onChange={(event) => setSearch(event.target.value)}
-        />
         <ListToolbarFilter
           label={t("filters.category")}
           allLabel={t("filters.allCategories")}
@@ -150,10 +149,9 @@ export function MessageChannelListPage() {
             setEnabledStatus(value as ChannelEnabledStatus)
           }
         />
-        {search || category || enabledStatus !== "enabled" ? (
+        {category || enabledStatus !== "enabled" ? (
           <ListToolbarReset
             onClick={() => {
-              setSearch("")
               setCategory("")
               setEnabledStatus("enabled")
             }}
@@ -170,6 +168,7 @@ export function MessageChannelListPage() {
         onRetry={() => void refresh()}
       >
         <ResourceTable
+          hideHeader
           columns={[
             {
               key: "name",
@@ -193,30 +192,6 @@ export function MessageChannelListPage() {
                 )
               },
             },
-            {
-              key: "category",
-              header: t("list.columns.category"),
-              cellClassName: "whitespace-nowrap",
-              cell: (channel) => {
-                const typeDefinition = messageChannelTypeDefinition(
-                  channel.type,
-                )
-                if (!typeDefinition) {
-                  console.warn("未知的消息渠道类型", channel.type)
-                  return ""
-                }
-                return t(`types.${typeDefinition.translationKey}`)
-              },
-            },
-            {
-              key: "language",
-              header: t("list.columns.language"),
-              cellClassName: "whitespace-nowrap",
-              cell: (channel) =>
-                t(
-                  `locales.${channel.defaultLocale === "zh-CN" ? "zhCN" : "enUS"}`,
-                ),
-            },
           ]}
           rows={filteredChannels}
           rowKey={(channel) => channel.id}
@@ -225,30 +200,25 @@ export function MessageChannelListPage() {
               ? t("list.emptyTitle")
               : t("list.emptyFiltered")
           }
-          actions={(channel) => ({
-            primary: (
-              <Button variant="outline" size="icon-sm" asChild>
-                <Link
-                  to={`/settings/channels/${channel.type}/${channel.id}`}
-                  aria-label={t("common:actions.edit")}
-                  title={t("common:actions.edit")}
+          onRowActivate={(channel) =>
+            navigate(`/settings/channels/${channel.type}/${channel.id}`)
+          }
+          actions={(channel) => {
+            const label = channel.enabled
+              ? t("list.deactivate")
+              : t("list.activate")
+            return {
+              primary: (
+                <ListActionButton
+                  tone={channel.enabled ? "destructive" : "success"}
+                  disabled={updatingChannelId === channel.id}
+                  onClick={() => requestStatusChange(channel)}
                 >
-                  <PencilIcon />
-                </Link>
-              </Button>
-            ),
-            menu: (
-              <DropdownMenuItem
-                destructive={channel.enabled}
-                disabled={updatingChannelId === channel.id}
-                onSelect={() => requestStatusChange(channel)}
-              >
-                {channel.enabled
-                  ? t("list.deactivate")
-                  : t("list.activate")}
-              </DropdownMenuItem>
-            ),
-          })}
+                  {label}
+                </ListActionButton>
+              ),
+            }
+          }}
         />
       </ResourceListLayout>
 

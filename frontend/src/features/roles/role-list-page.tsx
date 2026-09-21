@@ -1,6 +1,6 @@
 /** 角色与权限列表页。 */
 import { useEffect, useRef, useState } from "react"
-import { EyeIcon } from "lucide-react"
+import { PlusIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Link, useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -13,6 +13,7 @@ import {
   type PermissionDefinition,
   type RoleData,
 } from "@/api"
+import { ListActionButton } from "@/components/list-action-button"
 import { PageHeader } from "@/components/page-header"
 import { ResourceListLayout } from "@/components/resource-list"
 import { ResourceTable } from "@/components/resource-table"
@@ -27,7 +28,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import {
   permissionDefinitionLabel,
   roleDescription,
@@ -110,18 +110,33 @@ export function RoleListPage() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <PageHeader title={t("roles.title")}>
+      <PageHeader
+        title={t("roles.title")}
+        description={t("roles.description")}
+      >
         {maximum !== null && roles.length < maximum ? (
-          <Button size="sm" asChild>
-            <Link to="/settings/roles/new">{t("roles.list.create")}</Link>
+          <Button variant="ghost" size="icon-sm" asChild>
+            <Link
+              to="/settings/roles/new"
+              aria-label={t("roles.list.create")}
+              title={t("roles.list.create")}
+            >
+              <PlusIcon />
+            </Link>
           </Button>
         ) : (
           <Button
-            size="sm"
+            variant="ghost"
+            size="icon-sm"
             disabled
-            title={maximum === null ? undefined : t("roles.list.limitReached")}
+            aria-label={t("roles.list.create")}
+            title={
+              maximum === null
+                ? t("roles.list.create")
+                : t("roles.list.limitReached")
+            }
           >
-            {t("roles.list.create")}
+            <PlusIcon />
           </Button>
         )}
       </PageHeader>
@@ -133,32 +148,26 @@ export function RoleListPage() {
         frameClassName="@container"
       >
         <ResourceTable
+          hideHeader
           columns={[
             {
-              key: "name",
+              key: "role",
               header: t("roles.list.columns.name"),
-              cellClassName: "font-medium",
-              cell: (role) => roleDisplayName(role, tCommon),
-            },
-            {
-              key: "description",
-              header: t("roles.list.columns.description"),
-              className: "hidden @3xl:table-cell",
-              headerClassName: "w-64",
-              cellClassName: "max-w-64 text-muted-foreground",
               cell: (role) => {
                 const description = roleDescription(role, t)
                 return (
-                  <span className="block truncate" title={description}>
-                    {description}
-                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate font-medium">
+                      {roleDisplayName(role, tCommon)}
+                    </p>
+                    <p className="truncate text-xs text-muted-foreground">
+                      {t("roles.list.memberCount", { count: role.memberCount })}
+                      <span aria-hidden="true"> · </span>
+                      {description}
+                    </p>
+                  </div>
                 )
               },
-            },
-            {
-              key: "memberCount",
-              header: t("roles.list.columns.memberCount"),
-              cell: (role) => role.memberCount,
             },
             {
               key: "permissions",
@@ -171,27 +180,17 @@ export function RoleListPage() {
           rows={roles}
           rowKey={(role) => role.id}
           empty={t("roles.list.empty")}
+          onRowActivate={(role) => navigate(`/settings/roles/${role.id}`)}
           actions={(role) => ({
-            primary: (
-              <Button variant="outline" size="icon-sm" asChild>
-                <Link
-                  to={`/settings/roles/${role.id}`}
-                  aria-label={tCommon("actions.view")}
-                  title={tCommon("actions.view")}
+            primary:
+              role.kind === RoleKind.RoleKindCustom ? (
+                <ListActionButton
+                  tone="destructive"
+                  onClick={() => setDeletingRole(role)}
                 >
-                  <EyeIcon />
-                </Link>
-              </Button>
-            ),
-            menu: (
-              <DropdownMenuItem
-                destructive
-                disabled={role.kind !== RoleKind.RoleKindCustom}
-                onSelect={() => setDeletingRole(role)}
-              >
-                {tCommon("actions.delete")}
-              </DropdownMenuItem>
-            ),
+                  {tCommon("actions.delete")}
+                </ListActionButton>
+              ) : null,
           })}
         />
       </ResourceListLayout>

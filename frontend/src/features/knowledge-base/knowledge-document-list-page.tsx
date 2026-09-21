@@ -66,6 +66,7 @@ function KnowledgeDocumentGroupList({ baseId, groupId }: { baseId: string; group
           [base.data?.name, group?.isDefault ? t("group.default") : group?.name].filter(Boolean).join(" · ") ||
           t("documents.title")
         }
+        description={t("documents.description")}
       >
         {list.data && !list.error && (
           <>

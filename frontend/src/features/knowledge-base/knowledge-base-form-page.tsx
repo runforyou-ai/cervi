@@ -26,6 +26,7 @@ import {
 import { FormInputField } from "@/components/form/form-input-field"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { PageContent } from "@/components/page-content"
+import { PageBackButton } from "@/components/page-back-button"
 import { PageHeader } from "@/components/page-header"
 import {
   AlertDialog,
@@ -278,7 +279,16 @@ export function KnowledgeBaseFormPage({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <PageHeader title={title} />
+      <PageHeader
+        title={title}
+        description={t(
+          mode === "create"
+            ? "form.createDescription"
+            : "form.editDescription",
+        )}
+      >
+        {mode === "edit" ? <PageBackButton to={cancelPath} /> : null}
+      </PageHeader>
       <PageContent>
         {loading ? (
           <LoadingIndicator className="min-h-48 justify-center rounded-lg border">

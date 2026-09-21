@@ -10,7 +10,6 @@ const channels = {
     enUS: "English",
   },
   filters: {
-    search: "Search channel names",
     category: "Channel category",
     allCategories: "All categories",
     status: "Channel status",
@@ -28,6 +27,7 @@ const channels = {
   },
   list: {
     title: "Message channels",
+    description: "Channels customers use to reach you",
     create: "Add channel",
     activate: "Activate",
     deactivate: "Deactivate",
@@ -37,8 +37,6 @@ const channels = {
     emptyFiltered: "No channels match these filters",
     columns: {
       name: "Name",
-      category: "Channel category",
-      language: "Default service language",
     },
   },
   deactivation: {
@@ -51,9 +49,11 @@ const channels = {
   },
   create: {
     title: "Add channel",
+    description: "Pick a channel type and connect it",
   },
   edit: {
     title: "{{type}} channel settings",
+    description: "Basic information, reception and connection settings",
     fallbackTitle: "Message channel settings",
     namedTitle: "{{type}} · {{name}}",
   },

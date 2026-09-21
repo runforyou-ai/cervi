@@ -10,7 +10,6 @@ const channels = {
     enUS: "English",
   },
   filters: {
-    search: "搜索渠道名称",
     category: "渠道类别",
     allCategories: "全部类别",
     status: "渠道状态",
@@ -28,6 +27,7 @@ const channels = {
   },
   list: {
     title: "消息渠道",
+    description: "管理客户发起会话的接入渠道",
     create: "添加渠道",
     activate: "启用",
     deactivate: "停用",
@@ -37,8 +37,6 @@ const channels = {
     emptyFiltered: "没有符合筛选条件的渠道",
     columns: {
       name: "名称",
-      category: "渠道类别",
-      language: "默认接待语言",
     },
   },
   deactivation: {
@@ -51,9 +49,11 @@ const channels = {
   },
   create: {
     title: "添加渠道",
+    description: "选择渠道类型并完成接入",
   },
   edit: {
     title: "{{type}}渠道设置",
+    description: "维护渠道的基础信息、接待方式和接入设置",
     fallbackTitle: "消息渠道设置",
     namedTitle: "{{type}} · {{name}}",
   },

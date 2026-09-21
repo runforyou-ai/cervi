@@ -27,6 +27,7 @@ import { FormValidationMessage } from "@/components/form/form-validation-message
 import { ResourceListFrame } from "@/components/resource-list"
 import { ResourceContent } from "@/components/resource-content"
 import { PageContent } from "@/components/page-content"
+import { PageBackButton } from "@/components/page-back-button"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
@@ -404,7 +405,16 @@ export function ModelProviderFormPage({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <PageHeader title={title} />
+      <PageHeader
+        title={title}
+        description={t(
+          mode === "create"
+            ? "modelServices.form.createDescription"
+            : "modelServices.form.editDescription",
+        )}
+      >
+        {mode === "edit" ? <PageBackButton to={listPath} /> : null}
+      </PageHeader>
       <PageContent>
         <ResourceContent
           loading={loading}

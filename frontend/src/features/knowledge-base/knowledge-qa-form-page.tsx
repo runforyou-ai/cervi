@@ -24,6 +24,7 @@ import {
 } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
 import { PageContent } from "@/components/page-content"
+import { PageBackButton } from "@/components/page-back-button"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
@@ -58,6 +59,7 @@ type QAFormValues = z.infer<ReturnType<typeof createQASchema>>
 export function KnowledgeQAFormPage({ mode }: { mode: "create" | "edit" }) {
   const { t } = useTranslation("knowledgeBase")
   const { knowledgeBaseId = "", groupId = "", entryId = "" } = useParams()
+  const location = useLocation()
   const base = useResource(
     resourceKeys.knowledgeBase(knowledgeBaseId),
     (signal) => getKnowledgeBase(knowledgeBaseId, signal),
@@ -75,7 +77,16 @@ export function KnowledgeQAFormPage({ mode }: { mode: "create" | "edit" }) {
     <>
       <PageHeader
         title={t(mode === "create" ? "qa.createTitle" : "qa.editTitle")}
-      />
+        description={t(
+          mode === "create" ? "qa.createDescription" : "qa.editDescription",
+        )}
+      >
+        {mode === "edit" ? (
+          <PageBackButton
+            to={`/knowledge-bases/${knowledgeBaseId}/groups/${groupId}/qa${location.search}`}
+          />
+        ) : null}
+      </PageHeader>
       <PageContent>
         {error || !ready ? (
           <KnowledgeQAFeedback

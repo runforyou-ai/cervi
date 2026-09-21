@@ -3,6 +3,7 @@ const knowledgeBase = {
   documents: {
     retryFailed: "提交文档重试失败，请重试。",
     title: "文档",
+    description: "上传或编写供 AI 员工检索的文档",
     more: "{{name}}的更多操作",
     search: "搜索文档名称",
     empty: "暂无文档",
@@ -33,6 +34,8 @@ const knowledgeBase = {
     importError: "导入网页失败，请重试。",
     createTitle: "编写文档",
     editTitle: "编辑文档",
+    createDescription: "编写新的在线文档",
+    editDescription: "修改文档名称和正文",
     name: "文档名称",
     content: "正文",
     titleRequired: "请输入文档名称",
@@ -112,6 +115,7 @@ const knowledgeBase = {
     },
   },
   documentDetail: {
+    description: "查看文档原文和分段结果",
     segments: {
       position: "第 {{position}} 段",
       matched: "命中分段",
@@ -133,6 +137,7 @@ const knowledgeBase = {
   qa: {
     movedSuccess: "问答已保存并移至“{{group}}”。",
     title: "知识问答",
+    description: "维护标准问答，供 AI 员工直接引用",
     create: "新增问答",
     question: "标准问题",
     status: "状态",
@@ -150,6 +155,8 @@ const knowledgeBase = {
     loadError: "读取问答失败，请重试。",
     createTitle: "新增问答",
     editTitle: "编辑问答",
+    createDescription: "新增一条标准问答",
+    editDescription: "修改问题、相似问法和答案",
     unsupported: "只有本地问答知识库支持此操作。",
     questionRequired: "请输入标准问题。",
     answerRequired: "请输入答案。",
@@ -204,6 +211,8 @@ const knowledgeBase = {
 
     createTitle: "新建知识库",
     editTitle: "编辑知识库",
+    createDescription: "新建知识库并选择检索模型",
+    editDescription: "维护知识库信息和检索配置",
     category: "知识库类型",
     name: "知识库名称",
     description: "描述",

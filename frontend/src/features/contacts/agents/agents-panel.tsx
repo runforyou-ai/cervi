@@ -119,6 +119,7 @@ export function AgentsPanel({
       <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <PageHeader
           title={t("scopes.agents")}
+          description={t("scopeDescriptions.agents")}
           beforeTitle={
             <ContactScopeMobileSelect
               scope="agents"

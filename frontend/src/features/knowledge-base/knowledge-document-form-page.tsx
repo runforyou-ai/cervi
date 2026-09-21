@@ -19,6 +19,7 @@ import {
 } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
 import { PageContent } from "@/components/page-content"
+import { PageBackButton } from "@/components/page-back-button"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
@@ -62,6 +63,7 @@ export function KnowledgeDocumentFormPage({
     groupId = "",
     documentId = "",
   } = useParams()
+  const location = useLocation()
   const base = useResource(
     resourceKeys.knowledgeBase(knowledgeBaseId),
     (signal) => getKnowledgeBase(knowledgeBaseId, signal),
@@ -85,7 +87,18 @@ export function KnowledgeDocumentFormPage({
         title={t(
           mode === "create" ? "documents.createTitle" : "documents.editTitle",
         )}
-      />
+        description={t(
+          mode === "create"
+            ? "documents.createDescription"
+            : "documents.editDescription",
+        )}
+      >
+        {mode === "edit" ? (
+          <PageBackButton
+            to={`/knowledge-bases/${knowledgeBaseId}/groups/${groupId}/documents${location.search}`}
+          />
+        ) : null}
+      </PageHeader>
       <PageContent>
         {error || !ready ? (
           <KnowledgeQAFeedback

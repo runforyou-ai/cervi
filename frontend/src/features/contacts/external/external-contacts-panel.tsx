@@ -203,6 +203,7 @@ export function ExternalContactsPanel({
       <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <PageHeader
           title={selectedChannel?.name ?? t("scopes.external")}
+          description={t("scopeDescriptions.external")}
           beforeTitle={
             <ContactScopeMobileSelect
               scope="external"

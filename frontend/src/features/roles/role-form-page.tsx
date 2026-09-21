@@ -25,6 +25,7 @@ import {
 import { FormInputField } from "@/components/form/form-input-field"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { PageContent } from "@/components/page-content"
+import { PageBackButton } from "@/components/page-back-button"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
@@ -317,7 +318,16 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <PageHeader title={title} />
+      <PageHeader
+        title={title}
+        description={t(
+          mode === "create"
+            ? "roles.form.createDescription"
+            : "roles.form.detailDescription",
+        )}
+      >
+        {mode === "detail" ? <PageBackButton to="/settings/roles" /> : null}
+      </PageHeader>
       <PageContent>
         {loading ? (
           <LoadingIndicator className="min-h-48 justify-center rounded-lg border">

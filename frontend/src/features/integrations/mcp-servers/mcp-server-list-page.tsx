@@ -1,6 +1,6 @@
 /** MCP 服务列表页。 */
 import { useEffect, useRef, useState } from "react"
-import { PencilIcon } from "lucide-react"
+import { PencilIcon, PlusIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Link, useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -80,7 +80,10 @@ export function MCPServerListPage() {
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-      <PageHeader title={t("mcpServer.title")}>
+      <PageHeader
+        title={t("mcpServer.title")}
+        description={t("mcpServer.description")}
+      >
         <Button
           size="sm"
           variant="outline"
@@ -89,8 +92,14 @@ export function MCPServerListPage() {
         >
           {t("mcpServer.tools.refresh")}
         </Button>
-        <Button size="sm" asChild>
-          <Link to="/settings/mcp-servers/new">{t("mcpServer.list.create")}</Link>
+        <Button variant="ghost" size="icon-sm" asChild>
+          <Link
+            to="/settings/mcp-servers/new"
+            aria-label={t("mcpServer.list.create")}
+            title={t("mcpServer.list.create")}
+          >
+            <PlusIcon />
+          </Link>
         </Button>
       </PageHeader>
       <ResourceListLayout
