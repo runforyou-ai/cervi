@@ -9,10 +9,8 @@ import {
   type AIProviderModelSummaryData,
   type AIProviderSummaryData,
 } from "@/api"
-import { ResourceContent } from "@/components/resource-content"
-import { ResourceListFrame } from "@/components/resource-list"
+import { ResourceListLayout } from "@/components/resource-list"
 import { ResourceTable } from "@/components/resource-table"
-import { PageContent } from "@/components/page-content"
 import { ListActionButton } from "@/components/list-action-button"
 import { PageHeader } from "@/components/page-header"
 import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
@@ -97,7 +95,7 @@ export function ModelProviderListPage({ section }: { section: ModelServiceSectio
           </Link>
         </Button>
       </PageHeader>
-      <PageContent>
+      <div className="cervi-page-gutter flex h-11 shrink-0 items-end select-none">
         <Tabs
           value={section}
           onValueChange={(value) => navigate(`/settings/model-services/${value}`)}
@@ -110,55 +108,50 @@ export function ModelProviderListPage({ section }: { section: ModelServiceSectio
             ))}
           </TabsList>
         </Tabs>
-
-        <div className="mt-6">
-          <ResourceContent
-            loading={showLoading}
-            error={Boolean(error)}
-            errorMessage={t("modelServices.list.loadError")}
-            onRetry={() => void refresh()}
-          >
-            <ResourceListFrame>
-              <ResourceTable
-                hideHeader
-                columns={[
-                  {
-                    key: "provider",
-                    header: t("modelServices.list.columns.name"),
-                    cell: (provider) => (
-                      <ProviderCell
-                        brand={t(aiProviderBrandConfigs[provider.brand].nameKey)}
-                        name={provider.name}
-                        models={provider.models.filter(
-                          (model) => model.type === sectionConfig.modelType,
-                        )}
-                      />
-                    ),
-                  },
-                ]}
-                rows={visibleProviders}
-                rowKey={(provider) => provider.id}
-                empty={t("modelServices.list.empty", {
-                  type: t(sectionConfig.nameKey),
-                })}
-                onRowActivate={(provider) =>
-                  navigate(`/settings/model-services/${section}/${provider.id}`)
-                }
-                actions={(provider) => ({
-                  primary: (
-                    <ListActionButton
-                      tone="destructive"
-                      onClick={() => deletion.select(provider)}
-                    >
-                      {t("common:actions.delete")}
-                    </ListActionButton>
-                  ),
-                })}
-              />
-            </ResourceListFrame>
-          </ResourceContent>
-        </div>
-      </PageContent>
+      </div>
+      <ResourceListLayout
+        loading={showLoading}
+        error={Boolean(error)}
+        errorMessage={t("modelServices.list.loadError")}
+        onRetry={() => void refresh()}
+      >
+        <ResourceTable
+          hideHeader
+          columns={[
+            {
+              key: "provider",
+              header: t("modelServices.list.columns.name"),
+              cell: (provider) => (
+                <ProviderCell
+                  brand={t(aiProviderBrandConfigs[provider.brand].nameKey)}
+                  name={provider.name}
+                  models={provider.models.filter(
+                    (model) => model.type === sectionConfig.modelType,
+                  )}
+                />
+              ),
+            },
+          ]}
+          rows={visibleProviders}
+          rowKey={(provider) => provider.id}
+          empty={t("modelServices.list.empty", {
+            type: t(sectionConfig.nameKey),
+          })}
+          onRowActivate={(provider) =>
+            navigate(`/settings/model-services/${section}/${provider.id}`)
+          }
+          actions={(provider) => ({
+            primary: (
+              <ListActionButton
+                tone="destructive"
+                onClick={() => deletion.select(provider)}
+              >
+                {t("common:actions.delete")}
+              </ListActionButton>
+            ),
+          })}
+        />
+      </ResourceListLayout>
 
       <DeleteConfirmationDialog
         open={deletion.item !== null}

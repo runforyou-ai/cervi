@@ -163,10 +163,10 @@ const settings = {
       permissionEmpty: "No permissions",
       permissionSeparator: ", ",
       permissionSummary: "{{items}} and {{count}} permissions total",
+      memberCount_one: "1 member",
+      memberCount_other: "{{count}} members",
       columns: {
         name: "Role",
-        description: "Description",
-        memberCount: "Members",
         permissions: "Permissions",
       },
     },

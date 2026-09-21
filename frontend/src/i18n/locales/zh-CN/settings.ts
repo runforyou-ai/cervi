@@ -157,10 +157,10 @@ const settings = {
       permissionEmpty: "无权限",
       permissionSeparator: "、",
       permissionSummary: "{{items}}等 {{count}} 个权限",
+      memberCount_one: "{{count}} 名成员",
+      memberCount_other: "{{count}} 名成员",
       columns: {
         name: "角色名称",
-        description: "角色说明",
-        memberCount: "成员数",
         permissions: "权限",
       },
     },
