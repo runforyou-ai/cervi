@@ -35,7 +35,7 @@ export function MobileGroupInfo({
 }) {
   const { t } = useTranslation("inbox")
   const { t: tm } = useTranslation("mobile")
-  const { formatDateTime } = useDateTime()
+  const { formatFullDateTime } = useDateTime()
   const owner = group.participants.find(
     (member) => member.role === GroupParticipantRole.GroupParticipantRoleOwner,
   )
@@ -112,7 +112,7 @@ export function MobileGroupInfo({
             {t("groupCreatedAt")}
           </span>
           <span className="min-w-0 flex-1 text-right">
-            {formatDateTime(group.createdAt)}
+            {formatFullDateTime(group.createdAt)}
           </span>
         </div>
       </div>

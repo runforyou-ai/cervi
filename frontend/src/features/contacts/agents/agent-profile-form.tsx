@@ -17,16 +17,16 @@ import {
   type Team,
 } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
+import { SwitchCardField } from "@/components/form/switch-card-field"
 import { ImagePicker } from "@/components/image-picker"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { NativeSelect } from "@/components/ui/native-select"
-import { Switch } from "@/components/ui/switch"
 import {
   selectableWorkStatuses,
   workStatusLabel,
 } from "@/components/work-status"
 import { RoleSelectField } from "@/features/contacts/role-select-field"
-import { TeamCheckboxField } from "@/features/contacts/team-checkbox-field"
+import { TeamSelectField } from "@/features/contacts/team-select-field"
 import {
   createAgentProfileSchema,
   type AgentProfileFormValues,
@@ -169,23 +169,18 @@ export function AgentProfileForm({
           )}
         />
         <Controller
-          name="handlesCustomers"
+          name="teamIds"
           control={form.control}
           render={({ field }) => (
-            <Field orientation="horizontal">
-              <FieldLabel htmlFor="agent-profile-handles-customers">
-                {t("agents.form.handlesCustomers")}
-              </FieldLabel>
-              <Switch
-                id="agent-profile-handles-customers"
-                name={field.name}
-                checked={field.value}
-                disabled={form.formState.isSubmitting}
-                onBlur={field.onBlur}
-                onCheckedChange={field.onChange}
-                ref={field.ref}
-              />
-            </Field>
+            <TeamSelectField
+              teams={teams}
+              label={t("agents.form.teams")}
+              emptyMessage={t("agents.form.noTeams")}
+              value={field.value}
+              onChange={field.onChange}
+              onBlur={field.onBlur}
+              disabled={form.formState.isSubmitting}
+            />
           )}
         />
         <Controller
@@ -216,17 +211,19 @@ export function AgentProfileForm({
           )}
         />
         <Controller
-          name="teamIds"
+          name="handlesCustomers"
           control={form.control}
           render={({ field }) => (
-            <TeamCheckboxField
-              teams={teams}
-              label={t("agents.form.teams")}
-              emptyMessage={t("agents.form.noTeams")}
-              value={field.value}
-              onChange={field.onChange}
-              onBlur={field.onBlur}
+            <SwitchCardField
+              id="agent-profile-handles-customers"
+              name={field.name}
+              label={t("agents.form.handlesCustomers")}
+              description={t("agents.form.handlesCustomersHelp")}
+              checked={field.value}
               disabled={form.formState.isSubmitting}
+              onBlur={field.onBlur}
+              onCheckedChange={field.onChange}
+              ref={field.ref}
             />
           )}
         />

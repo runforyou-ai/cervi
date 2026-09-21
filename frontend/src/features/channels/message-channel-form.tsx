@@ -26,7 +26,6 @@ import {
   createMessageChannelSchema,
   type MessageChannelFormValues,
 } from "@/features/channels/message-channel-schema"
-import { messageChannelTypeDefinitions } from "@/lib/message-channel-types"
 import { useAutoSave } from "@/hooks/use-auto-save"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
@@ -37,9 +36,12 @@ import { cn } from "@/lib/utils"
 /** 创建或修改消息渠道基础信息。 */
 export function MessageChannelForm({
   channel,
+  type = ChannelType.ChannelTypeWebsite,
   onUpdated,
 }: {
   channel?: MessageChannelSummary
+  /** 新建时的渠道类别，由所在的渠道二级菜单决定，表单内不再选择。 */
+  type?: ChannelType
   onUpdated?: (value: MessageChannelSummary) => void
 }) {
   const { t } = useTranslation(["channels", "common"])
@@ -60,9 +62,10 @@ export function MessageChannelForm({
   const form = useForm<MessageChannelFormValues>({
     resolver: zodResolver(schema),
     shouldUseNativeValidation: true,
-    mode: "onBlur",
+    // 编辑时离开字段即校验以便自动保存；新建时等提交再校验，避免原生校验把焦点锁在必填项上。
+    mode: channel ? "onBlur" : "onSubmit",
     defaultValues: {
-      type: channel?.type ?? ChannelType.ChannelTypeWebsite,
+      type: channel?.type ?? type,
       name: channel?.name ?? "",
       description: channel?.description ?? "",
       defaultLocale: channel?.defaultLocale ?? Locale.LocaleChineseSimplified,
@@ -116,7 +119,7 @@ export function MessageChannelForm({
       void invalidateResource(resourceKeys.channelOptions())
       form.reset(values)
       navigate(
-        `/settings/channels/${created.type}/${created.id}?tab=basic`,
+        `/channels/${created.type}/${created.id}?tab=basic`,
         { replace: true },
       )
     } catch (error) {
@@ -125,7 +128,7 @@ export function MessageChannelForm({
       }
       if (channel && isNotFoundApiError(error)) {
         console.warn("消息渠道不存在", { channel_id: channel.id })
-        navigate("/settings/channels", { replace: true })
+        navigate(`/channels/${channel.type}`, { replace: true })
         return
       }
       if (isApiError(error)) {
@@ -152,36 +155,11 @@ export function MessageChannelForm({
 
   return (
     <form
-      className={cn("w-full max-w-2xl", channel ? undefined : "space-y-9")}
+      className={cn("w-full", channel ? undefined : "space-y-9")}
       onSubmit={form.handleSubmit(submit)}
       noValidate
     >
       <FieldGroup>
-        {!channel ? (
-          <Controller
-            name="type"
-            control={form.control}
-            render={({ field, fieldState }) => (
-              <Field data-invalid={fieldState.invalid}>
-                <FieldLabel htmlFor={field.name} required>
-                  {t("form.type")}
-                </FieldLabel>
-                <NativeSelect
-                  {...field}
-                  id={field.name}
-                  required
-                  aria-invalid={fieldState.invalid}
-                >
-                  {messageChannelTypeDefinitions.map((definition) => (
-                    <option key={definition.type} value={definition.type}>
-                      {t(`types.${definition.translationKey}`)}
-                    </option>
-                  ))}
-                </NativeSelect>
-              </Field>
-            )}
-          />
-        ) : null}
 
         <FormInputField
           name="name"
@@ -241,12 +219,12 @@ export function MessageChannelForm({
 
       </FieldGroup>
       {channel ? null : (
-        <div className="flex items-center gap-2">
+        <div className="flex items-center justify-end gap-2">
+          <Button variant="outline" asChild>
+            <Link to={`/channels/${channelType}`}>{t("common:actions.cancel")}</Link>
+          </Button>
           <Button type="submit" disabled={isSubmitting}>
             {isSubmitting ? t("common:actions.saving") : t("common:actions.save")}
-          </Button>
-          <Button variant="outline" asChild>
-            <Link to="/settings/channels">{t("common:actions.cancel")}</Link>
           </Button>
         </div>
       )}

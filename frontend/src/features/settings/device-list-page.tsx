@@ -1,5 +1,6 @@
 /** 个人设置中的设备列表。 */
 import { useRef, useState } from "react"
+import { LaptopIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -11,6 +12,7 @@ import {
   revokeDevice,
   type DeviceData,
 } from "@/api"
+import { ListActionButton } from "@/components/list-action-button"
 import { ResourceContent } from "@/components/resource-content"
 import { ResourceListFrame } from "@/components/resource-list"
 import { ResourceTable } from "@/components/resource-table"
@@ -25,7 +27,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useDateTime } from "@/hooks/use-date-time"
 import { useImmediateSave } from "@/hooks/use-immediate-save"
@@ -41,8 +42,8 @@ export function DeviceListPage() {
   const invalidate = useResourceInvalidator()
   const save = useImmediateSave()
   const [revoking, setRevoking] = useState<DeviceData | null>(null)
-  const menuTriggers = useRef(new Map<string, HTMLButtonElement>())
-  // 确认框关闭后把焦点交回该行的三点菜单；设备已撤销时该行不再存在，按默认行为处理。
+  const actionButtons = useRef(new Map<string, HTMLButtonElement>())
+  // 确认框关闭后把焦点交回该行的撤销按钮；设备已撤销时该行不再存在，按默认行为处理。
   const returnFocusTo = useRef<string | null>(null)
   const {
     data,
@@ -93,50 +94,60 @@ export function DeviceListPage() {
       >
         <ResourceListFrame>
           <ResourceTable
+            hideHeader
             columns={[
               {
-                key: "name",
+                key: "device",
                 header: t("devices.list.columns.name"),
-                cellClassName: "font-medium",
+                cellClassName: "min-w-0",
                 cell: (device) => (
-                  <span className="flex items-center gap-2">
-                    {device.name}
-                    {device.id === local?.deviceId ? (
-                      <StatusBadge variant="muted">{t("devices.list.current")}</StatusBadge>
-                    ) : null}
-                  </span>
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                      <LaptopIcon className="size-4.5" aria-hidden="true" />
+                    </span>
+                    <span className="grid min-w-0 gap-0.5 leading-tight">
+                      <span className="flex min-w-0 items-center gap-2">
+                        <span className="truncate">
+                          <span className="font-medium">{device.name}</span>
+                          <span aria-hidden="true" className="mx-1.5 text-muted-foreground">·</span>
+                          <span className="text-muted-foreground">
+                            {t(`devices.platforms.${device.platform}`)}
+                          </span>
+                        </span>
+                        {device.id === local?.deviceId ? (
+                          <StatusBadge variant="muted">{t("devices.list.current")}</StatusBadge>
+                        ) : null}
+                      </span>
+                      <span className="truncate text-xs text-muted-foreground">
+                        {t("devices.list.registeredAt", {
+                          time: formatDateTime(device.createdAt),
+                        })}
+                      </span>
+                    </span>
+                  </div>
                 ),
-              },
-              {
-                key: "platform",
-                header: t("devices.list.columns.platform"),
-                cell: (device) => t(`devices.platforms.${device.platform}`),
-              },
-              {
-                key: "createdAt",
-                header: t("devices.list.columns.createdAt"),
-                cellClassName: "text-muted-foreground",
-                cell: (device) => formatDateTime(device.createdAt),
               },
             ]}
             rows={devices}
             rowKey={(device) => device.id}
             empty={t("devices.list.empty")}
             actions={(device) => ({
-              menuTriggerRef: (node) => {
-                if (node) menuTriggers.current.set(device.id, node)
-                else menuTriggers.current.delete(device.id)
-              },
-              menu: (
-                <DropdownMenuItem
-                  destructive
-                  onSelect={() => {
-                    returnFocusTo.current = device.id
-                    setRevoking(device)
-                  }}
-                >
-                  {t("devices.revoke.action")}
-                </DropdownMenuItem>
+              primary: (
+                <div className="ml-auto flex items-center gap-1">
+                  <ListActionButton
+                    tone="destructive"
+                    ref={(node) => {
+                      if (node) actionButtons.current.set(device.id, node)
+                      else actionButtons.current.delete(device.id)
+                    }}
+                    onClick={() => {
+                      returnFocusTo.current = device.id
+                      setRevoking(device)
+                    }}
+                  >
+                    {t("devices.revoke.action")}
+                  </ListActionButton>
+                </div>
               ),
             })}
           />
@@ -152,7 +163,7 @@ export function DeviceListPage() {
         <AlertDialogContent
           onCloseAutoFocus={(event) => {
             const trigger = returnFocusTo.current
-              ? menuTriggers.current.get(returnFocusTo.current)
+              ? actionButtons.current.get(returnFocusTo.current)
               : undefined
             if (!trigger) return
             event.preventDefault()

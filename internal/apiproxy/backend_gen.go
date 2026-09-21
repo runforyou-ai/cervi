@@ -777,6 +777,14 @@ func (b *Backend) DeleteTeam(ctx context.Context, meta appservice.RequestMeta, t
 	return b.do(ctx, meta, http.MethodDelete, "/teams/"+url.PathEscape(teamID), nil, nil, nil)
 }
 
+// ListAllTeamMembers 返回企业所有团队的成员列表，同一身份只列一次。
+func (b *Backend) ListAllTeamMembers(ctx context.Context, meta appservice.RequestMeta, input appservice.TeamMemberListInput) (appservice.TeamMemberList, error) {
+	var output appservice.TeamMemberList
+	err := b.do(ctx, meta, http.MethodGet, "/team-members", encodeTeamMemberListInputQuery(input), nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // ListTeamMembers 返回团队成员列表。
 func (b *Backend) ListTeamMembers(ctx context.Context, meta appservice.RequestMeta, teamID string, input appservice.TeamMemberListInput) (appservice.TeamMemberList, error) {
 	var output appservice.TeamMemberList

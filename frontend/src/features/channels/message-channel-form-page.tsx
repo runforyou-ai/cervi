@@ -270,9 +270,6 @@ function MessageChannelEditTabs({
     <Tabs
       value={activeTab}
       onValueChange={setTab}
-      className={
-        websiteChannel || telegramChannel ? "max-w-[1240px]" : "max-w-2xl"
-      }
     >
       <TabsList>
         <TabsTrigger value="basic">{t("tabs.basic")}</TabsTrigger>
@@ -336,19 +333,19 @@ export function MessageChannelFormPage({
     { enabled: editable },
   )
 
-  /** 编辑模式下拦截无效的渠道类型参数。 */
+  /** 拦截无效的渠道类型参数，回到默认渠道类别。 */
   useEffect(() => {
-    if (mode === "edit" && !isMessageChannelType(channelType)) {
-      navigate("/settings/channels", { replace: true })
+    if (!isMessageChannelType(channelType)) {
+      navigate("/channels", { replace: true })
     }
-  }, [channelType, mode, navigate])
+  }, [channelType, navigate])
 
   /** 详情就绪后校正地址中的渠道类型并同步编辑状态。 */
   useEffect(() => {
     if (!loadedChannel) return
     if (loadedChannel.type !== channelType) {
       navigate(
-        `/settings/channels/${loadedChannel.type}/${loadedChannel.id}`,
+        `/channels/${loadedChannel.type}/${loadedChannel.id}`,
         { replace: true },
       )
       return
@@ -380,7 +377,7 @@ export function MessageChannelFormPage({
         channel_id: channelId,
         channel_type: channelType,
       })
-      navigate("/settings/channels", { replace: true })
+      navigate(`/channels/${channelType}`, { replace: true })
     }
   }, [channelId, channelType, detailError, navigate])
 
@@ -414,7 +411,7 @@ export function MessageChannelFormPage({
       <PageHeader
         title={
           mode === "create"
-            ? t("create.title")
+            ? t("create.title", { type: typeLabel })
             : channel && typeLabel
               ? t("edit.namedTitle", { type: typeLabel, name: channel.name })
               : editTitle
@@ -424,10 +421,10 @@ export function MessageChannelFormPage({
         )}
       >
         {mode === "edit" ? (
-          <PageBackButton to="/settings/channels" />
+          <PageBackButton to={`/channels/${channelType}`} />
         ) : null}
       </PageHeader>
-      <PageContent>
+      <PageContent variant="form">
         {loading ? (
           <LoadingIndicator className="min-h-48 justify-center">
             {t("common:status.loading")}
@@ -454,9 +451,9 @@ export function MessageChannelFormPage({
             onChannelChange={handleChannelChange}
             onConnectionSavingChange={setTelegramConnectionSaving}
           />
-        ) : (
-          <MessageChannelForm />
-        )}
+        ) : isMessageChannelType(channelType) ? (
+          <MessageChannelForm type={channelType} />
+        ) : null}
       </PageContent>
     </div>
   )

@@ -25,12 +25,10 @@ import {
 } from "@/features/settings/profile-settings-schema"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { ImagePicker } from "@/components/image-picker"
-import { resolveAppPlatform } from "@/platform/app-platform"
 
 /** 修改当前用户的头像、姓名和邮箱，移动端使用触屏尺寸的整行保存按钮。 */
 export function ProfileSettingsForm({ user }: { user: CurrentUser }) {
   const { t } = useTranslation(["settings", "common"])
-  const mobile = resolveAppPlatform() === "mobile"
   const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
   const avatar = usePendingImageUpload({
@@ -88,7 +86,7 @@ export function ProfileSettingsForm({ user }: { user: CurrentUser }) {
 
   return (
     <form
-      className="w-full max-w-xl"
+      className="w-full"
       aria-label={t("profile.formLabel")}
       onSubmit={form.handleSubmit(save)}
       noValidate
@@ -122,7 +120,6 @@ export function ProfileSettingsForm({ user }: { user: CurrentUser }) {
                 autoComplete="name"
                 aria-invalid={fieldState.invalid}
                 required
-                autoFocus={!mobile}
               />
             </Field>
           )}

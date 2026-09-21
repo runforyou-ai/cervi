@@ -17,7 +17,7 @@ import { useMobileNavigation } from "@/apps/mobile/mobile-navigation"
 import { MobilePageHeader } from "@/apps/mobile/mobile-page"
 import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
 import { Button } from "@/components/ui/button"
-import { FieldLabel } from "@/components/ui/field"
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
@@ -98,12 +98,12 @@ export function MobileCreateGroupPage() {
     <section className="flex h-full min-h-0 flex-col">
       <MobilePageHeader title={t("group.create")} backTo={inboxURL} />
       <form
-        className="min-h-0 flex-1 space-y-9 overflow-y-auto overscroll-contain p-4"
+        className="cervi-form min-h-0 flex-1 space-y-9 overflow-y-auto overscroll-contain p-4"
         noValidate
         onSubmit={form.handleSubmit(create)}
       >
-        <div className="space-y-5">
-          <div className="space-y-2">
+        <FieldGroup>
+          <Field>
             <FieldLabel htmlFor="mobile-group-title" required>
               {tInbox("groupTitleLabel")}
             </FieldLabel>
@@ -116,7 +116,7 @@ export function MobileCreateGroupPage() {
               required
               disabled={saving}
             />
-          </div>
+          </Field>
           <MobileGroupMemberPicker
             currentIdentityID={identity.user.identityId}
             selected={field.value}
@@ -125,7 +125,7 @@ export function MobileCreateGroupPage() {
             inputRef={field.ref}
             disabled={saving}
           />
-        </div>
+        </FieldGroup>
         <div>
           <Button
             type="submit"

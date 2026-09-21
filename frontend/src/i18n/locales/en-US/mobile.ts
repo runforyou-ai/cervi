@@ -109,6 +109,7 @@ const mobile = {
     logoutTitle: "Log out of this account?",
     security: "Login and security",
     preferences: "Preferences",
+    notifications: "Notifications",
     title: "Me",
     profile: "Profile",
     email: "Email",

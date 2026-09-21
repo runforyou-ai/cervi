@@ -499,6 +499,11 @@ func (s *Service) DeleteTeam(ctx context.Context, meta RequestMeta, teamID strin
 	return s.backend.DeleteTeam(ctx, meta, teamID)
 }
 
+// ListAllTeamMembers 返回企业所有团队的成员列表，同一身份只列一次。
+func (s *Service) ListAllTeamMembers(ctx context.Context, meta RequestMeta, input TeamMemberListInput) (TeamMemberList, error) {
+	return withNormalizedSlices(s.backend.ListAllTeamMembers(ctx, meta, input))
+}
+
 // ListTeamMembers 返回团队成员列表。
 func (s *Service) ListTeamMembers(ctx context.Context, meta RequestMeta, teamID string, input TeamMemberListInput) (TeamMemberList, error) {
 	return withNormalizedSlices(s.backend.ListTeamMembers(ctx, meta, teamID, input))

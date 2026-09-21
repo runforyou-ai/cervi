@@ -118,7 +118,8 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
   const form = useForm<RoleSettingsFormValues>({
     resolver: zodResolver(schema),
     shouldUseNativeValidation: true,
-    mode: "onBlur",
+    // 编辑时离开字段即校验以便自动保存；新建时等提交再校验，避免原生校验把焦点锁在必填项上。
+    mode: mode === "create" ? "onSubmit" : "onBlur",
     defaultValues: { name: "", description: "", permissions: [] },
   })
   const selected = useWatch({ control: form.control, name: "permissions" })
@@ -328,7 +329,7 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
       >
         {mode === "detail" ? <PageBackButton to="/settings/roles" /> : null}
       </PageHeader>
-      <PageContent>
+      <PageContent variant="form">
         {loading ? (
           <LoadingIndicator className="min-h-48 justify-center rounded-lg border">
             {tCommon("status.loading")}
@@ -351,7 +352,7 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
           </div>
         ) : (
           <form
-            className="w-full max-w-3xl space-y-9"
+            className="w-full space-y-9"
             onSubmit={form.handleSubmit((values) => save(values))}
             noValidate
           >
@@ -479,7 +480,15 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
             </div>
 
             {autoSaveEnabled ? null : (
-              <div className="flex items-center gap-2">
+              <div className="flex items-center justify-end gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  disabled={form.formState.isSubmitting}
+                  onClick={cancel}
+                >
+                  {tCommon("actions.cancel")}
+                </Button>
                 <Button
                   type="submit"
                   disabled={form.formState.isSubmitting}
@@ -490,14 +499,6 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
                   {form.formState.isSubmitting
                     ? tCommon("actions.saving")
                     : tCommon("actions.save")}
-                </Button>
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={form.formState.isSubmitting}
-                  onClick={cancel}
-                >
-                  {tCommon("actions.cancel")}
                 </Button>
               </div>
             )}

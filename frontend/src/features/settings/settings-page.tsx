@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/page-header"
 import { ChangePasswordForm } from "@/features/settings/change-password-form"
 import { DeviceListPage } from "@/features/settings/device-list-page"
 import { GeneralSettingsForm } from "@/features/settings/general-settings-form"
+import { NotificationSettingsForm } from "@/features/settings/notification-settings-form"
 import { ProfileSettingsForm } from "@/features/settings/profile-settings-form"
 import { RoleListPage } from "@/features/roles/role-list-page"
 import { UserPreferencesForm } from "@/features/settings/user-preferences-form"
@@ -17,6 +18,7 @@ const formSections = [
   "profile",
   "security",
   "preferences",
+  "notifications",
   "devices",
   "general",
 ] as const
@@ -26,7 +28,6 @@ type SettingsFormSection = (typeof formSections)[number]
 export type SettingsSection =
   | SettingsFormSection
   | "roles"
-  | "channels"
   | "modelServices"
   | "mcpServers"
 
@@ -56,13 +57,15 @@ export function SettingsPage({
             title={t(`${section}.title`)}
             description={t(`${section}.description`)}
           />
-          <PageContent>
+          <PageContent variant={section === "devices" ? "default" : "form"}>
             {section === "profile" ? (
               <ProfileSettingsForm user={identity.user} />
             ) : section === "security" ? (
               <ChangePasswordForm />
             ) : section === "devices" ? (
               <DeviceListPage />
+            ) : section === "notifications" ? (
+              <NotificationSettingsForm user={identity.user} />
             ) : section === "general" ? (
               <GeneralSettingsForm organization={identity.organization} />
             ) : (

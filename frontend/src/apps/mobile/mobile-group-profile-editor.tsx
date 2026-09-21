@@ -12,7 +12,7 @@ import { useMobileBack } from "@/apps/mobile/mobile-navigation"
 import { MobilePageHeader } from "@/apps/mobile/mobile-page"
 import { ImagePicker } from "@/components/image-picker"
 import { Button } from "@/components/ui/button"
-import { FieldLabel } from "@/components/ui/field"
+import { Field, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
 import { usePendingImageUpload } from "@/hooks/use-pending-image-upload"
@@ -119,11 +119,11 @@ function MobileGroupFieldEditor({
         backDisabled={busy}
       />
       <form
-        className="min-h-0 flex-1 space-y-9 overflow-y-auto p-4"
+        className="cervi-form min-h-0 flex-1 space-y-9 overflow-y-auto p-4"
         noValidate
         onSubmit={form.handleSubmit(save)}
       >
-        <div className="space-y-2">
+        <Field>
           {field === "image" ? (
             <div className="flex flex-col items-center gap-2 text-center">
               <ImagePicker
@@ -163,7 +163,7 @@ function MobileGroupFieldEditor({
               )}
             </>
           )}
-        </div>
+        </Field>
         <div className="w-full">
           <Button
             type="submit"

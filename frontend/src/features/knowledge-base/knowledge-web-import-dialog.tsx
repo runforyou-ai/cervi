@@ -124,12 +124,7 @@ export function KnowledgeWebImportDialog({
               disabled={disabled}
             />
           </FieldGroup>
-          <div className="flex justify-end gap-3">
-            <Button type="submit" disabled={disabled}>
-              {t(
-                disabled ? "common:actions.saving" : "documents.create.import",
-              )}
-            </Button>
+          <div className="flex items-center justify-end gap-2">
             <Button
               type="button"
               variant="outline"
@@ -137,6 +132,11 @@ export function KnowledgeWebImportDialog({
               onClick={onClose}
             >
               {t("common:actions.cancel")}
+            </Button>
+            <Button type="submit" disabled={disabled}>
+              {t(
+                disabled ? "common:actions.saving" : "documents.create.import",
+              )}
             </Button>
           </div>
         </form>

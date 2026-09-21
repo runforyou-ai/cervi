@@ -270,7 +270,7 @@ export function WebsiteChannelUsagePanel({
       }
       if (isNotFoundApiError(submitError)) {
         console.warn("网站渠道不存在", { channel_id: channel.id })
-        navigate("/settings/channels", { replace: true })
+        navigate(`/channels/${channel.type}`, { replace: true })
         return
       }
       if (isApiError(submitError)) {
@@ -314,7 +314,7 @@ export function WebsiteChannelUsagePanel({
           forceMount
           className="data-[state=inactive]:hidden"
         >
-          <FieldGroup className="mt-6 max-w-2xl gap-8">
+          <FieldGroup className="mt-6 gap-8">
             <Field>
               <div className="flex items-center gap-2">
                 <FieldLabel>{t("usage.snippet")}</FieldLabel>
@@ -386,7 +386,7 @@ export function WebsiteChannelUsagePanel({
           forceMount
           className="data-[state=inactive]:hidden"
         >
-          <FieldGroup className="mt-6 max-w-2xl gap-8">
+          <FieldGroup className="mt-6 gap-8">
             <Field>
               <div className="flex items-center gap-2">
                 <FieldLabel>{t("usage.chatUrl")}</FieldLabel>

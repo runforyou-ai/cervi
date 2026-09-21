@@ -148,7 +148,8 @@ export function ModelProviderFormPage({
   const form = useForm<AIProviderFormValues>({
     resolver: zodResolver(schema),
     shouldUseNativeValidation: true,
-    mode: "onBlur",
+    // 编辑时离开字段即校验以便自动保存；新建时等提交再校验，避免原生校验把焦点锁在必填项上。
+    mode: mode === "edit" ? "onBlur" : "onSubmit",
     defaultValues: {
       brand: initialBrand,
       name: "",
@@ -415,7 +416,7 @@ export function ModelProviderFormPage({
       >
         {mode === "edit" ? <PageBackButton to={listPath} /> : null}
       </PageHeader>
-      <PageContent>
+      <PageContent variant="form">
         <ResourceContent
           loading={loading}
           error={Boolean(loadError)}
@@ -427,7 +428,7 @@ export function ModelProviderFormPage({
             onSubmit={form.handleSubmit((values) => save(values))}
             noValidate
           >
-            <FieldGroup className="max-w-2xl">
+            <FieldGroup>
               <Controller
                 name="brand"
                 control={form.control}

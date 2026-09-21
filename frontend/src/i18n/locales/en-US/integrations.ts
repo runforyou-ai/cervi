@@ -8,10 +8,7 @@ const integrations = {
       loadError: "Could not load MCP servers.",
       empty: "No MCP servers configured",
       columns: {
-        tools: "Tools",
         name: "Name",
-        url: "URL",
-        serverType: "Server type",
       },
     },
     connection: {

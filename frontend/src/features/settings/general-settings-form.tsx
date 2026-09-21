@@ -1,21 +1,23 @@
 /** 企业通用设置表单。 */
 import { useEffect, useMemo, useRef } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { useForm } from "react-hook-form"
+import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import { isApiError, updateOrganization, type Organization } from "@/api"
-import { InlineEditField } from "@/components/form/inline-edit-field"
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { Input } from "@/components/ui/input"
 import {
   createGeneralSettingsSchema,
   type GeneralSettingsFormValues,
 } from "@/features/settings/general-settings-schema"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useAutoSave } from "@/hooks/use-auto-save"
-import { useResourceInvalidator } from "@/hooks/use-resource"
+import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
+import { resolveServerURL } from "@/lib/server-url"
 import { recoverSession } from "@/lib/session-navigation"
 
 /** 显示并修改当前企业通用设置。 */
@@ -51,6 +53,8 @@ export function GeneralSettingsForm({
     }
   }, [])
   const markSaved = useAutoSave({ form, schema, save })
+  const serverURL = useResource(resourceKeys.serverURL(), () => resolveServerURL())
+  const domain = serverURL.data ? new URL(serverURL.data).host : ""
 
   /** 保存企业通用设置。 */
   async function save(values: GeneralSettingsFormValues) {
@@ -80,16 +84,43 @@ export function GeneralSettingsForm({
 
   return (
     <form
-      className="w-full max-w-xl"
+      className="w-full"
       onSubmit={form.handleSubmit(save)}
       noValidate
     >
-      <InlineEditField
-        name="name"
-        control={form.control}
-        label={t("general.form.name")}
-        required
-      />
+      <FieldGroup>
+        <Controller
+          name="name"
+          control={form.control}
+          render={({ field, fieldState }) => (
+            <Field data-invalid={fieldState.invalid}>
+              <FieldLabel htmlFor={field.name} required>
+                {t("general.form.name")}
+              </FieldLabel>
+              <Input
+                {...field}
+                id={field.name}
+                autoComplete="organization"
+                aria-invalid={fieldState.invalid}
+                required
+              />
+            </Field>
+          )}
+        />
+        {/* 域名由部署或开通时确定，这里只读展示，可选中复制。 */}
+        <Field>
+          <FieldLabel htmlFor="general-domain">
+            {t("general.form.domain")}
+          </FieldLabel>
+          <Input
+            id="general-domain"
+            value={domain}
+            placeholder={serverURL.loading ? t("common:status.loading") : undefined}
+            readOnly
+            className="text-muted-foreground"
+          />
+        </Field>
+      </FieldGroup>
     </form>
   )
 }

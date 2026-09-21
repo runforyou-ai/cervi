@@ -58,7 +58,8 @@ export function MCPServerFormPage({ mode }: { mode: "create" | "edit" }) {
   const form = useForm<MCPServerFormValues>({
     resolver: zodResolver(schema),
     shouldUseNativeValidation: true,
-    mode: "onBlur",
+    // 编辑时离开字段即校验以便自动保存；新建时等提交再校验，避免原生校验把焦点锁在必填项上。
+    mode: mode === "edit" ? "onBlur" : "onSubmit",
     defaultValues: {
       name: "",
       url: "",
@@ -182,7 +183,7 @@ export function MCPServerFormPage({ mode }: { mode: "create" | "edit" }) {
       >
         {mode === "edit" ? <PageBackButton to={listPath} /> : null}
       </PageHeader>
-      <PageContent>
+      <PageContent variant="form">
         <ResourceContent
           loading={loading}
           error={Boolean(loadError)}
@@ -190,7 +191,7 @@ export function MCPServerFormPage({ mode }: { mode: "create" | "edit" }) {
           onRetry={() => void refresh()}
         >
           <form
-            className="w-full max-w-2xl space-y-9"
+            className="w-full space-y-9"
             onSubmit={form.handleSubmit((values) => save(values))}
             noValidate
           >

@@ -107,7 +107,7 @@ export function MobileGroupMemberPicker({
           ref={inputRef}
           value={search}
           type="search"
-          className="min-h-11 md:text-base"
+          className="min-h-11 rounded-lg bg-muted/60 md:text-base dark:bg-muted/50"
           autoComplete="off"
           disabled={disabled}
           onBlur={onBlur}

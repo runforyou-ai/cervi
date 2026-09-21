@@ -323,6 +323,9 @@ type Backend interface {
 	// DeleteTeam 删除企业团队及其成员关系。
 	//cervi:route DELETE /teams/:teamID
 	DeleteTeam(context.Context, RequestMeta, string) error
+	// ListAllTeamMembers 返回企业所有团队的成员列表，同一身份只列一次。
+	//cervi:route GET /team-members
+	ListAllTeamMembers(context.Context, RequestMeta, TeamMemberListInput) (TeamMemberList, error)
 	// ListTeamMembers 返回团队成员列表。
 	//cervi:route GET /teams/:teamID/members
 	ListTeamMembers(context.Context, RequestMeta, string, TeamMemberListInput) (TeamMemberList, error)

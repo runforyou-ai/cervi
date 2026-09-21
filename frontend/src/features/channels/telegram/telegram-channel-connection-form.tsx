@@ -27,7 +27,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
-import { resolveChannelServerURL } from "@/features/channels/channel-server-url"
+import { resolveServerURL } from "@/lib/server-url"
 import {
   createTelegramChannelConnectionSchema,
   type TelegramChannelConnectionFormValues,
@@ -74,7 +74,7 @@ export function TelegramChannelConnectionForm({
     setSaving(true)
     onSavingChange(true)
     try {
-      const webhookBaseURL = await resolveChannelServerURL()
+      const webhookBaseURL = await resolveServerURL()
       const updated = await saveTelegramChannelConnection(channel.id, {
         botToken: values.botToken,
         webhookBaseURL,
@@ -86,7 +86,7 @@ export function TelegramChannelConnectionForm({
       if (recoverSession(error, navigate)) return
       if (isNotFoundApiError(error)) {
         console.warn("Telegram 渠道不存在", { channel_id: channel.id })
-        navigate("/settings/channels", { replace: true })
+        navigate(`/channels/${channel.type}`, { replace: true })
         return
       }
       if (!confirmBotReuse && isTelegramBotReuseConfirmationError(error)) {
@@ -129,7 +129,7 @@ export function TelegramChannelConnectionForm({
       if (recoverSession(error, navigate)) return
       if (isNotFoundApiError(error)) {
         console.warn("Telegram 渠道不存在", { channel_id: channel.id })
-        navigate("/settings/channels", { replace: true })
+        navigate(`/channels/${channel.type}`, { replace: true })
         return
       }
       console.warn("测试 Telegram 连接失败", {
@@ -149,7 +149,7 @@ export function TelegramChannelConnectionForm({
   return (
     <>
       <form
-        className="w-full max-w-2xl space-y-6"
+        className="w-full space-y-6"
         onSubmit={form.handleSubmit((values) => save(values))}
         noValidate
       >

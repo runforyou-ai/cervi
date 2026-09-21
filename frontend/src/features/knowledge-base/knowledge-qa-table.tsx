@@ -1,8 +1,8 @@
-/** 展示问答列表、索引状态和分页操作。 */
+/** 展示问答列表、索引状态和分页，问答操作通过右键菜单完成。 */
 import { useState } from "react"
-import { MoreHorizontalIcon } from "lucide-react"
+import { CircleHelpIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { Link, useNavigate } from "react-router"
+import { useNavigate } from "react-router"
 import { toast } from "sonner"
 import {
   isApiError,
@@ -11,21 +11,11 @@ import {
   type KnowledgeQASummaryData,
 } from "@/api"
 import { ResourceListFrame } from "@/components/resource-list"
-import { Button } from "@/components/ui/button"
+import { ResourceTable } from "@/components/resource-table"
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
+  ContextMenuItem,
+  ContextMenuSeparator,
+} from "@/components/ui/context-menu"
 import { useDateTime } from "@/hooks/use-date-time"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
@@ -38,7 +28,7 @@ import {
 } from "@/components/ui/tooltip"
 import { KnowledgeIndexStatus } from "@/features/knowledge-base/knowledge-index-status"
 
-/** 展示问答内容摘要、索引状态、创建时间和分页按钮。 */
+/** 按单列行布局展示标准问题、索引状态、相似问题数、答案摘要和创建时间。 */
 export function KnowledgeQATable({
   knowledgeBaseId,
   data,
@@ -61,9 +51,10 @@ export function KnowledgeQATable({
   const { t } = useTranslation(["knowledgeBase", "common"])
   const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
+  const { formatDateTime } = useDateTime()
   const [retryingIDs, setRetryingIDs] = useState<ReadonlySet<string>>(new Set())
 
-  /** 提交重新索引并在结束后刷新列表中的状态。 */
+  /** 按当前配置重新处理问答，并在结束后刷新列表中的状态。 */
   async function retryEntry(entry: KnowledgeQASummaryData) {
     setRetryingIDs((current) => new Set(current).add(entry.id))
     try {
@@ -89,137 +80,84 @@ export function KnowledgeQATable({
       totalLabel={t("qa.total", { count: data.page.total })}
       onPageChange={onPageChange}
     >
-      <Table className="min-w-[960px] table-fixed">
-        {/* 固定辅助列宽，标准问题和答案均分剩余空间。 */}
-        <colgroup>
-          <col />
-          <col className="w-32" />
-          <col />
-          <col className="w-24" />
-          <col className="w-48" />
-          <col className="w-32" />
-        </colgroup>
-        <TableHeader>
-          <TableRow>
-            <TableHead>{t("qa.question")}</TableHead>
-            <TableHead>{t("qa.similarQuestions")}</TableHead>
-            <TableHead>{t("qa.answer")}</TableHead>
-            <TableHead>{t("qa.status")}</TableHead>
-            <TableHead>{t("qa.createdAt")}</TableHead>
-            <TableHead>
-              {t("common:table.actions")}
-            </TableHead>
-          </TableRow>
-        </TableHeader>
-        <TableBody>
-          {data.entries.length === 0 ? (
-            <TableRow>
-              <TableCell
-                colSpan={6}
-                className="h-32 text-center text-muted-foreground"
-              >
-                {filtered ? t("qa.filteredEmpty") : t("qa.empty")}
-              </TableCell>
-            </TableRow>
-          ) : (
-            data.entries.map((entry) => (
-              <KnowledgeQARow
-                key={entry.id}
-                entry={entry}
-                editPath={`${listPath}/${entry.id}/edit${search}`}
-                retrying={retryingIDs.has(entry.id)}
-                onRetry={() => void retryEntry(entry)}
-                onDelete={() => onDelete(entry)}
-              />
-            ))
-          )}
-        </TableBody>
-      </Table>
+      <ResourceTable
+        hideHeader
+        columns={[
+          {
+            key: "question",
+            header: t("qa.question"),
+            // max-w-0 让自动布局的表格按比例分配宽度，长文本在列内截断。
+            cellClassName: "w-1/2 max-w-0",
+            cell: (entry) => (
+              <div className="flex min-w-0 items-center gap-3">
+                <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary/12 text-primary">
+                  <CircleHelpIcon className="size-4.5" aria-hidden="true" />
+                </span>
+                <span className="grid min-w-0 justify-items-start gap-1 leading-tight">
+                  <span className="max-w-full truncate font-medium" title={entry.question}>
+                    {entry.question}
+                  </span>
+                  <span className="flex items-center gap-2">
+                    <KnowledgeIndexStatus status={entry.status} failureMessage={entry.failureMessage} />
+                    {entry.similarQuestions.length > 0 ? (
+                      <Tooltip>
+                        <TooltipTrigger asChild>
+                          <span
+                            tabIndex={0}
+                            className="cursor-help text-xs text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                          >
+                            {t("qa.similarCount", { count: entry.similarQuestions.length })}
+                          </span>
+                        </TooltipTrigger>
+                        <TooltipContent side="bottom" sideOffset={4} className="max-w-sm">
+                          <ul className="grid max-h-64 gap-1 overflow-y-auto text-left">
+                            {entry.similarQuestions.map((question) => (
+                              <li key={question} className="whitespace-pre-wrap break-words">
+                                {question}
+                              </li>
+                            ))}
+                          </ul>
+                        </TooltipContent>
+                      </Tooltip>
+                    ) : null}
+                  </span>
+                </span>
+              </div>
+            ),
+          },
+          {
+            key: "answer",
+            header: t("qa.answer"),
+            cellClassName: "max-w-0 text-muted-foreground",
+            cell: (entry) => <span className="block truncate">{entry.answer}</span>,
+          },
+          {
+            key: "createdAt",
+            header: t("qa.createdAt"),
+            cellClassName: "w-px whitespace-nowrap text-muted-foreground tabular-nums",
+            cell: (entry) => formatDateTime(entry.createdAt),
+          },
+        ]}
+        rows={data.entries}
+        rowKey={(entry) => entry.id}
+        empty={filtered ? t("qa.filteredEmpty") : t("qa.empty")}
+        onRowActivate={(entry) => navigate(`${listPath}/${entry.id}/edit${search}`)}
+        // 问答操作都放在右键菜单里，行内只保留信息。
+        rowMenu={(entry) => (
+          <>
+            <ContextMenuItem
+              disabled={retryingIDs.has(entry.id)}
+              onSelect={() => void retryEntry(entry)}
+            >
+              {t("qa.reprocess")}
+            </ContextMenuItem>
+            <ContextMenuSeparator />
+            <ContextMenuItem destructive onSelect={() => onDelete(entry)}>
+              {t("common:actions.delete")}
+            </ContextMenuItem>
+          </>
+        )}
+      />
     </ResourceListFrame>
-  )
-}
-
-/** 展示一条问答及其编辑、重试和删除入口。 */
-function KnowledgeQARow({
-  entry,
-  editPath,
-  retrying,
-  onRetry,
-  onDelete,
-}: {
-  entry: KnowledgeQASummaryData
-  editPath: string
-  retrying: boolean
-  onRetry: () => void
-  onDelete: () => void
-}) {
-  const { t } = useTranslation(["knowledgeBase", "common"])
-  const { formatDateTime } = useDateTime()
-  return (
-    <TableRow>
-      <TableCell className="whitespace-pre-wrap break-words font-medium">
-        {entry.question}
-      </TableCell>
-      <TableCell>
-        {entry.similarQuestions.length > 0 ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <span
-                tabIndex={0}
-                className="cursor-help outline-none focus-visible:ring-2 focus-visible:ring-ring"
-              >
-                {entry.similarQuestions.length}
-              </span>
-            </TooltipTrigger>
-            <TooltipContent side="bottom" sideOffset={4} className="max-w-sm">
-              <ul className="grid max-h-64 gap-1 overflow-y-auto text-left">
-                {entry.similarQuestions.map((question) => (
-                  <li key={question} className="whitespace-pre-wrap break-words">
-                    {question}
-                  </li>
-                ))}
-              </ul>
-            </TooltipContent>
-          </Tooltip>
-        ) : 0}
-      </TableCell>
-      <TableCell className="text-muted-foreground">
-        <span className="block truncate">{entry.answer}</span>
-      </TableCell>
-      <TableCell>
-        <KnowledgeIndexStatus status={entry.status} failureMessage={entry.failureMessage} />
-      </TableCell>
-      <TableCell className="whitespace-nowrap text-muted-foreground">
-        {formatDateTime(entry.createdAt)}
-      </TableCell>
-      <TableCell className="whitespace-nowrap">
-        <div className="inline-flex items-center gap-2">
-          <Button variant="outline" size="sm" asChild>
-            <Link to={editPath}>{t("common:actions.edit")}</Link>
-          </Button>
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                aria-label={t("qa.more", {
-                  question: entry.question,
-                })}
-              >
-                <MoreHorizontalIcon />
-              </Button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end">
-              <DropdownMenuItem disabled={retrying} onSelect={onRetry}>
-                {t("common:actions.retry")}
-              </DropdownMenuItem>
-              <DropdownMenuItem destructive onSelect={onDelete}>
-                {t("common:actions.delete")}
-              </DropdownMenuItem>
-            </DropdownMenuContent>
-          </DropdownMenu>
-        </div>
-      </TableCell>
-    </TableRow>
   )
 }

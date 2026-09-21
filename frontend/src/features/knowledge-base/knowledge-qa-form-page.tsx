@@ -87,7 +87,7 @@ export function KnowledgeQAFormPage({ mode }: { mode: "create" | "edit" }) {
           />
         ) : null}
       </PageHeader>
-      <PageContent>
+      <PageContent variant="form">
         {error || !ready ? (
           <KnowledgeQAFeedback
             error={error}
@@ -135,7 +135,8 @@ function KnowledgeQAForm({
   const form = useForm<QAFormValues>({
     resolver: zodResolver(schema),
     shouldUseNativeValidation: true,
-    mode: "onBlur",
+    // 编辑时离开字段即校验以便自动保存；新建时等提交再校验，避免原生校验把焦点锁在必填项上。
+    mode: entry ? "onBlur" : "onSubmit",
     defaultValues: {
       question: entry?.question ?? "",
       answer: entry?.answer ?? "",
@@ -206,17 +207,14 @@ function KnowledgeQAForm({
   }
 
   return (
-    <form className="max-w-3xl space-y-9" onSubmit={form.handleSubmit((values) => save(values))}>
+    <form className="w-full space-y-9" onSubmit={form.handleSubmit((values) => save(values))}>
       <QAFormFields
         control={form.control}
         disabled={form.formState.isSubmitting}
         knowledgeBase={knowledgeBase}
       />
       {entry ? null : (
-        <div className="flex gap-3">
-          <Button type="submit" disabled={form.formState.isSubmitting}>
-            {t(form.formState.isSubmitting ? "common:actions.saving" : "common:actions.save")}
-          </Button>
+        <div className="flex items-center justify-end gap-2">
           <Button
             type="button"
             variant="outline"
@@ -224,6 +222,9 @@ function KnowledgeQAForm({
             onClick={() => navigate(returnPath, { replace: true })}
           >
             {t("common:actions.cancel")}
+          </Button>
+          <Button type="submit" disabled={form.formState.isSubmitting}>
+            {t(form.formState.isSubmitting ? "common:actions.saving" : "common:actions.save")}
           </Button>
         </div>
       )}
@@ -266,7 +267,8 @@ function SimilarQuestionFields({
           <Button
             type="button"
             variant="outline"
-            size="sm"
+            // 与表单页加高后的输入框同高，并排时底边对齐。
+            className="h-11 rounded-lg"
             disabled={disabled}
             aria-label={t("qa.removeSimilarQuestion", { number: index + 1 })}
             onClick={() => remove(index)}

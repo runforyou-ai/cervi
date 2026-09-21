@@ -607,6 +607,11 @@ export interface ContactListInput {
     "query": string;
     "stage"?: ContactStage | null;
     "channelId": string;
+
+    /**
+     * ChannelType 按渠道类别筛选，与 ChannelID 同时给出时两个条件都需满足。
+     */
+    "channelType"?: ChannelType | null;
     "methodType"?: ContactMethodType | null;
     "sort": ContactSort;
     "page": number;

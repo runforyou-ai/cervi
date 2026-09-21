@@ -62,7 +62,7 @@ export function ChangePasswordForm() {
 
   return (
     <form
-      className="w-full max-w-xl space-y-9"
+      className="w-full space-y-9"
       aria-label={t("password.formLabel")}
       onSubmit={form.handleSubmit(save)}
       noValidate
@@ -83,7 +83,6 @@ export function ChangePasswordForm() {
                 autoComplete="current-password"
                 aria-invalid={fieldState.invalid}
                 required
-                autoFocus={!mobile}
               />
             </Field>
           )}
@@ -127,7 +126,7 @@ export function ChangePasswordForm() {
           )}
         />
       </FieldGroup>
-      <div>
+      <div className="flex justify-end">
         <Button
           type="submit"
           className={mobile ? "min-h-11 w-full" : undefined}

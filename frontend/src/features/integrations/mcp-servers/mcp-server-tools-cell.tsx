@@ -5,9 +5,9 @@ import { useTranslation } from "react-i18next"
 import type { MCPServerData } from "@/api"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 
-/** 在固定宽度内显示数量、更新状态及工具目录。 */
+/** 以一行小字显示工具数量或更新状态，悬停展开工具目录。 */
 export function MCPServerToolsCell({ server }: { server: MCPServerData }) {
-  const { t, i18n } = useTranslation("integrations")
+  const { t } = useTranslation("integrations")
   const tools = server.tools
   const label = server.toolsUpdating
     ? t("mcpServer.tools.updating")
@@ -20,12 +20,14 @@ export function MCPServerToolsCell({ server }: { server: MCPServerData }) {
       <TooltipTrigger asChild>
         <button
           type="button"
-          aria-label={label}
-          className={`inline-flex h-8 min-w-8 items-center justify-start rounded-sm tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring ${server.toolsError ? "text-destructive" : "text-muted-foreground"}`}
+          className={`inline-flex max-w-60 min-w-0 items-center gap-1 rounded-sm tabular-nums outline-none focus-visible:ring-2 focus-visible:ring-ring ${server.toolsError ? "text-destructive" : "text-muted-foreground"}`}
+          // 行整体可点击进入编辑，查看工具目录时不触发跳转。
+          onClick={(event) => event.stopPropagation()}
         >
           {server.toolsUpdating ? (
-            <LoaderCircleIcon className="size-4 animate-spin" aria-hidden="true" />
-          ) : server.toolsUpdatedAt ? tools.length.toLocaleString(i18n.language) : "—"}
+            <LoaderCircleIcon className="size-3 shrink-0 animate-spin" aria-hidden="true" />
+          ) : null}
+          <span className="truncate">{label}</span>
         </button>
       </TooltipTrigger>
       <TooltipContent side="bottom" align="start" sideOffset={4} className="max-w-sm text-left text-wrap">

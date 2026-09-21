@@ -1,5 +1,6 @@
 /** 标准知识库分组文档列表、上传和原地管理。 */
 import { useEffect, useLayoutEffect, useRef, useState } from "react"
+import { SearchCheckIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useLocation, useParams } from "react-router"
 import { KnowledgeBaseCategory, getKnowledgeBase, listKnowledgeDocuments } from "@/api"
@@ -70,8 +71,16 @@ function KnowledgeDocumentGroupList({ baseId, groupId }: { baseId: string; group
       >
         {list.data && !list.error && (
           <>
-            <Button ref={retrievalTrigger} variant="outline" size="sm" onClick={() => setRetrievalOpen(true)}>
-              {t("retrieval.action")}
+            <Button
+              ref={retrievalTrigger}
+              variant="ghost"
+              size="icon-sm"
+              className="shrink-0 text-muted-foreground"
+              aria-label={t("retrieval.action")}
+              title={t("retrieval.action")}
+              onClick={() => setRetrievalOpen(true)}
+            >
+              <SearchCheckIcon />
             </Button>
             <KnowledgeDocumentUpload baseId={baseId} groupId={groupId} />
           </>

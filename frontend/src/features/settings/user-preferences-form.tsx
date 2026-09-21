@@ -14,16 +14,8 @@ import {
   type CurrentUser,
 } from "@/api"
 import { recoverSession } from "@/lib/session-navigation"
-import {
-  Field,
-  FieldContent,
-  FieldDescription,
-  FieldGroup,
-  FieldLabel,
-} from "@/components/ui/field"
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { NativeSelect } from "@/components/ui/native-select"
-import { Switch } from "@/components/ui/switch"
-import { NotificationPermissionSettings } from "@/features/notifications/notification-permission-settings"
 import {
   AppearanceSettings,
   type ThemePreference,
@@ -38,11 +30,6 @@ import { useResourceInvalidator } from "@/hooks/use-resource"
 import { changeAppLanguage } from "@/i18n"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { supportedTimeZones } from "@/lib/time-zones"
-import {
-  readNotificationDevicePreferences,
-  setNotificationSoundEnabled,
-  type NotificationDeviceScope,
-} from "@/platform/notifications"
 
 /** 修改当前用户偏好设置，移动端不展示多标签页设置。 */
 export function UserPreferencesForm({ user }: { user: CurrentUser }) {
@@ -50,10 +37,6 @@ export function UserPreferencesForm({ user }: { user: CurrentUser }) {
   const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
   const { theme, setTheme } = useTheme()
-  const notificationScope = useMemo<NotificationDeviceScope>(
-    () => ({ organizationId: user.organizationId, userId: user.id }),
-    [user.id, user.organizationId],
-  )
   const schema = useMemo(() => createUserPreferencesSchema(t), [t])
   const timeZones = useMemo(
     () => supportedTimeZones(user.timeZone),
@@ -67,9 +50,6 @@ export function UserPreferencesForm({ user }: { user: CurrentUser }) {
       locale: user.locale as UserPreferencesFormValues["locale"],
       timeZone: user.timeZone,
       theme: (theme ?? "system") as ThemePreference,
-      messageNotificationsEnabled: user.messageNotificationsEnabled,
-      notificationSoundEnabled:
-        readNotificationDevicePreferences(notificationScope).soundEnabled,
     },
   })
   /** next-themes 初始化后同步未编辑的主题字段。 */
@@ -89,19 +69,14 @@ export function UserPreferencesForm({ user }: { user: CurrentUser }) {
       const updated = await updateUserPreferences({
         locale: values.locale,
         timeZone: values.timeZone,
-        messageNotificationsEnabled: values.messageNotificationsEnabled,
+        // 账号偏好接口需要完整提交，新消息提醒由通知设置页维护，这里沿用当前值。
+        messageNotificationsEnabled: user.messageNotificationsEnabled,
       })
       setTheme(values.theme)
-      setNotificationSoundEnabled(
-        notificationScope,
-        values.notificationSoundEnabled,
-      )
       const next = {
         locale: values.locale,
         timeZone: updated.timeZone,
         theme: values.theme,
-        messageNotificationsEnabled: updated.messageNotificationsEnabled,
-        notificationSoundEnabled: values.notificationSoundEnabled,
       }
       form.reset(next)
       markSaved(next)
@@ -114,11 +89,7 @@ export function UserPreferencesForm({ user }: { user: CurrentUser }) {
       console.warn("保存偏好设置失败", error)
       if (isApiError(error)) {
         toast.error(
-          apiErrorMessage(error, [
-            "locale",
-            "timeZone",
-            "messageNotificationsEnabled",
-          ]),
+          apiErrorMessage(error, ["locale", "timeZone"]),
         )
         return
       }
@@ -129,7 +100,7 @@ export function UserPreferencesForm({ user }: { user: CurrentUser }) {
 
   return (
     <form
-      className="w-full max-w-2xl"
+      className="w-full"
       aria-label={t("preferences.formLabel")}
       onSubmit={form.handleSubmit(save)}
       noValidate
@@ -193,63 +164,6 @@ export function UserPreferencesForm({ user }: { user: CurrentUser }) {
             </Field>
           )}
         />
-        <section
-          className="grid gap-4 border-t pt-5"
-          aria-labelledby="notification-preferences-title"
-        >
-          <h3 id="notification-preferences-title" className="font-medium">
-            {t("preferences.notifications.title")}
-          </h3>
-          <Controller
-            name="messageNotificationsEnabled"
-            control={form.control}
-            render={({ field }) => (
-              <Field orientation="horizontal">
-                <FieldContent>
-                  <FieldLabel htmlFor={field.name}>
-                    {t("preferences.notifications.newMessages")}
-                  </FieldLabel>
-                  <FieldDescription>
-                    {t("preferences.notifications.newMessagesDescription")}
-                  </FieldDescription>
-                </FieldContent>
-                <Switch
-                  id={field.name}
-                  name={field.name}
-                  checked={field.value}
-                  onBlur={field.onBlur}
-                  onCheckedChange={field.onChange}
-                  ref={field.ref}
-                />
-              </Field>
-            )}
-          />
-          <Controller
-            name="notificationSoundEnabled"
-            control={form.control}
-            render={({ field }) => (
-              <Field orientation="horizontal">
-                <FieldContent>
-                  <FieldLabel htmlFor={field.name}>
-                    {t("preferences.notifications.sound")}
-                  </FieldLabel>
-                  <FieldDescription>
-                    {t("preferences.notifications.soundDescription")}
-                  </FieldDescription>
-                </FieldContent>
-                <Switch
-                  id={field.name}
-                  name={field.name}
-                  checked={field.value}
-                  onBlur={field.onBlur}
-                  onCheckedChange={field.onChange}
-                  ref={field.ref}
-                />
-              </Field>
-            )}
-          />
-          <NotificationPermissionSettings />
-        </section>
       </FieldGroup>
     </form>
   )
