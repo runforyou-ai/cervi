@@ -36,6 +36,7 @@ type WebsiteVisitorRealtime interface {
 // Service 是企业服务端对外提供的 Gin HTTP 适配器。
 type Service struct {
 	application         *appservice.Service
+	deviceRuns          appservice.DeviceRunBackend
 	websiteVisitor      *appservice.WebsiteVisitorService
 	visitorRealtime     WebsiteVisitorRealtime
 	telegramWebhook     TelegramWebhookReceiver
@@ -61,6 +62,13 @@ func WithWebsiteVisitorRealtime(realtime WebsiteVisitorRealtime) ServiceOption {
 	}
 }
 
+// WithDeviceRuns 注入本机设备执行 Agent 运行的运行期调用。
+func WithDeviceRuns(backend appservice.DeviceRunBackend) ServiceOption {
+	return func(service *Service) {
+		service.deviceRuns = backend
+	}
+}
+
 // WithTelegramWebhook 注入 Telegram 公开回调接收能力。
 func WithTelegramWebhook(receiver TelegramWebhookReceiver) ServiceOption {
 	return func(service *Service) {
@@ -79,6 +87,9 @@ func NewService(application *appservice.Service, options ...ServiceOption) *Serv
 	router.Use(gin.Recovery())
 
 	service.registerGeneratedRoutes(router)
+	if service.deviceRuns != nil {
+		service.registerGeneratedDeviceRunRoutes(router)
+	}
 	// 创建企业管理员并返回登录令牌。
 	router.POST("/install", func(c *gin.Context) {
 		var input appservice.InstallWorkspaceInput
@@ -149,9 +160,12 @@ func enumList[T ~string](values []string) []T {
 	return list
 }
 
-// requestMeta 从请求头提取令牌和语言，构造应用服务请求元数据。
+// requestMeta 从请求头提取令牌、语言和设备编号，构造应用服务请求元数据。
 func requestMeta(c *gin.Context) appservice.RequestMeta {
-	return appservice.RequestMeta{Token: bearerToken(c.GetHeader("Authorization")), Locale: appservice.Locale(c.GetHeader("Accept-Language"))}
+	return appservice.RequestMeta{
+		Token: bearerToken(c.GetHeader("Authorization")), Locale: appservice.Locale(c.GetHeader("Accept-Language")),
+		DeviceID: strings.TrimSpace(c.GetHeader(appservice.DeviceHeader)),
+	}
 }
 
 // bearerToken 从 Authorization 头解析 Bearer 令牌，格式不符时返回空串。

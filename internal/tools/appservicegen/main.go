@@ -1,9 +1,10 @@
-// appservicegen 从 appservice.Backend 和 appservice.OperatorBackend 接口的 cervi:route
-// 指令生成各层适配样板：appservice.Service 的委托方法、服务端 DirectBackend 与
+// appservicegen 从 appservice.Backend、appservice.OperatorBackend 和 appservice.DeviceRunBackend
+// 接口的 cervi:route 指令生成各层适配样板：appservice.Service 的委托方法、服务端 DirectBackend 与
 // OperatorDirectBackend 的认证分发方法、Gin 路由与 Handler、原生端 API Proxy 转发方法。
 //
 // Backend 面向各端客户端并生成全部层，OperatorBackend 面向 SaaS 后端的服务间调用，
-// 只生成运营认证分发和 Gin 适配。
+// 只生成运营认证分发和 Gin 适配；DeviceRunBackend 面向原生端设备执行循环，生成设备认证分发、
+// Gin 适配和 API Proxy 转发，不生成 Service 委托。
 package main
 
 import (
@@ -95,6 +96,7 @@ type queryStruct struct {
 type apiTarget struct {
 	comment      string
 	receiver     string
+	application  string
 	register     string
 	requestMeta  string
 	writeResult  string
@@ -108,6 +110,7 @@ type apiTarget struct {
 var businessAPITarget = apiTarget{
 	comment:      "registerGeneratedRoutes 注册由 appservicegen 生成的业务路由。",
 	receiver:     "s *Service",
+	application:  "s.application",
 	register:     "registerGeneratedRoutes",
 	requestMeta:  "requestMeta(c)",
 	writeResult:  "writeResult",
@@ -121,6 +124,7 @@ var businessAPITarget = apiTarget{
 var operatorAPITarget = apiTarget{
 	comment:      "registerGeneratedOperatorRoutes 注册由 appservicegen 生成的运营路由。",
 	receiver:     "s *OperatorService",
+	application:  "s.application",
 	register:     "registerGeneratedOperatorRoutes",
 	requestMeta:  "operatorRequestMeta(c)",
 	writeResult:  "writeOperatorResult",
@@ -128,6 +132,20 @@ var operatorAPITarget = apiTarget{
 	bindPrefix:   "bindOperator",
 	bindJSON:     "bindOperatorJSON",
 	queryInteger: "positiveOperatorQueryInteger",
+}
+
+// deviceRunAPITarget 生成设备运行期接口的 Gin 适配代码。
+var deviceRunAPITarget = apiTarget{
+	comment:      "registerGeneratedDeviceRunRoutes 注册由 appservicegen 生成的设备运行期路由。",
+	receiver:     "s *Service",
+	application:  "s.deviceRuns",
+	register:     "registerGeneratedDeviceRunRoutes",
+	requestMeta:  "requestMeta(c)",
+	writeResult:  "writeResult",
+	writeEmpty:   "writeEmpty",
+	bindPrefix:   "bindDeviceRun",
+	bindJSON:     "bindJSON",
+	queryInteger: "positiveQueryInteger",
 }
 
 // main 解析 Backend 接口并写出各层生成文件。
@@ -152,6 +170,10 @@ func run() error {
 	if err != nil {
 		return err
 	}
+	deviceRunMethods, err := parseInterface(filepath.Join(root, "internal", "appservice", "device_run_backend.go"), "DeviceRunBackend", "RequestMeta")
+	if err != nil {
+		return err
+	}
 	queryStructs, err := parseQueryStructs(filepath.Join(root, "internal", "appservice"))
 	if err != nil {
 		return err
@@ -162,6 +184,9 @@ func run() error {
 	if err := validateOperator(operatorMethods, queryStructs); err != nil {
 		return err
 	}
+	if err := validateOperator(deviceRunMethods, queryStructs); err != nil {
+		return err
+	}
 	files := map[string][]byte{
 		filepath.Join(root, "internal", "appservice", "service_gen.go"):                 generateService(methods),
 		filepath.Join(root, "internal", "appservice", "direct_backend_gen.go"):          generateDirectBackend(methods),
@@ -169,6 +194,9 @@ func run() error {
 		filepath.Join(root, "internal", "api", "service_gen.go"):                        generateAPI(methods, queryStructs, businessAPITarget),
 		filepath.Join(root, "internal", "api", "operator_service_gen.go"):               generateAPI(operatorMethods, queryStructs, operatorAPITarget),
 		filepath.Join(root, "internal", "apiproxy", "backend_gen.go"):                   generateProxy(methods, queryStructs),
+		filepath.Join(root, "internal", "appservice", "device_run_direct_backend_gen.go"): generateDeviceRunDirectBackend(deviceRunMethods),
+		filepath.Join(root, "internal", "api", "device_run_service_gen.go"):               generateAPI(deviceRunMethods, queryStructs, deviceRunAPITarget),
+		filepath.Join(root, "internal", "apiproxy", "device_run_backend_gen.go"):          generateProxy(deviceRunMethods, queryStructs),
 	}
 	for path, source := range files {
 		formatted, err := format.Source(source)
@@ -545,9 +573,9 @@ func validate(methods []method, queryStructs map[string]queryStruct) error {
 	return nil
 }
 
-// validateOperator 校验运营契约的指令选项和查询结构体声明。
+// validateOperator 校验运营与设备运行期契约的指令选项和查询结构体声明。
 //
-// 运营调用一律校验运营服务凭据，生成范围固定为认证分发和 Gin 适配，
+// 这两套契约的调用一律先校验各自的调用方凭据，生成范围固定，
 // 指令因此只接受 status 和 query 选项。
 func validateOperator(methods []method, queryStructs map[string]queryStruct) error {
 	for _, item := range methods {
@@ -600,12 +628,15 @@ var httpMethodConstants = map[string]string{
 }
 
 // delegation 描述一层委托方法的接收器、转发目标、请求元数据类型、认证注入方式和结果归一化。
+// authenticator 与 identityName 为空时使用 authenticate 和 identity。
 type delegation struct {
 	receiver        string
 	target          string
 	metaType        string
 	skipManual      string
 	injectIdentity  bool
+	authenticator   string
+	identityName    string
 	normalizeSlices bool
 }
 
@@ -618,8 +649,12 @@ func emitDelegations(builder *strings.Builder, methods []method, layer delegatio
 		docComment(builder, item.doc, item.name, item.name)
 		arguments := []string{"ctx", "meta"}
 		injected := layer.injectIdentity && !item.route.public
+		authenticator, identityName := layer.authenticator, layer.identityName
+		if authenticator == "" {
+			authenticator, identityName = "authenticate", "identity"
+		}
 		if injected {
-			arguments = append(arguments, "identity")
+			arguments = append(arguments, identityName)
 		}
 		for _, parameter := range item.params {
 			arguments = append(arguments, parameter.name)
@@ -634,7 +669,7 @@ func emitDelegations(builder *strings.Builder, methods []method, layer delegatio
 		}
 		fmt.Fprintf(builder, "func (%s) %s(%s) %s {\n", layer.receiver, item.name, parameterList, results)
 		if injected {
-			fmt.Fprintf(builder, "\tidentity, err := %s.authenticate(ctx, meta)\n\tif err != nil {\n", layer.target)
+			fmt.Fprintf(builder, "\t%s, err := %s.%s(ctx, meta)\n\tif err != nil {\n", identityName, layer.target, authenticator)
 			if item.output == "" {
 				builder.WriteString("\t\treturn err\n")
 			} else {
@@ -692,6 +727,23 @@ func generateOperatorDirectBackend(methods []method) []byte {
 	return []byte(builder.String())
 }
 
+// generateDeviceRunDirectBackend 生成设备运行期调用的认证分发层。
+//
+// 每个方法先校验登录令牌与请求携带的设备，再把已认证设备交给 directOperations
+// 中的业务实现；本契约没有 Service 委托，结果在分发层归一化切片。
+func generateDeviceRunDirectBackend(methods []method) []byte {
+	builder := &strings.Builder{}
+	builder.WriteString("// Code generated by appservicegen. DO NOT EDIT.\n\n")
+	builder.WriteString("//go:build server\n\n")
+	builder.WriteString("package appservice\n\n")
+	builder.WriteString("import \"context\"\n\n")
+	emitDelegations(builder, methods, delegation{
+		receiver: "b *DirectBackend", target: "b.ops", metaType: "RequestMeta",
+		injectIdentity: true, authenticator: "authenticateDevice", identityName: "device", normalizeSlices: true,
+	})
+	return []byte(builder.String())
+}
+
 // generateAPI 生成 Gin 路由注册、Handler 和查询参数绑定函数。
 func generateAPI(methods []method, queryStructs map[string]queryStruct, target apiTarget) []byte {
 	builder := &strings.Builder{}
@@ -729,7 +781,7 @@ func generateAPI(methods []method, queryStructs map[string]queryStruct, target a
 				arguments = append(arguments, "input")
 			}
 		}
-		call := fmt.Sprintf("s.application.%s(%s)", item.name, strings.Join(arguments, ", "))
+		call := fmt.Sprintf("%s.%s(%s)", target.application, item.name, strings.Join(arguments, ", "))
 		if item.output == "" {
 			fmt.Fprintf(builder, "\t%s(c, %s)\n", target.writeEmpty, call)
 		} else {

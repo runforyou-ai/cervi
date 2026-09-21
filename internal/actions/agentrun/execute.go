@@ -204,7 +204,7 @@ func (a *ExecuteAction) settle(ctx context.Context, assigned runAssignment, resu
 	if ctx.Err() != nil {
 		return ctx.Err()
 	}
-	terminal, failErr := a.fail(ctx, execution.Run.ID, runErr)
+	terminal, failErr := a.fail(ctx, execution.Run.ID, runErr, "")
 	if failErr != nil {
 		return fmt.Errorf("agent run failed: %v; persist failure: %w", runErr, failErr)
 	}
@@ -266,8 +266,13 @@ func (a *ExecuteAction) begin(ctx context.Context, runID string) (executionConte
 	if terminal {
 		return executionContext{}, true, nil
 	}
+	return a.loadExecution(ctx, runID)
+}
+
+// loadExecution 读取运行中的业务运行及其锁定配置版本的执行配置，运行已进入终态时返回 true。
+func (a *ExecuteAction) loadExecution(ctx context.Context, runID string) (executionContext, bool, error) {
 	execution := executionContext{}
-	err = a.db.NewSelect().
+	err := a.db.NewSelect().
 		TableExpr("agent_runs AS agr").
 		ColumnExpr("agr.*").
 		ColumnExpr("oi.display_name AS agent_name").
@@ -553,8 +558,8 @@ func logCompletedRun(execution executionContext, endSeq int64, messageID string)
 	)
 }
 
-// fail 按运行策略取消失效运行或标记失败：客服运行转交人工，其他运行写入错误消息并为剩余输入补建下一次运行。
-func (a *ExecuteAction) fail(ctx context.Context, runID string, runErr error) (bool, error) {
+// fail 按运行策略取消失效运行或标记失败：客服运行转交人工，其他运行写入错误消息、记录错误码并为剩余输入补建下一次运行；code 为空表示没有稳定错误码。
+func (a *ExecuteAction) fail(ctx context.Context, runID string, runErr error, code domain.AgentRunErrorCode) (bool, error) {
 	// 限制持久化错误详情长度。
 	message := "agent run failed"
 	if runErr != nil {
@@ -630,7 +635,7 @@ func (a *ExecuteAction) fail(ctx context.Context, runID string, runErr error) (b
 			Set("response_message_id = ?", messageID).
 			Set("input_end_seq = ?", failureEnd).
 			Set("last_error = ?", message).
-			Set("error_code = NULL").
+			Set("error_code = NULLIF(?, '')", code).
 			Set("completed_at = now()").
 			Set("updated_at = now()").
 			WherePK().
@@ -653,6 +658,6 @@ func (a *ExecuteAction) FinalizeFailure(ctx context.Context, input RunInput, run
 	if !common.ValidUUID(input.RunID) {
 		return errors.New("agent run id is invalid")
 	}
-	_, err := a.fail(ctx, input.RunID, runErr)
+	_, err := a.fail(ctx, input.RunID, runErr, "")
 	return err
 }

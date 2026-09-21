@@ -102,6 +102,7 @@ const expectedFrames: Record<string, RealtimeServerFrame> = {
     ],
   },
   run_stream_ended: { type: "run_stream_ended", runId },
+  device_work_advanced: { type: "device_work_advanced", deviceId: "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a90", workSeq: 9223372036854775807n },
 }
 
 test("事件按共用夹具解码，64 位版本不丢精度", () => {

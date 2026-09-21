@@ -399,6 +399,9 @@ func (b *Backend) do(ctx context.Context, meta appservice.RequestMeta, method, p
 	if authenticated {
 		request.Header.Set("Authorization", "Bearer "+credential.Token)
 	}
+	if meta.DeviceID != "" {
+		request.Header.Set(appservice.DeviceHeader, meta.DeviceID)
+	}
 	response, err := state.client.Do(request)
 	if err != nil {
 		if ctx.Err() != nil {

@@ -316,7 +316,9 @@ export function AgentRunState({ run, incoming, conversationID, group, copilot, o
     ? t("agentThoughtRunning")
     : cancelled
       ? t("agentRunCancelled")
-      : t("agentRunQueued")
+      : run.executionDeviceName
+        ? t("agentRunQueuedOnDevice", { name: run.executionDeviceName })
+        : t("agentRunQueued")
   const reason = run.errorCode === "assignee_changed"
     ? t("agentRunAssigneeChanged")
     : run.errorCode === "session_closed"

@@ -9,6 +9,7 @@ import (
 	"errors"
 	"log/slog"
 	"net/http"
+	"slices"
 	"strings"
 	"sync"
 	"time"
@@ -41,6 +42,8 @@ type VisitorBackend interface {
 type MemberBackend interface {
 	// AuthenticateMember 校验请求携带的登录令牌并返回当前身份，令牌无效或账号不可用时返回登录会话错误。
 	AuthenticateMember(ctx context.Context, meta appservice.RequestMeta) (*servermodels.Identity, error)
+	// AuthenticateDevice 校验登录令牌与请求携带的本人未撤销设备并返回当前身份。
+	AuthenticateDevice(ctx context.Context, meta appservice.RequestMeta) (*servermodels.Identity, error)
 	// MemberSyncHeads 返回指定身份的同步探针值。
 	MemberSyncHeads(ctx context.Context, identity *servermodels.Identity) (appservice.SyncHeads, error)
 	// AuthorizeAgentRunStream 校验指定身份对运行所属会话的阅读资格，并返回运行所属会话编号。
@@ -83,6 +86,9 @@ var memberFrameTypes = []protocol.Type{
 	protocol.TypeConversationStateChanged, protocol.TypeConversationTyping, protocol.TypeIdentityProfileChanged,
 }
 
+// deviceFrameTypes 是携带设备身份的成员事件流额外可下发的事件。
+var deviceFrameTypes = []protocol.Type{protocol.TypeDeviceWorkAdvanced}
+
 // visitorFrameTypes 是网站访客事件流可下发的公开事件。
 var visitorFrameTypes = []protocol.Type{protocol.TypeVisitorHello, protocol.TypeConversationChanged, protocol.TypeVisitorTyping}
 
@@ -91,6 +97,8 @@ type streamRoute struct {
 	subjects       []string
 	allowed        []protocol.Type
 	tokenSessionID string
+	// deviceID 是事件流携带的已认证设备编号，只有该设备的工作水位通知会下发。
+	deviceID string
 	// expiresAt 是事件流授权的绝对到期时间，零值表示只受最长存活时间约束。
 	expiresAt  time.Time
 	attributes []any
@@ -159,7 +167,10 @@ func (g *Gateway) Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		if request.Method == http.MethodGet {
 			if request.URL.Path == Path {
-				meta := appservice.RequestMeta{Token: bearerToken(request.Header.Get("Authorization")), Locale: appservice.Locale(request.Header.Get("Accept-Language"))}
+				meta := appservice.RequestMeta{
+					Token: bearerToken(request.Header.Get("Authorization")), Locale: appservice.Locale(request.Header.Get("Accept-Language")),
+					DeviceID: strings.TrimSpace(request.Header.Get(appservice.DeviceHeader)),
+				}
 				g.stream(writer, request, meta, func(ctx context.Context) (streamRoute, error) {
 					return g.memberRoute(ctx, meta)
 				})
@@ -214,27 +225,38 @@ func (g *Gateway) Shutdown() {
 	})
 }
 
-// memberRoute 认证成员登录令牌，返回本人用户受众与本企业客服共享受众。
+// memberRoute 认证成员登录令牌，返回本人用户受众与本企业客服共享受众；携带设备编号时同时认证设备并下发该设备的工作水位。
 func (g *Gateway) memberRoute(ctx context.Context, meta appservice.RequestMeta) (streamRoute, error) {
-	identity, err := g.backend.AuthenticateMember(ctx, meta)
+	authenticate := g.backend.AuthenticateMember
+	allowed := memberFrameTypes
+	if meta.DeviceID != "" {
+		authenticate = g.backend.AuthenticateDevice
+		allowed = append(slices.Clone(memberFrameTypes), deviceFrameTypes...)
+	}
+	identity, err := authenticate(ctx, meta)
 	if err != nil {
 		return streamRoute{}, err
 	}
 	organizationID := identity.Organization.ID
+	attributes := []any{"organization_id", organizationID, "user_id", identity.User.ID}
+	if meta.DeviceID != "" {
+		attributes = append(attributes, "device_id", meta.DeviceID)
+	}
 	return streamRoute{
 		subjects: []string{
 			realtime.Subject(g.namespace, organizationID, realtime.AudienceUser, identity.User.ID),
 			// 当前阶段所有成员均可阅读客户会话，成员连接都接收客服共享受众通知。
 			realtime.Subject(g.namespace, organizationID, realtime.AudienceCustomerInbox, organizationID),
 		},
-		allowed:        memberFrameTypes,
+		allowed:        allowed,
 		tokenSessionID: identity.Token.ID,
+		deviceID:       meta.DeviceID,
 		// 事件流最长存活时间不晚于登录会话到期。
 		expiresAt:  identity.Token.ExpiresAt,
-		attributes: []any{"organization_id", organizationID, "user_id", identity.User.ID},
+		attributes: attributes,
 		greet: func(ctx context.Context, connectionID string) (protocol.Frame, error) {
 			// 订阅生效后再次校验登录会话，之后提交的登出或停用经受众通知送达。
-			if _, err := g.backend.AuthenticateMember(ctx, meta); err != nil {
+			if _, err := authenticate(ctx, meta); err != nil {
 				return nil, err
 			}
 			heads, err := g.backend.MemberSyncHeads(ctx, identity)
@@ -463,6 +485,8 @@ func (g *Gateway) deliver(subject string, data []byte) {
 		frame = protocol.IdentityProfileChanged{Version: payload.Version}
 	case realtime.KindPinOrderChanged:
 		frame = protocol.PinOrderChanged{Version: payload.Version}
+	case realtime.KindDeviceWorkAdvanced:
+		frame = protocol.DeviceWorkAdvanced{DeviceID: payload.DeviceID, WorkSeq: payload.Version}
 	case realtime.KindSessionLoggedOut:
 		for _, current := range targets {
 			if current.tokenSession() == payload.TokenSessionID {
@@ -481,6 +505,10 @@ func (g *Gateway) deliver(subject string, data []byte) {
 	// 变更通知只发给成员事件流；运行过程流在所属会话失权时结束，其余通知与它无关。
 	for _, current := range targets {
 		if member, ok := current.(*connection); ok {
+			// 设备工作水位只发给携带该设备身份的事件流。
+			if payload.Kind == realtime.KindDeviceWorkAdvanced && member.deviceID != payload.DeviceID {
+				continue
+			}
 			member.send(frame)
 			continue
 		}

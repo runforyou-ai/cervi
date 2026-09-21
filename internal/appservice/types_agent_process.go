@@ -92,4 +92,6 @@ type ConversationAgentRun struct {
 	ErrorCode       *string                   `json:"errorCode"`
 	LastError       *string                   `json:"lastError"`
 	Process         *ConversationAgentProcess `json:"process"`
+	// ExecutionDeviceName 是执行该运行的设备名称，服务端执行时为空。
+	ExecutionDeviceName *string `json:"executionDeviceName"`
 }
