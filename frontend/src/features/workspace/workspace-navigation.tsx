@@ -1,5 +1,5 @@
 /** 工作台左侧模块栏和用户菜单。 */
-import { useRef, useState } from "react"
+import { useRef, useState, type ReactNode } from "react"
 import {
   BrainCircuitIcon,
   Building2Icon,
@@ -126,7 +126,7 @@ function WorkspaceSearchEntry({ collapsed }: { collapsed: boolean }) {
         "flex h-8 shrink-0 items-center text-sm focus-visible:ring-2 focus-visible:ring-sidebar-ring",
         collapsed
           ? "w-8 justify-center rounded-md hover:bg-sidebar-accent hover:text-sidebar-accent-foreground"
-          : "mb-4 w-full gap-2 rounded-full bg-background/45 px-3 text-muted-foreground/65 hover:bg-background/70 hover:text-muted-foreground",
+          : "w-full min-w-0 flex-1 gap-2 rounded-full bg-background/45 px-3 text-muted-foreground/65 hover:bg-background/70 hover:text-muted-foreground",
       )}
       title={collapsed ? undefined : t("actions.searchShortcut")}
       aria-label={collapsed ? t("actions.searchPlaceholder") : undefined}
@@ -156,9 +156,11 @@ function WorkspaceSearchEntry({ collapsed }: { collapsed: boolean }) {
 /** 模块栏导航。 */
 function WorkspaceMenu({
   collapsed,
+  railToggle,
   onInboxClick,
 }: {
   collapsed: boolean
+  railToggle: ReactNode
   onInboxClick: () => void
 }) {
   const { t } = useTranslation("workspace")
@@ -175,7 +177,14 @@ function WorkspaceMenu({
       )}
       aria-label={t("navigationGroup")}
     >
-      <WorkspaceSearchEntry collapsed={collapsed} />
+      {collapsed ? (
+        <WorkspaceSearchEntry collapsed />
+      ) : (
+        <div className={cn("mb-4 flex items-center gap-1", railToggle && "pr-3")}>
+          <WorkspaceSearchEntry collapsed={false} />
+          {railToggle}
+        </div>
+      )}
       {/* 展开时导航项右侧额外留白，选中块与主内容卡片边缘拉开距离，搜索框保持原有宽度。 */}
       <div
         className={cn(
@@ -214,11 +223,25 @@ function WorkspaceMenu({
 function WorkspaceSettingsMenu({
   appHref,
   collapsed,
+  railToggle,
 }: {
   appHref: string
   collapsed: boolean
+  railToggle: ReactNode
 }) {
   const { t } = useTranslation("settings")
+
+  const backToApp = (
+    <WorkspaceRailItem
+      to={appHref}
+      icon={ChevronLeftIcon}
+      label={t("backToApp")}
+      active={false}
+      collapsed={collapsed}
+      // 左箭头字形本身内缩，展开时整行左移抵消，与下方导航项视觉左对齐。
+      className={collapsed ? undefined : "-ml-1"}
+    />
+  )
 
   return (
     <nav
@@ -230,15 +253,14 @@ function WorkspaceSettingsMenu({
       )}
       aria-label={t("navigationLabel")}
     >
-      <WorkspaceRailItem
-        to={appHref}
-        icon={ChevronLeftIcon}
-        label={t("backToApp")}
-        active={false}
-        collapsed={collapsed}
-        // 左箭头字形本身内缩，展开时整行左移抵消，与下方导航项视觉左对齐。
-        className={collapsed ? undefined : "-ml-1"}
-      />
+      {railToggle ? (
+        <div className="flex items-center gap-1 pr-3">
+          <div className="min-w-0 flex-1">{backToApp}</div>
+          {railToggle}
+        </div>
+      ) : (
+        backToApp
+      )}
       <PagePaneGroup title={t("groups.personal")} collapsed={collapsed}>
         <PagePaneLink
           collapsed={collapsed}
@@ -392,6 +414,11 @@ export function WorkspaceNavigation({
   const userMenuTriggerRef = useRef<HTMLButtonElement>(null)
   const skipUserMenuFocusRestoreRef = useRef(false)
   const showAppVersion = inSettings && resolveAppPlatform() === "desktop"
+  // Web 端展开态的收起开关与一级栏顶部行同处一行，原生端留在标题栏操作行。
+  const inlineRailToggle =
+    !collapsed && resolveAppPlatform() === "web" ? (
+      <WorkspaceRailToggle collapsed={false} onToggle={onToggleRail} />
+    ) : null
 
   /** 从用户菜单进入页面，并清除头像触发器的选中效果。 */
   function navigateFromUserMenu(path: string) {
@@ -445,10 +472,15 @@ export function WorkspaceNavigation({
         </div>
       ) : null}
       {inSettings ? (
-        <WorkspaceSettingsMenu appHref={appHref} collapsed={collapsed} />
+        <WorkspaceSettingsMenu
+          appHref={appHref}
+          collapsed={collapsed}
+          railToggle={inlineRailToggle}
+        />
       ) : (
         <WorkspaceMenu
           collapsed={collapsed}
+          railToggle={inlineRailToggle}
           onInboxClick={requestMessageNotificationPermission}
         />
       )}

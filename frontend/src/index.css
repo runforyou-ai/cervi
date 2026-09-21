@@ -303,7 +303,7 @@ body,
   --cervi-workspace-content-gutter: 10px;
   --cervi-workspace-content-top: var(--cervi-workspace-content-gutter);
   --cervi-workspace-rail-collapsed-width: 44px;
-  --cervi-workspace-rail-top: 36px;
+  --cervi-workspace-rail-top: var(--cervi-workspace-content-gutter);
   --cervi-workspace-titlebar-height: 36px;
   --cervi-workspace-titlebar-inset: 8px;
   --cervi-workspace-titlebar-offset: 0px;
@@ -371,24 +371,12 @@ body,
 
 /*
   一级栏收起为仅图标窄栏，宽度固定且不可拖动调整。收起开关改由窄栏自身渲染，
-  顶部留白收敛到该开关在展开态标题栏操作行中的位置，收起前后开关不移动。
+  顶部留白使其与主内容卡片首行的 48px 行居中对齐：卡片上沿加该行半高 24px，
+  再减开关半高 14px。macOS 窗口态的取值同时满足窄栏内容位于窗口按钮之下。
 */
 .cervi-workspace-shell[data-rail-collapsed="true"] {
   --cervi-workspace-rail-width: var(--cervi-workspace-rail-collapsed-width);
-  --cervi-workspace-rail-top: 4px;
-}
-
-[data-native-os="windows"] .cervi-workspace-shell[data-rail-collapsed="true"],
-[data-native-os="linux"] .cervi-workspace-shell[data-rail-collapsed="true"],
-[data-native-os="darwin"][data-window-fullscreen="true"]
-  .cervi-workspace-shell[data-rail-collapsed="true"] {
-  --cervi-workspace-rail-top: 6px;
-}
-
-/* macOS 窄栏容不下窗口按钮，窄栏内容下移到窗口按钮之下，收起开关与展开态导航起点齐平。 */
-[data-native-os="darwin"][data-window-fullscreen="false"]
-  .cervi-workspace-shell[data-rail-collapsed="true"] {
-  --cervi-workspace-rail-top: 45px;
+  --cervi-workspace-rail-top: calc(var(--cervi-workspace-content-top) + 10px);
 }
 
 /* 一级栏整体和主内容卡片上方的空白区域用于拖动窗口。 */

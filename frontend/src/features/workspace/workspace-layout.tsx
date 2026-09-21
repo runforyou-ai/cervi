@@ -227,7 +227,9 @@ function WorkspaceShell({ identity }: { identity: Identity }) {
     : fallbackHrefRef.current
   const inSettings = isSettingsHref(pageHref)
   // 窄栏下收起开关随一级栏内容渲染，整条标题栏操作行连同前进后退一并隐藏。
+  // Web 端展开态的收起开关也随一级栏渲染，标题栏操作行只在原生端出现。
   const railCollapsed = rail.collapsed
+  const showTitlebarActions = !railCollapsed && nativeHistoryNav
 
   return (
     <WorkspaceNavigationGuard>
@@ -255,15 +257,15 @@ function WorkspaceShell({ identity }: { identity: Identity }) {
           {railCollapsed ? null : (
             <WorkspaceRailResizer onWidthChange={rail.changeWidth} />
           )}
-          {railCollapsed ? null : (
+          {showTitlebarActions ? (
             <div className="cervi-workspace-titlebar-actions absolute top-0 left-0 z-40 flex items-center">
               <WorkspaceRailToggle
                 collapsed={false}
                 onToggle={rail.toggleCollapsed}
               />
-              {nativeHistoryNav ? <WorkspaceHistoryNav /> : null}
+              <WorkspaceHistoryNav />
             </div>
-          )}
+          ) : null}
           <div aria-hidden="true" className="cervi-workspace-top-drag-region" />
           <div className="cervi-workspace-content-frame relative flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden rounded-xl bg-background shadow-sm">
             <WorkspaceProvider value={workspaceContext}>
