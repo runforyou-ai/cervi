@@ -51,7 +51,6 @@ const contacts = {
     workStatus: "Work status",
     model: "Chat model",
     teams: "Teams",
-    joinedTeams: "Joined teams",
     joinedAt: "Joined",
     stage: "Stage",
     channels: "Channels",
@@ -212,8 +211,6 @@ const contacts = {
   teams: {
     create: "Create team",
     more: "More team actions",
-    joinedPair: "{{first}}, {{second}}",
-    joinedSummary: "{{first}}, {{second}}, and {{count}} teams total",
     createDescription: "Enter a team name and description.",
     editDescription: "Update the team name and description.",
     form: {

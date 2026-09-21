@@ -51,7 +51,6 @@ const contacts = {
     workStatus: "工作状态",
     model: "对话模型",
     teams: "所属团队",
-    joinedTeams: "加入的团队",
     joinedAt: "加入时间",
     stage: "阶段",
     channels: "渠道",
@@ -210,8 +209,6 @@ const contacts = {
   teams: {
     create: "创建团队",
     more: "更多团队操作",
-    joinedPair: "{{first}}、{{second}}",
-    joinedSummary: "{{first}}、{{second}} 等 {{count}} 个团队",
     createDescription: "填写团队名称和简介。",
     editDescription: "修改团队名称和简介。",
     form: {

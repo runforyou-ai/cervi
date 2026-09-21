@@ -1,6 +1,5 @@
 /** AI 员工列表、筛选、配置入口和状态管理面板。 */
 import { useState } from "react"
-import { MessageSquareIcon, Settings2Icon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useLocation, useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -21,11 +20,11 @@ import {
   ListToolbarReset,
   ListToolbarSearch,
 } from "@/components/list-toolbar"
+import { ListActionButton } from "@/components/list-action-button"
 import { PageHeader } from "@/components/page-header"
 import { ProfileAvatar } from "@/components/profile-avatar"
 import { ResourceListLayout } from "@/components/resource-list"
 import { ResourceTable } from "@/components/resource-table"
-import { Button } from "@/components/ui/button"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -36,14 +35,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
-import { WorkStatusBadge } from "@/components/work-status"
+import { WorkStatusDot } from "@/components/work-status"
 import { ContactCreateDialogs } from "@/features/contacts/contact-create-dialogs"
 import { ContactScopeMobileSelect } from "@/features/contacts/contact-scope-mobile-select"
-import { userStatusLabel } from "@/features/contacts/external/contact-labels"
-import { JoinedTeamsCell } from "@/features/contacts/joined-teams-cell"
 import { useContactSearch } from "@/features/contacts/use-contact-search"
-import { UserStatusBadge } from "@/features/contacts/user-status-badge"
 import { roleDisplayName } from "@/lib/role-labels"
 import { useContactInvalidator } from "@/features/contacts/use-contact-invalidator"
 import { resourceKeys } from "@/hooks/resource-keys"
@@ -182,38 +177,39 @@ export function AgentsPanel({
           }
         >
           <ResourceTable
+            hideHeader
             columns={[
               {
                 key: "name",
                 header: t("columns.name"),
-                cellClassName: "font-medium",
                 cell: (agent) => (
-                  <div className="flex items-center gap-2.5">
-                    <ProfileAvatar
-                      imageURL={agent.avatarUrl}
-                      name={agent.displayName}
-                      fallback="agent"
-                      className="size-7"
-                    />
-                    <span className="truncate">{agent.displayName}</span>
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="relative size-9 shrink-0">
+                      <ProfileAvatar
+                        imageURL={agent.avatarUrl}
+                        name={agent.displayName}
+                        fallback="agent"
+                        className="size-full"
+                      />
+                      <WorkStatusDot
+                        status={agent.workStatus}
+                        className="absolute -right-0.5 -bottom-0.5 ring-2 ring-background"
+                      />
+                    </span>
+                    <span className="truncate">
+                      <span className="font-medium">{agent.displayName}</span>
+                      <span aria-hidden="true" className="mx-1.5 text-muted-foreground">·</span>
+                      <span className="text-muted-foreground">
+                        {roleDisplayName(agent.role, tCommon)}
+                      </span>
+                    </span>
                   </div>
                 ),
               },
               {
-                key: "role",
-                header: t("columns.role"),
-                cell: (agent) => roleDisplayName(agent.role, tCommon),
-              },
-              {
-                key: "joinedTeams",
-                header: t("columns.joinedTeams"),
-                cellClassName: "max-w-xs",
-                cell: (agent) => <JoinedTeamsCell teams={agent.teams} />,
-              },
-              {
                 key: "model",
                 header: t("columns.model"),
-                cellClassName: "max-w-xs",
+                cellClassName: "max-w-xs text-muted-foreground",
                 cell: (agent) => (
                   <span className="block truncate">
                     {agent.execution.managed.providerName} ·{" "}
@@ -221,66 +217,43 @@ export function AgentsPanel({
                   </span>
                 ),
               },
-              {
-                key: "accountStatus",
-                header: t("columns.accountStatus"),
-                cell: (agent) => (
-                  <UserStatusBadge
-                    status={agent.status}
-                    label={userStatusLabel(agent.status, t)}
-                  />
-                ),
-              },
-              {
-                key: "workStatus",
-                header: t("columns.workStatus"),
-                cell: (agent) => <WorkStatusBadge status={agent.workStatus} />,
-              },
             ]}
             rows={agents}
             rowKey={(agent) => agent.id}
             empty={t("list.empty")}
+            onRowActivate={(agent) =>
+              navigate(
+                `/contacts/ai-employees/${agent.id}?tab=basic&returnTo=${encodeURIComponent(location.pathname + location.search)}`,
+              )
+            }
             actions={(agent) => ({
+              // 操作靠右对齐，不显示发消息的行中禁用按钮与其他行右端对齐。
               primary: (
-                <>
-                  <Button
-                    variant="outline"
-                    size="icon-sm"
-                    aria-label={t("sendMessage")}
-                    title={t("sendMessage")}
-                    disabled={agent.status !== UserStatus.UserStatusActive}
-                    onClick={() =>
-                      navigate(`/inbox?scope=internal&target=${agent.identityId}`)
+                <div className="ml-auto flex items-center gap-1">
+                  {agent.status === UserStatus.UserStatusActive ? (
+                    <ListActionButton
+                      onClick={() =>
+                        navigate(`/inbox?scope=internal&target=${agent.identityId}`)
+                      }
+                    >
+                      {t("sendMessage")}
+                    </ListActionButton>
+                  ) : null}
+                  <ListActionButton
+                    tone={
+                      agent.status === UserStatus.UserStatusActive
+                        ? "destructive"
+                        : "success"
                     }
+                    onClick={() => setChangingAgentStatus(agent)}
                   >
-                    <MessageSquareIcon />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon-sm"
-                    aria-label={t("agents.configure")}
-                    title={t("agents.configure")}
-                    onClick={() =>
-                      navigate(
-                        `/contacts/ai-employees/${agent.id}?tab=basic&returnTo=${encodeURIComponent(location.pathname + location.search)}`,
-                      )
-                    }
-                  >
-                    <Settings2Icon />
-                  </Button>
-                </>
-              ),
-              menu: (
-                <DropdownMenuItem
-                  destructive={agent.status === UserStatus.UserStatusActive}
-                  onSelect={() => setChangingAgentStatus(agent)}
-                >
-                  {t(
-                    agent.status === UserStatus.UserStatusActive
-                      ? "agents.status.deactivate"
-                      : "agents.status.reactivate",
-                  )}
-                </DropdownMenuItem>
+                    {t(
+                      agent.status === UserStatus.UserStatusActive
+                        ? "agents.status.deactivate"
+                        : "agents.status.reactivate",
+                    )}
+                  </ListActionButton>
+                </div>
               ),
             })}
           />
