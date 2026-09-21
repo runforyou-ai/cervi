@@ -36,6 +36,7 @@ type Payload struct {
 	TokenSessionID  string `json:"tokenSessionId,omitempty"`
 	SenderSubjectID string `json:"senderSubjectId,omitempty"`
 	Active          bool   `json:"active,omitempty"`
+	DeviceID        string `json:"deviceId,omitempty"`
 }
 
 // NewPublisher 创建使用指定 NATS 命名空间的通知发布器。
@@ -143,6 +144,7 @@ func (p *Publisher) publish(notification Notification) {
 	data, err := json.Marshal(Payload{
 		Kind: notification.Kind, ConversationID: notification.ConversationID, Version: notification.Version,
 		TokenSessionID: notification.TokenSessionID, SenderSubjectID: notification.SenderSubjectID, Active: notification.Active,
+		DeviceID: notification.DeviceID,
 	})
 	if err == nil {
 		err = p.send(Subject(p.config.Namespace, notification.OrganizationID, notification.AudienceKind, notification.AudienceID), data)

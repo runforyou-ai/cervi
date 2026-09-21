@@ -136,6 +136,12 @@ func (a *ExecuteAction) stopReply(ctx context.Context, identity *servermodels.Id
 			Set("completed_at = now()").Set("updated_at = now()").WherePK().Exec(ctx); err != nil {
 			return err
 		}
+		// 设备执行的运行推进设备工作水位，设备据此立即续租并得知停止。
+		if run.ExecutionDeviceID != nil {
+			if err := advanceDeviceWork(ctx, tx, run.OrganizationID, *run.ExecutionDeviceID); err != nil {
+				return err
+			}
+		}
 		if _, err := tx.NewUpdate().Model(lane).
 			Set("processed_seq = ?", lane.DesiredSeq).
 			Set("updated_at = now()").WherePK().Exec(ctx); err != nil {

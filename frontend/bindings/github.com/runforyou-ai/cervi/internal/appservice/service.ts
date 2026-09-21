@@ -31,10 +31,24 @@ export function AddGroupConversationMembers(meta: $models.RequestMeta, conversat
 }
 
 /**
+ * AddLocalWorkspace 让用户选择本机目录并注册为本设备的工作区，用户取消选择时返回空工作区编号。
+ */
+export function AddLocalWorkspace(meta: $models.RequestMeta): $CancellablePromise<$models.DeviceWorkspace> {
+    return $Call.ByID(3954828809, meta);
+}
+
+/**
  * AddTeamMembers 将企业身份批量加入团队。
  */
 export function AddTeamMembers(meta: $models.RequestMeta, teamID: string, input: $models.TeamMemberInput): $CancellablePromise<$models.Team> {
     return $Call.ByID(1201335915, meta, teamID, input);
+}
+
+/**
+ * BindConversationDevice 把 AI 单聊绑定到本人设备上的工作区。
+ */
+export function BindConversationDevice(meta: $models.RequestMeta, conversationID: string, input: $models.ConversationDeviceBindingInput): $CancellablePromise<$models.ConversationDeviceBinding> {
+    return $Call.ByID(670517532, meta, conversationID, input);
 }
 
 /**
@@ -388,6 +402,13 @@ export function GetContact(meta: $models.RequestMeta, contactID: string): $Cance
 }
 
 /**
+ * GetConversationDeviceBinding 返回会话绑定的设备与工作区。
+ */
+export function GetConversationDeviceBinding(meta: $models.RequestMeta, conversationID: string): $CancellablePromise<$models.ConversationDeviceBinding> {
+    return $Call.ByID(1226354556, meta, conversationID);
+}
+
+/**
  * GetConversationMessageContext 返回目标消息及其前后上下文。
  */
 export function GetConversationMessageContext(meta: $models.RequestMeta, conversationID: string, messageID: string): $CancellablePromise<$models.ConversationMessageList> {
@@ -616,6 +637,13 @@ export function ListCustomerReplyAgents(meta: $models.RequestMeta): $Cancellable
  */
 export function ListCustomerServiceAssignees(meta: $models.RequestMeta): $CancellablePromise<$models.CustomerServiceAssigneeList> {
     return $Call.ByID(630654755, meta);
+}
+
+/**
+ * ListDeviceWorkspaces 返回当前用户设备上的工作区。
+ */
+export function ListDeviceWorkspaces(meta: $models.RequestMeta, deviceID: string): $CancellablePromise<$models.DeviceWorkspaceList> {
+    return $Call.ByID(2515644074, meta, deviceID);
 }
 
 /**
@@ -871,6 +899,13 @@ export function RegisterDevice(meta: $models.RequestMeta, input: $models.DeviceR
 }
 
 /**
+ * RegisterDeviceWorkspace 在当前用户的设备上注册工作区。
+ */
+export function RegisterDeviceWorkspace(meta: $models.RequestMeta, deviceID: string, input: $models.DeviceWorkspaceInput): $CancellablePromise<$models.DeviceWorkspace> {
+    return $Call.ByID(2844438194, meta, deviceID, input);
+}
+
+/**
  * RemoveGroupConversationMember 移除单个群聊成员。
  */
 export function RemoveGroupConversationMember(meta: $models.RequestMeta, conversationID: string, input: $models.GroupConversationMemberInput): $CancellablePromise<$models.GroupConversation> {
@@ -1120,6 +1155,13 @@ export function TransferGroupConversationOwner(meta: $models.RequestMeta, conver
  */
 export function TransferServiceSession(meta: $models.RequestMeta, conversationID: string, input: $models.TransferServiceSessionInput): $CancellablePromise<$models.CustomerServiceSession> {
     return $Call.ByID(2034510468, meta, conversationID, input);
+}
+
+/**
+ * UnbindConversationDevice 解除 AI 单聊的设备绑定。
+ */
+export function UnbindConversationDevice(meta: $models.RequestMeta, conversationID: string): $CancellablePromise<void> {
+    return $Call.ByID(290548279, meta, conversationID);
 }
 
 /**

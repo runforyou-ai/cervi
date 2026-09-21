@@ -90,6 +90,27 @@ func (b *Backend) ConnectAgentRunStream(ctx context.Context, meta appservice.Req
 	return appservice.RealtimeConnection{ConnectionID: session.id}, nil
 }
 
+// OpenDeviceEventStream 以本机设备身份建立成员事件流，返回事件流响应体，关闭返回值即结束事件流；meta 必须携带设备编号。
+func (b *Backend) OpenDeviceEventStream(ctx context.Context, meta appservice.RequestMeta) (io.ReadCloser, error) {
+	response, cancel, err := b.openEventStream(ctx, meta, "/realtime")
+	if err != nil {
+		return nil, err
+	}
+	return deviceEventStream{ReadCloser: response.Body, cancel: cancel}, nil
+}
+
+// deviceEventStream 是设备事件流响应体，关闭时一并取消请求。
+type deviceEventStream struct {
+	io.ReadCloser
+	cancel context.CancelFunc
+}
+
+// Close 取消事件流请求并关闭响应体。
+func (s deviceEventStream) Close() error {
+	s.cancel()
+	return s.ReadCloser.Close()
+}
+
 // staleEventStream 关闭建立期间已被整体断开的事件流，由前端按新凭据重新请求。
 func staleEventStream(meta appservice.RequestMeta, cancel context.CancelFunc, response *http.Response) error {
 	cancel()
@@ -168,6 +189,9 @@ func (b *Backend) openEventStream(ctx context.Context, meta appservice.RequestMe
 	request.Header.Set("Accept", "text/event-stream")
 	request.Header.Set("Accept-Language", string(meta.Locale))
 	request.Header.Set("Authorization", "Bearer "+credential.Token)
+	if meta.DeviceID != "" {
+		request.Header.Set(appservice.DeviceHeader, meta.DeviceID)
+	}
 	// 事件流是长响应，使用不设整体超时的客户端，只限制等待响应头的时间。
 	connectTimer := time.AfterFunc(realtimeConnectTimeout, cancel)
 	response, err := (&http.Client{Transport: state.client.Transport}).Do(request)

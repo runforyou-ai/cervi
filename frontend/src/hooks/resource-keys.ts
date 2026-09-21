@@ -123,6 +123,10 @@ export const resourceKeys = {
   devices: () => ["devices"],
   /** 本机在当前企业服务器上的设备注册状态。 */
   currentDevice: () => ["current-device"],
+  /** 指定设备上的工作区。 */
+  deviceWorkspaces: (deviceId?: string) => itemKey("device-workspaces", deviceId),
+  /** 会话绑定的设备与工作区。 */
+  conversationDeviceBinding: (conversationId?: string) => itemKey("conversation-device-binding", conversationId),
   /** 知识库列表。 */
   knowledgeBases: () => ["knowledge-bases"],
   /** 单个知识库。 */

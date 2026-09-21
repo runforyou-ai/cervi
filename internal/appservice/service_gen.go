@@ -823,3 +823,28 @@ func (s *Service) ListDevices(ctx context.Context, meta RequestMeta) (DeviceList
 func (s *Service) RevokeDevice(ctx context.Context, meta RequestMeta, deviceID string) error {
 	return s.backend.RevokeDevice(ctx, meta, deviceID)
 }
+
+// RegisterDeviceWorkspace 在当前用户的设备上注册工作区。
+func (s *Service) RegisterDeviceWorkspace(ctx context.Context, meta RequestMeta, deviceID string, input DeviceWorkspaceInput) (DeviceWorkspace, error) {
+	return withNormalizedSlices(s.backend.RegisterDeviceWorkspace(ctx, meta, deviceID, input))
+}
+
+// ListDeviceWorkspaces 返回当前用户设备上的工作区。
+func (s *Service) ListDeviceWorkspaces(ctx context.Context, meta RequestMeta, deviceID string) (DeviceWorkspaceList, error) {
+	return withNormalizedSlices(s.backend.ListDeviceWorkspaces(ctx, meta, deviceID))
+}
+
+// GetConversationDeviceBinding 返回会话绑定的设备与工作区。
+func (s *Service) GetConversationDeviceBinding(ctx context.Context, meta RequestMeta, conversationID string) (ConversationDeviceBinding, error) {
+	return withNormalizedSlices(s.backend.GetConversationDeviceBinding(ctx, meta, conversationID))
+}
+
+// BindConversationDevice 把 AI 单聊绑定到本人设备上的工作区。
+func (s *Service) BindConversationDevice(ctx context.Context, meta RequestMeta, conversationID string, input ConversationDeviceBindingInput) (ConversationDeviceBinding, error) {
+	return withNormalizedSlices(s.backend.BindConversationDevice(ctx, meta, conversationID, input))
+}
+
+// UnbindConversationDevice 解除 AI 单聊的设备绑定。
+func (s *Service) UnbindConversationDevice(ctx context.Context, meta RequestMeta, conversationID string) error {
+	return s.backend.UnbindConversationDevice(ctx, meta, conversationID)
+}

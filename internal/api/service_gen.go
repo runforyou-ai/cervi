@@ -179,6 +179,11 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.POST("/devices", s.registerDevice)
 	router.GET("/devices", s.listDevices)
 	router.DELETE("/devices/:deviceID", s.revokeDevice)
+	router.POST("/devices/:deviceID/workspaces", s.registerDeviceWorkspace)
+	router.GET("/devices/:deviceID/workspaces", s.listDeviceWorkspaces)
+	router.GET("/conversations/:conversationID/device-binding", s.getConversationDeviceBinding)
+	router.PUT("/conversations/:conversationID/device-binding", s.bindConversationDevice)
+	router.DELETE("/conversations/:conversationID/device-binding", s.unbindConversationDevice)
 }
 
 // installationStatus 返回服务端初始化状态和公开企业名称。
@@ -1517,6 +1522,43 @@ func (s *Service) listDevices(c *gin.Context) {
 // revokeDevice 撤销当前用户的设备。
 func (s *Service) revokeDevice(c *gin.Context) {
 	writeEmpty(c, s.application.RevokeDevice(c.Request.Context(), requestMeta(c), c.Param("deviceID")))
+}
+
+// registerDeviceWorkspace 在当前用户的设备上注册工作区。
+func (s *Service) registerDeviceWorkspace(c *gin.Context) {
+	var input appservice.DeviceWorkspaceInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.RegisterDeviceWorkspace(c.Request.Context(), requestMeta(c), c.Param("deviceID"), input)
+	writeResult(c, http.StatusCreated, output, err)
+}
+
+// listDeviceWorkspaces 返回当前用户设备上的工作区。
+func (s *Service) listDeviceWorkspaces(c *gin.Context) {
+	output, err := s.application.ListDeviceWorkspaces(c.Request.Context(), requestMeta(c), c.Param("deviceID"))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// getConversationDeviceBinding 返回会话绑定的设备与工作区。
+func (s *Service) getConversationDeviceBinding(c *gin.Context) {
+	output, err := s.application.GetConversationDeviceBinding(c.Request.Context(), requestMeta(c), c.Param("conversationID"))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// bindConversationDevice 把 AI 单聊绑定到本人设备上的工作区。
+func (s *Service) bindConversationDevice(c *gin.Context) {
+	var input appservice.ConversationDeviceBindingInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.BindConversationDevice(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// unbindConversationDevice 解除 AI 单聊的设备绑定。
+func (s *Service) unbindConversationDevice(c *gin.Context) {
+	writeEmpty(c, s.application.UnbindConversationDevice(c.Request.Context(), requestMeta(c), c.Param("conversationID")))
 }
 
 // bindAgentListInputQuery 从查询参数解析 appservice.AgentListInput。

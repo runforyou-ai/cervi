@@ -1243,6 +1243,43 @@ func (b *Backend) RevokeDevice(ctx context.Context, meta appservice.RequestMeta,
 	return b.do(ctx, meta, http.MethodDelete, "/devices/"+url.PathEscape(deviceID), nil, nil, nil)
 }
 
+// RegisterDeviceWorkspace 在当前用户的设备上注册工作区。
+func (b *Backend) RegisterDeviceWorkspace(ctx context.Context, meta appservice.RequestMeta, deviceID string, input appservice.DeviceWorkspaceInput) (appservice.DeviceWorkspace, error) {
+	var output appservice.DeviceWorkspace
+	err := b.do(ctx, meta, http.MethodPost, "/devices/"+url.PathEscape(deviceID)+"/workspaces", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// ListDeviceWorkspaces 返回当前用户设备上的工作区。
+func (b *Backend) ListDeviceWorkspaces(ctx context.Context, meta appservice.RequestMeta, deviceID string) (appservice.DeviceWorkspaceList, error) {
+	var output appservice.DeviceWorkspaceList
+	err := b.do(ctx, meta, http.MethodGet, "/devices/"+url.PathEscape(deviceID)+"/workspaces", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// GetConversationDeviceBinding 返回会话绑定的设备与工作区。
+func (b *Backend) GetConversationDeviceBinding(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.ConversationDeviceBinding, error) {
+	var output appservice.ConversationDeviceBinding
+	err := b.do(ctx, meta, http.MethodGet, "/conversations/"+url.PathEscape(conversationID)+"/device-binding", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// BindConversationDevice 把 AI 单聊绑定到本人设备上的工作区。
+func (b *Backend) BindConversationDevice(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.ConversationDeviceBindingInput) (appservice.ConversationDeviceBinding, error) {
+	var output appservice.ConversationDeviceBinding
+	err := b.do(ctx, meta, http.MethodPut, "/conversations/"+url.PathEscape(conversationID)+"/device-binding", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// UnbindConversationDevice 解除 AI 单聊的设备绑定。
+func (b *Backend) UnbindConversationDevice(ctx context.Context, meta appservice.RequestMeta, conversationID string) error {
+	return b.do(ctx, meta, http.MethodDelete, "/conversations/"+url.PathEscape(conversationID)+"/device-binding", nil, nil, nil)
+}
+
 // encodeAgentListInputQuery 将 appservice.AgentListInput 编码为查询参数。
 func encodeAgentListInputQuery(input appservice.AgentListInput) url.Values {
 	query := url.Values{}

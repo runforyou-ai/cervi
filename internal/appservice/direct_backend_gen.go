@@ -1639,3 +1639,52 @@ func (b *DirectBackend) RevokeDevice(ctx context.Context, meta RequestMeta, devi
 	}
 	return b.ops.RevokeDevice(ctx, meta, identity, deviceID)
 }
+
+// RegisterDeviceWorkspace 在当前用户的设备上注册工作区。
+func (b *DirectBackend) RegisterDeviceWorkspace(ctx context.Context, meta RequestMeta, deviceID string, input DeviceWorkspaceInput) (DeviceWorkspace, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero DeviceWorkspace
+		return zero, err
+	}
+	return b.ops.RegisterDeviceWorkspace(ctx, meta, identity, deviceID, input)
+}
+
+// ListDeviceWorkspaces 返回当前用户设备上的工作区。
+func (b *DirectBackend) ListDeviceWorkspaces(ctx context.Context, meta RequestMeta, deviceID string) (DeviceWorkspaceList, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero DeviceWorkspaceList
+		return zero, err
+	}
+	return b.ops.ListDeviceWorkspaces(ctx, meta, identity, deviceID)
+}
+
+// GetConversationDeviceBinding 返回会话绑定的设备与工作区。
+func (b *DirectBackend) GetConversationDeviceBinding(ctx context.Context, meta RequestMeta, conversationID string) (ConversationDeviceBinding, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero ConversationDeviceBinding
+		return zero, err
+	}
+	return b.ops.GetConversationDeviceBinding(ctx, meta, identity, conversationID)
+}
+
+// BindConversationDevice 把 AI 单聊绑定到本人设备上的工作区。
+func (b *DirectBackend) BindConversationDevice(ctx context.Context, meta RequestMeta, conversationID string, input ConversationDeviceBindingInput) (ConversationDeviceBinding, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero ConversationDeviceBinding
+		return zero, err
+	}
+	return b.ops.BindConversationDevice(ctx, meta, identity, conversationID, input)
+}
+
+// UnbindConversationDevice 解除 AI 单聊的设备绑定。
+func (b *DirectBackend) UnbindConversationDevice(ctx context.Context, meta RequestMeta, conversationID string) error {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		return err
+	}
+	return b.ops.UnbindConversationDevice(ctx, meta, identity, conversationID)
+}

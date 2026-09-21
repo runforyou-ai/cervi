@@ -27,10 +27,11 @@ type connection struct {
 	id      string
 	cancel  context.CancelFunc
 
-	// subjects、allowed 与 tokenSessionID 在建立连接时写入，之后只读。
+	// subjects、allowed、tokenSessionID 与 deviceID 在建立连接时写入，之后只读。
 	subjects       []string
 	allowed        map[protocol.Type]bool
 	tokenSessionID string
+	deviceID       string
 
 	mu         sync.Mutex
 	queue      []protocol.Frame
@@ -55,6 +56,7 @@ func newConnection(gateway *Gateway, cancel context.CancelFunc, route streamRout
 		subjects:       route.subjects,
 		allowed:        allowed,
 		tokenSessionID: route.tokenSessionID,
+		deviceID:       route.deviceID,
 		merged:         map[mergeKey]int{},
 		wake:           make(chan struct{}, 1),
 	}
@@ -162,7 +164,7 @@ type mergeSource struct {
 	mergeable bool
 }
 
-// mergeTarget 返回变更通知与输入状态事件的合并方式，其他事件不可合并。
+// mergeTarget 返回变更通知、设备工作水位与输入状态事件的合并方式，其他事件不可合并。
 func mergeTarget(frame protocol.Frame) mergeSource {
 	switch value := frame.(type) {
 	case protocol.ConversationChanged:
@@ -175,6 +177,8 @@ func mergeTarget(frame protocol.Frame) mergeSource {
 		return mergeSource{key: mergeKey{frameType: protocol.TypeVisitorTyping, conversationID: value.ConversationID}, mergeable: true}
 	case protocol.IdentityProfileChanged:
 		return mergeSource{key: mergeKey{frameType: protocol.TypeIdentityProfileChanged}, version: value.Version, versioned: true, mergeable: true}
+	case protocol.DeviceWorkAdvanced:
+		return mergeSource{key: mergeKey{frameType: protocol.TypeDeviceWorkAdvanced}, version: value.WorkSeq, versioned: true, mergeable: true}
 	}
 	return mergeSource{}
 }

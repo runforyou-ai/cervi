@@ -14,12 +14,12 @@ import (
 	"github.com/wailsapp/wails/v3/pkg/application"
 )
 
-// deviceRegistrar 把本机注册为企业设备；不注册设备的原生平台为空。
+// deviceRegistrar 把本机注册为企业设备并执行派发给本机的运行；不注册设备的原生平台为空。
 type deviceRegistrar interface {
 	appservice.LocalDeviceReporter
-	// Start 开始注册循环。
+	// Start 开始注册与执行循环。
 	Start()
-	// Stop 结束注册循环并等待其退出。
+	// Stop 结束注册与执行循环并等待其退出。
 	Stop()
 }
 
@@ -57,6 +57,9 @@ func applicationServices(
 	registrar := newDeviceRegistrar(appStorage, backend, sessions)
 	if registrar != nil {
 		options = append(options, appservice.WithLocalDevice(registrar))
+		if workspaces, ok := registrar.(appservice.LocalWorkspaceManager); ok {
+			options = append(options, appservice.WithLocalWorkspaces(workspaces))
+		}
 	}
 	service := appservice.New(backend, options...)
 	return []application.Service{

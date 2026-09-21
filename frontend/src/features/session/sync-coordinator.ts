@@ -59,6 +59,7 @@ function conversationKeys(conversationId?: string): ResourceKey[] {
     resourceKeys.customerDeliveries(conversationId),
     resourceKeys.customerCopilotThreads(conversationId),
     resourceKeys.conversationMessageReferences(conversationId),
+    resourceKeys.conversationDeviceBinding(conversationId),
     resourceKeys.directConversation(),
   ]
 }

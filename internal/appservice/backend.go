@@ -521,6 +521,21 @@ type Backend interface {
 	// RevokeDevice 撤销当前用户的设备。
 	//cervi:route DELETE /devices/:deviceID
 	RevokeDevice(context.Context, RequestMeta, string) error
+	// RegisterDeviceWorkspace 在当前用户的设备上注册工作区。
+	//cervi:route POST /devices/:deviceID/workspaces status=201
+	RegisterDeviceWorkspace(context.Context, RequestMeta, string, DeviceWorkspaceInput) (DeviceWorkspace, error)
+	// ListDeviceWorkspaces 返回当前用户设备上的工作区。
+	//cervi:route GET /devices/:deviceID/workspaces
+	ListDeviceWorkspaces(context.Context, RequestMeta, string) (DeviceWorkspaceList, error)
+	// GetConversationDeviceBinding 返回会话绑定的设备与工作区。
+	//cervi:route GET /conversations/:conversationID/device-binding
+	GetConversationDeviceBinding(context.Context, RequestMeta, string) (ConversationDeviceBinding, error)
+	// BindConversationDevice 把 AI 单聊绑定到本人设备上的工作区。
+	//cervi:route PUT /conversations/:conversationID/device-binding
+	BindConversationDevice(context.Context, RequestMeta, string, ConversationDeviceBindingInput) (ConversationDeviceBinding, error)
+	// UnbindConversationDevice 解除 AI 单聊的设备绑定。
+	//cervi:route DELETE /conversations/:conversationID/device-binding
+	UnbindConversationDevice(context.Context, RequestMeta, string) error
 }
 
 // WorkspaceInstaller 由服务端 Backend 实现，用于企业初始化。
@@ -556,6 +571,12 @@ type ConversationWindowOpener interface {
 // LocalDeviceReporter 由把本机注册为设备的原生端实现。
 type LocalDeviceReporter interface {
 	CurrentDevice(context.Context, RequestMeta) (LocalDevice, error)
+}
+
+// LocalWorkspaceManager 由支持本机 Agent 工作区的原生端实现。
+type LocalWorkspaceManager interface {
+	// AddLocalWorkspace 让用户选择本机目录并注册为本设备的工作区，用户取消选择时返回空工作区编号。
+	AddLocalWorkspace(context.Context, RequestMeta) (DeviceWorkspace, error)
 }
 
 // NativeLocaleUpdater 同步当前设备上的原生界面语言。
