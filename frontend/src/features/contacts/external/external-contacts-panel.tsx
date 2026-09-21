@@ -64,7 +64,7 @@ export function ExternalContactsPanel({
 }) {
   const { t } = useTranslation(["contacts", "common"])
   const navigate = useNavigate()
-  const { formatDateTime } = useDateTime()
+  const { formatShortDateTime } = useDateTime()
   const invalidate = useResourceInvalidator()
   const {
     searchParams,
@@ -370,18 +370,21 @@ export function ExternalContactsPanel({
                 key: "channels",
                 header: t("columns.channels"),
                 cellClassName: "max-w-40 truncate text-muted-foreground",
-                cell: (contact) => contact.sourceChannelName,
+                cell: (contact) =>
+                  t("list.source", { channel: contact.sourceChannelName }),
               },
               {
                 key: "time",
                 header: deleted ? t("columns.deletedAt") : t("columns.addedAt"),
                 cellClassName: "whitespace-nowrap text-muted-foreground",
                 cell: (contact) =>
-                  formatDateTime(
-                    deleted && contact.deletedAt
-                      ? contact.deletedAt
-                      : contact.createdAt,
-                  ),
+                  deleted && contact.deletedAt
+                    ? t("trash.deletedAt", {
+                        time: formatShortDateTime(contact.deletedAt),
+                      })
+                    : t("list.addedAt", {
+                        time: formatShortDateTime(contact.createdAt),
+                      }),
               },
             ]}
             rows={contacts}
