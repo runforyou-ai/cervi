@@ -225,12 +225,14 @@ function CustomerReplyBlock({
   const { t } = useTranslation("inbox")
   return (
     <div className="my-2 rounded-lg border bg-background p-2.5 text-foreground">
-      <div className="whitespace-pre-wrap break-words">{body}</div>
-      <div className="mt-2 flex justify-end">
+      {/* 按钮右浮动在正文末尾，末行剩余宽度足够时同行展示，不足时换到下一行。 */}
+      <div className="flow-root whitespace-pre-wrap break-words">
+        {body}
         <Button
           type="button"
           variant="outline"
           size="xs"
+          className="float-right -mt-0.5 ml-2"
           disabled={Boolean(disabledReason)}
           title={disabledReason ?? undefined}
           onClick={() => onApply(body)}
@@ -1211,6 +1213,7 @@ function ConversationTimelineContent({
           {timeline.mode === "latest" && !currentPage?.hasLater ? (
             <AgentQueueState
               agents={currentPage?.pendingAgents ?? []}
+              copilot={conversationType === ConversationType.ConversationTypeCopilot}
               incoming={conversationType !== ConversationType.ConversationTypeCustomer}
             />
           ) : null}

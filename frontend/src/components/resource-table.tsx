@@ -134,7 +134,7 @@ function ResourceTableActionsCell({
   return (
     <TableCell className="w-px whitespace-nowrap">
       <div
-        className="inline-flex items-center gap-1"
+        className="flex items-center gap-1"
         onClick={(event) => event.stopPropagation()}
       >
         {primary}

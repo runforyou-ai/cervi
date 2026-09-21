@@ -27,6 +27,7 @@ const common = {
     retry: "Retry",
     clearFilters: "Clear filters",
     more: "More",
+    selectAll: "Select all",
   },
   unsavedChanges: {
     title: "Discard unsaved changes?",

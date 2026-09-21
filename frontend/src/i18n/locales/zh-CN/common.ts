@@ -27,6 +27,7 @@ const common = {
     retry: "重试",
     clearFilters: "清除筛选",
     more: "更多",
+    selectAll: "全选",
   },
   unsavedChanges: {
     title: "放弃未保存的修改？",

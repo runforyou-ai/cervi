@@ -18,6 +18,8 @@ export function ListActionButton({
       size="xs"
       className={cn(
         "rounded-xl px-3",
+        tone === "default" &&
+          "bg-primary/10 text-primary hover:bg-primary/20 hover:text-primary",
         tone === "destructive" &&
           "bg-destructive/10 text-destructive hover:bg-destructive/20 hover:text-destructive",
         tone === "success" &&

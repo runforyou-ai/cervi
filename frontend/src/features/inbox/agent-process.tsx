@@ -338,19 +338,22 @@ export function AgentRunState({ run, incoming, conversationID, group, copilot, o
         "relative flex min-h-8 max-w-[75%] flex-col justify-center py-2",
         // 运行中的过程与最终消息气泡同宽，结束后替换为消息时不再重新换行。
         thinking && "max-w-[min(36rem,85%)] sm:max-w-[min(36rem,75%)]",
-        incoming ? "ml-9" : "mr-9",
+        // Copilot 面板与其最终消息一致，不展示头像，在上方标出发送者。
+        !copilot && (incoming ? "ml-9" : "mr-9"),
       )}>
-        <ProfileAvatar
-          imageURL={run.agentAvatarUrl}
-          name={run.agentName}
-          fallback="agent"
-          title={senderName}
-          className={cn(
-            "absolute bottom-0 size-7 text-xs",
-            incoming ? "right-full mr-2" : "left-full ml-2",
-          )}
-        />
-        {group && incoming ? (
+        {copilot ? null : (
+          <ProfileAvatar
+            imageURL={run.agentAvatarUrl}
+            name={run.agentName}
+            fallback="agent"
+            title={senderName}
+            className={cn(
+              "absolute bottom-0 size-7 text-xs",
+              incoming ? "right-full mr-2" : "left-full ml-2",
+            )}
+          />
+        )}
+        {(group || copilot) && incoming ? (
           <span className="mb-1 max-w-full truncate text-xs font-medium text-foreground">{senderName}</span>
         ) : null}
         {thinking ? (
@@ -397,7 +400,7 @@ export function AgentRunState({ run, incoming, conversationID, group, copilot, o
 }
 
 /** 展示已收到点名、等待轮转发言的 AI 员工。 */
-export function AgentQueueState({ agents, incoming }: { agents: ConversationPendingAgent[]; incoming: boolean }) {
+export function AgentQueueState({ agents, incoming, copilot }: { agents: ConversationPendingAgent[]; incoming: boolean; copilot?: boolean }) {
   const { t } = useTranslation("inbox")
   if (!agents.length) return null
   const names = agents.map((agent) => agent.displayName.trim() || t("unknownSender")).join("、")
@@ -406,7 +409,7 @@ export function AgentQueueState({ agents, incoming }: { agents: ConversationPend
       className={cn("mt-2 flex min-w-0 text-xs text-muted-foreground", incoming ? "justify-start" : "justify-end")}
       role="status"
     >
-      <span className={cn("max-w-[75%] break-all", incoming ? "ml-9" : "mr-9")}>
+      <span className={cn("max-w-[75%] break-all", !copilot && (incoming ? "ml-9" : "mr-9"))}>
         {t("agentRunWaiting", { names })}
       </span>
     </div>

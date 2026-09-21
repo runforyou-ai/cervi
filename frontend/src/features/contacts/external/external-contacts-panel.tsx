@@ -1,6 +1,5 @@
 /** 外部联系人列表、筛选、详情和回收站面板。 */
 import { useEffect, useState } from "react"
-import { ArchiveRestoreIcon, EyeIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -27,12 +26,11 @@ import {
   ListToolbarReset,
   ListToolbarSearch,
 } from "@/components/list-toolbar"
+import { ListActionButton } from "@/components/list-action-button"
 import { PageHeader } from "@/components/page-header"
 import { ProfileAvatar } from "@/components/profile-avatar"
 import { ResourceListLayout } from "@/components/resource-list"
 import { ResourceTable } from "@/components/resource-table"
-import { SelectableText } from "@/components/selectable-text"
-import { Button } from "@/components/ui/button"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -43,7 +41,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import { ContactCreateDialogs } from "@/features/contacts/contact-create-dialogs"
 import { ContactDetailSheet } from "@/features/contacts/contact-detail-sheet"
 import { ContactScopeMobileSelect } from "@/features/contacts/contact-scope-mobile-select"
@@ -54,17 +51,6 @@ import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { recoverSession } from "@/lib/session-navigation"
 import { optionalWailsEnum } from "@/lib/wails-enum"
-
-/** 联系人阶段标签。 */
-function StageLabel({ stage }: { stage: ContactStage }) {
-  const { t } = useTranslation("contacts")
-  if (!stage) return null
-  return (
-    <SelectableText className="inline-flex rounded-md bg-secondary px-2 py-0.5 text-xs font-medium text-secondary-foreground">
-      {t(`stages.${stage}`)}
-    </SelectableText>
-  )
-}
 
 /** 外部联系人范围的列表、详情和弹窗。 */
 export function ExternalContactsPanel({
@@ -78,7 +64,7 @@ export function ExternalContactsPanel({
 }) {
   const { t } = useTranslation(["contacts", "common"])
   const navigate = useNavigate()
-  const { formatDateTime } = useDateTime()
+  const { formatShortDateTime } = useDateTime()
   const invalidate = useResourceInvalidator()
   const {
     searchParams,
@@ -339,98 +325,91 @@ export function ExternalContactsPanel({
           }
         >
           <ResourceTable
+            hideHeader
             columns={[
               {
                 key: "name",
                 header: t("columns.name"),
-                cellClassName: "font-medium",
-                cell: (contact) => (
-                  <div className="flex items-center gap-2.5">
-                    <ProfileAvatar
-                      imageURL={contact.avatarUrl}
-                      name={contact.displayName || t("anonymous")}
-                      className="size-7"
-                    />
-                    <span className="truncate">
-                      {contact.displayName || t("anonymous")}
-                    </span>
-                  </div>
-                ),
-              },
-              {
-                key: "stage",
-                header: t("columns.stage"),
-                cell: (contact) => <StageLabel stage={contact.stage} />,
-              },
-              {
-                key: "email",
-                header: t("columns.email"),
-                cellClassName: "text-muted-foreground",
-                cell: (contact) => contact.primaryEmail || "—",
-              },
-              {
-                key: "phone",
-                header: t("columns.phone"),
-                cellClassName: "text-muted-foreground",
-                cell: (contact) => contact.primaryPhone || "—",
+                cell: (contact) => {
+                  // 第二行只展示已填写的邮箱和电话。
+                  const reachable = [contact.primaryEmail, contact.primaryPhone]
+                    .filter(Boolean)
+                    .join(" · ")
+                  return (
+                    <div className="flex min-w-0 items-center gap-3">
+                      <ProfileAvatar
+                        imageURL={contact.avatarUrl}
+                        name={contact.displayName || t("anonymous")}
+                        className="size-9"
+                      />
+                      <span className="grid min-w-0 gap-0.5 leading-tight">
+                        <span className="truncate">
+                          <span className="font-medium">
+                            {contact.displayName || t("anonymous")}
+                          </span>
+                          {contact.stage ? (
+                            <>
+                              <span aria-hidden="true" className="mx-1.5 text-muted-foreground">·</span>
+                              <span className="text-muted-foreground">
+                                {t(`stages.${contact.stage}`)}
+                              </span>
+                            </>
+                          ) : null}
+                        </span>
+                        {reachable ? (
+                          <span className="truncate text-xs text-muted-foreground">
+                            {reachable}
+                          </span>
+                        ) : null}
+                      </span>
+                    </div>
+                  )
+                },
               },
               {
                 key: "channels",
                 header: t("columns.channels"),
-                cell: (contact) => contact.sourceChannelName,
+                cellClassName: "max-w-40 truncate text-muted-foreground",
+                cell: (contact) =>
+                  t("list.source", { channel: contact.sourceChannelName }),
               },
               {
                 key: "time",
                 header: deleted ? t("columns.deletedAt") : t("columns.addedAt"),
                 cellClassName: "whitespace-nowrap text-muted-foreground",
                 cell: (contact) =>
-                  formatDateTime(
-                    deleted && contact.deletedAt
-                      ? contact.deletedAt
-                      : contact.createdAt,
-                  ),
+                  deleted && contact.deletedAt
+                    ? t("trash.deletedAt", {
+                        time: formatShortDateTime(contact.deletedAt),
+                      })
+                    : t("list.addedAt", {
+                        time: formatShortDateTime(contact.createdAt),
+                      }),
               },
             ]}
             rows={contacts}
             rowKey={(contact) => contact.id}
             empty={deleted ? t("trash.empty") : t("list.empty")}
-            actions={(contact) =>
-              deleted
-                ? {
-                    primary: (
-                      <Button
-                        variant="outline"
-                        size="icon-sm"
-                        aria-label={t("trash.restore")}
-                        title={t("trash.restore")}
-                        onClick={() => setRestoringContact(contact)}
-                      >
-                        <ArchiveRestoreIcon />
-                      </Button>
-                    ),
-                  }
-                : {
-                    primary: (
-                      <Button
-                        variant="outline"
-                        size="icon-sm"
-                        aria-label={t("common:actions.view")}
-                        title={t("common:actions.view")}
-                        onClick={() => setParameters({ selected: contact.id })}
-                      >
-                        <EyeIcon />
-                      </Button>
-                    ),
-                    menu: (
-                      <DropdownMenuItem
-                        destructive
-                        onSelect={() => setDeletingContact(contact)}
-                      >
-                        {t("common:actions.delete")}
-                      </DropdownMenuItem>
-                    ),
-                  }
+            onRowActivate={
+              deleted ? undefined : (contact) => setParameters({ selected: contact.id })
             }
+            actions={(contact) => ({
+              primary: deleted ? (
+                <ListActionButton
+                  tone="success"
+                  onClick={() => setRestoringContact(contact)}
+                >
+                  {t("trash.restore")}
+                </ListActionButton>
+              ) : (
+                <ListActionButton
+                  tone="destructive"
+                  onClick={() => setDeletingContact(contact)}
+                >
+                  {t("common:actions.delete")}
+                </ListActionButton>
+              ),
+            })}
           />
         </ResourceListLayout>
       </section>

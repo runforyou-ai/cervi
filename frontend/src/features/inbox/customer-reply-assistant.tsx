@@ -76,6 +76,8 @@ export function CustomerReplyAssistant({
   const fieldPrefix = useId()
   const removeResource = useResourceRemover()
   const appliedRef = useRef(false)
+  const triggerRef = useRef<HTMLButtonElement>(null)
+  const [alignOffset, setAlignOffset] = useState(0)
   const [open, setOpen] = useState(false)
   const [mode, setMode] = useState(CustomerReplyMode.CustomerReplyModeReply)
   const storageKey = `cervi.inbox.replyAssistant.${currentIdentityID}`
@@ -184,6 +186,14 @@ export function CustomerReplyAssistant({
           : CustomerReplyMode.CustomerReplyModeReply,
       )
       setSource({ draft, replyToMessageID })
+      // 按按钮到输入区右边界的距离偏移，使弹层右边缘对齐主消息区右边界。
+      const trigger = triggerRef.current
+      const composer = trigger?.closest('[data-slot="conversation-composer"]')
+      setAlignOffset(
+        trigger && composer
+          ? trigger.getBoundingClientRect().right - composer.getBoundingClientRect().right
+          : 0,
+      )
     }
     setOpen(nextOpen)
   }
@@ -216,6 +226,7 @@ export function CustomerReplyAssistant({
 
   const trigger = (
     <Button
+      ref={triggerRef}
       type="button"
       variant="ghost"
       size="icon-sm"
@@ -438,8 +449,9 @@ export function CustomerReplyAssistant({
       <PopoverTrigger asChild>{trigger}</PopoverTrigger>
       <PopoverContent
         side="top"
-        align="start"
-        className="w-[min(36rem,calc(100vw-2rem))] space-y-3 p-3"
+        align="end"
+        alignOffset={alignOffset}
+        className="w-[min(27rem,calc(100vw-2rem))] space-y-3 p-3"
         onCloseAutoFocus={keepAppliedFocus}
       >
         <div className="flex items-center gap-2">

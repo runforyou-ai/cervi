@@ -23,15 +23,28 @@ export function useDateTime() {
     [i18n.resolvedLanguage, timeZone],
   )
 
+  /** 按用户时区拆出年月日时分秒。 */
+  function dateParts(value: string | Date) {
+    return Object.fromEntries(
+      formatter
+        .formatToParts(new Date(value))
+        .filter((part) => part.type !== "literal")
+        .map((part) => [part.type, part.value]),
+    )
+  }
+
   return {
     formatDateTime(value: string) {
-      const parts = Object.fromEntries(
-        formatter
-          .formatToParts(new Date(value))
-          .filter((part) => part.type !== "literal")
-          .map((part) => [part.type, part.value]),
-      )
+      const parts = dateParts(value)
       return `${parts.year}-${parts.month}-${parts.day} ${parts.hour}:${parts.minute}:${parts.second}`
+    },
+    /** 输出精确到分钟的短日期时间，不在今年时带上年份。 */
+    formatShortDateTime(value: string) {
+      const parts = dateParts(value)
+      const date = `${parts.month}/${parts.day} ${parts.hour}:${parts.minute}`
+      return parts.year === dateParts(new Date()).year
+        ? date
+        : `${parts.year}/${date}`
     },
   }
 }

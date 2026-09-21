@@ -22,6 +22,7 @@ import {
   ListToolbarReset,
   ListToolbarSearch,
 } from "@/components/list-toolbar"
+import { ListActionButton } from "@/components/list-action-button"
 import { PageHeader } from "@/components/page-header"
 import { ProfileAvatar } from "@/components/profile-avatar"
 import { ResourceListLayout } from "@/components/resource-list"
@@ -50,7 +51,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import { WorkStatusBadge, workStatusLabel } from "@/components/work-status"
+import { WorkStatusDot, workStatusLabel } from "@/components/work-status"
 import { useWorkspace } from "@/contexts/workspace-context"
 import { ContactCreateDialogs } from "@/features/contacts/contact-create-dialogs"
 import { ContactScopeMobileSelect } from "@/features/contacts/contact-scope-mobile-select"
@@ -79,7 +80,7 @@ export function TeamPanel({
   const { t: tCommon } = useTranslation("common")
   const { identity } = useWorkspace()
   const navigate = useNavigate()
-  const { formatDateTime } = useDateTime()
+  const { formatShortDateTime } = useDateTime()
   const invalidate = useResourceInvalidator()
   const {
     searchParams,
@@ -295,6 +296,18 @@ export function TeamPanel({
         </PageHeader>
 
         <ListToolbar>
+          <label className="flex h-7 items-center gap-2 px-1 text-sm">
+            <input
+              type="checkbox"
+              className="size-4 accent-primary"
+              disabled={teamMembers.length === 0}
+              checked={allVisibleTeamMembersSelected}
+              onChange={(event) =>
+                toggleAllVisibleTeamMembers(event.target.checked)
+              }
+            />
+            {tCommon("actions.selectAll")}
+          </label>
           <ListToolbarSearch
             value={search}
             aria-label={t("search.teamMembers")}
@@ -351,21 +364,12 @@ export function TeamPanel({
           }
         >
           <ResourceTable
+            hideHeader
             columns={[
               {
                 key: "select",
-                headerClassName: "w-10",
-                header: (
-                  <input
-                    type="checkbox"
-                    className="size-4 accent-primary"
-                    aria-label={t("teams.members.selectAll")}
-                    checked={allVisibleTeamMembersSelected}
-                    onChange={(event) =>
-                      toggleAllVisibleTeamMembers(event.target.checked)
-                    }
-                  />
-                ),
+                header: null,
+                cellClassName: "w-10",
                 cell: (member) => (
                   <input
                     type="checkbox"
@@ -385,60 +389,61 @@ export function TeamPanel({
               {
                 key: "memberName",
                 header: t("columns.memberName"),
-                cellClassName: "font-medium",
                 cell: (member) => (
-                  <div className="flex items-center gap-2.5">
-                    <ProfileAvatar
-                      imageURL={member.avatarUrl}
-                      name={member.displayName}
-                      fallback={
-                        member.identityType ===
-                        OrganizationIdentityType.OrganizationIdentityTypeAgent
-                          ? "agent"
-                          : "person"
-                      }
-                      className="size-7"
-                    />
-                    <span className="truncate">{member.displayName}</span>
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="relative size-9 shrink-0">
+                      <ProfileAvatar
+                        imageURL={member.avatarUrl}
+                        name={member.displayName}
+                        fallback={
+                          member.identityType ===
+                          OrganizationIdentityType.OrganizationIdentityTypeAgent
+                            ? "agent"
+                            : "person"
+                        }
+                        className="size-full"
+                      />
+                      <WorkStatusDot
+                        status={identityWorkStatus(member)}
+                        className="absolute -right-0.5 -bottom-0.5 ring-2 ring-background"
+                      />
+                    </span>
+                    <span className="truncate">
+                      <span className="font-medium">{member.displayName}</span>
+                      <span aria-hidden="true" className="mx-1.5 text-muted-foreground">·</span>
+                      <span className="text-muted-foreground">
+                        {t(
+                          member.identityType ===
+                            OrganizationIdentityType.OrganizationIdentityTypeAgent
+                            ? "identityCategories.agent"
+                            : "identityCategories.user",
+                        )}
+                      </span>
+                    </span>
                   </div>
-                ),
-              },
-              {
-                key: "type",
-                header: t("columns.type"),
-                cell: (member) =>
-                  t(
-                    member.identityType ===
-                      OrganizationIdentityType.OrganizationIdentityTypeAgent
-                      ? "identityCategories.agent"
-                      : "identityCategories.user",
-                  ),
-              },
-              {
-                key: "workStatus",
-                header: t("columns.workStatus"),
-                cell: (member) => (
-                  <WorkStatusBadge status={identityWorkStatus(member)} />
                 ),
               },
               {
                 key: "joinedAt",
                 header: t("columns.joinedAt"),
                 cellClassName: "whitespace-nowrap text-muted-foreground",
-                cell: (member) => formatDateTime(member.joinedAt),
+                cell: (member) =>
+                  t("teams.members.joinedAt", {
+                    time: formatShortDateTime(member.joinedAt),
+                  }),
               },
             ]}
             rows={teamMembers}
             rowKey={(member) => member.identityId}
             empty={t("list.empty")}
             actions={(member) => ({
-              menu: (
-                <DropdownMenuItem
-                  destructive
-                  onSelect={() => setRemovingTeamMembers([member])}
+              primary: (
+                <ListActionButton
+                  tone="destructive"
+                  onClick={() => setRemovingTeamMembers([member])}
                 >
                   {t("teams.members.remove")}
-                </DropdownMenuItem>
+                </ListActionButton>
               ),
             })}
           />

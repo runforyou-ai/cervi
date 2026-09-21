@@ -1,6 +1,5 @@
 /** 企业成员列表、筛选、详情和账号状态管理面板。 */
 import { useEffect, useState } from "react"
-import { EyeIcon, MessageSquareIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -24,11 +23,11 @@ import {
   ListToolbarReset,
   ListToolbarSearch,
 } from "@/components/list-toolbar"
+import { ListActionButton } from "@/components/list-action-button"
 import { PageHeader } from "@/components/page-header"
 import { ProfileAvatar } from "@/components/profile-avatar"
 import { ResourceListLayout } from "@/components/resource-list"
 import { ResourceTable } from "@/components/resource-table"
-import { Button } from "@/components/ui/button"
 import {
   AlertDialog,
   AlertDialogAction,
@@ -39,17 +38,13 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog"
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
-import { WorkStatusBadge } from "@/components/work-status"
+import { WorkStatusDot } from "@/components/work-status"
 import { useWorkspace } from "@/contexts/workspace-context"
 import { ContactCreateDialogs } from "@/features/contacts/contact-create-dialogs"
 import { ContactDetailSheet } from "@/features/contacts/contact-detail-sheet"
 import { ContactScopeMobileSelect } from "@/features/contacts/contact-scope-mobile-select"
-import { userStatusLabel } from "@/features/contacts/external/contact-labels"
-import { JoinedTeamsCell } from "@/features/contacts/joined-teams-cell"
 import { MemberDetailView } from "@/features/contacts/members/member-detail"
 import { useContactSearch } from "@/features/contacts/use-contact-search"
-import { UserStatusBadge } from "@/features/contacts/user-status-badge"
 import { roleDisplayName } from "@/lib/role-labels"
 import { useContactInvalidator } from "@/features/contacts/use-contact-invalidator"
 import { resourceKeys } from "@/hooks/resource-keys"
@@ -250,100 +245,74 @@ export function MembersPanel({
           }
         >
           <ResourceTable
+            hideHeader
             columns={[
               {
-                key: "employeeName",
+                key: "employee",
                 header: t("columns.employeeName"),
-                cellClassName: "font-medium",
+                cellClassName: "min-w-0",
                 cell: (user) => (
-                  <div className="flex items-center gap-2.5">
-                    <ProfileAvatar
-                      imageURL={user.avatarUrl}
-                      name={user.displayName}
-                      className="size-7"
-                    />
-                    <span className="truncate">{user.displayName}</span>
+                  <div className="flex min-w-0 items-center gap-3">
+                    <span className="relative size-9 shrink-0">
+                      <ProfileAvatar
+                        imageURL={user.avatarUrl}
+                        name={user.displayName}
+                        className="size-full"
+                      />
+                      <WorkStatusDot
+                        status={memberWorkStatus(user)}
+                        className="absolute -right-0.5 -bottom-0.5 ring-2 ring-background"
+                      />
+                    </span>
+                    <span className="grid min-w-0 gap-0.5 leading-tight">
+                      <span className="truncate">
+                        <span className="font-medium">{user.displayName}</span>
+                        <span aria-hidden="true" className="mx-1.5 text-muted-foreground">·</span>
+                        <span className="text-muted-foreground">
+                          {roleDisplayName(user.role, tCommon)}
+                        </span>
+                      </span>
+                      <span className="truncate text-xs text-muted-foreground">
+                        {user.email}
+                      </span>
+                    </span>
                   </div>
-                ),
-              },
-              {
-                key: "email",
-                header: t("columns.email"),
-                cellClassName: "text-muted-foreground",
-                cell: (user) => user.email,
-              },
-              {
-                key: "joinedTeams",
-                header: t("columns.joinedTeams"),
-                cellClassName: "max-w-xs",
-                cell: (user) => <JoinedTeamsCell teams={user.teams} />,
-              },
-              {
-                key: "role",
-                header: t("columns.role"),
-                cell: (user) => roleDisplayName(user.role, tCommon),
-              },
-              {
-                key: "accountStatus",
-                header: t("columns.accountStatus"),
-                cell: (user) => (
-                  <UserStatusBadge
-                    status={user.status}
-                    label={userStatusLabel(user.status, t)}
-                  />
-                ),
-              },
-              {
-                key: "workStatus",
-                header: t("columns.workStatus"),
-                cell: (user) => (
-                  <WorkStatusBadge status={memberWorkStatus(user)} />
                 ),
               },
             ]}
             rows={users}
             rowKey={(user) => user.id}
             empty={t("list.empty")}
+            onRowActivate={(user) => setParameters({ selected: user.id })}
             actions={(user) => ({
+              // 操作靠右对齐，不显示发消息的行中禁用按钮与其他行右端对齐。
               primary: (
-                <>
-                  <Button
-                    variant="outline"
-                    size="icon-sm"
-                    aria-label={t("sendMessage")}
-                    title={t("sendMessage")}
-                    disabled={
-                      user.status !== UserStatus.UserStatusActive ||
-                      user.identityId === identity.user.identityId
+                <div className="ml-auto flex items-center gap-1">
+                  {user.status === UserStatus.UserStatusActive &&
+                  user.identityId !== identity.user.identityId ? (
+                    <ListActionButton
+                      onClick={() =>
+                        navigate(`/inbox?scope=internal&target=${user.identityId}`)
+                      }
+                    >
+                      {t("sendMessage")}
+                    </ListActionButton>
+                  ) : null}
+                  <ListActionButton
+                    tone={
+                      user.status === UserStatus.UserStatusActive
+                        ? "destructive"
+                        : "success"
                     }
-                    onClick={() =>
-                      navigate(`/inbox?scope=internal&target=${user.identityId}`)
-                    }
+                    onClick={() => setChangingUserStatus(user)}
                   >
-                    <MessageSquareIcon />
-                  </Button>
-                  <Button
-                    variant="outline"
-                    size="icon-sm"
-                    aria-label={tCommon("actions.view")}
-                    title={tCommon("actions.view")}
-                    onClick={() => setParameters({ selected: user.id })}
-                  >
-                    <EyeIcon />
-                  </Button>
-                </>
-              ),
-              menu: (
-                <DropdownMenuItem
-                  destructive={user.status === UserStatus.UserStatusActive}
-                  onSelect={() => setChangingUserStatus(user)}
-                >
-                  {t(
-                    user.status === UserStatus.UserStatusActive
-                      ? "members.status.deactivate"
-                      : "members.status.reactivate",
-                  )}
-                </DropdownMenuItem>
+                    {t(
+                      user.status === UserStatus.UserStatusActive
+                        ? "members.status.deactivate"
+                        : "members.status.reactivate",
+                    )}
+                  </ListActionButton>
+                </div>
               ),
             })}
           />
