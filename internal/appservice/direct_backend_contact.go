@@ -40,7 +40,7 @@ func newContactOps(db *bun.DB) contactOps {
 // ListContacts 返回联系人列表。
 func (o *directOperations) ListContacts(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input ContactListInput) (ContactList, error) {
 	output, err := o.listContacts.Execute(ctx, identity, contactaction.ListInput{
-		Query: input.Query, Stage: optionalDomain[ContactStage, domain.ContactStage](input.Stage), ChannelID: input.ChannelID, MethodType: optionalDomain[ContactMethodType, domain.ContactMethodType](input.MethodType),
+		Query: input.Query, Stage: optionalDomain[ContactStage, domain.ContactStage](input.Stage), ChannelID: input.ChannelID, ChannelType: optionalDomain[ChannelType, domain.ChannelType](input.ChannelType), MethodType: optionalDomain[ContactMethodType, domain.ContactMethodType](input.MethodType),
 		Sort: domain.ContactSort(input.Sort), Page: input.Page, PageSize: input.PageSize, Deleted: input.Deleted,
 	})
 	if validationError, ok := errors.AsType[*common.FieldError](err); ok {

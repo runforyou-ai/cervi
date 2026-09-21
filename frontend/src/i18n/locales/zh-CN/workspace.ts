@@ -8,6 +8,7 @@ const workspace = {
   historyForward: "前进",
   inbox: "消息",
   contacts: "通讯录",
+  channels: "渠道",
   knowledgeBases: "知识库",
   settings: "设置",
   appVersion: "版本 {{version}}",

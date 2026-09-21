@@ -936,9 +936,9 @@ function ConversationTimelineContent({
                 <div key={message.id}>
                   {startsDay ? (
                     <div className="my-3 flex items-center gap-2.5 text-[11px] font-medium text-muted-foreground">
-                      <span className="h-px flex-1 bg-border" />
+                      <span className="h-px flex-1 bg-border/50" />
                       <time dateTime={day}>{formatDayLabel(date)}</time>
-                      <span className="h-px flex-1 bg-border" />
+                      <span className="h-px flex-1 bg-border/50" />
                     </div>
                   ) : null}
                   {message.sessionStart ? (
@@ -1097,7 +1097,7 @@ function ConversationTimelineContent({
                                     </button>
                                   ) : null}
                                   {message.agentProcess ? (
-                                    <AgentProcess process={message.agentProcess} incoming={incoming} onPrimary={!incoming && !agentNotice} onToggle={viewport.stopFollowing} />
+                                    <AgentProcess process={message.agentProcess} onPrimary={!incoming && !agentNotice} onToggle={viewport.stopFollowing} />
                                   ) : null}
                                   {/* 时间跟随正文末行，正文按整行宽度排版。 */}
                                   <div

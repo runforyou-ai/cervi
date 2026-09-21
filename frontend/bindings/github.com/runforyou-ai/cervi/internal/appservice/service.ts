@@ -577,6 +577,13 @@ export function ListAgents(meta: $models.RequestMeta, input: $models.AgentListIn
 }
 
 /**
+ * ListAllTeamMembers 返回企业所有团队的成员列表，同一身份只列一次。
+ */
+export function ListAllTeamMembers(meta: $models.RequestMeta, input: $models.TeamMemberListInput): $CancellablePromise<$models.TeamMemberList> {
+    return $Call.ByID(3827649919, meta, input);
+}
+
+/**
  * ListAvailableAIModels 返回指定品牌的预设模型目录。
  */
 export function ListAvailableAIModels(meta: $models.RequestMeta, brand: $models.AIProviderBrand): $CancellablePromise<$models.AIProviderModelList> {

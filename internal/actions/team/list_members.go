@@ -50,25 +50,50 @@ func NewListMembersQuery(db *bun.DB) *ListMembersQuery {
 
 // Execute 返回团队成员分页列表。
 func (q *ListMembersQuery) Execute(ctx context.Context, identity *servermodels.Identity, teamID string, input MemberListInput) (MemberListOutput, error) {
+	input, err := normalizeMemberListInput(input)
+	if err != nil {
+		return MemberListOutput{}, err
+	}
+	if _, err := loadTeam(ctx, q.db, identity.Organization.ID, teamID); err != nil {
+		return MemberListOutput{}, err
+	}
+	return q.list(ctx, identity, teamID, input)
+}
+
+// ExecuteAll 返回企业所有团队的成员分页列表，同一身份只列一次，加入时间取最早加入团队的时间。
+func (q *ListMembersQuery) ExecuteAll(ctx context.Context, identity *servermodels.Identity, input MemberListInput) (MemberListOutput, error) {
+	input, err := normalizeMemberListInput(input)
+	if err != nil {
+		return MemberListOutput{}, err
+	}
+	return q.list(ctx, identity, "", input)
+}
+
+// normalizeMemberListInput 规范化并校验团队成员列表查询条件。
+func normalizeMemberListInput(input MemberListInput) (MemberListInput, error) {
 	input.Query = strings.TrimSpace(input.Query)
 	input.WorkStatus = domain.WorkStatus(strings.TrimSpace(string(input.WorkStatus)))
 	var pageValid bool
 	input.Page, input.PageSize, pageValid = common.NormalizePagination(input.Page, input.PageSize)
 	if !pageValid {
-		return MemberListOutput{}, &common.FieldError{Fields: map[string]common.FieldCode{"query": ValidationQueryInvalid}}
+		return input, &common.FieldError{Fields: map[string]common.FieldCode{"query": ValidationQueryInvalid}}
 	}
 	if input.WorkStatus != "" && input.WorkStatus != domain.WorkStatusWorking && input.WorkStatus != domain.WorkStatusAway && input.WorkStatus != domain.WorkStatusOffDuty {
-		return MemberListOutput{}, &common.FieldError{Fields: map[string]common.FieldCode{"workStatus": ValidationWorkStatusInvalid}}
+		return input, &common.FieldError{Fields: map[string]common.FieldCode{"workStatus": ValidationWorkStatusInvalid}}
 	}
-	if _, err := loadTeam(ctx, q.db, identity.Organization.ID, teamID); err != nil {
-		return MemberListOutput{}, err
-	}
+	return input, nil
+}
+
+// list 按团队读取成员分页列表；teamID 为空时读取所有团队并按身份去重。
+func (q *ListMembersQuery) list(ctx context.Context, identity *servermodels.Identity, teamID string, input MemberListInput) (MemberListOutput, error) {
 	applyFilters := func(query *bun.SelectQuery) *bun.SelectQuery {
 		query = query.
 			Where("tm.organization_id = ?", identity.Organization.ID).
-			Where("tm.team_id = ?", teamID).
 			Where("oi.type IN (?, ?)", domain.OrganizationIdentityTypeUser, domain.OrganizationIdentityTypeAgent).
 			Where("((oi.type = ? AND u.status = ?) OR (oi.type = ? AND a.status = ?))", domain.OrganizationIdentityTypeUser, domain.UserStatusActive, domain.OrganizationIdentityTypeAgent, domain.UserStatusActive)
+		if teamID != "" {
+			query = query.Where("tm.team_id = ?", teamID)
+		}
 		if input.WorkStatus != "" {
 			query = query.Where("oi.work_status = ?", input.WorkStatus)
 		}
@@ -83,13 +108,15 @@ func (q *ListMembersQuery) Execute(ctx context.Context, identity *servermodels.I
 			Join("LEFT JOIN users AS u ON u.identity_id = oi.id AND u.organization_id = oi.organization_id").
 			Join("LEFT JOIN agents AS a ON a.identity_id = oi.id AND a.organization_id = oi.organization_id")
 	}
-	total, err := applyFilters(base()).Count(ctx)
-	if err != nil {
+	// 按身份去重计数，单个团队内每个身份只出现一次。
+	var total int
+	if err := applyFilters(base()).ColumnExpr("count(DISTINCT oi.id)").Scan(ctx, &total); err != nil {
 		return MemberListOutput{}, fmt.Errorf("count team members: %w", err)
 	}
 	members := make([]Member, 0)
 	if err := applyFilters(base()).
-		ColumnExpr("oi.id::text AS identity_id, oi.type AS identity_type, u.id::text AS user_id, a.id::text AS agent_id, oi.display_name, oi.avatar_file_id::text AS avatar_file_id, oi.work_status, tm.created_at AS joined_at").
+		ColumnExpr("oi.id::text AS identity_id, oi.type AS identity_type, u.id::text AS user_id, a.id::text AS agent_id, oi.display_name, oi.avatar_file_id::text AS avatar_file_id, oi.work_status, min(tm.created_at) AS joined_at").
+		GroupExpr("oi.id, oi.type, u.id, a.id, oi.display_name, oi.avatar_file_id, oi.work_status").
 		OrderExpr("lower(oi.display_name) ASC, oi.id ASC").
 		Limit(input.PageSize).
 		Offset((input.Page-1)*input.PageSize).

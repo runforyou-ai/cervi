@@ -136,7 +136,7 @@ func (s *Service) writeContactList(c *gin.Context, deleted bool) {
 		return
 	}
 	contacts, err := s.application.ListContacts(c.Request.Context(), requestMeta(c), appservice.ContactListInput{
-		Query: c.Query("query"), Stage: optionalEnum[appservice.ContactStage](c.Query("stage")), ChannelID: c.Query("channelId"), MethodType: optionalEnum[appservice.ContactMethodType](c.Query("methodType")),
+		Query: c.Query("query"), Stage: optionalEnum[appservice.ContactStage](c.Query("stage")), ChannelID: c.Query("channelId"), ChannelType: optionalEnum[appservice.ChannelType](c.Query("channelType")), MethodType: optionalEnum[appservice.ContactMethodType](c.Query("methodType")),
 		Sort: appservice.ContactSort(c.Query("sort")), Page: page, PageSize: pageSize, Deleted: deleted,
 	})
 	writeResult(c, http.StatusOK, contacts, err)

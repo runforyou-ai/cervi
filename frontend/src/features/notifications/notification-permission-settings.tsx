@@ -32,14 +32,14 @@ export function NotificationPermissionSettings() {
         return
       }
       if (canSendNotification(nextStatus)) {
-        toast.success(t("preferences.notifications.permission.allowSuccess"))
+        toast.success(t("notifications.permission.allowSuccess"))
         return
       }
       if (
         nextStatus !==
         NotificationPermissionStatus.NotificationPermissionStatusDenied
       ) {
-        toast.error(t("preferences.notifications.permission.allowDenied"))
+        toast.error(t("notifications.permission.allowDenied"))
         return
       }
     } catch (error) {
@@ -53,36 +53,37 @@ export function NotificationPermissionSettings() {
       }
     } catch (error) {
       console.warn("打开 macOS 通知设置失败", error)
-      toast.error(t("preferences.notifications.permission.settingsOpenError"))
+      toast.error(t("notifications.permission.settingsOpenError"))
       return
     }
     toast.error(
       t(
         requestFailed
-          ? "preferences.notifications.permission.allowError"
-          : "preferences.notifications.permission.allowDenied",
+          ? "notifications.permission.allowError"
+          : "notifications.permission.allowDenied",
       ),
     )
   }
 
   return (
-    <Field orientation="horizontal">
+    // 与通知开关卡片保持同一外观。
+    <Field orientation="horizontal" className="rounded-lg border p-4">
       <FieldContent>
         <FieldTitle>
-          {t("preferences.notifications.permission.label")}
+          {t("notifications.permission.label")}
         </FieldTitle>
         <FieldDescription>
           {authorized
-            ? t("preferences.notifications.permission.authorizedDescription")
+            ? t("notifications.permission.authorizedDescription")
             : t(
-                "preferences.notifications.permission.unauthorizedDescription",
+                "notifications.permission.unauthorizedDescription",
               )}
         </FieldDescription>
       </FieldContent>
       <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
         {authorized ? (
           <span className="rounded-full bg-muted px-2 py-1 text-xs font-medium text-muted-foreground">
-            {t("preferences.notifications.permission.authorized")}
+            {t("notifications.permission.authorized")}
           </span>
         ) : (
           <Button
@@ -94,8 +95,8 @@ export function NotificationPermissionSettings() {
           >
             {requesting ? <LoaderCircleIcon className="animate-spin" /> : null}
             {requesting
-              ? t("preferences.notifications.permission.allowing")
-              : t("preferences.notifications.permission.allow")}
+              ? t("notifications.permission.allowing")
+              : t("notifications.permission.allow")}
           </Button>
         )}
       </div>

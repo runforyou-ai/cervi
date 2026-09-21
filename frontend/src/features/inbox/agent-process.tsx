@@ -169,8 +169,8 @@ function AgentTool({ call, onToggle }: { call: AgentToolCall; onToggle: () => vo
   )
 }
 
-/** 沿头像侧对齐思考标题、右上角显示本次模型用量，首次展开时按运行编号读取过程内容。onPrimary 表示内容位于主色气泡内，决定配色；incoming 只决定对齐方向；onToggle 在展开或收起时暂停消息视口自动贴底。 */
-export function AgentProcess({ process, incoming, onPrimary, onToggle }: { process: ConversationAgentProcessData; incoming: boolean; onPrimary: boolean; onToggle: () => void }) {
+/** 思考标题与过程内容在气泡内靠左排列、右上角显示本次模型用量，首次展开时按运行编号读取过程内容。onPrimary 表示内容位于主色气泡内，决定配色；onToggle 在展开或收起时暂停消息视口自动贴底。 */
+export function AgentProcess({ process, onPrimary, onToggle }: { process: ConversationAgentProcessData; onPrimary: boolean; onToggle: () => void }) {
   const { t, i18n } = useTranslation(["inbox", "common"])
   const [opened, setOpened] = useState(false)
   const mobile = resolveAppPlatform() === "mobile"
@@ -185,8 +185,7 @@ export function AgentProcess({ process, incoming, onPrimary, onToggle }: { proce
     <Collapsible className="mb-3 min-w-0" onOpenChange={(open) => { onToggle(); if (open) setOpened(true) }}>
       <div className="flex items-center gap-2">
         <CollapsibleTrigger className={cn(
-          "group flex min-w-0 flex-1 cursor-pointer items-center gap-1.5 rounded-sm py-1 text-left text-xs focus-visible:outline focus-visible:outline-ring",
-          incoming ? "justify-start" : "justify-end",
+          "group flex min-w-0 flex-1 cursor-pointer items-center justify-start gap-1.5 rounded-sm py-1 text-left text-xs focus-visible:outline focus-visible:outline-ring",
           onPrimary ? "text-accent-foreground/75" : "text-muted-foreground",
           // 移动端按触屏点击区域抬高行高，点击区不与引用块和正文重叠。
           mobile && "py-2",
@@ -204,9 +203,7 @@ export function AgentProcess({ process, incoming, onPrimary, onToggle }: { proce
         </div>
       </div>
       <CollapsibleContent className={cn(
-        "mt-2 space-y-3 text-left text-sm",
-        incoming ? "pl-3" : "pr-3",
-        incoming ? "border-l" : "border-r",
+        "mt-2 space-y-3 border-l pl-3 text-left text-sm",
         onPrimary ? "border-accent-foreground/30" : "border-border",
       )}>
         {detail.data ? detail.data.blocks.map((block) =>
@@ -385,7 +382,7 @@ export function AgentRunState({ run, incoming, conversationID, group, copilot, o
           </Collapsible>
         ) : (
           <>
-            {run.process ? <AgentProcess process={run.process} incoming={incoming} onPrimary={false} onToggle={onToggle} /> : null}
+            {run.process ? <AgentProcess process={run.process} onPrimary={false} onToggle={onToggle} /> : null}
             <div className="flex items-center gap-1.5">
               {cancelled ? <BrainIcon aria-hidden className="size-4" /> : null}
               <span>{label}</span>

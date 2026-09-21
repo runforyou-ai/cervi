@@ -172,6 +172,8 @@
   "messenger.attachment_unavailable": "附件接收失败",
   "messenger.session_open": "处理中",
   "messenger.session_closed": "已结束",
+  "messenger.day_today": "今天",
+  "messenger.day_yesterday": "昨天",
   "error.internal": "服务暂时不可用，请稍后重试。",
   "error.method_not_allowed": "不支持此请求方法。",
   "error.installation_status_read_failed": "读取安装状态失败。",

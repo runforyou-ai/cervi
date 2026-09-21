@@ -97,7 +97,8 @@ export function KnowledgeBaseFormPage({
   const form = useForm<KnowledgeBaseFormValues>({
     resolver: zodResolver(schema),
     shouldUseNativeValidation: true,
-    mode: "onBlur",
+    // 编辑时离开字段即校验以便自动保存；新建时等提交再校验，避免原生校验把焦点锁在必填项上。
+    mode: mode === "edit" ? "onBlur" : "onSubmit",
     defaultValues: {
       name: "",
       description: "",
@@ -289,7 +290,7 @@ export function KnowledgeBaseFormPage({
       >
         {mode === "edit" ? <PageBackButton to={cancelPath} /> : null}
       </PageHeader>
-      <PageContent>
+      <PageContent variant="form">
         {loading ? (
           <LoadingIndicator className="min-h-48 justify-center rounded-lg border">
             {t("common:status.loading")}
@@ -313,7 +314,7 @@ export function KnowledgeBaseFormPage({
           </div>
         ) : (
           <form
-            className="w-full max-w-3xl space-y-9"
+            className="w-full space-y-9"
             onSubmit={form.handleSubmit((values) => submit(values))}
             noValidate
           >
@@ -394,7 +395,10 @@ export function KnowledgeBaseFormPage({
               <KnowledgeBaseSettingsFields control={form.control} isQA={isQA} providers={providers.data?.providers ?? []} />
             </FieldGroup>
             {mode === "create" ? (
-              <div className="flex items-center gap-3">
+              <div className="flex items-center justify-end gap-2">
+                <Button type="button" variant="outline" asChild>
+                  <Link to={cancelPath}>{t("common:actions.cancel")}</Link>
+                </Button>
                 <Button
                   ref={saveButton}
                   type="submit"
@@ -403,9 +407,6 @@ export function KnowledgeBaseFormPage({
                   {form.formState.isSubmitting
                     ? t("common:actions.saving")
                     : t("common:actions.create")}
-                </Button>
-                <Button type="button" variant="outline" asChild>
-                  <Link to={cancelPath}>{t("common:actions.cancel")}</Link>
                 </Button>
               </div>
             ) : null}

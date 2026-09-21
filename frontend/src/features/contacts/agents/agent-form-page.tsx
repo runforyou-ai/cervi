@@ -86,7 +86,7 @@ export function AgentFormPage({ mode }: { mode: "create" | "edit" }) {
       >
         {mode === "edit" ? <PageBackButton to={returnTo} /> : null}
       </PageHeader>
-      <PageContent>
+      <PageContent variant="form">
         {loading ? (
           <LoadingIndicator className="min-h-48 justify-center">
             {t("common:status.loading")}
@@ -125,7 +125,6 @@ export function AgentFormPage({ mode }: { mode: "create" | "edit" }) {
           <Tabs
             key={agent.id}
             value={tab}
-            className="max-w-2xl"
             onValueChange={(value) => {
               const next = new URLSearchParams(searchParams)
               next.set("tab", value)

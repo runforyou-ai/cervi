@@ -27,6 +27,7 @@ export function ContactsPage({
   const [searchParams] = useSearchParams()
   const deleted = scope === "external" && searchParams.get("view") === "trash"
   const channelId = searchParams.get("channelId") ?? ""
+  const channelType = searchParams.get("channelType") ?? ""
 
   const channelsResource = useResource(
     resourceKeys.channelOptions(),
@@ -52,13 +53,14 @@ export function ContactsPage({
 
   return (
     <PageSplit
-      paneWidth="md"
+      paneWidth="nav"
       paneVariant="nav"
       pane={
         <ContactScopeSidebar
           scope={scope}
           deleted={deleted}
           channelId={channelId}
+          channelType={channelType}
           channels={channels}
           teamId={teamId}
           teams={teams}

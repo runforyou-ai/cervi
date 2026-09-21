@@ -8,6 +8,7 @@ const workspace = {
   historyForward: "Forward",
   inbox: "Messages",
   contacts: "Contacts",
+  channels: "Channels",
   knowledgeBases: "Knowledge bases",
   settings: "Settings",
   appVersion: "Version {{version}}",

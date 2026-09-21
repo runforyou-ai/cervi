@@ -1,11 +1,11 @@
 /** 移动端个人中心、工作状态切换和个人设置子页。 */
 import { useState } from "react"
-import { CheckIcon, ChevronRightIcon } from "lucide-react"
+import { ChevronRightIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Link, useNavigate } from "react-router"
 import { toast } from "sonner"
 
-import { WorkStatus, logout, updateUserWorkStatus } from "@/api"
+import { logout, updateUserWorkStatus, type WorkStatus } from "@/api"
 import {
   MobilePageHeader,
   MobileScrollArea,
@@ -24,19 +24,10 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { UserAvatar } from "@/components/user-avatar"
-import {
-  selectableWorkStatuses,
-  WorkStatusDot,
-  workStatusLabel,
-} from "@/components/work-status"
+import { WorkStatusDot, WorkStatusPicker } from "@/components/work-status"
 import { ChangePasswordForm } from "@/features/settings/change-password-form"
+import { NotificationSettingsForm } from "@/features/settings/notification-settings-form"
 import { ProfileSettingsForm } from "@/features/settings/profile-settings-form"
 import { UserPreferencesForm } from "@/features/settings/user-preferences-form"
 import { resourceKeys } from "@/hooks/resource-keys"
@@ -93,12 +84,8 @@ export function MobileMePage() {
     <section className="flex h-full min-h-0 flex-col">
       <MobilePageHeader title={t("me.title")} />
       <MobileScrollArea storageKey="me" className="pt-2 pb-6">
-        <Link
-          to="/me/profile"
-          state={{ mobileBack: true }}
-          aria-label={t("me.profile")}
-          className="flex items-center gap-3 px-4 py-4 text-left outline-none active:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-        >
+        {/* 与桌面端用户菜单一致：名字下方直接切换工作状态，资料编辑走下方入口。 */}
+        <div className="flex items-center gap-3 px-4 py-4">
           <span className="relative shrink-0">
             <UserAvatar
               user={identity.user}
@@ -109,62 +96,21 @@ export function MobileMePage() {
               className="absolute -right-0.5 -bottom-0.5 size-3.5 ring-2 ring-background"
             />
           </span>
-          <span className="min-w-0 flex-1">
-            <span className="block truncate text-base font-semibold">
+          <div className="grid min-w-0 flex-1 gap-1.5">
+            <span className="truncate text-base font-semibold">
               {identity.user.displayName}
             </span>
-            <span className="mt-1 block truncate text-sm text-muted-foreground">
-              {identity.user.email}
-            </span>
-          </span>
-          <ChevronRightIcon
-            className="size-5 shrink-0 text-muted-foreground"
-            aria-hidden="true"
-          />
-        </Link>
+            <WorkStatusPicker
+              status={identity.user.workStatus}
+              handlesCustomers={identity.user.handlesCustomers}
+              disabled={changingWorkStatus}
+              itemClassName="min-h-11"
+              onChange={(workStatus) => void changeWorkStatus(workStatus)}
+            />
+          </div>
+        </div>
         <div className="divide-y border-y">
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button
-                type="button"
-                className={rowClassName}
-                disabled={changingWorkStatus}
-              >
-                <span className="flex-1">{t("workspace:workStatus")}</span>
-                <span className="flex items-center gap-2 text-muted-foreground">
-                  <WorkStatusDot status={identity.user.workStatus} />
-                  {workStatusLabel(identity.user.workStatus, tCommon)}
-                </span>
-                <ChevronRightIcon
-                  className="size-5 shrink-0 text-muted-foreground"
-                  aria-hidden="true"
-                />
-              </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className={identity.user.handlesCustomers ? "w-60" : "w-44"}>
-              {selectableWorkStatuses.map((workStatus) => (
-                <DropdownMenuItem
-                  key={workStatus}
-                  className="min-h-11"
-                  onSelect={() => void changeWorkStatus(workStatus)}
-                >
-                  <WorkStatusDot status={workStatus} className="size-2" />
-                  <span className="grid flex-1 gap-0.5">
-                    {workStatusLabel(workStatus, tCommon)}
-                    {identity.user.handlesCustomers && workStatus === WorkStatus.WorkStatusWorking ? (
-                      <span className="text-xs text-muted-foreground">
-                        {t("workspace:workStatusWorkingHint")}
-                      </span>
-                    ) : null}
-                  </span>
-                  {identity.user.workStatus === workStatus ? (
-                    <CheckIcon className="text-primary" />
-                  ) : null}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-          {(["security", "preferences"] as const).map((section) => (
+          {(["profile", "security", "preferences", "notifications"] as const).map((section) => (
             <Link
               key={section}
               to={`/me/${section}`}
@@ -220,18 +166,20 @@ export function MobileMePage() {
 export function MobileMeSettingsPage({
   section,
 }: {
-  section: "profile" | "security" | "preferences"
+  section: "profile" | "security" | "preferences" | "notifications"
 }) {
   const { t } = useTranslation("mobile")
   const { identity } = useMobileWorkspace()
   return (
     <section className="flex h-full min-h-0 flex-col">
       <MobilePageHeader title={t(`me.${section}`)} backTo="/me" />
-      <div className="min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
+      <div className="cervi-form min-h-0 flex-1 overflow-y-auto overscroll-contain p-4">
         {section === "profile" ? (
           <ProfileSettingsForm user={identity.user} />
         ) : section === "security" ? (
           <ChangePasswordForm />
+        ) : section === "notifications" ? (
+          <NotificationSettingsForm user={identity.user} />
         ) : (
           <UserPreferencesForm user={identity.user} />
         )}

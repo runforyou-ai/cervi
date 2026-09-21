@@ -6,7 +6,7 @@ import { Link } from "react-router"
 
 import { Button } from "@/components/ui/button"
 
-/** 统一表单提交状态，允许在保存与取消之间插入业务操作；自动保存的表单只保留业务操作。 */
+/** 统一表单提交状态，允许在取消之前插入业务操作；自动保存的表单只保留业务操作。 */
 export function FormActions({
   saving,
   disabled = false,
@@ -23,18 +23,19 @@ export function FormActions({
   const { t } = useTranslation("common")
   if (!submit) {
     return children ? (
-      <div className="flex items-center gap-2">{children}</div>
+      <div className="flex items-center justify-end gap-2">{children}</div>
     ) : null
   }
+  // 操作靠右排列：业务操作、取消、保存，主操作固定在最右。
   return (
-    <div className="flex items-center gap-2">
-      <Button type="submit" disabled={saving || disabled}>
-        {saving ? <LoaderCircleIcon className="animate-spin" /> : null}
-        {saving ? t("actions.saving") : t("actions.save")}
-      </Button>
+    <div className="flex items-center justify-end gap-2">
       {children}
       <Button type="button" variant="outline" asChild>
         <Link to={cancelTo}>{t("actions.cancel")}</Link>
+      </Button>
+      <Button type="submit" disabled={saving || disabled}>
+        {saving ? <LoaderCircleIcon className="animate-spin" /> : null}
+        {saving ? t("actions.saving") : t("actions.save")}
       </Button>
     </div>
   )

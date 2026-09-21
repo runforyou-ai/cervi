@@ -59,6 +59,12 @@
     --color-badge-website: var(--badge-website);
     --color-badge-telegram: var(--badge-telegram);
     --color-badge-wechat: var(--badge-wechat);
+    --color-file-pdf: var(--file-pdf);
+    --color-file-word: var(--file-word);
+    --color-file-sheet: var(--file-sheet);
+    --color-file-slide: var(--file-slide);
+    --color-file-code: var(--file-code);
+    --color-file-text: var(--file-text);
     --color-accent-foreground: var(--accent-foreground);
     --color-accent: var(--accent);
     --color-muted-foreground: var(--muted-foreground);
@@ -115,6 +121,14 @@
     --badge-website: oklch(0.6578 0.1846 253.49);
     --badge-telegram: oklch(0.68 0.12 230);
     --badge-wechat: oklch(0.62 0.15 149.5);
+
+    /* 知识库文档格式图标色，沿用常见办公文档的配色惯例。 */
+    --file-pdf: oklch(0.58 0.21 27);
+    --file-word: oklch(0.55 0.17 258);
+    --file-sheet: oklch(0.56 0.14 150);
+    --file-slide: oklch(0.64 0.17 45);
+    --file-code: oklch(0.55 0.17 300);
+    --file-text: oklch(0.55 0.016 286);
 
     --border: oklch(0.90 0.004 286.32);
     --input: oklch(0.90 0.004 286.32);
@@ -176,6 +190,13 @@
     --badge-website: oklch(0.6578 0.1846 253.49);
     --badge-telegram: oklch(0.68 0.12 230);
     --badge-wechat: oklch(0.6800 0.1500 149.5);
+
+    --file-pdf: oklch(0.70 0.17 25);
+    --file-word: oklch(0.70 0.14 258);
+    --file-sheet: oklch(0.72 0.13 150);
+    --file-slide: oklch(0.75 0.14 55);
+    --file-code: oklch(0.72 0.14 300);
+    --file-text: oklch(0.72 0.015 286);
 
     --border: oklch(1 0 0 / 10%);
     --input: oklch(1 0 0 / 15%);
@@ -267,6 +288,35 @@ body,
   display: none;
 }
 
+/*
+  窗口拖动区域统一显示箭头：光标为 auto 时 WebKit 会把按住拖动识别为文本选择而显示输入光标，
+  原生应用的标题栏始终是箭头。拖动区域内的输入框恢复文本光标。
+*/
+[data-native-os="darwin"][data-window-fullscreen="false"] :is(
+    .cervi-window-drag-region,
+    .cervi-workspace-rail,
+    .cervi-workspace-top-drag-region
+  ) {
+  cursor: default;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+[data-native-os="darwin"][data-window-fullscreen="false"] .cervi-workspace-rail :is(input, textarea) {
+  cursor: text;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+/* 会话窗口只有顶部留白用于拖动：留白显示箭头，内容区恢复默认光标。 */
+[data-native-os="darwin"][data-window-fullscreen="false"] .cervi-conversation-window {
+  cursor: default;
+}
+
+[data-native-os="darwin"][data-window-fullscreen="false"] .cervi-conversation-window > * {
+  cursor: auto;
+}
+
 [data-native-os="darwin"][data-window-fullscreen="false"] > .cervi-window-drag-region {
   --wails-draggable: drag;
   position: fixed;
@@ -298,6 +348,8 @@ body,
 */
 .cervi-workspace-shell {
   --cervi-workspace-chrome-top: color-mix(in oklab, var(--sidebar), black 3.5%);
+  /* 底部与顶部对称加深，主内容卡片底边与消息输入区的浅灰底拉开对比。 */
+  --cervi-workspace-chrome-bottom: color-mix(in oklab, var(--sidebar), black 3.5%);
   --cervi-workspace-rail-width: 220px;
   --cervi-workspace-content-inset: 6px;
   --cervi-workspace-content-gutter: 10px;
@@ -318,12 +370,15 @@ body,
       180deg,
       var(--cervi-workspace-chrome-top) 0px,
       var(--sidebar) 120px,
-      var(--sidebar) 100%
+      var(--sidebar) calc(100% - 120px),
+      var(--cervi-workspace-chrome-bottom) 100%
     );
 }
 
 .dark .cervi-workspace-shell {
   --cervi-workspace-chrome-top: color-mix(in oklab, var(--sidebar), black 20%);
+  /* 深色主题下消息输入区比工作台底色更暗，底部保持侧栏色即可形成对比。 */
+  --cervi-workspace-chrome-bottom: var(--sidebar);
 }
 
 .cervi-workspace-rail {
@@ -335,6 +390,14 @@ body,
 .cervi-workspace-content-frame {
   margin: var(--cervi-workspace-content-top) var(--cervi-workspace-content-gutter)
     var(--cervi-workspace-content-gutter) var(--cervi-workspace-content-inset);
+}
+
+/* 分栏页面由左栏和主区各自作为圆角卡片铺底色：主内容卡片本身透明、无阴影，两栏之间的缝透出工作台底色。 */
+@media (min-width: 48rem) {
+  .cervi-workspace-content-frame:has([data-slot="page-split"]) {
+    background-color: transparent;
+    box-shadow: none;
+  }
 }
 
 /* 标题栏操作与窗口按钮同一水平线，macOS 上向右让开窗口按钮。 */
@@ -467,4 +530,25 @@ body,
   .cervi-page-gutter {
     padding-inline: max(1.25rem, calc((100% - var(--page-max, 900px)) / 2));
   }
+}
+
+/*
+  表单的统一字段样式：字段间距放宽，字段内的输入框、下拉框和多行文本框加高、加大圆角并带浅色底。
+  由表单页内容区和弹窗、侧滑面板容器启用；只作用于表单字段内的控件，列表、表格和工具栏里的输入框保持组件默认样式。
+*/
+.cervi-form [data-slot=field-group] {
+  gap: 1.5rem;
+}
+
+.cervi-form [data-slot=field] :is([data-slot=input], [data-slot=native-select], [data-slot=select-trigger]) {
+  height: 2.75rem;
+}
+
+.cervi-form [data-slot=field] :is([data-slot=input], [data-slot=native-select], [data-slot=select-trigger], [data-slot=textarea]) {
+  border-radius: var(--radius);
+  background-color: color-mix(in oklab, var(--muted) 60%, transparent);
+}
+
+.dark .cervi-form [data-slot=field] :is([data-slot=input], [data-slot=native-select], [data-slot=select-trigger], [data-slot=textarea]) {
+  background-color: color-mix(in oklab, var(--muted) 50%, transparent);
 }

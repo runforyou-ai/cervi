@@ -104,6 +104,10 @@
     open: messenger.getAttribute("data-session-open"),
     closed: messenger.getAttribute("data-session-closed"),
   };
+  var dayLabels = {
+    today: messenger.getAttribute("data-day-today"),
+    yesterday: messenger.getAttribute("data-day-yesterday"),
+  };
   var emojiPanel = document.getElementById("cv-emoji");
   var moreMenu = document.getElementById("cv-more-menu");
   var moreToggle = document.getElementById("cv-more-toggle");
@@ -394,10 +398,9 @@
         activeConversation.creating !== null);
     var empty = input.value.trim() === "";
     sendButton.disabled = empty || blocked;
-    // 输入内容后附件和录音入口换成发送按钮，输入框宽度变化后重新计算高度。
+    // 输入内容后录音入口换成发送按钮，左侧附件入口保持可用；输入框宽度变化后重新计算高度。
     if (sendButton.hidden !== empty) {
       sendButton.hidden = empty;
-      $("cv-attach").hidden = !empty;
       $("cv-voice").hidden = !empty;
       autosize();
     }
@@ -518,11 +521,64 @@
     );
   }
 
-  // 按发送人和时间间隔划分当前会话消息组，只在组内最后一条显示头像。
+  // 返回日期分割线文案：今天、昨天，今年的只显示月日，其余显示完整日期。
+  function dayLabel(date) {
+    var now = new Date();
+    var yesterday = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 1);
+    if (date.toDateString() === now.toDateString()) {
+      return dayLabels.today;
+    }
+    if (date.toDateString() === yesterday.toDateString()) {
+      return dayLabels.yesterday;
+    }
+    var options = date.getFullYear() === now.getFullYear()
+      ? { month: "long", day: "numeric" }
+      : { year: "numeric", month: "long", day: "numeric" };
+    return date.toLocaleDateString(document.documentElement.lang, options);
+  }
+
+  // 让每天第一条消息前恰有一条日期分割线；只增删不符合的节点，重复执行不产生新变更，避免消息组观察器反复触发。
+  function refreshDayDividers(items) {
+    var starts = new Set();
+    items.forEach(function (message, index) {
+      var time = Number(message.getAttribute("data-originated-at"));
+      var previous = items[index - 1];
+      if (!Number.isFinite(time)) {
+        return;
+      }
+      if (!previous || new Date(Number(previous.getAttribute("data-originated-at"))).toDateString() !== new Date(time).toDateString()) {
+        starts.add(message);
+      }
+    });
+    Array.from(messages.querySelectorAll(":scope > .cv-day-divider")).forEach(function (divider) {
+      if (!starts.has(divider.nextElementSibling)) {
+        divider.remove();
+      }
+    });
+    starts.forEach(function (message) {
+      var date = new Date(Number(message.getAttribute("data-originated-at")));
+      var divider = message.previousElementSibling;
+      if (!divider || !divider.classList.contains("cv-day-divider")) {
+        divider = document.createElement("div");
+        divider.className = "cv-day-divider";
+        divider.appendChild(document.createElement("time"));
+        messages.insertBefore(divider, message);
+      }
+      var label = divider.firstElementChild;
+      var text = dayLabel(date);
+      if (label.textContent !== text) {
+        label.dateTime = date.toISOString();
+        label.textContent = text;
+      }
+    });
+  }
+
+  // 按发送人和时间间隔划分当前会话消息组，只在组内最后一条显示头像，并按天插入日期分割线。
   function refreshMessageGroups() {
     var items = Array.from(messages.children).filter(function (node) {
       return node.classList.contains("cv-message");
     });
+    refreshDayDividers(items);
     items.forEach(function (message, index) {
       var endsGroup = !sameMessageGroup(message, items[index + 1]);
       message.toggleAttribute("data-group-start", !sameMessageGroup(items[index - 1], message));

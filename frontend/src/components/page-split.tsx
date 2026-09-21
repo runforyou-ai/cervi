@@ -17,8 +17,8 @@ const paneWidthClass = {
   sm: "md:w-48",
   md: "md:w-56",
   lg: "md:w-72",
-  /* 消息页中栏：280px 会话列表。 */
-  inbox: "md:w-70",
+  /* 模块中栏：消息页会话列表与通讯录、渠道、知识库二级菜单统一 280px。 */
+  nav: "md:w-70",
 } as const
 
 const paneOnNarrowClass = {
@@ -52,16 +52,20 @@ export function PageSplit({
   return (
     <div
       data-slot="page-split"
-      className={cn("flex min-h-0 w-full flex-1 overflow-hidden", className)}
+      // 左栏与主区在宽屏下是两张各自带圆角的卡片，中间的缝透明并透出工作台底色。
+      className={cn(
+        "flex min-h-0 w-full flex-1 overflow-hidden md:gap-2",
+        className,
+      )}
     >
       <aside
         data-slot="page-split-pane"
         className={cn(
-          "min-h-0 shrink-0 flex-col overflow-hidden border-r select-none",
+          "min-h-0 shrink-0 flex-col overflow-hidden bg-background select-none md:rounded-xl",
           paneOnNarrowClass[paneOnNarrow],
           paneWidthClass[paneWidth],
           paneVariant === "nav" &&
-            "border-sidebar-border bg-sidebar-secondary text-sidebar-foreground",
+            "bg-sidebar-secondary text-sidebar-foreground",
           paneClassName,
         )}
       >
@@ -70,7 +74,7 @@ export function PageSplit({
       <div
         data-slot="page-split-main"
         className={cn(
-          "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden",
+          "flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden bg-background md:rounded-xl",
           mainClassName,
         )}
       >
@@ -95,11 +99,14 @@ export function PagePaneNav({
   return (
     <div className="flex min-h-0 flex-1 flex-col">
       {title ? (
-        <div className="flex shrink-0 items-center gap-2 px-3.5 pt-4 pb-1.5">
+        // 标题距中间栏顶边固定 20px；操作按钮只在标题行高度内垂直居中。
+        <div className="flex shrink-0 items-start gap-2 px-3.5 pt-5 pb-1.5">
           <h2 className="min-w-0 flex-1 truncate text-lg font-semibold tracking-tight">
             {title}
           </h2>
-          {action}
+          {action ? (
+            <div className="flex h-6 shrink-0 items-center gap-2">{action}</div>
+          ) : null}
         </div>
       ) : null}
       <ScrollArea className="min-h-0 flex-1">
@@ -117,12 +124,15 @@ export function PagePaneLink({
   activePath,
   icon: Icon,
   collapsed,
+  comingSoonHint = true,
   children,
 }: {
   to?: string
   activePath?: string
   icon?: LucideIcon
   collapsed?: boolean
+  /** 未开放项是否显示「即将推出」标签和悬停提示；关闭时只置灰。 */
+  comingSoonHint?: boolean
   children: ReactNode
 }) {
   const { t } = useTranslation("common")
@@ -160,11 +170,11 @@ export function PagePaneLink({
     <span
       className={cn(className, "cursor-default text-muted-foreground")}
       aria-disabled="true"
-      title={collapsed ? undefined : t("comingSoon")}
+      title={collapsed || !comingSoonHint ? undefined : t("comingSoon")}
     >
       {Icon ? <Icon className="size-4 shrink-0" /> : null}
       {label}
-      {collapsed ? null : (
+      {collapsed || !comingSoonHint ? null : (
         <StatusBadge variant="muted">{t("comingSoon")}</StatusBadge>
       )}
     </span>

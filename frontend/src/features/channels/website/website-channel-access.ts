@@ -1,5 +1,5 @@
 /** 网站渠道对外入口地址和安装代码。 */
-import { resolveChannelServerURL } from "@/features/channels/channel-server-url"
+import { resolveServerURL } from "@/lib/server-url"
 
 /** 返回网站渠道独立聊天链接。 */
 export function websiteChannelChatURL(origin: string, channelId: string) {
@@ -13,7 +13,7 @@ export function websiteChannelWidgetSnippet(origin: string, channelId: string) {
 
 /** 返回网站渠道公开入口使用的源站地址。 */
 export async function resolveWebsiteChannelOrigin() {
-  return resolveChannelServerURL()
+  return resolveServerURL()
 }
 
 /** 移除源站地址末尾多余的斜杠。 */

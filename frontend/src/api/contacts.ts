@@ -63,6 +63,7 @@ function listContactsByDeleted(
       query: query.query ?? "",
       stage: query.stage ?? null,
       channelId: query.channelId ?? "",
+      channelType: query.channelType ?? null,
       methodType: query.methodType ?? null,
       sort: query.sort ?? ContactSort.ContactSortCreatedAtDescending,
       page: query.page ?? 1,

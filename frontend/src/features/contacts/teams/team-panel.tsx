@@ -1,6 +1,6 @@
 /** 团队成员列表、批量管理和团队维护面板。 */
 import { useEffect, useState } from "react"
-import { MoreHorizontalIcon } from "lucide-react"
+import { PlusIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -9,6 +9,7 @@ import {
   OrganizationIdentityType,
   WorkStatus,
   deleteTeam,
+  listAllTeamMembers,
   listTeamMembers,
   removeTeamMembers,
   type ChannelOption,
@@ -45,12 +46,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
 import { WorkStatusDot, workStatusLabel } from "@/components/work-status"
 import { useWorkspace } from "@/contexts/workspace-context"
 import { ContactCreateDialogs } from "@/features/contacts/contact-create-dialogs"
@@ -80,7 +75,7 @@ export function TeamPanel({
   const { t: tCommon } = useTranslation("common")
   const { identity } = useWorkspace()
   const navigate = useNavigate()
-  const { formatShortDateTime } = useDateTime()
+  const { formatDateTime } = useDateTime()
   const invalidate = useResourceInvalidator()
   const {
     searchParams,
@@ -97,7 +92,9 @@ export function TeamPanel({
   const editingTeam = searchParams.get("editTeam") === "1"
   const addingTeamMembers = searchParams.get("addMembers") === "1"
   const selectedTeam = teams.find((team) => team.id === teamId)
-  const [deletingTeam, setDeletingTeam] = useState<Team | null>(null)
+  // 编辑和删除团队从中间栏团队的右键菜单发起，经地址参数打开对应弹窗。
+  const deletingTeam =
+    searchParams.get("deleteTeam") === "1" ? (selectedTeam ?? null) : null
   const [removingTeamMembers, setRemovingTeamMembers] = useState<TeamMember[]>(
     [],
   )
@@ -107,13 +104,13 @@ export function TeamPanel({
 
   const list = useResource(
     resourceKeys.teamMembers(teamId, { query, workStatus, page: currentPage, pageSize: 50 }),
-    () =>
-      listTeamMembers(teamId, {
-        query,
-        workStatus,
-        page: currentPage,
-        pageSize: 50,
-      }),
+    () => {
+      const listQuery = { query, workStatus, page: currentPage, pageSize: 50 }
+      // 未选具体团队时展示所有团队的成员。
+      return teamId
+        ? listTeamMembers(teamId, listQuery)
+        : listAllTeamMembers(listQuery)
+    },
   )
   const teamMembers = list.data?.members ?? []
   const page = list.data?.page ?? { number: currentPage, size: 50, total: 0 }
@@ -149,10 +146,9 @@ export function TeamPanel({
       await deleteTeam(deletingTeamID)
       void invalidate(resourceKeys.teams())
       invalidateMembershipCaches()
-      setDeletingTeam(null)
       toast.success(t("teams.delete.success"))
       if (teamId === deletingTeamID) {
-        navigate("/contacts/employees", { replace: true })
+        navigate("/contacts/teams", { replace: true })
       }
     } catch (error) {
       if (recoverSession(error, navigate)) return
@@ -185,7 +181,7 @@ export function TeamPanel({
       )
       setRemovingTeamMembers([])
       setSelectedTeamMemberIdentityIDs(new Set())
-      void invalidate(resourceKeys.teamMembers(teamId))
+      void invalidate(resourceKeys.teamMembers())
       void invalidate(resourceKeys.teamMemberCandidates(teamId))
       invalidateMembershipCaches()
     } catch (error) {
@@ -261,53 +257,35 @@ export function TeamPanel({
                 </Button>
               ) : null}
               <Button
-                size="sm"
+                variant="ghost"
+                size="icon-sm"
+                className="shrink-0 text-muted-foreground"
+                aria-label={t("teams.members.add")}
+                title={t("teams.members.add")}
                 onClick={() => setParameters({ addMembers: "1" })}
               >
-                {t("teams.members.add")}
+                <PlusIcon />
               </Button>
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <Button
-                    variant="ghost"
-                    size="icon-sm"
-                    aria-label={t("teams.more")}
-                    title={t("teams.more")}
-                  >
-                    <MoreHorizontalIcon />
-                  </Button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="end">
-                  <DropdownMenuItem
-                    onSelect={() => setParameters({ editTeam: "1" })}
-                  >
-                    {tCommon("actions.edit")}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    destructive
-                    onSelect={() => setDeletingTeam(selectedTeam)}
-                  >
-                    {t("teams.delete.action")}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              </DropdownMenu>
             </>
           ) : null}
         </PageHeader>
 
         <ListToolbar>
-          <label className="flex h-7 items-center gap-2 px-1 text-sm">
-            <input
-              type="checkbox"
-              className="size-4 accent-primary"
-              disabled={teamMembers.length === 0}
-              checked={allVisibleTeamMembersSelected}
-              onChange={(event) =>
-                toggleAllVisibleTeamMembers(event.target.checked)
-              }
-            />
-            {tCommon("actions.selectAll")}
-          </label>
+          {/* 所有团队视图只读：成员可能分属多个团队，不提供批量移出。 */}
+          {selectedTeam ? (
+            <label className="flex h-9 items-center gap-2 px-1 text-sm">
+              <input
+                type="checkbox"
+                className="size-4 accent-primary"
+                disabled={teamMembers.length === 0}
+                checked={allVisibleTeamMembersSelected}
+                onChange={(event) =>
+                  toggleAllVisibleTeamMembers(event.target.checked)
+                }
+              />
+              {tCommon("actions.selectAll")}
+            </label>
+          ) : null}
           <ListToolbarSearch
             value={search}
             aria-label={t("search.teamMembers")}
@@ -366,7 +344,7 @@ export function TeamPanel({
           <ResourceTable
             hideHeader
             columns={[
-              {
+              ...(selectedTeam ? [{
                 key: "select",
                 header: null,
                 cellClassName: "w-10",
@@ -385,7 +363,7 @@ export function TeamPanel({
                     }
                   />
                 ),
-              },
+              }] : []),
               {
                 key: "memberName",
                 header: t("columns.memberName"),
@@ -429,23 +407,27 @@ export function TeamPanel({
                 cellClassName: "whitespace-nowrap text-muted-foreground",
                 cell: (member) =>
                   t("teams.members.joinedAt", {
-                    time: formatShortDateTime(member.joinedAt),
+                    time: formatDateTime(member.joinedAt),
                   }),
               },
             ]}
             rows={teamMembers}
             rowKey={(member) => member.identityId}
             empty={t("list.empty")}
-            actions={(member) => ({
-              primary: (
-                <ListActionButton
-                  tone="destructive"
-                  onClick={() => setRemovingTeamMembers([member])}
-                >
-                  {t("teams.members.remove")}
-                </ListActionButton>
-              ),
-            })}
+            actions={
+              selectedTeam
+                ? (member) => ({
+                    primary: (
+                      <ListActionButton
+                        tone="destructive"
+                        onClick={() => setRemovingTeamMembers([member])}
+                      >
+                        {t("teams.members.remove")}
+                      </ListActionButton>
+                    ),
+                  })
+                : undefined
+            }
           />
         </ResourceListLayout>
       </section>
@@ -504,7 +486,7 @@ export function TeamPanel({
               onSaved={() => {
                 void invalidate(resourceKeys.teams())
                 setParameters({ addMembers: null })
-                void invalidate(resourceKeys.teamMembers(teamId))
+                void invalidate(resourceKeys.teamMembers())
                 invalidateMembershipCaches()
               }}
               onCancel={() => setParameters({ addMembers: null })}
@@ -515,7 +497,7 @@ export function TeamPanel({
 
       <AlertDialog
         open={deletingTeam !== null}
-        onOpenChange={(open) => !open && setDeletingTeam(null)}
+        onOpenChange={(open) => !open && setParameters({ deleteTeam: null })}
       >
         <AlertDialogContent>
           <AlertDialogHeader>

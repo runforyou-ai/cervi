@@ -208,11 +208,11 @@ export function ContactForm({
 
       </FieldGroup>
       <div className="flex items-center justify-end gap-2">
-        <Button type="submit" disabled={form.formState.isSubmitting}>
-          {form.formState.isSubmitting ? t("common:actions.saving") : t("common:actions.save")}
-        </Button>
         <Button type="button" variant="outline" onClick={onCancel}>
           {t("common:actions.cancel")}
+        </Button>
+        <Button type="submit" disabled={form.formState.isSubmitting}>
+          {form.formState.isSubmitting ? t("common:actions.saving") : t("common:actions.save")}
         </Button>
       </div>
     </form>

@@ -397,6 +397,8 @@ var messengerCopyMessageKeys = map[string]cervii18n.Key{
 	"attachmentUnavailable":     cervii18n.MessengerAttachmentUnavailable,
 	"sessionOpen":               cervii18n.MessengerSessionOpen,
 	"sessionClosed":             cervii18n.MessengerSessionClosed,
+	"dayToday":                  cervii18n.MessengerDayToday,
+	"dayYesterday":              cervii18n.MessengerDayYesterday,
 }
 
 // embedRequestHost 从公开嵌入请求中读取宿主网站主机。

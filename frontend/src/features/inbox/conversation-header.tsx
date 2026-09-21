@@ -6,7 +6,7 @@ import {
   PanelRightOpenIcon,
   RotateCcwIcon,
   SearchIcon,
-  UserRoundPlusIcon,
+  UserRoundCheckIcon,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
@@ -186,7 +186,7 @@ export function ConversationHeader({
                   ? t("conversationTakeover")
                   : t("conversationClaim")
               }
-              icon={UserRoundPlusIcon}
+              icon={UserRoundCheckIcon}
               busy={operation === "claim"}
               disabled={operation !== ""}
               onClick={() => void actions.claim()}

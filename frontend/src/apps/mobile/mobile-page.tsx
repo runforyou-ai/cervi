@@ -111,7 +111,7 @@ export function MobileSearchBar({
           type="search"
           enterKeyHint="search"
           aria-label={label}
-          className="min-h-11 pl-9 md:text-base"
+          className="min-h-11 rounded-lg bg-muted/60 pl-9 md:text-base dark:bg-muted/50"
           value={value}
           onChange={(event) => onChange(event.target.value)}
         />

@@ -1,9 +1,9 @@
 /** 工作台左侧模块栏和用户菜单。 */
 import { useRef, useState, type ReactNode } from "react"
 import {
+  BellIcon,
   BrainCircuitIcon,
   Building2Icon,
-  CheckIcon,
   ChevronLeftIcon,
   CodeXmlIcon,
   ContactRoundIcon,
@@ -28,9 +28,9 @@ import { NavLink, useLocation, useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
-  WorkStatus,
   updateUserWorkStatus,
   type Identity,
+  type WorkStatus,
 } from "@/api"
 import { PagePaneGroup, PagePaneLink } from "@/components/page-split"
 import { useGlobalSearch } from "@/contexts/global-search-context"
@@ -52,13 +52,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import {
-  selectableWorkStatuses,
-  WorkStatusDot,
-  workStatusLabel,
-  workStatusTextClass,
-  workStatusTintClass,
-} from "@/components/work-status"
+import { WorkStatusDot, WorkStatusPicker } from "@/components/work-status"
 import { UserAvatar } from "@/components/user-avatar"
 import { cn } from "@/lib/utils"
 import { resolveAppPlatform } from "@/platform/app-platform"
@@ -208,6 +202,13 @@ function WorkspaceMenu({
           collapsed={collapsed}
         />
         <WorkspaceRailItem
+          to="/channels"
+          icon={MessagesSquareIcon}
+          label={t("channels")}
+          active={location.pathname.startsWith("/channels")}
+          collapsed={collapsed}
+        />
+        <WorkspaceRailItem
           to="/knowledge-bases"
           icon={LibraryIcon}
           label={t("knowledgeBases")}
@@ -285,6 +286,13 @@ function WorkspaceSettingsMenu({
         </PagePaneLink>
         <PagePaneLink
           collapsed={collapsed}
+          to="/settings/notifications"
+          icon={BellIcon}
+        >
+          {t("navigation.notifications")}
+        </PagePaneLink>
+        <PagePaneLink
+          collapsed={collapsed}
           to="/settings/devices"
           icon={MonitorSmartphoneIcon}
         >
@@ -307,13 +315,9 @@ function WorkspaceSettingsMenu({
         >
           {t("navigation.roles")}
         </PagePaneLink>
-        <PagePaneLink
-          collapsed={collapsed}
-          to="/settings/channels"
-          icon={MessagesSquareIcon}
-        >
-          {t("navigation.channels")}
-        </PagePaneLink>
+      </PagePaneGroup>
+      {/* 集成：模型服务与 MCP 服务供 AI 调用外部能力，Webhooks 与开放 API 供外部系统调用 Cervi。 */}
+      <PagePaneGroup title={t("groups.integrations")} collapsed={collapsed}>
         <PagePaneLink
           collapsed={collapsed}
           to="/settings/model-services/chat"
@@ -337,60 +341,6 @@ function WorkspaceSettingsMenu({
         </PagePaneLink>
       </PagePaneGroup>
     </nav>
-  )
-}
-
-/** 用当前工作状态文字触发的状态选择菜单，开启接待的成员在「工作中」下看到自动分配说明。 */
-function WorkStatusPicker({
-  status,
-  handlesCustomers,
-  onChange,
-}: {
-  status: WorkStatus
-  handlesCustomers: boolean
-  onChange: (workStatus: WorkStatus) => void
-}) {
-  const { t } = useTranslation("workspace")
-  const { t: tCommon } = useTranslation("common")
-
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button
-          type="button"
-          className={cn(
-            "w-fit max-w-full truncate rounded-full px-2.5 text-left text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-ring",
-            workStatusTextClass(status),
-            workStatusTintClass(status),
-          )}
-          aria-label={t("workStatus")}
-        >
-          {workStatusLabel(status, tCommon)}
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent side="bottom" align="start" className={handlesCustomers ? "w-56" : "w-36"}>
-        {selectableWorkStatuses.map((workStatus) => (
-          <DropdownMenuItem
-            key={workStatus}
-            onSelect={(event) => {
-              event.preventDefault()
-              onChange(workStatus)
-            }}
-          >
-            <WorkStatusDot status={workStatus} />
-            <span className="grid flex-1 gap-0.5">
-              {workStatusLabel(workStatus, tCommon)}
-              {handlesCustomers && workStatus === WorkStatus.WorkStatusWorking ? (
-                <span className="text-xs text-muted-foreground">{t("workStatusWorkingHint")}</span>
-              ) : null}
-            </span>
-            {workStatus === status ? (
-              <CheckIcon className="text-primary" />
-            ) : null}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
   )
 }
 

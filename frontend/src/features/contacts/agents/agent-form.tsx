@@ -16,6 +16,7 @@ import {
   type AgentData,
 } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
+import { SwitchCardField } from "@/components/form/switch-card-field"
 import { ImagePicker } from "@/components/image-picker"
 import { Button } from "@/components/ui/button"
 import {
@@ -24,7 +25,6 @@ import {
   FieldGroup,
   FieldLabel,
 } from "@/components/ui/field"
-import { Switch } from "@/components/ui/switch"
 import { Textarea } from "@/components/ui/textarea"
 import { AgentModelField } from "@/features/contacts/agents/agent-model-field"
 import { parseAgentModelSelection } from "@/features/contacts/agents/agent-model-selection"
@@ -158,7 +158,7 @@ export function AgentForm({
 
   return (
     <form
-      className="w-full max-w-2xl space-y-9"
+      className="w-full space-y-9"
       onSubmit={form.handleSubmit(submit)}
       noValidate
     >
@@ -200,20 +200,17 @@ export function AgentForm({
           name="handlesCustomers"
           control={form.control}
           render={({ field }) => (
-            <Field orientation="horizontal">
-              <FieldLabel htmlFor={field.name}>
-                {t("agents.form.handlesCustomers")}
-              </FieldLabel>
-              <Switch
-                id={field.name}
-                name={field.name}
-                checked={field.value}
-                disabled={form.formState.isSubmitting}
-                onBlur={field.onBlur}
-                onCheckedChange={field.onChange}
-                ref={field.ref}
-              />
-            </Field>
+            <SwitchCardField
+              id="agent-create-handles-customers"
+              name={field.name}
+              label={t("agents.form.handlesCustomers")}
+              description={t("agents.form.handlesCustomersHelp")}
+              checked={field.value}
+              disabled={form.formState.isSubmitting}
+              onBlur={field.onBlur}
+              onCheckedChange={field.onChange}
+              ref={field.ref}
+            />
           )}
         />
         <AgentManagedExecutionFields
@@ -221,12 +218,7 @@ export function AgentForm({
           disabled={form.formState.isSubmitting}
         />
       </FieldGroup>
-      <div className="flex items-center gap-2">
-        <Button type="submit" disabled={form.formState.isSubmitting}>
-          {form.formState.isSubmitting
-            ? tCommon("actions.saving")
-            : tCommon("actions.create")}
-        </Button>
+      <div className="flex items-center justify-end gap-2">
         <Button
           type="button"
           variant="outline"
@@ -234,6 +226,11 @@ export function AgentForm({
           onClick={onCancel}
         >
           {tCommon("actions.cancel")}
+        </Button>
+        <Button type="submit" disabled={form.formState.isSubmitting}>
+          {form.formState.isSubmitting
+            ? tCommon("actions.saving")
+            : tCommon("actions.create")}
         </Button>
       </div>
     </form>

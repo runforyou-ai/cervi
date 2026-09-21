@@ -6,6 +6,9 @@ const contacts = {
   all: "All",
   create: "Add contact",
   anonymous: "Anonymous visitor",
+  teamSelect: {
+    placeholder: "Select teams",
+  },
   add: {
     member: "Add company member",
     agent: "Add AI employee",
@@ -112,6 +115,7 @@ const contacts = {
       password: "Initial password",
       role: "Company role",
       handlesCustomers: "Handles customers",
+      handlesCustomersHelp: "When on, this member can be assigned customer conversations.",
       maxServiceSessions: "Max conversations",
       teams: "Teams",
       noTeams: "There are no teams to select.",
@@ -146,6 +150,7 @@ const contacts = {
   },
   agents: {
     configure: "Configure",
+    nameSeparator: ", ",
     editTitle: "Configure AI employee",
     createDescription: "Create an AI employee and set up its profile",
     editDescription: "Update this AI employee's profile, knowledge and runtime",
@@ -155,6 +160,7 @@ const contacts = {
     form: {
       name: "AI employee name",
       handlesCustomers: "Handles customers",
+      handlesCustomersHelp: "When on, this AI employee can be assigned customer conversations.",
       teams: "Teams",
       noTeams: "There are no teams to select.",
       created: "AI employee added",
@@ -172,6 +178,8 @@ const contacts = {
       title: "Configure MCP services",
       unconfigured: "Not configured",
       selected: "Selected services: {{count}}",
+      selectedOne: "Selected: {{names}}",
+      selectedNames: "Selected: {{names}} and more ({{count}} services)",
       empty: "No MCP services",
       loadError: "Could not load MCP services. Try again.",
       tools: "Tools: {{count}}",
@@ -179,9 +187,12 @@ const contacts = {
     execution: {
       knowledgeBases: "Knowledge bases",
       knowledgeEmpty: "No knowledge bases",
-      knowledgeLoading: "Loading knowledge bases…",
-      knowledgeLoadError: "Failed to load knowledge bases",
-      knowledgeUnavailableCount: "Unavailable knowledge bases ({{count}})",
+      knowledgeTitle: "Configure knowledge bases",
+      knowledgeUnconfigured: "Not configured",
+      knowledgeSelected: "Selected knowledge bases: {{count}}",
+      knowledgeSelectedOne: "Selected: {{names}}",
+      knowledgeSelectedNames: "Selected: {{names}} and more ({{count}} knowledge bases)",
+      knowledgeLoadError: "Could not load knowledge bases. Try again.",
 
       title: "Execution settings",
       model: "Chat model",
@@ -213,7 +224,6 @@ const contacts = {
   },
   teams: {
     create: "Create team",
-    more: "More team actions",
     createDescription: "Enter a team name and description.",
     editDescription: "Update the team name and description.",
     form: {
@@ -254,7 +264,6 @@ const contacts = {
       removeError: "Could not remove team members. Try again.",
     },
     delete: {
-      action: "Delete team",
       title: "Delete “{{name}}”?",
       description:
         "{{count}} members will leave this team. Their accounts will not be deleted.",

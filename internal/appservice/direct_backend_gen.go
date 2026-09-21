@@ -1006,6 +1006,16 @@ func (b *DirectBackend) DeleteTeam(ctx context.Context, meta RequestMeta, teamID
 	return b.ops.DeleteTeam(ctx, meta, identity, teamID)
 }
 
+// ListAllTeamMembers 返回企业所有团队的成员列表，同一身份只列一次。
+func (b *DirectBackend) ListAllTeamMembers(ctx context.Context, meta RequestMeta, input TeamMemberListInput) (TeamMemberList, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero TeamMemberList
+		return zero, err
+	}
+	return b.ops.ListAllTeamMembers(ctx, meta, identity, input)
+}
+
 // ListTeamMembers 返回团队成员列表。
 func (b *DirectBackend) ListTeamMembers(ctx context.Context, meta RequestMeta, teamID string, input TeamMemberListInput) (TeamMemberList, error) {
 	identity, err := b.ops.authenticate(ctx, meta)

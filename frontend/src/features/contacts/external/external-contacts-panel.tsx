@@ -5,6 +5,7 @@ import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
+  ChannelType,
   ContactMethodType,
   ContactSort,
   ContactStage,
@@ -45,6 +46,7 @@ import { ContactCreateDialogs } from "@/features/contacts/contact-create-dialogs
 import { ContactDetailSheet } from "@/features/contacts/contact-detail-sheet"
 import { ContactScopeMobileSelect } from "@/features/contacts/contact-scope-mobile-select"
 import { ContactDetailView } from "@/features/contacts/external/contact-detail"
+import { channelTypeLabel } from "@/features/contacts/external/contact-labels"
 import { useContactSearch } from "@/features/contacts/use-contact-search"
 import { useDateTime } from "@/hooks/use-date-time"
 import { resourceKeys } from "@/hooks/resource-keys"
@@ -64,7 +66,7 @@ export function ExternalContactsPanel({
 }) {
   const { t } = useTranslation(["contacts", "common"])
   const navigate = useNavigate()
-  const { formatShortDateTime } = useDateTime()
+  const { formatDateTime } = useDateTime()
   const invalidate = useResourceInvalidator()
   const {
     searchParams,
@@ -77,6 +79,8 @@ export function ExternalContactsPanel({
   } = useContactSearch()
   const deleted = searchParams.get("view") === "trash"
   const channelId = searchParams.get("channelId") ?? ""
+  // 中间栏选中渠道类别时，列出该类别下所有渠道的联系人。
+  const channelType = optionalWailsEnum(ChannelType, searchParams.get("channelType"))
   const stage = optionalWailsEnum(ContactStage, searchParams.get("stage"))
   const methodType = optionalWailsEnum(
     ContactMethodType,
@@ -96,6 +100,7 @@ export function ExternalContactsPanel({
     query,
     stage,
     channelId: deleted ? "" : channelId,
+    channelType: deleted ? undefined : channelType,
     methodType,
     sort,
     page: currentPage,
@@ -188,7 +193,10 @@ export function ExternalContactsPanel({
     <>
       <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
         <PageHeader
-          title={selectedChannel?.name ?? t("scopes.external")}
+          title={
+            selectedChannel?.name ??
+            (channelType ? channelTypeLabel(channelType, t) : t("scopes.external"))
+          }
           description={t("scopeDescriptions.external")}
           beforeTitle={
             <ContactScopeMobileSelect
@@ -380,10 +388,10 @@ export function ExternalContactsPanel({
                 cell: (contact) =>
                   deleted && contact.deletedAt
                     ? t("trash.deletedAt", {
-                        time: formatShortDateTime(contact.deletedAt),
+                        time: formatDateTime(contact.deletedAt),
                       })
                     : t("list.addedAt", {
-                        time: formatShortDateTime(contact.createdAt),
+                        time: formatDateTime(contact.createdAt),
                       }),
               },
             ]}

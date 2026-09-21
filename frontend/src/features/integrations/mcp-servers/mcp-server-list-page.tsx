@@ -1,6 +1,6 @@
 /** MCP 服务列表页。 */
 import { useEffect, useRef, useState } from "react"
-import { PencilIcon, PlusIcon } from "lucide-react"
+import { PlugIcon, PlusIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Link, useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -12,12 +12,12 @@ import {
   refreshMCPServerTools,
   type MCPServerData,
 } from "@/api"
+import { ListActionButton } from "@/components/list-action-button"
 import { ResourceListLayout } from "@/components/resource-list"
 import { ResourceTable } from "@/components/resource-table"
 import { PageHeader } from "@/components/page-header"
 import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
 import { Button } from "@/components/ui/button"
-import { DropdownMenuItem } from "@/components/ui/dropdown-menu"
 import { MCPServerToolsCell } from "@/features/integrations/mcp-servers/mcp-server-tools-cell"
 import { MCPServerTestButton } from "@/features/integrations/mcp-servers/mcp-server-test-button"
 import { resourceKeys } from "@/hooks/resource-keys"
@@ -109,56 +109,45 @@ export function MCPServerListPage() {
         onRetry={() => void refresh()}
       >
         <ResourceTable
+          hideHeader
           columns={[
             {
-              key: "name",
+              key: "server",
               header: t("mcpServer.list.columns.name"),
-              cellClassName: "font-medium",
-              cell: (mcpServer) => mcpServer.name,
-            },
-            {
-              key: "serverType",
-              header: t("mcpServer.list.columns.serverType"),
-              cell: (mcpServer) => mcpServer.serverType,
-            },
-            {
-              key: "url",
-              header: t("mcpServer.list.columns.url"),
-              cellClassName: "max-w-xl text-muted-foreground",
-              cell: (mcpServer) => mcpServer.url,
-            },
-            {
-              key: "tools",
-              header: t("mcpServer.list.columns.tools"),
-              headerClassName: "w-20",
-              cell: (mcpServer) => <MCPServerToolsCell server={mcpServer} />,
+              cellClassName: "min-w-0",
+              cell: (mcpServer) => (
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                    <PlugIcon className="size-4.5" aria-hidden="true" />
+                  </span>
+                  <span className="grid min-w-0 gap-0.5 leading-tight">
+                    <span className="truncate font-medium">{mcpServer.name}</span>
+                    <span className="flex min-w-0 items-center text-xs text-muted-foreground">
+                      <MCPServerToolsCell server={mcpServer} />
+                    </span>
+                  </span>
+                </div>
+              ),
             },
           ]}
           rows={mcpServers}
           rowKey={(mcpServer) => mcpServer.id}
           empty={t("mcpServer.list.empty")}
+          onRowActivate={(mcpServer) =>
+            navigate(`/settings/mcp-servers/${mcpServer.id}`)
+          }
           actions={(mcpServer) => ({
+            // 操作靠右对齐，与企业成员列表一致。
             primary: (
-              <>
+              <div className="ml-auto flex items-center gap-1">
                 <MCPServerTestButton serverId={mcpServer.id} />
-                <Button variant="outline" size="icon-sm" asChild>
-                  <Link
-                    to={`/settings/mcp-servers/${mcpServer.id}`}
-                    aria-label={t("common:actions.edit")}
-                    title={t("common:actions.edit")}
-                  >
-                    <PencilIcon />
-                  </Link>
-                </Button>
-              </>
-            ),
-            menu: (
-              <DropdownMenuItem
-                destructive
-                onSelect={() => deletion.select(mcpServer)}
-              >
-                {t("common:actions.delete")}
-              </DropdownMenuItem>
+                <ListActionButton
+                  tone="destructive"
+                  onClick={() => deletion.select(mcpServer)}
+                >
+                  {t("common:actions.delete")}
+                </ListActionButton>
+              </div>
             ),
           })}
         />

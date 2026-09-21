@@ -8,10 +8,7 @@ const integrations = {
       loadError: "MCP 服务列表加载失败。",
       empty: "还没有配置 MCP 服务",
       columns: {
-        tools: "工具",
         name: "名称",
-        url: "URL",
-        serverType: "服务器类型",
       },
     },
     connection: {

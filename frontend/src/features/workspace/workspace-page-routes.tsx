@@ -2,6 +2,7 @@
 import type { ReactElement } from "react"
 import { matchRoutes, useRoutes, type Location, type RouteObject } from "react-router"
 
+import { ChannelsLayout } from "@/features/channels/channels-layout"
 import { MessageChannelFormPage } from "@/features/channels/message-channel-form-page"
 import { MessageChannelListPage } from "@/features/channels/message-channel-list-page"
 import { AgentFormPage } from "@/features/contacts/agents/agent-form-page"
@@ -25,6 +26,7 @@ import { SettingsPage } from "@/features/settings/settings-page"
 /** 需要公共外壳的路由前缀，同一前缀下的页面渲染在对应布局内。 */
 const workspaceRouteLayouts = [
   { prefix: "/knowledge-bases", element: <KnowledgeBaseLayout /> },
+  { prefix: "/channels", element: <ChannelsLayout /> },
 ]
 
 /** 工作台路由清单，地址解析与页面渲染共用同一份定义。 */
@@ -41,6 +43,10 @@ const workspaceRouteDefinitions = [
   {
     path: "/settings/preferences",
     element: <SettingsPage section="preferences" />,
+  },
+  {
+    path: "/settings/notifications",
+    element: <SettingsPage section="notifications" />,
   },
   {
     path: "/settings/devices",
@@ -95,12 +101,28 @@ const workspaceRouteDefinitions = [
     ),
   },
   {
+    path: "/contacts/teams",
+    element: <ContactsPage scope="team" />,
+  },
+  {
     path: "/contacts/teams/:teamId",
     element: <ContactsPage scope="team" />,
   },
   {
     path: "/contacts/external",
     element: <ContactsPage scope="external" />,
+  },
+  {
+    path: "/channels/:channelType/new",
+    element: <MessageChannelFormPage mode="create" />,
+  },
+  {
+    path: "/channels/:channelType/:channelId",
+    element: <MessageChannelFormPage mode="edit" />,
+  },
+  {
+    path: "/channels/:channelType",
+    element: <MessageChannelListPage />,
   },
   {
     path: "/knowledge-bases/new",
@@ -141,30 +163,6 @@ const workspaceRouteDefinitions = [
   {
     path: "/knowledge-bases",
     element: <KnowledgeBaseIndexPage />,
-  },
-  {
-    path: "/settings/channels/new",
-    element: (
-      <SettingsPage section="channels">
-        <MessageChannelFormPage mode="create" />
-      </SettingsPage>
-    ),
-  },
-  {
-    path: "/settings/channels/:channelType/:channelId",
-    element: (
-      <SettingsPage section="channels">
-        <MessageChannelFormPage mode="edit" />
-      </SettingsPage>
-    ),
-  },
-  {
-    path: "/settings/channels",
-    element: (
-      <SettingsPage section="channels">
-        <MessageChannelListPage />
-      </SettingsPage>
-    ),
   },
   {
     path: "/settings/mcp-servers/new",
@@ -303,6 +301,7 @@ const workspaceRouteObjects: RouteObject[] = [
 const workspaceRedirects: Readonly<Record<string, string>> = {
   "/settings": "/settings/profile",
   "/contacts": "/contacts/employees",
+  "/channels": "/channels/website",
   "/settings/model-services": "/settings/model-services/chat",
 }
 

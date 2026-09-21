@@ -151,6 +151,10 @@ export default function MobileApp() {
               element={<MobileMeSettingsPage section="preferences" />}
             />
             <Route
+              path="/me/notifications"
+              element={<MobileMeSettingsPage section="notifications" />}
+            />
+            <Route
               path="/contacts/employees"
               element={<MobileDirectoryPage key="employees" kind="employees" />}
             />

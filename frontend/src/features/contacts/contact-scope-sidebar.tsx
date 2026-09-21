@@ -1,7 +1,6 @@
 /** 通讯录二级导航：分类树和来源渠道筛选。 */
 import { forwardRef, useMemo, type ButtonHTMLAttributes } from "react"
 import {
-  ChevronRightIcon,
   ContactRoundIcon,
   PanelsTopLeftIcon,
   PlusIcon,
@@ -16,10 +15,12 @@ import { messageChannelTypeDefinition } from "@/lib/message-channel-types"
 import { PagePaneNav } from "@/components/page-split"
 import { Button } from "@/components/ui/button"
 import {
-  Collapsible,
-  CollapsibleContent,
-  CollapsibleTrigger,
-} from "@/components/ui/collapsible"
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuSeparator,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -58,7 +59,8 @@ const SubscopeButton = forwardRef<
       className={cn(
         contactNavSubitemClass,
         contactNavHoverClass,
-        nested ? "pl-14" : "pl-8",
+        // 三级项放在带竖线的容器内，由容器负责缩进。
+        nested ? "pl-2" : "pl-8",
         active && contactNavLeafActiveClass,
         className,
       )}
@@ -75,6 +77,7 @@ export function ContactScopeSidebar({
   scope,
   deleted,
   channelId,
+  channelType,
   channels,
   teamId,
   teams,
@@ -82,6 +85,7 @@ export function ContactScopeSidebar({
   scope: ContactScope
   deleted: boolean
   channelId: string
+  channelType: string
   channels: ChannelOption[]
   teamId: string
   teams: Team[]
@@ -155,125 +159,122 @@ export function ContactScopeSidebar({
         </DropdownMenu>
       }
     >
-      <Collapsible defaultOpen>
-        <CollapsibleTrigger asChild>
-          <button
-            type="button"
-            className={cn(
-              "group flex h-8 w-full items-center gap-2 rounded-md px-2.5 text-left text-sm transition-colors",
-              contactNavHoverClass,
-              scope !== "external" && contactNavPathActiveClass,
-            )}
-          >
-            <UsersIcon className="size-4" />
-            <span>{t("scopes.members")}</span>
-            <ChevronRightIcon className="ml-auto size-4 shrink-0 transition-transform group-data-[state=open]:rotate-90" />
-          </button>
-        </CollapsibleTrigger>
-        <CollapsibleContent className="flex flex-col gap-0.5">
-          <SubscopeButton
-            active={scope === "employees"}
-            onClick={() => navigate("/contacts/employees")}
-          >
-            {t("scopes.employees")}
-          </SubscopeButton>
-          <SubscopeButton
-            active={scope === "agents"}
-            onClick={() => navigate("/contacts/ai-employees")}
-          >
-            {t("scopes.agents")}
-          </SubscopeButton>
-          <Collapsible defaultOpen>
-            <CollapsibleTrigger asChild>
-              <button
-                type="button"
-                className={cn(
-                  "group pl-8",
-                  contactNavSubitemClass,
-                  contactNavHoverClass,
-                  scope === "team" && contactNavPathActiveClass,
-                )}
-              >
-                <span>{t("scopes.teams")}</span>
-                <ChevronRightIcon className="ml-auto size-3.5 shrink-0 transition-transform group-data-[state=open]:rotate-90" />
-              </button>
-            </CollapsibleTrigger>
-            <CollapsibleContent className="flex flex-col gap-0.5">
-              {teams.map((team) => (
+      {/* 分组标题只标示层级，子项始终展开。 */}
+      <div
+        className={cn(
+          "flex h-8 w-full items-center gap-2 px-2.5 text-sm",
+          scope !== "external" && contactNavPathActiveClass,
+        )}
+      >
+        <UsersIcon className="size-4" />
+        <span>{t("scopes.members")}</span>
+      </div>
+      <div className="flex flex-col gap-0.5">
+        <SubscopeButton
+          active={scope === "employees"}
+          onClick={() => navigate("/contacts/employees")}
+        >
+          {t("scopes.employees")}
+        </SubscopeButton>
+        <SubscopeButton
+          active={scope === "agents"}
+          onClick={() => navigate("/contacts/ai-employees")}
+        >
+          {t("scopes.agents")}
+        </SubscopeButton>
+        {/* 选中「团队」展示所有团队的成员；进入具体团队时保留路径高亮。 */}
+        <SubscopeButton
+          active={scope === "team" && !teamId}
+          className={cn(scope === "team" && teamId && contactNavPathActiveClass)}
+          onClick={() => navigate("/contacts/teams")}
+        >
+          {t("scopes.teams")}
+        </SubscopeButton>
+        {/* 与知识库分组一致：三级项左侧以竖线标示层级。 */}
+        <div className="ml-9 flex flex-col gap-0.5 border-l pl-2">
+          {teams.map((team) => (
+            // 编辑和删除团队通过右键菜单进入团队页并打开对应弹窗。
+            <ContextMenu key={team.id}>
+              <ContextMenuTrigger asChild>
                 <SubscopeButton
-                  key={team.id}
                   active={scope === "team" && teamId === team.id}
+                  className="data-[state=open]:bg-sidebar-accent"
                   icon={PanelsTopLeftIcon}
                   nested
                   onClick={() => navigate(`/contacts/teams/${team.id}`)}
                 >
                   {team.name}
                 </SubscopeButton>
-              ))}
-            </CollapsibleContent>
-          </Collapsible>
-        </CollapsibleContent>
-      </Collapsible>
-
-      <Collapsible defaultOpen>
-        <CollapsibleTrigger asChild>
-          <button
-            type="button"
-            className={cn(
-              "group flex h-8 w-full items-center gap-2 rounded-md px-2.5 text-left text-sm transition-colors",
-              contactNavHoverClass,
-              scope === "external" && contactNavPathActiveClass,
-            )}
-          >
-            <ContactRoundIcon className="size-4" />
-            <span>{t("scopes.external")}</span>
-            <ChevronRightIcon className="ml-auto size-4 shrink-0 transition-transform group-data-[state=open]:rotate-90" />
-          </button>
-        </CollapsibleTrigger>
-        <CollapsibleContent className="flex flex-col gap-0.5">
-          <SubscopeButton
-            active={scope === "external" && !deleted && !channelId}
-            onClick={() => navigate("/contacts/external")}
-          >
-            {t("all")}
-          </SubscopeButton>
-          {groupedChannels.map(([type, items]) => (
-            <Collapsible key={type} defaultOpen>
-              <CollapsibleTrigger asChild>
-                <button
-                  type="button"
-                  className={cn(
-                    "group pl-8",
-                    contactNavSubitemClass,
-                    contactNavHoverClass,
-                    scope === "external" &&
-                      items.some((channel) => channel.id === channelId) &&
-                      contactNavPathActiveClass,
-                  )}
+              </ContextMenuTrigger>
+              <ContextMenuContent>
+                <ContextMenuItem
+                  onSelect={() => navigate(`/contacts/teams/${team.id}?editTeam=1`)}
                 >
-                  <span>{channelTypeLabel(type, t)}</span>
-                  <ChevronRightIcon className="ml-auto size-3.5 shrink-0 transition-transform group-data-[state=open]:rotate-90" />
-                </button>
-              </CollapsibleTrigger>
-              <CollapsibleContent className="flex flex-col gap-0.5">
-                {items.map((channel) => (
-                  <SubscopeButton
-                    key={channel.id}
-                    active={scope === "external" && channelId === channel.id}
-                    icon={messageChannelTypeDefinition(type)?.icon}
-                    nested
-                    onClick={() =>
-                      navigate(`/contacts/external?channelId=${channel.id}`)
-                    }
-                  >
-                    {channel.name}
-                  </SubscopeButton>
-                ))}
-              </CollapsibleContent>
-            </Collapsible>
+                  {t("common:actions.edit")}
+                </ContextMenuItem>
+                <ContextMenuSeparator />
+                <ContextMenuItem
+                  destructive
+                  onSelect={() => navigate(`/contacts/teams/${team.id}?deleteTeam=1`)}
+                >
+                  {t("common:actions.delete")}
+                </ContextMenuItem>
+              </ContextMenuContent>
+            </ContextMenu>
           ))}
-        </CollapsibleContent>
-      </Collapsible>
+        </div>
+      </div>
+
+      <div
+        className={cn(
+          "flex h-8 w-full items-center gap-2 px-2.5 text-sm",
+          scope === "external" && contactNavPathActiveClass,
+        )}
+      >
+        <ContactRoundIcon className="size-4" />
+        <span>{t("scopes.external")}</span>
+      </div>
+      <div className="flex flex-col gap-0.5">
+        <SubscopeButton
+          active={scope === "external" && !deleted && !channelId && !channelType}
+          onClick={() => navigate("/contacts/external")}
+        >
+          {t("all")}
+        </SubscopeButton>
+        {groupedChannels.map(([type, items]) => (
+          <div key={type} className="flex flex-col gap-0.5">
+            {/* 选中渠道类别展示该类别下所有渠道的联系人。 */}
+            <SubscopeButton
+              active={
+                scope === "external" && !deleted && !channelId && channelType === type
+              }
+              className={cn(
+                scope === "external" &&
+                  items.some((channel) => channel.id === channelId) &&
+                  contactNavPathActiveClass,
+              )}
+              onClick={() => navigate(`/contacts/external?channelType=${type}`)}
+            >
+              {channelTypeLabel(type, t)}
+            </SubscopeButton>
+            <div className="ml-9 flex flex-col gap-0.5 border-l pl-2">
+              {items.map((channel) => (
+                <SubscopeButton
+                  key={channel.id}
+                  active={scope === "external" && channelId === channel.id}
+                  icon={messageChannelTypeDefinition(type)?.icon}
+                  nested
+                  onClick={() =>
+                    navigate(`/contacts/external?channelId=${channel.id}`)
+                  }
+                >
+                  {channel.name}
+                </SubscopeButton>
+              ))}
+            </div>
+          </div>
+        ))}
+      </div>
     </PagePaneNav>
   )
 }

@@ -29,15 +29,18 @@ export function ListToolbar({ children }: { children: ReactNode }) {
   )
 }
 
-/** 列表搜索输入框。 */
+/** 列表搜索输入框；底色和圆角与表单输入框一致，高度按工具栏密度取 36px。 */
 export function ListToolbarSearch({
   className,
   ...props
 }: InputHTMLAttributes<HTMLInputElement>) {
   return (
     <div className={cn("relative w-full sm:w-64", className)}>
-      <SearchIcon className="pointer-events-none absolute top-1/2 left-2 size-3.5 -translate-y-1/2 text-muted-foreground" />
-      <Input {...props} className="h-7 pl-7.5" />
+      <SearchIcon className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-muted-foreground" />
+      <Input
+        {...props}
+        className="h-9 rounded-lg bg-muted/60 pl-9 dark:bg-muted/50"
+      />
     </div>
   )
 }
@@ -68,17 +71,17 @@ export function ListToolbarFilter({
   return (
     <div
       className={cn(
-        "inline-flex h-7 items-center rounded-full border text-sm transition-colors",
+        "inline-flex h-9 items-center rounded-lg border text-sm transition-colors",
         active
           ? "border-transparent bg-accent text-accent-foreground"
-          : "bg-background hover:bg-accent hover:text-accent-foreground",
+          : "border-input bg-muted/60 hover:bg-accent hover:text-accent-foreground dark:bg-muted/50",
       )}
     >
       <DropdownMenu>
         <DropdownMenuTrigger
           className={cn(
-            "inline-flex h-full items-center gap-1.5 rounded-full px-2.5 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
-            active && "pr-1",
+            "inline-flex h-full items-center gap-1.5 rounded-lg px-3 outline-none focus-visible:ring-[3px] focus-visible:ring-ring/50",
+            active && "pr-1.5",
           )}
         >
           <span className={active ? "text-accent-foreground/70" : "text-muted-foreground"}>
@@ -117,7 +120,7 @@ export function ListToolbarFilter({
           type="button"
           aria-label={`${t("actions.remove")} ${label}`}
           title={`${t("actions.remove")} ${label}`}
-          className="mr-1.5 inline-flex size-4 items-center justify-center rounded-full text-accent-foreground/70 transition-colors hover:bg-accent-foreground/10 hover:text-accent-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
+          className="mr-2 inline-flex size-4 items-center justify-center rounded-full text-accent-foreground/70 transition-colors hover:bg-accent-foreground/10 hover:text-accent-foreground focus-visible:ring-[3px] focus-visible:ring-ring/50 focus-visible:outline-none"
           onClick={() => onValueChange("")}
         >
           <XIcon className="size-3" />
@@ -136,7 +139,7 @@ export function ListToolbarReset({
   onClick: () => void
 }) {
   return (
-    <Button variant="ghost" size="sm" className="rounded-full" onClick={onClick}>
+    <Button variant="ghost" className="h-9 rounded-lg" onClick={onClick}>
       {children}
     </Button>
   )

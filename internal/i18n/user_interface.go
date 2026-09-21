@@ -80,4 +80,6 @@ const (
 	MessengerAttachmentUnavailable     Key = "messenger.attachment_unavailable"
 	MessengerSessionOpen               Key = "messenger.session_open"
 	MessengerSessionClosed             Key = "messenger.session_closed"
+	MessengerDayToday                  Key = "messenger.day_today"
+	MessengerDayYesterday              Key = "messenger.day_yesterday"
 )
