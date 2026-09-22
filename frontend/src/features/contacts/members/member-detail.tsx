@@ -154,7 +154,8 @@ export function MemberDetailView({
       if (changed && saveState.isCurrent(request)) form.reset(valuesFromUser(user))
       if (recoverSession(error, navigate)) return
       if (isNotFoundApiError(error)) {
-        onNotFound()
+        // 只在详情仍是这次请求所属的成员时关闭，迟到的结果不影响之后打开的详情。
+        if (saveState.isCurrent(request)) onNotFound()
         return
       }
       console.warn("保存企业成员失败", error)

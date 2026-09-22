@@ -233,7 +233,8 @@ export function ContactDetailView({
       if (recoverSession(error, navigate)) return
       if (isNotFoundApiError(error)) {
         console.warn("联系人不存在", { contact_id: detail.contact.id })
-        onNotFound()
+        // 只在详情仍是这次请求所属的联系人时关闭，迟到的结果不影响之后打开的详情。
+        if (saveState.isCurrent(request)) onNotFound()
         return
       }
       console.warn("保存联系人失败", error)

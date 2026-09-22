@@ -344,6 +344,7 @@ export function ExternalContactsPanel({
       >
         {detailContact ? (
           <ContactDetailView
+            key={detailContact.contact.id}
             detail={detailContact}
             onSaved={(saved) => {
               void invalidate(resourceKeys.contact(saved.contact.id))
