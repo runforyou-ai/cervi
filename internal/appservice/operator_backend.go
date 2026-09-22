@@ -22,4 +22,19 @@ type OperatorBackend interface {
 	// LoadDeployment 返回部署形态与企业域名后缀。
 	//cervi:route GET /deployment
 	LoadDeployment(context.Context, OperatorRequestMeta) (OperatorDeployment, error)
+	// CheckDomainAvailability 返回域名前缀在查询时刻是否可用。
+	//cervi:route GET /domains/availability
+	CheckDomainAvailability(context.Context, OperatorRequestMeta, OperatorDomainAvailabilityInput) (OperatorDomainAvailability, error)
+	// ProvisionOrganization 按开通标识幂等地创建企业、初始成员和初始权益。
+	//cervi:route POST /organizations status=201
+	ProvisionOrganization(context.Context, OperatorRequestMeta, OperatorProvisionInput) (OperatorProvisioning, error)
+	// GetProvisioning 返回开通标识对应企业的当前状态。
+	//cervi:route GET /provisionings/:provisioningID
+	GetProvisioning(context.Context, OperatorRequestMeta, string) (OperatorProvisioning, error)
+	// ListOrganizations 按条件分页返回企业摘要。
+	//cervi:route GET /organizations
+	ListOrganizations(context.Context, OperatorRequestMeta, OperatorOrganizationListInput) (OperatorOrganizationList, error)
+	// GetOrganization 返回企业摘要与状态。
+	//cervi:route GET /organizations/:organizationID
+	GetOrganization(context.Context, OperatorRequestMeta, string) (OperatorOrganization, error)
 }
