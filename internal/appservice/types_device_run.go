@@ -20,11 +20,12 @@ type DeviceWork struct {
 	Runs    []DeviceWorkRun `json:"runs"`
 }
 
-// DeviceRunClaim 定义设备领取运行后得到的有效配置、租约到期时间与续租间隔；有效配置是运行时的不透明 JSON。
+// DeviceRunClaim 定义设备领取运行后得到的有效配置、租约到期时间、续租间隔与运行总时限；有效配置是运行时的不透明 JSON。
 type DeviceRunClaim struct {
 	Assignment                json.RawMessage `json:"assignment"`
 	LeaseExpiresAt            time.Time       `json:"leaseExpiresAt"`
 	LeaseRenewIntervalSeconds int             `json:"leaseRenewIntervalSeconds"`
+	RunTimeoutSeconds         int             `json:"runTimeoutSeconds"`
 }
 
 // DeviceRunLease 定义续租结果，Ended 为 true 表示运行已结束，设备应停止执行。

@@ -108,19 +108,35 @@ func TestDeviceModelProxyBrandRules(t *testing.T) {
 		t.Fatalf("Anthropic 上游请求 = %#v", record)
 	}
 
-	google := &stubDeviceModelAuthorizer{upstream: appservice.DeviceModelUpstream{
-		Brand: "google", BaseURL: upstream.URL, APIKey: "gemini-key", Identifier: "gemini-test",
+	volcengine := &stubDeviceModelAuthorizer{upstream: appservice.DeviceModelUpstream{
+		Brand: "volcengine", BaseURL: upstream.URL + "/api/v3", APIKey: "ark-key", Identifier: "doubao-test",
 	}}
-	if recorder := serveDeviceModel(google, "/v1beta/models/gemini-test:streamGenerateContent?alt=sse", `{}`); recorder.Code != http.StatusOK {
-		t.Fatalf("Google 响应 = %d", recorder.Code)
+	if recorder := serveDeviceModel(volcengine, "/responses", `{"model":"doubao-test"}`); recorder.Code != http.StatusOK {
+		t.Fatalf("火山引擎响应 = %d", recorder.Code)
 	}
-	if record.path != "/v1beta/models/gemini-test:streamGenerateContent" || record.query != "alt=sse" ||
-		record.googleKey != "gemini-key" || record.authorization != "" {
-		t.Fatalf("Google 上游请求 = %#v", record)
+	if record.path != "/api/v3/responses" || record.authorization != "Bearer ark-key" {
+		t.Fatalf("火山引擎上游请求 = %#v", record)
+	}
+
+	// Google 模型标识带或不带资源前缀时都按 SDK 生成的完整资源名放行。
+	for identifier, path := range map[string]string{
+		"gemini-test":         "/v1beta/models/gemini-test:streamGenerateContent",
+		"models/gemini-test":  "/v1beta/models/gemini-test:generateContent",
+		"tunedModels/my-tune": "/v1beta/tunedModels/my-tune:generateContent",
+	} {
+		google := &stubDeviceModelAuthorizer{upstream: appservice.DeviceModelUpstream{
+			Brand: "google", BaseURL: upstream.URL, APIKey: "gemini-key", Identifier: identifier,
+		}}
+		if recorder := serveDeviceModel(google, path+"?alt=sse", `{}`); recorder.Code != http.StatusOK {
+			t.Fatalf("Google %s 响应 = %d", identifier, recorder.Code)
+		}
+		if record.path != path || record.query != "alt=sse" || record.googleKey != "gemini-key" || record.authorization != "" {
+			t.Fatalf("Google %s 上游请求 = %#v", identifier, record)
+		}
 	}
 }
 
-// TestDeviceModelProxyRejects 验证模型与配置版本不一致、入口前缀不符或授权失败时不转发。
+// TestDeviceModelProxyRejects 验证非对话接口、路径穿越、模型与配置版本不一致、入口前缀不符或授权失败时不转发。
 func TestDeviceModelProxyRejects(t *testing.T) {
 	record := upstreamRecord{}
 	upstream := newModelUpstream(t, &record)
@@ -135,6 +151,17 @@ func TestDeviceModelProxyRejects(t *testing.T) {
 		"Google 模型不一致": {&stubDeviceModelAuthorizer{upstream: appservice.DeviceModelUpstream{
 			Brand: "google", BaseURL: upstream.URL, Identifier: "gemini-test",
 		}}, "/v1beta/models/gemini-other:generateContent", `{}`, http.StatusBadRequest},
+		"Google 路径穿越": {&stubDeviceModelAuthorizer{upstream: appservice.DeviceModelUpstream{
+			Brand: "google", BaseURL: upstream.URL, Identifier: "gemini-test",
+		}}, "/v1beta/models/gemini-test:generateContent/../../models/gemini-other:generateContent", `{}`, http.StatusBadRequest},
+		"Google 非对话接口": {&stubDeviceModelAuthorizer{upstream: appservice.DeviceModelUpstream{
+			Brand: "google", BaseURL: upstream.URL, Identifier: "gemini-test",
+		}}, "/v1beta/models/gemini-test:embedContent", `{}`, http.StatusBadRequest},
+		"非对话接口":   {&stubDeviceModelAuthorizer{upstream: openAI}, "/embeddings", `{"model":"gpt-test"}`, http.StatusBadRequest},
+		"编码的路径穿越": {&stubDeviceModelAuthorizer{upstream: openAI}, "/chat/completions/%2e%2e/files", `{"model":"gpt-test"}`, http.StatusBadRequest},
+		"Anthropic 非消息接口": {&stubDeviceModelAuthorizer{upstream: appservice.DeviceModelUpstream{
+			Brand: "anthropic", BaseURL: upstream.URL, Identifier: "claude-test",
+		}}, "/v1/files", `{"model":"claude-test"}`, http.StatusBadRequest},
 		"入口前缀不符": {&stubDeviceModelAuthorizer{upstream: appservice.DeviceModelUpstream{
 			Brand: "alibaba", BaseURL: upstream.URL + "/compatible-mode/v1", Identifier: "qwen-test",
 		}}, "/chat/completions", `{"model":"qwen-test"}`, http.StatusBadRequest},

@@ -82,6 +82,7 @@ func (o *directOperations) ClaimDeviceRun(ctx context.Context, meta RequestMeta,
 	return DeviceRunClaim{
 		Assignment: claim.Assignment, LeaseExpiresAt: claim.LeaseExpiresAt,
 		LeaseRenewIntervalSeconds: int(agentrunaction.DeviceRunLeaseRenewInterval.Seconds()),
+		RunTimeoutSeconds:         int(agentrunaction.DeviceRunMaxDuration.Seconds()),
 	}, nil
 }
 

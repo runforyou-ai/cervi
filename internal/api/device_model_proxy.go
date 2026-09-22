@@ -39,7 +39,7 @@ func WithDeviceModelProxy(authorizer DeviceModelAuthorizer) ServiceOption {
 	}
 }
 
-// proxyDeviceModel 把设备运行的模型请求转发给运行锁定的上游模型服务：换成供应商凭据，要求请求的模型与配置版本一致，流式响应逐块透传。
+// proxyDeviceModel 把设备运行的模型请求转发给运行锁定的上游模型服务：只放行该品牌的对话接口，要求请求的模型与配置版本一致，换成供应商凭据后逐块透传流式响应。
 func (s *Service) proxyDeviceModel(c *gin.Context) {
 	meta := requestMeta(c)
 	upstream, err := s.deviceModels.AuthorizeDeviceModelRequest(c.Request.Context(), meta, c.Param("runID"))
@@ -67,8 +67,8 @@ func (s *Service) proxyDeviceModel(c *gin.Context) {
 		writeApplicationError(c, appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, nil))
 		return
 	}
-	if !deviceModelRequestMatches(upstream, endpoint, body) {
-		slog.Warn("设备模型请求的模型与运行配置不一致", "agent_run_id", c.Param("runID"), "brand", upstream.Brand)
+	if !deviceModelRequestAllowed(upstream, endpoint, body) {
+		slog.Warn("设备模型请求不在允许范围内", "agent_run_id", c.Param("runID"), "brand", upstream.Brand, "endpoint", endpoint)
 		writeApplicationError(c, appservice.InvalidError(meta, cervii18n.ErrorValidationFailed, nil))
 		return
 	}
@@ -114,10 +114,28 @@ func (s *Service) proxyDeviceModel(c *gin.Context) {
 	}{c.Writer, c.Writer}, c.Request)
 }
 
-// deviceModelRequestMatches 判断请求的模型是否为运行配置版本锁定的模型：Google 按路径中的模型名判断，其余品牌按请求体的 model 字段判断。
-func deviceModelRequestMatches(upstream appservice.DeviceModelUpstream, endpoint string, body []byte) bool {
-	if domain.AIProviderBrand(upstream.Brand) == domain.AIProviderBrandGoogle {
-		return strings.Contains(endpoint, "/models/"+upstream.Identifier+":")
+// deviceModelRequestAllowed 判断请求是否为运行时对该品牌发起的对话接口且模型与配置版本锁定的一致：Google 按完整路径匹配模型资源名，其余品牌按固定接口路径和请求体的 model 字段判断。
+func deviceModelRequestAllowed(upstream appservice.DeviceModelUpstream, endpoint string, body []byte) bool {
+	switch domain.AIProviderBrand(upstream.Brand) {
+	case domain.AIProviderBrandGoogle:
+		// 模型标识不带资源前缀时按基础模型补全，与 SDK 的拼接规则一致。
+		resource := upstream.Identifier
+		if !strings.HasPrefix(resource, "models/") && !strings.HasPrefix(resource, "tunedModels/") {
+			resource = "models/" + resource
+		}
+		return endpoint == "/v1beta/"+resource+":generateContent" || endpoint == "/v1beta/"+resource+":streamGenerateContent"
+	case domain.AIProviderBrandAnthropic:
+		if endpoint != "/v1/messages" {
+			return false
+		}
+	case domain.AIProviderBrandVolcengine:
+		if endpoint != "/responses" {
+			return false
+		}
+	default:
+		if endpoint != "/chat/completions" {
+			return false
+		}
 	}
 	var payload struct {
 		Model *string `json:"model"`

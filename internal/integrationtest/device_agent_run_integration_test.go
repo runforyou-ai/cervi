@@ -139,13 +139,10 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 			t.Fatalf("lease after stop=%+v %v", lease, err)
 		}
 		// 停止后设备回传的过程内容仍被保留。
-		partial := agentruntime.RunResult{Blocks: []agentruntime.Block{{ID: uuid.NewV7().String(), Position: 1, ModelCallID: uuid.NewV7().String(), Kind: domain.AgentRunBlockContent, Payload: agentruntime.BlockPayload{Text: "停止前的内容"}}}}
-		if err := fixture.executor.FailDeviceRun(ctx, fixture.device, waiting.ID, domain.AgentRunErrorCodeDeviceRunFailed, "stopped", partial); err != nil {
+		if err := fixture.executor.FailDeviceRun(ctx, fixture.device, waiting.ID, domain.AgentRunErrorCodeDeviceRunFailed, "stopped", agentruntime.RunResult{Blocks: fixture.partialBlocks()}); err != nil {
 			t.Fatal(err)
 		}
-		if count, err := db.NewSelect().Model((*servermodels.AgentRunBlock)(nil)).Where("arb.agent_run_id = ?", waiting.ID).Count(ctx); err != nil || count != 1 {
-			t.Fatalf("stopped run blocks=%d %v", count, err)
-		}
+		fixture.assertBlocks(waiting.ID, 1)
 	})
 
 	t.Run("租约过期", func(t *testing.T) {
@@ -162,11 +159,12 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		if _, err := fixture.executor.RenewDeviceRunLease(ctx, fixture.device, run.ID); !errors.Is(err, agentrunaction.ErrDeviceRunLeaseLost) {
 			t.Fatalf("expired renew=%v", err)
 		}
-		if err := fixture.executor.CompleteDeviceRun(ctx, fixture.device, run.ID, agentruntime.RunResult{Content: "迟到", EndSeq: 1}); !errors.Is(err, agentrunaction.ErrDeviceRunLeaseLost) {
+		// 扫描收敛前设备上报的迟到结果被拒绝，运行随即按租约过期收敛并保留过程内容。
+		if err := fixture.executor.CompleteDeviceRun(ctx, fixture.device, run.ID, agentruntime.RunResult{Content: "迟到", EndSeq: 1, Blocks: fixture.partialBlocks()}); !errors.Is(err, agentrunaction.ErrDeviceRunLeaseLost) {
 			t.Fatalf("expired complete=%v", err)
 		}
-		fixture.sweep()
 		fixture.assertFailed(run.ID, domain.AgentRunErrorCodeDeviceLeaseExpired)
+		fixture.assertBlocks(run.ID, 1)
 
 		// 收尾请求等待会话锁期间租约过期，取得锁后按租约失效拒绝写入。
 		waiting := fixture.sendAndLoadRun(fixture.boundChat(second.ID), "等锁")
@@ -212,6 +210,42 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 			t.Fatalf("next run=%+v", next)
 		}
 		fixture.claimAndComplete(next.ID, "继续后的回复")
+	})
+
+	t.Run("超出总时限", func(t *testing.T) {
+		expire := func(runID string) {
+			if _, err := db.NewUpdate().Model((*servermodels.AgentRun)(nil)).
+				Set("claimed_at = now() - make_interval(secs => ?)", agentrunaction.DeviceRunMaxDuration.Seconds()+1).
+				Where("id = ?", runID).Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+		}
+		// 超出总时限后不再续租、不再代理模型请求，设备上报失败时按超时收敛并保留过程内容。
+		run := fixture.sendAndLoadRun(fixture.boundChat(second.ID), "超时")
+		if claim, err := fixture.executor.ClaimDeviceRun(ctx, fixture.device, run.ID); err != nil || len(claim.Assignment) == 0 {
+			t.Fatalf("claim=%+v %v", claim, err)
+		}
+		expire(run.ID)
+		if _, err := fixture.executor.RenewDeviceRunLease(ctx, fixture.device, run.ID); !errors.Is(err, agentrunaction.ErrDeviceRunLeaseLost) {
+			t.Fatalf("renew after deadline=%v", err)
+		}
+		if _, err := fixture.executor.ResolveDeviceModelUpstream(ctx, fixture.device, run.ID); !errors.Is(err, agentrunaction.ErrDeviceRunLeaseLost) {
+			t.Fatalf("model upstream after deadline=%v", err)
+		}
+		if err := fixture.executor.FailDeviceRun(ctx, fixture.device, run.ID, domain.AgentRunErrorCodeDeviceRunFailed, "context canceled", agentruntime.RunResult{Blocks: fixture.partialBlocks()}); err != nil {
+			t.Fatal(err)
+		}
+		fixture.assertFailed(run.ID, domain.AgentRunErrorCodeDeviceRunTimedOut)
+		fixture.assertBlocks(run.ID, 1)
+
+		// 租约仍在续期的运行超出总时限后由扫描收敛。
+		swept := fixture.sendAndLoadRun(run.ConversationID, "扫描超时")
+		if _, err := fixture.executor.ClaimDeviceRun(ctx, fixture.device, swept.ID); err != nil {
+			t.Fatal(err)
+		}
+		expire(swept.ID)
+		fixture.sweep()
+		fixture.assertFailed(swept.ID, domain.AgentRunErrorCodeDeviceRunTimedOut)
 	})
 
 	t.Run("工作区缺失与解绑", func(t *testing.T) {
@@ -335,6 +369,23 @@ func (f *deviceRunFixture) assertFailed(runID string, code domain.AgentRunErrorC
 	}
 	if run.Status != string(domain.AgentRunStatusFailed) || run.ErrorCode == nil || *run.ErrorCode != string(code) || run.ResponseMessageID == nil {
 		f.t.Fatalf("failed run=%+v", run)
+	}
+}
+
+// partialBlocks 构造设备回传的一个正文过程内容块。
+func (f *deviceRunFixture) partialBlocks() []agentruntime.Block {
+	return []agentruntime.Block{{
+		ID: uuid.NewV7().String(), Position: 1, ModelCallID: uuid.NewV7().String(),
+		Kind: domain.AgentRunBlockContent, Payload: agentruntime.BlockPayload{Text: "中断前的内容"},
+	}}
+}
+
+// assertBlocks 核对运行保存的过程内容块数量。
+func (f *deviceRunFixture) assertBlocks(runID string, expected int) {
+	f.t.Helper()
+	count, err := f.db.NewSelect().Model((*servermodels.AgentRunBlock)(nil)).Where("arb.agent_run_id = ?", runID).Count(f.ctx)
+	if err != nil || count != expected {
+		f.t.Fatalf("run blocks=%d %v", count, err)
 	}
 }
 

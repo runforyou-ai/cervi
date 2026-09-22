@@ -14,8 +14,8 @@ import (
 )
 
 const (
-	// localRunTimeout 是本机执行一次运行的总时限。
-	localRunTimeout = 30 * time.Minute
+	// defaultRunTimeout 是服务端未给出有效运行总时限时使用的时限。
+	defaultRunTimeout = 30 * time.Minute
 	// deviceModelAPIKey 是模型组件要求的非空凭据占位值，模型请求的认证由传输层写入登录令牌。
 	deviceModelAPIKey = "cervi-device"
 )
@@ -33,7 +33,12 @@ func (w *Worker) runAgent(runCtx context.Context, meta appservice.RequestMeta, r
 	if err != nil {
 		return agentruntime.RunResult{}, fmt.Errorf("resolve device model endpoint: %w", err)
 	}
-	ctx, cancel := context.WithTimeout(runCtx, localRunTimeout)
+	// 运行总时限以服务端下发的为准，无效时按默认时限执行。
+	timeout := time.Duration(claim.RunTimeoutSeconds) * time.Second
+	if timeout <= 0 {
+		timeout = defaultRunTimeout
+	}
+	ctx, cancel := context.WithTimeout(runCtx, timeout)
 	defer cancel()
 	result, err := w.runtime.Run(ctx, agentruntime.RunRequest{
 		RunID:       runID,

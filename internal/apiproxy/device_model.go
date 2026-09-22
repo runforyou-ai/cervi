@@ -4,8 +4,10 @@ package apiproxy
 
 import (
 	"context"
+	"fmt"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
@@ -26,18 +28,27 @@ func (b *Backend) DeviceModelEndpoint(ctx context.Context, meta appservice.Reque
 		base = http.DefaultTransport
 	}
 	endpoint := remoteEndpoint(state.baseURL, "/agent-runs/"+url.PathEscape(runID)+"/model", "")
-	return endpoint, &deviceModelTransport{base: base, token: credential.Token, deviceID: meta.DeviceID}, nil
+	parsed, err := url.Parse(endpoint)
+	if err != nil {
+		return "", nil, appservice.FailedError(meta, cervii18n.ErrorRemoteRequestCreateFailed)
+	}
+	return endpoint, &deviceModelTransport{base: base, endpoint: parsed, token: credential.Token, deviceID: meta.DeviceID}, nil
 }
 
-// deviceModelTransport 把模型组件写入的供应商凭据请求头换成登录令牌与本机设备编号。
+// deviceModelTransport 只向模型代理入口发出请求，并把模型组件写入的供应商凭据请求头换成登录令牌与本机设备编号。
 type deviceModelTransport struct {
 	base     http.RoundTripper
+	endpoint *url.URL
 	token    string
 	deviceID string
 }
 
-// RoundTrip 复制请求并替换认证请求头后发出。
+// RoundTrip 拒绝模型代理入口之外的地址，复制请求并替换认证请求头后发出。
 func (t *deviceModelTransport) RoundTrip(request *http.Request) (*http.Response, error) {
+	if request.URL.Scheme != t.endpoint.Scheme || request.URL.Host != t.endpoint.Host ||
+		!strings.HasPrefix(request.URL.Path, strings.TrimRight(t.endpoint.Path, "/")+"/") {
+		return nil, fmt.Errorf("device model request outside proxy endpoint: %s://%s%s", request.URL.Scheme, request.URL.Host, request.URL.Path)
+	}
 	outgoing := request.Clone(request.Context())
 	outgoing.Header.Del("X-Api-Key")
 	outgoing.Header.Del("X-Goog-Api-Key")
