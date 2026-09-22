@@ -179,7 +179,6 @@ const channels = {
     copied: "Copied",
     copyFailed: "Could not copy. Copy the text manually.",
     originError: "Could not generate the public entry. Try again later.",
-    saved: "Allowed websites saved.",
     validation: {
       allowedHostsTooMany: "You cannot allow more than 50 websites.",
       allowedHostInvalid:

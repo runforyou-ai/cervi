@@ -8,7 +8,6 @@ import {
   getUser,
   isDirectInboxConversation,
   type DirectInboxConversationData,
-  sendFirstDirectTextMessage,
   UserStatus,
   type UserData,
 } from "@/api"
@@ -16,8 +15,9 @@ import { MobileIndividualThread } from "@/apps/mobile/mobile-individual-thread"
 import { MobilePageHeader, MobilePageState } from "@/apps/mobile/mobile-page"
 import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
 import { LoadingIndicator } from "@/components/loading-indicator"
+import { useFirstChatMessage } from "@/features/inbox/use-first-chat-message"
 import { resourceKeys } from "@/hooks/resource-keys"
-import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
+import { useResource } from "@/hooks/use-resource"
 
 /** 按成员隔离草稿生命周期和发送结果。 */
 export function MobileEmployeeChatPage() {
@@ -146,7 +146,7 @@ function MobileEmployeeChatLookup({
 function MobileEmployeeDraft({ user }: { user: UserData }) {
   const navigate = useNavigate()
   const location = useLocation()
-  const invalidate = useResourceInvalidator()
+  const firstChat = useFirstChatMessage()
   const alive = useRef(true)
   useEffect(() => {
     alive.current = true
@@ -155,10 +155,8 @@ function MobileEmployeeDraft({ user }: { user: UserData }) {
     }
   }, [])
 
-  /** 首发确认后更新查询并替换当前草稿路由。 */
+  /** 首发确认后替换当前草稿路由。 */
   function handleCreated(conversation: DirectInboxConversationData) {
-    void invalidate(resourceKeys.directConversation(user.identityId))
-    void invalidate(resourceKeys.conversationMessages(conversation.id))
     if (alive.current) {
       void navigate(`/inbox/direct/${conversation.id}`, {
         replace: true,
@@ -172,13 +170,12 @@ function MobileEmployeeDraft({ user }: { user: UserData }) {
       conversationID=""
       peerIdentityID={user.identityId}
       onAttachmentConversationCreated={(conversation) => {
-        if (isDirectInboxConversation(conversation)) handleCreated(conversation)
+        if (!isDirectInboxConversation(conversation)) return
+        firstChat.refreshStarted(conversation, user.identityId)
+        handleCreated(conversation)
       }}
       sendIndividualMessage={async (input) => {
-        const result = await sendFirstDirectTextMessage({
-          targetIdentityId: user.identityId,
-          ...input,
-        })
+        const result = await firstChat.sendDirect(user.identityId, input)
         handleCreated(result.conversation)
         return result.message
       }}

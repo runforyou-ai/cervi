@@ -176,7 +176,6 @@ const channels = {
     copied: "已复制",
     copyFailed: "复制失败，请手动复制。",
     originError: "无法生成对外入口，请稍后重试。",
-    saved: "允许使用的网站已保存。",
     validation: {
       allowedHostsTooMany: "允许使用的网站不能超过 50 个。",
       allowedHostInvalid: "请每行填写一个有效域名、HTTP(S) 地址或 *。",

@@ -8,7 +8,6 @@ import {
   getAgent,
   isAgentInboxConversation,
   isNotFoundApiError,
-  sendFirstAgentTextMessage,
   UserStatus,
   type AgentData,
   type AgentInboxConversationData,
@@ -20,6 +19,7 @@ import { MobilePageState } from "@/apps/mobile/mobile-page"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { useAccountDisabledReason } from "@/features/inbox/use-account-disabled-reason"
 import { useConversationSummary } from "@/features/inbox/use-conversation-summary"
+import { useFirstChatMessage } from "@/features/inbox/use-first-chat-message"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 
@@ -66,6 +66,7 @@ function MobileAgentConversation({ conversationID }: { conversationID: string })
   const [created, setCreated] = useState<AgentInboxConversationData | null>(null)
   const persisted = !draftAgentID || Boolean(created)
   const alive = useRef(true)
+  const firstChat = useFirstChatMessage()
   const agent = useResource(
     resourceKeys.agent(draftAgentID),
     () => getAgent(draftAgentID),
@@ -131,12 +132,7 @@ function MobileAgentConversation({ conversationID }: { conversationID: string })
           lastReadMessageID={conversation?.lastReadMessageId}
           locateMessage={(location.state as MobileAgentLocationState | null)?.locateMessage}
           sendIndividualMessage={!persisted && draftAgent ? async (input) => {
-            const result = await sendFirstAgentTextMessage({
-              conversationId: conversationID,
-              agentIdentityId: draftAgent.identityId,
-              clientMessageId: input.clientMessageId,
-              body: input.body,
-            })
+            const result = await firstChat.sendAgent(conversationID, draftAgent.identityId, input)
             handleCreated(result.conversation)
             return result.message
           } : undefined}

@@ -1,8 +1,7 @@
 /** 移动端外部联系人列表与只读详情。 */
-import { useEffect, useState } from "react"
 import { ChevronRightIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { Link, useParams, useSearchParams } from "react-router"
+import { Link, useParams } from "react-router"
 
 import {
   ContactMethodType,
@@ -25,6 +24,7 @@ import { Button } from "@/components/ui/button"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useDateTime } from "@/hooks/use-date-time"
 import { useResource } from "@/hooks/use-resource"
+import { useListSearchParams } from "@/hooks/use-list-search-params"
 
 /** 联系人阶段对应的翻译键，未知阶段不展示。 */
 function contactStageKey(stage: ContactStage) {
@@ -45,27 +45,14 @@ function contactStageKey(stage: ContactStage) {
 export function MobileExternalContactsPage() {
   const { t } = useTranslation(["contacts", "mobile"])
   const { listPageCounts, scrollPositions } = useMobileNavigation()
-  const [params, setParams] = useSearchParams()
-  const queryText = params.get("q") ?? ""
-  const [search, setSearch] = useState(queryText)
-
-  useEffect(() => setSearch(queryText), [queryText])
-  useEffect(() => {
-    if (search === queryText) return
-    // 停止输入后再查询，替换当前历史并保留通讯录返回来源。
-    const timer = window.setTimeout(() => {
-      const next = new URLSearchParams()
-      if (search) next.set("q", search)
-      // 搜索改变时重置目标查询的加载进度和滚动位置。
-      if (search.trim() !== queryText.trim()) {
-        const storageKey = `external:${search.trim()}`
-        listPageCounts.delete(storageKey)
-        scrollPositions.delete(storageKey)
-      }
-      setParams(next, { replace: true, state: { mobileBack: true } })
-    }, 300)
-    return () => window.clearTimeout(timer)
-  }, [search, queryText, setParams, listPageCounts, scrollPositions])
+  // 检索词变化时重置目标查询的加载进度和滚动位置。
+  const { query: queryText, search, setSearch } = useListSearchParams({
+    onQueryChange: (query) => {
+      const storageKey = `external:${query}`
+      listPageCounts.delete(storageKey)
+      scrollPositions.delete(storageKey)
+    },
+  })
 
   return (
     <section className="flex h-full min-h-0 flex-col">

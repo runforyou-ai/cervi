@@ -1,10 +1,11 @@
 /** 已保存 MCP 服务的列表行连接测试。 */
-import { useEffect, useRef, useState } from "react"
+import { useEffect, useRef } from "react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import { isApiError, testSavedMCPServerConnection } from "@/api"
+import { usePendingIds } from "@/hooks/use-pending-ids"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
@@ -12,7 +13,7 @@ import { recoverSession } from "@/lib/session-navigation"
 export function useMCPServerConnectionTest() {
   const { t } = useTranslation("integrations")
   const navigate = useNavigate()
-  const [testingIds, setTestingIds] = useState<ReadonlySet<string>>(new Set())
+  const testing = usePendingIds()
   const mounted = useRef(true)
   useEffect(() => {
     mounted.current = true
@@ -23,23 +24,17 @@ export function useMCPServerConnectionTest() {
 
   /** 测试保存的配置并显示结果。 */
   async function test(serverId: string) {
-    if (testingIds.has(serverId)) return
-    setTestingIds((current) => new Set(current).add(serverId))
-    try {
-      await testSavedMCPServerConnection(serverId)
-      if (mounted.current) toast.success(t("mcpServer.connection.success"))
-    } catch (error) {
-      if (!mounted.current || recoverSession(error, navigate)) return
-      toast.error(isApiError(error) ? apiErrorMessage(error) : t("mcpServer.connection.error"))
-    } finally {
-      if (mounted.current)
-        setTestingIds((current) => {
-          const next = new Set(current)
-          next.delete(serverId)
-          return next
-        })
-    }
+    if (testing.pendingIds.has(serverId)) return
+    await testing.run(serverId, async () => {
+      try {
+        await testSavedMCPServerConnection(serverId)
+        if (mounted.current) toast.success(t("mcpServer.connection.success"))
+      } catch (error) {
+        if (!mounted.current || recoverSession(error, navigate)) return
+        toast.error(isApiError(error) ? apiErrorMessage(error) : t("mcpServer.connection.error"))
+      }
+    })
   }
 
-  return { testingIds, test }
+  return { testingIds: testing.pendingIds, test }
 }

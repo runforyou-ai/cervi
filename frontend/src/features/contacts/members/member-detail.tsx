@@ -1,5 +1,5 @@
 /** 企业成员详情和字段级编辑。 */
-import { useEffect, useMemo, useState, type KeyboardEvent, type ReactNode } from "react"
+import { useEffect, useMemo, useState, type KeyboardEvent } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
@@ -17,10 +17,13 @@ import {
   type RoleData,
   type Team,
 } from "@/api"
-import { DetailEditRow } from "@/components/form/detail-edit-row"
+import {
+  DetailEditRow,
+  ReadonlyDetailRow,
+} from "@/components/form/detail-edit-row"
+import { InlineEditField } from "@/components/form/inline-edit-field"
 import { WorkStatusBadge } from "@/components/work-status"
 import { Field, FieldDescription } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
 import { NativeSelect } from "@/components/ui/native-select"
 import { Switch } from "@/components/ui/switch"
 import { AccountStatusEditRow } from "@/features/contacts/account-status-edit-row"
@@ -48,16 +51,6 @@ function valuesFromUser(user: UserData): MemberFormValues {
     handlesCustomers: user.handlesCustomers,
     maxServiceSessions: String(user.maxServiceSessions),
   }
-}
-
-/** 显示企业成员只读字段。 */
-function ReadonlyDetailRow({ label, children }: { label: string; children: ReactNode }) {
-  return (
-    <div className="flex items-start gap-3 px-2 py-3 text-sm">
-      <div className="w-28 shrink-0 text-muted-foreground">{label}</div>
-      <div className="min-w-0 flex-1">{children}</div>
-    </div>
-  )
 }
 
 /** 按字段展示和编辑企业成员详情。 */
@@ -122,20 +115,15 @@ export function MemberDetailView({
     setEditing(field)
   }
 
-  /** 保存成员字段。 */
+  /** 保存成员字段：先在可编辑状态下校验；请求发出后即使详情关闭也写完并刷新缓存，只在仍打开时更新编辑状态。失败时文本输入保留草稿和编辑态，传入 draft 的即选即存控件恢复为已保存的值。 */
   async function saveMember(
-    draft: MemberFormValues = form.getValues(),
+    changed?: MemberFormValues,
     closeAfterSave = true,
   ) {
+    const draft = changed ?? form.getValues()
     const userID = user.id
-    const request = saveState.begin()
-    if (request === null) return
-    const valid = await form.trigger()
-    if (!saveState.isCurrent(request)) return
-    if (!valid) {
-      saveState.finish(request)
-      return
-    }
+    if (saveState.isSaving()) return
+    if (!(await form.trigger(undefined, { shouldFocus: true }))) return
     const current = valuesFromUser(user)
     if (
       draft.displayName === current.displayName &&
@@ -146,10 +134,11 @@ export function MemberDetailView({
       sameIDs(draft.teamIds, current.teamIds)
     ) {
       setEditing(null)
-      saveState.finish(request)
       return
     }
 
+    const request = saveState.begin()
+    if (request === null) return
     try {
       const saved = await updateUser(userID, {
         displayName: draft.displayName,
@@ -159,12 +148,10 @@ export function MemberDetailView({
         handlesCustomers: draft.handlesCustomers,
         maxServiceSessions: Number(draft.maxServiceSessions),
       })
-      if (!saveState.isCurrent(request)) return
-      if (closeAfterSave) setEditing(null)
       onSaved(saved)
+      if (closeAfterSave && saveState.isCurrent(request)) setEditing(null)
     } catch (error) {
-      if (!saveState.isCurrent(request)) return
-      cancelEdit()
+      if (changed && saveState.isCurrent(request)) form.reset(valuesFromUser(user))
       if (recoverSession(error, navigate)) return
       if (isNotFoundApiError(error)) {
         onNotFound()
@@ -188,20 +175,6 @@ export function MemberDetailView({
     }
   }
 
-  /** 处理文本字段快捷键。 */
-  function handleTextKeyDown(event: KeyboardEvent<HTMLInputElement>) {
-    if (event.key === "Escape") {
-      event.preventDefault()
-      event.stopPropagation()
-      cancelEdit()
-      return
-    }
-    if (event.key === "Enter") {
-      event.preventDefault()
-      event.currentTarget.blur()
-    }
-  }
-
   /** 处理选择字段快捷键。 */
   function handleSelectKeyDown(event: KeyboardEvent<HTMLSelectElement>) {
     if (event.key !== "Escape") return
@@ -212,63 +185,41 @@ export function MemberDetailView({
 
   const empty = <span className="text-muted-foreground">{t("detail.empty")}</span>
 
+  /** 文本字段共用的就地编辑属性：失焦或回车保存，Esc 放弃修改。 */
+  function textFieldProps(field: "name" | "email" | "maxServiceSessions") {
+    return {
+      control: form.control,
+      empty,
+      disabled: saving,
+      editing: editing === field,
+      editEnabled: editing === null && !saving,
+      onEditingChange: (next: boolean) => {
+        if (next) startEditing(field)
+      },
+      onCommit: () => void saveMember(),
+      onCancel: cancelEdit,
+    }
+  }
+
   return (
     <div className="flex flex-col gap-7">
       <section>
         <h3 className="mb-2 text-sm font-medium">{t("detail.basicInformation")}</h3>
         <div className="divide-y">
-          <DetailEditRow
+          <InlineEditField
+            {...textFieldProps("name")}
+            name="displayName"
             label={t("columns.name")}
-            value={user.displayName || empty}
-            editing={editing === "name"}
-            editEnabled={editing === null && !saving}
             required
-            onEdit={() => startEditing("name")}
-          >
-            <Controller
-              name="displayName"
-              control={form.control}
-              render={({ field }) => (
-                <Input
-                  {...field}
-                  autoFocus
-                  disabled={saving}
-                  onBlur={() => {
-                    field.onBlur()
-                    void saveMember()
-                  }}
-                  onKeyDown={handleTextKeyDown}
-                />
-              )}
-            />
-          </DetailEditRow>
+          />
 
-          <DetailEditRow
+          <InlineEditField
+            {...textFieldProps("email")}
+            name="email"
+            type="email"
             label={t("columns.email")}
-            value={user.email || empty}
-            editing={editing === "email"}
-            editEnabled={editing === null && !saving}
             required
-            onEdit={() => startEditing("email")}
-          >
-            <Controller
-              name="email"
-              control={form.control}
-              render={({ field }) => (
-                <Input
-                  {...field}
-                  type="email"
-                  autoFocus
-                  disabled={saving}
-                  onBlur={() => {
-                    field.onBlur()
-                    void saveMember()
-                  }}
-                  onKeyDown={handleTextKeyDown}
-                />
-              )}
-            />
-          </DetailEditRow>
+          />
 
           <DetailEditRow
             label={t("columns.role")}
@@ -344,35 +295,16 @@ export function MemberDetailView({
           </ReadonlyDetailRow>
 
           {user.handlesCustomers ? (
-            <DetailEditRow
+            <InlineEditField
+              {...textFieldProps("maxServiceSessions")}
+              name="maxServiceSessions"
+              type="number"
+              inputMode="numeric"
+              min={1}
+              step={1}
               label={t("columns.maxServiceSessions")}
-              value={user.maxServiceSessions}
-              editing={editing === "maxServiceSessions"}
-              editEnabled={editing === null && !saving}
               required
-              onEdit={() => startEditing("maxServiceSessions")}
-            >
-              <Controller
-                name="maxServiceSessions"
-                control={form.control}
-                render={({ field }) => (
-                  <Input
-                    {...field}
-                    type="number"
-                    inputMode="numeric"
-                    min={1}
-                    step={1}
-                    autoFocus
-                    disabled={saving}
-                    onBlur={() => {
-                      field.onBlur()
-                      void saveMember()
-                    }}
-                    onKeyDown={handleTextKeyDown}
-                  />
-                )}
-              />
-            </DetailEditRow>
+            />
           ) : null}
 
           <ReadonlyDetailRow label={t("columns.workStatus")}>

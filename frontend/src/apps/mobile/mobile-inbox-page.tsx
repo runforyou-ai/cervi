@@ -1,8 +1,6 @@
 /** 移动端统一会话摘要列表、阅读状态与置顶菜单、置顶排序和内部聊天入口。 */
 import { useEffect, useRef, useState } from "react"
-import { useSortable } from "@dnd-kit/sortable"
-import { CSS } from "@dnd-kit/utilities"
-import { BellOffIcon, GripVerticalIcon, PlusIcon, SearchIcon } from "lucide-react"
+import { GripVerticalIcon, PlusIcon, SearchIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 
@@ -29,16 +27,17 @@ import {
   MobilePageState,
 } from "@/apps/mobile/mobile-page"
 import {
-  ConversationAssigneeAvatar,
-  ConversationAvatar,
-} from "@/features/inbox/conversation-avatar"
-import {
   ConversationListMenu,
   useConversationListActions,
 } from "@/features/inbox/conversation-list-menu"
-import { conversationPreview } from "@/features/inbox/conversation-preview"
-import { ConversationUnreadBadge } from "@/features/inbox/conversation-unread-badge"
-import { PinnedSortArea, pinMoveCommand } from "@/features/inbox/pinned-sort"
+import { ConversationRowContent } from "@/features/inbox/conversation-row-content"
+import {
+  PinnedConversationList,
+  pinMoveCommand,
+  pinSortableStyle,
+  usePinSortable,
+  type PinSortable,
+} from "@/features/inbox/pinned-sort"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -47,8 +46,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { LoadingIndicator } from "@/components/loading-indicator"
-import { useConversationTime, useMinuteTick } from "@/features/inbox/use-conversation-time"
-import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
+import { useMinuteTick } from "@/features/inbox/use-conversation-time"
 import {
   useMemberChatPollingActive,
 } from "@/features/inbox/use-member-chat-polling"
@@ -93,7 +91,7 @@ type MobileConversationRowProps = {
   sorting: boolean
   onMenuChange: (open: boolean) => void
   onOpen: (conversation: MobileInboxConversation) => void
-  sortable?: ReturnType<typeof useSortable>
+  sortable?: PinSortable
 }
 
 /** 渲染会话摘要和未读角标，点击进入会话详情，长按打开阅读状态与置顶菜单；排序模式下置顶行右侧显示拖动手柄。 */
@@ -110,91 +108,10 @@ function MobileConversationRow({
   sortable,
 }: MobileConversationRowProps) {
   const { t } = useTranslation("inbox")
-  const formatTime = useConversationTime()
-  const customerConversation = isCustomerInboxConversation(conversation)
-    ? conversation
-    : null
-  const directConversation = isDirectInboxConversation(conversation)
-    ? conversation
-    : null
-  const agent = isAgentInboxConversation(conversation)
-    ? conversation.agent
-    : null
-  const groupConversation = isGroupInboxConversation(conversation)
-    ? conversation
-    : null
-  const summary =
-    customerConversation?.customer ??
-    directConversation?.direct ??
-    agent ??
-    groupConversation?.group
-  const agentRunLabel = agentRunStatusLabel(agent?.agentRunStatus ?? null, t)
-
-  if (!summary) return null
-  const preview = conversationPreview(conversation, summary, t)
-  const formattedTime = formatTime(summary.lastMessageAt)
-  const internalConversation =
-    directConversation ??
-    groupConversation ??
-    (isAgentInboxConversation(conversation) ? conversation : null)
-
-  const content = (
-    <>
-      <span className="relative shrink-0">
-        <ConversationAvatar conversation={conversation} className="size-10" />
-        <ConversationUnreadBadge conversation={conversation} />
-      </span>
-      <div className="min-w-0 flex-1 overflow-hidden">
-        <div className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-2">
-          <div className="flex min-w-0 items-center gap-2">
-            <p className="min-w-0 flex-1 truncate text-[15px] font-medium">
-              {name}
-            </p>
-            {agentRunLabel ? (
-              <span className="shrink-0 text-xs text-muted-foreground">
-                {agentRunLabel}
-              </span>
-            ) : null}
-          </div>
-          {formattedTime ? (
-            <time
-              dateTime={summary.lastMessageAt ?? undefined}
-              className="shrink-0 text-xs text-muted-foreground"
-            >
-              {formattedTime}
-            </time>
-          ) : null}
-        </div>
-        <div className="mt-0.5 flex min-w-0 items-center gap-2">
-          <p className="min-w-0 flex-1 truncate text-sm text-muted-foreground">
-            {preview}
-          </p>
-          {showAssignee ? (
-            <ConversationAssigneeAvatar conversation={conversation} className="size-4" />
-          ) : null}
-          {internalConversation?.muted ? (
-            <BellOffIcon
-              className="size-3.5 shrink-0 text-muted-foreground"
-              aria-label={t("conversationMuted")}
-            />
-          ) : null}
-        </div>
-      </div>
-    </>
-  )
-
-
   return (
     <li
       ref={sortable?.setNodeRef}
-      style={
-        sortable
-          ? {
-              transform: CSS.Translate.toString(sortable.transform),
-              transition: sortable.transition,
-            }
-          : undefined
-      }
+      style={pinSortableStyle(sortable)}
       data-inbox-id={conversation.id}
       data-pinned={conversation.pinned || undefined}
       className={cn(
@@ -218,7 +135,12 @@ function MobileConversationRow({
             aria-label={name}
             onClick={() => onOpen(conversation)}
           >
-            {content}
+            <ConversationRowContent
+              conversation={conversation}
+              name={name}
+              density="touch"
+              showAssignee={showAssignee}
+            />
           </button>
         </ConversationListMenu>
       </div>
@@ -241,12 +163,10 @@ function MobileConversationRow({
 
 /** 置顶区内的移动端会话行，只在排序模式且未保存时可拖动。 */
 function SortableMobileConversationRow(props: MobileConversationRowProps) {
-  const { t } = useTranslation("inbox")
-  const sortable = useSortable({
-    id: props.conversation.id,
-    disabled: !props.sorting || props.actions.saving,
-    attributes: { roleDescription: t("pinSortRole") },
-  })
+  const sortable = usePinSortable(
+    props.conversation.id,
+    !props.sorting || props.actions.saving,
+  )
   return <MobileConversationRow {...props} sortable={sortable} />
 }
 
@@ -295,7 +215,6 @@ function MobileInboxList({ query, changeQuery }: ReturnType<typeof useMobileInbo
       conversationName(conversation),
     ]),
   )
-  const rows = new Map(conversations.map((conversation) => [conversation.id, conversation]))
   const initial = list.revision === 0
   const row = (conversation: MobileInboxConversation) => ({
     conversation,
@@ -445,32 +364,31 @@ function MobileInboxList({ query, changeQuery }: ReturnType<typeof useMobileInbo
           ) : null}
           {conversations.length > 0 ? (
             <ul>
-              <PinnedSortArea
+              <PinnedConversationList
                 conversations={conversations}
                 pinnedIds={list.pinnedIds}
                 names={names}
                 pinOrderVersion={list.pinOrderVersion}
                 actions={actions}
                 onDraggingChange={viewport.setDragging}
-              >
-                {(order) => order.flatMap((id, index) => rows.has(id) ? [
+                renderPinned={(conversation, order, index) => (
                   <SortableMobileConversationRow
-                    key={id}
-                    {...row(rows.get(id)!)}
+                    key={conversation.id}
+                    {...row(conversation)}
                     pinMoves={{
-                      up: pinMoveCommand(order, id, index - 1, list.pinOrderVersion),
-                      down: pinMoveCommand(order, id, index + 1, list.pinOrderVersion),
+                      up: pinMoveCommand(order, conversation.id, index - 1, list.pinOrderVersion),
+                      down: pinMoveCommand(order, conversation.id, index + 1, list.pinOrderVersion),
                       sort: () => {
                         exitSortingOnMenuClose.current = false
                         setSorting(true)
                       },
                     }}
-                  />,
-                ] : [])}
-              </PinnedSortArea>
-              {conversations.flatMap((conversation) => list.pinnedIds.includes(conversation.id) ? [] : [
-                <MobileConversationRow key={conversation.id} {...row(conversation)} />,
-              ])}
+                  />
+                )}
+                renderRow={(conversation) => (
+                  <MobileConversationRow key={conversation.id} {...row(conversation)} />
+                )}
+              />
             </ul>
           ) : null}
         </InboxListPanel>

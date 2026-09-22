@@ -112,7 +112,7 @@ export function TimelineMessageBubble(props: TimelineMessageBubbleProps) {
   const copilot = conversationType === ConversationType.ConversationTypeCopilot
   // 移动端气泡禁止文本选择，消息菜单项使用触屏尺寸，回复入口只通过长按菜单提供。
   const mobile = resolveAppPlatform() === "mobile"
-  const menuItemClassName = cn(mobile && "min-h-11")
+  const menuItemClassName = "touch:min-h-11"
   const agentError = message.type === MessageType.MessageTypeAgentError
   const agentCancelled = message.type === MessageType.MessageTypeAgentCancelled
   const agentNotice = agentError || agentCancelled

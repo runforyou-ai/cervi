@@ -14,9 +14,9 @@ import {
   type WebsiteChannelAccessData,
   type WebsiteChannelData,
 } from "@/api"
-import { FormActions } from "@/components/form/form-actions"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { resourceKeys } from "@/hooks/resource-keys"
+import { useAutoSave } from "@/hooks/use-auto-save"
 import { useResource } from "@/hooks/use-resource"
 import { recoverSession } from "@/lib/session-navigation"
 import { Button } from "@/components/ui/button"
@@ -179,10 +179,12 @@ export function WebsiteChannelUsagePanel({
   const form = useForm<WebsiteChannelAccessFormValues>({
     resolver: zodResolver(schema),
     shouldUseNativeValidation: true,
+    mode: "onBlur",
     defaultValues: {
       allowedHosts: channel.access.allowedHosts.join("\n"),
     },
   })
+  const { markSaved } = useAutoSave({ form, schema, save })
   const originResource = useResource(resourceKeys.websiteChannelOrigin(), () =>
     resolveWebsiteChannelOrigin(),
   )
@@ -256,31 +258,32 @@ export function WebsiteChannelUsagePanel({
     }
   }
 
-  /** 保存允许使用的网站。 */
-  async function submit(values: WebsiteChannelAccessFormValues) {
+  /** 保存允许使用的网站，返回是否保存成功。 */
+  async function save(values: WebsiteChannelAccessFormValues) {
     try {
       const updated = await updateWebsiteChannelAccess(channel.id, {
         allowedHosts: allowedHostLines(values.allowedHosts),
       })
-      form.reset({ allowedHosts: updated.allowedHosts.join("\n") })
+      const next = { allowedHosts: updated.allowedHosts.join("\n") }
+      // 保存期间未继续输入时回填服务端整理后的列表。
+      if (form.getValues("allowedHosts") === values.allowedHosts) form.reset(next)
+      markSaved(next)
       onUpdated(updated)
-      toast.success(t("usage.saved"))
+      return true
     } catch (submitError) {
-      if (recoverSession(submitError, navigate)) {
-        return
-      }
+      if (recoverSession(submitError, navigate)) return false
       if (isNotFoundApiError(submitError)) {
         console.warn("网站渠道不存在", { channel_id: channel.id })
         navigate(`/channels/${channel.type}`, { replace: true })
-        return
-      }
-      if (isApiError(submitError)) {
-        console.warn("保存网站渠道允许使用的网站失败", submitError)
-        toast.error(apiErrorMessage(submitError, ["allowedHosts"]))
-        return
+        return false
       }
       console.warn("保存网站渠道允许使用的网站失败", submitError)
-      toast.error(t("form.networkError"))
+      toast.error(
+        isApiError(submitError)
+          ? apiErrorMessage(submitError, ["allowedHosts"])
+          : t("form.networkError"),
+      )
+      return false
     }
   }
 
@@ -295,8 +298,6 @@ export function WebsiteChannelUsagePanel({
   if (error) {
     return <p className="py-6 text-sm text-muted-foreground">{error}</p>
   }
-
-  const { isSubmitting } = form.formState
 
   return (
     <>
@@ -315,42 +316,40 @@ export function WebsiteChannelUsagePanel({
           forceMount
           className="data-[state=inactive]:hidden"
         >
-          <FieldGroup className="mt-6 gap-8">
-            <Field>
-              <div className="flex items-center gap-2">
-                <FieldLabel>{t("usage.snippet")}</FieldLabel>
-                <Button
-                  type="button"
-                  variant="link"
-                  size="xs"
-                  className="h-auto px-0 py-0 text-xs font-normal text-muted-foreground"
-                  onClick={() => setInstructions("embed")}
-                >
-                  {t("usage.instructions.open")}
-                </Button>
-              </div>
-              <FieldDescription>{t("usage.snippetHelp")}</FieldDescription>
-              <div className="flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2">
-                <code className="flex min-h-8 min-w-0 flex-1 items-center font-mono text-sm break-all whitespace-pre-wrap">
-                  {snippet}
-                </code>
-                <Button
-                  type="button"
-                  variant="outline"
-                  size="sm"
-                  className="shrink-0"
-                  onClick={() => void copy(snippet, "snippet")}
-                >
-                  {copied === "snippet" ? t("usage.copied") : t("usage.copy")}
-                </Button>
-              </div>
-            </Field>
+          <div className="mt-6 space-y-8">
+            <FieldGroup>
+              <Field>
+                <div className="flex items-center gap-2">
+                  <FieldLabel>{t("usage.snippet")}</FieldLabel>
+                  <Button
+                    type="button"
+                    variant="link"
+                    size="xs"
+                    className="h-auto px-0 py-0 text-xs font-normal text-muted-foreground"
+                    onClick={() => setInstructions("embed")}
+                  >
+                    {t("usage.instructions.open")}
+                  </Button>
+                </div>
+                <FieldDescription>{t("usage.snippetHelp")}</FieldDescription>
+                <div className="flex items-center gap-2 rounded-md border bg-muted/30 px-3 py-2">
+                  <code className="flex min-h-8 min-w-0 flex-1 items-center font-mono text-sm break-all whitespace-pre-wrap">
+                    {snippet}
+                  </code>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="shrink-0"
+                    onClick={() => void copy(snippet, "snippet")}
+                  >
+                    {copied === "snippet" ? t("usage.copied") : t("usage.copy")}
+                  </Button>
+                </div>
+              </Field>
+            </FieldGroup>
 
-            <form
-              className="space-y-9"
-              onSubmit={form.handleSubmit(submit)}
-              noValidate
-            >
+            <form onSubmit={form.handleSubmit(save)} noValidate>
               <FieldGroup>
                 <Controller
                   name="allowedHosts"
@@ -367,16 +366,14 @@ export function WebsiteChannelUsagePanel({
                         {...field}
                         id={field.name}
                         rows={4}
-                        disabled={isSubmitting}
                         aria-invalid={fieldState.invalid}
                       />
                     </Field>
                   )}
                 />
               </FieldGroup>
-              <FormActions saving={isSubmitting} />
             </form>
-          </FieldGroup>
+          </div>
         </TabsContent>
         <TabsContent
           value="link"

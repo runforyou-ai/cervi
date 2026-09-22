@@ -1,5 +1,6 @@
 /** 消息渠道创建页和按类型扩展的编辑页。 */
 import { useEffect, useState } from "react"
+import { useQueryClient } from "@tanstack/react-query"
 import { useTranslation } from "react-i18next"
 import {
   useNavigate,
@@ -19,11 +20,10 @@ import {
   type WebsiteChannelChatInterfaceInput,
   type WebsiteChannelData,
 } from "@/api"
-import { LoadingIndicator } from "@/components/loading-indicator"
 import { PageBackButton } from "@/components/page-back-button"
 import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
-import { Button } from "@/components/ui/button"
+import { ResourceContent } from "@/components/resource-content"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ChannelReceptionSettingsForm } from "@/features/channels/channel-reception-settings-form"
 import { MessageChannelForm } from "@/features/channels/message-channel-form"
@@ -42,30 +42,49 @@ import { WebsiteChatPreview } from "@/features/channels/website/website-chat-pre
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 
-const baseEditTabs = ["basic", "reception"] as const
-const websiteEditTabs = [...baseEditTabs, "chat-interface", "usage"] as const
-const telegramEditTabs = [...baseEditTabs, "connection"] as const
-
-type EditTab =
-  | (typeof websiteEditTabs)[number]
-  | (typeof telegramEditTabs)[number]
+type EditTab = "basic" | "reception" | "chat-interface" | "usage" | "connection"
 type EditableChannel =
   | MessageChannelSummary
   | WebsiteChannelData
   | TelegramChannel
 
-/** 判断值是否为当前渠道支持的编辑页签。 */
-function isEditTab(
-  value: string | null,
-  website: boolean,
-  telegram: boolean,
-): value is EditTab {
-  const tabs: readonly string[] = website
-    ? websiteEditTabs
-    : telegram
-      ? telegramEditTabs
-      : baseEditTabs
-  return value !== null && tabs.includes(value)
+/** 各编辑页签的标题文案键。 */
+const editTabLabelKeys = {
+  basic: "tabs.basic",
+  reception: "tabs.reception",
+  "chat-interface": "tabs.chatInterface",
+  usage: "tabs.usage",
+  connection: "tabs.connection",
+} as const satisfies Record<EditTab, string>
+
+/** 按渠道类型给出编辑页签和详情读取方式，未列出的类型只有通用页签。 */
+const channelEditConfigs: Partial<
+  Record<
+    ChannelType,
+    {
+      tabs: readonly EditTab[]
+      load: (id: string, signal: AbortSignal) => Promise<EditableChannel>
+    }
+  >
+> = {
+  [ChannelType.ChannelTypeWebsite]: {
+    tabs: ["basic", "reception", "chat-interface", "usage"],
+    load: getWebsiteChannel,
+  },
+  [ChannelType.ChannelTypeTelegram]: {
+    tabs: ["basic", "reception", "connection"],
+    load: getTelegramChannel,
+  },
+}
+
+/** 返回渠道类型的编辑配置。 */
+function channelEditConfig(type: string) {
+  return (
+    channelEditConfigs[type as ChannelType] ?? {
+      tabs: ["basic", "reception"] as const,
+      load: getMessageChannel,
+    }
+  )
 }
 
 /** 判断值是否为渠道访问方式页签。 */
@@ -120,15 +139,11 @@ function MessageChannelEditTabs({
   const [searchParams, setSearchParams] = useSearchParams()
   const websiteChannel = isWebsiteChannelData(channel) ? channel : null
   const telegramChannel = isTelegramChannel(channel) ? channel : null
+  const { tabs } = channelEditConfig(channel.type)
   const requestedTab = searchParams.get("tab")
   const requestedAccess = searchParams.get("access")
-  const activeTab = isEditTab(
-    requestedTab,
-    websiteChannel !== null,
-    telegramChannel !== null,
-  )
-    ? requestedTab
-    : "basic"
+  const tabValid = tabs.some((tab) => tab === requestedTab)
+  const activeTab = tabValid ? (requestedTab as EditTab) : "basic"
   const activeAccess: WebsiteChannelAccessTab =
     requestedAccess === "link" ? "link" : "embed"
   const [previewValue, setPreviewValue] =
@@ -137,11 +152,6 @@ function MessageChannelEditTabs({
     )
 
   useEffect(() => {
-    const tabValid = isEditTab(
-      requestedTab,
-      websiteChannel !== null,
-      telegramChannel !== null,
-    )
     const accessValid = isAccessTab(requestedAccess)
     if (
       tabValid &&
@@ -164,10 +174,9 @@ function MessageChannelEditTabs({
   }, [
     activeTab,
     requestedAccess,
-    requestedTab,
     searchParams,
     setSearchParams,
-    telegramChannel,
+    tabValid,
     websiteChannel,
   ])
 
@@ -191,13 +200,7 @@ function MessageChannelEditTabs({
 
   /** 合并通用渠道基础信息更新。 */
   function mergeSummary(updated: MessageChannelSummary) {
-    onChannelChange(
-      websiteChannel
-        ? { ...websiteChannel, ...updated }
-        : telegramChannel
-          ? { ...telegramChannel, ...updated }
-          : updated,
-    )
+    onChannelChange({ ...channel, ...updated })
   }
 
   const content = (
@@ -266,35 +269,26 @@ function MessageChannelEditTabs({
     </div>
   )
 
+  // 右侧面板：Telegram 显示接入信息，网站渠道显示聊天界面实时预览。
+  const aside = telegramChannel ? (
+    <TelegramChannelInfoPanel channel={telegramChannel} />
+  ) : websiteChannel && previewValue ? (
+    <WebsiteChatPreview value={previewValue} />
+  ) : null
+
   return (
-    <Tabs
-      value={activeTab}
-      onValueChange={setTab}
-    >
+    <Tabs value={activeTab} onValueChange={setTab}>
       <TabsList>
-        <TabsTrigger value="basic">{t("tabs.basic")}</TabsTrigger>
-        <TabsTrigger value="reception">{t("tabs.reception")}</TabsTrigger>
-        {websiteChannel ? (
-          <>
-            <TabsTrigger value="chat-interface">
-              {t("tabs.chatInterface")}
-            </TabsTrigger>
-            <TabsTrigger value="usage">{t("tabs.usage")}</TabsTrigger>
-          </>
-        ) : null}
-        {telegramChannel ? (
-          <TabsTrigger value="connection">{t("tabs.connection")}</TabsTrigger>
-        ) : null}
+        {tabs.map((tab) => (
+          <TabsTrigger key={tab} value={tab}>
+            {t(editTabLabelKeys[tab])}
+          </TabsTrigger>
+        ))}
       </TabsList>
-      {telegramChannel ? (
+      {aside ? (
         <div className="mt-6 grid gap-8 xl:grid-cols-[minmax(0,1fr)_360px]">
           {content}
-          <TelegramChannelInfoPanel channel={telegramChannel} />
-        </div>
-      ) : websiteChannel && previewValue ? (
-        <div className="mt-6 grid gap-8 xl:grid-cols-[minmax(0,1fr)_360px]">
-          {content}
-          <WebsiteChatPreview value={previewValue} />
+          {aside}
         </div>
       ) : (
         <div className="mt-6">{content}</div>
@@ -315,26 +309,31 @@ export function MessageChannelFormPage({
   const [pageSearchParams] = useSearchParams()
   // 来源列表的状态筛选，返回时带回。
   const listStatus = pageSearchParams.get("status")
-  const [channel, setChannel] = useState<EditableChannel | null>(null)
   const [telegramConnectionSaving, setTelegramConnectionSaving] =
     useState(false)
   const editable = mode === "edit" && isMessageChannelType(channelType)
-  const {
-    data: loadedChannel,
-    loading: detailLoading,
-    refreshing: detailRefreshing,
-    error: detailError,
-    refresh,
-  } = useResource<EditableChannel>(
-    resourceKeys.messageChannel(channelType, channelId),
-    (signal) =>
-      channelType === ChannelType.ChannelTypeWebsite
-        ? getWebsiteChannel(channelId, signal)
-        : channelType === ChannelType.ChannelTypeTelegram
-          ? getTelegramChannel(channelId, signal)
-          : getMessageChannel(channelId, signal),
-    { enabled: editable },
+  const detailKey = resourceKeys.messageChannel(channelType, channelId)
+  const detail = useResource<EditableChannel>(
+    detailKey,
+    (signal) => channelEditConfig(channelType).load(channelId, signal),
+    {
+      enabled: editable,
+      // 等待 Telegram 回调时低频刷新已保存的 Webhook 状态。
+      refetchInterval: (data) =>
+        data &&
+        isTelegramChannel(data) &&
+        data.connection.webhookStatus ===
+          TelegramWebhookStatus.TelegramWebhookStatusWaiting &&
+        !telegramConnectionSaving
+          ? 8_000
+          : false,
+    },
   )
+  // 地址中的类型与详情一致时才展示，类型不一致时等待纠正地址。
+  const channel =
+    detail.data && detail.data.type === channelType ? detail.data : null
+  const queryClient = useQueryClient()
+  const invalidateResource = useResourceInvalidator()
 
   /** 拦截无效的渠道类型参数，回到默认渠道类别。 */
   useEffect(() => {
@@ -343,58 +342,31 @@ export function MessageChannelFormPage({
     }
   }, [channelType, navigate])
 
-  /** 详情就绪后校正地址中的渠道类型并同步编辑状态。 */
+  /** 详情类型与地址不一致时校正地址。 */
+  const loadedChannel = detail.data
   useEffect(() => {
-    if (!loadedChannel) return
-    if (loadedChannel.type !== channelType) {
-      navigate(
-        `/channels/${loadedChannel.type}/${loadedChannel.id}`,
-        { replace: true },
-      )
-      return
-    }
-    setChannel(loadedChannel)
+    if (!loadedChannel || loadedChannel.type === channelType) return
+    navigate(`/channels/${loadedChannel.type}/${loadedChannel.id}`, {
+      replace: true,
+    })
   }, [channelType, loadedChannel, navigate])
-
-  /** 等待 Telegram 回调时低频刷新已保存的 Webhook 状态。 */
-  useEffect(() => {
-    if (
-      !channel ||
-      !isTelegramChannel(channel) ||
-      channel.connection.webhookStatus !==
-        TelegramWebhookStatus.TelegramWebhookStatusWaiting ||
-      telegramConnectionSaving
-    ) {
-      return
-    }
-    const timer = window.setInterval(() => {
-      void refresh()
-    }, 8_000)
-    return () => window.clearInterval(timer)
-  }, [channel, refresh, telegramConnectionSaving])
 
   /** 渠道不存在时回到渠道列表。 */
   useEffect(() => {
-    if (detailError && isNotFoundApiError(detailError)) {
+    if (detail.error && isNotFoundApiError(detail.error)) {
       console.warn("消息渠道不存在", {
         channel_id: channelId,
         channel_type: channelType,
       })
       navigate(`/channels/${channelType}`, { replace: true })
     }
-  }, [channelId, channelType, detailError, navigate])
+  }, [channelId, channelType, detail.error, navigate])
 
-  const loading =
-    mode === "edit" &&
-    (detailLoading ||
-      (!channel && !detailError) ||
-      (Boolean(detailError) && detailRefreshing))
-  const invalidateResource = useResourceInvalidator()
-
-  /** 子表单保存后同步本地渠道并失效详情缓存。 */
+  /** 子表单保存后写入详情缓存并重新读取。 */
   function handleChannelChange(next: EditableChannel) {
-    setChannel(next)
-    void invalidateResource(resourceKeys.messageChannel(channelType, channelId))
+    // 各页签按渠道详情提交完整记录，保存结果立即写入缓存，其他页签随即使用最新值。
+    queryClient.setQueryData(detailKey, next)
+    void invalidateResource(detailKey)
   }
 
   const typeDefinition = channel
@@ -430,32 +402,20 @@ export function MessageChannelFormPage({
         ) : null}
       </PageHeader>
       <PageContent variant="form">
-        {loading ? (
-          <LoadingIndicator className="min-h-48 justify-center">
-            {t("common:status.loading")}
-          </LoadingIndicator>
-        ) : mode === "edit" && !channel ? (
-          <div className="flex min-h-48 items-center justify-center text-center">
-            <div>
-              <p className="text-sm text-muted-foreground">
-                {t("form.loadError")}
-              </p>
-              <Button
-                className="mt-4"
-                variant="outline"
-                onClick={() => void refresh()}
-              >
-                {t("common:actions.retry")}
-              </Button>
-            </div>
-          </div>
-        ) : mode === "edit" && channel ? (
-          <MessageChannelEditTabs
-            key={channel.id}
-            channel={channel}
-            onChannelChange={handleChannelChange}
-            onConnectionSavingChange={setTelegramConnectionSaving}
-          />
+        {mode === "edit" ? (
+          <ResourceContent
+            resources={editable ? detail : []}
+            errorMessage={t("form.loadError")}
+          >
+            {channel ? (
+              <MessageChannelEditTabs
+                key={channel.id}
+                channel={channel}
+                onChannelChange={handleChannelChange}
+                onConnectionSavingChange={setTelegramConnectionSaving}
+              />
+            ) : null}
+          </ResourceContent>
         ) : isMessageChannelType(channelType) ? (
           <MessageChannelForm type={channelType} />
         ) : null}

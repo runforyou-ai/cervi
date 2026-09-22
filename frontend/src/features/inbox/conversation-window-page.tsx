@@ -26,7 +26,6 @@ export function ConversationWindowPage({
 
   return (
     <ConversationDetail
-      conversationId={conversationId}
       summary={summary}
       onGroupLeft={() => {
         void Window.Close().catch((error: unknown) => {

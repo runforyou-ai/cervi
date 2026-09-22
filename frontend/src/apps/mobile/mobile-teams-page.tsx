@@ -1,8 +1,7 @@
 /** 移动端团队列表与团队成员的只读浏览。 */
-import { useEffect, useState } from "react"
 import { ChevronRightIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { Link, useParams, useSearchParams } from "react-router"
+import { Link, useParams } from "react-router"
 
 import { listTeamMembers, listTeams, OrganizationIdentityType } from "@/api"
 import { useMobileNavigation } from "@/apps/mobile/mobile-navigation"
@@ -13,6 +12,7 @@ import { WorkStatusBadge } from "@/components/work-status"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useDateTime } from "@/hooks/use-date-time"
 import { useResource } from "@/hooks/use-resource"
+import { useListSearchParams } from "@/hooks/use-list-search-params"
 
 const teamListQuery = { query: "", page: 1, pageSize: 50 }
 
@@ -73,32 +73,19 @@ export function MobileTeamMembersPage() {
   const { t } = useTranslation(["mobile", "contacts"])
   const { teamID = "" } = useParams()
   const { listPageCounts, scrollPositions } = useMobileNavigation()
-  const [params, setParams] = useSearchParams()
-  const queryText = params.get("q") ?? ""
-  const [search, setSearch] = useState(queryText)
+  // 检索词变化时重置目标查询的加载进度和滚动位置。
+  const { query: queryText, search, setSearch } = useListSearchParams({
+    onQueryChange: (query) => {
+      const storageKey = `team:${teamID}:${query}`
+      listPageCounts.delete(storageKey)
+      scrollPositions.delete(storageKey)
+    },
+  })
   // 团队名称复用团队列表的同一份缓存，读不到时回到通用标题。
   const { data: teams } = useResource(resourceKeys.teams(teamListQuery), (signal) =>
     listTeams(teamListQuery, signal),
   )
   const teamName = teams?.teams.find((team) => team.id === teamID)?.name
-
-  useEffect(() => setSearch(queryText), [queryText])
-  useEffect(() => {
-    if (search === queryText) return
-    // 停止输入后再查询，替换当前历史并保留团队列表返回来源。
-    const timer = window.setTimeout(() => {
-      const next = new URLSearchParams()
-      if (search) next.set("q", search)
-      // 搜索改变时重置目标查询的加载进度和滚动位置。
-      if (search.trim() !== queryText.trim()) {
-        const storageKey = `team:${teamID}:${search.trim()}`
-        listPageCounts.delete(storageKey)
-        scrollPositions.delete(storageKey)
-      }
-      setParams(next, { replace: true, state: { mobileBack: true } })
-    }, 300)
-    return () => window.clearTimeout(timer)
-  }, [search, queryText, setParams, listPageCounts, scrollPositions, teamID])
 
   return (
     <section className="flex h-full min-h-0 flex-col">

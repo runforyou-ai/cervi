@@ -17,6 +17,8 @@ import { resolveAppPlatform } from "@/platform/app-platform"
 async function bootstrap() {
   await initializeI18n()
   const platform = resolveAppPlatform()
+  // 根元素标记平台，样式用 touch: 变体给移动端触屏尺寸。
+  document.documentElement.dataset.platform = platform
   // Web 和桌面端禁用原生右键菜单。
   if (platform !== "mobile") {
     document.addEventListener("contextmenu", (event) => {

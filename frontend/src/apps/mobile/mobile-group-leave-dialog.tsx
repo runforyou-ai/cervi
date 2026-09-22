@@ -24,7 +24,6 @@ export function MobileGroupLeaveDialog({
       pending={busy}
       title={t("groupLeaveTitle")}
       description={t("groupLeaveDescription")}
-      touch
       onOpenChange={(open) => {
         if (!open) onClose()
       }}

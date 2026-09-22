@@ -26,16 +26,13 @@ import {
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { resourceStatus } from "@/components/resource-content"
 import { PagePaneNav, PageSplit } from "@/components/page-split"
+import {
+  RowActionsMenu,
+  type ResourceRowAction,
+} from "@/components/row-actions-menu"
 import { StatusBadge } from "@/components/status-badge"
 import { ConfirmationDialog } from "@/components/confirmation-dialog"
 import { Button } from "@/components/ui/button"
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -62,6 +59,10 @@ type DeleteGroupTarget = {
   knowledgeBase: KnowledgeBaseData
   group: KnowledgeGroupData
 }
+
+/** 树节点行尾「⋯」浮在行右端，出现时盖住行尾内容，名称宽度保持不变。 */
+const treeRowMoreButtonClass =
+  "absolute top-1/2 right-1 -translate-y-1/2 bg-sidebar-accent"
 
 /** 显示知识库资源树和管理页面。 */
 export function KnowledgeBaseLayout() {
@@ -308,13 +309,31 @@ function KnowledgeBaseTree({
 
   return (
     <section className="mb-2">
-      {/* 知识库操作通过右键菜单完成，菜单打开期间保持该行高亮。 */}
-      <ContextMenu>
-        <ContextMenuTrigger asChild>
+      {/* 知识库操作通过右键或行尾「⋯」打开，菜单打开期间保持该行高亮。 */}
+      <RowActionsMenu
+        buttonSize="icon-xs"
+        buttonClassName={treeRowMoreButtonClass}
+        actions={[
+          {
+            key: "addGroup",
+            label: t("sidebar.addGroup"),
+            onSelect: () => onCreateGroup(),
+          },
+          {
+            key: "delete",
+            label: t("common:actions.delete"),
+            destructive: true,
+            separatorBefore: true,
+            onSelect: onDeleteKnowledgeBase,
+          },
+        ]}
+      >
+        {({ moreButton, menuOpen }) => (
           <div
             className={cn(
-              "flex items-center rounded-md transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[state=open]:bg-sidebar-accent",
-              active && "bg-sidebar-accent font-medium text-sidebar-accent-foreground",
+              "group/row relative flex items-center rounded-md transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+              (active || menuOpen) && "bg-sidebar-accent",
+              active && "font-medium text-sidebar-accent-foreground",
             )}
           >
             <Link
@@ -328,18 +347,10 @@ function KnowledgeBaseTree({
                 {categoryLabel}
               </StatusBadge>
             </Link>
+            {moreButton}
           </div>
-        </ContextMenuTrigger>
-        <ContextMenuContent>
-          <ContextMenuItem onSelect={() => onCreateGroup()}>
-            {t("sidebar.addGroup")}
-          </ContextMenuItem>
-          <ContextMenuSeparator />
-          <ContextMenuItem destructive onSelect={onDeleteKnowledgeBase}>
-            {t("common:actions.delete")}
-          </ContextMenuItem>
-        </ContextMenuContent>
-      </ContextMenu>
+        )}
+      </RowActionsMenu>
 
       <div className="mt-1 ml-3 border-l pl-2">
         {defaultGroup ? (
@@ -396,7 +407,7 @@ function KnowledgeBaseTree({
   )
 }
 
-/** 渲染知识库分组行，右键打开分组操作菜单。 */
+/** 渲染知识库分组行，右键或行尾「⋯」打开分组操作菜单。 */
 function KnowledgeGroupTreeRow({
   group,
   contentPath,
@@ -413,12 +424,30 @@ function KnowledgeGroupTreeRow({
   onDelete: () => void
 }) {
   const { t } = useTranslation(["knowledgeBase", "common"])
+  const actions: ResourceRowAction[] = [
+    ...(onAddChild
+      ? [{ key: "addChild", label: t("group.addChild"), onSelect: onAddChild }]
+      : []),
+    { key: "edit", label: t("common:actions.edit"), onSelect: onEdit },
+    {
+      key: "delete",
+      label: t("common:actions.delete"),
+      destructive: true,
+      separatorBefore: true,
+      onSelect: onDelete,
+    },
+  ]
   return (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>
+    <RowActionsMenu
+      buttonSize="icon-xs"
+      buttonClassName={treeRowMoreButtonClass}
+      actions={actions}
+    >
+      {({ moreButton, menuOpen }) => (
         <div
           className={cn(
-            "flex h-8 items-center rounded-md px-2 text-sm text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[state=open]:bg-sidebar-accent",
+            "group/row relative flex h-8 items-center rounded-md px-2 text-sm text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+            menuOpen && "bg-sidebar-accent",
             contentPath &&
               currentPath.startsWith(contentPath) &&
               "bg-sidebar-accent font-medium text-sidebar-accent-foreground",
@@ -435,20 +464,9 @@ function KnowledgeGroupTreeRow({
           ) : (
             <span className="ml-2 min-w-0 flex-1 truncate">{group.name}</span>
           )}
+          {moreButton}
         </div>
-      </ContextMenuTrigger>
-      <ContextMenuContent>
-        {onAddChild ? (
-          <ContextMenuItem onSelect={onAddChild}>
-            {t("group.addChild")}
-          </ContextMenuItem>
-        ) : null}
-        <ContextMenuItem onSelect={onEdit}>{t("common:actions.edit")}</ContextMenuItem>
-        <ContextMenuSeparator />
-        <ContextMenuItem destructive onSelect={onDelete}>
-          {t("common:actions.delete")}
-        </ContextMenuItem>
-      </ContextMenuContent>
-    </ContextMenu>
+      )}
+    </RowActionsMenu>
   )
 }

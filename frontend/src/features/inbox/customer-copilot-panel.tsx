@@ -9,7 +9,6 @@ import {
   listCustomerReplyAgents,
   sendFirstCustomerCopilotMessage,
   type ConversationMessageData,
-  type ConversationMessageReference,
   type CustomerCopilotThread,
   type DirectTextMessageInput,
 } from "@/api"
@@ -30,13 +29,12 @@ import {
 } from "@/features/inbox/conversation-composer"
 import { ConversationTimeline } from "@/features/inbox/conversation-timeline"
 import { selectCustomerReplyAgentID } from "@/features/inbox/customer-reply-agent"
-import { useOutgoingMessages } from "@/features/inbox/outgoing-message-context"
-import type { OutgoingConversationDraft } from "@/features/inbox/outgoing-message-store"
 import { useConversationTime, useMinuteTick } from "@/features/inbox/use-conversation-time"
 import {
   memberChatPollingInterval,
   useMemberChatPollingActive,
 } from "@/features/inbox/use-member-chat-polling"
+import { useThreadComposerBridge } from "@/features/inbox/use-thread-composer-bridge"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { cn } from "@/lib/utils"
@@ -345,43 +343,30 @@ function CopilotThreadView({
   onAttachmentThreadCreated: (threadConversationID: string) => void
 }) {
   const { identity } = useWorkspace()
-  const prepareSendRef = useRef<(() => Promise<boolean>) | null>(null)
-  const outgoing = useOutgoingMessages(threadID)
-  const [replyTo, setReplyTo] = useState<ConversationMessageReference | null>(null)
-  const [retryDraft, setRetryDraft] = useState<OutgoingConversationDraft | null>(null)
+  const bridge = useThreadComposerBridge(threadID)
 
   return (
     <>
       <ConversationTimeline
-        prepareSendRef={prepareSendRef}
+        {...bridge.timeline}
         conversationID={threadID}
         conversationType={ConversationType.ConversationTypeCopilot}
         currentUser={identity.user}
-        outgoingMessages={outgoing.messages}
-        onRetryFailedMessage={setRetryDraft}
         retryFailedMessageDisabled={Boolean(disabledReason)}
-        onReplyMessage={thread && !disabledReason ? setReplyTo : undefined}
+        onReplyMessage={thread && !disabledReason ? bridge.selectReplyTarget : undefined}
         mentionNavigation={false}
         enabled={Boolean(thread) && active}
         onApplyReply={onApplyReply}
         applyReplyDisabledReason={applyReplyDisabledReason}
       />
       <ConversationComposer
+        {...bridge.composer}
         conversationID={thread ? threadID : ""}
         conversationType={ConversationType.ConversationTypeCopilot}
         disabledReason={disabledReason}
-        onBeforeSend={() => prepareSendRef.current?.() ?? Promise.resolve(true)}
         submitOnEnter
         refocusAfterSubmit
-        retryFailedMessage
-        retryDraft={retryDraft}
-        replyTo={replyTo}
         currentIdentityID={identity.user.identityId}
-        onRetryDraftHandled={() => setRetryDraft(null)}
-        onReplyToChange={setReplyTo}
-        onSending={outgoing.start}
-        onSent={outgoing.succeed}
-        onFailed={outgoing.fail}
         onSucceeded={onSent}
         sendIndividualMessage={sendFirstMessage}
         attachmentAgentDraft={attachmentDraft}

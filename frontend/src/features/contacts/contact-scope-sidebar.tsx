@@ -13,14 +13,8 @@ import { useLocation, useNavigate } from "react-router"
 import { ChannelType, type ChannelOption, type Team } from "@/api"
 import { messageChannelTypeDefinition } from "@/lib/message-channel-types"
 import { PagePaneNav } from "@/components/page-split"
+import { RowActionsMenu } from "@/components/row-actions-menu"
 import { Button } from "@/components/ui/button"
-import {
-  ContextMenu,
-  ContextMenuContent,
-  ContextMenuItem,
-  ContextMenuSeparator,
-  ContextMenuTrigger,
-} from "@/components/ui/context-menu"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -193,34 +187,42 @@ export function ContactScopeSidebar({
         {/* 与知识库分组一致：三级项左侧以竖线标示层级。 */}
         <div className="ml-9 flex flex-col gap-0.5 border-l pl-2">
           {teams.map((team) => (
-            // 编辑和删除团队通过右键菜单进入团队页并打开对应弹窗。
-            <ContextMenu key={team.id}>
-              <ContextMenuTrigger asChild>
-                <SubscopeButton
-                  active={scope === "team" && teamId === team.id}
-                  className="data-[state=open]:bg-sidebar-accent"
-                  icon={PanelsTopLeftIcon}
-                  nested
-                  onClick={() => navigate(`/contacts/teams/${team.id}`)}
-                >
-                  {team.name}
-                </SubscopeButton>
-              </ContextMenuTrigger>
-              <ContextMenuContent>
-                <ContextMenuItem
-                  onSelect={() => navigate(`/contacts/teams/${team.id}?editTeam=1`)}
-                >
-                  {t("common:actions.edit")}
-                </ContextMenuItem>
-                <ContextMenuSeparator />
-                <ContextMenuItem
-                  destructive
-                  onSelect={() => navigate(`/contacts/teams/${team.id}?deleteTeam=1`)}
-                >
-                  {t("common:actions.delete")}
-                </ContextMenuItem>
-              </ContextMenuContent>
-            </ContextMenu>
+            // 编辑和删除团队进入团队页并打开对应弹窗。
+            <RowActionsMenu
+              key={team.id}
+              buttonSize="icon-xs"
+              // 「⋯」浮在行右端，名称右侧留出按钮宽度后截断。
+              buttonClassName="absolute top-1/2 right-1 -translate-y-1/2 bg-sidebar-accent"
+              actions={[
+                {
+                  key: "edit",
+                  label: t("common:actions.edit"),
+                  onSelect: () => navigate(`/contacts/teams/${team.id}?editTeam=1`),
+                },
+                {
+                  key: "delete",
+                  label: t("common:actions.delete"),
+                  destructive: true,
+                  separatorBefore: true,
+                  onSelect: () => navigate(`/contacts/teams/${team.id}?deleteTeam=1`),
+                },
+              ]}
+            >
+              {({ moreButton, menuOpen }) => (
+                <div className="group/row relative">
+                  <SubscopeButton
+                    active={scope === "team" && teamId === team.id}
+                    className={cn("pr-8", menuOpen && "bg-sidebar-accent")}
+                    icon={PanelsTopLeftIcon}
+                    nested
+                    onClick={() => navigate(`/contacts/teams/${team.id}`)}
+                  >
+                    {team.name}
+                  </SubscopeButton>
+                  {moreButton}
+                </div>
+              )}
+            </RowActionsMenu>
           ))}
         </div>
       </div>

@@ -32,7 +32,6 @@ import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
-import { resolveAppPlatform } from "@/platform/app-platform"
 
 type CustomerSummary = CustomerInboxConversationData["customer"]
 
@@ -265,7 +264,6 @@ export function CustomerSessionCloseDialog({
           ) : null}
         </>
       }
-      touch={resolveAppPlatform() === "mobile"}
       onOpenChange={actions.setCloseConfirmationOpen}
       onConfirm={() => {
         actions.setCloseConfirmationOpen(false)

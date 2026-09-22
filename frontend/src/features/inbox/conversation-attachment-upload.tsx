@@ -227,7 +227,7 @@ export function ConversationAttachmentUpload({
           ref={dialogRef}
           closeDisabled={form.formState.isSubmitting}
           className="max-h-[85dvh] sm:max-w-lg"
-          closeButtonClassName={mobile ? "top-1 right-1 flex size-11 items-center justify-center" : undefined}
+          closeButtonClassName="touch:top-1 touch:right-1 touch:flex touch:size-11 touch:items-center touch:justify-center"
           aria-describedby={undefined}
           onInteractOutside={(event) => event.preventDefault()}
           onOpenAutoFocus={(event) => {
@@ -239,7 +239,7 @@ export function ConversationAttachmentUpload({
             }
           }}
         >
-          <DialogHeader className={mobile ? "pr-8" : undefined}>
+          <DialogHeader className="touch:pr-8">
             <DialogTitle>{t("attachmentSend")}</DialogTitle>
           </DialogHeader>
           <form
@@ -281,7 +281,7 @@ export function ConversationAttachmentUpload({
                           type="button"
                           variant="ghost"
                           size="icon-sm"
-                          className={mobile ? "size-11 shrink-0" : undefined}
+                          className="touch:size-11 touch:shrink-0"
                           aria-label={t("attachmentRemove", {
                             name: item.file.name,
                           })}
@@ -332,7 +332,7 @@ export function ConversationAttachmentUpload({
               <Button
                 type="button"
                 variant="outline"
-                className={mobile ? "min-h-11" : undefined}
+                className="touch:min-h-11"
                 disabled={selected.length >= 100 || selecting || form.formState.isSubmitting}
                 onClick={() => inputRef.current?.click()}
               >
@@ -342,7 +342,7 @@ export function ConversationAttachmentUpload({
                 <Button
                   type="button"
                   variant="outline"
-                  className={mobile ? "min-h-11" : undefined}
+                  className="touch:min-h-11"
                   disabled={form.formState.isSubmitting}
                   onClick={() => {
                     replace([])
@@ -351,7 +351,7 @@ export function ConversationAttachmentUpload({
                 >
                   {tCommon("actions.cancel")}
                 </Button>
-                <Button type="submit" className={mobile ? "min-h-11" : undefined} disabled={selecting || form.formState.isSubmitting}>
+                <Button type="submit" className="touch:min-h-11" disabled={selecting || form.formState.isSubmitting}>
                   {t("messageSend")}
                 </Button>
               </div>
