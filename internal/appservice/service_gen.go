@@ -554,11 +554,6 @@ func (s *Service) CreateKnowledgeDocuments(ctx context.Context, meta RequestMeta
 	return withNormalizedSlices(s.backend.CreateKnowledgeDocuments(ctx, meta, knowledgeBaseID, input))
 }
 
-// MoveKnowledgeDocument 移动文档到同库分组。
-func (s *Service) MoveKnowledgeDocument(ctx context.Context, meta RequestMeta, knowledgeBaseID string, documentID string, input KnowledgeDocumentMoveInput) error {
-	return s.backend.MoveKnowledgeDocument(ctx, meta, knowledgeBaseID, documentID, input)
-}
-
 // DeleteKnowledgeDocument 删除文档并释放原件。
 func (s *Service) DeleteKnowledgeDocument(ctx context.Context, meta RequestMeta, knowledgeBaseID string, documentID string) error {
 	return s.backend.DeleteKnowledgeDocument(ctx, meta, knowledgeBaseID, documentID)
@@ -657,21 +652,6 @@ func (s *Service) UpdateKnowledgeBase(ctx context.Context, meta RequestMeta, kno
 // DeleteKnowledgeBase 删除企业知识库。
 func (s *Service) DeleteKnowledgeBase(ctx context.Context, meta RequestMeta, knowledgeBaseID string) error {
 	return s.backend.DeleteKnowledgeBase(ctx, meta, knowledgeBaseID)
-}
-
-// CreateKnowledgeGroup 创建知识库分组。
-func (s *Service) CreateKnowledgeGroup(ctx context.Context, meta RequestMeta, knowledgeBaseID string, input KnowledgeGroupInput) (KnowledgeBase, error) {
-	return withNormalizedSlices(s.backend.CreateKnowledgeGroup(ctx, meta, knowledgeBaseID, input))
-}
-
-// UpdateKnowledgeGroup 修改知识库分组。
-func (s *Service) UpdateKnowledgeGroup(ctx context.Context, meta RequestMeta, knowledgeBaseID string, groupID string, input KnowledgeGroupInput) (KnowledgeBase, error) {
-	return withNormalizedSlices(s.backend.UpdateKnowledgeGroup(ctx, meta, knowledgeBaseID, groupID, input))
-}
-
-// DeleteKnowledgeGroup 删除不含子分组和问答的知识库分组。
-func (s *Service) DeleteKnowledgeGroup(ctx context.Context, meta RequestMeta, knowledgeBaseID string, groupID string) (KnowledgeBase, error) {
-	return withNormalizedSlices(s.backend.DeleteKnowledgeGroup(ctx, meta, knowledgeBaseID, groupID))
 }
 
 // ListContacts 返回联系人列表。

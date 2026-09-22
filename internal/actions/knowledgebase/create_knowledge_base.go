@@ -59,17 +59,7 @@ func (a *CreateKnowledgeBaseAction) Execute(ctx context.Context, identity *serve
 		if err != nil {
 			return err
 		}
-		defaultGroup := &servermodels.KnowledgeGroup{KnowledgeBaseID: knowledgeBase.ID, Name: "", IsDefault: true, SortOrder: 0}
-		if _, err := tx.NewInsert().Model(defaultGroup).
-			Column("knowledge_base_id", "name", "is_default", "sort_order").
-			Exec(ctx); err != nil {
-			return err
-		}
 		record = recordFromModel(*knowledgeBase)
-		record.Groups, err = loadGroupRecords(ctx, tx, knowledgeBase.ID)
-		if err != nil {
-			return err
-		}
 		return nil
 	})
 	if err != nil {

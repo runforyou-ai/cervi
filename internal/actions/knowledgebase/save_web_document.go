@@ -29,15 +29,11 @@ func NewCreateWebDocumentAction(db *bun.DB, tasks servertask.TxEnqueuer) *Create
 
 // Execute 在同一事务中保存网页文档并投递抓取任务。
 func (a *CreateWebDocumentAction) Execute(ctx context.Context, identity *servermodels.Identity, baseID string, input WebDocumentInput) (*DocumentRecord, error) {
-	input.GroupID = strings.TrimSpace(input.GroupID)
 	input.Title = strings.TrimSpace(input.Title)
 	fields := validateDocumentTitle(input.Title)
 	address, err := webfetch.Normalize(input.SourceURL)
 	if err != nil {
 		fields["sourceUrl"] = ValidationDocumentURLInvalid
-	}
-	if !common.ValidUUID(input.GroupID) {
-		fields["groupId"] = ValidationDocumentGroupInvalid
 	}
 	if len(fields) > 0 {
 		return nil, &common.FieldError{Fields: fields}
@@ -54,10 +50,7 @@ func (a *CreateWebDocumentAction) Execute(ctx context.Context, identity *serverm
 		if base.Category != string(domain.KnowledgeBaseCategoryStandard) {
 			return ErrDocumentUnsupported
 		}
-		if _, err := loadKnowledgeGroup(ctx, tx, identity.Organization.ID, baseID, input.GroupID); err != nil {
-			return err
-		}
-		document := &servermodels.KnowledgeDocument{ID: uuid.NewV7().String(), KnowledgeBaseID: baseID, GroupID: input.GroupID, SourceKind: domain.KnowledgeDocumentSourceWeb, Title: input.Title, SourceURL: address, Status: domain.KnowledgeIndexInitial, CreatedByUserID: identity.User.ID}
+		document := &servermodels.KnowledgeDocument{ID: uuid.NewV7().String(), KnowledgeBaseID: baseID, SourceKind: domain.KnowledgeDocumentSourceWeb, Title: input.Title, SourceURL: address, Status: domain.KnowledgeIndexInitial, CreatedByUserID: identity.User.ID}
 		if _, err := tx.NewInsert().Model(document).Value("created_at", "clock_timestamp()").Value("updated_at", "clock_timestamp()").Exec(ctx); err != nil {
 			if isConstraintConflict(err, "knowledge_documents_source_url_unique") {
 				return ErrDocumentURLDuplicate

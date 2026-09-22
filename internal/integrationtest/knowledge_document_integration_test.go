@@ -61,7 +61,7 @@ func uploadedDocumentFile(t *testing.T, db *bun.DB, identity *servermodels.Ident
 	return record
 }
 
-// TestKnowledgeDocumentLifecycle 验证批次幂等、倒序、分组归属及删除原件状态。
+// TestKnowledgeDocumentLifecycle 验证批次幂等、知识库内倒序分页及删除原件状态。
 func TestKnowledgeDocumentLifecycle(t *testing.T) {
 	ctx := context.Background()
 	store, err := serverstorage.Open(ctx, servertest.DatabaseConfig(t))
@@ -76,20 +76,20 @@ func TestKnowledgeDocumentLifecycle(t *testing.T) {
 	second := uploadedDocumentFile(t, db, identity, "说明.pdf")
 	create := knowledgeaction.NewCreateDocumentsAction(db, newKnowledgeTasks(t, db))
 	query := knowledgeaction.NewDocumentQuery(db)
-	docs, err := create.Execute(ctx, identity, base.ID, base.Groups[0].ID, []string{first.ID, second.ID})
+	docs, err := create.Execute(ctx, identity, base.ID, []string{first.ID, second.ID})
 	if err != nil || len(docs) != 2 {
 		t.Fatalf("create=%+v %v", docs, err)
 	}
-	repeat, err := create.Execute(ctx, identity, base.ID, base.Groups[0].ID, []string{first.ID, second.ID})
+	repeat, err := create.Execute(ctx, identity, base.ID, []string{first.ID, second.ID})
 	if err != nil || repeat[0].ID != docs[0].ID {
 		t.Fatalf("retry=%+v %v", repeat, err)
 	}
-	page, err := query.List(ctx, identity, base.ID, knowledgeaction.DocumentListInput{GroupID: base.Groups[0].ID, PageSize: 1})
+	page, err := query.List(ctx, identity, base.ID, knowledgeaction.DocumentListInput{PageSize: 1})
 	if err != nil || page.Total != 2 || page.Documents[0].ID != docs[1].ID {
 		t.Fatalf("page=%+v %v", page, err)
 	}
 	for keyword, count := range map[string]int{"100%": 1, "_": 0, "报表": 1} {
-		result, err := query.List(ctx, identity, base.ID, knowledgeaction.DocumentListInput{GroupID: base.Groups[0].ID, Keyword: keyword})
+		result, err := query.List(ctx, identity, base.ID, knowledgeaction.DocumentListInput{Keyword: keyword})
 		if err != nil || result.Total != count {
 			t.Fatalf("search %s=%+v %v", keyword, result, err)
 		}
@@ -97,24 +97,9 @@ func TestKnowledgeDocumentLifecycle(t *testing.T) {
 	if docs[0].Status != domain.KnowledgeIndexQueued {
 		t.Fatal("new document not queued")
 	}
-	grouped, err := knowledgeaction.NewCreateKnowledgeGroupAction(db).Execute(ctx, identity, base.ID, knowledgeaction.GroupInput{Name: "归档"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	target := grouped.Groups[1].ID
-	if err := knowledgeaction.NewMoveDocumentAction(db).Execute(ctx, identity, base.ID, docs[0].ID, target); err != nil {
-		t.Fatal(err)
-	}
-	moved, err := query.Get(ctx, identity, base.ID, docs[0].ID)
-	if err != nil || moved.GroupID != target || !moved.CreatedAt.Equal(docs[0].CreatedAt) {
-		t.Fatalf("moved=%+v %v", moved, err)
-	}
-	repeat, err = create.Execute(ctx, identity, base.ID, base.Groups[0].ID, []string{first.ID})
-	if err != nil || repeat[0].GroupID != target {
-		t.Fatal("retry reverted group", err)
-	}
-	if _, err := knowledgeaction.NewDeleteKnowledgeGroupAction(db).Execute(ctx, identity, base.ID, target); !errors.Is(err, knowledgeaction.ErrGroupNotEmpty) {
-		t.Fatal("occupied group", err)
+	detail, err := query.Get(ctx, identity, base.ID, docs[0].ID)
+	if err != nil || detail.ID != docs[0].ID || !detail.CreatedAt.Equal(docs[0].CreatedAt) {
+		t.Fatalf("detail=%+v %v", detail, err)
 	}
 	if _, err := knowledgeaction.NewUpdateKnowledgeBaseAction(db, newKnowledgeTasks(t, db)).Execute(ctx, identity, base.ID, newKnowledgeBaseInput(t, db, identity, base.Name, domain.KnowledgeBaseCategoryQA)); !errors.Is(err, knowledgeaction.ErrBaseHasContent) {
 		t.Fatal("occupied base", err)
@@ -150,18 +135,18 @@ func TestKnowledgeDocumentBatchIsolation(t *testing.T) {
 	create := knowledgeaction.NewCreateDocumentsAction(db, newKnowledgeTasks(t, db))
 	first := uploadedDocumentFile(t, db, owner.Identity, "same.txt")
 	foreign := uploadedDocumentFile(t, db, other.Identity, "foreign.txt")
-	if _, err := create.Execute(ctx, owner.Identity, base.ID, base.Groups[0].ID, []string{first.ID, foreign.ID}); !errors.Is(err, fileaction.ErrFileNotFound) {
+	if _, err := create.Execute(ctx, owner.Identity, base.ID, []string{first.ID, foreign.ID}); !errors.Is(err, fileaction.ErrFileNotFound) {
 		t.Fatal("foreign file", err)
 	}
 	record, _ := fileaction.NewGetQuery(db).Execute(ctx, owner.Identity, first.ID)
 	if record.Status != string(domain.FileStatusUploaded) {
 		t.Fatal("batch failed to roll back")
 	}
-	if _, err := create.Execute(ctx, owner.Identity, base.ID, otherBase.Groups[0].ID, []string{first.ID}); !errors.Is(err, knowledgeaction.ErrGroupNotFound) {
-		t.Fatal("foreign group", err)
+	if _, err := create.Execute(ctx, owner.Identity, otherBase.ID, []string{first.ID}); !errors.Is(err, knowledgeaction.ErrNotFound) {
+		t.Fatal("foreign base", err)
 	}
 	for _, ids := range [][]string{nil, {first.ID, first.ID}, make([]string, 11)} {
-		if _, err := create.Execute(ctx, owner.Identity, base.ID, base.Groups[0].ID, ids); !errors.Is(err, knowledgeaction.ErrDocumentBatchInvalid) {
+		if _, err := create.Execute(ctx, owner.Identity, base.ID, ids); !errors.Is(err, knowledgeaction.ErrDocumentBatchInvalid) {
 			t.Fatal("batch bound", err)
 		}
 	}
@@ -170,7 +155,7 @@ func TestKnowledgeDocumentBatchIsolation(t *testing.T) {
 	failures := make(chan error, 2)
 	for range 2 {
 		wait.Go(func() {
-			result, err := create.Execute(ctx, owner.Identity, base.ID, base.Groups[0].ID, []string{first.ID})
+			result, err := create.Execute(ctx, owner.Identity, base.ID, []string{first.ID})
 			results <- result
 			failures <- err
 		})
@@ -197,14 +182,30 @@ func TestKnowledgeDocumentBatchIsolation(t *testing.T) {
 	if _, err := query.File(ctx, other.Identity, base.ID, id); !errors.Is(err, knowledgeaction.ErrDocumentNotFound) {
 		t.Fatal("foreign preview", err)
 	}
-	if err := knowledgeaction.NewMoveDocumentAction(db).Execute(ctx, owner.Identity, base.ID, id, otherBase.Groups[0].ID); !errors.Is(err, knowledgeaction.ErrGroupNotFound) {
-		t.Fatal("foreign move", err)
+	if _, err := query.List(ctx, other.Identity, base.ID, knowledgeaction.DocumentListInput{}); !errors.Is(err, knowledgeaction.ErrNotFound) {
+		t.Fatal("foreign list", err)
+	}
+	if err := knowledgeaction.NewDeleteDocumentAction(db).Execute(ctx, other.Identity, base.ID, id); !errors.Is(err, knowledgeaction.ErrNotFound) {
+		t.Fatal("foreign delete", err)
+	}
+	sameOrgBase, err := knowledgeaction.NewCreateKnowledgeBaseAction(db).Execute(ctx, owner.Identity, newKnowledgeBaseInput(t, db, owner.Identity, "其他资料", domain.KnowledgeBaseCategoryStandard))
+	if err != nil {
+		t.Fatal(err)
+	}
+	if _, err := query.Get(ctx, owner.Identity, sameOrgBase.ID, id); !errors.Is(err, knowledgeaction.ErrDocumentNotFound) {
+		t.Fatal("other base document", err)
+	}
+	if page, err := query.List(ctx, owner.Identity, sameOrgBase.ID, knowledgeaction.DocumentListInput{}); err != nil || page.Total != 0 {
+		t.Fatalf("other base list=%+v %v", page, err)
+	}
+	if _, err := create.Execute(ctx, owner.Identity, sameOrgBase.ID, []string{first.ID}); !errors.Is(err, fileaction.ErrFileNotFound) {
+		t.Fatal("other base retry", err)
 	}
 	ids := make([]string, 10)
 	for i := range ids {
 		ids[i] = uploadedDocumentFile(t, db, owner.Identity, "same.txt").ID
 	}
-	if result, err := create.Execute(ctx, owner.Identity, base.ID, base.Groups[0].ID, ids); err != nil || len(result) != 10 {
+	if result, err := create.Execute(ctx, owner.Identity, base.ID, ids); err != nil || len(result) != 10 {
 		t.Fatal("ten files", err)
 	}
 }
@@ -221,7 +222,7 @@ func TestKnowledgeDocumentLocalPreview(t *testing.T) {
 	owner, base := newDocumentFixture(t, db)
 	other, _ := newDocumentFixture(t, db)
 	file := uploadedDocumentFile(t, db, owner.Identity, "preview.txt")
-	docs, err := knowledgeaction.NewCreateDocumentsAction(db, newKnowledgeTasks(t, db)).Execute(ctx, owner.Identity, base.ID, base.Groups[0].ID, []string{file.ID})
+	docs, err := knowledgeaction.NewCreateDocumentsAction(db, newKnowledgeTasks(t, db)).Execute(ctx, owner.Identity, base.ID, []string{file.ID})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -311,7 +312,7 @@ func TestKnowledgeDocumentS3Preview(t *testing.T) {
 		}
 		objects["/cervi/"+record.StorageKey] = true
 	}
-	docs, err := knowledgeaction.NewCreateDocumentsAction(db, newKnowledgeTasks(t, db)).Execute(ctx, owner.Identity, base.ID, base.Groups[0].ID, []string{files[0].ID, files[1].ID})
+	docs, err := knowledgeaction.NewCreateDocumentsAction(db, newKnowledgeTasks(t, db)).Execute(ctx, owner.Identity, base.ID, []string{files[0].ID, files[1].ID})
 	if err != nil {
 		t.Fatal(err)
 	}

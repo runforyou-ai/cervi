@@ -16,15 +16,13 @@ type QASimilarQuestion struct {
 
 // QAInput 定义整条问答的可编辑内容。
 type QAInput struct {
-	GroupID          string
 	Question         string
 	SimilarQuestions []QASimilarQuestion
 	Answer           string
 }
 
-// QAListInput 定义分组中的问答查询条件。
+// QAListInput 定义知识库中的问答查询条件。
 type QAListInput struct {
-	GroupID  string
 	Keyword  string
 	Page     int
 	PageSize int
@@ -33,7 +31,6 @@ type QAListInput struct {
 // QASummary 定义问答列表项及其索引状态。
 type QASummary struct {
 	ID               string                      `bun:"id"`
-	GroupID          string                      `bun:"group_id"`
 	Question         string                      `bun:"question"`
 	SimilarQuestions []string                    `bun:"similar_questions,array"`
 	Answer           string                      `bun:"answer"`
@@ -45,7 +42,6 @@ type QASummary struct {
 // QARecord 定义完整问答详情。
 type QARecord struct {
 	ID               string
-	GroupID          string
 	Question         string
 	SimilarQuestions []QASimilarQuestion
 	Answer           string

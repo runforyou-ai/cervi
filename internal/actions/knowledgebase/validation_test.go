@@ -34,22 +34,6 @@ func TestNormalizeInput(t *testing.T) {
 	}
 }
 
-// TestNormalizeGroupInput 验证分组名称和上级编号校验。
-func TestNormalizeGroupInput(t *testing.T) {
-	input, fields := normalizeGroupInput(GroupInput{Name: "  产品  "})
-	if len(fields) != 0 || input.Name != "产品" {
-		t.Fatalf("input = %#v, fields = %#v", input, fields)
-	}
-	_, fields = normalizeGroupInput(GroupInput{Name: strings.Repeat("组", domain.KnowledgeGroupNameMaxLength+1), ParentID: "invalid"})
-	if fields["name"] != ValidationGroupNameTooLong || fields["parentId"] != ValidationGroupParentInvalid {
-		t.Fatalf("fields = %#v", fields)
-	}
-	_, fields = normalizeGroupInput(GroupInput{Name: "   "})
-	if fields["name"] != ValidationGroupNameRequired {
-		t.Fatalf("fields = %#v", fields)
-	}
-}
-
 // TestKnowledgeSettingsBounds 验证必填、边界值、小于下限及超过上限的数值配置。
 func TestKnowledgeSettingsBounds(t *testing.T) {
 	length, overlap := 512, 50

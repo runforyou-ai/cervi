@@ -862,11 +862,6 @@ func (b *Backend) CreateKnowledgeDocuments(ctx context.Context, meta appservice.
 	return output, err
 }
 
-// MoveKnowledgeDocument 移动文档到同库分组。
-func (b *Backend) MoveKnowledgeDocument(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, documentID string, input appservice.KnowledgeDocumentMoveInput) error {
-	return b.do(ctx, meta, http.MethodPut, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/documents/"+url.PathEscape(documentID)+"/group", nil, input, nil)
-}
-
 // DeleteKnowledgeDocument 删除文档并释放原件。
 func (b *Backend) DeleteKnowledgeDocument(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, documentID string) error {
 	return b.do(ctx, meta, http.MethodDelete, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/documents/"+url.PathEscape(documentID), nil, nil, nil)
@@ -1010,30 +1005,6 @@ func (b *Backend) UpdateKnowledgeBase(ctx context.Context, meta appservice.Reque
 // DeleteKnowledgeBase 删除企业知识库。
 func (b *Backend) DeleteKnowledgeBase(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string) error {
 	return b.do(ctx, meta, http.MethodDelete, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID), nil, nil, nil)
-}
-
-// CreateKnowledgeGroup 创建知识库分组。
-func (b *Backend) CreateKnowledgeGroup(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, input appservice.KnowledgeGroupInput) (appservice.KnowledgeBase, error) {
-	var output appservice.KnowledgeBase
-	err := b.do(ctx, meta, http.MethodPost, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/groups", nil, input, &output)
-	b.normalizeOutput(&output)
-	return output, err
-}
-
-// UpdateKnowledgeGroup 修改知识库分组。
-func (b *Backend) UpdateKnowledgeGroup(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, groupID string, input appservice.KnowledgeGroupInput) (appservice.KnowledgeBase, error) {
-	var output appservice.KnowledgeBase
-	err := b.do(ctx, meta, http.MethodPut, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/groups/"+url.PathEscape(groupID), nil, input, &output)
-	b.normalizeOutput(&output)
-	return output, err
-}
-
-// DeleteKnowledgeGroup 删除不含子分组和问答的知识库分组。
-func (b *Backend) DeleteKnowledgeGroup(ctx context.Context, meta appservice.RequestMeta, knowledgeBaseID string, groupID string) (appservice.KnowledgeBase, error) {
-	var output appservice.KnowledgeBase
-	err := b.do(ctx, meta, http.MethodDelete, "/knowledge-bases/"+url.PathEscape(knowledgeBaseID)+"/groups/"+url.PathEscape(groupID), nil, nil, &output)
-	b.normalizeOutput(&output)
-	return output, err
 }
 
 // GetContact 返回联系人详情。
@@ -1364,7 +1335,6 @@ func encodeInboxSearchInputQuery(input appservice.InboxSearchInput) url.Values {
 // encodeKnowledgeDocumentListInputQuery 将 appservice.KnowledgeDocumentListInput 编码为查询参数。
 func encodeKnowledgeDocumentListInputQuery(input appservice.KnowledgeDocumentListInput) url.Values {
 	query := url.Values{}
-	setQuery(query, "groupId", input.GroupID)
 	setQuery(query, "keyword", input.Keyword)
 	setPositiveQuery(query, "page", input.Page)
 	setPositiveQuery(query, "pageSize", input.PageSize)
@@ -1384,7 +1354,6 @@ func encodeKnowledgeDocumentSegmentInputQuery(input appservice.KnowledgeDocument
 // encodeKnowledgeQAListInputQuery 将 appservice.KnowledgeQAListInput 编码为查询参数。
 func encodeKnowledgeQAListInputQuery(input appservice.KnowledgeQAListInput) url.Values {
 	query := url.Values{}
-	setQuery(query, "groupId", input.GroupID)
 	setQuery(query, "keyword", input.Keyword)
 	setPositiveQuery(query, "page", input.Page)
 	setPositiveQuery(query, "pageSize", input.PageSize)

@@ -171,13 +171,6 @@ export function CreateKnowledgeDocuments(meta: $models.RequestMeta, knowledgeBas
 }
 
 /**
- * CreateKnowledgeGroup 创建知识库分组。
- */
-export function CreateKnowledgeGroup(meta: $models.RequestMeta, knowledgeBaseID: string, input: $models.KnowledgeGroupInput): $CancellablePromise<$models.KnowledgeBase> {
-    return $Call.ByID(2458756261, meta, knowledgeBaseID, input);
-}
-
-/**
  * CreateKnowledgeQAEntry 创建本地问答。
  */
 export function CreateKnowledgeQAEntry(meta: $models.RequestMeta, knowledgeBaseID: string, input: $models.KnowledgeQAInput): $CancellablePromise<$models.KnowledgeQAEntry> {
@@ -287,13 +280,6 @@ export function DeleteKnowledgeBase(meta: $models.RequestMeta, knowledgeBaseID: 
  */
 export function DeleteKnowledgeDocument(meta: $models.RequestMeta, knowledgeBaseID: string, documentID: string): $CancellablePromise<void> {
     return $Call.ByID(1875707654, meta, knowledgeBaseID, documentID);
-}
-
-/**
- * DeleteKnowledgeGroup 删除不含子分组和问答的知识库分组。
- */
-export function DeleteKnowledgeGroup(meta: $models.RequestMeta, knowledgeBaseID: string, groupID: string): $CancellablePromise<$models.KnowledgeBase> {
-    return $Call.ByID(3559839338, meta, knowledgeBaseID, groupID);
 }
 
 /**
@@ -829,13 +815,6 @@ export function MarkConversationRead(meta: $models.RequestMeta, conversationID: 
 }
 
 /**
- * MoveKnowledgeDocument 移动文档到同库分组。
- */
-export function MoveKnowledgeDocument(meta: $models.RequestMeta, knowledgeBaseID: string, documentID: string, input: $models.KnowledgeDocumentMoveInput): $CancellablePromise<void> {
-    return $Call.ByID(567509100, meta, knowledgeBaseID, documentID, input);
-}
-
-/**
  * OpenConversationWindow 在桌面端独立窗口打开指定会话，同一会话已打开时聚焦现有窗口。
  */
 export function OpenConversationWindow(meta: $models.RequestMeta, input: $models.ConversationWindowInput): $CancellablePromise<void> {
@@ -1253,13 +1232,6 @@ export function UpdateKnowledgeBase(meta: $models.RequestMeta, knowledgeBaseID: 
  */
 export function UpdateKnowledgeDocumentContent(meta: $models.RequestMeta, knowledgeBaseID: string, documentID: string, input: $models.KnowledgeDocumentContentInput): $CancellablePromise<$models.KnowledgeDocument> {
     return $Call.ByID(3457873805, meta, knowledgeBaseID, documentID, input);
-}
-
-/**
- * UpdateKnowledgeGroup 修改知识库分组。
- */
-export function UpdateKnowledgeGroup(meta: $models.RequestMeta, knowledgeBaseID: string, groupID: string, input: $models.KnowledgeGroupInput): $CancellablePromise<$models.KnowledgeBase> {
-    return $Call.ByID(1535726024, meta, knowledgeBaseID, groupID, input);
 }
 
 /**

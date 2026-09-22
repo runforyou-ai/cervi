@@ -17,14 +17,14 @@ import { useKnowledgeDocumentUpload, knowledgeDocumentFormats } from "./use-know
 import { KnowledgeWebImportDialog } from "./knowledge-web-import-dialog"
 
 /** 在文档列表中提供新增入口、显示批次进度并保留失败重试入口。 */
-export function KnowledgeDocumentUpload({ baseId, groupId }: { baseId: string; groupId: string }) {
+export function KnowledgeDocumentUpload({ baseId }: { baseId: string }) {
   const { t } = useTranslation(["knowledgeBase", "common"])
   const location = useLocation()
   const picker = useRef<HTMLInputElement>(null)
   const trigger = useRef<HTMLButtonElement>(null)
   const [dragging, setDragging] = useState(false)
   const [importing, setImporting] = useState(false)
-  const { open, busy, items, run, select, close, show } = useKnowledgeDocumentUpload({ baseId, groupId })
+  const { open, busy, items, run, select, close, show } = useKnowledgeDocumentUpload({ baseId })
   const selected = items.length > 0
   return (
     <>
@@ -47,7 +47,7 @@ export function KnowledgeDocumentUpload({ baseId, groupId }: { baseId: string; g
           </DropdownMenuItem>
           <DropdownMenuItem asChild>
             <Link
-              to={`/knowledge-bases/${baseId}/groups/${groupId}/documents/new${location.search}`}
+              to={`/knowledge-bases/${baseId}/documents/new${location.search}`}
             >
               {t("documents.create.write")}
             </Link>
@@ -151,7 +151,6 @@ export function KnowledgeDocumentUpload({ baseId, groupId }: { baseId: string; g
       </Dialog>
       <KnowledgeWebImportDialog
         baseId={baseId}
-        groupId={groupId}
         open={importing}
         triggerRef={trigger}
         onClose={() => setImporting(false)}

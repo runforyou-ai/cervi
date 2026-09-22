@@ -17,9 +17,9 @@ import (
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
-// ListKnowledgeDocuments 返回当前企业分组中的文档。
+// ListKnowledgeDocuments 返回当前企业知识库中的文档。
 func (o *directOperations) ListKnowledgeDocuments(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, baseID string, input KnowledgeDocumentListInput) (KnowledgeDocumentList, error) {
-	result, err := o.documentQuery.List(ctx, identity, baseID, knowledgeaction.DocumentListInput{GroupID: input.GroupID, Keyword: input.Keyword, Page: input.Page, PageSize: input.PageSize})
+	result, err := o.documentQuery.List(ctx, identity, baseID, knowledgeaction.DocumentListInput{Keyword: input.Keyword, Page: input.Page, PageSize: input.PageSize})
 	if err != nil {
 		return KnowledgeDocumentList{}, o.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeDocumentReadFailed, identity.Organization.ID, baseID)
 	}
@@ -41,7 +41,7 @@ func (o *directOperations) GetKnowledgeDocument(ctx context.Context, meta Reques
 
 // CreateKnowledgeDocuments 在事务中创建文档并激活已上传原件。
 func (o *directOperations) CreateKnowledgeDocuments(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, baseID string, input KnowledgeDocumentBatchInput) (KnowledgeDocumentBatch, error) {
-	records, err := o.createDocuments.Execute(ctx, identity, baseID, input.GroupID, input.FileIDs)
+	records, err := o.createDocuments.Execute(ctx, identity, baseID, input.FileIDs)
 	if err != nil {
 		return KnowledgeDocumentBatch{}, o.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeDocumentSaveFailed, identity.Organization.ID, baseID)
 	}
@@ -51,15 +51,6 @@ func (o *directOperations) CreateKnowledgeDocuments(ctx context.Context, meta Re
 	}
 	slog.Info("知识文档已保存", "organization_id", identity.Organization.ID, "knowledge_base_id", baseID, "document_count", len(records))
 	return output, nil
-}
-
-// MoveKnowledgeDocument 修改文档的分组归属。
-func (o *directOperations) MoveKnowledgeDocument(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, baseID, documentID string, input KnowledgeDocumentMoveInput) error {
-	if err := o.moveDocument.Execute(ctx, identity, baseID, documentID, input.GroupID); err != nil {
-		return o.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeDocumentSaveFailed, identity.Organization.ID, baseID)
-	}
-	slog.Info("知识文档已移动", "knowledge_base_id", baseID, "document_id", documentID, "group_id", input.GroupID)
-	return nil
 }
 
 // DeleteKnowledgeDocument 删除文档并安排原件清理。
@@ -73,7 +64,7 @@ func (o *directOperations) DeleteKnowledgeDocument(ctx context.Context, meta Req
 
 // CreateKnowledgeTextDocument 创建在线编写的文档并安排索引。
 func (o *directOperations) CreateKnowledgeTextDocument(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, baseID string, input KnowledgeTextDocumentInput) (KnowledgeDocument, error) {
-	record, err := o.saveTextDocument.Execute(ctx, identity, baseID, "", knowledgeaction.TextDocumentInput{GroupID: input.GroupID, Title: input.Title, Content: input.Content})
+	record, err := o.saveTextDocument.Execute(ctx, identity, baseID, "", knowledgeaction.TextDocumentInput{Title: input.Title, Content: input.Content})
 	if err != nil {
 		return KnowledgeDocument{}, o.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeDocumentSaveFailed, identity.Organization.ID, baseID)
 	}
@@ -112,7 +103,7 @@ func (o *directOperations) RenameKnowledgeDocument(ctx context.Context, meta Req
 
 // CreateKnowledgeWebDocument 导入网页并安排首次抓取。
 func (o *directOperations) CreateKnowledgeWebDocument(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, baseID string, input KnowledgeWebDocumentInput) (KnowledgeDocument, error) {
-	record, err := o.createWebDocument.Execute(ctx, identity, baseID, knowledgeaction.WebDocumentInput{GroupID: input.GroupID, Title: input.Title, SourceURL: input.SourceURL})
+	record, err := o.createWebDocument.Execute(ctx, identity, baseID, knowledgeaction.WebDocumentInput{Title: input.Title, SourceURL: input.SourceURL})
 	if err != nil {
 		return KnowledgeDocument{}, o.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeDocumentSaveFailed, identity.Organization.ID, baseID)
 	}
@@ -165,7 +156,7 @@ func knowledgeDocumentFromAction(meta RequestMeta, record knowledgeaction.Docume
 	if record.SourceKind == domain.KnowledgeDocumentSourceFile {
 		format = KnowledgeDocumentFormat(strings.ToLower(filepath.Ext(record.Name)))
 	}
-	return KnowledgeDocument{ProcessingStatus: KnowledgeIndexProcessingStatus(record.Status), SegmentBatchID: record.SegmentBatchID, SegmentCount: record.SegmentCount, FailureMessage: message, Format: format, SourceKind: KnowledgeDocumentSourceKind(record.SourceKind), ID: record.ID, GroupID: record.GroupID, Name: record.Name, SourceURL: record.SourceURL, ContentType: record.ContentType, ByteSize: record.ByteSize, Status: status, CreatedAt: record.CreatedAt}
+	return KnowledgeDocument{ProcessingStatus: KnowledgeIndexProcessingStatus(record.Status), SegmentBatchID: record.SegmentBatchID, SegmentCount: record.SegmentCount, FailureMessage: message, Format: format, SourceKind: KnowledgeDocumentSourceKind(record.SourceKind), ID: record.ID, Name: record.Name, SourceURL: record.SourceURL, ContentType: record.ContentType, ByteSize: record.ByteSize, Status: status, CreatedAt: record.CreatedAt}
 }
 
 // RetryKnowledgeDocument 按当前配置为文档安排新的处理任务。

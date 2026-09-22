@@ -25,7 +25,7 @@ func TestKnowledgeBaseDeleteWaitsForQAPublish(t *testing.T) {
 	defer store.Close()
 	db := store.DB()
 	identity, base := newQAFixture(t, db)
-	entry, err := knowledgeaction.NewSaveQAEntryAction(db, newKnowledgeTasks(t, db)).Execute(ctx, identity, base.ID, "", knowledgeaction.QAInput{GroupID: base.Groups[0].ID, Question: "如何退款？", Answer: "进入订单详情申请退款。"})
+	entry, err := knowledgeaction.NewSaveQAEntryAction(db, newKnowledgeTasks(t, db)).Execute(ctx, identity, base.ID, "", knowledgeaction.QAInput{Question: "如何退款？", Answer: "进入订单详情申请退款。"})
 	if err != nil {
 		t.Fatal(err)
 	}

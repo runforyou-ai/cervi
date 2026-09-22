@@ -40,7 +40,7 @@ func TestKnowledgeDocumentSourceWithoutFile(t *testing.T) {
 	}
 
 	query := knowledgeaction.NewDocumentQuery(db)
-	list, err := query.List(ctx, identity, base.ID, knowledgeaction.DocumentListInput{GroupID: base.Groups[0].ID})
+	list, err := query.List(ctx, identity, base.ID, knowledgeaction.DocumentListInput{})
 	if err != nil || len(list.Documents) != 1 {
 		t.Fatalf("list=%+v err=%v", list, err)
 	}
@@ -57,11 +57,11 @@ func TestKnowledgeDocumentSourceWithoutFile(t *testing.T) {
 	}
 
 	// 关键词按文档标题匹配，原件文件名不再参与过滤。
-	titled, err := query.List(ctx, identity, base.ID, knowledgeaction.DocumentListInput{GroupID: base.Groups[0].ID, Keyword: "在线退款"})
+	titled, err := query.List(ctx, identity, base.ID, knowledgeaction.DocumentListInput{Keyword: "在线退款"})
 	if err != nil || len(titled.Documents) != 1 {
 		t.Fatalf("titled=%+v err=%v", titled, err)
 	}
-	named, err := query.List(ctx, identity, base.ID, knowledgeaction.DocumentListInput{GroupID: base.Groups[0].ID, Keyword: "退款政策.txt"})
+	named, err := query.List(ctx, identity, base.ID, knowledgeaction.DocumentListInput{Keyword: "退款政策.txt"})
 	if err != nil || len(named.Documents) != 0 {
 		t.Fatalf("named=%+v err=%v", named, err)
 	}

@@ -44,7 +44,6 @@ func (e *ProcessError) Error() string { return "knowledge processing: " + e.Code
 // DocumentRecord 汇总文档归属、内容来源与正文元数据。
 type DocumentRecord struct {
 	ID             string                             `bun:"id"`
-	GroupID        string                             `bun:"group_id"`
 	SourceKind     domain.KnowledgeDocumentSourceKind `bun:"source_kind"`
 	SourceURL      string                             `bun:"source_url"`
 	Name           string                             `bun:"name"`
@@ -57,10 +56,10 @@ type DocumentRecord struct {
 	CreatedAt      time.Time                          `bun:"created_at"`
 }
 
-// DocumentListInput 定义分组文档的分页查询条件。
+// DocumentListInput 定义知识库文档的分页查询条件。
 type DocumentListInput struct {
-	GroupID, Keyword string
-	Page, PageSize   int
+	Keyword        string
+	Page, PageSize int
 }
 
 // DocumentListOutput 返回文档分页结果。
@@ -69,9 +68,8 @@ type DocumentListOutput struct {
 	Page, PageSize, Total int
 }
 
-// TextDocumentInput 定义在线编写文档的分组、名称与正文。
+// TextDocumentInput 定义在线编写文档的名称与正文。
 type TextDocumentInput struct {
-	GroupID string
 	Title   string
 	Content string
 }
@@ -82,9 +80,8 @@ type DocumentContentRecord struct {
 	Content  string
 }
 
-// WebDocumentInput 定义网页导入文档的分组、名称与页面地址。
+// WebDocumentInput 定义网页导入文档的名称与页面地址。
 type WebDocumentInput struct {
-	GroupID   string
 	Title     string
 	SourceURL string
 }

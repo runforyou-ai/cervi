@@ -34,16 +34,16 @@ func TestKnowledgeWebDocumentLifecycle(t *testing.T) {
 	connected := func(context.Context) error { return nil }
 
 	// 非 http 与 https 的地址在保存期拒绝。
-	if _, err := create.Execute(ctx, identity, base.ID, knowledgeaction.WebDocumentInput{GroupID: base.Groups[0].ID, Title: "帮助中心", SourceURL: "ftp://example.com/help"}); !errors.As(err, new(*common.FieldError)) {
+	if _, err := create.Execute(ctx, identity, base.ID, knowledgeaction.WebDocumentInput{Title: "帮助中心", SourceURL: "ftp://example.com/help"}); !errors.As(err, new(*common.FieldError)) {
 		t.Fatalf("err=%v", err)
 	}
 
-	created, err := create.Execute(ctx, identity, base.ID, knowledgeaction.WebDocumentInput{GroupID: base.Groups[0].ID, Title: "帮助中心", SourceURL: "https://example.com/help#section"})
+	created, err := create.Execute(ctx, identity, base.ID, knowledgeaction.WebDocumentInput{Title: "帮助中心", SourceURL: "https://example.com/help#section"})
 	if err != nil || created.SourceKind != domain.KnowledgeDocumentSourceWeb || created.SourceURL != "https://example.com/help" {
 		t.Fatalf("created=%+v err=%v", created, err)
 	}
 	// 同一知识库中重复导入同一页面被拒绝。
-	if _, err := create.Execute(ctx, identity, base.ID, knowledgeaction.WebDocumentInput{GroupID: base.Groups[0].ID, Title: "帮助中心副本", SourceURL: "https://example.com/help"}); !errors.Is(err, knowledgeaction.ErrDocumentURLDuplicate) {
+	if _, err := create.Execute(ctx, identity, base.ID, knowledgeaction.WebDocumentInput{Title: "帮助中心副本", SourceURL: "https://example.com/help"}); !errors.Is(err, knowledgeaction.ErrDocumentURLDuplicate) {
 		t.Fatalf("err=%v", err)
 	}
 
@@ -117,7 +117,7 @@ func TestKnowledgeWebDocumentLifecycle(t *testing.T) {
 	// 尚无快照的网页重试按出网处理，先检查转换服务连接；在线文档不检查。
 	checked := 0
 	counting := func(context.Context) error { checked++; return nil }
-	pending, err := create.Execute(ctx, identity, base.ID, knowledgeaction.WebDocumentInput{GroupID: base.Groups[0].ID, Title: "价格说明", SourceURL: "https://example.com/pricing"})
+	pending, err := create.Execute(ctx, identity, base.ID, knowledgeaction.WebDocumentInput{Title: "价格说明", SourceURL: "https://example.com/pricing"})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -126,7 +126,7 @@ func TestKnowledgeWebDocumentLifecycle(t *testing.T) {
 	}
 
 	// 在线文档不支持重新抓取。
-	text, err := knowledgeaction.NewSaveTextDocumentAction(db, tasks).Execute(ctx, identity, base.ID, "", knowledgeaction.TextDocumentInput{GroupID: base.Groups[0].ID, Title: "在线说明", Content: "正文"})
+	text, err := knowledgeaction.NewSaveTextDocumentAction(db, tasks).Execute(ctx, identity, base.ID, "", knowledgeaction.TextDocumentInput{Title: "在线说明", Content: "正文"})
 	if err != nil {
 		t.Fatal(err)
 	}

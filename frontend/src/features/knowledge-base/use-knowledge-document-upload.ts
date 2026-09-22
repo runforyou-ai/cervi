@@ -29,7 +29,7 @@ export const knowledgeDocumentFormats = Object.values(KnowledgeDocumentFormat).f
 const knowledgeDocumentMaxByteSize = 20 * 1024 * 1024
 
 /** 管理批次上传、逐项重试及离开页面后的临时文件清理。 */
-export function useKnowledgeDocumentUpload({ baseId, groupId }: { baseId: string; groupId: string }) {
+export function useKnowledgeDocumentUpload({ baseId }: { baseId: string }) {
   const { t } = useTranslation("knowledgeBase")
   const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
@@ -71,7 +71,7 @@ export function useKnowledgeDocumentUpload({ baseId, groupId }: { baseId: string
             item.controller.signal.throwIfAborted()
             item.stage = "saving"
             if (mounted.current) render((value) => value + 1)
-            await createKnowledgeDocuments(baseId, { groupId, fileIds: [fileId] })
+            await createKnowledgeDocuments(baseId, { fileIds: [fileId] })
           },
         )
         item.stage = "saved"

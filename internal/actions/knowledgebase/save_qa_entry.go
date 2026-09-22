@@ -42,13 +42,10 @@ func (a *SaveQAEntryAction) Execute(ctx context.Context, identity *servermodels.
 		if err := validateQAKnowledgeBase(base); err != nil {
 			return err
 		}
-		if _, err := loadKnowledgeGroup(ctx, tx, identity.Organization.ID, knowledgeBaseID, input.GroupID); err != nil {
-			return err
-		}
 		var entry *servermodels.KnowledgeQAEntry
 		if entryID == "" {
-			entry = &servermodels.KnowledgeQAEntry{KnowledgeBaseID: knowledgeBaseID, GroupID: input.GroupID, CreatedByUserID: identity.User.ID}
-			if _, err := tx.NewInsert().Model(entry).Column("knowledge_base_id", "group_id", "created_by_user_id").Returning("*").Exec(ctx); err != nil {
+			entry = &servermodels.KnowledgeQAEntry{KnowledgeBaseID: knowledgeBaseID, CreatedByUserID: identity.User.ID}
+			if _, err := tx.NewInsert().Model(entry).Column("knowledge_base_id", "created_by_user_id").Returning("*").Exec(ctx); err != nil {
 				return err
 			}
 		} else {
@@ -56,7 +53,7 @@ func (a *SaveQAEntryAction) Execute(ctx context.Context, identity *servermodels.
 			if err != nil {
 				return err
 			}
-			if _, err := tx.NewUpdate().Model(entry).Set("group_id = ?", input.GroupID).Set("updated_at = now()").WherePK().Returning("*").Exec(ctx); err != nil {
+			if _, err := tx.NewUpdate().Model(entry).Set("updated_at = now()").WherePK().Returning("*").Exec(ctx); err != nil {
 				return err
 			}
 		}

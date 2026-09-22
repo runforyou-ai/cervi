@@ -31,21 +31,9 @@ func (q *ListKnowledgeBasesQuery) Execute(ctx context.Context, identity *serverm
 		Scan(ctx); err != nil {
 		return nil, fmt.Errorf("list knowledge bases: %w", err)
 	}
-	baseIDs := make([]string, 0, len(models))
-	for _, model := range models {
-		baseIDs = append(baseIDs, model.ID)
-	}
-	groupsByBase, err := loadGroupRecordsByBase(ctx, q.db, baseIDs)
-	if err != nil {
-		return nil, fmt.Errorf("list knowledge base groups: %w", err)
-	}
 	records := make([]Record, 0, len(models))
 	for _, model := range models {
-		record := recordFromModel(model)
-		if groups := groupsByBase[model.ID]; groups != nil {
-			record.Groups = groups
-		}
-		records = append(records, record)
+		records = append(records, recordFromModel(model))
 	}
 	return records, nil
 }

@@ -57,7 +57,6 @@ export function KnowledgeDocumentFormPage({
   const { t } = useTranslation("knowledgeBase")
   const {
     knowledgeBaseId = "",
-    groupId = "",
     documentId = "",
   } = useParams()
   const location = useLocation()
@@ -90,7 +89,7 @@ export function KnowledgeDocumentFormPage({
       >
         {mode === "edit" ? (
           <PageBackButton
-            to={`/knowledge-bases/${knowledgeBaseId}/groups/${groupId}/documents${location.search}`}
+            to={`/knowledge-bases/${knowledgeBaseId}/documents${location.search}`}
           />
         ) : null}
       </PageHeader>
@@ -105,9 +104,8 @@ export function KnowledgeDocumentFormPage({
             </p>
           ) : (
             <KnowledgeDocumentForm
-              key={`${knowledgeBaseId}/${groupId}/${documentId}/${mode}`}
+              key={`${knowledgeBaseId}/${documentId}/${mode}`}
               baseId={knowledgeBaseId}
-              groupId={groupId}
               stored={mode === "edit" ? content.data : undefined}
             />
           )}
@@ -117,14 +115,12 @@ export function KnowledgeDocumentFormPage({
   )
 }
 
-/** 保存在线文档并返回原分组的筛选和页码。 */
+/** 保存在线文档并返回原列表的筛选和页码。 */
 function KnowledgeDocumentForm({
   baseId,
-  groupId,
   stored,
 }: {
   baseId: string
-  groupId: string
   stored?: KnowledgeDocumentContentData
 }) {
   const { t } = useTranslation(["knowledgeBase", "common"])
@@ -151,7 +147,7 @@ function KnowledgeDocumentForm({
       content: stored?.content ?? "",
     },
   })
-  const returnPath = `/knowledge-bases/${baseId}/groups/${groupId}/documents${location.search}`
+  const returnPath = `/knowledge-bases/${baseId}/documents${location.search}`
   // 表单未编辑时跟随最新读取到的名称与正文，编辑器按内容版本重建。
   const [contentVersion, setContentVersion] = useState(0)
   useEffect(() => {
@@ -172,7 +168,7 @@ function KnowledgeDocumentForm({
     save: async (values) => {
       const saved = stored
         ? await updateKnowledgeDocumentContent(baseId, stored.document.id, values)
-        : await createKnowledgeTextDocument(baseId, { ...values, groupId })
+        : await createKnowledgeTextDocument(baseId, values)
       await Promise.all([
         invalidate(resourceKeys.knowledgeDocuments(baseId)),
         invalidate(resourceKeys.knowledgeDocument(baseId, saved.id)),

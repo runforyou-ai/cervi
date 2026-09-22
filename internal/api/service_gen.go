@@ -126,7 +126,6 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.GET("/knowledge-bases/:knowledgeBaseID/documents", s.listKnowledgeDocuments)
 	router.GET("/knowledge-bases/:knowledgeBaseID/documents/:documentID", s.getKnowledgeDocument)
 	router.POST("/knowledge-bases/:knowledgeBaseID/documents", s.createKnowledgeDocuments)
-	router.PUT("/knowledge-bases/:knowledgeBaseID/documents/:documentID/group", s.moveKnowledgeDocument)
 	router.DELETE("/knowledge-bases/:knowledgeBaseID/documents/:documentID", s.deleteKnowledgeDocument)
 	router.GET("/knowledge-bases/:knowledgeBaseID/documents/:documentID/preview", s.getKnowledgeDocumentPreview)
 	router.POST("/knowledge-bases/:knowledgeBaseID/text-documents", s.createKnowledgeTextDocument)
@@ -147,9 +146,6 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.POST("/knowledge-bases", s.createKnowledgeBase)
 	router.PUT("/knowledge-bases/:knowledgeBaseID", s.updateKnowledgeBase)
 	router.DELETE("/knowledge-bases/:knowledgeBaseID", s.deleteKnowledgeBase)
-	router.POST("/knowledge-bases/:knowledgeBaseID/groups", s.createKnowledgeGroup)
-	router.PUT("/knowledge-bases/:knowledgeBaseID/groups/:groupID", s.updateKnowledgeGroup)
-	router.DELETE("/knowledge-bases/:knowledgeBaseID/groups/:groupID", s.deleteKnowledgeGroup)
 	router.GET("/contacts/:contactID", s.getContact)
 	router.POST("/contacts", s.createContact)
 	router.PUT("/contacts/:contactID", s.updateContact)
@@ -1124,15 +1120,6 @@ func (s *Service) createKnowledgeDocuments(c *gin.Context) {
 	writeResult(c, http.StatusCreated, output, err)
 }
 
-// moveKnowledgeDocument 移动文档到同库分组。
-func (s *Service) moveKnowledgeDocument(c *gin.Context) {
-	var input appservice.KnowledgeDocumentMoveInput
-	if !bindJSON(c, &input) {
-		return
-	}
-	writeEmpty(c, s.application.MoveKnowledgeDocument(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), c.Param("documentID"), input))
-}
-
 // deleteKnowledgeDocument 删除文档并释放原件。
 func (s *Service) deleteKnowledgeDocument(c *gin.Context) {
 	writeEmpty(c, s.application.DeleteKnowledgeDocument(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), c.Param("documentID")))
@@ -1286,32 +1273,6 @@ func (s *Service) updateKnowledgeBase(c *gin.Context) {
 // deleteKnowledgeBase 删除企业知识库。
 func (s *Service) deleteKnowledgeBase(c *gin.Context) {
 	writeEmpty(c, s.application.DeleteKnowledgeBase(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID")))
-}
-
-// createKnowledgeGroup 创建知识库分组。
-func (s *Service) createKnowledgeGroup(c *gin.Context) {
-	var input appservice.KnowledgeGroupInput
-	if !bindJSON(c, &input) {
-		return
-	}
-	output, err := s.application.CreateKnowledgeGroup(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), input)
-	writeResult(c, http.StatusCreated, output, err)
-}
-
-// updateKnowledgeGroup 修改知识库分组。
-func (s *Service) updateKnowledgeGroup(c *gin.Context) {
-	var input appservice.KnowledgeGroupInput
-	if !bindJSON(c, &input) {
-		return
-	}
-	output, err := s.application.UpdateKnowledgeGroup(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), c.Param("groupID"), input)
-	writeResult(c, http.StatusOK, output, err)
-}
-
-// deleteKnowledgeGroup 删除不含子分组和问答的知识库分组。
-func (s *Service) deleteKnowledgeGroup(c *gin.Context) {
-	output, err := s.application.DeleteKnowledgeGroup(c.Request.Context(), requestMeta(c), c.Param("knowledgeBaseID"), c.Param("groupID"))
-	writeResult(c, http.StatusOK, output, err)
 }
 
 // getContact 返回联系人详情。
@@ -1666,7 +1627,6 @@ func bindKnowledgeDocumentListInputQuery(c *gin.Context) (appservice.KnowledgeDo
 		return appservice.KnowledgeDocumentListInput{}, false
 	}
 	return appservice.KnowledgeDocumentListInput{
-		GroupID:  c.Query("groupId"),
 		Keyword:  c.Query("keyword"),
 		Page:     page,
 		PageSize: pageSize,
@@ -1702,7 +1662,6 @@ func bindKnowledgeQAListInputQuery(c *gin.Context) (appservice.KnowledgeQAListIn
 		return appservice.KnowledgeQAListInput{}, false
 	}
 	return appservice.KnowledgeQAListInput{
-		GroupID:  c.Query("groupId"),
 		Keyword:  c.Query("keyword"),
 		Page:     page,
 		PageSize: pageSize,

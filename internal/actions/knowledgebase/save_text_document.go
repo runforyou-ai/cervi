@@ -29,7 +29,7 @@ func NewSaveTextDocumentAction(db *bun.DB, tasks servertask.TxEnqueuer) *SaveTex
 
 // Execute 在同一事务中保存文档归属、名称和正文，空编号表示新增。
 func (a *SaveTextDocumentAction) Execute(ctx context.Context, identity *servermodels.Identity, baseID, documentID string, input TextDocumentInput) (*DocumentRecord, error) {
-	input, fields := normalizeTextDocumentInput(input, documentID == "")
+	input, fields := normalizeTextDocumentInput(input)
 	if len(fields) > 0 {
 		return nil, &common.FieldError{Fields: fields}
 	}
@@ -48,10 +48,7 @@ func (a *SaveTextDocumentAction) Execute(ctx context.Context, identity *servermo
 		document := &servermodels.KnowledgeDocument{}
 		changed := documentID == ""
 		if changed {
-			if _, err := loadKnowledgeGroup(ctx, tx, identity.Organization.ID, baseID, input.GroupID); err != nil {
-				return err
-			}
-			document = &servermodels.KnowledgeDocument{ID: uuid.NewV7().String(), KnowledgeBaseID: baseID, GroupID: input.GroupID, SourceKind: domain.KnowledgeDocumentSourceText, Title: input.Title, Status: domain.KnowledgeIndexInitial, CreatedByUserID: identity.User.ID}
+			document = &servermodels.KnowledgeDocument{ID: uuid.NewV7().String(), KnowledgeBaseID: baseID, SourceKind: domain.KnowledgeDocumentSourceText, Title: input.Title, Status: domain.KnowledgeIndexInitial, CreatedByUserID: identity.User.ID}
 			if _, err := tx.NewInsert().Model(document).Value("created_at", "clock_timestamp()").Value("updated_at", "clock_timestamp()").Exec(ctx); err != nil {
 				return err
 			}
@@ -135,17 +132,13 @@ func (a *RenameDocumentAction) Execute(ctx context.Context, identity *servermode
 	return output, nil
 }
 
-// normalizeTextDocumentInput 规范化并校验在线文档的分组、名称与正文。
-func normalizeTextDocumentInput(input TextDocumentInput, creating bool) (TextDocumentInput, map[string]common.FieldCode) {
-	input.GroupID = strings.TrimSpace(input.GroupID)
+// normalizeTextDocumentInput 规范化并校验在线文档的名称与正文。
+func normalizeTextDocumentInput(input TextDocumentInput) (TextDocumentInput, map[string]common.FieldCode) {
 	input.Title = strings.TrimSpace(input.Title)
 	input.Content = strings.TrimSpace(input.Content)
 	fields := validateDocumentTitle(input.Title)
 	if input.Content == "" {
 		fields["content"] = ValidationDocumentContentRequired
-	}
-	if creating && !common.ValidUUID(input.GroupID) {
-		fields["groupId"] = ValidationDocumentGroupInvalid
 	}
 	return input, fields
 }

@@ -29,7 +29,6 @@ import { PageHeader } from "@/components/page-header"
 import { ResourceContent } from "@/components/resource-content"
 import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { NativeSelect } from "@/components/ui/native-select"
 import { Textarea } from "@/components/ui/textarea"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useFormSave } from "@/hooks/use-form-save"
@@ -39,7 +38,6 @@ import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 function createQASchema(messages: {
   question: string
   answer: string
-  group: string
 }) {
   return z.object({
     question: z.string().trim().min(1, messages.question),
@@ -47,7 +45,6 @@ function createQASchema(messages: {
       z.object({ id: z.string(), content: z.string() }),
     ),
     answer: z.string().trim().min(1, messages.answer),
-    groupId: z.string().min(1, messages.group),
   })
 }
 
@@ -56,7 +53,7 @@ type QAFormValues = z.infer<ReturnType<typeof createQASchema>>
 /** 读取知识库和问答详情后展示编辑表单。 */
 export function KnowledgeQAFormPage({ mode }: { mode: "create" | "edit" }) {
   const { t } = useTranslation("knowledgeBase")
-  const { knowledgeBaseId = "", groupId = "", entryId = "" } = useParams()
+  const { knowledgeBaseId = "", entryId = "" } = useParams()
   const location = useLocation()
   const base = useResource(
     resourceKeys.knowledgeBase(knowledgeBaseId),
@@ -79,7 +76,7 @@ export function KnowledgeQAFormPage({ mode }: { mode: "create" | "edit" }) {
       >
         {mode === "edit" ? (
           <PageBackButton
-            to={`/knowledge-bases/${knowledgeBaseId}/groups/${groupId}/qa${location.search}`}
+            to={`/knowledge-bases/${knowledgeBaseId}/qa${location.search}`}
           />
         ) : null}
       </PageHeader>
@@ -92,9 +89,8 @@ export function KnowledgeQAFormPage({ mode }: { mode: "create" | "edit" }) {
             <p className="text-sm text-muted-foreground">{t("qa.unsupported")}</p>
           ) : (
             <KnowledgeQAForm
-              key={`${knowledgeBaseId}/${groupId}/${entryId}/${mode}`}
+              key={`${knowledgeBaseId}/${entryId}/${mode}`}
               knowledgeBase={base.data!}
-              groupId={groupId}
               entry={mode === "edit" ? entry.data : undefined}
             />
           )}
@@ -104,14 +100,12 @@ export function KnowledgeQAFormPage({ mode }: { mode: "create" | "edit" }) {
   )
 }
 
-/** 保存完整问答并返回原分组的筛选和页码。 */
+/** 保存完整问答并返回原列表的筛选和页码。 */
 function KnowledgeQAForm({
   knowledgeBase,
-  groupId,
   entry,
 }: {
   knowledgeBase: KnowledgeBaseData
-  groupId: string
   entry?: KnowledgeQAEntryData
 }) {
   const { t } = useTranslation(["knowledgeBase", "common"])
@@ -123,7 +117,6 @@ function KnowledgeQAForm({
       createQASchema({
         question: t("qa.questionRequired"),
         answer: t("qa.answerRequired"),
-        group: t("qa.groupRequired"),
       }),
     [t],
   )
@@ -136,17 +129,15 @@ function KnowledgeQAForm({
       question: entry?.question ?? "",
       answer: entry?.answer ?? "",
       similarQuestions: entry?.similarQuestions ?? [],
-      groupId: entry?.groupId ?? groupId,
     },
   })
-  const returnPath = `/knowledge-bases/${knowledgeBase.id}/groups/${groupId}/qa${location.search}`
+  const returnPath = `/knowledge-bases/${knowledgeBase.id}/qa${location.search}`
   useEffect(() => {
     if (!entry || form.formState.isDirty) return
     form.reset({
       question: entry.question,
       answer: entry.answer,
       similarQuestions: entry.similarQuestions,
-      groupId: entry.groupId,
     })
   }, [entry, form])
 
@@ -166,19 +157,8 @@ function KnowledgeQAForm({
       ])
       return saved
     },
-    onSubmitted: (saved) => {
-      const savedGroup = knowledgeBase.groups
-        .flatMap((group) => [group, ...group.children])
-        .find((group) => group.id === saved.groupId)
-      toast.success(
-        saved.groupId !== groupId
-          ? t("qa.movedSuccess", {
-              group: savedGroup?.isDefault
-                ? t("group.default")
-                : savedGroup?.name,
-            })
-          : t("qa.saveSuccess"),
-      )
+    onSubmitted: () => {
+      toast.success(t("qa.saveSuccess"))
       navigate(returnPath, { replace: true })
     },
     errorMessage: t("qa.saveError"),
@@ -194,7 +174,6 @@ function KnowledgeQAForm({
       <QAFormFields
         control={form.control}
         disabled={form.formState.isSubmitting}
-        knowledgeBase={knowledgeBase}
       />
       {entry ? null : (
         <FormActions
@@ -264,22 +243,16 @@ function SimilarQuestionFields({
   )
 }
 
-/** 展示问答正文和同一知识库中的分组选项。 */
+/** 展示标准问题、相似问题和答案输入。 */
 function QAFormFields({
   control,
   disabled,
-  knowledgeBase,
 }: {
   control: Control<QAFormValues>
   disabled: boolean
-  knowledgeBase: KnowledgeBaseData
 }) {
   const { t } = useTranslation("knowledgeBase")
   const id = useId()
-  const groups = knowledgeBase.groups.flatMap((group) => [
-    group,
-    ...group.children,
-  ])
   return (
     <FieldGroup>
       <FormInputField
@@ -307,35 +280,6 @@ function QAFormFields({
               aria-invalid={fieldState.invalid}
               disabled={disabled}
             />
-          </Field>
-        )}
-      />
-      <Controller
-        control={control}
-        name="groupId"
-        render={({ field, fieldState }) => (
-          <Field>
-            <FieldLabel htmlFor={`${id}-group`} required>
-              {t("qa.group")}
-            </FieldLabel>
-            <NativeSelect
-              {...field}
-              id={`${id}-group`}
-              required
-              aria-invalid={fieldState.invalid}
-              disabled={disabled}
-            >
-              <option value="">{t("qa.selectGroup")}</option>
-              {groups.map((group) => (
-                <option key={group.id} value={group.id}>
-                  {group.isDefault
-                    ? t("group.default")
-                    : group.parentId
-                      ? `${groups.find((parent) => parent.id === group.parentId)?.name} / ${group.name}`
-                      : group.name}
-                </option>
-              ))}
-            </NativeSelect>
           </Field>
         )}
       />

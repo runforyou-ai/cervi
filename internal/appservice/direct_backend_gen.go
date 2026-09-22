@@ -1115,15 +1115,6 @@ func (b *DirectBackend) CreateKnowledgeDocuments(ctx context.Context, meta Reque
 	return b.ops.CreateKnowledgeDocuments(ctx, meta, identity, knowledgeBaseID, input)
 }
 
-// MoveKnowledgeDocument 移动文档到同库分组。
-func (b *DirectBackend) MoveKnowledgeDocument(ctx context.Context, meta RequestMeta, knowledgeBaseID string, documentID string, input KnowledgeDocumentMoveInput) error {
-	identity, err := b.ops.authenticate(ctx, meta)
-	if err != nil {
-		return err
-	}
-	return b.ops.MoveKnowledgeDocument(ctx, meta, identity, knowledgeBaseID, documentID, input)
-}
-
 // DeleteKnowledgeDocument 删除文档并释放原件。
 func (b *DirectBackend) DeleteKnowledgeDocument(ctx context.Context, meta RequestMeta, knowledgeBaseID string, documentID string) error {
 	identity, err := b.ops.authenticate(ctx, meta)
@@ -1317,36 +1308,6 @@ func (b *DirectBackend) DeleteKnowledgeBase(ctx context.Context, meta RequestMet
 		return err
 	}
 	return b.ops.DeleteKnowledgeBase(ctx, meta, identity, knowledgeBaseID)
-}
-
-// CreateKnowledgeGroup 创建知识库分组。
-func (b *DirectBackend) CreateKnowledgeGroup(ctx context.Context, meta RequestMeta, knowledgeBaseID string, input KnowledgeGroupInput) (KnowledgeBase, error) {
-	identity, err := b.ops.authenticate(ctx, meta)
-	if err != nil {
-		var zero KnowledgeBase
-		return zero, err
-	}
-	return b.ops.CreateKnowledgeGroup(ctx, meta, identity, knowledgeBaseID, input)
-}
-
-// UpdateKnowledgeGroup 修改知识库分组。
-func (b *DirectBackend) UpdateKnowledgeGroup(ctx context.Context, meta RequestMeta, knowledgeBaseID string, groupID string, input KnowledgeGroupInput) (KnowledgeBase, error) {
-	identity, err := b.ops.authenticate(ctx, meta)
-	if err != nil {
-		var zero KnowledgeBase
-		return zero, err
-	}
-	return b.ops.UpdateKnowledgeGroup(ctx, meta, identity, knowledgeBaseID, groupID, input)
-}
-
-// DeleteKnowledgeGroup 删除不含子分组和问答的知识库分组。
-func (b *DirectBackend) DeleteKnowledgeGroup(ctx context.Context, meta RequestMeta, knowledgeBaseID string, groupID string) (KnowledgeBase, error) {
-	identity, err := b.ops.authenticate(ctx, meta)
-	if err != nil {
-		var zero KnowledgeBase
-		return zero, err
-	}
-	return b.ops.DeleteKnowledgeGroup(ctx, meta, identity, knowledgeBaseID, groupID)
 }
 
 // ListContacts 返回联系人列表。

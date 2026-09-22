@@ -37,7 +37,6 @@ type KnowledgeDocument struct {
 	Format           KnowledgeDocumentFormat        `json:"format"`
 	SourceKind       KnowledgeDocumentSourceKind    `json:"sourceKind"`
 	ID               string                         `json:"id"`
-	GroupID          string                         `json:"groupId"`
 	Name             string                         `json:"name"`
 	SourceURL        string                         `json:"sourceUrl"`
 	ContentType      string                         `json:"contentType"`
@@ -50,9 +49,8 @@ type KnowledgeDocument struct {
 	CreatedAt        time.Time                      `json:"createdAt"`
 }
 
-// KnowledgeDocumentListInput 定义分组文档的查询参数。
+// KnowledgeDocumentListInput 定义知识库文档的查询参数。
 type KnowledgeDocumentListInput struct {
-	GroupID  string `json:"groupId" query:"groupId"`
 	Keyword  string `json:"keyword" query:"keyword"`
 	Page     int    `json:"page" query:"page,default=1"`
 	PageSize int    `json:"pageSize" query:"pageSize,default=20"`
@@ -64,9 +62,8 @@ type KnowledgeDocumentList struct {
 	Page      PageInfo            `json:"page"`
 }
 
-// KnowledgeDocumentBatchInput 将最多十个已上传原件保存到分组。
+// KnowledgeDocumentBatchInput 将最多十个已上传原件保存到知识库。
 type KnowledgeDocumentBatchInput struct {
-	GroupID string   `json:"groupId"`
 	FileIDs []string `json:"fileIds"`
 }
 
@@ -75,16 +72,14 @@ type KnowledgeDocumentBatch struct {
 	Documents []KnowledgeDocument `json:"documents"`
 }
 
-// KnowledgeTextDocumentInput 定义在线编写文档的分组、名称与正文。
+// KnowledgeTextDocumentInput 定义在线编写文档的名称与正文。
 type KnowledgeTextDocumentInput struct {
-	GroupID string `json:"groupId"`
 	Title   string `json:"title"`
 	Content string `json:"content"`
 }
 
-// KnowledgeWebDocumentInput 定义网页导入文档的分组、名称与页面地址。
+// KnowledgeWebDocumentInput 定义网页导入文档的名称与页面地址。
 type KnowledgeWebDocumentInput struct {
-	GroupID   string `json:"groupId"`
 	Title     string `json:"title"`
 	SourceURL string `json:"sourceUrl"`
 }
@@ -109,11 +104,6 @@ type KnowledgeDocumentRenameInput struct {
 type KnowledgeDocumentContent struct {
 	Document KnowledgeDocument `json:"document"`
 	Content  string            `json:"content"`
-}
-
-// KnowledgeDocumentMoveInput 定义目标分组。
-type KnowledgeDocumentMoveInput struct {
-	GroupID string `json:"groupId"`
 }
 
 // KnowledgeDocumentPreviewRequest 定义读取原件用于本地预览的请求。

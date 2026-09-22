@@ -144,10 +144,9 @@ export function KnowledgeBaseFormPage({
     setCategory(loadedKnowledgeBase.category)
   }, [form, loadedKnowledgeBase])
 
-  // 新建页取消回到知识库首页，编辑页取消进入该库默认分组的内容列表。
-  const defaultGroup = loadedKnowledgeBase?.groups.find((group) => group.isDefault)
+  // 新建页取消回到知识库首页，编辑页取消进入该库的内容列表。
   const cancelPath = loadedKnowledgeBase
-    ? `/knowledge-bases/${loadedKnowledgeBase.id}/groups/${defaultGroup!.id}/${loadedKnowledgeBase.category === KnowledgeBaseCategory.KnowledgeBaseCategoryQA ? "qa" : "documents"}`
+    ? `/knowledge-bases/${loadedKnowledgeBase.id}/${loadedKnowledgeBase.category === KnowledgeBaseCategory.KnowledgeBaseCategoryQA ? "qa" : "documents"}`
     : "/knowledge-bases"
 
   /** 保存知识库。 */

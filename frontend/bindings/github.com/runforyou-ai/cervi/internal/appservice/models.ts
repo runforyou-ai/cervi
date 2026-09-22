@@ -2175,7 +2175,6 @@ export interface KnowledgeBase {
     "name": string;
     "category": KnowledgeBaseCategory;
     "description": string;
-    "groups": KnowledgeGroup[] | null;
     "createdAt": string;
     "updatedAt": string;
 }
@@ -2241,7 +2240,6 @@ export interface KnowledgeDocument {
     "format": KnowledgeDocumentFormat;
     "sourceKind": KnowledgeDocumentSourceKind;
     "id": string;
-    "groupId": string;
     "name": string;
     "sourceUrl": string;
     "contentType": string;
@@ -2262,10 +2260,9 @@ export interface KnowledgeDocumentBatch {
 }
 
 /**
- * KnowledgeDocumentBatchInput 将最多十个已上传原件保存到分组。
+ * KnowledgeDocumentBatchInput 将最多十个已上传原件保存到知识库。
  */
 export interface KnowledgeDocumentBatchInput {
-    "groupId": string;
     "fileIds": string[] | null;
 }
 
@@ -2316,20 +2313,12 @@ export interface KnowledgeDocumentList {
 }
 
 /**
- * KnowledgeDocumentListInput 定义分组文档的查询参数。
+ * KnowledgeDocumentListInput 定义知识库文档的查询参数。
  */
 export interface KnowledgeDocumentListInput {
-    "groupId": string;
     "keyword": string;
     "page": number;
     "pageSize": number;
-}
-
-/**
- * KnowledgeDocumentMoveInput 定义目标分组。
- */
-export interface KnowledgeDocumentMoveInput {
-    "groupId": string;
 }
 
 /**
@@ -2401,25 +2390,6 @@ export enum KnowledgeDocumentSourceKind {
 };
 
 /**
- * KnowledgeGroup 定义知识库分组树节点。
- */
-export interface KnowledgeGroup {
-    "id": string;
-    "parentId": string;
-    "name": string;
-    "isDefault": boolean;
-    "children": KnowledgeGroup[] | null;
-}
-
-/**
- * KnowledgeGroupInput 定义知识库分组可编辑字段。
- */
-export interface KnowledgeGroupInput {
-    "name": string;
-    "parentId": string;
-}
-
-/**
  * KnowledgeIndexProcessingStatus 定义知识来源索引流程的执行状态。
  */
 export enum KnowledgeIndexProcessingStatus {
@@ -2462,7 +2432,6 @@ export enum KnowledgeIndexStatus {
  */
 export interface KnowledgeQAEntry {
     "id": string;
-    "groupId": string;
     "question": string;
     "similarQuestions": KnowledgeQASimilarQuestion[] | null;
     "answer": string;
@@ -2474,7 +2443,6 @@ export interface KnowledgeQAEntry {
  * KnowledgeQAInput 定义整条问答的编辑字段。
  */
 export interface KnowledgeQAInput {
-    "groupId": string;
     "question": string;
     "similarQuestions": KnowledgeQASimilarQuestion[] | null;
     "answer": string;
@@ -2489,10 +2457,9 @@ export interface KnowledgeQAList {
 }
 
 /**
- * KnowledgeQAListInput 定义分组中的问答查询条件。
+ * KnowledgeQAListInput 定义知识库的问答查询条件。
  */
 export interface KnowledgeQAListInput {
-    "groupId": string;
     "keyword": string;
     "page": number;
     "pageSize": number;
@@ -2511,7 +2478,6 @@ export interface KnowledgeQASimilarQuestion {
  */
 export interface KnowledgeQASummary {
     "id": string;
-    "groupId": string;
     "question": string;
     "similarQuestions": string[] | null;
     "answer": string;
@@ -2550,19 +2516,17 @@ export interface KnowledgeRetrievalResult {
 }
 
 /**
- * KnowledgeTextDocumentInput 定义在线编写文档的分组、名称与正文。
+ * KnowledgeTextDocumentInput 定义在线编写文档的名称与正文。
  */
 export interface KnowledgeTextDocumentInput {
-    "groupId": string;
     "title": string;
     "content": string;
 }
 
 /**
- * KnowledgeWebDocumentInput 定义网页导入文档的分组、名称与页面地址。
+ * KnowledgeWebDocumentInput 定义网页导入文档的名称与页面地址。
  */
 export interface KnowledgeWebDocumentInput {
-    "groupId": string;
     "title": string;
     "sourceUrl": string;
 }

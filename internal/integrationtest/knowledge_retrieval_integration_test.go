@@ -85,7 +85,7 @@ func publishRetrievalDocument(t *testing.T, db *bun.DB, probe *retrievalProbe, i
 	t.Helper()
 	ctx := context.Background()
 	file := uploadedDocumentFile(t, db, identity, name)
-	documents, err := knowledgeaction.NewCreateDocumentsAction(db, newKnowledgeTasks(t, db)).Execute(ctx, identity, base.ID, base.Groups[0].ID, []string{file.ID})
+	documents, err := knowledgeaction.NewCreateDocumentsAction(db, newKnowledgeTasks(t, db)).Execute(ctx, identity, base.ID, []string{file.ID})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -284,7 +284,6 @@ func TestKnowledgeHybridRetrieval(t *testing.T) {
 func publishQAEntry(t *testing.T, db *bun.DB, probe *retrievalProbe, identity *servermodels.Identity, base *knowledgeaction.Record, input knowledgeaction.QAInput) string {
 	t.Helper()
 	ctx := context.Background()
-	input.GroupID = base.Groups[0].ID
 	entry, err := knowledgeaction.NewSaveQAEntryAction(db, newKnowledgeTasks(t, db)).Execute(ctx, identity, base.ID, "", input)
 	if err != nil {
 		t.Fatal(err)
@@ -377,7 +376,7 @@ func TestKnowledgeQARetrieval(t *testing.T) {
 		t.Fatalf("window=%+v err=%v", window, err)
 	}
 	// 条目修改并重新发布后，旧批次游标失效，新检索结果的游标读取当前答案。
-	if _, err := knowledgeaction.NewSaveQAEntryAction(db, newKnowledgeTasks(t, db)).Execute(ctx, identity, base.ID, refundID, knowledgeaction.QAInput{GroupID: base.Groups[0].ID, Question: "如何退款？", Answer: "联系客服办理退款。"}); err != nil {
+	if _, err := knowledgeaction.NewSaveQAEntryAction(db, newKnowledgeTasks(t, db)).Execute(ctx, identity, base.ID, refundID, knowledgeaction.QAInput{Question: "如何退款？", Answer: "联系客服办理退款。"}); err != nil {
 		t.Fatal(err)
 	}
 	task, _ := qaProcessInput(t, db, identity.Organization.ID, base.ID, refundID)

@@ -47,7 +47,7 @@ func TestKnowledgeBaseReindex(t *testing.T) {
 	}
 
 	file := uploadedDocumentFile(t, db, identity, "资料.txt")
-	documents, err := knowledgeaction.NewCreateDocumentsAction(db, tasks).Execute(ctx, identity, base.ID, base.Groups[0].ID, []string{file.ID})
+	documents, err := knowledgeaction.NewCreateDocumentsAction(db, tasks).Execute(ctx, identity, base.ID, []string{file.ID})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -60,7 +60,7 @@ func TestKnowledgeBaseReindex(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	entry, err := knowledgeaction.NewSaveQAEntryAction(db, tasks).Execute(ctx, identity, qaBase.ID, "", knowledgeaction.QAInput{GroupID: qaBase.Groups[0].ID, Question: "如何退款？", Answer: "进入订单详情申请退款。"})
+	entry, err := knowledgeaction.NewSaveQAEntryAction(db, tasks).Execute(ctx, identity, qaBase.ID, "", knowledgeaction.QAInput{Question: "如何退款？", Answer: "进入订单详情申请退款。"})
 	if err != nil {
 		t.Fatal(err)
 	}

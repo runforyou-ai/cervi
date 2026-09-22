@@ -12,7 +12,6 @@ import {
   ListKnowledgeDocuments,
   GetKnowledgeDocument,
   CreateKnowledgeDocuments,
-  MoveKnowledgeDocument,
   DeleteKnowledgeDocument,
   GetKnowledgeDocumentPreview,
   CreateKnowledgeQAEntry,
@@ -22,14 +21,11 @@ import {
   DeleteKnowledgeQAEntry,
   RetryKnowledgeQAEntry,
   CreateKnowledgeBase,
-  CreateKnowledgeGroup,
   DeleteKnowledgeBase,
-  DeleteKnowledgeGroup,
   GetKnowledgeBase,
   ListKnowledgeBaseAgents,
   ListKnowledgeBases,
   UpdateKnowledgeBase,
-  UpdateKnowledgeGroup,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import {
   type KnowledgeDocumentSegmentInput,
@@ -56,8 +52,6 @@ import {
   type KnowledgeBaseAgentList,
   type KnowledgeBaseInput,
   type KnowledgeBaseList,
-  type KnowledgeGroup,
-  type KnowledgeGroupInput,
   type KnowledgeRetrievalInput,
   type KnowledgeRetrievalResult,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
@@ -68,8 +62,6 @@ export type KnowledgeBaseCategoryId = Exclude<
   KnowledgeBaseCategory,
   KnowledgeBaseCategory.$zero
 >
-
-export type KnowledgeGroupData = NonNullArrays<KnowledgeGroup>
 
 export type KnowledgeBaseData = Omit<NonNullArrays<KnowledgeBase>, "category"> & {
   category: KnowledgeBaseCategoryId
@@ -87,9 +79,6 @@ export type KnowledgeBaseListData = Omit<
 const createKnowledgeBaseBound = bind(CreateKnowledgeBase)
 const getKnowledgeBaseBound = bind(GetKnowledgeBase)
 const updateKnowledgeBaseBound = bind(UpdateKnowledgeBase)
-const createKnowledgeGroupBound = bind(CreateKnowledgeGroup)
-const updateKnowledgeGroupBound = bind(UpdateKnowledgeGroup)
-const deleteKnowledgeGroupBound = bind(DeleteKnowledgeGroup)
 const listKnowledgeBasesBound = bind(ListKnowledgeBases)
 const listKnowledgeBaseAgentsBound = bind(ListKnowledgeBaseAgents)
 /** 创建企业知识库。 */
@@ -118,38 +107,6 @@ export function updateKnowledgeBase(
 
 /** 删除企业知识库。 */
 export const deleteKnowledgeBase = bind(DeleteKnowledgeBase)
-
-/** 创建知识库分组。 */
-export function createKnowledgeGroup(
-  knowledgeBaseId: string,
-  input: KnowledgeGroupInput,
-) {
-  return createKnowledgeGroupBound(
-    knowledgeBaseId,
-    input,
-  ) as Promise<KnowledgeBaseData>
-}
-
-/** 修改知识库分组。 */
-export function updateKnowledgeGroup(
-  knowledgeBaseId: string,
-  groupId: string,
-  input: KnowledgeGroupInput,
-) {
-  return updateKnowledgeGroupBound(
-    knowledgeBaseId,
-    groupId,
-    input,
-  ) as Promise<KnowledgeBaseData>
-}
-
-/** 删除不含子分组的知识库分组。 */
-export function deleteKnowledgeGroup(knowledgeBaseId: string, groupId: string) {
-  return deleteKnowledgeGroupBound(
-    knowledgeBaseId,
-    groupId,
-  ) as Promise<KnowledgeBaseData>
-}
 
 /** 读取当前配置版本绑定知识库的 AI 员工。 */
 export function listKnowledgeBaseAgents(knowledgeBaseId: string) {
@@ -187,7 +144,7 @@ const createKnowledgeQAEntryBound = bind(CreateKnowledgeQAEntry)
 const updateKnowledgeQAEntryBound = bind(UpdateKnowledgeQAEntry)
 const listKnowledgeQAEntriesBound = bind(ListKnowledgeQAEntries)
 
-/** 读取指定分组的问答列表。 */
+/** 读取指定知识库的问答列表。 */
 export function listKnowledgeQAEntries(
   knowledgeBaseId: string,
   input: KnowledgeQAListInput,
@@ -331,7 +288,7 @@ export function renameKnowledgeDocument(
 }
 const listKnowledgeDocumentsBound = bind(ListKnowledgeDocuments)
 const createKnowledgeDocumentsBound = bind(CreateKnowledgeDocuments)
-/** 读取分组文档列表。 */
+/** 读取知识库文档列表。 */
 export function listKnowledgeDocuments(
   baseId: string,
   input: KnowledgeDocumentListInput,
@@ -366,8 +323,6 @@ export function createKnowledgeDocuments(
     input,
   ) as Promise<KnowledgeDocumentBatchData>
 }
-/** 移动文档到同库分组。 */
-export const moveKnowledgeDocument = bind(MoveKnowledgeDocument)
 /** 删除文档并释放原件。 */
 export const deleteKnowledgeDocument = bind(DeleteKnowledgeDocument)
 /** 取得用于预览的原件读取请求。 */
