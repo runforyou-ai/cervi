@@ -21,7 +21,7 @@ import { KnowledgeDocumentPreview } from "./knowledge-document-preview"
 /** 按内容来源显示原件预览或正文，并提供固定批次的分段阅读入口。 */
 export function KnowledgeDocumentPage() {
   const { t } = useTranslation(["knowledgeBase", "common"])
-  const { knowledgeBaseId = "", groupId = "", documentId = "" } = useParams()
+  const { knowledgeBaseId = "", documentId = "" } = useParams()
   const location = useLocation()
   // 保存弹窗打开时的分段批次。
   const [segmentBatchId, setSegmentBatchId] = useState("")
@@ -45,8 +45,6 @@ export function KnowledgeDocumentPage() {
       refetchInterval: () => (processing ? 2000 : false),
     },
   )
-  const returnGroupId = document.data?.groupId ?? groupId
-  const returnSearch = returnGroupId === groupId ? location.search : ""
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
       <PageHeader
@@ -57,7 +55,7 @@ export function KnowledgeDocumentPage() {
           {t("documentDetail.viewSegments")}
         </Button>
         <PageBackButton
-          to={`/knowledge-bases/${knowledgeBaseId}/groups/${returnGroupId}/documents${returnSearch}`}
+          to={`/knowledge-bases/${knowledgeBaseId}/documents${location.search}`}
         />
       </PageHeader>
       {document.data?.sourceUrl ? (

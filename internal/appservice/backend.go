@@ -356,9 +356,6 @@ type Backend interface {
 	// CreateKnowledgeDocuments 保存最多十个已上传的文档原件。
 	//cervi:route POST /knowledge-bases/:knowledgeBaseID/documents status=201
 	CreateKnowledgeDocuments(context.Context, RequestMeta, string, KnowledgeDocumentBatchInput) (KnowledgeDocumentBatch, error)
-	// MoveKnowledgeDocument 移动文档到同库分组。
-	//cervi:route PUT /knowledge-bases/:knowledgeBaseID/documents/:documentID/group
-	MoveKnowledgeDocument(context.Context, RequestMeta, string, string, KnowledgeDocumentMoveInput) error
 	// DeleteKnowledgeDocument 删除文档并释放原件。
 	//cervi:route DELETE /knowledge-bases/:knowledgeBaseID/documents/:documentID
 	DeleteKnowledgeDocument(context.Context, RequestMeta, string, string) error
@@ -420,15 +417,6 @@ type Backend interface {
 	// DeleteKnowledgeBase 删除企业知识库。
 	//cervi:route DELETE /knowledge-bases/:knowledgeBaseID
 	DeleteKnowledgeBase(context.Context, RequestMeta, string) error
-	// CreateKnowledgeGroup 创建知识库分组。
-	//cervi:route POST /knowledge-bases/:knowledgeBaseID/groups status=201
-	CreateKnowledgeGroup(context.Context, RequestMeta, string, KnowledgeGroupInput) (KnowledgeBase, error)
-	// UpdateKnowledgeGroup 修改知识库分组。
-	//cervi:route PUT /knowledge-bases/:knowledgeBaseID/groups/:groupID
-	UpdateKnowledgeGroup(context.Context, RequestMeta, string, string, KnowledgeGroupInput) (KnowledgeBase, error)
-	// DeleteKnowledgeGroup 删除不含子分组和问答的知识库分组。
-	//cervi:route DELETE /knowledge-bases/:knowledgeBaseID/groups/:groupID
-	DeleteKnowledgeGroup(context.Context, RequestMeta, string, string) (KnowledgeBase, error)
 	// ListContacts 返回联系人列表。
 	//cervi:route GET /contacts manual=api,proxy
 	ListContacts(context.Context, RequestMeta, ContactListInput) (ContactList, error)

@@ -43,7 +43,7 @@ func qaSegments(t *testing.T, db *bun.DB, entry servermodels.KnowledgeQAEntry) [
 	return segments
 }
 
-// TestKnowledgeQAIndexLifecycle 验证问答保存投递、分段构成、内容变更替换批次、移动分组保留批次、失败保留旧批次以及删除清理。
+// TestKnowledgeQAIndexLifecycle 验证问答保存投递、分段构成、内容变更替换批次、重复保存保留批次、失败保留旧批次以及删除清理。
 func TestKnowledgeQAIndexLifecycle(t *testing.T) {
 	ctx := context.Background()
 	store, err := serverstorage.Open(ctx, servertest.DatabaseConfig(t))
@@ -58,7 +58,7 @@ func TestKnowledgeQAIndexLifecycle(t *testing.T) {
 	probe := &processingProbe{}
 	worker := knowledgeaction.NewProcessQAEntryAction(db, probe)
 	answer := strings.Repeat("进入订单详情，点击申请退款，审核通过后原路退回。", 40)
-	created, err := save.Execute(ctx, identity, base.ID, "", knowledgeaction.QAInput{GroupID: base.Groups[0].ID, Question: "如何退款？", Answer: answer, SimilarQuestions: []knowledgeaction.QASimilarQuestion{{Content: "退款入口"}, {Content: "怎么申请退款"}}})
+	created, err := save.Execute(ctx, identity, base.ID, "", knowledgeaction.QAInput{Question: "如何退款？", Answer: answer, SimilarQuestions: []knowledgeaction.QASimilarQuestion{{Content: "退款入口"}, {Content: "怎么申请退款"}}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,23 +99,19 @@ func TestKnowledgeQAIndexLifecycle(t *testing.T) {
 		t.Fatalf("stored=%d %v", stored, err)
 	}
 
-	// 仅移动分组不投递任务，也不改变已发布批次。
-	grouped, err := knowledgeaction.NewCreateKnowledgeGroupAction(db).Execute(ctx, identity, base.ID, knowledgeaction.GroupInput{Name: "售后"})
-	if err != nil {
-		t.Fatal(err)
-	}
-	moved := knowledgeaction.QAInput{GroupID: grouped.Groups[1].ID, Question: created.Question, Answer: created.Answer, SimilarQuestions: created.SimilarQuestions}
-	if _, err := save.Execute(ctx, identity, base.ID, created.ID, moved); err != nil {
+	// 内容相同的重复保存保留已发布批次和任务编号。
+	unchanged := knowledgeaction.QAInput{Question: created.Question, Answer: created.Answer, SimilarQuestions: created.SimilarQuestions}
+	if _, err := save.Execute(ctx, identity, base.ID, created.ID, unchanged); err != nil {
 		t.Fatal(err)
 	}
 	_, entry = qaProcessInput(t, db, identity.Organization.ID, base.ID, created.ID)
 	if entry.ProcessingID != input.ProcessingID || entry.Status != domain.KnowledgeIndexSucceeded {
-		t.Fatalf("moved entry=%+v", entry)
+		t.Fatalf("unchanged entry=%+v", entry)
 	}
 
 	// 修改相似问题后投递新任务，旧任务在阶段更新时退出，新批次替换旧分段。
-	moved.SimilarQuestions = []knowledgeaction.QASimilarQuestion{created.SimilarQuestions[0]}
-	if _, err := save.Execute(ctx, identity, base.ID, created.ID, moved); err != nil {
+	unchanged.SimilarQuestions = []knowledgeaction.QASimilarQuestion{created.SimilarQuestions[0]}
+	if _, err := save.Execute(ctx, identity, base.ID, created.ID, unchanged); err != nil {
 		t.Fatal(err)
 	}
 	next, entry := qaProcessInput(t, db, identity.Organization.ID, base.ID, created.ID)
@@ -167,13 +163,13 @@ func TestKnowledgeQAIndexLifecycle(t *testing.T) {
 	if entry.Status != domain.KnowledgeIndexFailed || entry.FailureCode != "embedding_failed" || entry.SegmentBatchID != next.ProcessingID || len(qaSegments(t, db, entry)) != entry.SegmentCount {
 		t.Fatalf("failed entry=%+v", entry)
 	}
-	page, err := knowledgeaction.NewListQAEntriesQuery(db).Execute(ctx, identity, base.ID, knowledgeaction.QAListInput{GroupID: grouped.Groups[1].ID})
+	page, err := knowledgeaction.NewListQAEntriesQuery(db).Execute(ctx, identity, base.ID, knowledgeaction.QAListInput{})
 	if err != nil || len(page.Entries) != 1 || page.Entries[0].Status != domain.KnowledgeIndexFailed || page.Entries[0].FailureCode != "embedding_failed" {
 		t.Fatalf("list=%+v err=%v", page, err)
 	}
 	probe.embedFail = false
 	// 保存未完成索引的条目时即使内容未变也会重新投递。
-	if _, err := save.Execute(ctx, identity, base.ID, created.ID, moved); err != nil {
+	if _, err := save.Execute(ctx, identity, base.ID, created.ID, unchanged); err != nil {
 		t.Fatal(err)
 	}
 	again, entry := qaProcessInput(t, db, identity.Organization.ID, base.ID, created.ID)
@@ -199,7 +195,7 @@ func TestKnowledgeQAIndexLifecycle(t *testing.T) {
 	if err := worker.Execute(ctx, again); err != nil {
 		t.Fatal(err)
 	}
-	another, err := save.Execute(ctx, identity, base.ID, "", knowledgeaction.QAInput{GroupID: base.Groups[0].ID, Question: "发票怎么开", Answer: "下单时选择电子发票。"})
+	another, err := save.Execute(ctx, identity, base.ID, "", knowledgeaction.QAInput{Question: "发票怎么开", Answer: "下单时选择电子发票。"})
 	if err != nil {
 		t.Fatal(err)
 	}

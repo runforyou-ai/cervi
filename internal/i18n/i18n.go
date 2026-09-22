@@ -39,7 +39,6 @@ const (
 	FieldKnowledgeDocumentTitleRequired     Key = "field.knowledge_document_title_required"
 	FieldKnowledgeDocumentTitleTooLong      Key = "field.knowledge_document_title_too_long"
 	FieldKnowledgeDocumentContentRequired   Key = "field.knowledge_document_content_required"
-	FieldKnowledgeDocumentGroupInvalid      Key = "field.knowledge_document_group_invalid"
 	FieldKnowledgeDocumentURLInvalid        Key = "field.knowledge_document_url_invalid"
 	ErrorKnowledgeDocumentURLDuplicate      Key = "error.knowledge_document_url_duplicate"
 	ErrorKnowledgePageUnreachable           Key = "error.knowledge_page_unreachable"
@@ -67,7 +66,6 @@ const (
 	ErrorKnowledgeQARetryFailed               Key = "error.knowledge_qa_retry_failed"
 	FieldKnowledgeQAQuestionRequired          Key = "field.knowledge_qa_question_required"
 	FieldKnowledgeQAAnswerRequired            Key = "field.knowledge_qa_answer_required"
-	FieldKnowledgeQAGroupInvalid              Key = "field.knowledge_qa_group_invalid"
 	FieldKnowledgeQAContentInvalid            Key = "field.knowledge_qa_content_invalid"
 
 	ErrorAgentRunProcessUnavailable       Key = "error.agent_run_process_unavailable"
@@ -397,12 +395,6 @@ const (
 	ErrorKnowledgeBaseCreateFailed                   Key = "error.knowledge_base_create_failed"
 	ErrorKnowledgeBaseUpdateFailed                   Key = "error.knowledge_base_update_failed"
 	ErrorKnowledgeBaseDeleteFailed                   Key = "error.knowledge_base_delete_failed"
-	ErrorKnowledgeGroupNotFound                      Key = "error.knowledge_group_not_found"
-	ErrorKnowledgeGroupInvalid                       Key = "error.knowledge_group_invalid"
-	ErrorKnowledgeGroupNotEmpty                      Key = "error.knowledge_group_not_empty"
-	ErrorKnowledgeGroupCreateFailed                  Key = "error.knowledge_group_create_failed"
-	ErrorKnowledgeGroupUpdateFailed                  Key = "error.knowledge_group_update_failed"
-	ErrorKnowledgeGroupDeleteFailed                  Key = "error.knowledge_group_delete_failed"
 	FieldKnowledgeBaseEmbeddingModelInvalid          Key = "field.knowledge_base_embedding_model_invalid"
 	FieldKnowledgeBaseEmbeddingDimensionInvalid      Key = "field.knowledge_base_embedding_dimension_invalid"
 	FieldKnowledgeBaseChunkLengthInvalid             Key = "field.knowledge_base_chunk_length_invalid"
@@ -416,10 +408,6 @@ const (
 	FieldKnowledgeBaseNameDuplicate                  Key = "field.knowledge_base_name_duplicate"
 	FieldKnowledgeBaseCategoryInvalid                Key = "field.knowledge_base_category_invalid"
 	FieldKnowledgeBaseDescriptionTooLong             Key = "field.knowledge_base_description_too_long"
-	FieldKnowledgeGroupNameRequired                  Key = "field.knowledge_group_name_required"
-	FieldKnowledgeGroupNameTooLong                   Key = "field.knowledge_group_name_too_long"
-	FieldKnowledgeGroupNameDuplicate                 Key = "field.knowledge_group_name_duplicate"
-	FieldKnowledgeGroupParentInvalid                 Key = "field.knowledge_group_parent_invalid"
 )
 
 const (

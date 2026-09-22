@@ -14,7 +14,6 @@ type KnowledgeQAEntry struct {
 	bun.BaseModel            `bun:"table:knowledge_qa_entries,alias:kqe"`
 	ID                       string                      `bun:"id,pk"`
 	KnowledgeBaseID          string                      `bun:"knowledge_base_id"`
-	GroupID                  string                      `bun:"group_id"`
 	Status                   domain.KnowledgeIndexStatus `bun:"status"`
 	ProcessingID             string                      `bun:"processing_id,nullzero"`
 	SegmentBatchID           string                      `bun:"segment_batch_id,nullzero"`

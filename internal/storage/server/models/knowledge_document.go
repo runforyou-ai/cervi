@@ -13,7 +13,6 @@ type KnowledgeDocument struct {
 	bun.BaseModel            `bun:"table:knowledge_documents,alias:kd"`
 	ID                       string                             `bun:"id,pk"`
 	KnowledgeBaseID          string                             `bun:"knowledge_base_id"`
-	GroupID                  string                             `bun:"group_id"`
 	SourceKind               domain.KnowledgeDocumentSourceKind `bun:"source_kind"`
 	Title                    string                             `bun:"title"`
 	SourceURL                string                             `bun:"source_url"`

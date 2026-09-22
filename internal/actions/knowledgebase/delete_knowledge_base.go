@@ -54,15 +54,12 @@ func (a *DeleteKnowledgeBaseAction) Execute(ctx context.Context, identity *serve
 		if _, err := tx.NewDelete().Model((*servermodels.KnowledgeDocument)(nil)).Where("knowledge_base_id = ?", knowledgeBaseID).Exec(ctx); err != nil {
 			return err
 		}
-		// 先删除内容，再删除条目和分组，全部操作持有知识库锁。
+		// 先删除内容，再删除条目，全部操作持有知识库锁。
 		entries := tx.NewSelect().Model((*servermodels.KnowledgeQAEntry)(nil)).Column("id").Where("knowledge_base_id = ?", knowledgeBaseID)
 		if _, err := tx.NewDelete().Model((*servermodels.KnowledgeQAContent)(nil)).Where("entry_id IN (?)", entries).Exec(ctx); err != nil {
 			return err
 		}
 		if _, err := tx.NewDelete().Model((*servermodels.KnowledgeQAEntry)(nil)).Where("knowledge_base_id = ?", knowledgeBaseID).Exec(ctx); err != nil {
-			return err
-		}
-		if _, err := tx.NewDelete().Model((*servermodels.KnowledgeGroup)(nil)).Where("knowledge_base_id = ?", knowledgeBaseID).Exec(ctx); err != nil {
 			return err
 		}
 		_, err := tx.NewDelete().Model((*servermodels.KnowledgeBase)(nil)).

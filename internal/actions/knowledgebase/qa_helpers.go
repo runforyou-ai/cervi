@@ -56,7 +56,7 @@ func loadQARecord(ctx context.Context, db bun.IDB, entry *servermodels.Knowledge
 		OrderExpr("kqc.sort_order ASC, kqc.id ASC").Scan(ctx); err != nil {
 		return nil, err
 	}
-	record := &QARecord{ID: entry.ID, GroupID: entry.GroupID, UpdatedAt: entry.UpdatedAt,
+	record := &QARecord{ID: entry.ID, UpdatedAt: entry.UpdatedAt,
 		CreatedAt: entry.CreatedAt, SimilarQuestions: make([]QASimilarQuestion, 0)}
 	for _, content := range contents {
 		switch content.Kind {
@@ -76,11 +76,7 @@ func normalizeQAInput(input QAInput) (QAInput, error) {
 	input.Question = strings.TrimSpace(input.Question)
 	input.Answer = strings.TrimSpace(input.Answer)
 	var valid bool
-	input.GroupID, valid = common.NormalizeUUID(input.GroupID)
 	fields := make(map[string]common.FieldCode)
-	if !valid {
-		fields["groupId"] = ValidationQAGroupInvalid
-	}
 	if input.Question == "" {
 		fields["question"] = ValidationQAQuestionRequired
 	}

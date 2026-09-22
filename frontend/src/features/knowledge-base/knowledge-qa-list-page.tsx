@@ -1,4 +1,4 @@
-/** 本地知识问答的分组列表、搜索和删除操作。 */
+/** 本地知识问答的列表、搜索和删除操作。 */
 import { PlusIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Link, useLocation } from "react-router"
@@ -15,33 +15,30 @@ import { useConfirmedAction } from "@/hooks/use-confirmed-action"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { KnowledgeQATable } from "@/features/knowledge-base/knowledge-qa-table"
 import {
-  KnowledgeGroupListShell,
-  KnowledgeGroupRoute,
-  useKnowledgeGroupList,
-} from "@/features/knowledge-base/knowledge-group-list"
+  KnowledgeContentListShell,
+  KnowledgeContentRoute,
+  useKnowledgeContentList,
+} from "@/features/knowledge-base/knowledge-content-list"
 
-/** 按分组切换列表实例，隔离删除对话框和滚动恢复状态。 */
+/** 按知识库切换列表实例，隔离删除对话框和滚动恢复状态。 */
 export function KnowledgeQAListPage() {
   return (
-    <KnowledgeGroupRoute>
-      {(ids) => <KnowledgeQAGroupList {...ids} />}
-    </KnowledgeGroupRoute>
+    <KnowledgeContentRoute>
+      {(ids) => <KnowledgeQAList {...ids} />}
+    </KnowledgeContentRoute>
   )
 }
 
-/** 展示当前分组中的问答，并保留返回时的列表位置。 */
-function KnowledgeQAGroupList({
+/** 展示当前知识库中的问答，并保留返回时的列表位置。 */
+function KnowledgeQAList({
   knowledgeBaseId,
-  groupId,
 }: {
   knowledgeBaseId: string
-  groupId: string
 }) {
   const { t } = useTranslation(["knowledgeBase", "common"])
   const location = useLocation()
-  const list = useKnowledgeGroupList({
+  const list = useKnowledgeContentList({
     knowledgeBaseId,
-    groupId,
     section: "qa",
     listKey: (parameters) => resourceKeys.knowledgeQAEntries(knowledgeBaseId, parameters),
     load: (parameters, signal) => listKnowledgeQAEntries(knowledgeBaseId, parameters, signal),
@@ -61,7 +58,7 @@ function KnowledgeQAGroupList({
 
   return (
     <>
-      <KnowledgeGroupListShell
+      <KnowledgeContentListShell
         list={list}
         knowledgeBaseId={knowledgeBaseId}
         category={KnowledgeBaseCategory.KnowledgeBaseCategoryQA}
@@ -91,7 +88,7 @@ function KnowledgeQAGroupList({
           onDelete={deletion.select}
           onPageChange={list.changePage}
         />
-      </KnowledgeGroupListShell>
+      </KnowledgeContentListShell>
       <ConfirmationDialog
         {...deletion.dialog}
         title={t("qa.deleteTitle")}

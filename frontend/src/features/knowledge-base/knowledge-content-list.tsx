@@ -1,4 +1,4 @@
-/** 知识库分组内容列表（文档、问答）共用的读取、页头、搜索和召回测试外壳。 */
+/** 知识库文档、问答列表共用的读取、页头、搜索和召回测试外壳。 */
 import { Fragment, useEffect, useRef, useState, type ReactNode } from "react"
 import type { QueryKey } from "@tanstack/react-query"
 import { SearchCheckIcon } from "lucide-react"
@@ -28,50 +28,46 @@ import { KnowledgeRetrievalSheet } from "./knowledge-retrieval-sheet"
 
 const pageSize = 20
 
-/** 分组列表的读取参数。 */
-export type KnowledgeGroupListParameters = {
-  groupId: string
+/** 知识库内容列表的读取参数。 */
+export type KnowledgeContentListParameters = {
   keyword: string
   page: number
   pageSize: number
 }
 
-/** 按知识库和分组切换列表实例，隔离弹窗、上传批次和滚动恢复状态。 */
-export function KnowledgeGroupRoute({
+/** 按知识库切换列表实例，隔离弹窗、上传批次和滚动恢复状态。 */
+export function KnowledgeContentRoute({
   children,
 }: {
-  children: (ids: { knowledgeBaseId: string; groupId: string }) => ReactNode
+  children: (ids: { knowledgeBaseId: string }) => ReactNode
 }) {
-  const { knowledgeBaseId = "", groupId = "" } = useParams()
+  const { knowledgeBaseId = "" } = useParams()
   return (
-    <Fragment key={`${knowledgeBaseId}/${groupId}`}>
-      {children({ knowledgeBaseId, groupId })}
+    <Fragment key={knowledgeBaseId}>
+      {children({ knowledgeBaseId })}
     </Fragment>
   )
 }
 
-/** 读取知识库与当前分组的一页内容；有条目在排队或处理中时每 2 秒刷新，页码越界时回到最后一页。 */
-export function useKnowledgeGroupList<T extends { page: PageInfo }>({
+/** 读取知识库的一页内容，处理中的条目每 2 秒刷新，页码越界时回到最后一页。 */
+export function useKnowledgeContentList<T extends { page: PageInfo }>({
   knowledgeBaseId,
-  groupId,
   section,
   listKey,
   load,
   processing,
 }: {
   knowledgeBaseId: string
-  groupId: string
   section: "documents" | "qa"
-  listKey: (parameters: KnowledgeGroupListParameters) => QueryKey
-  load: (parameters: KnowledgeGroupListParameters, signal: AbortSignal) => Promise<T>
+  listKey: (parameters: KnowledgeContentListParameters) => QueryKey
+  load: (parameters: KnowledgeContentListParameters, signal: AbortSignal) => Promise<T>
   processing: (data: T) => boolean
 }) {
-  const { t } = useTranslation("knowledgeBase")
   const location = useLocation()
   const listSearch = useListSearchParams()
   const { searchParams, query, setParameters } = listSearch
   const page = parseListPage(searchParams.get("page"))
-  const parameters = { groupId, keyword: query, page, pageSize }
+  const parameters = { keyword: query, page, pageSize }
   const base = useResource(resourceKeys.knowledgeBase(knowledgeBaseId), (signal) =>
     getKnowledgeBase(knowledgeBaseId, signal),
   )
@@ -80,10 +76,7 @@ export function useKnowledgeGroupList<T extends { page: PageInfo }>({
     keepPreviousData: true,
     refetchInterval: (data) => (data && processing(data) ? 2000 : false),
   })
-  const groups =
-    base.data?.groups.flatMap((group) => [group, ...group.children]) ?? []
-  const group = groups.find((item) => item.id === groupId)
-  const listPath = `/knowledge-bases/${knowledgeBaseId}/groups/${groupId}/${section}`
+  const listPath = `/knowledge-bases/${knowledgeBaseId}/${section}`
   const scroll = useListScrollRestore(
     `${listPath}${location.search}`,
     Boolean(list.data && !list.isPlaceholderData && base.data),
@@ -99,21 +92,17 @@ export function useKnowledgeGroupList<T extends { page: PageInfo }>({
     ...listSearch,
     base,
     list,
-    groups,
     listPath,
     scroll,
-    /** 页头标题：知识库名称 · 分组名称。 */
-    title: [base.data?.name, group?.isDefault ? t("group.default") : group?.name]
-      .filter(Boolean)
-      .join(" · "),
+    title: base.data?.name,
     /** 切换页码，第一页不写入地址。 */
     changePage: (value: number) =>
       setParameters({ page: value === 1 ? null : String(value) }),
   }
 }
 
-/** 渲染分组列表的页头（召回测试加业务操作）、搜索工具栏、读取状态和召回测试面板。 */
-export function KnowledgeGroupListShell({
+/** 渲染知识库内容列表的页头、搜索工具栏、读取状态和召回测试面板。 */
+export function KnowledgeContentListShell({
   list,
   knowledgeBaseId,
   category,
@@ -124,7 +113,7 @@ export function KnowledgeGroupListShell({
   actions,
   children,
 }: {
-  list: ReturnType<typeof useKnowledgeGroupList>
+  list: ReturnType<typeof useKnowledgeContentList>
   knowledgeBaseId: string
   category: KnowledgeBaseCategoryId
   fallbackTitle: string

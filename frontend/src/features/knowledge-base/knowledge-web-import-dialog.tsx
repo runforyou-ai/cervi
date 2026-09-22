@@ -26,13 +26,11 @@ import { knowledgeDocumentTitleMaxLength } from "./knowledge-document-form-page"
 /** 收集页面地址和名称后创建网页文档。 */
 export function KnowledgeWebImportDialog({
   baseId,
-  groupId,
   open,
   triggerRef,
   onClose,
 }: {
   baseId: string
-  groupId: string
   open: boolean
   triggerRef: RefObject<HTMLButtonElement | null>
   onClose: () => void
@@ -72,7 +70,7 @@ export function KnowledgeWebImportDialog({
   /** 提交导入并失效该知识库的文档列表缓存。 */
   async function save(values: { title: string; sourceUrl: string }) {
     try {
-      await createKnowledgeWebDocument(baseId, { ...values, groupId })
+      await createKnowledgeWebDocument(baseId, values)
       await invalidate(resourceKeys.knowledgeDocuments(baseId))
       if (!mounted.current) return
       toast.success(t("documents.importSuccess"))

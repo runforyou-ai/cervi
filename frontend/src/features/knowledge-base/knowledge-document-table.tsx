@@ -27,7 +27,6 @@ import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip
 import { useDateTime } from "@/hooks/use-date-time"
 import { formatFileSize } from "@/lib/file-size"
 import { cn } from "@/lib/utils"
-import type { DocumentAction } from "./knowledge-document-actions"
 import { KnowledgeIndexStatus } from "./knowledge-index-status"
 
 /** 各格式文档在行首显示的彩色图标，未列出的格式使用灰色通用文件图标。 */
@@ -69,8 +68,7 @@ export function KnowledgeDocumentTable({
   search,
   filtered,
   refreshing,
-  canMove,
-  onAction,
+  onDelete,
   onPage,
 }: {
   knowledgeBaseId: string
@@ -79,8 +77,7 @@ export function KnowledgeDocumentTable({
   search: string
   filtered: boolean
   refreshing: boolean
-  canMove: boolean
-  onAction: (action: DocumentAction) => void
+  onDelete: (document: KnowledgeDocumentData) => void
   onPage: (page: number) => void
 }) {
   const { t } = useTranslation(["knowledgeBase", "common"])
@@ -198,17 +195,11 @@ export function KnowledgeDocumentTable({
               ]
             : []),
           {
-            key: "move",
-            label: t("documents.move"),
-            disabled: !canMove,
-            onSelect: () => onAction({ document, kind: "move" }),
-          },
-          {
             key: "delete",
             label: t("common:actions.delete"),
             destructive: true,
             separatorBefore: true,
-            onSelect: () => onAction({ document, kind: "delete" }),
+            onSelect: () => onDelete(document),
           },
         ]}
       />

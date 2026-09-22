@@ -1,9 +1,8 @@
-/** 知识库模块布局，在窄侧栏中展示知识库和两级分组。 */
-import { useCallback, useEffect, useRef, useState } from "react"
+/** 知识库模块布局，在窄侧栏中展示知识库列表。 */
+import { useCallback, useEffect, useRef } from "react"
 import {
   CircleHelpIcon,
   FileTextIcon,
-  FolderIcon,
   PlusIcon,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
@@ -12,24 +11,19 @@ import { toast } from "sonner"
 
 import {
   deleteKnowledgeBase,
-  deleteKnowledgeGroup,
   isApiError,
   KnowledgeBaseCategory,
   listKnowledgeBaseAgents,
   listKnowledgeBases,
   type KnowledgeBaseAgentListData,
   type KnowledgeBaseData,
-  type KnowledgeGroupData,
   sessionPath,
   UserStatus,
 } from "@/api"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { resourceStatus } from "@/components/resource-content"
 import { PagePaneNav, PageSplit } from "@/components/page-split"
-import {
-  RowActionsMenu,
-  type ResourceRowAction,
-} from "@/components/row-actions-menu"
+import { RowActionsMenu } from "@/components/row-actions-menu"
 import { StatusBadge } from "@/components/status-badge"
 import { ConfirmationDialog } from "@/components/confirmation-dialog"
 import { Button } from "@/components/ui/button"
@@ -40,10 +34,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { KnowledgeBaseProvider } from "@/features/knowledge-base/knowledge-base-context"
-import {
-  KnowledgeGroupDialog,
-  type KnowledgeGroupDialogState,
-} from "@/features/knowledge-base/knowledge-group-dialog"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useConfirmedAction } from "@/hooks/use-confirmed-action"
 import { useResource, useResourceInvalidator, useResourceReader } from "@/hooks/use-resource"
@@ -55,23 +45,16 @@ type DeleteKnowledgeBaseTarget = {
   agents: KnowledgeBaseAgentListData["agents"]
 }
 
-type DeleteGroupTarget = {
-  knowledgeBase: KnowledgeBaseData
-  group: KnowledgeGroupData
-}
-
-/** 树节点行尾「⋯」浮在行右端，出现时盖住行尾内容，名称宽度保持不变。 */
-const treeRowMoreButtonClass =
+/** 列表行尾「⋯」浮在行右端，出现时盖住行尾内容，名称宽度保持不变。 */
+const rowMoreButtonClass =
   "absolute top-1/2 right-1 -translate-y-1/2 bg-sidebar-accent"
 
-/** 显示知识库资源树和管理页面。 */
+/** 显示知识库列表和管理页面。 */
 export function KnowledgeBaseLayout() {
   const { t } = useTranslation(["knowledgeBase", "common"])
   const location = useLocation()
   const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
-  const [groupDialog, setGroupDialog] =
-    useState<KnowledgeGroupDialogState | null>(null)
   const readResource = useResourceReader()
   const mounted = useRef(true)
   const indexActive =
@@ -89,7 +72,7 @@ export function KnowledgeBaseLayout() {
     }
   }, [])
 
-  /** 把创建、保存或分组结果同步到窄侧栏。 */
+  /** 把知识库创建和保存结果同步到窄侧栏。 */
   const upsertKnowledgeBase = useCallback(
     (knowledgeBase: KnowledgeBaseData) => {
       void refresh()
@@ -110,17 +93,6 @@ export function KnowledgeBaseLayout() {
     },
   })
 
-  const groupDeletion = useConfirmedAction<DeleteGroupTarget>({
-    action: (target) =>
-      deleteKnowledgeGroup(target.knowledgeBase.id, target.group.id),
-    invalidateKeys: (target) => [
-      resourceKeys.knowledgeBases(),
-      resourceKeys.knowledgeBase(target.knowledgeBase.id),
-    ],
-    logLabel: "知识库分组删除",
-    successMessage: () => t("group.deleteSuccess"),
-    errorMessage: () => t("group.deleteError"),
-  })
   const deletingAgents = knowledgeBaseDeletion.item?.agents ?? []
 
   /** 读取最新的 AI 员工绑定后打开知识库删除确认。 */
@@ -209,19 +181,10 @@ export function KnowledgeBaseLayout() {
               </p>
             ) : (
               knowledgeBases.map((knowledgeBase) => (
-                <KnowledgeBaseTree
+                <KnowledgeBaseRow
                   key={knowledgeBase.id}
                   knowledgeBase={knowledgeBase}
                   currentPath={location.pathname}
-                  onCreateGroup={(parentId) =>
-                    setGroupDialog({ knowledgeBase, parentId })
-                  }
-                  onEditGroup={(group) =>
-                    setGroupDialog({ knowledgeBase, group })
-                  }
-                  onDeleteGroup={(group) =>
-                    groupDeletion.select({ knowledgeBase, group })
-                  }
                   onDeleteKnowledgeBase={() =>
                     void requestDeleteKnowledgeBase(knowledgeBase)
                   }
@@ -239,12 +202,6 @@ export function KnowledgeBaseLayout() {
           </KnowledgeBaseProvider>
         </div>
       </PageSplit>
-
-      <KnowledgeGroupDialog
-        state={groupDialog}
-        onOpenChange={(open) => !open && setGroupDialog(null)}
-        onSaved={upsertKnowledgeBase}
-      />
 
       <ConfirmationDialog
         {...knowledgeBaseDeletion.dialog}
@@ -269,201 +226,68 @@ export function KnowledgeBaseLayout() {
         }
         pendingLabel={t("common:actions.deleting")}
       />
-
-      <ConfirmationDialog
-        {...groupDeletion.dialog}
-        title={t("group.deleteTitle")}
-        description={t("group.deleteDescription")}
-        pendingLabel={t("common:actions.deleting")}
-      />
     </>
   )
 }
 
-/** 渲染一个知识库及其分组管理入口。 */
-function KnowledgeBaseTree({
+/** 展示知识库内容入口和编辑、删除菜单。 */
+function KnowledgeBaseRow({
   knowledgeBase,
   currentPath,
-  onCreateGroup,
-  onEditGroup,
-  onDeleteGroup,
   onDeleteKnowledgeBase,
 }: {
   knowledgeBase: KnowledgeBaseData
   currentPath: string
-  onCreateGroup: (parentId?: string) => void
-  onEditGroup: (group: KnowledgeGroupData) => void
-  onDeleteGroup: (group: KnowledgeGroupData) => void
   onDeleteKnowledgeBase: () => void
 }) {
   const { t } = useTranslation(["knowledgeBase", "common"])
+  const navigate = useNavigate()
   const path = `/knowledge-bases/${knowledgeBase.id}`
   const isQA =
     knowledgeBase.category === KnowledgeBaseCategory.KnowledgeBaseCategoryQA
-  const active = currentPath === path
+  const active = currentPath === path || currentPath.startsWith(`${path}/`)
   const categoryLabel = isQA
     ? t("category.qaShort")
     : t("category.standardShort")
-  const defaultGroup = knowledgeBase.groups.find((group) => group.isDefault)
-  const regularGroups = knowledgeBase.groups.filter((group) => !group.isDefault)
 
-  return (
-    <section className="mb-2">
-      {/* 知识库操作通过右键或行尾「⋯」打开，菜单打开期间保持该行高亮。 */}
-      <RowActionsMenu
-        buttonSize="icon-xs"
-        buttonClassName={treeRowMoreButtonClass}
-        actions={[
-          {
-            key: "addGroup",
-            label: t("sidebar.addGroup"),
-            onSelect: () => onCreateGroup(),
-          },
-          {
-            key: "delete",
-            label: t("common:actions.delete"),
-            destructive: true,
-            separatorBefore: true,
-            onSelect: onDeleteKnowledgeBase,
-          },
-        ]}
-      >
-        {({ moreButton, menuOpen }) => (
-          <div
-            className={cn(
-              "group/row relative flex items-center rounded-md transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-              (active || menuOpen) && "bg-sidebar-accent",
-              active && "font-medium text-sidebar-accent-foreground",
-            )}
-          >
-            <Link
-              to={path}
-              className="flex h-8 min-w-0 flex-1 items-center gap-2 px-2.5 text-sm"
-              title={knowledgeBase.name}
-            >
-              {isQA ? <CircleHelpIcon /> : <FileTextIcon />}
-              <span className="truncate">{knowledgeBase.name}</span>
-              <StatusBadge variant="muted" className="ml-auto shrink-0 font-normal">
-                {categoryLabel}
-              </StatusBadge>
-            </Link>
-            {moreButton}
-          </div>
-        )}
-      </RowActionsMenu>
-
-      <div className="mt-1 ml-3 border-l pl-2">
-        {defaultGroup ? (
-          <Link
-            to={`${path}/groups/${defaultGroup.id}/${isQA ? "qa" : "documents"}`}
-            className={cn(
-              "flex h-8 items-center gap-2 rounded-md px-2 text-sm text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-              currentPath.startsWith(`${path}/groups/${defaultGroup.id}/${isQA ? "qa" : "documents"}`) &&
-                "bg-sidebar-accent font-medium text-sidebar-accent-foreground",
-            )}
-          >
-            <FolderIcon className="size-3.5 shrink-0" />
-            <span className="truncate">{t("group.default")}</span>
-          </Link>
-        ) : (
-          <div className="flex h-8 items-center gap-2 px-2 text-xs text-muted-foreground">
-            <FolderIcon className="size-3.5 shrink-0" />
-            <span className="truncate">{t("group.default")}</span>
-          </div>
-        )}
-        {regularGroups.map((group) => (
-          <div key={group.id}>
-            <KnowledgeGroupTreeRow
-              group={group}
-              contentPath={
-                isQA
-                  ? `${path}/groups/${group.id}/qa`
-                  : `${path}/groups/${group.id}/documents`
-              }
-              currentPath={currentPath}
-              onAddChild={() => onCreateGroup(group.id)}
-              onEdit={() => onEditGroup(group)}
-              onDelete={() => onDeleteGroup(group)}
-            />
-            {group.children.map((child) => (
-              <div key={child.id} className="ml-4">
-                <KnowledgeGroupTreeRow
-                  group={child}
-                  contentPath={
-                    isQA
-                      ? `${path}/groups/${child.id}/qa`
-                      : `${path}/groups/${child.id}/documents`
-                  }
-                  currentPath={currentPath}
-                  onEdit={() => onEditGroup(child)}
-                  onDelete={() => onDeleteGroup(child)}
-                />
-              </div>
-            ))}
-          </div>
-        ))}
-      </div>
-    </section>
-  )
-}
-
-/** 渲染知识库分组行，右键或行尾「⋯」打开分组操作菜单。 */
-function KnowledgeGroupTreeRow({
-  group,
-  contentPath,
-  currentPath,
-  onAddChild,
-  onEdit,
-  onDelete,
-}: {
-  group: KnowledgeGroupData
-  contentPath?: string
-  currentPath: string
-  onAddChild?: () => void
-  onEdit: () => void
-  onDelete: () => void
-}) {
-  const { t } = useTranslation(["knowledgeBase", "common"])
-  const actions: ResourceRowAction[] = [
-    ...(onAddChild
-      ? [{ key: "addChild", label: t("group.addChild"), onSelect: onAddChild }]
-      : []),
-    { key: "edit", label: t("common:actions.edit"), onSelect: onEdit },
-    {
-      key: "delete",
-      label: t("common:actions.delete"),
-      destructive: true,
-      separatorBefore: true,
-      onSelect: onDelete,
-    },
-  ]
   return (
     <RowActionsMenu
       buttonSize="icon-xs"
-      buttonClassName={treeRowMoreButtonClass}
-      actions={actions}
+      buttonClassName={rowMoreButtonClass}
+      actions={[
+        {
+          key: "edit",
+          label: t("common:actions.edit"),
+          onSelect: () => navigate(path),
+        },
+        {
+          key: "delete",
+          label: t("common:actions.delete"),
+          destructive: true,
+          separatorBefore: true,
+          onSelect: onDeleteKnowledgeBase,
+        },
+      ]}
     >
       {({ moreButton, menuOpen }) => (
         <div
           className={cn(
-            "group/row relative flex h-8 items-center rounded-md px-2 text-sm text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-            menuOpen && "bg-sidebar-accent",
-            contentPath &&
-              currentPath.startsWith(contentPath) &&
-              "bg-sidebar-accent font-medium text-sidebar-accent-foreground",
+            "group/row relative flex items-center rounded-md transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+            (active || menuOpen) && "bg-sidebar-accent",
+            active && "font-medium text-sidebar-accent-foreground",
           )}
         >
-          <FolderIcon className="size-3.5 shrink-0" />
-          {contentPath ? (
-            <Link
-              to={contentPath}
-              className="ml-2 min-w-0 flex-1 truncate py-2"
-            >
-              {group.name}
-            </Link>
-          ) : (
-            <span className="ml-2 min-w-0 flex-1 truncate">{group.name}</span>
-          )}
+          <Link
+            to={`${path}/${isQA ? "qa" : "documents"}`}
+            className="flex h-8 min-w-0 flex-1 items-center gap-2 px-2.5 text-sm"
+            title={knowledgeBase.name}
+          >
+            {isQA ? <CircleHelpIcon /> : <FileTextIcon />}
+            <span className="truncate">{knowledgeBase.name}</span>
+            <StatusBadge variant="muted" className="ml-auto shrink-0 font-normal">
+              {categoryLabel}
+            </StatusBadge>
+          </Link>
           {moreButton}
         </div>
       )}

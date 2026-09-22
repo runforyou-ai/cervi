@@ -184,7 +184,7 @@ export function ContactScopeSidebar({
         >
           {t("scopes.teams")}
         </SubscopeButton>
-        {/* 与知识库分组一致：三级项左侧以竖线标示层级。 */}
+        {/* 三级项左侧以竖线标示层级。 */}
         <div className="ml-9 flex flex-col gap-0.5 border-l pl-2">
           {teams.map((team) => (
             // 编辑和删除团队进入团队页并打开对应弹窗。

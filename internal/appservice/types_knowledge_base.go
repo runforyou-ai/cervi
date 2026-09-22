@@ -30,21 +30,6 @@ type KnowledgeBaseInput struct {
 	Description              string                `json:"description"`
 }
 
-// KnowledgeGroupInput 定义知识库分组可编辑字段。
-type KnowledgeGroupInput struct {
-	Name     string `json:"name"`
-	ParentID string `json:"parentId"`
-}
-
-// KnowledgeGroup 定义知识库分组树节点。
-type KnowledgeGroup struct {
-	ID        string           `json:"id"`
-	ParentID  string           `json:"parentId"`
-	Name      string           `json:"name"`
-	IsDefault bool             `json:"isDefault"`
-	Children  []KnowledgeGroup `json:"children"`
-}
-
 // KnowledgeBase 定义知识库详情。
 type KnowledgeBase struct {
 	EmbeddingProviderID      string                `json:"embeddingProviderId"`
@@ -60,7 +45,6 @@ type KnowledgeBase struct {
 	Name                     string                `json:"name"`
 	Category                 KnowledgeBaseCategory `json:"category"`
 	Description              string                `json:"description"`
-	Groups                   []KnowledgeGroup      `json:"groups"`
 	CreatedAt                time.Time             `json:"createdAt"`
 	UpdatedAt                time.Time             `json:"updatedAt"`
 }

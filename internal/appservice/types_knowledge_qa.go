@@ -10,15 +10,13 @@ type KnowledgeQASimilarQuestion struct {
 
 // KnowledgeQAInput 定义整条问答的编辑字段。
 type KnowledgeQAInput struct {
-	GroupID          string                       `json:"groupId"`
 	Question         string                       `json:"question"`
 	SimilarQuestions []KnowledgeQASimilarQuestion `json:"similarQuestions"`
 	Answer           string                       `json:"answer"`
 }
 
-// KnowledgeQAListInput 定义分组中的问答查询条件。
+// KnowledgeQAListInput 定义知识库的问答查询条件。
 type KnowledgeQAListInput struct {
-	GroupID  string `json:"groupId" query:"groupId"`
 	Keyword  string `json:"keyword" query:"keyword"`
 	Page     int    `json:"page" query:"page,default=1"`
 	PageSize int    `json:"pageSize" query:"pageSize,default=20"`
@@ -27,7 +25,6 @@ type KnowledgeQAListInput struct {
 // KnowledgeQASummary 定义问答列表项及其索引状态。
 type KnowledgeQASummary struct {
 	ID               string               `json:"id"`
-	GroupID          string               `json:"groupId"`
 	Question         string               `json:"question"`
 	SimilarQuestions []string             `json:"similarQuestions"`
 	Answer           string               `json:"answer"`
@@ -39,7 +36,6 @@ type KnowledgeQASummary struct {
 // KnowledgeQAEntry 定义完整问答详情。
 type KnowledgeQAEntry struct {
 	ID               string                       `json:"id"`
-	GroupID          string                       `json:"groupId"`
 	Question         string                       `json:"question"`
 	SimilarQuestions []KnowledgeQASimilarQuestion `json:"similarQuestions"`
 	Answer           string                       `json:"answer"`

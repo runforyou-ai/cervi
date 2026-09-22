@@ -139,7 +139,7 @@ export const resourceKeys = {
   knowledgeBase: (id?: string) => itemKey("knowledge-base", id),
   /** 当前配置版本绑定指定知识库的 AI 员工。 */
   knowledgeBaseAgents: (knowledgeBaseId?: string) => itemKey("knowledge-base-agents", knowledgeBaseId),
-  /** 指定知识库及分组条件的问答列表。 */
+  /** 指定知识库的问答列表。 */
   knowledgeQAEntries: (knowledgeBaseId?: string, parameters?: KeyParameters) =>
     scopedListKey("knowledge-qa-entries", knowledgeBaseId, parameters),
   /** 指定知识库中的完整问答。 */
@@ -147,7 +147,7 @@ export const resourceKeys = {
     entryId === undefined
       ? ["knowledge-qa-entry", knowledgeBaseId]
       : ["knowledge-qa-entry", knowledgeBaseId, entryId],
-  /** 指定知识库及分组条件的文档列表。 */
+  /** 指定知识库的文档列表。 */
   knowledgeDocuments: (baseId?: string, parameters?: KeyParameters) => scopedListKey("knowledge-documents", baseId, parameters),
   /** 单个文档详情。 */
   knowledgeDocument: (baseId: string, documentId: string) => ["knowledge-document", baseId, documentId],

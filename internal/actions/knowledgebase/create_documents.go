@@ -29,7 +29,7 @@ func NewCreateDocumentsAction(db *bun.DB, tasks servertask.TxEnqueuer) *CreateDo
 }
 
 // Execute 在同一事务中保存最多十个文件，文件编号用于重复提交幂等。
-func (a *CreateDocumentsAction) Execute(ctx context.Context, identity *servermodels.Identity, baseID, groupID string, fileIDs []string) ([]DocumentRecord, error) {
+func (a *CreateDocumentsAction) Execute(ctx context.Context, identity *servermodels.Identity, baseID string, fileIDs []string) ([]DocumentRecord, error) {
 	if len(fileIDs) == 0 || len(fileIDs) > 10 {
 		return nil, ErrDocumentBatchInvalid
 	}
@@ -49,9 +49,6 @@ func (a *CreateDocumentsAction) Execute(ctx context.Context, identity *servermod
 		if base.Category != string(domain.KnowledgeBaseCategoryStandard) {
 			return ErrDocumentUnsupported
 		}
-		if _, err := loadKnowledgeGroup(ctx, tx, identity.Organization.ID, baseID, groupID); err != nil {
-			return err
-		}
 		for _, fileID := range ids {
 			file := &servermodels.File{}
 			err := tx.NewSelect().Model(file).ColumnExpr("f.*").ColumnExpr("(f.expires_at IS NULL OR f.expires_at <= now()) AS expired").Where("f.id = ? AND f.organization_id = ? AND f.created_by_user_id = ? AND f.purpose = ?", fileID, identity.Organization.ID, identity.User.ID, domain.FilePurposeKnowledgeDocument).For("UPDATE").Scan(ctx)
@@ -64,7 +61,7 @@ func (a *CreateDocumentsAction) Execute(ctx context.Context, identity *servermod
 			if domain.KnowledgeDocumentContentType(file.OriginalName) == "" {
 				return ErrDocumentUnsupported
 			}
-			// 已保存的原件返回既有文档，保留后来移动的分组。
+			// 已保存的原件返回既有文档。
 			existing := &servermodels.KnowledgeDocument{}
 			err = tx.NewSelect().Model(existing).Where("kd.file_id = ?", fileID).Scan(ctx)
 			if err == nil {
@@ -84,7 +81,7 @@ func (a *CreateDocumentsAction) Execute(ctx context.Context, identity *servermod
 			if file.Status != string(domain.FileStatusUploaded) || file.Expired {
 				return fileaction.ErrFileNotFound
 			}
-			document := &servermodels.KnowledgeDocument{ID: uuid.NewV7().String(), KnowledgeBaseID: baseID, GroupID: groupID, SourceKind: domain.KnowledgeDocumentSourceFile, FileID: fileID, Status: domain.KnowledgeIndexInitial, CreatedByUserID: identity.User.ID}
+			document := &servermodels.KnowledgeDocument{ID: uuid.NewV7().String(), KnowledgeBaseID: baseID, SourceKind: domain.KnowledgeDocumentSourceFile, FileID: fileID, Status: domain.KnowledgeIndexInitial, CreatedByUserID: identity.User.ID}
 			if _, err := tx.NewInsert().Model(document).Value("created_at", "clock_timestamp()").Value("updated_at", "clock_timestamp()").Exec(ctx); err != nil {
 				return err
 			}

@@ -137,31 +137,31 @@ const workspaceRouteDefinitions = [
     element: <KnowledgeBaseFormPage mode="edit" />,
   },
   {
-    path: "/knowledge-bases/:knowledgeBaseId/groups/:groupId/qa/new",
+    path: "/knowledge-bases/:knowledgeBaseId/qa/new",
     element: <KnowledgeQAFormPage mode="create" />,
   },
   {
-    path: "/knowledge-bases/:knowledgeBaseId/groups/:groupId/qa/:entryId/edit",
+    path: "/knowledge-bases/:knowledgeBaseId/qa/:entryId/edit",
     element: <KnowledgeQAFormPage mode="edit" />,
   },
   {
-    path: "/knowledge-bases/:knowledgeBaseId/groups/:groupId/qa",
+    path: "/knowledge-bases/:knowledgeBaseId/qa",
     element: <KnowledgeQAListPage />,
   },
   {
-    path: "/knowledge-bases/:knowledgeBaseId/groups/:groupId/documents/new",
+    path: "/knowledge-bases/:knowledgeBaseId/documents/new",
     element: <KnowledgeDocumentFormPage mode="create" />,
   },
   {
-    path: "/knowledge-bases/:knowledgeBaseId/groups/:groupId/documents/:documentId/edit",
+    path: "/knowledge-bases/:knowledgeBaseId/documents/:documentId/edit",
     element: <KnowledgeDocumentFormPage mode="edit" />,
   },
   {
-    path: "/knowledge-bases/:knowledgeBaseId/groups/:groupId/documents/:documentId",
+    path: "/knowledge-bases/:knowledgeBaseId/documents/:documentId",
     element: <KnowledgeDocumentPage />,
   },
   {
-    path: "/knowledge-bases/:knowledgeBaseId/groups/:groupId/documents",
+    path: "/knowledge-bases/:knowledgeBaseId/documents",
     element: <KnowledgeDocumentListPage />,
   },
   {

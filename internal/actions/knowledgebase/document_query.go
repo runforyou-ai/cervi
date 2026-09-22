@@ -23,7 +23,7 @@ type DocumentQuery struct{ db *bun.DB }
 // NewDocumentQuery 创建知识文档查询。
 func NewDocumentQuery(db *bun.DB) *DocumentQuery { return &DocumentQuery{db: db} }
 
-// List 按创建时间倒序返回分组文档。
+// List 按创建时间倒序返回知识库文档。
 func (q *DocumentQuery) List(ctx context.Context, identity *servermodels.Identity, baseID string, input DocumentListInput) (DocumentListOutput, error) {
 	base, err := loadKnowledgeBase(ctx, q.db, identity.Organization.ID, baseID)
 	if err != nil {
@@ -32,9 +32,6 @@ func (q *DocumentQuery) List(ctx context.Context, identity *servermodels.Identit
 	if base.Category != string(domain.KnowledgeBaseCategoryStandard) {
 		return DocumentListOutput{}, ErrDocumentUnsupported
 	}
-	if _, err := loadKnowledgeGroup(ctx, q.db, identity.Organization.ID, baseID, input.GroupID); err != nil {
-		return DocumentListOutput{}, err
-	}
 	if input.Page < 1 {
 		input.Page = 1
 	}
@@ -42,7 +39,7 @@ func (q *DocumentQuery) List(ctx context.Context, identity *servermodels.Identit
 		input.PageSize = 20
 	}
 	records := make([]DocumentRecord, 0)
-	query := documentSelect(q.db).Where("kd.knowledge_base_id = ? AND kd.group_id = ?", baseID, input.GroupID)
+	query := documentSelect(q.db).Where("kd.knowledge_base_id = ?", baseID)
 	if keyword := strings.TrimSpace(input.Keyword); keyword != "" {
 		// 搜索文档名称时按字面处理通配符。
 		pattern := "%" + strings.NewReplacer("\\", "\\\\", "%", "\\%", "_", "\\_").Replace(keyword) + "%"
@@ -99,7 +96,7 @@ func (q *DocumentQuery) File(ctx context.Context, identity *servermodels.Identit
 // documentSelect 按内容来源取名称、内容类型和字节数，上传原件的属性仍从原件读取。
 func documentSelect(db bun.IDB) *bun.SelectQuery {
 	return db.NewSelect().TableExpr("knowledge_documents AS kd").
-		ColumnExpr("kd.id, kd.group_id, kd.source_kind, kd.source_url, kd.status, kd.segment_batch_id, kd.segment_count, kd.failure_code, kd.created_at").
+		ColumnExpr("kd.id, kd.source_kind, kd.source_url, kd.status, kd.segment_batch_id, kd.segment_count, kd.failure_code, kd.created_at").
 		ColumnExpr(documentNameExpr+" AS name").
 		ColumnExpr("CASE WHEN kd.source_kind = ? THEN f.content_type ELSE ? END AS content_type", domain.KnowledgeDocumentSourceFile, domain.KnowledgeDocumentMarkdownContentType).
 		ColumnExpr("CASE WHEN kd.source_kind = ? THEN f.byte_size ELSE COALESCE(octet_length(kdc.content), 0) END AS byte_size", domain.KnowledgeDocumentSourceFile).

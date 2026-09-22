@@ -55,11 +55,11 @@ func TestKnowledgeTextDocumentLifecycle(t *testing.T) {
 	save := knowledgeaction.NewSaveTextDocumentAction(db, newKnowledgeTasks(t, db))
 
 	// 正文为空的保存在校验阶段拒绝，不创建文档。
-	if _, err := save.Execute(ctx, identity, base.ID, "", knowledgeaction.TextDocumentInput{GroupID: base.Groups[0].ID, Title: "退款说明", Content: "  "}); !errors.As(err, new(*common.FieldError)) {
+	if _, err := save.Execute(ctx, identity, base.ID, "", knowledgeaction.TextDocumentInput{Title: "退款说明", Content: "  "}); !errors.As(err, new(*common.FieldError)) {
 		t.Fatalf("err=%v", err)
 	}
 
-	created, err := save.Execute(ctx, identity, base.ID, "", knowledgeaction.TextDocumentInput{GroupID: base.Groups[0].ID, Title: "退款说明", Content: "# 退款\n\n签收后七天内可以申请退款。"})
+	created, err := save.Execute(ctx, identity, base.ID, "", knowledgeaction.TextDocumentInput{Title: "退款说明", Content: "# 退款\n\n签收后七天内可以申请退款。"})
 	if err != nil || created.Name != "退款说明" || created.SourceKind != domain.KnowledgeDocumentSourceText {
 		t.Fatalf("created=%+v err=%v", created, err)
 	}

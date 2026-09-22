@@ -12,16 +12,16 @@ import (
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
-// ListKnowledgeQAEntries 返回当前企业分组中的问答列表。
+// ListKnowledgeQAEntries 返回当前企业知识库中的问答列表。
 func (o *directOperations) ListKnowledgeQAEntries(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, knowledgeBaseID string, input KnowledgeQAListInput) (KnowledgeQAList, error) {
-	output, err := o.listQAEntries.Execute(ctx, identity, knowledgeBaseID, knowledgebaseaction.QAListInput{GroupID: input.GroupID, Keyword: input.Keyword, Page: input.Page, PageSize: input.PageSize})
+	output, err := o.listQAEntries.Execute(ctx, identity, knowledgeBaseID, knowledgebaseaction.QAListInput{Keyword: input.Keyword, Page: input.Page, PageSize: input.PageSize})
 	if err != nil {
 		return KnowledgeQAList{}, o.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeQAReadFailed, identity.Organization.ID, knowledgeBaseID)
 	}
 	entries := make([]KnowledgeQASummary, 0, len(output.Entries))
 	for _, entry := range output.Entries {
 		status, message := knowledgeIndexPresentation(meta, entry.Status, entry.FailureCode)
-		entries = append(entries, KnowledgeQASummary{ID: entry.ID, GroupID: entry.GroupID, Question: entry.Question,
+		entries = append(entries, KnowledgeQASummary{ID: entry.ID, Question: entry.Question,
 			SimilarQuestions: entry.SimilarQuestions, Answer: entry.Answer, Status: status, FailureMessage: message, CreatedAt: entry.CreatedAt})
 	}
 	return KnowledgeQAList{Entries: entries, Page: PageInfo{Number: output.Page, Size: output.PageSize, Total: output.Total}}, nil
@@ -56,7 +56,7 @@ func (o *directOperations) saveKnowledgeQAEntry(ctx context.Context, meta Reques
 		questions = append(questions, knowledgebaseaction.QASimilarQuestion{ID: question.ID, Content: question.Content})
 	}
 	record, err := o.saveQAEntry.Execute(ctx, identity, knowledgeBaseID, entryID, knowledgebaseaction.QAInput{
-		GroupID: input.GroupID, Question: input.Question, Answer: input.Answer, SimilarQuestions: questions,
+		Question: input.Question, Answer: input.Answer, SimilarQuestions: questions,
 	})
 	if err != nil {
 		return KnowledgeQAEntry{}, o.knowledgeBaseError(ctx, meta, err, cervii18n.ErrorKnowledgeQASaveFailed, identity.Organization.ID, knowledgeBaseID)
@@ -89,6 +89,6 @@ func knowledgeQAFromAction(record knowledgebaseaction.QARecord) KnowledgeQAEntry
 	for _, question := range record.SimilarQuestions {
 		questions = append(questions, KnowledgeQASimilarQuestion{ID: question.ID, Content: question.Content})
 	}
-	return KnowledgeQAEntry{ID: record.ID, GroupID: record.GroupID, Question: record.Question, Answer: record.Answer,
+	return KnowledgeQAEntry{ID: record.ID, Question: record.Question, Answer: record.Answer,
 		SimilarQuestions: questions, CreatedAt: record.CreatedAt, UpdatedAt: record.UpdatedAt}
 }
