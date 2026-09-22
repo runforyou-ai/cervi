@@ -20,6 +20,8 @@ function agentToolLabel(tool: string, t: ReturnType<typeof useTranslation<"commo
       return t("agentTools.askCustomer")
     case "handoff_to_human":
       return t("agentTools.handoffToHuman")
+    case "resolve_conversation":
+      return t("agentTools.resolveConversation")
     case "mcp":
       return t("agentTools.mcp")
     default:

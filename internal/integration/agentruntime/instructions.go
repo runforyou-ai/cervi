@@ -23,9 +23,11 @@ const knowledgeToolGuidance = "- search_knowledge：检索企业资料，回答�
 
 const customerHistoryToolGuidance = "- search_customer_history：查看同一客户以往的沟通记录。"
 
-const askCustomerToolGuidance = "- ask_customer：需要客户补充信息、确认，或只需要问候时，用它发送要说的话并等待客户回复。"
+const askCustomerToolGuidance = "- ask_customer：需要客户补充信息、确认，或只需要问候时，用它发送要说的话并等待客户回复；判断客户的问题已经解决时，用 purpose 为 confirm_resolution 询问客户问题是否已解决、是否还需要其他帮助。"
 
 const handoffToolGuidance = "- handoff_to_human：无法从资料得到答案、客户明确要求真人、客户投诉或涉及退款赔偿等需要人工判断时，用它写明转交原因；系统会按承接结果通知客户并交给人工客服。"
+
+const resolveToolGuidance = "- resolve_conversation：客户明确表示问题已解决或不再需要帮助时，用它发送简短的结束语并结束本次服务；客户否认已解决或仍有疑问时继续处理或转人工，不调用它。"
 
 const agentChatSceneRules = `本次是企业内部对话，提问者是企业同事，你的回答只提供给同事。可以给出分析和建议，但不要宣称已经向客户发送消息或已经转交人工。`
 
@@ -36,7 +38,12 @@ kind 为 customer_conversation_background 的消息是所属客户会话的最�
 
 const customerSceneRules = `本次是客户会话，你的输出会直接发送给客户，使用与客户最近消息相同的语言。`
 
-const customerSceneDecisionRule = `直接输出正文表示给出最终回答，只有在本轮已经通过工具取得依据时才这样做；追问、转人工与其他工具不在同一次输出中同时调用。`
+const customerSceneDecisionRule = `直接输出正文表示给出最终回答，只有在本轮已经通过工具取得依据时才这样做；追问、转人工、结束服务与其他工具不在同一次输出中同时调用。`
+
+// CustomerIdleMessage 是客户超时未回复时由系统追加给 AI 客服的跟进提示消息内容。
+const CustomerIdleMessage = `{"kind":"customer_idle"}`
+
+const customerFollowUpRule = "内容为 " + CustomerIdleMessage + ` 的消息由系统发出，不是客户发言，表示客户在你上次发言后一段时间没有回复。此时调用 ask_customer，purpose 为 confirm_resolution，简短询问客户问题是否已经解决、是否还需要帮助；不重复之前的回答，不再查询资料。`
 
 const groupSceneRules = `本次在群聊「%s」中与其他成员一起工作。
 群内其他成员的发言以 JSON 提供：sender.name 是发送者名称，sender.kind 为 user 表示真人、为 agent 表示另一位 AI 员工，mentions 是这条消息点名的成员，replyTo 是被引用的原消息，attachment 是消息携带的附件；你自己的历史发言是纯文本。
@@ -47,7 +54,7 @@ addressedToYou 为 true 的消息是本次需要你处理的请求，其余消�
 type builtinTools struct {
 	Knowledge       bool
 	CustomerHistory bool
-	Terminal        bool // 客服场景的 ask_customer 与 handoff_to_human。
+	Terminal        bool // 客服场景的 ask_customer、handoff_to_human 与 resolve_conversation。
 }
 
 // AgentBaseline 按接待开关渲染 AI 员工基线；AI 员工名称为空时省略名称。
@@ -88,7 +95,7 @@ func toolGuidance(tools builtinTools) string {
 		lines = append(lines, customerHistoryToolGuidance)
 	}
 	if tools.Terminal {
-		lines = append(lines, askCustomerToolGuidance, handoffToolGuidance)
+		lines = append(lines, askCustomerToolGuidance, handoffToolGuidance, resolveToolGuidance)
 	}
 	if len(lines) == 0 {
 		return ""
@@ -100,7 +107,7 @@ func toolGuidance(tools builtinTools) string {
 func sceneRules(scene SceneContext, tools builtinTools) string {
 	switch scene.Scene {
 	case SceneCustomer:
-		return joinSections(customerSceneRules, toolGuidance(tools), customerSceneDecisionRule)
+		return joinSections(customerSceneRules, toolGuidance(tools), customerSceneDecisionRule, customerFollowUpRule)
 	case SceneGroup:
 		// 群内名称唯一的可点名成员按名称顺序列出，没有可点名成员时明确告知。
 		candidates := "无"

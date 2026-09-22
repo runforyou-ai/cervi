@@ -60,6 +60,7 @@ export {
     PermissionLevel,
     PermissionResource,
     RoleKind,
+    ServiceSessionCloseReason,
     ServiceSessionReturnReason,
     ServiceSessionStatus,
     ServiceSessionTargetKind,

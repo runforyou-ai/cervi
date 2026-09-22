@@ -186,6 +186,8 @@ const inbox = {
   serviceSessionTakenOver: "{{actor}} took over the conversation from {{from}}",
   serviceSessionTransferred: "{{actor}} transferred the conversation to {{target}}",
   serviceSessionClosed: "{{actor}} closed the conversation",
+  serviceSessionClosedAIResolved: "The customer confirmed the issue was resolved, so {{actor}} closed the conversation",
+  serviceSessionClosedCustomerUnresponsive: "The customer didn't reply, so {{actor}} closed the conversation",
   serviceSessionReopened: "{{actor}} reopened the conversation",
   serviceSessionReturned: "{{from}} can no longer handle customers, so the conversation returned to {{target}}",
   serviceSessionReturnedResponseTimeout: "{{from}} didn't reply in time, so the conversation returned to {{target}}",

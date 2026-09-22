@@ -20,7 +20,7 @@ func TestAssembleToolsByScene(t *testing.T) {
 		scene Scene
 		want  []string
 	}{
-		{SceneCustomer, []string{"search_customer_history", "ask_customer", "handoff_to_human"}},
+		{SceneCustomer, []string{"search_customer_history", "ask_customer", "handoff_to_human", "resolve_conversation"}},
 		{SceneAgentChat, []string{"calculator", "search_customer_history"}},
 		{SceneGroup, []string{"calculator", "search_customer_history"}},
 	} {

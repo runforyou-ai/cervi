@@ -119,7 +119,7 @@ func (o *directOperations) UpdateServiceTimeouts(ctx context.Context, meta Reque
 	}
 	slog.Info("客服超时时长已更新", "organization_id", identity.Organization.ID,
 		"response_reminder_minutes", saved.ResponseReminderMinutes, "response_reclaim_minutes", saved.ResponseReclaimMinutes,
-		"queue_reminder_minutes", saved.QueueReminderMinutes)
+		"queue_reminder_minutes", saved.QueueReminderMinutes, "ai_follow_up_minutes", saved.AIFollowUpMinutes, "ai_close_minutes", saved.AICloseMinutes)
 	return ServiceTimeouts(saved), nil
 }
 

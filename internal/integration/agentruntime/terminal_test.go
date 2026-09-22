@@ -70,6 +70,32 @@ func TestCustomerTerminalDecisions(t *testing.T) {
 				return assistantReply("", terminalCall("ask", askCustomerToolName, askArgs))
 			},
 		}, wantKind: domain.AgentRunOutcomeAskCustomer, wantContent: "请提供订单号", wantCalls: 1},
+		{name: "请客户确认问题已解决", outputs: []func() *schema.AgenticMessage{
+			func() *schema.AgenticMessage {
+				return assistantReply("", terminalCall("confirm", askCustomerToolName, `{"purpose":"confirm_resolution","message":"请问问题解决了吗？"}`))
+			},
+		}, wantKind: domain.AgentRunOutcomeAskCustomer, wantContent: "请问问题解决了吗？", wantCalls: 1},
+		{name: "客户确认后结束服务", outputs: []func() *schema.AgenticMessage{
+			func() *schema.AgenticMessage {
+				return assistantReply("", terminalCall("resolve", resolveToolName, `{"message":"不客气，祝您生活愉快"}`))
+			},
+		}, wantKind: domain.AgentRunOutcomeResolve, wantContent: "不客气，祝您生活愉快", wantCalls: 1},
+		{name: "结束语为空后纠正", outputs: []func() *schema.AgenticMessage{
+			func() *schema.AgenticMessage {
+				return assistantReply("", terminalCall("resolve", resolveToolName, `{"message":" "}`))
+			},
+			func() *schema.AgenticMessage {
+				return assistantReply("", terminalCall("resolve-2", resolveToolName, `{"message":"感谢您的咨询"}`))
+			},
+		}, wantKind: domain.AgentRunOutcomeResolve, wantContent: "感谢您的咨询", wantCalls: 2},
+		{name: "结束服务与追问同批后纠正", outputs: []func() *schema.AgenticMessage{
+			func() *schema.AgenticMessage {
+				return assistantReply("", terminalCall("resolve", resolveToolName, `{"message":"再见"}`), terminalCall("ask", askCustomerToolName, askArgs))
+			},
+			func() *schema.AgenticMessage {
+				return assistantReply("", terminalCall("ask-2", askCustomerToolName, askArgs))
+			},
+		}, wantKind: domain.AgentRunOutcomeAskCustomer, wantContent: "请提供订单号", wantCalls: 2},
 		{name: "转人工", outputs: []func() *schema.AgenticMessage{
 			func() *schema.AgenticMessage {
 				return assistantReply("", terminalCall("handoff", handoffToolName, handoffArgs))

@@ -33,4 +33,6 @@ type ServiceSession struct {
 	StatusChangedAt          time.Time  `bun:"status_changed_at"`
 	ClosedAt                 *time.Time `bun:"closed_at"`
 	ClosedByIdentityID       *string    `bun:"closed_by_identity_id"`
+	CloseReason              *string    `bun:"close_reason"`
+	ResolutionRequestedAt    *time.Time `bun:"resolution_requested_at"`
 }

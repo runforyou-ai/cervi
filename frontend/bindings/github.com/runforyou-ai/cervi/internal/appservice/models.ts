@@ -386,6 +386,7 @@ export enum AgentRunOutcome {
     AgentRunOutcomeReply = "reply",
     AgentRunOutcomeAskCustomer = "ask_customer",
     AgentRunOutcomeHandoff = "handoff",
+    AgentRunOutcomeResolve = "resolve",
 };
 
 /**
@@ -1047,7 +1048,7 @@ export interface ConversationSystemEvent {
     "title": string | null;
 
     /**
-     * 以下字段只由客服处理周期事件携带：原负责人、去向，以及转人工或退回队列的原因与成员可见的原因说明；操作人写入 Actor。
+     * 以下字段只由客服处理周期事件携带：原负责人、去向，转人工或退回队列的原因与成员可见的原因说明，以及关闭事件的结束方式；操作人写入 Actor。
      */
     "serviceSessionId": string | null;
     "fromIdentityId": string | null;
@@ -1055,6 +1056,7 @@ export interface ConversationSystemEvent {
     "sessionTarget": ServiceSessionTarget | null;
     "handoffReason": AgentHandoffReason | null;
     "returnReason": ServiceSessionReturnReason | null;
+    "closeReason": ServiceSessionCloseReason | null;
     "reasonText": string | null;
     "agentRunId": string | null;
 }
@@ -3051,6 +3053,20 @@ export interface ServiceQueueTeamList {
 }
 
 /**
+ * ServiceSessionCloseReason 表示客服处理周期的结束方式。
+ */
+export enum ServiceSessionCloseReason {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    ServiceSessionCloseAIResolved = "ai_resolved",
+    ServiceSessionCloseCustomerUnresponsive = "customer_unresponsive",
+    ServiceSessionCloseManual = "manual",
+};
+
+/**
  * ServiceSessionReturnReason 表示客服处理周期退回队列的原因。
  */
 export enum ServiceSessionReturnReason {
@@ -3102,12 +3118,14 @@ export enum ServiceSessionTargetKind {
 };
 
 /**
- * ServiceTimeouts 定义企业客服的超时时长，单位为分钟：负责人未回复的提醒与回收时长，以及队列等待提醒时长。
+ * ServiceTimeouts 定义企业客服的超时时长，单位为分钟：负责人未回复的提醒与回收时长、队列等待提醒时长，以及 AI 负责时客户未回复的跟进与关单时长。
  */
 export interface ServiceTimeouts {
     "responseReminderMinutes": number;
     "responseReclaimMinutes": number;
     "queueReminderMinutes": number;
+    "aiFollowUpMinutes": number;
+    "aiCloseMinutes": number;
 }
 
 /**

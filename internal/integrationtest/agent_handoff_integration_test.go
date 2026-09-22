@@ -931,9 +931,17 @@ func testServiceSessionOperationEvents(t *testing.T, f handoffFixture) {
 			message.Visibility != string(domain.MessageVisibilityInternalOnly) || message.ServiceSessionID == nil ||
 			event.ActorIdentityID != expected.actor || event.ActorDisplayName == "" ||
 			(expected.from == nil) != (event.FromIdentityID == nil) || (expected.from != nil && (*event.FromIdentityID != *expected.from || event.FromDisplayName == nil)) ||
-			(expected.target == nil) != (event.Target == nil) || (expected.target != nil && (event.Target.IdentityID == nil || *event.Target.IdentityID != *expected.target)) {
+			(expected.target == nil) != (event.Target == nil) || (expected.target != nil && (event.Target.IdentityID == nil || *event.Target.IdentityID != *expected.target)) ||
+			(expected.eventType == domain.ConversationSystemEventServiceSessionClosed) != (event.CloseReason != nil) ||
+			(event.CloseReason != nil && *event.CloseReason != domain.ServiceSessionCloseManual) {
 			t.Fatalf("event %d = %s %+v", index, *message.SystemEventType, event)
 		}
+	}
+	// 重新打开后清除结束方式。
+	reopened := servermodels.ServiceSession{}
+	if err := f.db.NewSelect().Model(&reopened).Where("ss.conversation_id = ?", conversationID).Scan(ctx); err != nil ||
+		reopened.Status != string(domain.ServiceSessionStatusOpen) || reopened.CloseReason != nil {
+		t.Fatalf("reopened session = %+v, error = %v", reopened, err)
 	}
 	// 周期事件不改变会话摘要与活动时间。
 	after := servermodels.Conversation{}

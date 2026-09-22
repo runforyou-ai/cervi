@@ -75,6 +75,7 @@ const common = {
     searchCustomerHistory: "Customer conversation history",
     askCustomer: "Ask the customer",
     handoffToHuman: "Hand off to a human",
+    resolveConversation: "Resolve and close",
     mcp: "MCP service tools",
   },
 }

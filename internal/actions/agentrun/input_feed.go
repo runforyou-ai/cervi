@@ -40,6 +40,11 @@ type agentRunPolicy interface {
 	sceneContext(context.Context, bun.IDB, executionContext) (agentruntime.SceneContext, error)
 }
 
+// decisionPolicy 由按运行结束方式更新业务状态的执行范围实现，在结果消息写入后调用。
+type decisionPolicy interface {
+	applyDecision(context.Context, bun.IDB, agentRunPolicyContext, *servermodels.AgentRun, *servermodels.AgentLane, agentruntime.RunResult, string) error
+}
+
 // mentionReplyPolicy 由从回复正文提取点名成员的执行范围实现。
 type mentionReplyPolicy interface {
 	applyMentions(context.Context, bun.IDB, agentRunPolicyContext, *servermodels.AgentRun, string, string) error
