@@ -10,6 +10,7 @@ import (
 	"fmt"
 	"log/slog"
 	"time"
+	"uuid"
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -160,6 +161,10 @@ func (a *ExecuteAction) ClaimDeviceRun(ctx context.Context, device RunDevice, ru
 			}
 			return fmt.Errorf("claim device agent run: %w", err)
 		}
+		// 运行期间以 AI 员工的聊天主体发布输入状态。
+		if _, err := chatstate.EnsureOrganizationIdentityChatSubject(ctx, tx, run.OrganizationID, run.AgentIdentityID, uuid.NewV7().String()); err != nil {
+			return err
+		}
 		if _, err := tx.NewUpdate().Model((*servermodels.DeviceWorkspace)(nil)).
 			Set("last_used_at = now()").Set("updated_at = now()").
 			Where("organization_id = ? AND id = ?", run.OrganizationID, run.ExecutionWorkspaceID).
@@ -178,6 +183,7 @@ func (a *ExecuteAction) ClaimDeviceRun(ctx context.Context, device RunDevice, ru
 		}
 		return DeviceClaim{}, err
 	}
+	a.holdDeviceRunTyping(ctx, initial, claim.LeaseExpiresAt)
 	slog.Info("设备已领取 Agent 运行", "organization_id", device.OrganizationID, "device_id", device.DeviceID,
 		"agent_run_id", runID, "workspace_id", initial.ExecutionWorkspaceID)
 	return claim, nil
@@ -211,6 +217,7 @@ func (a *ExecuteAction) RenewDeviceRunLease(ctx context.Context, device RunDevic
 		return DeviceLease{}, err
 	}
 	if agentRunStatusTerminal(run.Status) {
+		a.releaseDeviceRunTyping(runID)
 		return DeviceLease{Ended: true}, nil
 	}
 	lease := DeviceLease{}
@@ -227,6 +234,7 @@ func (a *ExecuteAction) RenewDeviceRunLease(ctx context.Context, device RunDevic
 		if reloadErr != nil {
 			return DeviceLease{}, reloadErr
 		}
+		a.releaseDeviceRunTyping(runID)
 		if agentRunStatusTerminal(current.Status) {
 			return DeviceLease{Ended: true}, nil
 		}
@@ -235,6 +243,7 @@ func (a *ExecuteAction) RenewDeviceRunLease(ctx context.Context, device RunDevic
 	if err != nil {
 		return DeviceLease{}, fmt.Errorf("renew device agent run lease: %w", err)
 	}
+	a.holdDeviceRunTyping(ctx, run, lease.LeaseExpiresAt)
 	return lease, nil
 }
 
@@ -293,6 +302,7 @@ func (a *ExecuteAction) CompleteDeviceRun(ctx context.Context, device RunDevice,
 		return err
 	}
 	if agentRunStatusTerminal(run.Status) {
+		a.releaseDeviceRunTyping(runID)
 		return a.persistPartialProcess(ctx, run, result)
 	}
 	if code := deviceRunExpiry(run); code != "" {
@@ -302,8 +312,12 @@ func (a *ExecuteAction) CompleteDeviceRun(ctx context.Context, device RunDevice,
 		return ErrDeviceRunLeaseLost
 	}
 	execution, terminal, err := a.loadExecution(ctx, runID)
-	if err != nil || terminal {
+	if err != nil {
 		return err
+	}
+	if terminal {
+		a.releaseDeviceRunTyping(runID)
+		return nil
 	}
 	policy, err := a.policyForRun(ctx, run)
 	if err != nil {
@@ -312,6 +326,7 @@ func (a *ExecuteAction) CompleteDeviceRun(ctx context.Context, device RunDevice,
 	if err := a.complete(withDeviceLease(ctx, device.DeviceID), execution, policy, result); err != nil {
 		return fmt.Errorf("persist completed device agent run: %w", err)
 	}
+	a.releaseDeviceRunTyping(runID)
 	// 迟到结果被门禁抑制时运行已被取消，保留已产生的过程内容。
 	return a.persistPartialProcess(ctx, &execution.Run, result)
 }
@@ -326,6 +341,7 @@ func (a *ExecuteAction) FailDeviceRun(ctx context.Context, device RunDevice, run
 		return err
 	}
 	if agentRunStatusTerminal(run.Status) {
+		a.releaseDeviceRunTyping(runID)
 		return a.persistPartialProcess(ctx, run, partial)
 	}
 	if code := deviceRunExpiry(run); run.Status == string(domain.AgentRunStatusRunning) && code != "" {
@@ -337,6 +353,7 @@ func (a *ExecuteAction) FailDeviceRun(ctx context.Context, device RunDevice, run
 	if _, err := a.fail(withDeviceLease(ctx, device.DeviceID), runID, errors.New(message), code); err != nil {
 		return fmt.Errorf("fail device agent run: %w", err)
 	}
+	a.releaseDeviceRunTyping(runID)
 	slog.Info("设备上报 Agent 运行失败", "organization_id", device.OrganizationID, "device_id", device.DeviceID,
 		"agent_run_id", runID, "error_code", code)
 	return a.persistPartialProcess(ctx, run, partial)
@@ -347,6 +364,7 @@ func (a *ExecuteAction) expireDeviceRun(ctx context.Context, run *servermodels.A
 	if _, err := a.fail(ctx, run.ID, errors.New(string(code)), code); err != nil {
 		return fmt.Errorf("expire device agent run: %w", err)
 	}
+	a.releaseDeviceRunTyping(run.ID)
 	slog.Info("设备 Agent 运行已收敛为失败", "agent_run_id", run.ID, "error_code", code)
 	return a.persistPartialProcess(ctx, run, partial)
 }
@@ -388,6 +406,7 @@ func (a *ExecuteAction) SweepDeviceRuns(ctx context.Context, _ struct{}) error {
 		if _, err := a.fail(ctx, run.ID, errors.New(string(run.Code)), run.Code); err != nil {
 			return fmt.Errorf("fail stale device agent run %s: %w", run.ID, err)
 		}
+		a.releaseDeviceRunTyping(run.ID)
 		slog.Info("设备 Agent 运行已收敛为失败", "agent_run_id", run.ID, "error_code", run.Code)
 	}
 	return nil

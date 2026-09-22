@@ -84,7 +84,7 @@ func UserConversationTyping(organizationID, userID, conversationID, senderSubjec
 	return Notification{OrganizationID: organizationID, AudienceKind: AudienceUser, AudienceID: userID, Kind: KindConversationTyping, ConversationID: conversationID, SenderSubjectID: senderSubjectID, Active: active}
 }
 
-// CustomerInboxConversationTyping 构造发往企业客服共享受众的客户会话输入状态，发送者为访客的聊天主体编号。
+// CustomerInboxConversationTyping 构造发往企业客服共享受众的客户会话输入状态，发送者为访客或负责 AI 员工的聊天主体编号。
 func CustomerInboxConversationTyping(organizationID, conversationID, senderSubjectID string, active bool) Notification {
 	return Notification{OrganizationID: organizationID, AudienceKind: AudienceCustomerInbox, AudienceID: organizationID, Kind: KindConversationTyping, ConversationID: conversationID, SenderSubjectID: senderSubjectID, Active: active}
 }

@@ -1,8 +1,12 @@
-/** 成员端会话输入状态：输入框上报本人输入，会话头展示其他成员或访客正在输入。 */
+/** 成员端会话输入状态：输入框上报本人输入，会话头展示其他成员、AI 员工或访客正在输入。 */
 import { useEffect, useMemo, useRef, useSyncExternalStore } from "react"
 import { useTranslation } from "react-i18next"
 
-import { reportConversationTyping, type GroupParticipant } from "@/api"
+import {
+  reportConversationTyping,
+  type CustomerInboxConversation,
+  type GroupParticipant,
+} from "@/api"
 import { realtimeClient } from "@/api/realtime"
 import { ConversationTypingReporter } from "@/features/inbox/conversation-typing-reporter"
 import { ConversationTypingStore } from "@/features/inbox/conversation-typing-store"
@@ -52,21 +56,37 @@ export function useConversationTypingReport(conversationID: string, enabled: boo
   )
 }
 
-/** 返回会话头展示的正在输入文案；participants 为空表示单聊，群聊按参与者解析名称并合并多人。 */
-export function useConversationTypingLabel(
-  conversationID: string,
-  participants: GroupParticipant[] | null,
-) {
+/** 按聊天主体解析输入者名称：null 表示无法识别该输入者，空串表示匿名访客。 */
+export type TypingSenderName = (senderSubjectID: string) => string | null
+
+/** 按群聊当前成员解析输入者名称，真人与 AI 员工同等处理。 */
+export function groupTypingSenderName(participants: GroupParticipant[]): TypingSenderName {
+  return (senderSubjectID) =>
+    participants.find((participant) => participant.chatSubjectId === senderSubjectID)?.displayName.trim() || null
+}
+
+/** 按客户与当前负责人的聊天主体解析客户会话的输入者名称。 */
+export function customerTypingSenderName(customer: CustomerInboxConversation): TypingSenderName {
+  return (senderSubjectID) => {
+    if (senderSubjectID === customer.contactChatSubjectId) return customer.contactName?.trim() ?? ""
+    if (customer.assignee && senderSubjectID === customer.assigneeChatSubjectId) return customer.assignee.displayName
+    return null
+  }
+}
+
+/** 返回会话头展示的正在输入文案；senderName 为 null 表示单聊或 AI 员工会话，只提示正在输入，其余会话按名称合并多人。 */
+export function useConversationTypingLabel(conversationID: string, senderName: TypingSenderName | null) {
   const { t } = useTranslation("inbox")
   const senders = useSyncExternalStore(
     (listener) => typingStore.subscribe(conversationID, listener),
     () => typingStore.senders(conversationID),
   )
   if (senders.length === 0) return ""
-  if (!participants) return t("typingDirect")
+  if (!senderName) return t("typingDirect")
   const names = senders.flatMap((senderSubjectID) => {
-    const name = participants.find((participant) => participant.chatSubjectId === senderSubjectID)?.displayName.trim()
-    return name ? [name] : []
+    const name = senderName(senderSubjectID)
+    if (name === null) return []
+    return [name || t("anonymousVisitor")]
   })
   if (names.length === 0) return ""
   if (names.length === 1) return t("typingOne", { name: names[0] })

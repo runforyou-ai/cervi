@@ -33,13 +33,15 @@ const (
 
 // ExecuteAction 执行并收尾一次 Agent 业务运行。
 type ExecuteAction struct {
-	db          *bun.DB
-	enqueuer    servertask.TxEnqueuer
-	runtime     agentruntime.Runtime
-	attachments *AttachmentReader
-	knowledge   KnowledgeRetrieval
-	runningMu   sync.Mutex
-	runningRuns map[string]*runningAgentRun
+	db           *bun.DB
+	enqueuer     servertask.TxEnqueuer
+	runtime      agentruntime.Runtime
+	attachments  *AttachmentReader
+	knowledge    KnowledgeRetrieval
+	runningMu    sync.Mutex
+	runningRuns  map[string]*runningAgentRun
+	typingMu     sync.Mutex
+	deviceTyping map[string]*runTyping
 }
 
 type executionContext struct {
@@ -61,7 +63,7 @@ type executionContext struct {
 
 // NewExecuteAction 创建 Agent Worker Action。
 func NewExecuteAction(db *bun.DB, enqueuer servertask.TxEnqueuer, runtime agentruntime.Runtime, attachments *AttachmentReader, knowledge KnowledgeRetrieval) *ExecuteAction {
-	return &ExecuteAction{db: db, enqueuer: enqueuer, runtime: runtime, attachments: attachments, knowledge: knowledge, runningRuns: make(map[string]*runningAgentRun)}
+	return &ExecuteAction{db: db, enqueuer: enqueuer, runtime: runtime, attachments: attachments, knowledge: knowledge, runningRuns: make(map[string]*runningAgentRun), deviceTyping: make(map[string]*runTyping)}
 }
 
 // runAssignment 表示一次已认领运行的执行指派：有效配置、运行期依赖与本次执行的取消与流式句柄。
@@ -74,7 +76,7 @@ type runAssignment struct {
 	History        agentruntime.CustomerHistorySearch
 	Running        *runningAgentRun
 	RunCtx         context.Context
-	Release        func() // 结束本次执行的访客提示、取消注册与运行 context。
+	Release        func() // 结束本次执行的输入状态、取消注册与运行 context。
 }
 
 // Execute 取得执行指派、运行 TurnLoop 并收尾，只保存吸收完当前输入后的稳定回复。
@@ -105,12 +107,12 @@ func (a *ExecuteAction) assign(ctx context.Context, runID string) (runAssignment
 		cancel()
 		return runAssignment{}, err
 	}
-	// 网站客户会话在生成期间向访客提示 AI 正在回复。
-	stopVisitorTyping := a.startVisitorTyping(runCtx, &execution.Run)
+	// 生成期间向会话受众发布 AI 员工正在输入。
+	stopTyping := a.startServerRunTyping(runCtx, &execution.Run)
 	assigned := runAssignment{
 		Execution: execution, Running: running, RunCtx: runCtx,
 		Release: func() {
-			stopVisitorTyping()
+			stopTyping()
 			unregister()
 			cancel()
 		},
@@ -252,6 +254,10 @@ func (a *ExecuteAction) begin(ctx context.Context, runID string) (executionConte
 			Set("status = ?", domain.AgentRunStatusRunning).
 			Set("started_at = COALESCE(started_at, now())").
 			Set("updated_at = now()").WherePK().Exec(ctx); err != nil {
+			return err
+		}
+		// 运行期间以 AI 员工的聊天主体发布输入状态。
+		if _, err := chatstate.EnsureOrganizationIdentityChatSubject(ctx, tx, run.OrganizationID, run.AgentIdentityID, uuid.NewV7().String()); err != nil {
 			return err
 		}
 		// 排队运行转为运行中时推进会话版本。

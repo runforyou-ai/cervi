@@ -82,6 +82,26 @@ func (f *realtimeFeed) notice(userID string, kind realtime.Kind, conversationID 
 	}
 }
 
+// userTyping 构造发往指定用户受众的会话输入状态。
+func (f *realtimeFeed) userTyping(userID, conversationID, senderSubjectID string, active bool) receivedNotification {
+	return receivedNotification{
+		Subject: realtime.Subject(f.namespace, f.organizationID, realtime.AudienceUser, userID),
+		Kind:    string(realtime.KindConversationTyping), ConversationID: conversationID, SenderSubjectID: senderSubjectID, Active: active,
+	}
+}
+
+// loadIdentitySubjectID 读取企业身份的聊天主体编号。
+func loadIdentitySubjectID(t *testing.T, db *bun.DB, organizationID, identityID string) string {
+	t.Helper()
+	var subjectID string
+	if err := db.NewSelect().Table("chat_subjects").Column("id").
+		Where("organization_id = ? AND kind = ? AND source_id = ?", organizationID, domain.ChatSubjectKindOrganizationIdentity, identityID).
+		Scan(context.Background(), &subjectID); err != nil {
+		t.Fatal(err)
+	}
+	return subjectID
+}
+
 // removed 构造发往指定用户受众的会话失权通知。
 func (f *realtimeFeed) removed(userID, conversationID string) receivedNotification {
 	return receivedNotification{
@@ -164,6 +184,50 @@ func (f *realtimeFeed) expectTyping(t *testing.T, want ...receivedNotification) 
 		}
 	}
 	compareNotifications(t, got, want)
+}
+
+// expectTypingStopped 读取输入状态直到收到指定的停止输入，其间只允许同一发送者的正在输入刷新。
+func (f *realtimeFeed) expectTypingStopped(t *testing.T, want receivedNotification) {
+	t.Helper()
+	refresh := want
+	refresh.Active = true
+	for {
+		notification, err := f.next(t)
+		if err != nil {
+			t.Fatalf("等待停止输入通知: %v", err)
+		}
+		if notification.Kind != string(realtime.KindConversationTyping) && notification.Kind != string(realtime.KindVisitorTyping) {
+			continue
+		}
+		if notification == want {
+			return
+		}
+		if notification != refresh {
+			t.Fatalf("输入状态不符 got=%+v want=%+v", notification, want)
+		}
+	}
+}
+
+// expectNoTyping 在短暂等待内确认没有输入状态通知，其他通知忽略。
+func (f *realtimeFeed) expectNoTyping(t *testing.T) {
+	t.Helper()
+	deadline := time.Now().Add(500 * time.Millisecond)
+	for {
+		remaining := time.Until(deadline)
+		if remaining <= 0 {
+			return
+		}
+		message, err := f.subscription.NextMsg(remaining)
+		if errors.Is(err, nats.ErrTimeout) {
+			return
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		if strings.Contains(string(message.Data), `"kind":"`+string(realtime.KindConversationTyping)+`"`) {
+			t.Fatalf("收到不应送达的输入状态 %s", message.Data)
+		}
+	}
 }
 
 // expect 读取与期望数量相同的通知，并与期望集合按任意顺序比较。
@@ -515,12 +579,13 @@ func TestRealtimeGroupMembershipNotifications(t *testing.T) {
 	feed.expect(t, feed.notice(f.owner.User.ID, realtime.KindConversationStateChanged, f.groupID, loadConversationStateVersion(t, f.db, f.groupID, f.owner.User.ID)))
 }
 
-// testAgentRunNotifications 验证 AI 聊天运行开始、失败结果与崩溃恢复重入的会话变更通知。
+// testAgentRunNotifications 验证 AI 聊天运行开始、失败结果与崩溃恢复重入的会话变更通知，以及生成期间 AI 员工的输入状态。
 func testAgentRunNotifications(t *testing.T, db *bun.DB, identity *servermodels.Identity, agentIdentityID string, tasks *servertask.Runtime) {
 	ctx := context.Background()
 	_, failing := createAgentLockChat(t, ctx, db, identity, agentIdentityID, tasks)
 	_, recovering := createAgentLockChat(t, ctx, db, identity, agentIdentityID, tasks)
 	feed := startRealtimeFeed(t, identity.Organization.ID)
+	agentSubjectID := loadIdentitySubjectID(t, db, identity.Organization.ID, agentIdentityID)
 
 	// 排队运行开始后模型失败，开始与失败结果各推进一次版本。
 	var runningVersion int64
@@ -536,7 +601,9 @@ func testAgentRunNotifications(t *testing.T, db *bun.DB, identity *servermodels.
 	}
 	feed.expect(t,
 		feed.notice(identity.User.ID, realtime.KindConversationChanged, failing.ConversationID, runningVersion),
+		feed.userTyping(identity.User.ID, failing.ConversationID, agentSubjectID, true),
 		feed.notice(identity.User.ID, realtime.KindConversationChanged, failing.ConversationID, loadConversationVersion(t, db, failing.ConversationID)),
+		feed.userTyping(identity.User.ID, failing.ConversationID, agentSubjectID, false),
 	)
 
 	// 崩溃恢复重入运行中状态不推进版本，成功结果推进一次。
@@ -558,7 +625,11 @@ func testAgentRunNotifications(t *testing.T, db *bun.DB, identity *servermodels.
 	if after != before+1 {
 		t.Fatalf("recovered run version=%d want=%d", after, before+1)
 	}
-	feed.expect(t, feed.notice(identity.User.ID, realtime.KindConversationChanged, recovering.ConversationID, after))
+	feed.expect(t,
+		feed.userTyping(identity.User.ID, recovering.ConversationID, agentSubjectID, true),
+		feed.notice(identity.User.ID, realtime.KindConversationChanged, recovering.ConversationID, after),
+		feed.userTyping(identity.User.ID, recovering.ConversationID, agentSubjectID, false),
+	)
 }
 
 // TestRealtimeCustomerInboxNotifications 验证客户会话收发与服务周期变化通知企业客服共享受众和访客目录受众，客服已读只通知本人。
@@ -818,7 +889,7 @@ func TestRealtimeCustomerDeliveryNotifications(t *testing.T) {
 	}
 }
 
-// testCustomerAgentRunNotifications 验证客服 Agent 运行开始与最终回复通知企业客服共享受众和访客目录受众。
+// testCustomerAgentRunNotifications 验证客服 Agent 运行开始与最终回复通知企业客服共享受众和访客目录受众，生成期间两类受众都收到 AI 员工正在输入。
 func testCustomerAgentRunNotifications(t *testing.T, db *bun.DB, identity *servermodels.Identity, agentIdentityID string, tasks *servertask.Runtime) {
 	ctx := context.Background()
 	first, _, run := createCustomerLockRun(t, ctx, db, identity, agentIdentityID, tasks)
@@ -837,13 +908,17 @@ func testCustomerAgentRunNotifications(t *testing.T, db *bun.DB, identity *serve
 		t.Fatal(err)
 	}
 	finalVersion := loadConversationVersion(t, db, first.Conversation.ID)
+	// 聊天主体在运行开始时建立，运行结束后读取。
+	agentSubjectID := loadIdentitySubjectID(t, db, identity.Organization.ID, agentIdentityID)
 	feed.expect(t,
 		feed.customerInbox(first.Conversation.ID, runningVersion),
 		feed.visitorDirectory(visitorIdentityID, first.Conversation.ID, runningVersion),
-		// AI 生成期间访客看到正在回复，运行结束后收到停止。
+		// AI 生成期间客服与访客看到正在输入，运行结束后收到停止。
+		feed.customerInboxTyping(first.Conversation.ID, agentSubjectID, true),
 		feed.visitorTyping(visitorIdentityID, first.Conversation.ID, true),
 		feed.customerInbox(first.Conversation.ID, finalVersion),
 		feed.visitorDirectory(visitorIdentityID, first.Conversation.ID, finalVersion),
+		feed.customerInboxTyping(first.Conversation.ID, agentSubjectID, false),
 		feed.visitorTyping(visitorIdentityID, first.Conversation.ID, false),
 	)
 }

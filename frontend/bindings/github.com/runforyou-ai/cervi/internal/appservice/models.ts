@@ -1308,6 +1308,16 @@ export interface CustomerInboxConversation {
     "title": string;
     "contactName": string | null;
     "contactAvatarUrl": string;
+
+    /**
+     * ContactChatSubjectID 是客户在会话中的聊天主体编号。
+     */
+    "contactChatSubjectId": string;
+
+    /**
+     * AssigneeChatSubjectID 是当前负责人的聊天主体编号，负责人尚未参与聊天时为空。
+     */
+    "assigneeChatSubjectId": string | null;
     "channelType": ChannelType;
     "channelName": string;
     "preview": string | null;

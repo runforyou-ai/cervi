@@ -184,9 +184,13 @@ const (
 
 // CustomerInboxConversation 定义客户会话摘要。
 type CustomerInboxConversation struct {
-	Title                     string                    `json:"title"`
-	ContactName               *string                   `json:"contactName"`
-	ContactAvatarURL          string                    `json:"contactAvatarUrl"`
+	Title            string  `json:"title"`
+	ContactName      *string `json:"contactName"`
+	ContactAvatarURL string  `json:"contactAvatarUrl"`
+	// ContactChatSubjectID 是客户在会话中的聊天主体编号。
+	ContactChatSubjectID string `json:"contactChatSubjectId"`
+	// AssigneeChatSubjectID 是当前负责人的聊天主体编号，负责人尚未参与聊天时为空。
+	AssigneeChatSubjectID     *string                   `json:"assigneeChatSubjectId"`
 	ChannelType               ChannelType               `json:"channelType"`
 	ChannelName               string                    `json:"channelName"`
 	Preview                   *string                   `json:"preview"`
