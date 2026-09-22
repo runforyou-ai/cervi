@@ -8,8 +8,9 @@ import (
 	"time"
 
 	"github.com/cloudwego/eino/components/model"
+	"github.com/cloudwego/eino/components/tool"
+	toolutils "github.com/cloudwego/eino/components/tool/utils"
 	"github.com/cloudwego/eino/schema"
-	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
 // TestRunFollowUpsDoNotConsumeIterationBudget 验证连续补充使用独立迭代预算并保留历史中间正文。
@@ -50,7 +51,7 @@ func TestRunFollowUpsDoNotConsumeIterationBudget(t *testing.T) {
 	}
 }
 
-// TestRunRetainsToolsAcrossRepeatedPreemption 验证连续工具抢占的结果保留及各轮输入的独立迭代预算。
+// TestRunRetainsToolsAcrossRepeatedPreemption 验证工具执行期间到达的新输入在工具完成后抢占，工具结果保留，各轮输入使用独立迭代预算。
 func TestRunRetainsToolsAcrossRepeatedPreemption(t *testing.T) {
 	runtime, err := New()
 	if err != nil {
@@ -58,6 +59,15 @@ func TestRunRetainsToolsAcrossRepeatedPreemption(t *testing.T) {
 	}
 	feed := &testInputFeed{}
 	feed.appendUser("开始计算")
+	// 计算器在执行期间追加一条新输入，抢占只能落在本轮工具调用完成之后。
+	calculator, err := toolutils.InferTool("calculator", "Add two numbers.", func(ctx context.Context, input calculatorInput) (calculatorOutput, error) {
+		feed.appendUser("再补充一项")
+		return calculate(ctx, input)
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	runtime.tools = []tool.BaseTool{calculator}
 	calls := 0
 	chatModel := &processChatModel{generate: func(_ context.Context, messages []*schema.AgenticMessage) (*schema.AgenticMessage, error) {
 		calls++
@@ -79,20 +89,9 @@ func TestRunRetainsToolsAcrossRepeatedPreemption(t *testing.T) {
 		return assistantReply("正在计算", &schema.FunctionToolCall{CallID: fmt.Sprintf("call-%d", calls), Name: "calculator", Arguments: `{"operation":"add","left":1,"right":2,"delayMilliseconds":200}`}), nil
 	}}
 	runtime.newModel = func(context.Context, ModelConfig) (model.AgenticModel, error) { return chatModel, nil }
-	seen := make(map[string]bool)
 	ctx, cancel := context.WithTimeout(context.Background(), 3*time.Second)
 	defer cancel()
-	result, err := runtime.Run(ctx, RunRequest{Assignment: Assignment{AgentName: "test"}, MaxIterations: 2, OnStream: func(delta StreamDelta) {
-		for _, operation := range delta.Operations {
-			if operation.Block == nil {
-				continue
-			}
-			if call := operation.Block.ToolCall; call != nil && call.Status == domain.AgentToolCallRunning && !seen[call.CallID] {
-				seen[call.CallID] = true
-				feed.appendUser("再补充一项")
-			}
-		}
-	}}, feed)
+	result, err := runtime.Run(ctx, RunRequest{Assignment: Assignment{AgentName: "test"}, MaxIterations: 2}, feed)
 	if err != nil || result.Content != "完成" || result.EndSeq != 4 || calls != 4 {
 		t.Fatalf("result = %#v, calls = %d, error = %v", result, calls, err)
 	}
