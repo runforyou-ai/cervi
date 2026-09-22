@@ -87,18 +87,10 @@ function mapPeriods(
 /** 读取客服工作时间并显示设置表单。 */
 export function BusinessHoursSettings() {
   const { t } = useTranslation("settings")
-  const { data, loading, refreshing, error, refresh } = useResource(
-    resourceKeys.businessHours(),
-    () => getBusinessHours(),
-  )
+  const hours = useResource(resourceKeys.businessHours(), () => getBusinessHours())
   return (
-    <ResourceContent
-      loading={loading || (Boolean(error) && !data && refreshing)}
-      error={Boolean(error) && !data}
-      errorMessage={t("customerService.loadError")}
-      onRetry={() => void refresh()}
-    >
-      {data ? <BusinessHoursForm hours={data} /> : null}
+    <ResourceContent resources={hours} errorMessage={t("customerService.loadError")}>
+      {hours.data ? <BusinessHoursForm hours={hours.data} /> : null}
     </ResourceContent>
   )
 }
@@ -141,7 +133,7 @@ function BusinessHoursForm({ hours }: { hours: BusinessHoursData }) {
       mounted.current = false
     }
   }, [])
-  const markSaved = useAutoSave({ form, schema, save })
+  const { markSaved } = useAutoSave({ form, schema, save })
   // 时段与日期的校验跨字段关联，组内任一值或行数变化后重新校验整组。
   useEffect(() => {
     const subscription = form.watch((_, { name }) => {
@@ -161,17 +153,19 @@ function BusinessHoursForm({ hours }: { hours: BusinessHoursData }) {
         overrides: values.overrides.map((override) => ({ date: override.date, periods: mapPeriods(override.periods, periodEndValue) })),
       })
       void invalidate(resourceKeys.businessHours())
-      if (!mounted.current) return
+      if (!mounted.current) return true
       markSaved(values)
+      return true
     } catch (error) {
-      if (!mounted.current) return
-      if (recoverSession(error, navigate)) return
+      // 离开页面后提交的改动失败时同样提示。
+      if (recoverSession(error, navigate)) return false
       console.warn("保存客服工作时间失败", error)
       if (isApiError(error)) {
         toast.error(apiErrorMessage(error, ["timeZone", "weekly", "overrides"]))
-        return
+        return false
       }
       toast.error(t("customerService.saveError"))
+      return false
     }
   }
 
