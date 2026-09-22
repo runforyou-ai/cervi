@@ -14,6 +14,7 @@ import {
 } from "@/api"
 import { useWorkspace } from "@/contexts/workspace-context"
 import type { ComposerDraftBridge } from "@/features/inbox/conversation-composer"
+import { DraftDeviceBinding } from "@/features/inbox/conversation-device-binding"
 import { ConversationSidePanel } from "@/features/inbox/conversation-side-panel"
 import { ConversationHeader } from "@/features/inbox/conversation-header"
 import { ConversationThread } from "@/features/inbox/conversation-thread"
@@ -66,6 +67,11 @@ export function ConversationMain({
     () => !isWideViewport,
   )
   const customerDraftRef = useRef<ComposerDraftBridge | null>(null)
+  // AI 聊天草稿选定的本机工作区按草稿编号记录，切换草稿后不沿用。
+  const [draftWorkspace, setDraftWorkspace] = useState({ draftID: "", workspaceID: "" })
+  const agentDraftID = selection.kind === "agent-draft" ? selection.conversationId : ""
+  const draftWorkspaceID =
+    agentDraftID && draftWorkspace.draftID === agentDraftID ? draftWorkspace.workspaceID : ""
 
   useEffect(() => {
     // 跨过响应式断点时恢复当前宽度对应的默认状态。
@@ -171,6 +177,14 @@ export function ConversationMain({
         ) : directTarget ? (
           <DirectConversationDraftHeader
             member={directTarget}
+            actions={
+              agentDraftID ? (
+                <DraftDeviceBinding
+                  workspaceID={draftWorkspaceID}
+                  onChange={(workspaceID) => setDraftWorkspace({ draftID: agentDraftID, workspaceID })}
+                />
+              ) : null
+            }
             narrowViewport={narrowViewport}
             contextVisible={!contextCollapsed}
             onToggleContext={() => setContextCollapsed((collapsed) => !collapsed)}
@@ -181,9 +195,8 @@ export function ConversationMain({
           conversation={validConversation}
           directTarget={directTarget}
           groupParticipants={group?.participants}
-          agentDraftID={
-            selection.kind === "agent-draft" ? selection.conversationId : ""
-          }
+          agentDraftID={agentDraftID}
+          draftWorkspaceID={draftWorkspaceID}
           replyDisabledReason={replyDisabledReason}
           onConversationChanged={() => {
             if (validConversation) onConversationChanged?.(validConversation.id)

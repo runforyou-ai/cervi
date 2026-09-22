@@ -53,7 +53,7 @@ func (o *directOperations) StopGroupAgentReply(ctx context.Context, meta Request
 
 // SendFirstAgentTextMessage 保存 AI 聊天首条消息并确认草稿对应的会话。
 func (o *directOperations) SendFirstAgentTextMessage(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input FirstAgentTextMessageInput) (FirstAgentTextMessageResult, error) {
-	result, err := o.sendFirstAgentTextMessage.Execute(ctx, identity, conversationaction.FirstAgentTextMessageInput{ConversationID: input.ConversationID, AgentIdentityID: input.AgentIdentityID, ClientMessageID: input.ClientMessageID, Body: input.Body})
+	result, err := o.sendFirstAgentTextMessage.Execute(ctx, identity, conversationaction.FirstAgentTextMessageInput{ConversationID: input.ConversationID, AgentIdentityID: input.AgentIdentityID, ClientMessageID: input.ClientMessageID, Body: input.Body, WorkspaceID: input.WorkspaceID})
 	if err != nil {
 		return FirstAgentTextMessageResult{}, individualConversationError(ctx, meta, err, identity.Organization.ID, input.ConversationID, "start_agent")
 	}

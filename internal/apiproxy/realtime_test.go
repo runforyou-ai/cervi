@@ -306,11 +306,23 @@ func TestRealtimeDisconnectClosesRunStreams(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// 运行过程事件携带运行编号，订阅方据此区分并发的运行过程流。
-	expectEvent(t, events, emittedEvent{appservice.RealtimeRunFrameEventName,
-		appservice.RealtimeRunFrameEvent{ConnectionID: first.ConnectionID, RunID: "run-1", Frame: string(frame)}})
-	expectEvent(t, events, emittedEvent{appservice.RealtimeRunFrameEventName,
-		appservice.RealtimeRunFrameEvent{ConnectionID: second.ConnectionID, RunID: "run-2", Frame: string(frame)}})
+	// 运行过程事件携带运行编号，订阅方据此区分并发的运行过程流；两条流的首帧到达顺序不固定。
+	want := map[string]appservice.RealtimeRunFrameEvent{
+		"run-1": {ConnectionID: first.ConnectionID, RunID: "run-1", Frame: string(frame)},
+		"run-2": {ConnectionID: second.ConnectionID, RunID: "run-2", Frame: string(frame)},
+	}
+	for range 2 {
+		select {
+		case event := <-events:
+			data, ok := event.data.(appservice.RealtimeRunFrameEvent)
+			if !ok || event.name != appservice.RealtimeRunFrameEventName || !reflect.DeepEqual(data, want[data.RunID]) {
+				t.Fatalf("event = %#v", event)
+			}
+			delete(want, data.RunID)
+		case <-time.After(5 * time.Second):
+			t.Fatalf("等待运行过程事件超时，尚未收到 %v", want)
+		}
+	}
 
 	if err := backend.DisconnectRealtime(context.Background(), meta, member.ConnectionID); err != nil {
 		t.Fatal(err)

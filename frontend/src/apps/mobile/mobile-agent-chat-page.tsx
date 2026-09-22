@@ -136,6 +136,7 @@ function MobileAgentConversation({ conversationID }: { conversationID: string })
               agentIdentityId: draftAgent.identityId,
               clientMessageId: input.clientMessageId,
               body: input.body,
+              workspaceId: "",
             })
             handleCreated(result.conversation)
             return result.message

@@ -105,7 +105,7 @@ export function ConversationComposer({
   draftBridgeRef,
 }: {
   attachmentTargetIdentityID?: string
-  attachmentAgentDraft?: { conversationID: string; agentIdentityID: string; customerConversationID?: string }
+  attachmentAgentDraft?: { conversationID: string; agentIdentityID: string; customerConversationID?: string; workspaceID?: string }
   customerChannel?: CustomerChannelCapabilities | null
   onAttachmentConversationCreated?: (conversation: InboxConversation | null, conversationID: string) => void
   draftBridgeRef?: RefObject<ComposerDraftBridge | null>
