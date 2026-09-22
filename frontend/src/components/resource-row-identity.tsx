@@ -1,0 +1,81 @@
+/** 数据列表首列的主信息：头像或图标、名称与次要信息、补充说明。 */
+import type { ReactNode } from "react"
+import type { LucideIcon } from "lucide-react"
+
+import type { WorkStatus } from "@/api"
+import { ProfileAvatar } from "@/components/profile-avatar"
+import { WorkStatusDot } from "@/components/work-status"
+
+type RowAvatar = {
+  imageURL?: string
+  name?: string | null
+  fallback?: "person" | "agent" | "group"
+}
+
+/** 渲染行首头像（可带工作状态点）或圆形图标，主行为名称加 `·` 分隔的次要信息，第二行为补充说明；文字说明按单行截断，传入元素时由元素自行控制截断。 */
+export function ResourceRowIdentity({
+  avatar,
+  icon: Icon,
+  status,
+  name,
+  secondary,
+  badge,
+  description,
+}: {
+  avatar?: RowAvatar
+  icon?: LucideIcon
+  status?: WorkStatus
+  name: ReactNode
+  secondary?: ReactNode
+  badge?: ReactNode
+  description?: ReactNode
+}) {
+  const title = (
+    <span className="truncate">
+      <span className="font-medium">{name}</span>
+      {secondary ? (
+        <>
+          <span aria-hidden="true" className="mx-1.5 text-muted-foreground">·</span>
+          <span className="text-muted-foreground">{secondary}</span>
+        </>
+      ) : null}
+    </span>
+  )
+
+  return (
+    <div className="flex min-w-0 items-center gap-3">
+      {Icon ? (
+        <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
+          <Icon className="size-4.5" aria-hidden="true" />
+        </span>
+      ) : (
+        <span className="relative size-9 shrink-0">
+          <ProfileAvatar {...avatar} className="size-full" />
+          {status !== undefined ? (
+            <WorkStatusDot
+              status={status}
+              className="absolute -right-0.5 -bottom-0.5 ring-2 ring-background"
+            />
+          ) : null}
+        </span>
+      )}
+      <span className="grid min-w-0 gap-0.5 leading-tight">
+        {badge ? (
+          <span className="flex min-w-0 items-center gap-2">
+            {title}
+            {badge}
+          </span>
+        ) : (
+          title
+        )}
+        {!description ? null : typeof description === "string" ? (
+          <span className="truncate text-xs text-muted-foreground">{description}</span>
+        ) : (
+          <span className="flex min-w-0 items-center text-xs text-muted-foreground">
+            {description}
+          </span>
+        )}
+      </span>
+    </div>
+  )
+}

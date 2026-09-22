@@ -73,7 +73,7 @@ function SearchGroup({
   if (count === 0) return null
   return (
     <section>
-      <h3 className="px-3 pt-2.5 pb-1 text-[11px] font-semibold text-muted-foreground">{title}</h3>
+      <h3 className="px-3 pt-2.5 pb-1 text-xs font-semibold text-muted-foreground">{title}</h3>
       {children}
       {viewAllLabel && count >= searchGroupLimit ? (
         <Button
@@ -137,12 +137,12 @@ function SearchResultRow({
     >
       <span className="shrink-0">{avatar}</span>
       <span className="min-w-0 flex-1">
-        <span className="block truncate text-[13px]">{title}</span>
+        <span className="block truncate text-sm">{title}</span>
         {detail ? (
-          <span className={cn("block truncate text-[11px] text-muted-foreground", selected && "text-accent-foreground/75")}>{detail}</span>
+          <span className={cn("block truncate text-xs text-muted-foreground", selected && "text-accent-foreground/75")}>{detail}</span>
         ) : null}
       </span>
-      {time ? <span className="shrink-0 text-[11px] text-muted-foreground">{time}</span> : null}
+      {time ? <span className="shrink-0 text-xs text-muted-foreground">{time}</span> : null}
     </button>
   )
 }
@@ -197,7 +197,7 @@ export function InboxSearchPanel({ search, identity }: { search: InboxSearchStat
     body = <LoadingIndicator className="justify-center py-10">{t("searchLoading")}</LoadingIndicator>
   } else if (query && search.error) {
     body = (
-      <div className="flex flex-col items-center gap-3 px-6 py-10 text-[13px] text-muted-foreground">
+      <div className="flex flex-col items-center gap-3 px-6 py-10 text-sm text-muted-foreground">
         <p>{t("searchError")}</p>
         <Button type="button" variant="outline" size="sm" onClick={() => void search.retry()}>
           {t("common:actions.retry")}
@@ -205,7 +205,7 @@ export function InboxSearchPanel({ search, identity }: { search: InboxSearchStat
       </div>
     )
   } else if (query && empty) {
-    body = <p className="px-6 py-10 text-center text-[13px] text-muted-foreground">{t("searchNoResults", { query })}</p>
+    body = <p className="px-6 py-10 text-center text-sm text-muted-foreground">{t("searchNoResults", { query })}</p>
   } else if (query) {
     body = (
       <>

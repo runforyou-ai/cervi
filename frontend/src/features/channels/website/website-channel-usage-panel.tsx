@@ -14,6 +14,7 @@ import {
   type WebsiteChannelAccessData,
   type WebsiteChannelData,
 } from "@/api"
+import { FormActions } from "@/components/form/form-actions"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
@@ -373,11 +374,7 @@ export function WebsiteChannelUsagePanel({
                   )}
                 />
               </FieldGroup>
-              <div>
-                <Button type="submit" disabled={isSubmitting}>
-                  {isSubmitting ? t("common:actions.saving") : t("common:actions.save")}
-                </Button>
-              </div>
+              <FormActions saving={isSubmitting} />
             </form>
           </FieldGroup>
         </TabsContent>

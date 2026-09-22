@@ -11,6 +11,13 @@ import {
 } from "@/api"
 import { optionalWailsEnum } from "@/lib/wails-enum"
 
+/** 消息范围页签的展示顺序，桌面端范围页签、移动端页签和左右滑动共用。 */
+export const inboxScopes = [
+  { value: InboxScope.InboxScopeAll, label: "scopeAll" },
+  { value: InboxScope.InboxScopeCustomer, label: "scopeCustomer" },
+  { value: InboxScope.InboxScopeInternal, label: "scopeInternal" },
+] as const
+
 /** 会话类型筛选项，顺序同时决定地址参数和游标的规范化顺序。 */
 export const inboxKindOptions = [
   { kind: ConversationType.ConversationTypeCustomer, label: "filterKindCustomer" },
@@ -78,6 +85,26 @@ function normalizeQueueFilter(filter: CustomerQueueFilter, teamId: string) {
   return { queueFilter: CustomerQueueFilter.CustomerQueueFilterAll, queueTeamId: "" }
 }
 
+/** 把队列筛选编码为单值：空为全部队列，public 为公共队列，其余为团队编号。 */
+export function inboxQueueParam(query: Pick<InboxQuery, "queueFilter" | "queueTeamId">) {
+  if (query.queueFilter === CustomerQueueFilter.CustomerQueueFilterPublic) {
+    return CustomerQueueFilter.CustomerQueueFilterPublic
+  }
+  return query.queueFilter === CustomerQueueFilter.CustomerQueueFilterTeam
+    ? query.queueTeamId
+    : ""
+}
+
+/** 把队列单值解码为队列筛选和团队编号。 */
+export function inboxQueueFromParam(value: string) {
+  if (value === CustomerQueueFilter.CustomerQueueFilterPublic) {
+    return { queueFilter: CustomerQueueFilter.CustomerQueueFilterPublic, queueTeamId: "" }
+  }
+  return value
+    ? { queueFilter: CustomerQueueFilter.CustomerQueueFilterTeam, queueTeamId: value }
+    : { queueFilter: CustomerQueueFilter.CustomerQueueFilterAll, queueTeamId: "" }
+}
+
 /** 按当前范围规范化筛选，范围外条件取默认值。 */
 export function normalizeInboxQuery(query: InboxQueryInput): NormalizedInboxQuery {
   const customer = query.scope === InboxScope.InboxScopeCustomer
@@ -133,16 +160,7 @@ export function inboxQueryFromSearch(params: URLSearchParams): NormalizedInboxQu
     customerView:
       optionalWailsEnum(CustomerInboxView, params.get("view")) ??
       CustomerInboxView.CustomerInboxViewQueue,
-    queueFilter:
-      params.get("queue") === CustomerQueueFilter.CustomerQueueFilterPublic
-        ? CustomerQueueFilter.CustomerQueueFilterPublic
-        : params.get("queue")
-          ? CustomerQueueFilter.CustomerQueueFilterTeam
-          : CustomerQueueFilter.CustomerQueueFilterAll,
-    queueTeamId:
-      params.get("queue") === CustomerQueueFilter.CustomerQueueFilterPublic
-        ? ""
-        : (params.get("queue") ?? ""),
+    ...inboxQueueFromParam(params.get("queue") ?? ""),
     assigneeIdentityId: params.get("assignee") ?? "",
     channelId: params.get("channel") ?? "",
     serviceStatus:
@@ -167,14 +185,7 @@ export function writeInboxQuerySearch(
       ? ""
       : query.customerView,
   )
-  write(
-    "queue",
-    query.queueFilter === CustomerQueueFilter.CustomerQueueFilterPublic
-      ? CustomerQueueFilter.CustomerQueueFilterPublic
-      : query.queueFilter === CustomerQueueFilter.CustomerQueueFilterTeam
-        ? query.queueTeamId
-        : "",
-  )
+  write("queue", inboxQueueParam(query))
   write("assignee", query.assigneeIdentityId)
   write("channel", query.channelId)
   write(

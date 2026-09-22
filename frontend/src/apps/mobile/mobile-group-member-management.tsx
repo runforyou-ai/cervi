@@ -15,15 +15,7 @@ import type { MobileGroupDetailsContext } from "@/apps/mobile/mobile-group-conte
 import { MobileGroupMemberList } from "@/apps/mobile/mobile-group-members"
 import { useMobileBack } from "@/apps/mobile/mobile-navigation"
 import { MobilePageHeader } from "@/apps/mobile/mobile-page"
-import {
-  AlertDialog,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+import { ConfirmationDialog } from "@/components/confirmation-dialog"
 import { Button } from "@/components/ui/button"
 
 /** 列出可操作成员并二次确认，移除后留在列表，转让后返回群详情。 */
@@ -61,8 +53,7 @@ export function MobileGroupMemberActionPage({
           t("group.removeMember", { name: memberName }),
         confirmTitle: t("inbox:groupRemoveMemberTitle", { name }),
         confirmDescription: t("inbox:groupRemoveMemberDescription"),
-        confirmButton: t("common:actions.confirm"),
-        confirmVariant: "destructive" as const,
+        destructive: true,
         submit: (identityID: string) =>
           removeGroupConversationMember(group.id, {
             memberIdentityId: identityID,
@@ -79,8 +70,7 @@ export function MobileGroupMemberActionPage({
           t("group.transferOwnerTo", { name: memberName }),
         confirmTitle: t("inbox:groupTransferOwnerTitle", { name }),
         confirmDescription: t("inbox:groupTransferOwnerDescription"),
-        confirmButton: t("common:actions.confirm"),
-        confirmVariant: "default" as const,
+        destructive: false,
         submit: (identityID: string) =>
           transferGroupConversationOwner(group.id, {
             ownerIdentityId: identityID,
@@ -139,39 +129,22 @@ export function MobileGroupMemberActionPage({
           </Button>
         )}
       />
-      <AlertDialog
+      <ConfirmationDialog
         open={confirming && canManage}
+        pending={busy}
+        title={config.confirmTitle}
+        description={config.confirmDescription}
+        destructive={config.destructive}
+        touch
         onOpenChange={(open) => {
-          if (!open && !busy) setConfirming(false)
+          if (!open) setConfirming(false)
         }}
-      >
-        <AlertDialogContent
-          onCloseAutoFocus={(event) => {
-            event.preventDefault()
-            trigger.current?.focus({ preventScroll: true })
-          }}
-        >
-          <AlertDialogHeader>
-            <AlertDialogTitle>{config.confirmTitle}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {config.confirmDescription}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel className="min-h-11" disabled={busy}>
-              {t("common:actions.cancel")}
-            </AlertDialogCancel>
-            <Button
-              className="min-h-11"
-              variant={config.confirmVariant}
-              disabled={busy}
-              onClick={() => target && void confirm(target)}
-            >
-              {config.confirmButton}
-            </Button>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        onConfirm={() => target && void confirm(target)}
+        onCloseAutoFocus={(event) => {
+          event.preventDefault()
+          trigger.current?.focus({ preventScroll: true })
+        }}
+      />
     </section>
   )
 }

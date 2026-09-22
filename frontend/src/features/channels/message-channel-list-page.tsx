@@ -1,14 +1,12 @@
 /** 渠道列表页，按中间栏选中的渠道类别展示该类别下的渠道。 */
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo } from "react"
 import { PlusIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { Link, useNavigate, useParams } from "react-router"
-import { toast } from "sonner"
+import { Link, useNavigate, useParams, useSearchParams } from "react-router"
 
 import {
   activateMessageChannel,
   deactivateMessageChannel,
-  isApiError,
   listMessageChannels,
   type MessageChannelSummary,
 } from "@/api"
@@ -17,29 +15,18 @@ import {
   ListToolbarFilter,
   ListToolbarReset,
 } from "@/components/list-toolbar"
-import { ListActionButton } from "@/components/list-action-button"
 import { PageHeader } from "@/components/page-header"
 import { ResourceListLayout } from "@/components/resource-list"
 import { ResourceTable } from "@/components/resource-table"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+import { ConfirmationDialog } from "@/components/confirmation-dialog"
 import { Button } from "@/components/ui/button"
 import {
   isMessageChannelType,
   messageChannelTypeDefinition,
 } from "@/lib/message-channel-types"
 import { resourceKeys } from "@/hooks/resource-keys"
-import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
-import { apiErrorMessage } from "@/lib/form-errors"
-import { recoverSession } from "@/lib/session-navigation"
+import { useConfirmedAction } from "@/hooks/use-confirmed-action"
+import { useResource } from "@/hooks/use-resource"
 import { cn } from "@/lib/utils"
 
 type ChannelEnabledStatus = "enabled" | "disabled"
@@ -49,24 +36,26 @@ export function MessageChannelListPage() {
   const { t } = useTranslation(["channels", "common"])
   const navigate = useNavigate()
   const { channelType = "" } = useParams()
-  const invalidate = useResourceInvalidator()
   const typeDefinition = isMessageChannelType(channelType)
     ? messageChannelTypeDefinition(channelType)
     : undefined
-  const [enabledStatus, setEnabledStatus] =
-    useState<ChannelEnabledStatus>("enabled")
-  const [updatingChannelId, setUpdatingChannelId] = useState("")
-  const [confirmingChannel, setConfirmingChannel] =
-    useState<MessageChannelSummary | null>(null)
+  const [searchParams, setSearchParams] = useSearchParams()
+  // 状态筛选记在 URL 中，从编辑页返回时保留。
+  const enabledStatus: ChannelEnabledStatus =
+    searchParams.get("status") === "disabled" ? "disabled" : "enabled"
+  const setEnabledStatus = (value: ChannelEnabledStatus) =>
+    setSearchParams(value === "enabled" ? {} : { status: value }, {
+      replace: true,
+    })
   const {
     data,
     loading,
-    refreshing,
+    retrying,
     error,
     refresh,
   } = useResource(resourceKeys.messageChannels(), () => listMessageChannels())
   const channels = useMemo(() => data ?? [], [data])
-  const showLoading = loading || (Boolean(error) && refreshing)
+  const showLoading = loading || retrying
 
   const filteredChannels = useMemo(
     () =>
@@ -86,40 +75,18 @@ export function MessageChannelListPage() {
     if (!typeDefinition) navigate("/channels", { replace: true })
   }, [navigate, typeDefinition])
 
-  /** 切换消息渠道的启用状态。 */
-  async function handleStatusChange(channel: MessageChannelSummary) {
-    setUpdatingChannelId(channel.id)
-    try {
-      await (channel.enabled
+  const statusChange = useConfirmedAction<MessageChannelSummary>({
+    action: (channel) =>
+      channel.enabled
         ? deactivateMessageChannel(channel.id)
-        : activateMessageChannel(channel.id))
-      void refresh()
-      void invalidate(resourceKeys.channelOptions())
-    } catch (requestError) {
-      if (recoverSession(requestError, navigate)) {
-        return
-      }
-      console.warn("切换消息渠道状态失败", {
-        channel_id: channel.id,
-        channel_type: channel.type,
-        enabled: !channel.enabled,
-        error: requestError,
-      })
-      toast.error(
-        isApiError(requestError)
-          ? apiErrorMessage(requestError)
-          : t("list.statusUpdateError"),
-      )
-    } finally {
-      setUpdatingChannelId("")
-      setConfirmingChannel(null)
-    }
-  }
-
-  /** 切换渠道状态前请求确认。 */
-  function requestStatusChange(channel: MessageChannelSummary) {
-    setConfirmingChannel(channel)
-  }
+        : activateMessageChannel(channel.id),
+    invalidateKeys: () => [
+      resourceKeys.messageChannels(),
+      resourceKeys.channelOptions(),
+    ],
+    logLabel: "切换消息渠道状态",
+    errorMessage: () => t("list.statusUpdateError"),
+  })
 
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden">
@@ -201,73 +168,52 @@ export function MessageChannelListPage() {
               : t("list.emptyFiltered")
           }
           onRowActivate={(channel) =>
-            navigate(`/channels/${channel.type}/${channel.id}`)
+            navigate(
+              `/channels/${channel.type}/${channel.id}${enabledStatus === "enabled" ? "" : "?status=disabled"}`,
+            )
           }
-          actions={(channel) => {
-            const label = channel.enabled
-              ? t("list.deactivate")
-              : t("list.activate")
-            return {
-              primary: (
-                <ListActionButton
-                  tone={channel.enabled ? "destructive" : "success"}
-                  disabled={updatingChannelId === channel.id}
-                  onClick={() => requestStatusChange(channel)}
-                >
-                  {label}
-                </ListActionButton>
-              ),
-            }
-          }}
+          rowActions={(channel) => [
+            {
+              key: "status",
+              label: channel.enabled ? t("list.deactivate") : t("list.activate"),
+              disabled:
+                statusChange.pending && statusChange.item?.id === channel.id,
+              destructive: channel.enabled,
+              separatorBefore: channel.enabled,
+              onSelect: () => statusChange.select(channel),
+            },
+          ]}
         />
       </ResourceListLayout>
 
-      {confirmingChannel ? (
-        <AlertDialog
-          open
-          onOpenChange={(open) => {
-            if (!open) {
-              setConfirmingChannel(null)
-            }
-          }}
-        >
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle>
-                {t(
-                  confirmingChannel.enabled
-                    ? "deactivation.title"
-                    : "activation.title",
-                  { name: confirmingChannel.name },
-                )}
-              </AlertDialogTitle>
-              <AlertDialogDescription>
-                {t(
-                  confirmingChannel.enabled
-                    ? "deactivation.description"
-                    : "activation.description",
-                )}
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel>
-                {t("common:actions.cancel")}
-              </AlertDialogCancel>
-              <AlertDialogAction
-                className={
-                  confirmingChannel.enabled
-                    ? undefined
-                    : "bg-primary text-primary-foreground hover:bg-primary/90"
-                }
-                disabled={updatingChannelId !== ""}
-                onClick={() => void handleStatusChange(confirmingChannel)}
-              >
-                {t("common:actions.confirm")}
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
-      ) : null}
+      <ConfirmationDialog
+        open={statusChange.item !== null}
+        pending={statusChange.pending}
+        title={
+          statusChange.item
+            ? t(
+                statusChange.item.enabled
+                  ? "deactivation.title"
+                  : "activation.title",
+                { name: statusChange.item.name },
+              )
+            : ""
+        }
+        description={
+          statusChange.item
+            ? t(
+                statusChange.item.enabled
+                  ? "deactivation.description"
+                  : "activation.description",
+              )
+            : ""
+        }
+        destructive={statusChange.item?.enabled ?? true}
+        onOpenChange={(open) => {
+          if (!open) statusChange.select(null)
+        }}
+        onConfirm={() => void statusChange.confirm()}
+      />
     </div>
   )
 }

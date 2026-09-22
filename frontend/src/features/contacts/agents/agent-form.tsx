@@ -18,7 +18,7 @@ import {
 import { FormInputField } from "@/components/form/form-input-field"
 import { SwitchCardField } from "@/components/form/switch-card-field"
 import { ImagePicker } from "@/components/image-picker"
-import { Button } from "@/components/ui/button"
+import { FormActions } from "@/components/form/form-actions"
 import {
   Field,
   FieldDescription,
@@ -52,7 +52,6 @@ export function AgentForm({
   onCancel: () => void
 }) {
   const { t } = useTranslation("contacts")
-  const { t: tCommon } = useTranslation("common")
   const navigate = useNavigate()
   const invalidateContact = useContactInvalidator()
   const schema = useMemo(
@@ -218,21 +217,7 @@ export function AgentForm({
           disabled={form.formState.isSubmitting}
         />
       </FieldGroup>
-      <div className="flex items-center justify-end gap-2">
-        <Button
-          type="button"
-          variant="outline"
-          disabled={form.formState.isSubmitting}
-          onClick={onCancel}
-        >
-          {tCommon("actions.cancel")}
-        </Button>
-        <Button type="submit" disabled={form.formState.isSubmitting}>
-          {form.formState.isSubmitting
-            ? tCommon("actions.saving")
-            : tCommon("actions.create")}
-        </Button>
-      </div>
+      <FormActions saving={form.formState.isSubmitting} onCancel={onCancel} />
     </form>
   )
 }

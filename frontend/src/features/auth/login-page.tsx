@@ -44,7 +44,7 @@ export function LoginPage({
             {allowServerChange ? (
               <button
                 type="button"
-                className="ml-2.5 inline-block whitespace-nowrap align-bottom text-[11px] font-medium tracking-[0.16em] text-muted-foreground transition-colors hover:text-foreground"
+                className="ml-2.5 inline-block whitespace-nowrap align-bottom text-xs font-medium tracking-[0.16em] text-muted-foreground transition-colors hover:text-foreground"
                 onClick={() => navigate("/connect")}
               >
                 {t("changeServer")}

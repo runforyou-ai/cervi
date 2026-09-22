@@ -129,8 +129,6 @@ const inbox = {
   groupMembersLoadError: "Could not load members",
   groupMembersEmpty: "No available members match your search",
   groupCreateError: "Could not create the group chat. Try again.",
-  groupMemberCount_one: "1 member",
-  groupMemberCount_other: "{{count}} members",
   groupOwner: "Owner",
   groupCreatedAt: "Created",
   groupDetailsLoading: "Loading group details",
@@ -164,14 +162,12 @@ const inbox = {
   groupDissolveTitle: "Dissolve ‘{{name}}’?",
   groupDissolveDescription:
     "Members will no longer be able to send messages or change group details. Current members can still view its history. This cannot be undone.",
-  groupDissolveConfirm: "Dissolve group",
   groupDissolveError: "Could not dissolve the group. Try again.",
   groupDissolved: "Group dissolved",
   groupDissolvedUnavailable:
     "This group has been dissolved. Its message history is read-only.",
   agentDisabledUnavailable:
     "This AI employee is disabled. New messages can't be sent.",
-  directPeerDisabled: "Disabled",
   directPeerDisabledUnavailable:
     "This member is disabled. New messages can't be sent.",
   groupSystemRenamed:
@@ -380,8 +376,6 @@ const inbox = {
   sidePanelOpen: "Expand side panel",
   sidePanelClose: "Collapse side panel",
   sidePanelResize: "Resize side panel",
-  contextTitleBar: "Customer details",
-  contextDescription: "Current channel, conversation status, and customer details",
   contextTabsLabel: "Contact context",
   contextProfileTab: "Profile",
   contextGroupProfileTab: "Group",
@@ -405,10 +399,6 @@ const inbox = {
   copilotThreadsLoadError: "Could not load AI Assistant conversations",
   contextBusinessTitle: "Business context",
   contextBusinessDescription: "No business context yet.",
-  sessionStatus: {
-    open: "Open",
-    closed: "Closed",
-  },
 }
 
 export default inbox

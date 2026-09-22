@@ -86,7 +86,6 @@ const contacts = {
     allMethods: "全部联系方式",
     allRoles: "全部角色",
     allWorkStatuses: "全部工作状态",
-    clear: "清除全部",
   },
   identityCategories: {
     user: "企业成员",

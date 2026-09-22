@@ -25,16 +25,8 @@ import {
 } from "@/api"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { PagePaneNav, PageSplit } from "@/components/page-split"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+import { StatusBadge } from "@/components/status-badge"
+import { ConfirmationDialog } from "@/components/confirmation-dialog"
 import { Button } from "@/components/ui/button"
 import {
   ContextMenu,
@@ -55,10 +47,15 @@ import {
   type KnowledgeGroupDialogState,
 } from "@/features/knowledge-base/knowledge-group-dialog"
 import { resourceKeys } from "@/hooks/resource-keys"
+import { useConfirmedAction } from "@/hooks/use-confirmed-action"
 import { useResource, useResourceInvalidator, useResourceReader } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
-import { recoverSession } from "@/lib/session-navigation"
 import { cn } from "@/lib/utils"
+
+type DeleteKnowledgeBaseTarget = {
+  knowledgeBase: KnowledgeBaseData
+  agents: KnowledgeBaseAgentListData["agents"]
+}
 
 type DeleteGroupTarget = {
   knowledgeBase: KnowledgeBaseData
@@ -73,16 +70,7 @@ export function KnowledgeBaseLayout() {
   const invalidate = useResourceInvalidator()
   const [groupDialog, setGroupDialog] =
     useState<KnowledgeGroupDialogState | null>(null)
-  const [deletingKnowledgeBase, setDeletingKnowledgeBase] =
-    useState<KnowledgeBaseData | null>(null)
-  const [deletingAgents, setDeletingAgents] = useState<
-    KnowledgeBaseAgentListData["agents"]
-  >([])
   const readResource = useResourceReader()
-  const [deletingGroup, setDeletingGroup] = useState<DeleteGroupTarget | null>(
-    null,
-  )
-  const [deleting, setDeleting] = useState(false)
   const mounted = useRef(true)
   const indexActive =
     location.pathname === "/knowledge-bases" ||
@@ -90,11 +78,11 @@ export function KnowledgeBaseLayout() {
   const {
     data,
     loading,
-    refreshing,
+    retrying,
     error: loadError,
     refresh,
   } = useResource(resourceKeys.knowledgeBases(), () => listKnowledgeBases())
-  const showLoading = loading || (Boolean(loadError) && refreshing)
+  const showLoading = loading || retrying
   const knowledgeBases = data?.knowledgeBases ?? []
 
   useEffect(() => {
@@ -113,6 +101,31 @@ export function KnowledgeBaseLayout() {
     [refresh, invalidate],
   )
 
+  const knowledgeBaseDeletion = useConfirmedAction<DeleteKnowledgeBaseTarget>({
+    action: (target) => deleteKnowledgeBase(target.knowledgeBase.id),
+    invalidateKeys: () => [resourceKeys.knowledgeBases()],
+    logLabel: "知识库删除",
+    successMessage: () => t("delete.success"),
+    errorMessage: () => t("delete.error"),
+    onSuccess: (target) => {
+      if (location.pathname.startsWith(`/knowledge-bases/${target.knowledgeBase.id}`))
+        navigate("/knowledge-bases")
+    },
+  })
+
+  const groupDeletion = useConfirmedAction<DeleteGroupTarget>({
+    action: (target) =>
+      deleteKnowledgeGroup(target.knowledgeBase.id, target.group.id),
+    invalidateKeys: (target) => [
+      resourceKeys.knowledgeBases(),
+      resourceKeys.knowledgeBase(target.knowledgeBase.id),
+    ],
+    logLabel: "知识库分组删除",
+    successMessage: () => t("group.deleteSuccess"),
+    errorMessage: () => t("group.deleteError"),
+  })
+  const deletingAgents = knowledgeBaseDeletion.item?.agents ?? []
+
   /** 读取最新的 AI 员工绑定后打开知识库删除确认。 */
   async function requestDeleteKnowledgeBase(knowledgeBase: KnowledgeBaseData) {
     try {
@@ -121,8 +134,7 @@ export function KnowledgeBaseLayout() {
         () => listKnowledgeBaseAgents(knowledgeBase.id),
       )
       if (!mounted.current) return
-      setDeletingAgents(result.agents)
-      setDeletingKnowledgeBase(knowledgeBase)
+      knowledgeBaseDeletion.select({ knowledgeBase, agents: result.agents })
     } catch (error) {
       if (!mounted.current) return
       if (isApiError(error) && sessionPath(error.state)) return
@@ -136,69 +148,9 @@ export function KnowledgeBaseLayout() {
     }
   }
 
-  /** 删除当前选中的知识库。 */
-  async function confirmDeleteKnowledgeBase() {
-    if (!deletingKnowledgeBase || deleting) return
-    const target = deletingKnowledgeBase
-    setDeleting(true)
-    try {
-      await deleteKnowledgeBase(target.id)
-      if (!mounted.current) return
-      void refresh()
-      setDeletingKnowledgeBase(null)
-      if (location.pathname.startsWith(`/knowledge-bases/${target.id}`)) {
-        navigate("/knowledge-bases")
-      }
-      toast.success(t("delete.success"))
-    } catch (error) {
-      if (!mounted.current) return
-      if (recoverSession(error, navigate)) return
-      console.warn("知识库删除失败", {
-        knowledge_base_id: target.id,
-        error,
-      })
-      toast.error(
-        isApiError(error) ? apiErrorMessage(error) : t("delete.error"),
-      )
-    } finally {
-      if (mounted.current) setDeleting(false)
-    }
-  }
-
-  /** 删除不含子分组的分组并刷新知识库树。 */
-  async function confirmDeleteGroup() {
-    if (!deletingGroup || deleting) return
-    const target = deletingGroup
-    setDeleting(true)
-    try {
-      const knowledgeBase = await deleteKnowledgeGroup(
-        target.knowledgeBase.id,
-        target.group.id,
-      )
-      if (!mounted.current) return
-      upsertKnowledgeBase(knowledgeBase)
-      setDeletingGroup(null)
-      toast.success(t("group.deleteSuccess"))
-    } catch (error) {
-      if (!mounted.current) return
-      if (recoverSession(error, navigate)) return
-      console.warn("知识库分组删除失败", {
-        knowledge_base_id: target.knowledgeBase.id,
-        group_id: target.group.id,
-        error,
-      })
-      toast.error(
-        isApiError(error) ? apiErrorMessage(error) : t("group.deleteError"),
-      )
-    } finally {
-      if (mounted.current) setDeleting(false)
-    }
-  }
-
   return (
     <>
       <PageSplit
-        paneWidth="nav"
         paneVariant="nav"
         paneOnNarrow={indexActive ? "fill" : "hide"}
         mainClassName={cn(indexActive && "hidden md:flex")}
@@ -271,7 +223,7 @@ export function KnowledgeBaseLayout() {
                     setGroupDialog({ knowledgeBase, group })
                   }
                   onDeleteGroup={(group) =>
-                    setDeletingGroup({ knowledgeBase, group })
+                    groupDeletion.select({ knowledgeBase, group })
                   }
                   onDeleteKnowledgeBase={() =>
                     void requestDeleteKnowledgeBase(knowledgeBase)
@@ -297,72 +249,46 @@ export function KnowledgeBaseLayout() {
         onSaved={upsertKnowledgeBase}
       />
 
-      <AlertDialog
-        open={deletingKnowledgeBase !== null}
-        onOpenChange={(open) =>
-          !open && !deleting && setDeletingKnowledgeBase(null)
+      <ConfirmationDialog
+        open={knowledgeBaseDeletion.item !== null}
+        pending={knowledgeBaseDeletion.pending}
+        title={
+          knowledgeBaseDeletion.item
+            ? t("delete.title", { name: knowledgeBaseDeletion.item.knowledgeBase.name })
+            : ""
         }
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {deletingKnowledgeBase
-                ? t("delete.title", { name: deletingKnowledgeBase.name })
-                : null}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {deletingAgents.length > 0
-                ? t("delete.agentsDescription", {
-                    count: deletingAgents.length,
-                    names: deletingAgents
-                      .map((agent) =>
-                        agent.status === UserStatus.UserStatusActive
-                          ? agent.displayName
-                          : t("agents.inactive", { name: agent.displayName }),
-                      )
-                      .join(t("delete.agentSeparator")),
-                  })
-                : t("delete.description")}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>
-              {t("common:actions.cancel")}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              disabled={deleting}
-              onClick={() => void confirmDeleteKnowledgeBase()}
-            >
-              {deleting ? t("common:actions.deleting") : t("common:actions.confirm")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        description={
+          deletingAgents.length > 0
+            ? t("delete.agentsDescription", {
+                count: deletingAgents.length,
+                names: deletingAgents
+                  .map((agent) =>
+                    agent.status === UserStatus.UserStatusActive
+                      ? agent.displayName
+                      : t("agents.inactive", { name: agent.displayName }),
+                  )
+                  .join(t("delete.agentSeparator")),
+              })
+            : t("delete.description")
+        }
+        pendingLabel={t("common:actions.deleting")}
+        onOpenChange={(open) => {
+          if (!open) knowledgeBaseDeletion.select(null)
+        }}
+        onConfirm={() => void knowledgeBaseDeletion.confirm()}
+      />
 
-      <AlertDialog
-        open={deletingGroup !== null}
-        onOpenChange={(open) => !open && !deleting && setDeletingGroup(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t("group.deleteTitle")}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("group.deleteDescription")}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={deleting}>
-              {t("common:actions.cancel")}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              disabled={deleting}
-              onClick={() => void confirmDeleteGroup()}
-            >
-              {deleting ? t("common:actions.deleting") : t("common:actions.confirm")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmationDialog
+        open={groupDeletion.item !== null}
+        pending={groupDeletion.pending}
+        title={t("group.deleteTitle")}
+        description={t("group.deleteDescription")}
+        pendingLabel={t("common:actions.deleting")}
+        onOpenChange={(open) => {
+          if (!open) groupDeletion.select(null)
+        }}
+        onConfirm={() => void groupDeletion.confirm()}
+      />
     </>
   )
 }
@@ -402,7 +328,7 @@ function KnowledgeBaseTree({
           <div
             className={cn(
               "flex items-center rounded-md transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[state=open]:bg-sidebar-accent",
-              active && "bg-sidebar-accent/60 font-medium",
+              active && "bg-sidebar-accent font-medium text-sidebar-accent-foreground",
             )}
           >
             <Link
@@ -412,9 +338,9 @@ function KnowledgeBaseTree({
             >
               {isQA ? <CircleHelpIcon /> : <FileTextIcon />}
               <span className="truncate">{knowledgeBase.name}</span>
-              <span className="ml-auto shrink-0 rounded bg-muted px-1.5 py-0.5 text-[10px] font-normal text-muted-foreground">
+              <StatusBadge variant="muted" className="ml-auto shrink-0 font-normal">
                 {categoryLabel}
-              </span>
+              </StatusBadge>
             </Link>
           </div>
         </ContextMenuTrigger>
@@ -434,9 +360,9 @@ function KnowledgeBaseTree({
           <Link
             to={`${path}/groups/${defaultGroup.id}/${isQA ? "qa" : "documents"}`}
             className={cn(
-              "flex h-8 items-center gap-2 rounded-md px-2 text-xs text-muted-foreground hover:bg-sidebar-accent",
+              "flex h-8 items-center gap-2 rounded-md px-2 text-sm text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
               currentPath.startsWith(`${path}/groups/${defaultGroup.id}/${isQA ? "qa" : "documents"}`) &&
-                "bg-sidebar-accent/60 font-medium text-sidebar-accent-foreground",
+                "bg-sidebar-accent font-medium text-sidebar-accent-foreground",
             )}
           >
             <FolderIcon className="size-3.5 shrink-0" />
@@ -504,16 +430,19 @@ function KnowledgeGroupTreeRow({
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
-        <div className="flex h-8 items-center rounded-md px-2 text-xs text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[state=open]:bg-sidebar-accent">
+        <div
+          className={cn(
+            "flex h-8 items-center rounded-md px-2 text-sm text-muted-foreground hover:bg-sidebar-accent hover:text-sidebar-accent-foreground data-[state=open]:bg-sidebar-accent",
+            contentPath &&
+              currentPath.startsWith(contentPath) &&
+              "bg-sidebar-accent font-medium text-sidebar-accent-foreground",
+          )}
+        >
           <FolderIcon className="size-3.5 shrink-0" />
           {contentPath ? (
             <Link
               to={contentPath}
-              className={cn(
-                "ml-2 min-w-0 flex-1 truncate py-2",
-                currentPath.startsWith(contentPath) &&
-                  "font-medium text-sidebar-accent-foreground",
-              )}
+              className="ml-2 min-w-0 flex-1 truncate py-2"
             >
               {group.name}
             </Link>

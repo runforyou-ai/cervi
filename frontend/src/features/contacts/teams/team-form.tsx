@@ -8,7 +8,7 @@ import { toast } from "sonner"
 
 import { createTeam, isApiError, updateTeam, type Team } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
-import { Button } from "@/components/ui/button"
+import { FormActions } from "@/components/form/form-actions"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Textarea } from "@/components/ui/textarea"
 import { recoverSession } from "@/lib/session-navigation"
@@ -99,18 +99,7 @@ export function TeamForm({
           )}
         />
       </FieldGroup>
-      <div className="flex items-center justify-end gap-2">
-        {onCancel ? (
-          <Button type="button" variant="outline" onClick={onCancel}>
-            {t("common:actions.cancel")}
-          </Button>
-        ) : null}
-        <Button type="submit" disabled={form.formState.isSubmitting}>
-          {form.formState.isSubmitting
-            ? t("common:actions.saving")
-            : t("common:actions.save")}
-        </Button>
-      </div>
+      <FormActions saving={form.formState.isSubmitting} onCancel={onCancel} />
     </form>
   )
 }

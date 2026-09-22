@@ -1,5 +1,5 @@
 /** 标准知识库分组文档列表、上传和原地管理。 */
-import { useEffect, useLayoutEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { SearchCheckIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useLocation, useParams } from "react-router"
@@ -11,8 +11,8 @@ import { Button } from "@/components/ui/button"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 import { useListSearchParams } from "@/hooks/use-list-search-params"
+import { useListScrollRestore } from "@/hooks/use-list-scroll-restore"
 import { KnowledgeQAFeedback } from "./knowledge-qa-feedback"
-import { useKnowledgeBaseContext } from "./knowledge-base-context"
 import { KnowledgeDocumentUpload } from "./knowledge-document-upload"
 import { KnowledgeDocumentActions, type DocumentAction } from "./knowledge-document-actions"
 import { KnowledgeDocumentTable } from "./knowledge-document-table"
@@ -28,7 +28,6 @@ export function KnowledgeDocumentListPage() {
 function KnowledgeDocumentGroupList({ baseId, groupId }: { baseId: string; groupId: string }) {
   const { t } = useTranslation(["knowledgeBase", "common"])
   const location = useLocation()
-  const { documentListScrollPositions } = useKnowledgeBaseContext()
   const { searchParams, query, search, setSearch, setParameters } = useListSearchParams()
   const parsed = Number(searchParams.get("page") ?? 1)
   const page = Number.isSafeInteger(parsed) && parsed > 0 ? parsed : 1
@@ -42,9 +41,10 @@ function KnowledgeDocumentGroupList({ baseId, groupId }: { baseId: string; group
   const groups = base.data?.groups.flatMap((group) => [group, ...group.children]) ?? []
   const group = groups.find((item) => item.id === groupId)
   const listPath = `/knowledge-bases/${baseId}/groups/${groupId}/documents`
-  const scrollKey = `${listPath}${location.search}`
-  const container = useRef<HTMLDivElement>(null)
-  const restored = useRef("")
+  const scroll = useListScrollRestore(
+    `${listPath}${location.search}`,
+    Boolean(list.data && !list.isPlaceholderData && base.data),
+  )
   const [action, setAction] = useState<DocumentAction | null>(null)
   const [retrievalOpen, setRetrievalOpen] = useState(false)
   const retrievalTrigger = useRef<HTMLButtonElement>(null)
@@ -53,13 +53,6 @@ function KnowledgeDocumentGroupList({ baseId, groupId }: { baseId: string; group
     if (list.data && !list.isPlaceholderData && page > pages)
       setParameters({ page: pages === 1 ? null : String(pages) }, true)
   }, [list.data, list.isPlaceholderData, page, pages, setParameters])
-  // 当前查询数据就绪后恢复该分组和筛选条件的滚动位置。
-  useLayoutEffect(() => {
-    if (!list.data || list.isPlaceholderData || !base.data || !container.current || restored.current === scrollKey)
-      return
-    container.current.scrollTop = documentListScrollPositions.get(scrollKey) ?? 0
-    restored.current = scrollKey
-  }, [list.data, list.isPlaceholderData, base.data, scrollKey, documentListScrollPositions])
   return (
     <>
       <PageHeader
@@ -75,7 +68,7 @@ function KnowledgeDocumentGroupList({ baseId, groupId }: { baseId: string; group
               ref={retrievalTrigger}
               variant="ghost"
               size="icon-sm"
-              className="shrink-0 text-muted-foreground"
+              className="shrink-0"
               aria-label={t("retrieval.action")}
               title={t("retrieval.action")}
               onClick={() => setRetrievalOpen(true)}
@@ -103,12 +96,7 @@ function KnowledgeDocumentGroupList({ baseId, groupId }: { baseId: string; group
           </ListToolbarReset>
         )}
       </ListToolbar>
-      <PageContent
-        ref={container}
-        onScroll={(event) => {
-          if (restored.current === scrollKey) documentListScrollPositions.set(scrollKey, event.currentTarget.scrollTop)
-        }}
-      >
+      <PageContent ref={scroll.ref} onScroll={scroll.onScroll}>
         {!base.data || !list.data ? (
           <KnowledgeQAFeedback
             error={base.error ?? list.error}

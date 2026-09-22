@@ -1,6 +1,6 @@
 /** 群聊侧边面板中的资料编辑和成员管理交互。 */
-import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react"
-import { MoreHorizontalIcon } from "lucide-react"
+import { useEffect, useRef, useState, type KeyboardEvent } from "react"
+import { MoreHorizontalIcon, PencilIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
@@ -20,7 +20,7 @@ import {
   type GroupConversationProfileInput,
   type MemberOption,
 } from "@/api"
-import { DetailEditActions, DetailEditRow } from "@/components/form/detail-edit-row"
+import { DetailEditActions } from "@/components/form/detail-edit-row"
 import { ImagePicker } from "@/components/image-picker"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { Button } from "@/components/ui/button"
@@ -33,9 +33,14 @@ import {
 import { GroupDissolveDialog } from "@/features/inbox/group-dissolve-dialog"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { GroupParticipantList } from "@/features/inbox/group-participant-list"
 import { GroupAvatar } from "@/features/inbox/group-avatar"
+import {
+  SidePanelField,
+  SidePanelTab,
+  SidePanelTabsList,
+} from "@/features/inbox/side-panel-layout"
 import { useDateTime } from "@/hooks/use-date-time"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
@@ -53,14 +58,20 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import type { z } from "zod"
 
-/** 展示群资料中的只读字段。 */
-function ReadonlyGroupRow({ label, children }: { label: string; children: ReactNode }) {
+/** 群资料字段的编辑入口，宽屏下悬停字段行时显示。 */
+function GroupFieldEditButton({ label, onEdit }: { label: string; onEdit: () => void }) {
+  const { t } = useTranslation("common")
   return (
-    <div className="flex min-h-11 items-start gap-3 px-2 py-1.5 text-sm">
-      <div className="w-28 shrink-0 pt-1 text-muted-foreground">{label}</div>
-      <div className="min-w-0 flex-1 pt-1">{children}</div>
-      <div className="w-14 shrink-0" />
-    </div>
+    <Button
+      variant="ghost"
+      size="icon-sm"
+      className="opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100"
+      aria-label={t("actions.editField", { field: label })}
+      title={t("actions.editField", { field: label })}
+      onClick={onEdit}
+    >
+      <PencilIcon />
+    </Button>
   )
 }
 
@@ -214,28 +225,11 @@ function GroupConversationProfile({
   const profileBusy = profileSaving || editing !== null
 
   return (
-    <div className="space-y-0.5">
-      <div className="flex min-h-20 items-start gap-3 px-2 py-1.5 text-sm">
-        <div className="w-28 shrink-0 pt-1 text-muted-foreground">
-          {t("groupImageLabel")}
-        </div>
-        <div className="min-w-0 flex-1">
-          {canManage ? (
-            <ImagePicker
-              fallback="group"
-              label={t("groupImageChoose")}
-              imageURL={image.pending?.previewURL || group.imageUrl}
-              className="size-16 rounded-xl"
-              disabled={profileBusy}
-              loading={profileSaving && Boolean(image.pending)}
-              onSelect={(file) => void changeImage(file)}
-            />
-          ) : (
-            <GroupAvatar imageURL={group.imageUrl} className="size-16 rounded-xl" />
-          )}
-        </div>
-        <div className="flex w-14 shrink-0 justify-end">
-          {canManage ? (
+    <dl className="space-y-1 text-sm">
+      <SidePanelField
+        label={t("groupImageLabel")}
+        action={
+          canManage ? (
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <Button
@@ -254,75 +248,107 @@ function GroupConversationProfile({
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
-          ) : null}
-        </div>
-      </div>
+          ) : undefined
+        }
+      >
+        {canManage ? (
+          <ImagePicker
+            fallback="group"
+            label={t("groupImageChoose")}
+            imageURL={image.pending?.previewURL || group.imageUrl}
+            className="size-16 rounded-xl"
+            disabled={profileBusy}
+            loading={profileSaving && Boolean(image.pending)}
+            onSelect={(file) => void changeImage(file)}
+          />
+        ) : (
+          <GroupAvatar imageURL={group.imageUrl} className="size-16 rounded-xl" />
+        )}
+      </SidePanelField>
       <GroupDissolveDialog
         group={group}
         open={dissolveOpen}
         onOpenChange={setDissolveOpen}
         trigger={moreTrigger.current}
       />
-      <DetailEditRow
+      <SidePanelField
         label={t("groupTitleLabel")}
-        value={group.title}
-        editing={editing === "title"}
-        editEnabled={canManage && !profileBusy}
         required
-        compact
-        onEdit={() => {
-          form.setValue("title", group.title)
-          setEditing("title")
-        }}
+        action={
+          canManage && !profileBusy ? (
+            <GroupFieldEditButton
+              label={t("groupTitleLabel")}
+              onEdit={() => {
+                form.setValue("title", group.title)
+                setEditing("title")
+              }}
+            />
+          ) : undefined
+        }
       >
-        <Input
-          autoFocus
-          {...form.register("title")}
-          required
-          maxLength={groupTitleMaxLength}
-          disabled={saveState.saving}
-          aria-label={t("groupTitleLabel")}
-          onBlur={(event) => {
-            void form.register("title").onBlur(event)
-            void saveProfileField("title")
-          }}
-          onKeyDown={handleTitleKeyDown}
-        />
-      </DetailEditRow>
-      <DetailEditRow
+        {editing === "title" ? (
+          <Input
+            autoFocus
+            {...form.register("title")}
+            required
+            maxLength={groupTitleMaxLength}
+            disabled={saveState.saving}
+            aria-label={t("groupTitleLabel")}
+            onBlur={(event) => {
+              void form.register("title").onBlur(event)
+              void saveProfileField("title")
+            }}
+            onKeyDown={handleTitleKeyDown}
+          />
+        ) : (
+          <span className="min-w-0 break-words">{group.title}</span>
+        )}
+      </SidePanelField>
+      <SidePanelField
         label={t("groupDescriptionLabel")}
-        value={group.description || t("groupDescriptionEmpty")}
-        editing={editing === "description"}
-        editEnabled={canManage && !profileBusy}
-        compact
-        onEdit={() => {
-          form.setValue("description", group.description)
-          setEditing("description")
-        }}
+        action={
+          canManage && !profileBusy ? (
+            <GroupFieldEditButton
+              label={t("groupDescriptionLabel")}
+              onEdit={() => {
+                form.setValue("description", group.description)
+                setEditing("description")
+              }}
+            />
+          ) : undefined
+        }
       >
-        <Textarea
-          autoFocus
-          {...form.register("description")}
-          rows={4}
-          maxLength={groupDescriptionMaxLength}
-          disabled={saveState.saving}
-          aria-label={t("groupDescriptionLabel")}
-          className="min-h-24 resize-y"
-          onKeyDown={handleDescriptionKeyDown}
-        />
-        <DetailEditActions
-          saving={saveState.saving}
-          onSave={() => void saveProfileField("description")}
-          onCancel={cancelEdit}
-        />
-      </DetailEditRow>
-      <ReadonlyGroupRow label={t("groupOwner")}>
-        {owner?.displayName ?? "—"}
-      </ReadonlyGroupRow>
-      <ReadonlyGroupRow label={t("groupCreatedAt")}>
+        {editing === "description" ? (
+          <div className="min-w-0 flex-1">
+            <Textarea
+              autoFocus
+              {...form.register("description")}
+              rows={4}
+              maxLength={groupDescriptionMaxLength}
+              disabled={saveState.saving}
+              aria-label={t("groupDescriptionLabel")}
+              className="min-h-24 resize-y"
+              onKeyDown={handleDescriptionKeyDown}
+            />
+            <DetailEditActions
+              saving={saveState.saving}
+              onSave={() => void saveProfileField("description")}
+              onCancel={cancelEdit}
+            />
+          </div>
+        ) : (
+          <span className="min-w-0 break-words">
+            {group.description || t("groupDescriptionEmpty")}
+          </span>
+        )}
+      </SidePanelField>
+      <SidePanelField label={t("groupOwner")}>
+        <span className="min-w-0 truncate">{owner?.displayName ?? "—"}</span>
+      </SidePanelField>
+      <SidePanelField label={t("groupCreatedAt")}>
         {createdAt ? formatFullDateTime(createdAt) : "—"}
-      </ReadonlyGroupRow>
-    </div>
+      </SidePanelField>
+    </dl>
   )
 }
 
@@ -444,23 +470,14 @@ export function GroupConversationContext({
 
   return (
     <Tabs key={conversationID} defaultValue="profile" className="min-h-0 flex-1">
-      <TabsList
-        aria-label={t("contextTabsLabel")}
-        className="h-auto min-h-12 shrink-0 justify-start gap-1 border-b-0 px-3 py-2"
-      >
-        <TabsTrigger
-          value="profile"
-          className="-mb-0 rounded-md border-b-0 px-2.5 py-1.5 text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-        >
+      <SidePanelTabsList aria-label={t("contextTabsLabel")}>
+        <SidePanelTab value="profile">
           {t("contextGroupProfileTab")}
-        </TabsTrigger>
-        <TabsTrigger
-          value="members"
-          className="-mb-0 rounded-md border-b-0 px-2.5 py-1.5 text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-        >
+        </SidePanelTab>
+        <SidePanelTab value="members">
           {t("contextGroupMembersTab")}
-        </TabsTrigger>
-      </TabsList>
+        </SidePanelTab>
+      </SidePanelTabsList>
 
       <TabsContent
         value="profile"

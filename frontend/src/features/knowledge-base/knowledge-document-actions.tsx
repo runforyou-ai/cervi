@@ -22,7 +22,7 @@ import { useResourceInvalidator } from "@/hooks/use-resource"
 import { recoverSession } from "@/lib/session-navigation"
 import { apiErrorMessage } from "@/lib/form-errors"
 
-export type DocumentAction = { document: KnowledgeDocument; kind: "move" | "delete"; trigger: HTMLButtonElement | null }
+export type DocumentAction = { document: KnowledgeDocument; kind: "move" | "delete" }
 
 /** 在列表上完成移动或确认删除，失败时保留原操作。 */
 export function KnowledgeDocumentActions({
@@ -79,13 +79,7 @@ export function KnowledgeDocumentActions({
         if (!open && !busy) onClose()
       }}
     >
-      <DialogContent
-        closeDisabled={busy}
-        onCloseAutoFocus={(event) => {
-          event.preventDefault()
-          action.trigger?.focus()
-        }}
-      >
+      <DialogContent closeDisabled={busy}>
         <DialogHeader>
           <DialogTitle>{t(action.kind === "move" ? "documents.move" : "common:actions.delete")}</DialogTitle>
           <DialogDescription>

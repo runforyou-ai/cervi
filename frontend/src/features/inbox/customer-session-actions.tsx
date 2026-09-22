@@ -22,26 +22,16 @@ import {
   type InboxAssignee,
   type ServiceQueueTeam,
 } from "@/api"
+import { ConfirmationDialog } from "@/components/confirmation-dialog"
 import {
   DropdownMenuItem,
   DropdownMenuLabel,
   DropdownMenuSeparator,
 } from "@/components/ui/dropdown-menu"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
-import { cn } from "@/lib/utils"
 import { resolveAppPlatform } from "@/platform/app-platform"
 
 type CustomerSummary = CustomerInboxConversationData["customer"]
@@ -259,38 +249,28 @@ export function CustomerSessionCloseDialog({
 }: {
   actions: CustomerSessionActions
 }) {
-  const { t } = useTranslation(["inbox", "common"])
-  // 移动端弹窗按钮使用触屏尺寸。
-  const buttonClassName = cn(resolveAppPlatform() === "mobile" && "min-h-11")
+  const { t } = useTranslation("inbox")
   return (
-    <AlertDialog
+    <ConfirmationDialog
       open={actions.closeConfirmationOpen}
+      pending={false}
+      title={t("conversationCloseConfirmTitle")}
+      description={
+        <>
+          {t("conversationCloseConfirmDescription")}
+          {actions.unansweredMentionCount > 0 ? (
+            <span className="mt-1 block text-foreground">
+              {t("conversationCloseUnansweredMentions", { count: actions.unansweredMentionCount })}
+            </span>
+          ) : null}
+        </>
+      }
+      touch={resolveAppPlatform() === "mobile"}
       onOpenChange={actions.setCloseConfirmationOpen}
-    >
-      <AlertDialogContent>
-        <AlertDialogHeader>
-          <AlertDialogTitle>{t("conversationCloseConfirmTitle")}</AlertDialogTitle>
-          <AlertDialogDescription>
-            {t("conversationCloseConfirmDescription")}
-            {actions.unansweredMentionCount > 0 ? (
-              <span className="mt-1 block text-foreground">
-                {t("conversationCloseUnansweredMentions", { count: actions.unansweredMentionCount })}
-              </span>
-            ) : null}
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel className={buttonClassName}>
-            {t("common:actions.cancel")}
-          </AlertDialogCancel>
-          <AlertDialogAction
-            className={buttonClassName}
-            onClick={() => void actions.close()}
-          >
-            {t("common:actions.confirm")}
-          </AlertDialogAction>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+      onConfirm={() => {
+        actions.setCloseConfirmationOpen(false)
+        void actions.close()
+      }}
+    />
   )
 }

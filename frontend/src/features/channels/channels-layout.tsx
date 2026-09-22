@@ -18,7 +18,6 @@ export function ChannelsLayout() {
 
   return (
     <PageSplit
-      paneWidth="nav"
       paneVariant="nav"
       pane={
         <PagePaneNav label={t("navigation.label")} title={t("list.title")}>

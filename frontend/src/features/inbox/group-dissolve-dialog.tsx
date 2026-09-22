@@ -8,21 +8,13 @@ import {
   isApiError,
   type GroupConversationData,
 } from "@/api"
-import {
-  AlertDialog,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { Button } from "@/components/ui/button"
+import { ConfirmationDialog } from "@/components/confirmation-dialog"
 import { useImmediateSave } from "@/hooks/use-immediate-save"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
+import { resolveAppPlatform } from "@/platform/app-platform"
 
 /** 解散成功后保留当前视图，失败时保留确认框供重试。 */
 export function GroupDissolveDialog({
@@ -36,7 +28,7 @@ export function GroupDissolveDialog({
   onOpenChange: (open: boolean) => void
   trigger?: HTMLElement | null
 }) {
-  const { t } = useTranslation(["inbox", "common"])
+  const { t } = useTranslation("inbox")
   const navigate = useNavigate()
   const save = useImmediateSave()
   const invalidate = useResourceInvalidator()
@@ -66,44 +58,22 @@ export function GroupDissolveDialog({
   }
 
   return (
-    <AlertDialog
+    <ConfirmationDialog
       open={open}
-      onOpenChange={(next) => {
-        if (!save.isSaving()) onOpenChange(next)
-      }}
-    >
-      <AlertDialogContent
-        onCloseAutoFocus={
-          trigger
-            ? (event) => {
-                event.preventDefault()
-                trigger.focus({ preventScroll: true })
-              }
-            : undefined
-        }
-      >
-        <AlertDialogHeader>
-          <AlertDialogTitle>
-            {t("groupDissolveTitle", { name: group.title })}
-          </AlertDialogTitle>
-          <AlertDialogDescription>
-            {t("groupDissolveDescription")}
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel className="min-h-11" disabled={save.saving}>
-            {t("common:actions.cancel")}
-          </AlertDialogCancel>
-          <Button
-            className="min-h-11"
-            variant="destructive"
-            disabled={save.saving}
-            onClick={() => void dissolve()}
-          >
-            {t("groupDissolveConfirm")}
-          </Button>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+      pending={save.saving}
+      title={t("groupDissolveTitle", { name: group.title })}
+      description={t("groupDissolveDescription")}
+      touch={resolveAppPlatform() === "mobile"}
+      onOpenChange={onOpenChange}
+      onConfirm={() => void dissolve()}
+      onCloseAutoFocus={
+        trigger
+          ? (event) => {
+              event.preventDefault()
+              trigger.focus({ preventScroll: true })
+            }
+          : undefined
+      }
+    />
   )
 }

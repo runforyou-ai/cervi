@@ -116,7 +116,7 @@ export function ConversationMentionNavigator({
         <Button
           size="icon-sm"
           variant="ghost"
-          className="relative rounded-full bg-gray-100 text-gray-500 shadow-sm after:absolute after:-inset-1 after:content-[''] hover:bg-gray-200 hover:text-gray-500 dark:hover:bg-gray-200"
+          className="relative rounded-full bg-muted text-muted-foreground shadow-sm after:absolute after:-inset-1 after:content-[''] hover:bg-accent hover:text-accent-foreground"
           disabled={busy}
           onClick={onLatest}
           aria-label={latestLabel}

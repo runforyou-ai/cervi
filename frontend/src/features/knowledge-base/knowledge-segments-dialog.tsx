@@ -97,7 +97,7 @@ export function KnowledgeSegmentsDialog({ knowledgeBaseId, documentId, documentN
         {resource.isPending ? <LoadingIndicator className="min-h-48 justify-center">{t("common:status.loading")}</LoadingIndicator> : !pages ?
           <div className="py-12 text-center text-sm text-muted-foreground"><p>{isApiError(resource.error) ? apiErrorMessage(resource.error) : t("documentDetail.segments.error")}</p><Button className="mt-4" variant="outline" onClick={() => void resource.refetch()}>{t("common:actions.retry")}</Button></div> : <>
           <div ref={top} className="flex min-h-px items-center justify-center text-sm text-muted-foreground">
-            {resource.isFetchingPreviousPage ? <span className="py-3">{t("common:status.loading")}</span> : resource.isFetchPreviousPageError ? <Button variant="link" onClick={() => {
+            {resource.isFetchingPreviousPage ? <LoadingIndicator className="py-3">{t("common:status.loading")}</LoadingIndicator> : resource.isFetchPreviousPageError ? <Button variant="link" onClick={() => {
               const pane = viewport.current
               if (pane) anchor.current = { height: pane.scrollHeight }
               void resource.fetchPreviousPage().then((result) => { if (result.isError) anchor.current = null })
@@ -116,7 +116,7 @@ export function KnowledgeSegmentsDialog({ knowledgeBaseId, documentId, documentN
             </div>
           </article>)}
           <div ref={bottom} className="flex min-h-px items-center justify-center text-sm text-muted-foreground">
-            {resource.isFetchingNextPage ? <span className="py-3">{t("common:status.loading")}</span> : resource.isFetchNextPageError ? <Button variant="link" onClick={() => void resource.fetchNextPage()}>{t("documentDetail.segments.retryNext")}</Button> : pages[0].page.total === 0 ? <p className="py-12">{t("documentDetail.segments.empty")}</p> : null}
+            {resource.isFetchingNextPage ? <LoadingIndicator className="py-3">{t("common:status.loading")}</LoadingIndicator> : resource.isFetchNextPageError ? <Button variant="link" onClick={() => void resource.fetchNextPage()}>{t("documentDetail.segments.retryNext")}</Button> : pages[0].page.total === 0 ? <p className="py-12">{t("documentDetail.segments.empty")}</p> : null}
           </div>
         </>}
       </div>

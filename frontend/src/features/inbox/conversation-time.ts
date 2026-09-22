@@ -1,6 +1,16 @@
 /** 会话列表统一采用用户时区下的相对时间和日历日期。 */
 import { previousDayKey } from "./calendar.ts"
 
+/** 创建用户时区下输出 YYYY-MM-DD 日期键的格式化器，用于同日、昨天和同年比较。 */
+export function createDayKeyFormatter(timeZone: string) {
+  return new Intl.DateTimeFormat("en-CA", {
+    timeZone,
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit",
+  })
+}
+
 /** 创建会话时间格式化器，今天和昨天之外距今不足六天时显示星期。 */
 export function createConversationTimeFormatter(
   locale: string | undefined,
@@ -23,13 +33,7 @@ export function createConversationTimeFormatter(
     month: "numeric",
     day: "numeric",
   })
-  /* en-CA 固定输出 YYYY-MM-DD，用于用户时区下的同日、昨天和同年比较。 */
-  const dayKey = new Intl.DateTimeFormat("en-CA", {
-    timeZone,
-    year: "numeric",
-    month: "2-digit",
-    day: "2-digit",
-  })
+  const dayKey = createDayKeyFormatter(timeZone)
 
   return (value: string | null, now = new Date()) => {
     if (!value) return ""

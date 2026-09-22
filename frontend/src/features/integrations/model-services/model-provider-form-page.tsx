@@ -12,45 +12,31 @@ import {
   AIModelType,
   AIProviderCredentialType,
   createAIProvider,
-  discoverAIProviderModels,
   getAIProvider,
   isApiError,
-  listAvailableAIModels,
   testAIProviderConnection,
   updateAIProvider,
   type AIProviderBrandId,
-  type AIProviderModelData,
 } from "@/api"
 import { FormActions } from "@/components/form/form-actions"
 import { FormInputField } from "@/components/form/form-input-field"
 import { FormValidationMessage } from "@/components/form/form-validation-message"
-import { ResourceListFrame } from "@/components/resource-list"
 import { ResourceContent } from "@/components/resource-content"
 import { PageContent } from "@/components/page-content"
 import { PageBackButton } from "@/components/page-back-button"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog"
-import { Field, FieldGroup, FieldLabel, FieldRequiredMark } from "@/components/ui/field"
-import { Input } from "@/components/ui/input"
+import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { NativeSelect } from "@/components/ui/native-select"
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from "@/components/ui/table"
 import {
   aiProviderBrandConfigs,
   aiProviderBrandOrder,
 } from "@/features/integrations/model-services/model-provider-brands"
+import { ModelPickerDialog } from "@/features/integrations/model-services/model-picker-dialog"
+import { modelFormValue } from "@/features/integrations/model-services/model-provider-model-values"
+import { ModelProviderModelsTable } from "@/features/integrations/model-services/model-provider-models-table"
 import {
-  modelInputModalityNameKeys,
-  modelInputModalityOrder,
   modelServiceSectionConfigs,
-  modelTypeNameKeys,
   type ModelServiceSection,
 } from "@/features/integrations/model-services/model-service-options"
 import {
@@ -63,27 +49,6 @@ import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
-
-/** 把模型 Token 数转换为紧凑显示值。 */
-function formatTokenCount(value: number) {
-  if (value % 1_048_576 === 0) return `${value / 1_048_576}M`
-  if (value % 1024 === 0) return `${value / 1024}K`
-  return String(value)
-}
-
-/** 把模型契约转换为表单值。 */
-function modelFormValue(model: AIProviderModelData) {
-  return {
-    identifier: model.identifier,
-    name: model.name,
-    type: model.type,
-    inputModalities: model.inputModalities,
-    contextWindow:
-      model.contextWindow > 0 ? formatTokenCount(model.contextWindow) : "",
-    maxOutputTokens:
-      model.maxOutputTokens > 0 ? formatTokenCount(model.maxOutputTokens) : "",
-  }
-}
 
 /** 返回模型目录中的第一条字段校验提示。 */
 function modelValidationMessage(errors: FieldErrors<AIProviderFormValues>["models"]) {
@@ -112,10 +77,6 @@ export function ModelProviderFormPage({
   const navigate = useNavigate()
   const { providerId = "" } = useParams()
   const invalidateResource = useResourceInvalidator()
-  const [modelDialogOpen, setModelDialogOpen] = useState(false)
-  const [availableModels, setAvailableModels] = useState<AIProviderModelData[]>([])
-  const [draftModelIDs, setDraftModelIDs] = useState<Set<string>>(new Set())
-  const [loadingModels, setLoadingModels] = useState(false)
   const [testingConnection, setTestingConnection] = useState(false)
   const mounted = useRef(true)
   const listPath = `/settings/model-services/${returnSection}`
@@ -196,84 +157,6 @@ export function ModelProviderFormPage({
       mounted.current = false
     }
   }, [])
-
-  /** 读取当前品牌的可选模型并打开选择弹窗。 */
-  async function openModelDialog() {
-    if (loadingModels) return
-    const brand = form.getValues("brand") as AIProviderBrandId
-    // 模型目录由服务实例提供时，先校验连接配置再读取实例。
-    const discovers = Boolean(aiProviderBrandConfigs[brand].discoversModels)
-    if (discovers) {
-      const valid = await form.trigger(["brand", "credentialType", "apiKey", "apiUrl"], {
-        shouldFocus: true,
-      })
-      if (!valid || !mounted.current) return
-    }
-    setLoadingModels(true)
-    const { credentialType, apiKey, apiUrl } = form.getValues()
-    const requested = `${brand}\n${credentialType}\n${apiKey}\n${apiUrl}`
-    try {
-      const models = discovers
-        ? await discoverAIProviderModels({ brand, credentialType, apiKey, apiUrl })
-        : await listAvailableAIModels(brand)
-      if (!mounted.current) return
-      // 读取期间连接配置变化时结果已过期，不能追加到当前品牌的目录。
-      const current = form.getValues()
-      if (
-        requested !==
-        `${current.brand}\n${current.credentialType}\n${current.apiKey}\n${current.apiUrl}`
-      ) {
-        return
-      }
-      setAvailableModels(models)
-      setDraftModelIDs(new Set(models.map((model) => model.identifier)))
-      setModelDialogOpen(true)
-    } catch (requestError) {
-      if (!mounted.current) return
-      if (recoverSession(requestError, navigate)) return
-      console.warn("可选模型加载失败", { brand, error: requestError })
-      toast.error(
-        isApiError(requestError)
-          ? apiErrorMessage(requestError, ["brand", "credentialType", "apiKey", "apiUrl"])
-          : t(
-              discovers
-                ? "modelServices.models.discoverError"
-                : "modelServices.models.loadError",
-            ),
-      )
-    } finally {
-      if (mounted.current) setLoadingModels(false)
-    }
-  }
-
-  /** 切换弹窗中的待选模型。 */
-  function toggleDraftModel(identifier: string, checked: boolean) {
-    setDraftModelIDs((current) => {
-      const next = new Set(current)
-      if (checked) next.add(identifier)
-      else next.delete(identifier)
-      return next
-    })
-  }
-
-  /** 取消选择弹窗中的全部模型。 */
-  function clearDraftModels() {
-    setDraftModelIDs(new Set())
-  }
-
-  /** 确认模型选择并追加目录中尚不存在的模型。 */
-  function confirmModels() {
-    const current = form.getValues("models")
-    const existingIDs = new Set(current.map((model) => model.identifier.trim()))
-    const modelsToAppend = availableModels
-      .filter(
-        (model) =>
-          draftModelIDs.has(model.identifier) && !existingIDs.has(model.identifier),
-      )
-      .map(modelFormValue)
-    if (modelsToAppend.length > 0) modelFields.append(modelsToAppend)
-    setModelDialogOpen(false)
-  }
 
   /** 添加一个文本输入的自定义对话模型。 */
   function addCustomModel() {
@@ -399,10 +282,6 @@ export function ModelProviderFormPage({
   const usesAPIKey =
     form.watch("credentialType") ===
     AIProviderCredentialType.AIProviderCredentialTypeAPIKey
-  const watchedModels = form.watch("models")
-  const hasChatModel = watchedModels.some(
-    (model) => model.type === AIModelType.AIModelTypeChat,
-  )
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -566,218 +445,17 @@ export function ModelProviderFormPage({
                   >
                     {t("modelServices.models.manualAdd")}
                   </Button>
-                  <Button
-                    type="button"
-                    variant="link"
-                    size="sm"
-                    className="h-auto p-0"
-                    disabled={loadingModels}
-                    onClick={() => void openModelDialog()}
-                  >
-                    {loadingModels
-                      ? t("modelServices.models.loading")
-                      : t(
-                          brandConfig.discoversModels
-                            ? "modelServices.models.discover"
-                            : "modelServices.models.fetch",
-                        )}
-                  </Button>
+                  <ModelPickerDialog
+                    form={form}
+                    onAppend={(models) => modelFields.append(models)}
+                  />
                 </div>
               </div>
-              <ResourceListFrame>
-                <Table>
-                  <TableHeader>
-                    <TableRow className="hover:bg-transparent">
-                      <TableHead>
-                        <span className="inline-flex items-center gap-1">
-                          {t("modelServices.models.columns.type")}
-                          <FieldRequiredMark />
-                        </span>
-                      </TableHead>
-                      <TableHead>
-                        <span className="inline-flex items-center gap-1">
-                          {t("modelServices.models.columns.identifier")}
-                          <FieldRequiredMark />
-                        </span>
-                      </TableHead>
-                      <TableHead>
-                        <span className="inline-flex items-center gap-1">
-                          {t("modelServices.models.columns.name")}
-                          <FieldRequiredMark />
-                        </span>
-                      </TableHead>
-                      <TableHead>
-                        <span className="inline-flex items-center gap-1">
-                          {t("modelServices.models.columns.inputModalities")}
-                          <FieldRequiredMark />
-                        </span>
-                      </TableHead>
-                      <TableHead>
-                        <span className="inline-flex items-center gap-1">
-                          {t("modelServices.models.columns.contextWindow")}
-                          <FieldRequiredMark />
-                        </span>
-                      </TableHead>
-                      <TableHead>
-                        <span className="inline-flex items-center gap-1">
-                          {t("modelServices.models.columns.maxOutputTokens")}
-                          {hasChatModel ? <FieldRequiredMark /> : null}
-                        </span>
-                      </TableHead>
-                      <TableHead className="w-px">{t("common:table.actions")}</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {modelFields.fields.length === 0 ? (
-                      <TableRow className="hover:bg-transparent">
-                        <TableCell
-                          colSpan={7}
-                          className="h-24 text-center text-muted-foreground"
-                        >
-                          {t("modelServices.models.empty")}
-                        </TableCell>
-                      </TableRow>
-                    ) : (
-                      modelFields.fields.map((model, index) => {
-                        const modelType = watchedModels[index]?.type ?? model.type
-                        return (
-                          <TableRow key={model.id}>
-                            <TableCell>
-                              <Controller
-                                name={`models.${index}.type`}
-                                control={form.control}
-                                render={({ field, fieldState }) => (
-                                  <NativeSelect
-                                    {...field}
-                                    required
-                                    className="min-w-28"
-                                    aria-label={t("modelServices.models.editField", {
-                                      field: t("modelServices.models.columns.type"),
-                                      row: index + 1,
-                                    })}
-                                    aria-invalid={fieldState.invalid}
-                                  >
-                                    <option value={AIModelType.AIModelTypeChat}>
-                                      {t("modelServices.models.types.chat")}
-                                    </option>
-                                    <option value={AIModelType.AIModelTypeEmbedding}>
-                                      {t("modelServices.models.types.embedding")}
-                                    </option>
-                                    <option value={AIModelType.AIModelTypeRerank}>
-                                      {t("modelServices.models.types.rerank")}
-                                    </option>
-                                  </NativeSelect>
-                                )}
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <Input
-                                {...form.register(`models.${index}.identifier`)}
-                                required
-                                maxLength={200}
-                                autoComplete="off"
-                                className="min-w-40 font-mono text-xs"
-                                aria-label={t("modelServices.models.editField", {
-                                  field: t("modelServices.models.columns.identifier"),
-                                  row: index + 1,
-                                })}
-                                aria-invalid={Boolean(
-                                  form.formState.errors.models?.[index]?.identifier,
-                                )}
-                              />
-                            </TableCell>
-                            <TableCell>
-                              <Input
-                                {...form.register(`models.${index}.name`)}
-                                required
-                                maxLength={200}
-                                autoComplete="off"
-                                className="min-w-36"
-                                aria-label={t("modelServices.models.editField", {
-                                  field: t("modelServices.models.columns.name"),
-                                  row: index + 1,
-                                })}
-                                aria-invalid={Boolean(
-                                  form.formState.errors.models?.[index]?.name,
-                                )}
-                              />
-                            </TableCell>
-                            <TableCell className="min-w-56">
-                              <div className="flex flex-wrap gap-x-3 gap-y-2">
-                                {modelInputModalityOrder.map((modality) => (
-                                  <label
-                                    key={modality}
-                                    className="inline-flex items-center gap-1.5 text-xs"
-                                  >
-                                    <input
-                                      {...form.register(
-                                        `models.${index}.inputModalities`,
-                                      )}
-                                      type="checkbox"
-                                      value={modality}
-                                      className="size-4 accent-primary"
-                                    />
-                                    {t(modelInputModalityNameKeys[modality])}
-                                  </label>
-                                ))}
-                              </div>
-                            </TableCell>
-                            <TableCell>
-                              <Input
-                                {...form.register(`models.${index}.contextWindow`)}
-                                required
-                                inputMode="decimal"
-                                autoComplete="off"
-                                className="min-w-24"
-                                aria-label={t("modelServices.models.editField", {
-                                  field: t("modelServices.models.columns.contextWindow"),
-                                  row: index + 1,
-                                })}
-                                aria-invalid={Boolean(
-                                  form.formState.errors.models?.[index]?.contextWindow,
-                                )}
-                              />
-                            </TableCell>
-                            <TableCell>
-                              {modelType === AIModelType.AIModelTypeChat ? (
-                                <Input
-                                  {...form.register(`models.${index}.maxOutputTokens`)}
-                                  required
-                                  inputMode="decimal"
-                                  autoComplete="off"
-                                  className="min-w-24"
-                                  aria-label={t("modelServices.models.editField", {
-                                    field: t(
-                                      "modelServices.models.columns.maxOutputTokens",
-                                    ),
-                                    row: index + 1,
-                                  })}
-                                  aria-invalid={Boolean(
-                                    form.formState.errors.models?.[index]
-                                      ?.maxOutputTokens,
-                                  )}
-                                />
-                              ) : (
-                                <span className="text-muted-foreground">—</span>
-                              )}
-                            </TableCell>
-                            <TableCell className="whitespace-nowrap">
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="xs"
-                                onClick={() => modelFields.remove(index)}
-                              >
-                                {t("common:actions.delete")}
-                              </Button>
-                            </TableCell>
-                          </TableRow>
-                        )
-                      })
-                    )}
-                  </TableBody>
-                </Table>
-              </ResourceListFrame>
+              <ModelProviderModelsTable
+                form={form}
+                fields={modelFields.fields}
+                onRemove={modelFields.remove}
+              />
               {/* 校验提示使用表单分区间距，不改变操作按钮位置。 */}
               <FormValidationMessage
                 className="absolute top-full right-0 left-0 mt-2"
@@ -806,91 +484,6 @@ export function ModelProviderFormPage({
           </form>
         </ResourceContent>
       </PageContent>
-
-      <Dialog open={modelDialogOpen} onOpenChange={setModelDialogOpen}>
-        <DialogContent className="max-w-3xl">
-          <DialogHeader>
-            <DialogTitle>
-              {t(
-                brandConfig.discoversModels
-                  ? "modelServices.models.discoverDialogTitle"
-                  : "modelServices.models.dialogTitle",
-              )}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="max-h-[60vh] overflow-auto rounded-lg border">
-            <Table>
-              <TableHeader>
-                <TableRow className="hover:bg-transparent">
-                  <TableHead className="w-12">
-                    <span className="sr-only">{t("modelServices.models.select")}</span>
-                  </TableHead>
-                  <TableHead>{t("modelServices.models.columns.identifier")}</TableHead>
-                  <TableHead>{t("modelServices.models.columns.type")}</TableHead>
-                  <TableHead>
-                    {t("modelServices.models.columns.inputModalities")}
-                  </TableHead>
-                </TableRow>
-              </TableHeader>
-              <TableBody>
-                {availableModels.length === 0 ? (
-                  <TableRow className="hover:bg-transparent">
-                    <TableCell
-                      colSpan={4}
-                      className="h-24 text-center text-muted-foreground"
-                    >
-                      {t("modelServices.models.dialogEmpty")}
-                    </TableCell>
-                  </TableRow>
-                ) : null}
-                {availableModels.map((model) => (
-                  <TableRow key={model.identifier}>
-                    <TableCell>
-                      <input
-                        type="checkbox"
-                        className="size-4 accent-primary"
-                        checked={draftModelIDs.has(model.identifier)}
-                        onChange={(event) =>
-                          toggleDraftModel(model.identifier, event.target.checked)
-                        }
-                        aria-label={t("modelServices.models.toggle", {
-                          name: model.name,
-                        })}
-                      />
-                    </TableCell>
-                    <TableCell className="font-mono text-xs">
-                      {model.identifier}
-                    </TableCell>
-                    <TableCell>{t(modelTypeNameKeys[model.type])}</TableCell>
-                    <TableCell>
-                      {model.inputModalities
-                        .map((modality) => t(modelInputModalityNameKeys[modality]))
-                        .join("、")}
-                    </TableCell>
-                  </TableRow>
-                ))}
-              </TableBody>
-            </Table>
-          </div>
-          <div className="flex items-center justify-between gap-3">
-            <Button type="button" variant="link" onClick={clearDraftModels}>
-              {t("modelServices.models.clearAll")}
-            </Button>
-            <div className="flex gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                onClick={() => setModelDialogOpen(false)}
-              >
-                {t("common:actions.cancel")}
-              </Button>
-              <Button type="button" onClick={confirmModels}>
-                {t("common:actions.confirm")}
-              </Button>
-            </div>
-          </div>
-        </DialogContent>
-      </Dialog>
     </div>
   )
 }

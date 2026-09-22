@@ -1,4 +1,4 @@
-/** 展示问答列表、索引状态和分页，问答操作通过右键菜单完成。 */
+/** 展示问答列表、索引状态和分页，问答操作通过行操作菜单完成。 */
 import { useState } from "react"
 import { CircleHelpIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
@@ -12,10 +12,6 @@ import {
 } from "@/api"
 import { ResourceListFrame } from "@/components/resource-list"
 import { ResourceTable } from "@/components/resource-table"
-import {
-  ContextMenuItem,
-  ContextMenuSeparator,
-} from "@/components/ui/context-menu"
 import { useDateTime } from "@/hooks/use-date-time"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
@@ -135,28 +131,29 @@ export function KnowledgeQATable({
             key: "createdAt",
             header: t("qa.createdAt"),
             cellClassName: "w-px whitespace-nowrap text-muted-foreground tabular-nums",
-            cell: (entry) => formatDateTime(entry.createdAt),
+            cell: (entry) =>
+              t("qa.createdAtTime", { time: formatDateTime(entry.createdAt) }),
           },
         ]}
         rows={data.entries}
         rowKey={(entry) => entry.id}
         empty={filtered ? t("qa.filteredEmpty") : t("qa.empty")}
         onRowActivate={(entry) => navigate(`${listPath}/${entry.id}/edit${search}`)}
-        // 问答操作都放在右键菜单里，行内只保留信息。
-        rowMenu={(entry) => (
-          <>
-            <ContextMenuItem
-              disabled={retryingIDs.has(entry.id)}
-              onSelect={() => void retryEntry(entry)}
-            >
-              {t("qa.reprocess")}
-            </ContextMenuItem>
-            <ContextMenuSeparator />
-            <ContextMenuItem destructive onSelect={() => onDelete(entry)}>
-              {t("common:actions.delete")}
-            </ContextMenuItem>
-          </>
-        )}
+        rowActions={(entry) => [
+          {
+            key: "reprocess",
+            label: t("qa.reprocess"),
+            disabled: retryingIDs.has(entry.id),
+            onSelect: () => void retryEntry(entry),
+          },
+          {
+            key: "delete",
+            label: t("common:actions.delete"),
+            destructive: true,
+            separatorBefore: true,
+            onSelect: () => onDelete(entry),
+          },
+        ]}
       />
     </ResourceListFrame>
   )

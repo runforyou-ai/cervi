@@ -8,6 +8,7 @@ import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { toast } from "sonner"
 import type { ConversationMessageReference, InboxConversation } from "@/api"
+import { IconTooltip } from "@/components/icon-tooltip"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -200,17 +201,19 @@ export function ConversationAttachmentUpload({
           void add(files)
         }}
       />
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-sm"
-        className={composerToolClass}
-        disabled={disabled || selecting || form.formState.isSubmitting || !queue}
-        aria-label={t("attachmentAdd")}
-        onClick={() => inputRef.current?.click()}
-      >
-        <PaperclipIcon />
-      </Button>
+      <IconTooltip label={t("attachmentAdd")}>
+        <Button
+          type="button"
+          variant="ghost"
+          size="icon-sm"
+          className={composerToolClass}
+          disabled={disabled || selecting || form.formState.isSubmitting || !queue}
+          aria-label={t("attachmentAdd")}
+          onClick={() => inputRef.current?.click()}
+        >
+          <PaperclipIcon />
+        </Button>
+      </IconTooltip>
       <Dialog
         open={selected.length > 0}
         onOpenChange={(open) => {

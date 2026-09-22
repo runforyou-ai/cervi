@@ -17,11 +17,11 @@ import {
   updateKnowledgeDocumentContent,
   type KnowledgeDocumentContentData,
 } from "@/api"
+import { FormActions } from "@/components/form/form-actions"
 import { FormInputField } from "@/components/form/form-input-field"
 import { PageContent } from "@/components/page-content"
 import { PageBackButton } from "@/components/page-back-button"
 import { PageHeader } from "@/components/page-header"
-import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { useAutoSave } from "@/hooks/use-auto-save"
 import { resourceKeys } from "@/hooks/resource-keys"
@@ -243,19 +243,10 @@ function KnowledgeDocumentForm({
         />
       </FieldGroup>
       {stored ? null : (
-        <div className="flex items-center justify-end gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            disabled={disabled}
-            onClick={() => navigate(returnPath, { replace: true })}
-          >
-            {t("common:actions.cancel")}
-          </Button>
-          <Button type="submit" disabled={disabled}>
-            {t(disabled ? "common:actions.saving" : "common:actions.save")}
-          </Button>
-        </div>
+        <FormActions
+          saving={disabled}
+          onCancel={() => navigate(returnPath, { replace: true })}
+        />
       )}
     </form>
   )

@@ -21,10 +21,9 @@ import {
   SlidersHorizontalIcon,
   UserRoundIcon,
   WebhookIcon,
-  type LucideIcon,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { NavLink, useLocation, useNavigate } from "react-router"
+import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
@@ -57,56 +56,6 @@ import { UserAvatar } from "@/components/user-avatar"
 import { cn } from "@/lib/utils"
 import { resolveAppPlatform } from "@/platform/app-platform"
 import { requestNotificationPermissionFromMessageMenu } from "@/platform/notifications"
-
-/** 模块栏导航项，窄栏下只显示图标并由浮层提示名称。 */
-function WorkspaceRailItem({
-  to,
-  icon: Icon,
-  label,
-  active,
-  collapsed,
-  onClick,
-  className,
-}: {
-  to: string
-  icon: LucideIcon
-  label: string
-  active: boolean
-  collapsed?: boolean
-  onClick?: () => void
-  className?: string
-}) {
-  const link = (
-    <NavLink
-      to={to}
-      onClick={onClick}
-      aria-label={collapsed ? label : undefined}
-      className={cn(
-        "flex h-8 shrink-0 items-center rounded-md text-sm",
-        collapsed ? "w-8 justify-center" : "w-full gap-2 px-2.5",
-        "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
-        "focus-visible:ring-2 focus-visible:ring-sidebar-ring",
-        active &&
-          "bg-sidebar-accent font-medium text-sidebar-accent-foreground",
-        className,
-      )}
-    >
-      <Icon className="size-4 shrink-0" />
-      {collapsed ? null : <span className="min-w-0 flex-1 truncate">{label}</span>}
-    </NavLink>
-  )
-
-  if (!collapsed) {
-    return link
-  }
-
-  return (
-    <Tooltip>
-      <TooltipTrigger asChild>{link}</TooltipTrigger>
-      <TooltipContent side="right">{label}</TooltipContent>
-    </Tooltip>
-  )
-}
 
 /** 打开全局搜索的入口，尺寸与导航项一致；窄栏下收为图标并由浮层提示。 */
 function WorkspaceSearchEntry({ collapsed }: { collapsed: boolean }) {
@@ -158,7 +107,6 @@ function WorkspaceMenu({
   onInboxClick: () => void
 }) {
   const { t } = useTranslation("workspace")
-  const location = useLocation()
 
   return (
     <nav
@@ -186,35 +134,28 @@ function WorkspaceMenu({
           collapsed ? "items-center gap-1.5" : "items-stretch gap-0.5 pr-3",
         )}
       >
-        <WorkspaceRailItem
+        <PagePaneLink
           to="/inbox"
           icon={InboxIcon}
-          label={t("inbox")}
-          active={location.pathname === "/inbox"}
           collapsed={collapsed}
           onClick={onInboxClick}
-        />
-        <WorkspaceRailItem
+        >
+          {t("inbox")}
+        </PagePaneLink>
+        <PagePaneLink
           to="/contacts/employees"
+          activePath="/contacts"
           icon={ContactRoundIcon}
-          label={t("contacts")}
-          active={location.pathname.startsWith("/contacts")}
           collapsed={collapsed}
-        />
-        <WorkspaceRailItem
-          to="/channels"
-          icon={MessagesSquareIcon}
-          label={t("channels")}
-          active={location.pathname.startsWith("/channels")}
-          collapsed={collapsed}
-        />
-        <WorkspaceRailItem
-          to="/knowledge-bases"
-          icon={LibraryIcon}
-          label={t("knowledgeBases")}
-          active={location.pathname.startsWith("/knowledge-bases")}
-          collapsed={collapsed}
-        />
+        >
+          {t("contacts")}
+        </PagePaneLink>
+        <PagePaneLink to="/channels" icon={MessagesSquareIcon} collapsed={collapsed}>
+          {t("channels")}
+        </PagePaneLink>
+        <PagePaneLink to="/knowledge-bases" icon={LibraryIcon} collapsed={collapsed}>
+          {t("knowledgeBases")}
+        </PagePaneLink>
       </div>
     </nav>
   )
@@ -233,15 +174,15 @@ function WorkspaceSettingsMenu({
   const { t } = useTranslation("settings")
 
   const backToApp = (
-    <WorkspaceRailItem
+    <PagePaneLink
       to={appHref}
       icon={ChevronLeftIcon}
-      label={t("backToApp")}
-      active={false}
       collapsed={collapsed}
       // 左箭头字形本身内缩，展开时整行左移抵消，与下方导航项视觉左对齐。
       className={collapsed ? undefined : "-ml-1"}
-    />
+    >
+      {t("backToApp")}
+    </PagePaneLink>
   )
 
   return (
@@ -310,7 +251,6 @@ function WorkspaceSettingsMenu({
         <PagePaneLink
           collapsed={collapsed}
           to="/settings/roles"
-          activePath="/settings/roles"
           icon={ShieldCheckIcon}
         >
           {t("navigation.roles")}
@@ -549,7 +489,7 @@ export function WorkspaceNavigation({
         </div>
       )}
       {showAppVersion && !collapsed ? (
-        <span className="pt-1 pr-0 pb-2.5 pl-4 text-[11px] text-muted-foreground/70">
+        <span className="pt-1 pr-0 pb-2.5 pl-4 text-xs text-muted-foreground/70">
           {t("appVersion", { version: __APP_VERSION__ })}
         </span>
       ) : null}

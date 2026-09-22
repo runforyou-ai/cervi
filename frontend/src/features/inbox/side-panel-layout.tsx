@@ -1,0 +1,74 @@
+/** 会话侧边面板共用的分段页签和资料字段行。 */
+import type { ComponentProps, ReactNode } from "react"
+
+import { TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { FieldRequiredMark } from "@/components/ui/field"
+import { cn } from "@/lib/utils"
+
+/** 侧边面板顶部的分段页签列表，右端为收起按钮留出位置。 */
+export function SidePanelTabsList({
+  className,
+  ...props
+}: ComponentProps<typeof TabsList>) {
+  return (
+    <TabsList
+      className={cn(
+        "h-auto min-h-12 shrink-0 justify-start gap-1 border-b-0 px-3 py-2",
+        className,
+      )}
+      {...props}
+    />
+  )
+}
+
+/** 侧边面板分段页签，样式与会话列表的范围页签一致。 */
+export function SidePanelTab({
+  className,
+  ...props
+}: ComponentProps<typeof TabsTrigger>) {
+  return (
+    <TabsTrigger
+      className={cn(
+        "-mb-0 flex h-7 items-center rounded-md border-b-0 px-2 py-0 font-normal hover:bg-muted data-[state=active]:bg-accent data-[state=active]:font-medium data-[state=active]:text-accent-foreground data-[state=active]:hover:bg-accent data-[state=active]:hover:text-accent-foreground",
+        className,
+      )}
+      {...props}
+    />
+  )
+}
+
+/** 侧边面板资料字段行，需放在 dl 内；给出 action 时在行尾增加操作列。 */
+export function SidePanelField({
+  label,
+  required = false,
+  action,
+  className,
+  children,
+}: {
+  label: string
+  required?: boolean
+  action?: ReactNode
+  className?: string
+  children: ReactNode
+}) {
+  return (
+    <div
+      className={cn(
+        "grid items-start gap-2",
+        action === undefined
+          ? "grid-cols-[4.75rem_minmax(0,1fr)]"
+          : "group grid-cols-[4.75rem_minmax(0,1fr)_auto]",
+        className,
+      )}
+    >
+      <dt className="flex min-h-7 min-w-0 items-center gap-1 text-xs text-muted-foreground">
+        <span className="min-w-0 truncate">{label}</span>
+        {required ? <FieldRequiredMark /> : null}
+      </dt>
+      <dd className="flex min-h-7 min-w-0 items-center gap-2">{children}</dd>
+      {action === undefined ? null : (
+        <div className="flex min-h-7 items-center">{action}</div>
+      )}
+    </div>
+  )
+}

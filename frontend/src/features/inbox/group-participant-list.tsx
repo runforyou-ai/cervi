@@ -17,17 +17,8 @@ import {
   type MemberOption,
 } from "@/api"
 import { ProfileAvatar } from "@/components/profile-avatar"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { Button, buttonVariants } from "@/components/ui/button"
+import { ConfirmationDialog } from "@/components/confirmation-dialog"
+import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -289,92 +280,37 @@ export function GroupParticipantList({
         onAdd={onAdd}
       />
 
-      <AlertDialog
+      <ConfirmationDialog
         open={transferring !== null}
+        pending={acting}
+        title={t("groupTransferOwnerTitle", {
+          name: transferring?.displayName ?? "",
+        })}
+        description={t("groupTransferOwnerDescription")}
+        destructive={false}
         onOpenChange={(open) => !open && setTransferring(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {t("groupTransferOwnerTitle", {
-                name: transferring?.displayName ?? "",
-              })}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("groupTransferOwnerDescription")}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={acting}>
-              {t("common:actions.cancel")}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              className={buttonVariants({ variant: "default" })}
-              disabled={acting}
-              onClick={() => void transferOwner()}
-            >
-              {t("common:actions.confirm")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        onConfirm={() => void transferOwner()}
+      />
 
-      <AlertDialog
+      <ConfirmationDialog
         open={removing !== null}
+        pending={acting}
+        title={t("groupRemoveMemberTitle", {
+          name: removing?.displayName ?? "",
+        })}
+        description={t("groupRemoveMemberDescription")}
         onOpenChange={(open) => !open && setRemoving(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {t("groupRemoveMemberTitle", {
-                name: removing?.displayName ?? "",
-              })}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("groupRemoveMemberDescription")}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={acting}>
-              {t("common:actions.cancel")}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              disabled={acting}
-              onClick={() => void removeMember()}
-            >
-              {t("common:actions.confirm")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        onConfirm={() => void removeMember()}
+      />
 
-      <AlertDialog
+      <ConfirmationDialog
         open={leaving !== null && !readOnly && !canManage}
-        onOpenChange={(open) => !open && !acting && setLeaving(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t("groupLeaveTitle")}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("groupLeaveDescription")}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={acting}>
-              {t("common:actions.cancel")}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              disabled={acting}
-              onClick={(event) => {
-                event.preventDefault()
-                void leaveGroup()
-              }}
-            >
-              {t("common:actions.confirm")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        pending={acting}
+        title={t("groupLeaveTitle")}
+        description={t("groupLeaveDescription")}
+        onOpenChange={(open) => !open && setLeaving(null)}
+        onConfirm={() => void leaveGroup()}
+      />
     </div>
   )
 }
