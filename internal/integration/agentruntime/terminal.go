@@ -1,5 +1,3 @@
-//go:build server
-
 package agentruntime
 
 import (
@@ -49,8 +47,7 @@ type askCustomerInput struct {
 }
 
 type handoffInput struct {
-	Reason  string `json:"reason"`
-	Message string `json:"message"`
+	Reason string `json:"reason"`
 }
 
 // terminalIntent 记录一次校验通过的终止工具调用。
@@ -92,10 +89,9 @@ func (t *terminalTools) tools() []tool.BaseTool {
 		}, run: t.askCustomer},
 		&terminalTool{info: &schema.ToolInfo{
 			Name: handoffToolName,
-			Desc: "把当前客户会话交给人工客服。reason 写明转交原因，仅企业成员可见；message 是发给客户的说明，可以为空。",
+			Desc: "把当前客户会话交给人工客服。reason 写明转交原因，仅企业成员可见；系统会按承接结果通知客户。",
 			ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
-				"reason":  {Type: schema.String, Required: true, Desc: "转交原因"},
-				"message": {Type: schema.String, Desc: "发给客户的说明"},
+				"reason": {Type: schema.String, Required: true, Desc: "转交原因"},
 			}),
 		}, run: t.handoffToHuman},
 	}
@@ -135,7 +131,7 @@ func (t *terminalTools) handoffToHuman(ctx context.Context, arguments string) er
 	}
 	t.record(ctx, terminalIntent{decision: TerminalDecision{
 		Kind: domain.AgentRunOutcomeHandoff, Reason: domain.AgentHandoffReasonModelRequested, ReasonText: string(reason),
-	}, message: strings.TrimSpace(input.Message)})
+	}})
 	return nil
 }
 

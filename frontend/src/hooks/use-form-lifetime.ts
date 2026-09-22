@@ -4,23 +4,25 @@ import { useLocation } from "react-router"
 
 import { useUnsavedChangesContext } from "@/contexts/unsaved-changes-context"
 
-/** 保留未保存提示，并让提交操作忽略卸载后的界面更新。 */
+/** 保留未保存提示，并让提交操作忽略卸载后的界面更新；discarded 表示用户已确认放弃当前修改。 */
 export function useFormLifetime(isDirty: boolean) {
   const { pathname } = useLocation()
   const context = useUnsavedChangesContext()
   const mounted = useRef(false)
   const dirty = useRef(isDirty)
   dirty.current = isDirty
+  const discarded = useRef(false)
   const register = context?.register
 
   useEffect(() => {
     mounted.current = true
-    const unregister = register?.(Symbol(), { pathname, dirty })
+    discarded.current = false
+    const unregister = register?.(Symbol(), { pathname, dirty, discarded })
     return () => {
       mounted.current = false
       unregister?.()
     }
   }, [pathname, register])
 
-  return { mounted, dirty }
+  return { mounted, dirty, discarded }
 }

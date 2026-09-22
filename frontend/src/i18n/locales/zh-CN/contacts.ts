@@ -221,6 +221,7 @@ const contacts = {
   },
   teams: {
     create: "创建团队",
+    edit: "编辑团队",
     createDescription: "填写团队名称和简介。",
     editDescription: "修改团队名称和简介。",
     form: {

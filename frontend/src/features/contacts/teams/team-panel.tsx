@@ -416,9 +416,9 @@ export function TeamPanel({
         >
           <DialogContent className="max-w-xl">
             <DialogHeader>
-              <DialogTitle>{tCommon("actions.edit")}</DialogTitle>
+              <DialogTitle>{t("teams.edit")}</DialogTitle>
               <DialogDescription>
-                {t("teams.createDescription")}
+                {t("teams.editDescription")}
               </DialogDescription>
             </DialogHeader>
             <TeamForm
@@ -462,22 +462,22 @@ export function TeamPanel({
         </Dialog>
       ) : null}
 
+      {/* 删除确认的开关跟随地址参数。 */}
       <ConfirmationDialog
+        {...teamDeletion.dialog}
         open={deletingTeam !== null}
-        pending={teamDeletion.pending}
         title={t("teams.delete.title", { name: deletingTeam?.name ?? "" })}
         description={t("teams.delete.description", {
           count: deletingTeam?.memberCount ?? 0,
         })}
+        pendingLabel={tCommon("actions.deleting")}
         onOpenChange={(open) => {
           if (!open) setParameters({ deleteTeam: null })
         }}
-        onConfirm={() => void teamDeletion.confirm()}
       />
 
       <ConfirmationDialog
-        open={memberRemoval.item !== null}
-        pending={memberRemoval.pending}
+        {...memberRemoval.dialog}
         title={
           removingTeamMembers.length === 1
             ? t("teams.members.removeTitle", {
@@ -492,10 +492,6 @@ export function TeamPanel({
             ? "teams.members.removeDescription"
             : "teams.members.removeMultipleDescription",
         )}
-        onOpenChange={(open) => {
-          if (!open) memberRemoval.select(null)
-        }}
-        onConfirm={() => void memberRemoval.confirm()}
       />
     </>
   )

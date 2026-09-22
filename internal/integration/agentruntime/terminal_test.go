@@ -1,5 +1,3 @@
-//go:build server
-
 package agentruntime
 
 import (
@@ -56,7 +54,7 @@ func terminalCall(callID, name, arguments string) *schema.FunctionToolCall {
 // TestCustomerTerminalDecisions 验证客服场景的终止工具、同批校验、参数纠正与额度用尽后的转人工。
 func TestCustomerTerminalDecisions(t *testing.T) {
 	askArgs := `{"purpose":"clarify","message":"请提供订单号"}`
-	handoffArgs := `{"reason":"客户要求退款","message":"已为您转接人工"}`
+	handoffArgs := `{"reason":"客户要求退款"}`
 	for _, scenario := range []struct {
 		name        string
 		outputs     []func() *schema.AgenticMessage
@@ -76,12 +74,12 @@ func TestCustomerTerminalDecisions(t *testing.T) {
 			func() *schema.AgenticMessage {
 				return assistantReply("", terminalCall("handoff", handoffToolName, handoffArgs))
 			},
-		}, wantKind: domain.AgentRunOutcomeHandoff, wantReason: domain.AgentHandoffReasonModelRequested, wantContent: "已为您转接人工", wantCalls: 1},
+		}, wantKind: domain.AgentRunOutcomeHandoff, wantReason: domain.AgentHandoffReasonModelRequested, wantCalls: 1},
 		{name: "转人工后到达新输入仍不降级", lateInput: true, outputs: []func() *schema.AgenticMessage{
 			func() *schema.AgenticMessage {
 				return assistantReply("", terminalCall("handoff", handoffToolName, handoffArgs))
 			},
-		}, wantKind: domain.AgentRunOutcomeHandoff, wantReason: domain.AgentHandoffReasonModelRequested, wantContent: "已为您转接人工", wantCalls: 1},
+		}, wantKind: domain.AgentRunOutcomeHandoff, wantReason: domain.AgentHandoffReasonModelRequested, wantCalls: 1},
 		{name: "追问与转人工同批后纠正", outputs: []func() *schema.AgenticMessage{
 			func() *schema.AgenticMessage {
 				return assistantReply("", terminalCall("ask", askCustomerToolName, askArgs), terminalCall("handoff", handoffToolName, handoffArgs))

@@ -46,27 +46,29 @@ const (
 	ErrorKnowledgePageUnsupported           Key = "error.knowledge_page_unsupported"
 	ErrorKnowledgePageTooLarge              Key = "error.knowledge_page_too_large"
 
-	ErrorAgentReplyStopFailed            Key = "error.agent_reply_stop_failed"
-	ErrorAgentUnavailable                Key = "error.agent_unavailable"
-	AgentCustomerHandoffFallback         Key = "agent.customer_handoff_fallback"
-	AgentCustomerFailureFallback         Key = "agent.customer_failure_fallback"
-	ErrorCustomerReplySuggestFailed      Key = "error.customer_reply_suggest_failed"
-	ErrorCustomerCopilotThreadListFailed Key = "error.customer_copilot_thread_list_failed"
-	FieldAgentIdentityIDInvalid          Key = "field.agent_identity_id_invalid"
-	FieldCustomerReplyModeInvalid        Key = "field.customer_reply_mode_invalid"
-	FieldCustomerReplyToneInvalid        Key = "field.customer_reply_tone_invalid"
-	FieldCustomerReplyDraftRequired      Key = "field.customer_reply_draft_required"
-	ErrorKnowledgeQANotFound             Key = "error.knowledge_qa_not_found"
-	ErrorKnowledgeQAUnsupported          Key = "error.knowledge_qa_unsupported"
-	ErrorKnowledgeBaseHasContent         Key = "error.knowledge_base_has_content"
-	ErrorKnowledgeQAReadFailed           Key = "error.knowledge_qa_read_failed"
-	ErrorKnowledgeQASaveFailed           Key = "error.knowledge_qa_save_failed"
-	ErrorKnowledgeQADeleteFailed         Key = "error.knowledge_qa_delete_failed"
-	ErrorKnowledgeQARetryFailed          Key = "error.knowledge_qa_retry_failed"
-	FieldKnowledgeQAQuestionRequired     Key = "field.knowledge_qa_question_required"
-	FieldKnowledgeQAAnswerRequired       Key = "field.knowledge_qa_answer_required"
-	FieldKnowledgeQAGroupInvalid         Key = "field.knowledge_qa_group_invalid"
-	FieldKnowledgeQAContentInvalid       Key = "field.knowledge_qa_content_invalid"
+	ErrorAgentReplyStopFailed                 Key = "error.agent_reply_stop_failed"
+	ErrorAgentUnavailable                     Key = "error.agent_unavailable"
+	AgentCustomerHandoffAssigned              Key = "agent.customer_handoff_assigned"
+	AgentCustomerHandoffQueued                Key = "agent.customer_handoff_queued"
+	AgentCustomerHandoffAfterHours            Key = "agent.customer_handoff_after_hours"
+	AgentCustomerHandoffAfterHoursUnscheduled Key = "agent.customer_handoff_after_hours_unscheduled"
+	ErrorCustomerReplySuggestFailed           Key = "error.customer_reply_suggest_failed"
+	ErrorCustomerCopilotThreadListFailed      Key = "error.customer_copilot_thread_list_failed"
+	FieldAgentIdentityIDInvalid               Key = "field.agent_identity_id_invalid"
+	FieldCustomerReplyModeInvalid             Key = "field.customer_reply_mode_invalid"
+	FieldCustomerReplyToneInvalid             Key = "field.customer_reply_tone_invalid"
+	FieldCustomerReplyDraftRequired           Key = "field.customer_reply_draft_required"
+	ErrorKnowledgeQANotFound                  Key = "error.knowledge_qa_not_found"
+	ErrorKnowledgeQAUnsupported               Key = "error.knowledge_qa_unsupported"
+	ErrorKnowledgeBaseHasContent              Key = "error.knowledge_base_has_content"
+	ErrorKnowledgeQAReadFailed                Key = "error.knowledge_qa_read_failed"
+	ErrorKnowledgeQASaveFailed                Key = "error.knowledge_qa_save_failed"
+	ErrorKnowledgeQADeleteFailed              Key = "error.knowledge_qa_delete_failed"
+	ErrorKnowledgeQARetryFailed               Key = "error.knowledge_qa_retry_failed"
+	FieldKnowledgeQAQuestionRequired          Key = "field.knowledge_qa_question_required"
+	FieldKnowledgeQAAnswerRequired            Key = "field.knowledge_qa_answer_required"
+	FieldKnowledgeQAGroupInvalid              Key = "field.knowledge_qa_group_invalid"
+	FieldKnowledgeQAContentInvalid            Key = "field.knowledge_qa_content_invalid"
 
 	ErrorAgentRunProcessUnavailable       Key = "error.agent_run_process_unavailable"
 	ErrorAgentRunProcessReadFailed        Key = "error.agent_run_process_read_failed"
@@ -116,6 +118,11 @@ const (
 	ErrorOrganizationAddressInvalid       Key = "error.organization_address_invalid"
 	ErrorInstallationNotAvailable         Key = "error.installation_not_available"
 	ErrorOperatorCredentialInvalid        Key = "error.operator_credential_invalid"
+	ErrorDomainPrefixInvalid              Key = "error.domain_prefix_invalid"
+	ErrorDomainTaken                      Key = "error.domain_taken"
+	ErrorProvisioningConflict             Key = "error.provisioning_conflict"
+	ErrorProvisioningNotFound             Key = "error.provisioning_not_found"
+	ErrorOrganizationNotFound             Key = "error.organization_not_found"
 	ErrorAuthenticationStatusFailed       Key = "error.authentication_status_failed"
 	ErrorAuthenticationRequired           Key = "error.authentication_required"
 	ErrorValidationFailed                 Key = "error.validation_failed"
@@ -209,6 +216,8 @@ const (
 	ErrorWorkStatusUpdateFailed           Key = "error.work_status_update_failed"
 	ErrorChannelSummaryListFailed         Key = "error.channel_summary_list_failed"
 	ErrorOrganizationUpdateFailed         Key = "error.organization_update_failed"
+	ErrorBusinessHoursLoadFailed          Key = "error.business_hours_load_failed"
+	ErrorBusinessHoursUpdateFailed        Key = "error.business_hours_update_failed"
 	ErrorServerURLInvalid                 Key = "error.server_url_invalid"
 	ErrorServerUnavailable                Key = "error.server_unavailable"
 	ErrorServerConnectionSaveFailed       Key = "error.server_connection_save_failed"
@@ -277,6 +286,8 @@ const (
 	FieldCurrentPasswordIncorrect        Key = "field.current_password_incorrect"
 	FieldLocaleInvalid                   Key = "field.locale_invalid"
 	FieldTimeZoneInvalid                 Key = "field.time_zone_invalid"
+	FieldBusinessHoursWeeklyInvalid      Key = "field.business_hours_weekly_invalid"
+	FieldBusinessHoursOverrideInvalid    Key = "field.business_hours_override_invalid"
 	FieldWorkStatusInvalid               Key = "field.work_status_invalid"
 	FieldMaxServiceSessionsInvalid       Key = "field.max_service_sessions_invalid"
 	FieldAgentWorkStatusUnavailable      Key = "field.agent_work_status_unavailable"
@@ -446,6 +457,17 @@ func Localize(acceptLanguage string, key Key) (string, string) {
 		return string(key), tag.String()
 	}
 	return message, tag.String()
+}
+
+// LocalizeTemplate 根据语言偏好用模板数据渲染本地化文案；词条缺失或本地化失败时记录错误并回退返回键本身。
+func LocalizeTemplate(acceptLanguage string, key Key, data map[string]any) string {
+	localizer := goi18n.NewLocalizer(bundle, acceptLanguage)
+	message, err := localizer.Localize(&goi18n.LocalizeConfig{MessageID: string(key), TemplateData: data})
+	if err != nil {
+		slog.Error("本地化文案失败，回退返回文案键", "key", string(key), "locale", acceptLanguage, "error", err)
+		return string(key)
+	}
+	return message
 }
 
 // LocalizeMap 将一组文案键翻译为对应文案；词条缺失或本地化失败时记录错误并回退返回键本身。

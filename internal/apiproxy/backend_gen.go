@@ -1230,6 +1230,22 @@ func (b *Backend) UpdateOrganization(ctx context.Context, meta appservice.Reques
 	return output, err
 }
 
+// GetBusinessHours 读取当前企业的客服工作时间。
+func (b *Backend) GetBusinessHours(ctx context.Context, meta appservice.RequestMeta) (appservice.BusinessHours, error) {
+	var output appservice.BusinessHours
+	err := b.do(ctx, meta, http.MethodGet, "/settings/customer-service/business-hours", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// UpdateBusinessHours 修改当前企业的客服工作时间。
+func (b *Backend) UpdateBusinessHours(ctx context.Context, meta appservice.RequestMeta, input appservice.BusinessHours) (appservice.BusinessHours, error) {
+	var output appservice.BusinessHours
+	err := b.do(ctx, meta, http.MethodPut, "/settings/customer-service/business-hours", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // RegisterDevice 注册当前用户的本机设备。
 func (b *Backend) RegisterDevice(ctx context.Context, meta appservice.RequestMeta, input appservice.DeviceRegistrationInput) (appservice.Device, error) {
 	var output appservice.Device

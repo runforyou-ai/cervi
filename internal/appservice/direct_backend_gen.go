@@ -1621,6 +1621,26 @@ func (b *DirectBackend) UpdateOrganization(ctx context.Context, meta RequestMeta
 	return b.ops.UpdateOrganization(ctx, meta, identity, input)
 }
 
+// GetBusinessHours 读取当前企业的客服工作时间。
+func (b *DirectBackend) GetBusinessHours(ctx context.Context, meta RequestMeta) (BusinessHours, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero BusinessHours
+		return zero, err
+	}
+	return b.ops.GetBusinessHours(ctx, meta, identity)
+}
+
+// UpdateBusinessHours 修改当前企业的客服工作时间。
+func (b *DirectBackend) UpdateBusinessHours(ctx context.Context, meta RequestMeta, input BusinessHours) (BusinessHours, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero BusinessHours
+		return zero, err
+	}
+	return b.ops.UpdateBusinessHours(ctx, meta, identity, input)
+}
+
 // RegisterDevice 注册当前用户的本机设备。
 func (b *DirectBackend) RegisterDevice(ctx context.Context, meta RequestMeta, input DeviceRegistrationInput) (Device, error) {
 	identity, err := b.ops.authenticate(ctx, meta)

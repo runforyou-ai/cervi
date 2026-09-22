@@ -47,15 +47,9 @@ export function MessageChannelListPage() {
     setSearchParams(value === "enabled" ? {} : { status: value }, {
       replace: true,
     })
-  const {
-    data,
-    loading,
-    retrying,
-    error,
-    refresh,
-  } = useResource(resourceKeys.messageChannels(), () => listMessageChannels())
+  const resource = useResource(resourceKeys.messageChannels(), () => listMessageChannels())
+  const { data } = resource
   const channels = useMemo(() => data ?? [], [data])
-  const showLoading = loading || retrying
 
   const filteredChannels = useMemo(
     () =>
@@ -129,10 +123,8 @@ export function MessageChannelListPage() {
       </ListToolbar>
 
       <ResourceListLayout
-        loading={showLoading}
-        error={Boolean(error)}
+        resources={resource}
         errorMessage={t("list.loadError")}
-        onRetry={() => void refresh()}
       >
         <ResourceTable
           hideHeader
@@ -187,8 +179,7 @@ export function MessageChannelListPage() {
       </ResourceListLayout>
 
       <ConfirmationDialog
-        open={statusChange.item !== null}
-        pending={statusChange.pending}
+        {...statusChange.dialog}
         title={
           statusChange.item
             ? t(
@@ -209,10 +200,6 @@ export function MessageChannelListPage() {
             : ""
         }
         destructive={statusChange.item?.enabled ?? true}
-        onOpenChange={(open) => {
-          if (!open) statusChange.select(null)
-        }}
-        onConfirm={() => void statusChange.confirm()}
       />
     </div>
   )

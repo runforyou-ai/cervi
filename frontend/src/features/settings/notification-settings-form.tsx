@@ -49,7 +49,7 @@ export function NotificationSettingsForm({ user }: { user: CurrentUser }) {
         readNotificationDevicePreferences(notificationScope).soundEnabled,
     },
   })
-  const markSaved = useAutoSave({ form, schema, save })
+  const { markSaved } = useAutoSave({ form, schema, save })
 
   /** 保存新消息提醒到账号偏好，通知声音只写入本机。 */
   async function save(values: NotificationSettingsFormValues) {
@@ -71,16 +71,18 @@ export function NotificationSettingsForm({ user }: { user: CurrentUser }) {
       form.reset(next)
       markSaved(next)
       void invalidate(resourceKeys.identity())
+      return true
     } catch (error) {
       if (recoverSession(error, navigate)) {
-        return
+        return false
       }
       console.warn("保存通知设置失败", error)
       if (isApiError(error)) {
         toast.error(apiErrorMessage(error, ["messageNotificationsEnabled"]))
-        return
+        return false
       }
       toast.error(t("notifications.saveError"))
+      return false
     }
   }
 

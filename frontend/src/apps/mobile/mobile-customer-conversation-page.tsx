@@ -33,6 +33,7 @@ import {
   useCustomerSessionActions,
 } from "@/features/inbox/customer-session-actions"
 import { useConversationAgentReplyLabel } from "@/features/inbox/conversation-agent-activity"
+import { useConversationName } from "@/features/inbox/use-conversation-name"
 import { useConversationTypingLabel } from "@/features/inbox/use-conversation-typing"
 import { useConversationSummary } from "@/features/inbox/use-conversation-summary"
 import { resourceKeys } from "@/hooks/resource-keys"
@@ -132,6 +133,7 @@ export function MobileCustomerConversationPage() {
   const conversation = data && isCustomerInboxConversation(data) ? data : null
   const typingLabel = useConversationTypingLabel(conversationID, null)
   const agentReplyLabel = useConversationAgentReplyLabel(conversationID)
+  const conversationName = useConversationName()
   // 访客正在输入优先于 AI 员工正在回复。
   const activityLabel = typingLabel || agentReplyLabel
   if (!conversationID) return <Navigate to={inboxURL} replace />
@@ -154,9 +156,7 @@ export function MobileCustomerConversationPage() {
         title={
           <span className="block min-w-0 truncate">
             {activityLabel ||
-              (customer
-                ? (customer.contactName ?? t("anonymousVisitor"))
-                : t("unknownSender"))}
+              (conversation ? conversationName(conversation) : t("unknownSender"))}
           </span>
         }
         actions={

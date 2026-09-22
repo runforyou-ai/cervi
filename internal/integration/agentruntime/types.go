@@ -1,10 +1,9 @@
-//go:build server
-
 // Package agentruntime 使用 Eino 执行平台托管 Agent。
 package agentruntime
 
 import (
 	"context"
+	"net/http"
 
 	"github.com/runforyou-ai/cervi/internal/domain"
 
@@ -61,7 +60,8 @@ type ModelConfig struct {
 	MaxOutputTokens int
 	ContextWindow   int
 	InputModalities []domain.AIModelInputModality
-	DisableThinking bool // 为 true 时在模型组件提供思考开关的品牌上关闭思考模式。
+	DisableThinking bool              // 为 true 时在模型组件提供思考开关的品牌上关闭思考模式。
+	Transport       http.RoundTripper // 非空时模型请求经该传输层发出。
 }
 
 // AttachmentContent 读取本次运行会话中指定附件消息的文件内容。
@@ -95,10 +95,11 @@ type GroundingPolicy string
 // GroundingStrict 要求直接输出的正文在当前输入边界内取得有效依据，否则纠正一次后转人工。
 const GroundingStrict GroundingPolicy = "strict"
 
-// ModelCredentials 定义调用模型所需的供应商凭据，由执行侧注入，不进入有效配置。
+// ModelCredentials 定义调用模型所需的凭据与入口，由执行侧注入，不进入有效配置；设备执行时指向服务端模型代理。
 type ModelCredentials struct {
-	APIKey  string
-	BaseURL string
+	APIKey    string
+	BaseURL   string
+	Transport http.RoundTripper // 非空时模型请求经该传输层发出。
 }
 
 // RunRequest 定义一次有界 Agent 业务运行。
@@ -108,10 +109,10 @@ type RunRequest struct {
 	Credentials           ModelCredentials // 模型供应商凭据。
 	KnowledgeSearch       KnowledgeSearch
 	CustomerHistorySearch CustomerHistorySearch
-	ReadAttachment        AttachmentContent
-	MCPConnections        []MCPServer // 有效配置中远程 MCP 服务对应的连接配置。
-	MaxIterations         int         // 单轮模型与工具迭代上限，零值使用默认值。
-	MaxTurns              int         // 吸收新输入的轮次上限，零值不限制，由运行 context 控制生命周期。
+	ReadAttachment        AttachmentContent // 为空时附件只以正文中的链接提供给模型。
+	MCPConnections        []MCPServer       // 有效配置中远程 MCP 服务对应的连接配置。
+	MaxIterations         int               // 单轮模型与工具迭代上限，零值使用默认值。
+	MaxTurns              int               // 吸收新输入的轮次上限，零值不限制，由运行 context 控制生命周期。
 	StreamID              string
 	Attempt               int
 	OnStream              func(StreamDelta) // 串行接收合并后的运行流增量，实现不得阻塞。
@@ -127,6 +128,7 @@ func (r RunRequest) modelConfig() ModelConfig {
 		MaxOutputTokens: int(r.Assignment.Model.MaxOutputTokens),
 		ContextWindow:   int(r.Assignment.Model.ContextWindow),
 		InputModalities: r.Assignment.Model.InputModalities,
+		Transport:       r.Credentials.Transport,
 	}
 }
 

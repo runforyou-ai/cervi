@@ -21,6 +21,7 @@ const common = {
     confirm: "Confirm",
     delete: "Delete",
     deleting: "Deleting…",
+    processing: "Processing…",
     search: "Search",
     searchPlaceholder: "Search…",
     searchShortcut: "Search (Ctrl/⌘ K)",

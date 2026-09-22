@@ -313,6 +313,7 @@ body,
 [data-native-os="darwin"][data-window-fullscreen="false"] :is(
     .cervi-window-drag-region,
     .cervi-workspace-rail,
+    .cervi-workspace-titlebar-actions,
     .cervi-workspace-top-drag-region
   ) {
   cursor: default;
@@ -452,12 +453,18 @@ body,
   --cervi-workspace-rail-top: calc(var(--cervi-workspace-content-top) + 10px);
 }
 
-/* 一级栏整体和主内容卡片上方的空白区域用于拖动窗口。 */
-[data-native-os="darwin"][data-window-fullscreen="false"] .cervi-workspace-rail {
+/* 一级栏整体、覆盖在其顶部的标题栏操作行和主内容卡片上方的空白区域用于拖动窗口。 */
+[data-native-os="darwin"][data-window-fullscreen="false"] :is(
+    .cervi-workspace-rail,
+    .cervi-workspace-titlebar-actions
+  ) {
   --wails-draggable: drag;
 }
 
-[data-native-os="darwin"] .cervi-workspace-rail :is(a, button, input) {
+[data-native-os="darwin"] :is(
+    .cervi-workspace-rail,
+    .cervi-workspace-titlebar-actions
+  ) :is(a, button, input) {
   --wails-draggable: no-drag;
 }
 

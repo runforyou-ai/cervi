@@ -43,16 +43,14 @@
 
 ## 契约扩展
 
-运行时编入批在 `DeviceRunBackend` 增加：
+运行时补齐批在 `DeviceRunBackend` 增加：
 
 | 路由 | 作用 |
 | --- | --- |
 | `POST /agent-runs/:runID/knowledge/search` | 沿用服务端知识检索实现 |
 | `GET /agent-runs/:runID/attachments/:messageID` | 读取本次运行的附件内容 |
 
-模型代理不进契约：它是带流式的字节透传，不是类型化业务调用。代理在 `internal/api` 下手写 Gin 路由，认证复用登录 Token 与设备请求头，额外校验运行由本设备持有有效租约，按 Revision 锁定的品牌注入凭据、强制模型标识与 Revision 一致后透传流式响应。设备侧把 `ModelConfig.BaseURL` 指向该路由、`APIKey` 换成登录 Token。
-
-设备收尾的结果与失败入口目前只带正文、输入边界和错误码；运行时编入后，失败与被抑制的运行同样回传已产生的用量和过程内容块，服务端按 `persistPartialProcess` 保存。
+设备有效配置目前按空能力解析，不含知识检索工具；知识检索路由上线后，`deviceAssignment` 按版本绑定的知识库开启 `Knowledge` 能力。
 
 ## 派发与租约的后续要求
 
@@ -62,10 +60,8 @@
 
 ## 运行时对齐
 
-- `internal/integration/agentruntime` 与 `internal/integration/knowledgeretrieval` 去掉 `server` 构建标签，编入桌面端；两者只依赖 `common`、`domain` 和已无构建标签的 `integration/mcp`，检索源由调用方以闭包注入。移动端不编入。
-- `RunRequest` 的依赖在设备侧实现为 API Proxy 调用：`InputFeed` 对应已上线的 Peek 与 Claim，`KnowledgeSearch`、`ReadAttachment` 对应上面新增的路由，`OnStream` 改为发 Wails 事件。运行时代码不因此改动。
+- `RunRequest` 的其余依赖在设备侧实现为 API Proxy 调用：`KnowledgeSearch`、`ReadAttachment` 对应上面新增的路由，`OnStream` 改为发 Wails 事件。运行时代码不因此改动。
 - 行为快照在领取时写入，工具清单取决于领取设备的能力清单；快照写定后，重试落在不再提供这些工具的设备上时直接失败。
-- 本地 Run 的时限单独配置，不沿用服务端的 `agentRunTimeout`。
 - 流式增量只在本机前端渲染，其他端展示运行状态与最终回复，状态变化沿用会话版本推进。
 - 首版不加载 Revision 绑定的企业远程 MCP 服务。
 
@@ -132,7 +128,7 @@
 
 ## 交付批次
 
-**运行时编入。** 去掉 `agentruntime` 与 `knowledgeretrieval` 的 `server` 标签、远程适配器、知识检索与附件路由、模型代理、本机流式渲染、本地 Run 时限，替换占位运行时。此时没有本机工具，本地 Run 与服务端 Run 结果等价，可直接对比验证。验收：设备侧不出现模型供应商凭据，服务端不出现工作区真实路径。
+**运行时补齐。** 知识检索与附件路由、对应的远程适配器、设备有效配置开启知识检索、本机流式渲染。验收：绑定知识库的本地 Run 与服务端 Run 的检索结果和回复等价，图片附件随消息直传。
 
 **只读本机工具。** `workspaceBackend`、工作区身份校验、路径围栏、能力清单上报与交集。验收：`..`、符号链接、已移动的工作区全部被拒；低版本设备得不到未支持的工具。
 

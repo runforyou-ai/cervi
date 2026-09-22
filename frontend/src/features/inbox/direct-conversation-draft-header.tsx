@@ -11,6 +11,7 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { HeaderAction } from "@/features/inbox/conversation-header"
+import { cn } from "@/lib/utils"
 
 /** 展示草稿收件人的头像。 */
 export function DirectConversationDraftAvatar({
@@ -39,12 +40,14 @@ export function DirectConversationDraftHeader({
   member,
   actions,
   contextVisible = false,
+  narrowViewport = false,
   onToggleContext,
 }: {
   member: MemberOption
   /** 展示在侧栏开关之前的草稿操作。 */
   actions?: ReactNode
   contextVisible?: boolean
+  narrowViewport?: boolean
   onToggleContext?: () => void
 }) {
   const { t } = useTranslation("inbox")
@@ -52,7 +55,10 @@ export function DirectConversationDraftHeader({
   return (
     <header
       data-slot="conversation-header"
-      className="flex min-h-12 shrink-0 items-center gap-2.5 px-3 py-2"
+      className={cn(
+        "flex min-h-12 shrink-0 items-center gap-2.5 px-3 py-2",
+        narrowViewport && "pr-14",
+      )}
     >
       {/* 标题只占文字宽度，右侧留白保持窗口可拖动。 */}
       <div className="flex min-w-0 flex-1 items-center">

@@ -487,6 +487,32 @@ export interface Auth {
 }
 
 /**
+ * BusinessHours 定义企业客服工作时间；Weekly 固定 7 项，从周一到周日排列。
+ */
+export interface BusinessHours {
+    "enabled": boolean;
+    "timeZone": string;
+    "weekly": (BusinessHoursPeriod[] | null)[] | null;
+    "overrides": BusinessHoursOverride[] | null;
+}
+
+/**
+ * BusinessHoursOverride 定义按日期覆盖的工作时段，Periods 为空表示当天休息。
+ */
+export interface BusinessHoursOverride {
+    "date": string;
+    "periods": BusinessHoursPeriod[] | null;
+}
+
+/**
+ * BusinessHoursPeriod 定义一天内的一个工作时段，起止为 HH:mm，结束可取 24:00。
+ */
+export interface BusinessHoursPeriod {
+    "start": string;
+    "end": string;
+}
+
+/**
  * ChangePasswordInput 定义当前用户修改密码所需字段。
  */
 export interface ChangePasswordInput {

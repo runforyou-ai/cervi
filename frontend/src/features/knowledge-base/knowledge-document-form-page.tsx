@@ -1,5 +1,5 @@
 /** 在线文档的独立新增和编辑页面。 */
-import { useEffect, useId, useMemo, useRef, useState } from "react"
+import { useEffect, useId, useMemo, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
@@ -11,7 +11,6 @@ import {
   createKnowledgeTextDocument,
   getKnowledgeBase,
   getKnowledgeDocumentContent,
-  isApiError,
   KnowledgeBaseCategory,
   KnowledgeDocumentSourceKind,
   updateKnowledgeDocumentContent,
@@ -22,14 +21,12 @@ import { FormInputField } from "@/components/form/form-input-field"
 import { PageContent } from "@/components/page-content"
 import { PageBackButton } from "@/components/page-back-button"
 import { PageHeader } from "@/components/page-header"
+import { ResourceContent } from "@/components/resource-content"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { useAutoSave } from "@/hooks/use-auto-save"
 import { resourceKeys } from "@/hooks/resource-keys"
+import { useFormSave } from "@/hooks/use-form-save"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
-import { apiErrorMessage } from "@/lib/form-errors"
-import { recoverSession } from "@/lib/session-navigation"
 import { KnowledgeDocumentEditor } from "./knowledge-document-editor"
-import { KnowledgeQAFeedback } from "./knowledge-qa-feedback"
 
 export const knowledgeDocumentTitleMaxLength = 120
 
@@ -73,8 +70,6 @@ export function KnowledgeDocumentFormPage({
     (signal) => getKnowledgeDocumentContent(knowledgeBaseId, documentId, signal),
     { enabled: mode === "edit", staleTime: 0 },
   )
-  const error = base.error ?? content.error
-  const ready = base.data && (mode === "create" || content.data)
   const supported =
     base.data?.category ===
       KnowledgeBaseCategory.KnowledgeBaseCategoryStandard &&
@@ -100,23 +95,23 @@ export function KnowledgeDocumentFormPage({
         ) : null}
       </PageHeader>
       <PageContent variant="form">
-        {error || !ready ? (
-          <KnowledgeQAFeedback
-            error={error}
-            retry={() => void (base.error ? base.refresh() : content.refresh())}
-          />
-        ) : !supported ? (
-          <p className="text-sm text-muted-foreground">
-            {t("documents.sourceUnsupported")}
-          </p>
-        ) : (
-          <KnowledgeDocumentForm
-            key={`${knowledgeBaseId}/${groupId}/${documentId}/${mode}`}
-            baseId={knowledgeBaseId}
-            groupId={groupId}
-            stored={mode === "edit" ? content.data : undefined}
-          />
-        )}
+        <ResourceContent
+          resources={mode === "edit" ? [base, content] : [base]}
+          errorMessage={t("documents.loadError")}
+        >
+          {!supported ? (
+            <p className="text-sm text-muted-foreground">
+              {t("documents.sourceUnsupported")}
+            </p>
+          ) : (
+            <KnowledgeDocumentForm
+              key={`${knowledgeBaseId}/${groupId}/${documentId}/${mode}`}
+              baseId={knowledgeBaseId}
+              groupId={groupId}
+              stored={mode === "edit" ? content.data : undefined}
+            />
+          )}
+        </ResourceContent>
       </PageContent>
     </>
   )
@@ -137,7 +132,6 @@ function KnowledgeDocumentForm({
   const location = useLocation()
   const invalidate = useResourceInvalidator()
   const id = useId()
-  const mounted = useRef(true)
   const schema = useMemo(
     () =>
       createDocumentSchema({
@@ -161,13 +155,6 @@ function KnowledgeDocumentForm({
   // 表单未编辑时跟随最新读取到的名称与正文，编辑器按内容版本重建。
   const [contentVersion, setContentVersion] = useState(0)
   useEffect(() => {
-    mounted.current = true
-    return () => {
-      mounted.current = false
-    }
-  }, [])
-
-  useEffect(() => {
     if (!stored || form.formState.isDirty) return
     const values = form.getValues()
     if (values.title === stored.document.name && values.content === stored.content)
@@ -178,15 +165,11 @@ function KnowledgeDocumentForm({
 
   /** 提交表单并失效该文档的列表、详情和正文缓存。 */
   // 编辑已有文档时边改边存，新建仍由底部按钮提交并跳回列表。
-  const markSaved = useAutoSave({
+  const { submit } = useFormSave({
     form,
     schema,
-    enabled: Boolean(stored),
-    save: (values) => save(values, true),
-  })
-
-  async function save(values: DocumentFormValues, autoSaved = false) {
-    try {
+    autoSave: Boolean(stored),
+    save: async (values) => {
       const saved = stored
         ? await updateKnowledgeDocumentContent(baseId, stored.document.id, values)
         : await createKnowledgeTextDocument(baseId, { ...values, groupId })
@@ -195,24 +178,22 @@ function KnowledgeDocumentForm({
         invalidate(resourceKeys.knowledgeDocument(baseId, saved.id)),
         invalidate(resourceKeys.knowledgeDocumentContent(baseId, saved.id)),
       ])
-      if (!mounted.current) return
-      if (autoSaved) {
-        markSaved(values)
-        return
-      }
+    },
+    onSubmitted: () => {
       toast.success(t("documents.saveSuccess"))
       navigate(returnPath, { replace: true })
-    } catch (error) {
-      if (!mounted.current || recoverSession(error, navigate)) return
-      toast.error(
-        isApiError(error) ? apiErrorMessage(error) : t("documents.saveError"),
-      )
-    }
-  }
+    },
+    errorMessage: t("documents.saveError"),
+    logLabel: "保存在线文档",
+  })
 
   const disabled = form.formState.isSubmitting
   return (
-    <form className="w-full space-y-9" onSubmit={form.handleSubmit((values) => save(values))}>
+    <form
+      className="w-full space-y-9"
+      onSubmit={form.handleSubmit(submit)}
+      noValidate
+    >
       <FieldGroup>
         <FormInputField
           control={form.control}

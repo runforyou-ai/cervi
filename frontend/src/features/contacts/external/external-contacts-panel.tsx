@@ -364,32 +364,22 @@ export function ExternalContactsPanel({
       />
 
       <ConfirmationDialog
-        open={deletion.item !== null}
-        pending={deletion.pending}
+        {...deletion.dialog}
         title={t("delete.title", {
           name: deletion.item?.displayName || t("anonymous"),
         })}
         description={t("delete.description")}
         pendingLabel={t("common:actions.deleting")}
-        onOpenChange={(open) => {
-          if (!open) deletion.select(null)
-        }}
-        onConfirm={() => void deletion.confirm()}
       />
 
       <ConfirmationDialog
-        open={restoration.item !== null}
-        pending={restoration.pending}
+        {...restoration.dialog}
         title={t("trash.restoreTitle", {
           name: restoration.item?.displayName || t("anonymous"),
         })}
         description={t("trash.restoreDescription")}
         destructive={false}
         pendingLabel={t("trash.restoring")}
-        onOpenChange={(open) => {
-          if (!open) restoration.select(null)
-        }}
-        onConfirm={() => void restoration.confirm()}
       />
     </>
   )

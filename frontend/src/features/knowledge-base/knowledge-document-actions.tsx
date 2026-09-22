@@ -88,7 +88,7 @@ export function KnowledgeDocumentActions({
               : action.document.name}
           </DialogDescription>
         </DialogHeader>
-        <form className="space-y-9" onSubmit={form.handleSubmit(save)}>
+        <form className="space-y-9" onSubmit={form.handleSubmit(save)} noValidate>
           {action.kind === "move" && (
             <Field>
               <FieldLabel htmlFor="document-target-group" required>

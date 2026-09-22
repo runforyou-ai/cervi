@@ -1,7 +1,7 @@
 /** 企业知识库新建和编辑页。 */
 import { useEffect, useMemo, useRef, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { Controller, useForm } from "react-hook-form"
+import { Controller, useForm, useWatch } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import {
   Link,
@@ -14,11 +14,9 @@ import { toast } from "sonner"
 import {
   KnowledgeBaseCategory,
   type KnowledgeBaseCategoryId,
-  type KnowledgeBaseData,
   createKnowledgeBase,
   getKnowledgeBase,
   listAIProviders,
-  isApiError,
   listKnowledgeBaseAgents,
   updateKnowledgeBase,
   UserStatus,
@@ -28,6 +26,7 @@ import { FormActions } from "@/components/form/form-actions"
 import { FormInputField } from "@/components/form/form-input-field"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { PageContent } from "@/components/page-content"
+import { ResourceContent } from "@/components/resource-content"
 import { PageBackButton } from "@/components/page-back-button"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
@@ -41,11 +40,9 @@ import {
 } from "@/features/knowledge-base/knowledge-base-schema"
 import { KnowledgeBaseSettingsFields } from "./knowledge-base-settings-fields"
 import { useKnowledgeBaseContext } from "@/features/knowledge-base/knowledge-base-context"
-import { useAutoSave } from "@/hooks/use-auto-save"
 import { resourceKeys } from "@/hooks/resource-keys"
+import { useFormSave } from "@/hooks/use-form-save"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
-import { apiErrorMessage } from "@/lib/form-errors"
-import { recoverSession } from "@/lib/session-navigation"
 
 /** 创建或编辑知识库。 */
 export function KnowledgeBaseFormPage({
@@ -66,7 +63,6 @@ export function KnowledgeBaseFormPage({
   const invalidateResource = useResourceInvalidator()
   const [category, setCategory] =
     useState<KnowledgeBaseCategoryId>(requestedCategory)
-  const mounted = useRef(true)
   const saveButton = useRef<HTMLButtonElement>(null)
   const [confirmReindex, setConfirmReindex] = useState(false)
   const isQA = category === KnowledgeBaseCategory.KnowledgeBaseCategoryQA
@@ -119,28 +115,18 @@ export function KnowledgeBaseFormPage({
     })
   }, [form, mode, requestedCategory])
 
-  const {
-    data: loadedKnowledgeBase,
-    loading: detailLoading,
-    refreshing: detailRefreshing,
-    error: detailError,
-    refresh: refreshKnowledgeBase,
-  } = useResource(
+  const detail = useResource(
     resourceKeys.knowledgeBase(knowledgeBaseId),
     () => getKnowledgeBase(knowledgeBaseId),
     { enabled: mode === "edit" },
   )
+  const loadedKnowledgeBase = detail.data
   const agents = useResource(
     resourceKeys.knowledgeBaseAgents(knowledgeBaseId),
     () => listKnowledgeBaseAgents(knowledgeBaseId),
     { enabled: mode === "edit", staleTime: 0 },
   )
   const providers = useResource(resourceKeys.aiProviders(), () => listAIProviders(), { staleTime: 0 })
-  const loading = providers.loading || providers.retrying || (
-    mode === "edit" &&
-    (detailLoading || (Boolean(detailError) && detailRefreshing))
-  )
-  const loadError = !loading && (Boolean(providers.error) || (mode === "edit" && Boolean(detailError)))
   /** 详情就绪后回填知识库表单和派生状态。 */
   useEffect(() => {
     if (!loadedKnowledgeBase) return
@@ -158,13 +144,6 @@ export function KnowledgeBaseFormPage({
     setCategory(loadedKnowledgeBase.category)
   }, [form, loadedKnowledgeBase])
 
-  useEffect(() => {
-    mounted.current = true
-    return () => {
-      mounted.current = false
-    }
-  }, [])
-
   // 新建页取消回到知识库首页，编辑页取消进入该库默认分组的内容列表。
   const defaultGroup = loadedKnowledgeBase?.groups.find((group) => group.isDefault)
   const cancelPath = loadedKnowledgeBase
@@ -172,18 +151,22 @@ export function KnowledgeBaseFormPage({
     : "/knowledge-bases"
 
   /** 保存知识库。 */
-  // 编辑已有知识库时边改边存；重建索引的确认沿用 submit 的判断。
+  // 编辑已有知识库时边改边存；变更向量模型、维度或分段参数时先确认重建索引。
   const reindexAutoSaved = useRef(false)
-  const markSaved = useAutoSave({
+  const watchedValues = useWatch({ control: form.control })
+  const { submit, commit } = useFormSave({
     form,
     schema,
-    enabled: mode === "edit",
-    save: (values) => submit(values, true),
-  })
-
-  async function save(values: KnowledgeBaseFormValues, autoSaved = false) {
-    try {
-      let knowledgeBase: KnowledgeBaseData
+    autoSave: mode === "edit",
+    // 需要确认重建索引的改动在确认前不会保存，离开页面时提示放弃。
+    unsaved: requiresReindex(watchedValues),
+    hold: (values, autoSaved) => {
+      if (!requiresReindex(values)) return false
+      reindexAutoSaved.current = autoSaved
+      setConfirmReindex(true)
+      return true
+    },
+    save: async (values) => {
       // 保存供应商与模型标识，并按知识库类型提交分段配置。
       const [embeddingProviderId, embeddingModelIdentifier] = JSON.parse(values.embeddingModel) as [string, string]
       const [rerankProviderId, rerankModelIdentifier] = values.rerankModel ? JSON.parse(values.rerankModel) as [string, string] : ["", ""]
@@ -201,70 +184,44 @@ export function KnowledgeBaseFormPage({
         rerankProviderId,
         rerankModelIdentifier,
       }
-      if (mode === "create") {
-        knowledgeBase = await createKnowledgeBase(input)
-      } else {
-        knowledgeBase = await updateKnowledgeBase(knowledgeBaseId, input)
-      }
-      if (mode === "edit") {
-        void invalidateResource(resourceKeys.knowledgeBase(knowledgeBaseId))
-      }
-      if (!mounted.current) return
+      if (mode === "create") return createKnowledgeBase(input)
+      const knowledgeBase = await updateKnowledgeBase(knowledgeBaseId, input)
+      void invalidateResource(resourceKeys.knowledgeBase(knowledgeBaseId))
+      return knowledgeBase
+    },
+    onSaved: (knowledgeBase) => {
       setConfirmReindex(false)
-      form.reset(values)
       upsertKnowledgeBase(knowledgeBase)
-      if (autoSaved) {
-        markSaved(values)
-        return
-      }
-      toast.success(
-        mode === "create"
-          ? t("form.createSuccess")
-          : t("form.updateSuccess"),
-      )
-      navigate(
-        mode === "create"
-          ? "/knowledge-bases"
-          : `/knowledge-bases/${knowledgeBase.id}`,
-      )
-    } catch (error) {
-      if (!mounted.current) return
-      if (recoverSession(error, navigate)) return
-      console.warn("知识库保存失败", {
-        knowledge_base_id: knowledgeBaseId,
-        error,
-      })
-      toast.error(
-        isApiError(error)
-          ? apiErrorMessage(error, [
-              "name",
-              "category",
-              "description",
-              "embeddingModelIdentifier",
-              "embeddingDimension",
-              "chunkLength",
-              "chunkOverlap",
-              "retrievalCount",
-              "retrievalScoreThreshold",
-              "rerankModelIdentifier",
-            ])
-          : t("form.saveError"),
-      )
-    }
-  }
+    },
+    onSubmitted: () => {
+      toast.success(t("form.createSuccess"))
+      navigate("/knowledge-bases")
+    },
+    errorMessage: t("form.saveError"),
+    errorFields: [
+      "name",
+      "category",
+      "description",
+      "embeddingModelIdentifier",
+      "embeddingDimension",
+      "chunkLength",
+      "chunkOverlap",
+      "retrievalCount",
+      "retrievalScoreThreshold",
+      "rerankModelIdentifier",
+    ],
+    logLabel: "知识库保存",
+  })
 
-  /** 编辑页变更向量模型、维度或分段参数时，保存前确认重新索引。 */
-  async function submit(values: KnowledgeBaseFormValues, autoSaved = false) {
-    if (mode === "edit" && loadedKnowledgeBase && (
-      values.embeddingModel !== JSON.stringify([loadedKnowledgeBase.embeddingProviderId, loadedKnowledgeBase.embeddingModelIdentifier]) ||
-      Number(values.embeddingDimension) !== loadedKnowledgeBase.embeddingDimension ||
-      (!isQA && (Number(values.chunkLength) !== loadedKnowledgeBase.chunkLength || Number(values.chunkOverlap) !== loadedKnowledgeBase.chunkOverlap))
-    )) {
-      reindexAutoSaved.current = autoSaved
-      setConfirmReindex(true)
-      return
-    }
-    await save(values, autoSaved)
+  /** 编辑页变更向量模型、维度或分段参数时需要重建索引。 */
+  function requiresReindex(values: Partial<KnowledgeBaseFormValues>) {
+    return Boolean(
+      mode === "edit" &&
+        loadedKnowledgeBase &&
+        (values.embeddingModel !== JSON.stringify([loadedKnowledgeBase.embeddingProviderId, loadedKnowledgeBase.embeddingModelIdentifier]) ||
+          Number(values.embeddingDimension) !== loadedKnowledgeBase.embeddingDimension ||
+          (!isQA && (Number(values.chunkLength) !== loadedKnowledgeBase.chunkLength || Number(values.chunkOverlap) !== loadedKnowledgeBase.chunkOverlap))),
+    )
   }
 
   const title =
@@ -283,31 +240,13 @@ export function KnowledgeBaseFormPage({
         {mode === "edit" ? <PageBackButton to={cancelPath} /> : null}
       </PageHeader>
       <PageContent variant="form">
-        {loading ? (
-          <LoadingIndicator className="min-h-48 justify-center rounded-lg border">
-            {t("common:status.loading")}
-          </LoadingIndicator>
-        ) : loadError ? (
-          <div className="flex min-h-48 flex-col items-center justify-center rounded-lg border text-center">
-            <p className="text-sm text-muted-foreground">
-              {t("form.loadError")}
-            </p>
-            <Button
-              className="mt-4"
-              variant="outline"
-              onClick={() => {
-                // 一次重试本页所有读取失败的数据。
-                if (providers.error) void providers.refresh()
-                if (mode === "edit" && detailError) void refreshKnowledgeBase()
-              }}
-            >
-              {t("common:actions.retry")}
-            </Button>
-          </div>
-        ) : (
+        <ResourceContent
+          resources={mode === "edit" ? [providers, detail] : [providers]}
+          errorMessage={t("form.loadError")}
+        >
           <form
             className="w-full space-y-9"
-            onSubmit={form.handleSubmit((values) => submit(values))}
+            onSubmit={form.handleSubmit(submit)}
             noValidate
           >
             <FieldGroup>
@@ -394,7 +333,7 @@ export function KnowledgeBaseFormPage({
               />
             ) : null}
           </form>
-        )}
+        </ResourceContent>
       </PageContent>
       <ConfirmationDialog
         open={confirmReindex}
@@ -405,7 +344,7 @@ export function KnowledgeBaseFormPage({
         onOpenChange={setConfirmReindex}
         onConfirm={() => {
           void form.handleSubmit((values) =>
-            save(values, reindexAutoSaved.current),
+            commit(values, reindexAutoSaved.current),
           )()
         }}
         onCloseAutoFocus={(event) => {

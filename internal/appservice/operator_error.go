@@ -13,16 +13,22 @@ import (
 type OperatorErrorCode string
 
 const (
-	OperatorErrorCodeInvalidCredential OperatorErrorCode = "invalid_operator_credential"
-	OperatorErrorCodeInvalidRequest    OperatorErrorCode = "invalid_request"
-	OperatorErrorCodeInternal          OperatorErrorCode = "internal"
+	OperatorErrorCodeInvalidCredential    OperatorErrorCode = "invalid_operator_credential"
+	OperatorErrorCodeInvalidRequest       OperatorErrorCode = "invalid_request"
+	OperatorErrorCodeInvalidDomainPrefix  OperatorErrorCode = "invalid_domain_prefix"
+	OperatorErrorCodeDomainTaken          OperatorErrorCode = "domain_taken"
+	OperatorErrorCodeIdempotencyConflict  OperatorErrorCode = "idempotency_conflict"
+	OperatorErrorCodeOrganizationNotFound OperatorErrorCode = "organization_not_found"
+	OperatorErrorCodeProvisioningNotFound OperatorErrorCode = "provisioning_not_found"
+	OperatorErrorCodeInternal             OperatorErrorCode = "internal"
 )
 
-// OperatorError 定义运营接口的结构化错误。
+// OperatorError 定义运营接口的结构化错误，Fields 在字段校验失败时给出各字段的校验码。
 type OperatorError struct {
 	Code      OperatorErrorCode `json:"code"`
 	Message   string            `json:"message"`
 	RequestID string            `json:"requestId"`
+	Fields    map[string]string `json:"fields,omitempty"`
 	status    int
 }
 
@@ -60,4 +66,11 @@ func invalidOperatorCredentialError(meta OperatorRequestMeta) *OperatorError {
 func newOperatorError(meta OperatorRequestMeta, status int, code OperatorErrorCode, messageKey cervii18n.Key) *OperatorError {
 	message, _ := cervii18n.Localize(string(meta.Locale), messageKey)
 	return &OperatorError{Code: code, Message: message, RequestID: meta.RequestID, status: status}
+}
+
+// operatorFieldError 返回带字段校验码的运营请求参数错误。
+func operatorFieldError(meta OperatorRequestMeta, fields map[string]string) *OperatorError {
+	operatorError := NewOperatorInvalidRequestError(meta)
+	operatorError.Fields = fields
+	return operatorError
 }

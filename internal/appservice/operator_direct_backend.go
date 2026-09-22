@@ -5,6 +5,10 @@ package appservice
 import (
 	"context"
 	"crypto/subtle"
+
+	organizationaction "github.com/runforyou-ai/cervi/internal/actions/organization"
+	provisioningaction "github.com/runforyou-ai/cervi/internal/actions/provisioning"
+	"github.com/uptrace/bun"
 )
 
 var _ OperatorBackend = (*OperatorDirectBackend)(nil)
@@ -25,7 +29,18 @@ func (g operatorGuard) authenticate(_ context.Context, meta OperatorRequestMeta)
 // operatorOperations 持有已认证运营实现所需的部署配置、Action 和 Query。
 type operatorOperations struct {
 	operatorGuard
-	deployment OperatorDeployment
+	deployment            OperatorDeployment
+	checkDomain           *provisioningaction.CheckDomainQuery
+	provisionOrganization *provisioningaction.ProvisionOrganizationAction
+	getProvisioning       *provisioningaction.GetProvisioningQuery
+	organizationSummaries *organizationaction.SummaryQuery
+}
+
+// OperatorConfig 定义运营后端使用的可信部署配置。
+type OperatorConfig struct {
+	Deployment             OperatorDeployment
+	Credential             string
+	OfficialIdentityIssuer string
 }
 
 // OperatorDirectBackend 校验运营凭据并把运营调用分发给已认证实现。
@@ -37,10 +52,15 @@ type OperatorDirectBackend struct {
 }
 
 // NewOperatorDirectBackend 创建直接访问服务端存储的运营后端。
-func NewOperatorDirectBackend(deployment OperatorDeployment, credential string) *OperatorDirectBackend {
+func NewOperatorDirectBackend(db *bun.DB, config OperatorConfig) *OperatorDirectBackend {
+	suffix := config.Deployment.ManagedDomainSuffix
 	return &OperatorDirectBackend{ops: &operatorOperations{
-		operatorGuard: operatorGuard{credential: credential},
-		deployment:    deployment,
+		operatorGuard:         operatorGuard{credential: config.Credential},
+		deployment:            config.Deployment,
+		checkDomain:           provisioningaction.NewCheckDomainQuery(db, suffix),
+		provisionOrganization: provisioningaction.NewProvisionOrganizationAction(db, config.OfficialIdentityIssuer, suffix),
+		getProvisioning:       provisioningaction.NewGetProvisioningQuery(db),
+		organizationSummaries: organizationaction.NewSummaryQuery(db),
 	}}
 }
 
