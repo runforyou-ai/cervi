@@ -14,11 +14,22 @@ import {
   type Identity,
   type InboxConversation,
 } from "@/api"
-import type { RealtimeServerFrame } from "@/api/realtime/protocol"
+import type {
+  RealtimeServerFrame,
+  ServiceAttentionReason,
+} from "@/api/realtime/protocol"
 import { useConversationName } from "@/features/inbox/use-conversation-name"
 import { messagePreview } from "@/lib/message-preview"
 import { NewMessageWatcher } from "./new-message-watcher"
 import { notifyNewMessage } from "./new-message-notifications"
+
+/** 各提醒原因对应的通知正文。 */
+const attentionBodyKeys = {
+  assigned: "notificationServiceAssigned",
+  response_overdue: "notificationServiceResponseOverdue",
+  queue_waiting: "notificationServiceQueueWaiting",
+  returned: "notificationServiceReturned",
+} as const satisfies Record<ServiceAttentionReason, string>
 
 /** 登录身份就绪后观察新消息与客服处理周期提醒并投递本地通知，投递成功时回调调用方。 */
 export function useNewMessageNotifications(
@@ -73,9 +84,10 @@ export function useNewMessageNotifications(
         throw error
       }
       const delivered = await notifyNewMessage({
-        id: `service_attention:${frame.serviceSessionId}:${frame.reason}`,
+        // 服务端每次提醒对应一次新的分配或等待轮次，通知编号按到达时间区分，不替换上一轮的通知。
+        id: `service_attention:${frame.serviceSessionId}:${frame.reason}:${Date.now()}`,
         title: conversationName(conversation),
-        body: t("notificationServiceAssigned"),
+        body: t(attentionBodyKeys[frame.reason]),
         scope: { organizationId, userId },
       })
       if (delivered) {
@@ -88,8 +100,6 @@ export function useNewMessageNotifications(
     if (!identityId) {
       return
     }
-    // 同一客服处理周期的同一提醒原因只通知一次。
-    const deliveredAttentions = new Set<string>()
     const watcher = new NewMessageWatcher(identityId, {
       readConversations: async () => (await loadInbox()).conversations,
       readConversation: async (conversationId) => {
@@ -114,10 +124,8 @@ export function useNewMessageNotifications(
       if (event.type !== "frame") {
         return
       }
+      // 服务端对每次分配与每轮等待只发一次提醒，客户端逐条投递。
       if (event.frame.type === "service_attention") {
-        const key = `${event.frame.serviceSessionId}:${event.frame.reason}`
-        if (deliveredAttentions.has(key)) return
-        deliveredAttentions.add(key)
         void deliverAttention(event.frame).catch((error: unknown) => {
           console.warn("处理客服提醒通知失败", error)
         })

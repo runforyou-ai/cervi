@@ -520,6 +520,12 @@ type Backend interface {
 	// UpdateBusinessHours 修改当前企业的客服工作时间。
 	//cervi:route PUT /settings/customer-service/business-hours
 	UpdateBusinessHours(context.Context, RequestMeta, BusinessHours) (BusinessHours, error)
+	// GetServiceTimeouts 读取当前企业的客服超时时长。
+	//cervi:route GET /settings/customer-service/timeouts
+	GetServiceTimeouts(context.Context, RequestMeta) (ServiceTimeouts, error)
+	// UpdateServiceTimeouts 修改当前企业的客服超时时长。
+	//cervi:route PUT /settings/customer-service/timeouts
+	UpdateServiceTimeouts(context.Context, RequestMeta, ServiceTimeouts) (ServiceTimeouts, error)
 
 	// RegisterDevice 注册当前用户的本机设备。
 	//cervi:route POST /devices

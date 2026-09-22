@@ -19,3 +19,10 @@ type BusinessHours struct {
 	Weekly    [][]BusinessHoursPeriod `json:"weekly"`
 	Overrides []BusinessHoursOverride `json:"overrides"`
 }
+
+// ServiceTimeouts 定义企业客服的超时时长，单位为分钟：负责人未回复的提醒与回收时长，以及队列等待提醒时长。
+type ServiceTimeouts struct {
+	ResponseReminderMinutes int `json:"responseReminderMinutes"`
+	ResponseReclaimMinutes  int `json:"responseReclaimMinutes"`
+	QueueReminderMinutes    int `json:"queueReminderMinutes"`
+}

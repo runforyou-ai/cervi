@@ -4,8 +4,8 @@ import { useTranslation } from "react-i18next"
 
 import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
-import { BusinessHoursSettings } from "@/features/settings/business-hours-form"
 import { ChangePasswordForm } from "@/features/settings/change-password-form"
+import { CustomerServiceSettings } from "@/features/settings/customer-service-settings"
 import { DeviceListPage } from "@/features/settings/device-list-page"
 import { GeneralSettingsForm } from "@/features/settings/general-settings-form"
 import { NotificationSettingsForm } from "@/features/settings/notification-settings-form"
@@ -71,7 +71,7 @@ export function SettingsPage({
             ) : section === "general" ? (
               <GeneralSettingsForm organization={identity.organization} />
             ) : section === "customerService" ? (
-              <BusinessHoursSettings />
+              <CustomerServiceSettings />
             ) : (
               <UserPreferencesForm user={identity.user} />
             )}

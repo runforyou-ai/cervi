@@ -153,9 +153,29 @@ const settings = {
   },
   customerService: {
     title: "Customer service",
-    description: "Set business hours used to tell customers when a human will follow up",
+    description: "Set business hours, and reminders and reassignment when customers wait too long for a reply",
     loadError: "Could not load business hours.",
     saveError: "Could not save business hours. Try again.",
+    tabs: {
+      businessHours: "Business hours",
+      assignment: "Assignment and reminders",
+    },
+    timeouts: {
+      formLabel: "Assignment and reminders form",
+      loadError: "Could not load assignment and reminder settings.",
+      saveError: "Could not save assignment and reminder settings. Try again.",
+      minutes: "minutes",
+      responseReminderMinutes: "No-reply reminder",
+      responseReminderMinutesDescription: "Remind the assignee when they haven't replied to the customer for this long",
+      responseReclaimMinutes: "No-reply reassignment",
+      responseReclaimMinutesDescription: "Return the conversation to its queue and assign it to someone else when the assignee still hasn't replied",
+      queueReminderMinutes: "Queue wait reminder",
+      queueReminderMinutesDescription: "Remind the team, or everyone who is working, when a conversation waits in the queue for this long",
+      validation: {
+        minutesInvalid: "Enter a whole number greater than 0.",
+        reclaimAfterReminder: "The reassignment time must be longer than the reminder time.",
+      },
+    },
     businessHours: {
       formLabel: "Business hours form",
       enabled: "Use business hours",

@@ -3,6 +3,7 @@ import type { TFunction } from "i18next"
 
 import {
   ConversationSystemEventType,
+  ServiceSessionReturnReason,
   ServiceSessionTargetKind,
   type ConversationMessageData,
   type ConversationSystemEventParticipant,
@@ -54,12 +55,16 @@ export function formatSystemEvent(
       reason: t(handoffReasonKey(event.handoffReason)),
     })
   }
-  // 退回队列事件没有操作人，只展示原负责人与退回去向。
+  // 退回队列事件没有操作人，按退回原因展示原负责人与退回去向。
   if (
     event.type ===
     ConversationSystemEventType.ConversationSystemEventServiceSessionReturned
   ) {
-    return t("serviceSessionReturned", {
+    const key =
+      event.returnReason === ServiceSessionReturnReason.ServiceSessionReturnResponseTimeout
+        ? "serviceSessionReturnedResponseTimeout"
+        : "serviceSessionReturned"
+    return t(key, {
       from:
         event.fromIdentityId === currentIdentityID
           ? t("messageSenderYou")

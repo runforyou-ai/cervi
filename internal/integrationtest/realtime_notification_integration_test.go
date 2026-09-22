@@ -41,6 +41,9 @@ type receivedNotification struct {
 	Version         string
 	SenderSubjectID string
 	Active          bool
+	// ServiceSessionID 与 AttentionReason 只由客服处理周期提醒携带。
+	ServiceSessionID string
+	AttentionReason  string
 }
 
 // realtimeFeed 订阅单个测试企业的全部受众通知。
@@ -153,9 +156,10 @@ func (f *realtimeFeed) next(t *testing.T) (receivedNotification, error) {
 	if err := json.Unmarshal(message.Data, &fields); err != nil {
 		t.Fatalf("解析实时通知 %s: %v", message.Data, err)
 	}
-	// 载荷只允许种类、会话 ID、版本、发送者主体与输入状态。
+	// 载荷只允许种类、会话 ID、版本、发送者主体、输入状态与客服处理周期提醒。
 	for key := range fields {
-		if key != "kind" && key != "conversationId" && key != "version" && key != "senderSubjectId" && key != "active" {
+		if key != "kind" && key != "conversationId" && key != "version" && key != "senderSubjectId" && key != "active" &&
+			key != "serviceSessionId" && key != "attentionReason" {
 			t.Fatalf("实时通知含业务字段: %s", message.Data)
 		}
 	}
@@ -167,6 +171,7 @@ func (f *realtimeFeed) next(t *testing.T) (receivedNotification, error) {
 	return receivedNotification{
 		Subject: message.Subject, Kind: text("kind"), ConversationID: text("conversationId"),
 		Version: text("version"), SenderSubjectID: text("senderSubjectId"), Active: active,
+		ServiceSessionID: text("serviceSessionId"), AttentionReason: text("attentionReason"),
 	}, nil
 }
 
@@ -249,8 +254,8 @@ func compareNotifications(t *testing.T, got, want []receivedNotification) {
 	t.Helper()
 	compare := func(a, b receivedNotification) int {
 		return strings.Compare(
-			a.Subject+a.Kind+a.ConversationID+a.Version+a.SenderSubjectID+strconv.FormatBool(a.Active),
-			b.Subject+b.Kind+b.ConversationID+b.Version+b.SenderSubjectID+strconv.FormatBool(b.Active),
+			a.Subject+a.Kind+a.ConversationID+a.Version+a.SenderSubjectID+strconv.FormatBool(a.Active)+a.ServiceSessionID+a.AttentionReason,
+			b.Subject+b.Kind+b.ConversationID+b.Version+b.SenderSubjectID+strconv.FormatBool(b.Active)+b.ServiceSessionID+b.AttentionReason,
 		)
 	}
 	slices.SortFunc(got, compare)

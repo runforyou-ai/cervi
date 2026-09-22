@@ -13,11 +13,14 @@ import (
 type CustomerServiceSetting struct {
 	bun.BaseModel `bun:"table:customer_service_settings,alias:css"`
 
-	OrganizationID         string                         `bun:"organization_id,pk"`
-	BusinessHoursEnabled   bool                           `bun:"business_hours_enabled"`
-	BusinessHoursTimeZone  string                         `bun:"business_hours_time_zone"`
-	BusinessHoursWeekly    [][]domain.BusinessHoursPeriod `bun:"business_hours_weekly,type:jsonb"`
-	BusinessHoursOverrides []domain.BusinessHoursOverride `bun:"business_hours_overrides,type:jsonb"`
-	CreatedAt              time.Time                      `bun:"created_at"`
-	UpdatedAt              time.Time                      `bun:"updated_at"`
+	OrganizationID          string                         `bun:"organization_id,pk"`
+	BusinessHoursEnabled    bool                           `bun:"business_hours_enabled"`
+	BusinessHoursTimeZone   string                         `bun:"business_hours_time_zone"`
+	BusinessHoursWeekly     [][]domain.BusinessHoursPeriod `bun:"business_hours_weekly,type:jsonb"`
+	BusinessHoursOverrides  []domain.BusinessHoursOverride `bun:"business_hours_overrides,type:jsonb"`
+	ResponseReminderMinutes int                            `bun:"response_reminder_minutes"`
+	ResponseReclaimMinutes  int                            `bun:"response_reclaim_minutes"`
+	QueueReminderMinutes    int                            `bun:"queue_reminder_minutes"`
+	CreatedAt               time.Time                      `bun:"created_at"`
+	UpdatedAt               time.Time                      `bun:"updated_at"`
 }

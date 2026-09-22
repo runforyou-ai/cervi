@@ -15,6 +15,7 @@ import (
 	knowledgeaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
 	mcpserveraction "github.com/runforyou-ai/cervi/internal/actions/mcpserver"
 	"github.com/runforyou-ai/cervi/internal/actions/serviceassignment"
+	"github.com/runforyou-ai/cervi/internal/actions/servicetimeout"
 	"github.com/runforyou-ai/cervi/internal/api"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/common/searchtext"
@@ -135,6 +136,19 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	if err := tasks.Registry().RegisterJSON(serviceassignment.BackfillActionName, serviceAssignment.Backfill); err != nil {
 		return nil, nil, err
 	}
+
+	// 注册客服处理周期超时扫描与单条处理任务，每 30 秒扫描一次到期周期。
+	serviceTimeout := servicetimeout.NewWorker(appStorage.DB(), tasks)
+	if err := tasks.Registry().RegisterJSON(servicetimeout.ScanActionName, serviceTimeout.Scan); err != nil {
+		return nil, nil, err
+	}
+	if err := tasks.Registry().RegisterJSON(servicetimeout.ProcessActionName, serviceTimeout.Process); err != nil {
+		return nil, nil, err
+	}
+	tasks.RegisterSchedule(servertask.ScheduleDefinition{
+		Key: servicetimeout.ScheduleKey, ActionName: servicetimeout.ScanActionName, Queue: "maintenance",
+		Payload: struct{}{}, CronExpression: "@every 30s", Timezone: "UTC", Enabled: true, MaxAttempts: 1, StartImmediately: true,
+	})
 
 	// 组装企业成员与网站匿名访客各自的业务入口。
 	directBackend := appservice.NewDirectBackend(appStorage.DB(), config.Deployment.Mode, localFiles, fileS3, tenantResolver, agentRunScheduler, executeAgentRun, tasks, documentConverter, customerReplySuggestions)

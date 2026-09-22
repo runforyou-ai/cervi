@@ -8,6 +8,7 @@ import (
 
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	"github.com/runforyou-ai/cervi/internal/actions/serviceassignment"
+	"github.com/runforyou-ai/cervi/internal/actions/servicetimeout"
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
@@ -23,6 +24,9 @@ func newTestTasks(db *bun.DB) *servertask.Runtime {
 		panic(err)
 	}
 	if err := tasks.Registry().RegisterJSON(agentrunaction.ReturnedHandoffActionName, func(context.Context, agentrunaction.ReturnedHandoffInput) error { return nil }); err != nil {
+		panic(err)
+	}
+	if err := tasks.Registry().RegisterJSON(servicetimeout.ProcessActionName, func(context.Context, servicetimeout.ProcessInput) error { return nil }); err != nil {
 		panic(err)
 	}
 	return tasks

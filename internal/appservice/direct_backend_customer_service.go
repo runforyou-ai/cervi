@@ -17,15 +17,19 @@ import (
 
 // customerServiceOps 持有企业客服设置的业务实现依赖。
 type customerServiceOps struct {
-	getBusinessHours    *customerserviceaction.GetBusinessHoursQuery
-	updateBusinessHours *customerserviceaction.UpdateBusinessHoursAction
+	getBusinessHours      *customerserviceaction.GetBusinessHoursQuery
+	updateBusinessHours   *customerserviceaction.UpdateBusinessHoursAction
+	getServiceTimeouts    *customerserviceaction.GetServiceTimeoutsQuery
+	updateServiceTimeouts *customerserviceaction.UpdateServiceTimeoutsAction
 }
 
 // newCustomerServiceOps 创建企业客服设置的业务实现依赖。
 func newCustomerServiceOps(db *bun.DB) customerServiceOps {
 	return customerServiceOps{
-		getBusinessHours:    customerserviceaction.NewGetBusinessHoursQuery(db),
-		updateBusinessHours: customerserviceaction.NewUpdateBusinessHoursAction(db),
+		getBusinessHours:      customerserviceaction.NewGetBusinessHoursQuery(db),
+		updateBusinessHours:   customerserviceaction.NewUpdateBusinessHoursAction(db),
+		getServiceTimeouts:    customerserviceaction.NewGetServiceTimeoutsQuery(db),
+		updateServiceTimeouts: customerserviceaction.NewUpdateServiceTimeoutsAction(db),
 	}
 }
 
@@ -77,6 +81,46 @@ func (o *directOperations) UpdateBusinessHours(ctx context.Context, meta Request
 	}
 	slog.Info("客服工作时间已更新", "organization_id", identity.Organization.ID, "enabled", saved.Enabled, "time_zone", saved.TimeZone)
 	return businessHoursFromDomain(saved), nil
+}
+
+// GetServiceTimeouts 读取当前企业的客服超时时长。
+func (o *directOperations) GetServiceTimeouts(ctx context.Context, meta RequestMeta, identity *servermodels.Identity) (ServiceTimeouts, error) {
+	timeouts, err := o.getServiceTimeouts.Execute(ctx, identity)
+	if err != nil {
+		if ctx.Err() != nil {
+			return ServiceTimeouts{}, ctx.Err()
+		}
+		slog.Warn("读取客服超时时长失败", "organization_id", identity.Organization.ID, "error", err)
+		return ServiceTimeouts{}, FailedError(meta, cervii18n.ErrorServiceTimeoutsLoadFailed)
+	}
+	return ServiceTimeouts(timeouts), nil
+}
+
+// UpdateServiceTimeouts 修改当前企业的客服超时时长。
+func (o *directOperations) UpdateServiceTimeouts(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input ServiceTimeouts) (ServiceTimeouts, error) {
+	saved, err := o.updateServiceTimeouts.Execute(ctx, identity, domain.ServiceTimeouts(input))
+	if err != nil {
+		if ctx.Err() != nil {
+			return ServiceTimeouts{}, ctx.Err()
+		}
+		if validationError, ok := errors.AsType[*common.FieldError](err); ok {
+			// 把客服超时时长校验错误码映射为本地化文案键。
+			keys := map[common.FieldCode]cervii18n.Key{
+				customerserviceaction.ValidationTimeoutMinutesInvalid: cervii18n.FieldServiceTimeoutMinutesInvalid,
+				customerserviceaction.ValidationReclaimNotAfterRemind: cervii18n.FieldServiceReclaimNotAfterReminder,
+			}
+			return ServiceTimeouts{}, InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, keys))
+		}
+		if errors.Is(err, common.ErrIdentityInvalid) {
+			return ServiceTimeouts{}, SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+		}
+		slog.Warn("修改客服超时时长失败", "organization_id", identity.Organization.ID, "error", err)
+		return ServiceTimeouts{}, FailedError(meta, cervii18n.ErrorServiceTimeoutsUpdateFailed)
+	}
+	slog.Info("客服超时时长已更新", "organization_id", identity.Organization.ID,
+		"response_reminder_minutes", saved.ResponseReminderMinutes, "response_reclaim_minutes", saved.ResponseReclaimMinutes,
+		"queue_reminder_minutes", saved.QueueReminderMinutes)
+	return ServiceTimeouts(saved), nil
 }
 
 // businessHoursFromDomain 把领域工作时间转换为传输结构。

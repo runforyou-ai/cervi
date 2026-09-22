@@ -507,6 +507,13 @@ export function GetRole(meta: $models.RequestMeta, roleID: string): $Cancellable
 }
 
 /**
+ * GetServiceTimeouts 读取当前企业的客服超时时长。
+ */
+export function GetServiceTimeouts(meta: $models.RequestMeta): $CancellablePromise<$models.ServiceTimeouts> {
+    return $Call.ByID(3370316769, meta);
+}
+
+/**
  * GetSyncHeads 返回当前用户可见会话与身份资料的同步探针值。
  */
 export function GetSyncHeads(meta: $models.RequestMeta): $CancellablePromise<$models.SyncHeads> {
@@ -1309,6 +1316,13 @@ export function UpdateRole(meta: $models.RequestMeta, roleID: string, input: $mo
  */
 export function UpdateRoleAssignments(meta: $models.RequestMeta, input: $models.RoleAssignmentsInput): $CancellablePromise<void> {
     return $Call.ByID(2402672415, meta, input);
+}
+
+/**
+ * UpdateServiceTimeouts 修改当前企业的客服超时时长。
+ */
+export function UpdateServiceTimeouts(meta: $models.RequestMeta, input: $models.ServiceTimeouts): $CancellablePromise<$models.ServiceTimeouts> {
+    return $Call.ByID(3866699950, meta, input);
 }
 
 /**

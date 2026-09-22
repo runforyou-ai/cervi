@@ -1246,6 +1246,22 @@ func (b *Backend) UpdateBusinessHours(ctx context.Context, meta appservice.Reque
 	return output, err
 }
 
+// GetServiceTimeouts 读取当前企业的客服超时时长。
+func (b *Backend) GetServiceTimeouts(ctx context.Context, meta appservice.RequestMeta) (appservice.ServiceTimeouts, error) {
+	var output appservice.ServiceTimeouts
+	err := b.do(ctx, meta, http.MethodGet, "/settings/customer-service/timeouts", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// UpdateServiceTimeouts 修改当前企业的客服超时时长。
+func (b *Backend) UpdateServiceTimeouts(ctx context.Context, meta appservice.RequestMeta, input appservice.ServiceTimeouts) (appservice.ServiceTimeouts, error) {
+	var output appservice.ServiceTimeouts
+	err := b.do(ctx, meta, http.MethodPut, "/settings/customer-service/timeouts", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // RegisterDevice 注册当前用户的本机设备。
 func (b *Backend) RegisterDevice(ctx context.Context, meta appservice.RequestMeta, input appservice.DeviceRegistrationInput) (appservice.Device, error) {
 	var output appservice.Device

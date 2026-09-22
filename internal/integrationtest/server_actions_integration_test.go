@@ -2484,7 +2484,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		}); err != nil {
 			t.Fatal(err)
 		}
-		if err := teamaction.NewDeleteTeamAction(db).Execute(context.Background(), loggedIn.Identity, team.ID); err != nil {
+		if err := teamaction.NewDeleteTeamAction(db, newTestTasks(db)).Execute(context.Background(), loggedIn.Identity, team.ID); err != nil {
 			t.Fatal(err)
 		}
 		memberAfterTeamDelete, err := useraction.NewGetUserQuery(db).Execute(context.Background(), loggedIn.Identity, createdMember.ID)

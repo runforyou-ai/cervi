@@ -74,6 +74,7 @@ func (a *ClaimServiceSessionAction) Execute(ctx context.Context, identity *serve
 				Set("assignee_identity_id = ?", identity.OrganizationIdentity.ID).
 				Set("assigned_at = COALESCE(assigned_at, ?)", now).
 				Set("assignee_assigned_at = ?", now).
+				Set("reminded_at = NULL").
 				Set("updated_at = now()").
 				WherePK().
 				Where("organization_id = ?", identity.Organization.ID).
@@ -294,7 +295,7 @@ func lockTransferTarget(ctx context.Context, tx bun.Tx, identity *servermodels.I
 
 // applyTransferTarget 按转交去向写入负责人与所属队列；转给团队或公共队列时清空负责人，转给成员时保持原队列。
 func applyTransferTarget(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, session *servermodels.ServiceSession, target domain.ServiceSessionTarget, targetIdentity *servermodels.OrganizationIdentity) error {
-	update := tx.NewUpdate().Model(session).Set("updated_at = now()").
+	update := tx.NewUpdate().Model(session).Set("reminded_at = NULL").Set("updated_at = now()").
 		WherePK().Where("organization_id = ?", identity.Organization.ID)
 	switch target.Kind {
 	case domain.ServiceSessionTargetMember:
@@ -402,6 +403,7 @@ func (a *CloseServiceSessionAction) Execute(ctx context.Context, identity *serve
 			Set("assigned_at = COALESCE(assigned_at, ?)", now).
 			Set("assignee_assigned_at = COALESCE(assignee_assigned_at, ?)", now).
 			Set("awaiting_reply_since = NULL").
+			Set("reminded_at = NULL").
 			Set("updated_at = now()").
 			WherePK().
 			Where("organization_id = ?", identity.Organization.ID).
@@ -482,6 +484,7 @@ func (a *ReopenServiceSessionAction) Execute(ctx context.Context, identity *serv
 			Set("status_changed_at = ?", now).
 			Set("closed_at = NULL").
 			Set("closed_by_identity_id = NULL").
+			Set("reminded_at = NULL").
 			Set("updated_at = now()").
 			WherePK().
 			Where("organization_id = ?", identity.Organization.ID).
