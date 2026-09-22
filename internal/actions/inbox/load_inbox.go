@@ -57,6 +57,8 @@ type CustomerConversationSummary struct {
 	Title                     string
 	ContactName               *string
 	ContactAvatarFileID       *string
+	ContactChatSubjectID      string
+	AssigneeChatSubjectID     *string
 	ChannelType               domain.ChannelType
 	ChannelName               string
 	Preview                   *string
@@ -147,6 +149,8 @@ type customerConversationRow struct {
 	Title                     string                           `bun:"title"`
 	ContactName               *string                          `bun:"contact_name"`
 	ContactAvatarFileID       *string                          `bun:"contact_avatar_file_id"`
+	ContactChatSubjectID      string                           `bun:"contact_chat_subject_id"`
+	AssigneeChatSubjectID     *string                          `bun:"assignee_chat_subject_id"`
 	ChannelType               string                           `bun:"channel_type"`
 	ChannelName               string                           `bun:"channel_name"`
 	Preview                   *string                          `bun:"preview"`
@@ -330,6 +334,7 @@ func (q *LoadInboxQuery) customerConversationDetailsQuery(organizationID, curren
 		ColumnExpr("cv.title AS title").
 		ColumnExpr("COALESCE(cci.display_name, c.display_name) AS contact_name").
 		ColumnExpr("cci.avatar_file_id AS contact_avatar_file_id").
+		ColumnExpr("(SELECT contact_cs.id::text FROM chat_subjects AS contact_cs WHERE contact_cs.organization_id = c.organization_id AND contact_cs.kind = ? AND contact_cs.source_id = c.id) AS contact_chat_subject_id", domain.ChatSubjectKindContact).
 		ColumnExpr("ch.type AS channel_type").
 		ColumnExpr("ch.name AS channel_name").
 		ColumnExpr("? AS preview", messagequery.Summary("msg")).
@@ -343,6 +348,7 @@ func (q *LoadInboxQuery) customerConversationDetailsQuery(organizationID, curren
 		ColumnExpr("current.assignee_identity_id::text AS assignee_identity_id").
 		ColumnExpr("assignee.type AS assignee_type").
 		ColumnExpr("assignee.display_name AS assignee_display_name").
+		ColumnExpr("(SELECT assignee_cs.id::text FROM chat_subjects AS assignee_cs WHERE assignee_cs.organization_id = current.organization_id AND assignee_cs.kind = ? AND assignee_cs.source_id = current.assignee_identity_id) AS assignee_chat_subject_id", domain.ChatSubjectKindOrganizationIdentity).
 		ColumnExpr("assignee.avatar_file_id::text AS assignee_avatar_file_id").
 		ColumnExpr("current.team_id::text AS team_id").
 		ColumnExpr("team.name AS team_name").
@@ -608,7 +614,7 @@ func (row customerConversationRow) summary() ConversationSummary {
 	return ConversationSummary{
 		ID: row.ID, Type: domain.ConversationTypeCustomer, UnreadCount: row.UnreadCount, MentionedUnreadCount: row.MentionedUnreadCount, Pinned: row.Pinned, LastMessageID: row.LastMessageID, LastMessageType: row.LastMessageType, LastReadMessageID: row.LastReadMessageID, LastActivityAt: row.LastActivityAt,
 		Customer: &CustomerConversationSummary{
-			Title: row.Title, ContactName: row.ContactName, ContactAvatarFileID: row.ContactAvatarFileID,
+			Title: row.Title, ContactName: row.ContactName, ContactAvatarFileID: row.ContactAvatarFileID, ContactChatSubjectID: row.ContactChatSubjectID, AssigneeChatSubjectID: row.AssigneeChatSubjectID,
 			ChannelType: domain.ChannelType(row.ChannelType), ChannelName: row.ChannelName,
 			Preview: row.Preview, PreviewSenderIdentityType: row.PreviewSenderIdentityType, PreviewVisibility: row.PreviewVisibility, LastMessageAt: row.LastMessageAt,
 			ServiceSessionID: row.ServiceSessionID, ServiceSessionStatus: domain.ServiceSessionStatus(row.ServiceSessionStatus), Assignee: assignee,

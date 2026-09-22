@@ -522,7 +522,7 @@ type CustomerAttachmentMessageInput struct {
 	ImageHeight      int
 }
 
-// AttachmentMessageInput 定义已上传附件的发送意图，AgentIdentityID 非空表示按 ConversationID 草稿编号首发 AI 聊天，同时指定 CustomerConversationID 表示首发该客户会话的 Copilot 线程。
+// AttachmentMessageInput 定义已上传附件的发送意图，AgentIdentityID 非空表示按 ConversationID 草稿编号首发 AI 聊天，同时指定 CustomerConversationID 表示首发该客户会话的 Copilot 线程；首发 AI 聊天时 WorkspaceID 非空则同时绑定本人设备上的该工作区。
 type AttachmentMessageInput struct {
 	ConversationID         string
 	TargetIdentityID       string
@@ -533,6 +533,7 @@ type AttachmentMessageInput struct {
 	Body                   string
 	ImageWidth             int
 	ImageHeight            int
+	WorkspaceID            string
 }
 
 // AttachmentMessageResult 返回附件消息，首发时返回新建单聊或 AI 聊天摘要。

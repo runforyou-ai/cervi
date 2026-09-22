@@ -1,5 +1,3 @@
-//go:build server
-
 // Package knowledgeretrieval 编排跨知识库关键词检索、结果融合和游标读取。
 package knowledgeretrieval
 

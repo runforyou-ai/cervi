@@ -12,6 +12,7 @@ import (
 
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
+	deviceaction "github.com/runforyou-ai/cervi/internal/actions/device"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -721,6 +722,9 @@ func individualConversationError(ctx context.Context, meta RequestMeta, err erro
 	}
 	if errors.Is(err, conversationaction.ErrConversationNotFound) {
 		return NotFoundError(meta, cervii18n.ErrorConversationNotFound)
+	}
+	if errors.Is(err, deviceaction.ErrWorkspaceNotFound) {
+		return NotFoundError(meta, cervii18n.ErrorDeviceWorkspaceNotFound)
 	}
 	if validationError, ok := errors.AsType[*conversationaction.ValidationError](err); ok {
 		return InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, conversationMessageValidationKeys))

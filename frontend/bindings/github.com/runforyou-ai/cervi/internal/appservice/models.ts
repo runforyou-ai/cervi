@@ -453,7 +453,7 @@ export enum AgentToolCallStatus {
 };
 
 /**
- * AttachmentMessageInput 定义已上传附件的发送意图，agentIdentityId 非空表示按 conversationId 草稿编号首发 AI 聊天，同时指定 customerConversationId 表示首发该客户会话的 Copilot 线程。
+ * AttachmentMessageInput 定义已上传附件的发送意图，agentIdentityId 非空表示按 conversationId 草稿编号首发 AI 聊天，同时指定 customerConversationId 表示首发该客户会话的 Copilot 线程；首发 AI 聊天时 workspaceId 非空则同时绑定本人设备上的该工作区。
  */
 export interface AttachmentMessageInput {
     "conversationId": string;
@@ -465,6 +465,7 @@ export interface AttachmentMessageInput {
     "body": string;
     "imageWidth": number;
     "imageHeight": number;
+    "workspaceId": string;
 }
 
 /**
@@ -1307,6 +1308,16 @@ export interface CustomerInboxConversation {
     "title": string;
     "contactName": string | null;
     "contactAvatarUrl": string;
+
+    /**
+     * ContactChatSubjectID 是客户在会话中的聊天主体编号。
+     */
+    "contactChatSubjectId": string;
+
+    /**
+     * AssigneeChatSubjectID 是当前负责人的聊天主体编号，负责人尚未参与聊天时为空。
+     */
+    "assigneeChatSubjectId": string | null;
     "channelType": ChannelType;
     "channelName": string;
     "preview": string | null;
@@ -1667,13 +1678,14 @@ export interface FileUploadRequest {
 }
 
 /**
- * FirstAgentTextMessageInput 定义 AI 草稿的稳定编号、目标和首条消息。
+ * FirstAgentTextMessageInput 定义 AI 草稿的稳定编号、目标和首条消息；workspaceId 非空时创建会话的同时绑定本人设备上的该工作区，首条消息即在本机执行。
  */
 export interface FirstAgentTextMessageInput {
     "conversationId": string;
     "agentIdentityId": string;
     "clientMessageId": string;
     "body": string;
+    "workspaceId": string;
 }
 
 /**

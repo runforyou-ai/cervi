@@ -72,6 +72,44 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		}
 	})
 
+	t.Run("草稿首发即绑定工作区", func(t *testing.T) {
+		sendFirst := conversationaction.NewSendFirstAgentTextMessageAction(db, agentrunaction.NewScheduler(tasks))
+		// 工作区不属于本人设备时整个首发回滚，不留下会话。
+		rejectedID := uuid.NewV7().String()
+		if _, err := sendFirst.Execute(ctx, identity, conversationaction.FirstAgentTextMessageInput{
+			ConversationID: rejectedID, AgentIdentityID: agentIdentityID, ClientMessageID: uuid.NewV7().String(), Body: "未知工作区", WorkspaceID: uuid.NewV7().String(),
+		}); !errors.Is(err, deviceaction.ErrWorkspaceNotFound) {
+			t.Fatalf("unknown workspace first send=%v", err)
+		}
+		if exists, err := db.NewSelect().Model((*servermodels.Conversation)(nil)).Where("cv.id = ?", rejectedID).Exists(ctx); err != nil || exists {
+			t.Fatalf("rejected draft conversation exists=%v %v", exists, err)
+		}
+
+		conversationID := uuid.NewV7().String()
+		if _, err := sendFirst.Execute(ctx, identity, conversationaction.FirstAgentTextMessageInput{
+			ConversationID: conversationID, AgentIdentityID: agentIdentityID, ClientMessageID: uuid.NewV7().String(), Body: "首条就在本机执行", WorkspaceID: first.ID,
+		}); err != nil {
+			t.Fatal(err)
+		}
+		binding, err := fixture.binding.Get(ctx, identity, conversationID)
+		if err != nil || binding == nil || binding.WorkspaceID != first.ID || binding.DeviceID != registered.ID {
+			t.Fatalf("draft binding=%+v %v", binding, err)
+		}
+		var run servermodels.AgentRun
+		if err := db.NewSelect().Model(&run).Where("agr.conversation_id = ?", conversationID).Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if run.ExecutionDeviceID == nil || *run.ExecutionDeviceID != registered.ID || run.ExecutionWorkspaceID == nil || *run.ExecutionWorkspaceID != first.ID {
+			t.Fatalf("first run=%+v", run)
+		}
+		if count, err := db.NewSelect().Model((*servermodels.TaskRun)(nil)).Where("tr.idempotency_key = ?", "agent:"+run.ID).Count(ctx); err != nil || count != 0 {
+			t.Fatalf("first device run enqueued server task=%d %v", count, err)
+		}
+		if _, err := fixture.executor.StopAgentReply(ctx, identity, conversationID, run.ID); err != nil {
+			t.Fatal(err)
+		}
+	})
+
 	t.Run("派发领取与工作区串行", func(t *testing.T) {
 		before := fixture.workSeq()
 		conversationID := fixture.boundChat(first.ID)
@@ -99,12 +137,23 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		if _, err := fixture.executor.ClaimDeviceRun(ctx, fixture.device, run.ID); !errors.Is(err, agentrunaction.ErrDeviceRunUnavailable) {
 			t.Fatalf("repeated claim=%v", err)
 		}
+		// 持有租约的设备取得配置版本锁定的模型服务，其他设备取不到。
+		upstream, err := fixture.executor.ResolveDeviceModelUpstream(ctx, fixture.device, run.ID)
+		if err != nil || upstream.Brand == "" || upstream.BaseURL == "" || upstream.Identifier == "" {
+			t.Fatalf("model upstream=%+v %v", upstream, err)
+		}
+		if _, err := fixture.executor.ResolveDeviceModelUpstream(ctx, agentrunaction.RunDevice{OrganizationID: identity.Organization.ID, UserID: identity.User.ID, DeviceID: uuid.NewV7().String()}, run.ID); !errors.Is(err, agentrunaction.ErrDeviceRunNotFound) {
+			t.Fatalf("foreign device model upstream=%v", err)
+		}
 		// 第二个会话绑定同一工作区，第一个运行结束前不能领取。
 		waiting := fixture.sendAndLoadRun(fixture.boundChat(first.ID), "排队")
 		if _, err := fixture.executor.ClaimDeviceRun(ctx, fixture.device, waiting.ID); !errors.Is(err, agentrunaction.ErrDeviceWorkspaceBusy) {
 			t.Fatalf("busy workspace claim=%v", err)
 		}
 		fixture.complete(run.ID, "本机回复")
+		if _, err := fixture.executor.ResolveDeviceModelUpstream(ctx, fixture.device, run.ID); !errors.Is(err, agentrunaction.ErrDeviceRunLeaseLost) {
+			t.Fatalf("model upstream after completion=%v", err)
+		}
 		var message servermodels.Message
 		if err := db.NewSelect().Model(&message).Where("msg.idempotency_key = ?", "agent:"+run.ID).Scan(ctx); err != nil || message.Body != "本机回复" {
 			t.Fatalf("device reply=%+v %v", message, err)
@@ -127,6 +176,38 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		if lease, err := fixture.executor.RenewDeviceRunLease(ctx, fixture.device, waiting.ID); err != nil || !lease.Ended {
 			t.Fatalf("lease after stop=%+v %v", lease, err)
 		}
+		// 停止后设备回传的过程内容仍被保留。
+		if err := fixture.executor.FailDeviceRun(ctx, fixture.device, waiting.ID, domain.AgentRunErrorCodeDeviceRunFailed, "stopped", agentruntime.RunResult{Blocks: fixture.partialBlocks()}); err != nil {
+			t.Fatal(err)
+		}
+		fixture.assertBlocks(waiting.ID, 1)
+	})
+
+	t.Run("设备运行输入状态", func(t *testing.T) {
+		conversationID := fixture.boundChat(first.ID)
+		run := fixture.sendAndLoadRun(conversationID, "输入状态")
+		feed := startRealtimeFeed(t, identity.Organization.ID)
+		if _, err := fixture.executor.ClaimDeviceRun(ctx, fixture.device, run.ID); err != nil {
+			t.Fatal(err)
+		}
+		// 领取时建立 AI 员工聊天主体并开始发布正在输入。
+		agentSubjectID := loadIdentitySubjectID(t, db, identity.Organization.ID, agentIdentityID)
+		feed.expectTyping(t, feed.userTyping(identity.User.ID, conversationID, agentSubjectID, true))
+		// 其他设备上报结果不影响本设备运行的输入状态。
+		foreign := agentrunaction.RunDevice{OrganizationID: identity.Organization.ID, UserID: identity.User.ID, DeviceID: uuid.NewV7().String()}
+		if err := fixture.executor.CompleteDeviceRun(ctx, foreign, run.ID, agentruntime.RunResult{Content: "他机", EndSeq: 1}); err == nil {
+			t.Fatal("foreign device completed run")
+		}
+		if lease, err := fixture.executor.RenewDeviceRunLease(ctx, fixture.device, run.ID); err != nil || lease.Ended {
+			t.Fatalf("renew=%+v %v", lease, err)
+		}
+		fixture.complete(run.ID, "本机回复")
+		feed.expectTypingStopped(t, feed.userTyping(identity.User.ID, conversationID, agentSubjectID, false))
+		// 收尾后迟到的续租不再开始发布。
+		if lease, err := fixture.executor.RenewDeviceRunLease(ctx, fixture.device, run.ID); err != nil || !lease.Ended {
+			t.Fatalf("renew after complete=%+v %v", lease, err)
+		}
+		feed.expectNoTyping(t)
 	})
 
 	t.Run("租约过期", func(t *testing.T) {
@@ -143,11 +224,12 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		if _, err := fixture.executor.RenewDeviceRunLease(ctx, fixture.device, run.ID); !errors.Is(err, agentrunaction.ErrDeviceRunLeaseLost) {
 			t.Fatalf("expired renew=%v", err)
 		}
-		if err := fixture.executor.CompleteDeviceRun(ctx, fixture.device, run.ID, agentruntime.RunResult{Content: "迟到", EndSeq: 1}); !errors.Is(err, agentrunaction.ErrDeviceRunLeaseLost) {
+		// 扫描收敛前设备上报的迟到结果被拒绝，运行随即按租约过期收敛并保留过程内容。
+		if err := fixture.executor.CompleteDeviceRun(ctx, fixture.device, run.ID, agentruntime.RunResult{Content: "迟到", EndSeq: 1, Blocks: fixture.partialBlocks()}); !errors.Is(err, agentrunaction.ErrDeviceRunLeaseLost) {
 			t.Fatalf("expired complete=%v", err)
 		}
-		fixture.sweep()
 		fixture.assertFailed(run.ID, domain.AgentRunErrorCodeDeviceLeaseExpired)
+		fixture.assertBlocks(run.ID, 1)
 
 		// 收尾请求等待会话锁期间租约过期，取得锁后按租约失效拒绝写入。
 		waiting := fixture.sendAndLoadRun(fixture.boundChat(second.ID), "等锁")
@@ -195,12 +277,48 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		fixture.claimAndComplete(next.ID, "继续后的回复")
 	})
 
+	t.Run("超出总时限", func(t *testing.T) {
+		expire := func(runID string) {
+			if _, err := db.NewUpdate().Model((*servermodels.AgentRun)(nil)).
+				Set("claimed_at = now() - make_interval(secs => ?)", agentrunaction.DeviceRunMaxDuration.Seconds()+1).
+				Where("id = ?", runID).Exec(ctx); err != nil {
+				t.Fatal(err)
+			}
+		}
+		// 超出总时限后不再续租、不再代理模型请求，设备上报失败时按超时收敛并保留过程内容。
+		run := fixture.sendAndLoadRun(fixture.boundChat(second.ID), "超时")
+		if claim, err := fixture.executor.ClaimDeviceRun(ctx, fixture.device, run.ID); err != nil || len(claim.Assignment) == 0 {
+			t.Fatalf("claim=%+v %v", claim, err)
+		}
+		expire(run.ID)
+		if _, err := fixture.executor.RenewDeviceRunLease(ctx, fixture.device, run.ID); !errors.Is(err, agentrunaction.ErrDeviceRunLeaseLost) {
+			t.Fatalf("renew after deadline=%v", err)
+		}
+		if _, err := fixture.executor.ResolveDeviceModelUpstream(ctx, fixture.device, run.ID); !errors.Is(err, agentrunaction.ErrDeviceRunLeaseLost) {
+			t.Fatalf("model upstream after deadline=%v", err)
+		}
+		if err := fixture.executor.FailDeviceRun(ctx, fixture.device, run.ID, domain.AgentRunErrorCodeDeviceRunFailed, "context canceled", agentruntime.RunResult{Blocks: fixture.partialBlocks()}); err != nil {
+			t.Fatal(err)
+		}
+		fixture.assertFailed(run.ID, domain.AgentRunErrorCodeDeviceRunTimedOut)
+		fixture.assertBlocks(run.ID, 1)
+
+		// 租约仍在续期的运行超出总时限后由扫描收敛。
+		swept := fixture.sendAndLoadRun(run.ConversationID, "扫描超时")
+		if _, err := fixture.executor.ClaimDeviceRun(ctx, fixture.device, swept.ID); err != nil {
+			t.Fatal(err)
+		}
+		expire(swept.ID)
+		fixture.sweep()
+		fixture.assertFailed(swept.ID, domain.AgentRunErrorCodeDeviceRunTimedOut)
+	})
+
 	t.Run("工作区缺失与解绑", func(t *testing.T) {
 		missing := fixture.sendAndLoadRun(fixture.boundChat(second.ID), "目录缺失")
-		if err := fixture.executor.FailDeviceRun(ctx, fixture.device, missing.ID, domain.AgentRunErrorCodeUserCancelled, ""); !errors.Is(err, agentrunaction.ErrDeviceRunFailureCodeInvalid) {
+		if err := fixture.executor.FailDeviceRun(ctx, fixture.device, missing.ID, domain.AgentRunErrorCodeUserCancelled, "", agentruntime.RunResult{}); !errors.Is(err, agentrunaction.ErrDeviceRunFailureCodeInvalid) {
 			t.Fatalf("invalid failure code=%v", err)
 		}
-		if err := fixture.executor.FailDeviceRun(ctx, fixture.device, missing.ID, domain.AgentRunErrorCodeWorkspaceMissing, ""); err != nil {
+		if err := fixture.executor.FailDeviceRun(ctx, fixture.device, missing.ID, domain.AgentRunErrorCodeWorkspaceMissing, "", agentruntime.RunResult{}); err != nil {
 			t.Fatal(err)
 		}
 		fixture.assertFailed(missing.ID, domain.AgentRunErrorCodeWorkspaceMissing)
@@ -316,6 +434,23 @@ func (f *deviceRunFixture) assertFailed(runID string, code domain.AgentRunErrorC
 	}
 	if run.Status != string(domain.AgentRunStatusFailed) || run.ErrorCode == nil || *run.ErrorCode != string(code) || run.ResponseMessageID == nil {
 		f.t.Fatalf("failed run=%+v", run)
+	}
+}
+
+// partialBlocks 构造设备回传的一个正文过程内容块。
+func (f *deviceRunFixture) partialBlocks() []agentruntime.Block {
+	return []agentruntime.Block{{
+		ID: uuid.NewV7().String(), Position: 1, ModelCallID: uuid.NewV7().String(),
+		Kind: domain.AgentRunBlockContent, Payload: agentruntime.BlockPayload{Text: "中断前的内容"},
+	}}
+}
+
+// assertBlocks 核对运行保存的过程内容块数量。
+func (f *deviceRunFixture) assertBlocks(runID string, expected int) {
+	f.t.Helper()
+	count, err := f.db.NewSelect().Model((*servermodels.AgentRunBlock)(nil)).Where("arb.agent_run_id = ?", runID).Count(f.ctx)
+	if err != nil || count != expected {
+		f.t.Fatalf("run blocks=%d %v", count, err)
 	}
 }
 

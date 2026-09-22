@@ -33,9 +33,12 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
-import { useConversationAgentReplyLabel } from "@/features/inbox/conversation-agent-activity"
 import { ConversationDeviceBinding } from "@/features/inbox/conversation-device-binding"
-import { useConversationTypingLabel } from "@/features/inbox/use-conversation-typing"
+import {
+  customerTypingSenderName,
+  groupTypingSenderName,
+  useConversationTypingLabel,
+} from "@/features/inbox/use-conversation-typing"
 import { cn } from "@/lib/utils"
 
 /** 会话头的图标操作按钮，悬停显示操作名称。 */
@@ -112,14 +115,15 @@ export function ConversationHeader({
     : null
   const customer = customerConversation?.customer ?? null
   const group = isGroupInboxConversation(conversation) ? conversation.group : null
-  // 正在输入提示紧接标题右侧展示。
-  const typingLabel = useConversationTypingLabel(
+  // 正在输入提示紧接标题右侧展示，真人与 AI 员工同等列出。
+  const activityLabel = useConversationTypingLabel(
     conversation.id,
-    group ? (groupParticipants ?? []) : null,
+    group
+      ? groupTypingSenderName(groupParticipants ?? [])
+      : customer
+        ? customerTypingSenderName(customer)
+        : null,
   )
-  const agentReplyLabel = useConversationAgentReplyLabel(conversation.id)
-  // 真人正在输入优先于 AI 员工正在回复；群聊不展示正在输入。
-  const activityLabel = (group ? "" : typingLabel) || agentReplyLabel
   const actions = useCustomerSessionActions(
     customerConversation,
     currentIdentityId,
