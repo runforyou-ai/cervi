@@ -26,7 +26,7 @@ type stubRunClient struct {
 	failures  map[string]appservice.DeviceRunFailureCode
 	// failedBlocks 按运行编号记录失败上报携带的过程内容块。
 	failedBlocks map[string]json.RawMessage
-	busy      map[string]bool
+	busy         map[string]bool
 	// blockPeek 为 true 时读取输入阻塞到运行 context 结束。
 	blockPeek bool
 	leaseEnd  bool
