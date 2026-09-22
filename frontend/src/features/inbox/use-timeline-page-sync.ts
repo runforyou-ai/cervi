@@ -1,8 +1,7 @@
-/** 把时间线窗口的读取结果同步给发送状态、正在输入状态和会话头的 AI 员工活动。 */
+/** 把时间线窗口的读取结果同步给发送状态与正在输入状态。 */
 import { useEffect, useRef } from "react"
 
-import { AgentRunStatus, type ConversationMessageListData } from "@/api"
-import { publishConversationAgentActivity } from "@/features/inbox/conversation-agent-activity"
+import type { ConversationMessageListData } from "@/api"
 import {
   nextTypingArrival,
   type TypingArrivalBaseline,
@@ -10,7 +9,7 @@ import {
 import { useOutgoingMessageStore } from "@/features/inbox/outgoing-message-context"
 import { clearConversationTypingSender } from "@/features/inbox/use-conversation-typing"
 
-/** 按当前窗口收敛发送项、清除新消息发送者的输入状态并发布 AI 员工活动。 */
+/** 按当前窗口收敛发送项，并清除新消息发送者的输入状态。 */
 export function useTimelinePageSync(
   conversationID: string,
   currentPage: ConversationMessageListData | null,
@@ -36,15 +35,4 @@ export function useTimelinePageSync(
     typingArrivalRef.current = arrival.baseline
     if (arrival.arrived && latestSenderSubjectID) clearConversationTypingSender(conversationID, latestSenderSubjectID)
   }, [conversationID, latestMessageSeq, latestSenderSubjectID, windowLoaded])
-  const agentActivityNames = [
-    ...(currentPage?.agentRuns ?? [])
-      .filter((run) => run.status === AgentRunStatus.AgentRunStatusQueued || run.status === AgentRunStatus.AgentRunStatusRunning)
-      .map((run) => run.agentName),
-    ...(currentPage?.pendingAgents ?? []).map((agent) => agent.displayName),
-  ].join("\u0000")
-  useEffect(() => {
-    // 会话头按时间线读到的运行与排队状态展示 AI 员工正在回复。
-    publishConversationAgentActivity(conversationID, agentActivityNames ? agentActivityNames.split("\u0000") : [])
-    return () => publishConversationAgentActivity(conversationID, [])
-  }, [agentActivityNames, conversationID])
 }

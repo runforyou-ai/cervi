@@ -32,8 +32,10 @@ import {
   customerReplySupported,
   useCustomerSessionActions,
 } from "@/features/inbox/customer-session-actions"
-import { useConversationAgentReplyLabel } from "@/features/inbox/conversation-agent-activity"
-import { useConversationTypingLabel } from "@/features/inbox/use-conversation-typing"
+import {
+  customerTypingSenderName,
+  useConversationTypingLabel,
+} from "@/features/inbox/use-conversation-typing"
 import { useConversationSummary } from "@/features/inbox/use-conversation-summary"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
@@ -130,10 +132,10 @@ export function MobileCustomerConversationPage() {
       ? initial
       : summary.data
   const conversation = data && isCustomerInboxConversation(data) ? data : null
-  const typingLabel = useConversationTypingLabel(conversationID, null)
-  const agentReplyLabel = useConversationAgentReplyLabel(conversationID)
-  // 访客正在输入优先于 AI 员工正在回复。
-  const activityLabel = typingLabel || agentReplyLabel
+  const activityLabel = useConversationTypingLabel(
+    conversationID,
+    conversation ? customerTypingSenderName(conversation.customer) : null,
+  )
   if (!conversationID) return <Navigate to={inboxURL} replace />
   const customer = conversation?.customer
   const disabledReason = customer

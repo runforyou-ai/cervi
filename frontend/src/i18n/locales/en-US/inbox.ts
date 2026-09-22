@@ -220,8 +220,6 @@ const inbox = {
   typingOne: "{{name}} is typing…",
   typingTwo: "{{first}} and {{second}} are typing…",
   typingMany: "{{count}} people are typing…",
-  agentReplyingOne: "{{name}} is replying…",
-  agentReplyingMany: "{{count}} AI employees are replying…",
   agentReplyStopped: "Reply stopped",
   agentStopReply: "Stop reply",
   agentStopFailed: "Failed to stop the reply. Please try again.",

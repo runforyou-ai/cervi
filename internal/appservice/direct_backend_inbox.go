@@ -171,9 +171,10 @@ func inboxConversationFromAction(summary inboxaction.ConversationSummary, avatar
 			attachmentByteLimit = domain.ChannelAttachmentLimit(summary.Customer.ChannelType)
 		}
 		conversation.Customer = &CustomerInboxConversation{
-			Title: summary.Customer.Title, ContactName: summary.Customer.ContactName,
-			ContactAvatarURL: optionalFileURL(avatarURLs, summary.Customer.ContactAvatarFileID),
-			ChannelType:      ChannelType(summary.Customer.ChannelType), ChannelName: summary.Customer.ChannelName,
+			Title: summary.Customer.Title, ContactName: summary.Customer.ContactName, ContactChatSubjectID: summary.Customer.ContactChatSubjectID,
+			AssigneeChatSubjectID: summary.Customer.AssigneeChatSubjectID,
+			ContactAvatarURL:      optionalFileURL(avatarURLs, summary.Customer.ContactAvatarFileID),
+			ChannelType:           ChannelType(summary.Customer.ChannelType), ChannelName: summary.Customer.ChannelName,
 			Preview: summary.Customer.Preview, PreviewSenderIdentityType: (*OrganizationIdentityType)(summary.Customer.PreviewSenderIdentityType),
 			PreviewVisibility: (*MessageVisibility)(summary.Customer.PreviewVisibility), LastMessageAt: summary.Customer.LastMessageAt,
 			ServiceSessionID: summary.Customer.ServiceSessionID, ServiceSessionStatus: ServiceSessionStatus(summary.Customer.ServiceSessionStatus), Assignee: assignee,

@@ -215,8 +215,6 @@ const inbox = {
   typingOne: "{{name}} 正在输入…",
   typingTwo: "{{first}}、{{second}} 正在输入…",
   typingMany: "{{count}} 人正在输入…",
-  agentReplyingOne: "{{name}} 正在回复…",
-  agentReplyingMany: "{{count}} 位 AI 员工正在回复…",
   agentReplyStopped: "已停止回复",
   agentStopReply: "停止回复",
   agentStopFailed: "停止回复失败，请重试。",

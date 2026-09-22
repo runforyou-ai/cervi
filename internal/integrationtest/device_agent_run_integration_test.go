@@ -129,6 +129,33 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		}
 	})
 
+	t.Run("设备运行输入状态", func(t *testing.T) {
+		conversationID := fixture.boundChat(first.ID)
+		run := fixture.sendAndLoadRun(conversationID, "输入状态")
+		feed := startRealtimeFeed(t, identity.Organization.ID)
+		if _, err := fixture.executor.ClaimDeviceRun(ctx, fixture.device, run.ID); err != nil {
+			t.Fatal(err)
+		}
+		// 领取时建立 AI 员工聊天主体并开始发布正在输入。
+		agentSubjectID := loadIdentitySubjectID(t, db, identity.Organization.ID, agentIdentityID)
+		feed.expectTyping(t, feed.userTyping(identity.User.ID, conversationID, agentSubjectID, true))
+		// 其他设备上报结果不影响本设备运行的输入状态。
+		foreign := agentrunaction.RunDevice{OrganizationID: identity.Organization.ID, UserID: identity.User.ID, DeviceID: uuid.NewV7().String()}
+		if err := fixture.executor.CompleteDeviceRun(ctx, foreign, run.ID, agentruntime.RunResult{Content: "他机", EndSeq: 1}); err == nil {
+			t.Fatal("foreign device completed run")
+		}
+		if lease, err := fixture.executor.RenewDeviceRunLease(ctx, fixture.device, run.ID); err != nil || lease.Ended {
+			t.Fatalf("renew=%+v %v", lease, err)
+		}
+		fixture.complete(run.ID, "本机回复")
+		feed.expectTypingStopped(t, feed.userTyping(identity.User.ID, conversationID, agentSubjectID, false))
+		// 收尾后迟到的续租不再开始发布。
+		if lease, err := fixture.executor.RenewDeviceRunLease(ctx, fixture.device, run.ID); err != nil || !lease.Ended {
+			t.Fatalf("renew after complete=%+v %v", lease, err)
+		}
+		feed.expectNoTyping(t)
+	})
+
 	t.Run("租约过期", func(t *testing.T) {
 		run := fixture.sendAndLoadRun(fixture.boundChat(second.ID), "租约")
 		if _, err := fixture.executor.ClaimDeviceRun(ctx, fixture.device, run.ID); err != nil {

@@ -28,7 +28,10 @@ import {
   memberChatPollingInterval,
   useMemberChatPollingActive,
 } from "@/features/inbox/use-member-chat-polling"
-import { useConversationAgentReplyLabel } from "@/features/inbox/conversation-agent-activity"
+import {
+  groupTypingSenderName,
+  useConversationTypingLabel,
+} from "@/features/inbox/use-conversation-typing"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 
@@ -84,8 +87,10 @@ function MobileGroupConversation({
     },
   )
   const unavailable = !refreshing && isNotFoundApiError(error)
-  // 群聊不展示真人正在输入，只保留 AI 员工正在回复。
-  const activityLabel = useConversationAgentReplyLabel(conversationID)
+  const activityLabel = useConversationTypingLabel(
+    conversationID,
+    groupTypingSenderName(data?.participants ?? []),
+  )
 
   /** 失去群聊访问权时提示一次，并回到原筛选下的消息列表。 */
   const handleUnavailable = useCallback(() => {
