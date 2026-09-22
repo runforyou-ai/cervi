@@ -27,7 +27,7 @@ const customerHistoryToolGuidance = "- search_customer_history：查看同一客
 
 const askCustomerToolGuidance = "- ask_customer：需要客户补充信息、确认，或只需要问候时，用它发送要说的话并等待客户回复。"
 
-const handoffToolGuidance = "- handoff_to_human：无法从资料得到答案、客户明确要求真人、客户投诉或涉及退款赔偿等需要人工判断时，用它写明转交原因；系统会通知客户并交给人工客服。"
+const handoffToolGuidance = "- handoff_to_human：无法从资料得到答案、客户明确要求真人、客户投诉或涉及退款赔偿等需要人工判断时，用它写明转交原因；系统会按承接结果通知客户并交给人工客服。"
 
 const agentChatSceneRules = `本次是企业内部对话，提问者是企业同事，你的回答只提供给同事。可以给出分析和建议，但不要宣称已经向客户发送消息或已经转交人工。`
 

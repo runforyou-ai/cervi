@@ -4,6 +4,7 @@ import { useTranslation } from "react-i18next"
 
 import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
+import { BusinessHoursSettings } from "@/features/settings/business-hours-form"
 import { ChangePasswordForm } from "@/features/settings/change-password-form"
 import { DeviceListPage } from "@/features/settings/device-list-page"
 import { GeneralSettingsForm } from "@/features/settings/general-settings-form"
@@ -21,6 +22,7 @@ const formSections = [
   "notifications",
   "devices",
   "general",
+  "customerService",
 ] as const
 
 type SettingsFormSection = (typeof formSections)[number]
@@ -68,6 +70,8 @@ export function SettingsPage({
               <NotificationSettingsForm user={identity.user} />
             ) : section === "general" ? (
               <GeneralSettingsForm organization={identity.organization} />
+            ) : section === "customerService" ? (
+              <BusinessHoursSettings />
             ) : (
               <UserPreferencesForm user={identity.user} />
             )}

@@ -100,6 +100,9 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	if err := tasks.Registry().RegisterJSONWithTerminalFailure(agentrunaction.RunActionName, executeAgentRun.Execute, executeAgentRun.FinalizeFailure); err != nil {
 		return nil, nil, err
 	}
+	if err := tasks.Registry().RegisterJSONWithTerminalFailure(agentrunaction.ReturnedHandoffActionName, executeAgentRun.HandOffReturnedSession, executeAgentRun.FinalizeReturnedHandoffFailure); err != nil {
+		return nil, nil, err
+	}
 	// 注册设备运行收敛扫描，每 15 秒把租约过期或失去执行条件的设备运行标记失败。
 	if err := tasks.Registry().RegisterJSON(agentrunaction.DeviceRunSweepActionName, executeAgentRun.SweepDeviceRuns); err != nil {
 		return nil, nil, err
