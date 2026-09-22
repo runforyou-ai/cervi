@@ -16,8 +16,8 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// ValidateAssignment 校验并锁定企业身份可以使用的角色。
-func ValidateAssignment(ctx context.Context, db bun.IDB, organizationID, roleID string, identityType domain.OrganizationIdentityType) (*servermodels.Role, error) {
+// ValidateAssignment 校验并锁定成员可以使用的角色。
+func ValidateAssignment(ctx context.Context, db bun.IDB, organizationID, roleID string) (*servermodels.Role, error) {
 	if !common.ValidUUID(roleID) {
 		return nil, ErrAssignmentInvalid
 	}
@@ -33,9 +33,6 @@ func ValidateAssignment(ctx context.Context, db bun.IDB, organizationID, roleID 
 	}
 	if err != nil {
 		return nil, err
-	}
-	if identityType == domain.OrganizationIdentityTypeAgent && domain.RoleKind(role.Kind) == domain.RoleKindAdmin {
-		return nil, ErrAgentAdministrator
 	}
 	return role, nil
 }
@@ -58,9 +55,8 @@ func LockAdministratorRole(ctx context.Context, db bun.IDB, organizationID strin
 // EnsureActiveAdministratorRemains 校验企业仍有账号正常的真人管理员。
 func EnsureActiveAdministratorRemains(ctx context.Context, db bun.IDB, organizationID, administratorRoleID string) error {
 	count, err := db.NewSelect().TableExpr("users AS u").
-		Join("JOIN organization_identities AS oi ON oi.id = u.identity_id AND oi.organization_id = u.organization_id AND oi.type = ?", domain.OrganizationIdentityTypeUser).
 		Where("u.organization_id = ?", organizationID).
-		Where("oi.role_id = ?", administratorRoleID).
+		Where("u.role_id = ?", administratorRoleID).
 		Where("u.status = ?", domain.UserStatusActive).
 		Count(ctx)
 	if err != nil {
@@ -72,15 +68,15 @@ func EnsureActiveAdministratorRemains(ctx context.Context, db bun.IDB, organizat
 	return nil
 }
 
-// UpdateAssignmentsAction 批量调整真人和 AI 员工的企业角色。
+// UpdateAssignmentsAction 批量调整成员的企业角色。
 type UpdateAssignmentsAction struct{ db *bun.DB }
 
-// NewUpdateAssignmentsAction 创建企业身份角色批量调整操作。
+// NewUpdateAssignmentsAction 创建成员角色批量调整操作。
 func NewUpdateAssignmentsAction(db *bun.DB) *UpdateAssignmentsAction {
 	return &UpdateAssignmentsAction{db: db}
 }
 
-// Execute 校验企业身份和角色后一次性保存全部调整。
+// Execute 校验成员和角色后一次性保存全部调整。
 func (a *UpdateAssignmentsAction) Execute(ctx context.Context, identity *servermodels.Identity, changes []AssignmentInput) error {
 	identityIDs := make([]string, 0, len(changes))
 	roleIDs := make([]string, 0, len(changes))
@@ -116,62 +112,33 @@ func (a *UpdateAssignmentsAction) Execute(ctx context.Context, identity *serverm
 		if err != nil {
 			return err
 		}
-		var roles []servermodels.Role
-		if err := tx.NewSelect().Model(&roles).
-			Column("id", "kind").
+		var lockedRoleIDs []string
+		if err := tx.NewSelect().Model((*servermodels.Role)(nil)).Column("id").
 			Where("organization_id = ?", identity.Organization.ID).
 			Where("id IN (?)", bun.In(roleIDs)).
 			For("KEY SHARE").
-			Scan(ctx); err != nil {
+			Scan(ctx, &lockedRoleIDs); err != nil {
 			return err
 		}
-		if len(roles) != len(roleIDs) {
+		if len(lockedRoleIDs) != len(roleIDs) {
 			return ErrAssignmentInvalid
 		}
-		roleKinds := make(map[string]domain.RoleKind, len(roles))
-		for _, role := range roles {
-			roleKinds[role.ID] = domain.RoleKind(role.Kind)
-		}
-		// 先锁定真人账号，保持用户账号先于企业身份的锁序。
-		if _, err := tx.NewSelect().Model((*servermodels.User)(nil)).Column("id").
+		// 多个成员账号按编号顺序加锁。
+		var userIDs []string
+		if err := tx.NewSelect().Model((*servermodels.User)(nil)).Column("id").
 			Where("organization_id = ? AND identity_id IN (?)", identity.Organization.ID, bun.In(identityIDs)).
-			OrderExpr("id").For("NO KEY UPDATE").Exec(ctx); err != nil {
+			OrderExpr("id").For("NO KEY UPDATE").Scan(ctx, &userIDs); err != nil {
 			return err
 		}
-		// 多个企业身份按编号顺序加锁。
-		var identities []struct {
-			ID   string `bun:"id"`
-			Type string `bun:"type"`
-		}
-		if err := tx.NewSelect().TableExpr("organization_identities AS oi").
-			ColumnExpr("oi.id, oi.type").
-			Where("oi.organization_id = ?", identity.Organization.ID).
-			Where("oi.id IN (?)", bun.In(identityIDs)).
-			OrderExpr("oi.id").
-			For("UPDATE OF oi").
-			Scan(ctx, &identities); err != nil {
-			return err
-		}
-		if len(identities) != len(identityIDs) {
+		if len(userIDs) != len(identityIDs) {
 			return ErrAssignmentInvalid
-		}
-		identityTypes := make(map[string]domain.OrganizationIdentityType, len(identities))
-		for _, stored := range identities {
-			identityTypes[stored.ID] = domain.OrganizationIdentityType(stored.Type)
 		}
 		for _, change := range changes {
-			if identityTypes[change.IdentityID] == domain.OrganizationIdentityTypeAgent && roleKinds[change.RoleID] == domain.RoleKindAdmin {
-				return ErrAgentAdministrator
-			}
-			query := tx.NewUpdate().Model((*servermodels.OrganizationIdentity)(nil)).
+			if _, err := identityaction.UpdateUserAccount(ctx, identity.Organization.ID, tx.NewUpdate().Model((*servermodels.User)(nil)).
+				Set("profile_version = profile_version + CASE WHEN role_id IS DISTINCT FROM ?::uuid THEN 1 ELSE 0 END", change.RoleID).
 				Set("role_id = ?", change.RoleID).
-				Set("updated_at = now()")
-			if identityTypes[change.IdentityID] == domain.OrganizationIdentityTypeUser {
-				_, err = identityaction.UpdateUserIdentity(ctx, tx, identity.Organization.ID, change.IdentityID, query)
-			} else {
-				_, err = query.Where("organization_id = ? AND id = ?", identity.Organization.ID, change.IdentityID).Exec(ctx)
-			}
-			if err != nil {
+				Set("updated_at = now()").
+				Where("organization_id = ? AND identity_id = ?", identity.Organization.ID, change.IdentityID)); err != nil {
 				return err
 			}
 		}

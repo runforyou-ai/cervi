@@ -965,7 +965,7 @@ func (s *Service) updateUser(c *gin.Context) {
 	writeResult(c, http.StatusOK, output, err)
 }
 
-// updateRoleAssignments 在一个事务中批量调整真人和 AI 员工角色。
+// updateRoleAssignments 在一个事务中批量调整成员角色。
 func (s *Service) updateRoleAssignments(c *gin.Context) {
 	var input appservice.RoleAssignmentsInput
 	if !bindJSON(c, &input) {

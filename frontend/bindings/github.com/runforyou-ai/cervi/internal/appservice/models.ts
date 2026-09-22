@@ -160,7 +160,6 @@ export interface Agent {
     "identityId": string;
     "displayName": string;
     "avatarUrl": string;
-    "role": RoleSummary;
     "handlesCustomers": boolean;
     "status": UserStatus;
     "workStatus": WorkStatus;
@@ -276,7 +275,6 @@ export interface AgentListItem {
     "identityId": string;
     "displayName": string;
     "avatarUrl": string;
-    "role": RoleSummary;
     "status": UserStatus;
     "workStatus": WorkStatus;
     "teams": TeamSummary[] | null;
@@ -1151,7 +1149,6 @@ export interface ConversationWindowInput {
  */
 export interface CreateAgentInput {
     "displayName": string;
-    "roleId": string;
     "teamIds": string[] | null;
     "handlesCustomers": boolean;
     "avatarFileId": string;
@@ -2849,20 +2846,6 @@ export interface PendingConversationMentions {
 }
 
 /**
- * PermissionAppliesTo 表示权限适用的企业身份类型。
- */
-export enum PermissionAppliesTo {
-    /**
-     * The Go zero value for the underlying type of the enum.
-     */
-    $zero = "",
-
-    PermissionAppliesToMember = "member",
-    PermissionAppliesToAgent = "agent",
-    PermissionAppliesToBoth = "both",
-};
-
-/**
  * PermissionCode 表示一项预定义权限。
  */
 export enum PermissionCode {
@@ -2890,7 +2873,6 @@ export interface PermissionDefinition {
     "code": PermissionCode;
     "resource": PermissionResource;
     "level": PermissionLevel;
-    "appliesTo": PermissionAppliesTo;
 }
 
 /**
@@ -2969,7 +2951,7 @@ export interface Role {
 }
 
 /**
- * RoleAssignmentInput 定义一个企业身份的目标角色。
+ * RoleAssignmentInput 定义一个成员的目标角色。
  */
 export interface RoleAssignmentInput {
     "identityId": string;
@@ -3356,7 +3338,6 @@ export interface UpdateAgentExecutionInput {
  */
 export interface UpdateAgentInput {
     "displayName": string;
-    "roleId": string;
     "teamIds": string[] | null;
     "handlesCustomers": boolean;
     "workStatus": WorkStatus;

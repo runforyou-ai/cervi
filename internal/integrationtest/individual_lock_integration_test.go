@@ -132,7 +132,7 @@ func newChatLockUser(t *testing.T, db *bun.DB, owner *servermodels.Identity) *se
 	ctx := context.Background()
 	id := uuid.NewV7().String()
 	email := id + "@chat-lock.test"
-	_, err := useraction.NewCreateUserAction(db, newTestTasks(db)).Execute(ctx, owner, useraction.CreateInput{HandlesCustomers: true, MaxServiceSessions: 10, DisplayName: "锁定成员 " + id, Email: email, Password: "password123", RoleID: owner.OrganizationIdentity.RoleID})
+	_, err := useraction.NewCreateUserAction(db, newTestTasks(db)).Execute(ctx, owner, useraction.CreateInput{HandlesCustomers: true, MaxServiceSessions: 10, DisplayName: "锁定成员 " + id, Email: email, Password: "password123", RoleID: owner.User.RoleID})
 	if err != nil {
 		t.Fatal(err)
 	}

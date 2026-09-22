@@ -115,7 +115,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if installed.Identity.OrganizationIdentity.RoleID == "" || installed.Identity.Organization.Name != "鹿行测试公司" || installed.Identity.User.Locale != "en-US" || installed.Identity.User.TimeZone != "America/New_York" || !installed.Identity.User.MessageNotificationsEnabled || installed.Identity.OrganizationIdentity.WorkStatus != string(domain.WorkStatusWorking) {
+	if installed.Identity.User.RoleID == "" || installed.Identity.Organization.Name != "鹿行测试公司" || installed.Identity.User.Locale != "en-US" || installed.Identity.User.TimeZone != "America/New_York" || !installed.Identity.User.MessageNotificationsEnabled || installed.Identity.OrganizationIdentity.WorkStatus != string(domain.WorkStatusWorking) {
 		t.Fatalf("unexpected identity: %#v", installed.Identity)
 	}
 	if installed.Identity.Organization.AccessHost != accessHost {
@@ -903,12 +903,12 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatalf("remove last active administrator error = %v", err)
 		}
 		administratorAfterRollback, err := useraction.NewGetUserQuery(db).Execute(context.Background(), loggedIn.Identity, loggedIn.Identity.User.ID)
-		if err != nil || administratorAfterRollback.RoleID != loggedIn.Identity.OrganizationIdentity.RoleID {
+		if err != nil || administratorAfterRollback.RoleID != loggedIn.Identity.User.RoleID {
 			t.Fatalf("administrator after rollback = %#v, error = %v", administratorAfterRollback, err)
 		}
 		if err := updateRoles.Execute(context.Background(), loggedIn.Identity, []roleaction.AssignmentInput{
 			{IdentityID: loggedIn.Identity.OrganizationIdentity.ID, RoleID: memberRole.ID},
-			{IdentityID: createdMember.IdentityID, RoleID: loggedIn.Identity.OrganizationIdentity.RoleID},
+			{IdentityID: createdMember.IdentityID, RoleID: loggedIn.Identity.User.RoleID},
 		}); err != nil {
 			t.Fatal(err)
 		}
@@ -916,7 +916,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatalf("deactivate last active administrator error = %v", err)
 		}
 		if err := updateRoles.Execute(context.Background(), loggedIn.Identity, []roleaction.AssignmentInput{
-			{IdentityID: loggedIn.Identity.OrganizationIdentity.ID, RoleID: loggedIn.Identity.OrganizationIdentity.RoleID},
+			{IdentityID: loggedIn.Identity.OrganizationIdentity.ID, RoleID: loggedIn.Identity.User.RoleID},
 			{IdentityID: createdMember.IdentityID, RoleID: memberRole.ID},
 		}); err != nil {
 			t.Fatal(err)
@@ -1544,13 +1544,6 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		customerServiceRole := &servermodels.Role{}
-		if err := db.NewSelect().Model(customerServiceRole).
-			Where("organization_id = ?", loggedIn.Identity.Organization.ID).
-			Where("kind = ?", domain.RoleKindCustomerService).
-			Scan(context.Background()); err != nil {
-			t.Fatal(err)
-		}
 		provider := &servermodels.AIProvider{
 			OrganizationID: loggedIn.Identity.Organization.ID,
 			Brand:          string(domain.AIProviderBrandOpenAI),
@@ -1577,7 +1570,6 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		}
 		createdAgent, err := agentaction.NewCreateAgentAction(db).Execute(context.Background(), loggedIn.Identity, agentaction.CreateInput{
 			HandlesCustomers: true, DisplayName: "接待智能体",
-			RoleID:  customerServiceRole.ID,
 			TeamIDs: []string{team.ID},
 			Execution: agentaction.ExecutionInput{
 				Mode: domain.AgentExecutionModeManaged,
@@ -1589,7 +1581,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if createdAgent.RoleID != customerServiceRole.ID || createdAgent.RoleKind != domain.RoleKindCustomerService || len(createdAgent.Teams) != 1 || createdAgent.Teams[0].ID != team.ID || createdAgent.CreatedAt.IsZero() || createdAgent.Execution.Managed == nil || createdAgent.Execution.Managed.ModelIdentifier != model.Identifier {
+		if len(createdAgent.Teams) != 1 || createdAgent.Teams[0].ID != team.ID || createdAgent.CreatedAt.IsZero() || createdAgent.Execution.Managed == nil || createdAgent.Execution.Managed.ModelIdentifier != model.Identifier {
 			t.Fatalf("created agent = %#v", createdAgent)
 		}
 		customerServiceAssignees, err := inboxaction.NewListCustomerServiceAssigneesQuery(db).Execute(context.Background(), loggedIn.Identity)
@@ -1632,7 +1624,6 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		}
 		updatedAgent, err := agentaction.NewUpdateAgentAction(db, testServiceSessionReturner(db)).Execute(context.Background(), loggedIn.Identity, createdAgent.ID, agentaction.UpdateInput{
 			DisplayName:      "售前智能体",
-			RoleID:           customerServiceRole.ID,
 			TeamIDs:          []string{team.ID},
 			HandlesCustomers: true,
 			WorkStatus:       domain.WorkStatusAway,
@@ -1646,7 +1637,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		}
 		// 核验无效工作状态触发整次资料提交回滚。
 		if _, err := agentaction.NewUpdateAgentAction(db, testServiceSessionReturner(db)).Execute(context.Background(), loggedIn.Identity, createdAgent.ID, agentaction.UpdateInput{
-			DisplayName: "不应保存的名称", RoleID: customerServiceRole.ID, TeamIDs: []string{team.ID}, HandlesCustomers: true, WorkStatus: "invalid",
+			DisplayName: "不应保存的名称", TeamIDs: []string{team.ID}, HandlesCustomers: true, WorkStatus: "invalid",
 		}); err == nil {
 			t.Fatal("invalid agent work status update succeeded")
 		} else {
@@ -1910,7 +1901,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil || teamAfterAgentDeactivation.MemberCount != 1 {
 			t.Fatalf("team after agent deactivation = %#v, error = %v", teamAfterAgentDeactivation, err)
 		}
-		if _, err := agentaction.NewUpdateAgentAction(db, testServiceSessionReturner(db)).Execute(context.Background(), loggedIn.Identity, createdAgent.ID, agentaction.UpdateInput{DisplayName: updatedAgent.DisplayName, RoleID: updatedAgent.RoleID, TeamIDs: []string{team.ID}, HandlesCustomers: true, WorkStatus: domain.WorkStatusWorking}); err == nil {
+		if _, err := agentaction.NewUpdateAgentAction(db, testServiceSessionReturner(db)).Execute(context.Background(), loggedIn.Identity, createdAgent.ID, agentaction.UpdateInput{DisplayName: updatedAgent.DisplayName, TeamIDs: []string{team.ID}, HandlesCustomers: true, WorkStatus: domain.WorkStatusWorking}); err == nil {
 			t.Fatal("inactive agent work status update succeeded")
 		} else {
 			var fieldError *common.FieldError
@@ -1933,7 +1924,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil || len(teamAfterAgentReactivation.Teams) != 1 || teamAfterAgentReactivation.Teams[0].MemberCount != 2 {
 			t.Fatalf("team after agent reactivation = %#v, error = %v", teamAfterAgentReactivation, err)
 		}
-		updatedAgent, err = agentaction.NewUpdateAgentAction(db, testServiceSessionReturner(db)).Execute(context.Background(), loggedIn.Identity, createdAgent.ID, agentaction.UpdateInput{DisplayName: updatedAgent.DisplayName, RoleID: updatedAgent.RoleID, TeamIDs: []string{team.ID}, HandlesCustomers: true, WorkStatus: domain.WorkStatusWorking})
+		updatedAgent, err = agentaction.NewUpdateAgentAction(db, testServiceSessionReturner(db)).Execute(context.Background(), loggedIn.Identity, createdAgent.ID, agentaction.UpdateInput{DisplayName: updatedAgent.DisplayName, TeamIDs: []string{team.ID}, HandlesCustomers: true, WorkStatus: domain.WorkStatusWorking})
 		if err != nil || updatedAgent.WorkStatus != domain.WorkStatusWorking {
 			t.Fatalf("working agent = %#v, error = %v", updatedAgent, err)
 		}
@@ -2409,55 +2400,55 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		testAgentFailureMessages(t, db, loggedIn.Identity, taskRuntime, agentConversation.ID, failedRun.ID, exhaustedRun.ID, nextRun.ID)
 
 		t.Run("Agent 群聊成员", func(t *testing.T) {
-			testGroupAgentMembership(t, db, loggedIn.Identity, customerServiceRole.ID, provider.ID, model.Identifier)
+			testGroupAgentMembership(t, db, loggedIn.Identity, provider.ID, model.Identifier)
 		})
 
 		t.Run("Agent 群内点名", func(t *testing.T) {
-			testGroupAgentMentionReplies(t, db, loggedIn.Identity, customerServiceRole.ID, provider.ID, model.Identifier)
+			testGroupAgentMentionReplies(t, db, loggedIn.Identity, provider.ID, model.Identifier)
 		})
 
 		t.Run("Agent 群内接力", func(t *testing.T) {
-			testGroupAgentHandoff(t, db, loggedIn.Identity, customerServiceRole.ID, provider.ID, model.Identifier)
+			testGroupAgentHandoff(t, db, loggedIn.Identity, provider.ID, model.Identifier)
 		})
 
 		t.Run("Agent 单聊引用", func(t *testing.T) {
-			testAgentDirectReplies(t, db, loggedIn.Identity, customerServiceRole.ID, provider.ID, model.Identifier)
+			testAgentDirectReplies(t, db, loggedIn.Identity, provider.ID, model.Identifier)
 		})
 
 		t.Run("独立 AI 聊天", func(t *testing.T) {
-			testAgentConversations(t, db, loggedIn.Identity, customerServiceRole.ID, provider.ID, model.Identifier)
+			testAgentConversations(t, db, loggedIn.Identity, provider.ID, model.Identifier)
 		})
 
 		t.Run("Agent 客服引用", func(t *testing.T) {
-			testAgentCustomerReplies(t, db, loggedIn.Identity, customerServiceRole.ID, provider.ID, model.Identifier)
+			testAgentCustomerReplies(t, db, loggedIn.Identity, provider.ID, model.Identifier)
 		})
 
 		t.Run("AI 客服转人工", func(t *testing.T) {
-			testAgentHandoffs(t, db, loggedIn.Identity, customerServiceRole.ID, provider.ID, model.Identifier)
+			testAgentHandoffs(t, db, loggedIn.Identity, provider.ID, model.Identifier)
 		})
 
 		t.Run("客服 AI 写回复", func(t *testing.T) {
-			testCustomerReplySuggestions(t, db, loggedIn.Identity, customerServiceRole.ID, provider.ID, model.Identifier)
+			testCustomerReplySuggestions(t, db, loggedIn.Identity, provider.ID, model.Identifier)
 		})
 
 		t.Run("客服 Copilot 线程", func(t *testing.T) {
-			testCustomerCopilotThreads(t, db, loggedIn.Identity, customerServiceRole.ID, provider.ID, model.Identifier)
+			testCustomerCopilotThreads(t, db, loggedIn.Identity, provider.ID, model.Identifier)
 		})
 
 		t.Run("Telegram AI 客服", func(t *testing.T) {
-			testAgentTelegramReplies(t, db, loggedIn.Identity, customerServiceRole.ID, provider.ID, model.Identifier)
+			testAgentTelegramReplies(t, db, loggedIn.Identity, provider.ID, model.Identifier)
 		})
 
 		t.Run("Agent MCP 服务配置", func(t *testing.T) {
-			testAgentMCPServices(t, db, loggedIn.Identity, customerServiceRole.ID, provider.ID, model.Identifier)
+			testAgentMCPServices(t, db, loggedIn.Identity, provider.ID, model.Identifier)
 		})
 
 		t.Run("Agent 运行期 MCP 服务", func(t *testing.T) {
-			testAgentRunMCPServices(t, db, loggedIn.Identity, customerServiceRole.ID, provider.ID, model.Identifier, taskRuntime)
+			testAgentRunMCPServices(t, db, loggedIn.Identity, provider.ID, model.Identifier, taskRuntime)
 		})
 
 		t.Run("Agent 本地知识库范围", func(t *testing.T) {
-			testAgentKnowledgeScopes(t, db, loggedIn.Identity, customerServiceRole.ID, provider.ID, model.Identifier)
+			testAgentKnowledgeScopes(t, db, loggedIn.Identity, provider.ID, model.Identifier)
 		})
 
 		closedWebsite, err := closeServiceSession.Execute(context.Background(), loggedIn.Identity, websiteInbound.Conversation.ID)
@@ -2624,21 +2615,22 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 	runStep("邮箱冲突与头像重试", func(t *testing.T) {
 		otherIdentity := &servermodels.OrganizationIdentity{
 			OrganizationID: loggedIn.Identity.Organization.ID,
-			Type:           string(domain.OrganizationIdentityTypeUser), RoleID: memberRole.ID, DisplayName: "其他成员", WorkStatus: string(domain.WorkStatusWorking),
+			Type:           string(domain.OrganizationIdentityTypeUser), DisplayName: "其他成员", WorkStatus: string(domain.WorkStatusWorking),
 		}
 		if _, err := db.NewInsert().Model(otherIdentity).
-			Column("organization_id", "type", "role_id", "display_name", "work_status").Returning("id").Exec(context.Background()); err != nil {
+			Column("organization_id", "type", "display_name", "work_status").Returning("id").Exec(context.Background()); err != nil {
 			t.Fatal(err)
 		}
 		otherUser := &servermodels.User{
 			IdentityID:     otherIdentity.ID,
 			OrganizationID: loggedIn.Identity.Organization.ID,
+			RoleID:         memberRole.ID,
 			Email:          "other@example.com",
 			PasswordHash:   "unused",
 			Status:         string(domain.UserStatusActive),
 		}
 		if _, err := db.NewInsert().Model(otherUser).
-			Column("identity_id", "organization_id", "email", "password_hash", "status").
+			Column("identity_id", "organization_id", "role_id", "email", "password_hash", "status").
 			Exec(context.Background()); err != nil {
 			t.Fatal(err)
 		}

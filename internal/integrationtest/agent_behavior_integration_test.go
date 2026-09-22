@@ -49,14 +49,9 @@ func TestAgentRoleBehavior(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var roleID string
-	if err := db.NewSelect().Table("roles").Column("id").Where("organization_id = ? AND kind = ?", identity.Organization.ID, domain.RoleKindCustomerService).Scan(ctx, &roleID); err != nil {
-		t.Fatal(err)
-	}
-
 	// 空企业指令可以创建、读取详情并再次保存。
 	agent, err := agentaction.NewCreateAgentAction(db).Execute(ctx, identity, agentaction.CreateInput{
-		HandlesCustomers: true, DisplayName: "行为助手", RoleID: roleID,
+		HandlesCustomers: true, DisplayName: "行为助手",
 		Execution: agentaction.ExecutionInput{Mode: domain.AgentExecutionModeManaged, Managed: &agentaction.ManagedExecutionInput{ProviderID: provider.ID, ModelIdentifier: "chat", SystemInstruction: "   "}},
 	})
 	if err != nil {

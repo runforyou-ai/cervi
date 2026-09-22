@@ -14,7 +14,6 @@ import {
   RoleKind,
   updateRole,
   updateRoleAssignments,
-  PermissionAppliesTo,
   type PermissionCode,
   type PermissionDefinition,
   type PermissionResource,
@@ -224,9 +223,7 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
         void invalidateResource(resourceKeys.roles())
         void invalidateResource(resourceKeys.role())
         void invalidateResource(resourceKeys.users())
-        void invalidateResource(resourceKeys.agents())
         void invalidateResource(resourceKeys.roleMembers())
-        void invalidateResource(resourceKeys.customerServiceAssignees())
       }
       return { createdRoleID, assignmentError: null }
     },
@@ -258,13 +255,7 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
       : role
         ? roleDisplayName(role, tCommon)
         : t("roles.form.detailTitle")
-  // 成员权限只列出适用于成员的权限；AI 员工的内置工作规则在 AI 员工运行配置中展示。
-  const rows = permissionRows(
-    definitions.filter(
-      (definition) =>
-        definition.appliesTo !== PermissionAppliesTo.PermissionAppliesToAgent,
-    ),
-  )
+  const rows = permissionRows(definitions)
   const pendingRoleIDs = useMemo(
     () =>
       Object.fromEntries(

@@ -9,10 +9,8 @@ import { toast } from "sonner"
 import {
   AgentExecutionMode,
   FilePurpose,
-  RoleKind,
   createAgent,
   isApiError,
-  type RoleData,
   type AgentData,
 } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
@@ -37,16 +35,13 @@ import { useFormLifetime } from "@/hooks/use-form-lifetime"
 import { usePendingImageUpload } from "@/hooks/use-pending-image-upload"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
-import { RoleSelectField } from "@/features/contacts/role-select-field"
 
 /** 创建 AI 员工，可同时设置头像。 */
 export function AgentForm({
-  roles,
   defaultTeamIds = [],
   onSaved,
   onCancel,
 }: {
-  roles: RoleData[]
   defaultTeamIds?: string[]
   onSaved: (agent: AgentData) => void
   onCancel: () => void
@@ -59,25 +54,16 @@ export function AgentForm({
       createAgentSchema({
         nameRequired: t("agents.validation.nameRequired"),
         nameInvalid: t("agents.validation.nameInvalid"),
-        roleRequired: t("members.validation.roleRequired"),
         modelRequired: t("agents.validation.modelRequired"),
         instructionTooLong: t("agents.validation.instructionTooLong"),
       }),
     [t],
   )
-  const assignableRoles = roles.filter(
-    (role) => role.kind !== RoleKind.RoleKindAdmin,
-  )
-  const defaultRoleID =
-    assignableRoles.find((role) => role.kind === RoleKind.RoleKindMember)?.id ??
-    assignableRoles[0]?.id ??
-    ""
   const form = useForm<AgentFormValues>({
     resolver: zodResolver(schema),
     shouldUseNativeValidation: true,
     defaultValues: {
       displayName: "",
-      roleId: defaultRoleID,
       teamIds: defaultTeamIds,
       handlesCustomers: false,
       execution: {
@@ -113,7 +99,6 @@ export function AgentForm({
       uploadingAvatar = false
       const created = await createAgent({
         displayName: values.displayName,
-        roleId: values.roleId,
         teamIds: values.teamIds,
         handlesCustomers: values.handlesCustomers,
         avatarFileId,
@@ -142,7 +127,6 @@ export function AgentForm({
         isApiError(error)
           ? apiErrorMessage(error, [
               "displayName",
-              "roleId",
               "execution",
               "providerId",
               "modelIdentifier",
@@ -180,20 +164,6 @@ export function AgentForm({
           label={t("agents.form.name")}
           autoFocus
           disabled={form.formState.isSubmitting}
-        />
-        <Controller
-          name="roleId"
-          control={form.control}
-          render={({ field, fieldState }) => (
-            <RoleSelectField
-              {...field}
-              id={field.name}
-              required
-              disabled={form.formState.isSubmitting}
-              aria-invalid={fieldState.invalid}
-              roles={assignableRoles}
-            />
-          )}
         />
         <Controller
           name="handlesCustomers"

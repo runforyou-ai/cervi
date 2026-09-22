@@ -3,14 +3,7 @@ import { useEffect, useMemo, useState } from "react"
 import { SearchIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
-import {
-  listAgents,
-  listUsers,
-  RoleKind,
-  type AgentListItemData,
-  type UserData,
-  type RoleData,
-} from "@/api"
+import { listUsers, RoleKind, type UserData, type RoleData } from "@/api"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { Button } from "@/components/ui/button"
 import {
@@ -30,18 +23,16 @@ const memberPageSize = 100
 
 /** 描述待随角色表单保存的成员调整。 */
 export type RoleMemberChange = {
-  member: RoleMemberData
+  member: UserData
   previousRoleID: string
   nextRoleID: string
 }
 
 type RoleMemberOption = Pick<RoleData, "id" | "kind" | "name">
-type RoleMemberData = UserData | AgentListItemData
 
 /** 读取当前企业的全部成员。 */
 async function listAllMembers() {
   const users: UserData[] = []
-  const agents: AgentListItemData[] = []
   let page = 1
   let pages = 1
   do {
@@ -50,22 +41,14 @@ async function listAllMembers() {
     pages = Math.ceil(output.page.total / memberPageSize)
     page += 1
   } while (page <= pages)
-  page = 1
-  pages = 1
-  do {
-    const output = await listAgents({ page, pageSize: memberPageSize })
-    agents.push(...output.agents)
-    pages = Math.ceil(output.page.total / memberPageSize)
-    page += 1
-  } while (page <= pages)
-  return [...users, ...agents]
+  return users
 }
 
 /** 判断成员姓名或邮箱是否包含搜索内容。 */
-function matchesMember(user: RoleMemberData, query: string) {
+function matchesMember(user: UserData, query: string) {
   const keyword = query.trim().toLocaleLowerCase()
   if (!keyword) return true
-  return `${user.displayName}\n${"email" in user ? user.email : ""}`
+  return `${user.displayName}\n${user.email}`
     .toLocaleLowerCase()
     .includes(keyword)
 }
@@ -79,7 +62,7 @@ function MemberRow({
   disabled = false,
   actionDisabled = false,
 }: {
-  user: RoleMemberData
+  user: UserData
   assignedRoleName?: string
   action: () => void
   actionLabel: string
@@ -97,7 +80,7 @@ function MemberRow({
       <div className="min-w-0 flex-1">
         <p className="truncate text-sm font-medium">{user.displayName}</p>
         <p className="truncate text-xs text-muted-foreground">
-          {"email" in user ? user.email : t("roles.members.aiEmployee")}
+          {user.email}
         </p>
         {assignedRoleName ? (
           <p className="mt-1 truncate text-xs text-muted-foreground">
@@ -175,10 +158,6 @@ export function RoleMemberDialog({
       role
         ? members.filter(
             (member) =>
-              !(
-                role.kind === RoleKind.RoleKindAdmin &&
-                !("email" in member)
-              ) &&
               (draftRoleIDs[member.identityId] ?? member.role.id) !== role.id &&
               matchesMember(member, query),
           )
@@ -191,7 +170,7 @@ export function RoleMemberDialog({
   )
 
   /** 暂存成员的目标角色。 */
-  function stageUserRole(user: RoleMemberData, nextRole: RoleMemberOption) {
+  function stageUserRole(user: UserData, nextRole: RoleMemberOption) {
     setDraftRoleIDs((current) => ({
       ...current,
       [user.identityId]: nextRole.id,

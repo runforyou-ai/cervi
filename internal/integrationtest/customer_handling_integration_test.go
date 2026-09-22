@@ -20,16 +20,16 @@ func TestCustomerHandlingAuthorization(t *testing.T) {
 	ctx := context.Background()
 	coordinator := newGroupAgentCoordinator(f.db)
 	// 群主恢复管理员角色，修改成员需要企业保留有效管理员。
-	if _, err := f.db.NewUpdate().Table("organization_identities").
+	if _, err := f.db.NewUpdate().Table("users").
 		Set("role_id = (SELECT id FROM roles WHERE organization_id = ? AND kind = ?)", f.owner.Organization.ID, domain.RoleKindAdmin).
-		Where("id = ?", f.owner.OrganizationIdentity.ID).Exec(ctx); err != nil {
+		Where("id = ?", f.owner.User.ID).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
 	setHandlesCustomers := func(handlesCustomers bool) {
 		t.Helper()
 		if _, err := useraction.NewUpdateUserAction(f.db, testServiceSessionReturner(f.db), newTestTasks(f.db)).Execute(ctx, f.owner, f.member.User.ID, useraction.UpdateInput{
 			DisplayName: f.member.OrganizationIdentity.DisplayName, Email: f.member.User.Email,
-			RoleID: f.member.OrganizationIdentity.RoleID, HandlesCustomers: handlesCustomers, MaxServiceSessions: 10,
+			RoleID: f.member.User.RoleID, HandlesCustomers: handlesCustomers, MaxServiceSessions: 10,
 		}); err != nil {
 			t.Fatal(err)
 		}

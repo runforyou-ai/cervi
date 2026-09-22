@@ -938,7 +938,7 @@ func (b *DirectBackend) UpdateUser(ctx context.Context, meta RequestMeta, userID
 	return b.ops.UpdateUser(ctx, meta, identity, userID, input)
 }
 
-// UpdateRoleAssignments 在一个事务中批量调整真人和 AI 员工角色。
+// UpdateRoleAssignments 在一个事务中批量调整成员角色。
 func (b *DirectBackend) UpdateRoleAssignments(ctx context.Context, meta RequestMeta, input RoleAssignmentsInput) error {
 	identity, err := b.ops.authenticate(ctx, meta)
 	if err != nil {

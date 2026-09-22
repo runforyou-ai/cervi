@@ -28,7 +28,7 @@ func (o *directOperations) ListRoles(ctx context.Context, meta RequestMeta, iden
 	for _, permission := range output.Permissions {
 		permissions = append(permissions, PermissionDefinition{
 			Code: PermissionCode(permission.Code), Resource: PermissionResource(permission.Resource),
-			Level: PermissionLevel(permission.Level), AppliesTo: PermissionAppliesTo(permission.AppliesTo),
+			Level: PermissionLevel(permission.Level),
 		})
 	}
 	return RoleList{Roles: roles, Permissions: permissions, Maximum: roleaction.MaxRolesPerOrganization}, nil
@@ -75,14 +75,14 @@ func (o *directOperations) DeleteRole(ctx context.Context, meta RequestMeta, ide
 	return nil
 }
 
-// UpdateRoleAssignments 在一个事务中批量调整真人和 AI 员工角色。
+// UpdateRoleAssignments 在一个事务中批量调整成员角色。
 func (o *directOperations) UpdateRoleAssignments(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input RoleAssignmentsInput) error {
 	assignments := make([]roleaction.AssignmentInput, 0, len(input.Assignments))
 	for _, assignment := range input.Assignments {
 		assignments = append(assignments, roleaction.AssignmentInput{IdentityID: assignment.IdentityID, RoleID: assignment.RoleID})
 	}
 	if err := o.updateRoleAssignments.Execute(ctx, identity, assignments); err != nil {
-		if errors.Is(err, roleaction.ErrAssignmentInvalid) || errors.Is(err, roleaction.ErrAgentAdministrator) {
+		if errors.Is(err, roleaction.ErrAssignmentInvalid) {
 			return InvalidError(meta, cervii18n.ErrorValidationFailed, nil)
 		}
 		if errors.Is(err, roleaction.ErrLastActiveAdministrator) {
@@ -90,7 +90,7 @@ func (o *directOperations) UpdateRoleAssignments(ctx context.Context, meta Reque
 		}
 		return o.roleError(ctx, meta, err, cervii18n.ErrorRoleUpdateFailed, identity.Organization.ID)
 	}
-	slog.Info("企业身份角色批量调整成功", "organization_id", identity.Organization.ID, "assignment_count", len(assignments))
+	slog.Info("成员角色批量调整成功", "organization_id", identity.Organization.ID, "assignment_count", len(assignments))
 	return nil
 }
 

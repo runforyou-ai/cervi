@@ -54,7 +54,7 @@ func newPinFixture(t *testing.T) pinFixture {
 	owner := installed.Identity
 	memberEmail := "member@" + suffix + ".pin.test"
 	if _, err := useraction.NewCreateUserAction(db, newTestTasks(db)).Execute(ctx, owner, useraction.CreateInput{
-		HandlesCustomers: true, MaxServiceSessions: 10, DisplayName: "成员", Email: memberEmail, Password: "password123", RoleID: owner.OrganizationIdentity.RoleID,
+		HandlesCustomers: true, MaxServiceSessions: 10, DisplayName: "成员", Email: memberEmail, Password: "password123", RoleID: owner.User.RoleID,
 	}); err != nil {
 		t.Fatal(err)
 	}

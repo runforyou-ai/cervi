@@ -59,12 +59,8 @@ func TestAgentAttachmentInputs(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var roleID string
-	if err := f.db.NewSelect().Table("roles").Column("id").Where("organization_id = ? AND kind = ?", f.owner.Organization.ID, domain.RoleKindCustomerService).Scan(ctx, &roleID); err != nil {
-		t.Fatal(err)
-	}
 	agent, err := agentaction.NewCreateAgentAction(f.db).Execute(ctx, f.owner, agentaction.CreateInput{
-		HandlesCustomers: true, DisplayName: "附件助手", RoleID: roleID,
+		HandlesCustomers: true, DisplayName: "附件助手",
 		Execution: agentaction.ExecutionInput{Mode: domain.AgentExecutionModeManaged, Managed: &agentaction.ManagedExecutionInput{
 			ProviderID: provider.ID, ModelIdentifier: "vision", SystemInstruction: "阅读附件并回答",
 		}},
