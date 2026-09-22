@@ -174,6 +174,7 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	httpAPI := api.NewService(
 		boundService,
 		api.WithDeviceRuns(directBackend),
+		api.WithDeviceModelProxy(directBackend),
 		api.WithWebsiteVisitor(websiteVisitorService, config.TLS.Mode != "off"),
 		api.WithWebsiteVisitorRealtime(realtimeGateway),
 		api.WithTelegramWebhook(telegramWebhook),

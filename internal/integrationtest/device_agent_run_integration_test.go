@@ -99,12 +99,23 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		if _, err := fixture.executor.ClaimDeviceRun(ctx, fixture.device, run.ID); !errors.Is(err, agentrunaction.ErrDeviceRunUnavailable) {
 			t.Fatalf("repeated claim=%v", err)
 		}
+		// 持有租约的设备取得配置版本锁定的模型服务，其他设备取不到。
+		upstream, err := fixture.executor.ResolveDeviceModelUpstream(ctx, fixture.device, run.ID)
+		if err != nil || upstream.Brand == "" || upstream.BaseURL == "" || upstream.Identifier == "" {
+			t.Fatalf("model upstream=%+v %v", upstream, err)
+		}
+		if _, err := fixture.executor.ResolveDeviceModelUpstream(ctx, agentrunaction.RunDevice{OrganizationID: identity.Organization.ID, UserID: identity.User.ID, DeviceID: uuid.NewV7().String()}, run.ID); !errors.Is(err, agentrunaction.ErrDeviceRunNotFound) {
+			t.Fatalf("foreign device model upstream=%v", err)
+		}
 		// 第二个会话绑定同一工作区，第一个运行结束前不能领取。
 		waiting := fixture.sendAndLoadRun(fixture.boundChat(first.ID), "排队")
 		if _, err := fixture.executor.ClaimDeviceRun(ctx, fixture.device, waiting.ID); !errors.Is(err, agentrunaction.ErrDeviceWorkspaceBusy) {
 			t.Fatalf("busy workspace claim=%v", err)
 		}
 		fixture.complete(run.ID, "本机回复")
+		if _, err := fixture.executor.ResolveDeviceModelUpstream(ctx, fixture.device, run.ID); !errors.Is(err, agentrunaction.ErrDeviceRunLeaseLost) {
+			t.Fatalf("model upstream after completion=%v", err)
+		}
 		var message servermodels.Message
 		if err := db.NewSelect().Model(&message).Where("msg.idempotency_key = ?", "agent:"+run.ID).Scan(ctx); err != nil || message.Body != "本机回复" {
 			t.Fatalf("device reply=%+v %v", message, err)
@@ -126,6 +137,14 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		}
 		if lease, err := fixture.executor.RenewDeviceRunLease(ctx, fixture.device, waiting.ID); err != nil || !lease.Ended {
 			t.Fatalf("lease after stop=%+v %v", lease, err)
+		}
+		// 停止后设备回传的过程内容仍被保留。
+		partial := agentruntime.RunResult{Blocks: []agentruntime.Block{{ID: uuid.NewV7().String(), Position: 1, ModelCallID: uuid.NewV7().String(), Kind: domain.AgentRunBlockContent, Payload: agentruntime.BlockPayload{Text: "停止前的内容"}}}}
+		if err := fixture.executor.FailDeviceRun(ctx, fixture.device, waiting.ID, domain.AgentRunErrorCodeDeviceRunFailed, "stopped", partial); err != nil {
+			t.Fatal(err)
+		}
+		if count, err := db.NewSelect().Model((*servermodels.AgentRunBlock)(nil)).Where("arb.agent_run_id = ?", waiting.ID).Count(ctx); err != nil || count != 1 {
+			t.Fatalf("stopped run blocks=%d %v", count, err)
 		}
 	})
 
@@ -197,10 +216,10 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 
 	t.Run("工作区缺失与解绑", func(t *testing.T) {
 		missing := fixture.sendAndLoadRun(fixture.boundChat(second.ID), "目录缺失")
-		if err := fixture.executor.FailDeviceRun(ctx, fixture.device, missing.ID, domain.AgentRunErrorCodeUserCancelled, ""); !errors.Is(err, agentrunaction.ErrDeviceRunFailureCodeInvalid) {
+		if err := fixture.executor.FailDeviceRun(ctx, fixture.device, missing.ID, domain.AgentRunErrorCodeUserCancelled, "", agentruntime.RunResult{}); !errors.Is(err, agentrunaction.ErrDeviceRunFailureCodeInvalid) {
 			t.Fatalf("invalid failure code=%v", err)
 		}
-		if err := fixture.executor.FailDeviceRun(ctx, fixture.device, missing.ID, domain.AgentRunErrorCodeWorkspaceMissing, ""); err != nil {
+		if err := fixture.executor.FailDeviceRun(ctx, fixture.device, missing.ID, domain.AgentRunErrorCodeWorkspaceMissing, "", agentruntime.RunResult{}); err != nil {
 			t.Fatal(err)
 		}
 		fixture.assertFailed(missing.ID, domain.AgentRunErrorCodeWorkspaceMissing)

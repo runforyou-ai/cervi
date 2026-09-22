@@ -72,8 +72,10 @@ const (
 	DeviceRunFailureRuntimeFailed    DeviceRunFailureCode = DeviceRunFailureCode(domain.AgentRunErrorCodeDeviceRunFailed)
 )
 
-// DeviceRunFailureInput 定义设备上报的运行失败原因与详情。
+// DeviceRunFailureInput 定义设备上报的运行失败原因与详情；用量与过程内容块是运行时的不透明 JSON，为空表示没有已产生的过程内容。
 type DeviceRunFailureInput struct {
 	ErrorCode DeviceRunFailureCode `json:"errorCode"`
 	Message   string               `json:"message"`
+	Usage     json.RawMessage      `json:"usage,omitempty"`
+	Blocks    json.RawMessage      `json:"blocks,omitempty"`
 }

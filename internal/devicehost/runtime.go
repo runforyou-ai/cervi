@@ -1,0 +1,108 @@
+//go:build !server && !ios && !android
+
+package devicehost
+
+import (
+	"context"
+	"encoding/json"
+	"errors"
+	"fmt"
+	"time"
+
+	"github.com/runforyou-ai/cervi/internal/appservice"
+	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
+)
+
+const (
+	// localRunTimeout 是本机执行一次运行的总时限。
+	localRunTimeout = 30 * time.Minute
+	// deviceModelAPIKey 是模型组件要求的非空凭据占位值，模型请求的认证由传输层写入登录令牌。
+	deviceModelAPIKey = "cervi-device"
+)
+
+// errRunSuppressed 表示服务端判定运行已失效，本机停止执行。
+var errRunSuppressed = errors.New("device run suppressed")
+
+// runAgent 按领取时固定的有效配置在本机执行运行时，模型请求经企业服务端模型代理，成功时回报结果。
+func (w *Worker) runAgent(runCtx context.Context, meta appservice.RequestMeta, runID string, claim appservice.DeviceRunClaim) (agentruntime.RunResult, error) {
+	var assignment agentruntime.Assignment
+	if err := json.Unmarshal(claim.Assignment, &assignment); err != nil {
+		return agentruntime.RunResult{}, fmt.Errorf("decode device run assignment: %w", err)
+	}
+	baseURL, transport, err := w.client.DeviceModelEndpoint(runCtx, meta, runID)
+	if err != nil {
+		return agentruntime.RunResult{}, fmt.Errorf("resolve device model endpoint: %w", err)
+	}
+	ctx, cancel := context.WithTimeout(runCtx, localRunTimeout)
+	defer cancel()
+	result, err := w.runtime.Run(ctx, agentruntime.RunRequest{
+		RunID:       runID,
+		Assignment:  assignment,
+		Credentials: agentruntime.ModelCredentials{APIKey: deviceModelAPIKey, BaseURL: baseURL, Transport: transport},
+	}, &remoteInputFeed{client: w.client, meta: meta, runID: runID})
+	if err != nil {
+		return result, err
+	}
+	input := appservice.DeviceRunResultInput{Content: result.Content, EndSeq: result.EndSeq}
+	if input.Decision, err = json.Marshal(result.Decision); err != nil {
+		return result, fmt.Errorf("encode device run decision: %w", err)
+	}
+	if input.Usage, input.Blocks, err = encodeProcess(result); err != nil {
+		return result, err
+	}
+	completeCtx, cancelComplete := context.WithTimeout(runCtx, workRequestTimeout)
+	defer cancelComplete()
+	if err := w.client.CompleteDeviceRun(completeCtx, meta, runID, input); err != nil {
+		return result, fmt.Errorf("complete device run: %w", err)
+	}
+	return result, nil
+}
+
+// encodeProcess 编码运行已产生的用量与过程内容块。
+func encodeProcess(result agentruntime.RunResult) (json.RawMessage, json.RawMessage, error) {
+	usage, err := json.Marshal(result.Usage)
+	if err != nil {
+		return nil, nil, fmt.Errorf("encode device run usage: %w", err)
+	}
+	blocks, err := json.Marshal(result.Blocks)
+	if err != nil {
+		return nil, nil, fmt.Errorf("encode device run blocks: %w", err)
+	}
+	return usage, blocks, nil
+}
+
+// remoteInputFeed 经企业服务端读取与认领设备运行的输入。
+type remoteInputFeed struct {
+	client appservice.DeviceRunBackend
+	meta   appservice.RequestMeta
+	runID  string
+}
+
+// Peek 返回指定序号之后尚未认领的连续输入信号。
+func (f *remoteInputFeed) Peek(ctx context.Context, afterSeq int64) ([]agentruntime.Trigger, error) {
+	signals, err := f.client.PeekDeviceRunInputs(ctx, f.meta, f.runID, appservice.DeviceRunInputPeekInput{AfterSeq: int(afterSeq)})
+	if err != nil {
+		return nil, fmt.Errorf("peek device run inputs: %w", err)
+	}
+	triggers := make([]agentruntime.Trigger, 0, len(signals.Seqs))
+	for _, seq := range signals.Seqs {
+		triggers = append(triggers, agentruntime.Trigger{Seq: seq})
+	}
+	return triggers, nil
+}
+
+// Claim 认领截至指定序号的输入并返回截至该边界的上下文消息，运行已失效时返回 errRunSuppressed。
+func (f *remoteInputFeed) Claim(ctx context.Context, throughSeq int64) (agentruntime.ClaimedInput, error) {
+	claimed, err := f.client.ClaimDeviceRunInputs(ctx, f.meta, f.runID, appservice.DeviceRunInputClaimInput{ThroughSeq: throughSeq})
+	if err != nil {
+		return agentruntime.ClaimedInput{}, fmt.Errorf("claim device run inputs: %w", err)
+	}
+	if claimed.Suppressed {
+		return agentruntime.ClaimedInput{}, errRunSuppressed
+	}
+	input := agentruntime.ClaimedInput{EndSeq: claimed.EndSeq}
+	if err := json.Unmarshal(claimed.Messages, &input.Messages); err != nil {
+		return agentruntime.ClaimedInput{}, fmt.Errorf("decode claimed messages: %w", err)
+	}
+	return input, nil
+}

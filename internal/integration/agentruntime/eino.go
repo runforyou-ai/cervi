@@ -1,5 +1,3 @@
-//go:build server
-
 package agentruntime
 
 import (
@@ -87,14 +85,14 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 	if err != nil {
 		return RunResult{}, err
 	}
-	// 模型声明文本以外的输入模态时，按窗口推导随消息直传的附件数量上限，至少直传一个。
+	// 模型声明文本以外的输入模态且执行侧提供附件读取时，按窗口推导随消息直传的附件数量上限，至少直传一个。
 	media := mediaInput{read: request.ReadAttachment, modalities: make(map[domain.AIModelInputModality]bool)}
 	for _, modality := range request.Assignment.Model.InputModalities {
 		if modality != domain.AIModelInputModalityText {
 			media.modalities[modality] = true
 		}
 	}
-	if len(media.modalities) > 0 {
+	if len(media.modalities) > 0 && media.read != nil {
 		media.maxCount = max(1, window*mediaWindowPercent/100/mediaTokens)
 	}
 	trackedModel := &mediaTrackingModel{AgenticModel: chatModel, rejected: &atomic.Bool{}}

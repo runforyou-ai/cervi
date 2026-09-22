@@ -76,6 +76,14 @@ type DeviceLease struct {
 	LeaseExpiresAt time.Time
 }
 
+// DeviceModelUpstream 是设备模型代理转发的上游模型服务与供应商凭据。
+type DeviceModelUpstream struct {
+	Brand      string
+	BaseURL    string
+	APIKey     string
+	Identifier string
+}
+
 // DeviceClaimedInput 是设备认领输入的结果，Suppressed 表示运行已失效，设备应停止执行。
 type DeviceClaimedInput struct {
 	Suppressed bool
@@ -182,12 +190,8 @@ func (a *ExecuteAction) deviceAssignment(ctx context.Context, runID string, poli
 	if terminal {
 		return nil, ErrDeviceRunUnavailable
 	}
-	// 设备首版不加载企业远程 MCP 服务，知识检索经服务端执行。
-	knowledge, err := loadRunKnowledgeSearch(ctx, a.db, a.knowledge, execution)
-	if err != nil {
-		return nil, fmt.Errorf("load device agent run knowledge bases: %w", err)
-	}
-	assignment, err := a.resolveAssignment(ctx, execution, policy, agentruntime.Capabilities{Knowledge: knowledge != nil})
+	// 设备执行不加载企业远程 MCP 服务与知识检索。
+	assignment, err := a.resolveAssignment(ctx, execution, policy, agentruntime.Capabilities{})
 	if err != nil {
 		return nil, err
 	}
@@ -231,6 +235,23 @@ func (a *ExecuteAction) RenewDeviceRunLease(ctx context.Context, device RunDevic
 	return lease, nil
 }
 
+// ResolveDeviceModelUpstream 返回设备持有有效租约的运行按配置版本锁定的模型服务与当前供应商凭据。
+func (a *ExecuteAction) ResolveDeviceModelUpstream(ctx context.Context, device RunDevice, runID string) (DeviceModelUpstream, error) {
+	if _, err := a.requireDeviceLease(ctx, device, runID); err != nil {
+		return DeviceModelUpstream{}, err
+	}
+	execution, terminal, err := a.loadExecution(ctx, runID)
+	if err != nil {
+		return DeviceModelUpstream{}, err
+	}
+	if terminal {
+		return DeviceModelUpstream{}, ErrDeviceRunLeaseLost
+	}
+	return DeviceModelUpstream{
+		Brand: execution.Brand, BaseURL: execution.APIURL, APIKey: execution.APIKey, Identifier: execution.ModelIdentifier,
+	}, nil
+}
+
 // PeekDeviceRunInputs 返回设备持有运行尚未进入 TurnLoop 缓冲区的连续输入信号。
 func (a *ExecuteAction) PeekDeviceRunInputs(ctx context.Context, device RunDevice, runID string, afterSeq int64) ([]agentruntime.Trigger, error) {
 	run, err := a.requireDeviceLease(ctx, device, runID)
@@ -262,14 +283,14 @@ func (a *ExecuteAction) ClaimDeviceRunInputs(ctx context.Context, device RunDevi
 	return DeviceClaimedInput{Input: claimed}, nil
 }
 
-// CompleteDeviceRun 按设备上报的运行结果收尾；运行已进入终态时直接返回，重复上报保持幂等。
+// CompleteDeviceRun 按设备上报的运行结果收尾；运行已进入终态时只保留过程内容，重复上报保持幂等。
 func (a *ExecuteAction) CompleteDeviceRun(ctx context.Context, device RunDevice, runID string, result agentruntime.RunResult) error {
 	run, err := a.loadDeviceRun(ctx, device, runID)
 	if err != nil {
 		return err
 	}
 	if agentRunStatusTerminal(run.Status) {
-		return nil
+		return a.persistPartialProcess(ctx, run, result)
 	}
 	if !deviceLeaseValid(run) {
 		return ErrDeviceRunLeaseLost
@@ -289,8 +310,8 @@ func (a *ExecuteAction) CompleteDeviceRun(ctx context.Context, device RunDevice,
 	return a.persistPartialProcess(ctx, &execution.Run, result)
 }
 
-// FailDeviceRun 按设备上报的失败原因收尾运行；排队中的运行可在领取前因工作区缺失失败，运行中的运行要求设备仍持有租约。
-func (a *ExecuteAction) FailDeviceRun(ctx context.Context, device RunDevice, runID string, code domain.AgentRunErrorCode, message string) error {
+// FailDeviceRun 按设备上报的失败原因收尾运行并保留已产生的过程内容；排队中的运行可在领取前因工作区缺失失败，运行中的运行要求设备仍持有租约，已进入终态的运行只保留过程内容。
+func (a *ExecuteAction) FailDeviceRun(ctx context.Context, device RunDevice, runID string, code domain.AgentRunErrorCode, message string, partial agentruntime.RunResult) error {
 	if code != domain.AgentRunErrorCodeWorkspaceMissing && code != domain.AgentRunErrorCodeDeviceRunFailed {
 		return ErrDeviceRunFailureCodeInvalid
 	}
@@ -299,7 +320,7 @@ func (a *ExecuteAction) FailDeviceRun(ctx context.Context, device RunDevice, run
 		return err
 	}
 	if agentRunStatusTerminal(run.Status) {
-		return nil
+		return a.persistPartialProcess(ctx, run, partial)
 	}
 	if run.Status == string(domain.AgentRunStatusRunning) && !deviceLeaseValid(run) {
 		return ErrDeviceRunLeaseLost
@@ -312,7 +333,7 @@ func (a *ExecuteAction) FailDeviceRun(ctx context.Context, device RunDevice, run
 	}
 	slog.Info("设备上报 Agent 运行失败", "organization_id", device.OrganizationID, "device_id", device.DeviceID,
 		"agent_run_id", runID, "error_code", code)
-	return nil
+	return a.persistPartialProcess(ctx, run, partial)
 }
 
 // SweepDeviceRuns 收敛无法继续的设备运行：运行中但租约已过期，或排队中但设备已撤销、设备主人已停用、会话绑定已变化。
