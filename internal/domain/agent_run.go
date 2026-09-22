@@ -53,6 +53,8 @@ const (
 	AgentRunErrorCodeWorkspaceMissing AgentRunErrorCode = "workspace_missing"
 	// AgentRunErrorCodeDeviceRunFailed 表示设备上的运行时执行失败。
 	AgentRunErrorCodeDeviceRunFailed AgentRunErrorCode = "device_run_failed"
+	// AgentRunErrorCodeDeviceRunTimedOut 表示设备运行自领取起超出总时限。
+	AgentRunErrorCodeDeviceRunTimedOut AgentRunErrorCode = "device_run_timed_out"
 )
 
 // AgentRunErrorCodeAgentUnavailable 表示 AI 员工被停用或失去接客资格，由管理操作取消运行。

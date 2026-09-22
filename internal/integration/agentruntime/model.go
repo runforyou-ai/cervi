@@ -1,5 +1,3 @@
-//go:build server
-
 package agentruntime
 
 import (
@@ -37,7 +35,8 @@ func newAgenticModel(ctx context.Context, config ModelConfig) (model.AgenticMode
 		return nil, err
 	}
 	httpClient := &http.Client{
-		Timeout: modelRequestTimeout,
+		Transport: config.Transport,
+		Timeout:   modelRequestTimeout,
 		CheckRedirect: func(_ *http.Request, _ []*http.Request) error {
 			return http.ErrUseLastResponse
 		},

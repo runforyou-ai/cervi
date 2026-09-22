@@ -4,12 +4,14 @@ package main
 
 import (
 	"context"
+	"log/slog"
 
 	"github.com/runforyou-ai/cervi/internal/apiproxy"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	appservicenative "github.com/runforyou-ai/cervi/internal/appservice/native"
 	"github.com/runforyou-ai/cervi/internal/clientsession"
 	"github.com/runforyou-ai/cervi/internal/devicehost"
+	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 )
 
 // nativeStorage 组合桌面端连接、登录凭据、设备注册与本机工作区存储能力。
@@ -45,15 +47,20 @@ func (d *desktopDevice) AddLocalWorkspace(ctx context.Context, meta appservice.R
 	return d.workspaces.AddLocalWorkspace(ctx, meta)
 }
 
-// newDeviceRegistrar 创建桌面端本机设备注册、执行循环与工作区管理。
+// newDeviceRegistrar 创建桌面端本机设备注册、执行循环与工作区管理；本机运行时创建失败时不注册设备。
 func newDeviceRegistrar(appStorage nativeStorage, backend *apiproxy.Backend, sessions *clientsession.Manager) deviceRegistrar {
 	registrar := devicehost.New(appStorage, backend, sessions)
 	if registrar == nil {
 		return nil
 	}
+	runtime, err := agentruntime.New()
+	if err != nil {
+		slog.Error("创建本机 Agent 运行时失败，本机设备不注册", "error", err)
+		return nil
+	}
 	return &desktopDevice{
 		Registrar:  registrar,
-		worker:     devicehost.NewWorker(registrar, appStorage, backend),
+		worker:     devicehost.NewWorker(registrar, appStorage, backend, runtime),
 		workspaces: devicehost.NewWorkspaces(registrar, appStorage, backend, appservicenative.SelectWorkspaceDirectory),
 	}
 }
