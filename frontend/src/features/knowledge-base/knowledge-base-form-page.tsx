@@ -23,21 +23,13 @@ import {
   updateKnowledgeBase,
   UserStatus,
 } from "@/api"
+import { ConfirmationDialog } from "@/components/confirmation-dialog"
+import { FormActions } from "@/components/form/form-actions"
 import { FormInputField } from "@/components/form/form-input-field"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { PageContent } from "@/components/page-content"
 import { PageBackButton } from "@/components/page-back-button"
 import { PageHeader } from "@/components/page-header"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Textarea } from "@/components/ui/textarea"
@@ -144,7 +136,7 @@ export function KnowledgeBaseFormPage({
     { enabled: mode === "edit", staleTime: 0 },
   )
   const providers = useResource(resourceKeys.aiProviders(), () => listAIProviders(), { staleTime: 0 })
-  const loading = providers.loading || (Boolean(providers.error) && providers.refreshing) || (
+  const loading = providers.loading || providers.retrying || (
     mode === "edit" &&
     (detailLoading || (Boolean(detailError) && detailRefreshing))
   )
@@ -330,8 +322,8 @@ export function KnowledgeBaseFormPage({
               {mode === "edit" ? (
                 <Field>
                   <FieldLabel>{t("agents.title")}</FieldLabel>
-                  {agents.loading || (Boolean(agents.error) && agents.refreshing) ? (
-                    <p className="text-sm text-muted-foreground">{t("common:status.loading")}</p>
+                  {agents.loading || agents.retrying ? (
+                    <LoadingIndicator>{t("common:status.loading")}</LoadingIndicator>
                   ) : agents.error ? (
                     <p className="flex items-center gap-2 text-sm text-muted-foreground">
                       {t("agents.loadError")}
@@ -395,50 +387,33 @@ export function KnowledgeBaseFormPage({
               <KnowledgeBaseSettingsFields control={form.control} isQA={isQA} providers={providers.data?.providers ?? []} />
             </FieldGroup>
             {mode === "create" ? (
-              <div className="flex items-center justify-end gap-2">
-                <Button type="button" variant="outline" asChild>
-                  <Link to={cancelPath}>{t("common:actions.cancel")}</Link>
-                </Button>
-                <Button
-                  ref={saveButton}
-                  type="submit"
-                  disabled={form.formState.isSubmitting}
-                >
-                  {form.formState.isSubmitting
-                    ? t("common:actions.saving")
-                    : t("common:actions.create")}
-                </Button>
-              </div>
+              <FormActions
+                saving={form.formState.isSubmitting}
+                cancelTo={cancelPath}
+                submitRef={saveButton}
+              />
             ) : null}
           </form>
         )}
       </PageContent>
-      <AlertDialog open={confirmReindex} onOpenChange={(open) => !form.formState.isSubmitting && setConfirmReindex(open)}>
-        <AlertDialogContent onCloseAutoFocus={(event) => {
+      <ConfirmationDialog
+        open={confirmReindex}
+        pending={form.formState.isSubmitting}
+        title={t("form.reindexTitle")}
+        description={t("form.reindexDescription")}
+        pendingLabel={t("common:actions.saving")}
+        onOpenChange={setConfirmReindex}
+        onConfirm={() => {
+          void form.handleSubmit((values) =>
+            save(values, reindexAutoSaved.current),
+          )()
+        }}
+        onCloseAutoFocus={(event) => {
           // 确认框关闭后恢复保存按钮的键盘焦点。
           event.preventDefault()
           saveButton.current?.focus()
-        }}>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t("form.reindexTitle")}</AlertDialogTitle>
-            <AlertDialogDescription>{t("form.reindexDescription")}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={form.formState.isSubmitting}>{t("common:actions.cancel")}</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={form.formState.isSubmitting}
-              onClick={(event) => {
-                event.preventDefault()
-                void form.handleSubmit((values) =>
-                  save(values, reindexAutoSaved.current),
-                )()
-              }}
-            >
-              {form.formState.isSubmitting ? t("common:actions.saving") : t("common:actions.confirm")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        }}
+      />
     </div>
   )
 }

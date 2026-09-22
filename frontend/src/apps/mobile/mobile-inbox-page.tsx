@@ -1,10 +1,8 @@
 /** 移动端统一会话摘要列表、阅读状态与置顶菜单、置顶排序和内部聊天入口。 */
 import { useEffect, useRef, useState } from "react"
-import type { TFunction } from "i18next"
 import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { BellOffIcon, GripVerticalIcon, PlusIcon, SearchIcon } from "lucide-react"
-import { messagePreview } from "@/lib/message-preview"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 
@@ -13,11 +11,8 @@ import {
   isAgentInboxConversation,
   isDirectInboxConversation,
   isGroupInboxConversation,
-  ConversationStatus,
   CustomerInboxView,
   InboxScope,
-  MessageType,
-  MessageVisibility,
   type CustomerInboxConversationData,
   type AgentInboxConversationData,
   type DirectInboxConversationData,
@@ -25,7 +20,6 @@ import {
   type GroupInboxConversationData,
 } from "@/api"
 import {
-  inboxScopes,
   MobileInboxFilter,
   MobileInboxScopes,
   useMobileInboxQuery,
@@ -42,6 +36,7 @@ import {
   ConversationListMenu,
   useConversationListActions,
 } from "@/features/inbox/conversation-list-menu"
+import { conversationPreview } from "@/features/inbox/conversation-preview"
 import { ConversationUnreadBadge } from "@/features/inbox/conversation-unread-badge"
 import { PinnedSortArea, pinMoveCommand } from "@/features/inbox/pinned-sort"
 import { Button } from "@/components/ui/button"
@@ -64,6 +59,8 @@ import {
   useMobileNavigation,
 } from "@/apps/mobile/mobile-navigation"
 import { InboxListPanel } from "@/features/inbox/inbox-list-panel"
+import { inboxScopes } from "@/features/inbox/inbox-query"
+import { useConversationName } from "@/features/inbox/use-conversation-name"
 import { usePartitionedInboxList } from "@/features/inbox/use-inbox-list"
 import { useInboxListViewport } from "@/features/inbox/use-inbox-list-viewport"
 import { cn } from "@/lib/utils"
@@ -84,18 +81,6 @@ function isMobileInboxConversation(
     isDirectInboxConversation(conversation) ||
     isGroupInboxConversation(conversation)
   )
-}
-
-/** 返回移动端会话行展示的名称。 */
-function mobileConversationName(conversation: MobileInboxConversation, t: TFunction<"inbox">) {
-  if (isCustomerInboxConversation(conversation))
-    return conversation.customer.contactName ?? t("anonymousVisitor")
-  const name = isDirectInboxConversation(conversation)
-    ? conversation.direct.peerName
-    : isAgentInboxConversation(conversation)
-      ? `${conversation.agent.agentName} · ${conversation.agent.title}`
-      : conversation.group.title
-  return name?.trim() || t("unknownSender")
 }
 
 type MobileConversationRowProps = {
@@ -146,27 +131,7 @@ function MobileConversationRow({
   const agentRunLabel = agentRunStatusLabel(agent?.agentRunStatus ?? null, t)
 
   if (!summary) return null
-  const previewBody =
-    groupConversation?.group.status ===
-    ConversationStatus.ConversationStatusArchived
-      ? t("groupDissolved")
-      : conversation.lastMessageType === MessageType.MessageTypeAgentCancelled
-        ? t("agentReplyStopped")
-        : conversation.lastMessageType === MessageType.MessageTypeAgentError
-          ? t("agentRunFailed")
-          : messagePreview(
-              summary.preview ?? "",
-              summary.previewSenderIdentityType,
-            ) ||
-            (groupConversation && conversation.lastMessageId
-              ? t("groupSystemUpdated")
-              : t("messagesEmpty"))
-  // 客户会话的末条消息是内部备注时，摘要标明来源。
-  const preview =
-    customerConversation?.customer.previewVisibility ===
-    MessageVisibility.MessageVisibilityInternalOnly
-      ? t("previewInternalNote", { preview: previewBody })
-      : previewBody
+  const preview = conversationPreview(conversation, summary, t)
   const formattedTime = formatTime(summary.lastMessageAt)
   const internalConversation =
     directConversation ??
@@ -294,7 +259,7 @@ export function MobileInboxPage() {
 /** 每个移动筛选独立挂载窗口，离开时保存原邻域。 */
 function MobileInboxList({ query, changeQuery }: ReturnType<typeof useMobileInboxQuery>) {
   const { t } = useTranslation(["mobile", "inbox", "common"])
-  const { t: inboxT } = useTranslation("inbox")
+  const conversationName = useConversationName()
   const navigate = useNavigate()
   const pollingActive = useMemberChatPollingActive({
     requireWindowFocus: false,
@@ -327,7 +292,7 @@ function MobileInboxList({ query, changeQuery }: ReturnType<typeof useMobileInbo
   const names = new Map(
     conversations.map((conversation) => [
       conversation.id,
-      mobileConversationName(conversation, inboxT),
+      conversationName(conversation),
     ]),
   )
   const rows = new Map(conversations.map((conversation) => [conversation.id, conversation]))

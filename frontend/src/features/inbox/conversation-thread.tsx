@@ -203,10 +203,7 @@ export function ConversationThread({
             void invalidate(resourceKeys.groupConversation(groupConversation.id))
         }}
         onSucceeded={onConversationChanged}
-        customerAttachmentSupported={Boolean(customerAttachment?.attachmentSupported)}
-        customerTypingSupported={customerAttachment?.channelType === ChannelType.ChannelTypeWebsite}
-        customerAttachmentByteLimit={customerAttachment?.attachmentByteLimit ?? 0}
-        customerAttachmentCaptionLimit={customerAttachment?.attachmentCaptionLimit ?? 4000}
+        customerChannel={customerAttachment}
         attachmentTargetIdentityID={directTarget && !agentDraftID ? directTarget.id : undefined}
         attachmentAgentDraft={directTarget && agentDraftID ? { conversationID: agentDraftID, agentIdentityID: directTarget.id } : undefined}
         draftBridgeRef={customerDraftRef}

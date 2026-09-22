@@ -1,6 +1,7 @@
 /** 保持列表滚动容器稳定，仅在读取失败时提供局部重试。 */
 import { useEffect, type ReactNode } from "react"
 import { useTranslation } from "react-i18next"
+import { LoadingIndicator } from "@/components/loading-indicator"
 import { Button } from "@/components/ui/button"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import type { InboxList } from "./use-inbox-list"
@@ -40,7 +41,7 @@ export function InboxListPanel({ list, viewport, detailError = false, retryDetai
           ) : null}
           {pageError ? (
             <Button variant="outline" size="sm" onClick={() => void list.retry()}>{t("common:actions.retry")}</Button>
-          ) : busy ? t("common:status.loading") : null}
+          ) : busy ? <LoadingIndicator className="text-xs">{t("common:status.loading")}</LoadingIndicator> : null}
         </div>
       ) : null}
     </div>

@@ -1,4 +1,4 @@
-/** 管理集成配置的删除确认、请求状态和缓存失效。 */
+/** 管理需要二次确认的单条记录操作：确认对象、请求状态、提示和缓存失效。 */
 import { useState } from "react"
 import type { QueryKey } from "@tanstack/react-query"
 import { useNavigate } from "react-router"
@@ -10,46 +10,43 @@ import { useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
-/** 串行删除选中的配置，并保留失败时的确认上下文。 */
-export function useIntegrationDeletion<T extends { id: string }>({
-  deleteItem,
-  listKey,
-  detailKey,
-  entityName,
+/** 串行执行确认后的操作，成功后失效相关缓存并关闭确认，失败时保留确认上下文。 */
+export function useConfirmedAction<T>({
+  action,
+  invalidateKeys = () => [],
   successMessage,
   errorMessage,
-  relatedKeys = [],
+  logLabel,
+  onSuccess,
 }: {
-  deleteItem: (id: string) => Promise<unknown>
-  listKey: QueryKey
-  detailKey: (id: string) => QueryKey
-  entityName: string
-  successMessage: string
-  errorMessage: string
-  relatedKeys?: QueryKey[]
+  action: (item: T) => Promise<unknown>
+  invalidateKeys?: (item: T) => QueryKey[]
+  successMessage?: (item: T) => string
+  errorMessage: (item: T) => string
+  logLabel: string
+  onSuccess?: (item: T) => void
 }) {
   const [item, setItem] = useState<T | null>(null)
   const save = useImmediateSave()
   const invalidate = useResourceInvalidator()
   const navigate = useNavigate()
 
-  /** 删除当前配置，离开页面后仅更新共享缓存。 */
+  /** 执行当前确认对象的操作，离开页面后仅更新共享缓存。 */
   async function confirm() {
-    if (!item) return
+    if (item === null) return
     const request = save.begin()
     if (request === null) return
     try {
-      await deleteItem(item.id)
-      void invalidate(listKey)
-      void invalidate(detailKey(item.id))
-      for (const key of relatedKeys) void invalidate(key)
+      await action(item)
+      for (const key of invalidateKeys(item)) void invalidate(key)
       if (!save.isCurrent(request)) return
       setItem(null)
-      toast.success(successMessage)
+      if (successMessage) toast.success(successMessage(item))
+      onSuccess?.(item)
     } catch (error) {
       if (!save.isCurrent(request) || recoverSession(error, navigate)) return
-      console.warn(`${entityName}删除失败`, { id: item.id, error })
-      toast.error(isApiError(error) ? apiErrorMessage(error) : errorMessage)
+      console.warn(`${logLabel}失败`, { item, error })
+      toast.error(isApiError(error) ? apiErrorMessage(error) : errorMessage(item))
     } finally {
       save.finish(request)
     }

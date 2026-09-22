@@ -9,43 +9,28 @@ import {
   type RefObject,
 } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { ArrowUpIcon, LoaderCircleIcon, MicIcon, PaperclipIcon, SmileIcon, StickyNoteIcon } from "lucide-react"
+import { ArrowUpIcon, LoaderCircleIcon, MicIcon, StickyNoteIcon } from "lucide-react"
 import { useForm } from "react-hook-form"
-import { messagePreview } from "@/lib/message-preview"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
-  ChatSubjectKind,
   ConversationType,
+  ChannelType,
   MessageVisibility,
-  OrganizationIdentityType,
   isApiError,
-  sendCustomerTextMessage,
-  sendAgentTextMessage,
-  sendCustomerCopilotTextMessage,
-  sendDirectTextMessage,
-  sendGroupTextMessage,
   type ConversationMessageData,
+  type CustomerInboxConversationData,
   type ConversationMessageReference,
   type DirectTextMessageInput,
   type GroupParticipant,
   type InboxConversation,
   type MemberOption,
 } from "@/api"
+import { IconTooltip } from "@/components/icon-tooltip"
 import { Button } from "@/components/ui/button"
-import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from "@/components/ui/popover"
 import { Textarea } from "@/components/ui/textarea"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
 import {
   createConversationComposerSchema,
   type ConversationComposerValues,
@@ -53,14 +38,12 @@ import {
 import {
   mentionTokenPattern,
   reconcileMentionAllToken,
-  type MentionAllToken,
 } from "@/lib/mention-token"
 import {
   conversationSendingIndicatorDelay,
   type MentionTarget,
   type OutgoingConversationDraft,
 } from "@/features/inbox/outgoing-message-store"
-import { ConversationAttachmentUpload } from "./conversation-attachment-upload"
 import { CustomerReplyAssistant } from "@/features/inbox/customer-reply-assistant"
 import { composerToolClass } from "@/features/inbox/composer-tool"
 import { useConversationTypingReport } from "@/features/inbox/use-conversation-typing"
@@ -68,9 +51,17 @@ import { resolveAppPlatform } from "@/platform/app-platform"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 import { cn } from "@/lib/utils"
-import composerEmojis from "../../../../internal/publicweb/composer-emojis.json"
 
-const conversationComposerMaxHeight = 200
+import { resizeComposerInput, useFocusInputOnTyping } from "./composer-input"
+import { sendComposerTextMessage } from "./composer-send"
+import {
+  ComposerAttachmentTool,
+  ComposerEmojiPicker,
+  ComposerMentionOverlay,
+  ComposerReplyPreview,
+} from "./conversation-composer-parts"
+import { useComposerMentions } from "./use-composer-mentions"
+import { useVisibilityDrafts } from "./use-visibility-drafts"
 
 /** 读取和替换回复输入框草稿的入口。 */
 export type ComposerDraftBridge = {
@@ -78,25 +69,11 @@ export type ComposerDraftBridge = {
   replace: (body: string) => void
 }
 
-type MentionCandidate =
-  | { kind: "all"; displayName: string }
-  | { kind: "member"; displayName: string; target: MentionTarget }
-
-/** 统计正文中仍然存在的完整 @ 姓名标记。 */
-function countMentionTokens(body: string, displayName: string) {
-  return Array.from(
-    body.matchAll(new RegExp(mentionTokenPattern([displayName]), "gu")),
-  ).length
-}
-
-/** 根据文本内容调整消息输入框高度。 */
-function resizeComposerInput(input: HTMLTextAreaElement | null) {
-  if (!input) return
-  input.style.height = "auto"
-  input.style.height = `${Math.min(input.scrollHeight, conversationComposerMaxHeight)}px`
-  const renderedHeight = input.getBoundingClientRect().height
-  input.style.overflowY = input.scrollHeight > renderedHeight ? "auto" : "hidden"
-}
+/** 客户会话所在渠道的附件与输入状态能力。 */
+export type CustomerChannelCapabilities = Pick<
+  CustomerInboxConversationData["customer"],
+  "attachmentSupported" | "attachmentByteLimit" | "attachmentCaptionLimit" | "channelType"
+>
 
 /** 展示并提交成员会话文本编辑区。 */
 export function ConversationComposer({
@@ -123,19 +100,13 @@ export function ConversationComposer({
   sendIndividualMessage,
   attachmentTargetIdentityID,
   attachmentAgentDraft,
-  customerAttachmentSupported = false,
-  customerTypingSupported = false,
-  customerAttachmentByteLimit = 0,
-  customerAttachmentCaptionLimit = 4000,
+  customerChannel = null,
   onAttachmentConversationCreated,
   draftBridgeRef,
 }: {
   attachmentTargetIdentityID?: string
   attachmentAgentDraft?: { conversationID: string; agentIdentityID: string; customerConversationID?: string }
-  customerAttachmentSupported?: boolean
-  customerTypingSupported?: boolean
-  customerAttachmentByteLimit?: number
-  customerAttachmentCaptionLimit?: number
+  customerChannel?: CustomerChannelCapabilities | null
   onAttachmentConversationCreated?: (conversation: InboxConversation | null, conversationID: string) => void
   draftBridgeRef?: RefObject<ComposerDraftBridge | null>
   conversationID: string
@@ -162,6 +133,12 @@ export function ConversationComposer({
     input: DirectTextMessageInput,
   ) => Promise<ConversationMessageData>
 }) {
+  // 渠道能力缺省时按不支持附件和输入状态处理，附件说明默认上限 4000 字。
+  const customerAttachmentSupported = Boolean(customerChannel?.attachmentSupported)
+  const customerTypingSupported =
+    customerChannel?.channelType === ChannelType.ChannelTypeWebsite
+  const customerAttachmentByteLimit = customerChannel?.attachmentByteLimit ?? 0
+  const customerAttachmentCaptionLimit = customerChannel?.attachmentCaptionLimit ?? 4000
   const { t } = useTranslation("inbox")
   const navigate = useNavigate()
   const aliveRef = useRef(true)
@@ -185,19 +162,6 @@ export function ConversationComposer({
   replyToRef.current = replyTo
   const visibilityRef = useRef(visibility)
   visibilityRef.current = visibility
-  const [mentions, setMentions] = useState<MentionTarget[]>([])
-  const mentionsRef = useRef(mentions)
-  mentionsRef.current = mentions
-  const [mentionAllToken, setMentionAllToken] =
-    useState<MentionAllToken | null>(null)
-  const mentionAll = mentionAllToken !== null
-  const [mentionQuery, setMentionQuery] = useState<{
-    start: number
-    value: string
-  } | null>(null)
-  const [activeMentionIndex, setActiveMentionIndex] = useState(0)
-  const [emojiOpen, setEmojiOpen] = useState(false)
-  const emojiCaretRef = useRef<number | null>(null)
   // 移动端的提及候选和取消引用使用触屏尺寸。
   const mobile = resolveAppPlatform() === "mobile"
   const { isSubmitting } = form.formState
@@ -208,38 +172,54 @@ export function ConversationComposer({
     visibility === MessageVisibility.MessageVisibilityInternalOnly
   // 内部备注不经渠道投递，不受对客发送资格限制。
   const disabledReason = internalNote ? null : replyDisabledReason
+  const groupConversation = conversationType === ConversationType.ConversationTypeGroup
+  const customerConversation = conversationType === ConversationType.ConversationTypeCustomer
+  // 单聊与群聊向其他成员上报本人正在输入；客户会话只有网站渠道在对客回复时向访客上报。
+  const typingReport = useConversationTypingReport(
+    conversationID,
+    (groupConversation ||
+      conversationType === ConversationType.ConversationTypeDirect ||
+      (customerConversation && customerTypingSupported && !internalNote)) &&
+      !disabledReason,
+  )
+  const {
+    mentions,
+    setMentions,
+    mentionsRef,
+    mentionAllToken,
+    setMentionAllToken,
+    mentionAll,
+    mentionQuery,
+    setMentionQuery,
+    activeMentionIndex,
+    mentionCandidates,
+    noteMentionHint,
+    updateMentionQuery,
+    reconcileMentions,
+    selectMention,
+    handleMentionKeyDown,
+  } = useComposerMentions({
+    form,
+    inputRef,
+    typingReport,
+    groupConversation,
+    customerConversation,
+    internalNote,
+    groupParticipants,
+    noteMentionMembers,
+    currentIdentityID,
+    noteSwitchAvailable: Boolean(onVisibilityChange),
+  })
   // 对客草稿与内部备注草稿各自保留正文和提醒成员，切换页签时互不覆盖。
-  const draftsRef = useRef<Partial<Record<MessageVisibility, string>>>({})
-  const draftMentionsRef = useRef<Partial<Record<MessageVisibility, MentionTarget[]>>>({})
-  const appliedVisibilityRef = useRef(visibility)
-  const focusAfterSwitchRef = useRef(false)
-
-  // 页签切换和引用、填入回复引起的模式变化共用同一套草稿保存与载入。
-  useEffect(() => {
-    const previous = appliedVisibilityRef.current
-    if (previous === visibility) return
-    appliedVisibilityRef.current = visibility
-    draftsRef.current[previous] = form.getValues("body")
-    draftMentionsRef.current[previous] = mentionsRef.current
-    form.setValue("body", draftsRef.current[visibility] ?? "")
-    setMentions(draftMentionsRef.current[visibility] ?? [])
-    setMentionQuery(null)
-    delete draftsRef.current[visibility]
-    delete draftMentionsRef.current[visibility]
-    const focus = focusAfterSwitchRef.current
-    focusAfterSwitchRef.current = false
-    window.requestAnimationFrame(() => {
-      resizeComposerInput(inputRef.current)
-      if (focus) form.setFocus("body")
-    })
-  }, [form, visibility])
-
-  /** 切换输入模式并把焦点留在输入框。 */
-  function switchVisibility(next: MessageVisibility) {
-    if (next === visibility) return
-    focusAfterSwitchRef.current = true
-    onVisibilityChange?.(next)
-  }
+  const { draftsRef, focusAfterSwitchRef, switchVisibility, stashDraft } = useVisibilityDrafts({
+    form,
+    visibility,
+    onVisibilityChange,
+    inputRef,
+    mentionsRef,
+    setMentions,
+    closeMentionQuery: () => setMentionQuery(null),
+  })
 
   useEffect(() => {
     aliveRef.current = true
@@ -256,8 +236,7 @@ export function ConversationComposer({
     retryRef.current = retryDraft
     // 失败消息回到发送时的可见范围，当前页签属于另一种可见范围时先存入对应草稿。
     if (retryDraft.visibility !== visibility) {
-      draftsRef.current[retryDraft.visibility] = retryDraft.body
-      draftMentionsRef.current[retryDraft.visibility] = retryDraft.mentions
+      stashDraft(retryDraft.visibility, retryDraft.body, retryDraft.mentions)
       return
     }
     form.setValue("body", retryDraft.body, { shouldDirty: true })
@@ -273,143 +252,14 @@ export function ConversationComposer({
     onReplyToChange,
     retryDraft,
     retryFailedMessage,
+    stashDraft,
     visibility,
   ])
 
-  const groupConversation = conversationType === ConversationType.ConversationTypeGroup
-  const customerConversation = conversationType === ConversationType.ConversationTypeCustomer
-  // 单聊与群聊向其他成员上报本人正在输入；客户会话只有网站渠道在对客回复时向访客上报。
-  const typingReport = useConversationTypingReport(
-    conversationID,
-    (groupConversation ||
-      conversationType === ConversationType.ConversationTypeDirect ||
-      (customerConversation && customerTypingSupported && !internalNote)) &&
-      !disabledReason,
-  )
-  // 群聊提醒当前成员，客户会话的内部备注提醒企业真人成员。
-  const mentionTargets = useMemo<MentionTarget[]>(() => {
-    if (groupConversation) {
-      return (groupParticipants ?? []).map((participant) => ({
-        identityID: participant.identityId,
-        chatSubjectID: participant.chatSubjectId,
-        displayName: participant.displayName,
-      }))
-    }
-    if (!customerConversation || !internalNote) return []
-    return (noteMentionMembers ?? [])
-      .filter((member) => member.type === OrganizationIdentityType.OrganizationIdentityTypeUser)
-      .map((member) => ({ identityID: member.id, chatSubjectID: null, displayName: member.displayName }))
-  }, [customerConversation, groupConversation, groupParticipants, internalNote, noteMentionMembers])
-
-  const mentionCandidates = useMemo<MentionCandidate[]>(() => {
-    if (!mentionQuery) return []
-    const query = mentionQuery.value.toLocaleLowerCase()
-    const candidates: MentionCandidate[] = []
-    if (groupConversation && !mentionAll && t("messageMentionAll").toLocaleLowerCase().includes(query)) {
-      candidates.push({ kind: "all", displayName: t("messageMentionAll") })
-    }
-    candidates.push(
-      ...mentionTargets
-        .filter(
-          (target) =>
-            target.identityID !== currentIdentityID &&
-            !mentions.some((mention) => mention.identityID === target.identityID) &&
-            target.displayName.toLocaleLowerCase().includes(query),
-        )
-        .map((target) => ({
-          kind: "member" as const,
-          displayName: target.displayName,
-          target,
-        })),
-    )
-    return candidates.slice(0, 8)
-  }, [
-    currentIdentityID,
-    groupConversation,
-    mentionTargets,
-    mentionQuery,
-    mentions,
-    mentionAll,
-    t,
-  ])
-  // 对客模式输入 @ 时提示切换到内部备注提醒同事。
-  const noteMentionHint =
-    customerConversation && !internalNote && Boolean(onVisibilityChange) && mentionQuery !== null
-
-  /** 根据光标前文本更新 @ 候选查询。 */
-  function updateMentionQuery(value: string, selectionStart: number | null) {
-    if (
-      (!groupConversation && !customerConversation) ||
-      selectionStart === null
-    ) {
-      setMentionQuery(null)
-      return
-    }
-    const beforeCaret = value.slice(0, selectionStart)
-    const match = beforeCaret.match(/(?:^|\s)@([^\s@]*)$/)
-    if (!match) {
-      setMentionQuery(null)
-      return
-    }
-    const markerOffset = match[0].lastIndexOf("@")
-    setMentionQuery({
-      start: beforeCaret.length - match[0].length + markerOffset,
-      value: match[1],
-    })
-    setActiveMentionIndex(0)
-  }
-
-  /** 删除正文中已经不存在的结构化提醒目标。 */
-  function reconcileMentions(value: string) {
-    setMentions((current) => {
-      const remainingByName = new Map<string, number>()
-      return current.filter((mention) => {
-        const remaining =
-          remainingByName.get(mention.displayName) ??
-          countMentionTokens(value, mention.displayName)
-        remainingByName.set(mention.displayName, Math.max(remaining - 1, 0))
-        return remaining > 0
-      })
-    })
-  }
-
-  /** 在正文光标处插入选中的成员或所有人标记。 */
-  function selectMention(candidate: MentionCandidate) {
-    const query = mentionQuery
-    const input = inputRef.current
-    if (!query || !input) return
-    const body = form.getValues("body")
-    const caret = input.selectionStart ?? body.length
-    const token = `@${candidate.displayName} `
-    const nextBody = `${body.slice(0, query.start)}${token}${body.slice(caret)}`
-    const nextCaret = query.start + token.length
-    form.setValue("body", nextBody, { shouldDirty: true })
-    typingReport.input(nextBody)
-    if (candidate.kind === "all") {
-      setMentionAllToken({ start: query.start, text: token.trimEnd() })
-    } else {
-      setMentionAllToken((current) =>
-        reconcileMentionAllToken(current, body, nextBody, nextCaret),
-      )
-      const { target } = candidate
-      setMentions((current) =>
-        current.some((mention) => mention.identityID === target.identityID)
-          ? current
-          : [...current, target],
-      )
-    }
-    setMentionQuery(null)
-    window.requestAnimationFrame(() => {
-      input.focus()
-      input.setSelectionRange(nextCaret, nextCaret)
-      resizeComposerInput(input)
-    })
-  }
-
-  /** 用选中的表情替换正文当前选区，关闭面板后光标落在表情之后。 */
+  /** 用选中的表情替换正文当前选区，返回插入内容之后的光标位置。 */
   function insertEmoji(emoji: string) {
     const input = inputRef.current
-    if (!input) return
+    if (!input) return null
     const body = form.getValues("body")
     const start = input.selectionStart ?? body.length
     const end = input.selectionEnd ?? start
@@ -422,8 +272,7 @@ export function ConversationComposer({
     typingReport.input(nextBody)
     reconcileMentions(nextBody)
     resizeComposerInput(input)
-    emojiCaretRef.current = nextCaret
-    setEmojiOpen(false)
+    return nextCaret
   }
 
   useEffect(() => {
@@ -438,33 +287,7 @@ export function ConversationComposer({
     }
   }, [form, isSubmitting, replyTo])
 
-  useEffect(() => {
-    if (disabledReason || isSubmitting) return
-    // 焦点不在输入控件上时，按下可打印字符直接转交输入框，该字符落入输入框。
-    function focusFromTyping(event: globalThis.KeyboardEvent) {
-      if (event.defaultPrevented || event.isComposing) return
-      if (event.ctrlKey || event.metaKey || event.altKey) return
-      // 空格是按钮和复选框的激活键，留给当前焦点元素。
-      if (event.key.length !== 1 || event.key === " ") return
-      const input = inputRef.current
-      if (!input || input.closest("[aria-hidden='true']")) return
-      const active = document.activeElement
-      if (
-        active instanceof HTMLElement &&
-        (active.isContentEditable ||
-          active.tagName === "INPUT" ||
-          active.tagName === "TEXTAREA" ||
-          active.tagName === "SELECT" ||
-          // 对话框和各类浮层内的按键归浮层处理。
-          active.closest("[data-radix-popper-content-wrapper],[role='dialog']"))
-      )
-        return
-      input.focus()
-      input.setSelectionRange(input.value.length, input.value.length)
-    }
-    document.addEventListener("keydown", focusFromTyping)
-    return () => document.removeEventListener("keydown", focusFromTyping)
-  }, [disabledReason, isSubmitting])
+  useFocusInputOnTyping(inputRef, !disabledReason && !isSubmitting)
 
   /** 按会话类型发送当前成员文本消息。 */
   async function send(values: ConversationComposerValues) {
@@ -521,48 +344,17 @@ export function ConversationComposer({
     setMentionAllToken(null)
     resizeComposerInput(inputRef.current)
     try {
-      const messageInput = { clientMessageId: clientMessageID, body }
-      let message: ConversationMessageData
-      switch (conversationType) {
-        case ConversationType.ConversationTypeAgent:
-        case ConversationType.ConversationTypeCopilot:
-        case ConversationType.ConversationTypeDirect: {
-          const directInput = {
-            ...messageInput,
-            replyToMessageId: replyTo?.id ?? "",
-          }
-          // 草稿首发走调用方入口，已有会话按类型发送。
-          if (sendIndividualMessage) message = await sendIndividualMessage(directInput)
-          else if (conversationType === ConversationType.ConversationTypeAgent)
-            message = await sendAgentTextMessage(conversationID, directInput)
-          else if (conversationType === ConversationType.ConversationTypeCopilot)
-            message = await sendCustomerCopilotTextMessage(conversationID, directInput)
-          else message = await sendDirectTextMessage(conversationID, directInput)
-          break
-        }
-        case ConversationType.ConversationTypeGroup:
-          message = await sendGroupTextMessage(conversationID, {
-            ...messageInput,
-            replyToMessageId: replyTo?.id ?? "",
-            mentionSubjectIds: orderedMentions.flatMap((mention) =>
-              mention.chatSubjectID ? [mention.chatSubjectID] : [],
-            ),
-            mentionAll,
-          })
-          break
-        case ConversationType.ConversationTypeCustomer:
-          message = await sendCustomerTextMessage(conversationID, {
-            ...messageInput,
-            replyToMessageId: replyTo?.id ?? "",
-            visibility,
-            mentionIdentityIds: internalNote
-              ? orderedMentions.map((mention) => mention.identityID)
-              : [],
-          })
-          break
-        default:
-          throw new Error("不支持的会话类型")
-      }
+      const message = await sendComposerTextMessage({
+        conversationType,
+        conversationID,
+        clientMessageID,
+        body,
+        replyToMessageID: replyTo?.id ?? "",
+        visibility,
+        mentions: orderedMentions,
+        mentionAll,
+        sendIndividualMessage,
+      })
       onSucceeded()
       // 按发送逻辑编号写入发送结果。
       onSent(clientMessageID, message)
@@ -595,8 +387,7 @@ export function ConversationComposer({
         retryRef.current = draft
         // 发送期间切换了页签时，失败正文回到发送时的可见范围。
         if (draft.visibility !== visibilityRef.current) {
-          draftsRef.current[draft.visibility] = body
-          draftMentionsRef.current[draft.visibility] = draft.mentions
+          stashDraft(draft.visibility, body, draft.mentions)
         } else {
           form.setValue("body", body, { shouldDirty: true })
           setMentions(draft.mentions)
@@ -644,31 +435,7 @@ export function ConversationComposer({
     if (disabledReason) return
     const composing =
       event.keyCode === 229 || event.nativeEvent.isComposing
-    if (!composing && mentionQuery && mentionCandidates.length > 0) {
-      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
-        event.preventDefault()
-        const direction = event.key === "ArrowDown" ? 1 : -1
-        setActiveMentionIndex((current) =>
-          (current + direction + mentionCandidates.length) %
-          mentionCandidates.length,
-        )
-        return
-      }
-      if (event.key === "Enter") {
-        event.preventDefault()
-        selectMention(
-          mentionCandidates[
-            Math.min(activeMentionIndex, mentionCandidates.length - 1)
-          ],
-        )
-        return
-      }
-      if (event.key === "Escape") {
-        event.preventDefault()
-        setMentionQuery(null)
-        return
-      }
-    }
+    if (handleMentionKeyDown(event, composing)) return
     // 提示可见时 Enter 切到内部备注，Escape 关闭提示，均不发送对客消息。
     if (!composing && noteMentionHint && (event.key === "Escape" || (event.key === "Enter" && !event.shiftKey))) {
       event.preventDefault()
@@ -719,7 +486,7 @@ export function ConversationComposer({
     return () => window.clearTimeout(timer)
   }, [isSubmitting])
 
-  // 输入内容后附件入口换成发送按钮，并保持到本次发送结束。
+  // 输入内容后语音入口换成发送按钮，并保持到本次发送结束。
   const showSend = !isBodyEmpty || isSubmitting
   const bodyInput = (
     <Textarea
@@ -738,8 +505,8 @@ export function ConversationComposer({
       className={cn(
         // 行高贴近字体自然行高，避免换行前后光标高度跳变；上下内边距之和保持 16px，下伸部留空由上多下少补偿。
         "max-h-[200px] min-h-10 min-w-0 flex-1 resize-none rounded-none border-0 bg-transparent px-0.5 pt-[11px] pb-[9px] leading-5 shadow-none focus-visible:ring-0 dark:bg-transparent",
-        // 正文与 20px 工具图标配比；窄屏保持 16px，避免移动端聚焦时缩放。
-        "md:text-[15px]",
+        // 正文各端统一 16px，移动端聚焦时不缩放，与访客端一致。
+        "md:text-[1rem]",
       )}
       onInput={(event) => {
         resizeComposerInput(event.currentTarget)
@@ -773,88 +540,6 @@ export function ConversationComposer({
       onKeyDown={submitFromKeyboard}
     />
   )
-  const attachmentTool =
-    (conversationType === ConversationType.ConversationTypeDirect ||
-      conversationType === ConversationType.ConversationTypeAgent ||
-      conversationType === ConversationType.ConversationTypeCopilot ||
-      conversationType === ConversationType.ConversationTypeGroup ||
-      (customerAttachmentSupported && !internalNote)) ? (
-      <ConversationAttachmentUpload
-        conversationID={conversationID || (attachmentAgentDraft?.conversationID ?? "")}
-        targetIdentityID={attachmentTargetIdentityID}
-        agentIdentityID={attachmentAgentDraft?.agentIdentityID}
-        customerConversationID={attachmentAgentDraft?.customerConversationID}
-        customer={conversationType === ConversationType.ConversationTypeCustomer}
-        byteLimit={customerAttachmentByteLimit}
-        captionLimit={customerAttachmentCaptionLimit}
-        replyTo={replyTo ?? null}
-        onSent={() => onReplyToChange?.(null)}
-        disabled={isSubmitting || Boolean(disabledReason)}
-        onBeforeSend={onBeforeSend}
-        onCreated={(conversation, conversationID) => onAttachmentConversationCreated?.(conversation, conversationID)}
-      />
-    ) : (
-      <Button
-        type="button"
-        variant="ghost"
-        size="icon-sm"
-        className={composerToolClass}
-        disabled
-        aria-label={t("attachmentAdd")}
-      >
-        <PaperclipIcon />
-      </Button>
-    )
-  const emojiTool = (
-    <Popover open={emojiOpen} onOpenChange={setEmojiOpen}>
-      <PopoverTrigger asChild>
-        <Button
-          type="button"
-          variant="ghost"
-          size="icon-sm"
-          className={composerToolClass}
-          disabled={isSubmitting || Boolean(disabledReason)}
-          aria-label={t("emojiPick")}
-        >
-          <SmileIcon />
-        </Button>
-      </PopoverTrigger>
-      <PopoverContent
-        side="top"
-        align="start"
-        collisionPadding={8}
-        aria-label={t("emojiPick")}
-        className={cn(
-          "grid max-h-64 gap-0.5 overflow-y-auto p-1.5",
-          // 面板不超过可用宽度，列数按 36px 按钮自动填充。
-          "w-[min(19rem,var(--radix-popover-content-available-width))] grid-cols-[repeat(auto-fill,2.25rem)]",
-        )}
-        onCloseAutoFocus={(event) => {
-          // 选中表情后焦点回到输入框并定位到插入内容之后。
-          const caret = emojiCaretRef.current
-          const input = inputRef.current
-          if (caret === null || !input) return
-          emojiCaretRef.current = null
-          event.preventDefault()
-          input.focus()
-          input.setSelectionRange(caret, caret)
-        }}
-      >
-        {composerEmojis.map((emoji) => (
-          <button
-            key={emoji}
-            type="button"
-            className={cn(
-              "flex size-9 items-center justify-center rounded-md text-xl leading-none outline-none hover:bg-accent focus-visible:bg-accent",
-            )}
-            onClick={() => insertEmoji(emoji)}
-          >
-            {emoji}
-          </button>
-        ))}
-      </PopoverContent>
-    </Popover>
-  )
 
   return (
     <form
@@ -865,93 +550,36 @@ export function ConversationComposer({
       noValidate
     >
       <div className="relative">
-        {!disabledReason && mentionQuery && mentionCandidates.length > 0 ? (
-          <div
-            role="listbox"
-            aria-label={t(groupConversation ? "messageMentionCandidates" : "noteMentionCandidates")}
-            className="absolute bottom-full left-2 z-30 mb-1 max-h-56 min-w-56 overflow-y-auto rounded-md border bg-popover p-1 text-popover-foreground shadow-md"
-          >
-            {mentionCandidates.map((candidate, index) => (
-              <button
-                key={
-                  candidate.kind === "all"
-                    ? "all"
-                    : candidate.target.identityID
-                }
-                type="button"
-                role="option"
-                aria-selected={index === activeMentionIndex}
-                className={cn(
-                  "flex min-h-9 w-full items-center rounded-sm px-2 py-1.5 text-left text-sm outline-none hover:bg-accent aria-selected:bg-accent",
-                )}
-                onPointerDown={(event) => event.preventDefault()}
-                onClick={() => selectMention(candidate)}
-              >
-                {candidate.displayName}
-              </button>
-            ))}
-          </div>
-        ) : null}
-        {!disabledReason && noteMentionHint ? (
-          <div
-            role="status"
-            className="absolute bottom-full left-2 z-30 mb-1 flex items-center gap-3 rounded-md border bg-popover py-1.5 pr-1.5 pl-3 text-sm text-popover-foreground shadow-md"
-          >
-            {t("noteMentionHint")}
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onPointerDown={(event) => event.preventDefault()}
-              onClick={() =>
-                switchVisibility(MessageVisibility.MessageVisibilityInternalOnly)
-              }
-            >
-              {t("noteMentionSwitch")}
-            </Button>
-          </div>
-        ) : null}
+        <ComposerMentionOverlay
+          candidates={mentionCandidates}
+          activeIndex={activeMentionIndex}
+          groupConversation={groupConversation}
+          showCandidates={!disabledReason && Boolean(mentionQuery) && mentionCandidates.length > 0}
+          showNoteHint={!disabledReason && noteMentionHint}
+          onSelect={selectMention}
+          onSwitchToNote={() =>
+            switchVisibility(MessageVisibility.MessageVisibilityInternalOnly)
+          }
+        />
         <div
           className={cn(
             internalNote
-              ? "bg-amber-50/60 dark:bg-amber-950/30"
+              ? "bg-note/60"
               : "bg-background",
           )}
         >
           {replyTo ? (
-            <div className="flex items-start justify-between gap-3 border-b px-3 py-2 text-xs">
-              <div className="min-w-0">
-                <p className="font-medium text-foreground">
-                  {replyTo.deleted
-                    ? t("messageOriginalDeleted")
-                    : t("messageReplyingTo", {
-                        name:
-                          replyTo.sender?.displayName?.trim() ||
-                          t(replyTo.sender?.kind === ChatSubjectKind.ChatSubjectKindContact ? "anonymousVisitor" : "unknownSender"),
-                      })}
-                </p>
-                <p className="truncate text-muted-foreground">
-                  {messagePreview(replyTo.body, replyTo.sender?.identityType)}
-                </p>
-              </div>
-              <button
-                type="button"
-                className={cn(
-                  "-my-1 min-h-8 shrink-0 px-2 text-muted-foreground hover:text-foreground",
-                )}
-                disabled={Boolean(disabledReason)}
-                onClick={() => onReplyToChange?.(null)}
-              >
-                {t("messageReplyCancel")}
-              </button>
-            </div>
+            <ComposerReplyPreview
+              replyTo={replyTo}
+              disabled={Boolean(disabledReason)}
+              onCancel={() => onReplyToChange?.(null)}
+            />
           ) : null}
           {/* 输入区整体铺底色，正文单独用白底并与上下边缘留出间距。 */}
           <div className="flex items-end gap-2 bg-foreground/[0.03] px-2 py-1">
             <div className="mb-1.5 flex items-end">
               {onVisibilityChange ? (
-                <Tooltip>
-                  <TooltipTrigger asChild>
+                <IconTooltip label={t("composerModeNote")}>
                     <Button
                       type="button"
                       variant="ghost"
@@ -960,7 +588,7 @@ export function ConversationComposer({
                       className={cn(
                         composerToolClass,
                         internalNote &&
-                          "bg-amber-100 text-amber-900 hover:bg-amber-100 hover:text-amber-900 dark:bg-amber-950 dark:text-amber-200 dark:hover:bg-amber-950 dark:hover:text-amber-200",
+                          "bg-note-active text-note-active-foreground hover:bg-note-active hover:text-note-active-foreground",
                       )}
                       aria-label={t("composerModeNote")}
                       onClick={() =>
@@ -973,11 +601,22 @@ export function ConversationComposer({
                     >
                       <StickyNoteIcon />
                     </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>{t("composerModeNote")}</TooltipContent>
-                </Tooltip>
+                </IconTooltip>
               ) : null}
-              {attachmentTool}
+              <ComposerAttachmentTool
+                conversationID={conversationID}
+                conversationType={conversationType}
+                customerEnabled={customerAttachmentSupported && !internalNote}
+                targetIdentityID={attachmentTargetIdentityID}
+                agentDraft={attachmentAgentDraft}
+                byteLimit={customerAttachmentByteLimit}
+                captionLimit={customerAttachmentCaptionLimit}
+                replyTo={replyTo}
+                disabled={isSubmitting || Boolean(disabledReason)}
+                onSent={() => onReplyToChange?.(null)}
+                onBeforeSend={onBeforeSend}
+                onCreated={onAttachmentConversationCreated}
+              />
             </div>
             <div className="flex min-w-0 flex-1 items-end rounded-md bg-background px-2">
               {disabledReason ? (
@@ -992,29 +631,37 @@ export function ConversationComposer({
               )}
             </div>
             <div className="mb-1.5 flex items-end">
-              {emojiTool}
+              <ComposerEmojiPicker
+                disabled={isSubmitting || Boolean(disabledReason)}
+                inputRef={inputRef}
+                onInsert={insertEmoji}
+              />
               {replyAssistant}
               {showSend ? (
-                <Button
-                  type="submit"
-                  size="icon-sm"
-                  className="relative rounded-full after:absolute after:-inset-1 after:content-['']"
-                  disabled={isSubmitting || Boolean(disabledReason) || isBodyEmpty || replyTo?.deleted}
-                  aria-label={t(internalNote ? "internalNoteSave" : "messageSend")}
-                >
-                  {showSubmitting ? <LoaderCircleIcon className="animate-spin" /> : <ArrowUpIcon />}
-                </Button>
+                <IconTooltip label={t(internalNote ? "internalNoteSave" : "messageSend")}>
+                  <Button
+                    type="submit"
+                    size="icon-sm"
+                    className="relative rounded-full after:absolute after:-inset-1 after:content-['']"
+                    disabled={isSubmitting || Boolean(disabledReason) || isBodyEmpty || replyTo?.deleted}
+                    aria-label={t(internalNote ? "internalNoteSave" : "messageSend")}
+                  >
+                    {showSubmitting ? <LoaderCircleIcon className="animate-spin" /> : <ArrowUpIcon />}
+                  </Button>
+                </IconTooltip>
               ) : (
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="icon-sm"
-                  className={composerToolClass}
-                  disabled
-                  aria-label={t("voiceMessage")}
-                >
-                  <MicIcon />
-                </Button>
+                <IconTooltip label={t("voiceMessage")}>
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="icon-sm"
+                    className={composerToolClass}
+                    disabled
+                    aria-label={t("voiceMessage")}
+                  >
+                    <MicIcon />
+                  </Button>
+                </IconTooltip>
               )}
             </div>
           </div>

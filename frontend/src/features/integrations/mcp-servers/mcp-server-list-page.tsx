@@ -12,30 +12,31 @@ import {
   refreshMCPServerTools,
   type MCPServerData,
 } from "@/api"
-import { ListActionButton } from "@/components/list-action-button"
 import { ResourceListLayout } from "@/components/resource-list"
+import { ResourceRowIdentity } from "@/components/resource-row-identity"
 import { ResourceTable } from "@/components/resource-table"
 import { PageHeader } from "@/components/page-header"
-import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
+import { ConfirmationDialog } from "@/components/confirmation-dialog"
 import { Button } from "@/components/ui/button"
 import { MCPServerToolsCell } from "@/features/integrations/mcp-servers/mcp-server-tools-cell"
-import { MCPServerTestButton } from "@/features/integrations/mcp-servers/mcp-server-test-button"
+import { useMCPServerConnectionTest } from "@/features/integrations/mcp-servers/use-mcp-server-connection-test"
 import { resourceKeys } from "@/hooks/resource-keys"
+import { useConfirmedAction } from "@/hooks/use-confirmed-action"
 import { useResource } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
-import { useIntegrationDeletion } from "@/features/integrations/use-integration-deletion"
 
 /** 显示当前企业配置的 MCP 服务。 */
 export function MCPServerListPage() {
   const { t } = useTranslation(["integrations", "common"])
   const navigate = useNavigate()
   const [submittingRefresh, setSubmittingRefresh] = useState(false)
+  const connectionTest = useMCPServerConnectionTest()
   const mounted = useRef(true)
   const {
     data,
     loading,
-    refreshing,
+    retrying,
     error: loadError,
     refresh,
   } = useResource(resourceKeys.mcpServers(), () => listMCPServers(), {
@@ -43,7 +44,7 @@ export function MCPServerListPage() {
     refetchInterval: (data) => data?.mcpServers.some((server) => server.toolsUpdating) ? 1000 : false,
     refetchOnWindowFocus: true,
   })
-  const showLoading = loading || (Boolean(loadError) && !data && refreshing)
+  const showLoading = loading || (retrying && !data)
   const mcpServers = data?.mcpServers ?? []
 
   useEffect(() => {
@@ -68,14 +69,17 @@ export function MCPServerListPage() {
     }
   }
 
-  const deletion = useIntegrationDeletion<MCPServerData>({
-    deleteItem: deleteMCPServer,
-    listKey: resourceKeys.mcpServers(),
-    detailKey: resourceKeys.mcpServer,
-    relatedKeys: [resourceKeys.agentMCPServerOptions(), resourceKeys.agent()],
-    entityName: "MCP 服务",
-    successMessage: t("mcpServer.delete.success"),
-    errorMessage: t("mcpServer.delete.error"),
+  const deletion = useConfirmedAction<MCPServerData>({
+    action: (server) => deleteMCPServer(server.id),
+    invalidateKeys: (server) => [
+      resourceKeys.mcpServers(),
+      resourceKeys.mcpServer(server.id),
+      resourceKeys.agentMCPServerOptions(),
+      resourceKeys.agent(),
+    ],
+    logLabel: "MCP 服务删除",
+    successMessage: () => t("mcpServer.delete.success"),
+    errorMessage: () => t("mcpServer.delete.error"),
   })
 
   return (
@@ -116,17 +120,11 @@ export function MCPServerListPage() {
               header: t("mcpServer.list.columns.name"),
               cellClassName: "min-w-0",
               cell: (mcpServer) => (
-                <div className="flex min-w-0 items-center gap-3">
-                  <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                    <PlugIcon className="size-4.5" aria-hidden="true" />
-                  </span>
-                  <span className="grid min-w-0 gap-0.5 leading-tight">
-                    <span className="truncate font-medium">{mcpServer.name}</span>
-                    <span className="flex min-w-0 items-center text-xs text-muted-foreground">
-                      <MCPServerToolsCell server={mcpServer} />
-                    </span>
-                  </span>
-                </div>
+                <ResourceRowIdentity
+                  icon={PlugIcon}
+                  name={mcpServer.name}
+                  description={<MCPServerToolsCell server={mcpServer} />}
+                />
               ),
             },
           ]}
@@ -136,30 +134,37 @@ export function MCPServerListPage() {
           onRowActivate={(mcpServer) =>
             navigate(`/settings/mcp-servers/${mcpServer.id}`)
           }
-          actions={(mcpServer) => ({
-            // 操作靠右对齐，与企业成员列表一致。
-            primary: (
-              <div className="ml-auto flex items-center gap-1">
-                <MCPServerTestButton serverId={mcpServer.id} />
-                <ListActionButton
-                  tone="destructive"
-                  onClick={() => deletion.select(mcpServer)}
-                >
-                  {t("common:actions.delete")}
-                </ListActionButton>
-              </div>
-            ),
-          })}
+          rowActions={(mcpServer) => {
+            const testing = connectionTest.testingIds.has(mcpServer.id)
+            return [
+              {
+                key: "test",
+                label: testing
+                  ? t("mcpServer.connection.testing")
+                  : t("mcpServer.connection.test"),
+                disabled: testing,
+                onSelect: () => void connectionTest.test(mcpServer.id),
+              },
+              {
+                key: "delete",
+                label: t("common:actions.delete"),
+                destructive: true,
+                separatorBefore: true,
+                onSelect: () => deletion.select(mcpServer),
+              },
+            ]
+          }}
         />
       </ResourceListLayout>
 
-      <DeleteConfirmationDialog
+      <ConfirmationDialog
         open={deletion.item !== null}
         pending={deletion.pending}
         title={
           deletion.item ? t("mcpServer.delete.title", { name: deletion.item.name }) : ""
         }
         description={t("mcpServer.delete.description")}
+        pendingLabel={t("common:actions.deleting")}
         onOpenChange={(open) => {
           if (!open) deletion.select(null)
         }}

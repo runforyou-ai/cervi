@@ -17,7 +17,7 @@ import {
 import { FormInputField } from "@/components/form/form-input-field"
 import { SwitchCardField } from "@/components/form/switch-card-field"
 import { ImagePicker } from "@/components/image-picker"
-import { Button } from "@/components/ui/button"
+import { FormActions } from "@/components/form/form-actions"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { usePendingImageUpload } from "@/hooks/use-pending-image-upload"
 import { apiErrorMessage } from "@/lib/form-errors"
@@ -44,7 +44,6 @@ export function MemberForm({
   onCancel: () => void
 }) {
   const { t } = useTranslation("contacts")
-  const { t: tCommon } = useTranslation("common")
   const navigate = useNavigate()
   const defaultRoleID =
     roles.find((role) => role.kind === RoleKind.RoleKindMember)?.id ??
@@ -212,16 +211,7 @@ export function MemberForm({
           )}
         />
       </FieldGroup>
-      <div className="flex items-center justify-end gap-2">
-        <Button type="button" variant="outline" onClick={onCancel}>
-          {tCommon("actions.cancel")}
-        </Button>
-        <Button type="submit" disabled={form.formState.isSubmitting}>
-          {form.formState.isSubmitting
-            ? tCommon("actions.saving")
-            : tCommon("actions.save")}
-        </Button>
-      </div>
+      <FormActions saving={form.formState.isSubmitting} onCancel={onCancel} />
     </form>
   )
 }

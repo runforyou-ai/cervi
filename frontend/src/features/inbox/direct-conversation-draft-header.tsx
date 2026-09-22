@@ -56,7 +56,7 @@ export function DirectConversationDraftHeader({
           <TooltipTrigger asChild>
             <h2
               data-slot="conversation-header-title"
-              className="min-w-0 truncate text-sm font-semibold"
+              className="min-w-0 truncate text-xl font-semibold"
             >
               {member.displayName}
             </h2>

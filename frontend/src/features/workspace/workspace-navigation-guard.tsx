@@ -11,16 +11,7 @@ import { useTranslation } from "react-i18next"
 import { useBlocker } from "react-router"
 
 import { SessionState, sessionPath } from "@/api"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+import { ConfirmationDialog } from "@/components/confirmation-dialog"
 import {
   UnsavedChangesContext,
   type UnsavedForm,
@@ -100,34 +91,18 @@ export function WorkspaceNavigationGuard({
   return (
     <UnsavedChangesContext.Provider value={context}>
       {children}
-      <AlertDialog
+      <ConfirmationDialog
         open={pending || blocker.state === "blocked"}
+        pending={false}
+        title={t("unsavedChanges.title")}
+        description={t("unsavedChanges.description")}
+        confirmLabel={t("unsavedChanges.discard")}
+        cancelLabel={t("unsavedChanges.keepEditing")}
         onOpenChange={(open) => {
           if (!open) finish(false)
         }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t("unsavedChanges.title")}</AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("unsavedChanges.description")}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>
-              {t("unsavedChanges.keepEditing")}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              onClick={(event) => {
-                event.preventDefault()
-                finish(true)
-              }}
-            >
-              {t("unsavedChanges.discard")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        onConfirm={() => finish(true)}
+      />
     </UnsavedChangesContext.Provider>
   )
 }

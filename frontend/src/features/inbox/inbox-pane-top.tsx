@@ -4,6 +4,7 @@ import { PlusIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
 import { InboxScope } from "@/api"
+import { IconTooltip } from "@/components/icon-tooltip"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -11,13 +12,8 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import { inboxScopes } from "@/features/inbox/inbox-query"
 import { cn } from "@/lib/utils"
-
-const scopes = [
-  { id: InboxScope.InboxScopeAll, labelKey: "scopeAll" },
-  { id: InboxScope.InboxScopeCustomer, labelKey: "scopeCustomer" },
-  { id: InboxScope.InboxScopeInternal, labelKey: "scopeInternal" },
-] as const
 
 /** 顶部操作行：会话范围切换、当前范围筛选和发起会话菜单。 */
 export function InboxPaneTop({
@@ -48,32 +44,32 @@ export function InboxPaneTop({
         aria-label={t("scopeLabel")}
         className="flex min-w-0 flex-1 items-center gap-0.5"
       >
-        {scopes.map((item) => {
+        {inboxScopes.map((item) => {
           const unread =
-            item.id === InboxScope.InboxScopeInternal
+            item.value === InboxScope.InboxScopeInternal
               ? attentionUnreadCount
-              : item.id === InboxScope.InboxScopeCustomer
+              : item.value === InboxScope.InboxScopeCustomer
                 ? customerMentionedUnreadCount
                 : 0
           return (
             <button
-              key={item.id}
+              key={item.value}
               type="button"
-              aria-pressed={scope === item.id}
+              aria-pressed={scope === item.value}
               className={cn(
-                "flex h-7 min-w-0 items-center gap-1 rounded-md px-2 text-[13px] text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
-                scope === item.id &&
+                "flex h-7 min-w-0 items-center gap-1 rounded-md px-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
+                scope === item.value &&
                   "bg-accent font-medium text-accent-foreground hover:bg-accent hover:text-accent-foreground",
               )}
-              onClick={() => onScopeChange(item.id)}
+              onClick={() => onScopeChange(item.value)}
             >
-              <span className="truncate">{t(item.labelKey)}</span>
+              <span className="truncate">{t(item.label)}</span>
               {unread > 0 ? (
                 <span
                   className="size-1.5 shrink-0 rounded-full bg-destructive"
                   role="status"
                   aria-label={t(
-                    item.id === InboxScope.InboxScopeInternal
+                    item.value === InboxScope.InboxScopeInternal
                       ? "internalAttentionUnread"
                       : "customerMentionUnread",
                     { count: unread },
@@ -88,17 +84,18 @@ export function InboxPaneTop({
       <div className="flex shrink-0 items-center">
         {filter}
         <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon-sm"
-              className="shrink-0 text-muted-foreground"
-              aria-label={t("newConversation")}
-              title={t("newConversation")}
-            >
-              <PlusIcon />
-            </Button>
-          </DropdownMenuTrigger>
+          <IconTooltip label={t("newConversation")}>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-sm"
+                className="shrink-0 text-muted-foreground"
+                aria-label={t("newConversation")}
+              >
+                <PlusIcon />
+              </Button>
+            </DropdownMenuTrigger>
+          </IconTooltip>
           <DropdownMenuContent align="start" className="min-w-52">
             <DropdownMenuItem onSelect={onCreateAgent}>
               {t("newAgentConversation")}

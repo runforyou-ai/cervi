@@ -14,6 +14,7 @@ import {
   isApiError,
   listCustomerReplyAgents,
 } from "@/api"
+import { IconTooltip } from "@/components/icon-tooltip"
 import { Button } from "@/components/ui/button"
 import { NativeSelect } from "@/components/ui/native-select"
 import {
@@ -34,6 +35,7 @@ import { useResource, useResourceRemover } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { cn } from "@/lib/utils"
 import { composerToolClass } from "@/features/inbox/composer-tool"
+import { selectCustomerReplyAgentID } from "@/features/inbox/customer-reply-agent"
 
 const replySourceDebounceDelay = 600
 
@@ -123,11 +125,10 @@ export function CustomerReplyAssistant({
     { enabled: open, staleTime: 0 },
   )
   const agents = agentOptions.data ?? []
-  const agentIdentityID = agents.some(
-    (agent) => agent.identityId === preferences.agentIdentityId,
+  const agentIdentityID = selectCustomerReplyAgentID(
+    agents,
+    preferences.agentIdentityId,
   )
-    ? preferences.agentIdentityId
-    : (agents[0]?.identityId ?? "")
   const rewrite = mode === CustomerReplyMode.CustomerReplyModeRewrite
   const parameters = {
     agentIdentityId: agentIdentityID,
@@ -233,7 +234,6 @@ export function CustomerReplyAssistant({
       className={composerToolClass}
       disabled={disabled}
       aria-label={t("replyAssistant")}
-      title={t("replyAssistant")}
     >
       {open && generating ? (
         <LoaderCircleIcon className="animate-spin" />
@@ -446,7 +446,9 @@ export function CustomerReplyAssistant({
 
   return (
     <Popover open={open} onOpenChange={changeOpen}>
-      <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+      <IconTooltip label={t("replyAssistant")}>
+        <PopoverTrigger asChild>{trigger}</PopoverTrigger>
+      </IconTooltip>
       <PopoverContent
         side="top"
         align="end"

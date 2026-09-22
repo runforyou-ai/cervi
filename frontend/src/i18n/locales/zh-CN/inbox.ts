@@ -128,8 +128,6 @@ const inbox = {
   groupMembersLoadError: "读取成员失败",
   groupMembersEmpty: "没有匹配的可用成员",
   groupCreateError: "无法创建群聊，请重试",
-  groupMemberCount_one: "{{count}} 位成员",
-  groupMemberCount_other: "{{count}} 位成员",
   groupOwner: "群主",
   groupCreatedAt: "创建时间",
   groupDetailsLoading: "正在读取群聊资料",
@@ -163,12 +161,10 @@ const inbox = {
   groupDissolveTitle: "解散“{{name}}”？",
   groupDissolveDescription:
     "解散后，所有成员将无法继续发送消息或修改群资料，现有成员仍可查看历史消息。此操作无法撤销。",
-  groupDissolveConfirm: "解散群聊",
   groupDissolveError: "无法解散群聊，请重试",
   groupDissolved: "群聊已解散",
   groupDissolvedUnavailable: "该群聊已解散，只能查看历史消息。",
   agentDisabledUnavailable: "该 AI 员工已禁用，无法发送新消息。",
-  directPeerDisabled: "已禁用",
   directPeerDisabledUnavailable: "该成员已禁用，无法发送新消息。",
   groupSystemRenamed:
     "{{actor}} 将群聊名称从“{{previousTitle}}”修改为“{{title}}”",
@@ -370,8 +366,6 @@ const inbox = {
   sidePanelOpen: "展开侧边面板",
   sidePanelClose: "收起侧边面板",
   sidePanelResize: "调整侧边面板宽度",
-  contextTitleBar: "客户资料",
-  contextDescription: "当前渠道、会话状态和客户资料",
   contextTabsLabel: "联系人上下文",
   contextProfileTab: "资料",
   contextGroupProfileTab: "群资料",
@@ -395,10 +389,6 @@ const inbox = {
   copilotThreadsLoadError: "读取 AI 助手对话失败",
   contextBusinessTitle: "业务上下文",
   contextBusinessDescription: "暂无业务上下文。",
-  sessionStatus: {
-    open: "进行中",
-    closed: "已结束",
-  },
 }
 
 export default inbox

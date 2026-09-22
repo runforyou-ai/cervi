@@ -195,7 +195,7 @@ export function AgentProcess({ process, onPrimary, onToggle }: { process: Conver
           <ChevronDownIcon aria-hidden className="size-3.5 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
         </CollapsibleTrigger>
         <div className={cn(
-          "flex shrink-0 gap-2 text-[11px]",
+          "flex shrink-0 gap-2 text-xs",
           onPrimary ? "text-accent-foreground/75" : "text-muted-foreground",
         )}>
           <span>{t("agentUsageInput", { count: process.inputTokens })}</span>

@@ -1,55 +1,39 @@
 /** 企业成员列表、筛选、详情和账号状态管理面板。 */
-import { useEffect, useState } from "react"
+import { useCallback } from "react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
-import { toast } from "sonner"
 
 import {
   UserStatus,
   deactivateUser,
-  getUser,
-  isApiError,
   listUsers,
   reactivateUser,
-  sessionPath,
   type ChannelOption,
   type RoleData,
   type Team,
   type UserData,
 } from "@/api"
 import {
-  ListToolbar,
   ListToolbarFilter,
   ListToolbarReset,
   ListToolbarSearch,
 } from "@/components/list-toolbar"
-import { ListActionButton } from "@/components/list-action-button"
-import { PageHeader } from "@/components/page-header"
-import { ProfileAvatar } from "@/components/profile-avatar"
-import { ResourceListLayout } from "@/components/resource-list"
+import { ConfirmationDialog } from "@/components/confirmation-dialog"
+import { ResourceRowIdentity } from "@/components/resource-row-identity"
 import { ResourceTable } from "@/components/resource-table"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
-import { WorkStatusDot } from "@/components/work-status"
 import { useWorkspace } from "@/contexts/workspace-context"
+import {
+  AccountStatusFilter,
+  useAccountStatusToggle,
+} from "@/features/contacts/account-status-toggle"
 import { ContactCreateDialogs } from "@/features/contacts/contact-create-dialogs"
-import { ContactDetailSheet } from "@/features/contacts/contact-detail-sheet"
-import { ContactScopeMobileSelect } from "@/features/contacts/contact-scope-mobile-select"
-import { MemberDetailView } from "@/features/contacts/members/member-detail"
+import { ContactListSection } from "@/features/contacts/contact-list-section"
+import { MemberDetailSheet } from "@/features/contacts/members/member-detail-sheet"
 import { useContactSearch } from "@/features/contacts/use-contact-search"
 import { roleDisplayName } from "@/lib/role-labels"
-import { useContactInvalidator } from "@/features/contacts/use-contact-invalidator"
+import { contactResourceKeys } from "@/features/contacts/use-contact-invalidator"
 import { resourceKeys } from "@/hooks/resource-keys"
-import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
-import { recoverSession } from "@/lib/session-navigation"
+import { useResource } from "@/hooks/use-resource"
 import { optionalWailsEnum } from "@/lib/wails-enum"
 
 /** 企业成员范围的列表、详情和弹窗。 */
@@ -66,8 +50,6 @@ export function MembersPanel({
   const { t: tCommon } = useTranslation("common")
   const { identity } = useWorkspace()
   const navigate = useNavigate()
-  const invalidateContact = useContactInvalidator()
-  const invalidate = useResourceInvalidator()
   const {
     searchParams,
     setParameters,
@@ -81,9 +63,17 @@ export function MembersPanel({
     optionalWailsEnum(UserStatus, searchParams.get("status")) ??
     UserStatus.UserStatusActive
   const roleId = searchParams.get("roleId") ?? ""
-  const [changingUserStatus, setChangingUserStatus] =
-    useState<UserData | null>(null)
-  const [deleting, setDeleting] = useState(false)
+  const statusToggle = useAccountStatusToggle<UserData>({
+    scope: "members",
+    deactivate: deactivateUser,
+    reactivate: reactivateUser,
+    // 修改自己的账号状态时同时刷新当前身份。
+    invalidateKeys: (user) => [
+      ...contactResourceKeys("user", user.id),
+      ...(user.id === identity.user.id ? [resourceKeys.identity()] : []),
+    ],
+    logLabel: "修改企业成员账号状态",
+  })
 
   const list = useResource(
     resourceKeys.users({ query, status, roleId, page: currentPage, pageSize: 50 }),
@@ -92,20 +82,6 @@ export function MembersPanel({
   const users = list.data?.users ?? []
   const page = list.data?.page ?? { number: currentPage, size: 50, total: 0 }
 
-  const detail = useResource(resourceKeys.user(selected), () => getUser(selected), {
-    enabled: Boolean(selected),
-  })
-  const detailUser = selected ? (detail.data ?? null) : null
-
-  const detailError = detail.error
-  useEffect(() => {
-    if (!selected || !detailError) return
-    if (isApiError(detailError) && sessionPath(detailError.state)) return
-    console.warn("联系人详情加载失败", detailError)
-    toast.error(t("detail.loadError"))
-    setParameters({ selected: null })
-  }, [detailError, selected, setParameters, t])
-
   /** 返回成员行显示的工作状态。 */
   function memberWorkStatus(user: UserData) {
     return user.id === identity.user.id
@@ -113,47 +89,11 @@ export function MembersPanel({
       : user.workStatus
   }
 
-  /** 关闭成员详情。 */
-  function closeDetail() {
-    setParameters({ selected: null, new: null })
-  }
-
-  /** 刷新列表并关闭详情。 */
-  function refreshAndClose() {
-    closeDetail()
-    void invalidateContact("user")
-  }
-
-  /** 禁用用户账号或恢复为正常状态。 */
-  async function changeUserStatus() {
-    if (!changingUserStatus) return
-    setDeleting(true)
-    try {
-      const saved =
-        changingUserStatus.status === UserStatus.UserStatusActive
-          ? await deactivateUser(changingUserStatus.id)
-          : await reactivateUser(changingUserStatus.id)
-      toast.success(
-        t(
-          changingUserStatus.status === UserStatus.UserStatusActive
-            ? "members.status.deactivated"
-            : "members.status.reactivated",
-        ),
-      )
-      setChangingUserStatus(null)
-      void invalidateContact("user", saved.id)
-      if (saved.id === identity.user.id) void invalidate(resourceKeys.identity())
-    } catch (error) {
-      if (recoverSession(error, navigate)) return
-      console.warn("修改企业成员账号状态失败", {
-        user_id: changingUserStatus.id,
-        error,
-      })
-      toast.error(t("members.status.error"))
-    } finally {
-      setDeleting(false)
-    }
-  }
+  // 详情关闭时一并清除新建参数；保持引用稳定，供详情面板的读取失败处理依赖。
+  const closeDetail = useCallback(
+    () => setParameters({ selected: null, new: null }),
+    [setParameters],
+  )
 
   const hasInternalFilters = Boolean(
     status !== UserStatus.UserStatusActive || roleId,
@@ -165,184 +105,97 @@ export function MembersPanel({
 
   return (
     <>
-      <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <PageHeader
-          title={t("scopes.employees")}
-          description={t("scopeDescriptions.employees")}
-          beforeTitle={
-            <ContactScopeMobileSelect
-              scope="employees"
-              teams={teams}
-              channels={channels}
+      <ContactListSection
+        title={t("scopes.employees")}
+        description={t("scopeDescriptions.employees")}
+        scope={{ scope: "employees", teams, channels }}
+        toolbar={
+          <>
+            <ListToolbarSearch
+              value={search}
+              aria-label={t("search.employees")}
+              onChange={(event) => setSearch(event.target.value)}
             />
-          }
-        />
-
-        <ListToolbar>
-          <ListToolbarSearch
-            value={search}
-            aria-label={t("search.employees")}
-            onChange={(event) => setSearch(event.target.value)}
-          />
-          <ListToolbarFilter
-            label={t("filters.accountStatus")}
-            value={status}
-            options={[
-              {
-                value: UserStatus.UserStatusActive,
-                label: t("statuses.active"),
-              },
-              {
-                value: UserStatus.UserStatusInactive,
-                label: t("statuses.inactive"),
-              },
-            ]}
-            onValueChange={(value) =>
-              setParameters({
-                status: value === UserStatus.UserStatusActive ? null : value,
-                page: null,
-                selected: null,
-              })
-            }
-          />
-          <ListToolbarFilter
-            label={t("filters.role")}
-            allLabel={t("filters.allRoles")}
-            value={roleId}
-            options={roleOptions}
-            contentClassName="max-h-[min(18rem,var(--radix-dropdown-menu-content-available-height))]"
-            onValueChange={(value) =>
-              setParameters({
-                roleId: value || null,
-                page: null,
-                selected: null,
-              })
-            }
-          />
-          {hasInternalFilters ? (
-            <ListToolbarReset
-              onClick={() =>
+            <AccountStatusFilter value={status} setParameters={setParameters} />
+            <ListToolbarFilter
+              label={t("filters.role")}
+              allLabel={t("filters.allRoles")}
+              value={roleId}
+              options={roleOptions}
+              contentClassName="max-h-[min(18rem,var(--radix-dropdown-menu-content-available-height))]"
+              onValueChange={(value) =>
                 setParameters({
-                  status: null,
-                  roleId: null,
+                  roleId: value || null,
                   page: null,
+                  selected: null,
                 })
               }
-            >
-              {t("filters.clear")}
-            </ListToolbarReset>
-          ) : null}
-        </ListToolbar>
-
-        <ResourceListLayout
-          loading={list.loading}
-          error={Boolean(list.error)}
-          errorMessage={t("list.loadError")}
-          onRetry={() => void list.refresh()}
-          page={page}
-          onPageChange={(number) =>
-            setParameters({ page: String(number), selected: null })
-          }
-        >
-          <ResourceTable
-            hideHeader
-            columns={[
-              {
-                key: "employee",
-                header: t("columns.employeeName"),
-                cellClassName: "min-w-0",
-                cell: (user) => (
-                  <div className="flex min-w-0 items-center gap-3">
-                    <span className="relative size-9 shrink-0">
-                      <ProfileAvatar
-                        imageURL={user.avatarUrl}
-                        name={user.displayName}
-                        className="size-full"
-                      />
-                      <WorkStatusDot
-                        status={memberWorkStatus(user)}
-                        className="absolute -right-0.5 -bottom-0.5 ring-2 ring-background"
-                      />
-                    </span>
-                    <span className="grid min-w-0 gap-0.5 leading-tight">
-                      <span className="truncate">
-                        <span className="font-medium">{user.displayName}</span>
-                        <span aria-hidden="true" className="mx-1.5 text-muted-foreground">·</span>
-                        <span className="text-muted-foreground">
-                          {roleDisplayName(user.role, tCommon)}
-                        </span>
-                      </span>
-                      <span className="truncate text-xs text-muted-foreground">
-                        {user.email}
-                      </span>
-                    </span>
-                  </div>
-                ),
-              },
-            ]}
-            rows={users}
-            rowKey={(user) => user.id}
-            empty={t("list.empty")}
-            onRowActivate={(user) => setParameters({ selected: user.id })}
-            actions={(user) => ({
-              // 操作靠右对齐，不显示发消息的行中禁用按钮与其他行右端对齐。
-              primary: (
-                <div className="ml-auto flex items-center gap-1">
-                  {user.status === UserStatus.UserStatusActive &&
-                  user.identityId !== identity.user.identityId ? (
-                    <ListActionButton
-                      onClick={() =>
-                        navigate(`/inbox?scope=internal&target=${user.identityId}`)
-                      }
-                    >
-                      {t("sendMessage")}
-                    </ListActionButton>
-                  ) : null}
-                  <ListActionButton
-                    tone={
-                      user.status === UserStatus.UserStatusActive
-                        ? "destructive"
-                        : "success"
-                    }
-                    onClick={() => setChangingUserStatus(user)}
-                  >
-                    {t(
-                      user.status === UserStatus.UserStatusActive
-                        ? "members.status.deactivate"
-                        : "members.status.reactivate",
-                    )}
-                  </ListActionButton>
-                </div>
-              ),
-            })}
-          />
-        </ResourceListLayout>
-      </section>
-
-      <ContactDetailSheet
-        open={Boolean(selected)}
-        onClose={closeDetail}
-        title={detailUser?.displayName ?? t("detail.memberTitle")}
-        description={t("detail.memberDescription")}
-        loading={detail.loading && Boolean(selected)}
+            />
+            {hasInternalFilters ? (
+              <ListToolbarReset
+                onClick={() =>
+                  setParameters({
+                    status: null,
+                    roleId: null,
+                    page: null,
+                  })
+                }
+              >
+                {tCommon("actions.clearFilters")}
+              </ListToolbarReset>
+            ) : null}
+          </>
+        }
+        list={list}
+        page={page}
+        setParameters={setParameters}
       >
-        {detailUser ? (
-          <MemberDetailView
-            key={detailUser.id}
-            user={detailUser}
-            teams={teams}
-            roles={roles}
-            workStatus={memberWorkStatus(detailUser)}
-            onSaved={(saved) => {
-              void invalidateContact("user", saved.id)
-              if (saved.id === identity.user.id) {
-                void invalidate(resourceKeys.identity())
-              }
-            }}
-            onNotFound={refreshAndClose}
-          />
-        ) : null}
-      </ContactDetailSheet>
+        <ResourceTable
+          hideHeader
+          columns={[
+            {
+              key: "employee",
+              header: t("columns.employeeName"),
+              cellClassName: "min-w-0",
+              cell: (user) => (
+                <ResourceRowIdentity
+                  avatar={{ imageURL: user.avatarUrl, name: user.displayName }}
+                  status={memberWorkStatus(user)}
+                  name={user.displayName}
+                  secondary={roleDisplayName(user.role, tCommon)}
+                  description={user.email}
+                />
+              ),
+            },
+          ]}
+          rows={users}
+          rowKey={(user) => user.id}
+          empty={t("list.empty")}
+          onRowActivate={(user) => setParameters({ selected: user.id })}
+          // 自己没有发消息，已停用的成员保留禁用的发消息。
+          rowActions={(user) => [
+            ...(user.identityId !== identity.user.identityId
+              ? [
+                  {
+                    key: "message",
+                    label: t("sendMessage"),
+                    disabled: user.status !== UserStatus.UserStatusActive,
+                    onSelect: () =>
+                      navigate(`/inbox?scope=internal&target=${user.identityId}`),
+                  },
+                ]
+              : []),
+            statusToggle.rowAction(user),
+          ]}
+        />
+      </ContactListSection>
+
+      <MemberDetailSheet
+        userId={selected}
+        roles={roles}
+        teams={teams}
+        onClose={closeDetail}
+      />
 
       <ContactCreateDialogs
         scope="employees"
@@ -353,41 +206,7 @@ export function MembersPanel({
         setParameters={setParameters}
       />
 
-      <AlertDialog
-        open={changingUserStatus !== null}
-        onOpenChange={(open) => !open && setChangingUserStatus(null)}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {t(
-                changingUserStatus?.status === UserStatus.UserStatusActive
-                  ? "members.status.deactivateTitle"
-                  : "members.status.reactivateTitle",
-                { name: changingUserStatus?.displayName ?? "" },
-              )}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {t(
-                changingUserStatus?.status === UserStatus.UserStatusActive
-                  ? "members.status.deactivateDescription"
-                  : "members.status.reactivateDescription",
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{tCommon("actions.cancel")}</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={deleting}
-              onClick={() => void changeUserStatus()}
-            >
-              {deleting
-                ? t("members.status.saving")
-                : tCommon("actions.confirm")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmationDialog {...statusToggle.dialog} />
     </>
   )
 }

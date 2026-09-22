@@ -26,7 +26,7 @@ const common = {
     searchShortcut: "Search (Ctrl/⌘ K)",
     retry: "Retry",
     clearFilters: "Clear filters",
-    more: "More",
+    moreActions: "More actions",
     selectAll: "Select all",
   },
   unsavedChanges: {

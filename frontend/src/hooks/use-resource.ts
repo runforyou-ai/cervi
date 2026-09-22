@@ -58,6 +58,8 @@ export function useResource<T>(
     isPlaceholderData: query.isPlaceholderData,
     loading: query.isPending && query.isFetching,
     refreshing: query.isFetching && !query.isPending,
+    // 读取失败后正在重试，页面据此把错误提示换回加载状态。
+    retrying: Boolean(query.error) && query.isFetching && !query.isPending,
     error: query.error,
     refresh: query.refetch,
   }

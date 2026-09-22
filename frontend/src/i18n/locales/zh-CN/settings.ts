@@ -67,7 +67,7 @@ const settings = {
         name: "设备名称",
       },
       current: "本机",
-      registeredAt: "注册于 {{time}}",
+      registeredAt: "{{time}} 注册",
       empty: "还没有设备。在电脑上安装并登录 Cervi 桌面端后，这台电脑会出现在这里。",
       loadError: "加载设备列表失败。",
     },

@@ -1,5 +1,5 @@
 /** 个人设置中的设备列表。 */
-import { useRef, useState } from "react"
+import { useState } from "react"
 import { LaptopIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
@@ -12,21 +12,12 @@ import {
   revokeDevice,
   type DeviceData,
 } from "@/api"
-import { ListActionButton } from "@/components/list-action-button"
+import { ConfirmationDialog } from "@/components/confirmation-dialog"
 import { ResourceContent } from "@/components/resource-content"
 import { ResourceListFrame } from "@/components/resource-list"
+import { ResourceRowIdentity } from "@/components/resource-row-identity"
 import { ResourceTable } from "@/components/resource-table"
 import { StatusBadge } from "@/components/status-badge"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useDateTime } from "@/hooks/use-date-time"
 import { useImmediateSave } from "@/hooks/use-immediate-save"
@@ -42,13 +33,10 @@ export function DeviceListPage() {
   const invalidate = useResourceInvalidator()
   const save = useImmediateSave()
   const [revoking, setRevoking] = useState<DeviceData | null>(null)
-  const actionButtons = useRef(new Map<string, HTMLButtonElement>())
-  // 确认框关闭后把焦点交回该行的撤销按钮；设备已撤销时该行不再存在，按默认行为处理。
-  const returnFocusTo = useRef<string | null>(null)
   const {
     data,
     loading,
-    refreshing,
+    retrying,
     error: loadError,
     refresh,
   } = useResource(resourceKeys.devices(), () => listDevices(), {
@@ -61,7 +49,7 @@ export function DeviceListPage() {
     { staleTime: 0, refetchOnWindowFocus: true },
   )
   const devices = data?.devices ?? []
-  const showLoading = loading || (Boolean(loadError) && !data && refreshing)
+  const showLoading = loading || (retrying && !data)
 
   /** 撤销选中的设备，离开页面后仅更新共享缓存。 */
   async function confirmRevoke() {
@@ -70,7 +58,6 @@ export function DeviceListPage() {
     if (request === null) return
     try {
       await revokeDevice(revoking.id)
-      returnFocusTo.current = null
       void invalidate(resourceKeys.devices())
       void invalidate(resourceKeys.currentDevice())
       if (!save.isCurrent(request)) return
@@ -101,99 +88,49 @@ export function DeviceListPage() {
                 header: t("devices.list.columns.name"),
                 cellClassName: "min-w-0",
                 cell: (device) => (
-                  <div className="flex min-w-0 items-center gap-3">
-                    <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
-                      <LaptopIcon className="size-4.5" aria-hidden="true" />
-                    </span>
-                    <span className="grid min-w-0 gap-0.5 leading-tight">
-                      <span className="flex min-w-0 items-center gap-2">
-                        <span className="truncate">
-                          <span className="font-medium">{device.name}</span>
-                          <span aria-hidden="true" className="mx-1.5 text-muted-foreground">·</span>
-                          <span className="text-muted-foreground">
-                            {t(`devices.platforms.${device.platform}`)}
-                          </span>
-                        </span>
-                        {device.id === local?.deviceId ? (
-                          <StatusBadge variant="muted">{t("devices.list.current")}</StatusBadge>
-                        ) : null}
-                      </span>
-                      <span className="truncate text-xs text-muted-foreground">
-                        {t("devices.list.registeredAt", {
-                          time: formatDateTime(device.createdAt),
-                        })}
-                      </span>
-                    </span>
-                  </div>
+                  <ResourceRowIdentity
+                    icon={LaptopIcon}
+                    name={device.name}
+                    secondary={t(`devices.platforms.${device.platform}`)}
+                    badge={
+                      device.id === local?.deviceId ? (
+                        <StatusBadge variant="muted">{t("devices.list.current")}</StatusBadge>
+                      ) : null
+                    }
+                    description={t("devices.list.registeredAt", {
+                      time: formatDateTime(device.createdAt),
+                    })}
+                  />
                 ),
               },
             ]}
             rows={devices}
             rowKey={(device) => device.id}
             empty={t("devices.list.empty")}
-            actions={(device) => ({
-              primary: (
-                <div className="ml-auto flex items-center gap-1">
-                  <ListActionButton
-                    tone="destructive"
-                    ref={(node) => {
-                      if (node) actionButtons.current.set(device.id, node)
-                      else actionButtons.current.delete(device.id)
-                    }}
-                    onClick={() => {
-                      returnFocusTo.current = device.id
-                      setRevoking(device)
-                    }}
-                  >
-                    {t("devices.revoke.action")}
-                  </ListActionButton>
-                </div>
-              ),
-            })}
+            rowActions={(device) => [
+              {
+                key: "revoke",
+                label: t("devices.revoke.action"),
+                destructive: true,
+                separatorBefore: true,
+                onSelect: () => setRevoking(device),
+              },
+            ]}
           />
         </ResourceListFrame>
       </ResourceContent>
 
-      <AlertDialog
+      <ConfirmationDialog
         open={revoking !== null}
+        pending={save.saving}
+        title={t("devices.revoke.title", { name: revoking?.name ?? "" })}
+        description={t("devices.revoke.description")}
+        pendingLabel={t("devices.revoke.pending")}
         onOpenChange={(open) => {
-          if (!open && !save.saving) setRevoking(null)
+          if (!open) setRevoking(null)
         }}
-      >
-        <AlertDialogContent
-          onCloseAutoFocus={(event) => {
-            const trigger = returnFocusTo.current
-              ? actionButtons.current.get(returnFocusTo.current)
-              : undefined
-            if (!trigger) return
-            event.preventDefault()
-            trigger.focus()
-          }}
-        >
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {t("devices.revoke.title", { name: revoking?.name ?? "" })}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("devices.revoke.description")}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={save.saving}>
-              {t("common:actions.cancel")}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              disabled={save.saving}
-              onClick={(event) => {
-                event.preventDefault()
-                void confirmRevoke()
-              }}
-            >
-              {save.saving ? t("devices.revoke.pending") : t("common:actions.confirm")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        onConfirm={() => void confirmRevoke()}
+      />
     </>
   )
 }

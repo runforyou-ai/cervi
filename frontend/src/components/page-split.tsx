@@ -13,26 +13,16 @@ import {
 } from "@/components/ui/tooltip"
 import { cn } from "@/lib/utils"
 
-const paneWidthClass = {
-  sm: "md:w-48",
-  md: "md:w-56",
-  lg: "md:w-72",
-  /* 模块中栏：消息页会话列表与通讯录、渠道、知识库二级菜单统一 280px。 */
-  nav: "md:w-70",
-} as const
-
 const paneOnNarrowClass = {
   hide: "hidden md:flex",
   fill: "flex w-full",
 } as const
 
-export type PageSplitPaneWidth = keyof typeof paneWidthClass
 export type PageSplitPaneOnNarrow = keyof typeof paneOnNarrowClass
 
-/** 按档位宽度分割左栏和主区。 */
+/** 分割左栏和主区；宽屏下左栏即模块中栏，消息页会话列表与通讯录、渠道、知识库二级菜单统一 280px。 */
 export function PageSplit({
   pane,
-  paneWidth = "md",
   paneOnNarrow = "hide",
   paneVariant = "plain",
   paneClassName,
@@ -41,7 +31,6 @@ export function PageSplit({
   children,
 }: {
   pane: ReactNode
-  paneWidth?: PageSplitPaneWidth
   paneOnNarrow?: PageSplitPaneOnNarrow
   paneVariant?: "plain" | "nav"
   paneClassName?: string
@@ -63,7 +52,7 @@ export function PageSplit({
         className={cn(
           "min-h-0 shrink-0 flex-col overflow-hidden bg-background select-none md:rounded-xl",
           paneOnNarrowClass[paneOnNarrow],
-          paneWidthClass[paneWidth],
+          "md:w-70",
           paneVariant === "nav" &&
             "bg-sidebar-secondary text-sidebar-foreground",
           paneClassName,
@@ -118,13 +107,15 @@ export function PagePaneNav({
   )
 }
 
-/** 分栏左栏导航项；activePath 按公共路径前缀保持整组页面的选中态，窄栏下只显示图标并由浮层提示名称。 */
+/** 分栏左栏和工作台一级栏的导航项；activePath 按公共路径前缀保持整组页面的选中态，窄栏下只显示图标并由浮层提示名称。 */
 export function PagePaneLink({
   to,
   activePath,
   icon: Icon,
   collapsed,
   comingSoonHint = true,
+  className: itemClassName,
+  onClick,
   children,
 }: {
   to?: string
@@ -133,6 +124,8 @@ export function PagePaneLink({
   collapsed?: boolean
   /** 未开放项是否显示「即将推出」标签和悬停提示；关闭时只置灰。 */
   comingSoonHint?: boolean
+  className?: string
+  onClick?: () => void
   children: ReactNode
 }) {
   const { t } = useTranslation("common")
@@ -147,6 +140,7 @@ export function PagePaneLink({
   const className = cn(
     "flex h-8 shrink-0 items-center rounded-md text-left text-sm transition-colors",
     collapsed ? "w-8 justify-center" : "w-full gap-2 px-2.5",
+    itemClassName,
   )
   const label = collapsed ? (
     <span className="sr-only">{children}</span>
@@ -157,9 +151,10 @@ export function PagePaneLink({
   const item = to ? (
     <NavLink
       to={to}
+      onClick={onClick}
       className={cn(
         className,
-        "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+        "hover:bg-sidebar-accent hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring",
         active && "bg-sidebar-accent font-medium text-sidebar-accent-foreground",
       )}
     >
@@ -215,7 +210,7 @@ export function PagePaneGroup({
 
   return (
     <div className="flex flex-col gap-0.5">
-      <span className="px-2.5 pt-2.5 pb-0.5 text-[11px] font-semibold tracking-[0.12em] text-muted-foreground/70 uppercase">
+      <span className="px-2.5 pt-2.5 pb-0.5 text-xs font-semibold tracking-[0.12em] text-muted-foreground/70 uppercase">
         {title}
       </span>
       {children}

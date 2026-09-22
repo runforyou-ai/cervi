@@ -49,7 +49,7 @@ export function InboxSearchConversationList({
           </Button>
         </div>
       ) : empty ? (
-        <p className="px-6 py-10 text-center text-[13px] text-muted-foreground">{t("searchNoResults", { query: query.search })}</p>
+        <p className="px-6 py-10 text-center text-sm text-muted-foreground">{t("searchNoResults", { query: query.search })}</p>
       ) : (
         children(conversations)
       )}

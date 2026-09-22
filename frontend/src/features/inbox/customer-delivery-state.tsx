@@ -10,6 +10,7 @@ import {
   resolveCustomerMessageDelivery,
   type CustomerMessageDelivery,
 } from "@/api"
+import { ConfirmationDialog } from "@/components/confirmation-dialog"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -17,16 +18,6 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
 import { cn } from "@/lib/utils"
@@ -93,7 +84,7 @@ export function CustomerDeliveryState({
     : t("messageSendError")
 
   return (
-    <div className={cn("inline-flex items-center gap-1.5 text-[11px]", className)}>
+    <div className={cn("inline-flex items-center gap-1.5 text-xs", className)}>
       <MessageSendState state={state} detail={detail} />
       {localFailed && onRetryLocal ? (
         <button type="button" disabled={retryLocalDisabled} onClick={onRetryLocal}>{t("messageRetry")}</button>
@@ -125,23 +116,15 @@ export function CustomerDeliveryState({
           </DropdownMenuContent>
         </DropdownMenu>
       ) : null}
-      <AlertDialog open={confirmRetry} onOpenChange={(open) => { if (!busy) setConfirmRetry(open) }}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t("deliveryRetryTitle")}</AlertDialogTitle>
-            <AlertDialogDescription>{t("deliveryRetryRisk")}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={busy}>{t("common:actions.cancel")}</AlertDialogCancel>
-            <AlertDialogAction disabled={busy} onClick={(event) => {
-              event.preventDefault()
-              void resolve(CustomerDeliveryResolution.CustomerDeliveryRetry, true)
-            }}>
-              {t("common:actions.confirm")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmationDialog
+        open={confirmRetry}
+        pending={busy}
+        title={t("deliveryRetryTitle")}
+        description={t("deliveryRetryRisk")}
+        destructive={false}
+        onOpenChange={setConfirmRetry}
+        onConfirm={() => void resolve(CustomerDeliveryResolution.CustomerDeliveryRetry, true)}
+      />
     </div>
   )
 }

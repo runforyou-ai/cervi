@@ -1,11 +1,12 @@
 /** 本地知识问答的分组列表、搜索和删除操作。 */
-import { useEffect, useLayoutEffect, useRef, useState } from "react"
+import { useEffect, useRef, useState } from "react"
 import { PlusIcon, SearchCheckIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Link, useLocation, useParams } from "react-router"
 
 import {
   KnowledgeBaseCategory,
+  deleteKnowledgeQAEntry,
   getKnowledgeBase,
   listKnowledgeQAEntries,
   type KnowledgeQASummaryData,
@@ -15,15 +16,16 @@ import {
   ListToolbarSearch,
   ListToolbarReset,
 } from "@/components/list-toolbar"
+import { ConfirmationDialog } from "@/components/confirmation-dialog"
 import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
+import { useConfirmedAction } from "@/hooks/use-confirmed-action"
 import { useListSearchParams } from "@/hooks/use-list-search-params"
+import { useListScrollRestore } from "@/hooks/use-list-scroll-restore"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
-import { useKnowledgeBaseContext } from "@/features/knowledge-base/knowledge-base-context"
 import { KnowledgeQATable } from "@/features/knowledge-base/knowledge-qa-table"
-import { KnowledgeQADeleteDialog } from "@/features/knowledge-base/knowledge-qa-delete-dialog"
 import { KnowledgeQAFeedback } from "@/features/knowledge-base/knowledge-qa-feedback"
 import { KnowledgeRetrievalSheet } from "@/features/knowledge-base/knowledge-retrieval-sheet"
 
@@ -49,7 +51,6 @@ function KnowledgeQAGroupList({
 }) {
   const { t } = useTranslation(["knowledgeBase", "common"])
   const location = useLocation()
-  const { qaListScrollPositions } = useKnowledgeBaseContext()
   const { searchParams, query, search, setSearch, setParameters } =
     useListSearchParams()
   const parsedPage = Number(searchParams.get("page") ?? 1)
@@ -79,34 +80,24 @@ function KnowledgeQAGroupList({
   const group = groups.find((item) => item.id === groupId)
   const groupName = group?.isDefault ? t("group.default") : group?.name
   const listPath = `/knowledge-bases/${knowledgeBaseId}/groups/${groupId}/qa`
-  const scrollKey = `${listPath}${location.search}`
-  const scrollContainer = useRef<HTMLDivElement>(null)
-  const restoredKey = useRef("")
-  const [deleting, setDeleting] = useState<KnowledgeQASummaryData | null>(null)
+  const scroll = useListScrollRestore(
+    `${listPath}${location.search}`,
+    Boolean(list.data && !list.isPlaceholderData && base.data),
+  )
+  const deletion = useConfirmedAction<KnowledgeQASummaryData>({
+    action: (entry) => deleteKnowledgeQAEntry(knowledgeBaseId, entry.id),
+    invalidateKeys: (entry) => [
+      resourceKeys.knowledgeQAEntries(knowledgeBaseId),
+      resourceKeys.knowledgeQAEntry(knowledgeBaseId, entry.id),
+    ],
+    logLabel: "问答删除",
+    successMessage: () => t("qa.deleteSuccess"),
+    errorMessage: () => t("qa.deleteError"),
+  })
   const [retrievalOpen, setRetrievalOpen] = useState(false)
   const retrievalTrigger = useRef<HTMLButtonElement>(null)
   const totalPages = Math.max(1, Math.ceil((list.data?.page.total ?? 0) / 20))
 
-  // 数据就绪后恢复对应分组和筛选条件的滚动位置。
-  useLayoutEffect(() => {
-    if (
-      !list.data ||
-      list.isPlaceholderData ||
-      !base.data ||
-      !scrollContainer.current ||
-      restoredKey.current === scrollKey
-    )
-      return
-    scrollContainer.current.scrollTop =
-      qaListScrollPositions.get(scrollKey) ?? 0
-    restoredKey.current = scrollKey
-  }, [
-    base.data,
-    list.data,
-    list.isPlaceholderData,
-    qaListScrollPositions,
-    scrollKey,
-  ])
   useEffect(() => {
     if (list.data && !list.isPlaceholderData && pageNumber > totalPages)
       setParameters(
@@ -130,7 +121,7 @@ function KnowledgeQAGroupList({
               ref={retrievalTrigger}
               variant="ghost"
               size="icon-sm"
-              className="shrink-0 text-muted-foreground"
+              className="shrink-0"
               aria-label={t("retrieval.action")}
               title={t("retrieval.action")}
               onClick={() => setRetrievalOpen(true)}
@@ -166,13 +157,7 @@ function KnowledgeQAGroupList({
           </ListToolbarReset>
         ) : null}
       </ListToolbar>
-      <PageContent
-        ref={scrollContainer}
-        onScroll={(event) => {
-          if (restoredKey.current === scrollKey)
-            qaListScrollPositions.set(scrollKey, event.currentTarget.scrollTop)
-        }}
-      >
+      <PageContent ref={scroll.ref} onScroll={scroll.onScroll}>
         {base.error || list.error || !base.data || !list.data ? (
           <KnowledgeQAFeedback
             error={base.error ?? list.error}
@@ -186,17 +171,30 @@ function KnowledgeQAGroupList({
             listPath={listPath}
             search={location.search}
             filtered={query !== ""}
-            onDelete={setDeleting}
+            onDelete={deletion.select}
             onPageChange={(page) =>
               setParameters({ page: page === 1 ? null : String(page) })
             }
           />
         )}
       </PageContent>
-      <KnowledgeQADeleteDialog
-        knowledgeBaseId={knowledgeBaseId}
-        entry={deleting}
-        onClose={() => setDeleting(null)}
+      <ConfirmationDialog
+        open={deletion.item !== null}
+        pending={deletion.pending}
+        title={t("qa.deleteTitle")}
+        // 问题原文可能含换行或长串字符，保留换行并允许断词。
+        description={
+          <span className="whitespace-pre-wrap break-words">
+            {t("qa.deleteDescription", {
+              question: deletion.item?.question ?? "",
+            })}
+          </span>
+        }
+        pendingLabel={t("common:actions.deleting")}
+        onOpenChange={(open) => {
+          if (!open) deletion.select(null)
+        }}
+        onConfirm={() => void deletion.confirm()}
       />
       <KnowledgeRetrievalSheet
         open={retrievalOpen}

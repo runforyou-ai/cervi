@@ -4,7 +4,7 @@ import {
   BriefcaseBusinessIcon,
   PanelRightCloseIcon,
 } from "lucide-react"
-import { useEffect, useRef, useState, type PointerEvent as ReactPointerEvent, type RefObject } from "react"
+import { useEffect, useRef, useState, type RefObject } from "react"
 import { useTranslation } from "react-i18next"
 
 import {
@@ -16,7 +16,8 @@ import {
   type InboxConversation,
   type MemberOption,
 } from "@/api"
-import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
+import { ResizeHandle } from "@/components/resize-handle"
+import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { ConversationAvatar } from "@/features/inbox/conversation-avatar"
 import { DirectConversationDraftAvatar } from "@/features/inbox/direct-conversation-draft-header"
 import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
@@ -24,6 +25,11 @@ import type { ComposerDraftBridge } from "@/features/inbox/conversation-composer
 import { CustomerCopilotPanel } from "@/features/inbox/customer-copilot-panel"
 import { GroupConversationContext } from "@/features/inbox/group-conversation-context"
 import { HeaderAction } from "@/features/inbox/conversation-header"
+import {
+  SidePanelField,
+  SidePanelTab,
+  SidePanelTabsList,
+} from "@/features/inbox/side-panel-layout"
 import { cn } from "@/lib/utils"
 
 const sidePanelMinWidth = 320
@@ -84,45 +90,34 @@ function InternalConversationProfile({
 
   return (
     <dl className="space-y-1 text-sm">
-      <div className="grid grid-cols-[4.75rem_minmax(0,1fr)] items-start gap-2">
-        <dt className="flex min-h-7 items-center text-xs text-muted-foreground">
-          {t("contextContactName")}
-        </dt>
-        <dd className="flex min-h-7 min-w-0 items-center gap-2">
-          {conversation ? (
-            <ConversationAvatar
-              conversation={conversation}
-              className="size-7 text-xs"
-            />
-          ) : directTarget ? (
-            <DirectConversationDraftAvatar
-              member={directTarget}
-              className="size-7 text-xs"
-            />
-          ) : null}
-          <span
-            className="min-w-0 truncate"
-            title={agent?.agentName ?? displayName}
-          >
-            {agent?.agentName ?? displayName}
-          </span>
-        </dd>
-      </div>
+      <SidePanelField label={t("contextContactName")}>
+        {conversation ? (
+          <ConversationAvatar
+            conversation={conversation}
+            className="size-7 text-xs"
+          />
+        ) : directTarget ? (
+          <DirectConversationDraftAvatar
+            member={directTarget}
+            className="size-7 text-xs"
+          />
+        ) : null}
+        <span
+          className="min-w-0 truncate"
+          title={agent?.agentName ?? displayName}
+        >
+          {agent?.agentName ?? displayName}
+        </span>
+      </SidePanelField>
       {direct || agent || directTarget ? (
-        <div className="grid grid-cols-[4.75rem_minmax(0,1fr)] items-start gap-2">
-          <dt className="flex min-h-7 items-center text-xs text-muted-foreground">
-            {t("contextIdentityType")}
-          </dt>
-          <dd className="flex min-h-7 items-center">{identityType}</dd>
-        </div>
+        <SidePanelField label={t("contextIdentityType")}>
+          {identityType}
+        </SidePanelField>
       ) : null}
       {agent && agentStatus ? (
-        <div className="grid grid-cols-[4.75rem_minmax(0,1fr)] items-start gap-2">
-          <dt className="flex min-h-7 items-center text-xs text-muted-foreground">
-            {t("contextAgentStatus")}
-          </dt>
-          <dd className="flex min-h-7 items-center">{agentStatus}</dd>
-        </div>
+        <SidePanelField label={t("contextAgentStatus")}>
+          {agentStatus}
+        </SidePanelField>
       ) : null}
     </dl>
   )
@@ -174,29 +169,17 @@ function ConversationSidePanelContent({
           onValueChange={setCustomerTab}
           className="min-h-0 flex-1"
         >
-          <TabsList
-            aria-label={t("contextTabsLabel")}
-            className="h-auto min-h-12 shrink-0 justify-start gap-1 border-b-0 px-3 py-2"
-          >
-            <TabsTrigger
-              value="profile"
-              className="-mb-0 rounded-md border-b-0 px-2.5 py-1.5 text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-            >
+          <SidePanelTabsList aria-label={t("contextTabsLabel")}>
+            <SidePanelTab value="profile">
               {t("contextProfileTab")}
-            </TabsTrigger>
-            <TabsTrigger
-              value="assistant"
-              className="-mb-0 rounded-md border-b-0 px-2.5 py-1.5 text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-            >
+            </SidePanelTab>
+            <SidePanelTab value="assistant">
               {t("contextAssistantTab")}
-            </TabsTrigger>
-            <TabsTrigger
-              value="business"
-              className="-mb-0 rounded-md border-b-0 px-2.5 py-1.5 text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-            >
+            </SidePanelTab>
+            <SidePanelTab value="business">
               {t("contextBusinessTab")}
-            </TabsTrigger>
-          </TabsList>
+            </SidePanelTab>
+          </SidePanelTabsList>
 
           <TabsContent
             value="profile"
@@ -204,20 +187,15 @@ function ConversationSidePanelContent({
           >
             <section className="space-y-2">
               <dl className="space-y-1 text-sm">
-                <div className="grid grid-cols-[4.75rem_minmax(0,1fr)] items-start gap-2">
-                  <dt className="flex min-h-7 min-w-0 items-center text-xs text-muted-foreground">
-                    {t("contextContactName")}
-                  </dt>
-                  <dd className="flex min-h-7 min-w-0 items-center gap-2">
-                    <ConversationAvatar
-                      conversation={conversation}
-                      className="size-7 text-xs"
-                    />
-                    <span className="min-w-0 truncate" title={displayName}>
-                      {displayName}
-                    </span>
-                  </dd>
-                </div>
+                <SidePanelField label={t("contextContactName")}>
+                  <ConversationAvatar
+                    conversation={conversation}
+                    className="size-7 text-xs"
+                  />
+                  <span className="min-w-0 truncate" title={displayName}>
+                    {displayName}
+                  </span>
+                </SidePanelField>
               </dl>
               <p className="text-xs leading-5 text-muted-foreground">
                 {t("contextContactDetailsPlaceholder")}
@@ -262,17 +240,11 @@ function ConversationSidePanelContent({
           defaultValue="profile"
           className="min-h-0 flex-1"
         >
-          <TabsList
-            aria-label={t("contextTabsLabel")}
-            className="h-auto min-h-12 shrink-0 justify-start gap-1 border-b-0 px-3 py-2"
-          >
-            <TabsTrigger
-              value="profile"
-              className="-mb-0 rounded-md border-b-0 px-2.5 py-1.5 text-xs data-[state=active]:bg-primary data-[state=active]:text-primary-foreground"
-            >
+          <SidePanelTabsList aria-label={t("contextTabsLabel")}>
+            <SidePanelTab value="profile">
               {t("contextProfileTab")}
-            </TabsTrigger>
-          </TabsList>
+            </SidePanelTab>
+          </SidePanelTabsList>
           <TabsContent
             value="profile"
             className="mt-0 min-h-0 flex-1 overflow-y-auto overscroll-contain p-3"
@@ -328,39 +300,22 @@ export function ConversationSidePanel({
     observer.observe(row)
     return () => observer.disconnect()
   }, [])
-  /** 结束拖动联系人上下文栏。 */
-  function stopSidePanelResize(event: ReactPointerEvent<HTMLButtonElement>) {
-    if (event.currentTarget.hasPointerCapture(event.pointerId)) {
-      event.currentTarget.releasePointerCapture(event.pointerId)
-    }
-  }
 
   return (
     <>
       <div ref={trackRef} className="relative h-full min-h-0 w-0 shrink-0">
         {visible ? (
-          <button
-            type="button"
-            className="absolute top-0 left-0 z-20 h-full w-2 -translate-x-1 cursor-col-resize touch-none"
-            aria-label={t("sidePanelResize")}
-            onPointerDown={(event) => {
-              // 开始拖动联系人上下文栏。
-              event.preventDefault()
-              event.currentTarget.setPointerCapture(event.pointerId)
-            }}
-            onPointerMove={(event) => {
-              if (!event.currentTarget.hasPointerCapture(event.pointerId)) {
-                return
-              }
+          <ResizeHandle
+            label={t("sidePanelResize")}
+            className="z-20 -translate-x-1"
+            onResize={(clientX) => {
               // 按指针位置调整宽度，下限为最小宽度与当前允许最大值中较小的一个。
               const width = Math.max(
                 Math.min(sidePanelMinWidth, maxWidth),
-                window.innerWidth - event.clientX,
+                window.innerWidth - clientX,
               )
               setDesiredWidth(Math.min(maxWidth, width))
             }}
-            onPointerUp={stopSidePanelResize}
-            onPointerCancel={stopSidePanelResize}
           />
         ) : null}
       </div>

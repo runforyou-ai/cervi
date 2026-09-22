@@ -53,7 +53,6 @@ export function ContactsPage({
 
   return (
     <PageSplit
-      paneWidth="nav"
       paneVariant="nav"
       pane={
         <ContactScopeSidebar

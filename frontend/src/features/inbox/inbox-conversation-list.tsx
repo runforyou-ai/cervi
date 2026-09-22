@@ -1,5 +1,4 @@
 /** 消息页中栏的会话列表项、右键操作与置顶区排序。 */
-import type { TFunction } from "i18next"
 import { useSortable } from "@dnd-kit/sortable"
 import { CSS } from "@dnd-kit/utilities"
 import { BellOffIcon } from "lucide-react"
@@ -7,9 +6,6 @@ import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 
 import {
-  ConversationStatus,
-  MessageType,
-  MessageVisibility,
   isAgentInboxConversation,
   isCustomerInboxConversation,
   isDirectInboxConversation,
@@ -27,6 +23,7 @@ import {
   ConversationListMenu,
   useConversationListActions,
 } from "@/features/inbox/conversation-list-menu"
+import { conversationPreview } from "@/features/inbox/conversation-preview"
 import { ConversationUnreadBadge } from "@/features/inbox/conversation-unread-badge"
 import { PinnedSortArea } from "@/features/inbox/pinned-sort"
 import { useConversationName } from "@/features/inbox/use-conversation-name"
@@ -36,40 +33,8 @@ import {
 } from "@/features/inbox/use-conversation-time"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
-import { messagePreview } from "@/lib/message-preview"
 import { recoverSession } from "@/lib/session-navigation"
 import { cn } from "@/lib/utils"
-
-/** 会话列表项的摘要文案：群解散、运行结果与内部备注各有固定文案，其余取末条消息预览。 */
-function conversationPreview(
-  conversation: InboxConversation,
-  summary: { preview?: string | null; previewSenderIdentityType?: Parameters<typeof messagePreview>[1]; lastMessageAt?: string | null },
-  t: TFunction<"inbox">,
-) {
-  const groupDissolved =
-    isGroupInboxConversation(conversation) &&
-    conversation.group.status ===
-      ConversationStatus.ConversationStatusArchived
-  const previewBody = groupDissolved
-    ? t("groupDissolved")
-    : conversation.lastMessageType === MessageType.MessageTypeAgentCancelled
-      ? t("agentReplyStopped")
-      : conversation.lastMessageType === MessageType.MessageTypeAgentError
-        ? t("agentRunFailed")
-        : messagePreview(
-            summary.preview ?? "",
-            summary.previewSenderIdentityType,
-          ).trim() ||
-          (isGroupInboxConversation(conversation) && summary.lastMessageAt
-            ? t("groupSystemUpdated")
-            : t("messagesEmpty"))
-  // 客户会话的末条消息是内部备注时，摘要标明来源。
-  return isCustomerInboxConversation(conversation) &&
-    conversation.customer.previewVisibility ===
-      MessageVisibility.MessageVisibilityInternalOnly
-    ? t("previewInternalNote", { preview: previewBody })
-    : previewBody
-}
 
 type ConversationRowProps = {
   conversation: InboxConversation
@@ -199,7 +164,7 @@ function ConversationRow({
                   </span>
                 ) : null}
                 {queueTeamName ? (
-                  <span className="max-w-24 shrink-0 truncate text-[10px] text-muted-foreground">
+                  <span className="max-w-24 shrink-0 truncate text-[10.5px] text-muted-foreground">
                     {queueTeamName}
                   </span>
                 ) : null}

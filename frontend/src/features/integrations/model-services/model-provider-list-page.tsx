@@ -11,9 +11,8 @@ import {
 } from "@/api"
 import { ResourceListLayout } from "@/components/resource-list"
 import { ResourceTable } from "@/components/resource-table"
-import { ListActionButton } from "@/components/list-action-button"
 import { PageHeader } from "@/components/page-header"
-import { DeleteConfirmationDialog } from "@/components/delete-confirmation-dialog"
+import { ConfirmationDialog } from "@/components/confirmation-dialog"
 import { Button } from "@/components/ui/button"
 import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { aiProviderBrandConfigs } from "@/features/integrations/model-services/model-provider-brands"
@@ -23,8 +22,8 @@ import {
   type ModelServiceSection,
 } from "@/features/integrations/model-services/model-service-options"
 import { resourceKeys } from "@/hooks/resource-keys"
+import { useConfirmedAction } from "@/hooks/use-confirmed-action"
 import { useResource } from "@/hooks/use-resource"
-import { useIntegrationDeletion } from "@/features/integrations/use-integration-deletion"
 
 /** 显示供应商名称、品牌和当前类型的模型摘要。 */
 function ProviderCell({
@@ -60,23 +59,25 @@ export function ModelProviderListPage({ section }: { section: ModelServiceSectio
   const { t } = useTranslation(["integrations", "common"])
   const navigate = useNavigate()
   const sectionConfig = modelServiceSectionConfigs[section]
-  const { data, loading, refreshing, error, refresh } = useResource(
+  const { data, loading, retrying, error, refresh } = useResource(
     resourceKeys.aiProviders(),
     () => listAIProviders(),
   )
-  const showLoading = loading || (Boolean(error) && refreshing)
+  const showLoading = loading || retrying
   const providers = data?.providers ?? []
   const visibleProviders = providers.filter((provider) =>
     provider.models.some((model) => model.type === sectionConfig.modelType),
   )
 
-  const deletion = useIntegrationDeletion<AIProviderSummaryData>({
-    deleteItem: deleteAIProvider,
-    listKey: resourceKeys.aiProviders(),
-    detailKey: resourceKeys.aiProvider,
-    entityName: "模型服务供应商",
-    successMessage: t("modelServices.delete.success"),
-    errorMessage: t("modelServices.delete.error"),
+  const deletion = useConfirmedAction<AIProviderSummaryData>({
+    action: (provider) => deleteAIProvider(provider.id),
+    invalidateKeys: (provider) => [
+      resourceKeys.aiProviders(),
+      resourceKeys.aiProvider(provider.id),
+    ],
+    logLabel: "模型服务供应商删除",
+    successMessage: () => t("modelServices.delete.success"),
+    errorMessage: () => t("modelServices.delete.error"),
   })
 
   return (
@@ -140,20 +141,19 @@ export function ModelProviderListPage({ section }: { section: ModelServiceSectio
           onRowActivate={(provider) =>
             navigate(`/settings/model-services/${section}/${provider.id}`)
           }
-          actions={(provider) => ({
-            primary: (
-              <ListActionButton
-                tone="destructive"
-                onClick={() => deletion.select(provider)}
-              >
-                {t("common:actions.delete")}
-              </ListActionButton>
-            ),
-          })}
+          rowActions={(provider) => [
+            {
+              key: "delete",
+              label: t("common:actions.delete"),
+              destructive: true,
+              separatorBefore: true,
+              onSelect: () => deletion.select(provider),
+            },
+          ]}
         />
       </ResourceListLayout>
 
-      <DeleteConfirmationDialog
+      <ConfirmationDialog
         open={deletion.item !== null}
         pending={deletion.pending}
         title={
@@ -162,6 +162,7 @@ export function ModelProviderListPage({ section }: { section: ModelServiceSectio
             : ""
         }
         description={t("modelServices.delete.description")}
+        pendingLabel={t("common:actions.deleting")}
         onOpenChange={(open) => {
           if (!open) deletion.select(null)
         }}

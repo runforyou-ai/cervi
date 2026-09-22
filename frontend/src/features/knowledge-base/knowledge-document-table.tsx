@@ -1,4 +1,4 @@
-/** 文档列表按单列行布局展示名称、索引状态和来源信息，文档操作通过右键菜单完成。 */
+/** 文档列表按单列行布局展示名称、索引状态和来源信息，文档操作通过行操作菜单完成。 */
 import { useState } from "react"
 import { toast } from "sonner"
 import { refetchKnowledgeDocument, retryKnowledgeDocument, isApiError, KnowledgeDocumentSourceKind } from "@/api"
@@ -23,10 +23,6 @@ import { useTranslation } from "react-i18next"
 import type { KnowledgeDocumentData, KnowledgeDocumentListData } from "@/api"
 import { ResourceListFrame } from "@/components/resource-list"
 import { ResourceTable } from "@/components/resource-table"
-import {
-  ContextMenuItem,
-  ContextMenuSeparator,
-} from "@/components/ui/context-menu"
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip"
 import { useDateTime } from "@/hooks/use-date-time"
 import { formatFileSize } from "@/lib/file-size"
@@ -65,7 +61,7 @@ function formatName(format: string) {
   return formatNames[format] ?? format.slice(1).toUpperCase()
 }
 
-/** 显示文档列表，右键行打开文档操作菜单。 */
+/** 显示文档列表，右键行或点行尾「⋯」打开文档操作菜单。 */
 export function KnowledgeDocumentTable({
   data,
   listPath,
@@ -169,7 +165,10 @@ export function KnowledgeDocumentTable({
             key: "details",
             header: t("documents.columns.createdAt"),
             cellClassName: "w-px whitespace-nowrap text-muted-foreground tabular-nums",
-            cell: (document) => formatDateTime(document.createdAt),
+            cell: (document) =>
+              t("documents.columns.createdAtTime", {
+                time: formatDateTime(document.createdAt),
+              }),
           },
         ]}
         rows={data.documents}
@@ -183,39 +182,38 @@ export function KnowledgeDocumentTable({
               : `${listPath}/${document.id}${search}`,
           )
         }
-        // 文档操作都放在右键菜单里，行内只保留信息。
-        rowMenu={(document) => (
-          <>
-            <ContextMenuItem
-              disabled={retryingIDs.has(document.id)}
-              onSelect={() => void retryDocument(document)}
-            >
-              {t("documents.reprocess")}
-            </ContextMenuItem>
-            {document.sourceKind ===
-            KnowledgeDocumentSourceKind.KnowledgeDocumentSourceWeb ? (
-              <ContextMenuItem
-                disabled={retryingIDs.has(document.id)}
-                onSelect={() => void retryDocument(document, true)}
-              >
-                {t("documents.refetch")}
-              </ContextMenuItem>
-            ) : null}
-            <ContextMenuItem
-              disabled={!canMove}
-              onSelect={() => onAction({ document, kind: "move", trigger: null })}
-            >
-              {t("documents.move")}
-            </ContextMenuItem>
-            <ContextMenuSeparator />
-            <ContextMenuItem
-              destructive
-              onSelect={() => onAction({ document, kind: "delete", trigger: null })}
-            >
-              {t("common:actions.delete")}
-            </ContextMenuItem>
-          </>
-        )}
+        // 网页来源的文档额外提供重新抓取。
+        rowActions={(document) => [
+          {
+            key: "reprocess",
+            label: t("documents.reprocess"),
+            disabled: retryingIDs.has(document.id),
+            onSelect: () => void retryDocument(document),
+          },
+          ...(document.sourceKind === KnowledgeDocumentSourceKind.KnowledgeDocumentSourceWeb
+            ? [
+                {
+                  key: "refetch",
+                  label: t("documents.refetch"),
+                  disabled: retryingIDs.has(document.id),
+                  onSelect: () => void retryDocument(document, true),
+                },
+              ]
+            : []),
+          {
+            key: "move",
+            label: t("documents.move"),
+            disabled: !canMove,
+            onSelect: () => onAction({ document, kind: "move" }),
+          },
+          {
+            key: "delete",
+            label: t("common:actions.delete"),
+            destructive: true,
+            separatorBefore: true,
+            onSelect: () => onAction({ document, kind: "delete" }),
+          },
+        ]}
       />
     </ResourceListFrame>
   )

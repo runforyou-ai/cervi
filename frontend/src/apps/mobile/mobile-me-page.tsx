@@ -1,5 +1,5 @@
 /** 移动端个人中心、工作状态切换和个人设置子页。 */
-import { useState } from "react"
+import { useRef, useState } from "react"
 import { ChevronRightIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Link, useNavigate } from "react-router"
@@ -12,17 +12,7 @@ import {
 } from "@/apps/mobile/mobile-page"
 import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
 import { deactivateNotificationPolicy } from "@/features/notifications/new-message-notifications"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from "@/components/ui/alert-dialog"
+import { ConfirmationDialog } from "@/components/confirmation-dialog"
 import { Button } from "@/components/ui/button"
 import { UserAvatar } from "@/components/user-avatar"
 import { WorkStatusDot, WorkStatusPicker } from "@/components/work-status"
@@ -40,11 +30,12 @@ const rowClassName =
 /** 展示个人资料、工作状态、设置入口和退出操作。 */
 export function MobileMePage() {
   const { t } = useTranslation(["mobile", "workspace", "common"])
-  const { t: tCommon } = useTranslation("common")
   const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
   const { identity } = useMobileWorkspace()
   const [loggingOut, setLoggingOut] = useState(false)
+  const [confirmingLogout, setConfirmingLogout] = useState(false)
+  const logoutButton = useRef<HTMLButtonElement>(null)
   const [changingWorkStatus, setChangingWorkStatus] = useState(false)
 
   /** 保存工作状态并刷新当前身份。 */
@@ -125,36 +116,31 @@ export function MobileMePage() {
           ))}
         </div>
         <div className="mt-9 px-4">
-          <AlertDialog>
-            <AlertDialogTrigger asChild>
-              <Button
-                className="min-h-11 w-full"
-                variant="destructive"
-                disabled={loggingOut}
-              >
-                {loggingOut ? t("loggingOut") : t("logout")}
-              </Button>
-            </AlertDialogTrigger>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle>{t("me.logoutTitle")}</AlertDialogTitle>
-                <AlertDialogDescription>
-                  {t("me.logoutDescription")}
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel className="min-h-11">
-                  {t("common:actions.cancel")}
-                </AlertDialogCancel>
-                <AlertDialogAction
-                  className="min-h-11"
-                  onClick={() => void handleLogout()}
-                >
-                  {tCommon("actions.confirm")}
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
+          <Button
+            ref={logoutButton}
+            className="min-h-11 w-full"
+            variant="destructive"
+            disabled={loggingOut}
+            onClick={() => setConfirmingLogout(true)}
+          >
+            {loggingOut ? t("loggingOut") : t("logout")}
+          </Button>
+          <ConfirmationDialog
+            open={confirmingLogout}
+            pending={false}
+            title={t("me.logoutTitle")}
+            description={t("me.logoutDescription")}
+            touch
+            onOpenChange={setConfirmingLogout}
+            onConfirm={() => {
+              setConfirmingLogout(false)
+              void handleLogout()
+            }}
+            onCloseAutoFocus={(event) => {
+              event.preventDefault()
+              logoutButton.current?.focus({ preventScroll: true })
+            }}
+          />
         </div>
       </MobileScrollArea>
     </section>

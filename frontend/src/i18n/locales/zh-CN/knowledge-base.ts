@@ -18,6 +18,7 @@ const knowledgeBase = {
     columns: {
       name: "名称",
       createdAt: "创建时间",
+      createdAtTime: "{{time}} 创建",
     },
     contentPending: "正在读取内容，请稍候。",
     contentEmpty: "暂无正文内容。",
@@ -137,6 +138,7 @@ const knowledgeBase = {
     create: "新增问答",
     question: "标准问题",
     createdAt: "创建时间",
+    createdAtTime: "{{time}} 创建",
     reprocess: "重新处理",
     retryFailed: "提交重新处理失败，请重试。",
     similarCount_one: "{{count}} 个相似问题",

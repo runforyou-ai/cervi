@@ -312,6 +312,9 @@ export function MessageChannelFormPage({
   const { t } = useTranslation(["channels", "common"])
   const navigate = useNavigate()
   const { channelId = "", channelType = "" } = useParams()
+  const [pageSearchParams] = useSearchParams()
+  // 来源列表的状态筛选，返回时带回。
+  const listStatus = pageSearchParams.get("status")
   const [channel, setChannel] = useState<EditableChannel | null>(null)
   const [telegramConnectionSaving, setTelegramConnectionSaving] =
     useState(false)
@@ -421,7 +424,9 @@ export function MessageChannelFormPage({
         )}
       >
         {mode === "edit" ? (
-          <PageBackButton to={`/channels/${channelType}`} />
+          <PageBackButton
+            to={`/channels/${channelType}${listStatus === "disabled" ? "?status=disabled" : ""}`}
+          />
         ) : null}
       </PageHeader>
       <PageContent variant="form">

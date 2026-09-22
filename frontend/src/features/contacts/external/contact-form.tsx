@@ -17,7 +17,7 @@ import {
 } from "@/api"
 import { recoverSession } from "@/lib/session-navigation"
 import { FormInputField } from "@/components/form/form-input-field"
-import { Button } from "@/components/ui/button"
+import { FormActions } from "@/components/form/form-actions"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { NativeSelect } from "@/components/ui/native-select"
 import { PhoneInput } from "@/components/ui/phone-input"
@@ -207,14 +207,7 @@ export function ContactForm({
         />
 
       </FieldGroup>
-      <div className="flex items-center justify-end gap-2">
-        <Button type="button" variant="outline" onClick={onCancel}>
-          {t("common:actions.cancel")}
-        </Button>
-        <Button type="submit" disabled={form.formState.isSubmitting}>
-          {form.formState.isSubmitting ? t("common:actions.saving") : t("common:actions.save")}
-        </Button>
-      </div>
+      <FormActions saving={form.formState.isSubmitting} onCancel={onCancel} />
     </form>
   )
 }

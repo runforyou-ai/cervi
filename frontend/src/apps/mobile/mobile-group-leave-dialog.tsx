@@ -1,16 +1,7 @@
 /** 移动端普通成员退出群聊的确认交互。 */
 import { useTranslation } from "react-i18next"
 import { leaveGroupConversation, type GroupConversationData } from "@/api"
-import { Button } from "@/components/ui/button"
-import {
-  AlertDialog,
-  AlertDialogContent,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogCancel,
-} from "@/components/ui/alert-dialog"
+import { ConfirmationDialog } from "@/components/confirmation-dialog"
 
 /** 普通成员确认退出，成功后由外层返回消息列表。 */
 export function MobileGroupLeaveDialog({
@@ -27,47 +18,27 @@ export function MobileGroupLeaveDialog({
   onSave: (action: () => Promise<unknown>, change: "leave") => Promise<boolean>
 }) {
   const { t } = useTranslation("inbox")
-  const { t: tCommon } = useTranslation("common")
   return (
-    <AlertDialog
+    <ConfirmationDialog
       open
+      pending={busy}
+      title={t("groupLeaveTitle")}
+      description={t("groupLeaveDescription")}
+      touch
       onOpenChange={(open) => {
-        if (!open && !busy) onClose()
+        if (!open) onClose()
       }}
-    >
-      <AlertDialogContent
-        onCloseAutoFocus={(event) => {
-          event.preventDefault()
-          trigger?.focus({ preventScroll: true })
-        }}
-      >
-        <AlertDialogHeader>
-          <AlertDialogTitle>{t("groupLeaveTitle")}</AlertDialogTitle>
-          <AlertDialogDescription>
-            {t("groupLeaveDescription")}
-          </AlertDialogDescription>
-        </AlertDialogHeader>
-        <AlertDialogFooter>
-          <AlertDialogCancel className="min-h-11" disabled={busy}>
-            {tCommon("actions.cancel")}
-          </AlertDialogCancel>
-          <Button
-            className="min-h-11"
-            variant="destructive"
-            disabled={busy}
-            onClick={async () => {
-              const success = await onSave(
-                () =>
-                  leaveGroupConversation(group.id),
-                "leave",
-              )
-              if (success) onClose()
-            }}
-          >
-            {tCommon("actions.confirm")}
-          </Button>
-        </AlertDialogFooter>
-      </AlertDialogContent>
-    </AlertDialog>
+      onConfirm={async () => {
+        const success = await onSave(
+          () => leaveGroupConversation(group.id),
+          "leave",
+        )
+        if (success) onClose()
+      }}
+      onCloseAutoFocus={(event) => {
+        event.preventDefault()
+        trigger?.focus({ preventScroll: true })
+      }}
+    />
   )
 }

@@ -85,7 +85,6 @@ const contacts = {
     allMethods: "All contact methods",
     allRoles: "All roles",
     allWorkStatuses: "All work statuses",
-    clear: "Clear all",
   },
   identityCategories: {
     user: "Company member",

@@ -18,6 +18,7 @@ const knowledgeBase = {
     columns: {
       name: "Name",
       createdAt: "Created",
+      createdAtTime: "Created {{time}}",
     },
     contentPending: "Reading the content, please wait.",
     contentEmpty: "No content yet.",
@@ -137,6 +138,7 @@ const knowledgeBase = {
     create: "Add Q&A",
     question: "Primary question",
     createdAt: "Created",
+    createdAtTime: "Created {{time}}",
     reprocess: "Reprocess",
     retryFailed: "Could not start reprocessing. Try again.",
     similarCount_one: "1 similar question",

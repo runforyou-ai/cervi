@@ -1,9 +1,8 @@
 /** 团队成员列表、批量管理和团队维护面板。 */
-import { useEffect, useState } from "react"
+import { useCallback, useEffect, useState } from "react"
 import { PlusIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { useNavigate } from "react-router"
-import { toast } from "sonner"
+import { useLocation, useNavigate } from "react-router"
 
 import {
   OrganizationIdentityType,
@@ -18,27 +17,14 @@ import {
   type TeamMember,
 } from "@/api"
 import {
-  ListToolbar,
   ListToolbarFilter,
   ListToolbarReset,
   ListToolbarSearch,
 } from "@/components/list-toolbar"
-import { ListActionButton } from "@/components/list-action-button"
-import { PageHeader } from "@/components/page-header"
-import { ProfileAvatar } from "@/components/profile-avatar"
-import { ResourceListLayout } from "@/components/resource-list"
+import { ConfirmationDialog } from "@/components/confirmation-dialog"
+import { ResourceRowIdentity } from "@/components/resource-row-identity"
 import { ResourceTable } from "@/components/resource-table"
 import { Button } from "@/components/ui/button"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
 import {
   Dialog,
   DialogContent,
@@ -46,17 +32,18 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { WorkStatusDot, workStatusLabel } from "@/components/work-status"
+import { workStatusLabel } from "@/components/work-status"
 import { useWorkspace } from "@/contexts/workspace-context"
 import { ContactCreateDialogs } from "@/features/contacts/contact-create-dialogs"
-import { ContactScopeMobileSelect } from "@/features/contacts/contact-scope-mobile-select"
+import { ContactListSection } from "@/features/contacts/contact-list-section"
+import { MemberDetailSheet } from "@/features/contacts/members/member-detail-sheet"
 import { TeamForm } from "@/features/contacts/teams/team-form"
 import { TeamMemberPicker } from "@/features/contacts/teams/team-member-picker"
 import { useContactSearch } from "@/features/contacts/use-contact-search"
 import { useDateTime } from "@/hooks/use-date-time"
 import { resourceKeys } from "@/hooks/resource-keys"
+import { useConfirmedAction } from "@/hooks/use-confirmed-action"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
-import { recoverSession } from "@/lib/session-navigation"
 import { optionalWailsEnum } from "@/lib/wails-enum"
 
 /** 单个团队范围的成员列表、批量操作和团队弹窗。 */
@@ -75,6 +62,7 @@ export function TeamPanel({
   const { t: tCommon } = useTranslation("common")
   const { identity } = useWorkspace()
   const navigate = useNavigate()
+  const location = useLocation()
   const { formatDateTime } = useDateTime()
   const invalidate = useResourceInvalidator()
   const {
@@ -84,7 +72,13 @@ export function TeamPanel({
     search,
     setSearch,
     currentPage,
+    selected,
   } = useContactSearch()
+  // 保持引用稳定，供成员详情面板的读取失败处理依赖。
+  const closeMemberDetail = useCallback(
+    () => setParameters({ selected: null }),
+    [setParameters],
+  )
   const workStatus = optionalWailsEnum(
     WorkStatus,
     searchParams.get("workStatus"),
@@ -95,12 +89,8 @@ export function TeamPanel({
   // 编辑和删除团队从中间栏团队的右键菜单发起，经地址参数打开对应弹窗。
   const deletingTeam =
     searchParams.get("deleteTeam") === "1" ? (selectedTeam ?? null) : null
-  const [removingTeamMembers, setRemovingTeamMembers] = useState<TeamMember[]>(
-    [],
-  )
   const [selectedTeamMemberIdentityIDs, setSelectedTeamMemberIdentityIDs] =
     useState<Set<string>>(new Set())
-  const [deleting, setDeleting] = useState(false)
 
   const list = useResource(
     resourceKeys.teamMembers(teamId, { query, workStatus, page: currentPage, pageSize: 50 }),
@@ -119,13 +109,18 @@ export function TeamPanel({
     setSelectedTeamMemberIdentityIDs(new Set())
   }, [currentPage, query, teamId, workStatus])
 
-  /** 团队或成员关系变化后，失效内嵌所属团队的成员和 AI 员工缓存。 */
+  // 团队或成员关系变化后，内嵌所属团队的成员和 AI 员工缓存需要失效。
+  const membershipCacheKeys = [
+    resourceKeys.serviceQueueTeams(),
+    resourceKeys.users(),
+    resourceKeys.user(),
+    resourceKeys.agents(),
+    resourceKeys.agent(),
+  ]
+
+  /** 失效内嵌所属团队的成员和 AI 员工缓存。 */
   function invalidateMembershipCaches() {
-    void invalidate(resourceKeys.serviceQueueTeams())
-    void invalidate(resourceKeys.users())
-    void invalidate(resourceKeys.user())
-    void invalidate(resourceKeys.agents())
-    void invalidate(resourceKeys.agent())
+    for (const key of membershipCacheKeys) void invalidate(key)
   }
 
   /** 返回团队成员行显示的工作状态。 */
@@ -137,61 +132,46 @@ export function TeamPanel({
       : member.workStatus
   }
 
-  /** 删除当前团队并刷新团队列表。 */
-  async function removeCurrentTeam() {
-    if (!deletingTeam) return
-    const deletingTeamID = deletingTeam.id
-    setDeleting(true)
-    try {
-      await deleteTeam(deletingTeamID)
-      void invalidate(resourceKeys.teams())
-      invalidateMembershipCaches()
-      toast.success(t("teams.delete.success"))
-      if (teamId === deletingTeamID) {
-        navigate("/contacts/teams", { replace: true })
-      }
-    } catch (error) {
-      if (recoverSession(error, navigate)) return
-      console.warn("删除团队失败", error)
-      toast.error(t("teams.delete.error"))
-    } finally {
-      setDeleting(false)
-    }
-  }
+  const teamDeletion = useConfirmedAction<Team>({
+    action: (team) => deleteTeam(team.id),
+    invalidateKeys: () => [resourceKeys.teams(), ...membershipCacheKeys],
+    successMessage: () => t("teams.delete.success"),
+    errorMessage: () => t("teams.delete.error"),
+    logLabel: "删除团队",
+    onSuccess: (team) => {
+      if (teamId === team.id) navigate("/contacts/teams", { replace: true })
+    },
+  })
+  const selectDeletingTeam = teamDeletion.select
+  // 删除确认的对象跟随地址参数中的待删除团队。
+  useEffect(() => selectDeletingTeam(deletingTeam), [deletingTeam, selectDeletingTeam])
 
-  /** 将选中的团队成员批量移出当前团队。 */
-  async function removeMembersFromCurrentTeam() {
-    if (!selectedTeam || removingTeamMembers.length === 0) return
-    setDeleting(true)
-    try {
-      await removeTeamMembers(selectedTeam.id, {
-        members: removingTeamMembers.map((member) => ({
+  const memberRemoval = useConfirmedAction<TeamMember[]>({
+    action: (members) =>
+      removeTeamMembers(teamId, {
+        members: members.map((member) => ({
           identityType: member.identityType,
           identityId: member.identityId,
         })),
-      })
-      void invalidate(resourceKeys.teams())
-      toast.success(
-        t(
-          removingTeamMembers.length === 1
-            ? "teams.members.removed"
-            : "teams.members.removedMultiple",
-          { count: removingTeamMembers.length },
-        ),
-      )
-      setRemovingTeamMembers([])
-      setSelectedTeamMemberIdentityIDs(new Set())
-      void invalidate(resourceKeys.teamMembers())
-      void invalidate(resourceKeys.teamMemberCandidates(teamId))
-      invalidateMembershipCaches()
-    } catch (error) {
-      if (recoverSession(error, navigate)) return
-      console.warn("移出团队成员失败", error)
-      toast.error(t("teams.members.removeError"))
-    } finally {
-      setDeleting(false)
-    }
-  }
+      }),
+    invalidateKeys: () => [
+      resourceKeys.teams(),
+      resourceKeys.teamMembers(),
+      resourceKeys.teamMemberCandidates(teamId),
+      ...membershipCacheKeys,
+    ],
+    successMessage: (members) =>
+      t(
+        members.length === 1
+          ? "teams.members.removed"
+          : "teams.members.removedMultiple",
+        { count: members.length },
+      ),
+    errorMessage: () => t("teams.members.removeError"),
+    logLabel: "移出团队成员",
+    onSuccess: () => setSelectedTeamMemberIdentityIDs(new Set()),
+  })
+  const removingTeamMembers = memberRemoval.item ?? []
 
   /** 切换当前页所有团队成员的选中状态。 */
   function toggleAllVisibleTeamMembers(checked: boolean) {
@@ -224,27 +204,19 @@ export function TeamPanel({
 
   return (
     <>
-      <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
-        <PageHeader
-          title={selectedTeam?.name ?? t("scopes.teams")}
-          description={t("scopeDescriptions.teams")}
-          beforeTitle={
-            <ContactScopeMobileSelect
-              scope="team"
-              teamId={teamId}
-              teams={teams}
-              channels={channels}
-            />
-          }
-        >
-          {selectedTeam ? (
+      <ContactListSection
+        title={selectedTeam?.name ?? t("scopes.teams")}
+        description={t("scopeDescriptions.teams")}
+        scope={{ scope: "team", teamId, teams, channels }}
+        headerActions={
+          selectedTeam ? (
             <>
               {selectedTeamMemberIdentityIDs.size > 0 ? (
                 <Button
                   variant="destructive"
                   size="sm"
                   onClick={() =>
-                    setRemovingTeamMembers(
+                    memberRemoval.select(
                       teamMembers.filter((member) =>
                         selectedTeamMemberIdentityIDs.has(member.identityId),
                       ),
@@ -259,7 +231,7 @@ export function TeamPanel({
               <Button
                 variant="ghost"
                 size="icon-sm"
-                className="shrink-0 text-muted-foreground"
+                className="shrink-0"
                 aria-label={t("teams.members.add")}
                 title={t("teams.members.add")}
                 onClick={() => setParameters({ addMembers: "1" })}
@@ -267,170 +239,165 @@ export function TeamPanel({
                 <PlusIcon />
               </Button>
             </>
-          ) : null}
-        </PageHeader>
-
-        <ListToolbar>
-          {/* 所有团队视图只读：成员可能分属多个团队，不提供批量移出。 */}
-          {selectedTeam ? (
-            <label className="flex h-9 items-center gap-2 px-1 text-sm">
-              <input
-                type="checkbox"
-                className="size-4 accent-primary"
-                disabled={teamMembers.length === 0}
-                checked={allVisibleTeamMembersSelected}
-                onChange={(event) =>
-                  toggleAllVisibleTeamMembers(event.target.checked)
-                }
-              />
-              {tCommon("actions.selectAll")}
-            </label>
-          ) : null}
-          <ListToolbarSearch
-            value={search}
-            aria-label={t("search.teamMembers")}
-            onChange={(event) => setSearch(event.target.value)}
-          />
-          <ListToolbarFilter
-            label={t("filters.workStatus")}
-            allLabel={t("filters.allWorkStatuses")}
-            value={workStatus ?? ""}
-            options={[
-              {
-                value: WorkStatus.WorkStatusWorking,
-                label: workStatusLabel(WorkStatus.WorkStatusWorking, tCommon),
-              },
-              {
-                value: WorkStatus.WorkStatusAway,
-                label: workStatusLabel(WorkStatus.WorkStatusAway, tCommon),
-              },
-              {
-                value: WorkStatus.WorkStatusOffDuty,
-                label: workStatusLabel(WorkStatus.WorkStatusOffDuty, tCommon),
-              },
-            ]}
-            onValueChange={(value) =>
-              setParameters({
-                workStatus: value || null,
-                page: null,
-                selected: null,
-              })
-            }
-          />
-          {hasInternalFilters ? (
-            <ListToolbarReset
-              onClick={() =>
+          ) : null
+        }
+        toolbar={
+          <>
+            {/* 所有团队视图只读：成员可能分属多个团队，不提供批量移出。 */}
+            {selectedTeam ? (
+              <label className="flex h-9 items-center gap-2 px-1 text-sm">
+                <input
+                  type="checkbox"
+                  className="size-4 accent-primary"
+                  disabled={teamMembers.length === 0}
+                  checked={allVisibleTeamMembersSelected}
+                  onChange={(event) =>
+                    toggleAllVisibleTeamMembers(event.target.checked)
+                  }
+                />
+                {tCommon("actions.selectAll")}
+              </label>
+            ) : null}
+            <ListToolbarSearch
+              value={search}
+              aria-label={t("search.teamMembers")}
+              onChange={(event) => setSearch(event.target.value)}
+            />
+            <ListToolbarFilter
+              label={t("filters.workStatus")}
+              allLabel={t("filters.allWorkStatuses")}
+              value={workStatus ?? ""}
+              options={[
+                {
+                  value: WorkStatus.WorkStatusWorking,
+                  label: workStatusLabel(WorkStatus.WorkStatusWorking, tCommon),
+                },
+                {
+                  value: WorkStatus.WorkStatusAway,
+                  label: workStatusLabel(WorkStatus.WorkStatusAway, tCommon),
+                },
+                {
+                  value: WorkStatus.WorkStatusOffDuty,
+                  label: workStatusLabel(WorkStatus.WorkStatusOffDuty, tCommon),
+                },
+              ]}
+              onValueChange={(value) =>
                 setParameters({
-                  workStatus: null,
+                  workStatus: value || null,
                   page: null,
+                  selected: null,
                 })
               }
-            >
-              {t("filters.clear")}
-            </ListToolbarReset>
-          ) : null}
-        </ListToolbar>
-
-        <ResourceListLayout
-          loading={list.loading}
-          error={Boolean(list.error)}
-          errorMessage={t("list.loadError")}
-          onRetry={() => void list.refresh()}
-          page={page}
-          onPageChange={(number) =>
-            setParameters({ page: String(number), selected: null })
-          }
-        >
-          <ResourceTable
-            hideHeader
-            columns={[
-              ...(selectedTeam ? [{
-                key: "select",
-                header: null,
-                cellClassName: "w-10",
-                cell: (member) => (
-                  <input
-                    type="checkbox"
-                    className="size-4 accent-primary"
-                    aria-label={t("teams.members.selectMember", {
-                      name: member.displayName,
-                    })}
-                    checked={selectedTeamMemberIdentityIDs.has(
-                      member.identityId,
-                    )}
-                    onChange={(event) =>
-                      toggleTeamMember(member.identityId, event.target.checked)
-                    }
-                  />
-                ),
-              }] : []),
-              {
-                key: "memberName",
-                header: t("columns.memberName"),
-                cell: (member) => (
-                  <div className="flex min-w-0 items-center gap-3">
-                    <span className="relative size-9 shrink-0">
-                      <ProfileAvatar
-                        imageURL={member.avatarUrl}
-                        name={member.displayName}
-                        fallback={
-                          member.identityType ===
-                          OrganizationIdentityType.OrganizationIdentityTypeAgent
-                            ? "agent"
-                            : "person"
-                        }
-                        className="size-full"
-                      />
-                      <WorkStatusDot
-                        status={identityWorkStatus(member)}
-                        className="absolute -right-0.5 -bottom-0.5 ring-2 ring-background"
-                      />
-                    </span>
-                    <span className="truncate">
-                      <span className="font-medium">{member.displayName}</span>
-                      <span aria-hidden="true" className="mx-1.5 text-muted-foreground">·</span>
-                      <span className="text-muted-foreground">
-                        {t(
-                          member.identityType ===
-                            OrganizationIdentityType.OrganizationIdentityTypeAgent
-                            ? "identityCategories.agent"
-                            : "identityCategories.user",
-                        )}
-                      </span>
-                    </span>
-                  </div>
-                ),
-              },
-              {
-                key: "joinedAt",
-                header: t("columns.joinedAt"),
-                cellClassName: "whitespace-nowrap text-muted-foreground",
-                cell: (member) =>
-                  t("teams.members.joinedAt", {
-                    time: formatDateTime(member.joinedAt),
-                  }),
-              },
-            ]}
-            rows={teamMembers}
-            rowKey={(member) => member.identityId}
-            empty={t("list.empty")}
-            actions={
-              selectedTeam
-                ? (member) => ({
-                    primary: (
-                      <ListActionButton
-                        tone="destructive"
-                        onClick={() => setRemovingTeamMembers([member])}
-                      >
-                        {t("teams.members.remove")}
-                      </ListActionButton>
-                    ),
+            />
+            {hasInternalFilters ? (
+              <ListToolbarReset
+                onClick={() =>
+                  setParameters({
+                    workStatus: null,
+                    page: null,
                   })
-                : undefined
-            }
-          />
-        </ResourceListLayout>
-      </section>
+                }
+              >
+                {tCommon("actions.clearFilters")}
+              </ListToolbarReset>
+            ) : null}
+          </>
+        }
+        list={list}
+        page={page}
+        setParameters={setParameters}
+      >
+        <ResourceTable
+          hideHeader
+          columns={[
+            ...(selectedTeam ? [{
+              key: "select",
+              header: null,
+              cellClassName: "w-10",
+              cell: (member) => (
+                <input
+                  type="checkbox"
+                  className="size-4 accent-primary"
+                  aria-label={t("teams.members.selectMember", {
+                    name: member.displayName,
+                  })}
+                  checked={selectedTeamMemberIdentityIDs.has(
+                    member.identityId,
+                  )}
+                  onClick={(event) => event.stopPropagation()}
+                  onChange={(event) =>
+                    toggleTeamMember(member.identityId, event.target.checked)
+                  }
+                />
+              ),
+            }] : []),
+            {
+              key: "memberName",
+              header: t("columns.memberName"),
+              cell: (member) => {
+                const agent =
+                  member.identityType ===
+                  OrganizationIdentityType.OrganizationIdentityTypeAgent
+                return (
+                  <ResourceRowIdentity
+                    avatar={{
+                      imageURL: member.avatarUrl,
+                      name: member.displayName,
+                      fallback: agent ? "agent" : "person",
+                    }}
+                    status={identityWorkStatus(member)}
+                    name={member.displayName}
+                    secondary={t(
+                      agent ? "identityCategories.agent" : "identityCategories.user",
+                    )}
+                  />
+                )
+              },
+            },
+            {
+              key: "joinedAt",
+              header: t("columns.joinedAt"),
+              cellClassName: "whitespace-nowrap text-muted-foreground",
+              cell: (member) =>
+                t("teams.members.joinedAt", {
+                  time: formatDateTime(member.joinedAt),
+                }),
+            },
+          ]}
+          rows={teamMembers}
+          rowKey={(member) => member.identityId}
+          // 企业成员与成员列表一样打开详情面板，AI 员工进入其编辑页并可返回本团队。
+          onRowActivate={(member) =>
+            member.identityType ===
+            OrganizationIdentityType.OrganizationIdentityTypeAgent
+              ? navigate(
+                  `/contacts/ai-employees/${member.agentId}?tab=basic&returnTo=${encodeURIComponent(location.pathname + location.search)}`,
+                )
+              : setParameters({ selected: member.userId })
+          }
+          empty={t("list.empty")}
+          rowActions={
+            selectedTeam
+              ? (member) => [
+                  {
+                    key: "remove",
+                    label: t("teams.members.remove"),
+                    destructive: true,
+                    separatorBefore: true,
+                    onSelect: () => memberRemoval.select([member]),
+                  },
+                ]
+              : undefined
+          }
+        />
+      </ContactListSection>
+
+      <MemberDetailSheet
+        userId={selected}
+        roles={roles}
+        teams={teams}
+        onClose={closeMemberDetail}
+      />
 
       <ContactCreateDialogs
         scope="team"
@@ -495,67 +462,41 @@ export function TeamPanel({
         </Dialog>
       ) : null}
 
-      <AlertDialog
+      <ConfirmationDialog
         open={deletingTeam !== null}
-        onOpenChange={(open) => !open && setParameters({ deleteTeam: null })}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {t("teams.delete.title", { name: deletingTeam?.name ?? "" })}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("teams.delete.description", {
-                count: deletingTeam?.memberCount ?? 0,
-              })}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{tCommon("actions.cancel")}</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={deleting}
-              onClick={() => void removeCurrentTeam()}
-            >
-              {tCommon("actions.confirm")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        pending={teamDeletion.pending}
+        title={t("teams.delete.title", { name: deletingTeam?.name ?? "" })}
+        description={t("teams.delete.description", {
+          count: deletingTeam?.memberCount ?? 0,
+        })}
+        onOpenChange={(open) => {
+          if (!open) setParameters({ deleteTeam: null })
+        }}
+        onConfirm={() => void teamDeletion.confirm()}
+      />
 
-      <AlertDialog
-        open={removingTeamMembers.length > 0}
-        onOpenChange={(open) => !open && setRemovingTeamMembers([])}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {removingTeamMembers.length === 1
-                ? t("teams.members.removeTitle", {
-                    name: removingTeamMembers[0].displayName,
-                  })
-                : t("teams.members.removeMultipleTitle", {
-                    count: removingTeamMembers.length,
-                  })}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {t(
-                removingTeamMembers.length === 1
-                  ? "teams.members.removeDescription"
-                  : "teams.members.removeMultipleDescription",
-              )}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{tCommon("actions.cancel")}</AlertDialogCancel>
-            <AlertDialogAction
-              disabled={deleting}
-              onClick={() => void removeMembersFromCurrentTeam()}
-            >
-              {tCommon("actions.confirm")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmationDialog
+        open={memberRemoval.item !== null}
+        pending={memberRemoval.pending}
+        title={
+          removingTeamMembers.length === 1
+            ? t("teams.members.removeTitle", {
+                name: removingTeamMembers[0].displayName,
+              })
+            : t("teams.members.removeMultipleTitle", {
+                count: removingTeamMembers.length,
+              })
+        }
+        description={t(
+          removingTeamMembers.length === 1
+            ? "teams.members.removeDescription"
+            : "teams.members.removeMultipleDescription",
+        )}
+        onOpenChange={(open) => {
+          if (!open) memberRemoval.select(null)
+        }}
+        onConfirm={() => void memberRemoval.confirm()}
+      />
     </>
   )
 }

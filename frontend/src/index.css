@@ -56,6 +56,11 @@
     --color-destructive: var(--destructive);
     --color-success: var(--success);
     --color-warning: var(--warning);
+    --color-note: var(--note);
+    --color-note-border: var(--note-border);
+    --color-note-foreground: var(--note-foreground);
+    --color-note-active: var(--note-active);
+    --color-note-active-foreground: var(--note-active-foreground);
     --color-badge-website: var(--badge-website);
     --color-badge-telegram: var(--badge-telegram);
     --color-badge-wechat: var(--badge-wechat);
@@ -116,6 +121,13 @@
     --destructive-foreground: oklch(1 0 0);
     --success: oklch(0.6200 0.1500 149.5);
     --warning: oklch(0.62 0.16 65);
+
+    /* 内部备注：气泡与输入区底色、虚线边框、标签文字，以及备注模式开关的选中态。 */
+    --note: oklch(0.987 0.022 95.277);
+    --note-border: oklch(0.769 0.188 70.08 / 0.7);
+    --note-foreground: oklch(0.555 0.163 48.998);
+    --note-active: oklch(0.962 0.059 95.617);
+    --note-active-foreground: oklch(0.414 0.112 45.904);
 
     /* 会话来源徽标色，按渠道类型区分。 */
     --badge-website: oklch(0.6578 0.1846 253.49);
@@ -186,6 +198,12 @@
     --destructive-foreground: oklch(0.985 0 0);
     --success: oklch(0.6800 0.1500 149.5);
     --warning: oklch(0.78 0.15 75);
+
+    --note: oklch(0.279 0.077 45.635 / 0.4);
+    --note-border: oklch(0.769 0.188 70.08 / 0.7);
+    --note-foreground: oklch(0.828 0.189 84.429);
+    --note-active: oklch(0.279 0.077 45.635);
+    --note-active-foreground: oklch(0.924 0.12 95.746);
 
     --badge-website: oklch(0.6578 0.1846 253.49);
     --badge-telegram: oklch(0.68 0.12 230);
@@ -308,15 +326,6 @@ body,
   -webkit-user-select: text;
 }
 
-/* 会话窗口只有顶部留白用于拖动：留白显示箭头，内容区恢复默认光标。 */
-[data-native-os="darwin"][data-window-fullscreen="false"] .cervi-conversation-window {
-  cursor: default;
-}
-
-[data-native-os="darwin"][data-window-fullscreen="false"] .cervi-conversation-window > * {
-  cursor: auto;
-}
-
 [data-native-os="darwin"][data-window-fullscreen="false"] > .cervi-window-drag-region {
   --wails-draggable: drag;
   position: fixed;
@@ -330,10 +339,15 @@ body,
   display: none;
 }
 
-/* 会话独立窗口在 macOS 隐藏标题栏后为窗口按钮保留可拖动的顶部空间。 */
+/* 会话独立窗口在 macOS 隐藏标题栏后为窗口按钮保留可拖动的顶部空间：留白显示箭头，内容区恢复默认光标。 */
 [data-native-os="darwin"][data-window-fullscreen="false"] .cervi-conversation-window {
   --wails-draggable: drag;
+  cursor: default;
   padding-top: var(--cervi-macos-titlebar-height);
+}
+
+[data-native-os="darwin"][data-window-fullscreen="false"] .cervi-conversation-window > * {
+  cursor: auto;
 }
 
 [data-native-os="darwin"] .cervi-conversation-window > * {
@@ -342,7 +356,7 @@ body,
 
 /*
   工作台底层顶部略深，向下过渡回一级栏底色。
-  顶部间距分两组：标题栏操作行的高度、内边距和偏移按该行自身的按钮尺寸取值；
+  顶部间距分两组：标题栏操作行的高度和左侧让位按该行自身的按钮尺寸取值；
   一级栏上沿在此基础上让开该行。标题栏操作行始终位于一级栏内，主内容卡片
   不受该行影响，上沿只随平台变化。此处是 Web 端取值，卡片四周留白一致。
 */
@@ -359,7 +373,6 @@ body,
   --cervi-workspace-rail-top: var(--cervi-workspace-rail-top-expanded);
   --cervi-workspace-titlebar-height: 36px;
   --cervi-workspace-titlebar-inset: 8px;
-  --cervi-workspace-titlebar-offset: 0px;
   background:
     radial-gradient(
       ellipse 240px 420px at left top,
@@ -403,7 +416,6 @@ body,
 /* 标题栏操作与窗口按钮同一水平线，macOS 上向右让开窗口按钮。 */
 .cervi-workspace-titlebar-actions {
   height: var(--cervi-workspace-titlebar-height);
-  padding-top: var(--cervi-workspace-titlebar-offset);
   padding-left: var(--cervi-workspace-titlebar-inset);
 }
 
@@ -421,7 +433,6 @@ body,
   --cervi-workspace-rail-top-expanded: 41px;
   --cervi-workspace-titlebar-height: 34px;
   --cervi-workspace-titlebar-inset: 80px;
-  --cervi-workspace-titlebar-offset: 0px;
 }
 
 /* macOS 全屏后窗口按钮移出内容区，主内容卡片四周留白一致，顶部间距只由标题栏操作行决定。 */
@@ -429,8 +440,6 @@ body,
   --cervi-workspace-content-top: var(--cervi-workspace-content-gutter);
   --cervi-workspace-rail-top-expanded: 40px;
   --cervi-workspace-titlebar-height: 40px;
-  --cervi-workspace-titlebar-inset: 8px;
-  --cervi-workspace-titlebar-offset: 0px;
 }
 
 /*

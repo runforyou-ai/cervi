@@ -13,17 +13,8 @@ import {
   type CustomerCopilotThread,
   type DirectTextMessageInput,
 } from "@/api"
+import { ConfirmationDialog } from "@/components/confirmation-dialog"
 import { LoadingIndicator } from "@/components/loading-indicator"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
 import { Button } from "@/components/ui/button"
 import {
   DropdownMenu,
@@ -38,6 +29,7 @@ import {
   type ComposerDraftBridge,
 } from "@/features/inbox/conversation-composer"
 import { ConversationTimeline } from "@/features/inbox/conversation-timeline"
+import { selectCustomerReplyAgentID } from "@/features/inbox/customer-reply-agent"
 import { useOutgoingMessages } from "@/features/inbox/outgoing-message-context"
 import type { OutgoingConversationDraft } from "@/features/inbox/outgoing-message-store"
 import { useConversationTime, useMinuteTick } from "@/features/inbox/use-conversation-time"
@@ -117,9 +109,7 @@ export function CustomerCopilotPanel({
     { enabled: drafting && active, staleTime: 0 },
   )
   const agents = agentOptions.data ?? []
-  const agentIdentityID = agents.some((agent) => agent.identityId === preferredAgentID)
-    ? preferredAgentID
-    : (agents[0]?.identityId ?? "")
+  const agentIdentityID = selectCustomerReplyAgentID(agents, preferredAgentID)
 
   /** 切换到指定线程并记住本页的查看位置。 */
   function openThread(threadID: string) {
@@ -248,34 +238,25 @@ export function CustomerCopilotPanel({
         }
         onAttachmentThreadCreated={(threadConversationID) => void openCreatedThread(threadConversationID)}
       />
-      <AlertDialog open={pendingReply !== null} onOpenChange={(open) => !open && setPendingReply(null)}>
-        <AlertDialogContent
-          onCloseAutoFocus={(event) => {
-            // 替换草稿后焦点交给回复输入框。
-            if (!appliedRef.current) return
-            appliedRef.current = false
-            event.preventDefault()
-          }}
-        >
-          <AlertDialogHeader>
-            <AlertDialogTitle>{t("copilotApplyReplyConfirmTitle")}</AlertDialogTitle>
-            <AlertDialogDescription>{t("copilotApplyReplyConfirmDescription")}</AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>{t("common:actions.cancel")}</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => {
-                if (pendingReply === null) return
-                appliedRef.current = true
-                customerDraftRef.current?.replace(pendingReply)
-                setPendingReply(null)
-              }}
-            >
-              {t("common:actions.confirm")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+      <ConfirmationDialog
+        open={pendingReply !== null}
+        pending={false}
+        title={t("copilotApplyReplyConfirmTitle")}
+        description={t("copilotApplyReplyConfirmDescription")}
+        onOpenChange={(open) => !open && setPendingReply(null)}
+        onConfirm={() => {
+          if (pendingReply === null) return
+          appliedRef.current = true
+          customerDraftRef.current?.replace(pendingReply)
+          setPendingReply(null)
+        }}
+        onCloseAutoFocus={(event) => {
+          // 替换草稿后焦点交给回复输入框。
+          if (!appliedRef.current) return
+          appliedRef.current = false
+          event.preventDefault()
+        }}
+      />
     </>
   )
 }

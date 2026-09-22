@@ -26,7 +26,7 @@ const common = {
     searchShortcut: "搜索（Ctrl/⌘ K）",
     retry: "重试",
     clearFilters: "清除筛选",
-    more: "更多",
+    moreActions: "更多操作",
     selectAll: "全选",
   },
   unsavedChanges: {

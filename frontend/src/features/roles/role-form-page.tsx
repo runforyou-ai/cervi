@@ -1,7 +1,6 @@
 /** 角色新建和详情页。 */
 import { useEffect, useMemo, useRef, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
-import { LoaderCircleIcon } from "lucide-react"
 import { Controller, useForm, useWatch } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useNavigate, useParams } from "react-router"
@@ -22,6 +21,7 @@ import {
   type PermissionResource,
   type RoleData,
 } from "@/api"
+import { FormActions } from "@/components/form/form-actions"
 import { FormInputField } from "@/components/form/form-input-field"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { PageContent } from "@/components/page-content"
@@ -99,10 +99,10 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
   const role = mode === "detail" ? (roleResource.data ?? null) : null
   const loading =
     catalogResource.loading ||
-    (Boolean(catalogResource.error) && catalogResource.refreshing) ||
+    catalogResource.retrying ||
     (mode === "detail" &&
       (roleResource.loading ||
-        (Boolean(roleResource.error) && roleResource.refreshing)))
+        roleResource.retrying))
   const loadError =
     !loading &&
     Boolean(catalogResource.error || (mode === "detail" && roleResource.error))
@@ -480,27 +480,10 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
             </div>
 
             {autoSaveEnabled ? null : (
-              <div className="flex items-center justify-end gap-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  disabled={form.formState.isSubmitting}
-                  onClick={cancel}
-                >
-                  {tCommon("actions.cancel")}
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={form.formState.isSubmitting}
-                >
-                  {form.formState.isSubmitting ? (
-                    <LoaderCircleIcon className="animate-spin" />
-                  ) : null}
-                  {form.formState.isSubmitting
-                    ? tCommon("actions.saving")
-                    : tCommon("actions.save")}
-                </Button>
-              </div>
+              <FormActions
+                saving={form.formState.isSubmitting}
+                onCancel={cancel}
+              />
             )}
           </form>
         )}

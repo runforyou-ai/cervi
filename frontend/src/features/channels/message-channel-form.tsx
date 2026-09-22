@@ -3,7 +3,7 @@ import { useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
-import { Link, useNavigate } from "react-router"
+import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
@@ -16,8 +16,8 @@ import {
   updateMessageChannel,
   type MessageChannelSummary,
 } from "@/api"
+import { FormActions } from "@/components/form/form-actions"
 import { FormInputField } from "@/components/form/form-input-field"
-import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { NativeSelect } from "@/components/ui/native-select"
 import { Textarea } from "@/components/ui/textarea"
@@ -219,14 +219,7 @@ export function MessageChannelForm({
 
       </FieldGroup>
       {channel ? null : (
-        <div className="flex items-center justify-end gap-2">
-          <Button variant="outline" asChild>
-            <Link to={`/channels/${channelType}`}>{t("common:actions.cancel")}</Link>
-          </Button>
-          <Button type="submit" disabled={isSubmitting}>
-            {isSubmitting ? t("common:actions.saving") : t("common:actions.save")}
-          </Button>
-        </div>
+        <FormActions saving={isSubmitting} cancelTo={`/channels/${channelType}`} />
       )}
     </form>
   )

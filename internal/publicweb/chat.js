@@ -496,11 +496,11 @@
     return meta;
   }
 
-  // 创建气泡正文区，时间在正文右侧底部对齐显示。
+  // 创建气泡正文区，时间浮动在正文末行右端。
   function bubbleContent(body, date) {
     var content = document.createElement("div");
-    content.className = "cv-message-content";
-    body.classList.add("cv-message-body");
+    content.className = "cv-message-body";
+    body.classList.add("cv-message-text");
     content.appendChild(body);
     content.appendChild(messageTime(date));
     return content;
@@ -2559,7 +2559,7 @@
       node.textContent = greeting || defaultGreeting;
     });
     forEachConversationNode(
-      '[data-greeting="true"] .cv-message-body',
+      '[data-greeting="true"] .cv-message-text',
       function (node) {
         node.textContent = greeting || defaultGreeting;
       },

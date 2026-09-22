@@ -8,6 +8,7 @@ import {
   ServiceSessionStatus,
   type InboxChannel,
 } from "@/api"
+import { IconTooltip } from "@/components/icon-tooltip"
 import { Button } from "@/components/ui/button"
 import { NativeSelect } from "@/components/ui/native-select"
 import {
@@ -57,23 +58,24 @@ export function InboxFilter({
   return (
     <Popover>
       {/* 触发按钮宽度固定，已设置条件用角标表示。 */}
-      <PopoverTrigger asChild>
-        <Button
-          variant="ghost"
-          size="icon-sm"
-          className="relative shrink-0 text-muted-foreground"
-          aria-label={applied ? t("filterApplied") : t("filterLabel")}
-          title={t("filterLabel")}
-        >
-          <FilterIcon />
-          {applied ? (
-            <span
-              aria-hidden="true"
-              className="absolute top-1 right-1 size-1.5 rounded-full bg-primary"
-            />
-          ) : null}
-        </Button>
-      </PopoverTrigger>
+      <IconTooltip label={t("filterLabel")}>
+        <PopoverTrigger asChild>
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            className="relative shrink-0 text-muted-foreground"
+            aria-label={applied ? t("filterApplied") : t("filterLabel")}
+          >
+            <FilterIcon />
+            {applied ? (
+              <span
+                aria-hidden="true"
+                className="absolute top-1 right-1 size-1.5 rounded-full bg-primary"
+              />
+            ) : null}
+          </Button>
+        </PopoverTrigger>
+      </IconTooltip>
       {/* 浮层紧贴触发按钮向右展开，改条件时会话列表大部分保持可见。 */}
       <PopoverContent side="right" align="start" className="grid gap-3">
         {scope === InboxScope.InboxScopeCustomer ? (

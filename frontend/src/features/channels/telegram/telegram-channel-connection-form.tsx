@@ -16,16 +16,7 @@ import {
   type TelegramChannel,
 } from "@/api"
 import { InlineEditField } from "@/components/form/inline-edit-field"
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog"
+import { ConfirmationDialog } from "@/components/confirmation-dialog"
 import { Button } from "@/components/ui/button"
 import { resolveServerURL } from "@/lib/server-url"
 import {
@@ -183,34 +174,17 @@ export function TelegramChannelConnectionForm({
           </Button>
         </div>
       </form>
-      <AlertDialog
+      <ConfirmationDialog
         open={pendingBotReuse !== null}
+        pending={saving}
+        title={t("telegramConnection.reuseConfirmation.title")}
+        description={t("telegramConnection.reuseConfirmation.description")}
+        destructive={false}
         onOpenChange={(open) => {
           if (!open) setPendingBotReuse(null)
         }}
-      >
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>
-              {t("telegramConnection.reuseConfirmation.title")}
-            </AlertDialogTitle>
-            <AlertDialogDescription>
-              {t("telegramConnection.reuseConfirmation.description")}
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel>
-              {t("common:actions.cancel")}
-            </AlertDialogCancel>
-            <AlertDialogAction
-              className="bg-primary text-primary-foreground hover:bg-primary/90"
-              onClick={confirmBotReuse}
-            >
-              {t("common:actions.confirm")}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+        onConfirm={confirmBotReuse}
+      />
     </>
   )
 }

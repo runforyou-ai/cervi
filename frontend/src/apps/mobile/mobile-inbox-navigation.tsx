@@ -15,6 +15,7 @@ import {
   type LoadInboxQuery,
 } from "@/api"
 import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
+import { LoadingIndicator } from "@/components/loading-indicator"
 import { Button } from "@/components/ui/button"
 import {
   Sheet,
@@ -27,6 +28,9 @@ import {
 import {
   inboxKindOptionsForScope,
   inboxQueryFromSearch,
+  inboxQueueFromParam,
+  inboxQueueParam,
+  inboxScopes,
   normalizeInboxQuery,
   toggleInboxKinds,
   writeInboxQuerySearch,
@@ -34,13 +38,6 @@ import {
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 import { cn } from "@/lib/utils"
-
-/** 消息范围页签的展示顺序，页签和左右滑动共用。 */
-export const inboxScopes = [
-  { value: InboxScope.InboxScopeAll, label: "scopeAll" },
-  { value: InboxScope.InboxScopeCustomer, label: "scopeCustomer" },
-  { value: InboxScope.InboxScopeInternal, label: "scopeInternal" },
-] as const
 
 const customerViews = [
   {
@@ -187,7 +184,7 @@ function MobileCustomerAssignee({
         ))}
       </select>
       {loading ? (
-        <p className="text-xs text-muted-foreground">{t("common:status.loading")}</p>
+        <LoadingIndicator className="text-xs">{t("common:status.loading")}</LoadingIndicator>
       ) : null}
       {error ? (
         <Button
@@ -200,28 +197,6 @@ function MobileCustomerAssignee({
       ) : null}
     </div>
   )
-}
-
-/** 把队列筛选读成选择器的单值：空为全部队列，public 为公共队列，其余为团队编号。 */
-function queueValue(query: MobileInboxQuery) {
-  if (query.queueFilter === CustomerQueueFilter.CustomerQueueFilterPublic) {
-    return CustomerQueueFilter.CustomerQueueFilterPublic
-  }
-  return query.queueTeamId
-}
-
-/** 把选择器的单值写回队列筛选，只在待分配视图生效。 */
-function queueChange(view: CustomerInboxView, queue: string) {
-  if (view !== CustomerInboxView.CustomerInboxViewQueue) {
-    return { queueFilter: CustomerQueueFilter.$zero, queueTeamId: "" }
-  }
-  if (queue === CustomerQueueFilter.CustomerQueueFilterPublic) {
-    return { queueFilter: CustomerQueueFilter.CustomerQueueFilterPublic, queueTeamId: "" }
-  }
-  if (queue) {
-    return { queueFilter: CustomerQueueFilter.CustomerQueueFilterTeam, queueTeamId: queue }
-  }
-  return { queueFilter: CustomerQueueFilter.CustomerQueueFilterAll, queueTeamId: "" }
 }
 
 /** 在底部面板中按当前范围选择筛选条件，取消时保留原筛选。 */
@@ -240,7 +215,7 @@ export function MobileInboxFilter({
   const [open, setOpen] = useState(false)
   const [view, setView] = useState(query.customerView)
   // 队列筛选用单值表示：空为全部队列，public 为公共队列，其余为团队编号。
-  const [queue, setQueue] = useState(queueValue(query))
+  const [queue, setQueue] = useState(inboxQueueParam(query))
   const [assignee, setAssignee] = useState(query.assigneeIdentityId)
   const [channel, setChannel] = useState(query.channelId)
   const [status, setStatus] = useState(query.serviceStatus)
@@ -297,7 +272,7 @@ export function MobileInboxFilter({
       onOpenChange={(next) => {
         if (next) {
           setView(query.customerView)
-          setQueue(queueValue(query))
+          setQueue(inboxQueueParam(query))
           setAssignee(query.assigneeIdentityId)
           setChannel(query.channelId)
           setStatus(query.serviceStatus)
@@ -457,7 +432,7 @@ export function MobileInboxFilter({
                 customer
                   ? {
                       customerView: view,
-                      ...queueChange(view, queue),
+                      ...inboxQueueFromParam(queue),
                       assigneeIdentityId:
                         view === CustomerInboxView.CustomerInboxViewCoworkers ? assignee : "",
                       channelId: channel,

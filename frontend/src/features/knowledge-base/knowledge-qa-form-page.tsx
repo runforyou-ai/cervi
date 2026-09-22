@@ -22,6 +22,7 @@ import {
   type KnowledgeBaseData,
   type KnowledgeQAEntryData,
 } from "@/api"
+import { FormActions } from "@/components/form/form-actions"
 import { FormInputField } from "@/components/form/form-input-field"
 import { PageContent } from "@/components/page-content"
 import { PageBackButton } from "@/components/page-back-button"
@@ -214,19 +215,10 @@ function KnowledgeQAForm({
         knowledgeBase={knowledgeBase}
       />
       {entry ? null : (
-        <div className="flex items-center justify-end gap-2">
-          <Button
-            type="button"
-            variant="outline"
-            disabled={form.formState.isSubmitting}
-            onClick={() => navigate(returnPath, { replace: true })}
-          >
-            {t("common:actions.cancel")}
-          </Button>
-          <Button type="submit" disabled={form.formState.isSubmitting}>
-            {t(form.formState.isSubmitting ? "common:actions.saving" : "common:actions.save")}
-          </Button>
-        </div>
+        <FormActions
+          saving={form.formState.isSubmitting}
+          onCancel={() => navigate(returnPath, { replace: true })}
+        />
       )}
     </form>
   )
