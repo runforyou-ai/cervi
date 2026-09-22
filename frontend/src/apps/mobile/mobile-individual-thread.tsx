@@ -1,11 +1,11 @@
-/** 移动端真人、AI 与客户聊天共用的时间线、阅读进度、文本与附件发送和失败重试。 */
-import { useEffect, useRef, useState } from "react"
+/** 移动端真人、AI、客户与群聊共用的时间线、阅读进度、文本与附件发送和失败重试。 */
+import { useEffect } from "react"
 
 import {
   ConversationType,
   type ConversationMessageData,
-  type ConversationMessageReference,
   type DirectTextMessageInput,
+  type GroupParticipant,
   type InboxConversation,
 } from "@/api"
 import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
@@ -17,14 +17,16 @@ import {
   ConversationTimeline,
   type ConversationLocateTarget,
 } from "@/features/inbox/conversation-timeline"
-import { useOutgoingMessages } from "@/features/inbox/outgoing-message-context"
-import type { OutgoingConversationDraft } from "@/features/inbox/outgoing-message-store"
 import { useConversationReadMarker } from "@/features/inbox/use-conversation-read-marker"
 import { useRecentConversations } from "@/features/inbox/use-recent-conversations"
+import { useThreadComposerBridge } from "@/features/inbox/use-thread-composer-bridge"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
 
-/** 草稿只展示本地发送状态，正式会话读取历史、推进已读、按需定位原消息并在前台轮询。 */
+/**
+ * 草稿只展示本地发送状态，正式会话读取历史、推进已读、按需定位原消息并在前台轮询；
+ * closedNotice 非空时保留历史并以该提示替换发送区（如群聊已解散）。
+ */
 export function MobileIndividualThread({
   conversationID,
   conversationType = ConversationType.ConversationTypeDirect,
@@ -34,10 +36,13 @@ export function MobileIndividualThread({
   onAttachmentConversationCreated,
   enabled = Boolean(conversationID),
   disabledReason = null,
+  closedNotice = null,
   lastReadMessageID = null,
   customerDeliveries = false,
   customerAttachment = null,
+  groupParticipants,
   locateMessage = null,
+  onUnavailable,
 }: {
   conversationID: string
   conversationType?: ConversationType
@@ -46,19 +51,21 @@ export function MobileIndividualThread({
   onAttachmentConversationCreated?: (conversation: InboxConversation) => void
   enabled?: boolean
   disabledReason?: string | null
+  closedNotice?: string | null
   lastReadMessageID?: string | null
   customerDeliveries?: boolean
   customerAttachment?: CustomerChannelCapabilities | null
+  groupParticipants?: GroupParticipant[]
   locateMessage?: ConversationLocateTarget | null
+  onUnavailable?: () => void
   sendIndividualMessage?: (
     input: DirectTextMessageInput,
   ) => Promise<ConversationMessageData>
 }) {
   const { identity } = useMobileWorkspace()
-  const prepareSendRef = useRef<(() => Promise<boolean>) | null>(null)
   const invalidate = useResourceInvalidator()
   // 真人草稿尚无会话编号，发送状态按对端身份分组。
-  const outgoing = useOutgoingMessages(
+  const bridge = useThreadComposerBridge(
     conversationID,
     peerIdentityID ? `draft:${peerIdentityID}` : "",
   )
@@ -67,10 +74,8 @@ export function MobileIndividualThread({
     conversationID,
     enabled && conversationType !== ConversationType.ConversationTypeCustomer,
   )
-  const [retryDraft, setRetryDraft] =
-    useState<OutgoingConversationDraft | null>(null)
-  const [replyTo, setReplyTo] =
-    useState<ConversationMessageReference | null>(null)
+  const replyDisabled = Boolean(disabledReason || closedNotice)
+  const group = conversationType === ConversationType.ConversationTypeGroup
   const { record: recordRecentConversation } = useRecentConversations(
     identity.user.identityId,
   )
@@ -83,51 +88,57 @@ export function MobileIndividualThread({
   return (
     <>
       <ConversationTimeline
-        prepareSendRef={prepareSendRef}
+        {...bridge.timeline}
         conversationID={conversationID}
         conversationType={conversationType}
         currentUser={identity.user}
         requireWindowFocus={false}
         customerDeliveries={customerDeliveries}
         enabled={enabled}
+        onUnavailable={onUnavailable}
         onReadMessage={enabled ? markRead : undefined}
-        onReplyMessage={enabled && !disabledReason ? setReplyTo : undefined}
+        onReplyMessage={enabled && !replyDisabled ? bridge.selectReplyTarget : undefined}
         readThroughMessageID={lastReadMessageID}
-        outgoingMessages={outgoing.messages}
-        onRetryFailedMessage={setRetryDraft}
-        retryFailedMessageDisabled={Boolean(disabledReason)}
+        retryFailedMessageDisabled={replyDisabled}
         locateMessage={locateMessage}
       />
-      <ConversationComposer
-        attachmentTargetIdentityID={!conversationID ? peerIdentityID : undefined}
-        attachmentAgentDraft={attachmentAgentIdentityID
-          ? { conversationID, agentIdentityID: attachmentAgentIdentityID }
-          : undefined}
-        onAttachmentConversationCreated={(created) => {
-          if (created) onAttachmentConversationCreated?.(created)
-        }}
-        onBeforeSend={() => prepareSendRef.current?.() ?? Promise.resolve(true)}
-        conversationID={conversationID}
-        conversationType={conversationType}
-        currentIdentityID={identity.user.identityId}
-        retryFailedMessage
-        disabledReason={disabledReason}
-        retryDraft={retryDraft}
-        replyTo={replyTo}
-        onRetryDraftHandled={() => setRetryDraft(null)}
-        onReplyToChange={setReplyTo}
-        sendIndividualMessage={sendIndividualMessage}
-        customerChannel={customerAttachment}
-        onSucceeded={() => {
-          void invalidate(resourceKeys.inbox())
-          // 发送结果可能改变客服负责人与处理状态，同时刷新会话摘要。
-          if (conversationID)
-            void invalidate(resourceKeys.conversationSummary(conversationID))
-        }}
-        onSending={outgoing.start}
-        onSent={outgoing.succeed}
-        onFailed={outgoing.fail}
-      />
+      {closedNotice ? (
+        <div
+          className="shrink-0 border-t p-4 text-center text-sm text-muted-foreground"
+          role="status"
+        >
+          {closedNotice}
+        </div>
+      ) : (
+        <ConversationComposer
+          {...bridge.composer}
+          attachmentTargetIdentityID={!conversationID ? peerIdentityID : undefined}
+          attachmentAgentDraft={attachmentAgentIdentityID
+            ? { conversationID, agentIdentityID: attachmentAgentIdentityID }
+            : undefined}
+          onAttachmentConversationCreated={(created) => {
+            if (created) onAttachmentConversationCreated?.(created)
+          }}
+          conversationID={conversationID}
+          conversationType={conversationType}
+          currentIdentityID={identity.user.identityId}
+          disabledReason={disabledReason}
+          groupParticipants={groupParticipants}
+          sendIndividualMessage={sendIndividualMessage}
+          customerChannel={customerAttachment}
+          onSucceeded={() => {
+            void invalidate(resourceKeys.inbox())
+            // 发送结果可能改变客服负责人与处理状态，同时刷新会话摘要。
+            if (conversationID && !group)
+              void invalidate(resourceKeys.conversationSummary(conversationID))
+          }}
+          onFailed={(clientMessageID) => {
+            bridge.outgoing.fail(clientMessageID)
+            // 群聊发送被拒绝后立即同步群状态，及时关闭已解散群的发送区。
+            if (group) void invalidate(resourceKeys.groupConversation(conversationID))
+          }}
+        />
+      )}
     </>
   )
 }

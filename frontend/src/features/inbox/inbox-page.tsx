@@ -302,7 +302,6 @@ export function InboxPage({
     if (!selectedConversationId) return null
     return (
       <ConversationDetail
-        conversationId={selectedConversationId}
         summary={summary}
         onGroupLeft={showConversationAfterGroupLeft}
         onLocalChange={followCustomerConversation}

@@ -221,7 +221,6 @@ const settings = {
       description: "角色说明",
       loadError: "角色加载失败。",
       createSuccess: "角色已创建。",
-      updateSuccess: "角色已保存。",
       saveError: "保存角色失败，请重试。",
     },
     permissions: {

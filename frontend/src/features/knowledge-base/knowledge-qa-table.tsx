@@ -1,5 +1,4 @@
 /** 展示问答列表、索引状态和分页，问答操作通过行操作菜单完成。 */
-import { useState } from "react"
 import { CircleHelpIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
@@ -14,6 +13,7 @@ import { ResourceListFrame } from "@/components/resource-list"
 import { ResourceTable } from "@/components/resource-table"
 import { useDateTime } from "@/hooks/use-date-time"
 import { resourceKeys } from "@/hooks/resource-keys"
+import { usePendingIds } from "@/hooks/use-pending-ids"
 import { useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
@@ -48,24 +48,20 @@ export function KnowledgeQATable({
   const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
   const { formatDateTime } = useDateTime()
-  const [retryingIDs, setRetryingIDs] = useState<ReadonlySet<string>>(new Set())
+  const retrying = usePendingIds()
 
   /** 按当前配置重新处理问答，并在结束后刷新列表中的状态。 */
-  async function retryEntry(entry: KnowledgeQASummaryData) {
-    setRetryingIDs((current) => new Set(current).add(entry.id))
-    try {
-      await retryKnowledgeQAEntry(knowledgeBaseId, entry.id)
-    } catch (error) {
-      if (!recoverSession(error, navigate))
-        toast.error(isApiError(error) ? apiErrorMessage(error) : t("qa.retryFailed"))
-    } finally {
-      await invalidate(resourceKeys.knowledgeQAEntries(knowledgeBaseId))
-      setRetryingIDs((current) => {
-        const next = new Set(current)
-        next.delete(entry.id)
-        return next
-      })
-    }
+  function retryEntry(entry: KnowledgeQASummaryData) {
+    return retrying.run(entry.id, async () => {
+      try {
+        await retryKnowledgeQAEntry(knowledgeBaseId, entry.id)
+      } catch (error) {
+        if (!recoverSession(error, navigate))
+          toast.error(isApiError(error) ? apiErrorMessage(error) : t("qa.retryFailed"))
+      } finally {
+        await invalidate(resourceKeys.knowledgeQAEntries(knowledgeBaseId))
+      }
+    })
   }
 
   return (
@@ -143,7 +139,7 @@ export function KnowledgeQATable({
           {
             key: "reprocess",
             label: t("qa.reprocess"),
-            disabled: retryingIDs.has(entry.id),
+            disabled: retrying.pendingIds.has(entry.id),
             onSelect: () => void retryEntry(entry),
           },
           {

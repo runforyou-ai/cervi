@@ -1,19 +1,15 @@
 /** 会话消息线程与回复区的即时消息协调。 */
-import { useEffect, useRef, useState, type RefObject } from "react"
+import { useEffect, useRef, type RefObject } from "react"
 import { useTranslation } from "react-i18next"
 
 import {
   ChannelType,
   ConversationType,
-  MessageVisibility,
   isCustomerInboxConversation,
   isAgentInboxConversation,
   isDirectInboxConversation,
   isGroupInboxConversation,
-  sendFirstAgentTextMessage,
-  sendFirstDirectTextMessage,
   type AgentInboxConversationData,
-  type ConversationMessageReference,
   type CustomerInboxConversationData,
   type DirectInboxConversationData,
   type GroupInboxConversationData,
@@ -32,9 +28,9 @@ import {
 } from "@/features/inbox/conversation-timeline"
 import { customerReplySupported } from "@/features/inbox/customer-session-actions"
 import { listAllMemberOptions } from "@/features/inbox/list-all-member-options"
-import { useOutgoingMessages } from "@/features/inbox/outgoing-message-context"
-import type { OutgoingConversationDraft } from "@/features/inbox/outgoing-message-store"
 import { useConversationReadMarker } from "@/features/inbox/use-conversation-read-marker"
+import { useFirstChatMessage } from "@/features/inbox/use-first-chat-message"
+import { useThreadComposerBridge } from "@/features/inbox/use-thread-composer-bridge"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 
@@ -70,7 +66,6 @@ export function ConversationThread({
   locateMessage: ConversationLocateTarget | null
   customerDraftRef?: RefObject<ComposerDraftBridge | null>
 }) {
-  const prepareSendRef = useRef<(() => Promise<boolean>) | null>(null)
   const { t } = useTranslation("inbox")
   const pageActive = usePortalContainer()?.active ?? true
   const { identity } = useWorkspace()
@@ -83,10 +78,11 @@ export function ConversationThread({
     (conversation && isDirectInboxConversation(conversation)
       ? conversation.direct.peerIdentityId
       : "")
-  const outgoing = useOutgoingMessages(
+  const bridge = useThreadComposerBridge(
     conversationID || agentDraftID,
     directPeerIdentityID ? `draft:${directPeerIdentityID}` : "",
   )
+  const firstChat = useFirstChatMessage()
   const conversationType =
     conversation?.type ??
     (agentDraftID
@@ -103,25 +99,6 @@ export function ConversationThread({
       aliveRef.current = false
     }
   }, [])
-  const [visibility, setVisibility] = useState<MessageVisibility>(
-    MessageVisibility.MessageVisibilityCustomerVisible,
-  )
-  // 对客回复与内部备注各自保留引用目标。
-  const [replyTargets, setReplyTargets] = useState<
-    Partial<Record<MessageVisibility, ConversationMessageReference | null>>
-  >({})
-  const replyTo = replyTargets[visibility] ?? null
-
-  /** 按时间线给出的输入模式保存引用目标并切到该模式。 */
-  function selectReplyTarget(
-    message: ConversationMessageReference | null,
-    target: MessageVisibility,
-  ) {
-    setVisibility(target)
-    setReplyTargets((current) => ({ ...current, [target]: message }))
-  }
-  const [retryDraft, setRetryDraft] =
-    useState<OutgoingConversationDraft | null>(null)
   const replySupported =
     !conversation ||
     isAgentInboxConversation(conversation) ||
@@ -149,57 +126,39 @@ export function ConversationThread({
   return (
     <>
       <ConversationTimeline
-        prepareSendRef={prepareSendRef}
+        {...bridge.timeline}
         customerDeliveries={telegramConversation}
         conversationID={conversationID}
         conversationType={conversationType}
         currentUser={identity.user}
-        outgoingMessages={outgoing.messages}
-        onRetryFailedMessage={(draft) => {
-          setVisibility(draft.visibility)
-          setReplyTargets((current) => ({ ...current, [draft.visibility]: draft.replyTo }))
-          setRetryDraft(draft)
-        }}
         retryFailedMessageDisabled={customerReplyUnavailable}
         onReplyMessage={
           conversation &&
           ((replySupported && !replyDisabledReason) || Boolean(customerConversation))
-            ? selectReplyTarget
+            ? bridge.selectReplyTarget
             : undefined
         }
         noteReplyEnabled={Boolean(customerConversation)}
         customerReplyUnavailable={customerReplyUnavailable}
-        replyVisibility={visibility}
+        replyVisibility={bridge.visibility}
         onReadMessage={conversation ? markRead : undefined}
         readThroughMessageID={conversation?.lastReadMessageId}
         enabled={Boolean(conversation)}
         locateMessage={locateMessage}
       />
       <ConversationComposer
+        {...bridge.composer}
         disabledReason={!replySupported ? t("channelReplyUnsupported") : replyDisabledReason}
-        onBeforeSend={() =>
-          prepareSendRef.current?.() ?? Promise.resolve(true)
-        }
         conversationID={conversationID}
         conversationType={conversationType}
         submitOnEnter
         refocusAfterSubmit
-        retryFailedMessage
-        retryDraft={retryDraft}
-        replyTo={replyTo}
         groupParticipants={groupParticipants}
         noteMentionMembers={noteMentionMembers.data}
         currentIdentityID={identity.user.identityId}
-        onRetryDraftHandled={() => setRetryDraft(null)}
-        onReplyToChange={(message) =>
-          setReplyTargets((current) => ({ ...current, [visibility]: message }))
-        }
-        visibility={visibility}
-        onVisibilityChange={customerConversation ? setVisibility : undefined}
-        onSending={outgoing.start}
-        onSent={outgoing.succeed}
+        onVisibilityChange={customerConversation ? bridge.setVisibility : undefined}
         onFailed={(clientMessageID) => {
-          outgoing.fail(clientMessageID)
+          bridge.outgoing.fail(clientMessageID)
           if (conversationID) void invalidate(resourceKeys.conversationSummary(conversationID))
           // 发送失败后刷新群资料。
           if (groupConversation)
@@ -212,8 +171,7 @@ export function ConversationThread({
         draftBridgeRef={customerDraftRef}
         onAttachmentConversationCreated={(created) => {
           if (!created) return
-          if (directTarget && !agentDraftID) void invalidate(resourceKeys.directConversation(directTarget.id))
-          void invalidate(resourceKeys.conversationMessages(created.id))
+          firstChat.refreshStarted(created, directTarget && !agentDraftID ? directTarget.id : undefined)
           // 附件首发成功后切到新建的单聊或 AI 聊天。
           if (aliveRef.current && (isDirectInboxConversation(created) || isAgentInboxConversation(created))) onChatStarted?.(created)
         }}
@@ -221,24 +179,8 @@ export function ConversationThread({
           directTarget
             ? async (input) => {
                 const result = agentDraftID
-                  ? await sendFirstAgentTextMessage({
-                      conversationId: agentDraftID,
-                      agentIdentityId: directTarget.id,
-                      clientMessageId: input.clientMessageId,
-                      body: input.body,
-                      workspaceId: draftWorkspaceID,
-                    })
-                  : await sendFirstDirectTextMessage({
-                      targetIdentityId: directTarget.id,
-                      ...input,
-                    })
-                if (!agentDraftID)
-                  void invalidate(
-                    resourceKeys.directConversation(directTarget.id),
-                  )
-                void invalidate(
-                  resourceKeys.conversationMessages(result.conversation.id),
-                )
+                  ? await firstChat.sendAgent(agentDraftID, directTarget.id, input, draftWorkspaceID)
+                  : await firstChat.sendDirect(directTarget.id, input)
                 // 首条发送成功后切到新建会话；线程已卸载时只刷新列表。
                 if (aliveRef.current) {
                   onChatStarted?.(result.conversation)

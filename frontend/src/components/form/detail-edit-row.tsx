@@ -73,6 +73,22 @@ export function DetailEditRow({
   )
 }
 
+/** 只读详情行，标签与可编辑详情行对齐。 */
+export function ReadonlyDetailRow({
+  label,
+  children,
+}: {
+  label: string
+  children: ReactNode
+}) {
+  return (
+    <div className="flex items-start gap-3 px-2 py-3 text-sm">
+      <div className="w-28 shrink-0 text-muted-foreground">{label}</div>
+      <div className="min-w-0 flex-1">{children}</div>
+    </div>
+  )
+}
+
 /** 详情字段编辑的保存和取消操作。 */
 export function DetailEditActions({
   saving,

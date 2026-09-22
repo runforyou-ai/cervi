@@ -1,5 +1,5 @@
 /** 移动端群名称、初始成员表单和创建后的聊天导航。 */
-import { useEffect, useRef, useState } from "react"
+import { useRef, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useController, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
@@ -20,6 +20,7 @@ import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { resourceKeys } from "@/hooks/resource-keys"
+import { useFormLifetime } from "@/hooks/use-form-lifetime"
 import { useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
@@ -33,15 +34,8 @@ export function MobileCreateGroupPage() {
   const location = useLocation()
   const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
-  const mounted = useRef(false)
   const submitting = useRef(false)
   const [saving, setSaving] = useState(false)
-  useEffect(() => {
-    mounted.current = true
-    return () => {
-      mounted.current = false
-    }
-  }, [])
 
   // 已选成员作为表单值保存，候选刷新后仍可移除。
   const schema = createGroupConversationSchema(tInbox, z.custom<MemberOption>()).omit({
@@ -57,6 +51,7 @@ export function MobileCreateGroupPage() {
     name: "members",
   })
   const title = form.watch("title")
+  const { mounted, dirty } = useFormLifetime(form.formState.isDirty)
 
   /** 提交初始成员，失败时保留表单，离开页面后忽略返回结果。 */
   async function create(values: z.infer<typeof schema>) {
@@ -72,6 +67,7 @@ export function MobileCreateGroupPage() {
       })
       if (!mounted.current) return
       void invalidate(resourceKeys.inbox())
+      dirty.current = false
       void navigate(`/inbox/group/${conversation.id}`, {
         replace: true,
         state: {

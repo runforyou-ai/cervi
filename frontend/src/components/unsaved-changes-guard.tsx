@@ -18,7 +18,7 @@ import {
 } from "@/contexts/unsaved-changes-context"
 
 /** 判断导航是否卸载表单，并统一确认放弃修改。 */
-export function WorkspaceNavigationGuard({
+export function UnsavedChangesGuard({
   children,
 }: {
   children: ReactNode

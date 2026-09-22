@@ -15,6 +15,7 @@ import {
   memberChatPollingInterval,
   useMemberChatPollingActive,
 } from "@/features/inbox/use-member-chat-polling"
+import { UnsavedChangesGuard } from "@/components/unsaved-changes-guard"
 import { SessionShell } from "@/features/session/session-shell"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
@@ -28,7 +29,7 @@ function MobileMessageNotifications({ identity }: { identity: Identity }) {
   return null
 }
 
-/** 在登录外壳内为所有移动端页面提供身份和导航上下文，回到前台时重建实时事件流。 */
+/** 在登录外壳内为所有移动端页面提供身份、导航上下文和未保存内容确认，回到前台时重建实时事件流。 */
 export function MobileWorkspaceLayout() {
   return (
     <SessionShell restartOnResume>
@@ -36,9 +37,11 @@ export function MobileWorkspaceLayout() {
         <MobileWorkspaceContext value={identity}>
           <MobileMessageNotifications identity={identity} />
           <MobileNavigationProvider>
-            <div className="flex h-dvh min-h-0 flex-col overflow-hidden bg-sidebar pt-[env(safe-area-inset-top)]">
-              <Outlet />
-            </div>
+            <UnsavedChangesGuard>
+              <div className="flex h-dvh min-h-0 flex-col overflow-hidden bg-sidebar pt-[env(safe-area-inset-top)]">
+                <Outlet />
+              </div>
+            </UnsavedChangesGuard>
           </MobileNavigationProvider>
         </MobileWorkspaceContext>
       )}

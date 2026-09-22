@@ -135,7 +135,6 @@ export function MobileGroupMemberActionPage({
         title={config.confirmTitle}
         description={config.confirmDescription}
         destructive={config.destructive}
-        touch
         onOpenChange={(open) => {
           if (!open) setConfirming(false)
         }}

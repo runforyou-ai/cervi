@@ -1,6 +1,6 @@
 /** 移动端群主添加真人和 AI 员工成员，保留选择并返回原群详情。 */
 import { groupMemberMaxCount } from "@/features/inbox/group-conversation-schema"
-import { useEffect, useRef } from "react"
+import { useEffect } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useController, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
@@ -14,6 +14,7 @@ import { useMobileBack } from "@/apps/mobile/mobile-navigation"
 import { MobilePageHeader } from "@/apps/mobile/mobile-page"
 import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
 import { Button } from "@/components/ui/button"
+import { useFormLifetime } from "@/hooks/use-form-lifetime"
 
 /** 按当前群成员和剩余名额选择成员，成功后刷新群聊事实。 */
 export function MobileAddGroupMembersPage() {
@@ -23,13 +24,6 @@ export function MobileAddGroupMembersPage() {
     useOutletContext<MobileGroupDetailsContext>()
   const { identity } = useMobileWorkspace()
   const close = useMobileBack(`/inbox/group/${group.id}/details`)
-  const alive = useRef(false)
-  useEffect(() => {
-    alive.current = true
-    return () => {
-      alive.current = false
-    }
-  }, [])
   const existingIDs = group.participants.map((member) => member.identityId)
   const remaining = Math.max(0, groupMemberMaxCount - existingIDs.length)
   const schema = z.object({
@@ -44,6 +38,7 @@ export function MobileAddGroupMembersPage() {
     defaultValues: { members: [] },
   })
   const { field } = useController({ control: form.control, name: "members" })
+  const { mounted, dirty } = useFormLifetime(form.formState.isDirty)
   useEffect(() => {
     // 已从其他端入群的成员退出候选和勾选，其余选择继续保留。
     const selected = field.value.filter(
@@ -70,7 +65,11 @@ export function MobileAddGroupMembersPage() {
         memberIdentityIds: values.members.map((member) => member.id),
       }),
     )
-    if (success && alive.current) close()
+    if (!success || !mounted.current) return
+    // 同步清空选择，返回前的重新渲染保持无未保存内容。
+    form.reset()
+    dirty.current = false
+    close()
   }
 
   return (

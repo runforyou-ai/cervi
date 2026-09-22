@@ -1,8 +1,7 @@
 /** 移动端真人与 AI 员工目录的搜索、分页和返回恢复。 */
-import { useEffect, useState } from "react"
 import { ChevronRightIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { Link, useLocation, useSearchParams } from "react-router"
+import { Link } from "react-router"
 
 import {
   listAgents,
@@ -19,6 +18,7 @@ import { MobilePagedList } from "@/apps/mobile/mobile-paged-list"
 import { ProfileAvatar } from "@/components/profile-avatar"
 import { WorkStatusBadge } from "@/components/work-status"
 import { resourceKeys } from "@/hooks/resource-keys"
+import { useListSearchParams } from "@/hooks/use-list-search-params"
 
 type DirectoryKind = "employees" | "agents"
 
@@ -34,34 +34,17 @@ export function MobileDirectoryPage({
   purpose?: DirectoryPurpose
 }) {
   const { t } = useTranslation(["mobile", "inbox"])
-  const location = useLocation()
   const { listPageCounts, scrollPositions } = useMobileNavigation()
-  const [params, setParams] = useSearchParams()
-  const queryText = params.get("q") ?? ""
-  const [search, setSearch] = useState(queryText)
   const newConversation = purpose === "newConversation"
   const listKey = newConversation ? `${kind}:new` : kind
-
-  useEffect(() => setSearch(queryText), [queryText])
-  useEffect(() => {
-    if (search === queryText) return
-    // 停止输入后再查询，替换当前历史并保留通讯录返回来源。
-    const timer = window.setTimeout(() => {
-      const next = new URLSearchParams()
-      if (search) next.set("q", search)
-      // 搜索改变时重置目标查询的加载进度和滚动位置。
-      if (search.trim() !== queryText.trim()) {
-        const storageKey = `${listKey}:${search.trim()}`
-        listPageCounts.delete(storageKey)
-        scrollPositions.delete(storageKey)
-      }
-      setParams(next, { replace: true, state: location.state })
-    }, 300)
-    return () => window.clearTimeout(timer)
-  }, [
-    search, queryText, setParams, location.state,
-    listPageCounts, scrollPositions, listKey,
-  ])
+  // 检索词变化时重置目标查询的加载进度和滚动位置。
+  const { query: queryText, search, setSearch } = useListSearchParams({
+    onQueryChange: (query) => {
+      const storageKey = `${listKey}:${query}`
+      listPageCounts.delete(storageKey)
+      scrollPositions.delete(storageKey)
+    },
+  })
 
   return (
     <section className="flex h-full min-h-0 flex-col">

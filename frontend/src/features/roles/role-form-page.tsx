@@ -188,12 +188,12 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
   }
 
   /** 保存角色资料、权限和成员配置。 */
-  // 详情页边改边存；内置管理员角色不可改，成员分配不在表单值内，单独触发保存。
-  const autoSaveEnabled = mode === "detail" && !admin
+  // 详情页边改边存；内置管理员角色只保存成员分配，名称和权限不提交。
+  const autoSave = mode === "detail"
   const { submit, saveNow, reportError } = useFormSave({
     form,
     schema,
-    autoSave: autoSaveEnabled,
+    autoSave,
     save: async (values) => {
       let targetRoleID = roleId
       if (mode === "create") {
@@ -239,11 +239,7 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
           navigate(`/settings/roles/${createdRoleID}`)
         return
       }
-      toast.success(
-        mode === "create"
-          ? t("roles.form.createSuccess")
-          : t("roles.form.updateSuccess"),
-      )
+      toast.success(t("roles.form.createSuccess"))
       navigate("/settings/roles")
     },
     errorMessage: t("roles.form.saveError"),
@@ -252,9 +248,9 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
   })
   // 成员分配不在表单值内，变更后与自动保存串行地立即保存一次。
   useEffect(() => {
-    if (!autoSaveEnabled || memberChanges.length === 0) return
+    if (!autoSave || memberChanges.length === 0) return
     saveNow(true)
-  }, [autoSaveEnabled, memberChanges])
+  }, [autoSave, memberChanges])
 
   const title =
     mode === "create"
@@ -286,11 +282,6 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
         return count
       }, memberTargetRole.memberCount)
     : 0
-
-  /** 返回角色列表。 */
-  function cancel() {
-    navigate("/settings/roles")
-  }
 
   return (
     <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
@@ -437,10 +428,10 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
               </section>
             </div>
 
-            {autoSaveEnabled ? null : (
+            {autoSave ? null : (
               <FormActions
                 saving={form.formState.isSubmitting}
-                onCancel={cancel}
+                onCancel={() => navigate("/settings/roles")}
               />
             )}
           </form>

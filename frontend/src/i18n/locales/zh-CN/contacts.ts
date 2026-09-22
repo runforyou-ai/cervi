@@ -292,7 +292,6 @@ const contacts = {
     phone: "电话",
     notes: "备注",
     created: "联系人已创建",
-    updated: "联系人已更新",
     networkError: "无法连接服务器，请稍后重试。",
   },
   validation: {

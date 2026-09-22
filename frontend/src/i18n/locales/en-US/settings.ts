@@ -227,7 +227,6 @@ const settings = {
       description: "Description",
       loadError: "Could not load the role.",
       createSuccess: "Role created.",
-      updateSuccess: "Role saved.",
       saveError: "Could not save the role. Try again.",
     },
     permissions: {

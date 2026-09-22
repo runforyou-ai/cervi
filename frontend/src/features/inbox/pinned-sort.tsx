@@ -1,4 +1,4 @@
-/** 置顶区的拖动与键盘排序，以及相对可见邻居的置顶位置命令。 */
+/** 置顶在前的会话列表、置顶区的拖动与键盘排序，以及相对可见邻居的置顶位置命令。 */
 import { useState, type ReactNode } from "react"
 import {
   DndContext,
@@ -13,8 +13,10 @@ import {
   SortableContext,
   arrayMove,
   sortableKeyboardCoordinates,
+  useSortable,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable"
+import { CSS } from "@dnd-kit/utilities"
 import { useTranslation } from "react-i18next"
 
 import {
@@ -44,8 +46,76 @@ export function pinMoveCommand(
   }
 }
 
+/** 置顶区内一行的拖动与键盘排序状态。 */
+export type PinSortable = ReturnType<typeof useSortable>
+
+/** 接入置顶区排序；disabled 时保留位置但不可拖动。 */
+export function usePinSortable(conversationId: string, disabled: boolean) {
+  const { t } = useTranslation("inbox")
+  return useSortable({
+    id: conversationId,
+    disabled,
+    attributes: { roleDescription: t("pinSortRole") },
+  })
+}
+
+/** 置顶行拖动中的位移与过渡样式；未接入排序时返回 undefined。 */
+export function pinSortableStyle(sortable: PinSortable | undefined) {
+  return sortable
+    ? {
+        transform: CSS.Translate.toString(sortable.transform),
+        transition: sortable.transition,
+      }
+    : undefined
+}
+
+/** 置顶区在前且可在区内排序、其余会话在后的列表；renderPinned 按当前展示顺序渲染置顶行，renderRow 渲染其余行。 */
+export function PinnedConversationList<T extends InboxConversation>({
+  conversations,
+  pinnedIds,
+  names,
+  pinOrderVersion,
+  actions,
+  onDraggingChange,
+  renderPinned,
+  renderRow,
+}: {
+  conversations: T[]
+  pinnedIds: string[]
+  names: Map<string, string>
+  pinOrderVersion: string
+  actions: ReturnType<typeof useConversationListActions>
+  onDraggingChange: (active: boolean) => void
+  renderPinned: (conversation: T, order: string[], index: number) => ReactNode
+  renderRow: (conversation: T) => ReactNode
+}) {
+  const rows = new Map(conversations.map((conversation) => [conversation.id, conversation]))
+  return (
+    <>
+      <PinnedSortArea
+        conversations={conversations}
+        pinnedIds={pinnedIds}
+        names={names}
+        pinOrderVersion={pinOrderVersion}
+        actions={actions}
+        onDraggingChange={onDraggingChange}
+      >
+        {(order) =>
+          order.flatMap((id, index) => {
+            const conversation = rows.get(id)
+            return conversation ? [renderPinned(conversation, order, index)] : []
+          })
+        }
+      </PinnedSortArea>
+      {conversations.flatMap((conversation) =>
+        pinnedIds.includes(conversation.id) ? [] : [renderRow(conversation)],
+      )}
+    </>
+  )
+}
+
 /** 置顶区排序容器：放下后先按临时顺序展示，置顶区权威顺序重读完成或保存失败后撤销，children 按当前展示顺序渲染置顶项。 */
-export function PinnedSortArea({
+function PinnedSortArea({
   conversations,
   pinnedIds,
   names,

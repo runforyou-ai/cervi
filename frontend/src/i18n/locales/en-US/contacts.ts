@@ -297,7 +297,6 @@ const contacts = {
     phone: "Phone",
     notes: "Notes",
     created: "Contact created",
-    updated: "Contact updated",
     networkError: "Could not connect to the server. Try again later.",
   },
   validation: {

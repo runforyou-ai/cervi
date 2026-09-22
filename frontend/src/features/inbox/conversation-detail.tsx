@@ -16,7 +16,6 @@ import { useResourceInvalidator } from "@/hooks/use-resource"
 
 /** 渲染指定会话的详情；退群清理完成后由宿主通过 onGroupLeft 决定去向，本人发送消息或处理客服会话并重读摘要后通过 onLocalChange 交给宿主。 */
 export function ConversationDetail({
-  conversationId,
   summary,
   onGroupLeft,
   onLocalChange,
@@ -24,7 +23,6 @@ export function ConversationDetail({
   locateMessage = null,
   narrowViewport = false,
 }: {
-  conversationId: string
   summary: ConversationSummaryResource
   onGroupLeft: (conversationID: string) => void
   onLocalChange?: (conversation: InboxConversation) => void

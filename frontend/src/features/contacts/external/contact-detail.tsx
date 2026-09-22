@@ -1,5 +1,12 @@
 /** 联系人详情和分节编辑。 */
-import { useEffect, useMemo, useState } from "react"
+import {
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+  type FocusEvent,
+  type KeyboardEvent,
+} from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
@@ -13,13 +20,10 @@ import {
   isNotFoundApiError,
   updateContact,
   type ContactDetail,
-  type ContactInput,
   type ContactMethodInput,
 } from "@/api"
-import {
-  DetailEditActions,
-  DetailEditRow,
-} from "@/components/form/detail-edit-row"
+import { DetailEditRow } from "@/components/form/detail-edit-row"
+import { InlineEditField } from "@/components/form/inline-edit-field"
 import { Field, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { NativeSelect } from "@/components/ui/native-select"
@@ -31,6 +35,7 @@ import {
   type ContactFormValues,
 } from "@/features/contacts/external/contact-schema"
 import { useDateTime } from "@/hooks/use-date-time"
+import { useImmediateSave } from "@/hooks/use-immediate-save"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
@@ -108,6 +113,14 @@ function methodsFromDetail(
   return methods
 }
 
+/** 各分节校验和提示使用的字段。 */
+const sectionFields = {
+  name: ["displayName"],
+  stage: ["stage"],
+  methods: ["email", "phone"],
+  notes: ["notes"],
+} satisfies Record<Exclude<EditingSection, null>, (keyof ContactFormValues)[]>
+
 /** 分节编辑联系人详情。 */
 export function ContactDetailView({
   detail,
@@ -122,7 +135,11 @@ export function ContactDetailView({
   const navigate = useNavigate()
   const { formatDateTime } = useDateTime()
   const [editing, setEditing] = useState<EditingSection>(null)
-  const [saving, setSaving] = useState(false)
+  const saveState = useImmediateSave()
+  const { saving } = saveState
+  const root = useRef<HTMLDivElement>(null)
+  // Esc 放弃后，编辑区卸载触发的失焦跳过保存。
+  const cancelled = useRef(false)
   const schema = useMemo(
     () =>
       createContactSchema({
@@ -147,51 +164,103 @@ export function ContactDetailView({
 
   /** 取消当前分节编辑。 */
   function cancelEdit() {
+    cancelled.current = true
     form.reset(valuesFromDetail(detail))
     setEditing(null)
   }
 
   /** 开始编辑指定分节。 */
   function startEditing(section: Exclude<EditingSection, null>) {
+    cancelled.current = false
     form.reset(valuesFromDetail(detail))
     setEditing(section)
   }
 
-  const save = form.handleSubmit(async (values) => {
-    const input: ContactInput = {
-      displayName: values.displayName,
-      channelId: detail.contact.sourceChannelId,
-      stage: values.stage,
-      notes: values.notes,
-      methods: methodsFromDetail(detail, values),
-    }
-    setSaving(true)
-    try {
-      const saved = await updateContact(detail.contact.id, input)
-      toast.success(t("form.updated"))
-      onSaved(saved)
-    } catch (error) {
-      if (recoverSession(error, navigate)) {
-        return
+  /**
+   * 保存指定分节：先在可编辑状态下校验，原生提示显示在当前分节的输入框上；与当前资料相同时直接退出编辑。
+   * 请求发出后即使侧栏关闭也写完并刷新缓存，只在仍打开时更新编辑状态。失败时文本输入保留草稿和编辑态，
+   * 传入 draft 的即选即存控件恢复为已保存的值。
+   */
+  async function saveContact(
+    section: Exclude<EditingSection, null>,
+    changed?: ContactFormValues,
+  ) {
+    const draft = changed ?? form.getValues()
+    if (cancelled.current || saveState.isSaving()) return
+    const fields = sectionFields[section]
+    if (!(await form.trigger(fields, { shouldFocus: true }))) return
+    const parsed = schema.safeParse(draft)
+    if (!parsed.success) {
+      // 跨字段规则（至少保留一项身份信息）提示在当前分节的首个输入框上。
+      const input = root.current?.querySelector<HTMLInputElement>(
+        `[name="${fields[0]}"]`,
+      )
+      if (input) {
+        input.setCustomValidity(parsed.error.issues[0]?.message ?? "")
+        input.reportValidity()
+        input.addEventListener("input", () => input.setCustomValidity(""), {
+          once: true,
+        })
+        input.focus()
       }
+      return
+    }
+    const current = valuesFromDetail(detail)
+    if (
+      draft.displayName === current.displayName &&
+      draft.stage === current.stage &&
+      draft.email === current.email &&
+      draft.phone === current.phone &&
+      draft.notes === current.notes
+    ) {
+      setEditing(null)
+      return
+    }
+    const request = saveState.begin()
+    if (request === null) return
+    try {
+      const saved = await updateContact(detail.contact.id, {
+        displayName: draft.displayName,
+        channelId: detail.contact.sourceChannelId,
+        stage: draft.stage,
+        notes: draft.notes,
+        methods: methodsFromDetail(detail, draft),
+      })
+      onSaved(saved)
+      if (saveState.isCurrent(request)) setEditing(null)
+    } catch (error) {
+      if (changed && saveState.isCurrent(request)) form.reset(valuesFromDetail(detail))
+      if (recoverSession(error, navigate)) return
       if (isNotFoundApiError(error)) {
         console.warn("联系人不存在", { contact_id: detail.contact.id })
-        onNotFound()
-        return
-      }
-      if (isApiError(error)) {
-        console.warn("保存联系人失败", error)
-        toast.error(
-          apiErrorMessage(error, ["displayName", "stage", "methods", "notes"]),
-        )
+        // 只在详情仍是这次请求所属的联系人时关闭，迟到的结果不影响之后打开的详情。
+        if (saveState.isCurrent(request)) onNotFound()
         return
       }
       console.warn("保存联系人失败", error)
-      toast.error(t("form.networkError"))
+      toast.error(
+        isApiError(error)
+          ? apiErrorMessage(error, ["displayName", "stage", "methods", "notes"])
+          : t("form.networkError"),
+      )
     } finally {
-      setSaving(false)
+      saveState.finish(request)
     }
-  })
+  }
+
+  /** 编辑区按 Esc 放弃修改。 */
+  function handleEscape(event: KeyboardEvent) {
+    if (event.key !== "Escape") return
+    event.preventDefault()
+    event.stopPropagation()
+    cancelEdit()
+  }
+
+  /** 焦点离开整个编辑区时保存。 */
+  function handleSectionBlur(event: FocusEvent<HTMLElement>) {
+    if (event.currentTarget.contains(event.relatedTarget)) return
+    void saveContact("methods")
+  }
 
   const empty = (
     <span className="text-muted-foreground">{t("detail.empty")}</span>
@@ -199,26 +268,26 @@ export function ContactDetailView({
   const stage = form.watch("stage")
 
   return (
-    <div className="flex flex-col gap-7">
+    <div ref={root} className="flex flex-col gap-7">
       <section>
         <h3 className="mb-2 text-sm font-medium">
           {t("detail.basicInformation")}
         </h3>
         <div className="divide-y">
-          <DetailEditRow
+          <InlineEditField
+            control={form.control}
+            name="displayName"
             label={t("columns.name")}
-            value={detail.contact.displayName || empty}
+            empty={empty}
+            disabled={saving}
             editing={editing === "name"}
             editEnabled={editing === null && !saving}
-            onEdit={() => startEditing("name")}
-          >
-            <Input {...form.register("displayName")} autoFocus />
-            <DetailEditActions
-              saving={saving}
-              onSave={() => void save()}
-              onCancel={cancelEdit}
-            />
-          </DetailEditRow>
+            onEditingChange={(next) => {
+              if (next) startEditing("name")
+            }}
+            onCommit={() => void saveContact("name")}
+            onCancel={cancelEdit}
+          />
 
           <DetailEditRow
             label={t("columns.stage")}
@@ -230,7 +299,21 @@ export function ContactDetailView({
             required
             onEdit={() => startEditing("stage")}
           >
-            <NativeSelect {...form.register("stage")} autoFocus value={stage}>
+            <NativeSelect
+              {...form.register("stage")}
+              autoFocus
+              value={stage}
+              disabled={saving}
+              onChange={(event) => {
+                const next = event.target.value as ContactFormValues["stage"]
+                form.setValue("stage", next)
+                void saveContact("stage", { ...form.getValues(), stage: next })
+              }}
+              onBlur={() => {
+                if (!saveState.isSaving()) cancelEdit()
+              }}
+              onKeyDown={handleEscape}
+            >
               <option value={ContactStage.ContactStageVisitor}>
                 {t("stages.visitor")}
               </option>
@@ -241,11 +324,6 @@ export function ContactDetailView({
                 {t("stages.customer")}
               </option>
             </NativeSelect>
-            <DetailEditActions
-              saving={saving}
-              onSave={() => void save()}
-              onCancel={cancelEdit}
-            />
           </DetailEditRow>
 
           <div className="flex items-start gap-3 px-2 py-3 text-sm">
@@ -281,7 +359,18 @@ export function ContactDetailView({
           editEnabled={editing === null && !saving}
           onEdit={() => startEditing("methods")}
         >
-          <div className="grid gap-4">
+          <div
+            className="grid gap-4"
+            onBlur={handleSectionBlur}
+            onKeyDown={(event) => {
+              handleEscape(event)
+              // 回车提交邮箱和电话，焦点离开编辑区后保存。
+              if (event.key === "Enter" && event.target instanceof HTMLInputElement) {
+                event.preventDefault()
+                event.target.blur()
+              }
+            }}
+          >
             <Field>
               <FieldLabel htmlFor="contact-detail-email">
                 {t("form.email")}
@@ -291,6 +380,7 @@ export function ContactDetailView({
                 type="email"
                 {...form.register("email")}
                 autoFocus
+                disabled={saving}
               />
             </Field>
             <Controller
@@ -310,16 +400,12 @@ export function ContactDetailView({
                     onBlur={field.onBlur}
                     aria-invalid={fieldState.invalid}
                     autoComplete="tel"
+                    disabled={saving}
                   />
                 </Field>
               )}
             />
           </div>
-          <DetailEditActions
-            saving={saving}
-            onSave={() => void save()}
-            onCancel={cancelEdit}
-          />
         </DetailEditRow>
       </section>
 
@@ -332,11 +418,13 @@ export function ContactDetailView({
           editEnabled={editing === null && !saving}
           onEdit={() => startEditing("notes")}
         >
-          <Textarea {...form.register("notes")} autoFocus rows={5} />
-          <DetailEditActions
-            saving={saving}
-            onSave={() => void save()}
-            onCancel={cancelEdit}
+          <Textarea
+            {...form.register("notes")}
+            autoFocus
+            rows={5}
+            disabled={saving}
+            onBlur={() => void saveContact("notes")}
+            onKeyDown={handleEscape}
           />
         </DetailEditRow>
       </section>

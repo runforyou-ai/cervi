@@ -9,7 +9,6 @@ import { recoverSession } from "@/lib/session-navigation"
 import { BrainIcon, ChevronDownIcon, LightbulbIcon, SquareIcon } from "lucide-react"
 import { MessageMarkdown } from "@/components/message-markdown"
 import { ProfileAvatar } from "@/components/profile-avatar"
-import { resolveAppPlatform } from "@/platform/app-platform"
 import { openExternalURL } from "@/platform/external-navigation"
 import { useTranslation } from "react-i18next"
 import { Popover } from "radix-ui"
@@ -173,7 +172,6 @@ function AgentTool({ call, onToggle }: { call: AgentToolCall; onToggle: () => vo
 export function AgentProcess({ process, onPrimary, onToggle }: { process: ConversationAgentProcessData; onPrimary: boolean; onToggle: () => void }) {
   const { t, i18n } = useTranslation(["inbox", "common"])
   const [opened, setOpened] = useState(false)
-  const mobile = resolveAppPlatform() === "mobile"
   const seconds = Math.max(0, Math.round(process.durationMilliseconds / 1000))
   // 已完成运行的过程内容不可变，首次展开后按运行编号读取并长期复用缓存。
   const detail = useResource(
@@ -188,7 +186,7 @@ export function AgentProcess({ process, onPrimary, onToggle }: { process: Conver
           "group flex min-w-0 flex-1 cursor-pointer items-center justify-start gap-1.5 rounded-sm py-1 text-left text-xs focus-visible:outline focus-visible:outline-ring",
           onPrimary ? "text-accent-foreground/75" : "text-muted-foreground",
           // 移动端按触屏点击区域抬高行高，点击区不与引用块和正文重叠。
-          mobile && "py-2",
+          "touch:py-2",
         )}>
           <LightbulbIcon aria-hidden className="size-4 shrink-0 text-yellow-400 dark:text-yellow-300" />
           <span className="truncate">{t("agentThoughtCompleted", { seconds })}</span>
@@ -360,12 +358,12 @@ export function AgentRunState({ run, incoming, conversationID, group, copilot, o
             <div className={cn(
               "flex items-center gap-1.5",
               // 移动端留出停止按钮触屏区域向左溢出的宽度，两个点击区域不重叠。
-              resolveAppPlatform() === "mobile" && "gap-3",
+              "touch:gap-3",
             )}>
               <CollapsibleTrigger className={cn(
                 "group flex min-w-0 cursor-pointer items-center gap-1.5 rounded-sm text-left focus-visible:outline focus-visible:outline-ring",
                 // 移动端按触屏点击区域抬高行高，点击区不与展开的过程内容重叠。
-                resolveAppPlatform() === "mobile" && "py-2",
+                "touch:py-2",
               )}>
                 <span className="truncate">{label}</span>
                 <ChevronDownIcon aria-hidden className="size-3.5 shrink-0 transition-transform group-data-[state=open]:rotate-180" />
@@ -455,7 +453,7 @@ function AgentReplyStopButton({ conversationID, runID, group, copilot, onStopped
       className={cn(
         "inline-flex size-5 shrink-0 items-center justify-center rounded-sm text-destructive focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring disabled:pointer-events-none disabled:opacity-50",
         // 移动端扩大触屏点击区域，负外边距保持原有行高和图标位置。
-        resolveAppPlatform() === "mobile" && "-m-3 size-11",
+        "touch:-m-3 touch:size-11",
       )}
       aria-label={t("agentStopReply")}
       title={t("agentStopReply")}

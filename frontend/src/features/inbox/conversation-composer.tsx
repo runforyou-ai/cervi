@@ -84,7 +84,6 @@ export function ConversationComposer({
   disabledReason: replyDisabledReason = null,
   visibility = MessageVisibility.MessageVisibilityCustomerVisible,
   onVisibilityChange,
-  retryFailedMessage = false,
   retryDraft = null,
   replyTo = null,
   groupParticipants,
@@ -116,7 +115,6 @@ export function ConversationComposer({
   disabledReason?: string | null
   visibility?: MessageVisibility
   onVisibilityChange?: (visibility: MessageVisibility) => void
-  retryFailedMessage?: boolean
   retryDraft?: OutgoingConversationDraft | null
   replyTo?: ConversationMessageReference | null
   groupParticipants?: GroupParticipant[]
@@ -230,7 +228,7 @@ export function ConversationComposer({
   }, [])
 
   useEffect(() => {
-    if (!retryFailedMessage || !retryDraft) return
+    if (!retryDraft) return
     onRetryDraftHandled?.()
     if (isSubmitting) return
     retryRef.current = retryDraft
@@ -251,7 +249,6 @@ export function ConversationComposer({
     onRetryDraftHandled,
     onReplyToChange,
     retryDraft,
-    retryFailedMessage,
     stashDraft,
     visibility,
   ])
@@ -316,7 +313,6 @@ export function ConversationComposer({
     const mentionKey = (targets: MentionTarget[]) =>
       targets.map((mention) => mention.identityID).join("\u0000")
     const retry =
-      retryFailedMessage &&
       retryRef.current?.body === body &&
       retryRef.current.visibility === visibility &&
       retryRef.current.replyTo?.id === replyTo?.id &&
@@ -383,17 +379,15 @@ export function ConversationComposer({
             ])
           : t("messageSendError"),
       )
-      if (retryFailedMessage) {
-        retryRef.current = draft
-        // 发送期间切换了页签时，失败正文回到发送时的可见范围。
-        if (draft.visibility !== visibilityRef.current) {
-          stashDraft(draft.visibility, body, draft.mentions)
-        } else {
-          form.setValue("body", body, { shouldDirty: true })
-          setMentions(draft.mentions)
-          setMentionAllToken(draft.mentionAllToken)
-          resizeComposerInput(inputRef.current)
-        }
+      retryRef.current = draft
+      // 发送期间切换了页签时，失败正文回到发送时的可见范围。
+      if (draft.visibility !== visibilityRef.current) {
+        stashDraft(draft.visibility, body, draft.mentions)
+      } else {
+        form.setValue("body", body, { shouldDirty: true })
+        setMentions(draft.mentions)
+        setMentionAllToken(draft.mentionAllToken)
+        resizeComposerInput(inputRef.current)
       }
       refocusPendingRef.current = refocusAfterSubmit
     }

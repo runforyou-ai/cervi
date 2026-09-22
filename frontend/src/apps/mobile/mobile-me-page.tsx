@@ -131,7 +131,6 @@ export function MobileMePage() {
             pending={false}
             title={t("me.logoutTitle")}
             description={t("me.logoutDescription")}
-            touch
             onOpenChange={setConfirmingLogout}
             onConfirm={() => {
               setConfirmingLogout(false)

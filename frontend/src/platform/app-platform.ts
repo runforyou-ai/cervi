@@ -27,8 +27,16 @@ type WailsWindow = Window & {
   }
 }
 
-/** 根据运行环境和开发预览标记识别应用平台。 */
+let cachedPlatform: AppPlatform | null = null
+
+/** 返回当前应用平台；平台在启动时确定，首次识别后缓存结果。 */
 export function resolveAppPlatform(): AppPlatform {
+  cachedPlatform ??= detectAppPlatform()
+  return cachedPlatform
+}
+
+/** 根据运行环境和开发预览标记识别应用平台。 */
+function detectAppPlatform(): AppPlatform {
   // 开发窗口通过地址标记加载移动端页面和交互。
   if (import.meta.env.DEV && new URLSearchParams(window.location.search).get("preview") === "mobile") {
     return "mobile"

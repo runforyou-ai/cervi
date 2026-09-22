@@ -1,0 +1,127 @@
+/** 桌面端与移动端会话列表项共用的头像、名称、状态、时间与摘要行。 */
+import { BellOffIcon } from "lucide-react"
+import { useTranslation } from "react-i18next"
+
+import {
+  isAgentInboxConversation,
+  isInternalInboxConversation,
+  type InboxConversation,
+} from "@/api"
+import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
+import {
+  ConversationAssigneeAvatar,
+  ConversationAvatar,
+} from "@/features/inbox/conversation-avatar"
+import {
+  conversationPreview,
+  inboxConversationSummary,
+} from "@/features/inbox/conversation-preview"
+import { ConversationUnreadBadge } from "@/features/inbox/conversation-unread-badge"
+import { useConversationTime } from "@/features/inbox/use-conversation-time"
+import { cn } from "@/lib/utils"
+
+/** compact 用于桌面端中栏，touch 用于移动端触屏列表。 */
+const densityClasses = {
+  compact: {
+    avatar: "size-8",
+    gap: "gap-1.5",
+    name: "text-sm",
+    meta: "text-[10.5px]",
+    secondLine: "mt-px",
+    preview: "text-xs",
+    muted: "size-3",
+  },
+  touch: {
+    avatar: "size-10",
+    gap: "gap-2",
+    name: "text-[15px]",
+    meta: "text-xs",
+    secondLine: "mt-0.5",
+    preview: "text-sm",
+    muted: "size-3.5",
+  },
+} as const
+
+/** 渲染会话列表项内容；queueTeamName 显示在名称后，selected 时时间与摘要使用选中配色，showAssignee 时摘要行末显示负责人。 */
+export function ConversationRowContent({
+  conversation,
+  name,
+  density,
+  selected = false,
+  showAssignee,
+  queueTeamName = null,
+}: {
+  conversation: InboxConversation
+  name: string
+  density: keyof typeof densityClasses
+  selected?: boolean
+  showAssignee: boolean
+  queueTeamName?: string | null
+}) {
+  const { t } = useTranslation("inbox")
+  const formatTime = useConversationTime()
+  const summary = inboxConversationSummary(conversation)
+  if (!summary) return null
+  const classes = densityClasses[density]
+  const agentRunLabel = agentRunStatusLabel(
+    isAgentInboxConversation(conversation)
+      ? conversation.agent.agentRunStatus
+      : null,
+    t,
+  )
+  const preview = conversationPreview(conversation, t)
+  const formattedTime = formatTime(summary.lastMessageAt)
+  const selectedTint = selected && "text-accent-foreground/75"
+  return (
+    <>
+      <span className="relative shrink-0">
+        <ConversationAvatar conversation={conversation} className={classes.avatar} />
+        <ConversationUnreadBadge conversation={conversation} />
+      </span>
+      <span className="min-w-0 flex-1 overflow-hidden">
+        <span className={cn("grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center", classes.gap)}>
+          <span className={cn("flex min-w-0 items-center", classes.gap)}>
+            <span className={cn("min-w-0 flex-1 truncate font-medium", classes.name)}>
+              {name}
+            </span>
+            {agentRunLabel ? (
+              <span className={cn("shrink-0 text-muted-foreground", classes.meta)}>
+                {agentRunLabel}
+              </span>
+            ) : null}
+            {queueTeamName ? (
+              <span className={cn("max-w-24 shrink-0 truncate text-muted-foreground", classes.meta)}>
+                {queueTeamName}
+              </span>
+            ) : null}
+          </span>
+          {formattedTime ? (
+            <time
+              dateTime={summary.lastMessageAt ?? undefined}
+              className={cn("shrink-0 text-muted-foreground", classes.meta, selectedTint)}
+            >
+              {formattedTime}
+            </time>
+          ) : null}
+        </span>
+        <span className={cn("flex min-w-0 items-center", classes.gap, classes.secondLine)}>
+          <span
+            title={preview}
+            className={cn("min-w-0 flex-1 truncate text-muted-foreground", classes.preview, selectedTint)}
+          >
+            {preview}
+          </span>
+          {showAssignee ? (
+            <ConversationAssigneeAvatar conversation={conversation} className="size-4" />
+          ) : null}
+          {isInternalInboxConversation(conversation) && conversation.muted ? (
+            <BellOffIcon
+              className={cn("shrink-0 text-muted-foreground", classes.muted)}
+              aria-label={t("conversationMuted")}
+            />
+          ) : null}
+        </span>
+      </span>
+    </>
+  )
+}

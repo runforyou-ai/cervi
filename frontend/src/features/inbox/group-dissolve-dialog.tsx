@@ -14,7 +14,6 @@ import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
-import { resolveAppPlatform } from "@/platform/app-platform"
 
 /** 解散成功后保留当前视图，失败时保留确认框供重试。 */
 export function GroupDissolveDialog({
@@ -63,7 +62,6 @@ export function GroupDissolveDialog({
       pending={save.saving}
       title={t("groupDissolveTitle", { name: group.title })}
       description={t("groupDissolveDescription")}
-      touch={resolveAppPlatform() === "mobile"}
       onOpenChange={onOpenChange}
       onConfirm={() => void dissolve()}
       onCloseAutoFocus={

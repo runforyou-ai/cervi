@@ -1,36 +1,26 @@
 /** 消息页中栏的会话列表项、右键操作与置顶区排序。 */
-import { useSortable } from "@dnd-kit/sortable"
-import { CSS } from "@dnd-kit/utilities"
-import { BellOffIcon } from "lucide-react"
-import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 
 import {
-  isAgentInboxConversation,
   isCustomerInboxConversation,
-  isDirectInboxConversation,
-  isGroupInboxConversation,
   isInternalInboxConversation,
   updateConversationUnreadMark,
   type InboxConversation,
 } from "@/api"
-import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
-import {
-  ConversationAssigneeAvatar,
-  ConversationAvatar,
-} from "@/features/inbox/conversation-avatar"
 import {
   ConversationListMenu,
   useConversationListActions,
 } from "@/features/inbox/conversation-list-menu"
-import { conversationPreview } from "@/features/inbox/conversation-preview"
-import { ConversationUnreadBadge } from "@/features/inbox/conversation-unread-badge"
-import { PinnedSortArea } from "@/features/inbox/pinned-sort"
-import { useConversationName } from "@/features/inbox/use-conversation-name"
+import { inboxConversationSummary } from "@/features/inbox/conversation-preview"
+import { ConversationRowContent } from "@/features/inbox/conversation-row-content"
 import {
-  useConversationTime,
-  useMinuteTick,
-} from "@/features/inbox/use-conversation-time"
+  PinnedConversationList,
+  pinSortableStyle,
+  usePinSortable,
+  type PinSortable,
+} from "@/features/inbox/pinned-sort"
+import { useConversationName } from "@/features/inbox/use-conversation-name"
+import { useMinuteTick } from "@/features/inbox/use-conversation-time"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
 import { recoverSession } from "@/lib/session-navigation"
@@ -47,7 +37,7 @@ type ConversationRowProps = {
   onMenuChange: (open: boolean) => void
   onSelect: (conversationId: string) => void
   onOpenInWindow?: (conversation: InboxConversation, name: string) => void
-  sortable?: ReturnType<typeof useSortable>
+  sortable?: PinSortable
 }
 
 /** 会话列表项；置顶项使用与悬停一致的底色，传入 sortable 时接入拖动与键盘排序。 */
@@ -64,33 +54,14 @@ function ConversationRow({
   onOpenInWindow,
   sortable,
 }: ConversationRowProps) {
-  const { t } = useTranslation("inbox")
-  const formatTime = useConversationTime()
   const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
-  const summary = isCustomerInboxConversation(conversation)
-    ? conversation.customer
-    : isAgentInboxConversation(conversation)
-      ? conversation.agent
-      : isDirectInboxConversation(conversation)
-        ? conversation.direct
-        : isGroupInboxConversation(conversation)
-          ? conversation.group
-          : null
-  if (!summary) return null
-  const agentRunLabel = agentRunStatusLabel(
-    isAgentInboxConversation(conversation)
-      ? conversation.agent.agentRunStatus
-      : null,
-    t,
-  )
-  const preview = conversationPreview(conversation, summary, t)
+  if (!inboxConversationSummary(conversation)) return null
   // 按全部队列查看待分配会话时标明所属团队队列，公共队列不加标签。
   const queueTeamName =
     showQueueTeam && isCustomerInboxConversation(conversation)
       ? conversation.customer.teamName
       : null
-  const formattedTime = formatTime(summary.lastMessageAt)
   const isInternal = isInternalInboxConversation(conversation)
   return (
     <ConversationListMenu
@@ -102,14 +73,7 @@ function ConversationRow({
         <button
           type="button"
           ref={sortable?.setNodeRef}
-          style={
-            sortable
-              ? {
-                  transform: CSS.Translate.toString(sortable.transform),
-                  transition: sortable.transition,
-                }
-              : undefined
-          }
+          style={pinSortableStyle(sortable)}
           {...sortable?.attributes}
           {...sortable?.listeners}
           data-inbox-id={conversation.id}
@@ -148,64 +112,14 @@ function ConversationRow({
               : undefined
           }
         >
-          <span className="relative shrink-0">
-            <ConversationAvatar conversation={conversation} className="size-8" />
-            <ConversationUnreadBadge conversation={conversation} />
-          </span>
-          <span className="min-w-0 flex-1 overflow-hidden">
-            <span className="grid min-w-0 grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5">
-              <span className="flex min-w-0 items-center gap-1.5">
-                <span className="min-w-0 flex-1 truncate text-sm font-medium">
-                  {name}
-                </span>
-                {agentRunLabel ? (
-                  <span className="shrink-0 text-[10.5px] text-muted-foreground">
-                    {agentRunLabel}
-                  </span>
-                ) : null}
-                {queueTeamName ? (
-                  <span className="max-w-24 shrink-0 truncate text-[10.5px] text-muted-foreground">
-                    {queueTeamName}
-                  </span>
-                ) : null}
-              </span>
-              <span className="flex shrink-0 items-center gap-1.5">
-                {formattedTime ? (
-                  <time
-                    dateTime={summary.lastMessageAt ?? undefined}
-                    className={cn(
-                      "shrink-0 text-[10.5px] text-muted-foreground",
-                      selected &&
-                        "text-accent-foreground/75",
-                    )}
-                  >
-                    {formattedTime}
-                  </time>
-                ) : null}
-              </span>
-            </span>
-            <span className="mt-px flex min-w-0 items-center gap-1.5">
-              <span
-                title={preview}
-                className={cn(
-                  "min-w-0 flex-1 truncate text-xs text-muted-foreground",
-                  selected &&
-                    "text-accent-foreground/75",
-                )}
-              >
-                {preview}
-              </span>
-              {showAssignee ? (
-                <ConversationAssigneeAvatar conversation={conversation} className="size-4" />
-              ) : null}
-              {isInternal && conversation.muted ? (
-                <BellOffIcon
-                  className="size-3 shrink-0 text-muted-foreground"
-                  aria-label={t("conversationMuted")}
-                />
-              ) : null}
-            </span>
-          </span>
+          <ConversationRowContent
+            conversation={conversation}
+            name={name}
+            density="compact"
+            selected={selected}
+            showAssignee={showAssignee}
+            queueTeamName={queueTeamName}
+          />
         </button>
     </ConversationListMenu>
   )
@@ -213,12 +127,7 @@ function ConversationRow({
 
 /** 置顶区内可拖动与键盘排序的会话项，保存期间停用排序。 */
 function SortableConversationRow(props: ConversationRowProps) {
-  const { t } = useTranslation("inbox")
-  const sortable = useSortable({
-    id: props.conversation.id,
-    disabled: props.actions.saving,
-    attributes: { roleDescription: t("pinSortRole") },
-  })
+  const sortable = usePinSortable(props.conversation.id, props.actions.saving)
   return <ConversationRow {...props} sortable={sortable} />
 }
 
@@ -258,7 +167,6 @@ export function InboxConversationList({
       conversationName(conversation),
     ]),
   )
-  const rows = new Map(conversations.map((conversation) => [conversation.id, conversation]))
   const row = (conversation: InboxConversation) => ({
     conversation,
     name: names.get(conversation.id) ?? "",
@@ -272,18 +180,19 @@ export function InboxConversationList({
     onOpenInWindow,
   })
   return (
-    <>
-      <PinnedSortArea
-        conversations={conversations}
-        pinnedIds={pinnedIds}
-        names={names}
-        pinOrderVersion={pinOrderVersion}
-        actions={actions}
-        onDraggingChange={onDraggingChange}
-      >
-        {(order) => order.flatMap((id) => rows.has(id) ? [<SortableConversationRow key={id} {...row(rows.get(id)!)} />] : [])}
-      </PinnedSortArea>
-      {conversations.flatMap((conversation) => pinnedIds.includes(conversation.id) ? [] : [<ConversationRow key={conversation.id} {...row(conversation)} />])}
-    </>
+    <PinnedConversationList
+      conversations={conversations}
+      pinnedIds={pinnedIds}
+      names={names}
+      pinOrderVersion={pinOrderVersion}
+      actions={actions}
+      onDraggingChange={onDraggingChange}
+      renderPinned={(conversation) => (
+        <SortableConversationRow key={conversation.id} {...row(conversation)} />
+      )}
+      renderRow={(conversation) => (
+        <ConversationRow key={conversation.id} {...row(conversation)} />
+      )}
+    />
   )
 }

@@ -1,12 +1,12 @@
 /** 文档列表按单列行布局展示名称、索引状态和来源信息，文档操作通过行操作菜单完成。 */
-import { useState } from "react"
 import { toast } from "sonner"
 import { refetchKnowledgeDocument, retryKnowledgeDocument, isApiError, KnowledgeDocumentSourceKind } from "@/api"
 import { resourceKeys } from "@/hooks/resource-keys"
+import { usePendingIds } from "@/hooks/use-pending-ids"
 import { useResourceInvalidator } from "@/hooks/use-resource"
 import { recoverSession } from "@/lib/session-navigation"
 import { apiErrorMessage } from "@/lib/form-errors"
-import { useNavigate, useParams } from "react-router"
+import { useNavigate } from "react-router"
 import {
   FileBracesIcon,
   FileCodeIcon,
@@ -63,6 +63,7 @@ function formatName(format: string) {
 
 /** 显示文档列表，右键行或点行尾「⋯」打开文档操作菜单。 */
 export function KnowledgeDocumentTable({
+  knowledgeBaseId,
   data,
   listPath,
   search,
@@ -72,6 +73,7 @@ export function KnowledgeDocumentTable({
   onAction,
   onPage,
 }: {
+  knowledgeBaseId: string
   data: KnowledgeDocumentListData
   listPath: string
   search: string
@@ -83,31 +85,26 @@ export function KnowledgeDocumentTable({
 }) {
   const { t } = useTranslation(["knowledgeBase", "common"])
   const { formatDateTime } = useDateTime()
-  const { knowledgeBaseId = "" } = useParams()
   const invalidate = useResourceInvalidator()
   const navigate = useNavigate()
-  const [retryingIDs, setRetryingIDs] = useState<ReadonlySet<string>>(new Set())
+  const retrying = usePendingIds()
 
   /** 提交重试或重新抓取，并在结束后刷新列表和详情中的文档状态。 */
-  async function retryDocument(document: KnowledgeDocumentData, refetch = false) {
-    setRetryingIDs((current) => new Set(current).add(document.id))
-    try {
-      if (refetch) await refetchKnowledgeDocument(knowledgeBaseId, document.id, { sourceUrl: "" })
-      else await retryKnowledgeDocument(knowledgeBaseId, document.id)
-    } catch (error) {
-      if (!recoverSession(error, navigate)) toast.error(isApiError(error) ? apiErrorMessage(error) : t(refetch ? "documents.refetchFailed" : "documents.retryFailed"))
-    } finally {
-      await Promise.all([
-        invalidate(resourceKeys.knowledgeDocuments(knowledgeBaseId)),
-        invalidate(resourceKeys.knowledgeDocument(knowledgeBaseId, document.id)),
-        invalidate(resourceKeys.knowledgeDocumentContent(knowledgeBaseId, document.id)),
-      ])
-      setRetryingIDs((current) => {
-        const next = new Set(current)
-        next.delete(document.id)
-        return next
-      })
-    }
+  function retryDocument(document: KnowledgeDocumentData, refetch = false) {
+    return retrying.run(document.id, async () => {
+      try {
+        if (refetch) await refetchKnowledgeDocument(knowledgeBaseId, document.id, { sourceUrl: "" })
+        else await retryKnowledgeDocument(knowledgeBaseId, document.id)
+      } catch (error) {
+        if (!recoverSession(error, navigate)) toast.error(isApiError(error) ? apiErrorMessage(error) : t(refetch ? "documents.refetchFailed" : "documents.retryFailed"))
+      } finally {
+        await Promise.all([
+          invalidate(resourceKeys.knowledgeDocuments(knowledgeBaseId)),
+          invalidate(resourceKeys.knowledgeDocument(knowledgeBaseId, document.id)),
+          invalidate(resourceKeys.knowledgeDocumentContent(knowledgeBaseId, document.id)),
+        ])
+      }
+    })
   }
 
   return (
@@ -187,7 +184,7 @@ export function KnowledgeDocumentTable({
           {
             key: "reprocess",
             label: t("documents.reprocess"),
-            disabled: retryingIDs.has(document.id),
+            disabled: retrying.pendingIds.has(document.id),
             onSelect: () => void retryDocument(document),
           },
           ...(document.sourceKind === KnowledgeDocumentSourceKind.KnowledgeDocumentSourceWeb
@@ -195,7 +192,7 @@ export function KnowledgeDocumentTable({
                 {
                   key: "refetch",
                   label: t("documents.refetch"),
-                  disabled: retryingIDs.has(document.id),
+                  disabled: retrying.pendingIds.has(document.id),
                   onSelect: () => void retryDocument(document, true),
                 },
               ]

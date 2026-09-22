@@ -5,6 +5,7 @@ import { useLocation, useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import { loadInbox, logout, WorkStatus, type Identity } from "@/api"
+import { UnsavedChangesGuard } from "@/components/unsaved-changes-guard"
 import {
   WorkspaceProvider,
   type WorkspaceOutletContext,
@@ -20,7 +21,6 @@ import {
   WorkspaceHistoryNav,
   useWorkspaceHistory,
 } from "@/features/workspace/workspace-history-nav"
-import { WorkspaceNavigationGuard } from "@/features/workspace/workspace-navigation-guard"
 import { WorkspaceNavigation } from "@/features/workspace/workspace-navigation"
 import {
   defaultWorkspaceHref,
@@ -236,7 +236,7 @@ function WorkspaceShell({ identity }: { identity: Identity }) {
   const showTitlebarActions = !railCollapsed && nativeHistoryNav
 
   return (
-    <WorkspaceNavigationGuard>
+    <UnsavedChangesGuard>
       <GlobalSearchProvider identity={identity}>
         <div
           className="cervi-workspace-shell relative flex h-svh min-h-0 w-full overflow-hidden"
@@ -278,6 +278,6 @@ function WorkspaceShell({ identity }: { identity: Identity }) {
           </div>
         </div>
       </GlobalSearchProvider>
-    </WorkspaceNavigationGuard>
+    </UnsavedChangesGuard>
   )
 }

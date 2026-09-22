@@ -1,43 +1,31 @@
 /** 本地知识问答的分组列表、搜索和删除操作。 */
-import { useEffect, useRef, useState } from "react"
-import { PlusIcon, SearchCheckIcon } from "lucide-react"
+import { PlusIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { Link, useLocation, useParams } from "react-router"
+import { Link, useLocation } from "react-router"
 
 import {
   KnowledgeBaseCategory,
   deleteKnowledgeQAEntry,
-  getKnowledgeBase,
   listKnowledgeQAEntries,
   type KnowledgeQASummaryData,
 } from "@/api"
-import {
-  ListToolbar,
-  ListToolbarSearch,
-  ListToolbarReset,
-} from "@/components/list-toolbar"
 import { ConfirmationDialog } from "@/components/confirmation-dialog"
-import { PageContent } from "@/components/page-content"
-import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { useConfirmedAction } from "@/hooks/use-confirmed-action"
-import { useListSearchParams } from "@/hooks/use-list-search-params"
-import { useListScrollRestore } from "@/hooks/use-list-scroll-restore"
 import { resourceKeys } from "@/hooks/resource-keys"
-import { useResource } from "@/hooks/use-resource"
 import { KnowledgeQATable } from "@/features/knowledge-base/knowledge-qa-table"
-import { ResourceContent } from "@/components/resource-content"
-import { KnowledgeRetrievalSheet } from "@/features/knowledge-base/knowledge-retrieval-sheet"
+import {
+  KnowledgeGroupListShell,
+  KnowledgeGroupRoute,
+  useKnowledgeGroupList,
+} from "@/features/knowledge-base/knowledge-group-list"
 
 /** 按分组切换列表实例，隔离删除对话框和滚动恢复状态。 */
 export function KnowledgeQAListPage() {
-  const { knowledgeBaseId = "", groupId = "" } = useParams()
   return (
-    <KnowledgeQAGroupList
-      key={`${knowledgeBaseId}/${groupId}`}
-      knowledgeBaseId={knowledgeBaseId}
-      groupId={groupId}
-    />
+    <KnowledgeGroupRoute>
+      {(ids) => <KnowledgeQAGroupList {...ids} />}
+    </KnowledgeGroupRoute>
   )
 }
 
@@ -51,39 +39,15 @@ function KnowledgeQAGroupList({
 }) {
   const { t } = useTranslation(["knowledgeBase", "common"])
   const location = useLocation()
-  const { searchParams, query, search, setSearch, setParameters } =
-    useListSearchParams()
-  const parsedPage = Number(searchParams.get("page") ?? 1)
-  const pageNumber =
-    Number.isSafeInteger(parsedPage) && parsedPage > 0 ? parsedPage : 1
-  const parameters = { groupId, keyword: query, page: pageNumber, pageSize: 20 }
-  const base = useResource(
-    resourceKeys.knowledgeBase(knowledgeBaseId),
-    (signal) => getKnowledgeBase(knowledgeBaseId, signal),
-  )
-  const list = useResource(
-    resourceKeys.knowledgeQAEntries(knowledgeBaseId, parameters),
-    (signal) => listKnowledgeQAEntries(knowledgeBaseId, parameters, signal),
-    {
-      staleTime: 0,
-      keepPreviousData: true,
-      refetchInterval: (data) =>
-        data?.entries.some(
-          (entry) => entry.status === "queued" || entry.status === "running",
-        )
-          ? 2000
-          : false,
-    },
-  )
-  const groups =
-    base.data?.groups.flatMap((group) => [group, ...group.children]) ?? []
-  const group = groups.find((item) => item.id === groupId)
-  const groupName = group?.isDefault ? t("group.default") : group?.name
-  const listPath = `/knowledge-bases/${knowledgeBaseId}/groups/${groupId}/qa`
-  const scroll = useListScrollRestore(
-    `${listPath}${location.search}`,
-    Boolean(list.data && !list.isPlaceholderData && base.data),
-  )
+  const list = useKnowledgeGroupList({
+    knowledgeBaseId,
+    groupId,
+    section: "qa",
+    listKey: (parameters) => resourceKeys.knowledgeQAEntries(knowledgeBaseId, parameters),
+    load: (parameters, signal) => listKnowledgeQAEntries(knowledgeBaseId, parameters, signal),
+    processing: (data) =>
+      data.entries.some((entry) => entry.status === "queued" || entry.status === "running"),
+  })
   const deletion = useConfirmedAction<KnowledgeQASummaryData>({
     action: (entry) => deleteKnowledgeQAEntry(knowledgeBaseId, entry.id),
     invalidateKeys: (entry) => [
@@ -94,85 +58,40 @@ function KnowledgeQAGroupList({
     successMessage: () => t("qa.deleteSuccess"),
     errorMessage: () => t("qa.deleteError"),
   })
-  const [retrievalOpen, setRetrievalOpen] = useState(false)
-  const retrievalTrigger = useRef<HTMLButtonElement>(null)
-  const totalPages = Math.max(1, Math.ceil((list.data?.page.total ?? 0) / 20))
-
-  useEffect(() => {
-    if (list.data && !list.isPlaceholderData && pageNumber > totalPages)
-      setParameters(
-        { page: totalPages === 1 ? null : String(totalPages) },
-        true,
-      )
-  }, [list.data, list.isPlaceholderData, pageNumber, setParameters, totalPages])
 
   return (
     <>
-      <PageHeader
-        title={
-          [base.data?.name, groupName].filter(Boolean).join(" · ") ||
-          t("qa.title")
-        }
+      <KnowledgeGroupListShell
+        list={list}
+        knowledgeBaseId={knowledgeBaseId}
+        category={KnowledgeBaseCategory.KnowledgeBaseCategoryQA}
+        fallbackTitle={t("qa.title")}
         description={t("qa.description")}
-      >
-        {list.data && !list.error ? (
-          <>
-            <Button
-              ref={retrievalTrigger}
-              variant="ghost"
-              size="icon-sm"
-              className="shrink-0"
-              aria-label={t("retrieval.action")}
-              title={t("retrieval.action")}
-              onClick={() => setRetrievalOpen(true)}
+        searchLabel={t("qa.search")}
+        errorMessage={t("qa.loadError")}
+        actions={
+          <Button variant="ghost" size="icon-sm" asChild>
+            <Link
+              to={`${list.listPath}/new${location.search}`}
+              aria-label={t("qa.create")}
+              title={t("qa.create")}
             >
-              <SearchCheckIcon />
-            </Button>
-            <Button variant="ghost" size="icon-sm" asChild>
-              <Link
-                to={`${listPath}/new${location.search}`}
-                aria-label={t("qa.create")}
-                title={t("qa.create")}
-              >
-                <PlusIcon />
-              </Link>
-            </Button>
-          </>
-        ) : null}
-      </PageHeader>
-      <ListToolbar>
-        <ListToolbarSearch
-          value={search}
-          aria-label={t("qa.search")}
-          onChange={(event) => setSearch(event.target.value)}
+              <PlusIcon />
+            </Link>
+          </Button>
+        }
+      >
+        <KnowledgeQATable
+          knowledgeBaseId={knowledgeBaseId}
+          data={list.list.data!}
+          loading={list.list.isPlaceholderData || list.list.refreshing}
+          listPath={list.listPath}
+          search={location.search}
+          filtered={list.query !== ""}
+          onDelete={deletion.select}
+          onPageChange={list.changePage}
         />
-        {search ? (
-          <ListToolbarReset
-            onClick={() => {
-              setSearch("")
-              setParameters({ q: null, page: null })
-            }}
-          >
-            {t("common:actions.clearFilters")}
-          </ListToolbarReset>
-        ) : null}
-      </ListToolbar>
-      <PageContent ref={scroll.ref} onScroll={scroll.onScroll}>
-        <ResourceContent resources={[base, list]} errorMessage={t("qa.loadError")}>
-          <KnowledgeQATable
-            knowledgeBaseId={knowledgeBaseId}
-            data={list.data!}
-            loading={list.isPlaceholderData || list.refreshing}
-            listPath={listPath}
-            search={location.search}
-            filtered={query !== ""}
-            onDelete={deletion.select}
-            onPageChange={(page) =>
-              setParameters({ page: page === 1 ? null : String(page) })
-            }
-          />
-        </ResourceContent>
-      </PageContent>
+      </KnowledgeGroupListShell>
       <ConfirmationDialog
         {...deletion.dialog}
         title={t("qa.deleteTitle")}
@@ -185,13 +104,6 @@ function KnowledgeQAGroupList({
           </span>
         }
         pendingLabel={t("common:actions.deleting")}
-      />
-      <KnowledgeRetrievalSheet
-        open={retrievalOpen}
-        onOpenChange={setRetrievalOpen}
-        knowledgeBaseId={knowledgeBaseId}
-        category={KnowledgeBaseCategory.KnowledgeBaseCategoryQA}
-        triggerRef={retrievalTrigger}
       />
     </>
   )

@@ -1,5 +1,4 @@
 /** 移动端群头像、名称和描述的独立编辑页。 */
-import { useEffect, useRef } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
@@ -15,6 +14,7 @@ import { Button } from "@/components/ui/button"
 import { Field, FieldLabel } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { useFormLifetime } from "@/hooks/use-form-lifetime"
 import { usePendingImageUpload } from "@/hooks/use-pending-image-upload"
 import {
   createGroupProfileSchema,
@@ -68,13 +68,6 @@ function MobileGroupFieldEditor({
       toast.error(t("groupImageUploadError"))
     },
   })
-  const alive = useRef(false)
-  useEffect(() => {
-    alive.current = true
-    return () => {
-      alive.current = false
-    }
-  }, [])
   const label = t(
     field === "image"
       ? "groupImageLabel"
@@ -92,13 +85,16 @@ function MobileGroupFieldEditor({
     shouldUseNativeValidation: true,
     defaultValues: { value: field === "image" ? "" : group[field] },
   })
+  const { mounted, dirty } = useFormLifetime(
+    form.formState.isDirty || image.pending !== null,
+  )
 
   /** 保存当前字段，离开编辑页后忽略迟到的导航结果。 */
   async function save(values: z.infer<typeof schema>) {
     // 上传失败由图片 Hook 提示，保留候选供再次保存时重试。
     const imageFileID =
       field === "image" ? await image.ensureUploaded().catch(() => null) : null
-    if (!alive.current || (field === "image" && !imageFileID)) return
+    if (!mounted.current || (field === "image" && !imageFileID)) return
     const success = await onSave(() =>
       updateGroupConversation(group.id, {
         title: field === "title" ? values.value : group.title,
@@ -106,7 +102,12 @@ function MobileGroupFieldEditor({
         imageFileId: field === "image" ? imageFileID : null,
       }),
     )
-    if (success && alive.current) close()
+    if (!success || !mounted.current) return
+    // 同步重置表单和图片候选，返回前的重新渲染保持无未保存内容。
+    form.reset(values)
+    image.clear()
+    dirty.current = false
+    close()
   }
 
   const uploading = image.pending?.status === "uploading"

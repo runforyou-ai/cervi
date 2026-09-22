@@ -25,7 +25,6 @@ export function ConfirmationDialog({
   pendingLabel,
   confirmLabel,
   cancelLabel,
-  touch = false,
   onOpenChange,
   onConfirm,
   onCloseAutoFocus,
@@ -38,14 +37,13 @@ export function ConfirmationDialog({
   pendingLabel?: string
   confirmLabel?: string
   cancelLabel?: string
-  touch?: boolean
   onOpenChange: (open: boolean) => void
   onConfirm: () => void
   onCloseAutoFocus?: ComponentProps<typeof AlertDialogContent>["onCloseAutoFocus"]
 }) {
   const { t } = useTranslation("common")
   // 移动端按钮使用触屏尺寸。
-  const buttonClassName = touch ? "min-h-11" : undefined
+  const buttonClassName = "touch:min-h-11"
   return (
     <AlertDialog
       open={open}
