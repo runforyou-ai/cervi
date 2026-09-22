@@ -123,7 +123,7 @@ func (a *UpdateAgentAction) Execute(ctx context.Context, identity *servermodels.
 				return err
 			}
 		}
-		// 名称或头像实际变化时，在资料写入与退回完成后推进展示该 AI 员工的会话版本；退回已按渠道身份、会话的锁序锁定其负责的会话。
+		// 名称或头像实际变化时，在资料写入与退回完成后推进展示该 AI 员工的会话版本；退回已锁定其负责的会话。
 		if displayChanged {
 			if err := chatstate.TouchIdentityConversations(ctx, tx, identity.Organization.ID, storedAgent.IdentityID); err != nil {
 				return err

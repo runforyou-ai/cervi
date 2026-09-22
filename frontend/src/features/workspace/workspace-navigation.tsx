@@ -4,6 +4,7 @@ import {
   BellIcon,
   BrainCircuitIcon,
   Building2Icon,
+  HeadsetIcon,
   ChevronLeftIcon,
   CodeXmlIcon,
   ContactRoundIcon,
@@ -306,6 +307,13 @@ function WorkspaceSettingsMenu({
           icon={Building2Icon}
         >
           {t("navigation.general")}
+        </PagePaneLink>
+        <PagePaneLink
+          collapsed={collapsed}
+          to="/settings/customer-service"
+          icon={HeadsetIcon}
+        >
+          {t("navigation.customerService")}
         </PagePaneLink>
         <PagePaneLink
           collapsed={collapsed}
