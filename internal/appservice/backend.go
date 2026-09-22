@@ -302,7 +302,7 @@ type Backend interface {
 	// UpdateUser 修改企业成员资料、角色和所属团队。
 	//cervi:route PUT /users/:userID
 	UpdateUser(context.Context, RequestMeta, string, UpdateUserInput) (User, error)
-	// UpdateRoleAssignments 在一个事务中批量调整真人和 AI 员工角色。
+	// UpdateRoleAssignments 在一个事务中批量调整成员角色。
 	//cervi:route PATCH /roles/assignments
 	UpdateRoleAssignments(context.Context, RequestMeta, RoleAssignmentsInput) error
 	// DeactivateUser 禁用企业成员账号。

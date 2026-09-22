@@ -92,9 +92,9 @@ func TestMemberProfileConversationInvalidation(t *testing.T) {
 	f := newProfileFixture(t)
 	ctx := context.Background()
 	// 群主恢复管理员角色，管理员修改成员与停用成员需要企业保留有效管理员。
-	if _, err := f.db.NewUpdate().Table("organization_identities").
+	if _, err := f.db.NewUpdate().Table("users").
 		Set("role_id = (SELECT id FROM roles WHERE organization_id = ? AND kind = ?)", f.owner.Organization.ID, domain.RoleKindAdmin).
-		Where("id = ?", f.owner.OrganizationIdentity.ID).Exec(ctx); err != nil {
+		Where("id = ?", f.owner.User.ID).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
 	// 成员只负责客户会话、尚未发言，客户会话仅经当前负责人关联到成员。
@@ -152,14 +152,14 @@ func TestMemberProfileConversationInvalidation(t *testing.T) {
 	if _, err := profile.Execute(ctx, f.member, useraction.ProfileInput{DisplayName: "成员新名", Email: f.member.User.Email}); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := useraction.NewUpdateUserAction(f.db, testServiceSessionReturner(f.db), newTestTasks(f.db)).Execute(ctx, f.owner, f.member.User.ID, useraction.UpdateInput{DisplayName: "成员新名", Email: "profile-renamed@navigation.test", RoleID: f.member.OrganizationIdentity.RoleID, HandlesCustomers: true, MaxServiceSessions: 10}); err != nil {
+	if _, err := useraction.NewUpdateUserAction(f.db, testServiceSessionReturner(f.db), newTestTasks(f.db)).Execute(ctx, f.owner, f.member.User.ID, useraction.UpdateInput{DisplayName: "成员新名", Email: "profile-renamed@navigation.test", RoleID: f.member.User.RoleID, HandlesCustomers: true, MaxServiceSessions: 10}); err != nil {
 		t.Fatal(err)
 	}
 	f.expectVersions(t, "名称未变", after, 0)
 	feed.expect(t, feed.notice(f.member.User.ID, realtime.KindIdentityProfileChanged, "", loadProfileVersion(t, f.db, f.member.User.ID)))
 
 	// 管理员改名同样推进。
-	if _, err := useraction.NewUpdateUserAction(f.db, testServiceSessionReturner(f.db), newTestTasks(f.db)).Execute(ctx, f.owner, f.member.User.ID, useraction.UpdateInput{DisplayName: "管理员改的名", Email: "profile-renamed@navigation.test", RoleID: f.member.OrganizationIdentity.RoleID, HandlesCustomers: true, MaxServiceSessions: 10}); err != nil {
+	if _, err := useraction.NewUpdateUserAction(f.db, testServiceSessionReturner(f.db), newTestTasks(f.db)).Execute(ctx, f.owner, f.member.User.ID, useraction.UpdateInput{DisplayName: "管理员改的名", Email: "profile-renamed@navigation.test", RoleID: f.member.User.RoleID, HandlesCustomers: true, MaxServiceSessions: 10}); err != nil {
 		t.Fatal(err)
 	}
 	f.expectVersions(t, "管理员改名", after, 1)
@@ -205,7 +205,6 @@ func TestMemberProfileConversationInvalidation(t *testing.T) {
 func TestAgentProfileConversationInvalidation(t *testing.T) {
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
-	roleID := f.owner.OrganizationIdentity.RoleID
 	provider := &servermodels.AIProvider{
 		OrganizationID: f.owner.Organization.ID, Brand: string(domain.AIProviderBrandOpenAI), Name: "资料失效测试模型服务",
 		CredentialType: string(domain.AIProviderCredentialTypeAPIKey), APIKey: "test-key", APIURL: "https://example.com/v1",
@@ -235,7 +234,7 @@ func TestAgentProfileConversationInvalidation(t *testing.T) {
 	}
 	createdAvatarID := uploadAvatar()
 	created, err := agentaction.NewCreateAgentAction(f.db).Execute(ctx, f.owner, agentaction.CreateInput{
-		HandlesCustomers: true, DisplayName: "资料助手", RoleID: roleID, AvatarFileID: createdAvatarID,
+		HandlesCustomers: true, DisplayName: "资料助手", AvatarFileID: createdAvatarID,
 		Execution: agentaction.ExecutionInput{Mode: domain.AgentExecutionModeManaged, Managed: &agentaction.ManagedExecutionInput{ProviderID: provider.ID, ModelIdentifier: model.Identifier, SystemInstruction: "回答问题"}},
 	})
 	if err != nil || created.AvatarFileID == nil || *created.AvatarFileID != createdAvatarID {
@@ -273,13 +272,13 @@ func TestAgentProfileConversationInvalidation(t *testing.T) {
 	update := agentaction.NewUpdateAgentAction(f.db, testServiceSessionReturner(f.db))
 	status := agentaction.NewUpdateStatusAction(f.db, testServiceSessionReturner(f.db))
 	rename := func(name string, workStatus domain.WorkStatus) error {
-		_, err := update.Execute(ctx, f.owner, created.ID, agentaction.UpdateInput{DisplayName: name, RoleID: roleID, WorkStatus: workStatus})
+		_, err := update.Execute(ctx, f.owner, created.ID, agentaction.UpdateInput{DisplayName: name, WorkStatus: workStatus})
 		return err
 	}
 	firstAvatarID, secondAvatarID := uploadAvatar(), uploadAvatar()
 	// changeAvatar 保持名称与工作状态，只提交头像。
 	changeAvatar := func(fileID string) error {
-		_, err := update.Execute(ctx, f.owner, created.ID, agentaction.UpdateInput{DisplayName: "资料助手新名", RoleID: roleID, WorkStatus: domain.WorkStatusAway, AvatarFileID: fileID})
+		_, err := update.Execute(ctx, f.owner, created.ID, agentaction.UpdateInput{DisplayName: "资料助手新名", WorkStatus: domain.WorkStatusAway, AvatarFileID: fileID})
 		return err
 	}
 	for _, step := range []struct {

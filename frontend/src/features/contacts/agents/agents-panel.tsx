@@ -26,7 +26,6 @@ import {
 import { ContactCreateDialogs } from "@/features/contacts/contact-create-dialogs"
 import { ContactListSection } from "@/features/contacts/contact-list-section"
 import { useContactSearch } from "@/features/contacts/use-contact-search"
-import { roleDisplayName } from "@/lib/role-labels"
 import { contactResourceKeys } from "@/features/contacts/use-contact-invalidator"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
@@ -115,7 +114,6 @@ export function AgentsPanel({
                   }}
                   status={agent.workStatus}
                   name={agent.displayName}
-                  secondary={roleDisplayName(agent.role, tCommon)}
                 />
               ),
             },

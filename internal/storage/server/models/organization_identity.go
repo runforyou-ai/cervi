@@ -15,7 +15,6 @@ type OrganizationIdentity struct {
 	ID                  string    `bun:"id,pk"`
 	OrganizationID      string    `bun:"organization_id"`
 	Type                string    `bun:"type"`
-	RoleID              string    `bun:"role_id"`
 	DisplayName         string    `bun:"display_name"`
 	AvatarFileID        *string   `bun:"avatar_file_id"`
 	HandlesCustomers    bool      `bun:"handles_customers"`

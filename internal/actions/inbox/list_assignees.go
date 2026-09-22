@@ -28,7 +28,7 @@ func NewListCustomerServiceAssigneesQuery(db *bun.DB) *ListCustomerServiceAssign
 	return &ListCustomerServiceAssigneesQuery{db: db}
 }
 
-// Execute 返回角色为客服且账号有效的真人和 AI 员工。
+// Execute 返回开启接待且账号有效的真人和 AI 员工。
 func (q *ListCustomerServiceAssigneesQuery) Execute(ctx context.Context, identity *servermodels.Identity) ([]CustomerServiceAssignee, error) {
 	identities, err := identityaction.ListActiveCustomerHandlingIdentities(ctx, q.db, identity.Organization.ID)
 	if err != nil {

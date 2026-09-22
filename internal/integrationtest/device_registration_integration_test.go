@@ -47,7 +47,7 @@ func newDeviceFixture(t *testing.T) deviceFixture {
 	owner := installed.Identity
 	memberEmail := "member@" + suffix + ".device.test"
 	if _, err := useraction.NewCreateUserAction(db, newTestTasks(db)).Execute(ctx, owner, useraction.CreateInput{
-		DisplayName: "另一名成员", Email: memberEmail, Password: "password123", RoleID: owner.OrganizationIdentity.RoleID,
+		DisplayName: "另一名成员", Email: memberEmail, Password: "password123", RoleID: owner.User.RoleID,
 	}); err != nil {
 		t.Fatal(err)
 	}

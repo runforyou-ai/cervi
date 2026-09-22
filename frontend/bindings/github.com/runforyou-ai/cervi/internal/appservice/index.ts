@@ -55,7 +55,6 @@ export {
     MessageVisibility,
     NotificationPermissionStatus,
     OrganizationIdentityType,
-    PermissionAppliesTo,
     PermissionCode,
     PermissionLevel,
     PermissionResource,

@@ -34,10 +34,10 @@ func (g *testCustomerReplyGenerator) GenerateReplyCandidates(_ context.Context, 
 }
 
 // testCustomerReplySuggestions 验证 AI 写回复的资格校验、上下文范围，以及不产生运行记录和消息。
-func testCustomerReplySuggestions(t *testing.T, db *bun.DB, identity *servermodels.Identity, roleID, providerID, modelID string) {
+func testCustomerReplySuggestions(t *testing.T, db *bun.DB, identity *servermodels.Identity, providerID, modelID string) {
 	ctx := context.Background()
 	created, err := agentaction.NewCreateAgentAction(db).Execute(ctx, identity, agentaction.CreateInput{
-		HandlesCustomers: true, DisplayName: "回复建议助手", RoleID: roleID,
+		HandlesCustomers: true, DisplayName: "回复建议助手",
 		Execution: agentaction.ExecutionInput{Mode: domain.AgentExecutionModeManaged, Managed: &agentaction.ManagedExecutionInput{ProviderID: providerID, ModelIdentifier: modelID, SystemInstruction: "你是售后客服"}},
 	})
 	if err != nil {
@@ -229,7 +229,7 @@ func testCustomerReplySuggestions(t *testing.T, db *bun.DB, identity *servermode
 		}
 	})
 	t.Run("Telegram 渠道不可外发", func(t *testing.T) {
-		f := newAgentTelegramFixture(t, db, identity, roleID, providerID, modelID)
+		f := newAgentTelegramFixture(t, db, identity, providerID, modelID)
 		input := agentrunaction.CustomerReplySuggestionsInput{
 			ConversationID: f.run.ConversationID, AgentIdentityID: created.IdentityID,
 			Mode: domain.CustomerReplyModeReply, Tone: domain.CustomerReplyToneKeep,

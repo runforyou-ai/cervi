@@ -89,11 +89,11 @@ func (r *testDirectReplyRuntime) Run(ctx context.Context, request agentruntime.R
 }
 
 // testAgentDirectReplies 验证历史窗口外的引用、引用删除和连续引用进入真实 Agent 输入流。
-func testAgentDirectReplies(t *testing.T, db *bun.DB, identity *servermodels.Identity, roleID, providerID, modelID string) {
+func testAgentDirectReplies(t *testing.T, db *bun.DB, identity *servermodels.Identity, providerID, modelID string) {
 	t.Helper()
 	ctx := context.Background()
 	created, err := agentaction.NewCreateAgentAction(db).Execute(ctx, identity, agentaction.CreateInput{
-		DisplayName: "引用助手", RoleID: roleID,
+		DisplayName: "引用助手",
 		Execution: agentaction.ExecutionInput{Mode: domain.AgentExecutionModeManaged, Managed: &agentaction.ManagedExecutionInput{
 			ProviderID: providerID, ModelIdentifier: modelID, SystemInstruction: "结合引用回答问题",
 		}},

@@ -51,27 +51,11 @@ const (
 	PermissionLevelManage PermissionLevel = PermissionLevel(domain.PermissionLevelManage)
 )
 
-// PermissionAppliesTo 表示权限适用的企业身份类型。
-type PermissionAppliesTo string
-
-const (
-	PermissionAppliesToMember PermissionAppliesTo = PermissionAppliesTo(domain.PermissionAppliesToMember)
-	PermissionAppliesToAgent  PermissionAppliesTo = PermissionAppliesTo(domain.PermissionAppliesToAgent)
-	PermissionAppliesToBoth   PermissionAppliesTo = PermissionAppliesTo(domain.PermissionAppliesToBoth)
-)
-
 // PermissionDefinition 定义权限目录中的一项权限。
 type PermissionDefinition struct {
-	Code      PermissionCode      `json:"code"`
-	Resource  PermissionResource  `json:"resource"`
-	Level     PermissionLevel     `json:"level"`
-	AppliesTo PermissionAppliesTo `json:"appliesTo"`
-}
-
-// AgentBehaviorProfile 定义 AI 员工的内置工作规则与可用工具。
-type AgentBehaviorProfile struct {
-	Instruction string   `json:"instruction"`
-	Tools       []string `json:"tools"`
+	Code     PermissionCode     `json:"code"`
+	Resource PermissionResource `json:"resource"`
+	Level    PermissionLevel    `json:"level"`
 }
 
 // Role 定义企业角色及其权限。
@@ -107,7 +91,7 @@ type RoleInput struct {
 	Permissions []PermissionCode `json:"permissions"`
 }
 
-// RoleAssignmentInput 定义一个企业身份的目标角色。
+// RoleAssignmentInput 定义一个成员的目标角色。
 type RoleAssignmentInput struct {
 	IdentityID string `json:"identityId"`
 	RoleID     string `json:"roleId"`

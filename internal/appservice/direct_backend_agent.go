@@ -52,7 +52,7 @@ func newAgentOps(db *bun.DB, agentCoordinator *agentrunaction.ExecuteAction, cus
 // CreateAgent 创建企业 AI 员工。
 func (o *directOperations) CreateAgent(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input CreateAgentInput) (Agent, error) {
 	created, err := o.createAgent.Execute(ctx, identity, agentaction.CreateInput{
-		DisplayName: input.DisplayName, RoleID: input.RoleID, TeamIDs: input.TeamIDs,
+		DisplayName: input.DisplayName, TeamIDs: input.TeamIDs,
 		HandlesCustomers: input.HandlesCustomers, AvatarFileID: input.AvatarFileID,
 		Execution: agentExecutionInput(input.Execution),
 	})
@@ -60,7 +60,6 @@ func (o *directOperations) CreateAgent(ctx context.Context, meta RequestMeta, id
 		return Agent{}, o.agentError(ctx, meta, err, cervii18n.ErrorAgentCreateFailed, identity.Organization.ID, "", map[common.FieldCode]cervii18n.Key{
 			agentaction.ValidationDisplayNameRequired:      cervii18n.FieldAgentNameRequired,
 			agentaction.ValidationDisplayNameInvalid:       cervii18n.FieldDisplayNameInvalid,
-			agentaction.ValidationRoleInvalid:              cervii18n.FieldMemberRoleInvalid,
 			agentaction.ValidationTeamInvalid:              cervii18n.FieldTeamInvalid,
 			agentaction.ValidationExecutionInvalid:         cervii18n.FieldAgentExecutionInvalid,
 			agentaction.ValidationKnowledgeBaseInvalid:     cervii18n.FieldAgentKnowledgeBaseInvalid,
@@ -145,7 +144,7 @@ func (o *directOperations) ListAgents(ctx context.Context, meta RequestMeta, ide
 			}
 		}
 		execution := AgentExecutionSummary{RevisionID: agent.Execution.RevisionID, Mode: AgentExecutionMode(agent.Execution.Mode), Managed: managed}
-		agents = append(agents, AgentListItem{ID: agent.ID, IdentityID: agent.IdentityID, DisplayName: agent.DisplayName, AvatarURL: optionalFileURL(avatarURLs, agent.AvatarFileID), Role: RoleSummary{ID: agent.RoleID, Kind: RoleKind(agent.RoleKind), Name: agent.RoleName}, Status: UserStatus(agent.Status), WorkStatus: WorkStatus(agent.WorkStatus), Teams: teams, Execution: execution, CreatedAt: agent.CreatedAt})
+		agents = append(agents, AgentListItem{ID: agent.ID, IdentityID: agent.IdentityID, DisplayName: agent.DisplayName, AvatarURL: optionalFileURL(avatarURLs, agent.AvatarFileID), Status: UserStatus(agent.Status), WorkStatus: WorkStatus(agent.WorkStatus), Teams: teams, Execution: execution, CreatedAt: agent.CreatedAt})
 	}
 	return AgentList{Agents: agents, Page: PageInfo{Number: output.Page.Number, Size: output.Page.Size, Total: output.Page.Total}}, nil
 }
@@ -161,12 +160,11 @@ func (o *directOperations) GetAgent(ctx context.Context, meta RequestMeta, ident
 
 // UpdateAgent 保存企业 AI 员工基本资料、头像和工作状态。
 func (o *directOperations) UpdateAgent(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, agentID string, input UpdateAgentInput) (Agent, error) {
-	agent, err := o.updateAgent.Execute(ctx, identity, agentID, agentaction.UpdateInput{DisplayName: input.DisplayName, RoleID: input.RoleID, TeamIDs: input.TeamIDs, HandlesCustomers: input.HandlesCustomers, WorkStatus: domain.WorkStatus(input.WorkStatus), AvatarFileID: input.AvatarFileID})
+	agent, err := o.updateAgent.Execute(ctx, identity, agentID, agentaction.UpdateInput{DisplayName: input.DisplayName, TeamIDs: input.TeamIDs, HandlesCustomers: input.HandlesCustomers, WorkStatus: domain.WorkStatus(input.WorkStatus), AvatarFileID: input.AvatarFileID})
 	if err != nil {
 		return Agent{}, o.agentError(ctx, meta, err, cervii18n.ErrorAgentUpdateFailed, identity.Organization.ID, agentID, map[common.FieldCode]cervii18n.Key{
 			agentaction.ValidationDisplayNameRequired:   cervii18n.FieldAgentNameRequired,
 			agentaction.ValidationDisplayNameInvalid:    cervii18n.FieldDisplayNameInvalid,
-			agentaction.ValidationRoleInvalid:           cervii18n.FieldMemberRoleInvalid,
 			agentaction.ValidationTeamInvalid:           cervii18n.FieldTeamInvalid,
 			agentaction.ValidationWorkStatusInvalid:     cervii18n.FieldWorkStatusInvalid,
 			agentaction.ValidationWorkStatusUnavailable: cervii18n.FieldAgentWorkStatusUnavailable,
@@ -238,7 +236,7 @@ func (o *directOperations) agentWithAvatar(ctx context.Context, meta RequestMeta
 	return output, nil
 }
 
-// agentFromAction 转换 AI 员工契约，并按当前角色附上内置工作规则。
+// agentFromAction 转换 AI 员工契约，并按接待开关附上内置工作规则。
 func agentFromAction(agent agentaction.Agent, organizationName string) Agent {
 	teams := make([]TeamSummary, 0, len(agent.Teams))
 	for _, team := range agent.Teams {
@@ -257,7 +255,7 @@ func agentFromAction(agent agentaction.Agent, organizationName string) Agent {
 	execution := AgentExecution{MCPServerIDs: agent.Execution.MCPServerIDs, RevisionID: agent.Execution.RevisionID, Mode: AgentExecutionMode(agent.Execution.Mode), Managed: managed}
 	instruction, tools := agentrunaction.BehaviorProfile(agent.HandlesCustomers, organizationName)
 	behavior := AgentBehaviorProfile{Instruction: instruction, Tools: tools}
-	return Agent{ID: agent.ID, IdentityID: agent.IdentityID, DisplayName: agent.DisplayName, Role: RoleSummary{ID: agent.RoleID, Kind: RoleKind(agent.RoleKind), Name: agent.RoleName}, HandlesCustomers: agent.HandlesCustomers, Status: UserStatus(agent.Status), WorkStatus: WorkStatus(agent.WorkStatus), Teams: teams, Execution: execution, Behavior: behavior, CreatedAt: agent.CreatedAt}
+	return Agent{ID: agent.ID, IdentityID: agent.IdentityID, DisplayName: agent.DisplayName, HandlesCustomers: agent.HandlesCustomers, Status: UserStatus(agent.Status), WorkStatus: WorkStatus(agent.WorkStatus), Teams: teams, Execution: execution, Behavior: behavior, CreatedAt: agent.CreatedAt}
 }
 
 // agentExecutionInput 转换 AI 员工执行配置输入。

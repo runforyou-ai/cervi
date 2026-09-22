@@ -275,7 +275,6 @@ const settings = {
       emptySelected: "还没有成员",
       noSearchResults: "没有匹配的成员",
       assignedTo: "已属于“{{role}}”",
-      aiEmployee: "AI 员工",
       add: "加入",
     },
     validation: {

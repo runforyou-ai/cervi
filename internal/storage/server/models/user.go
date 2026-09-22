@@ -15,6 +15,7 @@ type User struct {
 	ID                          string     `bun:"id,pk"`
 	IdentityID                  string     `bun:"identity_id"`
 	OrganizationID              string     `bun:"organization_id"`
+	RoleID                      string     `bun:"role_id"`
 	Email                       string     `bun:"email"`
 	PasswordHash                string     `bun:"password_hash,nullzero"`
 	Status                      string     `bun:"status"`

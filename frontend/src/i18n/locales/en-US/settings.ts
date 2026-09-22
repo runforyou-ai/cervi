@@ -281,7 +281,6 @@ const settings = {
       emptySelected: "No members have been added",
       noSearchResults: "No matching members",
       assignedTo: "Already in “{{role}}”",
-      aiEmployee: "AI employee",
       add: "Add",
     },
     validation: {

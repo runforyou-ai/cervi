@@ -8,7 +8,7 @@ import {
   useSearchParams,
 } from "react-router"
 
-import { getAgent, isNotFoundApiError, listRoles, listTeams } from "@/api"
+import { getAgent, isNotFoundApiError, listTeams } from "@/api"
 import { PageContent } from "@/components/page-content"
 import { PageBackButton } from "@/components/page-back-button"
 import { PageHeader } from "@/components/page-header"
@@ -30,7 +30,6 @@ export function AgentFormPage({ mode }: { mode: "create" | "edit" }) {
   const navigate = useNavigate()
   const location = useLocation()
   const invalidateContact = useContactInvalidator()
-  const roles = useResource(resourceKeys.roles(), () => listRoles())
   const teams = useResource(
     resourceKeys.teams({ pageSize: 100 }),
     () => listTeams({ pageSize: 100 }),
@@ -81,12 +80,11 @@ export function AgentFormPage({ mode }: { mode: "create" | "edit" }) {
       </PageHeader>
       <PageContent variant="form">
         <ResourceContent
-          resources={mode === "edit" ? [roles, teams, detail] : [roles]}
+          resources={mode === "edit" ? [teams, detail] : []}
           errorMessage={t("agents.form.loadError")}
         >
         {mode === "create" ? (
           <AgentForm
-            roles={roles.data?.roles ?? []}
             defaultTeamIds={teamId ? [teamId] : []}
             onCancel={() => navigate(returnTo)}
             onSaved={(created) => {
@@ -119,8 +117,7 @@ export function AgentFormPage({ mode }: { mode: "create" | "edit" }) {
             >
               <AgentProfileForm
                 agent={agent}
-                roles={roles.data?.roles ?? []}
-                teams={teams.data?.teams ?? []}
+                    teams={teams.data?.teams ?? []}
                 onSaved={() => {
                   void invalidateContact("agent", agent.id)
                 }}

@@ -210,7 +210,7 @@ func TestSyncHeadsConversationChanges(t *testing.T) {
 func TestSyncHeadsIdentityProfile(t *testing.T) {
 	f := newNavigationFixture(t)
 	ctx := context.Background()
-	if _, err := useraction.NewCreateUserAction(f.db, newTestTasks(f.db)).Execute(ctx, f.owner, useraction.CreateInput{HandlesCustomers: true, MaxServiceSessions: 10, DisplayName: "无会话成员", Email: "lonely@navigation.test", Password: "password123", RoleID: f.owner.OrganizationIdentity.RoleID}); err != nil {
+	if _, err := useraction.NewCreateUserAction(f.db, newTestTasks(f.db)).Execute(ctx, f.owner, useraction.CreateInput{HandlesCustomers: true, MaxServiceSessions: 10, DisplayName: "无会话成员", Email: "lonely@navigation.test", Password: "password123", RoleID: f.owner.User.RoleID}); err != nil {
 		t.Fatal(err)
 	}
 	loginAction := authaction.NewLoginAction(f.db)
@@ -268,7 +268,7 @@ func TestSyncHeadsIdentityProfile(t *testing.T) {
 			return err
 		}},
 		{"管理员修改邮箱", func() error {
-			_, err := updateUser.Execute(ctx, f.owner, lonely.User.ID, useraction.UpdateInput{DisplayName: "改名成员", Email: "renamed@navigation.test", RoleID: lonely.OrganizationIdentity.RoleID})
+			_, err := updateUser.Execute(ctx, f.owner, lonely.User.ID, useraction.UpdateInput{DisplayName: "改名成员", Email: "renamed@navigation.test", RoleID: lonely.User.RoleID})
 			return err
 		}},
 	} {
