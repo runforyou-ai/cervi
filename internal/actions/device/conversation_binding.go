@@ -59,9 +59,6 @@ func (a *ConversationBindingAction) Bind(ctx context.Context, identity *servermo
 	if !common.ValidUUID(conversationID) {
 		return nil, chatstate.ErrConversationNotFound
 	}
-	if !common.ValidUUID(workspaceID) {
-		return nil, ErrWorkspaceNotFound
-	}
 	var binding *BindingRecord
 	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
@@ -71,33 +68,7 @@ func (a *ConversationBindingAction) Bind(ctx context.Context, identity *servermo
 		if err != nil {
 			return err
 		}
-		var deviceID string
-		err = tx.NewSelect().Model((*servermodels.DeviceWorkspace)(nil)).Column("dw.device_id").
-			Join("JOIN devices AS d ON d.id = dw.device_id AND d.organization_id = dw.organization_id").
-			Where("dw.organization_id = ? AND dw.id = ?", identity.Organization.ID, workspaceID).
-			Where("d.user_id = ? AND d.revoked_at IS NULL", identity.User.ID).
-			For("SHARE OF d").Scan(ctx, &deviceID)
-		if errors.Is(err, sql.ErrNoRows) {
-			return ErrWorkspaceNotFound
-		}
-		if err != nil {
-			return fmt.Errorf("load binding workspace: %w", err)
-		}
-		if _, err := tx.NewInsert().Model(&servermodels.ConversationDeviceBinding{
-			OrganizationID: identity.Organization.ID, ConversationID: conversationID, DeviceID: deviceID, WorkspaceID: workspaceID,
-			PeerTriggerCapability: domain.PeerTriggerCapabilityOff, BoundByUserID: identity.User.ID,
-		}).
-			Column("organization_id", "conversation_id", "device_id", "workspace_id", "peer_trigger_capability", "bound_by_user_id").
-			On("CONFLICT (organization_id, conversation_id) DO UPDATE").
-			Set("device_id = EXCLUDED.device_id").
-			Set("workspace_id = EXCLUDED.workspace_id").
-			Set("bound_by_user_id = EXCLUDED.bound_by_user_id").
-			Set("updated_at = now()").
-			Exec(ctx); err != nil {
-			return fmt.Errorf("save conversation device binding: %w", err)
-		}
-		binding, err = loadBinding(ctx, tx, identity.Organization.ID, conversationID)
-		if err != nil {
+		if binding, err = SaveConversationBinding(ctx, tx, identity, conversationID, workspaceID); err != nil {
 			return err
 		}
 		return chatstate.TouchConversation(ctx, tx, conversation)
@@ -108,6 +79,39 @@ func (a *ConversationBindingAction) Bind(ctx context.Context, identity *servermo
 	slog.Info("会话已绑定设备工作区", "organization_id", identity.Organization.ID, "conversation_id", conversationID,
 		"device_id", binding.DeviceID, "workspace_id", workspaceID)
 	return binding, nil
+}
+
+// SaveConversationBinding 在调用方已锁定的 AI 单聊上，把会话绑定到当前成员本人未撤销设备上的工作区，已有绑定时替换。
+func SaveConversationBinding(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, conversationID, workspaceID string) (*BindingRecord, error) {
+	if !common.ValidUUID(workspaceID) {
+		return nil, ErrWorkspaceNotFound
+	}
+	var deviceID string
+	err := tx.NewSelect().Model((*servermodels.DeviceWorkspace)(nil)).Column("dw.device_id").
+		Join("JOIN devices AS d ON d.id = dw.device_id AND d.organization_id = dw.organization_id").
+		Where("dw.organization_id = ? AND dw.id = ?", identity.Organization.ID, workspaceID).
+		Where("d.user_id = ? AND d.revoked_at IS NULL", identity.User.ID).
+		For("SHARE OF d").Scan(ctx, &deviceID)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil, ErrWorkspaceNotFound
+	}
+	if err != nil {
+		return nil, fmt.Errorf("load binding workspace: %w", err)
+	}
+	if _, err := tx.NewInsert().Model(&servermodels.ConversationDeviceBinding{
+		OrganizationID: identity.Organization.ID, ConversationID: conversationID, DeviceID: deviceID, WorkspaceID: workspaceID,
+		PeerTriggerCapability: domain.PeerTriggerCapabilityOff, BoundByUserID: identity.User.ID,
+	}).
+		Column("organization_id", "conversation_id", "device_id", "workspace_id", "peer_trigger_capability", "bound_by_user_id").
+		On("CONFLICT (organization_id, conversation_id) DO UPDATE").
+		Set("device_id = EXCLUDED.device_id").
+		Set("workspace_id = EXCLUDED.workspace_id").
+		Set("bound_by_user_id = EXCLUDED.bound_by_user_id").
+		Set("updated_at = now()").
+		Exec(ctx); err != nil {
+		return nil, fmt.Errorf("save conversation device binding: %w", err)
+	}
+	return loadBinding(ctx, tx, identity.Organization.ID, conversationID)
 }
 
 // Unbind 由 AI 单聊的成员解除会话的设备绑定并推进会话版本；尚未领取的设备运行由收敛扫描标记失败。

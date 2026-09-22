@@ -72,6 +72,44 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		}
 	})
 
+	t.Run("草稿首发即绑定工作区", func(t *testing.T) {
+		sendFirst := conversationaction.NewSendFirstAgentTextMessageAction(db, agentrunaction.NewScheduler(tasks))
+		// 工作区不属于本人设备时整个首发回滚，不留下会话。
+		rejectedID := uuid.NewV7().String()
+		if _, err := sendFirst.Execute(ctx, identity, conversationaction.FirstAgentTextMessageInput{
+			ConversationID: rejectedID, AgentIdentityID: agentIdentityID, ClientMessageID: uuid.NewV7().String(), Body: "未知工作区", WorkspaceID: uuid.NewV7().String(),
+		}); !errors.Is(err, deviceaction.ErrWorkspaceNotFound) {
+			t.Fatalf("unknown workspace first send=%v", err)
+		}
+		if exists, err := db.NewSelect().Model((*servermodels.Conversation)(nil)).Where("cv.id = ?", rejectedID).Exists(ctx); err != nil || exists {
+			t.Fatalf("rejected draft conversation exists=%v %v", exists, err)
+		}
+
+		conversationID := uuid.NewV7().String()
+		if _, err := sendFirst.Execute(ctx, identity, conversationaction.FirstAgentTextMessageInput{
+			ConversationID: conversationID, AgentIdentityID: agentIdentityID, ClientMessageID: uuid.NewV7().String(), Body: "首条就在本机执行", WorkspaceID: first.ID,
+		}); err != nil {
+			t.Fatal(err)
+		}
+		binding, err := fixture.binding.Get(ctx, identity, conversationID)
+		if err != nil || binding == nil || binding.WorkspaceID != first.ID || binding.DeviceID != registered.ID {
+			t.Fatalf("draft binding=%+v %v", binding, err)
+		}
+		var run servermodels.AgentRun
+		if err := db.NewSelect().Model(&run).Where("agr.conversation_id = ?", conversationID).Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		if run.ExecutionDeviceID == nil || *run.ExecutionDeviceID != registered.ID || run.ExecutionWorkspaceID == nil || *run.ExecutionWorkspaceID != first.ID {
+			t.Fatalf("first run=%+v", run)
+		}
+		if count, err := db.NewSelect().Model((*servermodels.TaskRun)(nil)).Where("tr.idempotency_key = ?", "agent:"+run.ID).Count(ctx); err != nil || count != 0 {
+			t.Fatalf("first device run enqueued server task=%d %v", count, err)
+		}
+		if _, err := fixture.executor.StopAgentReply(ctx, identity, conversationID, run.ID); err != nil {
+			t.Fatal(err)
+		}
+	})
+
 	t.Run("派发领取与工作区串行", func(t *testing.T) {
 		before := fixture.workSeq()
 		conversationID := fixture.boundChat(first.ID)

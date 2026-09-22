@@ -226,7 +226,7 @@ export function ComposerAttachmentTool({
   conversationType: ConversationType
   customerEnabled: boolean
   targetIdentityID?: string
-  agentDraft?: { conversationID: string; agentIdentityID: string; customerConversationID?: string }
+  agentDraft?: { conversationID: string; agentIdentityID: string; customerConversationID?: string; workspaceID?: string }
   byteLimit: number
   captionLimit: number
   replyTo: ConversationMessageReference | null
@@ -246,6 +246,7 @@ export function ComposerAttachmentTool({
       targetIdentityID={targetIdentityID}
       agentIdentityID={agentDraft?.agentIdentityID}
       customerConversationID={agentDraft?.customerConversationID}
+      workspaceID={agentDraft?.workspaceID}
       customer={conversationType === ConversationType.ConversationTypeCustomer}
       byteLimit={byteLimit}
       captionLimit={captionLimit}

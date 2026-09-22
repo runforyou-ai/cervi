@@ -41,6 +41,7 @@ import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 /** 连接时间线与回复区，处理已读、发送和草稿转正会话。 */
 export function ConversationThread({
   agentDraftID,
+  draftWorkspaceID = "",
   conversation,
   directTarget,
   groupParticipants,
@@ -59,6 +60,8 @@ export function ConversationThread({
   directTarget: MemberOption | null
   groupParticipants: GroupParticipant[] | undefined
   agentDraftID: string
+  /** AI 聊天草稿选定的本机工作区，首次发送时随消息一起绑定。 */
+  draftWorkspaceID?: string
   replyDisabledReason: string | null
   onConversationChanged: () => void
   onChatStarted?: (
@@ -205,7 +208,7 @@ export function ConversationThread({
         onSucceeded={onConversationChanged}
         customerChannel={customerAttachment}
         attachmentTargetIdentityID={directTarget && !agentDraftID ? directTarget.id : undefined}
-        attachmentAgentDraft={directTarget && agentDraftID ? { conversationID: agentDraftID, agentIdentityID: directTarget.id } : undefined}
+        attachmentAgentDraft={directTarget && agentDraftID ? { conversationID: agentDraftID, agentIdentityID: directTarget.id, workspaceID: draftWorkspaceID } : undefined}
         draftBridgeRef={customerDraftRef}
         onAttachmentConversationCreated={(created) => {
           if (!created) return
@@ -223,6 +226,7 @@ export function ConversationThread({
                       agentIdentityId: directTarget.id,
                       clientMessageId: input.clientMessageId,
                       body: input.body,
+                      workspaceId: draftWorkspaceID,
                     })
                   : await sendFirstDirectTextMessage({
                       targetIdentityId: directTarget.id,

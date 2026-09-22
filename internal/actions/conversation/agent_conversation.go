@@ -11,6 +11,7 @@ import (
 	"uuid"
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
+	deviceaction "github.com/runforyou-ai/cervi/internal/actions/device"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -20,12 +21,13 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// FirstAgentTextMessageInput 定义 AI 草稿及首条消息。
+// FirstAgentTextMessageInput 定义 AI 草稿及首条消息；WorkspaceID 非空时创建会话的同时绑定本人设备上的该工作区。
 type FirstAgentTextMessageInput struct {
 	ConversationID  string
 	AgentIdentityID string
 	ClientMessageID string
 	Body            string
+	WorkspaceID     string
 }
 
 // FirstAgentTextMessageResult 定义首次发送确认的会话和消息。
@@ -60,7 +62,7 @@ func (a *SendFirstAgentTextMessageAction) Execute(ctx context.Context, identity 
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		if err := ensureAgentConversation(ctx, tx, identity, messageInput.ConversationID, agentID, messageInput.Body); err != nil {
+		if err := ensureAgentConversation(ctx, tx, identity, messageInput.ConversationID, agentID, messageInput.Body, input.WorkspaceID); err != nil {
 			return err
 		}
 		sendContext, err := lockAgentSendContext(ctx, tx, identity, messageInput.ConversationID)
@@ -80,8 +82,8 @@ func (a *SendFirstAgentTextMessageAction) Execute(ctx context.Context, identity 
 	return result, nil
 }
 
-// ensureAgentConversation 创建 AI 聊天，重试时核对固定的业务归属。
-func ensureAgentConversation(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, conversationID, agentID, body string) error {
+// ensureAgentConversation 创建 AI 聊天并按需绑定本人设备上的工作区，重试时核对固定的业务归属。
+func ensureAgentConversation(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, conversationID, agentID, body, workspaceID string) error {
 	// 锁定已有草稿并核对归属后复用共享主体。
 	if found, err := lockAgentConversationDraft(ctx, tx, identity, conversationID, agentID); err != nil || found {
 		return err
@@ -136,6 +138,12 @@ func ensureAgentConversation(ctx context.Context, tx bun.Tx, identity *servermod
 	}
 	if _, err := tx.NewInsert().Model(&participants).Column("id", "organization_id", "conversation_id", "subject_id", "role").Exec(ctx); err != nil {
 		return fmt.Errorf("create AI conversation participants: %w", err)
+	}
+	// 草稿选定的本机工作区在首条消息派发前绑定，首条消息即由该设备执行。
+	if workspaceID != "" {
+		if _, err := deviceaction.SaveConversationBinding(ctx, tx, identity, conversationID, workspaceID); err != nil {
+			return err
+		}
 	}
 	return nil
 }
