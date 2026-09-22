@@ -13,9 +13,10 @@ import (
 type Organization struct {
 	bun.BaseModel `bun:"table:organizations,alias:o"`
 
-	ID         string    `bun:"id,pk"`
-	AccessHost string    `bun:"access_host"`
-	Name       string    `bun:"name"`
-	CreatedAt  time.Time `bun:"created_at"`
-	UpdatedAt  time.Time `bun:"updated_at"`
+	ID              string    `bun:"id,pk"`
+	AccessHost      string    `bun:"access_host"`
+	Name            string    `bun:"name"`
+	LifecycleStatus string    `bun:"lifecycle_status"`
+	CreatedAt       time.Time `bun:"created_at"`
+	UpdatedAt       time.Time `bun:"updated_at"`
 }

@@ -32,6 +32,7 @@ import {
   customerReplySupported,
   useCustomerSessionActions,
 } from "@/features/inbox/customer-session-actions"
+import { useConversationName } from "@/features/inbox/use-conversation-name"
 import {
   customerTypingSenderName,
   useConversationTypingLabel,
@@ -136,6 +137,7 @@ export function MobileCustomerConversationPage() {
     conversationID,
     conversation ? customerTypingSenderName(conversation.customer) : null,
   )
+  const conversationName = useConversationName()
   if (!conversationID) return <Navigate to={inboxURL} replace />
   const customer = conversation?.customer
   const disabledReason = customer
@@ -156,9 +158,7 @@ export function MobileCustomerConversationPage() {
         title={
           <span className="block min-w-0 truncate">
             {activityLabel ||
-              (customer
-                ? (customer.contactName ?? t("anonymousVisitor"))
-                : t("unknownSender"))}
+              (conversation ? conversationName(conversation) : t("unknownSender"))}
           </span>
         }
         actions={

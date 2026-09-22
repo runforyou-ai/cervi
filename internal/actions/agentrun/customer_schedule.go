@@ -55,7 +55,7 @@ func (s *Scheduler) ScheduleCustomerAuto(ctx context.Context, db bun.IDB, organi
 		return false, err
 	}
 	if !eligible {
-		// 负责人是已失去接待资格的 AI 员工时，在本次入站事务内把周期退回原队列；本事务已持有会话锁，退回只读取外发目标。
+		// 负责人是已失去接待资格的 AI 员工时，在本次入站事务内把周期退回原队列。
 		assignee := &servermodels.OrganizationIdentity{}
 		if err := db.NewSelect().Model(assignee).
 			Column("oi.id", "oi.type", "oi.display_name").
@@ -64,7 +64,7 @@ func (s *Scheduler) ScheduleCustomerAuto(ctx context.Context, db bun.IDB, organi
 			return false, fmt.Errorf("load unavailable customer agent identity: %w", err)
 		}
 		cancelled, err := returnUnavailableAssigneeSession(ctx, db, s.enqueuer, organizationID, conversationID, session.ID,
-			assignee, "returned:"+session.ID+":"+messageID, false)
+			assignee, "returned:"+session.ID+":"+messageID)
 		if err != nil {
 			return false, err
 		}

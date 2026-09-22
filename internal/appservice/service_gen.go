@@ -814,6 +814,16 @@ func (s *Service) UpdateOrganization(ctx context.Context, meta RequestMeta, inpu
 	return withNormalizedSlices(s.backend.UpdateOrganization(ctx, meta, input))
 }
 
+// GetBusinessHours 读取当前企业的客服工作时间。
+func (s *Service) GetBusinessHours(ctx context.Context, meta RequestMeta) (BusinessHours, error) {
+	return withNormalizedSlices(s.backend.GetBusinessHours(ctx, meta))
+}
+
+// UpdateBusinessHours 修改当前企业的客服工作时间。
+func (s *Service) UpdateBusinessHours(ctx context.Context, meta RequestMeta, input BusinessHours) (BusinessHours, error) {
+	return withNormalizedSlices(s.backend.UpdateBusinessHours(ctx, meta, input))
+}
+
 // RegisterDevice 注册当前用户的本机设备。
 func (s *Service) RegisterDevice(ctx context.Context, meta RequestMeta, input DeviceRegistrationInput) (Device, error) {
 	return withNormalizedSlices(s.backend.RegisterDevice(ctx, meta, input))

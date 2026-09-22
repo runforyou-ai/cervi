@@ -27,6 +27,7 @@ import {
   type MessageChannelFormValues,
 } from "@/features/channels/message-channel-schema"
 import { useAutoSave } from "@/hooks/use-auto-save"
+import { useFormLifetime } from "@/hooks/use-form-lifetime"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
@@ -79,9 +80,11 @@ export function MessageChannelForm({
       },
     },
   })
+  // 新建时登记未保存内容，离开前确认。
+  const { dirty } = useFormLifetime(!channel && form.formState.isDirty)
   /** 提交消息渠道基础信息。 */
   // 已有渠道时边改边存，新建仍由底部按钮提交。
-  const markSaved = useAutoSave({
+  const { markSaved } = useAutoSave({
     form,
     schema,
     save: submit,
@@ -111,25 +114,27 @@ export function MessageChannelForm({
         onUpdated?.(updated)
         void invalidateResource(resourceKeys.messageChannels())
         void invalidateResource(resourceKeys.channelOptions())
-        return
+        return true
       }
 
       const created = await createMessageChannel(values)
       void invalidateResource(resourceKeys.messageChannels())
       void invalidateResource(resourceKeys.channelOptions())
+      dirty.current = false
       form.reset(values)
       navigate(
         `/channels/${created.type}/${created.id}?tab=basic`,
         { replace: true },
       )
+      return true
     } catch (error) {
       if (recoverSession(error, navigate)) {
-        return
+        return false
       }
       if (channel && isNotFoundApiError(error)) {
         console.warn("消息渠道不存在", { channel_id: channel.id })
         navigate(`/channels/${channel.type}`, { replace: true })
-        return
+        return false
       }
       if (isApiError(error)) {
         console.warn("保存消息渠道失败", error)
@@ -143,10 +148,11 @@ export function MessageChannelForm({
             "fallbackTarget",
           ]),
         )
-        return
+        return false
       }
       console.warn("保存消息渠道失败", error)
       toast.error(t("form.networkError"))
+      return false
     }
   }
 

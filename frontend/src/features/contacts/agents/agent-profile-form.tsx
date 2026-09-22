@@ -80,7 +80,7 @@ export function AgentProfileForm({
       if (!recoverSession(error, navigate)) toast.error(t("avatar.uploadError"))
     },
   })
-  const { mounted, dirty } = useFormLifetime(
+  const { mounted, dirty, discarded } = useFormLifetime(
     form.formState.isDirty || avatar.pending !== null,
   )
 
@@ -97,7 +97,7 @@ export function AgentProfileForm({
   }, [agent, dirty, form])
 
   /** 提交基本资料和待保存的头像，并保留其他页签的编辑内容。 */
-  const markSaved = useAutoSave({ form, schema, save: submit })
+  const { markSaved } = useAutoSave({ form, schema, save: submit, discarded })
 
   async function submit(values: AgentProfileFormValues) {
     let uploadingAvatar = false
@@ -107,15 +107,17 @@ export function AgentProfileForm({
       uploadingAvatar = false
       await updateAgent(agent.id, { ...values, avatarFileId })
       onSaved()
-      if (!mounted.current) return
+      if (!mounted.current) return true
       dirty.current = false
       form.reset(values)
       markSaved(values)
       avatar.clear()
+      return true
     } catch (error) {
       // 上传失败已由共享上传回调提示，保存只处理资料提交错误。
-      if (uploadingAvatar) return
-      if (!mounted.current || recoverSession(error, navigate)) return
+      if (uploadingAvatar) return false
+      // 离开页面后提交的改动失败时同样提示。
+      if (recoverSession(error, navigate)) return false
       console.warn("保存 AI 员工基本资料失败", { agent_id: agent.id, error })
       toast.error(
         isApiError(error)
@@ -128,6 +130,7 @@ export function AgentProfileForm({
             ])
           : t("agents.form.networkError"),
       )
+      return false
     }
   }
 

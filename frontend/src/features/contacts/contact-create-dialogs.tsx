@@ -95,7 +95,7 @@ export function ContactCreateDialogs({
         <DialogContent className="max-w-xl">
           <DialogHeader>
             <DialogTitle>{t("teams.create")}</DialogTitle>
-            <DialogDescription>{t("teams.editDescription")}</DialogDescription>
+            <DialogDescription>{t("teams.createDescription")}</DialogDescription>
           </DialogHeader>
           <TeamForm
             onSaved={(team) => {

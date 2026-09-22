@@ -52,5 +52,19 @@ export function useConfirmedAction<T>({
     }
   }
 
-  return { item, select: setItem, pending: save.saving, confirm }
+  return {
+    item,
+    select: setItem,
+    pending: save.saving,
+    confirm,
+    /** 展开到 ConfirmationDialog 的开关、进行中状态和确认回调，标题与说明由调用方给出。 */
+    dialog: {
+      open: item !== null,
+      pending: save.saving,
+      onOpenChange: (open: boolean) => {
+        if (!open) setItem(null)
+      },
+      onConfirm: () => void confirm(),
+    },
+  }
 }

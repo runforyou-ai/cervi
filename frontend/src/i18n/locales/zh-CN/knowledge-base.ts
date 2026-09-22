@@ -40,6 +40,7 @@ const knowledgeBase = {
     contentRequired: "请输入正文",
     saveSuccess: "文档已保存",
     saveError: "保存文档失败，请重试。",
+    loadError: "读取文档失败，请重试。",
     sourceUnsupported: "该文档来源不支持在线编辑。",
     sources: {
       file: "上传文件",
@@ -215,7 +216,6 @@ const knowledgeBase = {
     name: "知识库名称",
     description: "描述",
     createSuccess: "知识库创建成功。",
-    updateSuccess: "知识库保存成功。",
     loadError: "读取知识库详情失败。",
     saveError: "保存知识库失败，请重试。",
   },

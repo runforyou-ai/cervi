@@ -33,18 +33,12 @@ export function MCPServerListPage() {
   const [submittingRefresh, setSubmittingRefresh] = useState(false)
   const connectionTest = useMCPServerConnectionTest()
   const mounted = useRef(true)
-  const {
-    data,
-    loading,
-    retrying,
-    error: loadError,
-    refresh,
-  } = useResource(resourceKeys.mcpServers(), () => listMCPServers(), {
+  const resource = useResource(resourceKeys.mcpServers(), () => listMCPServers(), {
     staleTime: 0,
     refetchInterval: (data) => data?.mcpServers.some((server) => server.toolsUpdating) ? 1000 : false,
     refetchOnWindowFocus: true,
   })
-  const showLoading = loading || (retrying && !data)
+  const { data } = resource
   const mcpServers = data?.mcpServers ?? []
 
   useEffect(() => {
@@ -60,7 +54,7 @@ export function MCPServerListPage() {
     setSubmittingRefresh(true)
     try {
       await refreshMCPServerTools()
-      await refresh()
+      await resource.refresh()
     } catch (error) {
       if (!mounted.current || recoverSession(error, navigate)) return
       toast.error(isApiError(error) ? apiErrorMessage(error) : t("mcpServer.tools.submitError"))
@@ -107,10 +101,8 @@ export function MCPServerListPage() {
         </Button>
       </PageHeader>
       <ResourceListLayout
-        loading={showLoading}
-        error={Boolean(loadError) && !data}
+        resources={resource}
         errorMessage={t("mcpServer.list.loadError")}
-        onRetry={() => void refresh()}
       >
         <ResourceTable
           hideHeader
@@ -158,17 +150,12 @@ export function MCPServerListPage() {
       </ResourceListLayout>
 
       <ConfirmationDialog
-        open={deletion.item !== null}
-        pending={deletion.pending}
+        {...deletion.dialog}
         title={
           deletion.item ? t("mcpServer.delete.title", { name: deletion.item.name }) : ""
         }
         description={t("mcpServer.delete.description")}
         pendingLabel={t("common:actions.deleting")}
-        onOpenChange={(open) => {
-          if (!open) deletion.select(null)
-        }}
-        onConfirm={() => void deletion.confirm()}
       />
     </div>
   )

@@ -51,7 +51,7 @@ export function ChannelReceptionSettingsForm({
     },
   })
   /** 保存消息渠道接待设置。 */
-  const markSaved = useAutoSave({ form, schema, save: submit })
+  const { markSaved } = useAutoSave({ form, schema, save: submit })
 
   async function submit(values: ChannelReceptionSettingsFormValues) {
     try {
@@ -68,22 +68,24 @@ export function ChannelReceptionSettingsForm({
       form.reset(next)
       markSaved(next)
       onUpdated(updated)
+      return true
     } catch (error) {
-      if (recoverSession(error, navigate)) return
+      if (recoverSession(error, navigate)) return false
       if (isNotFoundApiError(error)) {
         console.warn("消息渠道不存在", { channel_id: channel.id })
         navigate(`/channels/${channel.type}`, { replace: true })
-        return
+        return false
       }
       if (isApiError(error)) {
         console.warn("保存消息渠道接待设置失败", error)
         toast.error(
           apiErrorMessage(error, ["newConversationTarget", "fallbackTarget"]),
         )
-        return
+        return false
       }
       console.warn("保存消息渠道接待设置失败", error)
       toast.error(t("form.networkError"))
+      return false
     }
   }
 

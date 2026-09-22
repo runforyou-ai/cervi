@@ -62,7 +62,7 @@ export function UserPreferencesForm({ user }: { user: CurrentUser }) {
   }, [form, theme])
 
   /** 保存账号与本机偏好设置。 */
-  const markSaved = useAutoSave({ form, schema, save })
+  const { markSaved } = useAutoSave({ form, schema, save })
 
   async function save(values: UserPreferencesFormValues) {
     try {
@@ -82,18 +82,20 @@ export function UserPreferencesForm({ user }: { user: CurrentUser }) {
       markSaved(next)
       void invalidate(resourceKeys.identity())
       await changeAppLanguage(updated.locale)
+      return true
     } catch (error) {
       if (recoverSession(error, navigate)) {
-        return
+        return false
       }
       console.warn("保存偏好设置失败", error)
       if (isApiError(error)) {
         toast.error(
           apiErrorMessage(error, ["locale", "timeZone"]),
         )
-        return
+        return false
       }
       toast.error(t("preferences.saveError"))
+      return false
     }
   }
 

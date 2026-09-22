@@ -5,12 +5,16 @@ package devicehost
 import (
 	"context"
 	"encoding/json"
+	"errors"
+	"fmt"
 	"io"
+	"net/http"
 	"sync"
 	"testing"
 	"time"
 
 	"github.com/runforyou-ai/cervi/internal/appservice"
+	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 )
 
 // stubRunClient 在内存中模拟设备运行期接口，记录领取、收尾与失败上报。
@@ -20,7 +24,9 @@ type stubRunClient struct {
 	claims    []string
 	completed map[string]string
 	failures  map[string]appservice.DeviceRunFailureCode
-	busy      map[string]bool
+	// failedBlocks 按运行编号记录失败上报携带的过程内容块。
+	failedBlocks map[string]json.RawMessage
+	busy         map[string]bool
 	// blockPeek 为 true 时读取输入阻塞到运行 context 结束。
 	blockPeek bool
 	leaseEnd  bool
@@ -85,12 +91,39 @@ func (c *stubRunClient) FailDeviceRun(_ context.Context, _ appservice.RequestMet
 	c.mu.Lock()
 	defer c.mu.Unlock()
 	c.failures[runID] = input.ErrorCode
+	c.failedBlocks[runID] = input.Blocks
 	return nil
 }
 
 // OpenDeviceEventStream 在测试中不建立事件流。
 func (c *stubRunClient) OpenDeviceEventStream(context.Context, appservice.RequestMeta) (io.ReadCloser, error) {
 	return nil, io.EOF
+}
+
+// DeviceModelEndpoint 返回固定的模型代理入口。
+func (c *stubRunClient) DeviceModelEndpoint(context.Context, appservice.RequestMeta, string) (string, http.RoundTripper, error) {
+	return "https://cervi.example.com/api/agent-runs/run/model", http.DefaultTransport, nil
+}
+
+// stubRuntime 读取并认领全部输入，以收到的上下文消息数量作为回复；failure 非空时返回该错误与一个过程内容块。
+type stubRuntime struct {
+	failure error
+}
+
+// Run 按预设认领输入并返回回复或失败。
+func (r stubRuntime) Run(ctx context.Context, _ agentruntime.RunRequest, feed agentruntime.InputFeed) (agentruntime.RunResult, error) {
+	triggers, err := feed.Peek(ctx, 0)
+	if err != nil {
+		return agentruntime.RunResult{}, err
+	}
+	claimed, err := feed.Claim(ctx, triggers[len(triggers)-1].Seq)
+	if err != nil {
+		return agentruntime.RunResult{}, err
+	}
+	if r.failure != nil {
+		return agentruntime.RunResult{Blocks: []agentruntime.Block{{ID: "block-1"}}}, r.failure
+	}
+	return agentruntime.RunResult{Content: fmt.Sprintf("收到 %d 条上下文消息", len(claimed.Messages)), EndSeq: claimed.EndSeq}, nil
 }
 
 // stubWorkspaceStore 在内存中保存工作区路径。
@@ -103,7 +136,7 @@ func (s stubWorkspaceStore) LoadAgentWorkspacePath(_ context.Context, _, _, work
 }
 
 // newTestWorker 创建已登录并已注册设备的执行循环，不启动后台循环。
-func newTestWorker(t *testing.T, client *stubRunClient, workspaces stubWorkspaceStore) *Worker {
+func newTestWorker(t *testing.T, client *stubRunClient, workspaces stubWorkspaceStore, runtime stubRuntime) *Worker {
 	t.Helper()
 	const serverURL = "https://cervi.example.com"
 	store := &stubStore{installID: "install-1", registrations: map[string]string{serverURL + "|org-1|user-1": "device-1"}}
@@ -113,18 +146,19 @@ func newTestWorker(t *testing.T, client *stubRunClient, workspaces stubWorkspace
 	}
 	client.completed = map[string]string{}
 	client.failures = map[string]appservice.DeviceRunFailureCode{}
-	worker := NewWorker(registrar, workspaces, client)
+	client.failedBlocks = map[string]json.RawMessage{}
+	worker := NewWorker(registrar, workspaces, client, runtime)
 	t.Cleanup(worker.Stop)
 	return worker
 }
 
-// TestWorkerSerializesWorkspace 验证同一工作区只领取一个运行，执行完成后再领取下一个并回报本机收到的上下文。
+// TestWorkerSerializesWorkspace 验证同一工作区只领取一个运行，执行完成后再领取下一个并回报运行时的回复。
 func TestWorkerSerializesWorkspace(t *testing.T) {
 	directory := t.TempDir()
 	client := &stubRunClient{work: appservice.DeviceWork{Runs: []appservice.DeviceWorkRun{
 		{RunID: "run-1", WorkspaceID: "workspace-1"}, {RunID: "run-2", WorkspaceID: "workspace-1"},
 	}}}
-	worker := newTestWorker(t, client, stubWorkspaceStore{"workspace-1": directory})
+	worker := newTestWorker(t, client, stubWorkspaceStore{"workspace-1": directory}, stubRuntime{})
 
 	worker.poll()
 	worker.runs.Wait()
@@ -148,7 +182,7 @@ func TestWorkerRetriesBusyWorkspace(t *testing.T) {
 		work: appservice.DeviceWork{Runs: []appservice.DeviceWorkRun{{RunID: "run-1", WorkspaceID: "workspace-1"}}},
 		busy: map[string]bool{"run-1": true},
 	}
-	worker := newTestWorker(t, client, stubWorkspaceStore{"workspace-1": t.TempDir()})
+	worker := newTestWorker(t, client, stubWorkspaceStore{"workspace-1": t.TempDir()}, stubRuntime{})
 
 	if !worker.poll() {
 		t.Fatal("工作区忙时没有要求重新检查")
@@ -163,7 +197,7 @@ func TestWorkerReportsMissingWorkspace(t *testing.T) {
 	client := &stubRunClient{work: appservice.DeviceWork{Runs: []appservice.DeviceWorkRun{
 		{RunID: "run-1", WorkspaceID: "workspace-1"}, {RunID: "run-2", WorkspaceID: "workspace-2"},
 	}}}
-	worker := newTestWorker(t, client, stubWorkspaceStore{"workspace-2": t.TempDir() + "/removed"})
+	worker := newTestWorker(t, client, stubWorkspaceStore{"workspace-2": t.TempDir() + "/removed"}, stubRuntime{})
 
 	worker.poll()
 	if len(client.claims) != 0 ||
@@ -181,7 +215,7 @@ func TestWorkerStopsEndedRun(t *testing.T) {
 		leaseEnd:  true,
 		peeked:    make(chan string, 1),
 	}
-	worker := newTestWorker(t, client, stubWorkspaceStore{"workspace-1": t.TempDir()})
+	worker := newTestWorker(t, client, stubWorkspaceStore{"workspace-1": t.TempDir()}, stubRuntime{})
 
 	worker.poll()
 	<-client.peeked
@@ -189,5 +223,21 @@ func TestWorkerStopsEndedRun(t *testing.T) {
 	worker.runs.Wait()
 	if len(client.completed) != 0 || len(client.failures) != 0 || len(worker.active) != 0 {
 		t.Fatalf("收尾 = %v，失败上报 = %v，本机登记 = %v", client.completed, client.failures, worker.active)
+	}
+}
+
+// TestWorkerReportsRuntimeFailure 验证运行时出错时上报运行失败并携带已产生的过程内容块。
+func TestWorkerReportsRuntimeFailure(t *testing.T) {
+	client := &stubRunClient{work: appservice.DeviceWork{Runs: []appservice.DeviceWorkRun{{RunID: "run-1", WorkspaceID: "workspace-1"}}}}
+	worker := newTestWorker(t, client, stubWorkspaceStore{"workspace-1": t.TempDir()}, stubRuntime{failure: errors.New("model unavailable")})
+
+	worker.poll()
+	worker.runs.Wait()
+	var blocks []agentruntime.Block
+	if err := json.Unmarshal(client.failedBlocks["run-1"], &blocks); err != nil {
+		t.Fatal(err)
+	}
+	if client.failures["run-1"] != appservice.DeviceRunFailureRuntimeFailed || len(blocks) != 1 || len(client.completed) != 0 {
+		t.Fatalf("失败上报 = %v，过程内容 = %v，收尾 = %v", client.failures, blocks, client.completed)
 	}
 }

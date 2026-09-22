@@ -26,7 +26,7 @@ import { useListScrollRestore } from "@/hooks/use-list-scroll-restore"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 import { KnowledgeQATable } from "@/features/knowledge-base/knowledge-qa-table"
-import { KnowledgeQAFeedback } from "@/features/knowledge-base/knowledge-qa-feedback"
+import { ResourceContent } from "@/components/resource-content"
 import { KnowledgeRetrievalSheet } from "@/features/knowledge-base/knowledge-retrieval-sheet"
 
 /** 按分组切换列表实例，隔离删除对话框和滚动恢复状态。 */
@@ -158,15 +158,10 @@ function KnowledgeQAGroupList({
         ) : null}
       </ListToolbar>
       <PageContent ref={scroll.ref} onScroll={scroll.onScroll}>
-        {base.error || list.error || !base.data || !list.data ? (
-          <KnowledgeQAFeedback
-            error={base.error ?? list.error}
-            retry={() => void (base.error ? base.refresh() : list.refresh())}
-          />
-        ) : (
+        <ResourceContent resources={[base, list]} errorMessage={t("qa.loadError")}>
           <KnowledgeQATable
             knowledgeBaseId={knowledgeBaseId}
-            data={list.data}
+            data={list.data!}
             loading={list.isPlaceholderData || list.refreshing}
             listPath={listPath}
             search={location.search}
@@ -176,11 +171,10 @@ function KnowledgeQAGroupList({
               setParameters({ page: page === 1 ? null : String(page) })
             }
           />
-        )}
+        </ResourceContent>
       </PageContent>
       <ConfirmationDialog
-        open={deletion.item !== null}
-        pending={deletion.pending}
+        {...deletion.dialog}
         title={t("qa.deleteTitle")}
         // 问题原文可能含换行或长串字符，保留换行并允许断词。
         description={
@@ -191,10 +185,6 @@ function KnowledgeQAGroupList({
           </span>
         }
         pendingLabel={t("common:actions.deleting")}
-        onOpenChange={(open) => {
-          if (!open) deletion.select(null)
-        }}
-        onConfirm={() => void deletion.confirm()}
       />
       <KnowledgeRetrievalSheet
         open={retrievalOpen}

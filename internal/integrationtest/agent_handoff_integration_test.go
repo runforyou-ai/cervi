@@ -6,6 +6,7 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"strings"
 	"sync"
 	"testing"
@@ -19,6 +20,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
+	customerserviceaction "github.com/runforyou-ai/cervi/internal/actions/customerservice"
 	teamaction "github.com/runforyou-ai/cervi/internal/actions/team"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -106,7 +108,7 @@ func (f handoffFixture) queuedRun(t *testing.T, conversationID string) servermod
 }
 
 // handoffRuntime 认领首批输入后按需执行插入动作，再返回模型给出的转人工决定。
-func handoffRuntime(content, reasonText string, during func()) *testAgentRuntime {
+func handoffRuntime(reasonText string, during func()) *testAgentRuntime {
 	return &testAgentRuntime{run: func(ctx context.Context, _ agentruntime.RunRequest, feed agentruntime.InputFeed) (agentruntime.RunResult, error) {
 		triggers, err := feed.Peek(ctx, 0)
 		if err != nil {
@@ -119,7 +121,7 @@ func handoffRuntime(content, reasonText string, during func()) *testAgentRuntime
 		if during != nil {
 			during()
 		}
-		return agentruntime.RunResult{Content: content, EndSeq: claimed.EndSeq, Decision: agentruntime.TerminalDecision{
+		return agentruntime.RunResult{EndSeq: claimed.EndSeq, Decision: agentruntime.TerminalDecision{
 			Kind: domain.AgentRunOutcomeHandoff, Reason: domain.AgentHandoffReasonModelRequested, ReasonText: reasonText,
 		}}, nil
 	}}
@@ -181,6 +183,45 @@ func loadSession(t *testing.T, db *bun.DB, sessionID string) servermodels.Servic
 	return session
 }
 
+// handoffNotice 读取按幂等键写入的对客通知正文。
+func handoffNotice(t *testing.T, db *bun.DB, key string) string {
+	t.Helper()
+	notice := servermodels.Message{}
+	if err := db.NewSelect().Model(&notice).Where("msg.idempotency_key = ? AND msg.type = ?", key, domain.MessageTypeText).Scan(context.Background()); err != nil {
+		t.Fatalf("load notice %s: %v", key, err)
+	}
+	return notice.Body
+}
+
+// runReturnedHandoffs 执行指定客服周期已投递的转人工承接任务，返回执行的任务数。
+func runReturnedHandoffs(t *testing.T, db *bun.DB, serviceSessionID string) int {
+	t.Helper()
+	ctx := context.Background()
+	var runs []servermodels.TaskRun
+	if err := db.NewSelect().Model(&runs).
+		Where("tr.action_name = ? AND tr.payload->>'serviceSessionId' = ?", agentrunaction.ReturnedHandoffActionName, serviceSessionID).
+		OrderExpr("tr.created_at").Scan(ctx); err != nil {
+		t.Fatal(err)
+	}
+	executor := testServiceSessionReturner(db)
+	for _, run := range runs {
+		input := agentrunaction.ReturnedHandoffInput{}
+		if err := json.Unmarshal(run.Payload, &input); err != nil {
+			t.Fatal(err)
+		}
+		if err := executor.HandOffReturnedSession(ctx, input); err != nil {
+			t.Fatal(err)
+		}
+	}
+	return len(runs)
+}
+
+// 转人工对客话术按渠道语言 zh-CN 取词。
+const (
+	handoffQueuedNotice      = "已为您转接人工客服，正在排队，请稍候。"
+	handoffUnscheduledNotice = "现在是非工作时间，我们已记录您的问题，工作时间内会尽快为您处理。"
+)
+
 // testAgentHandoffs 验证 AI 客服转人工的去向、并发边界、幂等、管理操作交接与资格变更互斥。
 func testAgentHandoffs(t *testing.T, db *bun.DB, identity *servermodels.Identity, roleID, providerID, modelID string) {
 	tasks := newTestTasks(db)
@@ -192,6 +233,7 @@ func testAgentHandoffs(t *testing.T, db *bun.DB, identity *servermodels.Identity
 	t.Run("主动转人工后转回同一 AI", func(t *testing.T) { testModelHandoffRoundTrip(t, f) })
 	t.Run("失败路由去向", func(t *testing.T) { testHandoffTargets(t, f) })
 	t.Run("转人工自动分配", func(t *testing.T) { testHandoffAutoAssignment(t, f) })
+	t.Run("工作时间与转人工话术", func(t *testing.T) { testBusinessHoursHandoffNotice(t, f) })
 	t.Run("人工接管与交接先后", func(t *testing.T) { testHandoffCommitOrder(t, f) })
 	t.Run("停用与关闭接待退回队列", func(t *testing.T) { testManagementReturn(t, f) })
 	t.Run("入站路由与资格变更交错", func(t *testing.T) { testInboundRoutingVersusEligibility(t, f) })
@@ -210,7 +252,7 @@ func testModelHandoffRoundTrip(t *testing.T, f handoffFixture) {
 	input := visitorInput(channelID, "")
 	first := f.receive(t, &input, "我要退款")
 	run := f.queuedRun(t, first.Conversation.ID)
-	runtime := handoffRuntime("马上为您转接", "客户要求退款", func() { f.receive(t, &input, "还在吗") })
+	runtime := handoffRuntime("客户要求退款", func() { f.receive(t, &input, "还在吗") })
 	executor := agentrunaction.NewExecuteAction(f.db, f.tasks, runtime, testAttachmentReader(f.db), nil)
 	for range 2 {
 		if err := executor.Execute(ctx, agentrunaction.RunInput{RunID: run.ID}); err != nil {
@@ -243,7 +285,7 @@ func testModelHandoffRoundTrip(t *testing.T, f handoffFixture) {
 	}
 	// 访客只看到两条消息和对客通知，内部原因不外露。
 	visible, err := conversationaction.NewListWebsiteMessagesQuery(f.db).Execute(ctx, conversationaction.MessageHistoryInput{ChannelID: channelID, ExternalID: input.ExternalID, ConversationID: first.Conversation.ID})
-	if err != nil || len(visible.Messages) != 3 || visible.Messages[2].ID != *run.ResponseMessageID || visible.Messages[2].Body != "马上为您转接" {
+	if err != nil || len(visible.Messages) != 3 || visible.Messages[2].ID != *run.ResponseMessageID || visible.Messages[2].Body != handoffQueuedNotice {
 		t.Fatalf("visitor messages = %+v, error = %v", visible, err)
 	}
 	for _, message := range visible.Messages {
@@ -326,7 +368,7 @@ func testHandoffTargets(t *testing.T, f handoffFixture) {
 			input := visitorInput(channelID, "")
 			first := f.receive(t, &input, "需要人工")
 			run := f.queuedRun(t, first.Conversation.ID)
-			if err := agentrunaction.NewExecuteAction(f.db, f.tasks, handoffRuntime("", "无法确认", nil), testAttachmentReader(f.db), nil).Execute(ctx, agentrunaction.RunInput{RunID: run.ID}); err != nil {
+			if err := agentrunaction.NewExecuteAction(f.db, f.tasks, handoffRuntime("无法确认", nil), testAttachmentReader(f.db), nil).Execute(ctx, agentrunaction.RunInput{RunID: run.ID}); err != nil {
 				t.Fatal(err)
 			}
 			session := loadSession(t, f.db, run.ScopeID)
@@ -341,10 +383,13 @@ func testHandoffTargets(t *testing.T, f handoffFixture) {
 				(scenario.wantKind == domain.ServiceSessionTargetMember && (events[0].Target.DisplayName == nil || *events[0].Target.DisplayName != "人工客服")) {
 				t.Fatalf("events = %+v", events)
 			}
-			// 模型未提供说明时使用渠道语言的内置通知。
-			notice := servermodels.Message{}
-			if err := f.db.NewSelect().Model(&notice).Where("msg.idempotency_key = ?", "agent:"+run.ID).Scan(ctx); err != nil || !strings.Contains(notice.Body, "人工客服") {
-				t.Fatalf("notice = %+v, error = %v", notice, err)
+			// 对客通知按承接结果使用渠道语言的内置话术。
+			wantNotice := handoffQueuedNotice
+			if scenario.wantAssignee != nil {
+				wantNotice = "已为您转接人工客服人工客服，请稍候。"
+			}
+			if notice := handoffNotice(t, f.db, "agent:"+run.ID); notice != wantNotice {
+				t.Fatalf("notice = %q, want %q", notice, wantNotice)
 			}
 		})
 	}
@@ -362,17 +407,17 @@ func testHandoffAutoAssignment(t *testing.T, f handoffFixture) {
 		t.Fatal(err)
 	}
 	channelID := f.newChannel(t, agent.IdentityID, channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue})
-	handOff := func() (servermodels.ServiceSession, []domain.ServiceSessionHandedOffEvent) {
+	handOff := func() (servermodels.ServiceSession, []domain.ServiceSessionHandedOffEvent, string) {
 		t.Helper()
 		input := visitorInput(channelID, "")
 		received := f.receive(t, &input, "需要人工")
 		run := f.queuedRun(t, received.Conversation.ID)
-		if err := agentrunaction.NewExecuteAction(f.db, f.tasks, handoffRuntime("", "无法确认", nil), testAttachmentReader(f.db), nil).Execute(ctx, agentrunaction.RunInput{RunID: run.ID}); err != nil {
+		if err := agentrunaction.NewExecuteAction(f.db, f.tasks, handoffRuntime("无法确认", nil), testAttachmentReader(f.db), nil).Execute(ctx, agentrunaction.RunInput{RunID: run.ID}); err != nil {
 			t.Fatal(err)
 		}
-		return loadSession(t, f.db, run.ScopeID), handoffEvents(t, f.db, received.Conversation.ID)
+		return loadSession(t, f.db, run.ScopeID), handoffEvents(t, f.db, received.Conversation.ID), handoffNotice(t, f.db, "agent:"+run.ID)
 	}
-	session, events := handOff()
+	session, events, notice := handOff()
 	if session.AssigneeIdentityID == nil || *session.AssigneeIdentityID != human.IdentityID || session.TeamID != nil ||
 		session.AssigneeAssignedAt == nil || session.AwaitingReplySince == nil {
 		t.Fatalf("assigned handoff session = %+v", session)
@@ -380,13 +425,93 @@ func testHandoffAutoAssignment(t *testing.T, f handoffFixture) {
 	if len(events) != 1 || events[0].Target.Kind != domain.ServiceSessionTargetMember || events[0].Target.IdentityID == nil || *events[0].Target.IdentityID != human.IdentityID {
 		t.Fatalf("assigned handoff events = %+v", events)
 	}
+	if notice != "已为您转接人工客服承接客服，请稍候。" {
+		t.Fatalf("assigned handoff notice = %q", notice)
+	}
 	// 承接客服满员后转人工留在公共队列。
-	session, events = handOff()
+	session, events, notice = handOff()
 	if session.AssigneeIdentityID != nil || session.AssigneeAssignedAt != nil || session.AwaitingReplySince == nil {
 		t.Fatalf("queued handoff session = %+v", session)
 	}
 	if len(events) != 1 || events[0].Target.Kind != domain.ServiceSessionTargetPublicQueue {
 		t.Fatalf("queued handoff events = %+v", events)
+	}
+	if notice != handoffQueuedNotice {
+		t.Fatalf("queued handoff notice = %q", notice)
+	}
+}
+
+// testBusinessHoursHandoffNotice 验证工作时间的保存与校验，以及无人可分配时按工作时间选择排队、非工作时间和无下次处理时间的话术。
+func testBusinessHoursHandoffNotice(t *testing.T, f handoffFixture) {
+	ctx := context.Background()
+	t.Cleanup(func() {
+		if _, err := f.db.NewDelete().Model((*servermodels.CustomerServiceSetting)(nil)).Where("organization_id = ?", f.identity.Organization.ID).Exec(ctx); err != nil {
+			t.Error(err)
+		}
+	})
+	update := customerserviceaction.NewUpdateBusinessHoursAction(f.db)
+	// 未保存时读取默认值。
+	hours, err := customerserviceaction.NewGetBusinessHoursQuery(f.db).Execute(ctx, f.identity)
+	if err != nil || hours.Enabled || hours.TimeZone != domain.BusinessHoursDefaultTimeZone || len(hours.Weekly[0]) != 1 || len(hours.Weekly[6]) != 0 {
+		t.Fatalf("default business hours = %+v, error = %v", hours, err)
+	}
+	// 时区、每周时段和日期覆盖分别校验。
+	invalid := domain.DefaultBusinessHours()
+	invalid.TimeZone = "Mars/Base"
+	invalid.Weekly[0] = []domain.BusinessHoursPeriod{{Start: "09:00", End: "13:00"}, {Start: "12:00", End: "18:00"}}
+	invalid.Overrides = []domain.BusinessHoursOverride{{Date: "2026-10-01"}, {Date: "2026-10-01"}}
+	var validation *customerserviceaction.ValidationError
+	if _, err := update.Execute(ctx, f.identity, invalid); !errors.As(err, &validation) || len(validation.Fields) != 3 ||
+		validation.Fields["timeZone"] != customerserviceaction.ValidationTimeZoneInvalid ||
+		validation.Fields["weekly"] != customerserviceaction.ValidationWeeklyInvalid ||
+		validation.Fields["overrides"] != customerserviceaction.ValidationOverrideInvalid {
+		t.Fatalf("validation error = %v", err)
+	}
+
+	agent := f.newAgent(t, "工作时间验证客服")
+	channelID := f.newChannel(t, agent.IdentityID, channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue})
+	location, err := time.LoadLocation("Asia/Shanghai")
+	if err != nil {
+		t.Fatal(err)
+	}
+	tomorrow := time.Now().In(location).AddDate(0, 0, 1)
+	allDay := []domain.BusinessHoursPeriod{{Start: "00:00", End: "24:00"}}
+	for _, scenario := range []struct {
+		name      string
+		weekly    []domain.BusinessHoursPeriod
+		overrides []domain.BusinessHoursOverride
+		want      string
+	}{
+		{name: "工作时间内排队", weekly: allDay, want: handoffQueuedNotice},
+		{name: "非工作时间有下次处理时间", overrides: []domain.BusinessHoursOverride{
+			{Date: tomorrow.Format(domain.BusinessHoursDateLayout), Periods: []domain.BusinessHoursPeriod{{Start: "13:00", End: "18:00"}, {Start: "09:30", End: "12:00"}}},
+		}, want: fmt.Sprintf("现在是非工作时间，我们已记录您的问题，将于%d月%d日 09:30（GMT+8）起为您处理。", tomorrow.Month(), tomorrow.Day())},
+		{name: "非工作时间无下次处理时间", want: handoffUnscheduledNotice},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			hours := domain.BusinessHours{Enabled: true, TimeZone: "Asia/Shanghai", Overrides: scenario.overrides}
+			for day := range hours.Weekly {
+				hours.Weekly[day] = scenario.weekly
+			}
+			if _, err := update.Execute(ctx, f.identity, hours); err != nil {
+				t.Fatal(err)
+			}
+			// 保存后的日期覆盖时段按开始时间排序。
+			saved, err := customerserviceaction.LoadBusinessHours(ctx, f.db, f.identity.Organization.ID)
+			if err != nil || !saved.Enabled || len(saved.Overrides) != len(scenario.overrides) ||
+				(len(saved.Overrides) > 0 && saved.Overrides[0].Periods[0].Start != "09:30") {
+				t.Fatalf("saved business hours = %+v, error = %v", saved, err)
+			}
+			input := visitorInput(channelID, "")
+			received := f.receive(t, &input, "需要人工")
+			run := f.queuedRun(t, received.Conversation.ID)
+			if err := agentrunaction.NewExecuteAction(f.db, f.tasks, handoffRuntime("无法确认", nil), testAttachmentReader(f.db), nil).Execute(ctx, agentrunaction.RunInput{RunID: run.ID}); err != nil {
+				t.Fatal(err)
+			}
+			if notice := handoffNotice(t, f.db, "agent:"+run.ID); notice != scenario.want {
+				t.Fatalf("notice = %q, want %q", notice, scenario.want)
+			}
+		})
 	}
 }
 
@@ -400,7 +525,7 @@ func testHandoffCommitOrder(t *testing.T, f handoffFixture) {
 	input := visitorInput(channelID, "")
 	first := f.receive(t, &input, "人工先接管")
 	run := f.queuedRun(t, first.Conversation.ID)
-	takeover := handoffRuntime("", "无法确认", func() {
+	takeover := handoffRuntime("无法确认", func() {
 		if _, err := conversationaction.NewClaimServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(ctx, f.identity, first.Conversation.ID); err != nil {
 			t.Fatal(err)
 		}
@@ -419,7 +544,7 @@ func testHandoffCommitOrder(t *testing.T, f handoffFixture) {
 	input = visitorInput(channelID, "")
 	second := f.receive(t, &input, "AI 先转人工")
 	run = f.queuedRun(t, second.Conversation.ID)
-	if err := agentrunaction.NewExecuteAction(f.db, f.tasks, handoffRuntime("", "无法确认", nil), testAttachmentReader(f.db), nil).Execute(ctx, agentrunaction.RunInput{RunID: run.ID}); err != nil {
+	if err := agentrunaction.NewExecuteAction(f.db, f.tasks, handoffRuntime("无法确认", nil), testAttachmentReader(f.db), nil).Execute(ctx, agentrunaction.RunInput{RunID: run.ID}); err != nil {
 		t.Fatal(err)
 	}
 	claimed, err := conversationaction.NewClaimServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(ctx, f.identity, second.Conversation.ID)
@@ -428,7 +553,7 @@ func testHandoffCommitOrder(t *testing.T, f handoffFixture) {
 	}
 }
 
-// testManagementReturn 验证停用 AI 员工和关闭其接待开关时，负责的开放周期连同在途运行一并退回原队列并补发对客通知。
+// testManagementReturn 验证停用 AI 员工和关闭其接待开关时，负责的开放周期连同在途运行一并退回原队列，转人工承接任务按承接结果补发一次对客通知。
 func testManagementReturn(t *testing.T, f handoffFixture) {
 	ctx := context.Background()
 	for _, change := range []string{"停用", "关闭接待"} {
@@ -473,11 +598,21 @@ func testManagementReturn(t *testing.T, f handoffFixture) {
 				if session.AssigneeIdentityID != nil || session.TeamID != nil {
 					t.Fatalf("session = %+v", session)
 				}
-				notices, err := f.db.NewSelect().Model((*servermodels.Message)(nil)).
+				// 任务重复执行只写一条通知。
+				for range 2 {
+					if tasks := runReturnedHandoffs(t, f.db, session.ID); tasks != 1 {
+						t.Fatalf("returned handoff tasks = %d", tasks)
+					}
+				}
+				// 对客通知不结束客户等待：有在途输入的周期保留等待起点，已回答的周期保持无等待。
+				if returned := loadSession(t, f.db, session.ID); (returned.AwaitingReplySince == nil) != (conversationID == idle.Conversation.ID) {
+					t.Fatalf("returned session awaiting reply = %v", returned.AwaitingReplySince)
+				}
+				var notices []servermodels.Message
+				if err := f.db.NewSelect().Model(&notices).
 					Where("msg.conversation_id = ? AND msg.idempotency_key LIKE ?", conversationID, "returned:"+session.ID+":%").
-					Where("msg.type = ?", domain.MessageTypeText).Count(ctx)
-				if err != nil || notices != 1 {
-					t.Fatalf("return notices = %d, error = %v", notices, err)
+					Where("msg.type = ?", domain.MessageTypeText).Scan(ctx); err != nil || len(notices) != 1 || notices[0].Body != handoffQueuedNotice {
+					t.Fatalf("return notices = %+v, error = %v", notices, err)
 				}
 			}
 			lane := servermodels.AgentLane{}
@@ -565,7 +700,7 @@ func testInboundUnavailableAssignee(t *testing.T, f handoffFixture) {
 func testTelegramModelHandoff(t *testing.T, f handoffFixture) {
 	ctx := context.Background()
 	fixture := newAgentTelegramFixture(t, f.db, f.identity, f.roleID, f.providerID, f.modelID)
-	executor := agentrunaction.NewExecuteAction(f.db, fixture.tasks, handoffRuntime("为您转接人工", "需要人工确认", nil), testAttachmentReader(f.db), nil)
+	executor := agentrunaction.NewExecuteAction(f.db, fixture.tasks, handoffRuntime("需要人工确认", nil), testAttachmentReader(f.db), nil)
 	for range 2 {
 		if err := executor.Execute(ctx, agentrunaction.RunInput{RunID: fixture.run.ID}); err != nil {
 			t.Fatal(err)
@@ -637,7 +772,7 @@ func testChannelEditVersusDeactivation(t *testing.T, f handoffFixture) {
 	}
 }
 
-// testTelegramInboundReturnVersusRunFailure 验证已持有会话锁的入站事务发现负责人失效时，退回只读取外发目标，与先锁渠道身份的运行收尾不形成循环等待。
+// testTelegramInboundReturnVersusRunFailure 验证已持有会话锁的入站事务发现负责人失效时，退回不锁渠道身份，与先锁渠道身份的运行收尾不形成循环等待；对客通知由转人工承接任务投递一次。
 func testTelegramInboundReturnVersusRunFailure(t *testing.T, f handoffFixture) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
@@ -689,6 +824,9 @@ func testTelegramInboundReturnVersusRunFailure(t *testing.T, f handoffFixture) {
 		t.Fatalf("finalize run failure: %v", err)
 	}
 	fixture.reload(t)
+	if tasks := runReturnedHandoffs(t, f.db, fixture.run.ScopeID); tasks != 1 {
+		t.Fatalf("returned handoff tasks = %d", tasks)
+	}
 	var deliveries []servermodels.CustomerMessageDelivery
 	if err := f.db.NewSelect().Model(&deliveries).Where("cmd.conversation_id = ?", fixture.run.ConversationID).Scan(ctx); err != nil {
 		t.Fatal(err)

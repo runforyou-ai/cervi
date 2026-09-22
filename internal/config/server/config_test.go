@@ -112,7 +112,7 @@ func clearServerEnvironment(t *testing.T) {
 		"TLS_MODE", "TLS_ACME_EMAIL", "FILE_STORAGE_PATH",
 		"S3_ENABLED", "S3_ENDPOINT", "S3_PUBLIC_BASE_URL", "S3_REGION", "S3_BUCKET",
 		"S3_ACCESS_KEY_ID", "S3_SECRET_ACCESS_KEY", "S3_FORCE_PATH_STYLE",
-		"DEPLOYMENT_MODE", "MANAGED_DOMAIN_SUFFIX", "OPERATOR_CREDENTIAL",
+		"DEPLOYMENT_MODE", "MANAGED_DOMAIN_SUFFIX", "OPERATOR_CREDENTIAL", "OFFICIAL_IDENTITY_ISSUER",
 	} {
 		t.Setenv(name, "")
 		if err := os.Unsetenv(name); err != nil {
@@ -264,14 +264,15 @@ func TestDeploymentDefaultsToSelfHosted(t *testing.T) {
 	}
 }
 
-// TestManagedDeploymentValidation 验证托管部署的域名后缀和运营凭据校验。
+// TestManagedDeploymentValidation 验证托管部署的域名后缀、运营凭据和官方身份 issuer 校验。
 func TestManagedDeploymentValidation(t *testing.T) {
 	valid := func() Config {
 		config := validTestConfig()
 		config.Deployment = DeploymentConfig{
-			Mode:                domain.DeploymentModeManaged,
-			ManagedDomainSuffix: "cervi.runforyou.app",
-			OperatorCredential:  strings.Repeat("c", 32),
+			Mode:                   domain.DeploymentModeManaged,
+			ManagedDomainSuffix:    "cervi.runforyou.app",
+			OperatorCredential:     strings.Repeat("c", 32),
+			OfficialIdentityIssuer: "https://account.runforyou.app",
 		}
 		return config
 	}
@@ -282,11 +283,14 @@ func TestManagedDeploymentValidation(t *testing.T) {
 	}
 
 	for name, mutate := range map[string]func(*Config){
-		"缺少域名后缀":   func(c *Config) { c.Deployment.ManagedDomainSuffix = "" },
-		"单级域名后缀":   func(c *Config) { c.Deployment.ManagedDomainSuffix = "app" },
-		"域名后缀带路径":  func(c *Config) { c.Deployment.ManagedDomainSuffix = "cervi.runforyou.app/operator" },
-		"运营凭据过短":   func(c *Config) { c.Deployment.OperatorCredential = strings.Repeat("c", 31) },
-		"部署形态取值无效": func(c *Config) { c.Deployment.Mode = "hosted" },
+		"缺少域名后缀":            func(c *Config) { c.Deployment.ManagedDomainSuffix = "" },
+		"单级域名后缀":            func(c *Config) { c.Deployment.ManagedDomainSuffix = "app" },
+		"域名后缀带路径":           func(c *Config) { c.Deployment.ManagedDomainSuffix = "cervi.runforyou.app/operator" },
+		"运营凭据过短":            func(c *Config) { c.Deployment.OperatorCredential = strings.Repeat("c", 31) },
+		"部署形态取值无效":          func(c *Config) { c.Deployment.Mode = "hosted" },
+		"缺少身份 issuer":       func(c *Config) { c.Deployment.OfficialIdentityIssuer = "" },
+		"身份 issuer 非 HTTPS": func(c *Config) { c.Deployment.OfficialIdentityIssuer = "http://account.runforyou.app" },
+		"身份 issuer 带查询":     func(c *Config) { c.Deployment.OfficialIdentityIssuer = "https://account.runforyou.app?x=1" },
 	} {
 		config := valid()
 		mutate(&config)
@@ -311,6 +315,7 @@ func TestDeploymentEnvironment(t *testing.T) {
 	t.Setenv("DEPLOYMENT_MODE", "Managed")
 	t.Setenv("MANAGED_DOMAIN_SUFFIX", "Cervi.RunForYou.App.")
 	t.Setenv("OPERATOR_CREDENTIAL", strings.Repeat("c", 40))
+	t.Setenv("OFFICIAL_IDENTITY_ISSUER", " https://account.runforyou.app ")
 
 	config, err := Load("")
 	if err != nil {
@@ -321,5 +326,8 @@ func TestDeploymentEnvironment(t *testing.T) {
 	}
 	if config.Deployment.ManagedDomainSuffix != "cervi.runforyou.app" {
 		t.Fatalf("域名后缀未规范化: %q", config.Deployment.ManagedDomainSuffix)
+	}
+	if config.Deployment.OfficialIdentityIssuer != "https://account.runforyou.app" {
+		t.Fatalf("身份 issuer 未按环境变量覆盖: %q", config.Deployment.OfficialIdentityIssuer)
 	}
 }

@@ -50,7 +50,7 @@ export function ProfileSettingsForm({ user }: { user: CurrentUser }) {
     },
   })
   /** 保存个人资料并刷新当前身份。 */
-  const markSaved = useAutoSave({ form, schema, save })
+  const { markSaved } = useAutoSave({ form, schema, save })
 
   async function save(values: ProfileSettingsFormValues) {
     let uploadingAvatar = false
@@ -67,18 +67,20 @@ export function ProfileSettingsForm({ user }: { user: CurrentUser }) {
       markSaved(next)
       avatar.clear()
       void invalidate(resourceKeys.identity())
+      return true
     } catch (error) {
       // 上传失败已由共享上传回调提示，保存只处理资料提交错误。
-      if (uploadingAvatar) return
+      if (uploadingAvatar) return false
       if (recoverSession(error, navigate)) {
-        return
+        return false
       }
       console.warn("保存个人资料失败", error)
       if (isApiError(error)) {
         toast.error(apiErrorMessage(error, ["displayName", "email"]))
-        return
+        return false
       }
       toast.error(t("profile.saveError"))
+      return false
     }
   }
 

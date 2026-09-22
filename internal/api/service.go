@@ -37,6 +37,7 @@ type WebsiteVisitorRealtime interface {
 type Service struct {
 	application         *appservice.Service
 	deviceRuns          appservice.DeviceRunBackend
+	deviceModels        DeviceModelAuthorizer
 	websiteVisitor      *appservice.WebsiteVisitorService
 	visitorRealtime     WebsiteVisitorRealtime
 	telegramWebhook     TelegramWebhookReceiver
@@ -89,6 +90,10 @@ func NewService(application *appservice.Service, options ...ServiceOption) *Serv
 	service.registerGeneratedRoutes(router)
 	if service.deviceRuns != nil {
 		service.registerGeneratedDeviceRunRoutes(router)
+	}
+	// 注册设备运行的模型代理，请求路径在代理入口之后按上游模型服务的接口拼接。
+	if service.deviceModels != nil {
+		router.POST("/agent-runs/:runID/model/*path", service.proxyDeviceModel)
 	}
 	// 创建企业管理员并返回登录令牌。
 	router.POST("/install", func(c *gin.Context) {

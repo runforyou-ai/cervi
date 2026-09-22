@@ -1,5 +1,5 @@
 /** 本地问答的独立新增和编辑页面。 */
-import { useEffect, useId, useMemo, useRef } from "react"
+import { useEffect, useId, useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import {
   Controller,
@@ -16,7 +16,6 @@ import {
   createKnowledgeQAEntry,
   getKnowledgeBase,
   getKnowledgeQAEntry,
-  isApiError,
   KnowledgeBaseCategory,
   updateKnowledgeQAEntry,
   type KnowledgeBaseData,
@@ -27,16 +26,14 @@ import { FormInputField } from "@/components/form/form-input-field"
 import { PageContent } from "@/components/page-content"
 import { PageBackButton } from "@/components/page-back-button"
 import { PageHeader } from "@/components/page-header"
+import { ResourceContent } from "@/components/resource-content"
 import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { NativeSelect } from "@/components/ui/native-select"
 import { Textarea } from "@/components/ui/textarea"
-import { useAutoSave } from "@/hooks/use-auto-save"
 import { resourceKeys } from "@/hooks/resource-keys"
+import { useFormSave } from "@/hooks/use-form-save"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
-import { apiErrorMessage } from "@/lib/form-errors"
-import { recoverSession } from "@/lib/session-navigation"
-import { KnowledgeQAFeedback } from "@/features/knowledge-base/knowledge-qa-feedback"
 
 /** 生成问答表单的必填校验。 */
 function createQASchema(messages: {
@@ -70,8 +67,6 @@ export function KnowledgeQAFormPage({ mode }: { mode: "create" | "edit" }) {
     (signal) => getKnowledgeQAEntry(knowledgeBaseId, entryId, signal),
     { enabled: mode === "edit", staleTime: 0 },
   )
-  const error = base.error ?? entry.error
-  const ready = base.data && (mode === "create" || entry.data)
   const supported =
     base.data?.category === KnowledgeBaseCategory.KnowledgeBaseCategoryQA
   return (
@@ -89,21 +84,21 @@ export function KnowledgeQAFormPage({ mode }: { mode: "create" | "edit" }) {
         ) : null}
       </PageHeader>
       <PageContent variant="form">
-        {error || !ready ? (
-          <KnowledgeQAFeedback
-            error={error}
-            retry={() => void (base.error ? base.refresh() : entry.refresh())}
-          />
-        ) : !supported ? (
-          <p className="text-sm text-muted-foreground">{t("qa.unsupported")}</p>
-        ) : (
-          <KnowledgeQAForm
-            key={`${knowledgeBaseId}/${groupId}/${entryId}/${mode}`}
-            knowledgeBase={base.data!}
-            groupId={groupId}
-            entry={mode === "edit" ? entry.data : undefined}
-          />
-        )}
+        <ResourceContent
+          resources={mode === "edit" ? [base, entry] : [base]}
+          errorMessage={t("qa.loadError")}
+        >
+          {!supported ? (
+            <p className="text-sm text-muted-foreground">{t("qa.unsupported")}</p>
+          ) : (
+            <KnowledgeQAForm
+              key={`${knowledgeBaseId}/${groupId}/${entryId}/${mode}`}
+              knowledgeBase={base.data!}
+              groupId={groupId}
+              entry={mode === "edit" ? entry.data : undefined}
+            />
+          )}
+        </ResourceContent>
       </PageContent>
     </>
   )
@@ -123,7 +118,6 @@ function KnowledgeQAForm({
   const navigate = useNavigate()
   const location = useLocation()
   const invalidate = useResourceInvalidator()
-  const mounted = useRef(true)
   const schema = useMemo(
     () =>
       createQASchema({
@@ -147,13 +141,6 @@ function KnowledgeQAForm({
   })
   const returnPath = `/knowledge-bases/${knowledgeBase.id}/groups/${groupId}/qa${location.search}`
   useEffect(() => {
-    mounted.current = true
-    return () => {
-      mounted.current = false
-    }
-  }, [])
-
-  useEffect(() => {
     if (!entry || form.formState.isDirty) return
     form.reset({
       question: entry.question,
@@ -165,15 +152,11 @@ function KnowledgeQAForm({
 
   /** 提交表单并失效该知识库下的问答缓存。 */
   // 编辑已有问答时边改边存，新建仍由底部按钮提交并跳回列表。
-  const markSaved = useAutoSave({
+  const { submit } = useFormSave({
     form,
     schema,
-    enabled: Boolean(entry),
-    save: (values) => save(values, true),
-  })
-
-  async function save(values: QAFormValues, autoSaved = false) {
-    try {
+    autoSave: Boolean(entry),
+    save: async (values) => {
       const saved = entry
         ? await updateKnowledgeQAEntry(knowledgeBase.id, entry.id, values)
         : await createKnowledgeQAEntry(knowledgeBase.id, values)
@@ -181,11 +164,9 @@ function KnowledgeQAForm({
         invalidate(resourceKeys.knowledgeQAEntries(knowledgeBase.id)),
         invalidate(resourceKeys.knowledgeQAEntry(knowledgeBase.id, saved.id)),
       ])
-      if (!mounted.current) return
-      if (autoSaved) {
-        markSaved(values)
-        return
-      }
+      return saved
+    },
+    onSubmitted: (saved) => {
       const savedGroup = knowledgeBase.groups
         .flatMap((group) => [group, ...group.children])
         .find((group) => group.id === saved.groupId)
@@ -199,16 +180,17 @@ function KnowledgeQAForm({
           : t("qa.saveSuccess"),
       )
       navigate(returnPath, { replace: true })
-    } catch (error) {
-      if (!mounted.current || recoverSession(error, navigate)) return
-      toast.error(
-        isApiError(error) ? apiErrorMessage(error) : t("qa.saveError"),
-      )
-    }
-  }
+    },
+    errorMessage: t("qa.saveError"),
+    logLabel: "保存问答",
+  })
 
   return (
-    <form className="w-full space-y-9" onSubmit={form.handleSubmit((values) => save(values))}>
+    <form
+      className="w-full space-y-9"
+      onSubmit={form.handleSubmit(submit)}
+      noValidate
+    >
       <QAFormFields
         control={form.control}
         disabled={form.formState.isSubmitting}

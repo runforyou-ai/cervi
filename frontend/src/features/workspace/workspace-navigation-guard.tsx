@@ -80,6 +80,15 @@ export function WorkspaceNavigationGuard({
     const resolve = pendingRef.current
     pendingRef.current = null
     setPending(false)
+    if (confirmed) {
+      // 将被离开的有改动表单标记为已放弃，卸载时跳过其中等待保存的内容。
+      const nextPathname =
+        blocker.state === "blocked" ? blocker.location.pathname : null
+      for (const form of forms.current.values()) {
+        if (form.dirty.current && form.pathname !== nextPathname)
+          form.discarded.current = true
+      }
+    }
     // 历史导航发生时取消原操作，仅处理当前被拦截的导航。
     resolve?.(blocker.state === "blocked" ? false : confirmed)
     if (blocker.state === "blocked") {

@@ -5,6 +5,7 @@ import { useTranslation } from "react-i18next"
 import type { PageInfo } from "@/api"
 import { ListToolbar } from "@/components/list-toolbar"
 import { PageHeader } from "@/components/page-header"
+import type { ResourceState } from "@/components/resource-content"
 import { ResourceListLayout } from "@/components/resource-list"
 import { ContactScopeMobileSelect } from "@/features/contacts/contact-scope-mobile-select"
 
@@ -25,7 +26,7 @@ export function ContactListSection({
   scope: ComponentProps<typeof ContactScopeMobileSelect>
   headerActions?: ReactNode
   toolbar: ReactNode
-  list: { loading: boolean; error: unknown; refresh: () => unknown }
+  list: ResourceState
   page: PageInfo
   setParameters: (changes: Record<string, string | null>) => void
   children: ReactNode
@@ -45,10 +46,8 @@ export function ContactListSection({
       <ListToolbar>{toolbar}</ListToolbar>
 
       <ResourceListLayout
-        loading={list.loading}
-        error={Boolean(list.error)}
+        resources={list}
         errorMessage={t("list.loadError")}
-        onRetry={() => void list.refresh()}
         page={page}
         onPageChange={(number) =>
           setParameters({ page: String(number), selected: null })

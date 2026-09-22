@@ -82,6 +82,7 @@ func (o *directOperations) ClaimDeviceRun(ctx context.Context, meta RequestMeta,
 	return DeviceRunClaim{
 		Assignment: claim.Assignment, LeaseExpiresAt: claim.LeaseExpiresAt,
 		LeaseRenewIntervalSeconds: int(agentrunaction.DeviceRunLeaseRenewInterval.Seconds()),
+		RunTimeoutSeconds:         int(agentrunaction.DeviceRunMaxDuration.Seconds()),
 	}, nil
 }
 
@@ -141,18 +142,8 @@ func (o *directOperations) CompleteDeviceRun(ctx context.Context, meta RequestMe
 		return NotFoundError(meta, cervii18n.ErrorDeviceRunNotFound)
 	}
 	result := agentruntime.RunResult{Content: input.Content, EndSeq: input.EndSeq}
-	// 解码运行时透传的结束方式、用量与过程内容块，缺省表示直接回答且没有过程内容。
-	for _, part := range []struct {
-		data   json.RawMessage
-		target any
-	}{{input.Decision, &result.Decision}, {input.Usage, &result.Usage}, {input.Blocks, &result.Blocks}} {
-		if len(part.data) == 0 || string(part.data) == "null" {
-			continue
-		}
-		if err := json.Unmarshal(part.data, part.target); err != nil {
-			slog.Warn("设备运行结果格式无效", "organization_id", device.device.OrganizationID, "device_id", device.device.DeviceID, "agent_run_id", runID, "error", err)
-			return InvalidError(meta, cervii18n.ErrorValidationFailed, nil)
-		}
+	if err := decodeDeviceRunProcess(meta, device, runID, &result, input.Decision, input.Usage, input.Blocks); err != nil {
+		return err
 	}
 	if err := o.agentCoordinator.CompleteDeviceRun(ctx, device.device, runID, result); err != nil {
 		return o.deviceRunError(ctx, meta, err, device, runID)
@@ -165,10 +156,59 @@ func (o *directOperations) FailDeviceRun(ctx context.Context, meta RequestMeta, 
 	if !common.ValidUUID(runID) {
 		return NotFoundError(meta, cervii18n.ErrorDeviceRunNotFound)
 	}
-	if err := o.agentCoordinator.FailDeviceRun(ctx, device.device, runID, domain.AgentRunErrorCode(input.ErrorCode), input.Message); err != nil {
+	partial := agentruntime.RunResult{}
+	if err := decodeDeviceRunProcess(meta, device, runID, &partial, nil, input.Usage, input.Blocks); err != nil {
+		return err
+	}
+	if err := o.agentCoordinator.FailDeviceRun(ctx, device.device, runID, domain.AgentRunErrorCode(input.ErrorCode), input.Message, partial); err != nil {
 		return o.deviceRunError(ctx, meta, err, device, runID)
 	}
 	return nil
+}
+
+// decodeDeviceRunProcess 解码设备透传的结束方式、用量与过程内容块，缺省表示直接回答且没有过程内容。
+func decodeDeviceRunProcess(meta RequestMeta, device deviceIdentity, runID string, result *agentruntime.RunResult, decision, usage, blocks json.RawMessage) error {
+	for _, part := range []struct {
+		data   json.RawMessage
+		target any
+	}{{decision, &result.Decision}, {usage, &result.Usage}, {blocks, &result.Blocks}} {
+		if len(part.data) == 0 || string(part.data) == "null" {
+			continue
+		}
+		if err := json.Unmarshal(part.data, part.target); err != nil {
+			slog.Warn("设备运行结果格式无效", "organization_id", device.device.OrganizationID, "device_id", device.device.DeviceID, "agent_run_id", runID, "error", err)
+			return InvalidError(meta, cervii18n.ErrorValidationFailed, nil)
+		}
+	}
+	return nil
+}
+
+// DeviceModelUpstream 定义设备模型代理转发的上游模型服务：规范化后的入口、品牌、供应商凭据与配置版本锁定的模型标识。
+type DeviceModelUpstream struct {
+	Brand      string
+	BaseURL    string
+	APIKey     string
+	Identifier string
+}
+
+// AuthorizeDeviceModelRequest 校验模型代理请求来自持有该运行有效租约的本人未撤销设备，并返回运行锁定的上游模型服务。
+func (b *DirectBackend) AuthorizeDeviceModelRequest(ctx context.Context, meta RequestMeta, runID string) (DeviceModelUpstream, error) {
+	device, err := b.ops.authenticateDevice(ctx, meta)
+	if err != nil {
+		return DeviceModelUpstream{}, err
+	}
+	if !common.ValidUUID(runID) {
+		return DeviceModelUpstream{}, NotFoundError(meta, cervii18n.ErrorDeviceRunNotFound)
+	}
+	upstream, err := b.ops.agentCoordinator.ResolveDeviceModelUpstream(ctx, device.device, runID)
+	if err != nil {
+		return DeviceModelUpstream{}, b.ops.deviceRunError(ctx, meta, err, device, runID)
+	}
+	baseURL, err := common.CompatibleModelBaseURL(upstream.Brand, upstream.BaseURL)
+	if err != nil {
+		return DeviceModelUpstream{}, b.ops.deviceRunError(ctx, meta, fmt.Errorf("normalize device model upstream: %w", err), device, runID)
+	}
+	return DeviceModelUpstream{Brand: upstream.Brand, BaseURL: baseURL, APIKey: upstream.APIKey, Identifier: upstream.Identifier}, nil
 }
 
 // deviceRunError 转换设备运行期错误：运行不存在、不可领取、工作区忙与租约失效给出稳定原因码，其余记录日志后按请求失败收敛。

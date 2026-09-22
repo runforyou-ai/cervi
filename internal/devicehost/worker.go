@@ -8,12 +8,14 @@ import (
 	"errors"
 	"io"
 	"log/slog"
+	"net/http"
 	"os"
 	"strings"
 	"sync"
 	"time"
 
 	"github.com/runforyou-ai/cervi/internal/appservice"
+	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/realtime/protocol"
 )
 
@@ -39,6 +41,8 @@ type RunClient interface {
 	appservice.DeviceRunBackend
 	// OpenDeviceEventStream 以本机设备身份建立成员事件流，关闭返回值即结束事件流。
 	OpenDeviceEventStream(context.Context, appservice.RequestMeta) (io.ReadCloser, error)
+	// DeviceModelEndpoint 返回运行的模型代理入口与附加本机设备认证的传输层。
+	DeviceModelEndpoint(context.Context, appservice.RequestMeta, string) (string, http.RoundTripper, error)
 }
 
 // WorkspaceStore 读取本机工作区的本地路径。
@@ -52,6 +56,7 @@ type Worker struct {
 	registrar *Registrar
 	store     WorkspaceStore
 	client    RunClient
+	runtime   agentruntime.Runtime
 
 	ctx     context.Context
 	cancel  context.CancelFunc
@@ -74,7 +79,7 @@ type activeRun struct {
 }
 
 // NewWorker 创建设备执行循环；当前平台不注册本机设备时返回 nil。
-func NewWorker(registrar *Registrar, store WorkspaceStore, client RunClient) *Worker {
+func NewWorker(registrar *Registrar, store WorkspaceStore, client RunClient, runtime agentruntime.Runtime) *Worker {
 	if registrar == nil {
 		return nil
 	}
@@ -83,6 +88,7 @@ func NewWorker(registrar *Registrar, store WorkspaceStore, client RunClient) *Wo
 		registrar: registrar,
 		store:     store,
 		client:    client,
+		runtime:   runtime,
 		ctx:       ctx,
 		cancel:    cancel,
 		wake:      make(chan struct{}, 1),
@@ -238,28 +244,34 @@ func (w *Worker) start(ctx context.Context, session deviceSession, meta appservi
 	}
 	w.runs.Add(2)
 	go w.renew(runCtx, cancelRun, meta, run.RunID, interval, renewNow)
-	go w.execute(runCtx, cancelRun, meta, run, path)
+	go w.execute(runCtx, cancelRun, meta, run.RunID, claim)
 	slog.Info("设备运行已领取", "agent_run_id", run.RunID, "workspace_id", run.WorkspaceID, "lease_expires_at", claim.LeaseExpiresAt)
 	return false
 }
 
-// execute 在本机执行一次已领取的运行，运行时出错且运行仍持有租约时上报失败。
-func (w *Worker) execute(runCtx context.Context, cancelRun context.CancelFunc, meta appservice.RequestMeta, run appservice.DeviceWorkRun, path string) {
+// execute 在本机执行一次已领取的运行，出错时上报失败与已产生的过程内容。
+func (w *Worker) execute(runCtx context.Context, cancelRun context.CancelFunc, meta appservice.RequestMeta, runID string, claim appservice.DeviceRunClaim) {
 	defer w.runs.Done()
 	defer w.Wake()
-	defer w.release(run.RunID)
+	defer w.release(runID)
 	defer cancelRun()
-	err := runPlaceholder(runCtx, w.client, meta, run.RunID, path)
-	if err == nil || runCtx.Err() != nil {
+	result, err := w.runAgent(runCtx, meta, runID, claim)
+	// 本机执行循环停止时不再上报；运行已在服务端结束或失效且没有过程内容时无需上报。
+	ended := runCtx.Err() != nil || errors.Is(err, errRunSuppressed)
+	if err == nil || w.ctx.Err() != nil || (ended && len(result.Blocks) == 0) {
 		return
 	}
-	slog.Warn("设备运行执行失败", "agent_run_id", run.RunID, "error", err)
+	if !ended {
+		slog.Warn("设备运行执行失败", "agent_run_id", runID, "error", err)
+	}
+	input := appservice.DeviceRunFailureInput{ErrorCode: appservice.DeviceRunFailureRuntimeFailed, Message: err.Error()}
+	if input.Usage, input.Blocks, err = encodeProcess(result); err != nil {
+		slog.Warn("编码设备运行过程内容失败", "agent_run_id", runID, "error", err)
+	}
 	ctx, cancel := context.WithTimeout(w.ctx, workRequestTimeout)
 	defer cancel()
-	if failErr := w.client.FailDeviceRun(ctx, meta, run.RunID, appservice.DeviceRunFailureInput{
-		ErrorCode: appservice.DeviceRunFailureRuntimeFailed, Message: err.Error(),
-	}); failErr != nil {
-		slog.Warn("上报设备运行失败未成功", "agent_run_id", run.RunID, "error", failErr)
+	if failErr := w.client.FailDeviceRun(ctx, meta, runID, input); failErr != nil {
+		slog.Warn("上报设备运行失败未成功", "agent_run_id", runID, "error", failErr)
 	}
 }
 

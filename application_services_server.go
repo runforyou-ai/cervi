@@ -100,6 +100,9 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	if err := tasks.Registry().RegisterJSONWithTerminalFailure(agentrunaction.RunActionName, executeAgentRun.Execute, executeAgentRun.FinalizeFailure); err != nil {
 		return nil, nil, err
 	}
+	if err := tasks.Registry().RegisterJSONWithTerminalFailure(agentrunaction.ReturnedHandoffActionName, executeAgentRun.HandOffReturnedSession, executeAgentRun.FinalizeReturnedHandoffFailure); err != nil {
+		return nil, nil, err
+	}
 	// 注册设备运行收敛扫描，每 15 秒把租约过期或失去执行条件的设备运行标记失败。
 	if err := tasks.Registry().RegisterJSON(agentrunaction.DeviceRunSweepActionName, executeAgentRun.SweepDeviceRuns); err != nil {
 		return nil, nil, err
@@ -174,6 +177,7 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	httpAPI := api.NewService(
 		boundService,
 		api.WithDeviceRuns(directBackend),
+		api.WithDeviceModelProxy(directBackend),
 		api.WithWebsiteVisitor(websiteVisitorService, config.TLS.Mode != "off"),
 		api.WithWebsiteVisitorRealtime(realtimeGateway),
 		api.WithTelegramWebhook(telegramWebhook),
@@ -205,10 +209,14 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 	}
 	// 运营接口只在托管部署注册，凭据认证是其唯一访问控制手段。
 	if config.Deployment.Mode.Managed() {
-		operatorBackend := appservice.NewOperatorDirectBackend(appservice.OperatorDeployment{
-			Mode:                appservice.DeploymentMode(config.Deployment.Mode),
-			ManagedDomainSuffix: config.Deployment.ManagedDomainSuffix,
-		}, config.Deployment.OperatorCredential)
+		operatorBackend := appservice.NewOperatorDirectBackend(appStorage.DB(), appservice.OperatorConfig{
+			Deployment: appservice.OperatorDeployment{
+				Mode:                appservice.DeploymentMode(config.Deployment.Mode),
+				ManagedDomainSuffix: config.Deployment.ManagedDomainSuffix,
+			},
+			Credential:             config.Deployment.OperatorCredential,
+			OfficialIdentityIssuer: config.Deployment.OfficialIdentityIssuer,
+		})
 		services = append(services, application.NewServiceWithOptions(api.NewOperatorService(operatorBackend), application.ServiceOptions{
 			Route: "/operator/v1",
 		}))
