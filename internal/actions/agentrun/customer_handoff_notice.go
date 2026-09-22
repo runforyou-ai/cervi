@@ -156,8 +156,8 @@ func (a *ExecuteAction) HandOffReturnedSession(ctx context.Context, input Return
 		if err != nil {
 			return err
 		}
-		// 对客通知不结束客户等待，写入后恢复通知前的等待起点。
-		awaitingReplySince := session.AwaitingReplySince
+		// 对客通知不结束客户等待，写入后恢复通知前的等待起点与本轮提醒时间。
+		awaitingReplySince, remindedAt := session.AwaitingReplySince, session.RemindedAt
 		if _, err := appendCustomerAgentMessage(ctx, tx, a.enqueuer, agentRunPolicyContext{
 			Conversation: conversation, ServiceSession: session, DeliveryRoute: deliveryRoute,
 		}, &servermodels.Message{
@@ -169,11 +169,12 @@ func (a *ExecuteAction) HandOffReturnedSession(ctx context.Context, input Return
 		}
 		if _, err := tx.NewUpdate().Model(session).
 			Set("awaiting_reply_since = ?", awaitingReplySince).
+			Set("reminded_at = ?", remindedAt).
 			WherePK().Where("organization_id = ?", input.OrganizationID).
 			Exec(ctx); err != nil {
 			return fmt.Errorf("restore returned session awaiting reply: %w", err)
 		}
-		session.AwaitingReplySince = awaitingReplySince
+		session.AwaitingReplySince, session.RemindedAt = awaitingReplySince, remindedAt
 		slog.Info("退回队列的客户会话已按承接结果通知客户",
 			"organization_id", input.OrganizationID, "conversation_id", session.ConversationID,
 			"service_session_id", session.ID, "assigned", assigneeName != nil)

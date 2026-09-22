@@ -285,6 +285,7 @@ export type {
     ServiceQueueTeam,
     ServiceQueueTeamList,
     ServiceSessionTarget,
+    ServiceTimeouts,
     Startup,
     SyncHeads,
     Team,

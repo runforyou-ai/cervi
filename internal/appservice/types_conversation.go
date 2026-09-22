@@ -70,6 +70,7 @@ type ServiceSessionReturnReason string
 
 const (
 	ServiceSessionReturnAssigneeUnavailable ServiceSessionReturnReason = ServiceSessionReturnReason(domain.ServiceSessionReturnAssigneeUnavailable)
+	ServiceSessionReturnResponseTimeout     ServiceSessionReturnReason = ServiceSessionReturnReason(domain.ServiceSessionReturnResponseTimeout)
 )
 
 // ServiceSessionTargetKind 表示客服处理周期流转去向的类型。

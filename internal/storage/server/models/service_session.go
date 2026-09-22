@@ -28,6 +28,7 @@ type ServiceSession struct {
 	AssignedAt               *time.Time `bun:"assigned_at"`
 	AssigneeAssignedAt       *time.Time `bun:"assignee_assigned_at"`
 	AwaitingReplySince       *time.Time `bun:"awaiting_reply_since"`
+	RemindedAt               *time.Time `bun:"reminded_at"`
 	FirstResponseAt          *time.Time `bun:"first_response_at"`
 	StatusChangedAt          time.Time  `bun:"status_changed_at"`
 	ClosedAt                 *time.Time `bun:"closed_at"`

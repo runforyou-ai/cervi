@@ -824,6 +824,16 @@ func (s *Service) UpdateBusinessHours(ctx context.Context, meta RequestMeta, inp
 	return withNormalizedSlices(s.backend.UpdateBusinessHours(ctx, meta, input))
 }
 
+// GetServiceTimeouts 读取当前企业的客服超时时长。
+func (s *Service) GetServiceTimeouts(ctx context.Context, meta RequestMeta) (ServiceTimeouts, error) {
+	return withNormalizedSlices(s.backend.GetServiceTimeouts(ctx, meta))
+}
+
+// UpdateServiceTimeouts 修改当前企业的客服超时时长。
+func (s *Service) UpdateServiceTimeouts(ctx context.Context, meta RequestMeta, input ServiceTimeouts) (ServiceTimeouts, error) {
+	return withNormalizedSlices(s.backend.UpdateServiceTimeouts(ctx, meta, input))
+}
+
 // RegisterDevice 注册当前用户的本机设备。
 func (s *Service) RegisterDevice(ctx context.Context, meta RequestMeta, input DeviceRegistrationInput) (Device, error) {
 	return withNormalizedSlices(s.backend.RegisterDevice(ctx, meta, input))

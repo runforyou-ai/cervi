@@ -2,9 +2,11 @@
 import {
   ChangePassword,
   GetBusinessHours,
+  GetServiceTimeouts,
   SelectImage,
   UpdateBusinessHours,
   UpdateOrganization,
+  UpdateServiceTimeouts,
   UpdateProfile,
   UpdateUserPreferences,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
@@ -22,6 +24,12 @@ export const getBusinessHours = bind(GetBusinessHours)
 
 /** 修改当前企业的客服工作时间。 */
 export const updateBusinessHours = bind(UpdateBusinessHours)
+
+/** 读取当前企业的客服超时时长。 */
+export const getServiceTimeouts = bind(GetServiceTimeouts)
+
+/** 修改当前企业的客服超时时长。 */
+export const updateServiceTimeouts = bind(UpdateServiceTimeouts)
 
 /** 修改当前用户的头像、姓名和邮箱。 */
 export const updateProfile = bind(UpdateProfile)

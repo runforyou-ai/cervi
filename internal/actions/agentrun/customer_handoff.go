@@ -97,6 +97,7 @@ func applyCustomerHandoff(ctx context.Context, db bun.IDB, enqueuer servertask.T
 		Set("assignee_identity_id = ?", assigneeID).
 		Set("team_id = ?", handoff.Route.TeamID).
 		Set("awaiting_reply_since = ?", now).
+		Set("reminded_at = NULL").
 		Set("updated_at = now()").
 		WherePK().Where("organization_id = ?", session.OrganizationID)
 	if assigneeID != nil {
@@ -417,12 +418,13 @@ func applyServiceSessionReturn(ctx context.Context, db bun.IDB, enqueuer servert
 		Set("assignee_identity_id = NULL").
 		Set("assignee_assigned_at = NULL").
 		Set("awaiting_reply_since = ?", awaitingReplySince).
+		Set("reminded_at = NULL").
 		Set("updated_at = now()").
 		WherePK().Where("organization_id = ?", session.OrganizationID).
 		Exec(ctx); err != nil {
 		return fmt.Errorf("return service session to queue: %w", err)
 	}
-	session.AssigneeIdentityID, session.AssigneeAssignedAt, session.AwaitingReplySince = nil, nil, awaitingReplySince
+	session.AssigneeIdentityID, session.AssigneeAssignedAt, session.AwaitingReplySince, session.RemindedAt = nil, nil, awaitingReplySince, nil
 	if domain.OrganizationIdentityType(assignee.Type) == domain.OrganizationIdentityTypeAgent {
 		if err := enqueueReturnedHandoff(ctx, db, enqueuer, ReturnedHandoffInput{
 			OrganizationID: session.OrganizationID, ServiceSessionID: session.ID, AgentIdentityID: assignee.ID, NoticeKey: key,

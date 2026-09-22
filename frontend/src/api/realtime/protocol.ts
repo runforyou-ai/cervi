@@ -12,10 +12,19 @@ const blockKinds = new Set(["thinking", "content", "tool_call"])
 const toolCallStatuses = new Set(["queued", "running", "succeeded", "failed"])
 
 /** 客服处理周期提醒的已知原因。 */
-const serviceAttentionReasons = new Set(["assigned"])
+const serviceAttentionReasons = new Set([
+  "assigned",
+  "response_overdue",
+  "queue_waiting",
+  "returned",
+])
 
 /** 客服处理周期提醒原因，与 internal/domain 的 ServiceAttentionReason 一致。 */
-export type ServiceAttentionReason = "assigned"
+export type ServiceAttentionReason =
+  | "assigned"
+  | "response_overdue"
+  | "queue_waiting"
+  | "returned"
 
 /** 当前协议主版本，只有破坏性演进才提升。 */
 export const realtimeProtocolVersion = 1

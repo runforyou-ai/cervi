@@ -1641,6 +1641,26 @@ func (b *DirectBackend) UpdateBusinessHours(ctx context.Context, meta RequestMet
 	return b.ops.UpdateBusinessHours(ctx, meta, identity, input)
 }
 
+// GetServiceTimeouts 读取当前企业的客服超时时长。
+func (b *DirectBackend) GetServiceTimeouts(ctx context.Context, meta RequestMeta) (ServiceTimeouts, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero ServiceTimeouts
+		return zero, err
+	}
+	return b.ops.GetServiceTimeouts(ctx, meta, identity)
+}
+
+// UpdateServiceTimeouts 修改当前企业的客服超时时长。
+func (b *DirectBackend) UpdateServiceTimeouts(ctx context.Context, meta RequestMeta, input ServiceTimeouts) (ServiceTimeouts, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero ServiceTimeouts
+		return zero, err
+	}
+	return b.ops.UpdateServiceTimeouts(ctx, meta, identity, input)
+}
+
 // RegisterDevice 注册当前用户的本机设备。
 func (b *DirectBackend) RegisterDevice(ctx context.Context, meta RequestMeta, input DeviceRegistrationInput) (Device, error) {
 	identity, err := b.ops.authenticate(ctx, meta)

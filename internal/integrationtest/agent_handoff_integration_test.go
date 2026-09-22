@@ -598,15 +598,18 @@ func testManagementReturn(t *testing.T, f handoffFixture) {
 				if session.AssigneeIdentityID != nil || session.TeamID != nil {
 					t.Fatalf("session = %+v", session)
 				}
-				// 任务重复执行只写一条通知。
+				// 本轮已发出的队列提醒不随承接通知清空；任务重复执行只写一条通知。
+				if _, err := f.db.NewUpdate().Table("service_sessions").Set("reminded_at = now()").Where("id = ?", session.ID).Exec(ctx); err != nil {
+					t.Fatal(err)
+				}
 				for range 2 {
 					if tasks := runReturnedHandoffs(t, f.db, session.ID); tasks != 1 {
 						t.Fatalf("returned handoff tasks = %d", tasks)
 					}
 				}
 				// 对客通知不结束客户等待：有在途输入的周期保留等待起点，已回答的周期保持无等待。
-				if returned := loadSession(t, f.db, session.ID); (returned.AwaitingReplySince == nil) != (conversationID == idle.Conversation.ID) {
-					t.Fatalf("returned session awaiting reply = %v", returned.AwaitingReplySince)
+				if returned := loadSession(t, f.db, session.ID); (returned.AwaitingReplySince == nil) != (conversationID == idle.Conversation.ID) || returned.RemindedAt == nil {
+					t.Fatalf("returned session awaiting reply = %v, reminded = %v", returned.AwaitingReplySince, returned.RemindedAt)
 				}
 				var notices []servermodels.Message
 				if err := f.db.NewSelect().Model(&notices).

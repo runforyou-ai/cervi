@@ -167,7 +167,7 @@ func TestServiceSessionTeamQueue(t *testing.T) {
 
 	// 删除团队后其队列中的处理周期并入公共队列。
 	route(channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue})
-	if err := teamaction.NewDeleteTeamAction(f.db).Execute(ctx, f.owner, staffed.ID); err != nil {
+	if err := teamaction.NewDeleteTeamAction(f.db, newTestTasks(f.db)).Execute(ctx, f.owner, staffed.ID); err != nil {
 		t.Fatal(err)
 	}
 	if _, teamID := loadServiceSessionQueue(t, f, teamConversationID); teamID != nil {
@@ -212,7 +212,7 @@ func TestDeleteTeamWaitsForTransfer(t *testing.T) {
 	xid := <-written
 	deleted := make(chan error, 1)
 	go func() {
-		deleted <- teamaction.NewDeleteTeamAction(f.db).Execute(ctx, f.owner, team.ID)
+		deleted <- teamaction.NewDeleteTeamAction(f.db, newTestTasks(f.db)).Execute(ctx, f.owner, team.ID)
 	}()
 	// 等删除在该事务上排队，确保队列清理发生在转交提交之后。
 	deadline := time.Now().Add(10 * time.Second)

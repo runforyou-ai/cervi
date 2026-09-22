@@ -3096,6 +3096,7 @@ export enum ServiceSessionReturnReason {
     $zero = "",
 
     ServiceSessionReturnAssigneeUnavailable = "assignee_unavailable",
+    ServiceSessionReturnResponseTimeout = "response_timeout",
 };
 
 /**
@@ -3135,6 +3136,15 @@ export enum ServiceSessionTargetKind {
     ServiceSessionTargetTeam = "team",
     ServiceSessionTargetMember = "member",
 };
+
+/**
+ * ServiceTimeouts 定义企业客服的超时时长，单位为分钟：负责人未回复的提醒与回收时长，以及队列等待提醒时长。
+ */
+export interface ServiceTimeouts {
+    "responseReminderMinutes": number;
+    "responseReclaimMinutes": number;
+    "queueReminderMinutes": number;
+}
 
 /**
  * SessionState 表示会话入口。

@@ -148,9 +148,29 @@ const settings = {
   },
   customerService: {
     title: "客服",
-    description: "设置客服工作时间，转人工无人接待时据此告知客户",
+    description: "设置客服工作时间，以及客户等待回复超时后的提醒与重新分配",
     loadError: "工作时间加载失败。",
     saveError: "保存工作时间失败，请重试。",
+    tabs: {
+      businessHours: "工作时间",
+      assignment: "分配与提醒",
+    },
+    timeouts: {
+      formLabel: "分配与提醒表单",
+      loadError: "分配与提醒设置加载失败。",
+      saveError: "保存分配与提醒设置失败，请重试。",
+      minutes: "分钟",
+      responseReminderMinutes: "未回复提醒",
+      responseReminderMinutesDescription: "负责人超过该时长未回复客户时提醒负责人",
+      responseReclaimMinutes: "未回复回收",
+      responseReclaimMinutesDescription: "负责人超过该时长仍未回复时退回队列，重新分配给其他客服",
+      queueReminderMinutes: "队列等待提醒",
+      queueReminderMinutesDescription: "会话在队列中等待超过该时长时提醒对应团队或全部工作中的客服",
+      validation: {
+        minutesInvalid: "请输入大于 0 的整数。",
+        reclaimAfterReminder: "回收时长必须大于提醒时长。",
+      },
+    },
     businessHours: {
       formLabel: "工作时间表单",
       enabled: "启用工作时间",

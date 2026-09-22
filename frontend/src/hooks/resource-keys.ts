@@ -129,6 +129,8 @@ export const resourceKeys = {
   conversationDeviceBinding: (conversationId?: string) => itemKey("conversation-device-binding", conversationId),
   /** 当前企业的客服工作时间。 */
   businessHours: () => ["business-hours"],
+  /** 当前企业的客服超时时长。 */
+  serviceTimeouts: () => ["service-timeouts"],
   /** 当前客户端连接的企业服务器地址。 */
   serverURL: () => ["server-url"],
   /** 知识库列表。 */

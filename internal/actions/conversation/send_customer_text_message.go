@@ -582,7 +582,8 @@ func applyMemberReplySessionPlan(ctx context.Context, db bun.IDB, session *serve
 		query = query.
 			Set("assignee_identity_id = ?", identityID).
 			Set("assigned_at = COALESCE(assigned_at, ?)", now).
-			Set("assignee_assigned_at = ?", now)
+			Set("assignee_assigned_at = ?", now).
+			Set("reminded_at = NULL")
 	}
 	if _, err := query.Exec(ctx); err != nil {
 		return fmt.Errorf("apply member reply service session: %w", err)
