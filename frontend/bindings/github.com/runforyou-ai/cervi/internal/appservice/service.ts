@@ -395,6 +395,13 @@ export function GetAttachmentDownload(meta: $models.RequestMeta, conversationID:
 }
 
 /**
+ * GetBusinessHours 读取当前企业的客服工作时间。
+ */
+export function GetBusinessHours(meta: $models.RequestMeta): $CancellablePromise<$models.BusinessHours> {
+    return $Call.ByID(721308771, meta);
+}
+
+/**
  * GetContact 返回联系人详情。
  */
 export function GetContact(meta: $models.RequestMeta, contactID: string): $CancellablePromise<$models.Contact> {
@@ -1190,6 +1197,13 @@ export function UpdateAgent(meta: $models.RequestMeta, agentID: string, input: $
  */
 export function UpdateAgentExecution(meta: $models.RequestMeta, agentID: string, input: $models.UpdateAgentExecutionInput): $CancellablePromise<$models.Agent> {
     return $Call.ByID(3177846414, meta, agentID, input);
+}
+
+/**
+ * UpdateBusinessHours 修改当前企业的客服工作时间。
+ */
+export function UpdateBusinessHours(meta: $models.RequestMeta, input: $models.BusinessHours): $CancellablePromise<$models.BusinessHours> {
+    return $Call.ByID(1348581964, meta, input);
 }
 
 /**

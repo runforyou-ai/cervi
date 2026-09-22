@@ -177,6 +177,8 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.PUT("/settings/mcp-servers/:mcpServerID", s.updateMCPServer)
 	router.DELETE("/settings/mcp-servers/:mcpServerID", s.deleteMCPServer)
 	router.PUT("/settings/organization", s.updateOrganization)
+	router.GET("/settings/customer-service/business-hours", s.getBusinessHours)
+	router.PUT("/settings/customer-service/business-hours", s.updateBusinessHours)
 	router.POST("/devices", s.registerDevice)
 	router.GET("/devices", s.listDevices)
 	router.DELETE("/devices/:deviceID", s.revokeDevice)
@@ -1511,6 +1513,22 @@ func (s *Service) updateOrganization(c *gin.Context) {
 		return
 	}
 	output, err := s.application.UpdateOrganization(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// getBusinessHours 读取当前企业的客服工作时间。
+func (s *Service) getBusinessHours(c *gin.Context) {
+	output, err := s.application.GetBusinessHours(c.Request.Context(), requestMeta(c))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// updateBusinessHours 修改当前企业的客服工作时间。
+func (s *Service) updateBusinessHours(c *gin.Context) {
+	var input appservice.BusinessHours
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.UpdateBusinessHours(c.Request.Context(), requestMeta(c), input)
 	writeResult(c, http.StatusOK, output, err)
 }
 

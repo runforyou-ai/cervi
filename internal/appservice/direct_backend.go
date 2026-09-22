@@ -57,6 +57,7 @@ type directOperations struct {
 	channelOps
 	contactOps
 	directoryOps
+	customerServiceOps
 	agentOps
 	knowledgeOps
 	integrationOps
@@ -75,18 +76,19 @@ func NewDirectBackend(db *bun.DB, deploymentMode domain.DeploymentMode, localFil
 	guard := sessionGuard{deploymentMode: deploymentMode, resolveTenant: tenantResolver, resolveIdentity: authaction.NewResolveIdentityQuery(db)}
 	documentQuery := knowledgebaseaction.NewDocumentQuery(db)
 	ops := &directOperations{
-		sessionGuard:    guard,
-		authOps:         newAuthOps(db),
-		conversationOps: newConversationOps(db, agentScheduler, agentCoordinator, taskEnqueuer),
-		inboxOps:        newInboxOps(db, taskEnqueuer),
-		channelOps:      newChannelOps(db, connectionRunner, telegramAPI),
-		contactOps:      newContactOps(db),
-		directoryOps:    newDirectoryOps(db, agentCoordinator, taskEnqueuer),
-		agentOps:        newAgentOps(db, agentCoordinator, customerReplySuggestions),
-		knowledgeOps:    newKnowledgeOps(db, taskEnqueuer, documentQuery, documentConverter),
-		integrationOps:  newIntegrationOps(db, connectionRunner, modelProviderRegistry, mcpTest, mcpScheduler),
-		deviceOps:       newDeviceOps(db),
-		fileOps:         newFileOps(db, localFiles, s3),
+		sessionGuard:       guard,
+		authOps:            newAuthOps(db),
+		conversationOps:    newConversationOps(db, agentScheduler, agentCoordinator, taskEnqueuer),
+		inboxOps:           newInboxOps(db, taskEnqueuer),
+		channelOps:         newChannelOps(db, connectionRunner, telegramAPI),
+		contactOps:         newContactOps(db),
+		directoryOps:       newDirectoryOps(db, agentCoordinator, taskEnqueuer),
+		customerServiceOps: newCustomerServiceOps(db),
+		agentOps:           newAgentOps(db, agentCoordinator, customerReplySuggestions),
+		knowledgeOps:       newKnowledgeOps(db, taskEnqueuer, documentQuery, documentConverter),
+		integrationOps:     newIntegrationOps(db, connectionRunner, modelProviderRegistry, mcpTest, mcpScheduler),
+		deviceOps:          newDeviceOps(db),
+		fileOps:            newFileOps(db, localFiles, s3),
 	}
 	return &DirectBackend{ops: ops}
 }

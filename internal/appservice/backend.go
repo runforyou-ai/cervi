@@ -514,6 +514,12 @@ type Backend interface {
 	// UpdateOrganization 修改当前企业通用设置。
 	//cervi:route PUT /settings/organization
 	UpdateOrganization(context.Context, RequestMeta, OrganizationInput) (Organization, error)
+	// GetBusinessHours 读取当前企业的客服工作时间。
+	//cervi:route GET /settings/customer-service/business-hours
+	GetBusinessHours(context.Context, RequestMeta) (BusinessHours, error)
+	// UpdateBusinessHours 修改当前企业的客服工作时间。
+	//cervi:route PUT /settings/customer-service/business-hours
+	UpdateBusinessHours(context.Context, RequestMeta, BusinessHours) (BusinessHours, error)
 
 	// RegisterDevice 注册当前用户的本机设备。
 	//cervi:route POST /devices
