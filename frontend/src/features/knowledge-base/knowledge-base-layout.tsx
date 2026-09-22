@@ -24,6 +24,7 @@ import {
   UserStatus,
 } from "@/api"
 import { LoadingIndicator } from "@/components/loading-indicator"
+import { resourceStatus } from "@/components/resource-content"
 import { PagePaneNav, PageSplit } from "@/components/page-split"
 import { StatusBadge } from "@/components/status-badge"
 import { ConfirmationDialog } from "@/components/confirmation-dialog"
@@ -75,14 +76,9 @@ export function KnowledgeBaseLayout() {
   const indexActive =
     location.pathname === "/knowledge-bases" ||
     location.pathname === "/knowledge-bases/"
-  const {
-    data,
-    loading,
-    retrying,
-    error: loadError,
-    refresh,
-  } = useResource(resourceKeys.knowledgeBases(), () => listKnowledgeBases())
-  const showLoading = loading || retrying
+  const resource = useResource(resourceKeys.knowledgeBases(), () => listKnowledgeBases())
+  const { data, refresh } = resource
+  const { status } = resourceStatus(resource)
   const knowledgeBases = data?.knowledgeBases ?? []
 
   useEffect(() => {
@@ -188,11 +184,11 @@ export function KnowledgeBaseLayout() {
               </DropdownMenu>
             }
           >
-            {showLoading ? (
+            {status === "loading" ? (
               <LoadingIndicator className="h-20 justify-center">
                 {t("common:status.loading")}
               </LoadingIndicator>
-            ) : loadError ? (
+            ) : status === "error" ? (
               <div className="flex flex-col items-center px-2 py-6 text-center">
                 <p className="text-sm text-muted-foreground">
                   {t("sidebar.loadError")}
@@ -250,8 +246,7 @@ export function KnowledgeBaseLayout() {
       />
 
       <ConfirmationDialog
-        open={knowledgeBaseDeletion.item !== null}
-        pending={knowledgeBaseDeletion.pending}
+        {...knowledgeBaseDeletion.dialog}
         title={
           knowledgeBaseDeletion.item
             ? t("delete.title", { name: knowledgeBaseDeletion.item.knowledgeBase.name })
@@ -272,22 +267,13 @@ export function KnowledgeBaseLayout() {
             : t("delete.description")
         }
         pendingLabel={t("common:actions.deleting")}
-        onOpenChange={(open) => {
-          if (!open) knowledgeBaseDeletion.select(null)
-        }}
-        onConfirm={() => void knowledgeBaseDeletion.confirm()}
       />
 
       <ConfirmationDialog
-        open={groupDeletion.item !== null}
-        pending={groupDeletion.pending}
+        {...groupDeletion.dialog}
         title={t("group.deleteTitle")}
         description={t("group.deleteDescription")}
         pendingLabel={t("common:actions.deleting")}
-        onOpenChange={(open) => {
-          if (!open) groupDeletion.select(null)
-        }}
-        onConfirm={() => void groupDeletion.confirm()}
       />
     </>
   )

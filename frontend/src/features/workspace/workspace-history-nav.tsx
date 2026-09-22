@@ -11,8 +11,8 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 
-/** 跟踪工作台挂载后的地址栈，得出前进后退的可用状态。 */
-function useWorkspaceHistory() {
+/** 跟踪工作台挂载后的地址栈，得出前进后退的可用状态；由常驻外壳持有，按钮收起后记录不丢失。 */
+export function useWorkspaceHistory() {
   const location = useLocation()
   const navigationType = useNavigationType()
   const navigate = useNavigate()
@@ -49,9 +49,13 @@ function useWorkspaceHistory() {
 }
 
 /** 标题栏上的前进后退按钮。 */
-export function WorkspaceHistoryNav() {
+export function WorkspaceHistoryNav({
+  history,
+}: {
+  history: ReturnType<typeof useWorkspaceHistory>
+}) {
   const { t } = useTranslation("workspace")
-  const { canGoBack, canGoForward, goBack, goForward } = useWorkspaceHistory()
+  const { canGoBack, canGoForward, goBack, goForward } = history
 
   return (
     <div className="flex items-center">

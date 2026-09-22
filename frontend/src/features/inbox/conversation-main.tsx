@@ -171,6 +171,7 @@ export function ConversationMain({
         ) : directTarget ? (
           <DirectConversationDraftHeader
             member={directTarget}
+            narrowViewport={narrowViewport}
             contextVisible={!contextCollapsed}
             onToggleContext={() => setContextCollapsed((collapsed) => !collapsed)}
           />

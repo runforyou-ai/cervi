@@ -1,13 +1,9 @@
 /** 个人设置中的设备列表。 */
-import { useState } from "react"
 import { LaptopIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { useNavigate } from "react-router"
-import { toast } from "sonner"
 
 import {
   currentDevice,
-  isApiError,
   listDevices,
   revokeDevice,
   type DeviceData,
@@ -20,26 +16,14 @@ import { ResourceTable } from "@/components/resource-table"
 import { StatusBadge } from "@/components/status-badge"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useDateTime } from "@/hooks/use-date-time"
-import { useImmediateSave } from "@/hooks/use-immediate-save"
-import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
-import { apiErrorMessage } from "@/lib/form-errors"
-import { recoverSession } from "@/lib/session-navigation"
+import { useConfirmedAction } from "@/hooks/use-confirmed-action"
+import { useResource } from "@/hooks/use-resource"
 
 /** 展示当前用户已注册的设备，并可撤销其中一台。 */
 export function DeviceListPage() {
   const { t } = useTranslation(["settings", "common"])
-  const navigate = useNavigate()
   const { formatDateTime } = useDateTime()
-  const invalidate = useResourceInvalidator()
-  const save = useImmediateSave()
-  const [revoking, setRevoking] = useState<DeviceData | null>(null)
-  const {
-    data,
-    loading,
-    retrying,
-    error: loadError,
-    refresh,
-  } = useResource(resourceKeys.devices(), () => listDevices(), {
+  const devicesResource = useResource(resourceKeys.devices(), () => listDevices(), {
     staleTime: 0,
     refetchOnWindowFocus: true,
   })
@@ -48,36 +32,20 @@ export function DeviceListPage() {
     () => currentDevice(),
     { staleTime: 0, refetchOnWindowFocus: true },
   )
-  const devices = data?.devices ?? []
-  const showLoading = loading || (retrying && !data)
-
-  /** 撤销选中的设备，离开页面后仅更新共享缓存。 */
-  async function confirmRevoke() {
-    if (!revoking) return
-    const request = save.begin()
-    if (request === null) return
-    try {
-      await revokeDevice(revoking.id)
-      void invalidate(resourceKeys.devices())
-      void invalidate(resourceKeys.currentDevice())
-      if (!save.isCurrent(request)) return
-      setRevoking(null)
-      toast.success(t("devices.revoke.success"))
-    } catch (error) {
-      if (!save.isCurrent(request) || recoverSession(error, navigate)) return
-      toast.error(isApiError(error) ? apiErrorMessage(error) : t("devices.revoke.error"))
-    } finally {
-      save.finish(request)
-    }
-  }
+  const devices = devicesResource.data?.devices ?? []
+  const revocation = useConfirmedAction<DeviceData>({
+    action: (device) => revokeDevice(device.id),
+    invalidateKeys: () => [resourceKeys.devices(), resourceKeys.currentDevice()],
+    successMessage: () => t("devices.revoke.success"),
+    errorMessage: () => t("devices.revoke.error"),
+    logLabel: "撤销设备",
+  })
 
   return (
     <>
       <ResourceContent
-        loading={showLoading}
-        error={Boolean(loadError) && !data}
+        resources={devicesResource}
         errorMessage={t("devices.list.loadError")}
-        onRetry={() => void refresh()}
       >
         <ResourceListFrame>
           <ResourceTable
@@ -113,7 +81,7 @@ export function DeviceListPage() {
                 label: t("devices.revoke.action"),
                 destructive: true,
                 separatorBefore: true,
-                onSelect: () => setRevoking(device),
+                onSelect: () => revocation.select(device),
               },
             ]}
           />
@@ -121,15 +89,10 @@ export function DeviceListPage() {
       </ResourceContent>
 
       <ConfirmationDialog
-        open={revoking !== null}
-        pending={save.saving}
-        title={t("devices.revoke.title", { name: revoking?.name ?? "" })}
+        {...revocation.dialog}
+        title={t("devices.revoke.title", { name: revocation.item?.name ?? "" })}
         description={t("devices.revoke.description")}
         pendingLabel={t("devices.revoke.pending")}
-        onOpenChange={(open) => {
-          if (!open) setRevoking(null)
-        }}
-        onConfirm={() => void confirmRevoke()}
       />
     </>
   )

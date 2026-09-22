@@ -15,7 +15,7 @@ import {
 import { buttonVariants } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 
-/** 统一确认文案、等待状态和关闭行为；删除、停用等危险操作用红色主按钮，恢复、启用等用主色；confirmLabel 与 cancelLabel 仅用于两个动作互斥的岔路弹窗。 */
+/** 统一确认文案、等待状态和关闭行为；未给出 pendingLabel 时进行中显示通用的处理中文案；删除、停用等危险操作用红色主按钮，恢复、启用等用主色；confirmLabel 与 cancelLabel 仅用于两个动作互斥的岔路弹窗。 */
 export function ConfirmationDialog({
   open,
   pending,
@@ -70,7 +70,9 @@ export function ConfirmationDialog({
               onConfirm()
             }}
           >
-            {pending && pendingLabel ? pendingLabel : (confirmLabel ?? t("actions.confirm"))}
+            {pending
+              ? (pendingLabel ?? t("actions.processing"))
+              : (confirmLabel ?? t("actions.confirm"))}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

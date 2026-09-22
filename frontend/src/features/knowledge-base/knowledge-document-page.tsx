@@ -11,10 +11,10 @@ import { MessageMarkdown } from "@/components/message-markdown"
 import { PageContent } from "@/components/page-content"
 import { PageBackButton } from "@/components/page-back-button"
 import { PageHeader } from "@/components/page-header"
+import { ResourceContent } from "@/components/resource-content"
 import { Button } from "@/components/ui/button"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
-import { KnowledgeQAFeedback } from "./knowledge-qa-feedback"
 import { KnowledgeSegmentsDialog } from "./knowledge-segments-dialog"
 import { KnowledgeDocumentPreview } from "./knowledge-document-preview"
 
@@ -74,32 +74,32 @@ export function KnowledgeDocumentPage() {
         </div>
       ) : null}
       <PageContent className="overflow-hidden">
-        {!document.data ? (
-          <KnowledgeQAFeedback error={document.error} retry={() => void document.refresh()} />
-        ) : uploaded ? (
-          <KnowledgeDocumentPreview
-            key={documentId}
-            knowledgeBaseId={knowledgeBaseId}
-            documentId={documentId}
-            name={document.data.name}
-          />
-        ) : !content.data ? (
-          <KnowledgeQAFeedback error={content.error} retry={() => void content.refresh()} />
-        ) : (
-          <div className="h-full overflow-auto rounded-lg border bg-card px-6 py-5">
-            {content.data.content ? (
-              <MessageMarkdown>{content.data.content}</MessageMarkdown>
-            ) : (
-              // 抓取尚未完成或已失败时说明当前状态，不呈现空白正文。
-              <p className="text-sm text-muted-foreground">
-                {processing
-                  ? t("documents.contentPending")
-                  : (document.data.failureMessage ?? "") ||
-                    t("documents.contentEmpty")}
-              </p>
-            )}
-          </div>
-        )}
+        <ResourceContent resources={document} errorMessage={t("documents.loadError")}>
+          {uploaded ? (
+            <KnowledgeDocumentPreview
+              key={documentId}
+              knowledgeBaseId={knowledgeBaseId}
+              documentId={documentId}
+              name={document.data?.name ?? ""}
+            />
+          ) : (
+            <ResourceContent resources={content} errorMessage={t("documents.loadError")}>
+              <div className="h-full overflow-auto rounded-lg border bg-card px-6 py-5">
+                {content.data?.content ? (
+                  <MessageMarkdown>{content.data.content}</MessageMarkdown>
+                ) : (
+                  // 抓取尚未完成或已失败时说明当前状态，不呈现空白正文。
+                  <p className="text-sm text-muted-foreground">
+                    {processing
+                      ? t("documents.contentPending")
+                      : (document.data?.failureMessage ?? "") ||
+                        t("documents.contentEmpty")}
+                  </p>
+                )}
+              </div>
+            </ResourceContent>
+          )}
+        </ResourceContent>
       </PageContent>
       {segmentBatchId && document.data && <KnowledgeSegmentsDialog
         knowledgeBaseId={knowledgeBaseId} documentId={documentId} documentName={document.data.name}

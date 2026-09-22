@@ -223,6 +223,7 @@ const contacts = {
   },
   teams: {
     create: "Create team",
+    edit: "Edit team",
     createDescription: "Enter a team name and description.",
     editDescription: "Update the team name and description.",
     form: {

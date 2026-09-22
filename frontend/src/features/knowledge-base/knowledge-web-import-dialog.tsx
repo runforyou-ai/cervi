@@ -104,7 +104,7 @@ export function KnowledgeWebImportDialog({
         <DialogHeader>
           <DialogTitle>{t("documents.create.import")}</DialogTitle>
         </DialogHeader>
-        <form className="space-y-9" onSubmit={form.handleSubmit(save)}>
+        <form className="space-y-9" onSubmit={form.handleSubmit(save)} noValidate>
           <FieldGroup>
             <FormInputField
               control={form.control}

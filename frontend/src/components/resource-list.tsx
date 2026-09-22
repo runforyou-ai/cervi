@@ -5,7 +5,11 @@ import { useLocation } from "react-router"
 import type { PageInfo } from "@/api"
 import { PageContent } from "@/components/page-content"
 import { PageControls } from "@/components/page-controls"
-import { ResourceContent } from "@/components/resource-content"
+import {
+  ResourceContent,
+  resourceStatus,
+  type ResourceState,
+} from "@/components/resource-content"
 import { useListScrollRestore } from "@/hooks/use-list-scroll-restore"
 import { cn } from "@/lib/utils"
 
@@ -45,20 +49,16 @@ export function ResourceListFrame({
 
 /** 列表页主体：恢复滚动位置，按加载状态渲染表格容器与分页。 */
 export function ResourceListLayout({
-  loading,
-  error,
+  resources,
   errorMessage,
-  onRetry,
   page,
   disabled,
   onPageChange,
   frameClassName,
   children,
 }: {
-  loading: boolean
-  error: boolean
+  resources: ResourceState | readonly ResourceState[]
   errorMessage: string
-  onRetry: () => void
   page?: PageInfo
   disabled?: boolean
   onPageChange?: (page: number) => void
@@ -68,17 +68,12 @@ export function ResourceListLayout({
   const location = useLocation()
   const scroll = useListScrollRestore(
     location.pathname + location.search,
-    !loading && !error,
+    resourceStatus(resources).status === "ready",
   )
 
   return (
     <PageContent ref={scroll.ref} onScroll={scroll.onScroll}>
-      <ResourceContent
-        loading={loading}
-        error={error}
-        errorMessage={errorMessage}
-        onRetry={onRetry}
-      >
+      <ResourceContent resources={resources} errorMessage={errorMessage}>
         <ResourceListFrame
           page={page}
           disabled={disabled}

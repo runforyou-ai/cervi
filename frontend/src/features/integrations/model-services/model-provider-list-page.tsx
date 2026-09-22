@@ -59,11 +59,8 @@ export function ModelProviderListPage({ section }: { section: ModelServiceSectio
   const { t } = useTranslation(["integrations", "common"])
   const navigate = useNavigate()
   const sectionConfig = modelServiceSectionConfigs[section]
-  const { data, loading, retrying, error, refresh } = useResource(
-    resourceKeys.aiProviders(),
-    () => listAIProviders(),
-  )
-  const showLoading = loading || retrying
+  const resource = useResource(resourceKeys.aiProviders(), () => listAIProviders())
+  const { data } = resource
   const providers = data?.providers ?? []
   const visibleProviders = providers.filter((provider) =>
     provider.models.some((model) => model.type === sectionConfig.modelType),
@@ -111,10 +108,8 @@ export function ModelProviderListPage({ section }: { section: ModelServiceSectio
         </Tabs>
       </div>
       <ResourceListLayout
-        loading={showLoading}
-        error={Boolean(error)}
+        resources={resource}
         errorMessage={t("modelServices.list.loadError")}
-        onRetry={() => void refresh()}
       >
         <ResourceTable
           hideHeader
@@ -154,8 +149,7 @@ export function ModelProviderListPage({ section }: { section: ModelServiceSectio
       </ResourceListLayout>
 
       <ConfirmationDialog
-        open={deletion.item !== null}
-        pending={deletion.pending}
+        {...deletion.dialog}
         title={
           deletion.item
             ? t("modelServices.delete.title", { name: deletion.item.name })
@@ -163,10 +157,6 @@ export function ModelProviderListPage({ section }: { section: ModelServiceSectio
         }
         description={t("modelServices.delete.description")}
         pendingLabel={t("common:actions.deleting")}
-        onOpenChange={(open) => {
-          if (!open) deletion.select(null)
-        }}
-        onConfirm={() => void deletion.confirm()}
       />
     </div>
   )
