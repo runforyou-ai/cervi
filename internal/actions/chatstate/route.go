@@ -36,7 +36,7 @@ func (r RouteSnapshot) Target() domain.ServiceSessionTarget {
 	}
 }
 
-// ResolveNewSessionRoute 按渠道初始目标、失败目标、公共队列的顺序解析新客服处理周期的路由；目标身份取 FOR KEY SHARE，调用方须在进入会话锁之前调用。
+// ResolveNewSessionRoute 按渠道初始目标、失败目标、公共队列的顺序解析新客服处理周期的路由，不在工作中的真人成员视为不可用；目标身份取 FOR KEY SHARE，调用方须在进入会话锁之前调用。
 func ResolveNewSessionRoute(ctx context.Context, db bun.IDB, channel *servermodels.Channel) (RouteSnapshot, error) {
 	channelType := domain.ChannelType(channel.Type)
 	if route, available, err := availableRoute(ctx, db, channel.OrganizationID, channelType, domain.ChannelRoutingTargetType(channel.InitialRoutingTargetType), channel.InitialRoutingTargetID, true); err != nil {
@@ -54,7 +54,7 @@ func ResolveNewSessionRoute(ctx context.Context, db bun.IDB, channel *servermode
 	return RouteSnapshot{}, nil
 }
 
-// ResolveHandoffRoute 只按渠道失败目标解析 AI 转交人工的去向：目标不可用、为 AI 员工或无效时进入公共队列；lock 为 true 时目标身份取 FOR KEY SHARE。
+// ResolveHandoffRoute 只按渠道失败目标解析 AI 转交人工的去向：目标不可用、不在工作中、为 AI 员工或无效时进入公共队列；lock 为 true 时目标身份取 FOR KEY SHARE。
 func ResolveHandoffRoute(ctx context.Context, db bun.IDB, channel *servermodels.Channel, lock bool) (RouteSnapshot, error) {
 	// 身份类型不可变，失败目标为 AI 员工时不加锁直接进入公共队列，交接只锁定人工目标。
 	if domain.ChannelRoutingTargetType(channel.FallbackRoutingTargetType) == domain.ChannelRoutingTargetTypeMember && channel.FallbackRoutingTargetID != nil {
@@ -91,6 +91,24 @@ func LoadConversationChannel(ctx context.Context, db bun.IDB, organizationID, co
 		return nil, fmt.Errorf("load customer conversation channel: %w", err)
 	}
 	return channel, nil
+}
+
+// ServiceSessionQueueTarget 返回客服处理周期当前所属队列的去向快照，团队已删除时按公共队列处理。
+func ServiceSessionQueueTarget(ctx context.Context, db bun.IDB, session *servermodels.ServiceSession) (domain.ServiceSessionTarget, error) {
+	if session.TeamID == nil {
+		return domain.ServiceSessionTarget{Kind: domain.ServiceSessionTargetPublicQueue}, nil
+	}
+	var name string
+	err := db.NewSelect().Model((*servermodels.Team)(nil)).Column("t.name").
+		Where("t.organization_id = ? AND t.id = ?", session.OrganizationID, *session.TeamID).
+		Scan(ctx, &name)
+	if errors.Is(err, sql.ErrNoRows) {
+		return domain.ServiceSessionTarget{Kind: domain.ServiceSessionTargetPublicQueue}, nil
+	}
+	if err != nil {
+		return domain.ServiceSessionTarget{}, fmt.Errorf("load service session queue team: %w", err)
+	}
+	return domain.ServiceSessionTarget{Kind: domain.ServiceSessionTargetTeam, TeamID: session.TeamID, TeamName: &name}, nil
 }
 
 // availableRoute 判断路由目标当前是否可用并返回对应快照。
@@ -139,6 +157,11 @@ func availableRoute(ctx context.Context, db bun.IDB, organizationID string, chan
 			return RouteSnapshot{}, false, err
 		}
 		identityType := domain.OrganizationIdentityType(identity.Type)
+		// 真人成员只在工作中时承接路由，AI 员工按接待资格承接。
+		if identityType == domain.OrganizationIdentityTypeUser && domain.WorkStatus(identity.WorkStatus) != domain.WorkStatusWorking {
+			slog.Info("消息渠道路由的成员不在工作中", "organization_id", organizationID, "identity_id", identity.ID, "work_status", identity.WorkStatus)
+			return RouteSnapshot{}, false, nil
+		}
 		if identityType == domain.OrganizationIdentityTypeAgent && !domain.ChannelSupportsAgentAssignee(channelType) {
 			slog.Warn("消息渠道不支持 AI 员工作为负责人",
 				"organization_id", organizationID,

@@ -42,6 +42,12 @@
     "wire": {"v": 1, "type": "pin_order_changed", "data": {"version": "5"}}
   },
   {
+    "name": "service_attention",
+    "result": "frame",
+    "encode": true,
+    "wire": {"v": 1, "type": "service_attention", "data": {"conversationId": "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8b", "serviceSessionId": "0190f5a2-7c1e-7d3a-9b2f-3c4d5e6f7a8e", "reason": "assigned"}}
+  },
+  {
     "name": "conversation_removed",
     "result": "frame",
     "encode": true,

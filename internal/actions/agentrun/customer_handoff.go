@@ -4,7 +4,6 @@ package agentrun
 
 import (
 	"context"
-	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -15,6 +14,7 @@ import (
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
+	"github.com/runforyou-ai/cervi/internal/actions/serviceassignment"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
@@ -32,8 +32,9 @@ type customerHandoff struct {
 	PolicyContext   agentRunPolicyContext
 	AgentIdentityID string
 	Route           chatstate.RouteSnapshot
-	NoticeKey       string // 对客通知的幂等键。
-	EventKey        string // 转人工系统事件的幂等键。
+	Member          *serviceassignment.Member // 路由到队列时自动分配的承接成员，为空表示留在队列或由路由指定成员承接。
+	NoticeKey       string                    // 对客通知的幂等键。
+	EventKey        string                    // 转人工系统事件的幂等键。
 	Notice          string
 	Reason          domain.AgentHandoffReason
 	ReasonText      string
@@ -53,6 +54,12 @@ func applyCustomerHandoff(ctx context.Context, db bun.IDB, enqueuer servertask.T
 		Scan(ctx, &agentName); err != nil {
 		return nil, fmt.Errorf("load handoff agent name: %w", err)
 	}
+	// 自动分配到成员时，事件去向与负责人都取实际承接成员，所属队列保持路由结果。
+	target, assigneeID := handoff.Route.Target(), handoff.Route.AssigneeIdentityID
+	if handoff.Member != nil {
+		target = domain.ServiceSessionTarget{Kind: domain.ServiceSessionTargetMember, IdentityID: &handoff.Member.IdentityID, DisplayName: &handoff.Member.DisplayName}
+		assigneeID = &handoff.Member.IdentityID
+	}
 	// 原因说明截断到固定长度，只进入成员可见的系统事件。
 	reasonText := []rune(strings.TrimSpace(handoff.ReasonText))
 	if len(reasonText) > handoffReasonTextMaxRunes {
@@ -60,7 +67,7 @@ func applyCustomerHandoff(ctx context.Context, db bun.IDB, enqueuer servertask.T
 	}
 	payload, err := json.Marshal(domain.ServiceSessionHandedOffEvent{
 		ServiceSessionID: session.ID, FromIdentityID: handoff.AgentIdentityID, FromDisplayName: agentName,
-		Target: handoff.Route.Target(), Reason: handoff.Reason, ReasonText: string(reasonText), AgentRunID: handoff.AgentRunID,
+		Target: target, Reason: handoff.Reason, ReasonText: string(reasonText), AgentRunID: handoff.AgentRunID,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("encode service session handoff event: %w", err)
@@ -82,33 +89,63 @@ func applyCustomerHandoff(ctx context.Context, db bun.IDB, enqueuer servertask.T
 	if err != nil {
 		return nil, fmt.Errorf("append customer handoff notice: %w", err)
 	}
+	// 客户等待起点记为交接时间，由真人承接回复。
+	now := time.Now().UTC()
 	update := db.NewUpdate().Model(session).
-		Set("assignee_identity_id = ?", handoff.Route.AssigneeIdentityID).
+		Set("assignee_identity_id = ?", assigneeID).
 		Set("team_id = ?", handoff.Route.TeamID).
+		Set("awaiting_reply_since = ?", now).
 		Set("updated_at = now()").
 		WherePK().Where("organization_id = ?", session.OrganizationID)
-	if handoff.Route.AssigneeIdentityID != nil {
-		update = update.Set("assigned_at = COALESCE(assigned_at, ?)", time.Now().UTC())
+	if assigneeID != nil {
+		update = update.Set("assigned_at = COALESCE(assigned_at, ?)", now).Set("assignee_assigned_at = ?", now)
+	} else {
+		update = update.Set("assignee_assigned_at = NULL")
 	}
 	if _, err := update.Exec(ctx); err != nil {
 		return nil, fmt.Errorf("hand off service session: %w", err)
 	}
-	session.AssigneeIdentityID, session.TeamID = handoff.Route.AssigneeIdentityID, handoff.Route.TeamID
+	session.AssigneeIdentityID, session.TeamID, session.AwaitingReplySince = assigneeID, handoff.Route.TeamID, &now
+	if err := notifyHandoffAssignee(ctx, db, session, handoff); err != nil {
+		return nil, err
+	}
 	slog.Info("客户会话已由 AI 员工转交人工",
 		"organization_id", session.OrganizationID, "conversation_id", session.ConversationID,
 		"service_session_id", session.ID, "agent_identity_id", handoff.AgentIdentityID,
-		"target_kind", handoff.Route.Target().Kind, "reason", handoff.Reason)
+		"target_kind", target.Kind, "reason", handoff.Reason)
 	return notice, nil
 }
 
-// resolveCustomerHandoffRoute 在进入会话锁之前读取客户会话所属渠道并解析转人工去向，目标身份取 FOR KEY SHARE。
-func resolveCustomerHandoffRoute(ctx context.Context, db bun.IDB, organizationID, conversationID string) (*servermodels.Channel, chatstate.RouteSnapshot, error) {
+// notifyHandoffAssignee 提醒转人工后直接承接的真人成员；自动分配的成员同时记录最近分配时间。
+func notifyHandoffAssignee(ctx context.Context, db bun.IDB, session *servermodels.ServiceSession, handoff customerHandoff) error {
+	if handoff.Member != nil {
+		return serviceassignment.MarkAssigned(ctx, db, session, handoff.Member)
+	}
+	if handoff.Route.AssigneeIdentityID == nil {
+		return nil
+	}
+	var userID string
+	if err := db.NewSelect().Model((*servermodels.User)(nil)).Column("u.id").
+		Where("u.organization_id = ? AND u.identity_id = ?", session.OrganizationID, *handoff.Route.AssigneeIdentityID).
+		Scan(ctx, &userID); err != nil {
+		return fmt.Errorf("load handoff assignee user: %w", err)
+	}
+	realtime.Notify(ctx, realtime.UserServiceAttention(session.OrganizationID, userID, session.ConversationID, session.ID, domain.ServiceAttentionAssigned))
+	return nil
+}
+
+// resolveCustomerHandoffRoute 在进入会话锁之前读取客户会话所属渠道并解析转人工去向，目标身份取 FOR KEY SHARE；去向为队列时挑选并锁定可分配成员。
+func resolveCustomerHandoffRoute(ctx context.Context, db bun.IDB, organizationID, conversationID string) (*servermodels.Channel, chatstate.RouteSnapshot, *serviceassignment.Member, error) {
 	channel, err := chatstate.LoadConversationChannel(ctx, db, organizationID, conversationID)
 	if err != nil {
-		return nil, chatstate.RouteSnapshot{}, err
+		return nil, chatstate.RouteSnapshot{}, nil, err
 	}
 	route, err := chatstate.ResolveHandoffRoute(ctx, db, channel, true)
-	return channel, route, err
+	if err != nil || route.AssigneeIdentityID != nil {
+		return channel, route, nil, err
+	}
+	member, err := serviceassignment.LockQueueMember(ctx, db, organizationID, route.TeamID, "")
+	return channel, route, member, err
 }
 
 // customerHandoffAllowed 复核运行仍持有当前开放周期的处理权；转人工不要求 AI 员工仍满足继续执行的资格。
@@ -134,7 +171,7 @@ func (a *ExecuteAction) completeCustomerHandoff(ctx context.Context, execution e
 	notice := strings.TrimSpace(result.Content)
 	suppressed, completed := false, false
 	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
-		channel, route, err := resolveCustomerHandoffRoute(ctx, tx, execution.Run.OrganizationID, execution.Run.ConversationID)
+		channel, route, member, err := resolveCustomerHandoffRoute(ctx, tx, execution.Run.OrganizationID, execution.Run.ConversationID)
 		if err != nil {
 			return err
 		}
@@ -164,7 +201,7 @@ func (a *ExecuteAction) completeCustomerHandoff(ctx context.Context, execution e
 			notice, _ = cervii18n.Localize(channel.DefaultLocale, cervii18n.AgentCustomerHandoffFallback)
 		}
 		message, err := applyCustomerHandoff(ctx, tx, a.enqueuer, customerHandoff{
-			PolicyContext: policyContext, AgentIdentityID: run.AgentIdentityID, Route: route,
+			PolicyContext: policyContext, AgentIdentityID: run.AgentIdentityID, Route: route, Member: member,
 			NoticeKey: "agent:" + run.ID, EventKey: "agent:" + run.ID + ":handoff-event", Notice: notice,
 			Reason: result.Decision.Reason, ReasonText: result.Decision.ReasonText, AgentRunID: &run.ID,
 		})
@@ -214,7 +251,7 @@ func (a *ExecuteAction) completeCustomerHandoff(ctx context.Context, execution e
 func (a *ExecuteAction) failCustomerRun(ctx context.Context, initial *servermodels.AgentRun, policy agentRunPolicy, lastError string, reason domain.AgentHandoffReason) (bool, error) {
 	terminal := false
 	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
-		channel, route, err := resolveCustomerHandoffRoute(ctx, tx, initial.OrganizationID, initial.ConversationID)
+		channel, route, member, err := resolveCustomerHandoffRoute(ctx, tx, initial.OrganizationID, initial.ConversationID)
 		if err != nil {
 			return err
 		}
@@ -269,7 +306,7 @@ func (a *ExecuteAction) failCustomerRun(ctx context.Context, initial *servermode
 		}
 		notice, _ := cervii18n.Localize(channel.DefaultLocale, cervii18n.AgentCustomerFailureFallback)
 		message, err := applyCustomerHandoff(ctx, tx, a.enqueuer, customerHandoff{
-			PolicyContext: policyContext, AgentIdentityID: run.AgentIdentityID, Route: route,
+			PolicyContext: policyContext, AgentIdentityID: run.AgentIdentityID, Route: route, Member: member,
 			NoticeKey: "agent:" + run.ID, EventKey: "agent:" + run.ID + ":handoff-event", Notice: notice,
 			Reason: reason, ReasonText: lastError, AgentRunID: &run.ID,
 		})
@@ -388,10 +425,11 @@ type serviceSessionReturn struct {
 	NoticeKey      string
 }
 
-// applyServiceSessionReturn 在调用方持有会话锁的事务中写入退回事件并清空负责人，所属队列保持不变。
+// applyServiceSessionReturn 在调用方持有会话锁的事务中写入退回事件并清空负责人，所属队列与客户等待起点保持不变，随后投递重新分配任务。
 func applyServiceSessionReturn(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer, returned serviceSessionReturn) error {
 	session := returned.ServiceSession
-	target, err := serviceSessionQueueTarget(ctx, db, session)
+	awaitingReplySince := session.AwaitingReplySince
+	target, err := chatstate.ServiceSessionQueueTarget(ctx, db, session)
 	if err != nil {
 		return err
 	}
@@ -427,35 +465,25 @@ func applyServiceSessionReturn(ctx context.Context, db bun.IDB, enqueuer servert
 			return fmt.Errorf("append customer service session return notice: %w", err)
 		}
 	}
+	// 客户等待起点保持退回前的值。
 	if _, err := db.NewUpdate().Model(session).
 		Set("assignee_identity_id = NULL").
+		Set("assignee_assigned_at = NULL").
+		Set("awaiting_reply_since = ?", awaitingReplySince).
 		Set("updated_at = now()").
 		WherePK().Where("organization_id = ?", session.OrganizationID).
 		Exec(ctx); err != nil {
 		return fmt.Errorf("return service session to queue: %w", err)
 	}
-	session.AssigneeIdentityID = nil
+	session.AssigneeIdentityID, session.AssigneeAssignedAt, session.AwaitingReplySince = nil, nil, awaitingReplySince
+	if err := serviceassignment.EnqueueAssign(ctx, db, enqueuer, serviceassignment.AssignInput{
+		OrganizationID: session.OrganizationID, ServiceSessionID: session.ID,
+	}); err != nil {
+		return err
+	}
 	slog.Info("客户会话负责人失去接待资格，周期已退回队列",
 		"organization_id", session.OrganizationID, "conversation_id", session.ConversationID,
 		"service_session_id", session.ID, "assignee_identity_id", returned.Assignee.ID,
 		"target_kind", target.Kind)
 	return nil
-}
-
-// serviceSessionQueueTarget 返回客服处理周期当前所属队列的去向快照，团队已删除时按公共队列处理。
-func serviceSessionQueueTarget(ctx context.Context, db bun.IDB, session *servermodels.ServiceSession) (domain.ServiceSessionTarget, error) {
-	if session.TeamID == nil {
-		return domain.ServiceSessionTarget{Kind: domain.ServiceSessionTargetPublicQueue}, nil
-	}
-	var name string
-	err := db.NewSelect().Model((*servermodels.Team)(nil)).Column("t.name").
-		Where("t.organization_id = ? AND t.id = ?", session.OrganizationID, *session.TeamID).
-		Scan(ctx, &name)
-	if errors.Is(err, sql.ErrNoRows) {
-		return domain.ServiceSessionTarget{Kind: domain.ServiceSessionTargetPublicQueue}, nil
-	}
-	if err != nil {
-		return domain.ServiceSessionTarget{}, fmt.Errorf("load service session queue team: %w", err)
-	}
-	return domain.ServiceSessionTarget{Kind: domain.ServiceSessionTargetTeam, TeamID: session.TeamID, TeamName: &name}, nil
 }

@@ -10,9 +10,7 @@ import (
 
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
-	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
 )
 
@@ -40,7 +38,7 @@ func TestCustomerConversationTyping(t *testing.T) {
 	feed := startRealtimeFeed(t, organizationID)
 	channelIdentityID := loadChannelIdentityID(t, f.db, f.conversationID)
 	visitorSubjectID := loadVisitorChatSubjectID(t, f.db, organizationID, f.conversationID)
-	coordinator := agentrunaction.NewExecuteAction(f.db, servertask.New(f.db, serverconfig.NATSConfig{}), nil, nil, nil)
+	coordinator := agentrunaction.NewExecuteAction(f.db, newTestTasks(f.db), nil, nil, nil)
 	memberTyping := conversationaction.NewReportConversationTypingAction(f.db)
 	visitorTyping := conversationaction.NewReportWebsiteVisitorTypingAction(f.db)
 
@@ -70,7 +68,7 @@ func TestCustomerConversationTyping(t *testing.T) {
 	}
 
 	// 周期由他人负责时客服不再向访客上报。
-	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, coordinator).Execute(ctx, f.member, f.conversationID); err != nil {
+	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(ctx, f.member, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
 	if err := memberTyping.Execute(ctx, f.owner, f.conversationID, true); !errors.Is(err, conversationaction.ErrConversationNotFound) {
@@ -81,7 +79,7 @@ func TestCustomerConversationTyping(t *testing.T) {
 	}
 
 	// 周期关闭后客服不再上报；访客仍可发起新一轮沟通，输入状态照常送达。
-	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, coordinator).Execute(ctx, f.member, f.conversationID); err != nil {
+	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(ctx, f.member, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
 	if err := memberTyping.Execute(ctx, f.member, f.conversationID, true); !errors.Is(err, conversationaction.ErrConversationNotFound) {

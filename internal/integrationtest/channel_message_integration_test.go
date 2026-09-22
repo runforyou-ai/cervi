@@ -28,7 +28,7 @@ func TestChannelMessageOpaqueIdentifiers(t *testing.T) {
 		var result conversationaction.InboundCustomerMessageResult
 		err := realtime.RunInTx(ctx, f.db, func(ctx context.Context, tx bun.Tx) error {
 			var err error
-			result, err = conversationaction.ReceiveInboundCustomerMessage(ctx, tx, channel, conversationaction.InboundCustomerMessageInput{
+			result, err = conversationaction.ReceiveInboundCustomerMessage(ctx, tx, newTestTasks(f.db), channel, conversationaction.InboundCustomerMessageInput{
 				ExternalID: "contact:opaque", SingleConversation: true, Body: body, OriginatedAt: time.Now().UTC(),
 				IdempotencyKey: f.channelID + ":" + input.AccountID + "|" + input.ConversationID + "|" + input.MessageID,
 				ChannelMessage: &input,

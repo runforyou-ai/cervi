@@ -11,7 +11,6 @@ import (
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	aiprovideraction "github.com/runforyou-ai/cervi/internal/actions/aiprovider"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
-	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -55,7 +54,7 @@ func newExecutionScopeFixture(t *testing.T) executionScopeFixture {
 	if err != nil {
 		t.Fatalf("创建 AI 员工失败：%v", err)
 	}
-	tasks := servertask.New(f.db, serverconfig.NATSConfig{})
+	tasks := newTestTasks(f.db)
 	if err := tasks.Registry().RegisterJSON(agentrunaction.RunActionName, func(context.Context, agentrunaction.RunInput) error { return nil }); err != nil {
 		t.Fatalf("注册任务失败：%v", err)
 	}
@@ -63,9 +62,9 @@ func newExecutionScopeFixture(t *testing.T) executionScopeFixture {
 	coordinator := agentrunaction.NewExecuteAction(f.db, tasks, nil, testAttachmentReader(f.db), nil)
 	return executionScopeFixture{
 		customerReadFixture: f, agentIdentityID: agent.IdentityID, tasks: tasks, scheduler: scheduler, coordinator: coordinator,
-		transfer: conversationaction.NewTransferServiceSessionAction(f.db, coordinator, scheduler),
-		claim:    conversationaction.NewClaimServiceSessionAction(f.db, coordinator),
-		close:    conversationaction.NewCloseServiceSessionAction(f.db, coordinator),
+		transfer: conversationaction.NewTransferServiceSessionAction(f.db, coordinator, scheduler, newTestTasks(f.db)),
+		claim:    conversationaction.NewClaimServiceSessionAction(f.db, coordinator, newTestTasks(f.db)),
+		close:    conversationaction.NewCloseServiceSessionAction(f.db, coordinator, newTestTasks(f.db)),
 	}
 }
 

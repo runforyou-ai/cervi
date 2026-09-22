@@ -123,7 +123,8 @@ func testCustomerFailureMessage(t *testing.T, db *bun.DB, identity *servermodels
 	if err != nil {
 		t.Fatal(err)
 	}
-	receive := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, agentrunaction.NewScheduler(tasks))
+	disableAutoAssignment(t, db, identity.Organization.ID)
+	receive := conversationaction.NewReceiveWebsiteCustomerMessageAction(db, agentrunaction.NewScheduler(tasks), newTestTasks(db))
 	input := conversationaction.WebsiteCustomerTextMessageInput{ChannelID: channel.ID, ExternalID: "web-session:0123456789abcdef0123456789abcdef", ClientMessageID: uuid.NewV7().String(), Body: "首条客服消息"}
 
 	sent, err := receive.Execute(ctx, input)

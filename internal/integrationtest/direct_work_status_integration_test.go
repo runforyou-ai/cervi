@@ -33,7 +33,7 @@ func TestDirectPeerWorkStatus(t *testing.T) {
 	}
 
 	feed := startRealtimeFeed(t, organizationID)
-	if _, err := useraction.NewUpdateWorkStatusAction(f.db).Execute(ctx, f.member, useraction.WorkStatusInput{WorkStatus: domain.WorkStatusOffDuty}); err != nil {
+	if _, err := useraction.NewUpdateWorkStatusAction(f.db, newTestTasks(f.db)).Execute(ctx, f.member, useraction.WorkStatusInput{WorkStatus: domain.WorkStatusOffDuty}); err != nil {
 		t.Fatal(err)
 	}
 	// 修改者本人收到身份资料通知，单聊对端收到会话变更通知。

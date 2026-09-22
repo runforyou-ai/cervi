@@ -67,6 +67,15 @@ export function formatSystemEvent(
       target: sessionTargetText(event.sessionTarget, currentIdentityID, t),
     })
   }
+  // 自动分配事件没有操作人，只展示承接成员。
+  if (
+    event.type ===
+    ConversationSystemEventType.ConversationSystemEventServiceSessionAssigned
+  ) {
+    return t("serviceSessionAssigned", {
+      target: sessionTargetText(event.sessionTarget, currentIdentityID, t),
+    })
+  }
   const participantName = (
     participant: ConversationSystemEventParticipant,
   ) =>

@@ -20,12 +20,10 @@ import (
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	"github.com/runforyou-ai/cervi/internal/appservice"
-	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/runforyou-ai/cervi/internal/tenant"
 	"github.com/uptrace/bun"
 )
@@ -69,14 +67,14 @@ func newInboxPaginationFixture(t *testing.T) inboxPaginationFixture {
 	if err != nil {
 		t.Fatal(err)
 	}
-	tasks := servertask.New(f.db, serverconfig.NATSConfig{})
+	tasks := newTestTasks(f.db)
 	if err := tasks.Registry().RegisterJSON(agentrunaction.RunActionName, func(context.Context, agentrunaction.RunInput) error { return nil }); err != nil {
 		t.Fatal(err)
 	}
 	startAgent := conversationaction.NewSendFirstAgentTextMessageAction(f.db, agentrunaction.NewScheduler(tasks))
 	buckets := []string{"queue", "mine", "coworkers", "closed"}
 	for index := range 60 {
-		peer, err := useraction.NewCreateUserAction(f.db).Execute(ctx, f.owner, useraction.CreateInput{HandlesCustomers: true, DisplayName: fmt.Sprintf("分页成员 %d", index), Email: fmt.Sprintf("page%d@test.example", index), Password: "password123", RoleID: f.member.OrganizationIdentity.RoleID})
+		peer, err := useraction.NewCreateUserAction(f.db, newTestTasks(f.db)).Execute(ctx, f.owner, useraction.CreateInput{HandlesCustomers: true, MaxServiceSessions: 10, DisplayName: fmt.Sprintf("分页成员 %d", index), Email: fmt.Sprintf("page%d@test.example", index), Password: "password123", RoleID: f.member.OrganizationIdentity.RoleID})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -108,11 +106,11 @@ func newInboxPaginationFixture(t *testing.T) inboxPaginationFixture {
 			if bucket == "coworkers" {
 				assignee = f.member
 			}
-			if _, err := conversationaction.NewClaimServiceSessionAction(f.db, nil).Execute(ctx, assignee, customerID); err != nil {
+			if _, err := conversationaction.NewClaimServiceSessionAction(f.db, nil, newTestTasks(f.db)).Execute(ctx, assignee, customerID); err != nil {
 				t.Fatal(err)
 			}
 			if bucket == "closed" {
-				if _, err := conversationaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil)).Execute(ctx, assignee, customerID); err != nil {
+				if _, err := conversationaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil), newTestTasks(f.db)).Execute(ctx, assignee, customerID); err != nil {
 					t.Fatal(err)
 				}
 			}

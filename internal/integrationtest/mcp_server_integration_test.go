@@ -12,14 +12,12 @@ import (
 	installationaction "github.com/runforyou-ai/cervi/internal/actions/installation"
 	mcpserveraction "github.com/runforyou-ai/cervi/internal/actions/mcpserver"
 	"github.com/runforyou-ai/cervi/internal/common"
-	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
 	mcpintegration "github.com/runforyou-ai/cervi/internal/integration/mcp"
 	servertest "github.com/runforyou-ai/cervi/internal/servertest"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
 )
 
@@ -46,7 +44,7 @@ func TestMCPServerLifecycle(t *testing.T) {
 	client := mcpDiscoverFunc(func(context.Context, mcpintegration.Config) ([]domain.MCPTool, error) {
 		return []domain.MCPTool{{Name: "search", Description: "检索文档"}}, nil
 	})
-	tasks := servertask.New(db, serverconfig.NATSConfig{})
+	tasks := newTestTasks(db)
 	worker := mcpserveraction.NewUpdateToolsAction(db, client)
 	if err := tasks.Registry().RegisterJSONWithTerminalFailure(mcpserveraction.RefreshToolsActionName, worker.Execute, worker.FinalizeFailure); err != nil {
 		t.Fatal(err)
@@ -148,7 +146,7 @@ func TestMCPToolsUpdates(t *testing.T) {
 	tools := []domain.MCPTool{{Name: "search", Description: "查找文档"}, {Name: "read", Description: "读取文档"}}
 	var discoverError error
 	client := mcpDiscoverFunc(func(context.Context, mcpintegration.Config) ([]domain.MCPTool, error) { return tools, discoverError })
-	tasks := servertask.New(db, serverconfig.NATSConfig{})
+	tasks := newTestTasks(db)
 	worker := mcpserveraction.NewUpdateToolsAction(db, client)
 	if err := tasks.Registry().RegisterJSONWithTerminalFailure(mcpserveraction.RefreshToolsActionName, worker.Execute, worker.FinalizeFailure); err != nil {
 		t.Fatal(err)
@@ -234,7 +232,7 @@ func TestMCPToolsUpdates(t *testing.T) {
 	}
 	// 入队失败必须回滚保存事务。
 	discoverError = nil
-	brokenScheduler := mcpserveraction.NewToolsScheduler(servertask.New(db, serverconfig.NATSConfig{}))
+	brokenScheduler := mcpserveraction.NewToolsScheduler(newTestTasks(db))
 	if _, err := mcpserveraction.NewUpdateMCPServerAction(db, probe, brokenScheduler).Execute(ctx, identity, record.ID, input); err == nil {
 		t.Fatal("expected unregistered action error")
 	}

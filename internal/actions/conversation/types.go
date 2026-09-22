@@ -272,7 +272,7 @@ type ConversationSystemEvent struct {
 	Targets       []ConversationSystemEventParticipant `json:"targets"`
 	PreviousTitle *string                              `json:"previousTitle,omitempty"`
 	Title         *string                              `json:"title,omitempty"`
-	// 以下字段只由 service_session_* 事件携带，结构与 domain.ServiceSessionHandedOffEvent、domain.ServiceSessionOperatedEvent、domain.ServiceSessionReturnedEvent 一致。
+	// 以下字段只由 service_session_* 事件携带，结构与 domain.ServiceSessionHandedOffEvent、domain.ServiceSessionOperatedEvent、domain.ServiceSessionReturnedEvent、domain.ServiceSessionAssignedEvent 一致。
 	ServiceSessionID *string                            `json:"serviceSessionId,omitempty"`
 	ActorIdentityID  *string                            `json:"actorIdentityId,omitempty"`
 	ActorDisplayName *string                            `json:"actorDisplayName,omitempty"`

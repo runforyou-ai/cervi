@@ -86,7 +86,7 @@ func ApplyCustomerHandlingConditions(query *bun.SelectQuery) *bun.SelectQuery {
 // customerHandlingIdentityQuery 构造统一的有效接待身份查询。
 func customerHandlingIdentityQuery(db bun.IDB, model any, organizationID string) *bun.SelectQuery {
 	return ApplyCustomerHandlingConditions(db.NewSelect().Model(model).
-		Column("oi.id", "oi.organization_id", "oi.type", "oi.role_id", "oi.display_name", "oi.avatar_file_id", "oi.handles_customers").
+		Column("oi.id", "oi.organization_id", "oi.type", "oi.role_id", "oi.display_name", "oi.avatar_file_id", "oi.handles_customers", "oi.work_status").
 		Where("oi.organization_id = ?", organizationID))
 }
 

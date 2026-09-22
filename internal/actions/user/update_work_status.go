@@ -10,24 +10,27 @@ import (
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
+	"github.com/runforyou-ai/cervi/internal/actions/serviceassignment"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
 )
 
 // UpdateWorkStatusAction 修改当前用户主动设置的工作状态。
 type UpdateWorkStatusAction struct {
-	db *bun.DB
+	db       *bun.DB
+	enqueuer servertask.TxEnqueuer
 }
 
 // NewUpdateWorkStatusAction 创建工作状态修改操作。
-func NewUpdateWorkStatusAction(db *bun.DB) *UpdateWorkStatusAction {
-	return &UpdateWorkStatusAction{db: db}
+func NewUpdateWorkStatusAction(db *bun.DB, enqueuer servertask.TxEnqueuer) *UpdateWorkStatusAction {
+	return &UpdateWorkStatusAction{db: db, enqueuer: enqueuer}
 }
 
-// Execute 校验并保存当前用户的工作状态。
+// Execute 校验并保存当前用户的工作状态，切换为工作中时从所在队列补分配。
 func (a *UpdateWorkStatusAction) Execute(ctx context.Context, identity *servermodels.Identity, input WorkStatusInput) (*servermodels.Identity, error) {
 	// 校验工作状态。
 	fields := make(map[string]ValidationCode)
@@ -59,6 +62,12 @@ func (a *UpdateWorkStatusAction) Execute(ctx context.Context, identity *servermo
 		if err != nil {
 			return err
 		}
+		var previousStatus domain.WorkStatus
+		if err := tx.NewSelect().Model((*servermodels.OrganizationIdentity)(nil)).Column("oi.work_status").
+			Where("oi.organization_id = ? AND oi.id = ?", identity.Organization.ID, storedUser.IdentityID).
+			Scan(ctx, &previousStatus); err != nil {
+			return err
+		}
 		if _, err := identityaction.UpdateUserIdentity(ctx, tx, identity.Organization.ID, storedUser.IdentityID, tx.NewUpdate().
 			Model((*servermodels.OrganizationIdentity)(nil)).
 			Set("work_status = ?", input.WorkStatus).
@@ -69,6 +78,11 @@ func (a *UpdateWorkStatusAction) Execute(ctx context.Context, identity *servermo
 		// 工作状态只在单聊页头展示，通知对端重读摘要即可。
 		if err := chatstate.NotifyDirectPeersWorkStatusChanged(ctx, tx, identity.Organization.ID, storedUser.IdentityID); err != nil {
 			return err
+		}
+		if input.WorkStatus == domain.WorkStatusWorking && previousStatus != domain.WorkStatusWorking {
+			if err := serviceassignment.EnqueueBackfill(ctx, tx, a.enqueuer, serviceassignment.BackfillInput{OrganizationID: identity.Organization.ID, IdentityID: storedUser.IdentityID}); err != nil {
+				return err
+			}
 		}
 		updatedIdentity, err = loadCurrentIdentity(ctx, tx, identity.Organization, identity.User.ID)
 		return err

@@ -14,7 +14,6 @@ import (
 	aiprovideraction "github.com/runforyou-ai/cervi/internal/actions/aiprovider"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	knowledgeaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
-	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/integration/knowledgeretrieval"
@@ -78,7 +77,7 @@ func newKnowledgeAgent(t *testing.T, db *bun.DB, identity *servermodels.Identity
 // newKnowledgeAgentScheduler 创建只登记运行任务的 Agent 调度器。
 func newKnowledgeAgentScheduler(t *testing.T, db *bun.DB) (*servertask.Runtime, *agentrunaction.Scheduler) {
 	t.Helper()
-	tasks := servertask.New(db, serverconfig.NATSConfig{})
+	tasks := newTestTasks(db)
 	if err := tasks.Registry().RegisterJSON(agentrunaction.RunActionName, func(context.Context, agentrunaction.RunInput) error { return nil }); err != nil {
 		t.Fatal(err)
 	}

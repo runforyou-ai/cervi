@@ -15,6 +15,7 @@ const workspace = {
   openUserMenu: "Open the user menu for {{name}}",
   workStatus: "Work status",
   workStatusUpdateError: "Could not change the work status. Try again.",
+  workStatusWorkingHint: "New customer conversations are assigned to you",
   logout: "Log out",
   loggingOut: "Logging out…",
   logoutError: "Could not log out. Please try again.",

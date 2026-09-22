@@ -77,37 +77,41 @@ type UserListInput struct {
 
 // CreateUserInput 定义新增企业成员字段，AvatarFileID 为空时不设置头像。
 type CreateUserInput struct {
-	DisplayName      string   `json:"displayName"`
-	Email            string   `json:"email"`
-	Password         string   `json:"password"`
-	RoleID           string   `json:"roleId"`
-	TeamIDs          []string `json:"teamIds"`
-	HandlesCustomers bool     `json:"handlesCustomers"`
-	AvatarFileID     string   `json:"avatarFileId"`
+	DisplayName        string   `json:"displayName"`
+	Email              string   `json:"email"`
+	Password           string   `json:"password"`
+	RoleID             string   `json:"roleId"`
+	TeamIDs            []string `json:"teamIds"`
+	HandlesCustomers   bool     `json:"handlesCustomers"`
+	MaxServiceSessions int      `json:"maxServiceSessions"`
+	AvatarFileID       string   `json:"avatarFileId"`
 }
 
-// UpdateUserInput 定义企业成员可编辑字段。
+// UpdateUserInput 定义企业成员可编辑字段，最大接待量只在开启接待时生效。
 type UpdateUserInput struct {
-	DisplayName      string   `json:"displayName"`
-	Email            string   `json:"email"`
-	RoleID           string   `json:"roleId"`
-	TeamIDs          []string `json:"teamIds"`
-	HandlesCustomers bool     `json:"handlesCustomers"`
+	DisplayName        string   `json:"displayName"`
+	Email              string   `json:"email"`
+	RoleID             string   `json:"roleId"`
+	TeamIDs            []string `json:"teamIds"`
+	HandlesCustomers   bool     `json:"handlesCustomers"`
+	MaxServiceSessions int      `json:"maxServiceSessions"`
 }
 
 // User 定义企业成员信息。
 type User struct {
-	ID               string        `json:"id"`
-	IdentityID       string        `json:"identityId"`
-	Email            string        `json:"email"`
-	DisplayName      string        `json:"displayName"`
-	AvatarURL        string        `json:"avatarUrl"`
-	Role             RoleSummary   `json:"role"`
-	HandlesCustomers bool          `json:"handlesCustomers"`
-	Status           UserStatus    `json:"status"`
-	WorkStatus       WorkStatus    `json:"workStatus"`
-	Teams            []TeamSummary `json:"teams"`
-	CreatedAt        time.Time     `json:"createdAt"`
+	ID               string      `json:"id"`
+	IdentityID       string      `json:"identityId"`
+	Email            string      `json:"email"`
+	DisplayName      string      `json:"displayName"`
+	AvatarURL        string      `json:"avatarUrl"`
+	Role             RoleSummary `json:"role"`
+	HandlesCustomers bool        `json:"handlesCustomers"`
+	// MaxServiceSessions 是自动分配时本人可负责的开放客服处理周期上限。
+	MaxServiceSessions int           `json:"maxServiceSessions"`
+	Status             UserStatus    `json:"status"`
+	WorkStatus         WorkStatus    `json:"workStatus"`
+	Teams              []TeamSummary `json:"teams"`
+	CreatedAt          time.Time     `json:"createdAt"`
 }
 
 // UserList 定义企业成员分页结果。

@@ -13,12 +13,10 @@ import (
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	"github.com/runforyou-ai/cervi/internal/appservice"
-	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/runforyou-ai/cervi/internal/tenant"
 )
 
@@ -88,7 +86,7 @@ func TestCustomerInternalNotes(t *testing.T) {
 		t.Fatalf("member timeline last message = %+v", last)
 	}
 
-	visitor := appservice.NewWebsiteVisitorDirectBackend(f.db, nil, nil, serverfilecontent.S3Config{})
+	visitor := appservice.NewWebsiteVisitorDirectBackend(f.db, nil, newTestTasks(f.db), nil, serverfilecontent.S3Config{})
 	externalID := "web-session:0123456789abcdef0123456789abcdef"
 	page, err := visitor.ListMessages(ctx, appservice.WebsiteVisitorMeta{}, f.channelID, externalID, f.conversationID, appservice.WebsiteVisitorMessageHistoryInput{})
 	if err != nil {
@@ -195,8 +193,8 @@ func TestCustomerInternalNotes(t *testing.T) {
 	})
 
 	t.Run("关闭周期后仍可补记内部备注", func(t *testing.T) {
-		tasks := servertask.New(f.db, serverconfig.NATSConfig{})
-		closeSession := conversationaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, tasks, nil, testAttachmentReader(f.db), nil))
+		tasks := newTestTasks(f.db)
+		closeSession := conversationaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, tasks, nil, testAttachmentReader(f.db), nil), newTestTasks(f.db))
 		if _, err := closeSession.Execute(ctx, f.owner, f.conversationID); err != nil {
 			t.Fatal(err)
 		}

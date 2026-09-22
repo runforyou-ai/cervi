@@ -114,7 +114,7 @@ func (o *directOperations) Login(ctx context.Context, meta RequestMeta, input Lo
 		slog.Warn("用户登录失败", "error", err)
 		return Auth{}, FailedError(meta, cervii18n.ErrorLoginFailed)
 	}
-	slog.Info("用户登录成功", "organization_id", output.Identity.Organization.ID, "user_id", output.Identity.User.ID, "work_status", domain.WorkStatusWorking)
+	slog.Info("用户登录成功", "organization_id", output.Identity.Organization.ID, "user_id", output.Identity.User.ID, "work_status", output.Identity.OrganizationIdentity.WorkStatus)
 	identity, err := o.identityFromModel(ctx, output.Identity)
 	if err != nil {
 		slog.Warn("读取登录用户头像失败", "organization_id", output.Identity.Organization.ID, "user_id", output.Identity.User.ID, "error", err)

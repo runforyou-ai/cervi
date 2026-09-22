@@ -11,6 +11,12 @@ const blockKinds = new Set(["thinking", "content", "tool_call"])
 /** 运行过程流工具调用的已知状态，取值与 AgentToolCallStatus 一致。 */
 const toolCallStatuses = new Set(["queued", "running", "succeeded", "failed"])
 
+/** 客服处理周期提醒的已知原因。 */
+const serviceAttentionReasons = new Set(["assigned"])
+
+/** 客服处理周期提醒原因，与 internal/domain 的 ServiceAttentionReason 一致。 */
+export type ServiceAttentionReason = "assigned"
+
 /** 当前协议主版本，只有破坏性演进才提升。 */
 export const realtimeProtocolVersion = 1
 
@@ -54,6 +60,12 @@ export type RealtimeServerFrame =
   | { type: "visitor_typing"; conversationId: string; active: boolean }
   | { type: "identity_profile_changed"; version: bigint }
   | { type: "pin_order_changed"; version: bigint }
+  | {
+      type: "service_attention"
+      conversationId: string
+      serviceSessionId: string
+      reason: ServiceAttentionReason
+    }
   | {
       type: "run_stream_snapshot"
       runId: string
@@ -148,6 +160,13 @@ function decodeServerData(type: string, data: FrameData): RealtimeServerFrame | 
     case "identity_profile_changed":
     case "pin_order_changed":
       return { type, version: readInt64(data, "version") }
+    case "service_attention":
+      return {
+        type,
+        conversationId: readString(data, "conversationId"),
+        serviceSessionId: readString(data, "serviceSessionId"),
+        reason: readEnum(data, "reason", serviceAttentionReasons) as ServiceAttentionReason,
+      }
     case "run_stream_snapshot":
       return {
         type,

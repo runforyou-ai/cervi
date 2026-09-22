@@ -15,10 +15,8 @@ import (
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
-	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
 )
 
@@ -191,8 +189,8 @@ func TestCustomerNoteMentions(t *testing.T) {
 		if _, counts := customerRow(f.member, domain.CustomerInboxViewMentioned); counts.CustomerMentioned != 1 {
 			t.Fatalf("unread mention before close counts=%+v", counts)
 		}
-		tasks := servertask.New(f.db, serverconfig.NATSConfig{})
-		closeSession := conversationaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, tasks, nil, testAttachmentReader(f.db), nil))
+		tasks := newTestTasks(f.db)
+		closeSession := conversationaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, tasks, nil, testAttachmentReader(f.db), nil), newTestTasks(f.db))
 		if _, err := closeSession.Execute(ctx, f.owner, f.conversationID); err != nil {
 			t.Fatal(err)
 		}
@@ -219,7 +217,7 @@ func TestCustomerNoteMentionsCreateSubjectsInOrder(t *testing.T) {
 	defer cancel()
 	identities := make([]*servermodels.Identity, 0, 2)
 	for index, email := range []string{"first-note@navigation.test", "second-note@navigation.test"} {
-		if _, err := useraction.NewCreateUserAction(f.db).Execute(ctx, f.owner, useraction.CreateInput{HandlesCustomers: true, DisplayName: []string{"备注成员甲", "备注成员乙"}[index], Email: email, Password: "password123", RoleID: f.owner.OrganizationIdentity.RoleID}); err != nil {
+		if _, err := useraction.NewCreateUserAction(f.db, newTestTasks(f.db)).Execute(ctx, f.owner, useraction.CreateInput{HandlesCustomers: true, MaxServiceSessions: 10, DisplayName: []string{"备注成员甲", "备注成员乙"}[index], Email: email, Password: "password123", RoleID: f.owner.OrganizationIdentity.RoleID}); err != nil {
 			t.Fatal(err)
 		}
 		login, err := authaction.NewLoginAction(f.db).Execute(ctx, authaction.LoginInput{OrganizationID: f.owner.Organization.ID, Email: email, Password: "password123"})

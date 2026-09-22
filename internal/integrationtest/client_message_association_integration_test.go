@@ -18,12 +18,10 @@ import (
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	"github.com/runforyou-ai/cervi/internal/api"
 	"github.com/runforyou-ai/cervi/internal/appservice"
-	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/runforyou-ai/cervi/internal/tenant"
 	"github.com/uptrace/bun"
 )
@@ -156,7 +154,7 @@ func TestDirectClientMessageAssociation(t *testing.T) {
 func TestWebsiteClientMessageAssociation(t *testing.T) {
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
-	visitor := appservice.NewWebsiteVisitorDirectBackend(f.db, agentrunaction.NewScheduler(servertask.New(f.db, serverconfig.NATSConfig{})), nil, serverfilecontent.S3Config{})
+	visitor := appservice.NewWebsiteVisitorDirectBackend(f.db, agentrunaction.NewScheduler(newTestTasks(f.db)), newTestTasks(f.db), nil, serverfilecontent.S3Config{})
 	const visitorA = "web-session:aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
 	const visitorB = "web-session:bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
 	clientID := uuid.NewV7().String()

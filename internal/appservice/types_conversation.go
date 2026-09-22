@@ -61,6 +61,8 @@ const (
 	ConversationSystemEventServiceSessionReopened    ConversationSystemEventType = ConversationSystemEventType(domain.ConversationSystemEventServiceSessionReopened)
 	// ConversationSystemEventServiceSessionReturned 表示失去接待资格的负责人所负责的客服处理周期退回队列。
 	ConversationSystemEventServiceSessionReturned ConversationSystemEventType = ConversationSystemEventType(domain.ConversationSystemEventServiceSessionReturned)
+	// ConversationSystemEventServiceSessionAssigned 表示队列中的客服处理周期自动分配给成员。
+	ConversationSystemEventServiceSessionAssigned ConversationSystemEventType = ConversationSystemEventType(domain.ConversationSystemEventServiceSessionAssigned)
 )
 
 // ServiceSessionReturnReason 表示客服处理周期退回队列的原因。

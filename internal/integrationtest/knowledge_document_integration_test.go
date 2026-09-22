@@ -20,7 +20,6 @@ import (
 	knowledgeaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
 	"github.com/runforyou-ai/cervi/internal/api"
 	"github.com/runforyou-ai/cervi/internal/appservice"
-	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servertest "github.com/runforyou-ai/cervi/internal/servertest"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
@@ -372,7 +371,7 @@ func TestKnowledgeDocumentS3Preview(t *testing.T) {
 // newKnowledgeTasks 创建可持久化文档与问答索引任务的测试运行时。
 func newKnowledgeTasks(t *testing.T, db *bun.DB) *servertask.Runtime {
 	t.Helper()
-	tasks := servertask.New(db, serverconfig.NATSConfig{})
+	tasks := newTestTasks(db)
 	if err := tasks.Registry().RegisterJSON(knowledgeaction.ProcessDocumentActionName, func(context.Context, knowledgeaction.ProcessInput) error { return nil }); err != nil {
 		t.Fatal(err)
 	}

@@ -19,13 +19,11 @@ import (
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	"github.com/runforyou-ai/cervi/internal/appservice"
-	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/runforyou-ai/cervi/internal/tenant"
 	"github.com/uptrace/bun"
 )
@@ -284,7 +282,7 @@ func TestInboxTelegramActivity(t *testing.T) {
 		t.Fatal(err)
 	}
 	source := before.Add(-24 * time.Hour)
-	receiver := channelaction.NewReceiveTelegramWebhookAction(f.db, agentrunaction.NewScheduler(servertask.New(f.db, serverconfig.NATSConfig{})), nil, nil, nil, nil)
+	receiver := channelaction.NewReceiveTelegramWebhookAction(f.db, agentrunaction.NewScheduler(newTestTasks(f.db)), nil, nil, nil, newTestTasks(f.db))
 	input := channelaction.TelegramWebhookInput{Secret: "secret", UpdateID: 1, Message: &channelaction.TelegramWebhookMessage{ChatID: 12345, SenderID: 12345, MessageID: 1, DisplayName: "晚到客户", Body: "昨天的消息", OriginatedAt: source}}
 	if err := receiver.Execute(ctx, channel.ID, input); err != nil {
 		t.Fatal(err)
@@ -317,7 +315,7 @@ func TestInboxTelegramActivity(t *testing.T) {
 		t.Fatal(err)
 	}
 	coordinator := agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil)
-	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, coordinator).Execute(ctx, f.owner, telegram.ID); err != nil {
+	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(ctx, f.owner, telegram.ID); err != nil {
 		t.Fatal(err)
 	}
 	// 「待分配」只接受未关闭状态；队列中关闭的会话由关闭人负责，出现在其已关闭列表。

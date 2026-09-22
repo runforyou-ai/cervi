@@ -11,9 +11,7 @@ import (
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
-	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 )
 
 // TestCustomerHandlingAuthorization 验证只有开启接待的成员可以领取、对客回复、关闭与重开客服周期，未开启的成员仍可写内部备注，也不能作为转交目标。
@@ -29,9 +27,9 @@ func TestCustomerHandlingAuthorization(t *testing.T) {
 	}
 	setHandlesCustomers := func(handlesCustomers bool) {
 		t.Helper()
-		if _, err := useraction.NewUpdateUserAction(f.db, testServiceSessionReturner(f.db)).Execute(ctx, f.owner, f.member.User.ID, useraction.UpdateInput{
+		if _, err := useraction.NewUpdateUserAction(f.db, testServiceSessionReturner(f.db), newTestTasks(f.db)).Execute(ctx, f.owner, f.member.User.ID, useraction.UpdateInput{
 			DisplayName: f.member.OrganizationIdentity.DisplayName, Email: f.member.User.Email,
-			RoleID: f.member.OrganizationIdentity.RoleID, HandlesCustomers: handlesCustomers,
+			RoleID: f.member.OrganizationIdentity.RoleID, HandlesCustomers: handlesCustomers, MaxServiceSessions: 10,
 		}); err != nil {
 			t.Fatal(err)
 		}
@@ -45,7 +43,7 @@ func TestCustomerHandlingAuthorization(t *testing.T) {
 	}
 
 	setHandlesCustomers(false)
-	claim := conversationaction.NewClaimServiceSessionAction(f.db, coordinator)
+	claim := conversationaction.NewClaimServiceSessionAction(f.db, coordinator, newTestTasks(f.db))
 	_, err := claim.Execute(ctx, f.member, f.conversationID)
 	expectHandlingRequired("未开启接待领取", err)
 	send := conversationaction.NewSendCustomerTextMessageAction(f.db, nil)
@@ -66,7 +64,7 @@ func TestCustomerHandlingAuthorization(t *testing.T) {
 	if _, err := claim.Execute(ctx, f.owner, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
-	transfer := conversationaction.NewTransferServiceSessionAction(f.db, coordinator, agentrunaction.NewScheduler(servertask.New(f.db, serverconfig.NATSConfig{})))
+	transfer := conversationaction.NewTransferServiceSessionAction(f.db, coordinator, agentrunaction.NewScheduler(newTestTasks(f.db)), newTestTasks(f.db))
 	_, err = transfer.Execute(ctx, f.owner, conversationaction.TransferServiceSessionInput{
 		ConversationID: f.conversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: f.member.OrganizationIdentity.ID,
 	})
@@ -82,7 +80,7 @@ func TestCustomerHandlingAuthorization(t *testing.T) {
 	}); err != nil {
 		t.Fatalf("转交给开启接待的成员 = %v", err)
 	}
-	closeSession := conversationaction.NewCloseServiceSessionAction(f.db, coordinator)
+	closeSession := conversationaction.NewCloseServiceSessionAction(f.db, coordinator, newTestTasks(f.db))
 	if _, err := closeSession.Execute(ctx, f.member, f.conversationID); err != nil {
 		t.Fatalf("开启接待关闭周期 = %v", err)
 	}

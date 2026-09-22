@@ -35,7 +35,7 @@ import { sameIDs, useImmediateSave } from "@/hooks/use-immediate-save"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
-type EditingField = "name" | "email" | "role" | "accountStatus" | "teams" | null
+type EditingField = "name" | "email" | "role" | "accountStatus" | "maxServiceSessions" | "teams" | null
 
 /** 把企业成员详情转换为编辑表单值。 */
 function valuesFromUser(user: UserData): MemberFormValues {
@@ -46,6 +46,7 @@ function valuesFromUser(user: UserData): MemberFormValues {
     roleId: user.role.id,
     teamIds: user.teams.map((team) => team.id),
     handlesCustomers: user.handlesCustomers,
+    maxServiceSessions: String(user.maxServiceSessions),
   }
 }
 
@@ -94,6 +95,7 @@ export function MemberDetailView({
           passwordTooShort: t("members.validation.passwordTooShort"),
           passwordTooLong: t("members.validation.passwordTooLong"),
           roleRequired: t("members.validation.roleRequired"),
+          maxServiceSessionsInvalid: t("members.validation.maxServiceSessionsInvalid"),
         },
         true,
       ),
@@ -140,6 +142,7 @@ export function MemberDetailView({
       draft.email === current.email &&
       draft.roleId === current.roleId &&
       draft.handlesCustomers === current.handlesCustomers &&
+      draft.maxServiceSessions.trim() === current.maxServiceSessions &&
       sameIDs(draft.teamIds, current.teamIds)
     ) {
       setEditing(null)
@@ -154,6 +157,7 @@ export function MemberDetailView({
         roleId: draft.roleId,
         teamIds: draft.teamIds,
         handlesCustomers: draft.handlesCustomers,
+        maxServiceSessions: Number(draft.maxServiceSessions),
       })
       if (!saveState.isCurrent(request)) return
       if (closeAfterSave) setEditing(null)
@@ -175,6 +179,7 @@ export function MemberDetailView({
               "roleId",
               "teamIds",
               "handlesCustomers",
+              "maxServiceSessions",
             ])
           : t("members.form.networkError"),
       )
@@ -337,6 +342,38 @@ export function MemberDetailView({
               }
             />
           </ReadonlyDetailRow>
+
+          {user.handlesCustomers ? (
+            <DetailEditRow
+              label={t("columns.maxServiceSessions")}
+              value={user.maxServiceSessions}
+              editing={editing === "maxServiceSessions"}
+              editEnabled={editing === null && !saving}
+              required
+              onEdit={() => startEditing("maxServiceSessions")}
+            >
+              <Controller
+                name="maxServiceSessions"
+                control={form.control}
+                render={({ field }) => (
+                  <Input
+                    {...field}
+                    type="number"
+                    inputMode="numeric"
+                    min={1}
+                    step={1}
+                    autoFocus
+                    disabled={saving}
+                    onBlur={() => {
+                      field.onBlur()
+                      void saveMember()
+                    }}
+                    onKeyDown={handleTextKeyDown}
+                  />
+                )}
+              />
+            </DetailEditRow>
+          ) : null}
 
           <ReadonlyDetailRow label={t("columns.workStatus")}>
             <WorkStatusBadge status={workStatus} />

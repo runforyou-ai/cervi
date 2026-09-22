@@ -333,9 +333,9 @@ func TestRealtimeIdentityProfileNotifications(t *testing.T) {
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	feed := startRealtimeFeed(t, f.owner.Organization.ID)
-	workStatus := useraction.NewUpdateWorkStatusAction(f.db)
+	workStatus := useraction.NewUpdateWorkStatusAction(f.db, newTestTasks(f.db))
 	preferences := useraction.NewUpdatePreferencesAction(f.db)
-	updateUser := useraction.NewUpdateUserAction(f.db, testServiceSessionReturner(f.db))
+	updateUser := useraction.NewUpdateUserAction(f.db, testServiceSessionReturner(f.db), newTestTasks(f.db))
 	for _, step := range []struct {
 		name   string
 		change func() error
@@ -566,8 +566,8 @@ func TestRealtimeCustomerInboxNotifications(t *testing.T) {
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	coordinator := newGroupAgentCoordinator(f.db)
-	claim := conversationaction.NewClaimServiceSessionAction(f.db, coordinator)
-	closeSession := conversationaction.NewCloseServiceSessionAction(f.db, coordinator)
+	claim := conversationaction.NewClaimServiceSessionAction(f.db, coordinator, newTestTasks(f.db))
+	closeSession := conversationaction.NewCloseServiceSessionAction(f.db, coordinator, newTestTasks(f.db))
 	reopen := conversationaction.NewReopenServiceSessionAction(f.db)
 	inbox := inboxaction.NewLoadInboxQuery(f.db)
 	feed := startRealtimeFeed(t, f.owner.Organization.ID)
@@ -636,7 +636,7 @@ func TestRealtimeCustomerInboxNotifications(t *testing.T) {
 	feed.expect(t, feed.customerInbox(f.conversationID, loadConversationVersion(t, f.db, f.conversationID)))
 
 	// 转交通知共享受众；原负责人随后关闭被拒绝，不留通知。
-	if _, err := conversationaction.NewTransferServiceSessionAction(f.db, coordinator, nil).Execute(ctx, f.owner, conversationaction.TransferServiceSessionInput{ConversationID: f.conversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: f.member.OrganizationIdentity.ID}); err != nil {
+	if _, err := conversationaction.NewTransferServiceSessionAction(f.db, coordinator, nil, newTestTasks(f.db)).Execute(ctx, f.owner, conversationaction.TransferServiceSessionInput{ConversationID: f.conversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: f.member.OrganizationIdentity.ID}); err != nil {
 		t.Fatal(err)
 	}
 	feed.expect(t, changed()...)

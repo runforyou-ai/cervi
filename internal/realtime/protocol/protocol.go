@@ -35,6 +35,7 @@ const (
 	TypeVisitorTyping            Type = "visitor_typing"
 	TypeIdentityProfileChanged   Type = "identity_profile_changed"
 	TypePinOrderChanged          Type = "pin_order_changed"
+	TypeServiceAttention         Type = "service_attention"
 	TypeRunStreamSnapshot        Type = "run_stream_snapshot"
 	TypeRunStreamDelta           Type = "run_stream_delta"
 	TypeRunStreamEnded           Type = "run_stream_ended"
@@ -111,6 +112,13 @@ type IdentityProfileChanged struct {
 // PinOrderChanged 表示本人的个人置顶顺序变到了指定版本，置顶区需要整区重读。
 type PinOrderChanged struct {
 	Version int64 `json:"version,string"`
+}
+
+// ServiceAttention 提醒本人处理指定客户会话的客服处理周期，只驱动本地通知；负责人与队列状态以收件箱为准。
+type ServiceAttention struct {
+	ConversationID   string                        `json:"conversationId"`
+	ServiceSessionID string                        `json:"serviceSessionId"`
+	Reason           domain.ServiceAttentionReason `json:"reason"`
 }
 
 // DeviceWorkAdvanced 表示本设备的工作水位推进到指定值，只发给携带该设备身份的事件流。
@@ -202,6 +210,9 @@ func (IdentityProfileChanged) FrameType() Type { return TypeIdentityProfileChang
 // FrameType 返回个人置顶顺序变更事件种类。
 func (PinOrderChanged) FrameType() Type { return TypePinOrderChanged }
 
+// FrameType 返回客服处理周期提醒事件种类。
+func (ServiceAttention) FrameType() Type { return TypeServiceAttention }
+
 // FrameType 返回设备工作水位事件种类。
 func (DeviceWorkAdvanced) FrameType() Type { return TypeDeviceWorkAdvanced }
 
@@ -236,6 +247,7 @@ var decoders = map[Type]decoder{
 	TypeVisitorTyping:            decodeAs[VisitorTyping],
 	TypeIdentityProfileChanged:   decodeAs[IdentityProfileChanged],
 	TypePinOrderChanged:          decodeAs[PinOrderChanged],
+	TypeServiceAttention:         decodeAs[ServiceAttention],
 	TypeRunStreamSnapshot:        decodeAs[RunStreamSnapshot],
 	TypeRunStreamDelta:           decodeAs[RunStreamDelta],
 	TypeRunStreamEnded:           decodeAs[RunStreamEnded],
