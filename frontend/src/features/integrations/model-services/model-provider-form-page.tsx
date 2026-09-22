@@ -1,5 +1,5 @@
 /** 模型服务供应商表单页。 */
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { LoaderCircleIcon } from "lucide-react"
 import { Controller, type FieldErrors, useFieldArray, useForm } from "react-hook-form"
@@ -44,7 +44,7 @@ import {
   parseTokenCount,
   type AIProviderFormValues,
 } from "@/features/integrations/model-services/model-provider-schema"
-import { useAutoSave } from "@/hooks/use-auto-save"
+import { useFormSave } from "@/hooks/use-form-save"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
@@ -78,7 +78,6 @@ export function ModelProviderFormPage({
   const { providerId = "" } = useParams()
   const invalidateResource = useResourceInvalidator()
   const [testingConnection, setTestingConnection] = useState(false)
-  const mounted = useRef(true)
   const listPath = `/settings/model-services/${returnSection}`
   const initialBrand = modelServiceSectionConfigs[returnSection].defaultBrand
   const schema = useMemo(
@@ -125,18 +124,10 @@ export function ModelProviderFormPage({
     name: "models",
   })
 
-  const {
-    data: provider,
-    loading: providerLoading,
-    refreshing: providerRefreshing,
-    error: providerError,
-    refresh,
-  } = useResource(resourceKeys.aiProvider(providerId), () => getAIProvider(providerId), {
+  const detail = useResource(resourceKeys.aiProvider(providerId), () => getAIProvider(providerId), {
     enabled: mode === "edit",
   })
-  const loading =
-    mode === "edit" && (providerLoading || (Boolean(providerError) && providerRefreshing))
-  const loadError = mode === "edit" && Boolean(providerError) && !loading
+  const provider = detail.data
 
   /** 详情就绪后回填供应商表单。 */
   useEffect(() => {
@@ -150,13 +141,6 @@ export function ModelProviderFormPage({
       models: provider.models.map(modelFormValue),
     })
   }, [form, provider])
-
-  useEffect(() => {
-    mounted.current = true
-    return () => {
-      mounted.current = false
-    }
-  }, [])
 
   /** 添加一个文本输入的自定义对话模型。 */
   function addCustomModel() {
@@ -204,33 +188,29 @@ export function ModelProviderFormPage({
 
   /** 创建或保存模型服务供应商。 */
   // 编辑已有供应商时边改边存，新建仍由底部按钮提交并跳回列表。
-  const markSaved = useAutoSave({
+  const { submit, mounted } = useFormSave({
     form,
     schema,
-    enabled: mode === "edit",
-    save: (values) => save(values, true),
-  })
-
-  async function save(values: AIProviderFormValues, autoSaved = false) {
-    const input = {
-      brand: values.brand,
-      name: values.name,
-      credentialType: values.credentialType,
-      apiKey: values.apiKey,
-      apiUrl: values.apiUrl,
-      models: values.models.map((model) => ({
-        identifier: model.identifier,
-        name: model.name,
-        type: model.type,
-        inputModalities: model.inputModalities,
-        contextWindow: parseTokenCount(model.contextWindow)!,
-        maxOutputTokens:
-          model.type === AIModelType.AIModelTypeChat
-            ? parseTokenCount(model.maxOutputTokens)!
-            : 0,
-      })),
-    }
-    try {
+    autoSave: mode === "edit",
+    save: async (values) => {
+      const input = {
+        brand: values.brand,
+        name: values.name,
+        credentialType: values.credentialType,
+        apiKey: values.apiKey,
+        apiUrl: values.apiUrl,
+        models: values.models.map((model) => ({
+          identifier: model.identifier,
+          name: model.name,
+          type: model.type,
+          inputModalities: model.inputModalities,
+          contextWindow: parseTokenCount(model.contextWindow)!,
+          maxOutputTokens:
+            model.type === AIModelType.AIModelTypeChat
+              ? parseTokenCount(model.maxOutputTokens)!
+              : 0,
+        })),
+      }
       if (mode === "create") {
         await createAIProvider(input)
       } else {
@@ -238,39 +218,15 @@ export function ModelProviderFormPage({
         void invalidateResource(resourceKeys.aiProvider(providerId))
       }
       void invalidateResource(resourceKeys.aiProviders())
-      if (!mounted.current) return
-      if (autoSaved) {
-        markSaved(values)
-        return
-      }
-      form.reset(values)
-      toast.success(
-        mode === "create"
-          ? t("modelServices.form.createSuccess")
-          : t("modelServices.form.updateSuccess"),
-      )
+    },
+    onSubmitted: () => {
+      toast.success(t("modelServices.form.createSuccess"))
       navigate(listPath)
-    } catch (requestError) {
-      if (!mounted.current) return
-      if (recoverSession(requestError, navigate)) return
-      console.warn("模型服务供应商保存失败", {
-        provider_id: providerId,
-        error: requestError,
-      })
-      toast.error(
-        isApiError(requestError)
-          ? apiErrorMessage(requestError, [
-              "brand",
-              "name",
-              "credentialType",
-              "apiKey",
-              "apiUrl",
-              "models",
-            ])
-          : t("modelServices.form.saveError"),
-      )
-    }
-  }
+    },
+    errorMessage: t("modelServices.form.saveError"),
+    errorFields: ["brand", "name", "credentialType", "apiKey", "apiUrl", "models"],
+    logLabel: "模型服务供应商保存",
+  })
 
   const title =
     mode === "create"
@@ -297,14 +253,12 @@ export function ModelProviderFormPage({
       </PageHeader>
       <PageContent variant="form">
         <ResourceContent
-          loading={loading}
-          error={Boolean(loadError)}
+          resources={mode === "edit" ? detail : []}
           errorMessage={t("modelServices.form.loadError")}
-          onRetry={() => void refresh()}
         >
           <form
             className="w-full space-y-9"
-            onSubmit={form.handleSubmit((values) => save(values))}
+            onSubmit={form.handleSubmit(submit)}
             noValidate
           >
             <FieldGroup>

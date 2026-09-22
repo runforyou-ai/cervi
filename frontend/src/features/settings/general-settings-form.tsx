@@ -52,7 +52,7 @@ export function GeneralSettingsForm({
       mounted.current = false
     }
   }, [])
-  const markSaved = useAutoSave({ form, schema, save })
+  const { markSaved } = useAutoSave({ form, schema, save })
   const serverURL = useResource(resourceKeys.serverURL(), () => resolveServerURL())
   const domain = serverURL.data ? new URL(serverURL.data).host : ""
 
@@ -61,14 +61,15 @@ export function GeneralSettingsForm({
     try {
       const saved = await updateOrganization(values)
       void invalidate(resourceKeys.identity())
-      if (!mounted.current) return
+      if (!mounted.current) return true
       const next = { name: saved.name }
       form.reset(next)
       markSaved(next)
+      return true
     } catch (error) {
-      if (!mounted.current) return
+      // 离开页面后提交的改动失败时同样提示。
       if (recoverSession(error, navigate)) {
-        return
+        return false
       }
       console.warn("企业通用设置更新失败", {
         organization_id: organization.id,
@@ -76,9 +77,10 @@ export function GeneralSettingsForm({
       })
       if (isApiError(error)) {
         toast.error(apiErrorMessage(error, ["name"]))
-        return
+        return false
       }
       toast.error(t("general.saveError"))
+      return false
     }
   }
 

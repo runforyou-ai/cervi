@@ -9,11 +9,10 @@ import {
 } from "react-router"
 
 import { getAgent, isNotFoundApiError, listRoles, listTeams } from "@/api"
-import { LoadingIndicator } from "@/components/loading-indicator"
 import { PageContent } from "@/components/page-content"
 import { PageBackButton } from "@/components/page-back-button"
 import { PageHeader } from "@/components/page-header"
-import { Button } from "@/components/ui/button"
+import { ResourceContent } from "@/components/resource-content"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { agentReturnPath } from "@/features/contacts/agents/agent-navigation"
 import { AgentForm } from "@/features/contacts/agents/agent-form"
@@ -46,12 +45,6 @@ export function AgentFormPage({ mode }: { mode: "create" | "edit" }) {
   const tab = searchParams.get("tab") === "execution" ? "execution" : "basic"
   const returnTo = agentReturnPath(location.pathname, location.search)
   const teamId = searchParams.get("teamId")
-  const loading =
-    roles.loading || (mode === "edit" && (teams.loading || detail.loading))
-  const error =
-    (!roles.data ? roles.error : null) ??
-    (mode === "edit" && !teams.data ? teams.error : null) ??
-    (mode === "edit" && !agent ? detail.error : null)
 
   // 缺省或无效页签统一写回地址，刷新时恢复同一分组。
   useEffect(() => {
@@ -87,29 +80,11 @@ export function AgentFormPage({ mode }: { mode: "create" | "edit" }) {
         {mode === "edit" ? <PageBackButton to={returnTo} /> : null}
       </PageHeader>
       <PageContent variant="form">
-        {loading ? (
-          <LoadingIndicator className="min-h-48 justify-center">
-            {t("common:status.loading")}
-          </LoadingIndicator>
-        ) : error ? (
-          <div className="flex min-h-48 flex-col items-center justify-center gap-4">
-            <p className="text-sm text-muted-foreground">
-              {t("agents.form.loadError")}
-            </p>
-            <Button
-              variant="outline"
-              onClick={() => {
-                if (roles.error) void roles.refresh()
-                if (mode === "edit") {
-                  if (teams.error) void teams.refresh()
-                  if (detail.error) void detail.refresh()
-                }
-              }}
-            >
-              {t("common:actions.retry")}
-            </Button>
-          </div>
-        ) : mode === "create" ? (
+        <ResourceContent
+          resources={mode === "edit" ? [roles, teams, detail] : [roles]}
+          errorMessage={t("agents.form.loadError")}
+        >
+        {mode === "create" ? (
           <AgentForm
             roles={roles.data?.roles ?? []}
             defaultTeamIds={teamId ? [teamId] : []}
@@ -165,6 +140,7 @@ export function AgentFormPage({ mode }: { mode: "create" | "edit" }) {
             </TabsContent>
           </Tabs>
         ) : null}
+        </ResourceContent>
       </PageContent>
     </div>
   )

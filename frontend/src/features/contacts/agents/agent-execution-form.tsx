@@ -64,7 +64,7 @@ export function AgentExecutionForm({
       mcpServerIds: agent.execution.mcpServerIds,
     },
   })
-  const { mounted, dirty } = useFormLifetime(form.formState.isDirty)
+  const { mounted, dirty, discarded } = useFormLifetime(form.formState.isDirty)
 
   // 外部删除服务后只同步未编辑的绑定，保留其他表单草稿。
   useEffect(() => {
@@ -74,7 +74,7 @@ export function AgentExecutionForm({
   }, [agent.execution.mcpServerIds, form])
 
   /** 提交当前运行配置并生成一个生效版本。 */
-  const markSaved = useAutoSave({ form, schema, save: submit })
+  const { markSaved } = useAutoSave({ form, schema, save: submit, discarded })
 
   async function submit(values: AgentExecutionFormValues) {
     try {
@@ -88,13 +88,15 @@ export function AgentExecutionForm({
         },
       })
       onSaved()
-      if (!mounted.current) return
+      if (!mounted.current) return true
       dirty.current = false
       const next = { ...values, mcpServerIds: saved.execution.mcpServerIds }
       form.reset(next)
       markSaved(next)
+      return true
     } catch (error) {
-      if (!mounted.current || recoverSession(error, navigate)) return
+      // 离开页面后提交的改动失败时同样提示。
+      if (recoverSession(error, navigate)) return false
       console.warn("保存 AI 员工运行配置失败", { agent_id: agent.id, error })
       toast.error(
         isApiError(error)
@@ -108,6 +110,7 @@ export function AgentExecutionForm({
             ])
           : t("agents.execution.saveError"),
       )
+      return false
     }
   }
 

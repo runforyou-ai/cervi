@@ -1,5 +1,5 @@
 /** 群聊侧边面板中的成员列表和成员管理交互。 */
-import { useId, useMemo, useState } from "react"
+import { useId, useMemo, useRef, useState } from "react"
 import {
   CrownIcon,
   MoreHorizontalIcon,
@@ -23,6 +23,7 @@ import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
+  DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { Input } from "@/components/ui/input"
@@ -80,6 +81,13 @@ export function GroupParticipantList({
   const [removing, setRemoving] = useState<GroupParticipant | null>(null)
   const [leaving, setLeaving] = useState<GroupParticipant | null>(null)
   const [acting, setActing] = useState(false)
+  // 菜单项随菜单卸载，确认框关闭后把焦点还给打开菜单的按钮。
+  const actionTrigger = useRef<HTMLElement | null>(null)
+
+  function restoreActionFocus(event: Event) {
+    event.preventDefault()
+    actionTrigger.current?.focus({ preventScroll: true })
+  }
   const normalizedQuery = query.trim().toLocaleLowerCase()
   const visibleParticipants = useMemo(
     () =>
@@ -227,6 +235,12 @@ export function GroupParticipantList({
                             type="button"
                             variant="ghost"
                             size="icon-sm"
+                            onPointerDown={(event) => {
+                              actionTrigger.current = event.currentTarget
+                            }}
+                            onKeyDown={(event) => {
+                              actionTrigger.current = event.currentTarget
+                            }}
                             aria-label={t("groupMemberMore", {
                               name: participant.displayName,
                             })}
@@ -253,6 +267,9 @@ export function GroupParticipantList({
                                 >
                                   {t("groupTransferOwner")}
                                 </DropdownMenuItem>
+                              ) : null}
+                              {participant.identityType === OrganizationIdentityType.OrganizationIdentityTypeUser ? (
+                                <DropdownMenuSeparator />
                               ) : null}
                               <DropdownMenuItem
                                 destructive
@@ -290,6 +307,7 @@ export function GroupParticipantList({
         destructive={false}
         onOpenChange={(open) => !open && setTransferring(null)}
         onConfirm={() => void transferOwner()}
+        onCloseAutoFocus={restoreActionFocus}
       />
 
       <ConfirmationDialog
@@ -301,6 +319,7 @@ export function GroupParticipantList({
         description={t("groupRemoveMemberDescription")}
         onOpenChange={(open) => !open && setRemoving(null)}
         onConfirm={() => void removeMember()}
+        onCloseAutoFocus={restoreActionFocus}
       />
 
       <ConfirmationDialog
@@ -310,6 +329,7 @@ export function GroupParticipantList({
         description={t("groupLeaveDescription")}
         onOpenChange={(open) => !open && setLeaving(null)}
         onConfirm={() => void leaveGroup()}
+        onCloseAutoFocus={restoreActionFocus}
       />
     </div>
   )

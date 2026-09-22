@@ -40,6 +40,7 @@ const knowledgeBase = {
     contentRequired: "Enter the content",
     saveSuccess: "Document saved",
     saveError: "Could not save the document. Try again.",
+    loadError: "Could not load the document. Try again.",
     sourceUnsupported: "This document source cannot be edited here.",
     sources: {
       file: "Uploaded file",
@@ -215,7 +216,6 @@ const knowledgeBase = {
     name: "Knowledge base name",
     description: "Description",
     createSuccess: "Knowledge base created.",
-    updateSuccess: "Knowledge base saved.",
     loadError: "Could not load the knowledge base.",
     saveError: "Could not save the knowledge base. Try again.",
   },

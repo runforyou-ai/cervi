@@ -1,5 +1,5 @@
 /** MCP 服务新增与编辑页。 */
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
@@ -27,8 +27,8 @@ import {
   createMCPServerSchema,
   type MCPServerFormValues,
 } from "@/features/integrations/mcp-servers/mcp-server-schema"
-import { useAutoSave } from "@/hooks/use-auto-save"
 import { resourceKeys } from "@/hooks/resource-keys"
+import { useFormSave } from "@/hooks/use-form-save"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
@@ -41,7 +41,6 @@ export function MCPServerFormPage({ mode }: { mode: "create" | "edit" }) {
   const navigate = useNavigate()
   const { mcpServerId = "" } = useParams()
   const invalidateResource = useResourceInvalidator()
-  const mounted = useRef(true)
   const [testing, setTesting] = useState(false)
   const schema = useMemo(
     () =>
@@ -67,18 +66,10 @@ export function MCPServerFormPage({ mode }: { mode: "create" | "edit" }) {
       authorizationToken: "",
     },
   })
-  const {
-    data: mcpServer,
-    loading: detailLoading,
-    refreshing: detailRefreshing,
-    error: detailError,
-    refresh,
-  } = useResource(resourceKeys.mcpServer(mcpServerId), () => getMCPServer(mcpServerId), {
+  const detail = useResource(resourceKeys.mcpServer(mcpServerId), () => getMCPServer(mcpServerId), {
     enabled: mode === "edit",
   })
-  const loading =
-    mode === "edit" && (detailLoading || (Boolean(detailError) && detailRefreshing))
-  const loadError = mode === "edit" && Boolean(detailError) && !loading
+  const mcpServer = detail.data
 
   /** 详情就绪后回填 MCP 服务表单。 */
   useEffect(() => {
@@ -90,13 +81,6 @@ export function MCPServerFormPage({ mode }: { mode: "create" | "edit" }) {
       authorizationToken: mcpServer.authorizationToken,
     })
   }, [mcpServer, form])
-
-  useEffect(() => {
-    mounted.current = true
-    return () => {
-      mounted.current = false
-    }
-  }, [])
 
   /** 测试当前未保存的连接配置。 */
   async function testConnection() {
@@ -117,16 +101,11 @@ export function MCPServerFormPage({ mode }: { mode: "create" | "edit" }) {
 
   /** 创建或保存 MCP 服务，并由服务端提交工具更新任务。 */
   // 编辑已有服务时边改边存，新建仍由底部按钮提交并跳回列表。
-  const markSaved = useAutoSave({
+  const { submit, mounted } = useFormSave({
     form,
     schema,
-    enabled: mode === "edit",
-    save: (values) => save(values, true),
-  })
-
-  async function save(values: MCPServerFormValues, autoSaved = false) {
-    if (testing) return
-    try {
+    autoSave: mode === "edit",
+    save: async (values) => {
       await (mode === "create"
         ? createMCPServer(values)
         : updateMCPServer(mcpServerId, values))
@@ -135,38 +114,15 @@ export function MCPServerFormPage({ mode }: { mode: "create" | "edit" }) {
       }
       void invalidateResource(resourceKeys.mcpServers())
       void invalidateResource(resourceKeys.agentMCPServerOptions())
-      if (!mounted.current) return
-      if (autoSaved) {
-        markSaved(values)
-        return
-      }
-      form.reset(values)
-      toast.success(
-        mode === "create"
-          ? t("mcpServer.form.createSuccess")
-          : t("mcpServer.form.updateSuccess"),
-      )
+    },
+    onSubmitted: () => {
+      toast.success(t("mcpServer.form.createSuccess"))
       navigate(listPath)
-    } catch (requestError) {
-      if (!mounted.current) return
-      if (recoverSession(requestError, navigate)) return
-      console.warn("MCP 服务保存失败", {
-        mcp_server_id: mcpServerId,
-        mode,
-        error: requestError,
-      })
-      toast.error(
-        isApiError(requestError)
-          ? apiErrorMessage(requestError, [
-              "name",
-              "url",
-              "serverType",
-              "authorizationToken",
-            ])
-          : t("mcpServer.form.saveError"),
-      )
-    }
-  }
+    },
+    errorMessage: t("mcpServer.form.saveError"),
+    errorFields: ["name", "url", "serverType", "authorizationToken"],
+    logLabel: "MCP 服务保存",
+  })
 
   const title =
     mode === "create" ? t("mcpServer.form.createTitle") : t("mcpServer.form.editTitle")
@@ -185,14 +141,12 @@ export function MCPServerFormPage({ mode }: { mode: "create" | "edit" }) {
       </PageHeader>
       <PageContent variant="form">
         <ResourceContent
-          loading={loading}
-          error={Boolean(loadError)}
+          resources={mode === "edit" ? detail : []}
           errorMessage={t("mcpServer.form.loadError")}
-          onRetry={() => void refresh()}
         >
           <form
             className="w-full space-y-9"
-            onSubmit={form.handleSubmit((values) => save(values))}
+            onSubmit={form.handleSubmit(submit)}
             noValidate
           >
             <FieldGroup>

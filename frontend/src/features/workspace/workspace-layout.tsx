@@ -16,7 +16,10 @@ import {
 import { useNewMessageNotifications } from "@/features/notifications/use-new-message-notifications"
 import { GlobalSearchProvider } from "@/features/inbox/global-search"
 import { SessionShell } from "@/features/session/session-shell"
-import { WorkspaceHistoryNav } from "@/features/workspace/workspace-history-nav"
+import {
+  WorkspaceHistoryNav,
+  useWorkspaceHistory,
+} from "@/features/workspace/workspace-history-nav"
 import { WorkspaceNavigationGuard } from "@/features/workspace/workspace-navigation-guard"
 import { WorkspaceNavigation } from "@/features/workspace/workspace-navigation"
 import {
@@ -71,6 +74,7 @@ function WorkspaceShell({ identity }: { identity: Identity }) {
   const rail = useWorkspaceRail()
   // Web 端的前进后退由浏览器提供，工作台只在原生端给出入口。
   const nativeHistoryNav = resolveAppPlatform() === "desktop"
+  const history = useWorkspaceHistory()
   const [attentionPending, setAttentionPending] = useState(false)
   const workspaceLocation = resolveWorkspaceLocation(location)
   const fallbackHrefRef = useRef(defaultWorkspaceHref)
@@ -263,7 +267,7 @@ function WorkspaceShell({ identity }: { identity: Identity }) {
                 collapsed={false}
                 onToggle={rail.toggleCollapsed}
               />
-              <WorkspaceHistoryNav />
+              <WorkspaceHistoryNav history={history} />
             </div>
           ) : null}
           <div aria-hidden="true" className="cervi-workspace-top-drag-region" />

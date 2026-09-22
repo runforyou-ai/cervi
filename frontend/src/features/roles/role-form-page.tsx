@@ -1,5 +1,5 @@
 /** 角色新建和详情页。 */
-import { useEffect, useMemo, useRef, useState } from "react"
+import { useEffect, useMemo, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm, useWatch } from "react-hook-form"
 import { useTranslation } from "react-i18next"
@@ -9,7 +9,6 @@ import { toast } from "sonner"
 import {
   createRole,
   getRole,
-  isApiError,
   listRoles,
   PermissionLevel,
   RoleKind,
@@ -23,12 +22,12 @@ import {
 } from "@/api"
 import { FormActions } from "@/components/form/form-actions"
 import { FormInputField } from "@/components/form/form-input-field"
-import { LoadingIndicator } from "@/components/loading-indicator"
 import { PageContent } from "@/components/page-content"
 import { PageBackButton } from "@/components/page-back-button"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
+import { ResourceContent, resourceStatus } from "@/components/resource-content"
 import { ResourceListFrame } from "@/components/resource-list"
 import {
   Table,
@@ -53,11 +52,9 @@ import {
   RoleMemberDialog,
   type RoleMemberChange,
 } from "@/features/roles/role-member-dialog"
-import { useAutoSave } from "@/hooks/use-auto-save"
 import { resourceKeys } from "@/hooks/resource-keys"
+import { useFormSave } from "@/hooks/use-form-save"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
-import { apiErrorMessage } from "@/lib/form-errors"
-import { recoverSession } from "@/lib/session-navigation"
 
 const newRoleID = "new-role"
 
@@ -84,7 +81,6 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
   const invalidateResource = useResourceInvalidator()
   const [memberDialogOpen, setMemberDialogOpen] = useState(false)
   const [memberChanges, setMemberChanges] = useState<RoleMemberChange[]>([])
-  const mounted = useRef(true)
   const catalogResource = useResource(resourceKeys.roles(), () => listRoles())
   const roleResource = useResource(
     resourceKeys.role(roleId),
@@ -97,15 +93,9 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
   )
   const definitions = catalogResource.data?.permissions ?? []
   const role = mode === "detail" ? (roleResource.data ?? null) : null
-  const loading =
-    catalogResource.loading ||
-    catalogResource.retrying ||
-    (mode === "detail" &&
-      (roleResource.loading ||
-        roleResource.retrying))
-  const loadError =
-    !loading &&
-    Boolean(catalogResource.error || (mode === "detail" && roleResource.error))
+  const resources =
+    mode === "detail" ? [catalogResource, roleResource] : [catalogResource]
+  const ready = resourceStatus(resources).status === "ready"
   const schema = useMemo(
     () =>
       createRoleSettingsSchema({
@@ -151,7 +141,7 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
 
   /** 目录和角色详情就绪后回填表单并清空成员暂存。 */
   useEffect(() => {
-    if (loading || loadError) return
+    if (!ready) return
     setMemberChanges([])
     form.reset({
       name: role
@@ -162,14 +152,7 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
       description: role ? roleDescription(role, t) : "",
       permissions: role?.permissions ?? [],
     })
-  }, [form, loadError, loading, role, t, tCommon])
-
-  useEffect(() => {
-    mounted.current = true
-    return () => {
-      mounted.current = false
-    }
-  }, [])
+  }, [form, ready, role, t, tCommon])
 
   /** 切换权限并维护管理权限对查看权限的依赖。 */
   function togglePermission(
@@ -207,41 +190,37 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
   /** 保存角色资料、权限和成员配置。 */
   // 详情页边改边存；内置管理员角色不可改，成员分配不在表单值内，单独触发保存。
   const autoSaveEnabled = mode === "detail" && !admin
-  const markSaved = useAutoSave({
+  const { submit, saveNow, reportError } = useFormSave({
     form,
     schema,
-    enabled: autoSaveEnabled,
-    save: (values) => save(values, true),
-  })
-  useEffect(() => {
-    if (!autoSaveEnabled || memberChanges.length === 0) return
-    void save(form.getValues(), true)
-  }, [autoSaveEnabled, memberChanges, form])
-
-  async function save(values: RoleSettingsFormValues, autoSaved = false) {
-    let createdRoleID = ""
-    let targetRoleID = roleId
-    try {
+    autoSave: autoSaveEnabled,
+    save: async (values) => {
+      let targetRoleID = roleId
       if (mode === "create") {
-        const created = await createRole(values)
-        createdRoleID = created.id
-        targetRoleID = created.id
+        targetRoleID = (await createRole(values)).id
         void invalidateResource(resourceKeys.roles())
       } else if (!admin) {
         await updateRole(roleId, values)
         void invalidateResource(resourceKeys.roles())
         void invalidateResource(resourceKeys.role(roleId))
       }
+      const createdRoleID = mode === "create" ? targetRoleID : ""
       if (memberChanges.length > 0) {
-        await updateRoleAssignments({
-          assignments: memberChanges.map((change) => ({
-            identityId: change.member.identityId,
-            roleId:
-              change.nextRoleID === newRoleID
-                ? targetRoleID
-                : change.nextRoleID,
-          })),
-        })
+        try {
+          await updateRoleAssignments({
+            assignments: memberChanges.map((change) => ({
+              identityId: change.member.identityId,
+              roleId:
+                change.nextRoleID === newRoleID
+                  ? targetRoleID
+                  : change.nextRoleID,
+            })),
+          })
+        } catch (error) {
+          // 角色已创建时保留创建结果，提示成员分配失败后进入新角色详情。
+          if (!createdRoleID) throw error
+          return { createdRoleID, assignmentError: error }
+        }
         void invalidateResource(resourceKeys.roles())
         void invalidateResource(resourceKeys.role())
         void invalidateResource(resourceKeys.users())
@@ -249,11 +228,15 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
         void invalidateResource(resourceKeys.roleMembers())
         void invalidateResource(resourceKeys.customerServiceAssignees())
       }
-      if (!mounted.current) return
-      form.reset(values)
-      setMemberChanges([])
-      if (autoSaved) {
-        markSaved(values)
+      return { createdRoleID, assignmentError: null }
+    },
+    onSaved: ({ assignmentError }) => {
+      if (!assignmentError) setMemberChanges([])
+    },
+    onSubmitted: ({ createdRoleID, assignmentError }) => {
+      if (assignmentError) {
+        if (!reportError(assignmentError))
+          navigate(`/settings/roles/${createdRoleID}`)
         return
       }
       toast.success(
@@ -262,24 +245,16 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
           : t("roles.form.updateSuccess"),
       )
       navigate("/settings/roles")
-    } catch (requestError) {
-      if (!mounted.current) return
-      if (recoverSession(requestError, navigate)) return
-      console.warn("保存角色失败", {
-        role_id: targetRoleID,
-        error: requestError,
-      })
-      if (isApiError(requestError)) {
-        toast.error(
-          apiErrorMessage(requestError, ["name", "description", "permissions"]),
-        )
-        if (createdRoleID) navigate(`/settings/roles/${createdRoleID}`)
-        return
-      }
-      toast.error(t("roles.form.saveError"))
-      if (createdRoleID) navigate(`/settings/roles/${createdRoleID}`)
-    }
-  }
+    },
+    errorMessage: t("roles.form.saveError"),
+    errorFields: ["name", "description", "permissions"],
+    logLabel: "保存角色",
+  })
+  // 成员分配不在表单值内，变更后与自动保存串行地立即保存一次。
+  useEffect(() => {
+    if (!autoSaveEnabled || memberChanges.length === 0) return
+    saveNow(true)
+  }, [autoSaveEnabled, memberChanges])
 
   const title =
     mode === "create"
@@ -330,30 +305,13 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
         {mode === "detail" ? <PageBackButton to="/settings/roles" /> : null}
       </PageHeader>
       <PageContent variant="form">
-        {loading ? (
-          <LoadingIndicator className="min-h-48 justify-center rounded-lg border">
-            {tCommon("status.loading")}
-          </LoadingIndicator>
-        ) : loadError ? (
-          <div className="flex min-h-48 flex-col items-center justify-center rounded-lg border text-center">
-            <p className="text-sm text-muted-foreground">
-              {t("roles.form.loadError")}
-            </p>
-            <Button
-              className="mt-4"
-              variant="outline"
-              onClick={() => {
-                void catalogResource.refresh()
-                if (mode === "detail") void roleResource.refresh()
-              }}
-            >
-              {tCommon("actions.retry")}
-            </Button>
-          </div>
-        ) : (
+        <ResourceContent
+          resources={resources}
+          errorMessage={t("roles.form.loadError")}
+        >
           <form
             className="w-full space-y-9"
-            onSubmit={form.handleSubmit((values) => save(values))}
+            onSubmit={form.handleSubmit(submit)}
             noValidate
           >
             <div className="space-y-5">
@@ -486,7 +444,7 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
               />
             )}
           </form>
-        )}
+        </ResourceContent>
       </PageContent>
       <RoleMemberDialog
         role={memberDialogOpen ? memberTargetRole : null}

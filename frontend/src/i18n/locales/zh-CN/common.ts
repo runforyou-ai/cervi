@@ -21,6 +21,7 @@ const common = {
     confirm: "确认",
     delete: "删除",
     deleting: "正在删除…",
+    processing: "正在处理…",
     search: "搜索",
     searchPlaceholder: "搜索…",
     searchShortcut: "搜索（Ctrl/⌘ K）",

@@ -46,11 +46,8 @@ export function RoleListPage() {
   const { t } = useTranslation("settings")
   const { t: tCommon } = useTranslation("common")
   const navigate = useNavigate()
-  const { data, loading, retrying, error, refresh } = useResource(
-    resourceKeys.roles(),
-    () => listRoles(),
-  )
-  const showLoading = loading || retrying
+  const resource = useResource(resourceKeys.roles(), () => listRoles())
+  const { data } = resource
   const roles = data?.roles ?? []
   const permissions = data?.permissions ?? []
   const maximum = data?.maximum ?? null
@@ -96,10 +93,8 @@ export function RoleListPage() {
         )}
       </PageHeader>
       <ResourceListLayout
-        loading={showLoading}
-        error={Boolean(error)}
+        resources={resource}
         errorMessage={t("roles.list.loadError")}
-        onRetry={() => void refresh()}
         frameClassName="@container"
       >
         <ResourceTable
@@ -154,8 +149,7 @@ export function RoleListPage() {
       </ResourceListLayout>
 
       <ConfirmationDialog
-        open={deletion.item !== null}
-        pending={deletion.pending}
+        {...deletion.dialog}
         title={
           deletion.item
             ? t("roles.delete.title", {
@@ -165,10 +159,6 @@ export function RoleListPage() {
         }
         description={t("roles.delete.description")}
         pendingLabel={tCommon("actions.deleting")}
-        onOpenChange={(open) => {
-          if (!open) deletion.select(null)
-        }}
-        onConfirm={() => void deletion.confirm()}
       />
     </div>
   )

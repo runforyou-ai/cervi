@@ -7,12 +7,12 @@ import { KnowledgeBaseCategory, getKnowledgeBase, listKnowledgeDocuments } from 
 import { ListToolbar, ListToolbarSearch, ListToolbarReset } from "@/components/list-toolbar"
 import { PageHeader } from "@/components/page-header"
 import { PageContent } from "@/components/page-content"
+import { ResourceContent } from "@/components/resource-content"
 import { Button } from "@/components/ui/button"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 import { useListSearchParams } from "@/hooks/use-list-search-params"
 import { useListScrollRestore } from "@/hooks/use-list-scroll-restore"
-import { KnowledgeQAFeedback } from "./knowledge-qa-feedback"
 import { KnowledgeDocumentUpload } from "./knowledge-document-upload"
 import { KnowledgeDocumentActions, type DocumentAction } from "./knowledge-document-actions"
 import { KnowledgeDocumentTable } from "./knowledge-document-table"
@@ -97,14 +97,9 @@ function KnowledgeDocumentGroupList({ baseId, groupId }: { baseId: string; group
         )}
       </ListToolbar>
       <PageContent ref={scroll.ref} onScroll={scroll.onScroll}>
-        {!base.data || !list.data ? (
-          <KnowledgeQAFeedback
-            error={base.error ?? list.error}
-            retry={() => void (base.error ? base.refresh() : list.refresh())}
-          />
-        ) : (
+        <ResourceContent resources={[base, list]} errorMessage={t("documents.loadError")}>
           <KnowledgeDocumentTable
-            data={list.data}
+            data={list.data!}
             listPath={listPath}
             search={location.search}
             filtered={Boolean(query)}
@@ -113,7 +108,7 @@ function KnowledgeDocumentGroupList({ baseId, groupId }: { baseId: string; group
             onAction={setAction}
             onPage={(value) => setParameters({ page: value === 1 ? null : String(value) })}
           />
-        )}
+        </ResourceContent>
       </PageContent>
       {action && base.data && (
         <KnowledgeDocumentActions base={base.data} action={action} onClose={() => setAction(null)} />
