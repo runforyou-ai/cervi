@@ -10,12 +10,12 @@ import (
 	"strings"
 	"time"
 
+	organizationaction "github.com/runforyou-ai/cervi/internal/actions/organization"
 	commonemail "github.com/runforyou-ai/cervi/internal/common/email"
 	commonpassword "github.com/runforyou-ai/cervi/internal/common/password"
 	"github.com/runforyou-ai/cervi/internal/common/token"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	"github.com/runforyou-ai/cervi/internal/storage/server/pgerr"
 	"github.com/runforyou-ai/cervi/internal/tenant"
 	"github.com/uptrace/bun"
 )
@@ -75,85 +75,25 @@ func (a *InstallWorkspaceAction) Execute(ctx context.Context, input InstallWorks
 		return InstallWorkspaceOutput{}, fmt.Errorf("issue installation token: %w", err)
 	}
 
-	identity := &servermodels.Identity{}
+	var identity *servermodels.Identity
 	err = a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		organization := &servermodels.Organization{AccessHost: input.AccessHost, Name: input.OrganizationName}
-		if _, err := tx.NewInsert().
-			Model(organization).
-			Column("access_host", "name").
-			Returning("id").
-			Exec(ctx); err != nil {
-			if pgerr.UniqueViolationOn(err, "organizations_access_host_unique") {
-				return ErrAlreadyInstalled
-			}
-			return err
+		created, err := organizationaction.Create(ctx, tx, organizationaction.CreateInput{
+			AccessHost:        input.AccessHost,
+			Name:              input.OrganizationName,
+			AdminDisplayName:  input.DisplayName,
+			AdminEmail:        input.Email,
+			AdminPasswordHash: passwordHash,
+			Locale:            input.Locale,
+			TimeZone:          input.TimeZone,
+		})
+		if errors.Is(err, organizationaction.ErrAccessHostTaken) {
+			return ErrAlreadyInstalled
 		}
-
-		var adminRoleID string
-		for _, kind := range domain.BuiltInRoleKinds() {
-			role := &servermodels.Role{OrganizationID: organization.ID, Kind: string(kind)}
-			if _, err := tx.NewInsert().
-				Model(role).
-				Column("organization_id", "kind").
-				Returning("id").
-				Exec(ctx); err != nil {
-				return err
-			}
-			if kind == domain.RoleKindAdmin {
-				adminRoleID = role.ID
-			}
-			permissions := domain.DefaultRolePermissions(kind)
-			if len(permissions) == 0 {
-				continue
-			}
-			records := make([]servermodels.RolePermission, 0, len(permissions))
-			for _, permission := range permissions {
-				records = append(records, servermodels.RolePermission{
-					OrganizationID: organization.ID,
-					RoleID:         role.ID,
-					Permission:     string(permission),
-				})
-			}
-			if _, err := tx.NewInsert().
-				Model(&records).
-				Column("organization_id", "role_id", "permission").
-				Exec(ctx); err != nil {
-				return err
-			}
-		}
-
-		// 企业创建者默认开启接待客户，企业初始化后即可处理客户会话。
-		organizationIdentity := &servermodels.OrganizationIdentity{
-			OrganizationID:   organization.ID,
-			Type:             string(domain.OrganizationIdentityTypeUser),
-			RoleID:           adminRoleID,
-			DisplayName:      input.DisplayName,
-			HandlesCustomers: true,
-			WorkStatus:       string(domain.WorkStatusWorking),
-		}
-		if _, err := tx.NewInsert().Model(organizationIdentity).
-			Column("organization_id", "type", "role_id", "display_name", "handles_customers", "work_status").
-			Returning("id, work_status, work_status_updated_at").Exec(ctx); err != nil {
-			return err
-		}
-		user := &servermodels.User{
-			IdentityID:     organizationIdentity.ID,
-			OrganizationID: organization.ID,
-			Email:          input.Email,
-			PasswordHash:   passwordHash,
-			Status:         string(domain.UserStatusActive),
-			Locale:         string(input.Locale),
-			TimeZone:       input.TimeZone,
-		}
-		if _, err := tx.NewInsert().
-			Model(user).
-			Column("identity_id", "organization_id", "email", "password_hash", "status", "locale", "time_zone").
-			Returning("id, message_notifications_enabled").
-			Exec(ctx); err != nil {
+		if err != nil {
 			return err
 		}
 		record := &servermodels.Token{
-			UserID:    user.ID,
+			UserID:    created.User.ID,
 			TokenHash: issued.TokenHash,
 			ExpiresAt: issued.ExpiresAt,
 		}
@@ -163,10 +103,7 @@ func (a *InstallWorkspaceAction) Execute(ctx context.Context, input InstallWorks
 			Exec(ctx); err != nil {
 			return err
 		}
-
-		identity.Organization = *organization
-		identity.OrganizationIdentity = *organizationIdentity
-		identity.User = *user
+		identity = created
 		return nil
 	})
 	if err != nil {

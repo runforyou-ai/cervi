@@ -35,11 +35,12 @@ type Config struct {
 	Storage       StorageConfig    `yaml:"storage"`
 }
 
-// DeploymentConfig 定义部署形态及官方托管所需的域名后缀和运营凭据。
+// DeploymentConfig 定义部署形态及官方托管所需的域名后缀、运营凭据和可信官方身份服务。
 type DeploymentConfig struct {
-	Mode                domain.DeploymentMode `yaml:"mode"`
-	ManagedDomainSuffix string                `yaml:"managedDomainSuffix"`
-	OperatorCredential  string                `yaml:"operatorCredential"`
+	Mode                   domain.DeploymentMode `yaml:"mode"`
+	ManagedDomainSuffix    string                `yaml:"managedDomainSuffix"`
+	OperatorCredential     string                `yaml:"operatorCredential"`
+	OfficialIdentityIssuer string                `yaml:"officialIdentityIssuer"`
 }
 
 // ServerConfig 定义 HTTP 服务监听配置。
@@ -116,6 +117,7 @@ func (config *Config) normalize() {
 	config.Deployment.Mode = domain.DeploymentMode(strings.ToLower(strings.TrimSpace(string(config.Deployment.Mode))))
 	config.Deployment.ManagedDomainSuffix = strings.ToLower(strings.Trim(strings.TrimSpace(config.Deployment.ManagedDomainSuffix), "."))
 	config.Deployment.OperatorCredential = strings.TrimSpace(config.Deployment.OperatorCredential)
+	config.Deployment.OfficialIdentityIssuer = strings.TrimSpace(config.Deployment.OfficialIdentityIssuer)
 	config.Server.Host = strings.TrimSpace(config.Server.Host)
 	config.Database.Host = strings.TrimSpace(config.Database.Host)
 	config.Database.User = strings.TrimSpace(config.Database.User)
@@ -156,6 +158,7 @@ func applyEnvironment(config *Config) error {
 	applyDeploymentModeEnvironment("DEPLOYMENT_MODE", &config.Deployment.Mode)
 	applyStringEnvironment("MANAGED_DOMAIN_SUFFIX", &config.Deployment.ManagedDomainSuffix)
 	applyStringEnvironment("OPERATOR_CREDENTIAL", &config.Deployment.OperatorCredential)
+	applyStringEnvironment("OFFICIAL_IDENTITY_ISSUER", &config.Deployment.OfficialIdentityIssuer)
 	applyStringEnvironment("WAILS_SERVER_HOST", &config.Server.Host)
 	applyStringEnvironment("TLS_MODE", &config.TLS.Mode)
 	applyStringEnvironment("TLS_ACME_EMAIL", &config.TLS.ACMEEmail)
@@ -285,8 +288,8 @@ func (config DeploymentConfig) validate() error {
 		return fmt.Errorf("deployment.mode 必须是 self_hosted 或 managed")
 	}
 	if !config.Mode.Managed() {
-		if config.ManagedDomainSuffix != "" || config.OperatorCredential != "" {
-			return fmt.Errorf("deployment.managedDomainSuffix 和 deployment.operatorCredential 只在 managed 模式下使用")
+		if config.ManagedDomainSuffix != "" || config.OperatorCredential != "" || config.OfficialIdentityIssuer != "" {
+			return fmt.Errorf("deployment.managedDomainSuffix、deployment.operatorCredential 和 deployment.officialIdentityIssuer 只在 managed 模式下使用")
 		}
 		return nil
 	}
@@ -295,6 +298,11 @@ func (config DeploymentConfig) validate() error {
 	}
 	if len([]rune(config.OperatorCredential)) < operatorCredentialMinLength {
 		return fmt.Errorf("deployment.operatorCredential 至少需要 %d 个字符", operatorCredentialMinLength)
+	}
+	// 官方身份服务的 issuer 是不带凭据、查询和片段的 HTTPS 地址，按原样与 ID Token 的 iss 比对。
+	issuer, err := url.Parse(config.OfficialIdentityIssuer)
+	if err != nil || issuer.Scheme != "https" || issuer.Host == "" || issuer.User != nil || issuer.RawQuery != "" || issuer.Fragment != "" {
+		return fmt.Errorf("deployment.officialIdentityIssuer 必须是完整的 HTTPS 地址")
 	}
 	return nil
 }

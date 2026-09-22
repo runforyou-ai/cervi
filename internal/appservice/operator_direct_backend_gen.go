@@ -15,3 +15,53 @@ func (b *OperatorDirectBackend) LoadDeployment(ctx context.Context, meta Operato
 	}
 	return withNormalizedSlices(b.ops.LoadDeployment(ctx, meta, identity))
 }
+
+// CheckDomainAvailability 返回域名前缀在查询时刻是否可用。
+func (b *OperatorDirectBackend) CheckDomainAvailability(ctx context.Context, meta OperatorRequestMeta, input OperatorDomainAvailabilityInput) (OperatorDomainAvailability, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero OperatorDomainAvailability
+		return zero, err
+	}
+	return withNormalizedSlices(b.ops.CheckDomainAvailability(ctx, meta, identity, input))
+}
+
+// ProvisionOrganization 按开通标识幂等地创建企业、初始成员和初始权益。
+func (b *OperatorDirectBackend) ProvisionOrganization(ctx context.Context, meta OperatorRequestMeta, input OperatorProvisionInput) (OperatorProvisioning, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero OperatorProvisioning
+		return zero, err
+	}
+	return withNormalizedSlices(b.ops.ProvisionOrganization(ctx, meta, identity, input))
+}
+
+// GetProvisioning 返回开通标识对应企业的当前状态。
+func (b *OperatorDirectBackend) GetProvisioning(ctx context.Context, meta OperatorRequestMeta, provisioningID string) (OperatorProvisioning, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero OperatorProvisioning
+		return zero, err
+	}
+	return withNormalizedSlices(b.ops.GetProvisioning(ctx, meta, identity, provisioningID))
+}
+
+// ListOrganizations 按条件分页返回企业摘要。
+func (b *OperatorDirectBackend) ListOrganizations(ctx context.Context, meta OperatorRequestMeta, input OperatorOrganizationListInput) (OperatorOrganizationList, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero OperatorOrganizationList
+		return zero, err
+	}
+	return withNormalizedSlices(b.ops.ListOrganizations(ctx, meta, identity, input))
+}
+
+// GetOrganization 返回企业摘要与状态。
+func (b *OperatorDirectBackend) GetOrganization(ctx context.Context, meta OperatorRequestMeta, organizationID string) (OperatorOrganization, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero OperatorOrganization
+		return zero, err
+	}
+	return withNormalizedSlices(b.ops.GetOrganization(ctx, meta, identity, organizationID))
+}
