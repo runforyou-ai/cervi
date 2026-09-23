@@ -3,19 +3,19 @@ import { useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
-import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
   ContactMethodType,
   ContactStage,
   createContact,
-  isApiError,
   type ChannelOption,
   type ContactDetail,
   type ContactInput,
 } from "@/api"
-import { recoverSession } from "@/lib/session-navigation"
+import { useFormSave } from "@/hooks/use-form-save"
+import { resourceKeys } from "@/hooks/resource-keys"
+import { useResourceInvalidator } from "@/hooks/use-resource"
 import { FormInputField } from "@/components/form/form-input-field"
 import { FormActions } from "@/components/form/form-actions"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
@@ -27,7 +27,6 @@ import {
   createContactSchema,
   type ContactFormValues,
 } from "@/features/contacts/external/contact-schema"
-import { apiErrorMessage } from "@/lib/form-errors"
 
 /** 创建联系人。 */
 export function ContactForm({
@@ -40,7 +39,7 @@ export function ContactForm({
   onCancel: () => void
 }) {
   const { t } = useTranslation(["contacts", "common"])
-  const navigate = useNavigate()
+  const invalidate = useResourceInvalidator()
   const schema = useMemo(
     () =>
       createContactSchema({
@@ -65,39 +64,37 @@ export function ContactForm({
       notes: "",
     },
   })
-  /** 提交新建联系人。 */
-  async function submit(values: ContactFormValues) {
-    const input: ContactInput = {
-      displayName: values.displayName,
-      channelId: values.channelId,
-      stage: values.stage,
-      notes: values.notes,
-      methods: [
-        ...(values.email
-          ? [{ type: ContactMethodType.ContactMethodTypeEmail, value: values.email, label: "", isPrimary: true }]
-          : []),
-        ...(values.phone
-          ? [{ type: ContactMethodType.ContactMethodTypePhone, value: values.phone, label: "", isPrimary: true }]
-          : []),
-      ],
-    }
-    try {
+  const { submit } = useFormSave({
+    form,
+    schema,
+    autoSave: false,
+    save: async (values) => {
+      const input: ContactInput = {
+        displayName: values.displayName,
+        channelId: values.channelId,
+        stage: values.stage,
+        notes: values.notes,
+        methods: [
+          ...(values.email
+            ? [{ type: ContactMethodType.ContactMethodTypeEmail, value: values.email, label: "", isPrimary: true }]
+            : []),
+          ...(values.phone
+            ? [{ type: ContactMethodType.ContactMethodTypePhone, value: values.phone, label: "", isPrimary: true }]
+            : []),
+        ],
+      }
       const saved = await createContact(input)
+      void invalidate(resourceKeys.contacts())
+      return saved
+    },
+    onSubmitted: (saved) => {
       toast.success(t("form.created"))
       onSaved(saved)
-    } catch (error) {
-      if (recoverSession(error, navigate)) {
-        return
-      }
-      if (isApiError(error)) {
-        console.warn("创建联系人失败", error)
-        toast.error(apiErrorMessage(error, ["displayName", "channelId", "stage", "methods", "notes"]))
-        return
-      }
-      console.warn("创建联系人失败", error)
-      toast.error(t("form.networkError"))
-    }
-  }
+    },
+    errorMessage: t("form.networkError"),
+    errorFields: ["displayName", "channelId", "stage", "methods", "notes"],
+    logLabel: "创建联系人",
+  })
 
   return (
     <form

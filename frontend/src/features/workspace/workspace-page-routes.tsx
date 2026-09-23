@@ -1,34 +1,83 @@
 /** 定义工作台页面路由。 */
-import type { ReactElement } from "react"
+import { lazy, Suspense, type ReactElement } from "react"
+import { LoadingIndicator } from "@/components/loading-indicator"
 import { matchRoutes, useRoutes, type Location, type RouteObject } from "react-router"
 
-import { AgentFormPage } from "@/features/agents/agent-form-page"
-import { AgentListPage } from "@/features/agents/agent-list-page"
-import { AIPerformancePage } from "@/features/agents/ai-performance-page"
 import {
   AgentsModuleLayout,
   agentsModulePaths,
 } from "@/features/agents/agents-module-layout"
-import { MessageChannelFormPage } from "@/features/channels/message-channel-form-page"
-import { MessageChannelListPage } from "@/features/channels/message-channel-list-page"
-import { AssistantFormPage } from "@/features/contacts/assistants/assistant-form-page"
-import { ContactsPage } from "@/features/contacts/contacts-page"
-import { ChatRoute } from "@/features/inbox/chat-route"
-import { InboxRoute } from "@/features/inbox/inbox-route"
-import { MCPServerFormPage } from "@/features/integrations/mcp-servers/mcp-server-form-page"
-import { MCPServerListPage } from "@/features/integrations/mcp-servers/mcp-server-list-page"
-import { ModelProviderFormPage } from "@/features/integrations/model-services/model-provider-form-page"
-import { ModelProviderListPage } from "@/features/integrations/model-services/model-provider-list-page"
-import { KnowledgeDocumentListPage } from "@/features/knowledge-base/knowledge-document-list-page"
-import { KnowledgeDocumentFormPage } from "@/features/knowledge-base/knowledge-document-form-page"
-import { KnowledgeDocumentPage } from "@/features/knowledge-base/knowledge-document-page"
-import { KnowledgeQAListPage } from "@/features/knowledge-base/knowledge-qa-list-page"
-import { KnowledgeQAFormPage } from "@/features/knowledge-base/knowledge-qa-form-page"
-import { KnowledgeBaseFormPage } from "@/features/knowledge-base/knowledge-base-form-page"
-import { KnowledgeBaseListPage } from "@/features/knowledge-base/knowledge-base-list-page"
-import { RoleFormPage } from "@/features/roles/role-form-page"
-import { MemberFormPage } from "@/features/settings/members/member-form-page"
-import { SettingsPage } from "@/features/settings/settings-page"
+
+// 页面组件在所属路由首次进入时加载。
+const AgentFormPage = lazy(() =>
+  import("@/features/agents/agent-form-page").then((module) => ({ default: module.AgentFormPage })),
+)
+const AgentListPage = lazy(() =>
+  import("@/features/agents/agent-list-page").then((module) => ({ default: module.AgentListPage })),
+)
+const AIPerformancePage = lazy(() =>
+  import("@/features/agents/ai-performance-page").then((module) => ({ default: module.AIPerformancePage })),
+)
+const MessageChannelFormPage = lazy(() =>
+  import("@/features/channels/message-channel-form-page").then((module) => ({ default: module.MessageChannelFormPage })),
+)
+const MessageChannelListPage = lazy(() =>
+  import("@/features/channels/message-channel-list-page").then((module) => ({ default: module.MessageChannelListPage })),
+)
+const AssistantFormPage = lazy(() =>
+  import("@/features/contacts/assistants/assistant-form-page").then((module) => ({ default: module.AssistantFormPage })),
+)
+const ContactsPage = lazy(() =>
+  import("@/features/contacts/contacts-page").then((module) => ({ default: module.ContactsPage })),
+)
+const ChatRoute = lazy(() =>
+  import("@/features/inbox/chat-route").then((module) => ({ default: module.ChatRoute })),
+)
+const InboxRoute = lazy(() =>
+  import("@/features/inbox/inbox-route").then((module) => ({ default: module.InboxRoute })),
+)
+const MCPServerFormPage = lazy(() =>
+  import("@/features/integrations/mcp-servers/mcp-server-form-page").then((module) => ({ default: module.MCPServerFormPage })),
+)
+const MCPServerListPage = lazy(() =>
+  import("@/features/integrations/mcp-servers/mcp-server-list-page").then((module) => ({ default: module.MCPServerListPage })),
+)
+const ModelProviderFormPage = lazy(() =>
+  import("@/features/integrations/model-services/model-provider-form-page").then((module) => ({ default: module.ModelProviderFormPage })),
+)
+const ModelProviderListPage = lazy(() =>
+  import("@/features/integrations/model-services/model-provider-list-page").then((module) => ({ default: module.ModelProviderListPage })),
+)
+const KnowledgeDocumentListPage = lazy(() =>
+  import("@/features/knowledge-base/knowledge-document-list-page").then((module) => ({ default: module.KnowledgeDocumentListPage })),
+)
+const KnowledgeDocumentFormPage = lazy(() =>
+  import("@/features/knowledge-base/knowledge-document-form-page").then((module) => ({ default: module.KnowledgeDocumentFormPage })),
+)
+const KnowledgeDocumentPage = lazy(() =>
+  import("@/features/knowledge-base/knowledge-document-page").then((module) => ({ default: module.KnowledgeDocumentPage })),
+)
+const KnowledgeQAListPage = lazy(() =>
+  import("@/features/knowledge-base/knowledge-qa-list-page").then((module) => ({ default: module.KnowledgeQAListPage })),
+)
+const KnowledgeQAFormPage = lazy(() =>
+  import("@/features/knowledge-base/knowledge-qa-form-page").then((module) => ({ default: module.KnowledgeQAFormPage })),
+)
+const KnowledgeBaseFormPage = lazy(() =>
+  import("@/features/knowledge-base/knowledge-base-form-page").then((module) => ({ default: module.KnowledgeBaseFormPage })),
+)
+const KnowledgeBaseListPage = lazy(() =>
+  import("@/features/knowledge-base/knowledge-base-list-page").then((module) => ({ default: module.KnowledgeBaseListPage })),
+)
+const RoleFormPage = lazy(() =>
+  import("@/features/roles/role-form-page").then((module) => ({ default: module.RoleFormPage })),
+)
+const MemberFormPage = lazy(() =>
+  import("@/features/settings/members/member-form-page").then((module) => ({ default: module.MemberFormPage })),
+)
+const SettingsPage = lazy(() =>
+  import("@/features/settings/settings-page").then((module) => ({ default: module.SettingsPage })),
+)
 
 /** 需要公共外壳的路由前缀，同一前缀下的页面渲染在对应布局内。 */
 const workspaceRouteLayouts = agentsModulePaths.map((prefix) => ({
@@ -332,5 +381,10 @@ export function resolveWorkspaceLocation(
 
 /** 按指定地址渲染一份工作台页面树。 */
 export function WorkspacePageRoutes({ location }: { location: string }) {
-  return useRoutes(workspaceRouteObjects, location)
+  const page = useRoutes(workspaceRouteObjects, location)
+  return (
+    <Suspense fallback={<LoadingIndicator className="min-h-48 justify-center" />}>
+      {page}
+    </Suspense>
+  )
 }

@@ -844,8 +844,7 @@ func testChannelEditVersusDeactivation(t *testing.T, f handoffFixture) {
 	}()
 	waitChatSignal(t, ctx, gate.reached)
 	go func() {
-		_, err := channelaction.NewUpdateMessageChannelAction(f.db).Execute(ctx, editor.Identity, channelID, channelaction.MessageChannelInput{
-			Name: "渠道编辑并发", DefaultLocale: domain.LocaleChineseSimplified,
+		_, err := channelaction.NewUpdateMessageChannelAction(f.db).ExecuteReception(ctx, editor.Identity, channelID, channelaction.MessageChannelReceptionInput{
 			NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypeMember, ID: agent.IdentityID},
 			FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 		})

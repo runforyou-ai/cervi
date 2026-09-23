@@ -24,8 +24,8 @@ import {
   FieldLabel,
 } from "@/components/ui/field"
 import { Textarea } from "@/components/ui/textarea"
-import { AgentModelField } from "@/features/agents/agent-model-field"
-import { parseAgentModelSelection } from "@/features/agents/agent-model-selection"
+import { AgentModelField } from "@/components/agent-fields/agent-model-field"
+import { parseAgentModelSelection } from "@/lib/agent-model-selection"
 import {
   createAgentSchema,
   type AgentFormValues,

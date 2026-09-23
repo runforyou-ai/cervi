@@ -3,18 +3,14 @@ import { useEffect, useMemo, useRef, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { LoaderCircleIcon } from "lucide-react"
 import {
-  Controller,
-  type FieldErrors,
   useFieldArray,
   useForm,
-  useWatch,
 } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { Navigate, useNavigate, useParams } from "react-router"
 import { toast } from "sonner"
 
 import {
-  AIModelInputModality,
   AIModelType,
   AIProviderBrand,
   AIProviderCredentialType,
@@ -24,30 +20,20 @@ import {
   listAIProviders,
   testAIProviderConnection,
   updateAIProvider,
-  type AIProviderBrandId,
 } from "@/api"
-import { ConfirmationDialog } from "@/components/confirmation-dialog"
 import { FormActions } from "@/components/form/form-actions"
-import { FormInputField } from "@/components/form/form-input-field"
-import { FormValidationMessage } from "@/components/form/form-validation-message"
 import { ResourceContent } from "@/components/resource-content"
 import { PageContent } from "@/components/page-content"
 import { PageBackButton } from "@/components/page-back-button"
 import { PageHeader } from "@/components/page-header"
 import { Button } from "@/components/ui/button"
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { NativeSelect } from "@/components/ui/native-select"
 import {
-  ModelEditDialog,
   useAIModelSchemaMessages,
 } from "@/features/integrations/model-services/model-edit-dialog"
-import { ModelProviderBrandIcon } from "@/features/integrations/model-services/model-provider-brand-icon"
-import { ModelPickerDialog } from "@/features/integrations/model-services/model-picker-dialog"
 import {
   aiProviderBrandConfigs,
   aiProviderBrandOrder,
 } from "@/features/integrations/model-services/model-provider-brands"
-import { ModelProviderModelList } from "@/features/integrations/model-services/model-provider-model-list"
 import {
   modelFormValue,
   rollbackModels,
@@ -64,20 +50,8 @@ import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
-/** 返回模型目录中的第一条字段校验提示。 */
-function modelValidationMessage(errors: FieldErrors<AIProviderFormValues>["models"]) {
-  if (!errors) return ""
-  if (typeof errors.message === "string") return errors.message
-  if (typeof errors.root?.message === "string") return errors.root.message
-  if (!Array.isArray(errors)) return ""
-  for (const model of errors) {
-    if (!model) continue
-    const error =
-      model.identifier ?? model.name ?? model.contextWindow ?? model.maxOutputTokens
-    if (typeof error?.message === "string") return error.message
-  }
-  return ""
-}
+import { ModelProviderModelEditor } from "./model-provider-model-editor"
+import { ModelProviderConnectionFields } from "./model-provider-connection-fields"
 
 const listPath = "/settings/model-services"
 
@@ -88,11 +62,6 @@ export function ModelProviderFormPage({ mode }: { mode: "create" | "edit" }) {
   const { providerId = "", brand: routeBrand = "" } = useParams()
   const invalidateResource = useResourceInvalidator()
   const [testingConnection, setTestingConnection] = useState(false)
-  const [editingModel, setEditingModel] = useState<{
-    index: number | null
-    model: AIModelFormValues
-  } | null>(null)
-  const [removingModel, setRemovingModel] = useState<number | null>(null)
   const createBrand = aiProviderBrandOrder.find((brand) => brand === routeBrand) ?? null
   const initialBrand = createBrand ?? AIProviderBrand.AIProviderBrandDeepSeek
   const modelMessages = useAIModelSchemaMessages()
@@ -155,67 +124,24 @@ export function ModelProviderFormPage({ mode }: { mode: "create" | "edit" }) {
     form.setValue("name", name)
   }, [form, initialBrand, mode, providers.data, t])
 
+  const initializedDetail = useRef<string | null>(null)
   /** 详情就绪后回填供应商表单。 */
   useEffect(() => {
     if (!provider) return
+    if (initializedDetail.current === providerId && form.formState.isDirty) return
+    initializedDetail.current = providerId
     savedModels.current = provider.models.map(modelFormValue)
-    form.reset({
+    const values = {
       brand: provider.brand,
       name: provider.name,
       credentialType: provider.credentialType,
       apiKey: provider.apiKey,
       apiUrl: provider.apiUrl,
       models: provider.models.map(modelFormValue),
-    })
+    }
+    form.reset(values)
+    markSaved(values)
   }, [form, provider])
-
-  const watchedModels = useWatch({ control: form.control, name: "models" })
-  // 编辑中的模型不与自身标识冲突。
-  const takenIdentifiers = useMemo(
-    () =>
-      new Set(
-        watchedModels
-          .filter((_, index) => index !== editingModel?.index)
-          .map((model) => model.identifier.trim()),
-      ),
-    [watchedModels, editingModel],
-  )
-
-  /** 打开弹窗添加一个文本输入的自定义对话模型。 */
-  function addCustomModel() {
-    setEditingModel({
-      index: null,
-      model: {
-        identifier: "",
-        name: "",
-        type: AIModelType.AIModelTypeChat,
-        inputModalities: [AIModelInputModality.AIModelInputModalityText],
-        contextWindow: "",
-        maxOutputTokens: "",
-      },
-    })
-  }
-
-  /** 修改模型目录；编辑已保存的供应商时立即校验目录，不合法时显示提示并等待补全后自动保存。 */
-  function changeModels(change: () => void) {
-    change()
-    if (mode === "edit") void form.trigger("models")
-  }
-
-  /** 保存弹窗中的模型：新增时追加，编辑时替换原位置。 */
-  function saveModel(model: AIModelFormValues) {
-    const index = editingModel?.index ?? null
-    changeModels(() =>
-      index === null ? modelFields.append(model) : modelFields.update(index, model),
-    )
-    setEditingModel(null)
-  }
-
-  /** 移除模型；已保存的供应商在确认后移除。 */
-  function removeModel(index: number) {
-    if (mode === "edit") setRemovingModel(index)
-    else modelFields.remove(index)
-  }
 
   /** 使用当前未保存的地址和密钥测试模型服务连接。 */
   async function testConnection() {
@@ -251,7 +177,7 @@ export function ModelProviderFormPage({ mode }: { mode: "create" | "edit" }) {
 
   /** 创建或保存模型服务供应商。 */
   // 编辑已有供应商时边改边存，新建仍由底部按钮提交并跳回列表。
-  const { submit, mounted } = useFormSave({
+  const { submit, mounted, markSaved } = useFormSave({
     form,
     schema,
     autoSave: mode === "edit",
@@ -307,14 +233,6 @@ export function ModelProviderFormPage({ mode }: { mode: "create" | "edit" }) {
     mode === "create"
       ? t("modelServices.form.createTitle")
       : t("modelServices.form.editTitle")
-  const modelErrorMessage = modelValidationMessage(form.formState.errors.models)
-  const watchedBrand = form.watch("brand") as AIProviderBrandId
-  const brandConfig = aiProviderBrandConfigs[watchedBrand]
-  const brandName = t(brandConfig.nameKey)
-  const usesAPIKey =
-    form.watch("credentialType") ===
-    AIProviderCredentialType.AIProviderCredentialTypeAPIKey
-
   if (mode === "create" && !createBrand) return <Navigate to={listPath} replace />
 
   return (
@@ -339,126 +257,9 @@ export function ModelProviderFormPage({ mode }: { mode: "create" | "edit" }) {
             onSubmit={form.handleSubmit(submit)}
             noValidate
           >
-            <FieldGroup>
-              <Field>
-                <FieldLabel>{t("modelServices.form.brand")}</FieldLabel>
-                <div className="flex h-9 items-center gap-2 text-sm">
-                  <ModelProviderBrandIcon brand={watchedBrand} className="size-7 rounded-md [&>svg]:size-4" />
-                  {brandName}
-                </div>
-              </Field>
-              <FormInputField
-                name="name"
-                control={form.control}
-                label={t("modelServices.form.name")}
-                autoFocus={mode === "create"}
-              />
-              {brandConfig.supportsNoCredential ? (
-                <Controller
-                  name="credentialType"
-                  control={form.control}
-                  render={({ field, fieldState }) => (
-                    <Field data-invalid={fieldState.invalid}>
-                      <FieldLabel htmlFor="model-provider-credential-type" required>
-                        {t("modelServices.form.credentialType")}
-                      </FieldLabel>
-                      <NativeSelect
-                        {...field}
-                        id="model-provider-credential-type"
-                        required
-                        aria-invalid={fieldState.invalid}
-                        onChange={(event) => {
-                          const next = event.target
-                            .value as AIProviderFormValues["credentialType"]
-                          field.onChange(next)
-                          // 不需要凭据的服务不保留已填写的密钥。
-                          if (
-                            next ===
-                            AIProviderCredentialType.AIProviderCredentialTypeNone
-                          ) {
-                            form.setValue("apiKey", "", { shouldDirty: true })
-                          }
-                        }}
-                      >
-                        <option
-                          value={
-                            AIProviderCredentialType.AIProviderCredentialTypeAPIKey
-                          }
-                        >
-                          {t("modelServices.form.credentialTypes.apiKey")}
-                        </option>
-                        <option
-                          value={AIProviderCredentialType.AIProviderCredentialTypeNone}
-                        >
-                          {t("modelServices.form.credentialTypes.none")}
-                        </option>
-                      </NativeSelect>
-                    </Field>
-                  )}
-                />
-              ) : null}
-              {usesAPIKey ? (
-                <FormInputField
-                  name="apiKey"
-                  control={form.control}
-                  label={t("modelServices.form.apiKey")}
-                  autoComplete="off"
-                  passwordVisibilityLabels={{
-                    show: t("modelServices.form.showAPIKey"),
-                    hide: t("modelServices.form.hideAPIKey"),
-                  }}
-                />
-              ) : null}
-              <FormInputField
-                name="apiUrl"
-                control={form.control}
-                label={t("modelServices.form.apiUrl")}
-                inputMode="url"
-              />
-            </FieldGroup>
+            <ModelProviderConnectionFields form={form} mode={mode} />
 
-            <section className="relative">
-              <div className="mb-3 flex items-center justify-between gap-3">
-                <h3 className="flex items-center gap-2 text-sm font-medium">
-                  {t("modelServices.models.title")}
-                  <span aria-hidden="true" className="text-destructive">
-                    *
-                  </span>
-                </h3>
-                <div className="flex items-center gap-3">
-                  <Button
-                    type="button"
-                    variant="link"
-                    size="sm"
-                    className="h-auto p-0"
-                    onClick={addCustomModel}
-                  >
-                    {t("modelServices.models.manualAdd")}
-                  </Button>
-                  <ModelPickerDialog
-                    form={form}
-                    onAppend={(models) => changeModels(() => modelFields.append(models))}
-                  />
-                </div>
-              </div>
-              <ModelProviderModelList
-                models={modelFields.fields.map((field, index) => ({
-                  key: field.id,
-                  model: watchedModels[index] ?? field,
-                }))}
-                removable={mode === "create" || modelFields.fields.length > 1}
-                onEdit={(index) =>
-                  setEditingModel({ index, model: form.getValues(`models.${index}`) })
-                }
-                onRemove={removeModel}
-              />
-              {/* 校验提示使用表单分区间距，不改变操作按钮位置。 */}
-              <FormValidationMessage
-                className="absolute top-full right-0 left-0 mt-2"
-                message={modelErrorMessage}
-              />
-            </section>
-
+            <ModelProviderModelEditor form={form} modelFields={modelFields} mode={mode} />
             <FormActions
               saving={form.formState.isSubmitting}
               disabled={testingConnection}
@@ -481,33 +282,6 @@ export function ModelProviderFormPage({ mode }: { mode: "create" | "edit" }) {
         </ResourceContent>
       </PageContent>
 
-      <ModelEditDialog
-        editing={
-          editingModel
-            ? { creating: editingModel.index === null, model: editingModel.model }
-            : null
-        }
-        takenIdentifiers={takenIdentifiers}
-        onOpenChange={(open) => !open && setEditingModel(null)}
-        onSave={saveModel}
-      />
-      <ConfirmationDialog
-        open={removingModel !== null}
-        pending={false}
-        title={
-          removingModel !== null
-            ? t("modelServices.models.removeTitle", {
-                name: watchedModels[removingModel]?.name ?? "",
-              })
-            : ""
-        }
-        description={t("modelServices.models.removeDescription")}
-        onOpenChange={(open) => !open && setRemovingModel(null)}
-        onConfirm={() => {
-          if (removingModel !== null) changeModels(() => modelFields.remove(removingModel))
-          setRemovingModel(null)
-        }}
-      />
     </div>
   )
 }

@@ -798,13 +798,23 @@ func (b *DirectBackend) CreateMessageChannel(ctx context.Context, meta RequestMe
 }
 
 // UpdateMessageChannel 修改消息渠道基础信息。
-func (b *DirectBackend) UpdateMessageChannel(ctx context.Context, meta RequestMeta, channelID string, input MessageChannelInput) (MessageChannelSummary, error) {
+func (b *DirectBackend) UpdateMessageChannel(ctx context.Context, meta RequestMeta, channelID string, input MessageChannelBasicsInput) (MessageChannelSummary, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
 	if err != nil {
 		var zero MessageChannelSummary
 		return zero, err
 	}
 	return b.ops.UpdateMessageChannel(ctx, meta, identity, channelID, input)
+}
+
+// UpdateMessageChannelReception 修改消息渠道接待设置。
+func (b *DirectBackend) UpdateMessageChannelReception(ctx context.Context, meta RequestMeta, channelID string, input MessageChannelReceptionInput) (MessageChannelSummary, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero MessageChannelSummary
+		return zero, err
+	}
+	return b.ops.UpdateMessageChannelReception(ctx, meta, identity, channelID, input)
 }
 
 // UpdateWebsiteChannelChatInterface 修改网站渠道聊天界面。

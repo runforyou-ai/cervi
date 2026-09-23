@@ -128,8 +128,7 @@ func TestServiceSessionTeamQueue(t *testing.T) {
 	updateChannel := channelaction.NewUpdateMessageChannelAction(f.db)
 	route := func(target channelaction.RoutingTarget) {
 		t.Helper()
-		if _, err := updateChannel.Execute(ctx, f.owner, f.channelID, channelaction.MessageChannelInput{
-			Name: "客服未读测试", DefaultLocale: domain.LocaleChineseSimplified,
+		if _, err := updateChannel.ExecuteReception(ctx, f.owner, f.channelID, channelaction.MessageChannelReceptionInput{
 			NewConversationTarget: target,
 			FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 		}); err != nil {

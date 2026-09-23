@@ -1,4 +1,5 @@
 /** 客户会话的 AI 助手：切换和新建 Copilot 线程，在线程中提问并把 AI 回复填入对客草稿；桌面侧栏与移动端子页共用线程状态和对话视图。 */
+import type { ComposerDraftBridge } from "@/features/inbox/conversation-composer-types"
 import { useEffect, useRef, useState, type RefObject } from "react"
 import { ChevronDownIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
@@ -26,7 +27,6 @@ import { NativeSelect } from "@/components/ui/native-select"
 import { useWorkspace } from "@/contexts/workspace-context"
 import {
   ConversationComposer,
-  type ComposerDraftBridge,
 } from "@/features/inbox/conversation-composer"
 import { ConversationTimeline } from "@/features/inbox/conversation-timeline"
 import { selectCustomerReplyAgentID } from "@/features/inbox/customer-reply-agent"

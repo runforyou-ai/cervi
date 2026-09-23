@@ -50,27 +50,27 @@ export function ProfileSettingsForm({ user }: { user: CurrentUser }) {
     },
   })
   /** 保存个人资料并刷新当前身份。 */
-  const { markSaved } = useAutoSave({ form, schema, save })
+  const { acceptSaved, saveNow } = useAutoSave({ form, schema, save })
 
   async function save(values: ProfileSettingsFormValues) {
-    let uploadingAvatar = false
+    let avatarFileId: string
     try {
-      uploadingAvatar = Boolean(pendingAvatar && !pendingAvatar.fileID)
-      const avatarFileId = await avatar.ensureUploaded()
-      uploadingAvatar = false
+      avatarFileId = await avatar.ensureUploaded()
+    } catch {
+      // 图片上传错误由上传回调展示。
+      return false
+    }
+    try {
       const updated = await updateProfile({ ...values, avatarFileId })
       const next = {
         displayName: updated.displayName,
         email: updated.email,
       }
-      form.reset(next)
-      markSaved(next)
-      avatar.clear()
+      acceptSaved(values, next)
+      avatar.clear(avatarFileId)
       void invalidate(resourceKeys.identity())
       return true
     } catch (error) {
-      // 上传失败已由共享上传回调提示，保存只处理资料提交错误。
-      if (uploadingAvatar) return false
       if (recoverSession(error, navigate)) {
         return false
       }
@@ -90,7 +90,7 @@ export function ProfileSettingsForm({ user }: { user: CurrentUser }) {
     <form
       className="w-full"
       aria-label={t("profile.formLabel")}
-      onSubmit={form.handleSubmit(save)}
+      onSubmit={form.handleSubmit(() => saveNow(true))}
       noValidate
     >
       <FieldGroup>
@@ -105,7 +105,10 @@ export function ProfileSettingsForm({ user }: { user: CurrentUser }) {
             avatarClassName="rounded-full text-2xl"
             disabled={isSubmitting}
             loading={pendingAvatar?.status === "uploading"}
-            onSelect={avatar.select}
+            onSelect={(file) => {
+              avatar.select(file)
+              saveNow(true)
+            }}
           />
         </Field>
         <Controller

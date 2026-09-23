@@ -1,5 +1,5 @@
 /** 角色新建和详情页。 */
-import { useEffect, useMemo, useState } from "react"
+import { useRef, useEffect, useMemo, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm, useWatch } from "react-hook-form"
 import { useTranslation } from "react-i18next"
@@ -138,11 +138,14 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
     [memberTargetRole, roles],
   )
 
+  const initializedDetail = useRef<string | null>(null)
   /** 目录和角色详情就绪后回填表单并清空成员暂存。 */
   useEffect(() => {
     if (!ready) return
+    if (initializedDetail.current === mode + roleId && (form.formState.isDirty || memberChanges.length > 0)) return
+    initializedDetail.current = mode + roleId
     setMemberChanges([])
-    form.reset({
+    const values = {
       name: role
         ? role.kind === RoleKind.RoleKindCustom
           ? role.name
@@ -150,7 +153,9 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
         : "",
       description: role ? roleDescription(role, t) : "",
       permissions: role?.permissions ?? [],
-    })
+    }
+    form.reset(values)
+    markSaved(values)
   }, [form, ready, role, t, tCommon])
 
   /** 切换权限并维护管理权限对查看权限的依赖。 */
@@ -189,7 +194,7 @@ export function RoleFormPage({ mode }: { mode: "create" | "detail" }) {
   /** 保存角色资料、权限和成员配置。 */
   // 详情页边改边存；内置管理员角色只保存成员分配，名称和权限不提交。
   const autoSave = mode === "detail"
-  const { submit, saveNow, reportError } = useFormSave({
+  const { submit, saveNow, markSaved, reportError } = useFormSave({
     form,
     schema,
     autoSave,

@@ -1,4 +1,5 @@
 /** 会话消息线程与回复区的即时消息协调。 */
+import type { ComposerDraftBridge } from "@/features/inbox/conversation-composer-types"
 import { useEffect, useRef, type RefObject } from "react"
 import { useTranslation } from "react-i18next"
 
@@ -20,7 +21,6 @@ import { usePortalContainer } from "@/components/ui/portal-container"
 import { useWorkspace } from "@/contexts/workspace-context"
 import {
   ConversationComposer,
-  type ComposerDraftBridge,
 } from "@/features/inbox/conversation-composer"
 import {
   ConversationTimeline,

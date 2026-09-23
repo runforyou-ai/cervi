@@ -2,11 +2,9 @@
 import { z } from "zod"
 
 import { AgentExecutionMode, WorkStatus } from "@/api"
-import { isAgentModelSelection } from "@/features/agents/agent-model-selection"
+import { createAgentManagedExecutionSchema } from "@/lib/agent-execution-schema"
 import { displayNamePattern } from "@/lib/display-name"
 import { requiredWailsEnum } from "@/lib/wails-enum"
-
-const maxSystemInstructionLength = 20000
 
 /** AI 员工表单校验文案。 */
 export interface AgentValidationMessages {
@@ -30,26 +28,6 @@ export function createAgentProfileSchema(messages: {
     workStatus: requiredWailsEnum(WorkStatus),
     teamIds: z.array(z.string().uuid()),
     handlesCustomers: z.boolean(),
-  })
-}
-
-/** 创建 AI 员工平台托管执行配置校验规则。 */
-export function createAgentManagedExecutionSchema(
-  messages: Omit<AgentValidationMessages, "nameRequired" | "nameInvalid">,
-) {
-  return z.object({
-    modelSelection: z
-      .string()
-      .min(1, messages.modelRequired)
-      .refine(isAgentModelSelection, messages.modelRequired),
-    knowledgeBaseIds: z.array(z.string().uuid()),
-    systemInstruction: z
-      .string()
-      .trim()
-      .refine((value) => {
-        // 校验系统指令的 Unicode 字符数上限。
-        return [...value].length <= maxSystemInstructionLength
-      }, messages.instructionTooLong),
   })
 }
 

@@ -13,7 +13,7 @@ import {
   type DirectInboxConversationData,
 } from "@/api"
 import { useWorkspace } from "@/contexts/workspace-context"
-import type { ComposerDraftBridge } from "@/features/inbox/conversation-composer"
+import type { ComposerDraftBridge } from "@/features/inbox/conversation-composer-types"
 import { ConversationSidePanel } from "@/features/inbox/conversation-side-panel"
 import { ConversationHeader } from "@/features/inbox/conversation-header"
 import { ConversationThread } from "@/features/inbox/conversation-thread"

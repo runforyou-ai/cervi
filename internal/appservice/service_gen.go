@@ -395,8 +395,13 @@ func (s *Service) CreateMessageChannel(ctx context.Context, meta RequestMeta, in
 }
 
 // UpdateMessageChannel 修改消息渠道基础信息。
-func (s *Service) UpdateMessageChannel(ctx context.Context, meta RequestMeta, channelID string, input MessageChannelInput) (MessageChannelSummary, error) {
+func (s *Service) UpdateMessageChannel(ctx context.Context, meta RequestMeta, channelID string, input MessageChannelBasicsInput) (MessageChannelSummary, error) {
 	return withNormalizedSlices(s.backend.UpdateMessageChannel(ctx, meta, channelID, input))
+}
+
+// UpdateMessageChannelReception 修改消息渠道接待设置。
+func (s *Service) UpdateMessageChannelReception(ctx context.Context, meta RequestMeta, channelID string, input MessageChannelReceptionInput) (MessageChannelSummary, error) {
+	return withNormalizedSlices(s.backend.UpdateMessageChannelReception(ctx, meta, channelID, input))
 }
 
 // UpdateWebsiteChannelChatInterface 修改网站渠道聊天界面。

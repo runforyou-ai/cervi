@@ -3,16 +3,17 @@ import { useEffect, useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
-import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
-import { createTeam, isApiError, updateTeam, type Team } from "@/api"
+import { createTeam, updateTeam, type Team } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
 import { FormActions } from "@/components/form/form-actions"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { Textarea } from "@/components/ui/textarea"
-import { recoverSession } from "@/lib/session-navigation"
-import { apiErrorMessage } from "@/lib/form-errors"
+import { useFormSave } from "@/hooks/use-form-save"
+import { resourceKeys } from "@/hooks/resource-keys"
+import { useResourceInvalidator } from "@/hooks/use-resource"
+import { teamMembershipCacheKeys } from "@/features/contacts/teams/team-membership-cache"
 import {
   createTeamSchema,
   type TeamFormValues,
@@ -29,7 +30,7 @@ export function TeamForm({
   onCancel?: () => void
 }) {
   const { t } = useTranslation(["contacts", "common"])
-  const navigate = useNavigate()
+  const invalidate = useResourceInvalidator()
   const schema = useMemo(
     () =>
       createTeamSchema({
@@ -51,24 +52,27 @@ export function TeamForm({
     if (!team) form.setFocus("name")
   }, [form, team])
 
-  /** 提交团队表单。 */
-  async function submit(values: TeamFormValues) {
-    try {
+  const { submit } = useFormSave({
+    form,
+    schema,
+    autoSave: false,
+    save: async (values) => {
       const saved = team
         ? await updateTeam(team.id, values)
         : await createTeam(values)
+      void invalidate(resourceKeys.teams())
+      void invalidate(resourceKeys.serviceCategories())
+      for (const key of teamMembershipCacheKeys) void invalidate(key)
+      return saved
+    },
+    onSubmitted: (saved) => {
       toast.success(t(team ? "teams.form.updated" : "teams.form.created"))
       onSaved(saved)
-    } catch (error) {
-      if (recoverSession(error, navigate)) return
-      console.warn("保存团队失败", error)
-      toast.error(
-        isApiError(error)
-          ? apiErrorMessage(error, ["name", "description"])
-          : t("teams.form.networkError"),
-      )
-    }
-  }
+    },
+    errorMessage: t("teams.form.networkError"),
+    errorFields: ["name", "description"],
+    logLabel: "保存团队",
+  })
 
   return (
     <form

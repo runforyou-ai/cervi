@@ -1,4 +1,5 @@
 /** 移动端真人、AI、客户与群聊共用的时间线、阅读进度、文本与附件发送、客户会话内部备注和失败重试。 */
+import type { ComposerDraftBridge, CustomerChannelCapabilities } from "@/features/inbox/conversation-composer-types"
 import { useEffect, type RefObject } from "react"
 
 import {
@@ -11,8 +12,6 @@ import {
 import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
 import {
   ConversationComposer,
-  type ComposerDraftBridge,
-  type CustomerChannelCapabilities,
 } from "@/features/inbox/conversation-composer"
 import {
   ConversationTimeline,

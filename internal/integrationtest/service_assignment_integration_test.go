@@ -255,8 +255,7 @@ func TestServiceSessionRouteSkipsInactiveMember(t *testing.T) {
 	f := newAssignmentFixture(t)
 	ctx := context.Background()
 	member := f.member.OrganizationIdentity.ID
-	if _, err := channelaction.NewUpdateMessageChannelAction(f.db).Execute(ctx, f.owner, f.channelID, channelaction.MessageChannelInput{
-		Name: "客服未读测试", DefaultLocale: domain.LocaleChineseSimplified,
+	if _, err := channelaction.NewUpdateMessageChannelAction(f.db).ExecuteReception(ctx, f.owner, f.channelID, channelaction.MessageChannelReceptionInput{
 		NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypeMember, ID: member},
 		FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 	}); err != nil {
