@@ -95,7 +95,7 @@ export function WebsiteChannelChatInterfaceForm({
     previewValue.title,
   ])
 
-  const { markSaved } = useAutoSave({ form, schema, save: submit })
+  const { acceptSaved, saveNow } = useAutoSave({ form, schema, save: submit })
 
   /** 提交聊天界面设置。 */
   async function submit(values: WebsiteChannelChatInterfaceFormValues) {
@@ -107,8 +107,7 @@ export function WebsiteChannelChatInterfaceForm({
         greetingMessage: updated.greetingMessage ?? "",
         themeColor: updated.themeColor,
       }
-      form.reset(next)
-      markSaved(next)
+      acceptSaved(values, next)
       onUpdated(updated)
       return true
     } catch (error) {
@@ -142,7 +141,7 @@ export function WebsiteChannelChatInterfaceForm({
   return (
     <form
       className="w-full"
-      onSubmit={form.handleSubmit(submit)}
+      onSubmit={form.handleSubmit(() => saveNow())}
       noValidate
     >
       <FieldGroup>

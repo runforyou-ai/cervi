@@ -90,6 +90,19 @@ type TelegramChannelConnectionTestInput struct {
 	BotToken string `json:"botToken"`
 }
 
+// MessageChannelBasicsInput 定义渠道基础信息的编辑字段。
+type MessageChannelBasicsInput struct {
+	Name          string `json:"name"`
+	Description   string `json:"description"`
+	DefaultLocale Locale `json:"defaultLocale"`
+}
+
+// MessageChannelReceptionInput 定义渠道接待设置的编辑字段。
+type MessageChannelReceptionInput struct {
+	NewConversationTarget ChannelRoutingTarget `json:"newConversationTarget"`
+	FallbackTarget        ChannelRoutingTarget `json:"fallbackTarget"`
+}
+
 // MessageChannelInput 定义消息渠道可编辑的通用字段。
 type MessageChannelInput struct {
 	Name                  string               `json:"name"`

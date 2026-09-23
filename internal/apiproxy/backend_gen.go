@@ -613,9 +613,17 @@ func (b *Backend) CreateMessageChannel(ctx context.Context, meta appservice.Requ
 }
 
 // UpdateMessageChannel 修改消息渠道基础信息。
-func (b *Backend) UpdateMessageChannel(ctx context.Context, meta appservice.RequestMeta, channelID string, input appservice.MessageChannelInput) (appservice.MessageChannelSummary, error) {
+func (b *Backend) UpdateMessageChannel(ctx context.Context, meta appservice.RequestMeta, channelID string, input appservice.MessageChannelBasicsInput) (appservice.MessageChannelSummary, error) {
 	var output appservice.MessageChannelSummary
 	err := b.do(ctx, meta, http.MethodPut, "/channels/"+url.PathEscape(channelID), nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// UpdateMessageChannelReception 修改消息渠道接待设置。
+func (b *Backend) UpdateMessageChannelReception(ctx context.Context, meta appservice.RequestMeta, channelID string, input appservice.MessageChannelReceptionInput) (appservice.MessageChannelSummary, error) {
+	var output appservice.MessageChannelSummary
+	err := b.do(ctx, meta, http.MethodPut, "/channels/"+url.PathEscape(channelID)+"/reception", nil, input, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }

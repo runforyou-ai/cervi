@@ -23,14 +23,13 @@ import { teamMembershipCacheKeys } from "@/features/contacts/teams/team-membersh
 import { useContactSearch } from "@/features/contacts/use-contact-search"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useConfirmedAction } from "@/hooks/use-confirmed-action"
-import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
+import { useResource } from "@/hooks/use-resource"
 
 /** 列出企业团队并提供团队维护入口。 */
 export function TeamListPanel() {
   const { t } = useTranslation(["contacts", "common"])
   const navigate = useNavigate()
   const location = useLocation()
-  const invalidate = useResourceInvalidator()
   const { searchParams, setParameters, query, search, setSearch, currentPage } =
     useContactSearch()
   const [editingTeam, setEditingTeam] = useState<Team | null>(null)
@@ -131,7 +130,6 @@ export function TeamListPanel() {
           </DialogHeader>
           <TeamForm
             onSaved={(team) => {
-              void invalidate(resourceKeys.teams())
               navigate(`/contacts/teams/${team.id}`, { replace: true })
             }}
             onCancel={() => setParameters({ newTeam: null })}
@@ -152,9 +150,6 @@ export function TeamListPanel() {
             <TeamForm
               team={editingTeam}
               onSaved={() => {
-                void invalidate(resourceKeys.teams())
-                void invalidate(resourceKeys.serviceCategories())
-                for (const key of teamMembershipCacheKeys) void invalidate(key)
                 setEditingTeam(null)
               }}
               onCancel={() => setEditingTeam(null)}

@@ -390,7 +390,6 @@ export function ExternalContactsPanel() {
             channels={channels}
             onSaved={() => {
               setParameters({ new: null })
-              void invalidate(resourceKeys.contacts())
             }}
             onCancel={() => setParameters({ new: null })}
           />

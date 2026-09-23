@@ -15,13 +15,13 @@ import {
   FieldLabel,
 } from "@/components/ui/field"
 import { Textarea } from "@/components/ui/textarea"
-import { AgentKnowledgeField } from "@/features/agents/agent-knowledge-field"
-import { AgentMCPField } from "@/features/agents/agent-mcp-field"
-import { AgentModelField } from "@/features/agents/agent-model-field"
+import { AgentKnowledgeField } from "@/components/agent-fields/agent-knowledge-field"
+import { AgentMCPField } from "@/components/agent-fields/agent-mcp-field"
+import { AgentModelField } from "@/components/agent-fields/agent-model-field"
 import {
   agentModelSelection,
   parseAgentModelSelection,
-} from "@/features/agents/agent-model-selection"
+} from "@/lib/agent-model-selection"
 import {
   createAgentExecutionSchema,
   type AgentExecutionFormValues,
@@ -74,7 +74,7 @@ export function AgentExecutionForm({
   }, [agent.execution.mcpServerIds, form])
 
   /** 提交当前运行配置并生成一个生效版本。 */
-  const { markSaved } = useAutoSave({ form, schema, save: submit, discarded })
+  const { acceptSaved, saveNow } = useAutoSave({ form, schema, save: submit, discarded })
 
   async function submit(values: AgentExecutionFormValues) {
     try {
@@ -89,10 +89,8 @@ export function AgentExecutionForm({
       })
       onSaved()
       if (!mounted.current) return true
-      dirty.current = false
       const next = { ...values, mcpServerIds: saved.execution.mcpServerIds }
-      form.reset(next)
-      markSaved(next)
+      dirty.current = !acceptSaved(values, next)
       return true
     } catch (error) {
       // 离开页面后提交的改动失败时同样提示。
@@ -115,7 +113,7 @@ export function AgentExecutionForm({
   }
 
   return (
-    <form onSubmit={form.handleSubmit(submit)} noValidate>
+    <form onSubmit={form.handleSubmit(() => saveNow())} noValidate>
       <FieldGroup>
         <AgentModelField
           control={form.control}

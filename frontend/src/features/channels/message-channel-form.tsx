@@ -81,10 +81,10 @@ export function MessageChannelForm({
     },
   })
   // 新建时登记未保存内容，离开前确认。
-  const { dirty } = useFormLifetime(!channel && form.formState.isDirty)
+  const { dirty, mounted } = useFormLifetime(!channel && form.formState.isDirty)
   /** 提交消息渠道基础信息。 */
   // 已有渠道时边改边存，新建仍由底部按钮提交。
-  const { markSaved } = useAutoSave({
+  const { acceptSaved, saveNow } = useAutoSave({
     form,
     schema,
     save: submit,
@@ -98,19 +98,16 @@ export function MessageChannelForm({
           name: values.name,
           description: values.description,
           defaultLocale: values.defaultLocale,
-          newConversationTarget: channel.newConversationTarget,
-          fallbackTarget: channel.fallbackTarget,
         })
         const next = {
           type: updated.type,
           name: updated.name,
           description: updated.description ?? "",
           defaultLocale: updated.defaultLocale,
-          newConversationTarget: updated.newConversationTarget,
-          fallbackTarget: updated.fallbackTarget,
+          newConversationTarget: values.newConversationTarget,
+          fallbackTarget: values.fallbackTarget,
         }
-        form.reset(next)
-        markSaved(next)
+        acceptSaved(values, next)
         onUpdated?.(updated)
         void invalidateResource(resourceKeys.messageChannels())
         void invalidateResource(resourceKeys.channelOptions())
@@ -120,6 +117,7 @@ export function MessageChannelForm({
       const created = await createMessageChannel(values)
       void invalidateResource(resourceKeys.messageChannels())
       void invalidateResource(resourceKeys.channelOptions())
+      if (!mounted.current) return true
       dirty.current = false
       form.reset(values)
       navigate(
@@ -128,6 +126,7 @@ export function MessageChannelForm({
       )
       return true
     } catch (error) {
+      if (!channel && !mounted.current) return false
       if (recoverSession(error, navigate)) {
         return false
       }
@@ -162,7 +161,7 @@ export function MessageChannelForm({
   return (
     <form
       className={cn("w-full", channel ? undefined : "space-y-9")}
-      onSubmit={form.handleSubmit(submit)}
+      onSubmit={form.handleSubmit((values) => channel ? saveNow() : submit(values))}
       noValidate
     >
       <FieldGroup>

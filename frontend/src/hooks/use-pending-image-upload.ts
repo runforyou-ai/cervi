@@ -65,8 +65,9 @@ export function usePendingImageUpload({
     void start(candidate)
   }
 
-  /** 释放当前预览并放弃未保存的图片选择。 */
-  function clear() {
+  /** 释放当前预览，指定文件编号时只释放该次保存使用的图片。 */
+  function clear(savedFileID?: string) {
+    if (savedFileID !== undefined && (!savedFileID || current.current?.fileID !== savedFileID)) return
     if (current.current) URL.revokeObjectURL(current.current.previewURL)
     current.current = null
     setPending(null)

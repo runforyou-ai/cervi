@@ -120,3 +120,24 @@ test("卸载释放预览并忽略未完成上传的失败", async (t) => {
   assert.deepEqual(h.revoked, ["blob:preview-1"])
   assert.deepEqual(h.errors, [])
 })
+
+test("旧头像保存完成只清除对应上传，不清除新选择的头像", async (t) => {
+  const h = await host(t)
+  await React.act(() => h.value.select(new File(["a"], "a.png")))
+  await React.act(() => h.uploads[0].resolve({ id: "old" }))
+  await React.act(() => h.value.select(new File(["b"], "b.png")))
+  await React.act(() => h.value.clear("old"))
+  assert.equal(h.value.pending.file.name, "b.png")
+  await React.act(() => h.uploads[1].resolve({ id: "new" }))
+  await React.act(() => h.value.clear("new"))
+  assert.equal(h.value.pending, null)
+})
+
+test("不含头像的旧保存完成时保留刚开始上传的新头像", async (t) => {
+  const h = await host(t)
+  await React.act(() => h.value.select(new File(["a"], "a.png")))
+  await React.act(() => h.value.clear(""))
+  assert.equal(h.value.pending.file.name, "a.png")
+  await React.act(() => h.uploads[0].resolve({ id: "new" }))
+  assert.equal(h.value.pending.fileID, "new")
+})

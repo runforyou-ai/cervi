@@ -133,7 +133,7 @@ function BusinessHoursForm({ hours }: { hours: BusinessHoursData }) {
       mounted.current = false
     }
   }, [])
-  const { markSaved } = useAutoSave({ form, schema, save })
+  const { markSaved, saveNow } = useAutoSave({ form, schema, save })
   // 时段与日期的校验跨字段关联，组内任一值或行数变化后重新校验整组。
   useEffect(() => {
     const subscription = form.watch((_, { name }) => {
@@ -173,7 +173,7 @@ function BusinessHoursForm({ hours }: { hours: BusinessHoursData }) {
     <form
       className="w-full"
       aria-label={t("customerService.businessHours.formLabel")}
-      onSubmit={form.handleSubmit(save)}
+      onSubmit={form.handleSubmit(() => saveNow())}
       noValidate
     >
       <FieldGroup>

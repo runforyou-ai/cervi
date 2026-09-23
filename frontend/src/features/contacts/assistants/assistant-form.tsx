@@ -25,12 +25,12 @@ import {
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { AgentKnowledgeField } from "@/features/agents/agent-knowledge-field"
-import { AgentModelField } from "@/features/agents/agent-model-field"
+import { AgentKnowledgeField } from "@/components/agent-fields/agent-knowledge-field"
+import { AgentModelField } from "@/components/agent-fields/agent-model-field"
 import {
   agentModelSelection,
   parseAgentModelSelection,
-} from "@/features/agents/agent-model-selection"
+} from "@/lib/agent-model-selection"
 import { useAssistantInvalidator } from "@/features/contacts/assistants/assistant-keys"
 import {
   createAssistantSchema,
@@ -184,7 +184,7 @@ export function AssistantEditForm({
     if (!dirty.current) form.reset(values)
   }, [values, dirty, form])
 
-  const { markSaved, saveNow } = useAutoSave({ form, schema, save: submit, discarded })
+  const { acceptSaved, saveNow } = useAutoSave({ form, schema, save: submit, discarded })
 
   /** 提交资料、执行配置与待保存的头像。 */
   async function submit(next: AssistantFormValues) {
@@ -196,10 +196,8 @@ export function AssistantEditForm({
       await updateAssistant(assistant.id, assistantInput(next, avatarFileId))
       onSaved()
       if (!mounted.current) return true
-      dirty.current = false
-      form.reset(next)
-      markSaved(next)
-      avatar.clear()
+      dirty.current = !acceptSaved(next)
+      avatar.clear(avatarFileId)
       return true
     } catch (error) {
       // 上传失败已由共享上传回调提示，保存只处理资料提交错误。
@@ -211,7 +209,7 @@ export function AssistantEditForm({
   }
 
   return (
-    <form onSubmit={form.handleSubmit(submit)} noValidate>
+    <form onSubmit={form.handleSubmit(() => saveNow(true))} noValidate>
       <AssistantFields
         control={form.control}
         disabled={form.formState.isSubmitting}

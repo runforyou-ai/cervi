@@ -3,11 +3,8 @@ import { useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
-import { useNavigate } from "react-router"
-import { toast } from "sonner"
 
 import {
-  isApiError,
   updateUserPreferences,
   type CurrentUser,
 } from "@/api"
@@ -19,10 +16,8 @@ import {
   type NotificationSettingsFormValues,
 } from "@/features/settings/notification-settings-schema"
 import { resourceKeys } from "@/hooks/resource-keys"
-import { useAutoSave } from "@/hooks/use-auto-save"
+import { useFormSave } from "@/hooks/use-form-save"
 import { useResourceInvalidator } from "@/hooks/use-resource"
-import { apiErrorMessage } from "@/lib/form-errors"
-import { recoverSession } from "@/lib/session-navigation"
 import {
   readNotificationDevicePreferences,
   setNotificationSoundEnabled,
@@ -32,7 +27,6 @@ import {
 /** 修改新消息提醒、本机通知声音，并管理本设备通知权限。 */
 export function NotificationSettingsForm({ user }: { user: CurrentUser }) {
   const { t } = useTranslation(["settings", "common"])
-  const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
   const notificationScope = useMemo<NotificationDeviceScope>(
     () => ({ organizationId: user.organizationId, userId: user.id }),
@@ -49,11 +43,11 @@ export function NotificationSettingsForm({ user }: { user: CurrentUser }) {
         readNotificationDevicePreferences(notificationScope).soundEnabled,
     },
   })
-  const { markSaved } = useAutoSave({ form, schema, save })
-
-  /** 保存新消息提醒到账号偏好，通知声音只写入本机。 */
-  async function save(values: NotificationSettingsFormValues) {
-    try {
+  const { submit } = useFormSave({
+    form,
+    schema,
+    autoSave: true,
+    save: async (values) => {
       // 账号偏好接口需要完整提交，语言与时区沿用当前值。
       const updated = await updateUserPreferences({
         locale: user.locale,
@@ -64,33 +58,23 @@ export function NotificationSettingsForm({ user }: { user: CurrentUser }) {
         notificationScope,
         values.notificationSoundEnabled,
       )
-      const next = {
+      void invalidate(resourceKeys.identity())
+      return {
         messageNotificationsEnabled: updated.messageNotificationsEnabled,
         notificationSoundEnabled: values.notificationSoundEnabled,
       }
-      form.reset(next)
-      markSaved(next)
-      void invalidate(resourceKeys.identity())
-      return true
-    } catch (error) {
-      if (recoverSession(error, navigate)) {
-        return false
-      }
-      console.warn("保存通知设置失败", error)
-      if (isApiError(error)) {
-        toast.error(apiErrorMessage(error, ["messageNotificationsEnabled"]))
-        return false
-      }
-      toast.error(t("notifications.saveError"))
-      return false
-    }
-  }
+    },
+    savedValues: (saved) => saved,
+    errorMessage: t("notifications.saveError"),
+    errorFields: ["messageNotificationsEnabled"],
+    logLabel: "保存通知设置",
+  })
 
   return (
     <form
       className="w-full"
       aria-label={t("notifications.formLabel")}
-      onSubmit={form.handleSubmit(save)}
+      onSubmit={form.handleSubmit(submit)}
       noValidate
     >
       <FieldGroup>

@@ -2,7 +2,7 @@
 import { useTranslation } from "react-i18next"
 
 import { listKnowledgeBases } from "@/api"
-import { AgentResourcePickerField } from "@/features/agents/agent-resource-picker-field"
+import { AgentResourcePickerField } from "@/components/agent-fields/agent-resource-picker-field"
 import { resourceKeys } from "@/hooks/resource-keys"
 
 /** 显示已选知识库数量，在模态框中勾选 AI 员工可检索的知识库。 */

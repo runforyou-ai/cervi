@@ -125,10 +125,13 @@ export function KnowledgeBaseFormPage({
     { enabled: mode === "edit", staleTime: 0 },
   )
   const providers = useResource(resourceKeys.aiProviders(), () => listAIProviders(), { staleTime: 0 })
+  const initializedDetail = useRef<string | null>(null)
   /** 详情就绪后回填知识库表单和派生状态。 */
   useEffect(() => {
     if (!loadedKnowledgeBase) return
-    form.reset({
+    if (initializedDetail.current === knowledgeBaseId && form.formState.isDirty) return
+    initializedDetail.current = knowledgeBaseId
+    const values = {
       name: loadedKnowledgeBase.name,
       description: loadedKnowledgeBase.description,
       embeddingModel: loadedKnowledgeBase.embeddingProviderId ? JSON.stringify([loadedKnowledgeBase.embeddingProviderId, loadedKnowledgeBase.embeddingModelIdentifier]) : "",
@@ -138,7 +141,9 @@ export function KnowledgeBaseFormPage({
       retrievalCount: String(loadedKnowledgeBase.retrievalCount),
       retrievalScoreThreshold: String(loadedKnowledgeBase.retrievalScoreThreshold),
       rerankModel: loadedKnowledgeBase.rerankProviderId ? JSON.stringify([loadedKnowledgeBase.rerankProviderId, loadedKnowledgeBase.rerankModelIdentifier]) : "",
-    })
+    }
+    form.reset(values)
+    markSaved(values)
     setCategory(loadedKnowledgeBase.category)
   }, [form, loadedKnowledgeBase])
 
@@ -148,7 +153,7 @@ export function KnowledgeBaseFormPage({
   // 编辑已有知识库时边改边存；变更向量模型、维度或分段参数时先确认重建索引。
   const reindexAutoSaved = useRef(false)
   const watchedValues = useWatch({ control: form.control })
-  const { submit, commit } = useFormSave({
+  const { submit, commit, markSaved } = useFormSave({
     form,
     schema,
     autoSave: mode === "edit",

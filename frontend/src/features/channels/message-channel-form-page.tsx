@@ -1,6 +1,5 @@
 /** 消息渠道创建页和按类型扩展的编辑页。 */
 import { useEffect, useState } from "react"
-import { useQueryClient } from "@tanstack/react-query"
 import { useTranslation } from "react-i18next"
 import {
   useNavigate,
@@ -132,7 +131,7 @@ function MessageChannelEditTabs({
   onConnectionSavingChange,
 }: {
   channel: EditableChannel
-  onChannelChange: (channel: EditableChannel) => void
+  onChannelChange: () => void
   onConnectionSavingChange: (saving: boolean) => void
 }) {
   const { t } = useTranslation("channels")
@@ -198,11 +197,6 @@ function MessageChannelEditTabs({
     setSearchParams(nextParams, { replace: true })
   }
 
-  /** 合并通用渠道基础信息更新。 */
-  function mergeSummary(updated: MessageChannelSummary) {
-    onChannelChange({ ...channel, ...updated })
-  }
-
   const content = (
     <div className="min-w-0">
       <TabsContent
@@ -210,7 +204,7 @@ function MessageChannelEditTabs({
         forceMount
         className="data-[state=inactive]:hidden"
       >
-        <MessageChannelForm channel={channel} onUpdated={mergeSummary} />
+        <MessageChannelForm channel={channel} onUpdated={onChannelChange} />
       </TabsContent>
       <TabsContent
         value="reception"
@@ -219,7 +213,7 @@ function MessageChannelEditTabs({
       >
         <ChannelReceptionSettingsForm
           channel={channel}
-          onUpdated={mergeSummary}
+          onUpdated={onChannelChange}
         />
       </TabsContent>
       {websiteChannel ? (
@@ -232,9 +226,7 @@ function MessageChannelEditTabs({
             <WebsiteChannelChatInterfaceForm
               channel={websiteChannel}
               onPreviewChange={setPreviewValue}
-              onUpdated={(chatInterface) =>
-                onChannelChange({ ...websiteChannel, chatInterface })
-              }
+              onUpdated={onChannelChange}
             />
           </TabsContent>
           <TabsContent
@@ -246,9 +238,7 @@ function MessageChannelEditTabs({
               channel={websiteChannel}
               access={activeAccess}
               onAccessChange={setAccess}
-              onUpdated={(access) =>
-                onChannelChange({ ...websiteChannel, access })
-              }
+              onUpdated={onChannelChange}
             />
           </TabsContent>
         </>
@@ -332,7 +322,6 @@ export function MessageChannelFormPage({
   // 地址中的类型与详情一致时才展示，类型不一致时等待纠正地址。
   const channel =
     detail.data && detail.data.type === channelType ? detail.data : null
-  const queryClient = useQueryClient()
   const invalidateResource = useResourceInvalidator()
 
   /** 拦截无效的渠道类型参数，回到渠道列表。 */
@@ -362,10 +351,8 @@ export function MessageChannelFormPage({
     }
   }, [channelId, channelType, detail.error, navigate])
 
-  /** 子表单保存后写入详情缓存并重新读取。 */
-  function handleChannelChange(next: EditableChannel) {
-    // 各页签按渠道详情提交完整记录，保存结果立即写入缓存，其他页签随即使用最新值。
-    queryClient.setQueryData(detailKey, next)
+  /** 子表单保存后重新读取服务端详情。 */
+  function handleChannelChange() {
     void invalidateResource(detailKey)
   }
 

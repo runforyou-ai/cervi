@@ -184,7 +184,7 @@ export function CreateGroupConversationDialog({
                     variant="outline"
                     size="sm"
                     disabled={form.formState.isSubmitting}
-                    onClick={image.clear}
+                    onClick={() => image.clear()}
                   >
                     {t("groupImageDiscard")}
                   </Button>

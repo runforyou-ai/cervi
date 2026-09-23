@@ -9,7 +9,7 @@ import { toast } from "sonner"
 import {
   isApiError,
   isNotFoundApiError,
-  updateMessageChannel,
+  updateMessageChannelReception,
   type MessageChannelSummary,
 } from "@/api"
 import { FieldGroup } from "@/components/ui/field"
@@ -51,22 +51,16 @@ export function ChannelReceptionSettingsForm({
     },
   })
   /** 保存消息渠道接待设置。 */
-  const { markSaved } = useAutoSave({ form, schema, save: submit })
+  const { acceptSaved, saveNow } = useAutoSave({ form, schema, save: submit })
 
   async function submit(values: ChannelReceptionSettingsFormValues) {
     try {
-      const updated = await updateMessageChannel(channel.id, {
-        name: channel.name,
-        description: channel.description ?? "",
-        defaultLocale: channel.defaultLocale,
-        ...values,
-      })
+      const updated = await updateMessageChannelReception(channel.id, values)
       const next = {
         newConversationTarget: updated.newConversationTarget,
         fallbackTarget: updated.fallbackTarget,
       }
-      form.reset(next)
-      markSaved(next)
+      acceptSaved(values, next)
       onUpdated(updated)
       return true
     } catch (error) {
@@ -92,7 +86,7 @@ export function ChannelReceptionSettingsForm({
   return (
     <form
       className="w-full"
-      onSubmit={form.handleSubmit(submit)}
+      onSubmit={form.handleSubmit(() => saveNow())}
       noValidate
     >
       <FieldGroup>

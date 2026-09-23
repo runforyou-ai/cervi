@@ -137,12 +137,28 @@ func (o *directOperations) CreateMessageChannel(ctx context.Context, meta Reques
 }
 
 // UpdateMessageChannel 修改消息渠道基础信息。
-func (o *directOperations) UpdateMessageChannel(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, channelID string, input MessageChannelInput) (MessageChannelSummary, error) {
-	channel, err := o.updateMessageChannel.Execute(ctx, identity, channelID, channelInput(input))
+func (o *directOperations) UpdateMessageChannel(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, channelID string, input MessageChannelBasicsInput) (MessageChannelSummary, error) {
+	channel, err := o.updateMessageChannel.ExecuteBasics(ctx, identity, channelID, channelaction.MessageChannelBasicsInput{
+		Name:          input.Name,
+		Description:   input.Description,
+		DefaultLocale: domain.Locale(input.DefaultLocale),
+	})
 	if err != nil {
 		return MessageChannelSummary{}, o.channelMutationError(ctx, meta, err, cervii18n.ErrorChannelUpdateFailed, identity.Organization.ID, channelID)
 	}
 	slog.Info("消息渠道更新成功", "organization_id", identity.Organization.ID, "channel_id", channel.ID, "channel_type", channel.Type)
+	return messageChannelFromRecord(channel), nil
+}
+
+// UpdateMessageChannelReception 修改消息渠道接待设置。
+func (o *directOperations) UpdateMessageChannelReception(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, channelID string, input MessageChannelReceptionInput) (MessageChannelSummary, error) {
+	channel, err := o.updateMessageChannel.ExecuteReception(ctx, identity, channelID, channelaction.MessageChannelReceptionInput{
+		NewConversationTarget: channelRoutingTargetInput(input.NewConversationTarget),
+		FallbackTarget:        channelRoutingTargetInput(input.FallbackTarget),
+	})
+	if err != nil {
+		return MessageChannelSummary{}, o.channelMutationError(ctx, meta, err, cervii18n.ErrorChannelUpdateFailed, identity.Organization.ID, channelID)
+	}
 	return messageChannelFromRecord(channel), nil
 }
 

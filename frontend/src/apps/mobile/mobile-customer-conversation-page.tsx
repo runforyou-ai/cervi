@@ -37,7 +37,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
-import type { ComposerDraftBridge } from "@/features/inbox/conversation-composer"
+import type { ComposerDraftBridge } from "@/features/inbox/conversation-composer-types"
 import { HandoffSummaryCard } from "@/features/inbox/handoff-summary-card"
 import {
   CustomerSessionCloseDialog,

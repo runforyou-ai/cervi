@@ -1,0 +1,194 @@
+/** 会话编辑器的输入、提醒和可见范围交互状态。 */
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react"
+import { zodResolver } from "@hookform/resolvers/zod"
+import { useForm } from "react-hook-form"
+import { useTranslation } from "react-i18next"
+import { ConversationType, ChannelType, MessageVisibility } from "@/api"
+import { createConversationComposerSchema, type ConversationComposerValues } from "./conversation-composer-schema"
+import { reconcileMentionAllToken } from "@/lib/mention-token"
+import { conversationSendingIndicatorDelay } from "./outgoing-message-store"
+import { useConversationTypingReport } from "./use-conversation-typing"
+import { resolveAppPlatform } from "@/platform/app-platform"
+import { resizeComposerInput, useFocusInputOnTyping } from "./composer-input"
+import { useComposerMentions } from "./use-composer-mentions"
+import { useVisibilityDrafts } from "./use-visibility-drafts"
+import { useComposerSubmission } from "./use-composer-submission"
+import type { ConversationComposerProps } from "./conversation-composer-types"
+
+/** 组合会话编辑器状态并提供输入交互。 */
+export function useConversationComposer(props: ConversationComposerProps) {
+  const { conversationID, conversationType, submitOnEnter = false, disabledReason: replyDisabledReason = null,
+    visibility = MessageVisibility.MessageVisibilityCustomerVisible, onVisibilityChange,
+    groupParticipants, noteMentionMembers, currentIdentityID = "", customerChannel = null, draftBridgeRef,
+  } = props
+  // 渠道能力缺省时按不支持附件和输入状态处理，附件说明默认上限 4000 字。
+  const customerAttachmentSupported = Boolean(customerChannel?.attachmentSupported)
+  const customerTypingSupported =
+    customerChannel?.channelType === ChannelType.ChannelTypeWebsite
+  const customerAttachmentByteLimit = customerChannel?.attachmentByteLimit ?? 0
+  const customerAttachmentCaptionLimit = customerChannel?.attachmentCaptionLimit ?? 4000
+  const { t } = useTranslation("inbox")
+  const schema = useMemo(
+    () =>
+      createConversationComposerSchema({
+        bodyTooLong: t("messageBodyTooLong"),
+      }),
+    [t],
+  )
+  const form = useForm<ConversationComposerValues>({
+    resolver: zodResolver(schema),
+    shouldUseNativeValidation: true,
+    defaultValues: { body: "" },
+  })
+  const inputID = `conversation-reply-${conversationID}`
+  const inputRef = useRef<HTMLTextAreaElement | null>(null)
+  // 移动端的提及候选和取消引用使用触屏尺寸。
+  const mobile = resolveAppPlatform() === "mobile"
+  const { isSubmitting } = form.formState
+  const bodyValue = form.watch("body")
+  const isBodyEmpty = !bodyValue.trim()
+  const internalNote =
+    visibility === MessageVisibility.MessageVisibilityInternalOnly
+  // 内部备注不经渠道投递，不受对客发送资格限制。
+  const disabledReason = internalNote ? null : replyDisabledReason
+  const groupConversation = conversationType === ConversationType.ConversationTypeGroup
+  const customerConversation = conversationType === ConversationType.ConversationTypeCustomer
+  // 单聊与群聊向其他成员上报本人正在输入；客户会话只有网站渠道在对客回复时向访客上报。
+  const typingReport = useConversationTypingReport(
+    conversationID,
+    (groupConversation ||
+      conversationType === ConversationType.ConversationTypeDirect ||
+      (customerConversation && customerTypingSupported && !internalNote)) &&
+      !disabledReason,
+  )
+  const mentionsState = useComposerMentions({
+    form, inputRef, typingReport, groupConversation, customerConversation, internalNote,
+    groupParticipants, noteMentionMembers, currentIdentityID, noteSwitchAvailable: Boolean(onVisibilityChange),
+  })
+  const {
+    setMentions,
+    mentionsRef,
+    setMentionAllToken,
+    mentionQuery,
+    setMentionQuery,
+    activeMentionIndex,
+    mentionCandidates,
+    noteMentionHint,
+    updateMentionQuery,
+    reconcileMentions,
+    selectMention,
+    handleMentionKeyDown,
+  } = mentionsState
+  // 对客草稿与内部备注草稿各自保留正文和提醒成员，切换页签时互不覆盖。
+  const { draftsRef, focusAfterSwitchRef, switchVisibility, stashDraft } = useVisibilityDrafts({
+    form,
+    visibility,
+    onVisibilityChange,
+    inputRef,
+    mentionsRef,
+    setMentions,
+    closeMentionQuery: () => setMentionQuery(null),
+  })
+
+  const send = useComposerSubmission({ props, form, inputRef, disabledReason, mentionsState, stashDraft, typingReport })
+
+  /** 用选中的表情替换正文当前选区，返回插入内容之后的光标位置。 */
+  function insertEmoji(emoji: string) {
+    const input = inputRef.current
+    if (!input) return null
+    const body = form.getValues("body")
+    const start = input.selectionStart ?? body.length
+    const end = input.selectionEnd ?? start
+    const nextBody = `${body.slice(0, start)}${emoji}${body.slice(end)}`
+    const nextCaret = start + emoji.length
+    setMentionAllToken((current) =>
+      reconcileMentionAllToken(current, body, nextBody, nextCaret),
+    )
+    form.setValue("body", nextBody, { shouldDirty: true })
+    typingReport.input(nextBody)
+    reconcileMentions(nextBody)
+    resizeComposerInput(input)
+    return nextCaret
+  }
+
+  useFocusInputOnTyping(inputRef, !disabledReason && !isSubmitting)
+
+  /** 用 AI 生成的回复替换当前对客草稿，focus 为真时聚焦输入框。 */
+  const applyReplySuggestion = useCallback((reply: string, focus = true) => {
+    // 候选回复始终填入对客草稿，内部备注模式下先切回对客页签。
+    if (visibility === MessageVisibility.MessageVisibilityInternalOnly) {
+      draftsRef.current[MessageVisibility.MessageVisibilityCustomerVisible] = reply
+      focusAfterSwitchRef.current = focus
+      onVisibilityChange?.(MessageVisibility.MessageVisibilityCustomerVisible)
+      return
+    }
+    form.setValue("body", reply, { shouldDirty: true })
+    window.requestAnimationFrame(() => {
+      resizeComposerInput(inputRef.current)
+      if (focus) form.setFocus("body")
+    })
+  }, [form, onVisibilityChange, visibility])
+
+  useEffect(() => {
+    if (!draftBridgeRef) return
+    // 向 AI 助手提供读取和替换对客草稿的入口；移动端填入后返回会话，不弹出键盘。
+    draftBridgeRef.current = {
+      read: () =>
+        internalNote
+          ? (draftsRef.current[MessageVisibility.MessageVisibilityCustomerVisible] ?? "")
+          : form.getValues("body"),
+      replace: (body) => applyReplySuggestion(body, !mobile),
+    }
+    return () => {
+      draftBridgeRef.current = null
+    }
+  }, [applyReplySuggestion, draftBridgeRef, form, internalNote, mobile])
+
+  /** 在桌面键盘上提交消息，并保留 Shift+Enter 换行。 */
+  function submitFromKeyboard(event: KeyboardEvent<HTMLTextAreaElement>) {
+    if (disabledReason) return
+    const composing =
+      event.keyCode === 229 || event.nativeEvent.isComposing
+    if (handleMentionKeyDown(event, composing)) return
+    // 提示可见时 Enter 切到内部备注，Escape 关闭提示，均不发送对客消息。
+    if (!composing && noteMentionHint && (event.key === "Escape" || (event.key === "Enter" && !event.shiftKey))) {
+      event.preventDefault()
+      if (event.key === "Enter") switchVisibility(MessageVisibility.MessageVisibilityInternalOnly)
+      else setMentionQuery(null)
+      return
+    }
+    if (
+      !submitOnEnter ||
+      event.key !== "Enter" ||
+      event.shiftKey ||
+      composing
+    ) {
+      return
+    }
+    event.preventDefault()
+    if (!form.formState.isSubmitting && !isBodyEmpty) {
+      void form.handleSubmit(send)()
+    }
+  }
+
+  const [showSubmitting, setShowSubmitting] = useState(false)
+  useEffect(() => {
+    if (!isSubmitting) {
+      setShowSubmitting(false)
+      return
+    }
+    const timer = window.setTimeout(
+      () => setShowSubmitting(true),
+      conversationSendingIndicatorDelay,
+    )
+    return () => window.clearTimeout(timer)
+  }, [isSubmitting])
+
+  return {
+    form, inputRef, inputID, bodyValue, isBodyEmpty, isSubmitting, internalNote, disabledReason,
+    mobile, groupConversation, customerAttachmentSupported, customerAttachmentByteLimit, customerAttachmentCaptionLimit,
+    mentionCandidates, activeMentionIndex, mentionQuery, noteMentionHint, selectMention, switchVisibility,
+    setMentionAllToken, typingReport, reconcileMentions, updateMentionQuery, setMentionQuery,
+    insertEmoji, applyReplySuggestion, submitFromKeyboard, showSubmitting, send,
+  }
+}

@@ -33,6 +33,15 @@ export function useAutoSave<T extends FieldValues>({
   const saving = useRef(false)
   const queued = useRef<"changed" | "forced" | null>(null)
   const saved = useRef(JSON.stringify(form.getValues()))
+  const savedVersion = useRef(0)
+  const mounted = useRef(false)
+
+  useEffect(() => {
+    mounted.current = true
+    return () => {
+      mounted.current = false
+    }
+  }, [])
 
   /** 保存当前值；force 为 true 时即使与上次保存结果相同也提交。 */
   async function flush(force = false) {
@@ -46,13 +55,16 @@ export function useAutoSave<T extends FieldValues>({
     if (!force && serialized === saved.current) return
 
     saving.current = true
+    const version = savedVersion.current
     try {
-      if (await latest.current.save(parsed.data)) saved.current = serialized
+      if (await latest.current.save(parsed.data)) {
+        if (version === savedVersion.current) saved.current = serialized
+      }
     } finally {
       saving.current = false
       const next = queued.current
       queued.current = null
-      if (next) void flush(next === "forced")
+      if (next && !discarded?.current) void flush(next === "forced")
     }
   }
   const flushRef = useRef(flush)
@@ -80,6 +92,22 @@ export function useAutoSave<T extends FieldValues>({
     /** 服务端返回新值后同步保存基准，回填值与基准相同时跳过保存。 */
     markSaved(values: T) {
       saved.current = JSON.stringify(values)
+      savedVersion.current += 1
+    },
+    /** 确认已保存快照，仅在当前值仍与提交值相同时回填服务端结果。 */
+    acceptSaved(submitted: T, values: T = submitted) {
+      saved.current = JSON.stringify(values)
+      savedVersion.current += 1
+      const current = latest.current.schema.safeParse(form.getValues())
+      if (
+        mounted.current &&
+        current.success &&
+        JSON.stringify(current.data) === JSON.stringify(submitted)
+      ) {
+        form.reset(values)
+        return true
+      }
+      return false
     },
     /** 立即排队保存一次并与自动保存串行；force 用于表单值之外的改动（如成员分配），值未变也提交。 */
     saveNow(force = false) {

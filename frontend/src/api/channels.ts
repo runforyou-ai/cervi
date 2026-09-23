@@ -11,6 +11,7 @@ import {
   SaveTelegramChannelConnection,
   TestTelegramChannelConnection,
   UpdateMessageChannel,
+  UpdateMessageChannelReception,
   UpdateWebsiteChannelAccess,
   UpdateWebsiteChannelChatInterface,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
@@ -43,6 +44,9 @@ export const createMessageChannel = bind(CreateMessageChannel)
 
 /** 修改消息渠道基础信息。 */
 export const updateMessageChannel = bind(UpdateMessageChannel)
+
+/** 修改消息渠道接待设置。 */
+export const updateMessageChannelReception = bind(UpdateMessageChannelReception)
 
 /** 测试 Telegram 草稿 Token。 */
 export const testTelegramChannelConnection = bind(

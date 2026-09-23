@@ -9,6 +9,19 @@ import (
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
+// MessageChannelBasicsInput 定义渠道基础信息的编辑字段。
+type MessageChannelBasicsInput struct {
+	Name          string
+	Description   string
+	DefaultLocale domain.Locale
+}
+
+// MessageChannelReceptionInput 定义渠道接待设置的编辑字段。
+type MessageChannelReceptionInput struct {
+	NewConversationTarget RoutingTarget
+	FallbackTarget        RoutingTarget
+}
+
 // MessageChannelInput 定义消息渠道可编辑的通用字段。
 type MessageChannelInput struct {
 	Name                  string

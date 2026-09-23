@@ -389,10 +389,8 @@ func TestCustomerProfileConversationInvalidation(t *testing.T) {
 	updateChannel := channelaction.NewUpdateMessageChannelAction(f.db)
 	// renameChannel 只修改渠道名称。
 	renameChannel := func(name string) error {
-		_, err := updateChannel.Execute(ctx, f.owner, f.channelID, channelaction.MessageChannelInput{
+		_, err := updateChannel.ExecuteBasics(ctx, f.owner, f.channelID, channelaction.MessageChannelBasicsInput{
 			Name: name, DefaultLocale: domain.LocaleChineseSimplified,
-			NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
-			FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 		})
 		return err
 	}

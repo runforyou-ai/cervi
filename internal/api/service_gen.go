@@ -95,6 +95,7 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.GET("/channels/:channelID", s.getMessageChannel)
 	router.POST("/channels", s.createMessageChannel)
 	router.PUT("/channels/:channelID", s.updateMessageChannel)
+	router.PUT("/channels/:channelID/reception", s.updateMessageChannelReception)
 	router.PUT("/channels/website/:channelID/chat-interface", s.updateWebsiteChannelChatInterface)
 	router.PUT("/channels/website/:channelID/access", s.updateWebsiteChannelAccess)
 	router.POST("/channels/:channelID/deactivate", s.deactivateMessageChannel)
@@ -869,11 +870,21 @@ func (s *Service) createMessageChannel(c *gin.Context) {
 
 // updateMessageChannel 修改消息渠道基础信息。
 func (s *Service) updateMessageChannel(c *gin.Context) {
-	var input appservice.MessageChannelInput
+	var input appservice.MessageChannelBasicsInput
 	if !bindJSON(c, &input) {
 		return
 	}
 	output, err := s.application.UpdateMessageChannel(c.Request.Context(), requestMeta(c), c.Param("channelID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// updateMessageChannelReception 修改消息渠道接待设置。
+func (s *Service) updateMessageChannelReception(c *gin.Context) {
+	var input appservice.MessageChannelReceptionInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.UpdateMessageChannelReception(c.Request.Context(), requestMeta(c), c.Param("channelID"), input)
 	writeResult(c, http.StatusOK, output, err)
 }
 
