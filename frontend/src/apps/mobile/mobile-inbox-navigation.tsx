@@ -1,5 +1,5 @@
 /** 移动端收件箱页签、地址查询和服务会话筛选面板。 */
-import { useState, type ReactNode } from "react"
+import { useState, type ReactNode, type Ref } from "react"
 import { useTranslation } from "react-i18next"
 import { useSearchParams } from "react-router"
 
@@ -66,45 +66,49 @@ export function useMobileInboxQuery() {
 /** 移动端收件箱当前列表的完整筛选。 */
 export type MobileInboxQuery = ReturnType<typeof useMobileInboxQuery>["query"]
 
-/** 展示待处理与全部两个页签，待处理以中性徽标显示本人待处理数。 */
+/** 展示待处理与全部两个页签，待处理以中性徽标显示本人待处理数；指示线位置由调用方按滑动进度写入。 */
 export function MobileInboxScopes({
   scope,
   pendingCount,
-  onChange,
+  indicatorRef,
+  onSelect,
 }: {
   scope: InboxScope
   pendingCount: number
-  onChange: (query: Partial<InboxQuery>) => void
+  indicatorRef: Ref<HTMLSpanElement>
+  onSelect: (scope: InboxScope) => void
 }) {
   const { t } = useTranslation("inbox")
   return (
-    <nav
-      aria-label={t("tabLabel")}
-      className="grid shrink-0 grid-cols-2 border-b px-4"
-    >
-      {inboxTabs.map(({ value, label }) => (
-        <button
-          key={value}
-          type="button"
-          aria-pressed={scope === value}
-          onClick={() => onChange({ scope: value })}
-          className={cn(
-            "flex min-h-11 items-center justify-center gap-1.5 border-b-2 border-transparent px-2 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
-            scope === value
-              ? "border-primary text-primary"
-              : "text-muted-foreground",
-          )}
-        >
-          {t(label)}
-          {value === InboxScope.InboxScopePending && pendingCount > 0 ? (
-            <CountBadge
-              count={pendingCount}
-              tone="neutral"
-              label={t("pendingCount", { count: pendingCount })}
-            />
-          ) : null}
-        </button>
-      ))}
+    <nav aria-label={t("tabLabel")} className="shrink-0 border-b px-4">
+      <div className="relative grid grid-cols-2">
+        {inboxTabs.map(({ value, label }) => (
+          <button
+            key={value}
+            type="button"
+            aria-pressed={scope === value}
+            onClick={() => onSelect(value)}
+            className={cn(
+              "flex min-h-11 items-center justify-center gap-1.5 px-2 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+              scope === value ? "text-primary" : "text-muted-foreground",
+            )}
+          >
+            {t(label)}
+            {value === InboxScope.InboxScopePending && pendingCount > 0 ? (
+              <CountBadge
+                count={pendingCount}
+                tone="neutral"
+                label={t("pendingCount", { count: pendingCount })}
+              />
+            ) : null}
+          </button>
+        ))}
+        <span
+          ref={indicatorRef}
+          aria-hidden="true"
+          className="absolute bottom-0 left-0 h-0.5 w-1/2 bg-primary"
+        />
+      </div>
     </nav>
   )
 }

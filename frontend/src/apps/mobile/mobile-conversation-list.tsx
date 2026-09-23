@@ -1,5 +1,5 @@
-/** 移动端会话列表外壳：会话行、置顶排序、长按菜单、加载与空状态，以及列表区左右滑动。 */
-import { useEffect, useRef, useState, type ReactNode } from "react"
+/** 移动端会话列表：标题栏、会话行、置顶排序、长按菜单、加载与空状态。 */
+import { useEffect, useRef, type ReactNode } from "react"
 import { GripVerticalIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
@@ -24,7 +24,6 @@ import {
   useMobileNavigation,
 } from "@/apps/mobile/mobile-navigation"
 import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
-import { LoadingIndicator } from "@/components/loading-indicator"
 import { Button } from "@/components/ui/button"
 import {
   ConversationListMenu,
@@ -169,37 +168,56 @@ export function useMobileListOptions() {
   return { identity, active: pollingActive, history: inboxWindows }
 }
 
-/** 渲染带标题栏的会话列表，排序模式下标题栏只保留完成按钮；onSwipe 返回是否切换了范围。 */
-export function MobileConversationListPage({
+/** 渲染列表标题栏，排序模式下只保留完成按钮。 */
+export function MobileListHeader({
   title,
   actions,
-  toolbar,
+  sorting,
+  onSortingDone,
+}: {
+  title: string
+  actions: ReactNode
+  sorting: boolean
+  onSortingDone: () => void
+}) {
+  const { t } = useTranslation("inbox")
+  return (
+    <MobilePageHeader
+      title={title}
+      actions={sorting ? (
+        <Button variant="ghost" className="-mr-2 min-h-11" onClick={onSortingDone}>
+          {t("pinSortDone")}
+        </Button>
+      ) : actions}
+    />
+  )
+}
+
+/** 渲染会话列表主体：加载、错误与空状态，置顶区在前的会话行和置顶排序。 */
+export function MobileConversationList({
   list,
   viewport,
   showAssignee,
   showAudience,
   emptyTitle,
   emptyDescription,
-  onSwipe,
+  sorting,
+  onSortingChange,
 }: {
-  title: string
-  actions: ReactNode
-  toolbar: ReactNode
   list: InboxList | PartitionedInboxList
   viewport: InboxListViewport
   showAssignee: boolean
   showAudience: boolean
   emptyTitle: string
   emptyDescription: string
-  onSwipe?: (direction: 1 | -1) => boolean
+  sorting: boolean
+  onSortingChange: (sorting: boolean) => void
 }) {
-  const { t } = useTranslation(["mobile", "inbox", "common"])
+  const { t } = useTranslation("mobile")
   const conversationName = useConversationName()
   const navigate = useNavigate()
-  const actionsState = useConversationListActions(list.settlePin)
-  const [sorting, setSorting] = useState(false)
+  const actions = useConversationListActions(list.settlePin)
   const exitSortingOnMenuClose = useRef(false)
-  const swipeStart = useRef<{ x: number; y: number } | null>(null)
   useMinuteTick()
   useEffect(() => {
     if (!sorting) return
@@ -207,11 +225,11 @@ export function MobileConversationListPage({
     const exitSorting = (event: Event) => {
       if (event.defaultPrevented) return
       event.preventDefault()
-      setSorting(false)
+      onSortingChange(false)
     }
     window.addEventListener("cervi:back", exitSorting)
     return () => window.removeEventListener("cervi:back", exitSorting)
-  }, [sorting])
+  }, [sorting, onSortingChange])
   const conversations = list.conversations.filter(isMobileInboxConversation)
   const names = new Map(
     conversations.map((conversation) => [
@@ -223,7 +241,7 @@ export function MobileConversationListPage({
   const row = (conversation: MobileInboxConversation) => ({
     conversation,
     name: names.get(conversation.id) ?? "",
-    actions: actionsState,
+    actions,
     pinOrderVersion: list.pinOrderVersion,
     showAssignee,
     showAudience,
@@ -231,11 +249,11 @@ export function MobileConversationListPage({
     // 排序中打开的菜单在关闭后结束排序，菜单打开期间手柄保持占位。
     onMenuChange: (open: boolean) => {
       if (open) exitSortingOnMenuClose.current = sorting
-      else if (exitSortingOnMenuClose.current) setSorting(false)
+      else if (exitSortingOnMenuClose.current) onSortingChange(false)
       viewport.setMenu(open)
     },
     onOpen: (conversation: MobileInboxConversation) => {
-      setSorting(false)
+      onSortingChange(false)
       navigate(mobileConversationPath(conversation), {
         state: { conversation, mobileBack: true },
       })
@@ -243,96 +261,45 @@ export function MobileConversationListPage({
   })
 
   return (
-    <section className="flex h-full min-h-0 flex-col">
-      <MobilePageHeader
-        title={title}
-        actions={sorting ? (
-          <Button
-            variant="ghost"
-            className="-mr-2 min-h-11"
-            onClick={() => setSorting(false)}
-          >
-            {t("inbox:pinSortDone")}
-          </Button>
-        ) : actions}
-      />
-      {toolbar}
-      <div
-        className="flex min-h-0 flex-1 flex-col"
-        onTouchStart={(event) => {
-          // 菜单打开期间的触摸只服务于菜单本身，从排序手柄开始的触摸只用于拖动。
-          const touch = event.touches[0]
-          const onHandle =
-            event.target instanceof Element &&
-            event.target.closest("[data-pin-sort-handle]") !== null
-          swipeStart.current =
-            onSwipe && touch && !onHandle && !viewport.interaction.current.menu
-              ? { x: touch.clientX, y: touch.clientY }
-              : null
-        }}
-        onTouchCancel={() => {
-          swipeStart.current = null
-        }}
-        onTouchEnd={(event) => {
-          const start = swipeStart.current
-          const touch = event.changedTouches[0]
-          swipeStart.current = null
-          if (!onSwipe || !start || !touch || viewport.interaction.current.menu) return
-          const moveX = touch.clientX - start.x
-          const moveY = touch.clientY - start.y
-          // 横向位移达到阈值且是纵向的两倍以上时判定为切换范围的滑动。
-          if (Math.abs(moveX) < 64 || Math.abs(moveX) < Math.abs(moveY) * 2)
-            return
-          // 抬手后的点击不应落到滑动经过的会话行上。
-          if (onSwipe(moveX < 0 ? 1 : -1)) event.preventDefault()
-        }}
-      >
-        <InboxListPanel list={list} viewport={viewport} mobile>
-          {initial && !list.error ? (
-            <LoadingIndicator className="min-h-64 flex-1 justify-center">
-              {t("common:status.loading")}
-            </LoadingIndicator>
-          ) : null}
-          {initial && list.error ? (
-            <MobilePageState
-              title={t("listLoadError")}
-              onRetry={() => void list.retry()}
-            />
-          ) : null}
-          {!initial && conversations.length === 0 && !list.hasBefore && !list.hasAfter ? (
-            <MobilePageState title={emptyTitle} description={emptyDescription} />
-          ) : null}
-          {conversations.length > 0 ? (
-            <ul>
-              <PinnedConversationList
-                conversations={conversations}
-                pinnedIds={list.pinnedIds}
-                names={names}
-                pinOrderVersion={list.pinOrderVersion}
-                actions={actionsState}
-                onDraggingChange={viewport.setDragging}
-                renderPinned={(conversation, order, index) => (
-                  <SortableMobileConversationRow
-                    key={conversation.id}
-                    {...row(conversation)}
-                    pinMoves={{
-                      up: pinMoveCommand(order, conversation.id, index - 1, list.pinOrderVersion),
-                      down: pinMoveCommand(order, conversation.id, index + 1, list.pinOrderVersion),
-                      sort: () => {
-                        exitSortingOnMenuClose.current = false
-                        setSorting(true)
-                      },
-                    }}
-                  />
-                )}
-                renderRow={(conversation) => (
-                  <MobileConversationRow key={conversation.id} {...row(conversation)} />
-                )}
+    <InboxListPanel list={list} viewport={viewport} mobile>
+      {initial && list.error ? (
+        <MobilePageState
+          title={t("listLoadError")}
+          onRetry={() => void list.retry()}
+        />
+      ) : null}
+      {!initial && conversations.length === 0 && !list.hasBefore && !list.hasAfter ? (
+        <MobilePageState title={emptyTitle} description={emptyDescription} />
+      ) : null}
+      {conversations.length > 0 ? (
+        <ul>
+          <PinnedConversationList
+            conversations={conversations}
+            pinnedIds={list.pinnedIds}
+            names={names}
+            pinOrderVersion={list.pinOrderVersion}
+            actions={actions}
+            onDraggingChange={viewport.setDragging}
+            renderPinned={(conversation, order, index) => (
+              <SortableMobileConversationRow
+                key={conversation.id}
+                {...row(conversation)}
+                pinMoves={{
+                  up: pinMoveCommand(order, conversation.id, index - 1, list.pinOrderVersion),
+                  down: pinMoveCommand(order, conversation.id, index + 1, list.pinOrderVersion),
+                  sort: () => {
+                    exitSortingOnMenuClose.current = false
+                    onSortingChange(true)
+                  },
+                }}
               />
-            </ul>
-          ) : null}
-        </InboxListPanel>
-      </div>
-    </section>
+            )}
+            renderRow={(conversation) => (
+              <MobileConversationRow key={conversation.id} {...row(conversation)} />
+            )}
+          />
+        </ul>
+      ) : null}
+    </InboxListPanel>
   )
 }

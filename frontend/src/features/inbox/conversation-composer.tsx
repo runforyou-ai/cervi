@@ -582,7 +582,7 @@ export function ConversationComposer({
                       className={cn(
                         composerToolClass,
                         internalNote &&
-                          "bg-note-active text-note-active-foreground hover:bg-note-active hover:text-note-active-foreground",
+                          "bg-note-active text-note-active-foreground hover:bg-note-active hover:text-note-active-foreground dark:hover:bg-note-active",
                       )}
                       aria-label={t("composerModeNote")}
                       onClick={() =>
@@ -635,12 +635,16 @@ export function ConversationComposer({
                 <IconTooltip label={t(internalNote ? "internalNoteSave" : "messageSend")}>
                   <Button
                     type="submit"
+                    variant="ghost"
                     size="icon-sm"
-                    className="relative rounded-full after:absolute after:-inset-1 after:content-['']"
+                    className={cn(composerToolClass, "group")}
                     disabled={isSubmitting || Boolean(disabledReason) || isBodyEmpty || replyTo?.deleted}
                     aria-label={t(internalNote ? "internalNoteSave" : "messageSend")}
                   >
-                    {showSubmitting ? <LoaderCircleIcon className="animate-spin" /> : <ArrowUpIcon />}
+                    {/* 28px 按钮内绘制 24px 主色实心圆。 */}
+                    <span className="flex size-6 items-center justify-center rounded-full bg-primary text-primary-foreground transition-colors group-hover:bg-primary/90">
+                      {showSubmitting ? <LoaderCircleIcon className="size-3.5 animate-spin" /> : <ArrowUpIcon className="size-3.5" />}
+                    </span>
                   </Button>
                 </IconTooltip>
               ) : (
