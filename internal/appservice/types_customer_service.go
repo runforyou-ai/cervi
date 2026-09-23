@@ -52,3 +52,29 @@ type ServiceCategory struct {
 type ServiceCategoryList struct {
 	Categories []ServiceCategory `json:"categories"`
 }
+
+// CustomerIdentitySecret 定义企业客户身份密钥，未生成时 Secret 为空。
+type CustomerIdentitySecret struct {
+	Secret string `json:"secret"`
+}
+
+// CustomerProfile 定义客户会话的客户身份与当前周期访客上下文；未验证身份时企业用户编号为空。
+type CustomerProfile struct {
+	IdentityVerified bool           `json:"identityVerified"`
+	ExternalUserID   string         `json:"externalUserId"`
+	Email            string         `json:"email"`
+	Visit            *CustomerVisit `json:"visit"`
+}
+
+// CustomerVisit 定义网站访客在当前周期的来源页、当前页与浏览器环境，页面地址不含查询串与 hash。
+type CustomerVisit struct {
+	ReferrerURL string `json:"referrerUrl"`
+	PageURL     string `json:"pageUrl"`
+	PageTitle   string `json:"pageTitle"`
+	Browser     string `json:"browser"`
+	OS          string `json:"os"`
+	DeviceType  string `json:"deviceType"`
+	Language    string `json:"language"`
+	TimeZone    string `json:"timeZone"`
+	Country     string `json:"country"`
+}

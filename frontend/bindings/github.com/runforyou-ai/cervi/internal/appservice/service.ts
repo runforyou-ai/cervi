@@ -451,6 +451,20 @@ export function GetConversationNavigationState(meta: $models.RequestMeta, conver
 }
 
 /**
+ * GetCustomerIdentitySecret 读取当前企业的客户身份密钥，未生成时为空。
+ */
+export function GetCustomerIdentitySecret(meta: $models.RequestMeta): $CancellablePromise<$models.CustomerIdentitySecret> {
+    return $Call.ByID(3521433016, meta);
+}
+
+/**
+ * GetCustomerProfile 返回客户会话的客户身份与当前周期访客上下文。
+ */
+export function GetCustomerProfile(meta: $models.RequestMeta, conversationID: string): $CancellablePromise<$models.CustomerProfile> {
+    return $Call.ByID(4235789851, meta, conversationID);
+}
+
+/**
  * GetGroupConversation 返回当前成员可见的群聊资料。
  */
 export function GetGroupConversation(meta: $models.RequestMeta, conversationID: string): $CancellablePromise<$models.GroupConversation> {
@@ -973,6 +987,13 @@ export function RefetchKnowledgeDocument(meta: $models.RequestMeta, knowledgeBas
  */
 export function RefreshMCPServerTools(meta: $models.RequestMeta): $CancellablePromise<void> {
     return $Call.ByID(3429373167, meta);
+}
+
+/**
+ * RegenerateCustomerIdentitySecret 生成或重新生成当前企业的客户身份密钥，旧密钥立即失效。
+ */
+export function RegenerateCustomerIdentitySecret(meta: $models.RequestMeta): $CancellablePromise<$models.CustomerIdentitySecret> {
+    return $Call.ByID(2223815906, meta);
 }
 
 /**

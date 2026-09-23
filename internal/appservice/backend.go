@@ -71,6 +71,9 @@ type Backend interface {
 	// ReadInboxWindow 重读已加载双向边界之间的完整列表范围。
 	//cervi:route POST /inbox/window/query
 	ReadInboxWindow(context.Context, RequestMeta, InboxWindowInput) (InboxWindow, error)
+	// GetCustomerProfile 返回客户会话的客户身份与当前周期访客上下文。
+	//cervi:route GET /conversations/:conversationID/customer-profile
+	GetCustomerProfile(context.Context, RequestMeta, string) (CustomerProfile, error)
 	// GetInboxConversation 返回当前用户有权阅读的独立会话摘要。
 	//cervi:route GET /conversations/:conversationID/summary
 	GetInboxConversation(context.Context, RequestMeta, string) (InboxConversation, error)
@@ -535,6 +538,12 @@ type Backend interface {
 	// UpdateOrganization 修改当前企业通用设置。
 	//cervi:route PUT /settings/organization
 	UpdateOrganization(context.Context, RequestMeta, OrganizationInput) (Organization, error)
+	// GetCustomerIdentitySecret 读取当前企业的客户身份密钥，未生成时为空。
+	//cervi:route GET /settings/customer-service/identity-secret
+	GetCustomerIdentitySecret(context.Context, RequestMeta) (CustomerIdentitySecret, error)
+	// RegenerateCustomerIdentitySecret 生成或重新生成当前企业的客户身份密钥，旧密钥立即失效。
+	//cervi:route POST /settings/customer-service/identity-secret
+	RegenerateCustomerIdentitySecret(context.Context, RequestMeta) (CustomerIdentitySecret, error)
 	// GetBusinessHours 读取当前企业的客服工作时间。
 	//cervi:route GET /settings/customer-service/business-hours
 	GetBusinessHours(context.Context, RequestMeta) (BusinessHours, error)

@@ -126,6 +126,14 @@ func (b *Backend) ReadInboxWindow(ctx context.Context, meta appservice.RequestMe
 	return output, err
 }
 
+// GetCustomerProfile 返回客户会话的客户身份与当前周期访客上下文。
+func (b *Backend) GetCustomerProfile(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.CustomerProfile, error) {
+	var output appservice.CustomerProfile
+	err := b.do(ctx, meta, http.MethodGet, "/conversations/"+url.PathEscape(conversationID)+"/customer-profile", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // GetInboxConversation 返回当前用户有权阅读的独立会话摘要。
 func (b *Backend) GetInboxConversation(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.InboxConversation, error) {
 	var output appservice.InboxConversation
@@ -1282,6 +1290,22 @@ func (b *Backend) DeleteMCPServer(ctx context.Context, meta appservice.RequestMe
 func (b *Backend) UpdateOrganization(ctx context.Context, meta appservice.RequestMeta, input appservice.OrganizationInput) (appservice.Organization, error) {
 	var output appservice.Organization
 	err := b.do(ctx, meta, http.MethodPut, "/settings/organization", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// GetCustomerIdentitySecret 读取当前企业的客户身份密钥，未生成时为空。
+func (b *Backend) GetCustomerIdentitySecret(ctx context.Context, meta appservice.RequestMeta) (appservice.CustomerIdentitySecret, error) {
+	var output appservice.CustomerIdentitySecret
+	err := b.do(ctx, meta, http.MethodGet, "/settings/customer-service/identity-secret", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// RegenerateCustomerIdentitySecret 生成或重新生成当前企业的客户身份密钥，旧密钥立即失效。
+func (b *Backend) RegenerateCustomerIdentitySecret(ctx context.Context, meta appservice.RequestMeta) (appservice.CustomerIdentitySecret, error) {
+	var output appservice.CustomerIdentitySecret
+	err := b.do(ctx, meta, http.MethodPost, "/settings/customer-service/identity-secret", nil, nil, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }

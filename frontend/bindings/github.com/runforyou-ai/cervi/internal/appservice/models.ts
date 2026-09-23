@@ -1421,6 +1421,13 @@ export enum CustomerDeliveryStatus {
 };
 
 /**
+ * CustomerIdentitySecret 定义企业客户身份密钥，未生成时 Secret 为空。
+ */
+export interface CustomerIdentitySecret {
+    "secret": string;
+}
+
+/**
  * CustomerInboxConversation 定义客户会话摘要。
  */
 export interface CustomerInboxConversation {
@@ -1488,6 +1495,16 @@ export interface CustomerMessageDelivery {
     "messageId": string;
     "status": CustomerDeliveryStatus;
     "lastError": string;
+}
+
+/**
+ * CustomerProfile 定义客户会话的客户身份与当前周期访客上下文；未验证身份时企业用户编号为空。
+ */
+export interface CustomerProfile {
+    "identityVerified": boolean;
+    "externalUserId": string;
+    "email": string;
+    "visit": CustomerVisit | null;
 }
 
 /**
@@ -1599,6 +1616,21 @@ export interface CustomerTextMessageInput {
      * MentionIdentityIDs 是内部备注提醒的企业成员身份，按正文出现顺序排列；对客消息不得携带。
      */
     "mentionIdentityIds": string[] | null;
+}
+
+/**
+ * CustomerVisit 定义网站访客在当前周期的来源页、当前页与浏览器环境，页面地址不含查询串与 hash。
+ */
+export interface CustomerVisit {
+    "referrerUrl": string;
+    "pageUrl": string;
+    "pageTitle": string;
+    "browser": string;
+    "os": string;
+    "deviceType": string;
+    "language": string;
+    "timeZone": string;
+    "country": string;
 }
 
 /**

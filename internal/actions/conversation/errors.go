@@ -22,6 +22,8 @@ var (
 	ErrMentionTargetInvalid = errors.New("conversation mention target invalid")
 	// ErrChannelNotFound 表示网站渠道不存在或不可用。
 	ErrChannelNotFound = errors.New("website channel not found")
+	// ErrCustomerIdentityInvalid 表示网站登录用户签名身份无效、过期或企业尚未生成客户身份密钥。
+	ErrCustomerIdentityInvalid = errors.New("website customer identity invalid")
 	// ErrConversationNotFound 表示会话不存在或当前身份无权访问。
 	ErrConversationNotFound = chatstate.ErrConversationNotFound
 	// ErrDirectTargetNotFound 表示内部单聊目标不存在或不可用。

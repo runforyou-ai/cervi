@@ -68,12 +68,17 @@ func (p customerRunPolicy) prepareLocked(ctx context.Context, db bun.IDB, policy
 	return false, nil
 }
 
-// loadMessages 读取本轮客服周期内的模型上下文；本轮最后认领的输入是超时跟进时，在末尾追加系统跟进提示。
+// loadMessages 读取本轮客服周期内的模型上下文：开头是客户身份与访问上下文，本轮最后认领的输入是超时跟进时在末尾追加系统跟进提示。
 func (p customerRunPolicy) loadMessages(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, endSeq int64, links attachmentLinks) ([]agentruntime.Message, error) {
+	customer, err := loadCustomerContextMessage(ctx, db, run)
+	if err != nil {
+		return nil, err
+	}
 	messages, err := loadClaimedCustomerMessages(ctx, db, run, endSeq, links)
 	if err != nil {
 		return nil, err
 	}
+	messages = append([]agentruntime.Message{customer}, messages...)
 	input, err := loadLastClaimedInput(ctx, db, run, endSeq)
 	if err != nil {
 		return nil, err
@@ -360,4 +365,39 @@ func ensureCustomerAgentParticipant(ctx context.Context, db bun.IDB, organizatio
 		}
 	}
 	return participant.ID, nil
+}
+
+// loadCustomerContextMessage 读取客服周期的客户身份与访客上下文并投影为系统提供的上下文消息；内容变化时修订随之变化。
+// 只提供是否已验证身份、名称与本次访问信息，不含企业用户编号、邮箱与签名身份。
+func loadCustomerContextMessage(ctx context.Context, db bun.IDB, run *servermodels.AgentRun) (agentruntime.Message, error) {
+	row := struct {
+		ExternalID     string                 `bun:"external_id"`
+		ExternalUserID *string                `bun:"external_user_id"`
+		Name           *string                `bun:"name"`
+		VisitorContext *domain.VisitorContext `bun:"visitor_context,type:jsonb"`
+	}{}
+	if err := db.NewSelect().
+		TableExpr("service_sessions AS ss").
+		ColumnExpr("cci.external_id, c.external_user_id, ss.visitor_context").
+		ColumnExpr("COALESCE(cci.display_name, c.display_name) AS name").
+		Join("JOIN contact_channel_identities AS cci ON cci.id = ss.contact_channel_identity_id AND cci.organization_id = ss.organization_id").
+		Join("JOIN contacts AS c ON c.id = cci.contact_id AND c.organization_id = cci.organization_id").
+		Where("ss.organization_id = ?", run.OrganizationID).
+		Where("ss.id = ?", run.ScopeID).
+		Scan(ctx, &row); err != nil {
+		return agentruntime.Message{}, fmt.Errorf("load customer context: %w", err)
+	}
+	customer := agentruntime.CustomerContext{
+		IdentityVerified: row.ExternalUserID != nil && conversationaction.IsWebsiteCustomerExternalID(row.ExternalID),
+	}
+	if row.Name != nil {
+		customer.Name = *row.Name
+	}
+	if visit := row.VisitorContext; visit != nil {
+		customer.Visit = &agentruntime.CustomerVisit{
+			PageURL: visit.PageURL, PageTitle: visit.PageTitle, Language: visit.Language, TimeZone: visit.TimeZone, Country: visit.Country,
+		}
+	}
+	content := customer.Message()
+	return agentruntime.Message{ID: "customer-context:" + run.ScopeID, Revision: content, Role: agentruntime.MessageRoleUser, Content: content}, nil
 }

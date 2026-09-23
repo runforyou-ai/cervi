@@ -5,6 +5,7 @@ package integrationtest
 import (
 	"context"
 	"encoding/json"
+	"strings"
 	"testing"
 
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
@@ -28,6 +29,10 @@ func resolutionRuntime(content string, decision agentruntime.TerminalDecision, i
 		claimed, err := feed.Claim(ctx, triggers[len(triggers)-1].Seq)
 		if err != nil {
 			return agentruntime.RunResult{}, err
+		}
+		// 去掉开头系统提供的客户上下文消息，只把会话消息交给 inspect。
+		if len(claimed.Messages) > 0 && strings.HasPrefix(claimed.Messages[0].ID, "customer-context:") {
+			claimed.Messages = claimed.Messages[1:]
 		}
 		if inspect != nil {
 			inspect(claimed.Messages)

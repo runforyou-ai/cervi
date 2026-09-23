@@ -73,6 +73,7 @@ const (
 	MessengerReferenceUnavailable      Key = "messenger.reference_unavailable"
 	MessengerReferenceLatest           Key = "messenger.reference_latest"
 	MessengerRequestFailed             Key = "messenger.request_failed"
+	MessengerIdentityExpired           Key = "messenger.identity_expired"
 	MessengerAttachmentUploading       Key = "messenger.attachment_uploading"
 	MessengerAttachmentFailed          Key = "messenger.attachment_failed"
 	MessengerAttachmentCancel          Key = "messenger.attachment_cancel"
