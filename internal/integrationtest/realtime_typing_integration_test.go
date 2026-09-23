@@ -103,7 +103,7 @@ func TestRealtimeConversationTyping(t *testing.T) {
 	}
 
 	// 退出群聊后无法上报，也不再收到该群的输入状态。
-	if err := conversationaction.NewLeaveGroupConversationAction(f.db).Execute(ctx, f.member, f.groupID); err != nil {
+	if err := conversationaction.NewLeaveGroupConversationAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.member, f.groupID); err != nil {
 		t.Fatal(err)
 	}
 	var applicationError *appservice.Error

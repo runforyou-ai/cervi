@@ -444,6 +444,56 @@ func (s *Service) ReactivateAgent(ctx context.Context, meta RequestMeta, agentID
 	return withNormalizedSlices(s.backend.ReactivateAgent(ctx, meta, agentID))
 }
 
+// ListAssistants 返回当前成员名下的助理。
+func (s *Service) ListAssistants(ctx context.Context, meta RequestMeta) (AssistantList, error) {
+	return withNormalizedSlices(s.backend.ListAssistants(ctx, meta))
+}
+
+// ListMemberAssistants 返回指定成员名下的助理。
+func (s *Service) ListMemberAssistants(ctx context.Context, meta RequestMeta, userID string) (AssistantList, error) {
+	return withNormalizedSlices(s.backend.ListMemberAssistants(ctx, meta, userID))
+}
+
+// GetAssistant 返回当前成员名下的助理详情。
+func (s *Service) GetAssistant(ctx context.Context, meta RequestMeta, assistantID string) (AssistantDetail, error) {
+	return withNormalizedSlices(s.backend.GetAssistant(ctx, meta, assistantID))
+}
+
+// CreateAssistant 在当前成员的电脑上创建助理。
+func (s *Service) CreateAssistant(ctx context.Context, meta RequestMeta, input CreateAssistantInput) (Assistant, error) {
+	return withNormalizedSlices(s.backend.CreateAssistant(ctx, meta, input))
+}
+
+// UpdateAssistant 修改当前成员名下的助理。
+func (s *Service) UpdateAssistant(ctx context.Context, meta RequestMeta, assistantID string, input AssistantInput) (Assistant, error) {
+	return withNormalizedSlices(s.backend.UpdateAssistant(ctx, meta, assistantID, input))
+}
+
+// PauseAssistant 暂停当前成员名下的助理。
+func (s *Service) PauseAssistant(ctx context.Context, meta RequestMeta, assistantID string) (Assistant, error) {
+	return withNormalizedSlices(s.backend.PauseAssistant(ctx, meta, assistantID))
+}
+
+// ResumeAssistant 恢复当前成员名下已暂停的助理。
+func (s *Service) ResumeAssistant(ctx context.Context, meta RequestMeta, assistantID string) (Assistant, error) {
+	return withNormalizedSlices(s.backend.ResumeAssistant(ctx, meta, assistantID))
+}
+
+// MoveAssistant 把当前成员名下的助理换到指定电脑。
+func (s *Service) MoveAssistant(ctx context.Context, meta RequestMeta, assistantID string, input AssistantDeviceInput) (Assistant, error) {
+	return withNormalizedSlices(s.backend.MoveAssistant(ctx, meta, assistantID, input))
+}
+
+// DeactivateAssistant 停用助理。
+func (s *Service) DeactivateAssistant(ctx context.Context, meta RequestMeta, assistantID string) (Assistant, error) {
+	return withNormalizedSlices(s.backend.DeactivateAssistant(ctx, meta, assistantID))
+}
+
+// ReactivateAssistant 启用已停用的助理。
+func (s *Service) ReactivateAssistant(ctx context.Context, meta RequestMeta, assistantID string) (Assistant, error) {
+	return withNormalizedSlices(s.backend.ReactivateAssistant(ctx, meta, assistantID))
+}
+
 // ListUsers 返回企业成员列表。
 func (s *Service) ListUsers(ctx context.Context, meta RequestMeta, input UserListInput) (UserList, error) {
 	return withNormalizedSlices(s.backend.ListUsers(ctx, meta, input))
@@ -839,17 +889,17 @@ func (s *Service) ListDeviceWorkspaces(ctx context.Context, meta RequestMeta, de
 	return withNormalizedSlices(s.backend.ListDeviceWorkspaces(ctx, meta, deviceID))
 }
 
-// GetConversationDeviceBinding 返回会话绑定的设备与工作区。
-func (s *Service) GetConversationDeviceBinding(ctx context.Context, meta RequestMeta, conversationID string) (ConversationDeviceBinding, error) {
-	return withNormalizedSlices(s.backend.GetConversationDeviceBinding(ctx, meta, conversationID))
+// ListConversationAssistantWorkspaces 返回会话中各位助理的绑定电脑与工作区。
+func (s *Service) ListConversationAssistantWorkspaces(ctx context.Context, meta RequestMeta, conversationID string) (ConversationAssistantWorkspaceList, error) {
+	return withNormalizedSlices(s.backend.ListConversationAssistantWorkspaces(ctx, meta, conversationID))
 }
 
-// BindConversationDevice 把 AI 单聊绑定到本人设备上的工作区。
-func (s *Service) BindConversationDevice(ctx context.Context, meta RequestMeta, conversationID string, input ConversationDeviceBindingInput) (ConversationDeviceBinding, error) {
-	return withNormalizedSlices(s.backend.BindConversationDevice(ctx, meta, conversationID, input))
+// SetConversationAssistantWorkspace 由主人为会话中的助理指定工作区。
+func (s *Service) SetConversationAssistantWorkspace(ctx context.Context, meta RequestMeta, conversationID string, assistantIdentityID string, input ConversationAssistantWorkspaceInput) error {
+	return s.backend.SetConversationAssistantWorkspace(ctx, meta, conversationID, assistantIdentityID, input)
 }
 
-// UnbindConversationDevice 解除 AI 单聊的设备绑定。
-func (s *Service) UnbindConversationDevice(ctx context.Context, meta RequestMeta, conversationID string) error {
-	return s.backend.UnbindConversationDevice(ctx, meta, conversationID)
+// ClearConversationAssistantWorkspace 由主人清除会话中助理的工作区。
+func (s *Service) ClearConversationAssistantWorkspace(ctx context.Context, meta RequestMeta, conversationID string, assistantIdentityID string) error {
+	return s.backend.ClearConversationAssistantWorkspace(ctx, meta, conversationID, assistantIdentityID)
 }

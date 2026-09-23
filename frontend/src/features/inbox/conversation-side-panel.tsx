@@ -31,6 +31,7 @@ import {
   SidePanelTabsList,
 } from "@/features/inbox/side-panel-layout"
 import { cn } from "@/lib/utils"
+import { isAIIdentityType } from "@/lib/identity-type"
 
 const sidePanelMinWidth = 320
 const sidePanelDefaultWidth = 384
@@ -80,12 +81,13 @@ function InternalConversationProfile({
     conversation && isAgentInboxConversation(conversation)
       ? conversation.agent
       : null
+  const peerType = agent?.agentType ?? direct?.peerType ?? directTarget?.type
   const identityType =
-    agent ||
-    (direct?.peerType ?? directTarget?.type) ===
-      OrganizationIdentityType.OrganizationIdentityTypeAgent
-      ? t("contextIdentityAgent")
-      : t("contextIdentityMember")
+    peerType === OrganizationIdentityType.OrganizationIdentityTypeAssistant
+      ? t("contextIdentityAssistant")
+      : isAIIdentityType(peerType)
+        ? t("contextIdentityAgent")
+        : t("contextIdentityMember")
   const agentStatus = agentRunStatusLabel(agent?.agentRunStatus ?? null, t)
 
   return (

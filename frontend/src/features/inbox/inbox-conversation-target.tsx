@@ -11,7 +11,7 @@ import {
   type DirectInboxConversationData,
   type MemberOption,
 } from "@/api"
-import { listAllMemberOptions } from "@/features/inbox/list-all-member-options"
+import { listChatTargets } from "@/features/inbox/list-all-member-options"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
@@ -33,7 +33,7 @@ export function InboxConversationTarget({
 }) {
   const { t } = useTranslation("inbox")
   const completedRef = useRef(false)
-  const members = useResource(resourceKeys.memberOptions(), listAllMemberOptions, {
+  const members = useResource(resourceKeys.chatTargets(), listChatTargets, {
     staleTime: 0,
   })
   const member = members.data?.find((item) => item.id === identityId)

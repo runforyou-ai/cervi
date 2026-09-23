@@ -234,6 +234,8 @@ type AgentInboxConversation struct {
 	AgentName                 string                    `json:"agentName"`
 	AgentAvatarURL            string                    `json:"agentAvatarUrl"`
 	AgentStatus               UserStatus                `json:"agentStatus"`
+	AgentType                 OrganizationIdentityType  `json:"agentType"`
+	AssistantPresence         *AssistantPresence        `json:"assistantPresence"`
 	Preview                   *string                   `json:"preview"`
 	PreviewSenderIdentityType *OrganizationIdentityType `json:"previewSenderIdentityType"`
 	LastMessageAt             *time.Time                `json:"lastMessageAt"`

@@ -545,7 +545,7 @@ func TestRealtimeGroupMembershipNotifications(t *testing.T) {
 	feed.expect(t, append(changed(f.owner, f.member, third), actorRead(f.owner))...)
 
 	// 主动退出的成员收到失权通知，并作为系统事件操作人收到本人阅读水位通知；其余成员收到变更。
-	if err := conversationaction.NewLeaveGroupConversationAction(f.db).Execute(ctx, third, group.ID); err != nil {
+	if err := conversationaction.NewLeaveGroupConversationAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, third, group.ID); err != nil {
 		t.Fatal(err)
 	}
 	feed.expect(t, append(changed(f.owner, f.member), feed.removed(third.User.ID, group.ID), actorRead(third))...)

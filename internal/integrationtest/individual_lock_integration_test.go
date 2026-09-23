@@ -318,7 +318,7 @@ func TestDirectSendAcceptedBeforeTargetDisabled(t *testing.T) {
 	// 停用在会话锁上等待已通过校验的发送提交，再推进展示该成员的会话版本。
 	disabled := make(chan error, 1)
 	go func() {
-		_, err := useraction.NewUpdateStatusAction(f.db, testServiceSessionReturner(f.db)).Execute(ctx, f.member, f.member.User.ID, domain.UserStatusInactive)
+		_, err := testUserStatusAction(f.db).Execute(ctx, f.member, f.member.User.ID, domain.UserStatusInactive)
 		disabled <- err
 	}()
 	waitChatDatabaseLock(t, ctx, f.db, `FROM "conversations"`, f.member.OrganizationIdentity.ID)

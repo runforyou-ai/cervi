@@ -1,13 +1,10 @@
 /** 本机设备调用。 */
 import {
   AddLocalWorkspace,
-  BindConversationDevice,
   CurrentDevice,
-  GetConversationDeviceBinding,
   ListDeviceWorkspaces,
   ListDevices,
   RevokeDevice,
-  UnbindConversationDevice,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import {
   DevicePlatform,
@@ -51,12 +48,3 @@ export function listDeviceWorkspaces(deviceID: string) {
 
 /** 选择本机目录并注册为本设备的工作区，用户取消选择时返回空工作区编号。 */
 export const addLocalWorkspace = bind(AddLocalWorkspace)
-
-/** 读取会话绑定的设备与工作区。 */
-export const getConversationDeviceBinding = bind(GetConversationDeviceBinding)
-
-/** 把 AI 单聊绑定到本人设备上的工作区。 */
-export const bindConversationDevice = bind(BindConversationDevice)
-
-/** 解除 AI 单聊的设备绑定。 */
-export const unbindConversationDevice = bind(UnbindConversationDevice)

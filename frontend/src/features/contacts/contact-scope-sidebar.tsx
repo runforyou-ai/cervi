@@ -10,7 +10,7 @@ import {
 import { useTranslation } from "react-i18next"
 import { useLocation, useNavigate } from "react-router"
 
-import { ChannelType, type ChannelOption, type Team } from "@/api"
+import { ChannelType, currentDevice, type ChannelOption, type Team } from "@/api"
 import { messageChannelTypeDefinition } from "@/lib/message-channel-types"
 import { PagePaneNav } from "@/components/page-split"
 import { RowActionsMenu } from "@/components/row-actions-menu"
@@ -24,6 +24,8 @@ import {
 import { agentReturnPath } from "@/features/contacts/agents/agent-navigation"
 import { channelTypeLabel } from "@/features/contacts/external/contact-labels"
 import type { ContactScope } from "@/features/contacts/contact-scope"
+import { resourceKeys } from "@/hooks/resource-keys"
+import { useResource } from "@/hooks/use-resource"
 import { cn } from "@/lib/utils"
 
 const contactNavHoverClass =
@@ -87,6 +89,8 @@ export function ContactScopeSidebar({
   const { t } = useTranslation(["contacts", "common"])
   const navigate = useNavigate()
   const location = useLocation()
+  const { data: localDevice } = useResource(resourceKeys.currentDevice(), () => currentDevice())
+  const localDeviceID = localDevice?.deviceId ?? ""
   const groupedChannels = useMemo(() => {
     const groups = new Map<ChannelType, ChannelOption[]>()
     for (const channel of channels) {
@@ -135,6 +139,14 @@ export function ContactScopeSidebar({
             >
               {t("add.agent")}
             </DropdownMenuItem>
+            {/* 只有桌面端能在本机创建助理。 */}
+            <DropdownMenuItem
+              disabled={!localDeviceID}
+              title={localDeviceID ? undefined : t("assistants.createOnDesktop")}
+              onSelect={() => navigate("/contacts/assistants/new")}
+            >
+              {t("add.assistant")}
+            </DropdownMenuItem>
             {/* TODO: 添加外部联系人入口，校验联系人身份和可发送渠道。 */}
             {/*
             <DropdownMenuItem
@@ -175,6 +187,12 @@ export function ContactScopeSidebar({
           onClick={() => navigate("/contacts/ai-employees")}
         >
           {t("scopes.agents")}
+        </SubscopeButton>
+        <SubscopeButton
+          active={scope === "assistants"}
+          onClick={() => navigate("/contacts/assistants")}
+        >
+          {t("scopes.assistants")}
         </SubscopeButton>
         {/* 选中「团队」展示所有团队的成员；进入具体团队时保留路径高亮。 */}
         <SubscopeButton

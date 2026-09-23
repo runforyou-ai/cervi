@@ -14,7 +14,7 @@ import "context"
 // 指令只接受 status 和 query 选项，每个调用先校验登录令牌，再校验 DeviceHeader
 // 指向的设备属于当前用户且未撤销。
 //
-// 本契约的消费者是原生端的设备执行循环，界面发起的设备、工作区与会话绑定管理属于
+// 本契约的消费者是原生端的设备执行循环，界面发起的设备、工作区与助理工作区指定属于
 // Backend，新增方法按消费者归入其中一个。
 type DeviceRunBackend interface {
 	// GetDeviceWork 返回本设备的工作水位与待领取运行。

@@ -67,10 +67,11 @@ func (a *UpdateAgentAction) Execute(ctx context.Context, identity *servermodels.
 		}
 		storedAgent := &servermodels.Agent{}
 		err = tx.NewSelect().Model(storedAgent).
-			Column("identity_id", "status").
-			Where("organization_id = ?", identity.Organization.ID).
-			Where("id = ?", agentID).
-			For("UPDATE").
+			Column("a.identity_id", "a.status").
+			Where("a.organization_id = ?", identity.Organization.ID).
+			Where("a.id = ?", agentID).
+			Where(employeeIdentityCondition).
+			For("UPDATE OF a").
 			Scan(ctx)
 		if errors.Is(err, sql.ErrNoRows) {
 			return ErrNotFound

@@ -46,9 +46,10 @@ type SendGroupTextMessageAction struct {
 }
 
 type groupMemberRow struct {
-	IdentityID   string  `bun:"identity_id"`
-	DisplayName  string  `bun:"display_name"`
-	AvatarFileID *string `bun:"avatar_file_id"`
+	IdentityID   string                          `bun:"identity_id"`
+	IdentityType domain.OrganizationIdentityType `bun:"identity_type"`
+	DisplayName  string                          `bun:"display_name"`
+	AvatarFileID *string                         `bun:"avatar_file_id"`
 }
 
 type groupParticipantRow struct {
@@ -92,7 +93,7 @@ func (a *CreateGroupConversationAction) Execute(ctx context.Context, identity *s
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		members, err := loadActiveGroupMembers(ctx, tx, identity.Organization.ID, normalized.MemberIdentityIDs)
+		members, err := loadActiveGroupMembers(ctx, tx, identity, normalized.MemberIdentityIDs)
 		if err != nil {
 			return err
 		}
@@ -372,18 +373,28 @@ func normalizeGroupConversationInput(currentIdentityID string, input GroupConver
 	return input, fields
 }
 
-// loadActiveGroupMembers 读取同企业可加入群聊的有效真人和 AI 员工。
-func loadActiveGroupMembers(ctx context.Context, db bun.IDB, organizationID string, identityIDs []string) ([]groupMemberRow, error) {
+// loadActiveGroupMembers 读取同企业可加入群聊的有效真人、AI 员工与当前成员本人名下的助理；调用方须在锁定群聊前调用，先对其中 AI 的记录取共享锁，与停用 AI 及其主人的锁序一致。
+func loadActiveGroupMembers(ctx context.Context, db bun.IDB, identity *servermodels.Identity, identityIDs []string) ([]groupMemberRow, error) {
+	var lockedAgentIDs []string
+	if err := db.NewSelect().Model((*servermodels.Agent)(nil)).Column("a.id").
+		Where("a.organization_id = ? AND a.identity_id IN (?)", identity.Organization.ID, bun.In(identityIDs)).
+		OrderExpr("a.id ASC").For("SHARE").
+		Scan(ctx, &lockedAgentIDs); err != nil {
+		return nil, fmt.Errorf("lock group agent members: %w", err)
+	}
 	rows := make([]groupMemberRow, 0, len(identityIDs))
 	if err := db.NewSelect().
 		TableExpr("organization_identities AS oi").
 		ColumnExpr("oi.id AS identity_id").
+		ColumnExpr("oi.type AS identity_type").
 		ColumnExpr("oi.display_name AS display_name").
 		ColumnExpr("oi.avatar_file_id::text AS avatar_file_id").
 		Join("LEFT JOIN users AS u ON u.organization_id = oi.organization_id AND u.identity_id = oi.id").
 		Join("LEFT JOIN agents AS a ON a.organization_id = oi.organization_id AND a.identity_id = oi.id").
-		Where("oi.organization_id = ?", organizationID).
-		Where("(oi.type = ? AND u.status = ?) OR (oi.type = ? AND a.status = ?)", domain.OrganizationIdentityTypeUser, domain.UserStatusActive, domain.OrganizationIdentityTypeAgent, domain.UserStatusActive).
+		Where("oi.organization_id = ?", identity.Organization.ID).
+		Where("(oi.type = ? AND u.status = ?) OR (oi.type = ? AND a.status = ?) OR (oi.type = ? AND a.status = ? AND a.owner_user_id = ?)",
+			domain.OrganizationIdentityTypeUser, domain.UserStatusActive, domain.OrganizationIdentityTypeAgent, domain.UserStatusActive,
+			domain.OrganizationIdentityTypeAssistant, domain.UserStatusActive, identity.User.ID).
 		Where("oi.id IN (?)", bun.In(identityIDs)).
 		OrderExpr("lower(oi.display_name) ASC, oi.id ASC").
 		Scan(ctx, &rows); err != nil {
@@ -395,18 +406,18 @@ func loadActiveGroupMembers(ctx context.Context, db bun.IDB, organizationID stri
 	return rows, nil
 }
 
-// scheduleGroupAgents 按引用目标优先、提醒顺序在后的次序为群内 AI 员工追加输入。
+// scheduleGroupAgents 按引用目标优先、提醒顺序在后的次序为群内 AI 员工与助理追加输入。
 func (a *SendGroupTextMessageAction) scheduleGroupAgents(ctx context.Context, db bun.IDB, organizationID, conversationID, messageID, senderSubjectID string, reply *ConversationMessageReference, mentions []ConversationMessageMention) error {
 	agentIdentityIDs := make([]string, 0, len(mentions)+1)
 	seen := make(map[string]struct{}, len(mentions)+1)
-	// 回复 AI 员工的文本消息与显式点名等价，作为首个执行目标。
+	// 回复 AI 员工或助理的文本消息与显式点名等价，作为首个执行目标。
 	if reply != nil && reply.Sender != nil && reply.Sender.IdentityType != nil &&
-		*reply.Sender.IdentityType == domain.OrganizationIdentityTypeAgent {
+		domain.OrganizationIdentityTypeIsAI(*reply.Sender.IdentityType) {
 		agentIdentityIDs = append(agentIdentityIDs, reply.Sender.SourceID)
 		seen[reply.Sender.SourceID] = struct{}{}
 	}
 	for _, mention := range mentions {
-		if mention.IdentityType != domain.OrganizationIdentityTypeAgent {
+		if !domain.OrganizationIdentityTypeIsAI(mention.IdentityType) {
 			continue
 		}
 		if _, duplicate := seen[mention.SourceID]; duplicate {
@@ -417,6 +428,9 @@ func (a *SendGroupTextMessageAction) scheduleGroupAgents(ctx context.Context, db
 	}
 	if len(agentIdentityIDs) == 0 {
 		return nil
+	}
+	if err := ensureAssistantsReachable(ctx, db, organizationID, agentIdentityIDs); err != nil {
+		return err
 	}
 	if err := a.agentScheduler.ScheduleGroupMentions(ctx, db, organizationID, conversationID, messageID, senderSubjectID, agentIdentityIDs); err != nil {
 		return fmt.Errorf("schedule group agent mentions: %w", err)

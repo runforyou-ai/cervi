@@ -82,6 +82,12 @@ const (
 	ConflictReasonAttachmentTooLarge = "attachment_too_large"
 	// ConflictReasonCaptionTooLong 表示附件说明超过来源渠道的字符上限。
 	ConflictReasonCaptionTooLong = "caption_too_long"
+	// ConflictReasonAssistantPaused 表示助理已被主人暂停，不接收新请求。
+	ConflictReasonAssistantPaused = "assistant_paused"
+	// ConflictReasonAssistantUnbound 表示助理绑定的电脑已撤销，主人换到新电脑前不接收新请求。
+	ConflictReasonAssistantUnbound = "assistant_unbound"
+	// ConflictReasonAssistantInactive 表示被点名的助理已禁用。
+	ConflictReasonAssistantInactive = "assistant_inactive"
 	// ConflictReasonPinOrderVersionStale 表示提交的置顶顺序版本不是当前版本。
 	ConflictReasonPinOrderVersionStale = "pin_order_version_stale"
 	// ConflictReasonPinNeighborNotPinned 表示置顶顺序的邻居会话当前不在置顶区。
@@ -522,7 +528,7 @@ type CustomerAttachmentMessageInput struct {
 	ImageHeight      int
 }
 
-// AttachmentMessageInput 定义已上传附件的发送意图，AgentIdentityID 非空表示按 ConversationID 草稿编号首发 AI 聊天，同时指定 CustomerConversationID 表示首发该客户会话的 Copilot 线程；首发 AI 聊天时 WorkspaceID 非空则同时绑定本人设备上的该工作区。
+// AttachmentMessageInput 定义已上传附件的发送意图，AgentIdentityID 非空表示按 ConversationID 草稿编号首发 AI 聊天，同时指定 CustomerConversationID 表示首发该客户会话的 Copilot 线程；首发本人助理的聊天时 WorkspaceID 非空则同时为助理指定该工作区。
 type AttachmentMessageInput struct {
 	ConversationID         string
 	TargetIdentityID       string

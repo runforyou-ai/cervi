@@ -216,7 +216,7 @@ func TestInboxNameSearchRules(t *testing.T) {
 	}
 
 	// 已退出的群聊不再命中。
-	if err := conversationaction.NewLeaveGroupConversationAction(f.db).Execute(ctx, f.member, percent.ID); err != nil {
+	if err := conversationaction.NewLeaveGroupConversationAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.member, percent.ID); err != nil {
 		t.Fatal(err)
 	}
 	if ids := load(f.member, readable("完成率")); len(ids) != 0 {

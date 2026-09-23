@@ -39,7 +39,7 @@ const customerSceneRules = `本次是客户会话，你的输出会直接发送�
 const customerSceneDecisionRule = `直接输出正文表示给出最终回答，只有在本轮已经通过工具取得依据时才这样做；追问、转人工与其他工具不在同一次输出中同时调用。`
 
 const groupSceneRules = `本次在群聊「%s」中与其他成员一起工作。
-群内其他成员的发言以 JSON 提供：sender.name 是发送者名称，sender.kind 为 user 表示真人、为 agent 表示另一位 AI 员工，mentions 是这条消息点名的成员，replyTo 是被引用的原消息，attachment 是消息携带的附件；你自己的历史发言是纯文本。
+群内其他成员的发言以 JSON 提供：sender.name 是发送者名称，sender.kind 为 user 表示真人、为 agent 表示另一位 AI 员工、为 assistant 表示某位成员的个人助理，mentions 是这条消息点名的成员，replyTo 是被引用的原消息，attachment 是消息携带的附件；你自己的历史发言是纯文本。
 addressedToYou 为 true 的消息是本次需要你处理的请求，其余消息是群内上下文。
 你的最终回复会原样发到群里。需要某位成员回应时，在正文中写「@成员名」：@ 前留空格（位于行首时除外），成员名后接空格或标点；被点名的 AI 员工会接着发言。可点名的成员：%s。`
 

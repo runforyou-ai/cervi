@@ -179,15 +179,17 @@ func (w *Worker) poll() bool {
 	return retry
 }
 
-// reserve 在本机登记运行及其工作区，运行已在执行或工作区正忙时返回 false。
+// reserve 在本机登记运行及其工作区，运行已在执行或工作区正忙时返回 false；不使用工作区的运行只登记运行本身。
 func (w *Worker) reserve(run appservice.DeviceWorkRun) bool {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	if w.active[run.RunID] != nil || w.busy[run.WorkspaceID] {
+	if w.active[run.RunID] != nil || (run.WorkspaceID != "" && w.busy[run.WorkspaceID]) {
 		return false
 	}
 	w.active[run.RunID] = &activeRun{workspaceID: run.WorkspaceID, renewNow: make(chan struct{}, 1)}
-	w.busy[run.WorkspaceID] = true
+	if run.WorkspaceID != "" {
+		w.busy[run.WorkspaceID] = true
+	}
 	return true
 }
 
@@ -196,30 +198,19 @@ func (w *Worker) release(runID string) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	if current := w.active[runID]; current != nil {
-		delete(w.busy, current.workspaceID)
+		if current.workspaceID != "" {
+			delete(w.busy, current.workspaceID)
+		}
 		delete(w.active, runID)
 	}
 }
 
-// start 解析工作区路径并领取运行，领取成功后启动执行与续租，返回是否需要尽快重新检查。
+// start 校验本机工作区并领取运行，领取成功后启动执行与续租，返回是否需要尽快重新检查；不使用工作区的运行直接领取。
 func (w *Worker) start(ctx context.Context, session deviceSession, meta appservice.RequestMeta, run appservice.DeviceWorkRun) bool {
-	path, found, err := w.store.LoadAgentWorkspacePath(ctx, session.serverURL, session.credential.OrganizationID, run.WorkspaceID)
-	if err != nil {
-		w.release(run.RunID)
-		slog.Warn("读取本机工作区路径失败", "workspace_id", run.WorkspaceID, "error", err)
-		return true
-	}
-	// 本机找不到工作区目录时拒绝领取，由服务端以明确原因结束运行。
-	if info, statErr := os.Stat(path); !found || statErr != nil || !info.IsDir() {
-		w.release(run.RunID)
-		if err := w.client.FailDeviceRun(ctx, meta, run.RunID, appservice.DeviceRunFailureInput{
-			ErrorCode: appservice.DeviceRunFailureWorkspaceMissing, Message: "workspace directory is unavailable on this device",
-		}); err != nil {
-			slog.Warn("上报工作区缺失失败", "agent_run_id", run.RunID, "workspace_id", run.WorkspaceID, "error", err)
-			return true
+	if run.WorkspaceID != "" {
+		if retry, ok := w.checkWorkspace(ctx, session, meta, run); !ok {
+			return retry
 		}
-		slog.Info("本机工作区不可用，运行已上报失败", "agent_run_id", run.RunID, "workspace_id", run.WorkspaceID)
-		return false
 	}
 	claim, err := w.client.ClaimDeviceRun(ctx, meta, run.RunID)
 	if err != nil {
@@ -247,6 +238,29 @@ func (w *Worker) start(ctx context.Context, session deviceSession, meta appservi
 	go w.execute(runCtx, cancelRun, meta, run.RunID, claim)
 	slog.Info("设备运行已领取", "agent_run_id", run.RunID, "workspace_id", run.WorkspaceID, "lease_expires_at", claim.LeaseExpiresAt)
 	return false
+}
+
+// checkWorkspace 确认运行指定的工作区目录在本机可用，不可用时释放登记并上报工作区缺失，返回是否需要尽快重新检查与能否继续领取。
+func (w *Worker) checkWorkspace(ctx context.Context, session deviceSession, meta appservice.RequestMeta, run appservice.DeviceWorkRun) (bool, bool) {
+	path, found, err := w.store.LoadAgentWorkspacePath(ctx, session.serverURL, session.credential.OrganizationID, run.WorkspaceID)
+	if err != nil {
+		w.release(run.RunID)
+		slog.Warn("读取本机工作区路径失败", "workspace_id", run.WorkspaceID, "error", err)
+		return true, false
+	}
+	// 本机找不到工作区目录时拒绝领取，由服务端以明确原因结束运行。
+	if info, statErr := os.Stat(path); !found || statErr != nil || !info.IsDir() {
+		w.release(run.RunID)
+		if err := w.client.FailDeviceRun(ctx, meta, run.RunID, appservice.DeviceRunFailureInput{
+			ErrorCode: appservice.DeviceRunFailureWorkspaceMissing, Message: "workspace directory is unavailable on this device",
+		}); err != nil {
+			slog.Warn("上报工作区缺失失败", "agent_run_id", run.RunID, "workspace_id", run.WorkspaceID, "error", err)
+			return true, false
+		}
+		slog.Info("本机工作区不可用，运行已上报失败", "agent_run_id", run.RunID, "workspace_id", run.WorkspaceID)
+		return false, false
+	}
+	return false, true
 }
 
 // execute 在本机执行一次已领取的运行，出错时上报失败与已产生的过程内容。

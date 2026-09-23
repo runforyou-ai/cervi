@@ -9,12 +9,13 @@ import {
   isCustomerInboxConversation,
   isDirectInboxConversation,
   isGroupInboxConversation,
+  OrganizationIdentityType,
   type AgentInboxConversationData,
   type DirectInboxConversationData,
 } from "@/api"
 import { useWorkspace } from "@/contexts/workspace-context"
 import type { ComposerDraftBridge } from "@/features/inbox/conversation-composer"
-import { DraftDeviceBinding } from "@/features/inbox/conversation-device-binding"
+import { DraftAssistantWorkspace } from "@/features/inbox/assistant-workspace"
 import { ConversationSidePanel } from "@/features/inbox/conversation-side-panel"
 import { ConversationHeader } from "@/features/inbox/conversation-header"
 import { ConversationThread } from "@/features/inbox/conversation-thread"
@@ -67,7 +68,7 @@ export function ConversationMain({
     () => !isWideViewport,
   )
   const customerDraftRef = useRef<ComposerDraftBridge | null>(null)
-  // AI 聊天草稿选定的本机工作区按草稿编号记录，切换草稿后不沿用。
+  // 助理聊天草稿选定的工作区按草稿编号记录，切换草稿后不沿用。
   const [draftWorkspace, setDraftWorkspace] = useState({ draftID: "", workspaceID: "" })
   const agentDraftID = selection.kind === "agent-draft" ? selection.conversationId : ""
   const draftWorkspaceID =
@@ -178,8 +179,10 @@ export function ConversationMain({
           <DirectConversationDraftHeader
             member={directTarget}
             actions={
-              agentDraftID ? (
-                <DraftDeviceBinding
+              agentDraftID &&
+              directTarget.type === OrganizationIdentityType.OrganizationIdentityTypeAssistant ? (
+                <DraftAssistantWorkspace
+                  assistantIdentityID={directTarget.id}
                   workspaceID={draftWorkspaceID}
                   onChange={(workspaceID) => setDraftWorkspace({ draftID: agentDraftID, workspaceID })}
                 />

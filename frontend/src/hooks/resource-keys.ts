@@ -94,6 +94,8 @@ export const resourceKeys = {
       : ["customer-reply-suggestions", conversationId, parameters],
   /** 发起内部会话时使用的成员候选项。 */
   memberOptions: () => ["member-options"],
+  /** 可发起单聊的对象，含本人名下的助理。 */
+  chatTargets: () => ["chat-targets"],
   /** 单个群聊资料和当前成员。 */
   groupConversation: (conversationId?: string) =>
     itemKey("group-conversation", conversationId),
@@ -125,8 +127,8 @@ export const resourceKeys = {
   currentDevice: () => ["current-device"],
   /** 指定设备上的工作区。 */
   deviceWorkspaces: (deviceId?: string) => itemKey("device-workspaces", deviceId),
-  /** 会话绑定的设备与工作区。 */
-  conversationDeviceBinding: (conversationId?: string) => itemKey("conversation-device-binding", conversationId),
+  /** 会话中各位助理的绑定电脑与工作区。 */
+  conversationAssistantWorkspaces: (conversationId?: string) => itemKey("conversation-assistant-workspaces", conversationId),
   /** 当前企业的客服工作时间。 */
   businessHours: () => ["business-hours"],
   /** 当前企业的客服超时时长。 */
@@ -173,6 +175,12 @@ export const resourceKeys = {
   agents: (parameters?: KeyParameters) => listKey("agents", parameters),
   /** 单个智能体。 */
   agent: (id?: string) => itemKey("agent", id),
+  /** 当前成员名下的助理列表。 */
+  assistants: () => ["assistants"],
+  /** 当前成员名下的单个助理。 */
+  assistant: (id?: string) => itemKey("assistant", id),
+  /** 指定成员名下的助理列表。 */
+  memberAssistants: (userId?: string) => itemKey("member-assistants", userId),
   /** 团队列表，可带分页参数。 */
   teams: (parameters?: KeyParameters) => listKey("teams", parameters),
   /** 团队成员列表，按团队 ID 与筛选分页参数标识。 */

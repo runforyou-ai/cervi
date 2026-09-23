@@ -5,6 +5,7 @@ import { useParams, useSearchParams } from "react-router"
 import { listChannelOptions, listRoles, listTeams } from "@/api"
 import { PageSplit } from "@/components/page-split"
 import { AgentsPanel } from "@/features/contacts/agents/agents-panel"
+import { AssistantsPanel } from "@/features/contacts/assistants/assistants-panel"
 import { ContactScopeSidebar } from "@/features/contacts/contact-scope-sidebar"
 import { ExternalContactsPanel } from "@/features/contacts/external/external-contacts-panel"
 import { MembersPanel } from "@/features/contacts/members/members-panel"
@@ -71,6 +72,8 @@ export function ContactsPage({
           <MembersPanel channels={channels} roles={roles} teams={teams} />
         ) : scope === "agents" ? (
           <AgentsPanel channels={channels} roles={roles} teams={teams} />
+        ) : scope === "assistants" ? (
+          <AssistantsPanel channels={channels} teams={teams} />
         ) : scope === "team" ? (
           <TeamPanel
             channels={channels}

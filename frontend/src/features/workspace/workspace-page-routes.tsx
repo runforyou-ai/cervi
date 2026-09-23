@@ -6,6 +6,7 @@ import { ChannelsLayout } from "@/features/channels/channels-layout"
 import { MessageChannelFormPage } from "@/features/channels/message-channel-form-page"
 import { MessageChannelListPage } from "@/features/channels/message-channel-list-page"
 import { AgentFormPage } from "@/features/contacts/agents/agent-form-page"
+import { AssistantFormPage } from "@/features/contacts/assistants/assistant-form-page"
 import { ContactsPage } from "@/features/contacts/contacts-page"
 import { InboxRoute } from "@/features/inbox/inbox-route"
 import { MCPServerFormPage } from "@/features/integrations/mcp-servers/mcp-server-form-page"
@@ -101,6 +102,26 @@ const workspaceRouteDefinitions = [
     element: (
       <ContactsPage scope="agents">
         <AgentFormPage mode="edit" />
+      </ContactsPage>
+    ),
+  },
+  {
+    path: "/contacts/assistants",
+    element: <ContactsPage scope="assistants" />,
+  },
+  {
+    path: "/contacts/assistants/new",
+    element: (
+      <ContactsPage scope="assistants">
+        <AssistantFormPage mode="create" />
+      </ContactsPage>
+    ),
+  },
+  {
+    path: "/contacts/assistants/:assistantId",
+    element: (
+      <ContactsPage scope="assistants">
+        <AssistantFormPage mode="edit" />
       </ContactsPage>
     ),
   },

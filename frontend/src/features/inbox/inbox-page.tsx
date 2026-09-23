@@ -9,7 +9,6 @@ import {
   CustomerInboxView,
   CustomerQueueFilter,
   InboxScope,
-  OrganizationIdentityType,
   ServiceSessionStatus,
   isApiError,
   isCustomerInboxConversation,
@@ -63,6 +62,7 @@ import {
 } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { resolveAppPlatform } from "@/platform/app-platform"
+import { isAIIdentityType } from "@/lib/identity-type"
 
 /** 新建后需要切换到的内部会话。 */
 type InternalInboxConversationData =
@@ -226,7 +226,7 @@ export function InboxPage({
       return
     }
     setChatDraft(
-      member.type === OrganizationIdentityType.OrganizationIdentityTypeAgent
+      isAIIdentityType(member.type)
         ? { kind: "agent-draft", member, conversationId: crypto.randomUUID() }
         : { kind: "direct-draft", member },
     )

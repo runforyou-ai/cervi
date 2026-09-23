@@ -1,4 +1,4 @@
-/** 企业成员与 AI 员工列表共用的账号状态筛选、启停操作和确认流程。 */
+/** 企业成员、AI 员工与助理列表共用的账号状态筛选、启停操作和确认流程。 */
 import type { QueryKey } from "@tanstack/react-query"
 import { useTranslation } from "react-i18next"
 
@@ -7,7 +7,7 @@ import { ListToolbarFilter } from "@/components/list-toolbar"
 import type { ResourceRowAction } from "@/components/resource-table"
 import { useConfirmedAction } from "@/hooks/use-confirmed-action"
 
-type AccountScope = "members" | "agents"
+type AccountScope = "members" | "agents" | "assistants"
 
 type AccountItem = {
   id: string

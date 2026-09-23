@@ -695,6 +695,86 @@ func (b *Backend) ReactivateAgent(ctx context.Context, meta appservice.RequestMe
 	return output, err
 }
 
+// ListAssistants 返回当前成员名下的助理。
+func (b *Backend) ListAssistants(ctx context.Context, meta appservice.RequestMeta) (appservice.AssistantList, error) {
+	var output appservice.AssistantList
+	err := b.do(ctx, meta, http.MethodGet, "/assistants", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// ListMemberAssistants 返回指定成员名下的助理。
+func (b *Backend) ListMemberAssistants(ctx context.Context, meta appservice.RequestMeta, userID string) (appservice.AssistantList, error) {
+	var output appservice.AssistantList
+	err := b.do(ctx, meta, http.MethodGet, "/users/"+url.PathEscape(userID)+"/assistants", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// GetAssistant 返回当前成员名下的助理详情。
+func (b *Backend) GetAssistant(ctx context.Context, meta appservice.RequestMeta, assistantID string) (appservice.AssistantDetail, error) {
+	var output appservice.AssistantDetail
+	err := b.do(ctx, meta, http.MethodGet, "/assistants/"+url.PathEscape(assistantID), nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// CreateAssistant 在当前成员的电脑上创建助理。
+func (b *Backend) CreateAssistant(ctx context.Context, meta appservice.RequestMeta, input appservice.CreateAssistantInput) (appservice.Assistant, error) {
+	var output appservice.Assistant
+	err := b.do(ctx, meta, http.MethodPost, "/assistants", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// UpdateAssistant 修改当前成员名下的助理。
+func (b *Backend) UpdateAssistant(ctx context.Context, meta appservice.RequestMeta, assistantID string, input appservice.AssistantInput) (appservice.Assistant, error) {
+	var output appservice.Assistant
+	err := b.do(ctx, meta, http.MethodPut, "/assistants/"+url.PathEscape(assistantID), nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// PauseAssistant 暂停当前成员名下的助理。
+func (b *Backend) PauseAssistant(ctx context.Context, meta appservice.RequestMeta, assistantID string) (appservice.Assistant, error) {
+	var output appservice.Assistant
+	err := b.do(ctx, meta, http.MethodPost, "/assistants/"+url.PathEscape(assistantID)+"/pause", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// ResumeAssistant 恢复当前成员名下已暂停的助理。
+func (b *Backend) ResumeAssistant(ctx context.Context, meta appservice.RequestMeta, assistantID string) (appservice.Assistant, error) {
+	var output appservice.Assistant
+	err := b.do(ctx, meta, http.MethodPost, "/assistants/"+url.PathEscape(assistantID)+"/resume", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// MoveAssistant 把当前成员名下的助理换到指定电脑。
+func (b *Backend) MoveAssistant(ctx context.Context, meta appservice.RequestMeta, assistantID string, input appservice.AssistantDeviceInput) (appservice.Assistant, error) {
+	var output appservice.Assistant
+	err := b.do(ctx, meta, http.MethodPut, "/assistants/"+url.PathEscape(assistantID)+"/device", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// DeactivateAssistant 停用助理。
+func (b *Backend) DeactivateAssistant(ctx context.Context, meta appservice.RequestMeta, assistantID string) (appservice.Assistant, error) {
+	var output appservice.Assistant
+	err := b.do(ctx, meta, http.MethodPost, "/assistants/"+url.PathEscape(assistantID)+"/deactivate", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// ReactivateAssistant 启用已停用的助理。
+func (b *Backend) ReactivateAssistant(ctx context.Context, meta appservice.RequestMeta, assistantID string) (appservice.Assistant, error) {
+	var output appservice.Assistant
+	err := b.do(ctx, meta, http.MethodPost, "/assistants/"+url.PathEscape(assistantID)+"/reactivate", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // ListUsers 返回企业成员列表。
 func (b *Backend) ListUsers(ctx context.Context, meta appservice.RequestMeta, input appservice.UserListInput) (appservice.UserList, error) {
 	var output appservice.UserList
@@ -1270,25 +1350,22 @@ func (b *Backend) ListDeviceWorkspaces(ctx context.Context, meta appservice.Requ
 	return output, err
 }
 
-// GetConversationDeviceBinding 返回会话绑定的设备与工作区。
-func (b *Backend) GetConversationDeviceBinding(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.ConversationDeviceBinding, error) {
-	var output appservice.ConversationDeviceBinding
-	err := b.do(ctx, meta, http.MethodGet, "/conversations/"+url.PathEscape(conversationID)+"/device-binding", nil, nil, &output)
+// ListConversationAssistantWorkspaces 返回会话中各位助理的绑定电脑与工作区。
+func (b *Backend) ListConversationAssistantWorkspaces(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.ConversationAssistantWorkspaceList, error) {
+	var output appservice.ConversationAssistantWorkspaceList
+	err := b.do(ctx, meta, http.MethodGet, "/conversations/"+url.PathEscape(conversationID)+"/assistant-workspaces", nil, nil, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }
 
-// BindConversationDevice 把 AI 单聊绑定到本人设备上的工作区。
-func (b *Backend) BindConversationDevice(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.ConversationDeviceBindingInput) (appservice.ConversationDeviceBinding, error) {
-	var output appservice.ConversationDeviceBinding
-	err := b.do(ctx, meta, http.MethodPut, "/conversations/"+url.PathEscape(conversationID)+"/device-binding", nil, input, &output)
-	b.normalizeOutput(&output)
-	return output, err
+// SetConversationAssistantWorkspace 由主人为会话中的助理指定工作区。
+func (b *Backend) SetConversationAssistantWorkspace(ctx context.Context, meta appservice.RequestMeta, conversationID string, assistantIdentityID string, input appservice.ConversationAssistantWorkspaceInput) error {
+	return b.do(ctx, meta, http.MethodPut, "/conversations/"+url.PathEscape(conversationID)+"/assistant-workspaces/"+url.PathEscape(assistantIdentityID), nil, input, nil)
 }
 
-// UnbindConversationDevice 解除 AI 单聊的设备绑定。
-func (b *Backend) UnbindConversationDevice(ctx context.Context, meta appservice.RequestMeta, conversationID string) error {
-	return b.do(ctx, meta, http.MethodDelete, "/conversations/"+url.PathEscape(conversationID)+"/device-binding", nil, nil, nil)
+// ClearConversationAssistantWorkspace 由主人清除会话中助理的工作区。
+func (b *Backend) ClearConversationAssistantWorkspace(ctx context.Context, meta appservice.RequestMeta, conversationID string, assistantIdentityID string) error {
+	return b.do(ctx, meta, http.MethodDelete, "/conversations/"+url.PathEscape(conversationID)+"/assistant-workspaces/"+url.PathEscape(assistantIdentityID), nil, nil, nil)
 }
 
 // encodeAgentListInputQuery 将 appservice.AgentListInput 编码为查询参数。

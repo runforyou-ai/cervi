@@ -197,8 +197,15 @@ func inboxConversationFromAction(summary inboxaction.ConversationSummary, avatar
 			status := AgentRunStatus(*summary.Agent.AgentRunStatus)
 			agentRunStatus = &status
 		}
+		// 只有助理携带在线状态。
+		var assistantPresence *AssistantPresence
+		if summary.Agent.AssistantPresence != "" {
+			presence := AssistantPresence(summary.Agent.AssistantPresence)
+			assistantPresence = &presence
+		}
 		conversation.Agent = &AgentInboxConversation{
 			Title: summary.Agent.Title, AgentIdentityID: summary.Agent.AgentIdentityID, AgentName: summary.Agent.AgentName, AgentAvatarURL: optionalFileURL(avatarURLs, summary.Agent.AgentAvatarFileID), AgentStatus: UserStatus(summary.Agent.AgentStatus),
+			AgentType: OrganizationIdentityType(summary.Agent.AgentType), AssistantPresence: assistantPresence,
 			Preview: summary.Agent.Preview, PreviewSenderIdentityType: (*OrganizationIdentityType)(summary.Agent.PreviewSenderIdentityType), LastMessageAt: summary.Agent.LastMessageAt, AgentRunStatus: agentRunStatus,
 		}
 	}

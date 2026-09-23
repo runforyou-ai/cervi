@@ -27,7 +27,9 @@ export function ContactScopeMobileSelect({
       ? "employees"
       : scope === "agents"
         ? "agents"
-        : scope === "team"
+        : scope === "assistants"
+          ? "assistants"
+          : scope === "team"
           ? `team:${teamId}`
           : channelId
             ? `channel:${channelId}`
@@ -39,6 +41,8 @@ export function ContactScopeMobileSelect({
       navigate("/contacts/employees")
     } else if (value === "agents") {
       navigate("/contacts/ai-employees")
+    } else if (value === "assistants") {
+      navigate("/contacts/assistants")
     } else if (value.startsWith("team:")) {
       navigate(`/contacts/teams/${value.slice("team:".length)}`)
     } else if (value.startsWith("channel:")) {
@@ -58,6 +62,7 @@ export function ContactScopeMobileSelect({
       >
         <option value="employees">{t("scopes.employees")}</option>
         <option value="agents">{t("scopes.agents")}</option>
+        <option value="assistants">{t("scopes.assistants")}</option>
         {teams.map((team) => (
           <option key={team.id} value={`team:${team.id}`}>
             {t("scopes.teams")} · {team.name}

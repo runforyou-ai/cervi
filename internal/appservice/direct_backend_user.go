@@ -6,6 +6,7 @@ import (
 	"context"
 	"errors"
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
+	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	"log/slog"
 
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
@@ -60,7 +61,7 @@ func newDirectoryOps(db *bun.DB, agentCoordinator *agentrunaction.ExecuteAction,
 		createUser:               useraction.NewCreateUserAction(db, taskEnqueuer),
 		updateUser:               useraction.NewUpdateUserAction(db, agentCoordinator, taskEnqueuer),
 		updateRoleAssignments:    roleaction.NewUpdateAssignmentsAction(db),
-		updateUserStatus:         useraction.NewUpdateStatusAction(db, agentCoordinator),
+		updateUserStatus:         useraction.NewUpdateStatusAction(db, agentCoordinator, conversationaction.NewOwnedAssistantRetirer(agentCoordinator)),
 		listTeams:                teamaction.NewListTeamsQuery(db),
 		createTeam:               teamaction.NewCreateTeamAction(db),
 		updateTeam:               teamaction.NewUpdateTeamAction(db),

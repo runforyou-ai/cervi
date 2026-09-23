@@ -49,7 +49,7 @@ func newProfileFixture(t *testing.T) profileFixture {
 	if _, err := newGroupSendAction(f.db).Execute(ctx, f.member, conversationaction.GroupTextMessageInput{ConversationID: left.ID, ClientMessageID: uuid.NewV7().String(), Body: "退出前的发言"}); err != nil {
 		t.Fatal(err)
 	}
-	if err := conversationaction.NewLeaveGroupConversationAction(f.db).Execute(ctx, f.member, left.ID); err != nil {
+	if err := conversationaction.NewLeaveGroupConversationAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.member, left.ID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, newGroupAgentCoordinator(f.db), newTestTasks(f.db)).Execute(ctx, f.member, f.conversationID); err != nil {
@@ -166,7 +166,7 @@ func TestMemberProfileConversationInvalidation(t *testing.T) {
 	feed.expect(t, append(changedNotices(), feed.notice(f.member.User.ID, realtime.KindIdentityProfileChanged, "", loadProfileVersion(t, f.db, f.member.User.ID)))...)
 
 	// 停用与恢复改变列表展示的账号状态，重复停用不推进；停用另发连接撤销控制，本段只核对版本。
-	status := useraction.NewUpdateStatusAction(f.db, testServiceSessionReturner(f.db))
+	status := testUserStatusAction(f.db)
 	// 停用把该成员负责的客服周期退回公共队列，客户会话随退回事件推进一次后不再展示该成员。
 	before = f.internalVersions(t)
 	customerBefore := loadConversationVersion(t, f.db, f.conversationID)

@@ -14,9 +14,10 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { listAllMemberOptions } from "@/features/inbox/list-all-member-options"
+import { listChatTargets } from "@/features/inbox/list-all-member-options"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
+import { isAIIdentityType } from "@/lib/identity-type"
 
 /** 选择一位活跃 AI 员工开始新聊天。 */
 export function ConversationTargetPickerDialog({
@@ -31,14 +32,11 @@ export function ConversationTargetPickerDialog({
   const { t } = useTranslation(["inbox", "common"])
   const dialogRef = useRef<HTMLDivElement>(null)
   const { data, loading, error, refresh } = useResource(
-    resourceKeys.memberOptions(),
-    listAllMemberOptions,
+    resourceKeys.chatTargets(),
+    listChatTargets,
     { enabled: open, staleTime: 0 },
   )
-  const candidates = (data ?? []).filter(
-    (member) =>
-      member.type === OrganizationIdentityType.OrganizationIdentityTypeAgent,
-  )
+  const candidates = (data ?? []).filter((member) => isAIIdentityType(member.type))
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -99,6 +97,9 @@ export function ConversationTargetPickerDialog({
                   />
                   <span className="min-w-0 flex-1 truncate text-sm font-medium">
                     {member.displayName}
+                  </span>
+                  <span className="shrink-0 text-xs text-muted-foreground">
+                    {t(member.type === OrganizationIdentityType.OrganizationIdentityTypeAssistant ? "groupAssistant" : "groupAgent")}
                   </span>
                 </button>
               ))}
