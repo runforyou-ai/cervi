@@ -1167,7 +1167,7 @@ export function UnbindConversationDevice(meta: $models.RequestMeta, conversation
 /**
  * UpdateAIProvider 修改模型服务供应商。
  */
-export function UpdateAIProvider(meta: $models.RequestMeta, providerID: string, input: $models.AIProviderInput): $CancellablePromise<$models.AIProvider> {
+export function UpdateAIProvider(meta: $models.RequestMeta, providerID: string, input: $models.AIProviderUpdateInput): $CancellablePromise<$models.AIProvider> {
     return $Call.ByID(3982600252, meta, providerID, input);
 }
 

@@ -1478,7 +1478,7 @@ func (b *DirectBackend) CreateAIProvider(ctx context.Context, meta RequestMeta, 
 }
 
 // UpdateAIProvider 修改模型服务供应商。
-func (b *DirectBackend) UpdateAIProvider(ctx context.Context, meta RequestMeta, providerID string, input AIProviderInput) (AIProvider, error) {
+func (b *DirectBackend) UpdateAIProvider(ctx context.Context, meta RequestMeta, providerID string, input AIProviderUpdateInput) (AIProvider, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
 	if err != nil {
 		var zero AIProvider

@@ -279,8 +279,7 @@ function WorkspaceSettingsMenu({
       <PagePaneGroup title={t("groups.integrations")} collapsed={collapsed}>
         <PagePaneLink
           collapsed={collapsed}
-          to="/settings/model-services/chat"
-          activePath="/settings/model-services"
+          to="/settings/model-services"
           icon={BrainCircuitIcon}
         >
           {t("navigation.modelServices")}

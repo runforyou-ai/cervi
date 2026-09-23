@@ -1396,7 +1396,7 @@ func (s *Service) createAIProvider(c *gin.Context) {
 
 // updateAIProvider 修改模型服务供应商。
 func (s *Service) updateAIProvider(c *gin.Context) {
-	var input appservice.AIProviderInput
+	var input appservice.AIProviderUpdateInput
 	if !bindJSON(c, &input) {
 		return
 	}

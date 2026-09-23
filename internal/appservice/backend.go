@@ -470,7 +470,7 @@ type Backend interface {
 	CreateAIProvider(context.Context, RequestMeta, AIProviderInput) (AIProvider, error)
 	// UpdateAIProvider 修改模型服务供应商。
 	//cervi:route PUT /settings/model-services/:providerID
-	UpdateAIProvider(context.Context, RequestMeta, string, AIProviderInput) (AIProvider, error)
+	UpdateAIProvider(context.Context, RequestMeta, string, AIProviderUpdateInput) (AIProvider, error)
 	// DeleteAIProvider 删除模型服务供应商。
 	//cervi:route DELETE /settings/model-services/:providerID
 	DeleteAIProvider(context.Context, RequestMeta, string) error

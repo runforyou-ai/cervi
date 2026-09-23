@@ -1,70 +1,37 @@
 /** 模型服务供应商列表页。 */
+import { useState } from "react"
 import { PlusIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { Link, useNavigate } from "react-router"
+import { useNavigate } from "react-router"
 
 import {
   deleteAIProvider,
   listAIProviders,
-  type AIProviderModelSummaryData,
   type AIProviderSummaryData,
 } from "@/api"
 import { ResourceListLayout } from "@/components/resource-list"
+import { ResourceRowIdentity } from "@/components/resource-row-identity"
 import { ResourceTable } from "@/components/resource-table"
 import { PageHeader } from "@/components/page-header"
 import { ConfirmationDialog } from "@/components/confirmation-dialog"
 import { Button } from "@/components/ui/button"
-import { Tabs, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { aiProviderBrandConfigs } from "@/features/integrations/model-services/model-provider-brands"
+import { ModelProviderBrandDialog } from "@/features/integrations/model-services/model-provider-brand-dialog"
 import {
-  modelServiceSectionConfigs,
-  modelServiceSectionOrder,
-  type ModelServiceSection,
+  modelTypeNameKeys,
+  modelTypeOrder,
 } from "@/features/integrations/model-services/model-service-options"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useConfirmedAction } from "@/hooks/use-confirmed-action"
 import { useResource } from "@/hooks/use-resource"
 
-/** 显示供应商名称、品牌和当前类型的模型摘要。 */
-function ProviderCell({
-  brand,
-  name,
-  models,
-}: {
-  brand: string
-  name: string
-  models: AIProviderModelSummaryData[]
-}) {
-  const { t } = useTranslation("integrations")
-  const summary = models
-    .map((model) => model.name)
-    .join(t("modelServices.list.modelSeparator"))
-
-  return (
-    <div className="min-w-0">
-      <p className="truncate font-medium">
-        {brand}
-        <span className="text-muted-foreground"> · </span>
-        {name}
-      </p>
-      {summary ? (
-        <p className="truncate text-xs text-muted-foreground">{summary}</p>
-      ) : null}
-    </div>
-  )
-}
-
-/** 显示指定类型的模型服务供应商。 */
-export function ModelProviderListPage({ section }: { section: ModelServiceSection }) {
+/** 显示企业配置的模型服务供应商及各类型模型数量。 */
+export function ModelProviderListPage() {
   const { t } = useTranslation(["integrations", "common"])
   const navigate = useNavigate()
-  const sectionConfig = modelServiceSectionConfigs[section]
+  const [choosingBrand, setChoosingBrand] = useState(false)
   const resource = useResource(resourceKeys.aiProviders(), () => listAIProviders())
-  const { data } = resource
-  const providers = data?.providers ?? []
-  const visibleProviders = providers.filter((provider) =>
-    provider.models.some((model) => model.type === sectionConfig.modelType),
-  )
+  const providers = resource.data?.providers ?? []
 
   const deletion = useConfirmedAction<AIProviderSummaryData>({
     action: (provider) => deleteAIProvider(provider.id),
@@ -83,30 +50,16 @@ export function ModelProviderListPage({ section }: { section: ModelServiceSectio
         title={t("modelServices.title")}
         description={t("modelServices.description")}
       >
-        <Button variant="ghost" size="icon-sm" asChild>
-          <Link
-            to={`/settings/model-services/${section}/new`}
-            aria-label={t("modelServices.list.create")}
-            title={t("modelServices.list.create")}
-          >
-            <PlusIcon />
-          </Link>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          aria-label={t("modelServices.list.create")}
+          title={t("modelServices.list.create")}
+          onClick={() => setChoosingBrand(true)}
+        >
+          <PlusIcon />
         </Button>
       </PageHeader>
-      <div className="cervi-page-gutter flex h-11 shrink-0 items-end select-none">
-        <Tabs
-          value={section}
-          onValueChange={(value) => navigate(`/settings/model-services/${value}`)}
-        >
-          <TabsList>
-            {modelServiceSectionOrder.map((item) => (
-              <TabsTrigger key={item} value={item}>
-                {t(modelServiceSectionConfigs[item].nameKey)}
-              </TabsTrigger>
-            ))}
-          </TabsList>
-        </Tabs>
-      </div>
       <ResourceListLayout
         resources={resource}
         errorMessage={t("modelServices.list.loadError")}
@@ -117,24 +70,38 @@ export function ModelProviderListPage({ section }: { section: ModelServiceSectio
             {
               key: "provider",
               header: t("modelServices.list.columns.name"),
-              cell: (provider) => (
-                <ProviderCell
-                  brand={t(aiProviderBrandConfigs[provider.brand].nameKey)}
-                  name={provider.name}
-                  models={provider.models.filter(
-                    (model) => model.type === sectionConfig.modelType,
-                  )}
-                />
-              ),
+              cell: (provider) => {
+                const brand = t(aiProviderBrandConfigs[provider.brand].nameKey)
+                // 按模型类型统计数量，没有的类型不展示。
+                const counts = modelTypeOrder
+                  .map((type) => ({
+                    type,
+                    count: provider.models.filter((model) => model.type === type)
+                      .length,
+                  }))
+                  .filter(({ count }) => count > 0)
+                  .map(({ type, count }) =>
+                    t("modelServices.list.modelCount", {
+                      count,
+                      type: t(modelTypeNameKeys[type]),
+                    }),
+                  )
+                return (
+                  <ResourceRowIdentity
+                    avatar={{ name: brand }}
+                    name={provider.name}
+                    secondary={provider.name === brand ? undefined : brand}
+                    description={counts.join(" · ")}
+                  />
+                )
+              },
             },
           ]}
-          rows={visibleProviders}
+          rows={providers}
           rowKey={(provider) => provider.id}
-          empty={t("modelServices.list.empty", {
-            type: t(sectionConfig.nameKey),
-          })}
+          empty={t("modelServices.list.empty")}
           onRowActivate={(provider) =>
-            navigate(`/settings/model-services/${section}/${provider.id}`)
+            navigate(`/settings/model-services/${provider.id}`)
           }
           rowActions={(provider) => [
             {
@@ -148,6 +115,7 @@ export function ModelProviderListPage({ section }: { section: ModelServiceSectio
         />
       </ResourceListLayout>
 
+      <ModelProviderBrandDialog open={choosingBrand} onOpenChange={setChoosingBrand} />
       <ConfirmationDialog
         {...deletion.dialog}
         title={

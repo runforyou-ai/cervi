@@ -95,7 +95,7 @@ export enum AIProviderCredentialType {
 };
 
 /**
- * AIProviderInput 定义模型服务供应商可编辑字段。
+ * AIProviderInput 定义创建模型服务供应商的字段。
  */
 export interface AIProviderInput {
     "brand": AIProviderBrand;
@@ -150,6 +150,17 @@ export interface AIProviderSummary {
     "name": string;
     "apiUrl": string;
     "models": AIProviderModelSummary[] | null;
+}
+
+/**
+ * AIProviderUpdateInput 定义修改模型服务供应商的字段，品牌沿用创建时的值。
+ */
+export interface AIProviderUpdateInput {
+    "name": string;
+    "credentialType": AIProviderCredentialType;
+    "apiKey": string;
+    "apiUrl": string;
+    "models": AIProviderModel[] | null;
 }
 
 /**

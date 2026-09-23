@@ -50,9 +50,18 @@ const (
 	AIModelInputModalityVideo AIModelInputModality = AIModelInputModality(domain.AIModelInputModalityVideo)
 )
 
-// AIProviderInput 定义模型服务供应商可编辑字段。
+// AIProviderInput 定义创建模型服务供应商的字段。
 type AIProviderInput struct {
 	Brand          AIProviderBrand          `json:"brand"`
+	Name           string                   `json:"name"`
+	CredentialType AIProviderCredentialType `json:"credentialType"`
+	APIKey         string                   `json:"apiKey"`
+	APIURL         string                   `json:"apiUrl"`
+	Models         []AIProviderModel        `json:"models"`
+}
+
+// AIProviderUpdateInput 定义修改模型服务供应商的字段，品牌沿用创建时的值。
+type AIProviderUpdateInput struct {
 	Name           string                   `json:"name"`
 	CredentialType AIProviderCredentialType `json:"credentialType"`
 	APIKey         string                   `json:"apiKey"`

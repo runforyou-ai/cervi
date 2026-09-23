@@ -80,6 +80,7 @@ export type {
     AIProviderModelList,
     AIProviderModelSummary,
     AIProviderSummary,
+    AIProviderUpdateInput,
     Agent,
     AgentBehaviorProfile,
     AgentExecution,

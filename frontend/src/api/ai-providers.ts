@@ -21,6 +21,7 @@ import {
   type AIProviderModel,
   type AIProviderModelSummary,
   type AIProviderSummary,
+  type AIProviderUpdateInput,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import { bind } from "@/api/client"
 import type { NonNullArrays } from "@/api/normalize"
@@ -118,7 +119,7 @@ export function createAIProvider(input: AIProviderInput) {
 }
 
 /** 修改模型服务供应商。 */
-export function updateAIProvider(providerId: string, input: AIProviderInput) {
+export function updateAIProvider(providerId: string, input: AIProviderUpdateInput) {
   return updateAIProviderBound(providerId, input) as Promise<AIProviderData>
 }
 

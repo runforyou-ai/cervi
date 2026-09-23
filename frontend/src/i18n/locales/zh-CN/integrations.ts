@@ -59,12 +59,7 @@ const integrations = {
   },
   modelServices: {
     title: "模型服务",
-    description: "配置对话、向量和重排模型的供应商",
-    tabs: {
-      chat: "对话模型",
-      embedding: "嵌入模型",
-      rerank: "重排序模型",
-    },
+    description: "配置对话、嵌入和重排序模型的供应商",
     brands: {
       deepseek: "DeepSeek",
       alibaba: "阿里云百炼",
@@ -83,11 +78,16 @@ const integrations = {
     list: {
       create: "添加供应商",
       loadError: "模型服务供应商列表加载失败。",
-      empty: "还没有配置支持{{type}}的供应商",
-      modelSeparator: "、",
+      empty: "还没有添加模型服务供应商",
+      modelCount_one: "{{count}} 个{{type}}模型",
+      modelCount_other: "{{count}} 个{{type}}模型",
       columns: {
         name: "名称",
       },
+    },
+    brandDialog: {
+      title: "选择品牌",
+      description: "选择要接入的模型服务",
     },
     form: {
       createTitle: "添加供应商",
@@ -114,7 +114,9 @@ const integrations = {
       loadError: "模型服务供应商加载失败。",
     },
     models: {
-      title: "模型目录",
+      title: "模型",
+      createTitle: "添加模型",
+      editTitle: "编辑模型",
       manualAdd: "手动添加",
       fetch: "选择预设模型",
       discover: "读取可用模型",
@@ -125,10 +127,18 @@ const integrations = {
       dialogTitle: "选择预设模型",
       discoverDialogTitle: "选择可用模型",
       dialogEmpty: "没有可选择的模型",
-      select: "选择",
       toggle: "选择 {{name}}",
-      editField: "第 {{row}} 行{{field}}",
-      clearAll: "取消全选",
+      search: "搜索模型",
+      noMatches: "没有匹配的模型",
+      added: "已添加",
+      incomplete: "待补充",
+      selected_one: "已选 {{count}} 个",
+      selected_other: "已选 {{count}} 个",
+      modalitySeparator: "、",
+      contextWindowSummary: "上下文 {{value}}",
+      maxOutputTokensSummary: "最大输出 {{value}}",
+      removeTitle: "移除模型“{{name}}”？",
+      removeDescription: "AI 员工或知识库正在使用的模型不能移除。",
       types: {
         chat: "对话",
         embedding: "嵌入",

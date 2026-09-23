@@ -5,9 +5,18 @@ package aiprovider
 
 import "github.com/runforyou-ai/cervi/internal/domain"
 
-// Input 定义模型服务供应商可编辑字段。
+// Input 定义创建模型服务供应商的字段。
 type Input struct {
 	Brand          domain.AIProviderBrand
+	Name           string
+	CredentialType domain.AIProviderCredentialType
+	APIKey         string
+	APIURL         string
+	Models         []Model
+}
+
+// UpdateInput 定义修改模型服务供应商的字段，品牌沿用创建时的值。
+type UpdateInput struct {
 	Name           string
 	CredentialType domain.AIProviderCredentialType
 	APIKey         string
