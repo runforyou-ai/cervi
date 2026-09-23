@@ -34,7 +34,6 @@ import { ResourceContent } from "@/components/resource-content"
 import { PageContent } from "@/components/page-content"
 import { PageBackButton } from "@/components/page-back-button"
 import { PageHeader } from "@/components/page-header"
-import { ProfileAvatar } from "@/components/profile-avatar"
 import { Button } from "@/components/ui/button"
 import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
 import { NativeSelect } from "@/components/ui/native-select"
@@ -42,6 +41,7 @@ import {
   ModelEditDialog,
   useAIModelSchemaMessages,
 } from "@/features/integrations/model-services/model-edit-dialog"
+import { ModelProviderBrandIcon } from "@/features/integrations/model-services/model-provider-brand-icon"
 import { ModelPickerDialog } from "@/features/integrations/model-services/model-picker-dialog"
 import {
   aiProviderBrandConfigs,
@@ -343,7 +343,7 @@ export function ModelProviderFormPage({ mode }: { mode: "create" | "edit" }) {
               <Field>
                 <FieldLabel>{t("modelServices.form.brand")}</FieldLabel>
                 <div className="flex h-9 items-center gap-2 text-sm">
-                  <ProfileAvatar name={brandName} className="size-6 rounded-md text-xs" />
+                  <ModelProviderBrandIcon brand={watchedBrand} className="size-7 rounded-md [&>svg]:size-4" />
                   {brandName}
                 </div>
               </Field>

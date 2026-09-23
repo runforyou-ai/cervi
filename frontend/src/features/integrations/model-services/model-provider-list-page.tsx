@@ -17,6 +17,7 @@ import { ConfirmationDialog } from "@/components/confirmation-dialog"
 import { Button } from "@/components/ui/button"
 import { aiProviderBrandConfigs } from "@/features/integrations/model-services/model-provider-brands"
 import { ModelProviderBrandDialog } from "@/features/integrations/model-services/model-provider-brand-dialog"
+import { ModelProviderBrandIcon } from "@/features/integrations/model-services/model-provider-brand-icon"
 import {
   modelTypeNameKeys,
   modelTypeOrder,
@@ -88,7 +89,7 @@ export function ModelProviderListPage() {
                   )
                 return (
                   <ResourceRowIdentity
-                    avatar={{ name: brand }}
+                    leading={<ModelProviderBrandIcon brand={provider.brand} />}
                     name={provider.name}
                     secondary={provider.name === brand ? undefined : brand}
                     description={counts.join(" · ")}

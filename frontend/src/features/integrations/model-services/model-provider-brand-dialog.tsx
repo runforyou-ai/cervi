@@ -2,7 +2,6 @@
 import { useTranslation } from "react-i18next"
 import { Link } from "react-router"
 
-import { ProfileAvatar } from "@/components/profile-avatar"
 import {
   Dialog,
   DialogContent,
@@ -14,6 +13,7 @@ import {
   aiProviderBrandConfigs,
   aiProviderBrandOrder,
 } from "@/features/integrations/model-services/model-provider-brands"
+import { ModelProviderBrandIcon } from "@/features/integrations/model-services/model-provider-brand-icon"
 
 /** 以卡片展示可接入的品牌，选中后进入该品牌的添加页。 */
 export function ModelProviderBrandDialog({
@@ -43,7 +43,7 @@ export function ModelProviderBrandDialog({
                 to={`/settings/model-services/new/${brand}`}
                 className="flex min-w-0 items-center gap-3 rounded-lg border bg-card p-4 transition-colors hover:bg-accent/50 focus-visible:border-primary focus-visible:outline-hidden"
               >
-                <ProfileAvatar name={name} className="size-9 shrink-0" />
+                <ModelProviderBrandIcon brand={brand} />
                 <span className="truncate text-sm font-medium">{name}</span>
               </Link>
             )
