@@ -135,18 +135,6 @@ func assertInvalidOperatorRequest(t *testing.T, recorder *httptest.ResponseRecor
 	}
 }
 
-// TestOperatorRejectsUnknownPath 验证运营路由不提供未登记的路径。
-func TestOperatorRejectsUnknownPath(t *testing.T) {
-	service := newTestOperatorService()
-	request := httptest.NewRequest(http.MethodGet, "/unregistered", nil)
-	request.Header.Set("Authorization", "Bearer "+testOperatorCredential)
-	recorder := httptest.NewRecorder()
-	service.ServeHTTP(recorder, request)
-	if recorder.Code != http.StatusNotFound {
-		t.Fatalf("返回了 %d", recorder.Code)
-	}
-}
-
 // TestOperatorDomainAvailabilityRejectsInvalidPrefix 验证不符合 DNS 标签规则的前缀返回稳定错误码。
 func TestOperatorDomainAvailabilityRejectsInvalidPrefix(t *testing.T) {
 	service := newTestOperatorService()

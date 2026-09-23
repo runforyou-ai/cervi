@@ -470,11 +470,11 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		fixture.assertFailed(missing.ID, domain.AgentRunErrorCodeWorkspaceMissing)
 
 		cleared := fixture.sendAndLoadRun(fixture.assistantChat(second.ID), "清除")
-		version := conversationVersion(t, ctx, db, cleared.ConversationID)
+		version := loadConversationVersion(t, db, cleared.ConversationID)
 		if err := fixture.workspaces.Clear(ctx, identity, cleared.ConversationID, assistant.IdentityID); err != nil {
 			t.Fatal(err)
 		}
-		if conversationVersion(t, ctx, db, cleared.ConversationID) <= version {
+		if loadConversationVersion(t, db, cleared.ConversationID) <= version {
 			t.Fatal("clear did not advance conversation version")
 		}
 		if work, err := fixture.executor.DeviceWork(ctx, fixture.device); err != nil || deviceWorkContains(work, cleared.ID) {
@@ -688,16 +688,6 @@ func (f *deviceRunFixture) workSeq() int64 {
 		f.t.Fatal(err)
 	}
 	return seq
-}
-
-// conversationVersion 读取会话当前版本。
-func conversationVersion(t *testing.T, ctx context.Context, db *bun.DB, conversationID string) int64 {
-	t.Helper()
-	var version int64
-	if err := db.NewSelect().Model((*servermodels.Conversation)(nil)).Column("version").Where("id = ?", conversationID).Scan(ctx, &version); err != nil {
-		t.Fatal(err)
-	}
-	return version
 }
 
 // deviceWorkContains 判断待领取运行中是否包含指定运行。

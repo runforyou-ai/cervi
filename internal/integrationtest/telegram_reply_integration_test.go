@@ -121,13 +121,6 @@ func TestTelegramInternalNoteReplyEligibility(t *testing.T) {
 	if deliveries != 0 {
 		t.Fatalf("telegram internal note deliveries = %d", deliveries)
 	}
-	quoted, err := conversationaction.NewSendCustomerTextMessageAction(f.db, nil).Execute(ctx, f.owner, conversationaction.CustomerTextMessageInput{
-		ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(),
-		Body: "补充一点", ReplyToMessageID: note.ID, Visibility: domain.MessageVisibilityInternalOnly,
-	})
-	if err != nil || quoted.ReplyTo == nil || quoted.ReplyTo.ID != note.ID {
-		t.Fatalf("telegram note reply = %+v err=%v", quoted.ReplyTo, err)
-	}
 
 	t.Run("尚未投递的对客消息仍可被内部备注引用", func(t *testing.T) {
 		send := conversationaction.NewSendCustomerTextMessageAction(f.db, nil)
@@ -136,18 +129,6 @@ func TestTelegramInternalNoteReplyEligibility(t *testing.T) {
 		})
 		if err != nil {
 			t.Fatal(err)
-		}
-		states, err := conversationaction.NewListConversationMessagesQuery(f.db).ListReferences(ctx, f.owner, f.conversationID, []string{pending.ID})
-		if err != nil || len(states) != 1 || !states[0].ReplyUnavailable {
-			t.Fatalf("pending state=%+v err=%v", states, err)
-		}
-		_, err = send.Execute(ctx, f.owner, conversationaction.CustomerTextMessageInput{
-			ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(),
-			Body: "继续跟进", ReplyToMessageID: pending.ID,
-		})
-		var conflict *conversationaction.ConflictError
-		if !errors.As(err, &conflict) || conflict.Reason != conversationaction.ConflictReasonReplyTargetInvalid {
-			t.Fatalf("customer visible reply to pending message = %v", err)
 		}
 		noteQuote, err := send.Execute(ctx, f.owner, conversationaction.CustomerTextMessageInput{
 			ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(),

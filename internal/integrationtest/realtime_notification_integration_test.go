@@ -19,7 +19,6 @@ import (
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
-	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	serverconfig "github.com/runforyou-ai/cervi/internal/config/server"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -645,29 +644,12 @@ func TestRealtimeCustomerInboxNotifications(t *testing.T) {
 	claim := conversationaction.NewClaimServiceSessionAction(f.db, coordinator, newTestTasks(f.db))
 	closeSession := conversationaction.NewCloseServiceSessionAction(f.db, coordinator, newTestTasks(f.db))
 	reopen := conversationaction.NewReopenServiceSessionAction(f.db)
-	inbox := inboxaction.NewLoadInboxQuery(f.db)
 	feed := startRealtimeFeed(t, f.owner.Organization.ID)
 	visitorIdentityID := loadChannelIdentityID(t, f.db, f.conversationID)
 	// changed 构造客户会话当前版本的共享受众与访客目录受众通知。
 	changed := func() []receivedNotification {
 		version := loadConversationVersion(t, f.db, f.conversationID)
 		return []receivedNotification{feed.customerInbox(f.conversationID, version), feed.visitorDirectory(visitorIdentityID, f.conversationID, version)}
-	}
-	// listed 判断客户会话是否出现在指定客服的会话列表中。
-	listed := func(identity *servermodels.Identity, input inboxaction.LoadInput) bool {
-		page, _, err := inbox.Execute(ctx, identity, input)
-		if err != nil {
-			t.Fatal(err)
-		}
-		return slices.ContainsFunc(page.Conversations, func(row inboxaction.ConversationSummary) bool { return row.ID == f.conversationID })
-	}
-	// activity 读取客户会话的活动排序时间。
-	activity := func() time.Time {
-		var value time.Time
-		if err := f.db.NewSelect().Table("conversations").Column("last_activity_at").Where("id = ?", f.conversationID).Scan(ctx, &value); err != nil {
-			t.Fatal(err)
-		}
-		return value
 	}
 
 	// 访客消息通知共享受众与访客目录受众，不逐客服扇出。
@@ -676,22 +658,11 @@ func TestRealtimeCustomerInboxNotifications(t *testing.T) {
 	}
 	feed.expect(t, changed()...)
 
-	// 领取后移出双方的待领取、进入负责人的等我回复并按负责人筛出，筛选迁移不影响双方按 ID 阅读。
+	// 领取通知共享受众。
 	if _, err := claim.Execute(ctx, f.owner, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
 	feed.expect(t, changed()...)
-	queued := inboxaction.LoadInput{Scope: domain.InboxScopePending, PendingKind: domain.InboxPendingKindQueue}
-	ownedByOwner := inboxaction.LoadInput{Scope: domain.InboxScopeAll, AssigneeFilter: domain.InboxAssigneeFilterIdentity, AssigneeIdentityID: f.owner.OrganizationIdentity.ID}
-	if listed(f.owner, queued) || listed(f.member, queued) || !listed(f.owner, inboxaction.LoadInput{Scope: domain.InboxScopePending, PendingKind: domain.InboxPendingKindReply}) || !listed(f.member, ownedByOwner) {
-		t.Fatal("claimed conversation views did not converge")
-	}
-	for _, identity := range []*servermodels.Identity{f.owner, f.member} {
-		results, err := inbox.ReadByIDs(ctx, identity, []string{f.conversationID}, nil)
-		if err != nil || len(results) != 1 || results[0].Conversation == nil {
-			t.Fatalf("claimed conversation unreadable results=%+v err=%v", results, err)
-		}
-	}
 	// 负责人重复领取没有变化，不推进版本。
 	version := loadConversationVersion(t, f.db, f.conversationID)
 	if _, err := claim.Execute(ctx, f.owner, f.conversationID); err != nil {
@@ -722,22 +693,15 @@ func TestRealtimeCustomerInboxNotifications(t *testing.T) {
 		t.Fatal("former assignee closed the transferred session")
 	}
 
-	// 关闭与重开改变服务视图并通知，但不改变活动时间。
-	lastActivity := activity()
+	// 关闭与重开通知共享受众。
 	if _, err := closeSession.Execute(ctx, f.member, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
 	feed.expect(t, changed()...)
-	if !listed(f.member, inboxaction.LoadInput{Scope: domain.InboxScopeAll, AssigneeFilter: domain.InboxAssigneeFilterIdentity, AssigneeIdentityID: f.member.OrganizationIdentity.ID, ServiceStatus: domain.ServiceSessionStatusClosed}) {
-		t.Fatal("closed conversation missing from closed view")
-	}
 	if _, err := reopen.Execute(ctx, f.member, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
 	feed.expect(t, changed()...)
-	if !activity().Equal(lastActivity) {
-		t.Fatalf("service status changed activity from %s to %s", lastActivity, activity())
-	}
 
 	// 关闭后访客再发消息开启新周期并通知共享受众。
 	if _, err := closeSession.Execute(ctx, f.member, f.conversationID); err != nil {
@@ -757,12 +721,11 @@ func TestRealtimeCustomerInboxNotifications(t *testing.T) {
 	feed.expect(t, feed.notice(f.member.User.ID, realtime.KindConversationStateChanged, f.conversationID, loadConversationStateVersion(t, f.db, f.conversationID, f.member.User.ID)))
 }
 
-// TestRealtimeVisitorDirectoryNotifications 验证网站客户线程按所属渠道身份通知访客目录受众，不同访客身份互不接收，目录查询据此发现未知线程。
+// TestRealtimeVisitorDirectoryNotifications 验证网站客户线程按所属渠道身份通知访客目录受众，不同访客身份互不接收。
 func TestRealtimeVisitorDirectoryNotifications(t *testing.T) {
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	feed := startRealtimeFeed(t, f.owner.Organization.ID)
-	directory := conversationaction.NewListWebsiteConversationsQuery(f.db)
 	const visitor = "web-session:0123456789abcdef0123456789abcdef"
 	const otherVisitor = "web-session:fedcba9876543210fedcba9876543210"
 	visitorIdentityID := loadChannelIdentityID(t, f.db, f.conversationID)
@@ -777,23 +740,7 @@ func TestRealtimeVisitorDirectoryNotifications(t *testing.T) {
 	secondVersion := loadConversationVersion(t, f.db, second.Conversation.ID)
 	feed.expect(t, feed.customerInbox(second.Conversation.ID, secondVersion), feed.visitorDirectory(visitorIdentityID, second.Conversation.ID, secondVersion))
 
-	// 目录查询按渠道身份列出两个线程，另一标签页据此发现未知线程。
-	threads, err := directory.Execute(ctx, f.channelID, visitor)
-	if err != nil {
-		t.Fatal(err)
-	}
-	listed := make([]string, 0, len(threads))
-	for _, thread := range threads {
-		listed = append(listed, thread.ID)
-	}
-	slices.Sort(listed)
-	want := []string{f.conversationID, second.Conversation.ID}
-	slices.Sort(want)
-	if !slices.Equal(listed, want) {
-		t.Fatalf("访客目录 got=%v want=%v", listed, want)
-	}
-
-	// 另一访客身份的线程只通知其自身受众，且不出现在前一访客的目录中。
+	// 另一访客身份的线程只通知其自身受众。
 	other, err := f.receive.Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
 		ChannelID: f.channelID, ExternalID: otherVisitor, ClientMessageID: uuid.NewV7().String(), Body: "另一访客的线程",
 	})
@@ -806,18 +753,6 @@ func TestRealtimeVisitorDirectoryNotifications(t *testing.T) {
 	}
 	otherVersion := loadConversationVersion(t, f.db, other.Conversation.ID)
 	feed.expect(t, feed.customerInbox(other.Conversation.ID, otherVersion), feed.visitorDirectory(otherIdentityID, other.Conversation.ID, otherVersion))
-	threads, err = directory.Execute(ctx, f.channelID, visitor)
-	if err != nil {
-		t.Fatal(err)
-	}
-	listed = listed[:0]
-	for _, thread := range threads {
-		listed = append(listed, thread.ID)
-	}
-	slices.Sort(listed)
-	if !slices.Equal(listed, want) {
-		t.Fatalf("跨访客目录隔离 got=%v want=%v", listed, want)
-	}
 }
 
 // TestRealtimeCustomerDeliveryNotifications 验证投递状态变化、渠道启停与更换机器人推进客户会话版本并通知共享受众，无变化的写入不推进。

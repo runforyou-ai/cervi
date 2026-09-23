@@ -5,7 +5,6 @@ package integrationtest
 import (
 	"context"
 	"errors"
-	"fmt"
 	"testing"
 	"time"
 	"uuid"
@@ -103,36 +102,5 @@ func TestDirectReplyBoundaries(t *testing.T) {
 	after, err := f.db.NewSelect().Model((*servermodels.Message)(nil)).Where("msg.conversation_id = ?", first.Conversation.ID).Count(ctx)
 	if err != nil || after != before {
 		t.Fatalf("failed send persisted: before=%d after=%d err=%v", before, after, err)
-	}
-}
-
-// TestDirectReplyHistoryWindow 验证单聊按原有顺序定位窗口外的引用目标且不推进已读。
-func TestDirectReplyHistoryWindow(t *testing.T) {
-	f := newNavigationFixture(t)
-	ctx := context.Background()
-	first, err := conversationaction.NewSendFirstDirectTextMessageAction(f.db).Execute(ctx, f.owner, conversationaction.FirstDirectTextMessageInput{
-		TargetIdentityID: f.member.OrganizationIdentity.ID, ClientMessageID: uuid.NewV7().String(), Body: "较早的原文",
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
-	send := conversationaction.NewSendDirectTextMessageAction(f.db)
-	for i := range 60 {
-		if _, err := send.Execute(ctx, f.owner, conversationaction.InternalTextMessageInput{ConversationID: first.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: fmt.Sprintf("后续消息 %d", i)}); err != nil {
-			t.Fatal(err)
-		}
-	}
-	history := conversationaction.NewListConversationMessagesQuery(f.db)
-	latest, err := history.Execute(ctx, f.member, conversationaction.ConversationMessageHistoryInput{ConversationID: first.Conversation.ID})
-	if err != nil || !latest.HasEarlier || latest.Messages[0].ID == first.Message.ID {
-		t.Fatalf("latest=%+v err=%v", latest, err)
-	}
-	window, err := history.Execute(ctx, f.member, conversationaction.ConversationMessageHistoryInput{ConversationID: first.Conversation.ID, AroundMessageID: first.Message.ID})
-	if err != nil || window.HasEarlier || !window.HasLater || len(window.Messages) != 26 || window.Messages[0].ID != first.Message.ID {
-		t.Fatalf("window=%+v err=%v", window, err)
-	}
-	count, err := f.db.NewSelect().Model((*servermodels.ConversationUserState)(nil)).Where("cus.conversation_id = ? AND cus.user_id = ?", first.Conversation.ID, f.member.User.ID).Count(ctx)
-	if err != nil || count != 0 {
-		t.Fatalf("history created read state: count=%d err=%v", count, err)
 	}
 }

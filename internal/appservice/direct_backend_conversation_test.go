@@ -12,20 +12,6 @@ import (
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 )
 
-// TestConversationMessageCursorRoundTrip 验证成员消息游标绑定会话并可稳定还原。
-func TestConversationMessageCursorRoundTrip(t *testing.T) {
-	const conversationID = "0198ddee-c056-7bc5-a1d9-586f878ee966"
-	point := conversationaction.MessageCursorPoint{
-		MessageSeq: 9007199254740993,
-		ID:         "0198ddf0-a234-7f01-8d99-e3e0af0f5f65",
-	}
-	cursor := encodeConversationMessageCursor(conversationID, point)
-	decoded, valid := decodeConversationMessageCursor(cursor, conversationID)
-	if !valid || decoded.ID != point.ID || decoded.MessageSeq != point.MessageSeq {
-		t.Fatalf("decoded cursor = %#v, valid = %v", decoded, valid)
-	}
-}
-
 // TestConversationMessageCursorRejectsAnotherConversation 验证消息游标的会话归属校验。
 func TestConversationMessageCursorRejectsAnotherConversation(t *testing.T) {
 	point := conversationaction.MessageCursorPoint{

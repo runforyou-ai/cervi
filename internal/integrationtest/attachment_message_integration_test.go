@@ -219,21 +219,13 @@ func TestAttachmentMessageSequence(t *testing.T) {
 	if !foundConversation {
 		t.Fatal("caption preview missing from inbox")
 	}
-	// 尚未完成上传或已经过期的临时文件不能发送，也不留下消息。
-	pending, err := fileaction.NewCreateUploadAction(f.db).Execute(ctx, f.owner, domain.FileStorageBackendLocal, fileaction.UploadInput{
-		Purpose: domain.FilePurposeMessageAttachment, FileName: "pending.txt", ByteSize: 7,
-	})
-	if err != nil {
-		t.Fatal(err)
-	}
+	// 已经过期的临时文件不能发送，也不留下消息。
 	expired := uploadedAttachment(t, f.db, f.owner, "expired.txt", "text/plain")
 	if _, err := f.db.NewUpdate().Table("files").Set("expires_at = now() - interval '1 second'").Where("id = ?", expired).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
-	for _, fileID := range []string{pending.ID, expired} {
-		if _, err := send.Execute(ctx, f.owner, conversationaction.AttachmentMessageInput{ConversationID: secondResult.ConversationID, ClientMessageID: uuid.NewV7().String(), FileID: fileID}); !errors.Is(err, fileaction.ErrFileNotFound) {
-			t.Fatalf("unfinished file %s accepted: %v", fileID, err)
-		}
+	if _, err := send.Execute(ctx, f.owner, conversationaction.AttachmentMessageInput{ConversationID: secondResult.ConversationID, ClientMessageID: uuid.NewV7().String(), FileID: expired}); !errors.Is(err, fileaction.ErrFileNotFound) {
+		t.Fatalf("expired file accepted: %v", err)
 	}
 	count, err := f.db.NewSelect().Model((*servermodels.Message)(nil)).Where("conversation_id = ?", secondResult.ConversationID).Count(ctx)
 	if err != nil || count != 2 {

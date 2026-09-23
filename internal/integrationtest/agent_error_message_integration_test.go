@@ -4,6 +4,7 @@ package integrationtest
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
 	"testing"
 	"uuid"
@@ -25,6 +26,7 @@ func testAgentFailureMessages(t *testing.T, db *bun.DB, identity *servermodels.I
 	query := conversationaction.NewListConversationMessagesQuery(db)
 	failures := make(map[string]bool)
 	processed := make(map[string]bool)
+	runs := make(map[string]servermodels.AgentRun)
 	finalizer := agentrunaction.NewExecuteAction(db, tasks, nil, testAttachmentReader(db), nil)
 	for _, runID := range []string{firstRunID, secondRunID} {
 		var run servermodels.AgentRun
@@ -47,6 +49,7 @@ func testAgentFailureMessages(t *testing.T, db *bun.DB, identity *servermodels.I
 			t.Fatal(err)
 		}
 		processed[message.ID] = hasBlocks
+		runs[message.ID] = run
 		if err := finalizer.FinalizeFailure(ctx, agentrunaction.RunInput{RunID: runID}, errors.New("duplicate completion")); err != nil {
 			t.Fatal(err)
 		}
@@ -64,6 +67,16 @@ func testAgentFailureMessages(t *testing.T, db *bun.DB, identity *servermodels.I
 		// 中断前产生过内容的运行在失败消息上给出过程引用，没有产生内容的运行不给。
 		if (message.AgentProcess != nil) != processed[message.ID] || message.Sender == nil || message.Sender.IdentityType == nil || *message.Sender.IdentityType != domain.OrganizationIdentityTypeAgent {
 			t.Fatalf("failure sender = %+v, process expected = %v", message, processed[message.ID])
+		}
+		// 过程引用指向产生该失败消息的运行并携带其模型用量。
+		if message.AgentProcess != nil {
+			var usage agentruntime.Usage
+			if err := json.Unmarshal(runs[message.ID].Usage, &usage); err != nil {
+				t.Fatal(err)
+			}
+			if message.AgentProcess.ID != runs[message.ID].ID || usage.TotalTokens == 0 || message.AgentProcess.Usage != usage {
+				t.Fatalf("failure process = %+v, run usage = %+v", message.AgentProcess, usage)
+			}
 		}
 		cursor := &conversationaction.MessageCursorPoint{ID: message.ID, MessageSeq: message.MessageSeq}
 		earlier, err := query.Execute(ctx, identity, conversationaction.ConversationMessageHistoryInput{ConversationID: conversationID, Before: cursor})

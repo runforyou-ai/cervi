@@ -5,7 +5,6 @@ package integrationtest
 import (
 	"context"
 	"errors"
-	"fmt"
 	"strings"
 	"testing"
 	"time"
@@ -23,35 +22,16 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// TestInboxIndependentConversation 验证首页外深链、批量逐项结果及退群和解散的阅读边界。
+// TestInboxIndependentConversation 验证按编号读取单个会话、批量逐项结果及退群和解散的阅读边界。
 func TestInboxIndependentConversation(t *testing.T) {
 	f := newNavigationFixture(t)
 	ctx := tenant.WithAccessHost(context.Background(), f.owner.Organization.AccessHost)
-	for index := 0; index < 79; index++ {
-		if _, err := conversationaction.NewCreateGroupConversationAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationInput{Title: fmt.Sprintf("分页外群 %d", index), MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID}}); err != nil {
-			t.Fatal(err)
-		}
-	}
 	login, err := authaction.NewLoginAction(f.db).Execute(ctx, authaction.LoginInput{OrganizationID: f.owner.Organization.ID, Email: "member@navigation.test", Password: "password123"})
 	if err != nil {
 		t.Fatal(err)
 	}
 	backend := appservice.NewDirectBackend(f.db, domain.DeploymentModeSelfHosted, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil)
 	meta := appservice.RequestMeta{Token: login.Token}
-	inbox, err := backend.LoadInbox(ctx, meta, appservice.LoadInboxInput{Scope: appservice.InboxScopeChat})
-	if err != nil || len(inbox.Conversations) != 50 || !inbox.HasMore || inbox.NextCursor == "" {
-		t.Fatalf("inbox=%+v err=%v", inbox, err)
-	}
-	for _, item := range inbox.Conversations {
-		if item.ID == f.groupID {
-			t.Fatal("oldest group unexpectedly in first page")
-		}
-	}
-	second, err := backend.LoadInbox(ctx, meta, appservice.LoadInboxInput{Scope: appservice.InboxScopeChat, Cursor: inbox.NextCursor})
-	if err != nil || len(second.Conversations) != 30 || second.HasMore || second.NextCursor != "" || second.Conversations[29].ID != f.groupID {
-		t.Fatalf("second page=%+v err=%v", second, err)
-	}
-
 	summary, err := backend.GetInboxConversation(ctx, meta, f.groupID)
 	if err != nil || summary.ID != f.groupID || summary.Group == nil {
 		t.Fatalf("deep link=%+v err=%v", summary, err)

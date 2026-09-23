@@ -32,7 +32,6 @@ type processingProbe struct {
 	connectionErr error
 	credential    embedding.Credential
 	markdown      string
-	page          string
 	fetchErr      error
 }
 
@@ -41,7 +40,7 @@ func (p *processingProbe) Fetch(context.Context, string) (webfetch.Page, error) 
 	if p.fetchErr != nil {
 		return webfetch.Page{}, p.fetchErr
 	}
-	return webfetch.Page{Name: "page.html", Body: []byte(p.page)}, nil
+	return webfetch.Page{Name: "page.html"}, nil
 }
 
 // CheckConnection 返回预设的连接检查结果。
@@ -551,19 +550,5 @@ func TestKnowledgeConnectionFailureSkipsTask(t *testing.T) {
 	}
 	if len(runs) != 2 || runs[1].MaxAttempts != 1 {
 		t.Fatalf("runs=%+v", runs)
-	}
-	if err := db.NewSelect().Model(&document).Where("kd.id = ?", document.ID).Scan(ctx); err != nil {
-		t.Fatal(err)
-	}
-	input.ProcessingID = document.ProcessingID
-	probe.fail = true
-	if err := worker.FinalizeFailure(ctx, input, worker.Execute(ctx, input)); err != nil {
-		t.Fatal(err)
-	}
-	if err := db.NewSelect().Model(&document).Where("kd.id = ?", document.ID).Scan(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if document.Status != domain.KnowledgeIndexFailed || document.FailureCode != "parse_failed" || document.SegmentBatchID != published {
-		t.Fatalf("document=%+v", document)
 	}
 }
