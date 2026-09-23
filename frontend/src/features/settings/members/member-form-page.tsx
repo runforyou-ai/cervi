@@ -20,6 +20,7 @@ const listPath = "/settings/members"
 /** 新建企业成员，或按字段查看和编辑已有成员；返回时回到来源列表的筛选和页码。 */
 export function MemberFormPage({ mode }: { mode: "create" | "detail" }) {
   const { t } = useTranslation("contacts")
+  const { t: tSettings } = useTranslation("settings")
   const { userId = "" } = useParams()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
@@ -64,7 +65,7 @@ export function MemberFormPage({ mode }: { mode: "create" | "detail" }) {
       <PageContent variant="form">
         <ResourceContent
           resources={mode === "detail" ? [roles, teams, detail] : [roles, teams]}
-          errorMessage={t("detail.loadError")}
+          errorMessage={tSettings("members.detailLoadError")}
         >
           {mode === "create" ? (
             <MemberForm

@@ -10,11 +10,11 @@ import {
   deleteContact,
   getContact,
   isApiError,
+  listChannelOptions,
   listContacts,
   listDeletedContacts,
   restoreContact,
   sessionPath,
-  type ChannelOption,
   type ContactSummary,
 } from "@/api"
 import {
@@ -45,12 +45,22 @@ import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { optionalWailsEnum } from "@/lib/wails-enum"
 
 /** 外部联系人范围的列表、详情和弹窗。 */
-export function ExternalContactsPanel({
-  channels,
-}: {
-  channels: ChannelOption[]
-}) {
+export function ExternalContactsPanel() {
   const { t } = useTranslation(["contacts", "common"])
+  const channelsResource = useResource(
+    resourceKeys.channelOptions(),
+    () => listChannelOptions(),
+    { staleTime: 0 },
+  )
+  const channels = channelsResource.data ?? []
+  const channelsError = channelsResource.error
+
+  /** 渠道选项加载失败时记录日志，便于排查筛选项为空的原因。 */
+  useEffect(() => {
+    if (channelsError) {
+      console.warn("外部联系人渠道选项加载失败", channelsError)
+    }
+  }, [channelsError])
   const { formatDateTime } = useDateTime()
   const invalidate = useResourceInvalidator()
   const {

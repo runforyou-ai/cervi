@@ -125,7 +125,7 @@ export function MemberListPage() {
 
       <ResourceListLayout
         resources={list}
-        errorMessage={t("list.loadError")}
+        errorMessage={tSettings("members.loadError")}
         page={page}
         onPageChange={(number) => setParameters({ page: String(number) })}
       >
@@ -148,7 +148,7 @@ export function MemberListPage() {
           ]}
           rows={users}
           rowKey={(user) => user.id}
-          empty={t("list.empty")}
+          empty={tSettings("members.empty")}
           onRowActivate={(user) => navigate(`/settings/members/${user.id}?${returnQuery}`)}
           rowActions={(user) => [statusToggle.rowAction(user)]}
         />

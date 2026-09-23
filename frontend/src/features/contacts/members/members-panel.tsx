@@ -69,12 +69,9 @@ export function MembersPanel() {
           rows={users}
           rowKey={(user) => user.id}
           empty={t("list.empty")}
-          // 点击自己的行不跳转。
-          onRowActivate={(user) => {
-            if (user.identityId !== identity.user.identityId) {
-              navigate(`/chats?target=${user.identityId}`)
-            }
-          }}
+          onRowActivate={(user) => navigate(`/chats?target=${user.identityId}`)}
+          // 自己的行不可进入。
+          canActivateRow={(user) => user.identityId !== identity.user.identityId}
         />
     </ContactListSection>
   )

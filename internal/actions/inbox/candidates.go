@@ -162,7 +162,7 @@ func (q *LoadInboxQuery) pendingCandidates(identity *servermodels.Identity, inpu
 	return query
 }
 
-// matchConversationNames 按列表展示的会话名称筛选候选，未命名的群按在群成员名称匹配，名称与搜索词同样经 NFKC 规范化并合并连续空白，搜索词中的通配符按字面匹配，返回与候选相同的投影。
+// matchConversationNames 按会话名称筛选候选：群聊匹配群名，未命名的群匹配除查看者外任一在群成员的名称，单聊匹配对方名称，AI 聊天匹配标题或 AI 名称，客户会话匹配客户名称；名称与搜索词同样经 NFKC 规范化并合并连续空白，搜索词中的通配符按字面匹配，返回与候选相同的投影。
 func (q *LoadInboxQuery) matchConversationNames(identity *servermodels.Identity, candidates *bun.SelectQuery, search string) *bun.SelectQuery {
 	pattern := "%" + strings.NewReplacer(`\`, `\\`, "%", `\%`, "_", `\_`).Replace(search) + "%"
 	// 名称按搜索词的规则规范化后再匹配。

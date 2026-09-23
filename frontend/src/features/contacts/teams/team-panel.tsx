@@ -326,16 +326,16 @@ export function TeamPanel({ teamId }: { teamId: string }) {
           ]}
           rows={teamMembers}
           rowKey={(member) => member.identityId}
-          // 同事与同事列表一样进入单聊，点击自己不跳转；AI 员工进入其编辑页并可返回本团队。
-          onRowActivate={(member) => {
-            if (member.identityType === OrganizationIdentityType.OrganizationIdentityTypeAgent) {
-              navigate(
-                `/ai-employees/${member.agentId}?tab=basic&returnTo=${encodeURIComponent(location.pathname + location.search)}`,
-              )
-            } else if (member.identityId !== identity.user.identityId) {
-              navigate(`/chats?target=${member.identityId}`)
-            }
-          }}
+          // 同事与同事列表一样进入单聊，AI 员工进入其编辑页并可返回本团队。
+          onRowActivate={(member) =>
+            navigate(
+              member.identityType === OrganizationIdentityType.OrganizationIdentityTypeAgent
+                ? `/ai-employees/${member.agentId}?tab=basic&returnTo=${encodeURIComponent(location.pathname + location.search)}`
+                : `/chats?target=${member.identityId}`,
+            )
+          }
+          // 自己的行不可进入。
+          canActivateRow={(member) => member.identityId !== identity.user.identityId}
           empty={t("list.empty")}
           rowActions={
             selectedTeam

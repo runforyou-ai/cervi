@@ -250,6 +250,9 @@ const settings = {
   members: {
     title: "Members",
     description: "Add member accounts and set roles, teams and customer handling",
+    empty: "No matching members",
+    loadError: "Could not load members.",
+    detailLoadError: "Could not load the member.",
   },
   roles: {
     title: "Roles and permissions",
