@@ -33,8 +33,11 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.POST("/inbox/window/query", s.readInboxWindow)
 	router.GET("/conversations/:conversationID/customer-profile", s.getCustomerProfile)
 	router.GET("/conversations/:conversationID/business-queries", s.listCustomerBusinessQueries)
+	router.GET("/conversations/:conversationID/service-summaries", s.getCustomerServiceSummaries)
+	router.PUT("/service-sessions/:serviceSessionID/summary", s.updateServiceSessionSummary)
 	router.GET("/conversations/:conversationID/summary", s.getInboxConversation)
 	router.POST("/inbox/conversations/query", s.readInboxConversations)
+	router.GET("/conversations/:conversationID/attention", s.readConversationAttention)
 	router.GET("/inbox/search", s.searchInbox)
 	router.GET("/inbox/assignees", s.listCustomerServiceAssignees)
 	router.GET("/inbox/queue-teams", s.listServiceQueueTeams)
@@ -194,6 +197,8 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.PUT("/settings/customer-service/business-hours", s.updateBusinessHours)
 	router.GET("/settings/customer-service/timeouts", s.getServiceTimeouts)
 	router.PUT("/settings/customer-service/timeouts", s.updateServiceTimeouts)
+	router.GET("/settings/customer-service/summary", s.getServiceSummarySettings)
+	router.PUT("/settings/customer-service/summary", s.updateServiceSummarySettings)
 	router.GET("/settings/customer-service/categories", s.listServiceCategories)
 	router.POST("/settings/customer-service/categories", s.createServiceCategory)
 	router.PUT("/settings/customer-service/categories/:categoryID", s.updateServiceCategory)
@@ -367,6 +372,22 @@ func (s *Service) listCustomerBusinessQueries(c *gin.Context) {
 	writeResult(c, http.StatusOK, output, err)
 }
 
+// getCustomerServiceSummaries 返回客户会话当前周期的交接摘要与同一客户已关闭周期的小结。
+func (s *Service) getCustomerServiceSummaries(c *gin.Context) {
+	output, err := s.application.GetCustomerServiceSummaries(c.Request.Context(), requestMeta(c), c.Param("conversationID"))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// updateServiceSessionSummary 修改已关闭客服处理周期的小结、是否解决与咨询分类。
+func (s *Service) updateServiceSessionSummary(c *gin.Context) {
+	var input appservice.ServiceSessionSummaryInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.UpdateServiceSessionSummary(c.Request.Context(), requestMeta(c), c.Param("serviceSessionID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
 // getInboxConversation 返回当前用户有权阅读的独立会话摘要。
 func (s *Service) getInboxConversation(c *gin.Context) {
 	output, err := s.application.GetInboxConversation(c.Request.Context(), requestMeta(c), c.Param("conversationID"))
@@ -380,6 +401,16 @@ func (s *Service) readInboxConversations(c *gin.Context) {
 		return
 	}
 	output, err := s.application.ReadInboxConversations(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// readConversationAttention 返回会话摘要及已知消息之后计入本人提醒的未读消息，提醒口径与应用角标一致。
+func (s *Service) readConversationAttention(c *gin.Context) {
+	input, ok := bindConversationAttentionInputQuery(c)
+	if !ok {
+		return
+	}
+	output, err := s.application.ReadConversationAttention(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
 	writeResult(c, http.StatusOK, output, err)
 }
 
@@ -1647,6 +1678,22 @@ func (s *Service) updateServiceTimeouts(c *gin.Context) {
 	writeResult(c, http.StatusOK, output, err)
 }
 
+// getServiceSummarySettings 读取当前企业的周期小结设置。
+func (s *Service) getServiceSummarySettings(c *gin.Context) {
+	output, err := s.application.GetServiceSummarySettings(c.Request.Context(), requestMeta(c))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// updateServiceSummarySettings 修改当前企业的周期小结设置。
+func (s *Service) updateServiceSummarySettings(c *gin.Context) {
+	var input appservice.ServiceSummarySettings
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.UpdateServiceSummarySettings(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
 // listServiceCategories 返回当前企业的咨询分类目录。
 func (s *Service) listServiceCategories(c *gin.Context) {
 	output, err := s.application.ListServiceCategories(c.Request.Context(), requestMeta(c))
@@ -1801,6 +1848,13 @@ func bindAgentListInputQuery(c *gin.Context) (appservice.AgentListInput, bool) {
 		Status:   optionalEnum[appservice.UserStatus](c.Query("status")),
 		Page:     page,
 		PageSize: pageSize,
+	}, true
+}
+
+// bindConversationAttentionInputQuery 从查询参数解析 appservice.ConversationAttentionInput。
+func bindConversationAttentionInputQuery(c *gin.Context) (appservice.ConversationAttentionInput, bool) {
+	return appservice.ConversationAttentionInput{
+		AfterMessageID: c.Query("afterMessageId"),
 	}, true
 }
 

@@ -148,13 +148,14 @@ const settings = {
   },
   customerService: {
     title: "客服",
-    description: "设置客服工作时间、超时提醒与重新分配、AI 跟进与关闭、咨询分类，以及客户身份验证",
+    description: "设置客服工作时间、超时提醒与重新分配、AI 跟进与关闭、咨询分类、会话小结，以及客户身份验证",
     loadError: "工作时间加载失败。",
     saveError: "保存工作时间失败，请重试。",
     tabs: {
       businessHours: "工作时间",
       assignment: "分配与提醒",
       categories: "咨询分类",
+      summary: "会话小结",
       identity: "客户身份验证",
     },
     identity: {
@@ -203,6 +204,19 @@ const settings = {
         nameTooLong: "分类名称不能超过 64 个字符。",
         descriptionTooLong: "分类说明不能超过 500 个字符。",
       },
+    },
+    summary: {
+      formLabel: "会话小结表单",
+      loadError: "会话小结设置加载失败。",
+      saveError: "保存会话小结设置失败，请重试。",
+      decision: "判断模型",
+      decisionDescription: "会话结束时判断客户是否提出了实际问题，并标注咨询分类和是否解决",
+      summary: "小结模型",
+      summaryDescription: "会话结束时写小结，AI 转人工时写交接摘要",
+      notUsed: "不使用",
+      configureModels: "添加模型",
+      locale: "小结语言",
+      localeDescription: "小结和交接摘要使用的语言",
     },
     timeouts: {
       formLabel: "分配与提醒表单",

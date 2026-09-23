@@ -28,7 +28,7 @@ func (a *RemoveMembersAction) Execute(ctx context.Context, identity *servermodel
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		if _, err := loadTeam(ctx, tx, identity.Organization.ID, teamID); err != nil {
+		if err := lockTeam(ctx, tx, identity.Organization.ID, teamID); err != nil {
 			return err
 		}
 		unique := make(map[string]MemberIdentity, len(members))

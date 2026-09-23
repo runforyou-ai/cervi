@@ -24,6 +24,11 @@ type CustomerServiceSetting struct {
 	AIFollowUpMinutes       int                            `bun:"ai_follow_up_minutes"`
 	AICloseMinutes          int                            `bun:"ai_close_minutes"`
 	CustomerIdentitySecret  *string                        `bun:"customer_identity_secret"`
+	DecisionProviderID      *string                        `bun:"decision_provider_id"`
+	DecisionModelIdentifier *string                        `bun:"decision_model_identifier"`
+	SummaryProviderID       *string                        `bun:"summary_provider_id"`
+	SummaryModelIdentifier  *string                        `bun:"summary_model_identifier"`
+	SummaryLocale           string                         `bun:"summary_locale"`
 	CreatedAt               time.Time                      `bun:"created_at"`
 	UpdatedAt               time.Time                      `bun:"updated_at"`
 }

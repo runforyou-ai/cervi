@@ -193,6 +193,26 @@ func (b *DirectBackend) ListCustomerBusinessQueries(ctx context.Context, meta Re
 	return b.ops.ListCustomerBusinessQueries(ctx, meta, identity, conversationID)
 }
 
+// GetCustomerServiceSummaries 返回客户会话当前周期的交接摘要与同一客户已关闭周期的小结。
+func (b *DirectBackend) GetCustomerServiceSummaries(ctx context.Context, meta RequestMeta, conversationID string) (CustomerServiceSummaries, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero CustomerServiceSummaries
+		return zero, err
+	}
+	return b.ops.GetCustomerServiceSummaries(ctx, meta, identity, conversationID)
+}
+
+// UpdateServiceSessionSummary 修改已关闭客服处理周期的小结、是否解决与咨询分类。
+func (b *DirectBackend) UpdateServiceSessionSummary(ctx context.Context, meta RequestMeta, serviceSessionID string, input ServiceSessionSummaryInput) (ServiceSessionSummary, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero ServiceSessionSummary
+		return zero, err
+	}
+	return b.ops.UpdateServiceSessionSummary(ctx, meta, identity, serviceSessionID, input)
+}
+
 // GetInboxConversation 返回当前用户有权阅读的独立会话摘要。
 func (b *DirectBackend) GetInboxConversation(ctx context.Context, meta RequestMeta, conversationID string) (InboxConversation, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
@@ -211,6 +231,16 @@ func (b *DirectBackend) ReadInboxConversations(ctx context.Context, meta Request
 		return zero, err
 	}
 	return b.ops.ReadInboxConversations(ctx, meta, identity, input)
+}
+
+// ReadConversationAttention 返回会话摘要及已知消息之后计入本人提醒的未读消息，提醒口径与应用角标一致。
+func (b *DirectBackend) ReadConversationAttention(ctx context.Context, meta RequestMeta, conversationID string, input ConversationAttentionInput) (ConversationAttention, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero ConversationAttention
+		return zero, err
+	}
+	return b.ops.ReadConversationAttention(ctx, meta, identity, conversationID, input)
 }
 
 // SearchInbox 按范围检索会话名称、消息正文与附件文件名、成员和外部联系人。
@@ -1789,6 +1819,26 @@ func (b *DirectBackend) UpdateServiceTimeouts(ctx context.Context, meta RequestM
 		return zero, err
 	}
 	return b.ops.UpdateServiceTimeouts(ctx, meta, identity, input)
+}
+
+// GetServiceSummarySettings 读取当前企业的周期小结设置。
+func (b *DirectBackend) GetServiceSummarySettings(ctx context.Context, meta RequestMeta) (ServiceSummarySettings, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero ServiceSummarySettings
+		return zero, err
+	}
+	return b.ops.GetServiceSummarySettings(ctx, meta, identity)
+}
+
+// UpdateServiceSummarySettings 修改当前企业的周期小结设置。
+func (b *DirectBackend) UpdateServiceSummarySettings(ctx context.Context, meta RequestMeta, input ServiceSummarySettings) (ServiceSummarySettings, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero ServiceSummarySettings
+		return zero, err
+	}
+	return b.ops.UpdateServiceSummarySettings(ctx, meta, identity, input)
 }
 
 // ListServiceCategories 返回当前企业的咨询分类目录。

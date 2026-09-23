@@ -142,6 +142,22 @@ func (b *Backend) ListCustomerBusinessQueries(ctx context.Context, meta appservi
 	return output, err
 }
 
+// GetCustomerServiceSummaries 返回客户会话当前周期的交接摘要与同一客户已关闭周期的小结。
+func (b *Backend) GetCustomerServiceSummaries(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.CustomerServiceSummaries, error) {
+	var output appservice.CustomerServiceSummaries
+	err := b.do(ctx, meta, http.MethodGet, "/conversations/"+url.PathEscape(conversationID)+"/service-summaries", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// UpdateServiceSessionSummary 修改已关闭客服处理周期的小结、是否解决与咨询分类。
+func (b *Backend) UpdateServiceSessionSummary(ctx context.Context, meta appservice.RequestMeta, serviceSessionID string, input appservice.ServiceSessionSummaryInput) (appservice.ServiceSessionSummary, error) {
+	var output appservice.ServiceSessionSummary
+	err := b.do(ctx, meta, http.MethodPut, "/service-sessions/"+url.PathEscape(serviceSessionID)+"/summary", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // GetInboxConversation 返回当前用户有权阅读的独立会话摘要。
 func (b *Backend) GetInboxConversation(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.InboxConversation, error) {
 	var output appservice.InboxConversation
@@ -154,6 +170,14 @@ func (b *Backend) GetInboxConversation(ctx context.Context, meta appservice.Requ
 func (b *Backend) ReadInboxConversations(ctx context.Context, meta appservice.RequestMeta, input appservice.ReadInboxConversationsInput) (appservice.InboxConversationResults, error) {
 	var output appservice.InboxConversationResults
 	err := b.do(ctx, meta, http.MethodPost, "/inbox/conversations/query", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// ReadConversationAttention 返回会话摘要及已知消息之后计入本人提醒的未读消息，提醒口径与应用角标一致。
+func (b *Backend) ReadConversationAttention(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.ConversationAttentionInput) (appservice.ConversationAttention, error) {
+	var output appservice.ConversationAttention
+	err := b.do(ctx, meta, http.MethodGet, "/conversations/"+url.PathEscape(conversationID)+"/attention", encodeConversationAttentionInputQuery(input), nil, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }
@@ -1366,6 +1390,22 @@ func (b *Backend) UpdateServiceTimeouts(ctx context.Context, meta appservice.Req
 	return output, err
 }
 
+// GetServiceSummarySettings 读取当前企业的周期小结设置。
+func (b *Backend) GetServiceSummarySettings(ctx context.Context, meta appservice.RequestMeta) (appservice.ServiceSummarySettings, error) {
+	var output appservice.ServiceSummarySettings
+	err := b.do(ctx, meta, http.MethodGet, "/settings/customer-service/summary", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// UpdateServiceSummarySettings 修改当前企业的周期小结设置。
+func (b *Backend) UpdateServiceSummarySettings(ctx context.Context, meta appservice.RequestMeta, input appservice.ServiceSummarySettings) (appservice.ServiceSummarySettings, error) {
+	var output appservice.ServiceSummarySettings
+	err := b.do(ctx, meta, http.MethodPut, "/settings/customer-service/summary", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // ListServiceCategories 返回当前企业的咨询分类目录。
 func (b *Backend) ListServiceCategories(ctx context.Context, meta appservice.RequestMeta) (appservice.ServiceCategoryList, error) {
 	var output appservice.ServiceCategoryList
@@ -1476,6 +1516,13 @@ func encodeAgentListInputQuery(input appservice.AgentListInput) url.Values {
 	setOptionalQuery(query, "status", input.Status)
 	setPositiveQuery(query, "page", input.Page)
 	setPositiveQuery(query, "pageSize", input.PageSize)
+	return query
+}
+
+// encodeConversationAttentionInputQuery 将 appservice.ConversationAttentionInput 编码为查询参数。
+func encodeConversationAttentionInputQuery(input appservice.ConversationAttentionInput) url.Values {
+	query := url.Values{}
+	setQuery(query, "afterMessageId", input.AfterMessageID)
 	return query
 }
 

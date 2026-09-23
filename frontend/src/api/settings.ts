@@ -5,6 +5,7 @@ import {
   DeleteServiceCategory,
   GetBusinessHours,
   GetCustomerIdentitySecret,
+  GetServiceSummarySettings,
   GetServiceTimeouts,
   ListServiceCategories,
   RegenerateCustomerIdentitySecret,
@@ -12,6 +13,7 @@ import {
   UpdateBusinessHours,
   UpdateOrganization,
   UpdateServiceCategory,
+  UpdateServiceSummarySettings,
   UpdateServiceTimeouts,
   UpdateProfile,
   UpdateUserPreferences,
@@ -36,6 +38,12 @@ export const getServiceTimeouts = bind(GetServiceTimeouts)
 
 /** 修改当前企业的客服超时时长。 */
 export const updateServiceTimeouts = bind(UpdateServiceTimeouts)
+
+/** 读取当前企业的会话小结设置。 */
+export const getServiceSummarySettings = bind(GetServiceSummarySettings)
+
+/** 修改当前企业的会话小结设置。 */
+export const updateServiceSummarySettings = bind(UpdateServiceSummarySettings)
 
 /** 读取当前企业的客户身份密钥，未生成时为空。 */
 export const getCustomerIdentitySecret = bind(GetCustomerIdentitySecret)

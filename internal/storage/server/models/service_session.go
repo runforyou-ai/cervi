@@ -43,4 +43,11 @@ type ServiceSession struct {
 	RatingComment            *string                `bun:"rating_comment"`
 	RatedAt                  *time.Time             `bun:"rated_at"`
 	VisitorContext           *domain.VisitorContext `bun:"visitor_context,type:jsonb"`
+	SummaryStatus            *string                `bun:"summary_status"`
+	Summary                  *string                `bun:"summary"`
+	Resolved                 *bool                  `bun:"resolved"`
+	SummaryEditedByID        *string                `bun:"summary_edited_by_identity_id"`
+	SummaryEditedAt          *time.Time             `bun:"summary_edited_at"`
+	HandoffMessageID         *string                `bun:"handoff_message_id"`
+	HandoffSummary           *domain.HandoffSummary `bun:"handoff_summary,type:jsonb"`
 }

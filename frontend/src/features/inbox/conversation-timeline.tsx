@@ -5,6 +5,7 @@ import { useNavigate } from "react-router"
 import { toast } from "sonner"
 
 import {
+  ConversationSystemEventType,
   ConversationType,
   MessageVisibility,
   isApiError,
@@ -187,6 +188,8 @@ function ConversationTimelineContent({
   const navigate = useNavigate()
   const timeZone = useUserTimeZone()
   const pollingActive = useMemberChatPollingActive({ requireWindowFocus })
+  // 会话显示在可见窗口中即推进已读，不要求窗口获得焦点。
+  const readingActive = useMemberChatPollingActive({ requireWindowFocus: false })
   const scrollRootRef = useRef<HTMLDivElement>(null)
   const keepPositionRef = useRef<(() => void) | null>(null)
   const invalidate = useResourceInvalidator()
@@ -239,13 +242,28 @@ function ConversationTimelineContent({
     page: currentPage,
     mode: timeline.mode,
     switching: timeline.switching || location.locating,
-    readingActive: enabled && pollingActive,
+    readingActive: enabled && readingActive,
     identityID: currentIdentityID,
     atBottom: viewport.atBottom,
     getAtBottom: viewport.getAtBottom,
     onReadMessage,
     readThroughMessageID,
   })
+  // 客户会话中每个周期最后一次关闭事件承载该周期的小结。
+  const summaryEventIDs = new Set<string>()
+  if (conversationType === ConversationType.ConversationTypeCustomer) {
+    const latestClosed = new Map<string, string>()
+    for (const message of visibleMessages) {
+      const event = message.systemEvent
+      if (event?.serviceSessionId && event.type === ConversationSystemEventType.ConversationSystemEventServiceSessionClosed) {
+        latestClosed.set(event.serviceSessionId, message.id)
+      }
+      if (event?.serviceSessionId && event.type === ConversationSystemEventType.ConversationSystemEventServiceSessionReopened) {
+        latestClosed.delete(event.serviceSessionId)
+      }
+    }
+    for (const id of latestClosed.values()) summaryEventIDs.add(id)
+  }
 
   /** 当前成员失去会话访问权时恢复到会话列表。 */
   const handleUnavailable = useCallback(() => {
@@ -448,6 +466,7 @@ function ConversationTimelineContent({
                   currentUser={currentUser}
                   formatters={dateFormatters}
                   highlighted={location.highlightedID === message.id}
+                  summaryEvent={summaryEventIDs.has(message.id)}
                   customerDeliveries={customerDeliveries}
                   delivery={message.persistedMessageID ? deliveriesByMessage.get(message.persistedMessageID) : undefined}
                   deliveriesFailed={Boolean(deliveries.error)}

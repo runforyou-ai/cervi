@@ -15,6 +15,7 @@ export function clearConversationResources(client: QueryClient, conversationID: 
     resourceKeys.groupConversation(conversationID),
     resourceKeys.customerDeliveries(conversationID),
     resourceKeys.customerBusinessQueries(conversationID),
+    resourceKeys.customerServiceSummaries(conversationID),
   ]
   for (const queryKey of keys) client.removeQueries({ queryKey })
   client.removeQueries({ queryKey: resourceKeys.attachmentDownload(conversationID) })

@@ -26,7 +26,10 @@ import {
   ReadConversationMessageWindow,
   GetInboxConversation,
   ReadInboxConversations,
+  ReadConversationAttention,
   ReopenServiceSession,
+  GetCustomerServiceSummaries,
+  UpdateServiceSessionSummary,
   SearchInbox,
   RemoveGroupConversationMember,
   SendCustomerAttachmentMessage,
@@ -56,6 +59,7 @@ import {
   ReportConversationTyping,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import type {
+  ConversationAttention,
   CustomerInboxConversation,
   ConversationMessage,
   ConversationAgentProcess,
@@ -383,6 +387,12 @@ export function reopenServiceSession(conversationId: string) {
   return reopenServiceSessionBound(conversationId)
 }
 
+/** 读取客户会话当前周期的交接摘要与同一客户已关闭周期的小结。 */
+export const getCustomerServiceSummaries = bind(GetCustomerServiceSummaries)
+
+/** 修改已关闭客服处理周期的小结、是否解决与咨询分类。 */
+export const updateServiceSessionSummary = bind(UpdateServiceSessionSummary)
+
 /** 分页读取成员可见的会话消息。 */
 export function listConversationMessages(
   conversationID: string,
@@ -640,6 +650,11 @@ export const stopGroupAgentReply = bind(StopGroupAgentReply)
 
 /** 独立读取当前用户可见的会话摘要。 */
 export const getInboxConversation = bind(GetInboxConversation)
+
+export type ConversationAttentionData = NonNullArrays<ConversationAttention>
+
+/** 读取会话摘要及已知消息之后计入本人提醒的未读消息。 */
+export const readConversationAttention = bind(ReadConversationAttention)
 
 /** 批量核对指定会话的阅读和列表资格。 */
 export function readInboxConversations(input: ReadInboxConversationsInput, signal?: AbortSignal) {

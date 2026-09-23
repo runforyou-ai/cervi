@@ -79,43 +79,18 @@ func validateRoleID(ctx context.Context, db bun.IDB, organizationID, roleID stri
 	return err
 }
 
-// lockAdministratorRole 锁定管理员角色以串行维护有效管理员数量。
-func lockAdministratorRole(ctx context.Context, db bun.IDB, organizationID string) (string, error) {
-	return roleaction.LockAdministratorRole(ctx, db, organizationID)
-}
-
-// ensureActiveAdministratorRemains 校验企业仍有正常状态的管理员。
-func ensureActiveAdministratorRemains(ctx context.Context, db bun.IDB, organizationID, administratorRoleID string) error {
-	return roleaction.EnsureActiveAdministratorRemains(ctx, db, organizationID, administratorRoleID)
-}
-
-// validateTeamIDs 规范化团队编号、去重并校验全部团队属于当前企业。
+// validateTeamIDs 规范化团队编号并锁定同企业的全部目标团队。
 func validateTeamIDs(ctx context.Context, db bun.IDB, organizationID string, teamIDs []string) ([]string, error) {
 	ids, valid := common.NormalizeUUIDs(teamIDs)
 	if !valid {
 		return nil, &ValidationError{Fields: map[string]ValidationCode{"teamIds": ValidationTeamInvalid}}
 	}
-	if len(ids) == 0 {
-		return ids, nil
+	_, err := teamaction.LockTeams(ctx, db, organizationID, ids)
+	if errors.Is(err, teamaction.ErrNotFound) {
+		return nil, &ValidationError{Fields: map[string]ValidationCode{"teamIds": ValidationTeamInvalid}}
 	}
-	count, err := db.NewSelect().TableExpr("teams AS t").
-		Where("t.organization_id = ?", organizationID).
-		Where("t.id IN (?)", bun.In(ids)).
-		Count(ctx)
 	if err != nil {
 		return nil, err
 	}
-	if count != len(ids) {
-		return nil, &ValidationError{Fields: map[string]ValidationCode{"teamIds": ValidationTeamInvalid}}
-	}
 	return ids, nil
-}
-
-// replaceUserTeams 校验团队编号后按差集修改成员所属团队。
-func replaceUserTeams(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, organizationIdentityID string, teamIDs []string) error {
-	ids, err := validateTeamIDs(ctx, tx, identity.Organization.ID, teamIDs)
-	if err != nil {
-		return err
-	}
-	return teamaction.ReplaceIdentityTeams(ctx, tx, identity, organizationIdentityID, ids)
 }

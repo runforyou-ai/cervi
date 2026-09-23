@@ -380,17 +380,7 @@ func (q *LoadInboxQuery) customerConversationDetailsQuery(organizationID, curren
 		Join("LEFT JOIN organization_identities AS assignee ON assignee.organization_id = cv.organization_id AND assignee.id = current.assignee_identity_id").
 		Join("LEFT JOIN teams AS team ON team.organization_id = cv.organization_id AND team.id = current.team_id").
 		Join("LEFT JOIN conversation_user_states AS state ON state.organization_id = cv.organization_id AND state.conversation_id = cv.id AND state.user_id = ?", userID).
-		Join(`JOIN LATERAL (
-			SELECT count(*) AS unread_count,
-				count(*) FILTER (WHERE EXISTS (?)) AS mentioned_unread_count
-			FROM messages AS unread_msg
-			JOIN conversation_participants AS sender_cp ON sender_cp.organization_id = unread_msg.organization_id AND sender_cp.conversation_id = unread_msg.conversation_id AND sender_cp.id = unread_msg.sender_participant_id
-			JOIN chat_subjects AS sender_cs ON sender_cs.organization_id = sender_cp.organization_id AND sender_cs.id = sender_cp.subject_id
-			WHERE unread_msg.organization_id = cv.organization_id AND unread_msg.conversation_id = cv.id
-				AND unread_msg.type IN (?) AND unread_msg.deleted_at IS NULL
-				AND NOT (sender_cs.kind = ? AND sender_cs.source_id = ?)
-				AND unread_msg.message_seq > COALESCE(state.read_seq, 0)
-		) AS unread ON TRUE`, messageMentionsIdentity(q.db, "unread_msg", currentIdentityID), bun.In([]domain.MessageType{domain.MessageTypeText, domain.MessageTypeAttachment, domain.MessageTypeAgentError}), domain.ChatSubjectKindOrganizationIdentity, currentIdentityID).
+		Join("JOIN LATERAL (?) AS unread ON TRUE", unreadCountsQuery(q.db, currentIdentityID)).
 		// 统计当前周期内被提醒成员之后尚未在会话中发言的提醒。
 		Join(`JOIN LATERAL (
 			SELECT count(*) AS unanswered_mention_count
@@ -404,14 +394,6 @@ func (q *LoadInboxQuery) customerConversationDetailsQuery(organizationID, curren
 						AND answer.message_seq > note.message_seq AND answer.deleted_at IS NULL AND answer_cp.subject_id = note_mention.subject_id
 				)
 		) AS unanswered ON TRUE`)
-}
-
-// messageMentionsIdentity 构造指定消息提醒了某个企业身份的存在性子查询。
-func messageMentionsIdentity(db bun.IDB, messageAlias, identityID string) *bun.SelectQuery {
-	return db.NewSelect().TableExpr("message_mentions AS mention").ColumnExpr("1").
-		Join("JOIN chat_subjects AS mention_cs ON mention_cs.organization_id = mention.organization_id AND mention_cs.id = mention.subject_id").
-		Where("mention.organization_id = ?.organization_id AND mention.message_id = ?.id", bun.Ident(messageAlias), bun.Ident(messageAlias)).
-		Where("mention_cs.kind = ? AND mention_cs.source_id = ?", domain.ChatSubjectKindOrganizationIdentity, identityID)
 }
 
 // filterServiceInbox 为服务会话追加来源与服务对象筛选；全部范围另按服务状态和负责人筛选。
@@ -455,15 +437,7 @@ func withIndividualConversationDetails(query *bun.SelectQuery, identityID, userI
 		Join("LEFT JOIN chat_subjects AS preview_cs ON preview_cs.id = preview_cp.subject_id AND preview_cs.organization_id = preview_cp.organization_id").
 		Join("LEFT JOIN organization_identities AS preview_oi ON preview_oi.id = preview_cs.source_id AND preview_oi.organization_id = preview_cs.organization_id AND preview_cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
 		Join("LEFT JOIN conversation_user_states AS state ON state.organization_id = cv.organization_id AND state.conversation_id = cv.id AND state.user_id = ?", userID).
-		Join(`JOIN LATERAL (
-			SELECT count(*) AS unread_count
-			FROM messages AS unread_msg
-			LEFT JOIN conversation_participants AS sender_cp ON sender_cp.organization_id = unread_msg.organization_id AND sender_cp.id = unread_msg.sender_participant_id
-			LEFT JOIN chat_subjects AS sender_cs ON sender_cs.organization_id = sender_cp.organization_id AND sender_cs.id = sender_cp.subject_id
-			WHERE unread_msg.organization_id = cv.organization_id AND unread_msg.conversation_id = cv.id AND unread_msg.deleted_at IS NULL
-				AND (unread_msg.sender_participant_id IS NULL OR sender_cs.source_id <> ?)
-				AND unread_msg.message_seq > COALESCE(state.read_seq, 0)
-		) AS unread ON TRUE`, identityID)
+		Join("JOIN LATERAL (?) AS unread ON TRUE", unreadCountsQuery(query.DB(), identityID))
 }
 
 // directConversationDetailsQuery 按真人身份对及有效成员关系读取长期单聊。
@@ -511,17 +485,7 @@ func (q *LoadInboxQuery) groupConversationsQuery(organizationID, identityID, use
 		Join("LEFT JOIN chat_subjects AS preview_cs ON preview_cs.id = preview_cp.subject_id AND preview_cs.organization_id = preview_cp.organization_id").
 		Join("LEFT JOIN organization_identities AS preview_oi ON preview_oi.id = preview_cs.source_id AND preview_oi.organization_id = preview_cs.organization_id AND preview_cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
 		Join("LEFT JOIN conversation_user_states AS state ON state.organization_id = cv.organization_id AND state.conversation_id = cv.id AND state.user_id = ?", userID).
-		Join(`JOIN LATERAL (
-			SELECT count(*) AS unread_count,
-				count(*) FILTER (WHERE mention.message_id IS NOT NULL OR unread_msg.mention_all) AS mentioned_unread_count
-			FROM messages AS unread_msg
-			LEFT JOIN conversation_participants AS sender_cp ON sender_cp.organization_id = unread_msg.organization_id AND sender_cp.id = unread_msg.sender_participant_id
-			LEFT JOIN chat_subjects AS sender_cs ON sender_cs.organization_id = sender_cp.organization_id AND sender_cs.id = sender_cp.subject_id
-			LEFT JOIN message_mentions AS mention ON mention.organization_id = unread_msg.organization_id AND mention.message_id = unread_msg.id AND mention.subject_id = mine.subject_id
-			WHERE unread_msg.organization_id = cv.organization_id AND unread_msg.conversation_id = cv.id AND unread_msg.deleted_at IS NULL
-				AND (unread_msg.sender_participant_id IS NULL OR sender_cs.source_id <> ?)
-				AND unread_msg.message_seq > COALESCE(state.read_seq, 0)
-		) AS unread ON TRUE`, identityID)
+		Join("JOIN LATERAL (?) AS unread ON TRUE", unreadCountsQuery(q.db, identityID))
 }
 
 // loadUnreadCounts 按完整会话范围汇总提醒，不受当前筛选和列表条数限制。
@@ -551,17 +515,10 @@ func (q *LoadInboxQuery) countPending(ctx context.Context, identity *servermodel
 	}
 	err := q.db.NewSelect().TableExpr("(?) AS pending", q.pendingCandidates(identity, LoadInput{Scope: domain.InboxScopePending})).
 		ColumnExpr("count(*) AS pending_count").
-		ColumnExpr(`COALESCE(sum((
-			SELECT count(*)
-			FROM messages AS unread_msg
-			JOIN conversation_participants AS sender_cp ON sender_cp.organization_id = unread_msg.organization_id AND sender_cp.conversation_id = unread_msg.conversation_id AND sender_cp.id = unread_msg.sender_participant_id
-			JOIN chat_subjects AS sender_cs ON sender_cs.organization_id = sender_cp.organization_id AND sender_cs.id = sender_cp.subject_id
-			WHERE unread_msg.organization_id = ? AND unread_msg.conversation_id = pending.id
-				AND unread_msg.type IN (?) AND unread_msg.deleted_at IS NULL
-				AND NOT (sender_cs.kind = ? AND sender_cs.source_id = ?)
-				AND unread_msg.message_seq > COALESCE(state.read_seq, 0)
-		)), 0) AS pending_unread_count`, identity.Organization.ID, bun.In([]domain.MessageType{domain.MessageTypeText, domain.MessageTypeAttachment, domain.MessageTypeAgentError}), domain.ChatSubjectKindOrganizationIdentity, identity.OrganizationIdentity.ID).
-		Join("LEFT JOIN conversation_user_states AS state ON state.organization_id = ? AND state.conversation_id = pending.id AND state.user_id = ?", identity.Organization.ID, identity.User.ID).
+		ColumnExpr("COALESCE(sum(unread.unread_count), 0) AS pending_unread_count").
+		Join("JOIN conversations AS cv ON cv.organization_id = ? AND cv.id = pending.id", identity.Organization.ID).
+		Join("LEFT JOIN conversation_user_states AS state ON state.organization_id = cv.organization_id AND state.conversation_id = cv.id AND state.user_id = ?", identity.User.ID).
+		Join("JOIN LATERAL (?) AS unread ON TRUE", unreadCountsQuery(q.db, identity.OrganizationIdentity.ID)).
 		Scan(ctx, &counts)
 	if err != nil {
 		return 0, 0, fmt.Errorf("count pending service conversations: %w", err)

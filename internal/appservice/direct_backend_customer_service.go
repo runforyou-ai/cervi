@@ -32,6 +32,10 @@ type customerServiceOps struct {
 	regenerateSecret      *customerserviceaction.RegenerateCustomerIdentitySecretAction
 	getCustomerProfile    *contactaction.GetCustomerProfileQuery
 	listBusinessQueries   *conversationaction.ListBusinessQueriesQuery
+	getSummarySettings    *customerserviceaction.GetServiceSummarySettingsQuery
+	updateSummarySettings *customerserviceaction.UpdateServiceSummarySettingsAction
+	listSummaries         *conversationaction.ListServiceSummariesQuery
+	updateSummary         *conversationaction.UpdateServiceSessionSummaryAction
 }
 
 // newCustomerServiceOps 创建企业客服设置的业务实现依赖。
@@ -49,6 +53,10 @@ func newCustomerServiceOps(db *bun.DB) customerServiceOps {
 		regenerateSecret:      customerserviceaction.NewRegenerateCustomerIdentitySecretAction(db),
 		getCustomerProfile:    contactaction.NewGetCustomerProfileQuery(db),
 		listBusinessQueries:   conversationaction.NewListBusinessQueriesQuery(db),
+		getSummarySettings:    customerserviceaction.NewGetServiceSummarySettingsQuery(db),
+		updateSummarySettings: customerserviceaction.NewUpdateServiceSummarySettingsAction(db),
+		listSummaries:         conversationaction.NewListServiceSummariesQuery(db),
+		updateSummary:         conversationaction.NewUpdateServiceSessionSummaryAction(db),
 	}
 }
 
@@ -327,4 +335,133 @@ func businessHoursPeriodsToDomain(periods []BusinessHoursPeriod) []domain.Busine
 		output = append(output, domain.BusinessHoursPeriod{Start: period.Start, End: period.End})
 	}
 	return output
+}
+
+// GetServiceSummarySettings 读取当前企业的周期小结设置。
+func (o *directOperations) GetServiceSummarySettings(ctx context.Context, meta RequestMeta, identity *servermodels.Identity) (ServiceSummarySettings, error) {
+	settings, err := o.getSummarySettings.Execute(ctx, identity)
+	if err != nil {
+		if ctx.Err() != nil {
+			return ServiceSummarySettings{}, ctx.Err()
+		}
+		slog.Warn("读取周期小结设置失败", "organization_id", identity.Organization.ID, "error", err)
+		return ServiceSummarySettings{}, FailedError(meta, cervii18n.ErrorSummarySettingsLoadFailed)
+	}
+	return serviceSummarySettingsFromDomain(settings), nil
+}
+
+// UpdateServiceSummarySettings 修改当前企业的周期小结设置。
+func (o *directOperations) UpdateServiceSummarySettings(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input ServiceSummarySettings) (ServiceSummarySettings, error) {
+	settings := domain.ServiceSummarySettings{Locale: domain.Locale(input.Locale)}
+	if input.Decision != nil {
+		settings.Decision = &domain.AIModelReference{ProviderID: input.Decision.ProviderID, ModelIdentifier: input.Decision.ModelIdentifier}
+	}
+	if input.Summary != nil {
+		settings.Summary = &domain.AIModelReference{ProviderID: input.Summary.ProviderID, ModelIdentifier: input.Summary.ModelIdentifier}
+	}
+	saved, err := o.updateSummarySettings.Execute(ctx, identity, settings)
+	if err != nil {
+		if ctx.Err() != nil {
+			return ServiceSummarySettings{}, ctx.Err()
+		}
+		if validationError, ok := errors.AsType[*common.FieldError](err); ok {
+			// 把周期小结设置校验错误码映射为本地化文案键。
+			keys := map[common.FieldCode]cervii18n.Key{
+				customerserviceaction.ValidationSummaryModelInvalid:  cervii18n.FieldServiceSummaryModelInvalid,
+				customerserviceaction.ValidationSummaryLocaleInvalid: cervii18n.FieldLocaleInvalid,
+			}
+			return ServiceSummarySettings{}, InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, keys))
+		}
+		if errors.Is(err, common.ErrIdentityInvalid) {
+			return ServiceSummarySettings{}, SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+		}
+		slog.Warn("修改周期小结设置失败", "organization_id", identity.Organization.ID, "error", err)
+		return ServiceSummarySettings{}, FailedError(meta, cervii18n.ErrorSummarySettingsUpdateFailed)
+	}
+	slog.Info("周期小结设置已更新", "organization_id", identity.Organization.ID,
+		"decision_configured", saved.Decision != nil, "summary_configured", saved.Summary != nil, "locale", saved.Locale)
+	return serviceSummarySettingsFromDomain(saved), nil
+}
+
+// serviceSummarySettingsFromDomain 把周期小结设置转换为传输结构。
+func serviceSummarySettingsFromDomain(settings domain.ServiceSummarySettings) ServiceSummarySettings {
+	result := ServiceSummarySettings{Locale: Locale(settings.Locale)}
+	if settings.Decision != nil {
+		result.Decision = &AIModelReference{ProviderID: settings.Decision.ProviderID, ModelIdentifier: settings.Decision.ModelIdentifier}
+	}
+	if settings.Summary != nil {
+		result.Summary = &AIModelReference{ProviderID: settings.Summary.ProviderID, ModelIdentifier: settings.Summary.ModelIdentifier}
+	}
+	return result
+}
+
+// GetCustomerServiceSummaries 返回客户会话当前周期的交接摘要与同一客户已关闭周期的小结。
+func (o *directOperations) GetCustomerServiceSummaries(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string) (CustomerServiceSummaries, error) {
+	summaries, err := o.listSummaries.Execute(ctx, identity, conversationID)
+	if err != nil {
+		if ctx.Err() != nil {
+			return CustomerServiceSummaries{}, ctx.Err()
+		}
+		if errors.Is(err, conversationaction.ErrConversationNotFound) {
+			return CustomerServiceSummaries{}, NotFoundError(meta, cervii18n.ErrorConversationNotFound)
+		}
+		slog.Warn("读取周期小结失败", "organization_id", identity.Organization.ID, "conversation_id", conversationID, "error", err)
+		return CustomerServiceSummaries{}, FailedError(meta, cervii18n.ErrorServiceSummariesLoadFailed)
+	}
+	result := CustomerServiceSummaries{Sessions: make([]ServiceSessionSummary, 0, len(summaries.Sessions))}
+	if handoff := summaries.Handoff; handoff != nil {
+		result.Handoff = &HandoffSummary{Request: handoff.Request, Progress: handoff.Progress, Blocker: handoff.Blocker}
+	}
+	for _, summary := range summaries.Sessions {
+		result.Sessions = append(result.Sessions, serviceSessionSummaryFromAction(summary))
+	}
+	return result, nil
+}
+
+// UpdateServiceSessionSummary 修改已关闭客服处理周期的小结、是否解决与咨询分类。
+func (o *directOperations) UpdateServiceSessionSummary(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, serviceSessionID string, input ServiceSessionSummaryInput) (ServiceSessionSummary, error) {
+	summary, err := o.updateSummary.Execute(ctx, identity, conversationaction.UpdateServiceSessionSummaryInput{
+		ServiceSessionID: serviceSessionID, Summary: input.Summary, Resolved: input.Resolved, CategoryID: input.CategoryID,
+	})
+	if err != nil {
+		if ctx.Err() != nil {
+			return ServiceSessionSummary{}, ctx.Err()
+		}
+		if validationError, ok := errors.AsType[*common.FieldError](err); ok {
+			// 把小结校验错误码映射为本地化文案键。
+			keys := map[common.FieldCode]cervii18n.Key{
+				conversationaction.ValidationSummaryTooLong:    cervii18n.FieldServiceSummaryTooLong,
+				conversationaction.ValidationCategoryIDInvalid: cervii18n.FieldServiceCategoryInvalid,
+			}
+			return ServiceSessionSummary{}, InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, keys))
+		}
+		if errors.Is(err, conversationaction.ErrServiceSessionNotFound) || errors.Is(err, conversationaction.ErrConversationNotFound) {
+			return ServiceSessionSummary{}, NotFoundError(meta, cervii18n.ErrorConversationNotFound)
+		}
+		if conflict, ok := errors.AsType[*conversationaction.ConflictError](err); ok && conflict.Reason == conversationaction.ConflictReasonServiceSessionNotClosed {
+			return ServiceSessionSummary{}, ConflictError(meta, cervii18n.ErrorServiceSessionNotClosed, conflict.Reason)
+		}
+		if errors.Is(err, common.ErrIdentityInvalid) {
+			return ServiceSessionSummary{}, SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+		}
+		slog.Warn("修改周期小结失败", "organization_id", identity.Organization.ID, "service_session_id", serviceSessionID, "error", err)
+		return ServiceSessionSummary{}, FailedError(meta, cervii18n.ErrorSessionSummaryUpdateFailed)
+	}
+	slog.Info("周期小结已由客服修改", "organization_id", identity.Organization.ID, "service_session_id", serviceSessionID, "identity_id", identity.OrganizationIdentity.ID)
+	return serviceSessionSummaryFromAction(summary), nil
+}
+
+// serviceSessionSummaryFromAction 把周期小结转换为传输结构。
+func serviceSessionSummaryFromAction(summary conversationaction.ServiceSessionSummary) ServiceSessionSummary {
+	result := ServiceSessionSummary{
+		ServiceSessionID: summary.ServiceSessionID, ConversationID: summary.ConversationID,
+		ChannelType: ChannelType(summary.ChannelType), ChannelName: summary.ChannelName,
+		ClosedAt: summary.ClosedAt, CloseReason: ServiceSessionCloseReason(summary.CloseReason),
+		Summary: summary.Summary, Resolved: summary.Resolved, CategoryID: summary.CategoryID, CategoryName: summary.CategoryName,
+		EditedAt: summary.EditedAt, EditedBy: summary.EditedByName,
+	}
+	if summary.Status != nil {
+		result.Status = new(ServiceSummaryStatus(*summary.Status))
+	}
+	return result
 }

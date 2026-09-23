@@ -8,6 +8,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -93,7 +94,7 @@ func replaceModels(ctx context.Context, tx bun.Tx, organizationID, providerID st
 	return err
 }
 
-// validateReferencedModels 校验新目录保留 AI 员工和知识库正在使用的模型。
+// validateReferencedModels 校验新目录保留 AI 员工、知识库和周期小结设置正在使用的模型。
 func validateReferencedModels(ctx context.Context, db bun.IDB, organizationID, providerID string, models []Model) error {
 	activeIdentifiers := make([]string, 0)
 	if err := db.NewSelect().TableExpr("agents AS a").
@@ -151,6 +152,39 @@ func validateReferencedModels(ctx context.Context, db bun.IDB, organizationID, p
 			if !found {
 				return &ValidationError{Fields: map[string]ValidationCode{"models": ValidationModelsInUse}}
 			}
+		}
+	}
+	// 周期小结设置引用的判断模型和小结模型必须保留原有用途。
+	setting := &servermodels.CustomerServiceSetting{}
+	err := db.NewSelect().Model(setting).
+		Column("decision_provider_id", "decision_model_identifier", "summary_provider_id", "summary_model_identifier").
+		Where("organization_id = ?", organizationID).
+		Where("decision_provider_id = ? OR summary_provider_id = ?", providerID, providerID).
+		Scan(ctx)
+	if errors.Is(err, sql.ErrNoRows) {
+		return nil
+	}
+	if err != nil {
+		return err
+	}
+	for _, reference := range []struct {
+		providerID, identifier *string
+		modelType              domain.AIModelType
+	}{
+		{setting.DecisionProviderID, setting.DecisionModelIdentifier, domain.AIModelTypeDecision},
+		{setting.SummaryProviderID, setting.SummaryModelIdentifier, domain.AIModelTypeChat},
+	} {
+		if reference.providerID == nil || *reference.providerID != providerID || reference.identifier == nil {
+			continue
+		}
+		found := false
+		for _, model := range models {
+			// 小结模型须保留文本输入。
+			textInput := reference.modelType != domain.AIModelTypeChat || slices.Contains(model.InputModalities, domain.AIModelInputModalityText)
+			found = found || (model.Identifier == *reference.identifier && model.Type == reference.modelType && textInput)
+		}
+		if !found {
+			return &ValidationError{Fields: map[string]ValidationCode{"models": ValidationModelsInUse}}
 		}
 	}
 	return nil

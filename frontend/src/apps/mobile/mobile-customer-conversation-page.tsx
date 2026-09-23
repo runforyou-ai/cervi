@@ -38,6 +38,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import type { ComposerDraftBridge } from "@/features/inbox/conversation-composer-types"
+import { HandoffSummaryCard } from "@/features/inbox/handoff-summary-card"
 import {
   CustomerSessionCloseDialog,
   CustomerTransferMenuItems,
@@ -252,6 +253,12 @@ export function MobileCustomerConversationPage() {
             ) : null}
           </div>
         ) : (
+          <>
+          <HandoffSummaryCard
+            key={`handoff-${conversationID}`}
+            conversationID={conversationID}
+            assignee={conversation.customer.assignee}
+          />
           <MobileIndividualThread
             key={conversationID}
             conversationID={conversationID}
@@ -266,6 +273,7 @@ export function MobileCustomerConversationPage() {
             lastReadMessageID={conversation.lastReadMessageId}
             locateMessage={locationState?.locateMessage}
           />
+          </>
         )}
       </section>
       {conversation ? (

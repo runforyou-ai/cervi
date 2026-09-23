@@ -69,6 +69,12 @@ const (
 	AIModelTypeDecision  AIModelType = "decision"
 )
 
+// AIModelReference 指向企业模型服务中的一个模型。
+type AIModelReference struct {
+	ProviderID      string
+	ModelIdentifier string
+}
+
 // AIModelInputModality 定义模型支持的输入模态。
 type AIModelInputModality string
 
