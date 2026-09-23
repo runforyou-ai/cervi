@@ -16,11 +16,19 @@ import (
 	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
 )
 
-// Config 定义远程 MCP 连接配置。
+const (
+	// CustomerIDHeader 携带按客户查询的服务所服务的客户在企业系统中的用户编号。
+	CustomerIDHeader = "X-Cervi-Customer-Id"
+	// CustomerEmailHeader 携带该客户的邮箱，只作参考。
+	CustomerEmailHeader = "X-Cervi-Customer-Email"
+)
+
+// Config 定义远程 MCP 连接配置，Headers 附加到会话的每个 HTTP 请求。
 type Config struct {
 	URL                string
 	ServerType         domain.MCPServerType
 	AuthorizationToken string
+	Headers            map[string]string
 }
 
 // Discoverer 读取 MCP 服务的完整工具目录。
@@ -68,7 +76,7 @@ func (c *Client) Discover(ctx context.Context, config Config) ([]domain.MCPTool,
 // newTransport 按服务类型创建带认证的 MCP 传输，deadline 为零值时请求期限跟随调用方 context。
 func newTransport(config Config, deadline time.Time) (sdk.Transport, error) {
 	client := connectiontest.NewHTTPClient()
-	client.Transport = &authenticatedTransport{token: config.AuthorizationToken, deadline: deadline}
+	client.Transport = &authenticatedTransport{token: config.AuthorizationToken, headers: config.Headers, deadline: deadline}
 	switch config.ServerType {
 	case domain.MCPServerTypeSSE:
 		return &sdk.SSEClientTransport{Endpoint: config.URL, HTTPClient: client}, nil
@@ -87,9 +95,10 @@ func connect(ctx context.Context, transport sdk.Transport) (*sdk.ClientSession, 
 	return session, nil
 }
 
-// authenticatedTransport 为 MCP 的每个 HTTP 请求附加认证并分类状态错误。
+// authenticatedTransport 为 MCP 的每个 HTTP 请求附加认证与配置的请求头并分类状态错误。
 type authenticatedTransport struct {
 	token    string
+	headers  map[string]string
 	deadline time.Time
 }
 
@@ -103,6 +112,9 @@ func (t *authenticatedTransport) RoundTrip(request *http.Request) (*http.Respons
 	request = request.Clone(ctx)
 	if t.token != "" {
 		request.Header.Set("Authorization", "Bearer "+t.token)
+	}
+	for name, value := range t.headers {
+		request.Header.Set(name, value)
 	}
 	response, err := http.DefaultTransport.RoundTrip(request)
 	if err != nil {

@@ -183,6 +183,16 @@ func (b *DirectBackend) GetCustomerProfile(ctx context.Context, meta RequestMeta
 	return b.ops.GetCustomerProfile(ctx, meta, identity, conversationID)
 }
 
+// ListCustomerBusinessQueries 返回客户会话当前客服周期内 AI 客服查询业务系统的记录。
+func (b *DirectBackend) ListCustomerBusinessQueries(ctx context.Context, meta RequestMeta, conversationID string) (CustomerBusinessQueryList, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero CustomerBusinessQueryList
+		return zero, err
+	}
+	return b.ops.ListCustomerBusinessQueries(ctx, meta, identity, conversationID)
+}
+
 // GetInboxConversation 返回当前用户有权阅读的独立会话摘要。
 func (b *DirectBackend) GetInboxConversation(ctx context.Context, meta RequestMeta, conversationID string) (InboxConversation, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
@@ -1680,6 +1690,16 @@ func (b *DirectBackend) UpdateMCPServer(ctx context.Context, meta RequestMeta, m
 		return zero, err
 	}
 	return b.ops.UpdateMCPServer(ctx, meta, identity, mcpServerID, input)
+}
+
+// UpdateMCPToolPurpose 标记 MCP 服务中一个工具的用途。
+func (b *DirectBackend) UpdateMCPToolPurpose(ctx context.Context, meta RequestMeta, mcpServerID string, input MCPToolPurposeInput) (MCPServer, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero MCPServer
+		return zero, err
+	}
+	return b.ops.UpdateMCPToolPurpose(ctx, meta, identity, mcpServerID, input)
 }
 
 // DeleteMCPServer 删除 MCP 服务。

@@ -74,6 +74,9 @@ type Backend interface {
 	// GetCustomerProfile 返回客户会话的客户身份与当前周期访客上下文。
 	//cervi:route GET /conversations/:conversationID/customer-profile
 	GetCustomerProfile(context.Context, RequestMeta, string) (CustomerProfile, error)
+	// ListCustomerBusinessQueries 返回客户会话当前客服周期内 AI 客服查询业务系统的记录。
+	//cervi:route GET /conversations/:conversationID/business-queries
+	ListCustomerBusinessQueries(context.Context, RequestMeta, string) (CustomerBusinessQueryList, error)
 	// GetInboxConversation 返回当前用户有权阅读的独立会话摘要。
 	//cervi:route GET /conversations/:conversationID/summary
 	GetInboxConversation(context.Context, RequestMeta, string) (InboxConversation, error)
@@ -532,6 +535,9 @@ type Backend interface {
 	// UpdateMCPServer 修改 MCP 服务。
 	//cervi:route PUT /settings/mcp-servers/:mcpServerID
 	UpdateMCPServer(context.Context, RequestMeta, string, MCPServerInput) (MCPServer, error)
+	// UpdateMCPToolPurpose 标记 MCP 服务中一个工具的用途。
+	//cervi:route PUT /settings/mcp-servers/:mcpServerID/tool-purpose
+	UpdateMCPToolPurpose(context.Context, RequestMeta, string, MCPToolPurposeInput) (MCPServer, error)
 	// DeleteMCPServer 删除 MCP 服务。
 	//cervi:route DELETE /settings/mcp-servers/:mcpServerID
 	DeleteMCPServer(context.Context, RequestMeta, string) error

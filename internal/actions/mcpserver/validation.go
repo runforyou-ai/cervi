@@ -14,13 +14,14 @@ import (
 type ValidationCode = common.FieldCode
 
 const (
-	ValidationServerTypeInvalid ValidationCode = "MCP_SERVER_TYPE_INVALID"
-	ValidationNameRequired      ValidationCode = "MCP_SERVER_NAME_REQUIRED"
-	ValidationNameTooLong       ValidationCode = "MCP_SERVER_NAME_TOO_LONG"
-	ValidationNameDuplicate     ValidationCode = "MCP_SERVER_NAME_DUPLICATE"
-	ValidationURLRequired       ValidationCode = "MCP_SERVER_URL_REQUIRED"
-	ValidationURLInvalid        ValidationCode = "MCP_SERVER_URL_INVALID"
-	ValidationURLTooLong        ValidationCode = "MCP_SERVER_URL_TOO_LONG"
+	ValidationServerTypeInvalid  ValidationCode = "MCP_SERVER_TYPE_INVALID"
+	ValidationNameRequired       ValidationCode = "MCP_SERVER_NAME_REQUIRED"
+	ValidationNameTooLong        ValidationCode = "MCP_SERVER_NAME_TOO_LONG"
+	ValidationNameDuplicate      ValidationCode = "MCP_SERVER_NAME_DUPLICATE"
+	ValidationURLRequired        ValidationCode = "MCP_SERVER_URL_REQUIRED"
+	ValidationURLInvalid         ValidationCode = "MCP_SERVER_URL_INVALID"
+	ValidationURLTooLong         ValidationCode = "MCP_SERVER_URL_TOO_LONG"
+	ValidationToolPurposeInvalid ValidationCode = "MCP_TOOL_PURPOSE_INVALID"
 )
 
 // ValidationError 表示 MCP 服务字段校验失败。

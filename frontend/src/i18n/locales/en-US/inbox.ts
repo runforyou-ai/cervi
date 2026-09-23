@@ -453,8 +453,10 @@ const inbox = {
   copilotApplyReplyConfirmTitle: "Replace reply draft",
   copilotApplyReplyConfirmDescription: "The customer reply box already has content. Using this reply replaces the current draft.",
   copilotThreadsLoadError: "Could not load AI Assistant conversations",
-  contextBusinessTitle: "Business context",
-  contextBusinessDescription: "No business context yet.",
+  contextBusinessEmptyTitle: "No business lookups yet",
+  contextBusinessEmptyDescription: "Business system lookups made by the AI agent in this service session appear here.",
+  contextBusinessEvidence: "Used as answer evidence",
+  contextBusinessLoadError: "Could not load business lookups.",
 }
 
 export default inbox

@@ -78,6 +78,14 @@ func TestSceneRules(t *testing.T) {
 	if empty := sceneRules(SceneContext{Scene: SceneGroup}, builtinTools{}); !strings.Contains(empty, "本次在群聊中") || !strings.Contains(empty, "可点名的成员：无") {
 		t.Fatalf("无可点名成员时的场景规则 = %q", empty)
 	}
+	// 按客户查询的服务因客户未登录而未挂载时才说明引导登录。
+	if customer := sceneRules(SceneContext{Scene: SceneCustomer}, builtinTools{Terminal: true}); strings.Contains(customer, customerLoginRequiredRule) {
+		t.Fatalf("客户已登录时的场景规则 = %q", customer)
+	}
+	login := ResolveAssignment(customerFacts(), Capabilities{CustomerLoginRequired: true})
+	if !strings.Contains(login.Instruction, customerLoginRequiredRule) {
+		t.Fatalf("客户未登录时的指令 = %q", login.Instruction)
+	}
 }
 
 // TestResolveAssignment 验证有效配置记录接待开关、场景、规则版本、完整指令、哈希与工具清单。

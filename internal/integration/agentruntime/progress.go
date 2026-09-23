@@ -42,6 +42,8 @@ type ToolCall struct {
 	Status      domain.AgentToolCallStatus `json:"status"`
 	StartedAt   *time.Time                 `json:"startedAt"`
 	CompletedAt *time.Time                 `json:"completedAt"`
+	MCPServer   string                     `json:"mcpServer,omitempty"` // 远程工具所属的 MCP 服务名称，内置工具为空。
+	Evidence    bool                       `json:"evidence,omitempty"`  // 原始结果通过依据判定。
 }
 
 // streamView 返回内容块在运行流中的展示形态，工具调用不含参数和结果。
@@ -60,6 +62,7 @@ type processRecorder struct {
 	process       []Block
 	candidate     string
 	toolPositions map[string]int
+	mcpTools      map[string]string // 本次运行挂载的远程工具名称到所属 MCP 服务名称，运行开始前写入。
 	call          *modelCallStream
 	publisher     *streamPublisher
 }
@@ -316,6 +319,15 @@ func (r *processRecorder) updateTool(callID string, update func(*ToolCall)) erro
 	update(r.process[position].Payload.ToolCall)
 	r.publisher.add(StreamOperation{Kind: StreamOperationUpsertBlock, Block: r.process[position].streamView()})
 	return nil
+}
+
+// markEvidence 标记工具调用的原始结果构成回答依据。
+func (r *processRecorder) markEvidence(callID string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if position, ok := r.toolPositions[callID]; ok {
+		r.process[position].Payload.ToolCall.Evidence = true
+	}
 }
 
 // reset 在重新执行本次输入前清空已记录的过程内容。

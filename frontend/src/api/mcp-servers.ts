@@ -5,6 +5,7 @@ import {
   GetMCPServer,
   ListMCPServers,
   UpdateMCPServer,
+  UpdateMCPToolPurpose,
   TestMCPServerConnection,
   TestSavedMCPServerConnection,
   RefreshMCPServerTools,
@@ -31,6 +32,9 @@ export const createMCPServer = bind(CreateMCPServer)
 
 /** 修改 MCP 服务。 */
 export const updateMCPServer = bind(UpdateMCPServer)
+
+/** 标记 MCP 服务中一个工具的用途，用途为空表示取消标记。 */
+export const updateMCPToolPurpose = bind(UpdateMCPToolPurpose)
 
 /** 删除 MCP 服务。 */
 export const deleteMCPServer = bind(DeleteMCPServer)

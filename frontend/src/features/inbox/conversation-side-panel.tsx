@@ -1,9 +1,5 @@
 /** 客服、单聊与群聊共用的会话侧边面板。 */
-import {
-  BotIcon,
-  BriefcaseBusinessIcon,
-  PanelRightCloseIcon,
-} from "lucide-react"
+import { PanelRightCloseIcon } from "lucide-react"
 import { useEffect, useRef, useState, type RefObject } from "react"
 import { useTranslation } from "react-i18next"
 
@@ -23,6 +19,7 @@ import { ConversationAvatar } from "@/features/inbox/conversation-avatar"
 import { DirectConversationDraftAvatar } from "@/features/inbox/direct-conversation-draft-header"
 import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
 import type { ComposerDraftBridge } from "@/features/inbox/conversation-composer"
+import { CustomerBusinessQueries } from "@/features/inbox/customer-business-queries"
 import { CustomerCopilotPanel } from "@/features/inbox/customer-copilot-panel"
 import { CustomerProfileDetails } from "@/features/inbox/customer-profile-details"
 import { GroupConversationContext } from "@/features/inbox/group-conversation-context"
@@ -40,29 +37,6 @@ const sidePanelDefaultWidth = 384
 const sidePanelMaxWidth = 640
 // 展开侧边面板后为会话区保留的宽度，空间不足时侧边面板最多占一半。
 const conversationMinWidth = 420
-
-/** 展示尚无数据的上下文页签。 */
-function ContextPlaceholder({
-  icon: Icon,
-  title,
-  description,
-}: {
-  icon: typeof BotIcon
-  title: string
-  description: string
-}) {
-  return (
-    <div className="flex h-full flex-col items-center justify-center px-6 text-center">
-      <div className="mb-3 flex size-10 items-center justify-center rounded-xl border bg-muted/30 text-muted-foreground">
-        <Icon className="size-4" />
-      </div>
-      <h3 className="text-sm font-medium">{title}</h3>
-      <p className="mt-1.5 max-w-60 text-xs leading-5 text-muted-foreground">
-        {description}
-      </p>
-    </div>
-  )
-}
 
 /** 展示单聊的基础资料。 */
 function InternalConversationProfile({
@@ -225,13 +199,9 @@ function ConversationSidePanelContent({
 
           <TabsContent
             value="business"
-            className="mt-0 min-h-0 flex-1 overflow-hidden"
+            className="mt-0 min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain"
           >
-            <ContextPlaceholder
-              icon={BriefcaseBusinessIcon}
-              title={t("contextBusinessTitle")}
-              description={t("contextBusinessDescription")}
-            />
+            <CustomerBusinessQueries conversationID={conversation.id} />
           </TabsContent>
         </Tabs>
       ) : conversation && group ? (

@@ -73,7 +73,15 @@ func (a *UpdateToolsAction) finish(ctx context.Context, input RefreshToolsInput,
 		if failure == "" {
 			now := time.Now()
 			record.Tools, record.ToolsUpdatedAt = tools, &now
-			columns = append(columns, "tools", "tools_updated_at")
+			// 只保留新目录中仍存在的工具的用途标记。
+			purposes := make(map[string]domain.MCPToolPurpose, len(record.ToolPurposes))
+			for _, item := range tools {
+				if purpose, ok := record.ToolPurposes[item.Name]; ok {
+					purposes[item.Name] = purpose
+				}
+			}
+			record.ToolPurposes = purposes
+			columns = append(columns, "tools", "tools_updated_at", "tool_purposes")
 		}
 		if _, err := tx.NewUpdate().Model(record).Column(columns...).WherePK().Exec(ctx); err != nil {
 			return err

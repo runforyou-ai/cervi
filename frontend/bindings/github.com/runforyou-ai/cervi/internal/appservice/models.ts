@@ -1335,6 +1335,28 @@ export interface CustomerAttachmentMessageInput {
 }
 
 /**
+ * CustomerBusinessQuery 定义 AI 客服在当前客服周期内调用业务查询工具的一次记录。
+ */
+export interface CustomerBusinessQuery {
+    "id": string;
+    "mcpServer": string;
+    "toolName": string;
+    "arguments": string;
+    "result": string | null;
+    "error": string | null;
+    "status": AgentToolCallStatus;
+    "evidence": boolean;
+    "calledAt": string;
+}
+
+/**
+ * CustomerBusinessQueryList 定义客户会话当前客服周期的业务查询记录，按调用时间倒序。
+ */
+export interface CustomerBusinessQueryList {
+    "queries": CustomerBusinessQuery[] | null;
+}
+
+/**
  * CustomerCopilotTextMessageInput 定义发给 Copilot 线程的成员提问。
  */
 export interface CustomerCopilotTextMessageInput {
@@ -2792,6 +2814,7 @@ export interface MCPServer {
     "url": string;
     "serverType": MCPServerType;
     "authorizationToken": string;
+    "customerScoped": boolean;
     "tools": MCPTool[] | null;
     "toolsUpdatedAt": string | null;
     "toolsUpdating": boolean;
@@ -2817,6 +2840,7 @@ export interface MCPServerInput {
     "url": string;
     "serverType": MCPServerType;
     "authorizationToken": string;
+    "customerScoped": boolean;
 }
 
 /**
@@ -2840,11 +2864,34 @@ export enum MCPServerType {
 };
 
 /**
- * MCPTool 定义工具目录的展示信息。
+ * MCPTool 定义工具目录的展示信息与用途。
  */
 export interface MCPTool {
     "name": string;
     "description": string;
+    "purpose": MCPToolPurpose;
+}
+
+/**
+ * MCPToolPurpose 定义工具用途，空值表示未标记。
+ */
+export enum MCPToolPurpose {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    MCPToolPurposeUnmarked = "",
+    MCPToolPurposeQuery = "query",
+    MCPToolPurposeAction = "action",
+};
+
+/**
+ * MCPToolPurposeInput 定义一个工具的用途标记，用途为空表示取消标记。
+ */
+export interface MCPToolPurposeInput {
+    "toolName": string;
+    "purpose": MCPToolPurpose;
 }
 
 /**

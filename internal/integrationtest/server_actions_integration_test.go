@@ -2431,6 +2431,10 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			testAgentCustomerReplies(t, db, loggedIn.Identity, provider.ID, model.Identifier)
 		})
 
+		t.Run("AI 客服业务查询", func(t *testing.T) {
+			testCustomerBusinessQueries(t, db, loggedIn.Identity, provider.ID, model.Identifier)
+		})
+
 		t.Run("AI 客服转人工", func(t *testing.T) {
 			testAgentHandoffs(t, db, loggedIn.Identity, provider.ID, model.Identifier)
 		})

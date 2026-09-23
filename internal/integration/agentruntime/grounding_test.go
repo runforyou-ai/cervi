@@ -288,7 +288,8 @@ func TestGroundingGateVisibility(t *testing.T) {
 		{name: "只读回截断预览", matched: true, read: "     1\t" + original[:20] + "…已转存至 /trunc/k1"},
 	} {
 		t.Run(scenario.name, func(t *testing.T) {
-			gate := newGroundingGate(map[string]evidenceJudge{KnowledgeToolName: knowledgeEvidence})
+			marked := ""
+			gate := newGroundingGate(map[string]evidenceJudge{KnowledgeToolName: knowledgeEvidence}, func(callID string) { marked = callID })
 			if scenario.matched {
 				gate.valid["k1"] = original
 			}
@@ -299,28 +300,31 @@ func TestGroundingGateVisibility(t *testing.T) {
 			if _, _, err := gate.AfterModelRewriteState(context.Background(), state, nil); err != nil {
 				t.Fatal(err)
 			}
-			if gate.verdict() != scenario.grounded {
-				t.Fatalf("grounded = %v", gate.verdict())
+			// 完整读回时标记的是来源调用而不是读回调用。
+			if gate.verdict() != scenario.grounded || (marked == "k1") != scenario.grounded {
+				t.Fatalf("grounded = %v, marked = %q", gate.verdict(), marked)
 			}
 		})
 	}
 }
 
-// TestGroundingGenericEvidenceSource 验证登记的通用依据来源按原始结果登记，模型可见文本与原始结果一致时才计入依据。
-func TestGroundingGenericEvidenceSource(t *testing.T) {
-	nonEmpty := func(output string) bool { return strings.TrimSpace(output) != "" }
+// TestGroundingQueryEvidenceSource 验证业务查询工具按原始结果登记依据，空列表同样构成依据，模型可见文本与原始结果一致时才计入依据并通知过程记录。
+func TestGroundingQueryEvidenceSource(t *testing.T) {
 	for _, scenario := range []struct {
 		name     string
 		output   string
 		visible  string
+		evidence bool
 		grounded bool
 	}{
-		{name: "完整可见", output: "订单 1001 已发货", visible: "订单 1001 已发货", grounded: true},
+		{name: "完整可见", output: "订单 1001 已发货", visible: "订单 1001 已发货", evidence: true, grounded: true},
+		{name: "空列表", output: `{"orders":[]}`, visible: `{"orders":[]}`, evidence: true, grounded: true},
 		{name: "截断预览不计入", output: "订单 1001 已发货", visible: "订单 10…（结果已转存至 /trunc/o1）"},
-		{name: "原始结果未通过判定", output: " ", visible: " "},
+		{name: "空白结果未通过判定", output: " ", visible: " "},
 	} {
 		t.Run(scenario.name, func(t *testing.T) {
-			gate := newGroundingGate(map[string]evidenceJudge{"lookup_order": nonEmpty})
+			marked := ""
+			gate := newGroundingGate(map[string]evidenceJudge{"lookup_order": queryEvidence}, func(callID string) { marked = callID })
 			endpoint, err := gate.WrapInvokableToolCall(context.Background(), func(context.Context, string, ...tool.Option) (string, error) {
 				return scenario.output, nil
 			}, &adk.ToolContext{Name: "lookup_order", CallID: "o1"})
@@ -339,8 +343,8 @@ func TestGroundingGenericEvidenceSource(t *testing.T) {
 			if _, _, err := gate.AfterModelRewriteState(context.Background(), state, nil); err != nil {
 				t.Fatal(err)
 			}
-			if gate.verdict() != scenario.grounded {
-				t.Fatalf("grounded = %v", gate.verdict())
+			if gate.verdict() != scenario.grounded || (marked == "o1") != scenario.evidence {
+				t.Fatalf("grounded = %v, marked = %q", gate.verdict(), marked)
 			}
 		})
 	}

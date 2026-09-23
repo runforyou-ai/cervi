@@ -446,8 +446,10 @@ const inbox = {
   copilotApplyReplyConfirmTitle: "替换回复草稿",
   copilotApplyReplyConfirmDescription: "回复客户的输入框中已有内容，填入后将替换当前草稿。",
   copilotThreadsLoadError: "读取 AI 助手对话失败",
-  contextBusinessTitle: "业务上下文",
-  contextBusinessDescription: "暂无业务上下文。",
+  contextBusinessEmptyTitle: "暂无业务查询",
+  contextBusinessEmptyDescription: "AI 客服在本次服务中查询业务系统后，查询记录会显示在这里。",
+  contextBusinessEvidence: "已作为回答依据",
+  contextBusinessLoadError: "读取业务查询记录失败。",
 }
 
 export default inbox

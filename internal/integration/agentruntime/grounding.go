@@ -25,7 +25,8 @@ type evidenceJudge func(output string) bool
 // groundingGate 按模型实际可见的上下文判定直接输出的正文是否在当前输入边界内取得有效依据；依据来源由工具名到判定函数的登记决定。
 type groundingGate struct {
 	adk.TypedBaseChatModelAgentMiddleware[*schema.AgenticMessage]
-	judges map[string]evidenceJudge
+	judges     map[string]evidenceJudge
+	onEvidence func(callID string) // 来源工具调用的原始结果对模型完整可见时通知过程记录。
 
 	mu       sync.Mutex
 	valid    map[string]string   // 原始结果通过判定的工具调用编号及其原始结果。
@@ -34,8 +35,8 @@ type groundingGate struct {
 }
 
 // newGroundingGate 按依据来源登记创建一次执行尝试共用的依据门禁。
-func newGroundingGate(judges map[string]evidenceJudge) *groundingGate {
-	return &groundingGate{judges: judges, valid: make(map[string]string), boundary: make(map[string]struct{})}
+func newGroundingGate(judges map[string]evidenceJudge, onEvidence func(callID string)) *groundingGate {
+	return &groundingGate{judges: judges, onEvidence: onEvidence, valid: make(map[string]string), boundary: make(map[string]struct{})}
 }
 
 // WrapInvokableToolCall 在依据来源工具返回时按原始结果判定并登记，门禁位于上下文治理内层，取得的是截断前的结果。
@@ -70,7 +71,7 @@ func (g *groundingGate) resetBoundary(history []*schema.AgenticMessage) {
 	g.grounded = false
 }
 
-// AfterModelRewriteState 在模型给出不含工具调用的输出时，按本次发给模型的上下文判定是否取得依据。
+// AfterModelRewriteState 在模型给出不含工具调用的输出时，按本次发给模型的上下文判定是否取得依据，并标记完整可见的来源调用。
 func (g *groundingGate) AfterModelRewriteState(ctx context.Context, state *adk.TypedChatModelAgentState[*schema.AgenticMessage], _ *adk.TypedModelContext[*schema.AgenticMessage]) (context.Context, *adk.TypedChatModelAgentState[*schema.AgenticMessage], error) {
 	visible := state.Messages[:len(state.Messages)-1]
 	if hasToolCalls(state.Messages[len(state.Messages)-1]) {
@@ -107,48 +108,51 @@ func (g *groundingGate) AfterModelRewriteState(ctx context.Context, state *adk.T
 			}
 			text := builder.String()
 			// 依据来源的结果与原始结果一致时模型可见；截断或清理后需经转存读回。
+			source := result.CallID
+			visible := false
 			if call.Name == offloadedResultToolName {
-				g.grounded = g.readsBackEvidence(call.Arguments, text)
+				source, visible = g.readsBackEvidence(call.Arguments, text)
 			} else if output, valid := g.valid[result.CallID]; valid {
-				g.grounded = text == output
+				visible = text == output
 			}
-			if g.grounded {
-				return ctx, state, nil
+			if visible {
+				g.grounded = true
+				g.onEvidence(source)
 			}
 		}
 	}
 	return ctx, state, nil
 }
 
-// readsBackEvidence 判断一次转存读回是否把当前边界内已通过判定的来源结果完整取回；读回文本去掉行号后须包含原始结果。
-func (g *groundingGate) readsBackEvidence(arguments, text string) bool {
+// readsBackEvidence 判断一次转存读回是否把当前边界内已通过判定的来源结果完整取回，返回来源调用编号；读回文本去掉行号后须包含原始结果。
+func (g *groundingGate) readsBackEvidence(arguments, text string) (string, bool) {
 	input := struct {
 		FilePath string `json:"file_path"`
 	}{}
 	if json.Unmarshal([]byte(arguments), &input) != nil {
-		return false
+		return "", false
 	}
 	source, trunc := strings.CutPrefix(input.FilePath, truncOffloadDir)
 	if !trunc {
 		var clear bool
 		if source, clear = strings.CutPrefix(input.FilePath, clearOffloadDir); !clear {
-			return false
+			return "", false
 		}
 	}
 	output, valid := g.valid[source]
 	if _, before := g.boundary[source]; before || !valid {
-		return false
+		return "", false
 	}
 	// 读回工具按「行号、制表符、原文」逐行返回；失败说明不带行号，按未读回处理。
 	lines := strings.Split(text, "\n")
 	for i, line := range lines {
 		number, content, numbered := strings.Cut(line, "\t")
 		if _, err := strconv.Atoi(strings.TrimSpace(number)); !numbered || err != nil {
-			return false
+			return "", false
 		}
 		lines[i] = content
 	}
-	return strings.Contains(strings.Join(lines, "\n"), output)
+	return source, strings.Contains(strings.Join(lines, "\n"), output)
 }
 
 // verdict 返回最近一次直接输出正文时的依据判定。
@@ -156,6 +160,11 @@ func (g *groundingGate) verdict() bool {
 	g.mu.Lock()
 	defer g.mu.Unlock()
 	return g.grounded
+}
+
+// queryEvidence 判定业务查询工具的结果去除空白后非空，没有记录的空列表或空对象同样构成依据。
+func queryEvidence(output string) bool {
+	return strings.TrimSpace(output) != ""
 }
 
 // knowledgeEvidence 判定知识检索结果含有正文非空的命中记录。

@@ -84,6 +84,11 @@ func (s *Service) GetCustomerProfile(ctx context.Context, meta RequestMeta, conv
 	return withNormalizedSlices(s.backend.GetCustomerProfile(ctx, meta, conversationID))
 }
 
+// ListCustomerBusinessQueries 返回客户会话当前客服周期内 AI 客服查询业务系统的记录。
+func (s *Service) ListCustomerBusinessQueries(ctx context.Context, meta RequestMeta, conversationID string) (CustomerBusinessQueryList, error) {
+	return withNormalizedSlices(s.backend.ListCustomerBusinessQueries(ctx, meta, conversationID))
+}
+
 // GetInboxConversation 返回当前用户有权阅读的独立会话摘要。
 func (s *Service) GetInboxConversation(ctx context.Context, meta RequestMeta, conversationID string) (InboxConversation, error) {
 	return withNormalizedSlices(s.backend.GetInboxConversation(ctx, meta, conversationID))
@@ -842,6 +847,11 @@ func (s *Service) CreateMCPServer(ctx context.Context, meta RequestMeta, input M
 // UpdateMCPServer 修改 MCP 服务。
 func (s *Service) UpdateMCPServer(ctx context.Context, meta RequestMeta, mcpServerID string, input MCPServerInput) (MCPServer, error) {
 	return withNormalizedSlices(s.backend.UpdateMCPServer(ctx, meta, mcpServerID, input))
+}
+
+// UpdateMCPToolPurpose 标记 MCP 服务中一个工具的用途。
+func (s *Service) UpdateMCPToolPurpose(ctx context.Context, meta RequestMeta, mcpServerID string, input MCPToolPurposeInput) (MCPServer, error) {
+	return withNormalizedSlices(s.backend.UpdateMCPToolPurpose(ctx, meta, mcpServerID, input))
 }
 
 // DeleteMCPServer 删除 MCP 服务。
