@@ -104,6 +104,8 @@ type AgentConversationSummary struct {
 	AgentName                 string
 	AgentAvatarFileID         *string
 	AgentStatus               domain.UserStatus
+	AgentType                 domain.OrganizationIdentityType
+	AssistantPresence         domain.AssistantPresence
 	Preview                   *string
 	PreviewSenderIdentityType *domain.OrganizationIdentityType
 	LastMessageAt             *time.Time
@@ -214,6 +216,10 @@ type agentConversationRow struct {
 	AgentName                 string                           `bun:"agent_name"`
 	AgentAvatarFileID         *string                          `bun:"agent_avatar_file_id"`
 	AgentStatus               domain.UserStatus                `bun:"agent_status"`
+	AgentType                 domain.OrganizationIdentityType  `bun:"agent_type"`
+	AgentPaused               bool                             `bun:"agent_paused"`
+	AgentDeviceRevoked        bool                             `bun:"agent_device_revoked"`
+	AgentDeviceLastSeenAt     *time.Time                       `bun:"agent_device_last_seen_at"`
 	Preview                   *string                          `bun:"preview"`
 	PreviewSenderIdentityType *domain.OrganizationIdentityType `bun:"preview_sender_identity_type"`
 	LastMessageAt             *time.Time                       `bun:"last_message_at"`
@@ -470,6 +476,8 @@ func (q *LoadInboxQuery) agentConversationDetailsQuery(organizationID, identityI
 func withAgentConversationDetails(query *bun.SelectQuery, identityID, userID string) *bun.SelectQuery {
 	return withIndividualConversationDetails(query, identityID, userID).
 		ColumnExpr("cv.title, oi.id AS agent_identity_id, oi.display_name AS agent_name, oi.avatar_file_id AS agent_avatar_file_id, agent.status AS agent_status, latest_agent_run.status AS agent_run_status").
+		ColumnExpr("oi.type AS agent_type, agent.paused_at IS NOT NULL AS agent_paused, agent_device.revoked_at IS NOT NULL AS agent_device_revoked, agent_device.last_seen_at AS agent_device_last_seen_at").
+		Join("LEFT JOIN devices AS agent_device ON agent_device.organization_id = agent.organization_id AND agent_device.id = agent.device_id").
 		Join("LEFT JOIN LATERAL (SELECT agr.status FROM agent_runs AS agr WHERE agr.organization_id = cv.organization_id AND agr.conversation_id = cv.id AND agr.agent_identity_id = ac.agent_identity_id ORDER BY agr.created_at DESC, agr.id DESC LIMIT 1) AS latest_agent_run ON TRUE")
 }
 
@@ -538,8 +546,12 @@ func (q *LoadInboxQuery) countPending(ctx context.Context, identity *servermodel
 	return count, nil
 }
 
-// summary 将 AI 会话查询结果转换为统一摘要。
+// summary 将 AI 会话查询结果转换为统一摘要，对象为助理时按当前时间计算其在线状态。
 func (row agentConversationRow) summary() ConversationSummary {
+	var assistantPresence domain.AssistantPresence
+	if row.AgentType == domain.OrganizationIdentityTypeAssistant {
+		assistantPresence = domain.ResolveAssistantPresence(row.AgentStatus, row.AgentPaused, row.AgentDeviceRevoked, row.AgentDeviceLastSeenAt, time.Now())
+	}
 	var agentRunStatus *domain.AgentRunStatus
 	if row.AgentRunStatus != nil {
 		status := domain.AgentRunStatus(*row.AgentRunStatus)
@@ -549,6 +561,7 @@ func (row agentConversationRow) summary() ConversationSummary {
 		ID: row.ID, Type: domain.ConversationTypeAgent, UnreadCount: row.UnreadCount, Muted: row.Muted, MarkedUnread: row.MarkedUnread, Pinned: row.Pinned, LastMessageID: row.LastMessageID, LastMessageType: row.LastMessageType, LastReadMessageID: row.LastReadMessageID, LastActivityAt: row.LastActivityAt,
 		Agent: &AgentConversationSummary{
 			Title: row.Title, AgentIdentityID: row.AgentIdentityID, AgentName: row.AgentName, AgentAvatarFileID: row.AgentAvatarFileID, AgentStatus: row.AgentStatus,
+			AgentType: row.AgentType, AssistantPresence: assistantPresence,
 			Preview: row.Preview, PreviewSenderIdentityType: row.PreviewSenderIdentityType, LastMessageAt: row.LastMessageAt, AgentRunStatus: agentRunStatus,
 		},
 	}

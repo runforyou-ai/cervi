@@ -48,8 +48,8 @@ const (
 	AgentRunErrorCodeDeviceLeaseExpired AgentRunErrorCode = "device_lease_expired"
 	// AgentRunErrorCodeDeviceUnavailable 表示执行设备已撤销或设备主人已停用。
 	AgentRunErrorCodeDeviceUnavailable AgentRunErrorCode = "device_unavailable"
-	// AgentRunErrorCodeDeviceUnbound 表示会话已解除或更换设备绑定。
-	AgentRunErrorCodeDeviceUnbound AgentRunErrorCode = "device_unbound"
+	// AgentRunErrorCodeExecutionChanged 表示运行派发后助理已换电脑或该会话的工作区已变化，排队中的运行不再执行。
+	AgentRunErrorCodeExecutionChanged AgentRunErrorCode = "execution_changed"
 	// AgentRunErrorCodeWorkspaceMissing 表示执行设备上找不到绑定的工作区目录。
 	AgentRunErrorCodeWorkspaceMissing AgentRunErrorCode = "workspace_missing"
 	// AgentRunErrorCodeDeviceRunFailed 表示设备上的运行时执行失败。

@@ -4,7 +4,6 @@ package agentrun
 
 import (
 	"context"
-	"database/sql"
 	"errors"
 	"fmt"
 	"uuid"
@@ -107,7 +106,7 @@ func advanceLaneSequence(ctx context.Context, db bun.IDB, spec agentRunSpec) (la
 	return sequence, nil
 }
 
-// insertAndDispatchRun 创建 Agent 业务运行并派发执行：会话已绑定设备时交给该设备的工作区，否则投递隔离 Worker。
+// insertAndDispatchRun 创建 Agent 业务运行并派发执行：助理的运行交给其绑定电脑与该会话的工作区，AI 员工的运行投递隔离 Worker。
 func insertAndDispatchRun(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer, spec agentRunSpec, laneID string, startSeq int64) (string, error) {
 	run := &servermodels.AgentRun{
 		ID: uuid.NewV7().String(), OrganizationID: spec.OrganizationID, ConversationID: spec.ConversationID,
@@ -115,25 +114,22 @@ func insertAndDispatchRun(ctx context.Context, db bun.IDB, enqueuer servertask.T
 		ScopeKind: string(spec.ScopeKind), ScopeID: spec.ScopeID,
 		Status: string(domain.AgentRunStatusQueued), InputStartSeq: startSeq,
 	}
-	binding := &servermodels.ConversationDeviceBinding{}
-	err := db.NewSelect().Model(binding).
-		Where("cdb.organization_id = ? AND cdb.conversation_id = ?", spec.OrganizationID, spec.ConversationID).
-		Scan(ctx)
-	if err != nil && !errors.Is(err, sql.ErrNoRows) {
-		return "", fmt.Errorf("load conversation device binding: %w", err)
+	if err := db.NewSelect().Model((*servermodels.Agent)(nil)).
+		ColumnExpr("a.device_id, caw.workspace_id").
+		Join("LEFT JOIN conversation_assistant_workspaces AS caw ON caw.organization_id = a.organization_id AND caw.conversation_id = ? AND caw.agent_id = a.id", spec.ConversationID).
+		Where("a.organization_id = ? AND a.identity_id = ?", spec.OrganizationID, spec.AgentIdentityID).
+		Scan(ctx, &run.ExecutionDeviceID, &run.ExecutionWorkspaceID); err != nil {
+		return "", fmt.Errorf("load agent execution device: %w", err)
 	}
-	bound := err == nil
-	if bound {
-		run.ExecutionDeviceID, run.ExecutionWorkspaceID = &binding.DeviceID, &binding.WorkspaceID
-	}
+	onDevice := run.ExecutionDeviceID != nil
 	if _, err := db.NewInsert().Model(run).
 		Column("id", "organization_id", "conversation_id", "agent_identity_id", "agent_revision_id", "lane_id", "scope_kind", "scope_id", "status", "input_start_seq",
 			"execution_device_id", "execution_workspace_id").
 		Exec(ctx); err != nil {
 		return "", fmt.Errorf("create agent run: %w", err)
 	}
-	if bound {
-		return run.ID, advanceDeviceWork(ctx, db, spec.OrganizationID, binding.DeviceID)
+	if onDevice {
+		return run.ID, advanceDeviceWork(ctx, db, spec.OrganizationID, *run.ExecutionDeviceID)
 	}
 	if _, err := enqueuer.EnqueueIn(ctx, db, RunActionName, RunInput{RunID: run.ID}, servertask.EnqueueOptions{
 		Queue: servertask.QueueAgent, MaxAttempts: 3,

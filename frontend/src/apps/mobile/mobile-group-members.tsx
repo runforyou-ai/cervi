@@ -16,6 +16,7 @@ import {
   MobileSearchBar,
 } from "@/apps/mobile/mobile-page"
 import { ProfileAvatar } from "@/components/profile-avatar"
+import { isAIIdentityType } from "@/lib/identity-type"
 
 /** 展示最多两行头像，以及群主添加和移除成员入口。 */
 export function MobileGroupMembersPreview({
@@ -45,12 +46,7 @@ export function MobileGroupMembersPreview({
             <ProfileAvatar
               name={member.displayName}
               imageURL={member.avatarUrl}
-              fallback={
-                member.identityType ===
-                OrganizationIdentityType.OrganizationIdentityTypeAgent
-                  ? "agent"
-                  : "person"
-              }
+              fallback={isAIIdentityType(member.identityType) ? "agent" : "person"}
               className="size-12 rounded-xl"
             />
             <span className="w-full truncate text-center text-xs">
@@ -143,21 +139,15 @@ export function MobileGroupMemberList({
               <ProfileAvatar
                 name={member.displayName}
                 imageURL={member.avatarUrl}
-                fallback={
-                  member.identityType ===
-                  OrganizationIdentityType.OrganizationIdentityTypeAgent
-                    ? "agent"
-                    : "person"
-                }
+                fallback={isAIIdentityType(member.identityType) ? "agent" : "person"}
                 className="size-10"
               />
               <span className="min-w-0 flex-1 break-words text-sm">
                 {member.displayName}
               </span>
-              {member.identityType ===
-              OrganizationIdentityType.OrganizationIdentityTypeAgent ? (
+              {isAIIdentityType(member.identityType) ? (
                 <span className="shrink-0 text-xs text-muted-foreground">
-                  {t("groupAgent")}
+                  {t(member.identityType === OrganizationIdentityType.OrganizationIdentityTypeAssistant ? "groupAssistant" : "groupAgent")}
                 </span>
               ) : null}
               {trailing(member)}

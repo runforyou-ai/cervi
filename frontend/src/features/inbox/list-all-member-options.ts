@@ -1,5 +1,11 @@
 /** 收件箱会话选择器共用的企业身份候选读取。 */
-import { listMemberOptions, type MemberOption } from "@/api"
+import {
+  listAssistants,
+  listMemberOptions,
+  OrganizationIdentityType,
+  UserStatus,
+  type MemberOption,
+} from "@/api"
 
 const memberOptionPageSize = 100
 
@@ -18,4 +24,18 @@ export async function listAllMemberOptions() {
     page += 1
   } while (page <= pages)
   return members
+}
+
+/** 读取可发起单聊的对象：全部企业身份候选项与本人名下正常的助理。 */
+export async function listChatTargets() {
+  const [members, owned] = await Promise.all([listAllMemberOptions(), listAssistants()])
+  const assistants: MemberOption[] = owned.assistants
+    .filter((assistant) => assistant.status === UserStatus.UserStatusActive)
+    .map((assistant) => ({
+      id: assistant.identityId,
+      type: OrganizationIdentityType.OrganizationIdentityTypeAssistant,
+      displayName: assistant.displayName,
+      avatarUrl: assistant.avatarUrl,
+    }))
+  return [...members, ...assistants]
 }

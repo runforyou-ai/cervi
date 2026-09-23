@@ -78,6 +78,8 @@ type internalMessageContext struct {
 	SubjectID       string                     `bun:"subject_id"`
 	AgentIdentityID string                     `bun:"agent_identity_id"`
 	AgentRevisionID *string                    `bun:"agent_revision_id"`
+	AgentPaused     bool                       `bun:"agent_paused"`
+	AgentUnbound    bool                       `bun:"agent_unbound"`
 	AgentInputKind  domain.AgentInputKind      `bun:"-"`
 }
 

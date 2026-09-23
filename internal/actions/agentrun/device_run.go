@@ -32,6 +32,11 @@ const (
 	DeviceRunMaxDuration = 30 * time.Minute
 	// deviceRunSweepBatch 是单次扫描收敛的运行数量上限。
 	deviceRunSweepBatch = 100
+	// deviceRunRouteJoins 关联运行所属助理及其在该会话中的当前工作区。
+	deviceRunRouteJoins = `JOIN agents AS a ON a.organization_id = agr.organization_id AND a.identity_id = agr.agent_identity_id
+		LEFT JOIN conversation_assistant_workspaces AS caw ON caw.organization_id = agr.organization_id AND caw.conversation_id = agr.conversation_id AND caw.agent_id = a.id`
+	// deviceRunRouteCurrent 判断助理仍绑定运行的执行设备，且该会话的工作区与派发时一致。
+	deviceRunRouteCurrent = `a.device_id = agr.execution_device_id AND caw.workspace_id IS NOT DISTINCT FROM agr.execution_workspace_id`
 )
 
 var (
@@ -54,11 +59,11 @@ type RunDevice struct {
 	DeviceID       string
 }
 
-// DeviceWorkRun 是设备待领取运行的摘要。
+// DeviceWorkRun 是设备待领取运行的摘要，WorkspaceID 为空表示运行不使用本机工作区。
 type DeviceWorkRun struct {
 	RunID          string `bun:"id"`
 	ConversationID string `bun:"conversation_id"`
-	WorkspaceID    string `bun:"execution_workspace_id"`
+	WorkspaceID    string `bun:"workspace_id"`
 }
 
 // DeviceWork 是设备当前工作水位与待领取运行。
@@ -93,7 +98,7 @@ type DeviceClaimedInput struct {
 	Input      agentruntime.ClaimedInput
 }
 
-// DeviceWork 返回设备的工作水位与按创建顺序排列、会话绑定仍指向本设备的待领取运行。
+// DeviceWork 返回设备的工作水位与按创建顺序排列、助理绑定与会话工作区仍与派发时一致的待领取运行。
 func (a *ExecuteAction) DeviceWork(ctx context.Context, device RunDevice) (DeviceWork, error) {
 	work := DeviceWork{Runs: make([]DeviceWorkRun, 0)}
 	if err := a.db.NewSelect().Model((*servermodels.Device)(nil)).Column("work_seq").
@@ -102,10 +107,10 @@ func (a *ExecuteAction) DeviceWork(ctx context.Context, device RunDevice) (Devic
 		return DeviceWork{}, fmt.Errorf("load device work sequence: %w", err)
 	}
 	if err := a.db.NewSelect().Model((*servermodels.AgentRun)(nil)).
-		Column("id", "conversation_id", "execution_workspace_id").
-		// 会话绑定已解除或更换的运行不再交给设备，由收敛扫描标记失败。
-		Join("JOIN conversation_device_bindings AS cdb ON cdb.organization_id = agr.organization_id AND cdb.conversation_id = agr.conversation_id").
-		Where("cdb.device_id = agr.execution_device_id AND cdb.workspace_id = agr.execution_workspace_id").
+		ColumnExpr("agr.id, agr.conversation_id, COALESCE(agr.execution_workspace_id::text, '') AS workspace_id").
+		// 助理已换电脑或会话工作区已变化的运行不再交给设备，由收敛扫描标记失败。
+		Join(deviceRunRouteJoins).
+		Where(deviceRunRouteCurrent).
 		Where("agr.organization_id = ? AND agr.execution_device_id = ?", device.OrganizationID, device.DeviceID).
 		Where("agr.status = ?", domain.AgentRunStatusQueued).
 		OrderExpr("agr.created_at ASC, agr.id ASC").
@@ -138,15 +143,16 @@ func (a *ExecuteAction) ClaimDeviceRun(ctx context.Context, device RunDevice, ru
 		if run.Status != string(domain.AgentRunStatusQueued) {
 			return ErrDeviceRunUnavailable
 		}
-		// 会话绑定已解除或更换时拒绝领取，由收敛扫描标记失败。
-		bound, err := tx.NewSelect().Model((*servermodels.ConversationDeviceBinding)(nil)).
-			Where("cdb.organization_id = ? AND cdb.conversation_id = ?", run.OrganizationID, run.ConversationID).
-			Where("cdb.device_id = ? AND cdb.workspace_id = ?", run.ExecutionDeviceID, run.ExecutionWorkspaceID).
+		// 助理已换电脑或会话工作区已变化时拒绝领取，由收敛扫描标记失败。
+		current, err := tx.NewSelect().Model((*servermodels.AgentRun)(nil)).
+			Join(deviceRunRouteJoins).
+			Where("agr.id = ?", run.ID).
+			Where(deviceRunRouteCurrent).
 			Exists(ctx)
 		if err != nil {
-			return fmt.Errorf("check device run binding: %w", err)
+			return fmt.Errorf("check device run route: %w", err)
 		}
-		if !bound {
+		if !current {
 			return ErrDeviceRunUnavailable
 		}
 		if err := tx.NewRaw(`
@@ -161,15 +167,17 @@ func (a *ExecuteAction) ClaimDeviceRun(ctx context.Context, device RunDevice, ru
 			}
 			return fmt.Errorf("claim device agent run: %w", err)
 		}
-		// 运行期间以 AI 员工的聊天主体发布输入状态。
+		// 运行期间以助理的聊天主体发布输入状态。
 		if _, err := chatstate.EnsureOrganizationIdentityChatSubject(ctx, tx, run.OrganizationID, run.AgentIdentityID, uuid.NewV7().String()); err != nil {
 			return err
 		}
-		if _, err := tx.NewUpdate().Model((*servermodels.DeviceWorkspace)(nil)).
-			Set("last_used_at = now()").Set("updated_at = now()").
-			Where("organization_id = ? AND id = ?", run.OrganizationID, run.ExecutionWorkspaceID).
-			Exec(ctx); err != nil {
-			return fmt.Errorf("touch device workspace: %w", err)
+		if run.ExecutionWorkspaceID != nil {
+			if _, err := tx.NewUpdate().Model((*servermodels.DeviceWorkspace)(nil)).
+				Set("last_used_at = now()").Set("updated_at = now()").
+				Where("organization_id = ? AND id = ?", run.OrganizationID, *run.ExecutionWorkspaceID).
+				Exec(ctx); err != nil {
+				return fmt.Errorf("touch device workspace: %w", err)
+			}
 		}
 		return chatstate.TouchConversation(ctx, tx, locked.PolicyContext.Conversation)
 	})
@@ -369,7 +377,7 @@ func (a *ExecuteAction) expireDeviceRun(ctx context.Context, run *servermodels.A
 	return a.persistPartialProcess(ctx, run, partial)
 }
 
-// SweepDeviceRuns 收敛无法继续的设备运行：运行中但租约已过期或超出总时限，或排队中但设备已撤销、设备主人已停用、会话绑定已变化。
+// SweepDeviceRuns 收敛无法继续的设备运行：运行中但租约已过期或超出总时限，或排队中但设备已撤销、设备主人已停用、助理已换电脑或会话工作区已变化。
 func (a *ExecuteAction) SweepDeviceRuns(ctx context.Context, _ struct{}) error {
 	var stale []struct {
 		ID   string                   `bun:"id"`
@@ -386,19 +394,20 @@ func (a *ExecuteAction) SweepDeviceRuns(ctx context.Context, _ struct{}) error {
 		FROM agent_runs AS agr
 		LEFT JOIN devices AS d ON d.id = agr.execution_device_id AND d.organization_id = agr.organization_id
 		LEFT JOIN users AS u ON u.id = d.user_id AND u.organization_id = d.organization_id AND u.status = ?
-		LEFT JOIN conversation_device_bindings AS cdb ON cdb.organization_id = agr.organization_id AND cdb.conversation_id = agr.conversation_id
+		LEFT JOIN agents AS a ON a.organization_id = agr.organization_id AND a.identity_id = agr.agent_identity_id
+		LEFT JOIN conversation_assistant_workspaces AS caw ON caw.organization_id = agr.organization_id AND caw.conversation_id = agr.conversation_id AND caw.agent_id = a.id
 		WHERE agr.execution_device_id IS NOT NULL
 			AND (
 				(agr.status = ? AND (agr.lease_expires_at <= clock_timestamp() OR agr.claimed_at + make_interval(secs => ?) <= clock_timestamp()))
 				OR (agr.status = ? AND (
 					d.id IS NULL OR d.revoked_at IS NOT NULL OR u.id IS NULL
-					OR cdb.id IS NULL OR cdb.device_id <> agr.execution_device_id OR cdb.workspace_id <> agr.execution_workspace_id
+					OR a.device_id IS DISTINCT FROM agr.execution_device_id OR caw.workspace_id IS DISTINCT FROM agr.execution_workspace_id
 				))
 			)
 		ORDER BY agr.created_at ASC
 		LIMIT ?
 	`, domain.AgentRunStatusRunning, DeviceRunMaxDuration.Seconds(), domain.AgentRunErrorCodeDeviceRunTimedOut,
-		domain.AgentRunStatusRunning, domain.AgentRunErrorCodeDeviceLeaseExpired, domain.AgentRunErrorCodeDeviceUnavailable, domain.AgentRunErrorCodeDeviceUnbound,
+		domain.AgentRunStatusRunning, domain.AgentRunErrorCodeDeviceLeaseExpired, domain.AgentRunErrorCodeDeviceUnavailable, domain.AgentRunErrorCodeExecutionChanged,
 		domain.UserStatusActive, domain.AgentRunStatusRunning, DeviceRunMaxDuration.Seconds(), domain.AgentRunStatusQueued, deviceRunSweepBatch).Scan(ctx, &stale); err != nil {
 		return fmt.Errorf("find stale device agent runs: %w", err)
 	}

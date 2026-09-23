@@ -40,7 +40,10 @@ type RemoveGroupConversationMemberAction struct {
 type TransferGroupConversationOwnerAction struct{ db *bun.DB }
 
 // LeaveGroupConversationAction 退出普通成员参与的群聊。
-type LeaveGroupConversationAction struct{ db *bun.DB }
+type LeaveGroupConversationAction struct {
+	db          *bun.DB
+	coordinator GroupAgentRunCoordinator
+}
 
 // DissolveGroupConversationAction 解散群聊并保留当前成员的只读历史。
 type DissolveGroupConversationAction struct {
@@ -56,10 +59,11 @@ type GroupAgentRunCoordinator interface {
 }
 
 type activeGroupParticipantRow struct {
-	ParticipantID string `bun:"participant_id"`
-	IdentityID    string `bun:"identity_id"`
-	DisplayName   string `bun:"display_name"`
-	Role          string `bun:"role"`
+	ParticipantID        string `bun:"participant_id"`
+	IdentityID           string `bun:"identity_id"`
+	DisplayName          string `bun:"display_name"`
+	Role                 string `bun:"role"`
+	AssistantOwnerUserID string `bun:"assistant_owner_user_id"`
 }
 
 // NewUpdateGroupConversationAction 创建群聊资料修改操作。
@@ -83,8 +87,8 @@ func NewTransferGroupConversationOwnerAction(db *bun.DB) *TransferGroupConversat
 }
 
 // NewLeaveGroupConversationAction 创建群聊退出操作。
-func NewLeaveGroupConversationAction(db *bun.DB) *LeaveGroupConversationAction {
-	return &LeaveGroupConversationAction{db: db}
+func NewLeaveGroupConversationAction(db *bun.DB, coordinator GroupAgentRunCoordinator) *LeaveGroupConversationAction {
+	return &LeaveGroupConversationAction{db: db, coordinator: coordinator}
 }
 
 // NewDissolveGroupConversationAction 创建群聊解散操作。
@@ -159,7 +163,7 @@ func (a *UpdateGroupConversationAction) Execute(ctx context.Context, identity *s
 	return result, nil
 }
 
-// Execute 增加有效企业成员，重新加入时复用原参与者行。
+// Execute 增加有效企业成员，重新加入时复用原参与者行；群主可以加入任何有效成员，其他成员只能加入本人名下的助理。
 func (a *AddGroupConversationMembersAction) Execute(ctx context.Context, identity *servermodels.Identity, input GroupConversationMembersInput) (GroupConversation, error) {
 	conversationID, memberIDs, fields := normalizeGroupMembersInput(identity.OrganizationIdentity.ID, input.ConversationID, input.MemberIdentityIDs)
 	if len(fields) > 0 {
@@ -175,13 +179,20 @@ func (a *AddGroupConversationMembersAction) Execute(ctx context.Context, identit
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		group, err := chatstate.LockGroup(ctx, tx, identity, conversationID, chatstate.GroupManageable)
+		members, err := loadActiveGroupMembers(ctx, tx, identity, memberIDs)
 		if err != nil {
 			return err
 		}
-		members, err := loadActiveGroupMembers(ctx, tx, identity.Organization.ID, memberIDs)
+		group, err := chatstate.LockGroup(ctx, tx, identity, conversationID, chatstate.GroupSendable)
 		if err != nil {
 			return err
+		}
+		if group.Role != string(domain.ConversationParticipantRoleOwner) {
+			for _, member := range members {
+				if member.IdentityType != domain.OrganizationIdentityTypeAssistant {
+					return chatstate.ErrGroupOwnerRequired
+				}
+			}
 		}
 		activeIDs, err := loadActiveGroupParticipantIdentityIDs(ctx, tx, identity.Organization.ID, conversationID)
 		if err != nil {
@@ -245,7 +256,7 @@ func (a *AddGroupConversationMembersAction) Execute(ctx context.Context, identit
 	return result, nil
 }
 
-// Execute 将当前有效的普通成员移出群聊。
+// Execute 将当前有效的普通成员移出群聊，群主可以移出任何成员，助理主人可以移出本人名下的助理；被移出的真人名下的助理随之移出。
 func (a *RemoveGroupConversationMemberAction) Execute(ctx context.Context, identity *servermodels.Identity, input GroupConversationMemberInput) (GroupConversation, error) {
 	conversationID, memberID, fields := normalizeGroupMemberInput(input.ConversationID, input.MemberIdentityID, "memberIdentityId", ValidationGroupMemberIDInvalid)
 	if len(fields) > 0 {
@@ -257,13 +268,16 @@ func (a *RemoveGroupConversationMemberAction) Execute(ctx context.Context, ident
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		group, err := chatstate.LockGroup(ctx, tx, identity, conversationID, chatstate.GroupManageable)
+		group, err := chatstate.LockGroup(ctx, tx, identity, conversationID, chatstate.GroupSendable)
 		if err != nil {
 			return err
 		}
 		target, err := loadActiveGroupParticipant(ctx, tx, identity.Organization.ID, conversationID, memberID, false)
 		if err != nil {
 			return err
+		}
+		if group.Role != string(domain.ConversationParticipantRoleOwner) && target.AssistantOwnerUserID != identity.User.ID {
+			return chatstate.ErrGroupOwnerRequired
 		}
 		if target.Role == string(domain.ConversationParticipantRoleOwner) {
 			return &ConflictError{Reason: ConflictReasonGroupOwnerCannotBeRemoved}
@@ -288,8 +302,20 @@ func (a *RemoveGroupConversationMemberAction) Execute(ctx context.Context, ident
 		if err != nil {
 			return err
 		}
+		if err := clearGroupAssistantWorkspaces(ctx, tx, identity.Organization.ID, conversationID, []string{memberID}); err != nil {
+			return err
+		}
+		targets := []ConversationSystemEventParticipant{groupParticipantSnapshot(target)}
+		for _, userID := range removedUserIDs {
+			removed, runIDs, err := removeOwnedGroupAssistants(ctx, tx, a.coordinator, identity.Organization.ID, conversationID, userID)
+			if err != nil {
+				return err
+			}
+			targets = append(targets, removed...)
+			cancelledRunIDs = append(cancelledRunIDs, runIDs...)
+		}
 		if _, err := createGroupSystemEvent(ctx, tx, identity, group.Conversation, ConversationSystemEvent{
-			Type: domain.ConversationSystemEventGroupMemberRemoved, Actor: groupActorSnapshot(identity), Targets: []ConversationSystemEventParticipant{groupParticipantSnapshot(target)},
+			Type: domain.ConversationSystemEventGroupMemberRemoved, Actor: groupActorSnapshot(identity), Targets: targets,
 		}); err != nil {
 			return err
 		}
@@ -345,12 +371,13 @@ func (a *TransferGroupConversationOwnerAction) Execute(ctx context.Context, iden
 	return result, nil
 }
 
-// Execute 退出群聊，群主必须先通过转让操作成为普通成员。
+// Execute 退出群聊并带走本人名下的助理，群主必须先通过转让操作成为普通成员。
 func (a *LeaveGroupConversationAction) Execute(ctx context.Context, identity *servermodels.Identity, conversationID string) error {
 	conversationID, valid := common.NormalizeUUID(conversationID)
 	if !valid {
 		return &ValidationError{Fields: map[string]ValidationCode{"conversationId": ValidationConversationIDInvalid}}
 	}
+	var cancelledRunIDs []string
 	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
@@ -369,13 +396,26 @@ func (a *LeaveGroupConversationAction) Execute(ctx context.Context, identity *se
 		if _, err := clearConversationPin(ctx, tx, identity.Organization.ID, identity.User.ID, conversationID); err != nil {
 			return err
 		}
-		_, err = createGroupSystemEvent(ctx, tx, identity, group.Conversation, ConversationSystemEvent{
+		if _, err := createGroupSystemEvent(ctx, tx, identity, group.Conversation, ConversationSystemEvent{
 			Type: domain.ConversationSystemEventGroupMemberLeft, Actor: groupActorSnapshot(identity),
+		}); err != nil {
+			return err
+		}
+		removed, runIDs, err := removeOwnedGroupAssistants(ctx, tx, a.coordinator, identity.Organization.ID, conversationID, identity.User.ID)
+		if err != nil || len(removed) == 0 {
+			return err
+		}
+		cancelledRunIDs = runIDs
+		_, err = appendGroupSystemEvent(ctx, tx, group.Conversation, ConversationSystemEvent{
+			Type: domain.ConversationSystemEventGroupMemberRemoved, Actor: groupActorSnapshot(identity), Targets: removed,
 		})
 		return err
 	})
 	if err != nil {
 		return fmt.Errorf("leave group conversation: %w", err)
+	}
+	if len(cancelledRunIDs) > 0 {
+		a.coordinator.CancelRunContexts(cancelledRunIDs)
 	}
 	return nil
 }
@@ -404,6 +444,11 @@ func (a *DissolveGroupConversationAction) Execute(ctx context.Context, identity 
 			cancelledRunIDs, err = a.coordinator.CancelForGroupConversation(ctx, tx, identity.Organization.ID, conversationID)
 			if err != nil {
 				return err
+			}
+			if _, err := tx.NewDelete().Model((*servermodels.ConversationAssistantWorkspace)(nil)).
+				Where("organization_id = ? AND conversation_id = ?", identity.Organization.ID, conversationID).
+				Exec(ctx); err != nil {
+				return fmt.Errorf("clear dissolved group assistant workspaces: %w", err)
 			}
 			if _, err := createGroupSystemEvent(ctx, tx, identity, group.Conversation, ConversationSystemEvent{
 				Type: domain.ConversationSystemEventGroupDissolved, Actor: groupActorSnapshot(identity),
@@ -526,8 +571,10 @@ func loadActiveGroupParticipant(ctx context.Context, db bun.IDB, organizationID,
 		ColumnExpr("cs.source_id AS identity_id").
 		ColumnExpr("oi.display_name AS display_name").
 		ColumnExpr("cp.role AS role").
+		ColumnExpr("CASE WHEN oi.type = ? THEN COALESCE(a.owner_user_id::text, '') ELSE '' END AS assistant_owner_user_id", domain.OrganizationIdentityTypeAssistant).
 		Join("JOIN chat_subjects AS cs ON cs.organization_id = cp.organization_id AND cs.id = cp.subject_id AND cs.kind = ? AND cs.source_id = ?", domain.ChatSubjectKindOrganizationIdentity, identityID).
-		Join("JOIN organization_identities AS oi ON oi.organization_id = cs.organization_id AND oi.id = cs.source_id")
+		Join("JOIN organization_identities AS oi ON oi.organization_id = cs.organization_id AND oi.id = cs.source_id").
+		Join("LEFT JOIN agents AS a ON a.organization_id = oi.organization_id AND a.identity_id = oi.id")
 	if requireActiveUser {
 		query = query.Join("JOIN users AS u ON u.organization_id = oi.organization_id AND u.identity_id = oi.id AND u.status = ?", domain.UserStatusActive)
 	}
@@ -613,22 +660,9 @@ func leaveGroupParticipant(ctx context.Context, db bun.IDB, organizationID, part
 	return nil
 }
 
-// createGroupSystemEvent 写入类型化系统事件并推进会话摘要。
+// createGroupSystemEvent 写入类型化系统事件并推进会话摘要与操作人的已读位置。
 func createGroupSystemEvent(ctx context.Context, db bun.IDB, identity *servermodels.Identity, conversation *servermodels.Conversation, event ConversationSystemEvent) (*servermodels.Message, error) {
-	if event.Targets == nil {
-		event.Targets = make([]ConversationSystemEventParticipant, 0)
-	}
-	payload, err := json.Marshal(event)
-	if err != nil {
-		return nil, fmt.Errorf("marshal group system event: %w", err)
-	}
-	eventType := string(event.Type)
-	message := &servermodels.Message{
-		ID: uuid.NewV7().String(), OrganizationID: identity.Organization.ID, ConversationID: conversation.ID,
-		Type: string(domain.MessageTypeSystem), Body: "", SystemEventType: &eventType, SystemEventPayload: payload,
-		OriginatedAt: time.Now().UTC(),
-	}
-	message, _, err = chatstate.AppendMessage(ctx, db, conversation, message)
+	message, err := appendGroupSystemEvent(ctx, db, conversation, event)
 	if err != nil {
 		return nil, err
 	}
@@ -640,6 +674,25 @@ func createGroupSystemEvent(ctx context.Context, db bun.IDB, identity *servermod
 		return nil, err
 	}
 	return message, nil
+}
+
+// appendGroupSystemEvent 写入类型化系统事件并推进会话摘要。
+func appendGroupSystemEvent(ctx context.Context, db bun.IDB, conversation *servermodels.Conversation, event ConversationSystemEvent) (*servermodels.Message, error) {
+	if event.Targets == nil {
+		event.Targets = make([]ConversationSystemEventParticipant, 0)
+	}
+	payload, err := json.Marshal(event)
+	if err != nil {
+		return nil, fmt.Errorf("marshal group system event: %w", err)
+	}
+	eventType := string(event.Type)
+	message := &servermodels.Message{
+		ID: uuid.NewV7().String(), OrganizationID: conversation.OrganizationID, ConversationID: conversation.ID,
+		Type: string(domain.MessageTypeSystem), Body: "", SystemEventType: &eventType, SystemEventPayload: payload,
+		OriginatedAt: time.Now().UTC(),
+	}
+	message, _, err = chatstate.AppendMessage(ctx, db, conversation, message)
+	return message, err
 }
 
 // groupActorSnapshot 记录操作人的审计快照。

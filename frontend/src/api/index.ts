@@ -31,6 +31,7 @@ export {
   uploadFile,
 } from "@/api/uploads"
 export * from "@/api/agents"
+export * from "@/api/assistants"
 export * from "@/api/ai-providers"
 export * from "@/api/mcp-servers"
 export * from "@/api/channels"

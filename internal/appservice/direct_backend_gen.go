@@ -898,6 +898,106 @@ func (b *DirectBackend) ReactivateAgent(ctx context.Context, meta RequestMeta, a
 	return b.ops.ReactivateAgent(ctx, meta, identity, agentID)
 }
 
+// ListAssistants 返回当前成员名下的助理。
+func (b *DirectBackend) ListAssistants(ctx context.Context, meta RequestMeta) (AssistantList, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero AssistantList
+		return zero, err
+	}
+	return b.ops.ListAssistants(ctx, meta, identity)
+}
+
+// ListMemberAssistants 返回指定成员名下的助理。
+func (b *DirectBackend) ListMemberAssistants(ctx context.Context, meta RequestMeta, userID string) (AssistantList, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero AssistantList
+		return zero, err
+	}
+	return b.ops.ListMemberAssistants(ctx, meta, identity, userID)
+}
+
+// GetAssistant 返回当前成员名下的助理详情。
+func (b *DirectBackend) GetAssistant(ctx context.Context, meta RequestMeta, assistantID string) (AssistantDetail, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero AssistantDetail
+		return zero, err
+	}
+	return b.ops.GetAssistant(ctx, meta, identity, assistantID)
+}
+
+// CreateAssistant 在当前成员的电脑上创建助理。
+func (b *DirectBackend) CreateAssistant(ctx context.Context, meta RequestMeta, input CreateAssistantInput) (Assistant, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero Assistant
+		return zero, err
+	}
+	return b.ops.CreateAssistant(ctx, meta, identity, input)
+}
+
+// UpdateAssistant 修改当前成员名下的助理。
+func (b *DirectBackend) UpdateAssistant(ctx context.Context, meta RequestMeta, assistantID string, input AssistantInput) (Assistant, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero Assistant
+		return zero, err
+	}
+	return b.ops.UpdateAssistant(ctx, meta, identity, assistantID, input)
+}
+
+// PauseAssistant 暂停当前成员名下的助理。
+func (b *DirectBackend) PauseAssistant(ctx context.Context, meta RequestMeta, assistantID string) (Assistant, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero Assistant
+		return zero, err
+	}
+	return b.ops.PauseAssistant(ctx, meta, identity, assistantID)
+}
+
+// ResumeAssistant 恢复当前成员名下已暂停的助理。
+func (b *DirectBackend) ResumeAssistant(ctx context.Context, meta RequestMeta, assistantID string) (Assistant, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero Assistant
+		return zero, err
+	}
+	return b.ops.ResumeAssistant(ctx, meta, identity, assistantID)
+}
+
+// MoveAssistant 把当前成员名下的助理换到指定电脑。
+func (b *DirectBackend) MoveAssistant(ctx context.Context, meta RequestMeta, assistantID string, input AssistantDeviceInput) (Assistant, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero Assistant
+		return zero, err
+	}
+	return b.ops.MoveAssistant(ctx, meta, identity, assistantID, input)
+}
+
+// DeactivateAssistant 停用助理。
+func (b *DirectBackend) DeactivateAssistant(ctx context.Context, meta RequestMeta, assistantID string) (Assistant, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero Assistant
+		return zero, err
+	}
+	return b.ops.DeactivateAssistant(ctx, meta, identity, assistantID)
+}
+
+// ReactivateAssistant 启用已停用的助理。
+func (b *DirectBackend) ReactivateAssistant(ctx context.Context, meta RequestMeta, assistantID string) (Assistant, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero Assistant
+		return zero, err
+	}
+	return b.ops.ReactivateAssistant(ctx, meta, identity, assistantID)
+}
+
 // ListUsers 返回企业成员列表。
 func (b *DirectBackend) ListUsers(ctx context.Context, meta RequestMeta, input UserListInput) (UserList, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
@@ -1710,31 +1810,30 @@ func (b *DirectBackend) ListDeviceWorkspaces(ctx context.Context, meta RequestMe
 	return b.ops.ListDeviceWorkspaces(ctx, meta, identity, deviceID)
 }
 
-// GetConversationDeviceBinding 返回会话绑定的设备与工作区。
-func (b *DirectBackend) GetConversationDeviceBinding(ctx context.Context, meta RequestMeta, conversationID string) (ConversationDeviceBinding, error) {
+// ListConversationAssistantWorkspaces 返回会话中各位助理的绑定电脑与工作区。
+func (b *DirectBackend) ListConversationAssistantWorkspaces(ctx context.Context, meta RequestMeta, conversationID string) (ConversationAssistantWorkspaceList, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
 	if err != nil {
-		var zero ConversationDeviceBinding
+		var zero ConversationAssistantWorkspaceList
 		return zero, err
 	}
-	return b.ops.GetConversationDeviceBinding(ctx, meta, identity, conversationID)
+	return b.ops.ListConversationAssistantWorkspaces(ctx, meta, identity, conversationID)
 }
 
-// BindConversationDevice 把 AI 单聊绑定到本人设备上的工作区。
-func (b *DirectBackend) BindConversationDevice(ctx context.Context, meta RequestMeta, conversationID string, input ConversationDeviceBindingInput) (ConversationDeviceBinding, error) {
-	identity, err := b.ops.authenticate(ctx, meta)
-	if err != nil {
-		var zero ConversationDeviceBinding
-		return zero, err
-	}
-	return b.ops.BindConversationDevice(ctx, meta, identity, conversationID, input)
-}
-
-// UnbindConversationDevice 解除 AI 单聊的设备绑定。
-func (b *DirectBackend) UnbindConversationDevice(ctx context.Context, meta RequestMeta, conversationID string) error {
+// SetConversationAssistantWorkspace 由主人为会话中的助理指定工作区。
+func (b *DirectBackend) SetConversationAssistantWorkspace(ctx context.Context, meta RequestMeta, conversationID string, assistantIdentityID string, input ConversationAssistantWorkspaceInput) error {
 	identity, err := b.ops.authenticate(ctx, meta)
 	if err != nil {
 		return err
 	}
-	return b.ops.UnbindConversationDevice(ctx, meta, identity, conversationID)
+	return b.ops.SetConversationAssistantWorkspace(ctx, meta, identity, conversationID, assistantIdentityID, input)
+}
+
+// ClearConversationAssistantWorkspace 由主人清除会话中助理的工作区。
+func (b *DirectBackend) ClearConversationAssistantWorkspace(ctx context.Context, meta RequestMeta, conversationID string, assistantIdentityID string) error {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		return err
+	}
+	return b.ops.ClearConversationAssistantWorkspace(ctx, meta, identity, conversationID, assistantIdentityID)
 }

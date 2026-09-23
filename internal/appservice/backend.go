@@ -290,6 +290,36 @@ type Backend interface {
 	// ReactivateAgent 恢复企业 AI 员工。
 	//cervi:route POST /agents/:agentID/reactivate
 	ReactivateAgent(context.Context, RequestMeta, string) (Agent, error)
+	// ListAssistants 返回当前成员名下的助理。
+	//cervi:route GET /assistants
+	ListAssistants(context.Context, RequestMeta) (AssistantList, error)
+	// ListMemberAssistants 返回指定成员名下的助理。
+	//cervi:route GET /users/:userID/assistants
+	ListMemberAssistants(context.Context, RequestMeta, string) (AssistantList, error)
+	// GetAssistant 返回当前成员名下的助理详情。
+	//cervi:route GET /assistants/:assistantID
+	GetAssistant(context.Context, RequestMeta, string) (AssistantDetail, error)
+	// CreateAssistant 在当前成员的电脑上创建助理。
+	//cervi:route POST /assistants status=201
+	CreateAssistant(context.Context, RequestMeta, CreateAssistantInput) (Assistant, error)
+	// UpdateAssistant 修改当前成员名下的助理。
+	//cervi:route PUT /assistants/:assistantID
+	UpdateAssistant(context.Context, RequestMeta, string, AssistantInput) (Assistant, error)
+	// PauseAssistant 暂停当前成员名下的助理。
+	//cervi:route POST /assistants/:assistantID/pause
+	PauseAssistant(context.Context, RequestMeta, string) (Assistant, error)
+	// ResumeAssistant 恢复当前成员名下已暂停的助理。
+	//cervi:route POST /assistants/:assistantID/resume
+	ResumeAssistant(context.Context, RequestMeta, string) (Assistant, error)
+	// MoveAssistant 把当前成员名下的助理换到指定电脑。
+	//cervi:route PUT /assistants/:assistantID/device
+	MoveAssistant(context.Context, RequestMeta, string, AssistantDeviceInput) (Assistant, error)
+	// DeactivateAssistant 停用助理。
+	//cervi:route POST /assistants/:assistantID/deactivate
+	DeactivateAssistant(context.Context, RequestMeta, string) (Assistant, error)
+	// ReactivateAssistant 启用已停用的助理。
+	//cervi:route POST /assistants/:assistantID/reactivate
+	ReactivateAssistant(context.Context, RequestMeta, string) (Assistant, error)
 	// ListUsers 返回企业成员列表。
 	//cervi:route GET /users
 	ListUsers(context.Context, RequestMeta, UserListInput) (UserList, error)
@@ -542,15 +572,15 @@ type Backend interface {
 	// ListDeviceWorkspaces 返回当前用户设备上的工作区。
 	//cervi:route GET /devices/:deviceID/workspaces
 	ListDeviceWorkspaces(context.Context, RequestMeta, string) (DeviceWorkspaceList, error)
-	// GetConversationDeviceBinding 返回会话绑定的设备与工作区。
-	//cervi:route GET /conversations/:conversationID/device-binding
-	GetConversationDeviceBinding(context.Context, RequestMeta, string) (ConversationDeviceBinding, error)
-	// BindConversationDevice 把 AI 单聊绑定到本人设备上的工作区。
-	//cervi:route PUT /conversations/:conversationID/device-binding
-	BindConversationDevice(context.Context, RequestMeta, string, ConversationDeviceBindingInput) (ConversationDeviceBinding, error)
-	// UnbindConversationDevice 解除 AI 单聊的设备绑定。
-	//cervi:route DELETE /conversations/:conversationID/device-binding
-	UnbindConversationDevice(context.Context, RequestMeta, string) error
+	// ListConversationAssistantWorkspaces 返回会话中各位助理的绑定电脑与工作区。
+	//cervi:route GET /conversations/:conversationID/assistant-workspaces
+	ListConversationAssistantWorkspaces(context.Context, RequestMeta, string) (ConversationAssistantWorkspaceList, error)
+	// SetConversationAssistantWorkspace 由主人为会话中的助理指定工作区。
+	//cervi:route PUT /conversations/:conversationID/assistant-workspaces/:assistantIdentityID
+	SetConversationAssistantWorkspace(context.Context, RequestMeta, string, string, ConversationAssistantWorkspaceInput) error
+	// ClearConversationAssistantWorkspace 由主人清除会话中助理的工作区。
+	//cervi:route DELETE /conversations/:conversationID/assistant-workspaces/:assistantIdentityID
+	ClearConversationAssistantWorkspace(context.Context, RequestMeta, string, string) error
 }
 
 // WorkspaceInstaller 由服务端 Backend 实现，用于企业初始化。

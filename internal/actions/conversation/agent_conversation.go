@@ -21,7 +21,7 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// FirstAgentTextMessageInput 定义 AI 草稿及首条消息；WorkspaceID 非空时创建会话的同时绑定本人设备上的该工作区。
+// FirstAgentTextMessageInput 定义 AI 草稿及首条消息；目标为本人助理且 WorkspaceID 非空时，创建会话的同时为助理指定该工作区。
 type FirstAgentTextMessageInput struct {
 	ConversationID  string
 	AgentIdentityID string
@@ -82,16 +82,18 @@ func (a *SendFirstAgentTextMessageAction) Execute(ctx context.Context, identity 
 	return result, nil
 }
 
-// ensureAgentConversation 创建 AI 聊天并按需绑定本人设备上的工作区，重试时核对固定的业务归属。
+// ensureAgentConversation 创建与 AI 员工或本人助理的聊天，按需为助理指定工作区，重试时核对固定的业务归属。
 func ensureAgentConversation(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, conversationID, agentID, body, workspaceID string) error {
 	// 锁定已有草稿并核对归属后复用共享主体。
 	if found, err := lockAgentConversationDraft(ctx, tx, identity, conversationID, agentID); err != nil || found {
 		return err
 	}
+	// 助理只能由主人发起聊天。
 	var target servermodels.OrganizationIdentity
 	err := tx.NewSelect().Model(&target).
 		Join("JOIN agents AS agent ON agent.organization_id = oi.organization_id AND agent.identity_id = oi.id").
-		Where("oi.organization_id = ? AND oi.id = ? AND oi.type = ?", identity.Organization.ID, agentID, domain.OrganizationIdentityTypeAgent).
+		Where("oi.organization_id = ? AND oi.id = ?", identity.Organization.ID, agentID).
+		Where("oi.type = ? OR (oi.type = ? AND agent.owner_user_id = ?)", domain.OrganizationIdentityTypeAgent, domain.OrganizationIdentityTypeAssistant, identity.User.ID).
 		Where("agent.status = ?", domain.UserStatusActive).Scan(ctx)
 	if errors.Is(err, sql.ErrNoRows) {
 		return ErrAgentTargetNotFound
@@ -139,9 +141,9 @@ func ensureAgentConversation(ctx context.Context, tx bun.Tx, identity *servermod
 	if _, err := tx.NewInsert().Model(&participants).Column("id", "organization_id", "conversation_id", "subject_id", "role").Exec(ctx); err != nil {
 		return fmt.Errorf("create AI conversation participants: %w", err)
 	}
-	// 草稿选定的本机工作区在首条消息派发前绑定，首条消息即由该设备执行。
+	// 草稿选定的工作区在首条消息派发前指定，首条消息即可使用该工作区。
 	if workspaceID != "" {
-		if _, err := deviceaction.SaveConversationBinding(ctx, tx, identity, conversationID, workspaceID); err != nil {
+		if err := deviceaction.SaveAssistantWorkspace(ctx, tx, identity, conversationID, agentID, workspaceID); err != nil {
 			return err
 		}
 	}
@@ -208,13 +210,14 @@ func lockAgentSendContext(ctx context.Context, tx bun.Tx, identity *servermodels
 		return row, err
 	}
 	err = tx.NewSelect().TableExpr("agent_conversations AS ac").
-		ColumnExpr("ac.conversation_id, mine.id AS participant_id, mine.subject_id, ac.agent_identity_id, agent.active_revision_id AS agent_revision_id").
+		ColumnExpr("ac.conversation_id, mine.id AS participant_id, mine.subject_id, ac.agent_identity_id, agent.active_revision_id AS agent_revision_id, agent.paused_at IS NOT NULL AS agent_paused, agent_device.revoked_at IS NOT NULL AS agent_unbound").
 		Join("JOIN conversations AS cv ON cv.id = ac.conversation_id AND cv.organization_id = ac.organization_id").
 		Join("JOIN chat_subjects AS user_cs ON user_cs.organization_id = ac.organization_id AND user_cs.kind = ? AND user_cs.source_id = ac.user_identity_id", domain.ChatSubjectKindOrganizationIdentity).
 		Join("JOIN conversation_participants AS mine ON mine.organization_id = ac.organization_id AND mine.conversation_id = ac.conversation_id AND mine.subject_id = user_cs.id AND mine.left_at IS NULL").
 		Join("JOIN chat_subjects AS agent_cs ON agent_cs.organization_id = ac.organization_id AND agent_cs.kind = ? AND agent_cs.source_id = ac.agent_identity_id", domain.ChatSubjectKindOrganizationIdentity).
 		Join("JOIN conversation_participants AS peer ON peer.organization_id = ac.organization_id AND peer.conversation_id = ac.conversation_id AND peer.subject_id = agent_cs.id AND peer.left_at IS NULL").
 		Join("JOIN agents AS agent ON agent.organization_id = ac.organization_id AND agent.identity_id = ac.agent_identity_id").
+		Join("LEFT JOIN devices AS agent_device ON agent_device.organization_id = agent.organization_id AND agent_device.id = agent.device_id").
 		Where("ac.organization_id = ? AND ac.conversation_id = ? AND ac.user_identity_id = ?", identity.Organization.ID, conversationID, identity.OrganizationIdentity.ID).
 		Where("cv.type = ? AND cv.status = ? AND agent.status = ?", domain.ConversationTypeAgent, domain.ConversationStatusActive, domain.UserStatusActive).Scan(ctx, &row)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -222,6 +225,13 @@ func lockAgentSendContext(ctx context.Context, tx bun.Tx, identity *servermodels
 	}
 	if err != nil {
 		return row, fmt.Errorf("load AI conversation send context: %w", err)
+	}
+	// 未绑定电脑优先于暂停，与助理在线状态的优先级一致。
+	if row.AgentUnbound {
+		return row, &ConflictError{Reason: ConflictReasonAssistantUnbound}
+	}
+	if row.AgentPaused {
+		return row, &ConflictError{Reason: ConflictReasonAssistantPaused}
 	}
 	row.Conversation = member.Conversation
 	row.AgentInputKind = domain.AgentInputKindAgentDirect

@@ -198,7 +198,7 @@ func TestGroupOwnerTransferAndLeave(t *testing.T) {
 		t.Fatal(err)
 	}
 	mention := f.send(t, f.owner, "解散前待查看提及", true)
-	if err := conversationaction.NewLeaveGroupConversationAction(f.db).Execute(ctx, f.owner, f.groupID); err != nil {
+	if err := conversationaction.NewLeaveGroupConversationAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, f.groupID); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := conversationaction.NewDissolveGroupConversationAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.member, f.groupID); err != nil {

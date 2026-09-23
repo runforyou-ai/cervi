@@ -8,7 +8,6 @@ import {
   ConversationType,
   MessageType,
   MessageVisibility,
-  OrganizationIdentityType,
   type ConversationMessageReference,
   type CurrentUser,
   type CustomerMessageDelivery,
@@ -34,6 +33,7 @@ import { CustomerDeliveryState } from "./customer-delivery-state"
 import { MessageSendState } from "./message-send-state"
 import type { TimelineDateFormatters } from "./timeline-grouping"
 import { messageMentionNames, type TimelineMessage } from "./timeline-messages"
+import { isAIIdentityType } from "@/lib/identity-type"
 
 /** 消息气泡依赖的会话上下文、投递状态与操作入口。 */
 export type TimelineMessageBubbleContext = {
@@ -236,8 +236,7 @@ export function TimelineMessageBubble(props: TimelineMessageBubbleProps) {
                 imageURL={useCurrentUserAvatar
                   ? currentUser.avatarUrl
                   : message.sender?.avatarUrl}
-                fallback={message.sender?.identityType ===
-                  OrganizationIdentityType.OrganizationIdentityTypeAgent
+                fallback={isAIIdentityType(message.sender?.identityType)
                   ? "agent"
                   : "person"}
                 className={cn(
@@ -373,7 +372,7 @@ function MessageBubbleContent({
         ) : message.attachment ? (
           <ConversationAttachment retryDisabled={retryFailedMessageDisabled} body={message.body} attachment={message.attachment} conversationID={conversationID} messageID={message.persistedMessageID ?? message.id}
             originatedAt={message.originatedAt} timeLabel={formatters.clock.format(date)} timeTitle={formatters.full.format(date)} incoming={incoming} bubbleClassName={bubbleClassName} renderDeliveryState={renderDeliveryState} />
-        ) : message.sender?.identityType === OrganizationIdentityType.OrganizationIdentityTypeAgent ? (
+        ) : isAIIdentityType(message.sender?.identityType) ? (
           <div className="min-w-0">
             <MessageMarkdown
               locale={i18n.language}

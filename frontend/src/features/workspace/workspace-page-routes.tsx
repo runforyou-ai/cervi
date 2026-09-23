@@ -10,6 +10,7 @@ import {
 } from "@/features/agents/agents-module-layout"
 import { MessageChannelFormPage } from "@/features/channels/message-channel-form-page"
 import { MessageChannelListPage } from "@/features/channels/message-channel-list-page"
+import { AssistantFormPage } from "@/features/contacts/assistants/assistant-form-page"
 import { ContactsPage } from "@/features/contacts/contacts-page"
 import { ChatRoute } from "@/features/inbox/chat-route"
 import { InboxRoute } from "@/features/inbox/inbox-route"
@@ -100,6 +101,26 @@ const workspaceRouteDefinitions = [
   {
     path: "/contacts/external",
     element: <ContactsPage scope="external" />,
+  },
+  {
+    path: "/contacts/assistants",
+    element: <ContactsPage scope="assistants" />,
+  },
+  {
+    path: "/contacts/assistants/new",
+    element: (
+      <ContactsPage scope="assistants">
+        <AssistantFormPage mode="create" />
+      </ContactsPage>
+    ),
+  },
+  {
+    path: "/contacts/assistants/:assistantId",
+    element: (
+      <ContactsPage scope="assistants">
+        <AssistantFormPage mode="edit" />
+      </ContactsPage>
+    ),
   },
   {
     path: "/ai-employees",

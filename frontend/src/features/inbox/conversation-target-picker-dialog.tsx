@@ -14,7 +14,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { listAllMemberOptions } from "@/features/inbox/list-all-member-options"
+import { listChatTargets } from "@/features/inbox/list-all-member-options"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 
@@ -33,14 +33,15 @@ export function ConversationTargetPickerDialog({
   const { t } = useTranslation(["inbox", "common"])
   const dialogRef = useRef<HTMLDivElement>(null)
   const { data, loading, error, refresh } = useResource(
-    resourceKeys.memberOptions(),
-    listAllMemberOptions,
+    resourceKeys.chatTargets(),
+    listChatTargets,
     { enabled: open, staleTime: 0 },
   )
   const members = (data ?? []).filter((member) => member.id !== currentIdentityId)
   const candidates = [
     ...members.filter((member) => member.type === OrganizationIdentityType.OrganizationIdentityTypeUser),
     ...members.filter((member) => member.type === OrganizationIdentityType.OrganizationIdentityTypeAgent),
+    ...members.filter((member) => member.type === OrganizationIdentityType.OrganizationIdentityTypeAssistant),
   ]
 
   return (
@@ -105,6 +106,8 @@ export function ConversationTargetPickerDialog({
                   </span>
                   {member.type === OrganizationIdentityType.OrganizationIdentityTypeAgent ? (
                     <span className="shrink-0 text-xs text-muted-foreground">{t("chatPickerAgent")}</span>
+                  ) : member.type === OrganizationIdentityType.OrganizationIdentityTypeAssistant ? (
+                    <span className="shrink-0 text-xs text-muted-foreground">{t("chatPickerAssistant")}</span>
                   ) : null}
                 </button>
               ))}

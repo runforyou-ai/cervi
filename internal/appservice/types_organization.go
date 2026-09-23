@@ -6,8 +6,9 @@ import "github.com/runforyou-ai/cervi/internal/domain"
 type OrganizationIdentityType string
 
 const (
-	OrganizationIdentityTypeUser  OrganizationIdentityType = OrganizationIdentityType(domain.OrganizationIdentityTypeUser)
-	OrganizationIdentityTypeAgent OrganizationIdentityType = OrganizationIdentityType(domain.OrganizationIdentityTypeAgent)
+	OrganizationIdentityTypeUser      OrganizationIdentityType = OrganizationIdentityType(domain.OrganizationIdentityTypeUser)
+	OrganizationIdentityTypeAgent     OrganizationIdentityType = OrganizationIdentityType(domain.OrganizationIdentityTypeAgent)
+	OrganizationIdentityTypeAssistant OrganizationIdentityType = OrganizationIdentityType(domain.OrganizationIdentityTypeAssistant)
 )
 
 // Organization 定义当前企业及其通用设置。
