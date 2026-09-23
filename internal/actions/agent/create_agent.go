@@ -5,14 +5,12 @@ package agent
 
 import (
 	"context"
-	"errors"
 	"fmt"
 	"strings"
 	"uuid"
 
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
-	roleaction "github.com/runforyou-ai/cervi/internal/actions/role"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -45,13 +43,6 @@ func (a *CreateAgentAction) Execute(ctx context.Context, identity *servermodels.
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		role, err := roleaction.ValidateAssignment(ctx, tx, identity.Organization.ID, input.RoleID, domain.OrganizationIdentityTypeAgent)
-		if errors.Is(err, roleaction.ErrAssignmentInvalid) || errors.Is(err, roleaction.ErrAgentAdministrator) {
-			return &common.FieldError{Fields: map[string]common.FieldCode{"roleId": ValidationRoleInvalid}}
-		}
-		if err != nil {
-			return err
-		}
 		teamIDs, teams, err := validateAndLoadTeams(ctx, tx, identity.Organization.ID, input.TeamIDs)
 		if err != nil {
 			return err
@@ -64,7 +55,6 @@ func (a *CreateAgentAction) Execute(ctx context.Context, identity *servermodels.
 		organizationIdentity := &servermodels.OrganizationIdentity{
 			OrganizationID:   identity.Organization.ID,
 			Type:             string(domain.OrganizationIdentityTypeAgent),
-			RoleID:           input.RoleID,
 			DisplayName:      input.DisplayName,
 			HandlesCustomers: input.HandlesCustomers,
 			WorkStatus:       string(domain.WorkStatusWorking),
@@ -78,7 +68,7 @@ func (a *CreateAgentAction) Execute(ctx context.Context, identity *servermodels.
 			organizationIdentity.AvatarFileID = avatarFileID
 		}
 		if _, err := tx.NewInsert().Model(organizationIdentity).
-			Column("organization_id", "type", "role_id", "display_name", "avatar_file_id", "handles_customers", "work_status").
+			Column("organization_id", "type", "display_name", "avatar_file_id", "handles_customers", "work_status").
 			Returning("id, created_at").
 			Exec(ctx); err != nil {
 			return err
@@ -115,7 +105,7 @@ func (a *CreateAgentAction) Execute(ctx context.Context, identity *servermodels.
 				return err
 			}
 		}
-		output = &Agent{ID: agent.ID, IdentityID: organizationIdentity.ID, DisplayName: organizationIdentity.DisplayName, AvatarFileID: organizationIdentity.AvatarFileID, RoleID: role.ID, RoleKind: domain.RoleKind(role.Kind), RoleName: role.Name, HandlesCustomers: organizationIdentity.HandlesCustomers, Status: domain.UserStatus(agent.Status), WorkStatus: domain.WorkStatus(organizationIdentity.WorkStatus), Teams: teams, Execution: execution, CreatedAt: organizationIdentity.CreatedAt}
+		output = &Agent{ID: agent.ID, IdentityID: organizationIdentity.ID, DisplayName: organizationIdentity.DisplayName, AvatarFileID: organizationIdentity.AvatarFileID, HandlesCustomers: organizationIdentity.HandlesCustomers, Status: domain.UserStatus(agent.Status), WorkStatus: domain.WorkStatus(organizationIdentity.WorkStatus), Teams: teams, Execution: execution, CreatedAt: organizationIdentity.CreatedAt}
 		return nil
 	})
 	if err != nil {

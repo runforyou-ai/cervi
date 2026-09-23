@@ -418,7 +418,7 @@ func TestRealtimeIdentityProfileNotifications(t *testing.T) {
 			return err
 		}},
 		{"管理员修改邮箱", func() error {
-			_, err := updateUser.Execute(ctx, f.owner, f.member.User.ID, useraction.UpdateInput{DisplayName: "成员", Email: "renamed@navigation.test", RoleID: f.member.OrganizationIdentity.RoleID})
+			_, err := updateUser.Execute(ctx, f.owner, f.member.User.ID, useraction.UpdateInput{DisplayName: "成员", Email: "renamed@navigation.test", RoleID: f.member.User.RoleID})
 			return err
 		}},
 	} {

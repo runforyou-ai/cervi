@@ -16,7 +16,6 @@ const (
 // CreateAgentInput 定义新增 AI 员工字段，AvatarFileID 为空时不设置头像。
 type CreateAgentInput struct {
 	DisplayName      string              `json:"displayName"`
-	RoleID           string              `json:"roleId"`
 	TeamIDs          []string            `json:"teamIds"`
 	HandlesCustomers bool                `json:"handlesCustomers"`
 	AvatarFileID     string              `json:"avatarFileId"`
@@ -26,7 +25,6 @@ type CreateAgentInput struct {
 // UpdateAgentInput 定义 AI 员工可编辑字段，AvatarFileID 为空时保留当前头像。
 type UpdateAgentInput struct {
 	DisplayName      string     `json:"displayName"`
-	RoleID           string     `json:"roleId"`
 	TeamIDs          []string   `json:"teamIds"`
 	HandlesCustomers bool       `json:"handlesCustomers"`
 	WorkStatus       WorkStatus `json:"workStatus"`
@@ -74,13 +72,18 @@ type AgentListInput struct {
 	PageSize int         `json:"pageSize" query:"pageSize,default=50"`
 }
 
+// AgentBehaviorProfile 定义 AI 员工的内置工作规则与可用工具。
+type AgentBehaviorProfile struct {
+	Instruction string   `json:"instruction"`
+	Tools       []string `json:"tools"`
+}
+
 // Agent 定义 AI 员工信息，Behavior 是该员工当前生效的内置工作规则与可用工具。
 type Agent struct {
 	ID               string               `json:"id"`
 	IdentityID       string               `json:"identityId"`
 	DisplayName      string               `json:"displayName"`
 	AvatarURL        string               `json:"avatarUrl"`
-	Role             RoleSummary          `json:"role"`
 	HandlesCustomers bool                 `json:"handlesCustomers"`
 	Status           UserStatus           `json:"status"`
 	WorkStatus       WorkStatus           `json:"workStatus"`
@@ -96,7 +99,6 @@ type AgentListItem struct {
 	IdentityID  string                `json:"identityId"`
 	DisplayName string                `json:"displayName"`
 	AvatarURL   string                `json:"avatarUrl"`
-	Role        RoleSummary           `json:"role"`
 	Status      UserStatus            `json:"status"`
 	WorkStatus  WorkStatus            `json:"workStatus"`
 	Teams       []TeamSummary         `json:"teams"`

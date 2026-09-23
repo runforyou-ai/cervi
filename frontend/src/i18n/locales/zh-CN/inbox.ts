@@ -181,6 +181,8 @@ const inbox = {
   serviceSessionTakenOver: "{{actor}} 接管了 {{from}} 负责的会话",
   serviceSessionTransferred: "{{actor}} 将会话转交给 {{target}}",
   serviceSessionClosed: "{{actor}} 关闭了会话",
+  serviceSessionClosedAIResolved: "客户确认问题已解决，{{actor}} 关闭了会话",
+  serviceSessionClosedCustomerUnresponsive: "客户未回复，{{actor}} 关闭了会话",
   serviceSessionReopened: "{{actor}} 重新打开了会话",
   serviceSessionReturned: "{{from}} 已无法接待客户，会话退回{{target}}",
   serviceSessionReturnedResponseTimeout: "{{from}} 超时未回复，会话退回{{target}}",

@@ -29,13 +29,11 @@ import { contactResourceKeys } from "@/features/contacts/use-contact-invalidator
 import { useContactSearch } from "@/features/contacts/use-contact-search"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
-import { roleDisplayName } from "@/lib/role-labels"
 import { optionalWailsEnum } from "@/lib/wails-enum"
 
 /** 显示 AI 员工列表并提供配置和状态操作。 */
 export function AgentListPage() {
   const { t } = useTranslation(["agents", "common"])
-  const { t: tCommon } = useTranslation("common")
   const navigate = useNavigate()
   const location = useLocation()
   const { searchParams, setParameters, query, search, setSearch, currentPage } =
@@ -110,7 +108,6 @@ export function AgentListPage() {
                   }}
                   status={agent.workStatus}
                   name={agent.displayName}
-                  secondary={roleDisplayName(agent.role, tCommon)}
                 />
               ),
             },

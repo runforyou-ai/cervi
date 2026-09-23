@@ -19,6 +19,7 @@ import (
 const (
 	askCustomerToolName = "ask_customer"
 	handoffToolName     = "handoff_to_human"
+	resolveToolName     = "resolve_conversation"
 	// correctionLimit 是一次执行尝试内允许纠正无效终止输出或无依据正文的次数。
 	correctionLimit = 1
 	// handoffReasonTextMaxRunes 限制转交原因写入系统事件的长度。
@@ -50,6 +51,15 @@ type handoffInput struct {
 	Reason string `json:"reason"`
 }
 
+type resolveInput struct {
+	Message string `json:"message"`
+}
+
+// isTerminalToolName 判断工具是否为客服场景的终止工具。
+func isTerminalToolName(name string) bool {
+	return name == askCustomerToolName || name == handoffToolName || name == resolveToolName
+}
+
 // terminalIntent 记录一次校验通过的终止工具调用。
 type terminalIntent struct {
 	decision TerminalDecision
@@ -74,15 +84,16 @@ func newTerminalTools() *terminalTools {
 	return &terminalTools{intents: make(map[string]terminalIntent)}
 }
 
-// tools 返回 ask_customer 与 handoff_to_human 两个终止工具。
+// tools 返回 ask_customer、handoff_to_human 与 resolve_conversation 三个终止工具。
 func (t *terminalTools) tools() []tool.BaseTool {
 	return []tool.BaseTool{
 		&terminalTool{info: &schema.ToolInfo{
 			Name: askCustomerToolName,
 			Desc: "向客户发送追问、确认或问候并等待客户回复。message 是发给客户的完整内容。",
 			ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
-				"purpose": {Type: schema.String, Required: true, Desc: "greeting 问候，clarify 请客户补充信息，confirm 请客户确认", Enum: []string{
+				"purpose": {Type: schema.String, Required: true, Desc: "greeting 问候，clarify 请客户补充信息，confirm 请客户确认，confirm_resolution 请客户确认问题是否已解决", Enum: []string{
 					string(domain.AgentAskCustomerPurposeGreeting), string(domain.AgentAskCustomerPurposeClarify), string(domain.AgentAskCustomerPurposeConfirm),
+					string(domain.AgentAskCustomerPurposeConfirmResolution),
 				}},
 				"message": {Type: schema.String, Required: true, Desc: "发给客户的内容"},
 			}),
@@ -94,6 +105,13 @@ func (t *terminalTools) tools() []tool.BaseTool {
 				"reason": {Type: schema.String, Required: true, Desc: "转交原因"},
 			}),
 		}, run: t.handoffToHuman},
+		&terminalTool{info: &schema.ToolInfo{
+			Name: resolveToolName,
+			Desc: "客户确认问题已解决时发送结束语并结束本次服务。message 是发给客户的简短结束语。",
+			ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
+				"message": {Type: schema.String, Required: true, Desc: "发给客户的结束语"},
+			}),
+		}, run: t.resolve},
 	}
 }
 
@@ -105,9 +123,10 @@ func (t *terminalTools) askCustomer(ctx context.Context, arguments string) error
 	}
 	input.Message = strings.TrimSpace(input.Message)
 	switch input.Purpose {
-	case domain.AgentAskCustomerPurposeGreeting, domain.AgentAskCustomerPurposeClarify, domain.AgentAskCustomerPurposeConfirm:
+	case domain.AgentAskCustomerPurposeGreeting, domain.AgentAskCustomerPurposeClarify, domain.AgentAskCustomerPurposeConfirm,
+		domain.AgentAskCustomerPurposeConfirmResolution:
 	default:
-		return errors.New("purpose 只能是 greeting、clarify 或 confirm")
+		return errors.New("purpose 只能是 greeting、clarify、confirm 或 confirm_resolution")
 	}
 	if input.Message == "" {
 		return errors.New("message 不能为空")
@@ -135,6 +154,20 @@ func (t *terminalTools) handoffToHuman(ctx context.Context, arguments string) er
 	return nil
 }
 
+// resolve 校验结束语并登记 resolve 意图。
+func (t *terminalTools) resolve(ctx context.Context, arguments string) error {
+	input := resolveInput{}
+	if err := json.Unmarshal([]byte(arguments), &input); err != nil {
+		return fmt.Errorf("参数不是有效的 JSON：%w", err)
+	}
+	input.Message = strings.TrimSpace(input.Message)
+	if input.Message == "" {
+		return errors.New("message 不能为空")
+	}
+	t.record(ctx, terminalIntent{decision: TerminalDecision{Kind: domain.AgentRunOutcomeResolve}, message: input.Message})
+	return nil
+}
+
 // record 按工具调用编号登记终止意图，并请求本次模型规划在工具结果后直接结束。
 func (t *terminalTools) record(ctx context.Context, intent terminalIntent) {
 	t.mu.Lock()
@@ -158,16 +191,16 @@ func (t *terminalTools) AfterModelRewriteState(ctx context.Context, state *adk.T
 			continue
 		}
 		names = append(names, block.FunctionToolCall.Name)
-		if block.FunctionToolCall.Name == askCustomerToolName || block.FunctionToolCall.Name == handoffToolName {
+		if isTerminalToolName(block.FunctionToolCall.Name) {
 			terminal++
 		}
 	}
 	issue := ""
 	switch {
 	case terminal > 1:
-		issue = "ask_customer 与 handoff_to_human 一次只能调用其中一个"
+		issue = "ask_customer、handoff_to_human 与 resolve_conversation 一次只能调用其中一个"
 	case terminal == 1 && len(names) > 1:
-		issue = "ask_customer 或 handoff_to_human 必须单独调用，不能与其他工具同时调用"
+		issue = "ask_customer、handoff_to_human 或 resolve_conversation 必须单独调用，不能与其他工具同时调用"
 	}
 	t.mu.Lock()
 	t.batchIssue, t.batchSeen = issue, false
@@ -192,7 +225,7 @@ func (t *terminalTools) middleware() compose.ToolMiddleware {
 					return nil, t.reject(ctx, issue)
 				}
 				output, err := next(ctx, input)
-				if err == nil || (input.Name != askCustomerToolName && input.Name != handoffToolName) || ctx.Err() != nil {
+				if err == nil || !isTerminalToolName(input.Name) || ctx.Err() != nil {
 					return output, err
 				}
 				return nil, t.reject(ctx, err.Error())
@@ -209,7 +242,7 @@ func (t *terminalTools) reject(ctx context.Context, issue string) error {
 		t.corrections++
 		t.mu.Unlock()
 		slog.Warn("Agent 终止输出无效，要求模型纠正", "agent_run_id", runIDFromContext(ctx), "issue", issue)
-		return fmt.Errorf("%s。需要客户补充信息或只是问候请单独调用 ask_customer；无法解答请单独调用 handoff_to_human", issue)
+		return fmt.Errorf("%s。需要客户补充信息或只是问候请单独调用 ask_customer；无法解答请单独调用 handoff_to_human；客户确认问题已解决请单独调用 resolve_conversation", issue)
 	}
 	reason := domain.AgentHandoffReasonInvalidOutput
 	if exhausted {

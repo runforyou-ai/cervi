@@ -68,10 +68,10 @@ func (f groupAgentFixture) countMessageMentions(t *testing.T, body string) int {
 }
 
 // testGroupAgentHandoff 验证正文点名、按轮次合并的接力与不设深度上限的接力链。
-func testGroupAgentHandoff(t *testing.T, db *bun.DB, identity *servermodels.Identity, roleID, providerID, modelID string) {
+func testGroupAgentHandoff(t *testing.T, db *bun.DB, identity *servermodels.Identity, providerID, modelID string) {
 	t.Helper()
 	ctx := context.Background()
-	agents := newGroupAgentCollaborators(t, db, identity, roleID, providerID, modelID)
+	agents := newGroupAgentCollaborators(t, db, identity, providerID, modelID)
 
 	t.Run("指令列出可点名成员", func(t *testing.T) {
 		f := newGroupAgentFixture(t, db, identity, agents)

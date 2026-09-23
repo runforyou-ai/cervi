@@ -450,6 +450,11 @@ func (a *ExecuteAction) complete(ctx context.Context, execution executionContext
 				return err
 			}
 		}
+		if deciding, ok := policy.(decisionPolicy); ok {
+			if err := deciding.applyDecision(ctx, tx, policyContext, run, lane, result, messageID); err != nil {
+				return err
+			}
+		}
 		if len(blocks) > 0 {
 			if _, err := tx.NewInsert().Model(&blocks).Exec(ctx); err != nil {
 				return fmt.Errorf("persist agent run blocks: %w", err)

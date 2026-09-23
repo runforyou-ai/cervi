@@ -1284,7 +1284,7 @@ export function UpdateRole(meta: $models.RequestMeta, roleID: string, input: $mo
 }
 
 /**
- * UpdateRoleAssignments 在一个事务中批量调整真人和 AI 员工角色。
+ * UpdateRoleAssignments 在一个事务中批量调整成员角色。
  */
 export function UpdateRoleAssignments(meta: $models.RequestMeta, input: $models.RoleAssignmentsInput): $CancellablePromise<void> {
     return $Call.ByID(2402672415, meta, input);

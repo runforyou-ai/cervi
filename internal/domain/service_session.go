@@ -8,6 +8,18 @@ const (
 	ServiceSessionStatusClosed ServiceSessionStatus = "closed"
 )
 
+// ServiceSessionCloseReason 定义客服处理周期的结束方式。
+type ServiceSessionCloseReason string
+
+const (
+	// ServiceSessionCloseAIResolved 表示客户确认问题已解决后由 AI 负责人关闭。
+	ServiceSessionCloseAIResolved ServiceSessionCloseReason = "ai_resolved"
+	// ServiceSessionCloseCustomerUnresponsive 表示 AI 跟进或请求确认后客户超时未回复而关闭。
+	ServiceSessionCloseCustomerUnresponsive ServiceSessionCloseReason = "customer_unresponsive"
+	// ServiceSessionCloseManual 表示由客服人工关闭。
+	ServiceSessionCloseManual ServiceSessionCloseReason = "manual"
+)
+
 // DefaultMaxServiceSessions 是成员默认的最大接待量。
 const DefaultMaxServiceSessions = 10
 

@@ -9,7 +9,7 @@ import (
 )
 
 // AssignmentRulesVersion 是基线与场景规则的规则版本，基线或场景规则增删时加一；措辞调整只体现在指令哈希上。
-const AssignmentRulesVersion = 2
+const AssignmentRulesVersion = 3
 
 // SceneContext 表示拼接场景规则所需的运行期事实，群聊字段只在群聊场景取值。
 type SceneContext struct {
@@ -96,7 +96,7 @@ func mcpServerNames(capabilities Capabilities) []string {
 
 // builtinToolNames 按注册顺序列出本次运行的内置工具，开发期计算器只在内部场景注册，终止工具只在客服场景注册。
 func builtinToolNames(scene Scene, capabilities Capabilities) []string {
-	names := make([]string, 0, 3)
+	names := make([]string, 0, 4)
 	if scene != SceneCustomer {
 		names = append(names, "calculator")
 	}
@@ -104,7 +104,7 @@ func builtinToolNames(scene Scene, capabilities Capabilities) []string {
 		names = append(names, "search_knowledge")
 	}
 	if scene == SceneCustomer {
-		names = append(names, "ask_customer", "handoff_to_human")
+		names = append(names, "ask_customer", "handoff_to_human", "resolve_conversation")
 	}
 	return names
 }

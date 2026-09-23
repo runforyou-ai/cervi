@@ -727,7 +727,7 @@ func (b *Backend) UpdateUser(ctx context.Context, meta appservice.RequestMeta, u
 	return output, err
 }
 
-// UpdateRoleAssignments 在一个事务中批量调整真人和 AI 员工角色。
+// UpdateRoleAssignments 在一个事务中批量调整成员角色。
 func (b *Backend) UpdateRoleAssignments(ctx context.Context, meta appservice.RequestMeta, input appservice.RoleAssignmentsInput) error {
 	return b.do(ctx, meta, http.MethodPatch, "/roles/assignments", nil, input, nil)
 }

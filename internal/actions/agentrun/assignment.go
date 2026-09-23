@@ -14,7 +14,7 @@ import (
 // BehaviorProfile 返回 AI 员工按当前接待开关适用的内置工作规则与可用工具，供管理界面只读展示。
 func BehaviorProfile(handlesCustomers bool, organizationName string) (string, []string) {
 	if handlesCustomers {
-		return agentruntime.AgentBaseline(handlesCustomers, organizationName, ""), []string{"search_knowledge", "ask_customer", "handoff_to_human", "mcp"}
+		return agentruntime.AgentBaseline(handlesCustomers, organizationName, ""), []string{"search_knowledge", "ask_customer", "handoff_to_human", "resolve_conversation", "mcp"}
 	}
 	return agentruntime.AgentBaseline(handlesCustomers, organizationName, ""), []string{"search_knowledge", "mcp"}
 }

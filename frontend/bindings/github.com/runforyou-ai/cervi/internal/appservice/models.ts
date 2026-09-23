@@ -160,7 +160,6 @@ export interface Agent {
     "identityId": string;
     "displayName": string;
     "avatarUrl": string;
-    "role": RoleSummary;
     "handlesCustomers": boolean;
     "status": UserStatus;
     "workStatus": WorkStatus;
@@ -276,7 +275,6 @@ export interface AgentListItem {
     "identityId": string;
     "displayName": string;
     "avatarUrl": string;
-    "role": RoleSummary;
     "status": UserStatus;
     "workStatus": WorkStatus;
     "teams": TeamSummary[] | null;
@@ -386,6 +384,7 @@ export enum AgentRunOutcome {
     AgentRunOutcomeReply = "reply",
     AgentRunOutcomeAskCustomer = "ask_customer",
     AgentRunOutcomeHandoff = "handoff",
+    AgentRunOutcomeResolve = "resolve",
 };
 
 /**
@@ -1042,7 +1041,7 @@ export interface ConversationSystemEvent {
     "title": string | null;
 
     /**
-     * 以下字段只由客服处理周期事件携带：原负责人、去向，以及转人工或退回队列的原因与成员可见的原因说明；操作人写入 Actor。
+     * 以下字段只由客服处理周期事件携带：原负责人、去向，转人工或退回队列的原因与成员可见的原因说明，以及关闭事件的结束方式；操作人写入 Actor。
      */
     "serviceSessionId": string | null;
     "fromIdentityId": string | null;
@@ -1050,6 +1049,7 @@ export interface ConversationSystemEvent {
     "sessionTarget": ServiceSessionTarget | null;
     "handoffReason": AgentHandoffReason | null;
     "returnReason": ServiceSessionReturnReason | null;
+    "closeReason": ServiceSessionCloseReason | null;
     "reasonText": string | null;
     "agentRunId": string | null;
 }
@@ -1146,7 +1146,6 @@ export interface ConversationWindowInput {
  */
 export interface CreateAgentInput {
     "displayName": string;
-    "roleId": string;
     "teamIds": string[] | null;
     "handlesCustomers": boolean;
     "avatarFileId": string;
@@ -2844,20 +2843,6 @@ export interface PendingConversationMentions {
 }
 
 /**
- * PermissionAppliesTo 表示权限适用的企业身份类型。
- */
-export enum PermissionAppliesTo {
-    /**
-     * The Go zero value for the underlying type of the enum.
-     */
-    $zero = "",
-
-    PermissionAppliesToMember = "member",
-    PermissionAppliesToAgent = "agent",
-    PermissionAppliesToBoth = "both",
-};
-
-/**
  * PermissionCode 表示一项预定义权限。
  */
 export enum PermissionCode {
@@ -2885,7 +2870,6 @@ export interface PermissionDefinition {
     "code": PermissionCode;
     "resource": PermissionResource;
     "level": PermissionLevel;
-    "appliesTo": PermissionAppliesTo;
 }
 
 /**
@@ -2964,7 +2948,7 @@ export interface Role {
 }
 
 /**
- * RoleAssignmentInput 定义一个企业身份的目标角色。
+ * RoleAssignmentInput 定义一个成员的目标角色。
  */
 export interface RoleAssignmentInput {
     "identityId": string;
@@ -3046,6 +3030,20 @@ export interface ServiceQueueTeamList {
 }
 
 /**
+ * ServiceSessionCloseReason 表示客服处理周期的结束方式。
+ */
+export enum ServiceSessionCloseReason {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    ServiceSessionCloseAIResolved = "ai_resolved",
+    ServiceSessionCloseCustomerUnresponsive = "customer_unresponsive",
+    ServiceSessionCloseManual = "manual",
+};
+
+/**
  * ServiceSessionReturnReason 表示客服处理周期退回队列的原因。
  */
 export enum ServiceSessionReturnReason {
@@ -3097,12 +3095,14 @@ export enum ServiceSessionTargetKind {
 };
 
 /**
- * ServiceTimeouts 定义企业客服的超时时长，单位为分钟：负责人未回复的提醒与回收时长，以及队列等待提醒时长。
+ * ServiceTimeouts 定义企业客服的超时时长，单位为分钟：负责人未回复的提醒与回收时长、队列等待提醒时长，以及 AI 负责时客户未回复的跟进与关单时长。
  */
 export interface ServiceTimeouts {
     "responseReminderMinutes": number;
     "responseReclaimMinutes": number;
     "queueReminderMinutes": number;
+    "aiFollowUpMinutes": number;
+    "aiCloseMinutes": number;
 }
 
 /**
@@ -3351,7 +3351,6 @@ export interface UpdateAgentExecutionInput {
  */
 export interface UpdateAgentInput {
     "displayName": string;
-    "roleId": string;
     "teamIds": string[] | null;
     "handlesCustomers": boolean;
     "workStatus": WorkStatus;

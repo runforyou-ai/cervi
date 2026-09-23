@@ -21,10 +21,10 @@ import (
 )
 
 // testAgentCustomerReplies 验证客服上下文按周期隔离，并保留窗口外和跨周期的一层引用。
-func testAgentCustomerReplies(t *testing.T, db *bun.DB, identity *servermodels.Identity, roleID, providerID, modelID string) {
+func testAgentCustomerReplies(t *testing.T, db *bun.DB, identity *servermodels.Identity, providerID, modelID string) {
 	ctx := context.Background()
 	created, err := agentaction.NewCreateAgentAction(db).Execute(ctx, identity, agentaction.CreateInput{
-		HandlesCustomers: true, DisplayName: "客服引用助手", RoleID: roleID,
+		HandlesCustomers: true, DisplayName: "客服引用助手",
 		Execution: agentaction.ExecutionInput{Mode: domain.AgentExecutionModeManaged, Managed: &agentaction.ManagedExecutionInput{ProviderID: providerID, ModelIdentifier: modelID, SystemInstruction: "结合引用回答"}},
 	})
 	if err != nil {

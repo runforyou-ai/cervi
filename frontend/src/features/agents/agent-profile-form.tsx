@@ -8,12 +8,10 @@ import { toast } from "sonner"
 
 import {
   FilePurpose,
-  RoleKind,
   UserStatus,
   isApiError,
   updateAgent,
   type AgentData,
-  type RoleData,
   type Team,
 } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
@@ -25,7 +23,6 @@ import {
   selectableWorkStatuses,
   workStatusLabel,
 } from "@/components/work-status"
-import { RoleSelectField } from "@/features/contacts/role-select-field"
 import { TeamSelectField } from "@/features/contacts/team-select-field"
 import {
   createAgentProfileSchema,
@@ -37,15 +34,13 @@ import { apiErrorMessage } from "@/lib/form-errors"
 import { useAutoSave } from "@/hooks/use-auto-save"
 import { recoverSession } from "@/lib/session-navigation"
 
-/** 单独保存 AI 员工头像、名称、角色、工作状态和所属团队。 */
+/** 单独保存 AI 员工头像、名称、工作状态和所属团队。 */
 export function AgentProfileForm({
   agent,
-  roles,
   teams,
   onSaved,
 }: {
   agent: AgentData
-  roles: RoleData[]
   teams: Team[]
   onSaved: () => void
 }) {
@@ -57,7 +52,6 @@ export function AgentProfileForm({
       createAgentProfileSchema({
         nameRequired: t("validation.nameRequired"),
         nameInvalid: t("validation.nameInvalid"),
-        roleRequired: t("contacts:members.validation.roleRequired"),
       }),
     [t],
   )
@@ -67,7 +61,6 @@ export function AgentProfileForm({
     mode: "onBlur",
     defaultValues: {
       displayName: agent.displayName,
-      roleId: agent.role.id,
       workStatus: agent.workStatus,
       teamIds: agent.teams.map((team) => team.id),
       handlesCustomers: agent.handlesCustomers,
@@ -89,7 +82,6 @@ export function AgentProfileForm({
     if (dirty.current) return
     form.reset({
       displayName: agent.displayName,
-      roleId: agent.role.id,
       workStatus: agent.workStatus,
       teamIds: agent.teams.map((team) => team.id),
       handlesCustomers: agent.handlesCustomers,
@@ -123,7 +115,6 @@ export function AgentProfileForm({
         isApiError(error)
           ? apiErrorMessage(error, [
               "displayName",
-              "roleId",
               "workStatus",
               "teamIds",
               "handlesCustomers",
@@ -154,22 +145,6 @@ export function AgentProfileForm({
           control={form.control}
           label={t("form.name")}
           disabled={form.formState.isSubmitting}
-        />
-        <Controller
-          name="roleId"
-          control={form.control}
-          render={({ field, fieldState }) => (
-            <RoleSelectField
-              {...field}
-              id="agent-profile-role"
-              required
-              aria-invalid={fieldState.invalid}
-              disabled={form.formState.isSubmitting}
-              roles={roles.filter(
-                (role) => role.kind !== RoleKind.RoleKindAdmin,
-              )}
-            />
-          )}
         />
         <Controller
           name="teamIds"

@@ -77,19 +77,19 @@ func Create(ctx context.Context, tx bun.Tx, input CreateInput) (*servermodels.Id
 	organizationIdentity := &servermodels.OrganizationIdentity{
 		OrganizationID:   organization.ID,
 		Type:             string(domain.OrganizationIdentityTypeUser),
-		RoleID:           adminRoleID,
 		DisplayName:      input.AdminDisplayName,
 		HandlesCustomers: true,
 		WorkStatus:       string(domain.WorkStatusWorking),
 	}
 	if _, err := tx.NewInsert().Model(organizationIdentity).
-		Column("organization_id", "type", "role_id", "display_name", "handles_customers", "work_status").
+		Column("organization_id", "type", "display_name", "handles_customers", "work_status").
 		Returning("id, work_status, work_status_updated_at").Exec(ctx); err != nil {
 		return nil, err
 	}
 	user := &servermodels.User{
 		IdentityID:     organizationIdentity.ID,
 		OrganizationID: organization.ID,
+		RoleID:         adminRoleID,
 		Email:          input.AdminEmail,
 		PasswordHash:   input.AdminPasswordHash,
 		Status:         string(domain.UserStatusActive),
@@ -98,7 +98,7 @@ func Create(ctx context.Context, tx bun.Tx, input CreateInput) (*servermodels.Id
 	}
 	if _, err := tx.NewInsert().
 		Model(user).
-		Column("identity_id", "organization_id", "email", "password_hash", "status", "locale", "time_zone").
+		Column("identity_id", "organization_id", "role_id", "email", "password_hash", "status", "locale", "time_zone").
 		Returning("id, message_notifications_enabled").
 		Exec(ctx); err != nil {
 		return nil, err

@@ -58,12 +58,8 @@ func newKnowledgeAgent(t *testing.T, db *bun.DB, identity *servermodels.Identity
 	if err != nil {
 		t.Fatal(err)
 	}
-	var roleID string
-	if err := db.NewSelect().Table("roles").Column("id").Where("organization_id = ? AND kind = ?", identity.Organization.ID, domain.RoleKindCustomerService).Scan(ctx, &roleID); err != nil {
-		t.Fatal(err)
-	}
 	agent, err := agentaction.NewCreateAgentAction(db).Execute(ctx, identity, agentaction.CreateInput{
-		HandlesCustomers: true, DisplayName: "资料助手", RoleID: roleID,
+		HandlesCustomers: true, DisplayName: "资料助手",
 		Execution: agentaction.ExecutionInput{Mode: domain.AgentExecutionModeManaged, Managed: &agentaction.ManagedExecutionInput{
 			ProviderID: provider.ID, ModelIdentifier: "chat", SystemInstruction: "依据知识库回答", KnowledgeBaseIDs: knowledgeBaseIDs,
 		}},
