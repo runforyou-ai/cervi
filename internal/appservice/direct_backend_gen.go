@@ -1820,6 +1820,36 @@ func (b *DirectBackend) DeleteServiceCategory(ctx context.Context, meta RequestM
 	return b.ops.DeleteServiceCategory(ctx, meta, identity, categoryID)
 }
 
+// GetAIPerformanceReport 返回当前企业指定范围内的 AI 客服表现概览。
+func (b *DirectBackend) GetAIPerformanceReport(ctx context.Context, meta RequestMeta, input AIPerformanceReportInput) (AIPerformanceReport, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero AIPerformanceReport
+		return zero, err
+	}
+	return b.ops.GetAIPerformanceReport(ctx, meta, identity, input)
+}
+
+// ListAIPerformanceBreakdowns 返回按渠道或咨询分类拆分的一页 AI 客服表现。
+func (b *DirectBackend) ListAIPerformanceBreakdowns(ctx context.Context, meta RequestMeta, input AIPerformanceBreakdownInput) (AIPerformanceBreakdownList, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero AIPerformanceBreakdownList
+		return zero, err
+	}
+	return b.ops.ListAIPerformanceBreakdowns(ctx, meta, identity, input)
+}
+
+// ListAIKnowledgeGaps 返回一页因知识不足或缺少依据的转人工。
+func (b *DirectBackend) ListAIKnowledgeGaps(ctx context.Context, meta RequestMeta, input AIKnowledgeGapInput) (AIKnowledgeGapList, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero AIKnowledgeGapList
+		return zero, err
+	}
+	return b.ops.ListAIKnowledgeGaps(ctx, meta, identity, input)
+}
+
 // RegisterDevice 注册当前用户的本机设备。
 func (b *DirectBackend) RegisterDevice(ctx context.Context, meta RequestMeta, input DeviceRegistrationInput) (Device, error) {
 	identity, err := b.ops.authenticate(ctx, meta)

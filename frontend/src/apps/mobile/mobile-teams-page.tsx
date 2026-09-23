@@ -1,9 +1,10 @@
 /** 移动端团队列表与团队成员的只读浏览。 */
 import { ChevronRightIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { Link, useParams } from "react-router"
+import { Link, useNavigate, useParams } from "react-router"
 
-import { listTeamMembers, listTeams, OrganizationIdentityType } from "@/api"
+import type { MobileAgentLocationState } from "@/apps/mobile/mobile-agent-chat-page"
+import { getTeam, listTeamMembers, listTeams, OrganizationIdentityType } from "@/api"
 import { useMobileNavigation } from "@/apps/mobile/mobile-navigation"
 import { MobilePageHeader, MobileSearchBar } from "@/apps/mobile/mobile-page"
 import { MobilePagedList } from "@/apps/mobile/mobile-paged-list"
@@ -14,57 +15,88 @@ import { useDateTime } from "@/hooks/use-date-time"
 import { useResource } from "@/hooks/use-resource"
 import { useListSearchParams } from "@/hooks/use-list-search-params"
 
-const teamListQuery = { query: "", page: 1, pageSize: 50 }
-
-/** 展示企业团队及其成员人数，点击进入成员名单。 */
+/** 防抖同步团队名称搜索，展示企业团队及其成员人数，点击进入成员名单。 */
 export function MobileTeamsPage() {
-  const { t } = useTranslation("mobile")
+  const { t } = useTranslation(["mobile", "contacts"])
+  const { listPageCounts, scrollPositions } = useMobileNavigation()
+  // 检索词变化时重置目标查询的加载进度和滚动位置。
+  const { query: queryText, search, setSearch } = useListSearchParams({
+    onQueryChange: (query) => {
+      const storageKey = `teams:${query}`
+      listPageCounts.delete(storageKey)
+      scrollPositions.delete(storageKey)
+    },
+  })
   return (
     <section className="flex h-full min-h-0 flex-col">
-      <MobilePageHeader title={t("contacts.teams")} backTo="/contacts" />
-      <MobilePagedList
-        storageKey="teams"
-        labels={{
-          loadError: t("teams.loadError"),
-          loadMoreError: t("contacts.loadMoreError"),
-          empty: t("teams.empty"),
-          allLoaded: t("teams.allLoaded"),
-        }}
-        source={(page) => {
-          const query = { ...teamListQuery, page }
-          return {
-            key: resourceKeys.teams(query),
-            load: (signal) => listTeams(query, signal),
-          }
-        }}
-        select={(data) => ({ items: data.teams, page: data.page })}
-      >
-        {(teams) => (
-          <ul className="divide-y border-b">
-            {teams.map((team) => (
-              <li key={team.id}>
-                <Link
-                  to={`/contacts/teams/${team.id}`}
-                  state={{ mobileBack: true }}
-                  className="flex min-h-18 items-center gap-3 px-4 py-3 outline-none active:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-                >
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[15px] font-medium">
-                      {team.name}
-                    </span>
-                    <span className="block truncate text-xs text-muted-foreground">
-                      {team.description ||
-                        t("teams.memberCount", { count: team.memberCount })}
-                    </span>
-                  </span>
-                  <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground" />
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
-      </MobilePagedList>
+      <MobilePageHeader title={t("contacts:scopes.teams")} backTo="/contacts" />
+      <MobileSearchBar
+        label={t("contacts:search.teams")}
+        value={search}
+        onChange={setSearch}
+      />
+      <MobileTeamList
+        key={`teams:${queryText.trim()}`}
+        queryText={queryText.trim()}
+        searching={search !== queryText}
+      />
     </section>
+  )
+}
+
+/** 逐页读取团队，行内展示名称和描述或成员人数。 */
+function MobileTeamList({
+  queryText,
+  searching,
+}: {
+  queryText: string
+  searching: boolean
+}) {
+  const { t } = useTranslation(["mobile", "contacts"])
+  return (
+    <MobilePagedList
+      storageKey={`teams:${queryText}`}
+      searching={searching}
+      labels={{
+        loadError: t("teams.loadError"),
+        loadMoreError: t("contacts.loadMoreError"),
+        empty: queryText ? t("contacts:teams.emptyFiltered") : t("teams.empty"),
+        allLoaded: t("teams.allLoaded"),
+      }}
+      source={(page) => {
+        const query = { query: queryText, page, pageSize: 50 }
+        return {
+          key: resourceKeys.teams(query),
+          load: (signal) => listTeams(query, signal),
+        }
+      }}
+      select={(data) => ({ items: data.teams, page: data.page })}
+    >
+      {(teams) => (
+        <ul className="divide-y border-b">
+          {teams.map((team) => (
+            <li key={team.id}>
+              <Link
+                to={`/contacts/teams/${team.id}`}
+                state={{ mobileBack: true }}
+                className="flex min-h-18 items-center gap-3 px-4 py-3 outline-none active:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
+              >
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[15px] font-medium">
+                    {team.name}
+                  </span>
+                  <span className="block truncate text-xs text-muted-foreground">
+                    {team.description ||
+                      t("teams.memberCount", { count: team.memberCount })}
+                  </span>
+                </span>
+                <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground" />
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </MobilePagedList>
   )
 }
 
@@ -81,16 +113,13 @@ export function MobileTeamMembersPage() {
       scrollPositions.delete(storageKey)
     },
   })
-  // 团队名称复用团队列表的同一份缓存，读不到时回到通用标题。
-  const { data: teams } = useResource(resourceKeys.teams(teamListQuery), (signal) =>
-    listTeams(teamListQuery, signal),
-  )
-  const teamName = teams?.teams.find((team) => team.id === teamID)?.name
+  // 读不到团队名称时回到通用标题。
+  const { data: team } = useResource(resourceKeys.team(teamID), () => getTeam(teamID))
 
   return (
     <section className="flex h-full min-h-0 flex-col">
       <MobilePageHeader
-        title={teamName ?? t("contacts.teams")}
+        title={team?.name ?? t("contacts:scopes.teams")}
         backTo="/contacts/teams"
       />
       <MobileSearchBar
@@ -119,7 +148,10 @@ function MobileTeamMemberList({
   searching: boolean
 }) {
   const { t } = useTranslation("mobile")
+  const navigate = useNavigate()
   const { formatDateTime } = useDateTime()
+  const rowClassName =
+    "flex min-h-18 items-center gap-3 px-4 py-3 outline-none active:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
   return (
     <MobilePagedList
       storageKey={`team:${teamID}:${queryText}`}
@@ -144,36 +176,55 @@ function MobileTeamMemberList({
           {members.map((member) => {
             const agent =
               member.identityType === OrganizationIdentityType.OrganizationIdentityTypeAgent
-            const target = agent
-              ? `/contacts/ai-employees/${member.agentId}/chat`
-              : `/contacts/employees/${member.userId}`
-            return (
-              <li key={member.identityId}>
-                <Link
-                  to={target}
-                  state={{ mobileBack: true }}
-                  className="flex min-h-18 items-center gap-3 px-4 py-3 outline-none active:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-                >
-                  <ProfileAvatar
-                    name={member.displayName}
-                    imageURL={member.avatarUrl}
-                    fallback={agent ? "agent" : "person"}
-                  />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-[15px] font-medium">
-                      {member.displayName}
-                    </span>
-                    <span className="mt-0.5 flex items-center gap-2">
-                      <WorkStatusBadge status={member.workStatus} />
-                      <span className="truncate text-xs text-muted-foreground">
-                        {t("teams.joinedAt", {
-                          time: formatDateTime(member.joinedAt),
-                        })}
-                      </span>
+            const content = (
+              <>
+                <ProfileAvatar
+                  name={member.displayName}
+                  imageURL={member.avatarUrl}
+                  fallback={agent ? "agent" : "person"}
+                />
+                <span className="min-w-0 flex-1">
+                  <span className="block truncate text-[15px] font-medium">
+                    {member.displayName}
+                  </span>
+                  <span className="mt-0.5 flex items-center gap-2">
+                    <WorkStatusBadge status={member.workStatus} />
+                    <span className="truncate text-xs text-muted-foreground">
+                      {t("teams.joinedAt", {
+                        time: formatDateTime(member.joinedAt),
+                      })}
                     </span>
                   </span>
-                  <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground" />
-                </Link>
+                </span>
+                <ChevronRightIcon className="size-4 shrink-0 text-muted-foreground" />
+              </>
+            )
+            return (
+              <li key={member.identityId}>
+                {agent ? (
+                  <button
+                    type="button"
+                    className={`w-full text-left ${rowClassName}`}
+                    onClick={() =>
+                      void navigate(`/chats/agent/${crypto.randomUUID()}`, {
+                        state: {
+                          draftAgentID: member.agentId,
+                          mobileBack: true,
+                        } satisfies MobileAgentLocationState,
+                      })
+                    }
+                  >
+                    {content}
+                  </button>
+                ) : (
+                  <Link
+                    to={`/contacts/employees/${member.userId}`}
+                    state={{ mobileBack: true }}
+                    className={rowClassName}
+                  >
+                    {content}
+                  </Link>
+                )}
               </li>
             )
           })}

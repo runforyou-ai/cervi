@@ -320,6 +320,7 @@
   "error.service_category_delete_failed": "Could not delete the inquiry category.",
   "error.service_category_not_found": "This inquiry category could not be found.",
   "error.service_category_limit_reached": "You can have up to 100 inquiry categories.",
+  "error.ai_performance_report_load_failed": "Could not load the AI performance report.",
   "error.server_url_invalid": "Enter a valid company server address.",
   "error.server_unavailable": "Could not connect to the Cervi company server.",
   "error.server_connection_save_failed": "Could not save the company server address.",

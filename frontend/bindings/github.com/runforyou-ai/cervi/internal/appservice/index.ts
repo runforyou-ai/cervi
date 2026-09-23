@@ -9,6 +9,7 @@ export {
 export {
     AIModelInputModality,
     AIModelType,
+    AIPerformanceDimension,
     AIProviderBrand,
     AIProviderCredentialType,
     AgentExecutionMode,
@@ -74,6 +75,16 @@ export {
 } from "./models.js";
 
 export type {
+    AIHandoffReasonCount,
+    AIKnowledgeGap,
+    AIKnowledgeGapInput,
+    AIKnowledgeGapList,
+    AIPerformanceBreakdown,
+    AIPerformanceBreakdownInput,
+    AIPerformanceBreakdownList,
+    AIPerformanceReport,
+    AIPerformanceReportInput,
+    AIPerformanceSummary,
     AIProvider,
     AIProviderConnectionInput,
     AIProviderInput,

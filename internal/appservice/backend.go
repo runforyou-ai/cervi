@@ -574,6 +574,15 @@ type Backend interface {
 	// DeleteServiceCategory 删除咨询分类，历史记录保留分类名称。
 	//cervi:route DELETE /settings/customer-service/categories/:categoryID
 	DeleteServiceCategory(context.Context, RequestMeta, string) error
+	// GetAIPerformanceReport 返回当前企业指定范围内的 AI 客服表现概览。
+	//cervi:route GET /reports/ai-performance
+	GetAIPerformanceReport(context.Context, RequestMeta, AIPerformanceReportInput) (AIPerformanceReport, error)
+	// ListAIPerformanceBreakdowns 返回按渠道或咨询分类拆分的一页 AI 客服表现。
+	//cervi:route GET /reports/ai-performance/breakdowns
+	ListAIPerformanceBreakdowns(context.Context, RequestMeta, AIPerformanceBreakdownInput) (AIPerformanceBreakdownList, error)
+	// ListAIKnowledgeGaps 返回一页因知识不足或缺少依据的转人工。
+	//cervi:route GET /reports/ai-performance/knowledge-gaps
+	ListAIKnowledgeGaps(context.Context, RequestMeta, AIKnowledgeGapInput) (AIKnowledgeGapList, error)
 
 	// RegisterDevice 注册当前用户的本机设备。
 	//cervi:route POST /devices
