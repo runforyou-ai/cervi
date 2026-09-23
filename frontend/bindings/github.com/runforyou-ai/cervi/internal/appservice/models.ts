@@ -23,6 +23,24 @@ export interface AIKnowledgeGap {
 }
 
 /**
+ * AIKnowledgeGapInput 定义知识缺口清单的统计范围与分页。
+ */
+export interface AIKnowledgeGapInput {
+    "days": number;
+    "channelId": string;
+    "page": number;
+    "pageSize": number;
+}
+
+/**
+ * AIKnowledgeGapList 定义一页知识缺口，按转人工时间倒序排列。
+ */
+export interface AIKnowledgeGapList {
+    "gaps": AIKnowledgeGap[] | null;
+    "page": PageInfo;
+}
+
+/**
  * AIModelInputModality 表示模型支持的输入模态。
  */
 export enum AIModelInputModality {
@@ -63,14 +81,43 @@ export interface AIPerformanceBreakdown {
 }
 
 /**
- * AIPerformanceReport 定义 AI 表现报表；KnowledgeGaps 按时间倒序只含最近的部分，KnowledgeGapTotal 为范围内总数。
+ * AIPerformanceBreakdownInput 定义按维度拆分的统计范围与分页。
+ */
+export interface AIPerformanceBreakdownInput {
+    "days": number;
+    "channelId": string;
+    "dimension": AIPerformanceDimension;
+    "page": number;
+    "pageSize": number;
+}
+
+/**
+ * AIPerformanceBreakdownList 定义一页拆分结果。
+ */
+export interface AIPerformanceBreakdownList {
+    "rows": AIPerformanceBreakdown[] | null;
+    "page": PageInfo;
+}
+
+/**
+ * AIPerformanceDimension 定义 AI 表现报表的拆分维度。
+ */
+export enum AIPerformanceDimension {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    AIPerformanceDimensionChannel = "channel",
+    AIPerformanceDimensionCategory = "category",
+};
+
+/**
+ * AIPerformanceReport 定义 AI 表现报表概览：整体计数、转人工原因分布与知识缺口总数。
  */
 export interface AIPerformanceReport {
     "summary": AIPerformanceSummary;
-    "channels": AIPerformanceBreakdown[] | null;
-    "categories": AIPerformanceBreakdown[] | null;
     "handoffReasons": AIHandoffReasonCount[] | null;
-    "knowledgeGaps": AIKnowledgeGap[] | null;
     "knowledgeGapTotal": number;
 }
 

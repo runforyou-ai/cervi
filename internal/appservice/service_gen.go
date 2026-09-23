@@ -914,9 +914,19 @@ func (s *Service) DeleteServiceCategory(ctx context.Context, meta RequestMeta, c
 	return s.backend.DeleteServiceCategory(ctx, meta, categoryID)
 }
 
-// GetAIPerformanceReport 返回当前企业指定范围内的 AI 客服表现报表。
+// GetAIPerformanceReport 返回当前企业指定范围内的 AI 客服表现概览。
 func (s *Service) GetAIPerformanceReport(ctx context.Context, meta RequestMeta, input AIPerformanceReportInput) (AIPerformanceReport, error) {
 	return withNormalizedSlices(s.backend.GetAIPerformanceReport(ctx, meta, input))
+}
+
+// ListAIPerformanceBreakdowns 返回按渠道或咨询分类拆分的一页 AI 客服表现。
+func (s *Service) ListAIPerformanceBreakdowns(ctx context.Context, meta RequestMeta, input AIPerformanceBreakdownInput) (AIPerformanceBreakdownList, error) {
+	return withNormalizedSlices(s.backend.ListAIPerformanceBreakdowns(ctx, meta, input))
+}
+
+// ListAIKnowledgeGaps 返回一页因知识不足或缺少依据的转人工。
+func (s *Service) ListAIKnowledgeGaps(ctx context.Context, meta RequestMeta, input AIKnowledgeGapInput) (AIKnowledgeGapList, error) {
+	return withNormalizedSlices(s.backend.ListAIKnowledgeGaps(ctx, meta, input))
 }
 
 // RegisterDevice 注册当前用户的本机设备。

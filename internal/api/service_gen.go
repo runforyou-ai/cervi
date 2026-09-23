@@ -198,6 +198,8 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.PUT("/settings/customer-service/categories/:categoryID", s.updateServiceCategory)
 	router.DELETE("/settings/customer-service/categories/:categoryID", s.deleteServiceCategory)
 	router.GET("/reports/ai-performance", s.getAIPerformanceReport)
+	router.GET("/reports/ai-performance/breakdowns", s.listAIPerformanceBreakdowns)
+	router.GET("/reports/ai-performance/knowledge-gaps", s.listAIKnowledgeGaps)
 	router.POST("/devices", s.registerDevice)
 	router.GET("/devices", s.listDevices)
 	router.DELETE("/devices/:deviceID", s.revokeDevice)
@@ -1670,13 +1672,33 @@ func (s *Service) deleteServiceCategory(c *gin.Context) {
 	writeEmpty(c, s.application.DeleteServiceCategory(c.Request.Context(), requestMeta(c), c.Param("categoryID")))
 }
 
-// getAIPerformanceReport 返回当前企业指定范围内的 AI 客服表现报表。
+// getAIPerformanceReport 返回当前企业指定范围内的 AI 客服表现概览。
 func (s *Service) getAIPerformanceReport(c *gin.Context) {
 	input, ok := bindAIPerformanceReportInputQuery(c)
 	if !ok {
 		return
 	}
 	output, err := s.application.GetAIPerformanceReport(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// listAIPerformanceBreakdowns 返回按渠道或咨询分类拆分的一页 AI 客服表现。
+func (s *Service) listAIPerformanceBreakdowns(c *gin.Context) {
+	input, ok := bindAIPerformanceBreakdownInputQuery(c)
+	if !ok {
+		return
+	}
+	output, err := s.application.ListAIPerformanceBreakdowns(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// listAIKnowledgeGaps 返回一页因知识不足或缺少依据的转人工。
+func (s *Service) listAIKnowledgeGaps(c *gin.Context) {
+	input, ok := bindAIKnowledgeGapInputQuery(c)
+	if !ok {
+		return
+	}
+	output, err := s.application.ListAIKnowledgeGaps(c.Request.Context(), requestMeta(c), input)
 	writeResult(c, http.StatusOK, output, err)
 }
 
@@ -1735,6 +1757,51 @@ func (s *Service) setConversationAssistantWorkspace(c *gin.Context) {
 // clearConversationAssistantWorkspace 由主人清除会话中助理的工作区。
 func (s *Service) clearConversationAssistantWorkspace(c *gin.Context) {
 	writeEmpty(c, s.application.ClearConversationAssistantWorkspace(c.Request.Context(), requestMeta(c), c.Param("conversationID"), c.Param("assistantIdentityID")))
+}
+
+// bindAIKnowledgeGapInputQuery 从查询参数解析 appservice.AIKnowledgeGapInput。
+func bindAIKnowledgeGapInputQuery(c *gin.Context) (appservice.AIKnowledgeGapInput, bool) {
+	days, ok := positiveQueryInteger(c, "days", 30)
+	if !ok {
+		return appservice.AIKnowledgeGapInput{}, false
+	}
+	page, ok := positiveQueryInteger(c, "page", 1)
+	if !ok {
+		return appservice.AIKnowledgeGapInput{}, false
+	}
+	pageSize, ok := positiveQueryInteger(c, "pageSize", 50)
+	if !ok {
+		return appservice.AIKnowledgeGapInput{}, false
+	}
+	return appservice.AIKnowledgeGapInput{
+		Days:      days,
+		ChannelID: c.Query("channelId"),
+		Page:      page,
+		PageSize:  pageSize,
+	}, true
+}
+
+// bindAIPerformanceBreakdownInputQuery 从查询参数解析 appservice.AIPerformanceBreakdownInput。
+func bindAIPerformanceBreakdownInputQuery(c *gin.Context) (appservice.AIPerformanceBreakdownInput, bool) {
+	days, ok := positiveQueryInteger(c, "days", 30)
+	if !ok {
+		return appservice.AIPerformanceBreakdownInput{}, false
+	}
+	page, ok := positiveQueryInteger(c, "page", 1)
+	if !ok {
+		return appservice.AIPerformanceBreakdownInput{}, false
+	}
+	pageSize, ok := positiveQueryInteger(c, "pageSize", 50)
+	if !ok {
+		return appservice.AIPerformanceBreakdownInput{}, false
+	}
+	return appservice.AIPerformanceBreakdownInput{
+		Days:      days,
+		ChannelID: c.Query("channelId"),
+		Dimension: appservice.AIPerformanceDimension(c.Query("dimension")),
+		Page:      page,
+		PageSize:  pageSize,
+	}, true
 }
 
 // bindAIPerformanceReportInputQuery 从查询参数解析 appservice.AIPerformanceReportInput。

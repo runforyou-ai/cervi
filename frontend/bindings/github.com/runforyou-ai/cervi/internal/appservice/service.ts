@@ -388,7 +388,7 @@ export function GenerateCustomerReplySuggestions(meta: $models.RequestMeta, conv
 }
 
 /**
- * GetAIPerformanceReport 返回当前企业指定范围内的 AI 客服表现报表。
+ * GetAIPerformanceReport 返回当前企业指定范围内的 AI 客服表现概览。
  */
 export function GetAIPerformanceReport(meta: $models.RequestMeta, input: $models.AIPerformanceReportInput): $CancellablePromise<$models.AIPerformanceReport> {
     return $Call.ByID(3120646064, meta, input);
@@ -609,6 +609,20 @@ export function InstallationStatus(meta: $models.RequestMeta): $CancellablePromi
  */
 export function LeaveGroupConversation(meta: $models.RequestMeta, conversationID: string): $CancellablePromise<void> {
     return $Call.ByID(43150167, meta, conversationID);
+}
+
+/**
+ * ListAIKnowledgeGaps 返回一页因知识不足或缺少依据的转人工。
+ */
+export function ListAIKnowledgeGaps(meta: $models.RequestMeta, input: $models.AIKnowledgeGapInput): $CancellablePromise<$models.AIKnowledgeGapList> {
+    return $Call.ByID(3230590365, meta, input);
+}
+
+/**
+ * ListAIPerformanceBreakdowns 返回按渠道或咨询分类拆分的一页 AI 客服表现。
+ */
+export function ListAIPerformanceBreakdowns(meta: $models.RequestMeta, input: $models.AIPerformanceBreakdownInput): $CancellablePromise<$models.AIPerformanceBreakdownList> {
+    return $Call.ByID(159368614, meta, input);
 }
 
 /**

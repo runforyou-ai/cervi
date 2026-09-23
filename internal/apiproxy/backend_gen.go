@@ -1387,10 +1387,26 @@ func (b *Backend) DeleteServiceCategory(ctx context.Context, meta appservice.Req
 	return b.do(ctx, meta, http.MethodDelete, "/settings/customer-service/categories/"+url.PathEscape(categoryID), nil, nil, nil)
 }
 
-// GetAIPerformanceReport 返回当前企业指定范围内的 AI 客服表现报表。
+// GetAIPerformanceReport 返回当前企业指定范围内的 AI 客服表现概览。
 func (b *Backend) GetAIPerformanceReport(ctx context.Context, meta appservice.RequestMeta, input appservice.AIPerformanceReportInput) (appservice.AIPerformanceReport, error) {
 	var output appservice.AIPerformanceReport
 	err := b.do(ctx, meta, http.MethodGet, "/reports/ai-performance", encodeAIPerformanceReportInputQuery(input), nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// ListAIPerformanceBreakdowns 返回按渠道或咨询分类拆分的一页 AI 客服表现。
+func (b *Backend) ListAIPerformanceBreakdowns(ctx context.Context, meta appservice.RequestMeta, input appservice.AIPerformanceBreakdownInput) (appservice.AIPerformanceBreakdownList, error) {
+	var output appservice.AIPerformanceBreakdownList
+	err := b.do(ctx, meta, http.MethodGet, "/reports/ai-performance/breakdowns", encodeAIPerformanceBreakdownInputQuery(input), nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// ListAIKnowledgeGaps 返回一页因知识不足或缺少依据的转人工。
+func (b *Backend) ListAIKnowledgeGaps(ctx context.Context, meta appservice.RequestMeta, input appservice.AIKnowledgeGapInput) (appservice.AIKnowledgeGapList, error) {
+	var output appservice.AIKnowledgeGapList
+	err := b.do(ctx, meta, http.MethodGet, "/reports/ai-performance/knowledge-gaps", encodeAIKnowledgeGapInputQuery(input), nil, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }
@@ -1448,6 +1464,27 @@ func (b *Backend) SetConversationAssistantWorkspace(ctx context.Context, meta ap
 // ClearConversationAssistantWorkspace 由主人清除会话中助理的工作区。
 func (b *Backend) ClearConversationAssistantWorkspace(ctx context.Context, meta appservice.RequestMeta, conversationID string, assistantIdentityID string) error {
 	return b.do(ctx, meta, http.MethodDelete, "/conversations/"+url.PathEscape(conversationID)+"/assistant-workspaces/"+url.PathEscape(assistantIdentityID), nil, nil, nil)
+}
+
+// encodeAIKnowledgeGapInputQuery 将 appservice.AIKnowledgeGapInput 编码为查询参数。
+func encodeAIKnowledgeGapInputQuery(input appservice.AIKnowledgeGapInput) url.Values {
+	query := url.Values{}
+	setPositiveQuery(query, "days", input.Days)
+	setQuery(query, "channelId", input.ChannelID)
+	setPositiveQuery(query, "page", input.Page)
+	setPositiveQuery(query, "pageSize", input.PageSize)
+	return query
+}
+
+// encodeAIPerformanceBreakdownInputQuery 将 appservice.AIPerformanceBreakdownInput 编码为查询参数。
+func encodeAIPerformanceBreakdownInputQuery(input appservice.AIPerformanceBreakdownInput) url.Values {
+	query := url.Values{}
+	setPositiveQuery(query, "days", input.Days)
+	setQuery(query, "channelId", input.ChannelID)
+	setQuery(query, "dimension", string(input.Dimension))
+	setPositiveQuery(query, "page", input.Page)
+	setPositiveQuery(query, "pageSize", input.PageSize)
+	return query
 }
 
 // encodeAIPerformanceReportInputQuery 将 appservice.AIPerformanceReportInput 编码为查询参数。
