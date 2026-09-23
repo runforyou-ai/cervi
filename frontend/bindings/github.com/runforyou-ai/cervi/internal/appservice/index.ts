@@ -73,6 +73,12 @@ export {
 } from "./models.js";
 
 export type {
+    AIHandoffReasonCount,
+    AIKnowledgeGap,
+    AIPerformanceBreakdown,
+    AIPerformanceReport,
+    AIPerformanceReportInput,
+    AIPerformanceSummary,
     AIProvider,
     AIProviderConnectionInput,
     AIProviderInput,

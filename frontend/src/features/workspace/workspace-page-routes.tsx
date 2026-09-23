@@ -4,6 +4,7 @@ import { matchRoutes, useRoutes, type Location, type RouteObject } from "react-r
 
 import { AgentFormPage } from "@/features/agents/agent-form-page"
 import { AgentListPage } from "@/features/agents/agent-list-page"
+import { AIPerformancePage } from "@/features/agents/ai-performance-page"
 import {
   AgentsModuleLayout,
   agentsModulePaths,
@@ -142,6 +143,10 @@ const workspaceRouteDefinitions = [
         <AssistantFormPage mode="edit" />
       </ContactsPage>
     ),
+  },
+  {
+    path: "/ai-performance",
+    element: <AIPerformancePage />,
   },
   {
     path: "/ai-employees",

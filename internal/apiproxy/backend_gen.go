@@ -1371,6 +1371,14 @@ func (b *Backend) DeleteServiceCategory(ctx context.Context, meta appservice.Req
 	return b.do(ctx, meta, http.MethodDelete, "/settings/customer-service/categories/"+url.PathEscape(categoryID), nil, nil, nil)
 }
 
+// GetAIPerformanceReport 返回当前企业指定范围内的 AI 客服表现报表。
+func (b *Backend) GetAIPerformanceReport(ctx context.Context, meta appservice.RequestMeta, input appservice.AIPerformanceReportInput) (appservice.AIPerformanceReport, error) {
+	var output appservice.AIPerformanceReport
+	err := b.do(ctx, meta, http.MethodGet, "/reports/ai-performance", encodeAIPerformanceReportInputQuery(input), nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // RegisterDevice 注册当前用户的本机设备。
 func (b *Backend) RegisterDevice(ctx context.Context, meta appservice.RequestMeta, input appservice.DeviceRegistrationInput) (appservice.Device, error) {
 	var output appservice.Device
@@ -1424,6 +1432,14 @@ func (b *Backend) SetConversationAssistantWorkspace(ctx context.Context, meta ap
 // ClearConversationAssistantWorkspace 由主人清除会话中助理的工作区。
 func (b *Backend) ClearConversationAssistantWorkspace(ctx context.Context, meta appservice.RequestMeta, conversationID string, assistantIdentityID string) error {
 	return b.do(ctx, meta, http.MethodDelete, "/conversations/"+url.PathEscape(conversationID)+"/assistant-workspaces/"+url.PathEscape(assistantIdentityID), nil, nil, nil)
+}
+
+// encodeAIPerformanceReportInputQuery 将 appservice.AIPerformanceReportInput 编码为查询参数。
+func encodeAIPerformanceReportInputQuery(input appservice.AIPerformanceReportInput) url.Values {
+	query := url.Values{}
+	setPositiveQuery(query, "days", input.Days)
+	setQuery(query, "channelId", input.ChannelID)
+	return query
 }
 
 // encodeAgentListInputQuery 将 appservice.AgentListInput 编码为查询参数。

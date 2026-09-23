@@ -229,6 +229,7 @@ const (
 	ErrorServiceCategoryDeleteFailed      Key = "error.service_category_delete_failed"
 	ErrorServiceCategoryNotFound          Key = "error.service_category_not_found"
 	ErrorServiceCategoryLimitReached      Key = "error.service_category_limit_reached"
+	ErrorAIPerformanceReportLoadFailed    Key = "error.ai_performance_report_load_failed"
 	ErrorServerURLInvalid                 Key = "error.server_url_invalid"
 	ErrorServerUnavailable                Key = "error.server_unavailable"
 	ErrorServerConnectionSaveFailed       Key = "error.server_connection_save_failed"
