@@ -28,6 +28,7 @@ const (
 	AgentRunOutcomeReply       AgentRunOutcome = AgentRunOutcome(domain.AgentRunOutcomeReply)
 	AgentRunOutcomeAskCustomer AgentRunOutcome = AgentRunOutcome(domain.AgentRunOutcomeAskCustomer)
 	AgentRunOutcomeHandoff     AgentRunOutcome = AgentRunOutcome(domain.AgentRunOutcomeHandoff)
+	AgentRunOutcomeResolve     AgentRunOutcome = AgentRunOutcome(domain.AgentRunOutcomeResolve)
 )
 
 // AgentHandoffReason 定义 AI 客服转交人工的原因。

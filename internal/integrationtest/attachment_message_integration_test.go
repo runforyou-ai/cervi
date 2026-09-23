@@ -90,7 +90,7 @@ func TestAttachmentMessages(t *testing.T) {
 		if err != nil || downloaded.ID != file.ID {
 			t.Fatalf("download=%+v err=%v", downloaded, err)
 		}
-		itemsPage, _, err := inboxaction.NewLoadInboxQuery(f.db).Execute(ctx, f.member, inboxaction.LoadInput{Scope: domain.InboxScopeAll})
+		itemsPage, _, err := inboxaction.NewLoadInboxQuery(f.db).Execute(ctx, f.member, inboxaction.LoadInput{Scope: domain.InboxScopeChat})
 		items := itemsPage.Conversations
 		if err != nil {
 			t.Fatal(err)
@@ -206,7 +206,7 @@ func TestAttachmentMessageSequence(t *testing.T) {
 	if _, err := query.GetAttachmentFile(ctx, f.member, secondResult.ConversationID, secondResult.Message.ID); err != nil {
 		t.Fatal(err)
 	}
-	itemsPage, _, err := inboxaction.NewLoadInboxQuery(f.db).Execute(ctx, f.member, inboxaction.LoadInput{Scope: domain.InboxScopeAll})
+	itemsPage, _, err := inboxaction.NewLoadInboxQuery(f.db).Execute(ctx, f.member, inboxaction.LoadInput{Scope: domain.InboxScopeChat})
 	if err != nil {
 		t.Fatal(err)
 	}

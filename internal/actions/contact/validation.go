@@ -139,7 +139,6 @@ func normalizeListInput(input ListInput) (ListInput, map[string]ValidationCode) 
 	input.Query = strings.TrimSpace(input.Query)
 	input.Stage = domain.ContactStage(strings.TrimSpace(string(input.Stage)))
 	input.ChannelID = strings.TrimSpace(input.ChannelID)
-	input.ChannelType = domain.ChannelType(strings.TrimSpace(string(input.ChannelType)))
 	input.MethodType = domain.ContactMethodType(strings.TrimSpace(string(input.MethodType)))
 	input.Sort = domain.ContactSort(strings.TrimSpace(string(input.Sort)))
 	var pageValid bool
@@ -157,9 +156,6 @@ func normalizeListInput(input ListInput) (ListInput, map[string]ValidationCode) 
 	}
 	if input.ChannelID != "" && !common.ValidUUID(input.ChannelID) {
 		fields["channelId"] = ValidationQueryInvalid
-	}
-	if input.ChannelType != "" && !domain.SupportedMessageChannelType(input.ChannelType) {
-		fields["channelType"] = ValidationQueryInvalid
 	}
 	if input.Sort == "" {
 		input.Sort = domain.ContactSortCreatedAtDescending

@@ -38,7 +38,7 @@ func TestInboxIndependentConversation(t *testing.T) {
 	}
 	backend := appservice.NewDirectBackend(f.db, domain.DeploymentModeSelfHosted, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil)
 	meta := appservice.RequestMeta{Token: login.Token}
-	inbox, err := backend.LoadInbox(ctx, meta, appservice.LoadInboxInput{Scope: appservice.InboxScopeInternal})
+	inbox, err := backend.LoadInbox(ctx, meta, appservice.LoadInboxInput{Scope: appservice.InboxScopeChat})
 	if err != nil || len(inbox.Conversations) != 50 || !inbox.HasMore || inbox.NextCursor == "" {
 		t.Fatalf("inbox=%+v err=%v", inbox, err)
 	}
@@ -47,7 +47,7 @@ func TestInboxIndependentConversation(t *testing.T) {
 			t.Fatal("oldest group unexpectedly in first page")
 		}
 	}
-	second, err := backend.LoadInbox(ctx, meta, appservice.LoadInboxInput{Scope: appservice.InboxScopeInternal, Cursor: inbox.NextCursor})
+	second, err := backend.LoadInbox(ctx, meta, appservice.LoadInboxInput{Scope: appservice.InboxScopeChat, Cursor: inbox.NextCursor})
 	if err != nil || len(second.Conversations) != 30 || second.HasMore || second.NextCursor != "" || second.Conversations[29].ID != f.groupID {
 		t.Fatalf("second page=%+v err=%v", second, err)
 	}
@@ -58,7 +58,7 @@ func TestInboxIndependentConversation(t *testing.T) {
 	}
 	missing := uuid.NewV7().String()
 	foreign := newNavigationFixture(t)
-	request := appservice.ReadInboxConversationsInput{ConversationIDs: []string{f.groupID, missing, foreign.groupID, f.groupID}, Query: appservice.InboxQuery{Scope: appservice.InboxScopeCustomer}}
+	request := appservice.ReadInboxConversationsInput{ConversationIDs: []string{f.groupID, missing, foreign.groupID, f.groupID}, Query: appservice.InboxQuery{Scope: appservice.InboxScopeAll}}
 	batch, err := backend.ReadInboxConversations(ctx, meta, request)
 	if err != nil || len(batch.Results) != 4 {
 		t.Fatalf("batch=%+v err=%v", batch, err)
@@ -75,6 +75,11 @@ func TestInboxIndependentConversation(t *testing.T) {
 			t.Fatalf("invisible entity leaked=%+v", item)
 		}
 	}
+	// 未指定范围时只核对阅读资格，可读会话一律匹配。
+	readable, err := backend.ReadInboxConversations(ctx, meta, appservice.ReadInboxConversationsInput{ConversationIDs: request.ConversationIDs})
+	if err != nil || readable.Results[0].Availability != appservice.InboxConversationMatching || readable.Results[1].Availability != appservice.InboxConversationUnavailable {
+		t.Fatalf("readable batch=%+v err=%v", readable, err)
+	}
 	// 核验不存在和跨企业会话返回相同错误。
 	for _, id := range []string{missing, foreign.groupID} {
 		_, err := backend.GetInboxConversation(ctx, meta, id)
@@ -86,7 +91,7 @@ func TestInboxIndependentConversation(t *testing.T) {
 	if _, err := conversationaction.NewRemoveGroupConversationMemberAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, conversationaction.GroupConversationMemberInput{ConversationID: f.groupID, MemberIdentityID: f.member.OrganizationIdentity.ID}); err != nil {
 		t.Fatal(err)
 	}
-	request.Query.Scope = appservice.InboxScopeInternal
+	request.Query.Scope = appservice.InboxScopeChat
 	batch, err = backend.ReadInboxConversations(ctx, meta, request)
 	if err != nil || batch.Results[0].Conversation != nil || batch.Results[0].Availability != appservice.InboxConversationUnavailable {
 		t.Fatalf("removed=%+v err=%v", batch, err)
@@ -120,7 +125,7 @@ func TestInboxCustomerDetailSnapshot(t *testing.T) {
 		t.Fatal(err)
 	}
 	query := inboxaction.NewLoadInboxQuery(f.db)
-	mine := inboxaction.LoadInput{Scope: domain.InboxScopeCustomer, CustomerView: domain.CustomerInboxViewMine}
+	mine := inboxaction.LoadInput{Scope: domain.InboxScopeAll, AssigneeFilter: domain.InboxAssigneeFilterIdentity, AssigneeIdentityID: f.owner.OrganizationIdentity.ID}
 	ids := []string{f.conversationID, direct.Conversation.ID}
 	f.db.AddQueryHook(chatQueryHook{})
 	gate := newChatQueryGate(t, false, 1, func(event *bun.QueryEvent) bool {
@@ -151,7 +156,7 @@ func TestInboxCustomerDetailSnapshot(t *testing.T) {
 	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil), newTestTasks(f.db)).Execute(ctx, f.member, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
-	closed := inboxaction.LoadInput{Scope: domain.InboxScopeCustomer, CustomerView: domain.CustomerInboxViewCoworkers, ServiceStatus: domain.ServiceSessionStatusClosed}
+	closed := inboxaction.LoadInput{Scope: domain.InboxScopeAll, AssigneeFilter: domain.InboxAssigneeFilterIdentity, AssigneeIdentityID: f.member.OrganizationIdentity.ID, ServiceStatus: domain.ServiceSessionStatusClosed}
 	current, err = query.ReadByIDs(ctx, f.owner, ids, &closed)
 	if err != nil || !current[0].MatchesQuery || current[0].Conversation.Customer.ServiceSessionStatus != domain.ServiceSessionStatusClosed {
 		t.Fatalf("closed=%+v err=%v", current, err)

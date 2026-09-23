@@ -1,12 +1,20 @@
-/** 当前列表范围的筛选浮层。 */
+/** 收件箱当前页签的筛选浮层。 */
+import type { ReactNode } from "react"
 import { FilterIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
 import {
-  ConversationType,
+  CustomerQueueFilter,
+  InboxAssigneeFilter,
+  InboxPendingKind,
   InboxScope,
+  OrganizationIdentityType,
+  ServiceAudience,
   ServiceSessionStatus,
+  type InboxAssignee,
   type InboxChannel,
+  type InboxQuery,
+  type ServiceQueueTeam,
 } from "@/api"
 import { IconTooltip } from "@/components/icon-tooltip"
 import { Button } from "@/components/ui/button"
@@ -17,43 +25,57 @@ import {
   PopoverTrigger,
 } from "@/components/ui/popover"
 import {
-  inboxKindOptionsForScope,
-  toggleInboxKinds,
+  inboxAssigneeFromParam,
+  inboxAssigneeParam,
+  inboxPendingKindOptions,
+  inboxQueueFromParam,
+  inboxQueueParam,
+  serviceAudienceOptions,
+  type NormalizedInboxQuery,
 } from "@/features/inbox/inbox-query"
 
-type InboxFilterValue = {
-  channelId: string
-  serviceStatus: ServiceSessionStatus
-  kinds: ConversationType[]
-}
-
 /** 判断当前筛选是否偏离默认值。 */
-function inboxFilterApplied(value: InboxFilterValue) {
+function inboxFilterApplied(query: NormalizedInboxQuery) {
   return (
-    value.channelId !== "" ||
-    value.serviceStatus === ServiceSessionStatus.ServiceSessionStatusClosed ||
-    value.kinds.length > 0
+    query.pendingKind !== InboxPendingKind.$zero ||
+    query.channelId !== "" ||
+    query.audience !== ServiceAudience.$zero ||
+    query.serviceStatus === ServiceSessionStatus.ServiceSessionStatusClosed ||
+    inboxAssigneeParam(query) !== ""
   )
 }
 
-/** 按当前范围提供渠道、服务状态或会话类型筛选。 */
+/** 浮层中带标签的一行下拉选择。 */
+function FilterField({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <label className="grid gap-1.5">
+      <span className="text-xs text-muted-foreground">{label}</span>
+      {children}
+    </label>
+  )
+}
+
+/** 按当前页签提供类型、队列、状态、负责人、来源与服务对象筛选；尚未接入的服务对象只展示不可选。 */
 export function InboxFilter({
-  scope,
-  value,
+  query,
   channels,
-  closedStatusDisabled,
+  queueTeams,
+  assignees,
+  currentIdentityId,
   onChange,
 }: {
-  scope: InboxScope
-  value: InboxFilterValue
+  query: NormalizedInboxQuery
   channels: InboxChannel[]
-  /** 「待分配」视图只看未关闭会话，已关闭选项置灰。 */
-  closedStatusDisabled: boolean
-  onChange: (changes: Partial<InboxFilterValue>) => void
+  queueTeams: ServiceQueueTeam[]
+  assignees: InboxAssignee[]
+  currentIdentityId: string
+  onChange: (changes: Partial<InboxQuery>) => void
 }) {
   const { t } = useTranslation("inbox")
-  const applied = inboxFilterApplied(value)
-  const options = inboxKindOptionsForScope(scope)
+  const applied = inboxFilterApplied(query)
+  const pending = query.scope === InboxScope.InboxScopePending
+  const assignee = inboxAssigneeParam(query)
+  const coworkers = assignees.filter((item) => item.identityId !== currentIdentityId)
 
   return (
     <Popover>
@@ -78,74 +100,104 @@ export function InboxFilter({
       </IconTooltip>
       {/* 浮层紧贴触发按钮向右展开，改条件时会话列表大部分保持可见。 */}
       <PopoverContent side="right" align="start" className="grid gap-3">
-        {scope === InboxScope.InboxScopeCustomer ? (
+        {pending ? (
           <>
-            <label className="grid gap-1.5">
-              <span className="text-xs text-muted-foreground">
-                {t("filterChannel")}
-              </span>
+            <FilterField label={t("filterPendingKind")}>
               <NativeSelect
-                value={value.channelId}
+                value={query.pendingKind}
                 onChange={(event) =>
-                  onChange({ channelId: event.target.value })
+                  onChange({ pendingKind: event.target.value as InboxPendingKind })
                 }
               >
-                <option value="">{t("filterAllChannels")}</option>
-                {channels.map((channel) => (
-                  <option key={channel.id} value={channel.id}>
-                    {channel.enabled
-                      ? channel.name
-                      : `${channel.name}（${t("filterChannelDisabled")}）`}
+                <option value="">{t("filterAll")}</option>
+                {inboxPendingKindOptions.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {t(option.label)}
                   </option>
                 ))}
               </NativeSelect>
-            </label>
-            <label className="grid gap-1.5">
-              <span className="text-xs text-muted-foreground">
-                {t("filterServiceStatus")}
-              </span>
+            </FilterField>
+            {query.pendingKind === InboxPendingKind.InboxPendingKindQueue ? (
+              <FilterField label={t("filterQueue")}>
+                <NativeSelect
+                  value={inboxQueueParam(query)}
+                  onChange={(event) => onChange(inboxQueueFromParam(event.target.value))}
+                >
+                  <option value="">{t("queueFilterAllQueues")}</option>
+                  <option value={CustomerQueueFilter.CustomerQueueFilterPublic}>{t("queueFilterPublicQueue")}</option>
+                  {queueTeams.filter((team) => team.mine).map((team) => (
+                    <option key={team.id} value={team.id}>
+                      {team.name}
+                    </option>
+                  ))}
+                </NativeSelect>
+              </FilterField>
+            ) : null}
+          </>
+        ) : (
+          <>
+            <FilterField label={t("filterServiceStatus")}>
               <NativeSelect
-                value={value.serviceStatus}
+                value={query.serviceStatus}
                 onChange={(event) =>
-                  onChange({
-                    serviceStatus: event.target.value as ServiceSessionStatus,
-                  })
+                  onChange({ serviceStatus: event.target.value as ServiceSessionStatus })
                 }
               >
                 <option value={ServiceSessionStatus.ServiceSessionStatusOpen}>
                   {t("filterServiceStatusOpen")}
                 </option>
-                <option
-                  value={ServiceSessionStatus.ServiceSessionStatusClosed}
-                  disabled={closedStatusDisabled}
-                >
+                <option value={ServiceSessionStatus.ServiceSessionStatusClosed}>
                   {t("filterServiceStatusClosed")}
                 </option>
               </NativeSelect>
-            </label>
+            </FilterField>
+            <FilterField label={t("filterAssignee")}>
+              <NativeSelect
+                value={assignee}
+                onChange={(event) => onChange(inboxAssigneeFromParam(event.target.value))}
+              >
+                <option value="">{t("filterAll")}</option>
+                <option value={currentIdentityId}>{t("filterAssigneeMe")}</option>
+                <option value={InboxAssigneeFilter.InboxAssigneeFilterUnassigned}>{t("filterAssigneeUnassigned")}</option>
+                {coworkers.map((item) => (
+                  <option key={item.identityId} value={item.identityId}>
+                    {item.type === OrganizationIdentityType.OrganizationIdentityTypeAgent
+                      ? t("filterAssigneeAgent", { name: item.displayName })
+                      : item.displayName}
+                  </option>
+                ))}
+              </NativeSelect>
+            </FilterField>
           </>
-        ) : (
-          <fieldset className="grid gap-1.5">
-            <legend className="pb-1.5 text-xs text-muted-foreground">
-              {t("filterKind")}
-            </legend>
-            {options.map((option) => (
-              <label key={option.kind} className="flex items-center gap-2 text-sm">
-                <input
-                  type="checkbox"
-                  className="size-4 accent-primary"
-                  checked={value.kinds.includes(option.kind)}
-                  onChange={(event) =>
-                    onChange({
-                      kinds: toggleInboxKinds(scope, value.kinds, option.kind, event.target.checked),
-                    })
-                  }
-                />
-                <span>{t(option.label)}</span>
-              </label>
-            ))}
-          </fieldset>
         )}
+        <FilterField label={t("filterSource")}>
+          <NativeSelect
+            value={query.channelId}
+            onChange={(event) => onChange({ channelId: event.target.value })}
+          >
+            <option value="">{t("filterAll")}</option>
+            {channels.map((channel) => (
+              <option key={channel.id} value={channel.id}>
+                {channel.enabled
+                  ? channel.name
+                  : `${channel.name}（${t("filterChannelDisabled")}）`}
+              </option>
+            ))}
+          </NativeSelect>
+        </FilterField>
+        <FilterField label={t("filterAudience")}>
+          <NativeSelect
+            value={query.audience}
+            onChange={(event) => onChange({ audience: event.target.value as ServiceAudience })}
+          >
+            <option value="">{t("filterAll")}</option>
+            {serviceAudienceOptions.map((option) => (
+              <option key={option.value} value={option.value} disabled={!option.available}>
+                {t(option.label)}
+              </option>
+            ))}
+          </NativeSelect>
+        </FilterField>
         {applied ? (
           <Button
             variant="outline"
@@ -153,9 +205,12 @@ export function InboxFilter({
             className="justify-self-start"
             onClick={() =>
               onChange({
+                pendingKind: InboxPendingKind.$zero,
+                ...inboxQueueFromParam(""),
                 channelId: "",
+                audience: ServiceAudience.$zero,
                 serviceStatus: ServiceSessionStatus.ServiceSessionStatusOpen,
-                kinds: [],
+                ...inboxAssigneeFromParam(""),
               })
             }
           >

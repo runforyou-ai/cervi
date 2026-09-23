@@ -21,7 +21,7 @@ export function MemberAssistantsSection({ userId }: { userId: string }) {
   const { t } = useTranslation("contacts")
   const { data } = useResource(resourceKeys.memberAssistants(userId), () => listMemberAssistants(userId))
   const statusToggle = useAccountStatusToggle<AssistantData>({
-    scope: "assistants",
+    keyPrefix: "contacts:assistants.status",
     deactivate: deactivateAssistant,
     reactivate: reactivateAssistant,
     invalidateKeys: (assistant) => assistantResourceKeys(assistant.id),

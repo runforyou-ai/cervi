@@ -12,6 +12,7 @@ import (
 	"uuid"
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
+	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
@@ -66,9 +67,64 @@ func (p customerRunPolicy) prepareLocked(ctx context.Context, db bun.IDB, policy
 	return false, nil
 }
 
-// loadMessages 读取本轮客服周期内的模型上下文。
+// loadMessages 读取本轮客服周期内的模型上下文；本轮最后认领的输入是超时跟进时，在末尾追加系统跟进提示。
 func (p customerRunPolicy) loadMessages(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, endSeq int64, links attachmentLinks) ([]agentruntime.Message, error) {
-	return loadClaimedCustomerMessages(ctx, db, run, endSeq, links)
+	messages, err := loadClaimedCustomerMessages(ctx, db, run, endSeq, links)
+	if err != nil {
+		return nil, err
+	}
+	input, err := loadLastClaimedInput(ctx, db, run, endSeq)
+	if err != nil {
+		return nil, err
+	}
+	if domain.AgentInputKind(input.Kind) == domain.AgentInputKindFollowUp {
+		messages = append(messages, agentruntime.Message{ID: "follow-up:" + input.ID, Role: agentruntime.MessageRoleUser, Content: agentruntime.CustomerIdleMessage})
+	}
+	return messages, nil
+}
+
+// applyDecision 按客服运行的结束方式更新周期：回应客户消息时客户确认解决且没有待处理输入则关闭周期；请求确认解决或回应超时跟进时记录请求时间，跟进轮的结束语同样只记为确认请求。
+func (p customerRunPolicy) applyDecision(ctx context.Context, db bun.IDB, policyContext agentRunPolicyContext, run *servermodels.AgentRun, lane *servermodels.AgentLane, result agentruntime.RunResult, messageID string) error {
+	session := policyContext.ServiceSession
+	input, err := loadLastClaimedInput(ctx, db, run, result.EndSeq)
+	if err != nil {
+		return err
+	}
+	followUp := domain.AgentInputKind(input.Kind) == domain.AgentInputKindFollowUp
+	if result.Decision.Kind == domain.AgentRunOutcomeResolve && !followUp {
+		// 结束语之后仍有客户输入待处理时保持周期开放，由下一次运行继续处理。
+		if lane.DesiredSeq > result.EndSeq {
+			return nil
+		}
+		return conversationaction.CloseAgentServiceSession(ctx, db, policyContext.Conversation, session, domain.ServiceSessionCloseAIResolved)
+	}
+	requested := followUp ||
+		(result.Decision.Kind == domain.AgentRunOutcomeAskCustomer && result.Decision.Purpose == domain.AgentAskCustomerPurposeConfirmResolution)
+	if !requested {
+		return nil
+	}
+	if _, err := db.NewUpdate().Model(session).
+		Set("resolution_requested_at = now()").
+		Set("updated_at = now()").
+		WherePK().Where("organization_id = ? AND status = ? AND last_message_id = ?", session.OrganizationID, domain.ServiceSessionStatusOpen, messageID).
+		Exec(ctx); err != nil {
+		return fmt.Errorf("record service session resolution request: %w", err)
+	}
+	return nil
+}
+
+// loadLastClaimedInput 读取运行在指定输入边界内最后认领的输入。
+func loadLastClaimedInput(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, endSeq int64) (*servermodels.AgentInput, error) {
+	input := &servermodels.AgentInput{}
+	if err := db.NewSelect().Model(input).
+		Column("id", "kind").
+		Where("lane_id = ? AND agent_run_id = ? AND input_seq <= ?", run.LaneID, run.ID, endSeq).
+		OrderExpr("input_seq DESC").
+		Limit(1).
+		Scan(ctx); err != nil {
+		return nil, fmt.Errorf("load last claimed agent input: %w", err)
+	}
+	return input, nil
 }
 
 // persistMessage 追加客服 Agent 结果并记录有效首响。

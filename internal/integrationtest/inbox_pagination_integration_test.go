@@ -34,13 +34,13 @@ type customerInboxFilter struct {
 	input inboxaction.LoadInput
 }
 
-// customerInboxFilters 返回覆盖处理归属与服务状态组合的客户会话筛选。
-func customerInboxFilters() []customerInboxFilter {
+// customerInboxFilters 返回覆盖负责人与服务状态组合的服务会话筛选，mine 为 owner 负责，coworkers 为 member 负责。
+func customerInboxFilters(ownerID, memberID string) []customerInboxFilter {
 	return []customerInboxFilter{
-		{"queue", inboxaction.LoadInput{Scope: domain.InboxScopeCustomer, CustomerView: domain.CustomerInboxViewQueue}},
-		{"mine", inboxaction.LoadInput{Scope: domain.InboxScopeCustomer, CustomerView: domain.CustomerInboxViewMine}},
-		{"coworkers", inboxaction.LoadInput{Scope: domain.InboxScopeCustomer, CustomerView: domain.CustomerInboxViewCoworkers}},
-		{"closed", inboxaction.LoadInput{Scope: domain.InboxScopeCustomer, CustomerView: domain.CustomerInboxViewMine, ServiceStatus: domain.ServiceSessionStatusClosed}},
+		{"queue", inboxaction.LoadInput{Scope: domain.InboxScopeAll, AssigneeFilter: domain.InboxAssigneeFilterUnassigned}},
+		{"mine", inboxaction.LoadInput{Scope: domain.InboxScopeAll, AssigneeFilter: domain.InboxAssigneeFilterIdentity, AssigneeIdentityID: ownerID}},
+		{"coworkers", inboxaction.LoadInput{Scope: domain.InboxScopeAll, AssigneeFilter: domain.InboxAssigneeFilterIdentity, AssigneeIdentityID: memberID}},
+		{"closed", inboxaction.LoadInput{Scope: domain.InboxScopeAll, AssigneeFilter: domain.InboxAssigneeFilterIdentity, AssigneeIdentityID: ownerID, ServiceStatus: domain.ServiceSessionStatusClosed}},
 	}
 }
 
@@ -63,7 +63,7 @@ func newInboxPaginationFixture(t *testing.T) inboxPaginationFixture {
 	if _, err := f.db.NewInsert().Model(model).Column("provider_id", "organization_id", "identifier", "name", "model_type", "input_modalities", "context_window", "max_output_tokens").Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
-	agent, err := agentaction.NewCreateAgentAction(f.db).Execute(ctx, f.owner, agentaction.CreateInput{HandlesCustomers: true, DisplayName: "分页助手", RoleID: f.member.OrganizationIdentity.RoleID, Execution: agentaction.ExecutionInput{Mode: domain.AgentExecutionModeManaged, Managed: &agentaction.ManagedExecutionInput{ProviderID: provider.ID, ModelIdentifier: model.Identifier, SystemInstruction: "测试分页"}}})
+	agent, err := agentaction.NewCreateAgentAction(f.db).Execute(ctx, f.owner, agentaction.CreateInput{HandlesCustomers: true, DisplayName: "分页助手", Execution: agentaction.ExecutionInput{Mode: domain.AgentExecutionModeManaged, Managed: &agentaction.ManagedExecutionInput{ProviderID: provider.ID, ModelIdentifier: model.Identifier, SystemInstruction: "测试分页"}}})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -74,7 +74,7 @@ func newInboxPaginationFixture(t *testing.T) inboxPaginationFixture {
 	startAgent := conversationaction.NewSendFirstAgentTextMessageAction(f.db, agentrunaction.NewScheduler(tasks))
 	buckets := []string{"queue", "mine", "coworkers", "closed"}
 	for index := range 60 {
-		peer, err := useraction.NewCreateUserAction(f.db, newTestTasks(f.db)).Execute(ctx, f.owner, useraction.CreateInput{HandlesCustomers: true, MaxServiceSessions: 10, DisplayName: fmt.Sprintf("分页成员 %d", index), Email: fmt.Sprintf("page%d@test.example", index), Password: "password123", RoleID: f.member.OrganizationIdentity.RoleID})
+		peer, err := useraction.NewCreateUserAction(f.db, newTestTasks(f.db)).Execute(ctx, f.owner, useraction.CreateInput{HandlesCustomers: true, MaxServiceSessions: 10, DisplayName: fmt.Sprintf("分页成员 %d", index), Email: fmt.Sprintf("page%d@test.example", index), Password: "password123", RoleID: f.member.User.RoleID})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -148,10 +148,10 @@ func TestInboxPagination(t *testing.T) {
 		input inboxaction.LoadInput
 		ids   []string
 	}{
-		{"all", inboxaction.LoadInput{}, append(slices.Clone(f.internalIDs), f.customerIDs["mine"]...)},
-		{"internal", inboxaction.LoadInput{Scope: domain.InboxScopeInternal, Limit: 17}, f.internalIDs},
+		{"service", inboxaction.LoadInput{Scope: domain.InboxScopeAll}, append(append(slices.Clone(f.customerIDs["queue"]), f.customerIDs["mine"]...), f.customerIDs["coworkers"]...)},
+		{"chat", inboxaction.LoadInput{Scope: domain.InboxScopeChat, Limit: 17}, f.internalIDs},
 	}
-	for _, filter := range customerInboxFilters() {
+	for _, filter := range customerInboxFilters(f.owner.OrganizationIdentity.ID, f.member.OrganizationIdentity.ID) {
 		filter.input.Limit = 4
 		cases = append(cases, struct {
 			name  string
@@ -163,12 +163,12 @@ func TestInboxPagination(t *testing.T) {
 		name  string
 		input inboxaction.LoadInput
 		ids   []string
-	}{"assignee", inboxaction.LoadInput{Scope: domain.InboxScopeCustomer, CustomerView: domain.CustomerInboxViewCoworkers, AssigneeIdentityID: f.member.OrganizationIdentity.ID, Limit: 3}, f.customerIDs["coworkers"]})
+	}{"unassigned_small_pages", inboxaction.LoadInput{Scope: domain.InboxScopeAll, AssigneeFilter: domain.InboxAssigneeFilterUnassigned, Limit: 3}, f.customerIDs["queue"]})
 	cases = append(cases, struct {
 		name  string
 		input inboxaction.LoadInput
 		ids   []string
-	}{"unavailable_assignee", inboxaction.LoadInput{Scope: domain.InboxScopeCustomer, CustomerView: domain.CustomerInboxViewCoworkers, AssigneeIdentityID: uuid.NewV7().String()}, nil})
+	}{"unavailable_assignee", inboxaction.LoadInput{Scope: domain.InboxScopeAll, AssigneeFilter: domain.InboxAssigneeFilterIdentity, AssigneeIdentityID: uuid.NewV7().String()}, nil})
 
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
@@ -244,7 +244,7 @@ func TestInboxPaginationBoundaries(t *testing.T) {
 			}
 
 			query := inboxaction.NewLoadInboxQuery(f.db)
-			input := inboxaction.LoadInput{Scope: domain.InboxScopeInternal, Limit: 2}
+			input := inboxaction.LoadInput{Scope: domain.InboxScopeChat, Limit: 2}
 			page, _, err := query.Execute(ctx, f.member, input)
 			if err != nil || !page.HasMore {
 				t.Fatalf("first page=%+v err=%v", page, err)
@@ -274,8 +274,8 @@ func TestInboxPaginationBoundaries(t *testing.T) {
 			backend := appservice.NewDirectBackend(f.db, domain.DeploymentModeSelfHosted, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil)
 			meta := appservice.RequestMeta{Token: login.Token}
 			for _, request := range []appservice.LoadInboxInput{
-				{Scope: appservice.InboxScopeCustomer, Cursor: input.Cursor},
-				{Scope: appservice.InboxScopeInternal, Cursor: "invalid"},
+				{Scope: appservice.InboxScopePending, Cursor: input.Cursor},
+				{Scope: appservice.InboxScopeChat, Cursor: "invalid"},
 			} {
 				_, err := backend.LoadInbox(ctx, meta, request)
 				var apiError *appservice.Error

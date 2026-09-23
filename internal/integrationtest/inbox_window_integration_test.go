@@ -60,7 +60,7 @@ func TestInboxContextDeepWindow(t *testing.T) {
 	}
 	backend := appservice.NewDirectBackend(f.db, domain.DeploymentModeSelfHosted, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil)
 	meta := appservice.RequestMeta{Token: login.Token}
-	filter := appservice.InboxQuery{Scope: appservice.InboxScopeInternal}
+	filter := appservice.InboxQuery{Scope: appservice.InboxScopeChat}
 	all, err := backend.LoadInbox(ctx, meta, appservice.LoadInboxInput{Scope: filter.Scope, Limit: 300})
 	if err != nil || len(all.Conversations) != 220 || all.HasMore || all.HasBefore {
 		t.Fatalf("full list size=%d err=%v", len(all.Conversations), err)
@@ -163,16 +163,15 @@ func TestInboxContextDeepWindow(t *testing.T) {
 	assertInboxWindowIDs(t, next.Conversations, all.Conversations[210:213])
 }
 
-// TestInboxContextFilters 验证四类会话与客户队列沿用同一资格、排序和默认窗口大小。
+// TestInboxContextFilters 验证聊天、待处理与全部服务会话沿用同一资格、排序和默认窗口大小。
 func TestInboxContextFilters(t *testing.T) {
 	f := newInboxPaginationFixture(t)
 	ctx := context.Background()
 	query := inboxaction.NewLoadInboxQuery(f.db)
-	filters := []inboxaction.LoadInput{{}, {Scope: domain.InboxScopeInternal}}
-	for _, filter := range customerInboxFilters() {
+	filters := []inboxaction.LoadInput{{Scope: domain.InboxScopeChat}, {Scope: domain.InboxScopePending}, {Scope: domain.InboxScopeAll}}
+	for _, filter := range customerInboxFilters(f.owner.OrganizationIdentity.ID, f.member.OrganizationIdentity.ID) {
 		filters = append(filters, filter.input)
 	}
-	filters = append(filters, inboxaction.LoadInput{Scope: domain.InboxScopeCustomer, CustomerView: domain.CustomerInboxViewCoworkers, AssigneeIdentityID: f.member.OrganizationIdentity.ID})
 	for _, filter := range filters {
 		filter.Limit = 300
 		page, _, err := query.Execute(ctx, f.owner, filter)
@@ -209,7 +208,7 @@ func TestInboxContextUnavailable(t *testing.T) {
 	}
 	backend := appservice.NewDirectBackend(f.db, domain.DeploymentModeSelfHosted, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil)
 	meta := appservice.RequestMeta{Token: login.Token}
-	filter := appservice.InboxQuery{Scope: appservice.InboxScopeInternal}
+	filter := appservice.InboxQuery{Scope: appservice.InboxScopeChat}
 	located, err := backend.GetInboxContext(ctx, meta, appservice.InboxContextInput{Query: filter, AnchorID: f.groupID})
 	if err != nil || len(located.Window.Conversations) != 1 || located.Window.Conversations[0].LastActivityAt != nil {
 		t.Fatalf("empty conversation=%+v err=%v", located, err)
@@ -223,7 +222,7 @@ func TestInboxContextUnavailable(t *testing.T) {
 		}
 		assertInboxWindowIDs(t, unavailable.Window.Conversations, nil)
 	}
-	outside, err := backend.GetInboxContext(ctx, meta, appservice.InboxContextInput{Query: appservice.InboxQuery{Scope: appservice.InboxScopeCustomer}, AnchorID: f.groupID})
+	outside, err := backend.GetInboxContext(ctx, meta, appservice.InboxContextInput{Query: appservice.InboxQuery{Scope: appservice.InboxScopeAll}, AnchorID: f.groupID})
 	if err != nil || outside.Anchor.Availability != appservice.InboxConversationOutsideQuery || outside.Anchor.Conversation == nil || outside.Anchor.Conversation.PositionCursor != "" {
 		t.Fatalf("outside query=%+v err=%v", outside, err)
 	}
@@ -231,7 +230,7 @@ func TestInboxContextUnavailable(t *testing.T) {
 	for _, request := range []appservice.InboxContextInput{
 		{Query: filter, AnchorID: f.groupID, AnchorCursor: "bad"},
 		{Query: filter, AnchorID: uuid.NewV7().String(), AnchorCursor: oldCursor},
-		{Query: appservice.InboxQuery{Scope: appservice.InboxScopeCustomer}, AnchorID: f.groupID, AnchorCursor: oldCursor},
+		{Query: appservice.InboxQuery{Scope: appservice.InboxScopeAll}, AnchorID: f.groupID, AnchorCursor: oldCursor},
 	} {
 		_, err := backend.GetInboxContext(ctx, meta, request)
 		var apiError *appservice.Error
@@ -241,7 +240,7 @@ func TestInboxContextUnavailable(t *testing.T) {
 	}
 	query := inboxaction.NewLoadInboxQuery(f.db)
 	for _, identity := range []*servermodels.Identity{f.owner, foreign.owner} {
-		_, err := query.ReadContext(ctx, identity, inboxaction.ContextInput{Query: inboxaction.LoadInput{Scope: domain.InboxScopeInternal}, AnchorID: f.groupID, AnchorCursor: oldCursor})
+		_, err := query.ReadContext(ctx, identity, inboxaction.ContextInput{Query: inboxaction.LoadInput{Scope: domain.InboxScopeChat}, AnchorID: f.groupID, AnchorCursor: oldCursor})
 		if !errors.Is(err, inboxaction.ErrCursorInvalid) {
 			t.Fatalf("accepted foreign cursor: %v", err)
 		}
@@ -276,7 +275,7 @@ func TestInboxContextSnapshot(t *testing.T) {
 	done := make(chan error, 1)
 	go func() {
 		var err error
-		snapshot, err = query.ReadContext(context.WithValue(ctx, chatQueryGateKey{}, gate), f.member, inboxaction.ContextInput{Query: inboxaction.LoadInput{Scope: domain.InboxScopeInternal}, AnchorID: f.groupID})
+		snapshot, err = query.ReadContext(context.WithValue(ctx, chatQueryGateKey{}, gate), f.member, inboxaction.ContextInput{Query: inboxaction.LoadInput{Scope: domain.InboxScopeChat}, AnchorID: f.groupID})
 		done <- err
 	}()
 	waitChatSignal(t, ctx, gate.reached)
@@ -290,7 +289,7 @@ func TestInboxContextSnapshot(t *testing.T) {
 	if !snapshot.Anchor.MatchesQuery || snapshot.Anchor.Conversation == nil || len(snapshot.Window.Conversations) != 1 || snapshot.Window.Conversations[0].ID != f.groupID {
 		t.Fatalf("mixed snapshot=%+v", snapshot)
 	}
-	current, err := query.ReadContext(ctx, f.member, inboxaction.ContextInput{Query: inboxaction.LoadInput{Scope: domain.InboxScopeInternal}, AnchorID: f.groupID})
+	current, err := query.ReadContext(ctx, f.member, inboxaction.ContextInput{Query: inboxaction.LoadInput{Scope: domain.InboxScopeChat}, AnchorID: f.groupID})
 	if err != nil || current.Anchor.Conversation != nil || len(current.Window.Conversations) != 0 {
 		t.Fatalf("next snapshot=%+v err=%v", current, err)
 	}
@@ -306,7 +305,7 @@ func TestInboxContextCustomerTransition(t *testing.T) {
 		}
 	}
 	query := inboxaction.NewLoadInboxQuery(f.db)
-	filter := inboxaction.LoadInput{Scope: domain.InboxScopeCustomer, CustomerView: domain.CustomerInboxViewQueue}
+	filter := inboxaction.LoadInput{Scope: domain.InboxScopeAll, AssigneeFilter: domain.InboxAssigneeFilterUnassigned}
 	page, _, err := query.Execute(ctx, f.owner, filter)
 	if err != nil || len(page.Conversations) != 3 {
 		t.Fatalf("queue=%+v err=%v", page, err)
@@ -330,7 +329,7 @@ func TestInboxContextCustomerTransition(t *testing.T) {
 	// 核验倒置区间和跨查询边界的校验错误。
 	for _, input := range []inboxaction.ReadWindowInput{
 		{Query: filter, StartCursor: page.EndCursor, EndCursor: page.StartCursor},
-		{Query: inboxaction.LoadInput{Scope: domain.InboxScopeInternal}, StartCursor: page.StartCursor, EndCursor: page.EndCursor},
+		{Query: inboxaction.LoadInput{Scope: domain.InboxScopeChat}, StartCursor: page.StartCursor, EndCursor: page.EndCursor},
 		{Query: filter, StartCursor: page.StartCursor},
 	} {
 		_, err := query.ReadWindow(ctx, f.owner, input)
@@ -338,7 +337,7 @@ func TestInboxContextCustomerTransition(t *testing.T) {
 			t.Fatalf("invalid range accepted: %+v err=%v", input, err)
 		}
 	}
-	_, _, err = query.Execute(ctx, f.owner, inboxaction.LoadInput{Scope: filter.Scope, CustomerView: filter.CustomerView, Cursor: page.EndCursor, BeforeCursor: page.StartCursor})
+	_, _, err = query.Execute(ctx, f.owner, inboxaction.LoadInput{Scope: filter.Scope, AssigneeFilter: filter.AssigneeFilter, Cursor: page.EndCursor, BeforeCursor: page.StartCursor})
 	if !errors.Is(err, inboxaction.ErrQueryInvalid) {
 		t.Fatalf("conflicting directions accepted: %v", err)
 	}
@@ -350,7 +349,7 @@ func TestInboxWindowSnapshot(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
 	defer cancel()
 	query := inboxaction.NewLoadInboxQuery(f.db)
-	filter := inboxaction.LoadInput{Scope: domain.InboxScopeInternal}
+	filter := inboxaction.LoadInput{Scope: domain.InboxScopeChat}
 	page, _, err := query.Execute(ctx, f.member, filter)
 	if err != nil {
 		t.Fatal(err)

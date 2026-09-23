@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next"
 import { useLocation, useNavigate } from "react-router"
 import { toast } from "sonner"
 
-import { loadInbox, logout, WorkStatus, type Identity } from "@/api"
+import { logout, WorkStatus, type Identity } from "@/api"
 import { UnsavedChangesGuard } from "@/components/unsaved-changes-guard"
 import {
   WorkspaceProvider,
@@ -16,6 +16,7 @@ import {
 } from "@/features/notifications/new-message-notifications"
 import { useNewMessageNotifications } from "@/features/notifications/use-new-message-notifications"
 import { GlobalSearchProvider } from "@/features/inbox/global-search"
+import { useInboxAttention } from "@/features/inbox/inbox-attention"
 import { SessionShell } from "@/features/session/session-shell"
 import {
   WorkspaceHistoryNav,
@@ -33,8 +34,6 @@ import {
   WorkspaceRailResizer,
   WorkspaceRailToggle,
 } from "@/features/workspace/workspace-rail"
-import { resourceKeys } from "@/hooks/resource-keys"
-import { useResource } from "@/hooks/use-resource"
 import { resolveAppPlatform } from "@/platform/app-platform"
 import { updateNotificationUnreadIndicator } from "@/platform/notifications"
 
@@ -120,15 +119,10 @@ function WorkspaceShell({ identity }: { identity: Identity }) {
     messageNotificationsEnabled && workStatus === WorkStatus.WorkStatusWorking
 
   // 提醒总数按权威查询读取，会话变化由同步协调器失效该查询。
-  const attention = useResource(
-    resourceKeys.inboxAttention({ organizationId, userId }),
-    async () => {
-      // 应用角标合计内部会话提醒与客户会话中提醒本人的未读。
-      const inbox = await loadInbox({ limit: 1 })
-      return inbox.attentionUnreadCount + inbox.customerMentionedUnreadCount
-    },
-  )
-  const unreadCount = attention.data ?? 0
+  const attention = useInboxAttention(identity)
+  const pendingCount = attention.data?.pending ?? 0
+  // 应用角标合计聊天提醒与本人待处理的服务会话。
+  const unreadCount = attention.data?.total ?? 0
 
   // 实时确认的新消息按通知策略投递，投递成功即进入待处理提醒。
   const deliveredAt = useRef(0)
@@ -195,10 +189,10 @@ function WorkspaceShell({ identity }: { identity: Identity }) {
     }
   }, [])
 
-  /** 用户查看消息页时停止托盘闪烁。 */
+  /** 用户查看收件箱或聊天时停止托盘闪烁。 */
   useEffect(() => {
     if (
-      location.pathname !== "/inbox" ||
+      (location.pathname !== "/inbox" && location.pathname !== "/chats") ||
       !attentionPending ||
       document.visibilityState !== "visible" ||
       !document.hasFocus()
@@ -254,6 +248,7 @@ function WorkspaceShell({ identity }: { identity: Identity }) {
             inSettings={inSettings}
             appHref={appHrefRef.current}
             collapsed={railCollapsed}
+            pendingCount={pendingCount}
             onToggleRail={rail.toggleCollapsed}
             onLogout={handleLogout}
             loggingOut={loggingOut}

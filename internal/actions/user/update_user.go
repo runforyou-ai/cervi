@@ -92,8 +92,9 @@ func (a *UpdateUserAction) Execute(ctx context.Context, identity *servermodels.I
 		}
 		// 最大接待量只在开启接待时写入，未开启接待时保留原值。
 		accountUpdate := tx.NewUpdate().Model((*servermodels.User)(nil)).
-			Set("profile_version = profile_version + CASE WHEN email IS DISTINCT FROM ? THEN 1 ELSE 0 END", input.Email).
+			Set("profile_version = profile_version + CASE WHEN (email, role_id) IS DISTINCT FROM (?, ?::uuid) THEN 1 ELSE 0 END", input.Email, input.RoleID).
 			Set("email = ?", input.Email).
+			Set("role_id = ?", input.RoleID).
 			Set("updated_at = now()").
 			Where("organization_id = ?", identity.Organization.ID).
 			Where("id = ?", userID)
@@ -120,7 +121,6 @@ func (a *UpdateUserAction) Execute(ctx context.Context, identity *servermodels.I
 		}
 		displayChanged, err := identityaction.UpdateUserIdentity(ctx, tx, identity.Organization.ID, identityID, tx.NewUpdate().Model((*servermodels.OrganizationIdentity)(nil)).
 			Set("display_name = ?", input.DisplayName).
-			Set("role_id = ?", input.RoleID).
 			Set("handles_customers = ?", input.HandlesCustomers).
 			Set("updated_at = now()"))
 		if err != nil {

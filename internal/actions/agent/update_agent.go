@@ -13,7 +13,6 @@ import (
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
-	roleaction "github.com/runforyou-ai/cervi/internal/actions/role"
 	teamaction "github.com/runforyou-ai/cervi/internal/actions/team"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -52,13 +51,6 @@ func (a *UpdateAgentAction) Execute(ctx context.Context, identity *servermodels.
 	var cancelledRunIDs []string
 	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
-			return err
-		}
-		_, err := roleaction.ValidateAssignment(ctx, tx, identity.Organization.ID, input.RoleID, domain.OrganizationIdentityTypeAgent)
-		if errors.Is(err, roleaction.ErrAssignmentInvalid) || errors.Is(err, roleaction.ErrAgentAdministrator) {
-			return &common.FieldError{Fields: map[string]common.FieldCode{"roleId": ValidationRoleInvalid}}
-		}
-		if err != nil {
 			return err
 		}
 		teamIDs, _, err := validateAndLoadTeams(ctx, tx, identity.Organization.ID, input.TeamIDs)
@@ -102,7 +94,6 @@ func (a *UpdateAgentAction) Execute(ctx context.Context, identity *servermodels.
 		err = tx.NewUpdate().Model((*servermodels.OrganizationIdentity)(nil)).
 			Set("display_name = ?", input.DisplayName).
 			Set("avatar_file_id = COALESCE(?, avatar_file_id)", nextAvatarFileID).
-			Set("role_id = ?", input.RoleID).
 			Set("handles_customers = ?", input.HandlesCustomers).
 			Set("work_status_updated_at = CASE WHEN work_status <> ? THEN now() ELSE work_status_updated_at END", input.WorkStatus).
 			Set("work_status = ?", input.WorkStatus).

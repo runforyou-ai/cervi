@@ -122,10 +122,10 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.POST("/users/:userID/deactivate", s.deactivateUser)
 	router.POST("/users/:userID/reactivate", s.reactivateUser)
 	router.GET("/teams", s.listTeams)
+	router.GET("/teams/:teamID", s.getTeam)
 	router.POST("/teams", s.createTeam)
 	router.PUT("/teams/:teamID", s.updateTeam)
 	router.DELETE("/teams/:teamID", s.deleteTeam)
-	router.GET("/team-members", s.listAllTeamMembers)
 	router.GET("/teams/:teamID/members", s.listTeamMembers)
 	router.GET("/teams/:teamID/member-candidates", s.listTeamMemberCandidates)
 	router.POST("/teams/:teamID/members", s.addTeamMembers)
@@ -1047,7 +1047,7 @@ func (s *Service) updateUser(c *gin.Context) {
 	writeResult(c, http.StatusOK, output, err)
 }
 
-// updateRoleAssignments 在一个事务中批量调整真人和 AI 员工角色。
+// updateRoleAssignments 在一个事务中批量调整成员角色。
 func (s *Service) updateRoleAssignments(c *gin.Context) {
 	var input appservice.RoleAssignmentsInput
 	if !bindJSON(c, &input) {
@@ -1078,6 +1078,12 @@ func (s *Service) listTeams(c *gin.Context) {
 	writeResult(c, http.StatusOK, output, err)
 }
 
+// getTeam 返回团队详情。
+func (s *Service) getTeam(c *gin.Context) {
+	output, err := s.application.GetTeam(c.Request.Context(), requestMeta(c), c.Param("teamID"))
+	writeResult(c, http.StatusOK, output, err)
+}
+
 // createTeam 创建企业团队。
 func (s *Service) createTeam(c *gin.Context) {
 	var input appservice.TeamInput
@@ -1101,16 +1107,6 @@ func (s *Service) updateTeam(c *gin.Context) {
 // deleteTeam 删除企业团队及其成员关系。
 func (s *Service) deleteTeam(c *gin.Context) {
 	writeEmpty(c, s.application.DeleteTeam(c.Request.Context(), requestMeta(c), c.Param("teamID")))
-}
-
-// listAllTeamMembers 返回企业所有团队的成员列表，同一身份只列一次。
-func (s *Service) listAllTeamMembers(c *gin.Context) {
-	input, ok := bindTeamMemberListInputQuery(c)
-	if !ok {
-		return
-	}
-	output, err := s.application.ListAllTeamMembers(c.Request.Context(), requestMeta(c), input)
-	writeResult(c, http.StatusOK, output, err)
 }
 
 // listTeamMembers 返回团队成员列表。
@@ -1705,12 +1701,14 @@ func bindInboxSearchInputQuery(c *gin.Context) (appservice.InboxSearchInput, boo
 		Range:              appservice.InboxSearchRange(c.Query("range")),
 		ConversationID:     c.Query("conversationId"),
 		Scope:              appservice.InboxScope(c.Query("scope")),
-		CustomerView:       appservice.CustomerInboxView(c.Query("customerView")),
+		PendingKind:        appservice.InboxPendingKind(c.Query("pendingKind")),
 		QueueFilter:        appservice.CustomerQueueFilter(c.Query("queueFilter")),
 		QueueTeamID:        c.Query("queueTeamId"),
-		AssigneeIdentityID: c.Query("assigneeIdentityId"),
 		ChannelID:          c.Query("channelId"),
+		Audience:           appservice.ServiceAudience(c.Query("audience")),
 		ServiceStatus:      appservice.ServiceSessionStatus(c.Query("serviceStatus")),
+		AssigneeFilter:     appservice.InboxAssigneeFilter(c.Query("assigneeFilter")),
+		AssigneeIdentityID: c.Query("assigneeIdentityId"),
 		Kinds:              enumList[appservice.ConversationType](c.QueryArray("kinds")),
 	}, true
 }
@@ -1776,12 +1774,14 @@ func bindLoadInboxInputQuery(c *gin.Context) (appservice.LoadInboxInput, bool) {
 	return appservice.LoadInboxInput{
 		Partition:          appservice.InboxPartition(c.Query("partition")),
 		Scope:              appservice.InboxScope(c.Query("scope")),
-		CustomerView:       appservice.CustomerInboxView(c.Query("customerView")),
+		PendingKind:        appservice.InboxPendingKind(c.Query("pendingKind")),
 		QueueFilter:        appservice.CustomerQueueFilter(c.Query("queueFilter")),
 		QueueTeamID:        c.Query("queueTeamId"),
-		AssigneeIdentityID: c.Query("assigneeIdentityId"),
 		ChannelID:          c.Query("channelId"),
+		Audience:           appservice.ServiceAudience(c.Query("audience")),
 		ServiceStatus:      appservice.ServiceSessionStatus(c.Query("serviceStatus")),
+		AssigneeFilter:     appservice.InboxAssigneeFilter(c.Query("assigneeFilter")),
+		AssigneeIdentityID: c.Query("assigneeIdentityId"),
 		Kinds:              enumList[appservice.ConversationType](c.QueryArray("kinds")),
 		Search:             c.Query("search"),
 		SearchRange:        appservice.InboxSearchRange(c.Query("searchRange")),

@@ -15,13 +15,44 @@ import (
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
-const inboxSortVersion = 1
+const inboxSortVersion = 2
 
-// compareInboxPoints 按当前分区的显示顺序比较位置，结果为负表示排在更前面。
-func compareInboxPoints(partition domain.InboxPartition, left, right inboxCursorPoint) int {
-	if partition == domain.InboxPartitionPinned {
-		if order := comparePinRanks(left.PinRank, right.PinRank); order != 0 {
-			return order
+// inboxOrder 表示列表的显示顺序。
+type inboxOrder int
+
+const (
+	// inboxOrderActivity 按最近活动时间倒序，空活动时间排在最后。
+	inboxOrderActivity inboxOrder = iota
+	// inboxOrderPinned 按个人置顶顺序值升序。
+	inboxOrderPinned
+	// inboxOrderWaiting 按等待起点正序，等待最久的排在最前。
+	inboxOrderWaiting
+)
+
+// order 返回当前范围与分区的显示顺序。
+func (input LoadInput) order() inboxOrder {
+	if input.Partition == domain.InboxPartitionPinned {
+		return inboxOrderPinned
+	}
+	if input.Scope == domain.InboxScopePending {
+		return inboxOrderWaiting
+	}
+	return inboxOrderActivity
+}
+
+// compareInboxPoints 按显示顺序比较位置，结果为负表示排在更前面。
+func compareInboxPoints(order inboxOrder, left, right inboxCursorPoint) int {
+	switch order {
+	case inboxOrderPinned:
+		if result := comparePinRanks(left.PinRank, right.PinRank); result != 0 {
+			return result
+		}
+		return strings.Compare(left.ID, right.ID)
+	case inboxOrderWaiting:
+		if left.WaitingSince != nil && right.WaitingSince != nil {
+			if result := left.WaitingSince.Compare(*right.WaitingSince); result != 0 {
+				return result
+			}
 		}
 		return strings.Compare(left.ID, right.ID)
 	}
@@ -32,8 +63,8 @@ func compareInboxPoints(partition domain.InboxPartition, left, right inboxCursor
 		return -1
 	}
 	if left.LastActivityAt != nil && right.LastActivityAt != nil {
-		if order := left.LastActivityAt.Compare(*right.LastActivityAt); order != 0 {
-			return -order
+		if result := left.LastActivityAt.Compare(*right.LastActivityAt); result != 0 {
+			return -result
 		}
 	}
 	return -strings.Compare(left.ID, right.ID)
@@ -53,11 +84,23 @@ func comparePinRanks(left, right *int64) int {
 	return cmp.Compare(*left, *right)
 }
 
-// inboxCursorPoint 保存数据库原始活动时间与个人置顶顺序值，空活动时间使用独立的编号边界。
+// inboxCursorPoint 保存数据库原始活动时间、个人置顶顺序值与待处理等待起点，空活动时间使用独立的编号边界。
 type inboxCursorPoint struct {
 	ID             string     `json:"id" bun:"id"`
 	LastActivityAt *time.Time `json:"lastActivityAt" bun:"last_activity_at"`
 	PinRank        *int64     `json:"pinRank" bun:"pin_rank"`
+	WaitingSince   *time.Time `json:"waitingSince,omitempty" bun:"waiting_since"`
+	// PendingKind 与 Mentioned 是待处理条目的类型和是否有未回应的提醒，只用于摘要，不参与排序与游标。
+	PendingKind domain.InboxPendingKind `json:"-" bun:"pending_kind"`
+	Mentioned   bool                    `json:"-" bun:"mentioned"`
+}
+
+// pending 返回待处理条目的摘要，非待处理候选返回空。
+func (point inboxCursorPoint) pending() *PendingSummary {
+	if point.PendingKind == "" || point.WaitingSince == nil {
+		return nil
+	}
+	return &PendingSummary{Kind: point.PendingKind, Since: *point.WaitingSince, Mentioned: point.Mentioned}
 }
 
 // inboxCursor 将排序边界绑定到当前企业、用户、规范化筛选、搜索词和置顶分区。
@@ -69,12 +112,14 @@ type inboxCursor struct {
 	Partition          domain.InboxPartition       `json:"partition"`
 	PinOrderVersion    int64                       `json:"pinOrderVersion"`
 	Scope              domain.InboxScope           `json:"scope"`
-	CustomerView       domain.CustomerInboxView    `json:"customerView"`
+	PendingKind        domain.InboxPendingKind     `json:"pendingKind"`
 	QueueFilter        domain.CustomerQueueFilter  `json:"queueFilter"`
 	QueueTeamID        string                      `json:"queueTeamId"`
-	AssigneeIdentityID string                      `json:"assigneeIdentityId"`
 	ChannelID          string                      `json:"channelId"`
+	Audience           domain.ServiceAudience      `json:"audience"`
 	ServiceStatus      domain.ServiceSessionStatus `json:"serviceStatus"`
+	AssigneeFilter     domain.InboxAssigneeFilter  `json:"assigneeFilter"`
+	AssigneeIdentityID string                      `json:"assigneeIdentityId"`
 	Kinds              []domain.ConversationType   `json:"kinds"`
 	Search             string                      `json:"search"`
 	SearchRange        SearchRange                 `json:"searchRange"`
@@ -89,9 +134,9 @@ func encodeInboxCursor(identity *servermodels.Identity, input LoadInput, pinOrde
 		inboxCursorPoint: point, Version: inboxSortVersion,
 		OrganizationID: identity.Organization.ID, UserID: identity.User.ID,
 		Partition: input.Partition, PinOrderVersion: pinOrderVersion,
-		Scope: input.Scope, CustomerView: input.CustomerView, AssigneeIdentityID: input.AssigneeIdentityID,
-		QueueFilter: input.QueueFilter, QueueTeamID: input.QueueTeamID,
-		ChannelID: input.ChannelID, ServiceStatus: input.ServiceStatus, Kinds: input.Kinds,
+		Scope: input.Scope, PendingKind: input.PendingKind, QueueFilter: input.QueueFilter, QueueTeamID: input.QueueTeamID,
+		ChannelID: input.ChannelID, Audience: input.Audience, ServiceStatus: input.ServiceStatus,
+		AssigneeFilter: input.AssigneeFilter, AssigneeIdentityID: input.AssigneeIdentityID, Kinds: input.Kinds,
 		Search: input.Search, SearchRange: input.SearchRange,
 	})
 	if err != nil {
@@ -110,9 +155,11 @@ func decodeInboxCursor(value string, identity *servermodels.Identity, input Load
 	if json.Unmarshal(data, &cursor) != nil || cursor.Version != inboxSortVersion ||
 		cursor.OrganizationID != identity.Organization.ID || cursor.UserID != identity.User.ID ||
 		cursor.Partition != input.Partition ||
-		cursor.Scope != input.Scope || cursor.CustomerView != input.CustomerView || cursor.AssigneeIdentityID != input.AssigneeIdentityID ||
+		cursor.Scope != input.Scope || cursor.PendingKind != input.PendingKind ||
 		cursor.QueueFilter != input.QueueFilter || cursor.QueueTeamID != input.QueueTeamID ||
-		cursor.ChannelID != input.ChannelID || cursor.ServiceStatus != input.ServiceStatus || !slices.Equal(cursor.Kinds, input.Kinds) ||
+		cursor.ChannelID != input.ChannelID || cursor.Audience != input.Audience || cursor.ServiceStatus != input.ServiceStatus ||
+		cursor.AssigneeFilter != input.AssigneeFilter || cursor.AssigneeIdentityID != input.AssigneeIdentityID || !slices.Equal(cursor.Kinds, input.Kinds) ||
+		(input.order() == inboxOrderWaiting && cursor.WaitingSince == nil) ||
 		cursor.Search != input.Search || cursor.SearchRange != input.SearchRange ||
 		!common.ValidUUID(cursor.ID) {
 		return nil, ErrCursorInvalid

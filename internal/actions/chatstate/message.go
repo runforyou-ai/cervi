@@ -51,7 +51,7 @@ func AppendMessage(ctx context.Context, db bun.IDB, conversation *servermodels.C
 		Returning("*").Exec(ctx); err != nil {
 		return nil, false, fmt.Errorf("append conversation message: %w", err)
 	}
-	// 周期摘要只记录对客消息；客户消息开始或延续等待回复，成员与 AI 员工的对客消息结束等待；等待起点变化时清空本轮提醒时间。
+	// 周期摘要只记录对客消息；客户消息开始或延续等待回复，成员与 AI 员工的对客消息结束等待；等待起点变化时清空本轮提醒时间；新的对客消息清空 AI 请求确认解决的时间。
 	if message.ServiceSessionID != nil && message.Visibility != string(domain.MessageVisibilityInternalOnly) {
 		fromContact := db.NewSelect().TableExpr("conversation_participants AS cp").ColumnExpr("1").
 			Join("JOIN chat_subjects AS cs ON cs.organization_id = cp.organization_id AND cs.id = cp.subject_id").
@@ -61,6 +61,7 @@ func AppendMessage(ctx context.Context, db bun.IDB, conversation *servermodels.C
 			Set("last_message_at = ?", message.OriginatedAt).
 			Set("awaiting_reply_since = CASE WHEN EXISTS (?) THEN COALESCE(awaiting_reply_since, ?) ELSE NULL END", fromContact, message.OriginatedAt).
 			Set("reminded_at = CASE WHEN EXISTS (?) AND awaiting_reply_since IS NOT NULL THEN reminded_at ELSE NULL END", fromContact).
+			Set("resolution_requested_at = NULL").
 			Set("updated_at = now()").
 			Where("organization_id = ? AND conversation_id = ? AND id = ?", conversation.OrganizationID, conversation.ID, *message.ServiceSessionID).
 			Where("status = ?", domain.ServiceSessionStatusOpen).

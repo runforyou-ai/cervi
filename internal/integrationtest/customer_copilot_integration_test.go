@@ -21,10 +21,10 @@ import (
 )
 
 // testCustomerCopilotThreads 验证 Copilot 线程的创建、多人提问、背景资料、停止回复、会话隔离与实时受众。
-func testCustomerCopilotThreads(t *testing.T, db *bun.DB, identity *servermodels.Identity, roleID, providerID, modelID string) {
+func testCustomerCopilotThreads(t *testing.T, db *bun.DB, identity *servermodels.Identity, providerID, modelID string) {
 	ctx := context.Background()
 	created, err := agentaction.NewCreateAgentAction(db).Execute(ctx, identity, agentaction.CreateInput{
-		HandlesCustomers: true, DisplayName: "Copilot 助手", RoleID: roleID,
+		HandlesCustomers: true, DisplayName: "Copilot 助手",
 		Execution: agentaction.ExecutionInput{Mode: domain.AgentExecutionModeManaged, Managed: &agentaction.ManagedExecutionInput{ProviderID: providerID, ModelIdentifier: modelID, SystemInstruction: "你是售后专家"}},
 	})
 	if err != nil {
@@ -106,7 +106,7 @@ func testCustomerCopilotThreads(t *testing.T, db *bun.DB, identity *servermodels
 	if err != nil || len(threads) != 1 || threads[0].ID != threadID || threads[0].AgentStatus != domain.UserStatusActive {
 		t.Fatalf("colleague threads = %+v, error = %v", threads, err)
 	}
-	inboxPage, _, err := inboxaction.NewLoadInboxQuery(db).Execute(ctx, colleague, inboxaction.LoadInput{Scope: domain.InboxScopeAll})
+	inboxPage, _, err := inboxaction.NewLoadInboxQuery(db).Execute(ctx, colleague, inboxaction.LoadInput{Scope: domain.InboxScopeChat})
 	if err != nil {
 		t.Fatal(err)
 	}

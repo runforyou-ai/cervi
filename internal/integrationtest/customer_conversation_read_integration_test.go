@@ -34,10 +34,10 @@ func newCustomerReadFixture(t *testing.T) customerReadFixture {
 		t.Fatal(err)
 	}
 	for _, identity := range []*servermodels.Identity{f.owner, f.member} {
-		if _, err := f.db.NewUpdate().Table("organization_identities").Set("role_id = ?", roleID).Where("organization_id = ? AND id = ?", identity.Organization.ID, identity.OrganizationIdentity.ID).Exec(ctx); err != nil {
+		if _, err := f.db.NewUpdate().Table("users").Set("role_id = ?", roleID).Where("organization_id = ? AND id = ?", identity.Organization.ID, identity.User.ID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
-		identity.OrganizationIdentity.RoleID = roleID
+		identity.User.RoleID = roleID
 	}
 	channel, err := channelaction.NewCreateMessageChannelAction(f.db).Execute(ctx, f.owner, channelaction.CreateMessageChannelInput{
 		Type: domain.ChannelTypeWebsite, Name: "客服未读测试", DefaultLocale: domain.LocaleChineseSimplified,
@@ -57,10 +57,10 @@ func newCustomerReadFixture(t *testing.T) customerReadFixture {
 	return customerReadFixture{navigationFixture: f, channelID: channel.ID, conversationID: result.Conversation.ID, receive: receive}
 }
 
-// inboxRow 读取指定处理归属与服务状态的客服视图，并核对内部提醒总数没有被客户消息改变。
-func (f customerReadFixture) inboxRow(t *testing.T, identity *servermodels.Identity, view domain.CustomerInboxView, status domain.ServiceSessionStatus) inboxaction.ConversationSummary {
+// inboxRow 读取全部服务会话中指定服务状态的目标行，并核对内部提醒总数没有被客户消息改变。
+func (f customerReadFixture) inboxRow(t *testing.T, identity *servermodels.Identity, status domain.ServiceSessionStatus) inboxaction.ConversationSummary {
 	t.Helper()
-	rowsPage, counts, err := inboxaction.NewLoadInboxQuery(f.db).Execute(context.Background(), identity, inboxaction.LoadInput{Scope: domain.InboxScopeCustomer, CustomerView: view, ServiceStatus: status})
+	rowsPage, counts, err := inboxaction.NewLoadInboxQuery(f.db).Execute(context.Background(), identity, inboxaction.LoadInput{Scope: domain.InboxScopeAll, ServiceStatus: status})
 	rows := rowsPage.Conversations
 	if err != nil {
 		t.Fatal(err)
@@ -90,17 +90,17 @@ func TestCustomerConversationPersonalRead(t *testing.T) {
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	read := conversationaction.NewMarkConversationReadAction(f.db)
-	first := f.inboxRow(t, f.owner, domain.CustomerInboxViewQueue, domain.ServiceSessionStatusOpen)
+	first := f.inboxRow(t, f.owner, domain.ServiceSessionStatusOpen)
 	if first.UnreadCount != 1 || first.LastReadMessageID != nil {
 		t.Fatalf("initial unread: %+v", first)
 	}
 	if _, err := read.Execute(ctx, f.owner, f.conversationID, *first.LastMessageID, true); err != nil {
 		t.Fatal(err)
 	}
-	if row := f.inboxRow(t, f.owner, domain.CustomerInboxViewQueue, domain.ServiceSessionStatusOpen); row.UnreadCount != 0 {
+	if row := f.inboxRow(t, f.owner, domain.ServiceSessionStatusOpen); row.UnreadCount != 0 {
 		t.Fatalf("owner unread: %+v", row)
 	}
-	if row := f.inboxRow(t, f.member, domain.CustomerInboxViewQueue, domain.ServiceSessionStatusOpen); row.UnreadCount != 1 {
+	if row := f.inboxRow(t, f.member, domain.ServiceSessionStatusOpen); row.UnreadCount != 1 {
 		t.Fatalf("reading changed coworker: %+v", row)
 	}
 	// 核验旁观客服阅读后参与关系和队列归属保持原值。
@@ -112,10 +112,10 @@ func TestCustomerConversationPersonalRead(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if row := f.inboxRow(t, f.owner, domain.CustomerInboxViewMine, domain.ServiceSessionStatusOpen); row.UnreadCount != 0 {
+	if row := f.inboxRow(t, f.owner, domain.ServiceSessionStatusOpen); row.UnreadCount != 0 {
 		t.Fatalf("own reply unread: %+v", row)
 	}
-	if row := f.inboxRow(t, f.member, domain.CustomerInboxViewCoworkers, domain.ServiceSessionStatusOpen); row.UnreadCount != 2 {
+	if row := f.inboxRow(t, f.member, domain.ServiceSessionStatusOpen); row.UnreadCount != 2 {
 		t.Fatalf("coworker reply not counted: %+v", row)
 	}
 	for _, id := range []string{reply.ID, *first.LastMessageID, reply.ID} {
@@ -128,19 +128,19 @@ func TestCustomerConversationPersonalRead(t *testing.T) {
 	if _, err := conversationaction.NewTransferServiceSessionAction(f.db, coordinator, agentrunaction.NewScheduler(newTestTasks(f.db)), newTestTasks(f.db)).Execute(ctx, f.owner, conversationaction.TransferServiceSessionInput{ConversationID: f.conversationID, TargetKind: domain.ServiceSessionTargetMember, IdentityID: f.member.OrganizationIdentity.ID}); err != nil {
 		t.Fatal(err)
 	}
-	if row := f.inboxRow(t, f.owner, domain.CustomerInboxViewCoworkers, domain.ServiceSessionStatusOpen); row.LastReadMessageID == nil || *row.LastReadMessageID != *first.LastMessageID {
+	if row := f.inboxRow(t, f.owner, domain.ServiceSessionStatusOpen); row.LastReadMessageID == nil || *row.LastReadMessageID != *first.LastMessageID {
 		t.Fatalf("transfer changed owner read: %+v", row)
 	}
 	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(ctx, f.member, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
-	if row := f.inboxRow(t, f.member, domain.CustomerInboxViewMine, domain.ServiceSessionStatusClosed); row.UnreadCount != 0 || *row.LastReadMessageID != reply.ID {
+	if row := f.inboxRow(t, f.member, domain.ServiceSessionStatusClosed); row.UnreadCount != 0 || *row.LastReadMessageID != reply.ID {
 		t.Fatalf("close changed read: %+v", row)
 	}
 	if _, err := conversationaction.NewReopenServiceSessionAction(f.db).Execute(ctx, f.member, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
-	if row := f.inboxRow(t, f.member, domain.CustomerInboxViewMine, domain.ServiceSessionStatusOpen); *row.LastReadMessageID != reply.ID {
+	if row := f.inboxRow(t, f.member, domain.ServiceSessionStatusOpen); *row.LastReadMessageID != reply.ID {
 		t.Fatalf("reopen changed read: %+v", row)
 	}
 	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(ctx, f.member, f.conversationID); err != nil {
@@ -150,7 +150,7 @@ func TestCustomerConversationPersonalRead(t *testing.T) {
 	if err != nil || !next.OpenedNewServiceSession {
 		t.Fatalf("new session: %+v %v", next, err)
 	}
-	if row := f.inboxRow(t, f.member, domain.CustomerInboxViewQueue, domain.ServiceSessionStatusOpen); row.UnreadCount != 1 || *row.LastReadMessageID != reply.ID {
+	if row := f.inboxRow(t, f.member, domain.ServiceSessionStatusOpen); row.UnreadCount != 1 || *row.LastReadMessageID != reply.ID {
 		t.Fatalf("new session reset read: %+v", row)
 	}
 }
@@ -161,8 +161,8 @@ func TestCustomerConversationReadBoundaries(t *testing.T) {
 	other := newCustomerReadFixture(t)
 	ctx := context.Background()
 	read := conversationaction.NewMarkConversationReadAction(f.db)
-	first := f.inboxRow(t, f.owner, domain.CustomerInboxViewQueue, domain.ServiceSessionStatusOpen)
-	foreign := other.inboxRow(t, other.owner, domain.CustomerInboxViewQueue, domain.ServiceSessionStatusOpen)
+	first := f.inboxRow(t, f.owner, domain.ServiceSessionStatusOpen)
+	foreign := other.inboxRow(t, other.owner, domain.ServiceSessionStatusOpen)
 	for _, attempt := range []struct {
 		identity              *servermodels.Identity
 		conversation, message string
@@ -179,7 +179,7 @@ func TestCustomerConversationReadBoundaries(t *testing.T) {
 	if _, err := f.db.NewUpdate().Table("chat_subjects").Set("source_id = ?", f.owner.OrganizationIdentity.ID).Where("organization_id = ? AND kind = ?", f.owner.Organization.ID, domain.ChatSubjectKindContact).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if row := f.inboxRow(t, f.owner, domain.CustomerInboxViewQueue, domain.ServiceSessionStatusOpen); row.UnreadCount != 1 {
+	if row := f.inboxRow(t, f.owner, domain.ServiceSessionStatusOpen); row.UnreadCount != 1 {
 		t.Fatalf("contact mistaken for self: %+v", row)
 	}
 	if _, err := read.Execute(ctx, f.owner, f.conversationID, *first.LastMessageID, false); err != nil {
@@ -196,13 +196,13 @@ func TestCustomerConversationReadBoundaries(t *testing.T) {
 	if _, err := f.db.NewUpdate().Table("messages").Set("deleted_at = now()").Where("id IN (?)", bun.In([]string{*first.LastMessageID, second.Message.ID})).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if row := f.inboxRow(t, f.owner, domain.CustomerInboxViewQueue, domain.ServiceSessionStatusOpen); row.UnreadCount != 1 || *row.LastReadMessageID != *first.LastMessageID {
+	if row := f.inboxRow(t, f.owner, domain.ServiceSessionStatusOpen); row.UnreadCount != 1 || *row.LastReadMessageID != *first.LastMessageID {
 		t.Fatalf("deleted read anchor: %+v", row)
 	}
 	if _, err := read.Execute(ctx, f.owner, f.conversationID, third.Message.ID, true); err != nil {
 		t.Fatal(err)
 	}
-	if row := f.inboxRow(t, f.owner, domain.CustomerInboxViewQueue, domain.ServiceSessionStatusOpen); row.UnreadCount != 0 {
+	if row := f.inboxRow(t, f.owner, domain.ServiceSessionStatusOpen); row.UnreadCount != 0 {
 		t.Fatalf("explicit read: %+v", row)
 	}
 }
@@ -285,7 +285,7 @@ func TestCustomerConversationDelayedMessage(t *testing.T) {
 			if err := <-done; err != nil {
 				t.Fatal(err)
 			}
-			row := f.inboxRow(t, f.member, domain.CustomerInboxViewCoworkers, domain.ServiceSessionStatusOpen)
+			row := f.inboxRow(t, f.member, domain.ServiceSessionStatusOpen)
 			if row.UnreadCount != 1 {
 				t.Fatalf("late commit disappeared from unread: %+v", row)
 			}

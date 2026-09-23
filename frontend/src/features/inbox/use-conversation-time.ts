@@ -1,5 +1,5 @@
 /** 桌面端与移动端共用的会话时间显示和分钟刷新。 */
-import { useEffect, useMemo, useState } from "react"
+import { useCallback, useEffect, useMemo, useState } from "react"
 import { useTranslation } from "react-i18next"
 import { useUserTimeZone } from "@/contexts/user-preferences"
 import { createConversationTimeFormatter } from "./conversation-time"
@@ -15,6 +15,17 @@ export function useConversationTime() {
     }),
     [i18n.resolvedLanguage, t, timeZone],
   )
+}
+
+/** 把等待起点格式化为等待时长，不足一分钟按一分钟计。 */
+export function useWaitingDuration() {
+  const { t } = useTranslation("inbox")
+  return useCallback((since: string) => {
+    const minutes = Math.max(1, Math.floor((Date.now() - new Date(since).getTime()) / 60_000))
+    if (minutes < 60) return t("waitingMinutes", { count: minutes })
+    if (minutes < 24 * 60) return t("waitingHours", { count: Math.floor(minutes / 60) })
+    return t("waitingDays", { count: Math.floor(minutes / (24 * 60)) })
+  }, [t])
 }
 
 /** 每分钟触发一次重渲染，保持相对时间新鲜。 */

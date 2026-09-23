@@ -1038,7 +1038,7 @@ func (b *DirectBackend) UpdateUser(ctx context.Context, meta RequestMeta, userID
 	return b.ops.UpdateUser(ctx, meta, identity, userID, input)
 }
 
-// UpdateRoleAssignments 在一个事务中批量调整真人和 AI 员工角色。
+// UpdateRoleAssignments 在一个事务中批量调整成员角色。
 func (b *DirectBackend) UpdateRoleAssignments(ctx context.Context, meta RequestMeta, input RoleAssignmentsInput) error {
 	identity, err := b.ops.authenticate(ctx, meta)
 	if err != nil {
@@ -1077,6 +1077,16 @@ func (b *DirectBackend) ListTeams(ctx context.Context, meta RequestMeta, input T
 	return b.ops.ListTeams(ctx, meta, identity, input)
 }
 
+// GetTeam 返回团队详情。
+func (b *DirectBackend) GetTeam(ctx context.Context, meta RequestMeta, teamID string) (Team, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero Team
+		return zero, err
+	}
+	return b.ops.GetTeam(ctx, meta, identity, teamID)
+}
+
 // CreateTeam 创建企业团队。
 func (b *DirectBackend) CreateTeam(ctx context.Context, meta RequestMeta, input TeamInput) (Team, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
@@ -1104,16 +1114,6 @@ func (b *DirectBackend) DeleteTeam(ctx context.Context, meta RequestMeta, teamID
 		return err
 	}
 	return b.ops.DeleteTeam(ctx, meta, identity, teamID)
-}
-
-// ListAllTeamMembers 返回企业所有团队的成员列表，同一身份只列一次。
-func (b *DirectBackend) ListAllTeamMembers(ctx context.Context, meta RequestMeta, input TeamMemberListInput) (TeamMemberList, error) {
-	identity, err := b.ops.authenticate(ctx, meta)
-	if err != nil {
-		var zero TeamMemberList
-		return zero, err
-	}
-	return b.ops.ListAllTeamMembers(ctx, meta, identity, input)
 }
 
 // ListTeamMembers 返回团队成员列表。

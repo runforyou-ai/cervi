@@ -49,7 +49,7 @@ func TestDirectPeerWorkStatus(t *testing.T) {
 // loadDirectPeerWorkStatus 读取指定身份收件箱中该单聊的对端工作状态。
 func loadDirectPeerWorkStatus(t *testing.T, db *bun.DB, identity *servermodels.Identity, conversationID string) domain.WorkStatus {
 	t.Helper()
-	page, _, err := inboxaction.NewLoadInboxQuery(db).Execute(context.Background(), identity, inboxaction.LoadInput{})
+	page, _, err := inboxaction.NewLoadInboxQuery(db).Execute(context.Background(), identity, inboxaction.LoadInput{Scope: domain.InboxScopeChat})
 	if err != nil {
 		t.Fatal(err)
 	}

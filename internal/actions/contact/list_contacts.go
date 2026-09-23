@@ -80,9 +80,6 @@ func applyContactFilters(query *bun.SelectQuery, organizationID string, input Li
 	if input.ChannelID != "" {
 		query = query.Where("(c.source_channel_id = ? OR EXISTS (SELECT 1 FROM contact_channel_identities AS cci WHERE cci.organization_id = c.organization_id AND cci.contact_id = c.id AND cci.channel_id = ?))", input.ChannelID, input.ChannelID)
 	}
-	if input.ChannelType != "" {
-		query = query.Where("(EXISTS (SELECT 1 FROM channels AS ch WHERE ch.organization_id = c.organization_id AND ch.id = c.source_channel_id AND ch.type = ?) OR EXISTS (SELECT 1 FROM contact_channel_identities AS cci JOIN channels AS ch ON ch.id = cci.channel_id AND ch.organization_id = cci.organization_id WHERE cci.organization_id = c.organization_id AND cci.contact_id = c.id AND ch.type = ?))", input.ChannelType, input.ChannelType)
-	}
 	if input.MethodType != "" {
 		query = query.Where("EXISTS (SELECT 1 FROM contact_methods AS cm WHERE cm.organization_id = c.organization_id AND cm.contact_id = c.id AND cm.type = ?)", input.MethodType)
 	}

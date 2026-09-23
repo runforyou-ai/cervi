@@ -643,6 +643,7 @@ func conversationMessageFromAction(message conversationaction.ConversationMessag
 			ServiceSessionID: message.SystemEvent.ServiceSessionID, FromIdentityID: message.SystemEvent.FromIdentityID,
 			FromDisplayName: message.SystemEvent.FromDisplayName, HandoffReason: (*AgentHandoffReason)(message.SystemEvent.Reason),
 			ReturnReason: (*ServiceSessionReturnReason)(message.SystemEvent.ReturnReason),
+			CloseReason:  (*ServiceSessionCloseReason)(message.SystemEvent.CloseReason),
 			ReasonText:   message.SystemEvent.ReasonText, AgentRunID: message.SystemEvent.AgentRunID,
 		}
 		// 客服处理周期事件的操作人按群聊事件的 actor 结构返回。

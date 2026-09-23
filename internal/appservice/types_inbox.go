@@ -25,23 +25,40 @@ const (
 	AgentRunStatusCancelled AgentRunStatus = AgentRunStatus(domain.AgentRunStatusCancelled)
 )
 
-// InboxScope 表示统一收件箱读取范围。
+// InboxScope 表示会话列表读取范围：pending 为待处理服务会话，all 为全部服务会话，chat 为本人参与的群聊与单聊。
 type InboxScope string
 
 const (
-	InboxScopeAll      InboxScope = InboxScope(domain.InboxScopeAll)
-	InboxScopeCustomer InboxScope = InboxScope(domain.InboxScopeCustomer)
-	InboxScopeInternal InboxScope = InboxScope(domain.InboxScopeInternal)
+	InboxScopePending InboxScope = InboxScope(domain.InboxScopePending)
+	InboxScopeAll     InboxScope = InboxScope(domain.InboxScopeAll)
+	InboxScopeChat    InboxScope = InboxScope(domain.InboxScopeChat)
 )
 
-// CustomerInboxView 表示客户会话的处理归属视图。
-type CustomerInboxView string
+// InboxPendingKind 表示待处理条目的类型：reply 为等我回复，queue 为待领取，mention 为内部备注提醒本人。
+type InboxPendingKind string
 
 const (
-	CustomerInboxViewQueue     CustomerInboxView = CustomerInboxView(domain.CustomerInboxViewQueue)
-	CustomerInboxViewMine      CustomerInboxView = CustomerInboxView(domain.CustomerInboxViewMine)
-	CustomerInboxViewCoworkers CustomerInboxView = CustomerInboxView(domain.CustomerInboxViewCoworkers)
-	CustomerInboxViewMentioned CustomerInboxView = CustomerInboxView(domain.CustomerInboxViewMentioned)
+	InboxPendingKindReply   InboxPendingKind = InboxPendingKind(domain.InboxPendingKindReply)
+	InboxPendingKindQueue   InboxPendingKind = InboxPendingKind(domain.InboxPendingKindQueue)
+	InboxPendingKindMention InboxPendingKind = InboxPendingKind(domain.InboxPendingKindMention)
+)
+
+// InboxAssigneeFilter 表示服务会话的负责人筛选：all 为不限，unassigned 为未分配，identity 为指定企业身份。
+type InboxAssigneeFilter string
+
+const (
+	InboxAssigneeFilterAll        InboxAssigneeFilter = InboxAssigneeFilter(domain.InboxAssigneeFilterAll)
+	InboxAssigneeFilterUnassigned InboxAssigneeFilter = InboxAssigneeFilter(domain.InboxAssigneeFilterUnassigned)
+	InboxAssigneeFilterIdentity   InboxAssigneeFilter = InboxAssigneeFilter(domain.InboxAssigneeFilterIdentity)
+)
+
+// ServiceAudience 表示服务对象：customer 为外部客户，employee 为本企业员工，partner 为伙伴。
+type ServiceAudience string
+
+const (
+	ServiceAudienceCustomer ServiceAudience = ServiceAudience(domain.ServiceAudienceCustomer)
+	ServiceAudienceEmployee ServiceAudience = ServiceAudience(domain.ServiceAudienceEmployee)
+	ServiceAudiencePartner  ServiceAudience = ServiceAudience(domain.ServiceAudiencePartner)
 )
 
 // InboxPartition 表示统一收件箱的置顶分区。
@@ -77,7 +94,7 @@ type ConversationPinState struct {
 	PinOrderVersion string `json:"pinOrderVersion"`
 }
 
-// CustomerQueueFilter 表示「待分配」视图的队列筛选。
+// CustomerQueueFilter 表示待领取条目的队列筛选。
 type CustomerQueueFilter string
 
 const (
@@ -86,31 +103,35 @@ const (
 	CustomerQueueFilterTeam   CustomerQueueFilter = CustomerQueueFilter(domain.CustomerQueueFilterTeam)
 )
 
-// InboxQuery 定义与分页边界无关的会话筛选；search 非空时按会话名称搜索，searchRange 为 list 时沿用列表筛选，为 readable 时覆盖全部可读会话且不带其他列表筛选。
+// InboxQuery 定义与分页边界无关的会话列表范围与筛选；pendingKind 与队列筛选只在待处理范围生效，pendingKind 为 mention 时包含同时等我回复或待领取但有提醒本人的条目，服务状态与负责人筛选只在全部范围生效，来源与服务对象在两个服务会话范围生效，kinds 只在聊天范围生效；search 非空时按会话名称搜索，searchRange 为 list 时沿用列表范围，为 readable 时覆盖全部可读会话且不带范围与筛选。
 type InboxQuery struct {
 	Partition          InboxPartition       `json:"partition" query:"partition"`
 	Scope              InboxScope           `json:"scope" query:"scope"`
-	CustomerView       CustomerInboxView    `json:"customerView" query:"customerView"`
+	PendingKind        InboxPendingKind     `json:"pendingKind" query:"pendingKind"`
 	QueueFilter        CustomerQueueFilter  `json:"queueFilter" query:"queueFilter"`
 	QueueTeamID        string               `json:"queueTeamId" query:"queueTeamId"`
-	AssigneeIdentityID string               `json:"assigneeIdentityId" query:"assigneeIdentityId"`
 	ChannelID          string               `json:"channelId" query:"channelId"`
+	Audience           ServiceAudience      `json:"audience" query:"audience"`
 	ServiceStatus      ServiceSessionStatus `json:"serviceStatus" query:"serviceStatus"`
+	AssigneeFilter     InboxAssigneeFilter  `json:"assigneeFilter" query:"assigneeFilter"`
+	AssigneeIdentityID string               `json:"assigneeIdentityId" query:"assigneeIdentityId"`
 	Kinds              []ConversationType   `json:"kinds" query:"kinds"`
 	Search             string               `json:"search" query:"search"`
 	SearchRange        InboxSearchRange     `json:"searchRange" query:"searchRange"`
 }
 
-// LoadInboxInput 定义统一收件箱筛选、会话名称搜索和分页边界。
+// LoadInboxInput 定义会话列表范围、筛选、会话名称搜索和分页边界。
 type LoadInboxInput struct {
 	Partition          InboxPartition       `json:"partition" query:"partition"`
 	Scope              InboxScope           `json:"scope" query:"scope"`
-	CustomerView       CustomerInboxView    `json:"customerView" query:"customerView"`
+	PendingKind        InboxPendingKind     `json:"pendingKind" query:"pendingKind"`
 	QueueFilter        CustomerQueueFilter  `json:"queueFilter" query:"queueFilter"`
 	QueueTeamID        string               `json:"queueTeamId" query:"queueTeamId"`
-	AssigneeIdentityID string               `json:"assigneeIdentityId" query:"assigneeIdentityId"`
 	ChannelID          string               `json:"channelId" query:"channelId"`
+	Audience           ServiceAudience      `json:"audience" query:"audience"`
 	ServiceStatus      ServiceSessionStatus `json:"serviceStatus" query:"serviceStatus"`
+	AssigneeFilter     InboxAssigneeFilter  `json:"assigneeFilter" query:"assigneeFilter"`
+	AssigneeIdentityID string               `json:"assigneeIdentityId" query:"assigneeIdentityId"`
 	Kinds              []ConversationType   `json:"kinds" query:"kinds"`
 	Search             string               `json:"search" query:"search"`
 	SearchRange        InboxSearchRange     `json:"searchRange" query:"searchRange"`
@@ -122,10 +143,10 @@ type LoadInboxInput struct {
 // query 返回不含分页边界的会话筛选。
 func (input LoadInboxInput) query() InboxQuery {
 	return InboxQuery{
-		Partition: input.Partition,
-		Scope:     input.Scope, CustomerView: input.CustomerView, AssigneeIdentityID: input.AssigneeIdentityID,
-		QueueFilter: input.QueueFilter, QueueTeamID: input.QueueTeamID,
-		ChannelID: input.ChannelID, ServiceStatus: input.ServiceStatus, Kinds: input.Kinds,
+		Partition: input.Partition, Scope: input.Scope,
+		PendingKind: input.PendingKind, QueueFilter: input.QueueFilter, QueueTeamID: input.QueueTeamID,
+		ChannelID: input.ChannelID, Audience: input.Audience, ServiceStatus: input.ServiceStatus,
+		AssigneeFilter: input.AssigneeFilter, AssigneeIdentityID: input.AssigneeIdentityID, Kinds: input.Kinds,
 		Search: input.Search, SearchRange: input.SearchRange,
 	}
 }
@@ -253,6 +274,13 @@ type GroupInboxConversation struct {
 	MemberCount               int                       `json:"memberCount"`
 }
 
+// InboxPendingItem 定义待处理条目的类型、等待起点，以及当前周期内是否有提醒本人且尚未回应的内部备注。
+type InboxPendingItem struct {
+	Kind      InboxPendingKind `json:"kind"`
+	Since     time.Time        `json:"since"`
+	Mentioned bool             `json:"mentioned"`
+}
+
 // InboxConversation 定义成员统一收件箱列表项。
 type InboxConversation struct {
 	// PositionCursor 保存列表窗口和匹配锚点的查询位置。
@@ -273,6 +301,8 @@ type InboxConversation struct {
 	Customer          *CustomerInboxConversation `json:"customer"`
 	Direct            *DirectInboxConversation   `json:"direct"`
 	Group             *GroupInboxConversation    `json:"group"`
+	// Pending 只在待处理范围的列表项中返回。
+	Pending *InboxPendingItem `json:"pending"`
 }
 
 // Inbox 定义成员收件箱查询结果。
@@ -287,8 +317,8 @@ type Inbox struct {
 	HasMore              bool                `json:"hasMore"`
 	UnreadCount          int                 `json:"unreadCount"`
 	AttentionUnreadCount int                 `json:"attentionUnreadCount"`
-	// CustomerMentionedUnreadCount 是处理中客户会话的当前周期内提醒本人且尚未读到的消息数。
-	CustomerMentionedUnreadCount int `json:"customerMentionedUnreadCount"`
+	// PendingCount 是本人全部待处理条目数，不受当前筛选影响。
+	PendingCount int `json:"pendingCount"`
 }
 
 // InboxConversationAvailability 表示指定会话的阅读和列表资格。
@@ -300,7 +330,7 @@ const (
 	InboxConversationUnavailable  InboxConversationAvailability = "unavailable"
 )
 
-// ReadInboxConversationsInput 指定待核对的会话及完整列表筛选。
+// ReadInboxConversationsInput 指定待核对的会话及完整列表筛选；未指定范围与搜索词时只核对阅读资格。
 type ReadInboxConversationsInput struct {
 	ConversationIDs []string   `json:"conversationIds"`
 	Query           InboxQuery `json:"query"`
@@ -367,18 +397,20 @@ const (
 	InboxSearchRangeConversation InboxSearchRange = "conversation"
 )
 
-// InboxSearchInput 定义检索文本与范围；列表筛选只在 list 范围生效，会话编号只在 conversation 范围生效。
+// InboxSearchInput 定义检索文本与范围；列表范围与筛选只在 list 范围生效，会话编号只在 conversation 范围生效。
 type InboxSearchInput struct {
 	Query              string               `json:"query" query:"query"`
 	Range              InboxSearchRange     `json:"range" query:"range"`
 	ConversationID     string               `json:"conversationId" query:"conversationId"`
 	Scope              InboxScope           `json:"scope" query:"scope"`
-	CustomerView       CustomerInboxView    `json:"customerView" query:"customerView"`
+	PendingKind        InboxPendingKind     `json:"pendingKind" query:"pendingKind"`
 	QueueFilter        CustomerQueueFilter  `json:"queueFilter" query:"queueFilter"`
 	QueueTeamID        string               `json:"queueTeamId" query:"queueTeamId"`
-	AssigneeIdentityID string               `json:"assigneeIdentityId" query:"assigneeIdentityId"`
 	ChannelID          string               `json:"channelId" query:"channelId"`
+	Audience           ServiceAudience      `json:"audience" query:"audience"`
 	ServiceStatus      ServiceSessionStatus `json:"serviceStatus" query:"serviceStatus"`
+	AssigneeFilter     InboxAssigneeFilter  `json:"assigneeFilter" query:"assigneeFilter"`
+	AssigneeIdentityID string               `json:"assigneeIdentityId" query:"assigneeIdentityId"`
 	Kinds              []ConversationType   `json:"kinds" query:"kinds"`
 }
 

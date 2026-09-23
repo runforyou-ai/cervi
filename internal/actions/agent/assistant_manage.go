@@ -47,16 +47,9 @@ func (a *CreateAssistantAction) Execute(ctx context.Context, identity *servermod
 		if err != nil {
 			return err
 		}
-		// 助理的企业身份使用企业内置成员角色，不参与客服接待。
-		var roleID string
-		if err := tx.NewSelect().TableExpr("roles AS r").ColumnExpr("r.id::text").
-			Where("r.organization_id = ? AND r.kind = ?", identity.Organization.ID, domain.RoleKindMember).
-			For("KEY SHARE").Scan(ctx, &roleID); err != nil {
-			return fmt.Errorf("load assistant role: %w", err)
-		}
 		organizationIdentity := &servermodels.OrganizationIdentity{
 			OrganizationID: identity.Organization.ID, Type: string(domain.OrganizationIdentityTypeAssistant),
-			RoleID: roleID, DisplayName: input.DisplayName, WorkStatus: string(domain.WorkStatusWorking),
+			DisplayName: input.DisplayName, WorkStatus: string(domain.WorkStatusWorking),
 		}
 		if input.AvatarFileID != "" {
 			if organizationIdentity.AvatarFileID, err = fileaction.ActivateLinkedImage(ctx, tx, identity.Organization.ID, domain.FilePurposeAgentAvatar, input.AvatarFileID, nil); err != nil {
@@ -64,7 +57,7 @@ func (a *CreateAssistantAction) Execute(ctx context.Context, identity *servermod
 			}
 		}
 		if _, err := tx.NewInsert().Model(organizationIdentity).
-			Column("organization_id", "type", "role_id", "display_name", "avatar_file_id", "handles_customers", "work_status").
+			Column("organization_id", "type", "display_name", "avatar_file_id", "handles_customers", "work_status").
 			Returning("id").Exec(ctx); err != nil {
 			return err
 		}

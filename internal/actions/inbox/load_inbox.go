@@ -21,19 +21,21 @@ import (
 
 const defaultInboxPageSize = 50
 
-// LoadInput 定义统一收件箱筛选、会话名称搜索、页大小和分页边界；Search 规范化后为空表示不搜索，SearchRange 只在搜索时生效。
+// LoadInput 定义会话列表范围、筛选、会话名称搜索、页大小和分页边界；Search 规范化后为空表示不搜索，SearchRange 只在搜索时生效。
 type LoadInput struct {
 	Cursor             string
 	BeforeCursor       string
 	Limit              int
 	Partition          domain.InboxPartition
 	Scope              domain.InboxScope
-	CustomerView       domain.CustomerInboxView
+	PendingKind        domain.InboxPendingKind
 	QueueFilter        domain.CustomerQueueFilter
 	QueueTeamID        string
-	AssigneeIdentityID string
 	ChannelID          string
+	Audience           domain.ServiceAudience
 	ServiceStatus      domain.ServiceSessionStatus
+	AssigneeFilter     domain.InboxAssigneeFilter
+	AssigneeIdentityID string
 	Kinds              []domain.ConversationType
 	Search             string
 	SearchRange        SearchRange
@@ -42,6 +44,13 @@ type LoadInput struct {
 // includesKind 判断会话类型是否属于当前筛选，未选类型表示不限类型。
 func (input LoadInput) includesKind(kind domain.ConversationType) bool {
 	return len(input.Kinds) == 0 || slices.Contains(input.Kinds, kind)
+}
+
+// PendingSummary 定义待处理条目的类型、等待起点，以及当前周期内是否有提醒本人且尚未回应的内部备注。
+type PendingSummary struct {
+	Kind      domain.InboxPendingKind
+	Since     time.Time
+	Mentioned bool
 }
 
 // AssigneeSummary 定义客户会话负责人摘要。
@@ -132,6 +141,8 @@ type ConversationSummary struct {
 	Agent                *AgentConversationSummary
 	Direct               *DirectConversationSummary
 	Group                *GroupConversationSummary
+	// Pending 只在待处理范围内返回，给出条目类型与等待起点。
+	Pending *PendingSummary
 }
 
 // LoadInboxQuery 读取当前企业的统一收件箱。
@@ -139,11 +150,11 @@ type LoadInboxQuery struct {
 	db bun.IDB
 }
 
-// UnreadCounts 定义内部会话的客观未读和提醒未读总数，以及处理中客户会话里提醒本人的未读数。
+// UnreadCounts 定义内部会话的客观未读和提醒未读总数，以及本人待处理的服务会话数。
 type UnreadCounts struct {
-	Unread            int `bun:"unread_count"`
-	Attention         int `bun:"attention_unread_count"`
-	CustomerMentioned int `bun:"-"`
+	Unread    int `bun:"unread_count"`
+	Attention int `bun:"attention_unread_count"`
+	Pending   int `bun:"-"`
 }
 
 type customerConversationRow struct {
@@ -299,7 +310,7 @@ func (q *LoadInboxQuery) Execute(ctx context.Context, identity *servermodels.Ide
 		if err != nil {
 			return err
 		}
-		counts.CustomerMentioned, err = snapshot.countCustomerMentionedUnread(ctx, identity)
+		counts.Pending, err = snapshot.countPending(ctx, identity)
 		return err
 	})
 	return page, counts, err
@@ -398,70 +409,25 @@ func messageMentionsIdentity(db bun.IDB, messageAlias, identityID string) *bun.S
 		Where("mention_cs.kind = ? AND mention_cs.source_id = ?", domain.ChatSubjectKindOrganizationIdentity, identityID)
 }
 
-// filterCustomerInbox 为客户摘要追加当前列表的筛选条件。
-func filterCustomerInbox(query *bun.SelectQuery, currentIdentityID string, input LoadInput) *bun.SelectQuery {
+// filterServiceInbox 为服务会话追加来源与服务对象筛选；全部范围另按服务状态和负责人筛选。
+func filterServiceInbox(query *bun.SelectQuery, input LoadInput) *bun.SelectQuery {
 	query = query.Where("msg.id IS NOT NULL")
 	if input.ChannelID != "" {
 		query = query.Where("cci.channel_id = ?", input.ChannelID)
 	}
-	if input.Scope == domain.InboxScopeAll {
-		// 本人负责，或在当前客服周期内发过文本或附件消息（对客回复、内部备注）或被提醒。
-		query = query.
-			Where("current.status = ?", domain.ServiceSessionStatusOpen).
-			Where(`(
-				current.assignee_identity_id = ?
-				OR EXISTS (
-					SELECT 1
-					FROM messages AS related_msg
-					JOIN conversation_participants AS related_cp
-						ON related_cp.organization_id = related_msg.organization_id
-						AND related_cp.conversation_id = related_msg.conversation_id
-						AND related_cp.id = related_msg.sender_participant_id
-					JOIN chat_subjects AS related_cs
-						ON related_cs.organization_id = related_cp.organization_id
-						AND related_cs.id = related_cp.subject_id
-					WHERE related_msg.organization_id = cv.organization_id
-						AND related_msg.conversation_id = cv.id
-						AND related_msg.service_session_id = current.id
-						AND related_msg.deleted_at IS NULL
-						AND related_msg.type IN (?)
-						AND related_cs.kind = ?
-						AND related_cs.source_id = ?
-				)
-				OR EXISTS (
-					SELECT 1 FROM messages AS note
-					WHERE note.organization_id = cv.organization_id AND note.conversation_id = cv.id
-						AND note.service_session_id = current.id AND note.deleted_at IS NULL AND EXISTS (?)
-				)
-			)`, currentIdentityID, bun.In([]domain.MessageType{domain.MessageTypeText, domain.MessageTypeAttachment}), domain.ChatSubjectKindOrganizationIdentity, currentIdentityID, messageMentionsIdentity(query.DB(), "note", currentIdentityID))
-	} else {
-		// 服务状态与处理归属是两个正交条件，同时收窄同一批客户会话。
-		query = query.Where("current.status = ?", input.ServiceStatus)
-		switch input.CustomerView {
-		case domain.CustomerInboxViewQueue:
-			query = query.Where("current.assignee_identity_id IS NULL")
-			switch input.QueueFilter {
-			case domain.CustomerQueueFilterPublic:
-				query = query.Where("current.team_id IS NULL")
-			case domain.CustomerQueueFilterTeam:
-				query = query.Where("current.team_id = ?", input.QueueTeamID)
-			}
-		case domain.CustomerInboxViewMine:
-			query = query.Where("current.assignee_identity_id = ?", currentIdentityID)
-		case domain.CustomerInboxViewCoworkers:
-			query = query.Where("current.assignee_identity_id IS NOT NULL").
-				Where("current.assignee_identity_id <> ?", currentIdentityID)
-			if input.AssigneeIdentityID != "" {
-				query = query.Where("current.assignee_identity_id = ?", input.AssigneeIdentityID)
-			}
-		case domain.CustomerInboxViewMentioned:
-			// 当前客服周期内有内部备注提醒本人。
-			query = query.Where(`EXISTS (
-				SELECT 1 FROM messages AS note
-				WHERE note.organization_id = cv.organization_id AND note.conversation_id = cv.id
-					AND note.service_session_id = current.id AND note.deleted_at IS NULL AND EXISTS (?)
-			)`, messageMentionsIdentity(query.DB(), "note", currentIdentityID))
-		}
+	// 当前服务会话都来自客户渠道，员工与伙伴的服务会话尚未接入。
+	if input.Audience != "" && input.Audience != domain.ServiceAudienceCustomer {
+		query = query.Where("FALSE")
+	}
+	if input.Scope != domain.InboxScopeAll {
+		return query
+	}
+	query = query.Where("current.status = ?", input.ServiceStatus)
+	switch input.AssigneeFilter {
+	case domain.InboxAssigneeFilterUnassigned:
+		query = query.Where("current.assignee_identity_id IS NULL")
+	case domain.InboxAssigneeFilterIdentity:
+		query = query.Where("current.assignee_identity_id = ?", input.AssigneeIdentityID)
 	}
 	return query
 }
@@ -571,18 +537,11 @@ func (q *LoadInboxQuery) loadUnreadCounts(ctx context.Context, organizationID, i
 	return counts, nil
 }
 
-// countCustomerMentionedUnread 统计处理中客户会话的当前周期内提醒本人且尚未读到的消息数，范围与默认的 @我的 视图一致。
-func (q *LoadInboxQuery) countCustomerMentionedUnread(ctx context.Context, identity *servermodels.Identity) (int, error) {
-	count, err := q.db.NewSelect().TableExpr("messages AS msg").
-		Join("JOIN customer_conversations AS cc ON cc.organization_id = msg.organization_id AND cc.conversation_id = msg.conversation_id AND cc.current_service_session_id = msg.service_session_id").
-		Join("JOIN service_sessions AS current ON current.organization_id = cc.organization_id AND current.id = cc.current_service_session_id AND current.status = ?", domain.ServiceSessionStatusOpen).
-		Join("LEFT JOIN conversation_user_states AS state ON state.organization_id = msg.organization_id AND state.conversation_id = msg.conversation_id AND state.user_id = ?", identity.User.ID).
-		Where("msg.organization_id = ? AND msg.deleted_at IS NULL", identity.Organization.ID).
-		Where("msg.message_seq > COALESCE(state.read_seq, 0)").
-		Where("EXISTS (?)", messageMentionsIdentity(q.db, "msg", identity.OrganizationIdentity.ID)).
-		Count(ctx)
+// countPending 统计本人全部待处理条目，不受当前筛选影响。
+func (q *LoadInboxQuery) countPending(ctx context.Context, identity *servermodels.Identity) (int, error) {
+	count, err := q.db.NewSelect().TableExpr("(?) AS pending", q.pendingCandidates(identity, LoadInput{Scope: domain.InboxScopePending})).Count(ctx)
 	if err != nil {
-		return 0, fmt.Errorf("count customer mentioned unread messages: %w", err)
+		return 0, fmt.Errorf("count pending service conversations: %w", err)
 	}
 	return count, nil
 }
@@ -659,36 +618,26 @@ func (row groupConversationRow) summary() ConversationSummary {
 	}
 }
 
-// inboxKindsForScope 返回当前范围内可筛选的会话类型，顺序用于规范化筛选值。
-func inboxKindsForScope(scope domain.InboxScope) []domain.ConversationType {
-	switch scope {
-	case domain.InboxScopeCustomer:
-		return []domain.ConversationType{domain.ConversationTypeCustomer}
-	case domain.InboxScopeInternal:
-		return []domain.ConversationType{domain.ConversationTypeDirect, domain.ConversationTypeGroup, domain.ConversationTypeAgent}
-	default:
-		return []domain.ConversationType{domain.ConversationTypeCustomer, domain.ConversationTypeDirect, domain.ConversationTypeGroup, domain.ConversationTypeAgent}
-	}
-}
+// chatKinds 是一级栏聊天可筛选的会话类型，顺序用于规范化筛选值。
+var chatKinds = []domain.ConversationType{domain.ConversationTypeDirect, domain.ConversationTypeGroup, domain.ConversationTypeAgent}
 
-// normalizeInboxKinds 校验会话类型属于当前范围，并按固定顺序去重；覆盖全部类型等同不限类型。
-func normalizeInboxKinds(scope domain.InboxScope, kinds []domain.ConversationType) ([]domain.ConversationType, error) {
+// normalizeChatKinds 校验会话类型属于聊天范围，并按固定顺序去重；覆盖全部类型等同不限类型。
+func normalizeChatKinds(kinds []domain.ConversationType) ([]domain.ConversationType, error) {
 	if len(kinds) == 0 {
 		return nil, nil
 	}
-	available := inboxKindsForScope(scope)
 	selected := make(map[domain.ConversationType]bool, len(kinds))
 	for _, kind := range kinds {
-		if !slices.Contains(available, kind) {
+		if !slices.Contains(chatKinds, kind) {
 			return nil, ErrQueryInvalid
 		}
 		selected[kind] = true
 	}
-	if len(selected) == len(available) {
+	if len(selected) == len(chatKinds) {
 		return nil, nil
 	}
 	normalized := make([]domain.ConversationType, 0, len(selected))
-	for _, kind := range available {
+	for _, kind := range chatKinds {
 		if selected[kind] {
 			normalized = append(normalized, kind)
 		}
@@ -696,44 +645,72 @@ func normalizeInboxKinds(scope domain.InboxScope, kinds []domain.ConversationTyp
 	return normalized, nil
 }
 
-// validateQueueFilter 校验队列筛选：只在「待分配」视图生效，指定团队时须带有效团队编号。
-func validateQueueFilter(input LoadInput) error {
-	if input.CustomerView != domain.CustomerInboxViewQueue {
-		if input.QueueFilter != "" || input.QueueTeamID != "" {
-			return ErrQueryInvalid
-		}
-		return nil
+// normalizeQueueFilter 规范化待领取条目的队列筛选：只在待领取类型生效，指定团队时须带有效团队编号。
+func normalizeQueueFilter(input LoadInput) (LoadInput, error) {
+	if input.PendingKind != domain.InboxPendingKindQueue {
+		input.QueueFilter, input.QueueTeamID = "", ""
+		return input, nil
+	}
+	if input.QueueFilter == "" {
+		input.QueueFilter = domain.CustomerQueueFilterAll
 	}
 	switch input.QueueFilter {
 	case domain.CustomerQueueFilterAll, domain.CustomerQueueFilterPublic:
 		if input.QueueTeamID != "" {
-			return ErrQueryInvalid
+			return input, ErrQueryInvalid
 		}
 	case domain.CustomerQueueFilterTeam:
 		if !common.ValidUUID(input.QueueTeamID) {
-			return ErrQueryInvalid
+			return input, ErrQueryInvalid
 		}
 	default:
+		return input, ErrQueryInvalid
+	}
+	return input, nil
+}
+
+// normalizeAssigneeFilter 规范化全部范围的负责人筛选：指定企业身份时须带有效身份编号。
+func normalizeAssigneeFilter(input LoadInput) (LoadInput, error) {
+	if input.AssigneeFilter == "" {
+		input.AssigneeFilter = domain.InboxAssigneeFilterAll
+	}
+	switch input.AssigneeFilter {
+	case domain.InboxAssigneeFilterAll, domain.InboxAssigneeFilterUnassigned:
+		if input.AssigneeIdentityID != "" {
+			return input, ErrQueryInvalid
+		}
+	case domain.InboxAssigneeFilterIdentity:
+		if !common.ValidUUID(input.AssigneeIdentityID) {
+			return input, ErrQueryInvalid
+		}
+	default:
+		return input, ErrQueryInvalid
+	}
+	return input, nil
+}
+
+// normalizeServiceFilters 校验服务会话共用的来源与服务对象筛选。
+func normalizeServiceFilters(input LoadInput) error {
+	if input.ChannelID != "" && !common.ValidUUID(input.ChannelID) {
+		return ErrQueryInvalid
+	}
+	if input.Audience != "" && !slices.Contains([]domain.ServiceAudience{domain.ServiceAudienceCustomer, domain.ServiceAudienceEmployee, domain.ServiceAudiencePartner}, input.Audience) {
 		return ErrQueryInvalid
 	}
 	return nil
 }
 
-// normalizeLoadInput 规范化并校验收件箱筛选。
+// normalizeLoadInput 规范化并校验会话列表范围与筛选；可读范围搜索不带列表范围和筛选，其余读取按范围保留适用的筛选。
 func normalizeLoadInput(input LoadInput) (LoadInput, error) {
 	input.Scope = domain.InboxScope(strings.TrimSpace(string(input.Scope)))
-	input.CustomerView = domain.CustomerInboxView(strings.TrimSpace(string(input.CustomerView)))
-	input.ServiceStatus = domain.ServiceSessionStatus(strings.TrimSpace(string(input.ServiceStatus)))
+	input.PendingKind = domain.InboxPendingKind(strings.TrimSpace(string(input.PendingKind)))
 	input.QueueFilter = domain.CustomerQueueFilter(strings.TrimSpace(string(input.QueueFilter)))
 	input.QueueTeamID = strings.TrimSpace(input.QueueTeamID)
-	input.AssigneeIdentityID = strings.TrimSpace(input.AssigneeIdentityID)
 	input.ChannelID = strings.TrimSpace(input.ChannelID)
-	if input.Scope == "" {
-		input.Scope = domain.InboxScopeAll
-	}
-	if input.Scope != domain.InboxScopeAll && input.Scope != domain.InboxScopeCustomer && input.Scope != domain.InboxScopeInternal {
-		return input, ErrQueryInvalid
-	}
+	input.Audience = domain.ServiceAudience(strings.TrimSpace(string(input.Audience)))
+	input.ServiceStatus = domain.ServiceSessionStatus(strings.TrimSpace(string(input.ServiceStatus)))
+	input.AssigneeFilter = domain.InboxAssigneeFilter(strings.TrimSpace(string(input.AssigneeFilter)))
+	input.AssigneeIdentityID = strings.TrimSpace(input.AssigneeIdentityID)
 	input.Partition = domain.InboxPartition(strings.TrimSpace(string(input.Partition)))
 	if input.Partition == "" {
 		input.Partition = domain.InboxPartitionAll
@@ -741,12 +718,7 @@ func normalizeLoadInput(input LoadInput) (LoadInput, error) {
 	if input.Partition != domain.InboxPartitionAll && input.Partition != domain.InboxPartitionPinned && input.Partition != domain.InboxPartitionRegular {
 		return input, ErrQueryInvalid
 	}
-	kinds, err := normalizeInboxKinds(input.Scope, input.Kinds)
-	if err != nil {
-		return input, err
-	}
-	input.Kinds = kinds
-	// 搜索词按 NFKC 规范化并合并连续空白；搜索只读取完整活动序，可读范围不附加其他列表筛选。
+	// 搜索词按 NFKC 规范化并合并连续空白；搜索只读取完整排序，不区分置顶分区。
 	input.Search = strings.Join(strings.Fields(norm.NFKC.String(input.Search)), " ")
 	if input.Search == "" {
 		input.SearchRange = ""
@@ -754,36 +726,47 @@ func normalizeLoadInput(input LoadInput) (LoadInput, error) {
 		if input.SearchRange == "" {
 			input.SearchRange = SearchRangeList
 		}
-		if input.Partition != domain.InboxPartitionAll || (input.SearchRange != SearchRangeList && input.SearchRange != SearchRangeReadable) ||
-			(input.SearchRange == SearchRangeReadable && (input.Scope != domain.InboxScopeAll || len(input.Kinds) > 0)) {
+		if input.Partition != domain.InboxPartitionAll || (input.SearchRange != SearchRangeList && input.SearchRange != SearchRangeReadable) {
 			return input, ErrQueryInvalid
 		}
 	}
-	if input.Scope != domain.InboxScopeCustomer {
-		// 处理归属、渠道和服务状态只描述客户队列，其他范围一律按空条件读取。
-		input.CustomerView, input.AssigneeIdentityID, input.ChannelID, input.ServiceStatus = "", "", "", ""
-		input.QueueFilter, input.QueueTeamID = "", ""
+	if input.SearchRange == SearchRangeReadable {
+		if input.Scope != "" || input.PendingKind != "" || input.QueueFilter != "" || input.QueueTeamID != "" || input.ChannelID != "" || input.Audience != "" ||
+			input.ServiceStatus != "" || input.AssigneeFilter != "" || input.AssigneeIdentityID != "" || len(input.Kinds) > 0 {
+			return input, ErrQueryInvalid
+		}
 		return input, nil
 	}
-	if input.CustomerView == "" {
-		input.CustomerView = domain.CustomerInboxViewQueue
+	pending, all, chat := input.Scope == domain.InboxScopePending, input.Scope == domain.InboxScopeAll, input.Scope == domain.InboxScopeChat
+	if !pending && !all && !chat {
+		return input, ErrQueryInvalid
 	}
+	if chat {
+		kinds, err := normalizeChatKinds(input.Kinds)
+		if err != nil {
+			return input, err
+		}
+		return LoadInput{Cursor: input.Cursor, BeforeCursor: input.BeforeCursor, Limit: input.Limit, Partition: input.Partition, Scope: input.Scope, Kinds: kinds, Search: input.Search, SearchRange: input.SearchRange}, nil
+	}
+	input.Kinds = nil
+	if err := normalizeServiceFilters(input); err != nil {
+		return input, err
+	}
+	if pending {
+		// 待处理按等待起点排序，不区分置顶分区；服务状态与负责人不适用。
+		if input.Partition != domain.InboxPartitionAll ||
+			(input.PendingKind != "" && !slices.Contains([]domain.InboxPendingKind{domain.InboxPendingKindReply, domain.InboxPendingKindQueue, domain.InboxPendingKindMention}, input.PendingKind)) {
+			return input, ErrQueryInvalid
+		}
+		input.ServiceStatus, input.AssigneeFilter, input.AssigneeIdentityID = "", "", ""
+		return normalizeQueueFilter(input)
+	}
+	input.PendingKind, input.QueueFilter, input.QueueTeamID = "", "", ""
 	if input.ServiceStatus == "" {
 		input.ServiceStatus = domain.ServiceSessionStatusOpen
 	}
-	if input.CustomerView == domain.CustomerInboxViewQueue && input.QueueFilter == "" {
-		input.QueueFilter = domain.CustomerQueueFilterAll
-	}
-	if err := validateQueueFilter(input); err != nil {
-		return input, err
-	}
-	if !slices.Contains([]domain.CustomerInboxView{domain.CustomerInboxViewQueue, domain.CustomerInboxViewMine, domain.CustomerInboxViewCoworkers, domain.CustomerInboxViewMentioned}, input.CustomerView) ||
-		(input.ServiceStatus != domain.ServiceSessionStatusOpen && input.ServiceStatus != domain.ServiceSessionStatusClosed) ||
-		// 「待分配」只列出未关闭的会话。
-		(input.CustomerView == domain.CustomerInboxViewQueue && input.ServiceStatus != domain.ServiceSessionStatusOpen) ||
-		(input.ChannelID != "" && !common.ValidUUID(input.ChannelID)) ||
-		(input.AssigneeIdentityID != "" && (input.CustomerView != domain.CustomerInboxViewCoworkers || !common.ValidUUID(input.AssigneeIdentityID))) {
+	if input.ServiceStatus != domain.ServiceSessionStatusOpen && input.ServiceStatus != domain.ServiceSessionStatusClosed {
 		return input, ErrQueryInvalid
 	}
-	return input, nil
+	return normalizeAssigneeFilter(input)
 }

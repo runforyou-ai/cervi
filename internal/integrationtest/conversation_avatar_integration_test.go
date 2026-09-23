@@ -91,7 +91,7 @@ func TestConversationAvatarsFollowIdentity(t *testing.T) {
 	if err != nil || lookup == nil || lookup.PeerAvatarFileID == nil || *lookup.PeerAvatarFileID != updatedAvatarID {
 		t.Fatalf("lookup=%+v err=%v", lookup, err)
 	}
-	itemsPage, _, err := inboxaction.NewLoadInboxQuery(f.db).Execute(ctx, f.member, inboxaction.LoadInput{Scope: domain.InboxScopeAll})
+	itemsPage, _, err := inboxaction.NewLoadInboxQuery(f.db).Execute(ctx, f.member, inboxaction.LoadInput{Scope: domain.InboxScopeChat})
 	items := itemsPage.Conversations
 	if err != nil {
 		t.Fatal(err)

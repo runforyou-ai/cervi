@@ -4,6 +4,7 @@ import type { LucideIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { NavLink, useLocation } from "react-router"
 
+import { CountBadge } from "@/components/count-badge"
 import { StatusBadge } from "@/components/status-badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
@@ -20,7 +21,7 @@ const paneOnNarrowClass = {
 
 export type PageSplitPaneOnNarrow = keyof typeof paneOnNarrowClass
 
-/** 分割左栏和主区；宽屏下左栏即模块中栏，消息页会话列表与通讯录、渠道、知识库二级菜单统一 280px。 */
+/** 分割左栏和主区；宽屏下左栏即模块中栏，消息页会话列表与通讯录、AI 员工二级菜单统一 280px。 */
 export function PageSplit({
   pane,
   paneOnNarrow = "hide",
@@ -107,39 +108,44 @@ export function PagePaneNav({
   )
 }
 
-/** 分栏左栏和工作台一级栏的导航项；activePath 按公共路径前缀保持整组页面的选中态，窄栏下只显示图标并由浮层提示名称。 */
+/** 分栏左栏和工作台一级栏的导航项；activePath 按一个或多个公共路径前缀保持整组页面的选中态，count 大于零时在行尾显示数量，窄栏下只显示图标并由浮层提示名称。 */
 export function PagePaneLink({
   to,
   activePath,
   icon: Icon,
   collapsed,
   comingSoonHint = true,
+  count = 0,
+  countLabel,
   className: itemClassName,
   onClick,
   children,
 }: {
   to?: string
-  activePath?: string
+  activePath?: string | readonly string[]
   icon?: LucideIcon
   collapsed?: boolean
   /** 未开放项是否显示「即将推出」标签和悬停提示；关闭时只置灰。 */
   comingSoonHint?: boolean
+  count?: number
+  /** 数量的无障碍说明。 */
+  countLabel?: string
   className?: string
   onClick?: () => void
   children: ReactNode
 }) {
   const { t } = useTranslation("common")
   const { pathname } = useLocation()
-  const prefixActive =
-    activePath !== undefined &&
-    (pathname === activePath || pathname.startsWith(`${activePath}/`))
+  const prefixActive = (
+    typeof activePath === "string" ? [activePath] : (activePath ?? [])
+  ).some((path) => pathname === path || pathname.startsWith(`${path}/`))
   // 选中态按当前路径判定，className 保持字符串形式，供窄栏下的浮层触发器合并。
   const active =
     prefixActive ||
     (to !== undefined && (pathname === to || pathname.startsWith(`${to}/`)))
   const className = cn(
     "flex h-8 shrink-0 items-center rounded-md text-left text-sm transition-colors",
-    collapsed ? "w-8 justify-center" : "w-full gap-2 px-2.5",
+    collapsed ? "relative w-8 justify-center" : "w-full gap-2 px-2.5",
     itemClassName,
   )
   const label = collapsed ? (
@@ -147,6 +153,14 @@ export function PagePaneLink({
   ) : (
     <span className="min-w-0 flex-1 truncate">{children}</span>
   )
+  // 展开时行尾显示数量，窄栏下在图标角上显示圆点。
+  const badge = count > 0 ? (
+    collapsed ? (
+      <span aria-label={countLabel} className="absolute top-1 right-1 size-1.5 rounded-full bg-destructive" />
+    ) : (
+      <CountBadge count={count} label={countLabel} />
+    )
+  ) : null
 
   const item = to ? (
     <NavLink
@@ -160,6 +174,7 @@ export function PagePaneLink({
     >
       {Icon ? <Icon className="size-4 shrink-0" /> : null}
       {label}
+      {badge}
     </NavLink>
   ) : (
     <span

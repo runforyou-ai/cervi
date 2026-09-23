@@ -33,7 +33,7 @@ import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
-const listPath = "/settings/mcp-servers"
+const listPath = "/tools"
 
 /** 编辑 MCP 服务名称、地址、服务器类型和认证令牌。 */
 export function MCPServerFormPage({ mode }: { mode: "create" | "edit" }) {

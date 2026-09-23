@@ -51,7 +51,6 @@ type handoffFixture struct {
 	db         *bun.DB
 	identity   *servermodels.Identity
 	tasks      *servertask.Runtime
-	roleID     string
 	providerID string
 	modelID    string
 }
@@ -60,7 +59,7 @@ type handoffFixture struct {
 func (f handoffFixture) newAgent(t *testing.T, name string) *agentaction.Agent {
 	t.Helper()
 	created, err := agentaction.NewCreateAgentAction(f.db).Execute(context.Background(), f.identity, agentaction.CreateInput{
-		DisplayName: name, RoleID: f.roleID, HandlesCustomers: true,
+		DisplayName: name, HandlesCustomers: true,
 		Execution: agentaction.ExecutionInput{Mode: domain.AgentExecutionModeManaged, Managed: &agentaction.ManagedExecutionInput{ProviderID: f.providerID, ModelIdentifier: f.modelID}},
 	})
 	if err != nil {
@@ -229,12 +228,12 @@ const (
 )
 
 // testAgentHandoffs 验证 AI 客服转人工的去向、并发边界、幂等、管理操作交接与资格变更互斥。
-func testAgentHandoffs(t *testing.T, db *bun.DB, identity *servermodels.Identity, roleID, providerID, modelID string) {
+func testAgentHandoffs(t *testing.T, db *bun.DB, identity *servermodels.Identity, providerID, modelID string) {
 	tasks := newTestTasks(db)
 	if err := tasks.Registry().RegisterJSON(agentrunaction.RunActionName, func(context.Context, agentrunaction.RunInput) error { return nil }); err != nil {
 		t.Fatal(err)
 	}
-	f := handoffFixture{db: db, identity: identity, tasks: tasks, roleID: roleID, providerID: providerID, modelID: modelID}
+	f := handoffFixture{db: db, identity: identity, tasks: tasks, providerID: providerID, modelID: modelID}
 	disableAutoAssignment(t, db, identity.Organization.ID)
 	t.Run("主动转人工后转回同一 AI", func(t *testing.T) { testModelHandoffRoundTrip(t, f) })
 	t.Run("失败路由去向", func(t *testing.T) { testHandoffTargets(t, f) })
@@ -338,7 +337,7 @@ func testHandoffTargets(t *testing.T, f handoffFixture) {
 		t.Fatal(err)
 	}
 	human, err := useraction.NewCreateUserAction(f.db, newTestTasks(f.db)).Execute(ctx, f.identity, useraction.CreateInput{
-		HandlesCustomers: true, MaxServiceSessions: 10, DisplayName: "人工客服", Email: "handoff-" + uuid.NewV7().String()[:8] + "@handoff.test", Password: "password123", RoleID: f.roleID,
+		HandlesCustomers: true, MaxServiceSessions: 10, DisplayName: "人工客服", Email: "handoff-" + uuid.NewV7().String()[:8] + "@handoff.test", Password: "password123", RoleID: f.identity.User.RoleID,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -407,7 +406,7 @@ func testHandoffAutoAssignment(t *testing.T, f handoffFixture) {
 	t.Cleanup(func() { disableAutoAssignment(t, f.db, f.identity.Organization.ID) })
 	agent := f.newAgent(t, "自动分配验证客服")
 	human, err := useraction.NewCreateUserAction(f.db, newTestTasks(f.db)).Execute(ctx, f.identity, useraction.CreateInput{
-		HandlesCustomers: true, MaxServiceSessions: 1, DisplayName: "承接客服", Email: "assign-" + uuid.NewV7().String()[:8] + "@handoff.test", Password: "password123", RoleID: f.roleID,
+		HandlesCustomers: true, MaxServiceSessions: 1, DisplayName: "承接客服", Email: "assign-" + uuid.NewV7().String()[:8] + "@handoff.test", Password: "password123", RoleID: f.identity.User.RoleID,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -585,7 +584,7 @@ func testManagementReturn(t *testing.T, f handoffFixture) {
 				}
 			default:
 				if _, err := agentaction.NewUpdateAgentAction(f.db, returner).Execute(ctx, f.identity, agent.ID, agentaction.UpdateInput{
-					DisplayName: agent.DisplayName, RoleID: agent.RoleID, TeamIDs: []string{}, HandlesCustomers: false, WorkStatus: domain.WorkStatusWorking,
+					DisplayName: agent.DisplayName, TeamIDs: []string{}, HandlesCustomers: false, WorkStatus: domain.WorkStatusWorking,
 				}); err != nil {
 					t.Fatal(err)
 				}
@@ -658,7 +657,7 @@ func testInboundRoutingVersusEligibility(t *testing.T, f handoffFixture) {
 							_, err = agentaction.NewUpdateStatusAction(f.db, testServiceSessionReturner(f.db)).Execute(ctx, f.identity, agent.ID, domain.UserStatusInactive)
 						} else {
 							_, err = agentaction.NewUpdateAgentAction(f.db, testServiceSessionReturner(f.db)).Execute(ctx, f.identity, agent.ID, agentaction.UpdateInput{
-								DisplayName: agent.DisplayName, RoleID: agent.RoleID, TeamIDs: []string{}, HandlesCustomers: false, WorkStatus: domain.WorkStatusWorking,
+								DisplayName: agent.DisplayName, TeamIDs: []string{}, HandlesCustomers: false, WorkStatus: domain.WorkStatusWorking,
 							})
 						}
 						errs <- err
@@ -708,7 +707,7 @@ func testInboundUnavailableAssignee(t *testing.T, f handoffFixture) {
 // testTelegramModelHandoff 验证 Telegram 会话主动转人工只产生一次对客投递，重复执行不追加。
 func testTelegramModelHandoff(t *testing.T, f handoffFixture) {
 	ctx := context.Background()
-	fixture := newAgentTelegramFixture(t, f.db, f.identity, f.roleID, f.providerID, f.modelID)
+	fixture := newAgentTelegramFixture(t, f.db, f.identity, f.providerID, f.modelID)
 	executor := agentrunaction.NewExecuteAction(f.db, fixture.tasks, handoffRuntime("需要人工确认", nil), testAttachmentReader(f.db), nil)
 	for range 2 {
 		if err := executor.Execute(ctx, agentrunaction.RunInput{RunID: fixture.run.ID}); err != nil {
@@ -735,7 +734,7 @@ func testChannelEditVersusDeactivation(t *testing.T, f handoffFixture) {
 	// 渠道编辑由另一名成员发起，两个操作人各自持有自己的账号锁。
 	email := "channel-editor-" + uuid.NewV7().String()[:8] + "@handoff.test"
 	if _, err := useraction.NewCreateUserAction(f.db, newTestTasks(f.db)).Execute(ctx, f.identity, useraction.CreateInput{
-		HandlesCustomers: true, MaxServiceSessions: 10, DisplayName: "渠道编辑成员", Email: email, Password: "password123", RoleID: f.identity.OrganizationIdentity.RoleID,
+		HandlesCustomers: true, MaxServiceSessions: 10, DisplayName: "渠道编辑成员", Email: email, Password: "password123", RoleID: f.identity.User.RoleID,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -785,7 +784,7 @@ func testChannelEditVersusDeactivation(t *testing.T, f handoffFixture) {
 func testTelegramInboundReturnVersusRunFailure(t *testing.T, f handoffFixture) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
 	defer cancel()
-	fixture := newAgentTelegramFixture(t, f.db, f.identity, f.roleID, f.providerID, f.modelID)
+	fixture := newAgentTelegramFixture(t, f.db, f.identity, f.providerID, f.modelID)
 	if _, err := f.db.NewUpdate().Model((*servermodels.Agent)(nil)).Set("status = ?", domain.UserStatusInactive).
 		Where("identity_id = ?", fixture.run.AgentIdentityID).Exec(ctx); err != nil {
 		t.Fatal(err)
@@ -861,7 +860,7 @@ func testServiceSessionOperationEvents(t *testing.T, f handoffFixture) {
 	}
 	email := "session-events-" + uuid.NewV7().String()[:8] + "@handoff.test"
 	if _, err := useraction.NewCreateUserAction(f.db, newTestTasks(f.db)).Execute(ctx, f.identity, useraction.CreateInput{
-		HandlesCustomers: true, MaxServiceSessions: 10, DisplayName: "接管成员", Email: email, Password: "password123", RoleID: f.roleID,
+		HandlesCustomers: true, MaxServiceSessions: 10, DisplayName: "接管成员", Email: email, Password: "password123", RoleID: f.identity.User.RoleID,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -937,9 +936,17 @@ func testServiceSessionOperationEvents(t *testing.T, f handoffFixture) {
 			message.Visibility != string(domain.MessageVisibilityInternalOnly) || message.ServiceSessionID == nil ||
 			event.ActorIdentityID != expected.actor || event.ActorDisplayName == "" ||
 			(expected.from == nil) != (event.FromIdentityID == nil) || (expected.from != nil && (*event.FromIdentityID != *expected.from || event.FromDisplayName == nil)) ||
-			(expected.target == nil) != (event.Target == nil) || (expected.target != nil && (event.Target.IdentityID == nil || *event.Target.IdentityID != *expected.target)) {
+			(expected.target == nil) != (event.Target == nil) || (expected.target != nil && (event.Target.IdentityID == nil || *event.Target.IdentityID != *expected.target)) ||
+			(expected.eventType == domain.ConversationSystemEventServiceSessionClosed) != (event.CloseReason != nil) ||
+			(event.CloseReason != nil && *event.CloseReason != domain.ServiceSessionCloseManual) {
 			t.Fatalf("event %d = %s %+v", index, *message.SystemEventType, event)
 		}
+	}
+	// 重新打开后清除结束方式。
+	reopened := servermodels.ServiceSession{}
+	if err := f.db.NewSelect().Model(&reopened).Where("ss.conversation_id = ?", conversationID).Scan(ctx); err != nil ||
+		reopened.Status != string(domain.ServiceSessionStatusOpen) || reopened.CloseReason != nil {
+		t.Fatalf("reopened session = %+v, error = %v", reopened, err)
 	}
 	// 周期事件不改变会话摘要与活动时间。
 	after := servermodels.Conversation{}

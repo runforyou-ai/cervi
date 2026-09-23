@@ -1,5 +1,6 @@
 /** 企业成员列表、筛选、详情和账号状态管理面板。 */
 import { useCallback } from "react"
+import { PlusIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 
@@ -21,6 +22,7 @@ import {
 import { ConfirmationDialog } from "@/components/confirmation-dialog"
 import { ResourceRowIdentity } from "@/components/resource-row-identity"
 import { ResourceTable } from "@/components/resource-table"
+import { Button } from "@/components/ui/button"
 import { useWorkspace } from "@/contexts/workspace-context"
 import {
   AccountStatusFilter,
@@ -64,7 +66,7 @@ export function MembersPanel({
     UserStatus.UserStatusActive
   const roleId = searchParams.get("roleId") ?? ""
   const statusToggle = useAccountStatusToggle<UserData>({
-    scope: "members",
+    keyPrefix: "contacts:members.status",
     deactivate: deactivateUser,
     reactivate: reactivateUser,
     // 修改自己的账号状态时同时刷新当前身份。
@@ -108,7 +110,18 @@ export function MembersPanel({
       <ContactListSection
         title={t("scopes.employees")}
         description={t("scopeDescriptions.employees")}
-        scope={{ scope: "employees", teams, channels }}
+        scope="employees"
+        headerActions={
+          <Button
+            variant="ghost"
+            size="icon-sm"
+            aria-label={t("add.member")}
+            title={t("add.member")}
+            onClick={() => setParameters({ new: "1" })}
+          >
+            <PlusIcon />
+          </Button>
+        }
         toolbar={
           <>
             <ListToolbarSearch
@@ -181,7 +194,7 @@ export function MembersPanel({
                     label: t("sendMessage"),
                     disabled: user.status !== UserStatus.UserStatusActive,
                     onSelect: () =>
-                      navigate(`/inbox?scope=internal&target=${user.identityId}`),
+                      navigate(`/chats?target=${user.identityId}`),
                   },
                 ]
               : []),

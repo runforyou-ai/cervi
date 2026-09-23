@@ -160,7 +160,6 @@ export interface Agent {
     "identityId": string;
     "displayName": string;
     "avatarUrl": string;
-    "role": RoleSummary;
     "handlesCustomers": boolean;
     "status": UserStatus;
     "workStatus": WorkStatus;
@@ -278,7 +277,6 @@ export interface AgentListItem {
     "identityId": string;
     "displayName": string;
     "avatarUrl": string;
-    "role": RoleSummary;
     "status": UserStatus;
     "workStatus": WorkStatus;
     "teams": TeamSummary[] | null;
@@ -388,6 +386,7 @@ export enum AgentRunOutcome {
     AgentRunOutcomeReply = "reply",
     AgentRunOutcomeAskCustomer = "ask_customer",
     AgentRunOutcomeHandoff = "handoff",
+    AgentRunOutcomeResolve = "resolve",
 };
 
 /**
@@ -716,11 +715,6 @@ export interface ContactListInput {
     "query": string;
     "stage"?: ContactStage | null;
     "channelId": string;
-
-    /**
-     * ChannelType 按渠道类别筛选，与 ChannelID 同时给出时两个条件都需满足。
-     */
-    "channelType"?: ChannelType | null;
     "methodType"?: ContactMethodType | null;
     "sort": ContactSort;
     "page": number;
@@ -1137,7 +1131,7 @@ export interface ConversationSystemEvent {
     "title": string | null;
 
     /**
-     * 以下字段只由客服处理周期事件携带：原负责人、去向，以及转人工或退回队列的原因与成员可见的原因说明；操作人写入 Actor。
+     * 以下字段只由客服处理周期事件携带：原负责人、去向，转人工或退回队列的原因与成员可见的原因说明，以及关闭事件的结束方式；操作人写入 Actor。
      */
     "serviceSessionId": string | null;
     "fromIdentityId": string | null;
@@ -1145,6 +1139,7 @@ export interface ConversationSystemEvent {
     "sessionTarget": ServiceSessionTarget | null;
     "handoffReason": AgentHandoffReason | null;
     "returnReason": ServiceSessionReturnReason | null;
+    "closeReason": ServiceSessionCloseReason | null;
     "reasonText": string | null;
     "agentRunId": string | null;
 }
@@ -1241,7 +1236,6 @@ export interface ConversationWindowInput {
  */
 export interface CreateAgentInput {
     "displayName": string;
-    "roleId": string;
     "teamIds": string[] | null;
     "handlesCustomers": boolean;
     "avatarFileId": string;
@@ -1460,21 +1454,6 @@ export interface CustomerInboxConversation {
 }
 
 /**
- * CustomerInboxView 表示客户会话的处理归属视图。
- */
-export enum CustomerInboxView {
-    /**
-     * The Go zero value for the underlying type of the enum.
-     */
-    $zero = "",
-
-    CustomerInboxViewQueue = "queue",
-    CustomerInboxViewMine = "mine",
-    CustomerInboxViewCoworkers = "coworkers",
-    CustomerInboxViewMentioned = "mentioned",
-};
-
-/**
  * CustomerMessageDelivery 定义成员可见的外部投递结果。
  */
 export interface CustomerMessageDelivery {
@@ -1487,7 +1466,7 @@ export interface CustomerMessageDelivery {
 }
 
 /**
- * CustomerQueueFilter 表示「待分配」视图的队列筛选。
+ * CustomerQueueFilter 表示待领取条目的队列筛选。
  */
 export enum CustomerQueueFilter {
     /**
@@ -1974,9 +1953,9 @@ export interface Inbox {
     "attentionUnreadCount": number;
 
     /**
-     * CustomerMentionedUnreadCount 是处理中客户会话的当前周期内提醒本人且尚未读到的消息数。
+     * PendingCount 是本人全部待处理条目数，不受当前筛选影响。
      */
-    "customerMentionedUnreadCount": number;
+    "pendingCount": number;
 }
 
 /**
@@ -1988,6 +1967,20 @@ export interface InboxAssignee {
     "displayName": string;
     "avatarUrl": string;
 }
+
+/**
+ * InboxAssigneeFilter 表示服务会话的负责人筛选：all 为不限，unassigned 为未分配，identity 为指定企业身份。
+ */
+export enum InboxAssigneeFilter {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    InboxAssigneeFilterAll = "all",
+    InboxAssigneeFilterUnassigned = "unassigned",
+    InboxAssigneeFilterIdentity = "identity",
+};
 
 /**
  * InboxChannel 定义收件箱渠道筛选候选。
@@ -2052,6 +2045,11 @@ export interface InboxConversation {
     "customer": CustomerInboxConversation | null;
     "direct": DirectInboxConversation | null;
     "group": GroupInboxConversation | null;
+
+    /**
+     * Pending 只在待处理范围的列表项中返回。
+     */
+    "pending": InboxPendingItem | null;
 }
 
 /**
@@ -2099,24 +2097,49 @@ export enum InboxPartition {
 };
 
 /**
- * InboxQuery 定义与分页边界无关的会话筛选；search 非空时按会话名称搜索，searchRange 为 list 时沿用列表筛选，为 readable 时覆盖全部可读会话且不带其他列表筛选。
+ * InboxPendingItem 定义待处理条目的类型、等待起点，以及当前周期内是否有提醒本人且尚未回应的内部备注。
+ */
+export interface InboxPendingItem {
+    "kind": InboxPendingKind;
+    "since": string;
+    "mentioned": boolean;
+}
+
+/**
+ * InboxPendingKind 表示待处理条目的类型：reply 为等我回复，queue 为待领取，mention 为内部备注提醒本人。
+ */
+export enum InboxPendingKind {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    InboxPendingKindReply = "reply",
+    InboxPendingKindQueue = "queue",
+    InboxPendingKindMention = "mention",
+};
+
+/**
+ * InboxQuery 定义与分页边界无关的会话列表范围与筛选；pendingKind 与队列筛选只在待处理范围生效，pendingKind 为 mention 时包含同时等我回复或待领取但有提醒本人的条目，服务状态与负责人筛选只在全部范围生效，来源与服务对象在两个服务会话范围生效，kinds 只在聊天范围生效；search 非空时按会话名称搜索，searchRange 为 list 时沿用列表范围，为 readable 时覆盖全部可读会话且不带范围与筛选。
  */
 export interface InboxQuery {
     "partition": InboxPartition;
     "scope": InboxScope;
-    "customerView": CustomerInboxView;
+    "pendingKind": InboxPendingKind;
     "queueFilter": CustomerQueueFilter;
     "queueTeamId": string;
-    "assigneeIdentityId": string;
     "channelId": string;
+    "audience": ServiceAudience;
     "serviceStatus": ServiceSessionStatus;
+    "assigneeFilter": InboxAssigneeFilter;
+    "assigneeIdentityId": string;
     "kinds": ConversationType[] | null;
     "search": string;
     "searchRange": InboxSearchRange;
 }
 
 /**
- * InboxScope 表示统一收件箱读取范围。
+ * InboxScope 表示会话列表读取范围：pending 为待处理服务会话，all 为全部服务会话，chat 为本人参与的群聊与单聊。
  */
 export enum InboxScope {
     /**
@@ -2124,25 +2147,27 @@ export enum InboxScope {
      */
     $zero = "",
 
+    InboxScopePending = "pending",
     InboxScopeAll = "all",
-    InboxScopeCustomer = "customer",
-    InboxScopeInternal = "internal",
+    InboxScopeChat = "chat",
 };
 
 /**
- * InboxSearchInput 定义检索文本与范围；列表筛选只在 list 范围生效，会话编号只在 conversation 范围生效。
+ * InboxSearchInput 定义检索文本与范围；列表范围与筛选只在 list 范围生效，会话编号只在 conversation 范围生效。
  */
 export interface InboxSearchInput {
     "query": string;
     "range": InboxSearchRange;
     "conversationId": string;
     "scope": InboxScope;
-    "customerView": CustomerInboxView;
+    "pendingKind": InboxPendingKind;
     "queueFilter": CustomerQueueFilter;
     "queueTeamId": string;
-    "assigneeIdentityId": string;
     "channelId": string;
+    "audience": ServiceAudience;
     "serviceStatus": ServiceSessionStatus;
+    "assigneeFilter": InboxAssigneeFilter;
+    "assigneeIdentityId": string;
     "kinds": ConversationType[] | null;
 }
 
@@ -2632,17 +2657,19 @@ export interface KnowledgeWebDocumentInput {
 }
 
 /**
- * LoadInboxInput 定义统一收件箱筛选、会话名称搜索和分页边界。
+ * LoadInboxInput 定义会话列表范围、筛选、会话名称搜索和分页边界。
  */
 export interface LoadInboxInput {
     "partition": InboxPartition;
     "scope": InboxScope;
-    "customerView": CustomerInboxView;
+    "pendingKind": InboxPendingKind;
     "queueFilter": CustomerQueueFilter;
     "queueTeamId": string;
-    "assigneeIdentityId": string;
     "channelId": string;
+    "audience": ServiceAudience;
     "serviceStatus": ServiceSessionStatus;
+    "assigneeFilter": InboxAssigneeFilter;
+    "assigneeIdentityId": string;
     "kinds": ConversationType[] | null;
     "search": string;
     "searchRange": InboxSearchRange;
@@ -2950,20 +2977,6 @@ export interface PendingConversationMentions {
 }
 
 /**
- * PermissionAppliesTo 表示权限适用的企业身份类型。
- */
-export enum PermissionAppliesTo {
-    /**
-     * The Go zero value for the underlying type of the enum.
-     */
-    $zero = "",
-
-    PermissionAppliesToMember = "member",
-    PermissionAppliesToAgent = "agent",
-    PermissionAppliesToBoth = "both",
-};
-
-/**
  * PermissionCode 表示一项预定义权限。
  */
 export enum PermissionCode {
@@ -2991,7 +3004,6 @@ export interface PermissionDefinition {
     "code": PermissionCode;
     "resource": PermissionResource;
     "level": PermissionLevel;
-    "appliesTo": PermissionAppliesTo;
 }
 
 /**
@@ -3033,7 +3045,7 @@ export interface ProfileInput {
 }
 
 /**
- * ReadInboxConversationsInput 指定待核对的会话及完整列表筛选。
+ * ReadInboxConversationsInput 指定待核对的会话及完整列表筛选；未指定范围与搜索词时只核对阅读资格。
  */
 export interface ReadInboxConversationsInput {
     "conversationIds": string[] | null;
@@ -3070,7 +3082,7 @@ export interface Role {
 }
 
 /**
- * RoleAssignmentInput 定义一个企业身份的目标角色。
+ * RoleAssignmentInput 定义一个成员的目标角色。
  */
 export interface RoleAssignmentInput {
     "identityId": string;
@@ -3127,6 +3139,20 @@ export interface RoleSummary {
 }
 
 /**
+ * ServiceAudience 表示服务对象：customer 为外部客户，employee 为本企业员工，partner 为伙伴。
+ */
+export enum ServiceAudience {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    ServiceAudienceCustomer = "customer",
+    ServiceAudienceEmployee = "employee",
+    ServiceAudiencePartner = "partner",
+};
+
+/**
  * ServiceQueueTeam 定义可作为客服队列的团队。
  */
 export interface ServiceQueueTeam {
@@ -3150,6 +3176,20 @@ export interface ServiceQueueTeam {
 export interface ServiceQueueTeamList {
     "teams": ServiceQueueTeam[] | null;
 }
+
+/**
+ * ServiceSessionCloseReason 表示客服处理周期的结束方式。
+ */
+export enum ServiceSessionCloseReason {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    ServiceSessionCloseAIResolved = "ai_resolved",
+    ServiceSessionCloseCustomerUnresponsive = "customer_unresponsive",
+    ServiceSessionCloseManual = "manual",
+};
 
 /**
  * ServiceSessionReturnReason 表示客服处理周期退回队列的原因。
@@ -3203,12 +3243,14 @@ export enum ServiceSessionTargetKind {
 };
 
 /**
- * ServiceTimeouts 定义企业客服的超时时长，单位为分钟：负责人未回复的提醒与回收时长，以及队列等待提醒时长。
+ * ServiceTimeouts 定义企业客服的超时时长，单位为分钟：负责人未回复的提醒与回收时长、队列等待提醒时长，以及 AI 负责时客户未回复的跟进与关单时长。
  */
 export interface ServiceTimeouts {
     "responseReminderMinutes": number;
     "responseReclaimMinutes": number;
     "queueReminderMinutes": number;
+    "aiFollowUpMinutes": number;
+    "aiCloseMinutes": number;
 }
 
 /**
@@ -3457,7 +3499,6 @@ export interface UpdateAgentExecutionInput {
  */
 export interface UpdateAgentInput {
     "displayName": string;
-    "roleId": string;
     "teamIds": string[] | null;
     "handlesCustomers": boolean;
     "workStatus": WorkStatus;

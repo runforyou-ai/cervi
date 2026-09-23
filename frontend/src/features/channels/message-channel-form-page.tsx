@@ -335,7 +335,7 @@ export function MessageChannelFormPage({
   const queryClient = useQueryClient()
   const invalidateResource = useResourceInvalidator()
 
-  /** 拦截无效的渠道类型参数，回到默认渠道类别。 */
+  /** 拦截无效的渠道类型参数，回到渠道列表。 */
   useEffect(() => {
     if (!isMessageChannelType(channelType)) {
       navigate("/channels", { replace: true })
@@ -358,7 +358,7 @@ export function MessageChannelFormPage({
         channel_id: channelId,
         channel_type: channelType,
       })
-      navigate(`/channels/${channelType}`, { replace: true })
+      navigate("/channels", { replace: true })
     }
   }, [channelId, channelType, detail.error, navigate])
 
@@ -397,7 +397,7 @@ export function MessageChannelFormPage({
       >
         {mode === "edit" ? (
           <PageBackButton
-            to={`/channels/${channelType}${listStatus === "disabled" ? "?status=disabled" : ""}`}
+            to={`/channels${listStatus === "disabled" ? "?status=disabled" : ""}`}
           />
         ) : null}
       </PageHeader>

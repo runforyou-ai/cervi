@@ -44,12 +44,10 @@ func inboxLoadInput(query InboxQuery) inboxaction.LoadInput {
 		kinds = append(kinds, domain.ConversationType(kind))
 	}
 	return inboxaction.LoadInput{
-		Partition: domain.InboxPartition(query.Partition),
-		Scope:     domain.InboxScope(query.Scope), CustomerView: domain.CustomerInboxView(query.CustomerView),
-		QueueFilter:        domain.CustomerQueueFilter(query.QueueFilter),
-		QueueTeamID:        query.QueueTeamID,
-		AssigneeIdentityID: query.AssigneeIdentityID, ChannelID: query.ChannelID,
-		ServiceStatus: domain.ServiceSessionStatus(query.ServiceStatus), Kinds: kinds,
+		Partition: domain.InboxPartition(query.Partition), Scope: domain.InboxScope(query.Scope),
+		PendingKind: domain.InboxPendingKind(query.PendingKind), QueueFilter: domain.CustomerQueueFilter(query.QueueFilter), QueueTeamID: query.QueueTeamID,
+		ChannelID: query.ChannelID, Audience: domain.ServiceAudience(query.Audience), ServiceStatus: domain.ServiceSessionStatus(query.ServiceStatus),
+		AssigneeFilter: domain.InboxAssigneeFilter(query.AssigneeFilter), AssigneeIdentityID: query.AssigneeIdentityID, Kinds: kinds,
 		Search: query.Search, SearchRange: inboxaction.SearchRange(query.SearchRange),
 	}
 }
@@ -71,7 +69,7 @@ func (o *directOperations) LoadInbox(ctx context.Context, meta RequestMeta, iden
 		PinOrderVersion: strconv.FormatInt(page.PinOrderVersion, 10), Conversations: conversations,
 		NextCursor: page.NextCursor, HasMore: page.HasMore,
 		UnreadCount: unreadCounts.Unread, AttentionUnreadCount: unreadCounts.Attention,
-		CustomerMentionedUnreadCount: unreadCounts.CustomerMentioned,
+		PendingCount: unreadCounts.Pending,
 	}, nil
 }
 
@@ -159,6 +157,9 @@ func (o *directOperations) ListCustomerServiceAssignees(ctx context.Context, met
 // inboxConversationFromAction 转换完整会话摘要并填充头像地址。
 func inboxConversationFromAction(summary inboxaction.ConversationSummary, avatarURLs map[string]string) InboxConversation {
 	conversation := InboxConversation{PositionCursor: summary.PositionCursor, ID: summary.ID, LastActivityAt: summary.LastActivityAt, Type: ConversationType(summary.Type), UnreadCount: summary.UnreadCount, MentionedUnreadCount: summary.MentionedUnreadCount, Muted: summary.Muted, MarkedUnread: summary.MarkedUnread, Pinned: summary.Pinned, LastMessageID: summary.LastMessageID, LastMessageType: (*MessageType)(summary.LastMessageType), LastReadMessageID: summary.LastReadMessageID}
+	if summary.Pending != nil {
+		conversation.Pending = &InboxPendingItem{Kind: InboxPendingKind(summary.Pending.Kind), Since: summary.Pending.Since, Mentioned: summary.Pending.Mentioned}
+	}
 	if summary.Customer != nil {
 		var assignee *InboxAssignee
 		if summary.Customer.Assignee != nil {
@@ -237,8 +238,13 @@ func (o *directOperations) GetInboxConversation(ctx context.Context, meta Reques
 
 // ReadInboxConversations 在每项中区分匹配、筛选外可读及不可用的会话。
 func (o *directOperations) ReadInboxConversations(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input ReadInboxConversationsInput) (InboxConversationResults, error) {
-	query := inboxLoadInput(input.Query)
-	results, err := o.loadInbox.ReadByIDs(ctx, identity, input.ConversationIDs, &query)
+	// 未指定范围与搜索词时只核对阅读资格。
+	var query *inboxaction.LoadInput
+	if input.Query.Scope != "" || input.Query.Search != "" {
+		loadInput := inboxLoadInput(input.Query)
+		query = &loadInput
+	}
+	results, err := o.loadInbox.ReadByIDs(ctx, identity, input.ConversationIDs, query)
 	if err != nil {
 		return InboxConversationResults{}, inboxReadError(ctx, meta, identity.Organization.ID, "批量摘要", err)
 	}
@@ -325,9 +331,9 @@ func inboxReadError(ctx context.Context, meta RequestMeta, organizationID, opera
 // SearchInbox 按范围检索会话、消息和人员，并统一解析会话图片与人员头像。
 func (o *directOperations) SearchInbox(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input InboxSearchInput) (InboxSearchResult, error) {
 	list := inboxLoadInput(InboxQuery{
-		Scope: input.Scope, CustomerView: input.CustomerView, AssigneeIdentityID: input.AssigneeIdentityID,
-		QueueFilter: input.QueueFilter, QueueTeamID: input.QueueTeamID,
-		ChannelID: input.ChannelID, ServiceStatus: input.ServiceStatus, Kinds: input.Kinds,
+		Scope: input.Scope, PendingKind: input.PendingKind, QueueFilter: input.QueueFilter, QueueTeamID: input.QueueTeamID,
+		ChannelID: input.ChannelID, Audience: input.Audience, ServiceStatus: input.ServiceStatus,
+		AssigneeFilter: input.AssigneeFilter, AssigneeIdentityID: input.AssigneeIdentityID, Kinds: input.Kinds,
 	})
 	result, err := o.loadInbox.Search(ctx, identity, inboxaction.SearchInput{
 		Text: input.Query, Range: inboxaction.SearchRange(input.Range), List: list, ConversationID: input.ConversationID,

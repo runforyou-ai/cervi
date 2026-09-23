@@ -49,14 +49,9 @@ func TestAgentRoleBehavior(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	var roleID string
-	if err := db.NewSelect().Table("roles").Column("id").Where("organization_id = ? AND kind = ?", identity.Organization.ID, domain.RoleKindCustomerService).Scan(ctx, &roleID); err != nil {
-		t.Fatal(err)
-	}
-
 	// 空企业指令可以创建、读取详情并再次保存。
 	agent, err := agentaction.NewCreateAgentAction(db).Execute(ctx, identity, agentaction.CreateInput{
-		HandlesCustomers: true, DisplayName: "行为助手", RoleID: roleID,
+		HandlesCustomers: true, DisplayName: "行为助手",
 		Execution: agentaction.ExecutionInput{Mode: domain.AgentExecutionModeManaged, Managed: &agentaction.ManagedExecutionInput{ProviderID: provider.ID, ModelIdentifier: "chat", SystemInstruction: "   "}},
 	})
 	if err != nil {
@@ -127,7 +122,7 @@ func TestAgentRoleBehavior(t *testing.T) {
 		t.Fatalf("behavior snapshot = %s, error = %v", run.BehaviorSnapshot, err)
 	}
 	sum := sha256.Sum256([]byte(captured.Assignment.Instruction))
-	if !snapshot.HandlesCustomers || snapshot.Scene != string(agentruntime.SceneAgentChat) || snapshot.RulesVersion != 2 ||
+	if !snapshot.HandlesCustomers || snapshot.Scene != string(agentruntime.SceneAgentChat) || snapshot.RulesVersion != agentruntime.AssignmentRulesVersion ||
 		snapshot.Instruction != captured.Assignment.Instruction || snapshot.InstructionSHA256 != hex.EncodeToString(sum[:]) ||
 		snapshot.Model.ProviderID != provider.ID || snapshot.Model.Identifier != "chat" || snapshot.Model.ContextWindow != 32000 ||
 		len(snapshot.Tools) != 1 || snapshot.Tools[0] != "calculator" || len(snapshot.MCPServers) != 0 || snapshot.Grounding != "" {
@@ -168,8 +163,10 @@ func TestAgentRoleBehavior(t *testing.T) {
 	}
 	runQueuedAgentRun(t, db, execute, inbound.Conversation.ID)
 	if captured.Assignment.Scene != agentruntime.SceneCustomer || captured.Assignment.Grounding != agentruntime.GroundingStrict || !strings.HasPrefix(captured.Assignment.Instruction, baselinePrefix) ||
-		!strings.Contains(captured.Assignment.Instruction, "\n\n本次是客户会话") || !strings.HasSuffix(captured.Assignment.Instruction, "追问、转人工与其他工具不在同一次输出中同时调用。") ||
+		!strings.Contains(captured.Assignment.Instruction, "\n\n本次是客户会话") || !strings.Contains(captured.Assignment.Instruction, "追问、转人工、结束服务与其他工具不在同一次输出中同时调用。") ||
+		!strings.HasSuffix(captured.Assignment.Instruction, "不重复之前的回答，不再查询资料。") ||
 		!strings.Contains(captured.Assignment.Instruction, "- ask_customer：") || !strings.Contains(captured.Assignment.Instruction, "- handoff_to_human：") ||
+		!strings.Contains(captured.Assignment.Instruction, "- resolve_conversation：") ||
 		strings.Contains(captured.Assignment.Instruction, "search_customer_history") || strings.Contains(captured.Assignment.Instruction, "人工客服跟进") {
 		t.Fatalf("customer instruction = scene %q, %q", captured.Assignment.Scene, captured.Assignment.Instruction)
 	}
@@ -180,7 +177,7 @@ func TestAgentRoleBehavior(t *testing.T) {
 	if err := json.Unmarshal(customerRun.BehaviorSnapshot, &snapshot); err != nil {
 		t.Fatal(err)
 	}
-	if snapshot.Scene != string(agentruntime.SceneCustomer) || !slices.Equal(snapshot.Tools, []string{"ask_customer", "handoff_to_human"}) ||
+	if snapshot.Scene != string(agentruntime.SceneCustomer) || !slices.Equal(snapshot.Tools, []string{"ask_customer", "handoff_to_human", "resolve_conversation"}) ||
 		snapshot.Grounding != string(agentruntime.GroundingStrict) {
 		t.Fatalf("customer behavior snapshot = %+v", snapshot)
 	}

@@ -161,6 +161,7 @@ const (
 	ErrorUserLastActiveAdministrator      Key = "error.user_last_active_administrator"
 	ErrorTeamNotFound                     Key = "error.team_not_found"
 	ErrorTeamListFailed                   Key = "error.team_list_failed"
+	ErrorTeamLoadFailed                   Key = "error.team_load_failed"
 	ErrorTeamCreateFailed                 Key = "error.team_create_failed"
 	ErrorTeamUpdateFailed                 Key = "error.team_update_failed"
 	ErrorTeamDeleteFailed                 Key = "error.team_delete_failed"

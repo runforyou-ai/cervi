@@ -33,6 +33,7 @@ type directoryOps struct {
 	updateRoleAssignments    *roleaction.UpdateAssignmentsAction
 	updateUserStatus         *useraction.UpdateStatusAction
 	listTeams                *teamaction.ListTeamsQuery
+	getTeam                  *teamaction.GetTeamQuery
 	createTeam               *teamaction.CreateTeamAction
 	updateTeam               *teamaction.UpdateTeamAction
 	deleteTeam               *teamaction.DeleteTeamAction
@@ -63,6 +64,7 @@ func newDirectoryOps(db *bun.DB, agentCoordinator *agentrunaction.ExecuteAction,
 		updateRoleAssignments:    roleaction.NewUpdateAssignmentsAction(db),
 		updateUserStatus:         useraction.NewUpdateStatusAction(db, agentCoordinator, conversationaction.NewOwnedAssistantRetirer(agentCoordinator)),
 		listTeams:                teamaction.NewListTeamsQuery(db),
+		getTeam:                  teamaction.NewGetTeamQuery(db),
 		createTeam:               teamaction.NewCreateTeamAction(db),
 		updateTeam:               teamaction.NewUpdateTeamAction(db),
 		deleteTeam:               teamaction.NewDeleteTeamAction(db, taskEnqueuer),

@@ -49,7 +49,6 @@ func (a *CreateUserAction) Execute(ctx context.Context, identity *servermodels.I
 		organizationIdentity := &servermodels.OrganizationIdentity{
 			OrganizationID:   identity.Organization.ID,
 			Type:             string(domain.OrganizationIdentityTypeUser),
-			RoleID:           input.RoleID,
 			DisplayName:      input.DisplayName,
 			HandlesCustomers: input.HandlesCustomers,
 			WorkStatus:       string(domain.WorkStatusWorking),
@@ -63,13 +62,14 @@ func (a *CreateUserAction) Execute(ctx context.Context, identity *servermodels.I
 			organizationIdentity.AvatarFileID = avatarFileID
 		}
 		_, err := tx.NewInsert().Model(organizationIdentity).
-			Column("organization_id", "type", "role_id", "display_name", "avatar_file_id", "handles_customers", "work_status").Returning("id").Exec(ctx)
+			Column("organization_id", "type", "display_name", "avatar_file_id", "handles_customers", "work_status").Returning("id").Exec(ctx)
 		if err != nil {
 			return err
 		}
 		user := &servermodels.User{
 			IdentityID:         organizationIdentity.ID,
 			OrganizationID:     identity.Organization.ID,
+			RoleID:             input.RoleID,
 			Email:              input.Email,
 			PasswordHash:       passwordHash,
 			Status:             string(domain.UserStatusActive),
@@ -78,7 +78,7 @@ func (a *CreateUserAction) Execute(ctx context.Context, identity *servermodels.I
 			MaxServiceSessions: input.MaxServiceSessions,
 		}
 		_, err = tx.NewInsert().Model(user).
-			Column("identity_id", "organization_id", "email", "password_hash", "status", "locale", "time_zone", "max_service_sessions").Returning("id").Exec(ctx)
+			Column("identity_id", "organization_id", "role_id", "email", "password_hash", "status", "locale", "time_zone", "max_service_sessions").Returning("id").Exec(ctx)
 		if isUniqueViolation(err) {
 			return &ValidationError{Fields: map[string]ValidationCode{"email": ValidationEmailDuplicate}}
 		}

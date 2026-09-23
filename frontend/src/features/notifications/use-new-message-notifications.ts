@@ -8,6 +8,7 @@ import {
   isNotFoundApiError,
   listConversationMessages,
   listPendingConversationMentions,
+  InboxScope,
   loadInbox,
   realtimeClient,
   type ConversationMessage,
@@ -101,7 +102,14 @@ export function useNewMessageNotifications(
       return
     }
     const watcher = new NewMessageWatcher(identityId, {
-      readConversations: async () => (await loadInbox()).conversations,
+      // 基线覆盖本人参与的聊天与待处理的服务会话。
+      readConversations: async () => {
+        const [chats, pending] = await Promise.all([
+          loadInbox({ scope: InboxScope.InboxScopeChat }),
+          loadInbox({ scope: InboxScope.InboxScopePending }),
+        ])
+        return [...chats.conversations, ...pending.conversations]
+      },
       readConversation: async (conversationId) => {
         try {
           return await getInboxConversation(conversationId)

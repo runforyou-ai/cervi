@@ -27,6 +27,15 @@ func (o *directOperations) ListTeams(ctx context.Context, meta RequestMeta, iden
 	return TeamList{Teams: teams, Page: PageInfo{Number: output.Page.Number, Size: output.Page.Size, Total: output.Page.Total}}, nil
 }
 
+// GetTeam 返回团队详情。
+func (o *directOperations) GetTeam(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, teamID string) (Team, error) {
+	team, err := o.getTeam.Execute(ctx, identity, teamID)
+	if err != nil {
+		return Team{}, o.teamError(ctx, meta, err, cervii18n.ErrorTeamLoadFailed, identity.Organization.ID, teamID)
+	}
+	return teamFromAction(team), nil
+}
+
 // CreateTeam 创建企业团队。
 func (o *directOperations) CreateTeam(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input TeamInput) (Team, error) {
 	team, err := o.createTeam.Execute(ctx, identity, teamaction.Input{Name: input.Name, Description: input.Description})
@@ -54,17 +63,6 @@ func (o *directOperations) DeleteTeam(ctx context.Context, meta RequestMeta, ide
 	}
 	slog.Info("团队删除成功", "organization_id", identity.Organization.ID, "team_id", teamID)
 	return nil
-}
-
-// ListAllTeamMembers 返回企业所有团队的成员列表。
-func (o *directOperations) ListAllTeamMembers(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input TeamMemberListInput) (TeamMemberList, error) {
-	output, err := o.listTeamMembers.ExecuteAll(ctx, identity, teamaction.MemberListInput{
-		Query: input.Query, WorkStatus: optionalDomain[WorkStatus, domain.WorkStatus](input.WorkStatus), Page: input.Page, PageSize: input.PageSize,
-	})
-	if err != nil {
-		return TeamMemberList{}, o.teamError(ctx, meta, err, cervii18n.ErrorTeamMemberListFailed, identity.Organization.ID, "")
-	}
-	return o.teamMemberList(ctx, meta, identity, "", output)
 }
 
 // ListTeamMembers 返回团队成员列表。

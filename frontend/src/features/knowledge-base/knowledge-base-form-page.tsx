@@ -39,7 +39,6 @@ import {
   type KnowledgeBaseFormValues,
 } from "@/features/knowledge-base/knowledge-base-schema"
 import { KnowledgeBaseSettingsFields } from "./knowledge-base-settings-fields"
-import { useKnowledgeBaseContext } from "@/features/knowledge-base/knowledge-base-context"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useFormSave } from "@/hooks/use-form-save"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
@@ -58,7 +57,6 @@ export function KnowledgeBaseFormPage({
     KnowledgeBaseCategory.KnowledgeBaseCategoryQA
       ? KnowledgeBaseCategory.KnowledgeBaseCategoryQA
       : KnowledgeBaseCategory.KnowledgeBaseCategoryStandard
-  const { upsertKnowledgeBase } = useKnowledgeBaseContext()
   const { knowledgeBaseId = "" } = useParams()
   const invalidateResource = useResourceInvalidator()
   const [category, setCategory] =
@@ -144,10 +142,7 @@ export function KnowledgeBaseFormPage({
     setCategory(loadedKnowledgeBase.category)
   }, [form, loadedKnowledgeBase])
 
-  // 新建页取消回到知识库首页，编辑页取消进入该库的内容列表。
-  const cancelPath = loadedKnowledgeBase
-    ? `/knowledge-bases/${loadedKnowledgeBase.id}/${loadedKnowledgeBase.category === KnowledgeBaseCategory.KnowledgeBaseCategoryQA ? "qa" : "documents"}`
-    : "/knowledge-bases"
+  const cancelPath = "/knowledge-bases"
 
   /** 保存知识库。 */
   // 编辑已有知识库时边改边存；变更向量模型、维度或分段参数时先确认重建索引。
@@ -190,7 +185,7 @@ export function KnowledgeBaseFormPage({
     },
     onSaved: (knowledgeBase) => {
       setConfirmReindex(false)
-      upsertKnowledgeBase(knowledgeBase)
+      void invalidateResource(resourceKeys.knowledgeBases())
     },
     onSubmitted: () => {
       toast.success(t("form.createSuccess"))
@@ -280,7 +275,7 @@ export function KnowledgeBaseFormPage({
                       {agents.data.agents.map((agent) => (
                         <Link
                           key={agent.id}
-                          to={`/contacts/ai-employees/${agent.id}`}
+                          to={`/ai-employees/${agent.id}`}
                           className="underline-offset-4 hover:underline"
                         >
                           {agent.status === UserStatus.UserStatusActive

@@ -29,9 +29,6 @@ const channels = {
     x: "X 私信",
     appleMessages: "Apple Messages for Business",
   },
-  navigation: {
-    label: "渠道分类",
-  },
   locales: {
     zhCN: "简体中文",
     enUS: "English",

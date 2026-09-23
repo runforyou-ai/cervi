@@ -1,13 +1,15 @@
 package domain
 
-// ServiceTimeouts 定义企业客服的未响应提醒、未响应回收与队列等待提醒时长，单位为分钟。
+// ServiceTimeouts 定义企业客服的未响应提醒、未响应回收、队列等待提醒、AI 超时跟进与 AI 超时关单时长，单位为分钟。
 type ServiceTimeouts struct {
 	ResponseReminderMinutes int
 	ResponseReclaimMinutes  int
 	QueueReminderMinutes    int
+	AIFollowUpMinutes       int
+	AICloseMinutes          int
 }
 
 // DefaultServiceTimeouts 返回企业未设置时的超时时长。
 func DefaultServiceTimeouts() ServiceTimeouts {
-	return ServiceTimeouts{ResponseReminderMinutes: 5, ResponseReclaimMinutes: 15, QueueReminderMinutes: 5}
+	return ServiceTimeouts{ResponseReminderMinutes: 5, ResponseReclaimMinutes: 15, QueueReminderMinutes: 5, AIFollowUpMinutes: 10, AICloseMinutes: 30}
 }

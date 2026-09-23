@@ -74,6 +74,7 @@ func (a *ClaimServiceSessionAction) Execute(ctx context.Context, identity *serve
 				Set("assignee_identity_id = ?", identity.OrganizationIdentity.ID).
 				Set("assigned_at = COALESCE(assigned_at, ?)", now).
 				Set("assignee_assigned_at = ?", now).
+				Set("queued_at = NULL").
 				Set("reminded_at = NULL").
 				Set("updated_at = now()").
 				WherePK().
@@ -293,20 +294,21 @@ func lockTransferTarget(ctx context.Context, tx bun.Tx, identity *servermodels.I
 	}
 }
 
-// applyTransferTarget 按转交去向写入负责人与所属队列；转给团队或公共队列时清空负责人，转给成员时保持原队列。
+// applyTransferTarget 按转交去向写入负责人与所属队列；转给团队或公共队列时清空负责人并从此刻计入队列，转给成员时保持原队列。
 func applyTransferTarget(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, session *servermodels.ServiceSession, target domain.ServiceSessionTarget, targetIdentity *servermodels.OrganizationIdentity) error {
+	now := time.Now().UTC()
 	update := tx.NewUpdate().Model(session).Set("reminded_at = NULL").Set("updated_at = now()").
 		WherePK().Where("organization_id = ?", identity.Organization.ID)
 	switch target.Kind {
 	case domain.ServiceSessionTargetMember:
-		now := time.Now().UTC()
 		update = update.Set("assignee_identity_id = ?", targetIdentity.ID).
 			Set("assigned_at = COALESCE(assigned_at, ?)", now).
-			Set("assignee_assigned_at = ?", now)
+			Set("assignee_assigned_at = ?", now).
+			Set("queued_at = NULL")
 	case domain.ServiceSessionTargetTeam:
-		update = update.Set("assignee_identity_id = NULL").Set("assignee_assigned_at = NULL").Set("team_id = ?", target.TeamID)
+		update = update.Set("assignee_identity_id = NULL").Set("assignee_assigned_at = NULL").Set("queued_at = ?", now).Set("team_id = ?", target.TeamID)
 	default:
-		update = update.Set("assignee_identity_id = NULL").Set("assignee_assigned_at = NULL").Set("team_id = NULL")
+		update = update.Set("assignee_identity_id = NULL").Set("assignee_assigned_at = NULL").Set("queued_at = ?", now).Set("team_id = NULL")
 	}
 	if _, err := update.Exec(ctx); err != nil {
 		return err
@@ -399,11 +401,14 @@ func (a *CloseServiceSessionAction) Execute(ctx context.Context, identity *serve
 			Set("status_changed_at = ?", now).
 			Set("closed_at = ?", now).
 			Set("closed_by_identity_id = ?", identity.OrganizationIdentity.ID).
+			Set("close_reason = ?", domain.ServiceSessionCloseManual).
 			Set("assignee_identity_id = ?", assigneeIdentityID).
 			Set("assigned_at = COALESCE(assigned_at, ?)", now).
 			Set("assignee_assigned_at = COALESCE(assignee_assigned_at, ?)", now).
 			Set("awaiting_reply_since = NULL").
+			Set("queued_at = NULL").
 			Set("reminded_at = NULL").
+			Set("resolution_requested_at = NULL").
 			Set("updated_at = now()").
 			WherePK().
 			Where("organization_id = ?", identity.Organization.ID).
@@ -416,7 +421,7 @@ func (a *CloseServiceSessionAction) Execute(ctx context.Context, identity *serve
 		if session.AssignedAt == nil {
 			session.AssignedAt = &now
 		}
-		if err := appendServiceSessionEvent(ctx, tx, identity, conversation, session, domain.ConversationSystemEventServiceSessionClosed, nil, nil); err != nil {
+		if err := appendServiceSessionClosedEvent(ctx, tx, conversation, session, identity.OrganizationIdentity.ID, identity.OrganizationIdentity.DisplayName, domain.ServiceSessionCloseManual); err != nil {
 			return err
 		}
 		if ownedBefore {
@@ -444,6 +449,43 @@ func (a *CloseServiceSessionAction) Execute(ctx context.Context, identity *serve
 	}
 	finishServiceSessionAgentCancellation(a.coordinator, cancelledRunIDs, cancelledSession, domain.AgentRunErrorCodeSessionClosed)
 	return output, nil
+}
+
+// CloseAgentServiceSession 在调用方持有会话锁的事务中关闭 AI 员工负责的开放周期：写入结束方式与关闭事件，关闭人为负责的 AI 员工。
+func CloseAgentServiceSession(ctx context.Context, db bun.IDB, conversation *servermodels.Conversation, session *servermodels.ServiceSession, reason domain.ServiceSessionCloseReason) error {
+	if domain.ServiceSessionStatus(session.Status) != domain.ServiceSessionStatusOpen || session.AssigneeIdentityID == nil {
+		return ErrDataInvariant
+	}
+	agent := &servermodels.OrganizationIdentity{}
+	if err := db.NewSelect().Model(agent).Column("oi.id", "oi.display_name").
+		Where("oi.organization_id = ? AND oi.id = ? AND oi.type = ?", session.OrganizationID, *session.AssigneeIdentityID, domain.OrganizationIdentityTypeAgent).
+		Scan(ctx); err != nil {
+		return fmt.Errorf("load closing agent identity: %w", err)
+	}
+	now := time.Now().UTC()
+	if _, err := db.NewUpdate().Model(session).
+		Set("status = ?", domain.ServiceSessionStatusClosed).
+		Set("status_changed_at = ?", now).
+		Set("closed_at = ?", now).
+		Set("closed_by_identity_id = ?", agent.ID).
+		Set("close_reason = ?", reason).
+		Set("awaiting_reply_since = NULL").
+		Set("reminded_at = NULL").
+		Set("resolution_requested_at = NULL").
+		Set("updated_at = now()").
+		WherePK().
+		Where("organization_id = ?", session.OrganizationID).
+		Exec(ctx); err != nil {
+		return fmt.Errorf("close agent service session: %w", err)
+	}
+	closeReason := string(reason)
+	session.Status, session.StatusChangedAt, session.ClosedAt = string(domain.ServiceSessionStatusClosed), now, &now
+	session.ClosedByIdentityID, session.CloseReason = &agent.ID, &closeReason
+	session.AwaitingReplySince, session.RemindedAt, session.ResolutionRequestedAt = nil, nil, nil
+	if err := appendServiceSessionClosedEvent(ctx, db, conversation, session, agent.ID, agent.DisplayName, reason); err != nil {
+		return err
+	}
+	return chatstate.TouchConversation(ctx, db, conversation)
 }
 
 // ReopenServiceSessionAction 重新打开已关闭的客户会话处理周期。
@@ -481,9 +523,11 @@ func (a *ReopenServiceSessionAction) Execute(ctx context.Context, identity *serv
 			Set("assignee_identity_id = ?", identity.OrganizationIdentity.ID).
 			Set("assigned_at = COALESCE(assigned_at, ?)", now).
 			Set("assignee_assigned_at = ?", now).
+			Set("queued_at = NULL").
 			Set("status_changed_at = ?", now).
 			Set("closed_at = NULL").
 			Set("closed_by_identity_id = NULL").
+			Set("close_reason = NULL").
 			Set("reminded_at = NULL").
 			Set("updated_at = now()").
 			WherePK().

@@ -2,7 +2,7 @@
 import { useTranslation } from "react-i18next"
 
 import { listAgentMCPServerOptions } from "@/api"
-import { AgentResourcePickerField } from "@/features/contacts/agents/agent-resource-picker-field"
+import { AgentResourcePickerField } from "@/features/agents/agent-resource-picker-field"
 import { resourceKeys } from "@/hooks/resource-keys"
 
 /** 显示已选 MCP 服务数量，在模态框中勾选服务。 */
@@ -15,7 +15,7 @@ export function AgentMCPField({
   onChange: (ids: string[]) => void
   disabled: boolean
 }) {
-  const { t } = useTranslation("contacts")
+  const { t } = useTranslation("agents")
   return (
     <AgentResourcePickerField
       value={value}
@@ -27,21 +27,21 @@ export function AgentMCPField({
         services.map((service) => ({
           id: service.id,
           name: service.name,
-          detail: t("agents.mcp.tools", { count: service.toolCount }),
+          detail: t("mcp.tools", { count: service.toolCount }),
         }))
       }
       labels={{
-        title: t("agents.mcp.title"),
-        group: t("agents.mcp.services"),
-        unconfigured: t("agents.mcp.unconfigured"),
+        title: t("mcp.title"),
+        group: t("mcp.services"),
+        unconfigured: t("mcp.unconfigured"),
         selected: (count, names) =>
           names === ""
-            ? t("agents.mcp.selected", { count })
+            ? t("mcp.selected", { count })
             : count === 1
-              ? t("agents.mcp.selectedOne", { names })
-              : t("agents.mcp.selectedNames", { names, count }),
-        empty: t("agents.mcp.empty"),
-        loadError: t("agents.mcp.loadError"),
+              ? t("mcp.selectedOne", { names })
+              : t("mcp.selectedNames", { names, count }),
+        empty: t("mcp.empty"),
+        loadError: t("mcp.loadError"),
       }}
     />
   )

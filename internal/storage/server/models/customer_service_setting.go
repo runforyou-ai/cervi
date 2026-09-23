@@ -21,6 +21,8 @@ type CustomerServiceSetting struct {
 	ResponseReminderMinutes int                            `bun:"response_reminder_minutes"`
 	ResponseReclaimMinutes  int                            `bun:"response_reclaim_minutes"`
 	QueueReminderMinutes    int                            `bun:"queue_reminder_minutes"`
+	AIFollowUpMinutes       int                            `bun:"ai_follow_up_minutes"`
+	AICloseMinutes          int                            `bun:"ai_close_minutes"`
 	CreatedAt               time.Time                      `bun:"created_at"`
 	UpdatedAt               time.Time                      `bun:"updated_at"`
 }

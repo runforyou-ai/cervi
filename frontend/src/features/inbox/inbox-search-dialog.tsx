@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next"
 import { useState } from "react"
 import { useLocation, useNavigate } from "react-router"
 
-import { InboxSearchPersonKind, type Identity } from "@/api"
+import { ConversationType, InboxSearchPersonKind, type Identity } from "@/api"
 import { Button } from "@/components/ui/button"
 import {
   Dialog,
@@ -47,26 +47,29 @@ export function InboxSearchDialog({
   const conversationName = useConversationName()
   const scopedName = scopedConversation.data ? conversationName(scopedConversation.data) : ""
 
-  /** 打开搜索结果：消息定位到原消息，会话和外部联系人打开会话，成员和 AI 按身份进入聊天。 */
+  /** 打开搜索结果：服务会话在收件箱打开，聊天在聊天页打开；消息定位到原消息，成员和 AI 按身份进入聊天。 */
   function openItem(item: InboxSearchItem) {
-    // 已在消息页时保留当前列表筛选，其余入口按默认筛选打开。
-    const params = new URLSearchParams(onInbox ? location.search : "")
-    params.delete("target")
-    params.delete("message")
-    if (item.kind === "message") {
-      params.set("conversation", item.message.conversation.id)
-      params.set("message", item.message.id)
-    } else if (item.kind === "conversation") {
-      params.set("conversation", item.conversation.id)
-    } else if (item.person.kind === InboxSearchPersonKind.InboxSearchPersonContact) {
+    const conversation =
+      item.kind === "message" ? item.message.conversation : item.kind === "conversation" ? item.conversation : null
+    let conversationId = conversation?.id ?? ""
+    let service = conversation?.type === ConversationType.ConversationTypeCustomer
+    if (item.kind === "person") {
+      if (item.person.kind !== InboxSearchPersonKind.InboxSearchPersonContact) {
+        onOpenChange(false)
+        navigate(`/chats?target=${item.person.id}`)
+        return
+      }
       if (!item.person.conversationId) return
-      params.set("conversation", item.person.conversationId)
-    } else {
-      params.delete("conversation")
-      params.set("target", item.person.id)
+      conversationId = item.person.conversationId
+      service = true
     }
+    // 已在收件箱时保留当前页签与筛选，其余入口按默认筛选打开。
+    const params = new URLSearchParams(service && onInbox ? location.search : "")
+    params.delete("message")
+    params.set("conversation", conversationId)
+    if (item.kind === "message") params.set("message", item.message.id)
     onOpenChange(false)
-    navigate(`/inbox?${params.toString()}`)
+    navigate(`${service ? "/inbox" : "/chats"}?${params.toString()}`)
   }
 
   return (

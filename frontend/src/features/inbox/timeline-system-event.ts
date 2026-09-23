@@ -3,6 +3,7 @@ import type { TFunction } from "i18next"
 
 import {
   ConversationSystemEventType,
+  ServiceSessionCloseReason,
   ServiceSessionReturnReason,
   ServiceSessionTargetKind,
   type ConversationMessageData,
@@ -109,6 +110,13 @@ export function formatSystemEvent(
         target: sessionTargetText(event.sessionTarget, currentIdentityID, t),
       })
     case ConversationSystemEventType.ConversationSystemEventServiceSessionClosed:
+      // AI 负责人关闭的周期按结束方式说明关闭原因。
+      if (event.closeReason === ServiceSessionCloseReason.ServiceSessionCloseAIResolved) {
+        return t("serviceSessionClosedAIResolved", { actor })
+      }
+      if (event.closeReason === ServiceSessionCloseReason.ServiceSessionCloseCustomerUnresponsive) {
+        return t("serviceSessionClosedCustomerUnresponsive", { actor })
+      }
       return t("serviceSessionClosed", { actor })
     case ConversationSystemEventType.ConversationSystemEventServiceSessionReopened:
       return t("serviceSessionReopened", { actor })

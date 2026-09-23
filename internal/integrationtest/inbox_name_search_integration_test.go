@@ -85,8 +85,8 @@ func TestInboxNameSearchPagination(t *testing.T) {
 	}
 	for _, changed := range []inboxaction.LoadInput{
 		{Search: "周报", SearchRange: inboxaction.SearchRangeReadable, Limit: 25},
-		{Search: "周报 汇总", SearchRange: inboxaction.SearchRangeList, Limit: 25},
-		{Limit: 25},
+		{Scope: domain.InboxScopeChat, Search: "周报 汇总", SearchRange: inboxaction.SearchRangeList, Limit: 25},
+		{Scope: domain.InboxScopeChat, Limit: 25},
 	} {
 		changed.Cursor = first.NextCursor
 		if _, _, err := query.Execute(ctx, f.owner, changed); !errors.Is(err, inboxaction.ErrCursorInvalid) {
@@ -194,25 +194,27 @@ func TestInboxNameSearchRules(t *testing.T) {
 			t.Fatalf("搜索 %q 应命中全角名称：%v", text, ids)
 		}
 	}
-	if ids := load(f.owner, readable("   ")); len(ids) <= 2 {
+	if ids := load(f.owner, inboxaction.LoadInput{Scope: domain.InboxScopeChat, Search: "   ", SearchRange: inboxaction.SearchRangeList}); len(ids) <= 2 {
 		t.Fatalf("空白搜索词应按未搜索读取完整列表：%v", ids)
 	}
 
-	// 队列中未领取的客户会话不在「全部」列表内，但属于可读范围与客户列表。
+	// 队列中未领取的客户会话属于可读范围、待处理与全部服务会话，不在聊天列表内。
 	if ids := load(f.owner, readable("名称搜索客户")); !slices.Equal(ids, []string{f.conversationID}) {
 		t.Fatalf("可读范围应覆盖队列中的客户会话：%v", ids)
 	}
-	listAll := inboxaction.LoadInput{Search: "名称搜索客户", SearchRange: inboxaction.SearchRangeList}
+	listAll := inboxaction.LoadInput{Scope: domain.InboxScopeAll, ServiceStatus: domain.ServiceSessionStatusClosed, Search: "名称搜索客户", SearchRange: inboxaction.SearchRangeList}
 	if ids := load(f.owner, listAll); len(ids) != 0 {
 		t.Fatalf("列表范围应只在当前筛选内匹配：%v", ids)
 	}
-	listAll.Scope = domain.InboxScopeCustomer
-	if ids := load(f.owner, listAll); !slices.Equal(ids, []string{f.conversationID}) {
-		t.Fatalf("客户列表范围应命中联系人名称：%v", ids)
+	for _, scope := range []domain.InboxScope{domain.InboxScopeAll, domain.InboxScopePending} {
+		list := inboxaction.LoadInput{Scope: scope, Search: "名称搜索客户", SearchRange: inboxaction.SearchRangeList}
+		if ids := load(f.owner, list); !slices.Equal(ids, []string{f.conversationID}) {
+			t.Fatalf("服务会话列表范围 %s 应命中联系人名称：%v", scope, ids)
+		}
 	}
-	listAll.Scope = domain.InboxScopeInternal
+	listAll = inboxaction.LoadInput{Scope: domain.InboxScopeChat, Search: "名称搜索客户", SearchRange: inboxaction.SearchRangeList}
 	if ids := load(f.owner, listAll); len(ids) != 0 {
-		t.Fatalf("内部列表范围不应命中客户会话：%v", ids)
+		t.Fatalf("聊天列表范围不应命中客户会话：%v", ids)
 	}
 
 	// 已退出的群聊不再命中。
@@ -227,7 +229,8 @@ func TestInboxNameSearchRules(t *testing.T) {
 	}
 
 	for _, input := range []inboxaction.LoadInput{
-		{Search: "周报", SearchRange: inboxaction.SearchRangeReadable, Scope: domain.InboxScopeCustomer},
+		{Search: "周报", SearchRange: inboxaction.SearchRangeReadable, Scope: domain.InboxScopeAll},
+		{Search: "周报", SearchRange: inboxaction.SearchRangeList},
 		{Search: "周报", SearchRange: inboxaction.SearchRangeReadable, Kinds: []domain.ConversationType{domain.ConversationTypeGroup}},
 		{Search: "周报", SearchRange: inboxaction.SearchRangeReadable, Partition: domain.InboxPartitionPinned},
 		{Search: "周报", SearchRange: inboxaction.SearchRangeConversation},

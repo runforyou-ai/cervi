@@ -1,14 +1,14 @@
 /** 通讯录页面协调层：加载共享目录数据并按范围渲染面板。 */
 import { useEffect, type ReactNode } from "react"
-import { useParams, useSearchParams } from "react-router"
+import { useParams } from "react-router"
 
 import { listChannelOptions, listRoles, listTeams } from "@/api"
 import { PageSplit } from "@/components/page-split"
-import { AgentsPanel } from "@/features/contacts/agents/agents-panel"
 import { AssistantsPanel } from "@/features/contacts/assistants/assistants-panel"
 import { ContactScopeSidebar } from "@/features/contacts/contact-scope-sidebar"
 import { ExternalContactsPanel } from "@/features/contacts/external/external-contacts-panel"
 import { MembersPanel } from "@/features/contacts/members/members-panel"
+import { TeamListPanel } from "@/features/contacts/teams/team-list-panel"
 import { TeamPanel } from "@/features/contacts/teams/team-panel"
 import { type ContactScope } from "@/features/contacts/contact-scope"
 import { resourceKeys } from "@/hooks/resource-keys"
@@ -16,19 +16,9 @@ import { useResource } from "@/hooks/use-resource"
 
 export type { ContactScope }
 
-/** 按分类列出通讯录。 */
-export function ContactsPage({
-  scope,
-  children,
-}: {
-  scope: ContactScope
-  children?: ReactNode
-}) {
+/** 按分类列出通讯录，传入 children 时在同一布局中渲染该分类下的子页面。 */
+export function ContactsPage({ scope, children }: { scope: ContactScope; children?: ReactNode }) {
   const { teamId = "" } = useParams()
-  const [searchParams] = useSearchParams()
-  const deleted = scope === "external" && searchParams.get("view") === "trash"
-  const channelId = searchParams.get("channelId") ?? ""
-  const channelType = searchParams.get("channelType") ?? ""
 
   const channelsResource = useResource(
     resourceKeys.channelOptions(),
@@ -45,7 +35,7 @@ export function ContactsPage({
   const catalogError =
     channelsResource.error ?? rolesResource.error ?? teamsResource.error
 
-  /** 目录数据加载失败时记录日志，便于排查侧栏为空的原因。 */
+  /** 目录数据加载失败时记录日志，便于排查筛选项为空的原因。 */
   useEffect(() => {
     if (catalogError) {
       console.warn("通讯录筛选数据加载失败", catalogError)
@@ -53,41 +43,22 @@ export function ContactsPage({
   }, [catalogError])
 
   return (
-    <PageSplit
-      paneVariant="nav"
-      pane={
-        <ContactScopeSidebar
-          scope={scope}
-          deleted={deleted}
-          channelId={channelId}
-          channelType={channelType}
+    <PageSplit paneVariant="nav" pane={<ContactScopeSidebar />}>
+      {children ?? (scope === "assistants" ? (
+        <AssistantsPanel />
+      ) : scope === "employees" ? (
+        <MembersPanel channels={channels} roles={roles} teams={teams} />
+      ) : scope === "team" && teamId ? (
+        <TeamPanel roles={roles} teams={teams} teamId={teamId} />
+      ) : scope === "team" ? (
+        <TeamListPanel channels={channels} roles={roles} teams={teams} />
+      ) : (
+        <ExternalContactsPanel
           channels={channels}
-          teamId={teamId}
+          roles={roles}
           teams={teams}
         />
-      }
-    >
-      {children ??
-        (scope === "employees" ? (
-          <MembersPanel channels={channels} roles={roles} teams={teams} />
-        ) : scope === "agents" ? (
-          <AgentsPanel channels={channels} roles={roles} teams={teams} />
-        ) : scope === "assistants" ? (
-          <AssistantsPanel channels={channels} teams={teams} />
-        ) : scope === "team" ? (
-          <TeamPanel
-            channels={channels}
-            roles={roles}
-            teams={teams}
-            teamId={teamId}
-          />
-        ) : (
-          <ExternalContactsPanel
-            channels={channels}
-            roles={roles}
-            teams={teams}
-          />
-        ))}
+      ))}
     </PageSplit>
   )
 }

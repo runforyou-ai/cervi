@@ -1,4 +1,4 @@
-/** 团队成员列表、批量管理和团队维护面板。 */
+/** 单个团队的成员列表与批量管理面板。 */
 import { useCallback, useEffect, useState } from "react"
 import { PlusIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
@@ -7,11 +7,10 @@ import { useLocation, useNavigate } from "react-router"
 import {
   OrganizationIdentityType,
   WorkStatus,
-  deleteTeam,
-  listAllTeamMembers,
+  getTeam,
+  isNotFoundApiError,
   listTeamMembers,
   removeTeamMembers,
-  type ChannelOption,
   type RoleData,
   type Team,
   type TeamMember,
@@ -22,6 +21,7 @@ import {
   ListToolbarSearch,
 } from "@/components/list-toolbar"
 import { ConfirmationDialog } from "@/components/confirmation-dialog"
+import { PageBackButton } from "@/components/page-back-button"
 import { ResourceRowIdentity } from "@/components/resource-row-identity"
 import { ResourceTable } from "@/components/resource-table"
 import { Button } from "@/components/ui/button"
@@ -34,11 +34,10 @@ import {
 } from "@/components/ui/dialog"
 import { workStatusLabel } from "@/components/work-status"
 import { useWorkspace } from "@/contexts/workspace-context"
-import { ContactCreateDialogs } from "@/features/contacts/contact-create-dialogs"
 import { ContactListSection } from "@/features/contacts/contact-list-section"
 import { MemberDetailSheet } from "@/features/contacts/members/member-detail-sheet"
-import { TeamForm } from "@/features/contacts/teams/team-form"
 import { TeamMemberPicker } from "@/features/contacts/teams/team-member-picker"
+import { teamMembershipCacheKeys } from "@/features/contacts/teams/team-membership-cache"
 import { useContactSearch } from "@/features/contacts/use-contact-search"
 import { useDateTime } from "@/hooks/use-date-time"
 import { resourceKeys } from "@/hooks/resource-keys"
@@ -46,14 +45,12 @@ import { useConfirmedAction } from "@/hooks/use-confirmed-action"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { optionalWailsEnum } from "@/lib/wails-enum"
 
-/** 单个团队范围的成员列表、批量操作和团队弹窗。 */
+/** 单个团队的成员列表、批量移出和添加成员弹窗。 */
 export function TeamPanel({
-  channels,
   roles,
   teams,
   teamId,
 }: {
-  channels: ChannelOption[]
   roles: RoleData[]
   teams: Team[]
   teamId: string
@@ -83,24 +80,23 @@ export function TeamPanel({
     WorkStatus,
     searchParams.get("workStatus"),
   )
-  const editingTeam = searchParams.get("editTeam") === "1"
   const addingTeamMembers = searchParams.get("addMembers") === "1"
-  const selectedTeam = teams.find((team) => team.id === teamId)
-  // 编辑和删除团队从中间栏团队的右键菜单发起，经地址参数打开对应弹窗。
-  const deletingTeam =
-    searchParams.get("deleteTeam") === "1" ? (selectedTeam ?? null) : null
+  // 返回来源团队列表并保留其搜索与页码。
+  const returnParameter = searchParams.get("returnTo") ?? ""
+  const returnTo =
+    returnParameter.split("?")[0] === "/contacts/teams"
+      ? returnParameter
+      : "/contacts/teams"
+  const teamResource = useResource(resourceKeys.team(teamId), () =>
+    getTeam(teamId),
+  )
+  const selectedTeam = teamResource.data
   const [selectedTeamMemberIdentityIDs, setSelectedTeamMemberIdentityIDs] =
     useState<Set<string>>(new Set())
 
   const list = useResource(
     resourceKeys.teamMembers(teamId, { query, workStatus, page: currentPage, pageSize: 50 }),
-    () => {
-      const listQuery = { query, workStatus, page: currentPage, pageSize: 50 }
-      // 未选具体团队时展示所有团队的成员。
-      return teamId
-        ? listTeamMembers(teamId, listQuery)
-        : listAllTeamMembers(listQuery)
-    },
+    () => listTeamMembers(teamId, { query, workStatus, page: currentPage, pageSize: 50 }),
   )
   const teamMembers = list.data?.members ?? []
   const page = list.data?.page ?? { number: currentPage, size: 50, total: 0 }
@@ -109,19 +105,13 @@ export function TeamPanel({
     setSelectedTeamMemberIdentityIDs(new Set())
   }, [currentPage, query, teamId, workStatus])
 
-  // 团队或成员关系变化后，内嵌所属团队的成员和 AI 员工缓存需要失效。
-  const membershipCacheKeys = [
-    resourceKeys.serviceQueueTeams(),
-    resourceKeys.users(),
-    resourceKeys.user(),
-    resourceKeys.agents(),
-    resourceKeys.agent(),
-  ]
+  // 团队不存在时回到来源列表。
+  useEffect(() => {
+    if (!isNotFoundApiError(teamResource.error)) return
+    console.warn("团队不存在", { team_id: teamId })
+    navigate(returnTo, { replace: true })
+  }, [navigate, returnTo, teamId, teamResource.error])
 
-  /** 失效内嵌所属团队的成员和 AI 员工缓存。 */
-  function invalidateMembershipCaches() {
-    for (const key of membershipCacheKeys) void invalidate(key)
-  }
 
   /** 返回团队成员行显示的工作状态。 */
   function identityWorkStatus(member: TeamMember) {
@@ -131,20 +121,6 @@ export function TeamPanel({
       ? identity.user.workStatus
       : member.workStatus
   }
-
-  const teamDeletion = useConfirmedAction<Team>({
-    action: (team) => deleteTeam(team.id),
-    invalidateKeys: () => [resourceKeys.teams(), ...membershipCacheKeys],
-    successMessage: () => t("teams.delete.success"),
-    errorMessage: () => t("teams.delete.error"),
-    logLabel: "删除团队",
-    onSuccess: (team) => {
-      if (teamId === team.id) navigate("/contacts/teams", { replace: true })
-    },
-  })
-  const selectDeletingTeam = teamDeletion.select
-  // 删除确认的对象跟随地址参数中的待删除团队。
-  useEffect(() => selectDeletingTeam(deletingTeam), [deletingTeam, selectDeletingTeam])
 
   const memberRemoval = useConfirmedAction<TeamMember[]>({
     action: (members) =>
@@ -158,7 +134,7 @@ export function TeamPanel({
       resourceKeys.teams(),
       resourceKeys.teamMembers(),
       resourceKeys.teamMemberCandidates(teamId),
-      ...membershipCacheKeys,
+      ...teamMembershipCacheKeys,
     ],
     successMessage: (members) =>
       t(
@@ -207,9 +183,10 @@ export function TeamPanel({
       <ContactListSection
         title={selectedTeam?.name ?? t("scopes.teams")}
         description={t("scopeDescriptions.teams")}
-        scope={{ scope: "team", teamId, teams, channels }}
+        scope="team"
         headerActions={
-          selectedTeam ? (
+          <>
+            {selectedTeam ? (
             <>
               {selectedTeamMemberIdentityIDs.size > 0 ? (
                 <Button
@@ -239,11 +216,12 @@ export function TeamPanel({
                 <PlusIcon />
               </Button>
             </>
-          ) : null
+            ) : null}
+            <PageBackButton to={returnTo} />
+          </>
         }
         toolbar={
           <>
-            {/* 所有团队视图只读：成员可能分属多个团队，不提供批量移出。 */}
             {selectedTeam ? (
               <label className="flex h-9 items-center gap-2 px-1 text-sm">
                 <input
@@ -371,7 +349,7 @@ export function TeamPanel({
             member.identityType ===
             OrganizationIdentityType.OrganizationIdentityTypeAgent
               ? navigate(
-                  `/contacts/ai-employees/${member.agentId}?tab=basic&returnTo=${encodeURIComponent(location.pathname + location.search)}`,
+                  `/ai-employees/${member.agentId}?tab=basic&returnTo=${encodeURIComponent(location.pathname + location.search)}`,
                 )
               : setParameters({ selected: member.userId })
           }
@@ -399,41 +377,6 @@ export function TeamPanel({
         onClose={closeMemberDetail}
       />
 
-      <ContactCreateDialogs
-        scope="team"
-        channels={channels}
-        roles={roles}
-        teams={teams}
-        selectedTeam={selectedTeam}
-        searchParams={searchParams}
-        setParameters={setParameters}
-      />
-
-      {selectedTeam ? (
-        <Dialog
-          open={editingTeam}
-          onOpenChange={(open) => !open && setParameters({ editTeam: null })}
-        >
-          <DialogContent className="max-w-xl">
-            <DialogHeader>
-              <DialogTitle>{t("teams.edit")}</DialogTitle>
-              <DialogDescription>
-                {t("teams.editDescription")}
-              </DialogDescription>
-            </DialogHeader>
-            <TeamForm
-              team={selectedTeam}
-              onSaved={() => {
-                void invalidate(resourceKeys.teams())
-                invalidateMembershipCaches()
-                setParameters({ editTeam: null })
-              }}
-              onCancel={() => setParameters({ editTeam: null })}
-            />
-          </DialogContent>
-        </Dialog>
-      ) : null}
-
       {selectedTeam ? (
         <Dialog
           open={addingTeamMembers}
@@ -454,27 +397,13 @@ export function TeamPanel({
                 void invalidate(resourceKeys.teams())
                 setParameters({ addMembers: null })
                 void invalidate(resourceKeys.teamMembers())
-                invalidateMembershipCaches()
+                for (const key of teamMembershipCacheKeys) void invalidate(key)
               }}
               onCancel={() => setParameters({ addMembers: null })}
             />
           </DialogContent>
         </Dialog>
       ) : null}
-
-      {/* 删除确认的开关跟随地址参数。 */}
-      <ConfirmationDialog
-        {...teamDeletion.dialog}
-        open={deletingTeam !== null}
-        title={t("teams.delete.title", { name: deletingTeam?.name ?? "" })}
-        description={t("teams.delete.description", {
-          count: deletingTeam?.memberCount ?? 0,
-        })}
-        pendingLabel={tCommon("actions.deleting")}
-        onOpenChange={(open) => {
-          if (!open) setParameters({ deleteTeam: null })
-        }}
-      />
 
       <ConfirmationDialog
         {...memberRemoval.dialog}

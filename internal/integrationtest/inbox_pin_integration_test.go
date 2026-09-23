@@ -54,7 +54,7 @@ func newPinFixture(t *testing.T) pinFixture {
 	owner := installed.Identity
 	memberEmail := "member@" + suffix + ".pin.test"
 	if _, err := useraction.NewCreateUserAction(db, newTestTasks(db)).Execute(ctx, owner, useraction.CreateInput{
-		HandlesCustomers: true, MaxServiceSessions: 10, DisplayName: "成员", Email: memberEmail, Password: "password123", RoleID: owner.OrganizationIdentity.RoleID,
+		HandlesCustomers: true, MaxServiceSessions: 10, DisplayName: "成员", Email: memberEmail, Password: "password123", RoleID: owner.User.RoleID,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -124,9 +124,9 @@ func (f pinFixture) pinRanks(t *testing.T, identity *servermodels.Identity) []in
 func TestConversationPinOrder(t *testing.T) {
 	f := newPinFixture(t)
 	ctx := context.Background()
-	all := inboxaction.LoadInput{Scope: domain.InboxScopeInternal}
-	pinned := inboxaction.LoadInput{Scope: domain.InboxScopeInternal, Partition: domain.InboxPartitionPinned}
-	regular := inboxaction.LoadInput{Scope: domain.InboxScopeInternal, Partition: domain.InboxPartitionRegular}
+	all := inboxaction.LoadInput{Scope: domain.InboxScopeChat}
+	pinned := inboxaction.LoadInput{Scope: domain.InboxScopeChat, Partition: domain.InboxPartitionPinned}
+	regular := inboxaction.LoadInput{Scope: domain.InboxScopeChat, Partition: domain.InboxPartitionRegular}
 
 	version := f.pin(t, f.owner, conversationaction.ConversationPinInput{ConversationID: f.groupA, Pinned: true})
 	version = f.pin(t, f.owner, conversationaction.ConversationPinInput{ConversationID: f.directID, Pinned: true, ExpectedPinOrderVersion: version})
@@ -195,7 +195,7 @@ func TestConversationPinOrder(t *testing.T) {
 func TestConversationPinPositions(t *testing.T) {
 	f := newPinFixture(t)
 	ctx := context.Background()
-	pinned := inboxaction.LoadInput{Scope: domain.InboxScopeInternal, Partition: domain.InboxPartitionPinned}
+	pinned := inboxaction.LoadInput{Scope: domain.InboxScopeChat, Partition: domain.InboxPartitionPinned}
 	version := f.pin(t, f.owner, conversationaction.ConversationPinInput{ConversationID: f.groupA, Pinned: true})
 	version = f.pin(t, f.owner, conversationaction.ConversationPinInput{ConversationID: f.directID, Pinned: true, ExpectedPinOrderVersion: version})
 	version = f.pin(t, f.owner, conversationaction.ConversationPinInput{ConversationID: f.groupB, Pinned: true, ExpectedPinOrderVersion: version})
@@ -244,8 +244,8 @@ func TestConversationPinPartitionEligibility(t *testing.T) {
 	f := newPinFixture(t)
 	ctx := context.Background()
 	query := inboxaction.NewLoadInboxQuery(f.db)
-	pinnedQuery := inboxaction.LoadInput{Scope: domain.InboxScopeInternal, Partition: domain.InboxPartitionPinned}
-	regularQuery := inboxaction.LoadInput{Scope: domain.InboxScopeInternal, Partition: domain.InboxPartitionRegular}
+	pinnedQuery := inboxaction.LoadInput{Scope: domain.InboxScopeChat, Partition: domain.InboxPartitionPinned}
+	regularQuery := inboxaction.LoadInput{Scope: domain.InboxScopeChat, Partition: domain.InboxPartitionRegular}
 	matches := func(input inboxaction.LoadInput) inboxaction.ConversationResult {
 		t.Helper()
 		results, err := query.ReadByIDs(ctx, f.owner, []string{f.groupA}, &input)
@@ -269,7 +269,7 @@ func TestConversationPinPartitionEligibility(t *testing.T) {
 		t.Fatalf("置顶后未被判为置顶区匹配: %+v", result)
 	}
 	// 不指定分区的调用方仍按完整活动序核对资格。
-	if result := matches(inboxaction.LoadInput{Scope: domain.InboxScopeInternal}); !result.MatchesQuery {
+	if result := matches(inboxaction.LoadInput{Scope: domain.InboxScopeChat}); !result.MatchesQuery {
 		t.Fatalf("完整活动序漏掉置顶会话: %+v", result)
 	}
 }
@@ -278,7 +278,7 @@ func TestConversationPinPartitionEligibility(t *testing.T) {
 func TestConversationPinRenumber(t *testing.T) {
 	f := newPinFixture(t)
 	ctx := context.Background()
-	pinned := inboxaction.LoadInput{Scope: domain.InboxScopeInternal, Partition: domain.InboxPartitionPinned}
+	pinned := inboxaction.LoadInput{Scope: domain.InboxScopeChat, Partition: domain.InboxPartitionPinned}
 	version := f.pin(t, f.owner, conversationaction.ConversationPinInput{ConversationID: f.groupA, Pinned: true})
 	version = f.pin(t, f.owner, conversationaction.ConversationPinInput{ConversationID: f.groupB, Pinned: true, ExpectedPinOrderVersion: version})
 	// 把相邻顺序值压到最小间隔，后续插入只能通过重编号完成。
@@ -308,7 +308,7 @@ func TestConversationPinCursor(t *testing.T) {
 	f := newPinFixture(t)
 	ctx := context.Background()
 	query := inboxaction.NewLoadInboxQuery(f.db)
-	pinned := inboxaction.LoadInput{Scope: domain.InboxScopeInternal, Partition: domain.InboxPartitionPinned, Limit: 1}
+	pinned := inboxaction.LoadInput{Scope: domain.InboxScopeChat, Partition: domain.InboxPartitionPinned, Limit: 1}
 	version := f.pin(t, f.owner, conversationaction.ConversationPinInput{ConversationID: f.groupA, Pinned: true})
 	version = f.pin(t, f.owner, conversationaction.ConversationPinInput{ConversationID: f.groupB, Pinned: true, ExpectedPinOrderVersion: version})
 	page, _, err := query.Execute(ctx, f.owner, pinned)
@@ -330,7 +330,7 @@ func TestConversationPinCursor(t *testing.T) {
 		t.Fatalf("顺序变化后仍接受旧置顶游标: %v", err)
 	}
 	// 普通区游标与置顶区分开，不受置顶顺序版本影响。
-	regular := inboxaction.LoadInput{Scope: domain.InboxScopeInternal, Partition: domain.InboxPartitionRegular}
+	regular := inboxaction.LoadInput{Scope: domain.InboxScopeChat, Partition: domain.InboxPartitionRegular}
 	regularPage, _, err := query.Execute(ctx, f.owner, regular)
 	if err != nil || len(regularPage.Conversations) != 0 {
 		t.Fatalf("普通区 = %+v，error = %v", regularPage, err)
@@ -341,7 +341,7 @@ func TestConversationPinCursor(t *testing.T) {
 func TestConversationPinRevocation(t *testing.T) {
 	f := newPinFixture(t)
 	ctx := context.Background()
-	pinned := inboxaction.LoadInput{Scope: domain.InboxScopeInternal, Partition: domain.InboxPartitionPinned}
+	pinned := inboxaction.LoadInput{Scope: domain.InboxScopeChat, Partition: domain.InboxPartitionPinned}
 	version := f.pin(t, f.member, conversationaction.ConversationPinInput{ConversationID: f.groupA, Pinned: true})
 	version = f.pin(t, f.member, conversationaction.ConversationPinInput{ConversationID: f.groupB, Pinned: true, ExpectedPinOrderVersion: version})
 	if _, err := conversationaction.NewRemoveGroupConversationMemberAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, conversationaction.GroupConversationMemberInput{
@@ -447,7 +447,7 @@ func TestConversationPinRemovalLockOrder(t *testing.T) {
 		t.Fatalf("失权后的置顶写入 = %v", err)
 	}
 	// 移除提交后被移出会话的置顶已清除，另一条置顶保留。
-	got := f.partition(t, f.member, inboxaction.LoadInput{Scope: domain.InboxScopeInternal, Partition: domain.InboxPartitionPinned})
+	got := f.partition(t, f.member, inboxaction.LoadInput{Scope: domain.InboxScopeChat, Partition: domain.InboxPartitionPinned})
 	if len(got) != 1 || got[0] != f.groupB {
 		t.Fatalf("并发结束后的置顶区 = %v，want [B]", got)
 	}
@@ -459,7 +459,7 @@ func TestCustomerConversationPin(t *testing.T) {
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	query := inboxaction.NewLoadInboxQuery(f.db)
-	pinned := inboxaction.LoadInput{Scope: domain.InboxScopeCustomer, Partition: domain.InboxPartitionPinned}
+	pinned := inboxaction.LoadInput{Scope: domain.InboxScopeAll, Partition: domain.InboxPartitionPinned}
 	pin := conversationaction.NewUpdateConversationPinAction(f.db)
 	state, err := pin.Execute(ctx, f.member, conversationaction.ConversationPinInput{ConversationID: f.conversationID, Pinned: true})
 	if err != nil || !state.Pinned || state.PinOrderVersion != 1 {
@@ -475,11 +475,11 @@ func TestCustomerConversationPin(t *testing.T) {
 		t.Fatalf("另一名客服的置顶区 = %+v，error = %v", ownerPage, err)
 	}
 	// 普通区不再包含该会话，完整活动序仍然包含。
-	regular, _, err := query.Execute(ctx, f.member, inboxaction.LoadInput{Scope: domain.InboxScopeCustomer, Partition: domain.InboxPartitionRegular})
+	regular, _, err := query.Execute(ctx, f.member, inboxaction.LoadInput{Scope: domain.InboxScopeAll, Partition: domain.InboxPartitionRegular})
 	if err != nil || len(regular.Conversations) != 0 {
 		t.Fatalf("客户会话仍留在普通区: %+v，error = %v", regular, err)
 	}
-	all, _, err := query.Execute(ctx, f.member, inboxaction.LoadInput{Scope: domain.InboxScopeCustomer})
+	all, _, err := query.Execute(ctx, f.member, inboxaction.LoadInput{Scope: domain.InboxScopeAll})
 	if err != nil || len(all.Conversations) != 1 || !all.Conversations[0].Pinned {
 		t.Fatalf("完整活动序 = %+v，error = %v", all, err)
 	}
@@ -614,7 +614,7 @@ func TestConversationPinRenumberKeepsRevokedCleared(t *testing.T) {
 	}); err != nil {
 		t.Fatal(err)
 	}
-	got := f.partition(t, f.member, inboxaction.LoadInput{Scope: domain.InboxScopeInternal, Partition: domain.InboxPartitionPinned})
+	got := f.partition(t, f.member, inboxaction.LoadInput{Scope: domain.InboxScopeChat, Partition: domain.InboxPartitionPinned})
 	if len(got) != 2 || got[0] != f.directID || got[1] != f.groupB {
 		t.Fatalf("重编号后的置顶区 = %v，want [X B]", got)
 	}

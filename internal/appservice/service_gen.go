@@ -514,7 +514,7 @@ func (s *Service) UpdateUser(ctx context.Context, meta RequestMeta, userID strin
 	return withNormalizedSlices(s.backend.UpdateUser(ctx, meta, userID, input))
 }
 
-// UpdateRoleAssignments 在一个事务中批量调整真人和 AI 员工角色。
+// UpdateRoleAssignments 在一个事务中批量调整成员角色。
 func (s *Service) UpdateRoleAssignments(ctx context.Context, meta RequestMeta, input RoleAssignmentsInput) error {
 	return s.backend.UpdateRoleAssignments(ctx, meta, input)
 }
@@ -534,6 +534,11 @@ func (s *Service) ListTeams(ctx context.Context, meta RequestMeta, input TeamLis
 	return withNormalizedSlices(s.backend.ListTeams(ctx, meta, input))
 }
 
+// GetTeam 返回团队详情。
+func (s *Service) GetTeam(ctx context.Context, meta RequestMeta, teamID string) (Team, error) {
+	return withNormalizedSlices(s.backend.GetTeam(ctx, meta, teamID))
+}
+
 // CreateTeam 创建企业团队。
 func (s *Service) CreateTeam(ctx context.Context, meta RequestMeta, input TeamInput) (Team, error) {
 	return withNormalizedSlices(s.backend.CreateTeam(ctx, meta, input))
@@ -547,11 +552,6 @@ func (s *Service) UpdateTeam(ctx context.Context, meta RequestMeta, teamID strin
 // DeleteTeam 删除企业团队及其成员关系。
 func (s *Service) DeleteTeam(ctx context.Context, meta RequestMeta, teamID string) error {
 	return s.backend.DeleteTeam(ctx, meta, teamID)
-}
-
-// ListAllTeamMembers 返回企业所有团队的成员列表，同一身份只列一次。
-func (s *Service) ListAllTeamMembers(ctx context.Context, meta RequestMeta, input TeamMemberListInput) (TeamMemberList, error) {
-	return withNormalizedSlices(s.backend.ListAllTeamMembers(ctx, meta, input))
 }
 
 // ListTeamMembers 返回团队成员列表。

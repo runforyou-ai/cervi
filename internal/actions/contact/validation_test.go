@@ -113,15 +113,3 @@ func TestNormalizeListInput(t *testing.T) {
 		t.Fatalf("validation fields = %#v, want five errors", fields)
 	}
 }
-
-// TestNormalizeListInputChannelType 验证联系人列表的渠道类别筛选只接受受支持的渠道类型。
-func TestNormalizeListInputChannelType(t *testing.T) {
-	input, fields := normalizeListInput(ListInput{ChannelType: " website "})
-	if len(fields) != 0 || input.ChannelType != domain.ChannelTypeWebsite {
-		t.Fatalf("normalized channel type = %q, fields = %#v", input.ChannelType, fields)
-	}
-	_, fields = normalizeListInput(ListInput{ChannelType: "email"})
-	if fields["channelType"] != ValidationQueryInvalid {
-		t.Fatalf("channel type validation = %q, want %q", fields["channelType"], ValidationQueryInvalid)
-	}
-}

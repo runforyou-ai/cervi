@@ -1,4 +1,4 @@
-/** 企业成员、AI 员工与助理列表共用的账号状态筛选、启停操作和确认流程。 */
+/** 企业成员与 AI 员工列表共用的账号状态筛选、启停操作和确认流程。 */
 import type { QueryKey } from "@tanstack/react-query"
 import { useTranslation } from "react-i18next"
 
@@ -7,7 +7,8 @@ import { ListToolbarFilter } from "@/components/list-toolbar"
 import type { ResourceRowAction } from "@/components/resource-table"
 import { useConfirmedAction } from "@/hooks/use-confirmed-action"
 
-type AccountScope = "members" | "agents" | "assistants"
+/** 启停文案所在的词条前缀。 */
+type AccountStatusKeyPrefix = "contacts:members.status" | "contacts:assistants.status" | "agents:status"
 
 type AccountItem = {
   id: string
@@ -45,19 +46,19 @@ export function AccountStatusFilter({
 
 /** 确认后禁用正常账号或恢复已禁用账号，返回行操作菜单项和确认框属性。 */
 export function useAccountStatusToggle<T extends AccountItem>({
-  scope,
+  keyPrefix,
   deactivate,
   reactivate,
   invalidateKeys,
   logLabel,
 }: {
-  scope: AccountScope
+  keyPrefix: AccountStatusKeyPrefix
   deactivate: (id: string) => Promise<unknown>
   reactivate: (id: string) => Promise<unknown>
   invalidateKeys: (item: T) => QueryKey[]
   logLabel: string
 }) {
-  const { t } = useTranslation("contacts")
+  const { t } = useTranslation(["contacts", "agents"])
   const action = useConfirmedAction<T>({
     action: (item) =>
       item.status === UserStatus.UserStatusActive
@@ -67,10 +68,10 @@ export function useAccountStatusToggle<T extends AccountItem>({
     successMessage: (item) =>
       t(
         item.status === UserStatus.UserStatusActive
-          ? `${scope}.status.deactivated`
-          : `${scope}.status.reactivated`,
+          ? `${keyPrefix}.deactivated`
+          : `${keyPrefix}.reactivated`,
       ),
-    errorMessage: () => t(`${scope}.status.error`),
+    errorMessage: () => t(`${keyPrefix}.error`),
     logLabel,
   })
   const deactivating = action.item?.status === UserStatus.UserStatusActive
@@ -81,7 +82,7 @@ export function useAccountStatusToggle<T extends AccountItem>({
       const active = item.status === UserStatus.UserStatusActive
       return {
         key: "status",
-        label: t(active ? `${scope}.status.deactivate` : `${scope}.status.reactivate`),
+        label: t(active ? `${keyPrefix}.deactivate` : `${keyPrefix}.reactivate`),
         onSelect: () => action.select(item),
         destructive: active,
         separatorBefore: active,
@@ -91,16 +92,16 @@ export function useAccountStatusToggle<T extends AccountItem>({
       open: action.item !== null,
       pending: action.pending,
       title: t(
-        deactivating ? `${scope}.status.deactivateTitle` : `${scope}.status.reactivateTitle`,
+        deactivating ? `${keyPrefix}.deactivateTitle` : `${keyPrefix}.reactivateTitle`,
         { name: action.item?.displayName ?? "" },
       ),
       description: t(
         deactivating
-          ? `${scope}.status.deactivateDescription`
-          : `${scope}.status.reactivateDescription`,
+          ? `${keyPrefix}.deactivateDescription`
+          : `${keyPrefix}.reactivateDescription`,
       ),
       destructive: deactivating,
-      pendingLabel: t(`${scope}.status.saving`),
+      pendingLabel: t(`${keyPrefix}.saving`),
       onOpenChange: (open: boolean) => {
         if (!open) action.select(null)
       },

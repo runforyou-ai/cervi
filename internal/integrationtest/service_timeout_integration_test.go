@@ -11,6 +11,7 @@ import (
 	"uuid"
 
 	"github.com/nats-io/nats.go"
+	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	"github.com/runforyou-ai/cervi/internal/actions/customerservice"
 	"github.com/runforyou-ai/cervi/internal/actions/serviceassignment"
@@ -33,7 +34,7 @@ type timeoutFixture struct {
 func newTimeoutFixture(t *testing.T) timeoutFixture {
 	t.Helper()
 	f := newAssignmentFixture(t)
-	return timeoutFixture{assignmentFixture: f, timeouts: servicetimeout.NewWorker(f.db, newTestTasks(f.db)), feed: startRealtimeFeed(t, f.owner.Organization.ID)}
+	return timeoutFixture{assignmentFixture: f, timeouts: servicetimeout.NewWorker(f.db, newTestTasks(f.db), agentrunaction.NewScheduler(newTestTasks(f.db))), feed: startRealtimeFeed(t, f.owner.Organization.ID)}
 }
 
 // age 把周期的客户等待起点与负责人接手时间同时拨回指定分钟数。
@@ -220,13 +221,14 @@ func TestServiceTimeoutsSettings(t *testing.T) {
 		t.Fatalf("default timeouts = %+v, %v", loaded, err)
 	}
 	update := customerservice.NewUpdateServiceTimeoutsAction(f.db)
-	_, err = update.Execute(ctx, f.owner, domain.ServiceTimeouts{ResponseReminderMinutes: 10, ResponseReclaimMinutes: 10, QueueReminderMinutes: 0})
+	_, err = update.Execute(ctx, f.owner, domain.ServiceTimeouts{ResponseReminderMinutes: 10, ResponseReclaimMinutes: 10, QueueReminderMinutes: 0, AIFollowUpMinutes: 0, AICloseMinutes: 5})
 	validation, ok := errors.AsType[*common.FieldError](err)
 	if !ok || validation.Fields["responseReclaimMinutes"] != customerservice.ValidationReclaimNotAfterRemind ||
-		validation.Fields["queueReminderMinutes"] != customerservice.ValidationTimeoutMinutesInvalid {
+		validation.Fields["queueReminderMinutes"] != customerservice.ValidationTimeoutMinutesInvalid ||
+		validation.Fields["aiFollowUpMinutes"] != customerservice.ValidationTimeoutMinutesInvalid || len(validation.Fields) != 3 {
 		t.Fatalf("validation error = %v", err)
 	}
-	want := domain.ServiceTimeouts{ResponseReminderMinutes: 3, ResponseReclaimMinutes: 8, QueueReminderMinutes: 2}
+	want := domain.ServiceTimeouts{ResponseReminderMinutes: 3, ResponseReclaimMinutes: 8, QueueReminderMinutes: 2, AIFollowUpMinutes: 4, AICloseMinutes: 12}
 	if _, err := update.Execute(ctx, f.owner, want); err != nil {
 		t.Fatal(err)
 	}

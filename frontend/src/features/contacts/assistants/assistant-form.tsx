@@ -25,11 +25,11 @@ import {
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
-import { AgentModelField } from "@/features/contacts/agents/agent-model-field"
+import { AgentModelField } from "@/features/agents/agent-model-field"
 import {
   agentModelSelection,
   parseAgentModelSelection,
-} from "@/features/contacts/agents/agent-model-selection"
+} from "@/features/agents/agent-model-selection"
 import { useAssistantInvalidator } from "@/features/contacts/assistants/assistant-keys"
 import {
   createAssistantSchema,
@@ -51,8 +51,8 @@ function useAssistantSchema() {
       createAssistantSchema({
         nameRequired: t("assistants.validation.nameRequired"),
         nameInvalid: t("assistants.validation.nameInvalid"),
-        modelRequired: t("agents.validation.modelRequired"),
-        instructionTooLong: t("agents.validation.instructionTooLong"),
+        modelRequired: t("assistants.validation.modelRequired"),
+        instructionTooLong: t("assistants.validation.instructionTooLong"),
       }),
     [t],
   )
@@ -128,7 +128,7 @@ export function AssistantCreateForm({
       if (uploadingAvatar) return
       if (!mounted.current || recoverSession(error, navigate)) return
       console.warn("创建助理失败", { error })
-      toast.error(isApiError(error) ? apiErrorMessage(error, assistantErrorFields) : t("agents.form.networkError"))
+      toast.error(isApiError(error) ? apiErrorMessage(error, assistantErrorFields) : t("assistants.networkError"))
     }
   }
 
@@ -204,7 +204,7 @@ export function AssistantEditForm({
       // 上传失败已由共享上传回调提示，保存只处理资料提交错误。
       if (uploadingAvatar || recoverSession(error, navigate)) return false
       console.warn("保存助理失败", { assistant_id: assistant.id, error })
-      toast.error(isApiError(error) ? apiErrorMessage(error, assistantErrorFields) : t("agents.form.networkError"))
+      toast.error(isApiError(error) ? apiErrorMessage(error, assistantErrorFields) : t("assistants.networkError"))
       return false
     }
   }

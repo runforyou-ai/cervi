@@ -16,8 +16,6 @@ import {
   reactivateAssistant,
   resumeAssistant,
   type AssistantData,
-  type ChannelOption,
-  type Team,
 } from "@/api"
 import { ConfirmationDialog } from "@/components/confirmation-dialog"
 import { ListToolbarSearch } from "@/components/list-toolbar"
@@ -40,13 +38,7 @@ import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
 /** 显示当前成员名下的助理并提供编辑、换电脑、暂停和启停操作。 */
-export function AssistantsPanel({
-  channels,
-  teams,
-}: {
-  channels: ChannelOption[]
-  teams: Team[]
-}) {
+export function AssistantsPanel() {
   const { t } = useTranslation("contacts")
   const navigate = useNavigate()
   const invalidate = useAssistantInvalidator()
@@ -59,7 +51,7 @@ export function AssistantsPanel({
     assistant.displayName.toLowerCase().includes(query),
   )
   const statusToggle = useAccountStatusToggle<AssistantData>({
-    scope: "assistants",
+    keyPrefix: "contacts:assistants.status",
     deactivate: deactivateAssistant,
     reactivate: reactivateAssistant,
     invalidateKeys: (assistant) => assistantResourceKeys(assistant.id),
@@ -99,7 +91,7 @@ export function AssistantsPanel({
       <ContactListSection
         title={t("scopes.assistants")}
         description={t("scopeDescriptions.assistants")}
-        scope={{ scope: "assistants", teams, channels }}
+        scope="assistants"
         headerActions={
           localDeviceID ? (
             <Button variant="ghost" size="icon-sm" asChild>
@@ -141,7 +133,7 @@ export function AssistantsPanel({
             },
             {
               key: "model",
-              header: t("columns.model"),
+              header: t("assistants.columns.model"),
               cellClassName: "max-w-xs text-muted-foreground",
               cell: (assistant) => (
                 <span className="block truncate">

@@ -1,7 +1,7 @@
 /** 简体中文·集成文案。 */
 const integrations = {
   mcpServer: {
-    title: "MCP 服务",
+    title: "工具",
     description: "接入外部工具服务，供 AI 员工调用",
     list: {
       create: "添加 MCP 服务",

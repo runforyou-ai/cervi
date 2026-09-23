@@ -17,7 +17,6 @@ const settings = {
     customerService: "Customer service",
     roles: "Roles and permissions",
     modelServices: "Model services",
-    mcpServers: "MCP servers",
     webhooks: "Webhooks",
     openApi: "Developer API",
   },
@@ -153,7 +152,7 @@ const settings = {
   },
   customerService: {
     title: "Customer service",
-    description: "Set business hours, and reminders and reassignment when customers wait too long for a reply",
+    description: "Set business hours, reminders and reassignment when customers wait too long for a reply, and follow-ups when customers don't reply to AI",
     loadError: "Could not load business hours.",
     saveError: "Could not save business hours. Try again.",
     tabs: {
@@ -171,6 +170,10 @@ const settings = {
       responseReclaimMinutesDescription: "Return the conversation to its queue and assign it to someone else when the assignee still hasn't replied",
       queueReminderMinutes: "Queue wait reminder",
       queueReminderMinutesDescription: "Remind the team, or everyone who is working, when a conversation waits in the queue for this long",
+      aiFollowUpMinutes: "AI follow-up",
+      aiFollowUpMinutesDescription: "When the customer hasn't replied to AI for this long, AI follows up once and asks whether the issue is resolved",
+      aiCloseMinutes: "AI closes conversation",
+      aiCloseMinutesDescription: "Close the conversation when the customer still hasn't replied this long after AI follows up or asks whether the issue is resolved",
       validation: {
         minutesInvalid: "Enter a whole number greater than 0.",
         reclaimAfterReminder: "The reassignment time must be longer than the reminder time.",
@@ -281,7 +284,6 @@ const settings = {
       emptySelected: "No members have been added",
       noSearchResults: "No matching members",
       assignedTo: "Already in “{{role}}”",
-      aiEmployee: "AI employee",
       add: "Add",
     },
     validation: {

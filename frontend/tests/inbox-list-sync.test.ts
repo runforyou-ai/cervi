@@ -60,7 +60,7 @@ function setup() {
     restore: () => {},
     unavailable: () => {},
   }
-  const controller = new InboxListController(ports, { scope: "all", customerView: "queue", assigneeIdentityId: "" } as InboxQuery)
+  const controller = new InboxListController(ports, { scope: "chat" } as InboxQuery)
   const client = new QueryClient({ defaultOptions: { queries: { retry: false, gcTime: Infinity } } })
   const syncKey = resourceKeys.inbox({ organizationId: "o1", userId: "u1", view: "list" })
   const observer = new QueryObserver(client, {
