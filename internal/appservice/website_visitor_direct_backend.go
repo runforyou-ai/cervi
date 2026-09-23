@@ -43,6 +43,7 @@ type WebsiteVisitorDirectBackend struct {
 	completeUpload    *conversationaction.CompleteWebsiteVisitorUploadAction
 	getAttachment     *conversationaction.GetWebsiteVisitorAttachmentQuery
 	reportTyping      *conversationaction.ReportWebsiteVisitorTypingAction
+	rateSession       *conversationaction.RateWebsiteServiceSessionAction
 	localFiles        *serverfilecontent.LocalStore
 	s3                serverfilecontent.S3Config
 }
@@ -57,6 +58,7 @@ func NewWebsiteVisitorDirectBackend(db *bun.DB, agentScheduler conversationactio
 		completeUpload:    conversationaction.NewCompleteWebsiteVisitorUploadAction(db),
 		getAttachment:     conversationaction.NewGetWebsiteVisitorAttachmentQuery(db),
 		reportTyping:      conversationaction.NewReportWebsiteVisitorTypingAction(db),
+		rateSession:       conversationaction.NewRateWebsiteServiceSessionAction(db),
 		localFiles:        localFiles,
 		s3:                s3,
 	}
@@ -270,7 +272,12 @@ func (b *WebsiteVisitorDirectBackend) ListMessages(ctx context.Context, meta Web
 	if err != nil {
 		return WebsiteVisitorMessageHistory{}, websiteVisitorError(ctx, meta, err, cervii18n.ErrorConversationMessageListFailed, "list_messages", "channel_id", channelID, "conversation_id", conversationID)
 	}
-	result := WebsiteVisitorMessageHistory{Messages: make([]WebsiteVisitorMessage, 0, len(page.Messages))}
+	result := WebsiteVisitorMessageHistory{Messages: make([]WebsiteVisitorMessage, 0, len(page.Messages)), SessionRatings: make([]WebsiteVisitorSessionRating, 0, len(page.SessionRatings))}
+	for _, rating := range page.SessionRatings {
+		result.SessionRatings = append(result.SessionRatings, WebsiteVisitorSessionRating{
+			ServiceSessionID: rating.ServiceSessionID, EndMessageID: rating.EndMessageID, WebsiteVisitorRating: websiteVisitorRatingFromAction(rating.VisitorRating),
+		})
+	}
 	linker := visitorAttachmentLinker{s3: b.s3}
 	for _, message := range page.Messages {
 		converted, err := websiteVisitorMessageFromAction(ctx, &linker, message)
@@ -298,6 +305,19 @@ func (b *WebsiteVisitorDirectBackend) ReportTyping(ctx context.Context, meta Web
 	return nil
 }
 
+// RateServiceSession 保存网站访客对已关闭客服处理周期的评价。
+func (b *WebsiteVisitorDirectBackend) RateServiceSession(ctx context.Context, meta WebsiteVisitorMeta, channelID, externalID, conversationID, serviceSessionID string, input WebsiteVisitorRatingInput) (WebsiteVisitorRating, error) {
+	rating, err := b.rateSession.Execute(ctx, conversationaction.WebsiteServiceSessionRatingInput{
+		ChannelID: channelID, ExternalID: externalID, ConversationID: conversationID, ServiceSessionID: serviceSessionID,
+		Resolved: input.Resolved, Comment: input.Comment,
+	})
+	if err != nil {
+		return WebsiteVisitorRating{}, websiteVisitorError(ctx, meta, err, cervii18n.ErrorServiceSessionRateFailed, "rate_service_session", "channel_id", channelID, "service_session_id", serviceSessionID)
+	}
+	slog.Info("网站访客已评价客服处理周期", "channel_id", channelID, "conversation_id", conversationID, "service_session_id", serviceSessionID, "resolved", input.Resolved)
+	return websiteVisitorRatingFromAction(rating), nil
+}
+
 // websiteVisitorError 把语言无关访客错误映射为本地化应用错误。
 func websiteVisitorError(ctx context.Context, meta WebsiteVisitorMeta, err error, failureKey cervii18n.Key, operation string, attributes ...any) error {
 	requestMeta := RequestMeta{Locale: meta.Locale}
@@ -319,6 +339,8 @@ func websiteVisitorError(ctx context.Context, meta WebsiteVisitorMeta, err error
 			return ConflictError(requestMeta, cervii18n.ErrorReplyTargetInvalid, conflict.Reason)
 		case conversationaction.ConflictReasonAttachmentTooLarge:
 			return ConflictError(requestMeta, cervii18n.ErrorAttachmentTooLarge, conflict.Reason)
+		case conversationaction.ConflictReasonServiceSessionNotRateable:
+			return ConflictError(requestMeta, cervii18n.ErrorServiceSessionNotRateable, conflict.Reason)
 		}
 		return ConflictError(requestMeta, cervii18n.ErrorMessageConflict, conflict.Reason)
 	}
@@ -341,6 +363,7 @@ var websiteVisitorValidationKeys = map[conversationaction.ValidationCode]cervii1
 	conversationaction.ValidationBodyRequired:            cervii18n.FieldMessageBodyRequired,
 	conversationaction.ValidationBodyTooLong:             cervii18n.FieldMessageBodyTooLong,
 	conversationaction.ValidationCursorInvalid:           cervii18n.FieldMessageCursorInvalid,
+	conversationaction.ValidationRatingCommentTooLong:    cervii18n.FieldRatingCommentTooLong,
 	conversationaction.ValidationFileIDInvalid:           cervii18n.ErrorFileNotFound,
 	fileaction.ValidationFileNameRequired:                cervii18n.FieldFileNameRequired,
 	fileaction.ValidationContentTypeInvalid:              cervii18n.FieldFileContentTypeInvalid,
@@ -382,6 +405,10 @@ func websiteVisitorMessageFromAction(ctx context.Context, linker *visitorAttachm
 			attachment.PreviewURL, attachment.DownloadURL = links.PreviewURL, links.DownloadURL
 		}
 	}
+	var event *WebsiteVisitorEvent
+	if value.Event != nil {
+		event = &WebsiteVisitorEvent{Type: string(value.Event.Type), ServiceSessionID: value.Event.ServiceSessionID, MemberName: value.Event.MemberName}
+	}
 	senderAvatarURL := ""
 	if value.SenderAvatar != nil {
 		avatarURL, err := linker.avatarURL(ctx, *value.SenderAvatar)
@@ -394,7 +421,13 @@ func websiteVisitorMessageFromAction(ctx context.Context, linker *visitorAttachm
 		ClientMessageID: value.ClientMessageID, SenderIdentityID: value.SenderIdentityID, SenderName: value.SenderDisplayName, SenderAvatarURL: senderAvatarURL,
 		ReplyTo:    replyTo,
 		Attachment: attachment,
+		Event:      event,
 		ID:         value.ID, Author: string(value.Author), Body: value.Body, SenderIdentityType: (*OrganizationIdentityType)(value.SenderIdentityType),
 		MessageSeq: strconv.FormatInt(value.MessageSeq, 10), OriginatedAt: value.OriginatedAt, CreatedAt: value.CreatedAt,
 	}, nil
+}
+
+// websiteVisitorRatingFromAction 转换访客评价状态。
+func websiteVisitorRatingFromAction(value conversationaction.VisitorRating) WebsiteVisitorRating {
+	return WebsiteVisitorRating{Rateable: value.Rateable, Resolved: value.Resolved, Comment: value.Comment}
 }

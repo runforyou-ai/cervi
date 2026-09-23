@@ -645,6 +645,7 @@ func conversationMessageFromAction(message conversationaction.ConversationMessag
 			ReturnReason: (*ServiceSessionReturnReason)(message.SystemEvent.ReturnReason),
 			CloseReason:  (*ServiceSessionCloseReason)(message.SystemEvent.CloseReason),
 			ReasonText:   message.SystemEvent.ReasonText, CategoryName: message.SystemEvent.CategoryName, AgentRunID: message.SystemEvent.AgentRunID,
+			RatingResolved: message.SystemEvent.Resolved, RatingComment: message.SystemEvent.Comment,
 		}
 		// 客服处理周期事件的操作人按群聊事件的 actor 结构返回。
 		if message.SystemEvent.ActorIdentityID != nil && message.SystemEvent.ActorDisplayName != nil {

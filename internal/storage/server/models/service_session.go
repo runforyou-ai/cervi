@@ -37,4 +37,7 @@ type ServiceSession struct {
 	CloseReason              *string    `bun:"close_reason"`
 	ResolutionRequestedAt    *time.Time `bun:"resolution_requested_at"`
 	CategoryID               *string    `bun:"category_id"`
+	RatingResolved           *bool      `bun:"rating_resolved"`
+	RatingComment            *string    `bun:"rating_comment"`
+	RatedAt                  *time.Time `bun:"rated_at"`
 }

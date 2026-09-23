@@ -216,6 +216,8 @@ const inbox = {
   serviceSessionReturned: "{{from}} can no longer handle customers, so the conversation returned to {{target}}",
   serviceSessionReturnedResponseTimeout: "{{from}} didn't reply in time, so the conversation returned to {{target}}",
   serviceSessionAssigned: "The conversation was assigned to {{target}}",
+  serviceSessionRatedResolved: "Customer rating: resolved",
+  serviceSessionRatedUnresolved: "Customer rating: not resolved",
   handoffTargetTeam: "team {{name}}",
   handoffReasonKnowledgeGap: "no answer in the available information",
   handoffReasonCustomerRequested: "customer asked for a human",

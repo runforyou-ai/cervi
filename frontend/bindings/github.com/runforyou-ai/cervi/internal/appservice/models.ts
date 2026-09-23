@@ -1148,7 +1148,7 @@ export interface ConversationSystemEvent {
     "title": string | null;
 
     /**
-     * 以下字段只由客服处理周期事件携带：原负责人、去向，转人工或退回队列的原因与成员可见的原因说明，转人工时的咨询分类，以及关闭事件的结束方式；操作人写入 Actor。
+     * 以下字段只由客服处理周期事件携带：原负责人、去向，转人工或退回队列的原因与成员可见的原因说明，转人工时的咨询分类，关闭事件的结束方式，以及访客评价的是否解决与评语；操作人写入 Actor。
      */
     "serviceSessionId": string | null;
     "fromIdentityId": string | null;
@@ -1160,6 +1160,8 @@ export interface ConversationSystemEvent {
     "reasonText": string | null;
     "categoryName": string | null;
     "agentRunId": string | null;
+    "ratingResolved": boolean | null;
+    "ratingComment": string | null;
 }
 
 /**
@@ -1209,6 +1211,11 @@ export enum ConversationSystemEventType {
      * ConversationSystemEventServiceSessionAssigned 表示队列中的客服处理周期自动分配给成员。
      */
     ConversationSystemEventServiceSessionAssigned = "service_session_assigned",
+
+    /**
+     * ConversationSystemEventServiceSessionRated 表示访客评价了已关闭的客服处理周期。
+     */
+    ConversationSystemEventServiceSessionRated = "service_session_rated",
 };
 
 /**

@@ -82,4 +82,12 @@ const (
 	MessengerSessionClosed             Key = "messenger.session_closed"
 	MessengerDayToday                  Key = "messenger.day_today"
 	MessengerDayYesterday              Key = "messenger.day_yesterday"
+	MessengerSessionEnded              Key = "messenger.session_ended"
+	MessengerMemberJoined              Key = "messenger.member_joined"
+	MessengerRatingQuestion            Key = "messenger.rating_question"
+	MessengerRatingResolved            Key = "messenger.rating_resolved"
+	MessengerRatingUnresolved          Key = "messenger.rating_unresolved"
+	MessengerRatingComment             Key = "messenger.rating_comment"
+	MessengerRatingSubmit              Key = "messenger.rating_submit"
+	MessengerRatingThanks              Key = "messenger.rating_thanks"
 )

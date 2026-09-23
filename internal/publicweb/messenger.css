@@ -547,6 +547,23 @@ summary:focus-visible {
 .cv-day-divider::before,
 .cv-day-divider::after { height: 1px; flex: 1; background: color-mix(in srgb, var(--cv-border) 50%, transparent); content: ""; }
 .cv-day-divider + .cv-message[data-group-start] { margin-top: 0; }
+.cv-event { display: flex; margin: 12px 0; flex-direction: column; align-items: center; gap: 8px; }
+.cv-event-text { margin: 0; color: var(--cv-muted-foreground); font-size: 12px; line-height: 18px; text-align: center; }
+.cv-rating { display: flex; width: min(100%, 280px); flex-direction: column; gap: 10px; padding: 14px; border: 1px solid var(--cv-border); border-radius: 14px; background: var(--cv-background); }
+.cv-rating-form,
+.cv-rating-details { display: flex; flex-direction: column; gap: 10px; }
+.cv-rating-question { margin: 0; font-size: 13px; font-weight: 600; line-height: 20px; text-align: center; }
+.cv-rating-choices { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+.cv-rating-choice { min-height: 34px; padding: 6px 10px; border: 1px solid var(--cv-border); border-radius: 10px; background: var(--cv-background); font-size: 13px; cursor: pointer; }
+.cv-rating-choice:hover { background: var(--cv-surface); }
+.cv-rating-choice[aria-pressed="true"] { border-color: var(--cv-theme); background: color-mix(in srgb, var(--cv-theme) 10%, var(--cv-background)); color: var(--cv-foreground); font-weight: 600; }
+.cv-rating-label { display: flex; flex-direction: column; gap: 4px; color: var(--cv-muted-foreground); font-size: 12px; line-height: 18px; }
+.cv-rating-comment { display: block; width: 100%; min-height: 34px; resize: none; padding: 7px 10px; border: 1px solid var(--cv-border); border-radius: 10px; background: var(--cv-background); color: var(--cv-foreground); font-size: 13px; line-height: 18px; }
+.cv-rating-submit { min-height: 34px; padding: 6px 12px; border: 0; border-radius: 10px; background: var(--cv-theme); color: var(--cv-on-theme); font-size: 13px; font-weight: 600; cursor: pointer; }
+.cv-rating-submit:disabled { opacity: 0.6; cursor: default; }
+.cv-rating-error { margin: 0; color: var(--cv-danger); font-size: 12px; line-height: 18px; text-align: center; }
+.cv-rating-result { margin: 0; color: var(--cv-muted-foreground); font-size: 13px; line-height: 20px; text-align: center; }
+.cv-rating-result-comment { margin: 0; overflow-wrap: anywhere; color: var(--cv-foreground); font-size: 13px; line-height: 20px; white-space: pre-wrap; text-align: center; }
 .cv-message[data-group-start] { margin-top: 8px; }
 .cv-message-visitor { align-items: flex-end; padding-right: 36px; }
 .cv-message-assistant { align-items: flex-start; padding-left: 36px; }

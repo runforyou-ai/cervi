@@ -19,6 +19,7 @@ const (
 	ConversationSystemEventServiceSessionReopened    ConversationSystemEventType = "service_session_reopened"
 	ConversationSystemEventServiceSessionReturned    ConversationSystemEventType = "service_session_returned"
 	ConversationSystemEventServiceSessionAssigned    ConversationSystemEventType = "service_session_assigned"
+	ConversationSystemEventServiceSessionRated       ConversationSystemEventType = "service_session_rated"
 )
 
 // ServiceSessionReturnReason 定义客服处理周期退回队列的原因。
@@ -84,4 +85,11 @@ type ServiceSessionAssignedEvent struct {
 	ServiceSessionID string               `json:"serviceSessionId"`
 	Target           ServiceSessionTarget `json:"target"`
 	Source           ServiceSessionTarget `json:"source"`
+}
+
+// ServiceSessionRatedEvent 是 service_session_rated 事件的结构化内容：访客对已关闭客服处理周期的是否解决与评语。
+type ServiceSessionRatedEvent struct {
+	ServiceSessionID string `json:"serviceSessionId"`
+	Resolved         bool   `json:"resolved"`
+	Comment          string `json:"comment"`
 }

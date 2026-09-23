@@ -63,6 +63,8 @@ const (
 	ConversationSystemEventServiceSessionReturned ConversationSystemEventType = ConversationSystemEventType(domain.ConversationSystemEventServiceSessionReturned)
 	// ConversationSystemEventServiceSessionAssigned 表示队列中的客服处理周期自动分配给成员。
 	ConversationSystemEventServiceSessionAssigned ConversationSystemEventType = ConversationSystemEventType(domain.ConversationSystemEventServiceSessionAssigned)
+	// ConversationSystemEventServiceSessionRated 表示访客评价了已关闭的客服处理周期。
+	ConversationSystemEventServiceSessionRated ConversationSystemEventType = ConversationSystemEventType(domain.ConversationSystemEventServiceSessionRated)
 )
 
 // ServiceSessionReturnReason 表示客服处理周期退回队列的原因。
@@ -249,7 +251,7 @@ type ConversationSystemEvent struct {
 	Targets       []ConversationSystemEventParticipant `json:"targets"`
 	PreviousTitle *string                              `json:"previousTitle"`
 	Title         *string                              `json:"title"`
-	// 以下字段只由客服处理周期事件携带：原负责人、去向，转人工或退回队列的原因与成员可见的原因说明，转人工时的咨询分类，以及关闭事件的结束方式；操作人写入 Actor。
+	// 以下字段只由客服处理周期事件携带：原负责人、去向，转人工或退回队列的原因与成员可见的原因说明，转人工时的咨询分类，关闭事件的结束方式，以及访客评价的是否解决与评语；操作人写入 Actor。
 	ServiceSessionID *string                     `json:"serviceSessionId"`
 	FromIdentityID   *string                     `json:"fromIdentityId"`
 	FromDisplayName  *string                     `json:"fromDisplayName"`
@@ -260,6 +262,8 @@ type ConversationSystemEvent struct {
 	ReasonText       *string                     `json:"reasonText"`
 	CategoryName     *string                     `json:"categoryName"`
 	AgentRunID       *string                     `json:"agentRunId"`
+	RatingResolved   *bool                       `json:"ratingResolved"`
+	RatingComment    *string                     `json:"ratingComment"`
 }
 
 // ConversationMessage 定义成员可见的会话消息。

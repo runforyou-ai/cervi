@@ -269,6 +269,8 @@ const (
 	ErrorChannelOutboundUnsupported       Key = "error.channel_outbound_unsupported"
 	ErrorChannelAttachmentUnsupported     Key = "error.channel_attachment_unsupported"
 	ErrorAttachmentTooLarge               Key = "error.attachment_too_large"
+	ErrorServiceSessionRateFailed         Key = "error.service_session_rate_failed"
+	ErrorServiceSessionNotRateable        Key = "error.service_session_not_rateable"
 	ErrorAttachmentCaptionTooLong         Key = "error.attachment_caption_too_long"
 	ErrorServiceSessionAlreadyOpen        Key = "error.service_session_already_open"
 	ErrorTransferTeamUnavailable          Key = "error.transfer_team_unavailable"
@@ -396,6 +398,7 @@ const (
 	FieldMessageBodyRequired             Key = "field.message_body_required"
 	FieldMessageBodyTooLong              Key = "field.message_body_too_long"
 	FieldMessageCursorInvalid            Key = "field.message_cursor_invalid"
+	FieldRatingCommentTooLong            Key = "field.rating_comment_too_long"
 	FieldMessageVisibilityInvalid        Key = "field.message_visibility_invalid"
 	FieldConversationPinTargetInvalid    Key = "field.conversation_pin_target_invalid"
 )

@@ -154,7 +154,9 @@ func testAgentResolvesSession(t *testing.T, f resolutionFixture) {
 	}
 	assertAgentClosed(t, f.db, loadSession(t, f.db, run.ScopeID), agent.IdentityID, domain.ServiceSessionCloseAIResolved)
 	visible, err := conversationaction.NewListWebsiteMessagesQuery(f.db).Execute(ctx, conversationaction.MessageHistoryInput{ChannelID: channelID, ExternalID: input.ExternalID, ConversationID: first.Conversation.ID})
-	if err != nil || len(visible.Messages) != 2 || visible.Messages[1].Body != "不客气，祝您生活愉快" {
+	if err != nil || len(visible.Messages) != 3 || visible.Messages[1].Body != "不客气，祝您生活愉快" ||
+		visible.Messages[2].Event == nil || visible.Messages[2].Event.Type != conversationaction.VisitorEventSessionEnded ||
+		len(visible.SessionRatings) != 1 || visible.SessionRatings[0].EndMessageID != visible.Messages[2].ID || !visible.SessionRatings[0].Rateable {
 		t.Fatalf("visitor messages = %+v, error = %v", visible, err)
 	}
 	if next := f.receive(t, &input, "又有一个新问题"); !next.OpenedNewServiceSession {

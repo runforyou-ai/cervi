@@ -83,6 +83,17 @@ export function formatSystemEvent(
       target: sessionTargetText(event.sessionTarget, currentIdentityID, t),
     })
   }
+  // 访客评价事件没有操作人，按是否解决展示结果，评语由时间线另起一行展示。
+  if (
+    event.type ===
+    ConversationSystemEventType.ConversationSystemEventServiceSessionRated
+  ) {
+    return t(
+      event.ratingResolved
+        ? "serviceSessionRatedResolved"
+        : "serviceSessionRatedUnresolved",
+    )
+  }
   const participantName = (
     participant: ConversationSystemEventParticipant,
   ) =>

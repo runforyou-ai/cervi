@@ -399,6 +399,14 @@ var messengerCopyMessageKeys = map[string]cervii18n.Key{
 	"sessionClosed":             cervii18n.MessengerSessionClosed,
 	"dayToday":                  cervii18n.MessengerDayToday,
 	"dayYesterday":              cervii18n.MessengerDayYesterday,
+	"sessionEnded":              cervii18n.MessengerSessionEnded,
+	"memberJoined":              cervii18n.MessengerMemberJoined,
+	"ratingQuestion":            cervii18n.MessengerRatingQuestion,
+	"ratingResolved":            cervii18n.MessengerRatingResolved,
+	"ratingUnresolved":          cervii18n.MessengerRatingUnresolved,
+	"ratingComment":             cervii18n.MessengerRatingComment,
+	"ratingSubmit":              cervii18n.MessengerRatingSubmit,
+	"ratingThanks":              cervii18n.MessengerRatingThanks,
 }
 
 // embedRequestHost 从公开嵌入请求中读取宿主网站主机。
