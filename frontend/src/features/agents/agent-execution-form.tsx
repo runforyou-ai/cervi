@@ -15,17 +15,17 @@ import {
   FieldLabel,
 } from "@/components/ui/field"
 import { Textarea } from "@/components/ui/textarea"
-import { AgentKnowledgeField } from "@/features/contacts/agents/agent-knowledge-field"
-import { AgentMCPField } from "@/features/contacts/agents/agent-mcp-field"
-import { AgentModelField } from "@/features/contacts/agents/agent-model-field"
+import { AgentKnowledgeField } from "@/features/agents/agent-knowledge-field"
+import { AgentMCPField } from "@/features/agents/agent-mcp-field"
+import { AgentModelField } from "@/features/agents/agent-model-field"
 import {
   agentModelSelection,
   parseAgentModelSelection,
-} from "@/features/contacts/agents/agent-model-selection"
+} from "@/features/agents/agent-model-selection"
 import {
   createAgentExecutionSchema,
   type AgentExecutionFormValues,
-} from "@/features/contacts/agents/agent-schema"
+} from "@/features/agents/agent-schema"
 import { useFormLifetime } from "@/hooks/use-form-lifetime"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { useAutoSave } from "@/hooks/use-auto-save"
@@ -39,13 +39,13 @@ export function AgentExecutionForm({
   agent: AgentData
   onSaved: () => void
 }) {
-  const { t } = useTranslation(["contacts", "common"])
+  const { t } = useTranslation(["agents", "common"])
   const navigate = useNavigate()
   const schema = useMemo(
     () =>
       createAgentExecutionSchema({
-        modelRequired: t("agents.validation.modelRequired"),
-        instructionTooLong: t("agents.validation.instructionTooLong"),
+        modelRequired: t("validation.modelRequired"),
+        instructionTooLong: t("validation.instructionTooLong"),
       }),
     [t],
   )
@@ -108,7 +108,7 @@ export function AgentExecutionForm({
               "knowledgeBaseIds",
               "mcpServerIds",
             ])
-          : t("agents.execution.saveError"),
+          : t("execution.saveError"),
       )
       return false
     }
@@ -128,7 +128,7 @@ export function AgentExecutionForm({
           render={({ field, fieldState }) => (
             <Field data-invalid={fieldState.invalid}>
               <FieldLabel htmlFor="agent-execution-instruction">
-                {t("agents.execution.instruction")}
+                {t("execution.instruction")}
               </FieldLabel>
               <Textarea
                 {...field}
@@ -138,13 +138,13 @@ export function AgentExecutionForm({
                 disabled={form.formState.isSubmitting}
               />
               <FieldDescription>
-                {t("agents.execution.instructionHelp")}
+                {t("execution.instructionHelp")}
               </FieldDescription>
             </Field>
           )}
         />
         <Field>
-          <FieldLabel>{t("agents.execution.behavior")}</FieldLabel>
+          <FieldLabel>{t("execution.behavior")}</FieldLabel>
           <AgentBehaviorSummary behavior={agent.behavior} />
         </Field>
         <Controller
@@ -152,7 +152,7 @@ export function AgentExecutionForm({
           control={form.control}
           render={({ field }) => (
             <Field>
-              <FieldLabel>{t("agents.execution.knowledgeBases")}</FieldLabel>
+              <FieldLabel>{t("execution.knowledgeBases")}</FieldLabel>
               <AgentKnowledgeField
                 value={field.value}
                 onChange={field.onChange}
@@ -166,7 +166,7 @@ export function AgentExecutionForm({
           control={form.control}
           render={({ field }) => (
             <Field>
-              <FieldLabel>{t("agents.mcp.services")}</FieldLabel>
+              <FieldLabel>{t("mcp.services")}</FieldLabel>
               <AgentMCPField value={field.value} onChange={field.onChange} disabled={form.formState.isSubmitting} />
             </Field>
           )}

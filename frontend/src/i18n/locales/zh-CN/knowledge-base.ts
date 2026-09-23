@@ -164,23 +164,22 @@ const knowledgeBase = {
     addSimilarQuestion: "添加相似问题",
   },
   title: "知识库",
-  navigation: "知识库列表",
+  description: "AI 员工回答问题时检索的资料",
+  list: {
+    create: "新建知识库",
+    createStandard: "文档知识库",
+    createQA: "问答知识库",
+    loadError: "读取知识库列表失败。",
+    empty: "还没有知识库",
+    columns: {
+      name: "名称",
+    },
+  },
   category: {
     standard: "文档知识库",
     qa: "问答知识库",
     standardShort: "文档",
     qaShort: "问答",
-  },
-  sidebar: {
-    createStandard: "文档知识库",
-    createQA: "问答知识库",
-    loadError: "读取知识库列表失败。",
-    empty: "还没有知识库",
-  },
-  selection: {
-    empty: "从左侧选择一个知识库。",
-    createDocument: "新建文档知识库",
-    createQA: "新建问答知识库",
   },
   form: {
     embeddingModel: "向量模型",

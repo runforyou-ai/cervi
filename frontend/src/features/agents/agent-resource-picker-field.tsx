@@ -50,7 +50,7 @@ export function AgentResourcePickerField<T>({
   toOptions: (data: T) => AgentResourceOption[]
   labels: AgentResourcePickerLabels
 }) {
-  const { t } = useTranslation("contacts")
+  const { t } = useTranslation("agents")
   const [open, setOpen] = useState(false)
   const trigger = useRef<HTMLButtonElement>(null)
   const resource = useResource(resourceKey, load, { staleTime: 0 })
@@ -60,7 +60,7 @@ export function AgentResourcePickerField<T>({
     .filter((option) => value.includes(option.id))
     .slice(0, 2)
     .map((option) => option.name)
-    .join(t("agents.nameSeparator"))
+    .join(t("nameSeparator"))
   return (
     <Dialog open={open} onOpenChange={setOpen}>
       <div className="flex items-center gap-3">
@@ -72,7 +72,7 @@ export function AgentResourcePickerField<T>({
           disabled={disabled}
           onClick={() => setOpen(true)}
         >
-          {t("agents.configure")}
+          {t("configure")}
         </Button>
         <span className="text-sm text-muted-foreground">
           {value.length === 0

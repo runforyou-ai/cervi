@@ -1,6 +1,7 @@
-/** AI 员工列表、筛选、配置入口和状态管理面板。 */
+/** AI 员工列表页：筛选、配置入口和状态管理。 */
+import { PlusIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { useLocation, useNavigate } from "react-router"
+import { Link, useLocation, useNavigate } from "react-router"
 
 import {
   UserStatus,
@@ -8,41 +9,32 @@ import {
   listAgents,
   reactivateAgent,
   type AgentListItemData,
-  type ChannelOption,
-  type RoleData,
-  type Team,
 } from "@/api"
 import {
+  ListToolbar,
   ListToolbarReset,
   ListToolbarSearch,
 } from "@/components/list-toolbar"
 import { ConfirmationDialog } from "@/components/confirmation-dialog"
+import { PageHeader } from "@/components/page-header"
+import { ResourceListLayout } from "@/components/resource-list"
 import { ResourceRowIdentity } from "@/components/resource-row-identity"
 import { ResourceTable } from "@/components/resource-table"
+import { Button } from "@/components/ui/button"
 import {
   AccountStatusFilter,
   useAccountStatusToggle,
 } from "@/features/contacts/account-status-toggle"
-import { ContactCreateDialogs } from "@/features/contacts/contact-create-dialogs"
-import { ContactListSection } from "@/features/contacts/contact-list-section"
-import { useContactSearch } from "@/features/contacts/use-contact-search"
-import { roleDisplayName } from "@/lib/role-labels"
 import { contactResourceKeys } from "@/features/contacts/use-contact-invalidator"
+import { useContactSearch } from "@/features/contacts/use-contact-search"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
+import { roleDisplayName } from "@/lib/role-labels"
 import { optionalWailsEnum } from "@/lib/wails-enum"
 
-/** 显示 AI 员工目录并提供配置和状态操作。 */
-export function AgentsPanel({
-  channels,
-  roles,
-  teams,
-}: {
-  channels: ChannelOption[]
-  roles: RoleData[]
-  teams: Team[]
-}) {
-  const { t } = useTranslation("contacts")
+/** 显示 AI 员工列表并提供配置和状态操作。 */
+export function AgentListPage() {
+  const { t } = useTranslation(["agents", "common"])
   const { t: tCommon } = useTranslation("common")
   const navigate = useNavigate()
   const location = useLocation()
@@ -52,7 +44,7 @@ export function AgentsPanel({
     optionalWailsEnum(UserStatus, searchParams.get("status")) ??
     UserStatus.UserStatusActive
   const statusToggle = useAccountStatusToggle<AgentListItemData>({
-    scope: "agents",
+    keyPrefix: "agents:status",
     deactivate: deactivateAgent,
     reactivate: reactivateAgent,
     invalidateKeys: (agent) => contactResourceKeys("agent", agent.id),
@@ -65,40 +57,43 @@ export function AgentsPanel({
   )
   const agents = list.data?.agents ?? []
   const page = list.data?.page ?? { number: currentPage, size: 50, total: 0 }
-
-  const hasInternalFilters = Boolean(status !== UserStatus.UserStatusActive)
+  const returnTo = encodeURIComponent(location.pathname + location.search)
 
   return (
-    <>
-      <ContactListSection
-        title={t("scopes.agents")}
-        description={t("scopeDescriptions.agents")}
-        scope={{ scope: "agents", teams, channels }}
-        toolbar={
-          <>
-            <ListToolbarSearch
-              value={search}
-              aria-label={t("search.agents")}
-              onChange={(event) => setSearch(event.target.value)}
-            />
-            <AccountStatusFilter value={status} setParameters={setParameters} />
-            {hasInternalFilters ? (
-              <ListToolbarReset
-                onClick={() =>
-                  setParameters({
-                    status: null,
-                    page: null,
-                  })
-                }
-              >
-                {tCommon("actions.clearFilters")}
-              </ListToolbarReset>
-            ) : null}
-          </>
-        }
-        list={list}
+    <section className="flex min-h-0 flex-1 flex-col overflow-hidden">
+      <PageHeader title={t("title")} description={t("description")}>
+        <Button variant="ghost" size="icon-sm" asChild>
+          <Link
+            to={`/ai-employees/new?returnTo=${returnTo}`}
+            aria-label={t("create")}
+            title={t("create")}
+          >
+            <PlusIcon />
+          </Link>
+        </Button>
+      </PageHeader>
+
+      <ListToolbar>
+        <ListToolbarSearch
+          value={search}
+          aria-label={t("search")}
+          onChange={(event) => setSearch(event.target.value)}
+        />
+        <AccountStatusFilter value={status} setParameters={setParameters} />
+        {status !== UserStatus.UserStatusActive ? (
+          <ListToolbarReset
+            onClick={() => setParameters({ status: null, page: null })}
+          >
+            {t("common:actions.clearFilters")}
+          </ListToolbarReset>
+        ) : null}
+      </ListToolbar>
+
+      <ResourceListLayout
+        resources={list}
+        errorMessage={t("loadError")}
         page={page}
-        setParameters={setParameters}
+        onPageChange={(number) => setParameters({ page: String(number) })}
       >
         <ResourceTable
           hideHeader
@@ -133,11 +128,9 @@ export function AgentsPanel({
           ]}
           rows={agents}
           rowKey={(agent) => agent.id}
-          empty={t("list.empty")}
+          empty={t("empty")}
           onRowActivate={(agent) =>
-            navigate(
-              `/contacts/ai-employees/${agent.id}?tab=basic&returnTo=${encodeURIComponent(location.pathname + location.search)}`,
-            )
+            navigate(`/ai-employees/${agent.id}?tab=basic&returnTo=${returnTo}`)
           }
           // 已停用的 AI 员工保留禁用的发消息。
           rowActions={(agent) => [
@@ -151,18 +144,9 @@ export function AgentsPanel({
             statusToggle.rowAction(agent),
           ]}
         />
-      </ContactListSection>
-
-      <ContactCreateDialogs
-        scope="agents"
-        channels={channels}
-        roles={roles}
-        teams={teams}
-        searchParams={searchParams}
-        setParameters={setParameters}
-      />
+      </ResourceListLayout>
 
       <ConfirmationDialog {...statusToggle.dialog} />
-    </>
+    </section>
   )
 }

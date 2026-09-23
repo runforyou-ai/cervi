@@ -33,7 +33,7 @@ export function TeamSelectField({
   const names = teams
     .filter((team) => value.includes(team.id))
     .map((team) => team.name)
-    .join(t("agents.nameSeparator"))
+    .join(t("teamSelect.separator"))
   return (
     <Field>
       <FieldLabel>{label}</FieldLabel>

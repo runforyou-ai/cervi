@@ -2,7 +2,7 @@
 import { useTranslation } from "react-i18next"
 
 import { listKnowledgeBases } from "@/api"
-import { AgentResourcePickerField } from "@/features/contacts/agents/agent-resource-picker-field"
+import { AgentResourcePickerField } from "@/features/agents/agent-resource-picker-field"
 import { resourceKeys } from "@/hooks/resource-keys"
 
 /** 显示已选知识库数量，在模态框中勾选 AI 员工可检索的知识库。 */
@@ -15,7 +15,7 @@ export function AgentKnowledgeField({
   onChange: (ids: string[]) => void
   disabled: boolean
 }) {
-  const { t } = useTranslation("contacts")
+  const { t } = useTranslation("agents")
   return (
     <AgentResourcePickerField
       value={value}
@@ -31,17 +31,17 @@ export function AgentKnowledgeField({
         }))
       }
       labels={{
-        title: t("agents.execution.knowledgeTitle"),
-        group: t("agents.execution.knowledgeBases"),
-        unconfigured: t("agents.execution.knowledgeUnconfigured"),
+        title: t("execution.knowledgeTitle"),
+        group: t("execution.knowledgeBases"),
+        unconfigured: t("execution.knowledgeUnconfigured"),
         selected: (count, names) =>
           names === ""
-            ? t("agents.execution.knowledgeSelected", { count })
+            ? t("execution.knowledgeSelected", { count })
             : count === 1
-              ? t("agents.execution.knowledgeSelectedOne", { names })
-              : t("agents.execution.knowledgeSelectedNames", { names, count }),
-        empty: t("agents.execution.knowledgeEmpty"),
-        loadError: t("agents.execution.knowledgeLoadError"),
+              ? t("execution.knowledgeSelectedOne", { names })
+              : t("execution.knowledgeSelectedNames", { names, count }),
+        empty: t("execution.knowledgeEmpty"),
+        loadError: t("execution.knowledgeLoadError"),
       }}
     />
   )

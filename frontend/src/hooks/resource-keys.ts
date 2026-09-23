@@ -175,6 +175,8 @@ export const resourceKeys = {
   agent: (id?: string) => itemKey("agent", id),
   /** 团队列表，可带分页参数。 */
   teams: (parameters?: KeyParameters) => listKey("teams", parameters),
+  /** 单个团队。 */
+  team: (id?: string) => itemKey("team", id),
   /** 团队成员列表，按团队 ID 与筛选分页参数标识。 */
   teamMembers: (teamId?: string, parameters?: KeyParameters) =>
     scopedListKey("team-members", teamId, parameters),

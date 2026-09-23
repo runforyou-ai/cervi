@@ -756,6 +756,14 @@ func (b *Backend) ListTeams(ctx context.Context, meta appservice.RequestMeta, in
 	return output, err
 }
 
+// GetTeam 返回团队详情。
+func (b *Backend) GetTeam(ctx context.Context, meta appservice.RequestMeta, teamID string) (appservice.Team, error) {
+	var output appservice.Team
+	err := b.do(ctx, meta, http.MethodGet, "/teams/"+url.PathEscape(teamID), nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // CreateTeam 创建企业团队。
 func (b *Backend) CreateTeam(ctx context.Context, meta appservice.RequestMeta, input appservice.TeamInput) (appservice.Team, error) {
 	var output appservice.Team
@@ -775,14 +783,6 @@ func (b *Backend) UpdateTeam(ctx context.Context, meta appservice.RequestMeta, t
 // DeleteTeam 删除企业团队及其成员关系。
 func (b *Backend) DeleteTeam(ctx context.Context, meta appservice.RequestMeta, teamID string) error {
 	return b.do(ctx, meta, http.MethodDelete, "/teams/"+url.PathEscape(teamID), nil, nil, nil)
-}
-
-// ListAllTeamMembers 返回企业所有团队的成员列表，同一身份只列一次。
-func (b *Backend) ListAllTeamMembers(ctx context.Context, meta appservice.RequestMeta, input appservice.TeamMemberListInput) (appservice.TeamMemberList, error) {
-	var output appservice.TeamMemberList
-	err := b.do(ctx, meta, http.MethodGet, "/team-members", encodeTeamMemberListInputQuery(input), nil, &output)
-	b.normalizeOutput(&output)
-	return output, err
 }
 
 // ListTeamMembers 返回团队成员列表。

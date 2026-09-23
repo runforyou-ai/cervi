@@ -12,7 +12,7 @@ import { Link } from "react-router"
 import { listAgentModelOptions, type AgentModelOption } from "@/api"
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field"
 import { NativeSelect } from "@/components/ui/native-select"
-import { agentModelSelection } from "@/features/contacts/agents/agent-model-selection"
+import { agentModelSelection } from "@/features/agents/agent-model-selection"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 
@@ -46,7 +46,7 @@ export function AgentModelField<TValues extends FieldValues>({
   name: FieldPathByValue<TValues, string>
   disabled?: boolean
 }) {
-  const { t } = useTranslation("contacts")
+  const { t } = useTranslation("agents")
   const modelsResource = useResource(
     resourceKeys.agentModelOptions(),
     () => listAgentModelOptions(),
@@ -64,20 +64,20 @@ export function AgentModelField<TValues extends FieldValues>({
       render={({ field, fieldState }) => (
         <Field data-invalid={fieldState.invalid}>
           <FieldLabel htmlFor={`${name}-select`} required>
-            {t("agents.execution.model")}
+            {t("execution.model")}
           </FieldLabel>
           <NativeSelect
             {...field}
             id={`${name}-select`}
             required
             disabled={disabled || loading}
-            aria-label={t("agents.execution.model")}
+            aria-label={t("execution.model")}
             aria-invalid={fieldState.invalid}
           >
             <option value="">
               {loading
-                ? t("agents.execution.modelLoading")
-                : t("agents.execution.modelSelect")}
+                ? t("execution.modelLoading")
+                : t("execution.modelSelect")}
             </option>
             {groups.map(([providerId, group]) => (
               <optgroup key={providerId} label={group.providerName}>
@@ -97,13 +97,13 @@ export function AgentModelField<TValues extends FieldValues>({
           </NativeSelect>
           {failed ? (
             <FieldDescription>
-              {t("agents.execution.modelLoadError")}
+              {t("execution.modelLoadError")}
             </FieldDescription>
           ) : !loading && models.length === 0 ? (
             <FieldDescription>
-              {t("agents.execution.noModels")}{" "}
+              {t("execution.noModels")}{" "}
               <Link to="/settings/model-services/chat">
-                {t("agents.execution.configureModels")}
+                {t("execution.configureModels")}
               </Link>
             </FieldDescription>
           ) : null}
