@@ -6,7 +6,7 @@ import {
   type ConversationMessageData,
   type DirectTextMessageInput,
   type GroupParticipant,
-  type InboxConversation,
+  type InboxConversationData,
 } from "@/api"
 import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
 import {
@@ -50,7 +50,7 @@ export function MobileIndividualThread({
   conversationType?: ConversationType
   peerIdentityID?: string
   attachmentAgentIdentityID?: string
-  onAttachmentConversationCreated?: (conversation: InboxConversation) => void
+  onAttachmentConversationCreated?: (conversation: InboxConversationData) => void
   enabled?: boolean
   disabledReason?: string | null
   closedNotice?: string | null

@@ -382,7 +382,6 @@ const (
 	FieldTargetIdentityIDInvalid         Key = "field.target_identity_id_invalid"
 	FieldTargetTeamIDInvalid             Key = "field.target_team_id_invalid"
 	FieldTransferTargetInvalid           Key = "field.transfer_target_invalid"
-	FieldGroupTitleRequired              Key = "field.group_title_required"
 	FieldGroupTitleTooLong               Key = "field.group_title_too_long"
 	FieldGroupDescriptionTooLong         Key = "field.group_description_too_long"
 	FieldGroupImageFileIDInvalid         Key = "field.group_image_file_id_invalid"

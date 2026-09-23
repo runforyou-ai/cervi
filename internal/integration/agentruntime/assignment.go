@@ -14,7 +14,7 @@ const AssignmentRulesVersion = 3
 // SceneContext 表示拼接场景规则所需的运行期事实，群聊字段只在群聊场景取值，咨询分类只在客服场景取值。
 type SceneContext struct {
 	Scene             Scene
-	GroupTitle        string
+	GroupTitle        string            // 群聊名称，未命名的群为空。
 	MentionCandidates []string          // 群内名称唯一的可点名成员，按名称排序。
 	HandoffCategories []HandoffCategory // 企业咨询分类目录，按名称排序。
 }

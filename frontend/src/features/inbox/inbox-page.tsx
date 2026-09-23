@@ -15,7 +15,7 @@ import {
   listInboxChannels,
   listServiceQueueTeams,
   openConversationWindow,
-  type InboxConversation,
+  type InboxConversationData,
   type InboxQuery,
 } from "@/api"
 import { PageSplit } from "@/components/page-split"
@@ -137,7 +137,7 @@ export function InboxPage({
   }
 
   /** 桌面端在独立窗口打开会话，窗口标题取会话名称。 */
-  async function openConversationInWindow(conversation: InboxConversation, name: string) {
+  async function openConversationInWindow(conversation: InboxConversationData, name: string) {
     try {
       await openConversationWindow({ conversationId: conversation.id, title: name })
     } catch (error) {
@@ -147,7 +147,7 @@ export function InboxPage({
   }
 
   /** 本人关闭服务会话后取消选中并清空主区，已关闭会话里的其他操作保持选中。 */
-  function followCustomerConversation(conversation: InboxConversation) {
+  function followCustomerConversation(conversation: InboxConversationData) {
     if (!isCustomerInboxConversation(conversation) || conversation.id !== selectedConversationId) return
     const closing =
       conversation.customer.serviceSessionStatus === ServiceSessionStatus.ServiceSessionStatusClosed &&

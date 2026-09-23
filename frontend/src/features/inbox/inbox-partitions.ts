@@ -1,8 +1,8 @@
 /** 把置顶区与普通区的窗口状态合并为一条列表，协调两个分区对同一视口的首次定位，并生成相对可见邻居的置顶位置命令。 */
-import type { InboxConversation } from "@/api"
+import type { InboxConversationData } from "@/api"
 import type { InboxListPorts, InboxListState } from "./inbox-list-controller"
 
-export type InboxPartitionSnapshot = { state: InboxListState; conversations: InboxConversation[] }
+export type InboxPartitionSnapshot = { state: InboxListState; conversations: InboxConversationData[] }
 
 /** 先置顶后普通地合并两个分区：普通区停在深处窗口时只展示普通区，置顶区首次读取结束后才接上普通区，同一会话只出现一次。 */
 export function combineInboxPartitions(pinned: InboxPartitionSnapshot, regular: InboxPartitionSnapshot) {

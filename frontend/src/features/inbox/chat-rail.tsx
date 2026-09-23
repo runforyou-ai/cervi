@@ -11,7 +11,7 @@ import {
   loadInbox,
   updateConversationUnreadMark,
   type Identity,
-  type InboxConversation,
+  type InboxConversationData,
 } from "@/api"
 import { CountBadge } from "@/components/count-badge"
 import { IconTooltip } from "@/components/icon-tooltip"
@@ -119,7 +119,7 @@ function ChatRailItem({
   onOpen,
   sortable,
 }: {
-  conversation: InboxConversation
+  conversation: InboxConversationData
   name: string
   selected: boolean
   collapsed: boolean
@@ -227,7 +227,7 @@ function ChatRailSection({
   })
   const conversationName = useConversationName()
   const names = new Map(chats.conversations.map((conversation) => [conversation.id, conversationName(conversation)]))
-  const itemProps = (conversation: InboxConversation) => ({
+  const itemProps = (conversation: InboxConversationData) => ({
     conversation,
     name: names.get(conversation.id) ?? "",
     selected: conversation.id === selectedConversationId,

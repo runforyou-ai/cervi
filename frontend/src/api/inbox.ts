@@ -125,7 +125,9 @@ export type ConversationAgentProcessData =
 
 export type ConversationMessageData = NonNullArrays<ConversationMessage>
 
-export type CustomerInboxConversationData = NonNullArrays<InboxConversation> & {
+export type InboxConversationData = NonNullArrays<InboxConversation>
+
+export type CustomerInboxConversationData = InboxConversationData & {
   type: ConversationType.ConversationTypeCustomer
   customer: CustomerInboxConversation
   direct: null
@@ -133,7 +135,7 @@ export type CustomerInboxConversationData = NonNullArrays<InboxConversation> & {
   agent: null
 }
 
-export type DirectInboxConversationData = NonNullArrays<InboxConversation> & {
+export type DirectInboxConversationData = InboxConversationData & {
   type: ConversationType.ConversationTypeDirect
   customer: null
   direct: DirectInboxConversation
@@ -141,15 +143,15 @@ export type DirectInboxConversationData = NonNullArrays<InboxConversation> & {
   agent: null
 }
 
-export type GroupInboxConversationData = NonNullArrays<InboxConversation> & {
+export type GroupInboxConversationData = InboxConversationData & {
   type: ConversationType.ConversationTypeGroup
   customer: null
   direct: null
-  group: GroupInboxConversation
+  group: NonNullArrays<GroupInboxConversation>
   agent: null
 }
 
-export type AgentInboxConversationData = NonNullArrays<InboxConversation> & {
+export type AgentInboxConversationData = InboxConversationData & {
   type: ConversationType.ConversationTypeAgent
   customer: null
   direct: null
@@ -253,7 +255,7 @@ export function updateConversationNotificationSettings(
 
 /** 判断统一收件箱项是否为结构完整的客户会话。 */
 export function isCustomerInboxConversation(
-  conversation: InboxConversation,
+  conversation: InboxConversationData,
 ): conversation is CustomerInboxConversationData {
   return (
     conversation.agent === null &&
@@ -266,7 +268,7 @@ export function isCustomerInboxConversation(
 
 /** 判断统一收件箱项是否为结构完整的内部单聊。 */
 export function isDirectInboxConversation(
-  conversation: InboxConversation,
+  conversation: InboxConversationData,
 ): conversation is DirectInboxConversationData {
   return (
     conversation.agent === null &&
@@ -279,7 +281,7 @@ export function isDirectInboxConversation(
 
 /** 判断统一收件箱项是否为结构完整的企业群聊。 */
 export function isGroupInboxConversation(
-  conversation: InboxConversation,
+  conversation: InboxConversationData,
 ): conversation is GroupInboxConversationData {
   return (
     conversation.agent === null &&
@@ -292,7 +294,7 @@ export function isGroupInboxConversation(
 
 /** 判断统一收件箱项是否为支持静音和手动未读的内部会话。 */
 export function isInternalInboxConversation(
-  conversation: InboxConversation,
+  conversation: InboxConversationData,
 ): conversation is
   | AgentInboxConversationData
   | DirectInboxConversationData
@@ -584,7 +586,7 @@ export function markConversationMentionReviewed(
 
 /** 判断收件箱项是否为独立 AI 聊天。 */
 export function isAgentInboxConversation(
-  conversation: InboxConversation,
+  conversation: InboxConversationData,
 ): conversation is AgentInboxConversationData {
   return (
     conversation.type === ConversationType.ConversationTypeAgent &&

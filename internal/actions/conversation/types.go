@@ -21,7 +21,6 @@ const (
 	ValidationTargetIdentityIDInvalid   ValidationCode = "target_identity_id_invalid"
 	ValidationTargetTeamIDInvalid       ValidationCode = "target_team_id_invalid"
 	ValidationTransferTargetKindInvalid ValidationCode = "transfer_target_kind_invalid"
-	ValidationGroupTitleRequired        ValidationCode = "group_title_required"
 	ValidationGroupTitleTooLong         ValidationCode = "group_title_too_long"
 	ValidationGroupDescriptionTooLong   ValidationCode = "group_description_too_long"
 	ValidationGroupImageFileIDInvalid   ValidationCode = "group_image_file_id_invalid"
@@ -500,6 +499,8 @@ type GroupConversationSummary struct {
 	Status      domain.ConversationStatus
 	MemberCount int
 	ImageFileID *string
+	// MemberPreviewNames 是除创建人外按入群先后排列的前几名成员名称。
+	MemberPreviewNames []string
 }
 
 // GroupParticipant 定义群聊中的当前有效成员。
@@ -522,6 +523,8 @@ type GroupConversation struct {
 	CreatedAt    time.Time
 	Participants []GroupParticipant
 	Muted        bool
+	// MemberPreviewNames 是除查看者外按入群先后排列的前几名在群成员名称。
+	MemberPreviewNames []string
 }
 
 // GroupTextMessageInput 定义成员发送的群聊文本消息。

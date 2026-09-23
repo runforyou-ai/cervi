@@ -272,6 +272,8 @@ type GroupInboxConversation struct {
 	PreviewSenderIdentityType *OrganizationIdentityType `json:"previewSenderIdentityType"`
 	LastMessageAt             *time.Time                `json:"lastMessageAt"`
 	MemberCount               int                       `json:"memberCount"`
+	// MemberPreviewNames 是除查看者外按入群先后排列的前几名在群成员名称，用于显示未命名的群。
+	MemberPreviewNames []string `json:"memberPreviewNames"`
 }
 
 // InboxPendingItem 定义待处理条目的类型、等待起点，以及当前周期内是否有提醒本人且尚未回应的内部备注。

@@ -349,6 +349,7 @@ type DirectTextMessageInput struct {
 
 // GroupConversationInput 定义群聊资料和创建时加入的成员。
 type GroupConversationInput struct {
+	// Title 为空时创建未命名的群，按成员名称显示。
 	Title             string   `json:"title"`
 	Description       string   `json:"description"`
 	ImageFileID       string   `json:"imageFileId"`
@@ -398,6 +399,8 @@ type GroupConversation struct {
 	CreatedAt    time.Time          `json:"createdAt"`
 	Participants []GroupParticipant `json:"participants"`
 	Muted        bool               `json:"muted"`
+	// MemberPreviewNames 是除查看者外按入群先后排列的前几名在群成员名称，用于显示未命名的群。
+	MemberPreviewNames []string `json:"memberPreviewNames"`
 }
 
 // GroupTextMessageInput 定义成员发送的群聊文本消息。

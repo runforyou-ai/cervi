@@ -7,7 +7,7 @@ import {
   InboxSearchRange,
   readInboxConversations,
   searchInbox,
-  type InboxConversation,
+  type InboxConversationData,
   type InboxQuery,
   type InboxSearchResultData,
 } from "@/api"
@@ -27,7 +27,7 @@ export type InboxSearchPersonData = InboxSearchResultData["people"][number]
 
 /** 搜索模式中可用键盘选择和打开的结果项。 */
 export type InboxSearchItem =
-  | { kind: "conversation"; conversation: InboxConversation }
+  | { kind: "conversation"; conversation: InboxConversationData }
   | { kind: "message"; message: InboxSearchMessageData }
   | { kind: "person"; person: InboxSearchPersonData }
 
@@ -136,7 +136,7 @@ export function useInboxSearch({
   const [text, setText] = useState("")
   const [type, setType] = useState<InboxSearchType>("all")
   const [activeIndex, setActiveIndex] = useState(0)
-  const [pagedConversations, setPagedConversations] = useState<InboxConversation[]>([])
+  const [pagedConversations, setPagedConversations] = useState<InboxConversationData[]>([])
   const typeIndexes = useRef(new Map<InboxSearchType, number>())
   const results = useInboxSearchResults({
     active: true,

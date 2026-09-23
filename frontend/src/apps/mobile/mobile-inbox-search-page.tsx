@@ -8,7 +8,7 @@ import {
   InboxSearchPersonKind,
   InboxSearchRange,
   OrganizationIdentityType,
-  type InboxConversation,
+  type InboxConversationData,
 } from "@/api"
 import {
   mobileConversationPath,
@@ -111,9 +111,9 @@ function MobileConversationRows({
   highlight,
   onOpen,
 }: {
-  conversations: InboxConversation[]
+  conversations: InboxConversationData[]
   highlight: string
-  onOpen: (conversation: InboxConversation) => void
+  onOpen: (conversation: InboxConversationData) => void
 }) {
   const conversationName = useConversationName()
   return conversations.map((conversation) => (
@@ -137,7 +137,7 @@ function MobileSearchResults({
 }: {
   search: ReturnType<typeof useInboxSearchResults>
   query: string
-  onOpenConversation: (conversation: InboxConversation, messageId?: string) => void
+  onOpenConversation: (conversation: InboxConversationData, messageId?: string) => void
   onOpenPerson: (person: InboxSearchPersonData) => void
   onViewAllConversations: () => void
 }) {
@@ -256,7 +256,7 @@ export function MobileInboxSearchPage() {
   }
 
   /** 打开会话详情，消息结果同时定位原消息。 */
-  function openConversation(conversation: InboxConversation, messageId = "") {
+  function openConversation(conversation: InboxConversationData, messageId = "") {
     void navigate(mobileConversationPath(conversation), {
       state: {
         conversation,

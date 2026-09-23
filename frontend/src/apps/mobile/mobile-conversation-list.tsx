@@ -12,7 +12,7 @@ import {
   type CustomerInboxConversationData,
   type AgentInboxConversationData,
   type DirectInboxConversationData,
-  type InboxConversation,
+  type InboxConversationData,
   type GroupInboxConversationData,
 } from "@/api"
 import {
@@ -56,7 +56,7 @@ type MobileInboxConversation =
 
 /** 识别移动端支持的会话摘要。 */
 function isMobileInboxConversation(
-  conversation: InboxConversation,
+  conversation: InboxConversationData,
 ): conversation is MobileInboxConversation {
   return (
     isCustomerInboxConversation(conversation) ||

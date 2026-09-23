@@ -89,6 +89,7 @@ func (a *CreateGroupConversationAction) Execute(ctx context.Context, identity *s
 		participantIDs[identityID] = uuid.NewV7().String()
 	}
 
+	var previewNames []string
 	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
@@ -96,6 +97,11 @@ func (a *CreateGroupConversationAction) Execute(ctx context.Context, identity *s
 		members, err := loadActiveGroupMembers(ctx, tx, identity, normalized.MemberIdentityIDs)
 		if err != nil {
 			return err
+		}
+		// 初始成员同时入群，按名称顺序取前几名作为未命名群的显示成员。
+		previewNames = make([]string, 0, chatstate.GroupMemberPreviewNamesLimit)
+		for _, member := range members[:min(len(members), chatstate.GroupMemberPreviewNamesLimit)] {
+			previewNames = append(previewNames, member.DisplayName)
 		}
 		var imageFileID *string
 		if normalized.ImageFileID != "" {
@@ -113,7 +119,7 @@ func (a *CreateGroupConversationAction) Execute(ctx context.Context, identity *s
 		conversation := &servermodels.Conversation{
 			ID: conversationID, OrganizationID: identity.Organization.ID,
 			Type: string(domain.ConversationTypeGroup), Status: string(domain.ConversationStatusActive),
-			Title: &normalized.Title, Description: common.OptionalString(normalized.Description),
+			Title: common.OptionalString(normalized.Title), Description: common.OptionalString(normalized.Description),
 			ImageFileID: imageFileID, CreatedBySubjectID: &createdBySubjectID, Version: 1,
 		}
 		if _, err := tx.NewInsert().Model(conversation).
@@ -149,7 +155,7 @@ func (a *CreateGroupConversationAction) Execute(ctx context.Context, identity *s
 	return GroupConversationSummary{
 		ID: conversationID, Title: normalized.Title,
 		Status: domain.ConversationStatusActive, MemberCount: len(normalized.MemberIdentityIDs) + 1,
-		ImageFileID: common.OptionalString(normalized.ImageFileID),
+		ImageFileID: common.OptionalString(normalized.ImageFileID), MemberPreviewNames: previewNames,
 	}, nil
 }
 
@@ -167,15 +173,17 @@ func loadGroupConversation(ctx context.Context, db bun.IDB, identity *servermode
 		}}
 	}
 	var summary struct {
-		Title       string    `bun:"title"`
-		Description string    `bun:"description"`
-		ImageFileID *string   `bun:"image_file_id"`
-		Status      string    `bun:"status"`
-		CreatedAt   time.Time `bun:"created_at"`
-		Muted       bool      `bun:"muted"`
+		Title              string    `bun:"title"`
+		MemberPreviewNames []string  `bun:"member_preview_names,array"`
+		Description        string    `bun:"description"`
+		ImageFileID        *string   `bun:"image_file_id"`
+		Status             string    `bun:"status"`
+		CreatedAt          time.Time `bun:"created_at"`
+		Muted              bool      `bun:"muted"`
 	}
 	err := chatstate.GroupQuery(db, identity, conversationID).
-		ColumnExpr("cv.title AS title").
+		ColumnExpr("COALESCE(cv.title, '') AS title").
+		ColumnExpr(chatstate.GroupMemberPreviewNamesExpr+" AS member_preview_names", identity.OrganizationIdentity.ID, chatstate.GroupMemberPreviewNamesLimit).
 		ColumnExpr("COALESCE(cv.description, '') AS description").
 		ColumnExpr("cv.image_file_id::text AS image_file_id").
 		ColumnExpr("cv.status AS status").
@@ -219,7 +227,7 @@ func loadGroupConversation(ctx context.Context, db bun.IDB, identity *servermode
 		ID: conversationID, Title: summary.Title, Description: summary.Description, ImageFileID: summary.ImageFileID,
 		Status:    domain.ConversationStatus(summary.Status),
 		CreatedAt: summary.CreatedAt, Participants: participants,
-		Muted: summary.Muted,
+		Muted: summary.Muted, MemberPreviewNames: summary.MemberPreviewNames,
 	}, nil
 }
 
@@ -336,9 +344,7 @@ func normalizeGroupConversationInput(currentIdentityID string, input GroupConver
 	input.Title = strings.TrimSpace(input.Title)
 	input.Description = strings.TrimSpace(input.Description)
 	input.ImageFileID = strings.TrimSpace(input.ImageFileID)
-	if input.Title == "" {
-		fields["title"] = ValidationGroupTitleRequired
-	} else if utf8.RuneCountInString(input.Title) > maxGroupTitleLength {
+	if utf8.RuneCountInString(input.Title) > maxGroupTitleLength {
 		fields["title"] = ValidationGroupTitleTooLong
 	}
 	if utf8.RuneCountInString(input.Description) > maxGroupDescriptionLength {

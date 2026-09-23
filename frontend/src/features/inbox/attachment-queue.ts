@@ -10,7 +10,7 @@ import {
   sendAttachmentMessage,
   sendCustomerAttachmentMessage,
   type ConversationMessageReference,
-  type InboxConversation,
+  type InboxConversationData,
   type MessageAttachment,
 } from "@/api"
 import type { OutgoingMessageStore } from "./outgoing-message-store"
@@ -51,7 +51,7 @@ type Batch = {
   replyTo: ConversationMessageReference | null
   jobs: AttachmentJob[]
   sending: boolean
-  onCreated: (conversation: InboxConversation | null, conversationID: string) => void
+  onCreated: (conversation: InboxConversationData | null, conversationID: string) => void
 }
 
 /** 同时上传最多三个文件，并按每批的选择顺序串行发送已上传的附件。 */

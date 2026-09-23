@@ -162,7 +162,7 @@ func (q *LoadInboxQuery) pendingCandidates(identity *servermodels.Identity, inpu
 	return query
 }
 
-// matchConversationNames 按列表展示的会话名称筛选候选，名称与搜索词同样经 NFKC 规范化并合并连续空白，搜索词中的通配符按字面匹配，返回与候选相同的投影。
+// matchConversationNames 按列表展示的会话名称筛选候选，未命名的群按在群成员名称匹配，名称与搜索词同样经 NFKC 规范化并合并连续空白，搜索词中的通配符按字面匹配，返回与候选相同的投影。
 func (q *LoadInboxQuery) matchConversationNames(identity *servermodels.Identity, candidates *bun.SelectQuery, search string) *bun.SelectQuery {
 	pattern := "%" + strings.NewReplacer(`\`, `\\`, "%", `\%`, "_", `\_`).Replace(search) + "%"
 	// 名称按搜索词的规则规范化后再匹配。
@@ -179,9 +179,17 @@ func (q *LoadInboxQuery) matchConversationNames(identity *servermodels.Identity,
 		Join("LEFT JOIN customer_conversations AS cc ON cc.organization_id = cv.organization_id AND cc.conversation_id = cv.id").
 		Join("LEFT JOIN contact_channel_identities AS cci ON cci.organization_id = cc.organization_id AND cci.id = cc.contact_channel_identity_id").
 		Join("LEFT JOIN contacts AS c ON c.organization_id = cci.organization_id AND c.id = cci.contact_id").
-		Where(`(cv.type = ? AND `+name("cv.title")+` ILIKE ?) OR (cv.type = ? AND `+name("peer_oi.display_name")+` ILIKE ?)
+		// 未命名的群按除查看者外的在群成员名称匹配。
+		Where(`(cv.type = ? AND (`+name("cv.title")+` ILIKE ? OR (cv.title IS NULL AND EXISTS (
+				SELECT 1 FROM conversation_participants AS member_cp
+				JOIN chat_subjects AS member_cs ON member_cs.organization_id = member_cp.organization_id AND member_cs.id = member_cp.subject_id AND member_cs.kind = ?
+				JOIN organization_identities AS member_oi ON member_oi.organization_id = member_cs.organization_id AND member_oi.id = member_cs.source_id
+				WHERE member_cp.organization_id = cv.organization_id AND member_cp.conversation_id = cv.id AND member_cp.left_at IS NULL
+					AND member_cs.source_id <> ? AND `+name("member_oi.display_name")+` ILIKE ?))))
+			OR (cv.type = ? AND `+name("peer_oi.display_name")+` ILIKE ?)
 			OR (cv.type = ? AND (`+name("cv.title")+` ILIKE ? OR `+name("agent_oi.display_name")+` ILIKE ?))
 			OR (cv.type = ? AND `+name("COALESCE(cci.display_name, c.display_name)")+` ILIKE ?)`,
-			domain.ConversationTypeGroup, pattern, domain.ConversationTypeDirect, pattern,
+			domain.ConversationTypeGroup, pattern, domain.ChatSubjectKindOrganizationIdentity, identity.OrganizationIdentity.ID, pattern,
+			domain.ConversationTypeDirect, pattern,
 			domain.ConversationTypeAgent, pattern, pattern, domain.ConversationTypeCustomer, pattern)
 }

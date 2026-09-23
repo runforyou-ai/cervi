@@ -3,7 +3,7 @@ import assert from "node:assert/strict"
 import { test } from "node:test"
 import { combineInboxPartitions, pinMoveTarget, regularPartitionRestore, type InboxPartitionSnapshot } from "../src/features/inbox/inbox-partitions.ts"
 import type { InboxListPorts, InboxListState } from "../src/features/inbox/inbox-list-controller.ts"
-import type { InboxConversation } from "../src/api/index.ts"
+import type { InboxConversationData } from "../src/api/index.ts"
 
 /** 构造一个分区的窗口状态与已读取的会话摘要。 */
 function partition(ids: string[], change: Partial<InboxListState> = {}): InboxPartitionSnapshot {
@@ -13,7 +13,7 @@ function partition(ids: string[], change: Partial<InboxListState> = {}): InboxPa
       startCursor: "", endCursor: "", hasBefore: false, hasAfter: false, attentionUnreadCount: 0, pendingCount: 0, pinOrderVersion: "",
       status: "ready", operation: null, error: null, revision: 1, ...change,
     },
-    conversations: ids.map((id) => ({ id }) as InboxConversation),
+    conversations: ids.map((id) => ({ id }) as InboxConversationData),
   }
 }
 

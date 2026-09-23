@@ -316,6 +316,7 @@ func (o *directOperations) CreateGroupConversation(ctx context.Context, meta Req
 		Group: &GroupInboxConversation{
 			Title: summary.Title, ImageURL: optionalFileURL(imageURLs, summary.ImageFileID),
 			Status: ConversationStatus(summary.Status), MemberCount: summary.MemberCount,
+			MemberPreviewNames: summary.MemberPreviewNames,
 		},
 	}, nil
 }
@@ -432,7 +433,7 @@ func (o *directOperations) groupConversationFromAction(ctx context.Context, iden
 		ID: record.ID, Title: record.Title, Description: record.Description,
 		ImageURL: optionalFileURL(avatarURLs, record.ImageFileID), Status: ConversationStatus(record.Status),
 		CreatedAt: record.CreatedAt, Participants: participants,
-		Muted: record.Muted,
+		Muted: record.Muted, MemberPreviewNames: record.MemberPreviewNames,
 	}, nil
 }
 
@@ -924,7 +925,6 @@ var conversationMessageValidationKeys = map[conversationaction.ValidationCode]ce
 	conversationaction.ValidationTargetIdentityIDInvalid:   cervii18n.FieldTargetIdentityIDInvalid,
 	conversationaction.ValidationTargetTeamIDInvalid:       cervii18n.FieldTargetTeamIDInvalid,
 	conversationaction.ValidationTransferTargetKindInvalid: cervii18n.FieldTransferTargetInvalid,
-	conversationaction.ValidationGroupTitleRequired:        cervii18n.FieldGroupTitleRequired,
 	conversationaction.ValidationGroupTitleTooLong:         cervii18n.FieldGroupTitleTooLong,
 	conversationaction.ValidationGroupDescriptionTooLong:   cervii18n.FieldGroupDescriptionTooLong,
 	conversationaction.ValidationGroupImageFileIDInvalid:   cervii18n.FieldGroupImageFileIDInvalid,

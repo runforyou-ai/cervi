@@ -1,5 +1,5 @@
 /** 消息页当前选中的会话或聊天草稿。 */
-import type { InboxConversation, MemberOption } from "@/api"
+import type { InboxConversationData, MemberOption } from "@/api"
 
 /** 尚未产生正式会话的聊天草稿。 */
 export type ChatDraft =
@@ -8,4 +8,4 @@ export type ChatDraft =
 
 /** 消息页当前选中的会话或草稿。 */
 export type ConversationSelection =
-  ChatDraft | { kind: "conversation"; conversation: InboxConversation }
+  ChatDraft | { kind: "conversation"; conversation: InboxConversationData }

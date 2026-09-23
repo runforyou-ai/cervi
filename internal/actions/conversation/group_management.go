@@ -124,7 +124,7 @@ func (a *UpdateGroupConversationAction) Execute(ctx context.Context, identity *s
 		}
 		if title != normalized.Title || description != normalized.Description || imageChanged {
 			if err := tx.NewUpdate().Model(group.Conversation).
-				Set("title = ?", normalized.Title).
+				Set("title = ?", common.OptionalString(normalized.Title)).
 				Set("description = ?", common.OptionalString(normalized.Description)).
 				Set("image_file_id = ?", nextImageFileID).
 				Set("version = version + 1").
@@ -483,9 +483,7 @@ func normalizeGroupProfileInput(input GroupConversationProfileInput) (GroupConve
 	input.ConversationID = normalizedConversationID
 	input.Title = strings.TrimSpace(input.Title)
 	input.Description = strings.TrimSpace(input.Description)
-	if input.Title == "" {
-		fields["title"] = ValidationGroupTitleRequired
-	} else if utf8.RuneCountInString(input.Title) > maxGroupTitleLength {
+	if utf8.RuneCountInString(input.Title) > maxGroupTitleLength {
 		fields["title"] = ValidationGroupTitleTooLong
 	}
 	if utf8.RuneCountInString(input.Description) > maxGroupDescriptionLength {

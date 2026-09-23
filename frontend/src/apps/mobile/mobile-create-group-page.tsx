@@ -100,7 +100,7 @@ export function MobileCreateGroupPage() {
       >
         <FieldGroup>
           <Field>
-            <FieldLabel htmlFor="mobile-group-title" required>
+            <FieldLabel htmlFor="mobile-group-title">
               {tInbox("groupTitleLabel")}
             </FieldLabel>
             <Input
@@ -109,7 +109,6 @@ export function MobileCreateGroupPage() {
               className="min-h-11 md:text-base"
               autoComplete="off"
               maxLength={groupTitleMaxLength}
-              required
               disabled={saving}
             />
           </Field>

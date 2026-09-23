@@ -9,6 +9,7 @@ import {
   type GroupConversationData,
 } from "@/api"
 import { ConfirmationDialog } from "@/components/confirmation-dialog"
+import { useGroupDisplayName } from "@/features/inbox/use-conversation-name"
 import { useImmediateSave } from "@/hooks/use-immediate-save"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
@@ -28,6 +29,7 @@ export function GroupDissolveDialog({
   trigger?: HTMLElement | null
 }) {
   const { t } = useTranslation("inbox")
+  const groupName = useGroupDisplayName()
   const navigate = useNavigate()
   const save = useImmediateSave()
   const invalidate = useResourceInvalidator()
@@ -60,7 +62,9 @@ export function GroupDissolveDialog({
     <ConfirmationDialog
       open={open}
       pending={save.saving}
-      title={t("groupDissolveTitle", { name: group.title })}
+      title={t("groupDissolveTitle", {
+        name: groupName(group, group.participants.length),
+      })}
       description={t("groupDissolveDescription")}
       onOpenChange={onOpenChange}
       onConfirm={() => void dissolve()}

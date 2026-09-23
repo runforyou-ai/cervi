@@ -13,7 +13,7 @@ import {
   realtimeClient,
   type ConversationMessage,
   type Identity,
-  type InboxConversation,
+  type InboxConversationData,
 } from "@/api"
 import type {
   RealtimeServerFrame,
@@ -44,7 +44,7 @@ export function useNewMessageNotifications(
   const identityId = identity?.user.identityId
 
   const deliver = useEffectEvent(
-    async (conversation: InboxConversation, message: ConversationMessage) => {
+    async (conversation: InboxConversationData, message: ConversationMessage) => {
       if (!organizationId || !userId) {
         return
       }
@@ -76,7 +76,7 @@ export function useNewMessageNotifications(
       if (!organizationId || !userId) {
         return
       }
-      let conversation: InboxConversation
+      let conversation: InboxConversationData
       try {
         conversation = await getInboxConversation(frame.conversationId)
       } catch (error) {

@@ -4,7 +4,7 @@ import { useNavigate } from "react-router"
 import {
   isInternalInboxConversation,
   updateConversationUnreadMark,
-  type InboxConversation,
+  type InboxConversationData,
 } from "@/api"
 import {
   ConversationListMenu,
@@ -26,7 +26,7 @@ import { recoverSession } from "@/lib/session-navigation"
 import { cn } from "@/lib/utils"
 
 type ConversationRowProps = {
-  conversation: InboxConversation
+  conversation: InboxConversationData
   name: string
   showAudience: boolean
   showAssignee: boolean
@@ -35,7 +35,7 @@ type ConversationRowProps = {
   pinOrderVersion: string
   onMenuChange: (open: boolean) => void
   onSelect: (conversationId: string) => void
-  onOpenInWindow?: (conversation: InboxConversation, name: string) => void
+  onOpenInWindow?: (conversation: InboxConversationData, name: string) => void
   sortable?: PinSortable
 }
 
@@ -139,7 +139,7 @@ export function InboxConversationList({
   onSelect,
   onOpenInWindow,
 }: {
-  conversations: InboxConversation[]
+  conversations: InboxConversationData[]
   showAudience: boolean
   showAssignee: boolean
   pinnedIds: string[]
@@ -149,7 +149,7 @@ export function InboxConversationList({
   onPinSettled: (pinned: boolean) => Promise<void>
   selectedId?: string
   onSelect: (conversationId: string) => void
-  onOpenInWindow?: (conversation: InboxConversation, name: string) => void
+  onOpenInWindow?: (conversation: InboxConversationData, name: string) => void
 }) {
   const conversationName = useConversationName()
   const actions = useConversationListActions(onPinSettled)
@@ -161,7 +161,7 @@ export function InboxConversationList({
       conversationName(conversation),
     ]),
   )
-  const row = (conversation: InboxConversation) => ({
+  const row = (conversation: InboxConversationData) => ({
     conversation,
     name: names.get(conversation.id) ?? "",
     showAudience,

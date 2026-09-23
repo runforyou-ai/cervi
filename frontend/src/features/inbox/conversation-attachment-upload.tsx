@@ -7,7 +7,7 @@ import { useForm } from "react-hook-form"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { z } from "zod"
 import { toast } from "sonner"
-import type { ConversationMessageReference, InboxConversation } from "@/api"
+import type { ConversationMessageReference, InboxConversationData } from "@/api"
 import { IconTooltip } from "@/components/icon-tooltip"
 import { Button } from "@/components/ui/button"
 import {
@@ -53,7 +53,7 @@ export function ConversationAttachmentUpload({
   captionLimit?: number
   replyTo?: ConversationMessageReference | null
   disabled: boolean
-  onCreated: (conversation: InboxConversation | null, conversationID: string) => void
+  onCreated: (conversation: InboxConversationData | null, conversationID: string) => void
   onBeforeSend?: () => Promise<boolean>
   onSent?: () => void
 }) {

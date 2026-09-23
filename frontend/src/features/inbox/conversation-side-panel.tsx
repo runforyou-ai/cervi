@@ -13,7 +13,7 @@ import {
   isAgentInboxConversation,
   isDirectInboxConversation,
   isGroupInboxConversation,
-  type InboxConversation,
+  type InboxConversationData,
   type MemberOption,
 } from "@/api"
 import { ResizeHandle } from "@/components/resize-handle"
@@ -68,7 +68,7 @@ function InternalConversationProfile({
   directTarget,
   displayName,
 }: {
-  conversation: InboxConversation | null
+  conversation: InboxConversationData | null
   directTarget: MemberOption | null
   displayName: string
 }) {
@@ -136,7 +136,7 @@ function ConversationSidePanelContent({
   onGroupLeft,
   onClose,
 }: {
-  conversation: InboxConversation | null
+  conversation: InboxConversationData | null
   directTarget: MemberOption | null
   displayName: string
   currentIdentityID: string
@@ -275,7 +275,7 @@ export function ConversationSidePanel({
   visible,
   onClose,
 }: {
-  conversation: InboxConversation | null
+  conversation: InboxConversationData | null
   directTarget: MemberOption | null
   displayName: string
   currentIdentityID: string

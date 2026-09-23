@@ -192,7 +192,7 @@ export function CreateGroupConversationDialog({
               </div>
             </div>
             <div className="space-y-1.5">
-              <FieldLabel htmlFor="group-title" required>
+              <FieldLabel htmlFor="group-title">
                 {t("groupTitleLabel")}
               </FieldLabel>
               <Input
@@ -200,7 +200,6 @@ export function CreateGroupConversationDialog({
                 id="group-title"
                 autoComplete="off"
                 maxLength={groupTitleMaxLength}
-                required
               />
             </div>
             <div className="space-y-1.5">

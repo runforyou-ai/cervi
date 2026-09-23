@@ -25,7 +25,7 @@ import {
   type ConversationMessageReference,
   type DirectTextMessageInput,
   type GroupParticipant,
-  type InboxConversation,
+  type InboxConversationData,
   type MemberOption,
 } from "@/api"
 import { IconTooltip } from "@/components/icon-tooltip"
@@ -106,7 +106,7 @@ export function ConversationComposer({
   attachmentTargetIdentityID?: string
   attachmentAgentDraft?: { conversationID: string; agentIdentityID: string; customerConversationID?: string; workspaceID?: string }
   customerChannel?: CustomerChannelCapabilities | null
-  onAttachmentConversationCreated?: (conversation: InboxConversation | null, conversationID: string) => void
+  onAttachmentConversationCreated?: (conversation: InboxConversationData | null, conversationID: string) => void
   draftBridgeRef?: RefObject<ComposerDraftBridge | null>
   conversationID: string
   conversationType: ConversationType

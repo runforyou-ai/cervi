@@ -2,10 +2,10 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 import { NewMessageWatcher } from "../src/features/notifications/new-message-watcher.ts"
-import type { ConversationMessage, InboxConversation } from "../src/api/index.ts"
+import type { ConversationMessage, InboxConversationData } from "../src/api/index.ts"
 
 /** 构造带未读、静音和末条位置的会话行。 */
-function conversation(id: string, overrides: Partial<InboxConversation> = {}): InboxConversation {
+function conversation(id: string, overrides: Partial<InboxConversationData> = {}): InboxConversationData {
   return {
     id,
     unreadCount: 1,
@@ -16,7 +16,7 @@ function conversation(id: string, overrides: Partial<InboxConversation> = {}): I
     lastReadMessageId: null,
     group: null,
     ...overrides,
-  } as InboxConversation
+  } as InboxConversationData
 }
 
 /** 构造他人发送的普通文本消息。 */
@@ -42,7 +42,7 @@ async function settle() {
 function fixture() {
   const delivered: string[] = []
   const failures: unknown[] = []
-  const conversations = new Map<string, InboxConversation | null>()
+  const conversations = new Map<string, InboxConversationData | null>()
   const messages = new Map<string, ConversationMessage[]>()
   const mentions = new Map<string, string[]>()
   const reads: string[] = []
@@ -57,7 +57,7 @@ function fixture() {
       readConversations: async () => {
         const gate = gates.conversations.shift()
         if (gate) await gate.promise
-        return [...conversations.values()].filter((row): row is InboxConversation => row !== null)
+        return [...conversations.values()].filter((row): row is InboxConversationData => row !== null)
       },
       readConversation: async (conversationId) => {
         reads.push(conversationId)

@@ -23,6 +23,7 @@ import { LoadingIndicator } from "@/components/loading-indicator"
 import { useRealtimeSyncActive } from "@/contexts/realtime-sync-context"
 import { useAttachmentQueue } from "@/features/inbox/attachment-queue-context"
 import { useOutgoingMessageStore } from "@/features/inbox/outgoing-message-context"
+import { useGroupDisplayName } from "@/features/inbox/use-conversation-name"
 import { Button } from "@/components/ui/button"
 import {
   memberChatPollingInterval,
@@ -53,6 +54,7 @@ function MobileGroupConversation({
   conversationID: string
 }) {
   const { t } = useTranslation(["mobile", "inbox", "common"])
+  const groupName = useGroupDisplayName()
   const navigate = useNavigate()
   const outgoingStore = useOutgoingMessageStore()
   const { queue } = useAttachmentQueue()
@@ -150,7 +152,8 @@ function MobileGroupConversation({
             ) : (
               <span className="flex min-w-0 items-center">
                 <span className="min-w-0 truncate">
-                  {activityLabel || data?.title || t("group.title")}
+                  {activityLabel ||
+                    (data ? groupName(data, data.participants.length) : t("group.title"))}
                 </span>
                 {data?.muted ? (
                   <BellOffIcon

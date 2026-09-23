@@ -20,14 +20,14 @@ const schemas: Record<string, any> = {}
 runInNewContext(source, { z, exports: schemas })
 const translate = (key: string) => `translated:${key}`
 
-test("群名称去除首尾空格，空名称与超长资料返回业务翻译", () => {
+test("群名称去除首尾空格并允许留空，超长资料返回业务翻译", () => {
   const schema = schemas.profile(translate)
   assert.equal(
     schema.parse({ title: "  项目群  ", description: "  说明  " }).title,
     "项目群",
   )
+  assert.equal(schema.parse({ title: "   ", description: "" }).title, "")
   for (const [title, description, key] of [
-    ["   ", "", "groupTitleRequired"],
     ["名".repeat(101), "", "groupTitleTooLong"],
     ["项目群", "描".repeat(501), "groupDescriptionTooLong"],
   ]) {
