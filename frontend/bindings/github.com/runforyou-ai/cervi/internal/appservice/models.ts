@@ -3022,14 +3022,12 @@ export enum MessageAttachmentTransferStatus {
 };
 
 /**
- * MessageChannelInput 定义消息渠道可编辑的通用字段。
+ * MessageChannelBasicsInput 定义渠道基础信息的编辑字段。
  */
-export interface MessageChannelInput {
+export interface MessageChannelBasicsInput {
     "name": string;
     "description": string;
     "defaultLocale": Locale;
-    "newConversationTarget": ChannelRoutingTarget;
-    "fallbackTarget": ChannelRoutingTarget;
 }
 
 /**
@@ -3037,6 +3035,14 @@ export interface MessageChannelInput {
  */
 export interface MessageChannelList {
     "channels": MessageChannelSummary[] | null;
+}
+
+/**
+ * MessageChannelReceptionInput 定义渠道接待设置的编辑字段。
+ */
+export interface MessageChannelReceptionInput {
+    "newConversationTarget": ChannelRoutingTarget;
+    "fallbackTarget": ChannelRoutingTarget;
 }
 
 /**

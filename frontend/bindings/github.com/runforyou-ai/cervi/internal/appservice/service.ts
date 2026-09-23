@@ -1370,8 +1370,15 @@ export function UpdateMCPToolPurpose(meta: $models.RequestMeta, mcpServerID: str
 /**
  * UpdateMessageChannel 修改消息渠道基础信息。
  */
-export function UpdateMessageChannel(meta: $models.RequestMeta, channelID: string, input: $models.MessageChannelInput): $CancellablePromise<$models.MessageChannelSummary> {
+export function UpdateMessageChannel(meta: $models.RequestMeta, channelID: string, input: $models.MessageChannelBasicsInput): $CancellablePromise<$models.MessageChannelSummary> {
     return $Call.ByID(4163765989, meta, channelID, input);
+}
+
+/**
+ * UpdateMessageChannelReception 修改消息渠道接待设置。
+ */
+export function UpdateMessageChannelReception(meta: $models.RequestMeta, channelID: string, input: $models.MessageChannelReceptionInput): $CancellablePromise<$models.MessageChannelSummary> {
+    return $Call.ByID(3135846814, meta, channelID, input);
 }
 
 /**

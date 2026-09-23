@@ -89,7 +89,7 @@ export function AgentProfileForm({
   }, [agent, dirty, form])
 
   /** 提交基本资料和待保存的头像，并保留其他页签的编辑内容。 */
-  const { markSaved } = useAutoSave({ form, schema, save: submit, discarded })
+  const { acceptSaved, saveNow } = useAutoSave({ form, schema, save: submit, discarded })
 
   async function submit(values: AgentProfileFormValues) {
     let uploadingAvatar = false
@@ -100,10 +100,8 @@ export function AgentProfileForm({
       await updateAgent(agent.id, { ...values, avatarFileId })
       onSaved()
       if (!mounted.current) return true
-      dirty.current = false
-      form.reset(values)
-      markSaved(values)
-      avatar.clear()
+      dirty.current = !acceptSaved(values)
+      avatar.clear(avatarFileId)
       return true
     } catch (error) {
       // 上传失败已由共享上传回调提示，保存只处理资料提交错误。
@@ -126,7 +124,7 @@ export function AgentProfileForm({
   }
 
   return (
-    <form onSubmit={form.handleSubmit(submit)} noValidate>
+    <form onSubmit={form.handleSubmit(() => saveNow(true))} noValidate>
       <FieldGroup>
         <Field>
           <FieldLabel>{t("contacts:avatar.label")}</FieldLabel>

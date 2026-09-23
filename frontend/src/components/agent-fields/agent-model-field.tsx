@@ -12,7 +12,7 @@ import { Link } from "react-router"
 import { listAgentModelOptions, type AgentModelOption } from "@/api"
 import { Field, FieldDescription, FieldLabel } from "@/components/ui/field"
 import { NativeSelect } from "@/components/ui/native-select"
-import { agentModelSelection } from "@/features/agents/agent-model-selection"
+import { agentModelSelection } from "@/lib/agent-model-selection"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 

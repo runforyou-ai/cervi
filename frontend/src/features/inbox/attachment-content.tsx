@@ -20,6 +20,7 @@ export function AttachmentContent({
   onOpen,
   openLabel,
   onImageLoad,
+  onImageError,
 }: {
   name: string
   byteSize: number
@@ -34,6 +35,7 @@ export function AttachmentContent({
   onOpen?: () => void
   openLabel?: string
   onImageLoad?: () => void
+  onImageError?: () => void
 }) {
   if (imageWidth > 0 && imageHeight > 0) {
     return (
@@ -50,6 +52,7 @@ export function AttachmentContent({
             alt={onOpen ? "" : name}
             className="block size-full object-contain"
             onLoad={onImageLoad}
+            onError={onImageError}
           />
         ) : (
           // 没有预览地址时在图片位置显示接收中或接收失败等状态。

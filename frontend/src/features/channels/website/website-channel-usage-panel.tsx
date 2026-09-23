@@ -184,7 +184,7 @@ export function WebsiteChannelUsagePanel({
       allowedHosts: channel.access.allowedHosts.join("\n"),
     },
   })
-  const { markSaved } = useAutoSave({ form, schema, save })
+  const { acceptSaved, saveNow } = useAutoSave({ form, schema, save })
   const originResource = useResource(resourceKeys.websiteChannelOrigin(), () =>
     resolveWebsiteChannelOrigin(),
   )
@@ -265,9 +265,7 @@ export function WebsiteChannelUsagePanel({
         allowedHosts: allowedHostLines(values.allowedHosts),
       })
       const next = { allowedHosts: updated.allowedHosts.join("\n") }
-      // 保存期间未继续输入时回填服务端整理后的列表。
-      if (form.getValues("allowedHosts") === values.allowedHosts) form.reset(next)
-      markSaved(next)
+      acceptSaved(values, next)
       onUpdated(updated)
       return true
     } catch (submitError) {
@@ -349,7 +347,7 @@ export function WebsiteChannelUsagePanel({
               </Field>
             </FieldGroup>
 
-            <form onSubmit={form.handleSubmit(save)} noValidate>
+            <form onSubmit={form.handleSubmit(() => saveNow())} noValidate>
               <FieldGroup>
                 <Controller
                   name="allowedHosts"

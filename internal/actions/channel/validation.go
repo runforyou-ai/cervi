@@ -77,12 +77,32 @@ func normalizeCreateMessageChannelInput(input CreateMessageChannelInput) (Create
 
 // normalizeMessageChannelInput 规范化并校验消息渠道通用输入。
 func normalizeMessageChannelInput(input MessageChannelInput) (MessageChannelInput, map[string]ValidationCode) {
+	basics, fields := normalizeMessageChannelBasics(MessageChannelBasicsInput{
+		Name:          input.Name,
+		Description:   input.Description,
+		DefaultLocale: input.DefaultLocale,
+	})
+	reception, receptionFields := normalizeMessageChannelReception(MessageChannelReceptionInput{
+		NewConversationTarget: input.NewConversationTarget,
+		FallbackTarget:        input.FallbackTarget,
+	})
+	for field, code := range receptionFields {
+		fields[field] = code
+	}
+	return MessageChannelInput{
+		Name:                  basics.Name,
+		Description:           basics.Description,
+		DefaultLocale:         basics.DefaultLocale,
+		NewConversationTarget: reception.NewConversationTarget,
+		FallbackTarget:        reception.FallbackTarget,
+	}, fields
+}
+
+// normalizeMessageChannelBasics 规范化并校验渠道基础信息。
+func normalizeMessageChannelBasics(input MessageChannelBasicsInput) (MessageChannelBasicsInput, map[string]ValidationCode) {
 	input.Name = strings.TrimSpace(input.Name)
 	input.Description = strings.TrimSpace(input.Description)
 	input.DefaultLocale = domain.Locale(strings.TrimSpace(string(input.DefaultLocale)))
-	input.NewConversationTarget = normalizeRoutingTarget(input.NewConversationTarget)
-	input.FallbackTarget = normalizeRoutingTarget(input.FallbackTarget)
-
 	fields := make(map[string]ValidationCode)
 	if input.Name == "" {
 		fields["name"] = ValidationNameRequired
@@ -95,15 +115,21 @@ func normalizeMessageChannelInput(input MessageChannelInput) (MessageChannelInpu
 	if input.DefaultLocale != domain.LocaleChineseSimplified && input.DefaultLocale != domain.LocaleEnglishUnitedStates {
 		fields["defaultLocale"] = ValidationDefaultLocaleInvalid
 	}
+	return input, fields
+}
+
+// normalizeMessageChannelReception 规范化并校验渠道接待设置。
+func normalizeMessageChannelReception(input MessageChannelReceptionInput) (MessageChannelReceptionInput, map[string]ValidationCode) {
+	input.NewConversationTarget = normalizeRoutingTarget(input.NewConversationTarget)
+	input.FallbackTarget = normalizeRoutingTarget(input.FallbackTarget)
+	fields := make(map[string]ValidationCode)
 	if !routingTargetShapeValid(input.NewConversationTarget) {
 		fields["newConversationTarget"] = ValidationRoutingTargetInvalid
 	}
 	if !routingTargetShapeValid(input.FallbackTarget) {
 		fields["fallbackTarget"] = ValidationRoutingTargetInvalid
 	}
-	if input.NewConversationTarget.Type != domain.ChannelRoutingTargetTypePublicQueue &&
-		input.NewConversationTarget.Type == input.FallbackTarget.Type &&
-		input.NewConversationTarget.ID == input.FallbackTarget.ID {
+	if input.NewConversationTarget.Type != domain.ChannelRoutingTargetTypePublicQueue && input.NewConversationTarget.Type == input.FallbackTarget.Type && input.NewConversationTarget.ID == input.FallbackTarget.ID {
 		fields["fallbackTarget"] = ValidationRoutingTargetInvalid
 	}
 	return input, fields

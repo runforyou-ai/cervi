@@ -1,7 +1,7 @@
 /** 助理表单校验规则。 */
 import { z } from "zod"
 
-import { createAgentManagedExecutionSchema } from "@/features/agents/agent-schema"
+import { createAgentManagedExecutionSchema } from "@/lib/agent-execution-schema"
 import { displayNamePattern } from "@/lib/display-name"
 
 /** 创建助理资料与执行配置校验规则。 */

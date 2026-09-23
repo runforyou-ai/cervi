@@ -50,6 +50,8 @@ export function ConversationAttachment({
   const navigate = useNavigate()
   const mobile = resolveAppPlatform() === "mobile"
   const [previewOpen, setPreviewOpen] = useState(false)
+  const [failedPreview, setFailedPreview] = useState<string | null>(null)
+  const [previewVersion, setPreviewVersion] = useState(0)
   const { queue, jobs } = useAttachmentQueue()
   const job = jobs.find(
     (item) =>
@@ -72,8 +74,13 @@ export function ConversationAttachment({
   const preview = useResource(
     resourceKeys.attachmentDownload(conversationID, messageID),
     () => getAttachmentDownload(conversationID, messageID),
-    { enabled: ready && transferred && image && Boolean(conversationID) },
+    {
+      enabled: ready && transferred && image && Boolean(conversationID),
+      staleTime: 0,
+      refetchOnWindowFocus: true,
+    },
   )
+  const previewFailed = failedPreview !== null && failedPreview === preview.data?.previewUrl
   const progress = attachment.byteSize
     ? Math.min((job?.bytes ?? 0) / attachment.byteSize, 1)
     : 0
@@ -174,6 +181,21 @@ export function ConversationAttachment({
   // 文件打开下载地址，移动端图片打开应用内预览。
   const canPreview = ready && transferred && mobile && image && Boolean(preview.data?.previewUrl)
   const canDownload = ready && transferred && !(mobile && image)
+  const previewRetry = image && (preview.error || previewFailed) ? (
+    <button
+      type="button"
+      className="rounded-md bg-background/90 px-3 py-2 text-xs text-foreground shadow-sm disabled:opacity-50"
+      disabled={preview.refreshing}
+      onClick={async () => {
+        const result = await preview.refresh()
+        if (result.error) return
+        setFailedPreview(null)
+        setPreviewVersion((version) => version + 1)
+      }}
+    >
+      {t("attachmentPreviewRetry")}
+    </button>
+  ) : null
   const bubble = cn("rounded-2xl px-3 py-2", bubbleClassName)
   return (
     <>
@@ -188,12 +210,13 @@ export function ConversationAttachment({
         data-attachment-status={ready ? "ready" : failed ? "failed" : "uploading"}
       >
         <AttachmentContent
+          key={previewVersion}
           name={attachment.name}
           byteSize={attachment.byteSize}
           imageWidth={attachment.imageWidth}
           imageHeight={attachment.imageHeight}
           previewURL={preview.data?.previewUrl || job?.previewURL}
-          action={control}
+          action={control ?? previewRetry}
           detail={detail}
           footer={body ? undefined : footer}
           inverted={!incoming}
@@ -208,8 +231,10 @@ export function ConversationAttachment({
             else void download()
           } : undefined}
           onImageLoad={() => {
+            setFailedPreview(null)
             if (preview.data?.previewUrl && job) queue?.releasePreview(job.id)
           }}
+          onImageError={() => setFailedPreview(preview.data?.previewUrl ?? null)}
         />
         {image && failed ? (
           <p className="text-xs text-muted-foreground">
@@ -219,15 +244,6 @@ export function ConversationAttachment({
         {ready && deliveryBelowImage
           ? renderDeliveryState?.("rounded-full bg-accent px-2 py-0.5 text-accent-foreground")
           : null}
-        {image && preview.error ? (
-          <button
-            type="button"
-            className="text-xs text-muted-foreground"
-            onClick={() => void preview.refresh()}
-          >
-            {t("attachmentPreviewRetry")}
-          </button>
-        ) : null}
         {body ? (
           // 图片正文单独成气泡，非图片正文留在附件气泡内，时间与正文同行。
           <div className={cn("min-w-0 after:block after:clear-both after:content-['']", image ? cn("max-w-80", bubble) : "pt-2")}>
@@ -246,7 +262,14 @@ export function ConversationAttachment({
             <DialogHeader className="pr-8">
               <DialogTitle className="break-all">{attachment.name}</DialogTitle>
             </DialogHeader>
-            <img src={preview.data?.previewUrl} alt={attachment.name} className="max-h-[65dvh] w-full object-contain" />
+            <img
+              key={previewVersion}
+              src={preview.data?.previewUrl}
+              alt={attachment.name}
+              className="max-h-[65dvh] w-full object-contain"
+              onError={() => setFailedPreview(preview.data?.previewUrl ?? null)}
+            />
+            {previewRetry}
           </DialogContent>
         </Dialog>
       ) : null}

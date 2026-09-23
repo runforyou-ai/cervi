@@ -253,7 +253,10 @@ type Backend interface {
 	CreateMessageChannel(context.Context, RequestMeta, CreateMessageChannelInput) (MessageChannelSummary, error)
 	// UpdateMessageChannel 修改消息渠道基础信息。
 	//cervi:route PUT /channels/:channelID
-	UpdateMessageChannel(context.Context, RequestMeta, string, MessageChannelInput) (MessageChannelSummary, error)
+	UpdateMessageChannel(context.Context, RequestMeta, string, MessageChannelBasicsInput) (MessageChannelSummary, error)
+	// UpdateMessageChannelReception 修改消息渠道接待设置。
+	//cervi:route PUT /channels/:channelID/reception
+	UpdateMessageChannelReception(context.Context, RequestMeta, string, MessageChannelReceptionInput) (MessageChannelSummary, error)
 	// UpdateWebsiteChannelChatInterface 修改网站渠道聊天界面。
 	//cervi:route PUT /channels/website/:channelID/chat-interface
 	UpdateWebsiteChannelChatInterface(context.Context, RequestMeta, string, WebsiteChannelChatInterfaceInput) (WebsiteChannelChatInterface, error)

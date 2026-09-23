@@ -761,11 +761,9 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatalf("unexpected updated chat interface: %#v", chatInterface)
 		}
 
-		channel, err = updateChannel.Execute(context.Background(), loggedIn.Identity, channel.ID, channelaction.MessageChannelInput{
-			Name:                  "帮助中心",
-			DefaultLocale:         domain.LocaleEnglishUnitedStates,
-			NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
-			FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
+		channel, err = updateChannel.ExecuteBasics(context.Background(), loggedIn.Identity, channel.ID, channelaction.MessageChannelBasicsInput{
+			Name:          "帮助中心",
+			DefaultLocale: domain.LocaleEnglishUnitedStates,
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -773,11 +771,9 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if channel.Name != "帮助中心" || channel.Description != nil || channel.DefaultLocale != string(domain.LocaleEnglishUnitedStates) {
 			t.Fatalf("unexpected updated channel: %#v", channel)
 		}
-		telegramChannel, err = updateChannel.Execute(context.Background(), loggedIn.Identity, telegramChannel.ID, channelaction.MessageChannelInput{
-			Name:                  "Telegram 支持",
-			DefaultLocale:         domain.LocaleEnglishUnitedStates,
-			NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
-			FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
+		telegramChannel, err = updateChannel.ExecuteBasics(context.Background(), loggedIn.Identity, telegramChannel.ID, channelaction.MessageChannelBasicsInput{
+			Name:          "Telegram 支持",
+			DefaultLocale: domain.LocaleEnglishUnitedStates,
 		})
 		if err != nil {
 			t.Fatal(err)
@@ -1458,18 +1454,14 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil || teamMembers.Page.Total != 1 || len(teamMembers.Members) != 1 || teamMembers.Members[0].IdentityID != createdAgent.IdentityID || teamMembers.Members[0].WorkStatus != domain.WorkStatusAway {
 			t.Fatalf("team directory = %#v, error = %v", teamMembers, err)
 		}
-		channel, err = updateChannel.Execute(context.Background(), loggedIn.Identity, channel.ID, channelaction.MessageChannelInput{
-			Name:                  channel.Name,
-			DefaultLocale:         domain.LocaleEnglishUnitedStates,
+		channel, err = updateChannel.ExecuteReception(context.Background(), loggedIn.Identity, channel.ID, channelaction.MessageChannelReceptionInput{
 			NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypeMember, ID: createdAgent.IdentityID},
 			FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 		})
 		if err != nil || channel.InitialRoutingTargetID == nil || *channel.InitialRoutingTargetID != createdAgent.IdentityID {
 			t.Fatalf("agent channel routing = %#v, error = %v", channel, err)
 		}
-		_, err = updateChannel.Execute(context.Background(), loggedIn.Identity, telegramChannel.ID, channelaction.MessageChannelInput{
-			Name:                  telegramChannel.Name,
-			DefaultLocale:         domain.LocaleEnglishUnitedStates,
+		_, err = updateChannel.ExecuteReception(context.Background(), loggedIn.Identity, telegramChannel.ID, channelaction.MessageChannelReceptionInput{
 			NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypeMember, ID: createdAgent.IdentityID},
 			FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 		})
@@ -1497,9 +1489,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil {
 			t.Fatalf("Telegram agent transfer error = %#v", err)
 		}
-		channel, err = updateChannel.Execute(context.Background(), loggedIn.Identity, channel.ID, channelaction.MessageChannelInput{
-			Name:                  channel.Name,
-			DefaultLocale:         domain.LocaleEnglishUnitedStates,
+		channel, err = updateChannel.ExecuteReception(context.Background(), loggedIn.Identity, channel.ID, channelaction.MessageChannelReceptionInput{
 			NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 			FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 		})
@@ -1546,9 +1536,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil || closedPublicQueue.Status != domain.ServiceSessionStatusClosed {
 			t.Fatalf("closed public queue session = %#v, error = %v", closedPublicQueue, err)
 		}
-		channel, err = updateChannel.Execute(context.Background(), loggedIn.Identity, channel.ID, channelaction.MessageChannelInput{
-			Name:                  channel.Name,
-			DefaultLocale:         domain.LocaleEnglishUnitedStates,
+		channel, err = updateChannel.ExecuteReception(context.Background(), loggedIn.Identity, channel.ID, channelaction.MessageChannelReceptionInput{
 			NewConversationTarget: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypeMember, ID: createdAgent.IdentityID},
 			FallbackTarget:        channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue},
 		})

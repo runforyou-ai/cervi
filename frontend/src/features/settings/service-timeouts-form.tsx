@@ -105,7 +105,7 @@ function ServiceTimeoutsForm({ values }: { values: ServiceTimeoutsFormValues }) 
       mounted.current = false
     }
   }, [])
-  const { markSaved } = useAutoSave({ form, schema, save })
+  const { markSaved, saveNow } = useAutoSave({ form, schema, save })
   // 提醒时长变化后重新校验回收时长。
   useEffect(() => {
     const subscription = form.watch((_, { name }) => {
@@ -145,7 +145,7 @@ function ServiceTimeoutsForm({ values }: { values: ServiceTimeoutsFormValues }) 
     <form
       className="w-full"
       aria-label={t("customerService.timeouts.formLabel")}
-      onSubmit={form.handleSubmit(save)}
+      onSubmit={form.handleSubmit(() => saveNow())}
       noValidate
     >
       <FieldGroup>
