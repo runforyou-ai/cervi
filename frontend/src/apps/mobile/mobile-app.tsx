@@ -1,5 +1,4 @@
 /** 移动端独立入口和路由。 */
-import { ConversationType } from "@/api"
 import { useEffect } from "react"
 import { Navigate, Route, Routes } from "react-router"
 
@@ -9,6 +8,7 @@ import { MobileCustomerConversationPage } from "@/apps/mobile/mobile-customer-co
 import { MobileCustomerCopilotPage } from "@/apps/mobile/mobile-customer-copilot-page"
 import { MobileCustomerProfilePage } from "@/apps/mobile/mobile-customer-profile-page"
 import { MobileIndividualConversationPage } from "@/apps/mobile/mobile-individual-conversation-page"
+import { MobileIndividualProfilePage } from "@/apps/mobile/mobile-individual-profile-page"
 import { MobileEmployeeChatPage } from "@/apps/mobile/mobile-employee-chat-page"
 import { MobileEmployeeProfilePage } from "@/apps/mobile/mobile-employee-profile-page"
 import { MobileGroupConversationPage } from "@/apps/mobile/mobile-group-conversation-page"
@@ -132,7 +132,9 @@ export default function MobileApp() {
             <Route
               path="/chats/agent/:conversationID"
               element={<MobileAgentConversationPage />}
-            />
+            >
+              <Route path="profile" element={<MobileIndividualProfilePage />} />
+            </Route>
             <Route
               path="/inbox/customer/:conversationID"
               element={<MobileCustomerConversationPage />}
@@ -142,12 +144,10 @@ export default function MobileApp() {
             </Route>
             <Route
               path="/chats/direct/:conversationID"
-              element={
-                <MobileIndividualConversationPage
-                  conversationType={ConversationType.ConversationTypeDirect}
-                />
-              }
-            />
+              element={<MobileIndividualConversationPage />}
+            >
+              <Route path="profile" element={<MobileIndividualProfilePage />} />
+            </Route>
             <Route
               path="/me/profile"
               element={<MobileMeSettingsPage section="profile" />}

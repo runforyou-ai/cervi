@@ -5,10 +5,8 @@ import { useTranslation } from "react-i18next"
 
 import {
   ChannelType,
-  OrganizationIdentityType,
   isCustomerInboxConversation,
   isAgentInboxConversation,
-  isDirectInboxConversation,
   isGroupInboxConversation,
   type InboxConversationData,
   type MemberOption,
@@ -17,20 +15,19 @@ import { ResizeHandle } from "@/components/resize-handle"
 import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { ConversationAvatar } from "@/features/inbox/conversation-avatar"
 import { DirectConversationDraftAvatar } from "@/features/inbox/direct-conversation-draft-header"
-import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
 import type { ComposerDraftBridge } from "@/features/inbox/conversation-composer"
 import { CustomerBusinessQueries } from "@/features/inbox/customer-business-queries"
 import { CustomerCopilotPanel } from "@/features/inbox/customer-copilot-panel"
 import { CustomerProfileDetails } from "@/features/inbox/customer-profile-details"
 import { GroupConversationContext } from "@/features/inbox/group-conversation-context"
 import { HeaderAction } from "@/features/inbox/conversation-header"
+import { InternalConversationDetails } from "@/features/inbox/internal-conversation-details"
 import {
   SidePanelField,
   SidePanelTab,
   SidePanelTabsList,
 } from "@/features/inbox/side-panel-layout"
 import { cn } from "@/lib/utils"
-import { isAIIdentityType } from "@/lib/identity-type"
 
 const sidePanelMinWidth = 320
 const sidePanelDefaultWidth = 384
@@ -38,7 +35,7 @@ const sidePanelMaxWidth = 640
 // 展开侧边面板后为会话区保留的宽度，空间不足时侧边面板最多占一半。
 const conversationMinWidth = 420
 
-/** 展示单聊的基础资料。 */
+/** 展示单聊与 AI 会话的基础资料。 */
 function InternalConversationProfile({
   conversation,
   directTarget,
@@ -49,22 +46,10 @@ function InternalConversationProfile({
   displayName: string
 }) {
   const { t } = useTranslation("inbox")
-  const direct =
-    conversation && isDirectInboxConversation(conversation)
-      ? conversation.direct
-      : null
   const agent =
     conversation && isAgentInboxConversation(conversation)
       ? conversation.agent
       : null
-  const peerType = agent?.agentType ?? direct?.peerType ?? directTarget?.type
-  const identityType =
-    peerType === OrganizationIdentityType.OrganizationIdentityTypeAssistant
-      ? t("contextIdentityAssistant")
-      : isAIIdentityType(peerType)
-        ? t("contextIdentityAgent")
-        : t("contextIdentityMember")
-  const agentStatus = agentRunStatusLabel(agent?.agentRunStatus ?? null, t)
 
   return (
     <dl className="space-y-1 text-sm">
@@ -87,16 +72,10 @@ function InternalConversationProfile({
           {agent?.agentName ?? displayName}
         </span>
       </SidePanelField>
-      {direct || agent || directTarget ? (
-        <SidePanelField label={t("contextIdentityType")}>
-          {identityType}
-        </SidePanelField>
-      ) : null}
-      {agent && agentStatus ? (
-        <SidePanelField label={t("contextAgentStatus")}>
-          {agentStatus}
-        </SidePanelField>
-      ) : null}
+      <InternalConversationDetails
+        conversation={conversation}
+        directTarget={directTarget}
+      />
     </dl>
   )
 }

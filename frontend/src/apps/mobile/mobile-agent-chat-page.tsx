@@ -1,7 +1,13 @@
 /** 移动端 AI 对话页，在同一页面内完成草稿和正式会话的交接。 */
 import { useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
-import { useLocation, useNavigate, useParams } from "react-router"
+import {
+  Outlet,
+  useLocation,
+  useMatch,
+  useNavigate,
+  useParams,
+} from "react-router"
 
 import {
   ConversationType,
@@ -13,7 +19,10 @@ import {
   type AgentData,
   type AgentInboxConversationData,
 } from "@/api"
-import { MobileIndividualHeader } from "@/apps/mobile/mobile-individual-conversation-page"
+import {
+  MobileIndividualHeader,
+  type MobileIndividualConversationContext,
+} from "@/apps/mobile/mobile-individual-conversation-page"
 import { MobileIndividualThread } from "@/apps/mobile/mobile-individual-thread"
 import type { MobileLocateState } from "@/apps/mobile/mobile-navigation"
 import { MobilePageState } from "@/apps/mobile/mobile-page"
@@ -46,11 +55,12 @@ export function MobileAgentConversationPage() {
   )
 }
 
-/** 首发后启用正式查询，保留已发送气泡和输入框直至服务端数据接管。 */
+/** 首发后启用正式查询，保留已发送气泡和输入框直至服务端数据接管；资料子页打开时保留会话。 */
 function MobileAgentConversation({ conversationID }: { conversationID: string }) {
   const { t } = useTranslation(["mobile", "inbox", "common"])
   const navigate = useNavigate()
   const location = useLocation()
+  const childOpen = !useMatch("/chats/agent/:conversationID")
   const [draftAgentID] = useState(
     () => (location.state as MobileAgentLocationState | null)?.draftAgentID ?? "",
   )
@@ -117,47 +127,63 @@ function MobileAgentConversation({ conversationID }: { conversationID: string })
     })
   }
 
+  const covered = childOpen && Boolean(conversation)
+
   return (
-    <section className="flex h-full min-h-0 flex-col bg-background">
-      <MobileIndividualHeader
-        conversation={conversation}
-        peerName={
-          conversation?.agent.title ?? draftAgent?.displayName ??
-          agent.data?.displayName ?? t("contacts.agents")
-        }
-      />
-      {ready ? (
-        <MobileIndividualThread
-          conversationID={conversationID}
-          conversationType={ConversationType.ConversationTypeAgent}
-          enabled={persisted}
-          attachmentAgentIdentityID={!persisted ? draftAgent?.identityId : undefined}
-          onAttachmentConversationCreated={(created) => {
-            if (isAgentInboxConversation(created)) handleCreated(created)
-          }}
-          disabledReason={disabledReason}
-          lastReadMessageID={conversation?.lastReadMessageId}
-          locateMessage={(location.state as MobileAgentLocationState | null)?.locateMessage}
-          sendIndividualMessage={!persisted && draftAgent ? async (input) => {
-            const result = await firstChat.sendAgent(conversationID, draftAgent.identityId, input)
-            handleCreated(result.conversation)
-            return result.message
-          } : undefined}
+    <div className="relative h-full min-h-0">
+      <section
+        className={`flex h-full min-h-0 flex-col bg-background ${covered ? "absolute inset-0 opacity-0 pointer-events-none" : ""}`}
+        inert={covered}
+      >
+        <MobileIndividualHeader
+          conversation={conversation}
+          covered={covered}
+          peerName={
+            conversation?.agent.title ?? draftAgent?.displayName ??
+            agent.data?.displayName ?? t("contacts.agents")
+          }
         />
-      ) : resource.loading || resource.refreshing || (!persisted && agent.data?.status === UserStatus.UserStatusActive && !agent.error) ? (
-        <LoadingIndicator className="min-h-0 flex-1 justify-center">
-          {t("common:status.loading")}
-        </LoadingIndicator>
-      ) : (
-        <MobilePageState
-          title={persisted
-            ? t(resource.error
-              ? "inbox:conversationLoadError" : "inbox:conversationUnavailable")
-            : t(resource.error && !isNotFoundApiError(resource.error)
-              ? "agents.chatError" : "agents.unavailable")}
-          onRetry={resource.error ? () => void resource.refresh() : undefined}
+        {ready ? (
+          <MobileIndividualThread
+            conversationID={conversationID}
+            conversationType={ConversationType.ConversationTypeAgent}
+            enabled={persisted && !childOpen}
+            attachmentAgentIdentityID={!persisted ? draftAgent?.identityId : undefined}
+            onAttachmentConversationCreated={(created) => {
+              if (isAgentInboxConversation(created)) handleCreated(created)
+            }}
+            disabledReason={disabledReason}
+            lastReadMessageID={conversation?.lastReadMessageId}
+            locateMessage={(location.state as MobileAgentLocationState | null)?.locateMessage}
+            sendIndividualMessage={!persisted && draftAgent ? async (input) => {
+              const result = await firstChat.sendAgent(conversationID, draftAgent.identityId, input)
+              handleCreated(result.conversation)
+              return result.message
+            } : undefined}
+          />
+        ) : resource.loading || resource.refreshing || (!persisted && agent.data?.status === UserStatus.UserStatusActive && !agent.error) ? (
+          <LoadingIndicator className="min-h-0 flex-1 justify-center">
+            {t("common:status.loading")}
+          </LoadingIndicator>
+        ) : (
+          <MobilePageState
+            title={persisted
+              ? t(resource.error
+                ? "inbox:conversationLoadError" : "inbox:conversationUnavailable")
+              : t(resource.error && !isNotFoundApiError(resource.error)
+                ? "agents.chatError" : "agents.unavailable")}
+            onRetry={resource.error ? () => void resource.refresh() : undefined}
+          />
+        )}
+      </section>
+      {conversation ? (
+        <Outlet
+          key={conversation.id}
+          context={
+            { conversation } satisfies MobileIndividualConversationContext
+          }
         />
-      )}
-    </section>
+      ) : null}
+    </div>
   )
 }

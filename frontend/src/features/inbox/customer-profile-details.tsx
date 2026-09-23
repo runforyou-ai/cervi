@@ -1,18 +1,14 @@
 /** 客户会话侧栏的客户身份与当前周期访客上下文。 */
-import type { ComponentType, ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 
 import { getCustomerProfile } from "@/api"
-import { SidePanelField } from "@/features/inbox/side-panel-layout"
+import {
+  SidePanelField,
+  type ProfileField,
+} from "@/features/inbox/side-panel-layout"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 import { openExternalURL } from "@/platform/external-navigation"
-
-/** 客户资料字段行组件，需放在 dl 内。 */
-export type CustomerProfileField = ComponentType<{
-  label: string
-  children: ReactNode
-}>
 
 /** 按会话最新消息刷新客户身份与访客上下文，只展示有值的字段；身份验证状态只在网站渠道展示；字段行默认使用侧栏样式。 */
 export function CustomerProfileDetails({
@@ -24,7 +20,7 @@ export function CustomerProfileDetails({
   conversationID: string
   lastMessageID: string | null
   website: boolean
-  field?: CustomerProfileField
+  field?: ProfileField
 }) {
   const { t } = useTranslation("inbox")
   const profile = useResource(

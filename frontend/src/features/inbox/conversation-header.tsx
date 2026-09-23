@@ -11,7 +11,6 @@ import {
 import { useTranslation } from "react-i18next"
 
 import {
-  AssistantPresence,
   OrganizationIdentityType,
   isAgentInboxConversation,
   isCustomerInboxConversation,
@@ -35,6 +34,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from "@/components/ui/tooltip"
+import { assistantPresenceLabel } from "@/features/inbox/agent-run-status"
 import {
   customerTypingSenderName,
   groupTypingSenderName,
@@ -122,14 +122,7 @@ export function ConversationHeader({
       ? conversation.agent
       : null
   // 助理不在线时在标题旁说明原因，正常在线不额外提示。
-  const presenceLabel =
-    assistant?.assistantPresence === AssistantPresence.AssistantPresenceOffline
-      ? t("assistantPresenceOffline")
-      : assistant?.assistantPresence === AssistantPresence.AssistantPresencePaused
-        ? t("assistantPresencePaused")
-        : assistant?.assistantPresence === AssistantPresence.AssistantPresenceUnbound
-          ? t("assistantPresenceUnbound")
-          : null
+  const presenceLabel = assistantPresenceLabel(assistant?.assistantPresence, t)
   // 正在输入提示紧接标题右侧展示，真人与 AI 员工同等列出。
   const activityLabel = useConversationTypingLabel(
     conversation.id,

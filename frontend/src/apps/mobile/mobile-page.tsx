@@ -90,6 +90,22 @@ export function MobilePageHeader({
   )
 }
 
+/** 上下排列的资料字段行，需放在 dl 内。 */
+export function MobileProfileField({
+  label,
+  children,
+}: {
+  label: string
+  children: ReactNode
+}) {
+  return (
+    <div className="py-4">
+      <dt className="text-xs text-muted-foreground">{label}</dt>
+      <dd className="mt-1 flex min-w-0 items-center text-sm">{children}</dd>
+    </div>
+  )
+}
+
 /** 在列表顶部显示带放大镜图标的单行搜索框，标签只供读屏使用。 */
 export function MobileSearchBar({
   label,
