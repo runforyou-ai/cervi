@@ -24,6 +24,7 @@ import type {
   OutgoingConversationMessage,
 } from "@/features/inbox/outgoing-message-store"
 import { recoverSession } from "@/lib/session-navigation"
+import { resolveAppPlatform } from "@/platform/app-platform"
 
 import { useConversationTimeline } from "./use-conversation-timeline"
 import { useConversationViewport } from "./use-conversation-viewport"
@@ -49,16 +50,17 @@ function CustomerReplyBlock({
   onApply: (body: string) => void
 }) {
   const { t } = useTranslation("inbox")
+  const mobile = resolveAppPlatform() === "mobile"
   return (
     <div className="my-2 rounded-lg border bg-background p-2.5 text-foreground">
-      {/* 按钮右浮动在正文末尾，末行剩余宽度足够时同行展示，不足时换到下一行。 */}
+      {/* 桌面端按钮右浮动在正文末尾，末行剩余宽度足够时同行展示；移动端按钮在正文下方占满整行。 */}
       <div className="flow-root whitespace-pre-wrap break-words">
         {body}
         <Button
           type="button"
           variant="outline"
-          size="xs"
-          className="float-right -mt-0.5 ml-2"
+          size={mobile ? "default" : "xs"}
+          className={mobile ? "mt-2.5 min-h-11 w-full" : "float-right -mt-0.5 ml-2"}
           disabled={Boolean(disabledReason)}
           title={disabledReason ?? undefined}
           onClick={() => onApply(body)}

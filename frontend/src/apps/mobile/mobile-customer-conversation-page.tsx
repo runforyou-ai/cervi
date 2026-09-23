@@ -1,7 +1,19 @@
-/** 移动端客户会话详情、回复与客服处理周期操作。 */
-import { LoaderCircleIcon, MoreHorizontalIcon, SearchIcon } from "lucide-react"
+/** 移动端客户会话详情、回复、AI 助手入口与客服处理周期操作。 */
+import { useRef } from "react"
+import {
+  LoaderCircleIcon,
+  MoreHorizontalIcon,
+  SparklesIcon,
+} from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { Navigate, useLocation, useNavigate, useParams } from "react-router"
+import {
+  Navigate,
+  Outlet,
+  useLocation,
+  useMatch,
+  useNavigate,
+  useParams,
+} from "react-router"
 
 import {
   ChannelType,
@@ -9,6 +21,7 @@ import {
   isCustomerInboxConversation,
   type CustomerInboxConversationData,
 } from "@/api"
+import type { MobileCustomerCopilotContext } from "@/apps/mobile/mobile-customer-copilot-page"
 import { MobileIndividualThread } from "@/apps/mobile/mobile-individual-thread"
 import {
   mobileSearchPath,
@@ -25,6 +38,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
+import type { ComposerDraftBridge } from "@/features/inbox/conversation-composer"
 import {
   CustomerSessionCloseDialog,
   CustomerTransferMenuItems,
@@ -41,7 +55,7 @@ import { useConversationSummary } from "@/features/inbox/use-conversation-summar
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
 
-/** 展示客服处理周期的领取、接管、转交、关闭与重新打开菜单。 */
+/** 展示会话内搜索及客服处理周期的领取、接管、转交、关闭与重新打开菜单。 */
 function MobileCustomerSessionMenu({
   conversation,
 }: {
@@ -49,6 +63,7 @@ function MobileCustomerSessionMenu({
 }) {
   const { t } = useTranslation("inbox")
   const { identity } = useMobileWorkspace()
+  const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
   const actions = useCustomerSessionActions(
     conversation,
@@ -80,6 +95,16 @@ function MobileCustomerSessionMenu({
           </Button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="min-w-48">
+          <DropdownMenuItem
+            className="min-h-11"
+            onSelect={() =>
+              void navigate(mobileSearchPath(conversation.id), {
+                state: { mobileBack: true },
+              })
+            }
+          >
+            {t("searchCurrentConversation")}
+          </DropdownMenuItem>
           {actions.reopenable ? (
             <DropdownMenuItem
               className="min-h-11"
@@ -114,7 +139,7 @@ function MobileCustomerSessionMenu({
   )
 }
 
-/** 加载客户会话摘要，展示历史、回复区、会话内搜索入口和处理菜单。 */
+/** 加载客户会话摘要，展示历史、回复区、AI 助手入口和包含会话内搜索的处理菜单；AI 助手子页打开时保留会话与草稿。 */
 export function MobileCustomerConversationPage() {
   const { t } = useTranslation(["inbox", "common"])
   const { inboxURL } = useMobileNavigation()
@@ -122,6 +147,8 @@ export function MobileCustomerConversationPage() {
   const { conversationID = "" } = useParams()
   const location = useLocation()
   const navigate = useNavigate()
+  const copilotOpen = !useMatch("/inbox/customer/:conversationID")
+  const customerDraftRef = useRef<ComposerDraftBridge | null>(null)
   const summary = useConversationSummary(conversationID, false)
   const locationState = location.state as
     | (MobileLocateState & { conversation?: CustomerInboxConversationData })
@@ -151,70 +178,92 @@ export function MobileCustomerConversationPage() {
       : t("channelReplyUnsupported")
     : null
 
+  const covered = copilotOpen && Boolean(conversation)
+
   return (
-    <section className="flex h-full min-h-0 flex-col bg-background">
-      <MobilePageHeader
-        backTo={inboxURL}
-        title={
-          <span className="block min-w-0 truncate">
-            {activityLabel ||
-              (conversation ? conversationName(conversation) : t("unknownSender"))}
-          </span>
-        }
-        actions={
-          <>
-            <Button
-              variant="ghost"
-              size="icon-lg"
-              aria-label={t("searchCurrentConversation")}
-              disabled={!conversation}
-              onClick={() =>
-                void navigate(mobileSearchPath(conversationID), {
-                  state: { mobileBack: true },
-                })
-              }
-            >
-              <SearchIcon />
-            </Button>
-            {conversation ? (
-              <MobileCustomerSessionMenu conversation={conversation} />
-            ) : null}
-          </>
-        }
-      />
-      {summary.loading && !conversation ? (
-        <LoadingIndicator className="min-h-0 flex-1 justify-center">
-          {t("messagesLoading")}
-        </LoadingIndicator>
-      ) : !conversation ? (
-        <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-sm text-muted-foreground">
-          <p>
-            {t(summary.error ? "conversationLoadError" : "conversationUnavailable")}
-          </p>
-          {summary.error ? (
-            <Button
-              variant="outline"
-              className="min-h-11"
-              onClick={() => void summary.refresh()}
-            >
-              {t("common:actions.retry")}
-            </Button>
-          ) : null}
-        </div>
-      ) : (
-        <MobileIndividualThread
-          key={conversationID}
-          conversationID={conversationID}
-          conversationType={ConversationType.ConversationTypeCustomer}
-          customerDeliveries={
-            conversation.customer.channelType === ChannelType.ChannelTypeTelegram
+    <div className="relative h-full min-h-0">
+      <section
+        className={`flex h-full min-h-0 flex-col bg-background ${covered ? "absolute inset-0 opacity-0 pointer-events-none" : ""}`}
+        inert={covered}
+      >
+        <MobilePageHeader
+          backTo={covered ? undefined : inboxURL}
+          title={
+            <span className="block min-w-0 truncate">
+              {activityLabel ||
+                (conversation ? conversationName(conversation) : t("unknownSender"))}
+            </span>
           }
-          customerAttachment={conversation.customer}
-          disabledReason={disabledReason}
-          lastReadMessageID={conversation.lastReadMessageId}
-          locateMessage={locationState?.locateMessage}
+          actions={
+            <>
+              <Button
+                variant="ghost"
+                size="icon-lg"
+                aria-label={t("contextAssistantTab")}
+                title={t("contextAssistantTab")}
+                disabled={!conversation}
+                onClick={() =>
+                  void navigate(`/inbox/customer/${conversationID}/copilot`, {
+                    state: { conversation, mobileBack: true },
+                  })
+                }
+              >
+                <SparklesIcon />
+              </Button>
+              {conversation ? (
+                <MobileCustomerSessionMenu conversation={conversation} />
+              ) : null}
+            </>
+          }
         />
-      )}
-    </section>
+        {summary.loading && !conversation ? (
+          <LoadingIndicator className="min-h-0 flex-1 justify-center">
+            {t("messagesLoading")}
+          </LoadingIndicator>
+        ) : !conversation ? (
+          <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-sm text-muted-foreground">
+            <p>
+              {t(summary.error ? "conversationLoadError" : "conversationUnavailable")}
+            </p>
+            {summary.error ? (
+              <Button
+                variant="outline"
+                className="min-h-11"
+                onClick={() => void summary.refresh()}
+              >
+                {t("common:actions.retry")}
+              </Button>
+            ) : null}
+          </div>
+        ) : (
+          <MobileIndividualThread
+            key={conversationID}
+            conversationID={conversationID}
+            conversationType={ConversationType.ConversationTypeCustomer}
+            customerDeliveries={
+              conversation.customer.channelType === ChannelType.ChannelTypeTelegram
+            }
+            customerAttachment={conversation.customer}
+            disabledReason={disabledReason}
+            enabled={!copilotOpen}
+            customerDraftRef={customerDraftRef}
+            lastReadMessageID={conversation.lastReadMessageId}
+            locateMessage={locationState?.locateMessage}
+          />
+        )}
+      </section>
+      {conversation ? (
+        <Outlet
+          key={conversation.id}
+          context={
+            {
+              conversation,
+              customerDraftRef,
+              replyDisabledReason: disabledReason,
+            } satisfies MobileCustomerCopilotContext
+          }
+        />
+      ) : null}
+    </div>
   )
 }
