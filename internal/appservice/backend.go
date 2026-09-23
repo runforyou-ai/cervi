@@ -514,6 +514,18 @@ type Backend interface {
 	// UpdateServiceTimeouts 修改当前企业的客服超时时长。
 	//cervi:route PUT /settings/customer-service/timeouts
 	UpdateServiceTimeouts(context.Context, RequestMeta, ServiceTimeouts) (ServiceTimeouts, error)
+	// ListServiceCategories 返回当前企业的咨询分类目录。
+	//cervi:route GET /settings/customer-service/categories
+	ListServiceCategories(context.Context, RequestMeta) (ServiceCategoryList, error)
+	// CreateServiceCategory 新增咨询分类。
+	//cervi:route POST /settings/customer-service/categories status=201
+	CreateServiceCategory(context.Context, RequestMeta, ServiceCategoryInput) (ServiceCategory, error)
+	// UpdateServiceCategory 修改咨询分类。
+	//cervi:route PUT /settings/customer-service/categories/:categoryID
+	UpdateServiceCategory(context.Context, RequestMeta, string, ServiceCategoryInput) (ServiceCategory, error)
+	// DeleteServiceCategory 删除咨询分类，历史记录保留分类名称。
+	//cervi:route DELETE /settings/customer-service/categories/:categoryID
+	DeleteServiceCategory(context.Context, RequestMeta, string) error
 
 	// RegisterDevice 注册当前用户的本机设备。
 	//cervi:route POST /devices

@@ -71,11 +71,14 @@ const (
 	AgentRunOutcomeResolve     AgentRunOutcome = "resolve"
 )
 
-// AgentHandoffReason 定义 AI 客服把会话转交人工的原因。
+// AgentHandoffReason 定义 AI 客服把会话转交人工的原因：业务原因由模型调用 handoff_to_human 时给出，其余为 Runtime 给出的系统原因。
 type AgentHandoffReason string
 
 const (
-	AgentHandoffReasonModelRequested       AgentHandoffReason = "model_requested"
+	AgentHandoffReasonKnowledgeGap         AgentHandoffReason = "knowledge_gap"
+	AgentHandoffReasonCustomerRequested    AgentHandoffReason = "customer_requested"
+	AgentHandoffReasonNeedsHumanJudgment   AgentHandoffReason = "needs_human_judgment"
+	AgentHandoffReasonComplaint            AgentHandoffReason = "complaint"
 	AgentHandoffReasonInsufficientEvidence AgentHandoffReason = "insufficient_evidence"
 	AgentHandoffReasonBudgetExhausted      AgentHandoffReason = "budget_exhausted"
 	AgentHandoffReasonInvalidOutput        AgentHandoffReason = "invalid_output"
@@ -83,6 +86,11 @@ const (
 	AgentHandoffReasonTimeout              AgentHandoffReason = "timeout"
 	AgentHandoffReasonAgentUnavailable     AgentHandoffReason = "agent_unavailable"
 )
+
+// AgentHandoffBusinessReasons 按展示顺序列出模型可选的业务原因。
+var AgentHandoffBusinessReasons = []AgentHandoffReason{
+	AgentHandoffReasonKnowledgeGap, AgentHandoffReasonCustomerRequested, AgentHandoffReasonNeedsHumanJudgment, AgentHandoffReasonComplaint,
+}
 
 // AgentAskCustomerPurpose 定义 AI 客服向客户发问的用途；confirm_resolution 决定周期的超时关单，其余只用于审计与统计。
 type AgentAskCustomerPurpose string

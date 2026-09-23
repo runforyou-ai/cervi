@@ -36,4 +36,5 @@ type ServiceSession struct {
 	ClosedByIdentityID       *string    `bun:"closed_by_identity_id"`
 	CloseReason              *string    `bun:"close_reason"`
 	ResolutionRequestedAt    *time.Time `bun:"resolution_requested_at"`
+	CategoryID               *string    `bun:"category_id"`
 }

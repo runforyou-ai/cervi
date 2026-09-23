@@ -35,7 +35,10 @@ const (
 type AgentHandoffReason string
 
 const (
-	AgentHandoffReasonModelRequested       AgentHandoffReason = AgentHandoffReason(domain.AgentHandoffReasonModelRequested)
+	AgentHandoffReasonKnowledgeGap         AgentHandoffReason = AgentHandoffReason(domain.AgentHandoffReasonKnowledgeGap)
+	AgentHandoffReasonCustomerRequested    AgentHandoffReason = AgentHandoffReason(domain.AgentHandoffReasonCustomerRequested)
+	AgentHandoffReasonNeedsHumanJudgment   AgentHandoffReason = AgentHandoffReason(domain.AgentHandoffReasonNeedsHumanJudgment)
+	AgentHandoffReasonComplaint            AgentHandoffReason = AgentHandoffReason(domain.AgentHandoffReasonComplaint)
 	AgentHandoffReasonInsufficientEvidence AgentHandoffReason = AgentHandoffReason(domain.AgentHandoffReasonInsufficientEvidence)
 	AgentHandoffReasonBudgetExhausted      AgentHandoffReason = AgentHandoffReason(domain.AgentHandoffReasonBudgetExhausted)
 	AgentHandoffReasonInvalidOutput        AgentHandoffReason = AgentHandoffReason(domain.AgentHandoffReasonInvalidOutput)

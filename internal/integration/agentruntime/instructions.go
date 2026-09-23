@@ -25,7 +25,9 @@ const customerHistoryToolGuidance = "- search_customer_history：查看同一客
 
 const askCustomerToolGuidance = "- ask_customer：需要客户补充信息、确认，或只需要问候时，用它发送要说的话并等待客户回复；判断客户的问题已经解决时，用 purpose 为 confirm_resolution 询问客户问题是否已解决、是否还需要其他帮助。"
 
-const handoffToolGuidance = "- handoff_to_human：无法从资料得到答案、客户明确要求真人、客户投诉或涉及退款赔偿等需要人工判断时，用它写明转交原因；系统会按承接结果通知客户并交给人工客服。"
+const handoffToolGuidance = "- handoff_to_human：无法从资料得到答案、客户明确要求真人、客户投诉或涉及退款赔偿等需要人工判断时，用它选择转交原因并写明转交说明；系统会按承接结果通知客户并交给人工客服。"
+
+const handoffCategoryToolGuidance = "- handoff_to_human：无法从资料得到答案、客户明确要求真人、客户投诉或涉及退款赔偿等需要人工判断时，用它选择转交原因并写明转交说明；客户咨询明确属于某个咨询分类时一并填写该分类，系统会交给该分类的团队，没有明确匹配的分类时不填。系统会按承接结果通知客户并交给人工客服。"
 
 const resolveToolGuidance = "- resolve_conversation：客户明确表示问题已解决或不再需要帮助时，用它发送简短的结束语并结束本次服务；客户否认已解决或仍有疑问时继续处理或转人工，不调用它。"
 
@@ -52,9 +54,10 @@ addressedToYou 为 true 的消息是本次需要你处理的请求，其余消�
 
 // builtinTools 表示本次运行实际注册的内置工具，场景规则据此说明工具用法。
 type builtinTools struct {
-	Knowledge       bool
-	CustomerHistory bool
-	Terminal        bool // 客服场景的 ask_customer、handoff_to_human 与 resolve_conversation。
+	Knowledge         bool
+	CustomerHistory   bool
+	Terminal          bool // 客服场景的 ask_customer、handoff_to_human 与 resolve_conversation。
+	HandoffCategories bool // 企业有可选的咨询分类，handoff_to_human 提供 category 参数。
 }
 
 // AgentBaseline 按接待开关渲染 AI 员工基线；AI 员工名称为空时省略名称。
@@ -95,7 +98,11 @@ func toolGuidance(tools builtinTools) string {
 		lines = append(lines, customerHistoryToolGuidance)
 	}
 	if tools.Terminal {
-		lines = append(lines, askCustomerToolGuidance, handoffToolGuidance, resolveToolGuidance)
+		handoff := handoffToolGuidance
+		if tools.HandoffCategories {
+			handoff = handoffCategoryToolGuidance
+		}
+		lines = append(lines, askCustomerToolGuidance, handoff, resolveToolGuidance)
 	}
 	if len(lines) == 0 {
 		return ""

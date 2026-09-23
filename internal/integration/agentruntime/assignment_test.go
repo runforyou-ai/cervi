@@ -60,6 +60,13 @@ func TestToolGuidance(t *testing.T) {
 	if !strings.HasPrefix(terminal, "可用工具：\n") || !strings.Contains(terminal, "- ask_customer：") || !strings.Contains(terminal, "- handoff_to_human：") {
 		t.Fatalf("终止工具说明 = %q", terminal)
 	}
+	// 企业没有咨询分类时不提及分类，有分类时说明只在明确匹配时填写。
+	if strings.Contains(terminal, "分类") {
+		t.Fatalf("没有咨询分类时不应提及分类：%q", terminal)
+	}
+	if categories := toolGuidance(builtinTools{Terminal: true, HandoffCategories: true}); !strings.Contains(categories, "没有明确匹配的分类时不填") {
+		t.Fatalf("咨询分类说明 = %q", categories)
+	}
 }
 
 // TestSceneRules 验证群聊场景列出可点名成员，没有可点名成员时明确告知。

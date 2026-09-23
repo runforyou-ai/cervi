@@ -177,6 +177,10 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.PUT("/settings/customer-service/business-hours", s.updateBusinessHours)
 	router.GET("/settings/customer-service/timeouts", s.getServiceTimeouts)
 	router.PUT("/settings/customer-service/timeouts", s.updateServiceTimeouts)
+	router.GET("/settings/customer-service/categories", s.listServiceCategories)
+	router.POST("/settings/customer-service/categories", s.createServiceCategory)
+	router.PUT("/settings/customer-service/categories/:categoryID", s.updateServiceCategory)
+	router.DELETE("/settings/customer-service/categories/:categoryID", s.deleteServiceCategory)
 	router.POST("/devices", s.registerDevice)
 	router.GET("/devices", s.listDevices)
 	router.DELETE("/devices/:deviceID", s.revokeDevice)
@@ -1505,6 +1509,37 @@ func (s *Service) updateServiceTimeouts(c *gin.Context) {
 	}
 	output, err := s.application.UpdateServiceTimeouts(c.Request.Context(), requestMeta(c), input)
 	writeResult(c, http.StatusOK, output, err)
+}
+
+// listServiceCategories 返回当前企业的咨询分类目录。
+func (s *Service) listServiceCategories(c *gin.Context) {
+	output, err := s.application.ListServiceCategories(c.Request.Context(), requestMeta(c))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// createServiceCategory 新增咨询分类。
+func (s *Service) createServiceCategory(c *gin.Context) {
+	var input appservice.ServiceCategoryInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.CreateServiceCategory(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusCreated, output, err)
+}
+
+// updateServiceCategory 修改咨询分类。
+func (s *Service) updateServiceCategory(c *gin.Context) {
+	var input appservice.ServiceCategoryInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.UpdateServiceCategory(c.Request.Context(), requestMeta(c), c.Param("categoryID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// deleteServiceCategory 删除咨询分类，历史记录保留分类名称。
+func (s *Service) deleteServiceCategory(c *gin.Context) {
+	writeEmpty(c, s.application.DeleteServiceCategory(c.Request.Context(), requestMeta(c), c.Param("categoryID")))
 }
 
 // registerDevice 注册当前用户的本机设备。

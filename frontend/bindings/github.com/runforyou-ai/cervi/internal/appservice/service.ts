@@ -213,6 +213,13 @@ export function CreateRole(meta: $models.RequestMeta, input: $models.RoleInput):
 }
 
 /**
+ * CreateServiceCategory 新增咨询分类。
+ */
+export function CreateServiceCategory(meta: $models.RequestMeta, input: $models.ServiceCategoryInput): $CancellablePromise<$models.ServiceCategory> {
+    return $Call.ByID(3908878777, meta, input);
+}
+
+/**
  * CreateTeam 创建企业团队。
  */
 export function CreateTeam(meta: $models.RequestMeta, input: $models.TeamInput): $CancellablePromise<$models.Team> {
@@ -301,6 +308,13 @@ export function DeleteMCPServer(meta: $models.RequestMeta, mcpServerID: string):
  */
 export function DeleteRole(meta: $models.RequestMeta, roleID: string): $CancellablePromise<void> {
     return $Call.ByID(3214219121, meta, roleID);
+}
+
+/**
+ * DeleteServiceCategory 删除咨询分类，历史记录保留分类名称。
+ */
+export function DeleteServiceCategory(meta: $models.RequestMeta, categoryID: string): $CancellablePromise<void> {
+    return $Call.ByID(1999679124, meta, categoryID);
 }
 
 /**
@@ -735,6 +749,13 @@ export function ListPendingConversationMentions(meta: $models.RequestMeta, conve
  */
 export function ListRoles(meta: $models.RequestMeta): $CancellablePromise<$models.RoleList> {
     return $Call.ByID(3773953103, meta);
+}
+
+/**
+ * ListServiceCategories 返回当前企业的咨询分类目录。
+ */
+export function ListServiceCategories(meta: $models.RequestMeta): $CancellablePromise<$models.ServiceCategoryList> {
+    return $Call.ByID(3774541533, meta);
 }
 
 /**
@@ -1288,6 +1309,13 @@ export function UpdateRole(meta: $models.RequestMeta, roleID: string, input: $mo
  */
 export function UpdateRoleAssignments(meta: $models.RequestMeta, input: $models.RoleAssignmentsInput): $CancellablePromise<void> {
     return $Call.ByID(2402672415, meta, input);
+}
+
+/**
+ * UpdateServiceCategory 修改咨询分类。
+ */
+export function UpdateServiceCategory(meta: $models.RequestMeta, categoryID: string, input: $models.ServiceCategoryInput): $CancellablePromise<$models.ServiceCategory> {
+    return $Call.ByID(314412950, meta, categoryID, input);
 }
 
 /**

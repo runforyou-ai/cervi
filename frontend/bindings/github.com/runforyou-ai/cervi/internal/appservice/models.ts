@@ -225,7 +225,10 @@ export enum AgentHandoffReason {
      */
     $zero = "",
 
-    AgentHandoffReasonModelRequested = "model_requested",
+    AgentHandoffReasonKnowledgeGap = "knowledge_gap",
+    AgentHandoffReasonCustomerRequested = "customer_requested",
+    AgentHandoffReasonNeedsHumanJudgment = "needs_human_judgment",
+    AgentHandoffReasonComplaint = "complaint",
     AgentHandoffReasonInsufficientEvidence = "insufficient_evidence",
     AgentHandoffReasonBudgetExhausted = "budget_exhausted",
     AgentHandoffReasonInvalidOutput = "invalid_output",
@@ -1041,7 +1044,7 @@ export interface ConversationSystemEvent {
     "title": string | null;
 
     /**
-     * 以下字段只由客服处理周期事件携带：原负责人、去向，转人工或退回队列的原因与成员可见的原因说明，以及关闭事件的结束方式；操作人写入 Actor。
+     * 以下字段只由客服处理周期事件携带：原负责人、去向，转人工或退回队列的原因与成员可见的原因说明，转人工时的咨询分类，以及关闭事件的结束方式；操作人写入 Actor。
      */
     "serviceSessionId": string | null;
     "fromIdentityId": string | null;
@@ -1051,6 +1054,7 @@ export interface ConversationSystemEvent {
     "returnReason": ServiceSessionReturnReason | null;
     "closeReason": ServiceSessionCloseReason | null;
     "reasonText": string | null;
+    "categoryName": string | null;
     "agentRunId": string | null;
 }
 
@@ -3050,6 +3054,34 @@ export enum ServiceAudience {
     ServiceAudienceEmployee = "employee",
     ServiceAudiencePartner = "partner",
 };
+
+/**
+ * ServiceCategory 定义咨询分类及其承接团队。
+ */
+export interface ServiceCategory {
+    "id": string;
+    "name": string;
+    "description": string;
+    "team": TeamSummary | null;
+    "createdAt": string;
+    "updatedAt": string;
+}
+
+/**
+ * ServiceCategoryInput 定义咨询分类可编辑字段；TeamID 为空表示转人工时按渠道失败路由。
+ */
+export interface ServiceCategoryInput {
+    "name": string;
+    "description": string;
+    "teamId": string | null;
+}
+
+/**
+ * ServiceCategoryList 定义企业咨询分类目录。
+ */
+export interface ServiceCategoryList {
+    "categories": ServiceCategory[] | null;
+}
 
 /**
  * ServiceQueueTeam 定义可作为客服队列的团队。

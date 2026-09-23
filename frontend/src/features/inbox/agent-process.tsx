@@ -43,8 +43,14 @@ import { cn } from "@/lib/utils"
 /** 返回转人工原因对应的 inbox 词条键。 */
 export function handoffReasonKey(reason: AgentHandoffReason | null | undefined) {
   switch (reason) {
-    case AgentHandoffReason.AgentHandoffReasonModelRequested:
-      return "handoffReasonModelRequested" as const
+    case AgentHandoffReason.AgentHandoffReasonKnowledgeGap:
+      return "handoffReasonKnowledgeGap" as const
+    case AgentHandoffReason.AgentHandoffReasonCustomerRequested:
+      return "handoffReasonCustomerRequested" as const
+    case AgentHandoffReason.AgentHandoffReasonNeedsHumanJudgment:
+      return "handoffReasonNeedsHumanJudgment" as const
+    case AgentHandoffReason.AgentHandoffReasonComplaint:
+      return "handoffReasonComplaint" as const
     case AgentHandoffReason.AgentHandoffReasonInsufficientEvidence:
       return "handoffReasonInsufficientEvidence" as const
     case AgentHandoffReason.AgentHandoffReasonBudgetExhausted:

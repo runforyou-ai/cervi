@@ -14,6 +14,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
+	"github.com/runforyou-ai/cervi/internal/actions/servicecategory"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/storage/server/messagequery"
@@ -158,9 +159,17 @@ func appendCustomerAgentMessage(ctx context.Context, db bun.IDB, enqueuer server
 	return message, nil
 }
 
-// sceneContext 给出客户会话场景。
-func (p customerRunPolicy) sceneContext(context.Context, bun.IDB, executionContext) (agentruntime.SceneContext, error) {
-	return agentruntime.SceneContext{Scene: agentruntime.SceneCustomer}, nil
+// sceneContext 给出客户会话场景与企业咨询分类目录。
+func (p customerRunPolicy) sceneContext(ctx context.Context, db bun.IDB, execution executionContext) (agentruntime.SceneContext, error) {
+	categories, err := servicecategory.Active(ctx, db, execution.Run.OrganizationID)
+	if err != nil {
+		return agentruntime.SceneContext{}, err
+	}
+	handoffCategories := make([]agentruntime.HandoffCategory, 0, len(categories))
+	for _, category := range categories {
+		handoffCategories = append(handoffCategories, agentruntime.HandoffCategory{ID: category.ID, Name: category.Name, Description: category.Description})
+	}
+	return agentruntime.SceneContext{Scene: agentruntime.SceneCustomer, HandoffCategories: handoffCategories}, nil
 }
 
 // laneRevision 在当前负责人仍合格时返回客户 Agent 的配置版本。

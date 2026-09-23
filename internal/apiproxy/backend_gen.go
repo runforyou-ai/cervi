@@ -1233,6 +1233,35 @@ func (b *Backend) UpdateServiceTimeouts(ctx context.Context, meta appservice.Req
 	return output, err
 }
 
+// ListServiceCategories 返回当前企业的咨询分类目录。
+func (b *Backend) ListServiceCategories(ctx context.Context, meta appservice.RequestMeta) (appservice.ServiceCategoryList, error) {
+	var output appservice.ServiceCategoryList
+	err := b.do(ctx, meta, http.MethodGet, "/settings/customer-service/categories", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// CreateServiceCategory 新增咨询分类。
+func (b *Backend) CreateServiceCategory(ctx context.Context, meta appservice.RequestMeta, input appservice.ServiceCategoryInput) (appservice.ServiceCategory, error) {
+	var output appservice.ServiceCategory
+	err := b.do(ctx, meta, http.MethodPost, "/settings/customer-service/categories", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// UpdateServiceCategory 修改咨询分类。
+func (b *Backend) UpdateServiceCategory(ctx context.Context, meta appservice.RequestMeta, categoryID string, input appservice.ServiceCategoryInput) (appservice.ServiceCategory, error) {
+	var output appservice.ServiceCategory
+	err := b.do(ctx, meta, http.MethodPut, "/settings/customer-service/categories/"+url.PathEscape(categoryID), nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// DeleteServiceCategory 删除咨询分类，历史记录保留分类名称。
+func (b *Backend) DeleteServiceCategory(ctx context.Context, meta appservice.RequestMeta, categoryID string) error {
+	return b.do(ctx, meta, http.MethodDelete, "/settings/customer-service/categories/"+url.PathEscape(categoryID), nil, nil, nil)
+}
+
 // RegisterDevice 注册当前用户的本机设备。
 func (b *Backend) RegisterDevice(ctx context.Context, meta appservice.RequestMeta, input appservice.DeviceRegistrationInput) (appservice.Device, error) {
 	var output appservice.Device

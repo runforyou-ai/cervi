@@ -131,6 +131,8 @@ export const resourceKeys = {
   businessHours: () => ["business-hours"],
   /** 当前企业的客服超时时长。 */
   serviceTimeouts: () => ["service-timeouts"],
+  /** 当前企业的咨询分类目录。 */
+  serviceCategories: () => ["service-categories"],
   /** 当前客户端连接的企业服务器地址。 */
   serverURL: () => ["server-url"],
   /** 知识库列表。 */

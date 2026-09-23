@@ -9,6 +9,7 @@ import (
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/actions/serviceassignment"
+	"github.com/runforyou-ai/cervi/internal/actions/servicecategory"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
@@ -26,7 +27,7 @@ func NewDeleteTeamAction(db *bun.DB, enqueuer servertask.TxEnqueuer) *DeleteTeam
 	return &DeleteTeamAction{db: db, enqueuer: enqueuer}
 }
 
-// Execute 删除团队及其成员关系，并把渠道关联和团队队列中的客服处理周期重置到公共队列，为并入公共队列的等待周期投递分配任务。
+// Execute 删除团队及其成员关系，清空渠道与咨询分类的团队关联，并把团队队列中的客服处理周期重置到公共队列，为并入公共队列的等待周期投递分配任务。
 func (a *DeleteTeamAction) Execute(ctx context.Context, identity *servermodels.Identity, teamID string) error {
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
@@ -46,6 +47,9 @@ func (a *DeleteTeamAction) Execute(ctx context.Context, identity *servermodels.I
 			return err
 		}
 		if err := channelaction.ResetRoutingTarget(ctx, tx, identity.Organization.ID, domain.ChannelRoutingTargetTypeTeam, teamID); err != nil {
+			return err
+		}
+		if err := servicecategory.ClearTeam(ctx, tx, identity.Organization.ID, teamID); err != nil {
 			return err
 		}
 		// 已关闭周期重开后仍读取队列，团队的全部客服处理周期并入公共队列；队列中的周期重新计算队列等待提醒。

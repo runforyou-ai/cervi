@@ -814,6 +814,26 @@ func (s *Service) UpdateServiceTimeouts(ctx context.Context, meta RequestMeta, i
 	return withNormalizedSlices(s.backend.UpdateServiceTimeouts(ctx, meta, input))
 }
 
+// ListServiceCategories 返回当前企业的咨询分类目录。
+func (s *Service) ListServiceCategories(ctx context.Context, meta RequestMeta) (ServiceCategoryList, error) {
+	return withNormalizedSlices(s.backend.ListServiceCategories(ctx, meta))
+}
+
+// CreateServiceCategory 新增咨询分类。
+func (s *Service) CreateServiceCategory(ctx context.Context, meta RequestMeta, input ServiceCategoryInput) (ServiceCategory, error) {
+	return withNormalizedSlices(s.backend.CreateServiceCategory(ctx, meta, input))
+}
+
+// UpdateServiceCategory 修改咨询分类。
+func (s *Service) UpdateServiceCategory(ctx context.Context, meta RequestMeta, categoryID string, input ServiceCategoryInput) (ServiceCategory, error) {
+	return withNormalizedSlices(s.backend.UpdateServiceCategory(ctx, meta, categoryID, input))
+}
+
+// DeleteServiceCategory 删除咨询分类，历史记录保留分类名称。
+func (s *Service) DeleteServiceCategory(ctx context.Context, meta RequestMeta, categoryID string) error {
+	return s.backend.DeleteServiceCategory(ctx, meta, categoryID)
+}
+
 // RegisterDevice 注册当前用户的本机设备。
 func (s *Service) RegisterDevice(ctx context.Context, meta RequestMeta, input DeviceRegistrationInput) (Device, error) {
 	return withNormalizedSlices(s.backend.RegisterDevice(ctx, meta, input))
