@@ -37,7 +37,7 @@ export function MobileIndividualHeader({
   peerName: string
 }) {
   const { t: tInbox } = useTranslation("inbox")
-  const { inboxURL } = useMobileNavigation()
+  const { chatsURL } = useMobileNavigation()
   const location = useLocation()
   const navigate = useNavigate()
   const { memberUserID, agentDirectory } =
@@ -51,7 +51,7 @@ export function MobileIndividualHeader({
           ? "/contacts/ai-employees"
           : memberUserID
             ? `/contacts/employees/${memberUserID}`
-            : inboxURL
+            : chatsURL
       }
       title={
         <span className="block min-w-0 truncate">{typingLabel || peerName}</span>
@@ -84,7 +84,7 @@ export function MobileIndividualConversationPage({
   conversationType: ConversationType
 }) {
   const { t } = useTranslation(["inbox", "common"])
-  const { inboxURL } = useMobileNavigation()
+  const { chatsURL } = useMobileNavigation()
   const { conversationID = "" } = useParams()
   const location = useLocation()
   const summary = useConversationSummary(conversationID, false)
@@ -95,7 +95,7 @@ export function MobileIndividualConversationPage({
   const conversation = data && data.type === conversationType &&
     (isDirectInboxConversation(data) || isAgentInboxConversation(data)) ? data : null
   const disabledReason = useAccountDisabledReason(conversation)
-  if (!conversationID) return <Navigate to={inboxURL} replace />
+  if (!conversationID) return <Navigate to={chatsURL} replace />
   const peerName =
     (conversation?.agent?.title ?? conversation?.direct?.peerName)?.trim() ||
     t("unknownSender")

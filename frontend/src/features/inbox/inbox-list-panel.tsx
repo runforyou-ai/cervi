@@ -24,10 +24,11 @@ export function InboxListPanel({ list, viewport, detailError = false, retryDetai
     // 内容不足一屏时自动补齐，恢复的深处窗口仍优先保持原邻域。
     if (!busy && !list.error && list.hasAfter && container.clientHeight > 0 && container.scrollHeight <= container.clientHeight + 120) void list.request("after")
   }, [busy, list.error, list.hasAfter, list.request, list.revision, viewport])
-  // 页脚在可向前翻页、分页出错和空列表加载时占位，有数据时的轮询不占位。
+  // 页脚在可向前翻页、分页出错，以及空列表首次读取或翻页时占位；后台轮询与重读不占位。
   const previous = !list.conversations.length && list.hasBefore
   const pageError = list.error === "before" || list.error === "after"
-  const showFooter = previous || pageError || (busy && !list.conversations.length)
+  const loading = busy && (list.revision === 0 || list.operation === "before" || list.operation === "after")
+  const showFooter = previous || pageError || (loading && !list.conversations.length)
   const content = (
     <div className="grid min-w-0 grid-cols-[minmax(0,1fr)] pb-1.5">
       {children}
@@ -41,7 +42,7 @@ export function InboxListPanel({ list, viewport, detailError = false, retryDetai
           ) : null}
           {pageError ? (
             <Button variant="outline" size="sm" onClick={() => void list.retry()}>{t("common:actions.retry")}</Button>
-          ) : busy ? <LoadingIndicator className="text-xs">{t("common:status.loading")}</LoadingIndicator> : null}
+          ) : loading ? <LoadingIndicator className="text-xs">{t("common:status.loading")}</LoadingIndicator> : null}
         </div>
       ) : null}
     </div>

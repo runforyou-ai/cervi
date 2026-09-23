@@ -338,6 +338,68 @@ func TestInboxPendingScope(t *testing.T) {
 	}
 }
 
+// TestInboxPendingUnreadCount 验证待处理总数只随处理变化，待处理会话中的未读消息总数随本人阅读清零、按他人新消息逐条增加，本人发言不计入，且不受列表范围与筛选影响。
+func TestInboxPendingUnreadCount(t *testing.T) {
+	f := newCustomerReadFixture(t)
+	ctx := context.Background()
+	query := inboxaction.NewLoadInboxQuery(f.db)
+	// counts 按各列表范围与筛选读取成员的待处理总数与待处理会话中的未读消息总数，各次读取结果一致时返回。
+	counts := func() (int, int) {
+		t.Helper()
+		var pending, unread int
+		for index, input := range []inboxaction.LoadInput{
+			{Scope: domain.InboxScopePending},
+			{Scope: domain.InboxScopePending, ChannelID: uuid.NewV7().String()},
+			{Scope: domain.InboxScopeChat},
+		} {
+			_, counts, err := query.Execute(ctx, f.member, input)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if index > 0 && (counts.Pending != pending || counts.PendingUnread != unread) {
+				t.Fatalf("input=%+v pending=%d unread=%d want %d %d", input, counts.Pending, counts.PendingUnread, pending, unread)
+			}
+			pending, unread = counts.Pending, counts.PendingUnread
+		}
+		return pending, unread
+	}
+
+	received, err := f.visitorMessage(ctx, "有人吗")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pending, unread := counts(); pending != 1 || unread == 0 {
+		t.Fatalf("before read pending=%d unread=%d", pending, unread)
+	}
+	// 阅读到最新消息后待处理仍在，未读消息数清零。
+	if _, err := conversationaction.NewMarkConversationReadAction(f.db).Execute(ctx, f.member, f.conversationID, received.Message.ID, false); err != nil {
+		t.Fatal(err)
+	}
+	if pending, unread := counts(); pending != 1 || unread != 0 {
+		t.Fatalf("after read pending=%d unread=%d", pending, unread)
+	}
+	// 本人发出的内部备注不计入未读。
+	send := conversationaction.NewSendCustomerTextMessageAction(f.db, nil)
+	if _, err := send.Execute(ctx, f.member, conversationaction.CustomerTextMessageInput{
+		ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "我先看看",
+		Visibility: domain.MessageVisibilityInternalOnly,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if pending, unread := counts(); pending != 1 || unread != 0 {
+		t.Fatalf("after own note pending=%d unread=%d", pending, unread)
+	}
+	// 客户再次来信后按消息条数计入未读。
+	for _, body := range []string{"还在吗", "急"} {
+		if _, err := f.visitorMessage(ctx, body); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if pending, unread := counts(); pending != 1 || unread != 2 {
+		t.Fatalf("after new message pending=%d unread=%d", pending, unread)
+	}
+}
+
 // TestInboxPendingMentionAlongsideOtherKinds 验证提醒本人独立于条目类型：待领取或等我回复的会话同时被提醒时，行上标明提醒，筛选 @我 时包含该会话。
 func TestInboxPendingMentionAlongsideOtherKinds(t *testing.T) {
 	f := newCustomerReadFixture(t)

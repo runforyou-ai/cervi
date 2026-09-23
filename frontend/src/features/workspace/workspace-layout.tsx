@@ -121,7 +121,7 @@ function WorkspaceShell({ identity }: { identity: Identity }) {
   // 提醒总数按权威查询读取，会话变化由同步协调器失效该查询。
   const attention = useInboxAttention(identity)
   const pendingCount = attention.data?.pending ?? 0
-  // 应用角标合计聊天提醒与本人待处理的服务会话。
+  // 应用角标合计聊天提醒未读数与待处理会话中的未读消息数，待处理总数不计入。
   const unreadCount = attention.data?.total ?? 0
 
   // 实时确认的新消息按通知策略投递，投递成功即进入待处理提醒。

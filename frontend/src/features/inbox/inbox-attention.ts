@@ -3,13 +3,14 @@ import { InboxScope, loadInbox, type Identity } from "@/api"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 
-/** 读取聊天提醒未读数与本人待处理的服务会话数，total 为应用角标数。 */
+/** 读取聊天提醒未读数、本人待处理的服务会话数及这些会话中的未读消息数，total 为应用角标数，由聊天提醒未读数与待处理会话未读消息数相加。 */
 export async function loadInboxAttention() {
   const inbox = await loadInbox({ scope: InboxScope.InboxScopeChat, limit: 1 })
   return {
     unread: inbox.attentionUnreadCount,
     pending: inbox.pendingCount,
-    total: inbox.attentionUnreadCount + inbox.pendingCount,
+    pendingUnread: inbox.pendingUnreadCount,
+    total: inbox.attentionUnreadCount + inbox.pendingUnreadCount,
   }
 }
 

@@ -1,64 +1,26 @@
-/** 移动端聊天、待处理与全部会话列表、阅读状态与置顶菜单、置顶排序和聊天入口。 */
-import { useEffect, useRef, useState } from "react"
-import { GripVerticalIcon, PlusIcon, SearchIcon } from "lucide-react"
+/** 移动端收件箱：待处理与全部两页并排、跟手滑动切换，页签指示线随滑动进度移动。 */
+import { useEffect, useLayoutEffect, useRef, useState } from "react"
+import { SearchIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 
+import { InboxScope } from "@/api"
 import {
-  isCustomerInboxConversation,
-  isAgentInboxConversation,
-  isDirectInboxConversation,
-  isGroupInboxConversation,
-  InboxScope,
-  type CustomerInboxConversationData,
-  type AgentInboxConversationData,
-  type DirectInboxConversationData,
-  type InboxConversation,
-  type GroupInboxConversationData,
-} from "@/api"
+  MobileConversationList,
+  MobileListHeader,
+  useMobileListOptions,
+} from "@/apps/mobile/mobile-conversation-list"
 import {
   MobileInboxFilter,
   MobileInboxScopes,
-  mobileInboxTabs,
   useMobileInboxQuery,
+  type MobileInboxQuery,
 } from "@/apps/mobile/mobile-inbox-navigation"
-import {
-  MobilePageHeader,
-  MobilePageState,
-} from "@/apps/mobile/mobile-page"
-import {
-  ConversationListMenu,
-  useConversationListActions,
-} from "@/features/inbox/conversation-list-menu"
-import { ConversationRowContent } from "@/features/inbox/conversation-row-content"
-import {
-  PinnedConversationList,
-  pinMoveCommand,
-  pinSortableStyle,
-  usePinSortable,
-  type PinSortable,
-} from "@/features/inbox/pinned-sort"
-import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { LoadingIndicator } from "@/components/loading-indicator"
-import { useMinuteTick } from "@/features/inbox/use-conversation-time"
-import {
-  useMemberChatPollingActive,
-} from "@/features/inbox/use-member-chat-polling"
+import { mobileSearchPath } from "@/apps/mobile/mobile-navigation"
 import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
-import {
-  mobileConversationPath,
-  mobileSearchPath,
-  useMobileNavigation,
-} from "@/apps/mobile/mobile-navigation"
+import { Button } from "@/components/ui/button"
 import { useInboxAttention } from "@/features/inbox/inbox-attention"
-import { InboxListPanel } from "@/features/inbox/inbox-list-panel"
-import { useConversationName } from "@/features/inbox/use-conversation-name"
+import { inboxTabs, normalizeInboxQuery } from "@/features/inbox/inbox-query"
 import {
   useInboxList,
   usePartitionedInboxList,
@@ -69,363 +31,181 @@ import {
 import { useInboxListViewport } from "@/features/inbox/use-inbox-list-viewport"
 import { cn } from "@/lib/utils"
 
-type MobileInboxConversation =
-  | CustomerInboxConversationData
-  | AgentInboxConversationData
-  | DirectInboxConversationData
-  | GroupInboxConversationData
-
-/** 识别移动端支持的会话摘要。 */
-function isMobileInboxConversation(
-  conversation: InboxConversation,
-): conversation is MobileInboxConversation {
-  return (
-    isCustomerInboxConversation(conversation) ||
-    isAgentInboxConversation(conversation) ||
-    isDirectInboxConversation(conversation) ||
-    isGroupInboxConversation(conversation)
-  )
-}
-
-type MobileConversationRowProps = {
-  conversation: MobileInboxConversation
-  name: string
-  actions: ReturnType<typeof useConversationListActions>
-  pinOrderVersion: string
-  pinMoves?: NonNullable<Parameters<typeof ConversationListMenu>[0]["pinMoves"]>
-  showAssignee: boolean
-  showAudience: boolean
+type MobileInboxPaneProps = {
+  query: MobileInboxQuery
+  covered: boolean
   sorting: boolean
-  onMenuChange: (open: boolean) => void
-  onOpen: (conversation: MobileInboxConversation) => void
-  sortable?: PinSortable
+  onSortingChange: (sorting: boolean) => void
 }
 
-/** 渲染会话摘要和未读角标，点击进入会话详情，长按打开阅读状态与置顶菜单；排序模式下置顶行右侧显示拖动手柄。 */
-function MobileConversationRow({
-  conversation,
-  name,
-  actions,
-  pinOrderVersion,
-  pinMoves,
-  showAssignee,
-  showAudience,
-  sorting,
-  onMenuChange,
-  onOpen,
-  sortable,
-}: MobileConversationRowProps) {
-  const { t } = useTranslation("inbox")
-  return (
-    <li
-      ref={sortable?.setNodeRef}
-      style={pinSortableStyle(sortable)}
-      data-inbox-id={conversation.id}
-      data-pinned={conversation.pinned || undefined}
-      className={cn(
-        "flex min-w-0 items-center border-b last:border-b-0",
-        conversation.pinned && "bg-muted",
-        sortable?.isDragging && "relative z-10 shadow-md",
-      )}
-    >
-      <div className="min-w-0 flex-1">
-        <ConversationListMenu
-          conversation={conversation}
-          actions={actions}
-          itemClassName="min-h-11"
-          pinOrderVersion={pinOrderVersion}
-          pinMoves={pinMoves}
-          onOpenChange={onMenuChange}
-        >
-          <button
-            type="button"
-            className="flex w-full min-w-0 gap-3 px-4 py-3 text-left outline-none transition-colors select-none active:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-            aria-label={name}
-            onClick={() => onOpen(conversation)}
-          >
-            <ConversationRowContent
-              conversation={conversation}
-              name={name}
-              density="touch"
-              showAssignee={showAssignee}
-              showAudience={showAudience}
-            />
-          </button>
-        </ConversationListMenu>
-      </div>
-      {sorting && sortable ? (
-        <button
-          type="button"
-          ref={sortable.setActivatorNodeRef}
-          data-pin-sort-handle
-          {...sortable.attributes}
-          {...sortable.listeners}
-          className="flex size-11 shrink-0 touch-none items-center justify-center text-muted-foreground outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
-          aria-label={t("pinSortHandle", { name })}
-        >
-          <GripVerticalIcon className="size-5" />
-        </button>
-      ) : null}
-    </li>
-  )
-}
-
-/** 置顶区内的移动端会话行，只在排序模式且未保存时可拖动。 */
-function SortableMobileConversationRow(props: MobileConversationRowProps) {
-  const sortable = usePinSortable(
-    props.conversation.id,
-    !props.sorting || props.actions.saving,
-  )
-  return <MobileConversationRow {...props} sortable={sortable} />
-}
-
-/** 加载当前页签的真实会话摘要并恢复列表浏览位置。 */
+/** 渲染收件箱标题、页签、当前页筛选和两页横向吸附滚动的列表，滚动位置与地址中的页签保持同步。 */
 export function MobileInboxPage() {
-  const navigation = useMobileInboxQuery()
-  const key = JSON.stringify(navigation.query)
-  return navigation.query.scope === InboxScope.InboxScopePending
-    ? <MobilePendingInbox key={key} {...navigation} />
-    : <MobilePartitionedInbox key={key} {...navigation} />
-}
-
-/** 读取移动端列表所需的身份、轮询与浏览位置选项。 */
-function useMobileListOptions() {
-  const pollingActive = useMemberChatPollingActive({
-    requireWindowFocus: false,
-  })
-  const { identity } = useMobileWorkspace()
-  const { inboxWindows } = useMobileNavigation()
-  return { identity, active: pollingActive, history: inboxWindows }
-}
-
-/** 待处理页签按等待起点读取一条列表。 */
-function MobilePendingInbox(navigation: ReturnType<typeof useMobileInboxQuery>) {
-  const viewport = useInboxListViewport()
-  const list = useInboxList(navigation.query, viewport, useMobileListOptions())
-  return <MobileInboxList {...navigation} list={list} viewport={viewport} />
-}
-
-/** 聊天与全部页签按置顶区在前、最近活动在后读取列表。 */
-function MobilePartitionedInbox(navigation: ReturnType<typeof useMobileInboxQuery>) {
-  const viewport = useInboxListViewport()
-  const list = usePartitionedInboxList(navigation.query, viewport, useMobileListOptions())
-  return <MobileInboxList {...navigation} list={list} viewport={viewport} />
-}
-
-/** 每个移动筛选独立挂载窗口，离开时保存原邻域。 */
-function MobileInboxList({
-  query,
-  changeQuery,
-  list,
-  viewport,
-}: ReturnType<typeof useMobileInboxQuery> & {
-  list: InboxList | PartitionedInboxList
-  viewport: InboxListViewport
-}) {
-  const { t } = useTranslation(["mobile", "inbox", "common"])
-  const conversationName = useConversationName()
+  const { t } = useTranslation(["mobile", "common"])
   const navigate = useNavigate()
   const { identity } = useMobileWorkspace()
   const attention = useInboxAttention(identity)
-  const actions = useConversationListActions(list.settlePin)
+  const { query, changeQuery } = useMobileInboxQuery()
+  const [filterOpen, setFilterOpen] = useState(false)
   const [sorting, setSorting] = useState(false)
-  const exitSortingOnMenuClose = useRef(false)
-  const swipeStart = useRef<{ x: number; y: number } | null>(null)
-  useMinuteTick()
-  useEffect(() => {
-    if (!sorting) return
-    // 排序期间系统返回先退出排序模式。
-    const exitSorting = (event: Event) => {
-      if (event.defaultPrevented) return
-      event.preventDefault()
-      setSorting(false)
+  // 离开页签时记下该页筛选，回到该页时恢复。
+  const [remembered, setRemembered] = useState<Partial<Record<InboxScope, MobileInboxQuery>>>({})
+  const pager = useRef<HTMLDivElement>(null)
+  const indicator = useRef<HTMLSpanElement>(null)
+  const index = inboxTabs.findIndex((tab) => tab.value === query.scope)
+  const currentIndex = useRef(index)
+  // 当前页使用地址中的筛选，另一页使用离开时记下的筛选或当前可共用的筛选条件。
+  const paneQuery = (scope: InboxScope) =>
+    scope === query.scope ? query : (remembered[scope] ?? normalizeInboxQuery({ ...query, scope }))
+
+  /** 按横向滚动进度移动页签指示线。 */
+  function moveIndicator(progress: number) {
+    if (indicator.current) indicator.current.style.transform = `translateX(${progress * 100}%)`
+  }
+
+  /** 切换当前页签，记下离开页的筛选并恢复目标页的筛选，同时结束置顶排序。 */
+  function selectScope(scope: InboxScope) {
+    if (scope === query.scope) return
+    setSorting(false)
+    setRemembered((current) => ({ ...current, [query.scope]: query }))
+    changeQuery(remembered[scope] ?? { scope })
+  }
+
+  useLayoutEffect(() => {
+    currentIndex.current = index
+  }, [index])
+  useLayoutEffect(() => {
+    // 进入页面和尺寸变化时直接对齐到当前页签，滑动过程中不干预滚动位置。
+    const element = pager.current
+    if (!element) return
+    /** 把滚动位置和指示线对齐到当前页签。 */
+    const align = () => {
+      element.scrollLeft = currentIndex.current * element.clientWidth
+      moveIndicator(currentIndex.current)
     }
-    window.addEventListener("cervi:back", exitSorting)
-    return () => window.removeEventListener("cervi:back", exitSorting)
-  }, [sorting])
-  const conversations = list.conversations.filter(isMobileInboxConversation)
-  const names = new Map(
-    conversations.map((conversation) => [
-      conversation.id,
-      conversationName(conversation),
-    ]),
-  )
-  const initial = list.revision === 0
-  const row = (conversation: MobileInboxConversation) => ({
-    conversation,
-    name: names.get(conversation.id) ?? "",
-    actions,
-    pinOrderVersion: list.pinOrderVersion,
-    // 全部页签在摘要行末显示负责人，待处理与全部页签标明服务对象。
-    showAssignee: query.scope === InboxScope.InboxScopeAll,
-    showAudience: query.scope !== InboxScope.InboxScopeChat,
-    sorting,
-    // 排序中打开的菜单在关闭后结束排序，菜单打开期间手柄保持占位。
-    onMenuChange: (open: boolean) => {
-      if (open) exitSortingOnMenuClose.current = sorting
-      else if (exitSortingOnMenuClose.current) setSorting(false)
-      viewport.setMenu(open)
-    },
-    onOpen: (conversation: MobileInboxConversation) => {
-      setSorting(false)
-      navigate(mobileConversationPath(conversation), {
-        state: { conversation, mobileBack: true },
-      })
-    },
-  })
+    align()
+    const observer = new ResizeObserver(align)
+    observer.observe(element)
+    return () => observer.disconnect()
+  }, [])
 
   return (
     <section className="flex h-full min-h-0 flex-col">
-      <MobilePageHeader
+      <MobileListHeader
         title={t("inbox.title")}
-        actions={sorting ? (
+        sorting={sorting}
+        onSortingDone={() => setSorting(false)}
+        actions={
           <Button
             variant="ghost"
-            className="-mr-2 min-h-11"
-            onClick={() => setSorting(false)}
+            size="icon-lg"
+            className="shrink-0"
+            aria-label={t("common:actions.search")}
+            onClick={() => navigate(mobileSearchPath(), { state: { mobileBack: true } })}
           >
-            {t("inbox:pinSortDone")}
+            <SearchIcon />
           </Button>
-        ) : (
-          <>
-            <Button
-              variant="ghost"
-              size="icon-lg"
-              className="shrink-0"
-              aria-label={t("common:actions.search")}
-              onClick={() =>
-                navigate(mobileSearchPath(), { state: { mobileBack: true } })
-              }
-            >
-              <SearchIcon />
-            </Button>
-            <DropdownMenu onOpenChange={viewport.setMenu}>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon-lg"
-                  className="shrink-0"
-                  aria-label={t("inbox.add")}
-                >
-                  <PlusIcon />
-                </Button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end">
-                <DropdownMenuItem
-                  className="min-h-11"
-                  onSelect={() => navigate("/inbox/agent/new", {
-                    state: { mobileBack: true },
-                  })}
-                >
-                  {t("inbox:newAgentConversation")}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="min-h-11"
-                  onSelect={() => navigate("/inbox/group/new", {
-                    state: { mobileBack: true },
-                  })}
-                >
-                  {t("group.create")}
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
-          </>
-        )}
+        }
       />
       <MobileInboxScopes
         scope={query.scope}
-        attentionUnreadCount={attention.data?.unread ?? 0}
         pendingCount={attention.data?.pending ?? 0}
-        onChange={changeQuery}
+        indicatorRef={indicator}
+        onSelect={(scope) => {
+          // 点击页签平滑滚动到目标页，页签随滚动越过中线时切换。
+          const element = pager.current
+          const target = inboxTabs.findIndex((tab) => tab.value === scope)
+          if (element) element.scrollTo({ left: target * element.clientWidth, behavior: "smooth" })
+          else selectScope(scope)
+        }}
       />
-      <div className="flex h-11 shrink-0 items-center border-b">
-        <MobileInboxFilter query={query} onChange={changeQuery} onOpenChange={viewport.setMenu} />
-      </div>
+      <MobileInboxFilter
+        key={query.scope}
+        query={query}
+        onChange={changeQuery}
+        onOpenChange={setFilterOpen}
+      />
       <div
-        className="flex min-h-0 flex-1 flex-col"
-        onTouchStart={(event) => {
-          // 菜单打开期间的触摸只服务于菜单本身，从排序手柄开始的触摸只用于拖动。
-          const touch = event.touches[0]
-          const onHandle =
-            event.target instanceof Element &&
-            event.target.closest("[data-pin-sort-handle]") !== null
-          swipeStart.current =
-            touch && !onHandle && !viewport.interaction.current.menu
-              ? { x: touch.clientX, y: touch.clientY }
-              : null
-        }}
-        onTouchCancel={() => {
-          swipeStart.current = null
-        }}
-        onTouchEnd={(event) => {
-          const start = swipeStart.current
-          const touch = event.changedTouches[0]
-          swipeStart.current = null
-          if (!start || !touch || viewport.interaction.current.menu) return
-          const moveX = touch.clientX - start.x
-          const moveY = touch.clientY - start.y
-          // 横向位移达到阈值且是纵向的两倍以上时判定为切换范围的滑动。
-          if (Math.abs(moveX) < 64 || Math.abs(moveX) < Math.abs(moveY) * 2)
-            return
-          const current = mobileInboxTabs.findIndex(
-            (item) => item.value === query.scope,
-          )
-          const next = mobileInboxTabs[current + (moveX < 0 ? 1 : -1)]
-          if (!next) return
-          // 抬手后的点击不应落到滑动经过的会话行上。
-          event.preventDefault()
-          changeQuery({ scope: next.value })
+        ref={pager}
+        className={cn(
+          "flex min-h-0 flex-1 snap-x snap-mandatory overflow-y-hidden overscroll-x-contain [scrollbar-width:none] [&::-webkit-scrollbar]:hidden",
+          sorting ? "overflow-x-hidden" : "overflow-x-auto",
+        )}
+        onScroll={(event) => {
+          const element = event.currentTarget
+          if (!element.clientWidth) return
+          const progress = element.scrollLeft / element.clientWidth
+          moveIndicator(progress)
+          const next = inboxTabs[Math.round(progress)]
+          if (next) selectScope(next.value)
         }}
       >
-        <InboxListPanel list={list} viewport={viewport} mobile>
-          {initial && !list.error ? (
-            <LoadingIndicator className="min-h-64 flex-1 justify-center">
-              {t("common:status.loading")}
-            </LoadingIndicator>
-          ) : null}
-          {initial && list.error ? (
-            <MobilePageState
-              title={t("inbox.loadError")}
-              onRetry={() => void list.retry()}
-            />
-          ) : null}
-          {!initial && conversations.length === 0 && !list.hasBefore && !list.hasAfter ? (
-            <MobilePageState
-              title={query.scope === InboxScope.InboxScopePending ? t("inbox:pendingEmptyTitle") : t("inbox.emptyTitle")}
-              description={query.scope === InboxScope.InboxScopePending ? t("inbox:pendingEmptyDescription") : t("inbox.emptyDescription")}
-            />
-          ) : null}
-          {conversations.length > 0 ? (
-            <ul>
-              <PinnedConversationList
-                conversations={conversations}
-                pinnedIds={list.pinnedIds}
-                names={names}
-                pinOrderVersion={list.pinOrderVersion}
-                actions={actions}
-                onDraggingChange={viewport.setDragging}
-                renderPinned={(conversation, order, index) => (
-                  <SortableMobileConversationRow
-                    key={conversation.id}
-                    {...row(conversation)}
-                    pinMoves={{
-                      up: pinMoveCommand(order, conversation.id, index - 1, list.pinOrderVersion),
-                      down: pinMoveCommand(order, conversation.id, index + 1, list.pinOrderVersion),
-                      sort: () => {
-                        exitSortingOnMenuClose.current = false
-                        setSorting(true)
-                      },
-                    }}
-                  />
-                )}
-                renderRow={(conversation) => (
-                  <MobileConversationRow key={conversation.id} {...row(conversation)} />
-                )}
+        {inboxTabs.map(({ value }) => (
+          <div key={value} className="flex min-h-0 w-full shrink-0 snap-start snap-always flex-col">
+            {value === InboxScope.InboxScopePending ? (
+              <MobilePendingPane
+                key={JSON.stringify(paneQuery(value))}
+                query={paneQuery(value)}
+                covered={filterOpen && query.scope === value}
+                sorting={false}
+                onSortingChange={setSorting}
               />
-            </ul>
-          ) : null}
-        </InboxListPanel>
+            ) : (
+              <MobileAllPane
+                key={JSON.stringify(paneQuery(value))}
+                query={paneQuery(value)}
+                covered={filterOpen && query.scope === value}
+                sorting={sorting}
+                onSortingChange={setSorting}
+              />
+            )}
+          </div>
+        ))}
       </div>
     </section>
+  )
+}
+
+/** 待处理页按等待起点读取一条列表。 */
+function MobilePendingPane(props: MobileInboxPaneProps) {
+  const viewport = useInboxListViewport()
+  const list = useInboxList(props.query, viewport, useMobileListOptions())
+  return <MobileInboxPaneList {...props} list={list} viewport={viewport} />
+}
+
+/** 全部页按置顶区在前、最近活动在后读取列表。 */
+function MobileAllPane(props: MobileInboxPaneProps) {
+  const viewport = useInboxListViewport()
+  const list = usePartitionedInboxList(props.query, viewport, useMobileListOptions())
+  return <MobileInboxPaneList {...props} list={list} viewport={viewport} />
+}
+
+/** 渲染单页服务会话列表，筛选面板打开期间保持该页列表原位。 */
+function MobileInboxPaneList({
+  query,
+  covered,
+  sorting,
+  onSortingChange,
+  list,
+  viewport,
+}: MobileInboxPaneProps & {
+  list: InboxList | PartitionedInboxList
+  viewport: InboxListViewport
+}) {
+  const { t } = useTranslation("inbox")
+  const pending = query.scope === InboxScope.InboxScopePending
+  useEffect(() => {
+    viewport.setCovered(covered)
+  }, [covered, viewport])
+  return (
+    <MobileConversationList
+      list={list}
+      viewport={viewport}
+      showAssignee={!pending}
+      showAudience
+      emptyTitle={t(pending ? "pendingEmptyTitle" : "emptyTitle")}
+      emptyDescription={t(pending ? "pendingEmptyDescription" : "emptyDescription")}
+      sorting={sorting}
+      onSortingChange={onSortingChange}
+    />
   )
 }

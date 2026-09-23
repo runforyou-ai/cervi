@@ -24,7 +24,7 @@ export function MobilePageHeader({
   actions?: ReactNode
 }) {
   const { t } = useTranslation("common")
-  const back = useMobileBack(backTo ?? "/inbox")
+  const back = useMobileBack(backTo ?? "/chats")
   const headerRef = useRef<HTMLElement>(null)
   const startRef = useRef<HTMLDivElement>(null)
   const endRef = useRef<HTMLDivElement>(null)

@@ -219,9 +219,9 @@ export function MobileInboxSearchPage() {
   const navigate = useNavigate()
   const location = useLocation()
   const [params, setParams] = useSearchParams()
-  const { inboxURL, inboxWindows } = useMobileNavigation()
+  const { listURL, inboxWindows } = useMobileNavigation()
   const { identity } = useMobileWorkspace()
-  const back = useMobileBack(inboxURL)
+  const back = useMobileBack(listURL)
   const { ids: recentConversationIds } = useRecentConversations(identity.user.identityId)
   const inputRef = useRef<HTMLInputElement>(null)
   const [text, setText] = useState(() => params.get("q") ?? "")
@@ -272,7 +272,7 @@ export function MobileInboxSearchPage() {
       if (person.conversationId)
         void navigate(`/inbox/customer/${person.conversationId}`, { state: { mobileBack: true } })
     } else if (person.agentId) {
-      void navigate(`/inbox/agent/${crypto.randomUUID()}`, {
+      void navigate(`/chats/agent/${crypto.randomUUID()}`, {
         state: {
           draftAgentID: person.agentId,
           draftAssistant: person.identityType === OrganizationIdentityType.OrganizationIdentityTypeAssistant,
@@ -316,7 +316,7 @@ export function MobileInboxSearchPage() {
               variant="ghost"
               size="icon-sm"
               className="absolute top-1/2 right-0.5 -translate-y-1/2 text-muted-foreground"
-              aria-label={t("mobile:inbox.clearSearch")}
+              aria-label={t("mobile:clearSearch")}
               onClick={() => {
                 setText("")
                 updateParams({ q: "", ...(type === "conversations" ? { type: "" } : {}) })

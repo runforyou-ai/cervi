@@ -21,7 +21,10 @@ import { useLocation, useNavigate } from "react-router"
 export type MobileLocateState = { locateMessage?: ConversationLocateTarget }
 
 type MobileNavigationState = {
+  chatsURL: string
   inboxURL: string
+  /** 最近一次停留的收件箱或消息列表地址。 */
+  listURL: string
   scrollPositions: Map<string, number>
   listPageCounts: Map<string, number>
   inboxWindows: Map<string, InboxListBookmark>
@@ -31,26 +34,36 @@ const MobileNavigationContext = createContext<MobileNavigationState | null>(
   null,
 )
 
-/** 在登录工作区内保存导航状态，退出时一起释放。 */
+/** 在登录工作区内保存导航状态和消息、收件箱列表的最近地址，退出时一起释放。 */
 export function MobileNavigationProvider({
   children,
 }: {
   children: ReactNode
 }) {
+  const [chatsURL, setChatsURL] = useState("/chats")
   const [inboxURL, setInboxURL] = useState("/inbox")
+  const [listURL, setListURL] = useState("/inbox")
   const scrollPositions = useRef(new Map<string, number>())
   const listPageCounts = useRef(new Map<string, number>())
   const inboxWindows = useRef(new Map<string, InboxListBookmark>())
   const location = useLocation()
   useLayoutEffect(() => {
+    const url = location.pathname + location.search
+    if (location.pathname === "/chats") {
+      setChatsURL(url)
+      setListURL(url)
+    }
     if (location.pathname === "/inbox") {
-      setInboxURL(location.pathname + location.search)
+      setInboxURL(url)
+      setListURL(url)
     }
   }, [location.pathname, location.search])
   return (
     <MobileNavigationContext
       value={{
+        chatsURL,
         inboxURL,
+        listURL,
         scrollPositions: scrollPositions.current,
         listPageCounts: listPageCounts.current,
         inboxWindows: inboxWindows.current,
@@ -81,21 +94,22 @@ export function useMobileBack(fallback: string) {
   }
 }
 
-/** 返回会话摘要对应的移动端详情地址。 */
+/** 返回会话摘要对应的移动端详情地址：服务会话属于收件箱，其余属于消息。 */
 export function mobileConversationPath(conversation: InboxConversation) {
-  const type = isCustomerInboxConversation(conversation)
-    ? "customer"
-    : isAgentInboxConversation(conversation)
-      ? "agent"
-      : isDirectInboxConversation(conversation)
-        ? "direct"
-        : "group"
-  return `/inbox/${type}/${conversation.id}`
+  if (isCustomerInboxConversation(conversation)) {
+    return `/inbox/customer/${conversation.id}`
+  }
+  const type = isAgentInboxConversation(conversation)
+    ? "agent"
+    : isDirectInboxConversation(conversation)
+      ? "direct"
+      : "group"
+  return `/chats/${type}/${conversation.id}`
 }
 
 /** 返回移动端检索页地址，传入会话编号时限定在该会话内检索。 */
 export function mobileSearchPath(conversationID = "") {
   return conversationID
-    ? `/inbox/search?${new URLSearchParams({ conversation: conversationID })}`
-    : "/inbox/search"
+    ? `/search?${new URLSearchParams({ conversation: conversationID })}`
+    : "/search"
 }

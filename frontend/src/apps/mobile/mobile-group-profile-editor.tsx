@@ -29,13 +29,13 @@ export function MobileGroupProfileEditor() {
   const context = useOutletContext<MobileGroupDetailsContext>()
   const { field } = useParams()
   if (field !== "image" && field !== "title" && field !== "description")
-    return <Navigate to={`/inbox/group/${context.group.id}/details`} replace />
+    return <Navigate to={`/chats/group/${context.group.id}/details`} replace />
   if (!context.canManage)
     return (
       <section className="flex h-full min-h-0 flex-col bg-background">
         <MobilePageHeader
           title={t("group.profile")}
-          backTo={`/inbox/group/${context.group.id}/details`}
+          backTo={`/chats/group/${context.group.id}/details`}
         />
         <p className="p-4 text-sm text-muted-foreground" role="status">
           {t(
@@ -59,7 +59,7 @@ function MobileGroupFieldEditor({
   const { t } = useTranslation("inbox")
   const { t: tm } = useTranslation("mobile")
   const navigate = useNavigate()
-  const close = useMobileBack(`/inbox/group/${group.id}/details`)
+  const close = useMobileBack(`/chats/group/${group.id}/details`)
   const image = usePendingImageUpload({
     purpose: FilePurpose.FilePurposeGroupImage,
     onError: (error) => {
@@ -116,7 +116,7 @@ function MobileGroupFieldEditor({
     <section className="flex h-full min-h-0 flex-col bg-background">
       <MobilePageHeader
         title={label}
-        backTo={`/inbox/group/${group.id}/details`}
+        backTo={`/chats/group/${group.id}/details`}
         backDisabled={busy}
       />
       <form

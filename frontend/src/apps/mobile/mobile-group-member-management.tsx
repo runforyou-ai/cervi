@@ -27,7 +27,7 @@ export function MobileGroupMemberActionPage({
   const { t } = useTranslation(["mobile", "inbox", "common"])
   const { group, canManage, busy, onSave } =
     useOutletContext<MobileGroupDetailsContext>()
-  const close = useMobileBack(`/inbox/group/${group.id}/details`)
+  const close = useMobileBack(`/chats/group/${group.id}/details`)
   const [target, setTarget] = useState<GroupParticipant | null>(null)
   // 确认框开关独立于目标成员，关闭时保留 target 供标题展示姓名。
   const [confirming, setConfirming] = useState(false)
@@ -97,7 +97,7 @@ export function MobileGroupMemberActionPage({
     <section className="flex h-full min-h-0 flex-col bg-background">
       <MobilePageHeader
         title={config.title}
-        backTo={`/inbox/group/${group.id}/details`}
+        backTo={`/chats/group/${group.id}/details`}
         backDisabled={busy}
       />
       {canManage ? null : (

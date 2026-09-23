@@ -319,6 +319,8 @@ type Inbox struct {
 	AttentionUnreadCount int                 `json:"attentionUnreadCount"`
 	// PendingCount 是本人全部待处理条目数，不受当前筛选影响。
 	PendingCount int `json:"pendingCount"`
+	// PendingUnreadCount 是本人待处理条目中的未读消息总数，不受当前筛选影响。
+	PendingUnreadCount int `json:"pendingUnreadCount"`
 }
 
 // InboxConversationAvailability 表示指定会话的阅读和列表资格。

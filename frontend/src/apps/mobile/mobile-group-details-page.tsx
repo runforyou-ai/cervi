@@ -42,7 +42,7 @@ export function MobileGroupDetailsPage() {
   } = useMobileGroup()
   const { identity } = useMobileWorkspace()
   const navigate = useNavigate()
-  const childOpen = !useMatch("/inbox/group/:conversationID/details")
+  const childOpen = !useMatch("/chats/group/:conversationID/details")
   const invalidate = useResourceInvalidator()
   const save = useImmediateSave()
   const muteSave = useImmediateSave()
@@ -145,7 +145,7 @@ export function MobileGroupDetailsPage() {
       >
         <MobilePageHeader
           title={t("group.details")}
-          backTo={childOpen ? undefined : `/inbox/group/${group.id}`}
+          backTo={childOpen ? undefined : `/chats/group/${group.id}`}
           actions={
             error ? (
               <Button

@@ -16,6 +16,7 @@ import { MobileGroupMemberActionPage } from "@/apps/mobile/mobile-group-member-m
 import { MobileGroupDetailsPage } from "@/apps/mobile/mobile-group-details-page"
 import { MobileDirectoryPage } from "@/apps/mobile/mobile-directory-page"
 import { MobileAgentChatPage, MobileAgentConversationPage } from "@/apps/mobile/mobile-agent-chat-page"
+import { MobileChatsPage } from "@/apps/mobile/mobile-chats-page"
 import { MobileInboxPage } from "@/apps/mobile/mobile-inbox-page"
 import { MobileInboxSearchPage } from "@/apps/mobile/mobile-inbox-search-page"
 import {
@@ -74,18 +75,19 @@ export default function MobileApp() {
         <Route path="/setup" element={<Navigate to="/connect" replace />} />
         <Route element={<MobileWorkspaceLayout />}>
           <Route element={<MobileTabLayout />}>
+            <Route path="/chats" element={<MobileChatsPage />} />
             <Route path="/inbox" element={<MobileInboxPage />} />
             <Route path="/contacts" element={<MobileContactsPage />} />
             <Route path="/me" element={<MobileMePage />} />
           </Route>
           <Route element={<MobileDetailLayout />}>
-            <Route path="/inbox/search" element={<MobileInboxSearchPage />} />
+            <Route path="/search" element={<MobileInboxSearchPage />} />
             <Route
-              path="/inbox/group/new"
+              path="/chats/group/new"
               element={<MobileCreateGroupPage />}
             />
             <Route
-              path="/inbox/group/:conversationID"
+              path="/chats/group/:conversationID"
               element={<MobileGroupConversationPage />}
             >
               <Route path="details" element={<MobileGroupDetailsPage />}>
@@ -113,7 +115,7 @@ export default function MobileApp() {
               </Route>
             </Route>
             <Route
-              path="/inbox/agent/new"
+              path="/chats/agent/new"
               element={
                 <MobileDirectoryPage
                   key="agent-new"
@@ -123,7 +125,7 @@ export default function MobileApp() {
               }
             />
             <Route
-              path="/inbox/agent/:conversationID"
+              path="/chats/agent/:conversationID"
               element={<MobileAgentConversationPage />}
             />
             <Route
@@ -131,7 +133,7 @@ export default function MobileApp() {
               element={<MobileCustomerConversationPage />}
             />
             <Route
-              path="/inbox/direct/:conversationID"
+              path="/chats/direct/:conversationID"
               element={
                 <MobileIndividualConversationPage
                   conversationType={ConversationType.ConversationTypeDirect}

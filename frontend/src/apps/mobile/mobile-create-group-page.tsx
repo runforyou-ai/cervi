@@ -30,7 +30,7 @@ export function MobileCreateGroupPage() {
   const { t } = useTranslation("mobile")
   const { t: tInbox } = useTranslation("inbox")
   const { identity } = useMobileWorkspace()
-  const { inboxURL } = useMobileNavigation()
+  const { chatsURL } = useMobileNavigation()
   const location = useLocation()
   const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
@@ -68,7 +68,7 @@ export function MobileCreateGroupPage() {
       if (!mounted.current) return
       void invalidate(resourceKeys.inbox())
       dirty.current = false
-      void navigate(`/inbox/group/${conversation.id}`, {
+      void navigate(`/chats/group/${conversation.id}`, {
         replace: true,
         state: {
           mobileBack: Boolean(
@@ -92,7 +92,7 @@ export function MobileCreateGroupPage() {
 
   return (
     <section className="flex h-full min-h-0 flex-col">
-      <MobilePageHeader title={t("group.create")} backTo={inboxURL} />
+      <MobilePageHeader title={t("group.create")} backTo={chatsURL} />
       <form
         className="cervi-form min-h-0 flex-1 space-y-9 overflow-y-auto overscroll-contain p-4"
         noValidate

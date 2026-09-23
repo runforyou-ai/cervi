@@ -2,6 +2,9 @@
 const mobile = {
   refreshFailed: "刷新失败",
   apply: "应用筛选",
+  filterSummary: "筛选：{{summary}}",
+  listLoadError: "无法加载会话，请检查网络后重试。",
+  clearSearch: "清除搜索内容",
   logout: "退出登录",
   loggingOut: "正在退出…",
   logoutError: "退出登录失败，请重试。",
@@ -52,22 +55,20 @@ const mobile = {
   },
   tabs: {
     label: "主导航",
+    chats: "消息",
+    inbox: "收件箱",
     contacts: "通讯录",
-    inbox: "消息",
     me: "我的",
   },
-  inbox: {
-    add: "新增",
-    assigneesRetry: "负责人加载失败，重试",
-    allCoworkers: "全部同事",
-    selectedAssignee: "已选负责人",
-    assignee: "负责人",
-    filterSummary: "筛选：{{summary}}",
+  chats: {
     title: "消息",
-    loadError: "无法加载消息，请检查网络后重试。",
+    add: "新增",
     emptyTitle: "暂无会话",
-    emptyDescription: "当前分类和筛选条件下没有会话。",
-    clearSearch: "清除搜索内容",
+    emptyDescription: "当前筛选条件下没有会话。",
+  },
+  inbox: {
+    title: "收件箱",
+    selectedAssignee: "已选负责人",
   },
   group: {
     addMembers: "添加群成员",

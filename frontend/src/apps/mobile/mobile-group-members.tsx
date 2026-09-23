@@ -174,7 +174,7 @@ export function MobileGroupMembersPage() {
         title={`${t("contextGroupMembersTab")}${t("mobile:group.memberCount", {
           count: group.participants.length,
         })}`}
-        backTo={`/inbox/group/${group.id}/details`}
+        backTo={`/chats/group/${group.id}/details`}
       />
       <MobileGroupMemberList
         members={group.participants}

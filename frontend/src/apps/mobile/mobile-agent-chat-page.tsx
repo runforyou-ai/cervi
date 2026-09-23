@@ -41,7 +41,7 @@ export function MobileAgentChatPage() {
   const [conversationID] = useState(() => crypto.randomUUID())
   return (
     <Navigate
-      to={`/inbox/agent/${conversationID}`}
+      to={`/chats/agent/${conversationID}`}
       replace
       state={{ ...location.state, draftAgentID: agentID, agentDirectory: true }}
     />
@@ -121,7 +121,7 @@ function MobileAgentConversation({ conversationID }: { conversationID: string })
   function handleCreated(conversation: AgentInboxConversationData) {
     if (!alive.current) return
     setCreated(conversation)
-    void navigate(`/inbox/agent/${conversationID}`, {
+    void navigate(`/chats/agent/${conversationID}`, {
       replace: true,
       state: { ...location.state, draftAgentID: undefined },
     })
