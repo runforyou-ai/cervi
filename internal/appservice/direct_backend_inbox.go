@@ -237,6 +237,29 @@ func (o *directOperations) GetInboxConversation(ctx context.Context, meta Reques
 	return conversations[0], nil
 }
 
+// ReadConversationAttention 读取会话摘要及已知消息之后计入本人提醒的未读消息。
+func (o *directOperations) ReadConversationAttention(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string, input ConversationAttentionInput) (ConversationAttention, error) {
+	attention, err := o.loadInbox.ReadAttention(ctx, identity, conversationID, input.AfterMessageID)
+	if err != nil {
+		return ConversationAttention{}, inboxReadError(ctx, meta, identity.Organization.ID, "提醒消息", err)
+	}
+	if attention == nil {
+		return ConversationAttention{}, NotFoundError(meta, cervii18n.ErrorConversationNotFound).WithReason("conversation_unavailable")
+	}
+	conversations, err := o.inboxConversationsFromActions(ctx, meta, identity, []inboxaction.ConversationSummary{attention.Conversation})
+	if err != nil {
+		return ConversationAttention{}, err
+	}
+	output := ConversationAttention{Conversation: conversations[0], Messages: make([]ConversationAttentionMessage, 0, len(attention.Messages))}
+	for _, message := range attention.Messages {
+		output.Messages = append(output.Messages, ConversationAttentionMessage{
+			ID: message.ID, Type: MessageType(message.Type), Visibility: MessageVisibility(message.Visibility), Body: message.Body,
+			AttachmentName: message.AttachmentName, SenderName: message.SenderName, SenderIdentityType: (*OrganizationIdentityType)(message.SenderIdentityType),
+		})
+	}
+	return output, nil
+}
+
 // ReadInboxConversations 在每项中区分匹配、筛选外可读及不可用的会话。
 func (o *directOperations) ReadInboxConversations(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input ReadInboxConversationsInput) (InboxConversationResults, error) {
 	// 未指定范围与搜索词时只核对阅读资格。

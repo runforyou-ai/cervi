@@ -3,15 +3,15 @@ import { useEffect, useEffectEvent } from "react"
 import { useTranslation } from "react-i18next"
 
 import {
+  MessageType,
   MessageVisibility,
   getInboxConversation,
   isNotFoundApiError,
-  listConversationMessages,
-  listPendingConversationMentions,
   InboxScope,
   loadInbox,
+  readConversationAttention,
   realtimeClient,
-  type ConversationMessage,
+  type ConversationAttentionMessage,
   type Identity,
   type InboxConversationData,
 } from "@/api"
@@ -44,15 +44,17 @@ export function useNewMessageNotifications(
   const identityId = identity?.user.identityId
 
   const deliver = useEffectEvent(
-    async (conversation: InboxConversationData, message: ConversationMessage) => {
+    async (conversation: InboxConversationData, message: ConversationAttentionMessage) => {
       if (!organizationId || !userId) {
         return
       }
-      // 附件消息展示文件名，其余消息按发送者身份取正文摘要。
-      const preview = message.attachment
-        ? t("notificationAttachment", { name: message.attachment.name })
-        : messagePreview(message.body, message.sender?.identityType).trim()
-      const sender = message.sender?.displayName?.trim() || t("unknownSender")
+      // 附件消息展示文件名，运行失败使用固定文案，其余消息按发送者身份取正文摘要。
+      const preview = message.attachmentName
+        ? t("notificationAttachment", { name: message.attachmentName })
+        : message.type === MessageType.MessageTypeAgentError
+          ? t("agentRunFailed")
+          : messagePreview(message.body, message.senderIdentityType).trim()
+      const sender = message.senderName?.trim() || t("unknownSender")
       const delivered = await notifyNewMessage({
         id: message.id,
         title: conversationName(conversation),
@@ -101,7 +103,7 @@ export function useNewMessageNotifications(
     if (!identityId) {
       return
     }
-    const watcher = new NewMessageWatcher(identityId, {
+    const watcher = new NewMessageWatcher({
       // 基线覆盖本人参与的聊天与待处理的服务会话。
       readConversations: async () => {
         const [chats, pending] = await Promise.all([
@@ -110,19 +112,15 @@ export function useNewMessageNotifications(
         ])
         return [...chats.conversations, ...pending.conversations]
       },
-      readConversation: async (conversationId) => {
+      readAttention: async (conversationId, afterMessageId) => {
         try {
-          return await getInboxConversation(conversationId)
+          return await readConversationAttention(conversationId, { afterMessageId })
         } catch (error) {
           // 失去阅读资格的会话按不可读处理，由观察器清除其基线。
           if (isNotFoundApiError(error)) return null
           throw error
         }
       },
-      readMessages: async (conversationId) =>
-        (await listConversationMessages(conversationId)).messages,
-      readPendingMentions: async (conversationId) =>
-        (await listPendingConversationMentions(conversationId)).messageIds,
       deliver,
       failed: (error) => {
         console.warn("处理新消息通知失败", error)

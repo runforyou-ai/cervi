@@ -987,6 +987,34 @@ export interface ConversationAgentRun {
 }
 
 /**
+ * ConversationAttention 返回会话摘要与其中计入本人提醒的未读消息，消息按会话顺序排列。
+ */
+export interface ConversationAttention {
+    "conversation": InboxConversation;
+    "messages": ConversationAttentionMessage[] | null;
+}
+
+/**
+ * ConversationAttentionInput 定义调用方已知的最后一条消息，为空时只判断会话最新一条消息是否计入提醒。
+ */
+export interface ConversationAttentionInput {
+    "afterMessageId": string;
+}
+
+/**
+ * ConversationAttentionMessage 定义计入本人提醒的一条未读消息的通知摘要。
+ */
+export interface ConversationAttentionMessage {
+    "id": string;
+    "type": MessageType;
+    "visibility": MessageVisibility;
+    "body": string;
+    "attachmentName": string | null;
+    "senderName": string | null;
+    "senderIdentityType": OrganizationIdentityType | null;
+}
+
+/**
  * ConversationMentionReview 定义连续确认后的服务端水位。
  */
 export interface ConversationMentionReview {

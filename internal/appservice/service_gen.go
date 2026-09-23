@@ -109,6 +109,11 @@ func (s *Service) ReadInboxConversations(ctx context.Context, meta RequestMeta, 
 	return withNormalizedSlices(s.backend.ReadInboxConversations(ctx, meta, input))
 }
 
+// ReadConversationAttention 返回会话摘要及已知消息之后计入本人提醒的未读消息，提醒口径与应用角标一致。
+func (s *Service) ReadConversationAttention(ctx context.Context, meta RequestMeta, conversationID string, input ConversationAttentionInput) (ConversationAttention, error) {
+	return withNormalizedSlices(s.backend.ReadConversationAttention(ctx, meta, conversationID, input))
+}
+
 // SearchInbox 按范围检索会话名称、消息正文与附件文件名、成员和外部联系人。
 func (s *Service) SearchInbox(ctx context.Context, meta RequestMeta, input InboxSearchInput) (InboxSearchResult, error) {
 	return withNormalizedSlices(s.backend.SearchInbox(ctx, meta, input))

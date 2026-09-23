@@ -32,34 +32,41 @@ func (q *LoadInboxQuery) ReadByIDs(ctx context.Context, identity *servermodels.I
 		}
 		input = &normalized
 	}
-	results := make([]ConversationResult, 0, len(ids))
 	if len(ids) == 0 {
-		return results, nil
+		return []ConversationResult{}, nil
 	}
+	var results []ConversationResult
 	err := q.db.RunInTx(ctx, &sql.TxOptions{Isolation: sql.LevelRepeatableRead, ReadOnly: true}, func(ctx context.Context, tx bun.Tx) error {
-		snapshot := NewLoadInboxQuery(tx)
-		summaries, err := snapshot.readSummaries(ctx, identity, ids)
-		if err != nil {
-			return err
-		}
-		matches := make(map[string]inboxCursorPoint)
-		if input != nil {
-			matches, err = snapshot.matchInboxIDs(ctx, identity, ids, *input)
-			if err != nil {
-				return err
-			}
-		}
-		for _, id := range ids {
-			summary := summaries[id]
-			point, matched := matches[id]
-			if summary != nil && matched {
-				summary.Pending = point.pending()
-			}
-			results = append(results, ConversationResult{ID: id, Conversation: summary, MatchesQuery: summary != nil && (input == nil || matched)})
-		}
-		return nil
+		var err error
+		results, err = NewLoadInboxQuery(tx).readByIDs(ctx, identity, ids, input)
+		return err
 	})
 	return results, err
+}
+
+// readByIDs 在当前快照中读取指定会话摘要并按筛选判断列表资格，匹配待处理范围时附带待处理条目摘要。
+func (q *LoadInboxQuery) readByIDs(ctx context.Context, identity *servermodels.Identity, ids []string, input *LoadInput) ([]ConversationResult, error) {
+	summaries, err := q.readSummaries(ctx, identity, ids)
+	if err != nil {
+		return nil, err
+	}
+	matches := make(map[string]inboxCursorPoint)
+	if input != nil {
+		matches, err = q.matchInboxIDs(ctx, identity, ids, *input)
+		if err != nil {
+			return nil, err
+		}
+	}
+	results := make([]ConversationResult, 0, len(ids))
+	for _, id := range ids {
+		summary := summaries[id]
+		point, matched := matches[id]
+		if summary != nil && matched {
+			summary.Pending = point.pending()
+		}
+		results = append(results, ConversationResult{ID: id, Conversation: summary, MatchesQuery: summary != nil && (input == nil || matched)})
+	}
+	return results, nil
 }
 
 // readSummaries 按当前阅读资格批量读取四类会话的公开摘要。

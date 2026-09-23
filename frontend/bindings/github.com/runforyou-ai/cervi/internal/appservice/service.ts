@@ -969,6 +969,13 @@ export function ReactivateUser(meta: $models.RequestMeta, userID: string): $Canc
 }
 
 /**
+ * ReadConversationAttention 返回会话摘要及已知消息之后计入本人提醒的未读消息，提醒口径与应用角标一致。
+ */
+export function ReadConversationAttention(meta: $models.RequestMeta, conversationID: string, input: $models.ConversationAttentionInput): $CancellablePromise<$models.ConversationAttention> {
+    return $Call.ByID(3705452205, meta, conversationID, input);
+}
+
+/**
  * ReadConversationMessageWindow 重读已加载首尾游标之间的完整消息范围。
  */
 export function ReadConversationMessageWindow(meta: $models.RequestMeta, conversationID: string, input: $models.ConversationMessageWindowInput): $CancellablePromise<$models.ConversationMessageList> {
