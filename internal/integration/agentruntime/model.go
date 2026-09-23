@@ -104,9 +104,13 @@ func newAgenticModel(ctx context.Context, config ModelConfig) (model.AgenticMode
 		if maxTokens != nil {
 			componentConfig.ExtraFields["max_tokens"] = *maxTokens
 		}
-		// 智谱通过请求体的 thinking 参数关闭思考。
-		if domain.AIProviderBrand(config.Brand) == domain.AIProviderBrandZhipu && config.DisableThinking {
+		// 智谱通过请求体的 thinking 参数关闭思考，OpenRouter 通过 reasoning 参数关闭思考。
+		switch {
+		case !config.DisableThinking:
+		case domain.AIProviderBrand(config.Brand) == domain.AIProviderBrandZhipu:
 			componentConfig.ExtraFields["thinking"] = map[string]any{"type": "disabled"}
+		case domain.AIProviderBrand(config.Brand) == domain.AIProviderBrandOpenRouter:
+			componentConfig.ExtraFields["reasoning"] = map[string]any{"effort": "none"}
 		}
 		chatModel, err = agenticopenai.NewChatModel(ctx, componentConfig)
 	}

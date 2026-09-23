@@ -31,6 +31,8 @@ func TestRegistryUsesProviderReadOnlyEndpoints(t *testing.T) {
 		{name: "MiniMax", brand: domain.AIProviderBrandMiniMax, basePath: "/v1", wantPath: "/v1/models", response: `{"object":"list","data":[]}`},
 		{name: "xAI", brand: domain.AIProviderBrandXAI, basePath: "/v1", wantPath: "/v1/models", response: `{"object":"list","data":[]}`},
 		{name: "Mistral", brand: domain.AIProviderBrandMistral, basePath: "/v1", wantPath: "/v1/models", response: `{"object":"list","data":[]}`},
+		{name: "OpenRouter", brand: domain.AIProviderBrandOpenRouter, basePath: "/api/v1", wantPath: "/api/v1/key", response: `{"data":{"label":"sk-or"}}`},
+		{name: "TypeSafe", brand: domain.AIProviderBrandTypeSafe, basePath: "/v1", wantPath: "/v1/models", response: `{"models":[{"name":"jev-latest"}]}`},
 		{name: "Ollama", brand: domain.AIProviderBrandOllama, wantPath: "/api/tags", response: `{"models":[]}`},
 		{name: "OpenAI 兼容", brand: domain.AIProviderBrandOpenAICompatible, basePath: "/v1", wantPath: "/v1/models", response: `{"object":"list","data":[]}`},
 	}

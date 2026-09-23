@@ -171,7 +171,7 @@ function AgentResourcePickerDialog<T>({
               <label
                 key={option.id}
                 className={cn(
-                  "flex min-w-0 cursor-pointer items-start gap-3 rounded-lg border bg-card p-4 focus-within:border-primary",
+                  "flex min-w-0 cursor-pointer items-start gap-3 rounded-lg border bg-card p-4 has-focus-visible:border-primary",
                   selected.includes(option.id)
                     ? "border-primary bg-primary/5"
                     : "hover:bg-accent/50",

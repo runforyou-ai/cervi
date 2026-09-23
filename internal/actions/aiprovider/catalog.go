@@ -84,6 +84,10 @@ func AvailableModels(brand domain.AIProviderBrand) []Model {
 			{Identifier: "mistral-embed", Name: "Mistral Embed", Type: domain.AIModelTypeEmbedding, InputModalities: text, ContextWindow: 8_192},
 			{Identifier: "codestral-embed-2505", Name: "Codestral Embed", Type: domain.AIModelTypeEmbedding, InputModalities: text, ContextWindow: 8_192},
 		}
+	case domain.AIProviderBrandTypeSafe:
+		return []Model{
+			{Identifier: "jev-latest", Name: "Jev", Type: domain.AIModelTypeDecision, InputModalities: text, ContextWindow: 32_000},
+		}
 	default:
 		return nil
 	}

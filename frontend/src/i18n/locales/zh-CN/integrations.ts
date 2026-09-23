@@ -59,7 +59,7 @@ const integrations = {
   },
   modelServices: {
     title: "模型服务",
-    description: "配置对话、嵌入和重排序模型的供应商",
+    description: "配置对话、嵌入、重排序和判断模型的供应商",
     brands: {
       deepseek: "DeepSeek",
       alibaba: "阿里云百炼",
@@ -72,6 +72,8 @@ const integrations = {
       minimax: "MiniMax",
       xai: "xAI",
       mistral: "Mistral",
+      openrouter: "OpenRouter",
+      typesafe: "TypeSafe",
       ollama: "Ollama",
       openai_compatible: "OpenAI 兼容服务",
     },
@@ -143,6 +145,7 @@ const integrations = {
         chat: "对话",
         embedding: "嵌入",
         rerank: "重排序",
+        decision: "判断",
       },
       modalities: {
         text: "文本",

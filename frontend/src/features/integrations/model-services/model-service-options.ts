@@ -10,15 +10,17 @@ export const modelTypeOrder: AIModelTypeId[] = [
   AIModelType.AIModelTypeChat,
   AIModelType.AIModelTypeEmbedding,
   AIModelType.AIModelTypeRerank,
+  AIModelType.AIModelTypeDecision,
 ]
 
 export const modelTypeNameKeys: Record<
   AIModelTypeId,
-  `modelServices.models.types.${"chat" | "embedding" | "rerank"}`
+  `modelServices.models.types.${"chat" | "embedding" | "rerank" | "decision"}`
 > = {
   [AIModelType.AIModelTypeChat]: "modelServices.models.types.chat",
   [AIModelType.AIModelTypeEmbedding]: "modelServices.models.types.embedding",
   [AIModelType.AIModelTypeRerank]: "modelServices.models.types.rerank",
+  [AIModelType.AIModelTypeDecision]: "modelServices.models.types.decision",
 }
 
 export const modelInputModalityOrder: AIModelInputModalityId[] = [

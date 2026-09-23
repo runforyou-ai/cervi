@@ -11,12 +11,13 @@ import volcengineIcon from "@lobehub/icons-static-svg/icons/volcengine-color.svg
 import minimaxIcon from "@lobehub/icons-static-svg/icons/minimax-color.svg?raw"
 import xaiIcon from "@lobehub/icons-static-svg/icons/xai.svg?raw"
 import mistralIcon from "@lobehub/icons-static-svg/icons/mistral-color.svg?raw"
+import openrouterIcon from "@lobehub/icons-static-svg/icons/openrouter.svg?raw"
 import ollamaIcon from "@lobehub/icons-static-svg/icons/ollama.svg?raw"
 
 type AIProviderBrandConfig = {
   nameKey: `modelServices.brands.${AIProviderBrandId}`
   defaultAPIURL: string
-  /** 品牌标志的 SVG 源码，通用兼容服务不设置。 */
+  /** 品牌标志的 SVG 源码，没有公开标志的品牌和通用兼容服务不设置。 */
   icon?: string
   /** 模型目录由服务实例提供，添加模型时读取服务实例。 */
   discoversModels?: boolean
@@ -36,6 +37,8 @@ export const aiProviderBrandOrder: AIProviderBrandId[] = [
   AIProviderBrand.AIProviderBrandMiniMax,
   AIProviderBrand.AIProviderBrandXAI,
   AIProviderBrand.AIProviderBrandMistral,
+  AIProviderBrand.AIProviderBrandOpenRouter,
+  AIProviderBrand.AIProviderBrandTypeSafe,
   AIProviderBrand.AIProviderBrandOllama,
   AIProviderBrand.AIProviderBrandOpenAICompatible,
 ]
@@ -98,6 +101,16 @@ export const aiProviderBrandConfigs: Record<
     nameKey: "modelServices.brands.mistral",
     icon: mistralIcon,
     defaultAPIURL: "https://api.mistral.ai/v1",
+  },
+  [AIProviderBrand.AIProviderBrandOpenRouter]: {
+    nameKey: "modelServices.brands.openrouter",
+    icon: openrouterIcon,
+    defaultAPIURL: "https://openrouter.ai/api/v1",
+    discoversModels: true,
+  },
+  [AIProviderBrand.AIProviderBrandTypeSafe]: {
+    nameKey: "modelServices.brands.typesafe",
+    defaultAPIURL: "https://api.typesafe.ai/v1",
   },
   [AIProviderBrand.AIProviderBrandOllama]: {
     nameKey: "modelServices.brands.ollama",

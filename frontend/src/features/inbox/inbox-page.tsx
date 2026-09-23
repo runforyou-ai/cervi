@@ -44,6 +44,7 @@ import type { useInboxListViewport } from "@/features/inbox/use-inbox-list-viewp
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useIsNarrowViewport } from "@/hooks/use-narrow-viewport"
 import { useResource } from "@/hooks/use-resource"
+import { focusDialogContainer } from "@/lib/dialog-focus"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { resolveAppPlatform } from "@/platform/app-platform"
 
@@ -255,7 +256,10 @@ export function InboxPage({
 
       {isNarrowViewport && selectedConversationId ? (
         <Sheet open={isNarrowDetailOpen} onOpenChange={setIsNarrowDetailOpen}>
-          <SheetContent className="data-[side=right]:w-full p-0 sm:max-w-lg">
+          <SheetContent
+            className="data-[side=right]:w-full p-0 sm:max-w-lg"
+            onOpenAutoFocus={focusDialogContainer}
+          >
             <SheetHeader className="sr-only">
               <SheetTitle>
                 {t("conversationTitle", {

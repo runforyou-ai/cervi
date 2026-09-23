@@ -96,6 +96,48 @@ func TestOpenAICompatibleDiscovererReadsModelList(t *testing.T) {
 	}
 }
 
+// TestOpenRouterDiscovererMapsOutputModalities 验证 OpenRouter 按输出类型识别模型用途并过滤不支持的模型。
+func TestOpenRouterDiscovererMapsOutputModalities(t *testing.T) {
+	server := httptest.NewTestServer(t, http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+		if request.URL.Path != "/api/v1/models" || request.URL.Query().Get("output_modalities") != "all" {
+			t.Errorf("url = %s", request.URL)
+		}
+		writer.Header().Set("Content-Type", "application/json")
+		_, _ = writer.Write([]byte(`{"data":[
+			{"id":"deepseek/deepseek-v4.1-flash","name":"DeepSeek V4.1 Flash","context_length":1048576,"architecture":{"input_modalities":["text","image","file"],"output_modalities":["text"]},"top_provider":{"max_completion_tokens":393216}},
+			{"id":"qwen/qwen3-embedding","name":"Qwen3 Embedding","context_length":32000,"architecture":{"input_modalities":["text"],"output_modalities":["embeddings"]},"top_provider":{}},
+			{"id":"cohere/rerank-4-pro","name":"Rerank 4 Pro","context_length":32000,"architecture":{"input_modalities":["text"],"output_modalities":["rerank"]},"top_provider":{}},
+			{"id":"typesafe/jev-1.13","name":"TypeSafe: Jev 1.13","context_length":32000,"architecture":{"input_modalities":["text"],"output_modalities":["decisions"]},"top_provider":{"max_completion_tokens":28800}},
+			{"id":"image/model","name":"Image","context_length":1000,"architecture":{"input_modalities":["text"],"output_modalities":["image"]},"top_provider":{}},
+			{"id":"mixed/model","name":"Mixed","context_length":1000,"architecture":{"input_modalities":["text"],"output_modalities":["image","text"]},"top_provider":{}}
+		]}`))
+	}))
+
+	discoverer, err := NewRegistry(server.Client()).NewDiscoverer(Config{
+		Brand: domain.AIProviderBrandOpenRouter, APIKey: "key", APIURL: server.URL + "/api/v1",
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	models, err := discoverer.Discover(context.Background())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(models) != 4 {
+		t.Fatalf("models = %#v", models)
+	}
+	chat := models[0]
+	if chat.Type != domain.AIModelTypeChat || chat.Name != "DeepSeek V4.1 Flash" || chat.ContextWindow != 1048576 ||
+		chat.MaxOutputTokens != 393216 || len(chat.InputModalities) != 2 {
+		t.Fatalf("chat = %#v", chat)
+	}
+	for index, want := range []domain.AIModelType{domain.AIModelTypeEmbedding, domain.AIModelTypeRerank, domain.AIModelTypeDecision} {
+		if model := models[index+1]; model.Type != want || model.MaxOutputTokens != 0 {
+			t.Fatalf("model %d = %#v", index+1, model)
+		}
+	}
+}
+
 // TestRegistryRejectsUnsupportedDiscovery 验证模型目录固定的品牌不提供模型发现。
 func TestRegistryRejectsUnsupportedDiscovery(t *testing.T) {
 	registry := NewRegistry(http.DefaultClient)

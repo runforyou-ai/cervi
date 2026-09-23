@@ -33,6 +33,7 @@ import {
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceRemover } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
+import { focusDialogContainer } from "@/lib/dialog-focus"
 import { cn } from "@/lib/utils"
 import { composerToolClass } from "@/features/inbox/composer-tool"
 import { selectCustomerReplyAgentID } from "@/features/inbox/customer-reply-agent"
@@ -393,6 +394,7 @@ export function CustomerReplyAssistant({
           showCloseButton={false}
           aria-describedby={undefined}
           className="max-h-[calc(100dvh-env(safe-area-inset-top)-1rem)] gap-0 overflow-hidden rounded-t-2xl pb-[env(safe-area-inset-bottom)]"
+          onOpenAutoFocus={focusDialogContainer}
           onCloseAutoFocus={keepAppliedFocus}
         >
           <SheetHeader className="shrink-0 flex-row items-center border-b">

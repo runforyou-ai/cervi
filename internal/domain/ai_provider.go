@@ -15,6 +15,8 @@ const (
 	AIProviderBrandMiniMax          AIProviderBrand = "minimax"
 	AIProviderBrandXAI              AIProviderBrand = "xai"
 	AIProviderBrandMistral          AIProviderBrand = "mistral"
+	AIProviderBrandOpenRouter       AIProviderBrand = "openrouter"
+	AIProviderBrandTypeSafe         AIProviderBrand = "typesafe"
 	AIProviderBrandOllama           AIProviderBrand = "ollama"
 	AIProviderBrandOpenAICompatible AIProviderBrand = "openai_compatible"
 )
@@ -25,7 +27,8 @@ func ValidAIProviderBrand(brand AIProviderBrand) bool {
 	case AIProviderBrandDeepSeek, AIProviderBrandAlibaba, AIProviderBrandOpenAI,
 		AIProviderBrandAnthropic, AIProviderBrandGoogle, AIProviderBrandMoonshot,
 		AIProviderBrandZhipu, AIProviderBrandVolcengine, AIProviderBrandMiniMax,
-		AIProviderBrandXAI, AIProviderBrandMistral, AIProviderBrandOllama,
+		AIProviderBrandXAI, AIProviderBrandMistral, AIProviderBrandOpenRouter,
+		AIProviderBrandTypeSafe, AIProviderBrandOllama,
 		AIProviderBrandOpenAICompatible:
 		return true
 	default:
@@ -63,6 +66,7 @@ const (
 	AIModelTypeChat      AIModelType = "chat"
 	AIModelTypeEmbedding AIModelType = "embedding"
 	AIModelTypeRerank    AIModelType = "rerank"
+	AIModelTypeDecision  AIModelType = "decision"
 )
 
 // AIModelInputModality 定义模型支持的输入模态。
