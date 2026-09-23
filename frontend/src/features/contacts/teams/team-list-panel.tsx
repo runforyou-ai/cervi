@@ -4,13 +4,7 @@ import { PlusIcon, UsersIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useLocation, useNavigate } from "react-router"
 
-import {
-  deleteTeam,
-  listTeams,
-  type ChannelOption,
-  type RoleData,
-  type Team,
-} from "@/api"
+import { deleteTeam, listTeams, type Team } from "@/api"
 import { ListToolbarSearch } from "@/components/list-toolbar"
 import { ConfirmationDialog } from "@/components/confirmation-dialog"
 import { ResourceRowIdentity } from "@/components/resource-row-identity"
@@ -23,7 +17,6 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
-import { ContactCreateDialogs } from "@/features/contacts/contact-create-dialogs"
 import { ContactListSection } from "@/features/contacts/contact-list-section"
 import { TeamForm } from "@/features/contacts/teams/team-form"
 import { teamMembershipCacheKeys } from "@/features/contacts/teams/team-membership-cache"
@@ -33,15 +26,7 @@ import { useConfirmedAction } from "@/hooks/use-confirmed-action"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 
 /** 列出企业团队并提供团队维护入口。 */
-export function TeamListPanel({
-  channels,
-  roles,
-  teams,
-}: {
-  channels: ChannelOption[]
-  roles: RoleData[]
-  teams: Team[]
-}) {
+export function TeamListPanel() {
   const { t } = useTranslation(["contacts", "common"])
   const navigate = useNavigate()
   const location = useLocation()
@@ -49,6 +34,7 @@ export function TeamListPanel({
   const { searchParams, setParameters, query, search, setSearch, currentPage } =
     useContactSearch()
   const [editingTeam, setEditingTeam] = useState<Team | null>(null)
+  const creatingTeam = searchParams.get("newTeam") === "1"
 
   const list = useResource(
     resourceKeys.teams({ query, page: currentPage, pageSize: 50 }),
@@ -134,14 +120,24 @@ export function TeamListPanel({
         />
       </ContactListSection>
 
-      <ContactCreateDialogs
-        scope="team"
-        channels={channels}
-        roles={roles}
-        teams={teams}
-        searchParams={searchParams}
-        setParameters={setParameters}
-      />
+      <Dialog
+        open={creatingTeam}
+        onOpenChange={(open) => !open && setParameters({ newTeam: null })}
+      >
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>{t("teams.create")}</DialogTitle>
+            <DialogDescription>{t("teams.createDescription")}</DialogDescription>
+          </DialogHeader>
+          <TeamForm
+            onSaved={(team) => {
+              void invalidate(resourceKeys.teams())
+              navigate(`/contacts/teams/${team.id}`, { replace: true })
+            }}
+            onCancel={() => setParameters({ newTeam: null })}
+          />
+        </DialogContent>
+      </Dialog>
 
       <Dialog
         open={editingTeam !== null}

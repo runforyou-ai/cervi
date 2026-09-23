@@ -273,7 +273,6 @@ function GroupConversationProfile({
       />
       <SidePanelField
         label={t("groupTitleLabel")}
-        required
         action={
           canManage && !profileBusy ? (
             <GroupFieldEditButton
@@ -290,7 +289,6 @@ function GroupConversationProfile({
           <Input
             autoFocus
             {...form.register("title")}
-            required
             maxLength={groupTitleMaxLength}
             disabled={saveState.saving}
             aria-label={t("groupTitleLabel")}
@@ -301,7 +299,9 @@ function GroupConversationProfile({
             onKeyDown={handleTitleKeyDown}
           />
         ) : (
-          <span className="min-w-0 break-words">{group.title}</span>
+          <span className="min-w-0 break-words">
+            {group.title || t("groupFieldEmpty")}
+          </span>
         )}
       </SidePanelField>
       <SidePanelField
@@ -338,7 +338,7 @@ function GroupConversationProfile({
           </div>
         ) : (
           <span className="min-w-0 break-words">
-            {group.description || t("groupDescriptionEmpty")}
+            {group.description || t("groupFieldEmpty")}
           </span>
         )}
       </SidePanelField>

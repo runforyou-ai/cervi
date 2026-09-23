@@ -7,7 +7,7 @@ import {
   isAgentInboxConversation,
   isCustomerInboxConversation,
   isInternalInboxConversation,
-  type InboxConversation,
+  type InboxConversationData,
 } from "@/api"
 import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
 import {
@@ -53,7 +53,7 @@ export function ConversationRowContent({
   showAssignee,
   showAudience = false,
 }: {
-  conversation: InboxConversation
+  conversation: InboxConversationData
   name: string
   density: keyof typeof densityClasses
   selected?: boolean

@@ -71,10 +71,8 @@ export function MobileGroupInfo({
                     imageURL={group.imageUrl}
                     className="ml-auto size-12 rounded-xl"
                   />
-                ) : field === "title" ? (
-                  group.title
                 ) : (
-                  group.description || t("groupDescriptionEmpty")
+                  group[field] || t("groupFieldEmpty")
                 )}
               </span>
               <ChevronRightIcon className="size-5 shrink-0 text-muted-foreground" />

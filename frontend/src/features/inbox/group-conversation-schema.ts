@@ -8,7 +8,6 @@ export const groupAdditionalMemberMaxCount = groupMemberMaxCount - 1
 
 type GroupTranslator = (
   key:
-    | "groupTitleRequired"
     | "groupTitleTooLong"
     | "groupDescriptionTooLong"
     | "groupMembersRequired"
@@ -21,7 +20,6 @@ export function createGroupProfileSchema(t: GroupTranslator) {
     title: z
       .string()
       .trim()
-      .min(1, t("groupTitleRequired"))
       .max(groupTitleMaxLength, t("groupTitleTooLong")),
     description: z
       .string()

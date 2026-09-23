@@ -133,6 +133,9 @@ export function formatSystemEvent(
     case ConversationSystemEventType.ConversationSystemEventServiceSessionReopened:
       return t("serviceSessionReopened", { actor })
     case ConversationSystemEventType.ConversationSystemEventGroupRenamed:
+      // 未命名的群首次命名或清除名称时分别说明。
+      if (!event.title) return t("groupSystemTitleCleared", { actor })
+      if (!event.previousTitle) return t("groupSystemTitleSet", { actor, title: event.title })
       return t("groupSystemRenamed", {
         actor,
         previousTitle: event.previousTitle,

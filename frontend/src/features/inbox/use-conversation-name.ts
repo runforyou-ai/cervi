@@ -7,14 +7,37 @@ import {
   isCustomerInboxConversation,
   isDirectInboxConversation,
   isGroupInboxConversation,
-  type InboxConversation,
+  type GroupInboxConversationData,
+  type InboxConversationData,
 } from "@/api"
+
+/** 群聊显示名：有名称时使用名称，未命名时按除自己外的成员名称拼接。 */
+export function useGroupDisplayName() {
+  const { t } = useTranslation("inbox")
+  return useCallback(
+    (
+      group: Pick<GroupInboxConversationData["group"], "title" | "memberPreviewNames">,
+      memberCount: number,
+    ) => {
+      const title = group.title.trim()
+      if (title) return title
+      const names = group.memberPreviewNames.join(t("groupNameSeparator"))
+      if (!names) return t("groupUntitled")
+      const more = memberCount - 1 - group.memberPreviewNames.length
+      return more > 0
+        ? t("groupMemberNamesMore", { names, count: memberCount, more })
+        : names
+    },
+    [t],
+  )
+}
 
 /** 会话在列表和主区中的显示名。 */
 export function useConversationName() {
   const { t } = useTranslation("inbox")
+  const groupName = useGroupDisplayName()
   return useCallback(
-    (conversation: InboxConversation) => {
+    (conversation: InboxConversationData) => {
       if (isAgentInboxConversation(conversation))
         return `${conversation.agent.agentName} · ${conversation.agent.title}`
       if (isDirectInboxConversation(conversation)) {
@@ -26,10 +49,10 @@ export function useConversationName() {
         )
       }
       if (isGroupInboxConversation(conversation)) {
-        return conversation.group.title.trim() || t("unknownSender")
+        return groupName(conversation.group, conversation.group.memberCount)
       }
       return t("unknownSender")
     },
-    [t],
+    [groupName, t],
   )
 }

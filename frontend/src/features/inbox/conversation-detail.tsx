@@ -1,5 +1,5 @@
 /** 会话详情：按摘要读取结果渲染加载中、不可用、读取失败或会话主区，并统一处理消息后刷新与退群清理。 */
-import type { InboxConversation } from "@/api"
+import type { InboxConversationData } from "@/api"
 import { useQueryClient } from "@tanstack/react-query"
 import { useTranslation } from "react-i18next"
 
@@ -25,7 +25,7 @@ export function ConversationDetail({
 }: {
   summary: ConversationSummaryResource
   onGroupLeft: (conversationID: string) => void
-  onLocalChange?: (conversation: InboxConversation) => void
+  onLocalChange?: (conversation: InboxConversationData) => void
   onSearchConversation?: (conversationID: string) => void
   locateMessage?: ConversationLocateTarget | null
   narrowViewport?: boolean
@@ -41,7 +41,7 @@ export function ConversationDetail({
   function refreshConversation(conversationID: string) {
     void invalidate(resourceKeys.inbox())
     void invalidate(resourceKeys.conversationSummary(conversationID)).then(() => {
-      const current = queryClient.getQueryData<InboxConversation | null>(resourceKeys.conversationSummary(conversationID))
+      const current = queryClient.getQueryData<InboxConversationData | null>(resourceKeys.conversationSummary(conversationID))
       if (current) onLocalChange?.(current)
     })
   }

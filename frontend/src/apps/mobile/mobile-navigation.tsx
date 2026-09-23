@@ -11,7 +11,7 @@ import {
   isAgentInboxConversation,
   isCustomerInboxConversation,
   isDirectInboxConversation,
-  type InboxConversation,
+  type InboxConversationData,
 } from "@/api"
 import type { ConversationLocateTarget } from "@/features/inbox/conversation-timeline"
 import type { InboxListBookmark } from "@/features/inbox/inbox-list-controller"
@@ -95,7 +95,7 @@ export function useMobileBack(fallback: string) {
 }
 
 /** 返回会话摘要对应的移动端详情地址：服务会话属于收件箱，其余属于消息。 */
-export function mobileConversationPath(conversation: InboxConversation) {
+export function mobileConversationPath(conversation: InboxConversationData) {
   if (isCustomerInboxConversation(conversation)) {
     return `/inbox/customer/${conversation.id}`
   }

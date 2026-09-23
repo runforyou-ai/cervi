@@ -50,7 +50,6 @@ export function MobileCreateGroupPage() {
     control: form.control,
     name: "members",
   })
-  const title = form.watch("title")
   const { mounted, dirty } = useFormLifetime(form.formState.isDirty)
 
   /** 提交初始成员，失败时保留表单，离开页面后忽略返回结果。 */
@@ -100,7 +99,7 @@ export function MobileCreateGroupPage() {
       >
         <FieldGroup>
           <Field>
-            <FieldLabel htmlFor="mobile-group-title" required>
+            <FieldLabel htmlFor="mobile-group-title">
               {tInbox("groupTitleLabel")}
             </FieldLabel>
             <Input
@@ -109,7 +108,6 @@ export function MobileCreateGroupPage() {
               className="min-h-11 md:text-base"
               autoComplete="off"
               maxLength={groupTitleMaxLength}
-              required
               disabled={saving}
             />
           </Field>
@@ -126,7 +124,7 @@ export function MobileCreateGroupPage() {
           <Button
             type="submit"
             className="min-h-11 w-full"
-            disabled={saving || !title.trim() || field.value.length === 0}
+            disabled={saving || field.value.length === 0}
           >
             {t("group.complete")}
           </Button>

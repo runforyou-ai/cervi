@@ -3,7 +3,7 @@ import {
   sendFirstAgentTextMessage,
   sendFirstDirectTextMessage,
   type DirectTextMessageInput,
-  type InboxConversation,
+  type InboxConversationData,
 } from "@/api"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
@@ -14,7 +14,7 @@ export function useFirstChatMessage() {
 
   /** 刷新新建会话的消息，真人单聊同时刷新按对端读取的单聊。 */
   function refreshStarted(
-    conversation: InboxConversation,
+    conversation: InboxConversationData,
     directPeerIdentityID?: string,
   ) {
     if (directPeerIdentityID)

@@ -8,6 +8,7 @@ import { ChangePasswordForm } from "@/features/settings/change-password-form"
 import { CustomerServiceSettings } from "@/features/settings/customer-service-settings"
 import { DeviceListPage } from "@/features/settings/device-list-page"
 import { GeneralSettingsForm } from "@/features/settings/general-settings-form"
+import { MemberListPage } from "@/features/settings/members/member-list-page"
 import { NotificationSettingsForm } from "@/features/settings/notification-settings-form"
 import { ProfileSettingsForm } from "@/features/settings/profile-settings-form"
 import { RoleListPage } from "@/features/roles/role-list-page"
@@ -29,6 +30,7 @@ type SettingsFormSection = (typeof formSections)[number]
 
 export type SettingsSection =
   | SettingsFormSection
+  | "members"
   | "roles"
   | "modelServices"
 
@@ -76,6 +78,8 @@ export function SettingsPage({
             )}
           </PageContent>
         </>
+      ) : section === "members" ? (
+        <MemberListPage />
       ) : (
         <RoleListPage />
       )}

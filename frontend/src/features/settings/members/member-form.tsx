@@ -13,6 +13,7 @@ import {
   isApiError,
   type RoleData,
   type Team,
+  type UserData,
 } from "@/api"
 import { FormInputField } from "@/components/form/form-input-field"
 import { SwitchCardField } from "@/components/form/switch-card-field"
@@ -27,20 +28,18 @@ import { TeamSelectField } from "@/features/contacts/team-select-field"
 import {
   createMemberSchema,
   type MemberFormValues,
-} from "@/features/contacts/members/member-schema"
+} from "@/features/settings/members/member-schema"
 
 /** 创建企业成员，可同时设置头像。 */
 export function MemberForm({
   teams,
   roles,
-  defaultTeamIds = [],
   onSaved,
   onCancel,
 }: {
   teams: Team[]
   roles: RoleData[]
-  defaultTeamIds?: string[]
-  onSaved: () => void
+  onSaved: (user: UserData) => void
   onCancel: () => void
 }) {
   const { t } = useTranslation("contacts")
@@ -75,7 +74,7 @@ export function MemberForm({
       email: "",
       password: "",
       roleId: defaultRoleID,
-      teamIds: defaultTeamIds,
+      teamIds: [],
       handlesCustomers: false,
       maxServiceSessions: "10",
     },
@@ -102,7 +101,7 @@ export function MemberForm({
       uploadingAvatar = Boolean(avatar.pending && !avatar.pending.fileID)
       const avatarFileId = await avatar.ensureUploaded()
       uploadingAvatar = false
-      await createUser({
+      const created = await createUser({
         displayName: values.displayName,
         email: values.email,
         password: values.password,
@@ -113,7 +112,7 @@ export function MemberForm({
         avatarFileId,
       })
       toast.success(t("members.form.created"))
-      onSaved()
+      onSaved(created)
     } catch (error) {
       // 上传失败已由共享上传回调提示，保存只处理资料提交错误。
       if (uploadingAvatar) return

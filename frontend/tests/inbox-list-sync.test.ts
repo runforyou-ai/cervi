@@ -5,7 +5,7 @@ import { QueryClient, QueryObserver } from "@tanstack/react-query"
 import { ResourceRefresher } from "../src/features/session/resource-refresher.ts"
 import { InboxListController, type InboxListPorts } from "../src/features/inbox/inbox-list-controller.ts"
 import { resourceKeys } from "../src/hooks/resource-keys.ts"
-import type { InboxConversation, InboxQuery } from "../src/api/index.ts"
+import type { InboxConversationData, InboxQuery } from "../src/api/index.ts"
 
 /** 等待已排队的微任务与 I/O 回调执行完毕。 */
 function flush() {
@@ -20,7 +20,7 @@ function setup() {
   let gating = false
   let failing = false
   const conversation = (id: string) =>
-    ({ id, positionCursor: `p${id}`, lastActivityAt: `2026-09-09T00:00:0${id}Z` }) as InboxConversation
+    ({ id, positionCursor: `p${id}`, lastActivityAt: `2026-09-09T00:00:0${id}Z` }) as InboxConversationData
   // 读取结果取发起时刻的顺序，读取期间发生的变化只能由随后的重读取得。
   const snapshot = () => ({
     conversations: order.map(conversation),

@@ -215,6 +215,7 @@ func inboxConversationFromAction(summary inboxaction.ConversationSummary, avatar
 			Title: summary.Group.Title, ImageURL: optionalFileURL(avatarURLs, summary.Group.ImageFileID),
 			Status: ConversationStatus(summary.Group.Status), Preview: summary.Group.Preview, PreviewSenderIdentityType: (*OrganizationIdentityType)(summary.Group.PreviewSenderIdentityType),
 			LastMessageAt: summary.Group.LastMessageAt, MemberCount: summary.Group.MemberCount,
+			MemberPreviewNames: summary.Group.MemberPreviewNames,
 		}
 	}
 	return conversation

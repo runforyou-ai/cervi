@@ -463,7 +463,6 @@
   "field.target_identity_id_invalid": "请选择有效的企业成员。",
   "field.target_team_id_invalid": "请选择有效的团队。",
   "field.transfer_target_invalid": "请选择有效的转交去向。",
-  "field.group_title_required": "请输入群聊名称。",
   "field.group_title_too_long": "群聊名称不能超过 100 个字符。",
   "field.group_description_too_long": "群聊描述不能超过 500 个字符。",
   "field.group_image_file_id_invalid": "请选择有效的群聊图片。",

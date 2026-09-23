@@ -11,6 +11,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/storage/server/messagequery"
@@ -121,6 +122,8 @@ type GroupConversationSummary struct {
 	PreviewSenderIdentityType *domain.OrganizationIdentityType
 	LastMessageAt             *time.Time
 	MemberCount               int
+	// MemberPreviewNames 是除查看者外按入群先后排列的前几名在群成员名称。
+	MemberPreviewNames []string
 }
 
 // ConversationSummary 定义统一收件箱会话信封。
@@ -244,6 +247,7 @@ type groupConversationRow struct {
 	PreviewSenderIdentityType *domain.OrganizationIdentityType `bun:"preview_sender_identity_type"`
 	LastMessageAt             *time.Time                       `bun:"last_message_at"`
 	MemberCount               int                              `bun:"member_count"`
+	MemberPreviewNames        []string                         `bun:"member_preview_names,array"`
 	LastActivityAt            *time.Time                       `bun:"last_activity_at"`
 	UnreadCount               int                              `bun:"unread_count"`
 	MentionedUnreadCount      int                              `bun:"mentioned_unread_count"`
@@ -485,7 +489,8 @@ func withAgentConversationDetails(query *bun.SelectQuery, identityID, userID str
 // groupConversationsQuery 共用群聊成员范围、个人状态和未读统计。
 func (q *LoadInboxQuery) groupConversationsQuery(organizationID, identityID, userID string) *bun.SelectQuery {
 	return q.groupConversationAccessQuery(organizationID, identityID).
-		ColumnExpr("cv.title AS title").
+		ColumnExpr("COALESCE(cv.title, '') AS title").
+		ColumnExpr(chatstate.GroupMemberPreviewNamesExpr+" AS member_preview_names", identityID, chatstate.GroupMemberPreviewNamesLimit).
 		ColumnExpr("cv.image_file_id::text AS image_file_id").
 		ColumnExpr("cv.status AS status").
 		ColumnExpr("? AS preview", messagequery.Summary("msg")).
@@ -631,7 +636,7 @@ func (row groupConversationRow) summary() ConversationSummary {
 		ID: row.ID, Type: domain.ConversationTypeGroup, UnreadCount: row.UnreadCount, MentionedUnreadCount: row.MentionedUnreadCount, Muted: row.Muted, MarkedUnread: row.MarkedUnread, Pinned: row.Pinned, LastMessageID: row.LastMessageID, LastMessageType: row.LastMessageType, LastReadMessageID: row.LastReadMessageID, LastActivityAt: row.LastActivityAt,
 		Group: &GroupConversationSummary{
 			Title: row.Title, ImageFileID: row.ImageFileID, Status: domain.ConversationStatus(row.Status), Preview: row.Preview, PreviewSenderIdentityType: row.PreviewSenderIdentityType,
-			LastMessageAt: row.LastMessageAt, MemberCount: row.MemberCount,
+			LastMessageAt: row.LastMessageAt, MemberCount: row.MemberCount, MemberPreviewNames: row.MemberPreviewNames,
 		},
 	}
 }

@@ -12,7 +12,7 @@ import {
   updateConversationPin,
   updateConversationUnreadMark,
   type ConversationPinCommand,
-  type InboxConversation,
+  type InboxConversationData,
 } from "@/api"
 import {
   ContextMenu,
@@ -40,7 +40,7 @@ export function useConversationListActions(onPinSettled?: (pinned: boolean) => P
 
   /** 执行一项个人设置保存，失败时按错误原因提示。 */
   async function save(
-    conversation: InboxConversation,
+    conversation: InboxConversationData,
     update: () => Promise<unknown>,
     failure: {
       log: string
@@ -72,7 +72,7 @@ export function useConversationListActions(onPinSettled?: (pinned: boolean) => P
   return {
     saving: settingsSave.saving,
     // 有消息时把真实已读推进到列表最后一条消息并清除手动未读。
-    markRead: (conversation: InboxConversation) =>
+    markRead: (conversation: InboxConversationData) =>
       save(
         conversation,
         () =>
@@ -86,14 +86,14 @@ export function useConversationListActions(onPinSettled?: (pinned: boolean) => P
               }),
         readStateFailure,
       ),
-    markUnread: (conversation: InboxConversation) =>
+    markUnread: (conversation: InboxConversationData) =>
       save(
         conversation,
         () =>
           updateConversationUnreadMark(conversation.id, { markedUnread: true }),
         readStateFailure,
       ),
-    toggleMuted: (conversation: InboxConversation) =>
+    toggleMuted: (conversation: InboxConversationData) =>
       save(
         conversation,
         () =>
@@ -103,7 +103,7 @@ export function useConversationListActions(onPinSettled?: (pinned: boolean) => P
         { log: "更新会话静音设置失败", message: "conversationMuteError" },
       ),
     // 置顶、取消置顶与按邻居移动共用同一条写入，顺序版本冲突由服务端拒绝。
-    updatePin: (conversation: InboxConversation, command: ConversationPinCommand) =>
+    updatePin: (conversation: InboxConversationData, command: ConversationPinCommand) =>
       save(conversation, async () => {
         await updateConversationPin(conversation.id, command)
         await onPinSettled?.(command.pinned)
@@ -125,7 +125,7 @@ export function ConversationListMenu({
   onOpenChange,
   children,
 }: {
-  conversation: InboxConversation
+  conversation: InboxConversationData
   actions: ReturnType<typeof useConversationListActions>
   itemClassName?: string
   pinOrderVersion?: string

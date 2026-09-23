@@ -28,7 +28,7 @@ export type ResourceTableColumn<T> = {
 
 export type { ResourceRowAction } from "@/components/row-actions-menu"
 
-/** 按列定义渲染表头和单元格，空列表展示占位行；给出 onRowActivate 时整行可点击或用回车触发，给出 rowActions 时在最右侧追加操作列，有操作的行可右键或点「⋯」打开同一份操作菜单，hideHeader 用于列含义已经一目了然的列表。 */
+/** 按列定义渲染表头和单元格，空列表展示占位行；给出 onRowActivate 时整行可点击或用回车触发，canActivateRow 返回 false 的行不可进入，给出 rowActions 时在最右侧追加操作列，有操作的行可右键或点「⋯」打开同一份操作菜单，hideHeader 用于列含义已经一目了然的列表。 */
 export function ResourceTable<T>({
   columns,
   rows,
@@ -36,6 +36,7 @@ export function ResourceTable<T>({
   empty,
   rowActions,
   onRowActivate,
+  canActivateRow,
   hideHeader = false,
 }: {
   columns: readonly ResourceTableColumn<T>[]
@@ -44,6 +45,7 @@ export function ResourceTable<T>({
   empty: ReactNode
   rowActions?: (row: T) => ResourceRowAction[]
   onRowActivate?: (row: T) => void
+  canActivateRow?: (row: T) => boolean
   hideHeader?: boolean
 }) {
   const { t } = useTranslation("common")
@@ -84,7 +86,9 @@ export function ResourceTable<T>({
               row={row}
               columns={columns}
               actions={rowActions?.(row)}
-              onRowActivate={onRowActivate}
+              onRowActivate={
+                canActivateRow && !canActivateRow(row) ? undefined : onRowActivate
+              }
             />
           ))
         )}

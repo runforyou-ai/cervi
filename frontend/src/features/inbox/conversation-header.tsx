@@ -17,7 +17,7 @@ import {
   isCustomerInboxConversation,
   isGroupInboxConversation,
   type GroupParticipant,
-  type InboxConversation,
+  type InboxConversationData,
 } from "@/api"
 import { Button } from "@/components/ui/button"
 import {
@@ -100,7 +100,7 @@ export function ConversationHeader({
   contextVisible = false,
   onToggleContext,
 }: {
-  conversation: InboxConversation
+  conversation: InboxConversationData
   contactName: string
   currentIdentityId: string
   handlesCustomers: boolean
