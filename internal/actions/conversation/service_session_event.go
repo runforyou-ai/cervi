@@ -31,6 +31,20 @@ func appendServiceSessionEvent(ctx context.Context, db bun.IDB, identity *server
 		}
 		event.FromDisplayName = &fromName
 	}
+	return appendServiceSessionOperatedEvent(ctx, db, conversation, session, eventType, event)
+}
+
+// appendServiceSessionClosedEvent 在调用方持有会话锁的事务中写入客服处理周期关闭事件，记录关闭人与结束方式，仅成员可见。
+func appendServiceSessionClosedEvent(ctx context.Context, db bun.IDB, conversation *servermodels.Conversation, session *servermodels.ServiceSession,
+	actorIdentityID, actorDisplayName string, reason domain.ServiceSessionCloseReason) error {
+	return appendServiceSessionOperatedEvent(ctx, db, conversation, session, domain.ConversationSystemEventServiceSessionClosed, domain.ServiceSessionOperatedEvent{
+		ServiceSessionID: session.ID, ActorIdentityID: actorIdentityID, ActorDisplayName: actorDisplayName, CloseReason: &reason,
+	})
+}
+
+// appendServiceSessionOperatedEvent 把客服处理周期操作事件写入会话时间线，仅成员可见。
+func appendServiceSessionOperatedEvent(ctx context.Context, db bun.IDB, conversation *servermodels.Conversation, session *servermodels.ServiceSession,
+	eventType domain.ConversationSystemEventType, event domain.ServiceSessionOperatedEvent) error {
 	payload, err := json.Marshal(event)
 	if err != nil {
 		return fmt.Errorf("encode service session event: %w", err)

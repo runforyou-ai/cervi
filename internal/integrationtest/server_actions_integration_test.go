@@ -2427,6 +2427,10 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			testAgentHandoffs(t, db, loggedIn.Identity, provider.ID, model.Identifier)
 		})
 
+		t.Run("AI 客服解决与超时关单", func(t *testing.T) {
+			testAgentResolution(t, db, loggedIn.Identity, customerServiceRole.ID, provider.ID, model.Identifier)
+		})
+
 		t.Run("客服 AI 写回复", func(t *testing.T) {
 			testCustomerReplySuggestions(t, db, loggedIn.Identity, provider.ID, model.Identifier)
 		})

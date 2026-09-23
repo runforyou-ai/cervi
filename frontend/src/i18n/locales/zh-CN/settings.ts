@@ -148,7 +148,7 @@ const settings = {
   },
   customerService: {
     title: "客服",
-    description: "设置客服工作时间，以及客户等待回复超时后的提醒与重新分配",
+    description: "设置客服工作时间、客户等待回复超时后的提醒与重新分配，以及客户不回复 AI 时的跟进与关闭",
     loadError: "工作时间加载失败。",
     saveError: "保存工作时间失败，请重试。",
     tabs: {
@@ -166,6 +166,10 @@ const settings = {
       responseReclaimMinutesDescription: "负责人超过该时长仍未回复时退回队列，重新分配给其他客服",
       queueReminderMinutes: "队列等待提醒",
       queueReminderMinutesDescription: "会话在队列中等待超过该时长时提醒对应团队或全部工作中的客服",
+      aiFollowUpMinutes: "AI 跟进",
+      aiFollowUpMinutesDescription: "AI 回复后客户超过该时长未回复时，AI 跟进一次并询问问题是否已解决",
+      aiCloseMinutes: "AI 关闭会话",
+      aiCloseMinutesDescription: "AI 跟进或询问问题是否已解决后，客户超过该时长仍未回复时关闭会话",
       validation: {
         minutesInvalid: "请输入大于 0 的整数。",
         reclaimAfterReminder: "回收时长必须大于提醒时长。",

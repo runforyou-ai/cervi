@@ -58,14 +58,15 @@ type ServiceSessionHandedOffEvent struct {
 	AgentRunID       *string              `json:"agentRunId"`
 }
 
-// ServiceSessionOperatedEvent 是成员领取、接管、转交、关闭、重开客服处理周期事件的结构化内容：操作人、原负责人与转交目标。
+// ServiceSessionOperatedEvent 是领取、接管、转交、关闭、重开客服处理周期事件的结构化内容：操作人、原负责人、转交目标，关闭事件另带结束方式。
 type ServiceSessionOperatedEvent struct {
-	ServiceSessionID string                `json:"serviceSessionId"`
-	ActorIdentityID  string                `json:"actorIdentityId"`
-	ActorDisplayName string                `json:"actorDisplayName"`
-	FromIdentityID   *string               `json:"fromIdentityId,omitempty"`
-	FromDisplayName  *string               `json:"fromDisplayName,omitempty"`
-	Target           *ServiceSessionTarget `json:"target,omitempty"`
+	ServiceSessionID string                     `json:"serviceSessionId"`
+	ActorIdentityID  string                     `json:"actorIdentityId"`
+	ActorDisplayName string                     `json:"actorDisplayName"`
+	FromIdentityID   *string                    `json:"fromIdentityId,omitempty"`
+	FromDisplayName  *string                    `json:"fromDisplayName,omitempty"`
+	Target           *ServiceSessionTarget      `json:"target,omitempty"`
+	CloseReason      *ServiceSessionCloseReason `json:"closeReason,omitempty"`
 }
 
 // ServiceSessionReturnedEvent 是 service_session_returned 事件的结构化内容：原负责人、退回的队列与原因。

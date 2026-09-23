@@ -28,6 +28,7 @@ const (
 	AgentInputKindAgentDirect  AgentInputKind = "agent_direct"
 	AgentInputKindCustomerAuto AgentInputKind = "customer_auto"
 	AgentInputKindCopilot      AgentInputKind = "copilot"
+	AgentInputKindFollowUp     AgentInputKind = "follow_up"
 )
 
 // AgentRunErrorCode 定义 Agent 运行取消或失败的稳定原因。
@@ -67,6 +68,7 @@ const (
 	AgentRunOutcomeReply       AgentRunOutcome = "reply"
 	AgentRunOutcomeAskCustomer AgentRunOutcome = "ask_customer"
 	AgentRunOutcomeHandoff     AgentRunOutcome = "handoff"
+	AgentRunOutcomeResolve     AgentRunOutcome = "resolve"
 )
 
 // AgentHandoffReason 定义 AI 客服把会话转交人工的原因。
@@ -82,11 +84,13 @@ const (
 	AgentHandoffReasonAgentUnavailable     AgentHandoffReason = "agent_unavailable"
 )
 
-// AgentAskCustomerPurpose 定义 AI 客服向客户发问的用途，只用于审计与统计。
+// AgentAskCustomerPurpose 定义 AI 客服向客户发问的用途；confirm_resolution 决定周期的超时关单，其余只用于审计与统计。
 type AgentAskCustomerPurpose string
 
 const (
 	AgentAskCustomerPurposeGreeting AgentAskCustomerPurpose = "greeting"
 	AgentAskCustomerPurposeClarify  AgentAskCustomerPurpose = "clarify"
 	AgentAskCustomerPurposeConfirm  AgentAskCustomerPurpose = "confirm"
+	// AgentAskCustomerPurposeConfirmResolution 请客户确认问题是否已解决，发出后周期进入等待确认。
+	AgentAskCustomerPurposeConfirmResolution AgentAskCustomerPurpose = "confirm_resolution"
 )

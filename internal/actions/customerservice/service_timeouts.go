@@ -23,7 +23,7 @@ const (
 func LoadServiceTimeouts(ctx context.Context, db bun.IDB, organizationID string) (domain.ServiceTimeouts, error) {
 	setting := &servermodels.CustomerServiceSetting{}
 	err := db.NewSelect().Model(setting).
-		Column("response_reminder_minutes", "response_reclaim_minutes", "queue_reminder_minutes").
+		Column("response_reminder_minutes", "response_reclaim_minutes", "queue_reminder_minutes", "ai_follow_up_minutes", "ai_close_minutes").
 		Where("css.organization_id = ?", organizationID).
 		Scan(ctx)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -36,6 +36,8 @@ func LoadServiceTimeouts(ctx context.Context, db bun.IDB, organizationID string)
 		ResponseReminderMinutes: setting.ResponseReminderMinutes,
 		ResponseReclaimMinutes:  setting.ResponseReclaimMinutes,
 		QueueReminderMinutes:    setting.QueueReminderMinutes,
+		AIFollowUpMinutes:       setting.AIFollowUpMinutes,
+		AICloseMinutes:          setting.AICloseMinutes,
 	}, nil
 }
 
@@ -78,6 +80,12 @@ func (a *UpdateServiceTimeoutsAction) Execute(ctx context.Context, identity *ser
 	if input.QueueReminderMinutes < 1 {
 		fields["queueReminderMinutes"] = ValidationTimeoutMinutesInvalid
 	}
+	if input.AIFollowUpMinutes < 1 {
+		fields["aiFollowUpMinutes"] = ValidationTimeoutMinutesInvalid
+	}
+	if input.AICloseMinutes < 1 {
+		fields["aiCloseMinutes"] = ValidationTimeoutMinutesInvalid
+	}
 	if len(fields) > 0 {
 		return domain.ServiceTimeouts{}, &ValidationError{Fields: fields}
 	}
@@ -90,15 +98,17 @@ func (a *UpdateServiceTimeoutsAction) Execute(ctx context.Context, identity *ser
 			OrganizationID: identity.Organization.ID, BusinessHoursEnabled: hours.Enabled, BusinessHoursTimeZone: hours.TimeZone,
 			BusinessHoursWeekly: hours.Weekly[:], BusinessHoursOverrides: hours.Overrides,
 			ResponseReminderMinutes: input.ResponseReminderMinutes, ResponseReclaimMinutes: input.ResponseReclaimMinutes,
-			QueueReminderMinutes: input.QueueReminderMinutes,
+			QueueReminderMinutes: input.QueueReminderMinutes, AIFollowUpMinutes: input.AIFollowUpMinutes, AICloseMinutes: input.AICloseMinutes,
 		}
 		if _, err := tx.NewInsert().Model(setting).
 			Column("organization_id", "business_hours_enabled", "business_hours_time_zone", "business_hours_weekly", "business_hours_overrides",
-				"response_reminder_minutes", "response_reclaim_minutes", "queue_reminder_minutes").
+				"response_reminder_minutes", "response_reclaim_minutes", "queue_reminder_minutes", "ai_follow_up_minutes", "ai_close_minutes").
 			On("CONFLICT (organization_id) DO UPDATE").
 			Set("response_reminder_minutes = EXCLUDED.response_reminder_minutes").
 			Set("response_reclaim_minutes = EXCLUDED.response_reclaim_minutes").
 			Set("queue_reminder_minutes = EXCLUDED.queue_reminder_minutes").
+			Set("ai_follow_up_minutes = EXCLUDED.ai_follow_up_minutes").
+			Set("ai_close_minutes = EXCLUDED.ai_close_minutes").
 			Set("updated_at = now()").
 			Exec(ctx); err != nil {
 			return fmt.Errorf("save service timeouts: %w", err)

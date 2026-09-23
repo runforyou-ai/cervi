@@ -56,10 +56,10 @@ func (g *finalIterationGuard) BeforeModelRewriteState(ctx context.Context, state
 		state.Messages = append(state.Messages, schema.UserAgenticMessage("工具调用次数已达本轮上限，请基于已获得的信息给出最终回答。"))
 		return ctx, state, nil
 	}
-	// 客服场景只保留追问与转人工，模型在预算末端仍有出口。
-	kept := make([]*schema.ToolInfo, 0, 2)
+	// 客服场景只保留追问、转人工与确认解决，模型在预算末端仍有出口。
+	kept := make([]*schema.ToolInfo, 0, 3)
 	for _, info := range state.ToolInfos {
-		if info.Name == askCustomerToolName || info.Name == handoffToolName {
+		if isTerminalToolName(info.Name) {
 			kept = append(kept, info)
 		}
 	}

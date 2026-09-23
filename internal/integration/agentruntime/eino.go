@@ -375,7 +375,7 @@ func (e *einoExecution) onAgentEvents(ctx context.Context, turn *adk.TurnContext
 	return nil
 }
 
-// takeUnsent 在客服场景从共享历史末尾取出本轮未发给客户的正文或追问调用及其结果，返回取出的消息；其他场景保留历史。
+// takeUnsent 在客服场景从共享历史末尾取出本轮未发给客户的正文、追问或结束语调用及其结果，返回取出的消息；其他场景保留历史。
 func (e *einoExecution) takeUnsent(decision TerminalDecision, content string) []*schema.AgenticMessage {
 	messages := e.history.messages
 	if e.terminal == nil || content == "" || len(messages) == 0 {
@@ -391,13 +391,17 @@ func (e *einoExecution) takeUnsent(decision TerminalDecision, content string) []
 		}
 		e.history.messages = messages[:last]
 		return messages[last:]
-	case domain.AgentRunOutcomeAskCustomer:
-		// 追问是末尾一条只调用 ask_customer 的模型输出及其工具结果。
+	case domain.AgentRunOutcomeAskCustomer, domain.AgentRunOutcomeResolve:
+		// 追问或结束语是末尾一条只调用对应终止工具的模型输出及其工具结果。
+		toolName := askCustomerToolName
+		if decision.Kind == domain.AgentRunOutcomeResolve {
+			toolName = resolveToolName
+		}
 		if last < 1 || messages[last-1].Role != schema.AgenticRoleTypeAssistant || messages[last].Role == schema.AgenticRoleTypeAssistant {
 			return nil
 		}
 		for _, block := range messages[last-1].ContentBlocks {
-			if block.Type == schema.ContentBlockTypeFunctionToolCall && block.FunctionToolCall.Name != askCustomerToolName {
+			if block.Type == schema.ContentBlockTypeFunctionToolCall && block.FunctionToolCall.Name != toolName {
 				return nil
 			}
 		}
