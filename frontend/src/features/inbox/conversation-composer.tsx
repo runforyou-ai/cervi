@@ -393,36 +393,36 @@ export function ConversationComposer({
     }
   }
 
-  /** 用 AI 生成的回复替换当前对客草稿并聚焦输入框。 */
-  const applyReplySuggestion = useCallback((reply: string) => {
+  /** 用 AI 生成的回复替换当前对客草稿，focus 为真时聚焦输入框。 */
+  const applyReplySuggestion = useCallback((reply: string, focus = true) => {
     // 候选回复始终填入对客草稿，内部备注模式下先切回对客页签。
     if (visibility === MessageVisibility.MessageVisibilityInternalOnly) {
       draftsRef.current[MessageVisibility.MessageVisibilityCustomerVisible] = reply
-      focusAfterSwitchRef.current = true
+      focusAfterSwitchRef.current = focus
       onVisibilityChange?.(MessageVisibility.MessageVisibilityCustomerVisible)
       return
     }
     form.setValue("body", reply, { shouldDirty: true })
     window.requestAnimationFrame(() => {
       resizeComposerInput(inputRef.current)
-      form.setFocus("body")
+      if (focus) form.setFocus("body")
     })
   }, [form, onVisibilityChange, visibility])
 
   useEffect(() => {
     if (!draftBridgeRef) return
-    // 向 AI 助手提供读取和替换对客草稿的入口。
+    // 向 AI 助手提供读取和替换对客草稿的入口；移动端填入后返回会话，不弹出键盘。
     draftBridgeRef.current = {
       read: () =>
         internalNote
           ? (draftsRef.current[MessageVisibility.MessageVisibilityCustomerVisible] ?? "")
           : form.getValues("body"),
-      replace: applyReplySuggestion,
+      replace: (body) => applyReplySuggestion(body, !mobile),
     }
     return () => {
       draftBridgeRef.current = null
     }
-  }, [applyReplySuggestion, draftBridgeRef, form, internalNote])
+  }, [applyReplySuggestion, draftBridgeRef, form, internalNote, mobile])
 
   /** 在桌面键盘上提交消息，并保留 Shift+Enter 换行。 */
   function submitFromKeyboard(event: KeyboardEvent<HTMLTextAreaElement>) {
