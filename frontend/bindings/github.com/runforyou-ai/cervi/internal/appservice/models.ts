@@ -28,6 +28,7 @@ export enum AIModelType {
     AIModelTypeChat = "chat",
     AIModelTypeEmbedding = "embedding",
     AIModelTypeRerank = "rerank",
+    AIModelTypeDecision = "decision",
 };
 
 /**
@@ -63,6 +64,8 @@ export enum AIProviderBrand {
     AIProviderBrandMiniMax = "minimax",
     AIProviderBrandXAI = "xai",
     AIProviderBrandMistral = "mistral",
+    AIProviderBrandOpenRouter = "openrouter",
+    AIProviderBrandTypeSafe = "typesafe",
 
     /**
      * 以下品牌为自建或本机部署的模型服务，可以不配置凭据。

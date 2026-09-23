@@ -89,6 +89,7 @@ func TestModelRequestsStayUnderProxyEndpoint(t *testing.T) {
 		domain.AIProviderBrandDeepSeek:   {"deepseek-test": "/chat/completions"},
 		domain.AIProviderBrandAlibaba:    {"qwen-test": "/compatible-mode/v1/chat/completions"},
 		domain.AIProviderBrandZhipu:      {"glm-test": "/chat/completions"},
+		domain.AIProviderBrandOpenRouter: {"deepseek/deepseek-test": "/chat/completions"},
 		domain.AIProviderBrandOllama:     {"llama-test": "/v1/chat/completions"},
 		domain.AIProviderBrandVolcengine: {"doubao-test": "/responses"},
 		domain.AIProviderBrandAnthropic:  {"claude-test": "/v1/messages"},
@@ -123,5 +124,37 @@ func TestModelRequestsStayUnderProxyEndpoint(t *testing.T) {
 				}
 			}
 		}
+	}
+}
+
+// bodyRecordingTransport 记录模型组件发出的请求体并返回请求错误。
+type bodyRecordingTransport struct {
+	bodies []string
+}
+
+// RoundTrip 记录请求体并返回 400 错误响应。
+func (t *bodyRecordingTransport) RoundTrip(request *http.Request) (*http.Response, error) {
+	body, _ := io.ReadAll(request.Body)
+	t.bodies = append(t.bodies, string(body))
+	return &http.Response{
+		StatusCode: http.StatusBadRequest, Request: request,
+		Header: http.Header{"Content-Type": {"application/json"}},
+		Body:   io.NopCloser(strings.NewReader(`{"error":{"message":"rejected"}}`)),
+	}, nil
+}
+
+// TestOpenRouterDisableThinking 验证 OpenRouter 关闭思考时请求体携带 reasoning.effort 为 none。
+func TestOpenRouterDisableThinking(t *testing.T) {
+	transport := &bodyRecordingTransport{}
+	chatModel, err := newAgenticModel(context.Background(), ModelConfig{
+		Brand: string(domain.AIProviderBrandOpenRouter), APIKey: "placeholder", BaseURL: "https://openrouter.ai/api/v1",
+		Identifier: "deepseek/deepseek-test", MaxOutputTokens: 100, DisableThinking: true, Transport: transport,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, _ = chatModel.Generate(context.Background(), []*schema.AgenticMessage{schema.UserAgenticMessage("你好")})
+	if len(transport.bodies) == 0 || !strings.Contains(transport.bodies[0], `"reasoning":{"effort":"none"}`) {
+		t.Fatalf("bodies = %v", transport.bodies)
 	}
 }

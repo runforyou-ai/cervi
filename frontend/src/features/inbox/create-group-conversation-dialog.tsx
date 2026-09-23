@@ -149,7 +149,14 @@ export function CreateGroupConversationDialog({
 
   return (
     <Dialog open={open} onOpenChange={changeOpen}>
-      <DialogContent className="grid-rows-[auto_minmax(0,1fr)] overflow-hidden sm:max-w-2xl">
+      <DialogContent
+        className="grid-rows-[auto_minmax(0,1fr)] overflow-hidden sm:max-w-2xl"
+        onOpenAutoFocus={(event) => {
+          // 打开时聚焦必填的群名称，跳过前面的群头像按钮。
+          event.preventDefault()
+          form.setFocus("title")
+        }}
+      >
         <DialogHeader>
           <DialogTitle>{t("groupCreateTitle")}</DialogTitle>
           <DialogDescription>{t("groupCreateDescription")}</DialogDescription>

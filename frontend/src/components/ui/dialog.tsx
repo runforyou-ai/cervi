@@ -6,6 +6,7 @@ import { useTranslation } from "react-i18next"
 
 import { cn } from "@/lib/utils"
 import { usePortalContainer } from "@/components/ui/portal-container"
+import { focusContainerWithoutControls } from "@/lib/dialog-focus"
 
 function Dialog(props: React.ComponentProps<typeof DialogPrimitive.Root>) {
   return <DialogPrimitive.Root data-slot="dialog" {...props} />
@@ -50,6 +51,7 @@ function DialogContent({
   children,
   closeDisabled = false,
   closeButtonClassName,
+  onOpenAutoFocus,
   ...props
 }: React.ComponentProps<typeof DialogPrimitive.Content> & { closeDisabled?: boolean; closeButtonClassName?: string }) {
   const { t } = useTranslation("common")
@@ -60,13 +62,17 @@ function DialogContent({
       <DialogPrimitive.Content
         data-slot="dialog-content"
         className={cn(
-          "cervi-form fixed top-1/2 left-1/2 z-50 grid max-h-[calc(100svh-2rem)] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-3.5 overflow-y-auto rounded-lg border bg-background p-5 shadow-lg data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
+          "cervi-form fixed top-1/2 left-1/2 z-50 grid outline-hidden max-h-[calc(100svh-2rem)] w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 gap-3.5 overflow-y-auto rounded-lg border bg-background p-5 shadow-lg data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=closed]:zoom-out-95 data-[state=open]:animate-in data-[state=open]:fade-in-0 data-[state=open]:zoom-in-95",
           className,
         )}
+        onOpenAutoFocus={(event) => {
+          onOpenAutoFocus?.(event)
+          focusContainerWithoutControls(event)
+        }}
         {...props}
       >
         {children}
-        <DialogPrimitive.Close disabled={closeDisabled} className={cn("absolute top-2.5 right-2.5 inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus:ring-2 focus:ring-ring focus:ring-offset-2 focus:outline-hidden", closeButtonClassName)}>
+        <DialogPrimitive.Close data-dialog-close disabled={closeDisabled} className={cn("absolute top-2.5 right-2.5 inline-flex size-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus:outline-hidden", closeButtonClassName)}>
           <XIcon className="size-4" />
           <span className="sr-only">{t("actions.close")}</span>
         </DialogPrimitive.Close>

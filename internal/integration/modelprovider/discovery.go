@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"slices"
 	"strconv"
 	"strings"
 
@@ -213,6 +214,96 @@ func (d *openAICompatibleDiscoverer) Discover(ctx context.Context) ([]Discovered
 			Type:            domain.AIModelTypeChat,
 			InputModalities: []domain.AIModelInputModality{domain.AIModelInputModalityText},
 		})
+	}
+	return models, nil
+}
+
+// newOpenRouterDiscovererFactory 创建 OpenRouter 模型列表的发现适配器工厂。
+func newOpenRouterDiscovererFactory(client HTTPDoer) DiscovererFactory {
+	return func(config Config) (Discoverer, error) {
+		return &openRouterDiscoverer{client: client, config: config}, nil
+	}
+}
+
+// openRouterDiscoverer 通过 OpenRouter 模型列表读取全部输出类型的模型及其能力。
+type openRouterDiscoverer struct {
+	client HTTPDoer
+	config Config
+}
+
+// Discover 读取 OpenRouter 模型列表，按输出类型识别对话、向量、重排和判断模型，其余输出类型的模型不列出。
+func (d *openRouterDiscoverer) Discover(ctx context.Context) ([]DiscoveredModel, error) {
+	requestURL, err := connectiontest.AppendPath(d.config.APIURL, "models")
+	if err != nil {
+		return nil, connectiontest.InvalidConfigError(err)
+	}
+	request, err := http.NewRequest(http.MethodGet, requestURL+"?output_modalities=all", nil)
+	if err != nil {
+		return nil, connectiontest.InvalidConfigError(err)
+	}
+	setHeaders(request, d.config.APIKey)
+	var payload struct {
+		Data []struct {
+			ID            string `json:"id"`
+			Name          string `json:"name"`
+			ContextLength int64  `json:"context_length"`
+			Architecture  struct {
+				InputModalities  []string `json:"input_modalities"`
+				OutputModalities []string `json:"output_modalities"`
+			} `json:"architecture"`
+			TopProvider struct {
+				MaxCompletionTokens int64 `json:"max_completion_tokens"`
+			} `json:"top_provider"`
+		} `json:"data"`
+	}
+	if err := connectiontest.ReadHTTPResponse(ctx, d.client, request, func(response io.Reader) error {
+		if err := json.NewDecoder(response).Decode(&payload); err != nil {
+			return err
+		}
+		if payload.Data == nil {
+			return errors.New("model list response does not contain a data array")
+		}
+		return nil
+	}); err != nil {
+		return nil, err
+	}
+	models := make([]DiscoveredModel, 0, len(payload.Data))
+	for _, item := range payload.Data {
+		identifier := strings.TrimSpace(item.ID)
+		if identifier == "" || len(item.Architecture.OutputModalities) != 1 {
+			continue
+		}
+		model := DiscoveredModel{Identifier: identifier, Name: strings.TrimSpace(item.Name), ContextWindow: item.ContextLength}
+		if model.Name == "" {
+			model.Name = identifier
+		}
+		switch item.Architecture.OutputModalities[0] {
+		case "text":
+			model.Type = domain.AIModelTypeChat
+			model.MaxOutputTokens = item.TopProvider.MaxCompletionTokens
+		case "embeddings":
+			model.Type = domain.AIModelTypeEmbedding
+		case "rerank":
+			model.Type = domain.AIModelTypeRerank
+		case "decisions":
+			model.Type = domain.AIModelTypeDecision
+		default:
+			continue
+		}
+		// 只保留 Cervi 支持的输入模态，文件等其他输入不列出。
+		for _, modality := range item.Architecture.InputModalities {
+			switch value := domain.AIModelInputModality(modality); value {
+			case domain.AIModelInputModalityText, domain.AIModelInputModalityImage,
+				domain.AIModelInputModalityAudio, domain.AIModelInputModalityVideo:
+				if !slices.Contains(model.InputModalities, value) {
+					model.InputModalities = append(model.InputModalities, value)
+				}
+			}
+		}
+		if !slices.Contains(model.InputModalities, domain.AIModelInputModalityText) {
+			continue
+		}
+		models = append(models, model)
 	}
 	return models, nil
 }

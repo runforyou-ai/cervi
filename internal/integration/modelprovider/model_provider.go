@@ -49,10 +49,13 @@ func NewRegistry(client HTTPDoer) *Registry {
 		domain.AIProviderBrandMiniMax:    openAICompatible,
 		domain.AIProviderBrandXAI:        openAICompatible,
 		domain.AIProviderBrandMistral:    openAICompatible,
+		domain.AIProviderBrandOpenRouter: newOpenRouterFactory(client),
+		domain.AIProviderBrandTypeSafe:   newTypeSafeFactory(client),
 
 		domain.AIProviderBrandOllama:           newOllamaFactory(client),
 		domain.AIProviderBrandOpenAICompatible: openAICompatible,
 	}, discoverers: map[domain.AIProviderBrand]DiscovererFactory{
+		domain.AIProviderBrandOpenRouter:       newOpenRouterDiscovererFactory(client),
 		domain.AIProviderBrandOllama:           newOllamaDiscovererFactory(client),
 		domain.AIProviderBrandOpenAICompatible: newOpenAICompatibleDiscovererFactory(client),
 	}}
@@ -112,7 +115,7 @@ func newOllamaFactory(client HTTPDoer) Factory {
 			return nil, connectiontest.InvalidConfigError(err)
 		}
 		setHeaders(request, config.APIKey)
-		return &httpProbe{client: client, request: request, validate: validateOllamaModelList}, nil
+		return &httpProbe{client: client, request: request, validate: validateModelsArray}, nil
 	}
 }
 
@@ -163,7 +166,39 @@ func newGoogleFactory(client HTTPDoer) Factory {
 		}
 		request.Header.Set("Accept", "application/json")
 		request.Header.Set("x-goog-api-key", config.APIKey)
-		return &httpProbe{client: client, request: request, validate: validateGoogleModelList}, nil
+		return &httpProbe{client: client, request: request, validate: validateModelsArray}, nil
+	}
+}
+
+// newOpenRouterFactory 创建 OpenRouter 密钥信息探测器工厂，模型列表接口无需凭据，改读密钥信息校验凭据。
+func newOpenRouterFactory(client HTTPDoer) Factory {
+	return func(config Config) (connectiontest.Probe, error) {
+		requestURL, err := connectiontest.AppendPath(config.APIURL, "key")
+		if err != nil {
+			return nil, connectiontest.InvalidConfigError(err)
+		}
+		request, err := http.NewRequest(http.MethodGet, requestURL, nil)
+		if err != nil {
+			return nil, connectiontest.InvalidConfigError(err)
+		}
+		setHeaders(request, config.APIKey)
+		return &httpProbe{client: client, request: request, validate: validateOpenRouterKey}, nil
+	}
+}
+
+// newTypeSafeFactory 创建 TypeSafe 模型列表探测器工厂。
+func newTypeSafeFactory(client HTTPDoer) Factory {
+	return func(config Config) (connectiontest.Probe, error) {
+		requestURL, err := connectiontest.AppendPath(config.APIURL, "models")
+		if err != nil {
+			return nil, connectiontest.InvalidConfigError(err)
+		}
+		request, err := http.NewRequest(http.MethodGet, requestURL, nil)
+		if err != nil {
+			return nil, connectiontest.InvalidConfigError(err)
+		}
+		setHeaders(request, config.APIKey)
+		return &httpProbe{client: client, request: request, validate: validateModelsArray}, nil
 	}
 }
 
@@ -209,22 +244,8 @@ func alibabaModelsURL(baseURL string) (string, error) {
 	return parsed.String(), nil
 }
 
-// validateOllamaModelList 校验 Ollama 模型列表的最小响应契约。
-func validateOllamaModelList(reader io.Reader) error {
-	var payload struct {
-		Models json.RawMessage `json:"models"`
-	}
-	if err := json.NewDecoder(reader).Decode(&payload); err != nil {
-		return err
-	}
-	if len(payload.Models) == 0 || payload.Models[0] != '[' {
-		return errors.New("model list response does not contain a models array")
-	}
-	return nil
-}
-
-// validateGoogleModelList 校验 Gemini API 模型列表的最小响应契约。
-func validateGoogleModelList(reader io.Reader) error {
+// validateModelsArray 校验带 models 数组的模型列表最小响应契约，适用于 Ollama、Gemini API 和 TypeSafe。
+func validateModelsArray(reader io.Reader) error {
 	var payload struct {
 		Models json.RawMessage `json:"models"`
 	}
@@ -250,6 +271,20 @@ func validateAlibabaModelList(reader io.Reader) error {
 	}
 	if !payload.Success || len(payload.Output.Models) == 0 || payload.Output.Models[0] != '[' {
 		return errors.New("model list response does not contain a successful models array")
+	}
+	return nil
+}
+
+// validateOpenRouterKey 校验 OpenRouter 密钥信息的最小响应契约。
+func validateOpenRouterKey(reader io.Reader) error {
+	var payload struct {
+		Data json.RawMessage `json:"data"`
+	}
+	if err := json.NewDecoder(reader).Decode(&payload); err != nil {
+		return err
+	}
+	if len(payload.Data) == 0 || payload.Data[0] != '{' {
+		return errors.New("key response does not contain a data object")
 	}
 	return nil
 }

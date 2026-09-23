@@ -11,6 +11,7 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet"
+import { focusDialogContainer } from "@/lib/dialog-focus"
 
 /** 以摘要按钮打开底部面板，打开时由调用方重置草稿，应用后关闭；取消时保留原筛选。 */
 export function MobileFilterSheet({
@@ -54,6 +55,7 @@ export function MobileFilterSheet({
           showCloseButton={false}
           aria-describedby={undefined}
           className="max-h-[calc(100dvh-env(safe-area-inset-top)-1rem)] gap-0 rounded-t-2xl pb-[env(safe-area-inset-bottom)]"
+          onOpenAutoFocus={focusDialogContainer}
         >
           <SheetHeader className="flex-row items-center border-b">
             <SheetTitle className="flex-1">{t("inbox:filterLabel")}</SheetTitle>

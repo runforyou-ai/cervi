@@ -17,6 +17,8 @@ const (
 	AIProviderBrandMiniMax    AIProviderBrand = AIProviderBrand(domain.AIProviderBrandMiniMax)
 	AIProviderBrandXAI        AIProviderBrand = AIProviderBrand(domain.AIProviderBrandXAI)
 	AIProviderBrandMistral    AIProviderBrand = AIProviderBrand(domain.AIProviderBrandMistral)
+	AIProviderBrandOpenRouter AIProviderBrand = AIProviderBrand(domain.AIProviderBrandOpenRouter)
+	AIProviderBrandTypeSafe   AIProviderBrand = AIProviderBrand(domain.AIProviderBrandTypeSafe)
 
 	// 以下品牌为自建或本机部署的模型服务，可以不配置凭据。
 	AIProviderBrandOllama           AIProviderBrand = AIProviderBrand(domain.AIProviderBrandOllama)
@@ -38,6 +40,7 @@ const (
 	AIModelTypeChat      AIModelType = AIModelType(domain.AIModelTypeChat)
 	AIModelTypeEmbedding AIModelType = AIModelType(domain.AIModelTypeEmbedding)
 	AIModelTypeRerank    AIModelType = AIModelType(domain.AIModelTypeRerank)
+	AIModelTypeDecision  AIModelType = AIModelType(domain.AIModelTypeDecision)
 )
 
 // AIModelInputModality 表示模型支持的输入模态。

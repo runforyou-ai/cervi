@@ -123,10 +123,7 @@ func normalizeModel(model *Model) bool {
 	switch model.Type {
 	case domain.AIModelTypeChat:
 		return model.MaxOutputTokens > 0
-	case domain.AIModelTypeEmbedding:
-		model.MaxOutputTokens = 0
-		return true
-	case domain.AIModelTypeRerank:
+	case domain.AIModelTypeEmbedding, domain.AIModelTypeRerank, domain.AIModelTypeDecision:
 		model.MaxOutputTokens = 0
 		return true
 	default:

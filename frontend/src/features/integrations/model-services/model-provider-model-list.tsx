@@ -1,5 +1,5 @@
 /** 模型服务表单中的模型目录列表。 */
-import { ArrowDownUpIcon, BinaryIcon, MessageSquareTextIcon } from "lucide-react"
+import { ArrowDownUpIcon, BinaryIcon, MessageSquareTextIcon, SplitIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
 import { AIModelType, type AIModelTypeId } from "@/api"
@@ -20,6 +20,7 @@ const modelTypeIcons: Record<AIModelTypeId, typeof MessageSquareTextIcon> = {
   [AIModelType.AIModelTypeChat]: MessageSquareTextIcon,
   [AIModelType.AIModelTypeEmbedding]: BinaryIcon,
   [AIModelType.AIModelTypeRerank]: ArrowDownUpIcon,
+  [AIModelType.AIModelTypeDecision]: SplitIcon,
 }
 
 /** 逐行展示模型名称、标识、类型、输入类型和 Token 上限，缺少 Token 上限的模型标记待补充，点击行编辑模型；removable 为 false 时删除不可用。 */

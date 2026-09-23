@@ -60,7 +60,7 @@ const integrations = {
   },
   modelServices: {
     title: "Model services",
-    description: "Providers for chat, embedding and rerank models",
+    description: "Providers for chat, embedding, rerank and decision models",
     brands: {
       deepseek: "DeepSeek",
       alibaba: "Alibaba Cloud Model Studio",
@@ -73,6 +73,8 @@ const integrations = {
       minimax: "MiniMax",
       xai: "xAI",
       mistral: "Mistral",
+      openrouter: "OpenRouter",
+      typesafe: "TypeSafe",
       ollama: "Ollama",
       openai_compatible: "OpenAI-compatible service",
     },
@@ -146,6 +148,7 @@ const integrations = {
         chat: "Chat",
         embedding: "Embedding",
         rerank: "Reranking",
+        decision: "Decision",
       },
       modalities: {
         text: "Text",
