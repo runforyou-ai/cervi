@@ -4,8 +4,10 @@ import {
   CreateServiceCategory,
   DeleteServiceCategory,
   GetBusinessHours,
+  GetCustomerIdentitySecret,
   GetServiceTimeouts,
   ListServiceCategories,
+  RegenerateCustomerIdentitySecret,
   SelectImage,
   UpdateBusinessHours,
   UpdateOrganization,
@@ -34,6 +36,12 @@ export const getServiceTimeouts = bind(GetServiceTimeouts)
 
 /** 修改当前企业的客服超时时长。 */
 export const updateServiceTimeouts = bind(UpdateServiceTimeouts)
+
+/** 读取当前企业的客户身份密钥，未生成时为空。 */
+export const getCustomerIdentitySecret = bind(GetCustomerIdentitySecret)
+
+/** 生成或重新生成当前企业的客户身份密钥，旧密钥立即失效。 */
+export const regenerateCustomerIdentitySecret = bind(RegenerateCustomerIdentitySecret)
 
 /** 读取当前企业的咨询分类目录。 */
 export const listServiceCategories = bind(ListServiceCategories)

@@ -29,8 +29,8 @@ type apiError struct {
 
 // WebsiteVisitorRealtime 输出已通过访客授权的网站访客实时事件流。
 type WebsiteVisitorRealtime interface {
-	// ServeVisitor 按渠道与访客外部编号解析受众并输出事件流，直到事件流结束。
-	ServeVisitor(writer http.ResponseWriter, request *http.Request, channelID, externalID string)
+	// ServeVisitor 按渠道与访客外部编号解析受众并输出事件流，直到事件流结束；登录用户的事件流在签名身份过期时结束。
+	ServeVisitor(writer http.ResponseWriter, request *http.Request, meta appservice.WebsiteVisitorMeta, channelID, externalID string)
 }
 
 // Service 是企业服务端对外提供的 Gin HTTP 适配器。
@@ -43,17 +43,20 @@ type Service struct {
 	visitorRealtime     WebsiteVisitorRealtime
 	telegramWebhook     TelegramWebhookReceiver
 	trustForwardedProto bool
-	router              *gin.Engine
+	// visitorCountryHeader 是可信反向代理写入访客国家代码的请求头名称，为空时不采集。
+	visitorCountryHeader string
+	router               *gin.Engine
 }
 
 // ServiceOption 配置企业服务端 HTTP API 的独立能力。
 type ServiceOption func(*Service)
 
-// WithWebsiteVisitor 注入匿名网站访客应用服务。
-func WithWebsiteVisitor(visitor *appservice.WebsiteVisitorService, trustForwardedProto bool) ServiceOption {
+// WithWebsiteVisitor 注入网站访客应用服务与访客国家代码请求头名称。
+func WithWebsiteVisitor(visitor *appservice.WebsiteVisitorService, trustForwardedProto bool, visitorCountryHeader string) ServiceOption {
 	return func(service *Service) {
 		service.websiteVisitor = visitor
 		service.trustForwardedProto = trustForwardedProto
+		service.visitorCountryHeader = visitorCountryHeader
 	}
 }
 

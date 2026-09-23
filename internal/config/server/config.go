@@ -43,10 +43,12 @@ type DeploymentConfig struct {
 	OfficialIdentityIssuer string                `yaml:"officialIdentityIssuer"`
 }
 
-// ServerConfig 定义 HTTP 服务监听配置。
+// ServerConfig 定义 HTTP 服务监听配置与可信反向代理提供的请求头。
 type ServerConfig struct {
 	Host string `yaml:"host"`
 	Port int    `yaml:"port"`
+	// VisitorCountryHeader 是反向代理写入的访客国家代码请求头名称，为空时不采集访客地区；反向代理必须覆盖客户端同名请求头。
+	VisitorCountryHeader string `yaml:"visitorCountryHeader"`
 }
 
 // DatabaseConfig 定义 PostgreSQL 连接配置。
@@ -119,6 +121,7 @@ func (config *Config) normalize() {
 	config.Deployment.OperatorCredential = strings.TrimSpace(config.Deployment.OperatorCredential)
 	config.Deployment.OfficialIdentityIssuer = strings.TrimSpace(config.Deployment.OfficialIdentityIssuer)
 	config.Server.Host = strings.TrimSpace(config.Server.Host)
+	config.Server.VisitorCountryHeader = strings.TrimSpace(config.Server.VisitorCountryHeader)
 	config.Database.Host = strings.TrimSpace(config.Database.Host)
 	config.Database.User = strings.TrimSpace(config.Database.User)
 	config.Database.Password = strings.TrimSpace(config.Database.Password)
@@ -160,6 +163,7 @@ func applyEnvironment(config *Config) error {
 	applyStringEnvironment("OPERATOR_CREDENTIAL", &config.Deployment.OperatorCredential)
 	applyStringEnvironment("OFFICIAL_IDENTITY_ISSUER", &config.Deployment.OfficialIdentityIssuer)
 	applyStringEnvironment("WAILS_SERVER_HOST", &config.Server.Host)
+	applyStringEnvironment("VISITOR_COUNTRY_HEADER", &config.Server.VisitorCountryHeader)
 	applyStringEnvironment("TLS_MODE", &config.TLS.Mode)
 	applyStringEnvironment("TLS_ACME_EMAIL", &config.TLS.ACMEEmail)
 	applyStringEnvironment("FILE_STORAGE_PATH", &config.Storage.LocalDirectory)

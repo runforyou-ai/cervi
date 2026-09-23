@@ -31,6 +31,7 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.GET("/inbox", s.loadInbox)
 	router.POST("/inbox/context/query", s.getInboxContext)
 	router.POST("/inbox/window/query", s.readInboxWindow)
+	router.GET("/conversations/:conversationID/customer-profile", s.getCustomerProfile)
 	router.GET("/conversations/:conversationID/summary", s.getInboxConversation)
 	router.POST("/inbox/conversations/query", s.readInboxConversations)
 	router.GET("/inbox/search", s.searchInbox)
@@ -184,6 +185,8 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.PUT("/settings/mcp-servers/:mcpServerID", s.updateMCPServer)
 	router.DELETE("/settings/mcp-servers/:mcpServerID", s.deleteMCPServer)
 	router.PUT("/settings/organization", s.updateOrganization)
+	router.GET("/settings/customer-service/identity-secret", s.getCustomerIdentitySecret)
+	router.POST("/settings/customer-service/identity-secret", s.regenerateCustomerIdentitySecret)
 	router.GET("/settings/customer-service/business-hours", s.getBusinessHours)
 	router.PUT("/settings/customer-service/business-hours", s.updateBusinessHours)
 	router.GET("/settings/customer-service/timeouts", s.getServiceTimeouts)
@@ -348,6 +351,12 @@ func (s *Service) readInboxWindow(c *gin.Context) {
 		return
 	}
 	output, err := s.application.ReadInboxWindow(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// getCustomerProfile 返回客户会话的客户身份与当前周期访客上下文。
+func (s *Service) getCustomerProfile(c *gin.Context) {
+	output, err := s.application.GetCustomerProfile(c.Request.Context(), requestMeta(c), c.Param("conversationID"))
 	writeResult(c, http.StatusOK, output, err)
 }
 
@@ -1564,6 +1573,18 @@ func (s *Service) updateOrganization(c *gin.Context) {
 		return
 	}
 	output, err := s.application.UpdateOrganization(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// getCustomerIdentitySecret 读取当前企业的客户身份密钥，未生成时为空。
+func (s *Service) getCustomerIdentitySecret(c *gin.Context) {
+	output, err := s.application.GetCustomerIdentitySecret(c.Request.Context(), requestMeta(c))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// regenerateCustomerIdentitySecret 生成或重新生成当前企业的客户身份密钥，旧密钥立即失效。
+func (s *Service) regenerateCustomerIdentitySecret(c *gin.Context) {
+	output, err := s.application.RegenerateCustomerIdentitySecret(c.Request.Context(), requestMeta(c))
 	writeResult(c, http.StatusOK, output, err)
 }
 

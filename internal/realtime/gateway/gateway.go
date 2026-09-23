@@ -36,6 +36,8 @@ const flushTimeout = 5 * time.Second
 type VisitorBackend interface {
 	// AuthenticateVisitor 校验启用的网站渠道与访客身份并返回事件流受众，渠道停用或尚未建立身份时返回访客业务错误。
 	AuthenticateVisitor(ctx context.Context, meta appservice.WebsiteVisitorMeta, channelID, externalID string) (appservice.WebsiteVisitorAudience, error)
+	// VerifyCustomer 按渠道所属企业当前的客户身份密钥校验签名身份，失效时返回访客业务错误。
+	VerifyCustomer(ctx context.Context, meta appservice.WebsiteVisitorMeta, channelID, token string) (appservice.WebsiteVisitorCustomer, error)
 }
 
 // MemberBackend 解析成员登录令牌并读取同步探针值。
@@ -186,11 +188,10 @@ func (g *Gateway) Middleware(next http.Handler) http.Handler {
 	})
 }
 
-// ServeVisitor 处理已通过访客授权的网站访客事件流请求，channelID 与 externalID 由公开路由的访客授权得到。
-func (g *Gateway) ServeVisitor(writer http.ResponseWriter, request *http.Request, channelID, externalID string) {
-	visitorMeta := appservice.WebsiteVisitorMeta{Locale: appservice.Locale(request.Header.Get("Accept-Language"))}
-	g.stream(writer, request, appservice.RequestMeta{Locale: visitorMeta.Locale}, func(ctx context.Context) (streamRoute, error) {
-		return g.visitorRoute(ctx, visitorMeta, channelID, externalID)
+// ServeVisitor 处理已通过访客授权的网站访客事件流请求，访客元信息、channelID 与 externalID 由公开路由的访客授权得到。
+func (g *Gateway) ServeVisitor(writer http.ResponseWriter, request *http.Request, meta appservice.WebsiteVisitorMeta, channelID, externalID string) {
+	g.stream(writer, request, appservice.RequestMeta{Locale: meta.Locale}, func(ctx context.Context) (streamRoute, error) {
+		return g.visitorRoute(ctx, meta, channelID, externalID)
 	})
 }
 
@@ -278,18 +279,31 @@ func (g *Gateway) visitorRoute(ctx context.Context, meta appservice.WebsiteVisit
 	if err != nil {
 		return streamRoute{}, err
 	}
+	subjects := []string{
+		realtime.Subject(g.namespace, target.OrganizationID, realtime.AudienceVisitorDirectory, target.ChannelIdentityID),
+		// 渠道停用的撤销控制按渠道发送，该渠道全部访客事件流据此结束。
+		realtime.Subject(g.namespace, target.OrganizationID, realtime.AudienceWebsiteChannel, target.ChannelID),
+	}
+	// 登录用户的事件流在签名身份过期时结束，并随客户身份密钥重新生成撤销。
+	var expiresAt time.Time
+	if meta.Customer != nil {
+		subjects = append(subjects, realtime.Subject(g.namespace, target.OrganizationID, realtime.AudienceCustomerIdentity, target.OrganizationID))
+		expiresAt = meta.Customer.ExpiresAt
+	}
 	return streamRoute{
-		subjects: []string{
-			realtime.Subject(g.namespace, target.OrganizationID, realtime.AudienceVisitorDirectory, target.ChannelIdentityID),
-			// 渠道停用的撤销控制按渠道发送，该渠道全部访客事件流据此结束。
-			realtime.Subject(g.namespace, target.OrganizationID, realtime.AudienceWebsiteChannel, target.ChannelID),
-		},
+		subjects:   subjects,
 		allowed:    visitorFrameTypes,
+		expiresAt:  expiresAt,
 		attributes: []any{"organization_id", target.OrganizationID, "channel_id", target.ChannelID, "channel_identity_id", target.ChannelIdentityID},
 		greet: func(ctx context.Context, connectionID string) (protocol.Frame, error) {
-			// 订阅生效后再次校验渠道与访客身份，之后提交的渠道停用经受众通知送达。
+			// 订阅生效后再次校验渠道与访客身份，登录用户按当前密钥重新验签；之后提交的渠道停用与密钥重新生成经受众通知送达。
 			if _, err := g.visitor.AuthenticateVisitor(ctx, meta, channelID, externalID); err != nil {
 				return nil, err
+			}
+			if meta.Customer != nil {
+				if _, err := g.visitor.VerifyCustomer(ctx, meta, channelID, meta.CustomerToken); err != nil {
+					return nil, err
+				}
 			}
 			return protocol.VisitorHello{ConnectionID: connectionID}, nil
 		},
@@ -497,7 +511,7 @@ func (g *Gateway) deliver(subject string, data []byte) {
 			}
 		}
 		return
-	case realtime.KindUserDisabled, realtime.KindChannelDisabled:
+	case realtime.KindUserDisabled, realtime.KindChannelDisabled, realtime.KindCustomerIdentityRevoked:
 		for _, current := range targets {
 			current.revoke(payload.Kind)
 		}

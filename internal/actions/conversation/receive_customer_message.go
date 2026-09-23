@@ -29,6 +29,9 @@ type InboundCustomerMessageInput struct {
 	ExternalMedia           *InboundExternalMedia
 	ReplyToMessageID        string
 	ExternalID              string
+	ExternalUserID          string
+	Email                   string
+	VisitorContext          *domain.VisitorContext
 	DisplayName             *string
 	RequestedConversationID *string
 	SingleConversation      bool
@@ -91,6 +94,8 @@ func ReceiveInboundCustomerMessage(ctx context.Context, db bun.IDB, enqueuer ser
 		ExternalID:     input.ExternalID,
 		ContactID:      ids.contact,
 		IdentityID:     ids.channelIdentity,
+		ExternalUserID: input.ExternalUserID,
+		Email:          input.Email,
 	})
 	if err != nil {
 		return InboundCustomerMessageResult{}, err
@@ -209,8 +214,9 @@ func ReceiveInboundCustomerMessage(ctx context.Context, db bun.IDB, enqueuer ser
 			LastMessageAt: input.OriginatedAt,
 			AssignedAt:    assignedAt, AssigneeAssignedAt: assignedAt, QueuedAt: queuedAt, StatusChangedAt: input.OriginatedAt,
 		}
+		session.VisitorContext = input.VisitorContext
 		if _, err := db.NewInsert().Model(session).
-			Column("id", "organization_id", "conversation_id", "contact_channel_identity_id", "sequence", "status", "team_id", "assignee_identity_id", "opening_message_id", "last_message_id", "last_message_at", "assigned_at", "assignee_assigned_at", "queued_at", "status_changed_at").
+			Column("id", "organization_id", "conversation_id", "contact_channel_identity_id", "sequence", "status", "team_id", "assignee_identity_id", "opening_message_id", "last_message_id", "last_message_at", "assigned_at", "assignee_assigned_at", "queued_at", "status_changed_at", "visitor_context").
 			Returning("*").
 			Exec(ctx); err != nil {
 			return InboundCustomerMessageResult{}, fmt.Errorf("create service session: %w", err)
@@ -229,6 +235,21 @@ func ReceiveInboundCustomerMessage(ctx context.Context, db bun.IDB, enqueuer ser
 			}); err != nil {
 				return InboundCustomerMessageResult{}, err
 			}
+		}
+	} else if input.VisitorContext != nil {
+		// 访客上下文随进行中周期的消息更新，来源页保留周期开始时的记录。
+		visitorContext := *input.VisitorContext
+		visitorContext.ReferrerURL = ""
+		if session.VisitorContext != nil {
+			visitorContext.ReferrerURL = session.VisitorContext.ReferrerURL
+		}
+		session.VisitorContext = &visitorContext
+		if _, err := db.NewUpdate().Model(session).
+			Column("visitor_context").
+			WherePK().
+			Where("organization_id = ?", channel.OrganizationID).
+			Exec(ctx); err != nil {
+			return InboundCustomerMessageResult{}, fmt.Errorf("update service session visitor context: %w", err)
 		}
 	}
 

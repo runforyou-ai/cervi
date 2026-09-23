@@ -111,6 +111,7 @@ func testAgentCustomerReplies(t *testing.T, db *bun.DB, identity *servermodels.I
 				if err != nil {
 					return agentruntime.RunResult{}, err
 				}
+				claimed.Messages = customerTurnMessages(t, claimed.Messages)
 				wantLength := 100
 				if scenario.earlierSession {
 					wantLength = 3
@@ -168,6 +169,7 @@ func testAgentCustomerReplies(t *testing.T, db *bun.DB, identity *servermodels.I
 				if err != nil {
 					return agentruntime.RunResult{}, err
 				}
+				claimed.Messages = customerTurnMessages(t, claimed.Messages)
 				if len(claimed.Messages) != min(wantLength+1, 100) || claimed.Messages[len(claimed.Messages)-1].Content != input.Body {
 					t.Fatalf("follow-up context=%+v", claimed.Messages)
 				}
@@ -207,4 +209,13 @@ func testAgentCustomerReplies(t *testing.T, db *bun.DB, identity *servermodels.I
 	testCustomerFailureMessage(t, db, identity, tasks, created.IdentityID)
 	testCustomerAgentLocking(t, db, identity, created.IdentityID, tasks)
 	testCustomerAgentRunNotifications(t, db, identity, created.IdentityID, tasks)
+}
+
+// customerTurnMessages 核对客服运行上下文以系统提供的客户上下文消息开头，并返回其后的会话消息。
+func customerTurnMessages(t *testing.T, messages []agentruntime.Message) []agentruntime.Message {
+	t.Helper()
+	if len(messages) == 0 || !strings.HasPrefix(messages[0].ID, "customer-context:") || !strings.Contains(messages[0].Content, `"kind":"customer_context"`) {
+		t.Fatalf("客服上下文缺少客户上下文消息: %+v", messages)
+	}
+	return messages[1:]
 }

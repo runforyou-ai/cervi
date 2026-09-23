@@ -41,6 +41,14 @@
   var previewMode = messenger.getAttribute("data-preview") === "true";
   var channelID = messenger.getAttribute("data-channel-id");
   var visitorToken = "";
+  // 嵌入挂件时由父页面下发签名身份后再初始化；独立聊天页直接以匿名访客初始化。
+  var embedded = document.documentElement.classList.contains("cv-embed");
+  var identityReceived = !embedded;
+  var customerToken = "";
+  var rotateVisitor = false;
+  var identityExpired = false;
+  var hostPage = null;
+  var CUSTOMER_IDENTITY_INVALID = "customer_identity_invalid";
   var initialized = previewMode;
   var initializationPending = false;
   var messageRequestPending = false;
@@ -92,6 +100,7 @@
     agent: messenger.getAttribute("data-reference-agent"),
   };
   var requestFailedLabel = messenger.getAttribute("data-request-failed");
+  var identityExpiredLabel = messenger.getAttribute("data-identity-expired");
   var attachmentLabels = {
     uploading: messenger.getAttribute("data-attachment-uploading"),
     failed: messenger.getAttribute("data-attachment-failed"),
@@ -266,7 +275,9 @@
     intro.hidden = previewMode
       ? activeConversation.started
       : activeConversation.id !== null;
-    $("cv-conversation-error").hidden = true;
+    // 签名身份失效后切换会话仍保留失效提示。
+    $("cv-conversation-error").textContent = identityExpired ? identityExpiredLabel : requestFailedLabel;
+    $("cv-conversation-error").hidden = !identityExpired;
     input.value = activeConversation.draft;
     renderComposerReference();
     fileInput.value = "";
@@ -322,10 +333,11 @@
   }
 
   function postToParent(message) {
-    if (window.parent === window) {
+    // 只发往嵌入时确定的父页面源，父源未知时不发送。
+    if (window.parent === window || !parentOrigin) {
       return;
     }
-    window.parent.postMessage(message, parentOrigin || "*");
+    window.parent.postMessage(message, parentOrigin);
   }
 
   function closeMessenger() {
@@ -974,19 +986,74 @@
     options.headers = options.headers || {};
     options.headers.Accept = "application/json";
     options.headers["Accept-Language"] = document.documentElement.lang;
-    if (visitorToken) {
-      options.headers["X-Cervi-Visitor-Token"] = visitorToken;
-    }
+    applyIdentityHeaders(options.headers);
     return window.fetch(path, options).then(function (response) {
       return response.json().then(function (payload) {
         if (!response.ok) {
           var message = payload.error && payload.error.message;
           var error = new Error(message || requestFailedLabel);
+          if (isIdentityRejection(response, payload)) {
+            handleIdentityExpired();
+            error.message = identityExpiredLabel;
+          }
           throw error;
         }
         return payload;
       });
     });
+  }
+
+  // 登录用户携带签名身份，匿名访客携带访客 Token。
+  function applyIdentityHeaders(headers) {
+    if (customerToken) {
+      headers["X-Cervi-Customer-Token"] = customerToken;
+    } else if (visitorToken) {
+      headers["X-Cervi-Visitor-Token"] = visitorToken;
+    }
+  }
+
+  // 判断响应是否为签名身份失效。
+  function isIdentityRejection(response, payload) {
+    return (
+      response.status === 401 &&
+      !!customerToken &&
+      !!payload &&
+      !!payload.error &&
+      payload.error.reason === CUSTOMER_IDENTITY_INVALID
+    );
+  }
+
+  // 签名身份失效后停止实时连接、禁用发送并通知父页面，等待宿主重新登录或退出。
+  function handleIdentityExpired() {
+    if (identityExpired) {
+      return;
+    }
+    identityExpired = true;
+    initialized = false;
+    haltVisitorRealtime("stopped");
+    setNewConversationAvailability(false);
+    showInitializationState(identityExpiredLabel, false);
+    $("cv-conversation-error").textContent = identityExpiredLabel;
+    $("cv-conversation-error").hidden = false;
+    updateSendState();
+    postToParent({ type: "cervi:identity-expired" });
+  }
+
+  // 返回访客发送消息时所在的宿主页面与浏览器环境。
+  function currentPage() {
+    var timeZone = "";
+    try {
+      timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone || "";
+    } catch (error) {
+      timeZone = "";
+    }
+    return {
+      url: hostPage ? hostPage.url : "",
+      title: hostPage ? hostPage.title : "",
+      referrer: hostPage ? hostPage.referrer : document.referrer,
+      language: window.navigator.language || "",
+      timeZone: timeZone,
+    };
   }
 
   // 将服务端摘要合并到页面会话状态。
@@ -1034,7 +1101,7 @@
 
   // 初始化真实网站 Messenger。
   function initializeRealMessenger() {
-    if (previewMode || initializationPending) {
+    if (previewMode || initializationPending || !identityReceived || identityExpired) {
       return;
     }
     initializationPending = true;
@@ -1046,10 +1113,12 @@
     requestWebsiteJSON(
       "/api/public/website-channels/" +
         encodeURIComponent(channelID) +
-        "/messenger",
+        "/messenger" +
+        (rotateVisitor ? "?rotate=1" : ""),
     )
       .then(function (result) {
         visitorToken = result.visitorToken;
+        rotateVisitor = false;
         result.conversations.forEach(function (summary) {
           upsertRealConversation(summary, null);
         });
@@ -1059,7 +1128,7 @@
         setNewConversationAvailability(true);
       })
       .catch(function (error) {
-        showInitializationState(error.message || requestFailedLabel, true);
+        showInitializationState(error.message || requestFailedLabel, !identityExpired);
       })
       .finally(function () {
         initializationPending = false;
@@ -1686,9 +1755,7 @@
       Accept: "text/event-stream",
       "Accept-Language": document.documentElement.lang,
     };
-    if (visitorToken) {
-      headers["X-Cervi-Visitor-Token"] = visitorToken;
-    }
+    applyIdentityHeaders(headers);
     refreshIdle();
     window
       .fetch(
@@ -1699,9 +1766,23 @@
       )
       .then(function (response) {
         if (!response.ok || !response.body) {
-          // 渠道、身份与访客 Token 错误重试不会改变结果，只有服务不可用按退避重连。
+          // 渠道、身份与访客 Token 错误重试不会改变结果，只有服务不可用按退避重连；签名身份失效时进入失效状态。
           var rejected = new Error("visitor event stream rejected");
           rejected.retryable = response.status >= 500;
+          if (response.status === 401 && customerToken) {
+            response
+              .json()
+              .then(function (payload) {
+                if (isIdentityRejection(response, payload)) {
+                  handleIdentityExpired();
+                }
+              })
+              .catch(function () {})
+              .finally(function () {
+                finish(rejected);
+              });
+            return;
+          }
           finish(rejected);
           return;
         }
@@ -2107,6 +2188,7 @@
           replyToMessageId: replyToID,
           conversationId: conversation.id,
           body: text,
+          page: currentPage(),
         }),
       },
     )
@@ -2459,6 +2541,7 @@
             body: entry.body,
             imageWidth: size.width,
             imageHeight: size.height,
+            page: currentPage(),
           }),
         },
       );
@@ -3047,7 +3130,7 @@
   });
 
   window.addEventListener("message", function (event) {
-    if (event.source !== window.parent) {
+    if (event.source !== window.parent || window.parent === window) {
       return;
     }
     if (parentOrigin && event.origin !== parentOrigin) {
@@ -3056,8 +3139,40 @@
     if (!event.data || typeof event.data.type !== "string") {
       return;
     }
+    // 父页面源以其发来的首条消息为准。
+    if (!parentOrigin && event.origin !== "null") {
+      parentOrigin = event.origin;
+    }
+    if (event.data.type === "cervi:identity") {
+      // 身份只在首次下发时生效，切换身份由挂件重新加载聊天页。
+      if (!identityReceived) {
+        identityReceived = true;
+        customerToken =
+          typeof event.data.customerToken === "string" ? event.data.customerToken : "";
+        rotateVisitor = event.data.rotate === true;
+        if (!previewMode) {
+          initializeRealMessenger();
+        }
+      }
+      return;
+    }
+    if (event.data.type === "cervi:page") {
+      hostPage = {
+        url: typeof event.data.url === "string" ? event.data.url : "",
+        title: typeof event.data.title === "string" ? event.data.title : "",
+        referrer: typeof event.data.referrer === "string" ? event.data.referrer : "",
+      };
+      return;
+    }
     if (event.data.type === "cervi:widget-state") {
       applyWidgetState(event.data);
+      // 挂件未下发身份时按匿名访客初始化。
+      if (!identityReceived) {
+        identityReceived = true;
+        if (!previewMode) {
+          initializeRealMessenger();
+        }
+      }
       postToParent({ type: "cervi:frame-ready" });
       return;
     }

@@ -18,6 +18,7 @@ const (
 	AudienceCustomerInbox    AudienceKind = "customer_inbox"
 	AudienceVisitorDirectory AudienceKind = "visitor_directory"
 	AudienceWebsiteChannel   AudienceKind = "website_channel"
+	AudienceCustomerIdentity AudienceKind = "customer_identity"
 )
 
 // Kind 定义通知种类。
@@ -34,6 +35,7 @@ const (
 	KindSessionLoggedOut         Kind = "session_logged_out"
 	KindUserDisabled             Kind = "user_disabled"
 	KindChannelDisabled          Kind = "channel_disabled"
+	KindCustomerIdentityRevoked  Kind = "customer_identity_revoked"
 	KindServiceAttention         Kind = "service_attention"
 	KindDeviceWorkAdvanced       Kind = "device_work_advanced"
 )
@@ -112,6 +114,11 @@ func UserDeviceWorkAdvanced(organizationID, userID, deviceID string, workSeq int
 // WebsiteChannelDisabled 构造网站渠道停用撤销控制，Gateway 据此结束该渠道全部访客事件流；受众 ID 为渠道 ID。
 func WebsiteChannelDisabled(organizationID, channelID string) Notification {
 	return Notification{OrganizationID: organizationID, AudienceKind: AudienceWebsiteChannel, AudienceID: channelID, Kind: KindChannelDisabled}
+}
+
+// CustomerIdentityRevoked 构造客户身份密钥重新生成的撤销控制，Gateway 据此结束该企业全部以签名身份建立的访客事件流；受众 ID 为企业 ID。
+func CustomerIdentityRevoked(organizationID string) Notification {
+	return Notification{OrganizationID: organizationID, AudienceKind: AudienceCustomerIdentity, AudienceID: organizationID, Kind: KindCustomerIdentityRevoked}
 }
 
 // UserSessionLoggedOut 构造登出撤销控制，Gateway 据此关闭该登录会话的连接。

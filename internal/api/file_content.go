@@ -12,6 +12,7 @@ import (
 	"strings"
 
 	authaction "github.com/runforyou-ai/cervi/internal/actions/auth"
+	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -26,6 +27,7 @@ type LocalObjectService struct {
 	resolveTenant   tenant.Resolver
 	resolveIdentity *authaction.ResolveIdentityQuery
 	getFile         *fileaction.GetQuery
+	verifyCustomer  *conversationaction.VerifyWebsiteCustomerQuery
 	local           *serverfilecontent.LocalStore
 	objects         http.Handler
 }
@@ -34,7 +36,7 @@ type LocalObjectService struct {
 func NewLocalObjectService(db *bun.DB, local *serverfilecontent.LocalStore, tenantResolver tenant.Resolver) *LocalObjectService {
 	return &LocalObjectService{
 		resolveTenant: tenantResolver, resolveIdentity: authaction.NewResolveIdentityQuery(db),
-		getFile: fileaction.NewGetQuery(db), local: local, objects: http.FileServerFS(local.ObjectsFS()),
+		getFile: fileaction.NewGetQuery(db), verifyCustomer: conversationaction.NewVerifyWebsiteCustomerQuery(db), local: local, objects: http.FileServerFS(local.ObjectsFS()),
 	}
 }
 
@@ -43,7 +45,7 @@ func (s *LocalObjectService) ServeHTTP(writer http.ResponseWriter, request *http
 	// 允许原生端 WebView 直传和读取企业服务器对象。
 	writer.Header().Set("Access-Control-Allow-Origin", "*")
 	writer.Header().Set("Access-Control-Allow-Methods", "GET, HEAD, PUT, OPTIONS")
-	writer.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, "+websiteVisitorHeader)
+	writer.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, "+websiteVisitorHeader+", "+websiteCustomerHeader)
 	if request.Method == http.MethodOptions {
 		writer.WriteHeader(http.StatusNoContent)
 		return
@@ -87,11 +89,27 @@ func (s *LocalObjectService) ServeHTTP(writer http.ResponseWriter, request *http
 	}
 }
 
-// uploadLocalObject 将认证后的请求内容保存到本地最终对象目录，渠道访客按访客令牌校验文件归属。
+// uploadLocalObject 将认证后的请求内容保存到本地最终对象目录，网站登录用户按签名身份、渠道访客按访客令牌校验文件归属。
 func (s *LocalObjectService) uploadLocalObject(writer http.ResponseWriter, request *http.Request, storageKey string) {
 	var record *servermodels.File
 	var err error
-	if visitorToken := strings.TrimSpace(request.Header.Get(websiteVisitorHeader)); visitorToken != "" {
+	if customerToken := strings.TrimSpace(request.Header.Get(websiteCustomerHeader)); customerToken != "" {
+		// 按访问地址所属企业验签，文件须属于该企业下该登录用户的渠道身份。
+		scope, tenantErr := s.resolveTenant.Resolve(request.Context(), tenant.AccessHost(request.Context()))
+		if tenantErr != nil {
+			http.Error(writer, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			return
+		}
+		verified, verifyErr := s.verifyCustomer.ExecuteForOrganization(request.Context(), scope.OrganizationID, customerToken)
+		if verifyErr != nil {
+			http.Error(writer, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
+			return
+		}
+		record, err = s.getFile.VisitorPendingByStorageKey(request.Context(), websiteCustomerExternalID(verified.Customer.UserID), storageKey)
+		if err == nil && record.OrganizationID != scope.OrganizationID {
+			err = fileaction.ErrFileNotFound
+		}
+	} else if visitorToken := strings.TrimSpace(request.Header.Get(websiteVisitorHeader)); visitorToken != "" {
 		if !validWebsiteVisitorToken(visitorToken) {
 			http.Error(writer, http.StatusText(http.StatusUnauthorized), http.StatusUnauthorized)
 			return

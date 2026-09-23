@@ -23,8 +23,14 @@ import (
 
 var _ WebsiteVisitorBackend = (*WebsiteVisitorDirectBackend)(nil)
 
-// WebsiteVisitorTokenHeader 是访客直传本地对象和调用公开接口使用的令牌请求头。
-const WebsiteVisitorTokenHeader = "X-Cervi-Visitor-Token"
+const (
+	// WebsiteVisitorTokenHeader 是访客直传本地对象和调用公开接口使用的令牌请求头。
+	WebsiteVisitorTokenHeader = "X-Cervi-Visitor-Token"
+	// WebsiteCustomerTokenHeader 是网站登录用户直传本地对象和调用公开接口携带签名身份的请求头。
+	WebsiteCustomerTokenHeader = "X-Cervi-Customer-Token"
+	// WebsiteCustomerIdentityInvalidReason 是签名身份失效错误的稳定原因码。
+	WebsiteCustomerIdentityInvalidReason = "customer_identity_invalid"
+)
 
 // WebsiteVisitorAudience 是网站访客事件流的受众标识，渠道身份记录 ID 用于构造受众 Subject。
 type WebsiteVisitorAudience struct {
@@ -39,6 +45,7 @@ type WebsiteVisitorDirectBackend struct {
 	sendMessage       *conversationaction.ReceiveWebsiteCustomerMessageAction
 	listMessages      *conversationaction.ListWebsiteMessagesQuery
 	authorizeVisitor  *conversationaction.AuthorizeWebsiteVisitorQuery
+	verifyCustomer    *conversationaction.VerifyWebsiteCustomerQuery
 	createUpload      *conversationaction.CreateWebsiteVisitorUploadAction
 	completeUpload    *conversationaction.CompleteWebsiteVisitorUploadAction
 	getAttachment     *conversationaction.GetWebsiteVisitorAttachmentQuery
@@ -55,6 +62,7 @@ func NewWebsiteVisitorDirectBackend(db *bun.DB, agentScheduler conversationactio
 		sendMessage:       conversationaction.NewReceiveWebsiteCustomerMessageAction(db, agentScheduler, taskEnqueuer),
 		listMessages:      conversationaction.NewListWebsiteMessagesQuery(db),
 		authorizeVisitor:  conversationaction.NewAuthorizeWebsiteVisitorQuery(db),
+		verifyCustomer:    conversationaction.NewVerifyWebsiteCustomerQuery(db),
 		completeUpload:    conversationaction.NewCompleteWebsiteVisitorUploadAction(db),
 		getAttachment:     conversationaction.NewGetWebsiteVisitorAttachmentQuery(db),
 		reportTyping:      conversationaction.NewReportWebsiteVisitorTypingAction(db),
@@ -93,11 +101,46 @@ func (b *WebsiteVisitorDirectBackend) ListConversations(ctx context.Context, met
 	return result, nil
 }
 
+// VerifyCustomer 按渠道所属企业的客户身份密钥校验签名身份。
+func (b *WebsiteVisitorDirectBackend) VerifyCustomer(ctx context.Context, meta WebsiteVisitorMeta, channelID, token string) (WebsiteVisitorCustomer, error) {
+	verified, err := b.verifyCustomer.Execute(ctx, channelID, token)
+	if err != nil {
+		return WebsiteVisitorCustomer{}, websiteVisitorError(ctx, meta, err, cervii18n.ErrorCustomerIdentityInvalid, "verify_customer", "channel_id", channelID)
+	}
+	return websiteVisitorCustomerFromAction(verified), nil
+}
+
+// VerifyOrganizationCustomer 按指定企业的客户身份密钥校验签名身份，供访客直传本地对象时认证。
+func (b *WebsiteVisitorDirectBackend) VerifyOrganizationCustomer(ctx context.Context, organizationID, token string) (WebsiteVisitorCustomer, error) {
+	verified, err := b.verifyCustomer.ExecuteForOrganization(ctx, organizationID, token)
+	if err != nil {
+		return WebsiteVisitorCustomer{}, err
+	}
+	return websiteVisitorCustomerFromAction(verified), nil
+}
+
+// websiteVisitorCustomerFromAction 转换验签通过的网站登录用户。
+func websiteVisitorCustomerFromAction(value conversationaction.VerifiedWebsiteCustomer) WebsiteVisitorCustomer {
+	return WebsiteVisitorCustomer{
+		OrganizationID: value.OrganizationID, UserID: value.Customer.UserID, Name: value.Customer.Name,
+		Email: value.Customer.Email, ExpiresAt: value.ExpiresAt,
+	}
+}
+
+// websiteCustomerInput 返回访客元信息中已验证的登录用户，匿名访客返回空。
+func websiteCustomerInput(meta WebsiteVisitorMeta) *conversationaction.WebsiteCustomer {
+	if meta.Customer == nil {
+		return nil
+	}
+	return &conversationaction.WebsiteCustomer{UserID: meta.Customer.UserID, Name: meta.Customer.Name, Email: meta.Customer.Email}
+}
+
 // SendTextMessage 持久化网站访客文本消息。
 func (b *WebsiteVisitorDirectBackend) SendTextMessage(ctx context.Context, meta WebsiteVisitorMeta, channelID, externalID string, input WebsiteVisitorTextMessageInput) (WebsiteVisitorMessageResult, error) {
 	result, err := b.sendMessage.Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
 		ChannelID: channelID, ExternalID: externalID, ConversationID: input.ConversationID,
 		ClientMessageID: input.ClientMessageID, Body: input.Body, ReplyToMessageID: input.ReplyToMessageID,
+		Customer: websiteCustomerInput(meta), VisitorContext: websiteVisitorContext(meta, input.Page),
 	})
 	if err != nil {
 		return WebsiteVisitorMessageResult{}, websiteVisitorError(ctx, meta, err, cervii18n.ErrorMessageSendFailed, "send_text_message", "channel_id", channelID)
@@ -111,6 +154,7 @@ func (b *WebsiteVisitorDirectBackend) SendAttachmentMessage(ctx context.Context,
 		ChannelID: channelID, ExternalID: externalID, ConversationID: input.ConversationID,
 		ClientMessageID: input.ClientMessageID, FileID: input.FileID, Body: input.Body, ReplyToMessageID: input.ReplyToMessageID,
 		ImageWidth: input.ImageWidth, ImageHeight: input.ImageHeight,
+		Customer: websiteCustomerInput(meta), VisitorContext: websiteVisitorContext(meta, input.Page),
 	})
 	if err != nil {
 		return WebsiteVisitorMessageResult{}, websiteVisitorError(ctx, meta, err, cervii18n.ErrorMessageSendFailed, "send_attachment_message", "channel_id", channelID)
@@ -146,6 +190,7 @@ func (b *WebsiteVisitorDirectBackend) CreateAttachmentUpload(ctx context.Context
 	record, err := b.createUpload.Execute(ctx, conversationaction.WebsiteVisitorUploadInput{
 		ChannelID: channelID, ExternalID: externalID,
 		FileName: input.FileName, ContentType: input.ContentType, ByteSize: input.ByteSize,
+		Customer: websiteCustomerInput(meta),
 	})
 	if err != nil {
 		return WebsiteVisitorUpload{}, websiteVisitorError(ctx, meta, err, cervii18n.ErrorFileUploadCreateFailed, "create_attachment_upload", "channel_id", channelID)
@@ -188,10 +233,12 @@ func (b *WebsiteVisitorDirectBackend) visitorUploadRequest(ctx context.Context, 
 		if err != nil {
 			return WebsiteVisitorUploadRequest{}, err
 		}
-		return WebsiteVisitorUploadRequest{
-			Method: http.MethodPut, URL: contentURL,
-			Headers: map[string]string{WebsiteVisitorTokenHeader: meta.Token, "Content-Type": record.ContentType},
-		}, nil
+		// 登录用户以签名身份直传，匿名访客以访客令牌直传。
+		headers := map[string]string{WebsiteVisitorTokenHeader: meta.Token, "Content-Type": record.ContentType}
+		if meta.Customer != nil {
+			headers = map[string]string{WebsiteCustomerTokenHeader: meta.CustomerToken, "Content-Type": record.ContentType}
+		}
+		return WebsiteVisitorUploadRequest{Method: http.MethodPut, URL: contentURL, Headers: headers}, nil
 	}
 	signed, err := serverfilecontent.PresignPut(ctx, b.s3, record.StorageKey, record.ContentType)
 	if err != nil {
@@ -326,6 +373,9 @@ func websiteVisitorError(ctx context.Context, meta WebsiteVisitorMeta, err error
 	}
 	if errors.Is(err, conversationaction.ErrChannelNotFound) {
 		return NotFoundError(requestMeta, cervii18n.ErrorChannelNotFound)
+	}
+	if errors.Is(err, conversationaction.ErrCustomerIdentityInvalid) {
+		return InvalidError(requestMeta, cervii18n.ErrorCustomerIdentityInvalid, nil).WithReason(WebsiteCustomerIdentityInvalidReason).WithStatus(http.StatusUnauthorized)
 	}
 	if errors.Is(err, conversationaction.ErrConversationNotFound) {
 		return NotFoundError(requestMeta, cervii18n.ErrorConversationNotFound)

@@ -36,7 +36,7 @@ func (a *CreateWebsiteVisitorUploadAction) Execute(ctx context.Context, input We
 	if !common.ValidUUID(input.ChannelID) {
 		fields["channelId"] = ValidationChannelIDInvalid
 	}
-	if !validWebsiteExternalID(input.ExternalID) {
+	if !validWebsiteExternalID(input.ExternalID) || (input.Customer != nil && input.ExternalID != WebsiteCustomerExternalID(input.Customer.UserID)) {
 		fields["visitorToken"] = ValidationExternalIDInvalid
 	}
 	if len(fields) > 0 {
@@ -57,12 +57,16 @@ func (a *CreateWebsiteVisitorUploadAction) Execute(ctx context.Context, input We
 			if err != nil {
 				return err
 			}
-			// 访客的首条消息可以是附件，渠道身份在创建上传这一步落库。
+			// 访客的首条消息可以是附件，渠道身份在创建上传这一步落库，登录用户同时关联企业用户编号与邮箱。
 			ids := generateIDs()
-			ensured, identityErr := contactaction.EnsureChannelIdentity(ctx, tx, contactaction.EnsureChannelIdentityInput{
+			identityInput := contactaction.EnsureChannelIdentityInput{
 				OrganizationID: channel.OrganizationID, ChannelID: channel.ID, ExternalID: input.ExternalID,
 				ContactID: ids.contact, IdentityID: ids.channelIdentity,
-			})
+			}
+			if input.Customer != nil {
+				identityInput.ExternalUserID, identityInput.Email = input.Customer.UserID, input.Customer.Email
+			}
+			ensured, identityErr := contactaction.EnsureChannelIdentity(ctx, tx, identityInput)
 			if identityErr != nil {
 				return identityErr
 			}

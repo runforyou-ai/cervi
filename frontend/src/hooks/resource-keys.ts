@@ -26,6 +26,9 @@ function scopedListKey(
 export const resourceKeys = {
   /** 当前登录身份、所属企业和用户偏好。 */
   identity: () => ["identity"],
+  /** 客户会话的客户身份与当前周期访客上下文，参数为会话最新消息编号。 */
+  customerProfile: (conversationId?: string, parameters?: KeyParameters) =>
+    scopedListKey("customer-profile", conversationId, parameters),
   /** 按会话编号读取的独立摘要。 */
   conversationSummary: (conversationId?: string) => itemKey("conversation-summary", conversationId),
   /** 指定会话的列表资格。 */
@@ -133,6 +136,8 @@ export const resourceKeys = {
   businessHours: () => ["business-hours"],
   /** 当前企业的客服超时时长。 */
   serviceTimeouts: () => ["service-timeouts"],
+  /** 当前企业的客户身份密钥。 */
+  customerIdentitySecret: () => ["customer-identity-secret"],
   /** 当前企业的咨询分类目录。 */
   serviceCategories: () => ["service-categories"],
   /** 当前客户端连接的企业服务器地址。 */
