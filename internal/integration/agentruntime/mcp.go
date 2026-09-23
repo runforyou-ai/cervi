@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"time"
 
 	"github.com/cloudwego/eino/components/tool"
@@ -21,6 +22,7 @@ var mcpHandshakeTimeout = 15 * time.Second
 type MCPServer struct {
 	Name   string
 	Config mcp.Config
+	Tools  []string // 限定挂载的工具名称，nil 表示挂载目录中的全部工具。
 }
 
 // openMCPTools 连接本次运行绑定的 MCP 服务并注册其工具，返回释放全部会话的函数。
@@ -42,6 +44,9 @@ func openMCPTools(ctx context.Context, runID string, servers []MCPServer, regist
 		}
 		accepted := 0
 		for _, item := range catalog {
+			if server.Tools != nil && !slices.Contains(server.Tools, item.Name) {
+				continue
+			}
 			if _, exists := registered[item.Name]; exists {
 				slog.Warn("MCP 工具名称与已注册工具重复，跳过该工具",
 					"agent_run_id", runID, "mcp_server", server.Name, "tool_name", item.Name)
@@ -147,7 +152,7 @@ func (t *mcpTool) Info(context.Context) (*schema.ToolInfo, error) { return t.inf
 func (t *mcpTool) InvokableRun(ctx context.Context, argumentsInJSON string, _ ...tool.Option) (string, error) {
 	arguments := json.RawMessage(argumentsInJSON)
 	if !json.Valid(arguments) {
-		return "参数不是合法 JSON，请重新提交。", nil
+		return "", errors.New("参数不是合法 JSON，请重新提交。")
 	}
 	result, err := t.session.Call(ctx, t.info.Name, arguments)
 	if err != nil {

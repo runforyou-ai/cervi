@@ -9,7 +9,7 @@ import (
 )
 
 // AssignmentRulesVersion 是基线与场景规则的规则版本，基线或场景规则增删时加一；措辞调整只体现在指令哈希上。
-const AssignmentRulesVersion = 4
+const AssignmentRulesVersion = 5
 
 // SceneContext 表示拼接场景规则所需的运行期事实，群聊字段只在群聊场景取值，咨询分类只在客服场景取值。
 type SceneContext struct {
@@ -51,6 +51,8 @@ type Capabilities struct {
 	Knowledge  bool     // 本次运行可检索会话绑定的知识库。
 	MCPServers []string // 可连接的远程 MCP 服务名称。
 	LocalTools []string // 执行设备在本次运行的工作区中提供的本机工具，按本机工具目录顺序排列。
+	// CustomerLoginRequired 表示客服场景中有按客户查询的服务因客户未验证身份而未挂载。
+	CustomerLoginRequired bool
 }
 
 // Assignment 是一次运行的有效配置，同时作为运行时入参、运行审计快照和设备执行指派。
@@ -71,7 +73,10 @@ type Assignment struct {
 // ResolveAssignment 按业务事实与执行侧能力产出一次运行的有效配置；执行侧能力只影响工具清单、指令中的工具说明和 MCP 服务名称。
 func ResolveAssignment(facts AssignmentFacts, capabilities Capabilities) Assignment {
 	scene := facts.Scene.Scene
-	tools := builtinTools{Knowledge: capabilities.Knowledge, Workspace: capabilities.LocalTools, Terminal: scene == SceneCustomer, HandoffCategories: len(facts.Scene.HandoffCategories) > 0}
+	tools := builtinTools{
+		Knowledge: capabilities.Knowledge, Workspace: capabilities.LocalTools, Terminal: scene == SceneCustomer,
+		HandoffCategories: len(facts.Scene.HandoffCategories) > 0, CustomerLoginRequired: capabilities.CustomerLoginRequired,
+	}
 	instruction := composeInstruction(
 		AgentBaseline(facts.HandlesCustomers, facts.OrganizationName, facts.AgentName),
 		facts.Instruction,

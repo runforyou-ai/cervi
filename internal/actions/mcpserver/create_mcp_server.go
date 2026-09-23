@@ -42,10 +42,11 @@ func (a *CreateMCPServerAction) Execute(ctx context.Context, identity *servermod
 		mcpServer = servermodels.MCPServer{
 			OrganizationID: identity.Organization.ID, Name: input.Name,
 			URL: input.URL, ServerType: input.ServerType, AuthorizationToken: input.AuthorizationToken,
+			CustomerScoped: input.CustomerScoped,
 		}
 		_, err := tx.NewInsert().
 			Model(&mcpServer).
-			Column("organization_id", "name", "url", "server_type", "authorization_token").
+			Column("organization_id", "name", "url", "server_type", "authorization_token", "customer_scoped").
 			Returning("*").
 			Exec(ctx)
 		if err != nil {

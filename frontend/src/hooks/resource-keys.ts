@@ -29,6 +29,8 @@ export const resourceKeys = {
   /** 客户会话的客户身份与当前周期访客上下文，参数为会话最新消息编号。 */
   customerProfile: (conversationId?: string, parameters?: KeyParameters) =>
     scopedListKey("customer-profile", conversationId, parameters),
+  /** 客户会话当前客服周期的业务查询记录，随会话内容变化重读。 */
+  customerBusinessQueries: (conversationId?: string) => itemKey("customer-business-queries", conversationId),
   /** 按会话编号读取的独立摘要。 */
   conversationSummary: (conversationId?: string) => itemKey("conversation-summary", conversationId),
   /** 指定会话的列表资格。 */

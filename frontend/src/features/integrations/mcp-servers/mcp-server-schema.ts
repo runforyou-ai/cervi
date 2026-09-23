@@ -32,6 +32,7 @@ export function createMCPServerSchema(messages: {
       messages.serverTypeInvalid,
     ),
     authorizationToken: z.string(),
+    customerScoped: z.boolean(),
   })
 }
 

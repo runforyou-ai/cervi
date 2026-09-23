@@ -72,7 +72,7 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 			if request.KnowledgeSearch != nil {
 				judges[KnowledgeToolName] = knowledgeEvidence
 			}
-			gate = newGroundingGate(judges)
+			gate = newGroundingGate(judges, recorder.markEvidence)
 		}
 	}
 	// 工作区图片读取随直传附件一同受模型拒绝后的重新执行控制。
@@ -87,6 +87,16 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 		return RunResult{}, err
 	}
 	defer releaseSessions()
+	// 登记远程工具的所属服务；客服场景只挂载查询工具，其结果作为回答依据。
+	recorder.mcpTools = make(map[string]string)
+	for _, item := range tools {
+		if remote, ok := item.(*mcpTool); ok {
+			recorder.mcpTools[remote.info.Name] = remote.server
+			if gate != nil {
+				gate.judges[remote.info.Name] = queryEvidence
+			}
+		}
+	}
 	window := ContextWindowTokens(modelConfig)
 	reductionHandlers, err := newContextReductionHandlers(ctx, window)
 	if err != nil {

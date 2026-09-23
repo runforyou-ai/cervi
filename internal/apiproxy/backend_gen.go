@@ -134,6 +134,14 @@ func (b *Backend) GetCustomerProfile(ctx context.Context, meta appservice.Reques
 	return output, err
 }
 
+// ListCustomerBusinessQueries 返回客户会话当前客服周期内 AI 客服查询业务系统的记录。
+func (b *Backend) ListCustomerBusinessQueries(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.CustomerBusinessQueryList, error) {
+	var output appservice.CustomerBusinessQueryList
+	err := b.do(ctx, meta, http.MethodGet, "/conversations/"+url.PathEscape(conversationID)+"/business-queries", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // GetInboxConversation 返回当前用户有权阅读的独立会话摘要。
 func (b *Backend) GetInboxConversation(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.InboxConversation, error) {
 	var output appservice.InboxConversation
@@ -1277,6 +1285,14 @@ func (b *Backend) CreateMCPServer(ctx context.Context, meta appservice.RequestMe
 func (b *Backend) UpdateMCPServer(ctx context.Context, meta appservice.RequestMeta, mcpServerID string, input appservice.MCPServerInput) (appservice.MCPServer, error) {
 	var output appservice.MCPServer
 	err := b.do(ctx, meta, http.MethodPut, "/settings/mcp-servers/"+url.PathEscape(mcpServerID), nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// UpdateMCPToolPurpose 标记 MCP 服务中一个工具的用途。
+func (b *Backend) UpdateMCPToolPurpose(ctx context.Context, meta appservice.RequestMeta, mcpServerID string, input appservice.MCPToolPurposeInput) (appservice.MCPServer, error) {
+	var output appservice.MCPServer
+	err := b.do(ctx, meta, http.MethodPut, "/settings/mcp-servers/"+url.PathEscape(mcpServerID)+"/tool-purpose", nil, input, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }

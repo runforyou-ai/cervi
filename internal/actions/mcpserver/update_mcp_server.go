@@ -47,18 +47,22 @@ func (a *UpdateMCPServerAction) Execute(ctx context.Context, identity *servermod
 		if err != nil {
 			return err
 		}
-		// 连接配置变化后清除旧服务的目录。
+		// 连接配置变化后清除旧服务的目录，地址变化时一并清除工具用途。
 		if current.URL != input.URL || current.ServerType != input.ServerType || current.AuthorizationToken != input.AuthorizationToken {
 			current.Tools = []domain.MCPTool{}
 			current.ToolsUpdatedAt = nil
+		}
+		if current.URL != input.URL {
+			current.ToolPurposes = map[string]domain.MCPToolPurpose{}
 		}
 		current.Name = input.Name
 		current.URL = input.URL
 		current.ServerType = input.ServerType
 		current.AuthorizationToken = input.AuthorizationToken
+		current.CustomerScoped = input.CustomerScoped
 		if _, err := tx.NewUpdate().
 			Model(current).
-			Column("name", "url", "server_type", "authorization_token", "tools", "tools_updated_at").
+			Column("name", "url", "server_type", "authorization_token", "customer_scoped", "tools", "tools_updated_at", "tool_purposes").
 			Set("updated_at = now()").
 			Where("organization_id = ?", identity.Organization.ID).
 			WherePK().

@@ -8,6 +8,7 @@ import (
 	"log/slog"
 
 	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
+	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	customerserviceaction "github.com/runforyou-ai/cervi/internal/actions/customerservice"
 	servicecategoryaction "github.com/runforyou-ai/cervi/internal/actions/servicecategory"
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -30,6 +31,7 @@ type customerServiceOps struct {
 	getIdentitySecret     *customerserviceaction.GetCustomerIdentitySecretQuery
 	regenerateSecret      *customerserviceaction.RegenerateCustomerIdentitySecretAction
 	getCustomerProfile    *contactaction.GetCustomerProfileQuery
+	listBusinessQueries   *conversationaction.ListBusinessQueriesQuery
 }
 
 // newCustomerServiceOps 创建企业客服设置的业务实现依赖。
@@ -46,6 +48,7 @@ func newCustomerServiceOps(db *bun.DB) customerServiceOps {
 		getIdentitySecret:     customerserviceaction.NewGetCustomerIdentitySecretQuery(db),
 		regenerateSecret:      customerserviceaction.NewRegenerateCustomerIdentitySecretAction(db),
 		getCustomerProfile:    contactaction.NewGetCustomerProfileQuery(db),
+		listBusinessQueries:   conversationaction.NewListBusinessQueriesQuery(db),
 	}
 }
 
@@ -98,6 +101,30 @@ func (o *directOperations) GetCustomerProfile(ctx context.Context, meta RequestM
 			ReferrerURL: visit.ReferrerURL, PageURL: visit.PageURL, PageTitle: visit.PageTitle, Browser: visit.Browser, OS: visit.OS,
 			DeviceType: visit.DeviceType, Language: visit.Language, TimeZone: visit.TimeZone, Country: visit.Country,
 		}
+	}
+	return result, nil
+}
+
+// ListCustomerBusinessQueries 返回客户会话当前客服周期内 AI 客服查询业务系统的记录。
+func (o *directOperations) ListCustomerBusinessQueries(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string) (CustomerBusinessQueryList, error) {
+	queries, err := o.listBusinessQueries.Execute(ctx, identity, conversationID)
+	if err != nil {
+		if ctx.Err() != nil {
+			return CustomerBusinessQueryList{}, ctx.Err()
+		}
+		if errors.Is(err, conversationaction.ErrConversationNotFound) {
+			return CustomerBusinessQueryList{}, NotFoundError(meta, cervii18n.ErrorConversationNotFound)
+		}
+		slog.Warn("读取业务查询记录失败", "organization_id", identity.Organization.ID, "conversation_id", conversationID, "error", err)
+		return CustomerBusinessQueryList{}, FailedError(meta, cervii18n.ErrorBusinessQueriesLoadFailed)
+	}
+	result := CustomerBusinessQueryList{Queries: make([]CustomerBusinessQuery, 0, len(queries))}
+	for _, query := range queries {
+		call := query.ToolCall
+		result.Queries = append(result.Queries, CustomerBusinessQuery{
+			ID: query.ID, MCPServer: call.MCPServer, ToolName: call.Name, Arguments: call.Arguments, Result: call.Result, Error: call.Error,
+			Status: AgentToolCallStatus(call.Status), Evidence: call.Evidence, CalledAt: query.CalledAt,
+		})
 	}
 	return result, nil
 }

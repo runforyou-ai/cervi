@@ -31,6 +31,7 @@ type integrationOps struct {
 	getMCPServer             *mcpserveraction.GetMCPServerQuery
 	createMCPServer          *mcpserveraction.CreateMCPServerAction
 	updateMCPServer          *mcpserveraction.UpdateMCPServerAction
+	updateMCPToolPurpose     *mcpserveraction.UpdateToolPurposeAction
 	deleteMCPServer          *mcpserveraction.DeleteMCPServerAction
 	testMCPServerConnection  *mcpserveraction.TestConnectionAction
 	refreshMCPServerTools    *mcpserveraction.RefreshToolsAction
@@ -50,6 +51,7 @@ func newIntegrationOps(db *bun.DB, connectionRunner *connectiontest.Runner, mode
 		getMCPServer:             mcpserveraction.NewGetMCPServerQuery(db),
 		createMCPServer:          mcpserveraction.NewCreateMCPServerAction(db, mcpTest, mcpScheduler),
 		updateMCPServer:          mcpserveraction.NewUpdateMCPServerAction(db, mcpTest, mcpScheduler),
+		updateMCPToolPurpose:     mcpserveraction.NewUpdateToolPurposeAction(db),
 		deleteMCPServer:          mcpserveraction.NewDeleteMCPServerAction(db),
 		testMCPServerConnection:  mcpTest,
 		refreshMCPServerTools:    mcpserveraction.NewRefreshToolsAction(db, mcpScheduler),
@@ -116,6 +118,23 @@ func (o *directOperations) UpdateMCPServer(ctx context.Context, meta RequestMeta
 	return mcpServerFromAction(meta, *record), nil
 }
 
+// UpdateMCPToolPurpose 标记 MCP 服务中一个工具的用途。
+func (o *directOperations) UpdateMCPToolPurpose(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, mcpServerID string, input MCPToolPurposeInput) (MCPServer, error) {
+	record, err := o.updateMCPToolPurpose.Execute(ctx, identity, mcpServerID, mcpserveraction.ToolPurposeInput{
+		ToolName: input.ToolName, Purpose: domain.MCPToolPurpose(input.Purpose),
+	})
+	if errors.Is(err, mcpserveraction.ErrToolNotFound) {
+		return MCPServer{}, NotFoundError(meta, cervii18n.ErrorMCPToolNotFound)
+	}
+	if err != nil {
+		return MCPServer{}, o.mcpServerMutationError(
+			ctx, meta, err, cervii18n.ErrorMCPServerUpdateFailed, identity.Organization.ID,
+			"mcp_server_id", mcpServerID,
+		)
+	}
+	return mcpServerFromAction(meta, *record), nil
+}
+
 // DeleteMCPServer 删除 MCP 服务。
 func (o *directOperations) DeleteMCPServer(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, mcpServerID string) error {
 	if err := o.deleteMCPServer.Execute(ctx, identity, mcpServerID); err != nil {
@@ -132,13 +151,14 @@ func (o *directOperations) mcpServerMutationError(ctx context.Context, meta Requ
 	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
 		// 映射 MCP 服务校验错误。
 		keys := map[common.FieldCode]cervii18n.Key{
-			mcpserveraction.ValidationServerTypeInvalid: cervii18n.FieldMCPServerTypeInvalid,
-			mcpserveraction.ValidationNameRequired:      cervii18n.FieldMCPServerNameRequired,
-			mcpserveraction.ValidationNameTooLong:       cervii18n.FieldMCPServerNameTooLong,
-			mcpserveraction.ValidationNameDuplicate:     cervii18n.FieldMCPServerNameDuplicate,
-			mcpserveraction.ValidationURLRequired:       cervii18n.FieldMCPServerURLRequired,
-			mcpserveraction.ValidationURLInvalid:        cervii18n.FieldHTTPURLInvalid,
-			mcpserveraction.ValidationURLTooLong:        cervii18n.FieldMCPServerURLTooLong,
+			mcpserveraction.ValidationServerTypeInvalid:  cervii18n.FieldMCPServerTypeInvalid,
+			mcpserveraction.ValidationNameRequired:       cervii18n.FieldMCPServerNameRequired,
+			mcpserveraction.ValidationNameTooLong:        cervii18n.FieldMCPServerNameTooLong,
+			mcpserveraction.ValidationNameDuplicate:      cervii18n.FieldMCPServerNameDuplicate,
+			mcpserveraction.ValidationURLRequired:        cervii18n.FieldMCPServerURLRequired,
+			mcpserveraction.ValidationURLInvalid:         cervii18n.FieldHTTPURLInvalid,
+			mcpserveraction.ValidationURLTooLong:         cervii18n.FieldMCPServerURLTooLong,
+			mcpserveraction.ValidationToolPurposeInvalid: cervii18n.FieldMCPToolPurposeInvalid,
 		}
 		return InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, keys))
 	}
@@ -168,6 +188,7 @@ func (o *directOperations) mcpServerError(ctx context.Context, meta RequestMeta,
 func mcpServerInput(input MCPServerInput) mcpserveraction.Input {
 	return mcpserveraction.Input{
 		Name: input.Name, URL: input.URL, ServerType: domain.MCPServerType(input.ServerType), AuthorizationToken: input.AuthorizationToken,
+		CustomerScoped: input.CustomerScoped,
 	}
 }
 
@@ -175,7 +196,7 @@ func mcpServerInput(input MCPServerInput) mcpserveraction.Input {
 func mcpServerFromAction(meta RequestMeta, input mcpserveraction.Record) MCPServer {
 	tools := make([]MCPTool, 0, len(input.Tools))
 	for _, item := range input.Tools {
-		tools = append(tools, MCPTool{Name: item.Name, Description: item.Description})
+		tools = append(tools, MCPTool{Name: item.Name, Description: item.Description, Purpose: MCPToolPurpose(input.ToolPurposes[item.Name])})
 	}
 	message := ""
 	if input.ToolsFailure != "" {
@@ -184,7 +205,7 @@ func mcpServerFromAction(meta RequestMeta, input mcpserveraction.Record) MCPServ
 	return MCPServer{
 		Tools: tools, ToolsUpdatedAt: input.ToolsUpdatedAt, ToolsUpdating: input.ToolsUpdating, ToolsError: message,
 		ID: input.ID, Name: input.Name, URL: input.URL, ServerType: MCPServerType(input.ServerType), AuthorizationToken: input.AuthorizationToken,
-		CreatedAt: input.CreatedAt, UpdatedAt: input.UpdatedAt,
+		CustomerScoped: input.CustomerScoped, CreatedAt: input.CreatedAt, UpdatedAt: input.UpdatedAt,
 	}
 }
 

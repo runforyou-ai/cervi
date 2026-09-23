@@ -32,6 +32,7 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.POST("/inbox/context/query", s.getInboxContext)
 	router.POST("/inbox/window/query", s.readInboxWindow)
 	router.GET("/conversations/:conversationID/customer-profile", s.getCustomerProfile)
+	router.GET("/conversations/:conversationID/business-queries", s.listCustomerBusinessQueries)
 	router.GET("/conversations/:conversationID/summary", s.getInboxConversation)
 	router.POST("/inbox/conversations/query", s.readInboxConversations)
 	router.GET("/inbox/search", s.searchInbox)
@@ -183,6 +184,7 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.POST("/settings/mcp-servers/refresh-tools", s.refreshMCPServerTools)
 	router.POST("/settings/mcp-servers", s.createMCPServer)
 	router.PUT("/settings/mcp-servers/:mcpServerID", s.updateMCPServer)
+	router.PUT("/settings/mcp-servers/:mcpServerID/tool-purpose", s.updateMCPToolPurpose)
 	router.DELETE("/settings/mcp-servers/:mcpServerID", s.deleteMCPServer)
 	router.PUT("/settings/organization", s.updateOrganization)
 	router.GET("/settings/customer-service/identity-secret", s.getCustomerIdentitySecret)
@@ -357,6 +359,12 @@ func (s *Service) readInboxWindow(c *gin.Context) {
 // getCustomerProfile 返回客户会话的客户身份与当前周期访客上下文。
 func (s *Service) getCustomerProfile(c *gin.Context) {
 	output, err := s.application.GetCustomerProfile(c.Request.Context(), requestMeta(c), c.Param("conversationID"))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// listCustomerBusinessQueries 返回客户会话当前客服周期内 AI 客服查询业务系统的记录。
+func (s *Service) listCustomerBusinessQueries(c *gin.Context) {
+	output, err := s.application.ListCustomerBusinessQueries(c.Request.Context(), requestMeta(c), c.Param("conversationID"))
 	writeResult(c, http.StatusOK, output, err)
 }
 
@@ -1558,6 +1566,16 @@ func (s *Service) updateMCPServer(c *gin.Context) {
 		return
 	}
 	output, err := s.application.UpdateMCPServer(c.Request.Context(), requestMeta(c), c.Param("mcpServerID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// updateMCPToolPurpose 标记 MCP 服务中一个工具的用途。
+func (s *Service) updateMCPToolPurpose(c *gin.Context) {
+	var input appservice.MCPToolPurposeInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.UpdateMCPToolPurpose(c.Request.Context(), requestMeta(c), c.Param("mcpServerID"), input)
 	writeResult(c, http.StatusOK, output, err)
 }
 

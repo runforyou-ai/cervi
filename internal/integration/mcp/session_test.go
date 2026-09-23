@@ -3,9 +3,11 @@ package mcp
 import (
 	"context"
 	"encoding/json"
+	"io"
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync/atomic"
 	"testing"
 
 	sdk "github.com/modelcontextprotocol/go-sdk/mcp"
@@ -85,5 +87,50 @@ func TestConnectUnavailable(t *testing.T) {
 	_, err := Connect(context.Background(), Config{URL: "http://127.0.0.1:1/mcp", ServerType: domain.MCPServerTypeStreamableHTTP})
 	if _, _, ok := connectiontest.Details(err); !ok {
 		t.Fatalf("connect error = %v", err)
+	}
+}
+
+// TestSessionHeaders 验证会话的每个 HTTP 请求都附加配置的请求头。
+func TestSessionHeaders(t *testing.T) {
+	ctx := context.Background()
+	config := newSessionTestServer(t)
+	var requests, missing atomic.Int32
+	target := config.URL
+	proxy := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		requests.Add(1)
+		if r.Header.Get(CustomerIDHeader) != "user-1" || r.Header.Get(CustomerEmailHeader) != "ada@example.com" {
+			missing.Add(1)
+		}
+		request, err := http.NewRequestWithContext(r.Context(), r.Method, target, r.Body)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		request.Header = r.Header.Clone()
+		response, err := http.DefaultTransport.RoundTrip(request)
+		if err != nil {
+			t.Error(err)
+			return
+		}
+		defer response.Body.Close()
+		for name, values := range response.Header {
+			w.Header()[name] = values
+		}
+		w.WriteHeader(response.StatusCode)
+		_, _ = io.Copy(w, response.Body)
+	}))
+	t.Cleanup(proxy.Close)
+	config.URL = proxy.URL
+	config.Headers = map[string]string{CustomerIDHeader: "user-1", CustomerEmailHeader: "ada@example.com"}
+	session, err := Connect(ctx, config)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer session.Close()
+	if result, err := session.Call(ctx, "echo", json.RawMessage(`{"text":"订单"}`)); err != nil || result != "echo:订单" {
+		t.Fatalf("call result = %q, err = %v", result, err)
+	}
+	if requests.Load() < 2 || missing.Load() != 0 {
+		t.Fatalf("requests = %d, missing headers = %d", requests.Load(), missing.Load())
 	}
 }

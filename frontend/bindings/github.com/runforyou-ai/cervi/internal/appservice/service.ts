@@ -682,6 +682,13 @@ export function ListConversationMessages(meta: $models.RequestMeta, conversation
 }
 
 /**
+ * ListCustomerBusinessQueries 返回客户会话当前客服周期内 AI 客服查询业务系统的记录。
+ */
+export function ListCustomerBusinessQueries(meta: $models.RequestMeta, conversationID: string): $CancellablePromise<$models.CustomerBusinessQueryList> {
+    return $Call.ByID(3978813044, meta, conversationID);
+}
+
+/**
  * ListCustomerCopilotThreads 返回客户会话的全部 Copilot 线程。
  */
 export function ListCustomerCopilotThreads(meta: $models.RequestMeta, conversationID: string): $CancellablePromise<$models.CustomerCopilotThreadList> {
@@ -1372,6 +1379,13 @@ export function UpdateKnowledgeQAEntry(meta: $models.RequestMeta, knowledgeBaseI
  */
 export function UpdateMCPServer(meta: $models.RequestMeta, mcpServerID: string, input: $models.MCPServerInput): $CancellablePromise<$models.MCPServer> {
     return $Call.ByID(4046277534, meta, mcpServerID, input);
+}
+
+/**
+ * UpdateMCPToolPurpose 标记 MCP 服务中一个工具的用途。
+ */
+export function UpdateMCPToolPurpose(meta: $models.RequestMeta, mcpServerID: string, input: $models.MCPToolPurposeInput): $CancellablePromise<$models.MCPServer> {
+    return $Call.ByID(3906705663, meta, mcpServerID, input);
 }
 
 /**
