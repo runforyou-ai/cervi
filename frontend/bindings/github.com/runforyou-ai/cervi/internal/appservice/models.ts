@@ -1679,12 +1679,14 @@ export enum DevicePlatform {
 };
 
 /**
- * DeviceRegistrationInput 定义设备注册上报的本机信息。
+ * DeviceRegistrationInput 定义设备注册上报的本机信息、本机运行时版本与本机工具名称清单。
  */
 export interface DeviceRegistrationInput {
     "installId": string;
     "name": string;
     "platform": DevicePlatform;
+    "runtimeVersion": number;
+    "toolManifest": string[] | null;
 }
 
 /**
@@ -1879,12 +1881,20 @@ export interface GroupConversation {
     "createdAt": string;
     "participants": GroupParticipant[] | null;
     "muted": boolean;
+
+    /**
+     * MemberPreviewNames 是除查看者外按入群先后排列的前几名在群成员名称，用于显示未命名的群。
+     */
+    "memberPreviewNames": string[] | null;
 }
 
 /**
  * GroupConversationInput 定义群聊资料和创建时加入的成员。
  */
 export interface GroupConversationInput {
+    /**
+     * Title 为空时创建未命名的群，按成员名称显示。
+     */
     "title": string;
     "description": string;
     "imageFileId": string;
@@ -1936,6 +1946,11 @@ export interface GroupInboxConversation {
     "previewSenderIdentityType": OrganizationIdentityType | null;
     "lastMessageAt": string | null;
     "memberCount": number;
+
+    /**
+     * MemberPreviewNames 是除查看者外按入群先后排列的前几名在群成员名称，用于显示未命名的群。
+     */
+    "memberPreviewNames": string[] | null;
 }
 
 /**

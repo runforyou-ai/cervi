@@ -257,6 +257,46 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		fixture.complete(run.ID, "已查阅资料")
 	})
 
+	t.Run("本机工具按工作区与设备能力下发", func(t *testing.T) {
+		// 按设备上报的运行时版本与工具清单领取运行，返回有效配置中的工具。
+		claimTools := func(runtimeVersion int, manifest []string, workspaceID string) []string {
+			t.Helper()
+			if _, err := deviceaction.NewRegisterDeviceAction(db).Execute(ctx, identity, deviceaction.RegisterInput{
+				InstallID: installID, Name: "测试电脑", Platform: domain.DevicePlatformMacOS, RuntimeVersion: runtimeVersion, ToolManifest: manifest,
+			}); err != nil {
+				t.Fatal(err)
+			}
+			run := fixture.sendAndLoadRun(fixture.assistantChat(workspaceID), "看看代码")
+			claim, err := fixture.executor.ClaimDeviceRun(ctx, fixture.device, run.ID)
+			if err != nil {
+				t.Fatal(err)
+			}
+			var assignment agentruntime.Assignment
+			if err := json.Unmarshal(claim.Assignment, &assignment); err != nil {
+				t.Fatal(err)
+			}
+			fixture.complete(run.ID, "已查看")
+			return assignment.Tools
+		}
+		manifest := append(agentruntime.LocalToolManifest(), "future_tool")
+		tools := claimTools(agentruntime.LocalRuntimeVersion, manifest, second.ID)
+		for _, name := range agentruntime.LocalToolManifest() {
+			if !slices.Contains(tools, name) {
+				t.Fatalf("workspace run tools=%v", tools)
+			}
+		}
+		if slices.Contains(tools, "future_tool") {
+			t.Fatalf("unknown manifest tool granted=%v", tools)
+		}
+		// 不使用工作区的运行和低版本设备都没有本机工具。
+		if tools := claimTools(agentruntime.LocalRuntimeVersion, manifest, ""); slices.ContainsFunc(tools, agentruntime.IsLocalTool) {
+			t.Fatalf("run without workspace tools=%v", tools)
+		}
+		if tools := claimTools(0, manifest, second.ID); slices.ContainsFunc(tools, agentruntime.IsLocalTool) {
+			t.Fatalf("outdated device tools=%v", tools)
+		}
+	})
+
 	t.Run("派发领取与工作区串行", func(t *testing.T) {
 		before := fixture.workSeq()
 		conversationID := fixture.assistantChat(first.ID)

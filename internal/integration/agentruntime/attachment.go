@@ -78,13 +78,22 @@ func (m *mediaTrackingModel) Stream(ctx context.Context, input []*schema.Agentic
 	})), nil
 }
 
-// carriesMedia 判断模型输入是否包含直传的图片、音频或视频内容块。
+// carriesMedia 判断模型输入是否包含直传的图片、音频或视频内容块，或工具结果中的非文本内容。
 func carriesMedia(input []*schema.AgenticMessage) bool {
 	for _, message := range input {
 		for _, block := range message.ContentBlocks {
 			switch block.Type {
 			case schema.ContentBlockTypeUserInputImage, schema.ContentBlockTypeUserInputAudio, schema.ContentBlockTypeUserInputVideo:
 				return true
+			case schema.ContentBlockTypeFunctionToolResult:
+				if block.FunctionToolResult == nil {
+					continue
+				}
+				for _, content := range block.FunctionToolResult.Content {
+					if content != nil && content.Type != schema.FunctionToolResultContentBlockTypeText {
+						return true
+					}
+				}
 			}
 		}
 	}

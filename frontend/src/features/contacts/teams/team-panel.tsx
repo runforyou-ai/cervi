@@ -1,5 +1,5 @@
 /** 单个团队的成员列表与批量管理面板。 */
-import { useCallback, useEffect, useState } from "react"
+import { useEffect, useState } from "react"
 import { PlusIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useLocation, useNavigate } from "react-router"
@@ -11,8 +11,6 @@ import {
   isNotFoundApiError,
   listTeamMembers,
   removeTeamMembers,
-  type RoleData,
-  type Team,
   type TeamMember,
 } from "@/api"
 import {
@@ -35,7 +33,6 @@ import {
 import { workStatusLabel } from "@/components/work-status"
 import { useWorkspace } from "@/contexts/workspace-context"
 import { ContactListSection } from "@/features/contacts/contact-list-section"
-import { MemberDetailSheet } from "@/features/contacts/members/member-detail-sheet"
 import { TeamMemberPicker } from "@/features/contacts/teams/team-member-picker"
 import { teamMembershipCacheKeys } from "@/features/contacts/teams/team-membership-cache"
 import { useContactSearch } from "@/features/contacts/use-contact-search"
@@ -46,15 +43,7 @@ import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { optionalWailsEnum } from "@/lib/wails-enum"
 
 /** 单个团队的成员列表、批量移出和添加成员弹窗。 */
-export function TeamPanel({
-  roles,
-  teams,
-  teamId,
-}: {
-  roles: RoleData[]
-  teams: Team[]
-  teamId: string
-}) {
+export function TeamPanel({ teamId }: { teamId: string }) {
   const { t } = useTranslation("contacts")
   const { t: tCommon } = useTranslation("common")
   const { identity } = useWorkspace()
@@ -69,13 +58,7 @@ export function TeamPanel({
     search,
     setSearch,
     currentPage,
-    selected,
   } = useContactSearch()
-  // 保持引用稳定，供成员详情面板的读取失败处理依赖。
-  const closeMemberDetail = useCallback(
-    () => setParameters({ selected: null }),
-    [setParameters],
-  )
   const workStatus = optionalWailsEnum(
     WorkStatus,
     searchParams.get("workStatus"),
@@ -263,7 +246,6 @@ export function TeamPanel({
                 setParameters({
                   workStatus: value || null,
                   page: null,
-                  selected: null,
                 })
               }
             />
@@ -344,15 +326,16 @@ export function TeamPanel({
           ]}
           rows={teamMembers}
           rowKey={(member) => member.identityId}
-          // 企业成员与成员列表一样打开详情面板，AI 员工进入其编辑页并可返回本团队。
+          // 同事与同事列表一样进入单聊，AI 员工进入其编辑页并可返回本团队。
           onRowActivate={(member) =>
-            member.identityType ===
-            OrganizationIdentityType.OrganizationIdentityTypeAgent
-              ? navigate(
-                  `/ai-employees/${member.agentId}?tab=basic&returnTo=${encodeURIComponent(location.pathname + location.search)}`,
-                )
-              : setParameters({ selected: member.userId })
+            navigate(
+              member.identityType === OrganizationIdentityType.OrganizationIdentityTypeAgent
+                ? `/ai-employees/${member.agentId}?tab=basic&returnTo=${encodeURIComponent(location.pathname + location.search)}`
+                : `/chats?target=${member.identityId}`,
+            )
           }
+          // 自己的行不可进入。
+          canActivateRow={(member) => member.identityId !== identity.user.identityId}
           empty={t("list.empty")}
           rowActions={
             selectedTeam
@@ -369,13 +352,6 @@ export function TeamPanel({
           }
         />
       </ContactListSection>
-
-      <MemberDetailSheet
-        userId={selected}
-        roles={roles}
-        teams={teams}
-        onClose={closeMemberDetail}
-      />
 
       {selectedTeam ? (
         <Dialog

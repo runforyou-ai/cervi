@@ -75,7 +75,14 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 			gate = newGroundingGate(judges)
 		}
 	}
-	tools, releaseSessions, err := r.assembleTools(ctx, request, terminal)
+	// 工作区图片读取随直传附件一同受模型拒绝后的重新执行控制。
+	workspaceImages := &atomic.Bool{}
+	workspaceImages.Store(true)
+	workspace, workspaceTools, err := newWorkspaceMiddleware(ctx, request, workspaceImages)
+	if err != nil {
+		return RunResult{}, err
+	}
+	tools, releaseSessions, err := r.assembleTools(ctx, request, terminal, workspaceTools)
 	if err != nil {
 		return RunResult{}, err
 	}
@@ -101,6 +108,9 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 		terminal.budgetSpent = guard.budgetExhausted
 	}
 	handlers := append([]adk.TypedChatModelAgentMiddleware[*schema.AgenticMessage]{recorder, guard}, reductionHandlers...)
+	if workspace != nil {
+		handlers = append(handlers, workspace)
+	}
 	handlers = append(handlers, &toolArgumentsNormalizer{})
 	toolMiddlewares := []compose.ToolMiddleware{toolExecutionMiddleware(recorder)}
 	if terminal != nil {
@@ -147,11 +157,12 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 			recorder.reset()
 			continue
 		}
-		if err != nil && ctx.Err() == nil && media.maxCount > 0 && trackedModel.rejected.Load() {
-			slog.Warn("模型调用拒绝直传附件，改为仅在正文提供附件链接并重新执行",
+		if err != nil && ctx.Err() == nil && (media.maxCount > 0 || workspaceImages.Load()) && trackedModel.rejected.Load() {
+			slog.Warn("模型调用拒绝直传附件或工作区图片，改为仅在正文提供附件链接、不再向模型提供工作区图片并重新执行",
 				"agent_run_id", request.RunID, "error", err)
 			recorder.reset()
 			media = mediaInput{}
+			workspaceImages.Store(false)
 			continue
 		}
 		if err != nil {
@@ -168,9 +179,9 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 	}
 }
 
-// assembleTools 按场景与请求装配本次运行的工具：开发期计算器只在内部场景注册，终止工具只在客服场景注册，远程 MCP 工具在内置工具之后连接并跳过重名。
+// assembleTools 按场景与请求装配本次运行的工具：开发期计算器只在内部场景注册，终止工具只在客服场景注册，远程 MCP 工具在内置工具之后连接并跳过与内置工具、工作区工具重名的工具。
 // 工具集合由本次运行注入的依赖决定，调用方必须让注入的依赖与有效配置中的工具清单一致。
-func (r *EinoRuntime) assembleTools(ctx context.Context, request RunRequest, terminal *terminalTools) ([]tool.BaseTool, func(), error) {
+func (r *EinoRuntime) assembleTools(ctx context.Context, request RunRequest, terminal *terminalTools, workspaceTools []string) ([]tool.BaseTool, func(), error) {
 	tools := make([]tool.BaseTool, 0, len(r.tools)+4)
 	if request.Assignment.Scene != SceneCustomer {
 		tools = append(tools, r.tools...)
@@ -196,6 +207,9 @@ func (r *EinoRuntime) assembleTools(ctx context.Context, request RunRequest, ter
 	if len(request.MCPConnections) > 0 {
 		// 收齐本次运行的内置工具名称，远程工具重名时由 openMCPTools 跳过。
 		registered := map[string]struct{}{offloadedResultToolName: {}}
+		for _, name := range workspaceTools {
+			registered[name] = struct{}{}
+		}
 		for _, existing := range tools {
 			info, err := existing.Info(ctx)
 			if err != nil {

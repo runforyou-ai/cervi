@@ -1,14 +1,14 @@
 /** 按成员事件流确认的新消息决定本地通知范围：维护各会话已知末条基线，逐条执行提醒策略。 */
-import type { ConversationMessage, InboxConversation } from "@/api"
+import type { ConversationMessage, InboxConversationData } from "@/api"
 import type { RealtimeServerFrame } from "@/api/realtime/protocol"
 
 /** 观察器依赖的权威读取、通知投递与错误处理入口。 */
 export type NewMessageWatcherPorts = {
-  readConversations: () => Promise<InboxConversation[]>
-  readConversation: (conversationId: string) => Promise<InboxConversation | null>
+  readConversations: () => Promise<InboxConversationData[]>
+  readConversation: (conversationId: string) => Promise<InboxConversationData | null>
   readMessages: (conversationId: string) => Promise<ConversationMessage[]>
   readPendingMentions: (conversationId: string) => Promise<string[]>
-  deliver: (conversation: InboxConversation, message: ConversationMessage) => Promise<void>
+  deliver: (conversation: InboxConversationData, message: ConversationMessage) => Promise<void>
   failed: (error: unknown) => void
 }
 
@@ -217,7 +217,7 @@ export class NewMessageWatcher {
   }
 
   /** 记录会话当前的末条消息位置。 */
-  private remember(conversation: InboxConversation) {
+  private remember(conversation: InboxConversationData) {
     if (conversation.lastMessageId) {
       this.baselines.set(conversation.id, conversation.lastMessageId)
       return

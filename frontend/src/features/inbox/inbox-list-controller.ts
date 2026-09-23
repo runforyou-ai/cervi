@@ -1,5 +1,5 @@
 /** 串行调度收件箱窗口读取，只保存列表顺序、查询边界和浏览状态。 */
-import type { InboxConversation, InboxQuery, InboxWindow } from "@/api"
+import type { InboxConversationData, InboxQuery, InboxWindow } from "@/api"
 import type { loadInbox, readInboxConversations } from "@/api"
 
 export type InboxListOperation = "initial" | "before" | "after" | "poll" | "refresh"
@@ -10,10 +10,10 @@ export type InboxListAnchor = {
   height: number
   neighbors: { id: string; offset: number }[]
 }
-type ListPosition = Pick<InboxConversation, "id" | "positionCursor" | "lastActivityAt">
+type ListPosition = Pick<InboxConversationData, "id" | "positionCursor" | "lastActivityAt">
 type RowResults = Awaited<ReturnType<typeof readInboxConversations>>
 type Page = Awaited<ReturnType<typeof loadInbox>>
-type Window = Omit<InboxWindow, "conversations"> & { conversations: InboxConversation[] }
+type Window = Omit<InboxWindow, "conversations"> & { conversations: InboxConversationData[] }
 
 export type InboxListState = {
   ids: string[]

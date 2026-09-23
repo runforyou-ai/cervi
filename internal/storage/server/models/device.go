@@ -22,6 +22,8 @@ type Device struct {
 	RevokedAt      *time.Time            `bun:"revoked_at"`
 	WorkSeq        int64                 `bun:"work_seq"`
 	LastSeenAt     *time.Time            `bun:"last_seen_at"`
+	RuntimeVersion int                   `bun:"runtime_version"`
+	ToolManifest   []string              `bun:"tool_manifest,type:jsonb"`
 	CreatedAt      time.Time             `bun:"created_at"`
 	UpdatedAt      time.Time             `bun:"updated_at"`
 }

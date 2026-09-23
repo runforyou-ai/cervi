@@ -7,7 +7,7 @@ import {
   ChatSubjectKind,
   ConversationType,
   type ConversationMessageReference,
-  type InboxConversation,
+  type InboxConversationData,
 } from "@/api"
 import { IconTooltip } from "@/components/icon-tooltip"
 import { Button } from "@/components/ui/button"
@@ -233,7 +233,7 @@ export function ComposerAttachmentTool({
   disabled: boolean
   onSent: () => void
   onBeforeSend?: () => Promise<boolean>
-  onCreated?: (conversation: InboxConversation | null, conversationID: string) => void
+  onCreated?: (conversation: InboxConversationData | null, conversationID: string) => void
 }) {
   const { t } = useTranslation("inbox")
   return (conversationType === ConversationType.ConversationTypeDirect ||

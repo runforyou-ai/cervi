@@ -22,7 +22,7 @@ import { useTranslation } from "react-i18next"
 import {
   ConversationPinPosition,
   type ConversationPinCommand,
-  type InboxConversation,
+  type InboxConversationData,
 } from "@/api"
 import type { useConversationListActions } from "@/features/inbox/conversation-list-menu"
 import { pinMoveTarget } from "@/features/inbox/inbox-partitions"
@@ -70,7 +70,7 @@ export function pinSortableStyle(sortable: PinSortable | undefined) {
 }
 
 /** 置顶区在前且可在区内排序、其余会话在后的列表；renderPinned 按当前展示顺序渲染置顶行，renderRow 渲染其余行。 */
-export function PinnedConversationList<T extends InboxConversation>({
+export function PinnedConversationList<T extends InboxConversationData>({
   conversations,
   pinnedIds,
   names,
@@ -124,7 +124,7 @@ function PinnedSortArea({
   onDraggingChange,
   children,
 }: {
-  conversations: InboxConversation[]
+  conversations: InboxConversationData[]
   pinnedIds: string[]
   names: Map<string, string>
   pinOrderVersion: string

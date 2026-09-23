@@ -2,11 +2,11 @@
 import assert from "node:assert/strict"
 import { test } from "node:test"
 import { InboxListController, type InboxListPorts } from "../src/features/inbox/inbox-list-controller.ts"
-import type { InboxConversation, InboxQuery } from "../src/api/index.ts"
+import type { InboxConversationData, InboxQuery } from "../src/api/index.ts"
 
 /** 构造保持服务端精度的排序位置。 */
-function row(number: number): InboxConversation {
-  return { id: String(number), positionCursor: `p${number}`, lastActivityAt: `2026-09-09T00:00:00.${String(1000 - number).padStart(6, "0")}Z` } as InboxConversation
+function row(number: number): InboxConversationData {
+  return { id: String(number), positionCursor: `p${number}`, lastActivityAt: `2026-09-09T00:00:00.${String(1000 - number).padStart(6, "0")}Z` } as InboxConversationData
 }
 
 /** 构造具有双向边界的权威窗口。 */

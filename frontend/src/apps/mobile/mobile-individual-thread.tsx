@@ -1,16 +1,17 @@
 /** 移动端真人、AI、客户与群聊共用的时间线、阅读进度、文本与附件发送、客户会话内部备注和失败重试。 */
-import { useEffect } from "react"
+import { useEffect, type RefObject } from "react"
 
 import {
   ConversationType,
   type ConversationMessageData,
   type DirectTextMessageInput,
   type GroupParticipant,
-  type InboxConversation,
+  type InboxConversationData,
 } from "@/api"
 import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
 import {
   ConversationComposer,
+  type ComposerDraftBridge,
   type CustomerChannelCapabilities,
 } from "@/features/inbox/conversation-composer"
 import {
@@ -27,7 +28,7 @@ import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 /**
  * 草稿只展示本地发送状态，正式会话读取历史、推进已读、按需定位原消息并在前台轮询；
  * closedNotice 非空时保留历史并以该提示替换发送区（如群聊已解散）；
- * 客户会话可切换内部备注，不能对客回复时仍可写备注并引用消息。
+ * 客户会话可切换内部备注，不能对客回复时仍可写备注并引用消息；customerDraftRef 供 AI 助手读取和替换对客草稿。
  */
 export function MobileIndividualThread({
   conversationID,
@@ -45,12 +46,13 @@ export function MobileIndividualThread({
   groupParticipants,
   locateMessage = null,
   onUnavailable,
+  customerDraftRef,
 }: {
   conversationID: string
   conversationType?: ConversationType
   peerIdentityID?: string
   attachmentAgentIdentityID?: string
-  onAttachmentConversationCreated?: (conversation: InboxConversation) => void
+  onAttachmentConversationCreated?: (conversation: InboxConversationData) => void
   enabled?: boolean
   disabledReason?: string | null
   closedNotice?: string | null
@@ -60,6 +62,7 @@ export function MobileIndividualThread({
   groupParticipants?: GroupParticipant[]
   locateMessage?: ConversationLocateTarget | null
   onUnavailable?: () => void
+  customerDraftRef?: RefObject<ComposerDraftBridge | null>
   sendIndividualMessage?: (
     input: DirectTextMessageInput,
   ) => Promise<ConversationMessageData>
@@ -142,6 +145,7 @@ export function MobileIndividualThread({
           onVisibilityChange={customer ? bridge.setVisibility : undefined}
           sendIndividualMessage={sendIndividualMessage}
           customerChannel={customerAttachment}
+          draftBridgeRef={customerDraftRef}
           onSucceeded={() => {
             void invalidate(resourceKeys.inbox())
             // 发送结果可能改变客服负责人与处理状态，同时刷新会话摘要。

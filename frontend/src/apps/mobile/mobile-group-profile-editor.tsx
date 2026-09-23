@@ -140,14 +140,13 @@ function MobileGroupFieldEditor({
             </div>
           ) : (
             <>
-              <FieldLabel htmlFor="mobile-edit-group-value" required={field === "title"}>
+              <FieldLabel htmlFor="mobile-edit-group-value">
                 {label}
               </FieldLabel>
               {field === "title" ? (
                 <Input
                   {...form.register("value")}
                   id="mobile-edit-group-value"
-                  required
                   maxLength={groupTitleMaxLength}
                   disabled={disabled}
                   className="min-h-11 md:text-base"

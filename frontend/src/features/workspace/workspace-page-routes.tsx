@@ -26,6 +26,7 @@ import { KnowledgeQAFormPage } from "@/features/knowledge-base/knowledge-qa-form
 import { KnowledgeBaseFormPage } from "@/features/knowledge-base/knowledge-base-form-page"
 import { KnowledgeBaseListPage } from "@/features/knowledge-base/knowledge-base-list-page"
 import { RoleFormPage } from "@/features/roles/role-form-page"
+import { MemberFormPage } from "@/features/settings/members/member-form-page"
 import { SettingsPage } from "@/features/settings/settings-page"
 
 /** 需要公共外壳的路由前缀，同一前缀下的页面渲染在对应布局内。 */
@@ -65,6 +66,26 @@ const workspaceRouteDefinitions = [
   {
     path: "/settings/customer-service",
     element: <SettingsPage section="customerService" />,
+  },
+  {
+    path: "/settings/members/new",
+    element: (
+      <SettingsPage section="members">
+        <MemberFormPage mode="create" />
+      </SettingsPage>
+    ),
+  },
+  {
+    path: "/settings/members/:userId",
+    element: (
+      <SettingsPage section="members">
+        <MemberFormPage mode="detail" />
+      </SettingsPage>
+    ),
+  },
+  {
+    path: "/settings/members",
+    element: <SettingsPage section="members" />,
   },
   {
     path: "/settings/roles/new",

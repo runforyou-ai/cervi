@@ -6,7 +6,7 @@ import {
   InboxSearchPersonKind,
   OrganizationIdentityType,
   type Identity,
-  type InboxConversation,
+  type InboxConversationData,
 } from "@/api"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { ProfileAvatar } from "@/components/profile-avatar"
@@ -161,7 +161,7 @@ export function InboxSearchPanel({ search, identity }: { search: InboxSearchStat
     listRef.current?.querySelector(`[data-search-index="${search.selectedIndex}"]`)?.scrollIntoView({ block: "nearest" })
   }, [search.selectedIndex])
 
-  const conversationRows = (conversations: InboxConversation[]) =>
+  const conversationRows = (conversations: InboxConversationData[]) =>
     conversations.map((conversation, index) => (
       <SearchResultRow
         key={conversation.id}

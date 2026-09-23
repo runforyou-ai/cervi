@@ -9,12 +9,12 @@ import {
   isCustomerInboxConversation,
   isDirectInboxConversation,
   isGroupInboxConversation,
-  type InboxConversation,
+  type InboxConversationData,
 } from "@/api"
 import { messagePreview } from "@/lib/message-preview"
 
 /** 返回会话列表项的摘要数据（末条消息、时间、未读等）；列表不支持的会话类型返回 null。 */
-export function inboxConversationSummary(conversation: InboxConversation) {
+export function inboxConversationSummary(conversation: InboxConversationData) {
   if (isCustomerInboxConversation(conversation)) return conversation.customer
   if (isAgentInboxConversation(conversation)) return conversation.agent
   if (isDirectInboxConversation(conversation)) return conversation.direct
@@ -24,7 +24,7 @@ export function inboxConversationSummary(conversation: InboxConversation) {
 
 /** 会话列表项的摘要文案：群解散、运行结果与内部备注各有固定文案，其余取末条消息预览。 */
 export function conversationPreview(
-  conversation: InboxConversation,
+  conversation: InboxConversationData,
   t: TFunction<"inbox">,
 ) {
   const summary = inboxConversationSummary(conversation)

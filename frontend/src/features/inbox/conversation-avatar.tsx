@@ -7,7 +7,7 @@ import {
   isAgentInboxConversation,
   isDirectInboxConversation,
   isGroupInboxConversation,
-  type InboxConversation,
+  type InboxConversationData,
 } from "@/api"
 import { ProfileAvatar } from "@/components/profile-avatar"
 import { messageChannelTypeDefinition } from "@/lib/message-channel-types"
@@ -18,7 +18,7 @@ export function ConversationAvatar({
   conversation,
   className,
 }: {
-  conversation: InboxConversation
+  conversation: InboxConversationData
   className?: string
 }) {
   const customer = isCustomerInboxConversation(conversation)
@@ -74,7 +74,7 @@ export function ConversationAssigneeAvatar({
   conversation,
   className,
 }: {
-  conversation: InboxConversation
+  conversation: InboxConversationData
   className?: string
 }) {
   const { t } = useTranslation("inbox")

@@ -32,7 +32,7 @@ import { TeamCheckboxOptions } from "@/features/contacts/team-checkbox-options"
 import {
   createMemberSchema,
   type MemberFormValues,
-} from "@/features/contacts/members/member-schema"
+} from "@/features/settings/members/member-schema"
 import { roleDisplayName } from "@/lib/role-labels"
 import { useDateTime } from "@/hooks/use-date-time"
 import { sameIDs, useImmediateSave } from "@/hooks/use-immediate-save"

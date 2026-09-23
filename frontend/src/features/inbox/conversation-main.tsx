@@ -102,6 +102,7 @@ export function ConversationMain({
           group: {
             ...sourceGroupConversation.group,
             title: group.title,
+            memberPreviewNames: group.memberPreviewNames,
             imageUrl: group.imageUrl,
             memberCount: group.participants.length,
             status: group.status,

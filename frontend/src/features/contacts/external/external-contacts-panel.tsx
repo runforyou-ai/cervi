@@ -10,14 +10,12 @@ import {
   deleteContact,
   getContact,
   isApiError,
+  listChannelOptions,
   listContacts,
   listDeletedContacts,
   restoreContact,
   sessionPath,
-  type ChannelOption,
   type ContactSummary,
-  type RoleData,
-  type Team,
 } from "@/api"
 import {
   ListToolbarFilter,
@@ -27,10 +25,17 @@ import {
 import { ConfirmationDialog } from "@/components/confirmation-dialog"
 import { ResourceRowIdentity } from "@/components/resource-row-identity"
 import { ResourceTable } from "@/components/resource-table"
-import { ContactCreateDialogs } from "@/features/contacts/contact-create-dialogs"
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog"
 import { ContactDetailSheet } from "@/features/contacts/contact-detail-sheet"
 import { ContactListSection } from "@/features/contacts/contact-list-section"
 import { ContactDetailView } from "@/features/contacts/external/contact-detail"
+import { ContactForm } from "@/features/contacts/external/contact-form"
 import { channelTypeLabel } from "@/features/contacts/external/contact-labels"
 import { useContactSearch } from "@/features/contacts/use-contact-search"
 import { useDateTime } from "@/hooks/use-date-time"
@@ -40,16 +45,22 @@ import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { optionalWailsEnum } from "@/lib/wails-enum"
 
 /** 外部联系人范围的列表、详情和弹窗。 */
-export function ExternalContactsPanel({
-  channels,
-  roles,
-  teams,
-}: {
-  channels: ChannelOption[]
-  roles: RoleData[]
-  teams: Team[]
-}) {
+export function ExternalContactsPanel() {
   const { t } = useTranslation(["contacts", "common"])
+  const channelsResource = useResource(
+    resourceKeys.channelOptions(),
+    () => listChannelOptions(),
+    { staleTime: 0 },
+  )
+  const channels = channelsResource.data ?? []
+  const channelsError = channelsResource.error
+
+  /** 渠道选项加载失败时记录日志，便于排查筛选项为空的原因。 */
+  useEffect(() => {
+    if (channelsError) {
+      console.warn("外部联系人渠道选项加载失败", channelsError)
+    }
+  }, [channelsError])
   const { formatDateTime } = useDateTime()
   const invalidate = useResourceInvalidator()
   const {
@@ -366,14 +377,25 @@ export function ExternalContactsPanel({
         ) : null}
       </ContactDetailSheet>
 
-      <ContactCreateDialogs
-        scope="external"
-        channels={channels}
-        roles={roles}
-        teams={teams}
-        searchParams={searchParams}
-        setParameters={setParameters}
-      />
+      <Dialog
+        open={searchParams.get("new") === "1"}
+        onOpenChange={(open) => !open && setParameters({ new: null })}
+      >
+        <DialogContent className="max-w-xl">
+          <DialogHeader>
+            <DialogTitle>{t("detail.createTitle")}</DialogTitle>
+            <DialogDescription>{t("detail.createDescription")}</DialogDescription>
+          </DialogHeader>
+          <ContactForm
+            channels={channels}
+            onSaved={() => {
+              setParameters({ new: null })
+              void invalidate(resourceKeys.contacts())
+            }}
+            onCancel={() => setParameters({ new: null })}
+          />
+        </DialogContent>
+      </Dialog>
 
       <ConfirmationDialog
         {...deletion.dialog}

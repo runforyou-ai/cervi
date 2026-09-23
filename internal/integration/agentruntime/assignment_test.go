@@ -69,13 +69,13 @@ func TestToolGuidance(t *testing.T) {
 	}
 }
 
-// TestSceneRules 验证群聊场景列出可点名成员，没有可点名成员时明确告知。
+// TestSceneRules 验证群聊场景写明群名并列出可点名成员，未命名的群不写群名，没有可点名成员时明确告知。
 func TestSceneRules(t *testing.T) {
 	rules := sceneRules(SceneContext{Scene: SceneGroup, GroupTitle: "售后组", MentionCandidates: []string{"小鹿", "老王"}}, builtinTools{})
 	if !strings.Contains(rules, "群聊「售后组」") || !strings.Contains(rules, "小鹿、老王") {
 		t.Fatalf("群聊场景规则 = %q", rules)
 	}
-	if empty := sceneRules(SceneContext{Scene: SceneGroup}, builtinTools{}); !strings.Contains(empty, "可点名的成员：无") {
+	if empty := sceneRules(SceneContext{Scene: SceneGroup}, builtinTools{}); !strings.Contains(empty, "本次在群聊中") || !strings.Contains(empty, "可点名的成员：无") {
 		t.Fatalf("无可点名成员时的场景规则 = %q", empty)
 	}
 }

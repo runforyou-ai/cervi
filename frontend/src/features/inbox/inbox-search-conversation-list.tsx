@@ -2,7 +2,7 @@
 import { useEffect, type ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 
-import type { Identity, InboxConversation, InboxQuery } from "@/api"
+import type { Identity, InboxConversationData, InboxQuery } from "@/api"
 import { Button } from "@/components/ui/button"
 import type { InboxListBookmark } from "./inbox-list-controller"
 import { InboxListPanel } from "./inbox-list-panel"
@@ -22,8 +22,8 @@ export function InboxSearchConversationList({
   query: InboxQuery
   history?: Map<string, InboxListBookmark>
   mobile?: boolean
-  onConversationsChange?: (conversations: InboxConversation[]) => void
-  children: (conversations: InboxConversation[]) => ReactNode
+  onConversationsChange?: (conversations: InboxConversationData[]) => void
+  children: (conversations: InboxConversationData[]) => ReactNode
 }) {
   const { t } = useTranslation(["inbox", "common"])
   const viewport = useInboxListViewport()

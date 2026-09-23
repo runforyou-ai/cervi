@@ -5,6 +5,7 @@ import (
 	"context"
 	"net/http"
 
+	"github.com/cloudwego/eino/adk/filesystem"
 	"github.com/runforyou-ai/cervi/internal/domain"
 
 	"github.com/runforyou-ai/cervi/internal/integration/knowledgeretrieval"
@@ -109,10 +110,11 @@ type RunRequest struct {
 	Credentials           ModelCredentials // 模型供应商凭据。
 	KnowledgeSearch       KnowledgeSearch
 	CustomerHistorySearch CustomerHistorySearch
-	ReadAttachment        AttachmentContent // 为空时附件只以正文中的链接提供给模型。
-	MCPConnections        []MCPServer       // 有效配置中远程 MCP 服务对应的连接配置。
-	MaxIterations         int               // 单轮模型与工具迭代上限，零值使用默认值。
-	MaxTurns              int               // 吸收新输入的轮次上限，零值不限制，由运行 context 控制生命周期。
+	ReadAttachment        AttachmentContent  // 为空时附件只以正文中的链接提供给模型。
+	MCPConnections        []MCPServer        // 有效配置中远程 MCP 服务对应的连接配置。
+	Workspace             filesystem.Backend // 有效配置包含本机工具时由执行设备提供的工作区，路径以 / 表示工作区根目录。
+	MaxIterations         int                // 单轮模型与工具迭代上限，零值使用默认值。
+	MaxTurns              int                // 吸收新输入的轮次上限，零值不限制，由运行 context 控制生命周期。
 	StreamID              string
 	Attempt               int
 	OnStream              func(StreamDelta) // 串行接收合并后的运行流增量，实现不得阻塞。
