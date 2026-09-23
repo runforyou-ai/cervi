@@ -551,7 +551,7 @@ export enum AssistantPresence {
 };
 
 /**
- * AttachmentMessageInput 定义已上传附件的发送意图，agentIdentityId 非空表示按 conversationId 草稿编号首发 AI 聊天，同时指定 customerConversationId 表示首发该客户会话的 Copilot 线程；首发本人助理的聊天时 workspaceId 非空则同时为助理指定该工作区。
+ * AttachmentMessageInput 定义已上传附件的发送意图，agentIdentityId 非空表示按 conversationId 草稿编号首发 AI 聊天，同时指定 customerConversationId 表示首发该客户会话的 Copilot 线程。
  */
 export interface AttachmentMessageInput {
     "conversationId": string;
@@ -563,7 +563,6 @@ export interface AttachmentMessageInput {
     "body": string;
     "imageWidth": number;
     "imageHeight": number;
-    "workspaceId": string;
 }
 
 /**
@@ -865,32 +864,6 @@ export interface ConversationAgentRun {
      * ExecutionDeviceName 是执行该运行的设备名称，服务端执行时为空。
      */
     "executionDeviceName": string | null;
-}
-
-/**
- * ConversationAssistantWorkspace 定义会话中一位助理的绑定电脑与工作区，workspaceId 为空表示尚未指定。
- */
-export interface ConversationAssistantWorkspace {
-    "assistantIdentityId": string;
-    "ownerUserId": string;
-    "deviceId": string;
-    "deviceName": string;
-    "workspaceId": string;
-    "workspaceLabel": string;
-}
-
-/**
- * ConversationAssistantWorkspaceInput 定义为会话中的助理指定的工作区。
- */
-export interface ConversationAssistantWorkspaceInput {
-    "workspaceId": string;
-}
-
-/**
- * ConversationAssistantWorkspaceList 定义会话中各位助理的工作区。
- */
-export interface ConversationAssistantWorkspaceList {
-    "assistants": ConversationAssistantWorkspace[] | null;
 }
 
 /**
@@ -1701,39 +1674,12 @@ export enum DevicePlatform {
 };
 
 /**
- * DeviceRegistrationInput 定义设备注册上报的本机信息、本机运行时版本与本机工具名称清单。
+ * DeviceRegistrationInput 定义设备注册上报的本机信息。
  */
 export interface DeviceRegistrationInput {
     "installId": string;
     "name": string;
     "platform": DevicePlatform;
-    "runtimeVersion": number;
-    "toolManifest": string[] | null;
-}
-
-/**
- * DeviceWorkspace 定义设备上供 Agent 执行本机工具的工作区。
- */
-export interface DeviceWorkspace {
-    "id": string;
-    "deviceId": string;
-    "label": string;
-    "lastUsedAt": string | null;
-    "createdAt": string;
-}
-
-/**
- * DeviceWorkspaceInput 定义设备工作区的显示名。
- */
-export interface DeviceWorkspaceInput {
-    "label": string;
-}
-
-/**
- * DeviceWorkspaceList 定义设备上的工作区列表。
- */
-export interface DeviceWorkspaceList {
-    "workspaces": DeviceWorkspace[] | null;
 }
 
 /**
@@ -1838,14 +1784,13 @@ export interface FileUploadRequest {
 }
 
 /**
- * FirstAgentTextMessageInput 定义 AI 草稿的稳定编号、目标和首条消息；目标为本人助理且 workspaceId 非空时，创建会话的同时为助理指定该工作区。
+ * FirstAgentTextMessageInput 定义 AI 草稿的稳定编号、目标和首条消息。
  */
 export interface FirstAgentTextMessageInput {
     "conversationId": string;
     "agentIdentityId": string;
     "clientMessageId": string;
     "body": string;
-    "workspaceId": string;
 }
 
 /**

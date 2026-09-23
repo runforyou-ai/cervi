@@ -24,7 +24,7 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// deviceRunFixture 是设备执行集成测试共用的助理、设备、工作区与调用入口。
+// deviceRunFixture 是设备执行集成测试共用的助理、设备与调用入口。
 type deviceRunFixture struct {
 	t          *testing.T
 	ctx        context.Context
@@ -33,13 +33,12 @@ type deviceRunFixture struct {
 	assistant  *agentaction.Assistant
 	tasks      *servertask.Runtime
 	executor   *agentrunaction.ExecuteAction
-	workspaces *deviceaction.ConversationAssistantWorkspaceAction
 	sendFirst  *conversationaction.SendFirstAgentTextMessageAction
 	send       *conversationaction.SendAgentTextMessageAction
 	device     agentrunaction.RunDevice
 }
 
-// testDeviceAgentRuns 验证助理的运行派发到其绑定电脑，以及领取、工作区串行、停止、租约过期、换电脑、暂停与失去执行条件的收敛；AI 员工的运行始终在服务端执行。
+// testDeviceAgentRuns 验证助理的运行派发到其绑定电脑，以及领取、并行、停止、租约过期、换电脑、暂停与失去执行条件的收敛；AI 员工的运行始终在服务端执行。
 func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identity, employee *agentaction.Agent, tasks *servertask.Runtime) {
 	ctx := context.Background()
 	installID := uuid.NewV7().String()
@@ -58,21 +57,10 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 	fixture := &deviceRunFixture{
 		t: t, ctx: ctx, db: db, identity: identity, assistant: assistant, tasks: tasks,
 		executor:   agentrunaction.NewExecuteAction(db, tasks, nil, testAttachmentReader(db), nil),
-		workspaces: deviceaction.NewConversationAssistantWorkspaceAction(db),
 		sendFirst:  conversationaction.NewSendFirstAgentTextMessageAction(db, agentrunaction.NewScheduler(tasks)),
 		send:       conversationaction.NewSendAgentTextMessageAction(db, agentrunaction.NewScheduler(tasks)),
 		device:     agentrunaction.RunDevice{OrganizationID: identity.Organization.ID, UserID: identity.User.ID, DeviceID: registered.ID},
 	}
-	register := deviceaction.NewRegisterWorkspaceAction(db)
-	first, err := register.Execute(ctx, identity, registered.ID, "cervi")
-	if err != nil {
-		t.Fatal(err)
-	}
-	second, err := register.Execute(ctx, identity, registered.ID, "docs")
-	if err != nil {
-		t.Fatal(err)
-	}
-
 	t.Run("助理归属主人", func(t *testing.T) {
 		if assistant.OwnerUserID != identity.User.ID || assistant.DeviceID != registered.ID || assistant.Presence(time.Now()) != domain.AssistantPresenceOffline {
 			t.Fatalf("assistant=%+v", assistant)
@@ -100,7 +88,7 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 
 	t.Run("AI 员工在服务端执行", func(t *testing.T) {
 		_, run := createAgentLockChat(t, ctx, db, identity, employee.IdentityID, tasks)
-		if run.ExecutionDeviceID != nil || run.ExecutionWorkspaceID != nil {
+		if run.ExecutionDeviceID != nil {
 			t.Fatalf("employee run dispatched to device=%+v", run)
 		}
 		if _, err := fixture.executor.StopAgentReply(ctx, identity, run.ConversationID, run.ID); err != nil {
@@ -108,91 +96,35 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		}
 	})
 
-	t.Run("设备认证与工作区归属", func(t *testing.T) {
+	t.Run("设备认证", func(t *testing.T) {
 		other := newChatLockUser(t, db, identity)
 		if _, err := deviceaction.NewAuthenticateDeviceAction(db).Execute(ctx, other, registered.ID); !errors.Is(err, deviceaction.ErrNotFound) {
 			t.Fatalf("other member device auth=%v", err)
 		}
-		if _, err := register.Execute(ctx, other, registered.ID, "other"); !errors.Is(err, deviceaction.ErrNotFound) {
-			t.Fatalf("other member workspace=%v", err)
-		}
-		conversationID := fixture.assistantChat(first.ID)
-		if err := fixture.workspaces.Set(ctx, other, conversationID, assistant.IdentityID, second.ID); err == nil {
-			t.Fatal("non-member set assistant workspace")
-		}
-		// 工作区必须属于助理绑定的电脑。
-		otherDevice, err := deviceaction.NewRegisterDeviceAction(db).Execute(ctx, identity, deviceaction.RegisterInput{InstallID: uuid.NewV7().String(), Name: "另一台", Platform: domain.DevicePlatformMacOS})
-		if err != nil {
-			t.Fatal(err)
-		}
-		foreignWorkspace, err := register.Execute(ctx, identity, otherDevice.ID, "other")
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := fixture.workspaces.Set(ctx, identity, conversationID, assistant.IdentityID, foreignWorkspace.ID); !errors.Is(err, deviceaction.ErrWorkspaceNotFound) {
-			t.Fatalf("workspace on another device=%v", err)
-		}
 	})
 
-	t.Run("草稿首发即指定工作区", func(t *testing.T) {
-		// 工作区不属于助理绑定电脑时整个首发回滚，不留下会话。
-		rejectedID := uuid.NewV7().String()
-		if _, err := fixture.sendFirst.Execute(ctx, identity, conversationaction.FirstAgentTextMessageInput{
-			ConversationID: rejectedID, AgentIdentityID: assistant.IdentityID, ClientMessageID: uuid.NewV7().String(), Body: "未知工作区", WorkspaceID: uuid.NewV7().String(),
-		}); !errors.Is(err, deviceaction.ErrWorkspaceNotFound) {
-			t.Fatalf("unknown workspace first send=%v", err)
-		}
-		if exists, err := db.NewSelect().Model((*servermodels.Conversation)(nil)).Where("cv.id = ?", rejectedID).Exists(ctx); err != nil || exists {
-			t.Fatalf("rejected draft conversation exists=%v %v", exists, err)
-		}
-		// AI 员工没有工作区。
-		if _, err := fixture.sendFirst.Execute(ctx, identity, conversationaction.FirstAgentTextMessageInput{
-			ConversationID: uuid.NewV7().String(), AgentIdentityID: employee.IdentityID, ClientMessageID: uuid.NewV7().String(), Body: "员工工作区", WorkspaceID: first.ID,
-		}); !errors.Is(err, deviceaction.ErrAssistantNotInConversation) {
-			t.Fatalf("employee workspace first send=%v", err)
-		}
-
+	t.Run("草稿首发即派发到绑定电脑", func(t *testing.T) {
 		conversationID := uuid.NewV7().String()
 		if _, err := fixture.sendFirst.Execute(ctx, identity, conversationaction.FirstAgentTextMessageInput{
-			ConversationID: conversationID, AgentIdentityID: assistant.IdentityID, ClientMessageID: uuid.NewV7().String(), Body: "首条就在本机执行", WorkspaceID: first.ID,
+			ConversationID: conversationID, AgentIdentityID: assistant.IdentityID, ClientMessageID: uuid.NewV7().String(), Body: "首条就在本机执行",
 		}); err != nil {
 			t.Fatal(err)
-		}
-		workspaces, err := fixture.workspaces.List(ctx, identity, conversationID)
-		if err != nil || len(workspaces) != 1 || workspaces[0].WorkspaceID != first.ID || workspaces[0].DeviceID != registered.ID || workspaces[0].AssistantIdentityID != assistant.IdentityID {
-			t.Fatalf("draft workspaces=%+v %v", workspaces, err)
 		}
 		var run servermodels.AgentRun
 		if err := db.NewSelect().Model(&run).Where("agr.conversation_id = ?", conversationID).Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
-		if run.ExecutionDeviceID == nil || *run.ExecutionDeviceID != registered.ID || run.ExecutionWorkspaceID == nil || *run.ExecutionWorkspaceID != first.ID {
+		if run.ExecutionDeviceID == nil || *run.ExecutionDeviceID != registered.ID {
 			t.Fatalf("first run=%+v", run)
 		}
 		if count, err := db.NewSelect().Model((*servermodels.TaskRun)(nil)).Where("tr.idempotency_key = ?", "agent:"+run.ID).Count(ctx); err != nil || count != 0 {
 			t.Fatalf("first device run enqueued server task=%d %v", count, err)
 		}
-		if _, err := fixture.executor.StopAgentReply(ctx, identity, conversationID, run.ID); err != nil {
-			t.Fatal(err)
-		}
-	})
-
-	t.Run("未指定工作区仍在绑定电脑执行", func(t *testing.T) {
-		conversationID := fixture.assistantChat("")
-		run := fixture.sendAndLoadRun(conversationID, "只对话")
-		if run.ExecutionDeviceID == nil || *run.ExecutionDeviceID != registered.ID || run.ExecutionWorkspaceID != nil {
-			t.Fatalf("run without workspace=%+v", run)
-		}
 		work, err := fixture.executor.DeviceWork(ctx, fixture.device)
 		if err != nil || !deviceWorkContains(work, run.ID) {
 			t.Fatalf("device work=%+v %v", work, err)
 		}
-		for _, offered := range work.Runs {
-			if offered.RunID == run.ID && offered.WorkspaceID != "" {
-				t.Fatalf("offered workspace=%+v", offered)
-			}
-		}
-		fixture.claimAndComplete(run.ID, "只对话的回复")
+		fixture.claimAndComplete(run.ID, "首条的回复")
 	})
 
 	t.Run("运行期知识检索与附件读取", func(t *testing.T) {
@@ -213,7 +145,7 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		bindKnowledge([]string{base.ID})
 		defer bindKnowledge(nil)
 		executor := agentrunaction.NewExecuteAction(db, tasks, nil, testAttachmentReader(db), testDeviceKnowledge{})
-		conversationID := fixture.assistantChat("")
+		conversationID := fixture.assistantChat()
 		sent, err := conversationaction.NewSendAttachmentMessageAction(db, agentrunaction.NewScheduler(tasks)).Execute(ctx, identity, conversationaction.AttachmentMessageInput{
 			ConversationID: conversationID, ClientMessageID: uuid.NewV7().String(), Body: "看看截图",
 			FileID: uploadedAttachment(t, db, identity, "screen.png", "image/png"),
@@ -257,51 +189,29 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		fixture.complete(run.ID, "已查阅资料")
 	})
 
-	t.Run("本机工具按工作区与设备能力下发", func(t *testing.T) {
-		// 按设备上报的运行时版本与工具清单领取运行，返回有效配置中的工具。
-		claimTools := func(runtimeVersion int, manifest []string, workspaceID string) []string {
-			t.Helper()
-			if _, err := deviceaction.NewRegisterDeviceAction(db).Execute(ctx, identity, deviceaction.RegisterInput{
-				InstallID: installID, Name: "测试电脑", Platform: domain.DevicePlatformMacOS, RuntimeVersion: runtimeVersion, ToolManifest: manifest,
-			}); err != nil {
-				t.Fatal(err)
-			}
-			run := fixture.sendAndLoadRun(fixture.assistantChat(workspaceID), "看看代码")
-			claim, err := fixture.executor.ClaimDeviceRun(ctx, fixture.device, run.ID)
-			if err != nil {
-				t.Fatal(err)
-			}
-			var assignment agentruntime.Assignment
-			if err := json.Unmarshal(claim.Assignment, &assignment); err != nil {
-				t.Fatal(err)
-			}
-			fixture.complete(run.ID, "已查看")
-			return assignment.Tools
+	t.Run("设备运行下发全部本机工具", func(t *testing.T) {
+		run := fixture.sendAndLoadRun(fixture.assistantChat(), "看看文件")
+		claim, err := fixture.executor.ClaimDeviceRun(ctx, fixture.device, run.ID)
+		if err != nil {
+			t.Fatal(err)
 		}
-		manifest := append(agentruntime.LocalToolManifest(), "future_tool")
-		tools := claimTools(agentruntime.LocalRuntimeVersion, manifest, second.ID)
-		for _, name := range agentruntime.LocalToolManifest() {
-			if !slices.Contains(tools, name) {
-				t.Fatalf("workspace run tools=%v", tools)
+		var assignment agentruntime.Assignment
+		if err := json.Unmarshal(claim.Assignment, &assignment); err != nil {
+			t.Fatal(err)
+		}
+		for _, name := range agentruntime.LocalTools() {
+			if !slices.Contains(assignment.Tools, name) {
+				t.Fatalf("device run tools=%v", assignment.Tools)
 			}
 		}
-		if slices.Contains(tools, "future_tool") {
-			t.Fatalf("unknown manifest tool granted=%v", tools)
-		}
-		// 不使用工作区的运行和低版本设备都没有本机工具。
-		if tools := claimTools(agentruntime.LocalRuntimeVersion, manifest, ""); slices.ContainsFunc(tools, agentruntime.IsLocalTool) {
-			t.Fatalf("run without workspace tools=%v", tools)
-		}
-		if tools := claimTools(0, manifest, second.ID); slices.ContainsFunc(tools, agentruntime.IsLocalTool) {
-			t.Fatalf("outdated device tools=%v", tools)
-		}
+		fixture.complete(run.ID, "已查看")
 	})
 
-	t.Run("派发领取与工作区串行", func(t *testing.T) {
+	t.Run("派发领取与并行", func(t *testing.T) {
 		before := fixture.workSeq()
-		conversationID := fixture.assistantChat(first.ID)
+		conversationID := fixture.assistantChat()
 		run := fixture.sendAndLoadRun(conversationID, "在本机执行")
-		if run.ExecutionDeviceID == nil || *run.ExecutionDeviceID != registered.ID || run.ExecutionWorkspaceID == nil || *run.ExecutionWorkspaceID != first.ID {
+		if run.ExecutionDeviceID == nil || *run.ExecutionDeviceID != registered.ID {
 			t.Fatalf("device run=%+v", run)
 		}
 		if count, err := db.NewSelect().Model((*servermodels.TaskRun)(nil)).Where("tr.idempotency_key = ?", "agent:"+run.ID).Count(ctx); err != nil || count != 0 {
@@ -332,10 +242,10 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		if _, err := fixture.executor.ResolveDeviceModelUpstream(ctx, agentrunaction.RunDevice{OrganizationID: identity.Organization.ID, UserID: identity.User.ID, DeviceID: uuid.NewV7().String()}, run.ID); !errors.Is(err, agentrunaction.ErrDeviceRunNotFound) {
 			t.Fatalf("foreign device model upstream=%v", err)
 		}
-		// 第二个会话指定同一工作区，第一个运行结束前不能领取。
-		waiting := fixture.sendAndLoadRun(fixture.assistantChat(first.ID), "排队")
-		if _, err := fixture.executor.ClaimDeviceRun(ctx, fixture.device, waiting.ID); !errors.Is(err, agentrunaction.ErrDeviceWorkspaceBusy) {
-			t.Fatalf("busy workspace claim=%v", err)
+		// 其他会话的运行不必等待，可以同时领取。
+		waiting := fixture.sendAndLoadRun(fixture.assistantChat(), "并行")
+		if _, err := fixture.executor.ClaimDeviceRun(ctx, fixture.device, waiting.ID); err != nil {
+			t.Fatalf("parallel claim=%v", err)
 		}
 		fixture.complete(run.ID, "本机回复")
 		if _, err := fixture.executor.ResolveDeviceModelUpstream(ctx, fixture.device, run.ID); !errors.Is(err, agentrunaction.ErrDeviceRunLeaseLost) {
@@ -348,9 +258,6 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		// 已完成的运行再次上报保持幂等。
 		if err := fixture.executor.CompleteDeviceRun(ctx, fixture.device, run.ID, agentruntime.RunResult{Content: "重复", EndSeq: 1}); err != nil {
 			t.Fatal(err)
-		}
-		if _, err := fixture.executor.ClaimDeviceRun(ctx, fixture.device, waiting.ID); err != nil {
-			t.Fatalf("claim after release=%v", err)
 		}
 		// 停止运行后续租得知结束，工作水位随之推进。
 		stoppedSeq := fixture.workSeq()
@@ -371,7 +278,7 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 	})
 
 	t.Run("设备运行输入状态", func(t *testing.T) {
-		conversationID := fixture.assistantChat(first.ID)
+		conversationID := fixture.assistantChat()
 		run := fixture.sendAndLoadRun(conversationID, "输入状态")
 		feed := startRealtimeFeed(t, identity.Organization.ID)
 		if _, err := fixture.executor.ClaimDeviceRun(ctx, fixture.device, run.ID); err != nil {
@@ -397,7 +304,7 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		feed.expectNoTyping(t)
 	})
 	t.Run("租约过期", func(t *testing.T) {
-		run := fixture.sendAndLoadRun(fixture.assistantChat(second.ID), "租约")
+		run := fixture.sendAndLoadRun(fixture.assistantChat(), "租约")
 		if _, err := fixture.executor.ClaimDeviceRun(ctx, fixture.device, run.ID); err != nil {
 			t.Fatal(err)
 		}
@@ -418,7 +325,7 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		fixture.assertBlocks(run.ID, 1)
 
 		// 收尾请求等待会话锁期间租约过期，取得锁后按租约失效拒绝写入。
-		waiting := fixture.sendAndLoadRun(fixture.assistantChat(second.ID), "等锁")
+		waiting := fixture.sendAndLoadRun(fixture.assistantChat(), "等锁")
 		if _, err := fixture.executor.ClaimDeviceRun(ctx, fixture.device, waiting.ID); err != nil {
 			t.Fatal(err)
 		}
@@ -472,7 +379,7 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 			}
 		}
 		// 超出总时限后不再续租、不再代理模型请求，设备上报失败时按超时收敛并保留过程内容。
-		run := fixture.sendAndLoadRun(fixture.assistantChat(second.ID), "超时")
+		run := fixture.sendAndLoadRun(fixture.assistantChat(), "超时")
 		if claim, err := fixture.executor.ClaimDeviceRun(ctx, fixture.device, run.ID); err != nil || len(claim.Assignment) == 0 {
 			t.Fatalf("claim=%+v %v", claim, err)
 		}
@@ -499,41 +406,19 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		fixture.assertFailed(swept.ID, domain.AgentRunErrorCodeDeviceRunTimedOut)
 	})
 
-	t.Run("工作区缺失与清除", func(t *testing.T) {
-		missing := fixture.sendAndLoadRun(fixture.assistantChat(second.ID), "目录缺失")
-		if err := fixture.executor.FailDeviceRun(ctx, fixture.device, missing.ID, domain.AgentRunErrorCodeUserCancelled, "", agentruntime.RunResult{}); !errors.Is(err, agentrunaction.ErrDeviceRunFailureCodeInvalid) {
+	t.Run("失败原因校验", func(t *testing.T) {
+		run := fixture.sendAndLoadRun(fixture.assistantChat(), "失败")
+		if err := fixture.executor.FailDeviceRun(ctx, fixture.device, run.ID, domain.AgentRunErrorCodeUserCancelled, "", agentruntime.RunResult{}); !errors.Is(err, agentrunaction.ErrDeviceRunFailureCodeInvalid) {
 			t.Fatalf("invalid failure code=%v", err)
 		}
-		if err := fixture.executor.FailDeviceRun(ctx, fixture.device, missing.ID, domain.AgentRunErrorCodeWorkspaceMissing, "", agentruntime.RunResult{}); err != nil {
+		if err := fixture.executor.FailDeviceRun(ctx, fixture.device, run.ID, domain.AgentRunErrorCodeDeviceRunFailed, "", agentruntime.RunResult{}); err != nil {
 			t.Fatal(err)
 		}
-		fixture.assertFailed(missing.ID, domain.AgentRunErrorCodeWorkspaceMissing)
-
-		cleared := fixture.sendAndLoadRun(fixture.assistantChat(second.ID), "清除")
-		version := loadConversationVersion(t, db, cleared.ConversationID)
-		if err := fixture.workspaces.Clear(ctx, identity, cleared.ConversationID, assistant.IdentityID); err != nil {
-			t.Fatal(err)
-		}
-		if loadConversationVersion(t, db, cleared.ConversationID) <= version {
-			t.Fatal("clear did not advance conversation version")
-		}
-		if work, err := fixture.executor.DeviceWork(ctx, fixture.device); err != nil || deviceWorkContains(work, cleared.ID) {
-			t.Fatalf("cleared run still offered=%+v %v", work, err)
-		}
-		if _, err := fixture.executor.ClaimDeviceRun(ctx, fixture.device, cleared.ID); !errors.Is(err, agentrunaction.ErrDeviceRunUnavailable) {
-			t.Fatalf("cleared claim=%v", err)
-		}
-		fixture.sweep()
-		fixture.assertFailed(cleared.ID, domain.AgentRunErrorCodeExecutionChanged)
-		next := fixture.sendAndLoadRun(cleared.ConversationID, "不带工作区")
-		if next.ExecutionDeviceID == nil || *next.ExecutionDeviceID != registered.ID || next.ExecutionWorkspaceID != nil {
-			t.Fatalf("run after clear=%+v", next)
-		}
-		fixture.claimAndComplete(next.ID, "不带工作区的回复")
+		fixture.assertFailed(run.ID, domain.AgentRunErrorCodeDeviceRunFailed)
 	})
 
 	t.Run("暂停与恢复", func(t *testing.T) {
-		conversationID := fixture.assistantChat("")
+		conversationID := fixture.assistantChat()
 		paused, err := agentaction.NewSetAssistantPausedAction(db).Execute(ctx, identity, assistant.ID, true)
 		if err != nil || paused.Presence(time.Now()) != domain.AssistantPresencePaused {
 			t.Fatalf("pause=%+v %v", paused, err)
@@ -549,7 +434,7 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 	})
 
 	t.Run("换到另一台电脑", func(t *testing.T) {
-		conversationID := fixture.assistantChat(second.ID)
+		conversationID := fixture.assistantChat()
 		queued := fixture.sendAndLoadRun(conversationID, "换电脑前")
 		otherDevice, err := deviceaction.NewRegisterDeviceAction(db).Execute(ctx, identity, deviceaction.RegisterInput{InstallID: uuid.NewV7().String(), Name: "新电脑", Platform: domain.DevicePlatformLinux})
 		if err != nil {
@@ -559,17 +444,14 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		if err != nil || moved.DeviceID != otherDevice.ID {
 			t.Fatalf("move=%+v %v", moved, err)
 		}
-		// 换电脑清空各会话的工作区指定，原电脑上未领取的运行被收敛。
-		if workspaces, err := fixture.workspaces.List(ctx, identity, conversationID); err != nil || len(workspaces) != 1 || workspaces[0].WorkspaceID != "" || workspaces[0].DeviceID != otherDevice.ID {
-			t.Fatalf("workspaces after move=%+v %v", workspaces, err)
-		}
+		// 原电脑上未领取的运行被收敛。
 		if _, err := fixture.executor.ClaimDeviceRun(ctx, fixture.device, queued.ID); !errors.Is(err, agentrunaction.ErrDeviceRunUnavailable) {
 			t.Fatalf("claim on previous device=%v", err)
 		}
 		fixture.sweep()
 		fixture.assertFailed(queued.ID, domain.AgentRunErrorCodeExecutionChanged)
 		next := fixture.sendAndLoadRun(conversationID, "换电脑后")
-		if next.ExecutionDeviceID == nil || *next.ExecutionDeviceID != otherDevice.ID || next.ExecutionWorkspaceID != nil {
+		if next.ExecutionDeviceID == nil || *next.ExecutionDeviceID != otherDevice.ID {
 			t.Fatalf("run after move=%+v", next)
 		}
 		if _, err := fixture.executor.StopAgentReply(ctx, identity, conversationID, next.ID); err != nil {
@@ -581,7 +463,7 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 	})
 
 	t.Run("撤销设备", func(t *testing.T) {
-		run := fixture.sendAndLoadRun(fixture.assistantChat(second.ID), "撤销")
+		run := fixture.sendAndLoadRun(fixture.assistantChat(), "撤销")
 		if err := deviceaction.NewRevokeDeviceAction(db).Execute(ctx, identity, registered.ID); err != nil {
 			t.Fatal(err)
 		}
@@ -622,12 +504,12 @@ func (testDeviceKnowledge) Sources(_ context.Context, _ string, knowledgeBaseIDs
 	return sources, nil
 }
 
-// assistantChat 创建一条与测试助理的新单聊，workspaceID 非空时同时指定工作区，停止首条消息的运行后返回会话编号。
-func (f *deviceRunFixture) assistantChat(workspaceID string) string {
+// assistantChat 创建一条与测试助理的新单聊，停止首条消息的运行后返回会话编号。
+func (f *deviceRunFixture) assistantChat() string {
 	f.t.Helper()
 	conversationID := uuid.NewV7().String()
 	if _, err := f.sendFirst.Execute(f.ctx, f.identity, conversationaction.FirstAgentTextMessageInput{
-		ConversationID: conversationID, AgentIdentityID: f.assistant.IdentityID, ClientMessageID: uuid.NewV7().String(), Body: "开始", WorkspaceID: workspaceID,
+		ConversationID: conversationID, AgentIdentityID: f.assistant.IdentityID, ClientMessageID: uuid.NewV7().String(), Body: "开始",
 	}); err != nil {
 		f.t.Fatalf("send first=%v", err)
 	}

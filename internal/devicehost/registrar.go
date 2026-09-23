@@ -15,7 +15,6 @@ import (
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/clientsession"
 	"github.com/runforyou-ai/cervi/internal/domain"
-	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 )
 
 const (
@@ -179,7 +178,7 @@ func (r *Registrar) run() {
 	}
 }
 
-// register 在已登录且当前登录会话尚未注册时上报本机设备、本机运行时版本与本机工具清单，返回本次是否无需尽快重试。
+// register 在已登录且当前登录会话尚未注册时上报本机设备，返回本次是否无需尽快重试。
 func (r *Registrar) register() bool {
 	ctx, cancel := context.WithTimeout(r.ctx, registerTimeout)
 	defer cancel()
@@ -199,7 +198,6 @@ func (r *Registrar) register() bool {
 	}
 	device, err := r.client.RegisterDevice(ctx, meta, appservice.DeviceRegistrationInput{
 		InstallID: installID, Name: r.name, Platform: appservice.DevicePlatform(r.platform),
-		RuntimeVersion: agentruntime.LocalRuntimeVersion, ToolManifest: agentruntime.LocalToolManifest(),
 	})
 	if err != nil {
 		slog.Warn("注册本机设备失败", "server_url", serverURL, "organization_id", credential.OrganizationID, "error", err)

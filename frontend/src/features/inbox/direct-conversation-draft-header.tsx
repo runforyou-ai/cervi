@@ -1,6 +1,5 @@
 /** 展示尚未创建会话的单聊目标。 */
 import { PanelRightOpenIcon } from "lucide-react"
-import type { ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 
 import { type MemberOption } from "@/api"
@@ -37,14 +36,11 @@ export function DirectConversationDraftAvatar({
 /** 展示草稿收件人的姓名和身份。 */
 export function DirectConversationDraftHeader({
   member,
-  actions,
   contextVisible = false,
   narrowViewport = false,
   onToggleContext,
 }: {
   member: MemberOption
-  /** 展示在侧栏开关之前的草稿操作。 */
-  actions?: ReactNode
   contextVisible?: boolean
   narrowViewport?: boolean
   onToggleContext?: () => void
@@ -73,7 +69,6 @@ export function DirectConversationDraftHeader({
           <TooltipContent className="max-w-80">{member.displayName}</TooltipContent>
         </Tooltip>
       </div>
-      {actions}
       {onToggleContext && !contextVisible ? (
         <HeaderAction
           label={t("sidePanelOpen")}

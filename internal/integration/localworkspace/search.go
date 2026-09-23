@@ -19,14 +19,15 @@ import (
 // maxSearchFileBytes 是内容搜索时单个文件的字节上限，超出的文件跳过。
 const maxSearchFileBytes = 2 << 20
 
-// skippedDirs 是遍历工作区时跳过的目录名。
+// skippedDirs 是遍历目录时跳过的目录名。
 var skippedDirs = []string{".git"}
 
-// GlobInfo 在搜索起点目录下按 glob 模式匹配文件，模式相对起点目录匹配，以 / 开头时相对工作区根目录匹配；结果按修改时间从新到旧排列。
+// GlobInfo 在搜索起点目录下按 glob 模式匹配文件，模式相对起点目录匹配，绝对路径模式从其固定前缀目录开始匹配；结果按修改时间从新到旧排列。
 func (b *Backend) GlobInfo(ctx context.Context, req *filesystem.GlobInfoRequest) ([]filesystem.FileInfo, error) {
 	pattern, base := req.Pattern, req.Path
-	if strings.HasPrefix(pattern, "/") {
-		pattern, base = strings.TrimPrefix(pattern, "/"), "/"
+	if filepath.IsAbs(pattern) {
+		base, pattern = doublestar.SplitPattern(filepath.ToSlash(pattern))
+		base = filepath.FromSlash(base)
 	}
 	if !doublestar.ValidatePattern(pattern) {
 		return nil, fmt.Errorf("glob 模式无效：%s", req.Pattern)
@@ -37,12 +38,12 @@ func (b *Backend) GlobInfo(ctx context.Context, req *filesystem.GlobInfoRequest)
 	}
 	var infos []filesystem.FileInfo
 	err = b.walk(ctx, dir, func(real string, entry fs.DirEntry) error {
-		rel, err := filepath.Rel(dir.real, real)
+		rel, err := filepath.Rel(dir, real)
 		if err != nil || !doublestar.MatchUnvalidated(pattern, filepath.ToSlash(rel)) {
 			return nil
 		}
 		if info, err := entry.Info(); err == nil {
-			infos = append(infos, fileInfo(b.virtualPath(real), info))
+			infos = append(infos, fileInfo(real, info))
 		}
 		return nil
 	})
@@ -90,8 +91,8 @@ func (b *Backend) GrepRaw(ctx context.Context, req *filesystem.GrepRequest) ([]f
 	err = b.walk(ctx, start, func(real string, entry fs.DirEntry) error {
 		// 过滤路径相对搜索目录计算，搜索单个文件时取文件名。
 		rel := filepath.Base(real)
-		if real != start.real {
-			relative, err := filepath.Rel(start.real, real)
+		if real != start {
+			relative, err := filepath.Rel(start, real)
 			if err != nil {
 				return nil
 			}
@@ -123,7 +124,6 @@ func (b *Backend) grepFile(real string, re *regexp.Regexp, req *filesystem.GrepR
 	if err != nil || isBinary(content) {
 		return nil
 	}
-	virtual := b.virtualPath(real)
 	text := string(content)
 	lines := strings.Split(strings.TrimSuffix(text, "\n"), "\n")
 	hits := make([]bool, len(lines))
@@ -159,22 +159,22 @@ func (b *Backend) grepFile(real string, re *regexp.Regexp, req *filesystem.GrepR
 	var matches []filesystem.GrepMatch
 	for index, show := range shown {
 		if show {
-			matches = append(matches, filesystem.GrepMatch{Path: virtual, Line: index + 1, Content: lines[index]})
+			matches = append(matches, filesystem.GrepMatch{Path: real, Line: index + 1, Content: lines[index]})
 		}
 	}
 	return matches
 }
 
-// walk 遍历起点下的普通文件，起点是文件时只访问该文件；跳过版本库目录，不跟随符号链接目录，指向工作区外的文件链接被跳过。
-func (b *Backend) walk(ctx context.Context, start target, visit func(real string, entry fs.DirEntry) error) error {
-	info, err := os.Stat(start.real)
+// walk 遍历起点下的普通文件，起点是文件时只访问该文件；跳过版本库目录，不跟随符号链接目录。
+func (b *Backend) walk(ctx context.Context, start string, visit func(real string, entry fs.DirEntry) error) error {
+	info, err := os.Stat(start)
 	if err != nil {
-		return fmt.Errorf("无法访问：%s", start.virtual)
+		return fmt.Errorf("无法访问：%s", start)
 	}
 	if !info.IsDir() {
-		return visit(start.real, fs.FileInfoToDirEntry(info))
+		return visit(start, fs.FileInfoToDirEntry(info))
 	}
-	return filepath.WalkDir(start.real, func(real string, entry fs.DirEntry, err error) error {
+	return filepath.WalkDir(start, func(real string, entry fs.DirEntry, err error) error {
 		if ctxErr := ctx.Err(); ctxErr != nil {
 			return ctxErr
 		}
@@ -182,17 +182,13 @@ func (b *Backend) walk(ctx context.Context, start target, visit func(real string
 			return nil
 		}
 		if entry.IsDir() {
-			if real != start.real && slices.Contains(skippedDirs, entry.Name()) {
+			if real != start && slices.Contains(skippedDirs, entry.Name()) {
 				return filepath.SkipDir
 			}
 			return nil
 		}
 		if entry.Type()&fs.ModeSymlink != 0 {
-			target, err := filepath.EvalSymlinks(real)
-			if err != nil || !b.contains(target) {
-				return nil
-			}
-			info, err := os.Stat(target)
+			info, err := os.Stat(real)
 			if err != nil || info.IsDir() {
 				return nil
 			}

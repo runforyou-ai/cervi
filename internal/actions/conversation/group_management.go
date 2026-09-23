@@ -302,9 +302,6 @@ func (a *RemoveGroupConversationMemberAction) Execute(ctx context.Context, ident
 		if err != nil {
 			return err
 		}
-		if err := clearGroupAssistantWorkspaces(ctx, tx, identity.Organization.ID, conversationID, []string{memberID}); err != nil {
-			return err
-		}
 		targets := []ConversationSystemEventParticipant{groupParticipantSnapshot(target)}
 		for _, userID := range removedUserIDs {
 			removed, runIDs, err := removeOwnedGroupAssistants(ctx, tx, a.coordinator, identity.Organization.ID, conversationID, userID)
@@ -444,11 +441,6 @@ func (a *DissolveGroupConversationAction) Execute(ctx context.Context, identity 
 			cancelledRunIDs, err = a.coordinator.CancelForGroupConversation(ctx, tx, identity.Organization.ID, conversationID)
 			if err != nil {
 				return err
-			}
-			if _, err := tx.NewDelete().Model((*servermodels.ConversationAssistantWorkspace)(nil)).
-				Where("organization_id = ? AND conversation_id = ?", identity.Organization.ID, conversationID).
-				Exec(ctx); err != nil {
-				return fmt.Errorf("clear dissolved group assistant workspaces: %w", err)
 			}
 			if _, err := createGroupSystemEvent(ctx, tx, identity, group.Conversation, ConversationSystemEvent{
 				Type: domain.ConversationSystemEventGroupDissolved, Actor: groupActorSnapshot(identity),

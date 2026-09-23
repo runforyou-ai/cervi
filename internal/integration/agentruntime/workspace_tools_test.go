@@ -15,51 +15,20 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
-// TestLocalToolCatalog 验证每个本机工具都声明风险类别，交集只放行设备清单中版本满足且无需审批的工具。
-func TestLocalToolCatalog(t *testing.T) {
-	for _, item := range localTools {
-		if !slices.Contains([]LocalToolRisk{LocalToolRiskReadOnly, LocalToolRiskModifiesLocal, LocalToolRiskExecutesCode}, item.Risk) || item.MinRuntimeVersion < 1 {
-			t.Fatalf("local tool %q lacks risk or runtime version: %+v", item.Name, item)
-		}
-		if item.MinRuntimeVersion > LocalRuntimeVersion {
-			t.Fatalf("local tool %q requires runtime %d above current %d", item.Name, item.MinRuntimeVersion, LocalRuntimeVersion)
-		}
-	}
-	manifest := append(LocalToolManifest(), "future_tool")
-	available := AvailableLocalTools(manifest, LocalRuntimeVersion)
-	for _, name := range available {
-		if !localToolAutoAllowed(name) {
-			t.Fatalf("tool %q granted without approval", name)
-		}
-	}
-	if !slices.Equal(available, LocalToolManifest()) {
-		t.Fatalf("available=%v", available)
-	}
-	if got := AvailableLocalTools([]string{"grep", "ls"}, LocalRuntimeVersion); !slices.Equal(got, []string{"ls", "grep"}) {
-		t.Fatalf("partial manifest=%v", got)
-	}
-	if got := AvailableLocalTools(manifest, 0); len(got) != 0 {
-		t.Fatalf("outdated runtime=%v", got)
-	}
-	if localToolAutoAllowed("unregistered") {
-		t.Fatal("unregistered tool auto allowed")
-	}
-}
-
 // TestResolveAssignmentLocalTools 验证本机工具进入工具清单并在指令中说明，没有本机工具时不出现说明。
 func TestResolveAssignmentLocalTools(t *testing.T) {
 	facts := AssignmentFacts{OrganizationName: "测试企业", AgentName: "小码", Scene: SceneContext{Scene: SceneAgentChat}}
 	assignment := ResolveAssignment(facts, Capabilities{LocalTools: []string{"ls", "read_file"}})
-	if !slices.Contains(assignment.Tools, "ls") || !slices.Contains(assignment.Tools, "read_file") || !strings.Contains(assignment.Instruction, "- ls、read_file：查阅本会话指定的工作区") {
+	if !slices.Contains(assignment.Tools, "ls") || !slices.Contains(assignment.Tools, "read_file") || !strings.Contains(assignment.Instruction, "- ls、read_file：查阅这台电脑上的文件") {
 		t.Fatalf("assignment=%+v", assignment)
 	}
 	plain := ResolveAssignment(facts, Capabilities{})
-	if slices.ContainsFunc(plain.Tools, IsLocalTool) || strings.Contains(plain.Instruction, "工作区") {
+	if slices.ContainsFunc(plain.Tools, IsLocalTool) || strings.Contains(plain.Instruction, "这台电脑上的文件") {
 		t.Fatalf("assignment without workspace=%+v", plain)
 	}
 }
 
-// imageWorkspace 是返回固定文本与图片的测试工作区，按图片读取时图片文件返回图片内容。
+// imageWorkspace 是返回固定文本与图片的测试本机文件后端，按图片读取时图片文件返回图片内容。
 type imageWorkspace struct {
 	filesystem.Backend
 }
@@ -74,7 +43,7 @@ func (imageWorkspace) MultiModalRead(context.Context, *filesystem.MultiModalRead
 	return &filesystem.MultiFileContent{Parts: []filesystem.FileContentPart{{Type: filesystem.FileContentPartTypeImage, MIMEType: "image/png", Data: []byte("png")}}}, nil
 }
 
-// workspaceChatModel 第一次调用读取工作区文件，拿到工具结果后给出回答；rejectImages 为 true 时拒绝携带工具图片的请求。
+// workspaceChatModel 第一次调用读取本机文件，拿到工具结果后给出回答；rejectImages 为 true 时拒绝携带工具图片的请求。
 type workspaceChatModel struct {
 	mu           sync.Mutex
 	rejectImages bool
@@ -144,7 +113,7 @@ func TestWorkspaceToolsFollowAssignment(t *testing.T) {
 	}
 }
 
-// TestWorkspaceImageRead 验证模型支持图片时工作区图片随工具结果交给模型并以类型记入过程；模型拒绝后改按文本读取重新执行。
+// TestWorkspaceImageRead 验证模型支持图片时本机图片随工具结果交给模型并以类型记入过程；模型拒绝后改按文本读取重新执行。
 func TestWorkspaceImageRead(t *testing.T) {
 	images := []domain.AIModelInputModality{domain.AIModelInputModalityText, domain.AIModelInputModalityImage}
 	chatModel := &workspaceChatModel{}

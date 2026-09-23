@@ -18,7 +18,6 @@ import (
 	"github.com/runforyou-ai/cervi/internal/integration/knowledgeretrieval"
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	"github.com/runforyou-ai/cervi/internal/storage/server/pgerr"
 	"github.com/uptrace/bun"
 )
 
@@ -33,11 +32,10 @@ const (
 	DeviceRunMaxDuration = 30 * time.Minute
 	// deviceRunSweepBatch 是单次扫描收敛的运行数量上限。
 	deviceRunSweepBatch = 100
-	// deviceRunRouteJoins 关联运行所属助理及其在该会话中的当前工作区。
-	deviceRunRouteJoins = `JOIN agents AS a ON a.organization_id = agr.organization_id AND a.identity_id = agr.agent_identity_id
-		LEFT JOIN conversation_assistant_workspaces AS caw ON caw.organization_id = agr.organization_id AND caw.conversation_id = agr.conversation_id AND caw.agent_id = a.id`
-	// deviceRunRouteCurrent 判断助理仍绑定运行的执行设备，且该会话的工作区与派发时一致。
-	deviceRunRouteCurrent = `a.device_id = agr.execution_device_id AND caw.workspace_id IS NOT DISTINCT FROM agr.execution_workspace_id`
+	// deviceRunRouteJoins 关联运行所属助理。
+	deviceRunRouteJoins = `JOIN agents AS a ON a.organization_id = agr.organization_id AND a.identity_id = agr.agent_identity_id`
+	// deviceRunRouteCurrent 判断助理仍绑定运行的执行设备。
+	deviceRunRouteCurrent = `a.device_id = agr.execution_device_id`
 )
 
 var (
@@ -45,8 +43,6 @@ var (
 	ErrDeviceRunNotFound = errors.New("device agent run not found")
 	// ErrDeviceRunUnavailable 表示运行已不处于可领取状态。
 	ErrDeviceRunUnavailable = errors.New("device agent run is not claimable")
-	// ErrDeviceWorkspaceBusy 表示同一工作区已有运行中的运行。
-	ErrDeviceWorkspaceBusy = errors.New("device workspace is busy")
 	// ErrDeviceRunLeaseLost 表示设备已不持有运行的有效租约。
 	ErrDeviceRunLeaseLost = errors.New("device agent run lease lost")
 	// ErrDeviceRunFailureCodeInvalid 表示设备上报的失败原因不在允许范围内。
@@ -60,11 +56,10 @@ type RunDevice struct {
 	DeviceID       string
 }
 
-// DeviceWorkRun 是设备待领取运行的摘要，WorkspaceID 为空表示运行不使用本机工作区。
+// DeviceWorkRun 是设备待领取运行的摘要。
 type DeviceWorkRun struct {
 	RunID          string `bun:"id"`
 	ConversationID string `bun:"conversation_id"`
-	WorkspaceID    string `bun:"workspace_id"`
 }
 
 // DeviceWork 是设备当前工作水位与待领取运行。
@@ -99,7 +94,7 @@ type DeviceClaimedInput struct {
 	Input      agentruntime.ClaimedInput
 }
 
-// DeviceWork 返回设备的工作水位与按创建顺序排列、助理绑定与会话工作区仍与派发时一致的待领取运行。
+// DeviceWork 返回设备的工作水位与按创建顺序排列、助理仍绑定该设备的待领取运行。
 func (a *ExecuteAction) DeviceWork(ctx context.Context, device RunDevice) (DeviceWork, error) {
 	work := DeviceWork{Runs: make([]DeviceWorkRun, 0)}
 	if err := a.db.NewSelect().Model((*servermodels.Device)(nil)).Column("work_seq").
@@ -108,8 +103,8 @@ func (a *ExecuteAction) DeviceWork(ctx context.Context, device RunDevice) (Devic
 		return DeviceWork{}, fmt.Errorf("load device work sequence: %w", err)
 	}
 	if err := a.db.NewSelect().Model((*servermodels.AgentRun)(nil)).
-		ColumnExpr("agr.id, agr.conversation_id, COALESCE(agr.execution_workspace_id::text, '') AS workspace_id").
-		// 助理已换电脑或会话工作区已变化的运行不再交给设备，由收敛扫描标记失败。
+		ColumnExpr("agr.id, agr.conversation_id").
+		// 助理已换电脑的运行不再交给设备，由收敛扫描标记失败。
 		Join(deviceRunRouteJoins).
 		Where(deviceRunRouteCurrent).
 		Where("agr.organization_id = ? AND agr.execution_device_id = ?", device.OrganizationID, device.DeviceID).
@@ -144,7 +139,7 @@ func (a *ExecuteAction) ClaimDeviceRun(ctx context.Context, device RunDevice, ru
 		if run.Status != string(domain.AgentRunStatusQueued) {
 			return ErrDeviceRunUnavailable
 		}
-		// 助理已换电脑或会话工作区已变化时拒绝领取，由收敛扫描标记失败。
+		// 助理已换电脑时拒绝领取，由收敛扫描标记失败。
 		current, err := tx.NewSelect().Model((*servermodels.AgentRun)(nil)).
 			Join(deviceRunRouteJoins).
 			Where("agr.id = ?", run.ID).
@@ -163,22 +158,11 @@ func (a *ExecuteAction) ClaimDeviceRun(ctx context.Context, device RunDevice, ru
 			WHERE id = ?
 			RETURNING lease_expires_at
 		`, domain.AgentRunStatusRunning, DeviceRunLeaseTTL.Seconds(), run.ID).Scan(ctx, &claim.LeaseExpiresAt); err != nil {
-			if pgerr.UniqueViolationOn(err, "agent_runs_running_workspace_unique") {
-				return ErrDeviceWorkspaceBusy
-			}
 			return fmt.Errorf("claim device agent run: %w", err)
 		}
 		// 运行期间以助理的聊天主体发布输入状态。
 		if _, err := chatstate.EnsureOrganizationIdentityChatSubject(ctx, tx, run.OrganizationID, run.AgentIdentityID, uuid.NewV7().String()); err != nil {
 			return err
-		}
-		if run.ExecutionWorkspaceID != nil {
-			if _, err := tx.NewUpdate().Model((*servermodels.DeviceWorkspace)(nil)).
-				Set("last_used_at = now()").Set("updated_at = now()").
-				Where("organization_id = ? AND id = ?", run.OrganizationID, *run.ExecutionWorkspaceID).
-				Exec(ctx); err != nil {
-				return fmt.Errorf("touch device workspace: %w", err)
-			}
 		}
 		return chatstate.TouchConversation(ctx, tx, locked.PolicyContext.Conversation)
 	})
@@ -194,7 +178,7 @@ func (a *ExecuteAction) ClaimDeviceRun(ctx context.Context, device RunDevice, ru
 	}
 	a.holdDeviceRunTyping(ctx, initial, claim.LeaseExpiresAt)
 	slog.Info("设备已领取 Agent 运行", "organization_id", device.OrganizationID, "device_id", device.DeviceID,
-		"agent_run_id", runID, "workspace_id", initial.ExecutionWorkspaceID)
+		"agent_run_id", runID)
 	return claim, nil
 }
 
@@ -207,18 +191,8 @@ func (a *ExecuteAction) deviceAssignment(ctx context.Context, runID string, poli
 	if terminal {
 		return nil, ErrDeviceRunUnavailable
 	}
-	// 设备执行不加载企业远程 MCP 服务，配置版本绑定知识库时经服务端检索。
-	capabilities := agentruntime.Capabilities{Knowledge: len(execution.KnowledgeBaseIDs) > 0}
-	// 运行使用工作区时，本机工具取工具目录与执行设备最近上报的清单和运行时版本的交集。
-	if execution.Run.ExecutionWorkspaceID != nil && execution.Run.ExecutionDeviceID != nil {
-		var device servermodels.Device
-		if err := a.db.NewSelect().Model(&device).Column("runtime_version", "tool_manifest").
-			Where("d.organization_id = ? AND d.id = ?", execution.Run.OrganizationID, *execution.Run.ExecutionDeviceID).
-			Scan(ctx); err != nil {
-			return nil, fmt.Errorf("load device agent run tool manifest: %w", err)
-		}
-		capabilities.LocalTools = agentruntime.AvailableLocalTools(device.ToolManifest, device.RuntimeVersion)
-	}
+	// 设备执行不加载企业远程 MCP 服务，配置版本绑定知识库时经服务端检索，本机工具全部提供。
+	capabilities := agentruntime.Capabilities{Knowledge: len(execution.KnowledgeBaseIDs) > 0, LocalTools: agentruntime.LocalTools()}
 	assignment, err := a.resolveAssignment(ctx, execution, policy, capabilities)
 	if err != nil {
 		return nil, err
@@ -382,9 +356,9 @@ func (a *ExecuteAction) CompleteDeviceRun(ctx context.Context, device RunDevice,
 	return a.persistPartialProcess(ctx, &execution.Run, result)
 }
 
-// FailDeviceRun 按设备上报的失败原因收尾运行并保留已产生的过程内容；排队中的运行可在领取前因工作区缺失失败，运行中的运行在租约已过期或超出总时限时按对应原因收敛，已进入终态的运行只保留过程内容。
+// FailDeviceRun 按设备上报的失败原因收尾运行并保留已产生的过程内容；运行中的运行在租约已过期或超出总时限时按对应原因收敛，已进入终态的运行只保留过程内容。
 func (a *ExecuteAction) FailDeviceRun(ctx context.Context, device RunDevice, runID string, code domain.AgentRunErrorCode, message string, partial agentruntime.RunResult) error {
-	if code != domain.AgentRunErrorCodeWorkspaceMissing && code != domain.AgentRunErrorCodeDeviceRunFailed {
+	if code != domain.AgentRunErrorCodeDeviceRunFailed {
 		return ErrDeviceRunFailureCodeInvalid
 	}
 	run, err := a.loadDeviceRun(ctx, device, runID)
@@ -420,7 +394,7 @@ func (a *ExecuteAction) expireDeviceRun(ctx context.Context, run *servermodels.A
 	return a.persistPartialProcess(ctx, run, partial)
 }
 
-// SweepDeviceRuns 收敛无法继续的设备运行：运行中但租约已过期或超出总时限，或排队中但设备已撤销、设备主人已停用、助理已换电脑或会话工作区已变化。
+// SweepDeviceRuns 收敛无法继续的设备运行：运行中但租约已过期或超出总时限，或排队中但设备已撤销、设备主人已停用或助理已换电脑。
 func (a *ExecuteAction) SweepDeviceRuns(ctx context.Context, _ struct{}) error {
 	var stale []struct {
 		ID   string                   `bun:"id"`
@@ -438,13 +412,12 @@ func (a *ExecuteAction) SweepDeviceRuns(ctx context.Context, _ struct{}) error {
 		LEFT JOIN devices AS d ON d.id = agr.execution_device_id AND d.organization_id = agr.organization_id
 		LEFT JOIN users AS u ON u.id = d.user_id AND u.organization_id = d.organization_id AND u.status = ?
 		LEFT JOIN agents AS a ON a.organization_id = agr.organization_id AND a.identity_id = agr.agent_identity_id
-		LEFT JOIN conversation_assistant_workspaces AS caw ON caw.organization_id = agr.organization_id AND caw.conversation_id = agr.conversation_id AND caw.agent_id = a.id
 		WHERE agr.execution_device_id IS NOT NULL
 			AND (
 				(agr.status = ? AND (agr.lease_expires_at <= clock_timestamp() OR agr.claimed_at + make_interval(secs => ?) <= clock_timestamp()))
 				OR (agr.status = ? AND (
 					d.id IS NULL OR d.revoked_at IS NOT NULL OR u.id IS NULL
-					OR a.device_id IS DISTINCT FROM agr.execution_device_id OR caw.workspace_id IS DISTINCT FROM agr.execution_workspace_id
+					OR a.device_id IS DISTINCT FROM agr.execution_device_id
 				))
 			)
 		ORDER BY agr.created_at ASC

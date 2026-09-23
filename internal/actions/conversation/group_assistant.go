@@ -14,7 +14,7 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// removeOwnedGroupAssistants 在调用方已锁定的群聊中移出指定主人名下仍在群内的助理，清除其工作区指定并收敛其运行，返回被移出助理的快照与被取消的运行编号。
+// removeOwnedGroupAssistants 在调用方已锁定的群聊中移出指定主人名下仍在群内的助理并收敛其运行，返回被移出助理的快照与被取消的运行编号。
 func removeOwnedGroupAssistants(ctx context.Context, tx bun.Tx, coordinator GroupAgentRunCoordinator, organizationID, conversationID, ownerUserID string) ([]ConversationSystemEventParticipant, []string, error) {
 	rows := make([]activeGroupParticipantRow, 0)
 	if err := tx.NewSelect().TableExpr("conversation_participants AS cp").
@@ -30,7 +30,6 @@ func removeOwnedGroupAssistants(ctx context.Context, tx bun.Tx, coordinator Grou
 		return nil, nil, fmt.Errorf("load owned group assistants: %w", err)
 	}
 	removed := make([]ConversationSystemEventParticipant, 0, len(rows))
-	identityIDs := make([]string, 0, len(rows))
 	var cancelledRunIDs []string
 	for _, row := range rows {
 		if err := leaveGroupParticipant(ctx, tx, organizationID, row.ParticipantID); err != nil {
@@ -42,26 +41,8 @@ func removeOwnedGroupAssistants(ctx context.Context, tx bun.Tx, coordinator Grou
 		}
 		cancelledRunIDs = append(cancelledRunIDs, runIDs...)
 		removed = append(removed, groupParticipantSnapshot(row))
-		identityIDs = append(identityIDs, row.IdentityID)
-	}
-	if err := clearGroupAssistantWorkspaces(ctx, tx, organizationID, conversationID, identityIDs); err != nil {
-		return nil, nil, err
 	}
 	return removed, cancelledRunIDs, nil
-}
-
-// clearGroupAssistantWorkspaces 删除指定身份中助理在该会话的工作区指定，非助理身份没有指定记录。
-func clearGroupAssistantWorkspaces(ctx context.Context, db bun.IDB, organizationID, conversationID string, identityIDs []string) error {
-	if len(identityIDs) == 0 {
-		return nil
-	}
-	if _, err := db.NewDelete().Model((*servermodels.ConversationAssistantWorkspace)(nil)).
-		Where("organization_id = ? AND conversation_id = ?", organizationID, conversationID).
-		Where("agent_id IN (SELECT id FROM agents WHERE organization_id = ? AND identity_id IN (?))", organizationID, bun.In(identityIDs)).
-		Exec(ctx); err != nil {
-		return fmt.Errorf("clear group assistant workspaces: %w", err)
-	}
-	return nil
 }
 
 // ensureAssistantsReachable 校验被点名的助理可以接收新请求，按已禁用、绑定电脑已撤销、已暂停的顺序返回冲突，与助理在线状态的优先级一致；AI 员工不受影响。

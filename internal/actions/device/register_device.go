@@ -22,7 +22,7 @@ func NewRegisterDeviceAction(db *bun.DB) *RegisterDeviceAction {
 	return &RegisterDeviceAction{db: db}
 }
 
-// Execute 按安装标识注册或更新当前用户的本机设备；同一安装重新注册即重新授权，撤销标记随之清除，本机运行时版本与工具清单以本次上报为准。
+// Execute 按安装标识注册或更新当前用户的本机设备；同一安装重新注册即重新授权，撤销标记随之清除。
 func (a *RegisterDeviceAction) Execute(ctx context.Context, identity *servermodels.Identity, input RegisterInput) (*Record, error) {
 	input, fields := normalizeRegisterInput(input)
 	if len(fields) > 0 {
@@ -34,8 +34,6 @@ func (a *RegisterDeviceAction) Execute(ctx context.Context, identity *servermode
 		InstallID:      input.InstallID,
 		Name:           input.Name,
 		Platform:       input.Platform,
-		RuntimeVersion: input.RuntimeVersion,
-		ToolManifest:   input.ToolManifest,
 	}
 	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
@@ -43,12 +41,10 @@ func (a *RegisterDeviceAction) Execute(ctx context.Context, identity *servermode
 		}
 		_, err := tx.NewInsert().
 			Model(&device).
-			Column("organization_id", "user_id", "install_id", "name", "platform", "runtime_version", "tool_manifest").
+			Column("organization_id", "user_id", "install_id", "name", "platform").
 			On("CONFLICT (organization_id, user_id, install_id) DO UPDATE").
 			Set("name = EXCLUDED.name").
 			Set("platform = EXCLUDED.platform").
-			Set("runtime_version = EXCLUDED.runtime_version").
-			Set("tool_manifest = EXCLUDED.tool_manifest").
 			Set("revoked_at = NULL").
 			Set("updated_at = now()").
 			Returning("*").

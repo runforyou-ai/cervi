@@ -1,4 +1,4 @@
-// Package localworkspace 以工作区根目录为界提供本机文件的只读访问，模型看到的路径以 / 表示工作区根目录。
+// Package localworkspace 提供本机文件的只读访问，相对路径以会话默认文件夹为起点，模型看到的是本机绝对路径。
 package localworkspace
 
 import (
@@ -6,10 +6,8 @@ import (
 	"context"
 	"errors"
 	"fmt"
-	"io/fs"
 	"net/http"
 	"os"
-	"path"
 	"path/filepath"
 	"slices"
 	"strings"
@@ -30,71 +28,35 @@ const (
 // imageTypes 是可以按图片读取的内容类型。
 var imageTypes = []string{"image/png", "image/jpeg", "image/gif", "image/webp"}
 
-var (
-	// errReadOnly 表示工作区只读，不接受写入。
-	errReadOnly = errors.New("工作区只读，不能写入或修改文件")
-	// errWorkspaceUnavailable 表示工作区目录已被移动、删除或替换。
-	errWorkspaceUnavailable = errors.New("工作区目录已不可用")
-)
+// errReadOnly 表示文件只读，不接受写入。
+var errReadOnly = errors.New("文件只读，不能写入或修改文件")
 
-// Backend 以工作区根目录为虚拟根读取本机文件，解析符号链接后越出工作区的路径一律拒绝；错误信息只包含虚拟路径。
+// Backend 读取本机文件：绝对路径直接访问，~ 开头按用户主目录展开，相对路径以默认文件夹为起点。
 type Backend struct {
-	root     string
-	rootInfo os.FileInfo
+	root string
 }
 
-// New 打开本机工作区，目录不存在或不是目录时返回错误。
+// New 以默认文件夹为相对路径起点打开本机文件访问，目录不存在时创建。
 func New(dir string) (*Backend, error) {
-	root, err := filepath.EvalSymlinks(dir)
-	if err != nil {
-		return nil, errWorkspaceUnavailable
+	if err := os.MkdirAll(dir, 0o755); err != nil {
+		return nil, fmt.Errorf("create default folder: %w", err)
 	}
-	info, err := os.Stat(root)
-	if err != nil || !info.IsDir() {
-		return nil, errWorkspaceUnavailable
-	}
-	return &Backend{root: root, rootInfo: info}, nil
+	return &Backend{root: filepath.Clean(dir)}, nil
 }
 
-// target 是一次访问解析得到的虚拟路径与工作区内的真实路径。
-type target struct {
-	virtual string
-	real    string
-}
-
-// resolve 把模型给出的路径解析为工作区内的真实路径：先相对虚拟根规范化，再解析符号链接并校验仍位于工作区内。
-func (b *Backend) resolve(name string) (target, error) {
-	virtual := path.Clean("/" + filepath.ToSlash(name))
-	// 工作区根目录被移动、删除或替换为其他目录时拒绝访问。
-	if info, err := os.Stat(b.root); err != nil || !os.SameFile(info, b.rootInfo) {
-		return target{}, errWorkspaceUnavailable
-	}
-	resolved, err := filepath.EvalSymlinks(filepath.Join(b.root, filepath.FromSlash(virtual)))
-	if err != nil {
-		if errors.Is(err, fs.ErrNotExist) {
-			return target{}, fmt.Errorf("路径不存在：%s", virtual)
+// resolve 把模型给出的路径解析为本机绝对路径。
+func (b *Backend) resolve(name string) (string, error) {
+	switch {
+	case name == "~" || strings.HasPrefix(name, "~/") || strings.HasPrefix(name, `~\`):
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return "", errors.New("无法确定用户主目录")
 		}
-		return target{}, fmt.Errorf("无法访问：%s", virtual)
+		name = filepath.Join(home, name[1:])
+	case !filepath.IsAbs(name):
+		name = filepath.Join(b.root, name)
 	}
-	if !b.contains(resolved) {
-		return target{}, fmt.Errorf("路径不在工作区内：%s", virtual)
-	}
-	return target{virtual: virtual, real: resolved}, nil
-}
-
-// contains 判断真实路径是否位于工作区根目录内。
-func (b *Backend) contains(real string) bool {
-	rel, err := filepath.Rel(b.root, real)
-	return err == nil && !filepath.IsAbs(rel) && rel != ".." && !strings.HasPrefix(rel, ".."+string(filepath.Separator))
-}
-
-// virtualPath 返回工作区内真实路径对应的虚拟路径。
-func (b *Backend) virtualPath(real string) string {
-	rel, err := filepath.Rel(b.root, real)
-	if err != nil {
-		return "/"
-	}
-	return path.Clean("/" + filepath.ToSlash(rel))
+	return filepath.Clean(name), nil
 }
 
 // LsInfo 列出目录的直接子项，目录路径以 / 结尾；路径指向文件时返回该文件。
@@ -103,41 +65,37 @@ func (b *Backend) LsInfo(ctx context.Context, req *filesystem.LsInfoRequest) ([]
 	if err != nil {
 		return nil, err
 	}
-	info, err := os.Stat(dir.real)
+	info, err := os.Stat(dir)
 	if err != nil {
-		return nil, fmt.Errorf("无法访问：%s", dir.virtual)
+		return nil, fmt.Errorf("无法访问：%s", dir)
 	}
 	if !info.IsDir() {
-		return []filesystem.FileInfo{fileInfo(dir.virtual, info)}, nil
+		return []filesystem.FileInfo{fileInfo(dir, info)}, nil
 	}
-	entries, err := os.ReadDir(dir.real)
+	entries, err := os.ReadDir(dir)
 	if err != nil {
-		return nil, fmt.Errorf("无法读取目录：%s", dir.virtual)
+		return nil, fmt.Errorf("无法读取目录：%s", dir)
 	}
 	infos := make([]filesystem.FileInfo, 0, len(entries))
 	for _, entry := range entries {
-		// 指向工作区内的符号链接按目标展示，指向工作区外或不存在的目标时只展示条目本身。
-		info, err := entry.Info()
+		// 符号链接按目标展示，目标不存在时只展示条目本身。
+		name := filepath.Join(dir, entry.Name())
+		info, err := os.Stat(name)
 		if err != nil {
-			continue
-		}
-		if entry.Type()&fs.ModeSymlink != 0 {
-			if resolved, err := filepath.EvalSymlinks(filepath.Join(dir.real, entry.Name())); err == nil && b.contains(resolved) {
-				if target, err := os.Stat(resolved); err == nil {
-					info = target
-				}
+			if info, err = entry.Info(); err != nil {
+				continue
 			}
 		}
-		infos = append(infos, fileInfo(path.Join(dir.virtual, entry.Name()), info))
+		infos = append(infos, fileInfo(name, info))
 	}
 	return infos, nil
 }
 
-// fileInfo 转换文件信息，目录路径以 / 结尾。
-func fileInfo(virtual string, info os.FileInfo) filesystem.FileInfo {
-	result := filesystem.FileInfo{Path: virtual, IsDir: info.IsDir(), Size: info.Size(), ModifiedAt: info.ModTime().UTC().Format(time.RFC3339)}
-	if info.IsDir() && virtual != "/" {
-		result.Path += "/"
+// fileInfo 转换文件信息，目录路径以路径分隔符结尾。
+func fileInfo(name string, info os.FileInfo) filesystem.FileInfo {
+	result := filesystem.FileInfo{Path: name, IsDir: info.IsDir(), Size: info.Size(), ModifiedAt: info.ModTime().UTC().Format(time.RFC3339)}
+	if info.IsDir() && !strings.HasSuffix(name, string(filepath.Separator)) {
+		result.Path += string(filepath.Separator)
 	}
 	return result
 }
@@ -153,7 +111,7 @@ func (b *Backend) Read(ctx context.Context, req *filesystem.ReadRequest) (*files
 		return nil, err
 	}
 	if isBinary(content) {
-		return nil, fmt.Errorf("二进制文件无法按文本读取：%s", file.virtual)
+		return nil, fmt.Errorf("二进制文件无法按文本读取：%s", file)
 	}
 	lines := strings.SplitAfter(string(content), "\n")
 	start := max(req.Offset, 1) - 1
@@ -192,13 +150,13 @@ func (b *Backend) MultiModalRead(ctx context.Context, req *filesystem.MultiModal
 }
 
 // imageType 按普通文件开头内容识别图片类型，不是图片或不是普通文件时返回空串。
-func (b *Backend) imageType(file target) (string, error) {
-	if info, err := os.Stat(file.real); err != nil || !info.Mode().IsRegular() {
+func (b *Backend) imageType(file string) (string, error) {
+	if info, err := os.Stat(file); err != nil || !info.Mode().IsRegular() {
 		return "", nil
 	}
-	handle, err := os.Open(file.real)
+	handle, err := os.Open(file)
 	if err != nil {
-		return "", fmt.Errorf("无法读取文件：%s", file.virtual)
+		return "", fmt.Errorf("无法读取文件：%s", file)
 	}
 	defer handle.Close()
 	head := make([]byte, 512)
@@ -210,24 +168,24 @@ func (b *Backend) imageType(file target) (string, error) {
 	return "", nil
 }
 
-// readFile 读取工作区内的普通文件，目录、管道与设备等非普通文件或超出字节上限时返回错误。
-func (b *Backend) readFile(file target, limit int64) ([]byte, error) {
-	info, err := os.Stat(file.real)
+// readFile 读取普通文件，目录、管道与设备等非普通文件或超出字节上限时返回错误。
+func (b *Backend) readFile(file string, limit int64) ([]byte, error) {
+	info, err := os.Stat(file)
 	if err != nil {
-		return nil, fmt.Errorf("无法读取文件：%s", file.virtual)
+		return nil, fmt.Errorf("无法读取文件：%s", file)
 	}
 	if info.IsDir() {
-		return nil, fmt.Errorf("路径是目录，请使用 ls 查看：%s", file.virtual)
+		return nil, fmt.Errorf("路径是目录，请使用 ls 查看：%s", file)
 	}
 	if !info.Mode().IsRegular() {
-		return nil, fmt.Errorf("不是普通文件，无法读取：%s", file.virtual)
+		return nil, fmt.Errorf("不是普通文件，无法读取：%s", file)
 	}
 	if info.Size() > limit {
-		return nil, fmt.Errorf("文件超过 %d MB，无法读取：%s", limit>>20, file.virtual)
+		return nil, fmt.Errorf("文件超过 %d MB，无法读取：%s", limit>>20, file)
 	}
-	content, err := os.ReadFile(file.real)
+	content, err := os.ReadFile(file)
 	if err != nil {
-		return nil, fmt.Errorf("无法读取文件：%s", file.virtual)
+		return nil, fmt.Errorf("无法读取文件：%s", file)
 	}
 	return content, nil
 }
@@ -237,12 +195,12 @@ func isBinary(content []byte) bool {
 	return bytes.IndexByte(content[:min(len(content), binarySniffBytes)], 0) >= 0
 }
 
-// Write 拒绝写入，工作区只读。
+// Write 拒绝写入，文件只读。
 func (b *Backend) Write(context.Context, *filesystem.WriteRequest) error {
 	return errReadOnly
 }
 
-// Edit 拒绝修改，工作区只读。
+// Edit 拒绝修改，文件只读。
 func (b *Backend) Edit(context.Context, *filesystem.EditRequest) error {
 	return errReadOnly
 }
