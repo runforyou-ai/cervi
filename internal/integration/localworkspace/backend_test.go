@@ -43,11 +43,7 @@ func newTestWorkspace(t *testing.T) (*Backend, string, string) {
 	if err := os.WriteFile(filepath.Join(root, "app.bin"), []byte{'a', 0, 'b'}, 0o644); err != nil {
 		t.Fatal(err)
 	}
-	backend, err := New(root)
-	if err != nil {
-		t.Fatal(err)
-	}
-	return backend, root, outside
+	return New(root), root, outside
 }
 
 // requireSymlink 创建符号链接，当前平台不支持时跳过测试。
@@ -61,7 +57,7 @@ func requireSymlink(t *testing.T, target, link string) {
 	}
 }
 
-// TestResolve 验证相对路径以默认文件夹为起点，绝对路径与 ~ 开头的路径访问本机任意位置，符号链接按目标读取，默认文件夹不存在时自动创建。
+// TestResolve 验证相对路径以默认文件夹为起点，绝对路径与 ~ 开头的路径访问本机任意位置，符号链接按目标读取，以目录链接为起点时 glob 与 grep 遍历其目标。
 func TestResolve(t *testing.T) {
 	ctx := context.Background()
 	backend, root, outside := newTestWorkspace(t)
@@ -85,12 +81,14 @@ func TestResolve(t *testing.T) {
 	if content, err := backend.Read(ctx, &filesystem.ReadRequest{FilePath: "linked/notes.txt"}); err != nil || content.Content != "outside hello" {
 		t.Fatalf("symlink read=%+v %v", content, err)
 	}
-	fresh := filepath.Join(t.TempDir(), "Cervi", "conversation")
-	if _, err := New(fresh); err != nil {
-		t.Fatal(err)
+	if infos, err := backend.GlobInfo(ctx, &filesystem.GlobInfoRequest{Pattern: "*.txt", Path: "linked"}); err != nil || len(infos) != 1 || infos[0].Path != filepath.Join(root, "linked", "notes.txt") {
+		t.Fatalf("glob in linked dir=%+v %v", infos, err)
 	}
-	if info, err := os.Stat(fresh); err != nil || !info.IsDir() {
-		t.Fatalf("default folder not created: %v", err)
+	if matches, err := backend.GrepRaw(ctx, &filesystem.GrepRequest{Pattern: "outside", Path: "linked"}); err != nil || len(matches) != 1 || matches[0].Path != filepath.Join(root, "linked", "notes.txt") {
+		t.Fatalf("grep in linked dir=%+v %v", matches, err)
+	}
+	if _, err := New(filepath.Join(t.TempDir(), "missing")).LsInfo(ctx, &filesystem.LsInfoRequest{}); err == nil {
+		t.Fatal("listed missing default folder")
 	}
 }
 

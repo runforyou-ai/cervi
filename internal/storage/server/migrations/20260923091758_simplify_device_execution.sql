@@ -65,7 +65,7 @@ COMMENT ON COLUMN conversation_assistant_workspaces.assigned_by_user_id IS '指�
 
 ALTER TABLE agent_runs ADD COLUMN execution_workspace_id uuid;
 
-COMMENT ON COLUMN agent_runs.execution_workspace_id IS '执行工作区编号，派发时按会话绑定写入';
+COMMENT ON COLUMN agent_runs.execution_workspace_id IS '执行工作区编号，派发时按会话中助理的工作区写入，为空表示不使用本机工具';
 
 CREATE UNIQUE INDEX agent_runs_running_workspace_unique
     ON agent_runs (organization_id, execution_workspace_id)

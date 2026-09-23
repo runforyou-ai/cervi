@@ -25,6 +25,14 @@ var skippedDirs = []string{".git"}
 // GlobInfo 在搜索起点目录下按 glob 模式匹配文件，模式相对起点目录匹配，绝对路径模式从其固定前缀目录开始匹配；结果按修改时间从新到旧排列。
 func (b *Backend) GlobInfo(ctx context.Context, req *filesystem.GlobInfoRequest) ([]filesystem.FileInfo, error) {
 	pattern, base := req.Pattern, req.Path
+	// ~ 开头的模式按用户主目录展开后当作绝对路径模式。
+	if pattern == "~" || strings.HasPrefix(pattern, "~/") || strings.HasPrefix(pattern, `~\`) {
+		home, err := os.UserHomeDir()
+		if err != nil {
+			return nil, errors.New("无法确定用户主目录")
+		}
+		pattern = filepath.Join(home, pattern[1:])
+	}
 	if filepath.IsAbs(pattern) {
 		base, pattern = doublestar.SplitPattern(filepath.ToSlash(pattern))
 		base = filepath.FromSlash(base)
@@ -165,7 +173,7 @@ func (b *Backend) grepFile(real string, re *regexp.Regexp, req *filesystem.GrepR
 	return matches
 }
 
-// walk 遍历起点下的普通文件，起点是文件时只访问该文件；跳过版本库目录，不跟随符号链接目录。
+// walk 遍历起点下的普通文件，起点是文件时只访问该文件；起点是目录链接时遍历其目标并按起点路径报告，跳过版本库目录，不跟随起点以下的符号链接目录。
 func (b *Backend) walk(ctx context.Context, start string, visit func(real string, entry fs.DirEntry) error) error {
 	info, err := os.Stat(start)
 	if err != nil {
@@ -174,7 +182,15 @@ func (b *Backend) walk(ctx context.Context, start string, visit func(real string
 	if !info.IsDir() {
 		return visit(start, fs.FileInfoToDirEntry(info))
 	}
-	return filepath.WalkDir(start, func(real string, entry fs.DirEntry, err error) error {
+	target, err := filepath.EvalSymlinks(start)
+	if err != nil {
+		return fmt.Errorf("无法访问：%s", start)
+	}
+	return filepath.WalkDir(target, func(walked string, entry fs.DirEntry, err error) error {
+		real := walked
+		if rel, relErr := filepath.Rel(target, walked); relErr == nil {
+			real = filepath.Join(start, rel)
+		}
 		if ctxErr := ctx.Err(); ctxErr != nil {
 			return ctxErr
 		}
@@ -182,13 +198,13 @@ func (b *Backend) walk(ctx context.Context, start string, visit func(real string
 			return nil
 		}
 		if entry.IsDir() {
-			if real != start && slices.Contains(skippedDirs, entry.Name()) {
+			if walked != target && slices.Contains(skippedDirs, entry.Name()) {
 				return filepath.SkipDir
 			}
 			return nil
 		}
 		if entry.Type()&fs.ModeSymlink != 0 {
-			info, err := os.Stat(real)
+			info, err := os.Stat(walked)
 			if err != nil || info.IsDir() {
 				return nil
 			}

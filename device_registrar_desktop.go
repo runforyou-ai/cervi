@@ -38,7 +38,7 @@ func (d *desktopDevice) Stop() {
 	d.Registrar.Stop()
 }
 
-// newDeviceRegistrar 创建桌面端本机设备注册与执行循环，各会话的默认文件夹位于用户文稿目录下的 Cervi；本机运行时创建失败或无法确定用户主目录时不注册设备。
+// newDeviceRegistrar 创建桌面端本机设备注册与执行循环，各会话的默认文件夹位于用户文档目录下的 Cervi；本机运行时创建失败时不注册设备。
 func newDeviceRegistrar(appStorage nativeStorage, backend *apiproxy.Backend, sessions *clientsession.Manager) deviceRegistrar {
 	registrar := devicehost.New(appStorage, backend, sessions)
 	if registrar == nil {
@@ -49,12 +49,13 @@ func newDeviceRegistrar(appStorage nativeStorage, backend *apiproxy.Backend, ses
 		slog.Error("创建本机 Agent 运行时失败，本机设备不注册", "error", err)
 		return nil
 	}
-	home, err := os.UserHomeDir()
+	// 无法确定文档目录时默认文件夹放在系统临时目录下，助理照常运行。
+	documents, err := devicehost.DocumentsDir()
 	if err != nil {
-		slog.Error("无法确定用户主目录，本机设备不注册", "error", err)
-		return nil
+		slog.Warn("无法确定用户文档目录，会话默认文件夹改放在临时目录", "error", err)
+		documents = os.TempDir()
 	}
-	worker := devicehost.NewWorker(registrar, backend, runtime, filepath.Join(home, "Documents", "Cervi"))
+	worker := devicehost.NewWorker(registrar, backend, runtime, filepath.Join(documents, "Cervi"))
 	// 本机界面查看本机执行中的运行时直接读取本机过程流。
 	backend.UseLocalRunStreams(worker)
 	return &desktopDevice{Registrar: registrar, worker: worker}

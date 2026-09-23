@@ -36,12 +36,9 @@ type Backend struct {
 	root string
 }
 
-// New 以默认文件夹为相对路径起点打开本机文件访问，目录不存在时创建。
-func New(dir string) (*Backend, error) {
-	if err := os.MkdirAll(dir, 0o755); err != nil {
-		return nil, fmt.Errorf("create default folder: %w", err)
-	}
-	return &Backend{root: filepath.Clean(dir)}, nil
+// New 以默认文件夹为相对路径起点打开本机文件访问。
+func New(dir string) *Backend {
+	return &Backend{root: filepath.Clean(dir)}
 }
 
 // resolve 把模型给出的路径解析为本机绝对路径。
@@ -59,7 +56,7 @@ func (b *Backend) resolve(name string) (string, error) {
 	return filepath.Clean(name), nil
 }
 
-// LsInfo 列出目录的直接子项，目录路径以 / 结尾；路径指向文件时返回该文件。
+// LsInfo 列出目录的直接子项，目录路径以路径分隔符结尾；路径指向文件时返回该文件。
 func (b *Backend) LsInfo(ctx context.Context, req *filesystem.LsInfoRequest) ([]filesystem.FileInfo, error) {
 	dir, err := b.resolve(req.Path)
 	if err != nil {
