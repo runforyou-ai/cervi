@@ -9,7 +9,6 @@ import (
 	"time"
 
 	agentaction "github.com/runforyou-ai/cervi/internal/actions/agent"
-	deviceaction "github.com/runforyou-ai/cervi/internal/actions/device"
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -18,7 +17,7 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// assistantOps 持有助理与会话助理工作区的 Action 和 Query。
+// assistantOps 持有助理的 Action 和 Query。
 type assistantOps struct {
 	listAssistants        *agentaction.ListAssistantsQuery
 	getAssistant          *agentaction.GetAssistantQuery
@@ -27,7 +26,6 @@ type assistantOps struct {
 	setAssistantPaused    *agentaction.SetAssistantPausedAction
 	moveAssistant         *agentaction.MoveAssistantAction
 	updateAssistantStatus *agentaction.UpdateAssistantStatusAction
-	assistantWorkspaces   *deviceaction.ConversationAssistantWorkspaceAction
 }
 
 // newAssistantOps 创建助理的业务实现依赖。
@@ -40,7 +38,6 @@ func newAssistantOps(db *bun.DB) assistantOps {
 		setAssistantPaused:    agentaction.NewSetAssistantPausedAction(db),
 		moveAssistant:         agentaction.NewMoveAssistantAction(db),
 		updateAssistantStatus: agentaction.NewUpdateAssistantStatusAction(db),
-		assistantWorkspaces:   deviceaction.NewConversationAssistantWorkspaceAction(db),
 	}
 }
 
@@ -181,39 +178,6 @@ func (o *directOperations) changeAssistantStatus(ctx context.Context, meta Reque
 	}
 	slog.Info("助理状态已修改", "organization_id", identity.Organization.ID, "assistant_id", assistantID, "status", status)
 	return o.assistantWithAvatar(ctx, meta, identity, record, cervii18n.ErrorAssistantStatusUpdateFailed)
-}
-
-// ListConversationAssistantWorkspaces 返回会话中各位助理的绑定电脑与工作区。
-func (o *directOperations) ListConversationAssistantWorkspaces(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string) (ConversationAssistantWorkspaceList, error) {
-	records, err := o.assistantWorkspaces.List(ctx, identity, conversationID)
-	if err != nil {
-		return ConversationAssistantWorkspaceList{}, o.deviceError(ctx, meta, err, cervii18n.ErrorAssistantWorkspaceLoadFailed, identity.Organization.ID, "conversation_id", conversationID)
-	}
-	assistants := make([]ConversationAssistantWorkspace, 0, len(records))
-	for _, record := range records {
-		assistants = append(assistants, ConversationAssistantWorkspace{
-			AssistantIdentityID: record.AssistantIdentityID, OwnerUserID: record.OwnerUserID,
-			DeviceID: record.DeviceID, DeviceName: record.DeviceName,
-			WorkspaceID: record.WorkspaceID, WorkspaceLabel: record.WorkspaceLabel,
-		})
-	}
-	return ConversationAssistantWorkspaceList{Assistants: assistants}, nil
-}
-
-// SetConversationAssistantWorkspace 由主人为会话中的助理指定工作区。
-func (o *directOperations) SetConversationAssistantWorkspace(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID, assistantIdentityID string, input ConversationAssistantWorkspaceInput) error {
-	if err := o.assistantWorkspaces.Set(ctx, identity, conversationID, assistantIdentityID, input.WorkspaceID); err != nil {
-		return o.deviceError(ctx, meta, err, cervii18n.ErrorAssistantWorkspaceSetFailed, identity.Organization.ID, "conversation_id", conversationID)
-	}
-	return nil
-}
-
-// ClearConversationAssistantWorkspace 由主人清除会话中助理的工作区。
-func (o *directOperations) ClearConversationAssistantWorkspace(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID, assistantIdentityID string) error {
-	if err := o.assistantWorkspaces.Clear(ctx, identity, conversationID, assistantIdentityID); err != nil {
-		return o.deviceError(ctx, meta, err, cervii18n.ErrorAssistantWorkspaceClearFailed, identity.Organization.ID, "conversation_id", conversationID)
-	}
-	return nil
 }
 
 // assistantWithAvatar 解析助理头像地址并转换契约。

@@ -22,7 +22,6 @@ func (o *directOperations) SendAttachmentMessage(ctx context.Context, meta Reque
 	result, err := o.sendAttachmentMessage.Execute(ctx, identity, conversationaction.AttachmentMessageInput{
 		ConversationID: input.ConversationID, TargetIdentityID: input.TargetIdentityID, AgentIdentityID: input.AgentIdentityID, CustomerConversationID: input.CustomerConversationID,
 		ClientMessageID: input.ClientMessageID, FileID: input.FileID, Body: input.Body, ImageWidth: input.ImageWidth, ImageHeight: input.ImageHeight,
-		WorkspaceID: input.WorkspaceID,
 	})
 	if errors.Is(err, fileaction.ErrFileNotFound) {
 		return AttachmentMessageResult{}, NotFoundError(meta, cervii18n.ErrorFileNotFound)

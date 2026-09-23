@@ -198,7 +198,7 @@ func NewMoveAssistantAction(db *bun.DB) *MoveAssistantAction {
 	return &MoveAssistantAction{db: db}
 }
 
-// Execute 把助理绑定到当前成员名下的指定电脑并清空各会话的工作区指定；原电脑上尚未领取的运行由收敛扫描结束。
+// Execute 把助理绑定到当前成员名下的指定电脑；原电脑上尚未领取的运行由收敛扫描结束。
 func (a *MoveAssistantAction) Execute(ctx context.Context, identity *servermodels.Identity, assistantID, deviceID string) (*Assistant, error) {
 	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
@@ -219,11 +219,6 @@ func (a *MoveAssistantAction) Execute(ctx context.Context, identity *servermodel
 			Where("organization_id = ? AND id = ?", identity.Organization.ID, stored.ID).
 			Exec(ctx); err != nil {
 			return err
-		}
-		if _, err := tx.NewDelete().Model((*servermodels.ConversationAssistantWorkspace)(nil)).
-			Where("organization_id = ? AND agent_id = ?", identity.Organization.ID, stored.ID).
-			Exec(ctx); err != nil {
-			return fmt.Errorf("clear assistant workspaces: %w", err)
 		}
 		return chatstate.TouchIdentityConversations(ctx, tx, identity.Organization.ID, stored.IdentityID)
 	})

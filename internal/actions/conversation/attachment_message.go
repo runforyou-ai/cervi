@@ -127,7 +127,7 @@ func lockAttachmentConversation(ctx context.Context, tx bun.Tx, identity *server
 			if err := ensureCustomerCopilotThread(ctx, tx, identity, conversationID, input.CustomerConversationID, input.AgentIdentityID, title); err != nil {
 				return chatstate.Member{}, nil, err
 			}
-		} else if err := ensureAgentConversation(ctx, tx, identity, conversationID, input.AgentIdentityID, title, input.WorkspaceID); err != nil {
+		} else if err := ensureAgentConversation(ctx, tx, identity, conversationID, input.AgentIdentityID, title); err != nil {
 			return chatstate.Member{}, nil, err
 		}
 	}

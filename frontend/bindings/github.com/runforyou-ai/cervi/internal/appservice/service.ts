@@ -31,13 +31,6 @@ export function AddGroupConversationMembers(meta: $models.RequestMeta, conversat
 }
 
 /**
- * AddLocalWorkspace 让用户选择本机目录并注册为本设备的工作区，用户取消选择时返回空工作区编号。
- */
-export function AddLocalWorkspace(meta: $models.RequestMeta): $CancellablePromise<$models.DeviceWorkspace> {
-    return $Call.ByID(3954828809, meta);
-}
-
-/**
  * AddTeamMembers 将企业身份批量加入团队。
  */
 export function AddTeamMembers(meta: $models.RequestMeta, teamID: string, input: $models.TeamMemberInput): $CancellablePromise<$models.Team> {
@@ -77,13 +70,6 @@ export function CheckNotificationPermission(meta: $models.RequestMeta): $Cancell
  */
 export function ClaimServiceSession(meta: $models.RequestMeta, conversationID: string): $CancellablePromise<$models.CustomerServiceSession> {
     return $Call.ByID(104372695, meta, conversationID);
-}
-
-/**
- * ClearConversationAssistantWorkspace 由主人清除会话中助理的工作区。
- */
-export function ClearConversationAssistantWorkspace(meta: $models.RequestMeta, conversationID: string, assistantIdentityID: string): $CancellablePromise<void> {
-    return $Call.ByID(1143051713, meta, conversationID, assistantIdentityID);
 }
 
 /**
@@ -682,13 +668,6 @@ export function ListContacts(meta: $models.RequestMeta, input: $models.ContactLi
 }
 
 /**
- * ListConversationAssistantWorkspaces 返回会话中各位助理的绑定电脑与工作区。
- */
-export function ListConversationAssistantWorkspaces(meta: $models.RequestMeta, conversationID: string): $CancellablePromise<$models.ConversationAssistantWorkspaceList> {
-    return $Call.ByID(1473208141, meta, conversationID);
-}
-
-/**
  * ListConversationMessageReferences 读取当前窗口的引用摘要和回复可用状态。
  */
 export function ListConversationMessageReferences(meta: $models.RequestMeta, conversationID: string, input: $models.ConversationMessageReferenceListInput): $CancellablePromise<$models.ConversationMessageReferenceList> {
@@ -735,13 +714,6 @@ export function ListCustomerReplyAgents(meta: $models.RequestMeta): $Cancellable
  */
 export function ListCustomerServiceAssignees(meta: $models.RequestMeta): $CancellablePromise<$models.CustomerServiceAssigneeList> {
     return $Call.ByID(630654755, meta);
-}
-
-/**
- * ListDeviceWorkspaces 返回当前用户设备上的工作区。
- */
-export function ListDeviceWorkspaces(meta: $models.RequestMeta, deviceID: string): $CancellablePromise<$models.DeviceWorkspaceList> {
-    return $Call.ByID(2515644074, meta, deviceID);
 }
 
 /**
@@ -1032,13 +1004,6 @@ export function RegisterDevice(meta: $models.RequestMeta, input: $models.DeviceR
 }
 
 /**
- * RegisterDeviceWorkspace 在当前用户的设备上注册工作区。
- */
-export function RegisterDeviceWorkspace(meta: $models.RequestMeta, deviceID: string, input: $models.DeviceWorkspaceInput): $CancellablePromise<$models.DeviceWorkspace> {
-    return $Call.ByID(2844438194, meta, deviceID, input);
-}
-
-/**
  * RemoveGroupConversationMember 移除单个群聊成员。
  */
 export function RemoveGroupConversationMember(meta: $models.RequestMeta, conversationID: string, input: $models.GroupConversationMemberInput): $CancellablePromise<$models.GroupConversation> {
@@ -1232,13 +1197,6 @@ export function SendMessageNotification(meta: $models.RequestMeta, input: $model
  */
 export function ServerURL(meta: $models.RequestMeta): $CancellablePromise<string> {
     return $Call.ByID(791180750, meta);
-}
-
-/**
- * SetConversationAssistantWorkspace 由主人为会话中的助理指定工作区。
- */
-export function SetConversationAssistantWorkspace(meta: $models.RequestMeta, conversationID: string, assistantIdentityID: string, input: $models.ConversationAssistantWorkspaceInput): $CancellablePromise<void> {
-    return $Call.ByID(744899192, meta, conversationID, assistantIdentityID, input);
 }
 
 /**

@@ -23,7 +23,7 @@ func TestNonRegularFiles(t *testing.T) {
 	go func() {
 		defer close(done)
 		ctx := context.Background()
-		for _, name := range []string{"/pipe", "/pipe-link"} {
+		for _, name := range []string{"pipe", "pipe-link"} {
 			if _, err := backend.Read(ctx, &filesystem.ReadRequest{FilePath: name}); err == nil {
 				t.Errorf("read %s succeeded", name)
 			}
@@ -35,7 +35,7 @@ func TestNonRegularFiles(t *testing.T) {
 			}
 		}
 		if _, err := backend.GrepRaw(ctx, &filesystem.GrepRequest{Pattern: "hello"}); err != nil {
-			t.Errorf("grep workspace=%v", err)
+			t.Errorf("grep default folder=%v", err)
 		}
 	}()
 	select {

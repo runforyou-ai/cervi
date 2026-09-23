@@ -22,8 +22,6 @@ type deviceOps struct {
 	listDevices         *deviceaction.ListDevicesQuery
 	revokeDevice        *deviceaction.RevokeDeviceAction
 	deviceAuthenticator *deviceaction.AuthenticateDeviceAction
-	registerWorkspace   *deviceaction.RegisterWorkspaceAction
-	listWorkspaces      *deviceaction.ListWorkspacesQuery
 }
 
 // newDeviceOps 创建本机设备的业务实现依赖。
@@ -33,8 +31,6 @@ func newDeviceOps(db *bun.DB) deviceOps {
 		listDevices:         deviceaction.NewListDevicesQuery(db),
 		revokeDevice:        deviceaction.NewRevokeDeviceAction(db),
 		deviceAuthenticator: deviceaction.NewAuthenticateDeviceAction(db),
-		registerWorkspace:   deviceaction.NewRegisterWorkspaceAction(db),
-		listWorkspaces:      deviceaction.NewListWorkspacesQuery(db),
 	}
 }
 
@@ -42,7 +38,6 @@ func newDeviceOps(db *bun.DB) deviceOps {
 func (o *directOperations) RegisterDevice(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input DeviceRegistrationInput) (Device, error) {
 	record, err := o.registerDevice.Execute(ctx, identity, deviceaction.RegisterInput{
 		InstallID: input.InstallID, Name: input.Name, Platform: domain.DevicePlatform(input.Platform),
-		RuntimeVersion: input.RuntimeVersion, ToolManifest: input.ToolManifest,
 	})
 	if err != nil {
 		return Device{}, o.deviceError(ctx, meta, err, cervii18n.ErrorDeviceRegisterFailed, identity.Organization.ID)
@@ -71,28 +66,6 @@ func (o *directOperations) RevokeDevice(ctx context.Context, meta RequestMeta, i
 	return nil
 }
 
-// RegisterDeviceWorkspace 在当前用户的设备上注册工作区。
-func (o *directOperations) RegisterDeviceWorkspace(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, deviceID string, input DeviceWorkspaceInput) (DeviceWorkspace, error) {
-	record, err := o.registerWorkspace.Execute(ctx, identity, deviceID, input.Label)
-	if err != nil {
-		return DeviceWorkspace{}, o.deviceError(ctx, meta, err, cervii18n.ErrorDeviceWorkspaceRegisterFailed, identity.Organization.ID, "device_id", deviceID)
-	}
-	return deviceWorkspaceFromAction(*record), nil
-}
-
-// ListDeviceWorkspaces 返回当前用户设备上的工作区。
-func (o *directOperations) ListDeviceWorkspaces(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, deviceID string) (DeviceWorkspaceList, error) {
-	records, err := o.listWorkspaces.Execute(ctx, identity, deviceID)
-	if err != nil {
-		return DeviceWorkspaceList{}, o.deviceError(ctx, meta, err, cervii18n.ErrorDeviceWorkspaceListFailed, identity.Organization.ID, "device_id", deviceID)
-	}
-	workspaces := make([]DeviceWorkspace, 0, len(records))
-	for _, record := range records {
-		workspaces = append(workspaces, deviceWorkspaceFromAction(record))
-	}
-	return DeviceWorkspaceList{Workspaces: workspaces}, nil
-}
-
 // deviceError 转换本机设备操作错误。设备注册信息由客户端程序上报，校验失败按注册失败收敛并记录字段原因码。
 func (o *directOperations) deviceError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key, organizationID string, attributes ...any) error {
 	if ctx.Err() != nil {
@@ -104,14 +77,8 @@ func (o *directOperations) deviceError(ctx context.Context, meta RequestMeta, er
 	if errors.Is(err, deviceaction.ErrNotFound) {
 		return NotFoundError(meta, cervii18n.ErrorDeviceNotFound)
 	}
-	if errors.Is(err, deviceaction.ErrWorkspaceNotFound) {
-		return NotFoundError(meta, cervii18n.ErrorDeviceWorkspaceNotFound)
-	}
 	if errors.Is(err, chatstate.ErrConversationNotFound) {
 		return NotFoundError(meta, cervii18n.ErrorConversationNotFound)
-	}
-	if errors.Is(err, deviceaction.ErrAssistantNotInConversation) {
-		return NotFoundError(meta, cervii18n.ErrorAssistantNotInConversation)
 	}
 	logAttributes := []any{"organization_id", organizationID, "failure", failureKey}
 	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
@@ -121,11 +88,6 @@ func (o *directOperations) deviceError(ctx context.Context, meta RequestMeta, er
 	}
 	slog.Warn("设备操作失败", append(logAttributes, attributes...)...)
 	return FailedError(meta, failureKey)
-}
-
-// deviceWorkspaceFromAction 转换工作区输出。
-func deviceWorkspaceFromAction(input deviceaction.WorkspaceRecord) DeviceWorkspace {
-	return DeviceWorkspace{ID: input.ID, DeviceID: input.DeviceID, Label: input.Label, LastUsedAt: input.LastUsedAt, CreatedAt: input.CreatedAt}
 }
 
 // deviceFromAction 转换设备输出。
