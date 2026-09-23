@@ -23,10 +23,7 @@ const mobile = {
     noTeams: "No teams yet",
     sendMessage: "Send message",
     chatError: "Could not open the conversation. Please try again.",
-    employees: "Members",
     agents: "AI employees",
-    teams: "Teams",
-    external: "External contacts",
   },
   teams: {
     loadError: "Could not load teams. Please try again.",
@@ -44,12 +41,11 @@ const mobile = {
     detail: "Contact profile",
     notFound: "This contact does not exist or is unavailable.",
   },
+  assistants: {
+    loadError: "Could not load assistants. Please try again.",
+    notFound: "This assistant does not exist or is unavailable.",
+  },
   agents: {
-    search: "Search AI employees by name",
-    empty: "No AI employees found",
-    loadError: "Could not load AI employees. Please try again.",
-    allLoaded: "All AI employees shown",
-    loadMoreError: "Could not load AI employees",
     chatError: "Could not open the AI conversation. Please try again.",
     unavailable: "This AI employee does not exist or has been deactivated.",
   },

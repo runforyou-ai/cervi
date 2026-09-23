@@ -2,19 +2,15 @@
 import { PlusIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Link, useNavigate } from "react-router"
-import { toast } from "sonner"
 
 import {
   AssistantPresence,
   UserStatus,
   currentDevice,
   deactivateAssistant,
-  isApiError,
   listAssistants,
   moveAssistant,
-  pauseAssistant,
   reactivateAssistant,
-  resumeAssistant,
   type AssistantData,
 } from "@/api"
 import { ConfirmationDialog } from "@/components/confirmation-dialog"
@@ -23,25 +19,19 @@ import { ResourceRowIdentity } from "@/components/resource-row-identity"
 import { ResourceTable } from "@/components/resource-table"
 import { Button } from "@/components/ui/button"
 import { useAccountStatusToggle } from "@/features/contacts/account-status-toggle"
-import {
-  assistantResourceKeys,
-  useAssistantInvalidator,
-} from "@/features/contacts/assistants/assistant-keys"
+import { assistantResourceKeys } from "@/features/contacts/assistants/assistant-keys"
 import { assistantPresenceLabel } from "@/features/contacts/assistants/assistant-presence"
+import { useAssistantPause } from "@/features/contacts/assistants/use-assistant-pause"
 import { ContactListSection } from "@/features/contacts/contact-list-section"
 import { useContactSearch } from "@/features/contacts/use-contact-search"
 import { useConfirmedAction } from "@/hooks/use-confirmed-action"
-import { useImmediateSave } from "@/hooks/use-immediate-save"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
-import { apiErrorMessage } from "@/lib/form-errors"
-import { recoverSession } from "@/lib/session-navigation"
 
 /** 显示当前成员名下的助理并提供编辑、换电脑、暂停和启停操作。 */
 export function AssistantsPanel() {
   const { t } = useTranslation("contacts")
   const navigate = useNavigate()
-  const invalidate = useAssistantInvalidator()
   const { setParameters, search, setSearch } = useContactSearch()
   const list = useResource(resourceKeys.assistants(), () => listAssistants())
   const { data: local } = useResource(resourceKeys.currentDevice(), () => currentDevice())
@@ -64,25 +54,7 @@ export function AssistantsPanel() {
     errorMessage: () => t("assistants.move.error"),
     logLabel: "把助理换到这台电脑",
   })
-  const pauseSave = useImmediateSave()
-
-  /** 暂停或恢复助理，成功后刷新列表。 */
-  async function togglePaused(assistant: AssistantData) {
-    const request = pauseSave.begin()
-    if (request === null) return
-    const paused = assistant.presence === AssistantPresence.AssistantPresencePaused
-    try {
-      await (paused ? resumeAssistant(assistant.id) : pauseAssistant(assistant.id))
-      void invalidate(assistant.id)
-      if (pauseSave.isCurrent(request)) toast.success(t(paused ? "assistants.pause.resumed" : "assistants.pause.paused"))
-    } catch (error) {
-      if (!pauseSave.isCurrent(request) || recoverSession(error, navigate)) return
-      console.warn("修改助理暂停状态失败", { assistant_id: assistant.id, error })
-      toast.error(isApiError(error) ? apiErrorMessage(error) : t("assistants.pause.error"))
-    } finally {
-      pauseSave.finish(request)
-    }
-  }
+  const pause = useAssistantPause()
 
   const createLabel = localDeviceID ? t("add.assistant") : t("assistants.createOnDesktop")
 
@@ -174,8 +146,8 @@ export function AssistantsPanel() {
                 key: "pause",
                 label: t(paused ? "assistants.actions.resume" : "assistants.actions.pause"),
                 // 已禁用或未绑定电脑的助理不接收请求，暂停没有意义。
-                disabled: !active || assistant.presence === AssistantPresence.AssistantPresenceUnbound || pauseSave.saving,
-                onSelect: () => void togglePaused(assistant),
+                disabled: !active || assistant.presence === AssistantPresence.AssistantPresenceUnbound || pause.saving,
+                onSelect: () => void pause.toggle(assistant),
               },
               statusToggle.rowAction(assistant),
             ]
