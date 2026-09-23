@@ -7,10 +7,12 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"slices"
 	"time"
 
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
+	"github.com/runforyou-ai/cervi/internal/integration/knowledgeretrieval"
 )
 
 const (
@@ -24,7 +26,7 @@ const (
 var errRunSuppressed = errors.New("device run suppressed")
 
 // runAgent 按领取时固定的有效配置在本机执行运行时，模型请求经企业服务端模型代理，成功时回报结果。
-func (w *Worker) runAgent(runCtx context.Context, meta appservice.RequestMeta, runID string, claim appservice.DeviceRunClaim) (agentruntime.RunResult, error) {
+func (w *Worker) runAgent(runCtx context.Context, meta appservice.RequestMeta, runID string, claim appservice.DeviceRunClaim, local *activeRun) (agentruntime.RunResult, error) {
 	var assignment agentruntime.Assignment
 	if err := json.Unmarshal(claim.Assignment, &assignment); err != nil {
 		return agentruntime.RunResult{}, fmt.Errorf("decode device run assignment: %w", err)
@@ -40,11 +42,27 @@ func (w *Worker) runAgent(runCtx context.Context, meta appservice.RequestMeta, r
 	}
 	ctx, cancel := context.WithTimeout(runCtx, timeout)
 	defer cancel()
-	result, err := w.runtime.Run(ctx, agentruntime.RunRequest{
+	request := agentruntime.RunRequest{
 		RunID:       runID,
 		Assignment:  assignment,
 		Credentials: agentruntime.ModelCredentials{APIKey: deviceModelAPIKey, BaseURL: baseURL, Transport: transport},
-	}, &remoteInputFeed{client: w.client, meta: meta, runID: runID})
+		ReadAttachment: func(ctx context.Context, messageID string) ([]byte, error) {
+			return w.client.ReadDeviceRunAttachment(ctx, meta, runID, messageID)
+		},
+		StreamID: local.streamID,
+		Attempt:  1,
+		OnStream: func(delta agentruntime.StreamDelta) {
+			// 运行 context 已取消时丢弃增量。
+			if ctx.Err() == nil {
+				local.stream.Publish(delta)
+			}
+		},
+	}
+	// 有效配置包含知识检索时经企业服务端检索运行绑定的知识库。
+	if slices.Contains(assignment.Tools, agentruntime.KnowledgeToolName) {
+		request.KnowledgeSearch = remoteKnowledgeSearch(w.client, meta, runID)
+	}
+	result, err := w.runtime.Run(ctx, request, &remoteInputFeed{client: w.client, meta: meta, runID: runID})
 	if err != nil {
 		return result, err
 	}
@@ -74,6 +92,25 @@ func encodeProcess(result agentruntime.RunResult) (json.RawMessage, json.RawMess
 		return nil, nil, fmt.Errorf("encode device run blocks: %w", err)
 	}
 	return usage, blocks, nil
+}
+
+// remoteKnowledgeSearch 返回经企业服务端检索运行绑定知识库的检索函数。
+func remoteKnowledgeSearch(client appservice.DeviceRunBackend, meta appservice.RequestMeta, runID string) agentruntime.KnowledgeSearch {
+	return func(ctx context.Context, request knowledgeretrieval.Request) (knowledgeretrieval.Result, error) {
+		encoded, err := json.Marshal(request)
+		if err != nil {
+			return knowledgeretrieval.Result{}, fmt.Errorf("encode knowledge search request: %w", err)
+		}
+		output, err := client.SearchDeviceRunKnowledge(ctx, meta, runID, appservice.DeviceRunKnowledgeSearchInput{Request: encoded})
+		if err != nil {
+			return knowledgeretrieval.Result{}, err
+		}
+		var result knowledgeretrieval.Result
+		if err := json.Unmarshal(output.Result, &result); err != nil {
+			return knowledgeretrieval.Result{}, fmt.Errorf("decode knowledge search result: %w", err)
+		}
+		return result, nil
+	}
 }
 
 // remoteInputFeed 经企业服务端读取与认领设备运行的输入。

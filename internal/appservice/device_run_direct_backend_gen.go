@@ -56,6 +56,16 @@ func (b *DirectBackend) ClaimDeviceRunInputs(ctx context.Context, meta RequestMe
 	return withNormalizedSlices(b.ops.ClaimDeviceRunInputs(ctx, meta, device, runID, input))
 }
 
+// SearchDeviceRunKnowledge 在本设备持有运行绑定的知识库中检索。
+func (b *DirectBackend) SearchDeviceRunKnowledge(ctx context.Context, meta RequestMeta, runID string, input DeviceRunKnowledgeSearchInput) (DeviceRunKnowledgeSearchResult, error) {
+	device, err := b.ops.authenticateDevice(ctx, meta)
+	if err != nil {
+		var zero DeviceRunKnowledgeSearchResult
+		return zero, err
+	}
+	return withNormalizedSlices(b.ops.SearchDeviceRunKnowledge(ctx, meta, device, runID, input))
+}
+
 // CompleteDeviceRun 以成功结果收尾本设备持有的运行。
 func (b *DirectBackend) CompleteDeviceRun(ctx context.Context, meta RequestMeta, runID string, input DeviceRunResultInput) error {
 	device, err := b.ops.authenticateDevice(ctx, meta)

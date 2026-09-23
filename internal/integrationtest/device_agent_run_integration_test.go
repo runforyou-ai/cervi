@@ -4,7 +4,9 @@ package integrationtest
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"slices"
 	"testing"
 	"time"
 	"uuid"
@@ -13,8 +15,10 @@ import (
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	deviceaction "github.com/runforyou-ai/cervi/internal/actions/device"
+	knowledgeaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
+	"github.com/runforyou-ai/cervi/internal/integration/knowledgeretrieval"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
@@ -189,6 +193,68 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 			}
 		}
 		fixture.claimAndComplete(run.ID, "只对话的回复")
+	})
+
+	t.Run("运行期知识检索与附件读取", func(t *testing.T) {
+		base, err := knowledgeaction.NewCreateKnowledgeBaseAction(db).Execute(ctx, identity, newKnowledgeBaseInput(t, db, identity, "设备资料", domain.KnowledgeBaseCategoryStandard))
+		if err != nil {
+			t.Fatal(err)
+		}
+		bindKnowledge := func(ids []string) {
+			t.Helper()
+			if _, err := agentaction.NewUpdateAssistantAction(db).Execute(ctx, identity, assistant.ID, agentaction.AssistantInput{
+				DisplayName: assistant.DisplayName, Execution: agentaction.ManagedExecutionInput{
+					ProviderID: employee.Execution.Managed.ProviderID, ModelIdentifier: employee.Execution.Managed.ModelIdentifier, KnowledgeBaseIDs: ids,
+				},
+			}); err != nil {
+				t.Fatal(err)
+			}
+		}
+		bindKnowledge([]string{base.ID})
+		defer bindKnowledge(nil)
+		executor := agentrunaction.NewExecuteAction(db, tasks, nil, testAttachmentReader(db), testDeviceKnowledge{})
+		conversationID := fixture.assistantChat("")
+		sent, err := conversationaction.NewSendAttachmentMessageAction(db, agentrunaction.NewScheduler(tasks)).Execute(ctx, identity, conversationaction.AttachmentMessageInput{
+			ConversationID: conversationID, ClientMessageID: uuid.NewV7().String(), Body: "看看截图",
+			FileID: uploadedAttachment(t, db, identity, "screen.png", "image/png"),
+		})
+		if err != nil {
+			t.Fatal(err)
+		}
+		var run servermodels.AgentRun
+		if err := db.NewSelect().Model(&run).Where("agr.conversation_id = ? AND agr.status = ?", conversationID, domain.AgentRunStatusQueued).Scan(ctx); err != nil {
+			t.Fatal(err)
+		}
+		// 领取前不能读取运行期资料。
+		if _, err := executor.SearchDeviceRunKnowledge(ctx, fixture.device, run.ID, knowledgeretrieval.Request{Queries: []string{"退款"}}); !errors.Is(err, agentrunaction.ErrDeviceRunLeaseLost) {
+			t.Fatalf("search before claim=%v", err)
+		}
+		claim, err := executor.ClaimDeviceRun(ctx, fixture.device, run.ID)
+		if err != nil {
+			t.Fatal(err)
+		}
+		var assignment agentruntime.Assignment
+		if err := json.Unmarshal(claim.Assignment, &assignment); err != nil || !slices.Contains(assignment.Tools, agentruntime.KnowledgeToolName) {
+			t.Fatalf("assignment=%+v %v", assignment, err)
+		}
+		result, err := executor.SearchDeviceRunKnowledge(ctx, fixture.device, run.ID, knowledgeretrieval.Request{Queries: []string{"退款"}})
+		if err != nil || len(result.Records) != 1 || result.Records[0].KnowledgeBaseID != base.ID || result.Records[0].Content != "设备资料：退款" {
+			t.Fatalf("search=%+v %v", result, err)
+		}
+		content, err := executor.ReadDeviceRunAttachment(ctx, fixture.device, run.ID, sent.Message.ID)
+		if err != nil || string(content) != "content:screen.png" {
+			t.Fatalf("attachment=%q %v", content, err)
+		}
+		// 其他会话的附件与其他设备都读不到。
+		if _, err := executor.ReadDeviceRunAttachment(ctx, fixture.device, run.ID, uuid.NewV7().String()); !errors.Is(err, agentrunaction.ErrAttachmentUnavailable) {
+			t.Fatalf("foreign attachment=%v", err)
+		}
+		otherDevice := fixture.device
+		otherDevice.DeviceID = uuid.NewV7().String()
+		if _, err := executor.ReadDeviceRunAttachment(ctx, otherDevice, run.ID, sent.Message.ID); !errors.Is(err, agentrunaction.ErrDeviceRunNotFound) {
+			t.Fatalf("other device attachment=%v", err)
+		}
+		fixture.complete(run.ID, "已查阅资料")
 	})
 
 	t.Run("派发领取与工作区串行", func(t *testing.T) {
@@ -500,6 +566,20 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 			t.Fatalf("reload assistant=%+v %v", reloaded, err)
 		}
 	})
+}
+
+// testDeviceKnowledge 为每个知识库提供一条以库名和查询拼成正文的检索结果。
+type testDeviceKnowledge struct{}
+
+// Sources 按知识库编号构造检索来源。
+func (testDeviceKnowledge) Sources(_ context.Context, _ string, knowledgeBaseIDs []string) ([]knowledgeretrieval.Source, error) {
+	sources := make([]knowledgeretrieval.Source, 0, len(knowledgeBaseIDs))
+	for _, id := range knowledgeBaseIDs {
+		sources = append(sources, knowledgeretrieval.Source{ID: id, Name: "设备资料", Retrieve: func(_ context.Context, query string) ([]knowledgeretrieval.Record, error) {
+			return []knowledgeretrieval.Record{{KnowledgeBaseID: id, SegmentID: uuid.NewV7().String(), Content: "设备资料：" + query, Matched: true}}, nil
+		}})
+	}
+	return sources, nil
 }
 
 // assistantChat 创建一条与测试助理的新单聊，workspaceID 非空时同时指定工作区，停止首条消息的运行后返回会话编号。

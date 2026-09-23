@@ -52,6 +52,14 @@ func (b *Backend) ClaimDeviceRunInputs(ctx context.Context, meta appservice.Requ
 	return output, err
 }
 
+// SearchDeviceRunKnowledge 在本设备持有运行绑定的知识库中检索。
+func (b *Backend) SearchDeviceRunKnowledge(ctx context.Context, meta appservice.RequestMeta, runID string, input appservice.DeviceRunKnowledgeSearchInput) (appservice.DeviceRunKnowledgeSearchResult, error) {
+	var output appservice.DeviceRunKnowledgeSearchResult
+	err := b.do(ctx, meta, http.MethodPost, "/agent-runs/"+url.PathEscape(runID)+"/knowledge/search", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // CompleteDeviceRun 以成功结果收尾本设备持有的运行。
 func (b *Backend) CompleteDeviceRun(ctx context.Context, meta appservice.RequestMeta, runID string, input appservice.DeviceRunResultInput) error {
 	return b.do(ctx, meta, http.MethodPost, "/agent-runs/"+url.PathEscape(runID)+"/result", nil, input, nil)

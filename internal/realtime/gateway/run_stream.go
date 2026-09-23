@@ -11,17 +11,17 @@ import (
 	"uuid"
 
 	"github.com/runforyou-ai/cervi/internal/appservice"
-	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	"github.com/runforyou-ai/cervi/internal/realtime/protocol"
 )
 
-// runStream 是一条运行过程流，写协程独占响应写入；快照分片先于增量写出，待发增量按序号相接合并为一条。
+// runStream 是一条运行过程流，写协程独占响应写入，待写事件由 queue 按序缓存。
 type runStream struct {
 	gateway *Gateway
 	id      string
 	runID   string
 	cancel  context.CancelFunc
+	queue   *protocol.RunStreamQueue
 
 	// subjects、tokenSessionID 与 conversationID 在登记事件流前写入，之后只读。
 	subjects       []string
@@ -29,13 +29,7 @@ type runStream struct {
 	conversationID string
 
 	mu         sync.Mutex
-	snapshot   []protocol.RunStreamSnapshot
-	delta      *agentruntime.StreamDelta
 	controller *http.ResponseController
-	// ended 表示源运行流已结束，剩余事件写出后补发结束事件。
-	ended   bool
-	closing bool
-	wake    chan struct{}
 }
 
 // newRunStream 创建尚未输出事件流的运行过程流，cancel 结束该流的请求处理。
@@ -45,7 +39,7 @@ func newRunStream(gateway *Gateway, runID string, cancel context.CancelFunc) *ru
 		id:      uuid.NewV7().String(),
 		runID:   runID,
 		cancel:  cancel,
-		wake:    make(chan struct{}, 1),
+		queue:   protocol.NewRunStreamQueue(runID, gateway.options.RunPendingTextBytes),
 	}
 }
 
@@ -88,7 +82,7 @@ func (g *Gateway) serveRun(writer http.ResponseWriter, request *http.Request, ru
 		return
 	}
 
-	snapshot, unsubscribe, running := g.backend.SubscribeAgentRunStream(runID, current.publish, current.finish)
+	snapshot, unsubscribe, running := g.backend.SubscribeAgentRunStream(runID, current.queue.Publish, current.queue.Finish)
 	if running {
 		defer unsubscribe()
 	}
@@ -113,7 +107,7 @@ func (g *Gateway) serveRun(writer http.ResponseWriter, request *http.Request, ru
 		current.write(writer, controller, protocol.RunStreamEnded{RunID: runID})
 		return
 	}
-	current.enqueueSnapshot(snapshot)
+	current.queue.Snapshot(snapshot, g.options.RunSnapshotPartBytes)
 
 	// 事件流最长存活时间不晚于登录会话到期。
 	lifetime := min(g.options.MaxLifetime, time.Until(identity.Token.ExpiresAt))
@@ -128,41 +122,26 @@ func (g *Gateway) serveRun(writer http.ResponseWriter, request *http.Request, ru
 	slog.Info("运行过程流已结束", "stream_id", current.id, "agent_run_id", runID, "user_id", identity.User.ID)
 }
 
-// run 先写出快照分片再写出合并后的增量并定期发送心跳，源运行流结束时补发结束事件。
+// run 按序写出队列中的快照分片、合并后的增量与结束事件并定期发送心跳，事件流结束或关闭时返回。
 func (s *runStream) run(ctx context.Context, writer http.ResponseWriter, controller *http.ResponseController) {
 	ping := time.NewTicker(s.gateway.options.PingInterval)
 	defer ping.Stop()
 
 	for {
-		s.mu.Lock()
-		snapshot, delta := s.snapshot, s.delta
-		s.snapshot, s.delta = nil, nil
-		s.mu.Unlock()
-
-		for _, part := range snapshot {
-			if !s.write(writer, controller, part) {
+		frames, done := s.queue.Take()
+		for _, frame := range frames {
+			if !s.write(writer, controller, frame) {
 				return
 			}
 		}
-		if delta != nil && !s.write(writer, controller, runStreamDelta(*delta)) {
+		if done {
 			return
 		}
-
-		s.mu.Lock()
-		pending, ended, closing := len(s.snapshot) > 0 || s.delta != nil, s.ended, s.closing
-		s.mu.Unlock()
-		if pending {
+		if len(frames) > 0 {
 			continue
 		}
-		if closing {
-			return
-		}
-		if ended {
-			s.write(writer, controller, protocol.RunStreamEnded{RunID: s.runID})
-			return
-		}
 		select {
-		case <-s.wake:
+		case <-s.queue.Wake():
 		case <-ping.C:
 			if !s.write(writer, controller, protocol.Ping{}) {
 				return
@@ -194,54 +173,6 @@ func (s *runStream) write(writer http.ResponseWriter, controller *http.ResponseC
 	return true
 }
 
-// enqueueSnapshot 把订阅时的快照按文本预算拆分为分片事件，排在全部增量之前写出。
-func (s *runStream) enqueueSnapshot(snapshot agentruntime.StreamSnapshot) {
-	parts := splitSnapshot(snapshot, s.gateway.options.RunSnapshotPartBytes)
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.closing {
-		return
-	}
-	s.snapshot = parts
-	s.signal()
-}
-
-// publish 合并待发增量；增量不相接或合并后超出文本上限时按慢消费者结束事件流，由客户端重新取快照。
-func (s *runStream) publish(delta agentruntime.StreamDelta) {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.closing || s.ended {
-		return
-	}
-	if s.delta == nil {
-		s.delta = &delta
-	} else if merged, ok := agentruntime.MergeStreamDeltas(*s.delta, delta); ok {
-		s.delta = &merged
-	} else {
-		slog.Warn("运行过程流待发增量不相接，结束事件流", "stream_id", s.id, "agent_run_id", s.runID,
-			"pending_sequence", s.delta.Sequence, "base_sequence", delta.BaseSequence)
-		s.beginClose()
-		return
-	}
-	if size := deltaTextBytes(*s.delta); size > s.gateway.options.RunPendingTextBytes {
-		slog.Warn("运行过程流待发增量超出上限，按慢消费者结束", "stream_id", s.id, "agent_run_id", s.runID, "pending_bytes", size)
-		s.beginClose()
-		return
-	}
-	s.signal()
-}
-
-// finish 登记源运行流已结束，剩余事件写出后补发结束事件。
-func (s *runStream) finish() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.closing || s.ended {
-		return
-	}
-	s.ended = true
-	s.signal()
-}
-
 // tokenSession 返回事件流所属登录会话编号。
 func (s *runStream) tokenSession() string { return s.tokenSessionID }
 
@@ -259,26 +190,14 @@ func (s *runStream) shutdown() { s.close() }
 
 // close 清除未发送的事件并结束事件流，不补发结束事件。
 func (s *runStream) close() {
-	s.mu.Lock()
-	defer s.mu.Unlock()
-	if s.closing {
-		return
-	}
-	s.beginClose()
-}
-
-// beginClose 在持有流锁时进入关闭状态、清除未发送的事件并唤醒写协程。
-func (s *runStream) beginClose() {
-	s.closing = true
-	s.snapshot, s.delta = nil, nil
-	s.signal()
+	s.queue.Close()
 }
 
 // attach 登记事件流的响应控制器，事件流已进入关闭状态时返回 false。
 func (s *runStream) attach(controller *http.ResponseController) bool {
 	s.mu.Lock()
 	defer s.mu.Unlock()
-	if s.closing {
+	if s.queue.Closed() {
 		return false
 	}
 	s.controller = controller
@@ -294,79 +213,4 @@ func (s *runStream) abort() {
 	if controller != nil {
 		_ = controller.SetWriteDeadline(time.Now())
 	}
-}
-
-// signal 唤醒写协程，已有待处理唤醒时直接返回。
-func (s *runStream) signal() {
-	select {
-	case s.wake <- struct{}{}:
-	default:
-	}
-}
-
-// splitSnapshot 把快照按文本预算拆分为分片事件，每个分片至少包含一个内容块。
-// 候选正文整段放在首个分片并计入该分片预算，其长度由模型单次最大输出约束。
-func splitSnapshot(snapshot agentruntime.StreamSnapshot, budget int) []protocol.RunStreamSnapshot {
-	header := protocol.RunStreamSnapshot{RunID: snapshot.RunID, StreamID: snapshot.StreamID, Attempt: snapshot.Attempt, Sequence: snapshot.Sequence}
-	first := header
-	first.CandidateContent, first.Blocks = snapshot.CandidateContent, []protocol.RunStreamBlock{}
-	parts := []protocol.RunStreamSnapshot{first}
-	size := len(snapshot.CandidateContent)
-	for _, block := range snapshot.Blocks {
-		view := runStreamBlock(block)
-		last := &parts[len(parts)-1]
-		if len(last.Blocks) > 0 && size+len(view.Text) > budget {
-			next := header
-			next.Blocks = []protocol.RunStreamBlock{}
-			parts = append(parts, next)
-			last, size = &parts[len(parts)-1], 0
-		}
-		last.Blocks = append(last.Blocks, view)
-		size += len(view.Text)
-	}
-	for i := range parts {
-		parts[i].Part, parts[i].PartCount = i, len(parts)
-	}
-	return parts
-}
-
-// runStreamDelta 把运行流增量转换为事件契约中的增量。
-func runStreamDelta(delta agentruntime.StreamDelta) protocol.RunStreamDelta {
-	operations := make([]protocol.RunStreamOperation, 0, len(delta.Operations))
-	for _, operation := range delta.Operations {
-		item := protocol.RunStreamOperation{
-			Kind:     protocol.RunStreamOperationKind(operation.Kind),
-			BlockID:  operation.BlockID,
-			BlockIDs: operation.BlockIDs,
-			Text:     operation.Text,
-		}
-		if operation.Block != nil {
-			block := runStreamBlock(*operation.Block)
-			item.Block = &block
-		}
-		operations = append(operations, item)
-	}
-	return protocol.RunStreamDelta{RunID: delta.RunID, StreamID: delta.StreamID, Attempt: delta.Attempt,
-		BaseSequence: delta.BaseSequence, Sequence: delta.Sequence, Operations: operations}
-}
-
-// runStreamBlock 把运行流内容块转换为事件契约中的展示块。
-func runStreamBlock(block agentruntime.StreamBlock) protocol.RunStreamBlock {
-	view := protocol.RunStreamBlock{ID: block.ID, Position: block.Position, Kind: block.Kind, Text: block.Text}
-	if call := block.ToolCall; call != nil {
-		view.ToolCall = &protocol.RunStreamToolCall{Name: call.Name, Status: call.Status, StartedAt: call.StartedAt, CompletedAt: call.CompletedAt}
-	}
-	return view
-}
-
-// deltaTextBytes 返回增量中全部操作携带的文本字节数。
-func deltaTextBytes(delta agentruntime.StreamDelta) int {
-	total := 0
-	for _, operation := range delta.Operations {
-		total += len(operation.Text)
-		if operation.Block != nil {
-			total += len(operation.Block.Text)
-		}
-	}
-	return total
 }

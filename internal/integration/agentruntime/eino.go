@@ -70,7 +70,7 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 		if request.Assignment.Grounding == GroundingStrict {
 			judges := make(map[string]evidenceJudge)
 			if request.KnowledgeSearch != nil {
-				judges[knowledgeToolName] = knowledgeEvidence
+				judges[KnowledgeToolName] = knowledgeEvidence
 			}
 			gate = newGroundingGate(judges)
 		}

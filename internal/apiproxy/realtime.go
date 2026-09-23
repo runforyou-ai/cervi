@@ -28,6 +28,7 @@ var realtimeConnectTimeout = 30 * time.Second
 type realtimeClient struct {
 	emit    func(name string, data any)
 	caller  func(context.Context) string
+	local   LocalRunStreams
 	mu      sync.Mutex
 	windows map[string]*windowStreams
 }
@@ -74,10 +75,20 @@ func (b *Backend) DisconnectRealtime(_ context.Context, _ appservice.RequestMeta
 	return nil
 }
 
-// ConnectAgentRunStream 使用当前登录凭据建立指定运行的过程流，同一运行可重复请求，各自独立。
+// ConnectAgentRunStream 使用当前登录凭据建立指定运行的过程流，运行在本机执行时校验阅读资格后读取本机过程流；同一运行可重复请求，各自独立。
 func (b *Backend) ConnectAgentRunStream(ctx context.Context, meta appservice.RequestMeta, runID string) (appservice.RealtimeConnection, error) {
 	owner := b.realtime.owner(ctx)
 	generation := b.realtime.generation(owner)
+	// 运行在本机执行时经企业服务器校验阅读资格后直接读取本机过程流。
+	if b.realtime.runsLocally(runID) {
+		if err := b.AuthorizeAgentRunStreamAccess(ctx, meta, runID); err != nil {
+			return appservice.RealtimeConnection{}, err
+		}
+		if session, ok := b.realtime.startLocalRun(owner, generation, runID); ok {
+			slog.Info("本机运行过程流已建立", "connection_id", session.id, "window", owner, "agent_run_id", runID)
+			return appservice.RealtimeConnection{ConnectionID: session.id}, nil
+		}
+	}
 	response, cancel, err := b.openEventStream(ctx, meta, "/realtime/runs/"+runID)
 	if err != nil {
 		return appservice.RealtimeConnection{}, err
@@ -290,6 +301,16 @@ func (c *realtimeClient) disconnectAll() {
 
 // startRun 登记指定窗口的新运行过程流并启动接收协程，同一窗口的多条运行过程流同时存在；通道代次已变化时不登记并返回 false。
 func (c *realtimeClient) startRun(owner string, body io.ReadCloser, cancel context.CancelFunc, runID string, generation int) (*realtimeSession, bool) {
+	session := c.newRunSession(owner, runID, cancel)
+	if !c.register(session, generation) {
+		return nil, false
+	}
+	go c.receive(session, body)
+	return session, true
+}
+
+// newRunSession 创建按运行过程流事件投递的事件流，结束时解除所属窗口的登记。
+func (c *realtimeClient) newRunSession(owner, runID string, cancel context.CancelFunc) *realtimeSession {
 	session := &realtimeSession{id: uuid.NewV7().String(), owner: owner, runID: runID, cancel: cancel}
 	session.emitFrame = func(current *realtimeSession, frame string) {
 		c.emit(appservice.RealtimeRunFrameEventName, appservice.RealtimeRunFrameEvent{ConnectionID: current.id, RunID: current.runID, Frame: frame})
@@ -304,19 +325,22 @@ func (c *realtimeClient) startRun(owner string, body io.ReadCloser, cancel conte
 			delete(streams.runs, ended.id)
 		}
 	}
+	return session
+}
+
+// register 把运行过程流登记到所属窗口的实时通道，通道代次已变化时返回 false。
+func (c *realtimeClient) register(session *realtimeSession, generation int) bool {
 	c.mu.Lock()
-	streams := c.window(owner)
+	defer c.mu.Unlock()
+	streams := c.window(session.owner)
 	if streams.generation != generation {
-		c.mu.Unlock()
-		return nil, false
+		return false
 	}
 	if streams.runs == nil {
 		streams.runs = map[string]*realtimeSession{}
 	}
 	streams.runs[session.id] = session
-	c.mu.Unlock()
-	go c.receive(session, body)
-	return session, true
+	return true
 }
 
 // disconnectRun 解除指定运行过程流登记并关闭，接收协程随后投递结束事件。

@@ -89,7 +89,7 @@ func runGrounded(t *testing.T, chatModel *groundingModel, feed *testInputFeed, r
 
 // TestGroundingGate 验证严格依据策略下正文的放行、纠正与转人工。
 func TestGroundingGate(t *testing.T) {
-	search := terminalCall("k1", knowledgeToolName, `{"queries":["退货期限"]}`)
+	search := terminalCall("k1", KnowledgeToolName, `{"queries":["退货期限"]}`)
 	ask := terminalCall("ask", askCustomerToolName, `{"purpose":"clarify","message":"请提供订单号"}`)
 	emptyKnowledge := func(context.Context, knowledgeretrieval.Request) (knowledgeretrieval.Result, error) {
 		return knowledgeretrieval.Result{Records: []knowledgeretrieval.Record{{SegmentID: "s1", Content: "周边内容"}}}, nil
@@ -167,7 +167,7 @@ func TestGroundingGate(t *testing.T) {
 				return
 			}
 			if corrections != 1 || !strings.Contains(correction, scenario.wantCorrection) ||
-				(scenario.knowledge == nil && strings.Contains(correction, knowledgeToolName)) {
+				(scenario.knowledge == nil && strings.Contains(correction, KnowledgeToolName)) {
 				t.Fatalf("corrections = %d, correction = %q", corrections, correction)
 			}
 		})
@@ -179,7 +179,7 @@ func TestGroundingCorrectionKeepsBudget(t *testing.T) {
 	feed := &testInputFeed{}
 	feed.appendUser("退货期限是几天")
 	chatModel := &groundingModel{script: []func([]*schema.AgenticMessage) *schema.AgenticMessage{
-		reply("", terminalCall("k1", knowledgeToolName, `{"queries":["退货期限"]}`)), reply(groundedAnswer), reply(groundedAnswer),
+		reply("", terminalCall("k1", KnowledgeToolName, `{"queries":["退货期限"]}`)), reply(groundedAnswer), reply(groundedAnswer),
 	}}
 	result := runGrounded(t, chatModel, feed, RunRequest{
 		MaxIterations: 3,
@@ -203,7 +203,7 @@ func TestGroundingBudgetEndSkipsCorrection(t *testing.T) {
 	feed := &testInputFeed{}
 	feed.appendUser("退货期限是几天")
 	chatModel := &groundingModel{script: []func([]*schema.AgenticMessage) *schema.AgenticMessage{
-		reply("", terminalCall("k1", knowledgeToolName, `{"queries":["退货期限"]}`)), reply(groundedAnswer),
+		reply("", terminalCall("k1", KnowledgeToolName, `{"queries":["退货期限"]}`)), reply(groundedAnswer),
 	}}
 	result := runGrounded(t, chatModel, feed, RunRequest{
 		MaxIterations: 2,
@@ -224,7 +224,7 @@ func TestGroundingResetsOnNewInput(t *testing.T) {
 	chatModel := &groundingModel{script: []func([]*schema.AgenticMessage) *schema.AgenticMessage{
 		func([]*schema.AgenticMessage) *schema.AgenticMessage {
 			once.Do(func() { feed.appendUser("那换货呢") })
-			return assistantReply("", terminalCall("k1", knowledgeToolName, `{"queries":["退货期限"]}`))
+			return assistantReply("", terminalCall("k1", KnowledgeToolName, `{"queries":["退货期限"]}`))
 		},
 		reply(groundedAnswer),
 	}}
@@ -240,7 +240,7 @@ func TestGroundingFollowsOffloadedEvidence(t *testing.T) {
 	feed := &testInputFeed{}
 	feed.appendUser("退货期限是几天")
 	chatModel := &groundingModel{script: []func([]*schema.AgenticMessage) *schema.AgenticMessage{
-		reply("", terminalCall("k1", knowledgeToolName, `{"queries":["退货期限"]}`)),
+		reply("", terminalCall("k1", KnowledgeToolName, `{"queries":["退货期限"]}`)),
 		reply(groundedAnswer),
 		reply("", terminalCall("r1", offloadedResultToolName, `{"file_path":"/trunc/k1"}`)),
 		reply(groundedAnswer),
@@ -266,7 +266,7 @@ func TestGroundingGateVisibility(t *testing.T) {
 	messages := func(readResult string) []*schema.AgenticMessage {
 		return []*schema.AgenticMessage{
 			schema.UserAgenticMessage("退货期限是几天"),
-			assistantReply("", terminalCall("k1", knowledgeToolName, `{"queries":["退货期限"]}`)),
+			assistantReply("", terminalCall("k1", KnowledgeToolName, `{"queries":["退货期限"]}`)),
 			toolReply("k1", "工具结果已清理，可读取 /clear/k1"),
 			assistantReply("", terminalCall("r1", offloadedResultToolName, `{"file_path":"/clear/k1"}`)),
 			toolReply("r1", readResult),
@@ -288,7 +288,7 @@ func TestGroundingGateVisibility(t *testing.T) {
 		{name: "只读回截断预览", matched: true, read: "     1\t" + original[:20] + "…已转存至 /trunc/k1"},
 	} {
 		t.Run(scenario.name, func(t *testing.T) {
-			gate := newGroundingGate(map[string]evidenceJudge{knowledgeToolName: knowledgeEvidence})
+			gate := newGroundingGate(map[string]evidenceJudge{KnowledgeToolName: knowledgeEvidence})
 			if scenario.matched {
 				gate.valid["k1"] = original
 			}
@@ -359,8 +359,8 @@ func TestGroundingMultipleSearches(t *testing.T) {
 			feed := &testInputFeed{}
 			feed.appendUser("退货期限是几天")
 			chatModel := &groundingModel{script: []func([]*schema.AgenticMessage) *schema.AgenticMessage{
-				reply("", terminalCall("k1", knowledgeToolName, `{"queries":["A"]}`)),
-				reply("", terminalCall("k2", knowledgeToolName, `{"queries":["B"]}`)),
+				reply("", terminalCall("k1", KnowledgeToolName, `{"queries":["A"]}`)),
+				reply("", terminalCall("k2", KnowledgeToolName, `{"queries":["B"]}`)),
 				reply(groundedAnswer),
 			}}
 			result := runGrounded(t, chatModel, feed, RunRequest{
@@ -388,7 +388,7 @@ func TestGroundingBudgetEndInvalidTerminalCall(t *testing.T) {
 	feed := &testInputFeed{}
 	feed.appendUser("退货期限是几天")
 	chatModel := &groundingModel{script: []func([]*schema.AgenticMessage) *schema.AgenticMessage{
-		reply("", terminalCall("k1", knowledgeToolName, `{"queries":["退货期限"]}`)),
+		reply("", terminalCall("k1", KnowledgeToolName, `{"queries":["退货期限"]}`)),
 		reply("", terminalCall("ask", askCustomerToolName, `{}`)),
 	}}
 	result := runGrounded(t, chatModel, feed, RunRequest{MaxIterations: 2, KnowledgeSearch: matchedKnowledge("退货期限为 7 天")})
@@ -408,7 +408,7 @@ func TestGroundingCorrectionStaysOutOfHistory(t *testing.T) {
 		reply(rejected),
 		func([]*schema.AgenticMessage) *schema.AgenticMessage {
 			once.Do(func() { feed.appendUser("订单号是 1001") })
-			return assistantReply("", terminalCall("k1", knowledgeToolName, `{"queries":["退货期限"]}`))
+			return assistantReply("", terminalCall("k1", KnowledgeToolName, `{"queries":["退货期限"]}`))
 		},
 		reply("", terminalCall("ask", askCustomerToolName, `{"purpose":"confirm","message":"请确认订单号"}`)),
 	}}

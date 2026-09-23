@@ -33,6 +33,14 @@ func (o *directOperations) GetAgentRunProcess(ctx context.Context, meta RequestM
 	return result, nil
 }
 
+// AuthorizeAgentRunStreamAccess 校验当前成员对运行所属会话的阅读资格。
+func (o *directOperations) AuthorizeAgentRunStreamAccess(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, runID string) error {
+	if _, err := o.authorizeAgentRunStream.Execute(ctx, identity, runID); err != nil {
+		return agentRunProcessError(ctx, meta, err, identity.Organization.ID, runID)
+	}
+	return nil
+}
+
 // agentRunProcessError 转换运行过程详情读取错误。
 func agentRunProcessError(ctx context.Context, meta RequestMeta, err error, organizationID, runID string) error {
 	if ctx.Err() != nil {

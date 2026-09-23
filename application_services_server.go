@@ -192,6 +192,7 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 		boundService,
 		api.WithDeviceRuns(directBackend),
 		api.WithDeviceModelProxy(directBackend),
+		api.WithDeviceRunAttachments(directBackend),
 		api.WithWebsiteVisitor(websiteVisitorService, config.TLS.Mode != "off"),
 		api.WithWebsiteVisitorRealtime(realtimeGateway),
 		api.WithTelegramWebhook(telegramWebhook),

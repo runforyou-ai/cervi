@@ -18,8 +18,8 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// errAttachmentUnavailable 表示附件不属于本次运行会话、已删除或尚未上传完成。
-var errAttachmentUnavailable = errors.New("agent attachment is unavailable")
+// ErrAttachmentUnavailable 表示附件不属于本次运行会话、已删除或尚未上传完成。
+var ErrAttachmentUnavailable = errors.New("agent attachment is unavailable")
 
 // FileOpener 按原件记录流式读取文件内容。
 type FileOpener interface {
@@ -42,7 +42,7 @@ func NewAttachmentReader(db *bun.DB, files FileOpener, scheme, s3PublicBaseURL s
 // Content 读取本次运行会话中指定附件消息的文件内容。
 func (r *AttachmentReader) Content(ctx context.Context, run *servermodels.AgentRun, messageID string) ([]byte, error) {
 	if !common.ValidUUID(messageID) {
-		return nil, errAttachmentUnavailable
+		return nil, ErrAttachmentUnavailable
 	}
 	file := &servermodels.File{}
 	err := r.db.NewSelect().Model(file).
@@ -52,7 +52,7 @@ func (r *AttachmentReader) Content(ctx context.Context, run *servermodels.AgentR
 		Where("msg.deleted_at IS NULL AND f.status = ?", domain.FileStatusActive).
 		Scan(ctx)
 	if errors.Is(err, sql.ErrNoRows) {
-		return nil, errAttachmentUnavailable
+		return nil, ErrAttachmentUnavailable
 	}
 	if err != nil {
 		return nil, fmt.Errorf("load agent attachment file: %w", err)

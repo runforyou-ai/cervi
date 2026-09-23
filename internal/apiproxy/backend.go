@@ -367,18 +367,35 @@ func (b *Backend) inspectServer(ctx context.Context, meta appservice.RequestMeta
 	return state, status, nil
 }
 
-// do 向已连接的企业服务器发送 HTTP 请求。
+// do 向已连接的企业服务器发送 HTTP 请求并解码 JSON 响应。
 func (b *Backend) do(ctx context.Context, meta appservice.RequestMeta, method, path string, query url.Values, input, output any) error {
+	response, err := b.send(ctx, meta, method, path, query, input)
+	if err != nil {
+		return err
+	}
+	defer response.Body.Close()
+	if output == nil || response.StatusCode == http.StatusNoContent {
+		return nil
+	}
+	if err := json.NewDecoder(io.LimitReader(response.Body, maxResponseBytes)).Decode(output); err != nil {
+		slog.Warn("解析企业服务器响应失败", "method", method, "path", path, "status", response.StatusCode, "error", err)
+		return appservice.UnavailableError(meta, cervii18n.ErrorServerConnectionFailed, nil)
+	}
+	return nil
+}
+
+// send 向已连接的企业服务器发送 HTTP 请求，返回状态码为 2xx 的响应，调用方负责关闭响应体。
+func (b *Backend) send(ctx context.Context, meta appservice.RequestMeta, method, path string, query url.Values, input any) (*http.Response, error) {
 	state := b.connection.currentState()
 	if state == nil {
-		return appservice.SessionError(meta, appservice.SessionStateConnect, cervii18n.ErrorServerConnectionRequired)
+		return nil, appservice.SessionError(meta, appservice.SessionStateConnect, cervii18n.ErrorServerConnectionRequired)
 	}
 	credential, authenticated := b.sessions.Current(ctx, state.baseURL.String())
 	var body io.Reader
 	if input != nil {
 		payload, err := json.Marshal(input)
 		if err != nil {
-			return fmt.Errorf("encode remote request: %w", err)
+			return nil, fmt.Errorf("encode remote request: %w", err)
 		}
 		body = bytes.NewReader(payload)
 	}
@@ -389,7 +406,7 @@ func (b *Backend) do(ctx context.Context, meta appservice.RequestMeta, method, p
 	endpoint := remoteEndpoint(state.baseURL, path, rawQuery)
 	request, err := http.NewRequestWithContext(ctx, method, endpoint, body)
 	if err != nil {
-		return appservice.FailedError(meta, cervii18n.ErrorRemoteRequestCreateFailed)
+		return nil, appservice.FailedError(meta, cervii18n.ErrorRemoteRequestCreateFailed)
 	}
 	request.Header.Set("Accept", "application/json")
 	request.Header.Set("Accept-Language", string(meta.Locale))
@@ -405,28 +422,20 @@ func (b *Backend) do(ctx context.Context, meta appservice.RequestMeta, method, p
 	response, err := state.client.Do(request)
 	if err != nil {
 		if ctx.Err() != nil {
-			return ctx.Err()
+			return nil, ctx.Err()
 		}
 		slog.Warn("企业服务器请求失败", "server_url", state.baseURL.String(), "method", method, "path", path, "error", err)
-		return appservice.UnavailableError(meta, cervii18n.ErrorServerConnectionFailed, nil)
+		return nil, appservice.UnavailableError(meta, cervii18n.ErrorServerConnectionFailed, nil)
 	}
-	defer response.Body.Close()
 	if response.StatusCode < http.StatusOK || response.StatusCode >= http.StatusMultipleChoices {
+		defer response.Body.Close()
 		var rejected *clientsession.Credential
 		if authenticated {
 			rejected = &credential
 		}
-		return b.remoteError(ctx, state, rejected, response, method, path)
+		return nil, b.remoteError(ctx, state, rejected, response, method, path)
 	}
-	limited := io.LimitReader(response.Body, maxResponseBytes)
-	if output == nil || response.StatusCode == http.StatusNoContent {
-		return nil
-	}
-	if err := json.NewDecoder(limited).Decode(output); err != nil {
-		slog.Warn("解析企业服务器响应失败", "server_url", state.baseURL.String(), "method", method, "path", path, "status", response.StatusCode, "error", err)
-		return appservice.UnavailableError(meta, cervii18n.ErrorServerConnectionFailed, nil)
-	}
-	return nil
+	return response, nil
 }
 
 // remoteError 解析企业服务器错误响应；登录会话失效且请求携带了凭据时清除本地凭据。

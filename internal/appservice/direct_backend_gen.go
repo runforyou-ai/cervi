@@ -669,6 +669,15 @@ func (b *DirectBackend) GetAgentRunProcess(ctx context.Context, meta RequestMeta
 	return b.ops.GetAgentRunProcess(ctx, meta, identity, runID)
 }
 
+// AuthorizeAgentRunStreamAccess 校验当前成员对运行所属会话的阅读资格，原生端读取本机执行中运行的过程流前调用。
+func (b *DirectBackend) AuthorizeAgentRunStreamAccess(ctx context.Context, meta RequestMeta, runID string) error {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		return err
+	}
+	return b.ops.AuthorizeAgentRunStreamAccess(ctx, meta, identity, runID)
+}
+
 // ListMessageChannels 返回消息渠道列表。
 func (b *DirectBackend) ListMessageChannels(ctx context.Context, meta RequestMeta) (MessageChannelList, error) {
 	identity, err := b.ops.authenticate(ctx, meta)

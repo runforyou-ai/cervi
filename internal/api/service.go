@@ -38,6 +38,7 @@ type Service struct {
 	application         *appservice.Service
 	deviceRuns          appservice.DeviceRunBackend
 	deviceModels        DeviceModelAuthorizer
+	deviceAttachments   DeviceRunAttachmentReader
 	websiteVisitor      *appservice.WebsiteVisitorService
 	visitorRealtime     WebsiteVisitorRealtime
 	telegramWebhook     TelegramWebhookReceiver
@@ -94,6 +95,10 @@ func NewService(application *appservice.Service, options ...ServiceOption) *Serv
 	// 注册设备运行的模型代理，请求路径在代理入口之后按上游模型服务的接口拼接。
 	if service.deviceModels != nil {
 		router.POST("/agent-runs/:runID/model/*path", service.proxyDeviceModel)
+	}
+	// 注册设备运行读取会话附件的原始内容入口。
+	if service.deviceAttachments != nil {
+		router.GET("/agent-runs/:runID/attachments/:messageID", service.readDeviceRunAttachment)
 	}
 	// 创建企业管理员并返回登录令牌。
 	router.POST("/install", func(c *gin.Context) {

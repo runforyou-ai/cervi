@@ -18,6 +18,7 @@ func (s *Service) registerGeneratedDeviceRunRoutes(router *gin.Engine) {
 	router.POST("/agent-runs/:runID/lease", s.renewDeviceRunLease)
 	router.GET("/agent-runs/:runID/inputs", s.peekDeviceRunInputs)
 	router.POST("/agent-runs/:runID/inputs/claim", s.claimDeviceRunInputs)
+	router.POST("/agent-runs/:runID/knowledge/search", s.searchDeviceRunKnowledge)
 	router.POST("/agent-runs/:runID/result", s.completeDeviceRun)
 	router.POST("/agent-runs/:runID/failure", s.failDeviceRun)
 }
@@ -57,6 +58,16 @@ func (s *Service) claimDeviceRunInputs(c *gin.Context) {
 		return
 	}
 	output, err := s.deviceRuns.ClaimDeviceRunInputs(c.Request.Context(), requestMeta(c), c.Param("runID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// searchDeviceRunKnowledge 在本设备持有运行绑定的知识库中检索。
+func (s *Service) searchDeviceRunKnowledge(c *gin.Context) {
+	var input appservice.DeviceRunKnowledgeSearchInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.deviceRuns.SearchDeviceRunKnowledge(c.Request.Context(), requestMeta(c), c.Param("runID"), input)
 	writeResult(c, http.StatusOK, output, err)
 }
 

@@ -329,6 +329,11 @@ func (s *Service) GetAgentRunProcess(ctx context.Context, meta RequestMeta, runI
 	return withNormalizedSlices(s.backend.GetAgentRunProcess(ctx, meta, runID))
 }
 
+// AuthorizeAgentRunStreamAccess 校验当前成员对运行所属会话的阅读资格，原生端读取本机执行中运行的过程流前调用。
+func (s *Service) AuthorizeAgentRunStreamAccess(ctx context.Context, meta RequestMeta, runID string) error {
+	return s.backend.AuthorizeAgentRunStreamAccess(ctx, meta, runID)
+}
+
 // ListMessageChannels 返回消息渠道列表。
 func (s *Service) ListMessageChannels(ctx context.Context, meta RequestMeta) (MessageChannelList, error) {
 	return withNormalizedSlices(s.backend.ListMessageChannels(ctx, meta))

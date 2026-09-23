@@ -25,6 +25,7 @@ import {
 } from "@/components/ui/field"
 import { Input } from "@/components/ui/input"
 import { Textarea } from "@/components/ui/textarea"
+import { AgentKnowledgeField } from "@/features/agents/agent-knowledge-field"
 import { AgentModelField } from "@/features/agents/agent-model-field"
 import {
   agentModelSelection,
@@ -227,7 +228,7 @@ export function AssistantEditForm({
   )
 }
 
-/** 渲染助理的头像、名称、对话模型、指令与只读的执行电脑；知识库随设备端知识检索一起开放，表单保留已有绑定。 */
+/** 渲染助理的头像、名称、对话模型、指令、知识库与只读的执行电脑。 */
 function AssistantFields({
   control,
   disabled,
@@ -245,7 +246,7 @@ function AssistantFields({
   deviceName: string
   autoFocus?: boolean
 }) {
-  const { t } = useTranslation("contacts")
+  const { t } = useTranslation(["contacts", "agents"])
   return (
     <FieldGroup>
       <Field>
@@ -281,6 +282,16 @@ function AssistantFields({
               disabled={disabled}
               aria-invalid={fieldState.invalid}
             />
+          </Field>
+        )}
+      />
+      <Controller
+        name="knowledgeBaseIds"
+        control={control}
+        render={({ field }) => (
+          <Field>
+            <FieldLabel>{t("agents:execution.knowledgeBases")}</FieldLabel>
+            <AgentKnowledgeField value={field.value} onChange={field.onChange} disabled={disabled} />
           </Field>
         )}
       />

@@ -81,6 +81,7 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.POST("/group-conversations/:conversationID/messages", s.sendGroupTextMessage)
 	router.POST("/group-conversations/:conversationID/runs/:runID/stop", s.stopGroupAgentReply)
 	router.GET("/agent-runs/:runID/process", s.getAgentRunProcess)
+	router.GET("/agent-runs/:runID/stream-access", s.authorizeAgentRunStreamAccess)
 	router.GET("/channels", s.listMessageChannels)
 	router.GET("/channels/website/:channelID", s.getWebsiteChannel)
 	router.GET("/channels/telegram/:channelID", s.getTelegramChannel)
@@ -760,6 +761,11 @@ func (s *Service) stopGroupAgentReply(c *gin.Context) {
 func (s *Service) getAgentRunProcess(c *gin.Context) {
 	output, err := s.application.GetAgentRunProcess(c.Request.Context(), requestMeta(c), c.Param("runID"))
 	writeResult(c, http.StatusOK, output, err)
+}
+
+// authorizeAgentRunStreamAccess 校验当前成员对运行所属会话的阅读资格，原生端读取本机执行中运行的过程流前调用。
+func (s *Service) authorizeAgentRunStreamAccess(c *gin.Context) {
+	writeEmpty(c, s.application.AuthorizeAgentRunStreamAccess(c.Request.Context(), requestMeta(c), c.Param("runID")))
 }
 
 // listMessageChannels 返回消息渠道列表。

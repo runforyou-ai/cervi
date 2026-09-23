@@ -111,7 +111,7 @@ func builtinToolNames(scene Scene, capabilities Capabilities) []string {
 		names = append(names, "calculator")
 	}
 	if capabilities.Knowledge {
-		names = append(names, "search_knowledge")
+		names = append(names, KnowledgeToolName)
 	}
 	if scene == SceneCustomer {
 		names = append(names, "ask_customer", "handoff_to_human", "resolve_conversation")

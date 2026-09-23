@@ -32,6 +32,9 @@ type DeviceRunBackend interface {
 	// ClaimDeviceRunInputs 为本设备持有的运行认领输入并返回截至该边界的上下文消息。
 	//cervi:route POST /agent-runs/:runID/inputs/claim
 	ClaimDeviceRunInputs(context.Context, RequestMeta, string, DeviceRunInputClaimInput) (DeviceRunClaimedInput, error)
+	// SearchDeviceRunKnowledge 在本设备持有运行绑定的知识库中检索。
+	//cervi:route POST /agent-runs/:runID/knowledge/search
+	SearchDeviceRunKnowledge(context.Context, RequestMeta, string, DeviceRunKnowledgeSearchInput) (DeviceRunKnowledgeSearchResult, error)
 	// CompleteDeviceRun 以成功结果收尾本设备持有的运行。
 	//cervi:route POST /agent-runs/:runID/result
 	CompleteDeviceRun(context.Context, RequestMeta, string, DeviceRunResultInput) error
