@@ -21,6 +21,7 @@ import (
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
 	customerserviceaction "github.com/runforyou-ai/cervi/internal/actions/customerservice"
+	servicecategoryaction "github.com/runforyou-ai/cervi/internal/actions/servicecategory"
 	teamaction "github.com/runforyou-ai/cervi/internal/actions/team"
 	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -108,6 +109,11 @@ func (f handoffFixture) queuedRun(t *testing.T, conversationID string) servermod
 
 // handoffRuntime 认领首批输入后按需执行插入动作，再返回模型给出的转人工决定。
 func handoffRuntime(reasonText string, during func()) *testAgentRuntime {
+	return categoryHandoffRuntime(reasonText, "", during)
+}
+
+// categoryHandoffRuntime 认领首批输入后按需执行插入动作，再返回带咨询分类编号的转人工决定。
+func categoryHandoffRuntime(reasonText, categoryID string, during func()) *testAgentRuntime {
 	return &testAgentRuntime{run: func(ctx context.Context, _ agentruntime.RunRequest, feed agentruntime.InputFeed) (agentruntime.RunResult, error) {
 		triggers, err := feed.Peek(ctx, 0)
 		if err != nil {
@@ -121,7 +127,7 @@ func handoffRuntime(reasonText string, during func()) *testAgentRuntime {
 			during()
 		}
 		return agentruntime.RunResult{EndSeq: claimed.EndSeq, Decision: agentruntime.TerminalDecision{
-			Kind: domain.AgentRunOutcomeHandoff, Reason: domain.AgentHandoffReasonModelRequested, ReasonText: reasonText,
+			Kind: domain.AgentRunOutcomeHandoff, Reason: domain.AgentHandoffReasonKnowledgeGap, ReasonText: reasonText, CategoryID: categoryID,
 		}}, nil
 	}}
 }
@@ -231,6 +237,7 @@ func testAgentHandoffs(t *testing.T, db *bun.DB, identity *servermodels.Identity
 	disableAutoAssignment(t, db, identity.Organization.ID)
 	t.Run("主动转人工后转回同一 AI", func(t *testing.T) { testModelHandoffRoundTrip(t, f) })
 	t.Run("失败路由去向", func(t *testing.T) { testHandoffTargets(t, f) })
+	t.Run("咨询分类路由", func(t *testing.T) { testHandoffCategoryRouting(t, f) })
 	t.Run("转人工自动分配", func(t *testing.T) { testHandoffAutoAssignment(t, f) })
 	t.Run("工作时间与转人工话术", func(t *testing.T) { testBusinessHoursHandoffNotice(t, f) })
 	t.Run("人工接管与交接先后", func(t *testing.T) { testHandoffCommitOrder(t, f) })
@@ -262,7 +269,7 @@ func testModelHandoffRoundTrip(t *testing.T, f handoffFixture) {
 		t.Fatal(err)
 	}
 	if run.Status != string(domain.AgentRunStatusSucceeded) || run.Outcome == nil || *run.Outcome != string(domain.AgentRunOutcomeHandoff) ||
-		run.OutcomeReason == nil || *run.OutcomeReason != string(domain.AgentHandoffReasonModelRequested) ||
+		run.OutcomeReason == nil || *run.OutcomeReason != string(domain.AgentHandoffReasonKnowledgeGap) ||
 		run.InputEndSeq == nil || *run.InputEndSeq != 1 || run.HandoffSettledSeq == nil || *run.HandoffSettledSeq != 2 || run.ResponseMessageID == nil {
 		t.Fatalf("handoff run = %+v", run)
 	}
@@ -389,6 +396,88 @@ func testHandoffTargets(t *testing.T, f handoffFixture) {
 			}
 			if notice := handoffNotice(t, f.db, "agent:"+run.ID); notice != wantNotice {
 				t.Fatalf("notice = %q, want %q", notice, wantNotice)
+			}
+		})
+	}
+}
+
+// testHandoffCategoryRouting 验证 AI 选择的咨询分类写入周期与事件，分类团队可用时优先于渠道失败路由；未关联团队或团队无人接待时记下分类并按失败路由，已归档或未选择时不记分类。
+func testHandoffCategoryRouting(t *testing.T, f handoffFixture) {
+	ctx := context.Background()
+	agent := f.newAgent(t, "分类路由验证客服")
+	suffix := uuid.NewV7().String()[:8]
+	team, err := teamaction.NewCreateTeamAction(f.db).Execute(ctx, f.identity, teamaction.Input{Name: "退款组 " + suffix})
+	if err != nil {
+		t.Fatal(err)
+	}
+	human, err := useraction.NewCreateUserAction(f.db, newTestTasks(f.db)).Execute(ctx, f.identity, useraction.CreateInput{
+		HandlesCustomers: true, MaxServiceSessions: 10, DisplayName: "退款客服", Email: "category-" + suffix + "@handoff.test", Password: "password123", RoleID: f.identity.User.RoleID,
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	disableAutoAssignment(t, f.db, f.identity.Organization.ID)
+	if _, err := teamaction.NewAddMembersAction(f.db, newTestTasks(f.db)).Execute(ctx, f.identity, team.ID, []teamaction.MemberIdentity{
+		{IdentityType: domain.OrganizationIdentityTypeUser, IdentityID: human.IdentityID},
+	}); err != nil {
+		t.Fatal(err)
+	}
+	refund, err := servicecategoryaction.NewCreateAction(f.db).Execute(ctx, f.identity, servicecategoryaction.Input{Name: "退款 " + suffix, Description: "退款、退货", TeamID: &team.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	shipping, err := servicecategoryaction.NewCreateAction(f.db).Execute(ctx, f.identity, servicecategoryaction.Input{Name: "物流 " + suffix})
+	if err != nil {
+		t.Fatal(err)
+	}
+	archived, err := servicecategoryaction.NewCreateAction(f.db).Execute(ctx, f.identity, servicecategoryaction.Input{Name: "旧分类 " + suffix, TeamID: &team.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := servicecategoryaction.NewArchiveAction(f.db).Execute(ctx, f.identity, archived.ID); err != nil {
+		t.Fatal(err)
+	}
+	emptyTeam, err := teamaction.NewCreateTeamAction(f.db).Execute(ctx, f.identity, teamaction.Input{Name: "空团队 " + suffix})
+	if err != nil {
+		t.Fatal(err)
+	}
+	unstaffed, err := servicecategoryaction.NewCreateAction(f.db).Execute(ctx, f.identity, servicecategoryaction.Input{Name: "投诉 " + suffix, TeamID: &emptyTeam.ID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	channelID := f.newChannel(t, agent.IdentityID, channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue})
+	for _, scenario := range []struct {
+		name         string
+		category     *servicecategoryaction.Record
+		wantTeam     *string
+		wantCategory *string
+	}{
+		{name: "分类团队", category: refund, wantTeam: &team.ID, wantCategory: &refund.ID},
+		{name: "分类未关联团队", category: shipping, wantCategory: &shipping.ID},
+		{name: "分类团队无人接待", category: unstaffed, wantCategory: &unstaffed.ID},
+		{name: "分类已归档", category: archived},
+		{name: "未选择分类"},
+	} {
+		t.Run(scenario.name, func(t *testing.T) {
+			input := visitorInput(channelID, "")
+			received := f.receive(t, &input, "我要退款")
+			run := f.queuedRun(t, received.Conversation.ID)
+			categoryID := ""
+			if scenario.category != nil {
+				categoryID = scenario.category.ID
+			}
+			if err := agentrunaction.NewExecuteAction(f.db, f.tasks, categoryHandoffRuntime("客户要求退款", categoryID, nil), testAttachmentReader(f.db), nil).Execute(ctx, agentrunaction.RunInput{RunID: run.ID}); err != nil {
+				t.Fatal(err)
+			}
+			session := loadSession(t, f.db, run.ScopeID)
+			if (scenario.wantTeam == nil) != (session.TeamID == nil) || (scenario.wantTeam != nil && *session.TeamID != *scenario.wantTeam) ||
+				(scenario.wantCategory == nil) != (session.CategoryID == nil) || (scenario.wantCategory != nil && *session.CategoryID != *scenario.wantCategory) {
+				t.Fatalf("session = %+v", session)
+			}
+			events := handoffEvents(t, f.db, received.Conversation.ID)
+			if len(events) != 1 || events[0].Reason != domain.AgentHandoffReasonKnowledgeGap ||
+				(scenario.wantCategory == nil) != (events[0].CategoryName == nil) || (scenario.wantCategory != nil && *events[0].CategoryName != scenario.category.Name) {
+				t.Fatalf("events = %+v", events)
 			}
 		})
 	}

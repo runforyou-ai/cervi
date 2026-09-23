@@ -1622,6 +1622,45 @@ func (b *DirectBackend) UpdateServiceTimeouts(ctx context.Context, meta RequestM
 	return b.ops.UpdateServiceTimeouts(ctx, meta, identity, input)
 }
 
+// ListServiceCategories 返回当前企业的咨询分类目录。
+func (b *DirectBackend) ListServiceCategories(ctx context.Context, meta RequestMeta) (ServiceCategoryList, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero ServiceCategoryList
+		return zero, err
+	}
+	return b.ops.ListServiceCategories(ctx, meta, identity)
+}
+
+// CreateServiceCategory 新增咨询分类。
+func (b *DirectBackend) CreateServiceCategory(ctx context.Context, meta RequestMeta, input ServiceCategoryInput) (ServiceCategory, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero ServiceCategory
+		return zero, err
+	}
+	return b.ops.CreateServiceCategory(ctx, meta, identity, input)
+}
+
+// UpdateServiceCategory 修改咨询分类。
+func (b *DirectBackend) UpdateServiceCategory(ctx context.Context, meta RequestMeta, categoryID string, input ServiceCategoryInput) (ServiceCategory, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero ServiceCategory
+		return zero, err
+	}
+	return b.ops.UpdateServiceCategory(ctx, meta, identity, categoryID, input)
+}
+
+// DeleteServiceCategory 删除咨询分类，历史记录保留分类名称。
+func (b *DirectBackend) DeleteServiceCategory(ctx context.Context, meta RequestMeta, categoryID string) error {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		return err
+	}
+	return b.ops.DeleteServiceCategory(ctx, meta, identity, categoryID)
+}
+
 // RegisterDevice 注册当前用户的本机设备。
 func (b *DirectBackend) RegisterDevice(ctx context.Context, meta RequestMeta, input DeviceRegistrationInput) (Device, error) {
 	identity, err := b.ops.authenticate(ctx, meta)

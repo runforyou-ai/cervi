@@ -283,6 +283,7 @@ type ConversationSystemEvent struct {
 	ReturnReason     *domain.ServiceSessionReturnReason `json:"returnReason,omitempty"`
 	CloseReason      *domain.ServiceSessionCloseReason  `json:"closeReason,omitempty"`
 	ReasonText       *string                            `json:"reasonText,omitempty"`
+	CategoryName     *string                            `json:"categoryName,omitempty"`
 	AgentRunID       *string                            `json:"agentRunId,omitempty"`
 }
 

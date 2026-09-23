@@ -11,11 +11,19 @@ import (
 // AssignmentRulesVersion 是基线与场景规则的规则版本，基线或场景规则增删时加一；措辞调整只体现在指令哈希上。
 const AssignmentRulesVersion = 3
 
-// SceneContext 表示拼接场景规则所需的运行期事实，群聊字段只在群聊场景取值。
+// SceneContext 表示拼接场景规则所需的运行期事实，群聊字段只在群聊场景取值，咨询分类只在客服场景取值。
 type SceneContext struct {
 	Scene             Scene
 	GroupTitle        string
-	MentionCandidates []string // 群内名称唯一的可点名成员，按名称排序。
+	MentionCandidates []string          // 群内名称唯一的可点名成员，按名称排序。
+	HandoffCategories []HandoffCategory // 企业咨询分类目录，按名称排序。
+}
+
+// HandoffCategory 表示转人工时可选的一项咨询分类；模型只看到名称与说明，编号用于交接时复核。
+type HandoffCategory struct {
+	ID          string `json:"id"`
+	Name        string `json:"name"`
+	Description string `json:"description"`
 }
 
 // AssignmentModel 记录一次运行固定使用的模型标识、品牌、参数与输入模态，不含供应商凭据。
@@ -46,22 +54,23 @@ type Capabilities struct {
 
 // Assignment 是一次运行的有效配置，同时作为运行时入参、运行审计快照和设备执行指派。
 type Assignment struct {
-	HandlesCustomers  bool            `json:"handlesCustomers"`
-	AgentName         string          `json:"agentName"`
-	Scene             Scene           `json:"scene"`
-	RulesVersion      int             `json:"rulesVersion"`
-	Instruction       string          `json:"instruction"`
-	InstructionSHA256 string          `json:"instructionSha256"`
-	Model             AssignmentModel `json:"model"`
-	Tools             []string        `json:"tools"`
-	MCPServers        []string        `json:"mcpServers"`
-	Grounding         GroundingPolicy `json:"grounding,omitempty"` // 对客正文的依据检查策略，客服场景为严格策略。
+	HandlesCustomers  bool              `json:"handlesCustomers"`
+	AgentName         string            `json:"agentName"`
+	Scene             Scene             `json:"scene"`
+	RulesVersion      int               `json:"rulesVersion"`
+	Instruction       string            `json:"instruction"`
+	InstructionSHA256 string            `json:"instructionSha256"`
+	Model             AssignmentModel   `json:"model"`
+	Tools             []string          `json:"tools"`
+	MCPServers        []string          `json:"mcpServers"`
+	Grounding         GroundingPolicy   `json:"grounding,omitempty"`         // 对客正文的依据检查策略，客服场景为严格策略。
+	HandoffCategories []HandoffCategory `json:"handoffCategories,omitempty"` // 转人工时可选的咨询分类，只在客服场景取值。
 }
 
 // ResolveAssignment 按业务事实与执行侧能力产出一次运行的有效配置；执行侧能力只影响工具清单、指令中的工具说明和 MCP 服务名称。
 func ResolveAssignment(facts AssignmentFacts, capabilities Capabilities) Assignment {
 	scene := facts.Scene.Scene
-	tools := builtinTools{Knowledge: capabilities.Knowledge, Terminal: scene == SceneCustomer}
+	tools := builtinTools{Knowledge: capabilities.Knowledge, Terminal: scene == SceneCustomer, HandoffCategories: len(facts.Scene.HandoffCategories) > 0}
 	instruction := composeInstruction(
 		AgentBaseline(facts.HandlesCustomers, facts.OrganizationName, facts.AgentName),
 		facts.Instruction,
@@ -83,6 +92,7 @@ func ResolveAssignment(facts AssignmentFacts, capabilities Capabilities) Assignm
 		Tools:             builtinToolNames(scene, capabilities),
 		MCPServers:        mcpServerNames(capabilities),
 		Grounding:         grounding,
+		HandoffCategories: facts.Scene.HandoffCategories,
 	}
 }
 

@@ -55,6 +55,7 @@ type ServiceSessionHandedOffEvent struct {
 	Target           ServiceSessionTarget `json:"target"`
 	Reason           AgentHandoffReason   `json:"reason"`
 	ReasonText       string               `json:"reasonText"`
+	CategoryName     *string              `json:"categoryName,omitempty"` // 转人工时 AI 选择的咨询分类名称快照。
 	AgentRunID       *string              `json:"agentRunId"`
 }
 

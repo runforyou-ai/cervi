@@ -36,7 +36,7 @@ func (r RouteSnapshot) Target() domain.ServiceSessionTarget {
 	}
 }
 
-// ResolveNewSessionRoute 按渠道初始目标、失败目标、公共队列的顺序解析新客服处理周期的路由，不在工作中的真人成员视为不可用；目标身份取 FOR KEY SHARE，调用方须在进入会话锁之前调用。
+// ResolveNewSessionRoute 按渠道初始目标、失败目标、公共队列的顺序解析新客服处理周期的路由，不在工作中的真人成员视为不可用；目标身份与团队取 FOR KEY SHARE，调用方须在进入会话锁之前调用。
 func ResolveNewSessionRoute(ctx context.Context, db bun.IDB, channel *servermodels.Channel) (RouteSnapshot, error) {
 	channelType := domain.ChannelType(channel.Type)
 	if route, available, err := availableRoute(ctx, db, channel.OrganizationID, channelType, domain.ChannelRoutingTargetType(channel.InitialRoutingTargetType), channel.InitialRoutingTargetID, true); err != nil {
@@ -54,8 +54,18 @@ func ResolveNewSessionRoute(ctx context.Context, db bun.IDB, channel *servermode
 	return RouteSnapshot{}, nil
 }
 
-// ResolveHandoffRoute 只按渠道失败目标解析 AI 转交人工的去向：目标不可用、不在工作中、为 AI 员工或无效时进入公共队列；lock 为 true 时目标身份取 FOR KEY SHARE。
-func ResolveHandoffRoute(ctx context.Context, db bun.IDB, channel *servermodels.Channel, lock bool) (RouteSnapshot, error) {
+// ResolveHandoffRoute 解析 AI 转交人工的去向：先取咨询分类对应的团队，团队不可用或未指定时按渠道失败目标；失败目标不可用、不在工作中、为 AI 员工或无效时进入公共队列；lock 为 true 时目标身份与团队取 FOR KEY SHARE。
+func ResolveHandoffRoute(ctx context.Context, db bun.IDB, channel *servermodels.Channel, categoryTeamID *string, lock bool) (RouteSnapshot, error) {
+	if categoryTeamID != nil {
+		route, available, err := availableRoute(ctx, db, channel.OrganizationID, domain.ChannelType(channel.Type), domain.ChannelRoutingTargetTypeTeam, categoryTeamID, lock)
+		if err != nil {
+			return RouteSnapshot{}, fmt.Errorf("resolve service category handoff route: %w", err)
+		}
+		if available {
+			return route, nil
+		}
+		slog.Warn("咨询分类对应的团队不可用，按渠道失败路由转交", "organization_id", channel.OrganizationID, "channel_id", channel.ID, "team_id", *categoryTeamID)
+	}
 	// 身份类型不可变，失败目标为 AI 员工时不加锁直接进入公共队列，交接只锁定人工目标。
 	if domain.ChannelRoutingTargetType(channel.FallbackRoutingTargetType) == domain.ChannelRoutingTargetTypeMember && channel.FallbackRoutingTargetID != nil {
 		var identityType domain.OrganizationIdentityType
@@ -120,11 +130,15 @@ func availableRoute(ctx context.Context, db bun.IDB, organizationID string, chan
 		if targetID == nil {
 			return RouteSnapshot{}, false, nil
 		}
+		// lock 为 true 时团队取 FOR KEY SHARE，与团队删除互斥；已删除的团队视为不可用。
 		team := &servermodels.Team{}
-		err := db.NewSelect().Model(team).Column("t.id", "t.name").
+		query := db.NewSelect().Model(team).Column("t.id", "t.name").
 			Where("t.organization_id = ?", organizationID).
-			Where("t.id = ?", *targetID).
-			Scan(ctx)
+			Where("t.id = ?", *targetID)
+		if lock {
+			query = query.For("KEY SHARE")
+		}
+		err := query.Scan(ctx)
 		if errors.Is(err, sql.ErrNoRows) {
 			return RouteSnapshot{}, false, nil
 		}

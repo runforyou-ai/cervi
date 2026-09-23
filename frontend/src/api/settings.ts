@@ -1,11 +1,15 @@
 /** 企业设置与个人账号设置调用。 */
 import {
   ChangePassword,
+  CreateServiceCategory,
+  DeleteServiceCategory,
   GetBusinessHours,
   GetServiceTimeouts,
+  ListServiceCategories,
   SelectImage,
   UpdateBusinessHours,
   UpdateOrganization,
+  UpdateServiceCategory,
   UpdateServiceTimeouts,
   UpdateProfile,
   UpdateUserPreferences,
@@ -30,6 +34,18 @@ export const getServiceTimeouts = bind(GetServiceTimeouts)
 
 /** 修改当前企业的客服超时时长。 */
 export const updateServiceTimeouts = bind(UpdateServiceTimeouts)
+
+/** 读取当前企业的咨询分类目录。 */
+export const listServiceCategories = bind(ListServiceCategories)
+
+/** 新增咨询分类。 */
+export const createServiceCategory = bind(CreateServiceCategory)
+
+/** 修改咨询分类。 */
+export const updateServiceCategory = bind(UpdateServiceCategory)
+
+/** 删除咨询分类。 */
+export const deleteServiceCategory = bind(DeleteServiceCategory)
 
 /** 修改当前用户的头像、姓名和邮箱。 */
 export const updateProfile = bind(UpdateProfile)

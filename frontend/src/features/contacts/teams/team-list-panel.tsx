@@ -58,7 +58,7 @@ export function TeamListPanel({
 
   const teamDeletion = useConfirmedAction<Team>({
     action: (team) => deleteTeam(team.id),
-    invalidateKeys: () => [resourceKeys.teams(), ...teamMembershipCacheKeys],
+    invalidateKeys: () => [resourceKeys.teams(), resourceKeys.serviceCategories(), ...teamMembershipCacheKeys],
     successMessage: () => t("teams.delete.success"),
     errorMessage: () => t("teams.delete.error"),
     logLabel: "删除团队",
@@ -157,6 +157,7 @@ export function TeamListPanel({
               team={editingTeam}
               onSaved={() => {
                 void invalidate(resourceKeys.teams())
+                void invalidate(resourceKeys.serviceCategories())
                 for (const key of teamMembershipCacheKeys) void invalidate(key)
                 setEditingTeam(null)
               }}

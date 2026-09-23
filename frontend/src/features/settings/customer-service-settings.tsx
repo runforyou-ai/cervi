@@ -1,17 +1,23 @@
-/** 客服设置页签：工作时间与分配提醒，当前页签与地址同步。 */
+/** 客服设置页签：工作时间、分配提醒与咨询分类，当前页签与地址同步。 */
 import { useEffect } from "react"
 import { useTranslation } from "react-i18next"
 import { useSearchParams } from "react-router"
 
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { BusinessHoursSettings } from "@/features/settings/business-hours-form"
+import { ServiceCategoriesSettings } from "@/features/settings/service-categories-settings"
 import { ServiceTimeoutsSettings } from "@/features/settings/service-timeouts-form"
 
-/** 按地址中的页签显示工作时间或分配与提醒设置。 */
+/** 客服设置的页签，首项为缺省页签。 */
+const customerServiceTabs = ["businessHours", "assignment", "categories"] as const
+
+/** 按地址中的页签显示工作时间、分配与提醒或咨询分类设置。 */
 export function CustomerServiceSettings() {
   const { t } = useTranslation("settings")
   const [searchParams, setSearchParams] = useSearchParams()
-  const tab = searchParams.get("tab") === "assignment" ? "assignment" : "businessHours"
+  const tab =
+    customerServiceTabs.find((value) => value === searchParams.get("tab")) ??
+    customerServiceTabs[0]
 
   // 缺省或无效页签统一写回地址，刷新时恢复同一页签。
   useEffect(() => {
@@ -37,6 +43,9 @@ export function CustomerServiceSettings() {
         <TabsTrigger value="assignment">
           {t("customerService.tabs.assignment")}
         </TabsTrigger>
+        <TabsTrigger value="categories">
+          {t("customerService.tabs.categories")}
+        </TabsTrigger>
       </TabsList>
       <TabsContent
         value="businessHours"
@@ -51,6 +60,13 @@ export function CustomerServiceSettings() {
         className="mt-6 data-[state=inactive]:hidden"
       >
         <ServiceTimeoutsSettings />
+      </TabsContent>
+      <TabsContent
+        value="categories"
+        forceMount
+        className="mt-6 data-[state=inactive]:hidden"
+      >
+        <ServiceCategoriesSettings />
       </TabsContent>
     </Tabs>
   )

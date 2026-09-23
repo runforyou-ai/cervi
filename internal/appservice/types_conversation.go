@@ -249,7 +249,7 @@ type ConversationSystemEvent struct {
 	Targets       []ConversationSystemEventParticipant `json:"targets"`
 	PreviousTitle *string                              `json:"previousTitle"`
 	Title         *string                              `json:"title"`
-	// 以下字段只由客服处理周期事件携带：原负责人、去向，转人工或退回队列的原因与成员可见的原因说明，以及关闭事件的结束方式；操作人写入 Actor。
+	// 以下字段只由客服处理周期事件携带：原负责人、去向，转人工或退回队列的原因与成员可见的原因说明，转人工时的咨询分类，以及关闭事件的结束方式；操作人写入 Actor。
 	ServiceSessionID *string                     `json:"serviceSessionId"`
 	FromIdentityID   *string                     `json:"fromIdentityId"`
 	FromDisplayName  *string                     `json:"fromDisplayName"`
@@ -258,6 +258,7 @@ type ConversationSystemEvent struct {
 	ReturnReason     *ServiceSessionReturnReason `json:"returnReason"`
 	CloseReason      *ServiceSessionCloseReason  `json:"closeReason"`
 	ReasonText       *string                     `json:"reasonText"`
+	CategoryName     *string                     `json:"categoryName"`
 	AgentRunID       *string                     `json:"agentRunId"`
 }
 
