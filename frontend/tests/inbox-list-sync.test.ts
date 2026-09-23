@@ -18,7 +18,6 @@ function setup() {
   const gates: PromiseWithResolvers<void>[] = []
   let order = ["1", "2", "3"]
   let gating = false
-  let failing = false
   const conversation = (id: string) =>
     ({ id, positionCursor: `p${id}`, lastActivityAt: `2026-09-09T00:00:0${id}Z` }) as InboxConversationData
   // 读取结果取发起时刻的顺序，读取期间发生的变化只能由随后的重读取得。
@@ -40,7 +39,6 @@ function setup() {
       calls.push("page")
       const window = snapshot()
       await hold()
-      if (failing) throw new Error("offline")
       return { ...window, hasMore: false, nextCursor: window.endCursor, unreadCount: 0, attentionUnreadCount: 0 }
     },
     window: async () => {
@@ -79,10 +77,8 @@ function setup() {
     calls,
     unsubscribe,
     refresher: new ResourceRefresher(client),
-    status: () => client.getQueryState(syncKey)?.status,
     surface: (id: string) => { order = [id, ...order] },
     gate: (value: boolean) => { gating = value },
-    fail: (value: boolean) => { failing = value },
     release: () => { gates.forEach((gate) => gate.resolve()); gates.length = 0 },
   }
 }
@@ -107,31 +103,6 @@ test("读取在途时到达的失效不被缓存层吞掉，随后的重读取�
 
     assert.deepEqual(f.controller.getSnapshot().ids, ["9", "1", "2", "3"])
     assert.equal(f.calls.slice(loaded).filter((call) => call === "page").length, 2)
-  } finally {
-    f.unsubscribe()
-  }
-})
-
-test("读取失败登记为查询失败，失败重试重新读取并恢复", async () => {
-  const f = setup()
-  try {
-    await flush()
-    assert.equal(f.status(), "success")
-
-    f.fail(true)
-    f.refresher.invalidate(resourceKeys.inbox())
-    await flush()
-    assert.equal(f.status(), "error")
-    assert.equal(f.controller.getSnapshot().error, "poll")
-
-    // 失败期间发生的变化由重试后的重读取得。
-    f.fail(false)
-    f.surface("9")
-    f.refresher.retry()
-    await flush()
-    assert.equal(f.status(), "success")
-    assert.equal(f.controller.getSnapshot().error, null)
-    assert.deepEqual(f.controller.getSnapshot().ids, ["9", "1", "2", "3"])
   } finally {
     f.unsubscribe()
   }

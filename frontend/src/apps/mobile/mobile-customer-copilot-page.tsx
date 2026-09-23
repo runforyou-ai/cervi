@@ -1,10 +1,10 @@
 /** 移动端客户会话的 AI 助手子页：切换和新建 Copilot 线程、提问，并把 AI 回复填入客户会话草稿后返回。 */
-import { useState, type RefObject } from "react"
+import { useState } from "react"
 import { CheckIcon, ChevronDownIcon, SquarePenIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useOutletContext } from "react-router"
 
-import type { CustomerInboxConversationData } from "@/api"
+import type { MobileCustomerConversationContext } from "@/apps/mobile/mobile-customer-conversation-page"
 import { useMobileBack } from "@/apps/mobile/mobile-navigation"
 import { MobilePageHeader } from "@/apps/mobile/mobile-page"
 import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
@@ -15,7 +15,6 @@ import {
   SheetHeader,
   SheetTitle,
 } from "@/components/ui/sheet"
-import type { ComposerDraftBridge } from "@/features/inbox/conversation-composer"
 import {
   CopilotAgentSelect,
   CopilotApplyReplyDialog,
@@ -28,18 +27,11 @@ import {
 import { focusDialogContainer } from "@/lib/dialog-focus"
 import { cn } from "@/lib/utils"
 
-/** 客户会话页向 AI 助手子页提供的会话、对客草稿入口和回复限制。 */
-export type MobileCustomerCopilotContext = {
-  conversation: CustomerInboxConversationData
-  customerDraftRef: RefObject<ComposerDraftBridge | null>
-  replyDisabledReason: string | null
-}
-
 /** 全屏展示 AI 助手，填入回复后回到客户会话。 */
 export function MobileCustomerCopilotPage() {
   const { t } = useTranslation("inbox")
   const { conversation, customerDraftRef, replyDisabledReason } =
-    useOutletContext<MobileCustomerCopilotContext>()
+    useOutletContext<MobileCustomerConversationContext>()
   const { identity } = useMobileWorkspace()
   const conversationPath = `/inbox/customer/${conversation.id}`
   const back = useMobileBack(conversationPath)

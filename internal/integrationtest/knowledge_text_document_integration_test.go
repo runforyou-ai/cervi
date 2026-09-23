@@ -40,7 +40,7 @@ func runDocumentProcessing(t *testing.T, db *bun.DB, probe *retrievalProbe, orga
 	}
 }
 
-// TestKnowledgeTextDocumentLifecycle 验证在线文档的创建、索引、改名、正文编辑、来源限制与删除清理。
+// TestKnowledgeTextDocumentLifecycle 验证在线文档的创建、索引、改名、正文编辑、标题过滤与召回名称、来源限制与删除清理。
 func TestKnowledgeTextDocumentLifecycle(t *testing.T) {
 	ctx := context.Background()
 	store, err := serverstorage.Open(ctx, servertest.DatabaseConfig(t))
@@ -125,6 +125,21 @@ func TestKnowledgeTextDocumentLifecycle(t *testing.T) {
 	}
 	if _, err := knowledgeaction.NewRenameDocumentAction(db).Execute(ctx, identity, base.ID, uploaded, "配送政策"); !errors.Is(err, knowledgeaction.ErrDocumentSourceUnsupported) {
 		t.Fatalf("err=%v", err)
+	}
+
+	// 列表按文档标题过滤，在线文档的类型与大小取自正文。
+	titled, err := knowledgeaction.NewDocumentQuery(db).List(ctx, identity, base.ID, knowledgeaction.DocumentListInput{Keyword: "退款政策"})
+	if err != nil || len(titled.Documents) != 1 || titled.Documents[0].ID != created.ID {
+		t.Fatalf("titled=%+v err=%v", titled, err)
+	}
+	if record := titled.Documents[0]; record.ContentType != domain.KnowledgeDocumentMarkdownContentType || record.ByteSize != int64(len(content.Content)) {
+		t.Fatalf("content_type=%s byte_size=%d", record.ContentType, record.ByteSize)
+	}
+
+	// 召回结果的来源名称取文档标题。
+	records, err := knowledgeaction.NewRetrievalService(db, probe, probe).Retrieve(ctx, identity, base.ID, "如何申请退款")
+	if err != nil || len(records) == 0 || records[0].DocumentID != created.ID || records[0].DocumentName != "退款政策说明" {
+		t.Fatalf("records=%+v err=%v", records, err)
 	}
 
 	// 删除文档时正文与分段一并清除。

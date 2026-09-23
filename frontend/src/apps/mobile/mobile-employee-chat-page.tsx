@@ -37,7 +37,10 @@ function MobileEmployeeChat({ userID }: { userID: string }) {
         title={draftUser.displayName}
         backTo={`/contacts/employees/${userID}`}
       />
-      <MobileEmployeeDraft user={draftUser} />
+      <MobileDirectDraft
+        identityID={draftUser.identityId}
+        memberUserID={draftUser.id}
+      />
     </section>
   )
 }
@@ -142,8 +145,14 @@ function MobileEmployeeChatLookup({
   )
 }
 
-/** 首次发送成功后用正式会话替换草稿路由，保留成员资料作为返回位置。 */
-function MobileEmployeeDraft({ user }: { user: UserData }) {
+/** 真人单聊草稿，首次发送成功后用正式会话替换草稿路由；给出成员编号时保留成员资料作为返回位置。 */
+export function MobileDirectDraft({
+  identityID,
+  memberUserID,
+}: {
+  identityID: string
+  memberUserID?: string
+}) {
   const navigate = useNavigate()
   const location = useLocation()
   const firstChat = useFirstChatMessage()
@@ -160,7 +169,7 @@ function MobileEmployeeDraft({ user }: { user: UserData }) {
     if (alive.current) {
       void navigate(`/chats/direct/${conversation.id}`, {
         replace: true,
-        state: { ...location.state, conversation, memberUserID: user.id },
+        state: { ...location.state, conversation, memberUserID },
       })
     }
   }
@@ -168,14 +177,14 @@ function MobileEmployeeDraft({ user }: { user: UserData }) {
   return (
     <MobileIndividualThread
       conversationID=""
-      peerIdentityID={user.identityId}
+      peerIdentityID={identityID}
       onAttachmentConversationCreated={(conversation) => {
         if (!isDirectInboxConversation(conversation)) return
-        firstChat.refreshStarted(conversation, user.identityId)
+        firstChat.refreshStarted(conversation, identityID)
         handleCreated(conversation)
       }}
       sendIndividualMessage={async (input) => {
-        const result = await firstChat.sendDirect(user.identityId, input)
+        const result = await firstChat.sendDirect(identityID, input)
         handleCreated(result.conversation)
         return result.message
       }}

@@ -61,7 +61,7 @@ func toolExecutionMiddleware(recorder *processRecorder) compose.ToolMiddleware {
 func recordToolCall(ctx context.Context, recorder *processRecorder, input *compose.ToolInput, call func(context.Context) (string, error)) (string, error) {
 	startedAt := time.Now()
 	if err := recorder.updateTool(input.CallID, func(call *ToolCall) {
-		call.Status, call.StartedAt = domain.AgentToolCallRunning, &startedAt
+		call.Status, call.StartedAt, call.MCPServer = domain.AgentToolCallRunning, &startedAt, recorder.mcpTools[input.Name]
 	}); err != nil {
 		return "", err
 	}

@@ -78,3 +78,21 @@ type CustomerVisit struct {
 	TimeZone    string `json:"timeZone"`
 	Country     string `json:"country"`
 }
+
+// CustomerBusinessQuery 定义 AI 客服在当前客服周期内调用业务查询工具的一次记录。
+type CustomerBusinessQuery struct {
+	ID        string              `json:"id"`
+	MCPServer string              `json:"mcpServer"`
+	ToolName  string              `json:"toolName"`
+	Arguments string              `json:"arguments"`
+	Result    *string             `json:"result"`
+	Error     *string             `json:"error"`
+	Status    AgentToolCallStatus `json:"status"`
+	Evidence  bool                `json:"evidence"`
+	CalledAt  time.Time           `json:"calledAt"`
+}
+
+// CustomerBusinessQueryList 定义客户会话当前客服周期的业务查询记录，按调用时间倒序。
+type CustomerBusinessQueryList struct {
+	Queries []CustomerBusinessQuery `json:"queries"`
+}

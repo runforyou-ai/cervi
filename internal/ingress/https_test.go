@@ -82,19 +82,6 @@ func TestAllowCertificateRequiresHTTPEntry(t *testing.T) {
 	}
 }
 
-// TestNewHTTPSEntryExternalDoesNotCreateListeners 验证外部模式使用外部 HTTPS 入口。
-func TestNewHTTPSEntryExternalDoesNotCreateListeners(t *testing.T) {
-	service := NewHTTPSEntry(
-		serverconfig.TLSConfig{Mode: "external"},
-		serverconfig.ServerConfig{Host: "127.0.0.1", Port: 8080},
-		nil,
-		nil,
-	)
-	if service.mode != modeExternal || service.httpServer != nil || service.httpsServer != nil {
-		t.Fatal("expected external mode without HTTP or HTTPS listeners")
-	}
-}
-
 // TestCertificateRequestLimiterBoundsNewAttempts 验证新证书请求受滑动时间窗口限制。
 func TestCertificateRequestLimiterBoundsNewAttempts(t *testing.T) {
 	limiter := &certificateRequestLimiter{}

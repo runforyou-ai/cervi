@@ -14,7 +14,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { listChatTargets } from "@/features/inbox/list-all-member-options"
+import { listChatTargets, orderChatTargets } from "@/features/inbox/list-all-member-options"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 
@@ -37,12 +37,7 @@ export function ConversationTargetPickerDialog({
     listChatTargets,
     { enabled: open, staleTime: 0 },
   )
-  const members = (data ?? []).filter((member) => member.id !== currentIdentityId)
-  const candidates = [
-    ...members.filter((member) => member.type === OrganizationIdentityType.OrganizationIdentityTypeUser),
-    ...members.filter((member) => member.type === OrganizationIdentityType.OrganizationIdentityTypeAgent),
-    ...members.filter((member) => member.type === OrganizationIdentityType.OrganizationIdentityTypeAssistant),
-  ]
+  const candidates = orderChatTargets(data ?? [], currentIdentityId)
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

@@ -73,6 +73,8 @@ func (c CustomerContext) Message() string {
 	return string(encoded)
 }
 
+const customerLoginRequiredRule = `客户尚未在企业网站登录，无法查询其个人的订单、账户等业务记录。客户询问这类信息时，用 ask_customer 请客户先在网站登录后再咨询，或调用 handoff_to_human 交给人工，不直接给出答复。`
+
 const customerSceneDecisionRule = `直接输出正文表示给出最终回答，只有在本轮已经通过工具取得依据时才这样做；追问、转人工、结束服务与其他工具不在同一次输出中同时调用。`
 
 // CustomerIdleMessage 是客户超时未回复时由系统追加给 AI 客服的跟进提示消息内容。
@@ -92,6 +94,8 @@ type builtinTools struct {
 	CustomerHistory   bool
 	Terminal          bool // 客服场景的 ask_customer、handoff_to_human 与 resolve_conversation。
 	HandoffCategories bool // 企业有可选的咨询分类，handoff_to_human 提供 category 参数。
+	// CustomerLoginRequired 表示客户未验证身份，按客户查询的业务工具未挂载。
+	CustomerLoginRequired bool
 }
 
 // AgentBaseline 按接待开关渲染 AI 员工基线；AI 员工名称为空时省略名称。
@@ -151,7 +155,12 @@ func toolGuidance(tools builtinTools) string {
 func sceneRules(scene SceneContext, tools builtinTools) string {
 	switch scene.Scene {
 	case SceneCustomer:
-		return joinSections(customerSceneRules, customerContextRule, toolGuidance(tools), customerSceneDecisionRule, customerFollowUpRule)
+		// 按客户查询的业务工具因客户未登录而未挂载时说明处理方式。
+		loginRule := ""
+		if tools.CustomerLoginRequired {
+			loginRule = customerLoginRequiredRule
+		}
+		return joinSections(customerSceneRules, customerContextRule, toolGuidance(tools), loginRule, customerSceneDecisionRule, customerFollowUpRule)
 	case SceneGroup:
 		// 群内名称唯一的可点名成员按名称顺序列出，没有可点名成员时明确告知。
 		candidates := "无"

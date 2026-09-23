@@ -1,5 +1,5 @@
 /** MCP 服务新增与编辑页。 */
-import { useEffect, useMemo, useState } from "react"
+import { useEffect, useMemo, useRef, useState } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
 import { Controller, useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
@@ -16,6 +16,7 @@ import {
 } from "@/api"
 import { FormActions } from "@/components/form/form-actions"
 import { FormInputField } from "@/components/form/form-input-field"
+import { SwitchCardField } from "@/components/form/switch-card-field"
 import { ResourceContent } from "@/components/resource-content"
 import { PageContent } from "@/components/page-content"
 import { PageBackButton } from "@/components/page-back-button"
@@ -27,6 +28,7 @@ import {
   createMCPServerSchema,
   type MCPServerFormValues,
 } from "@/features/integrations/mcp-servers/mcp-server-schema"
+import { MCPServerToolPurposes } from "@/features/integrations/mcp-servers/mcp-server-tool-purposes"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useFormSave } from "@/hooks/use-form-save"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
@@ -35,7 +37,7 @@ import { recoverSession } from "@/lib/session-navigation"
 
 const listPath = "/tools"
 
-/** 编辑 MCP 服务名称、地址、服务器类型和认证令牌。 */
+/** 编辑 MCP 服务名称、地址、服务器类型、认证令牌、按客户查询开关与工具用途。 */
 export function MCPServerFormPage({ mode }: { mode: "create" | "edit" }) {
   const { t } = useTranslation(["integrations", "common"])
   const navigate = useNavigate()
@@ -64,21 +66,27 @@ export function MCPServerFormPage({ mode }: { mode: "create" | "edit" }) {
       url: "",
       serverType: MCPServerType.MCPServerTypeStreamableHTTP,
       authorizationToken: "",
+      customerScoped: false,
     },
   })
   const detail = useResource(resourceKeys.mcpServer(mcpServerId), () => getMCPServer(mcpServerId), {
     enabled: mode === "edit",
+    // 工具目录更新期间轮询详情。
+    refetchInterval: (data) => data?.toolsUpdating ? 1000 : false,
   })
   const mcpServer = detail.data
+  const filledServerID = useRef("")
 
-  /** 详情就绪后回填 MCP 服务表单。 */
+  /** 详情首次就绪后回填 MCP 服务表单，之后的刷新只更新工具目录，保留表单中的编辑。 */
   useEffect(() => {
-    if (!mcpServer) return
+    if (!mcpServer || filledServerID.current === mcpServer.id) return
+    filledServerID.current = mcpServer.id
     form.reset({
       name: mcpServer.name,
       url: mcpServer.url,
       serverType: mcpServer.serverType,
       authorizationToken: mcpServer.authorizationToken,
+      customerScoped: mcpServer.customerScoped,
     })
   }, [mcpServer, form])
 
@@ -203,6 +211,24 @@ export function MCPServerFormPage({ mode }: { mode: "create" | "edit" }) {
                   hide: t("mcpServer.form.hideToken"),
                 }}
               />
+              <Controller
+                name="customerScoped"
+                control={form.control}
+                render={({ field }) => (
+                  <SwitchCardField
+                    id="mcp-server-customer-scoped"
+                    name={field.name}
+                    label={t("mcpServer.form.customerScoped")}
+                    description={t("mcpServer.form.customerScopedHelp")}
+                    checked={field.value}
+                    disabled={testing || form.formState.isSubmitting}
+                    onBlur={field.onBlur}
+                    onCheckedChange={field.onChange}
+                    ref={field.ref}
+                  />
+                )}
+              />
+              {mode === "edit" && mcpServer ? <MCPServerToolPurposes server={mcpServer} /> : null}
             </FieldGroup>
             <FormActions
               saving={form.formState.isSubmitting}

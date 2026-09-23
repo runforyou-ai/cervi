@@ -192,7 +192,7 @@ func TestGroupMentionNavigation(t *testing.T) {
 	}
 }
 
-// TestGroupMessageContextAndOrder 验证双向窗口、删除引用和并发写入的稳定顺序。
+// TestGroupMessageContextAndOrder 验证双向窗口、首条定位、读历史不推进已读、删除引用和并发写入的稳定顺序。
 func TestGroupMessageContextAndOrder(t *testing.T) {
 	f := newNavigationFixture(t)
 	ctx := context.Background()
@@ -213,6 +213,15 @@ func TestGroupMessageContextAndOrder(t *testing.T) {
 	later, err := history.Execute(ctx, f.member, conversationaction.ConversationMessageHistoryInput{ConversationID: f.groupID, After: window.After})
 	if err != nil || later.HasLater || !later.HasEarlier || len(later.Messages) != 9 {
 		t.Fatalf("later=%+v err=%v", later, err)
+	}
+	// 目标为首条消息时窗口没有更早内容。
+	oldest, err := history.Execute(ctx, f.member, conversationaction.ConversationMessageHistoryInput{ConversationID: f.groupID, AroundMessageID: messages[0].ID})
+	if err != nil || oldest.HasEarlier || !oldest.HasLater || oldest.Messages[0].ID != messages[0].ID {
+		t.Fatalf("oldest=%+v err=%v", oldest, err)
+	}
+	// 读取历史不推进已读。
+	if count, err := f.db.NewSelect().Model((*servermodels.ConversationUserState)(nil)).Where("cus.conversation_id = ? AND cus.user_id = ? AND cus.last_read_message_id IS NOT NULL", f.groupID, f.member.User.ID).Count(ctx); err != nil || count != 0 {
+		t.Fatalf("history advanced read state: count=%d err=%v", count, err)
 	}
 	reply, err := send.Execute(ctx, f.owner, conversationaction.GroupTextMessageInput{ConversationID: f.groupID, ClientMessageID: uuid.NewV7().String(), Body: "引用", ReplyToMessageID: messages[35].ID})
 	if err != nil {

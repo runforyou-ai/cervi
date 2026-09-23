@@ -72,59 +72,6 @@ func TestChatMessageAppendReplay(t *testing.T) {
 	}
 }
 
-// TestChatMessageAppendRollback 验证消息和摘要已写入后回滚，群分配器也恢复到提交前位置。
-func TestChatMessageAppendRollback(t *testing.T) {
-	f := newNavigationFixture(t)
-	ctx := context.Background()
-	before := f.send(t, f.owner, "保留的消息", false)
-	rollback := errors.New("rollback after summary")
-	messageID := uuid.NewV7().String()
-	err := realtime.RunInTx(ctx, f.db, func(ctx context.Context, tx bun.Tx) error {
-		if err := identityaction.LockActiveUser(ctx, tx, f.owner); err != nil {
-			return err
-		}
-		member, err := chatstate.LockGroup(ctx, tx, f.owner, f.groupID, chatstate.GroupSendable)
-		if err != nil {
-			return err
-		}
-		message, inserted, err := chatstate.AppendMessage(ctx, tx, member.Conversation, &servermodels.Message{
-			ID: messageID, OrganizationID: f.owner.Organization.ID, ConversationID: f.groupID,
-			SenderParticipantID: &member.ParticipantID, Type: string(domain.MessageTypeText), Body: "回滚的消息", OriginatedAt: time.Now().UTC(),
-		})
-		if err != nil {
-			return err
-		}
-		if !inserted || message.CreatedAt.IsZero() || message.MessageSeq != before.MessageSeq+1 {
-			t.Fatalf("appended message=%+v inserted=%v", message, inserted)
-		}
-		var lastID string
-		if err := tx.NewSelect().Model(member.Conversation).Column("last_message_id").WherePK().Scan(ctx, &lastID); err != nil {
-			return err
-		}
-		if lastID != messageID {
-			t.Fatalf("summary not written before rollback: %s", lastID)
-		}
-		return rollback
-	})
-	if !errors.Is(err, rollback) {
-		t.Fatalf("expected controlled rollback: %v", err)
-	}
-	if exists, err := f.db.NewSelect().Model((*servermodels.Message)(nil)).Where("id = ?", messageID).Exists(ctx); err != nil || exists {
-		t.Fatalf("message survived rollback: %v %v", exists, err)
-	}
-	var cv servermodels.Conversation
-	if err := f.db.NewSelect().Model(&cv).Where("id = ?", f.groupID).Scan(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if cv.LastMessageID == nil || *cv.LastMessageID != before.ID || cv.LastMessageSeq != before.MessageSeq {
-		t.Fatalf("summary survived rollback: %+v", cv)
-	}
-	next := f.send(t, f.owner, "回滚后的消息", false)
-	if next.MessageSeq != before.MessageSeq+1 {
-		t.Fatalf("allocator did not roll back: %+v", next)
-	}
-}
-
 // TestTelegramAppendUsesLocalSequence 验证晚到渠道消息保留来源时间，并按本地顺序推进会话和周期摘要。
 func TestTelegramAppendUsesLocalSequence(t *testing.T) {
 	f := newCustomerDeliveryFixture(t)

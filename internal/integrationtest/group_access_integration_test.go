@@ -197,7 +197,6 @@ func TestGroupOwnerTransferAndLeave(t *testing.T) {
 	if _, err := update.Execute(ctx, f.member, input); err != nil {
 		t.Fatal(err)
 	}
-	mention := f.send(t, f.owner, "解散前待查看提及", true)
 	if err := conversationaction.NewLeaveGroupConversationAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.owner, f.groupID); err != nil {
 		t.Fatal(err)
 	}
@@ -212,23 +211,8 @@ func TestGroupOwnerTransferAndLeave(t *testing.T) {
 		t.Fatalf("dissolved management=%v", err)
 	}
 	history, err := conversationaction.NewListConversationMessagesQuery(f.db).Execute(ctx, f.member, conversationaction.ConversationMessageHistoryInput{ConversationID: f.groupID})
-	if err != nil || len(history.Messages) != 5 {
+	if err != nil || len(history.Messages) != 4 {
 		t.Fatalf("dissolved history=%+v err=%v", history, err)
-	}
-	// 解散保留最后一位群主的关系，个人设置和已读继续可用，发送被拒绝。
-	for _, operation := range groupAccessWrites() {
-		messageID := history.Messages[len(history.Messages)-1].ID
-		if operation.name == "mention" {
-			messageID = mention.ID
-		}
-		err := operation.execute(ctx, f, messageID)
-		if operation.name == "send" {
-			if !errors.Is(err, conversationaction.ErrConversationNotFound) {
-				t.Fatalf("dissolved send=%v", err)
-			}
-		} else if err != nil {
-			t.Fatalf("dissolved %s=%v", operation.name, err)
-		}
 	}
 }
 

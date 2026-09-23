@@ -14,6 +14,7 @@ type Input struct {
 	URL                string
 	ServerType         domain.MCPServerType
 	AuthorizationToken string
+	CustomerScoped     bool
 }
 
 // ConnectionInput 定义待测试的连接配置。
@@ -31,6 +32,8 @@ type Record struct {
 	ServerType         domain.MCPServerType
 	AuthorizationToken string
 	Tools              []domain.MCPTool
+	ToolPurposes       map[string]domain.MCPToolPurpose
+	CustomerScoped     bool
 	ToolsUpdatedAt     *time.Time
 	ToolsUpdating      bool
 	ToolsFailure       string

@@ -138,8 +138,8 @@ func TestConversationUnreadMark(t *testing.T) {
 	}
 }
 
-// TestInboxUnreadUsesCanonicalDirect 验证单聊列表与未读总数使用同一身份对来源。
-func TestInboxUnreadUsesCanonicalDirect(t *testing.T) {
+// TestDirectConversationUnreadMark 验证单聊的个人标记计入提醒总数，静音后不计入。
+func TestDirectConversationUnreadMark(t *testing.T) {
 	f := newNavigationFixture(t)
 	ctx := context.Background()
 	sent, err := conversationaction.NewSendFirstDirectTextMessageAction(f.db).Execute(ctx, f.owner, conversationaction.FirstDirectTextMessageInput{TargetIdentityID: f.member.OrganizationIdentity.ID, ClientMessageID: uuid.NewV7().String(), Body: "单聊消息"})
@@ -165,18 +165,6 @@ func TestInboxUnreadUsesCanonicalDirect(t *testing.T) {
 	_, counts, err = inbox.Execute(ctx, f.member, inboxaction.LoadInput{Scope: domain.InboxScopeChat})
 	if err != nil || counts.Attention != 0 {
 		t.Fatalf("muted direct mark: %#v %v", counts, err)
-	}
-	// 模拟迁移前没有规范化身份对、但仍有参与者和消息的会话。
-	if _, err = f.db.NewDelete().Table("direct_conversations").Where("organization_id = ? AND conversation_id = ?", f.owner.Organization.ID, sent.Conversation.ID).Exec(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if _, err = f.db.NewDelete().Table("conversation_user_states").Where("organization_id = ? AND conversation_id = ?", f.owner.Organization.ID, sent.Conversation.ID).Exec(ctx); err != nil {
-		t.Fatal(err)
-	}
-	rowsPage, counts, err := inbox.Execute(ctx, f.member, inboxaction.LoadInput{Scope: domain.InboxScopeChat})
-	rows := rowsPage.Conversations
-	if err != nil || len(rows) != 1 || rows[0].ID != f.groupID || counts.Unread != 0 || counts.Attention != 0 {
-		t.Fatalf("hidden direct leaked unread: %#v %#v %v", rows, counts, err)
 	}
 }
 

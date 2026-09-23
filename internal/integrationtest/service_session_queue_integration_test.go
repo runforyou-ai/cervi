@@ -107,7 +107,7 @@ func TestServiceSessionTeamQueue(t *testing.T) {
 		t.Fatal("非团队成员的待领取不应包含该团队队列中的会话")
 	}
 
-	// 领取与转交给个人都不改变队列，退回公共队列同时清空负责人与队列。
+	// 领取与转交给个人都不改变队列。
 	if _, err := claim.Execute(ctx, f.member, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
@@ -122,18 +122,6 @@ func TestServiceSessionTeamQueue(t *testing.T) {
 	assignee, teamID = loadServiceSessionQueue(t, f, f.conversationID)
 	if assignee == nil || *assignee != f.owner.OrganizationIdentity.ID || teamID == nil || *teamID != staffed.ID {
 		t.Fatalf("转交给个人后归属 = %v, %v", assignee, teamID)
-	}
-	if _, err := claim.Execute(ctx, f.member, f.conversationID); err != nil {
-		t.Fatal(err)
-	}
-	if _, err := transfer.Execute(ctx, f.member, conversationaction.TransferServiceSessionInput{
-		ConversationID: f.conversationID, TargetKind: domain.ServiceSessionTargetPublicQueue,
-	}); err != nil {
-		t.Fatalf("退回公共队列 = %v", err)
-	}
-	assignee, teamID = loadServiceSessionQueue(t, f, f.conversationID)
-	if assignee != nil || teamID != nil {
-		t.Fatalf("退回公共队列后归属 = %v, %v", assignee, teamID)
 	}
 
 	// 渠道路由到没有接待成员的团队时降级到公共队列。

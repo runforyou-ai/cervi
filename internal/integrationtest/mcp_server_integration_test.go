@@ -179,10 +179,16 @@ func TestMCPToolsUpdates(t *testing.T) {
 	if err != nil || record.ToolsUpdating || len(record.Tools) != 2 || record.ToolsUpdatedAt == nil {
 		t.Fatalf("first refresh: %+v, %v", record, err)
 	}
+	mark := mcpserveraction.NewUpdateToolPurposeAction(db)
+	for name, purpose := range map[string]domain.MCPToolPurpose{"search": domain.MCPToolPurposeQuery, "read": domain.MCPToolPurposeAction} {
+		if _, err := mark.Execute(ctx, identity, record.ID, mcpserveraction.ToolPurposeInput{ToolName: name, Purpose: purpose}); err != nil {
+			t.Fatal(err)
+		}
+	}
 	// 核验每次保存的新任务标识及旧任务回调的批次校验。
-	input.Name = "Renamed"
+	input.Name, input.CustomerScoped = "Renamed", true
 	record, err = update.Execute(ctx, identity, record.ID, input)
-	if err != nil || !record.ToolsUpdating {
+	if err != nil || !record.ToolsUpdating || !record.CustomerScoped {
 		t.Fatalf("save did not enqueue: %+v, %v", record, err)
 	}
 	second := mcpRefreshInput(t, ctx, db, record.ID)
@@ -195,12 +201,33 @@ func TestMCPToolsUpdates(t *testing.T) {
 	if current := mcpRefreshInput(t, ctx, db, record.ID); current != second {
 		t.Fatal("old failure changed current batch")
 	}
-	tools = []domain.MCPTool{}
+	// 刷新后只保留仍存在的工具的用途标记。
+	tools = []domain.MCPTool{{Name: "search", Description: "查找文档"}}
 	if err := worker.Execute(ctx, second); err != nil {
 		t.Fatal(err)
 	}
 	record, _ = get.Execute(ctx, identity, record.ID)
-	if record.ToolsUpdating || record.ToolsUpdatedAt == nil || len(record.Tools) != 0 {
+	if len(record.ToolPurposes) != 1 || record.ToolPurposes["search"] != domain.MCPToolPurposeQuery {
+		t.Fatalf("refresh must keep purposes of remaining tools: %+v", record)
+	}
+	// 更换地址后清除工具用途。
+	input.URL = "https://example.com/other-mcp"
+	record, err = update.Execute(ctx, identity, record.ID, input)
+	if err != nil || len(record.ToolPurposes) != 0 {
+		t.Fatalf("URL change must clear purposes: %+v, %v", record, err)
+	}
+	if err := worker.Execute(ctx, mcpRefreshInput(t, ctx, db, record.ID)); err != nil {
+		t.Fatal(err)
+	}
+	tools = []domain.MCPTool{}
+	if err := refresh.Execute(ctx, identity); err != nil {
+		t.Fatal(err)
+	}
+	if err := worker.Execute(ctx, mcpRefreshInput(t, ctx, db, record.ID)); err != nil {
+		t.Fatal(err)
+	}
+	record, _ = get.Execute(ctx, identity, record.ID)
+	if record.ToolsUpdating || record.ToolsUpdatedAt == nil || len(record.Tools) != 0 || len(record.ToolPurposes) != 0 {
 		t.Fatalf("empty list must replace tools: %+v", record)
 	}
 	// 保存探测失败时，配置和任务均保持原样。

@@ -14,7 +14,6 @@ const inbox = {
   attachmentDownload: "Download",
   attachmentDownloadFailed: "Download failed. Please retry.",
 
-  newAgentConversation: "Create AI chat",
   agentPickerEmpty: "No AI colleagues available",
   messageSendState: "Send status",
   messageSendState_sending: "Sending",
@@ -418,6 +417,7 @@ const inbox = {
   sidePanelClose: "Collapse side panel",
   sidePanelResize: "Resize side panel",
   contextTabsLabel: "Contact context",
+  customerProfile: "Customer profile",
   contextProfileTab: "Profile",
   contextGroupProfileTab: "Group",
   contextGroupMembersTab: "Members",
@@ -453,8 +453,10 @@ const inbox = {
   copilotApplyReplyConfirmTitle: "Replace reply draft",
   copilotApplyReplyConfirmDescription: "The customer reply box already has content. Using this reply replaces the current draft.",
   copilotThreadsLoadError: "Could not load AI Assistant conversations",
-  contextBusinessTitle: "Business context",
-  contextBusinessDescription: "No business context yet.",
+  contextBusinessEmptyTitle: "No business lookups yet",
+  contextBusinessEmptyDescription: "Business system lookups made by the AI agent in this service session appear here.",
+  contextBusinessEvidence: "Used as answer evidence",
+  contextBusinessLoadError: "Could not load business lookups.",
 }
 
 export default inbox

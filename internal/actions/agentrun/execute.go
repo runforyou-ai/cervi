@@ -136,10 +136,11 @@ func (a *ExecuteAction) assign(ctx context.Context, runID string) (runAssignment
 			}, nil
 		}
 	}
-	assigned.MCPConnections, err = loadRunMCPServers(ctx, a.db, &execution.Run)
+	mcpServers, err := loadRunMCPServers(ctx, a.db, &execution.Run)
 	if err != nil {
 		return assigned, fmt.Errorf("load agent run mcp servers: %w", err)
 	}
+	assigned.MCPConnections = mcpServers.Servers
 	assigned.Knowledge, err = loadRunKnowledgeSearch(ctx, a.db, a.knowledge, execution)
 	if err != nil {
 		return assigned, fmt.Errorf("load agent run knowledge bases: %w", err)
@@ -149,7 +150,7 @@ func (a *ExecuteAction) assign(ctx context.Context, runID string) (runAssignment
 		serverNames = append(serverNames, server.Name)
 	}
 	assigned.Assignment, err = a.resolveAssignment(ctx, execution, assigned.Policy,
-		agentruntime.Capabilities{Knowledge: assigned.Knowledge != nil, MCPServers: serverNames})
+		agentruntime.Capabilities{Knowledge: assigned.Knowledge != nil, MCPServers: serverNames, CustomerLoginRequired: mcpServers.CustomerLoginRequired})
 	if err != nil {
 		return assigned, err
 	}

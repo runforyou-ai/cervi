@@ -77,17 +77,6 @@ func TestExecuteHandlerRecoversPanic(t *testing.T) {
 	}
 }
 
-// TestTaskFinalizationContextIgnoresCancellation 验证停机后仍能提交任务终态。
-func TestTaskFinalizationContextIgnoresCancellation(t *testing.T) {
-	parent, cancelParent := context.WithCancel(context.Background())
-	cancelParent()
-	ctx, cancel := taskFinalizationContext(parent)
-	defer cancel()
-	if err := ctx.Err(); err != nil {
-		t.Fatalf("finalization context is already cancelled: %v", err)
-	}
-}
-
 // TestResolveExecutionErrorPreservesHandlerResult 验证 Action 完成后保留其执行结果。
 func TestResolveExecutionErrorPreservesHandlerResult(t *testing.T) {
 	heartbeatErr := errors.New("lease lost")

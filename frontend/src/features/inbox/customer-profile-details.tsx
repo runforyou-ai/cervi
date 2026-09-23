@@ -1,4 +1,5 @@
 /** 客户会话侧栏的客户身份与当前周期访客上下文。 */
+import type { ComponentType, ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 
 import { getCustomerProfile } from "@/api"
@@ -7,15 +8,23 @@ import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 import { openExternalURL } from "@/platform/external-navigation"
 
-/** 按会话最新消息刷新客户身份与访客上下文，只展示有值的字段；身份验证状态只在网站渠道展示。 */
+/** 客户资料字段行组件，需放在 dl 内。 */
+export type CustomerProfileField = ComponentType<{
+  label: string
+  children: ReactNode
+}>
+
+/** 按会话最新消息刷新客户身份与访客上下文，只展示有值的字段；身份验证状态只在网站渠道展示；字段行默认使用侧栏样式。 */
 export function CustomerProfileDetails({
   conversationID,
   lastMessageID,
   website,
+  field: Field = SidePanelField,
 }: {
   conversationID: string
   lastMessageID: string | null
   website: boolean
+  field?: CustomerProfileField
 }) {
   const { t } = useTranslation("inbox")
   const profile = useResource(
@@ -47,26 +56,26 @@ export function CustomerProfileDetails({
   return (
     <>
       {website ? (
-        <SidePanelField label={t("contextVerification")}>
+        <Field label={t("contextVerification")}>
           {data.identityVerified ? t("contextVerified") : t("contextUnverified")}
-        </SidePanelField>
+        </Field>
       ) : null}
       {data.externalUserId ? (
-        <SidePanelField label={t("contextExternalUserId")}>
+        <Field label={t("contextExternalUserId")}>
           <span className="min-w-0 truncate" title={data.externalUserId}>
             {data.externalUserId}
           </span>
-        </SidePanelField>
+        </Field>
       ) : null}
       {data.email ? (
-        <SidePanelField label={t("contextEmail")}>
+        <Field label={t("contextEmail")}>
           <span className="min-w-0 truncate" title={data.email}>
             {data.email}
           </span>
-        </SidePanelField>
+        </Field>
       ) : null}
       {visit?.pageUrl ? (
-        <SidePanelField label={t("contextCurrentPage")}>
+        <Field label={t("contextCurrentPage")}>
           <button
             type="button"
             className="min-w-0 truncate text-left hover:underline"
@@ -75,10 +84,10 @@ export function CustomerProfileDetails({
           >
             {visit.pageTitle || visit.pageUrl}
           </button>
-        </SidePanelField>
+        </Field>
       ) : null}
       {visit?.referrerUrl ? (
-        <SidePanelField label={t("contextReferrer")}>
+        <Field label={t("contextReferrer")}>
           <button
             type="button"
             className="min-w-0 truncate text-left hover:underline"
@@ -87,29 +96,29 @@ export function CustomerProfileDetails({
           >
             {visit.referrerUrl}
           </button>
-        </SidePanelField>
+        </Field>
       ) : null}
       {device ? (
-        <SidePanelField label={t("contextDevice")}>
+        <Field label={t("contextDevice")}>
           <span className="min-w-0 truncate" title={device}>
             {device}
           </span>
-        </SidePanelField>
+        </Field>
       ) : null}
       {visit?.language ? (
-        <SidePanelField label={t("contextLanguage")}>
+        <Field label={t("contextLanguage")}>
           {visit.language}
-        </SidePanelField>
+        </Field>
       ) : null}
       {visit?.timeZone ? (
-        <SidePanelField label={t("contextTimeZone")}>
+        <Field label={t("contextTimeZone")}>
           {visit.timeZone}
-        </SidePanelField>
+        </Field>
       ) : null}
       {visit?.country ? (
-        <SidePanelField label={t("contextCountry")}>
+        <Field label={t("contextCountry")}>
           {visit.country}
-        </SidePanelField>
+        </Field>
       ) : null}
     </>
   )

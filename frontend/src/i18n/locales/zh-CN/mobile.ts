@@ -63,6 +63,7 @@ const mobile = {
   chats: {
     title: "消息",
     add: "新增",
+    searchTargets: "搜索姓名",
     emptyTitle: "暂无会话",
     emptyDescription: "当前筛选条件下没有会话。",
   },

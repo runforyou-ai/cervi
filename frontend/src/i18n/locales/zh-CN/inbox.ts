@@ -14,7 +14,6 @@ const inbox = {
   attachmentDownload: "下载",
   attachmentDownloadFailed: "下载失败，请重试",
 
-  newAgentConversation: "创建 AI 聊天",
   agentPickerEmpty: "暂无可用的 AI 员工",
   messageSendState: "发送状态",
   messageSendState_sending: "发送中",
@@ -411,6 +410,7 @@ const inbox = {
   sidePanelClose: "收起侧边面板",
   sidePanelResize: "调整侧边面板宽度",
   contextTabsLabel: "联系人上下文",
+  customerProfile: "客户资料",
   contextProfileTab: "资料",
   contextGroupProfileTab: "群资料",
   contextGroupMembersTab: "群成员",
@@ -446,8 +446,10 @@ const inbox = {
   copilotApplyReplyConfirmTitle: "替换回复草稿",
   copilotApplyReplyConfirmDescription: "回复客户的输入框中已有内容，填入后将替换当前草稿。",
   copilotThreadsLoadError: "读取 AI 助手对话失败",
-  contextBusinessTitle: "业务上下文",
-  contextBusinessDescription: "暂无业务上下文。",
+  contextBusinessEmptyTitle: "暂无业务查询",
+  contextBusinessEmptyDescription: "AI 客服在本次服务中查询业务系统后，查询记录会显示在这里。",
+  contextBusinessEvidence: "已作为回答依据",
+  contextBusinessLoadError: "读取业务查询记录失败。",
 }
 
 export default inbox

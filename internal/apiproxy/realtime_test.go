@@ -195,56 +195,43 @@ func TestRealtimeIndependentConnections(t *testing.T) {
 	}
 }
 
-// TestRealtimeWindowReconnectReplacesStream 验证同一窗口刷新后重新连接时关闭该窗口原有的事件流。
+// TestRealtimeWindowReconnectReplacesStream 验证同一窗口或无法识别的窗口重新连接时关闭该通道原有的事件流。
 func TestRealtimeWindowReconnectReplacesStream(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		writer.Header().Set("Content-Type", "text/event-stream")
-		writer.(http.Flusher).Flush()
-		<-request.Context().Done()
-	}))
-	t.Cleanup(server.Close)
+	for _, test := range []struct {
+		name  string
+		owner string
+	}{
+		{name: "同一窗口", owner: "1"},
+		{name: "无法识别窗口", owner: ""},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
+				writer.Header().Set("Content-Type", "text/event-stream")
+				writer.(http.Flusher).Flush()
+				<-request.Context().Done()
+			}))
+			t.Cleanup(server.Close)
 
-	backend, events := newRealtimeTestBackend(t, server.URL)
-	meta := appservice.RequestMeta{Locale: "zh-CN"}
-	window := context.WithValue(context.Background(), testWindowKey{}, "1")
-	first, err := backend.ConnectRealtime(window, meta)
-	if err != nil {
-		t.Fatal(err)
-	}
-	second, err := backend.ConnectRealtime(window, meta)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(backend.realtime.disconnectAll)
-	expectEvent(t, events, emittedEvent{appservice.RealtimeClosedEventName, appservice.RealtimeClosedEvent{ConnectionID: first.ConnectionID}})
-	if current, _ := windowStreamsOf(backend, "1"); current != second.ConnectionID {
-		t.Fatalf("窗口的成员事件流 = %q，want %q", current, second.ConnectionID)
-	}
-}
-
-// TestRealtimeUnknownWindowSharesChannel 验证无法识别调用窗口时归入同一条实时通道，新连接替换原有事件流。
-func TestRealtimeUnknownWindowSharesChannel(t *testing.T) {
-	server := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
-		writer.Header().Set("Content-Type", "text/event-stream")
-		writer.(http.Flusher).Flush()
-		<-request.Context().Done()
-	}))
-	t.Cleanup(server.Close)
-
-	backend, events := newRealtimeTestBackend(t, server.URL)
-	meta := appservice.RequestMeta{Locale: "zh-CN"}
-	first, err := backend.ConnectRealtime(context.Background(), meta)
-	if err != nil {
-		t.Fatal(err)
-	}
-	second, err := backend.ConnectRealtime(context.Background(), meta)
-	if err != nil {
-		t.Fatal(err)
-	}
-	t.Cleanup(backend.realtime.disconnectAll)
-	expectEvent(t, events, emittedEvent{appservice.RealtimeClosedEventName, appservice.RealtimeClosedEvent{ConnectionID: first.ConnectionID}})
-	if current, _ := windowStreamsOf(backend, ""); current != second.ConnectionID {
-		t.Fatalf("无归属通道的成员事件流 = %q，want %q", current, second.ConnectionID)
+			backend, events := newRealtimeTestBackend(t, server.URL)
+			meta := appservice.RequestMeta{Locale: "zh-CN"}
+			window := context.Background()
+			if test.owner != "" {
+				window = context.WithValue(window, testWindowKey{}, test.owner)
+			}
+			first, err := backend.ConnectRealtime(window, meta)
+			if err != nil {
+				t.Fatal(err)
+			}
+			second, err := backend.ConnectRealtime(window, meta)
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Cleanup(backend.realtime.disconnectAll)
+			expectEvent(t, events, emittedEvent{appservice.RealtimeClosedEventName, appservice.RealtimeClosedEvent{ConnectionID: first.ConnectionID}})
+			if current, _ := windowStreamsOf(backend, test.owner); current != second.ConnectionID {
+				t.Fatalf("窗口的成员事件流 = %q，want %q", current, second.ConnectionID)
+			}
+		})
 	}
 }
 

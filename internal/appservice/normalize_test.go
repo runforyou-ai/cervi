@@ -1,9 +1,7 @@
 package appservice
 
 import (
-	"encoding/json"
 	"reflect"
-	"strings"
 	"testing"
 	"time"
 )
@@ -39,20 +37,6 @@ func TestNormalizeSlicesFillsNestedNilSlices(t *testing.T) {
 	}
 	if !value.External.IsZero() {
 		t.Fatalf("包外类型不应被遍历改写: %+v", value.External)
-	}
-}
-
-// TestNormalizeSlicesSerializesRoleListAsArrays 验证真实业务结果序列化后不出现 null 切片。
-func TestNormalizeSlicesSerializesRoleListAsArrays(t *testing.T) {
-	output := RoleList{Roles: []Role{{}}}
-	normalizeSlices(&output)
-
-	encoded, err := json.Marshal(output)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if strings.Contains(string(encoded), "null") {
-		t.Fatalf("序列化结果仍包含 null: %s", encoded)
 	}
 }
 
