@@ -1,4 +1,4 @@
-/** 移动端统一会话摘要列表、阅读状态与置顶菜单、置顶排序和内部聊天入口。 */
+/** 移动端聊天、待处理与全部会话列表、阅读状态与置顶菜单、置顶排序和聊天入口。 */
 import { useEffect, useRef, useState } from "react"
 import { GripVerticalIcon, PlusIcon, SearchIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
@@ -9,7 +9,6 @@ import {
   isAgentInboxConversation,
   isDirectInboxConversation,
   isGroupInboxConversation,
-  CustomerInboxView,
   InboxScope,
   type CustomerInboxConversationData,
   type AgentInboxConversationData,
@@ -20,6 +19,7 @@ import {
 import {
   MobileInboxFilter,
   MobileInboxScopes,
+  mobileInboxTabs,
   useMobileInboxQuery,
 } from "@/apps/mobile/mobile-inbox-navigation"
 import {
@@ -56,10 +56,16 @@ import {
   mobileSearchPath,
   useMobileNavigation,
 } from "@/apps/mobile/mobile-navigation"
+import { useInboxAttention } from "@/features/inbox/inbox-attention"
 import { InboxListPanel } from "@/features/inbox/inbox-list-panel"
-import { inboxScopes } from "@/features/inbox/inbox-query"
 import { useConversationName } from "@/features/inbox/use-conversation-name"
-import { usePartitionedInboxList } from "@/features/inbox/use-inbox-list"
+import {
+  useInboxList,
+  usePartitionedInboxList,
+  type InboxList,
+  type InboxListViewport,
+  type PartitionedInboxList,
+} from "@/features/inbox/use-inbox-list"
 import { useInboxListViewport } from "@/features/inbox/use-inbox-list-viewport"
 import { cn } from "@/lib/utils"
 
@@ -88,6 +94,7 @@ type MobileConversationRowProps = {
   pinOrderVersion: string
   pinMoves?: NonNullable<Parameters<typeof ConversationListMenu>[0]["pinMoves"]>
   showAssignee: boolean
+  showAudience: boolean
   sorting: boolean
   onMenuChange: (open: boolean) => void
   onOpen: (conversation: MobileInboxConversation) => void
@@ -102,6 +109,7 @@ function MobileConversationRow({
   pinOrderVersion,
   pinMoves,
   showAssignee,
+  showAudience,
   sorting,
   onMenuChange,
   onOpen,
@@ -140,6 +148,7 @@ function MobileConversationRow({
               name={name}
               density="touch"
               showAssignee={showAssignee}
+              showAudience={showAudience}
             />
           </button>
         </ConversationListMenu>
@@ -170,28 +179,54 @@ function SortableMobileConversationRow(props: MobileConversationRowProps) {
   return <MobileConversationRow {...props} sortable={sortable} />
 }
 
-/** 加载当前范围的真实会话摘要并恢复列表浏览位置。 */
+/** 加载当前页签的真实会话摘要并恢复列表浏览位置。 */
 export function MobileInboxPage() {
   const navigation = useMobileInboxQuery()
-  return <MobileInboxList key={JSON.stringify(navigation.query)} {...navigation} />
+  const key = JSON.stringify(navigation.query)
+  return navigation.query.scope === InboxScope.InboxScopePending
+    ? <MobilePendingInbox key={key} {...navigation} />
+    : <MobilePartitionedInbox key={key} {...navigation} />
 }
 
-/** 每个移动筛选独立挂载窗口，离开时保存原邻域。 */
-function MobileInboxList({ query, changeQuery }: ReturnType<typeof useMobileInboxQuery>) {
-  const { t } = useTranslation(["mobile", "inbox", "common"])
-  const conversationName = useConversationName()
-  const navigate = useNavigate()
+/** 读取移动端列表所需的身份、轮询与浏览位置选项。 */
+function useMobileListOptions() {
   const pollingActive = useMemberChatPollingActive({
     requireWindowFocus: false,
   })
   const { identity } = useMobileWorkspace()
   const { inboxWindows } = useMobileNavigation()
+  return { identity, active: pollingActive, history: inboxWindows }
+}
+
+/** 待处理页签按等待起点读取一条列表。 */
+function MobilePendingInbox(navigation: ReturnType<typeof useMobileInboxQuery>) {
   const viewport = useInboxListViewport()
-  const list = usePartitionedInboxList(query, viewport, {
-    identity,
-    active: pollingActive,
-    history: inboxWindows,
-  })
+  const list = useInboxList(navigation.query, viewport, useMobileListOptions())
+  return <MobileInboxList {...navigation} list={list} viewport={viewport} />
+}
+
+/** 聊天与全部页签按置顶区在前、最近活动在后读取列表。 */
+function MobilePartitionedInbox(navigation: ReturnType<typeof useMobileInboxQuery>) {
+  const viewport = useInboxListViewport()
+  const list = usePartitionedInboxList(navigation.query, viewport, useMobileListOptions())
+  return <MobileInboxList {...navigation} list={list} viewport={viewport} />
+}
+
+/** 每个移动筛选独立挂载窗口，离开时保存原邻域。 */
+function MobileInboxList({
+  query,
+  changeQuery,
+  list,
+  viewport,
+}: ReturnType<typeof useMobileInboxQuery> & {
+  list: InboxList | PartitionedInboxList
+  viewport: InboxListViewport
+}) {
+  const { t } = useTranslation(["mobile", "inbox", "common"])
+  const conversationName = useConversationName()
+  const navigate = useNavigate()
+  const { identity } = useMobileWorkspace()
+  const attention = useInboxAttention(identity)
   const actions = useConversationListActions(list.settlePin)
   const [sorting, setSorting] = useState(false)
   const exitSortingOnMenuClose = useRef(false)
@@ -221,11 +256,9 @@ function MobileInboxList({ query, changeQuery }: ReturnType<typeof useMobileInbo
     name: names.get(conversation.id) ?? "",
     actions,
     pinOrderVersion: list.pinOrderVersion,
-    // 「全部」与「同事」视图在摘要行末显示负责人。
-    showAssignee:
-      query.scope === InboxScope.InboxScopeAll ||
-      (query.scope === InboxScope.InboxScopeCustomer &&
-        query.customerView === CustomerInboxView.CustomerInboxViewCoworkers),
+    // 全部页签在摘要行末显示负责人，待处理与全部页签标明服务对象。
+    showAssignee: query.scope === InboxScope.InboxScopeAll,
+    showAudience: query.scope !== InboxScope.InboxScopeChat,
     sorting,
     // 排序中打开的菜单在关闭后结束排序，菜单打开期间手柄保持占位。
     onMenuChange: (open: boolean) => {
@@ -301,8 +334,8 @@ function MobileInboxList({ query, changeQuery }: ReturnType<typeof useMobileInbo
       />
       <MobileInboxScopes
         scope={query.scope}
-        attentionUnreadCount={list.attentionUnreadCount}
-        customerMentionedUnreadCount={list.customerMentionedUnreadCount}
+        attentionUnreadCount={attention.data?.unread ?? 0}
+        pendingCount={attention.data?.pending ?? 0}
         onChange={changeQuery}
       />
       <div className="flex h-11 shrink-0 items-center border-b">
@@ -334,10 +367,10 @@ function MobileInboxList({ query, changeQuery }: ReturnType<typeof useMobileInbo
           // 横向位移达到阈值且是纵向的两倍以上时判定为切换范围的滑动。
           if (Math.abs(moveX) < 64 || Math.abs(moveX) < Math.abs(moveY) * 2)
             return
-          const current = inboxScopes.findIndex(
+          const current = mobileInboxTabs.findIndex(
             (item) => item.value === query.scope,
           )
-          const next = inboxScopes[current + (moveX < 0 ? 1 : -1)]
+          const next = mobileInboxTabs[current + (moveX < 0 ? 1 : -1)]
           if (!next) return
           // 抬手后的点击不应落到滑动经过的会话行上。
           event.preventDefault()
@@ -358,8 +391,8 @@ function MobileInboxList({ query, changeQuery }: ReturnType<typeof useMobileInbo
           ) : null}
           {!initial && conversations.length === 0 && !list.hasBefore && !list.hasAfter ? (
             <MobilePageState
-              title={t("inbox.emptyTitle")}
-              description={t("inbox.emptyDescription")}
+              title={query.scope === InboxScope.InboxScopePending ? t("inbox:pendingEmptyTitle") : t("inbox.emptyTitle")}
+              description={query.scope === InboxScope.InboxScopePending ? t("inbox:pendingEmptyDescription") : t("inbox.emptyDescription")}
             />
           ) : null}
           {conversations.length > 0 ? (

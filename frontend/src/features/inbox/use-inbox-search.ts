@@ -53,8 +53,8 @@ export function useInboxSearchResults({
 }) {
   const trimmedText = text.trim()
   const [searchedText, setSearchedText] = useState(trimmedText)
-  const listRange = query.scope !== InboxScope.InboxScopeAll
-  // 当前范围为「全部」时列表筛选与全部消息等价，只保留全部消息。
+  // 未指定列表范围时列表检索与全部消息等价，只保留全部消息。
+  const listRange = query.scope !== InboxScope.$zero
   const range =
     (selectedRange === InboxSearchRange.InboxSearchRangeList && !listRange) ||
     (selectedRange === InboxSearchRange.InboxSearchRangeConversation && !conversationId)

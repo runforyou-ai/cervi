@@ -101,9 +101,9 @@ func applyCustomerHandoff(ctx context.Context, db bun.IDB, enqueuer servertask.T
 		Set("updated_at = now()").
 		WherePK().Where("organization_id = ?", session.OrganizationID)
 	if assigneeID != nil {
-		update = update.Set("assigned_at = COALESCE(assigned_at, ?)", now).Set("assignee_assigned_at = ?", now)
+		update = update.Set("assigned_at = COALESCE(assigned_at, ?)", now).Set("assignee_assigned_at = ?", now).Set("queued_at = NULL")
 	} else {
-		update = update.Set("assignee_assigned_at = NULL")
+		update = update.Set("assignee_assigned_at = NULL").Set("queued_at = ?", now)
 	}
 	if _, err := update.Exec(ctx); err != nil {
 		return nil, fmt.Errorf("hand off service session: %w", err)
@@ -417,6 +417,7 @@ func applyServiceSessionReturn(ctx context.Context, db bun.IDB, enqueuer servert
 	if _, err := db.NewUpdate().Model(session).
 		Set("assignee_identity_id = NULL").
 		Set("assignee_assigned_at = NULL").
+		Set("queued_at = now()").
 		Set("awaiting_reply_since = ?", awaitingReplySince).
 		Set("reminded_at = NULL").
 		Set("updated_at = now()").

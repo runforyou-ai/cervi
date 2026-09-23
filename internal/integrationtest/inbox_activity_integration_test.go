@@ -147,7 +147,7 @@ func TestInboxSnapshot(t *testing.T) {
 	done := make(chan error, 1)
 	go func() {
 		var err error
-		snapshot, err = backend.LoadInbox(context.WithValue(ctx, chatQueryGateKey{}, gate), appservice.RequestMeta{Token: login.Token}, appservice.LoadInboxInput{Scope: appservice.InboxScopeInternal})
+		snapshot, err = backend.LoadInbox(context.WithValue(ctx, chatQueryGateKey{}, gate), appservice.RequestMeta{Token: login.Token}, appservice.LoadInboxInput{Scope: appservice.InboxScopeChat})
 		done <- err
 	}()
 	waitChatSignal(t, ctx, gate.reached)
@@ -159,7 +159,7 @@ func TestInboxSnapshot(t *testing.T) {
 	if len(snapshot.Conversations) != 1 || snapshot.Conversations[0].LastMessageID == nil || *snapshot.Conversations[0].LastMessageID != first.ID || snapshot.Conversations[0].UnreadCount != 1 || snapshot.UnreadCount != 1 || snapshot.AttentionUnreadCount != 1 {
 		t.Fatalf("mixed snapshot=%+v rows=%+v", snapshot, snapshot.Conversations)
 	}
-	current, err := backend.LoadInbox(ctx, appservice.RequestMeta{Token: login.Token}, appservice.LoadInboxInput{Scope: appservice.InboxScopeInternal})
+	current, err := backend.LoadInbox(ctx, appservice.RequestMeta{Token: login.Token}, appservice.LoadInboxInput{Scope: appservice.InboxScopeChat})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -168,7 +168,7 @@ func TestInboxSnapshot(t *testing.T) {
 	}
 }
 
-// TestInboxActivityOrder 验证混合列表保持微秒顺序、同时间编号倒序及空会话沉底。
+// TestInboxActivityOrder 验证聊天列表保持微秒顺序、同时间编号倒序及空会话沉底。
 func TestInboxActivityOrder(t *testing.T) {
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
@@ -181,22 +181,22 @@ func TestInboxActivityOrder(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	// 客服回复使客户会话进入本人全部范围。
-	if _, err := conversationaction.NewSendCustomerTextMessageAction(f.db, nil).Execute(ctx, f.owner, conversationaction.CustomerTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "回复"}); err != nil {
+	third, err := conversationaction.NewCreateGroupConversationAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationInput{Title: "第三个群", MemberIdentityIDs: []string{f.member.OrganizationIdentity.ID}})
+	if err != nil {
 		t.Fatal(err)
 	}
 	var base time.Time
 	if err := f.db.NewRaw("SELECT date_trunc('milliseconds', clock_timestamp()) - interval '1 hour'").Scan(ctx, &base); err != nil {
 		t.Fatal(err)
 	}
-	ids := []string{direct.Conversation.ID, f.groupID, f.conversationID}
+	ids := []string{direct.Conversation.ID, f.groupID, third.ID}
 	for i, id := range ids {
 		if _, err := f.db.NewUpdate().Model((*servermodels.Conversation)(nil)).Set("last_activity_at = ?", base.Add(time.Duration(2-i)*time.Microsecond)).Set("last_message_at = ?", base.Add(time.Duration(i)*time.Hour)).Where("id = ?", id).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
 	}
 	query := inboxaction.NewLoadInboxQuery(f.db)
-	rowsPage, counts, err := query.Execute(ctx, f.owner, inboxaction.LoadInput{})
+	rowsPage, counts, err := query.Execute(ctx, f.owner, inboxaction.LoadInput{Scope: domain.InboxScopeChat})
 	rows := rowsPage.Conversations
 	if err != nil {
 		t.Fatal(err)
@@ -208,13 +208,13 @@ func TestInboxActivityOrder(t *testing.T) {
 	if !slices.Equal(got, append(slices.Clone(ids), empty.ID)) || counts.Unread != 0 || counts.Attention != 0 {
 		t.Fatalf("order=%v counts=%+v", got, counts)
 	}
-	if rows[2].Customer.LastMessageAt == nil || !rows[2].Customer.LastMessageAt.Equal(base.Add(2*time.Hour)) || rows[3].LastActivityAt != nil {
+	if rows[2].Group.LastMessageAt == nil || !rows[2].Group.LastMessageAt.Equal(base.Add(2*time.Hour)) || rows[3].LastActivityAt != nil {
 		t.Fatalf("preview or empty=%+v", rows)
 	}
 	if _, err := f.db.NewUpdate().Model((*servermodels.Conversation)(nil)).Set("last_activity_at = ?", base).Where("id IN (?)", bun.In(ids)).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
-	rowsPage, _, err = query.Execute(ctx, f.owner, inboxaction.LoadInput{})
+	rowsPage, _, err = query.Execute(ctx, f.owner, inboxaction.LoadInput{Scope: domain.InboxScopeChat})
 	rows = rowsPage.Conversations
 	if err != nil {
 		t.Fatal(err)
@@ -256,7 +256,7 @@ func TestInboxActivityOrder(t *testing.T) {
 	if _, err := conversationaction.NewUpdateGroupConversationAction(f.db).Execute(ctx, f.owner, conversationaction.GroupConversationProfileInput{ConversationID: empty.ID, Title: "新群名", Description: "仅资料"}); err != nil {
 		t.Fatal(err)
 	}
-	rowsPage, _, err = query.Execute(ctx, f.owner, inboxaction.LoadInput{})
+	rowsPage, _, err = query.Execute(ctx, f.owner, inboxaction.LoadInput{Scope: domain.InboxScopeChat})
 	rows = rowsPage.Conversations
 	if err != nil || rows[0].ID != empty.ID || rows[0].LastActivityAt == nil {
 		t.Fatalf("system activity=%+v err=%v", rows, err)
@@ -288,7 +288,7 @@ func TestInboxTelegramActivity(t *testing.T) {
 		t.Fatal(err)
 	}
 	query := inboxaction.NewLoadInboxQuery(f.db)
-	rowsPage, counts, err := query.Execute(ctx, f.owner, inboxaction.LoadInput{Scope: domain.InboxScopeCustomer, CustomerView: domain.CustomerInboxViewQueue})
+	rowsPage, counts, err := query.Execute(ctx, f.owner, inboxaction.LoadInput{Scope: domain.InboxScopeAll, AssigneeFilter: domain.InboxAssigneeFilterUnassigned})
 	rows := rowsPage.Conversations
 	if err != nil {
 		t.Fatal(err)
@@ -300,14 +300,13 @@ func TestInboxTelegramActivity(t *testing.T) {
 	if err := receiver.Execute(ctx, channel.ID, input); err != nil {
 		t.Fatal(err)
 	}
-	allPage, _, err := query.Execute(ctx, f.owner, inboxaction.LoadInput{})
-	all := allPage.Conversations
+	chatPage, _, err := query.Execute(ctx, f.owner, inboxaction.LoadInput{Scope: domain.InboxScopeChat})
 	if err != nil {
 		t.Fatal(err)
 	}
-	for _, row := range all {
+	for _, row := range chatPage.Conversations {
 		if row.Customer != nil {
-			t.Fatalf("public queue leaked into all: %+v", row)
+			t.Fatalf("customer conversation leaked into chats: %+v", row)
 		}
 	}
 	// 阅读与处理状态更新投影并保留活动位置。
@@ -318,11 +317,8 @@ func TestInboxTelegramActivity(t *testing.T) {
 	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(ctx, f.owner, telegram.ID); err != nil {
 		t.Fatal(err)
 	}
-	// 「待分配」只接受未关闭状态；队列中关闭的会话由关闭人负责，出现在其已关闭列表。
-	if _, _, err := query.Execute(ctx, f.owner, inboxaction.LoadInput{Scope: domain.InboxScopeCustomer, CustomerView: domain.CustomerInboxViewQueue, ServiceStatus: domain.ServiceSessionStatusClosed}); !errors.Is(err, inboxaction.ErrQueryInvalid) {
-		t.Fatalf("closed queue view accepted: %v", err)
-	}
-	closedPage, counts, err := query.Execute(ctx, f.owner, inboxaction.LoadInput{Scope: domain.InboxScopeCustomer, CustomerView: domain.CustomerInboxViewMine, ServiceStatus: domain.ServiceSessionStatusClosed})
+	// 队列中关闭的会话由关闭人负责，出现在其负责的已关闭列表。
+	closedPage, counts, err := query.Execute(ctx, f.owner, inboxaction.LoadInput{Scope: domain.InboxScopeAll, AssigneeFilter: domain.InboxAssigneeFilterIdentity, AssigneeIdentityID: f.owner.OrganizationIdentity.ID, ServiceStatus: domain.ServiceSessionStatusClosed})
 	closed := closedPage.Conversations
 	if err != nil || len(closed) != 1 || !closed[0].LastActivityAt.Equal(*telegram.LastActivityAt) || closed[0].UnreadCount != 0 || counts.Attention != 0 {
 		t.Fatalf("closed=%+v counts=%+v err=%v", closed, counts, err)

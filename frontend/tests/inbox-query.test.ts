@@ -1,4 +1,4 @@
-/** 验证收件箱筛选的范围规则与地址参数往返。 */
+/** 验证会话列表范围的筛选规则与地址参数往返。 */
 import assert from "node:assert/strict"
 import { readFileSync } from "node:fs"
 import { stripTypeScriptTypes } from "node:module"
@@ -14,21 +14,33 @@ const ConversationType = {
 }
 const InboxScope = {
   $zero: "",
+  InboxScopePending: "pending",
   InboxScopeAll: "all",
-  InboxScopeCustomer: "customer",
-  InboxScopeInternal: "internal",
+  InboxScopeChat: "chat",
 }
-const CustomerInboxView = {
+const InboxPendingKind = {
   $zero: "",
-  CustomerInboxViewQueue: "queue",
-  CustomerInboxViewMine: "mine",
-  CustomerInboxViewCoworkers: "coworkers",
+  InboxPendingKindReply: "reply",
+  InboxPendingKindQueue: "queue",
+  InboxPendingKindMention: "mention",
+}
+const InboxAssigneeFilter = {
+  $zero: "",
+  InboxAssigneeFilterAll: "all",
+  InboxAssigneeFilterUnassigned: "unassigned",
+  InboxAssigneeFilterIdentity: "identity",
 }
 const CustomerQueueFilter = {
   $zero: "",
   CustomerQueueFilterAll: "all",
   CustomerQueueFilterPublic: "public",
   CustomerQueueFilterTeam: "team",
+}
+const ServiceAudience = {
+  $zero: "",
+  ServiceAudienceCustomer: "customer",
+  ServiceAudienceEmployee: "employee",
+  ServiceAudiencePartner: "partner",
 }
 const ServiceSessionStatus = {
   $zero: "",
@@ -52,103 +64,108 @@ const optionalWailsEnum = (values: Record<string, string>, value: string | null)
     ? undefined
     : value
 
-type InboxQuery = {
-  partition?: string
-  scope: string
-  customerView: string
-  queueFilter?: string
-  queueTeamId?: string
-  assigneeIdentityId: string
-  channelId: string
-  serviceStatus: string
-  kinds: string[]
-  search?: string
-  searchRange?: string
-}
+type InboxQuery = Record<string, unknown> & { scope: string }
 
 const source = readFileSync(new URL("../src/features/inbox/inbox-query.ts", import.meta.url), "utf8")
 const module: {
   normalizeInboxQuery?: (query: InboxQuery) => InboxQuery
-  inboxQueryFromSearch?: (params: URLSearchParams) => InboxQuery
+  inboxQueryFromSearch?: (params: URLSearchParams, scopes?: string[]) => InboxQuery
   writeInboxQuerySearch?: (params: URLSearchParams, query: InboxQuery) => void
-  toggleInboxKinds?: (scope: string, kinds: string[], kind: string, checked: boolean) => string[]
+  toggleChatKinds?: (kinds: string[], kind: string, checked: boolean) => string[]
 } = {}
 runInNewContext(
   stripTypeScriptTypes(source).replace(/^import\s[\s\S]*?from "[^"]+"\n/gm, "").replaceAll("export ", "") +
-    "\nObject.assign(module, { normalizeInboxQuery, inboxQueryFromSearch, writeInboxQuerySearch, toggleInboxKinds })",
-  { module, ConversationType, InboxScope, InboxPartition, InboxSearchRange, CustomerInboxView, CustomerQueueFilter, ServiceSessionStatus, optionalWailsEnum, URLSearchParams },
+    "\nObject.assign(module, { normalizeInboxQuery, inboxQueryFromSearch, writeInboxQuerySearch, toggleChatKinds })",
+  {
+    module, ConversationType, InboxScope, InboxPendingKind, InboxAssigneeFilter, InboxPartition, InboxSearchRange,
+    CustomerQueueFilter, ServiceAudience, ServiceSessionStatus, optionalWailsEnum, URLSearchParams,
+  },
 )
-const { normalizeInboxQuery, inboxQueryFromSearch, writeInboxQuerySearch, toggleInboxKinds } = module as Required<typeof module>
+const { normalizeInboxQuery, inboxQueryFromSearch, writeInboxQuerySearch, toggleChatKinds } = module as Required<typeof module>
 
 /** 跨 VM 上下文返回的结果按值比较。 */
 function plain<Value>(value: Value): Value {
   return JSON.parse(JSON.stringify(value))
 }
 
-test("范围外的客户条件和会话类型按空值规范化", () => {
+/** 各范围都不带条件时的规范化结果。 */
+const empty = {
+  partition: "all", pendingKind: "", queueFilter: "", queueTeamId: "", channelId: "", audience: "",
+  serviceStatus: "", assigneeFilter: "", assigneeIdentityId: "", kinds: [], search: "", searchRange: "list",
+}
+
+test("范围外的条件按空值规范化", () => {
+  const carried = {
+    pendingKind: "queue", queueFilter: "public", channelId: "web", audience: "customer", serviceStatus: "closed",
+    assigneeFilter: "identity", assigneeIdentityId: "peer", kinds: ["customer", "group"],
+  }
+  assert.deepEqual(plain(normalizeInboxQuery({ scope: "chat", ...carried })), { ...empty, scope: "chat", kinds: ["group"] })
   assert.deepEqual(
-    plain(normalizeInboxQuery({ scope: "internal", customerView: "coworkers", assigneeIdentityId: "someone", channelId: "channel", serviceStatus: "closed", kinds: ["customer", "group"] })),
-    { partition: "all", scope: "internal", customerView: "queue", queueFilter: "", queueTeamId: "", assigneeIdentityId: "", channelId: "", serviceStatus: "open", kinds: ["group"], search: "", searchRange: "list" },
+    plain(normalizeInboxQuery({ scope: "pending", ...carried })),
+    { ...empty, scope: "pending", pendingKind: "queue", queueFilter: "public", channelId: "web", audience: "customer" },
   )
   assert.deepEqual(
-    plain(normalizeInboxQuery({ scope: "customer", customerView: "mine", assigneeIdentityId: "someone", channelId: "channel", serviceStatus: "closed", kinds: ["group"] })),
-    { partition: "all", scope: "customer", customerView: "mine", queueFilter: "", queueTeamId: "", assigneeIdentityId: "", channelId: "channel", serviceStatus: "closed", kinds: [], search: "", searchRange: "list" },
+    plain(normalizeInboxQuery({ scope: "all", ...carried })),
+    { ...empty, scope: "all", channelId: "web", audience: "customer", serviceStatus: "closed", assigneeFilter: "identity", assigneeIdentityId: "peer" },
   )
 })
 
-test("待分配视图的服务状态固定为未关闭", () => {
-  assert.equal(normalizeInboxQuery({ scope: "customer", customerView: "queue", queueFilter: "", queueTeamId: "", assigneeIdentityId: "", channelId: "", serviceStatus: "closed", kinds: [] }).serviceStatus, "open")
-  assert.equal(inboxQueryFromSearch(new URLSearchParams("scope=customer&view=queue&status=closed")).serviceStatus, "open")
+test("待处理不区分置顶分区，队列筛选只在待领取类型生效", () => {
+  assert.equal(normalizeInboxQuery({ scope: "pending", partition: "pinned" }).partition, "all")
+  assert.equal(normalizeInboxQuery({ scope: "all", partition: "pinned" }).partition, "pinned")
+  const reply = normalizeInboxQuery({ scope: "pending", pendingKind: "reply", queueFilter: "public" })
+  assert.equal(reply.queueFilter, "")
+  // 指定队列缺少团队编号时按全部队列处理。
+  assert.equal(normalizeInboxQuery({ scope: "pending", pendingKind: "queue", queueFilter: "team", queueTeamId: "" }).queueFilter, "all")
+  // 指定负责人缺少身份编号时按不限处理。
+  assert.equal(normalizeInboxQuery({ scope: "all", assigneeFilter: "identity", assigneeIdentityId: "" }).assigneeFilter, "all")
 })
 
-test("勾满当前范围全部类型等同不限类型", () => {
-  assert.deepEqual(plain(toggleInboxKinds("internal", ["direct", "group"], "agent", true)), [])
-  assert.deepEqual(plain(toggleInboxKinds("internal", ["direct", "group"], "direct", false)), ["group"])
-  assert.deepEqual(plain(toggleInboxKinds("all", [], "group", true)), ["group"])
+test("勾满聊天范围全部类型等同不限类型", () => {
+  assert.deepEqual(plain(toggleChatKinds(["direct", "group"], "agent", true)), [])
+  assert.deepEqual(plain(toggleChatKinds(["direct", "group"], "direct", false)), ["group"])
+  assert.deepEqual(plain(toggleChatKinds([], "customer", true)), [])
 })
 
 test("地址参数往返保持规范化结果，默认值不写入", () => {
-  const original = new URLSearchParams("scope=customer&view=coworkers&assignee=peer&channel=web&status=closed&conversation=kept")
+  const original = new URLSearchParams("tab=all&channel=web&audience=customer&status=closed&assignee=peer&conversation=kept")
   const query = inboxQueryFromSearch(original)
-  assert.deepEqual(plain(query), { partition: "all", scope: "customer", customerView: "coworkers", queueFilter: "", queueTeamId: "", assigneeIdentityId: "peer", channelId: "web", serviceStatus: "closed", kinds: [], search: "", searchRange: "list" })
+  assert.deepEqual(
+    plain(query),
+    { ...empty, scope: "all", channelId: "web", audience: "customer", serviceStatus: "closed", assigneeFilter: "identity", assigneeIdentityId: "peer" },
+  )
   const written = new URLSearchParams(original)
   writeInboxQuerySearch(written, query)
   assert.equal(written.toString(), original.toString())
-  // 切到内部范围时客户条件和范围外类型一起清空。
-  const internal = new URLSearchParams(original)
-  writeInboxQuerySearch(internal, normalizeInboxQuery({ ...query, scope: "internal", kinds: ["customer"] }))
-  assert.equal(internal.toString(), "scope=internal&conversation=kept")
-  // 置顶分区由列表控制器决定，不进入地址参数。
+  // 切到待处理时状态与负责人一起清空，来源与服务对象保留。
+  const pending = new URLSearchParams(original)
+  writeInboxQuerySearch(pending, normalizeInboxQuery({ ...query, scope: "pending" }))
+  assert.equal(pending.toString(), "tab=pending&channel=web&audience=customer&conversation=kept")
+  // 未分配写入固定取值，不限是默认值不写入。
+  const unassigned = new URLSearchParams()
+  writeInboxQuerySearch(unassigned, normalizeInboxQuery({ scope: "all", assigneeFilter: "unassigned" }))
+  assert.equal(unassigned.toString(), "tab=all&assignee=unassigned")
+  // 置顶分区与会话名称搜索不进入地址参数。
   const pinned = new URLSearchParams(original)
-  writeInboxQuerySearch(pinned, normalizeInboxQuery({ ...query, partition: "pinned" }))
+  writeInboxQuerySearch(pinned, normalizeInboxQuery({ ...query, partition: "pinned", search: "周报", searchRange: "readable" }))
   assert.equal(pinned.toString(), original.toString())
-  // 会话名称搜索只用于搜索模式的分页列表，不进入列表地址参数。
-  const searched = new URLSearchParams(original)
-  writeInboxQuerySearch(searched, normalizeInboxQuery({ ...query, search: "周报", searchRange: "readable" }))
-  assert.equal(searched.toString(), original.toString())
 })
 
-test("队列筛选只在客户范围的待分配视图生效", () => {
+test("待领取的队列筛选编码为单值", () => {
   const team = "5f3c4a20-6c4e-4c4a-9a3a-1f2b3c4d5e6f"
-  const queued = inboxQueryFromSearch(new URLSearchParams(`scope=customer&queue=${team}`))
-  assert.deepEqual(plain(queued), { partition: "all", scope: "customer", customerView: "queue", queueFilter: "team", queueTeamId: team, assigneeIdentityId: "", channelId: "", serviceStatus: "open", kinds: [], search: "", searchRange: "list" })
+  const queued = inboxQueryFromSearch(new URLSearchParams(`tab=pending&kind=queue&queue=${team}`))
+  assert.deepEqual(plain(queued), { ...empty, scope: "pending", pendingKind: "queue", queueFilter: "team", queueTeamId: team })
   const written = new URLSearchParams()
   writeInboxQuerySearch(written, queued)
-  assert.equal(written.toString(), `scope=customer&queue=${team}`)
-  // 公共队列写入固定取值，全部队列是默认值不写入。
-  const publicQueue = new URLSearchParams()
-  writeInboxQuerySearch(publicQueue, normalizeInboxQuery({ ...queued, queueFilter: "public", queueTeamId: "" }))
-  assert.equal(publicQueue.toString(), "scope=customer&queue=public")
+  assert.equal(written.toString(), `tab=pending&kind=queue&queue=${team}`)
   const allQueues = new URLSearchParams()
   writeInboxQuerySearch(allQueues, normalizeInboxQuery({ ...queued, queueFilter: "all", queueTeamId: "" }))
-  assert.equal(allQueues.toString(), "scope=customer")
-  // 切到其他视图或其他范围时队列筛选一并清空。
-  const mine = new URLSearchParams()
-  writeInboxQuerySearch(mine, normalizeInboxQuery({ ...queued, customerView: "mine" }))
-  assert.equal(mine.toString(), "scope=customer&view=mine")
-  const internal = new URLSearchParams()
-  writeInboxQuerySearch(internal, normalizeInboxQuery({ ...queued, scope: "internal" }))
-  assert.equal(internal.toString(), "scope=internal")
-  // 指定队列缺少团队编号时按全部队列处理。
-  assert.equal(plain(normalizeInboxQuery({ ...queued, queueTeamId: "" })).queueFilter, "all")
+  assert.equal(allQueues.toString(), "tab=pending&kind=queue")
+})
+
+test("未指定或不可选的页签取第一个可选范围", () => {
+  assert.equal(inboxQueryFromSearch(new URLSearchParams("")).scope, "pending")
+  assert.equal(inboxQueryFromSearch(new URLSearchParams("tab=chat")).scope, "pending")
+  assert.equal(inboxQueryFromSearch(new URLSearchParams(""), ["chat", "pending", "all"]).scope, "chat")
+  assert.equal(inboxQueryFromSearch(new URLSearchParams("tab=all"), ["chat", "pending", "all"]).scope, "all")
 })

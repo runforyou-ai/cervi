@@ -22,12 +22,15 @@ type ConversationWindow struct {
 	HasAfter        bool
 }
 
-// candidatePointsQuery 复用所有列表窗口的资格、置顶分区与最小排序投影。
+// candidatePointsQuery 复用所有列表窗口的资格、置顶分区与最小排序投影；待处理范围另投影条目类型与等待起点。
 func (q *LoadInboxQuery) candidatePointsQuery(identity *servermodels.Identity, input LoadInput) *bun.SelectQuery {
 	query := q.db.NewSelect().TableExpr("(?) AS candidates", q.listCandidates(identity, input)).
 		ColumnExpr("candidates.id, candidates.last_activity_at, cus.pin_rank").
 		Join("LEFT JOIN conversation_user_states AS cus ON cus.organization_id = ? AND cus.conversation_id = candidates.id AND cus.user_id = ?",
 			identity.Organization.ID, identity.User.ID)
+	if input.Scope == domain.InboxScopePending {
+		query = query.ColumnExpr("candidates.pending_kind, candidates.waiting_since, candidates.mentioned")
+	}
 	switch input.Partition {
 	case domain.InboxPartitionPinned:
 		return query.Where("cus.pin_rank IS NOT NULL")
@@ -37,10 +40,10 @@ func (q *LoadInboxQuery) candidatePointsQuery(identity *servermodels.Identity, i
 	return query
 }
 
-// constrainInboxPoint 按当前分区的显示顺序施加前后边界，包含边界时也适用于闭区间重读。
-func constrainInboxPoint(query *bun.SelectQuery, partition domain.InboxPartition, point inboxCursorPoint, before, inclusive bool) *bun.SelectQuery {
-	if partition == domain.InboxPartitionPinned {
-		// 置顶区按顺序值升序展示，靠前即顺序值更小。
+// constrainInboxPoint 按显示顺序施加前后边界，包含边界时也适用于闭区间重读。
+func constrainInboxPoint(query *bun.SelectQuery, order inboxOrder, point inboxCursorPoint, before, inclusive bool) *bun.SelectQuery {
+	if order == inboxOrderPinned || order == inboxOrderWaiting {
+		// 置顶顺序值与等待起点都按升序展示，靠前即值更小。
 		operator := ">"
 		if before {
 			operator = "<"
@@ -48,7 +51,10 @@ func constrainInboxPoint(query *bun.SelectQuery, partition domain.InboxPartition
 		if inclusive {
 			operator += "="
 		}
-		return query.Where("(cus.pin_rank, candidates.id) "+operator+" (?, ?)", point.PinRank, point.ID)
+		if order == inboxOrderPinned {
+			return query.Where("(cus.pin_rank, candidates.id) "+operator+" (?, ?)", point.PinRank, point.ID)
+		}
+		return query.Where("(candidates.waiting_since, candidates.id) "+operator+" (?, ?)", point.WaitingSince, point.ID)
 	}
 	operator := "<"
 	if before {
@@ -69,13 +75,19 @@ func constrainInboxPoint(query *bun.SelectQuery, partition domain.InboxPartition
 	return query.Where("((candidates.last_activity_at, candidates.id) "+operator+" (?, ?) OR candidates.last_activity_at IS NULL)", *point.LastActivityAt, point.ID)
 }
 
-// orderInboxPoints 按当前分区和读取方向排列候选，向前读取时先取最近的邻居。
-func orderInboxPoints(query *bun.SelectQuery, partition domain.InboxPartition, before bool) *bun.SelectQuery {
-	if partition == domain.InboxPartitionPinned {
+// orderInboxPoints 按显示顺序和读取方向排列候选，向前读取时先取最近的邻居。
+func orderInboxPoints(query *bun.SelectQuery, order inboxOrder, before bool) *bun.SelectQuery {
+	switch order {
+	case inboxOrderPinned:
 		if before {
 			return query.OrderExpr("cus.pin_rank DESC, candidates.id DESC")
 		}
 		return query.OrderExpr("cus.pin_rank ASC, candidates.id ASC")
+	case inboxOrderWaiting:
+		if before {
+			return query.OrderExpr("candidates.waiting_since DESC, candidates.id DESC")
+		}
+		return query.OrderExpr("candidates.waiting_since ASC, candidates.id ASC")
 	}
 	if before {
 		return query.OrderExpr("candidates.last_activity_at ASC NULLS FIRST, candidates.id ASC")
@@ -87,10 +99,10 @@ func orderInboxPoints(query *bun.SelectQuery, partition domain.InboxPartition, b
 func (q *LoadInboxQuery) readNeighborPoints(ctx context.Context, identity *servermodels.Identity, input LoadInput, point *inboxCursorPoint, before bool, limit int) ([]inboxCursorPoint, error) {
 	query := q.candidatePointsQuery(identity, input)
 	if point != nil {
-		query = constrainInboxPoint(query, input.Partition, *point, before, false)
+		query = constrainInboxPoint(query, input.order(), *point, before, false)
 	}
 	var points []inboxCursorPoint
-	if err := orderInboxPoints(query, input.Partition, before).Limit(limit).Scan(ctx, &points); err != nil {
+	if err := orderInboxPoints(query, input.order(), before).Limit(limit).Scan(ctx, &points); err != nil {
 		return nil, fmt.Errorf("read inbox neighbors: %w", err)
 	}
 	if before {
@@ -134,11 +146,11 @@ func (q *LoadInboxQuery) buildConversationWindow(ctx context.Context, identity *
 		if err != nil {
 			return window, err
 		}
-		window.HasBefore, err = constrainInboxPoint(q.candidatePointsQuery(identity, input), input.Partition, *start, true, false).Exists(ctx)
+		window.HasBefore, err = constrainInboxPoint(q.candidatePointsQuery(identity, input), input.order(), *start, true, false).Exists(ctx)
 		if err != nil {
 			return window, fmt.Errorf("probe inbox before window: %w", err)
 		}
-		window.HasAfter, err = constrainInboxPoint(q.candidatePointsQuery(identity, input), input.Partition, *end, false, false).Exists(ctx)
+		window.HasAfter, err = constrainInboxPoint(q.candidatePointsQuery(identity, input), input.order(), *end, false, false).Exists(ctx)
 		if err != nil {
 			return window, fmt.Errorf("probe inbox after window: %w", err)
 		}
@@ -157,6 +169,7 @@ func (q *LoadInboxQuery) buildConversationWindow(ctx context.Context, identity *
 	// 候选与摘要共用阅读资格和快照，位置游标保留当前查询及数据库精度。
 	for _, point := range points {
 		summary := *summaries[point.ID]
+		summary.Pending = point.pending()
 		summary.PositionCursor, err = encodeInboxCursor(identity, input, pinOrderVersion, point)
 		if err != nil {
 			return window, err

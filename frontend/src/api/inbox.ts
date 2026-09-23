@@ -100,14 +100,16 @@ import type {
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import {
   ConversationType,
-  CustomerInboxView,
   CustomerQueueFilter,
   ServiceSessionTargetKind,
   ConversationPinPosition,
+  InboxAssigneeFilter,
   InboxPartition,
+  InboxPendingKind,
   InboxScope,
   InboxSearchRange,
   MessageAttachmentTransferStatus,
+  ServiceAudience,
   ServiceSessionStatus,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import { bind } from "@/api/client"
@@ -302,20 +304,21 @@ export function isInternalInboxConversation(
   )
 }
 
-/** 读取成员统一收件箱会话列表。 */
+/** 读取成员会话列表，未指定范围时读取待处理服务会话。 */
 export async function loadInbox(
   query: Partial<LoadInboxInput> = {},
 ): Promise<InboxData> {
   const inbox = await loadInboxBound({
     partition: query.partition ?? InboxPartition.InboxPartitionAll,
-    scope: query.scope ?? InboxScope.InboxScopeAll,
-    customerView:
-      query.customerView ?? CustomerInboxView.CustomerInboxViewQueue,
-    queueFilter: query.queueFilter ?? CustomerQueueFilter.CustomerQueueFilterAll,
+    scope: query.scope ?? InboxScope.InboxScopePending,
+    pendingKind: query.pendingKind ?? InboxPendingKind.$zero,
+    queueFilter: query.queueFilter ?? CustomerQueueFilter.$zero,
     queueTeamId: query.queueTeamId ?? "",
-    assigneeIdentityId: query.assigneeIdentityId ?? "",
     channelId: query.channelId ?? "",
-    serviceStatus: query.serviceStatus ?? ServiceSessionStatus.ServiceSessionStatusOpen,
+    audience: query.audience ?? ServiceAudience.$zero,
+    serviceStatus: query.serviceStatus ?? ServiceSessionStatus.$zero,
+    assigneeFilter: query.assigneeFilter ?? InboxAssigneeFilter.$zero,
+    assigneeIdentityId: query.assigneeIdentityId ?? "",
     kinds: query.kinds ?? [],
     search: query.search ?? "",
     searchRange: query.searchRange ?? InboxSearchRange.InboxSearchRangeList,
@@ -649,13 +652,15 @@ export function searchInbox(input: Partial<InboxSearchInput>, signal?: AbortSign
     query: input.query ?? "",
     range: input.range ?? InboxSearchRange.InboxSearchRangeReadable,
     conversationId: input.conversationId ?? "",
-    scope: input.scope ?? InboxScope.InboxScopeAll,
-    customerView: input.customerView ?? CustomerInboxView.CustomerInboxViewQueue,
-    queueFilter: input.queueFilter ?? CustomerQueueFilter.CustomerQueueFilterAll,
+    scope: input.scope ?? InboxScope.$zero,
+    pendingKind: input.pendingKind ?? InboxPendingKind.$zero,
+    queueFilter: input.queueFilter ?? CustomerQueueFilter.$zero,
     queueTeamId: input.queueTeamId ?? "",
-    assigneeIdentityId: input.assigneeIdentityId ?? "",
     channelId: input.channelId ?? "",
-    serviceStatus: input.serviceStatus ?? ServiceSessionStatus.ServiceSessionStatusOpen,
+    audience: input.audience ?? ServiceAudience.$zero,
+    serviceStatus: input.serviceStatus ?? ServiceSessionStatus.$zero,
+    assigneeFilter: input.assigneeFilter ?? InboxAssigneeFilter.$zero,
+    assigneeIdentityId: input.assigneeIdentityId ?? "",
     kinds: input.kinds ?? [],
   }, signal)
 }

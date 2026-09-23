@@ -653,9 +653,9 @@ func TestRealtimeCustomerInboxNotifications(t *testing.T) {
 		version := loadConversationVersion(t, f.db, f.conversationID)
 		return []receivedNotification{feed.customerInbox(f.conversationID, version), feed.visitorDirectory(visitorIdentityID, f.conversationID, version)}
 	}
-	// listed 判断客户会话是否出现在指定客服的处理视图中。
-	listed := func(identity *servermodels.Identity, view domain.CustomerInboxView, status domain.ServiceSessionStatus) bool {
-		page, _, err := inbox.Execute(ctx, identity, inboxaction.LoadInput{Scope: domain.InboxScopeCustomer, CustomerView: view, ServiceStatus: status})
+	// listed 判断客户会话是否出现在指定客服的会话列表中。
+	listed := func(identity *servermodels.Identity, input inboxaction.LoadInput) bool {
+		page, _, err := inbox.Execute(ctx, identity, input)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -676,12 +676,14 @@ func TestRealtimeCustomerInboxNotifications(t *testing.T) {
 	}
 	feed.expect(t, changed()...)
 
-	// 领取后公共队列移除、本人与同事视图出现，筛选迁移不影响双方按 ID 阅读。
+	// 领取后移出双方的待领取、进入负责人的等我回复并按负责人筛出，筛选迁移不影响双方按 ID 阅读。
 	if _, err := claim.Execute(ctx, f.owner, f.conversationID); err != nil {
 		t.Fatal(err)
 	}
 	feed.expect(t, changed()...)
-	if listed(f.owner, domain.CustomerInboxViewQueue, domain.ServiceSessionStatusOpen) || listed(f.member, domain.CustomerInboxViewQueue, domain.ServiceSessionStatusOpen) || !listed(f.owner, domain.CustomerInboxViewMine, domain.ServiceSessionStatusOpen) || !listed(f.member, domain.CustomerInboxViewCoworkers, domain.ServiceSessionStatusOpen) {
+	queued := inboxaction.LoadInput{Scope: domain.InboxScopePending, PendingKind: domain.InboxPendingKindQueue}
+	ownedByOwner := inboxaction.LoadInput{Scope: domain.InboxScopeAll, AssigneeFilter: domain.InboxAssigneeFilterIdentity, AssigneeIdentityID: f.owner.OrganizationIdentity.ID}
+	if listed(f.owner, queued) || listed(f.member, queued) || !listed(f.owner, inboxaction.LoadInput{Scope: domain.InboxScopePending, PendingKind: domain.InboxPendingKindReply}) || !listed(f.member, ownedByOwner) {
 		t.Fatal("claimed conversation views did not converge")
 	}
 	for _, identity := range []*servermodels.Identity{f.owner, f.member} {
@@ -726,7 +728,7 @@ func TestRealtimeCustomerInboxNotifications(t *testing.T) {
 		t.Fatal(err)
 	}
 	feed.expect(t, changed()...)
-	if !listed(f.member, domain.CustomerInboxViewMine, domain.ServiceSessionStatusClosed) {
+	if !listed(f.member, inboxaction.LoadInput{Scope: domain.InboxScopeAll, AssigneeFilter: domain.InboxAssigneeFilterIdentity, AssigneeIdentityID: f.member.OrganizationIdentity.ID, ServiceStatus: domain.ServiceSessionStatusClosed}) {
 		t.Fatal("closed conversation missing from closed view")
 	}
 	if _, err := reopen.Execute(ctx, f.member, f.conversationID); err != nil {

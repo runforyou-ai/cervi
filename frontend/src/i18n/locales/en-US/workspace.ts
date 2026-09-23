@@ -6,7 +6,7 @@ const workspace = {
   railOpen: "Expand the navigation sidebar",
   historyBack: "Back",
   historyForward: "Forward",
-  inbox: "Messages",
+  inbox: "Inbox",
   agents: "AI employees",
   contacts: "Contacts",
   settings: "Settings",

@@ -1,25 +1,33 @@
 package domain
 
-// InboxScope 定义统一收件箱读取范围。
+// InboxScope 定义会话列表读取范围：pending 为需要本人处理的服务会话，all 为全部服务会话，chat 为本人参与的群聊与单聊。
 type InboxScope string
 
 const (
-	InboxScopeAll      InboxScope = "all"
-	InboxScopeCustomer InboxScope = "customer"
-	InboxScopeInternal InboxScope = "internal"
+	InboxScopePending InboxScope = "pending"
+	InboxScopeAll     InboxScope = "all"
+	InboxScopeChat    InboxScope = "chat"
 )
 
-// CustomerInboxView 定义客户会话的处理归属视图。
-type CustomerInboxView string
+// InboxPendingKind 定义待处理条目的类型：reply 为等我回复，queue 为待领取，mention 为内部备注提醒本人。
+type InboxPendingKind string
 
 const (
-	CustomerInboxViewQueue     CustomerInboxView = "queue"
-	CustomerInboxViewMine      CustomerInboxView = "mine"
-	CustomerInboxViewCoworkers CustomerInboxView = "coworkers"
-	CustomerInboxViewMentioned CustomerInboxView = "mentioned"
+	InboxPendingKindReply   InboxPendingKind = "reply"
+	InboxPendingKindQueue   InboxPendingKind = "queue"
+	InboxPendingKindMention InboxPendingKind = "mention"
 )
 
-// CustomerQueueFilter 定义「待分配」视图的队列筛选：all 为全部队列，public 为公共队列，team 为指定团队。
+// InboxAssigneeFilter 定义服务会话的负责人筛选：all 为不限，unassigned 为未分配，identity 为指定企业身份。
+type InboxAssigneeFilter string
+
+const (
+	InboxAssigneeFilterAll        InboxAssigneeFilter = "all"
+	InboxAssigneeFilterUnassigned InboxAssigneeFilter = "unassigned"
+	InboxAssigneeFilterIdentity   InboxAssigneeFilter = "identity"
+)
+
+// CustomerQueueFilter 定义待领取条目的队列筛选：all 为本人可领取的全部队列，public 为公共队列，team 为指定团队。
 type CustomerQueueFilter string
 
 const (

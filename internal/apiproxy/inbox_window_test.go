@@ -18,7 +18,7 @@ import (
 // TestBackendInboxWindow 验证原生端窗口请求、原边界和独立锚点头像归一化。
 func TestBackendInboxWindow(t *testing.T) {
 	filter := appservice.InboxQuery{
-		Scope: appservice.InboxScopeCustomer, CustomerView: appservice.CustomerInboxViewCoworkers, AssigneeIdentityID: "peer",
+		Scope: appservice.InboxScopeAll, AssigneeFilter: appservice.InboxAssigneeFilterIdentity, AssigneeIdentityID: "peer", Audience: appservice.ServiceAudienceCustomer,
 		ChannelID: "channel", ServiceStatus: appservice.ServiceSessionStatusClosed, Kinds: []appservice.ConversationType{appservice.ConversationTypeCustomer},
 	}
 	contextInput := appservice.InboxContextInput{Query: filter, AnchorID: "anchor", AnchorCursor: "old", BeforeLimit: 3, AfterLimit: 5}

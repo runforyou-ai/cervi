@@ -469,7 +469,7 @@ func TestFileRequestURLs(t *testing.T) {
 func TestBackendInboxPagination(t *testing.T) {
 	remote := httptest.NewServer(http.HandlerFunc(func(writer http.ResponseWriter, request *http.Request) {
 		query := request.URL.Query()
-		if request.URL.Path != "/api/inbox" || query.Get("scope") != "customer" || query.Get("customerView") != "coworkers" || query.Get("assigneeIdentityId") != "peer" ||
+		if request.URL.Path != "/api/inbox" || query.Get("scope") != "all" || query.Get("assigneeFilter") != "identity" || query.Get("assigneeIdentityId") != "peer" || query.Get("audience") != "customer" ||
 			query.Get("channelId") != "channel" || query.Get("serviceStatus") != "closed" || !slices.Equal(query["kinds"], []string{"customer"}) ||
 			(query.Get("cursor") != "boundary-value" || query.Get("beforeCursor") != "") && (query.Get("beforeCursor") != "boundary-value" || query.Get("cursor") != "") || query.Get("limit") != "7" || request.Header.Get("Authorization") != "Bearer page-token" {
 			t.Errorf("request=%s authorization=%s", request.URL, request.Header.Get("Authorization"))
@@ -483,7 +483,7 @@ func TestBackendInboxPagination(t *testing.T) {
 	}
 	for _, before := range []bool{false, true} {
 		input := appservice.LoadInboxInput{
-			Scope: appservice.InboxScopeCustomer, CustomerView: appservice.CustomerInboxViewCoworkers, AssigneeIdentityID: "peer",
+			Scope: appservice.InboxScopeAll, AssigneeFilter: appservice.InboxAssigneeFilterIdentity, AssigneeIdentityID: "peer", Audience: appservice.ServiceAudienceCustomer,
 			ChannelID: "channel", ServiceStatus: appservice.ServiceSessionStatusClosed, Kinds: []appservice.ConversationType{appservice.ConversationTypeCustomer},
 			Cursor: "boundary-value", Limit: 7,
 		}

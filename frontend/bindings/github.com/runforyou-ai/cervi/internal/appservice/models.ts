@@ -1354,21 +1354,6 @@ export interface CustomerInboxConversation {
 }
 
 /**
- * CustomerInboxView 表示客户会话的处理归属视图。
- */
-export enum CustomerInboxView {
-    /**
-     * The Go zero value for the underlying type of the enum.
-     */
-    $zero = "",
-
-    CustomerInboxViewQueue = "queue",
-    CustomerInboxViewMine = "mine",
-    CustomerInboxViewCoworkers = "coworkers",
-    CustomerInboxViewMentioned = "mentioned",
-};
-
-/**
  * CustomerMessageDelivery 定义成员可见的外部投递结果。
  */
 export interface CustomerMessageDelivery {
@@ -1381,7 +1366,7 @@ export interface CustomerMessageDelivery {
 }
 
 /**
- * CustomerQueueFilter 表示「待分配」视图的队列筛选。
+ * CustomerQueueFilter 表示待领取条目的队列筛选。
  */
 export enum CustomerQueueFilter {
     /**
@@ -1868,9 +1853,9 @@ export interface Inbox {
     "attentionUnreadCount": number;
 
     /**
-     * CustomerMentionedUnreadCount 是处理中客户会话的当前周期内提醒本人且尚未读到的消息数。
+     * PendingCount 是本人全部待处理条目数，不受当前筛选影响。
      */
-    "customerMentionedUnreadCount": number;
+    "pendingCount": number;
 }
 
 /**
@@ -1882,6 +1867,20 @@ export interface InboxAssignee {
     "displayName": string;
     "avatarUrl": string;
 }
+
+/**
+ * InboxAssigneeFilter 表示服务会话的负责人筛选：all 为不限，unassigned 为未分配，identity 为指定企业身份。
+ */
+export enum InboxAssigneeFilter {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    InboxAssigneeFilterAll = "all",
+    InboxAssigneeFilterUnassigned = "unassigned",
+    InboxAssigneeFilterIdentity = "identity",
+};
 
 /**
  * InboxChannel 定义收件箱渠道筛选候选。
@@ -1946,6 +1945,11 @@ export interface InboxConversation {
     "customer": CustomerInboxConversation | null;
     "direct": DirectInboxConversation | null;
     "group": GroupInboxConversation | null;
+
+    /**
+     * Pending 只在待处理范围的列表项中返回。
+     */
+    "pending": InboxPendingItem | null;
 }
 
 /**
@@ -1993,24 +1997,49 @@ export enum InboxPartition {
 };
 
 /**
- * InboxQuery 定义与分页边界无关的会话筛选；search 非空时按会话名称搜索，searchRange 为 list 时沿用列表筛选，为 readable 时覆盖全部可读会话且不带其他列表筛选。
+ * InboxPendingItem 定义待处理条目的类型、等待起点，以及当前周期内是否有提醒本人且尚未回应的内部备注。
+ */
+export interface InboxPendingItem {
+    "kind": InboxPendingKind;
+    "since": string;
+    "mentioned": boolean;
+}
+
+/**
+ * InboxPendingKind 表示待处理条目的类型：reply 为等我回复，queue 为待领取，mention 为内部备注提醒本人。
+ */
+export enum InboxPendingKind {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    InboxPendingKindReply = "reply",
+    InboxPendingKindQueue = "queue",
+    InboxPendingKindMention = "mention",
+};
+
+/**
+ * InboxQuery 定义与分页边界无关的会话列表范围与筛选；pendingKind 与队列筛选只在待处理范围生效，pendingKind 为 mention 时包含同时等我回复或待领取但有提醒本人的条目，服务状态与负责人筛选只在全部范围生效，来源与服务对象在两个服务会话范围生效，kinds 只在聊天范围生效；search 非空时按会话名称搜索，searchRange 为 list 时沿用列表范围，为 readable 时覆盖全部可读会话且不带范围与筛选。
  */
 export interface InboxQuery {
     "partition": InboxPartition;
     "scope": InboxScope;
-    "customerView": CustomerInboxView;
+    "pendingKind": InboxPendingKind;
     "queueFilter": CustomerQueueFilter;
     "queueTeamId": string;
-    "assigneeIdentityId": string;
     "channelId": string;
+    "audience": ServiceAudience;
     "serviceStatus": ServiceSessionStatus;
+    "assigneeFilter": InboxAssigneeFilter;
+    "assigneeIdentityId": string;
     "kinds": ConversationType[] | null;
     "search": string;
     "searchRange": InboxSearchRange;
 }
 
 /**
- * InboxScope 表示统一收件箱读取范围。
+ * InboxScope 表示会话列表读取范围：pending 为待处理服务会话，all 为全部服务会话，chat 为本人参与的群聊与单聊。
  */
 export enum InboxScope {
     /**
@@ -2018,25 +2047,27 @@ export enum InboxScope {
      */
     $zero = "",
 
+    InboxScopePending = "pending",
     InboxScopeAll = "all",
-    InboxScopeCustomer = "customer",
-    InboxScopeInternal = "internal",
+    InboxScopeChat = "chat",
 };
 
 /**
- * InboxSearchInput 定义检索文本与范围；列表筛选只在 list 范围生效，会话编号只在 conversation 范围生效。
+ * InboxSearchInput 定义检索文本与范围；列表范围与筛选只在 list 范围生效，会话编号只在 conversation 范围生效。
  */
 export interface InboxSearchInput {
     "query": string;
     "range": InboxSearchRange;
     "conversationId": string;
     "scope": InboxScope;
-    "customerView": CustomerInboxView;
+    "pendingKind": InboxPendingKind;
     "queueFilter": CustomerQueueFilter;
     "queueTeamId": string;
-    "assigneeIdentityId": string;
     "channelId": string;
+    "audience": ServiceAudience;
     "serviceStatus": ServiceSessionStatus;
+    "assigneeFilter": InboxAssigneeFilter;
+    "assigneeIdentityId": string;
     "kinds": ConversationType[] | null;
 }
 
@@ -2526,17 +2557,19 @@ export interface KnowledgeWebDocumentInput {
 }
 
 /**
- * LoadInboxInput 定义统一收件箱筛选、会话名称搜索和分页边界。
+ * LoadInboxInput 定义会话列表范围、筛选、会话名称搜索和分页边界。
  */
 export interface LoadInboxInput {
     "partition": InboxPartition;
     "scope": InboxScope;
-    "customerView": CustomerInboxView;
+    "pendingKind": InboxPendingKind;
     "queueFilter": CustomerQueueFilter;
     "queueTeamId": string;
-    "assigneeIdentityId": string;
     "channelId": string;
+    "audience": ServiceAudience;
     "serviceStatus": ServiceSessionStatus;
+    "assigneeFilter": InboxAssigneeFilter;
+    "assigneeIdentityId": string;
     "kinds": ConversationType[] | null;
     "search": string;
     "searchRange": InboxSearchRange;
@@ -2911,7 +2944,7 @@ export interface ProfileInput {
 }
 
 /**
- * ReadInboxConversationsInput 指定待核对的会话及完整列表筛选。
+ * ReadInboxConversationsInput 指定待核对的会话及完整列表筛选；未指定范围与搜索词时只核对阅读资格。
  */
 export interface ReadInboxConversationsInput {
     "conversationIds": string[] | null;
@@ -3003,6 +3036,20 @@ export interface RoleSummary {
     "kind": RoleKind;
     "name": string;
 }
+
+/**
+ * ServiceAudience 表示服务对象：customer 为外部客户，employee 为本企业员工，partner 为伙伴。
+ */
+export enum ServiceAudience {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    ServiceAudienceCustomer = "customer",
+    ServiceAudienceEmployee = "employee",
+    ServiceAudiencePartner = "partner",
+};
 
 /**
  * ServiceQueueTeam 定义可作为客服队列的团队。

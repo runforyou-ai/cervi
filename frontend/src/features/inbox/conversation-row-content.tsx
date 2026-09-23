@@ -3,7 +3,9 @@ import { BellOffIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
 import {
+  InboxPendingKind,
   isAgentInboxConversation,
+  isCustomerInboxConversation,
   isInternalInboxConversation,
   type InboxConversation,
 } from "@/api"
@@ -17,7 +19,7 @@ import {
   inboxConversationSummary,
 } from "@/features/inbox/conversation-preview"
 import { ConversationUnreadBadge } from "@/features/inbox/conversation-unread-badge"
-import { useConversationTime } from "@/features/inbox/use-conversation-time"
+import { useConversationTime, useWaitingDuration } from "@/features/inbox/use-conversation-time"
 import { cn } from "@/lib/utils"
 
 /** compact 用于桌面端中栏，touch 用于移动端触屏列表。 */
@@ -42,26 +44,38 @@ const densityClasses = {
   },
 } as const
 
-/** 渲染会话列表项内容；queueTeamName 显示在名称后，selected 时时间与摘要使用选中配色，showAssignee 时摘要行末显示负责人。 */
+/** 渲染会话列表项内容；selected 时时间与摘要使用选中配色，showAssignee 时摘要行末显示负责人，showAudience 时名称后标明服务对象；待处理条目以等待时长代替时间，摘要前显示条目类型，另有未回应的提醒时再标 @我。 */
 export function ConversationRowContent({
   conversation,
   name,
   density,
   selected = false,
   showAssignee,
-  queueTeamName = null,
+  showAudience = false,
 }: {
   conversation: InboxConversation
   name: string
   density: keyof typeof densityClasses
   selected?: boolean
   showAssignee: boolean
-  queueTeamName?: string | null
+  showAudience?: boolean
 }) {
   const { t } = useTranslation("inbox")
   const formatTime = useConversationTime()
+  const formatWaiting = useWaitingDuration()
   const summary = inboxConversationSummary(conversation)
   if (!summary) return null
+  const pending = conversation.pending
+  // 待领取条目标明所属队列，团队队列取团队名称。
+  const pendingLabel = !pending
+    ? ""
+    : pending.kind === InboxPendingKind.InboxPendingKindReply
+      ? t("pendingKindReply")
+      : pending.kind === InboxPendingKind.InboxPendingKindMention
+        ? t("pendingKindMention")
+        : t("pendingKindQueueNamed", {
+            queue: (isCustomerInboxConversation(conversation) ? conversation.customer.teamName : null) ?? t("queueFilterPublicQueue"),
+          })
   const classes = densityClasses[density]
   const agentRunLabel = agentRunStatusLabel(
     isAgentInboxConversation(conversation)
@@ -70,7 +84,7 @@ export function ConversationRowContent({
     t,
   )
   const preview = conversationPreview(conversation, t)
-  const formattedTime = formatTime(summary.lastMessageAt)
+  const formattedTime = pending ? formatWaiting(pending.since) : formatTime(summary.lastMessageAt)
   const selectedTint = selected && "text-accent-foreground/75"
   return (
     <>
@@ -89,15 +103,15 @@ export function ConversationRowContent({
                 {agentRunLabel}
               </span>
             ) : null}
-            {queueTeamName ? (
-              <span className={cn("max-w-24 shrink-0 truncate text-muted-foreground", classes.meta)}>
-                {queueTeamName}
+            {showAudience && isCustomerInboxConversation(conversation) ? (
+              <span className={cn("shrink-0 text-muted-foreground", classes.meta)}>
+                {t("audienceCustomer")}
               </span>
             ) : null}
           </span>
           {formattedTime ? (
             <time
-              dateTime={summary.lastMessageAt ?? undefined}
+              dateTime={(pending ? pending.since : summary.lastMessageAt) ?? undefined}
               className={cn("shrink-0 text-muted-foreground", classes.meta, selectedTint)}
             >
               {formattedTime}
@@ -105,6 +119,26 @@ export function ConversationRowContent({
           ) : null}
         </span>
         <span className={cn("flex min-w-0 items-center", classes.gap, classes.secondLine)}>
+          {pendingLabel ? (
+            <span
+              className={cn(
+                "max-w-32 shrink-0 truncate rounded px-1 font-medium",
+                classes.meta,
+                pending?.kind === InboxPendingKind.InboxPendingKindReply
+                  ? "bg-destructive/10 text-destructive"
+                  : pending?.kind === InboxPendingKind.InboxPendingKindMention
+                    ? "bg-primary/10 text-primary"
+                    : "bg-muted text-muted-foreground",
+              )}
+            >
+              {pendingLabel}
+            </span>
+          ) : null}
+          {pending?.mentioned && pending.kind !== InboxPendingKind.InboxPendingKindMention ? (
+            <span className={cn("shrink-0 rounded bg-primary/10 px-1 font-medium text-primary", classes.meta)}>
+              {t("pendingKindMention")}
+            </span>
+          ) : null}
           <span
             title={preview}
             className={cn("min-w-0 flex-1 truncate text-muted-foreground", classes.preview, selectedTint)}

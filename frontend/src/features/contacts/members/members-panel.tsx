@@ -194,7 +194,7 @@ export function MembersPanel({
                     label: t("sendMessage"),
                     disabled: user.status !== UserStatus.UserStatusActive,
                     onSelect: () =>
-                      navigate(`/inbox?scope=internal&target=${user.identityId}`),
+                      navigate(`/chats?target=${user.identityId}`),
                   },
                 ]
               : []),

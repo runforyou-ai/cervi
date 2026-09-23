@@ -26,7 +26,7 @@ function useInboxPartition(input: InboxQuery, viewport: InboxListViewport, optio
   const { identity, active, history } = options
   const client = useQueryClient()
   const realtime = useRealtimeSyncActive()
-  const query = useMemo(() => input, [input.partition, input.scope, input.customerView, input.queueFilter, input.queueTeamId, input.assigneeIdentityId, input.channelId, input.serviceStatus, input.kinds?.join(","), input.search, input.searchRange])
+  const query = useMemo(() => input, [input.partition, input.scope, input.pendingKind, input.queueFilter, input.queueTeamId, input.channelId, input.audience, input.serviceStatus, input.assigneeFilter, input.assigneeIdentityId, input.kinds?.join(","), input.search, input.searchRange])
   const owner = useMemo(() => ({ organizationId: identity.organization.id, userId: identity.user.id }), [identity.organization.id, identity.user.id])
   const view = useId()
   const headKey = resourceKeys.inbox({ ...owner, ...query })
@@ -138,16 +138,19 @@ function bindViewport(viewport: InboxListViewport, positions: InboxPartitionView
   }
 }
 
-/** 按完整活动序读取一条列表，不区分置顶。 */
+/** 按查询自身的排序读取一条列表，不区分置顶；settlePin 在置顶写入后重读列表。 */
 export function useInboxList(input: InboxQuery, viewport: InboxListViewport, options: InboxListOptions) {
   const list = useInboxPartition(input, viewport, options)
   bindViewport(viewport, list.state.positions, [list], list)
+  const controller = list.controller
+  const settlePin = useCallback((_pinned: boolean) => controller.refreshOwnWrite(), [controller])
   return {
     ...list.state,
     conversations: list.conversations,
     pinnedIds: [] as string[],
     request: list.controller.request,
     retry: list.controller.retry,
+    settlePin,
   }
 }
 

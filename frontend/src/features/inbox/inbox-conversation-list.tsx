@@ -2,7 +2,6 @@
 import { useNavigate } from "react-router"
 
 import {
-  isCustomerInboxConversation,
   isInternalInboxConversation,
   updateConversationUnreadMark,
   type InboxConversation,
@@ -29,7 +28,7 @@ import { cn } from "@/lib/utils"
 type ConversationRowProps = {
   conversation: InboxConversation
   name: string
-  showQueueTeam: boolean
+  showAudience: boolean
   showAssignee: boolean
   selected: boolean
   actions: ReturnType<typeof useConversationListActions>
@@ -44,7 +43,7 @@ type ConversationRowProps = {
 function ConversationRow({
   conversation,
   name,
-  showQueueTeam,
+  showAudience,
   showAssignee,
   selected,
   actions,
@@ -57,11 +56,6 @@ function ConversationRow({
   const navigate = useNavigate()
   const invalidate = useResourceInvalidator()
   if (!inboxConversationSummary(conversation)) return null
-  // 按全部队列查看待分配会话时标明所属团队队列，公共队列不加标签。
-  const queueTeamName =
-    showQueueTeam && isCustomerInboxConversation(conversation)
-      ? conversation.customer.teamName
-      : null
   const isInternal = isInternalInboxConversation(conversation)
   return (
     <ConversationListMenu
@@ -118,7 +112,7 @@ function ConversationRow({
             density="compact"
             selected={selected}
             showAssignee={showAssignee}
-            queueTeamName={queueTeamName}
+            showAudience={showAudience}
           />
         </button>
     </ConversationListMenu>
@@ -131,10 +125,10 @@ function SortableConversationRow(props: ConversationRowProps) {
   return <ConversationRow {...props} sortable={sortable} />
 }
 
-/** 会话列表，置顶区在前且可在区内排序；showQueueTeam 为真时客户会话名称后显示所属团队队列，showAssignee 为真时客户会话摘要行末显示负责人小头像，传入 onOpenInWindow 时双击会话项在独立窗口打开该会话。 */
+/** 会话列表，置顶区在前且可在区内排序；showAudience 为真时名称后标明服务对象，showAssignee 为真时客户会话摘要行末显示负责人小头像，传入 onOpenInWindow 时双击会话项在独立窗口打开该会话。 */
 export function InboxConversationList({
   conversations,
-  showQueueTeam,
+  showAudience,
   showAssignee,
   pinnedIds,
   pinOrderVersion,
@@ -146,7 +140,7 @@ export function InboxConversationList({
   onOpenInWindow,
 }: {
   conversations: InboxConversation[]
-  showQueueTeam: boolean
+  showAudience: boolean
   showAssignee: boolean
   pinnedIds: string[]
   pinOrderVersion: string
@@ -170,7 +164,7 @@ export function InboxConversationList({
   const row = (conversation: InboxConversation) => ({
     conversation,
     name: names.get(conversation.id) ?? "",
-    showQueueTeam,
+    showAudience,
     showAssignee,
     selected: selectedId === conversation.id,
     actions,

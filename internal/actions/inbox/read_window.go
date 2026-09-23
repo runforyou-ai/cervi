@@ -31,7 +31,7 @@ func (q *LoadInboxQuery) ReadWindow(ctx context.Context, identity *servermodels.
 	if err != nil {
 		return ConversationWindow{}, err
 	}
-	if compareInboxPoints(query.Partition, start.inboxCursorPoint, end.inboxCursorPoint) > 0 {
+	if compareInboxPoints(query.order(), start.inboxCursorPoint, end.inboxCursorPoint) > 0 {
 		return ConversationWindow{}, ErrQueryInvalid
 	}
 	var window ConversationWindow
@@ -47,10 +47,10 @@ func (q *LoadInboxQuery) ReadWindow(ctx context.Context, identity *servermodels.
 		if err := authorizeInboxCursor(end, query.Partition, pinOrderVersion); err != nil {
 			return err
 		}
-		candidates := constrainInboxPoint(snapshot.candidatePointsQuery(identity, query), query.Partition, start.inboxCursorPoint, false, true)
-		candidates = constrainInboxPoint(candidates, query.Partition, end.inboxCursorPoint, true, true)
+		candidates := constrainInboxPoint(snapshot.candidatePointsQuery(identity, query), query.order(), start.inboxCursorPoint, false, true)
+		candidates = constrainInboxPoint(candidates, query.order(), end.inboxCursorPoint, true, true)
 		var points []inboxCursorPoint
-		if err := orderInboxPoints(candidates, query.Partition, false).Scan(ctx, &points); err != nil {
+		if err := orderInboxPoints(candidates, query.order(), false).Scan(ctx, &points); err != nil {
 			return err
 		}
 		// 保留请求的范围，空区间也能继续重试或向两侧查找邻域。

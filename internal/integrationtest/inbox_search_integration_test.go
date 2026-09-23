@@ -128,8 +128,8 @@ func TestInboxSearch(t *testing.T) {
 		t.Fatalf("AI 员工检索未命中：%+v", agents.People)
 	}
 
-	customerList := search(f.owner, inboxaction.SearchInput{Text: "changchun", Range: inboxaction.SearchRangeList, List: inboxaction.LoadInput{Scope: domain.InboxScopeCustomer}})
-	internalList := search(f.owner, inboxaction.SearchInput{Text: "changchun", Range: inboxaction.SearchRangeList, List: inboxaction.LoadInput{Scope: domain.InboxScopeInternal}})
+	customerList := search(f.owner, inboxaction.SearchInput{Text: "changchun", Range: inboxaction.SearchRangeList, List: inboxaction.LoadInput{Scope: domain.InboxScopeAll}})
+	internalList := search(f.owner, inboxaction.SearchInput{Text: "changchun", Range: inboxaction.SearchRangeList, List: inboxaction.LoadInput{Scope: domain.InboxScopeChat}})
 	if len(customerList.Messages) != 0 || !slices.Contains(messageIDs(internalList), trip.ID) {
 		t.Fatalf("列表范围不正确：customer=%v internal=%v", messageIDs(customerList), messageIDs(internalList))
 	}

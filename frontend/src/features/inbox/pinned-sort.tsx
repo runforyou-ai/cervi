@@ -85,7 +85,7 @@ export function PinnedConversationList<T extends InboxConversation>({
   names: Map<string, string>
   pinOrderVersion: string
   actions: ReturnType<typeof useConversationListActions>
-  onDraggingChange: (active: boolean) => void
+  onDraggingChange?: (active: boolean) => void
   renderPinned: (conversation: T, order: string[], index: number) => ReactNode
   renderRow: (conversation: T) => ReactNode
 }) {
@@ -129,7 +129,7 @@ function PinnedSortArea({
   names: Map<string, string>
   pinOrderVersion: string
   actions: ReturnType<typeof useConversationListActions>
-  onDraggingChange: (active: boolean) => void
+  onDraggingChange?: (active: boolean) => void
   children: (order: string[]) => ReactNode
 }) {
   const { t } = useTranslation("inbox")
@@ -150,7 +150,7 @@ function PinnedSortArea({
 
   /** 把放下位置转成相对可见邻居的位置命令并保存。 */
   function drop({ active, over }: DragEndEvent) {
-    onDraggingChange(false)
+    onDraggingChange?.(false)
     const conversation = conversations.find((row) => row.id === String(active.id))
     const to = over ? order.indexOf(String(over.id)) : -1
     const command = pinMoveCommand(order, String(active.id), to, pinOrderVersion)
@@ -175,9 +175,9 @@ function PinnedSortArea({
           onDragCancel: ({ active }) => announce("pinSortCancelled", active.id),
         },
       }}
-      onDragStart={() => onDraggingChange(true)}
+      onDragStart={() => onDraggingChange?.(true)}
       onDragEnd={drop}
-      onDragCancel={() => onDraggingChange(false)}
+      onDragCancel={() => onDraggingChange?.(false)}
     >
       <SortableContext items={order} strategy={verticalListSortingStrategy}>
         {children(order)}
