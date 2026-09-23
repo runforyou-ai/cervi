@@ -2,6 +2,9 @@
 const mobile = {
   refreshFailed: "Refresh failed",
   apply: "Apply filters",
+  filterSummary: "Filter: {{summary}}",
+  listLoadError: "Could not load conversations. Check your connection and try again.",
+  clearSearch: "Clear search",
   logout: "Log out",
   loggingOut: "Logging out…",
   logoutError: "Could not log out. Please try again.",
@@ -52,22 +55,20 @@ const mobile = {
   },
   tabs: {
     label: "Main navigation",
+    chats: "Messages",
+    inbox: "Inbox",
     contacts: "Contacts",
-    inbox: "Messages",
     me: "Me",
   },
-  inbox: {
-    add: "Add",
-    assigneesRetry: "Could not load assignees. Retry",
-    allCoworkers: "All coworkers",
-    selectedAssignee: "Selected assignee",
-    assignee: "Assignee",
-    filterSummary: "Filter: {{summary}}",
+  chats: {
     title: "Messages",
-    loadError: "Could not load messages. Check your connection and try again.",
+    add: "Add",
     emptyTitle: "No conversations",
-    emptyDescription: "No conversations match this category and its filters.",
-    clearSearch: "Clear search",
+    emptyDescription: "No conversations match these filters.",
+  },
+  inbox: {
+    title: "Inbox",
+    selectedAssignee: "Selected assignee",
   },
   group: {
     addMembers: "Add group members",

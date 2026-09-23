@@ -18,7 +18,7 @@ export function ConversationUnreadBadge({
       className={cn(
         "absolute rounded-full ring-2 ring-background",
         conversation.unreadCount > 0
-          ? "-top-1.5 -right-1.5 flex min-w-5 items-center justify-center gap-0.5 px-1 text-[10px] font-semibold leading-5"
+          ? "-top-1 -right-1.5 flex h-4 min-w-4 items-center justify-center gap-0.5 px-1 text-[10px] leading-none font-semibold tabular-nums"
           : "-top-0.5 -right-0.5 size-2.5",
         conversation.muted
           ? "bg-muted text-muted-foreground"

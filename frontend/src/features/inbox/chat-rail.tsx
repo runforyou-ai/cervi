@@ -172,7 +172,7 @@ function ChatRailItem({
             <span className="shrink-0 text-xs font-semibold text-destructive" aria-label={t("railMentioned")}>@</span>
           ) : null}
           {conversation.unreadCount > 0 ? (
-            <CountBadge count={conversation.unreadCount} muted={conversation.muted} />
+            <CountBadge count={conversation.unreadCount} tone={conversation.muted ? "muted" : "alert"} />
           ) : conversation.markedUnread ? (
             <span className="size-2 shrink-0 rounded-full bg-destructive" aria-label={t("conversationMarkedUnread")} />
           ) : null}

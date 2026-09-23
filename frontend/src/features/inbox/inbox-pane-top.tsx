@@ -43,7 +43,7 @@ export function InboxPaneTop({
           >
             <span className="truncate">{t(item.label)}</span>
             {item.value === InboxScope.InboxScopePending && pendingCount > 0 ? (
-              <CountBadge count={pendingCount} label={t("pendingCount", { count: pendingCount })} />
+              <CountBadge count={pendingCount} tone="neutral" label={t("pendingCount", { count: pendingCount })} />
             ) : null}
           </button>
         ))}

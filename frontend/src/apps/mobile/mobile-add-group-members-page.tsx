@@ -23,7 +23,7 @@ export function MobileAddGroupMembersPage() {
   const { group, canManage, busy, onSave } =
     useOutletContext<MobileGroupDetailsContext>()
   const { identity } = useMobileWorkspace()
-  const close = useMobileBack(`/inbox/group/${group.id}/details`)
+  const close = useMobileBack(`/chats/group/${group.id}/details`)
   const existingIDs = group.participants.map((member) => member.identityId)
   const remaining = Math.max(0, groupMemberMaxCount - existingIDs.length)
   const schema = z.object({
@@ -76,7 +76,7 @@ export function MobileAddGroupMembersPage() {
     <section className="flex h-full min-h-0 flex-col bg-background">
       <MobilePageHeader
         title={t("group.addMembers")}
-        backTo={`/inbox/group/${group.id}/details`}
+        backTo={`/chats/group/${group.id}/details`}
         backDisabled={busy}
       />
       <form

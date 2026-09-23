@@ -144,6 +144,7 @@ function WorkspaceMenu({
           icon={InboxIcon}
           collapsed={collapsed}
           count={pendingCount}
+          countTone="neutral"
           countLabel={t("inbox:pendingCount", { count: pendingCount })}
           onClick={onInboxClick}
         >

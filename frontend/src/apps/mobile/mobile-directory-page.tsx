@@ -52,7 +52,7 @@ export function MobileDirectoryPage({
         title={t(
           newConversation ? "inbox:newAgentConversation" : `contacts.${kind}`,
         )}
-        backTo={newConversation ? "/inbox" : "/contacts"}
+        backTo={newConversation ? "/chats" : "/contacts"}
       />
       <MobileSearchBar
         label={t(kind === "agents" ? "agents.search" : "contacts.search")}

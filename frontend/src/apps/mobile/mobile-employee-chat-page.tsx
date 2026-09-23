@@ -107,7 +107,7 @@ function MobileEmployeeChatLookup({
   ) {
     return (
       <Navigate
-        to={`/inbox/direct/${lookup.data.id}`}
+        to={`/chats/direct/${lookup.data.id}`}
         replace
         state={{
           ...location.state,
@@ -158,7 +158,7 @@ function MobileEmployeeDraft({ user }: { user: UserData }) {
   /** 首发确认后替换当前草稿路由。 */
   function handleCreated(conversation: DirectInboxConversationData) {
     if (alive.current) {
-      void navigate(`/inbox/direct/${conversation.id}`, {
+      void navigate(`/chats/direct/${conversation.id}`, {
         replace: true,
         state: { ...location.state, conversation, memberUserID: user.id },
       })

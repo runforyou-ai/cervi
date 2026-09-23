@@ -64,11 +64,11 @@ function MobileGroupConversation({
   // 记录当前群子页到来源列表的历史距离，退出时一次返回来源。
   const returnDepth =
     navigationState?.groupReturnDepth ?? (navigationState?.mobileBack ? 1 : 0)
-  const { inboxURL } = useMobileNavigation()
+  const { chatsURL } = useMobileNavigation()
   const invalidate = useResourceInvalidator()
   const leaving = useRef(false)
   const [leavePending, setLeavePending] = useState(false)
-  const detailsOpen = !useMatch("/inbox/group/:conversationID")
+  const detailsOpen = !useMatch("/chats/group/:conversationID")
   const pollingActive = useMemberChatPollingActive({
     requireWindowFocus: false,
   })
@@ -101,8 +101,8 @@ function MobileGroupConversation({
     toast.message(t("group.unavailable"))
     void invalidate(resourceKeys.inbox())
     if (returnDepth > 0) void navigate(-returnDepth)
-    else void navigate(inboxURL, { replace: true })
-  }, [conversationID, inboxURL, invalidate, navigate, outgoingStore, queue, returnDepth, t])
+    else void navigate(chatsURL, { replace: true })
+  }, [conversationID, chatsURL, invalidate, navigate, outgoingStore, queue, returnDepth, t])
 
   /** 主动退出后结束访问检测并返回来源列表。 */
   function handleLeft() {
@@ -110,7 +110,7 @@ function MobileGroupConversation({
     queue?.forgetConversation(conversationID)
     outgoingStore.forgetConversation(conversationID)
     if (returnDepth > 0) void navigate(-returnDepth)
-    else void navigate(inboxURL, { replace: true })
+    else void navigate(chatsURL, { replace: true })
   }
 
   useEffect(() => {
@@ -141,8 +141,8 @@ function MobileGroupConversation({
             detailsOpen && data
               ? undefined
               : detailsOpen
-                ? `/inbox/group/${conversationID}`
-                : inboxURL
+                ? `/chats/group/${conversationID}`
+                : chatsURL
           }
           title={
             detailsOpen ? (
@@ -180,7 +180,7 @@ function MobileGroupConversation({
                 aria-label={t("group.details")}
                 disabled={!data || detailsOpen}
                 onClick={() =>
-                  navigate(`/inbox/group/${conversationID}/details`, {
+                  navigate(`/chats/group/${conversationID}/details`, {
                     replace: returnDepth === 0,
                     state: {
                       mobileBack: returnDepth > 0,

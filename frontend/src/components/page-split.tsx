@@ -4,7 +4,7 @@ import type { LucideIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { NavLink, useLocation } from "react-router"
 
-import { CountBadge } from "@/components/count-badge"
+import { CountBadge, type CountBadgeTone } from "@/components/count-badge"
 import { StatusBadge } from "@/components/status-badge"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import {
@@ -117,6 +117,7 @@ export function PagePaneLink({
   comingSoonHint = true,
   count = 0,
   countLabel,
+  countTone = "alert",
   className: itemClassName,
   onClick,
   children,
@@ -130,6 +131,8 @@ export function PagePaneLink({
   count?: number
   /** 数量的无障碍说明。 */
   countLabel?: string
+  /** 数量徽标配色。 */
+  countTone?: CountBadgeTone
   className?: string
   onClick?: () => void
   children: ReactNode
@@ -156,9 +159,15 @@ export function PagePaneLink({
   // 展开时行尾显示数量，窄栏下在图标角上显示圆点。
   const badge = count > 0 ? (
     collapsed ? (
-      <span aria-label={countLabel} className="absolute top-1 right-1 size-1.5 rounded-full bg-destructive" />
+      <span
+        aria-label={countLabel}
+        className={cn(
+          "absolute top-1 right-1 size-1.5 rounded-full",
+          countTone === "neutral" ? "bg-foreground/50" : "bg-destructive",
+        )}
+      />
     ) : (
-      <CountBadge count={count} label={countLabel} />
+      <CountBadge count={count} label={countLabel} tone={countTone} />
     )
   ) : null
 

@@ -338,6 +338,44 @@ func TestInboxPendingScope(t *testing.T) {
 	}
 }
 
+// TestInboxPendingUnreadCount 验证待处理总数只随处理变化，有未读消息的待处理会话数随本人阅读减少、随客户新消息增加。
+func TestInboxPendingUnreadCount(t *testing.T) {
+	f := newCustomerReadFixture(t)
+	ctx := context.Background()
+	query := inboxaction.NewLoadInboxQuery(f.db)
+	// counts 读取成员当前的待处理总数与有未读消息的待处理会话数。
+	counts := func() (int, int) {
+		t.Helper()
+		_, counts, err := query.Execute(ctx, f.member, inboxaction.LoadInput{Scope: domain.InboxScopePending})
+		if err != nil {
+			t.Fatal(err)
+		}
+		return counts.Pending, counts.PendingUnread
+	}
+
+	received, err := f.visitorMessage(ctx, "有人吗")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if pending, unread := counts(); pending != 1 || unread != 1 {
+		t.Fatalf("before read pending=%d unread=%d", pending, unread)
+	}
+	// 阅读到最新消息后待处理仍在，未读会话数清零。
+	if _, err := conversationaction.NewMarkConversationReadAction(f.db).Execute(ctx, f.member, f.conversationID, received.Message.ID, false); err != nil {
+		t.Fatal(err)
+	}
+	if pending, unread := counts(); pending != 1 || unread != 0 {
+		t.Fatalf("after read pending=%d unread=%d", pending, unread)
+	}
+	// 客户再次来信后重新计入未读会话数。
+	if _, err := f.visitorMessage(ctx, "还在吗"); err != nil {
+		t.Fatal(err)
+	}
+	if pending, unread := counts(); pending != 1 || unread != 1 {
+		t.Fatalf("after new message pending=%d unread=%d", pending, unread)
+	}
+}
+
 // TestInboxPendingMentionAlongsideOtherKinds 验证提醒本人独立于条目类型：待领取或等我回复的会话同时被提醒时，行上标明提醒，筛选 @我 时包含该会话。
 func TestInboxPendingMentionAlongsideOtherKinds(t *testing.T) {
 	f := newCustomerReadFixture(t)

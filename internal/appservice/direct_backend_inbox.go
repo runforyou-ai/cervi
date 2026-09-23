@@ -69,7 +69,7 @@ func (o *directOperations) LoadInbox(ctx context.Context, meta RequestMeta, iden
 		PinOrderVersion: strconv.FormatInt(page.PinOrderVersion, 10), Conversations: conversations,
 		NextCursor: page.NextCursor, HasMore: page.HasMore,
 		UnreadCount: unreadCounts.Unread, AttentionUnreadCount: unreadCounts.Attention,
-		PendingCount: unreadCounts.Pending,
+		PendingCount: unreadCounts.Pending, PendingUnreadCount: unreadCounts.PendingUnread,
 	}, nil
 }
 

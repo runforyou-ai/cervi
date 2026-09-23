@@ -1,6 +1,6 @@
 /** 移动端身份入口、一级导航和详情布局。 */
 import { createContext, useContext } from "react"
-import { ContactRoundIcon, InboxIcon, UserRoundIcon } from "lucide-react"
+import { ContactRoundIcon, InboxIcon, MessageCircleIcon, UserRoundIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { NavLink, Outlet } from "react-router"
 
@@ -50,10 +50,10 @@ export function MobileWorkspaceLayout() {
   )
 }
 
-/** 为一级页面显示固定底部导航和消息页签的内部提醒角标。 */
+/** 为一级页面显示固定底部导航，收件箱显示有未读消息的待处理会话数，消息显示聊天提醒未读数。 */
 export function MobileTabLayout() {
   const { t } = useTranslation(["mobile", "inbox"])
-  const { inboxURL } = useMobileNavigation()
+  const { chatsURL, inboxURL } = useMobileNavigation()
   const { identity } = useMobileWorkspace()
   const pollingActive = useMemberChatPollingActive({
     requireWindowFocus: false,
@@ -71,14 +71,20 @@ export function MobileTabLayout() {
         pollingActive && !realtime ? memberChatPollingInterval : false,
     },
   )
-  // 消息页签角标合计聊天提醒与本人待处理的服务会话。
-  const attentionUnreadCount = attention.data?.total ?? 0
   const tabs = [
     {
       path: inboxURL,
       label: t("tabs.inbox"),
       icon: InboxIcon,
-      badge: attentionUnreadCount,
+      badge: attention.data?.pendingUnread ?? 0,
+      badgeLabel: t("inbox:pendingUnreadCount", { count: attention.data?.pendingUnread ?? 0 }),
+    },
+    {
+      path: chatsURL,
+      label: t("tabs.chats"),
+      icon: MessageCircleIcon,
+      badge: attention.data?.unread ?? 0,
+      badgeLabel: t("inbox:chatAttentionUnread", { count: attention.data?.unread ?? 0 }),
     },
     { path: "/contacts", label: t("tabs.contacts"), icon: ContactRoundIcon },
     { path: "/me", label: t("tabs.me"), icon: UserRoundIcon },
@@ -92,8 +98,8 @@ export function MobileTabLayout() {
         aria-label={t("tabs.label")}
         className="shrink-0 border-t bg-sidebar pb-[env(safe-area-inset-bottom)]"
       >
-        <div className="grid grid-cols-3">
-          {tabs.map(({ path, label, icon: Icon, badge }) => (
+        <div className="grid grid-cols-4">
+          {tabs.map(({ path, label, icon: Icon, badge, badgeLabel }) => (
             <NavLink
               key={label}
               to={path}
@@ -110,9 +116,7 @@ export function MobileTabLayout() {
                 {badge ? (
                   <span className="absolute -top-1.5 left-3 flex h-4 min-w-4 items-center justify-center rounded-full bg-destructive px-1 text-[10px] leading-4 font-semibold text-destructive-foreground ring-2 ring-sidebar">
                     <span aria-hidden="true">{badge > 99 ? "99+" : badge}</span>
-                    <span className="sr-only">
-                      {t("inbox:messageAttentionUnread", { count: badge })}
-                    </span>
+                    <span className="sr-only">{badgeLabel}</span>
                   </span>
                 ) : null}
               </span>

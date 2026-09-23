@@ -270,7 +270,7 @@ export function MobileInboxSearchPage() {
       if (person.conversationId)
         void navigate(`/inbox/customer/${person.conversationId}`, { state: { mobileBack: true } })
     } else if (person.agentId) {
-      void navigate(`/inbox/agent/${crypto.randomUUID()}`, {
+      void navigate(`/chats/agent/${crypto.randomUUID()}`, {
         state: { draftAgentID: person.agentId, mobileBack: true },
       })
     } else if (person.userId) {
@@ -310,7 +310,7 @@ export function MobileInboxSearchPage() {
               variant="ghost"
               size="icon-sm"
               className="absolute top-1/2 right-0.5 -translate-y-1/2 text-muted-foreground"
-              aria-label={t("mobile:inbox.clearSearch")}
+              aria-label={t("mobile:clearSearch")}
               onClick={() => {
                 setText("")
                 updateParams({ q: "", ...(type === "conversations" ? { type: "" } : {}) })
