@@ -142,6 +142,22 @@ func (b *Backend) ListCustomerBusinessQueries(ctx context.Context, meta appservi
 	return output, err
 }
 
+// GetCustomerServiceSummaries 返回客户会话当前周期的交接摘要与同一客户已关闭周期的小结。
+func (b *Backend) GetCustomerServiceSummaries(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.CustomerServiceSummaries, error) {
+	var output appservice.CustomerServiceSummaries
+	err := b.do(ctx, meta, http.MethodGet, "/conversations/"+url.PathEscape(conversationID)+"/service-summaries", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// UpdateServiceSessionSummary 修改已关闭客服处理周期的小结、是否解决与咨询分类。
+func (b *Backend) UpdateServiceSessionSummary(ctx context.Context, meta appservice.RequestMeta, serviceSessionID string, input appservice.ServiceSessionSummaryInput) (appservice.ServiceSessionSummary, error) {
+	var output appservice.ServiceSessionSummary
+	err := b.do(ctx, meta, http.MethodPut, "/service-sessions/"+url.PathEscape(serviceSessionID)+"/summary", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // GetInboxConversation 返回当前用户有权阅读的独立会话摘要。
 func (b *Backend) GetInboxConversation(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.InboxConversation, error) {
 	var output appservice.InboxConversation
@@ -1354,6 +1370,22 @@ func (b *Backend) GetServiceTimeouts(ctx context.Context, meta appservice.Reques
 func (b *Backend) UpdateServiceTimeouts(ctx context.Context, meta appservice.RequestMeta, input appservice.ServiceTimeouts) (appservice.ServiceTimeouts, error) {
 	var output appservice.ServiceTimeouts
 	err := b.do(ctx, meta, http.MethodPut, "/settings/customer-service/timeouts", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// GetServiceSummarySettings 读取当前企业的周期小结设置。
+func (b *Backend) GetServiceSummarySettings(ctx context.Context, meta appservice.RequestMeta) (appservice.ServiceSummarySettings, error) {
+	var output appservice.ServiceSummarySettings
+	err := b.do(ctx, meta, http.MethodGet, "/settings/customer-service/summary", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// UpdateServiceSummarySettings 修改当前企业的周期小结设置。
+func (b *Backend) UpdateServiceSummarySettings(ctx context.Context, meta appservice.RequestMeta, input appservice.ServiceSummarySettings) (appservice.ServiceSummarySettings, error) {
+	var output appservice.ServiceSummarySettings
+	err := b.do(ctx, meta, http.MethodPut, "/settings/customer-service/summary", nil, input, &output)
 	b.normalizeOutput(&output)
 	return output, err
 }

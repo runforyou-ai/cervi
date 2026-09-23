@@ -453,7 +453,7 @@ func (w *Worker) handleAgentIdle(ctx context.Context, input ProcessInput, timeou
 				"organization_id", session.OrganizationID, "conversation_id", session.ConversationID,
 				"service_session_id", session.ID, "assignee_identity_id", *session.AssigneeIdentityID, "scheduled", scheduled)
 		case actionCloseUnresponsive:
-			if err := conversationaction.CloseAgentServiceSession(ctx, tx, loaded.Conversation, session, domain.ServiceSessionCloseCustomerUnresponsive); err != nil {
+			if err := conversationaction.CloseAgentServiceSession(ctx, tx, w.enqueuer, loaded.Conversation, session, domain.ServiceSessionCloseCustomerUnresponsive); err != nil {
 				return err
 			}
 			slog.Info("客户确认请求后超时未回复，客服处理周期已关闭",

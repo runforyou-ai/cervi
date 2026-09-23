@@ -15,6 +15,7 @@ import (
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
 	"github.com/runforyou-ai/cervi/internal/actions/servicecategory"
+	"github.com/runforyou-ai/cervi/internal/actions/servicesummary"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/storage/server/messagequery"
@@ -102,7 +103,7 @@ func (p customerRunPolicy) applyDecision(ctx context.Context, db bun.IDB, policy
 		if lane.DesiredSeq > result.EndSeq {
 			return nil
 		}
-		return conversationaction.CloseAgentServiceSession(ctx, db, policyContext.Conversation, session, domain.ServiceSessionCloseAIResolved)
+		return conversationaction.CloseAgentServiceSession(ctx, db, p.enqueuer, policyContext.Conversation, session, domain.ServiceSessionCloseAIResolved)
 	}
 	requested := followUp ||
 		(result.Decision.Kind == domain.AgentRunOutcomeAskCustomer && result.Decision.Purpose == domain.AgentAskCustomerPurposeConfirmResolution)
@@ -367,7 +368,7 @@ func ensureCustomerAgentParticipant(ctx context.Context, db bun.IDB, organizatio
 	return participant.ID, nil
 }
 
-// loadCustomerContextMessage 读取客服周期的客户身份与访客上下文并投影为系统提供的上下文消息；内容变化时修订随之变化。
+// loadCustomerContextMessage 读取客服周期的客户身份、访客上下文与同一客户最近的历史小结并投影为系统提供的上下文消息；内容变化时修订随之变化。
 // 只提供是否已验证身份、名称与本次访问信息，不含企业用户编号、邮箱与签名身份。
 func loadCustomerContextMessage(ctx context.Context, db bun.IDB, run *servermodels.AgentRun) (agentruntime.Message, error) {
 	row := struct {
@@ -398,6 +399,11 @@ func loadCustomerContextMessage(ctx context.Context, db bun.IDB, run *servermode
 			PageURL: visit.PageURL, PageTitle: visit.PageTitle, Language: visit.Language, TimeZone: visit.TimeZone, Country: visit.Country,
 		}
 	}
+	history, err := servicesummary.RecentHistory(ctx, db, run.OrganizationID, run.ScopeID)
+	if err != nil {
+		return agentruntime.Message{}, err
+	}
+	customer.History = history
 	content := customer.Message()
 	return agentruntime.Message{ID: "customer-context:" + run.ScopeID, Revision: content, Role: agentruntime.MessageRoleUser, Content: content}, nil
 }

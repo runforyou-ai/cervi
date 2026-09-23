@@ -458,6 +458,13 @@ export function GetCustomerProfile(meta: $models.RequestMeta, conversationID: st
 }
 
 /**
+ * GetCustomerServiceSummaries 返回客户会话当前周期的交接摘要与同一客户已关闭周期的小结。
+ */
+export function GetCustomerServiceSummaries(meta: $models.RequestMeta, conversationID: string): $CancellablePromise<$models.CustomerServiceSummaries> {
+    return $Call.ByID(3735562331, meta, conversationID);
+}
+
+/**
  * GetGroupConversation 返回当前成员可见的群聊资料。
  */
 export function GetGroupConversation(meta: $models.RequestMeta, conversationID: string): $CancellablePromise<$models.GroupConversation> {
@@ -532,6 +539,13 @@ export function GetMessageChannel(meta: $models.RequestMeta, channelID: string):
  */
 export function GetRole(meta: $models.RequestMeta, roleID: string): $CancellablePromise<$models.Role> {
     return $Call.ByID(4002500470, meta, roleID);
+}
+
+/**
+ * GetServiceSummarySettings 读取当前企业的周期小结设置。
+ */
+export function GetServiceSummarySettings(meta: $models.RequestMeta): $CancellablePromise<$models.ServiceSummarySettings> {
+    return $Call.ByID(1036123262, meta);
 }
 
 /**
@@ -1407,6 +1421,20 @@ export function UpdateRoleAssignments(meta: $models.RequestMeta, input: $models.
  */
 export function UpdateServiceCategory(meta: $models.RequestMeta, categoryID: string, input: $models.ServiceCategoryInput): $CancellablePromise<$models.ServiceCategory> {
     return $Call.ByID(314412950, meta, categoryID, input);
+}
+
+/**
+ * UpdateServiceSessionSummary 修改已关闭客服处理周期的小结、是否解决与咨询分类。
+ */
+export function UpdateServiceSessionSummary(meta: $models.RequestMeta, serviceSessionID: string, input: $models.ServiceSessionSummaryInput): $CancellablePromise<$models.ServiceSessionSummary> {
+    return $Call.ByID(1427241630, meta, serviceSessionID, input);
+}
+
+/**
+ * UpdateServiceSummarySettings 修改当前企业的周期小结设置。
+ */
+export function UpdateServiceSummarySettings(meta: $models.RequestMeta, input: $models.ServiceSummarySettings): $CancellablePromise<$models.ServiceSummarySettings> {
+    return $Call.ByID(375121599, meta, input);
 }
 
 /**

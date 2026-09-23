@@ -1,6 +1,10 @@
 package appservice
 
-import "time"
+import (
+	"time"
+
+	"github.com/runforyou-ai/cervi/internal/domain"
+)
 
 // BusinessHoursPeriod 定义一天内的一个工作时段，起止为 HH:mm，结束可取 24:00。
 type BusinessHoursPeriod struct {
@@ -29,6 +33,66 @@ type ServiceTimeouts struct {
 	QueueReminderMinutes    int `json:"queueReminderMinutes"`
 	AIFollowUpMinutes       int `json:"aiFollowUpMinutes"`
 	AICloseMinutes          int `json:"aiCloseMinutes"`
+}
+
+// AIModelReference 指向模型服务中的一个模型。
+type AIModelReference struct {
+	ProviderID      string `json:"providerId"`
+	ModelIdentifier string `json:"modelIdentifier"`
+}
+
+// ServiceSummarySettings 定义周期小结使用的判断模型、小结模型与小结语言；模型为空表示不使用。
+type ServiceSummarySettings struct {
+	Decision *AIModelReference `json:"decision"`
+	Summary  *AIModelReference `json:"summary"`
+	Locale   Locale            `json:"locale"`
+}
+
+// ServiceSummaryStatus 表示客服处理周期小结的生成状态。
+type ServiceSummaryStatus string
+
+const (
+	ServiceSummaryPending   ServiceSummaryStatus = ServiceSummaryStatus(domain.ServiceSessionSummaryPending)
+	ServiceSummaryReady     ServiceSummaryStatus = ServiceSummaryStatus(domain.ServiceSessionSummaryReady)
+	ServiceSummaryNoRequest ServiceSummaryStatus = ServiceSummaryStatus(domain.ServiceSessionSummaryNoRequest)
+	ServiceSummaryFailed    ServiceSummaryStatus = ServiceSummaryStatus(domain.ServiceSessionSummaryFailed)
+)
+
+// HandoffSummary 定义 AI 转人工时交给承接客服的摘要：客户诉求、AI 已完成的处理与需要人工处理的卡点。
+type HandoffSummary struct {
+	Request  string `json:"request"`
+	Progress string `json:"progress"`
+	Blocker  string `json:"blocker"`
+}
+
+// ServiceSessionSummary 定义一个已关闭客服处理周期的结束方式与小结；Status 为空表示不生成小结，EditedBy 非空表示由客服修改。
+type ServiceSessionSummary struct {
+	ServiceSessionID string                    `json:"serviceSessionId"`
+	ConversationID   string                    `json:"conversationId"`
+	ChannelType      ChannelType               `json:"channelType"`
+	ChannelName      string                    `json:"channelName"`
+	ClosedAt         time.Time                 `json:"closedAt"`
+	CloseReason      ServiceSessionCloseReason `json:"closeReason"`
+	Status           *ServiceSummaryStatus     `json:"status"`
+	Summary          *string                   `json:"summary"`
+	Resolved         *bool                     `json:"resolved"`
+	CategoryID       *string                   `json:"categoryId"`
+	CategoryName     *string                   `json:"categoryName"`
+	EditedAt         *time.Time                `json:"editedAt"`
+	EditedBy         *string                   `json:"editedBy"`
+}
+
+// CustomerServiceSummaries 定义客户会话当前开放周期的交接摘要与同一客户已关闭周期的小结，小结按关闭时间从新到旧排列。
+type CustomerServiceSummaries struct {
+	Handoff  *HandoffSummary         `json:"handoff"`
+	Sessions []ServiceSessionSummary `json:"sessions"`
+}
+
+// ServiceSessionSummaryInput 定义客服修改的小结、是否解决与咨询分类；Resolved 与 CategoryID 为空表示不标注。
+type ServiceSessionSummaryInput struct {
+	Summary    string  `json:"summary"`
+	Resolved   *bool   `json:"resolved"`
+	CategoryID *string `json:"categoryId"`
 }
 
 // ServiceCategoryInput 定义咨询分类可编辑字段；TeamID 为空表示转人工时按渠道失败路由。

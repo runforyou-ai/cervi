@@ -56,6 +56,14 @@ export enum AIModelInputModality {
 };
 
 /**
+ * AIModelReference 指向模型服务中的一个模型。
+ */
+export interface AIModelReference {
+    "providerId": string;
+    "modelIdentifier": string;
+}
+
+/**
  * AIModelType 表示 AI 模型用途。
  */
 export enum AIModelType {
@@ -1707,6 +1715,14 @@ export interface CustomerServiceSession {
 }
 
 /**
+ * CustomerServiceSummaries 定义客户会话当前开放周期的交接摘要与同一客户已关闭周期的小结，小结按关闭时间从新到旧排列。
+ */
+export interface CustomerServiceSummaries {
+    "handoff": HandoffSummary | null;
+    "sessions": ServiceSessionSummary[] | null;
+}
+
+/**
  * CustomerTextMessageInput 定义成员发送的客户会话文本消息。
  */
 export interface CustomerTextMessageInput {
@@ -2066,6 +2082,15 @@ export interface GroupTextMessageInput {
     "replyToMessageId": string;
     "mentionSubjectIds": string[] | null;
     "mentionAll": boolean;
+}
+
+/**
+ * HandoffSummary 定义 AI 转人工时交给承接客服的摘要：客户诉求、AI 已完成的处理与需要人工处理的卡点。
+ */
+export interface HandoffSummary {
+    "request": string;
+    "progress": string;
+    "blocker": string;
 }
 
 /**
@@ -3427,6 +3452,34 @@ export enum ServiceSessionStatus {
 };
 
 /**
+ * ServiceSessionSummary 定义一个已关闭客服处理周期的结束方式与小结；Status 为空表示不生成小结，EditedBy 非空表示由客服修改。
+ */
+export interface ServiceSessionSummary {
+    "serviceSessionId": string;
+    "conversationId": string;
+    "channelType": ChannelType;
+    "channelName": string;
+    "closedAt": string;
+    "closeReason": ServiceSessionCloseReason;
+    "status": ServiceSummaryStatus | null;
+    "summary": string | null;
+    "resolved": boolean | null;
+    "categoryId": string | null;
+    "categoryName": string | null;
+    "editedAt": string | null;
+    "editedBy": string | null;
+}
+
+/**
+ * ServiceSessionSummaryInput 定义客服修改的小结、是否解决与咨询分类；Resolved 与 CategoryID 为空表示不标注。
+ */
+export interface ServiceSessionSummaryInput {
+    "summary": string;
+    "resolved": boolean | null;
+    "categoryId": string | null;
+}
+
+/**
  * ServiceSessionTarget 定义客服处理周期流转的去向及名称快照。
  */
 export interface ServiceSessionTarget {
@@ -3449,6 +3502,30 @@ export enum ServiceSessionTargetKind {
     ServiceSessionTargetPublicQueue = "public_queue",
     ServiceSessionTargetTeam = "team",
     ServiceSessionTargetMember = "member",
+};
+
+/**
+ * ServiceSummarySettings 定义周期小结使用的判断模型、小结模型与小结语言；模型为空表示不使用。
+ */
+export interface ServiceSummarySettings {
+    "decision": AIModelReference | null;
+    "summary": AIModelReference | null;
+    "locale": Locale;
+}
+
+/**
+ * ServiceSummaryStatus 表示客服处理周期小结的生成状态。
+ */
+export enum ServiceSummaryStatus {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    ServiceSummaryPending = "pending",
+    ServiceSummaryReady = "ready",
+    ServiceSummaryNoRequest = "no_request",
+    ServiceSummaryFailed = "failed",
 };
 
 /**
