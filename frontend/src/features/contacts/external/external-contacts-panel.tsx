@@ -4,7 +4,6 @@ import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
 import {
-  ChannelType,
   ContactMethodType,
   ContactSort,
   ContactStage,
@@ -64,8 +63,6 @@ export function ExternalContactsPanel({
   } = useContactSearch()
   const deleted = searchParams.get("view") === "trash"
   const channelId = searchParams.get("channelId") ?? ""
-  // 中间栏选中渠道类别时，列出该类别下所有渠道的联系人。
-  const channelType = optionalWailsEnum(ChannelType, searchParams.get("channelType"))
   const stage = optionalWailsEnum(ContactStage, searchParams.get("stage"))
   const methodType = optionalWailsEnum(
     ContactMethodType,
@@ -79,7 +76,6 @@ export function ExternalContactsPanel({
     query,
     stage,
     channelId: deleted ? "" : channelId,
-    channelType: deleted ? undefined : channelType,
     methodType,
     sort,
     page: currentPage,
@@ -138,18 +134,14 @@ export function ExternalContactsPanel({
     logLabel: "恢复联系人",
   })
 
-  const hasExternalFilters = Boolean(stage || methodType)
-  const selectedChannel = channels.find((channel) => channel.id === channelId)
+  const hasExternalFilters = Boolean(channelId || stage || methodType)
 
   return (
     <>
       <ContactListSection
-        title={
-          selectedChannel?.name ??
-          (channelType ? channelTypeLabel(channelType, t) : t("scopes.external"))
-        }
+        title={t("scopes.external")}
         description={t("scopeDescriptions.external")}
-        scope={{ scope: "external", channelId, teams, channels }}
+        scope="external"
         toolbar={
           <>
             <ListToolbarSearch
@@ -167,6 +159,7 @@ export function ExternalContactsPanel({
               onValueChange={(value) =>
                 setParameters({
                   view: value === "trash" ? "trash" : null,
+                  channelId: null,
                   stage: null,
                   methodType: null,
                   page: null,
@@ -176,6 +169,23 @@ export function ExternalContactsPanel({
             />
             {!deleted ? (
               <>
+                <ListToolbarFilter
+                  label={t("filters.channel")}
+                  allLabel={t("filters.allChannels")}
+                  value={channelId}
+                  options={channels.map((channel) => ({
+                    value: channel.id,
+                    label: `${channelTypeLabel(channel.type, t)} · ${channel.name}`,
+                  }))}
+                  contentClassName="max-h-[min(18rem,var(--radix-dropdown-menu-content-available-height))]"
+                  onValueChange={(value) =>
+                    setParameters({
+                      channelId: value || null,
+                      page: null,
+                      selected: null,
+                    })
+                  }
+                />
                 <ListToolbarFilter
                   label={t("filters.stage")}
                   allLabel={t("filters.allStages")}
@@ -228,6 +238,7 @@ export function ExternalContactsPanel({
                   <ListToolbarReset
                     onClick={() =>
                       setParameters({
+                        channelId: null,
                         stage: null,
                         methodType: null,
                         page: null,

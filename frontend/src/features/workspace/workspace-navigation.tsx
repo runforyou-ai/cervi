@@ -2,6 +2,7 @@
 import { useRef, useState, type ReactNode } from "react"
 import {
   BellIcon,
+  BotIcon,
   BrainCircuitIcon,
   Building2Icon,
   HeadsetIcon,
@@ -9,13 +10,10 @@ import {
   CodeXmlIcon,
   ContactRoundIcon,
   InboxIcon,
-  LibraryIcon,
   LoaderCircleIcon,
   LockKeyholeIcon,
   LogOutIcon,
-  MessagesSquareIcon,
   MonitorSmartphoneIcon,
-  PlugIcon,
   SearchIcon,
   SettingsIcon,
   ShieldCheckIcon,
@@ -35,6 +33,7 @@ import {
 import { PagePaneGroup, PagePaneLink } from "@/components/page-split"
 import { useGlobalSearch } from "@/contexts/global-search-context"
 import { useUnsavedChangesContext } from "@/contexts/unsaved-changes-context"
+import { agentsModulePaths } from "@/features/agents/agents-module-layout"
 import { WorkspaceRailToggle } from "@/features/workspace/workspace-rail"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
@@ -144,18 +143,20 @@ function WorkspaceMenu({
           {t("inbox")}
         </PagePaneLink>
         <PagePaneLink
+          to="/ai-employees"
+          activePath={agentsModulePaths}
+          icon={BotIcon}
+          collapsed={collapsed}
+        >
+          {t("agents")}
+        </PagePaneLink>
+        <PagePaneLink
           to="/contacts/employees"
           activePath="/contacts"
           icon={ContactRoundIcon}
           collapsed={collapsed}
         >
           {t("contacts")}
-        </PagePaneLink>
-        <PagePaneLink to="/channels" icon={MessagesSquareIcon} collapsed={collapsed}>
-          {t("channels")}
-        </PagePaneLink>
-        <PagePaneLink to="/knowledge-bases" icon={LibraryIcon} collapsed={collapsed}>
-          {t("knowledgeBases")}
         </PagePaneLink>
       </div>
     </nav>
@@ -264,7 +265,7 @@ function WorkspaceSettingsMenu({
           {t("navigation.roles")}
         </PagePaneLink>
       </PagePaneGroup>
-      {/* 集成：模型服务与 MCP 服务供 AI 调用外部能力，Webhooks 与开放 API 供外部系统调用 Cervi。 */}
+      {/* 集成：模型服务供 AI 调用模型，Webhooks 与开放 API 供外部系统调用 Cervi。 */}
       <PagePaneGroup title={t("groups.integrations")} collapsed={collapsed}>
         <PagePaneLink
           collapsed={collapsed}
@@ -273,13 +274,6 @@ function WorkspaceSettingsMenu({
           icon={BrainCircuitIcon}
         >
           {t("navigation.modelServices")}
-        </PagePaneLink>
-        <PagePaneLink
-          collapsed={collapsed}
-          to="/settings/mcp-servers"
-          icon={PlugIcon}
-        >
-          {t("navigation.mcpServers")}
         </PagePaneLink>
         <PagePaneLink collapsed={collapsed} icon={WebhookIcon}>
           {t("navigation.webhooks")}

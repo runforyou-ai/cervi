@@ -2,7 +2,7 @@
 import { z } from "zod"
 
 import { AgentExecutionMode, WorkStatus } from "@/api"
-import { isAgentModelSelection } from "@/features/contacts/agents/agent-model-selection"
+import { isAgentModelSelection } from "@/features/agents/agent-model-selection"
 import { displayNamePattern } from "@/lib/display-name"
 import { requiredWailsEnum } from "@/lib/wails-enum"
 

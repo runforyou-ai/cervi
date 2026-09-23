@@ -1,8 +1,8 @@
-/** 渠道列表页，按中间栏选中的渠道类别展示该类别下的渠道。 */
-import { useEffect, useMemo } from "react"
+/** 渠道列表页：列出已接入的渠道，添加时选择平台。 */
+import { useMemo } from "react"
 import { PlusIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
-import { Link, useNavigate, useParams, useSearchParams } from "react-router"
+import { Link, useNavigate, useSearchParams } from "react-router"
 
 import {
   activateMessageChannel,
@@ -19,10 +19,19 @@ import { PageHeader } from "@/components/page-header"
 import { ResourceListLayout } from "@/components/resource-list"
 import { ResourceTable } from "@/components/resource-table"
 import { ConfirmationDialog } from "@/components/confirmation-dialog"
+import { StatusBadge } from "@/components/status-badge"
 import { Button } from "@/components/ui/button"
 import {
-  isMessageChannelType,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu"
+import {
   messageChannelTypeDefinition,
+  messageChannelTypeDefinitions,
+  plannedChannelDefinitions,
 } from "@/lib/message-channel-types"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useConfirmedAction } from "@/hooks/use-confirmed-action"
@@ -31,14 +40,10 @@ import { cn } from "@/lib/utils"
 
 type ChannelEnabledStatus = "enabled" | "disabled"
 
-/** 加载并管理当前类别的渠道列表。 */
+/** 加载并管理已接入的渠道列表。 */
 export function MessageChannelListPage() {
   const { t } = useTranslation(["channels", "common"])
   const navigate = useNavigate()
-  const { channelType = "" } = useParams()
-  const typeDefinition = isMessageChannelType(channelType)
-    ? messageChannelTypeDefinition(channelType)
-    : undefined
   const [searchParams, setSearchParams] = useSearchParams()
   // 状态筛选记在 URL 中，从编辑页返回时保留。
   const enabledStatus: ChannelEnabledStatus =
@@ -54,20 +59,10 @@ export function MessageChannelListPage() {
   const filteredChannels = useMemo(
     () =>
       channels.filter(
-        (channel) =>
-          channel.type === channelType &&
-          channel.enabled === (enabledStatus === "enabled"),
+        (channel) => channel.enabled === (enabledStatus === "enabled"),
       ),
-    [channelType, channels, enabledStatus],
+    [channels, enabledStatus],
   )
-  const typeChannelCount = channels.filter(
-    (channel) => channel.type === channelType,
-  ).length
-
-  /** 无效的类别参数回到默认渠道类别。 */
-  useEffect(() => {
-    if (!typeDefinition) navigate("/channels", { replace: true })
-  }, [navigate, typeDefinition])
 
   const statusChange = useConfirmedAction<MessageChannelSummary>({
     action: (channel) =>
@@ -84,23 +79,42 @@ export function MessageChannelListPage() {
 
   return (
     <div className="flex min-h-0 w-full flex-1 flex-col overflow-hidden">
-      <PageHeader
-        title={
-          typeDefinition
-            ? t(`types.${typeDefinition.translationKey}`)
-            : t("list.title")
-        }
-        description={t("list.description")}
-      >
-        <Button variant="ghost" size="icon-sm" asChild>
-          <Link
-            to={`/channels/${channelType}/new`}
-            aria-label={t("list.create")}
-            title={t("list.create")}
-          >
-            <PlusIcon />
-          </Link>
-        </Button>
+      <PageHeader title={t("list.title")} description={t("list.description")}>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button
+              variant="ghost"
+              size="icon-sm"
+              aria-label={t("list.create")}
+              title={t("list.create")}
+            >
+              <PlusIcon />
+            </Button>
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="end" className="w-60">
+            {messageChannelTypeDefinitions.map((definition) => (
+              <DropdownMenuItem key={definition.type} asChild>
+                <Link to={`/channels/${definition.type}/new`}>
+                  <definition.icon />
+                  {t(`types.${definition.translationKey}`)}
+                </Link>
+              </DropdownMenuItem>
+            ))}
+            <DropdownMenuSeparator />
+            {/* 尚未接入的平台保留显示并标注即将支持。 */}
+            {plannedChannelDefinitions.map((definition) => (
+              <DropdownMenuItem key={definition.key} disabled>
+                <definition.icon />
+                <span className="min-w-0 flex-1 truncate">
+                  {t(`plannedTypes.${definition.key}`)}
+                </span>
+                <StatusBadge variant="muted">
+                  {t("common:comingSoon")}
+                </StatusBadge>
+              </DropdownMenuItem>
+            ))}
+          </DropdownMenuContent>
+        </DropdownMenu>
       </PageHeader>
 
       <ListToolbar>
@@ -146,7 +160,15 @@ export function MessageChannelListPage() {
                     >
                       {definition ? <definition.icon className="size-4" /> : null}
                     </span>
-                    <span className="truncate">{channel.name}</span>
+                    <span className="truncate">
+                      {channel.name}
+                      {definition ? (
+                        <span className="font-normal text-muted-foreground">
+                          {" · "}
+                          {t(`types.${definition.translationKey}`)}
+                        </span>
+                      ) : null}
+                    </span>
                   </div>
                 )
               },
@@ -155,7 +177,7 @@ export function MessageChannelListPage() {
           rows={filteredChannels}
           rowKey={(channel) => channel.id}
           empty={
-            typeChannelCount === 0
+            channels.length === 0
               ? t("list.emptyTitle")
               : t("list.emptyFiltered")
           }

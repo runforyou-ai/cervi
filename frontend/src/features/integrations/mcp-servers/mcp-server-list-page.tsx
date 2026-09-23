@@ -92,7 +92,7 @@ export function MCPServerListPage() {
         </Button>
         <Button variant="ghost" size="icon-sm" asChild>
           <Link
-            to="/settings/mcp-servers/new"
+            to="/tools/new"
             aria-label={t("mcpServer.list.create")}
             title={t("mcpServer.list.create")}
           >
@@ -124,7 +124,7 @@ export function MCPServerListPage() {
           rowKey={(mcpServer) => mcpServer.id}
           empty={t("mcpServer.list.empty")}
           onRowActivate={(mcpServer) =>
-            navigate(`/settings/mcp-servers/${mcpServer.id}`)
+            navigate(`/tools/${mcpServer.id}`)
           }
           rowActions={(mcpServer) => {
             const testing = connectionTest.testingIds.has(mcpServer.id)

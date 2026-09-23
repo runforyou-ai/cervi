@@ -314,6 +314,9 @@ type Backend interface {
 	// ListTeams 返回企业团队列表。
 	//cervi:route GET /teams
 	ListTeams(context.Context, RequestMeta, TeamListInput) (TeamList, error)
+	// GetTeam 返回团队详情。
+	//cervi:route GET /teams/:teamID
+	GetTeam(context.Context, RequestMeta, string) (Team, error)
 	// CreateTeam 创建企业团队。
 	//cervi:route POST /teams status=201
 	CreateTeam(context.Context, RequestMeta, TeamInput) (Team, error)
@@ -323,9 +326,6 @@ type Backend interface {
 	// DeleteTeam 删除企业团队及其成员关系。
 	//cervi:route DELETE /teams/:teamID
 	DeleteTeam(context.Context, RequestMeta, string) error
-	// ListAllTeamMembers 返回企业所有团队的成员列表，同一身份只列一次。
-	//cervi:route GET /team-members
-	ListAllTeamMembers(context.Context, RequestMeta, TeamMemberListInput) (TeamMemberList, error)
 	// ListTeamMembers 返回团队成员列表。
 	//cervi:route GET /teams/:teamID/members
 	ListTeamMembers(context.Context, RequestMeta, string, TeamMemberListInput) (TeamMemberList, error)

@@ -27,7 +27,7 @@ import { TeamSelectField } from "@/features/contacts/team-select-field"
 import {
   createAgentProfileSchema,
   type AgentProfileFormValues,
-} from "@/features/contacts/agents/agent-schema"
+} from "@/features/agents/agent-schema"
 import { useFormLifetime } from "@/hooks/use-form-lifetime"
 import { usePendingImageUpload } from "@/hooks/use-pending-image-upload"
 import { apiErrorMessage } from "@/lib/form-errors"
@@ -44,14 +44,14 @@ export function AgentProfileForm({
   teams: Team[]
   onSaved: () => void
 }) {
-  const { t } = useTranslation(["contacts", "common"])
+  const { t } = useTranslation(["agents", "contacts", "common"])
   const { t: tCommon } = useTranslation("common")
   const navigate = useNavigate()
   const schema = useMemo(
     () =>
       createAgentProfileSchema({
-        nameRequired: t("agents.validation.nameRequired"),
-        nameInvalid: t("agents.validation.nameInvalid"),
+        nameRequired: t("validation.nameRequired"),
+        nameInvalid: t("validation.nameInvalid"),
       }),
     [t],
   )
@@ -70,7 +70,7 @@ export function AgentProfileForm({
     purpose: FilePurpose.FilePurposeAgentAvatar,
     onError: (error) => {
       console.warn("上传 AI 员工头像失败", { agent_id: agent.id, error })
-      if (!recoverSession(error, navigate)) toast.error(t("avatar.uploadError"))
+      if (!recoverSession(error, navigate)) toast.error(t("contacts:avatar.uploadError"))
     },
   })
   const { mounted, dirty, discarded } = useFormLifetime(
@@ -119,7 +119,7 @@ export function AgentProfileForm({
               "teamIds",
               "handlesCustomers",
             ])
-          : t("agents.form.networkError"),
+          : t("form.networkError"),
       )
       return false
     }
@@ -129,11 +129,11 @@ export function AgentProfileForm({
     <form onSubmit={form.handleSubmit(submit)} noValidate>
       <FieldGroup>
         <Field>
-          <FieldLabel>{t("avatar.label")}</FieldLabel>
+          <FieldLabel>{t("contacts:avatar.label")}</FieldLabel>
           <ImagePicker
             imageURL={avatar.pending?.previewURL || agent.avatarUrl}
             fallback="agent"
-            label={t("avatar.choose")}
+            label={t("contacts:avatar.choose")}
             disabled={form.formState.isSubmitting}
             loading={avatar.pending?.status === "uploading"}
             onSelect={avatar.select}
@@ -143,7 +143,7 @@ export function AgentProfileForm({
           name="displayName"
           id="agent-profile-name"
           control={form.control}
-          label={t("agents.form.name")}
+          label={t("form.name")}
           disabled={form.formState.isSubmitting}
         />
         <Controller
@@ -152,8 +152,8 @@ export function AgentProfileForm({
           render={({ field }) => (
             <TeamSelectField
               teams={teams}
-              label={t("agents.form.teams")}
-              emptyMessage={t("agents.form.noTeams")}
+              label={t("form.teams")}
+              emptyMessage={t("form.noTeams")}
               value={field.value}
               onChange={field.onChange}
               onBlur={field.onBlur}
@@ -167,7 +167,7 @@ export function AgentProfileForm({
           render={({ field, fieldState }) => (
             <Field data-invalid={fieldState.invalid}>
               <FieldLabel htmlFor="agent-profile-work-status" required>
-                {t("columns.workStatus")}
+                {t("contacts:columns.workStatus")}
               </FieldLabel>
               <NativeSelect
                 {...field}
@@ -195,8 +195,8 @@ export function AgentProfileForm({
             <SwitchCardField
               id="agent-profile-handles-customers"
               name={field.name}
-              label={t("agents.form.handlesCustomers")}
-              description={t("agents.form.handlesCustomersHelp")}
+              label={t("form.handlesCustomers")}
+              description={t("form.handlesCustomersHelp")}
               checked={field.value}
               disabled={form.formState.isSubmitting}
               onBlur={field.onBlur}

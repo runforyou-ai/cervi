@@ -24,12 +24,12 @@ import {
   FieldLabel,
 } from "@/components/ui/field"
 import { Textarea } from "@/components/ui/textarea"
-import { AgentModelField } from "@/features/contacts/agents/agent-model-field"
-import { parseAgentModelSelection } from "@/features/contacts/agents/agent-model-selection"
+import { AgentModelField } from "@/features/agents/agent-model-field"
+import { parseAgentModelSelection } from "@/features/agents/agent-model-selection"
 import {
   createAgentSchema,
   type AgentFormValues,
-} from "@/features/contacts/agents/agent-schema"
+} from "@/features/agents/agent-schema"
 import { useContactInvalidator } from "@/features/contacts/use-contact-invalidator"
 import { useFormLifetime } from "@/hooks/use-form-lifetime"
 import { usePendingImageUpload } from "@/hooks/use-pending-image-upload"
@@ -46,16 +46,16 @@ export function AgentForm({
   onSaved: (agent: AgentData) => void
   onCancel: () => void
 }) {
-  const { t } = useTranslation("contacts")
+  const { t } = useTranslation(["agents", "contacts"])
   const navigate = useNavigate()
   const invalidateContact = useContactInvalidator()
   const schema = useMemo(
     () =>
       createAgentSchema({
-        nameRequired: t("agents.validation.nameRequired"),
-        nameInvalid: t("agents.validation.nameInvalid"),
-        modelRequired: t("agents.validation.modelRequired"),
-        instructionTooLong: t("agents.validation.instructionTooLong"),
+        nameRequired: t("validation.nameRequired"),
+        nameInvalid: t("validation.nameInvalid"),
+        modelRequired: t("validation.modelRequired"),
+        instructionTooLong: t("validation.instructionTooLong"),
       }),
     [t],
   )
@@ -80,7 +80,7 @@ export function AgentForm({
     purpose: FilePurpose.FilePurposeAgentAvatar,
     onError: (error) => {
       console.warn("上传 AI 员工头像失败", error)
-      if (!recoverSession(error, navigate)) toast.error(t("avatar.uploadError"))
+      if (!recoverSession(error, navigate)) toast.error(t("contacts:avatar.uploadError"))
     },
   })
   const { mounted, dirty } = useFormLifetime(
@@ -113,7 +113,7 @@ export function AgentForm({
       })
       void invalidateContact("agent")
       if (!mounted.current) return
-      toast.success(t("agents.form.created"))
+      toast.success(t("form.created"))
       dirty.current = false
       form.reset(values)
       avatar.clear()
@@ -134,7 +134,7 @@ export function AgentForm({
               "knowledgeBaseIds",
               "teamIds",
             ])
-          : t("agents.form.networkError"),
+          : t("form.networkError"),
       )
     }
   }
@@ -147,11 +147,11 @@ export function AgentForm({
     >
       <FieldGroup>
         <Field>
-          <FieldLabel>{t("avatar.label")}</FieldLabel>
+          <FieldLabel>{t("contacts:avatar.label")}</FieldLabel>
           <ImagePicker
             imageURL={avatar.pending?.previewURL}
             fallback="agent"
-            label={t("avatar.choose")}
+            label={t("contacts:avatar.choose")}
             disabled={form.formState.isSubmitting}
             loading={avatar.pending?.status === "uploading"}
             onSelect={avatar.select}
@@ -161,7 +161,7 @@ export function AgentForm({
           name="displayName"
           id="agent-create-name"
           control={form.control}
-          label={t("agents.form.name")}
+          label={t("form.name")}
           autoFocus
           disabled={form.formState.isSubmitting}
         />
@@ -172,8 +172,8 @@ export function AgentForm({
             <SwitchCardField
               id="agent-create-handles-customers"
               name={field.name}
-              label={t("agents.form.handlesCustomers")}
-              description={t("agents.form.handlesCustomersHelp")}
+              label={t("form.handlesCustomers")}
+              description={t("form.handlesCustomersHelp")}
               checked={field.value}
               disabled={form.formState.isSubmitting}
               onBlur={field.onBlur}
@@ -200,7 +200,7 @@ function AgentManagedExecutionFields({
   disabled: boolean
   control: Control<AgentFormValues>
 }) {
-  const { t } = useTranslation("contacts")
+  const { t } = useTranslation("agents")
   return (
     <>
       <AgentModelField
@@ -214,7 +214,7 @@ function AgentManagedExecutionFields({
         render={({ field, fieldState }) => (
           <Field data-invalid={fieldState.invalid}>
             <FieldLabel htmlFor="agent-system-instruction">
-              {t("agents.execution.instruction")}
+              {t("execution.instruction")}
             </FieldLabel>
             <Textarea
               {...field}
@@ -224,7 +224,7 @@ function AgentManagedExecutionFields({
               aria-invalid={fieldState.invalid}
             />
             <FieldDescription>
-              {t("agents.execution.instructionHelp")}
+              {t("execution.instructionHelp")}
             </FieldDescription>
           </Field>
         )}

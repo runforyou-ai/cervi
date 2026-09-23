@@ -110,7 +110,6 @@ func (b *Backend) ListContacts(ctx context.Context, meta appservice.RequestMeta,
 	setQuery(query, "query", input.Query)
 	setOptionalQuery(query, "stage", input.Stage)
 	setQuery(query, "channelId", input.ChannelID)
-	setOptionalQuery(query, "channelType", input.ChannelType)
 	setOptionalQuery(query, "methodType", input.MethodType)
 	setQuery(query, "sort", string(input.Sort))
 	setPositiveQuery(query, "page", input.Page)

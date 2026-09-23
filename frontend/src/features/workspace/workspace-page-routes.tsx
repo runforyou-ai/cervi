@@ -2,10 +2,14 @@
 import type { ReactElement } from "react"
 import { matchRoutes, useRoutes, type Location, type RouteObject } from "react-router"
 
-import { ChannelsLayout } from "@/features/channels/channels-layout"
+import { AgentFormPage } from "@/features/agents/agent-form-page"
+import { AgentListPage } from "@/features/agents/agent-list-page"
+import {
+  AgentsModuleLayout,
+  agentsModulePaths,
+} from "@/features/agents/agents-module-layout"
 import { MessageChannelFormPage } from "@/features/channels/message-channel-form-page"
 import { MessageChannelListPage } from "@/features/channels/message-channel-list-page"
-import { AgentFormPage } from "@/features/contacts/agents/agent-form-page"
 import { ContactsPage } from "@/features/contacts/contacts-page"
 import { InboxRoute } from "@/features/inbox/inbox-route"
 import { MCPServerFormPage } from "@/features/integrations/mcp-servers/mcp-server-form-page"
@@ -18,16 +22,15 @@ import { KnowledgeDocumentPage } from "@/features/knowledge-base/knowledge-docum
 import { KnowledgeQAListPage } from "@/features/knowledge-base/knowledge-qa-list-page"
 import { KnowledgeQAFormPage } from "@/features/knowledge-base/knowledge-qa-form-page"
 import { KnowledgeBaseFormPage } from "@/features/knowledge-base/knowledge-base-form-page"
-import { KnowledgeBaseIndexPage } from "@/features/knowledge-base/knowledge-base-index-page"
-import { KnowledgeBaseLayout } from "@/features/knowledge-base/knowledge-base-layout"
+import { KnowledgeBaseListPage } from "@/features/knowledge-base/knowledge-base-list-page"
 import { RoleFormPage } from "@/features/roles/role-form-page"
 import { SettingsPage } from "@/features/settings/settings-page"
 
 /** 需要公共外壳的路由前缀，同一前缀下的页面渲染在对应布局内。 */
-const workspaceRouteLayouts = [
-  { prefix: "/knowledge-bases", element: <KnowledgeBaseLayout /> },
-  { prefix: "/channels", element: <ChannelsLayout /> },
-]
+const workspaceRouteLayouts = agentsModulePaths.map((prefix) => ({
+  prefix,
+  element: <AgentsModuleLayout />,
+}))
 
 /** 工作台路由清单，地址解析与页面渲染共用同一份定义。 */
 const workspaceRouteDefinitions = [
@@ -85,26 +88,6 @@ const workspaceRouteDefinitions = [
     element: <ContactsPage scope="employees" />,
   },
   {
-    path: "/contacts/ai-employees",
-    element: <ContactsPage scope="agents" />,
-  },
-  {
-    path: "/contacts/ai-employees/new",
-    element: (
-      <ContactsPage scope="agents">
-        <AgentFormPage mode="create" />
-      </ContactsPage>
-    ),
-  },
-  {
-    path: "/contacts/ai-employees/:agentId",
-    element: (
-      <ContactsPage scope="agents">
-        <AgentFormPage mode="edit" />
-      </ContactsPage>
-    ),
-  },
-  {
     path: "/contacts/teams",
     element: <ContactsPage scope="team" />,
   },
@@ -117,16 +100,28 @@ const workspaceRouteDefinitions = [
     element: <ContactsPage scope="external" />,
   },
   {
+    path: "/ai-employees",
+    element: <AgentListPage />,
+  },
+  {
+    path: "/ai-employees/new",
+    element: <AgentFormPage mode="create" />,
+  },
+  {
+    path: "/ai-employees/:agentId",
+    element: <AgentFormPage mode="edit" />,
+  },
+  {
+    path: "/channels",
+    element: <MessageChannelListPage />,
+  },
+  {
     path: "/channels/:channelType/new",
     element: <MessageChannelFormPage mode="create" />,
   },
   {
     path: "/channels/:channelType/:channelId",
     element: <MessageChannelFormPage mode="edit" />,
-  },
-  {
-    path: "/channels/:channelType",
-    element: <MessageChannelListPage />,
   },
   {
     path: "/knowledge-bases/new",
@@ -166,31 +161,19 @@ const workspaceRouteDefinitions = [
   },
   {
     path: "/knowledge-bases",
-    element: <KnowledgeBaseIndexPage />,
+    element: <KnowledgeBaseListPage />,
   },
   {
-    path: "/settings/mcp-servers/new",
-    element: (
-      <SettingsPage section="mcpServers">
-        <MCPServerFormPage mode="create" />
-      </SettingsPage>
-    ),
+    path: "/tools",
+    element: <MCPServerListPage />,
   },
   {
-    path: "/settings/mcp-servers/:mcpServerId",
-    element: (
-      <SettingsPage section="mcpServers">
-        <MCPServerFormPage mode="edit" />
-      </SettingsPage>
-    ),
+    path: "/tools/new",
+    element: <MCPServerFormPage mode="create" />,
   },
   {
-    path: "/settings/mcp-servers",
-    element: (
-      <SettingsPage section="mcpServers">
-        <MCPServerListPage />
-      </SettingsPage>
-    ),
+    path: "/tools/:mcpServerId",
+    element: <MCPServerFormPage mode="edit" />,
   },
   {
     path: "/settings/model-services/chat/new",
@@ -305,7 +288,6 @@ const workspaceRouteObjects: RouteObject[] = [
 const workspaceRedirects: Readonly<Record<string, string>> = {
   "/settings": "/settings/profile",
   "/contacts": "/contacts/employees",
-  "/channels": "/channels/website",
   "/settings/model-services": "/settings/model-services/chat",
 }
 

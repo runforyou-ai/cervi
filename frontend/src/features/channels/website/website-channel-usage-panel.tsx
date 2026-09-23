@@ -274,7 +274,7 @@ export function WebsiteChannelUsagePanel({
       if (recoverSession(submitError, navigate)) return false
       if (isNotFoundApiError(submitError)) {
         console.warn("网站渠道不存在", { channel_id: channel.id })
-        navigate(`/channels/${channel.type}`, { replace: true })
+        navigate("/channels", { replace: true })
         return false
       }
       console.warn("保存网站渠道允许使用的网站失败", submitError)

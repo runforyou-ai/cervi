@@ -116,7 +116,7 @@ func (f resolutionFixture) process(t *testing.T, sessionID string) servermodels.
 }
 
 // testAgentResolution 验证 AI 确认解决后关单、确认请求与超时跟进后的客户失联关单，以及客户回复对确认请求的清除。
-func testAgentResolution(t *testing.T, db *bun.DB, identity *servermodels.Identity, roleID, providerID, modelID string) {
+func testAgentResolution(t *testing.T, db *bun.DB, identity *servermodels.Identity, providerID, modelID string) {
 	tasks := newTestTasks(db)
 	if err := tasks.Registry().RegisterJSON(agentrunaction.RunActionName, func(context.Context, agentrunaction.RunInput) error { return nil }); err != nil {
 		t.Fatal(err)
@@ -126,7 +126,7 @@ func testAgentResolution(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		t.Fatal(err)
 	}
 	f := resolutionFixture{
-		handoffFixture: handoffFixture{db: db, identity: identity, tasks: tasks, roleID: roleID, providerID: providerID, modelID: modelID},
+		handoffFixture: handoffFixture{db: db, identity: identity, tasks: tasks, providerID: providerID, modelID: modelID},
 		timeouts:       servicetimeout.NewWorker(db, newTestTasks(db), agentrunaction.NewScheduler(tasks)),
 		settings:       settings,
 	}

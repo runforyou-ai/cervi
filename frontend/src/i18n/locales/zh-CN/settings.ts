@@ -17,7 +17,6 @@ const settings = {
     customerService: "客服",
     roles: "角色与权限",
     modelServices: "模型服务",
-    mcpServers: "MCP 服务",
     webhooks: "Webhook",
     openApi: "开放接口",
   },

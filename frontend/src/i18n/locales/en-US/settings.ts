@@ -17,7 +17,6 @@ const settings = {
     customerService: "Customer service",
     roles: "Roles and permissions",
     modelServices: "Model services",
-    mcpServers: "MCP servers",
     webhooks: "Webhooks",
     openApi: "Developer API",
   },
