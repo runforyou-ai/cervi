@@ -16,8 +16,8 @@ const (
 	mediaWindowPercent = 20
 	// mediaTokens 按常见多模态模型单个图片或媒体片段的输入上限估算 Token。
 	mediaTokens = 1280
-	// maxMediaBytes 单个附件随请求直传的字节上限，超出时只保留正文中的链接。
-	maxMediaBytes = 10 << 20
+	// MaxMediaBytes 是单个附件随请求直传的字节上限，超出时只保留正文中的链接。
+	MaxMediaBytes = 10 << 20
 	// maxRunMediaBytes 单次运行上下文直传附件的累计字节上限。
 	maxRunMediaBytes = 20 << 20
 )

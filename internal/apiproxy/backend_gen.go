@@ -514,6 +514,11 @@ func (b *Backend) GetAgentRunProcess(ctx context.Context, meta appservice.Reques
 	return output, err
 }
 
+// AuthorizeAgentRunStreamAccess 校验当前成员对运行所属会话的阅读资格，原生端读取本机执行中运行的过程流前调用。
+func (b *Backend) AuthorizeAgentRunStreamAccess(ctx context.Context, meta appservice.RequestMeta, runID string) error {
+	return b.do(ctx, meta, http.MethodGet, "/agent-runs/"+url.PathEscape(runID)+"/stream-access", nil, nil, nil)
+}
+
 // ListMessageChannels 返回消息渠道列表。
 func (b *Backend) ListMessageChannels(ctx context.Context, meta appservice.RequestMeta) (appservice.MessageChannelList, error) {
 	var output appservice.MessageChannelList

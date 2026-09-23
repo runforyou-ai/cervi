@@ -221,6 +221,9 @@ type Backend interface {
 	// GetAgentRunProcess 返回一次已完成运行的有序过程内容和模型用量。
 	//cervi:route GET /agent-runs/:runID/process
 	GetAgentRunProcess(context.Context, RequestMeta, string) (AgentRunProcess, error)
+	// AuthorizeAgentRunStreamAccess 校验当前成员对运行所属会话的阅读资格，原生端读取本机执行中运行的过程流前调用。
+	//cervi:route GET /agent-runs/:runID/stream-access
+	AuthorizeAgentRunStreamAccess(context.Context, RequestMeta, string) error
 	// ListMessageChannels 返回消息渠道列表。
 	//cervi:route GET /channels
 	ListMessageChannels(context.Context, RequestMeta) (MessageChannelList, error)

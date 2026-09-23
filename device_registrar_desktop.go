@@ -58,9 +58,12 @@ func newDeviceRegistrar(appStorage nativeStorage, backend *apiproxy.Backend, ses
 		slog.Error("创建本机 Agent 运行时失败，本机设备不注册", "error", err)
 		return nil
 	}
+	worker := devicehost.NewWorker(registrar, appStorage, backend, runtime)
+	// 本机界面查看本机执行中的运行时直接读取本机过程流。
+	backend.UseLocalRunStreams(worker)
 	return &desktopDevice{
 		Registrar:  registrar,
-		worker:     devicehost.NewWorker(registrar, appStorage, backend, runtime),
+		worker:     worker,
 		workspaces: devicehost.NewWorkspaces(registrar, appStorage, backend, appservicenative.SelectWorkspaceDirectory),
 	}
 }

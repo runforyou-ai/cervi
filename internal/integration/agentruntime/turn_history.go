@@ -33,7 +33,7 @@ func (h *turnHistory) appendInput(ctx context.Context, messages []Message, media
 	for i := len(fresh) - 1; i >= 0; i-- {
 		attachment := fresh[i].Media
 		if attachment == nil || fresh[i].Role != MessageRoleUser || h.mediaCount >= media.maxCount ||
-			attachment.ByteSize > maxMediaBytes || h.mediaBytes+attachment.ByteSize > maxRunMediaBytes {
+			attachment.ByteSize > MaxMediaBytes || h.mediaBytes+attachment.ByteSize > maxRunMediaBytes {
 			continue
 		}
 		modality, supported := inlineMediaTypes[attachment.MIMEType]

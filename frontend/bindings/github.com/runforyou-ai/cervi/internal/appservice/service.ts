@@ -45,6 +45,13 @@ export function AddTeamMembers(meta: $models.RequestMeta, teamID: string, input:
 }
 
 /**
+ * AuthorizeAgentRunStreamAccess 校验当前成员对运行所属会话的阅读资格，原生端读取本机执行中运行的过程流前调用。
+ */
+export function AuthorizeAgentRunStreamAccess(meta: $models.RequestMeta, runID: string): $CancellablePromise<void> {
+    return $Call.ByID(3380917493, meta, runID);
+}
+
+/**
  * CancelFileUpload 将未发送的临时文件交给清理任务。
  */
 export function CancelFileUpload(meta: $models.RequestMeta, fileID: string): $CancellablePromise<void> {

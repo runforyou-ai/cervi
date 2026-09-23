@@ -56,6 +56,16 @@ type DeviceRunClaimedInput struct {
 	Messages   json.RawMessage `json:"messages"`
 }
 
+// DeviceRunKnowledgeSearchInput 定义设备运行的知识检索参数，检索参数是运行时的不透明 JSON。
+type DeviceRunKnowledgeSearchInput struct {
+	Request json.RawMessage `json:"request"`
+}
+
+// DeviceRunKnowledgeSearchResult 定义设备运行的知识检索结果，检索结果是运行时的不透明 JSON。
+type DeviceRunKnowledgeSearchResult struct {
+	Result json.RawMessage `json:"result"`
+}
+
 // DeviceRunResultInput 定义设备运行的成功结果；结束方式、用量与过程内容块是运行时的不透明 JSON，为空表示直接回答且没有过程内容。
 type DeviceRunResultInput struct {
 	Content  string          `json:"content"`

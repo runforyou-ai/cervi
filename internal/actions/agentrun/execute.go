@@ -176,7 +176,7 @@ func (a *ExecuteAction) runAssigned(assigned runAssignment) (agentruntime.RunRes
 		OnStream: func(delta agentruntime.StreamDelta) {
 			// 运行 context 已取消时丢弃增量。
 			if assigned.RunCtx.Err() == nil {
-				running.stream.publish(delta)
+				running.stream.Publish(delta)
 			}
 		},
 	}, feed)

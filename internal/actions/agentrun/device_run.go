@@ -15,6 +15,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
+	"github.com/runforyou-ai/cervi/internal/integration/knowledgeretrieval"
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/runforyou-ai/cervi/internal/storage/server/pgerr"
@@ -206,8 +207,8 @@ func (a *ExecuteAction) deviceAssignment(ctx context.Context, runID string, poli
 	if terminal {
 		return nil, ErrDeviceRunUnavailable
 	}
-	// 设备执行不加载企业远程 MCP 服务与知识检索。
-	assignment, err := a.resolveAssignment(ctx, execution, policy, agentruntime.Capabilities{})
+	// 设备执行不加载企业远程 MCP 服务，配置版本绑定知识库时经服务端检索。
+	assignment, err := a.resolveAssignment(ctx, execution, policy, agentruntime.Capabilities{Knowledge: len(execution.KnowledgeBaseIDs) > 0})
 	if err != nil {
 		return nil, err
 	}
@@ -301,6 +302,37 @@ func (a *ExecuteAction) ClaimDeviceRunInputs(ctx context.Context, device RunDevi
 		return DeviceClaimedInput{}, err
 	}
 	return DeviceClaimedInput{Input: claimed}, nil
+}
+
+// SearchDeviceRunKnowledge 在设备持有运行的配置版本绑定的知识库中检索。
+func (a *ExecuteAction) SearchDeviceRunKnowledge(ctx context.Context, device RunDevice, runID string, request knowledgeretrieval.Request) (knowledgeretrieval.Result, error) {
+	if _, err := a.requireDeviceLease(ctx, device, runID); err != nil {
+		return knowledgeretrieval.Result{}, err
+	}
+	execution, terminal, err := a.loadExecution(ctx, runID)
+	if err != nil {
+		return knowledgeretrieval.Result{}, err
+	}
+	if terminal {
+		return knowledgeretrieval.Result{}, ErrDeviceRunLeaseLost
+	}
+	search, err := loadRunKnowledgeSearch(ctx, a.db, a.knowledge, execution)
+	if err != nil {
+		return knowledgeretrieval.Result{}, fmt.Errorf("load device agent run knowledge bases: %w", err)
+	}
+	if search == nil {
+		return knowledgeretrieval.Result{}, errors.New("device agent run has no bound knowledge bases")
+	}
+	return search(ctx, request)
+}
+
+// ReadDeviceRunAttachment 读取设备持有运行所属会话中指定附件消息的文件内容。
+func (a *ExecuteAction) ReadDeviceRunAttachment(ctx context.Context, device RunDevice, runID, messageID string) ([]byte, error) {
+	run, err := a.requireDeviceLease(ctx, device, runID)
+	if err != nil {
+		return nil, err
+	}
+	return a.attachments.Content(ctx, run, messageID)
 }
 
 // CompleteDeviceRun 按设备上报的运行结果收尾；运行已进入终态时只保留过程内容，重复上报保持幂等；租约已过期或运行超出总时限时收敛为失败、保留过程内容并返回 ErrDeviceRunLeaseLost。

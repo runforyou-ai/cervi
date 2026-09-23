@@ -13,6 +13,7 @@ import (
 	"strings"
 	"sync"
 	"time"
+	"uuid"
 
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
@@ -43,6 +44,8 @@ type RunClient interface {
 	OpenDeviceEventStream(context.Context, appservice.RequestMeta) (io.ReadCloser, error)
 	// DeviceModelEndpoint 返回运行的模型代理入口与附加本机设备认证的传输层。
 	DeviceModelEndpoint(context.Context, appservice.RequestMeta, string) (string, http.RoundTripper, error)
+	// ReadDeviceRunAttachment 读取运行所属会话中指定附件消息的文件内容。
+	ReadDeviceRunAttachment(ctx context.Context, meta appservice.RequestMeta, runID, messageID string) ([]byte, error)
 }
 
 // WorkspaceStore 读取本机工作区的本地路径。
@@ -72,10 +75,13 @@ type Worker struct {
 	busy map[string]bool
 }
 
-// activeRun 是本机正在执行的一次运行。
+// activeRun 是本机登记执行的一次运行；过程流在登记时创建，释放登记时结束。
+// 设备只领取排队中的运行，领取后不再回到排队，同一运行在设备上只执行一次，尝试序号固定为 1。
 type activeRun struct {
 	workspaceID string
 	renewNow    chan struct{}
+	streamID    string
+	stream      *agentruntime.StreamHub
 }
 
 // NewWorker 创建设备执行循环；当前平台不注册本机设备时返回 nil。
@@ -186,23 +192,59 @@ func (w *Worker) reserve(run appservice.DeviceWorkRun) bool {
 	if w.active[run.RunID] != nil || (run.WorkspaceID != "" && w.busy[run.WorkspaceID]) {
 		return false
 	}
-	w.active[run.RunID] = &activeRun{workspaceID: run.WorkspaceID, renewNow: make(chan struct{}, 1)}
+	streamID := uuid.NewV7().String()
+	w.active[run.RunID] = &activeRun{
+		workspaceID: run.WorkspaceID, renewNow: make(chan struct{}, 1), streamID: streamID,
+		stream: agentruntime.NewStreamHub(agentruntime.StreamSnapshot{RunID: run.RunID, StreamID: streamID, Attempt: 1}),
+	}
 	if run.WorkspaceID != "" {
 		w.busy[run.WorkspaceID] = true
 	}
 	return true
 }
 
-// release 移除本机对运行及其工作区的登记。
+// release 移除本机对运行及其工作区的登记并结束运行的过程流。
 func (w *Worker) release(runID string) {
 	w.mu.Lock()
-	defer w.mu.Unlock()
-	if current := w.active[runID]; current != nil {
+	current := w.active[runID]
+	if current != nil {
 		if current.workspaceID != "" {
 			delete(w.busy, current.workspaceID)
 		}
 		delete(w.active, runID)
 	}
+	w.mu.Unlock()
+	if current != nil {
+		current.stream.End()
+	}
+}
+
+// RunsLocally 判断运行是否已在本机登记执行。
+func (w *Worker) RunsLocally(runID string) bool {
+	if w == nil {
+		return false
+	}
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.active[runID] != nil
+}
+
+// SubscribeLocalRunStream 订阅本机登记执行的运行的过程流，返回订阅时的快照与取消订阅函数，回调在运行流锁内执行；运行不在本机或过程流已结束时返回 false。
+func (w *Worker) SubscribeLocalRunStream(runID string, onDelta func(agentruntime.StreamDelta), onEnd func()) (agentruntime.StreamSnapshot, func(), bool) {
+	if w == nil {
+		return agentruntime.StreamSnapshot{}, nil, false
+	}
+	w.mu.Lock()
+	current := w.active[runID]
+	w.mu.Unlock()
+	if current == nil {
+		return agentruntime.StreamSnapshot{}, nil, false
+	}
+	snapshot, subscription, ok := current.stream.Subscribe(onDelta, onEnd)
+	if !ok {
+		return agentruntime.StreamSnapshot{}, nil, false
+	}
+	return snapshot, subscription.Close, true
 }
 
 // start 校验本机工作区并领取运行，领取成功后启动执行与续租，返回是否需要尽快重新检查；不使用工作区的运行直接领取。
@@ -225,7 +267,7 @@ func (w *Worker) start(ctx context.Context, session deviceSession, meta appservi
 		return errorReason(err) != "run_unavailable"
 	}
 	w.mu.Lock()
-	renewNow := w.active[run.RunID].renewNow
+	local := w.active[run.RunID]
 	w.mu.Unlock()
 	runCtx, cancelRun := context.WithCancel(w.ctx)
 	// 服务端给出的续租间隔无效时按默认间隔续租。
@@ -234,8 +276,8 @@ func (w *Worker) start(ctx context.Context, session deviceSession, meta appservi
 		interval = defaultLeaseRenewInterval
 	}
 	w.runs.Add(2)
-	go w.renew(runCtx, cancelRun, meta, run.RunID, interval, renewNow)
-	go w.execute(runCtx, cancelRun, meta, run.RunID, claim)
+	go w.renew(runCtx, cancelRun, meta, run.RunID, interval, local.renewNow)
+	go w.execute(runCtx, cancelRun, meta, run.RunID, claim, local)
 	slog.Info("设备运行已领取", "agent_run_id", run.RunID, "workspace_id", run.WorkspaceID, "lease_expires_at", claim.LeaseExpiresAt)
 	return false
 }
@@ -264,12 +306,12 @@ func (w *Worker) checkWorkspace(ctx context.Context, session deviceSession, meta
 }
 
 // execute 在本机执行一次已领取的运行，出错时上报失败与已产生的过程内容。
-func (w *Worker) execute(runCtx context.Context, cancelRun context.CancelFunc, meta appservice.RequestMeta, runID string, claim appservice.DeviceRunClaim) {
+func (w *Worker) execute(runCtx context.Context, cancelRun context.CancelFunc, meta appservice.RequestMeta, runID string, claim appservice.DeviceRunClaim, local *activeRun) {
 	defer w.runs.Done()
 	defer w.Wake()
 	defer w.release(runID)
 	defer cancelRun()
-	result, err := w.runAgent(runCtx, meta, runID, claim)
+	result, err := w.runAgent(runCtx, meta, runID, claim, local)
 	// 本机执行循环停止时不再上报；运行已在服务端结束或失效且没有过程内容时无需上报。
 	ended := runCtx.Err() != nil || errors.Is(err, errRunSuppressed)
 	if err == nil || w.ctx.Err() != nil || (ended && len(result.Blocks) == 0) {

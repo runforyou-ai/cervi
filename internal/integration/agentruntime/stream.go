@@ -141,6 +141,18 @@ func MergeStreamDeltas(earlier, later StreamDelta) (StreamDelta, bool) {
 	return merged, true
 }
 
+// TextBytes 返回增量中全部操作携带的文本字节数。
+func (d StreamDelta) TextBytes() int {
+	total := 0
+	for _, operation := range d.Operations {
+		total += len(operation.Text)
+		if operation.Block != nil {
+			total += len(operation.Block.Text)
+		}
+	}
+	return total
+}
+
 // Clone 复制快照供独立读取。
 func (s StreamSnapshot) Clone() StreamSnapshot {
 	s.Blocks = slices.Clone(s.Blocks)

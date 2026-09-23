@@ -21,7 +21,7 @@ type runningAgentRun struct {
 	cancel   context.CancelFunc
 	attempt  int
 	streamID string
-	stream   *runStream
+	stream   *agentruntime.StreamHub
 }
 
 // CancelForServiceSession 在客服事务内取消原负责人尚未结束的运行。
@@ -110,7 +110,7 @@ func (a *ExecuteAction) registerRunContext(ctx context.Context, runID string, ca
 	execution, _ := servertask.CurrentExecution(ctx)
 	streamID := uuid.NewV7().String()
 	running := &runningAgentRun{cancel: cancel, attempt: execution.Attempt, streamID: streamID,
-		stream: newRunStream(agentruntime.StreamSnapshot{RunID: runID, StreamID: streamID, Attempt: execution.Attempt})}
+		stream: agentruntime.NewStreamHub(agentruntime.StreamSnapshot{RunID: runID, StreamID: streamID, Attempt: execution.Attempt})}
 	a.runningMu.Lock()
 	if previous := a.runningRuns[runID]; previous != nil {
 		if previous.attempt >= running.attempt {
@@ -127,6 +127,6 @@ func (a *ExecuteAction) registerRunContext(ctx context.Context, runID string, ca
 			delete(a.runningRuns, runID)
 		}
 		a.runningMu.Unlock()
-		running.stream.end()
+		running.stream.End()
 	}, nil
 }

@@ -15,6 +15,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
+	"github.com/runforyou-ai/cervi/internal/integration/knowledgeretrieval"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 )
 
@@ -136,6 +137,26 @@ func (o *directOperations) ClaimDeviceRunInputs(ctx context.Context, meta Reques
 	return DeviceRunClaimedInput{EndSeq: claimed.Input.EndSeq, Messages: messages}, nil
 }
 
+// SearchDeviceRunKnowledge 在本设备持有运行绑定的知识库中检索。
+func (o *directOperations) SearchDeviceRunKnowledge(ctx context.Context, meta RequestMeta, device deviceIdentity, runID string, input DeviceRunKnowledgeSearchInput) (DeviceRunKnowledgeSearchResult, error) {
+	if !common.ValidUUID(runID) {
+		return DeviceRunKnowledgeSearchResult{}, NotFoundError(meta, cervii18n.ErrorDeviceRunNotFound)
+	}
+	var request knowledgeretrieval.Request
+	if err := json.Unmarshal(input.Request, &request); err != nil {
+		return DeviceRunKnowledgeSearchResult{}, InvalidError(meta, cervii18n.ErrorValidationFailed, nil)
+	}
+	result, err := o.agentCoordinator.SearchDeviceRunKnowledge(ctx, device.device, runID, request)
+	if err != nil {
+		return DeviceRunKnowledgeSearchResult{}, o.deviceRunError(ctx, meta, err, device, runID)
+	}
+	encoded, err := json.Marshal(result)
+	if err != nil {
+		return DeviceRunKnowledgeSearchResult{}, o.deviceRunError(ctx, meta, fmt.Errorf("encode knowledge search result: %w", err), device, runID)
+	}
+	return DeviceRunKnowledgeSearchResult{Result: encoded}, nil
+}
+
 // CompleteDeviceRun 以成功结果收尾本设备持有的运行。
 func (o *directOperations) CompleteDeviceRun(ctx context.Context, meta RequestMeta, device deviceIdentity, runID string, input DeviceRunResultInput) error {
 	if !common.ValidUUID(runID) {
@@ -209,6 +230,25 @@ func (b *DirectBackend) AuthorizeDeviceModelRequest(ctx context.Context, meta Re
 		return DeviceModelUpstream{}, b.ops.deviceRunError(ctx, meta, fmt.Errorf("normalize device model upstream: %w", err), device, runID)
 	}
 	return DeviceModelUpstream{Brand: upstream.Brand, BaseURL: baseURL, APIKey: upstream.APIKey, Identifier: upstream.Identifier}, nil
+}
+
+// ReadDeviceRunAttachment 校验请求来自持有该运行有效租约的本人未撤销设备，并返回运行所属会话中指定附件消息的文件内容。
+func (b *DirectBackend) ReadDeviceRunAttachment(ctx context.Context, meta RequestMeta, runID, messageID string) ([]byte, error) {
+	device, err := b.ops.authenticateDevice(ctx, meta)
+	if err != nil {
+		return nil, err
+	}
+	if !common.ValidUUID(runID) {
+		return nil, NotFoundError(meta, cervii18n.ErrorDeviceRunNotFound)
+	}
+	content, err := b.ops.agentCoordinator.ReadDeviceRunAttachment(ctx, device.device, runID, messageID)
+	if errors.Is(err, agentrunaction.ErrAttachmentUnavailable) {
+		return nil, NotFoundError(meta, cervii18n.ErrorFileNotFound)
+	}
+	if err != nil {
+		return nil, b.ops.deviceRunError(ctx, meta, err, device, runID)
+	}
+	return content, nil
 }
 
 // deviceRunError 转换设备运行期错误：运行不存在、不可领取、工作区忙与租约失效给出稳定原因码，其余记录日志后按请求失败收敛。

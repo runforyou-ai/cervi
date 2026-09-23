@@ -94,7 +94,7 @@ func TestTurnHistoryInlinesRecentMedia(t *testing.T) {
 		{ID: "old", Role: MessageRoleUser, Content: "旧图", Media: png},
 		{ID: "svg", Role: MessageRoleUser, Content: "矢量图", Media: &Media{MIMEType: "image/svg+xml", ByteSize: 10}},
 		{ID: "video", Role: MessageRoleUser, Content: "视频", Media: &Media{MIMEType: "video/mp4", ByteSize: 10}},
-		{ID: "large", Role: MessageRoleUser, Content: "大图", Media: &Media{MIMEType: "image/png", ByteSize: maxMediaBytes + 1}},
+		{ID: "large", Role: MessageRoleUser, Content: "大图", Media: &Media{MIMEType: "image/png", ByteSize: MaxMediaBytes + 1}},
 		{ID: "voice", Role: MessageRoleUser, Content: "语音", Media: &Media{MIMEType: "audio/wav", ByteSize: 2048}},
 		{ID: "new", Role: MessageRoleUser, Content: "新图", Media: png},
 	}, mediaInput{read: read, modalities: visual, maxCount: 2})
