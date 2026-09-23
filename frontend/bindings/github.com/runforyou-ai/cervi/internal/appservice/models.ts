@@ -79,12 +79,13 @@ export enum AIModelType {
 };
 
 /**
- * AIPerformanceBreakdown 定义按渠道或咨询分类拆分的已关闭周期数与 AI 独立解决数；ID 为空表示未分类。
+ * AIPerformanceBreakdown 定义按渠道或咨询分类拆分的已关闭周期数、已解决数与 AI 独立解决数；ID 为空表示未分类。
  */
 export interface AIPerformanceBreakdown {
     "id": string;
     "name": string;
     "closed": number;
+    "resolved": number;
     "aiResolved": number;
 }
 
@@ -138,11 +139,15 @@ export interface AIPerformanceReportInput {
 }
 
 /**
- * AIPerformanceSummary 定义统计范围内已关闭周期的整体计数；AIResolved 为 AI 独立解决的周期数，HandedOff 为发生过转人工的周期数，CloseAIResolved 等为按结束方式的周期数。
+ * AIPerformanceSummary 定义统计范围内已关闭周期的计数，排除小结状态为无实质诉求的周期：Resolved 与 Unresolved 按小结的是否解决计数，其余为未判定；AIOnly 为 AI 员工独立处理并关闭的周期数，AIResolved 与 AIUnresolved 为其中的已解决与未解决数；HandedOff 为发生过转人工的周期数，CloseAIResolved 等为按结束方式的周期数。
  */
 export interface AIPerformanceSummary {
     "closed": number;
+    "resolved": number;
+    "unresolved": number;
+    "aiOnly": number;
     "aiResolved": number;
+    "aiUnresolved": number;
     "handedOff": number;
     "closeAiResolved": number;
     "customerUnresponsive": number;

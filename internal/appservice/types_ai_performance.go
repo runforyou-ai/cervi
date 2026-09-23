@@ -20,10 +20,14 @@ type AIPerformanceReportInput struct {
 	ChannelID string `json:"channelId" query:"channelId"`
 }
 
-// AIPerformanceSummary 定义统计范围内已关闭周期的整体计数；AIResolved 为 AI 独立解决的周期数，HandedOff 为发生过转人工的周期数，CloseAIResolved 等为按结束方式的周期数。
+// AIPerformanceSummary 定义统计范围内已关闭周期的计数，排除小结状态为无实质诉求的周期：Resolved 与 Unresolved 按小结的是否解决计数，其余为未判定；AIOnly 为 AI 员工独立处理并关闭的周期数，AIResolved 与 AIUnresolved 为其中的已解决与未解决数；HandedOff 为发生过转人工的周期数，CloseAIResolved 等为按结束方式的周期数。
 type AIPerformanceSummary struct {
 	Closed               int `json:"closed"`
+	Resolved             int `json:"resolved"`
+	Unresolved           int `json:"unresolved"`
+	AIOnly               int `json:"aiOnly"`
 	AIResolved           int `json:"aiResolved"`
+	AIUnresolved         int `json:"aiUnresolved"`
 	HandedOff            int `json:"handedOff"`
 	CloseAIResolved      int `json:"closeAiResolved"`
 	CustomerUnresponsive int `json:"customerUnresponsive"`
@@ -54,11 +58,12 @@ type AIPerformanceBreakdownInput struct {
 	PageSize  int                    `json:"pageSize" query:"pageSize,default=50"`
 }
 
-// AIPerformanceBreakdown 定义按渠道或咨询分类拆分的已关闭周期数与 AI 独立解决数；ID 为空表示未分类。
+// AIPerformanceBreakdown 定义按渠道或咨询分类拆分的已关闭周期数、已解决数与 AI 独立解决数；ID 为空表示未分类。
 type AIPerformanceBreakdown struct {
 	ID         string `json:"id"`
 	Name       string `json:"name"`
 	Closed     int    `json:"closed"`
+	Resolved   int    `json:"resolved"`
 	AIResolved int    `json:"aiResolved"`
 }
 

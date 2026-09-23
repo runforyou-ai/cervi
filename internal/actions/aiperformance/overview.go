@@ -24,7 +24,11 @@ func (q *OverviewQuery) Execute(ctx context.Context, identity *servermodels.Iden
 	overview := &Overview{HandoffReasons: []ReasonCount{}}
 	if err := q.db.NewRaw(scope+`
 SELECT count(*) AS closed,
-	count(*) FILTER (WHERE ai_resolved) AS ai_resolved,
+	count(*) FILTER (WHERE resolved) AS resolved,
+	count(*) FILTER (WHERE NOT resolved) AS unresolved,
+	count(*) FILTER (WHERE ai_only) AS ai_only,
+	count(*) FILTER (WHERE ai_only AND resolved) AS ai_resolved,
+	count(*) FILTER (WHERE ai_only AND NOT resolved) AS ai_unresolved,
 	(SELECT count(DISTINCT service_session_id) FROM handoffs) AS handed_off,
 	count(*) FILTER (WHERE close_reason = ?) AS close_ai_resolved,
 	count(*) FILTER (WHERE close_reason = ?) AS customer_unresponsive,

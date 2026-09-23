@@ -13,14 +13,16 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// breakdownSQL 按拆分维度汇总已关闭周期，渠道按渠道名称分组，咨询分类未分类时 ID 为空。
+// breakdownSQL 按拆分维度汇总已关闭周期的已解决数与 AI 独立解决数，渠道按渠道名称分组，咨询分类未分类时 ID 为空。
 var breakdownSQL = map[domain.AIPerformanceDimension]string{
 	domain.AIPerformanceDimensionChannel: `
-SELECT c.id, c.name, count(*) AS closed, count(*) FILTER (WHERE closed.ai_resolved) AS ai_resolved
+SELECT c.id, c.name, count(*) AS closed, count(*) FILTER (WHERE closed.resolved) AS resolved,
+	count(*) FILTER (WHERE closed.ai_only AND closed.resolved) AS ai_resolved
 FROM closed JOIN channels c ON c.id = closed.channel_id
 GROUP BY c.id, c.name`,
 	domain.AIPerformanceDimensionCategory: `
-SELECT sc.id, coalesce(sc.name, '') AS name, count(*) AS closed, count(*) FILTER (WHERE closed.ai_resolved) AS ai_resolved
+SELECT sc.id, coalesce(sc.name, '') AS name, count(*) AS closed, count(*) FILTER (WHERE closed.resolved) AS resolved,
+	count(*) FILTER (WHERE closed.ai_only AND closed.resolved) AS ai_resolved
 FROM closed LEFT JOIN service_categories sc ON sc.id = closed.category_id
 GROUP BY sc.id, sc.name`,
 }
