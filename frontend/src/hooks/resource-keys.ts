@@ -142,6 +142,8 @@ export const resourceKeys = {
   customerIdentitySecret: () => ["customer-identity-secret"],
   /** 当前企业的咨询分类目录。 */
   serviceCategories: () => ["service-categories"],
+  /** AI 表现报表，参数包含统计天数与渠道。 */
+  aiPerformanceReport: (parameters?: KeyParameters) => listKey("ai-performance-report", parameters),
   /** 当前客户端连接的企业服务器地址。 */
   serverURL: () => ["server-url"],
   /** 知识库列表。 */

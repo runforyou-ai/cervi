@@ -914,6 +914,11 @@ func (s *Service) DeleteServiceCategory(ctx context.Context, meta RequestMeta, c
 	return s.backend.DeleteServiceCategory(ctx, meta, categoryID)
 }
 
+// GetAIPerformanceReport 返回当前企业指定范围内的 AI 客服表现报表。
+func (s *Service) GetAIPerformanceReport(ctx context.Context, meta RequestMeta, input AIPerformanceReportInput) (AIPerformanceReport, error) {
+	return withNormalizedSlices(s.backend.GetAIPerformanceReport(ctx, meta, input))
+}
+
 // RegisterDevice 注册当前用户的本机设备。
 func (s *Service) RegisterDevice(ctx context.Context, meta RequestMeta, input DeviceRegistrationInput) (Device, error) {
 	return withNormalizedSlices(s.backend.RegisterDevice(ctx, meta, input))

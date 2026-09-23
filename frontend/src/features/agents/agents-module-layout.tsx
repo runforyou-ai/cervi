@@ -1,5 +1,5 @@
-/** AI 员工模块的分栏外壳：二级栏固定为 AI 员工、渠道、知识库、工具四个入口。 */
-import { BotIcon, LibraryIcon, PlugIcon, RadioTowerIcon } from "lucide-react"
+/** AI 员工模块的分栏外壳：二级栏固定为表现、AI 员工、渠道、知识库、工具五个入口。 */
+import { BotIcon, ChartColumnIcon, LibraryIcon, PlugIcon, RadioTowerIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { Outlet, useLocation, useNavigate } from "react-router"
 
@@ -8,6 +8,7 @@ import { NativeSelect } from "@/components/ui/native-select"
 
 /** 模块入口：路径前缀、图标和导航文案。 */
 const agentsModuleEntries = [
+  { path: "/ai-performance", icon: ChartColumnIcon, label: "navigation.performance" },
   { path: "/ai-employees", icon: BotIcon, label: "navigation.agents" },
   { path: "/channels", icon: RadioTowerIcon, label: "navigation.channels" },
   { path: "/knowledge-bases", icon: LibraryIcon, label: "navigation.knowledgeBases" },

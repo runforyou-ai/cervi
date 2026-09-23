@@ -388,6 +388,13 @@ export function GenerateCustomerReplySuggestions(meta: $models.RequestMeta, conv
 }
 
 /**
+ * GetAIPerformanceReport 返回当前企业指定范围内的 AI 客服表现报表。
+ */
+export function GetAIPerformanceReport(meta: $models.RequestMeta, input: $models.AIPerformanceReportInput): $CancellablePromise<$models.AIPerformanceReport> {
+    return $Call.ByID(3120646064, meta, input);
+}
+
+/**
  * GetAIProvider 返回当前企业中的模型服务供应商详情。
  */
 export function GetAIProvider(meta: $models.RequestMeta, providerID: string): $CancellablePromise<$models.AIProvider> {

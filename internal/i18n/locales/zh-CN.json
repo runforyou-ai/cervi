@@ -330,6 +330,7 @@
   "error.service_category_delete_failed": "删除咨询分类失败。",
   "error.service_category_not_found": "没有找到这个咨询分类。",
   "error.service_category_limit_reached": "咨询分类最多 100 个。",
+  "error.ai_performance_report_load_failed": "读取 AI 表现报表失败。",
   "error.server_url_invalid": "请输入有效的企业服务器地址。",
   "error.server_unavailable": "无法连接到 Cervi 企业服务器。",
   "error.server_connection_save_failed": "保存企业服务器地址失败。",

@@ -197,6 +197,7 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.POST("/settings/customer-service/categories", s.createServiceCategory)
 	router.PUT("/settings/customer-service/categories/:categoryID", s.updateServiceCategory)
 	router.DELETE("/settings/customer-service/categories/:categoryID", s.deleteServiceCategory)
+	router.GET("/reports/ai-performance", s.getAIPerformanceReport)
 	router.POST("/devices", s.registerDevice)
 	router.GET("/devices", s.listDevices)
 	router.DELETE("/devices/:deviceID", s.revokeDevice)
@@ -1669,6 +1670,16 @@ func (s *Service) deleteServiceCategory(c *gin.Context) {
 	writeEmpty(c, s.application.DeleteServiceCategory(c.Request.Context(), requestMeta(c), c.Param("categoryID")))
 }
 
+// getAIPerformanceReport 返回当前企业指定范围内的 AI 客服表现报表。
+func (s *Service) getAIPerformanceReport(c *gin.Context) {
+	input, ok := bindAIPerformanceReportInputQuery(c)
+	if !ok {
+		return
+	}
+	output, err := s.application.GetAIPerformanceReport(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
 // registerDevice 注册当前用户的本机设备。
 func (s *Service) registerDevice(c *gin.Context) {
 	var input appservice.DeviceRegistrationInput
@@ -1724,6 +1735,18 @@ func (s *Service) setConversationAssistantWorkspace(c *gin.Context) {
 // clearConversationAssistantWorkspace 由主人清除会话中助理的工作区。
 func (s *Service) clearConversationAssistantWorkspace(c *gin.Context) {
 	writeEmpty(c, s.application.ClearConversationAssistantWorkspace(c.Request.Context(), requestMeta(c), c.Param("conversationID"), c.Param("assistantIdentityID")))
+}
+
+// bindAIPerformanceReportInputQuery 从查询参数解析 appservice.AIPerformanceReportInput。
+func bindAIPerformanceReportInputQuery(c *gin.Context) (appservice.AIPerformanceReportInput, bool) {
+	days, ok := positiveQueryInteger(c, "days", 30)
+	if !ok {
+		return appservice.AIPerformanceReportInput{}, false
+	}
+	return appservice.AIPerformanceReportInput{
+		Days:      days,
+		ChannelID: c.Query("channelId"),
+	}, true
 }
 
 // bindAgentListInputQuery 从查询参数解析 appservice.AgentListInput。

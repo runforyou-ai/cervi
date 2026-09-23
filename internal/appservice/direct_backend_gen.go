@@ -1820,6 +1820,16 @@ func (b *DirectBackend) DeleteServiceCategory(ctx context.Context, meta RequestM
 	return b.ops.DeleteServiceCategory(ctx, meta, identity, categoryID)
 }
 
+// GetAIPerformanceReport 返回当前企业指定范围内的 AI 客服表现报表。
+func (b *DirectBackend) GetAIPerformanceReport(ctx context.Context, meta RequestMeta, input AIPerformanceReportInput) (AIPerformanceReport, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero AIPerformanceReport
+		return zero, err
+	}
+	return b.ops.GetAIPerformanceReport(ctx, meta, identity, input)
+}
+
 // RegisterDevice 注册当前用户的本机设备。
 func (b *DirectBackend) RegisterDevice(ctx context.Context, meta RequestMeta, input DeviceRegistrationInput) (Device, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
