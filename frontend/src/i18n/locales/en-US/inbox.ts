@@ -81,7 +81,7 @@ const inbox = {
   tabAll: "All",
   pendingCount: "Pending: {{count}}",
   chatAttentionUnread: "Chat alerts: {{count}}",
-  pendingUnreadCount: "Pending with new messages: {{count}}",
+  pendingUnreadCount: "Unread in pending: {{count}}",
   pendingKindReply: "Awaiting my reply",
   pendingKindMention: "@Me",
   pendingKindQueue: "Unclaimed",

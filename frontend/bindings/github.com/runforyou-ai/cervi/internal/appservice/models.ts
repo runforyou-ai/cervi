@@ -1858,7 +1858,7 @@ export interface Inbox {
     "pendingCount": number;
 
     /**
-     * PendingUnreadCount 是本人待处理条目中有未读消息的会话数，不受当前筛选影响。
+     * PendingUnreadCount 是本人待处理条目中的未读消息总数，不受当前筛选影响。
      */
     "pendingUnreadCount": number;
 }

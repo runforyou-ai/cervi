@@ -338,12 +338,12 @@ func TestInboxPendingScope(t *testing.T) {
 	}
 }
 
-// TestInboxPendingUnreadCount 验证待处理总数只随处理变化，有未读消息的待处理会话数随本人阅读减少、随他人新消息增加，本人发言不计入，且不受列表范围与筛选影响。
+// TestInboxPendingUnreadCount 验证待处理总数只随处理变化，待处理会话中的未读消息总数随本人阅读清零、按他人新消息逐条增加，本人发言不计入，且不受列表范围与筛选影响。
 func TestInboxPendingUnreadCount(t *testing.T) {
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	query := inboxaction.NewLoadInboxQuery(f.db)
-	// counts 按各列表范围与筛选读取成员的待处理总数与有未读消息的待处理会话数，各次读取结果一致时返回。
+	// counts 按各列表范围与筛选读取成员的待处理总数与待处理会话中的未读消息总数，各次读取结果一致时返回。
 	counts := func() (int, int) {
 		t.Helper()
 		var pending, unread int
@@ -368,10 +368,10 @@ func TestInboxPendingUnreadCount(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if pending, unread := counts(); pending != 1 || unread != 1 {
+	if pending, unread := counts(); pending != 1 || unread == 0 {
 		t.Fatalf("before read pending=%d unread=%d", pending, unread)
 	}
-	// 阅读到最新消息后待处理仍在，未读会话数清零。
+	// 阅读到最新消息后待处理仍在，未读消息数清零。
 	if _, err := conversationaction.NewMarkConversationReadAction(f.db).Execute(ctx, f.member, f.conversationID, received.Message.ID, false); err != nil {
 		t.Fatal(err)
 	}
@@ -389,11 +389,13 @@ func TestInboxPendingUnreadCount(t *testing.T) {
 	if pending, unread := counts(); pending != 1 || unread != 0 {
 		t.Fatalf("after own note pending=%d unread=%d", pending, unread)
 	}
-	// 客户再次来信后重新计入未读会话数。
-	if _, err := f.visitorMessage(ctx, "还在吗"); err != nil {
-		t.Fatal(err)
+	// 客户再次来信后按消息条数计入未读。
+	for _, body := range []string{"还在吗", "急"} {
+		if _, err := f.visitorMessage(ctx, body); err != nil {
+			t.Fatal(err)
+		}
 	}
-	if pending, unread := counts(); pending != 1 || unread != 1 {
+	if pending, unread := counts(); pending != 1 || unread != 2 {
 		t.Fatalf("after new message pending=%d unread=%d", pending, unread)
 	}
 }

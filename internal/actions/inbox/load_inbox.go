@@ -148,7 +148,7 @@ type LoadInboxQuery struct {
 	db bun.IDB
 }
 
-// UnreadCounts 定义内部会话的客观未读和提醒未读总数，以及本人待处理的服务会话数与其中有未读消息的会话数。
+// UnreadCounts 定义内部会话的客观未读和提醒未读总数，以及本人待处理的服务会话数与这些会话中的未读消息总数。
 type UnreadCounts struct {
 	Unread        int `bun:"unread_count"`
 	Attention     int `bun:"attention_unread_count"`
@@ -530,7 +530,7 @@ func (q *LoadInboxQuery) loadUnreadCounts(ctx context.Context, organizationID, i
 	return counts, nil
 }
 
-// countPending 统计本人全部待处理条目及其中有本人未读消息的条目，不受当前筛选影响；未读口径与客户会话摘要一致。
+// countPending 统计本人全部待处理条目数及这些条目中本人的未读消息总数，不受当前筛选影响；未读口径与客户会话摘要一致。
 func (q *LoadInboxQuery) countPending(ctx context.Context, identity *servermodels.Identity) (int, int, error) {
 	var counts struct {
 		Pending int `bun:"pending_count"`
@@ -538,8 +538,8 @@ func (q *LoadInboxQuery) countPending(ctx context.Context, identity *servermodel
 	}
 	err := q.db.NewSelect().TableExpr("(?) AS pending", q.pendingCandidates(identity, LoadInput{Scope: domain.InboxScopePending})).
 		ColumnExpr("count(*) AS pending_count").
-		ColumnExpr(`count(*) FILTER (WHERE EXISTS (
-			SELECT 1
+		ColumnExpr(`COALESCE(sum((
+			SELECT count(*)
 			FROM messages AS unread_msg
 			JOIN conversation_participants AS sender_cp ON sender_cp.organization_id = unread_msg.organization_id AND sender_cp.conversation_id = unread_msg.conversation_id AND sender_cp.id = unread_msg.sender_participant_id
 			JOIN chat_subjects AS sender_cs ON sender_cs.organization_id = sender_cp.organization_id AND sender_cs.id = sender_cp.subject_id
@@ -547,7 +547,7 @@ func (q *LoadInboxQuery) countPending(ctx context.Context, identity *servermodel
 				AND unread_msg.type IN (?) AND unread_msg.deleted_at IS NULL
 				AND NOT (sender_cs.kind = ? AND sender_cs.source_id = ?)
 				AND unread_msg.message_seq > COALESCE(state.read_seq, 0)
-		)) AS pending_unread_count`, identity.Organization.ID, bun.In([]domain.MessageType{domain.MessageTypeText, domain.MessageTypeAttachment, domain.MessageTypeAgentError}), domain.ChatSubjectKindOrganizationIdentity, identity.OrganizationIdentity.ID).
+		)), 0) AS pending_unread_count`, identity.Organization.ID, bun.In([]domain.MessageType{domain.MessageTypeText, domain.MessageTypeAttachment, domain.MessageTypeAgentError}), domain.ChatSubjectKindOrganizationIdentity, identity.OrganizationIdentity.ID).
 		Join("LEFT JOIN conversation_user_states AS state ON state.organization_id = ? AND state.conversation_id = pending.id AND state.user_id = ?", identity.Organization.ID, identity.User.ID).
 		Scan(ctx, &counts)
 	if err != nil {

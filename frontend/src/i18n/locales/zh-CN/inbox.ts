@@ -81,7 +81,7 @@ const inbox = {
   tabAll: "全部",
   pendingCount: "{{count}} 条待处理",
   chatAttentionUnread: "{{count}} 条聊天提醒",
-  pendingUnreadCount: "{{count}} 个待处理会话有新消息",
+  pendingUnreadCount: "待处理会话中 {{count}} 条未读消息",
   pendingKindReply: "等我回复",
   pendingKindMention: "@我",
   pendingKindQueue: "待领取",

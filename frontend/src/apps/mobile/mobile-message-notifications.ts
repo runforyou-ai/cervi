@@ -85,7 +85,7 @@ export function useMobileMessageNotifications(identity: Identity | null) {
     loadInboxAttention,
     { enabled: Boolean(organizationId && userId) },
   )
-  // 应用角标合计聊天提醒未读数与有未读消息的待处理会话数，待处理总数不计入。
+  // 应用角标合计聊天提醒未读数与待处理会话中的未读消息数，待处理总数不计入。
   const unreadCount = attention.data?.total
   const attentionEnabled =
     Boolean(messageNotificationsEnabled) &&

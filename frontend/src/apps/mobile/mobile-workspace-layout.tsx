@@ -50,7 +50,7 @@ export function MobileWorkspaceLayout() {
   )
 }
 
-/** 为一级页面显示固定底部导航，收件箱显示有未读消息的待处理会话数，消息显示聊天提醒未读数。 */
+/** 为一级页面显示固定底部导航，收件箱显示待处理会话中的未读消息数，消息显示聊天提醒未读数。 */
 export function MobileTabLayout() {
   const { t } = useTranslation(["mobile", "inbox"])
   const { chatsURL, inboxURL } = useMobileNavigation()
