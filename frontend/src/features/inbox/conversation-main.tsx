@@ -9,16 +9,15 @@ import {
   isCustomerInboxConversation,
   isDirectInboxConversation,
   isGroupInboxConversation,
-  OrganizationIdentityType,
   type AgentInboxConversationData,
   type DirectInboxConversationData,
 } from "@/api"
 import { useWorkspace } from "@/contexts/workspace-context"
 import type { ComposerDraftBridge } from "@/features/inbox/conversation-composer"
-import { DraftAssistantWorkspace } from "@/features/inbox/assistant-workspace"
 import { ConversationSidePanel } from "@/features/inbox/conversation-side-panel"
 import { ConversationHeader } from "@/features/inbox/conversation-header"
 import { ConversationThread } from "@/features/inbox/conversation-thread"
+import { HandoffSummaryCard } from "@/features/inbox/handoff-summary-card"
 import type { ConversationLocateTarget } from "@/features/inbox/conversation-timeline"
 import { customerReplyDisabledReason } from "@/features/inbox/customer-session-actions"
 import { DirectConversationDraftHeader } from "@/features/inbox/direct-conversation-draft-header"
@@ -68,11 +67,7 @@ export function ConversationMain({
     () => !isWideViewport,
   )
   const customerDraftRef = useRef<ComposerDraftBridge | null>(null)
-  // 助理聊天草稿选定的工作区按草稿编号记录，切换草稿后不沿用。
-  const [draftWorkspace, setDraftWorkspace] = useState({ draftID: "", workspaceID: "" })
   const agentDraftID = selection.kind === "agent-draft" ? selection.conversationId : ""
-  const draftWorkspaceID =
-    agentDraftID && draftWorkspace.draftID === agentDraftID ? draftWorkspace.workspaceID : ""
 
   useEffect(() => {
     // 跨过响应式断点时恢复当前宽度对应的默认状态。
@@ -179,19 +174,16 @@ export function ConversationMain({
         ) : directTarget ? (
           <DirectConversationDraftHeader
             member={directTarget}
-            actions={
-              agentDraftID &&
-              directTarget.type === OrganizationIdentityType.OrganizationIdentityTypeAssistant ? (
-                <DraftAssistantWorkspace
-                  assistantIdentityID={directTarget.id}
-                  workspaceID={draftWorkspaceID}
-                  onChange={(workspaceID) => setDraftWorkspace({ draftID: agentDraftID, workspaceID })}
-                />
-              ) : null
-            }
             narrowViewport={narrowViewport}
             contextVisible={!contextCollapsed}
             onToggleContext={() => setContextCollapsed((collapsed) => !collapsed)}
+          />
+        ) : null}
+        {customerConversation ? (
+          <HandoffSummaryCard
+            key={customerConversation.id}
+            conversationID={customerConversation.id}
+            assignee={customerConversation.customer.assignee}
           />
         ) : null}
         <ConversationThread
@@ -200,7 +192,6 @@ export function ConversationMain({
           directTarget={directTarget}
           groupParticipants={group?.participants}
           agentDraftID={agentDraftID}
-          draftWorkspaceID={draftWorkspaceID}
           replyDisabledReason={replyDisabledReason}
           onConversationChanged={() => {
             if (validConversation) onConversationChanged?.(validConversation.id)

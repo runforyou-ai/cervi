@@ -142,6 +142,22 @@ func (b *Backend) ListCustomerBusinessQueries(ctx context.Context, meta appservi
 	return output, err
 }
 
+// GetCustomerServiceSummaries 返回客户会话当前周期的交接摘要与同一客户已关闭周期的小结。
+func (b *Backend) GetCustomerServiceSummaries(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.CustomerServiceSummaries, error) {
+	var output appservice.CustomerServiceSummaries
+	err := b.do(ctx, meta, http.MethodGet, "/conversations/"+url.PathEscape(conversationID)+"/service-summaries", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// UpdateServiceSessionSummary 修改已关闭客服处理周期的小结、是否解决与咨询分类。
+func (b *Backend) UpdateServiceSessionSummary(ctx context.Context, meta appservice.RequestMeta, serviceSessionID string, input appservice.ServiceSessionSummaryInput) (appservice.ServiceSessionSummary, error) {
+	var output appservice.ServiceSessionSummary
+	err := b.do(ctx, meta, http.MethodPut, "/service-sessions/"+url.PathEscape(serviceSessionID)+"/summary", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // GetInboxConversation 返回当前用户有权阅读的独立会话摘要。
 func (b *Backend) GetInboxConversation(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.InboxConversation, error) {
 	var output appservice.InboxConversation
@@ -1366,6 +1382,22 @@ func (b *Backend) UpdateServiceTimeouts(ctx context.Context, meta appservice.Req
 	return output, err
 }
 
+// GetServiceSummarySettings 读取当前企业的周期小结设置。
+func (b *Backend) GetServiceSummarySettings(ctx context.Context, meta appservice.RequestMeta) (appservice.ServiceSummarySettings, error) {
+	var output appservice.ServiceSummarySettings
+	err := b.do(ctx, meta, http.MethodGet, "/settings/customer-service/summary", nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// UpdateServiceSummarySettings 修改当前企业的周期小结设置。
+func (b *Backend) UpdateServiceSummarySettings(ctx context.Context, meta appservice.RequestMeta, input appservice.ServiceSummarySettings) (appservice.ServiceSummarySettings, error) {
+	var output appservice.ServiceSummarySettings
+	err := b.do(ctx, meta, http.MethodPut, "/settings/customer-service/summary", nil, input, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // ListServiceCategories 返回当前企业的咨询分类目录。
 func (b *Backend) ListServiceCategories(ctx context.Context, meta appservice.RequestMeta) (appservice.ServiceCategoryList, error) {
 	var output appservice.ServiceCategoryList
@@ -1438,40 +1470,6 @@ func (b *Backend) ListDevices(ctx context.Context, meta appservice.RequestMeta) 
 // RevokeDevice 撤销当前用户的设备。
 func (b *Backend) RevokeDevice(ctx context.Context, meta appservice.RequestMeta, deviceID string) error {
 	return b.do(ctx, meta, http.MethodDelete, "/devices/"+url.PathEscape(deviceID), nil, nil, nil)
-}
-
-// RegisterDeviceWorkspace 在当前用户的设备上注册工作区。
-func (b *Backend) RegisterDeviceWorkspace(ctx context.Context, meta appservice.RequestMeta, deviceID string, input appservice.DeviceWorkspaceInput) (appservice.DeviceWorkspace, error) {
-	var output appservice.DeviceWorkspace
-	err := b.do(ctx, meta, http.MethodPost, "/devices/"+url.PathEscape(deviceID)+"/workspaces", nil, input, &output)
-	b.normalizeOutput(&output)
-	return output, err
-}
-
-// ListDeviceWorkspaces 返回当前用户设备上的工作区。
-func (b *Backend) ListDeviceWorkspaces(ctx context.Context, meta appservice.RequestMeta, deviceID string) (appservice.DeviceWorkspaceList, error) {
-	var output appservice.DeviceWorkspaceList
-	err := b.do(ctx, meta, http.MethodGet, "/devices/"+url.PathEscape(deviceID)+"/workspaces", nil, nil, &output)
-	b.normalizeOutput(&output)
-	return output, err
-}
-
-// ListConversationAssistantWorkspaces 返回会话中各位助理的绑定电脑与工作区。
-func (b *Backend) ListConversationAssistantWorkspaces(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.ConversationAssistantWorkspaceList, error) {
-	var output appservice.ConversationAssistantWorkspaceList
-	err := b.do(ctx, meta, http.MethodGet, "/conversations/"+url.PathEscape(conversationID)+"/assistant-workspaces", nil, nil, &output)
-	b.normalizeOutput(&output)
-	return output, err
-}
-
-// SetConversationAssistantWorkspace 由主人为会话中的助理指定工作区。
-func (b *Backend) SetConversationAssistantWorkspace(ctx context.Context, meta appservice.RequestMeta, conversationID string, assistantIdentityID string, input appservice.ConversationAssistantWorkspaceInput) error {
-	return b.do(ctx, meta, http.MethodPut, "/conversations/"+url.PathEscape(conversationID)+"/assistant-workspaces/"+url.PathEscape(assistantIdentityID), nil, input, nil)
-}
-
-// ClearConversationAssistantWorkspace 由主人清除会话中助理的工作区。
-func (b *Backend) ClearConversationAssistantWorkspace(ctx context.Context, meta appservice.RequestMeta, conversationID string, assistantIdentityID string) error {
-	return b.do(ctx, meta, http.MethodDelete, "/conversations/"+url.PathEscape(conversationID)+"/assistant-workspaces/"+url.PathEscape(assistantIdentityID), nil, nil, nil)
 }
 
 // encodeAIKnowledgeGapInputQuery 将 appservice.AIKnowledgeGapInput 编码为查询参数。

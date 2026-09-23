@@ -89,6 +89,16 @@ func (s *Service) ListCustomerBusinessQueries(ctx context.Context, meta RequestM
 	return withNormalizedSlices(s.backend.ListCustomerBusinessQueries(ctx, meta, conversationID))
 }
 
+// GetCustomerServiceSummaries 返回客户会话当前周期的交接摘要与同一客户已关闭周期的小结。
+func (s *Service) GetCustomerServiceSummaries(ctx context.Context, meta RequestMeta, conversationID string) (CustomerServiceSummaries, error) {
+	return withNormalizedSlices(s.backend.GetCustomerServiceSummaries(ctx, meta, conversationID))
+}
+
+// UpdateServiceSessionSummary 修改已关闭客服处理周期的小结、是否解决与咨询分类。
+func (s *Service) UpdateServiceSessionSummary(ctx context.Context, meta RequestMeta, serviceSessionID string, input ServiceSessionSummaryInput) (ServiceSessionSummary, error) {
+	return withNormalizedSlices(s.backend.UpdateServiceSessionSummary(ctx, meta, serviceSessionID, input))
+}
+
 // GetInboxConversation 返回当前用户有权阅读的独立会话摘要。
 func (s *Service) GetInboxConversation(ctx context.Context, meta RequestMeta, conversationID string) (InboxConversation, error) {
 	return withNormalizedSlices(s.backend.GetInboxConversation(ctx, meta, conversationID))
@@ -899,6 +909,16 @@ func (s *Service) UpdateServiceTimeouts(ctx context.Context, meta RequestMeta, i
 	return withNormalizedSlices(s.backend.UpdateServiceTimeouts(ctx, meta, input))
 }
 
+// GetServiceSummarySettings 读取当前企业的周期小结设置。
+func (s *Service) GetServiceSummarySettings(ctx context.Context, meta RequestMeta) (ServiceSummarySettings, error) {
+	return withNormalizedSlices(s.backend.GetServiceSummarySettings(ctx, meta))
+}
+
+// UpdateServiceSummarySettings 修改当前企业的周期小结设置。
+func (s *Service) UpdateServiceSummarySettings(ctx context.Context, meta RequestMeta, input ServiceSummarySettings) (ServiceSummarySettings, error) {
+	return withNormalizedSlices(s.backend.UpdateServiceSummarySettings(ctx, meta, input))
+}
+
 // ListServiceCategories 返回当前企业的咨询分类目录。
 func (s *Service) ListServiceCategories(ctx context.Context, meta RequestMeta) (ServiceCategoryList, error) {
 	return withNormalizedSlices(s.backend.ListServiceCategories(ctx, meta))
@@ -947,29 +967,4 @@ func (s *Service) ListDevices(ctx context.Context, meta RequestMeta) (DeviceList
 // RevokeDevice 撤销当前用户的设备。
 func (s *Service) RevokeDevice(ctx context.Context, meta RequestMeta, deviceID string) error {
 	return s.backend.RevokeDevice(ctx, meta, deviceID)
-}
-
-// RegisterDeviceWorkspace 在当前用户的设备上注册工作区。
-func (s *Service) RegisterDeviceWorkspace(ctx context.Context, meta RequestMeta, deviceID string, input DeviceWorkspaceInput) (DeviceWorkspace, error) {
-	return withNormalizedSlices(s.backend.RegisterDeviceWorkspace(ctx, meta, deviceID, input))
-}
-
-// ListDeviceWorkspaces 返回当前用户设备上的工作区。
-func (s *Service) ListDeviceWorkspaces(ctx context.Context, meta RequestMeta, deviceID string) (DeviceWorkspaceList, error) {
-	return withNormalizedSlices(s.backend.ListDeviceWorkspaces(ctx, meta, deviceID))
-}
-
-// ListConversationAssistantWorkspaces 返回会话中各位助理的绑定电脑与工作区。
-func (s *Service) ListConversationAssistantWorkspaces(ctx context.Context, meta RequestMeta, conversationID string) (ConversationAssistantWorkspaceList, error) {
-	return withNormalizedSlices(s.backend.ListConversationAssistantWorkspaces(ctx, meta, conversationID))
-}
-
-// SetConversationAssistantWorkspace 由主人为会话中的助理指定工作区。
-func (s *Service) SetConversationAssistantWorkspace(ctx context.Context, meta RequestMeta, conversationID string, assistantIdentityID string, input ConversationAssistantWorkspaceInput) error {
-	return s.backend.SetConversationAssistantWorkspace(ctx, meta, conversationID, assistantIdentityID, input)
-}
-
-// ClearConversationAssistantWorkspace 由主人清除会话中助理的工作区。
-func (s *Service) ClearConversationAssistantWorkspace(ctx context.Context, meta RequestMeta, conversationID string, assistantIdentityID string) error {
-	return s.backend.ClearConversationAssistantWorkspace(ctx, meta, conversationID, assistantIdentityID)
 }

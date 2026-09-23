@@ -33,19 +33,17 @@ export function useFirstChatMessage() {
       refreshStarted(result.conversation, targetIdentityID)
       return result
     },
-    /** 向 AI 员工发送草稿会话的首条消息并建出会话；workspaceID 为选定的本机执行工作区，未选择时为空。 */
+    /** 向 AI 员工发送草稿会话的首条消息并建出会话。 */
     async sendAgent(
       conversationID: string,
       agentIdentityID: string,
       input: DirectTextMessageInput,
-      workspaceID = "",
     ) {
       const result = await sendFirstAgentTextMessage({
         conversationId: conversationID,
         agentIdentityId: agentIdentityID,
         clientMessageId: input.clientMessageId,
         body: input.body,
-        workspaceId: workspaceID,
       })
       refreshStarted(result.conversation)
       return result

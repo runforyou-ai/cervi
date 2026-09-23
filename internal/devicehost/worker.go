@@ -9,7 +9,7 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
-	"os"
+	"path/filepath"
 	"strings"
 	"sync"
 	"time"
@@ -23,7 +23,7 @@ import (
 const (
 	// workPollInterval 是不依赖事件流、定期比较工作水位的间隔。
 	workPollInterval = 30 * time.Second
-	// workRetryInterval 是领取被同一工作区挡回或请求失败后重新检查的间隔。
+	// workRetryInterval 是请求失败后重新检查的间隔。
 	workRetryInterval = 5 * time.Second
 	// workRequestTimeout 是单次运行期请求的时限。
 	workRequestTimeout = 30 * time.Second
@@ -48,18 +48,13 @@ type RunClient interface {
 	ReadDeviceRunAttachment(ctx context.Context, meta appservice.RequestMeta, runID, messageID string) ([]byte, error)
 }
 
-// WorkspaceStore 读取本机工作区的本地路径。
-type WorkspaceStore interface {
-	// LoadAgentWorkspacePath 读取指定企业服务器上工作区编号对应的本地路径。
-	LoadAgentWorkspacePath(ctx context.Context, serverURL, organizationID, workspaceID string) (string, bool, error)
-}
-
-// Worker 领取派发给本机设备的 Agent 运行并在本机执行，同一工作区的运行串行执行。
+// Worker 领取派发给本机设备的 Agent 运行并在本机执行，每个会话以默认文件夹为本机文件的相对路径起点。
 type Worker struct {
 	registrar *Registrar
-	store     WorkspaceStore
 	client    RunClient
 	runtime   agentruntime.Runtime
+	// folders 是各会话默认文件夹的上级目录。
+	folders string
 
 	ctx     context.Context
 	cancel  context.CancelFunc
@@ -69,39 +64,35 @@ type Worker struct {
 	runs    sync.WaitGroup
 
 	mu sync.Mutex
-	// active 按运行编号保存执行中运行的工作区与立即续租信号。
+	// active 按运行编号保存执行中运行的默认文件夹与立即续租信号。
 	active map[string]*activeRun
-	// busy 是本机正在执行运行的工作区。
-	busy map[string]bool
 }
 
 // activeRun 是本机登记执行的一次运行；过程流在登记时创建，释放登记时结束。
 // 设备只领取排队中的运行，领取后不再回到排队，同一运行在设备上只执行一次，尝试序号固定为 1。
 type activeRun struct {
-	workspaceID   string
-	workspacePath string // 领取前确认可用的工作区本地路径，不使用工作区时为空。
-	renewNow      chan struct{}
-	streamID      string
-	stream        *agentruntime.StreamHub
+	folder   string // 运行所属会话的默认文件夹。
+	renewNow chan struct{}
+	streamID string
+	stream   *agentruntime.StreamHub
 }
 
-// NewWorker 创建设备执行循环；当前平台不注册本机设备时返回 nil。
-func NewWorker(registrar *Registrar, store WorkspaceStore, client RunClient, runtime agentruntime.Runtime) *Worker {
+// NewWorker 创建设备执行循环，folders 是各会话默认文件夹的上级目录；当前平台不注册本机设备时返回 nil。
+func NewWorker(registrar *Registrar, client RunClient, runtime agentruntime.Runtime, folders string) *Worker {
 	if registrar == nil {
 		return nil
 	}
 	ctx, cancel := context.WithCancel(context.Background())
 	return &Worker{
 		registrar: registrar,
-		store:     store,
 		client:    client,
 		runtime:   runtime,
+		folders:   folders,
 		ctx:       ctx,
 		cancel:    cancel,
 		wake:      make(chan struct{}, 1),
 		session:   make(chan struct{}, 1),
 		active:    map[string]*activeRun{},
-		busy:      map[string]bool{},
 	}
 }
 
@@ -154,7 +145,7 @@ func (w *Worker) loop() {
 	}
 }
 
-// poll 读取待领取运行并逐个领取本机空闲工作区上的运行，返回是否需要尽快重新检查。
+// poll 读取待领取运行并逐个领取，返回是否需要尽快重新检查。
 func (w *Worker) poll() bool {
 	ctx, cancel := context.WithTimeout(w.ctx, workRequestTimeout)
 	defer cancel()
@@ -179,39 +170,33 @@ func (w *Worker) poll() bool {
 		if !w.reserve(run) {
 			continue
 		}
-		if w.start(ctx, session, meta, run) {
+		if w.start(ctx, meta, run) {
 			retry = true
 		}
 	}
 	return retry
 }
 
-// reserve 在本机登记运行及其工作区，运行已在执行或工作区正忙时返回 false；不使用工作区的运行只登记运行本身。
+// reserve 在本机登记运行及其会话的默认文件夹，运行已在执行时返回 false。
 func (w *Worker) reserve(run appservice.DeviceWorkRun) bool {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	if w.active[run.RunID] != nil || (run.WorkspaceID != "" && w.busy[run.WorkspaceID]) {
+	if w.active[run.RunID] != nil {
 		return false
 	}
 	streamID := uuid.NewV7().String()
 	w.active[run.RunID] = &activeRun{
-		workspaceID: run.WorkspaceID, renewNow: make(chan struct{}, 1), streamID: streamID,
+		folder: filepath.Join(w.folders, run.ConversationID), renewNow: make(chan struct{}, 1), streamID: streamID,
 		stream: agentruntime.NewStreamHub(agentruntime.StreamSnapshot{RunID: run.RunID, StreamID: streamID, Attempt: 1}),
-	}
-	if run.WorkspaceID != "" {
-		w.busy[run.WorkspaceID] = true
 	}
 	return true
 }
 
-// release 移除本机对运行及其工作区的登记并结束运行的过程流。
+// release 移除本机对运行的登记并结束运行的过程流。
 func (w *Worker) release(runID string) {
 	w.mu.Lock()
 	current := w.active[runID]
 	if current != nil {
-		if current.workspaceID != "" {
-			delete(w.busy, current.workspaceID)
-		}
 		delete(w.active, runID)
 	}
 	w.mu.Unlock()
@@ -248,22 +233,11 @@ func (w *Worker) SubscribeLocalRunStream(runID string, onDelta func(agentruntime
 	return snapshot, subscription.Close, true
 }
 
-// start 校验本机工作区并领取运行，领取成功后启动执行与续租，返回是否需要尽快重新检查；不使用工作区的运行直接领取。
-func (w *Worker) start(ctx context.Context, session deviceSession, meta appservice.RequestMeta, run appservice.DeviceWorkRun) bool {
-	path := ""
-	if run.WorkspaceID != "" {
-		var retry, ok bool
-		if path, retry, ok = w.checkWorkspace(ctx, session, meta, run); !ok {
-			return retry
-		}
-	}
+// start 领取运行，领取成功后启动执行与续租，返回是否需要尽快重新检查。
+func (w *Worker) start(ctx context.Context, meta appservice.RequestMeta, run appservice.DeviceWorkRun) bool {
 	claim, err := w.client.ClaimDeviceRun(ctx, meta, run.RunID)
 	if err != nil {
 		w.release(run.RunID)
-		if errorReason(err) == "workspace_busy" {
-			slog.Info("同一工作区的其他任务尚未完成，稍后重新领取", "agent_run_id", run.RunID, "workspace_id", run.WorkspaceID)
-			return true
-		}
 		if ctx.Err() == nil {
 			slog.Warn("领取设备运行失败", "agent_run_id", run.RunID, "error", err)
 		}
@@ -271,7 +245,6 @@ func (w *Worker) start(ctx context.Context, session deviceSession, meta appservi
 	}
 	w.mu.Lock()
 	local := w.active[run.RunID]
-	local.workspacePath = path
 	w.mu.Unlock()
 	runCtx, cancelRun := context.WithCancel(w.ctx)
 	// 服务端给出的续租间隔无效时按默认间隔续租。
@@ -282,31 +255,8 @@ func (w *Worker) start(ctx context.Context, session deviceSession, meta appservi
 	w.runs.Add(2)
 	go w.renew(runCtx, cancelRun, meta, run.RunID, interval, local.renewNow)
 	go w.execute(runCtx, cancelRun, meta, run.RunID, claim, local)
-	slog.Info("设备运行已领取", "agent_run_id", run.RunID, "workspace_id", run.WorkspaceID, "lease_expires_at", claim.LeaseExpiresAt)
+	slog.Info("设备运行已领取", "agent_run_id", run.RunID, "lease_expires_at", claim.LeaseExpiresAt)
 	return false
-}
-
-// checkWorkspace 确认运行指定的工作区目录在本机可用，不可用时释放登记并上报工作区缺失，返回工作区本地路径、是否需要尽快重新检查与能否继续领取。
-func (w *Worker) checkWorkspace(ctx context.Context, session deviceSession, meta appservice.RequestMeta, run appservice.DeviceWorkRun) (string, bool, bool) {
-	path, found, err := w.store.LoadAgentWorkspacePath(ctx, session.serverURL, session.credential.OrganizationID, run.WorkspaceID)
-	if err != nil {
-		w.release(run.RunID)
-		slog.Warn("读取本机工作区路径失败", "workspace_id", run.WorkspaceID, "error", err)
-		return "", true, false
-	}
-	// 本机找不到工作区目录时拒绝领取，由服务端以明确原因结束运行。
-	if info, statErr := os.Stat(path); !found || statErr != nil || !info.IsDir() {
-		w.release(run.RunID)
-		if err := w.client.FailDeviceRun(ctx, meta, run.RunID, appservice.DeviceRunFailureInput{
-			ErrorCode: appservice.DeviceRunFailureWorkspaceMissing, Message: "workspace directory is unavailable on this device",
-		}); err != nil {
-			slog.Warn("上报工作区缺失失败", "agent_run_id", run.RunID, "workspace_id", run.WorkspaceID, "error", err)
-			return "", true, false
-		}
-		slog.Info("本机工作区不可用，运行已上报失败", "agent_run_id", run.RunID, "workspace_id", run.WorkspaceID)
-		return "", false, false
-	}
-	return path, false, true
 }
 
 // execute 在本机执行一次已领取的运行，出错时上报失败与已产生的过程内容。

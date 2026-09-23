@@ -57,9 +57,6 @@ func applicationServices(
 	registrar := newDeviceRegistrar(appStorage, backend, sessions)
 	if registrar != nil {
 		options = append(options, appservice.WithLocalDevice(registrar))
-		if workspaces, ok := registrar.(appservice.LocalWorkspaceManager); ok {
-			options = append(options, appservice.WithLocalWorkspaces(workspaces))
-		}
 	}
 	service := appservice.New(backend, options...)
 	return []application.Service{

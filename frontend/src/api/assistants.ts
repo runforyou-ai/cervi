@@ -1,17 +1,14 @@
-/** 助理与会话助理工作区调用。 */
+/** 助理调用。 */
 import {
-  ClearConversationAssistantWorkspace,
   CreateAssistant,
   DeactivateAssistant,
   GetAssistant,
   ListAssistants,
-  ListConversationAssistantWorkspaces,
   ListMemberAssistants,
   MoveAssistant,
   PauseAssistant,
   ReactivateAssistant,
   ResumeAssistant,
-  SetConversationAssistantWorkspace,
   UpdateAssistant,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/service"
 import {
@@ -20,7 +17,6 @@ import {
   type Assistant,
   type AssistantDetail,
   type AssistantList,
-  type ConversationAssistantWorkspaceList,
 } from "../../bindings/github.com/runforyou-ai/cervi/internal/appservice/models"
 import { bind } from "@/api/client"
 import type { NonNullArrays } from "@/api/normalize"
@@ -45,7 +41,6 @@ export type AssistantDetailData = {
 
 export type AssistantListData = { assistants: AssistantData[] }
 
-export type ConversationAssistantWorkspaceListData = NonNullArrays<ConversationAssistantWorkspaceList>
 
 const listAssistantsBound = bind(ListAssistants)
 const listMemberAssistantsBound = bind(ListMemberAssistants)
@@ -57,7 +52,6 @@ const resumeAssistantBound = bind(ResumeAssistant)
 const moveAssistantBound = bind(MoveAssistant)
 const deactivateAssistantBound = bind(DeactivateAssistant)
 const reactivateAssistantBound = bind(ReactivateAssistant)
-const listConversationAssistantWorkspacesBound = bind(ListConversationAssistantWorkspaces)
 
 /** 读取当前成员名下的助理。 */
 export function listAssistants() {
@@ -110,17 +104,6 @@ export function deactivateAssistant(assistantId: string) {
 export function reactivateAssistant(assistantId: string) {
   return reactivateAssistantBound(assistantId).then(asAssistant)
 }
-
-/** 读取会话中各位助理的绑定电脑与工作区。 */
-export function listConversationAssistantWorkspaces(conversationId: string) {
-  return listConversationAssistantWorkspacesBound(conversationId).then((output) => output.assistants)
-}
-
-/** 为会话中的助理指定工作区。 */
-export const setConversationAssistantWorkspace = bind(SetConversationAssistantWorkspace)
-
-/** 清除会话中助理的工作区。 */
-export const clearConversationAssistantWorkspace = bind(ClearConversationAssistantWorkspace)
 
 /** 断言助理列表中的每一项均为有效在线状态与平台托管执行配置。 */
 function asAssistantList(list: NonNullArrays<AssistantList>): AssistantListData {

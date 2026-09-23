@@ -3,31 +3,27 @@
 package main
 
 import (
-	"context"
 	"log/slog"
+	"os"
+	"path/filepath"
 
 	"github.com/runforyou-ai/cervi/internal/apiproxy"
-	"github.com/runforyou-ai/cervi/internal/appservice"
-	appservicenative "github.com/runforyou-ai/cervi/internal/appservice/native"
 	"github.com/runforyou-ai/cervi/internal/clientsession"
 	"github.com/runforyou-ai/cervi/internal/devicehost"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 )
 
-// nativeStorage 组合桌面端连接、登录凭据、设备注册与本机工作区存储能力。
+// nativeStorage 组合桌面端连接、登录凭据与设备注册存储能力。
 type nativeStorage interface {
 	apiproxy.Store
 	clientsession.Store
 	devicehost.Store
-	devicehost.WorkspaceStore
-	devicehost.LocalWorkspaceStore
 }
 
-// desktopDevice 组合桌面端本机设备注册、Agent 运行执行循环与本机工作区管理。
+// desktopDevice 组合桌面端本机设备注册与 Agent 运行执行循环。
 type desktopDevice struct {
 	*devicehost.Registrar
-	worker     *devicehost.Worker
-	workspaces *devicehost.Workspaces
+	worker *devicehost.Worker
 }
 
 // Start 开始设备注册与执行循环。
@@ -42,12 +38,7 @@ func (d *desktopDevice) Stop() {
 	d.Registrar.Stop()
 }
 
-// AddLocalWorkspace 让用户选择本机目录并注册为本设备的工作区。
-func (d *desktopDevice) AddLocalWorkspace(ctx context.Context, meta appservice.RequestMeta) (appservice.DeviceWorkspace, error) {
-	return d.workspaces.AddLocalWorkspace(ctx, meta)
-}
-
-// newDeviceRegistrar 创建桌面端本机设备注册、执行循环与工作区管理；本机运行时创建失败时不注册设备。
+// newDeviceRegistrar 创建桌面端本机设备注册与执行循环，各会话的默认文件夹位于用户文档目录下的 Cervi；本机运行时创建失败时不注册设备。
 func newDeviceRegistrar(appStorage nativeStorage, backend *apiproxy.Backend, sessions *clientsession.Manager) deviceRegistrar {
 	registrar := devicehost.New(appStorage, backend, sessions)
 	if registrar == nil {
@@ -58,12 +49,14 @@ func newDeviceRegistrar(appStorage nativeStorage, backend *apiproxy.Backend, ses
 		slog.Error("创建本机 Agent 运行时失败，本机设备不注册", "error", err)
 		return nil
 	}
-	worker := devicehost.NewWorker(registrar, appStorage, backend, runtime)
+	// 无法确定文档目录时默认文件夹放在系统临时目录下，助理照常运行。
+	documents, err := devicehost.DocumentsDir()
+	if err != nil {
+		slog.Warn("无法确定用户文档目录，会话默认文件夹改放在临时目录", "error", err)
+		documents = os.TempDir()
+	}
+	worker := devicehost.NewWorker(registrar, backend, runtime, filepath.Join(documents, "Cervi"))
 	// 本机界面查看本机执行中的运行时直接读取本机过程流。
 	backend.UseLocalRunStreams(worker)
-	return &desktopDevice{
-		Registrar:  registrar,
-		worker:     worker,
-		workspaces: devicehost.NewWorkspaces(registrar, appStorage, backend, appservicenative.SelectWorkspaceDirectory),
-	}
+	return &desktopDevice{Registrar: registrar, worker: worker}
 }

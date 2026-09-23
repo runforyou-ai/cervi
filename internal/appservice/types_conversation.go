@@ -468,13 +468,12 @@ type ConversationMentionReview struct {
 	Outcome                  ConversationMentionReviewOutcome `json:"outcome"`
 }
 
-// FirstAgentTextMessageInput 定义 AI 草稿的稳定编号、目标和首条消息；目标为本人助理且 workspaceId 非空时，创建会话的同时为助理指定该工作区。
+// FirstAgentTextMessageInput 定义 AI 草稿的稳定编号、目标和首条消息。
 type FirstAgentTextMessageInput struct {
 	ConversationID  string `json:"conversationId"`
 	AgentIdentityID string `json:"agentIdentityId"`
 	ClientMessageID string `json:"clientMessageId"`
 	Body            string `json:"body"`
-	WorkspaceID     string `json:"workspaceId"`
 }
 
 // FirstAgentTextMessageResult 定义首次发送确认的 AI 会话和消息。
@@ -490,7 +489,7 @@ type AgentTextMessageInput struct {
 	ReplyToMessageID string `json:"replyToMessageId"`
 }
 
-// AttachmentMessageInput 定义已上传附件的发送意图，agentIdentityId 非空表示按 conversationId 草稿编号首发 AI 聊天，同时指定 customerConversationId 表示首发该客户会话的 Copilot 线程；首发本人助理的聊天时 workspaceId 非空则同时为助理指定该工作区。
+// AttachmentMessageInput 定义已上传附件的发送意图，agentIdentityId 非空表示按 conversationId 草稿编号首发 AI 聊天，同时指定 customerConversationId 表示首发该客户会话的 Copilot 线程。
 type AttachmentMessageInput struct {
 	ConversationID         string `json:"conversationId"`
 	TargetIdentityID       string `json:"targetIdentityId"`
@@ -501,7 +500,6 @@ type AttachmentMessageInput struct {
 	Body                   string `json:"body"`
 	ImageWidth             int    `json:"imageWidth"`
 	ImageHeight            int    `json:"imageHeight"`
-	WorkspaceID            string `json:"workspaceId"`
 }
 
 // AttachmentMessageResult 定义附件消息及首发时创建的单聊或 AI 聊天。

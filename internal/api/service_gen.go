@@ -33,6 +33,8 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.POST("/inbox/window/query", s.readInboxWindow)
 	router.GET("/conversations/:conversationID/customer-profile", s.getCustomerProfile)
 	router.GET("/conversations/:conversationID/business-queries", s.listCustomerBusinessQueries)
+	router.GET("/conversations/:conversationID/service-summaries", s.getCustomerServiceSummaries)
+	router.PUT("/service-sessions/:serviceSessionID/summary", s.updateServiceSessionSummary)
 	router.GET("/conversations/:conversationID/summary", s.getInboxConversation)
 	router.POST("/inbox/conversations/query", s.readInboxConversations)
 	router.GET("/conversations/:conversationID/attention", s.readConversationAttention)
@@ -194,6 +196,8 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.PUT("/settings/customer-service/business-hours", s.updateBusinessHours)
 	router.GET("/settings/customer-service/timeouts", s.getServiceTimeouts)
 	router.PUT("/settings/customer-service/timeouts", s.updateServiceTimeouts)
+	router.GET("/settings/customer-service/summary", s.getServiceSummarySettings)
+	router.PUT("/settings/customer-service/summary", s.updateServiceSummarySettings)
 	router.GET("/settings/customer-service/categories", s.listServiceCategories)
 	router.POST("/settings/customer-service/categories", s.createServiceCategory)
 	router.PUT("/settings/customer-service/categories/:categoryID", s.updateServiceCategory)
@@ -204,11 +208,6 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.POST("/devices", s.registerDevice)
 	router.GET("/devices", s.listDevices)
 	router.DELETE("/devices/:deviceID", s.revokeDevice)
-	router.POST("/devices/:deviceID/workspaces", s.registerDeviceWorkspace)
-	router.GET("/devices/:deviceID/workspaces", s.listDeviceWorkspaces)
-	router.GET("/conversations/:conversationID/assistant-workspaces", s.listConversationAssistantWorkspaces)
-	router.PUT("/conversations/:conversationID/assistant-workspaces/:assistantIdentityID", s.setConversationAssistantWorkspace)
-	router.DELETE("/conversations/:conversationID/assistant-workspaces/:assistantIdentityID", s.clearConversationAssistantWorkspace)
 }
 
 // installationStatus 返回服务端初始化状态和公开企业名称。
@@ -369,6 +368,22 @@ func (s *Service) getCustomerProfile(c *gin.Context) {
 // listCustomerBusinessQueries 返回客户会话当前客服周期内 AI 客服查询业务系统的记录。
 func (s *Service) listCustomerBusinessQueries(c *gin.Context) {
 	output, err := s.application.ListCustomerBusinessQueries(c.Request.Context(), requestMeta(c), c.Param("conversationID"))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// getCustomerServiceSummaries 返回客户会话当前周期的交接摘要与同一客户已关闭周期的小结。
+func (s *Service) getCustomerServiceSummaries(c *gin.Context) {
+	output, err := s.application.GetCustomerServiceSummaries(c.Request.Context(), requestMeta(c), c.Param("conversationID"))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// updateServiceSessionSummary 修改已关闭客服处理周期的小结、是否解决与咨询分类。
+func (s *Service) updateServiceSessionSummary(c *gin.Context) {
+	var input appservice.ServiceSessionSummaryInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.UpdateServiceSessionSummary(c.Request.Context(), requestMeta(c), c.Param("serviceSessionID"), input)
 	writeResult(c, http.StatusOK, output, err)
 }
 
@@ -1652,6 +1667,22 @@ func (s *Service) updateServiceTimeouts(c *gin.Context) {
 	writeResult(c, http.StatusOK, output, err)
 }
 
+// getServiceSummarySettings 读取当前企业的周期小结设置。
+func (s *Service) getServiceSummarySettings(c *gin.Context) {
+	output, err := s.application.GetServiceSummarySettings(c.Request.Context(), requestMeta(c))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// updateServiceSummarySettings 修改当前企业的周期小结设置。
+func (s *Service) updateServiceSummarySettings(c *gin.Context) {
+	var input appservice.ServiceSummarySettings
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.UpdateServiceSummarySettings(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
 // listServiceCategories 返回当前企业的咨询分类目录。
 func (s *Service) listServiceCategories(c *gin.Context) {
 	output, err := s.application.ListServiceCategories(c.Request.Context(), requestMeta(c))
@@ -1732,42 +1763,6 @@ func (s *Service) listDevices(c *gin.Context) {
 // revokeDevice 撤销当前用户的设备。
 func (s *Service) revokeDevice(c *gin.Context) {
 	writeEmpty(c, s.application.RevokeDevice(c.Request.Context(), requestMeta(c), c.Param("deviceID")))
-}
-
-// registerDeviceWorkspace 在当前用户的设备上注册工作区。
-func (s *Service) registerDeviceWorkspace(c *gin.Context) {
-	var input appservice.DeviceWorkspaceInput
-	if !bindJSON(c, &input) {
-		return
-	}
-	output, err := s.application.RegisterDeviceWorkspace(c.Request.Context(), requestMeta(c), c.Param("deviceID"), input)
-	writeResult(c, http.StatusCreated, output, err)
-}
-
-// listDeviceWorkspaces 返回当前用户设备上的工作区。
-func (s *Service) listDeviceWorkspaces(c *gin.Context) {
-	output, err := s.application.ListDeviceWorkspaces(c.Request.Context(), requestMeta(c), c.Param("deviceID"))
-	writeResult(c, http.StatusOK, output, err)
-}
-
-// listConversationAssistantWorkspaces 返回会话中各位助理的绑定电脑与工作区。
-func (s *Service) listConversationAssistantWorkspaces(c *gin.Context) {
-	output, err := s.application.ListConversationAssistantWorkspaces(c.Request.Context(), requestMeta(c), c.Param("conversationID"))
-	writeResult(c, http.StatusOK, output, err)
-}
-
-// setConversationAssistantWorkspace 由主人为会话中的助理指定工作区。
-func (s *Service) setConversationAssistantWorkspace(c *gin.Context) {
-	var input appservice.ConversationAssistantWorkspaceInput
-	if !bindJSON(c, &input) {
-		return
-	}
-	writeEmpty(c, s.application.SetConversationAssistantWorkspace(c.Request.Context(), requestMeta(c), c.Param("conversationID"), c.Param("assistantIdentityID"), input))
-}
-
-// clearConversationAssistantWorkspace 由主人清除会话中助理的工作区。
-func (s *Service) clearConversationAssistantWorkspace(c *gin.Context) {
-	writeEmpty(c, s.application.ClearConversationAssistantWorkspace(c.Request.Context(), requestMeta(c), c.Param("conversationID"), c.Param("assistantIdentityID")))
 }
 
 // bindAIKnowledgeGapInputQuery 从查询参数解析 appservice.AIKnowledgeGapInput。

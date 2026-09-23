@@ -193,6 +193,26 @@ func (b *DirectBackend) ListCustomerBusinessQueries(ctx context.Context, meta Re
 	return b.ops.ListCustomerBusinessQueries(ctx, meta, identity, conversationID)
 }
 
+// GetCustomerServiceSummaries 返回客户会话当前周期的交接摘要与同一客户已关闭周期的小结。
+func (b *DirectBackend) GetCustomerServiceSummaries(ctx context.Context, meta RequestMeta, conversationID string) (CustomerServiceSummaries, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero CustomerServiceSummaries
+		return zero, err
+	}
+	return b.ops.GetCustomerServiceSummaries(ctx, meta, identity, conversationID)
+}
+
+// UpdateServiceSessionSummary 修改已关闭客服处理周期的小结、是否解决与咨询分类。
+func (b *DirectBackend) UpdateServiceSessionSummary(ctx context.Context, meta RequestMeta, serviceSessionID string, input ServiceSessionSummaryInput) (ServiceSessionSummary, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero ServiceSessionSummary
+		return zero, err
+	}
+	return b.ops.UpdateServiceSessionSummary(ctx, meta, identity, serviceSessionID, input)
+}
+
 // GetInboxConversation 返回当前用户有权阅读的独立会话摘要。
 func (b *DirectBackend) GetInboxConversation(ctx context.Context, meta RequestMeta, conversationID string) (InboxConversation, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
@@ -1791,6 +1811,26 @@ func (b *DirectBackend) UpdateServiceTimeouts(ctx context.Context, meta RequestM
 	return b.ops.UpdateServiceTimeouts(ctx, meta, identity, input)
 }
 
+// GetServiceSummarySettings 读取当前企业的周期小结设置。
+func (b *DirectBackend) GetServiceSummarySettings(ctx context.Context, meta RequestMeta) (ServiceSummarySettings, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero ServiceSummarySettings
+		return zero, err
+	}
+	return b.ops.GetServiceSummarySettings(ctx, meta, identity)
+}
+
+// UpdateServiceSummarySettings 修改当前企业的周期小结设置。
+func (b *DirectBackend) UpdateServiceSummarySettings(ctx context.Context, meta RequestMeta, input ServiceSummarySettings) (ServiceSummarySettings, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero ServiceSummarySettings
+		return zero, err
+	}
+	return b.ops.UpdateServiceSummarySettings(ctx, meta, identity, input)
+}
+
 // ListServiceCategories 返回当前企业的咨询分类目录。
 func (b *DirectBackend) ListServiceCategories(ctx context.Context, meta RequestMeta) (ServiceCategoryList, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
@@ -1887,52 +1927,4 @@ func (b *DirectBackend) RevokeDevice(ctx context.Context, meta RequestMeta, devi
 		return err
 	}
 	return b.ops.RevokeDevice(ctx, meta, identity, deviceID)
-}
-
-// RegisterDeviceWorkspace 在当前用户的设备上注册工作区。
-func (b *DirectBackend) RegisterDeviceWorkspace(ctx context.Context, meta RequestMeta, deviceID string, input DeviceWorkspaceInput) (DeviceWorkspace, error) {
-	identity, err := b.ops.authenticate(ctx, meta)
-	if err != nil {
-		var zero DeviceWorkspace
-		return zero, err
-	}
-	return b.ops.RegisterDeviceWorkspace(ctx, meta, identity, deviceID, input)
-}
-
-// ListDeviceWorkspaces 返回当前用户设备上的工作区。
-func (b *DirectBackend) ListDeviceWorkspaces(ctx context.Context, meta RequestMeta, deviceID string) (DeviceWorkspaceList, error) {
-	identity, err := b.ops.authenticate(ctx, meta)
-	if err != nil {
-		var zero DeviceWorkspaceList
-		return zero, err
-	}
-	return b.ops.ListDeviceWorkspaces(ctx, meta, identity, deviceID)
-}
-
-// ListConversationAssistantWorkspaces 返回会话中各位助理的绑定电脑与工作区。
-func (b *DirectBackend) ListConversationAssistantWorkspaces(ctx context.Context, meta RequestMeta, conversationID string) (ConversationAssistantWorkspaceList, error) {
-	identity, err := b.ops.authenticate(ctx, meta)
-	if err != nil {
-		var zero ConversationAssistantWorkspaceList
-		return zero, err
-	}
-	return b.ops.ListConversationAssistantWorkspaces(ctx, meta, identity, conversationID)
-}
-
-// SetConversationAssistantWorkspace 由主人为会话中的助理指定工作区。
-func (b *DirectBackend) SetConversationAssistantWorkspace(ctx context.Context, meta RequestMeta, conversationID string, assistantIdentityID string, input ConversationAssistantWorkspaceInput) error {
-	identity, err := b.ops.authenticate(ctx, meta)
-	if err != nil {
-		return err
-	}
-	return b.ops.SetConversationAssistantWorkspace(ctx, meta, identity, conversationID, assistantIdentityID, input)
-}
-
-// ClearConversationAssistantWorkspace 由主人清除会话中助理的工作区。
-func (b *DirectBackend) ClearConversationAssistantWorkspace(ctx context.Context, meta RequestMeta, conversationID string, assistantIdentityID string) error {
-	identity, err := b.ops.authenticate(ctx, meta)
-	if err != nil {
-		return err
-	}
-	return b.ops.ClearConversationAssistantWorkspace(ctx, meta, identity, conversationID, assistantIdentityID)
 }

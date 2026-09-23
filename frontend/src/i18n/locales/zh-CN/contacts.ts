@@ -188,7 +188,7 @@ const contacts = {
     },
     move: {
       title: "把“{{name}}”换到这台电脑？",
-      description: "原电脑不再执行这个助理，各会话的工作区需要在这台电脑上重新选择。",
+      description: "原电脑不再执行这个助理，之后由这台电脑执行。",
       saving: "正在更换…",
       done: "助理已换到这台电脑",
       error: "更换电脑失败，请重试。",

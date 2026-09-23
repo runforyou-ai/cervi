@@ -77,6 +77,12 @@ type Backend interface {
 	// ListCustomerBusinessQueries 返回客户会话当前客服周期内 AI 客服查询业务系统的记录。
 	//cervi:route GET /conversations/:conversationID/business-queries
 	ListCustomerBusinessQueries(context.Context, RequestMeta, string) (CustomerBusinessQueryList, error)
+	// GetCustomerServiceSummaries 返回客户会话当前周期的交接摘要与同一客户已关闭周期的小结。
+	//cervi:route GET /conversations/:conversationID/service-summaries
+	GetCustomerServiceSummaries(context.Context, RequestMeta, string) (CustomerServiceSummaries, error)
+	// UpdateServiceSessionSummary 修改已关闭客服处理周期的小结、是否解决与咨询分类。
+	//cervi:route PUT /service-sessions/:serviceSessionID/summary
+	UpdateServiceSessionSummary(context.Context, RequestMeta, string, ServiceSessionSummaryInput) (ServiceSessionSummary, error)
 	// GetInboxConversation 返回当前用户有权阅读的独立会话摘要。
 	//cervi:route GET /conversations/:conversationID/summary
 	GetInboxConversation(context.Context, RequestMeta, string) (InboxConversation, error)
@@ -565,6 +571,12 @@ type Backend interface {
 	// UpdateServiceTimeouts 修改当前企业的客服超时时长。
 	//cervi:route PUT /settings/customer-service/timeouts
 	UpdateServiceTimeouts(context.Context, RequestMeta, ServiceTimeouts) (ServiceTimeouts, error)
+	// GetServiceSummarySettings 读取当前企业的周期小结设置。
+	//cervi:route GET /settings/customer-service/summary
+	GetServiceSummarySettings(context.Context, RequestMeta) (ServiceSummarySettings, error)
+	// UpdateServiceSummarySettings 修改当前企业的周期小结设置。
+	//cervi:route PUT /settings/customer-service/summary
+	UpdateServiceSummarySettings(context.Context, RequestMeta, ServiceSummarySettings) (ServiceSummarySettings, error)
 	// ListServiceCategories 返回当前企业的咨询分类目录。
 	//cervi:route GET /settings/customer-service/categories
 	ListServiceCategories(context.Context, RequestMeta) (ServiceCategoryList, error)
@@ -596,21 +608,6 @@ type Backend interface {
 	// RevokeDevice 撤销当前用户的设备。
 	//cervi:route DELETE /devices/:deviceID
 	RevokeDevice(context.Context, RequestMeta, string) error
-	// RegisterDeviceWorkspace 在当前用户的设备上注册工作区。
-	//cervi:route POST /devices/:deviceID/workspaces status=201
-	RegisterDeviceWorkspace(context.Context, RequestMeta, string, DeviceWorkspaceInput) (DeviceWorkspace, error)
-	// ListDeviceWorkspaces 返回当前用户设备上的工作区。
-	//cervi:route GET /devices/:deviceID/workspaces
-	ListDeviceWorkspaces(context.Context, RequestMeta, string) (DeviceWorkspaceList, error)
-	// ListConversationAssistantWorkspaces 返回会话中各位助理的绑定电脑与工作区。
-	//cervi:route GET /conversations/:conversationID/assistant-workspaces
-	ListConversationAssistantWorkspaces(context.Context, RequestMeta, string) (ConversationAssistantWorkspaceList, error)
-	// SetConversationAssistantWorkspace 由主人为会话中的助理指定工作区。
-	//cervi:route PUT /conversations/:conversationID/assistant-workspaces/:assistantIdentityID
-	SetConversationAssistantWorkspace(context.Context, RequestMeta, string, string, ConversationAssistantWorkspaceInput) error
-	// ClearConversationAssistantWorkspace 由主人清除会话中助理的工作区。
-	//cervi:route DELETE /conversations/:conversationID/assistant-workspaces/:assistantIdentityID
-	ClearConversationAssistantWorkspace(context.Context, RequestMeta, string, string) error
 }
 
 // WorkspaceInstaller 由服务端 Backend 实现，用于企业初始化。
@@ -646,12 +643,6 @@ type ConversationWindowOpener interface {
 // LocalDeviceReporter 由把本机注册为设备的原生端实现。
 type LocalDeviceReporter interface {
 	CurrentDevice(context.Context, RequestMeta) (LocalDevice, error)
-}
-
-// LocalWorkspaceManager 由支持本机 Agent 工作区的原生端实现。
-type LocalWorkspaceManager interface {
-	// AddLocalWorkspace 让用户选择本机目录并注册为本设备的工作区，用户取消选择时返回空工作区编号。
-	AddLocalWorkspace(context.Context, RequestMeta) (DeviceWorkspace, error)
 }
 
 // NativeLocaleUpdater 同步当前设备上的原生界面语言。

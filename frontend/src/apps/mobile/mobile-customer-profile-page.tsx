@@ -1,30 +1,18 @@
 /** 移动端客户会话的客户资料子页：客户名称、来源渠道、身份与访客上下文。 */
-import type { ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 import { useOutletContext } from "react-router"
 
 import { ChannelType } from "@/api"
 import type { MobileCustomerConversationContext } from "@/apps/mobile/mobile-customer-conversation-page"
-import { MobilePageHeader, MobileScrollArea } from "@/apps/mobile/mobile-page"
+import {
+  MobilePageHeader,
+  MobileProfileField,
+  MobileScrollArea,
+} from "@/apps/mobile/mobile-page"
 import { ConversationAvatar } from "@/features/inbox/conversation-avatar"
 import { CustomerProfileDetails } from "@/features/inbox/customer-profile-details"
+import { CustomerServiceHistory } from "@/features/inbox/customer-service-history"
 import { useConversationName } from "@/features/inbox/use-conversation-name"
-
-/** 上下排列的资料字段行，需放在 dl 内。 */
-function MobileProfileField({
-  label,
-  children,
-}: {
-  label: string
-  children: ReactNode
-}) {
-  return (
-    <div className="py-4">
-      <dt className="text-xs text-muted-foreground">{label}</dt>
-      <dd className="mt-1 flex min-w-0 items-center text-sm">{children}</dd>
-    </div>
-  )
-}
 
 /** 全屏展示客户资料，返回时回到客户会话。 */
 export function MobileCustomerProfilePage() {
@@ -62,6 +50,7 @@ export function MobileCustomerProfilePage() {
             field={MobileProfileField}
           />
         </dl>
+        <CustomerServiceHistory conversationID={conversation.id} />
       </MobileScrollArea>
     </section>
   )

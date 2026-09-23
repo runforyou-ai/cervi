@@ -11,6 +11,7 @@ import (
 	"time"
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
+	"github.com/runforyou-ai/cervi/internal/actions/servicesummary"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/storage/server/messagequery"
@@ -89,11 +90,12 @@ func (p copilotRunPolicy) laneRevision(ctx context.Context, db bun.IDB, policyCo
 }
 
 type copilotBackground struct {
-	Kind           string                     `json:"kind"`
-	Contact        string                     `json:"contact"`
-	Channel        copilotBackgroundChannel   `json:"channel"`
-	ServiceSession copilotBackgroundSession   `json:"serviceSession"`
-	Messages       []copilotBackgroundMessage `json:"messages"`
+	Kind           string                                `json:"kind"`
+	Contact        string                                `json:"contact"`
+	Channel        copilotBackgroundChannel              `json:"channel"`
+	ServiceSession copilotBackgroundSession              `json:"serviceSession"`
+	History        []agentruntime.CustomerHistorySummary `json:"history,omitempty"`
+	Messages       []copilotBackgroundMessage            `json:"messages"`
 }
 
 type copilotBackgroundChannel struct {
@@ -130,10 +132,11 @@ type copilotBackgroundRow struct {
 	contextAttachmentRow
 }
 
-// loadCopilotBackground 读取所属客户会话的客户、渠道、当前客服周期和最近沟通记录，沟通记录按模型窗口预算保留较新的部分。
+// loadCopilotBackground 读取所属客户会话的客户、渠道、当前客服周期、同一客户最近的历史小结和最近沟通记录，沟通记录按模型窗口预算保留较新的部分。
 func loadCopilotBackground(ctx context.Context, db bun.IDB, run *servermodels.AgentRun, links attachmentLinks) (agentruntime.Message, error) {
 	var header struct {
 		CustomerConversationID string  `bun:"customer_conversation_id"`
+		ServiceSessionID       string  `bun:"service_session_id"`
 		Version                int64   `bun:"version"`
 		ContactName            string  `bun:"contact_name"`
 		ChannelType            string  `bun:"channel_type"`
@@ -144,7 +147,7 @@ func loadCopilotBackground(ctx context.Context, db bun.IDB, run *servermodels.Ag
 		ContextWindow          int64   `bun:"context_window"`
 	}
 	if err := db.NewSelect().TableExpr("customer_copilot_threads AS cct").
-		ColumnExpr("cc.conversation_id::text AS customer_conversation_id, cv.version").
+		ColumnExpr("cc.conversation_id::text AS customer_conversation_id, cc.current_service_session_id::text AS service_session_id, cv.version").
 		ColumnExpr("COALESCE(cci.display_name, c.display_name, '') AS contact_name").
 		ColumnExpr("ch.type AS channel_type, ch.name AS channel_name").
 		ColumnExpr("ss.status AS session_status, assignee.display_name AS assignee_name, assignee.type AS assignee_type").
@@ -198,9 +201,17 @@ func loadCopilotBackground(ctx context.Context, db bun.IDB, run *servermodels.Ag
 	if header.AssigneeName != nil && header.AssigneeType != nil {
 		background.ServiceSession.Assignee = &groupMessageSender{Name: *header.AssigneeName, Kind: *header.AssigneeType}
 	}
-	// 由新到旧累计沟通记录的 Token 估算，超出预算后停止，最新一条始终保留。
+	history, err := servicesummary.RecentHistory(ctx, db, run.OrganizationID, header.ServiceSessionID)
+	if err != nil {
+		return agentruntime.Message{}, err
+	}
+	background.History = history
+	// 历史小结与沟通记录共用背景预算；由新到旧累计沟通记录的 Token 估算，超出预算后停止，最新一条始终保留。
 	budget := agentruntime.ContextWindowTokens(agentruntime.ModelConfig{ContextWindow: int(header.ContextWindow)}) * copilotBackgroundWindowPercent / 100
 	used := 0
+	for _, entry := range history {
+		used += agentruntime.EstimateTextTokens(entry.Summary)
+	}
 	for _, row := range rows {
 		item := copilotBackgroundMessage{
 			Sender: groupMessageSender{Name: row.SenderName, Kind: "member"}, Visibility: row.Visibility,

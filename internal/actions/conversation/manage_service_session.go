@@ -13,6 +13,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/actions/serviceassignment"
+	"github.com/runforyou-ai/cervi/internal/actions/servicesummary"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/realtime"
@@ -424,6 +425,9 @@ func (a *CloseServiceSessionAction) Execute(ctx context.Context, identity *serve
 		if err := appendServiceSessionClosedEvent(ctx, tx, conversation, session, identity.OrganizationIdentity.ID, identity.OrganizationIdentity.DisplayName, domain.ServiceSessionCloseManual); err != nil {
 			return err
 		}
+		if err := servicesummary.MarkClosed(ctx, tx, a.enqueuer, session, domain.ServiceSessionCloseManual); err != nil {
+			return err
+		}
 		if ownedBefore {
 			if err := serviceassignment.EnqueueBackfill(ctx, tx, a.enqueuer, serviceassignment.BackfillInput{OrganizationID: session.OrganizationID, IdentityID: assigneeIdentityID}); err != nil {
 				return err
@@ -451,8 +455,8 @@ func (a *CloseServiceSessionAction) Execute(ctx context.Context, identity *serve
 	return output, nil
 }
 
-// CloseAgentServiceSession 在调用方持有会话锁的事务中关闭 AI 员工负责的开放周期：写入结束方式与关闭事件，关闭人为负责的 AI 员工。
-func CloseAgentServiceSession(ctx context.Context, db bun.IDB, conversation *servermodels.Conversation, session *servermodels.ServiceSession, reason domain.ServiceSessionCloseReason) error {
+// CloseAgentServiceSession 在调用方持有会话锁的事务中关闭 AI 员工负责的开放周期：写入结束方式与关闭事件并准备小结，关闭人为负责的 AI 员工。
+func CloseAgentServiceSession(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer, conversation *servermodels.Conversation, session *servermodels.ServiceSession, reason domain.ServiceSessionCloseReason) error {
 	if domain.ServiceSessionStatus(session.Status) != domain.ServiceSessionStatusOpen || session.AssigneeIdentityID == nil {
 		return ErrDataInvariant
 	}
@@ -483,6 +487,9 @@ func CloseAgentServiceSession(ctx context.Context, db bun.IDB, conversation *ser
 	session.ClosedByIdentityID, session.CloseReason = &agent.ID, &closeReason
 	session.AwaitingReplySince, session.RemindedAt, session.ResolutionRequestedAt = nil, nil, nil
 	if err := appendServiceSessionClosedEvent(ctx, db, conversation, session, agent.ID, agent.DisplayName, reason); err != nil {
+		return err
+	}
+	if err := servicesummary.MarkClosed(ctx, db, enqueuer, session, reason); err != nil {
 		return err
 	}
 	return chatstate.TouchConversation(ctx, db, conversation)
@@ -540,6 +547,9 @@ func (a *ReopenServiceSessionAction) Execute(ctx context.Context, identity *serv
 		session.AssigneeIdentityID = &assigneeIdentityID
 		session.ClosedAt = nil
 		if err := appendServiceSessionEvent(ctx, tx, identity, conversation, session, domain.ConversationSystemEventServiceSessionReopened, nil, nil); err != nil {
+			return err
+		}
+		if err := servicesummary.MarkReopened(ctx, tx, session); err != nil {
 			return err
 		}
 		if err := chatstate.TouchConversation(ctx, tx, conversation); err != nil {

@@ -190,7 +190,7 @@ const contacts = {
     },
     move: {
       title: "Move \"{{name}}\" to this computer?",
-      description: "The previous computer stops running this assistant. Choose workspaces again on this computer for each conversation.",
+      description: "The previous computer stops running this assistant. This computer runs it from now on.",
       saving: "Moving…",
       done: "Assistant moved to this computer",
       error: "Could not move the assistant. Try again.",

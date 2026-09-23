@@ -28,6 +28,8 @@ import {
   ReadInboxConversations,
   ReadConversationAttention,
   ReopenServiceSession,
+  GetCustomerServiceSummaries,
+  UpdateServiceSessionSummary,
   SearchInbox,
   RemoveGroupConversationMember,
   SendCustomerAttachmentMessage,
@@ -384,6 +386,12 @@ export function closeServiceSession(conversationId: string) {
 export function reopenServiceSession(conversationId: string) {
   return reopenServiceSessionBound(conversationId)
 }
+
+/** 读取客户会话当前周期的交接摘要与同一客户已关闭周期的小结。 */
+export const getCustomerServiceSummaries = bind(GetCustomerServiceSummaries)
+
+/** 修改已关闭客服处理周期的小结、是否解决与咨询分类。 */
+export const updateServiceSessionSummary = bind(UpdateServiceSessionSummary)
 
 /** 分页读取成员可见的会话消息。 */
 export function listConversationMessages(
