@@ -31,8 +31,10 @@ import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
+import { cn } from "@/lib/utils"
+import { resolveAppPlatform } from "@/platform/app-platform"
 
-/** 在助理单聊的会话头展示工作区入口：在助理绑定的电脑上可选择或添加工作区，其他端展示当前工作区并可清除。 */
+/** 在助理单聊的会话头展示工作区入口：在助理绑定的电脑上可选择或添加工作区，其他桌面端、Web 与移动端展示当前工作区并可清除；助理未绑定电脑时不展示。 */
 export function ConversationAssistantWorkspace({
   conversationID,
   assistantIdentityID,
@@ -49,6 +51,7 @@ export function ConversationAssistantWorkspace({
     () => listConversationAssistantWorkspaces(conversationID),
   )
   const entry = data?.find((item) => item.assistantIdentityId === assistantIdentityID)
+  const mobile = resolveAppPlatform() === "mobile"
   const { localDeviceID, workspaces } = useLocalWorkspaces()
   // 只有助理绑定的电脑能选择本机目录作为工作区。
   const onBoundDevice = entry !== undefined && entry.deviceId === localDeviceID
@@ -78,8 +81,15 @@ export function ConversationAssistantWorkspace({
     }, t("assistantWorkspaceAddError"))
   }
 
+  // 助理未绑定电脑时没有工作区记录，不展示入口。
+  if (data && !entry) return null
+
   return (
-    <WorkspacePopover workspaceLabel={entry?.workspaceLabel ?? ""} pending={pending}>
+    <WorkspacePopover
+      workspaceLabel={entry?.workspaceLabel ?? ""}
+      selectable={onBoundDevice}
+      pending={pending}
+    >
       {error && !data ? (
         <p className="text-sm text-muted-foreground">{t("assistantWorkspaceLoadError")}</p>
       ) : null}
@@ -131,7 +141,7 @@ export function ConversationAssistantWorkspace({
             <Button
               variant="outline"
               size="sm"
-              className="justify-self-start"
+              className={cn("justify-self-start", mobile && "min-h-11")}
               disabled={pending}
               onClick={() => void change(
                 () => clearConversationAssistantWorkspace(conversationID, assistantIdentityID),
@@ -185,7 +195,11 @@ export function DraftAssistantWorkspace({
   }
 
   return (
-    <WorkspacePopover workspaceLabel={selected?.label ?? ""} pending={pending}>
+    <WorkspacePopover
+      workspaceLabel={selected?.label ?? ""}
+      selectable={onBoundDevice}
+      pending={pending}
+    >
       {onBoundDevice ? (
         <>
           <label className="grid gap-1.5">
@@ -220,10 +234,13 @@ export function DraftAssistantWorkspace({
   )
 }
 
-/** 读取本机设备编号及其已注册的工作区，非桌面端设备编号为空。 */
+/** 读取本机设备编号及其已注册的工作区；移动端界面不作为助理绑定电脑，设备编号为空。 */
 function useLocalWorkspaces() {
-  const { data: local } = useResource(resourceKeys.currentDevice(), () => currentDevice())
-  const localDeviceID = local?.deviceId ?? ""
+  const mobile = resolveAppPlatform() === "mobile"
+  const { data: local } = useResource(resourceKeys.currentDevice(), () => currentDevice(), {
+    enabled: !mobile,
+  })
+  const localDeviceID = mobile ? "" : (local?.deviceId ?? "")
   const { data: workspaceList } = useResource(
     resourceKeys.deviceWorkspaces(localDeviceID),
     () => listDeviceWorkspaces(localDeviceID),
@@ -232,44 +249,57 @@ function useLocalWorkspaces() {
   return { localDeviceID, workspaces: workspaceList?.workspaces ?? [] }
 }
 
-/** 工作区入口按钮与设置浮层，已指定工作区时以圆点标记并在提示中显示工作区名称。 */
+/** 工作区入口按钮与设置浮层，已指定工作区时以圆点标记并在提示中显示工作区名称，不可选择时入口名称为「工作区」；移动端使用触控尺寸按钮，不显示悬停提示。 */
 function WorkspacePopover({
   workspaceLabel,
+  selectable,
   pending,
   children,
 }: {
   workspaceLabel: string
+  selectable: boolean
   pending: boolean
   children: ReactNode
 }) {
   const { t } = useTranslation("inbox")
+  const mobile = resolveAppPlatform() === "mobile"
   const label = workspaceLabel
     ? t("assistantWorkspaceActive", { workspace: workspaceLabel })
-    : t("assistantWorkspaceSelect")
+    : selectable
+      ? t("assistantWorkspaceSelect")
+      : t("assistantWorkspaceLabel")
+  const trigger = (
+    <PopoverTrigger asChild>
+      <Button
+        type="button"
+        variant="ghost"
+        size={mobile ? "icon-lg" : "icon-sm"}
+        className={cn("relative shrink-0", !mobile && "text-muted-foreground")}
+        aria-label={label}
+      >
+        {pending ? <LoaderCircleIcon className="animate-spin" /> : <FolderIcon />}
+        {workspaceLabel ? (
+          <span
+            aria-hidden="true"
+            className={cn(
+              "absolute size-1.5 rounded-full bg-primary",
+              mobile ? "top-2 right-2" : "top-1 right-1",
+            )}
+          />
+        ) : null}
+      </Button>
+    </PopoverTrigger>
+  )
   return (
     <Popover>
-      <Tooltip>
-        <TooltipTrigger asChild>
-          <PopoverTrigger asChild>
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon-sm"
-              className="relative shrink-0 text-muted-foreground"
-              aria-label={label}
-            >
-              {pending ? <LoaderCircleIcon className="animate-spin" /> : <FolderIcon />}
-              {workspaceLabel ? (
-                <span
-                  aria-hidden="true"
-                  className="absolute top-1 right-1 size-1.5 rounded-full bg-primary"
-                />
-              ) : null}
-            </Button>
-          </PopoverTrigger>
-        </TooltipTrigger>
-        <TooltipContent>{label}</TooltipContent>
-      </Tooltip>
+      {mobile ? (
+        trigger
+      ) : (
+        <Tooltip>
+          <TooltipTrigger asChild>{trigger}</TooltipTrigger>
+          <TooltipContent>{label}</TooltipContent>
+        </Tooltip>
+      )}
       <PopoverContent align="end" className="grid w-72 gap-3">
         {children}
       </PopoverContent>

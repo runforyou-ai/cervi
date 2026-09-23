@@ -1,9 +1,15 @@
 /** 会话侧边面板共用的分段页签和资料字段行。 */
-import type { ComponentProps, ReactNode } from "react"
+import type { ComponentProps, ComponentType, ReactNode } from "react"
 
 import { TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { FieldRequiredMark } from "@/components/ui/field"
 import { cn } from "@/lib/utils"
+
+/** 资料字段行组件，需放在 dl 内。 */
+export type ProfileField = ComponentType<{
+  label: string
+  children: ReactNode
+}>
 
 /** 侧边面板顶部的分段页签列表，右端为收起按钮留出位置。 */
 export function SidePanelTabsList({
