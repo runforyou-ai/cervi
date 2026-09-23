@@ -63,27 +63,36 @@ func testAIPerformanceReport(t *testing.T, db *bun.DB, identity *servermodels.Id
 	unresolved := false
 	closeSession(handoffRun.ScopeID, domain.ServiceSessionCloseAIResolved, &unresolved)
 
-	report, err := aiperformanceaction.NewReportQuery(db).Execute(ctx, identity, aiperformanceaction.Input{Days: 7, ChannelID: channelID})
+	scope := aiperformanceaction.Input{Days: 7, ChannelID: channelID}
+	overview, err := aiperformanceaction.NewOverviewQuery(db).Execute(ctx, identity, scope)
 	if err != nil {
 		t.Fatal(err)
 	}
-	summary := report.Summary
+	summary := overview.Summary
 	if summary.Closed != 2 || summary.AIResolved != 1 || summary.HandedOff != 1 || summary.CloseAIResolved != 2 || summary.Manual != 0 ||
-		summary.Rated != 1 || summary.RatedResolved != 0 {
-		t.Fatalf("summary = %+v", summary)
+		summary.Rated != 1 || summary.RatedResolved != 0 || overview.KnowledgeGapTotal != 1 {
+		t.Fatalf("overview = %+v", overview)
 	}
-	if len(report.Channels) != 1 || *report.Channels[0].ID != channelID || report.Channels[0].Closed != 2 || report.Channels[0].AIResolved != 1 {
-		t.Fatalf("channels = %+v", report.Channels)
+	if len(overview.HandoffReasons) != 1 || overview.HandoffReasons[0].Reason != string(domain.AgentHandoffReasonKnowledgeGap) || overview.HandoffReasons[0].Count != 1 {
+		t.Fatalf("handoff reasons = %+v", overview.HandoffReasons)
 	}
-	if len(report.Categories) != 1 || report.Categories[0].ID != nil || report.Categories[0].Closed != 2 {
-		t.Fatalf("categories = %+v", report.Categories)
+	breakdowns := aiperformanceaction.NewBreakdownQuery(db)
+	channels, err := breakdowns.Execute(ctx, identity, aiperformanceaction.BreakdownInput{Input: scope, Dimension: domain.AIPerformanceDimensionChannel})
+	if err != nil || channels.Total != 1 || len(channels.Rows) != 1 || *channels.Rows[0].ID != channelID || channels.Rows[0].Closed != 2 || channels.Rows[0].AIResolved != 1 {
+		t.Fatalf("channels = %+v, error = %v", channels, err)
 	}
-	if len(report.HandoffReasons) != 1 || report.HandoffReasons[0].Reason != string(domain.AgentHandoffReasonKnowledgeGap) || report.HandoffReasons[0].Count != 1 {
-		t.Fatalf("handoff reasons = %+v", report.HandoffReasons)
+	categories, err := breakdowns.Execute(ctx, identity, aiperformanceaction.BreakdownInput{Input: scope, Dimension: domain.AIPerformanceDimensionCategory})
+	if err != nil || categories.Total != 1 || len(categories.Rows) != 1 || categories.Rows[0].ID != nil || categories.Rows[0].Closed != 2 {
+		t.Fatalf("categories = %+v, error = %v", categories, err)
 	}
-	if report.KnowledgeGapTotal != 1 || len(report.KnowledgeGaps) != 1 || report.KnowledgeGaps[0].Question != "海外仓发货要几天" ||
-		report.KnowledgeGaps[0].MessageID == nil || report.KnowledgeGaps[0].ConversationID != handedOff.Conversation.ID {
-		t.Fatalf("knowledge gaps = %+v", report.KnowledgeGaps)
+	gapsQuery := aiperformanceaction.NewKnowledgeGapsQuery(db)
+	gaps, err := gapsQuery.Execute(ctx, identity, aiperformanceaction.KnowledgeGapInput{Input: scope})
+	if err != nil || gaps.Total != 1 || len(gaps.Gaps) != 1 || gaps.Gaps[0].Question != "海外仓发货要几天" ||
+		gaps.Gaps[0].MessageID == nil || gaps.Gaps[0].ConversationID != handedOff.Conversation.ID {
+		t.Fatalf("knowledge gaps = %+v, error = %v", gaps, err)
+	}
+	if gaps, err = gapsQuery.Execute(ctx, identity, aiperformanceaction.KnowledgeGapInput{Input: scope, Page: 2, PageSize: 1}); err != nil || gaps.Total != 1 || len(gaps.Gaps) != 0 {
+		t.Fatalf("knowledge gaps page 2 = %+v, error = %v", gaps, err)
 	}
 
 	// 停用 AI 员工把其负责的周期退回队列，记为 AI 员工不可用的转人工。
@@ -96,13 +105,13 @@ func testAIPerformanceReport(t *testing.T, db *bun.DB, identity *servermodels.Id
 		t.Fatal(err)
 	}
 	closeSession(returnedSessionID, domain.ServiceSessionCloseManual, nil)
-	report, err = aiperformanceaction.NewReportQuery(db).Execute(ctx, identity, aiperformanceaction.Input{Days: 7, ChannelID: retiredChannelID})
+	overview, err = aiperformanceaction.NewOverviewQuery(db).Execute(ctx, identity, aiperformanceaction.Input{Days: 7, ChannelID: retiredChannelID})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if report.Summary.Closed != 1 || report.Summary.HandedOff != 1 || report.Summary.Manual != 1 || report.KnowledgeGapTotal != 0 ||
-		len(report.HandoffReasons) != 1 || report.HandoffReasons[0].Reason != string(domain.AgentHandoffReasonAgentUnavailable) || report.HandoffReasons[0].Count != 1 {
-		t.Fatalf("returned report = %+v", report)
+	if overview.Summary.Closed != 1 || overview.Summary.HandedOff != 1 || overview.Summary.Manual != 1 || overview.KnowledgeGapTotal != 0 ||
+		len(overview.HandoffReasons) != 1 || overview.HandoffReasons[0].Reason != string(domain.AgentHandoffReasonAgentUnavailable) || overview.HandoffReasons[0].Count != 1 {
+		t.Fatalf("returned overview = %+v", overview)
 	}
 
 	// 真人对客回复过的周期即使按 AI 解决关闭也不计入独立解决。
@@ -115,24 +124,20 @@ func testAIPerformanceReport(t *testing.T, db *bun.DB, identity *servermodels.Id
 		t.Fatal(err)
 	}
 	closeSession(currentSession(replied.Conversation.ID), domain.ServiceSessionCloseAIResolved, nil)
-	report, err = aiperformanceaction.NewReportQuery(db).Execute(ctx, identity, aiperformanceaction.Input{Days: 7, ChannelID: humanChannelID})
+	overview, err = aiperformanceaction.NewOverviewQuery(db).Execute(ctx, identity, aiperformanceaction.Input{Days: 7, ChannelID: humanChannelID})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if report.Summary.Closed != 1 || report.Summary.CloseAIResolved != 1 || report.Summary.AIResolved != 0 || report.Summary.HandedOff != 0 {
-		t.Fatalf("human replied report = %+v", report.Summary)
+	if overview.Summary.Closed != 1 || overview.Summary.CloseAIResolved != 1 || overview.Summary.AIResolved != 0 || overview.Summary.HandedOff != 0 {
+		t.Fatalf("human replied overview = %+v", overview.Summary)
 	}
 
-	// 全部渠道包含上述三个渠道。
-	report, err = aiperformanceaction.NewReportQuery(db).Execute(ctx, identity, aiperformanceaction.Input{Days: 7})
-	if err != nil {
-		t.Fatal(err)
+	// 全部渠道不按渠道过滤，包含上述三个渠道。
+	overview, err = aiperformanceaction.NewOverviewQuery(db).Execute(ctx, identity, aiperformanceaction.Input{Days: 7})
+	if err != nil || overview.Summary.Closed < 4 {
+		t.Fatalf("all channels overview = %+v, error = %v", overview, err)
 	}
-	channels := map[string]int{}
-	for _, channel := range report.Channels {
-		channels[*channel.ID] = channel.Closed
-	}
-	if report.Summary.Closed < 4 || channels[channelID] != 2 || channels[retiredChannelID] != 1 || channels[humanChannelID] != 1 {
-		t.Fatalf("all channels report = %+v", report)
+	if channels, err = breakdowns.Execute(ctx, identity, aiperformanceaction.BreakdownInput{Input: aiperformanceaction.Input{Days: 7}, Dimension: domain.AIPerformanceDimensionChannel}); err != nil || channels.Total < 3 {
+		t.Fatalf("all channels breakdown = %+v, error = %v", channels, err)
 	}
 }
