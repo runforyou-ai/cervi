@@ -10,18 +10,10 @@ import {
 } from "@/api"
 import { requiredWailsEnum } from "@/lib/wails-enum"
 
-/** 创建模型服务供应商表单校验。 */
-export function createAIProviderSchema(messages: {
-  brandInvalid: string
-  credentialTypeInvalid: string
-  nameRequired: string
-  nameTooLong: string
-  apiKeyRequired: string
-  apiKeyTooLong: string
-  apiUrlRequired: string
-  apiUrlInvalid: string
+export type AIModelSchemaMessages = {
   modelIdentifierRequired: string
   modelIdentifierTooLong: string
+  modelIdentifierDuplicate: string
   modelNameRequired: string
   modelNameTooLong: string
   modelTypeInvalid: string
@@ -29,9 +21,72 @@ export function createAIProviderSchema(messages: {
   inputModalitiesRequired: string
   contextWindowInvalid: string
   maxOutputTokensInvalid: string
-  modelIdentifierDuplicate: string
-  modelsRequired: string
-}) {
+}
+
+/** 创建单个模型的校验，模型标识不能与 takenIdentifiers 中的标识重复。 */
+export function createAIModelSchema(
+  messages: AIModelSchemaMessages,
+  takenIdentifiers: ReadonlySet<string> = new Set(),
+) {
+  return z
+    .object({
+      identifier: z
+        .string()
+        .trim()
+        .min(1, messages.modelIdentifierRequired)
+        .max(200, messages.modelIdentifierTooLong)
+        .refine(
+          (identifier) => !takenIdentifiers.has(identifier),
+          messages.modelIdentifierDuplicate,
+        ),
+      name: z
+        .string()
+        .trim()
+        .min(1, messages.modelNameRequired)
+        .max(200, messages.modelNameTooLong),
+      type: requiredWailsEnum(AIModelType, messages.modelTypeInvalid),
+      inputModalities: z
+        .array(
+          requiredWailsEnum(AIModelInputModality, messages.inputModalityInvalid),
+        )
+        .min(1, messages.inputModalitiesRequired),
+      contextWindow: z
+        .string()
+        .trim()
+        .refine(
+          (value) => parseTokenCount(value) !== null,
+          messages.contextWindowInvalid,
+        ),
+      maxOutputTokens: z.string().trim(),
+    })
+    .superRefine((model, context) => {
+      if (
+        model.type === AIModelType.AIModelTypeChat &&
+        parseTokenCount(model.maxOutputTokens) === null
+      ) {
+        context.addIssue({
+          code: z.ZodIssueCode.custom,
+          message: messages.maxOutputTokensInvalid,
+          path: ["maxOutputTokens"],
+        })
+      }
+    })
+}
+
+/** 创建模型服务供应商表单校验。 */
+export function createAIProviderSchema(
+  messages: AIModelSchemaMessages & {
+    brandInvalid: string
+    credentialTypeInvalid: string
+    nameRequired: string
+    nameTooLong: string
+    apiKeyRequired: string
+    apiKeyTooLong: string
+    apiUrlRequired: string
+    apiUrlInvalid: string
+    modelsRequired: string
+  },
+) {
   return z.object({
     brand: requiredWailsEnum(AIProviderBrand, messages.brandInvalid),
     credentialType: requiredWailsEnum(
@@ -50,50 +105,7 @@ export function createAIProviderSchema(messages: {
       .min(1, messages.apiUrlRequired)
       .refine(isHTTPEndpoint, messages.apiUrlInvalid),
     models: z
-      .array(
-        z
-          .object({
-            identifier: z
-              .string()
-              .trim()
-              .min(1, messages.modelIdentifierRequired)
-              .max(200, messages.modelIdentifierTooLong),
-            name: z
-              .string()
-              .trim()
-              .min(1, messages.modelNameRequired)
-              .max(200, messages.modelNameTooLong),
-            type: requiredWailsEnum(AIModelType, messages.modelTypeInvalid),
-            inputModalities: z
-              .array(
-                requiredWailsEnum(
-                  AIModelInputModality,
-                  messages.inputModalityInvalid,
-                ),
-              )
-              .min(1, messages.inputModalitiesRequired),
-            contextWindow: z
-              .string()
-              .trim()
-              .refine(
-                (value) => parseTokenCount(value) !== null,
-                messages.contextWindowInvalid,
-              ),
-            maxOutputTokens: z.string().trim(),
-          })
-          .superRefine((model, context) => {
-            if (
-              model.type === AIModelType.AIModelTypeChat &&
-              parseTokenCount(model.maxOutputTokens) === null
-            ) {
-              context.addIssue({
-                code: z.ZodIssueCode.custom,
-                message: messages.maxOutputTokensInvalid,
-                path: ["maxOutputTokens"],
-              })
-            }
-          }),
-      )
+      .array(createAIModelSchema(messages))
       .min(1, messages.modelsRequired)
       .superRefine((models, context) => {
         const identifiers = new Set<string>()
@@ -140,3 +152,5 @@ export function parseTokenCount(value: string) {
 export type AIProviderFormValues = z.infer<
   ReturnType<typeof createAIProviderSchema>
 >
+
+export type AIModelFormValues = z.infer<ReturnType<typeof createAIModelSchema>>

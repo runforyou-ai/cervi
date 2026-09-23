@@ -12,9 +12,10 @@ type RowAvatar = {
   fallback?: "person" | "agent" | "group"
 }
 
-/** 渲染行首头像（可带工作状态点）或圆形图标，主行为名称加 `·` 分隔的次要信息，第二行为补充说明；文字说明按单行截断，传入元素时由元素自行控制截断。 */
+/** 渲染行首头像（可带工作状态点）、圆形图标或传入的行首元素，主行为名称加 `·` 分隔的次要信息，第二行为补充说明；文字说明按单行截断，传入元素时由元素自行控制截断。 */
 export function ResourceRowIdentity({
   avatar,
+  leading,
   icon: Icon,
   status,
   name,
@@ -23,6 +24,7 @@ export function ResourceRowIdentity({
   description,
 }: {
   avatar?: RowAvatar
+  leading?: ReactNode
   icon?: LucideIcon
   status?: WorkStatus
   name: ReactNode
@@ -44,7 +46,9 @@ export function ResourceRowIdentity({
 
   return (
     <div className="flex min-w-0 items-center gap-3">
-      {Icon ? (
+      {leading ? (
+        leading
+      ) : Icon ? (
         <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-muted text-muted-foreground">
           <Icon className="size-4.5" aria-hidden="true" />
         </span>

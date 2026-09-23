@@ -121,8 +121,11 @@ func (o *directOperations) CreateAIProvider(ctx context.Context, meta RequestMet
 }
 
 // UpdateAIProvider 修改模型服务供应商。
-func (o *directOperations) UpdateAIProvider(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, providerID string, input AIProviderInput) (AIProvider, error) {
-	provider, err := o.updateAIProvider.Execute(ctx, identity, providerID, aiProviderInput(input))
+func (o *directOperations) UpdateAIProvider(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, providerID string, input AIProviderUpdateInput) (AIProvider, error) {
+	provider, err := o.updateAIProvider.Execute(ctx, identity, providerID, aiprovideraction.UpdateInput{
+		Name: input.Name, CredentialType: domain.AIProviderCredentialType(input.CredentialType),
+		APIKey: input.APIKey, APIURL: input.APIURL, Models: aiProviderModelsInput(input.Models),
+	})
 	if err != nil {
 		return AIProvider{}, o.aiProviderMutationError(ctx, meta, err, cervii18n.ErrorAIProviderUpdateFailed, identity.Organization.ID, "provider_id", providerID)
 	}
@@ -168,8 +171,17 @@ func (o *directOperations) aiProviderError(ctx context.Context, meta RequestMeta
 
 // aiProviderInput 转换模型服务供应商输入。
 func aiProviderInput(input AIProviderInput) aiprovideraction.Input {
-	models := make([]aiprovideraction.Model, 0, len(input.Models))
-	for _, model := range input.Models {
+	return aiprovideraction.Input{
+		Brand: domain.AIProviderBrand(input.Brand), Name: input.Name,
+		CredentialType: domain.AIProviderCredentialType(input.CredentialType),
+		APIKey:         input.APIKey, APIURL: input.APIURL, Models: aiProviderModelsInput(input.Models),
+	}
+}
+
+// aiProviderModelsInput 转换模型目录输入。
+func aiProviderModelsInput(input []AIProviderModel) []aiprovideraction.Model {
+	models := make([]aiprovideraction.Model, 0, len(input))
+	for _, model := range input {
 		// 转换模型输入模态到领域值。
 		inputModalities := make([]domain.AIModelInputModality, 0, len(model.InputModalities))
 		for _, modality := range model.InputModalities {
@@ -181,11 +193,7 @@ func aiProviderInput(input AIProviderInput) aiprovideraction.Input {
 			ContextWindow:   model.ContextWindow, MaxOutputTokens: model.MaxOutputTokens,
 		})
 	}
-	return aiprovideraction.Input{
-		Brand: domain.AIProviderBrand(input.Brand), Name: input.Name,
-		CredentialType: domain.AIProviderCredentialType(input.CredentialType),
-		APIKey:         input.APIKey, APIURL: input.APIURL, Models: models,
-	}
+	return models
 }
 
 // aiProviderFromAction 转换模型服务供应商输出。

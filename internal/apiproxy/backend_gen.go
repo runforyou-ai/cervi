@@ -1129,7 +1129,7 @@ func (b *Backend) CreateAIProvider(ctx context.Context, meta appservice.RequestM
 }
 
 // UpdateAIProvider 修改模型服务供应商。
-func (b *Backend) UpdateAIProvider(ctx context.Context, meta appservice.RequestMeta, providerID string, input appservice.AIProviderInput) (appservice.AIProvider, error) {
+func (b *Backend) UpdateAIProvider(ctx context.Context, meta appservice.RequestMeta, providerID string, input appservice.AIProviderUpdateInput) (appservice.AIProvider, error) {
 	var output appservice.AIProvider
 	err := b.do(ctx, meta, http.MethodPut, "/settings/model-services/"+url.PathEscape(providerID), nil, input, &output)
 	b.normalizeOutput(&output)

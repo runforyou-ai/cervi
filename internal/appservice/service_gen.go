@@ -740,7 +740,7 @@ func (s *Service) CreateAIProvider(ctx context.Context, meta RequestMeta, input 
 }
 
 // UpdateAIProvider 修改模型服务供应商。
-func (s *Service) UpdateAIProvider(ctx context.Context, meta RequestMeta, providerID string, input AIProviderInput) (AIProvider, error) {
+func (s *Service) UpdateAIProvider(ctx context.Context, meta RequestMeta, providerID string, input AIProviderUpdateInput) (AIProvider, error) {
 	return withNormalizedSlices(s.backend.UpdateAIProvider(ctx, meta, providerID, input))
 }
 

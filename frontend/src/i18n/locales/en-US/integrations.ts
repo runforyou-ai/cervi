@@ -61,11 +61,6 @@ const integrations = {
   modelServices: {
     title: "Model services",
     description: "Providers for chat, embedding and rerank models",
-    tabs: {
-      chat: "Chat models",
-      embedding: "Embedding models",
-      rerank: "Reranking models",
-    },
     brands: {
       deepseek: "DeepSeek",
       alibaba: "Alibaba Cloud Model Studio",
@@ -84,11 +79,16 @@ const integrations = {
     list: {
       create: "Add provider",
       loadError: "Could not load model service providers.",
-      empty: "No providers support {{type}} yet",
-      modelSeparator: ", ",
+      empty: "No model service providers yet",
+      modelCount_one: "1 {{type}} model",
+      modelCount_other: "{{count}} {{type}} models",
       columns: {
         name: "Name",
       },
+    },
+    brandDialog: {
+      title: "Choose a brand",
+      description: "Choose the model service to connect",
     },
     form: {
       createTitle: "Add provider",
@@ -115,7 +115,9 @@ const integrations = {
       loadError: "Could not load the model service provider.",
     },
     models: {
-      title: "Model catalog",
+      title: "Models",
+      createTitle: "Add model",
+      editTitle: "Edit model",
       manualAdd: "Add manually",
       fetch: "Select preset models",
       discover: "Load available models",
@@ -127,10 +129,19 @@ const integrations = {
       dialogTitle: "Select preset models",
       discoverDialogTitle: "Select available models",
       dialogEmpty: "No models to select",
-      select: "Select",
       toggle: "Select {{name}}",
-      editField: "{{field}}, row {{row}}",
-      clearAll: "Clear all",
+      search: "Search models",
+      noMatches: "No matching models",
+      added: "Added",
+      incomplete: "Needs details",
+      selected_one: "1 selected",
+      selected_other: "{{count}} selected",
+      modalitySeparator: ", ",
+      contextWindowSummary: "{{value}} context",
+      maxOutputTokensSummary: "{{value}} max output",
+      removeTitle: "Remove model “{{name}}”?",
+      removeDescription:
+        "Models used by AI employees or knowledge bases can't be removed.",
       types: {
         chat: "Chat",
         embedding: "Embedding",
