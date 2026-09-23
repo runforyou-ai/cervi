@@ -26,7 +26,7 @@ type ReportListProps = {
 
 const pageSize = 50
 
-/** 按渠道或咨询分类列出已结束会话数、AI 独立解决数与解决率。 */
+/** 按渠道或咨询分类列出已结束会话数，以及已解决与 AI 独立解决的数量和占比。 */
 export function AIPerformanceBreakdownList({
   dimension,
   days,
@@ -65,16 +65,16 @@ export function AIPerformanceBreakdownList({
             cell: (row) => count(row.closed),
           },
           {
-            key: "aiResolved",
-            header: t("performance.columns.aiResolved"),
-            className: "w-32 text-right tabular-nums",
-            cell: (row) => count(row.aiResolved),
+            key: "resolved",
+            header: t("performance.columns.resolved"),
+            className: "w-36 text-right tabular-nums",
+            cell: (row) => `${count(row.resolved)} · ${rate(row.resolved, row.closed)}`,
           },
           {
-            key: "rate",
-            header: t("performance.columns.rate"),
-            className: "w-24 text-right tabular-nums",
-            cell: (row) => rate(row.aiResolved, row.closed),
+            key: "aiResolved",
+            header: t("performance.columns.aiResolved"),
+            className: "w-36 text-right tabular-nums",
+            cell: (row) => `${count(row.aiResolved)} · ${rate(row.aiResolved, row.closed)}`,
           },
         ]}
         rows={list.data?.rows ?? []}

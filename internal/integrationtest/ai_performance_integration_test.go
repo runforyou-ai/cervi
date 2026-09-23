@@ -19,7 +19,7 @@ import (
 	"uuid"
 )
 
-// testAIPerformanceReport 验证 AI 表现报表只把无真人参与、无转人工的 AI 解决计入独立解决，并按已关闭周期统计转人工原因与知识缺口。
+// testAIPerformanceReport 验证 AI 表现报表按小结的是否解决统计解决情况，只把 AI 员工关闭且无真人参与的已解决周期计入独立解决，排除无实质诉求的周期，并按已关闭周期统计转人工原因与知识缺口。
 func testAIPerformanceReport(t *testing.T, db *bun.DB, identity *servermodels.Identity, providerID, modelID string) {
 	ctx := context.Background()
 	tasks := newTestTasks(db)
@@ -33,10 +33,10 @@ func testAIPerformanceReport(t *testing.T, db *bun.DB, identity *servermodels.Id
 	disableAutoAssignment(t, db, identity.Organization.ID)
 	agent := f.newAgent(t, "表现报表客服")
 	channelID := f.newChannel(t, agent.IdentityID, channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue})
-	// closeSession 把周期按指定结束方式关闭，并写入访客评价。
-	closeSession := func(sessionID string, reason domain.ServiceSessionCloseReason, rating *bool) {
+	// closeSession 把周期按指定结束方式关闭，并写入访客评价与小结的是否解决。
+	closeSession := func(sessionID string, reason domain.ServiceSessionCloseReason, rating, resolved *bool) {
 		if _, err := db.NewUpdate().Table("service_sessions").
-			Set("status = ?, close_reason = ?, closed_at = now(), rating_resolved = ?", domain.ServiceSessionStatusClosed, reason, rating).
+			Set("status = ?, close_reason = ?, closed_at = now(), rating_resolved = ?, resolved = ?", domain.ServiceSessionStatusClosed, reason, rating, resolved).
 			Where("id = ?", sessionID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
@@ -61,7 +61,17 @@ func testAIPerformanceReport(t *testing.T, db *bun.DB, identity *servermodels.Id
 	handedOff := f.receive(t, &handoffInput, "海外仓发货要几天")
 	handoffRun := f.executeQueuedRun(t, handedOff.Conversation.ID, handoffRuntime("资料里没有海外仓时效", nil))
 	unresolved := false
-	closeSession(handoffRun.ScopeID, domain.ServiceSessionCloseAIResolved, &unresolved)
+	closeSession(handoffRun.ScopeID, domain.ServiceSessionCloseAIResolved, &unresolved, &unresolved)
+
+	// 无实质诉求的周期不计入报表。
+	greetingInput := visitorInput(channelID, "")
+	greeting := f.receive(t, &greetingInput, "你好")
+	greetingSessionID := currentSession(greeting.Conversation.ID)
+	closeSession(greetingSessionID, domain.ServiceSessionCloseCustomerUnresponsive, nil, nil)
+	if _, err := db.NewUpdate().Table("service_sessions").Set("summary_status = ?", domain.ServiceSessionSummaryNoRequest).
+		Where("id = ?", greetingSessionID).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
 
 	scope := aiperformanceaction.Input{Days: 7, ChannelID: channelID}
 	overview, err := aiperformanceaction.NewOverviewQuery(db).Execute(ctx, identity, scope)
@@ -69,7 +79,8 @@ func testAIPerformanceReport(t *testing.T, db *bun.DB, identity *servermodels.Id
 		t.Fatal(err)
 	}
 	summary := overview.Summary
-	if summary.Closed != 2 || summary.AIResolved != 1 || summary.HandedOff != 1 || summary.CloseAIResolved != 2 || summary.Manual != 0 ||
+	if summary.Closed != 2 || summary.Resolved != 1 || summary.Unresolved != 1 || summary.AIOnly != 1 || summary.AIResolved != 1 || summary.AIUnresolved != 0 ||
+		summary.HandedOff != 1 || summary.CloseAIResolved != 2 || summary.CustomerUnresponsive != 0 || summary.Manual != 0 ||
 		summary.Rated != 1 || summary.RatedResolved != 0 || overview.KnowledgeGapTotal != 1 {
 		t.Fatalf("overview = %+v", overview)
 	}
@@ -78,7 +89,7 @@ func testAIPerformanceReport(t *testing.T, db *bun.DB, identity *servermodels.Id
 	}
 	breakdowns := aiperformanceaction.NewBreakdownQuery(db)
 	channels, err := breakdowns.Execute(ctx, identity, aiperformanceaction.BreakdownInput{Input: scope, Dimension: domain.AIPerformanceDimensionChannel})
-	if err != nil || channels.Total != 1 || len(channels.Rows) != 1 || *channels.Rows[0].ID != channelID || channels.Rows[0].Closed != 2 || channels.Rows[0].AIResolved != 1 {
+	if err != nil || channels.Total != 1 || len(channels.Rows) != 1 || *channels.Rows[0].ID != channelID || channels.Rows[0].Closed != 2 || channels.Rows[0].Resolved != 1 || channels.Rows[0].AIResolved != 1 {
 		t.Fatalf("channels = %+v, error = %v", channels, err)
 	}
 	categories, err := breakdowns.Execute(ctx, identity, aiperformanceaction.BreakdownInput{Input: scope, Dimension: domain.AIPerformanceDimensionCategory})
@@ -104,17 +115,17 @@ func testAIPerformanceReport(t *testing.T, db *bun.DB, identity *servermodels.Id
 	if _, err := agentaction.NewUpdateStatusAction(db, testServiceSessionReturner(db)).Execute(ctx, identity, retired.ID, domain.UserStatusInactive); err != nil {
 		t.Fatal(err)
 	}
-	closeSession(returnedSessionID, domain.ServiceSessionCloseManual, nil)
+	closeSession(returnedSessionID, domain.ServiceSessionCloseManual, nil, nil)
 	overview, err = aiperformanceaction.NewOverviewQuery(db).Execute(ctx, identity, aiperformanceaction.Input{Days: 7, ChannelID: retiredChannelID})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if overview.Summary.Closed != 1 || overview.Summary.HandedOff != 1 || overview.Summary.Manual != 1 || overview.KnowledgeGapTotal != 0 ||
+	if overview.Summary.Closed != 1 || overview.Summary.HandedOff != 1 || overview.Summary.Manual != 1 || overview.Summary.Resolved != 0 || overview.Summary.Unresolved != 0 || overview.KnowledgeGapTotal != 0 ||
 		len(overview.HandoffReasons) != 1 || overview.HandoffReasons[0].Reason != string(domain.AgentHandoffReasonAgentUnavailable) || overview.HandoffReasons[0].Count != 1 {
 		t.Fatalf("returned overview = %+v", overview)
 	}
 
-	// 真人对客回复过的周期即使按 AI 解决关闭也不计入独立解决。
+	// 真人对客回复过的已解决周期计入已解决，不计入独立解决。
 	humanChannelID := f.newChannel(t, identity.OrganizationIdentity.ID, channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue})
 	repliedInput := visitorInput(humanChannelID, "")
 	replied := f.receive(t, &repliedInput, "怎么修改收货地址")
@@ -123,21 +134,42 @@ func testAIPerformanceReport(t *testing.T, db *bun.DB, identity *servermodels.Id
 	}); err != nil {
 		t.Fatal(err)
 	}
-	closeSession(currentSession(replied.Conversation.ID), domain.ServiceSessionCloseAIResolved, nil)
+	resolvedByHuman := true
+	closeSession(currentSession(replied.Conversation.ID), domain.ServiceSessionCloseAIResolved, nil, &resolvedByHuman)
 	overview, err = aiperformanceaction.NewOverviewQuery(db).Execute(ctx, identity, aiperformanceaction.Input{Days: 7, ChannelID: humanChannelID})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if overview.Summary.Closed != 1 || overview.Summary.CloseAIResolved != 1 || overview.Summary.AIResolved != 0 || overview.Summary.HandedOff != 0 {
+	if overview.Summary.Closed != 1 || overview.Summary.CloseAIResolved != 1 || overview.Summary.Resolved != 1 ||
+		overview.Summary.AIOnly != 0 || overview.Summary.AIResolved != 0 || overview.Summary.HandedOff != 0 {
 		t.Fatalf("human replied overview = %+v", overview.Summary)
 	}
 
-	// 全部渠道不按渠道过滤，包含上述三个渠道。
+	// 真人未对客回复直接关闭的已解决周期计入已解决，不计入独立处理。
+	closedByHumanChannelID := f.newChannel(t, identity.OrganizationIdentity.ID, channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue})
+	manualInput := visitorInput(closedByHumanChannelID, "")
+	manual := f.receive(t, &manualInput, "发票怎么开")
+	manualSessionID := currentSession(manual.Conversation.ID)
+	if _, err := conversationaction.NewCloseServiceSessionAction(db, testServiceSessionReturner(db), tasks).Execute(ctx, identity, manual.Conversation.ID); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := db.NewUpdate().Table("service_sessions").Set("resolved = true").Where("id = ?", manualSessionID).Exec(ctx); err != nil {
+		t.Fatal(err)
+	}
+	overview, err = aiperformanceaction.NewOverviewQuery(db).Execute(ctx, identity, aiperformanceaction.Input{Days: 7, ChannelID: closedByHumanChannelID})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if overview.Summary.Closed != 1 || overview.Summary.Manual != 1 || overview.Summary.Resolved != 1 || overview.Summary.AIOnly != 0 || overview.Summary.AIResolved != 0 {
+		t.Fatalf("closed by human overview = %+v", overview.Summary)
+	}
+
+	// 全部渠道不按渠道过滤，包含上述四个渠道。
 	overview, err = aiperformanceaction.NewOverviewQuery(db).Execute(ctx, identity, aiperformanceaction.Input{Days: 7})
-	if err != nil || overview.Summary.Closed < 4 {
+	if err != nil || overview.Summary.Closed < 5 {
 		t.Fatalf("all channels overview = %+v, error = %v", overview, err)
 	}
-	if channels, err = breakdowns.Execute(ctx, identity, aiperformanceaction.BreakdownInput{Input: aiperformanceaction.Input{Days: 7}, Dimension: domain.AIPerformanceDimensionChannel}); err != nil || channels.Total < 3 {
+	if channels, err = breakdowns.Execute(ctx, identity, aiperformanceaction.BreakdownInput{Input: aiperformanceaction.Input{Days: 7}, Dimension: domain.AIPerformanceDimensionChannel}); err != nil || channels.Total < 4 {
 		t.Fatalf("all channels breakdown = %+v, error = %v", channels, err)
 	}
 }

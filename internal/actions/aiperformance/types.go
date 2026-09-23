@@ -23,10 +23,14 @@ type Input struct {
 	ChannelID string
 }
 
-// Summary 定义统计范围内已关闭周期的整体计数；HandedOff 为发生过转人工的周期数。
+// Summary 定义统计范围内已关闭周期的整体计数，排除小结状态为无实质诉求的周期：Resolved 与 Unresolved 按小结的是否解决计数，其余为未判定；AIOnly 为 AI 员工独立处理并关闭的周期数，AIResolved 与 AIUnresolved 为其中的已解决与未解决数，HandedOff 为发生过转人工的周期数。
 type Summary struct {
 	Closed               int `bun:"closed"`
+	Resolved             int `bun:"resolved"`
+	Unresolved           int `bun:"unresolved"`
+	AIOnly               int `bun:"ai_only"`
 	AIResolved           int `bun:"ai_resolved"`
+	AIUnresolved         int `bun:"ai_unresolved"`
 	HandedOff            int `bun:"handed_off"`
 	CloseAIResolved      int `bun:"close_ai_resolved"`
 	CustomerUnresponsive int `bun:"customer_unresponsive"`
@@ -56,11 +60,12 @@ type BreakdownInput struct {
 	PageSize  int
 }
 
-// Breakdown 定义按渠道或咨询分类拆分的已关闭周期数与 AI 独立解决数；ID 为空表示未分类。
+// Breakdown 定义按渠道或咨询分类拆分的已关闭周期数、已解决数与 AI 独立解决数；ID 为空表示未分类。
 type Breakdown struct {
 	ID         *string `bun:"id"`
 	Name       string  `bun:"name"`
 	Closed     int     `bun:"closed"`
+	Resolved   int     `bun:"resolved"`
 	AIResolved int     `bun:"ai_resolved"`
 }
 

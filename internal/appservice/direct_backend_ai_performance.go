@@ -65,7 +65,7 @@ func (o *directOperations) ListAIPerformanceBreakdowns(ctx context.Context, meta
 	}
 	rows := make([]AIPerformanceBreakdown, 0, len(list.Rows))
 	for _, row := range list.Rows {
-		rows = append(rows, AIPerformanceBreakdown{ID: common.StringValue(row.ID), Name: row.Name, Closed: row.Closed, AIResolved: row.AIResolved})
+		rows = append(rows, AIPerformanceBreakdown{ID: common.StringValue(row.ID), Name: row.Name, Closed: row.Closed, Resolved: row.Resolved, AIResolved: row.AIResolved})
 	}
 	return AIPerformanceBreakdownList{Rows: rows, Page: PageInfo{Number: list.Page, Size: list.PageSize, Total: list.Total}}, nil
 }

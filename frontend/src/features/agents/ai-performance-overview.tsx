@@ -1,4 +1,4 @@
-/** AI 表现报表概览：指标卡、结束方式与转人工原因分布。 */
+/** AI 表现报表概览：指标卡、解决情况、结束方式与转人工原因分布。 */
 import type { ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 
@@ -57,6 +57,53 @@ export function AIPerformanceOverview({
           onClick={onOpenKnowledgeGaps}
         />
       </div>
+
+      <ReportSection title={t("performance.resolution")}>
+        {summary.closed > 0 ? (
+          <div className="grid gap-x-8 gap-y-5 md:grid-cols-2">
+            {[
+              {
+                key: "ai",
+                title: t("performance.aiOnly"),
+                total: summary.aiOnly,
+                resolved: summary.aiResolved,
+                unresolved: summary.aiUnresolved,
+              },
+              {
+                key: "human",
+                title: t("performance.humanInvolved"),
+                total: summary.closed - summary.aiOnly,
+                resolved: summary.resolved - summary.aiResolved,
+                unresolved: summary.unresolved - summary.aiUnresolved,
+              },
+            ].map((group) => {
+              if (group.total === 0) return null
+              return (
+                <div key={group.key} className="space-y-2">
+                  <p className="text-xs text-muted-foreground">
+                    {t("performance.resolutionGroup", { name: group.title, formatted: count(group.total) })}
+                  </p>
+                  <MeterList
+                    total={group.total}
+                    rows={[
+                      { key: "resolved", label: t("performance.resolved"), value: group.resolved },
+                      { key: "unresolved", label: t("performance.unresolved"), value: group.unresolved },
+                      {
+                        key: "undetermined",
+                        label: t("performance.undetermined"),
+                        value: group.total - group.resolved - group.unresolved,
+                      },
+                    ]}
+                    format={(value) => `${count(value)} · ${rate(value, group.total)}`}
+                  />
+                </div>
+              )
+            })}
+          </div>
+        ) : (
+          <EmptyNote>{t("performance.noSessions")}</EmptyNote>
+        )}
+      </ReportSection>
 
       <div className="grid gap-8 md:grid-cols-2">
         <ReportSection title={t("performance.closeReasons")}>
