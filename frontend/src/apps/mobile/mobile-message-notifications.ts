@@ -2,11 +2,11 @@
 import { useEffect, useLayoutEffect } from "react"
 
 import {
-  loadInbox,
   NotificationPermissionStatus,
   WorkStatus,
   type Identity,
 } from "@/api"
+import { loadInboxAttention } from "@/features/inbox/inbox-attention"
 import { activateNotificationPolicy } from "@/features/notifications/new-message-notifications"
 import { useNewMessageNotifications } from "@/features/notifications/use-new-message-notifications"
 import { resourceKeys } from "@/hooks/resource-keys"
@@ -82,14 +82,11 @@ export function useMobileMessageNotifications(identity: Identity | null) {
       organizationId: organizationId ?? "",
       userId: userId ?? "",
     }),
-    async () => {
-      // 应用角标合计内部会话提醒与客户会话中提醒本人的未读。
-      const inbox = await loadInbox({ limit: 1 })
-      return inbox.attentionUnreadCount + inbox.customerMentionedUnreadCount
-    },
+    loadInboxAttention,
     { enabled: Boolean(organizationId && userId) },
   )
-  const unreadCount = attention.data
+  // 应用角标合计聊天提醒与本人待处理的服务会话。
+  const unreadCount = attention.data?.total
   const attentionEnabled =
     Boolean(messageNotificationsEnabled) &&
     workStatus === WorkStatus.WorkStatusWorking

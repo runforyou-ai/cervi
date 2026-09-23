@@ -42,7 +42,7 @@ func (q *LoadInboxQuery) ReadByIDs(ctx context.Context, identity *servermodels.I
 		if err != nil {
 			return err
 		}
-		matches := make(map[string]bool)
+		matches := make(map[string]inboxCursorPoint)
 		if input != nil {
 			matches, err = snapshot.matchInboxIDs(ctx, identity, ids, *input)
 			if err != nil {
@@ -51,7 +51,11 @@ func (q *LoadInboxQuery) ReadByIDs(ctx context.Context, identity *servermodels.I
 		}
 		for _, id := range ids {
 			summary := summaries[id]
-			results = append(results, ConversationResult{ID: id, Conversation: summary, MatchesQuery: summary != nil && (input == nil || matches[id])})
+			point, matched := matches[id]
+			if summary != nil && matched {
+				summary.Pending = point.pending()
+			}
+			results = append(results, ConversationResult{ID: id, Conversation: summary, MatchesQuery: summary != nil && (input == nil || matched)})
 		}
 		return nil
 	})
@@ -97,16 +101,15 @@ func (q *LoadInboxQuery) readSummaries(ctx context.Context, identity *servermode
 	return summaries, nil
 }
 
-// matchInboxIDs 复用列表筛选与置顶分区核对指定 ID，不受分页边界限制。
-func (q *LoadInboxQuery) matchInboxIDs(ctx context.Context, identity *servermodels.Identity, ids []string, input LoadInput) (map[string]bool, error) {
-	var matched []string
-	points := q.candidatePointsQuery(identity, input).Where("candidates.id IN (?)", bun.In(ids))
-	if err := q.db.NewSelect().TableExpr("(?) AS points", points).ColumnExpr("id").Scan(ctx, &matched); err != nil {
+// matchInboxIDs 复用列表筛选与置顶分区核对指定 ID，不受分页边界限制，返回匹配会话的候选位置。
+func (q *LoadInboxQuery) matchInboxIDs(ctx context.Context, identity *servermodels.Identity, ids []string, input LoadInput) (map[string]inboxCursorPoint, error) {
+	var points []inboxCursorPoint
+	if err := q.candidatePointsQuery(identity, input).Where("candidates.id IN (?)", bun.In(ids)).Scan(ctx, &points); err != nil {
 		return nil, err
 	}
-	matches := make(map[string]bool, len(matched))
-	for _, id := range matched {
-		matches[id] = true
+	matches := make(map[string]inboxCursorPoint, len(points))
+	for _, point := range points {
+		matches[point.ID] = point
 	}
 	return matches, nil
 }

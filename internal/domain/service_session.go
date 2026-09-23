@@ -8,6 +8,15 @@ const (
 	ServiceSessionStatusClosed ServiceSessionStatus = "closed"
 )
 
+// ServiceAudience 定义服务对象：customer 为外部客户，employee 为本企业员工，partner 为伙伴。
+type ServiceAudience string
+
+const (
+	ServiceAudienceCustomer ServiceAudience = "customer"
+	ServiceAudienceEmployee ServiceAudience = "employee"
+	ServiceAudiencePartner  ServiceAudience = "partner"
+)
+
 // DefaultMaxServiceSessions 是成员默认的最大接待量。
 const DefaultMaxServiceSessions = 10
 

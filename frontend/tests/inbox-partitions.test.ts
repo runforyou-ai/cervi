@@ -10,7 +10,7 @@ function partition(ids: string[], change: Partial<InboxListState> = {}): InboxPa
   return {
     state: {
       ids, positions: ids.map((id) => ({ id, positionCursor: `p${id}`, lastActivityAt: "" })), rowIds: ids, unavailableIds: [],
-      startCursor: "", endCursor: "", hasBefore: false, hasAfter: false, attentionUnreadCount: 0, customerMentionedUnreadCount: 0, pinOrderVersion: "",
+      startCursor: "", endCursor: "", hasBefore: false, hasAfter: false, attentionUnreadCount: 0, pendingCount: 0, pinOrderVersion: "",
       status: "ready", operation: null, error: null, revision: 1, ...change,
     },
     conversations: ids.map((id) => ({ id }) as InboxConversation),

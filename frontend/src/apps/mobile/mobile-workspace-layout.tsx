@@ -4,7 +4,7 @@ import { ContactRoundIcon, InboxIcon, UserRoundIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { NavLink, Outlet } from "react-router"
 
-import { loadInbox, type Identity } from "@/api"
+import { type Identity } from "@/api"
 import { useMobileMessageNotifications } from "@/apps/mobile/mobile-message-notifications"
 import {
   MobileNavigationProvider,
@@ -16,6 +16,7 @@ import {
   useMemberChatPollingActive,
 } from "@/features/inbox/use-member-chat-polling"
 import { UnsavedChangesGuard } from "@/components/unsaved-changes-guard"
+import { loadInboxAttention } from "@/features/inbox/inbox-attention"
 import { SessionShell } from "@/features/session/session-shell"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
@@ -64,17 +65,14 @@ export function MobileTabLayout() {
       organizationId: identity.organization.id,
       userId: identity.user.id,
     }),
-    async () => {
-      // 应用角标合计内部会话提醒与客户会话中提醒本人的未读。
-      const inbox = await loadInbox({ limit: 1 })
-      return inbox.attentionUnreadCount + inbox.customerMentionedUnreadCount
-    },
+    loadInboxAttention,
     {
       refetchInterval:
         pollingActive && !realtime ? memberChatPollingInterval : false,
     },
   )
-  const attentionUnreadCount = attention.data ?? 0
+  // 消息页签角标合计聊天提醒与本人待处理的服务会话。
+  const attentionUnreadCount = attention.data?.total ?? 0
   const tabs = [
     {
       path: inboxURL,

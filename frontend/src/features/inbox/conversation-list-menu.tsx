@@ -134,7 +134,7 @@ export function ConversationListMenu({
     down: ConversationPinCommand | null
     sort: () => void
   }
-  onOpenChange: (open: boolean) => void
+  onOpenChange?: (open: boolean) => void
   children: ReactElement
 }) {
   const { t } = useTranslation("inbox")

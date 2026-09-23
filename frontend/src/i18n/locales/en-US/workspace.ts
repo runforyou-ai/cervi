@@ -6,7 +6,7 @@ const workspace = {
   railOpen: "Expand the navigation sidebar",
   historyBack: "Back",
   historyForward: "Forward",
-  inbox: "Messages",
+  inbox: "Inbox",
   contacts: "Contacts",
   channels: "Channels",
   knowledgeBases: "Knowledge bases",

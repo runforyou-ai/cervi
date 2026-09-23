@@ -20,17 +20,17 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// TestCustomerNoteMentions 验证内部备注提醒建立协作者、@我的视图、提及计数和周期关闭后的移出。
+// TestCustomerNoteMentions 验证内部备注提醒建立协作者、待处理的 @我 条目、提及计数和周期关闭后的移出。
 func TestCustomerNoteMentions(t *testing.T) {
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	send := conversationaction.NewSendCustomerTextMessageAction(f.db, nil)
 	load := inboxaction.NewLoadInboxQuery(f.db)
 	memberID := f.member.OrganizationIdentity.ID
-	// customerRow 读取指定身份在客户收件箱某个视图中的目标会话摘要。
-	customerRow := func(identity *servermodels.Identity, view domain.CustomerInboxView) (*inboxaction.ConversationSummary, inboxaction.UnreadCounts) {
+	// customerRow 读取指定身份在给定范围中的目标会话摘要。
+	customerRow := func(identity *servermodels.Identity, input inboxaction.LoadInput) (*inboxaction.ConversationSummary, inboxaction.UnreadCounts) {
 		t.Helper()
-		page, counts, err := load.Execute(ctx, identity, inboxaction.LoadInput{Scope: domain.InboxScopeCustomer, CustomerView: view, ServiceStatus: domain.ServiceSessionStatusOpen})
+		page, counts, err := load.Execute(ctx, identity, input)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -41,9 +41,15 @@ func TestCustomerNoteMentions(t *testing.T) {
 		}
 		return nil, counts
 	}
+	mentioned := inboxaction.LoadInput{Scope: domain.InboxScopePending, PendingKind: domain.InboxPendingKindMention}
+	all := inboxaction.LoadInput{Scope: domain.InboxScopeAll}
+	// 负责人领取后，提醒同事的会话对同事只以 @我 出现在待处理。
+	if _, err := conversationaction.NewClaimServiceSessionAction(f.db, nil, newTestTasks(f.db)).Execute(ctx, f.owner, f.conversationID); err != nil {
+		t.Fatal(err)
+	}
 
-	if row, counts := customerRow(f.member, domain.CustomerInboxViewMentioned); row != nil || counts.CustomerMentioned != 0 {
-		t.Fatalf("mentioned view before note = %+v counts=%+v", row, counts)
+	if row, counts := customerRow(f.member, mentioned); row != nil || counts.Pending != 0 {
+		t.Fatalf("mentioned items before note = %+v counts=%+v", row, counts)
 	}
 	noteInput := conversationaction.CustomerTextMessageInput{
 		ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(),
@@ -66,18 +72,18 @@ func TestCustomerNoteMentions(t *testing.T) {
 	if err := f.db.NewSelect().Model(session).Where("ss.conversation_id = ?", f.conversationID).Scan(ctx); err != nil {
 		t.Fatal(err)
 	}
-	if session.AssigneeIdentityID != nil {
+	if session.AssigneeIdentityID == nil || *session.AssigneeIdentityID != f.owner.OrganizationIdentity.ID {
 		t.Fatalf("mention changed assignee: %+v", session)
 	}
 
-	row, counts := customerRow(f.member, domain.CustomerInboxViewMentioned)
-	if row == nil || row.MentionedUnreadCount != 1 || counts.CustomerMentioned != 1 {
-		t.Fatalf("mentioned view row=%+v counts=%+v", row, counts)
+	row, counts := customerRow(f.member, mentioned)
+	if row == nil || row.MentionedUnreadCount != 1 || counts.Pending != 1 || row.Pending == nil || row.Pending.Kind != domain.InboxPendingKindMention || !row.Pending.Since.Equal(note.OriginatedAt) {
+		t.Fatalf("mentioned item row=%+v counts=%+v", row, counts)
 	}
-	if row, _ := customerRow(f.owner, domain.CustomerInboxViewMentioned); row != nil {
-		t.Fatalf("sender sees own mention in mentioned view: %+v", row)
+	if row, _ := customerRow(f.owner, mentioned); row != nil {
+		t.Fatalf("sender sees own mention in mentioned items: %+v", row)
 	}
-	if row, _ := customerRow(f.owner, domain.CustomerInboxViewQueue); row == nil || row.Customer.UnansweredMentionCount != 1 {
+	if row, _ := customerRow(f.owner, all); row == nil || row.Customer.UnansweredMentionCount != 1 {
 		t.Fatalf("unanswered mentions = %+v", row)
 	}
 
@@ -116,13 +122,13 @@ func TestCustomerNoteMentions(t *testing.T) {
 		}
 	})
 
-	t.Run("阅读后不再计数但仍留在视图中", func(t *testing.T) {
+	t.Run("阅读后不再计数但仍待处理", func(t *testing.T) {
 		if _, err := conversationaction.NewMarkConversationReadAction(f.db).Execute(ctx, f.member, f.conversationID, note.ID, false); err != nil {
 			t.Fatal(err)
 		}
-		row, counts := customerRow(f.member, domain.CustomerInboxViewMentioned)
-		if row == nil || row.MentionedUnreadCount != 0 || counts.CustomerMentioned != 0 {
-			t.Fatalf("mentioned view after read row=%+v counts=%+v", row, counts)
+		row, counts := customerRow(f.member, mentioned)
+		if row == nil || row.MentionedUnreadCount != 0 || counts.Pending != 1 {
+			t.Fatalf("mentioned item after read row=%+v counts=%+v", row, counts)
 		}
 	})
 
@@ -133,8 +139,11 @@ func TestCustomerNoteMentions(t *testing.T) {
 		}); err != nil {
 			t.Fatal(err)
 		}
-		if row, _ := customerRow(f.owner, domain.CustomerInboxViewQueue); row == nil || row.Customer.UnansweredMentionCount != 0 {
+		if row, _ := customerRow(f.owner, all); row == nil || row.Customer.UnansweredMentionCount != 0 {
 			t.Fatalf("unanswered mentions after reply = %+v", row)
+		}
+		if row, counts := customerRow(f.member, mentioned); row != nil || counts.Pending != 0 {
+			t.Fatalf("answered mention still pending row=%+v counts=%+v", row, counts)
 		}
 	})
 
@@ -178,33 +187,33 @@ func TestCustomerNoteMentions(t *testing.T) {
 		}
 	})
 
-	t.Run("周期关闭后移出@我的视图", func(t *testing.T) {
-		// 关闭前留下一条未读提醒，关闭后不再计入客户会话提醒总数。
+	t.Run("周期关闭后移出待处理", func(t *testing.T) {
+		// 关闭前留下一条未回应提醒，关闭后不再计入待处理。
 		if _, err := send.Execute(ctx, f.owner, conversationaction.CustomerTextMessageInput{
 			ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(),
 			Body: "@成员 结单前再确认下", Visibility: domain.MessageVisibilityInternalOnly, MentionIdentityIDs: []string{memberID},
 		}); err != nil {
 			t.Fatal(err)
 		}
-		if _, counts := customerRow(f.member, domain.CustomerInboxViewMentioned); counts.CustomerMentioned != 1 {
-			t.Fatalf("unread mention before close counts=%+v", counts)
+		if _, counts := customerRow(f.member, mentioned); counts.Pending != 1 {
+			t.Fatalf("unanswered mention before close counts=%+v", counts)
 		}
 		tasks := newTestTasks(f.db)
 		closeSession := conversationaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, tasks, nil, testAttachmentReader(f.db), nil), newTestTasks(f.db))
 		if _, err := closeSession.Execute(ctx, f.owner, f.conversationID); err != nil {
 			t.Fatal(err)
 		}
-		if row, counts := customerRow(f.member, domain.CustomerInboxViewMentioned); row != nil || counts.CustomerMentioned != 0 {
-			t.Fatalf("closed session still in mentioned view: %+v counts=%+v", row, counts)
+		if row, counts := customerRow(f.member, mentioned); row != nil || counts.Pending != 0 {
+			t.Fatalf("closed session still pending: %+v counts=%+v", row, counts)
 		}
-		// 客户再次来信开启新周期，上一周期的提醒不再归入@我的。
+		// 客户再次来信开启新周期，上一周期的提醒不再归入 @我。
 		if _, err := f.receive.Execute(ctx, conversationaction.WebsiteCustomerTextMessageInput{
 			ChannelID: f.channelID, ExternalID: "web-session:0123456789abcdef0123456789abcdef", ConversationID: &f.conversationID,
 			ClientMessageID: uuid.NewV7().String(), Body: "又有新问题",
 		}); err != nil {
 			t.Fatal(err)
 		}
-		if row, _ := customerRow(f.member, domain.CustomerInboxViewMentioned); row != nil {
+		if row, _ := customerRow(f.member, mentioned); row != nil {
 			t.Fatalf("new session inherits previous mentions: %+v", row)
 		}
 	})

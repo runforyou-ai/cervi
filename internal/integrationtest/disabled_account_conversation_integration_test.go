@@ -24,7 +24,7 @@ func testDisabledAgentConversation(t *testing.T, db *bun.DB, identity *servermod
 	ctx := context.Background()
 	first, _ := createAgentLockChat(t, ctx, db, identity, agentIdentityID, tasks)
 	query := inboxaction.NewLoadInboxQuery(db)
-	input := inboxaction.LoadInput{Scope: domain.InboxScopeInternal, Kinds: []domain.ConversationType{domain.ConversationTypeAgent}}
+	input := inboxaction.LoadInput{Scope: domain.InboxScopeChat, Kinds: []domain.ConversationType{domain.ConversationTypeAgent}}
 	unreadMark := conversationaction.NewUpdateConversationUnreadMarkAction(db)
 	if err := unreadMark.Execute(ctx, identity, first.Conversation.ID, true); err != nil {
 		t.Fatal(err)
@@ -93,7 +93,7 @@ func TestDisabledMemberDirectConversation(t *testing.T) {
 		t.Fatal(err)
 	}
 	query := inboxaction.NewLoadInboxQuery(f.db)
-	input := inboxaction.LoadInput{Scope: domain.InboxScopeInternal, Kinds: []domain.ConversationType{domain.ConversationTypeDirect}}
+	input := inboxaction.LoadInput{Scope: domain.InboxScopeChat, Kinds: []domain.ConversationType{domain.ConversationTypeDirect}}
 	_, before, err := query.Execute(ctx, f.owner, input)
 	if err != nil || before.Unread == 0 {
 		t.Fatalf("unread counts before disable=%+v %v", before, err)

@@ -171,6 +171,7 @@ func Assign(ctx context.Context, db bun.IDB, conversation *servermodels.Conversa
 		Set("assignee_identity_id = ?", member.IdentityID).
 		Set("assigned_at = COALESCE(assigned_at, ?)", now).
 		Set("assignee_assigned_at = ?", now).
+		Set("queued_at = NULL").
 		Set("reminded_at = NULL").
 		Set("updated_at = now()").
 		WherePK().Where("organization_id = ?", session.OrganizationID).

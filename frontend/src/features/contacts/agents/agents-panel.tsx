@@ -146,7 +146,7 @@ export function AgentsPanel({
               label: t("sendMessage"),
               disabled: agent.status !== UserStatus.UserStatusActive,
               onSelect: () =>
-                navigate(`/inbox?scope=internal&target=${agent.identityId}`),
+                navigate(`/chats?target=${agent.identityId}`),
             },
             statusToggle.rowAction(agent),
           ]}

@@ -64,25 +64,25 @@ func TestConversationUnreadMark(t *testing.T) {
 	if !state.MarkedUnread || *state.LastReadMessageID != *before.LastReadMessageID || !state.LastReadAt.Equal(*before.LastReadAt) || *state.LastReviewedMentionMessageID != *before.LastReviewedMentionMessageID {
 		t.Fatalf("mark changed read facts: %#v", state)
 	}
-	rowsPage, counts, err := inbox.Execute(ctx, f.member, inboxaction.LoadInput{Scope: domain.InboxScopeInternal})
+	rowsPage, counts, err := inbox.Execute(ctx, f.member, inboxaction.LoadInput{Scope: domain.InboxScopeChat})
 	rows := rowsPage.Conversations
 	if err != nil || len(rows) != 1 || !rows[0].MarkedUnread || counts.Unread != 0 || counts.Attention != 1 {
 		t.Fatalf("marked inbox = %#v %#v %v", rows, counts, err)
 	}
 	f.send(t, f.owner, "普通消息", false)
-	_, counts, err = inbox.Execute(ctx, f.member, inboxaction.LoadInput{})
+	_, counts, err = inbox.Execute(ctx, f.member, inboxaction.LoadInput{Scope: domain.InboxScopeChat})
 	if err != nil || counts.Unread != 1 || counts.Attention != 1 {
 		t.Fatalf("mark double counted: %#v %v", counts, err)
 	}
 	if _, err = mute.Execute(ctx, f.member, f.groupID, true); err != nil {
 		t.Fatal(err)
 	}
-	_, counts, err = inbox.Execute(ctx, f.member, inboxaction.LoadInput{})
+	_, counts, err = inbox.Execute(ctx, f.member, inboxaction.LoadInput{Scope: domain.InboxScopeChat})
 	if err != nil || counts.Attention != 0 {
 		t.Fatalf("muted mark: %#v %v", counts, err)
 	}
 	last := f.send(t, f.owner, "再次提及", true, f.subjectID)
-	_, counts, err = inbox.Execute(ctx, f.member, inboxaction.LoadInput{})
+	_, counts, err = inbox.Execute(ctx, f.member, inboxaction.LoadInput{Scope: domain.InboxScopeChat})
 	if err != nil || counts.Unread != 2 || counts.Attention != 1 {
 		t.Fatalf("muted mention: %#v %v", counts, err)
 	}
@@ -95,7 +95,7 @@ func TestConversationUnreadMark(t *testing.T) {
 	if _, err = mute.Execute(ctx, f.member, f.groupID, false); err != nil {
 		t.Fatal(err)
 	}
-	_, counts, err = inbox.Execute(ctx, f.member, inboxaction.LoadInput{})
+	_, counts, err = inbox.Execute(ctx, f.member, inboxaction.LoadInput{Scope: domain.InboxScopeChat})
 	if err != nil || counts.Unread != 0 || counts.Attention != 1 {
 		t.Fatalf("manual reminder lost: %#v %v", counts, err)
 	}
@@ -106,7 +106,7 @@ func TestConversationUnreadMark(t *testing.T) {
 	if state.MarkedUnread || *state.LastReadMessageID != last.ID || *state.LastReviewedMentionMessageID != first.ID {
 		t.Fatalf("clear changed read facts: %#v", state)
 	}
-	_, counts, err = inbox.Execute(ctx, f.member, inboxaction.LoadInput{})
+	_, counts, err = inbox.Execute(ctx, f.member, inboxaction.LoadInput{Scope: domain.InboxScopeChat})
 	if err != nil || counts.Unread != 0 || counts.Attention != 0 {
 		t.Fatalf("read inbox: %#v %v", counts, err)
 	}
@@ -155,14 +155,14 @@ func TestInboxUnreadUsesCanonicalDirect(t *testing.T) {
 	if err = mark.Execute(ctx, f.member, sent.Conversation.ID, true); err != nil {
 		t.Fatal(err)
 	}
-	_, counts, err := inbox.Execute(ctx, f.member, inboxaction.LoadInput{})
+	_, counts, err := inbox.Execute(ctx, f.member, inboxaction.LoadInput{Scope: domain.InboxScopeChat})
 	if err != nil || counts.Unread != 0 || counts.Attention != 1 {
 		t.Fatalf("direct mark: %#v %v", counts, err)
 	}
 	if _, err = conversationaction.NewUpdateConversationNotificationSettingsAction(f.db).Execute(ctx, f.member, sent.Conversation.ID, true); err != nil {
 		t.Fatal(err)
 	}
-	_, counts, err = inbox.Execute(ctx, f.member, inboxaction.LoadInput{})
+	_, counts, err = inbox.Execute(ctx, f.member, inboxaction.LoadInput{Scope: domain.InboxScopeChat})
 	if err != nil || counts.Attention != 0 {
 		t.Fatalf("muted direct mark: %#v %v", counts, err)
 	}
@@ -173,7 +173,7 @@ func TestInboxUnreadUsesCanonicalDirect(t *testing.T) {
 	if _, err = f.db.NewDelete().Table("conversation_user_states").Where("organization_id = ? AND conversation_id = ?", f.owner.Organization.ID, sent.Conversation.ID).Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
-	rowsPage, counts, err := inbox.Execute(ctx, f.member, inboxaction.LoadInput{})
+	rowsPage, counts, err := inbox.Execute(ctx, f.member, inboxaction.LoadInput{Scope: domain.InboxScopeChat})
 	rows := rowsPage.Conversations
 	if err != nil || len(rows) != 1 || rows[0].ID != f.groupID || counts.Unread != 0 || counts.Attention != 0 {
 		t.Fatalf("hidden direct leaked unread: %#v %#v %v", rows, counts, err)
@@ -206,14 +206,14 @@ func TestEmptyConversationUnreadMarksIgnoreListLimit(t *testing.T) {
 		}
 	}
 	inbox := inboxaction.NewLoadInboxQuery(f.db)
-	rowsPage, counts, err := inbox.Execute(ctx, f.member, inboxaction.LoadInput{Scope: domain.InboxScopeInternal})
+	rowsPage, counts, err := inbox.Execute(ctx, f.member, inboxaction.LoadInput{Scope: domain.InboxScopeChat})
 	rows := rowsPage.Conversations
 	if err != nil || len(rows) != 50 || counts.Unread != 0 || counts.Attention != 51 {
 		t.Fatalf("limited list changed total: %d %#v %v", len(rows), counts, err)
 	}
-	rowsPage, counts, err = inbox.Execute(ctx, f.member, inboxaction.LoadInput{Scope: domain.InboxScopeCustomer})
+	rowsPage, counts, err = inbox.Execute(ctx, f.member, inboxaction.LoadInput{Scope: domain.InboxScopeAll})
 	rows = rowsPage.Conversations
 	if err != nil || len(rows) != 0 || counts.Attention != 51 {
-		t.Fatalf("customer scope changed total: %d %#v %v", len(rows), counts, err)
+		t.Fatalf("service scope changed total: %d %#v %v", len(rows), counts, err)
 	}
 }

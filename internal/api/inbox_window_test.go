@@ -37,7 +37,7 @@ func TestInboxWindowHTTP(t *testing.T) {
 	server := httptest.NewServer(NewService(appservice.New(backend)))
 	defer server.Close()
 	filter := appservice.InboxQuery{
-		Scope: appservice.InboxScopeCustomer, CustomerView: appservice.CustomerInboxViewCoworkers, AssigneeIdentityID: "peer",
+		Scope: appservice.InboxScopeAll, AssigneeFilter: appservice.InboxAssigneeFilterIdentity, AssigneeIdentityID: "peer", Audience: appservice.ServiceAudienceCustomer,
 		ChannelID: "channel", ServiceStatus: appservice.ServiceSessionStatusClosed, Kinds: []appservice.ConversationType{appservice.ConversationTypeCustomer},
 	}
 	contextInput := appservice.InboxContextInput{Query: filter, AnchorID: "anchor", AnchorCursor: "original", BeforeLimit: 7, AfterLimit: 9}

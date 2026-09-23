@@ -58,7 +58,7 @@ func TestCustomerInternalNotes(t *testing.T) {
 		t.Fatalf("conversation summary = %+v, want note %s", conversation.LastMessageID, note.ID)
 	}
 	// 成员收件箱摘要取到内部备注时标明可见范围。
-	inboxPage, _, err := inboxaction.NewLoadInboxQuery(f.db).Execute(ctx, f.owner, inboxaction.LoadInput{Scope: domain.InboxScopeCustomer, CustomerView: domain.CustomerInboxViewQueue, ServiceStatus: domain.ServiceSessionStatusOpen})
+	inboxPage, _, err := inboxaction.NewLoadInboxQuery(f.db).Execute(ctx, f.owner, inboxaction.LoadInput{Scope: domain.InboxScopeAll, AssigneeFilter: domain.InboxAssigneeFilterUnassigned})
 	if err != nil {
 		t.Fatal(err)
 	}

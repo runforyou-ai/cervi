@@ -32,12 +32,11 @@ func loadServiceSessionQueue(t *testing.T, f customerReadFixture, conversationID
 	return session.AssigneeIdentityID, session.TeamID
 }
 
-// queueConversationIDs 按队列筛选读取「待分配」视图中的会话编号与所属团队名称。
-func queueConversationIDs(t *testing.T, f customerReadFixture, filter domain.CustomerQueueFilter, teamID string) map[string]*string {
+// queueConversationIDs 按队列筛选读取指定身份待领取条目中的会话编号与所属团队名称。
+func queueConversationIDs(t *testing.T, f customerReadFixture, identity *servermodels.Identity, filter domain.CustomerQueueFilter, teamID string) map[string]*string {
 	t.Helper()
-	page, _, err := inboxaction.NewLoadInboxQuery(f.db).Execute(context.Background(), f.owner, inboxaction.LoadInput{
-		Scope: domain.InboxScopeCustomer, CustomerView: domain.CustomerInboxViewQueue,
-		QueueFilter: filter, QueueTeamID: teamID, ServiceStatus: domain.ServiceSessionStatusOpen,
+	page, _, err := inboxaction.NewLoadInboxQuery(f.db).Execute(context.Background(), identity, inboxaction.LoadInput{
+		Scope: domain.InboxScopePending, PendingKind: domain.InboxPendingKindQueue, QueueFilter: filter, QueueTeamID: teamID,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -94,14 +93,18 @@ func TestServiceSessionTeamQueue(t *testing.T) {
 		t.Fatalf("转交到团队队列后归属 = %v, %v", assignee, teamID)
 	}
 
-	if name, ok := queueConversationIDs(t, f, domain.CustomerQueueFilterTeam, staffed.ID)[f.conversationID]; !ok || name == nil || *name != staffed.Name {
+	if name, ok := queueConversationIDs(t, f, f.member, domain.CustomerQueueFilterTeam, staffed.ID)[f.conversationID]; !ok || name == nil || *name != staffed.Name {
 		t.Fatalf("团队队列筛选缺少会话或团队名称 = %v", name)
 	}
-	if _, ok := queueConversationIDs(t, f, domain.CustomerQueueFilterPublic, "")[f.conversationID]; ok {
+	if _, ok := queueConversationIDs(t, f, f.member, domain.CustomerQueueFilterPublic, "")[f.conversationID]; ok {
 		t.Fatal("公共队列筛选不应包含团队队列中的会话")
 	}
-	if name, ok := queueConversationIDs(t, f, domain.CustomerQueueFilterAll, "")[f.conversationID]; !ok || name == nil {
+	if name, ok := queueConversationIDs(t, f, f.member, domain.CustomerQueueFilterAll, "")[f.conversationID]; !ok || name == nil {
 		t.Fatalf("全部队列筛选缺少会话或团队标签 = %v", name)
+	}
+	// 待领取只包含公共队列和本人所在团队的队列。
+	if _, ok := queueConversationIDs(t, f, f.owner, domain.CustomerQueueFilterAll, "")[f.conversationID]; ok {
+		t.Fatal("非团队成员的待领取不应包含该团队队列中的会话")
 	}
 
 	// 领取与转交给个人都不改变队列，退回公共队列同时清空负责人与队列。

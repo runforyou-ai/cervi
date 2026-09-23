@@ -1,36 +1,22 @@
-/** 会话列表列的顶部操作行。 */
+/** 收件箱列表列的顶部操作行。 */
 import type { ReactNode } from "react"
-import { PlusIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
 import { InboxScope } from "@/api"
-import { IconTooltip } from "@/components/icon-tooltip"
-import { Button } from "@/components/ui/button"
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu"
-import { inboxScopes } from "@/features/inbox/inbox-query"
+import { CountBadge } from "@/components/count-badge"
+import { inboxTabs, type InboxTab } from "@/features/inbox/inbox-query"
 import { cn } from "@/lib/utils"
 
-/** 顶部操作行：会话范围切换、当前范围筛选和发起会话菜单。 */
+/** 顶部操作行：待处理与全部两个等宽分段页签占满行宽，右侧为当前页签的筛选。 */
 export function InboxPaneTop({
-  scope,
-  attentionUnreadCount,
-  customerMentionedUnreadCount,
-  onScopeChange,
-  onCreateGroup,
-  onCreateAgent,
+  tab,
+  pendingCount,
+  onTabChange,
   filter,
 }: {
-  scope: InboxScope
-  attentionUnreadCount: number
-  customerMentionedUnreadCount: number
-  onScopeChange: (scope: InboxScope) => void
-  onCreateGroup: () => void
-  onCreateAgent: () => void
+  tab: InboxTab
+  pendingCount: number
+  onTabChange: (tab: InboxTab) => void
   filter: ReactNode
 }) {
   const { t } = useTranslation("inbox")
@@ -41,73 +27,28 @@ export function InboxPaneTop({
       className="flex h-12 shrink-0 items-center gap-1.5 px-2.5"
     >
       <nav
-        aria-label={t("scopeLabel")}
-        className="flex min-w-0 flex-1 items-center gap-0.5"
+        aria-label={t("tabLabel")}
+        className="flex h-8 min-w-0 flex-1 items-center gap-0.5 rounded-lg bg-muted p-0.5"
       >
-        {inboxScopes.map((item) => {
-          const unread =
-            item.value === InboxScope.InboxScopeInternal
-              ? attentionUnreadCount
-              : item.value === InboxScope.InboxScopeCustomer
-                ? customerMentionedUnreadCount
-                : 0
-          return (
-            <button
-              key={item.value}
-              type="button"
-              aria-pressed={scope === item.value}
-              className={cn(
-                "flex h-7 min-w-0 items-center gap-1 rounded-md px-2 text-sm text-muted-foreground transition-colors hover:bg-muted hover:text-foreground",
-                scope === item.value &&
-                  "bg-accent font-medium text-accent-foreground hover:bg-accent hover:text-accent-foreground",
-              )}
-              onClick={() => onScopeChange(item.value)}
-            >
-              <span className="truncate">{t(item.label)}</span>
-              {unread > 0 ? (
-                <span
-                  className="size-1.5 shrink-0 rounded-full bg-destructive"
-                  role="status"
-                  aria-label={t(
-                    item.value === InboxScope.InboxScopeInternal
-                      ? "internalAttentionUnread"
-                      : "customerMentionUnread",
-                    { count: unread },
-                  )}
-                />
-              ) : null}
-            </button>
-          )
-        })}
+        {inboxTabs.map((item) => (
+          <button
+            key={item.value}
+            type="button"
+            aria-pressed={tab === item.value}
+            className={cn(
+              "flex h-7 min-w-0 flex-1 items-center justify-center gap-1.5 rounded-md px-2 text-sm text-muted-foreground transition-colors outline-none hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring",
+              tab === item.value && "bg-background font-medium text-foreground shadow-sm",
+            )}
+            onClick={() => onTabChange(item.value)}
+          >
+            <span className="truncate">{t(item.label)}</span>
+            {item.value === InboxScope.InboxScopePending && pendingCount > 0 ? (
+              <CountBadge count={pendingCount} label={t("pendingCount", { count: pendingCount })} />
+            ) : null}
+          </button>
+        ))}
       </nav>
-      {/* 漏斗与加号字形两侧留白偏多，间距收为零抵消，视觉上与会话头的图标按钮一致。 */}
-      <div className="flex shrink-0 items-center">
-        {filter}
-        <DropdownMenu>
-          <IconTooltip label={t("newConversation")}>
-            <DropdownMenuTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon-sm"
-                className="shrink-0 text-muted-foreground"
-                aria-label={t("newConversation")}
-              >
-                <PlusIcon />
-              </Button>
-            </DropdownMenuTrigger>
-          </IconTooltip>
-          <DropdownMenuContent align="start" className="min-w-52">
-            <DropdownMenuItem onSelect={onCreateAgent}>
-              {t("newAgentConversation")}
-            </DropdownMenuItem>
-            <DropdownMenuItem className="gap-2" onSelect={onCreateGroup}>
-              <span className="min-w-0 flex-1 truncate">
-                {t("newGroupConversation")}
-              </span>
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-      </div>
+      <div className="flex shrink-0 items-center">{filter}</div>
     </div>
   )
 }

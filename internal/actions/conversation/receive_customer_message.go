@@ -193,9 +193,12 @@ func ReceiveInboundCustomerMessage(ctx context.Context, db bun.IDB, enqueuer ser
 	}
 
 	if createSession {
-		var assignedAt *time.Time
+		// 有负责人时记负责时间，无负责人时从首条消息起计入队列。
+		var assignedAt, queuedAt *time.Time
 		if route.AssigneeIdentityID != nil {
 			assignedAt = &input.OriginatedAt
+		} else {
+			queuedAt = &input.OriginatedAt
 		}
 		session = &servermodels.ServiceSession{
 			ID: ids.serviceSession, OrganizationID: channel.OrganizationID,
@@ -204,10 +207,10 @@ func ReceiveInboundCustomerMessage(ctx context.Context, db bun.IDB, enqueuer ser
 			TeamID: route.TeamID, AssigneeIdentityID: route.AssigneeIdentityID,
 			OpeningMessageID: ids.message, LastMessageID: ids.message,
 			LastMessageAt: input.OriginatedAt,
-			AssignedAt:    assignedAt, AssigneeAssignedAt: assignedAt, StatusChangedAt: input.OriginatedAt,
+			AssignedAt:    assignedAt, AssigneeAssignedAt: assignedAt, QueuedAt: queuedAt, StatusChangedAt: input.OriginatedAt,
 		}
 		if _, err := db.NewInsert().Model(session).
-			Column("id", "organization_id", "conversation_id", "contact_channel_identity_id", "sequence", "status", "team_id", "assignee_identity_id", "opening_message_id", "last_message_id", "last_message_at", "assigned_at", "assignee_assigned_at", "status_changed_at").
+			Column("id", "organization_id", "conversation_id", "contact_channel_identity_id", "sequence", "status", "team_id", "assignee_identity_id", "opening_message_id", "last_message_id", "last_message_at", "assigned_at", "assignee_assigned_at", "queued_at", "status_changed_at").
 			Returning("*").
 			Exec(ctx); err != nil {
 			return InboundCustomerMessageResult{}, fmt.Errorf("create service session: %w", err)

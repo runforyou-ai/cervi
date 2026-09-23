@@ -74,6 +74,7 @@ func (a *ClaimServiceSessionAction) Execute(ctx context.Context, identity *serve
 				Set("assignee_identity_id = ?", identity.OrganizationIdentity.ID).
 				Set("assigned_at = COALESCE(assigned_at, ?)", now).
 				Set("assignee_assigned_at = ?", now).
+				Set("queued_at = NULL").
 				Set("reminded_at = NULL").
 				Set("updated_at = now()").
 				WherePK().
@@ -293,20 +294,21 @@ func lockTransferTarget(ctx context.Context, tx bun.Tx, identity *servermodels.I
 	}
 }
 
-// applyTransferTarget 按转交去向写入负责人与所属队列；转给团队或公共队列时清空负责人，转给成员时保持原队列。
+// applyTransferTarget 按转交去向写入负责人与所属队列；转给团队或公共队列时清空负责人并从此刻计入队列，转给成员时保持原队列。
 func applyTransferTarget(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, session *servermodels.ServiceSession, target domain.ServiceSessionTarget, targetIdentity *servermodels.OrganizationIdentity) error {
+	now := time.Now().UTC()
 	update := tx.NewUpdate().Model(session).Set("reminded_at = NULL").Set("updated_at = now()").
 		WherePK().Where("organization_id = ?", identity.Organization.ID)
 	switch target.Kind {
 	case domain.ServiceSessionTargetMember:
-		now := time.Now().UTC()
 		update = update.Set("assignee_identity_id = ?", targetIdentity.ID).
 			Set("assigned_at = COALESCE(assigned_at, ?)", now).
-			Set("assignee_assigned_at = ?", now)
+			Set("assignee_assigned_at = ?", now).
+			Set("queued_at = NULL")
 	case domain.ServiceSessionTargetTeam:
-		update = update.Set("assignee_identity_id = NULL").Set("assignee_assigned_at = NULL").Set("team_id = ?", target.TeamID)
+		update = update.Set("assignee_identity_id = NULL").Set("assignee_assigned_at = NULL").Set("queued_at = ?", now).Set("team_id = ?", target.TeamID)
 	default:
-		update = update.Set("assignee_identity_id = NULL").Set("assignee_assigned_at = NULL").Set("team_id = NULL")
+		update = update.Set("assignee_identity_id = NULL").Set("assignee_assigned_at = NULL").Set("queued_at = ?", now).Set("team_id = NULL")
 	}
 	if _, err := update.Exec(ctx); err != nil {
 		return err
@@ -403,6 +405,7 @@ func (a *CloseServiceSessionAction) Execute(ctx context.Context, identity *serve
 			Set("assigned_at = COALESCE(assigned_at, ?)", now).
 			Set("assignee_assigned_at = COALESCE(assignee_assigned_at, ?)", now).
 			Set("awaiting_reply_since = NULL").
+			Set("queued_at = NULL").
 			Set("reminded_at = NULL").
 			Set("updated_at = now()").
 			WherePK().
@@ -481,6 +484,7 @@ func (a *ReopenServiceSessionAction) Execute(ctx context.Context, identity *serv
 			Set("assignee_identity_id = ?", identity.OrganizationIdentity.ID).
 			Set("assigned_at = COALESCE(assigned_at, ?)", now).
 			Set("assignee_assigned_at = ?", now).
+			Set("queued_at = NULL").
 			Set("status_changed_at = ?", now).
 			Set("closed_at = NULL").
 			Set("closed_by_identity_id = NULL").

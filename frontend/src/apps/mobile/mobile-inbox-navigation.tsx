@@ -1,21 +1,23 @@
-/** 移动端消息分类、地址查询和范围筛选面板。 */
-import { useState } from "react"
+/** 移动端消息页签、地址查询和页签筛选面板。 */
+import { useState, type ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 import { useSearchParams } from "react-router"
 
 import {
   ConversationType,
-  CustomerInboxView,
   CustomerQueueFilter,
+  InboxAssigneeFilter,
+  InboxPendingKind,
   InboxScope,
+  OrganizationIdentityType,
+  ServiceAudience,
   ServiceSessionStatus,
   listCustomerServiceAssignees,
   listInboxChannels,
   listServiceQueueTeams,
-  type LoadInboxQuery,
+  type InboxQuery,
 } from "@/api"
 import { useMobileWorkspace } from "@/apps/mobile/mobile-workspace-layout"
-import { LoadingIndicator } from "@/components/loading-indicator"
 import { Button } from "@/components/ui/button"
 import {
   Sheet,
@@ -26,33 +28,27 @@ import {
   SheetTrigger,
 } from "@/components/ui/sheet"
 import {
-  inboxKindOptionsForScope,
+  chatKindOptions,
+  inboxAssigneeFromParam,
+  inboxAssigneeParam,
+  inboxPendingKindOptions,
   inboxQueryFromSearch,
   inboxQueueFromParam,
   inboxQueueParam,
-  inboxScopes,
   normalizeInboxQuery,
-  toggleInboxKinds,
+  serviceAudienceOptions,
+  toggleChatKinds,
   writeInboxQuerySearch,
 } from "@/features/inbox/inbox-query"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 import { cn } from "@/lib/utils"
 
-const customerViews = [
-  {
-    value: CustomerInboxView.CustomerInboxViewQueue,
-    label: "queueFilterQueue",
-  },
-  { value: CustomerInboxView.CustomerInboxViewMine, label: "queueFilterMine" },
-  {
-    value: CustomerInboxView.CustomerInboxViewMentioned,
-    label: "queueFilterMentions",
-  },
-  {
-    value: CustomerInboxView.CustomerInboxViewCoworkers,
-    label: "queueFilterColleague",
-  },
+/** 移动端消息页签的展示顺序，页签按钮和左右滑动共用。 */
+export const mobileInboxTabs = [
+  { value: InboxScope.InboxScopeChat, label: "tabChat" },
+  { value: InboxScope.InboxScopePending, label: "tabPending" },
+  { value: InboxScope.InboxScopeAll, label: "tabAll" },
 ] as const
 
 const serviceStatuses = [
@@ -66,13 +62,15 @@ const serviceStatuses = [
   },
 ] as const
 
+const selectClassName = "h-11 w-full rounded-md border bg-background px-3 text-sm"
+
 /** 从地址派生与服务端及桌面端一致的完整消息查询。 */
 export function useMobileInboxQuery() {
   const [params, setParams] = useSearchParams()
-  const query = inboxQueryFromSearch(params)
+  const query = inboxQueryFromSearch(params, mobileInboxTabs.map((tab) => tab.value))
 
   /** 更换筛选时替换当前列表地址并保留导航层级。 */
-  function changeQuery(changes: LoadInboxQuery) {
+  function changeQuery(changes: Partial<InboxQuery>) {
     const search = new URLSearchParams()
     writeInboxQuerySearch(search, normalizeInboxQuery({ ...query, ...changes }))
     setParams(search, { replace: true })
@@ -83,184 +81,131 @@ export function useMobileInboxQuery() {
 /** 移动端当前列表的完整筛选。 */
 export type MobileInboxQuery = ReturnType<typeof useMobileInboxQuery>["query"]
 
-/** 展示三个业务范围，内部同时包含单聊和群聊，并提示内部未读。 */
+/** 展示聊天、待处理与全部三个页签，聊天提示未读提醒，待处理提示本人待处理数。 */
 export function MobileInboxScopes({
   scope,
   attentionUnreadCount,
-  customerMentionedUnreadCount,
+  pendingCount,
   onChange,
 }: {
   scope: InboxScope
   attentionUnreadCount: number
-  customerMentionedUnreadCount: number
-  onChange: (query: LoadInboxQuery) => void
+  pendingCount: number
+  onChange: (query: Partial<InboxQuery>) => void
 }) {
   const { t } = useTranslation("inbox")
   return (
     <nav
-      aria-label={t("scopeLabel")}
+      aria-label={t("tabLabel")}
       className="grid shrink-0 grid-cols-3 border-b px-4"
     >
-      {inboxScopes.map(({ value, label }) => (
-        <button
-          key={value}
-          type="button"
-          aria-pressed={scope === value}
-          onClick={() => onChange({ scope: value })}
-          className={cn(
-            "min-h-11 border-b-2 border-transparent px-2 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
-            scope === value
-              ? "border-primary text-primary"
-              : "text-muted-foreground",
-          )}
-        >
-          <span className="relative">
-            {t(label)}
-            {value === InboxScope.InboxScopeInternal && attentionUnreadCount > 0 ? (
-              <span
-                className="absolute -top-0.5 -right-2 size-2 rounded-full bg-destructive"
-                role="status"
-                aria-label={t("internalAttentionUnread", {
-                  count: attentionUnreadCount,
-                })}
-              />
-            ) : null}
-            {value === InboxScope.InboxScopeCustomer && customerMentionedUnreadCount > 0 ? (
-              <span
-                className="absolute -top-0.5 -right-2 size-2 rounded-full bg-destructive"
-                role="status"
-                aria-label={t("customerMentionUnread", {
-                  count: customerMentionedUnreadCount,
-                })}
-              />
-            ) : null}
-          </span>
-        </button>
-      ))}
+      {mobileInboxTabs.map(({ value, label }) => {
+        const count = value === InboxScope.InboxScopeChat ? attentionUnreadCount : value === InboxScope.InboxScopePending ? pendingCount : 0
+        return (
+          <button
+            key={value}
+            type="button"
+            aria-pressed={scope === value}
+            onClick={() => onChange({ scope: value })}
+            className={cn(
+              "min-h-11 border-b-2 border-transparent px-2 text-sm font-medium outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring",
+              scope === value
+                ? "border-primary text-primary"
+                : "text-muted-foreground",
+            )}
+          >
+            <span className="relative">
+              {t(label)}
+              {count > 0 ? (
+                <span
+                  className="absolute -top-0.5 -right-2 size-2 rounded-full bg-destructive"
+                  role="status"
+                  aria-label={t(value === InboxScope.InboxScopeChat ? "chatAttentionUnread" : "pendingCount", { count })}
+                />
+              ) : null}
+            </span>
+          </button>
+        )
+      })}
     </nav>
   )
 }
 
-/** 按需加载可选同事并通过原生选择控件切换。 */
-function MobileCustomerAssignee({
-  value,
-  onChange,
-}: {
-  value: string
-  onChange: (value: string) => void
-}) {
-  const { t } = useTranslation(["mobile", "common"])
-  const { identity } = useMobileWorkspace()
-  const { data, loading, error, refresh } = useResource(
-    resourceKeys.customerServiceAssignees(),
-    listCustomerServiceAssignees,
-    { staleTime: 0 },
-  )
-  const coworkers = (data ?? []).filter(
-    (item) => item.identityId !== identity.user.identityId,
-  )
+/** 面板中带标签的一项筛选。 */
+function MobileFilterField({ id, label, children }: { id: string; label: string; children: ReactNode }) {
   return (
     <div className="space-y-2">
-      <label
-        className="block text-sm font-medium"
-        htmlFor="mobile-customer-assignee"
-      >
-        {t("inbox.assignee")}
+      <label className="block text-sm font-medium" htmlFor={id}>
+        {label}
       </label>
-      <select
-        id="mobile-customer-assignee"
-        className="h-11 w-full rounded-md border bg-background px-3 text-sm"
-        value={value}
-        onChange={(event) => onChange(event.target.value)}
-      >
-        <option value="">{t("inbox.allCoworkers")}</option>
-        {value && !coworkers.some((item) => item.identityId === value) ? (
-          <option value={value}>{t("inbox.selectedAssignee")}</option>
-        ) : null}
-        {coworkers.map((item) => (
-          <option key={item.identityId} value={item.identityId}>
-            {item.displayName}
-          </option>
-        ))}
-      </select>
-      {loading ? (
-        <LoadingIndicator className="text-xs">{t("common:status.loading")}</LoadingIndicator>
-      ) : null}
-      {error ? (
-        <Button
-          variant="outline"
-          className="min-h-11"
-          onClick={() => void refresh()}
-        >
-          {t("inbox.assigneesRetry")}
-        </Button>
-      ) : null}
+      {children}
     </div>
   )
 }
 
-/** 在底部面板中按当前范围选择筛选条件，取消时保留原筛选。 */
+/** 在底部面板中按当前页签选择筛选条件，取消时保留原筛选；尚未接入的服务对象只展示不可选。 */
 export function MobileInboxFilter({
   query,
   onChange,
   onOpenChange,
 }: {
   query: MobileInboxQuery
-  onChange: (query: LoadInboxQuery) => void
+  onChange: (query: Partial<InboxQuery>) => void
   onOpenChange: (open: boolean) => void
 }) {
   const { t } = useTranslation("inbox")
   const { t: tMobile } = useTranslation(["mobile", "common"])
-  const customer = query.scope === InboxScope.InboxScopeCustomer
+  const { identity } = useMobileWorkspace()
+  const pending = query.scope === InboxScope.InboxScopePending
+  const all = query.scope === InboxScope.InboxScopeAll
+  const service = pending || all
   const [open, setOpen] = useState(false)
-  const [view, setView] = useState(query.customerView)
-  // 队列筛选用单值表示：空为全部队列，public 为公共队列，其余为团队编号。
+  const [pendingKind, setPendingKind] = useState(query.pendingKind)
+  // 队列与负责人筛选各用单值表示，与地址参数一致。
   const [queue, setQueue] = useState(inboxQueueParam(query))
-  const [assignee, setAssignee] = useState(query.assigneeIdentityId)
+  const [assignee, setAssignee] = useState(inboxAssigneeParam(query))
   const [channel, setChannel] = useState(query.channelId)
+  const [audience, setAudience] = useState(query.audience)
   const [status, setStatus] = useState(query.serviceStatus)
   const [kinds, setKinds] = useState<ConversationType[]>(query.kinds)
-  const { data } = useResource(
-    resourceKeys.customerServiceAssignees(),
-    listCustomerServiceAssignees,
-    { enabled: Boolean(query.assigneeIdentityId), staleTime: 0 },
-  )
   const { data: channels = [] } = useResource(
     resourceKeys.inboxChannels(),
     listInboxChannels,
-    { enabled: customer, staleTime: 0 },
+    { enabled: service, staleTime: 0 },
   )
   const { data: queueTeams = [] } = useResource(
     resourceKeys.serviceQueueTeams(),
     listServiceQueueTeams,
-    { enabled: customer, staleTime: 0 },
+    { enabled: pending, staleTime: 0 },
   )
-  const selected = data?.find(
-    (item) => item.identityId === query.assigneeIdentityId,
+  const { data: assignees = [] } = useResource(
+    resourceKeys.customerServiceAssignees(),
+    listCustomerServiceAssignees,
+    { enabled: all, staleTime: 0 },
   )
-  const options = inboxKindOptionsForScope(query.scope)
-  const viewLabel =
-    customerViews.find((item) => item.value === query.customerView)?.label ??
-    customerViews[0].label
-  const queueLabel =
-    query.queueFilter === CustomerQueueFilter.CustomerQueueFilterPublic
-      ? t("queueFilterPublicQueue")
-      : (queueTeams.find((item) => item.id === query.queueTeamId)?.name ?? "")
-  const summary = customer
+  const coworkers = assignees.filter((item) => item.identityId !== identity.user.identityId)
+  const assigneeLabel = (value: string) =>
+    value === identity.user.identityId
+      ? t("filterAssigneeMe")
+      : value === InboxAssigneeFilter.InboxAssigneeFilterUnassigned
+        ? t("filterAssigneeUnassigned")
+        : (coworkers.find((item) => item.identityId === value)?.displayName ?? tMobile("inbox.selectedAssignee"))
+  const summary = service
     ? [
-        t(viewLabel),
-        queueLabel,
-        query.assigneeIdentityId
-          ? (selected?.displayName ?? tMobile("inbox.selectedAssignee"))
-          : "",
+        pending ? t(inboxPendingKindOptions.find((item) => item.value === query.pendingKind)?.label ?? "filterAll") : "",
+        pending && query.queueFilter === CustomerQueueFilter.CustomerQueueFilterPublic
+          ? t("queueFilterPublicQueue")
+          : pending ? (queueTeams.find((item) => item.id === query.queueTeamId)?.name ?? "") : "",
+        all && inboxAssigneeParam(query) ? assigneeLabel(inboxAssigneeParam(query)) : "",
         channels.find((item) => item.id === query.channelId)?.name ?? "",
+        query.audience ? t(serviceAudienceOptions.find((item) => item.value === query.audience)?.label ?? "filterAll") : "",
         query.serviceStatus === ServiceSessionStatus.ServiceSessionStatusClosed
           ? t("filterServiceStatusClosed")
           : "",
       ]
     : [
         query.kinds.length
-          ? options
+          ? chatKindOptions
               .filter((option) => query.kinds.includes(option.kind))
               .map((option) => t(option.label))
               .join("、")
@@ -271,10 +216,11 @@ export function MobileInboxFilter({
       open={open}
       onOpenChange={(next) => {
         if (next) {
-          setView(query.customerView)
+          setPendingKind(query.pendingKind)
           setQueue(inboxQueueParam(query))
-          setAssignee(query.assigneeIdentityId)
+          setAssignee(inboxAssigneeParam(query))
           setChannel(query.channelId)
+          setAudience(query.audience)
           setStatus(query.serviceStatus)
           setKinds(query.kinds)
         }
@@ -289,7 +235,7 @@ export function MobileInboxFilter({
         >
           <span className="min-w-0 truncate">
             {tMobile("inbox.filterSummary", {
-              summary: summary.filter(Boolean).join(" · "),
+              summary: summary.filter(Boolean).join(" · ") || t("filterAll"),
             })}
           </span>
         </Button>
@@ -309,39 +255,46 @@ export function MobileInboxFilter({
           </SheetClose>
         </SheetHeader>
         <div className="overflow-y-auto p-4 space-y-9">
-          {customer ? (
+          {service ? (
             <div className="space-y-4">
-              <div
-                role="group"
-                aria-label={t("queueFilterLabel")}
-                className="grid grid-cols-2 gap-2"
-              >
-                {customerViews.map((item) => (
-                  <Button
-                    key={item.value}
-                    variant={view === item.value ? "default" : "outline"}
-                    className="min-h-11"
-                    aria-pressed={view === item.value}
-                    onClick={() => {
-                      setView(item.value)
-                      // 「待分配」只看未关闭会话。
-                      if (item.value === CustomerInboxView.CustomerInboxViewQueue) {
-                        setStatus(ServiceSessionStatus.ServiceSessionStatusOpen)
-                      }
-                    }}
-                  >
-                    {t(item.label)}
-                  </Button>
-                ))}
-              </div>
-              {view === CustomerInboxView.CustomerInboxViewQueue ? (
-                <div className="space-y-2">
-                  <label className="block text-sm font-medium" htmlFor="mobile-inbox-queue">
-                    {t("queueFilterLabel")}
-                  </label>
+              {pending ? (
+                <div
+                  role="group"
+                  aria-label={t("filterPendingKind")}
+                  className="grid grid-cols-2 gap-2"
+                >
+                  {[{ value: InboxPendingKind.$zero, label: "filterAll" } as const, ...inboxPendingKindOptions].map((item) => (
+                    <Button
+                      key={item.value}
+                      variant={pendingKind === item.value ? "default" : "outline"}
+                      className="min-h-11"
+                      aria-pressed={pendingKind === item.value}
+                      onClick={() => setPendingKind(item.value)}
+                    >
+                      {t(item.label)}
+                    </Button>
+                  ))}
+                </div>
+              ) : (
+                <div role="group" aria-label={t("filterServiceStatus")} className="grid grid-cols-2 gap-2">
+                  {serviceStatuses.map((item) => (
+                    <Button
+                      key={item.value}
+                      variant={status === item.value ? "default" : "outline"}
+                      className="min-h-11"
+                      aria-pressed={status === item.value}
+                      onClick={() => setStatus(item.value)}
+                    >
+                      {t(item.label)}
+                    </Button>
+                  ))}
+                </div>
+              )}
+              {pending && pendingKind === InboxPendingKind.InboxPendingKindQueue ? (
+                <MobileFilterField id="mobile-inbox-queue" label={t("filterQueue")}>
                   <select
                     id="mobile-inbox-queue"
-                    className="h-11 w-full rounded-md border bg-background px-3 text-sm"
+                    className={selectClassName}
                     value={queue}
                     onChange={(event) => setQueue(event.target.value)}
                   >
@@ -349,28 +302,47 @@ export function MobileInboxFilter({
                     <option value={CustomerQueueFilter.CustomerQueueFilterPublic}>
                       {t("queueFilterPublicQueue")}
                     </option>
-                    {queueTeams.map((item) => (
+                    {queueTeams.filter((item) => item.mine).map((item) => (
                       <option key={item.id} value={item.id}>
                         {item.name}
                       </option>
                     ))}
                   </select>
-                </div>
+                </MobileFilterField>
               ) : null}
-              {view === CustomerInboxView.CustomerInboxViewCoworkers ? (
-                <MobileCustomerAssignee value={assignee} onChange={setAssignee} />
+              {all ? (
+                <MobileFilterField id="mobile-inbox-assignee" label={t("filterAssignee")}>
+                  <select
+                    id="mobile-inbox-assignee"
+                    className={selectClassName}
+                    value={assignee}
+                    onChange={(event) => setAssignee(event.target.value)}
+                  >
+                    <option value="">{t("filterAll")}</option>
+                    <option value={identity.user.identityId}>{t("filterAssigneeMe")}</option>
+                    <option value={InboxAssigneeFilter.InboxAssigneeFilterUnassigned}>{t("filterAssigneeUnassigned")}</option>
+                    {assignee && ![identity.user.identityId, InboxAssigneeFilter.InboxAssigneeFilterUnassigned as string].includes(assignee) &&
+                    !coworkers.some((item) => item.identityId === assignee) ? (
+                      <option value={assignee}>{tMobile("inbox.selectedAssignee")}</option>
+                    ) : null}
+                    {coworkers.map((item) => (
+                      <option key={item.identityId} value={item.identityId}>
+                        {item.type === OrganizationIdentityType.OrganizationIdentityTypeAgent
+                          ? t("filterAssigneeAgent", { name: item.displayName })
+                          : item.displayName}
+                      </option>
+                    ))}
+                  </select>
+                </MobileFilterField>
               ) : null}
-              <div className="space-y-2">
-                <label className="block text-sm font-medium" htmlFor="mobile-inbox-channel">
-                  {t("filterChannel")}
-                </label>
+              <MobileFilterField id="mobile-inbox-source" label={t("filterSource")}>
                 <select
-                  id="mobile-inbox-channel"
-                  className="h-11 w-full rounded-md border bg-background px-3 text-sm"
+                  id="mobile-inbox-source"
+                  className={selectClassName}
                   value={channel}
                   onChange={(event) => setChannel(event.target.value)}
                 >
-                  <option value="">{t("filterAllChannels")}</option>
+                  <option value="">{t("filterAll")}</option>
                   {channels.map((item) => (
                     <option key={item.id} value={item.id}>
                       {item.enabled
@@ -379,45 +351,34 @@ export function MobileInboxFilter({
                     </option>
                   ))}
                 </select>
-              </div>
-              <div
-                role="group"
-                aria-labelledby="mobile-inbox-status"
-                className="space-y-2"
-              >
-                <p id="mobile-inbox-status" className="text-sm font-medium">
-                  {t("filterServiceStatus")}
-                </p>
-                <div className="grid grid-cols-2 gap-2">
-                  {serviceStatuses.map((item) => (
-                    <Button
-                      key={item.value}
-                      variant={status === item.value ? "default" : "outline"}
-                      className="min-h-11"
-                      aria-pressed={status === item.value}
-                      disabled={
-                        view === CustomerInboxView.CustomerInboxViewQueue &&
-                        item.value === ServiceSessionStatus.ServiceSessionStatusClosed
-                      }
-                      onClick={() => setStatus(item.value)}
-                    >
+              </MobileFilterField>
+              <MobileFilterField id="mobile-inbox-audience" label={t("filterAudience")}>
+                <select
+                  id="mobile-inbox-audience"
+                  className={selectClassName}
+                  value={audience}
+                  onChange={(event) => setAudience(event.target.value as ServiceAudience)}
+                >
+                  <option value="">{t("filterAll")}</option>
+                  {serviceAudienceOptions.map((item) => (
+                    <option key={item.value} value={item.value} disabled={!item.available}>
                       {t(item.label)}
-                    </Button>
+                    </option>
                   ))}
-                </div>
-              </div>
+                </select>
+              </MobileFilterField>
             </div>
           ) : (
             <fieldset className="space-y-2">
               <legend className="pb-2 text-sm font-medium">{t("filterKind")}</legend>
-              {options.map((option) => (
+              {chatKindOptions.map((option) => (
                 <label key={option.kind} className="flex min-h-11 items-center gap-3 text-sm">
                   <input
                     type="checkbox"
                     className="size-4 accent-primary"
                     checked={kinds.includes(option.kind)}
                     onChange={(event) =>
-                      setKinds(toggleInboxKinds(query.scope, kinds, option.kind, event.target.checked))
+                      setKinds(toggleChatKinds(kinds, option.kind, event.target.checked))
                     }
                   />
                   <span>{t(option.label)}</span>
@@ -429,13 +390,13 @@ export function MobileInboxFilter({
             className="min-h-11 w-full"
             onClick={() => {
               onChange(
-                customer
+                service
                   ? {
-                      customerView: view,
+                      pendingKind,
                       ...inboxQueueFromParam(queue),
-                      assigneeIdentityId:
-                        view === CustomerInboxView.CustomerInboxViewCoworkers ? assignee : "",
+                      ...inboxAssigneeFromParam(assignee),
                       channelId: channel,
+                      audience,
                       serviceStatus: status,
                     }
                   : { kinds },

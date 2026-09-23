@@ -36,9 +36,9 @@ func TestInboxPaginationHTTP(t *testing.T) {
 		before string
 	}{
 		{"", 50, "", ""},
-		{"?scope=customer&customerView=coworkers&assigneeIdentityId=peer&channelId=channel&serviceStatus=closed&limit=7&cursor=original-boundary", 7, "original-boundary", ""},
-		{"?scope=internal&kinds=group&kinds=direct&limit=9", 9, "", ""},
-		{"?scope=internal&beforeCursor=previous-boundary&limit=8", 8, "", "previous-boundary"},
+		{"?scope=all&assigneeFilter=identity&assigneeIdentityId=peer&channelId=channel&audience=customer&serviceStatus=closed&limit=7&cursor=original-boundary", 7, "original-boundary", ""},
+		{"?scope=chat&kinds=group&kinds=direct&limit=9", 9, "", ""},
+		{"?scope=pending&pendingKind=queue&queueFilter=public&beforeCursor=previous-boundary&limit=8", 8, "", "previous-boundary"},
 	} {
 		response := doJSON(t, http.MethodGet, server.URL+"/inbox"+test.query, nil, "token")
 		var page appservice.Inbox
@@ -47,9 +47,12 @@ func TestInboxPaginationHTTP(t *testing.T) {
 		if response.StatusCode != http.StatusOK || err != nil || backend.input.Limit != test.limit || backend.input.Cursor != test.cursor || backend.input.BeforeCursor != test.before || page.StartCursor != "first" || page.EndCursor != "last" || !page.HasBefore || !page.HasMore || page.NextCursor != "next-page" || page.UnreadCount != 80 || page.AttentionUnreadCount != 70 {
 			t.Fatalf("input=%+v response=%+v err=%v", backend.input, page, err)
 		}
-		if test.cursor != "" && (backend.input.Scope != appservice.InboxScopeCustomer || backend.input.CustomerView != appservice.CustomerInboxViewCoworkers ||
-			backend.input.AssigneeIdentityID != "peer" || backend.input.ChannelID != "channel" || backend.input.ServiceStatus != appservice.ServiceSessionStatusClosed) {
+		if test.cursor != "" && (backend.input.Scope != appservice.InboxScopeAll || backend.input.AssigneeFilter != appservice.InboxAssigneeFilterIdentity ||
+			backend.input.AssigneeIdentityID != "peer" || backend.input.ChannelID != "channel" || backend.input.Audience != appservice.ServiceAudienceCustomer || backend.input.ServiceStatus != appservice.ServiceSessionStatusClosed) {
 			t.Fatalf("filters lost=%+v", backend.input)
+		}
+		if test.limit == 8 && (backend.input.Scope != appservice.InboxScopePending || backend.input.PendingKind != appservice.InboxPendingKindQueue || backend.input.QueueFilter != appservice.CustomerQueueFilterPublic) {
+			t.Fatalf("pending filters lost=%+v", backend.input)
 		}
 		if test.limit == 9 && !slices.Equal(backend.input.Kinds, []appservice.ConversationType{appservice.ConversationTypeGroup, appservice.ConversationTypeDirect}) {
 			t.Fatalf("kinds lost=%+v", backend.input)

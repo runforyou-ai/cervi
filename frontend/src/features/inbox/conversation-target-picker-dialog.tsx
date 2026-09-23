@@ -1,4 +1,4 @@
-/** AI 聊天对象选择器。 */
+/** 单聊对象选择器。 */
 import { useRef } from "react"
 import { useTranslation } from "react-i18next"
 
@@ -18,13 +18,15 @@ import { listAllMemberOptions } from "@/features/inbox/list-all-member-options"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 
-/** 选择一位活跃 AI 员工开始新聊天。 */
+/** 选择一位同事或活跃 AI 员工开始单聊，同事在前。 */
 export function ConversationTargetPickerDialog({
   open,
+  currentIdentityId,
   onOpenChange,
   onSelected,
 }: {
   open: boolean
+  currentIdentityId: string
   onOpenChange: (open: boolean) => void
   onSelected: (member: MemberOption) => void
 }) {
@@ -35,10 +37,11 @@ export function ConversationTargetPickerDialog({
     listAllMemberOptions,
     { enabled: open, staleTime: 0 },
   )
-  const candidates = (data ?? []).filter(
-    (member) =>
-      member.type === OrganizationIdentityType.OrganizationIdentityTypeAgent,
-  )
+  const members = (data ?? []).filter((member) => member.id !== currentIdentityId)
+  const candidates = [
+    ...members.filter((member) => member.type === OrganizationIdentityType.OrganizationIdentityTypeUser),
+    ...members.filter((member) => member.type === OrganizationIdentityType.OrganizationIdentityTypeAgent),
+  ]
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
@@ -52,20 +55,20 @@ export function ConversationTargetPickerDialog({
         }}
       >
         <DialogHeader>
-          <DialogTitle>{t("agentPickerTitle")}</DialogTitle>
+          <DialogTitle>{t("newDirectConversation")}</DialogTitle>
           <DialogDescription>
-            {t("agentPickerDescription")}
+            {t("chatPickerDescription")}
           </DialogDescription>
         </DialogHeader>
         <ScrollArea className="min-h-64 rounded-md border">
           {loading ? (
             <LoadingIndicator className="min-h-64 justify-center">
-              {t("agentPickerLoading")}
+              {t("chatPickerLoading")}
             </LoadingIndicator>
           ) : error ? (
             <div className="flex min-h-64 flex-col items-center justify-center p-6 text-center">
               <p className="text-sm text-muted-foreground">
-                {t("agentPickerLoadError")}
+                {t("chatPickerLoadError")}
               </p>
               <Button
                 type="button"
@@ -79,7 +82,7 @@ export function ConversationTargetPickerDialog({
             </div>
           ) : candidates.length === 0 ? (
             <p className="px-6 py-12 text-center text-sm text-muted-foreground">
-              {t("agentPickerEmpty")}
+              {t("chatPickerEmpty")}
             </p>
           ) : (
             <div className="grid p-1.5">
@@ -100,6 +103,9 @@ export function ConversationTargetPickerDialog({
                   <span className="min-w-0 flex-1 truncate text-sm font-medium">
                     {member.displayName}
                   </span>
+                  {member.type === OrganizationIdentityType.OrganizationIdentityTypeAgent ? (
+                    <span className="shrink-0 text-xs text-muted-foreground">{t("chatPickerAgent")}</span>
+                  ) : null}
                 </button>
               ))}
             </div>

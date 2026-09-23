@@ -84,6 +84,7 @@ func (q *LoadInboxQuery) ReadContext(ctx context.Context, identity *servermodels
 		var current *inboxCursorPoint
 		if result.Anchor.MatchesQuery {
 			current = &anchorPoints[0]
+			result.Anchor.Conversation.Pending = current.pending()
 			result.Anchor.Conversation.PositionCursor, err = encodeInboxCursor(identity, query, pinOrderVersion, *current)
 			if err != nil {
 				return err
@@ -114,7 +115,7 @@ func (q *LoadInboxQuery) ReadContext(ctx context.Context, identity *servermodels
 		}
 		points := before
 		// 原位置未变的锚点补入中心；已移动的锚点只按当前排序出现在前后邻域。
-		if current != nil && compareInboxPoints(query.Partition, *current, *point) == 0 {
+		if current != nil && compareInboxPoints(query.order(), *current, *point) == 0 {
 			points = append(points, *current)
 		}
 		points = append(points, after...)

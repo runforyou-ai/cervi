@@ -7,6 +7,7 @@ import { MessageChannelFormPage } from "@/features/channels/message-channel-form
 import { MessageChannelListPage } from "@/features/channels/message-channel-list-page"
 import { AgentFormPage } from "@/features/contacts/agents/agent-form-page"
 import { ContactsPage } from "@/features/contacts/contacts-page"
+import { ChatRoute } from "@/features/inbox/chat-route"
 import { InboxRoute } from "@/features/inbox/inbox-route"
 import { MCPServerFormPage } from "@/features/integrations/mcp-servers/mcp-server-form-page"
 import { MCPServerListPage } from "@/features/integrations/mcp-servers/mcp-server-list-page"
@@ -32,6 +33,7 @@ const workspaceRouteLayouts = [
 /** 工作台路由清单，地址解析与页面渲染共用同一份定义。 */
 const workspaceRouteDefinitions = [
   { path: "/inbox", element: <InboxRoute /> },
+  { path: "/chats", element: <ChatRoute /> },
   {
     path: "/settings/profile",
     element: <SettingsPage section="profile" />,

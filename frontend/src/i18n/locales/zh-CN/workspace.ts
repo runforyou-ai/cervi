@@ -6,7 +6,7 @@ const workspace = {
   railOpen: "展开导航栏",
   historyBack: "后退",
   historyForward: "前进",
-  inbox: "消息",
+  inbox: "收件箱",
   contacts: "通讯录",
   channels: "渠道",
   knowledgeBases: "知识库",

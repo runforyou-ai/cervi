@@ -106,7 +106,7 @@ func testCustomerCopilotThreads(t *testing.T, db *bun.DB, identity *servermodels
 	if err != nil || len(threads) != 1 || threads[0].ID != threadID || threads[0].AgentStatus != domain.UserStatusActive {
 		t.Fatalf("colleague threads = %+v, error = %v", threads, err)
 	}
-	inboxPage, _, err := inboxaction.NewLoadInboxQuery(db).Execute(ctx, colleague, inboxaction.LoadInput{Scope: domain.InboxScopeAll})
+	inboxPage, _, err := inboxaction.NewLoadInboxQuery(db).Execute(ctx, colleague, inboxaction.LoadInput{Scope: domain.InboxScopeChat})
 	if err != nil {
 		t.Fatal(err)
 	}

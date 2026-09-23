@@ -35,6 +35,7 @@ import {
 import { PagePaneGroup, PagePaneLink } from "@/components/page-split"
 import { useGlobalSearch } from "@/contexts/global-search-context"
 import { useUnsavedChangesContext } from "@/contexts/unsaved-changes-context"
+import { ChatRailSections } from "@/features/inbox/chat-rail"
 import { WorkspaceRailToggle } from "@/features/workspace/workspace-rail"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResourceInvalidator } from "@/hooks/use-resource"
@@ -97,23 +98,27 @@ function WorkspaceSearchEntry({ collapsed }: { collapsed: boolean }) {
   )
 }
 
-/** 模块栏导航。 */
+/** 模块栏导航，模块之后按群聊与单聊分节列出本人参与的聊天。 */
 function WorkspaceMenu({
+  identity,
   collapsed,
   railToggle,
+  pendingCount,
   onInboxClick,
 }: {
+  identity: Identity
   collapsed: boolean
   railToggle: ReactNode
+  pendingCount: number
   onInboxClick: () => void
 }) {
-  const { t } = useTranslation("workspace")
+  const { t } = useTranslation(["workspace", "inbox"])
 
   return (
     <nav
       // 展开时右侧留白由主内容区的内缩间隙承担，使选中块与两侧可见边界等距；窄栏下图标整列居中。
       className={cn(
-        "flex flex-1 flex-col",
+        "flex min-h-0 flex-1 flex-col",
         collapsed
           ? "items-center gap-1.5 pt-1.5"
           : "items-stretch gap-0.5 pt-1 pr-0 pl-1.5",
@@ -128,10 +133,10 @@ function WorkspaceMenu({
           {railToggle}
         </div>
       )}
-      {/* 展开时导航项右侧额外留白，选中块与主内容卡片边缘拉开距离，搜索框保持原有宽度。 */}
+      {/* 展开时导航项右侧额外留白，选中块与主内容卡片边缘拉开距离，搜索框保持原有宽度；聊天较多时模块之下整体滚动。 */}
       <div
         className={cn(
-          "flex flex-col",
+          "flex min-h-0 flex-1 flex-col overflow-y-auto",
           collapsed ? "items-center gap-1.5" : "items-stretch gap-0.5 pr-3",
         )}
       >
@@ -139,6 +144,8 @@ function WorkspaceMenu({
           to="/inbox"
           icon={InboxIcon}
           collapsed={collapsed}
+          count={pendingCount}
+          countLabel={t("inbox:pendingCount", { count: pendingCount })}
           onClick={onInboxClick}
         >
           {t("inbox")}
@@ -157,6 +164,9 @@ function WorkspaceMenu({
         <PagePaneLink to="/knowledge-bases" icon={LibraryIcon} collapsed={collapsed}>
           {t("knowledgeBases")}
         </PagePaneLink>
+        <div className={cn("flex flex-col", collapsed ? "items-center gap-1.5" : "mt-3 gap-3")}>
+          <ChatRailSections identity={identity} collapsed={collapsed} />
+        </div>
       </div>
     </nav>
   )
@@ -298,6 +308,7 @@ export function WorkspaceNavigation({
   inSettings,
   appHref,
   collapsed,
+  pendingCount,
   onToggleRail,
   onLogout,
   loggingOut,
@@ -306,6 +317,7 @@ export function WorkspaceNavigation({
   inSettings: boolean
   appHref: string
   collapsed: boolean
+  pendingCount: number
   onToggleRail: () => void
   onLogout: () => void
   loggingOut: boolean
@@ -384,8 +396,10 @@ export function WorkspaceNavigation({
         />
       ) : (
         <WorkspaceMenu
+          identity={identity}
           collapsed={collapsed}
           railToggle={inlineRailToggle}
+          pendingCount={pendingCount}
           onInboxClick={requestMessageNotificationPermission}
         />
       )}

@@ -174,7 +174,7 @@ func testAgentConversations(t *testing.T, db *bun.DB, identity *servermodels.Ide
 		}
 	}
 	// 按编号读取独立摘要和批量资格，核验两个 AI 会话各自的最新结果。
-	details, err := inboxaction.NewLoadInboxQuery(db).ReadByIDs(ctx, identity, []string{first.Conversation.ID, second.Conversation.ID}, &inboxaction.LoadInput{Scope: domain.InboxScopeInternal})
+	details, err := inboxaction.NewLoadInboxQuery(db).ReadByIDs(ctx, identity, []string{first.Conversation.ID, second.Conversation.ID}, &inboxaction.LoadInput{Scope: domain.InboxScopeChat})
 	if err != nil || len(details) != 2 {
 		t.Fatalf("agent summaries=%+v err=%v", details, err)
 	}
@@ -268,7 +268,7 @@ func testAgentConversationAccess(t *testing.T, db *bun.DB, identity *servermodel
 	if err := unreadMark.Execute(ctx, identity, first.Conversation.ID, true); err != nil {
 		t.Fatal(err)
 	}
-	rowsPage, _, err := inboxaction.NewLoadInboxQuery(db).Execute(ctx, identity, inboxaction.LoadInput{Scope: domain.InboxScopeInternal})
+	rowsPage, _, err := inboxaction.NewLoadInboxQuery(db).Execute(ctx, identity, inboxaction.LoadInput{Scope: domain.InboxScopeChat})
 	rows := rowsPage.Conversations
 	if err != nil {
 		t.Fatal(err)

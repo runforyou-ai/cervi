@@ -295,6 +295,7 @@ func (w *Worker) reclaim(ctx context.Context, snapshot *servermodels.ServiceSess
 		if _, err := tx.NewUpdate().Model(session).
 			Set("assignee_identity_id = NULL").
 			Set("assignee_assigned_at = NULL").
+			Set("queued_at = now()").
 			Set("reminded_at = NULL").
 			Set("updated_at = now()").
 			WherePK().Where("organization_id = ?", session.OrganizationID).
