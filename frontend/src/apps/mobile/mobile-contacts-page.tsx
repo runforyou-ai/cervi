@@ -12,21 +12,21 @@ import { Link } from "react-router"
 import { MobilePageHeader, MobileScrollArea } from "@/apps/mobile/mobile-page"
 
 const categories = [
-  { path: "employees", label: "employees", icon: UserRoundIcon },
-  { path: "ai-employees", label: "agents", icon: BotIcon },
-  { path: "teams", label: "teams", icon: UsersRoundIcon },
-  { path: "external", label: "external", icon: ContactRoundIcon },
+  { path: "employees", icon: UserRoundIcon },
+  { path: "teams", icon: UsersRoundIcon },
+  { path: "external", icon: ContactRoundIcon },
+  { path: "assistants", icon: BotIcon },
 ] as const
 
-/** 展示通讯录四个分类的固定入口。 */
+/** 展示同事、团队、外部联系人和我的助理四个分类的固定入口。 */
 export function MobileContactsPage() {
-  const { t } = useTranslation("mobile")
+  const { t } = useTranslation(["mobile", "contacts"])
   return (
     <section className="flex h-full min-h-0 flex-col">
       <MobilePageHeader title={t("tabs.contacts")} />
       <MobileScrollArea storageKey="contacts">
         <ul className="divide-y">
-          {categories.map(({ path, label, icon: Icon }) => (
+          {categories.map(({ path, icon: Icon }) => (
             <li key={path}>
               <Link
                 to={`/contacts/${path}`}
@@ -37,7 +37,7 @@ export function MobileContactsPage() {
                   <Icon className="size-5" />
                 </span>
                 <span className="min-w-0 flex-1 text-[15px] font-medium">
-                  {t(`contacts.${label}`)}
+                  {t(`contacts:scopes.${path}`)}
                 </span>
                 <ChevronRightIcon className="size-4 text-muted-foreground" />
               </Link>

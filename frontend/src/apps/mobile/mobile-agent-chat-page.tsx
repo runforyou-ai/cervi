@@ -1,7 +1,7 @@
-/** 为 AI 新对话分配稳定路由，在同一页面内完成草稿和正式会话的交接。 */
+/** 移动端 AI 对话页，在同一页面内完成草稿和正式会话的交接。 */
 import { useEffect, useRef, useState } from "react"
 import { useTranslation } from "react-i18next"
-import { Navigate, useLocation, useNavigate, useParams } from "react-router"
+import { useLocation, useNavigate, useParams } from "react-router"
 
 import {
   ConversationType,
@@ -33,21 +33,6 @@ export type MobileAgentLocationState = MobileLocateState & {
   draftTarget?: Pick<AgentData, "identityId" | "displayName">
   draftAssistant?: boolean
   mobileBack?: boolean
-  agentDirectory?: boolean
-}
-
-/** 打开草稿前确定会话地址，首发成功后在当前页面展示会话。 */
-export function MobileAgentChatPage() {
-  const { agentID = "" } = useParams()
-  const location = useLocation()
-  const [conversationID] = useState(() => crypto.randomUUID())
-  return (
-    <Navigate
-      to={`/chats/agent/${conversationID}`}
-      replace
-      state={{ ...location.state, draftAgentID: agentID, agentDirectory: true }}
-    />
-  )
 }
 
 /** 按会话编号隔离草稿，首发前后保留同一个聊天实例。 */
