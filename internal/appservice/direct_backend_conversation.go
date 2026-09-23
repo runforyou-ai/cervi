@@ -94,7 +94,7 @@ func newConversationOps(db *bun.DB, agentScheduler conversationaction.AgentMessa
 		addGroupConversationMembers:     conversationaction.NewAddGroupConversationMembersAction(db),
 		removeGroupConversationMember:   conversationaction.NewRemoveGroupConversationMemberAction(db, agentCoordinator),
 		transferGroupConversationOwner:  conversationaction.NewTransferGroupConversationOwnerAction(db),
-		leaveGroupConversation:          conversationaction.NewLeaveGroupConversationAction(db),
+		leaveGroupConversation:          conversationaction.NewLeaveGroupConversationAction(db, agentCoordinator),
 		dissolveGroupConversation:       conversationaction.NewDissolveGroupConversationAction(db, agentCoordinator),
 		sendGroupTextMessage:            conversationaction.NewSendGroupTextMessageAction(db, agentScheduler),
 		getAgentRunProcess:              conversationaction.NewGetAgentRunProcessQuery(db),
@@ -644,7 +644,7 @@ func conversationMessageFromAction(message conversationaction.ConversationMessag
 			FromDisplayName: message.SystemEvent.FromDisplayName, HandoffReason: (*AgentHandoffReason)(message.SystemEvent.Reason),
 			ReturnReason: (*ServiceSessionReturnReason)(message.SystemEvent.ReturnReason),
 			CloseReason:  (*ServiceSessionCloseReason)(message.SystemEvent.CloseReason),
-			ReasonText:   message.SystemEvent.ReasonText, AgentRunID: message.SystemEvent.AgentRunID,
+			ReasonText:   message.SystemEvent.ReasonText, CategoryName: message.SystemEvent.CategoryName, AgentRunID: message.SystemEvent.AgentRunID,
 		}
 		// 客服处理周期事件的操作人按群聊事件的 actor 结构返回。
 		if message.SystemEvent.ActorIdentityID != nil && message.SystemEvent.ActorDisplayName != nil {
@@ -704,6 +704,13 @@ func conversationMessageSenderFromAction(sender *conversationaction.Conversation
 	}
 }
 
+// assistantConflictKeys 是助理无法接收新请求时的冲突提示。
+var assistantConflictKeys = map[string]cervii18n.Key{
+	conversationaction.ConflictReasonAssistantPaused:   cervii18n.ErrorAssistantPaused,
+	conversationaction.ConflictReasonAssistantUnbound:  cervii18n.ErrorAssistantUnbound,
+	conversationaction.ConflictReasonAssistantInactive: cervii18n.ErrorAssistantInactive,
+}
+
 // individualConversationError 转换真人单聊和 AI 聊天的目标及消息错误。
 func individualConversationError(ctx context.Context, meta RequestMeta, err error, organizationID, targetID, operation string) error {
 	if ctx.Err() != nil {
@@ -727,12 +734,18 @@ func individualConversationError(ctx context.Context, meta RequestMeta, err erro
 	if errors.Is(err, deviceaction.ErrWorkspaceNotFound) {
 		return NotFoundError(meta, cervii18n.ErrorDeviceWorkspaceNotFound)
 	}
+	if errors.Is(err, deviceaction.ErrAssistantNotInConversation) {
+		return NotFoundError(meta, cervii18n.ErrorAssistantNotInConversation)
+	}
 	if validationError, ok := errors.AsType[*conversationaction.ValidationError](err); ok {
 		return InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, conversationMessageValidationKeys))
 	}
 	if conflictError, ok := errors.AsType[*conversationaction.ConflictError](err); ok {
 		if conflictError.Reason == conversationaction.ConflictReasonReplyTargetInvalid {
 			return ConflictError(meta, cervii18n.ErrorReplyTargetInvalid, conflictError.Reason)
+		}
+		if key, ok := assistantConflictKeys[conflictError.Reason]; ok {
+			return ConflictError(meta, key, conflictError.Reason)
 		}
 		return ConflictError(meta, cervii18n.ErrorMessageConflict, conflictError.Reason)
 	}
@@ -781,6 +794,9 @@ func groupConversationError(ctx context.Context, meta RequestMeta, err error, or
 			messageKey = cervii18n.ErrorReplyTargetInvalid
 		case conversationaction.ConflictReasonGroupMentionTargetInvalid:
 			messageKey = cervii18n.ErrorGroupMentionTargetInvalid
+		}
+		if key, ok := assistantConflictKeys[conflictError.Reason]; ok {
+			messageKey = key
 		}
 		return ConflictError(meta, messageKey, conflictError.Reason)
 	}

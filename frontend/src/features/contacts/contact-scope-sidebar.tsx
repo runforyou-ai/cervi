@@ -9,7 +9,7 @@ import { useTranslation } from "react-i18next"
 
 import { PagePaneLink, PagePaneNav } from "@/components/page-split"
 
-/** 渲染通讯录分类入口；助理随本地运行时交付，交付前显示为即将支持。 */
+/** 渲染通讯录分类入口。 */
 export function ContactScopeSidebar() {
   const { t } = useTranslation("contacts")
 
@@ -24,7 +24,9 @@ export function ContactScopeSidebar() {
       <PagePaneLink to="/contacts/external" icon={ContactRoundIcon}>
         {t("scopes.external")}
       </PagePaneLink>
-      <PagePaneLink icon={BotIcon}>{t("scopes.assistants")}</PagePaneLink>
+      <PagePaneLink to="/contacts/assistants" icon={BotIcon}>
+        {t("scopes.assistants")}
+      </PagePaneLink>
     </PagePaneNav>
   )
 }

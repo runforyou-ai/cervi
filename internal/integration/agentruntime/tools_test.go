@@ -27,7 +27,7 @@ func TestAssembleToolsByScene(t *testing.T) {
 		t.Run(string(scenario.scene), func(t *testing.T) {
 			var terminal *terminalTools
 			if scenario.scene == SceneCustomer {
-				terminal = newTerminalTools()
+				terminal = newTerminalTools(nil)
 			}
 			tools, release, err := runtime.assembleTools(context.Background(), RunRequest{Assignment: Assignment{Scene: scenario.scene}, CustomerHistorySearch: history}, terminal)
 			if err != nil {

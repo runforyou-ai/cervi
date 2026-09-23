@@ -17,6 +17,7 @@ import { useConversationName } from "@/features/inbox/use-conversation-name"
 import { useConversationTime } from "@/features/inbox/use-conversation-time"
 import type { InboxSearchMessageData, InboxSearchState } from "@/features/inbox/use-inbox-search"
 import { cn } from "@/lib/utils"
+import { isAIIdentityType } from "@/lib/identity-type"
 
 const searchGroupLimit = 6
 const markClassName = "bg-transparent font-semibold text-primary"
@@ -235,7 +236,8 @@ export function InboxSearchPanel({ search, identity }: { search: InboxSearchStat
         <SearchGroup title={t("searchGroupPeople")} count={search.people.length} viewAllLabel={t("searchViewAll")}>
           {search.people.map((person, position) => {
             const contact = person.kind === InboxSearchPersonKind.InboxSearchPersonContact
-            const agent = person.identityType === OrganizationIdentityType.OrganizationIdentityTypeAgent
+            const agent = isAIIdentityType(person.identityType)
+            const assistant = person.identityType === OrganizationIdentityType.OrganizationIdentityTypeAssistant
             return (
               <SearchResultRow
                 key={`${person.kind}-${person.id}`}
@@ -247,7 +249,7 @@ export function InboxSearchPanel({ search, identity }: { search: InboxSearchStat
                 detail={
                   contact
                     ? t(person.conversationId ? "searchPersonContact" : "searchPersonNoConversation")
-                    : t(agent ? "contextIdentityAgent" : "contextIdentityMember")
+                    : t(assistant ? "contextIdentityAssistant" : agent ? "contextIdentityAgent" : "contextIdentityMember")
                 }
                 onSelect={search.setActiveIndex}
                 onOpen={() => search.open({ kind: "person", person })}

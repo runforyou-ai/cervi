@@ -1,49 +1,20 @@
-/** 模型服务页签、类型和输入模态的界面配置。 */
+/** 模型类型和输入模态的界面配置。 */
 import {
   AIModelInputModality,
   AIModelType,
-  AIProviderBrand,
   type AIModelInputModalityId,
   type AIModelTypeId,
-  type AIProviderBrandId,
 } from "@/api"
 
-export type ModelServiceSection = "chat" | "embedding" | "rerank"
-
-export const modelServiceSectionOrder: ModelServiceSection[] = [
-  "chat",
-  "embedding",
-  "rerank",
+export const modelTypeOrder: AIModelTypeId[] = [
+  AIModelType.AIModelTypeChat,
+  AIModelType.AIModelTypeEmbedding,
+  AIModelType.AIModelTypeRerank,
 ]
-
-export const modelServiceSectionConfigs: Record<
-  ModelServiceSection,
-  {
-    modelType: AIModelTypeId
-    defaultBrand: AIProviderBrandId
-    nameKey: `modelServices.tabs.${ModelServiceSection}`
-  }
-> = {
-  chat: {
-    modelType: AIModelType.AIModelTypeChat,
-    defaultBrand: AIProviderBrand.AIProviderBrandDeepSeek,
-    nameKey: "modelServices.tabs.chat",
-  },
-  embedding: {
-    modelType: AIModelType.AIModelTypeEmbedding,
-    defaultBrand: AIProviderBrand.AIProviderBrandAlibaba,
-    nameKey: "modelServices.tabs.embedding",
-  },
-  rerank: {
-    modelType: AIModelType.AIModelTypeRerank,
-    defaultBrand: AIProviderBrand.AIProviderBrandAlibaba,
-    nameKey: "modelServices.tabs.rerank",
-  },
-}
 
 export const modelTypeNameKeys: Record<
   AIModelTypeId,
-  `modelServices.models.types.${ModelServiceSection}`
+  `modelServices.models.types.${"chat" | "embedding" | "rerank"}`
 > = {
   [AIModelType.AIModelTypeChat]: "modelServices.models.types.chat",
   [AIModelType.AIModelTypeEmbedding]: "modelServices.models.types.embedding",

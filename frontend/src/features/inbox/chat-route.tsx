@@ -5,7 +5,6 @@ import { useTranslation } from "react-i18next"
 import { useSearchParams } from "react-router"
 
 import {
-  OrganizationIdentityType,
   type AgentInboxConversationData,
   type DirectInboxConversationData,
   type MemberOption,
@@ -26,6 +25,7 @@ import { useRecentConversations } from "@/features/inbox/use-recent-conversation
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useIsNarrowViewport } from "@/hooks/use-narrow-viewport"
 import { useResourceInvalidator, useResourceReader } from "@/hooks/use-resource"
+import { isAIIdentityType } from "@/lib/identity-type"
 
 /** 按地址中的会话、聊天对象或定位消息渲染聊天主区。 */
 export function ChatRoute() {
@@ -95,7 +95,7 @@ export function ChatRoute() {
       return
     }
     setDraft(
-      member.type === OrganizationIdentityType.OrganizationIdentityTypeAgent
+      isAIIdentityType(member.type)
         ? { kind: "agent-draft", member, conversationId: crypto.randomUUID() }
         : { kind: "direct-draft", member },
     )

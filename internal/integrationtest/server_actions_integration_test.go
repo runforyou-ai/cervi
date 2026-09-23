@@ -912,7 +912,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		}); err != nil {
 			t.Fatal(err)
 		}
-		if _, err := useraction.NewUpdateStatusAction(db, testServiceSessionReturner(db)).Execute(context.Background(), loggedIn.Identity, createdMember.ID, domain.UserStatusInactive); !errors.Is(err, useraction.ErrLastActiveAdministrator) {
+		if _, err := testUserStatusAction(db).Execute(context.Background(), loggedIn.Identity, createdMember.ID, domain.UserStatusInactive); !errors.Is(err, useraction.ErrLastActiveAdministrator) {
 			t.Fatalf("deactivate last active administrator error = %v", err)
 		}
 		if err := updateRoles.Execute(context.Background(), loggedIn.Identity, []roleaction.AssignmentInput{
@@ -925,7 +925,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil || teamUsers.Page.Total != 1 || len(teamUsers.Users) != 1 {
 			t.Fatalf("team users = %#v, error = %v", teamUsers, err)
 		}
-		inactiveMember, err := useraction.NewUpdateStatusAction(db, testServiceSessionReturner(db)).Execute(context.Background(), loggedIn.Identity, createdMember.ID, domain.UserStatusInactive)
+		inactiveMember, err := testUserStatusAction(db).Execute(context.Background(), loggedIn.Identity, createdMember.ID, domain.UserStatusInactive)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -940,7 +940,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		if err != nil || len(teamAfterUserDeactivation.Teams) != 1 || teamAfterUserDeactivation.Teams[0].MemberCount != 0 {
 			t.Fatalf("team after user deactivation = %#v, error = %v", teamAfterUserDeactivation, err)
 		}
-		reactivatedMember, err := useraction.NewUpdateStatusAction(db, testServiceSessionReturner(db)).Execute(context.Background(), loggedIn.Identity, createdMember.ID, domain.UserStatusActive)
+		reactivatedMember, err := testUserStatusAction(db).Execute(context.Background(), loggedIn.Identity, createdMember.ID, domain.UserStatusActive)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -1434,7 +1434,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatalf("non-participant group history error = %v", err)
 		}
 
-		leave := conversationaction.NewLeaveGroupConversationAction(db)
+		leave := conversationaction.NewLeaveGroupConversationAction(db, newGroupAgentCoordinator(db))
 		managedGroup, err := create.Execute(context.Background(), loggedIn.Identity, conversationaction.GroupConversationInput{
 			Title: "群主退出测试", MemberIdentityIDs: []string{memberLogin.Identity.OrganizationIdentity.ID},
 		})
@@ -1524,7 +1524,7 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 			t.Fatalf("mark added group member read: %v", err)
 		}
 
-		if _, err := useraction.NewUpdateStatusAction(db, testServiceSessionReturner(db)).Execute(context.Background(), loggedIn.Identity, observer.ID, domain.UserStatusInactive); err != nil {
+		if _, err := testUserStatusAction(db).Execute(context.Background(), loggedIn.Identity, observer.ID, domain.UserStatusInactive); err != nil {
 			t.Fatal(err)
 		}
 		if _, err := create.Execute(context.Background(), loggedIn.Identity, conversationaction.GroupConversationInput{
@@ -2402,6 +2402,10 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 
 		t.Run("Agent 群聊成员", func(t *testing.T) {
 			testGroupAgentMembership(t, db, loggedIn.Identity, provider.ID, model.Identifier)
+		})
+
+		t.Run("助理群聊成员", func(t *testing.T) {
+			testGroupAssistants(t, db, loggedIn.Identity, provider.ID, model.Identifier)
 		})
 
 		t.Run("Agent 群内点名", func(t *testing.T) {

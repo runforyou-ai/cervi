@@ -104,6 +104,16 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.PUT("/agents/:agentID/execution", s.updateAgentExecution)
 	router.POST("/agents/:agentID/deactivate", s.deactivateAgent)
 	router.POST("/agents/:agentID/reactivate", s.reactivateAgent)
+	router.GET("/assistants", s.listAssistants)
+	router.GET("/users/:userID/assistants", s.listMemberAssistants)
+	router.GET("/assistants/:assistantID", s.getAssistant)
+	router.POST("/assistants", s.createAssistant)
+	router.PUT("/assistants/:assistantID", s.updateAssistant)
+	router.POST("/assistants/:assistantID/pause", s.pauseAssistant)
+	router.POST("/assistants/:assistantID/resume", s.resumeAssistant)
+	router.PUT("/assistants/:assistantID/device", s.moveAssistant)
+	router.POST("/assistants/:assistantID/deactivate", s.deactivateAssistant)
+	router.POST("/assistants/:assistantID/reactivate", s.reactivateAssistant)
 	router.GET("/users", s.listUsers)
 	router.GET("/users/:userID", s.getUser)
 	router.POST("/users", s.createUser)
@@ -177,14 +187,18 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.PUT("/settings/customer-service/business-hours", s.updateBusinessHours)
 	router.GET("/settings/customer-service/timeouts", s.getServiceTimeouts)
 	router.PUT("/settings/customer-service/timeouts", s.updateServiceTimeouts)
+	router.GET("/settings/customer-service/categories", s.listServiceCategories)
+	router.POST("/settings/customer-service/categories", s.createServiceCategory)
+	router.PUT("/settings/customer-service/categories/:categoryID", s.updateServiceCategory)
+	router.DELETE("/settings/customer-service/categories/:categoryID", s.deleteServiceCategory)
 	router.POST("/devices", s.registerDevice)
 	router.GET("/devices", s.listDevices)
 	router.DELETE("/devices/:deviceID", s.revokeDevice)
 	router.POST("/devices/:deviceID/workspaces", s.registerDeviceWorkspace)
 	router.GET("/devices/:deviceID/workspaces", s.listDeviceWorkspaces)
-	router.GET("/conversations/:conversationID/device-binding", s.getConversationDeviceBinding)
-	router.PUT("/conversations/:conversationID/device-binding", s.bindConversationDevice)
-	router.DELETE("/conversations/:conversationID/device-binding", s.unbindConversationDevice)
+	router.GET("/conversations/:conversationID/assistant-workspaces", s.listConversationAssistantWorkspaces)
+	router.PUT("/conversations/:conversationID/assistant-workspaces/:assistantIdentityID", s.setConversationAssistantWorkspace)
+	router.DELETE("/conversations/:conversationID/assistant-workspaces/:assistantIdentityID", s.clearConversationAssistantWorkspace)
 }
 
 // installationStatus 返回服务端初始化状态和公开企业名称。
@@ -929,6 +943,78 @@ func (s *Service) reactivateAgent(c *gin.Context) {
 	writeResult(c, http.StatusOK, output, err)
 }
 
+// listAssistants 返回当前成员名下的助理。
+func (s *Service) listAssistants(c *gin.Context) {
+	output, err := s.application.ListAssistants(c.Request.Context(), requestMeta(c))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// listMemberAssistants 返回指定成员名下的助理。
+func (s *Service) listMemberAssistants(c *gin.Context) {
+	output, err := s.application.ListMemberAssistants(c.Request.Context(), requestMeta(c), c.Param("userID"))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// getAssistant 返回当前成员名下的助理详情。
+func (s *Service) getAssistant(c *gin.Context) {
+	output, err := s.application.GetAssistant(c.Request.Context(), requestMeta(c), c.Param("assistantID"))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// createAssistant 在当前成员的电脑上创建助理。
+func (s *Service) createAssistant(c *gin.Context) {
+	var input appservice.CreateAssistantInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.CreateAssistant(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusCreated, output, err)
+}
+
+// updateAssistant 修改当前成员名下的助理。
+func (s *Service) updateAssistant(c *gin.Context) {
+	var input appservice.AssistantInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.UpdateAssistant(c.Request.Context(), requestMeta(c), c.Param("assistantID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// pauseAssistant 暂停当前成员名下的助理。
+func (s *Service) pauseAssistant(c *gin.Context) {
+	output, err := s.application.PauseAssistant(c.Request.Context(), requestMeta(c), c.Param("assistantID"))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// resumeAssistant 恢复当前成员名下已暂停的助理。
+func (s *Service) resumeAssistant(c *gin.Context) {
+	output, err := s.application.ResumeAssistant(c.Request.Context(), requestMeta(c), c.Param("assistantID"))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// moveAssistant 把当前成员名下的助理换到指定电脑。
+func (s *Service) moveAssistant(c *gin.Context) {
+	var input appservice.AssistantDeviceInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.MoveAssistant(c.Request.Context(), requestMeta(c), c.Param("assistantID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// deactivateAssistant 停用助理。
+func (s *Service) deactivateAssistant(c *gin.Context) {
+	output, err := s.application.DeactivateAssistant(c.Request.Context(), requestMeta(c), c.Param("assistantID"))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// reactivateAssistant 启用已停用的助理。
+func (s *Service) reactivateAssistant(c *gin.Context) {
+	output, err := s.application.ReactivateAssistant(c.Request.Context(), requestMeta(c), c.Param("assistantID"))
+	writeResult(c, http.StatusOK, output, err)
+}
+
 // listUsers 返回企业成员列表。
 func (s *Service) listUsers(c *gin.Context) {
 	input, ok := bindUserListInputQuery(c)
@@ -1396,7 +1482,7 @@ func (s *Service) createAIProvider(c *gin.Context) {
 
 // updateAIProvider 修改模型服务供应商。
 func (s *Service) updateAIProvider(c *gin.Context) {
-	var input appservice.AIProviderInput
+	var input appservice.AIProviderUpdateInput
 	if !bindJSON(c, &input) {
 		return
 	}
@@ -1507,6 +1593,37 @@ func (s *Service) updateServiceTimeouts(c *gin.Context) {
 	writeResult(c, http.StatusOK, output, err)
 }
 
+// listServiceCategories 返回当前企业的咨询分类目录。
+func (s *Service) listServiceCategories(c *gin.Context) {
+	output, err := s.application.ListServiceCategories(c.Request.Context(), requestMeta(c))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// createServiceCategory 新增咨询分类。
+func (s *Service) createServiceCategory(c *gin.Context) {
+	var input appservice.ServiceCategoryInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.CreateServiceCategory(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusCreated, output, err)
+}
+
+// updateServiceCategory 修改咨询分类。
+func (s *Service) updateServiceCategory(c *gin.Context) {
+	var input appservice.ServiceCategoryInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	output, err := s.application.UpdateServiceCategory(c.Request.Context(), requestMeta(c), c.Param("categoryID"), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// deleteServiceCategory 删除咨询分类，历史记录保留分类名称。
+func (s *Service) deleteServiceCategory(c *gin.Context) {
+	writeEmpty(c, s.application.DeleteServiceCategory(c.Request.Context(), requestMeta(c), c.Param("categoryID")))
+}
+
 // registerDevice 注册当前用户的本机设备。
 func (s *Service) registerDevice(c *gin.Context) {
 	var input appservice.DeviceRegistrationInput
@@ -1544,25 +1661,24 @@ func (s *Service) listDeviceWorkspaces(c *gin.Context) {
 	writeResult(c, http.StatusOK, output, err)
 }
 
-// getConversationDeviceBinding 返回会话绑定的设备与工作区。
-func (s *Service) getConversationDeviceBinding(c *gin.Context) {
-	output, err := s.application.GetConversationDeviceBinding(c.Request.Context(), requestMeta(c), c.Param("conversationID"))
+// listConversationAssistantWorkspaces 返回会话中各位助理的绑定电脑与工作区。
+func (s *Service) listConversationAssistantWorkspaces(c *gin.Context) {
+	output, err := s.application.ListConversationAssistantWorkspaces(c.Request.Context(), requestMeta(c), c.Param("conversationID"))
 	writeResult(c, http.StatusOK, output, err)
 }
 
-// bindConversationDevice 把 AI 单聊绑定到本人设备上的工作区。
-func (s *Service) bindConversationDevice(c *gin.Context) {
-	var input appservice.ConversationDeviceBindingInput
+// setConversationAssistantWorkspace 由主人为会话中的助理指定工作区。
+func (s *Service) setConversationAssistantWorkspace(c *gin.Context) {
+	var input appservice.ConversationAssistantWorkspaceInput
 	if !bindJSON(c, &input) {
 		return
 	}
-	output, err := s.application.BindConversationDevice(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
-	writeResult(c, http.StatusOK, output, err)
+	writeEmpty(c, s.application.SetConversationAssistantWorkspace(c.Request.Context(), requestMeta(c), c.Param("conversationID"), c.Param("assistantIdentityID"), input))
 }
 
-// unbindConversationDevice 解除 AI 单聊的设备绑定。
-func (s *Service) unbindConversationDevice(c *gin.Context) {
-	writeEmpty(c, s.application.UnbindConversationDevice(c.Request.Context(), requestMeta(c), c.Param("conversationID")))
+// clearConversationAssistantWorkspace 由主人清除会话中助理的工作区。
+func (s *Service) clearConversationAssistantWorkspace(c *gin.Context) {
+	writeEmpty(c, s.application.ClearConversationAssistantWorkspace(c.Request.Context(), requestMeta(c), c.Param("conversationID"), c.Param("assistantIdentityID")))
 }
 
 // bindAgentListInputQuery 从查询参数解析 appservice.AgentListInput。

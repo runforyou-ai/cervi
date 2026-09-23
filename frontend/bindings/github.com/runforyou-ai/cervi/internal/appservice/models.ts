@@ -95,7 +95,7 @@ export enum AIProviderCredentialType {
 };
 
 /**
- * AIProviderInput 定义模型服务供应商可编辑字段。
+ * AIProviderInput 定义创建模型服务供应商的字段。
  */
 export interface AIProviderInput {
     "brand": AIProviderBrand;
@@ -150,6 +150,17 @@ export interface AIProviderSummary {
     "name": string;
     "apiUrl": string;
     "models": AIProviderModelSummary[] | null;
+}
+
+/**
+ * AIProviderUpdateInput 定义修改模型服务供应商的字段，品牌沿用创建时的值。
+ */
+export interface AIProviderUpdateInput {
+    "name": string;
+    "credentialType": AIProviderCredentialType;
+    "apiKey": string;
+    "apiUrl": string;
+    "models": AIProviderModel[] | null;
 }
 
 /**
@@ -225,7 +236,10 @@ export enum AgentHandoffReason {
      */
     $zero = "",
 
-    AgentHandoffReasonModelRequested = "model_requested",
+    AgentHandoffReasonKnowledgeGap = "knowledge_gap",
+    AgentHandoffReasonCustomerRequested = "customer_requested",
+    AgentHandoffReasonNeedsHumanJudgment = "needs_human_judgment",
+    AgentHandoffReasonComplaint = "complaint",
     AgentHandoffReasonInsufficientEvidence = "insufficient_evidence",
     AgentHandoffReasonBudgetExhausted = "budget_exhausted",
     AgentHandoffReasonInvalidOutput = "invalid_output",
@@ -243,6 +257,8 @@ export interface AgentInboxConversation {
     "agentName": string;
     "agentAvatarUrl": string;
     "agentStatus": UserStatus;
+    "agentType": OrganizationIdentityType;
+    "assistantPresence": AssistantPresence | null;
     "preview": string | null;
     "previewSenderIdentityType": OrganizationIdentityType | null;
     "lastMessageAt": string | null;
@@ -452,7 +468,87 @@ export enum AgentToolCallStatus {
 };
 
 /**
- * AttachmentMessageInput 定义已上传附件的发送意图，agentIdentityId 非空表示按 conversationId 草稿编号首发 AI 聊天，同时指定 customerConversationId 表示首发该客户会话的 Copilot 线程；首发 AI 聊天时 workspaceId 非空则同时绑定本人设备上的该工作区。
+ * Assistant 定义助理信息。
+ */
+export interface Assistant {
+    "id": string;
+    "identityId": string;
+    "displayName": string;
+    "avatarUrl": string;
+    "owner": AssistantOwner;
+    "device": AssistantDevice;
+    "status": UserStatus;
+    "presence": AssistantPresence;
+    "execution": AgentExecutionSummary;
+    "createdAt": string;
+}
+
+/**
+ * AssistantDetail 定义助理信息与当前完整执行配置。
+ */
+export interface AssistantDetail {
+    "assistant": Assistant;
+    "execution": AgentExecution;
+}
+
+/**
+ * AssistantDevice 定义助理绑定电脑的摘要。
+ */
+export interface AssistantDevice {
+    "id": string;
+    "name": string;
+}
+
+/**
+ * AssistantDeviceInput 定义助理要换到的电脑。
+ */
+export interface AssistantDeviceInput {
+    "deviceId": string;
+}
+
+/**
+ * AssistantInput 定义助理的资料与执行配置，avatarFileId 为空时保留当前头像。
+ */
+export interface AssistantInput {
+    "displayName": string;
+    "avatarFileId": string;
+    "execution": AgentManagedExecutionInput;
+}
+
+/**
+ * AssistantList 定义助理列表。
+ */
+export interface AssistantList {
+    "assistants": Assistant[] | null;
+}
+
+/**
+ * AssistantOwner 定义助理主人的摘要。
+ */
+export interface AssistantOwner {
+    "userId": string;
+    "identityId": string;
+    "displayName": string;
+}
+
+/**
+ * AssistantPresence 表示助理当前能否处理新请求。
+ */
+export enum AssistantPresence {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    AssistantPresenceOnline = "online",
+    AssistantPresenceOffline = "offline",
+    AssistantPresencePaused = "paused",
+    AssistantPresenceUnbound = "unbound",
+    AssistantPresenceInactive = "inactive",
+};
+
+/**
+ * AttachmentMessageInput 定义已上传附件的发送意图，agentIdentityId 非空表示按 conversationId 草稿编号首发 AI 聊天，同时指定 customerConversationId 表示首发该客户会话的 Copilot 线程；首发本人助理的聊天时 workspaceId 非空则同时为助理指定该工作区。
  */
 export interface AttachmentMessageInput {
     "conversationId": string;
@@ -769,10 +865,11 @@ export interface ConversationAgentRun {
 }
 
 /**
- * ConversationDeviceBinding 定义会话绑定的设备与工作区，Bound 为 false 时其余字段为空。
+ * ConversationAssistantWorkspace 定义会话中一位助理的绑定电脑与工作区，workspaceId 为空表示尚未指定。
  */
-export interface ConversationDeviceBinding {
-    "bound": boolean;
+export interface ConversationAssistantWorkspace {
+    "assistantIdentityId": string;
+    "ownerUserId": string;
     "deviceId": string;
     "deviceName": string;
     "workspaceId": string;
@@ -780,10 +877,17 @@ export interface ConversationDeviceBinding {
 }
 
 /**
- * ConversationDeviceBindingInput 定义会话要绑定的工作区。
+ * ConversationAssistantWorkspaceInput 定义为会话中的助理指定的工作区。
  */
-export interface ConversationDeviceBindingInput {
+export interface ConversationAssistantWorkspaceInput {
     "workspaceId": string;
+}
+
+/**
+ * ConversationAssistantWorkspaceList 定义会话中各位助理的工作区。
+ */
+export interface ConversationAssistantWorkspaceList {
+    "assistants": ConversationAssistantWorkspace[] | null;
 }
 
 /**
@@ -1041,7 +1145,7 @@ export interface ConversationSystemEvent {
     "title": string | null;
 
     /**
-     * 以下字段只由客服处理周期事件携带：原负责人、去向，转人工或退回队列的原因与成员可见的原因说明，以及关闭事件的结束方式；操作人写入 Actor。
+     * 以下字段只由客服处理周期事件携带：原负责人、去向，转人工或退回队列的原因与成员可见的原因说明，转人工时的咨询分类，以及关闭事件的结束方式；操作人写入 Actor。
      */
     "serviceSessionId": string | null;
     "fromIdentityId": string | null;
@@ -1051,6 +1155,7 @@ export interface ConversationSystemEvent {
     "returnReason": ServiceSessionReturnReason | null;
     "closeReason": ServiceSessionCloseReason | null;
     "reasonText": string | null;
+    "categoryName": string | null;
     "agentRunId": string | null;
 }
 
@@ -1150,6 +1255,16 @@ export interface CreateAgentInput {
     "handlesCustomers": boolean;
     "avatarFileId": string;
     "execution": AgentExecutionInput;
+}
+
+/**
+ * CreateAssistantInput 定义新建助理的资料、执行配置与要绑定的本机电脑，avatarFileId 为空时不设置头像。
+ */
+export interface CreateAssistantInput {
+    "displayName": string;
+    "avatarFileId": string;
+    "execution": AgentManagedExecutionInput;
+    "deviceId": string;
 }
 
 /**
@@ -1657,7 +1772,7 @@ export interface FileUploadRequest {
 }
 
 /**
- * FirstAgentTextMessageInput 定义 AI 草稿的稳定编号、目标和首条消息；workspaceId 非空时创建会话的同时绑定本人设备上的该工作区，首条消息即在本机执行。
+ * FirstAgentTextMessageInput 定义 AI 草稿的稳定编号、目标和首条消息；目标为本人助理且 workspaceId 非空时，创建会话的同时为助理指定该工作区。
  */
 export interface FirstAgentTextMessageInput {
     "conversationId": string;
@@ -2854,6 +2969,7 @@ export enum OrganizationIdentityType {
 
     OrganizationIdentityTypeUser = "user",
     OrganizationIdentityTypeAgent = "agent",
+    OrganizationIdentityTypeAssistant = "assistant",
 };
 
 /**
@@ -3055,6 +3171,34 @@ export enum ServiceAudience {
     ServiceAudienceEmployee = "employee",
     ServiceAudiencePartner = "partner",
 };
+
+/**
+ * ServiceCategory 定义咨询分类及其承接团队。
+ */
+export interface ServiceCategory {
+    "id": string;
+    "name": string;
+    "description": string;
+    "team": TeamSummary | null;
+    "createdAt": string;
+    "updatedAt": string;
+}
+
+/**
+ * ServiceCategoryInput 定义咨询分类可编辑字段；TeamID 为空表示转人工时按渠道失败路由。
+ */
+export interface ServiceCategoryInput {
+    "name": string;
+    "description": string;
+    "teamId": string | null;
+}
+
+/**
+ * ServiceCategoryList 定义企业咨询分类目录。
+ */
+export interface ServiceCategoryList {
+    "categories": ServiceCategory[] | null;
+}
 
 /**
  * ServiceQueueTeam 定义可作为客服队列的团队。

@@ -54,16 +54,17 @@ func terminalCall(callID, name, arguments string) *schema.FunctionToolCall {
 // TestCustomerTerminalDecisions 验证客服场景的终止工具、同批校验、参数纠正与额度用尽后的转人工。
 func TestCustomerTerminalDecisions(t *testing.T) {
 	askArgs := `{"purpose":"clarify","message":"请提供订单号"}`
-	handoffArgs := `{"reason":"客户要求退款"}`
+	handoffArgs := `{"reason":"needs_human_judgment","category":"退款","note":"客户要求退款"}`
 	for _, scenario := range []struct {
-		name        string
-		outputs     []func() *schema.AgenticMessage
-		lateInput   bool
-		wantKind    domain.AgentRunOutcome
-		wantReason  domain.AgentHandoffReason
-		wantContent string
-		wantCalls   int
-		wantHistory int
+		name         string
+		outputs      []func() *schema.AgenticMessage
+		lateInput    bool
+		wantKind     domain.AgentRunOutcome
+		wantReason   domain.AgentHandoffReason
+		wantCategory string
+		wantContent  string
+		wantCalls    int
+		wantHistory  int
 	}{
 		{name: "追问", outputs: []func() *schema.AgenticMessage{
 			func() *schema.AgenticMessage {
@@ -100,12 +101,25 @@ func TestCustomerTerminalDecisions(t *testing.T) {
 			func() *schema.AgenticMessage {
 				return assistantReply("", terminalCall("handoff", handoffToolName, handoffArgs))
 			},
-		}, wantKind: domain.AgentRunOutcomeHandoff, wantReason: domain.AgentHandoffReasonModelRequested, wantCalls: 1},
+		}, wantKind: domain.AgentRunOutcomeHandoff, wantReason: domain.AgentHandoffReasonNeedsHumanJudgment, wantCategory: "category-refund", wantCalls: 1},
+		{name: "未列出的咨询分类后纠正", outputs: []func() *schema.AgenticMessage{
+			func() *schema.AgenticMessage {
+				return assistantReply("", terminalCall("handoff", handoffToolName, `{"reason":"knowledge_gap","category":"物流","note":"查不到物流政策"}`))
+			},
+			func() *schema.AgenticMessage {
+				return assistantReply("", terminalCall("handoff-2", handoffToolName, `{"reason":"knowledge_gap","note":"查不到物流政策"}`))
+			},
+		}, wantKind: domain.AgentRunOutcomeHandoff, wantReason: domain.AgentHandoffReasonKnowledgeGap, wantCalls: 2},
+		{name: "咨询分类为 null 视为未选择", outputs: []func() *schema.AgenticMessage{
+			func() *schema.AgenticMessage {
+				return assistantReply("", terminalCall("handoff", handoffToolName, `{"reason":"complaint","category":null,"note":"客户投诉"}`))
+			},
+		}, wantKind: domain.AgentRunOutcomeHandoff, wantReason: domain.AgentHandoffReasonComplaint, wantCalls: 1},
 		{name: "转人工后到达新输入仍不降级", lateInput: true, outputs: []func() *schema.AgenticMessage{
 			func() *schema.AgenticMessage {
 				return assistantReply("", terminalCall("handoff", handoffToolName, handoffArgs))
 			},
-		}, wantKind: domain.AgentRunOutcomeHandoff, wantReason: domain.AgentHandoffReasonModelRequested, wantCalls: 1},
+		}, wantKind: domain.AgentRunOutcomeHandoff, wantReason: domain.AgentHandoffReasonNeedsHumanJudgment, wantCategory: "category-refund", wantCalls: 1},
 		{name: "追问与转人工同批后纠正", outputs: []func() *schema.AgenticMessage{
 			func() *schema.AgenticMessage {
 				return assistantReply("", terminalCall("ask", askCustomerToolName, askArgs), terminalCall("handoff", handoffToolName, handoffArgs))
@@ -125,9 +139,9 @@ func TestCustomerTerminalDecisions(t *testing.T) {
 				return assistantReply("", terminalCall("ask", askCustomerToolName, `{"purpose":"chat","message":""}`))
 			},
 			func() *schema.AgenticMessage {
-				return assistantReply("", terminalCall("handoff", handoffToolName, `{"reason":"无法确认"}`))
+				return assistantReply("", terminalCall("handoff", handoffToolName, `{"reason":"customer_requested","note":"客户要求真人"}`))
 			},
-		}, wantKind: domain.AgentRunOutcomeHandoff, wantReason: domain.AgentHandoffReasonModelRequested, wantContent: "", wantCalls: 2},
+		}, wantKind: domain.AgentRunOutcomeHandoff, wantReason: domain.AgentHandoffReasonCustomerRequested, wantContent: "", wantCalls: 2},
 		{name: "纠正额度用尽后转人工", outputs: []func() *schema.AgenticMessage{
 			func() *schema.AgenticMessage {
 				return assistantReply("", terminalCall("ask", askCustomerToolName, askArgs), terminalCall("handoff", handoffToolName, handoffArgs))
@@ -153,7 +167,8 @@ func TestCustomerTerminalDecisions(t *testing.T) {
 			historyCalls := 0
 			runtime := &EinoRuntime{newModel: func(context.Context, ModelConfig) (model.AgenticModel, error) { return chatModel, nil }}
 			result, err := runtime.Run(ctx, RunRequest{
-				RunID: "terminal-run", Assignment: Assignment{AgentName: "客服", Scene: SceneCustomer}, MaxIterations: 5, MaxTurns: 3,
+				RunID: "terminal-run", MaxIterations: 5, MaxTurns: 3,
+				Assignment: Assignment{AgentName: "客服", Scene: SceneCustomer, HandoffCategories: []HandoffCategory{{ID: "category-refund", Name: "退款", Description: "退款、退货"}}},
 				CustomerHistorySearch: func(context.Context, string) (CustomerHistoryResult, error) {
 					historyCalls++
 					return CustomerHistoryResult{}, nil
@@ -162,7 +177,7 @@ func TestCustomerTerminalDecisions(t *testing.T) {
 			if err != nil {
 				t.Fatal(err)
 			}
-			if result.Decision.Kind != scenario.wantKind || result.Decision.Reason != scenario.wantReason ||
+			if result.Decision.Kind != scenario.wantKind || result.Decision.Reason != scenario.wantReason || result.Decision.CategoryID != scenario.wantCategory ||
 				result.Content != scenario.wantContent || result.EndSeq != 1 {
 				t.Fatalf("result = %+v", result)
 			}
@@ -172,7 +187,7 @@ func TestCustomerTerminalDecisions(t *testing.T) {
 			if !slices.Contains(chatModel.tools[0], askCustomerToolName) || !slices.Contains(chatModel.tools[0], handoffToolName) {
 				t.Fatalf("customer tools = %v", chatModel.tools[0])
 			}
-			if scenario.wantKind == domain.AgentRunOutcomeHandoff && scenario.wantReason == domain.AgentHandoffReasonModelRequested &&
+			if scenario.wantKind == domain.AgentRunOutcomeHandoff && slices.Contains(domain.AgentHandoffBusinessReasons, scenario.wantReason) &&
 				result.Decision.ReasonText == "" {
 				t.Fatal("handoff reason text missing")
 			}

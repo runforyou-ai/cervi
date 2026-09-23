@@ -64,7 +64,7 @@ func TestDissolveGroupPreservesMembers(t *testing.T) {
 func TestDissolveDoesNotRestoreFormerMember(t *testing.T) {
 	f := newNavigationFixture(t)
 	ctx := context.Background()
-	leave := conversationaction.NewLeaveGroupConversationAction(f.db)
+	leave := conversationaction.NewLeaveGroupConversationAction(f.db, newGroupAgentCoordinator(f.db))
 	if err := leave.Execute(ctx, f.member, f.groupID); err != nil {
 		t.Fatal(err)
 	}

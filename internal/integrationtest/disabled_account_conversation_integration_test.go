@@ -12,7 +12,6 @@ import (
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	inboxaction "github.com/runforyou-ai/cervi/internal/actions/inbox"
-	useraction "github.com/runforyou-ai/cervi/internal/actions/user"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	servertask "github.com/runforyou-ai/cervi/internal/task/server"
@@ -98,7 +97,7 @@ func TestDisabledMemberDirectConversation(t *testing.T) {
 	if err != nil || before.Unread == 0 {
 		t.Fatalf("unread counts before disable=%+v %v", before, err)
 	}
-	updateStatus := useraction.NewUpdateStatusAction(f.db, testServiceSessionReturner(f.db))
+	updateStatus := testUserStatusAction(f.db)
 	if _, err := updateStatus.Execute(ctx, f.owner, f.member.User.ID, domain.UserStatusInactive); err != nil {
 		t.Fatal(err)
 	}

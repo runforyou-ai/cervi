@@ -10,6 +10,7 @@ import {
 } from "@/features/agents/agents-module-layout"
 import { MessageChannelFormPage } from "@/features/channels/message-channel-form-page"
 import { MessageChannelListPage } from "@/features/channels/message-channel-list-page"
+import { AssistantFormPage } from "@/features/contacts/assistants/assistant-form-page"
 import { ContactsPage } from "@/features/contacts/contacts-page"
 import { ChatRoute } from "@/features/inbox/chat-route"
 import { InboxRoute } from "@/features/inbox/inbox-route"
@@ -102,6 +103,26 @@ const workspaceRouteDefinitions = [
     element: <ContactsPage scope="external" />,
   },
   {
+    path: "/contacts/assistants",
+    element: <ContactsPage scope="assistants" />,
+  },
+  {
+    path: "/contacts/assistants/new",
+    element: (
+      <ContactsPage scope="assistants">
+        <AssistantFormPage mode="create" />
+      </ContactsPage>
+    ),
+  },
+  {
+    path: "/contacts/assistants/:assistantId",
+    element: (
+      <ContactsPage scope="assistants">
+        <AssistantFormPage mode="edit" />
+      </ContactsPage>
+    ),
+  },
+  {
     path: "/ai-employees",
     element: <AgentListPage />,
   },
@@ -178,74 +199,26 @@ const workspaceRouteDefinitions = [
     element: <MCPServerFormPage mode="edit" />,
   },
   {
-    path: "/settings/model-services/chat/new",
+    path: "/settings/model-services/new/:brand",
     element: (
       <SettingsPage section="modelServices">
-        <ModelProviderFormPage mode="create" returnSection="chat" />
+        <ModelProviderFormPage mode="create" />
       </SettingsPage>
     ),
   },
   {
-    path: "/settings/model-services/chat/:providerId",
+    path: "/settings/model-services/:providerId",
     element: (
       <SettingsPage section="modelServices">
-        <ModelProviderFormPage mode="edit" returnSection="chat" />
+        <ModelProviderFormPage mode="edit" />
       </SettingsPage>
     ),
   },
   {
-    path: "/settings/model-services/chat",
+    path: "/settings/model-services",
     element: (
       <SettingsPage section="modelServices">
-        <ModelProviderListPage section="chat" />
-      </SettingsPage>
-    ),
-  },
-  {
-    path: "/settings/model-services/embedding/new",
-    element: (
-      <SettingsPage section="modelServices">
-        <ModelProviderFormPage mode="create" returnSection="embedding" />
-      </SettingsPage>
-    ),
-  },
-  {
-    path: "/settings/model-services/embedding/:providerId",
-    element: (
-      <SettingsPage section="modelServices">
-        <ModelProviderFormPage mode="edit" returnSection="embedding" />
-      </SettingsPage>
-    ),
-  },
-  {
-    path: "/settings/model-services/embedding",
-    element: (
-      <SettingsPage section="modelServices">
-        <ModelProviderListPage section="embedding" />
-      </SettingsPage>
-    ),
-  },
-  {
-    path: "/settings/model-services/rerank/new",
-    element: (
-      <SettingsPage section="modelServices">
-        <ModelProviderFormPage mode="create" returnSection="rerank" />
-      </SettingsPage>
-    ),
-  },
-  {
-    path: "/settings/model-services/rerank/:providerId",
-    element: (
-      <SettingsPage section="modelServices">
-        <ModelProviderFormPage mode="edit" returnSection="rerank" />
-      </SettingsPage>
-    ),
-  },
-  {
-    path: "/settings/model-services/rerank",
-    element: (
-      <SettingsPage section="modelServices">
-        <ModelProviderListPage section="rerank" />
+        <ModelProviderListPage />
       </SettingsPage>
     ),
   },
@@ -290,7 +263,6 @@ const workspaceRouteObjects: RouteObject[] = [
 const workspaceRedirects: Readonly<Record<string, string>> = {
   "/settings": "/settings/profile",
   "/contacts": "/contacts/employees",
-  "/settings/model-services": "/settings/model-services/chat",
 }
 
 export type ResolvedWorkspaceLocation = {

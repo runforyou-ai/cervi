@@ -59,17 +59,3 @@ type DeviceWorkspace struct {
 type DeviceWorkspaceList struct {
 	Workspaces []DeviceWorkspace `json:"workspaces"`
 }
-
-// ConversationDeviceBindingInput 定义会话要绑定的工作区。
-type ConversationDeviceBindingInput struct {
-	WorkspaceID string `json:"workspaceId"`
-}
-
-// ConversationDeviceBinding 定义会话绑定的设备与工作区，Bound 为 false 时其余字段为空。
-type ConversationDeviceBinding struct {
-	Bound          bool   `json:"bound"`
-	DeviceID       string `json:"deviceId"`
-	DeviceName     string `json:"deviceName"`
-	WorkspaceID    string `json:"workspaceId"`
-	WorkspaceLabel string `json:"workspaceLabel"`
-}

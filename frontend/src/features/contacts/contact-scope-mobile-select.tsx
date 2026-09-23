@@ -27,6 +27,7 @@ export function ContactScopeMobileSelect({ scope }: { scope: ContactScope }) {
         <option value="employees">{t("scopes.employees")}</option>
         <option value="team">{t("scopes.teams")}</option>
         <option value="external">{t("scopes.external")}</option>
+        <option value="assistants">{t("scopes.assistants")}</option>
       </NativeSelect>
     </div>
   )

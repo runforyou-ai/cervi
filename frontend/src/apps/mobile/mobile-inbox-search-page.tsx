@@ -34,6 +34,7 @@ import {
   type InboxSearchType,
 } from "@/features/inbox/use-inbox-search"
 import { useRecentConversations } from "@/features/inbox/use-recent-conversations"
+import { isAIIdentityType } from "@/lib/identity-type"
 
 const searchTypes: InboxSearchType[] = ["all", "conversations", "messages", "people"]
 const searchGroupLimit = 6
@@ -183,7 +184,8 @@ function MobileSearchResults({
       <MobileSearchGroup title={t("searchGroupPeople")} count={search.people.length}>
         {search.people.map((person) => {
           const contact = person.kind === InboxSearchPersonKind.InboxSearchPersonContact
-          const agent = person.identityType === OrganizationIdentityType.OrganizationIdentityTypeAgent
+          const agent = isAIIdentityType(person.identityType)
+          const assistant = person.identityType === OrganizationIdentityType.OrganizationIdentityTypeAssistant
           return (
             <MobileSearchRow
               key={`${person.kind}-${person.id}`}
@@ -199,7 +201,7 @@ function MobileSearchResults({
               detail={
                 contact
                   ? t(person.conversationId ? "searchPersonContact" : "searchPersonNoConversation")
-                  : t(agent ? "contextIdentityAgent" : "contextIdentityMember")
+                  : t(assistant ? "contextIdentityAssistant" : agent ? "contextIdentityAgent" : "contextIdentityMember")
               }
               disabled={contact && !person.conversationId}
               onOpen={() => onOpenPerson(person)}
@@ -264,14 +266,18 @@ export function MobileInboxSearchPage() {
     })
   }
 
-  /** 打开人员结果：外部联系人进入客户会话，真人成员进入单聊，AI 员工开始新对话。 */
+  /** 打开人员结果：外部联系人进入客户会话，真人成员进入单聊，AI 员工与本人助理开始新对话。 */
   function openPerson(person: InboxSearchPersonData) {
     if (person.kind === InboxSearchPersonKind.InboxSearchPersonContact) {
       if (person.conversationId)
         void navigate(`/inbox/customer/${person.conversationId}`, { state: { mobileBack: true } })
     } else if (person.agentId) {
       void navigate(`/chats/agent/${crypto.randomUUID()}`, {
-        state: { draftAgentID: person.agentId, mobileBack: true },
+        state: {
+          draftAgentID: person.agentId,
+          draftAssistant: person.identityType === OrganizationIdentityType.OrganizationIdentityTypeAssistant,
+          mobileBack: true,
+        },
       })
     } else if (person.userId) {
       void navigate(`/contacts/employees/${person.userId}/chat`, { state: { mobileBack: true } })

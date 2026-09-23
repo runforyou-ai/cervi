@@ -45,13 +45,6 @@ export function AddTeamMembers(meta: $models.RequestMeta, teamID: string, input:
 }
 
 /**
- * BindConversationDevice 把 AI 单聊绑定到本人设备上的工作区。
- */
-export function BindConversationDevice(meta: $models.RequestMeta, conversationID: string, input: $models.ConversationDeviceBindingInput): $CancellablePromise<$models.ConversationDeviceBinding> {
-    return $Call.ByID(670517532, meta, conversationID, input);
-}
-
-/**
  * CancelFileUpload 将未发送的临时文件交给清理任务。
  */
 export function CancelFileUpload(meta: $models.RequestMeta, fileID: string): $CancellablePromise<void> {
@@ -77,6 +70,13 @@ export function CheckNotificationPermission(meta: $models.RequestMeta): $Cancell
  */
 export function ClaimServiceSession(meta: $models.RequestMeta, conversationID: string): $CancellablePromise<$models.CustomerServiceSession> {
     return $Call.ByID(104372695, meta, conversationID);
+}
+
+/**
+ * ClearConversationAssistantWorkspace 由主人清除会话中助理的工作区。
+ */
+export function ClearConversationAssistantWorkspace(meta: $models.RequestMeta, conversationID: string, assistantIdentityID: string): $CancellablePromise<void> {
+    return $Call.ByID(1143051713, meta, conversationID, assistantIdentityID);
 }
 
 /**
@@ -126,6 +126,13 @@ export function CreateAIProvider(meta: $models.RequestMeta, input: $models.AIPro
  */
 export function CreateAgent(meta: $models.RequestMeta, input: $models.CreateAgentInput): $CancellablePromise<$models.Agent> {
     return $Call.ByID(3052452131, meta, input);
+}
+
+/**
+ * CreateAssistant 在当前成员的电脑上创建助理。
+ */
+export function CreateAssistant(meta: $models.RequestMeta, input: $models.CreateAssistantInput): $CancellablePromise<$models.Assistant> {
+    return $Call.ByID(1835123138, meta, input);
 }
 
 /**
@@ -213,6 +220,13 @@ export function CreateRole(meta: $models.RequestMeta, input: $models.RoleInput):
 }
 
 /**
+ * CreateServiceCategory 新增咨询分类。
+ */
+export function CreateServiceCategory(meta: $models.RequestMeta, input: $models.ServiceCategoryInput): $CancellablePromise<$models.ServiceCategory> {
+    return $Call.ByID(3908878777, meta, input);
+}
+
+/**
  * CreateTeam 创建企业团队。
  */
 export function CreateTeam(meta: $models.RequestMeta, input: $models.TeamInput): $CancellablePromise<$models.Team> {
@@ -238,6 +252,13 @@ export function CurrentDevice(meta: $models.RequestMeta): $CancellablePromise<$m
  */
 export function DeactivateAgent(meta: $models.RequestMeta, agentID: string): $CancellablePromise<$models.Agent> {
     return $Call.ByID(2542842753, meta, agentID);
+}
+
+/**
+ * DeactivateAssistant 停用助理。
+ */
+export function DeactivateAssistant(meta: $models.RequestMeta, assistantID: string): $CancellablePromise<$models.Assistant> {
+    return $Call.ByID(3181648544, meta, assistantID);
 }
 
 /**
@@ -301,6 +322,13 @@ export function DeleteMCPServer(meta: $models.RequestMeta, mcpServerID: string):
  */
 export function DeleteRole(meta: $models.RequestMeta, roleID: string): $CancellablePromise<void> {
     return $Call.ByID(3214219121, meta, roleID);
+}
+
+/**
+ * DeleteServiceCategory 删除咨询分类，历史记录保留分类名称。
+ */
+export function DeleteServiceCategory(meta: $models.RequestMeta, categoryID: string): $CancellablePromise<void> {
+    return $Call.ByID(1999679124, meta, categoryID);
 }
 
 /**
@@ -374,6 +402,13 @@ export function GetAgentRunProcess(meta: $models.RequestMeta, runID: string): $C
 }
 
 /**
+ * GetAssistant 返回当前成员名下的助理详情。
+ */
+export function GetAssistant(meta: $models.RequestMeta, assistantID: string): $CancellablePromise<$models.AssistantDetail> {
+    return $Call.ByID(256912938, meta, assistantID);
+}
+
+/**
  * GetAttachmentDownload 签发当前成员可见消息附件的下载地址。
  */
 export function GetAttachmentDownload(meta: $models.RequestMeta, conversationID: string, messageID: string): $CancellablePromise<$models.FileDownload> {
@@ -392,13 +427,6 @@ export function GetBusinessHours(meta: $models.RequestMeta): $CancellablePromise
  */
 export function GetContact(meta: $models.RequestMeta, contactID: string): $CancellablePromise<$models.Contact> {
     return $Call.ByID(1550866366, meta, contactID);
-}
-
-/**
- * GetConversationDeviceBinding 返回会话绑定的设备与工作区。
- */
-export function GetConversationDeviceBinding(meta: $models.RequestMeta, conversationID: string): $CancellablePromise<$models.ConversationDeviceBinding> {
-    return $Call.ByID(1226354556, meta, conversationID);
 }
 
 /**
@@ -584,6 +612,13 @@ export function ListAgents(meta: $models.RequestMeta, input: $models.AgentListIn
 }
 
 /**
+ * ListAssistants 返回当前成员名下的助理。
+ */
+export function ListAssistants(meta: $models.RequestMeta): $CancellablePromise<$models.AssistantList> {
+    return $Call.ByID(1699852267, meta);
+}
+
+/**
  * ListAvailableAIModels 返回指定品牌的预设模型目录。
  */
 export function ListAvailableAIModels(meta: $models.RequestMeta, brand: $models.AIProviderBrand): $CancellablePromise<$models.AIProviderModelList> {
@@ -602,6 +637,13 @@ export function ListChannelOptions(meta: $models.RequestMeta): $CancellablePromi
  */
 export function ListContacts(meta: $models.RequestMeta, input: $models.ContactListInput): $CancellablePromise<$models.ContactList> {
     return $Call.ByID(1872706983, meta, input);
+}
+
+/**
+ * ListConversationAssistantWorkspaces 返回会话中各位助理的绑定电脑与工作区。
+ */
+export function ListConversationAssistantWorkspaces(meta: $models.RequestMeta, conversationID: string): $CancellablePromise<$models.ConversationAssistantWorkspaceList> {
+    return $Call.ByID(1473208141, meta, conversationID);
 }
 
 /**
@@ -710,6 +752,13 @@ export function ListMCPServers(meta: $models.RequestMeta): $CancellablePromise<$
 }
 
 /**
+ * ListMemberAssistants 返回指定成员名下的助理。
+ */
+export function ListMemberAssistants(meta: $models.RequestMeta, userID: string): $CancellablePromise<$models.AssistantList> {
+    return $Call.ByID(2987372113, meta, userID);
+}
+
+/**
  * ListMemberOptions 返回可分配的企业成员和 AI 员工。
  */
 export function ListMemberOptions(meta: $models.RequestMeta, input: $models.MemberOptionListInput): $CancellablePromise<$models.MemberOptionList> {
@@ -735,6 +784,13 @@ export function ListPendingConversationMentions(meta: $models.RequestMeta, conve
  */
 export function ListRoles(meta: $models.RequestMeta): $CancellablePromise<$models.RoleList> {
     return $Call.ByID(3773953103, meta);
+}
+
+/**
+ * ListServiceCategories 返回当前企业的咨询分类目录。
+ */
+export function ListServiceCategories(meta: $models.RequestMeta): $CancellablePromise<$models.ServiceCategoryList> {
+    return $Call.ByID(3774541533, meta);
 }
 
 /**
@@ -822,10 +878,24 @@ export function MarkConversationRead(meta: $models.RequestMeta, conversationID: 
 }
 
 /**
+ * MoveAssistant 把当前成员名下的助理换到指定电脑。
+ */
+export function MoveAssistant(meta: $models.RequestMeta, assistantID: string, input: $models.AssistantDeviceInput): $CancellablePromise<$models.Assistant> {
+    return $Call.ByID(1751145261, meta, assistantID, input);
+}
+
+/**
  * OpenConversationWindow 在桌面端独立窗口打开指定会话，同一会话已打开时聚焦现有窗口。
  */
 export function OpenConversationWindow(meta: $models.RequestMeta, input: $models.ConversationWindowInput): $CancellablePromise<void> {
     return $Call.ByID(1941707737, meta, input);
+}
+
+/**
+ * PauseAssistant 暂停当前成员名下的助理。
+ */
+export function PauseAssistant(meta: $models.RequestMeta, assistantID: string): $CancellablePromise<$models.Assistant> {
+    return $Call.ByID(716182148, meta, assistantID);
 }
 
 /**
@@ -847,6 +917,13 @@ export function ProbeServer(meta: $models.RequestMeta, serverURL: string): $Canc
  */
 export function ReactivateAgent(meta: $models.RequestMeta, agentID: string): $CancellablePromise<$models.Agent> {
     return $Call.ByID(2138582847, meta, agentID);
+}
+
+/**
+ * ReactivateAssistant 启用已停用的助理。
+ */
+export function ReactivateAssistant(meta: $models.RequestMeta, assistantID: string): $CancellablePromise<$models.Assistant> {
+    return $Call.ByID(1649631158, meta, assistantID);
 }
 
 /**
@@ -959,6 +1036,13 @@ export function ResolveCustomerMessageDelivery(meta: $models.RequestMeta, conver
  */
 export function RestoreContact(meta: $models.RequestMeta, contactID: string): $CancellablePromise<$models.Contact> {
     return $Call.ByID(468810132, meta, contactID);
+}
+
+/**
+ * ResumeAssistant 恢复当前成员名下已暂停的助理。
+ */
+export function ResumeAssistant(meta: $models.RequestMeta, assistantID: string): $CancellablePromise<$models.Assistant> {
+    return $Call.ByID(1089828191, meta, assistantID);
 }
 
 /**
@@ -1095,6 +1179,13 @@ export function ServerURL(meta: $models.RequestMeta): $CancellablePromise<string
 }
 
 /**
+ * SetConversationAssistantWorkspace 由主人为会话中的助理指定工作区。
+ */
+export function SetConversationAssistantWorkspace(meta: $models.RequestMeta, conversationID: string, assistantIdentityID: string, input: $models.ConversationAssistantWorkspaceInput): $CancellablePromise<void> {
+    return $Call.ByID(744899192, meta, conversationID, assistantIdentityID, input);
+}
+
+/**
  * StopAgentReply 停止独立 AI 会话中指定的回复并返回实际运行状态。
  */
 export function StopAgentReply(meta: $models.RequestMeta, conversationID: string, runID: string): $CancellablePromise<$models.AgentRunStatus> {
@@ -1158,16 +1249,9 @@ export function TransferServiceSession(meta: $models.RequestMeta, conversationID
 }
 
 /**
- * UnbindConversationDevice 解除 AI 单聊的设备绑定。
- */
-export function UnbindConversationDevice(meta: $models.RequestMeta, conversationID: string): $CancellablePromise<void> {
-    return $Call.ByID(290548279, meta, conversationID);
-}
-
-/**
  * UpdateAIProvider 修改模型服务供应商。
  */
-export function UpdateAIProvider(meta: $models.RequestMeta, providerID: string, input: $models.AIProviderInput): $CancellablePromise<$models.AIProvider> {
+export function UpdateAIProvider(meta: $models.RequestMeta, providerID: string, input: $models.AIProviderUpdateInput): $CancellablePromise<$models.AIProvider> {
     return $Call.ByID(3982600252, meta, providerID, input);
 }
 
@@ -1183,6 +1267,13 @@ export function UpdateAgent(meta: $models.RequestMeta, agentID: string, input: $
  */
 export function UpdateAgentExecution(meta: $models.RequestMeta, agentID: string, input: $models.UpdateAgentExecutionInput): $CancellablePromise<$models.Agent> {
     return $Call.ByID(3177846414, meta, agentID, input);
+}
+
+/**
+ * UpdateAssistant 修改当前成员名下的助理。
+ */
+export function UpdateAssistant(meta: $models.RequestMeta, assistantID: string, input: $models.AssistantInput): $CancellablePromise<$models.Assistant> {
+    return $Call.ByID(51035753, meta, assistantID, input);
 }
 
 /**
@@ -1288,6 +1379,13 @@ export function UpdateRole(meta: $models.RequestMeta, roleID: string, input: $mo
  */
 export function UpdateRoleAssignments(meta: $models.RequestMeta, input: $models.RoleAssignmentsInput): $CancellablePromise<void> {
     return $Call.ByID(2402672415, meta, input);
+}
+
+/**
+ * UpdateServiceCategory 修改咨询分类。
+ */
+export function UpdateServiceCategory(meta: $models.RequestMeta, categoryID: string, input: $models.ServiceCategoryInput): $CancellablePromise<$models.ServiceCategory> {
+    return $Call.ByID(314412950, meta, categoryID, input);
 }
 
 /**

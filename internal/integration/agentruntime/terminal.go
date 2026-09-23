@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"slices"
 	"strings"
 	"sync"
 
@@ -22,7 +23,7 @@ const (
 	resolveToolName     = "resolve_conversation"
 	// correctionLimit 是一次执行尝试内允许纠正无效终止输出或无依据正文的次数。
 	correctionLimit = 1
-	// handoffReasonTextMaxRunes 限制转交原因写入系统事件的长度。
+	// handoffReasonTextMaxRunes 限制转交说明写入系统事件的长度。
 	handoffReasonTextMaxRunes = 500
 )
 
@@ -31,7 +32,8 @@ type TerminalDecision struct {
 	Kind       domain.AgentRunOutcome
 	Purpose    domain.AgentAskCustomerPurpose // ask_customer 的发问用途。
 	Reason     domain.AgentHandoffReason      // handoff 的原因。
-	ReasonText string                         // handoff 时模型写明的转交原因，仅成员可见。
+	ReasonText string                         // handoff 时模型写明的转交说明，仅成员可见。
+	CategoryID string                         // handoff 时模型选择的咨询分类编号，未选择时为空。
 }
 
 // Outcome 返回决定对应的运行结果类型。
@@ -48,7 +50,9 @@ type askCustomerInput struct {
 }
 
 type handoffInput struct {
-	Reason string `json:"reason"`
+	Reason   domain.AgentHandoffReason `json:"reason"`
+	Category *string                   `json:"category"`
+	Note     string                    `json:"note"`
 }
 
 type resolveInput struct {
@@ -77,11 +81,49 @@ type terminalTools struct {
 	forced      *terminalIntent // 纠正额度或迭代预算用尽后由 Runtime 构造的转人工。
 	handoff     bool            // 本次执行已固定转人工决定。
 	budgetSpent func() bool     // 返回 true 表示当前规划已在迭代预算末端，无效输出不再纠正。
+	categories  []HandoffCategory
 }
 
-// newTerminalTools 创建一次执行尝试共用的终止工具状态。
-func newTerminalTools() *terminalTools {
-	return &terminalTools{intents: make(map[string]terminalIntent)}
+// newTerminalTools 创建一次执行尝试共用的终止工具状态，categories 是转人工时可选的咨询分类。
+func newTerminalTools(categories []HandoffCategory) *terminalTools {
+	return &terminalTools{intents: make(map[string]terminalIntent), categories: categories}
+}
+
+// handoffDescription 生成 handoff_to_human 的工具说明；企业没有咨询分类时不提及分类。
+func (t *terminalTools) handoffDescription() string {
+	if len(t.categories) == 0 {
+		return "把当前客户会话交给人工客服。reason 与 note 仅企业成员可见；系统会按承接结果通知客户。"
+	}
+	return "把当前客户会话交给人工客服。reason、category 与 note 仅企业成员可见；填写 category 时系统交给该分类的团队，并按承接结果通知客户。"
+}
+
+// handoffParams 生成 handoff_to_human 的参数定义；企业没有咨询分类时不提供 category。
+func (t *terminalTools) handoffParams() map[string]*schema.ParameterInfo {
+	reasons := make([]string, 0, len(domain.AgentHandoffBusinessReasons))
+	for _, reason := range domain.AgentHandoffBusinessReasons {
+		reasons = append(reasons, string(reason))
+	}
+	params := map[string]*schema.ParameterInfo{
+		"reason": {Type: schema.String, Required: true, Enum: reasons,
+			Desc: "knowledge_gap 资料中查不到答案，customer_requested 客户明确要求真人，needs_human_judgment 需要人工判断或决定（如退款赔偿、特殊处理），complaint 客户投诉"},
+		"note": {Type: schema.String, Required: true, Desc: "写给人工客服的转交说明：客户要什么、你已做了什么、卡在哪里"},
+	}
+	if len(t.categories) == 0 {
+		return params
+	}
+	names := make([]string, 0, len(t.categories))
+	lines := make([]string, 0, len(t.categories))
+	for _, category := range t.categories {
+		names = append(names, category.Name)
+		line := category.Name
+		if category.Description != "" {
+			line += "：" + category.Description
+		}
+		lines = append(lines, line)
+	}
+	params["category"] = &schema.ParameterInfo{Type: schema.String, Enum: names,
+		Desc: "客户咨询明确属于的分类，系统会交给该分类的团队；没有明确匹配的分类时不填。可选分类：\n" + strings.Join(lines, "\n")}
+	return params
 }
 
 // tools 返回 ask_customer、handoff_to_human 与 resolve_conversation 三个终止工具。
@@ -99,11 +141,9 @@ func (t *terminalTools) tools() []tool.BaseTool {
 			}),
 		}, run: t.askCustomer},
 		&terminalTool{info: &schema.ToolInfo{
-			Name: handoffToolName,
-			Desc: "把当前客户会话交给人工客服。reason 写明转交原因，仅企业成员可见；系统会按承接结果通知客户。",
-			ParamsOneOf: schema.NewParamsOneOfByParams(map[string]*schema.ParameterInfo{
-				"reason": {Type: schema.String, Required: true, Desc: "转交原因"},
-			}),
+			Name:        handoffToolName,
+			Desc:        t.handoffDescription(),
+			ParamsOneOf: schema.NewParamsOneOfByParams(t.handoffParams()),
 		}, run: t.handoffToHuman},
 		&terminalTool{info: &schema.ToolInfo{
 			Name: resolveToolName,
@@ -141,15 +181,28 @@ func (t *terminalTools) handoffToHuman(ctx context.Context, arguments string) er
 	if err := json.Unmarshal([]byte(arguments), &input); err != nil {
 		return fmt.Errorf("参数不是有效的 JSON：%w", err)
 	}
-	reason := []rune(strings.TrimSpace(input.Reason))
-	if len(reason) == 0 {
-		return errors.New("reason 不能为空")
+	if !slices.Contains(domain.AgentHandoffBusinessReasons, input.Reason) {
+		return errors.New("reason 只能是 knowledge_gap、customer_requested、needs_human_judgment 或 complaint")
 	}
-	if len(reason) > handoffReasonTextMaxRunes {
-		reason = reason[:handoffReasonTextMaxRunes]
+	// 咨询分类只接受本次提供的分类名称并换成分类编号，null 或空值表示没有匹配的分类。
+	categoryID := ""
+	if input.Category != nil && strings.TrimSpace(*input.Category) != "" {
+		name := strings.TrimSpace(*input.Category)
+		index := slices.IndexFunc(t.categories, func(category HandoffCategory) bool { return category.Name == name })
+		if index < 0 {
+			return errors.New("category 只能是参数说明中列出的分类名称，没有匹配的分类时不填")
+		}
+		categoryID = t.categories[index].ID
+	}
+	note := []rune(strings.TrimSpace(input.Note))
+	if len(note) == 0 {
+		return errors.New("note 不能为空")
+	}
+	if len(note) > handoffReasonTextMaxRunes {
+		note = note[:handoffReasonTextMaxRunes]
 	}
 	t.record(ctx, terminalIntent{decision: TerminalDecision{
-		Kind: domain.AgentRunOutcomeHandoff, Reason: domain.AgentHandoffReasonModelRequested, ReasonText: string(reason),
+		Kind: domain.AgentRunOutcomeHandoff, Reason: input.Reason, ReasonText: string(note), CategoryID: categoryID,
 	}})
 	return nil
 }

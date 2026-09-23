@@ -142,7 +142,7 @@ func TestInboxSearch(t *testing.T) {
 		t.Fatalf("不可读会话 err=%v", err)
 	}
 
-	if err := conversationaction.NewLeaveGroupConversationAction(f.db).Execute(ctx, f.member, f.groupID); err != nil {
+	if err := conversationaction.NewLeaveGroupConversationAction(f.db, newGroupAgentCoordinator(f.db)).Execute(ctx, f.member, f.groupID); err != nil {
 		t.Fatal(err)
 	}
 	if left := search(f.member, inboxaction.SearchInput{Text: "changchun", Range: inboxaction.SearchRangeReadable}); len(left.Messages) != 0 {

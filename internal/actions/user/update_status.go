@@ -19,18 +19,25 @@ import (
 	"github.com/uptrace/bun"
 )
 
+// AssistantRetirer 在停用成员的事务中停用其名下助理并移出所有群聊。
+type AssistantRetirer interface {
+	RetireOwnedAssistants(ctx context.Context, tx bun.Tx, actor *servermodels.Identity, ownerUserID string) ([]string, error)
+	CancelRunContexts([]string)
+}
+
 // UpdateStatusAction 修改用户账号状态。
 type UpdateStatusAction struct {
 	db       *bun.DB
 	returner ServiceSessionReturner
+	retirer  AssistantRetirer
 }
 
 // NewUpdateStatusAction 创建用户账号状态修改操作。
-func NewUpdateStatusAction(db *bun.DB, returner ServiceSessionReturner) *UpdateStatusAction {
-	return &UpdateStatusAction{db: db, returner: returner}
+func NewUpdateStatusAction(db *bun.DB, returner ServiceSessionReturner, retirer AssistantRetirer) *UpdateStatusAction {
+	return &UpdateStatusAction{db: db, returner: returner, retirer: retirer}
 }
 
-// Execute 禁用或恢复用户账号，并在禁用时清理渠道分配、把其负责的开放客服周期退回原队列。
+// Execute 禁用或恢复用户账号，并在禁用时清理渠道分配、把其负责的开放客服周期退回原队列、停用其名下助理；恢复时助理保持停用。
 func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels.Identity, userID string, status domain.UserStatus) (*User, error) {
 	if !common.ValidUUID(userID) {
 		return nil, ErrNotFound
@@ -39,7 +46,7 @@ func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels
 		return nil, &ValidationError{Fields: map[string]ValidationCode{"status": ValidationStatusInvalid}}
 	}
 	var output *User
-	var cancelledRunIDs []string
+	var cancelledRunIDs, retiredRunIDs []string
 	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
@@ -79,6 +86,9 @@ func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels
 			if err != nil {
 				return err
 			}
+			if retiredRunIDs, err = a.retirer.RetireOwnedAssistants(ctx, tx, identity, userID); err != nil {
+				return err
+			}
 			// 提交后通知 Gateway 关闭该用户的全部实时连接。
 			realtime.Notify(ctx, realtime.UserDisabled(identity.Organization.ID, userID))
 		}
@@ -98,5 +108,6 @@ func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels
 		return nil, fmt.Errorf("update user status: %w", err)
 	}
 	a.returner.CancelRunContexts(cancelledRunIDs)
+	a.retirer.CancelRunContexts(retiredRunIDs)
 	return output, nil
 }

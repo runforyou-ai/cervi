@@ -14,9 +14,12 @@ export function contactResourceKeys(kind: "user" | "agent", id?: string) {
     resourceKeys.customerServiceAssignees(),
     resourceKeys.serviceQueueTeams(),
     resourceKeys.memberOptions(),
+    resourceKeys.chatTargets(),
   ]
   // AI 员工的名称、状态和知识库绑定变化后刷新知识库的员工列表。
   if (kind === "agent") keys.push(resourceKeys.knowledgeBaseAgents())
+  // 成员停用时其名下助理随之停用。
+  if (kind === "user") keys.push(resourceKeys.memberAssistants(), resourceKeys.assistants())
   if (id) keys.push(kind === "user" ? resourceKeys.user(id) : resourceKeys.agent(id))
   return keys
 }

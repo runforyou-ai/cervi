@@ -14,7 +14,7 @@ import {
   ChannelType,
   OrganizationIdentityType,
   listCustomerServiceAssignees,
-  listTeams,
+  listAllTeams,
   type ChannelRoutingTarget,
   type InboxAssignee,
   type Team,
@@ -26,8 +26,6 @@ import { NativeSelect } from "@/components/ui/native-select"
 import type { ChannelReceptionSettingsFormValues } from "@/features/channels/reception/channel-reception-schema"
 
 type ReceptionTargetName = keyof ChannelReceptionSettingsFormValues
-
-const receptionOptionPageSize = 100
 
 const routingChoices = [
   ChannelRoutingTargetType.ChannelRoutingTargetTypePublicQueue,
@@ -159,22 +157,7 @@ export function ChannelReceptionSettingsFields<
     resourceKeys.channelReceptionOptions(),
     async () => {
       const [teams, assignees] = await Promise.all([
-        (async () => {
-          // 分页读取全部团队接待候选项。
-          const teams: Team[] = []
-          let page = 1
-          let pages = 1
-          do {
-            const output = await listTeams({
-              page,
-              pageSize: receptionOptionPageSize,
-            })
-            teams.push(...output.teams)
-            pages = Math.ceil(output.page.total / receptionOptionPageSize)
-            page += 1
-          } while (page <= pages)
-          return teams
-        })(),
+        listAllTeams(),
         listCustomerServiceAssignees(),
       ])
       return { teams, assignees }

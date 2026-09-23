@@ -8,6 +8,7 @@ import (
 	"log/slog"
 
 	customerserviceaction "github.com/runforyou-ai/cervi/internal/actions/customerservice"
+	servicecategoryaction "github.com/runforyou-ai/cervi/internal/actions/servicecategory"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	cervii18n "github.com/runforyou-ai/cervi/internal/i18n"
@@ -21,6 +22,10 @@ type customerServiceOps struct {
 	updateBusinessHours   *customerserviceaction.UpdateBusinessHoursAction
 	getServiceTimeouts    *customerserviceaction.GetServiceTimeoutsQuery
 	updateServiceTimeouts *customerserviceaction.UpdateServiceTimeoutsAction
+	listCategories        *servicecategoryaction.ListQuery
+	createCategory        *servicecategoryaction.CreateAction
+	updateCategory        *servicecategoryaction.UpdateAction
+	archiveCategory       *servicecategoryaction.ArchiveAction
 }
 
 // newCustomerServiceOps 创建企业客服设置的业务实现依赖。
@@ -30,6 +35,10 @@ func newCustomerServiceOps(db *bun.DB) customerServiceOps {
 		updateBusinessHours:   customerserviceaction.NewUpdateBusinessHoursAction(db),
 		getServiceTimeouts:    customerserviceaction.NewGetServiceTimeoutsQuery(db),
 		updateServiceTimeouts: customerserviceaction.NewUpdateServiceTimeoutsAction(db),
+		listCategories:        servicecategoryaction.NewListQuery(db),
+		createCategory:        servicecategoryaction.NewCreateAction(db),
+		updateCategory:        servicecategoryaction.NewUpdateAction(db),
+		archiveCategory:       servicecategoryaction.NewArchiveAction(db),
 	}
 }
 
@@ -121,6 +130,86 @@ func (o *directOperations) UpdateServiceTimeouts(ctx context.Context, meta Reque
 		"response_reminder_minutes", saved.ResponseReminderMinutes, "response_reclaim_minutes", saved.ResponseReclaimMinutes,
 		"queue_reminder_minutes", saved.QueueReminderMinutes, "ai_follow_up_minutes", saved.AIFollowUpMinutes, "ai_close_minutes", saved.AICloseMinutes)
 	return ServiceTimeouts(saved), nil
+}
+
+// ListServiceCategories 返回当前企业的咨询分类目录。
+func (o *directOperations) ListServiceCategories(ctx context.Context, meta RequestMeta, identity *servermodels.Identity) (ServiceCategoryList, error) {
+	records, err := o.listCategories.Execute(ctx, identity)
+	if err != nil {
+		return ServiceCategoryList{}, serviceCategoryError(ctx, meta, err, cervii18n.ErrorServiceCategoryListFailed, identity.Organization.ID, "")
+	}
+	categories := make([]ServiceCategory, 0, len(records))
+	for _, record := range records {
+		categories = append(categories, serviceCategoryFromAction(record))
+	}
+	return ServiceCategoryList{Categories: categories}, nil
+}
+
+// CreateServiceCategory 新增咨询分类。
+func (o *directOperations) CreateServiceCategory(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input ServiceCategoryInput) (ServiceCategory, error) {
+	record, err := o.createCategory.Execute(ctx, identity, servicecategoryaction.Input{Name: input.Name, Description: input.Description, TeamID: input.TeamID})
+	if err != nil {
+		return ServiceCategory{}, serviceCategoryError(ctx, meta, err, cervii18n.ErrorServiceCategoryCreateFailed, identity.Organization.ID, "")
+	}
+	slog.Info("咨询分类已新增", "organization_id", identity.Organization.ID, "service_category_id", record.ID)
+	return serviceCategoryFromAction(*record), nil
+}
+
+// UpdateServiceCategory 修改咨询分类。
+func (o *directOperations) UpdateServiceCategory(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, categoryID string, input ServiceCategoryInput) (ServiceCategory, error) {
+	record, err := o.updateCategory.Execute(ctx, identity, categoryID, servicecategoryaction.Input{Name: input.Name, Description: input.Description, TeamID: input.TeamID})
+	if err != nil {
+		return ServiceCategory{}, serviceCategoryError(ctx, meta, err, cervii18n.ErrorServiceCategoryUpdateFailed, identity.Organization.ID, categoryID)
+	}
+	slog.Info("咨询分类已更新", "organization_id", identity.Organization.ID, "service_category_id", categoryID)
+	return serviceCategoryFromAction(*record), nil
+}
+
+// DeleteServiceCategory 归档咨询分类。
+func (o *directOperations) DeleteServiceCategory(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, categoryID string) error {
+	if err := o.archiveCategory.Execute(ctx, identity, categoryID); err != nil {
+		return serviceCategoryError(ctx, meta, err, cervii18n.ErrorServiceCategoryDeleteFailed, identity.Organization.ID, categoryID)
+	}
+	slog.Info("咨询分类已删除", "organization_id", identity.Organization.ID, "service_category_id", categoryID)
+	return nil
+}
+
+// serviceCategoryError 把咨询分类操作错误转换为结构化、本地化错误。
+func serviceCategoryError(ctx context.Context, meta RequestMeta, err error, failureKey cervii18n.Key, organizationID, categoryID string) error {
+	if ctx.Err() != nil {
+		return ctx.Err()
+	}
+	if validationError, ok := errors.AsType[*common.FieldError](err); ok {
+		// 把咨询分类校验错误码映射为本地化文案键。
+		keys := map[common.FieldCode]cervii18n.Key{
+			servicecategoryaction.ValidationNameRequired:       cervii18n.FieldServiceCategoryNameRequired,
+			servicecategoryaction.ValidationNameTooLong:        cervii18n.FieldServiceCategoryNameTooLong,
+			servicecategoryaction.ValidationNameDuplicate:      cervii18n.FieldServiceCategoryNameDuplicate,
+			servicecategoryaction.ValidationDescriptionTooLong: cervii18n.FieldServiceCategoryDescTooLong,
+			servicecategoryaction.ValidationTeamInvalid:        cervii18n.FieldTeamInvalid,
+		}
+		return InvalidError(meta, cervii18n.ErrorValidationFailed, translateValidationFields(validationError.Fields, keys))
+	}
+	if errors.Is(err, common.ErrIdentityInvalid) {
+		return SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+	}
+	if errors.Is(err, servicecategoryaction.ErrNotFound) {
+		return NotFoundError(meta, cervii18n.ErrorServiceCategoryNotFound)
+	}
+	if errors.Is(err, servicecategoryaction.ErrLimitReached) {
+		return InvalidError(meta, cervii18n.ErrorServiceCategoryLimitReached, nil)
+	}
+	slog.Warn("咨询分类操作失败", "organization_id", organizationID, "service_category_id", categoryID, "failure", failureKey, "error", err)
+	return FailedError(meta, failureKey)
+}
+
+// serviceCategoryFromAction 转换咨询分类契约。
+func serviceCategoryFromAction(record servicecategoryaction.Record) ServiceCategory {
+	category := ServiceCategory{ID: record.ID, Name: record.Name, Description: record.Description, CreatedAt: record.CreatedAt, UpdatedAt: record.UpdatedAt}
+	if record.TeamID != nil && record.TeamName != nil {
+		category.Team = &TeamSummary{ID: *record.TeamID, Name: *record.TeamName}
+	}
+	return category
 }
 
 // businessHoursFromDomain 把领域工作时间转换为传输结构。

@@ -237,7 +237,7 @@ func testAgentConversations(t *testing.T, db *bun.DB, identity *servermodels.Ide
 		testAgentRunNotifications(t, db, identity, agent.IdentityID, tasks)
 	})
 	t.Run("本机设备执行", func(t *testing.T) {
-		testDeviceAgentRuns(t, db, identity, agent.IdentityID, tasks)
+		testDeviceAgentRuns(t, db, identity, agent, tasks)
 	})
 }
 

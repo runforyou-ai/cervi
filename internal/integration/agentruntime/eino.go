@@ -66,7 +66,7 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 	var terminal *terminalTools
 	var gate *groundingGate
 	if request.Assignment.Scene == SceneCustomer {
-		terminal = newTerminalTools()
+		terminal = newTerminalTools(request.Assignment.HandoffCategories)
 		if request.Assignment.Grounding == GroundingStrict {
 			judges := make(map[string]evidenceJudge)
 			if request.KnowledgeSearch != nil {

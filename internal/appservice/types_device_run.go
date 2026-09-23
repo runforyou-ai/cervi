@@ -7,7 +7,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
-// DeviceWorkRun 定义设备待领取运行的摘要。
+// DeviceWorkRun 定义设备待领取运行的摘要，workspaceId 为空表示运行不使用本机工作区。
 type DeviceWorkRun struct {
 	RunID          string `json:"runId"`
 	ConversationID string `json:"conversationId"`

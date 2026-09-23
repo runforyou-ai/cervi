@@ -30,6 +30,7 @@ import { Input } from "@/components/ui/input"
 import { GroupMemberPickerDialog } from "@/features/inbox/group-member-picker-dialog"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
+import { isAIIdentityType } from "@/lib/identity-type"
 
 /** 展示群聊成员头像。 */
 function GroupParticipantAvatar({
@@ -41,11 +42,7 @@ function GroupParticipantAvatar({
     <ProfileAvatar
       imageURL={participant.avatarUrl}
       name={participant.displayName}
-      fallback={
-        participant.identityType === OrganizationIdentityType.OrganizationIdentityTypeAgent
-          ? "agent"
-          : "person"
-      }
+      fallback={isAIIdentityType(participant.identityType) ? "agent" : "person"}
       className="size-9"
     />
   )
@@ -218,8 +215,10 @@ export function GroupParticipantList({
                       </span>
                     ) : null}
                   </span>
-                  {participant.identityType === OrganizationIdentityType.OrganizationIdentityTypeAgent ? (
-                    <span className="shrink-0 text-xs text-muted-foreground">{t("groupAgent")}</span>
+                  {isAIIdentityType(participant.identityType) ? (
+                    <span className="shrink-0 text-xs text-muted-foreground">
+                      {t(participant.identityType === OrganizationIdentityType.OrganizationIdentityTypeAssistant ? "groupAssistant" : "groupAgent")}
+                    </span>
                   ) : null}
                   {isOwner ? (
                     <span className="inline-flex shrink-0 items-center gap-1 text-xs text-muted-foreground">

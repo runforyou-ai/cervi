@@ -148,7 +148,7 @@ func loadGroupAgentRevision(ctx context.Context, db bun.IDB, organizationID, con
 		Where("a.organization_id = ?", organizationID).
 		Where("a.identity_id = ?", agentIdentityID)
 	if requireActive {
-		query = query.Where("a.status = ?", domain.UserStatusActive)
+		query = query.Where("a.status = ? AND a.paused_at IS NULL", domain.UserStatusActive)
 	}
 	err := query.Scan(ctx, &revisionID)
 	if errors.Is(err, sql.ErrNoRows) {
@@ -165,7 +165,7 @@ type groupMessageRow struct {
 	Body             string  `bun:"body"`
 	SenderSourceID   string  `bun:"sender_source_id"`
 	SenderName       string  `bun:"sender_name"`
-	SenderIsAgent    bool    `bun:"sender_is_agent"`
+	SenderType       string  `bun:"sender_type"`
 	MentionAll       bool    `bun:"mention_all"`
 	ReplyToMessageID *string `bun:"reply_to_message_id"`
 	ReplyBody        string  `bun:"reply_body"`
@@ -200,7 +200,7 @@ func loadClaimedGroupMessages(ctx context.Context, db bun.IDB, run *servermodels
 		ColumnExpr("msg.id, msg.body").
 		ColumnExpr("cs.source_id AS sender_source_id").
 		ColumnExpr("oi.display_name AS sender_name").
-		ColumnExpr("oi.type = ? AS sender_is_agent", domain.OrganizationIdentityTypeAgent).
+		ColumnExpr("oi.type AS sender_type").
 		ColumnExpr("msg.mention_all").
 		ColumnExpr("msg.reply_to_message_id").
 		ColumnExpr("? AS reply_body", messagequery.Summary("reply")).
@@ -244,15 +244,12 @@ func loadClaimedGroupMessages(ctx context.Context, db bun.IDB, run *servermodels
 			continue
 		}
 		envelope := groupMessageEnvelope{
-			Sender:         groupMessageSender{Name: row.SenderName, Kind: string(domain.OrganizationIdentityTypeUser)},
+			Sender:         groupMessageSender{Name: row.SenderName, Kind: row.SenderType},
 			Body:           row.Body,
 			Mentions:       mentions[row.ID],
 			MentionAll:     row.MentionAll,
 			AddressedToYou: addressed[row.ID],
 			Attachment:     row.attachment(row.ID, links),
-		}
-		if row.SenderIsAgent {
-			envelope.Sender.Kind = string(domain.OrganizationIdentityTypeAgent)
 		}
 		if row.ReplyToMessageID != nil {
 			reference := claimedMessageReference{MessageID: *row.ReplyToMessageID, Deleted: row.ReplyDeleted}
@@ -349,7 +346,7 @@ func (p groupMentionRunPolicy) applyMentions(ctx context.Context, db bun.IDB, po
 	}
 	ordinal := 0
 	for _, target := range targets {
-		if target.IdentityType != string(domain.OrganizationIdentityTypeAgent) {
+		if !domain.OrganizationIdentityTypeIsAI(domain.OrganizationIdentityType(target.IdentityType)) {
 			continue
 		}
 		revisionID, eligible, err := loadGroupAgentRevision(ctx, db, run.OrganizationID, run.ConversationID, target.IdentityID, true)

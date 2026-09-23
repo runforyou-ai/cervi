@@ -104,6 +104,17 @@ export function listTeams(query: TeamListQuery = {}, signal?: AbortSignal) {
   )
 }
 
+/** 分页读取企业全部团队，供路由目标等选择项使用。 */
+export async function listAllTeams() {
+  const pageSize = 100
+  const output = await listTeams({ page: 1, pageSize })
+  const teams = [...output.teams]
+  for (let page = 2; page <= Math.ceil(output.page.total / pageSize); page += 1) {
+    teams.push(...(await listTeams({ page, pageSize })).teams)
+  }
+  return teams
+}
+
 /** 读取可分配的企业成员和 AI 员工。 */
 export function listMemberOptions(
   query: MemberOptionListQuery = {},

@@ -14,6 +14,7 @@ import (
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	"github.com/runforyou-ai/cervi/internal/actions/serviceassignment"
+	"github.com/runforyou-ai/cervi/internal/actions/servicecategory"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/realtime"
@@ -36,6 +37,7 @@ type customerHandoff struct {
 	EventKey        string                    // 转人工系统事件的幂等键。
 	Reason          domain.AgentHandoffReason
 	ReasonText      string
+	Category        *servermodels.ServiceCategory // AI 选择的咨询分类，为空表示未选择或系统转交。
 	AgentRunID      *string
 }
 
@@ -68,9 +70,13 @@ func applyCustomerHandoff(ctx context.Context, db bun.IDB, enqueuer servertask.T
 	if len(reasonText) > handoffReasonTextMaxRunes {
 		reasonText = reasonText[:handoffReasonTextMaxRunes]
 	}
+	var categoryID, categoryName *string
+	if handoff.Category != nil {
+		categoryID, categoryName = &handoff.Category.ID, &handoff.Category.Name
+	}
 	payload, err := json.Marshal(domain.ServiceSessionHandedOffEvent{
 		ServiceSessionID: session.ID, FromIdentityID: handoff.AgentIdentityID, FromDisplayName: agentName,
-		Target: target, Reason: handoff.Reason, ReasonText: string(reasonText), AgentRunID: handoff.AgentRunID,
+		Target: target, Reason: handoff.Reason, ReasonText: string(reasonText), CategoryName: categoryName, AgentRunID: handoff.AgentRunID,
 	})
 	if err != nil {
 		return nil, fmt.Errorf("encode service session handoff event: %w", err)
@@ -92,7 +98,7 @@ func applyCustomerHandoff(ctx context.Context, db bun.IDB, enqueuer servertask.T
 	if err != nil {
 		return nil, fmt.Errorf("append customer handoff notice: %w", err)
 	}
-	// 客户等待起点记为交接时间，由真人承接回复。
+	// 客户等待起点记为交接时间，由真人承接回复；AI 选择了咨询分类时记到周期上。
 	update := db.NewUpdate().Model(session).
 		Set("assignee_identity_id = ?", assigneeID).
 		Set("team_id = ?", handoff.Route.TeamID).
@@ -100,6 +106,10 @@ func applyCustomerHandoff(ctx context.Context, db bun.IDB, enqueuer servertask.T
 		Set("reminded_at = NULL").
 		Set("updated_at = now()").
 		WherePK().Where("organization_id = ?", session.OrganizationID)
+	if categoryID != nil {
+		update = update.Set("category_id = ?", *categoryID)
+		session.CategoryID = categoryID
+	}
 	if assigneeID != nil {
 		update = update.Set("assigned_at = COALESCE(assigned_at, ?)", now).Set("assignee_assigned_at = ?", now).Set("queued_at = NULL")
 	} else {
@@ -115,7 +125,7 @@ func applyCustomerHandoff(ctx context.Context, db bun.IDB, enqueuer servertask.T
 	slog.Info("客户会话已由 AI 员工转交人工",
 		"organization_id", session.OrganizationID, "conversation_id", session.ConversationID,
 		"service_session_id", session.ID, "agent_identity_id", handoff.AgentIdentityID,
-		"target_kind", target.Kind, "reason", handoff.Reason)
+		"target_kind", target.Kind, "reason", handoff.Reason, "category_id", categoryID)
 	return message, nil
 }
 
@@ -137,18 +147,37 @@ func notifyHandoffAssignee(ctx context.Context, db bun.IDB, session *servermodel
 	return nil
 }
 
-// resolveCustomerHandoffRoute 在进入会话锁之前读取客户会话所属渠道并解析转人工去向，目标身份取 FOR KEY SHARE；去向为队列时挑选并锁定可分配成员。
-func resolveCustomerHandoffRoute(ctx context.Context, db bun.IDB, organizationID, conversationID string) (*servermodels.Channel, chatstate.RouteSnapshot, *serviceassignment.Member, error) {
+// customerHandoffRoute 是进入会话锁之前解析出的转人工去向。
+type customerHandoffRoute struct {
+	Channel  *servermodels.Channel
+	Route    chatstate.RouteSnapshot
+	Member   *serviceassignment.Member     // 去向为队列时挑选并锁定的可分配成员。
+	Category *servermodels.ServiceCategory // 按编号复核仍未归档的咨询分类。
+}
+
+// resolveCustomerHandoffRoute 在进入会话锁之前读取客户会话所属渠道与 AI 选择的咨询分类并解析转人工去向，目标身份与团队取 FOR KEY SHARE；categoryID 为空表示未选择分类。
+func resolveCustomerHandoffRoute(ctx context.Context, db bun.IDB, organizationID, conversationID, categoryID string) (customerHandoffRoute, error) {
+	resolved := customerHandoffRoute{}
 	channel, err := chatstate.LoadConversationChannel(ctx, db, organizationID, conversationID)
 	if err != nil {
-		return nil, chatstate.RouteSnapshot{}, nil, err
+		return resolved, err
 	}
-	route, err := chatstate.ResolveHandoffRoute(ctx, db, channel, true)
-	if err != nil || route.AssigneeIdentityID != nil {
-		return channel, route, nil, err
+	resolved.Channel = channel
+	// 分类在模型选择后被归档时按未选择分类处理。
+	var categoryTeamID *string
+	if categoryID != "" {
+		if resolved.Category, err = servicecategory.FindActive(ctx, db, organizationID, categoryID); err != nil {
+			return resolved, err
+		}
+		if resolved.Category != nil {
+			categoryTeamID = resolved.Category.TeamID
+		}
 	}
-	member, err := serviceassignment.LockQueueMember(ctx, db, organizationID, route.TeamID, "")
-	return channel, route, member, err
+	if resolved.Route, err = chatstate.ResolveHandoffRoute(ctx, db, channel, categoryTeamID, true); err != nil || resolved.Route.AssigneeIdentityID != nil {
+		return resolved, err
+	}
+	resolved.Member, err = serviceassignment.LockQueueMember(ctx, db, organizationID, resolved.Route.TeamID, "")
+	return resolved, err
 }
 
 // customerHandoffAllowed 复核运行仍持有当前开放周期的处理权；转人工不要求 AI 员工仍满足继续执行的资格。
@@ -173,7 +202,7 @@ func settleHandoffLane(ctx context.Context, db bun.IDB, lane *servermodels.Agent
 func (a *ExecuteAction) completeCustomerHandoff(ctx context.Context, execution executionContext, policy agentRunPolicy, result agentruntime.RunResult, usage []byte, blocks []servermodels.AgentRunBlock) error {
 	suppressed, completed := false, false
 	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
-		channel, route, member, err := resolveCustomerHandoffRoute(ctx, tx, execution.Run.OrganizationID, execution.Run.ConversationID)
+		resolved, err := resolveCustomerHandoffRoute(ctx, tx, execution.Run.OrganizationID, execution.Run.ConversationID, result.Decision.CategoryID)
 		if err != nil {
 			return err
 		}
@@ -200,9 +229,9 @@ func (a *ExecuteAction) completeCustomerHandoff(ctx context.Context, execution e
 			return errors.New("agent run handoff boundary is inconsistent")
 		}
 		message, err := applyCustomerHandoff(ctx, tx, a.enqueuer, customerHandoff{
-			PolicyContext: policyContext, Channel: channel, AgentIdentityID: run.AgentIdentityID, Route: route, Member: member,
+			PolicyContext: policyContext, Channel: resolved.Channel, AgentIdentityID: run.AgentIdentityID, Route: resolved.Route, Member: resolved.Member,
 			NoticeKey: "agent:" + run.ID, EventKey: "agent:" + run.ID + ":handoff-event",
-			Reason: result.Decision.Reason, ReasonText: result.Decision.ReasonText, AgentRunID: &run.ID,
+			Reason: result.Decision.Reason, ReasonText: result.Decision.ReasonText, Category: resolved.Category, AgentRunID: &run.ID,
 		})
 		if err != nil {
 			return err
@@ -250,7 +279,7 @@ func (a *ExecuteAction) completeCustomerHandoff(ctx context.Context, execution e
 func (a *ExecuteAction) failCustomerRun(ctx context.Context, initial *servermodels.AgentRun, policy agentRunPolicy, lastError string, reason domain.AgentHandoffReason) (bool, error) {
 	terminal := false
 	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
-		channel, route, member, err := resolveCustomerHandoffRoute(ctx, tx, initial.OrganizationID, initial.ConversationID)
+		resolved, err := resolveCustomerHandoffRoute(ctx, tx, initial.OrganizationID, initial.ConversationID, "")
 		if err != nil {
 			return err
 		}
@@ -304,7 +333,7 @@ func (a *ExecuteAction) failCustomerRun(ctx context.Context, initial *servermode
 			return err
 		}
 		message, err := applyCustomerHandoff(ctx, tx, a.enqueuer, customerHandoff{
-			PolicyContext: policyContext, Channel: channel, AgentIdentityID: run.AgentIdentityID, Route: route, Member: member,
+			PolicyContext: policyContext, Channel: resolved.Channel, AgentIdentityID: run.AgentIdentityID, Route: resolved.Route, Member: resolved.Member,
 			NoticeKey: "agent:" + run.ID, EventKey: "agent:" + run.ID + ":handoff-event",
 			Reason: reason, ReasonText: lastError, AgentRunID: &run.ID,
 		})

@@ -3,7 +3,7 @@ import { PanelRightOpenIcon } from "lucide-react"
 import type { ReactNode } from "react"
 import { useTranslation } from "react-i18next"
 
-import { OrganizationIdentityType, type MemberOption } from "@/api"
+import { type MemberOption } from "@/api"
 import { ProfileAvatar } from "@/components/profile-avatar"
 import {
   Tooltip,
@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/tooltip"
 import { HeaderAction } from "@/features/inbox/conversation-header"
 import { cn } from "@/lib/utils"
+import { isAIIdentityType } from "@/lib/identity-type"
 
 /** 展示草稿收件人的头像。 */
 export function DirectConversationDraftAvatar({
@@ -26,9 +27,7 @@ export function DirectConversationDraftAvatar({
       imageURL={member.avatarUrl}
       name={member.displayName}
       fallback={
-        member.type === OrganizationIdentityType.OrganizationIdentityTypeAgent
-          ? "agent"
-          : "person"
+        isAIIdentityType(member.type) ? "agent" : "person"
       }
       className={className}
     />

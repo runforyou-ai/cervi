@@ -6,6 +6,7 @@ import { Navigate, useLocation, useNavigate, useParams } from "react-router"
 import {
   ConversationType,
   getAgent,
+  getAssistant,
   isAgentInboxConversation,
   isNotFoundApiError,
   UserStatus,
@@ -23,8 +24,12 @@ import { useFirstChatMessage } from "@/features/inbox/use-first-chat-message"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 
+/** 移动端 AI 聊天草稿目标的身份、名称与账号状态。 */
+type DraftTarget = Pick<AgentData, "identityId" | "displayName" | "status">
+
 type MobileAgentLocationState = MobileLocateState & {
   draftAgentID?: string
+  draftAssistant?: boolean
   mobileBack?: boolean
   agentDirectory?: boolean
 }
@@ -62,16 +67,28 @@ function MobileAgentConversation({ conversationID }: { conversationID: string })
   const [draftAgentID] = useState(
     () => (location.state as MobileAgentLocationState | null)?.draftAgentID ?? "",
   )
-  const [draftAgent, setDraftAgent] = useState<AgentData | null>(null)
+  const [draftAssistant] = useState(
+    () => (location.state as MobileAgentLocationState | null)?.draftAssistant ?? false,
+  )
+  const [draftAgent, setDraftAgent] = useState<DraftTarget | null>(null)
   const [created, setCreated] = useState<AgentInboxConversationData | null>(null)
   const persisted = !draftAgentID || Boolean(created)
   const alive = useRef(true)
   const firstChat = useFirstChatMessage()
-  const agent = useResource(
+  // 草稿目标为本人助理时读取助理详情，其余读取 AI 员工详情。
+  const employee = useResource(
     resourceKeys.agent(draftAgentID),
     () => getAgent(draftAgentID),
-    { staleTime: 0, enabled: !persisted && !draftAgent },
+    { staleTime: 0, enabled: !persisted && !draftAgent && !draftAssistant },
   )
+  const assistant = useResource(
+    resourceKeys.assistant(draftAgentID),
+    () => getAssistant(draftAgentID),
+    { staleTime: 0, enabled: !persisted && !draftAgent && draftAssistant },
+  )
+  const agent = draftAssistant
+    ? { ...assistant, data: assistant.data?.assistant as DraftTarget | undefined }
+    : employee
   const summary = useConversationSummary(persisted ? conversationID : "", false)
   // 首发结果只用于当前页面过渡；后续摘要（包括不可用结果）由查询接管。
   const conversation =

@@ -48,12 +48,13 @@ export function formatSystemEvent(
   currentIdentityID: string,
   t: TimelineTranslate,
 ) {
-  // 转人工事件按去向与原因码本地化，名称取事件写入时的快照。
+  // 转人工事件按去向与原因码本地化，名称与咨询分类取事件写入时的快照。
   if (event.type === ConversationSystemEventType.ConversationSystemEventServiceSessionHandedOff) {
-    return t("serviceSessionHandedOff", {
+    return t(event.categoryName ? "serviceSessionHandedOffWithCategory" : "serviceSessionHandedOff", {
       agent: event.fromDisplayName ?? t("unknownSender"),
       target: sessionTargetText(event.sessionTarget, currentIdentityID, t),
       reason: t(handoffReasonKey(event.handoffReason)),
+      category: event.categoryName ?? "",
     })
   }
   // 退回队列事件没有操作人，按退回原因展示原负责人与退回去向。

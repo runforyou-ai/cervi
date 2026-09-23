@@ -114,7 +114,7 @@ func TestKnowledgeBaseSettings(t *testing.T) {
 	provider.Models = slices.DeleteFunc(provider.Models, func(model aiprovideraction.Model) bool {
 		return model.Identifier == "embedding-b"
 	})
-	_, err = aiprovideraction.NewUpdateAIProviderAction(db).Execute(ctx, identity, provider.ID, aiprovideraction.Input{Brand: provider.Brand, Name: provider.Name, CredentialType: provider.CredentialType, APIKey: provider.APIKey, APIURL: provider.APIURL, Models: provider.Models})
+	_, err = aiprovideraction.NewUpdateAIProviderAction(db).Execute(ctx, identity, provider.ID, aiprovideraction.UpdateInput{Name: provider.Name, CredentialType: provider.CredentialType, APIKey: provider.APIKey, APIURL: provider.APIURL, Models: provider.Models})
 	var validation *aiprovideraction.ValidationError
 	if !errors.As(err, &validation) || validation.Fields["models"] != aiprovideraction.ValidationModelsInUse {
 		t.Fatalf("remove model error=%v", err)

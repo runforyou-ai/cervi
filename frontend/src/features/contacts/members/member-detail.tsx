@@ -27,6 +27,7 @@ import { Field, FieldDescription } from "@/components/ui/field"
 import { NativeSelect } from "@/components/ui/native-select"
 import { Switch } from "@/components/ui/switch"
 import { AccountStatusEditRow } from "@/features/contacts/account-status-edit-row"
+import { MemberAssistantsSection } from "@/features/contacts/assistants/member-assistants-section"
 import { TeamCheckboxOptions } from "@/features/contacts/team-checkbox-options"
 import {
   createMemberSchema,
@@ -362,6 +363,8 @@ export function MemberDetailView({
           />
         </DetailEditRow>
       </section>
+
+      <MemberAssistantsSection userId={user.id} />
 
       <section>
         <h3 className="mb-3 text-sm font-medium">{t("detail.otherInformation")}</h3>

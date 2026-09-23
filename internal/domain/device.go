@@ -17,13 +17,3 @@ func ValidDevicePlatform(platform DevicePlatform) bool {
 	}
 	return false
 }
-
-// PeerTriggerCapability 定义绑定设备的会话中设备主人以外成员触发 Agent 时的能力等级。
-type PeerTriggerCapability string
-
-const (
-	PeerTriggerCapabilityOff               PeerTriggerCapability = "off"
-	PeerTriggerCapabilityReadOnly          PeerTriggerCapability = "read_only"
-	PeerTriggerCapabilityWriteWithApproval PeerTriggerCapability = "write_with_approval"
-	PeerTriggerCapabilitySameAsOwner       PeerTriggerCapability = "same_as_owner"
-)
