@@ -26,16 +26,16 @@ import (
 
 // deviceRunFixture 是设备执行集成测试共用的助理、设备与调用入口。
 type deviceRunFixture struct {
-	t          *testing.T
-	ctx        context.Context
-	db         *bun.DB
-	identity   *servermodels.Identity
-	assistant  *agentaction.Assistant
-	tasks      *servertask.Runtime
-	executor   *agentrunaction.ExecuteAction
-	sendFirst  *conversationaction.SendFirstAgentTextMessageAction
-	send       *conversationaction.SendAgentTextMessageAction
-	device     agentrunaction.RunDevice
+	t         *testing.T
+	ctx       context.Context
+	db        *bun.DB
+	identity  *servermodels.Identity
+	assistant *agentaction.Assistant
+	tasks     *servertask.Runtime
+	executor  *agentrunaction.ExecuteAction
+	sendFirst *conversationaction.SendFirstAgentTextMessageAction
+	send      *conversationaction.SendAgentTextMessageAction
+	device    agentrunaction.RunDevice
 }
 
 // testDeviceAgentRuns 验证助理的运行派发到其绑定电脑，以及领取、并行、停止、租约过期、换电脑、暂停与失去执行条件的收敛；AI 员工的运行始终在服务端执行。
@@ -56,10 +56,10 @@ func testDeviceAgentRuns(t *testing.T, db *bun.DB, identity *servermodels.Identi
 	}
 	fixture := &deviceRunFixture{
 		t: t, ctx: ctx, db: db, identity: identity, assistant: assistant, tasks: tasks,
-		executor:   agentrunaction.NewExecuteAction(db, tasks, nil, testAttachmentReader(db), nil),
-		sendFirst:  conversationaction.NewSendFirstAgentTextMessageAction(db, agentrunaction.NewScheduler(tasks)),
-		send:       conversationaction.NewSendAgentTextMessageAction(db, agentrunaction.NewScheduler(tasks)),
-		device:     agentrunaction.RunDevice{OrganizationID: identity.Organization.ID, UserID: identity.User.ID, DeviceID: registered.ID},
+		executor:  agentrunaction.NewExecuteAction(db, tasks, nil, testAttachmentReader(db), nil),
+		sendFirst: conversationaction.NewSendFirstAgentTextMessageAction(db, agentrunaction.NewScheduler(tasks)),
+		send:      conversationaction.NewSendAgentTextMessageAction(db, agentrunaction.NewScheduler(tasks)),
+		device:    agentrunaction.RunDevice{OrganizationID: identity.Organization.ID, UserID: identity.User.ID, DeviceID: registered.ID},
 	}
 	t.Run("助理归属主人", func(t *testing.T) {
 		if assistant.OwnerUserID != identity.User.ID || assistant.DeviceID != registered.ID || assistant.Presence(time.Now()) != domain.AssistantPresenceOffline {
