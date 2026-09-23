@@ -208,7 +208,18 @@ func (a *ExecuteAction) deviceAssignment(ctx context.Context, runID string, poli
 		return nil, ErrDeviceRunUnavailable
 	}
 	// 设备执行不加载企业远程 MCP 服务，配置版本绑定知识库时经服务端检索。
-	assignment, err := a.resolveAssignment(ctx, execution, policy, agentruntime.Capabilities{Knowledge: len(execution.KnowledgeBaseIDs) > 0})
+	capabilities := agentruntime.Capabilities{Knowledge: len(execution.KnowledgeBaseIDs) > 0}
+	// 运行使用工作区时，本机工具取工具目录与执行设备最近上报的清单和运行时版本的交集。
+	if execution.Run.ExecutionWorkspaceID != nil && execution.Run.ExecutionDeviceID != nil {
+		var device servermodels.Device
+		if err := a.db.NewSelect().Model(&device).Column("runtime_version", "tool_manifest").
+			Where("d.organization_id = ? AND d.id = ?", execution.Run.OrganizationID, *execution.Run.ExecutionDeviceID).
+			Scan(ctx); err != nil {
+			return nil, fmt.Errorf("load device agent run tool manifest: %w", err)
+		}
+		capabilities.LocalTools = agentruntime.AvailableLocalTools(device.ToolManifest, device.RuntimeVersion)
+	}
+	assignment, err := a.resolveAssignment(ctx, execution, policy, capabilities)
 	if err != nil {
 		return nil, err
 	}

@@ -50,6 +50,7 @@ type AssignmentFacts struct {
 type Capabilities struct {
 	Knowledge  bool     // 本次运行可检索会话绑定的知识库。
 	MCPServers []string // 可连接的远程 MCP 服务名称。
+	LocalTools []string // 执行设备在本次运行的工作区中提供的本机工具，按本机工具目录顺序排列。
 }
 
 // Assignment 是一次运行的有效配置，同时作为运行时入参、运行审计快照和设备执行指派。
@@ -70,7 +71,7 @@ type Assignment struct {
 // ResolveAssignment 按业务事实与执行侧能力产出一次运行的有效配置；执行侧能力只影响工具清单、指令中的工具说明和 MCP 服务名称。
 func ResolveAssignment(facts AssignmentFacts, capabilities Capabilities) Assignment {
 	scene := facts.Scene.Scene
-	tools := builtinTools{Knowledge: capabilities.Knowledge, Terminal: scene == SceneCustomer, HandoffCategories: len(facts.Scene.HandoffCategories) > 0}
+	tools := builtinTools{Knowledge: capabilities.Knowledge, Workspace: capabilities.LocalTools, Terminal: scene == SceneCustomer, HandoffCategories: len(facts.Scene.HandoffCategories) > 0}
 	instruction := composeInstruction(
 		AgentBaseline(facts.HandlesCustomers, facts.OrganizationName, facts.AgentName),
 		facts.Instruction,
@@ -104,15 +105,16 @@ func mcpServerNames(capabilities Capabilities) []string {
 	return names
 }
 
-// builtinToolNames 按注册顺序列出本次运行的内置工具，开发期计算器只在内部场景注册，终止工具只在客服场景注册。
+// builtinToolNames 按注册顺序列出本次运行的内置工具，开发期计算器只在内部场景注册，本机工具随执行设备的工作区注册，终止工具只在客服场景注册。
 func builtinToolNames(scene Scene, capabilities Capabilities) []string {
-	names := make([]string, 0, 4)
+	names := make([]string, 0, 4+len(capabilities.LocalTools))
 	if scene != SceneCustomer {
 		names = append(names, "calculator")
 	}
 	if capabilities.Knowledge {
 		names = append(names, KnowledgeToolName)
 	}
+	names = append(names, capabilities.LocalTools...)
 	if scene == SceneCustomer {
 		names = append(names, "ask_customer", "handoff_to_human", "resolve_conversation")
 	}

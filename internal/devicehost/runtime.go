@@ -13,6 +13,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/integration/knowledgeretrieval"
+	"github.com/runforyou-ai/cervi/internal/integration/localworkspace"
 )
 
 const (
@@ -57,6 +58,14 @@ func (w *Worker) runAgent(runCtx context.Context, meta appservice.RequestMeta, r
 				local.stream.Publish(delta)
 			}
 		},
+	}
+	// 运行使用工作区时，本机工具以该工作区为根目录读取文件。
+	if local.workspacePath != "" {
+		workspace, err := localworkspace.New(local.workspacePath)
+		if err != nil {
+			return agentruntime.RunResult{}, fmt.Errorf("open device run workspace: %w", err)
+		}
+		request.Workspace = workspace
 	}
 	// 有效配置包含知识检索时经企业服务端检索运行绑定的知识库。
 	if slices.Contains(assignment.Tools, agentruntime.KnowledgeToolName) {

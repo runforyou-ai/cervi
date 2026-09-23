@@ -24,11 +24,13 @@ type Device struct {
 	UpdatedAt time.Time      `json:"updatedAt"`
 }
 
-// DeviceRegistrationInput 定义设备注册上报的本机信息。
+// DeviceRegistrationInput 定义设备注册上报的本机信息、本机运行时版本与本机工具名称清单。
 type DeviceRegistrationInput struct {
-	InstallID string         `json:"installId"`
-	Name      string         `json:"name"`
-	Platform  DevicePlatform `json:"platform"`
+	InstallID      string         `json:"installId"`
+	Name           string         `json:"name"`
+	Platform       DevicePlatform `json:"platform"`
+	RuntimeVersion int            `json:"runtimeVersion"`
+	ToolManifest   []string       `json:"toolManifest"`
 }
 
 // DeviceList 定义当前用户的设备列表。
