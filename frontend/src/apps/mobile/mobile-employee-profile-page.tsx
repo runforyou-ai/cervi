@@ -18,7 +18,7 @@ import { useResource } from "@/hooks/use-resource"
 
 /** 展示姓名、邮箱、团队和工作状态，只允许向其他活跃成员发消息。 */
 export function MobileEmployeeProfilePage() {
-  const { t } = useTranslation(["mobile", "common"])
+  const { t } = useTranslation(["mobile", "common", "contacts"])
   const { userID = "" } = useParams()
   const { identity } = useMobileWorkspace()
   const {
@@ -98,7 +98,7 @@ export function MobileEmployeeProfilePage() {
                 </div>
                 <div className="py-4">
                   <dt className="text-xs text-muted-foreground">
-                    {t("contacts.teams")}
+                    {t("contacts:columns.teams")}
                   </dt>
                   <dd className="mt-1 break-words text-sm">
                     {user.teams.length

@@ -46,7 +46,6 @@ type Batch = {
   targetIdentityID: string
   agentIdentityID: string
   customerConversationID: string
-  workspaceID: string
   customer: boolean
   replyTo: ConversationMessageReference | null
   jobs: AttachmentJob[]
@@ -104,7 +103,6 @@ export class AttachmentQueue {
       targetIdentityID = "",
       agentIdentityID = "",
       customerConversationID = "",
-      workspaceID = "",
       customer = false,
       replyTo = null,
     }: {
@@ -112,7 +110,6 @@ export class AttachmentQueue {
       targetIdentityID?: string
       agentIdentityID?: string
       customerConversationID?: string
-      workspaceID?: string
       customer?: boolean
       replyTo?: ConversationMessageReference | null
     },
@@ -169,7 +166,6 @@ export class AttachmentQueue {
       targetIdentityID,
       agentIdentityID,
       customerConversationID,
-      workspaceID,
       customer,
       replyTo,
       jobs,
@@ -279,7 +275,6 @@ export class AttachmentQueue {
         targetIdentityId: batch.targetIdentityID,
         agentIdentityId: batch.agentIdentityID,
         customerConversationId: batch.customerConversationID,
-        workspaceId: batch.workspaceID,
         clientMessageId: job.id,
         fileId: job.fileID,
         body: job.body,
@@ -297,7 +292,6 @@ export class AttachmentQueue {
         batch.targetIdentityID = ""
         batch.agentIdentityID = ""
         batch.customerConversationID = ""
-        batch.workspaceID = ""
         for (const item of batch.jobs) item.conversationID = result.conversationId
         batch.onCreated(result.conversation, result.conversationId)
       }

@@ -25,10 +25,6 @@ func testGroupAssistants(t *testing.T, db *bun.DB, identity *servermodels.Identi
 	if err != nil {
 		t.Fatal(err)
 	}
-	workspace, err := deviceaction.NewRegisterWorkspaceAction(db).Execute(ctx, member, device.ID, "project")
-	if err != nil {
-		t.Fatal(err)
-	}
 	assistant, err := agentaction.NewCreateAssistantAction(db).Execute(ctx, member, device.ID, agentaction.AssistantInput{
 		DisplayName: "成员助理", Execution: agentaction.ManagedExecutionInput{ProviderID: providerID, ModelIdentifier: modelID},
 	})
@@ -43,13 +39,9 @@ func testGroupAssistants(t *testing.T, db *bun.DB, identity *servermodels.Identi
 	}
 	add := conversationaction.NewAddGroupConversationMembersAction(db)
 	remove := conversationaction.NewRemoveGroupConversationMemberAction(db, newGroupAgentCoordinator(db))
-	workspaces := deviceaction.NewConversationAssistantWorkspaceAction(db)
 	addAssistant := func() {
 		t.Helper()
 		if _, err := add.Execute(ctx, member, conversationaction.GroupConversationMembersInput{ConversationID: group.ID, MemberIdentityIDs: []string{assistant.IdentityID}}); err != nil {
-			t.Fatal(err)
-		}
-		if err := workspaces.Set(ctx, member, group.ID, assistant.IdentityID, workspace.ID); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -63,14 +55,6 @@ func testGroupAssistants(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		}
 		return active
 	}
-	assertWorkspaceCleared := func() {
-		t.Helper()
-		if exists, err := db.NewSelect().Model((*servermodels.ConversationAssistantWorkspace)(nil)).
-			Where("conversation_id = ? AND agent_id = ?", group.ID, assistant.ID).Exists(ctx); err != nil || exists {
-			t.Fatalf("assistant workspace kept=%v %v", exists, err)
-		}
-	}
-
 	t.Run("只有主人能带助理进群", func(t *testing.T) {
 		if _, err := add.Execute(ctx, identity, conversationaction.GroupConversationMembersInput{ConversationID: group.ID, MemberIdentityIDs: []string{assistant.IdentityID}}); !errors.Is(err, conversationaction.ErrGroupMemberNotFound) {
 			t.Fatalf("group owner added member assistant=%v", err)
@@ -96,7 +80,7 @@ func testGroupAssistants(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		if err := db.NewSelect().Model(&run).Where("agr.conversation_id = ? AND agr.agent_identity_id = ?", group.ID, assistant.IdentityID).Scan(ctx); err != nil {
 			t.Fatal(err)
 		}
-		if run.ExecutionDeviceID == nil || *run.ExecutionDeviceID != device.ID || run.ExecutionWorkspaceID == nil || *run.ExecutionWorkspaceID != workspace.ID {
+		if run.ExecutionDeviceID == nil || *run.ExecutionDeviceID != device.ID {
 			t.Fatalf("group assistant run=%+v", run)
 		}
 		// 暂停后群内点名在发送前被拒绝，不排队也不留下消息。
@@ -129,7 +113,6 @@ func testGroupAssistants(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		if inGroup() {
 			t.Fatal("assistant still in group")
 		}
-		assertWorkspaceCleared()
 		addAssistant()
 	})
 
@@ -140,7 +123,6 @@ func testGroupAssistants(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		if inGroup() {
 			t.Fatal("assistant stayed after owner left")
 		}
-		assertWorkspaceCleared()
 		if _, err := add.Execute(ctx, identity, conversationaction.GroupConversationMembersInput{ConversationID: group.ID, MemberIdentityIDs: []string{member.OrganizationIdentity.ID}}); err != nil {
 			t.Fatal(err)
 		}
@@ -154,7 +136,6 @@ func testGroupAssistants(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		if inGroup() {
 			t.Fatal("assistant stayed after owner removed")
 		}
-		assertWorkspaceCleared()
 		if _, err := add.Execute(ctx, identity, conversationaction.GroupConversationMembersInput{ConversationID: group.ID, MemberIdentityIDs: []string{member.OrganizationIdentity.ID}}); err != nil {
 			t.Fatal(err)
 		}
@@ -169,7 +150,6 @@ func testGroupAssistants(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		if inGroup() {
 			t.Fatal("assistant stayed after owner deactivated")
 		}
-		assertWorkspaceCleared()
 		assistants, err := agentaction.NewListAssistantsQuery(db).Execute(ctx, identity, member.User.ID)
 		if err != nil || len(assistants) != 1 || assistants[0].Status != domain.UserStatusInactive {
 			t.Fatalf("assistants after owner deactivated=%+v %v", assistants, err)
@@ -188,28 +168,6 @@ func testGroupAssistants(t *testing.T, db *bun.DB, identity *servermodels.Identi
 		}
 		if _, err := updateStatus.Execute(ctx, member, assistant.ID, domain.UserStatusActive); err != nil {
 			t.Fatal(err)
-		}
-	})
-
-	t.Run("启停与工作区并发不死锁", func(t *testing.T) {
-		addAssistant()
-		updateStatus := agentaction.NewUpdateAssistantStatusAction(db)
-		for i := range 10 {
-			status := domain.UserStatusInactive
-			if i%2 == 1 {
-				status = domain.UserStatusActive
-			}
-			errs := make(chan error, 2)
-			go func() {
-				_, err := updateStatus.Execute(ctx, identity, assistant.ID, status)
-				errs <- err
-			}()
-			go func() { errs <- workspaces.Set(ctx, member, group.ID, assistant.IdentityID, workspace.ID) }()
-			for range 2 {
-				if err := <-errs; err != nil {
-					t.Fatalf("concurrent status and workspace=%v", err)
-				}
-			}
 		}
 	})
 

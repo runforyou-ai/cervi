@@ -74,23 +74,3 @@ type AssistantDetail struct {
 type AssistantList struct {
 	Assistants []Assistant `json:"assistants"`
 }
-
-// ConversationAssistantWorkspaceInput 定义为会话中的助理指定的工作区。
-type ConversationAssistantWorkspaceInput struct {
-	WorkspaceID string `json:"workspaceId"`
-}
-
-// ConversationAssistantWorkspace 定义会话中一位助理的绑定电脑与工作区，workspaceId 为空表示尚未指定。
-type ConversationAssistantWorkspace struct {
-	AssistantIdentityID string `json:"assistantIdentityId"`
-	OwnerUserID         string `json:"ownerUserId"`
-	DeviceID            string `json:"deviceId"`
-	DeviceName          string `json:"deviceName"`
-	WorkspaceID         string `json:"workspaceId"`
-	WorkspaceLabel      string `json:"workspaceLabel"`
-}
-
-// ConversationAssistantWorkspaceList 定义会话中各位助理的工作区。
-type ConversationAssistantWorkspaceList struct {
-	Assistants []ConversationAssistantWorkspace `json:"assistants"`
-}

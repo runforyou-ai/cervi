@@ -61,7 +61,6 @@ function conversationKeys(conversationId?: string): ResourceKey[] {
     resourceKeys.customerServiceSummaries(conversationId),
     resourceKeys.customerCopilotThreads(conversationId),
     resourceKeys.conversationMessageReferences(conversationId),
-    resourceKeys.conversationAssistantWorkspaces(conversationId),
     resourceKeys.directConversation(),
   ]
 }

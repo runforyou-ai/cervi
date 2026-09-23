@@ -1860,6 +1860,36 @@ func (b *DirectBackend) DeleteServiceCategory(ctx context.Context, meta RequestM
 	return b.ops.DeleteServiceCategory(ctx, meta, identity, categoryID)
 }
 
+// GetAIPerformanceReport 返回当前企业指定范围内的 AI 客服表现概览。
+func (b *DirectBackend) GetAIPerformanceReport(ctx context.Context, meta RequestMeta, input AIPerformanceReportInput) (AIPerformanceReport, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero AIPerformanceReport
+		return zero, err
+	}
+	return b.ops.GetAIPerformanceReport(ctx, meta, identity, input)
+}
+
+// ListAIPerformanceBreakdowns 返回按渠道或咨询分类拆分的一页 AI 客服表现。
+func (b *DirectBackend) ListAIPerformanceBreakdowns(ctx context.Context, meta RequestMeta, input AIPerformanceBreakdownInput) (AIPerformanceBreakdownList, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero AIPerformanceBreakdownList
+		return zero, err
+	}
+	return b.ops.ListAIPerformanceBreakdowns(ctx, meta, identity, input)
+}
+
+// ListAIKnowledgeGaps 返回一页因知识不足或缺少依据的转人工。
+func (b *DirectBackend) ListAIKnowledgeGaps(ctx context.Context, meta RequestMeta, input AIKnowledgeGapInput) (AIKnowledgeGapList, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero AIKnowledgeGapList
+		return zero, err
+	}
+	return b.ops.ListAIKnowledgeGaps(ctx, meta, identity, input)
+}
+
 // RegisterDevice 注册当前用户的本机设备。
 func (b *DirectBackend) RegisterDevice(ctx context.Context, meta RequestMeta, input DeviceRegistrationInput) (Device, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
@@ -1887,52 +1917,4 @@ func (b *DirectBackend) RevokeDevice(ctx context.Context, meta RequestMeta, devi
 		return err
 	}
 	return b.ops.RevokeDevice(ctx, meta, identity, deviceID)
-}
-
-// RegisterDeviceWorkspace 在当前用户的设备上注册工作区。
-func (b *DirectBackend) RegisterDeviceWorkspace(ctx context.Context, meta RequestMeta, deviceID string, input DeviceWorkspaceInput) (DeviceWorkspace, error) {
-	identity, err := b.ops.authenticate(ctx, meta)
-	if err != nil {
-		var zero DeviceWorkspace
-		return zero, err
-	}
-	return b.ops.RegisterDeviceWorkspace(ctx, meta, identity, deviceID, input)
-}
-
-// ListDeviceWorkspaces 返回当前用户设备上的工作区。
-func (b *DirectBackend) ListDeviceWorkspaces(ctx context.Context, meta RequestMeta, deviceID string) (DeviceWorkspaceList, error) {
-	identity, err := b.ops.authenticate(ctx, meta)
-	if err != nil {
-		var zero DeviceWorkspaceList
-		return zero, err
-	}
-	return b.ops.ListDeviceWorkspaces(ctx, meta, identity, deviceID)
-}
-
-// ListConversationAssistantWorkspaces 返回会话中各位助理的绑定电脑与工作区。
-func (b *DirectBackend) ListConversationAssistantWorkspaces(ctx context.Context, meta RequestMeta, conversationID string) (ConversationAssistantWorkspaceList, error) {
-	identity, err := b.ops.authenticate(ctx, meta)
-	if err != nil {
-		var zero ConversationAssistantWorkspaceList
-		return zero, err
-	}
-	return b.ops.ListConversationAssistantWorkspaces(ctx, meta, identity, conversationID)
-}
-
-// SetConversationAssistantWorkspace 由主人为会话中的助理指定工作区。
-func (b *DirectBackend) SetConversationAssistantWorkspace(ctx context.Context, meta RequestMeta, conversationID string, assistantIdentityID string, input ConversationAssistantWorkspaceInput) error {
-	identity, err := b.ops.authenticate(ctx, meta)
-	if err != nil {
-		return err
-	}
-	return b.ops.SetConversationAssistantWorkspace(ctx, meta, identity, conversationID, assistantIdentityID, input)
-}
-
-// ClearConversationAssistantWorkspace 由主人清除会话中助理的工作区。
-func (b *DirectBackend) ClearConversationAssistantWorkspace(ctx context.Context, meta RequestMeta, conversationID string, assistantIdentityID string) error {
-	identity, err := b.ops.authenticate(ctx, meta)
-	if err != nil {
-		return err
-	}
-	return b.ops.ClearConversationAssistantWorkspace(ctx, meta, identity, conversationID, assistantIdentityID)
 }

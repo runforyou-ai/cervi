@@ -201,14 +201,12 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.POST("/settings/customer-service/categories", s.createServiceCategory)
 	router.PUT("/settings/customer-service/categories/:categoryID", s.updateServiceCategory)
 	router.DELETE("/settings/customer-service/categories/:categoryID", s.deleteServiceCategory)
+	router.GET("/reports/ai-performance", s.getAIPerformanceReport)
+	router.GET("/reports/ai-performance/breakdowns", s.listAIPerformanceBreakdowns)
+	router.GET("/reports/ai-performance/knowledge-gaps", s.listAIKnowledgeGaps)
 	router.POST("/devices", s.registerDevice)
 	router.GET("/devices", s.listDevices)
 	router.DELETE("/devices/:deviceID", s.revokeDevice)
-	router.POST("/devices/:deviceID/workspaces", s.registerDeviceWorkspace)
-	router.GET("/devices/:deviceID/workspaces", s.listDeviceWorkspaces)
-	router.GET("/conversations/:conversationID/assistant-workspaces", s.listConversationAssistantWorkspaces)
-	router.PUT("/conversations/:conversationID/assistant-workspaces/:assistantIdentityID", s.setConversationAssistantWorkspace)
-	router.DELETE("/conversations/:conversationID/assistant-workspaces/:assistantIdentityID", s.clearConversationAssistantWorkspace)
 }
 
 // installationStatus 返回服务端初始化状态和公开企业名称。
@@ -1705,6 +1703,36 @@ func (s *Service) deleteServiceCategory(c *gin.Context) {
 	writeEmpty(c, s.application.DeleteServiceCategory(c.Request.Context(), requestMeta(c), c.Param("categoryID")))
 }
 
+// getAIPerformanceReport 返回当前企业指定范围内的 AI 客服表现概览。
+func (s *Service) getAIPerformanceReport(c *gin.Context) {
+	input, ok := bindAIPerformanceReportInputQuery(c)
+	if !ok {
+		return
+	}
+	output, err := s.application.GetAIPerformanceReport(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// listAIPerformanceBreakdowns 返回按渠道或咨询分类拆分的一页 AI 客服表现。
+func (s *Service) listAIPerformanceBreakdowns(c *gin.Context) {
+	input, ok := bindAIPerformanceBreakdownInputQuery(c)
+	if !ok {
+		return
+	}
+	output, err := s.application.ListAIPerformanceBreakdowns(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// listAIKnowledgeGaps 返回一页因知识不足或缺少依据的转人工。
+func (s *Service) listAIKnowledgeGaps(c *gin.Context) {
+	input, ok := bindAIKnowledgeGapInputQuery(c)
+	if !ok {
+		return
+	}
+	output, err := s.application.ListAIKnowledgeGaps(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
 // registerDevice 注册当前用户的本机设备。
 func (s *Service) registerDevice(c *gin.Context) {
 	var input appservice.DeviceRegistrationInput
@@ -1726,40 +1754,61 @@ func (s *Service) revokeDevice(c *gin.Context) {
 	writeEmpty(c, s.application.RevokeDevice(c.Request.Context(), requestMeta(c), c.Param("deviceID")))
 }
 
-// registerDeviceWorkspace 在当前用户的设备上注册工作区。
-func (s *Service) registerDeviceWorkspace(c *gin.Context) {
-	var input appservice.DeviceWorkspaceInput
-	if !bindJSON(c, &input) {
-		return
+// bindAIKnowledgeGapInputQuery 从查询参数解析 appservice.AIKnowledgeGapInput。
+func bindAIKnowledgeGapInputQuery(c *gin.Context) (appservice.AIKnowledgeGapInput, bool) {
+	days, ok := positiveQueryInteger(c, "days", 30)
+	if !ok {
+		return appservice.AIKnowledgeGapInput{}, false
 	}
-	output, err := s.application.RegisterDeviceWorkspace(c.Request.Context(), requestMeta(c), c.Param("deviceID"), input)
-	writeResult(c, http.StatusCreated, output, err)
-}
-
-// listDeviceWorkspaces 返回当前用户设备上的工作区。
-func (s *Service) listDeviceWorkspaces(c *gin.Context) {
-	output, err := s.application.ListDeviceWorkspaces(c.Request.Context(), requestMeta(c), c.Param("deviceID"))
-	writeResult(c, http.StatusOK, output, err)
-}
-
-// listConversationAssistantWorkspaces 返回会话中各位助理的绑定电脑与工作区。
-func (s *Service) listConversationAssistantWorkspaces(c *gin.Context) {
-	output, err := s.application.ListConversationAssistantWorkspaces(c.Request.Context(), requestMeta(c), c.Param("conversationID"))
-	writeResult(c, http.StatusOK, output, err)
-}
-
-// setConversationAssistantWorkspace 由主人为会话中的助理指定工作区。
-func (s *Service) setConversationAssistantWorkspace(c *gin.Context) {
-	var input appservice.ConversationAssistantWorkspaceInput
-	if !bindJSON(c, &input) {
-		return
+	page, ok := positiveQueryInteger(c, "page", 1)
+	if !ok {
+		return appservice.AIKnowledgeGapInput{}, false
 	}
-	writeEmpty(c, s.application.SetConversationAssistantWorkspace(c.Request.Context(), requestMeta(c), c.Param("conversationID"), c.Param("assistantIdentityID"), input))
+	pageSize, ok := positiveQueryInteger(c, "pageSize", 50)
+	if !ok {
+		return appservice.AIKnowledgeGapInput{}, false
+	}
+	return appservice.AIKnowledgeGapInput{
+		Days:      days,
+		ChannelID: c.Query("channelId"),
+		Page:      page,
+		PageSize:  pageSize,
+	}, true
 }
 
-// clearConversationAssistantWorkspace 由主人清除会话中助理的工作区。
-func (s *Service) clearConversationAssistantWorkspace(c *gin.Context) {
-	writeEmpty(c, s.application.ClearConversationAssistantWorkspace(c.Request.Context(), requestMeta(c), c.Param("conversationID"), c.Param("assistantIdentityID")))
+// bindAIPerformanceBreakdownInputQuery 从查询参数解析 appservice.AIPerformanceBreakdownInput。
+func bindAIPerformanceBreakdownInputQuery(c *gin.Context) (appservice.AIPerformanceBreakdownInput, bool) {
+	days, ok := positiveQueryInteger(c, "days", 30)
+	if !ok {
+		return appservice.AIPerformanceBreakdownInput{}, false
+	}
+	page, ok := positiveQueryInteger(c, "page", 1)
+	if !ok {
+		return appservice.AIPerformanceBreakdownInput{}, false
+	}
+	pageSize, ok := positiveQueryInteger(c, "pageSize", 50)
+	if !ok {
+		return appservice.AIPerformanceBreakdownInput{}, false
+	}
+	return appservice.AIPerformanceBreakdownInput{
+		Days:      days,
+		ChannelID: c.Query("channelId"),
+		Dimension: appservice.AIPerformanceDimension(c.Query("dimension")),
+		Page:      page,
+		PageSize:  pageSize,
+	}, true
+}
+
+// bindAIPerformanceReportInputQuery 从查询参数解析 appservice.AIPerformanceReportInput。
+func bindAIPerformanceReportInputQuery(c *gin.Context) (appservice.AIPerformanceReportInput, bool) {
+	days, ok := positiveQueryInteger(c, "days", 30)
+	if !ok {
+		return appservice.AIPerformanceReportInput{}, false
+	}
+	return appservice.AIPerformanceReportInput{
+		Days:      days,
+		ChannelID: c.Query("channelId"),
+	}, true
 }
 
 // bindAgentListInputQuery 从查询参数解析 appservice.AgentListInput。

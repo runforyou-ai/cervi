@@ -57,7 +57,7 @@ export function MobileExternalContactsPage() {
   return (
     <section className="flex h-full min-h-0 flex-col">
       <MobilePageHeader
-        title={t("mobile:contacts.external")}
+        title={t("scopes.external")}
         backTo="/contacts"
       />
       <MobileSearchBar

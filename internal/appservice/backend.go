@@ -586,6 +586,15 @@ type Backend interface {
 	// DeleteServiceCategory 删除咨询分类，历史记录保留分类名称。
 	//cervi:route DELETE /settings/customer-service/categories/:categoryID
 	DeleteServiceCategory(context.Context, RequestMeta, string) error
+	// GetAIPerformanceReport 返回当前企业指定范围内的 AI 客服表现概览。
+	//cervi:route GET /reports/ai-performance
+	GetAIPerformanceReport(context.Context, RequestMeta, AIPerformanceReportInput) (AIPerformanceReport, error)
+	// ListAIPerformanceBreakdowns 返回按渠道或咨询分类拆分的一页 AI 客服表现。
+	//cervi:route GET /reports/ai-performance/breakdowns
+	ListAIPerformanceBreakdowns(context.Context, RequestMeta, AIPerformanceBreakdownInput) (AIPerformanceBreakdownList, error)
+	// ListAIKnowledgeGaps 返回一页因知识不足或缺少依据的转人工。
+	//cervi:route GET /reports/ai-performance/knowledge-gaps
+	ListAIKnowledgeGaps(context.Context, RequestMeta, AIKnowledgeGapInput) (AIKnowledgeGapList, error)
 
 	// RegisterDevice 注册当前用户的本机设备。
 	//cervi:route POST /devices
@@ -596,21 +605,6 @@ type Backend interface {
 	// RevokeDevice 撤销当前用户的设备。
 	//cervi:route DELETE /devices/:deviceID
 	RevokeDevice(context.Context, RequestMeta, string) error
-	// RegisterDeviceWorkspace 在当前用户的设备上注册工作区。
-	//cervi:route POST /devices/:deviceID/workspaces status=201
-	RegisterDeviceWorkspace(context.Context, RequestMeta, string, DeviceWorkspaceInput) (DeviceWorkspace, error)
-	// ListDeviceWorkspaces 返回当前用户设备上的工作区。
-	//cervi:route GET /devices/:deviceID/workspaces
-	ListDeviceWorkspaces(context.Context, RequestMeta, string) (DeviceWorkspaceList, error)
-	// ListConversationAssistantWorkspaces 返回会话中各位助理的绑定电脑与工作区。
-	//cervi:route GET /conversations/:conversationID/assistant-workspaces
-	ListConversationAssistantWorkspaces(context.Context, RequestMeta, string) (ConversationAssistantWorkspaceList, error)
-	// SetConversationAssistantWorkspace 由主人为会话中的助理指定工作区。
-	//cervi:route PUT /conversations/:conversationID/assistant-workspaces/:assistantIdentityID
-	SetConversationAssistantWorkspace(context.Context, RequestMeta, string, string, ConversationAssistantWorkspaceInput) error
-	// ClearConversationAssistantWorkspace 由主人清除会话中助理的工作区。
-	//cervi:route DELETE /conversations/:conversationID/assistant-workspaces/:assistantIdentityID
-	ClearConversationAssistantWorkspace(context.Context, RequestMeta, string, string) error
 }
 
 // WorkspaceInstaller 由服务端 Backend 实现，用于企业初始化。
@@ -646,12 +640,6 @@ type ConversationWindowOpener interface {
 // LocalDeviceReporter 由把本机注册为设备的原生端实现。
 type LocalDeviceReporter interface {
 	CurrentDevice(context.Context, RequestMeta) (LocalDevice, error)
-}
-
-// LocalWorkspaceManager 由支持本机 Agent 工作区的原生端实现。
-type LocalWorkspaceManager interface {
-	// AddLocalWorkspace 让用户选择本机目录并注册为本设备的工作区，用户取消选择时返回空工作区编号。
-	AddLocalWorkspace(context.Context, RequestMeta) (DeviceWorkspace, error)
 }
 
 // NativeLocaleUpdater 同步当前设备上的原生界面语言。

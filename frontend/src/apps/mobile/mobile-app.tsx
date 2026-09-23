@@ -17,7 +17,7 @@ import { MobileGroupMembersPage } from "@/apps/mobile/mobile-group-members"
 import { MobileGroupMemberActionPage } from "@/apps/mobile/mobile-group-member-management"
 import { MobileGroupDetailsPage } from "@/apps/mobile/mobile-group-details-page"
 import { MobileDirectoryPage } from "@/apps/mobile/mobile-directory-page"
-import { MobileAgentChatPage, MobileAgentConversationPage } from "@/apps/mobile/mobile-agent-chat-page"
+import { MobileAgentConversationPage } from "@/apps/mobile/mobile-agent-chat-page"
 import { MobileChatsPage } from "@/apps/mobile/mobile-chats-page"
 import {
   MobileNewChatPage,
@@ -29,6 +29,10 @@ import {
   MobileMePage,
   MobileMeSettingsPage,
 } from "@/apps/mobile/mobile-me-page"
+import {
+  MobileAssistantPage,
+  MobileAssistantsPage,
+} from "@/apps/mobile/mobile-assistants-page"
 import { MobileContactsPage } from "@/apps/mobile/mobile-contacts-page"
 import {
   MobileExternalContactPage,
@@ -160,10 +164,7 @@ export default function MobileApp() {
               path="/me/notifications"
               element={<MobileMeSettingsPage section="notifications" />}
             />
-            <Route
-              path="/contacts/employees"
-              element={<MobileDirectoryPage key="employees" kind="employees" />}
-            />
+            <Route path="/contacts/employees" element={<MobileDirectoryPage />} />
             <Route
               path="/contacts/employees/:userID"
               element={<MobileEmployeeProfilePage />}
@@ -173,12 +174,12 @@ export default function MobileApp() {
               element={<MobileEmployeeChatPage />}
             />
             <Route
-              path="/contacts/ai-employees"
-              element={<MobileDirectoryPage key="agents" kind="agents" />}
+              path="/contacts/assistants"
+              element={<MobileAssistantsPage />}
             />
             <Route
-              path="/contacts/ai-employees/:agentID/chat"
-              element={<MobileAgentChatPage />}
+              path="/contacts/assistants/:assistantID"
+              element={<MobileAssistantPage />}
             />
             <Route path="/contacts/teams" element={<MobileTeamsPage />} />
             <Route

@@ -9,13 +9,11 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
-// RegisterInput 定义设备注册上报的本机信息、本机运行时版本与本机工具名称清单。
+// RegisterInput 定义设备注册上报的本机信息。
 type RegisterInput struct {
-	InstallID      string
-	Name           string
-	Platform       domain.DevicePlatform
-	RuntimeVersion int
-	ToolManifest   []string
+	InstallID string
+	Name      string
+	Platform  domain.DevicePlatform
 }
 
 // Record 定义设备记录。

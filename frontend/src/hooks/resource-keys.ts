@@ -132,10 +132,6 @@ export const resourceKeys = {
   devices: () => ["devices"],
   /** 本机在当前企业服务器上的设备注册状态。 */
   currentDevice: () => ["current-device"],
-  /** 指定设备上的工作区。 */
-  deviceWorkspaces: (deviceId?: string) => itemKey("device-workspaces", deviceId),
-  /** 会话中各位助理的绑定电脑与工作区。 */
-  conversationAssistantWorkspaces: (conversationId?: string) => itemKey("conversation-assistant-workspaces", conversationId),
   /** 当前企业的客服工作时间。 */
   businessHours: () => ["business-hours"],
   /** 当前企业的客服超时时长。 */
@@ -146,6 +142,12 @@ export const resourceKeys = {
   customerIdentitySecret: () => ["customer-identity-secret"],
   /** 当前企业的咨询分类目录。 */
   serviceCategories: () => ["service-categories"],
+  /** AI 表现报表概览，参数包含统计天数与渠道。 */
+  aiPerformanceReport: (parameters?: KeyParameters) => listKey("ai-performance-report", parameters),
+  /** AI 表现按维度拆分，参数包含统计天数、渠道、维度与分页。 */
+  aiPerformanceBreakdowns: (parameters?: KeyParameters) => listKey("ai-performance-breakdowns", parameters),
+  /** 知识缺口清单，参数包含统计天数、渠道与分页。 */
+  aiKnowledgeGaps: (parameters?: KeyParameters) => listKey("ai-knowledge-gaps", parameters),
   /** 当前客户端连接的企业服务器地址。 */
   serverURL: () => ["server-url"],
   /** 知识库列表。 */

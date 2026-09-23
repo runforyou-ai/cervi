@@ -33,7 +33,6 @@ export function ConversationAttachmentUpload({
   targetIdentityID = "",
   agentIdentityID = "",
   customerConversationID = "",
-  workspaceID = "",
   customer = false,
   byteLimit = 0,
   captionLimit = 4000,
@@ -47,7 +46,6 @@ export function ConversationAttachmentUpload({
   targetIdentityID?: string
   agentIdentityID?: string
   customerConversationID?: string
-  workspaceID?: string
   customer?: boolean
   byteLimit?: number
   captionLimit?: number
@@ -178,7 +176,7 @@ export function ConversationAttachmentUpload({
         ...item,
         body: index === selectedRef.current.length - 1 ? values.description : "",
       })),
-      { conversationID, targetIdentityID, agentIdentityID, customerConversationID, workspaceID, customer, replyTo },
+      { conversationID, targetIdentityID, agentIdentityID, customerConversationID, customer, replyTo },
       (conversation, conversationID) => {
         if (aliveRef.current) onCreated(conversation, conversationID)
       },

@@ -24,7 +24,6 @@ import { useAccountDisabledReason } from "@/features/inbox/use-account-disabled-
 import { useConversationTypingLabel } from "@/features/inbox/use-conversation-typing"
 type MobileIndividualLocationState = MobileLocateState & {
   memberUserID?: string
-  agentDirectory?: boolean
   conversation?: DirectInboxConversationData | AgentInboxConversationData
 }
 
@@ -40,18 +39,14 @@ export function MobileIndividualHeader({
   const { chatsURL } = useMobileNavigation()
   const location = useLocation()
   const navigate = useNavigate()
-  const { memberUserID, agentDirectory } =
+  const { memberUserID } =
     (location.state as MobileIndividualLocationState | null) ?? {}
   const typingLabel = useConversationTypingLabel(conversation?.id ?? "", null)
 
   return (
     <MobilePageHeader
       backTo={
-        agentDirectory
-          ? "/contacts/ai-employees"
-          : memberUserID
-            ? `/contacts/employees/${memberUserID}`
-            : chatsURL
+        memberUserID ? `/contacts/employees/${memberUserID}` : chatsURL
       }
       title={
         <span className="block min-w-0 truncate">{typingLabel || peerName}</span>

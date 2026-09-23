@@ -934,6 +934,21 @@ func (s *Service) DeleteServiceCategory(ctx context.Context, meta RequestMeta, c
 	return s.backend.DeleteServiceCategory(ctx, meta, categoryID)
 }
 
+// GetAIPerformanceReport 返回当前企业指定范围内的 AI 客服表现概览。
+func (s *Service) GetAIPerformanceReport(ctx context.Context, meta RequestMeta, input AIPerformanceReportInput) (AIPerformanceReport, error) {
+	return withNormalizedSlices(s.backend.GetAIPerformanceReport(ctx, meta, input))
+}
+
+// ListAIPerformanceBreakdowns 返回按渠道或咨询分类拆分的一页 AI 客服表现。
+func (s *Service) ListAIPerformanceBreakdowns(ctx context.Context, meta RequestMeta, input AIPerformanceBreakdownInput) (AIPerformanceBreakdownList, error) {
+	return withNormalizedSlices(s.backend.ListAIPerformanceBreakdowns(ctx, meta, input))
+}
+
+// ListAIKnowledgeGaps 返回一页因知识不足或缺少依据的转人工。
+func (s *Service) ListAIKnowledgeGaps(ctx context.Context, meta RequestMeta, input AIKnowledgeGapInput) (AIKnowledgeGapList, error) {
+	return withNormalizedSlices(s.backend.ListAIKnowledgeGaps(ctx, meta, input))
+}
+
 // RegisterDevice 注册当前用户的本机设备。
 func (s *Service) RegisterDevice(ctx context.Context, meta RequestMeta, input DeviceRegistrationInput) (Device, error) {
 	return withNormalizedSlices(s.backend.RegisterDevice(ctx, meta, input))
@@ -947,29 +962,4 @@ func (s *Service) ListDevices(ctx context.Context, meta RequestMeta) (DeviceList
 // RevokeDevice 撤销当前用户的设备。
 func (s *Service) RevokeDevice(ctx context.Context, meta RequestMeta, deviceID string) error {
 	return s.backend.RevokeDevice(ctx, meta, deviceID)
-}
-
-// RegisterDeviceWorkspace 在当前用户的设备上注册工作区。
-func (s *Service) RegisterDeviceWorkspace(ctx context.Context, meta RequestMeta, deviceID string, input DeviceWorkspaceInput) (DeviceWorkspace, error) {
-	return withNormalizedSlices(s.backend.RegisterDeviceWorkspace(ctx, meta, deviceID, input))
-}
-
-// ListDeviceWorkspaces 返回当前用户设备上的工作区。
-func (s *Service) ListDeviceWorkspaces(ctx context.Context, meta RequestMeta, deviceID string) (DeviceWorkspaceList, error) {
-	return withNormalizedSlices(s.backend.ListDeviceWorkspaces(ctx, meta, deviceID))
-}
-
-// ListConversationAssistantWorkspaces 返回会话中各位助理的绑定电脑与工作区。
-func (s *Service) ListConversationAssistantWorkspaces(ctx context.Context, meta RequestMeta, conversationID string) (ConversationAssistantWorkspaceList, error) {
-	return withNormalizedSlices(s.backend.ListConversationAssistantWorkspaces(ctx, meta, conversationID))
-}
-
-// SetConversationAssistantWorkspace 由主人为会话中的助理指定工作区。
-func (s *Service) SetConversationAssistantWorkspace(ctx context.Context, meta RequestMeta, conversationID string, assistantIdentityID string, input ConversationAssistantWorkspaceInput) error {
-	return s.backend.SetConversationAssistantWorkspace(ctx, meta, conversationID, assistantIdentityID, input)
-}
-
-// ClearConversationAssistantWorkspace 由主人清除会话中助理的工作区。
-func (s *Service) ClearConversationAssistantWorkspace(ctx context.Context, meta RequestMeta, conversationID string, assistantIdentityID string) error {
-	return s.backend.ClearConversationAssistantWorkspace(ctx, meta, conversationID, assistantIdentityID)
 }

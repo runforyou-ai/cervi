@@ -23,10 +23,7 @@ const mobile = {
     noTeams: "暂未加入团队",
     sendMessage: "发消息",
     chatError: "无法打开单聊，请重试。",
-    employees: "企业成员",
     agents: "AI 员工",
-    teams: "团队",
-    external: "外部联系人",
   },
   teams: {
     loadError: "无法加载团队，请重试。",
@@ -44,12 +41,11 @@ const mobile = {
     detail: "联系人资料",
     notFound: "该联系人不存在或无法访问。",
   },
+  assistants: {
+    loadError: "无法加载助理，请重试。",
+    notFound: "该助理不存在或无法访问。",
+  },
   agents: {
-    search: "搜索 AI 员工姓名",
-    empty: "没有找到 AI 员工",
-    loadError: "无法加载 AI 员工，请重试。",
-    allLoaded: "已显示全部 AI 员工",
-    loadMoreError: "加载失败",
     chatError: "无法打开 AI 对话，请重试。",
     unavailable: "该 AI 员工不存在或已停用。",
   },
