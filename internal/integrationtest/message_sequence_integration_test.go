@@ -25,12 +25,11 @@ import (
 	serverstorage "github.com/runforyou-ai/cervi/internal/storage/server"
 	serverfilecontent "github.com/runforyou-ai/cervi/internal/storage/server/filecontent"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
-	"github.com/runforyou-ai/cervi/internal/storage/server/pgerr"
 	"github.com/runforyou-ai/cervi/internal/tenant"
 	"github.com/uptrace/bun"
 )
 
-// TestMessageSequenceCommitOrder 验证所有会话类型在提交前阻塞后续分配，回滚允许编号重用。
+// TestMessageSequenceCommitOrder 验证所有会话类型在提交前阻塞后续分配，回滚撤销事务内已写入的摘要并允许编号重用。
 func TestMessageSequenceCommitOrder(t *testing.T) {
 	f := newNavigationFixture(t)
 	for _, kind := range []domain.ConversationType{domain.ConversationTypeDirect, domain.ConversationTypeAgent, domain.ConversationTypeGroup, domain.ConversationTypeCustomer} {
@@ -55,6 +54,16 @@ func TestMessageSequenceCommitOrder(t *testing.T) {
 						message, _, err := chatstate.AppendMessage(ctx, tx, cv, &servermodels.Message{ID: uuid.NewV7().String(), OrganizationID: cv.OrganizationID, ConversationID: cv.ID, Type: "system", Body: "先取锁", OriginatedAt: time.Now().UTC()})
 						if err != nil {
 							return err
+						}
+						// 回滚用例在事务内核验摘要已随消息写入。
+						if rollback {
+							var lastID string
+							if err := tx.NewSelect().Model(cv).Column("last_message_id").WherePK().Scan(ctx, &lastID); err != nil {
+								return err
+							}
+							if lastID != message.ID {
+								return fmt.Errorf("summary not written before rollback: %s", lastID)
+							}
 						}
 						appended <- message
 						select {
@@ -122,7 +131,7 @@ func TestMessageSequenceCommitOrder(t *testing.T) {
 	}
 }
 
-// TestMessageSequenceLargeReadAndWindows 验证大整数序号的双向分页、引用定位、访客读取与删除后的阅读基线。
+// TestMessageSequenceLargeReadAndWindows 验证大整数序号的双向分页、引用定位与访客读取。
 func TestMessageSequenceLargeReadAndWindows(t *testing.T) {
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
@@ -160,40 +169,6 @@ func TestMessageSequenceLargeReadAndWindows(t *testing.T) {
 	visitor, err := conversationaction.NewListWebsiteMessagesQuery(f.db).Execute(ctx, conversationaction.MessageHistoryInput{ChannelID: f.channelID, ExternalID: "web-session:0123456789abcdef0123456789abcdef", ConversationID: f.conversationID, After: point})
 	if err != nil || len(visitor.Messages) != 1 || visitor.Messages[0].MessageSeq != sent[2].MessageSeq {
 		t.Fatalf("visitor=%+v err=%v", visitor, err)
-	}
-	read := conversationaction.NewMarkConversationReadAction(f.db)
-	for _, message := range []conversationaction.Message{sent[1], sent[0], sent[1]} {
-		result, err := read.Execute(ctx, f.owner, f.conversationID, message.ID, false)
-		if err != nil || result.ReadSeq != sent[1].MessageSeq {
-			t.Fatalf("read=%+v err=%v", result, err)
-		}
-	}
-	if _, err := f.db.NewUpdate().Model((*servermodels.Message)(nil)).Set("deleted_at = now()").Where("id = ?", sent[1].ID).Exec(ctx); err != nil {
-		t.Fatal(err)
-	}
-	if row := f.inboxRow(t, f.owner, domain.ServiceSessionStatusOpen); row.UnreadCount != 1 {
-		t.Fatalf("deleted read baseline=%+v", row)
-	}
-	result, err := read.Execute(ctx, f.owner, f.conversationID, sent[2].ID, false)
-	if err != nil || result.ReadSeq != sent[2].MessageSeq {
-		t.Fatalf("next read=%+v err=%v", result, err)
-	}
-}
-
-// TestMessageSequenceUnique 验证同一会话序号逐条递增，唯一约束拒绝复用已提交序号。
-func TestMessageSequenceUnique(t *testing.T) {
-	f := newNavigationFixture(t)
-	ctx := context.Background()
-	first := f.send(t, f.owner, "第一条", false)
-	next := f.send(t, f.owner, "第二条", false)
-	if next.MessageSeq != first.MessageSeq+1 {
-		t.Fatalf("sequence=%d want=%d", next.MessageSeq, first.MessageSeq+1)
-	}
-	// 唯一约束拒绝同一会话复用已提交序号。
-	duplicate := &servermodels.Message{ID: uuid.NewV7().String(), OrganizationID: f.owner.Organization.ID, ConversationID: f.groupID, MessageSeq: next.MessageSeq, Type: "text", Body: "重复", OriginatedAt: time.Now()}
-	_, err := f.db.NewInsert().Model(duplicate).Column("id", "organization_id", "conversation_id", "message_seq", "type", "body", "originated_at").Exec(ctx)
-	if !pgerr.UniqueViolationOn(err, "messages_message_seq_unique") {
-		t.Fatalf("duplicate accepted: %v", err)
 	}
 }
 

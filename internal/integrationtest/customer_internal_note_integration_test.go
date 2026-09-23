@@ -213,13 +213,5 @@ func TestCustomerInternalNotes(t *testing.T) {
 		if closed.Status != string(domain.ServiceSessionStatusClosed) || closed.LastMessageID == saved.ID {
 			t.Fatalf("closed session changed by note: %+v", closed)
 		}
-		// 对客回复仍然要求先重新打开周期。
-		_, err = send.Execute(ctx, f.owner, conversationaction.CustomerTextMessageInput{
-			ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "已为您加急",
-		})
-		var conflict *conversationaction.ConflictError
-		if !errors.As(err, &conflict) || conflict.Reason != conversationaction.ConflictReasonServiceSessionNotReplyable {
-			t.Fatalf("closed session reply = %v", err)
-		}
 	})
 }

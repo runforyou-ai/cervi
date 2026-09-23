@@ -451,7 +451,6 @@ func TestConversationPinRemovalLockOrder(t *testing.T) {
 	if len(got) != 1 || got[0] != f.groupB {
 		t.Fatalf("并发结束后的置顶区 = %v，want [B]", got)
 	}
-	_ = version
 }
 
 // TestCustomerConversationPin 验证客户会话按企业客服的历史访问资格置顶，并进入同一个人置顶顺序。

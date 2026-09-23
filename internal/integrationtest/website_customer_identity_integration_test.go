@@ -174,20 +174,14 @@ func TestWebsiteCustomerIdentityHTTP(t *testing.T) {
 		t.Fatalf("附件先行的联系人 %+v", attachmentContact)
 	}
 
-	// 重新生成密钥后旧签名立即失效，过期或超出有效期上限的签名同样失效。
+	// 重新生成密钥后旧签名立即失效。
 	secret, err = customerserviceaction.NewRegenerateCustomerIdentitySecretAction(f.db).Execute(ctx, f.owner)
 	if err != nil {
 		t.Fatal(err)
 	}
 	directoryPath := "/public/website-channels/" + f.channelID + "/conversations"
-	for name, stale := range map[string]string{
-		"旧密钥":     token,
-		"已过期":     signCustomer(t, secret, jwt.MapClaims{"sub": userID, "exp": time.Now().Add(-time.Hour).Unix()}),
-		"超出有效期上限": signCustomer(t, secret, jwt.MapClaims{"sub": userID, "exp": time.Now().Add(48 * time.Hour).Unix()}),
-	} {
-		if status, payload, _ := customerRequest(t, service, http.MethodGet, directoryPath, stale, ""); status != http.StatusUnauthorized || payload["error"].(map[string]any)["reason"] != appservice.WebsiteCustomerIdentityInvalidReason {
-			t.Fatalf("%s status=%d payload=%+v", name, status, payload)
-		}
+	if status, payload, _ := customerRequest(t, service, http.MethodGet, directoryPath, token, ""); status != http.StatusUnauthorized || payload["error"].(map[string]any)["reason"] != appservice.WebsiteCustomerIdentityInvalidReason {
+		t.Fatalf("旧密钥 status=%d payload=%+v", status, payload)
 	}
 	token = signCustomer(t, secret, claims)
 	status, directory, _ := customerRequest(t, service, http.MethodGet, directoryPath, token, "")

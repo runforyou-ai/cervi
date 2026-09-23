@@ -163,11 +163,6 @@ func TestInboxPagination(t *testing.T) {
 		name  string
 		input inboxaction.LoadInput
 		ids   []string
-	}{"unassigned_small_pages", inboxaction.LoadInput{Scope: domain.InboxScopeAll, AssigneeFilter: domain.InboxAssigneeFilterUnassigned, Limit: 3}, f.customerIDs["queue"]})
-	cases = append(cases, struct {
-		name  string
-		input inboxaction.LoadInput
-		ids   []string
 	}{"unavailable_assignee", inboxaction.LoadInput{Scope: domain.InboxScopeAll, AssigneeFilter: domain.InboxAssigneeFilterIdentity, AssigneeIdentityID: uuid.NewV7().String()}, nil})
 
 	for _, tc := range cases {

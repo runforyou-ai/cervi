@@ -23,13 +23,6 @@ func TestNormalizeWebsiteMessageInput(t *testing.T) {
 	}
 }
 
-// TestValidWebsiteExternalIDRejectsNonHex 验证网站外部身份只接受十六进制令牌。
-func TestValidWebsiteExternalIDRejectsNonHex(t *testing.T) {
-	if validWebsiteExternalID("web-session:gggggggggggggggggggggggggggggggg") {
-		t.Fatal("expected non-hex external ID to be rejected")
-	}
-}
-
 // TestNormalizeWebsiteReplyTarget 验证引用编号格式和新会话的引用限制。
 func TestNormalizeWebsiteReplyTarget(t *testing.T) {
 	conversationID := "0198ddee-c056-7bc5-a1d9-586f878ee966"
@@ -81,8 +74,11 @@ func TestNormalizeWebsiteAttachmentMessageInput(t *testing.T) {
 	}
 }
 
-// TestValidWebsiteCustomerExternalID 验证登录用户外部编号的格式，以及签名身份与外部编号必须一致。
+// TestValidWebsiteCustomerExternalID 验证访客与登录用户外部编号的格式，以及签名身份与外部编号必须一致。
 func TestValidWebsiteCustomerExternalID(t *testing.T) {
+	if validWebsiteExternalID("web-session:gggggggggggggggggggggggggggggggg") {
+		t.Fatal("expected non-hex external ID to be rejected")
+	}
 	if !validWebsiteExternalID("web-user:user-42@example.com") || validWebsiteExternalID("web-user:") || validWebsiteExternalID("web-user:a b") {
 		t.Fatal("unexpected web-user external ID validation")
 	}

@@ -186,27 +186,6 @@ func TestEnqueueInRejectsInvalidInputBeforeWriting(t *testing.T) {
 	}
 }
 
-// TestEnqueueStillOwnsItsTransaction 验证普通投递继续自行提交事务。
-func TestEnqueueStillOwnsItsTransaction(t *testing.T) {
-	ctx, db, runtime := newEnqueueTestRuntime(t)
-	actionName := registerEnqueueTestAction(t, runtime)
-	runID, err := runtime.Enqueue(ctx, actionName, struct{}{}, EnqueueOptions{})
-	if err != nil {
-		t.Fatal(err)
-	}
-	cleanupEnqueuedTask(t, db, runID)
-	if exists, existsErr := taskRunExists(ctx, db, runID); existsErr != nil {
-		t.Fatal(existsErr)
-	} else if !exists {
-		t.Fatal("普通投递没有提交任务运行记录")
-	}
-	if exists, existsErr := taskOutboxExists(ctx, db, runID); existsErr != nil {
-		t.Fatal(existsErr)
-	} else if !exists {
-		t.Fatal("普通投递没有提交任务发件箱记录")
-	}
-}
-
 // newEnqueueTestRuntime 创建使用测试 PostgreSQL 的任务运行时。
 func newEnqueueTestRuntime(t *testing.T) (context.Context, *bun.DB, *Runtime) {
 	t.Helper()

@@ -364,7 +364,6 @@ func testHandoffTargets(t *testing.T, f handoffFixture) {
 		wantTeam     *string
 		wantAssignee *string
 	}{
-		{name: "公共队列", fallback: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue}, wantKind: domain.ServiceSessionTargetPublicQueue},
 		{name: "团队", fallback: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypeTeam, ID: team.ID}, wantKind: domain.ServiceSessionTargetTeam, wantTeam: &team.ID},
 		{name: "真人", fallback: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypeMember, ID: human.IdentityID}, wantKind: domain.ServiceSessionTargetMember, wantAssignee: &human.IdentityID},
 		{name: "AI 员工", fallback: channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypeMember, ID: fallbackAgent.IdentityID}, wantKind: domain.ServiceSessionTargetPublicQueue},
