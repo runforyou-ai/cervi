@@ -63,6 +63,7 @@ const mobile = {
   chats: {
     title: "Messages",
     add: "Add",
+    searchTargets: "Search by name",
     emptyTitle: "No conversations",
     emptyDescription: "No conversations match these filters.",
   },

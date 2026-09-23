@@ -7,6 +7,7 @@ import { MobileCreateGroupPage } from "@/apps/mobile/mobile-create-group-page"
 import { MobileAddGroupMembersPage } from "@/apps/mobile/mobile-add-group-members-page"
 import { MobileCustomerConversationPage } from "@/apps/mobile/mobile-customer-conversation-page"
 import { MobileCustomerCopilotPage } from "@/apps/mobile/mobile-customer-copilot-page"
+import { MobileCustomerProfilePage } from "@/apps/mobile/mobile-customer-profile-page"
 import { MobileIndividualConversationPage } from "@/apps/mobile/mobile-individual-conversation-page"
 import { MobileEmployeeChatPage } from "@/apps/mobile/mobile-employee-chat-page"
 import { MobileEmployeeProfilePage } from "@/apps/mobile/mobile-employee-profile-page"
@@ -18,6 +19,10 @@ import { MobileGroupDetailsPage } from "@/apps/mobile/mobile-group-details-page"
 import { MobileDirectoryPage } from "@/apps/mobile/mobile-directory-page"
 import { MobileAgentChatPage, MobileAgentConversationPage } from "@/apps/mobile/mobile-agent-chat-page"
 import { MobileChatsPage } from "@/apps/mobile/mobile-chats-page"
+import {
+  MobileNewChatPage,
+  MobileNewChatTargetPage,
+} from "@/apps/mobile/mobile-new-chat-page"
 import { MobileInboxPage } from "@/apps/mobile/mobile-inbox-page"
 import { MobileInboxSearchPage } from "@/apps/mobile/mobile-inbox-search-page"
 import {
@@ -115,15 +120,10 @@ export default function MobileApp() {
                 />
               </Route>
             </Route>
+            <Route path="/chats/new" element={<MobileNewChatPage />} />
             <Route
-              path="/chats/agent/new"
-              element={
-                <MobileDirectoryPage
-                  key="agent-new"
-                  kind="agents"
-                  purpose="newConversation"
-                />
-              }
+              path="/chats/new/:identityID"
+              element={<MobileNewChatTargetPage />}
             />
             <Route
               path="/chats/agent/:conversationID"
@@ -134,6 +134,7 @@ export default function MobileApp() {
               element={<MobileCustomerConversationPage />}
             >
               <Route path="copilot" element={<MobileCustomerCopilotPage />} />
+              <Route path="profile" element={<MobileCustomerProfilePage />} />
             </Route>
             <Route
               path="/chats/direct/:conversationID"

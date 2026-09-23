@@ -27,8 +27,10 @@ import { useResource } from "@/hooks/use-resource"
 /** 移动端 AI 聊天草稿目标的身份、名称与账号状态。 */
 type DraftTarget = Pick<AgentData, "identityId" | "displayName" | "status">
 
-type MobileAgentLocationState = MobileLocateState & {
+/** 移动端 AI 聊天路由状态：draftAgentID 按 AI 员工或助理编号读取草稿目标，draftTarget 为已解析的活跃目标。 */
+export type MobileAgentLocationState = MobileLocateState & {
   draftAgentID?: string
+  draftTarget?: Pick<AgentData, "identityId" | "displayName">
   draftAssistant?: boolean
   mobileBack?: boolean
   agentDirectory?: boolean
@@ -70,9 +72,12 @@ function MobileAgentConversation({ conversationID }: { conversationID: string })
   const [draftAssistant] = useState(
     () => (location.state as MobileAgentLocationState | null)?.draftAssistant ?? false,
   )
-  const [draftAgent, setDraftAgent] = useState<DraftTarget | null>(null)
+  const [draftAgent, setDraftAgent] = useState<DraftTarget | null>(() => {
+    const target = (location.state as MobileAgentLocationState | null)?.draftTarget
+    return target ? { ...target, status: UserStatus.UserStatusActive } : null
+  })
   const [created, setCreated] = useState<AgentInboxConversationData | null>(null)
-  const persisted = !draftAgentID || Boolean(created)
+  const persisted = (!draftAgentID && !draftAgent) || Boolean(created)
   const alive = useRef(true)
   const firstChat = useFirstChatMessage()
   // 草稿目标为本人助理时读取助理详情，其余读取 AI 员工详情。
@@ -123,7 +128,7 @@ function MobileAgentConversation({ conversationID }: { conversationID: string })
     setCreated(conversation)
     void navigate(`/chats/agent/${conversationID}`, {
       replace: true,
-      state: { ...location.state, draftAgentID: undefined },
+      state: { ...location.state, draftAgentID: undefined, draftTarget: undefined },
     })
   }
 

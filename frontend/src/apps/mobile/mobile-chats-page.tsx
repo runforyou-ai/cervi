@@ -91,15 +91,15 @@ function MobileChatList({
               <DropdownMenuContent align="end">
                 <DropdownMenuItem
                   className="min-h-11"
-                  onSelect={() => navigate("/chats/agent/new", { state: { mobileBack: true } })}
-                >
-                  {t("inbox:newAgentConversation")}
-                </DropdownMenuItem>
-                <DropdownMenuItem
-                  className="min-h-11"
                   onSelect={() => navigate("/chats/group/new", { state: { mobileBack: true } })}
                 >
                   {t("group.create")}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="min-h-11"
+                  onSelect={() => navigate("/chats/new", { state: { mobileBack: true } })}
+                >
+                  {t("inbox:newDirectConversation")}
                 </DropdownMenuItem>
               </DropdownMenuContent>
             </DropdownMenu>
