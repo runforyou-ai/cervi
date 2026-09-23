@@ -5,8 +5,6 @@ package identity
 
 import (
 	"context"
-	"database/sql"
-	"errors"
 
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -16,6 +14,11 @@ import (
 
 // LockActiveUser 校验当前身份并锁定有效用户账号，供写事务复用。
 func LockActiveUser(ctx context.Context, tx bun.Tx, identity *servermodels.Identity) error {
+	return LockActiveUserAccounts(ctx, tx, identity, nil)
+}
+
+// LockActiveUserAccounts 按账号编号锁定操作者及关联账号，并校验操作者身份与有效状态。
+func LockActiveUserAccounts(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, relatedUserIDs []string) error {
 	if identity == nil ||
 		!common.ValidUUID(identity.Organization.ID) ||
 		!common.ValidUUID(identity.OrganizationIdentity.ID) ||
@@ -27,21 +30,23 @@ func LockActiveUser(ctx context.Context, tx bun.Tx, identity *servermodels.Ident
 		identity.User.OrganizationID != identity.Organization.ID {
 		return common.ErrIdentityInvalid
 	}
-	user := &servermodels.User{}
+	userIDs := append([]string{identity.User.ID}, relatedUserIDs...)
+	var users []servermodels.User
 	err := tx.NewSelect().
-		Model(user).
-		Column("id").
-		Where("id = ?", identity.User.ID).
-		Where("identity_id = ?", identity.User.IdentityID).
+		Model(&users).
+		Column("id", "identity_id", "status").
+		Where("id IN (?)", bun.In(userIDs)).
 		Where("organization_id = ?", identity.Organization.ID).
-		Where("status = ?", domain.UserStatusActive).
+		OrderExpr("id ASC").
 		For("NO KEY UPDATE").
 		Scan(ctx)
-	if errors.Is(err, sql.ErrNoRows) {
-		return common.ErrIdentityInvalid
-	}
 	if err != nil {
 		return err
 	}
-	return nil
+	for _, user := range users {
+		if user.ID == identity.User.ID && user.IdentityID == identity.User.IdentityID && user.Status == string(domain.UserStatusActive) {
+			return nil
+		}
+	}
+	return common.ErrIdentityInvalid
 }

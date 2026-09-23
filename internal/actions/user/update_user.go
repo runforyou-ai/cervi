@@ -13,7 +13,9 @@ import (
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
+	roleaction "github.com/runforyou-ai/cervi/internal/actions/role"
 	"github.com/runforyou-ai/cervi/internal/actions/serviceassignment"
+	teamaction "github.com/runforyou-ai/cervi/internal/actions/team"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/realtime"
@@ -63,17 +65,21 @@ func (a *UpdateUserAction) Execute(ctx context.Context, identity *servermodels.I
 	var output *User
 	var cancelledRunIDs []string
 	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
-		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
+		if err := identityaction.LockActiveUserAccounts(ctx, tx, identity, []string{userID}); err != nil {
 			return err
 		}
-		administratorRoleID, err := lockAdministratorRole(ctx, tx, identity.Organization.ID)
+		administratorRoleID, err := roleaction.LockAdministratorRole(ctx, tx, identity.Organization.ID)
 		if err != nil {
 			return err
 		}
 		if err := validateRoleID(ctx, tx, identity.Organization.ID, input.RoleID); err != nil {
 			return err
 		}
-		// 锁定目标账号并读取修改前的最大接待量与所属团队，用于判断可接待的队列会话是否增加。
+		input.TeamIDs, err = validateTeamIDs(ctx, tx, identity.Organization.ID, input.TeamIDs)
+		if err != nil {
+			return err
+		}
+		// 读取锁内目标账号的最大接待量与所属团队，用于判断可接待的队列会话是否增加。
 		var previous struct {
 			MaxServiceSessions int      `bun:"max_service_sessions"`
 			TeamIDs            []string `bun:"team_ids,array"`
@@ -82,7 +88,6 @@ func (a *UpdateUserAction) Execute(ctx context.Context, identity *servermodels.I
 			ColumnExpr("u.max_service_sessions").
 			ColumnExpr("ARRAY(SELECT tm.team_id::text FROM team_members AS tm WHERE tm.organization_id = u.organization_id AND tm.identity_id = u.identity_id) AS team_ids").
 			Where("u.organization_id = ? AND u.id = ?", identity.Organization.ID, userID).
-			For("NO KEY UPDATE OF u").
 			Scan(ctx, &previous)
 		if errors.Is(err, sql.ErrNoRows) {
 			return ErrNotFound
@@ -135,10 +140,10 @@ func (a *UpdateUserAction) Execute(ctx context.Context, identity *servermodels.I
 				return err
 			}
 		}
-		if err := ensureActiveAdministratorRemains(ctx, tx, identity.Organization.ID, administratorRoleID); err != nil {
+		if err := roleaction.EnsureActiveAdministratorRemains(ctx, tx, identity.Organization.ID, administratorRoleID); err != nil {
 			return err
 		}
-		if err := replaceUserTeams(ctx, tx, identity, identityID, input.TeamIDs); err != nil {
+		if err := teamaction.ReplaceIdentityTeams(ctx, tx, identity, identityID, input.TeamIDs); err != nil {
 			return err
 		}
 		// 开启接待、调高最大接待量或加入新团队后可接待的队列会话增加，由补分配任务在锁内重新判断。

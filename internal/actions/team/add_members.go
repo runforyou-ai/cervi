@@ -33,7 +33,7 @@ func (a *AddMembersAction) Execute(ctx context.Context, identity *servermodels.I
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		if _, err := loadTeam(ctx, tx, identity.Organization.ID, teamID); err != nil {
+		if err := lockTeam(ctx, tx, identity.Organization.ID, teamID); err != nil {
 			return err
 		}
 		uniqueIDs := make(map[string]domain.OrganizationIdentityType, len(members))

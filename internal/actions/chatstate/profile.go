@@ -59,6 +59,14 @@ func TouchChannelConversations(ctx context.Context, db bun.IDB, organizationID, 
 		Where("cc.organization_id = ? AND cci.channel_id = ?", organizationID, channelID), false)
 }
 
+// TouchTeamConversations 推进当前客服周期属于指定团队的会话版本，并通知企业客服受众。
+func TouchTeamConversations(ctx context.Context, db bun.IDB, organizationID, teamID string) error {
+	return touchProfileConversations(ctx, db, organizationID, db.NewSelect().TableExpr("customer_conversations AS cc").
+		Column("cc.conversation_id").
+		Join("JOIN service_sessions AS ss ON ss.organization_id = cc.organization_id AND ss.id = cc.current_service_session_id").
+		Where("cc.organization_id = ? AND ss.team_id = ?", organizationID, teamID), false)
+}
+
 // NotifyDirectPeersWorkStatusChanged 通知单聊对端重读会话摘要，用于只在单聊展示的工作状态变化；不推进会话版本。
 func NotifyDirectPeersWorkStatusChanged(ctx context.Context, db bun.IDB, organizationID, identityID string) error {
 	var rows []struct {

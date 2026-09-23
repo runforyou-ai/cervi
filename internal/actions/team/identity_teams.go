@@ -59,7 +59,7 @@ func LoadTeamsByIdentity(ctx context.Context, db bun.IDB, organizationID string,
 	return grouped, nil
 }
 
-// ReplaceIdentityTeams 按差集替换企业身份的团队关系；teamIDs 必须已校验属于当前企业。
+// ReplaceIdentityTeams 按差集替换企业身份的团队关系；调用方须持有 teamIDs 对应团队的共享锁。
 func ReplaceIdentityTeams(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, organizationIdentityID string, teamIDs []string) error {
 	if len(teamIDs) == 0 {
 		_, err := tx.NewDelete().Model((*servermodels.TeamMember)(nil)).

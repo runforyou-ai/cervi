@@ -9,6 +9,7 @@ import (
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/actions/serviceassignment"
+	teamaction "github.com/runforyou-ai/cervi/internal/actions/team"
 	commonpassword "github.com/runforyou-ai/cervi/internal/common/password"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/realtime"
@@ -46,6 +47,10 @@ func (a *CreateUserAction) Execute(ctx context.Context, identity *servermodels.I
 		if err := validateRoleID(ctx, tx, identity.Organization.ID, input.RoleID); err != nil {
 			return err
 		}
+		teamIDs, err := validateTeamIDs(ctx, tx, identity.Organization.ID, input.TeamIDs)
+		if err != nil {
+			return err
+		}
 		organizationIdentity := &servermodels.OrganizationIdentity{
 			OrganizationID:   identity.Organization.ID,
 			Type:             string(domain.OrganizationIdentityTypeUser),
@@ -61,7 +66,7 @@ func (a *CreateUserAction) Execute(ctx context.Context, identity *servermodels.I
 			}
 			organizationIdentity.AvatarFileID = avatarFileID
 		}
-		_, err := tx.NewInsert().Model(organizationIdentity).
+		_, err = tx.NewInsert().Model(organizationIdentity).
 			Column("organization_id", "type", "display_name", "avatar_file_id", "handles_customers", "work_status").Returning("id").Exec(ctx)
 		if err != nil {
 			return err
@@ -85,7 +90,7 @@ func (a *CreateUserAction) Execute(ctx context.Context, identity *servermodels.I
 		if err != nil {
 			return err
 		}
-		if err := replaceUserTeams(ctx, tx, identity, user.IdentityID, input.TeamIDs); err != nil {
+		if err := teamaction.ReplaceIdentityTeams(ctx, tx, identity, user.IdentityID, teamIDs); err != nil {
 			return err
 		}
 		if input.HandlesCustomers {
