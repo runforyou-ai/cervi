@@ -1,7 +1,7 @@
 /** 美式英语·集成文案。 */
 const integrations = {
   mcpServer: {
-    title: "MCP servers",
+    title: "Tools",
     description: "External tool services your AI employees can call",
     list: {
       create: "Add MCP server",

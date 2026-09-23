@@ -28,16 +28,14 @@ type ContactInput struct {
 
 // ListInput 定义外部联系人列表查询条件。
 type ListInput struct {
-	Query     string
-	Stage     domain.ContactStage
-	ChannelID string
-	// ChannelType 按渠道类别筛选来源或关联渠道属于该类别的联系人。
-	ChannelType domain.ChannelType
-	MethodType  domain.ContactMethodType
-	Sort        domain.ContactSort
-	Page        int
-	PageSize    int
-	Deleted     bool
+	Query      string
+	Stage      domain.ContactStage
+	ChannelID  string
+	MethodType domain.ContactMethodType
+	Sort       domain.ContactSort
+	Page       int
+	PageSize   int
+	Deleted    bool
 }
 
 // PageInfo 定义服务端分页信息。

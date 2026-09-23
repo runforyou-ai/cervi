@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"log/slog"
+	"uuid"
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
@@ -56,26 +57,7 @@ func (s *Scheduler) ScheduleCustomerAuto(ctx context.Context, db bun.IDB, organi
 	}
 	if !eligible {
 		// 负责人是已失去接待资格的 AI 员工时，在本次入站事务内把周期退回原队列。
-		assignee := &servermodels.OrganizationIdentity{}
-		if err := db.NewSelect().Model(assignee).
-			Column("oi.id", "oi.type", "oi.display_name").
-			Where("oi.organization_id = ? AND oi.id = ?", organizationID, *session.AssigneeIdentityID).
-			Scan(ctx); err != nil {
-			return false, fmt.Errorf("load unavailable customer agent identity: %w", err)
-		}
-		cancelled, err := returnUnavailableAssigneeSession(ctx, db, s.enqueuer, organizationID, conversationID, session.ID,
-			assignee, "returned:"+session.ID+":"+messageID)
-		if err != nil {
-			return false, err
-		}
-		slog.Warn("客户会话负责人不满足 Agent 执行资格，周期已退回队列",
-			"organization_id", organizationID,
-			"conversation_id", conversationID,
-			"service_session_id", serviceSessionID,
-			"assignee_identity_id", *session.AssigneeIdentityID,
-			"cancelled_run_ids", cancelled,
-		)
-		return false, nil
+		return false, s.returnIneligibleAgentSession(ctx, db, session, "returned:"+session.ID+":"+messageID)
 	}
 
 	if err := s.appendInput(ctx, db, agentRunSpec{
@@ -87,6 +69,60 @@ func (s *Scheduler) ScheduleCustomerAuto(ctx context.Context, db bun.IDB, organi
 		return false, err
 	}
 	return true, nil
+}
+
+// ScheduleCustomerFollowUp 在调用方已锁定会话的事务内为 AI 员工负责的开放周期追加一次超时跟进输入，来源消息为周期最后一条对客消息；负责人已失去接待资格时把周期退回原队列。
+func (s *Scheduler) ScheduleCustomerFollowUp(ctx context.Context, db bun.IDB, session *servermodels.ServiceSession) (bool, error) {
+	if s.enqueuer == nil {
+		return false, errors.New("agent run scheduler is unavailable")
+	}
+	if domain.ServiceSessionStatus(session.Status) != domain.ServiceSessionStatusOpen || session.AssigneeIdentityID == nil {
+		return false, nil
+	}
+	eligibility, eligible, err := loadCustomerAgentEligibility(ctx, db, session, "")
+	if err != nil {
+		return false, err
+	}
+	if !eligible {
+		// 负责人已失去接待资格时，在本次跟进事务内把周期退回原队列。
+		return false, s.returnIneligibleAgentSession(ctx, db, session, "returned:"+session.ID+":follow-up:"+session.LastMessageID)
+	}
+	subject, err := chatstate.EnsureOrganizationIdentityChatSubject(ctx, db, session.OrganizationID, *session.AssigneeIdentityID, uuid.NewV7().String())
+	if err != nil {
+		return false, err
+	}
+	if err := s.appendInput(ctx, db, agentRunSpec{
+		OrganizationID: session.OrganizationID, ConversationID: session.ConversationID,
+		AgentIdentityID: *session.AssigneeIdentityID, RevisionID: eligibility.RevisionID,
+		ScopeKind: domain.AgentExecutionScopeServiceSession, ScopeID: session.ID,
+		Kind: domain.AgentInputKindFollowUp, SourceSubjectID: subject.ID,
+	}, session.LastMessageID); err != nil {
+		return false, err
+	}
+	return true, nil
+}
+
+// returnIneligibleAgentSession 在调用方已锁定会话的事务内把失去接待资格的负责人所负责的周期退回原队列，key 为退回事件的幂等键。
+func (s *Scheduler) returnIneligibleAgentSession(ctx context.Context, db bun.IDB, session *servermodels.ServiceSession, key string) error {
+	assignee := &servermodels.OrganizationIdentity{}
+	if err := db.NewSelect().Model(assignee).
+		Column("oi.id", "oi.type", "oi.display_name").
+		Where("oi.organization_id = ? AND oi.id = ?", session.OrganizationID, *session.AssigneeIdentityID).
+		Scan(ctx); err != nil {
+		return fmt.Errorf("load unavailable customer agent identity: %w", err)
+	}
+	cancelled, err := returnUnavailableAssigneeSession(ctx, db, s.enqueuer, session.OrganizationID, session.ConversationID, session.ID, assignee, key)
+	if err != nil {
+		return err
+	}
+	slog.Warn("客户会话负责人不满足 Agent 执行资格，周期已退回队列",
+		"organization_id", session.OrganizationID,
+		"conversation_id", session.ConversationID,
+		"service_session_id", session.ID,
+		"assignee_identity_id", assignee.ID,
+		"cancelled_run_ids", cancelled,
+	)
+	return nil
 }
 
 // loadCustomerAssigneeType 读取当前客服负责人的企业身份类型。

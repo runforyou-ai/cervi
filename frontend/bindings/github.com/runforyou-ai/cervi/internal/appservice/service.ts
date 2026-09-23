@@ -507,6 +507,13 @@ export function GetSyncHeads(meta: $models.RequestMeta): $CancellablePromise<$mo
 }
 
 /**
+ * GetTeam 返回团队详情。
+ */
+export function GetTeam(meta: $models.RequestMeta, teamID: string): $CancellablePromise<$models.Team> {
+    return $Call.ByID(1981988775, meta, teamID);
+}
+
+/**
  * GetTelegramChannel 返回 Telegram 渠道详情。
  */
 export function GetTelegramChannel(meta: $models.RequestMeta, channelID: string): $CancellablePromise<$models.TelegramChannel> {
@@ -574,13 +581,6 @@ export function ListAgentModelOptions(meta: $models.RequestMeta): $CancellablePr
  */
 export function ListAgents(meta: $models.RequestMeta, input: $models.AgentListInput): $CancellablePromise<$models.AgentList> {
     return $Call.ByID(2544201800, meta, input);
-}
-
-/**
- * ListAllTeamMembers 返回企业所有团队的成员列表，同一身份只列一次。
- */
-export function ListAllTeamMembers(meta: $models.RequestMeta, input: $models.TeamMemberListInput): $CancellablePromise<$models.TeamMemberList> {
-    return $Call.ByID(3827649919, meta, input);
 }
 
 /**
@@ -1284,7 +1284,7 @@ export function UpdateRole(meta: $models.RequestMeta, roleID: string, input: $mo
 }
 
 /**
- * UpdateRoleAssignments 在一个事务中批量调整真人和 AI 员工角色。
+ * UpdateRoleAssignments 在一个事务中批量调整成员角色。
  */
 export function UpdateRoleAssignments(meta: $models.RequestMeta, input: $models.RoleAssignmentsInput): $CancellablePromise<void> {
     return $Call.ByID(2402672415, meta, input);

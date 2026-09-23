@@ -8,29 +8,28 @@ import {
   useSearchParams,
 } from "react-router"
 
-import { getAgent, isNotFoundApiError, listRoles, listTeams } from "@/api"
+import { getAgent, isNotFoundApiError, listTeams } from "@/api"
 import { PageContent } from "@/components/page-content"
 import { PageBackButton } from "@/components/page-back-button"
 import { PageHeader } from "@/components/page-header"
 import { ResourceContent } from "@/components/resource-content"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
-import { agentReturnPath } from "@/features/contacts/agents/agent-navigation"
-import { AgentForm } from "@/features/contacts/agents/agent-form"
-import { AgentProfileForm } from "@/features/contacts/agents/agent-profile-form"
-import { AgentExecutionForm } from "@/features/contacts/agents/agent-execution-form"
+import { agentReturnPath } from "@/features/agents/agent-navigation"
+import { AgentForm } from "@/features/agents/agent-form"
+import { AgentProfileForm } from "@/features/agents/agent-profile-form"
+import { AgentExecutionForm } from "@/features/agents/agent-execution-form"
 import { useContactInvalidator } from "@/features/contacts/use-contact-invalidator"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 
 /** 加载 AI 员工配置并维护独立保存的两个页签。 */
 export function AgentFormPage({ mode }: { mode: "create" | "edit" }) {
-  const { t } = useTranslation(["contacts", "common"])
+  const { t } = useTranslation(["agents", "common"])
   const { agentId = "" } = useParams()
   const [searchParams, setSearchParams] = useSearchParams()
   const navigate = useNavigate()
   const location = useLocation()
   const invalidateContact = useContactInvalidator()
-  const roles = useResource(resourceKeys.roles(), () => listRoles())
   const teams = useResource(
     resourceKeys.teams({ pageSize: 100 }),
     () => listTeams({ pageSize: 100 }),
@@ -66,32 +65,31 @@ export function AgentFormPage({ mode }: { mode: "create" | "edit" }) {
       <PageHeader
         title={
           mode === "create"
-            ? t("agents.create")
+            ? t("create")
             : agent
-              ? t("agents.edit", { name: agent.displayName })
-              : t("agents.editTitle")
+              ? t("edit", { name: agent.displayName })
+              : t("editTitle")
         }
         description={t(
           mode === "create"
-            ? "agents.createDescription"
-            : "agents.editDescription",
+            ? "createDescription"
+            : "editDescription",
         )}
       >
         {mode === "edit" ? <PageBackButton to={returnTo} /> : null}
       </PageHeader>
       <PageContent variant="form">
         <ResourceContent
-          resources={mode === "edit" ? [roles, teams, detail] : [roles]}
-          errorMessage={t("agents.form.loadError")}
+          resources={mode === "edit" ? [teams, detail] : []}
+          errorMessage={t("form.loadError")}
         >
         {mode === "create" ? (
           <AgentForm
-            roles={roles.data?.roles ?? []}
             defaultTeamIds={teamId ? [teamId] : []}
             onCancel={() => navigate(returnTo)}
             onSaved={(created) => {
               const next = new URLSearchParams({ tab: "basic", returnTo })
-              navigate(`/contacts/ai-employees/${created.id}?${next}`, {
+              navigate(`/ai-employees/${created.id}?${next}`, {
                 replace: true,
               })
             }}
@@ -107,9 +105,9 @@ export function AgentFormPage({ mode }: { mode: "create" | "edit" }) {
             }}
           >
             <TabsList>
-              <TabsTrigger value="basic">{t("agents.basic")}</TabsTrigger>
+              <TabsTrigger value="basic">{t("basic")}</TabsTrigger>
               <TabsTrigger value="execution">
-                {t("agents.execution.title")}
+                {t("execution.title")}
               </TabsTrigger>
             </TabsList>
             <TabsContent
@@ -119,7 +117,6 @@ export function AgentFormPage({ mode }: { mode: "create" | "edit" }) {
             >
               <AgentProfileForm
                 agent={agent}
-                roles={roles.data?.roles ?? []}
                 teams={teams.data?.teams ?? []}
                 onSaved={() => {
                   void invalidateContact("agent", agent.id)

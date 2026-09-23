@@ -34,10 +34,10 @@ func newCustomerReadFixture(t *testing.T) customerReadFixture {
 		t.Fatal(err)
 	}
 	for _, identity := range []*servermodels.Identity{f.owner, f.member} {
-		if _, err := f.db.NewUpdate().Table("organization_identities").Set("role_id = ?", roleID).Where("organization_id = ? AND id = ?", identity.Organization.ID, identity.OrganizationIdentity.ID).Exec(ctx); err != nil {
+		if _, err := f.db.NewUpdate().Table("users").Set("role_id = ?", roleID).Where("organization_id = ? AND id = ?", identity.Organization.ID, identity.User.ID).Exec(ctx); err != nil {
 			t.Fatal(err)
 		}
-		identity.OrganizationIdentity.RoleID = roleID
+		identity.User.RoleID = roleID
 	}
 	channel, err := channelaction.NewCreateMessageChannelAction(f.db).Execute(ctx, f.owner, channelaction.CreateMessageChannelInput{
 		Type: domain.ChannelTypeWebsite, Name: "客服未读测试", DefaultLocale: domain.LocaleChineseSimplified,

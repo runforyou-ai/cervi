@@ -35,13 +35,13 @@ type groupAgentFixture struct {
 }
 
 // newGroupAgentCollaborators 创建供群协作用例共享的两位 AI 员工。
-func newGroupAgentCollaborators(t *testing.T, db *bun.DB, identity *servermodels.Identity, roleID, providerID, modelID string) []*agentaction.Agent {
+func newGroupAgentCollaborators(t *testing.T, db *bun.DB, identity *servermodels.Identity, providerID, modelID string) []*agentaction.Agent {
 	t.Helper()
 	ctx := context.Background()
 	agents := make([]*agentaction.Agent, 0, 2)
 	for i := range 2 {
 		agent, err := agentaction.NewCreateAgentAction(db).Execute(ctx, identity, agentaction.CreateInput{
-			DisplayName: fmt.Sprintf("群协作助手 %d", i), RoleID: roleID,
+			DisplayName: fmt.Sprintf("群协作助手 %d", i),
 			Execution: agentaction.ExecutionInput{Mode: domain.AgentExecutionModeManaged, Managed: &agentaction.ManagedExecutionInput{
 				ProviderID: providerID, ModelIdentifier: modelID, SystemInstruction: "协助群内成员",
 			}},
@@ -183,10 +183,10 @@ func (f groupAgentFixture) runNext(t *testing.T, reply string, inspect func(agen
 }
 
 // testGroupAgentMentionReplies 验证群内点名触发、引用等价、轮转顺序与成员变化收敛。
-func testGroupAgentMentionReplies(t *testing.T, db *bun.DB, identity *servermodels.Identity, roleID, providerID, modelID string) {
+func testGroupAgentMentionReplies(t *testing.T, db *bun.DB, identity *servermodels.Identity, providerID, modelID string) {
 	t.Helper()
 	ctx := context.Background()
-	agents := newGroupAgentCollaborators(t, db, identity, roleID, providerID, modelID)
+	agents := newGroupAgentCollaborators(t, db, identity, providerID, modelID)
 
 	t.Run("群内附件进入上下文", func(t *testing.T) {
 		f := newGroupAgentFixture(t, db, identity, agents)

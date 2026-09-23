@@ -73,7 +73,7 @@ export function ChannelReceptionSettingsForm({
       if (recoverSession(error, navigate)) return false
       if (isNotFoundApiError(error)) {
         console.warn("消息渠道不存在", { channel_id: channel.id })
-        navigate(`/channels/${channel.type}`, { replace: true })
+        navigate("/channels", { replace: true })
         return false
       }
       if (isApiError(error)) {

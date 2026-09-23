@@ -137,8 +137,8 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 		return nil, nil, err
 	}
 
-	// 注册客服处理周期超时扫描与单条处理任务，每 30 秒扫描一次到期周期。
-	serviceTimeout := servicetimeout.NewWorker(appStorage.DB(), tasks)
+	// 注册客服处理周期超时扫描与单条处理任务，每 30 秒扫描一次到期周期；AI 超时跟进经 Agent 调度器追加输入。
+	serviceTimeout := servicetimeout.NewWorker(appStorage.DB(), tasks, agentRunScheduler)
 	if err := tasks.Registry().RegisterJSON(servicetimeout.ScanActionName, serviceTimeout.Scan); err != nil {
 		return nil, nil, err
 	}

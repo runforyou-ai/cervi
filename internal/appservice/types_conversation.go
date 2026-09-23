@@ -73,6 +73,15 @@ const (
 	ServiceSessionReturnResponseTimeout     ServiceSessionReturnReason = ServiceSessionReturnReason(domain.ServiceSessionReturnResponseTimeout)
 )
 
+// ServiceSessionCloseReason 表示客服处理周期的结束方式。
+type ServiceSessionCloseReason string
+
+const (
+	ServiceSessionCloseAIResolved           ServiceSessionCloseReason = ServiceSessionCloseReason(domain.ServiceSessionCloseAIResolved)
+	ServiceSessionCloseCustomerUnresponsive ServiceSessionCloseReason = ServiceSessionCloseReason(domain.ServiceSessionCloseCustomerUnresponsive)
+	ServiceSessionCloseManual               ServiceSessionCloseReason = ServiceSessionCloseReason(domain.ServiceSessionCloseManual)
+)
+
 // ServiceSessionTargetKind 表示客服处理周期流转去向的类型。
 type ServiceSessionTargetKind string
 
@@ -240,13 +249,14 @@ type ConversationSystemEvent struct {
 	Targets       []ConversationSystemEventParticipant `json:"targets"`
 	PreviousTitle *string                              `json:"previousTitle"`
 	Title         *string                              `json:"title"`
-	// 以下字段只由客服处理周期事件携带：原负责人、去向，以及转人工或退回队列的原因与成员可见的原因说明；操作人写入 Actor。
+	// 以下字段只由客服处理周期事件携带：原负责人、去向，转人工或退回队列的原因与成员可见的原因说明，以及关闭事件的结束方式；操作人写入 Actor。
 	ServiceSessionID *string                     `json:"serviceSessionId"`
 	FromIdentityID   *string                     `json:"fromIdentityId"`
 	FromDisplayName  *string                     `json:"fromDisplayName"`
 	SessionTarget    *ServiceSessionTarget       `json:"sessionTarget"`
 	HandoffReason    *AgentHandoffReason         `json:"handoffReason"`
 	ReturnReason     *ServiceSessionReturnReason `json:"returnReason"`
+	CloseReason      *ServiceSessionCloseReason  `json:"closeReason"`
 	ReasonText       *string                     `json:"reasonText"`
 	AgentRunID       *string                     `json:"agentRunId"`
 }

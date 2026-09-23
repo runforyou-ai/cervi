@@ -76,7 +76,7 @@ export function isMessageChannelType(
 }
 
 /**
- * 路线图中规划、尚未接入的渠道，按接入批次排列，只在渠道二级菜单中展示为不可点击项。
+ * 路线图中规划、尚未接入的渠道，按接入批次排列，只在添加渠道的平台选择中展示为不可选项。
  * 同时出现在国内和海外清单中的邮件、短信只列一次；接入后移入 messageChannelTypeDefinitions。
  */
 export const plannedChannelDefinitions = [

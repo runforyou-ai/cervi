@@ -111,15 +111,8 @@ func TestInboxSearch(t *testing.T) {
 		Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
-	// AI 员工不能使用管理员角色，改用企业内置的客服角色。
-	customerServiceRole := &servermodels.Role{}
-	if err := f.db.NewSelect().Model(customerServiceRole).
-		Where("organization_id = ?", f.owner.Organization.ID).
-		Where("kind = ?", domain.RoleKindCustomerService).Scan(ctx); err != nil {
-		t.Fatal(err)
-	}
 	agent, err := agentaction.NewCreateAgentAction(f.db).Execute(ctx, f.owner, agentaction.CreateInput{
-		HandlesCustomers: true, DisplayName: "检索助理", RoleID: customerServiceRole.ID,
+		HandlesCustomers: true, DisplayName: "检索助理",
 		Execution: agentaction.ExecutionInput{Mode: domain.AgentExecutionModeManaged, Managed: &agentaction.ManagedExecutionInput{
 			ProviderID: provider.ID, ModelIdentifier: model.Identifier, SystemInstruction: "负责检索测试。",
 		}},

@@ -13,7 +13,6 @@ import (
 // CreateInput 定义新增 AI 员工字段，AvatarFileID 为空时不设置头像。
 type CreateInput struct {
 	DisplayName      string
-	RoleID           string
 	TeamIDs          []string
 	HandlesCustomers bool
 	AvatarFileID     string
@@ -23,7 +22,6 @@ type CreateInput struct {
 // UpdateInput 定义 AI 员工可编辑字段，AvatarFileID 为空时保留当前头像。
 type UpdateInput struct {
 	DisplayName      string
-	RoleID           string
 	TeamIDs          []string
 	HandlesCustomers bool
 	WorkStatus       domain.WorkStatus
@@ -47,9 +45,6 @@ type Agent struct {
 	IdentityID       string            `bun:"identity_id"`
 	DisplayName      string            `bun:"display_name"`
 	AvatarFileID     *string           `bun:"avatar_file_id"`
-	RoleID           string            `bun:"role_id"`
-	RoleKind         domain.RoleKind   `bun:"role_kind"`
-	RoleName         string            `bun:"role_name"`
 	HandlesCustomers bool              `bun:"handles_customers"`
 	Status           domain.UserStatus `bun:"status"`
 	WorkStatus       domain.WorkStatus `bun:"work_status"`
@@ -64,9 +59,6 @@ type ListItem struct {
 	IdentityID       string            `bun:"identity_id"`
 	DisplayName      string            `bun:"display_name"`
 	AvatarFileID     *string           `bun:"avatar_file_id"`
-	RoleID           string            `bun:"role_id"`
-	RoleKind         domain.RoleKind   `bun:"role_kind"`
-	RoleName         string            `bun:"role_name"`
 	HandlesCustomers bool              `bun:"handles_customers"`
 	Status           domain.UserStatus `bun:"status"`
 	WorkStatus       domain.WorkStatus `bun:"work_status"`

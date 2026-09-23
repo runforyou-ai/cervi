@@ -75,6 +75,7 @@ const common = {
     searchCustomerHistory: "客户历史沟通",
     askCustomer: "追问客户",
     handoffToHuman: "转交人工",
+    resolveConversation: "确认解决并结束",
     mcp: "MCP 服务工具",
   },
 }

@@ -133,7 +133,7 @@ export function MessageChannelForm({
       }
       if (channel && isNotFoundApiError(error)) {
         console.warn("消息渠道不存在", { channel_id: channel.id })
-        navigate(`/channels/${channel.type}`, { replace: true })
+        navigate("/channels", { replace: true })
         return false
       }
       if (isApiError(error)) {
@@ -225,7 +225,7 @@ export function MessageChannelForm({
 
       </FieldGroup>
       {channel ? null : (
-        <FormActions saving={isSubmitting} cancelTo={`/channels/${channelType}`} />
+        <FormActions saving={isSubmitting} cancelTo="/channels" />
       )}
     </form>
   )

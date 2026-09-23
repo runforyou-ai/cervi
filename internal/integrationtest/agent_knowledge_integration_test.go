@@ -20,7 +20,7 @@ import (
 )
 
 // testAgentKnowledgeScopes 验证本地知识库绑定的保存、企业隔离、版本快照和失效解绑。
-func testAgentKnowledgeScopes(t *testing.T, db *bun.DB, identity *servermodels.Identity, roleID, providerID, modelID string) {
+func testAgentKnowledgeScopes(t *testing.T, db *bun.DB, identity *servermodels.Identity, providerID, modelID string) {
 	t.Helper()
 	ctx := context.Background()
 	bases := make([]string, 0, 2)
@@ -36,7 +36,7 @@ func testAgentKnowledgeScopes(t *testing.T, db *bun.DB, identity *servermodels.I
 		ProviderID: providerID, ModelIdentifier: modelID, SystemInstruction: "回答产品问题", KnowledgeBaseIDs: []string{bases[0], bases[0]},
 	}}
 	create := agentaction.NewCreateAgentAction(db)
-	created, err := create.Execute(ctx, identity, agentaction.CreateInput{DisplayName: "本地知识助手", RoleID: roleID, Execution: input})
+	created, err := create.Execute(ctx, identity, agentaction.CreateInput{DisplayName: "本地知识助手", Execution: input})
 	if err != nil || !slices.Equal(created.Execution.Managed.KnowledgeBaseIDs, bases[:1]) {
 		t.Fatalf("create=%+v err=%v", created, err)
 	}
@@ -76,7 +76,7 @@ func testAgentKnowledgeScopes(t *testing.T, db *bun.DB, identity *servermodels.I
 		if _, err := update.Execute(ctx, identity, created.ID, agentaction.UpdateExecutionInput{ExecutionInput: input}); !errors.As(err, &fields) || fields.Fields["knowledgeBaseIds"] != agentaction.ValidationKnowledgeBaseInvalid {
 			t.Fatalf("invalid update err=%v", err)
 		}
-		if _, err := create.Execute(ctx, identity, agentaction.CreateInput{DisplayName: "无效绑定助手", RoleID: roleID, Execution: input}); !errors.As(err, &fields) || fields.Fields["knowledgeBaseIds"] != agentaction.ValidationKnowledgeBaseInvalid {
+		if _, err := create.Execute(ctx, identity, agentaction.CreateInput{DisplayName: "无效绑定助手", Execution: input}); !errors.As(err, &fields) || fields.Fields["knowledgeBaseIds"] != agentaction.ValidationKnowledgeBaseInvalid {
 			t.Fatalf("invalid create err=%v", err)
 		}
 	}

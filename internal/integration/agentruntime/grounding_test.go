@@ -190,7 +190,7 @@ func TestGroundingCorrectionKeepsBudget(t *testing.T) {
 	if result.Decision.Kind != domain.AgentRunOutcomeHandoff || result.Decision.Reason != domain.AgentHandoffReasonBudgetExhausted {
 		t.Fatalf("result = %+v", result)
 	}
-	if chatModel.calls != 3 || !slices.Equal(chatModel.tools[2], []string{askCustomerToolName, handoffToolName}) {
+	if chatModel.calls != 3 || !slices.Equal(chatModel.tools[2], []string{askCustomerToolName, handoffToolName, resolveToolName}) {
 		t.Fatalf("calls = %d, tools = %v", chatModel.calls, chatModel.tools)
 	}
 	if !strings.Contains(chatModel.lastUser[2], "工具调用次数已达本轮上限") {

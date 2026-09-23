@@ -2,7 +2,7 @@
 import { z } from "zod"
 
 import { AgentExecutionMode, WorkStatus } from "@/api"
-import { isAgentModelSelection } from "@/features/contacts/agents/agent-model-selection"
+import { isAgentModelSelection } from "@/features/agents/agent-model-selection"
 import { displayNamePattern } from "@/lib/display-name"
 import { requiredWailsEnum } from "@/lib/wails-enum"
 
@@ -12,7 +12,6 @@ const maxSystemInstructionLength = 20000
 export interface AgentValidationMessages {
   nameRequired: string
   nameInvalid: string
-  roleRequired: string
   modelRequired: string
   instructionTooLong: string
 }
@@ -21,7 +20,6 @@ export interface AgentValidationMessages {
 export function createAgentProfileSchema(messages: {
   nameRequired: string
   nameInvalid: string
-  roleRequired: string
 }) {
   return z.object({
     displayName: z
@@ -29,7 +27,6 @@ export function createAgentProfileSchema(messages: {
       .trim()
       .min(1, messages.nameRequired)
       .regex(displayNamePattern, messages.nameInvalid),
-    roleId: z.string().uuid(messages.roleRequired),
     workStatus: requiredWailsEnum(WorkStatus),
     teamIds: z.array(z.string().uuid()),
     handlesCustomers: z.boolean(),
@@ -38,7 +35,7 @@ export function createAgentProfileSchema(messages: {
 
 /** 创建 AI 员工平台托管执行配置校验规则。 */
 export function createAgentManagedExecutionSchema(
-  messages: Omit<AgentValidationMessages, "nameRequired" | "nameInvalid" | "roleRequired">,
+  messages: Omit<AgentValidationMessages, "nameRequired" | "nameInvalid">,
 ) {
   return z.object({
     modelSelection: z
@@ -74,7 +71,7 @@ export type AgentProfileFormValues = z.infer<
 
 /** 创建运行配置编辑表单校验规则，服务绑定仅在编辑页配置。 */
 export function createAgentExecutionSchema(
-  messages: Omit<AgentValidationMessages, "nameRequired" | "nameInvalid" | "roleRequired">,
+  messages: Omit<AgentValidationMessages, "nameRequired" | "nameInvalid">,
 ) {
   return createAgentManagedExecutionSchema(messages).extend({ mcpServerIds: z.array(z.string().uuid()) })
 }

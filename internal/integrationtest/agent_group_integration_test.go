@@ -17,12 +17,12 @@ import (
 )
 
 // testGroupAgentMembership 验证活跃 Agent 建群、添加、移除和群主边界。
-func testGroupAgentMembership(t *testing.T, db *bun.DB, identity *servermodels.Identity, roleID, providerID, modelID string) {
+func testGroupAgentMembership(t *testing.T, db *bun.DB, identity *servermodels.Identity, providerID, modelID string) {
 	ctx := context.Background()
 	agents := make([]*agentaction.Agent, 0, 2)
 	for i := range 2 {
 		agent, err := agentaction.NewCreateAgentAction(db).Execute(ctx, identity, agentaction.CreateInput{
-			DisplayName: fmt.Sprintf("群成员助手 %d", i), RoleID: roleID,
+			DisplayName: fmt.Sprintf("群成员助手 %d", i),
 			Execution: agentaction.ExecutionInput{Mode: domain.AgentExecutionModeManaged, Managed: &agentaction.ManagedExecutionInput{
 				ProviderID: providerID, ModelIdentifier: modelID, SystemInstruction: "协助企业成员",
 			}},

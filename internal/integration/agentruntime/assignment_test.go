@@ -80,7 +80,7 @@ func TestResolveAssignment(t *testing.T) {
 		assignment.RulesVersion != AssignmentRulesVersion || assignment.Grounding != GroundingStrict {
 		t.Fatalf("有效配置 = %+v", assignment)
 	}
-	if !strings.Contains(assignment.Instruction, "只回答售后问题。") || !strings.HasSuffix(assignment.Instruction, customerSceneDecisionRule) {
+	if !strings.Contains(assignment.Instruction, "只回答售后问题。") || !strings.HasSuffix(assignment.Instruction, customerFollowUpRule) {
 		t.Fatalf("有效配置指令 = %q", assignment.Instruction)
 	}
 	if len(assignment.InstructionSHA256) != 64 || assignment.AgentName != "小鹿" || assignment.Model.Brand != "deepseek" ||
@@ -89,7 +89,7 @@ func TestResolveAssignment(t *testing.T) {
 		t.Fatalf("有效配置元数据 = %+v", assignment)
 	}
 	// 客服场景注册知识检索与终止工具，不注册开发期计算器。
-	if strings.Join(assignment.Tools, ",") != "search_knowledge,ask_customer,handoff_to_human" {
+	if strings.Join(assignment.Tools, ",") != "search_knowledge,ask_customer,handoff_to_human,resolve_conversation" {
 		t.Fatalf("客服工具清单 = %v", assignment.Tools)
 	}
 	internal := ResolveAssignment(AssignmentFacts{Scene: SceneContext{Scene: SceneAgentChat}}, Capabilities{})

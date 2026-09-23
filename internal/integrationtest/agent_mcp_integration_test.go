@@ -37,7 +37,7 @@ func newAgentMCPService(t *testing.T, db *bun.DB, identity *servermodels.Identit
 }
 
 // testAgentMCPServices 验证整体保存、企业隔离、删除联动和并发事务。
-func testAgentMCPServices(t *testing.T, db *bun.DB, owner *servermodels.Identity, roleID, providerID, modelID string) {
+func testAgentMCPServices(t *testing.T, db *bun.DB, owner *servermodels.Identity, providerID, modelID string) {
 	t.Helper()
 	ctx := context.Background()
 	execution := agentaction.ExecutionInput{Mode: domain.AgentExecutionModeManaged, Managed: &agentaction.ManagedExecutionInput{
@@ -49,7 +49,7 @@ func testAgentMCPServices(t *testing.T, db *bun.DB, owner *servermodels.Identity
 	remove := mcpaction.NewDeleteMCPServerAction(db)
 	agents := make([]*agentaction.Agent, 0, 2)
 	for range 2 {
-		agent, err := create.Execute(ctx, owner, agentaction.CreateInput{DisplayName: "MCP 配置助手", RoleID: roleID, Execution: execution})
+		agent, err := create.Execute(ctx, owner, agentaction.CreateInput{DisplayName: "MCP 配置助手", Execution: execution})
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -390,13 +390,13 @@ func testAgentMCPDeleteLatestRevision(t *testing.T, db *bun.DB, owner, colleague
 }
 
 // testAgentRunMCPServices 验证运行按配置版本装配同企业 MCP 服务，未绑定的服务不进入本次运行。
-func testAgentRunMCPServices(t *testing.T, db *bun.DB, owner *servermodels.Identity, roleID, providerID, modelID string, tasks *servertask.Runtime) {
+func testAgentRunMCPServices(t *testing.T, db *bun.DB, owner *servermodels.Identity, providerID, modelID string, tasks *servertask.Runtime) {
 	t.Helper()
 	ctx := context.Background()
 	execution := agentaction.ExecutionInput{Mode: domain.AgentExecutionModeManaged, Managed: &agentaction.ManagedExecutionInput{
 		ProviderID: providerID, ModelIdentifier: modelID, SystemInstruction: "调用外部工具",
 	}}
-	agent, err := agentaction.NewCreateAgentAction(db).Execute(ctx, owner, agentaction.CreateInput{DisplayName: "MCP 运行助手", RoleID: roleID, Execution: execution})
+	agent, err := agentaction.NewCreateAgentAction(db).Execute(ctx, owner, agentaction.CreateInput{DisplayName: "MCP 运行助手", Execution: execution})
 	if err != nil {
 		t.Fatal(err)
 	}

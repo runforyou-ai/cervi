@@ -16,7 +16,7 @@ type Input struct {
 	Permissions []domain.PermissionCode
 }
 
-// AssignmentInput 定义一个企业身份的目标角色。
+// AssignmentInput 定义一个成员的目标角色。
 type AssignmentInput struct {
 	IdentityID string
 	RoleID     string

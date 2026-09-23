@@ -227,6 +227,7 @@
   "error.user_last_active_administrator": "The administrator role must keep at least one active member.",
   "error.team_not_found": "This team could not be found.",
   "error.team_list_failed": "Could not load teams.",
+  "error.team_load_failed": "Could not load the team.",
   "error.team_create_failed": "Could not create the team.",
   "error.team_update_failed": "Could not save the team.",
   "error.team_delete_failed": "Could not delete the team.",

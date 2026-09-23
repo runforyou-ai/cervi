@@ -3,7 +3,7 @@ import {
   AddTeamMembers,
   CreateTeam,
   DeleteTeam,
-  ListAllTeamMembers,
+  GetTeam,
   ListMemberOptions,
   ListTeamMemberCandidates,
   ListTeamMembers,
@@ -38,13 +38,15 @@ const listTeamsBound = bind(ListTeams)
 const listMemberOptionsBound = bind(ListMemberOptions)
 const listTeamMemberCandidatesBound = bind(ListTeamMemberCandidates)
 const listTeamMembersBound = bind(ListTeamMembers)
-const listAllTeamMembersBound = bind(ListAllTeamMembers)
 
 /** 创建企业团队。 */
 export const createTeam = bind(CreateTeam)
 
 /** 修改企业团队。 */
 export const updateTeam = bind(UpdateTeam)
+
+/** 读取企业团队详情。 */
+export const getTeam = bind(GetTeam)
 
 /** 删除企业团队。 */
 export const deleteTeam = bind(DeleteTeam)
@@ -80,22 +82,6 @@ export function listTeamMembers(
 ) {
   return listTeamMembersBound(
     teamId,
-    {
-      query: query.query ?? "",
-      workStatus: query.workStatus ?? null,
-      page: query.page ?? 1,
-      pageSize: query.pageSize ?? 50,
-    },
-    signal,
-  )
-}
-
-/** 读取企业所有团队的成员列表，同一身份只列一次。 */
-export function listAllTeamMembers(
-  query: TeamMemberListQuery,
-  signal?: AbortSignal,
-) {
-  return listAllTeamMembersBound(
     {
       query: query.query ?? "",
       workStatus: query.workStatus ?? null,

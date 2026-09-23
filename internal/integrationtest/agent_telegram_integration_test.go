@@ -34,11 +34,11 @@ type agentTelegramFixture struct {
 }
 
 // newAgentTelegramFixture 创建自动分配给 AI 客服的 Telegram 私聊。
-func newAgentTelegramFixture(t *testing.T, db *bun.DB, identity *models.Identity, roleID, providerID, modelID string) agentTelegramFixture {
+func newAgentTelegramFixture(t *testing.T, db *bun.DB, identity *models.Identity, providerID, modelID string) agentTelegramFixture {
 	t.Helper()
 	ctx := context.Background()
 	agent, err := agentaction.NewCreateAgentAction(db).Execute(ctx, identity, agentaction.CreateInput{
-		HandlesCustomers: true, DisplayName: "Telegram AI 客服", RoleID: roleID,
+		HandlesCustomers: true, DisplayName: "Telegram AI 客服",
 		Execution: agentaction.ExecutionInput{Mode: domain.AgentExecutionModeManaged, Managed: &agentaction.ManagedExecutionInput{ProviderID: providerID, ModelIdentifier: modelID, SystemInstruction: "回答客户问题"}},
 	})
 	if err != nil {
@@ -94,10 +94,10 @@ func (f *agentTelegramFixture) receiveNext(t *testing.T) {
 }
 
 // testAgentTelegramReplies 验证自动接待、连续输入、事务投递及客服接管边界。
-func testAgentTelegramReplies(t *testing.T, db *bun.DB, identity *models.Identity, roleID, providerID, modelID string) {
+func testAgentTelegramReplies(t *testing.T, db *bun.DB, identity *models.Identity, providerID, modelID string) {
 	t.Run("引用上下文与历史窗口", func(t *testing.T) {
 		for _, external := range []bool{false, true} {
-			f := newAgentTelegramFixture(t, db, identity, roleID, providerID, modelID)
+			f := newAgentTelegramFixture(t, db, identity, providerID, modelID)
 			for range 100 {
 				f.receiveNext(t)
 			}
@@ -154,7 +154,7 @@ func testAgentTelegramReplies(t *testing.T, db *bun.DB, identity *models.Identit
 	})
 
 	t.Run("连续输入与幂等外发", func(t *testing.T) {
-		f := newAgentTelegramFixture(t, db, identity, roleID, providerID, modelID)
+		f := newAgentTelegramFixture(t, db, identity, providerID, modelID)
 		ctx := context.Background()
 		if err := f.receiver.Execute(ctx, f.channel.ID, f.input); err != nil {
 			t.Fatal(err)
@@ -242,7 +242,7 @@ func testAgentTelegramReplies(t *testing.T, db *bun.DB, identity *models.Identit
 	})
 	for _, scenario := range []string{"失败", "接管", "关闭", "更换机器人", "投递入队失败"} {
 		t.Run(scenario, func(t *testing.T) {
-			f := newAgentTelegramFixture(t, db, identity, roleID, providerID, modelID)
+			f := newAgentTelegramFixture(t, db, identity, providerID, modelID)
 			ctx := context.Background()
 			coordinator := agentrunaction.NewExecuteAction(db, f.tasks, nil, testAttachmentReader(db), nil)
 			model := &testAgentRuntime{run: func(ctx context.Context, _ agentruntime.RunRequest, feed agentruntime.InputFeed) (agentruntime.RunResult, error) {

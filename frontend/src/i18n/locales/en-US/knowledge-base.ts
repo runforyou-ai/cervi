@@ -164,23 +164,22 @@ const knowledgeBase = {
     addSimilarQuestion: "Add similar question",
   },
   title: "Knowledge bases",
-  navigation: "Knowledge base list",
+  description: "Materials AI employees search when answering",
+  list: {
+    create: "New knowledge base",
+    createStandard: "Document knowledge base",
+    createQA: "Q&A knowledge base",
+    loadError: "Could not load knowledge bases.",
+    empty: "No knowledge bases yet",
+    columns: {
+      name: "Name",
+    },
+  },
   category: {
     standard: "Document knowledge base",
     qa: "Q&A knowledge base",
     standardShort: "Docs",
     qaShort: "Q&A",
-  },
-  sidebar: {
-    createStandard: "Document knowledge base",
-    createQA: "Q&A knowledge base",
-    loadError: "Could not load knowledge bases.",
-    empty: "No knowledge bases yet",
-  },
-  selection: {
-    empty: "Select a knowledge base from the left.",
-    createDocument: "New document knowledge base",
-    createQA: "New Q&A knowledge base",
   },
   form: {
     embeddingModel: "Embedding model",

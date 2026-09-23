@@ -31,7 +31,6 @@ export type SettingsSection =
   | SettingsFormSection
   | "roles"
   | "modelServices"
-  | "mcpServers"
 
 /** 判断设置项的内容是否由设置外壳内的表单渲染。 */
 function isFormSection(section: SettingsSection): section is SettingsFormSection {

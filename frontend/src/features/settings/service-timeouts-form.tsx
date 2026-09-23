@@ -22,11 +22,13 @@ import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
-/** 表单中的三个时长字段，按页面顺序排列。 */
+/** 表单中的时长字段，按页面顺序排列。 */
 const timeoutFields = [
   "responseReminderMinutes",
   "responseReclaimMinutes",
   "queueReminderMinutes",
+  "aiFollowUpMinutes",
+  "aiCloseMinutes",
 ] as const
 
 type ServiceTimeoutsFormValues = Record<(typeof timeoutFields)[number], string>
@@ -42,6 +44,8 @@ function createServiceTimeoutsSchema(messages: {
       responseReminderMinutes: minutes,
       responseReclaimMinutes: minutes,
       queueReminderMinutes: minutes,
+      aiFollowUpMinutes: minutes,
+      aiCloseMinutes: minutes,
     })
     .superRefine((values, context) => {
       if (Number(values.responseReclaimMinutes) <= Number(values.responseReminderMinutes)) {
@@ -66,6 +70,8 @@ export function ServiceTimeoutsSettings() {
             responseReminderMinutes: String(timeouts.data.responseReminderMinutes),
             responseReclaimMinutes: String(timeouts.data.responseReclaimMinutes),
             queueReminderMinutes: String(timeouts.data.queueReminderMinutes),
+            aiFollowUpMinutes: String(timeouts.data.aiFollowUpMinutes),
+            aiCloseMinutes: String(timeouts.data.aiCloseMinutes),
           }}
         />
       ) : null}
@@ -73,7 +79,7 @@ export function ServiceTimeoutsSettings() {
   )
 }
 
-/** 维护未回复提醒、未回复回收与队列等待提醒时长，修改后自动保存。 */
+/** 维护未回复提醒、未回复回收、队列等待提醒与 AI 跟进、AI 关闭会话时长，修改后自动保存。 */
 function ServiceTimeoutsForm({ values }: { values: ServiceTimeoutsFormValues }) {
   const { t } = useTranslation("settings")
   const navigate = useNavigate()
@@ -115,6 +121,8 @@ function ServiceTimeoutsForm({ values }: { values: ServiceTimeoutsFormValues }) 
         responseReminderMinutes: Number(submitted.responseReminderMinutes),
         responseReclaimMinutes: Number(submitted.responseReclaimMinutes),
         queueReminderMinutes: Number(submitted.queueReminderMinutes),
+        aiFollowUpMinutes: Number(submitted.aiFollowUpMinutes),
+        aiCloseMinutes: Number(submitted.aiCloseMinutes),
       })
       void invalidate(resourceKeys.serviceTimeouts())
       if (!mounted.current) return true
