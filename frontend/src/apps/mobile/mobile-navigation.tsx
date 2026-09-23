@@ -23,6 +23,8 @@ export type MobileLocateState = { locateMessage?: ConversationLocateTarget }
 type MobileNavigationState = {
   chatsURL: string
   inboxURL: string
+  /** 最近一次停留的收件箱或消息列表地址。 */
+  listURL: string
   scrollPositions: Map<string, number>
   listPageCounts: Map<string, number>
   inboxWindows: Map<string, InboxListBookmark>
@@ -40,16 +42,20 @@ export function MobileNavigationProvider({
 }) {
   const [chatsURL, setChatsURL] = useState("/chats")
   const [inboxURL, setInboxURL] = useState("/inbox")
+  const [listURL, setListURL] = useState("/inbox")
   const scrollPositions = useRef(new Map<string, number>())
   const listPageCounts = useRef(new Map<string, number>())
   const inboxWindows = useRef(new Map<string, InboxListBookmark>())
   const location = useLocation()
   useLayoutEffect(() => {
+    const url = location.pathname + location.search
     if (location.pathname === "/chats") {
-      setChatsURL(location.pathname + location.search)
+      setChatsURL(url)
+      setListURL(url)
     }
     if (location.pathname === "/inbox") {
-      setInboxURL(location.pathname + location.search)
+      setInboxURL(url)
+      setListURL(url)
     }
   }, [location.pathname, location.search])
   return (
@@ -57,6 +63,7 @@ export function MobileNavigationProvider({
       value={{
         chatsURL,
         inboxURL,
+        listURL,
         scrollPositions: scrollPositions.current,
         listPageCounts: listPageCounts.current,
         inboxWindows: inboxWindows.current,

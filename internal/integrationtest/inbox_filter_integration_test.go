@@ -338,19 +338,30 @@ func TestInboxPendingScope(t *testing.T) {
 	}
 }
 
-// TestInboxPendingUnreadCount 验证待处理总数只随处理变化，有未读消息的待处理会话数随本人阅读减少、随客户新消息增加。
+// TestInboxPendingUnreadCount 验证待处理总数只随处理变化，有未读消息的待处理会话数随本人阅读减少、随他人新消息增加，本人发言不计入，且不受列表范围与筛选影响。
 func TestInboxPendingUnreadCount(t *testing.T) {
 	f := newCustomerReadFixture(t)
 	ctx := context.Background()
 	query := inboxaction.NewLoadInboxQuery(f.db)
-	// counts 读取成员当前的待处理总数与有未读消息的待处理会话数。
+	// counts 按各列表范围与筛选读取成员的待处理总数与有未读消息的待处理会话数，各次读取结果一致时返回。
 	counts := func() (int, int) {
 		t.Helper()
-		_, counts, err := query.Execute(ctx, f.member, inboxaction.LoadInput{Scope: domain.InboxScopePending})
-		if err != nil {
-			t.Fatal(err)
+		var pending, unread int
+		for index, input := range []inboxaction.LoadInput{
+			{Scope: domain.InboxScopePending},
+			{Scope: domain.InboxScopePending, ChannelID: uuid.NewV7().String()},
+			{Scope: domain.InboxScopeChat},
+		} {
+			_, counts, err := query.Execute(ctx, f.member, input)
+			if err != nil {
+				t.Fatal(err)
+			}
+			if index > 0 && (counts.Pending != pending || counts.PendingUnread != unread) {
+				t.Fatalf("input=%+v pending=%d unread=%d want %d %d", input, counts.Pending, counts.PendingUnread, pending, unread)
+			}
+			pending, unread = counts.Pending, counts.PendingUnread
 		}
-		return counts.Pending, counts.PendingUnread
+		return pending, unread
 	}
 
 	received, err := f.visitorMessage(ctx, "有人吗")
@@ -366,6 +377,17 @@ func TestInboxPendingUnreadCount(t *testing.T) {
 	}
 	if pending, unread := counts(); pending != 1 || unread != 0 {
 		t.Fatalf("after read pending=%d unread=%d", pending, unread)
+	}
+	// 本人发出的内部备注不计入未读。
+	send := conversationaction.NewSendCustomerTextMessageAction(f.db, nil)
+	if _, err := send.Execute(ctx, f.member, conversationaction.CustomerTextMessageInput{
+		ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "我先看看",
+		Visibility: domain.MessageVisibilityInternalOnly,
+	}); err != nil {
+		t.Fatal(err)
+	}
+	if pending, unread := counts(); pending != 1 || unread != 0 {
+		t.Fatalf("after own note pending=%d unread=%d", pending, unread)
 	}
 	// 客户再次来信后重新计入未读会话数。
 	if _, err := f.visitorMessage(ctx, "还在吗"); err != nil {

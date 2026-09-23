@@ -76,7 +76,7 @@ export function useMobileMessageNotifications(identity: Identity | null) {
 
   useNewMessageNotifications(identity, () => {})
 
-  // 提醒总数按权威查询读取，与消息页签角标共用同一份缓存。
+  // 提醒总数按权威查询读取，与底部导航角标共用同一份缓存。
   const attention = useResource(
     resourceKeys.inboxAttention({
       organizationId: organizationId ?? "",
@@ -85,7 +85,7 @@ export function useMobileMessageNotifications(identity: Identity | null) {
     loadInboxAttention,
     { enabled: Boolean(organizationId && userId) },
   )
-  // 应用角标合计聊天提醒与本人待处理的服务会话。
+  // 应用角标合计聊天提醒未读数与有未读消息的待处理会话数，待处理总数不计入。
   const unreadCount = attention.data?.total
   const attentionEnabled =
     Boolean(messageNotificationsEnabled) &&
