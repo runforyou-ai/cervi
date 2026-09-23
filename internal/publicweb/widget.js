@@ -37,6 +37,13 @@
   var frameReady = false;
   var previewConfig = null;
   var previewParentOrigin = "";
+  // 宿主传入的签名身份；退出后下一次加载聊天页时轮换匿名访客。
+  var settings = window.cerviSettings || {};
+  var customerToken =
+    typeof settings.customerToken === "string" ? settings.customerToken : "";
+  var rotateVisitor = false;
+  var identityExpiredListeners = [];
+  var pageTimer = 0;
   var desktopPanelWidth = 400;
   var desktopPanelHeight = 640;
   var expandedPanelMaxWidth = 480;
@@ -302,6 +309,7 @@
     applyLayout();
     syncFrameState();
     if (next) {
+      sendPage();
       frame.focus();
     } else {
       button.focus();
@@ -317,6 +325,49 @@
   function handleViewportModeChange() {
     applyLayout();
     syncFrameState();
+  }
+
+  // 向聊天页下发当前签名身份，每次加载聊天页只下发一次。
+  function sendIdentity() {
+    if (preview || !frame.contentWindow) {
+      return;
+    }
+    frame.contentWindow.postMessage(
+      { type: "cervi:identity", customerToken: customerToken, rotate: rotateVisitor },
+      baseUrl,
+    );
+    rotateVisitor = false;
+  }
+
+  // 向聊天页下发宿主页面地址、标题与来源页。
+  function sendPage() {
+    window.clearTimeout(pageTimer);
+    pageTimer = 0;
+    if (preview || !frame.contentWindow) {
+      return;
+    }
+    frame.contentWindow.postMessage(
+      {
+        type: "cervi:page",
+        url: window.location.href,
+        title: document.title,
+        referrer: document.referrer,
+      },
+      baseUrl,
+    );
+  }
+
+  // 单页应用切换路由后等待标题更新再下发页面。
+  function schedulePage() {
+    window.clearTimeout(pageTimer);
+    pageTimer = window.setTimeout(sendPage, 300);
+  }
+
+  // 切换身份时重新加载聊天页，丢弃旧身份的全部状态与在途请求。
+  function reloadFrame() {
+    frameReady = false;
+    applyLayout();
+    frame.src = frame.src;
   }
 
   function syncFrameState() {
@@ -370,6 +421,16 @@
       unreadBadge.hidden = event.data.unread !== true;
       return;
     }
+    if (event.data.type === "cervi:identity-expired") {
+      identityExpiredListeners.slice().forEach(function (listener) {
+        try {
+          listener();
+        } catch (error) {
+          console.warn("Cervi identityExpired listener failed", error);
+        }
+      });
+      return;
+    }
     if (event.data.type === "cervi:preview-ready") {
       notifyPreviewReady();
       return;
@@ -396,6 +457,8 @@
 
   mobileQuery.addEventListener("change", handleViewportModeChange);
   frame.addEventListener("load", function () {
+    sendIdentity();
+    sendPage();
     syncFrameState();
     sendPreviewConfig();
   });
@@ -409,8 +472,40 @@
       setOpen(false);
     },
     setBottomInset: setBottomInset,
+    // 以签名身份登录，已登录时直接替换当前用户。
+    login: function (token) {
+      customerToken = typeof token === "string" ? token : "";
+      rotateVisitor = false;
+      reloadFrame();
+    },
+    // 回到匿名访客并轮换匿名访客 Token。
+    logout: function () {
+      customerToken = "";
+      rotateVisitor = true;
+      reloadFrame();
+    },
+    // 订阅挂件事件，目前只有 identityExpired。
+    on: function (name, listener) {
+      if (name === "identityExpired" && typeof listener === "function") {
+        identityExpiredListeners.push(listener);
+      }
+    },
   };
   window.Cervi = api;
+
+  // 单页应用的路由变化后重新下发宿主页面。
+  if (!preview) {
+    ["pushState", "replaceState"].forEach(function (name) {
+      var original = window.history[name];
+      window.history[name] = function () {
+        var result = original.apply(this, arguments);
+        schedulePage();
+        return result;
+      };
+    });
+    window.addEventListener("popstate", schedulePage);
+    window.addEventListener("hashchange", schedulePage);
+  }
 
   shadow.appendChild(style);
   shadow.appendChild(panel);

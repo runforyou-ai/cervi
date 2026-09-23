@@ -91,7 +91,7 @@ func TestWebsiteVisitorDirectoryHTTP(t *testing.T) {
 	scheduler := agentrunaction.NewScheduler(newTestTasks(f.db))
 	visitorService := appservice.NewWebsiteVisitorService(appservice.NewWebsiteVisitorDirectBackend(f.db, scheduler, newTestTasks(f.db), nil, serverfilecontent.S3Config{}))
 	application := appservice.New(appservice.NewDirectBackend(f.db, domain.DeploymentModeSelfHosted, nil, serverfilecontent.S3Config{}, serverstorage.NewTenantResolver(f.db), nil, nil, nil, nil, nil))
-	client := websiteVisitorHTTP{service: api.NewService(application, api.WithWebsiteVisitor(visitorService, false))}
+	client := websiteVisitorHTTP{service: api.NewService(application, api.WithWebsiteVisitor(visitorService, false, ""))}
 	directoryPath := "/public/website-channels/" + f.channelID + "/conversations"
 	messagesPath := "/public/website-channels/" + f.channelID + "/messages"
 	// contacts 读取当前企业的联系人数量。

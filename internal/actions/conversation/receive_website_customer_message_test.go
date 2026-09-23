@@ -80,3 +80,20 @@ func TestNormalizeWebsiteAttachmentMessageInput(t *testing.T) {
 		t.Fatalf("fields=%#v", fields)
 	}
 }
+
+// TestValidWebsiteCustomerExternalID 验证登录用户外部编号的格式，以及签名身份与外部编号必须一致。
+func TestValidWebsiteCustomerExternalID(t *testing.T) {
+	if !validWebsiteExternalID("web-user:user-42@example.com") || validWebsiteExternalID("web-user:") || validWebsiteExternalID("web-user:a b") {
+		t.Fatal("unexpected web-user external ID validation")
+	}
+	input := WebsiteCustomerTextMessageInput{
+		ChannelID:       "0198ddee-c056-7bc5-a1d9-586f878ee966",
+		ExternalID:      WebsiteCustomerExternalID("user-42"),
+		ClientMessageID: "0198ddf0-a234-7f01-8d99-e3e0af0f5f65",
+		Body:            "你好",
+		Customer:        &WebsiteCustomer{UserID: "user-43"},
+	}
+	if _, fields := normalizeWebsiteMessageInput(input); fields["visitorToken"] != ValidationExternalIDInvalid {
+		t.Fatalf("fields=%#v", fields)
+	}
+}

@@ -116,6 +116,7 @@ func testAgentTelegramReplies(t *testing.T, db *bun.DB, identity *models.Identit
 				if err != nil {
 					return agentruntime.RunResult{}, err
 				}
+				claimed.Messages = customerTurnMessages(t, claimed.Messages)
 				if len(claimed.Messages) != 100 {
 					t.Fatalf("history=%d", len(claimed.Messages))
 				}
@@ -173,6 +174,7 @@ func testAgentTelegramReplies(t *testing.T, db *bun.DB, identity *models.Identit
 			if err != nil {
 				return agentruntime.RunResult{}, err
 			}
+			claimed.Messages = customerTurnMessages(t, claimed.Messages)
 			if len(claimed.Messages) != 1 || claimed.Messages[0].Role != agentruntime.MessageRoleUser {
 				t.Fatalf("context=%+v", claimed)
 			}
@@ -188,6 +190,7 @@ func testAgentTelegramReplies(t *testing.T, db *bun.DB, identity *models.Identit
 			if err != nil {
 				return agentruntime.RunResult{}, err
 			}
+			claimed.Messages = customerTurnMessages(t, claimed.Messages)
 			if len(claimed.Messages) != 2 || claimed.Messages[1].Content != f.input.Message.Body {
 				t.Fatalf("followup=%+v", claimed)
 			}
@@ -254,6 +257,7 @@ func testAgentTelegramReplies(t *testing.T, db *bun.DB, identity *models.Identit
 				if err != nil {
 					return agentruntime.RunResult{}, err
 				}
+				claimed.Messages = customerTurnMessages(t, claimed.Messages)
 				switch scenario {
 				case "失败":
 					return agentruntime.RunResult{}, errors.New("模型失败详情")

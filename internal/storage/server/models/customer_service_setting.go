@@ -23,6 +23,7 @@ type CustomerServiceSetting struct {
 	QueueReminderMinutes    int                            `bun:"queue_reminder_minutes"`
 	AIFollowUpMinutes       int                            `bun:"ai_follow_up_minutes"`
 	AICloseMinutes          int                            `bun:"ai_close_minutes"`
+	CustomerIdentitySecret  *string                        `bun:"customer_identity_secret"`
 	CreatedAt               time.Time                      `bun:"created_at"`
 	UpdatedAt               time.Time                      `bun:"updated_at"`
 }

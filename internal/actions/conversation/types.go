@@ -128,6 +128,15 @@ type WebsiteCustomerTextMessageInput struct {
 	ConversationID   *string
 	ClientMessageID  string
 	Body             string
+	Customer         *WebsiteCustomer
+	VisitorContext   *domain.VisitorContext
+}
+
+// WebsiteCustomer 表示验签通过的网站登录用户，外部编号为 web-user: 加企业用户编号。
+type WebsiteCustomer struct {
+	UserID string
+	Name   string
+	Email  string
 }
 
 // WebsiteCustomerAttachmentMessageInput 定义网站访客发送的附件消息。
@@ -141,6 +150,8 @@ type WebsiteCustomerAttachmentMessageInput struct {
 	Body             string
 	ImageWidth       int
 	ImageHeight      int
+	Customer         *WebsiteCustomer
+	VisitorContext   *domain.VisitorContext
 }
 
 // WebsiteVisitorUploadInput 定义网站访客附件上传的渠道归属与文件元数据。
@@ -150,6 +161,7 @@ type WebsiteVisitorUploadInput struct {
 	FileName    string
 	ContentType string
 	ByteSize    int64
+	Customer    *WebsiteCustomer
 }
 
 // ConversationSummary 定义访客可见会话摘要。

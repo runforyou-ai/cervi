@@ -66,7 +66,7 @@ func startVisitorRealtime(t *testing.T, f customerReadFixture, options gateway.O
 	t.Cleanup(realtimeGateway.Shutdown)
 
 	httpAPI := api.NewService(appservice.New(memberBackend),
-		api.WithWebsiteVisitor(appservice.NewWebsiteVisitorService(visitorBackend), false),
+		api.WithWebsiteVisitor(appservice.NewWebsiteVisitorService(visitorBackend), false, ""),
 		api.WithWebsiteVisitorRealtime(realtimeGateway),
 	)
 	server := httptest.NewUnstartedServer(httpAPI)

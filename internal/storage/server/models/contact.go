@@ -19,6 +19,7 @@ type Contact struct {
 	DisplayName     *string    `bun:"display_name"`
 	Stage           string     `bun:"stage"`
 	Notes           *string    `bun:"notes"`
+	ExternalUserID  *string    `bun:"external_user_id"`
 	CreatedAt       time.Time  `bun:"created_at"`
 	UpdatedAt       time.Time  `bun:"updated_at"`
 	DeletedAt       *time.Time `bun:"deleted_at"`

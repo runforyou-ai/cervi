@@ -14,6 +14,7 @@ import (
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	"github.com/runforyou-ai/cervi/internal/common"
+	"github.com/runforyou-ai/cervi/internal/common/customeridentity"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	"github.com/runforyou-ai/cervi/internal/storage/server/messagequery"
@@ -23,13 +24,17 @@ import (
 	"github.com/uptrace/bun"
 )
 
-const websiteExternalIDPrefix = "web-session:"
+const (
+	websiteExternalIDPrefix         = "web-session:"
+	websiteCustomerExternalIDPrefix = "web-user:"
+)
 
 // maxWriteAttempts 是并发唯一约束冲突时的最大写入尝试次数。
 const maxWriteAttempts = 3
 
 var websiteMessageRetryableConstraintNames = map[string]struct{}{
 	"contact_channel_identities_channel_external_unique":         {},
+	"contacts_organization_external_user_unique":                 {},
 	"chat_subjects_organization_kind_source_unique":              {},
 	"conversation_participants_org_conversation_subject_unique":  {},
 	"service_sessions_organization_conversation_open_unique":     {},
@@ -77,10 +82,10 @@ func (a *ReceiveWebsiteCustomerMessageAction) Execute(ctx context.Context, input
 	if len(fields) > 0 {
 		return ReceiveWebsiteCustomerMessageResult{}, &ValidationError{Fields: fields}
 	}
-	return a.receive(ctx, normalized.ChannelID, InboundCustomerMessageInput{
+	return a.receive(ctx, normalized.ChannelID, websiteInboundInput(normalized.Customer, normalized.VisitorContext, InboundCustomerMessageInput{
 		ExternalID: normalized.ExternalID, RequestedConversationID: normalized.ConversationID,
 		Body: normalized.Body, ClientMessageID: &normalized.ClientMessageID, ReplyToMessageID: normalized.ReplyToMessageID,
-	})
+	}))
 }
 
 // ExecuteAttachment 在一个可重试事务中写入网站访客附件消息并激活上传文件。
@@ -89,11 +94,23 @@ func (a *ReceiveWebsiteCustomerMessageAction) ExecuteAttachment(ctx context.Cont
 	if len(fields) > 0 {
 		return ReceiveWebsiteCustomerMessageResult{}, &ValidationError{Fields: fields}
 	}
-	return a.receive(ctx, normalized.ChannelID, InboundCustomerMessageInput{
+	return a.receive(ctx, normalized.ChannelID, websiteInboundInput(normalized.Customer, normalized.VisitorContext, InboundCustomerMessageInput{
 		ExternalID: normalized.ExternalID, RequestedConversationID: normalized.ConversationID,
 		Body: normalized.Body, ClientMessageID: &normalized.ClientMessageID, ReplyToMessageID: normalized.ReplyToMessageID,
 		Attachment: &InboundCustomerAttachment{FileID: normalized.FileID, ImageWidth: normalized.ImageWidth, ImageHeight: normalized.ImageHeight},
-	})
+	}))
+}
+
+// websiteInboundInput 为网站入站消息补充签名身份与访客上下文；签名中的名称写入渠道身份显示名称，省略时不改动。
+func websiteInboundInput(customer *WebsiteCustomer, visitorContext *domain.VisitorContext, input InboundCustomerMessageInput) InboundCustomerMessageInput {
+	input.VisitorContext = visitorContext
+	if customer != nil {
+		input.ExternalUserID, input.Email = customer.UserID, customer.Email
+		if customer.Name != "" {
+			input.DisplayName = &customer.Name
+		}
+	}
+	return input
 }
 
 // receive 在可重试事务中写入访客入站消息。
@@ -157,7 +174,7 @@ func normalizeWebsiteMessageInput(input WebsiteCustomerTextMessageInput) (Websit
 	if !common.ValidUUID(input.ChannelID) {
 		fields["channelId"] = ValidationChannelIDInvalid
 	}
-	if !validWebsiteExternalID(input.ExternalID) {
+	if !validWebsiteExternalID(input.ExternalID) || (input.Customer != nil && input.ExternalID != WebsiteCustomerExternalID(input.Customer.UserID)) {
 		fields["visitorToken"] = ValidationExternalIDInvalid
 	}
 	if input.ConversationID != nil && !common.ValidUUID(*input.ConversationID) {
@@ -188,6 +205,7 @@ func normalizeWebsiteAttachmentMessageInput(input WebsiteCustomerAttachmentMessa
 	text, fields := normalizeWebsiteMessageInput(WebsiteCustomerTextMessageInput{
 		ChannelID: input.ChannelID, ExternalID: input.ExternalID, ConversationID: input.ConversationID,
 		ClientMessageID: input.ClientMessageID, Body: input.Body, ReplyToMessageID: input.ReplyToMessageID,
+		Customer: input.Customer,
 	})
 	input.ChannelID, input.ExternalID, input.ConversationID = text.ChannelID, text.ExternalID, text.ConversationID
 	input.ClientMessageID, input.Body, input.ReplyToMessageID = text.ClientMessageID, text.Body, text.ReplyToMessageID
@@ -206,8 +224,19 @@ func normalizeWebsiteAttachmentMessageInput(input WebsiteCustomerAttachmentMessa
 	return input, fields
 }
 
-// validWebsiteExternalID 校验网站访客规范化外部编号。
+// WebsiteCustomerExternalID 返回网站登录用户的渠道外部编号。
+func WebsiteCustomerExternalID(userID string) string { return websiteCustomerExternalIDPrefix + userID }
+
+// IsWebsiteCustomerExternalID 判断渠道外部编号是否属于验签通过的网站登录用户。
+func IsWebsiteCustomerExternalID(value string) bool {
+	return strings.HasPrefix(value, websiteCustomerExternalIDPrefix)
+}
+
+// validWebsiteExternalID 校验网站访客规范化外部编号：匿名访客为 web-session: 加 32 位十六进制，登录用户为 web-user: 加企业用户编号。
 func validWebsiteExternalID(value string) bool {
+	if userID, customer := strings.CutPrefix(value, websiteCustomerExternalIDPrefix); customer {
+		return customeridentity.ValidUserID(userID)
+	}
 	if len(value) != len(websiteExternalIDPrefix)+32 || !strings.HasPrefix(value, websiteExternalIDPrefix) {
 		return false
 	}

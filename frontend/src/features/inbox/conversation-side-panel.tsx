@@ -8,6 +8,7 @@ import { useEffect, useRef, useState, type RefObject } from "react"
 import { useTranslation } from "react-i18next"
 
 import {
+  ChannelType,
   OrganizationIdentityType,
   isCustomerInboxConversation,
   isAgentInboxConversation,
@@ -23,6 +24,7 @@ import { DirectConversationDraftAvatar } from "@/features/inbox/direct-conversat
 import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
 import type { ComposerDraftBridge } from "@/features/inbox/conversation-composer"
 import { CustomerCopilotPanel } from "@/features/inbox/customer-copilot-panel"
+import { CustomerProfileDetails } from "@/features/inbox/customer-profile-details"
 import { GroupConversationContext } from "@/features/inbox/group-conversation-context"
 import { HeaderAction } from "@/features/inbox/conversation-header"
 import {
@@ -198,10 +200,12 @@ function ConversationSidePanelContent({
                     {displayName}
                   </span>
                 </SidePanelField>
+                <CustomerProfileDetails
+                  conversationID={conversation.id}
+                  lastMessageID={conversation.lastMessageId}
+                  website={customer.channelType === ChannelType.ChannelTypeWebsite}
+                />
               </dl>
-              <p className="text-xs leading-5 text-muted-foreground">
-                {t("contextContactDetailsPlaceholder")}
-              </p>
             </section>
           </TabsContent>
 

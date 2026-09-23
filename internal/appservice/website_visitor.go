@@ -5,10 +5,34 @@ import (
 	"time"
 )
 
-// WebsiteVisitorMeta 携带网站访客请求的本地化信息和访客令牌。
+// WebsiteVisitorMeta 携带网站访客请求的本地化信息、访客令牌、签名身份与请求来源信息。
 type WebsiteVisitorMeta struct {
 	Locale Locale
 	Token  string
+	// CustomerToken 是请求携带的签名身份原文，Customer 是其验签结果；匿名访客两者均为空。
+	CustomerToken string
+	Customer      *WebsiteVisitorCustomer
+	// UserAgent 与 Country 是请求头中的浏览器标识和可信代理提供的国家代码。
+	UserAgent string
+	Country   string
+}
+
+// WebsiteVisitorCustomer 是验签通过的网站登录用户。
+type WebsiteVisitorCustomer struct {
+	OrganizationID string
+	UserID         string
+	Name           string
+	Email          string
+	ExpiresAt      time.Time
+}
+
+// WebsiteVisitorPage 定义访客发送消息时所在的宿主页面与浏览器环境。
+type WebsiteVisitorPage struct {
+	URL      string `json:"url"`
+	Title    string `json:"title"`
+	Referrer string `json:"referrer"`
+	Language string `json:"language"`
+	TimeZone string `json:"timeZone"`
 }
 
 // WebsiteVisitorServiceSession 定义客户线程最新客服处理状态。
@@ -45,6 +69,8 @@ type WebsiteVisitorTextMessageInput struct {
 	ClientMessageID  string  `json:"clientMessageId"`
 	ConversationID   *string `json:"conversationId"`
 	Body             string  `json:"body"`
+	// Page 是访客发送时所在的宿主页面，缺省时不更新访客上下文。
+	Page *WebsiteVisitorPage `json:"page"`
 }
 
 // WebsiteVisitorTypingInput 定义网站访客在客户线程中的输入状态。
@@ -81,6 +107,8 @@ type WebsiteVisitorAttachmentMessageInput struct {
 	Body             string  `json:"body"`
 	ImageWidth       int     `json:"imageWidth"`
 	ImageHeight      int     `json:"imageHeight"`
+	// Page 是访客发送时所在的宿主页面，缺省时不更新访客上下文。
+	Page *WebsiteVisitorPage `json:"page"`
 }
 
 // WebsiteVisitorAttachmentLinks 定义访客附件的预览与下载地址，内容未就绪时两者为空。
@@ -181,8 +209,9 @@ type WebsiteVisitorMessageHistory struct {
 	After          *string                       `json:"after"`
 }
 
-// WebsiteVisitorBackend 定义匿名网站访客业务调用。
+// WebsiteVisitorBackend 定义网站访客业务调用。
 type WebsiteVisitorBackend interface {
+	VerifyCustomer(context.Context, WebsiteVisitorMeta, string, string) (WebsiteVisitorCustomer, error)
 	ListConversations(context.Context, WebsiteVisitorMeta, string, string) ([]WebsiteVisitorConversation, error)
 	SendTextMessage(context.Context, WebsiteVisitorMeta, string, string, WebsiteVisitorTextMessageInput) (WebsiteVisitorMessageResult, error)
 	SendAttachmentMessage(context.Context, WebsiteVisitorMeta, string, string, WebsiteVisitorAttachmentMessageInput) (WebsiteVisitorMessageResult, error)
@@ -194,7 +223,7 @@ type WebsiteVisitorBackend interface {
 	RateServiceSession(context.Context, WebsiteVisitorMeta, string, string, string, string, WebsiteVisitorRatingInput) (WebsiteVisitorRating, error)
 }
 
-// WebsiteVisitorService 转发匿名网站访客业务调用。
+// WebsiteVisitorService 转发网站访客业务调用。
 type WebsiteVisitorService struct {
 	backend WebsiteVisitorBackend
 }
@@ -211,6 +240,11 @@ func (s *WebsiteVisitorService) InitializeMessenger(ctx context.Context, meta We
 		return WebsiteVisitorMessenger{}, err
 	}
 	return WebsiteVisitorMessenger{VisitorToken: visitorToken, Conversations: directory.Conversations}, nil
+}
+
+// VerifyCustomer 按渠道所属企业的客户身份密钥校验签名身份。
+func (s *WebsiteVisitorService) VerifyCustomer(ctx context.Context, meta WebsiteVisitorMeta, channelID, token string) (WebsiteVisitorCustomer, error) {
+	return s.backend.VerifyCustomer(ctx, meta, channelID, token)
 }
 
 // ListConversations 返回当前渠道身份的客户线程目录，供访客在初始化之后重新发现线程。

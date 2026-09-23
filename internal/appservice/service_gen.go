@@ -79,6 +79,11 @@ func (s *Service) ReadInboxWindow(ctx context.Context, meta RequestMeta, input I
 	return withNormalizedSlices(s.backend.ReadInboxWindow(ctx, meta, input))
 }
 
+// GetCustomerProfile 返回客户会话的客户身份与当前周期访客上下文。
+func (s *Service) GetCustomerProfile(ctx context.Context, meta RequestMeta, conversationID string) (CustomerProfile, error) {
+	return withNormalizedSlices(s.backend.GetCustomerProfile(ctx, meta, conversationID))
+}
+
 // GetInboxConversation 返回当前用户有权阅读的独立会话摘要。
 func (s *Service) GetInboxConversation(ctx context.Context, meta RequestMeta, conversationID string) (InboxConversation, error) {
 	return withNormalizedSlices(s.backend.GetInboxConversation(ctx, meta, conversationID))
@@ -847,6 +852,16 @@ func (s *Service) DeleteMCPServer(ctx context.Context, meta RequestMeta, mcpServ
 // UpdateOrganization 修改当前企业通用设置。
 func (s *Service) UpdateOrganization(ctx context.Context, meta RequestMeta, input OrganizationInput) (Organization, error) {
 	return withNormalizedSlices(s.backend.UpdateOrganization(ctx, meta, input))
+}
+
+// GetCustomerIdentitySecret 读取当前企业的客户身份密钥，未生成时为空。
+func (s *Service) GetCustomerIdentitySecret(ctx context.Context, meta RequestMeta) (CustomerIdentitySecret, error) {
+	return withNormalizedSlices(s.backend.GetCustomerIdentitySecret(ctx, meta))
+}
+
+// RegenerateCustomerIdentitySecret 生成或重新生成当前企业的客户身份密钥，旧密钥立即失效。
+func (s *Service) RegenerateCustomerIdentitySecret(ctx context.Context, meta RequestMeta) (CustomerIdentitySecret, error) {
+	return withNormalizedSlices(s.backend.RegenerateCustomerIdentitySecret(ctx, meta))
 }
 
 // GetBusinessHours 读取当前企业的客服工作时间。

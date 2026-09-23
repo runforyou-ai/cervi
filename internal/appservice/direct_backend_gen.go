@@ -173,6 +173,16 @@ func (b *DirectBackend) ReadInboxWindow(ctx context.Context, meta RequestMeta, i
 	return b.ops.ReadInboxWindow(ctx, meta, identity, input)
 }
 
+// GetCustomerProfile 返回客户会话的客户身份与当前周期访客上下文。
+func (b *DirectBackend) GetCustomerProfile(ctx context.Context, meta RequestMeta, conversationID string) (CustomerProfile, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero CustomerProfile
+		return zero, err
+	}
+	return b.ops.GetCustomerProfile(ctx, meta, identity, conversationID)
+}
+
 // GetInboxConversation 返回当前用户有权阅读的独立会话摘要。
 func (b *DirectBackend) GetInboxConversation(ctx context.Context, meta RequestMeta, conversationID string) (InboxConversation, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
@@ -1689,6 +1699,26 @@ func (b *DirectBackend) UpdateOrganization(ctx context.Context, meta RequestMeta
 		return zero, err
 	}
 	return b.ops.UpdateOrganization(ctx, meta, identity, input)
+}
+
+// GetCustomerIdentitySecret 读取当前企业的客户身份密钥，未生成时为空。
+func (b *DirectBackend) GetCustomerIdentitySecret(ctx context.Context, meta RequestMeta) (CustomerIdentitySecret, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero CustomerIdentitySecret
+		return zero, err
+	}
+	return b.ops.GetCustomerIdentitySecret(ctx, meta, identity)
+}
+
+// RegenerateCustomerIdentitySecret 生成或重新生成当前企业的客户身份密钥，旧密钥立即失效。
+func (b *DirectBackend) RegenerateCustomerIdentitySecret(ctx context.Context, meta RequestMeta) (CustomerIdentitySecret, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero CustomerIdentitySecret
+		return zero, err
+	}
+	return b.ops.RegenerateCustomerIdentitySecret(ctx, meta, identity)
 }
 
 // GetBusinessHours 读取当前企业的客服工作时间。

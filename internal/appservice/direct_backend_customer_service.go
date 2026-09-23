@@ -7,6 +7,7 @@ import (
 	"errors"
 	"log/slog"
 
+	contactaction "github.com/runforyou-ai/cervi/internal/actions/contact"
 	customerserviceaction "github.com/runforyou-ai/cervi/internal/actions/customerservice"
 	servicecategoryaction "github.com/runforyou-ai/cervi/internal/actions/servicecategory"
 	"github.com/runforyou-ai/cervi/internal/common"
@@ -26,6 +27,9 @@ type customerServiceOps struct {
 	createCategory        *servicecategoryaction.CreateAction
 	updateCategory        *servicecategoryaction.UpdateAction
 	archiveCategory       *servicecategoryaction.ArchiveAction
+	getIdentitySecret     *customerserviceaction.GetCustomerIdentitySecretQuery
+	regenerateSecret      *customerserviceaction.RegenerateCustomerIdentitySecretAction
+	getCustomerProfile    *contactaction.GetCustomerProfileQuery
 }
 
 // newCustomerServiceOps 创建企业客服设置的业务实现依赖。
@@ -39,7 +43,63 @@ func newCustomerServiceOps(db *bun.DB) customerServiceOps {
 		createCategory:        servicecategoryaction.NewCreateAction(db),
 		updateCategory:        servicecategoryaction.NewUpdateAction(db),
 		archiveCategory:       servicecategoryaction.NewArchiveAction(db),
+		getIdentitySecret:     customerserviceaction.NewGetCustomerIdentitySecretQuery(db),
+		regenerateSecret:      customerserviceaction.NewRegenerateCustomerIdentitySecretAction(db),
+		getCustomerProfile:    contactaction.NewGetCustomerProfileQuery(db),
 	}
+}
+
+// GetCustomerIdentitySecret 读取当前企业的客户身份密钥，未生成时为空。
+func (o *directOperations) GetCustomerIdentitySecret(ctx context.Context, meta RequestMeta, identity *servermodels.Identity) (CustomerIdentitySecret, error) {
+	secret, err := o.getIdentitySecret.Execute(ctx, identity)
+	if err != nil {
+		if ctx.Err() != nil {
+			return CustomerIdentitySecret{}, ctx.Err()
+		}
+		slog.Warn("读取客户身份密钥失败", "organization_id", identity.Organization.ID, "error", err)
+		return CustomerIdentitySecret{}, FailedError(meta, cervii18n.ErrorCustomerIdentitySecretLoadFailed)
+	}
+	return CustomerIdentitySecret{Secret: secret}, nil
+}
+
+// RegenerateCustomerIdentitySecret 生成或重新生成当前企业的客户身份密钥，旧密钥立即失效。
+func (o *directOperations) RegenerateCustomerIdentitySecret(ctx context.Context, meta RequestMeta, identity *servermodels.Identity) (CustomerIdentitySecret, error) {
+	secret, err := o.regenerateSecret.Execute(ctx, identity)
+	if err != nil {
+		if ctx.Err() != nil {
+			return CustomerIdentitySecret{}, ctx.Err()
+		}
+		if errors.Is(err, common.ErrIdentityInvalid) {
+			return CustomerIdentitySecret{}, SessionError(meta, SessionStateLogin, cervii18n.ErrorAuthenticationRequired)
+		}
+		slog.Warn("生成客户身份密钥失败", "organization_id", identity.Organization.ID, "error", err)
+		return CustomerIdentitySecret{}, FailedError(meta, cervii18n.ErrorIdentitySecretRegenerateFailed)
+	}
+	slog.Info("客户身份密钥已重新生成", "organization_id", identity.Organization.ID, "user_id", identity.User.ID)
+	return CustomerIdentitySecret{Secret: secret}, nil
+}
+
+// GetCustomerProfile 返回客户会话的客户身份与当前周期访客上下文。
+func (o *directOperations) GetCustomerProfile(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string) (CustomerProfile, error) {
+	profile, err := o.getCustomerProfile.Execute(ctx, identity, conversationID)
+	if err != nil {
+		if ctx.Err() != nil {
+			return CustomerProfile{}, ctx.Err()
+		}
+		if errors.Is(err, contactaction.ErrNotFound) {
+			return CustomerProfile{}, NotFoundError(meta, cervii18n.ErrorConversationNotFound)
+		}
+		slog.Warn("读取客户资料失败", "organization_id", identity.Organization.ID, "conversation_id", conversationID, "error", err)
+		return CustomerProfile{}, FailedError(meta, cervii18n.ErrorCustomerProfileLoadFailed)
+	}
+	result := CustomerProfile{IdentityVerified: profile.IdentityVerified, ExternalUserID: profile.ExternalUserID, Email: profile.Email}
+	if visit := profile.VisitorContext; visit != nil {
+		result.Visit = &CustomerVisit{
+			ReferrerURL: visit.ReferrerURL, PageURL: visit.PageURL, PageTitle: visit.PageTitle, Browser: visit.Browser, OS: visit.OS,
+			DeviceType: visit.DeviceType, Language: visit.Language, TimeZone: visit.TimeZone, Country: visit.Country,
+		}
+	}
+	return result, nil
 }
 
 // GetBusinessHours 读取当前企业的客服工作时间。

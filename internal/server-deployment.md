@@ -77,6 +77,17 @@ storage:
 
 各字段对应的环境变量为 `S3_ENABLED`、`S3_ENDPOINT`、`S3_PUBLIC_BASE_URL`、`S3_REGION`、`S3_BUCKET`、`S3_ACCESS_KEY_ID`、`S3_SECRET_ACCESS_KEY` 和 `S3_FORCE_PATH_STYLE`，已设置时覆盖 YAML 中的同名字段。
 
+## 访客地区
+
+网站 Messenger 的访客地区取自反向代理写入的国家代码请求头，未配置时不采集：
+
+```yaml
+server:
+  visitorCountryHeader: CF-IPCountry
+```
+
+只在反向代理会覆盖客户端同名请求头时配置，例如 Cloudflare 的 `CF-IPCountry`。对应的环境变量为 `VISITOR_COUNTRY_HEADER`。
+
 ## Linux systemd
 
 文件路径：

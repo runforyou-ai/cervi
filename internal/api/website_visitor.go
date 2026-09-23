@@ -19,6 +19,8 @@ import (
 
 const (
 	websiteVisitorHeader      = appservice.WebsiteVisitorTokenHeader
+	websiteCustomerHeader     = appservice.WebsiteCustomerTokenHeader
+	websiteCustomerKey        = "cervi_website_customer"
 	websiteVisitorTokenSize   = 32
 	websiteVisitorBodyLimit   = 16 * 1024
 	websiteVisitorCookieAge   = 365 * 24 * 60 * 60
@@ -26,7 +28,7 @@ const (
 	websiteVisitorTokenKey    = "cervi_website_visitor_token"
 )
 
-// registerWebsiteVisitorRoutes 注册匿名网站 Messenger 路由。
+// registerWebsiteVisitorRoutes 注册网站 Messenger 公开路由。
 func (s *Service) registerWebsiteVisitorRoutes(router *gin.Engine) {
 	if s.websiteVisitor == nil {
 		return
@@ -43,15 +45,15 @@ func (s *Service) registerWebsiteVisitorRoutes(router *gin.Engine) {
 	const attachmentMessagesPath = "/public/website-channels/:channelID/attachment-messages"
 	const messageAttachmentPath = "/public/website-channels/:channelID/conversations/:conversationID/messages/:messageID/attachment"
 	router.GET(messengerPath, s.initializeWebsiteMessenger)
-	router.POST(messagesPath, authorizeWebsiteVisitor, s.sendWebsiteVisitorMessage)
-	router.GET(directoryPath, authorizeWebsiteVisitor, s.listWebsiteVisitorConversations)
-	router.GET(historyPath, authorizeWebsiteVisitor, s.listWebsiteVisitorMessages)
-	router.POST(attachmentsPath, authorizeWebsiteVisitor, s.createWebsiteVisitorAttachmentUpload)
-	router.POST(attachmentUploadPath, authorizeWebsiteVisitor, s.completeWebsiteVisitorAttachmentUpload)
-	router.POST(attachmentMessagesPath, authorizeWebsiteVisitor, s.sendWebsiteVisitorAttachmentMessage)
-	router.GET(messageAttachmentPath, authorizeWebsiteVisitor, s.getWebsiteVisitorMessageAttachment)
-	router.POST(typingPath, authorizeWebsiteVisitor, s.reportWebsiteVisitorTyping)
-	router.POST(ratingPath, authorizeWebsiteVisitor, s.rateWebsiteVisitorServiceSession)
+	router.POST(messagesPath, s.authorizeWebsiteVisitor, s.sendWebsiteVisitorMessage)
+	router.GET(directoryPath, s.authorizeWebsiteVisitor, s.listWebsiteVisitorConversations)
+	router.GET(historyPath, s.authorizeWebsiteVisitor, s.listWebsiteVisitorMessages)
+	router.POST(attachmentsPath, s.authorizeWebsiteVisitor, s.createWebsiteVisitorAttachmentUpload)
+	router.POST(attachmentUploadPath, s.authorizeWebsiteVisitor, s.completeWebsiteVisitorAttachmentUpload)
+	router.POST(attachmentMessagesPath, s.authorizeWebsiteVisitor, s.sendWebsiteVisitorAttachmentMessage)
+	router.GET(messageAttachmentPath, s.authorizeWebsiteVisitor, s.getWebsiteVisitorMessageAttachment)
+	router.POST(typingPath, s.authorizeWebsiteVisitor, s.reportWebsiteVisitorTyping)
+	router.POST(ratingPath, s.authorizeWebsiteVisitor, s.rateWebsiteVisitorServiceSession)
 	router.Match([]string{http.MethodGet, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace}, attachmentsPath, websiteVisitorMethodNotAllowed(http.MethodPost))
 	router.Match([]string{http.MethodGet, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace}, attachmentUploadPath, websiteVisitorMethodNotAllowed(http.MethodPost))
 	router.Match([]string{http.MethodGet, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace}, attachmentMessagesPath, websiteVisitorMethodNotAllowed(http.MethodPost))
@@ -65,18 +67,24 @@ func (s *Service) registerWebsiteVisitorRoutes(router *gin.Engine) {
 	if s.visitorRealtime == nil {
 		return
 	}
-	router.GET(realtimePath, authorizeWebsiteVisitor, s.serveWebsiteVisitorRealtime)
+	router.GET(realtimePath, s.authorizeWebsiteVisitor, s.serveWebsiteVisitorRealtime)
 	router.Match([]string{http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace}, realtimePath, websiteVisitorMethodNotAllowed(http.MethodGet))
 }
 
 // serveWebsiteVisitorRealtime 输出网站访客实时事件流，事件流结束前由网关独占响应写入。
 func (s *Service) serveWebsiteVisitorRealtime(c *gin.Context) {
-	s.visitorRealtime.ServeVisitor(c.Writer, c.Request, c.Param("channelID"), c.GetString(websiteVisitorExternalKey))
+	s.visitorRealtime.ServeVisitor(c.Writer, c.Request, s.websiteVisitorMeta(c), c.Param("channelID"), c.GetString(websiteVisitorExternalKey))
 }
 
-// authorizeWebsiteVisitor 统一处理需要访客 Token 的公开路由：禁止缓存，按 Header、Cookie 读取 Token 并写入渠道外部编号，Token 缺失或格式非法按公开错误体拒绝。
-func authorizeWebsiteVisitor(c *gin.Context) {
+// authorizeWebsiteVisitor 统一处理需要访客身份的公开路由：禁止缓存；携带签名身份时验签并以登录用户外部编号访问，否则按 Header、Cookie 读取访客 Token；身份缺失、非法或失效时按公开错误体拒绝。
+func (s *Service) authorizeWebsiteVisitor(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
+	if customerToken := strings.TrimSpace(c.GetHeader(websiteCustomerHeader)); customerToken != "" {
+		if !s.verifyWebsiteCustomer(c, customerToken) {
+			c.Abort()
+		}
+		return
+	}
 	token, valid := readWebsiteVisitorToken(c, c.Param("channelID"))
 	if !valid {
 		writeApplicationError(c, invalidWebsiteVisitorTokenError(c))
@@ -87,12 +95,37 @@ func authorizeWebsiteVisitor(c *gin.Context) {
 	c.Set(websiteVisitorTokenKey, token)
 }
 
-// initializeWebsiteMessenger 签发或恢复访客 Token 并返回会话列表。
+// verifyWebsiteCustomer 校验签名身份并写入登录用户外部编号，失败时写入错误响应并返回 false。
+func (s *Service) verifyWebsiteCustomer(c *gin.Context, customerToken string) bool {
+	customer, err := s.websiteVisitor.VerifyCustomer(c.Request.Context(), s.websiteVisitorMeta(c), c.Param("channelID"), customerToken)
+	if writeApplicationError(c, err) {
+		return false
+	}
+	c.Set(websiteVisitorExternalKey, websiteCustomerExternalID(customer.UserID))
+	c.Set(websiteCustomerKey, &customer)
+	return true
+}
+
+// initializeWebsiteMessenger 返回会话列表：携带签名身份时以登录用户初始化，不签发也不轮换访客 Token；匿名访客签发或恢复访客 Token，rotate=1 时忽略已有 Token 重新签发。
 func (s *Service) initializeWebsiteMessenger(c *gin.Context) {
 	c.Header("Cache-Control", "no-store")
 	channelID := c.Param("channelID")
+	if customerToken := strings.TrimSpace(c.GetHeader(websiteCustomerHeader)); customerToken != "" {
+		if !s.verifyWebsiteCustomer(c, customerToken) {
+			return
+		}
+		result, err := s.websiteVisitor.InitializeMessenger(c.Request.Context(), s.websiteVisitorMeta(c), channelID, c.GetString(websiteVisitorExternalKey), "")
+		if writeApplicationError(c, err) {
+			return
+		}
+		writeWebsiteVisitorResult(c, http.StatusOK, result)
+		return
+	}
 	token, valid := readWebsiteVisitorToken(c, channelID)
 	issued := false
+	if c.Query("rotate") == "1" {
+		valid = false
+	}
 	if !valid {
 		var err error
 		token, err = generateWebsiteVisitorToken()
@@ -103,7 +136,7 @@ func (s *Service) initializeWebsiteMessenger(c *gin.Context) {
 		}
 		issued = true
 	}
-	result, err := s.websiteVisitor.InitializeMessenger(c.Request.Context(), websiteVisitorMeta(c), channelID, websiteVisitorExternalID(token), token)
+	result, err := s.websiteVisitor.InitializeMessenger(c.Request.Context(), s.websiteVisitorMeta(c), channelID, websiteVisitorExternalID(token), token)
 	if writeApplicationError(c, err) {
 		return
 	}
@@ -128,7 +161,7 @@ func (s *Service) sendWebsiteVisitorMessage(c *gin.Context) {
 	if !bindWebsiteVisitorJSON(c, &input) {
 		return
 	}
-	result, err := s.websiteVisitor.SendTextMessage(c.Request.Context(), websiteVisitorMeta(c), c.Param("channelID"), c.GetString(websiteVisitorExternalKey), input)
+	result, err := s.websiteVisitor.SendTextMessage(c.Request.Context(), s.websiteVisitorMeta(c), c.Param("channelID"), c.GetString(websiteVisitorExternalKey), input)
 	if writeApplicationError(c, err) {
 		return
 	}
@@ -141,7 +174,7 @@ func (s *Service) createWebsiteVisitorAttachmentUpload(c *gin.Context) {
 	if !bindWebsiteVisitorJSON(c, &input) {
 		return
 	}
-	result, err := s.websiteVisitor.CreateAttachmentUpload(c.Request.Context(), websiteVisitorMeta(c), c.Param("channelID"), c.GetString(websiteVisitorExternalKey), input)
+	result, err := s.websiteVisitor.CreateAttachmentUpload(c.Request.Context(), s.websiteVisitorMeta(c), c.Param("channelID"), c.GetString(websiteVisitorExternalKey), input)
 	if writeApplicationError(c, err) {
 		return
 	}
@@ -154,7 +187,7 @@ func (s *Service) reportWebsiteVisitorTyping(c *gin.Context) {
 	if !bindWebsiteVisitorJSON(c, &input) {
 		return
 	}
-	err := s.websiteVisitor.ReportTyping(c.Request.Context(), websiteVisitorMeta(c), c.Param("channelID"), c.GetString(websiteVisitorExternalKey), c.Param("conversationID"), input)
+	err := s.websiteVisitor.ReportTyping(c.Request.Context(), s.websiteVisitorMeta(c), c.Param("channelID"), c.GetString(websiteVisitorExternalKey), c.Param("conversationID"), input)
 	if writeApplicationError(c, err) {
 		return
 	}
@@ -167,7 +200,7 @@ func (s *Service) rateWebsiteVisitorServiceSession(c *gin.Context) {
 	if !bindWebsiteVisitorJSON(c, &input) {
 		return
 	}
-	result, err := s.websiteVisitor.RateServiceSession(c.Request.Context(), websiteVisitorMeta(c), c.Param("channelID"), c.GetString(websiteVisitorExternalKey), c.Param("conversationID"), c.Param("serviceSessionID"), input)
+	result, err := s.websiteVisitor.RateServiceSession(c.Request.Context(), s.websiteVisitorMeta(c), c.Param("channelID"), c.GetString(websiteVisitorExternalKey), c.Param("conversationID"), c.Param("serviceSessionID"), input)
 	if writeApplicationError(c, err) {
 		return
 	}
@@ -176,7 +209,7 @@ func (s *Service) rateWebsiteVisitorServiceSession(c *gin.Context) {
 
 // completeWebsiteVisitorAttachmentUpload 核验网站访客上传的附件内容。
 func (s *Service) completeWebsiteVisitorAttachmentUpload(c *gin.Context) {
-	err := s.websiteVisitor.CompleteAttachmentUpload(c.Request.Context(), websiteVisitorMeta(c), c.Param("channelID"), c.GetString(websiteVisitorExternalKey), c.Param("fileID"))
+	err := s.websiteVisitor.CompleteAttachmentUpload(c.Request.Context(), s.websiteVisitorMeta(c), c.Param("channelID"), c.GetString(websiteVisitorExternalKey), c.Param("fileID"))
 	if writeApplicationError(c, err) {
 		return
 	}
@@ -189,7 +222,7 @@ func (s *Service) sendWebsiteVisitorAttachmentMessage(c *gin.Context) {
 	if !bindWebsiteVisitorJSON(c, &input) {
 		return
 	}
-	result, err := s.websiteVisitor.SendAttachmentMessage(c.Request.Context(), websiteVisitorMeta(c), c.Param("channelID"), c.GetString(websiteVisitorExternalKey), input)
+	result, err := s.websiteVisitor.SendAttachmentMessage(c.Request.Context(), s.websiteVisitorMeta(c), c.Param("channelID"), c.GetString(websiteVisitorExternalKey), input)
 	if writeApplicationError(c, err) {
 		return
 	}
@@ -198,7 +231,7 @@ func (s *Service) sendWebsiteVisitorAttachmentMessage(c *gin.Context) {
 
 // getWebsiteVisitorMessageAttachment 重新签发网站访客消息附件的预览与下载地址。
 func (s *Service) getWebsiteVisitorMessageAttachment(c *gin.Context) {
-	result, err := s.websiteVisitor.GetMessageAttachment(c.Request.Context(), websiteVisitorMeta(c), c.Param("channelID"), c.GetString(websiteVisitorExternalKey), c.Param("conversationID"), c.Param("messageID"))
+	result, err := s.websiteVisitor.GetMessageAttachment(c.Request.Context(), s.websiteVisitorMeta(c), c.Param("channelID"), c.GetString(websiteVisitorExternalKey), c.Param("conversationID"), c.Param("messageID"))
 	if writeApplicationError(c, err) {
 		return
 	}
@@ -207,7 +240,7 @@ func (s *Service) getWebsiteVisitorMessageAttachment(c *gin.Context) {
 
 // listWebsiteVisitorConversations 返回网站访客当前渠道身份的线程目录。
 func (s *Service) listWebsiteVisitorConversations(c *gin.Context) {
-	result, err := s.websiteVisitor.ListConversations(c.Request.Context(), websiteVisitorMeta(c), c.Param("channelID"), c.GetString(websiteVisitorExternalKey))
+	result, err := s.websiteVisitor.ListConversations(c.Request.Context(), s.websiteVisitorMeta(c), c.Param("channelID"), c.GetString(websiteVisitorExternalKey))
 	if writeApplicationError(c, err) {
 		return
 	}
@@ -216,7 +249,7 @@ func (s *Service) listWebsiteVisitorConversations(c *gin.Context) {
 
 // listWebsiteVisitorMessages 返回网站访客指定线程的消息历史。
 func (s *Service) listWebsiteVisitorMessages(c *gin.Context) {
-	result, err := s.websiteVisitor.ListMessages(c.Request.Context(), websiteVisitorMeta(c), c.Param("channelID"), c.GetString(websiteVisitorExternalKey), c.Param("conversationID"), appservice.WebsiteVisitorMessageHistoryInput{
+	result, err := s.websiteVisitor.ListMessages(c.Request.Context(), s.websiteVisitorMeta(c), c.Param("channelID"), c.GetString(websiteVisitorExternalKey), c.Param("conversationID"), appservice.WebsiteVisitorMessageHistoryInput{
 		Before: c.Query("before"), After: c.Query("after"),
 	})
 	if writeApplicationError(c, err) {
@@ -288,9 +321,23 @@ func websiteVisitorCookieName(channelID string) string {
 // websiteVisitorExternalID 把裸 Token 规范化为渠道外部编号。
 func websiteVisitorExternalID(token string) string { return "web-session:" + token }
 
-// websiteVisitorMeta 构造不含成员认证的访客调用元信息。
-func websiteVisitorMeta(c *gin.Context) appservice.WebsiteVisitorMeta {
-	return appservice.WebsiteVisitorMeta{Locale: appservice.Locale(c.GetHeader("Accept-Language")), Token: c.GetString(websiteVisitorTokenKey)}
+// websiteCustomerExternalID 把企业用户编号规范化为渠道外部编号。
+func websiteCustomerExternalID(userID string) string { return "web-user:" + userID }
+
+// websiteVisitorMeta 构造不含成员认证的访客调用元信息，含已验签的登录用户、浏览器标识与可信代理提供的国家代码。
+func (s *Service) websiteVisitorMeta(c *gin.Context) appservice.WebsiteVisitorMeta {
+	meta := appservice.WebsiteVisitorMeta{
+		Locale: appservice.Locale(c.GetHeader("Accept-Language")), Token: c.GetString(websiteVisitorTokenKey),
+		UserAgent: c.GetHeader("User-Agent"),
+	}
+	if s.visitorCountryHeader != "" {
+		meta.Country = c.GetHeader(s.visitorCountryHeader)
+	}
+	if customer, ok := c.Get(websiteCustomerKey); ok {
+		meta.Customer = customer.(*appservice.WebsiteVisitorCustomer)
+		meta.CustomerToken = strings.TrimSpace(c.GetHeader(websiteCustomerHeader))
+	}
+	return meta
 }
 
 // websiteVisitorRequestMeta 构造公开错误本地化所需的应用元信息。
