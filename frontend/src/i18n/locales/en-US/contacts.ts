@@ -109,7 +109,7 @@ const contacts = {
   },
   members: {
     create: "Add company member",
-    createDescription: "Create a member account that can sign in to this company.",
+    createDescription: "Create a member account that can sign in to this company",
     form: {
       name: "Name",
       email: "Email",
@@ -278,8 +278,7 @@ const contacts = {
     otherInformation: "Other information",
     linkedChannels: "Linked channels",
     memberTitle: "Company member",
-    memberDescription: "View and edit a company member.",
-    memberProfileDescription: "Colleague profile",
+    memberDescription: "View and edit a company member",
     contactDescription: "View and edit an external contact.",
     loadError: "Could not load contact details.",
     channels: "Connected channels",

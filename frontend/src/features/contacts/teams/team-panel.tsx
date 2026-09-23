@@ -1,5 +1,5 @@
 /** 单个团队的成员列表与批量管理面板。 */
-import { useCallback, useEffect, useState } from "react"
+import { useEffect, useState } from "react"
 import { PlusIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 import { useLocation, useNavigate } from "react-router"
@@ -33,7 +33,6 @@ import {
 import { workStatusLabel } from "@/components/work-status"
 import { useWorkspace } from "@/contexts/workspace-context"
 import { ContactListSection } from "@/features/contacts/contact-list-section"
-import { MemberProfileSheet } from "@/features/contacts/members/member-profile-sheet"
 import { TeamMemberPicker } from "@/features/contacts/teams/team-member-picker"
 import { teamMembershipCacheKeys } from "@/features/contacts/teams/team-membership-cache"
 import { useContactSearch } from "@/features/contacts/use-contact-search"
@@ -59,13 +58,7 @@ export function TeamPanel({ teamId }: { teamId: string }) {
     search,
     setSearch,
     currentPage,
-    selected,
   } = useContactSearch()
-  // 保持引用稳定，供同事资料面板的读取失败处理依赖。
-  const closeMemberDetail = useCallback(
-    () => setParameters({ selected: null }),
-    [setParameters],
-  )
   const workStatus = optionalWailsEnum(
     WorkStatus,
     searchParams.get("workStatus"),
@@ -253,7 +246,6 @@ export function TeamPanel({ teamId }: { teamId: string }) {
                 setParameters({
                   workStatus: value || null,
                   page: null,
-                  selected: null,
                 })
               }
             />
@@ -334,15 +326,16 @@ export function TeamPanel({ teamId }: { teamId: string }) {
           ]}
           rows={teamMembers}
           rowKey={(member) => member.identityId}
-          // 企业成员与同事列表一样打开资料面板，AI 员工进入其编辑页并可返回本团队。
-          onRowActivate={(member) =>
-            member.identityType ===
-            OrganizationIdentityType.OrganizationIdentityTypeAgent
-              ? navigate(
-                  `/ai-employees/${member.agentId}?tab=basic&returnTo=${encodeURIComponent(location.pathname + location.search)}`,
-                )
-              : setParameters({ selected: member.userId })
-          }
+          // 同事与同事列表一样进入单聊，点击自己不跳转；AI 员工进入其编辑页并可返回本团队。
+          onRowActivate={(member) => {
+            if (member.identityType === OrganizationIdentityType.OrganizationIdentityTypeAgent) {
+              navigate(
+                `/ai-employees/${member.agentId}?tab=basic&returnTo=${encodeURIComponent(location.pathname + location.search)}`,
+              )
+            } else if (member.identityId !== identity.user.identityId) {
+              navigate(`/chats?target=${member.identityId}`)
+            }
+          }}
           empty={t("list.empty")}
           rowActions={
             selectedTeam
@@ -359,8 +352,6 @@ export function TeamPanel({ teamId }: { teamId: string }) {
           }
         />
       </ContactListSection>
-
-      <MemberProfileSheet userId={selected} onClose={closeMemberDetail} />
 
       {selectedTeam ? (
         <Dialog

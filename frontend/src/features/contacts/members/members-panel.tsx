@@ -1,5 +1,4 @@
-/** 同事目录面板：搜索在职同事、查看资料并发起聊天。 */
-import { useCallback } from "react"
+/** 同事目录面板：搜索在职同事并发起聊天。 */
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
 
@@ -9,17 +8,16 @@ import { ResourceRowIdentity } from "@/components/resource-row-identity"
 import { ResourceTable } from "@/components/resource-table"
 import { useWorkspace } from "@/contexts/workspace-context"
 import { ContactListSection } from "@/features/contacts/contact-list-section"
-import { MemberProfileSheet } from "@/features/contacts/members/member-profile-sheet"
 import { useContactSearch } from "@/features/contacts/use-contact-search"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource } from "@/hooks/use-resource"
 
-/** 在职同事的列表、资料面板和发消息入口。 */
+/** 在职同事列表，点击同事进入与其单聊。 */
 export function MembersPanel() {
   const { t } = useTranslation("contacts")
   const { identity } = useWorkspace()
   const navigate = useNavigate()
-  const { setParameters, query, search, setSearch, currentPage, selected } =
+  const { setParameters, query, search, setSearch, currentPage } =
     useContactSearch()
   const status = UserStatus.UserStatusActive
 
@@ -30,15 +28,8 @@ export function MembersPanel() {
   const users = list.data?.users ?? []
   const page = list.data?.page ?? { number: currentPage, size: 50, total: 0 }
 
-  // 保持引用稳定，供资料面板的读取失败处理依赖。
-  const closeProfile = useCallback(
-    () => setParameters({ selected: null }),
-    [setParameters],
-  )
-
   return (
-    <>
-      <ContactListSection
+    <ContactListSection
         title={t("scopes.employees")}
         description={t("scopeDescriptions.employees")}
         scope="employees"
@@ -78,23 +69,13 @@ export function MembersPanel() {
           rows={users}
           rowKey={(user) => user.id}
           empty={t("list.empty")}
-          onRowActivate={(user) => setParameters({ selected: user.id })}
-          // 自己没有发消息。
-          rowActions={(user) =>
-            user.identityId !== identity.user.identityId
-              ? [
-                  {
-                    key: "message",
-                    label: t("sendMessage"),
-                    onSelect: () => navigate(`/chats?target=${user.identityId}`),
-                  },
-                ]
-              : []
-          }
+          // 点击自己的行不跳转。
+          onRowActivate={(user) => {
+            if (user.identityId !== identity.user.identityId) {
+              navigate(`/chats?target=${user.identityId}`)
+            }
+          }}
         />
-      </ContactListSection>
-
-      <MemberProfileSheet userId={selected} onClose={closeProfile} />
-    </>
+    </ContactListSection>
   )
 }
