@@ -42,6 +42,7 @@ func newDeviceOps(db *bun.DB) deviceOps {
 func (o *directOperations) RegisterDevice(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input DeviceRegistrationInput) (Device, error) {
 	record, err := o.registerDevice.Execute(ctx, identity, deviceaction.RegisterInput{
 		InstallID: input.InstallID, Name: input.Name, Platform: domain.DevicePlatform(input.Platform),
+		RuntimeVersion: input.RuntimeVersion, ToolManifest: input.ToolManifest,
 	})
 	if err != nil {
 		return Device{}, o.deviceError(ctx, meta, err, cervii18n.ErrorDeviceRegisterFailed, identity.Organization.ID)

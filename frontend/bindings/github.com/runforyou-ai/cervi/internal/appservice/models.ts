@@ -1647,12 +1647,14 @@ export enum DevicePlatform {
 };
 
 /**
- * DeviceRegistrationInput 定义设备注册上报的本机信息。
+ * DeviceRegistrationInput 定义设备注册上报的本机信息、本机运行时版本与本机工具名称清单。
  */
 export interface DeviceRegistrationInput {
     "installId": string;
     "name": string;
     "platform": DevicePlatform;
+    "runtimeVersion": number;
+    "toolManifest": string[] | null;
 }
 
 /**

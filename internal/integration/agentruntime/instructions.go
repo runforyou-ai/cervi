@@ -21,6 +21,8 @@ const memberBaseline = `你是企业「%s」的 AI 员工%s，协助企业同事
 
 const knowledgeToolGuidance = "- search_knowledge：检索企业资料，回答具体问题前先调用，一次可以传多个不同表述的查询。"
 
+const workspaceToolGuidance = "- %s：查阅本会话指定的工作区。路径以 / 开头，/ 表示工作区根目录；需要了解代码或文件内容时先按文件名或内容定位，再读取相关部分。"
+
 const customerHistoryToolGuidance = "- search_customer_history：查看同一客户以往的沟通记录。"
 
 const askCustomerToolGuidance = "- ask_customer：需要客户补充信息、确认，或只需要问候时，用它发送要说的话并等待客户回复；判断客户的问题已经解决时，用 purpose 为 confirm_resolution 询问客户问题是否已解决、是否还需要其他帮助。"
@@ -55,6 +57,7 @@ addressedToYou 为 true 的消息是本次需要你处理的请求，其余消�
 // builtinTools 表示本次运行实际注册的内置工具，场景规则据此说明工具用法。
 type builtinTools struct {
 	Knowledge         bool
+	Workspace         []string // 执行设备在工作区中提供的本机工具。
 	CustomerHistory   bool
 	Terminal          bool // 客服场景的 ask_customer、handoff_to_human 与 resolve_conversation。
 	HandoffCategories bool // 企业有可选的咨询分类，handoff_to_human 提供 category 参数。
@@ -93,6 +96,9 @@ func toolGuidance(tools builtinTools) string {
 	lines := make([]string, 0, 4)
 	if tools.Knowledge {
 		lines = append(lines, knowledgeToolGuidance)
+	}
+	if len(tools.Workspace) > 0 {
+		lines = append(lines, fmt.Sprintf(workspaceToolGuidance, strings.Join(tools.Workspace, "、")))
 	}
 	if tools.CustomerHistory {
 		lines = append(lines, customerHistoryToolGuidance)

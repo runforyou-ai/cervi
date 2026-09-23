@@ -3,6 +3,7 @@
 package device
 
 import (
+	"slices"
 	"strings"
 	"unicode/utf8"
 
@@ -14,11 +15,12 @@ import (
 type ValidationCode = common.FieldCode
 
 const (
-	ValidationInstallIDRequired ValidationCode = "DEVICE_INSTALL_ID_REQUIRED"
-	ValidationInstallIDTooLong  ValidationCode = "DEVICE_INSTALL_ID_TOO_LONG"
-	ValidationNameRequired      ValidationCode = "DEVICE_NAME_REQUIRED"
-	ValidationNameTooLong       ValidationCode = "DEVICE_NAME_TOO_LONG"
-	ValidationPlatformInvalid   ValidationCode = "DEVICE_PLATFORM_INVALID"
+	ValidationInstallIDRequired     ValidationCode = "DEVICE_INSTALL_ID_REQUIRED"
+	ValidationInstallIDTooLong      ValidationCode = "DEVICE_INSTALL_ID_TOO_LONG"
+	ValidationNameRequired          ValidationCode = "DEVICE_NAME_REQUIRED"
+	ValidationNameTooLong           ValidationCode = "DEVICE_NAME_TOO_LONG"
+	ValidationPlatformInvalid       ValidationCode = "DEVICE_PLATFORM_INVALID"
+	ValidationRuntimeVersionInvalid ValidationCode = "DEVICE_RUNTIME_VERSION_INVALID"
 )
 
 // ValidationError 表示设备字段校验失败。
@@ -49,5 +51,16 @@ func normalizeRegisterInput(input RegisterInput) (RegisterInput, map[string]Vali
 	if !domain.ValidDevicePlatform(input.Platform) {
 		fields["platform"] = ValidationPlatformInvalid
 	}
+	if input.RuntimeVersion < 0 {
+		fields["runtimeVersion"] = ValidationRuntimeVersionInvalid
+	}
+	// 工具清单去掉空名称与重复名称，未上报时为空清单。
+	manifest := make([]string, 0, len(input.ToolManifest))
+	for _, name := range input.ToolManifest {
+		if name = strings.TrimSpace(name); name != "" && !slices.Contains(manifest, name) {
+			manifest = append(manifest, name)
+		}
+	}
+	input.ToolManifest = manifest
 	return input, fields
 }
