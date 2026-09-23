@@ -130,10 +130,6 @@ export const resourceKeys = {
   devices: () => ["devices"],
   /** 本机在当前企业服务器上的设备注册状态。 */
   currentDevice: () => ["current-device"],
-  /** 指定设备上的工作区。 */
-  deviceWorkspaces: (deviceId?: string) => itemKey("device-workspaces", deviceId),
-  /** 会话中各位助理的绑定电脑与工作区。 */
-  conversationAssistantWorkspaces: (conversationId?: string) => itemKey("conversation-assistant-workspaces", conversationId),
   /** 当前企业的客服工作时间。 */
   businessHours: () => ["business-hours"],
   /** 当前企业的客服超时时长。 */

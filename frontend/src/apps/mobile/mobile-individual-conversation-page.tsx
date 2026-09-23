@@ -33,7 +33,6 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu"
 import { assistantPresenceLabel } from "@/features/inbox/agent-run-status"
-import { ConversationAssistantWorkspace } from "@/features/inbox/assistant-workspace"
 import { useConversationSummary } from "@/features/inbox/use-conversation-summary"
 import { LoadingIndicator } from "@/components/loading-indicator"
 import { useAccountDisabledReason } from "@/features/inbox/use-account-disabled-reason"
@@ -48,7 +47,7 @@ export type MobileIndividualConversationContext = {
   conversation: DirectInboxConversationData | AgentInboxConversationData
 }
 
-/** 展示双方会话的移动端头部：助理不在线时在标题栏下方整行说明，助理工作区入口，以及包含资料与会话内搜索的菜单；子页覆盖时不响应返回。 */
+/** 展示双方会话的移动端头部：助理不在线时在标题栏下方整行说明，并提供包含资料与会话内搜索的菜单；子页覆盖时不响应返回。 */
 export function MobileIndividualHeader({
   conversation,
   peerName,
@@ -89,55 +88,47 @@ export function MobileIndividualHeader({
           <span className="block min-w-0 truncate">{typingLabel || peerName}</span>
         }
         actions={
-          <>
-            {assistant && conversation ? (
-              <ConversationAssistantWorkspace
-                conversationID={conversation.id}
-                assistantIdentityID={assistant.agentIdentityId}
-              />
-            ) : null}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon-lg"
-                  className="-mr-2"
-                  aria-label={tInbox("conversationMore")}
-                  disabled={!conversation}
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button
+                variant="ghost"
+                size="icon-lg"
+                className="-mr-2"
+                aria-label={tInbox("conversationMore")}
+                disabled={!conversation}
+              >
+                <MoreHorizontalIcon />
+              </Button>
+            </DropdownMenuTrigger>
+            {conversation ? (
+              <DropdownMenuContent align="end" className="min-w-48">
+                <DropdownMenuItem
+                  className="min-h-11"
+                  onSelect={() =>
+                    // 资料子页挂在所在会话路由下。
+                    void navigate(
+                      isAgentInboxConversation(conversation)
+                        ? `/chats/agent/${conversation.id}/profile`
+                        : `/chats/direct/${conversation.id}/profile`,
+                      { state: { conversation, mobileBack: true } },
+                    )
+                  }
                 >
-                  <MoreHorizontalIcon />
-                </Button>
-              </DropdownMenuTrigger>
-              {conversation ? (
-                <DropdownMenuContent align="end" className="min-w-48">
-                  <DropdownMenuItem
-                    className="min-h-11"
-                    onSelect={() =>
-                      // 资料子页挂在所在会话路由下。
-                      void navigate(
-                        isAgentInboxConversation(conversation)
-                          ? `/chats/agent/${conversation.id}/profile`
-                          : `/chats/direct/${conversation.id}/profile`,
-                        { state: { conversation, mobileBack: true } },
-                      )
-                    }
-                  >
-                    {tInbox("contextProfileTab")}
-                  </DropdownMenuItem>
-                  <DropdownMenuItem
-                    className="min-h-11"
-                    onSelect={() =>
-                      void navigate(mobileSearchPath(conversation.id), {
-                        state: { mobileBack: true },
-                      })
-                    }
-                  >
-                    {tInbox("searchCurrentConversation")}
-                  </DropdownMenuItem>
-                </DropdownMenuContent>
-              ) : null}
-            </DropdownMenu>
-          </>
+                  {tInbox("contextProfileTab")}
+                </DropdownMenuItem>
+                <DropdownMenuItem
+                  className="min-h-11"
+                  onSelect={() =>
+                    void navigate(mobileSearchPath(conversation.id), {
+                      state: { mobileBack: true },
+                    })
+                  }
+                >
+                  {tInbox("searchCurrentConversation")}
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            ) : null}
+          </DropdownMenu>
         }
       />
       {presenceLabel ? (

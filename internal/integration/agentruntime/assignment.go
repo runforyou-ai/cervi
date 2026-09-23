@@ -50,7 +50,7 @@ type AssignmentFacts struct {
 type Capabilities struct {
 	Knowledge  bool     // 本次运行可检索会话绑定的知识库。
 	MCPServers []string // 可连接的远程 MCP 服务名称。
-	LocalTools []string // 执行设备在本次运行的工作区中提供的本机工具，按本机工具目录顺序排列。
+	LocalTools []string // 执行设备提供的本机工具，按本机工具目录顺序排列。
 	// CustomerLoginRequired 表示客服场景中有按客户查询的服务因客户未验证身份而未挂载。
 	CustomerLoginRequired bool
 }
@@ -110,7 +110,7 @@ func mcpServerNames(capabilities Capabilities) []string {
 	return names
 }
 
-// builtinToolNames 按注册顺序列出本次运行的内置工具，开发期计算器只在内部场景注册，本机工具随执行设备的工作区注册，终止工具只在客服场景注册。
+// builtinToolNames 按注册顺序列出本次运行的内置工具，开发期计算器只在内部场景注册，本机工具只在设备执行时注册，终止工具只在客服场景注册。
 func builtinToolNames(scene Scene, capabilities Capabilities) []string {
 	names := make([]string, 0, 4+len(capabilities.LocalTools))
 	if scene != SceneCustomer {

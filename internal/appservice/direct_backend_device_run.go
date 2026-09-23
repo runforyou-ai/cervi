@@ -66,7 +66,7 @@ func (o *directOperations) GetDeviceWork(ctx context.Context, meta RequestMeta, 
 	}
 	output := DeviceWork{WorkSeq: work.WorkSeq, Runs: make([]DeviceWorkRun, 0, len(work.Runs))}
 	for _, run := range work.Runs {
-		output.Runs = append(output.Runs, DeviceWorkRun{RunID: run.RunID, ConversationID: run.ConversationID, WorkspaceID: run.WorkspaceID})
+		output.Runs = append(output.Runs, DeviceWorkRun{RunID: run.RunID, ConversationID: run.ConversationID})
 	}
 	return output, nil
 }
@@ -251,7 +251,7 @@ func (b *DirectBackend) ReadDeviceRunAttachment(ctx context.Context, meta Reques
 	return content, nil
 }
 
-// deviceRunError 转换设备运行期错误：运行不存在、不可领取、工作区忙与租约失效给出稳定原因码，其余记录日志后按请求失败收敛。
+// deviceRunError 转换设备运行期错误：运行不存在、不可领取与租约失效给出稳定原因码，其余记录日志后按请求失败收敛。
 func (o *directOperations) deviceRunError(ctx context.Context, meta RequestMeta, err error, device deviceIdentity, runID string) error {
 	if ctx.Err() != nil {
 		return ctx.Err()
@@ -261,8 +261,6 @@ func (o *directOperations) deviceRunError(ctx context.Context, meta RequestMeta,
 		return NotFoundError(meta, cervii18n.ErrorDeviceRunNotFound)
 	case errors.Is(err, agentrunaction.ErrDeviceRunUnavailable):
 		return ConflictError(meta, cervii18n.ErrorDeviceRunUnavailable, "run_unavailable")
-	case errors.Is(err, agentrunaction.ErrDeviceWorkspaceBusy):
-		return ConflictError(meta, cervii18n.ErrorDeviceWorkspaceBusy, "workspace_busy")
 	case errors.Is(err, agentrunaction.ErrDeviceRunLeaseLost):
 		return ConflictError(meta, cervii18n.ErrorDeviceRunLeaseLost, "lease_lost")
 	case errors.Is(err, agentrunaction.ErrDeviceRunFailureCodeInvalid):

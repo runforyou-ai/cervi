@@ -35,7 +35,6 @@ import {
   TooltipTrigger,
 } from "@/components/ui/tooltip"
 import { assistantPresenceLabel } from "@/features/inbox/agent-run-status"
-import { ConversationAssistantWorkspace } from "@/features/inbox/assistant-workspace"
 import {
   customerTypingSenderName,
   groupTypingSenderName,
@@ -178,12 +177,6 @@ export function ConversationHeader({
               label={t("searchCurrentConversation")}
               icon={SearchIcon}
               onClick={onSearch}
-            />
-          ) : null}
-          {assistant ? (
-            <ConversationAssistantWorkspace
-              conversationID={conversation.id}
-              assistantIdentityID={assistant.agentIdentityId}
             />
           ) : null}
           {customer && actions.reopenable ? (

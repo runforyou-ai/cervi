@@ -9,10 +9,13 @@ import (
 	"fmt"
 	"io"
 	"net/http"
+	"os"
+	"path/filepath"
 	"sync"
 	"testing"
 	"time"
 
+	"github.com/cloudwego/eino/adk/filesystem"
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/integration/knowledgeretrieval"
@@ -27,7 +30,6 @@ type stubRunClient struct {
 	failures  map[string]appservice.DeviceRunFailureCode
 	// failedBlocks 按运行编号记录失败上报携带的过程内容块。
 	failedBlocks map[string]json.RawMessage
-	busy         map[string]bool
 	// blockPeek 为 true 时读取输入阻塞到运行 context 结束。
 	blockPeek bool
 	leaseEnd  bool
@@ -45,13 +47,10 @@ func (c *stubRunClient) GetDeviceWork(context.Context, appservice.RequestMeta) (
 	return c.work, nil
 }
 
-// ClaimDeviceRun 记录领取，预设为工作区忙的运行返回冲突。
+// ClaimDeviceRun 记录领取并返回预设的有效配置。
 func (c *stubRunClient) ClaimDeviceRun(_ context.Context, _ appservice.RequestMeta, runID string) (appservice.DeviceRunClaim, error) {
 	c.mu.Lock()
 	defer c.mu.Unlock()
-	if c.busy[runID] {
-		return appservice.DeviceRunClaim{}, &appservice.Error{Kind: appservice.ErrorKindConflict, Reason: "workspace_busy"}
-	}
 	c.claims = append(c.claims, runID)
 	assignment := c.assignment
 	if assignment == nil {
@@ -152,17 +151,8 @@ func (r stubRuntime) Run(ctx context.Context, request agentruntime.RunRequest, f
 	return agentruntime.RunResult{Content: fmt.Sprintf("收到 %d 条上下文消息", len(claimed.Messages)), EndSeq: claimed.EndSeq}, nil
 }
 
-// stubWorkspaceStore 在内存中保存工作区路径。
-type stubWorkspaceStore map[string]string
-
-// LoadAgentWorkspacePath 读取内存中的工作区路径。
-func (s stubWorkspaceStore) LoadAgentWorkspacePath(_ context.Context, _, _, workspaceID string) (string, bool, error) {
-	path, found := s[workspaceID]
-	return path, found, nil
-}
-
 // newTestWorker 创建已登录并已注册设备的执行循环，不启动后台循环。
-func newTestWorker(t *testing.T, client *stubRunClient, workspaces stubWorkspaceStore, runtime stubRuntime) *Worker {
+func newTestWorker(t *testing.T, client *stubRunClient, runtime stubRuntime) *Worker {
 	t.Helper()
 	const serverURL = "https://cervi.example.com"
 	store := &stubStore{installID: "install-1", registrations: map[string]string{serverURL + "|org-1|user-1": "device-1"}}
@@ -173,75 +163,46 @@ func newTestWorker(t *testing.T, client *stubRunClient, workspaces stubWorkspace
 	client.completed = map[string]string{}
 	client.failures = map[string]appservice.DeviceRunFailureCode{}
 	client.failedBlocks = map[string]json.RawMessage{}
-	worker := NewWorker(registrar, workspaces, client, runtime)
+	worker := NewWorker(registrar, client, runtime, t.TempDir())
 	t.Cleanup(worker.Stop)
 	return worker
 }
 
-// TestWorkerSerializesWorkspace 验证同一工作区只领取一个运行，执行完成后再领取下一个并回报运行时的回复。
-func TestWorkerSerializesWorkspace(t *testing.T) {
-	directory := t.TempDir()
+// TestWorkerRunsInConversationFolder 验证各会话的运行都被领取执行并回报回复，本机文件以会话默认文件夹为起点且文件夹自动创建。
+func TestWorkerRunsInConversationFolder(t *testing.T) {
 	client := &stubRunClient{work: appservice.DeviceWork{Runs: []appservice.DeviceWorkRun{
-		{RunID: "run-1", WorkspaceID: "workspace-1"}, {RunID: "run-2", WorkspaceID: "workspace-1"},
+		{RunID: "run-1", ConversationID: "conversation-1"}, {RunID: "run-2", ConversationID: "conversation-2"},
 	}}}
-	worker := newTestWorker(t, client, stubWorkspaceStore{"workspace-1": directory}, stubRuntime{})
+	var mu sync.Mutex
+	listed := map[string]bool{}
+	worker := newTestWorker(t, client, stubRuntime{inspect: func(ctx context.Context, request agentruntime.RunRequest) {
+		_, err := request.Workspace.LsInfo(ctx, &filesystem.LsInfoRequest{})
+		mu.Lock()
+		listed[request.RunID] = err == nil
+		mu.Unlock()
+	}})
 
 	worker.poll()
 	worker.runs.Wait()
-	client.mu.Lock()
-	if len(client.claims) != 1 || client.claims[0] != "run-1" || client.completed["run-1"] == "" {
-		t.Fatalf("首轮领取 = %v，收尾 = %v", client.claims, client.completed)
+	if len(client.claims) != 2 || client.completed["run-1"] == "" || client.completed["run-2"] == "" || !listed["run-1"] || !listed["run-2"] {
+		t.Fatalf("领取 = %v，收尾 = %v，读取默认文件夹 = %v", client.claims, client.completed, listed)
 	}
-	client.work.Runs = client.work.Runs[1:]
-	client.mu.Unlock()
-
-	worker.poll()
-	worker.runs.Wait()
-	if len(client.claims) != 2 || client.claims[1] != "run-2" {
-		t.Fatalf("次轮领取 = %v", client.claims)
-	}
-}
-
-// TestWorkerRetriesBusyWorkspace 验证服务端判定工作区忙时不执行并要求尽快重新检查。
-func TestWorkerRetriesBusyWorkspace(t *testing.T) {
-	client := &stubRunClient{
-		work: appservice.DeviceWork{Runs: []appservice.DeviceWorkRun{{RunID: "run-1", WorkspaceID: "workspace-1"}}},
-		busy: map[string]bool{"run-1": true},
-	}
-	worker := newTestWorker(t, client, stubWorkspaceStore{"workspace-1": t.TempDir()}, stubRuntime{})
-
-	if !worker.poll() {
-		t.Fatal("工作区忙时没有要求重新检查")
-	}
-	if len(client.claims) != 0 || len(worker.active) != 0 {
-		t.Fatalf("领取 = %v，本机登记 = %v", client.claims, worker.active)
-	}
-}
-
-// TestWorkerReportsMissingWorkspace 验证本机找不到工作区目录时不领取并上报工作区缺失。
-func TestWorkerReportsMissingWorkspace(t *testing.T) {
-	client := &stubRunClient{work: appservice.DeviceWork{Runs: []appservice.DeviceWorkRun{
-		{RunID: "run-1", WorkspaceID: "workspace-1"}, {RunID: "run-2", WorkspaceID: "workspace-2"},
-	}}}
-	worker := newTestWorker(t, client, stubWorkspaceStore{"workspace-2": t.TempDir() + "/removed"}, stubRuntime{})
-
-	worker.poll()
-	if len(client.claims) != 0 ||
-		client.failures["run-1"] != appservice.DeviceRunFailureWorkspaceMissing ||
-		client.failures["run-2"] != appservice.DeviceRunFailureWorkspaceMissing {
-		t.Fatalf("领取 = %v，失败上报 = %v", client.claims, client.failures)
+	for _, conversationID := range []string{"conversation-1", "conversation-2"} {
+		if info, err := os.Stat(filepath.Join(worker.folders, conversationID)); err != nil || !info.IsDir() {
+			t.Fatalf("默认文件夹 %s 未创建：%v", conversationID, err)
+		}
 	}
 }
 
 // TestWorkerStopsEndedRun 验证续租得知运行已结束后中断本机执行，且不上报失败。
 func TestWorkerStopsEndedRun(t *testing.T) {
 	client := &stubRunClient{
-		work:      appservice.DeviceWork{Runs: []appservice.DeviceWorkRun{{RunID: "run-1", WorkspaceID: "workspace-1"}}},
+		work:      appservice.DeviceWork{Runs: []appservice.DeviceWorkRun{{RunID: "run-1", ConversationID: "conversation-1"}}},
 		blockPeek: true,
 		leaseEnd:  true,
 		peeked:    make(chan string, 1),
 	}
-	worker := newTestWorker(t, client, stubWorkspaceStore{"workspace-1": t.TempDir()}, stubRuntime{})
+	worker := newTestWorker(t, client, stubRuntime{})
 
 	worker.poll()
 	<-client.peeked
@@ -254,8 +215,8 @@ func TestWorkerStopsEndedRun(t *testing.T) {
 
 // TestWorkerReportsRuntimeFailure 验证运行时出错时上报运行失败并携带已产生的过程内容块。
 func TestWorkerReportsRuntimeFailure(t *testing.T) {
-	client := &stubRunClient{work: appservice.DeviceWork{Runs: []appservice.DeviceWorkRun{{RunID: "run-1", WorkspaceID: "workspace-1"}}}}
-	worker := newTestWorker(t, client, stubWorkspaceStore{"workspace-1": t.TempDir()}, stubRuntime{failure: errors.New("model unavailable")})
+	client := &stubRunClient{work: appservice.DeviceWork{Runs: []appservice.DeviceWorkRun{{RunID: "run-1", ConversationID: "conversation-1"}}}}
+	worker := newTestWorker(t, client, stubRuntime{failure: errors.New("model unavailable")})
 
 	worker.poll()
 	worker.runs.Wait()
@@ -283,7 +244,7 @@ func TestWorkerWiresRunDependencies(t *testing.T) {
 		snapshot agentruntime.StreamSnapshot
 	)
 	endedOnce := make(chan struct{})
-	worker = newTestWorker(t, client, stubWorkspaceStore{}, stubRuntime{inspect: func(ctx context.Context, request agentruntime.RunRequest) {
+	worker = newTestWorker(t, client, stubRuntime{inspect: func(ctx context.Context, request agentruntime.RunRequest) {
 		result, err := request.KnowledgeSearch(ctx, knowledgeretrieval.Request{Queries: []string{"退款"}})
 		if err != nil {
 			t.Errorf("knowledge search: %v", err)
@@ -327,7 +288,7 @@ func TestWorkerWiresRunDependencies(t *testing.T) {
 func TestWorkerOmitsKnowledgeSearch(t *testing.T) {
 	client := &stubRunClient{work: appservice.DeviceWork{Runs: []appservice.DeviceWorkRun{{RunID: "run-1"}}}}
 	injected := true
-	worker := newTestWorker(t, client, stubWorkspaceStore{}, stubRuntime{inspect: func(_ context.Context, request agentruntime.RunRequest) {
+	worker := newTestWorker(t, client, stubRuntime{inspect: func(_ context.Context, request agentruntime.RunRequest) {
 		injected = request.KnowledgeSearch != nil
 	}})
 
@@ -340,7 +301,7 @@ func TestWorkerOmitsKnowledgeSearch(t *testing.T) {
 
 // TestWorkerStreamFollowsReservation 验证运行登记后即可订阅本机过程流，释放登记时过程流随之结束。
 func TestWorkerStreamFollowsReservation(t *testing.T) {
-	worker := newTestWorker(t, &stubRunClient{}, stubWorkspaceStore{}, stubRuntime{})
+	worker := newTestWorker(t, &stubRunClient{}, stubRuntime{})
 	if !worker.reserve(appservice.DeviceWorkRun{RunID: "run-1"}) || !worker.RunsLocally("run-1") {
 		t.Fatal("reserved run is not local")
 	}

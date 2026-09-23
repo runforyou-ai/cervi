@@ -943,28 +943,3 @@ func (s *Service) ListDevices(ctx context.Context, meta RequestMeta) (DeviceList
 func (s *Service) RevokeDevice(ctx context.Context, meta RequestMeta, deviceID string) error {
 	return s.backend.RevokeDevice(ctx, meta, deviceID)
 }
-
-// RegisterDeviceWorkspace 在当前用户的设备上注册工作区。
-func (s *Service) RegisterDeviceWorkspace(ctx context.Context, meta RequestMeta, deviceID string, input DeviceWorkspaceInput) (DeviceWorkspace, error) {
-	return withNormalizedSlices(s.backend.RegisterDeviceWorkspace(ctx, meta, deviceID, input))
-}
-
-// ListDeviceWorkspaces 返回当前用户设备上的工作区。
-func (s *Service) ListDeviceWorkspaces(ctx context.Context, meta RequestMeta, deviceID string) (DeviceWorkspaceList, error) {
-	return withNormalizedSlices(s.backend.ListDeviceWorkspaces(ctx, meta, deviceID))
-}
-
-// ListConversationAssistantWorkspaces 返回会话中各位助理的绑定电脑与工作区。
-func (s *Service) ListConversationAssistantWorkspaces(ctx context.Context, meta RequestMeta, conversationID string) (ConversationAssistantWorkspaceList, error) {
-	return withNormalizedSlices(s.backend.ListConversationAssistantWorkspaces(ctx, meta, conversationID))
-}
-
-// SetConversationAssistantWorkspace 由主人为会话中的助理指定工作区。
-func (s *Service) SetConversationAssistantWorkspace(ctx context.Context, meta RequestMeta, conversationID string, assistantIdentityID string, input ConversationAssistantWorkspaceInput) error {
-	return s.backend.SetConversationAssistantWorkspace(ctx, meta, conversationID, assistantIdentityID, input)
-}
-
-// ClearConversationAssistantWorkspace 由主人清除会话中助理的工作区。
-func (s *Service) ClearConversationAssistantWorkspace(ctx context.Context, meta RequestMeta, conversationID string, assistantIdentityID string) error {
-	return s.backend.ClearConversationAssistantWorkspace(ctx, meta, conversationID, assistantIdentityID)
-}

@@ -1432,40 +1432,6 @@ func (b *Backend) RevokeDevice(ctx context.Context, meta appservice.RequestMeta,
 	return b.do(ctx, meta, http.MethodDelete, "/devices/"+url.PathEscape(deviceID), nil, nil, nil)
 }
 
-// RegisterDeviceWorkspace 在当前用户的设备上注册工作区。
-func (b *Backend) RegisterDeviceWorkspace(ctx context.Context, meta appservice.RequestMeta, deviceID string, input appservice.DeviceWorkspaceInput) (appservice.DeviceWorkspace, error) {
-	var output appservice.DeviceWorkspace
-	err := b.do(ctx, meta, http.MethodPost, "/devices/"+url.PathEscape(deviceID)+"/workspaces", nil, input, &output)
-	b.normalizeOutput(&output)
-	return output, err
-}
-
-// ListDeviceWorkspaces 返回当前用户设备上的工作区。
-func (b *Backend) ListDeviceWorkspaces(ctx context.Context, meta appservice.RequestMeta, deviceID string) (appservice.DeviceWorkspaceList, error) {
-	var output appservice.DeviceWorkspaceList
-	err := b.do(ctx, meta, http.MethodGet, "/devices/"+url.PathEscape(deviceID)+"/workspaces", nil, nil, &output)
-	b.normalizeOutput(&output)
-	return output, err
-}
-
-// ListConversationAssistantWorkspaces 返回会话中各位助理的绑定电脑与工作区。
-func (b *Backend) ListConversationAssistantWorkspaces(ctx context.Context, meta appservice.RequestMeta, conversationID string) (appservice.ConversationAssistantWorkspaceList, error) {
-	var output appservice.ConversationAssistantWorkspaceList
-	err := b.do(ctx, meta, http.MethodGet, "/conversations/"+url.PathEscape(conversationID)+"/assistant-workspaces", nil, nil, &output)
-	b.normalizeOutput(&output)
-	return output, err
-}
-
-// SetConversationAssistantWorkspace 由主人为会话中的助理指定工作区。
-func (b *Backend) SetConversationAssistantWorkspace(ctx context.Context, meta appservice.RequestMeta, conversationID string, assistantIdentityID string, input appservice.ConversationAssistantWorkspaceInput) error {
-	return b.do(ctx, meta, http.MethodPut, "/conversations/"+url.PathEscape(conversationID)+"/assistant-workspaces/"+url.PathEscape(assistantIdentityID), nil, input, nil)
-}
-
-// ClearConversationAssistantWorkspace 由主人清除会话中助理的工作区。
-func (b *Backend) ClearConversationAssistantWorkspace(ctx context.Context, meta appservice.RequestMeta, conversationID string, assistantIdentityID string) error {
-	return b.do(ctx, meta, http.MethodDelete, "/conversations/"+url.PathEscape(conversationID)+"/assistant-workspaces/"+url.PathEscape(assistantIdentityID), nil, nil, nil)
-}
-
 // encodeAIKnowledgeGapInputQuery 将 appservice.AIKnowledgeGapInput 编码为查询参数。
 func encodeAIKnowledgeGapInputQuery(input appservice.AIKnowledgeGapInput) url.Values {
 	query := url.Values{}

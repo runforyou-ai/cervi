@@ -7,11 +7,10 @@ import (
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
 
-// DeviceWorkRun 定义设备待领取运行的摘要，workspaceId 为空表示运行不使用本机工作区。
+// DeviceWorkRun 定义设备待领取运行的摘要。
 type DeviceWorkRun struct {
 	RunID          string `json:"runId"`
 	ConversationID string `json:"conversationId"`
-	WorkspaceID    string `json:"workspaceId"`
 }
 
 // DeviceWork 定义设备的工作水位与按创建顺序排列的待领取运行。
@@ -79,8 +78,7 @@ type DeviceRunResultInput struct {
 type DeviceRunFailureCode string
 
 const (
-	DeviceRunFailureWorkspaceMissing DeviceRunFailureCode = DeviceRunFailureCode(domain.AgentRunErrorCodeWorkspaceMissing)
-	DeviceRunFailureRuntimeFailed    DeviceRunFailureCode = DeviceRunFailureCode(domain.AgentRunErrorCodeDeviceRunFailed)
+	DeviceRunFailureRuntimeFailed DeviceRunFailureCode = DeviceRunFailureCode(domain.AgentRunErrorCodeDeviceRunFailed)
 )
 
 // DeviceRunFailureInput 定义设备上报的运行失败原因与详情；用量与过程内容块是运行时的不透明 JSON，为空表示没有已产生的过程内容。
