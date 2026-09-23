@@ -1,4 +1,4 @@
-/** 移动端真人、AI、客户与群聊共用的时间线、阅读进度、文本与附件发送和失败重试。 */
+/** 移动端真人、AI、客户与群聊共用的时间线、阅读进度、文本与附件发送、客户会话内部备注和失败重试。 */
 import { useEffect } from "react"
 
 import {
@@ -17,15 +17,17 @@ import {
   ConversationTimeline,
   type ConversationLocateTarget,
 } from "@/features/inbox/conversation-timeline"
+import { listAllMemberOptions } from "@/features/inbox/list-all-member-options"
 import { useConversationReadMarker } from "@/features/inbox/use-conversation-read-marker"
 import { useRecentConversations } from "@/features/inbox/use-recent-conversations"
 import { useThreadComposerBridge } from "@/features/inbox/use-thread-composer-bridge"
 import { resourceKeys } from "@/hooks/resource-keys"
-import { useResourceInvalidator } from "@/hooks/use-resource"
+import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
 
 /**
  * 草稿只展示本地发送状态，正式会话读取历史、推进已读、按需定位原消息并在前台轮询；
- * closedNotice 非空时保留历史并以该提示替换发送区（如群聊已解散）。
+ * closedNotice 非空时保留历史并以该提示替换发送区（如群聊已解散）；
+ * 客户会话可切换内部备注，不能对客回复时仍可写备注并引用消息。
  */
 export function MobileIndividualThread({
   conversationID,
@@ -76,6 +78,11 @@ export function MobileIndividualThread({
   )
   const replyDisabled = Boolean(disabledReason || closedNotice)
   const group = conversationType === ConversationType.ConversationTypeGroup
+  const customer = conversationType === ConversationType.ConversationTypeCustomer
+  // 客户会话的内部备注可以提醒企业成员。
+  const noteMentionMembers = useResource(resourceKeys.memberOptions(), listAllMemberOptions, {
+    enabled: customer,
+  })
   const { record: recordRecentConversation } = useRecentConversations(
     identity.user.identityId,
   )
@@ -97,7 +104,14 @@ export function MobileIndividualThread({
         enabled={enabled}
         onUnavailable={onUnavailable}
         onReadMessage={enabled ? markRead : undefined}
-        onReplyMessage={enabled && !replyDisabled ? bridge.selectReplyTarget : undefined}
+        onReplyMessage={
+          enabled && !closedNotice && (!disabledReason || customer)
+            ? bridge.selectReplyTarget
+            : undefined
+        }
+        noteReplyEnabled={customer}
+        customerReplyUnavailable={replyDisabled}
+        replyVisibility={bridge.visibility}
         readThroughMessageID={lastReadMessageID}
         retryFailedMessageDisabled={replyDisabled}
         locateMessage={locateMessage}
@@ -124,6 +138,8 @@ export function MobileIndividualThread({
           currentIdentityID={identity.user.identityId}
           disabledReason={disabledReason}
           groupParticipants={groupParticipants}
+          noteMentionMembers={noteMentionMembers.data}
+          onVisibilityChange={customer ? bridge.setVisibility : undefined}
           sendIndividualMessage={sendIndividualMessage}
           customerChannel={customerAttachment}
           onSucceeded={() => {
