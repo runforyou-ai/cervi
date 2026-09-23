@@ -158,6 +158,14 @@ func (b *Backend) ReadInboxConversations(ctx context.Context, meta appservice.Re
 	return output, err
 }
 
+// ReadConversationAttention 返回会话摘要及已知消息之后计入本人提醒的未读消息，提醒口径与应用角标一致。
+func (b *Backend) ReadConversationAttention(ctx context.Context, meta appservice.RequestMeta, conversationID string, input appservice.ConversationAttentionInput) (appservice.ConversationAttention, error) {
+	var output appservice.ConversationAttention
+	err := b.do(ctx, meta, http.MethodGet, "/conversations/"+url.PathEscape(conversationID)+"/attention", encodeConversationAttentionInputQuery(input), nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
 // SearchInbox 按范围检索会话名称、消息正文与附件文件名、成员和外部联系人。
 func (b *Backend) SearchInbox(ctx context.Context, meta appservice.RequestMeta, input appservice.InboxSearchInput) (appservice.InboxSearchResult, error) {
 	var output appservice.InboxSearchResult
@@ -1502,6 +1510,13 @@ func encodeAgentListInputQuery(input appservice.AgentListInput) url.Values {
 	setOptionalQuery(query, "status", input.Status)
 	setPositiveQuery(query, "page", input.Page)
 	setPositiveQuery(query, "pageSize", input.PageSize)
+	return query
+}
+
+// encodeConversationAttentionInputQuery 将 appservice.ConversationAttentionInput 编码为查询参数。
+func encodeConversationAttentionInputQuery(input appservice.ConversationAttentionInput) url.Values {
+	query := url.Values{}
+	setQuery(query, "afterMessageId", input.AfterMessageID)
 	return query
 }
 

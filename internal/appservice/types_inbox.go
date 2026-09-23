@@ -340,6 +340,28 @@ type ReadInboxConversationsInput struct {
 	Query           InboxQuery `json:"query"`
 }
 
+// ConversationAttentionInput 定义调用方已知的最后一条消息，为空时只判断会话最新一条消息是否计入提醒。
+type ConversationAttentionInput struct {
+	AfterMessageID string `json:"afterMessageId" query:"afterMessageId"`
+}
+
+// ConversationAttentionMessage 定义计入本人提醒的一条未读消息的通知摘要。
+type ConversationAttentionMessage struct {
+	ID                 string                    `json:"id"`
+	Type               MessageType               `json:"type"`
+	Visibility         MessageVisibility         `json:"visibility"`
+	Body               string                    `json:"body"`
+	AttachmentName     *string                   `json:"attachmentName"`
+	SenderName         *string                   `json:"senderName"`
+	SenderIdentityType *OrganizationIdentityType `json:"senderIdentityType"`
+}
+
+// ConversationAttention 返回会话摘要与其中计入本人提醒的未读消息，消息按会话顺序排列。
+type ConversationAttention struct {
+	Conversation InboxConversation              `json:"conversation"`
+	Messages     []ConversationAttentionMessage `json:"messages"`
+}
+
 // InboxConversationResult 返回匹配状态，不可用时保留请求 ID 和资格。
 type InboxConversationResult struct {
 	ID           string                        `json:"id"`

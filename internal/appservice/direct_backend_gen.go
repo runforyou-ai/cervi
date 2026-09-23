@@ -213,6 +213,16 @@ func (b *DirectBackend) ReadInboxConversations(ctx context.Context, meta Request
 	return b.ops.ReadInboxConversations(ctx, meta, identity, input)
 }
 
+// ReadConversationAttention 返回会话摘要及已知消息之后计入本人提醒的未读消息，提醒口径与应用角标一致。
+func (b *DirectBackend) ReadConversationAttention(ctx context.Context, meta RequestMeta, conversationID string, input ConversationAttentionInput) (ConversationAttention, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero ConversationAttention
+		return zero, err
+	}
+	return b.ops.ReadConversationAttention(ctx, meta, identity, conversationID, input)
+}
+
 // SearchInbox 按范围检索会话名称、消息正文与附件文件名、成员和外部联系人。
 func (b *DirectBackend) SearchInbox(ctx context.Context, meta RequestMeta, input InboxSearchInput) (InboxSearchResult, error) {
 	identity, err := b.ops.authenticate(ctx, meta)

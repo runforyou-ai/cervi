@@ -187,6 +187,8 @@ function ConversationTimelineContent({
   const navigate = useNavigate()
   const timeZone = useUserTimeZone()
   const pollingActive = useMemberChatPollingActive({ requireWindowFocus })
+  // 会话显示在可见窗口中即推进已读，不要求窗口获得焦点。
+  const readingActive = useMemberChatPollingActive({ requireWindowFocus: false })
   const scrollRootRef = useRef<HTMLDivElement>(null)
   const keepPositionRef = useRef<(() => void) | null>(null)
   const invalidate = useResourceInvalidator()
@@ -239,7 +241,7 @@ function ConversationTimelineContent({
     page: currentPage,
     mode: timeline.mode,
     switching: timeline.switching || location.locating,
-    readingActive: enabled && pollingActive,
+    readingActive: enabled && readingActive,
     identityID: currentIdentityID,
     atBottom: viewport.atBottom,
     getAtBottom: viewport.getAtBottom,

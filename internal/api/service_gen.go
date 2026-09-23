@@ -35,6 +35,7 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.GET("/conversations/:conversationID/business-queries", s.listCustomerBusinessQueries)
 	router.GET("/conversations/:conversationID/summary", s.getInboxConversation)
 	router.POST("/inbox/conversations/query", s.readInboxConversations)
+	router.GET("/conversations/:conversationID/attention", s.readConversationAttention)
 	router.GET("/inbox/search", s.searchInbox)
 	router.GET("/inbox/assignees", s.listCustomerServiceAssignees)
 	router.GET("/inbox/queue-teams", s.listServiceQueueTeams)
@@ -384,6 +385,16 @@ func (s *Service) readInboxConversations(c *gin.Context) {
 		return
 	}
 	output, err := s.application.ReadInboxConversations(c.Request.Context(), requestMeta(c), input)
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// readConversationAttention 返回会话摘要及已知消息之后计入本人提醒的未读消息，提醒口径与应用角标一致。
+func (s *Service) readConversationAttention(c *gin.Context) {
+	input, ok := bindConversationAttentionInputQuery(c)
+	if !ok {
+		return
+	}
+	output, err := s.application.ReadConversationAttention(c.Request.Context(), requestMeta(c), c.Param("conversationID"), input)
 	writeResult(c, http.StatusOK, output, err)
 }
 
@@ -1831,6 +1842,13 @@ func bindAgentListInputQuery(c *gin.Context) (appservice.AgentListInput, bool) {
 		Status:   optionalEnum[appservice.UserStatus](c.Query("status")),
 		Page:     page,
 		PageSize: pageSize,
+	}, true
+}
+
+// bindConversationAttentionInputQuery 从查询参数解析 appservice.ConversationAttentionInput。
+func bindConversationAttentionInputQuery(c *gin.Context) (appservice.ConversationAttentionInput, bool) {
+	return appservice.ConversationAttentionInput{
+		AfterMessageID: c.Query("afterMessageId"),
 	}, true
 }
 

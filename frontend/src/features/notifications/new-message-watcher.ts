@@ -1,50 +1,44 @@
-/** 按成员事件流确认的新消息决定本地通知范围：维护各会话已知末条基线，逐条执行提醒策略。 */
-import type { ConversationMessage, InboxConversationData } from "@/api"
+/** 按成员事件流确认的会话变化投递新消息通知：维护各会话已知末条基线，逐条投递服务端确认计入本人提醒的未读消息。 */
+import type { ConversationAttentionData, ConversationAttentionMessage, InboxConversationData } from "@/api"
 import type { RealtimeServerFrame } from "@/api/realtime/protocol"
 
-/** 观察器依赖的权威读取、通知投递与错误处理入口。 */
+/** 观察器依赖的权威读取、通知投递与错误处理入口；readAttention 在会话不可读时返回 null。 */
 export type NewMessageWatcherPorts = {
   readConversations: () => Promise<InboxConversationData[]>
-  readConversation: (conversationId: string) => Promise<InboxConversationData | null>
-  readMessages: (conversationId: string) => Promise<ConversationMessage[]>
-  readPendingMentions: (conversationId: string) => Promise<string[]>
-  deliver: (conversation: InboxConversationData, message: ConversationMessage) => Promise<void>
+  readAttention: (
+    conversationId: string,
+    afterMessageId: string,
+  ) => Promise<ConversationAttentionData | null>
+  deliver: (conversation: InboxConversationData, message: ConversationAttentionMessage) => Promise<void>
   failed: (error: unknown) => void
 }
 
-/** 合并同一批变更通知的窗口。 */
+/** 已读确认窗口：每个会话从最近一次变化起计时，等待正在查看该会话的窗口或设备上报已读。 */
 export type NewMessageWatcherTiming = {
-  mergeWindowMs: number
+  settleWindowMs: number
 }
 
 const defaultTiming: NewMessageWatcherTiming = {
-  mergeWindowMs: 300,
+  settleWindowMs: 2000,
 }
 
 const notifiedMessageLimit = 500
 
 /** 登录会话内唯一的新消息观察器，随登录外壳创建与销毁。 */
 export class NewMessageWatcher {
-  private readonly identityId: string
   private readonly ports: NewMessageWatcherPorts
   private readonly timing: NewMessageWatcherTiming
   private readonly baselines = new Map<string, string>()
   private readonly notified = new Set<string>()
-  private readonly pending = new Set<string>()
+  private readonly timers = new Map<string, ReturnType<typeof setTimeout>>()
   private queue: Promise<void> = Promise.resolve()
-  private flushTimer: ReturnType<typeof setTimeout> | undefined
   private connection = 0
   private seededConnection = -1
   private seedingConnection = -1
   private disposed = false
 
   /** 创建观察器，事件流建立后由问候事件或 start 取得首个基线。 */
-  constructor(
-    identityId: string,
-    ports: NewMessageWatcherPorts,
-    timing: Partial<NewMessageWatcherTiming> = {},
-  ) {
-    this.identityId = identityId
+  constructor(ports: NewMessageWatcherPorts, timing: Partial<NewMessageWatcherTiming> = {}) {
     this.ports = ports
     this.timing = { ...defaultTiming, ...timing }
   }
@@ -60,12 +54,10 @@ export class NewMessageWatcher {
   /** 停止处理，之后到达的事件与在途结果一律丢弃。 */
   dispose() {
     this.disposed = true
-    clearTimeout(this.flushTimer)
-    this.flushTimer = undefined
-    this.pending.clear()
+    this.clearTimers()
   }
 
-  /** 处理一条服务端事件：连接问候开启新的连接代次并重建基线，会话变化进入本轮合并窗口。 */
+  /** 处理一条服务端事件：连接问候开启新的连接代次并重建基线，会话变化重新开始该会话的已读确认窗口。 */
   receive(frame: RealtimeServerFrame) {
     if (this.disposed) {
       return
@@ -74,19 +66,21 @@ export class NewMessageWatcher {
       case "server_hello":
         // 冷启动与重连按 catchup 处理：新代次先取当前基线，历史消息只更新未读，上一代次的在途结果与待处理会话一律丢弃。
         this.connection += 1
-        this.pending.clear()
-        clearTimeout(this.flushTimer)
-        this.flushTimer = undefined
+        this.clearTimers()
         this.startSeed()
         return
       case "conversation_changed":
         // 订阅时事件流已建立而没有问候事件时，同样先取基线再处理本次变化。
         this.startSeed()
-        this.pending.add(frame.conversationId)
-        this.flushTimer ??= setTimeout(() => this.flush(), this.timing.mergeWindowMs)
+        clearTimeout(this.timers.get(frame.conversationId))
+        this.timers.set(
+          frame.conversationId,
+          setTimeout(() => this.flush(frame.conversationId), this.timing.settleWindowMs),
+        )
         return
       case "conversation_removed":
-        this.pending.delete(frame.conversationId)
+        clearTimeout(this.timers.get(frame.conversationId))
+        this.timers.delete(frame.conversationId)
         this.baselines.delete(frame.conversationId)
         return
     }
@@ -127,88 +121,54 @@ export class NewMessageWatcher {
     }
   }
 
-  /** 处理本轮合并窗口内变化的会话，按到达顺序串行读取。 */
-  private flush() {
-    this.flushTimer = undefined
-    const conversationIds = [...this.pending]
-    this.pending.clear()
+  /** 会话的已读确认窗口到期后，按到期顺序串行处理该会话；排队期间该会话再次变化时交由新的窗口处理。 */
+  private flush(conversationId: string) {
+    this.timers.delete(conversationId)
     const connection = this.connection
     this.enqueue(async () => {
-      for (const conversationId of conversationIds) {
-        if (this.stale(connection)) {
-          return
-        }
-        try {
-          await this.process(conversationId, connection)
-        } catch (error) {
-          this.ports.failed(error)
-        }
+      if (this.stale(connection) || this.timers.has(conversationId)) {
+        return
+      }
+      try {
+        await this.process(conversationId, connection)
+      } catch (error) {
+        this.ports.failed(error)
       }
     })
   }
 
-  /** 读取变化会话的权威行与实际新增范围，逐条执行提醒策略。 */
+  /** 取消全部未到期的已读确认窗口。 */
+  private clearTimers() {
+    for (const timer of this.timers.values()) {
+      clearTimeout(timer)
+    }
+    this.timers.clear()
+  }
+
+  /** 读取变化会话中已知末条之后计入本人提醒的未读消息并逐条投递，基线尚未建立时只登记当前位置。 */
   private async process(conversationId: string, connection: number) {
-    const baseline = this.baselines.get(conversationId)
-    const conversation = await this.ports.readConversation(conversationId)
+    const attention = await this.ports.readAttention(conversationId, this.baselines.get(conversationId) ?? "")
     if (this.stale(connection)) {
       return
     }
-    if (!conversation) {
+    if (!attention) {
       this.baselines.delete(conversationId)
       return
     }
-    const lastMessageId = conversation.lastMessageId
-    // 基线尚未建立、末条未变、没有未读，以及静音的单聊、AI 聊天与客户会话，只登记当前位置。
-    if (
-      this.seededConnection !== connection ||
-      !lastMessageId ||
-      lastMessageId === baseline ||
-      conversation.unreadCount <= 0 ||
-      (conversation.muted && !conversation.group)
-    ) {
-      this.remember(conversation)
-      return
-    }
-    const messages = await this.ports.readMessages(conversationId)
-    if (this.stale(connection)) {
-      return
-    }
-    const baselineIndex = baseline ? messages.findIndex((message) => message.id === baseline) : -1
-    const readIndex = conversation.lastReadMessageId
-      ? messages.findIndex((message) => message.id === conversation.lastReadMessageId)
-      : -1
-    // 新增范围从已知末条与已读水位中靠后的一端开始；基线缺失或已被翻页移出时只按最新一条判断。
-    const arrived =
-      baselineIndex >= 0 ? messages.slice(Math.max(baselineIndex, readIndex) + 1) : messages.slice(-1)
-    const notifiable = arrived.filter(
-      (message) =>
-        !this.notified.has(message.id) &&
-        !message.systemEvent &&
-        message.sender !== null &&
-        message.sender.sourceId !== this.identityId &&
-        (message.body.trim() !== "" || message.attachment !== null),
-    )
-    // 静音群聊只提醒 @ 本人的消息。
-    const mentioned =
-      conversation.muted && notifiable.length
-        ? new Set(await this.ports.readPendingMentions(conversationId))
-        : null
-    if (this.stale(connection)) {
-      return
-    }
-    for (const message of notifiable) {
-      if (mentioned && !mentioned.has(message.id)) {
-        continue
-      }
-      this.markNotified(message.id)
-      await this.ports.deliver(conversation, message)
-      if (this.stale(connection)) {
-        return
+    if (this.seededConnection === connection) {
+      for (const message of attention.messages) {
+        if (this.notified.has(message.id)) {
+          continue
+        }
+        this.markNotified(message.id)
+        await this.ports.deliver(attention.conversation, message)
+        if (this.stale(connection)) {
+          return
+        }
       }
     }
-    // 权威读取与投递全部完成后才推进基线，读取失败时保留原位置，下一次事件重新处理该范围。
-    this.remember(conversation)
+    // 投递全部完成后才推进基线，读取失败时保留原位置，下一次事件重新处理该范围。
+    this.remember(attention.conversation)
   }
 
   /** 判断观察器已销毁或该结果属于过期的连接代次。 */
