@@ -22,25 +22,14 @@ import { useListSearchParams } from "@/hooks/use-list-search-params"
 
 type DirectoryKind = "employees" | "agents"
 
-/** 目录用途：通讯录浏览，或从消息页发起新的 AI 会话。 */
-type DirectoryPurpose = "browse" | "newConversation"
-
 /** 防抖同步搜索条件，按目录类型加载真人或 AI 员工。 */
-export function MobileDirectoryPage({
-  kind,
-  purpose = "browse",
-}: {
-  kind: DirectoryKind
-  purpose?: DirectoryPurpose
-}) {
-  const { t } = useTranslation(["mobile", "inbox"])
+export function MobileDirectoryPage({ kind }: { kind: DirectoryKind }) {
+  const { t } = useTranslation("mobile")
   const { listPageCounts, scrollPositions } = useMobileNavigation()
-  const newConversation = purpose === "newConversation"
-  const listKey = newConversation ? `${kind}:new` : kind
   // 检索词变化时重置目标查询的加载进度和滚动位置。
   const { query: queryText, search, setSearch } = useListSearchParams({
     onQueryChange: (query) => {
-      const storageKey = `${listKey}:${query}`
+      const storageKey = `${kind}:${query}`
       listPageCounts.delete(storageKey)
       scrollPositions.delete(storageKey)
     },
@@ -48,22 +37,15 @@ export function MobileDirectoryPage({
 
   return (
     <section className="flex h-full min-h-0 flex-col">
-      <MobilePageHeader
-        title={t(
-          newConversation ? "inbox:newAgentConversation" : `contacts.${kind}`,
-        )}
-        backTo={newConversation ? "/chats" : "/contacts"}
-      />
+      <MobilePageHeader title={t(`contacts.${kind}`)} backTo="/contacts" />
       <MobileSearchBar
         label={t(kind === "agents" ? "agents.search" : "contacts.search")}
         value={search}
         onChange={setSearch}
       />
       <MobileDirectoryList
-        key={`${listKey}:${queryText.trim()}`}
+        key={`${kind}:${queryText.trim()}`}
         kind={kind}
-        listKey={listKey}
-        newConversation={newConversation}
         queryText={queryText.trim()}
         searching={search !== queryText}
       />
@@ -74,14 +56,10 @@ export function MobileDirectoryPage({
 /** 逐页读取目录成员，行内展示头像、名称和辅助信息。 */
 function MobileDirectoryList({
   kind,
-  listKey,
-  newConversation,
   queryText,
   searching,
 }: {
   kind: DirectoryKind
-  listKey: string
-  newConversation: boolean
   queryText: string
   searching: boolean
 }) {
@@ -89,7 +67,7 @@ function MobileDirectoryList({
   const agents = kind === "agents"
   return (
     <MobilePagedList<UserData | AgentListItemData, UserListData | AgentListData>
-      storageKey={`${listKey}:${queryText}`}
+      storageKey={`${kind}:${queryText}`}
       searching={searching}
       labels={{
         loadError: t(agents ? "agents.loadError" : "contacts.loadError"),
@@ -124,7 +102,6 @@ function MobileDirectoryList({
                     ? `/contacts/ai-employees/${member.id}/chat`
                     : `/contacts/employees/${member.id}`
                 }
-                replace={newConversation}
                 state={{ mobileBack: true }}
                 className="flex min-h-18 items-center gap-3 px-4 py-3 outline-none active:bg-muted focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring"
               >

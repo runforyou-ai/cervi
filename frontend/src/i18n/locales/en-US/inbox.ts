@@ -14,7 +14,6 @@ const inbox = {
   attachmentDownload: "Download",
   attachmentDownloadFailed: "Download failed. Please retry.",
 
-  newAgentConversation: "Create AI chat",
   agentPickerEmpty: "No AI colleagues available",
   messageSendState: "Send status",
   messageSendState_sending: "Sending",
@@ -418,6 +417,7 @@ const inbox = {
   sidePanelClose: "Collapse side panel",
   sidePanelResize: "Resize side panel",
   contextTabsLabel: "Contact context",
+  customerProfile: "Customer profile",
   contextProfileTab: "Profile",
   contextGroupProfileTab: "Group",
   contextGroupMembersTab: "Members",
