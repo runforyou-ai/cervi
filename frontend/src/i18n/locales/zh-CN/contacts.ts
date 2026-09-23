@@ -21,7 +21,7 @@ const contacts = {
     assistants: "我的助理",
   },
   scopeDescriptions: {
-    employees: "管理企业成员的账号、团队和角色",
+    employees: "查找同事并发起聊天",
     teamList: "按团队组织同事和 AI 员工",
     teams: "查看团队成员",
     external: "查看各渠道接入的客户联系人",
@@ -274,6 +274,7 @@ const contacts = {
     linkedChannels: "关联渠道",
     memberTitle: "企业成员",
     memberDescription: "查看和编辑企业成员资料。",
+    memberProfileDescription: "同事资料",
     contactDescription: "查看和编辑外部联系人资料。",
     loadError: "联系人详情加载失败。",
     channels: "关联渠道",

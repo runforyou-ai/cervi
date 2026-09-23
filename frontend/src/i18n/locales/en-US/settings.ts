@@ -15,6 +15,7 @@ const settings = {
     devices: "Devices",
     general: "General",
     customerService: "Customer service",
+    members: "Members",
     roles: "Roles and permissions",
     modelServices: "Model services",
     webhooks: "Webhooks",
@@ -245,6 +246,10 @@ const settings = {
       dateRequired: "Select a date.",
       dateDuplicate: "Dates can't repeat.",
     },
+  },
+  members: {
+    title: "Members",
+    description: "Add member accounts and set roles, teams and customer handling",
   },
   roles: {
     title: "Roles and permissions",

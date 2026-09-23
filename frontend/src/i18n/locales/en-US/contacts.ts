@@ -21,7 +21,7 @@ const contacts = {
     assistants: "My assistants",
   },
   scopeDescriptions: {
-    employees: "Manage member accounts, teams and roles",
+    employees: "Find colleagues and start a chat",
     teamList: "Organize colleagues and AI employees into teams",
     teams: "Members of this team",
     external: "Customer contacts from your channels",
@@ -279,6 +279,7 @@ const contacts = {
     linkedChannels: "Linked channels",
     memberTitle: "Company member",
     memberDescription: "View and edit a company member.",
+    memberProfileDescription: "Colleague profile",
     contactDescription: "View and edit an external contact.",
     loadError: "Could not load contact details.",
     channels: "Connected channels",

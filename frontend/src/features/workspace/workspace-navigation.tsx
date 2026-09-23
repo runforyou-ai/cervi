@@ -19,6 +19,7 @@ import {
   ShieldCheckIcon,
   SlidersHorizontalIcon,
   UserRoundIcon,
+  UsersRoundIcon,
   WebhookIcon,
 } from "lucide-react"
 import { useTranslation } from "react-i18next"
@@ -267,6 +268,13 @@ function WorkspaceSettingsMenu({
           icon={HeadsetIcon}
         >
           {t("navigation.customerService")}
+        </PagePaneLink>
+        <PagePaneLink
+          collapsed={collapsed}
+          to="/settings/members"
+          icon={UsersRoundIcon}
+        >
+          {t("navigation.members")}
         </PagePaneLink>
         <PagePaneLink
           collapsed={collapsed}

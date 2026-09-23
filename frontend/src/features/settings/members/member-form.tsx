@@ -27,7 +27,7 @@ import { TeamSelectField } from "@/features/contacts/team-select-field"
 import {
   createMemberSchema,
   type MemberFormValues,
-} from "@/features/contacts/members/member-schema"
+} from "@/features/settings/members/member-schema"
 
 /** 创建企业成员，可同时设置头像。 */
 export function MemberForm({

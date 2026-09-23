@@ -67,6 +67,10 @@ const workspaceRouteDefinitions = [
     element: <SettingsPage section="customerService" />,
   },
   {
+    path: "/settings/members",
+    element: <SettingsPage section="members" />,
+  },
+  {
     path: "/settings/roles/new",
     element: (
       <SettingsPage section="roles">

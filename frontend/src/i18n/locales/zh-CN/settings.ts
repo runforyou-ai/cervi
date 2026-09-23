@@ -15,6 +15,7 @@ const settings = {
     devices: "设备",
     general: "通用设置",
     customerService: "客服",
+    members: "成员",
     roles: "角色与权限",
     modelServices: "模型服务",
     webhooks: "Webhook",
@@ -240,6 +241,10 @@ const settings = {
       dateRequired: "请选择日期。",
       dateDuplicate: "日期不能重复。",
     },
+  },
+  members: {
+    title: "成员",
+    description: "添加成员账号，设置角色、团队和接待",
   },
   roles: {
     title: "角色与权限",

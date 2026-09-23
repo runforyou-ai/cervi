@@ -1,4 +1,4 @@
-/** 企业成员详情侧滑面板，供成员列表和团队成员列表共用。 */
+/** 设置中企业成员的可编辑详情侧滑面板。 */
 import { useEffect } from "react"
 import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
@@ -12,7 +12,7 @@ import {
 } from "@/api"
 import { useWorkspace } from "@/contexts/workspace-context"
 import { ContactDetailSheet } from "@/features/contacts/contact-detail-sheet"
-import { MemberDetailView } from "@/features/contacts/members/member-detail"
+import { MemberDetailView } from "@/features/settings/members/member-detail"
 import { useContactInvalidator } from "@/features/contacts/use-contact-invalidator"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"

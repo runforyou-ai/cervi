@@ -1,8 +1,8 @@
-/** 通讯录页面协调层：加载共享目录数据并按范围渲染面板。 */
+/** 通讯录页面协调层：按范围渲染同事、团队、外部联系人和助理面板。 */
 import { useEffect, type ReactNode } from "react"
 import { useParams } from "react-router"
 
-import { listChannelOptions, listRoles, listTeams } from "@/api"
+import { listChannelOptions } from "@/api"
 import { PageSplit } from "@/components/page-split"
 import { AssistantsPanel } from "@/features/contacts/assistants/assistants-panel"
 import { ContactScopeSidebar } from "@/features/contacts/contact-scope-sidebar"
@@ -25,39 +25,28 @@ export function ContactsPage({ scope, children }: { scope: ContactScope; childre
     () => listChannelOptions(),
     { staleTime: 0 },
   )
-  const rolesResource = useResource(resourceKeys.roles(), () => listRoles())
-  const teamsResource = useResource(resourceKeys.teams({ pageSize: 100 }), () =>
-    listTeams({ pageSize: 100 }),
-  )
   const channels = channelsResource.data ?? []
-  const roles = rolesResource.data?.roles ?? []
-  const teams = teamsResource.data?.teams ?? []
-  const catalogError =
-    channelsResource.error ?? rolesResource.error ?? teamsResource.error
+  const channelsError = channelsResource.error
 
-  /** 目录数据加载失败时记录日志，便于排查筛选项为空的原因。 */
+  /** 渠道选项加载失败时记录日志，便于排查筛选项为空的原因。 */
   useEffect(() => {
-    if (catalogError) {
-      console.warn("通讯录筛选数据加载失败", catalogError)
+    if (channelsError) {
+      console.warn("通讯录渠道选项加载失败", channelsError)
     }
-  }, [catalogError])
+  }, [channelsError])
 
   return (
     <PageSplit paneVariant="nav" pane={<ContactScopeSidebar />}>
       {children ?? (scope === "assistants" ? (
         <AssistantsPanel />
       ) : scope === "employees" ? (
-        <MembersPanel channels={channels} roles={roles} teams={teams} />
+        <MembersPanel />
       ) : scope === "team" && teamId ? (
-        <TeamPanel roles={roles} teams={teams} teamId={teamId} />
+        <TeamPanel teamId={teamId} />
       ) : scope === "team" ? (
-        <TeamListPanel channels={channels} roles={roles} teams={teams} />
+        <TeamListPanel />
       ) : (
-        <ExternalContactsPanel
-          channels={channels}
-          roles={roles}
-          teams={teams}
-        />
+        <ExternalContactsPanel channels={channels} />
       ))}
     </PageSplit>
   )
