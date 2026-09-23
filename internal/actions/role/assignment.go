@@ -102,8 +102,20 @@ func (a *UpdateAssignmentsAction) Execute(ctx context.Context, identity *serverm
 	}
 
 	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
-		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
+		// 目标身份先解析账号编号，操作者与目标账号一起按编号取锁。
+		var userIDs []string
+		if len(identityIDs) > 0 {
+			if err := tx.NewSelect().Model((*servermodels.User)(nil)).Column("id").
+				Where("organization_id = ? AND identity_id IN (?)", identity.Organization.ID, bun.In(identityIDs)).
+				Scan(ctx, &userIDs); err != nil {
+				return err
+			}
+		}
+		if err := identityaction.LockActiveUserAccounts(ctx, tx, identity, userIDs); err != nil {
 			return err
+		}
+		if len(userIDs) != len(identityIDs) {
+			return ErrAssignmentInvalid
 		}
 		if len(changes) == 0 {
 			return nil
@@ -121,16 +133,6 @@ func (a *UpdateAssignmentsAction) Execute(ctx context.Context, identity *serverm
 			return err
 		}
 		if len(lockedRoleIDs) != len(roleIDs) {
-			return ErrAssignmentInvalid
-		}
-		// 多个成员账号按编号顺序加锁。
-		var userIDs []string
-		if err := tx.NewSelect().Model((*servermodels.User)(nil)).Column("id").
-			Where("organization_id = ? AND identity_id IN (?)", identity.Organization.ID, bun.In(identityIDs)).
-			OrderExpr("id").For("NO KEY UPDATE").Scan(ctx, &userIDs); err != nil {
-			return err
-		}
-		if len(userIDs) != len(identityIDs) {
 			return ErrAssignmentInvalid
 		}
 		for _, change := range changes {

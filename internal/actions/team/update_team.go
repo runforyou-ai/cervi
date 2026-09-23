@@ -4,10 +4,14 @@ package team
 
 import (
 	"context"
+	"database/sql"
+	"errors"
 	"fmt"
 
+	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
 	"github.com/runforyou-ai/cervi/internal/common"
+	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
 	"github.com/uptrace/bun"
 )
@@ -28,29 +32,32 @@ func (a *UpdateTeamAction) Execute(ctx context.Context, identity *servermodels.I
 		return nil, ErrNotFound
 	}
 	var record *TeamRecord
-	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
 		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
 			return err
 		}
-		result, err := tx.NewUpdate().Model((*servermodels.Team)(nil)).
+		var nameChanged bool
+		err := tx.NewUpdate().Model((*servermodels.Team)(nil)).
 			Set("name = ?", input.Name).
 			Set("description = ?", input.Description).
 			Set("updated_at = now()").
 			Where("organization_id = ?", identity.Organization.ID).
 			Where("id = ?", teamID).
-			Exec(ctx)
+			Returning("old.name IS DISTINCT FROM new.name").
+			Scan(ctx, &nameChanged)
 		if isUniqueViolation(err) {
 			return &common.FieldError{Fields: map[string]common.FieldCode{"name": ValidationNameDuplicate}}
 		}
-		if err != nil {
-			return err
-		}
-		rows, err := result.RowsAffected()
-		if err != nil {
-			return err
-		}
-		if rows == 0 {
+		if errors.Is(err, sql.ErrNoRows) {
 			return ErrNotFound
+		}
+		if err != nil {
+			return err
+		}
+		if nameChanged {
+			if err := chatstate.TouchTeamConversations(ctx, tx, identity.Organization.ID, teamID); err != nil {
+				return err
+			}
 		}
 		record, err = loadTeam(ctx, tx, identity.Organization.ID, teamID)
 		return err

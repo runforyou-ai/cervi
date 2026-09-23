@@ -12,6 +12,7 @@ import (
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
+	roleaction "github.com/runforyou-ai/cervi/internal/actions/role"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/realtime"
@@ -48,10 +49,10 @@ func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels
 	var output *User
 	var cancelledRunIDs, retiredRunIDs []string
 	err := realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
-		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
+		if err := identityaction.LockActiveUserAccounts(ctx, tx, identity, []string{userID}); err != nil {
 			return err
 		}
-		administratorRoleID, err := lockAdministratorRole(ctx, tx, identity.Organization.ID)
+		administratorRoleID, err := roleaction.LockAdministratorRole(ctx, tx, identity.Organization.ID)
 		if err != nil {
 			return err
 		}
@@ -98,7 +99,7 @@ func (a *UpdateStatusAction) Execute(ctx context.Context, identity *servermodels
 				return err
 			}
 		}
-		if err := ensureActiveAdministratorRemains(ctx, tx, identity.Organization.ID, administratorRoleID); err != nil {
+		if err := roleaction.EnsureActiveAdministratorRemains(ctx, tx, identity.Organization.ID, administratorRoleID); err != nil {
 			return err
 		}
 		output, err = loadUser(ctx, tx, identity.Organization.ID, userID)

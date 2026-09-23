@@ -6,6 +6,8 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"slices"
+	"strings"
 
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
@@ -28,6 +30,9 @@ func withActiveMemberCount(query *bun.SelectQuery) *bun.SelectQuery {
 
 // lockTeam 对当前企业中的团队行取 FOR UPDATE。
 func lockTeam(ctx context.Context, db bun.IDB, organizationID, teamID string) error {
+	if !common.ValidUUID(teamID) {
+		return ErrNotFound
+	}
 	var lockedID string
 	err := db.NewSelect().TableExpr("teams AS t").Column("id").
 		Where("t.organization_id = ? AND t.id = ?", organizationID, teamID).
@@ -37,6 +42,28 @@ func lockTeam(ctx context.Context, db bun.IDB, organizationID, teamID string) er
 		return ErrNotFound
 	}
 	return err
+}
+
+// LockTeams 按编号锁定同企业的全部指定团队，并按名称返回摘要；teamIDs 须已规范化并去重。
+func LockTeams(ctx context.Context, db bun.IDB, organizationID string, teamIDs []string) ([]Summary, error) {
+	teams := make([]Summary, 0, len(teamIDs))
+	if len(teamIDs) == 0 {
+		return teams, nil
+	}
+	if err := db.NewSelect().TableExpr("teams AS t").
+		ColumnExpr("t.id::text, t.name").
+		Where("t.organization_id = ? AND t.id IN (?)", organizationID, bun.In(teamIDs)).
+		OrderExpr("t.id ASC").For("KEY SHARE").Scan(ctx, &teams); err != nil {
+		return nil, err
+	}
+	if len(teams) != len(teamIDs) {
+		return nil, ErrNotFound
+	}
+	// 展示顺序按名称排列，同名团队保持编号顺序。
+	slices.SortStableFunc(teams, func(left, right Summary) int {
+		return strings.Compare(strings.ToLower(left.Name), strings.ToLower(right.Name))
+	})
+	return teams, nil
 }
 
 // loadTeam 读取当前企业中的团队。

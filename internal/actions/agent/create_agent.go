@@ -5,12 +5,14 @@ package agent
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"strings"
 	"uuid"
 
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	identityaction "github.com/runforyou-ai/cervi/internal/actions/identity"
+	teamaction "github.com/runforyou-ai/cervi/internal/actions/team"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -120,21 +122,12 @@ func validateAndLoadTeams(ctx context.Context, db bun.IDB, organizationID string
 	if !valid {
 		return nil, nil, &common.FieldError{Fields: map[string]common.FieldCode{"teamIds": ValidationTeamInvalid}}
 	}
-	if len(teamIDs) == 0 {
-		return teamIDs, []TeamSummary{}, nil
-	}
-	teams := make([]TeamSummary, 0, len(teamIDs))
-	if err := db.NewSelect().TableExpr("teams AS t").
-		ColumnExpr("t.id::text, t.name").
-		Where("t.organization_id = ?", organizationID).
-		Where("t.id IN (?)", bun.In(teamIDs)).
-		OrderExpr("lower(t.name) ASC, t.id ASC").
-		For("KEY SHARE").
-		Scan(ctx, &teams); err != nil {
-		return nil, nil, err
-	}
-	if len(teams) != len(teamIDs) {
+	teams, err := teamaction.LockTeams(ctx, db, organizationID, teamIDs)
+	if errors.Is(err, teamaction.ErrNotFound) {
 		return nil, nil, &common.FieldError{Fields: map[string]common.FieldCode{"teamIds": ValidationTeamInvalid}}
+	}
+	if err != nil {
+		return nil, nil, err
 	}
 	return teamIDs, teams, nil
 }
