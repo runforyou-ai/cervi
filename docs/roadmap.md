@@ -13,7 +13,7 @@
 1. 客服闭环：会话小结、运营报表与知识缺口 → 访客与客户信息 → 第一批渠道与 AI 翻译 → 网站 Messenger 占位能力、AI 满意度与质检、联系人资料、常用语 → 第二批渠道、自定义 API 渠道、开放接口与权限。
 2. 工作台信息架构：阶段 A 的前端整理与客服闭环并行，阶段 B 起在客服闭环交付后启动，见 [工作台信息架构与服务对象扩展方案](workbench-ia.md)。
 3. 服务对象扩展：员工服务台（IT 先行），伙伴服务台在出现真实客户时启动，同上方案。
-4. Agent：助理与桌面端本地运行（P4）。
+4. Agent：助理与桌面端本地运行（P4），已在实施中，与客服闭环并行推进，不占用同一批业务改动。
 5. 官方托管服务：按 [官方托管服务建设方案](saas-hosting-plan.md) 的阶段推进，与客服闭环并行，不占用同一批业务改动。
 6. 其余事项按各自的启动条件开启；安全、容量与性能在准备正式上线时集中处理。
 
@@ -711,13 +711,13 @@ Google Business Messages 已停止服务，不接入。
 
 ### P4：助理与桌面端本地运行
 
-成员在自己的电脑上创建助理，助理在这台电脑上读写代码、执行命令和操作界面。助理只进入主人所在的单聊和群聊，其他成员可以在群里使用它，写入、命令与界面操作都由主人审批；客服会话只使用 AI 员工。AI 员工只在服务端执行，助理只在主人绑定的电脑上执行，执行位置由归属决定。
+成员在自己的电脑上创建助理，助理在这台电脑上读写代码和执行命令，使用企业模型服务或主人电脑上已安装的编程 Agent。助理只进入主人所在的单聊和群聊；其他成员在群里只能让它读取主人授权的工作区，写入与命令只由主人触发，主人可以在任意端审批；客服会话只使用 AI 员工。AI 员工只在服务端执行，助理只在主人绑定的电脑上执行，执行位置由归属决定。
 
-设备是一类受用户控制的 Agent Worker：服务端保留 Run 的全部业务事实、输入认领、结果事务、群聊轮转和企业模型凭据，设备借出工作区和执行本机工具的进程。两端执行同一份 `agentruntime` 代码与同一个有效配置解析器，本机工具通过 Eino 的文件系统与 Shell 接口注入，审批在绑定电脑上同步完成。助理绑定一台电脑，工作区按「会话 × 助理」指定，真实路径只存在设备本地。
+设备是一类受用户控制的 Agent Worker：服务端保留 Run 的全部业务事实、输入认领、结果事务、群聊轮转和企业模型凭据，设备借出工作区和执行本机工具的进程。两端执行同一份 `agentruntime` 代码与同一个有效配置解析器，本机工具通过 Eino 的文件系统与 Shell 接口注入；「本机 Agent」来源经 ACP 驱动外部编程 Agent，由其使用自身登录与订阅。审批请求经服务端推送到主人所有在线端，工作区与审批模式按「会话 × 助理」指定，真实路径只存在设备本地。
 
-设备注册、派发领取、运行时编入、模型代理、助理身份与本机运行的知识检索、附件和过程流已上线，剩余按四批交付：只读本机工具、写入与命令审批、群聊中的助理、界面操作。之后按需增加「本机 Agent」模型来源，由主人电脑上的外部编程 Agent 使用其自身登录与订阅。
+设备注册、派发领取、运行时编入、模型代理、助理身份与本机运行的知识检索、附件和过程流已上线，剩余按四批交付：只读本机工具、审批与本机 Agent、内置写入与命令、群聊中的助理。界面操作暂缓。
 
-产品定义、交互、数据模型、审批规则、安全边界与批次验收见 [助理与桌面端本地运行实施方案](desktop-local-agent.md)。
+产品定义、交互、数据模型、审批模式、安全边界与批次验收见 [助理与桌面端本地运行实施方案](desktop-local-agent.md)。
 
 
 ### 服务端 Agent 完整能力（P1）
@@ -942,234 +942,16 @@ Checkpoint 只能恢复模型执行位置，不能证明外部副作用是否发
 
 ### 设备能力（P2／P3）
 
-P2 在服务端 Agent 需要调用设备能力的真实场景出现后启动；用户在电脑前让助理读写本机文件、执行命令的需求由 P4 承担。
-
-- 在 P4 已有的设备注册与撤销上增加 Capability Manifest；复用现有稳定 `device_id` 和 Realtime 请求头认证，不增加独立票据。
-- 在服务端单体内实现 Device Capability Gateway，并与 Realtime Gateway 保持业务编排和传输职责分离。
-- 增加 `device_invocations`、HTTP claim/progress/result，复用 P4 的设备 `work_seq` 与 `device_work_advanced` 水位通知。
-- 桌面端 Go 侧持有设备事件流，通过 `appservice.Service(API Proxy)` 领取和提交调用并交给 Go Executor，Executor 实现本机二次校验和设备侧幂等；前端只承担审批界面。
-- 首批开放文件选择上传、授权根元数据、只读 Git 状态能力。
-- 客户会话继续默认禁用设备工具。
-
-验收边界：事件流丢失事件或重连不会丢调用；非幂等调用结果未知时不会自动重放；设备撤销后不能继续领取调用。
-
-#### P3：设备能力扩展
-
-- 按真实场景增加 `client_work_items`、长任务恢复和结果对账。
-- 支持用户明确选择多设备，不自动广播副作用。
-- 扩展类型化文件用途和大结果文件引用。
-- 移动端支持前台审批、文件和相册选择，不承诺无人值守执行。
-- 出现第三方本地工具生态需求后增加设备侧完整 MCP Adapter。
-
-
-#### 服务端与设备的分工
-
-前期架构为：
-
-```text
-消息与业务触发
-  -> 服务端 Agent Runtime
-      -> 服务端业务工具
-      -> Device Capability Gateway
-          -> 持久化设备调用并登记通知
-          -> 提交后发布 Core NATS
-          -> Realtime Gateway
-          -> 成员 SSE 事件流推送设备工作水位
-          -> 客户端经 HTTP 领取并由 Capability Executor 执行
-```
-
-客户端 Capability Executor 不是 Agent：
-
-- 不运行模型和 Eino。
-- 不维护 Conversation 上下文。
-- 不选择下一项工具。
-- 只执行已经通过服务端策略和本机校验的具体调用。
-- 负责本机权限、授权目录、审批界面、参数约束、结果裁剪和设备侧幂等。
-
-执行命令、读写代码和操作界面属于高频本机工具循环，由助理在主人电脑上本地运行 Agent，见「P4：助理与桌面端本地运行」。Capability Executor 承担服务端 Agent 对设备的低频类型化调用，随 P2 在真实场景出现后落地。
-
-设备调用能力从 P2 开始落地；设备注册先随 P4 本地运行落地。
-
-#### 形态
-
-Device Capability Gateway 与 Realtime Gateway 是两个不同职责：
-
-- Device Capability Gateway 是服务端业务编排模块，负责能力策略、设备选择、审批和持久调用。
-- Realtime Gateway 是现有的实时传输模块，负责事件流认证、JSON 事件、Core NATS 订阅、发送队列和背压。
-
-第一版两者都在 Cervi Server 内运行。Device Capability Gateway 不建立第二个实时事件端点，不直接管理事件流，也不自行订阅 NATS。它负责：
-
-- 解析 Agent Tool 请求为类型化 Capability。
-- 计算企业策略、会话类型、Agent 策略、用户授权和设备能力的交集。
-- 选择设备或返回需要用户选择。
-- 创建持久设备调用和审批。
-- 事务提交后发布设备工作水位通知，管理超时并通过 HTTP 接收结果。
-- 把调用状态投影到 Tool Invocation 和审计链。
-
-Gateway 不替代 Action 和 Executor 的安全校验，也不允许 Agent 直接持有连接编号。
-
-#### 设备注册与认证
-
-设备能力落地前先增加可撤销设备注册：
-
-```text
-devices
-├── id
-├── organization_id
-├── user_id
-├── name
-├── platform
-├── trust_level
-├── capability_manifest
-├── work_seq
-├── last_seen_at
-├── revoked_at
-└── timestamps
-```
-
-`capability_manifest` 是最近一次经过校验的设备能力广告，不是允许集；实际允许集仍为设备广告、企业策略、会话类型、Agent Tool Policy、本机授权和当前 Run 的交集。`work_seq` 是该设备待领取工作的最新水位，覆盖 P4 本地 Run 和 P2 设备调用。
-
-P4 先落地 `id`、`organization_id`、`user_id`、`name`、`platform`、`work_seq`、`last_seen_at`、`revoked_at` 和时间戳，并按本地运行需要增加 `install_id`、`runtime_version` 和 `tool_manifest`；`trust_level` 与 `capability_manifest` 随 P2 增加。
-
-认证要求：
-
-- 复用 Realtime Gateway 的请求头 Bearer 认证，不创建第二套凭据通道。
-- 设备事件流沿用成员事件流的请求头认证，并在请求头声明稳定 `device_id` 与 Executor 能力；服务端绑定企业、用户、`device_id` 和客户端种类，声明 Executor 能力时同时校验设备未撤销。
-- 首次设备绑定由当前登录用户确认；设备信任和本机授权保存在设备记录及客户端安全存储中，不能只依赖请求头声明的能力。
-- 登出、换服、切换账号、设备撤销和用户停用必须使相关设备权限失效。
-- 桌面端 Go 侧持有设备事件流，通过本地 `appservice.Service(API Proxy)` 领取工作、交给 Go 侧执行并提交结果；API Proxy 从 Go `clientsession` 注入 Bearer Token，前端不接触原生端凭据。
-- 前端只承担审批界面：Go 通过 Wails 事件请求审批，前端通过 Wails 绑定回传决定；服务端和 Go 侧执行方都校验目标 `device_id`。
-
-#### 持久设备调用
-
-设备能力首次落地时增加独立执行记录，不能只把连接状态塞进 Tool Invocation：
-
-```text
-device_invocations
-├── id
-├── organization_id
-├── user_id
-├── device_id
-├── tool_invocation_id
-├── work_seq
-├── capability
-├── arguments
-├── arguments_hash
-├── idempotency_key
-├── status
-├── available_at
-├── expires_at
-├── claimed_at
-├── result
-├── result_file_id
-├── error
-└── timestamps
-```
-
-`agent_tool_invocations` 表达 Agent 的工具意图和业务审计；`device_invocations` 表达该意图在一台设备上的领取、执行和结果。一次非幂等 Tool Invocation 不得同时向多台设备创建活动调用。
-
-设备调用采用数据库事实和实时通知分离：
-
-```text
-服务端事务锁定 devices，分配 work_seq
-  -> 创建 device_invocation 并登记通知
-  -> 事务提交后发布用户 Subject，并携带目标 device_id 路由提示
-  -> Realtime Gateway 只向匹配该 device_id 且声明 Executor 能力的事件流推送 device_work_advanced
-  -> 桌面端 Go 通过 HTTP claim 领取完整调用
-  -> Go Executor 执行，需要审批时经 Wails 事件请求前端确认
-  -> Executor 持久化设备侧幂等状态
-  -> 桌面端 Go 通过 HTTP 提交 progress/result
-  -> Gateway 更新 Tool Invocation
-```
-
-`device_work_advanced` 事件随 P4 本地运行落地，在同一套实时事件定义中新增并可被旧客户端忽略，只发送给声明相应设备能力的事件流。它与变更通知共用事件流发送队列并按设备合并为最新水位，只携带设备编号和最新 `work_seq`，不携带工具名、参数或审批内容；不增加客户端持久命令。首版复用用户 NATS Subject，由各 Realtime Gateway 按已认证 `device_id` 过滤，不提前增加设备 Subject。
-
-设备重连后按现有 Realtime 认证重新建立事件流，再通过 HTTP 比较工作 Head、补拉或领取调用；声明 Executor 能力的设备另按固定间隔经 HTTP 比较工作 Head，覆盖提交后发布丢失的通知；设备 Head 不进入聊天 `GetSyncHeads`。不能依赖 Gateway 重放事件。终态设备调用按保留策略清理，长期审计仍由 Agent Tool Invocation 保存。
-
-#### 客户端 Executor
-
-桌面端首期 Executor 只在应用进程存活且用户在线时承诺执行。首批能力限制为：
-
-- 文件选择并上传为 Cervi `file_id`。
-- 授权根目录内的文件元数据读取。
-- 只读 `git status`、`git diff` 等明确能力。
-
-不在首批开放通用 Shell、删除、任意路径读取、通讯录全量读取或相册全量扫描。
-
-长命令、跨进程恢复或客户端已经执行但尚未上报的场景出现后，再以该能力驱动 `client_work_items` 和设备侧幂等账本。客户端不嵌入 NATS。
-
-现有文件上传只支持头像用途。设备工具需要返回文件引用前，先扩展类型化文件用途、授权和激活关系，不能绕过文件模块直接写存储。
-
-#### 桌面端与移动端差异
-
-桌面端：
-
-- 适合前台文件、Git 和授权目录能力。
-- 应用退出后不承诺继续执行。
-- 长任务需要 SQLite 工作项和明确恢复语义。
-
-移动端：
-
-- 默认只承担文件/相册选择、OS 权限确认和前台审批。
-- iOS 挂起、Android Doze 和厂商进程限制下，不假设常驻实时事件流。
-- 系统推送只负责提示用户打开应用，不保证无人值守执行。
-- WorkManager、BGTaskScheduler 和系统传输能力只在真实后台场景出现后接入。
-
-#### MCP 决策
-
-本节只讨论设备能力协议。企业远程 MCP 服务已由服务端在 Run 内直接连接和调用；设备侧完整 MCP Adapter 仅在第三方本地 MCP 工具生态出现后落地。
-
-P2 不直接采用 MCP subset 作为设备主协议，优先使用 Cervi 类型化的 HTTP invocation、claim、progress、result 和 cancel 契约；实时提示只扩展现有实时事件。
-
-原因：
-
-- MCP 不表达 Cervi 的企业、会话、Agent Run、设备寻址、审批、幂等和 `uncertain`。
-- 只有 `tools/list`、`tools/call`、progress 和 cancel 不是完整 MCP Profile。
-- 完整 MCP 还需要初始化、协议版本和能力协商；取消也只是尽力请求，不能作为副作用未发生的证明。
-- 自定义实时 Transport 加不完整 MCP Profile，会同时承担自有协议和 MCP 兼容成本。
-
-出现第三方本地 MCP 工具生态需求后，在 Executor 后增加完整 MCP Adapter：
-
-```text
-Cervi Gateway
-  -> Cervi Device Invocation
-  -> Executor
-      -> 内置类型化能力
-      -> MCP Adapter
-          -> 本地 MCP Server
-```
-
-届时要求：
-
-- 精确锁定 MCP 协议版本。
-- 实现完整生命周期和能力协商。
-- `tools/list` 只表示设备广告，不表示企业授权。
-- Gateway 仍负责策略、审批、设备选择、业务审计和 `uncertain`。
-- 禁止用 MCP resources、prompts、sampling 或 session 表达聊天、文件和企业事实。
-
-
-#### 替代架构及取舍
-
-##### 客户端直接运行完整 Agent
-
-优点是本地隐私、低延迟和离线能力更强，工具调用成为本机函数调用。执行命令、读写代码和操作界面属于高频本机工具循环，上下文位于本机工作区和屏幕，采用为 P4 助理的方案。企业模型供应商凭据、输入认领、最终消息、Run 终态和群聊轮转仍由服务端承担，客户端不复制审计与恢复机制；移动端不运行本地 Agent。
-
-##### 设备直接暴露为端到端 MCP Server
-
-优点是生态兼容。缺点是 MCP 不能替代 Cervi 的设备注册、授权、审批、幂等和不确定结果状态，最终仍需要 Gateway。现阶段不采用，未来作为 Executor 内部适配器。
-
-##### Agent Worker 直接调用设备实时连接
-
-组件最少，但会把设备寻址、授权、审批、连接状态和断线恢复散入 Eino Runtime，并使 Agent 持有瞬时连接。否决。
-
-##### 持久调用 + 实时事件唤醒
-
-相比同步设备 RPC 多一次持久化和领取请求，但能自然处理断线、重连、多实例、审计和 `uncertain`，并直接复用现有 Realtime Gateway、提交后通知发布、Core NATS、JSON 事件流与背压。采用为首选方案。
-
-##### 服务端 Agent 经 WebSocket 反向通道调用本机工具
-
-每次工具调用少一次领取往返，适合终端输出、截图流和即时取消等高频双向数据。多实例连接路由、断线后结果未知、审批和审计仍需持久调用承担，单次模型调用耗时仍远大于传输往返。用户在电脑前使用的场景采用「客户端直接运行完整 Agent」；远程指挥用户不在场的电脑出现真实需求后再评估。
-
+启动条件：服务端 AI 员工需要调用成员设备能力的真实场景出现，例如让 AI 员工取用成员电脑上的文件或 Git 状态。成员在电脑前让助理读写文件、执行命令由 P4 承担，不属于本项。
+
+关键决定：
+
+- 设备调用采用「持久调用 + 实时事件唤醒」：服务端事务创建 `device_invocations` 并推进设备 `work_seq`，提交后经现有成员事件流推送 `device_work_advanced`，设备经 HTTP 领取、执行并提交结果；不让 Agent 直接持有设备连接。
+- 服务端单体内的 Device Capability Gateway 负责能力策略、设备选择、审批和持久调用，实时传输继续由 Realtime Gateway 承担，不建设第二套实时基础设施。
+- 设备侧 Capability Executor 不是 Agent：不运行模型、不维护上下文，只执行已通过服务端策略和本机校验的类型化调用。
+- 设备协议使用 Cervi 类型化的 claim、progress、result、cancel 契约；出现第三方本地 MCP 工具生态后，再在 Executor 后增加完整 MCP Adapter。
+- `devices` 在此时增加 `trust_level` 与 `capability_manifest`；首批能力限于文件选择上传、授权根目录元数据和只读 Git 状态，客户会话默认没有设备能力。
+- 非幂等调用结果未知时进入 `uncertain`，不自动重放；移动端只承担前台审批与文件、相册选择，不承诺无人值守执行。
 
 ### 群内协作扩展
 
@@ -1179,7 +961,7 @@ Cervi Gateway
 | 话题之间并行发言 | 群 Policy 的 `loadMessages` 按话题收敛上下文，与上一行的 scope 取值一并生效 | 轮转规则本身，上下文契约 |
 | 主持 / 编排式讨论 | 替换轮转的选择规则 | 结果协议与输入模型 |
 | 工具审批与外部副作用 | P1.5 的审批事实与调用幂等 | 群协作的触发与写回 |
-| 本机执行（助理在主人电脑上处理群内请求） | 助理只进入主人所在的群，主人为该群指定工作区；其他成员触发的写入与命令由主人审批；建立运行时写入助理绑定的电脑并由设备领取，见 P4 | 轮转规则、点名接力、轮次语义与执行互斥 |
+| 本机执行（助理在主人电脑上处理群内请求） | 助理只由主人加入其所在的群，主人为该群指定工作区；其他成员触发的运行只有只读工具；建立运行时写入助理绑定的电脑并由设备领取，见 P4 | 轮转规则、点名接力、轮次语义与执行互斥 |
 | 定时或外部事件触发 | 一个写入 `agent_inputs` 的新入口，`kind` 增加取值 | 执行链路 |
 
 `scope_kind` 是本模型的扩展点：执行范围从隐含的列组合变成显式的、可增加取值的维度，Lane 归属与执行互斥的粒度都随它收细。
@@ -1217,6 +999,7 @@ Cervi Gateway
 | 操作系统级沙箱 | 本地 Run 的命令执行需要审批之外的隔离 |
 | 本地 Run 使用企业远程 MCP 服务 | 助理需要调用企业远程 MCP 工具 |
 | 其他端实时查看本地 Run | 用户需要在 Web 或移动端观看本机运行过程 |
+| 助理的界面操作 | 出现需要助理截图并操作本机界面的明确场景 |
 | 远程指挥不在场的电脑 | 用户需要从其他端让 AI 员工操作无人值守的电脑，届时评估 WebSocket 反向通道 |
 | 本地模型与离线运行 | 企业要求模型和上下文不离开设备，或无网络时需完成 Agent 循环 |
 
