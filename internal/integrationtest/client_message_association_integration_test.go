@@ -210,7 +210,7 @@ func TestWebsiteClientMessageAssociation(t *testing.T) {
 	}
 	assertMemberClientAssociation(t, f.db, f.owner, first.Conversation.ID, reply.ID, replyInput.ClientMessageID, f.member)
 	page, err := visitor.ListMessages(ctx, appservice.WebsiteVisitorMeta{}, f.channelID, visitorA, first.Conversation.ID, appservice.WebsiteVisitorMessageHistoryInput{})
-	if err != nil || len(page.Messages) != 2 || page.Messages[0].ClientMessageID == nil || *page.Messages[0].ClientMessageID != clientID || page.Messages[1].ClientMessageID != nil {
+	if err != nil || len(page.Messages) != 3 || page.Messages[0].ClientMessageID == nil || *page.Messages[0].ClientMessageID != clientID || page.Messages[1].Event == nil || page.Messages[2].ClientMessageID != nil {
 		t.Fatalf("visitor history=%+v err=%v", page, err)
 	}
 	assertClientAssociationHTTP(t, f.navigationFixture, first.Conversation.ID, first.Message.ID, reply.ID, replyInput.ClientMessageID)

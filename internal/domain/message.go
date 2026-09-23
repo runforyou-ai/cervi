@@ -6,6 +6,7 @@ type MessageAuthor string
 const (
 	MessageAuthorVisitor MessageAuthor = "visitor"
 	MessageAuthorAgent   MessageAuthor = "agent"
+	MessageAuthorSystem  MessageAuthor = "system"
 )
 
 // MessageVisibility 定义消息在客户会话中的可见范围。

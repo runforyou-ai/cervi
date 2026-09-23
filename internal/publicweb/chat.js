@@ -108,6 +108,20 @@
     today: messenger.getAttribute("data-day-today"),
     yesterday: messenger.getAttribute("data-day-yesterday"),
   };
+  var eventLabels = {
+    sessionEnded: messenger.getAttribute("data-session-ended"),
+    memberJoined: messenger.getAttribute("data-member-joined"),
+  };
+  var ratingLabels = {
+    question: messenger.getAttribute("data-rating-question"),
+    resolved: messenger.getAttribute("data-rating-resolved"),
+    unresolved: messenger.getAttribute("data-rating-unresolved"),
+    comment: messenger.getAttribute("data-rating-comment"),
+    submit: messenger.getAttribute("data-rating-submit"),
+    thanks: messenger.getAttribute("data-rating-thanks"),
+  };
+  var RATING_COMMENT_MAX_LENGTH = 1000;
+  var RATING_COMMENT_MAX_HEIGHT = 120;
   var emojiPanel = document.getElementById("cv-emoji");
   var moreMenu = document.getElementById("cv-more-menu");
   var moreToggle = document.getElementById("cv-more-toggle");
@@ -190,6 +204,7 @@
       refreshing: false,
       refreshSeq: 0,
       refreshPending: false,
+      sessionRatings: Object.create(null),
       lastMessageSeq: summary ? summary.lastMessageSeq : "0",
       replyState: "none",
       typingNode: null,
@@ -576,7 +591,7 @@
   // 按发送人和时间间隔划分当前会话消息组，只在组内最后一条显示头像，并按天插入日期分割线。
   function refreshMessageGroups() {
     var items = Array.from(messages.children).filter(function (node) {
-      return node.classList.contains("cv-message");
+      return node.classList.contains("cv-message") || node.classList.contains("cv-event");
     });
     refreshDayDividers(items);
     items.forEach(function (message, index) {
@@ -845,6 +860,16 @@
     return CerviMarkdown.preview(message.body, message.senderIdentityType);
   }
 
+  // 返回消息页中最后一条对话消息，客服处理周期事件不计入会话摘要。
+  function lastDialogueMessage(items) {
+    for (var index = items.length - 1; index >= 0; index -= 1) {
+      if (items[index].author !== "system") {
+        return items[index];
+      }
+    }
+    return null;
+  }
+
   // 更新指定会话的摘要、时间和未读状态。
   function updateConversationSummary(conversation, preview, date, messageSeq) {
     var originatedAt =
@@ -1090,11 +1115,12 @@
         result.messages.forEach(function (message) {
           appendServerMessage(conversation, message);
         });
+        syncSessionRatings(conversation, result.sessionRatings);
         conversation.before = result.before || "";
         conversation.after = result.after || "";
         conversation.historyLoaded = true;
-        if (result.messages.length > 0) {
-          var lastMessage = result.messages[result.messages.length - 1];
+        var lastMessage = lastDialogueMessage(result.messages);
+        if (lastMessage) {
           updateConversationSummary(
             conversation,
             messagePreview(lastMessage),
@@ -1170,6 +1196,10 @@
   // 把一条持久消息有序合入指定会话。
   function appendServerMessage(conversation, value) {
     if (conversation.messageIDs[value.id]) {
+      return;
+    }
+    if (value.author === "system") {
+      appendServerEvent(conversation, value);
       return;
     }
     var originatedAt = new Date(value.originatedAt);
@@ -1270,6 +1300,196 @@
       return;
     }
     removeConversationTyping(conversation);
+  }
+
+  // 把客服处理周期事件以居中提示有序合入指定会话，周期结束事件按已知评价状态挂载评价卡片。
+  function appendServerEvent(conversation, value) {
+    var node = document.createElement("div");
+    node.className = "cv-event";
+    node.setAttribute("data-message-id", value.id);
+    node.setAttribute("data-message-seq", value.messageSeq);
+    node.setAttribute("data-sender-key", "event:" + value.id);
+    node.setAttribute("data-originated-at", String(new Date(value.originatedAt).getTime()));
+    var text = document.createElement("p");
+    text.className = "cv-event-text";
+    text.textContent =
+      value.event.type === "session_ended"
+        ? eventLabels.sessionEnded
+        : eventLabels.memberJoined.replace("{name}", value.event.memberName);
+    node.appendChild(text);
+    if (value.event.type === "session_ended") {
+      node.setAttribute("data-session-ended", "");
+      reconcileRatingCard(conversation, node);
+    }
+    conversation.messageIDs[value.id] = value;
+    insertServerMessageNode(conversation, node, value.messageSeq);
+    // 事件插入后把对方的正在输入提示重新放回末尾。
+    if (conversation.typingNode) {
+      conversationMessageContainer(conversation).appendChild(conversation.typingNode);
+    }
+  }
+
+  // 用服务端返回的周期评价状态替换本地记录，并收敛全部已渲染的结束事件。
+  function syncSessionRatings(conversation, ratings) {
+    conversation.sessionRatings = Object.create(null);
+    (ratings || []).forEach(function (rating) {
+      conversation.sessionRatings[rating.endMessageId] = rating;
+    });
+    conversationMessageContainer(conversation)
+      .querySelectorAll("[data-session-ended]")
+      .forEach(function (node) {
+        reconcileRatingCard(conversation, node);
+      });
+  }
+
+  // 按评价状态增删或更新结束事件下的评价卡片；填写中的表单在仍可评价时保持不变。
+  function reconcileRatingCard(conversation, node) {
+    var rating = conversation.sessionRatings[node.getAttribute("data-message-id")];
+    var card = node.querySelector(".cv-rating");
+    if (!rating) {
+      if (card) {
+        card.remove();
+      }
+      return;
+    }
+    var state = rating.rateable ? "form" : "result";
+    if (card && card.getAttribute("data-state") === state) {
+      return;
+    }
+    var next = ratingCard(conversation, rating);
+    if (card) {
+      card.replaceWith(next);
+    } else {
+      node.appendChild(next);
+    }
+  }
+
+  // 创建周期结束后的评价卡片：未评价时选择是否解决并可填写评语后提交，已评价时展示结果。
+  function ratingCard(conversation, rating) {
+    var card = document.createElement("div");
+    card.className = "cv-rating";
+    if (!rating.rateable) {
+      card.setAttribute("data-state", "result");
+      renderRatingResult(card, rating);
+      return card;
+    }
+    card.setAttribute("data-state", "form");
+    var form = document.createElement("form");
+    form.className = "cv-rating-form";
+    var question = document.createElement("p");
+    question.className = "cv-rating-question";
+    question.textContent = ratingLabels.question;
+    var choices = document.createElement("div");
+    choices.className = "cv-rating-choices";
+    var details = document.createElement("div");
+    details.className = "cv-rating-details";
+    details.hidden = true;
+    var label = document.createElement("label");
+    label.className = "cv-rating-label";
+    var labelText = document.createElement("span");
+    labelText.textContent = ratingLabels.comment;
+    var comment = document.createElement("textarea");
+    comment.className = "cv-rating-comment";
+    comment.rows = 1;
+    comment.maxLength = RATING_COMMENT_MAX_LENGTH;
+    comment.addEventListener("input", function () {
+      comment.style.height = "auto";
+      comment.style.height = Math.min(comment.scrollHeight, RATING_COMMENT_MAX_HEIGHT) + "px";
+    });
+    label.appendChild(labelText);
+    label.appendChild(comment);
+    var submit = document.createElement("button");
+    submit.type = "submit";
+    submit.className = "cv-rating-submit";
+    submit.textContent = ratingLabels.submit;
+    var error = document.createElement("p");
+    error.className = "cv-rating-error";
+    error.setAttribute("role", "alert");
+    error.hidden = true;
+    details.appendChild(label);
+    details.appendChild(submit);
+    details.appendChild(error);
+    var selected = null;
+    // 选择是否解决后展开评语与提交入口。
+    [true, false].forEach(function (resolved) {
+      var choice = document.createElement("button");
+      choice.type = "button";
+      choice.className = "cv-rating-choice";
+      choice.textContent = resolved ? ratingLabels.resolved : ratingLabels.unresolved;
+      choice.setAttribute("aria-pressed", "false");
+      choice.addEventListener("click", function () {
+        selected = resolved;
+        choices.querySelectorAll(".cv-rating-choice").forEach(function (item) {
+          item.setAttribute("aria-pressed", String(item === choice));
+        });
+        details.hidden = false;
+      });
+      choices.appendChild(choice);
+    });
+    form.addEventListener("submit", function (submitEvent) {
+      submitEvent.preventDefault();
+      if (selected === null || submit.disabled) {
+        return;
+      }
+      submit.disabled = true;
+      error.hidden = true;
+      requestWebsiteJSON(
+        "/api/public/website-channels/" +
+          encodeURIComponent(channelID) +
+          "/conversations/" +
+          encodeURIComponent(conversation.id) +
+          "/service-sessions/" +
+          encodeURIComponent(rating.serviceSessionId) +
+          "/rating",
+        {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ resolved: selected, comment: comment.value }),
+        },
+      )
+        .then(function (result) {
+          conversation.sessionRatings[rating.endMessageId] = {
+            serviceSessionId: rating.serviceSessionId,
+            endMessageId: rating.endMessageId,
+            rateable: result.rateable,
+            resolved: result.resolved,
+            comment: result.comment,
+          };
+          if (card.parentNode) {
+            reconcileRatingCard(conversation, card.parentNode);
+          }
+        })
+        .catch(function (requestError) {
+          error.textContent = requestError.message || requestFailedLabel;
+          error.hidden = false;
+          submit.disabled = false;
+          // 提交失败时拉取当前评价状态，已在别处评价或周期已重开时卡片随之更新。
+          refreshConversationMessages(conversation);
+        });
+    });
+    form.appendChild(question);
+    form.appendChild(choices);
+    form.appendChild(details);
+    card.appendChild(form);
+    return card;
+  }
+
+  // 在评价卡片中展示已提交的是否解决与评语。
+  function renderRatingResult(card, rating) {
+    var thanks = document.createElement("p");
+    thanks.className = "cv-rating-question";
+    thanks.textContent = ratingLabels.thanks;
+    var result = document.createElement("p");
+    result.className = "cv-rating-result";
+    result.textContent = rating.resolved ? ratingLabels.resolved : ratingLabels.unresolved;
+    card.appendChild(thanks);
+    card.appendChild(result);
+    if (rating.comment) {
+      var comment = document.createElement("p");
+      comment.className = "cv-rating-result-comment";
+      comment.textContent = rating.comment;
+      card.appendChild(comment);
+    }
   }
 
   // 渲染服务端附件：图片内联预览并可点开灯箱，其余显示文件名、大小和下载入口。
@@ -1796,6 +2016,8 @@
         result.messages.forEach(function (message) {
           appendServerMessage(conversation, message);
         });
+        // 评价和周期重开不产生访客可见消息，每次拉取都按服务端评价状态收敛已渲染的结束事件。
+        syncSessionRatings(conversation, result.sessionRatings);
         if (followLatest) {
           scrollToBottom();
         }
@@ -1807,7 +2029,10 @@
         if (result.after) {
           conversation.after = result.after;
         }
-        var lastMessage = result.messages[result.messages.length - 1];
+        var lastMessage = lastDialogueMessage(result.messages);
+        if (!lastMessage) {
+          return;
+        }
         updateConversationSummary(
           conversation,
           messagePreview(lastMessage),

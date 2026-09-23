@@ -1719,7 +1719,10 @@ func TestServerActionsWithPostgreSQL(t *testing.T) {
 		memberHistory, err := conversationaction.NewListWebsiteMessagesQuery(db).Execute(context.Background(), conversationaction.MessageHistoryInput{
 			ChannelID: channel.ID, ExternalID: "web-session:fedcba9876543210fedcba9876543210", ConversationID: publicQueueInbound.Conversation.ID,
 		})
-		if err != nil || len(memberHistory.Messages) != 2 || memberHistory.Messages[0].SenderIdentityType != nil || memberHistory.Messages[1].Author != domain.MessageAuthorAgent || memberHistory.Messages[1].SenderIdentityType == nil || *memberHistory.Messages[1].SenderIdentityType != domain.OrganizationIdentityTypeUser {
+		// 成员回复前自动领取周期，访客在回复前看到成员加入事件。
+		if err != nil || len(memberHistory.Messages) != 3 || memberHistory.Messages[0].SenderIdentityType != nil ||
+			memberHistory.Messages[1].Event == nil || memberHistory.Messages[1].Event.Type != conversationaction.VisitorEventMemberJoined ||
+			memberHistory.Messages[2].Author != domain.MessageAuthorAgent || memberHistory.Messages[2].SenderIdentityType == nil || *memberHistory.Messages[2].SenderIdentityType != domain.OrganizationIdentityTypeUser {
 			t.Fatalf("website visitor and human sender identities = %#v, error = %v", memberHistory, err)
 		}
 		memberSummaries, err := conversationaction.NewListWebsiteConversationsQuery(db).Execute(context.Background(), channel.ID, "web-session:fedcba9876543210fedcba9876543210")

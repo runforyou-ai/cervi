@@ -211,6 +211,8 @@ const inbox = {
   serviceSessionReturned: "{{from}} 已无法接待客户，会话退回{{target}}",
   serviceSessionReturnedResponseTimeout: "{{from}} 超时未回复，会话退回{{target}}",
   serviceSessionAssigned: "会话已自动分配给 {{target}}",
+  serviceSessionRatedResolved: "客户评价：已解决",
+  serviceSessionRatedUnresolved: "客户评价：未解决",
   handoffTargetTeam: "团队「{{name}}」",
   handoffReasonKnowledgeGap: "资料中没有答案",
   handoffReasonCustomerRequested: "客户要求真人",

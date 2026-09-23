@@ -4,6 +4,7 @@ package conversation
 
 import (
 	"context"
+	"encoding/json"
 	"fmt"
 	"slices"
 	"time"
@@ -25,7 +26,11 @@ type websiteMessageRow struct {
 	ClientMessageID         *string                          `bun:"client_message_id"`
 	MessageSeq              int64                            `bun:"message_seq"`
 	ID                      string                           `bun:"id"`
+	Type                    domain.MessageType               `bun:"type"`
 	Body                    string                           `bun:"body"`
+	SystemEventType         *string                          `bun:"system_event_type"`
+	SystemEventPayload      json.RawMessage                  `bun:"system_event_payload"`
+	ServiceSessionID        string                           `bun:"service_session_id"`
 	SenderIdentityType      *domain.OrganizationIdentityType `bun:"sender_identity_type"`
 	SenderIdentityID        *string                          `bun:"sender_identity_id"`
 	SenderDisplayName       *string                          `bun:"sender_display_name"`
@@ -92,7 +97,11 @@ func (q *ListWebsiteMessagesQuery) Execute(ctx context.Context, input MessageHis
 		ColumnExpr("msg.id AS id").
 		ColumnExpr("CASE WHEN cs.kind = ? AND cs.source_id = ? AND ss.contact_channel_identity_id = ? THEN msg.client_message_id END AS client_message_id", domain.ChatSubjectKindContact, identity.ContactID, identity.ID).
 		ColumnExpr("msg.message_seq").
+		ColumnExpr("msg.type AS type").
 		ColumnExpr("msg.body AS body").
+		ColumnExpr("msg.system_event_type AS system_event_type").
+		ColumnExpr("msg.system_event_payload AS system_event_payload").
+		ColumnExpr("ss.id AS service_session_id").
 		ColumnExpr("oi.type AS sender_identity_type").
 		ColumnExpr("oi.id::text AS sender_identity_id").
 		ColumnExpr("oi.display_name AS sender_display_name").
@@ -119,8 +128,8 @@ func (q *ListWebsiteMessagesQuery) Execute(ctx context.Context, input MessageHis
 		Join("LEFT JOIN message_attachments AS ma ON ma.message_id = msg.id AND ma.organization_id = msg.organization_id").
 		Join("LEFT JOIN files AS af ON af.id = ma.file_id AND af.organization_id = ma.organization_id").
 		Join("JOIN service_sessions AS ss ON ss.id = msg.service_session_id AND ss.organization_id = msg.organization_id AND ss.conversation_id = msg.conversation_id").
-		Join("JOIN conversation_participants AS cp ON cp.id = msg.sender_participant_id AND cp.organization_id = msg.organization_id AND cp.conversation_id = msg.conversation_id").
-		Join("JOIN chat_subjects AS cs ON cs.id = cp.subject_id AND cs.organization_id = cp.organization_id").
+		Join("LEFT JOIN conversation_participants AS cp ON cp.id = msg.sender_participant_id AND cp.organization_id = msg.organization_id AND cp.conversation_id = msg.conversation_id").
+		Join("LEFT JOIN chat_subjects AS cs ON cs.id = cp.subject_id AND cs.organization_id = cp.organization_id").
 		Join("LEFT JOIN organization_identities AS oi ON oi.id = cs.source_id AND oi.organization_id = cs.organization_id AND cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
 		Join("LEFT JOIN files AS sav ON sav.id = oi.avatar_file_id AND sav.organization_id = oi.organization_id AND sav.status = ?", domain.FileStatusActive).
 		Join("LEFT JOIN messages AS reply ON reply.id = msg.reply_to_message_id AND reply.organization_id = msg.organization_id AND reply.conversation_id = msg.conversation_id AND reply.type IN (?, ?) AND reply.visibility = ?", domain.MessageTypeText, domain.MessageTypeAttachment, domain.MessageVisibilityCustomerVisible).
@@ -129,8 +138,23 @@ func (q *ListWebsiteMessagesQuery) Execute(ctx context.Context, input MessageHis
 		Join("LEFT JOIN organization_identities AS reply_oi ON reply_oi.id = reply_cs.source_id AND reply_oi.organization_id = reply_cs.organization_id AND reply_cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
 		Where("msg.organization_id = ?", channel.OrganizationID).
 		Where("msg.conversation_id = ?", input.ConversationID).
-		Where("msg.type IN (?, ?)", domain.MessageTypeText, domain.MessageTypeAttachment).
-		Where("msg.visibility = ?", domain.MessageVisibilityCustomerVisible).
+		// 访客只读对客消息，以及成员加入与周期结束两类客服处理周期事件；转交和自动分配只在去向为成员时计为成员加入；AI 转人工由对客话术告知访客，不投影事件。
+		WhereGroup(" AND ", func(query *bun.SelectQuery) *bun.SelectQuery {
+			return query.
+				WhereGroup(" OR ", func(query *bun.SelectQuery) *bun.SelectQuery {
+					return query.Where("msg.type IN (?, ?)", domain.MessageTypeText, domain.MessageTypeAttachment).
+						Where("msg.visibility = ?", domain.MessageVisibilityCustomerVisible)
+				}).
+				WhereGroup(" OR ", func(query *bun.SelectQuery) *bun.SelectQuery {
+					return query.Where("msg.type = ?", domain.MessageTypeSystem).
+						WhereGroup(" AND ", func(query *bun.SelectQuery) *bun.SelectQuery {
+							return query.Where("msg.system_event_type IN (?, ?, ?)", domain.ConversationSystemEventServiceSessionClaimed,
+								domain.ConversationSystemEventServiceSessionTakenOver, domain.ConversationSystemEventServiceSessionClosed).
+								WhereOr("msg.system_event_type IN (?, ?) AND msg.system_event_payload->'target'->>'kind' = ?", domain.ConversationSystemEventServiceSessionTransferred,
+									domain.ConversationSystemEventServiceSessionAssigned, domain.ServiceSessionTargetMember)
+						})
+				})
+		}).
 		Where("msg.deleted_at IS NULL")
 	if input.Before != nil {
 		query = query.Where("msg.message_seq < ?", input.Before.MessageSeq).
@@ -145,9 +169,50 @@ func (q *ListWebsiteMessagesQuery) Execute(ctx context.Context, input MessageHis
 	if err := query.Limit(websiteMessagePageSize+1).Scan(ctx, &rows); err != nil {
 		return MessageHistory{}, fmt.Errorf("list website conversation messages: %w", err)
 	}
-	history := buildMessageHistory(rows, input)
+	history, err := buildMessageHistory(rows, input)
+	if err != nil {
+		return MessageHistory{}, err
+	}
 	history.OrganizationID = channel.OrganizationID
+	history.SessionRatings, err = listWebsiteSessionRatings(ctx, q.db, channel.OrganizationID, input.ConversationID)
+	if err != nil {
+		return MessageHistory{}, err
+	}
 	return history, nil
+}
+
+// listWebsiteSessionRatings 读取线程内已关闭或已评价周期的评价状态，评价挂在周期最近一次结束事件上；重新打开且未评价的周期不返回。
+func listWebsiteSessionRatings(ctx context.Context, db bun.IDB, organizationID, conversationID string) ([]VisitorSessionRating, error) {
+	var rows []struct {
+		ServiceSessionID string                      `bun:"service_session_id"`
+		EndMessageID     string                      `bun:"end_message_id"`
+		Status           domain.ServiceSessionStatus `bun:"status"`
+		RatingResolved   *bool                       `bun:"rating_resolved"`
+		RatingComment    *string                     `bun:"rating_comment"`
+	}
+	if err := db.NewRaw(`SELECT ss.id AS service_session_id, ended.id AS end_message_id, ss.status, ss.rating_resolved, ss.rating_comment
+		FROM service_sessions AS ss
+		JOIN LATERAL (
+			SELECT msg.id FROM messages AS msg
+			WHERE msg.organization_id = ss.organization_id AND msg.conversation_id = ss.conversation_id AND msg.service_session_id = ss.id AND msg.system_event_type = ?
+			ORDER BY msg.message_seq DESC LIMIT 1
+		) AS ended ON TRUE
+		WHERE ss.organization_id = ? AND ss.conversation_id = ? AND (ss.status = ? OR ss.rated_at IS NOT NULL)
+		ORDER BY ss.sequence`,
+		domain.ConversationSystemEventServiceSessionClosed, organizationID, conversationID, domain.ServiceSessionStatusClosed).
+		Scan(ctx, &rows); err != nil {
+		return nil, fmt.Errorf("list website service session ratings: %w", err)
+	}
+	ratings := make([]VisitorSessionRating, 0, len(rows))
+	for _, row := range rows {
+		rating := VisitorSessionRating{ServiceSessionID: row.ServiceSessionID, EndMessageID: row.EndMessageID,
+			VisitorRating: VisitorRating{Rateable: row.RatingResolved == nil, Resolved: row.RatingResolved}}
+		if row.RatingComment != nil {
+			rating.Comment = *row.RatingComment
+		}
+		ratings = append(ratings, rating)
+	}
+	return ratings, nil
 }
 
 // validateMessageHistoryInput 校验消息分页输入。
@@ -174,7 +239,7 @@ func validateMessageHistoryInput(input MessageHistoryInput) map[string]Validatio
 }
 
 // buildMessageHistory 构造正序消息页。
-func buildMessageHistory(rows []websiteMessageRow, input MessageHistoryInput) MessageHistory {
+func buildMessageHistory(rows []websiteMessageRow, input MessageHistoryInput) (MessageHistory, error) {
 	hasMore := len(rows) > websiteMessagePageSize
 	if hasMore {
 		rows = rows[:websiteMessagePageSize]
@@ -184,6 +249,17 @@ func buildMessageHistory(rows []websiteMessageRow, input MessageHistoryInput) Me
 	}
 	messages := make([]Message, 0, len(rows))
 	for _, row := range rows {
+		if row.Type == domain.MessageTypeSystem {
+			event, err := websiteVisitorEvent(row)
+			if err != nil {
+				return MessageHistory{}, err
+			}
+			messages = append(messages, Message{
+				MessageSeq: row.MessageSeq, ID: row.ID, Author: domain.MessageAuthorSystem, Event: event,
+				OriginatedAt: row.OriginatedAt, SourceOrder: row.SourceOrder, CreatedAt: row.CreatedAt,
+			})
+			continue
+		}
 		author := domain.MessageAuthorAgent
 		if row.SubjectKind == string(domain.ChatSubjectKindContact) {
 			author = domain.MessageAuthorVisitor
@@ -228,7 +304,7 @@ func buildMessageHistory(rows []websiteMessageRow, input MessageHistoryInput) Me
 	}
 	result := MessageHistory{Messages: messages}
 	if len(rows) == 0 {
-		return result
+		return result, nil
 	}
 	first := MessageCursorPoint{MessageSeq: rows[0].MessageSeq, ID: rows[0].ID}
 	last := MessageCursorPoint{MessageSeq: rows[len(rows)-1].MessageSeq, ID: rows[len(rows)-1].ID}
@@ -245,5 +321,30 @@ func buildMessageHistory(rows []websiteMessageRow, input MessageHistoryInput) Me
 		}
 		result.After = &last
 	}
-	return result
+	return result, nil
+}
+
+// websiteVisitorEvent 把客服处理周期系统事件投影为访客可见事件，只保留成员名称与评价状态。
+func websiteVisitorEvent(row websiteMessageRow) (*VisitorEvent, error) {
+	if row.SystemEventType == nil {
+		return nil, fmt.Errorf("load website visitor event: %w", ErrDataInvariant)
+	}
+	var payload struct {
+		ActorDisplayName string                       `json:"actorDisplayName"`
+		Target           *domain.ServiceSessionTarget `json:"target"`
+	}
+	if err := json.Unmarshal(row.SystemEventPayload, &payload); err != nil {
+		return nil, fmt.Errorf("decode website visitor event: %w", err)
+	}
+	event := &VisitorEvent{Type: VisitorEventMemberJoined, ServiceSessionID: row.ServiceSessionID, MemberName: payload.ActorDisplayName}
+	switch domain.ConversationSystemEventType(*row.SystemEventType) {
+	case domain.ConversationSystemEventServiceSessionTransferred, domain.ConversationSystemEventServiceSessionAssigned:
+		if payload.Target == nil || payload.Target.DisplayName == nil {
+			return nil, fmt.Errorf("load website visitor event target: %w", ErrDataInvariant)
+		}
+		event.MemberName = *payload.Target.DisplayName
+	case domain.ConversationSystemEventServiceSessionClosed:
+		event = &VisitorEvent{Type: VisitorEventSessionEnded, ServiceSessionID: row.ServiceSessionID}
+	}
+	return event, nil
 }

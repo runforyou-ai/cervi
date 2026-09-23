@@ -81,8 +81,9 @@ func AppendMessage(ctx context.Context, db bun.IDB, conversation *servermodels.C
 			return nil, false, fmt.Errorf("update conversation summary: %w", err)
 		}
 	}
-	// 内部备注不推进客户可见事实，不登记网站访客受众的变更通知。
-	if err := notifyConversationChanged(ctx, db, conversation, message.Visibility != string(domain.MessageVisibilityInternalOnly)); err != nil {
+	// 内部备注不登记网站访客受众的变更通知；系统事件全部通知访客，访客据此拉取新事件并同步周期评价状态。
+	notifyVisitor := message.Visibility != string(domain.MessageVisibilityInternalOnly) || message.Type == string(domain.MessageTypeSystem)
+	if err := notifyConversationChanged(ctx, db, conversation, notifyVisitor); err != nil {
 		return nil, false, err
 	}
 	return message, true, nil

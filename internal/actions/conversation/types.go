@@ -43,6 +43,7 @@ const (
 	ValidationNeighborIDInvalid         ValidationCode = "neighbor_id_invalid"
 	ValidationPinPositionInvalid        ValidationCode = "pin_position_invalid"
 	ValidationPinOrderVersionInvalid    ValidationCode = "pin_order_version_invalid"
+	ValidationRatingCommentTooLong      ValidationCode = "rating_comment_too_long"
 )
 
 const (
@@ -92,6 +93,8 @@ const (
 	ConflictReasonPinOrderVersionStale = "pin_order_version_stale"
 	// ConflictReasonPinNeighborNotPinned 表示置顶顺序的邻居会话当前不在置顶区。
 	ConflictReasonPinNeighborNotPinned = "pin_neighbor_not_pinned"
+	// ConflictReasonServiceSessionNotRateable 表示客服处理周期未关闭或已评价。
+	ConflictReasonServiceSessionNotRateable = "service_session_not_rateable"
 )
 
 // ServiceSessionAssignee 定义客服处理周期负责人。
@@ -185,9 +188,40 @@ type Message struct {
 	SenderDisplayName string
 	SenderAvatar      *FileLocation
 	Body              string
-	OriginatedAt      time.Time
-	SourceOrder       int64
-	CreatedAt         time.Time
+	// Event 仅在 Author 为 system 时有值。
+	Event        *VisitorEvent
+	OriginatedAt time.Time
+	SourceOrder  int64
+	CreatedAt    time.Time
+}
+
+// VisitorEventType 定义访客可见的客服处理周期事件类型。
+type VisitorEventType string
+
+const (
+	VisitorEventMemberJoined VisitorEventType = "member_joined"
+	VisitorEventSessionEnded VisitorEventType = "session_ended"
+)
+
+// VisitorEvent 定义访客时间线中的客服处理周期事件，成员加入时带成员名称。
+type VisitorEvent struct {
+	Type             VisitorEventType
+	ServiceSessionID string
+	MemberName       string
+}
+
+// VisitorRating 定义访客对客服处理周期的评价状态；Rateable 为真时尚未评价。
+type VisitorRating struct {
+	Rateable bool
+	Resolved *bool
+	Comment  string
+}
+
+// VisitorSessionRating 定义客服处理周期的评价状态及其挂载的最近一次结束事件。
+type VisitorSessionRating struct {
+	ServiceSessionID string
+	EndMessageID     string
+	VisitorRating
 }
 
 // FileLocation 定义文件的存储位置。
@@ -224,6 +258,8 @@ type MessageHistoryInput struct {
 type MessageHistory struct {
 	OrganizationID string
 	Messages       []Message
+	// SessionRatings 覆盖线程内全部已关闭或已评价的周期，与消息分页无关。
+	SessionRatings []VisitorSessionRating
 	Before         *MessageCursorPoint
 	After          *MessageCursorPoint
 }
@@ -278,7 +314,7 @@ type ConversationSystemEvent struct {
 	Targets       []ConversationSystemEventParticipant `json:"targets"`
 	PreviousTitle *string                              `json:"previousTitle,omitempty"`
 	Title         *string                              `json:"title,omitempty"`
-	// 以下字段只由 service_session_* 事件携带，结构与 domain.ServiceSessionHandedOffEvent、domain.ServiceSessionOperatedEvent、domain.ServiceSessionReturnedEvent、domain.ServiceSessionAssignedEvent 一致。
+	// 以下字段只由 service_session_* 事件携带，结构与 domain.ServiceSessionHandedOffEvent、domain.ServiceSessionOperatedEvent、domain.ServiceSessionReturnedEvent、domain.ServiceSessionAssignedEvent、domain.ServiceSessionRatedEvent 一致。
 	ServiceSessionID *string                            `json:"serviceSessionId,omitempty"`
 	ActorIdentityID  *string                            `json:"actorIdentityId,omitempty"`
 	ActorDisplayName *string                            `json:"actorDisplayName,omitempty"`
@@ -291,6 +327,8 @@ type ConversationSystemEvent struct {
 	ReasonText       *string                            `json:"reasonText,omitempty"`
 	CategoryName     *string                            `json:"categoryName,omitempty"`
 	AgentRunID       *string                            `json:"agentRunId,omitempty"`
+	Resolved         *bool                              `json:"resolved,omitempty"`
+	Comment          *string                            `json:"comment,omitempty"`
 }
 
 // ConversationMessage 定义成员可见的会话消息。

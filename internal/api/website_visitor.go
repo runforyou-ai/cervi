@@ -36,6 +36,7 @@ func (s *Service) registerWebsiteVisitorRoutes(router *gin.Engine) {
 	const directoryPath = "/public/website-channels/:channelID/conversations"
 	const historyPath = "/public/website-channels/:channelID/conversations/:conversationID/messages"
 	const typingPath = "/public/website-channels/:channelID/conversations/:conversationID/typing"
+	const ratingPath = "/public/website-channels/:channelID/conversations/:conversationID/service-sessions/:serviceSessionID/rating"
 	const realtimePath = "/public/website-channels/:channelID/realtime"
 	const attachmentsPath = "/public/website-channels/:channelID/attachments"
 	const attachmentUploadPath = "/public/website-channels/:channelID/attachments/:fileID"
@@ -50,6 +51,7 @@ func (s *Service) registerWebsiteVisitorRoutes(router *gin.Engine) {
 	router.POST(attachmentMessagesPath, authorizeWebsiteVisitor, s.sendWebsiteVisitorAttachmentMessage)
 	router.GET(messageAttachmentPath, authorizeWebsiteVisitor, s.getWebsiteVisitorMessageAttachment)
 	router.POST(typingPath, authorizeWebsiteVisitor, s.reportWebsiteVisitorTyping)
+	router.POST(ratingPath, authorizeWebsiteVisitor, s.rateWebsiteVisitorServiceSession)
 	router.Match([]string{http.MethodGet, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace}, attachmentsPath, websiteVisitorMethodNotAllowed(http.MethodPost))
 	router.Match([]string{http.MethodGet, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace}, attachmentUploadPath, websiteVisitorMethodNotAllowed(http.MethodPost))
 	router.Match([]string{http.MethodGet, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace}, attachmentMessagesPath, websiteVisitorMethodNotAllowed(http.MethodPost))
@@ -59,6 +61,7 @@ func (s *Service) registerWebsiteVisitorRoutes(router *gin.Engine) {
 	router.Match([]string{http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace}, directoryPath, websiteVisitorMethodNotAllowed(http.MethodGet))
 	router.Match([]string{http.MethodPost, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace}, historyPath, websiteVisitorMethodNotAllowed(http.MethodGet))
 	router.Match([]string{http.MethodGet, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace}, typingPath, websiteVisitorMethodNotAllowed(http.MethodPost))
+	router.Match([]string{http.MethodGet, http.MethodPut, http.MethodPatch, http.MethodDelete, http.MethodHead, http.MethodOptions, http.MethodConnect, http.MethodTrace}, ratingPath, websiteVisitorMethodNotAllowed(http.MethodPost))
 	if s.visitorRealtime == nil {
 		return
 	}
@@ -156,6 +159,19 @@ func (s *Service) reportWebsiteVisitorTyping(c *gin.Context) {
 		return
 	}
 	writeWebsiteVisitorResult(c, http.StatusOK, struct{}{})
+}
+
+// rateWebsiteVisitorServiceSession 保存网站访客对已关闭客服处理周期的评价。
+func (s *Service) rateWebsiteVisitorServiceSession(c *gin.Context) {
+	var input appservice.WebsiteVisitorRatingInput
+	if !bindWebsiteVisitorJSON(c, &input) {
+		return
+	}
+	result, err := s.websiteVisitor.RateServiceSession(c.Request.Context(), websiteVisitorMeta(c), c.Param("channelID"), c.GetString(websiteVisitorExternalKey), c.Param("conversationID"), c.Param("serviceSessionID"), input)
+	if writeApplicationError(c, err) {
+		return
+	}
+	writeWebsiteVisitorResult(c, http.StatusOK, result)
 }
 
 // completeWebsiteVisitorAttachmentUpload 核验网站访客上传的附件内容。

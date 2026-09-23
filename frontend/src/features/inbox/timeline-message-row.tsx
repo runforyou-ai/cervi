@@ -83,6 +83,11 @@ export function TimelineMessageRow({
               {systemEvent.reasonText}
             </span>
           ) : null}
+          {systemEvent?.ratingComment ? (
+            <span className="max-w-full whitespace-pre-wrap break-words">
+              {systemEvent.ratingComment}
+            </span>
+          ) : null}
         </div>
       ) : (
         <TimelineMessageBubble

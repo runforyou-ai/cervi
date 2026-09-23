@@ -122,11 +122,40 @@ type WebsiteVisitorMessage struct {
 	Body               string                          `json:"body"`
 	SenderIdentityType *OrganizationIdentityType       `json:"senderIdentityType"`
 	// SenderIdentityID、SenderName 和 SenderAvatarURL 仅在企业成员或 AI 员工发送时有值。
-	SenderIdentityID string    `json:"senderIdentityId"`
-	SenderName       string    `json:"senderName"`
-	SenderAvatarURL  string    `json:"senderAvatarUrl"`
-	OriginatedAt     time.Time `json:"originatedAt"`
-	CreatedAt        time.Time `json:"createdAt"`
+	SenderIdentityID string `json:"senderIdentityId"`
+	SenderName       string `json:"senderName"`
+	SenderAvatarURL  string `json:"senderAvatarUrl"`
+	// Event 仅在 Author 为 system 时有值。
+	Event        *WebsiteVisitorEvent `json:"event"`
+	OriginatedAt time.Time            `json:"originatedAt"`
+	CreatedAt    time.Time            `json:"createdAt"`
+}
+
+// WebsiteVisitorEvent 定义访客时间线中的客服处理周期事件：member_joined 或 session_ended，成员加入时带成员名称。
+type WebsiteVisitorEvent struct {
+	Type             string `json:"type"`
+	ServiceSessionID string `json:"serviceSessionId"`
+	MemberName       string `json:"memberName"`
+}
+
+// WebsiteVisitorSessionRating 定义客服处理周期的评价状态及其挂载的最近一次结束事件。
+type WebsiteVisitorSessionRating struct {
+	ServiceSessionID string `json:"serviceSessionId"`
+	EndMessageID     string `json:"endMessageId"`
+	WebsiteVisitorRating
+}
+
+// WebsiteVisitorRating 定义访客对客服处理周期的评价状态；rateable 为真时尚未评价。
+type WebsiteVisitorRating struct {
+	Rateable bool   `json:"rateable"`
+	Resolved *bool  `json:"resolved"`
+	Comment  string `json:"comment"`
+}
+
+// WebsiteVisitorRatingInput 定义访客提交的客服处理周期评价。
+type WebsiteVisitorRatingInput struct {
+	Resolved bool   `json:"resolved"`
+	Comment  string `json:"comment"`
 }
 
 // WebsiteVisitorMessageResult 定义网站访客消息写入结果。
@@ -146,8 +175,10 @@ type WebsiteVisitorMessageHistoryInput struct {
 // WebsiteVisitorMessageHistory 定义网站访客历史分页结果。
 type WebsiteVisitorMessageHistory struct {
 	Messages []WebsiteVisitorMessage `json:"messages"`
-	Before   *string                 `json:"before"`
-	After    *string                 `json:"after"`
+	// SessionRatings 覆盖线程内全部已关闭或已评价的周期，与消息分页无关。
+	SessionRatings []WebsiteVisitorSessionRating `json:"sessionRatings"`
+	Before         *string                       `json:"before"`
+	After          *string                       `json:"after"`
 }
 
 // WebsiteVisitorBackend 定义匿名网站访客业务调用。
@@ -160,6 +191,7 @@ type WebsiteVisitorBackend interface {
 	GetMessageAttachment(context.Context, WebsiteVisitorMeta, string, string, string, string) (WebsiteVisitorAttachmentLinks, error)
 	ListMessages(context.Context, WebsiteVisitorMeta, string, string, string, WebsiteVisitorMessageHistoryInput) (WebsiteVisitorMessageHistory, error)
 	ReportTyping(context.Context, WebsiteVisitorMeta, string, string, string, WebsiteVisitorTypingInput) error
+	RateServiceSession(context.Context, WebsiteVisitorMeta, string, string, string, string, WebsiteVisitorRatingInput) (WebsiteVisitorRating, error)
 }
 
 // WebsiteVisitorService 转发匿名网站访客业务调用。
@@ -223,4 +255,9 @@ func (s *WebsiteVisitorService) ReportTyping(ctx context.Context, meta WebsiteVi
 // ListMessages 返回网站访客指定客户线程的消息历史。
 func (s *WebsiteVisitorService) ListMessages(ctx context.Context, meta WebsiteVisitorMeta, channelID, externalID, conversationID string, input WebsiteVisitorMessageHistoryInput) (WebsiteVisitorMessageHistory, error) {
 	return s.backend.ListMessages(ctx, meta, channelID, externalID, conversationID, input)
+}
+
+// RateServiceSession 保存网站访客对已关闭客服处理周期的评价。
+func (s *WebsiteVisitorService) RateServiceSession(ctx context.Context, meta WebsiteVisitorMeta, channelID, externalID, conversationID, serviceSessionID string, input WebsiteVisitorRatingInput) (WebsiteVisitorRating, error) {
+	return s.backend.RateServiceSession(ctx, meta, channelID, externalID, conversationID, serviceSessionID, input)
 }
