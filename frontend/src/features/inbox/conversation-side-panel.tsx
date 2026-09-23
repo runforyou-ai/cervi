@@ -20,6 +20,7 @@ import { DirectConversationDraftAvatar } from "@/features/inbox/direct-conversat
 import { agentRunStatusLabel } from "@/features/inbox/agent-run-status"
 import type { ComposerDraftBridge } from "@/features/inbox/conversation-composer"
 import { CustomerBusinessQueries } from "@/features/inbox/customer-business-queries"
+import { CustomerServiceHistory } from "@/features/inbox/customer-service-history"
 import { CustomerCopilotPanel } from "@/features/inbox/customer-copilot-panel"
 import { CustomerProfileDetails } from "@/features/inbox/customer-profile-details"
 import { GroupConversationContext } from "@/features/inbox/group-conversation-context"
@@ -181,6 +182,7 @@ function ConversationSidePanelContent({
                 />
               </dl>
             </section>
+            <CustomerServiceHistory conversationID={conversation.id} />
           </TabsContent>
 
           <TabsContent

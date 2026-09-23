@@ -77,6 +77,12 @@ type Backend interface {
 	// ListCustomerBusinessQueries 返回客户会话当前客服周期内 AI 客服查询业务系统的记录。
 	//cervi:route GET /conversations/:conversationID/business-queries
 	ListCustomerBusinessQueries(context.Context, RequestMeta, string) (CustomerBusinessQueryList, error)
+	// GetCustomerServiceSummaries 返回客户会话当前周期的交接摘要与同一客户已关闭周期的小结。
+	//cervi:route GET /conversations/:conversationID/service-summaries
+	GetCustomerServiceSummaries(context.Context, RequestMeta, string) (CustomerServiceSummaries, error)
+	// UpdateServiceSessionSummary 修改已关闭客服处理周期的小结、是否解决与咨询分类。
+	//cervi:route PUT /service-sessions/:serviceSessionID/summary
+	UpdateServiceSessionSummary(context.Context, RequestMeta, string, ServiceSessionSummaryInput) (ServiceSessionSummary, error)
 	// GetInboxConversation 返回当前用户有权阅读的独立会话摘要。
 	//cervi:route GET /conversations/:conversationID/summary
 	GetInboxConversation(context.Context, RequestMeta, string) (InboxConversation, error)
@@ -562,6 +568,12 @@ type Backend interface {
 	// UpdateServiceTimeouts 修改当前企业的客服超时时长。
 	//cervi:route PUT /settings/customer-service/timeouts
 	UpdateServiceTimeouts(context.Context, RequestMeta, ServiceTimeouts) (ServiceTimeouts, error)
+	// GetServiceSummarySettings 读取当前企业的周期小结设置。
+	//cervi:route GET /settings/customer-service/summary
+	GetServiceSummarySettings(context.Context, RequestMeta) (ServiceSummarySettings, error)
+	// UpdateServiceSummarySettings 修改当前企业的周期小结设置。
+	//cervi:route PUT /settings/customer-service/summary
+	UpdateServiceSummarySettings(context.Context, RequestMeta, ServiceSummarySettings) (ServiceSummarySettings, error)
 	// ListServiceCategories 返回当前企业的咨询分类目录。
 	//cervi:route GET /settings/customer-service/categories
 	ListServiceCategories(context.Context, RequestMeta) (ServiceCategoryList, error)

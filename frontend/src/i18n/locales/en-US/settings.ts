@@ -153,13 +153,14 @@ const settings = {
   },
   customerService: {
     title: "Customer service",
-    description: "Set business hours, timeout reminders and reassignment, AI follow-ups and closing, inquiry categories, and customer identity verification",
+    description: "Set business hours, timeout reminders and reassignment, AI follow-ups and closing, inquiry categories, conversation summaries, and customer identity verification",
     loadError: "Could not load business hours.",
     saveError: "Could not save business hours. Try again.",
     tabs: {
       businessHours: "Business hours",
       assignment: "Assignment and reminders",
       categories: "Inquiry categories",
+      summary: "Conversation summaries",
       identity: "Customer identity",
     },
     identity: {
@@ -208,6 +209,19 @@ const settings = {
         nameTooLong: "The category name cannot exceed 64 characters.",
         descriptionTooLong: "The category description cannot exceed 500 characters.",
       },
+    },
+    summary: {
+      formLabel: "Conversation summary form",
+      loadError: "Could not load conversation summary settings.",
+      saveError: "Could not save conversation summary settings. Try again.",
+      decision: "Decision model",
+      decisionDescription: "When a conversation ends, decides whether the customer raised a real request and labels its inquiry category and resolution",
+      summary: "Summary model",
+      summaryDescription: "Writes a summary when a conversation ends and a handoff note when AI hands off to a person",
+      notUsed: "None",
+      configureModels: "Add models",
+      locale: "Summary language",
+      localeDescription: "Language for summaries and handoff notes",
     },
     timeouts: {
       formLabel: "Assignment and reminders form",

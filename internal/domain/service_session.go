@@ -45,3 +45,24 @@ const (
 	// ServiceAttentionReturned 告知原负责人其超时未回复的周期已退回队列。
 	ServiceAttentionReturned ServiceAttentionReason = "returned"
 )
+
+// ServiceSessionSummaryStatus 定义客服处理周期小结的生成状态。
+type ServiceSessionSummaryStatus string
+
+const (
+	// ServiceSessionSummaryPending 表示周期已关闭，等待生成小结。
+	ServiceSessionSummaryPending ServiceSessionSummaryStatus = "pending"
+	// ServiceSessionSummaryReady 表示小结已生成或由客服填写。
+	ServiceSessionSummaryReady ServiceSessionSummaryStatus = "ready"
+	// ServiceSessionSummaryNoRequest 表示客户在本周期没有提出需要处理的问题或诉求。
+	ServiceSessionSummaryNoRequest ServiceSessionSummaryStatus = "no_request"
+	// ServiceSessionSummaryFailed 表示小结生成失败。
+	ServiceSessionSummaryFailed ServiceSessionSummaryStatus = "failed"
+)
+
+// HandoffSummary 是 AI 转人工时交给承接客服的摘要。
+type HandoffSummary struct {
+	Request  string `json:"request"`
+	Progress string `json:"progress"`
+	Blocker  string `json:"blocker"`
+}

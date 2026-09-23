@@ -67,6 +67,7 @@ export {
     ServiceSessionReturnReason,
     ServiceSessionStatus,
     ServiceSessionTargetKind,
+    ServiceSummaryStatus,
     SessionState,
     TelegramWebhookStatus,
     UserStatus,
@@ -74,6 +75,7 @@ export {
 } from "./models.js";
 
 export type {
+    AIModelReference,
     AIProvider,
     AIProviderConnectionInput,
     AIProviderInput,
@@ -183,6 +185,7 @@ export type {
     CustomerReplySuggestionsInput,
     CustomerServiceAssigneeList,
     CustomerServiceSession,
+    CustomerServiceSummaries,
     CustomerTextMessageInput,
     CustomerVisit,
     Device,
@@ -215,6 +218,7 @@ export type {
     GroupInboxConversation,
     GroupParticipant,
     GroupTextMessageInput,
+    HandoffSummary,
     Identity,
     ImageFile,
     Inbox,
@@ -305,7 +309,10 @@ export type {
     ServiceCategoryList,
     ServiceQueueTeam,
     ServiceQueueTeamList,
+    ServiceSessionSummary,
+    ServiceSessionSummaryInput,
     ServiceSessionTarget,
+    ServiceSummarySettings,
     ServiceTimeouts,
     Startup,
     SyncHeads,

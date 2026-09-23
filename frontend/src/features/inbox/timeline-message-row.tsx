@@ -13,18 +13,21 @@ import {
   type TimelineMessageBubbleContext,
 } from "./timeline-message-bubble"
 import type { TimelineMessage } from "./timeline-messages"
+import { TimelineSessionSummary } from "./timeline-session-summary"
 import { formatSystemEvent } from "./timeline-system-event"
 
-/** 按相邻消息决定分隔与分组，展示一条时间线消息。 */
+/** 按相邻消息决定分隔与分组，展示一条时间线消息；summaryEvent 为 true 的周期关闭事件附带该周期小结。 */
 export function TimelineMessageRow({
   message,
   previous,
   next,
+  summaryEvent = false,
   ...context
 }: TimelineMessageBubbleContext & {
   message: TimelineMessage
   previous: TimelineMessage | undefined
   next: TimelineMessage | undefined
+  summaryEvent?: boolean
 }) {
   const { t } = useTranslation(["inbox", "common"])
   const { formatters } = context
@@ -87,6 +90,12 @@ export function TimelineMessageRow({
             <span className="max-w-full whitespace-pre-wrap break-words">
               {systemEvent.ratingComment}
             </span>
+          ) : null}
+          {summaryEvent && systemEvent?.serviceSessionId ? (
+            <TimelineSessionSummary
+              conversationID={context.conversationID}
+              serviceSessionID={systemEvent.serviceSessionId}
+            />
           ) : null}
         </div>
       ) : (

@@ -31,6 +31,8 @@ export const resourceKeys = {
     scopedListKey("customer-profile", conversationId, parameters),
   /** 客户会话当前客服周期的业务查询记录，随会话内容变化重读。 */
   customerBusinessQueries: (conversationId?: string) => itemKey("customer-business-queries", conversationId),
+  /** 客户会话的交接摘要与客户历史周期小结，随会话内容变化重读。 */
+  customerServiceSummaries: (conversationId?: string) => itemKey("customer-service-summaries", conversationId),
   /** 按会话编号读取的独立摘要。 */
   conversationSummary: (conversationId?: string) => itemKey("conversation-summary", conversationId),
   /** 指定会话的列表资格。 */
@@ -138,6 +140,8 @@ export const resourceKeys = {
   businessHours: () => ["business-hours"],
   /** 当前企业的客服超时时长。 */
   serviceTimeouts: () => ["service-timeouts"],
+  /** 当前企业的会话小结设置。 */
+  serviceSummarySettings: () => ["service-summary-settings"],
   /** 当前企业的客户身份密钥。 */
   customerIdentitySecret: () => ["customer-identity-secret"],
   /** 当前企业的咨询分类目录。 */

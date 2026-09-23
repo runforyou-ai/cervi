@@ -8,6 +8,7 @@ import type { MobileCustomerConversationContext } from "@/apps/mobile/mobile-cus
 import { MobilePageHeader, MobileScrollArea } from "@/apps/mobile/mobile-page"
 import { ConversationAvatar } from "@/features/inbox/conversation-avatar"
 import { CustomerProfileDetails } from "@/features/inbox/customer-profile-details"
+import { CustomerServiceHistory } from "@/features/inbox/customer-service-history"
 import { useConversationName } from "@/features/inbox/use-conversation-name"
 
 /** 上下排列的资料字段行，需放在 dl 内。 */
@@ -62,6 +63,7 @@ export function MobileCustomerProfilePage() {
             field={MobileProfileField}
           />
         </dl>
+        <CustomerServiceHistory conversationID={conversation.id} />
       </MobileScrollArea>
     </section>
   )

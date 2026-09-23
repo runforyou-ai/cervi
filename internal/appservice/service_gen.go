@@ -89,6 +89,16 @@ func (s *Service) ListCustomerBusinessQueries(ctx context.Context, meta RequestM
 	return withNormalizedSlices(s.backend.ListCustomerBusinessQueries(ctx, meta, conversationID))
 }
 
+// GetCustomerServiceSummaries 返回客户会话当前周期的交接摘要与同一客户已关闭周期的小结。
+func (s *Service) GetCustomerServiceSummaries(ctx context.Context, meta RequestMeta, conversationID string) (CustomerServiceSummaries, error) {
+	return withNormalizedSlices(s.backend.GetCustomerServiceSummaries(ctx, meta, conversationID))
+}
+
+// UpdateServiceSessionSummary 修改已关闭客服处理周期的小结、是否解决与咨询分类。
+func (s *Service) UpdateServiceSessionSummary(ctx context.Context, meta RequestMeta, serviceSessionID string, input ServiceSessionSummaryInput) (ServiceSessionSummary, error) {
+	return withNormalizedSlices(s.backend.UpdateServiceSessionSummary(ctx, meta, serviceSessionID, input))
+}
+
 // GetInboxConversation 返回当前用户有权阅读的独立会话摘要。
 func (s *Service) GetInboxConversation(ctx context.Context, meta RequestMeta, conversationID string) (InboxConversation, error) {
 	return withNormalizedSlices(s.backend.GetInboxConversation(ctx, meta, conversationID))
@@ -892,6 +902,16 @@ func (s *Service) GetServiceTimeouts(ctx context.Context, meta RequestMeta) (Ser
 // UpdateServiceTimeouts 修改当前企业的客服超时时长。
 func (s *Service) UpdateServiceTimeouts(ctx context.Context, meta RequestMeta, input ServiceTimeouts) (ServiceTimeouts, error) {
 	return withNormalizedSlices(s.backend.UpdateServiceTimeouts(ctx, meta, input))
+}
+
+// GetServiceSummarySettings 读取当前企业的周期小结设置。
+func (s *Service) GetServiceSummarySettings(ctx context.Context, meta RequestMeta) (ServiceSummarySettings, error) {
+	return withNormalizedSlices(s.backend.GetServiceSummarySettings(ctx, meta))
+}
+
+// UpdateServiceSummarySettings 修改当前企业的周期小结设置。
+func (s *Service) UpdateServiceSummarySettings(ctx context.Context, meta RequestMeta, input ServiceSummarySettings) (ServiceSummarySettings, error) {
+	return withNormalizedSlices(s.backend.UpdateServiceSummarySettings(ctx, meta, input))
 }
 
 // ListServiceCategories 返回当前企业的咨询分类目录。

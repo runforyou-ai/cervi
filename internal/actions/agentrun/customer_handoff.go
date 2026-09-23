@@ -15,6 +15,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
 	"github.com/runforyou-ai/cervi/internal/actions/serviceassignment"
 	"github.com/runforyou-ai/cervi/internal/actions/servicecategory"
+	"github.com/runforyou-ai/cervi/internal/actions/servicesummary"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/realtime"
@@ -82,13 +83,19 @@ func applyCustomerHandoff(ctx context.Context, db bun.IDB, enqueuer servertask.T
 		return nil, fmt.Errorf("encode service session handoff event: %w", err)
 	}
 	eventType := string(domain.ConversationSystemEventServiceSessionHandedOff)
-	// 系统事件先于对客通知写入，会话最后消息保持为对客文本。
-	if _, _, err := appendAgentMessage(ctx, db, handoff.PolicyContext.Conversation, &servermodels.Message{
+	// 系统事件先于对客通知写入，会话最后消息保持为对客文本；首次写入事件时准备交接摘要。
+	event, inserted, err := appendAgentMessage(ctx, db, handoff.PolicyContext.Conversation, &servermodels.Message{
 		ID: uuid.NewV7().String(), OrganizationID: session.OrganizationID, ConversationID: session.ConversationID,
 		ServiceSessionID: &session.ID, Type: string(domain.MessageTypeSystem), Visibility: string(domain.MessageVisibilityInternalOnly),
 		SystemEventType: &eventType, SystemEventPayload: payload, IdempotencyKey: &handoff.EventKey,
-	}); err != nil {
+	})
+	if err != nil {
 		return nil, fmt.Errorf("append service session handoff event: %w", err)
+	}
+	if inserted {
+		if err := servicesummary.MarkHandedOff(ctx, db, enqueuer, session, event.ID); err != nil {
+			return nil, err
+		}
 	}
 	message, err := appendCustomerAgentMessage(ctx, db, enqueuer, handoff.PolicyContext, &servermodels.Message{
 		ID: uuid.NewV7().String(), OrganizationID: session.OrganizationID, ConversationID: session.ConversationID,

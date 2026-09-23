@@ -19,6 +19,7 @@ import { DraftAssistantWorkspace } from "@/features/inbox/assistant-workspace"
 import { ConversationSidePanel } from "@/features/inbox/conversation-side-panel"
 import { ConversationHeader } from "@/features/inbox/conversation-header"
 import { ConversationThread } from "@/features/inbox/conversation-thread"
+import { HandoffSummaryCard } from "@/features/inbox/handoff-summary-card"
 import type { ConversationLocateTarget } from "@/features/inbox/conversation-timeline"
 import { customerReplyDisabledReason } from "@/features/inbox/customer-session-actions"
 import { DirectConversationDraftHeader } from "@/features/inbox/direct-conversation-draft-header"
@@ -192,6 +193,13 @@ export function ConversationMain({
             narrowViewport={narrowViewport}
             contextVisible={!contextCollapsed}
             onToggleContext={() => setContextCollapsed((collapsed) => !collapsed)}
+          />
+        ) : null}
+        {customerConversation ? (
+          <HandoffSummaryCard
+            key={customerConversation.id}
+            conversationID={customerConversation.id}
+            assignee={customerConversation.customer.assignee}
           />
         ) : null}
         <ConversationThread

@@ -15,6 +15,7 @@ import (
 	knowledgeaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
 	mcpserveraction "github.com/runforyou-ai/cervi/internal/actions/mcpserver"
 	"github.com/runforyou-ai/cervi/internal/actions/serviceassignment"
+	"github.com/runforyou-ai/cervi/internal/actions/servicesummary"
 	"github.com/runforyou-ai/cervi/internal/actions/servicetimeout"
 	"github.com/runforyou-ai/cervi/internal/api"
 	"github.com/runforyou-ai/cervi/internal/appservice"
@@ -24,6 +25,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/ingress"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/integration/connectiontest"
+	"github.com/runforyou-ai/cervi/internal/integration/decision"
 	"github.com/runforyou-ai/cervi/internal/integration/documentconvert"
 	"github.com/runforyou-ai/cervi/internal/integration/embedding"
 	mcpintegration "github.com/runforyou-ai/cervi/internal/integration/mcp"
@@ -134,6 +136,15 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 		return nil, nil, err
 	}
 	if err := tasks.Registry().RegisterJSON(serviceassignment.BackfillActionName, serviceAssignment.Backfill); err != nil {
+		return nil, nil, err
+	}
+
+	// 注册客服处理周期小结与交接摘要任务，判断模型标注诉求、分类与是否解决，小结正文与交接摘要复用单次模型调用。
+	serviceSummary := servicesummary.NewWorker(appStorage.DB(), decision.NewClient(), agentRuntime)
+	if err := tasks.Registry().RegisterJSONWithTerminalFailure(servicesummary.SummarizeActionName, serviceSummary.Summarize, serviceSummary.FinalizeSummarizeFailure); err != nil {
+		return nil, nil, err
+	}
+	if err := tasks.Registry().RegisterJSON(servicesummary.HandoffSummaryActionName, serviceSummary.HandoffSummary); err != nil {
 		return nil, nil, err
 	}
 
