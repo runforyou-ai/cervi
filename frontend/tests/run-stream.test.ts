@@ -191,15 +191,18 @@ test("移除未知内容块的增量按缺口处理", () => {
   assert.equal(result.status, "gap")
 })
 
-test("重置操作清空内容块与候选正文", () => {
+test("移除内容块只删除指定块", () => {
   const state: RunStreamState = {
     runId, streamId, attempt: 1, sequence: 1n, candidateContent: "正文",
-    blocks: [{ id: "block-1", position: 1n, kind: thinking, text: "甲" }],
+    blocks: [
+      { id: "block-1", position: 1n, kind: thinking, text: "甲" },
+      { id: "block-2", position: 2n, kind: thinking, text: "乙" },
+    ],
   }
   const result = applyRunStreamDelta(state, {
-    runId, streamId, baseSequence: 1n, sequence: 2n, operations: [{ kind: "reset" }],
+    runId, streamId, baseSequence: 1n, sequence: 2n, operations: [{ kind: "remove_blocks", blockIds: ["block-2"] }],
   })
   assert.equal(result.status, "applied")
-  assert.deepEqual(result.status === "applied" ? result.state.blocks : undefined, [])
-  assert.equal(result.status === "applied" ? result.state.candidateContent : undefined, "")
+  assert.deepEqual(result.status === "applied" ? result.state.blocks.map((block) => block.id) : undefined, ["block-1"])
+  assert.equal(result.status === "applied" ? result.state.candidateContent : undefined, "正文")
 })

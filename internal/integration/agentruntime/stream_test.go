@@ -44,11 +44,9 @@ func TestStreamSnapshotApply(t *testing.T) {
 	}
 }
 
-// testStreamOperations 返回覆盖重置、文本追加、候选正文和工具状态更新的操作序列。
+// testStreamOperations 返回覆盖文本追加、候选正文和工具状态更新的操作序列。
 func testStreamOperations() []StreamOperation {
 	return []StreamOperation{
-		{Kind: StreamOperationUpsertBlock, Block: &StreamBlock{ID: "stale", Position: 1, Kind: domain.AgentRunBlockThinking}},
-		{Kind: StreamOperationReset},
 		{Kind: StreamOperationUpsertBlock, Block: &StreamBlock{ID: "thinking", Position: 1, Kind: domain.AgentRunBlockThinking, Text: "先"}},
 		{Kind: StreamOperationAppendBlockText, BlockID: "thinking", Text: "想"},
 		{Kind: StreamOperationAppendBlockText, BlockID: "thinking", Text: "想"},
@@ -60,7 +58,7 @@ func testStreamOperations() []StreamOperation {
 	}
 }
 
-// TestMergeStreamOperations 验证合并后的操作与逐条应用得到相同快照，重置之前的操作被丢弃。
+// TestMergeStreamOperations 验证合并后的操作与逐条应用得到相同快照。
 func TestMergeStreamOperations(t *testing.T) {
 	operations := testStreamOperations()
 	stepwise := StreamSnapshot{RunID: "run", StreamID: "stream"}
@@ -74,11 +72,11 @@ func TestMergeStreamOperations(t *testing.T) {
 	if _, err := combined.Apply(StreamDelta{RunID: "run", StreamID: "stream", Sequence: 1, Operations: merged}); err != nil {
 		t.Fatal(err)
 	}
-	if len(merged) != 5 || merged[0].Kind != StreamOperationReset || !reflect.DeepEqual(stepwise.Blocks, combined.Blocks) || stepwise.CandidateContent != combined.CandidateContent {
+	if len(merged) != 4 || !reflect.DeepEqual(stepwise.Blocks, combined.Blocks) || stepwise.CandidateContent != combined.CandidateContent {
 		t.Fatalf("merged = %#v, stepwise = %#v, combined = %#v", merged, stepwise, combined)
 	}
-	if operations[2].Block.Text != "先" {
-		t.Fatalf("merge modified source block: %#v", operations[2].Block)
+	if operations[0].Block.Text != "先" {
+		t.Fatalf("merge modified source block: %#v", operations[0].Block)
 	}
 }
 
@@ -105,7 +103,7 @@ func TestMergeStreamDeltas(t *testing.T) {
 	if _, err := combined.Apply(merged); err != nil {
 		t.Fatal(err)
 	}
-	if merged.BaseSequence != 0 || merged.Sequence != int64(len(operations)) || len(merged.Operations) != 5 ||
+	if merged.BaseSequence != 0 || merged.Sequence != int64(len(operations)) || len(merged.Operations) != 4 ||
 		!reflect.DeepEqual(stepwise.Blocks, combined.Blocks) || stepwise.CandidateContent != combined.CandidateContent || combined.Sequence != stepwise.Sequence {
 		t.Fatalf("merged = %#v, stepwise = %#v, combined = %#v", merged, stepwise, combined)
 	}

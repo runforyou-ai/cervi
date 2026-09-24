@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"reflect"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -23,7 +24,9 @@ func TestTurnPreemptionDoesNotSendEmptyAssistant(t *testing.T) {
 			feed := &testInputFeed{}
 			feed.appendUser("开始计算")
 			recorder := newProcessRecorder(RunRequest{})
-			execution := &einoExecution{inputs: &turnInputs{feed: feed}, recorder: recorder, maxTurns: 2}
+			mediaEnabled := &atomic.Bool{}
+			mediaEnabled.Store(true)
+			execution := &einoExecution{inputs: &turnInputs{feed: feed}, recorder: recorder, maxTurns: 2, mediaEnabled: mediaEnabled}
 			calls := 0
 			chatModel := &processChatModel{generate: func(ctx context.Context, messages []*schema.AgenticMessage) (*schema.AgenticMessage, error) {
 				calls++

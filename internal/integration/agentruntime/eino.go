@@ -19,7 +19,7 @@ import (
 
 const (
 	defaultMaxIterations = 20
-	// emptyResponseRetryLimit 是同一次输入在模型只产出推理内容时允许的重新执行次数。
+	// emptyResponseRetryLimit 是模型只产出推理内容时同一次模型调用允许的重试次数。
 	emptyResponseRetryLimit = 1
 )
 
@@ -75,14 +75,14 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 			gate = newGroundingGate(judges, recorder.markEvidence)
 		}
 	}
-	// 本机图片读取随直传附件一同受模型拒绝后的重新执行控制。
-	workspaceImages := &atomic.Bool{}
-	workspaceImages.Store(true)
-	workspace, workspaceTools, err := newWorkspaceMiddleware(ctx, request, workspaceImages)
+	// 模型拒绝多模态输入后，直传附件与本机图片读取一并关闭。
+	mediaEnabled := &atomic.Bool{}
+	mediaEnabled.Store(true)
+	workspace, err := newWorkspaceTools(ctx, request, mediaEnabled)
 	if err != nil {
 		return RunResult{}, err
 	}
-	tools, releaseSessions, err := r.assembleTools(ctx, request, terminal, workspaceTools)
+	tools, releaseSessions, err := r.assembleTools(ctx, request, terminal, workspace)
 	if err != nil {
 		return RunResult{}, err
 	}
@@ -112,14 +112,13 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 	if len(media.modalities) > 0 && media.read != nil {
 		media.maxCount = max(1, window*mediaWindowPercent/100/mediaTokens)
 	}
-	trackedModel := &mediaTrackingModel{AgenticModel: chatModel, rejected: &atomic.Bool{}}
 	guard := newFinalIterationGuard(maxIterations, terminal != nil)
 	if terminal != nil {
 		terminal.budgetSpent = guard.budgetExhausted
 	}
 	handlers := append([]adk.TypedChatModelAgentMiddleware[*schema.AgenticMessage]{recorder, guard}, reductionHandlers...)
-	if workspace != nil {
-		handlers = append(handlers, workspace)
+	if workspace.middleware != nil {
+		handlers = append(handlers, workspace.middleware)
 	}
 	handlers = append(handlers, &toolArgumentsNormalizer{})
 	toolMiddlewares := []compose.ToolMiddleware{toolExecutionMiddleware(recorder)}
@@ -130,69 +129,102 @@ func (r *EinoRuntime) Run(ctx context.Context, request RunRequest, feed InputFee
 	if gate != nil {
 		handlers = append(handlers, gate)
 	}
+	retry := &modelRetry{runID: request.RunID, mediaEnabled: mediaEnabled}
 	agent, err := adk.NewTypedChatModelAgent(ctx, &adk.TypedChatModelAgentConfig[*schema.AgenticMessage]{
-		Name: request.Assignment.AgentName, Instruction: request.Assignment.Instruction, Model: trackedModel,
+		Name: request.Assignment.AgentName, Instruction: request.Assignment.Instruction, Model: chatModel,
 		ToolsConfig: adk.ToolsConfig{ToolsNodeConfig: compose.ToolsNodeConfig{
 			Tools: tools, ToolCallMiddlewares: toolMiddlewares,
 		}},
-		Handlers:      handlers,
-		MaxIterations: maxIterations,
+		Handlers:         handlers,
+		MaxIterations:    maxIterations,
+		ModelRetryConfig: retry.config(),
 	})
 	if err != nil {
 		return RunResult{}, fmt.Errorf("create Eino chat model agent: %w", err)
 	}
 
-	// 模型偶发只产出推理内容而没有正文时按有界次数重新执行；携带直传附件的模型调用失败时去掉多模态内容重新执行一次。
-	var carriedUsage Usage
-	for emptyRetries := 0; ; {
-		execution := &einoExecution{
-			inputs: &turnInputs{feed: feed, holdPreempt: terminal.handoffFixed}, recorder: recorder, terminal: terminal, gate: gate, guard: guard,
-			maxTurns: request.MaxTurns, contextWindow: window, media: media,
-		}
-		execution.inputs.loop = adk.NewTurnLoop(adk.TurnLoopConfig[Trigger, *schema.AgenticMessage]{
-			GenInput: execution.genInput,
-			PrepareAgent: func(context.Context, *adk.TurnLoop[Trigger, *schema.AgenticMessage], []Trigger) (adk.TypedAgent[*schema.AgenticMessage], error) {
-				return agent, nil
-			},
-			OnAgentEvents: execution.onAgentEvents,
-		})
-		err := execution.inputs.run(ctx)
-		carriedUsage.PromptTokens += execution.result.Usage.PromptTokens
-		carriedUsage.CompletionTokens += execution.result.Usage.CompletionTokens
-		carriedUsage.TotalTokens += execution.result.Usage.TotalTokens
-		if errors.Is(err, errEmptyFinalResponse) && emptyRetries < emptyResponseRetryLimit && ctx.Err() == nil {
-			emptyRetries++
-			slog.Warn("模型未产出正文，重新执行本次输入",
-				"agent_run_id", request.RunID, "attempt", emptyRetries, "retry_limit", emptyResponseRetryLimit)
-			recorder.reset()
-			continue
-		}
-		if err != nil && ctx.Err() == nil && (media.maxCount > 0 || workspaceImages.Load()) && trackedModel.rejected.Load() {
-			slog.Warn("模型调用拒绝直传附件或本机图片，改为仅在正文提供附件链接、不再向模型提供本机图片并重新执行",
-				"agent_run_id", request.RunID, "error", err)
-			recorder.reset()
-			media = mediaInput{}
-			workspaceImages.Store(false)
-			continue
-		}
-		if err != nil {
-			return RunResult{Usage: carriedUsage, Blocks: recorder.partialBlocks()}, err
-		}
-		if !execution.finished || execution.inputs.claimedSeq <= 0 {
-			return RunResult{Usage: carriedUsage, Blocks: recorder.partialBlocks()},
-				errors.New("agent run stopped without a stable response")
-		}
-		execution.result.Usage = carriedUsage
-		execution.result.EndSeq = execution.inputs.claimedSeq
-		execution.result.Blocks = recorder.blocks()
-		return execution.result, nil
+	execution := &einoExecution{
+		inputs: &turnInputs{feed: feed, holdPreempt: terminal.handoffFixed}, recorder: recorder, terminal: terminal, gate: gate, guard: guard,
+		maxTurns: request.MaxTurns, contextWindow: window, media: media, mediaEnabled: mediaEnabled,
 	}
+	execution.inputs.loop = adk.NewTurnLoop(adk.TurnLoopConfig[Trigger, *schema.AgenticMessage]{
+		GenInput: execution.genInput,
+		PrepareAgent: func(context.Context, *adk.TurnLoop[Trigger, *schema.AgenticMessage], []Trigger) (adk.TypedAgent[*schema.AgenticMessage], error) {
+			return agent, nil
+		},
+		OnAgentEvents: execution.onAgentEvents,
+	})
+	err = execution.inputs.run(ctx)
+	execution.result.Usage.PromptTokens += retry.usage.PromptTokens
+	execution.result.Usage.CompletionTokens += retry.usage.CompletionTokens
+	execution.result.Usage.TotalTokens += retry.usage.TotalTokens
+	if err != nil {
+		return RunResult{Usage: execution.result.Usage, Blocks: recorder.partialBlocks()}, err
+	}
+	if !execution.finished || execution.inputs.claimedSeq <= 0 {
+		return RunResult{Usage: execution.result.Usage, Blocks: recorder.partialBlocks()},
+			errors.New("agent run stopped without a stable response")
+	}
+	execution.result.EndSeq = execution.inputs.claimedSeq
+	execution.result.Blocks = recorder.blocks()
+	return execution.result, nil
+}
+
+// modelRetry 决定单次模型调用是否重试，已执行的工具不重复执行，并累计被重试丢弃的输出用量；一次运行内的模型调用串行进行。
+type modelRetry struct {
+	runID        string
+	mediaEnabled *atomic.Bool
+	emptyRetries int // 当前模型调用因空正文已重试的次数。
+	usage        Usage
+}
+
+// config 返回模型重试配置：多模态重试与空正文重试分别计数。
+func (m *modelRetry) config() *adk.TypedModelRetryConfig[*schema.AgenticMessage] {
+	return &adk.TypedModelRetryConfig[*schema.AgenticMessage]{MaxRetries: emptyResponseRetryLimit + 1, ShouldRetry: m.shouldRetry}
+}
+
+// shouldRetry 在携带多模态内容的调用失败时关闭多模态输入并去掉这些内容重试；模型只产出推理内容、没有正文和工具调用时按有界次数重试。
+func (m *modelRetry) shouldRetry(ctx context.Context, attempt *adk.TypedRetryContext[*schema.AgenticMessage]) *adk.TypedRetryDecision[*schema.AgenticMessage] {
+	if attempt.RetryAttempt == 1 {
+		m.emptyRetries = 0
+	}
+	if ctx.Err() != nil {
+		return nil
+	}
+	var decision *adk.TypedRetryDecision[*schema.AgenticMessage]
+	output := attempt.OutputMessage
+	switch {
+	case attempt.Err != nil:
+		if !carriesMedia(attempt.InputMessages) {
+			return nil
+		}
+		slog.Warn("模型调用拒绝直传附件或本机图片，改为仅在正文提供附件链接、不再向模型提供本机图片并重试",
+			"agent_run_id", m.runID, "error", attempt.Err)
+		m.mediaEnabled.Store(false)
+		decision = &adk.TypedRetryDecision[*schema.AgenticMessage]{
+			Retry: true, ModifiedInputMessages: withoutMedia(attempt.InputMessages), PersistModifiedInputMessages: true,
+		}
+	case output != nil && (hasToolCalls(output) || strings.TrimSpace(assistantText(output)) != ""), m.emptyRetries >= emptyResponseRetryLimit:
+		return nil
+	default:
+		m.emptyRetries++
+		slog.Warn("模型未产出正文，重试本次模型调用",
+			"agent_run_id", m.runID, "attempt", m.emptyRetries, "retry_limit", emptyResponseRetryLimit)
+		decision = &adk.TypedRetryDecision[*schema.AgenticMessage]{Retry: true}
+	}
+	// 被丢弃的输出同样计入模型用量。
+	if output != nil && output.ResponseMeta != nil && output.ResponseMeta.TokenUsage != nil {
+		m.usage.PromptTokens += output.ResponseMeta.TokenUsage.PromptTokens
+		m.usage.CompletionTokens += output.ResponseMeta.TokenUsage.CompletionTokens
+		m.usage.TotalTokens += output.ResponseMeta.TokenUsage.TotalTokens
+	}
+	return decision
 }
 
 // assembleTools 按场景与请求装配本次运行的工具：开发期计算器只在内部场景注册，终止工具只在客服场景注册，远程 MCP 工具在内置工具之后连接并跳过与内置工具、本机工具重名的工具。
 // 工具集合由本次运行注入的依赖决定，调用方必须让注入的依赖与有效配置中的工具清单一致。
-func (r *EinoRuntime) assembleTools(ctx context.Context, request RunRequest, terminal *terminalTools, workspaceTools []string) ([]tool.BaseTool, func(), error) {
-	tools := make([]tool.BaseTool, 0, len(r.tools)+4)
+func (r *EinoRuntime) assembleTools(ctx context.Context, request RunRequest, terminal *terminalTools, workspace workspaceTools) ([]tool.BaseTool, func(), error) {
+	tools := make([]tool.BaseTool, 0, len(r.tools)+4+len(workspace.tools))
 	if request.Assignment.Scene != SceneCustomer {
 		tools = append(tools, r.tools...)
 	}
@@ -213,11 +245,12 @@ func (r *EinoRuntime) assembleTools(ctx context.Context, request RunRequest, ter
 	if terminal != nil {
 		tools = append(tools, terminal.tools()...)
 	}
+	tools = append(tools, workspace.tools...)
 	release := func() {}
 	if len(request.MCPConnections) > 0 {
 		// 收齐本次运行的内置工具名称，远程工具重名时由 openMCPTools 跳过。
 		registered := map[string]struct{}{offloadedResultToolName: {}}
-		for _, name := range workspaceTools {
+		for _, name := range workspace.names {
 			registered[name] = struct{}{}
 		}
 		for _, existing := range tools {
@@ -246,6 +279,7 @@ type einoExecution struct {
 	maxTurns      int
 	contextWindow int
 	media         mediaInput
+	mediaEnabled  *atomic.Bool // 为 false 时新输入不再直传附件，已有上下文去掉多模态内容。
 	turns         int
 	result        RunResult
 	finished      bool
@@ -279,7 +313,12 @@ func (e *einoExecution) genInput(ctx context.Context, _ *adk.TurnLoop[Trigger, *
 		if err != nil {
 			return nil, err
 		}
-		messages = e.history.appendInput(ctx, trimClaimedHistory(ctx, claimed.Messages, e.contextWindow), e.media)
+		media := e.media
+		if !e.mediaEnabled.Load() {
+			media = mediaInput{}
+			e.history.messages = withoutMedia(e.history.messages)
+		}
+		messages = e.history.appendInput(ctx, trimClaimedHistory(ctx, claimed.Messages, e.contextWindow), media)
 	case e.gate != nil:
 		// 纠正重新执行不认领输入、不计轮次，沿用当前边界的依据与剩余迭代预算。
 		lookup := ""
@@ -332,6 +371,9 @@ func (e *einoExecution) onAgentEvents(ctx context.Context, turn *adk.TurnContext
 			continue
 		}
 		message, err := event.Output.MessageOutput.GetMessage()
+		if _, retried := errors.AsType[*adk.WillRetryError](err); retried {
+			continue
+		}
 		if err != nil {
 			return err
 		}

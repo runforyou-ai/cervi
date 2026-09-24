@@ -1,4 +1,4 @@
-// Package localworkspace 提供本机文件的只读访问，相对路径以会话默认文件夹为起点，模型看到的是本机绝对路径。
+// Package localworkspace 提供本机文件的读写与命令执行，相对路径与命令工作目录以会话默认文件夹为起点，模型看到的是本机绝对路径。
 package localworkspace
 
 import (
@@ -11,6 +11,7 @@ import (
 	"path/filepath"
 	"slices"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/cloudwego/eino/adk/filesystem"
@@ -23,17 +24,18 @@ const (
 	maxImageBytes = 10 << 20
 	// binarySniffBytes 是判断二进制文件时检查的文件开头字节数。
 	binarySniffBytes = 8000
+	// maxSymlinkDepth 是写入时逐级解析符号链接的层数上限。
+	maxSymlinkDepth = 40
 )
 
 // imageTypes 是可以按图片读取的内容类型。
 var imageTypes = []string{"image/png", "image/jpeg", "image/gif", "image/webp"}
 
-// errReadOnly 表示文件只读，不接受写入。
-var errReadOnly = errors.New("文件只读，不能写入或修改文件")
-
-// Backend 读取本机文件：绝对路径直接访问，~ 开头按用户主目录展开，相对路径以默认文件夹为起点。
+// Backend 读写本机文件并执行命令：绝对路径直接访问，~ 开头按用户主目录展开，相对路径以默认文件夹为起点。
 type Backend struct {
 	root string
+	// writes 串行化写入、修改与删除，同一次运行并行的改动不互相覆盖。
+	writes sync.Mutex
 }
 
 // New 以默认文件夹为相对路径起点打开本机文件访问。
@@ -192,12 +194,136 @@ func isBinary(content []byte) bool {
 	return bytes.IndexByte(content[:min(len(content), binarySniffBytes)], 0) >= 0
 }
 
-// Write 拒绝写入，文件只读。
-func (b *Backend) Write(context.Context, *filesystem.WriteRequest) error {
-	return errReadOnly
+// Write 以完整内容创建或覆盖文件，缺少的上级目录一并创建；指向符号链接时写入链接目标。
+func (b *Backend) Write(ctx context.Context, req *filesystem.WriteRequest) error {
+	file, err := b.resolve(req.FilePath)
+	if err != nil {
+		return err
+	}
+	b.writes.Lock()
+	defer b.writes.Unlock()
+	// 排队期间运行已取消时不再改动文件。
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(file), 0o755); err != nil {
+		return fmt.Errorf("无法创建目录：%s", filepath.Dir(file))
+	}
+	return replaceFile(file, []byte(req.Content))
 }
 
-// Edit 拒绝修改，文件只读。
-func (b *Backend) Edit(context.Context, *filesystem.EditRequest) error {
-	return errReadOnly
+// Edit 把文本文件中的原文替换为新内容；原文必须存在，未要求全部替换时必须唯一。
+func (b *Backend) Edit(ctx context.Context, req *filesystem.EditRequest) error {
+	file, err := b.resolve(req.FilePath)
+	if err != nil {
+		return err
+	}
+	if req.OldString == "" {
+		return errors.New("要替换的原文不能为空")
+	}
+	if req.OldString == req.NewString {
+		return errors.New("替换内容与原文相同")
+	}
+	b.writes.Lock()
+	defer b.writes.Unlock()
+	// 排队期间运行已取消时不再改动文件。
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	content, err := b.readFile(file, maxReadBytes)
+	if err != nil {
+		return err
+	}
+	if isBinary(content) {
+		return fmt.Errorf("二进制文件无法按文本修改：%s", file)
+	}
+	text := string(content)
+	count := strings.Count(text, req.OldString)
+	switch {
+	case count == 0:
+		return fmt.Errorf("文件中找不到要替换的原文：%s", file)
+	case count > 1 && !req.ReplaceAll:
+		return fmt.Errorf("原文在文件中出现 %d 次，请提供更多上下文使其唯一，或设置 replace_all：%s", count, file)
+	}
+	if req.ReplaceAll {
+		text = strings.ReplaceAll(text, req.OldString, req.NewString)
+	} else {
+		text = strings.Replace(text, req.OldString, req.NewString, 1)
+	}
+	return replaceFile(file, []byte(text))
+}
+
+// replaceFile 先写入同目录的临时文件再替换目标，写入中途失败时原文件不变；已有文件保留原权限，新文件权限为 0644。
+func replaceFile(file string, content []byte) error {
+	// 符号链接逐级解析到最终目标，目标尚不存在时同样写入目标，链接本身保留；
+	// 每一级先按文件系统解析所在目录，链接中的 .. 相对真实目录计算。
+	for range maxSymlinkDepth {
+		if dir, err := filepath.EvalSymlinks(filepath.Dir(file)); err == nil {
+			file = filepath.Join(dir, filepath.Base(file))
+		}
+		info, err := os.Lstat(file)
+		if err != nil || info.Mode()&os.ModeSymlink == 0 {
+			break
+		}
+		target, err := os.Readlink(file)
+		if err != nil {
+			return fmt.Errorf("无法解析符号链接：%s", file)
+		}
+		if !filepath.IsAbs(target) {
+			target = filepath.Join(filepath.Dir(file), target)
+		}
+		file = filepath.Clean(target)
+	}
+	if info, err := os.Lstat(file); err == nil && info.Mode()&os.ModeSymlink != 0 {
+		return fmt.Errorf("符号链接层数过多：%s", file)
+	}
+	mode := os.FileMode(0o644)
+	if info, err := os.Stat(file); err == nil {
+		if !info.Mode().IsRegular() {
+			return fmt.Errorf("不是普通文件，无法写入：%s", file)
+		}
+		mode = info.Mode().Perm()
+	}
+	temp, err := os.CreateTemp(filepath.Dir(file), "."+filepath.Base(file)+".cervi-*")
+	if err != nil {
+		return fmt.Errorf("无法写入文件：%s", file)
+	}
+	defer os.Remove(temp.Name())
+	_, writeErr := temp.Write(content)
+	closeErr := temp.Close()
+	if writeErr != nil || closeErr != nil {
+		return fmt.Errorf("无法写入文件：%s", file)
+	}
+	if err := os.Chmod(temp.Name(), mode); err != nil {
+		return fmt.Errorf("无法写入文件：%s", file)
+	}
+	if err := os.Rename(temp.Name(), file); err != nil {
+		return fmt.Errorf("无法写入文件：%s", file)
+	}
+	return nil
+}
+
+// Delete 删除一个文件或空文件夹；路径是符号链接时只删除链接本身。
+func (b *Backend) Delete(ctx context.Context, name string) error {
+	file, err := b.resolve(name)
+	if err != nil {
+		return err
+	}
+	b.writes.Lock()
+	defer b.writes.Unlock()
+	// 排队期间运行已取消时不再改动文件。
+	if err := ctx.Err(); err != nil {
+		return err
+	}
+	info, err := os.Lstat(file)
+	if err != nil {
+		return fmt.Errorf("文件不存在：%s", file)
+	}
+	if err := os.Remove(file); err != nil {
+		if info.IsDir() {
+			return fmt.Errorf("只能删除空文件夹：%s", file)
+		}
+		return fmt.Errorf("无法删除：%s", file)
+	}
+	return nil
 }

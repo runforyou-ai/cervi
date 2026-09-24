@@ -51,7 +51,6 @@ const (
 	RunStreamRemoveBlocks    RunStreamOperationKind = "remove_blocks"
 	RunStreamAppendCandidate RunStreamOperationKind = "append_candidate"
 	RunStreamClearCandidate  RunStreamOperationKind = "clear_candidate"
-	RunStreamReset           RunStreamOperationKind = "reset"
 )
 
 // Frame 是可编码的实时事件。

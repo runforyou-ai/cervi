@@ -103,6 +103,14 @@ type ModelCredentials struct {
 	Transport http.RoundTripper // 非空时模型请求经该传输层发出。
 }
 
+// Workspace 是执行设备提供的本机文件与命令访问，相对路径与命令工作目录以会话默认文件夹为起点。
+type Workspace interface {
+	filesystem.Backend
+	filesystem.Shell
+	// Delete 删除一个文件或空文件夹。
+	Delete(ctx context.Context, path string) error
+}
+
 // RunRequest 定义一次有界 Agent 业务运行。
 type RunRequest struct {
 	RunID                 string
@@ -110,11 +118,11 @@ type RunRequest struct {
 	Credentials           ModelCredentials // 模型供应商凭据。
 	KnowledgeSearch       KnowledgeSearch
 	CustomerHistorySearch CustomerHistorySearch
-	ReadAttachment        AttachmentContent  // 为空时附件只以正文中的链接提供给模型。
-	MCPConnections        []MCPServer        // 有效配置中远程 MCP 服务对应的连接配置。
-	Workspace             filesystem.Backend // 有效配置包含本机工具时由执行设备提供的本机文件访问，相对路径以会话默认文件夹为起点。
-	MaxIterations         int                // 单轮模型与工具迭代上限，零值使用默认值。
-	MaxTurns              int                // 吸收新输入的轮次上限，零值不限制，由运行 context 控制生命周期。
+	ReadAttachment        AttachmentContent // 为空时附件只以正文中的链接提供给模型。
+	MCPConnections        []MCPServer       // 有效配置中远程 MCP 服务对应的连接配置。
+	Workspace             Workspace         // 有效配置包含本机工具时由执行设备提供的本机文件与命令访问。
+	MaxIterations         int               // 单轮模型与工具迭代上限，零值使用默认值。
+	MaxTurns              int               // 吸收新输入的轮次上限，零值不限制，由运行 context 控制生命周期。
 	StreamID              string
 	Attempt               int
 	OnStream              func(StreamDelta) // 串行接收合并后的运行流增量，实现不得阻塞。

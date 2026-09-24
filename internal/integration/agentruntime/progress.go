@@ -124,8 +124,16 @@ func (m *streamingModel) Stream(ctx context.Context, input []*schema.AgenticMess
 	}), nil
 }
 
-// beginCallLocked 开始一次模型调用并清空上一调用的候选正文，调用方持有缓冲锁。
+// beginCallLocked 开始一次模型调用并清空上一调用的候选正文；上一调用未定稿即被重试时移除其内容块。调用方持有缓冲锁。
 func (r *processRecorder) beginCallLocked() *modelCallStream {
+	if r.call != nil && len(r.process) > r.call.start {
+		removed := make([]string, 0, len(r.process)-r.call.start)
+		for _, block := range r.process[r.call.start:] {
+			removed = append(removed, block.ID)
+		}
+		r.process = r.process[:r.call.start]
+		r.publisher.add(StreamOperation{Kind: StreamOperationRemoveBlocks, BlockIDs: removed})
+	}
 	r.call = &modelCallStream{id: uuid.NewV7().String(), start: len(r.process), positions: make(map[int]int)}
 	if r.candidate != "" {
 		r.candidate = ""
@@ -328,15 +336,6 @@ func (r *processRecorder) markEvidence(callID string) {
 	if position, ok := r.toolPositions[callID]; ok {
 		r.process[position].Payload.ToolCall.Evidence = true
 	}
-}
-
-// reset 在重新执行本次输入前清空已记录的过程内容。
-func (r *processRecorder) reset() {
-	r.mu.Lock()
-	defer r.mu.Unlock()
-	r.process, r.candidate, r.call = nil, "", nil
-	r.toolPositions = make(map[string]int)
-	r.publisher.add(StreamOperation{Kind: StreamOperationReset})
 }
 
 // resetCandidate 在安全点补入新消息时丢弃候选正文、未完成模型调用的内容和被跳过的工具。
