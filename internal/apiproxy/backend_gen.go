@@ -1451,12 +1451,30 @@ func (b *Backend) ListAIPerformanceBreakdowns(ctx context.Context, meta appservi
 	return output, err
 }
 
-// ListAIKnowledgeGaps 返回一页因知识不足或缺少依据的转人工。
-func (b *Backend) ListAIKnowledgeGaps(ctx context.Context, meta appservice.RequestMeta, input appservice.AIKnowledgeGapInput) (appservice.AIKnowledgeGapList, error) {
-	var output appservice.AIKnowledgeGapList
-	err := b.do(ctx, meta, http.MethodGet, "/reports/ai-performance/knowledge-gaps", encodeAIKnowledgeGapInputQuery(input), nil, &output)
+// ListKnowledgeGaps 返回一页指定处理状态的待补知识。
+func (b *Backend) ListKnowledgeGaps(ctx context.Context, meta appservice.RequestMeta, input appservice.KnowledgeGapListInput) (appservice.KnowledgeGapList, error) {
+	var output appservice.KnowledgeGapList
+	err := b.do(ctx, meta, http.MethodGet, "/knowledge-gaps", encodeKnowledgeGapListInputQuery(input), nil, &output)
 	b.normalizeOutput(&output)
 	return output, err
+}
+
+// GetKnowledgeGap 返回待补知识详情。
+func (b *Backend) GetKnowledgeGap(ctx context.Context, meta appservice.RequestMeta, gapID string) (appservice.KnowledgeGap, error) {
+	var output appservice.KnowledgeGap
+	err := b.do(ctx, meta, http.MethodGet, "/knowledge-gaps/"+url.PathEscape(gapID), nil, nil, &output)
+	b.normalizeOutput(&output)
+	return output, err
+}
+
+// AcceptKnowledgeGap 把待补知识整理的问答加入知识库。
+func (b *Backend) AcceptKnowledgeGap(ctx context.Context, meta appservice.RequestMeta, gapID string, input appservice.KnowledgeGapAcceptInput) error {
+	return b.do(ctx, meta, http.MethodPost, "/knowledge-gaps/"+url.PathEscape(gapID)+"/accept", nil, input, nil)
+}
+
+// DismissKnowledgeGap 忽略待补知识。
+func (b *Backend) DismissKnowledgeGap(ctx context.Context, meta appservice.RequestMeta, gapID string) error {
+	return b.do(ctx, meta, http.MethodPost, "/knowledge-gaps/"+url.PathEscape(gapID)+"/dismiss", nil, nil, nil)
 }
 
 // RegisterDevice 注册当前用户的本机设备。
@@ -1478,16 +1496,6 @@ func (b *Backend) ListDevices(ctx context.Context, meta appservice.RequestMeta) 
 // RevokeDevice 撤销当前用户的设备。
 func (b *Backend) RevokeDevice(ctx context.Context, meta appservice.RequestMeta, deviceID string) error {
 	return b.do(ctx, meta, http.MethodDelete, "/devices/"+url.PathEscape(deviceID), nil, nil, nil)
-}
-
-// encodeAIKnowledgeGapInputQuery 将 appservice.AIKnowledgeGapInput 编码为查询参数。
-func encodeAIKnowledgeGapInputQuery(input appservice.AIKnowledgeGapInput) url.Values {
-	query := url.Values{}
-	setPositiveQuery(query, "days", input.Days)
-	setQuery(query, "channelId", input.ChannelID)
-	setPositiveQuery(query, "page", input.Page)
-	setPositiveQuery(query, "pageSize", input.PageSize)
-	return query
 }
 
 // encodeAIPerformanceBreakdownInputQuery 将 appservice.AIPerformanceBreakdownInput 编码为查询参数。
@@ -1589,6 +1597,16 @@ func encodeKnowledgeDocumentSegmentInputQuery(input appservice.KnowledgeDocument
 	query := url.Values{}
 	setQuery(query, "segmentBatchId", input.SegmentBatchID)
 	setQuery(query, "anchorSegmentId", input.AnchorSegmentID)
+	setPositiveQuery(query, "page", input.Page)
+	setPositiveQuery(query, "pageSize", input.PageSize)
+	return query
+}
+
+// encodeKnowledgeGapListInputQuery 将 appservice.KnowledgeGapListInput 编码为查询参数。
+func encodeKnowledgeGapListInputQuery(input appservice.KnowledgeGapListInput) url.Values {
+	query := url.Values{}
+	setQuery(query, "channelId", input.ChannelID)
+	setQuery(query, "status", string(input.Status))
 	setPositiveQuery(query, "page", input.Page)
 	setPositiveQuery(query, "pageSize", input.PageSize)
 	return query

@@ -26,51 +26,57 @@ func NewSaveQAEntryAction(db *bun.DB, tasks servertask.TxEnqueuer) *SaveQAEntryA
 
 // Execute 在同一事务中保存问答归属和全部内容，空编号表示新增。
 func (a *SaveQAEntryAction) Execute(ctx context.Context, identity *servermodels.Identity, knowledgeBaseID, entryID string, input QAInput) (*QARecord, error) {
+	var output *QARecord
+	err := a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
+		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
+			return err
+		}
+		var err error
+		output, err = a.ExecuteInTx(ctx, tx, identity, knowledgeBaseID, entryID, input)
+		return err
+	})
+	return output, err
+}
+
+// ExecuteInTx 在调用方已锁定活跃用户的事务中保存问答归属和全部内容，空编号表示新增。
+func (a *SaveQAEntryAction) ExecuteInTx(ctx context.Context, tx bun.Tx, identity *servermodels.Identity, knowledgeBaseID, entryID string, input QAInput) (*QARecord, error) {
 	input, err := normalizeQAInput(input)
 	if err != nil {
 		return nil, err
 	}
-	var output *QARecord
-	err = a.db.RunInTx(ctx, nil, func(ctx context.Context, tx bun.Tx) error {
-		if err := identityaction.LockActiveUser(ctx, tx, identity); err != nil {
-			return err
+	base, err := lockKnowledgeBase(ctx, tx, identity.Organization.ID, knowledgeBaseID)
+	if err != nil {
+		return nil, err
+	}
+	if err := validateQAKnowledgeBase(base); err != nil {
+		return nil, err
+	}
+	var entry *servermodels.KnowledgeQAEntry
+	if entryID == "" {
+		entry = &servermodels.KnowledgeQAEntry{KnowledgeBaseID: knowledgeBaseID, CreatedByUserID: identity.User.ID}
+		if _, err := tx.NewInsert().Model(entry).Column("knowledge_base_id", "created_by_user_id").Returning("*").Exec(ctx); err != nil {
+			return nil, err
 		}
-		base, err := lockKnowledgeBase(ctx, tx, identity.Organization.ID, knowledgeBaseID)
+	} else {
+		entry, err = lockQAEntry(ctx, tx, knowledgeBaseID, entryID)
 		if err != nil {
-			return err
+			return nil, err
 		}
-		if err := validateQAKnowledgeBase(base); err != nil {
-			return err
+		if _, err := tx.NewUpdate().Model(entry).Set("updated_at = now()").WherePK().Returning("*").Exec(ctx); err != nil {
+			return nil, err
 		}
-		var entry *servermodels.KnowledgeQAEntry
-		if entryID == "" {
-			entry = &servermodels.KnowledgeQAEntry{KnowledgeBaseID: knowledgeBaseID, CreatedByUserID: identity.User.ID}
-			if _, err := tx.NewInsert().Model(entry).Column("knowledge_base_id", "created_by_user_id").Returning("*").Exec(ctx); err != nil {
-				return err
-			}
-		} else {
-			entry, err = lockQAEntry(ctx, tx, knowledgeBaseID, entryID)
-			if err != nil {
-				return err
-			}
-			if _, err := tx.NewUpdate().Model(entry).Set("updated_at = now()").WherePK().Returning("*").Exec(ctx); err != nil {
-				return err
-			}
+	}
+	changed, err := saveQAContents(ctx, tx, entry.ID, input)
+	if err != nil {
+		return nil, err
+	}
+	// 新建、主问题、相似问题或答案增删改，或索引尚未成功时投递新任务。
+	if entryID == "" || changed || entry.Status != domain.KnowledgeIndexSucceeded {
+		if err := a.processing.enqueue(ctx, tx, identity.Organization.ID, base, entry); err != nil {
+			return nil, err
 		}
-		changed, err := saveQAContents(ctx, tx, entry.ID, input)
-		if err != nil {
-			return err
-		}
-		// 新建、主问题、相似问题或答案增删改，或索引尚未成功时投递新任务。
-		if entryID == "" || changed || entry.Status != domain.KnowledgeIndexSucceeded {
-			if err := a.processing.enqueue(ctx, tx, identity.Organization.ID, base, entry); err != nil {
-				return err
-			}
-		}
-		output, err = loadQARecord(ctx, tx, entry)
-		return err
-	})
-	return output, err
+	}
+	return loadQARecord(ctx, tx, entry)
 }
 
 // saveQAContents 按内容编号更新文本和顺序，删除被移除的相似问题，并返回主问题、相似问题或答案是否增删改。

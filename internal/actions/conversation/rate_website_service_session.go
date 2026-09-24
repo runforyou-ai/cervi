@@ -14,10 +14,12 @@ import (
 	"uuid"
 
 	"github.com/runforyou-ai/cervi/internal/actions/chatstate"
+	"github.com/runforyou-ai/cervi/internal/actions/knowledgegap"
 	"github.com/runforyou-ai/cervi/internal/common"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/realtime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
+	servertask "github.com/runforyou-ai/cervi/internal/task/server"
 	"github.com/uptrace/bun"
 )
 
@@ -35,15 +37,16 @@ type WebsiteServiceSessionRatingInput struct {
 
 // RateWebsiteServiceSessionAction 保存网站访客对已关闭客服处理周期的评价。
 type RateWebsiteServiceSessionAction struct {
-	db *bun.DB
+	db       *bun.DB
+	enqueuer servertask.TxEnqueuer
 }
 
 // NewRateWebsiteServiceSessionAction 创建网站访客评价 Action。
-func NewRateWebsiteServiceSessionAction(db *bun.DB) *RateWebsiteServiceSessionAction {
-	return &RateWebsiteServiceSessionAction{db: db}
+func NewRateWebsiteServiceSessionAction(db *bun.DB, enqueuer servertask.TxEnqueuer) *RateWebsiteServiceSessionAction {
+	return &RateWebsiteServiceSessionAction{db: db, enqueuer: enqueuer}
 }
 
-// Execute 在会话锁内写入周期评价并追加仅成员可见的评价事件；每个周期只能评价一次，周期须处于关闭状态。
+// Execute 在会话锁内写入周期评价并追加仅成员可见的评价事件，AI 员工关闭的周期评价为未解决时登记待补知识；每个周期只能评价一次，周期须处于关闭状态。
 func (a *RateWebsiteServiceSessionAction) Execute(ctx context.Context, input WebsiteServiceSessionRatingInput) (VisitorRating, error) {
 	input.Comment = strings.TrimSpace(input.Comment)
 	fields := map[string]ValidationCode{}
@@ -92,10 +95,11 @@ func (a *RateWebsiteServiceSessionAction) Execute(ctx context.Context, input Web
 		if domain.ServiceSessionStatus(session.Status) != domain.ServiceSessionStatusClosed || session.RatedAt != nil {
 			return &ConflictError{Reason: ConflictReasonServiceSessionNotRateable}
 		}
+		ratedAt := time.Now().UTC()
 		if _, err := tx.NewUpdate().Model(session).
 			Set("rating_resolved = ?", input.Resolved).
 			Set("rating_comment = ?", input.Comment).
-			Set("rated_at = ?", time.Now().UTC()).
+			Set("rated_at = ?", ratedAt).
 			Set("updated_at = now()").
 			WherePK().
 			Where("organization_id = ?", channel.OrganizationID).
@@ -107,12 +111,16 @@ func (a *RateWebsiteServiceSessionAction) Execute(ctx context.Context, input Web
 			return fmt.Errorf("encode service session rated event: %w", err)
 		}
 		typeName := string(domain.ConversationSystemEventServiceSessionRated)
+		eventID := uuid.NewV7().String()
 		if _, _, err := chatstate.AppendMessage(ctx, tx, conversation, &servermodels.Message{
-			ID: uuid.NewV7().String(), OrganizationID: session.OrganizationID, ConversationID: session.ConversationID,
+			ID: eventID, OrganizationID: session.OrganizationID, ConversationID: session.ConversationID,
 			ServiceSessionID: &session.ID, Type: string(domain.MessageTypeSystem), Visibility: string(domain.MessageVisibilityInternalOnly),
 			SystemEventType: &typeName, SystemEventPayload: payload, OriginatedAt: time.Now().UTC(),
 		}); err != nil {
 			return fmt.Errorf("append service session rated event: %w", err)
+		}
+		if !input.Resolved {
+			return knowledgegap.RecordAIReview(ctx, tx, a.enqueuer, session, domain.KnowledgeGapSourceRatedUnresolved, eventID, ratedAt)
 		}
 		return nil
 	})

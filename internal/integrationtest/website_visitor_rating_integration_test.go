@@ -21,7 +21,7 @@ func TestWebsiteVisitorEventsAndRating(t *testing.T) {
 	const visitor = "web-session:0123456789abcdef0123456789abcdef"
 	coordinator := agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil)
 	closeSession := conversationaction.NewCloseServiceSessionAction(f.db, coordinator, newTestTasks(f.db))
-	rate := conversationaction.NewRateWebsiteServiceSessionAction(f.db)
+	rate := conversationaction.NewRateWebsiteServiceSessionAction(f.db, newTestTasks(f.db))
 	listVisitor := func() conversationaction.MessageHistory {
 		t.Helper()
 		history, err := conversationaction.NewListWebsiteMessagesQuery(f.db).Execute(ctx, conversationaction.MessageHistoryInput{ChannelID: f.channelID, ExternalID: visitor, ConversationID: f.conversationID})

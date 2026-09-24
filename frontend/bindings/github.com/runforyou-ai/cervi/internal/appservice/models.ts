@@ -10,37 +10,6 @@ export interface AIHandoffReasonCount {
 }
 
 /**
- * AIKnowledgeGap 定义一次因知识不足或缺少依据的转人工；EventID 为转人工事件编号，MessageID 为客户提问消息编号，客户没有文本提问时为空。
- */
-export interface AIKnowledgeGap {
-    "eventId": string;
-    "conversationId": string;
-    "messageId": string;
-    "question": string;
-    "reason": AgentHandoffReason;
-    "categoryName": string;
-    "occurredAt": string;
-}
-
-/**
- * AIKnowledgeGapInput 定义知识缺口清单的统计范围与分页。
- */
-export interface AIKnowledgeGapInput {
-    "days": number;
-    "channelId": string;
-    "page": number;
-    "pageSize": number;
-}
-
-/**
- * AIKnowledgeGapList 定义一页知识缺口，按转人工时间倒序排列。
- */
-export interface AIKnowledgeGapList {
-    "gaps": AIKnowledgeGap[] | null;
-    "page": PageInfo;
-}
-
-/**
  * AIModelInputModality 表示模型支持的输入模态。
  */
 export enum AIModelInputModality {
@@ -122,7 +91,7 @@ export enum AIPerformanceDimension {
 };
 
 /**
- * AIPerformanceReport 定义 AI 表现报表概览：整体计数、转人工原因分布与知识缺口总数。
+ * AIPerformanceReport 定义 AI 表现报表概览：整体计数、转人工原因分布，以及所选渠道下全部待处理的待补知识条数，该条数不受统计天数限制。
  */
 export interface AIPerformanceReport {
     "summary": AIPerformanceSummary;
@@ -2727,6 +2696,146 @@ export enum KnowledgeDocumentSourceKind {
     KnowledgeDocumentSourceText = "text",
     KnowledgeDocumentSourceWeb = "web",
 };
+
+/**
+ * KnowledgeGap 定义待补知识详情：Question 为客户提问原文，DraftStatus 为草稿状态，Draft 只在已起草时给出；DefaultKnowledgeBaseID 为接待 AI 员工绑定的问答知识库，KnowledgeBaseID 与 QAEntryID 为加入的知识库与问答。
+ */
+export interface KnowledgeGap {
+    "id": string;
+    "conversationId": string;
+    "questionMessageId": string;
+    "question": string;
+    "source": KnowledgeGapSource;
+    "status": KnowledgeGapStatus;
+    "categoryName": string;
+    "occurredAt": string;
+    "draftStatus": KnowledgeGapDraftStatus;
+    "draft": KnowledgeGapDraft | null;
+    "defaultKnowledgeBaseId": string;
+    "knowledgeBaseId": string;
+    "qaEntryId": string;
+    "messages": KnowledgeGapMessage[] | null;
+}
+
+/**
+ * KnowledgeGapAcceptInput 定义加入知识库的问答：EntryID 为空时新建问答，否则更新该问答。
+ */
+export interface KnowledgeGapAcceptInput {
+    "knowledgeBaseId": string;
+    "entryId": string;
+    "entry": KnowledgeQAInput;
+}
+
+/**
+ * KnowledgeGapDraft 定义 AI 起草的问答；真人客服没有实质答复时 Answer 为空。
+ */
+export interface KnowledgeGapDraft {
+    "question": string;
+    "similarQuestions": string[] | null;
+    "answer": string;
+}
+
+/**
+ * KnowledgeGapDraftStatus 定义待补知识问答草稿的状态。
+ */
+export enum KnowledgeGapDraftStatus {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    KnowledgeGapDraftStatusPending = "pending",
+    KnowledgeGapDraftStatusReady = "ready",
+    KnowledgeGapDraftStatusFailed = "failed",
+    KnowledgeGapDraftStatusUnavailable = "unavailable",
+};
+
+/**
+ * KnowledgeGapList 定义一页待补知识，按来源发生时间倒序排列。
+ */
+export interface KnowledgeGapList {
+    "gaps": KnowledgeGapSummary[] | null;
+    "page": PageInfo;
+}
+
+/**
+ * KnowledgeGapListInput 定义待补知识清单的渠道、处理状态与分页，ChannelID 为空表示全部渠道。
+ */
+export interface KnowledgeGapListInput {
+    "channelId": string;
+    "status": KnowledgeGapStatus;
+    "page": number;
+    "pageSize": number;
+}
+
+/**
+ * KnowledgeGapMessage 定义待补知识来源周期中的一条对客消息，客户的 SenderName 为空。
+ */
+export interface KnowledgeGapMessage {
+    "id": string;
+    "sender": KnowledgeGapMessageSender;
+    "senderName": string;
+    "body": string;
+    "createdAt": string;
+}
+
+/**
+ * KnowledgeGapMessageSender 定义待补知识沟通记录中的发送方。
+ */
+export enum KnowledgeGapMessageSender {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    KnowledgeGapMessageSenderCustomer = "customer",
+    KnowledgeGapMessageSenderAI = "ai",
+    KnowledgeGapMessageSenderStaff = "staff",
+};
+
+/**
+ * KnowledgeGapSource 定义待补知识的来源。
+ */
+export enum KnowledgeGapSource {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    KnowledgeGapSourceKnowledgeGap = "knowledge_gap",
+    KnowledgeGapSourceInsufficientEvidence = "insufficient_evidence",
+    KnowledgeGapSourceRatedUnresolved = "rated_unresolved",
+    KnowledgeGapSourcePossiblyWrong = "possibly_wrong",
+};
+
+/**
+ * KnowledgeGapStatus 定义待补知识的处理状态。
+ */
+export enum KnowledgeGapStatus {
+    /**
+     * The Go zero value for the underlying type of the enum.
+     */
+    $zero = "",
+
+    KnowledgeGapStatusPending = "pending",
+    KnowledgeGapStatusAccepted = "accepted",
+    KnowledgeGapStatusDismissed = "dismissed",
+};
+
+/**
+ * KnowledgeGapSummary 定义清单中的一条待补知识；Question 优先取 AI 起草的问题，其次为客户提问原文，HasDraft 表示 AI 已起草问答。
+ */
+export interface KnowledgeGapSummary {
+    "id": string;
+    "conversationId": string;
+    "questionMessageId": string;
+    "question": string;
+    "source": KnowledgeGapSource;
+    "status": KnowledgeGapStatus;
+    "categoryName": string;
+    "hasDraft": boolean;
+    "occurredAt": string;
+}
 
 /**
  * KnowledgeIndexProcessingStatus 定义知识来源索引流程的执行状态。

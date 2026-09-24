@@ -1900,14 +1900,42 @@ func (b *DirectBackend) ListAIPerformanceBreakdowns(ctx context.Context, meta Re
 	return b.ops.ListAIPerformanceBreakdowns(ctx, meta, identity, input)
 }
 
-// ListAIKnowledgeGaps 返回一页因知识不足或缺少依据的转人工。
-func (b *DirectBackend) ListAIKnowledgeGaps(ctx context.Context, meta RequestMeta, input AIKnowledgeGapInput) (AIKnowledgeGapList, error) {
+// ListKnowledgeGaps 返回一页指定处理状态的待补知识。
+func (b *DirectBackend) ListKnowledgeGaps(ctx context.Context, meta RequestMeta, input KnowledgeGapListInput) (KnowledgeGapList, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
 	if err != nil {
-		var zero AIKnowledgeGapList
+		var zero KnowledgeGapList
 		return zero, err
 	}
-	return b.ops.ListAIKnowledgeGaps(ctx, meta, identity, input)
+	return b.ops.ListKnowledgeGaps(ctx, meta, identity, input)
+}
+
+// GetKnowledgeGap 返回待补知识详情。
+func (b *DirectBackend) GetKnowledgeGap(ctx context.Context, meta RequestMeta, gapID string) (KnowledgeGap, error) {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		var zero KnowledgeGap
+		return zero, err
+	}
+	return b.ops.GetKnowledgeGap(ctx, meta, identity, gapID)
+}
+
+// AcceptKnowledgeGap 把待补知识整理的问答加入知识库。
+func (b *DirectBackend) AcceptKnowledgeGap(ctx context.Context, meta RequestMeta, gapID string, input KnowledgeGapAcceptInput) error {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		return err
+	}
+	return b.ops.AcceptKnowledgeGap(ctx, meta, identity, gapID, input)
+}
+
+// DismissKnowledgeGap 忽略待补知识。
+func (b *DirectBackend) DismissKnowledgeGap(ctx context.Context, meta RequestMeta, gapID string) error {
+	identity, err := b.ops.authenticate(ctx, meta)
+	if err != nil {
+		return err
+	}
+	return b.ops.DismissKnowledgeGap(ctx, meta, identity, gapID)
 }
 
 // RegisterDevice 注册当前用户的本机设备。

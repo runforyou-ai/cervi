@@ -1,8 +1,14 @@
-/** AI 表现报表页：共用的结束时间与渠道筛选，概览、待补知识、按渠道与按咨询分类四个与地址同步的页签。 */
+/** AI 表现报表页：概览、待补知识、按渠道与按咨询分类四个与地址同步的页签，共用渠道筛选；报表页签按结束时间筛选，待补知识按处理状态筛选，处理中的条目编号保存在地址中。 */
 import { useTranslation } from "react-i18next"
 import { useSearchParams } from "react-router"
 
-import { AIPerformanceDimension, getAIPerformanceReport, listInboxChannels } from "@/api"
+import {
+  AIPerformanceDimension,
+  getAIPerformanceReport,
+  KnowledgeGapStatus,
+  listInboxChannels,
+  type KnowledgeGapStatusId,
+} from "@/api"
 import { ListToolbar, ListToolbarFilter } from "@/components/list-toolbar"
 import { PageContent } from "@/components/page-content"
 import { PageHeader } from "@/components/page-header"
@@ -22,11 +28,20 @@ const reportTabs = ["overview", "knowledgeGaps", "channels", "categories"] as co
 
 type ReportTab = (typeof reportTabs)[number]
 
+/** 待补知识的处理状态筛选，第一个为默认值。 */
+const gapStatuses: KnowledgeGapStatusId[] = [
+  KnowledgeGapStatus.KnowledgeGapStatusPending,
+  KnowledgeGapStatus.KnowledgeGapStatusAccepted,
+  KnowledgeGapStatus.KnowledgeGapStatusDismissed,
+]
+
 /** 地址参数的默认值，等于默认值时从地址中移除。 */
 const parameterDefaults: Record<string, string> = {
   tab: reportTabs[0],
   days: String(periodOptions[0]),
   channel: "",
+  status: gapStatuses[0],
+  gap: "",
   page: "1",
 }
 
@@ -42,6 +57,8 @@ export function AIPerformancePage() {
   const tabs = reportTabs.filter((value) => !(channelId && value === "channels"))
   const tab = tabs.find((value) => value === searchParams.get("tab")) ?? tabs[0]
   const page = Math.max(1, Number(searchParams.get("page")) || 1)
+  const status = gapStatuses.find((value) => value === searchParams.get("status")) ?? gapStatuses[0]
+  const gapId = searchParams.get("gap") ?? ""
 
   const channels = useResource(resourceKeys.inboxChannels(), () => listInboxChannels(), {
     staleTime: 0,
@@ -52,12 +69,20 @@ export function AIPerformancePage() {
     { keepPreviousData: true, enabled: tab === "overview" },
   )
 
-  /** 更新地址参数；未给出页码时回到第一页。 */
-  function setParameters(changes: { tab?: ReportTab; days?: string; channel?: string; page?: number }) {
+  /** 更新地址参数；未给出页码时回到第一页，筛选变化时关闭处理中的条目。 */
+  function setParameters(changes: {
+    tab?: ReportTab
+    days?: string
+    channel?: string
+    status?: string
+    gap?: string
+    page?: number
+  }) {
     setSearchParams(
       (current) => {
         const next = new URLSearchParams(current)
         if (changes.page === undefined) next.delete("page")
+        if (changes.gap === undefined) next.delete("gap")
         for (const [name, value] of Object.entries(changes)) {
           const text = String(value)
           if (text === parameterDefaults[name]) next.delete(name)
@@ -93,15 +118,18 @@ export function AIPerformancePage() {
       </div>
 
       <ListToolbar>
-        <ListToolbarFilter
-          label={t("performance.period")}
-          value={String(days)}
-          options={periodOptions.map((option) => ({
-            value: String(option),
-            label: t("performance.periodDays", { count: option }),
-          }))}
-          onValueChange={(value) => setParameters({ days: value })}
-        />
+        {/* 待补知识是待办队列，不按结束时间筛选。 */}
+        {tab === "knowledgeGaps" ? null : (
+          <ListToolbarFilter
+            label={t("performance.period")}
+            value={String(days)}
+            options={periodOptions.map((option) => ({
+              value: String(option),
+              label: t("performance.periodDays", { count: option }),
+            }))}
+            onValueChange={(value) => setParameters({ days: value })}
+          />
+        )}
         <ListToolbarFilter
           label={t("performance.channel")}
           allLabel={t("performance.allChannels")}
@@ -112,6 +140,17 @@ export function AIPerformancePage() {
           }))}
           onValueChange={(value) => setParameters({ channel: value })}
         />
+        {tab === "knowledgeGaps" ? (
+          <ListToolbarFilter
+            label={t("performance.gapStatus")}
+            value={status}
+            options={gapStatuses.map((value) => ({
+              value,
+              label: t(`performance.gapStatuses.${value}`),
+            }))}
+            onValueChange={(value) => setParameters({ status: value })}
+          />
+        ) : null}
       </ListToolbar>
 
       {tab === "overview" ? (
@@ -120,13 +159,22 @@ export function AIPerformancePage() {
             {report.data ? (
               <AIPerformanceOverview
                 report={report.data}
-                onOpenKnowledgeGaps={() => setParameters({ tab: "knowledgeGaps" })}
+                onOpenKnowledgeGaps={() =>
+                  setParameters({ tab: "knowledgeGaps", status: gapStatuses[0] })
+                }
               />
             ) : null}
           </ResourceContent>
         </PageContent>
       ) : tab === "knowledgeGaps" ? (
-        <AIKnowledgeGapList {...listProps} />
+        <AIKnowledgeGapList
+          channelId={channelId}
+          page={page}
+          onPageChange={listProps.onPageChange}
+          status={status}
+          gapId={gapId}
+          onGapChange={(value) => setParameters({ gap: value, page })}
+        />
       ) : (
         <AIPerformanceBreakdownList
           key={tab}

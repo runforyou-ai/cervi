@@ -17,6 +17,13 @@ import { Call as $Call, CancellablePromise as $CancellablePromise } from "@wails
 import * as $models from "./models.js";
 
 /**
+ * AcceptKnowledgeGap 把待补知识整理的问答加入知识库。
+ */
+export function AcceptKnowledgeGap(meta: $models.RequestMeta, gapID: string, input: $models.KnowledgeGapAcceptInput): $CancellablePromise<void> {
+    return $Call.ByID(3432414194, meta, gapID, input);
+}
+
+/**
  * ActivateMessageChannel 启用消息渠道。
  */
 export function ActivateMessageChannel(meta: $models.RequestMeta, channelID: string): $CancellablePromise<$models.MessageChannelSummary> {
@@ -353,6 +360,13 @@ export function DiscoverAIProviderModels(meta: $models.RequestMeta, input: $mode
 }
 
 /**
+ * DismissKnowledgeGap 忽略待补知识。
+ */
+export function DismissKnowledgeGap(meta: $models.RequestMeta, gapID: string): $CancellablePromise<void> {
+    return $Call.ByID(877794558, meta, gapID);
+}
+
+/**
  * DissolveGroupConversation 解散群聊并保留当前成员的只读历史。
  */
 export function DissolveGroupConversation(meta: $models.RequestMeta, conversationID: string): $CancellablePromise<$models.GroupConversation> {
@@ -514,6 +528,13 @@ export function GetKnowledgeDocumentPreview(meta: $models.RequestMeta, knowledge
 }
 
 /**
+ * GetKnowledgeGap 返回待补知识详情。
+ */
+export function GetKnowledgeGap(meta: $models.RequestMeta, gapID: string): $CancellablePromise<$models.KnowledgeGap> {
+    return $Call.ByID(455973222, meta, gapID);
+}
+
+/**
  * GetKnowledgeQAEntry 返回完整的本地问答。
  */
 export function GetKnowledgeQAEntry(meta: $models.RequestMeta, knowledgeBaseID: string, entryID: string): $CancellablePromise<$models.KnowledgeQAEntry> {
@@ -609,13 +630,6 @@ export function InstallationStatus(meta: $models.RequestMeta): $CancellablePromi
  */
 export function LeaveGroupConversation(meta: $models.RequestMeta, conversationID: string): $CancellablePromise<void> {
     return $Call.ByID(43150167, meta, conversationID);
-}
-
-/**
- * ListAIKnowledgeGaps 返回一页因知识不足或缺少依据的转人工。
- */
-export function ListAIKnowledgeGaps(meta: $models.RequestMeta, input: $models.AIKnowledgeGapInput): $CancellablePromise<$models.AIKnowledgeGapList> {
-    return $Call.ByID(3230590365, meta, input);
 }
 
 /**
@@ -770,6 +784,13 @@ export function ListKnowledgeDocumentSegments(meta: $models.RequestMeta, knowled
  */
 export function ListKnowledgeDocuments(meta: $models.RequestMeta, knowledgeBaseID: string, input: $models.KnowledgeDocumentListInput): $CancellablePromise<$models.KnowledgeDocumentList> {
     return $Call.ByID(4195704972, meta, knowledgeBaseID, input);
+}
+
+/**
+ * ListKnowledgeGaps 返回一页指定处理状态的待补知识。
+ */
+export function ListKnowledgeGaps(meta: $models.RequestMeta, input: $models.KnowledgeGapListInput): $CancellablePromise<$models.KnowledgeGapList> {
+    return $Call.ByID(1789876127, meta, input);
 }
 
 /**

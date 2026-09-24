@@ -598,9 +598,18 @@ type Backend interface {
 	// ListAIPerformanceBreakdowns 返回按渠道或咨询分类拆分的一页 AI 客服表现。
 	//cervi:route GET /reports/ai-performance/breakdowns
 	ListAIPerformanceBreakdowns(context.Context, RequestMeta, AIPerformanceBreakdownInput) (AIPerformanceBreakdownList, error)
-	// ListAIKnowledgeGaps 返回一页因知识不足或缺少依据的转人工。
-	//cervi:route GET /reports/ai-performance/knowledge-gaps
-	ListAIKnowledgeGaps(context.Context, RequestMeta, AIKnowledgeGapInput) (AIKnowledgeGapList, error)
+	// ListKnowledgeGaps 返回一页指定处理状态的待补知识。
+	//cervi:route GET /knowledge-gaps
+	ListKnowledgeGaps(context.Context, RequestMeta, KnowledgeGapListInput) (KnowledgeGapList, error)
+	// GetKnowledgeGap 返回待补知识详情。
+	//cervi:route GET /knowledge-gaps/:gapID
+	GetKnowledgeGap(context.Context, RequestMeta, string) (KnowledgeGap, error)
+	// AcceptKnowledgeGap 把待补知识整理的问答加入知识库。
+	//cervi:route POST /knowledge-gaps/:gapID/accept
+	AcceptKnowledgeGap(context.Context, RequestMeta, string, KnowledgeGapAcceptInput) error
+	// DismissKnowledgeGap 忽略待补知识。
+	//cervi:route POST /knowledge-gaps/:gapID/dismiss
+	DismissKnowledgeGap(context.Context, RequestMeta, string) error
 
 	// RegisterDevice 注册当前用户的本机设备。
 	//cervi:route POST /devices

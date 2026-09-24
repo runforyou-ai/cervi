@@ -19,7 +19,6 @@ import (
 type aiPerformanceOps struct {
 	aiPerformanceOverview   *aiperformanceaction.OverviewQuery
 	aiPerformanceBreakdowns *aiperformanceaction.BreakdownQuery
-	aiKnowledgeGaps         *aiperformanceaction.KnowledgeGapsQuery
 }
 
 // newAIPerformanceOps 创建 AI 表现报表的业务实现依赖。
@@ -27,7 +26,6 @@ func newAIPerformanceOps(db *bun.DB) aiPerformanceOps {
 	return aiPerformanceOps{
 		aiPerformanceOverview:   aiperformanceaction.NewOverviewQuery(db),
 		aiPerformanceBreakdowns: aiperformanceaction.NewBreakdownQuery(db),
-		aiKnowledgeGaps:         aiperformanceaction.NewKnowledgeGapsQuery(db),
 	}
 }
 
@@ -68,27 +66,6 @@ func (o *directOperations) ListAIPerformanceBreakdowns(ctx context.Context, meta
 		rows = append(rows, AIPerformanceBreakdown{ID: common.StringValue(row.ID), Name: row.Name, Closed: row.Closed, Resolved: row.Resolved, AIResolved: row.AIResolved})
 	}
 	return AIPerformanceBreakdownList{Rows: rows, Page: PageInfo{Number: list.Page, Size: list.PageSize, Total: list.Total}}, nil
-}
-
-// ListAIKnowledgeGaps 返回一页因知识不足或缺少依据的转人工。
-func (o *directOperations) ListAIKnowledgeGaps(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, input AIKnowledgeGapInput) (AIKnowledgeGapList, error) {
-	if input.ChannelID != "" && !common.ValidUUID(input.ChannelID) {
-		return AIKnowledgeGapList{}, NotFoundError(meta, cervii18n.ErrorChannelNotFound)
-	}
-	list, err := o.aiKnowledgeGaps.Execute(ctx, identity, aiperformanceaction.KnowledgeGapInput{
-		Input: aiperformanceaction.Input{Days: input.Days, ChannelID: input.ChannelID}, Page: input.Page, PageSize: input.PageSize,
-	})
-	if err != nil {
-		return AIKnowledgeGapList{}, aiPerformanceError(meta, err, identity.Organization.ID)
-	}
-	gaps := make([]AIKnowledgeGap, 0, len(list.Gaps))
-	for _, gap := range list.Gaps {
-		gaps = append(gaps, AIKnowledgeGap{
-			EventID: gap.EventID, ConversationID: gap.ConversationID, MessageID: common.StringValue(gap.MessageID), Question: gap.Question,
-			Reason: AgentHandoffReason(gap.Reason), CategoryName: common.StringValue(gap.CategoryName), OccurredAt: gap.OccurredAt,
-		})
-	}
-	return AIKnowledgeGapList{Gaps: gaps, Page: PageInfo{Number: list.Page, Size: list.PageSize, Total: list.Total}}, nil
 }
 
 // aiPerformanceError 把报表查询错误转换为结构化、本地化错误。
