@@ -12,6 +12,7 @@ import (
 	channelaction "github.com/runforyou-ai/cervi/internal/actions/channel"
 	conversationaction "github.com/runforyou-ai/cervi/internal/actions/conversation"
 	deliveryaction "github.com/runforyou-ai/cervi/internal/actions/customerdelivery"
+	"github.com/runforyou-ai/cervi/internal/actions/knowledgegap"
 	"github.com/runforyou-ai/cervi/internal/domain"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	servermodels "github.com/runforyou-ai/cervi/internal/storage/server/models"
@@ -19,7 +20,7 @@ import (
 	"uuid"
 )
 
-// testAIPerformanceReport 验证 AI 表现报表按小结的是否解决统计解决情况，只把 AI 员工关闭且无真人参与的已解决周期计入独立解决，排除无实质诉求的周期，并按已关闭周期统计转人工原因与知识缺口。
+// testAIPerformanceReport 验证 AI 表现报表按小结的是否解决统计解决情况，只把 AI 员工关闭且无真人参与的已解决周期计入独立解决，排除无实质诉求的周期，按已关闭周期统计转人工原因，并统计待处理的待补知识。
 func testAIPerformanceReport(t *testing.T, db *bun.DB, identity *servermodels.Identity, providerID, modelID string) {
 	ctx := context.Background()
 	tasks := newTestTasks(db)
@@ -62,6 +63,10 @@ func testAIPerformanceReport(t *testing.T, db *bun.DB, identity *servermodels.Id
 	handoffRun := f.executeQueuedRun(t, handedOff.Conversation.ID, handoffRuntime("资料里没有海外仓时效", nil))
 	unresolved := false
 	closeSession(handoffRun.ScopeID, domain.ServiceSessionCloseAIResolved, &unresolved, &unresolved)
+	handoffSession := loadSession(t, db, handoffRun.ScopeID)
+	if err := knowledgegap.RecordClosed(ctx, db, tasks, &handoffSession); err != nil {
+		t.Fatal(err)
+	}
 
 	// 无实质诉求的周期不计入报表。
 	greetingInput := visitorInput(channelID, "")
@@ -96,16 +101,6 @@ func testAIPerformanceReport(t *testing.T, db *bun.DB, identity *servermodels.Id
 	if err != nil || categories.Total != 1 || len(categories.Rows) != 1 || categories.Rows[0].ID != nil || categories.Rows[0].Closed != 2 {
 		t.Fatalf("categories = %+v, error = %v", categories, err)
 	}
-	gapsQuery := aiperformanceaction.NewKnowledgeGapsQuery(db)
-	gaps, err := gapsQuery.Execute(ctx, identity, aiperformanceaction.KnowledgeGapInput{Input: scope})
-	if err != nil || gaps.Total != 1 || len(gaps.Gaps) != 1 || gaps.Gaps[0].Question != "海外仓发货要几天" ||
-		gaps.Gaps[0].MessageID == nil || gaps.Gaps[0].ConversationID != handedOff.Conversation.ID {
-		t.Fatalf("knowledge gaps = %+v, error = %v", gaps, err)
-	}
-	if gaps, err = gapsQuery.Execute(ctx, identity, aiperformanceaction.KnowledgeGapInput{Input: scope, Page: 2, PageSize: 1}); err != nil || gaps.Total != 1 || len(gaps.Gaps) != 0 {
-		t.Fatalf("knowledge gaps page 2 = %+v, error = %v", gaps, err)
-	}
-
 	// 停用 AI 员工把其负责的周期退回队列，记为 AI 员工不可用的转人工。
 	retired := f.newAgent(t, "表现报表停用客服")
 	retiredChannelID := f.newChannel(t, retired.IdentityID, channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue})

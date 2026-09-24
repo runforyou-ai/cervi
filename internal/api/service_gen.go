@@ -205,7 +205,10 @@ func (s *Service) registerGeneratedRoutes(router *gin.Engine) {
 	router.DELETE("/settings/customer-service/categories/:categoryID", s.deleteServiceCategory)
 	router.GET("/reports/ai-performance", s.getAIPerformanceReport)
 	router.GET("/reports/ai-performance/breakdowns", s.listAIPerformanceBreakdowns)
-	router.GET("/reports/ai-performance/knowledge-gaps", s.listAIKnowledgeGaps)
+	router.GET("/knowledge-gaps", s.listKnowledgeGaps)
+	router.GET("/knowledge-gaps/:gapID", s.getKnowledgeGap)
+	router.POST("/knowledge-gaps/:gapID/accept", s.acceptKnowledgeGap)
+	router.POST("/knowledge-gaps/:gapID/dismiss", s.dismissKnowledgeGap)
 	router.POST("/devices", s.registerDevice)
 	router.GET("/devices", s.listDevices)
 	router.DELETE("/devices/:deviceID", s.revokeDevice)
@@ -1745,14 +1748,34 @@ func (s *Service) listAIPerformanceBreakdowns(c *gin.Context) {
 	writeResult(c, http.StatusOK, output, err)
 }
 
-// listAIKnowledgeGaps 返回一页因知识不足或缺少依据的转人工。
-func (s *Service) listAIKnowledgeGaps(c *gin.Context) {
-	input, ok := bindAIKnowledgeGapInputQuery(c)
+// listKnowledgeGaps 返回一页指定处理状态的待补知识。
+func (s *Service) listKnowledgeGaps(c *gin.Context) {
+	input, ok := bindKnowledgeGapListInputQuery(c)
 	if !ok {
 		return
 	}
-	output, err := s.application.ListAIKnowledgeGaps(c.Request.Context(), requestMeta(c), input)
+	output, err := s.application.ListKnowledgeGaps(c.Request.Context(), requestMeta(c), input)
 	writeResult(c, http.StatusOK, output, err)
+}
+
+// getKnowledgeGap 返回待补知识详情。
+func (s *Service) getKnowledgeGap(c *gin.Context) {
+	output, err := s.application.GetKnowledgeGap(c.Request.Context(), requestMeta(c), c.Param("gapID"))
+	writeResult(c, http.StatusOK, output, err)
+}
+
+// acceptKnowledgeGap 把待补知识整理的问答加入知识库。
+func (s *Service) acceptKnowledgeGap(c *gin.Context) {
+	var input appservice.KnowledgeGapAcceptInput
+	if !bindJSON(c, &input) {
+		return
+	}
+	writeEmpty(c, s.application.AcceptKnowledgeGap(c.Request.Context(), requestMeta(c), c.Param("gapID"), input))
+}
+
+// dismissKnowledgeGap 忽略待补知识。
+func (s *Service) dismissKnowledgeGap(c *gin.Context) {
+	writeEmpty(c, s.application.DismissKnowledgeGap(c.Request.Context(), requestMeta(c), c.Param("gapID")))
 }
 
 // registerDevice 注册当前用户的本机设备。
@@ -1774,28 +1797,6 @@ func (s *Service) listDevices(c *gin.Context) {
 // revokeDevice 撤销当前用户的设备。
 func (s *Service) revokeDevice(c *gin.Context) {
 	writeEmpty(c, s.application.RevokeDevice(c.Request.Context(), requestMeta(c), c.Param("deviceID")))
-}
-
-// bindAIKnowledgeGapInputQuery 从查询参数解析 appservice.AIKnowledgeGapInput。
-func bindAIKnowledgeGapInputQuery(c *gin.Context) (appservice.AIKnowledgeGapInput, bool) {
-	days, ok := positiveQueryInteger(c, "days", 30)
-	if !ok {
-		return appservice.AIKnowledgeGapInput{}, false
-	}
-	page, ok := positiveQueryInteger(c, "page", 1)
-	if !ok {
-		return appservice.AIKnowledgeGapInput{}, false
-	}
-	pageSize, ok := positiveQueryInteger(c, "pageSize", 50)
-	if !ok {
-		return appservice.AIKnowledgeGapInput{}, false
-	}
-	return appservice.AIKnowledgeGapInput{
-		Days:      days,
-		ChannelID: c.Query("channelId"),
-		Page:      page,
-		PageSize:  pageSize,
-	}, true
 }
 
 // bindAIPerformanceBreakdownInputQuery 从查询参数解析 appservice.AIPerformanceBreakdownInput。
@@ -1939,6 +1940,24 @@ func bindKnowledgeDocumentSegmentInputQuery(c *gin.Context) (appservice.Knowledg
 		AnchorSegmentID: c.Query("anchorSegmentId"),
 		Page:            page,
 		PageSize:        pageSize,
+	}, true
+}
+
+// bindKnowledgeGapListInputQuery 从查询参数解析 appservice.KnowledgeGapListInput。
+func bindKnowledgeGapListInputQuery(c *gin.Context) (appservice.KnowledgeGapListInput, bool) {
+	page, ok := positiveQueryInteger(c, "page", 1)
+	if !ok {
+		return appservice.KnowledgeGapListInput{}, false
+	}
+	pageSize, ok := positiveQueryInteger(c, "pageSize", 50)
+	if !ok {
+		return appservice.KnowledgeGapListInput{}, false
+	}
+	return appservice.KnowledgeGapListInput{
+		ChannelID: c.Query("channelId"),
+		Status:    appservice.KnowledgeGapStatus(c.Query("status")),
+		Page:      page,
+		PageSize:  pageSize,
 	}, true
 }
 

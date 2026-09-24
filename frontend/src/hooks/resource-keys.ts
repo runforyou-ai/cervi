@@ -146,8 +146,12 @@ export const resourceKeys = {
   aiPerformanceReport: (parameters?: KeyParameters) => listKey("ai-performance-report", parameters),
   /** AI 表现按维度拆分，参数包含统计天数、渠道、维度与分页。 */
   aiPerformanceBreakdowns: (parameters?: KeyParameters) => listKey("ai-performance-breakdowns", parameters),
-  /** 知识缺口清单，参数包含统计天数、渠道与分页。 */
-  aiKnowledgeGaps: (parameters?: KeyParameters) => listKey("ai-knowledge-gaps", parameters),
+  /** 待补知识清单，参数包含渠道、处理状态与分页。 */
+  knowledgeGaps: (parameters?: KeyParameters) => listKey("knowledge-gaps", parameters),
+  /** 单条待补知识详情。 */
+  knowledgeGap: (id?: string) => itemKey("knowledge-gap", id),
+  /** 待补知识的问题在指定知识库中召回的相似问答。 */
+  knowledgeGapSimilarQA: (gapId: string, knowledgeBaseId: string, query: string) => ["knowledge-gap-similar-qa", gapId, knowledgeBaseId, query],
   /** 当前客户端连接的企业服务器地址。 */
   serverURL: () => ["server-url"],
   /** 知识库列表。 */

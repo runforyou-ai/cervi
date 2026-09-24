@@ -1,19 +1,27 @@
 /** AI 表现报表的分页列表：按渠道或咨询分类拆分，以及待补知识清单。 */
 import { useTranslation } from "react-i18next"
 import { useNavigate } from "react-router"
+import { toast } from "sonner"
 
 import {
   AIPerformanceDimension,
-  listAIKnowledgeGaps,
+  dismissKnowledgeGap,
+  isApiError,
+  KnowledgeGapSource,
+  KnowledgeGapStatus,
   listAIPerformanceBreakdowns,
+  listKnowledgeGaps,
+  type KnowledgeGapStatusId,
 } from "@/api"
 import { ResourceListLayout } from "@/components/resource-list"
 import { ResourceTable } from "@/components/resource-table"
-import { handoffReasonKey } from "@/features/inbox/agent-process"
 import { useDateTime } from "@/hooks/use-date-time"
 import { resourceKeys } from "@/hooks/resource-keys"
-import { useResource } from "@/hooks/use-resource"
+import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
+import { apiErrorMessage } from "@/lib/form-errors"
+import { recoverSession } from "@/lib/session-navigation"
 
+import { AIKnowledgeGapSheet } from "./ai-knowledge-gap-sheet"
 import { useAIPerformanceFormat } from "./ai-performance-format"
 
 /** 报表列表共用的统计范围与分页。 */
@@ -85,61 +93,126 @@ export function AIPerformanceBreakdownList({
   )
 }
 
-/** 列出因知识不足或缺少依据的转人工，点击在收件箱定位客户提问。 */
-export function AIKnowledgeGapList({ days, channelId, page, onPageChange }: ReportListProps) {
-  const { t } = useTranslation(["agents", "inbox"])
+/** 列出指定处理状态的待补知识，点击行在侧栏中处理，处理完一条自动打开清单中的下一条。 */
+export function AIKnowledgeGapList({
+  channelId,
+  status,
+  page,
+  onPageChange,
+  gapId,
+  onGapChange,
+}: Omit<ReportListProps, "days"> & {
+  status: KnowledgeGapStatusId
+  gapId: string
+  onGapChange: (gapId: string) => void
+}) {
+  const { t } = useTranslation("agents")
   const navigate = useNavigate()
+  const invalidate = useResourceInvalidator()
   const { formatDateTime } = useDateTime()
-  const parameters = { days, channelId, page, pageSize }
+  const parameters = { channelId, status, page, pageSize }
   const list = useResource(
-    resourceKeys.aiKnowledgeGaps(parameters),
-    () => listAIKnowledgeGaps(parameters),
+    resourceKeys.knowledgeGaps(parameters),
+    () => listKnowledgeGaps(parameters),
     { keepPreviousData: true },
   )
+  const rows = list.data?.gaps ?? []
+  const pending = status === KnowledgeGapStatus.KnowledgeGapStatusPending
+
+  /** 忽略清单中的一条待补知识。 */
+  async function dismiss(id: string) {
+    try {
+      await dismissKnowledgeGap(id)
+      await Promise.all([
+        invalidate(resourceKeys.knowledgeGaps()),
+        invalidate(resourceKeys.knowledgeGap(id)),
+        invalidate(resourceKeys.aiPerformanceReport()),
+      ])
+    } catch (error) {
+      if (recoverSession(error, navigate)) return
+      console.warn("忽略待补知识失败", error)
+      toast.error(isApiError(error) ? apiErrorMessage(error) : t("performance.gapSheet.dismissError"))
+    }
+  }
 
   return (
-    <ResourceListLayout
-      resources={list}
-      errorMessage={t("performance.loadError")}
-      page={list.data?.page}
-      onPageChange={onPageChange}
-    >
-      <ResourceTable
-        hideHeader
-        columns={[
-          {
-            key: "question",
-            header: t("performance.gapQuestion"),
-            cellClassName: "w-full max-w-0",
-            cell: (gap) => (
-              <div className="min-w-0">
-                <p className="truncate">{gap.question || t("performance.noQuestion")}</p>
-                <p className="truncate text-xs text-muted-foreground">
-                  {[
-                    gap.categoryName || t("performance.uncategorized"),
-                    t(`inbox:${handoffReasonKey(gap.reason)}`),
-                  ].join(" · ")}
-                </p>
-              </div>
-            ),
-          },
-          {
-            key: "time",
-            header: t("performance.gapTime"),
-            cellClassName: "whitespace-nowrap text-muted-foreground",
-            cell: (gap) => t("performance.handedOffAt", { time: formatDateTime(gap.occurredAt) }),
-          },
-        ]}
-        rows={list.data?.gaps ?? []}
-        rowKey={(gap) => gap.eventId}
-        empty={t("performance.noGaps")}
-        onRowActivate={(gap) => {
-          // 在收件箱打开该会话并定位到客户提问。
-          const params = new URLSearchParams({ conversation: gap.conversationId })
-          if (gap.messageId) params.set("message", gap.messageId)
-          navigate(`/inbox?${params.toString()}`)
+    <>
+      <ResourceListLayout
+        resources={list}
+        errorMessage={t("performance.loadError")}
+        page={list.data?.page}
+        onPageChange={onPageChange}
+      >
+        <ResourceTable
+          hideHeader
+          columns={[
+            {
+              key: "question",
+              header: t("performance.gapQuestion"),
+              cellClassName: "w-full max-w-0",
+              cell: (gap) => (
+                <div className="min-w-0">
+                  <p className="truncate">{gap.question || t("performance.noQuestion")}</p>
+                  <p className="truncate text-xs text-muted-foreground">
+                    {[
+                      gap.categoryName || t("performance.uncategorized"),
+                      t(`performance.gapSources.${gap.source}`),
+                      pending && gap.hasDraft ? t("performance.hasDraft") : "",
+                    ]
+                      .filter(Boolean)
+                      .join(" · ")}
+                  </p>
+                </div>
+              ),
+            },
+            {
+              key: "time",
+              header: t("performance.gapTime"),
+              cellClassName: "whitespace-nowrap text-muted-foreground",
+              cell: (gap) => t(`performance.gapTimes.${gap.source}`, { time: formatDateTime(gap.occurredAt) }),
+            },
+          ]}
+          rows={rows}
+          rowKey={(gap) => gap.id}
+          empty={t(`performance.noGaps.${status}`)}
+          onRowActivate={(gap) => onGapChange(gap.id)}
+          rowActions={(gap) => [
+            {
+              key: "conversation",
+              label: t("performance.viewConversation"),
+              onSelect: () => {
+                // 在收件箱打开该会话；客户提问已确定时定位到提问，复核来源的提问由起草确定。
+                const params = new URLSearchParams({ conversation: gap.conversationId })
+                const review =
+                  gap.source === KnowledgeGapSource.KnowledgeGapSourceRatedUnresolved ||
+                  gap.source === KnowledgeGapSource.KnowledgeGapSourcePossiblyWrong
+                if (gap.questionMessageId && (!review || gap.hasDraft)) params.set("message", gap.questionMessageId)
+                navigate(`/inbox?${params.toString()}`)
+              },
+            },
+            // 只有待处理的条目可以忽略。
+            ...(gap.status === KnowledgeGapStatus.KnowledgeGapStatusPending
+              ? [
+                  {
+                    key: "dismiss",
+                    label: t("performance.dismissGap"),
+                    separatorBefore: true,
+                    onSelect: () => void dismiss(gap.id),
+                  },
+                ]
+              : []),
+          ]}
+        />
+      </ResourceListLayout>
+      <AIKnowledgeGapSheet
+        gapId={gapId}
+        onClose={() => onGapChange("")}
+        onHandled={() => {
+          // 待处理清单打开当前条目之后的下一条，其余清单处理后关闭侧栏。
+          const index = rows.findIndex((gap) => gap.id === gapId)
+          onGapChange(pending && index >= 0 ? (rows[index + 1]?.id ?? "") : "")
         }}
       />
-    </ResourceListLayout>
+    </>
   )
 }

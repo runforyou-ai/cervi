@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	agentrunaction "github.com/runforyou-ai/cervi/internal/actions/agentrun"
+	"github.com/runforyou-ai/cervi/internal/actions/knowledgegap"
 	"github.com/runforyou-ai/cervi/internal/actions/serviceassignment"
 	"github.com/runforyou-ai/cervi/internal/actions/servicesummary"
 	"github.com/runforyou-ai/cervi/internal/actions/servicetimeout"
@@ -15,7 +16,7 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// newTestTasks 创建不连接 NATS 的任务运行时，并以空处理器注册客服处理周期分配与转人工承接任务，供业务事务投递。
+// newTestTasks 创建不连接 NATS 的任务运行时，并以空处理器注册客服处理周期分配、转人工承接、小结与待补知识起草任务，供业务事务投递。
 func newTestTasks(db *bun.DB) *servertask.Runtime {
 	tasks := servertask.New(db, serverconfig.NATSConfig{})
 	if err := tasks.Registry().RegisterJSON(serviceassignment.AssignActionName, func(context.Context, serviceassignment.AssignInput) error { return nil }); err != nil {
@@ -34,6 +35,9 @@ func newTestTasks(db *bun.DB) *servertask.Runtime {
 		panic(err)
 	}
 	if err := tasks.Registry().RegisterJSON(servicesummary.HandoffSummaryActionName, func(context.Context, servicesummary.HandoffSummaryInput) error { return nil }); err != nil {
+		panic(err)
+	}
+	if err := tasks.Registry().RegisterJSON(knowledgegap.DraftActionName, func(context.Context, knowledgegap.DraftInput) error { return nil }); err != nil {
 		panic(err)
 	}
 	return tasks

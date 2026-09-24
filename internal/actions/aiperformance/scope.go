@@ -42,9 +42,6 @@ handoffs AS (
 	WHERE m.system_event_type = ? OR (m.system_event_type = ? AND oi.type = ?)
 )`
 
-// gapReasons 是计入知识缺口的转人工原因。
-var gapReasons = []domain.AgentHandoffReason{domain.AgentHandoffReasonKnowledgeGap, domain.AgentHandoffReasonInsufficientEvidence}
-
 // reportScope 返回拼好渠道条件的公共集合 SQL 与参数，调用方在其后追加本条查询。
 func reportScope(identity *servermodels.Identity, input Input) (string, []any) {
 	handedOff, returned := domain.ConversationSystemEventServiceSessionHandedOff, domain.ConversationSystemEventServiceSessionReturned

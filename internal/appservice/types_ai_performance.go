@@ -1,10 +1,6 @@
 package appservice
 
-import (
-	"time"
-
-	"github.com/runforyou-ai/cervi/internal/domain"
-)
+import "github.com/runforyou-ai/cervi/internal/domain"
 
 // AIPerformanceDimension 定义 AI 表现报表的拆分维度。
 type AIPerformanceDimension string
@@ -42,7 +38,7 @@ type AIHandoffReasonCount struct {
 	Count  int                `json:"count"`
 }
 
-// AIPerformanceReport 定义 AI 表现报表概览：整体计数、转人工原因分布与知识缺口总数。
+// AIPerformanceReport 定义 AI 表现报表概览：整体计数、转人工原因分布，以及所选渠道下全部待处理的待补知识条数，该条数不受统计天数限制。
 type AIPerformanceReport struct {
 	Summary           AIPerformanceSummary   `json:"summary"`
 	HandoffReasons    []AIHandoffReasonCount `json:"handoffReasons"`
@@ -71,29 +67,4 @@ type AIPerformanceBreakdown struct {
 type AIPerformanceBreakdownList struct {
 	Rows []AIPerformanceBreakdown `json:"rows"`
 	Page PageInfo                 `json:"page"`
-}
-
-// AIKnowledgeGapInput 定义知识缺口清单的统计范围与分页。
-type AIKnowledgeGapInput struct {
-	Days      int    `json:"days" query:"days,default=30"`
-	ChannelID string `json:"channelId" query:"channelId"`
-	Page      int    `json:"page" query:"page,default=1"`
-	PageSize  int    `json:"pageSize" query:"pageSize,default=50"`
-}
-
-// AIKnowledgeGap 定义一次因知识不足或缺少依据的转人工；EventID 为转人工事件编号，MessageID 为客户提问消息编号，客户没有文本提问时为空。
-type AIKnowledgeGap struct {
-	EventID        string             `json:"eventId"`
-	ConversationID string             `json:"conversationId"`
-	MessageID      string             `json:"messageId"`
-	Question       string             `json:"question"`
-	Reason         AgentHandoffReason `json:"reason"`
-	CategoryName   string             `json:"categoryName"`
-	OccurredAt     time.Time          `json:"occurredAt"`
-}
-
-// AIKnowledgeGapList 定义一页知识缺口，按转人工时间倒序排列。
-type AIKnowledgeGapList struct {
-	Gaps []AIKnowledgeGap `json:"gaps"`
-	Page PageInfo         `json:"page"`
 }

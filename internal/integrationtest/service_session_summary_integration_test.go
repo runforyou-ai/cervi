@@ -93,7 +93,7 @@ func TestServiceSessionSummaryLifecycle(t *testing.T) {
 		"category": {Kind: decision.KindChoice, Choice: category.ID, Probabilities: map[string]float64{category.ID: 0.8}},
 	}}
 	caller := &summaryCaller{text: "```json\n{\"summary\":\"客户询问订单状态，客服已告知预计送达时间。\"}\n```"}
-	worker := servicesummary.NewWorker(f.db, decider, caller)
+	worker := servicesummary.NewWorker(f.db, tasks, decider, caller)
 	if err := worker.Summarize(ctx, input); err != nil {
 		t.Fatal(err)
 	}
@@ -240,7 +240,7 @@ func TestHandoffSummary(t *testing.T) {
 		t.Fatal(err)
 	}
 	caller := &summaryCaller{text: `{"request":"Where is my order?","progress":"AI could not find the order.","blocker":"Check the order system."}`}
-	worker := servicesummary.NewWorker(f.db, &summaryDecider{}, caller)
+	worker := servicesummary.NewWorker(f.db, tasks, &summaryDecider{}, caller)
 	// 旧的转人工任务不写入。
 	if err := worker.HandoffSummary(ctx, servicesummary.HandoffSummaryInput{OrganizationID: f.owner.Organization.ID, ServiceSessionID: session.ID, MessageID: first}); err != nil {
 		t.Fatal(err)

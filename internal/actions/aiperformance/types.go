@@ -1,11 +1,10 @@
 //go:build server
 
-// Package aiperformance 汇总 AI 客服表现：解决率、结束方式、客户评价、转人工原因、按渠道与咨询分类的拆分和知识缺口。
+// Package aiperformance 汇总 AI 客服表现：解决率、结束方式、客户评价、转人工原因、按渠道与咨询分类的拆分和待处理的待补知识条数；待补知识条数不受统计天数限制。
 package aiperformance
 
 import (
 	"errors"
-	"time"
 
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
@@ -45,7 +44,7 @@ type ReasonCount struct {
 	Count  int    `bun:"count"`
 }
 
-// Overview 定义报表概览：整体计数、转人工原因分布与知识缺口总数。
+// Overview 定义报表概览：整体计数、转人工原因分布与所选渠道下全部待处理的待补知识条数。
 type Overview struct {
 	Summary           Summary
 	HandoffReasons    []ReasonCount
@@ -72,32 +71,6 @@ type Breakdown struct {
 // BreakdownList 定义一页拆分结果与总行数。
 type BreakdownList struct {
 	Rows     []Breakdown
-	Page     int
-	PageSize int
-	Total    int
-}
-
-// KnowledgeGapInput 定义知识缺口清单的统计范围与分页。
-type KnowledgeGapInput struct {
-	Input
-	Page     int
-	PageSize int
-}
-
-// KnowledgeGap 定义一次因知识不足或缺少依据的转人工，EventID 为转人工事件消息编号，Question 为事件之前客户发出的最后一条文本消息。
-type KnowledgeGap struct {
-	EventID        string    `bun:"event_id"`
-	ConversationID string    `bun:"conversation_id"`
-	MessageID      *string   `bun:"message_id"`
-	Question       string    `bun:"question"`
-	Reason         string    `bun:"reason"`
-	CategoryName   *string   `bun:"category_name"`
-	OccurredAt     time.Time `bun:"occurred_at"`
-}
-
-// KnowledgeGapList 定义一页知识缺口与总条数。
-type KnowledgeGapList struct {
-	Gaps     []KnowledgeGap
 	Page     int
 	PageSize int
 	Total    int

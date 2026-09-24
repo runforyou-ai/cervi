@@ -954,9 +954,24 @@ func (s *Service) ListAIPerformanceBreakdowns(ctx context.Context, meta RequestM
 	return withNormalizedSlices(s.backend.ListAIPerformanceBreakdowns(ctx, meta, input))
 }
 
-// ListAIKnowledgeGaps 返回一页因知识不足或缺少依据的转人工。
-func (s *Service) ListAIKnowledgeGaps(ctx context.Context, meta RequestMeta, input AIKnowledgeGapInput) (AIKnowledgeGapList, error) {
-	return withNormalizedSlices(s.backend.ListAIKnowledgeGaps(ctx, meta, input))
+// ListKnowledgeGaps 返回一页指定处理状态的待补知识。
+func (s *Service) ListKnowledgeGaps(ctx context.Context, meta RequestMeta, input KnowledgeGapListInput) (KnowledgeGapList, error) {
+	return withNormalizedSlices(s.backend.ListKnowledgeGaps(ctx, meta, input))
+}
+
+// GetKnowledgeGap 返回待补知识详情。
+func (s *Service) GetKnowledgeGap(ctx context.Context, meta RequestMeta, gapID string) (KnowledgeGap, error) {
+	return withNormalizedSlices(s.backend.GetKnowledgeGap(ctx, meta, gapID))
+}
+
+// AcceptKnowledgeGap 把待补知识整理的问答加入知识库。
+func (s *Service) AcceptKnowledgeGap(ctx context.Context, meta RequestMeta, gapID string, input KnowledgeGapAcceptInput) error {
+	return s.backend.AcceptKnowledgeGap(ctx, meta, gapID, input)
+}
+
+// DismissKnowledgeGap 忽略待补知识。
+func (s *Service) DismissKnowledgeGap(ctx context.Context, meta RequestMeta, gapID string) error {
+	return s.backend.DismissKnowledgeGap(ctx, meta, gapID)
 }
 
 // RegisterDevice 注册当前用户的本机设备。

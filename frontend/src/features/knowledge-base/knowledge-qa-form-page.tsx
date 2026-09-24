@@ -1,16 +1,10 @@
 /** 本地问答的独立新增和编辑页面。 */
-import { useEffect, useId, useMemo } from "react"
+import { useEffect, useMemo } from "react"
 import { zodResolver } from "@hookform/resolvers/zod"
-import {
-  Controller,
-  useFieldArray,
-  useForm,
-  type Control,
-} from "react-hook-form"
+import { useForm } from "react-hook-form"
 import { useTranslation } from "react-i18next"
 import { useLocation, useNavigate, useParams } from "react-router"
 import { toast } from "sonner"
-import { z } from "zod"
 
 import {
   createKnowledgeQAEntry,
@@ -22,33 +16,18 @@ import {
   type KnowledgeQAEntryData,
 } from "@/api"
 import { FormActions } from "@/components/form/form-actions"
-import { FormInputField } from "@/components/form/form-input-field"
+import {
+  createQASchema,
+  QAFormFields,
+  type QAFormValues,
+} from "@/components/knowledge-qa-fields"
 import { PageContent } from "@/components/page-content"
 import { PageBackButton } from "@/components/page-back-button"
 import { PageHeader } from "@/components/page-header"
 import { ResourceContent } from "@/components/resource-content"
-import { Button } from "@/components/ui/button"
-import { Field, FieldGroup, FieldLabel } from "@/components/ui/field"
-import { Textarea } from "@/components/ui/textarea"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useFormSave } from "@/hooks/use-form-save"
 import { useResource, useResourceInvalidator } from "@/hooks/use-resource"
-
-/** 生成问答表单的必填校验。 */
-function createQASchema(messages: {
-  question: string
-  answer: string
-}) {
-  return z.object({
-    question: z.string().trim().min(1, messages.question),
-    similarQuestions: z.array(
-      z.object({ id: z.string(), content: z.string() }),
-    ),
-    answer: z.string().trim().min(1, messages.answer),
-  })
-}
-
-type QAFormValues = z.infer<ReturnType<typeof createQASchema>>
 
 /** 读取知识库和问答详情后展示编辑表单。 */
 export function KnowledgeQAFormPage({ mode }: { mode: "create" | "edit" }) {
@@ -182,107 +161,5 @@ function KnowledgeQAForm({
         />
       )}
     </form>
-  )
-}
-
-/** 管理带稳定业务编号的多条相似问题输入。 */
-function SimilarQuestionFields({
-  control,
-  disabled,
-}: {
-  control: Control<QAFormValues>
-  disabled: boolean
-}) {
-  const { t } = useTranslation(["knowledgeBase", "common"])
-  const id = useId()
-  const { fields, append, remove } = useFieldArray({
-    control,
-    name: "similarQuestions",
-    keyName: "fieldKey",
-  })
-  return (
-    <div className="space-y-4" role="group" aria-labelledby={`${id}-label`}>
-      <div id={`${id}-label`} className="text-sm font-medium">
-        {t("qa.similarQuestions")}
-      </div>
-      {fields.map((item, index) => (
-        <div className="flex items-end gap-3" key={item.fieldKey}>
-          <div className="min-w-0 flex-1">
-            <FormInputField
-              control={control}
-              name={`similarQuestions.${index}.content`}
-              required={false}
-              id={`${id}-${item.fieldKey}`}
-              label={t("qa.similarQuestion", { number: index + 1 })}
-              disabled={disabled}
-            />
-          </div>
-          <Button
-            type="button"
-            variant="outline"
-            // 与表单页加高后的输入框同高，并排时底边对齐。
-            className="h-11 rounded-lg"
-            disabled={disabled}
-            aria-label={t("qa.removeSimilarQuestion", { number: index + 1 })}
-            onClick={() => remove(index)}
-          >
-            {t("common:actions.remove")}
-          </Button>
-        </div>
-      ))}
-      <Button
-        type="button"
-        variant="outline"
-        size="sm"
-        disabled={disabled}
-        onClick={() => append({ id: "", content: "" })}
-      >
-        {t("qa.addSimilarQuestion")}
-      </Button>
-    </div>
-  )
-}
-
-/** 展示标准问题、相似问题和答案输入。 */
-function QAFormFields({
-  control,
-  disabled,
-}: {
-  control: Control<QAFormValues>
-  disabled: boolean
-}) {
-  const { t } = useTranslation("knowledgeBase")
-  const id = useId()
-  return (
-    <FieldGroup>
-      <FormInputField
-        control={control}
-        name="question"
-        id={`${id}-question`}
-        label={t("qa.question")}
-        required
-        disabled={disabled}
-      />
-      <SimilarQuestionFields control={control} disabled={disabled} />
-      <Controller
-        control={control}
-        name="answer"
-        render={({ field, fieldState }) => (
-          <Field>
-            <FieldLabel htmlFor={`${id}-answer`} required>
-              {t("qa.answer")}
-            </FieldLabel>
-            <Textarea
-              {...field}
-              id={`${id}-answer`}
-              required
-              rows={12}
-              aria-invalid={fieldState.invalid}
-              disabled={disabled}
-            />
-          </Field>
-        )}
-      />
-    </FieldGroup>
   )
 }

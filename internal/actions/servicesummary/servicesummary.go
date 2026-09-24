@@ -1,6 +1,6 @@
 //go:build server
 
-// Package servicesummary 在客服处理周期关闭时生成小结并标注实质诉求、咨询分类与是否解决，在 AI 转人工时生成交接摘要。
+// Package servicesummary 在客服处理周期关闭时生成小结并标注实质诉求、咨询分类与是否解决，在 AI 转人工时生成交接摘要，并为待补知识起草问答。
 package servicesummary
 
 import (
@@ -45,27 +45,30 @@ type Decider interface {
 	Decide(context.Context, decision.Credential, string, any, map[string]decision.Question) (map[string]decision.Answer, error)
 }
 
-// Worker 执行周期小结与交接摘要任务。
+// Worker 执行周期小结、交接摘要与待补知识起草任务。
 type Worker struct {
-	db      *bun.DB
-	decider Decider
-	caller  agentruntime.SingleCaller
+	db       *bun.DB
+	enqueuer servertask.TxEnqueuer
+	decider  Decider
+	caller   agentruntime.SingleCaller
 }
 
-// NewWorker 创建周期小结与交接摘要任务执行器。
-func NewWorker(db *bun.DB, decider Decider, caller agentruntime.SingleCaller) *Worker {
-	return &Worker{db: db, decider: decider, caller: caller}
+// NewWorker 创建周期小结、交接摘要与待补知识起草任务执行器。
+func NewWorker(db *bun.DB, enqueuer servertask.TxEnqueuer, decider Decider, caller agentruntime.SingleCaller) *Worker {
+	return &Worker{db: db, enqueuer: enqueuer, decider: decider, caller: caller}
 }
 
-// transcriptEntry 是摘要资料中的一条对客消息；sender 为 customer 客户、ai AI 员工或 staff 真人客服。
+// transcriptEntry 是摘要资料中的一条对客消息；sender 为 customer 客户、ai AI 员工或 staff 真人客服，消息编号不进入模型资料。
 type transcriptEntry struct {
-	Sender  string `json:"sender"`
-	Content string `json:"content"`
+	MessageID string `json:"-"`
+	Sender    string `json:"sender"`
+	Content   string `json:"content"`
 }
 
 // loadTranscript 读取客服周期内不越过指定消息序号的最近对客文本与附件消息，按发送顺序返回。
 func loadTranscript(ctx context.Context, db bun.IDB, organizationID, serviceSessionID string, throughSeq int64) ([]transcriptEntry, error) {
 	rows := make([]struct {
+		ID           string  `bun:"id"`
 		Body         string  `bun:"body"`
 		Kind         string  `bun:"kind"`
 		IdentityType *string `bun:"identity_type"`
@@ -73,7 +76,7 @@ func loadTranscript(ctx context.Context, db bun.IDB, organizationID, serviceSess
 	if err := db.NewSelect().
 		TableExpr("messages AS msg").
 		ColumnExpr("? AS body", messagequery.Summary("msg")).
-		ColumnExpr("cs.kind, oi.type AS identity_type").
+		ColumnExpr("msg.id, cs.kind, oi.type AS identity_type").
 		Join("JOIN conversation_participants AS cp ON cp.id = msg.sender_participant_id AND cp.organization_id = msg.organization_id AND cp.conversation_id = msg.conversation_id").
 		Join("JOIN chat_subjects AS cs ON cs.id = cp.subject_id AND cs.organization_id = cp.organization_id").
 		Join("LEFT JOIN organization_identities AS oi ON oi.id = cs.source_id AND oi.organization_id = cs.organization_id AND cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
@@ -101,7 +104,7 @@ func loadTranscript(ctx context.Context, db bun.IDB, organizationID, serviceSess
 		if len(content) > transcriptMessageMaxRunes {
 			content = content[:transcriptMessageMaxRunes]
 		}
-		entries = append(entries, transcriptEntry{Sender: sender, Content: string(content)})
+		entries = append(entries, transcriptEntry{MessageID: row.ID, Sender: sender, Content: string(content)})
 	}
 	return entries, nil
 }

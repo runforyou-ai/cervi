@@ -66,7 +66,7 @@ func NewWebsiteVisitorDirectBackend(db *bun.DB, agentScheduler conversationactio
 		completeUpload:    conversationaction.NewCompleteWebsiteVisitorUploadAction(db),
 		getAttachment:     conversationaction.NewGetWebsiteVisitorAttachmentQuery(db),
 		reportTyping:      conversationaction.NewReportWebsiteVisitorTypingAction(db),
-		rateSession:       conversationaction.NewRateWebsiteServiceSessionAction(db),
+		rateSession:       conversationaction.NewRateWebsiteServiceSessionAction(db, taskEnqueuer),
 		localFiles:        localFiles,
 		s3:                s3,
 	}

@@ -13,6 +13,7 @@ import (
 	fileaction "github.com/runforyou-ai/cervi/internal/actions/file"
 	"github.com/runforyou-ai/cervi/internal/actions/filemaintenance"
 	knowledgeaction "github.com/runforyou-ai/cervi/internal/actions/knowledgebase"
+	"github.com/runforyou-ai/cervi/internal/actions/knowledgegap"
 	mcpserveraction "github.com/runforyou-ai/cervi/internal/actions/mcpserver"
 	"github.com/runforyou-ai/cervi/internal/actions/serviceassignment"
 	"github.com/runforyou-ai/cervi/internal/actions/servicesummary"
@@ -139,12 +140,15 @@ func applicationServices(appStorage *serverstorage.Store, config serverconfig.Co
 		return nil, nil, err
 	}
 
-	// 注册客服处理周期小结与交接摘要任务，判断模型标注诉求、分类与是否解决，小结正文与交接摘要复用单次模型调用。
-	serviceSummary := servicesummary.NewWorker(appStorage.DB(), decision.NewClient(), agentRuntime)
+	// 注册客服处理周期小结、交接摘要与待补知识起草任务，判断模型标注诉求、分类、是否解决与答复是否可能有误，正文生成复用单次模型调用。
+	serviceSummary := servicesummary.NewWorker(appStorage.DB(), tasks, decision.NewClient(), agentRuntime)
 	if err := tasks.Registry().RegisterJSONWithTerminalFailure(servicesummary.SummarizeActionName, serviceSummary.Summarize, serviceSummary.FinalizeSummarizeFailure); err != nil {
 		return nil, nil, err
 	}
 	if err := tasks.Registry().RegisterJSON(servicesummary.HandoffSummaryActionName, serviceSummary.HandoffSummary); err != nil {
+		return nil, nil, err
+	}
+	if err := tasks.Registry().RegisterJSONWithTerminalFailure(knowledgegap.DraftActionName, serviceSummary.DraftKnowledgeGap, serviceSummary.FinalizeKnowledgeGapDraftFailure); err != nil {
 		return nil, nil, err
 	}
 
