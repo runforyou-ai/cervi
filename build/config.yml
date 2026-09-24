@@ -35,3 +35,4 @@ dev_mode:
       type: background
     - cmd: wails3 task run
       type: primary
+      exit_policy: shutdown

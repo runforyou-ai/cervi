@@ -397,8 +397,8 @@ github.com/volcengine/volc-sdk-golang v1.0.23 h1:anOslb2Qp6ywnsbyq9jqR0ljuO63kg9
 github.com/volcengine/volc-sdk-golang v1.0.23/go.mod h1:AfG/PZRUkHJ9inETvbjNifTDgut25Wbkm2QoYBTbvyU=
 github.com/volcengine/volcengine-go-sdk v1.2.53 h1:aWooc5D8+Tx+R+Z7VsIp8aJCbWgfGdb687tq8G5b2JI=
 github.com/volcengine/volcengine-go-sdk v1.2.53/go.mod h1:DURKPVQ8Rsi4OQu4/NPjUyjla3MeHPgXT/qV+400fAw=
-github.com/wailsapp/wails/v3 v3.0.0-beta.24 h1:YmD11T9FYtuKIBgyC7JbkwPzLqNZ2IysQ7rZ3pDG1tI=
-github.com/wailsapp/wails/v3 v3.0.0-beta.24/go.mod h1:/6QR46/nhGCSADHbS++XtDb9dkTnenTHlGskTPRo9S0=
+github.com/wailsapp/wails/v3 v3.0.0-beta.25 h1:aEghNNKU0V2Q0kIfZxSJUxKLiLUTQnGNNhRXo3S7zVM=
+github.com/wailsapp/wails/v3 v3.0.0-beta.25/go.mod h1:62UsqQRqanuCbFi6xElIw3/2X+yGF+TKlyiWImA5taU=
 github.com/wk8/go-ordered-map/v2 v2.1.8 h1:5h/BUHu93oj4gIdvHHHGsScSTMijfx5PeYkE/fJgbpc=
 github.com/wk8/go-ordered-map/v2 v2.1.8/go.mod h1:5nJHM5DyteebpVlHnWMV0rPz6Zp7+xBAnxjb1X5vnTw=
 github.com/x-cray/logrus-prefixed-formatter v0.5.2 h1:00txxvfBM9muc0jiLIEAkAcIMJzfthRT6usrui8uGmg=
