@@ -421,8 +421,7 @@ body,
   padding-left: var(--cervi-workspace-titlebar-inset);
 }
 
-/* Windows 与 Linux 桌面端使用系统标题栏，标题栏操作行另含前进后退。 */
-[data-native-os="windows"] .cervi-workspace-shell,
+/* Linux 桌面端在系统标题栏下保留标题栏操作行。 */
 [data-native-os="linux"] .cervi-workspace-shell {
   --cervi-workspace-content-top: 28px;
   --cervi-workspace-rail-top-expanded: 40px;

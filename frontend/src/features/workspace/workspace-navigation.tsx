@@ -56,7 +56,7 @@ import {
 import { WorkStatusDot, WorkStatusPicker } from "@/components/work-status"
 import { UserAvatar } from "@/components/user-avatar"
 import { cn } from "@/lib/utils"
-import { resolveAppPlatform } from "@/platform/app-platform"
+import { resolveAppPlatform, resolveDesktopOS } from "@/platform/app-platform"
 import { requestNotificationPermissionFromMessageMenu } from "@/platform/notifications"
 
 /** 打开全局搜索的入口，尺寸与导航项一致；窄栏下收为图标并由浮层提示。 */
@@ -333,9 +333,9 @@ export function WorkspaceNavigation({
   const userMenuTriggerRef = useRef<HTMLButtonElement>(null)
   const skipUserMenuFocusRestoreRef = useRef(false)
   const showAppVersion = inSettings && resolveAppPlatform() === "desktop"
-  // Web 端展开态的收起开关与一级栏顶部行同处一行，原生端留在标题栏操作行。
+  // Web 与 Windows 端展开态的收起开关位于一级栏顶部行的右侧。
   const inlineRailToggle =
-    !collapsed && resolveAppPlatform() === "web" ? (
+    !collapsed && (resolveAppPlatform() === "web" || resolveDesktopOS() === "windows") ? (
       <WorkspaceRailToggle collapsed={false} onToggle={onToggleRail} />
     ) : null
 
