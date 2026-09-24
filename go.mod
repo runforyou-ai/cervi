@@ -34,7 +34,7 @@ require (
 	github.com/uptrace/bun/dialect/sqlitedialect v1.2.18
 	github.com/uptrace/bun/driver/pgdriver v1.2.18
 	github.com/volcengine/volcengine-go-sdk v1.2.53
-	github.com/wailsapp/wails/v3 v3.0.0-beta.24
+	github.com/wailsapp/wails/v3 v3.0.0-beta.25
 	github.com/yuin/goldmark v1.8.6
 	golang.org/x/crypto v0.57.0
 	golang.org/x/net v0.59.0
