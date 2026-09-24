@@ -310,6 +310,7 @@ export function WorkspaceNavigation({
   inSettings,
   appHref,
   collapsed,
+  inlineRailToggle,
   pendingCount,
   onToggleRail,
   onLogout,
@@ -319,6 +320,7 @@ export function WorkspaceNavigation({
   inSettings: boolean
   appHref: string
   collapsed: boolean
+  inlineRailToggle: boolean
   pendingCount: number
   onToggleRail: () => void
   onLogout: () => void
@@ -333,9 +335,9 @@ export function WorkspaceNavigation({
   const userMenuTriggerRef = useRef<HTMLButtonElement>(null)
   const skipUserMenuFocusRestoreRef = useRef(false)
   const showAppVersion = inSettings && resolveAppPlatform() === "desktop"
-  // Web 端展开态的收起开关与一级栏顶部行同处一行，原生端留在标题栏操作行。
-  const inlineRailToggle =
-    !collapsed && resolveAppPlatform() === "web" ? (
+  // 展开态的收起开关按工作台布局放在一级栏顶部行的右侧或标题栏操作行。
+  const railToggle =
+    !collapsed && inlineRailToggle ? (
       <WorkspaceRailToggle collapsed={false} onToggle={onToggleRail} />
     ) : null
 
@@ -394,13 +396,13 @@ export function WorkspaceNavigation({
         <WorkspaceSettingsMenu
           appHref={appHref}
           collapsed={collapsed}
-          railToggle={inlineRailToggle}
+          railToggle={railToggle}
         />
       ) : (
         <WorkspaceMenu
           identity={identity}
           collapsed={collapsed}
-          railToggle={inlineRailToggle}
+          railToggle={railToggle}
           pendingCount={pendingCount}
           onInboxClick={requestMessageNotificationPermission}
         />

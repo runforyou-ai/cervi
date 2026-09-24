@@ -71,8 +71,8 @@ function WorkspaceShell({ identity }: { identity: Identity }) {
   const navigate = useNavigate()
   const [loggingOut, setLoggingOut] = useState(false)
   const rail = useWorkspaceRail()
-  // Web 端的前进后退由浏览器提供，工作台只在原生端给出入口。
-  const nativeHistoryNav = resolveAppPlatform() === "desktop"
+  // 桌面端在一级栏顶部的标题栏操作行提供收起开关和前进后退，Web 端的前进后退由浏览器提供。
+  const titlebarActionsEnabled = resolveAppPlatform() === "desktop"
   const history = useWorkspaceHistory()
   const [attentionPending, setAttentionPending] = useState(false)
   const workspaceLocation = resolveWorkspaceLocation(location)
@@ -224,10 +224,9 @@ function WorkspaceShell({ identity }: { identity: Identity }) {
     ? workspaceLocation.canonicalHref
     : fallbackHrefRef.current
   const inSettings = isSettingsHref(pageHref)
-  // 窄栏下收起开关随一级栏内容渲染，整条标题栏操作行连同前进后退一并隐藏。
-  // Web 端展开态的收起开关也随一级栏渲染，标题栏操作行只在原生端出现。
+  // 窄栏下收起开关随窄栏渲染，标题栏操作行连同前进后退一并隐藏。
   const railCollapsed = rail.collapsed
-  const showTitlebarActions = !railCollapsed && nativeHistoryNav
+  const showTitlebarActions = !railCollapsed && titlebarActionsEnabled
 
   return (
     <UnsavedChangesGuard>
@@ -248,6 +247,7 @@ function WorkspaceShell({ identity }: { identity: Identity }) {
             inSettings={inSettings}
             appHref={appHrefRef.current}
             collapsed={railCollapsed}
+            inlineRailToggle={!titlebarActionsEnabled}
             pendingCount={pendingCount}
             onToggleRail={rail.toggleCollapsed}
             onLogout={handleLogout}
