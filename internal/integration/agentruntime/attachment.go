@@ -4,9 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"log/slog"
-	"sync/atomic"
 
-	"github.com/cloudwego/eino/components/model"
 	"github.com/cloudwego/eino/schema"
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
@@ -45,39 +43,6 @@ type mediaInput struct {
 	maxCount   int
 }
 
-// mediaTrackingModel 记录携带直传附件的模型调用是否失败，运行据此改用正文链接重新执行。
-type mediaTrackingModel struct {
-	model.AgenticModel
-	rejected *atomic.Bool
-}
-
-// Generate 调用模型，携带直传附件的请求失败时记录拒绝状态。
-func (m *mediaTrackingModel) Generate(ctx context.Context, input []*schema.AgenticMessage, opts ...model.Option) (*schema.AgenticMessage, error) {
-	output, err := m.AgenticModel.Generate(ctx, input, opts...)
-	if err != nil && carriesMedia(input) {
-		m.rejected.Store(true)
-	}
-	return output, err
-}
-
-// Stream 以流式调用模型，携带直传附件的请求在建立流或读取分片时失败都记录拒绝状态。
-func (m *mediaTrackingModel) Stream(ctx context.Context, input []*schema.AgenticMessage, opts ...model.Option) (*schema.StreamReader[*schema.AgenticMessage], error) {
-	output, err := m.AgenticModel.Stream(ctx, input, opts...)
-	if !carriesMedia(input) {
-		return output, err
-	}
-	if err != nil {
-		m.rejected.Store(true)
-		return nil, err
-	}
-	return schema.StreamReaderWithConvert(output, func(chunk *schema.AgenticMessage) (*schema.AgenticMessage, error) {
-		return chunk, nil
-	}, schema.WithErrWrapper(func(err error) error {
-		m.rejected.Store(true)
-		return err
-	})), nil
-}
-
 // carriesMedia 判断模型输入是否包含直传的图片、音频或视频内容块，或工具结果中的非文本内容。
 func carriesMedia(input []*schema.AgenticMessage) bool {
 	for _, message := range input {
@@ -98,6 +63,41 @@ func carriesMedia(input []*schema.AgenticMessage) bool {
 		}
 	}
 	return false
+}
+
+// withoutMedia 返回去掉多模态内容的模型输入：直传附件的用户消息只保留正文，工具结果中的非文本内容改为说明文字；不含多模态内容的消息原样复用。
+func withoutMedia(input []*schema.AgenticMessage) []*schema.AgenticMessage {
+	output := make([]*schema.AgenticMessage, len(input))
+	for i, message := range input {
+		if !carriesMedia([]*schema.AgenticMessage{message}) {
+			output[i] = message
+			continue
+		}
+		stripped := *message
+		stripped.ContentBlocks = make([]*schema.ContentBlock, 0, len(message.ContentBlocks))
+		for _, block := range message.ContentBlocks {
+			switch {
+			case block.Type == schema.ContentBlockTypeUserInputImage, block.Type == schema.ContentBlockTypeUserInputAudio, block.Type == schema.ContentBlockTypeUserInputVideo:
+			case block.Type == schema.ContentBlockTypeFunctionToolResult && block.FunctionToolResult != nil:
+				result := *block.FunctionToolResult
+				result.Content = make([]*schema.FunctionToolResultContentBlock, 0, len(block.FunctionToolResult.Content))
+				for _, content := range block.FunctionToolResult.Content {
+					if content != nil && content.Type != schema.FunctionToolResultContentBlockTypeText {
+						content = &schema.FunctionToolResultContentBlock{Type: schema.FunctionToolResultContentBlockTypeText,
+							Text: &schema.UserInputText{Text: "[" + string(content.Type) + "：当前模型无法查看此内容]"}}
+					}
+					result.Content = append(result.Content, content)
+				}
+				copied := *block
+				copied.FunctionToolResult = &result
+				stripped.ContentBlocks = append(stripped.ContentBlocks, &copied)
+			default:
+				stripped.ContentBlocks = append(stripped.ContentBlocks, block)
+			}
+		}
+		output[i] = &stripped
+	}
+	return output
 }
 
 // mediaUserMessage 读取附件并构造正文块与多模态块并列的用户消息，读取失败或模态不可直传时返回 false。

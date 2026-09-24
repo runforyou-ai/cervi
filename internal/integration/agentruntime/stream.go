@@ -29,7 +29,6 @@ const (
 	StreamOperationRemoveBlocks    StreamOperationKind = "remove_blocks"
 	StreamOperationAppendCandidate StreamOperationKind = "append_candidate"
 	StreamOperationClearCandidate  StreamOperationKind = "clear_candidate"
-	StreamOperationReset           StreamOperationKind = "reset"
 )
 
 // StreamOperation 定义一条可按顺序应用到运行流快照的变更。
@@ -120,8 +119,6 @@ func (s *StreamSnapshot) Apply(delta StreamDelta) (bool, error) {
 			candidate += operation.Text
 		case StreamOperationClearCandidate:
 			candidate = ""
-		case StreamOperationReset:
-			blocks, candidate = nil, ""
 		default:
 			return false, fmt.Errorf("unsupported stream operation %q", operation.Kind)
 		}
@@ -246,14 +243,10 @@ func (p *streamPublisher) flush() {
 	p.sink(delta)
 }
 
-// mergeStreamOperations 合并相邻的同块文本追加、候选正文追加和同块写入，重置之前的操作全部丢弃。
+// mergeStreamOperations 合并相邻的同块文本追加、候选正文追加和同块写入。
 func mergeStreamOperations(operations []StreamOperation) []StreamOperation {
 	merged := make([]StreamOperation, 0, len(operations))
 	for _, operation := range operations {
-		if operation.Kind == StreamOperationReset {
-			merged = append(merged[:0], operation)
-			continue
-		}
 		if len(merged) > 0 {
 			last := &merged[len(merged)-1]
 			switch {

@@ -3,12 +3,15 @@ package agentruntime
 import (
 	"context"
 	"fmt"
+	"runtime"
 	"slices"
 	"sync/atomic"
 
 	"github.com/cloudwego/eino/adk"
 	"github.com/cloudwego/eino/adk/filesystem"
 	fsmiddleware "github.com/cloudwego/eino/adk/middlewares/filesystem"
+	"github.com/cloudwego/eino/components/tool"
+	"github.com/cloudwego/eino/components/tool/utils"
 	"github.com/cloudwego/eino/schema"
 	"github.com/runforyou-ai/cervi/internal/domain"
 )
@@ -37,8 +40,40 @@ const grepToolDesc = `在文件内容中按正则表达式搜索。
 - multiline 为 true 时模式可以跨行匹配，. 匹配换行。
 - 跳过 .git 目录、二进制文件和超过 2 MB 的文件。`
 
-// newWorkspaceMiddleware 按有效配置中的本机工具创建本机文件工具中间件；模型支持图片输入且本机文件可按图片读取时 read_file 以图片返回图片文件，images 为 false 时改按文本读取。
-func newWorkspaceMiddleware(ctx context.Context, request RunRequest, images *atomic.Bool) (adk.TypedChatModelAgentMiddleware[*schema.AgenticMessage], []string, error) {
+const writeFileToolDesc = `以完整内容创建或覆盖文件，缺少的上级文件夹会一并创建。
+- file_path 可以是绝对路径、~ 开头的路径或相对默认文件夹的路径。
+- 覆盖已有文件前先用 read_file 读取，局部修改使用 edit_file。
+- 只写入文本；Word、Excel、PPT 等文件用 execute 运行脚本生成。`
+
+const editFileToolDesc = `把文本文件中的一段原文精确替换为新内容。
+- 修改前先用 read_file 读取文件；old_string 必须与文件内容完全一致（包括缩进与换行），不含 read_file 输出的行号前缀。
+- old_string 在文件中必须唯一，否则补充上下文使其唯一；replace_all 为 true 时替换全部出现处。
+- new_string 为空表示删除这段原文。`
+
+const deleteFileToolDesc = `删除一个文件或空文件夹。
+- file_path 可以是绝对路径、~ 开头的路径或相对默认文件夹的路径。
+- 删除无法撤销，只删除用户要求或本次任务生成的临时文件。`
+
+const executeToolDesc = `在这台电脑上执行一条 %s 命令，返回合并后的标准输出与标准错误。
+- 工作目录是本会话的默认文件夹。
+- 单次命令最长运行 10 分钟，超时即终止；命令结束时由它启动的后台进程也会终止，不要启动需要长期运行的服务。
+- 命令无法交互输入，需要确认的命令使用非交互参数（如 -y）。
+- 查找与读取文件优先使用 glob、grep、read_file，修改文件优先使用 edit_file、write_file。`
+
+// deleteFileArgs 是删除文件工具的参数。
+type deleteFileArgs struct {
+	FilePath string `json:"file_path" jsonschema:"required" jsonschema_description:"要删除的文件或空文件夹路径"`
+}
+
+// workspaceTools 是按有效配置创建的本机工具：文件读写与命令执行由中间件注册，删除文件作为普通工具注册。
+type workspaceTools struct {
+	middleware adk.TypedChatModelAgentMiddleware[*schema.AgenticMessage]
+	tools      []tool.BaseTool
+	names      []string
+}
+
+// newWorkspaceTools 按有效配置中的本机工具创建本机文件与命令工具；模型支持图片输入且本机文件可按图片读取时 read_file 以图片返回图片文件，images 为 false 时改按文本读取。
+func newWorkspaceTools(ctx context.Context, request RunRequest, images *atomic.Bool) (workspaceTools, error) {
 	names := make([]string, 0, len(localTools))
 	for _, name := range request.Assignment.Tools {
 		if IsLocalTool(name) {
@@ -46,37 +81,60 @@ func newWorkspaceMiddleware(ctx context.Context, request RunRequest, images *ato
 		}
 	}
 	if len(names) == 0 {
-		return nil, nil, nil
+		return workspaceTools{}, nil
 	}
 	if request.Workspace == nil {
-		return nil, nil, fmt.Errorf("agent run assignment requires local tools %v without local file access", names)
+		return workspaceTools{}, fmt.Errorf("agent run assignment requires local tools %v without local file access", names)
 	}
 	// 按有效配置启用工具，未列出的工具不注册。
 	config := func(name, desc string) *fsmiddleware.ToolConfig {
 		return &fsmiddleware.ToolConfig{Name: name, Desc: &desc, Disable: !slices.Contains(names, name)}
 	}
 	readDesc := readFileToolDesc
-	backend := request.Workspace
+	var backend filesystem.Backend = request.Workspace
 	_, multimodal := backend.(filesystem.MultiModalReader)
 	multimodal = multimodal && slices.Contains(request.Assignment.Model.InputModalities, domain.AIModelInputModalityImage)
 	if multimodal {
 		readDesc += readImageToolDesc
 		backend = &imageGatedBackend{Backend: backend, images: images}
 	}
-	middleware, err := fsmiddleware.NewTyped[*schema.AgenticMessage](ctx, &fsmiddleware.MiddlewareConfig{
+	middlewareConfig := &fsmiddleware.MiddlewareConfig{
 		Backend:             backend,
 		UseMultiModalRead:   multimodal,
 		LsToolConfig:        config("ls", lsToolDesc),
 		ReadFileToolConfig:  config("read_file", readDesc),
 		GlobToolConfig:      config("glob", globToolDesc),
 		GrepToolConfig:      config("grep", grepToolDesc),
-		WriteFileToolConfig: &fsmiddleware.ToolConfig{Disable: true},
-		EditFileToolConfig:  &fsmiddleware.ToolConfig{Disable: true},
-	})
-	if err != nil {
-		return nil, nil, fmt.Errorf("create workspace tools middleware: %w", err)
+		WriteFileToolConfig: config("write_file", writeFileToolDesc),
+		EditFileToolConfig:  config("edit_file", editFileToolDesc),
 	}
-	return middleware, names, nil
+	if slices.Contains(names, "execute") {
+		// 命令语法随执行设备的操作系统说明。
+		shell := "bash"
+		if runtime.GOOS == "windows" {
+			shell = "PowerShell"
+		}
+		middlewareConfig.Shell = request.Workspace
+		middlewareConfig.ExecuteToolConfig = &fsmiddleware.ExecuteToolConfig{ToolConfig: *config("execute", fmt.Sprintf(executeToolDesc, shell))}
+	}
+	middleware, err := fsmiddleware.NewTyped[*schema.AgenticMessage](ctx, middlewareConfig)
+	if err != nil {
+		return workspaceTools{}, fmt.Errorf("create workspace tools middleware: %w", err)
+	}
+	result := workspaceTools{middleware: middleware, names: names}
+	if slices.Contains(names, "delete_file") {
+		deleteTool, err := utils.InferTool("delete_file", deleteFileToolDesc, func(ctx context.Context, input deleteFileArgs) (string, error) {
+			if err := request.Workspace.Delete(ctx, input.FilePath); err != nil {
+				return "", err
+			}
+			return "已删除：" + input.FilePath, nil
+		})
+		if err != nil {
+			return workspaceTools{}, fmt.Errorf("create delete file tool: %w", err)
+		}
+		result.tools = append(result.tools, deleteTool)
+	}
+	return result, nil
 }
 
 // imageGatedBackend 在图片读取被关闭后把全部文件按文本读取，图片文件因此按二进制文件拒绝读取。

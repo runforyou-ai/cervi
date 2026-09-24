@@ -60,10 +60,6 @@ export function applyRunStreamDelta(
       case "clear_candidate":
         candidateContent = ""
         break
-      case "reset":
-        blocks = []
-        candidateContent = ""
-        break
     }
   }
   return { status: "applied", state: { ...state, sequence: delta.sequence, blocks, candidateContent } }

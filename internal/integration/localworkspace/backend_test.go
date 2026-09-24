@@ -2,10 +2,12 @@ package localworkspace
 
 import (
 	"context"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
 	"strings"
+	"sync"
 	"testing"
 
 	"github.com/cloudwego/eino/adk/filesystem"
@@ -132,11 +134,45 @@ func TestReadAndList(t *testing.T) {
 	if err != nil || text.FileContent == nil || !strings.HasPrefix(text.Content, "# Cervi") {
 		t.Fatalf("multimodal read text=%+v %v", text, err)
 	}
-	if err := backend.Write(ctx, &filesystem.WriteRequest{FilePath: "new.txt", Content: "x"}); err == nil {
-		t.Fatal("write accepted")
+}
+
+// TestWriteEditDelete 验证写入创建上级目录并覆盖已有文件，替换要求原文存在且唯一，删除只接受文件与空文件夹。
+func TestWriteEditDelete(t *testing.T) {
+	backend, root, _ := newTestWorkspace(t)
+	ctx := context.Background()
+	if err := backend.Write(ctx, &filesystem.WriteRequest{FilePath: "reports/q3.md", Content: "收入 100\n支出 100\n"}); err != nil {
+		t.Fatal(err)
 	}
-	if err := backend.Edit(ctx, &filesystem.EditRequest{FilePath: "README.md", OldString: "Cervi", NewString: "x"}); err == nil {
-		t.Fatal("edit accepted")
+	written := filepath.Join(root, "reports", "q3.md")
+	if content, err := os.ReadFile(written); err != nil || string(content) != "收入 100\n支出 100\n" {
+		t.Fatalf("written=%q %v", content, err)
+	}
+	if err := backend.Edit(ctx, &filesystem.EditRequest{FilePath: written, OldString: "100", NewString: "200"}); err == nil {
+		t.Fatal("ambiguous edit accepted")
+	}
+	if err := backend.Edit(ctx, &filesystem.EditRequest{FilePath: written, OldString: "收入 100", NewString: "收入 300"}); err != nil {
+		t.Fatal(err)
+	}
+	if err := backend.Edit(ctx, &filesystem.EditRequest{FilePath: written, OldString: "100", NewString: "150", ReplaceAll: true}); err != nil {
+		t.Fatal(err)
+	}
+	if content, _ := os.ReadFile(written); string(content) != "收入 300\n支出 150\n" {
+		t.Fatalf("edited=%q", content)
+	}
+	if err := backend.Edit(ctx, &filesystem.EditRequest{FilePath: "app.bin", OldString: "a", NewString: "c"}); err == nil {
+		t.Fatal("binary edit accepted")
+	}
+	if err := backend.Delete(ctx, "src"); err == nil {
+		t.Fatal("non-empty folder deleted")
+	}
+	if err := backend.Delete(ctx, written); err != nil {
+		t.Fatal(err)
+	}
+	if err := backend.Delete(ctx, "reports"); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := os.Stat(filepath.Join(root, "reports")); !os.IsNotExist(err) {
+		t.Fatalf("reports still exists: %v", err)
 	}
 }
 
@@ -189,5 +225,73 @@ func TestSearch(t *testing.T) {
 	}
 	if _, err := backend.GrepRaw(ctx, &filesystem.GrepRequest{Pattern: "(?<=a)b"}); err == nil {
 		t.Fatal("unsupported regexp accepted")
+	}
+}
+
+// TestConcurrentEditsAndReplace 验证并行修改同一文件的改动全部保留，覆盖时保留原权限且符号链接写入目标。
+func TestConcurrentEditsAndReplace(t *testing.T) {
+	backend, root, _ := newTestWorkspace(t)
+	ctx := context.Background()
+	file := filepath.Join(root, "list.txt")
+	lines := make([]string, 20)
+	for i := range lines {
+		lines[i] = fmt.Sprintf("item-%02d", i)
+	}
+	if err := os.WriteFile(file, []byte(strings.Join(lines, "\n")), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	var group sync.WaitGroup
+	for i := range lines {
+		group.Go(func() {
+			if err := backend.Edit(ctx, &filesystem.EditRequest{FilePath: file, OldString: lines[i], NewString: lines[i] + "-done"}); err != nil {
+				t.Error(err)
+			}
+		})
+	}
+	group.Wait()
+	content, _ := os.ReadFile(file)
+	if strings.Count(string(content), "-done") != len(lines) {
+		t.Fatalf("content=%q", content)
+	}
+	if info, _ := os.Stat(file); info.Mode().Perm() != 0o600 {
+		t.Fatalf("mode=%v", info.Mode().Perm())
+	}
+	link := filepath.Join(root, "link.txt")
+	requireSymlink(t, file, link)
+	if err := backend.Write(ctx, &filesystem.WriteRequest{FilePath: "link.txt", Content: "replaced"}); err != nil {
+		t.Fatal(err)
+	}
+	if info, err := os.Lstat(link); err != nil || info.Mode()&os.ModeSymlink == 0 {
+		t.Fatalf("link replaced: %v", err)
+	}
+	if content, _ := os.ReadFile(file); string(content) != "replaced" {
+		t.Fatalf("target=%q", content)
+	}
+	// 目标尚不存在的链接写入后创建目标，链接本身保留。
+	dangling := filepath.Join(root, "alias.txt")
+	requireSymlink(t, "target.txt", dangling)
+	if err := backend.Write(ctx, &filesystem.WriteRequest{FilePath: "alias.txt", Content: "created"}); err != nil {
+		t.Fatal(err)
+	}
+	if info, err := os.Lstat(dangling); err != nil || info.Mode()&os.ModeSymlink == 0 {
+		t.Fatalf("dangling link replaced: %v", err)
+	}
+	if content, _ := os.ReadFile(filepath.Join(root, "target.txt")); string(content) != "created" {
+		t.Fatalf("dangling target=%q", content)
+	}
+	// 所在目录也是链接时，链接中的 .. 相对真实目录解析。
+	if err := os.MkdirAll(filepath.Join(root, "real", "sub"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	requireSymlink(t, filepath.Join("real", "sub"), filepath.Join(root, "aliasdir"))
+	requireSymlink(t, filepath.Join("..", "target.txt"), filepath.Join(root, "real", "sub", "file.txt"))
+	if err := backend.Write(ctx, &filesystem.WriteRequest{FilePath: "aliasdir/file.txt", Content: "nested"}); err != nil {
+		t.Fatal(err)
+	}
+	if content, _ := os.ReadFile(filepath.Join(root, "real", "target.txt")); string(content) != "nested" {
+		t.Fatalf("nested target=%q", content)
+	}
+	if content, _ := os.ReadFile(filepath.Join(root, "target.txt")); string(content) != "created" {
+		t.Fatalf("root target overwritten=%q", content)
 	}
 }

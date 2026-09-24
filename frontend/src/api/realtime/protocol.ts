@@ -55,7 +55,6 @@ export type RunStreamOperation =
   | { kind: "remove_blocks"; blockIds: string[] }
   | { kind: "append_candidate"; text: string }
   | { kind: "clear_candidate" }
-  | { kind: "reset" }
 
 /** 服务端经事件流下发的事件。 */
 export type RealtimeServerFrame =
@@ -248,7 +247,6 @@ function readOperation(value: unknown): RunStreamOperation {
     case "append_candidate":
       return { kind, text: readString(value, "text") }
     case "clear_candidate":
-    case "reset":
       return { kind }
     default:
       throw new Error(`unsupported run stream operation ${kind}`)

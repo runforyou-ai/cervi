@@ -8,26 +8,7 @@ import {
   CollapsibleContent,
   CollapsibleTrigger,
 } from "@/components/ui/collapsible"
-
-/** 返回工具代码对应的显示名称。 */
-function agentToolLabel(tool: string, t: ReturnType<typeof useTranslation<"common">>["t"]) {
-  switch (tool) {
-    case "search_knowledge":
-      return t("agentTools.searchKnowledge")
-    case "search_customer_history":
-      return t("agentTools.searchCustomerHistory")
-    case "ask_customer":
-      return t("agentTools.askCustomer")
-    case "handoff_to_human":
-      return t("agentTools.handoffToHuman")
-    case "resolve_conversation":
-      return t("agentTools.resolveConversation")
-    case "mcp":
-      return t("agentTools.mcp")
-    default:
-      return tool
-  }
-}
+import { agentToolLabel } from "@/lib/agent-tool-labels"
 
 /** 折叠展示内置规则正文，工具清单常驻显示。 */
 export function AgentBehaviorSummary({

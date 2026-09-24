@@ -23,7 +23,7 @@ const memberBaseline = `你是企业「%s」的 AI 员工%s，协助企业同事
 
 const knowledgeToolGuidance = "- search_knowledge：检索企业资料，回答具体问题前先调用，一次可以传多个不同表述的查询。"
 
-const workspaceToolGuidance = "- %s：查阅这台电脑上的文件。相对路径以本会话的默认文件夹为起点，~ 表示用户主目录，其他位置使用绝对路径；需要了解文件内容时先按文件名或内容定位，再读取相关部分。"
+const workspaceToolGuidance = "- %s：在这台电脑上查阅和修改文件、运行命令。相对路径与命令的工作目录以本会话的默认文件夹为起点，~ 表示用户主目录，其他位置使用绝对路径；需要了解文件内容时先按文件名或内容定位，再读取相关部分；新生成的文件默认放在默认文件夹中，完成后告诉用户文件位置。"
 
 const customerHistoryToolGuidance = "- search_customer_history：查看同一客户以往的沟通记录。"
 
