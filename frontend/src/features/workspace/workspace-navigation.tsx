@@ -56,7 +56,7 @@ import {
 import { WorkStatusDot, WorkStatusPicker } from "@/components/work-status"
 import { UserAvatar } from "@/components/user-avatar"
 import { cn } from "@/lib/utils"
-import { resolveAppPlatform, resolveDesktopOS } from "@/platform/app-platform"
+import { resolveAppPlatform } from "@/platform/app-platform"
 import { requestNotificationPermissionFromMessageMenu } from "@/platform/notifications"
 
 /** 打开全局搜索的入口，尺寸与导航项一致；窄栏下收为图标并由浮层提示。 */
@@ -310,6 +310,7 @@ export function WorkspaceNavigation({
   inSettings,
   appHref,
   collapsed,
+  inlineRailToggle,
   pendingCount,
   onToggleRail,
   onLogout,
@@ -319,6 +320,7 @@ export function WorkspaceNavigation({
   inSettings: boolean
   appHref: string
   collapsed: boolean
+  inlineRailToggle: boolean
   pendingCount: number
   onToggleRail: () => void
   onLogout: () => void
@@ -333,9 +335,9 @@ export function WorkspaceNavigation({
   const userMenuTriggerRef = useRef<HTMLButtonElement>(null)
   const skipUserMenuFocusRestoreRef = useRef(false)
   const showAppVersion = inSettings && resolveAppPlatform() === "desktop"
-  // Web 与 Windows 端展开态的收起开关位于一级栏顶部行的右侧。
-  const inlineRailToggle =
-    !collapsed && (resolveAppPlatform() === "web" || resolveDesktopOS() === "windows") ? (
+  // 展开态的收起开关按工作台布局放在一级栏顶部行的右侧或标题栏操作行。
+  const railToggle =
+    !collapsed && inlineRailToggle ? (
       <WorkspaceRailToggle collapsed={false} onToggle={onToggleRail} />
     ) : null
 
@@ -394,13 +396,13 @@ export function WorkspaceNavigation({
         <WorkspaceSettingsMenu
           appHref={appHref}
           collapsed={collapsed}
-          railToggle={inlineRailToggle}
+          railToggle={railToggle}
         />
       ) : (
         <WorkspaceMenu
           identity={identity}
           collapsed={collapsed}
-          railToggle={inlineRailToggle}
+          railToggle={railToggle}
           pendingCount={pendingCount}
           onInboxClick={requestMessageNotificationPermission}
         />

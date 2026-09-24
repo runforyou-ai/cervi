@@ -34,7 +34,7 @@ import {
   WorkspaceRailResizer,
   WorkspaceRailToggle,
 } from "@/features/workspace/workspace-rail"
-import { resolveAppPlatform, resolveDesktopOS } from "@/platform/app-platform"
+import { resolveAppPlatform } from "@/platform/app-platform"
 import { updateNotificationUnreadIndicator } from "@/platform/notifications"
 
 /** 页面导航后清除非编辑区域的文字选区。 */
@@ -71,9 +71,8 @@ function WorkspaceShell({ identity }: { identity: Identity }) {
   const navigate = useNavigate()
   const [loggingOut, setLoggingOut] = useState(false)
   const rail = useWorkspaceRail()
-  // macOS 与 Linux 桌面端在标题栏操作行提供前进后退入口。
-  const nativeHistoryNav =
-    resolveAppPlatform() === "desktop" && resolveDesktopOS() !== "windows"
+  // 桌面端在一级栏顶部的标题栏操作行提供收起开关和前进后退，Web 端的前进后退由浏览器提供。
+  const titlebarActionsEnabled = resolveAppPlatform() === "desktop"
   const history = useWorkspaceHistory()
   const [attentionPending, setAttentionPending] = useState(false)
   const workspaceLocation = resolveWorkspaceLocation(location)
@@ -225,9 +224,9 @@ function WorkspaceShell({ identity }: { identity: Identity }) {
     ? workspaceLocation.canonicalHref
     : fallbackHrefRef.current
   const inSettings = isSettingsHref(pageHref)
-  // 标题栏操作行仅在 macOS 与 Linux 桌面端的导航栏展开时显示。
+  // 窄栏下收起开关随窄栏渲染，标题栏操作行连同前进后退一并隐藏。
   const railCollapsed = rail.collapsed
-  const showTitlebarActions = !railCollapsed && nativeHistoryNav
+  const showTitlebarActions = !railCollapsed && titlebarActionsEnabled
 
   return (
     <UnsavedChangesGuard>
@@ -248,6 +247,7 @@ function WorkspaceShell({ identity }: { identity: Identity }) {
             inSettings={inSettings}
             appHref={appHrefRef.current}
             collapsed={railCollapsed}
+            inlineRailToggle={!titlebarActionsEnabled}
             pendingCount={pendingCount}
             onToggleRail={rail.toggleCollapsed}
             onLogout={handleLogout}

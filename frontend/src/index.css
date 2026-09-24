@@ -421,9 +421,9 @@ body,
   padding-left: var(--cervi-workspace-titlebar-inset);
 }
 
-/* Linux 桌面端在系统标题栏下保留标题栏操作行。 */
+/* Windows 与 Linux 桌面端使用系统标题栏，标题栏操作行位于一级栏顶部，主内容卡片上沿与 Web 一致。 */
+[data-native-os="windows"] .cervi-workspace-shell,
 [data-native-os="linux"] .cervi-workspace-shell {
-  --cervi-workspace-content-top: 28px;
   --cervi-workspace-rail-top-expanded: 40px;
   --cervi-workspace-titlebar-height: 40px;
 }
