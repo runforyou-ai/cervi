@@ -221,7 +221,7 @@ SaaS 通过部署主域名 `https://cervi.runforyou.app/operator/v1` 调用运�
 
 官方身份接入采用 OpenID Connect Authorization Code Flow，并使用 PKCE。SaaS 配置唯一可信 issuer，Web、桌面端和移动端分别使用登记的客户端标识和回调地址。
 
-登录授权入口在官方域名完成身份确认。SaaS 前端使用自己的 Bearer 会话调用授权确认接口。官网和企业工作台各自管理所在 origin 的登录状态。
+登录授权入口在官方域名完成身份确认，授权确认由账号域名下的官方会话完成。官网和企业工作台各自管理所在 origin 的登录状态。
 
 登录尝试带用途，取值为 `login` 和 `accept_invitation`。两种用途共用同一套授权发起、回调和交换流程，只在读到稳定 subject 之后的处理不同。`accept_invitation` 的尝试额外绑定一条邀请记录，由发起时提交的邀请令牌确定。
 
@@ -698,11 +698,11 @@ SaaS 数据库恢复备份后，按 9.2 的对账流程恢复权益与官方身�
 
 | 项目 | 结论 |
 | --- | --- |
-| SaaS 工程技术栈 | 使用 Laravel。官网账号与邮箱验证使用框架认证能力，SaaS 前端接口使用 Sanctum Bearer Token，运营后台使用 Filament，开通与权益同步待办使用队列和定时任务 |
+| SaaS 工程技术栈 | 使用 Laravel。官网营销页、账号页与授权页使用 Blade，用户控制台（创建企业、开通进度、企业列表、订阅）使用 Blade + Livewire，均由会话认证，不设独立前端应用与前端 API；运营后台使用 Filament；开通与权益同步待办使用队列和定时任务 |
 | 官方身份服务实现 | 由 SaaS 承担 OIDC 提供方，基于 Laravel Passport 与 OIDC 扩展提供发现文档、JWKS、ID Token 和 PKCE。subject 使用 SaaS 用户表的 UUID。Web、桌面端和移动端各登记一个客户端，桌面端与移动端为不带密钥的公开客户端；企业 Web 回调在开通时写入 Web 客户端的精确回调地址列表。ID Token 携带 `nonce`、`email` 和 `email_verified` |
 | 官网与账号域名 | 官网、账号授权和 SaaS 管理入口使用企业后缀 `cervi.runforyou.app` 之外的域名，具体地址随 SaaS 部署确定 |
 
-官方身份服务的账号授权页在账号域名下使用会话 Cookie 保持官方登录状态，支撑已有官方会话时直接授权；SaaS 前端接口与 Cervi 各端仍使用 Bearer Token。cervi-server 按标准 OIDC 发现文档和 JWKS 校验 ID Token，只依赖配置的 issuer。
+官方身份服务的账号授权页在账号域名下使用会话 Cookie 保持官方登录状态，支撑已有官方会话时直接授权；Cervi 各端仍使用 Bearer Token。身份服务在授权完成前要求邮箱已验证，因此签发的 ID Token 中 `email_verified` 为 true；cervi-server 接受邀请时仍按 6.3 校验该声明。cervi-server 按标准 OIDC 发现文档和 JWKS 校验 ID Token，只依赖配置的 issuer。
 
 身份服务选型确认前完成一次验证：发现文档与 JWKS 可用，ID Token 携带上述声明，公开客户端可用 PKCE 完成授权，Web 客户端可通过代码增加精确回调地址。
 
