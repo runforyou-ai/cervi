@@ -42,6 +42,22 @@ const preferredCountries = [
   "...",
 ] as const
 
+/** 电话号码输入区，填满外层容器，边框、底色和焦点样式由外层容器承担。 */
+const PhoneNumberField = React.forwardRef<
+  HTMLInputElement,
+  React.ComponentProps<"input">
+>(({ className, ...props }, ref) => (
+  <Input
+    {...props}
+    ref={ref}
+    className={cn(
+      className,
+      "h-full rounded-l-none border-0 bg-transparent shadow-none focus-visible:ring-0 dark:bg-transparent",
+    )}
+  />
+))
+PhoneNumberField.displayName = "PhoneNumberField"
+
 const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
   ({ className, onChange, value, ...props }, ref) => {
     const { i18n } = useTranslation()
@@ -62,7 +78,7 @@ const PhoneInput = React.forwardRef<HTMLInputElement, PhoneInputProps>(
         limitMaxLength
         labels={chinese ? zhLabels : enLabels}
         locales={chinese ? "zh-CN" : "en-US"}
-        inputComponent={Input}
+        inputComponent={PhoneNumberField}
       />
     )
   },

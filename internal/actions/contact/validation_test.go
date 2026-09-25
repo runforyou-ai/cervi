@@ -37,7 +37,7 @@ func TestNormalizeContactInput(t *testing.T) {
 
 // TestNormalizeContactInputRejectsInvalidValues 验证联系人输入边界。
 func TestNormalizeContactInputRejectsInvalidValues(t *testing.T) {
-	_, fields := normalizeContactInput(ContactInput{})
+	_, fields := normalizeNewContactInput(ContactInput{})
 	if fields["displayName"] != ValidationIdentityRequired {
 		t.Fatalf("identity validation = %q, want %q", fields["displayName"], ValidationIdentityRequired)
 	}
@@ -82,6 +82,17 @@ func TestNormalizeContactInputRejectsInvalidValues(t *testing.T) {
 	})
 	if fields["methods"] != ValidationMethodsTooMany {
 		t.Fatalf("methods validation = %q, want %q", fields["methods"], ValidationMethodsTooMany)
+	}
+}
+
+// TestNormalizeContactInputAllowsAnonymousContact 验证更新联系人时姓名和联系方式可以同时为空。
+func TestNormalizeContactInputAllowsAnonymousContact(t *testing.T) {
+	_, fields := normalizeContactInput(ContactInput{
+		ChannelID: "4f7b7c62-6a1d-4c5e-9d3a-2f1e8b6c9a01",
+		Stage:     domain.ContactStageLead,
+	})
+	if len(fields) > 0 {
+		t.Fatalf("validation fields = %#v, want empty", fields)
 	}
 }
 

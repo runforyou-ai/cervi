@@ -23,7 +23,7 @@ func NewCreateContactAction(db *bun.DB) *CreateContactAction {
 
 // Execute 校验字段并在当前企业中创建联系人。
 func (a *CreateContactAction) Execute(ctx context.Context, identity *servermodels.Identity, input ContactInput) (*ContactDetail, error) {
-	input, fields := normalizeContactInput(input)
+	input, fields := normalizeNewContactInput(input)
 	if len(fields) > 0 {
 		return nil, &ValidationError{Fields: fields}
 	}
