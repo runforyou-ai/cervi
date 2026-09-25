@@ -47,7 +47,9 @@ func TestSearchProviders(t *testing.T) {
 	}{
 		{domain.WebSearchProviderTavily,
 			`{"results":[{"title":"T","url":"https://a.example/x","content":"S","published_date":"2026-01-01"}]}`,
-			func(c *captured) bool { return c.header.Get("Authorization") == "Bearer key" && c.body["time_range"] == "week" },
+			func(c *captured) bool {
+				return c.header.Get("Authorization") == "Bearer key" && c.body["time_range"] == "week"
+			},
 			Item{Title: "T", URL: "https://a.example/x", Snippet: "S", SiteName: "a.example", PublishedAt: "2026-01-01"}},
 		{domain.WebSearchProviderBrave,
 			`{"web":{"results":[{"title":"T","url":"https://a.example/x","description":"<strong>S</strong> &amp; more","page_age":"2026-01-01","profile":{"name":"A"}}]}}`,
@@ -57,7 +59,9 @@ func TestSearchProviders(t *testing.T) {
 			Item{Title: "T", URL: "https://a.example/x", Snippet: "S & more", SiteName: "A", PublishedAt: "2026-01-01"}},
 		{domain.WebSearchProviderExa,
 			`{"results":[{"title":"T","url":"https://a.example/x","publishedDate":"2026-01-01","highlights":["S1","S2"]}]}`,
-			func(c *captured) bool { return c.header.Get("X-Api-Key") == "key" && c.body["startPublishedDate"] != nil },
+			func(c *captured) bool {
+				return c.header.Get("X-Api-Key") == "key" && c.body["startPublishedDate"] != nil
+			},
 			Item{Title: "T", URL: "https://a.example/x", Snippet: "S1 … S2", SiteName: "a.example", PublishedAt: "2026-01-01"}},
 		{domain.WebSearchProviderPerplexity,
 			`{"results":[{"title":"T","url":"https://a.example/x","snippet":"S","date":"2026-01-01"}]}`,
@@ -83,15 +87,21 @@ func TestSearchProviders(t *testing.T) {
 			Item{Title: "T", URL: "https://a.example/x", Snippet: "S", SiteName: "a.example"}},
 		{domain.WebSearchProviderFirecrawl,
 			`{"success":true,"data":{"web":[{"title":"T","url":"https://a.example/x","description":"S"}]}}`,
-			func(c *captured) bool { return c.header.Get("Authorization") == "Bearer key" && c.body["tbs"] == "qdr:w" },
+			func(c *captured) bool {
+				return c.header.Get("Authorization") == "Bearer key" && c.body["tbs"] == "qdr:w"
+			},
 			Item{Title: "T", URL: "https://a.example/x", Snippet: "S", SiteName: "a.example"}},
 		{domain.WebSearchProviderBocha,
 			`{"code":200,"data":{"webPages":{"value":[{"name":"T","url":"https://a.example/x","snippet":"S","siteName":"A","datePublished":"2026-01-01"}]}}}`,
-			func(c *captured) bool { return c.header.Get("Authorization") == "Bearer key" && c.body["freshness"] == "oneWeek" },
+			func(c *captured) bool {
+				return c.header.Get("Authorization") == "Bearer key" && c.body["freshness"] == "oneWeek"
+			},
 			Item{Title: "T", URL: "https://a.example/x", Snippet: "S", SiteName: "A", PublishedAt: "2026-01-01"}},
 		{domain.WebSearchProviderAliyunIQS,
 			`{"pageItems":[{"title":"T","link":"https://a.example/x","snippet":"S","hostname":"A","publishedTime":"2026-01-01"}]}`,
-			func(c *captured) bool { return c.header.Get("Authorization") == "Bearer key" && c.body["timeRange"] == "OneWeek" },
+			func(c *captured) bool {
+				return c.header.Get("Authorization") == "Bearer key" && c.body["timeRange"] == "OneWeek"
+			},
 			Item{Title: "T", URL: "https://a.example/x", Snippet: "S", SiteName: "A", PublishedAt: "2026-01-01"}},
 		{domain.WebSearchProviderBaidu,
 			`{"request_id":"r","references":[{"title":"T","url":"https://a.example/x","content":"S","website":"A","date":"2026-01-01"}]}`,
@@ -101,7 +111,9 @@ func TestSearchProviders(t *testing.T) {
 			Item{Title: "T", URL: "https://a.example/x", Snippet: "S", SiteName: "A", PublishedAt: "2026-01-01"}},
 		{domain.WebSearchProviderVolcengine,
 			`{"ResponseMetadata":{},"Result":{"WebResults":[{"Title":"T","Url":"https://a.example/x","Snippet":"S","SiteName":"A","PublishTime":"2026-01-01"}]}}`,
-			func(c *captured) bool { return c.header.Get("Authorization") == "Bearer key" && c.body["TimeRange"] == "OneWeek" },
+			func(c *captured) bool {
+				return c.header.Get("Authorization") == "Bearer key" && c.body["TimeRange"] == "OneWeek"
+			},
 			Item{Title: "T", URL: "https://a.example/x", Snippet: "S", SiteName: "A", PublishedAt: "2026-01-01"}},
 		{domain.WebSearchProviderZhipu,
 			`{"search_result":[{"title":"T","link":"https://a.example/x","content":"S","media":"A","publish_date":"2026-01-01"}]}`,
@@ -111,7 +123,9 @@ func TestSearchProviders(t *testing.T) {
 			Item{Title: "T", URL: "https://a.example/x", Snippet: "S", SiteName: "A", PublishedAt: "2026-01-01"}},
 		{domain.WebSearchProviderSearXNG,
 			`{"results":[{"title":"T","url":"https://a.example/x","content":"S","publishedDate":null}]}`,
-			func(c *captured) bool { return strings.Contains(c.query, "format=json") && strings.Contains(c.query, "time_range=week") },
+			func(c *captured) bool {
+				return strings.Contains(c.query, "format=json") && strings.Contains(c.query, "time_range=week")
+			},
 			Item{Title: "T", URL: "https://a.example/x", Snippet: "S", SiteName: "a.example"}},
 	}
 	for _, tc := range cases {
