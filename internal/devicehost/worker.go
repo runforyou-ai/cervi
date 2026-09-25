@@ -17,6 +17,7 @@ import (
 
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
+	"github.com/runforyou-ai/cervi/internal/integration/localmcp"
 	"github.com/runforyou-ai/cervi/internal/integration/localworkspace"
 	"github.com/runforyou-ai/cervi/internal/integration/toolchain"
 	"github.com/runforyou-ai/cervi/internal/realtime/protocol"
@@ -66,6 +67,8 @@ type Worker struct {
 	client    RunClient
 	runtime   agentruntime.Runtime
 	toolchain Toolchain
+	// localMCP 是这台电脑上主人的助理共用的本地 MCP 服务配置。
+	localMCP *localmcp.Store
 	// folders 是各会话默认文件夹的上级目录。
 	folders string
 
@@ -93,7 +96,7 @@ type activeRun struct {
 }
 
 // NewWorker 创建设备执行循环，folders 是各会话默认文件夹的上级目录；当前平台不注册本机设备时返回 nil。
-func NewWorker(registrar *Registrar, client RunClient, runtime agentruntime.Runtime, runEnvironment Toolchain, folders string) *Worker {
+func NewWorker(registrar *Registrar, client RunClient, runtime agentruntime.Runtime, runEnvironment Toolchain, localMCP *localmcp.Store, folders string) *Worker {
 	if registrar == nil {
 		return nil
 	}
@@ -103,6 +106,7 @@ func NewWorker(registrar *Registrar, client RunClient, runtime agentruntime.Runt
 		client:    client,
 		runtime:   runtime,
 		toolchain: runEnvironment,
+		localMCP:  localMCP,
 		folders:   folders,
 		ctx:       ctx,
 		cancel:    cancel,
@@ -112,11 +116,12 @@ func NewWorker(registrar *Registrar, client RunClient, runtime agentruntime.Runt
 	}
 }
 
-// Start 订阅登录凭据变化，开始领取循环与设备事件流。
+// Start 开始准备运行环境，订阅登录凭据变化，开始领取循环与设备事件流；登录前按官方源准备，登录后按企业下发的下载源继续。
 func (w *Worker) Start() {
 	if w == nil {
 		return
 	}
+	w.toolchain.Ensure(w.Sources())
 	w.registrar.sessions.Subscribe(func() {
 		w.Wake()
 		signal(w.session)
@@ -135,6 +140,13 @@ func (w *Worker) Stop() {
 	w.loops.Wait()
 	w.runs.Wait()
 	w.toolchain.Close()
+}
+
+// Sources 返回企业服务端最近一次下发的运行环境下载源，尚未取得时为官方源。
+func (w *Worker) Sources() toolchain.Sources {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.sources
 }
 
 // Wake 请求立即比较一次工作水位。

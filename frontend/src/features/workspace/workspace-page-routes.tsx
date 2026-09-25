@@ -110,6 +110,10 @@ const workspaceRouteDefinitions = [
     element: <SettingsPage section="devices" />,
   },
   {
+    path: "/settings/local",
+    element: <SettingsPage section="local" />,
+  },
+  {
     path: "/settings/general",
     element: <SettingsPage section="general" />,
   },

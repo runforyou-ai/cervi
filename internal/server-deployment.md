@@ -77,7 +77,7 @@ storage:
 
 ## Agent 运行环境下载源
 
-桌面端在本机为助理准备 uv、Node.js 与默认 Python。`agentToolchain` 配置这些内容的下载源，经设备工作查询下发给本企业的桌面端，由桌面端直接下载；空字段使用官方源：
+桌面端在本机为助理和本地 MCP 服务准备 uv、Node.js 与默认 Python。`agentToolchain` 配置这些内容的下载源，经设备工作查询下发给本企业的桌面端，由桌面端直接下载；空字段使用官方源：
 
 ```yaml
 agentToolchain:
@@ -96,7 +96,8 @@ agentToolchain:
 | `nodeDownloadURL` | 下载 Node.js，按 `<前缀>/v<版本>/<文件名>` 拼接 | `https://nodejs.org/dist` |
 | `npmRegistry` | 助理安装的 npm 包；作为命令的 `NPM_CONFIG_REGISTRY` | npm 默认源 |
 
-- uv 与 Node.js 按桌面端内置的 SHA256 校验，镜像只负责传输。`pypiIndexURL` 必须是 PEP 503 简单索引，并已同步桌面端固定的 uv 版本。
+- 桌面端启动后自动安装内置版本的 uv 与 Node.js，按内置的 SHA256 校验；`pypiIndexURL` 必须是 PEP 503 简单索引，并已同步内置的 uv 版本。
+- 用户在桌面端「设置 → 本机」检查更新时，uv 取 `pypiIndexURL` 中最新的正式版本并按索引给出的 SHA256 校验，Node.js 取 `<nodeDownloadURL>/index.json` 中最新的 LTS 版本并按 `<nodeDownloadURL>/v<版本>/SHASUMS256.txt` 校验，镜像需要提供这两个文件。
 - 各字段必须是完整的 HTTP 或 HTTPS 地址，对应环境变量为 `AGENT_TOOLCHAIN_NODE_DOWNLOAD_URL`、`AGENT_TOOLCHAIN_PYTHON_INSTALL_MIRROR`、`AGENT_TOOLCHAIN_PYPI_INDEX_URL` 和 `AGENT_TOOLCHAIN_NPM_REGISTRY`。
 
 ## 访客地区

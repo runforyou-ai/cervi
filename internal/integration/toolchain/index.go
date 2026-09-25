@@ -9,41 +9,40 @@ import (
 	"net/http"
 	"net/url"
 	"path"
+	"strings"
 
 	"golang.org/x/net/html"
 )
 
-// packageFileURL 在 PyPI 简单索引（PEP 503）的项目页中查找指定文件的下载地址，索引不可用或未收录该文件时返回下载失败。
-func packageFileURL(ctx context.Context, client *http.Client, index, project, file string) (string, error) {
+// indexLink 是简单索引项目页中的一个文件，sha256 取自链接片段，索引未给出时为空。
+type indexLink struct {
+	file   string
+	url    string
+	sha256 string
+}
+
+// indexLinks 读取 PyPI 简单索引（PEP 503）中项目页列出的全部文件，相对链接按项目页解析；索引不可用时返回下载失败。
+func indexLinks(ctx context.Context, client *http.Client, index, project string) ([]indexLink, error) {
 	ctx, cancel := context.WithTimeoutCause(ctx, downloadStallTimeout, errDownloadStalled)
 	defer cancel()
 	page, err := url.Parse(index + "/" + project + "/")
 	if err != nil {
-		return "", fmt.Errorf("parse package index: %w", err)
+		return nil, fmt.Errorf("parse package index: %w", err)
 	}
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, page.String(), nil)
+	response, err := get(ctx, client, page.String(), "text/html")
 	if err != nil {
-		return "", fmt.Errorf("build package index request: %w", err)
-	}
-	request.Header.Set("Accept", "text/html")
-	request.Header.Set("User-Agent", userAgent)
-	response, err := client.Do(request)
-	if err != nil {
-		return "", &stepError{failure: FailureDownload, err: fmt.Errorf("read package index %s: %w", page, cmp.Or(context.Cause(ctx), err))}
+		return nil, err
 	}
 	defer response.Body.Close()
-	if response.StatusCode != http.StatusOK {
-		return "", &stepError{failure: FailureDownload, err: fmt.Errorf("read package index %s: HTTP %d", page, response.StatusCode)}
-	}
+	links := make([]indexLink, 0)
 	tokens := html.NewTokenizer(response.Body)
 	for {
 		switch tokens.Next() {
 		case html.ErrorToken:
-			err := tokens.Err()
-			if errors.Is(err, io.EOF) {
-				return "", &stepError{failure: FailureDownload, err: fmt.Errorf("package index %s does not list %s", page, file)}
+			if err := tokens.Err(); !errors.Is(err, io.EOF) {
+				return nil, &stepError{failure: FailureDownload, err: fmt.Errorf("read package index %s: %w", page, cmp.Or(context.Cause(ctx), err))}
 			}
-			return "", &stepError{failure: FailureDownload, err: fmt.Errorf("read package index %s: %w", page, cmp.Or(context.Cause(ctx), err))}
+			return links, nil
 		case html.StartTagToken:
 			name, hasAttributes := tokens.TagName()
 			if string(name) != "a" || !hasAttributes {
@@ -51,11 +50,11 @@ func packageFileURL(ctx context.Context, client *http.Client, index, project, fi
 			}
 			for {
 				key, value, more := tokens.TagAttr()
-				// 链接可以是相对索引页的地址，文件名之后的片段是索引给出的摘要。
 				if string(key) == "href" {
-					if link, err := page.Parse(string(value)); err == nil && path.Base(link.Path) == file {
+					if link, err := page.Parse(string(value)); err == nil {
+						digest, _ := strings.CutPrefix(link.Fragment, "sha256=")
 						link.Fragment = ""
-						return link.String(), nil
+						links = append(links, indexLink{file: path.Base(link.Path), url: link.String(), sha256: digest})
 					}
 				}
 				if !more {
@@ -64,4 +63,23 @@ func packageFileURL(ctx context.Context, client *http.Client, index, project, fi
 			}
 		}
 	}
+}
+
+// get 以 Cervi 的 User-Agent 发起 GET 请求，连接失败或状态码不是 200 时返回下载失败。
+func get(ctx context.Context, client *http.Client, target, accept string) (*http.Response, error) {
+	request, err := http.NewRequestWithContext(ctx, http.MethodGet, target, nil)
+	if err != nil {
+		return nil, fmt.Errorf("build request: %w", err)
+	}
+	request.Header.Set("Accept", accept)
+	request.Header.Set("User-Agent", userAgent)
+	response, err := client.Do(request)
+	if err != nil {
+		return nil, &stepError{failure: FailureDownload, err: fmt.Errorf("read %s: %w", target, cmp.Or(context.Cause(ctx), err))}
+	}
+	if response.StatusCode != http.StatusOK {
+		response.Body.Close()
+		return nil, &stepError{failure: FailureDownload, err: fmt.Errorf("read %s: HTTP %d", target, response.StatusCode)}
+	}
+	return response, nil
 }

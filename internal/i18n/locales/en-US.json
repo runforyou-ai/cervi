@@ -530,5 +530,11 @@
   "error.agent_run_process_read_failed": "Could not load the run process. Try again.",
   "error.agent_run_process_unavailable": "The run process is no longer available",
   "error.conversation_message_unavailable": "The original message is no longer available",
-  "error.conversation_mention_target_invalid": "This message does not mention you"
+  "error.conversation_mention_target_invalid": "This message does not mention you",
+  "error.local_toolchain_busy": "The work environment is being prepared or updated. Try again later.",
+  "error.local_toolchain_not_ready": "The work environment is still being prepared. You can update it once it's ready.",
+  "error.local_toolchain_download": "The download server is unreachable. The update didn't finish.",
+  "error.local_toolchain_verify": "The downloaded files failed verification. The update didn't finish.",
+  "error.local_toolchain_install": "Couldn't install on this computer, so the update didn't finish.",
+  "error.local_mcp_server_not_found": "The local MCP server doesn't exist."
 }

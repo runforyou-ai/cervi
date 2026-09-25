@@ -3109,11 +3109,33 @@ export interface LocalDevice {
 }
 
 /**
- * LocalToolchain 定义本机 Agent 运行环境的准备状态，失败原因只在失败状态下非空。
+ * LocalEnvironment 定义本机为助理提供的运行环境与本地 MCP 服务，未安装的组件版本为空。
+ */
+export interface LocalEnvironment {
+    "toolchain": LocalToolchain;
+    "location": string;
+    "uvVersion": string;
+    "nodeVersion": string;
+    "pythonVersion": string;
+    "mcpServers": LocalMCPServer[] | null;
+}
+
+/**
+ * LocalMCPServer 定义这台电脑上主人的助理共用的一个本地 MCP 服务。
+ */
+export interface LocalMCPServer {
+    "name": string;
+    "command": string;
+    "args": string[] | null;
+}
+
+/**
+ * LocalToolchain 定义本机 Agent 运行环境的准备状态，失败原因只在失败状态下非空，Updating 表示正在按用户请求更新。
  */
 export interface LocalToolchain {
     "state": LocalToolchainState;
     "failure": LocalToolchainFailure | null;
+    "updating": boolean;
 }
 
 /**
@@ -3165,6 +3187,13 @@ export enum LocalToolchainState {
      */
     LocalToolchainStateFailed = "failed",
 };
+
+/**
+ * LocalToolchainUpdate 定义更新本机运行环境的结果，Updated 表示有组件换了版本。
+ */
+export interface LocalToolchainUpdate {
+    "updated": boolean;
+}
 
 /**
  * Locale 表示应用支持的本地化语言。

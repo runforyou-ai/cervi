@@ -6,6 +6,7 @@ import (
 	"errors"
 	"io"
 	"net/http"
+	"os/exec"
 	"slices"
 	"strings"
 	"time"
@@ -23,12 +24,14 @@ const (
 	CustomerEmailHeader = "X-Cervi-Customer-Email"
 )
 
-// Config 定义远程 MCP 连接配置，Headers 附加到会话的每个 HTTP 请求。
+// Config 定义 MCP 连接配置：Command 非空时经标准输入输出启动本地服务，否则连接远程服务，Headers 附加到会话的每个 HTTP 请求。
 type Config struct {
 	URL                string
 	ServerType         domain.MCPServerType
 	AuthorizationToken string
 	Headers            map[string]string
+	// Command 是本地服务的启动命令，会话关闭时结束进程。
+	Command *exec.Cmd
 }
 
 // Discoverer 读取 MCP 服务的完整工具目录。
@@ -73,8 +76,11 @@ func (c *Client) Discover(ctx context.Context, config Config) ([]domain.MCPTool,
 	return tools, nil
 }
 
-// newTransport 按服务类型创建带认证的 MCP 传输，deadline 为零值时请求期限跟随调用方 context。
+// newTransport 为本地服务创建标准输入输出传输，为远程服务按服务类型创建带认证的传输，deadline 为零值时请求期限跟随调用方 context。
 func newTransport(config Config, deadline time.Time) (sdk.Transport, error) {
+	if config.Command != nil {
+		return &sdk.CommandTransport{Command: config.Command}, nil
+	}
 	client := connectiontest.NewHTTPClient()
 	client.Transport = &authenticatedTransport{token: config.AuthorizationToken, headers: config.Headers, deadline: deadline}
 	switch config.ServerType {

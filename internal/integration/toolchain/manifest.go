@@ -3,16 +3,16 @@ package toolchain
 import "runtime"
 
 const (
-	// uvVersion 是桌面端使用的 uv 版本。
+	// uvVersion 是首次安装的 uv 版本，已安装版本低于它时自动安装。
 	uvVersion = "0.12.19"
-	// nodeVersion 是桌面端使用的 Node.js 版本。
+	// nodeVersion 是首次安装的 Node.js 版本，已安装版本低于它时自动安装。
 	nodeVersion = "24.21.0"
-	// PythonVersion 是以 uv 安装为默认解释器的 Python 版本。
+	// PythonVersion 是首次安装时以 uv 安装为默认解释器的 Python 版本。
 	PythonVersion = "3.13.15"
 	// defaultPyPIIndexURL 是官方 PyPI 简单索引，uv 从中按 wheel 文件名查找下载地址。
 	defaultPyPIIndexURL = "https://pypi.org/simple"
-	// uvWheelContent 是 uv wheel 中存放可执行文件的目录。
-	uvWheelContent = "uv-" + uvVersion + ".data/scripts"
+	// pythonSeries 是默认 Python 的版本系列，更新时升级到该系列的最新补丁版本。
+	pythonSeries = "3.13"
 	// defaultNodeDownloadURL 是 Node.js 发行物的官方下载前缀，完整地址为 <前缀>/v<版本>/<文件名>。
 	defaultNodeDownloadURL = "https://nodejs.org/dist"
 )
@@ -41,6 +41,11 @@ var nodeArtifacts = map[string]artifact{
 	"windows/arm64": {file: "node-v24.21.0-win-arm64.zip", sha256: "8779b1bde1d39f8d420e3b57aa657b39891af434d3de44a919044cec06785921"},
 	"linux/amd64":   {file: "node-v24.21.0-linux-x64.tar.gz", sha256: "6e1db87ef58b8819e5d5402eff1536491b18edd8eb7bee5ef7897876e88dc5ff"},
 	"linux/arm64":   {file: "node-v24.21.0-linux-arm64.tar.gz", sha256: "724282c3b43aec998aa9527380465b45d229e021b58035f5f4f63095eabfe5d5"},
+}
+
+// uvWheelContent 返回指定版本的 uv wheel 中存放可执行文件的目录。
+func uvWheelContent(version string) string {
+	return "uv-" + version + ".data/scripts"
 }
 
 // platform 返回当前平台在发行物清单中的键。

@@ -41,11 +41,15 @@ function useWindowFullscreen(enabled: boolean) {
   return fullscreen
 }
 
-/** 本机设备状态变化时失效本机设备的读取结果，未挂载的页面下次挂载时重新读取。 */
+/** 本机设备状态变化时失效本机设备与本机环境的读取结果，未挂载的页面下次挂载时重新读取。 */
 function useLocalDeviceRefresh() {
   const invalidate = useResourceInvalidator()
   useEffect(
-    () => onLocalDeviceChanged(() => void invalidate(resourceKeys.currentDevice())),
+    () =>
+      onLocalDeviceChanged(() => {
+        void invalidate(resourceKeys.currentDevice())
+        void invalidate(resourceKeys.localEnvironment())
+      }),
     [invalidate],
   )
 }

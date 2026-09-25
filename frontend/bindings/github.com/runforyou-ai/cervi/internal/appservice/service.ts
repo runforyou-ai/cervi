@@ -549,6 +549,13 @@ export function GetKnowledgeQAEntry(meta: $models.RequestMeta, knowledgeBaseID: 
 }
 
 /**
+ * GetLocalEnvironment 返回本机为助理提供的运行环境与本地 MCP 服务。
+ */
+export function GetLocalEnvironment(meta: $models.RequestMeta): $CancellablePromise<$models.LocalEnvironment> {
+    return $Call.ByID(2566054506, meta);
+}
+
+/**
  * GetMCPServer 返回当前企业中的 MCP 服务详情。
  */
 export function GetMCPServer(meta: $models.RequestMeta, mcpServerID: string): $CancellablePromise<$models.MCPServer> {
@@ -962,6 +969,13 @@ export function OpenConversationWindow(meta: $models.RequestMeta, input: $models
 }
 
 /**
+ * OpenLocalToolchainFolder 在系统文件管理器中打开本机运行环境的安装位置。
+ */
+export function OpenLocalToolchainFolder(meta: $models.RequestMeta): $CancellablePromise<void> {
+    return $Call.ByID(1638985388, meta);
+}
+
+/**
  * PauseAssistant 暂停当前成员名下的助理。
  */
 export function PauseAssistant(meta: $models.RequestMeta, assistantID: string): $CancellablePromise<$models.Assistant> {
@@ -1071,6 +1085,13 @@ export function RegisterDevice(meta: $models.RequestMeta, input: $models.DeviceR
  */
 export function RemoveGroupConversationMember(meta: $models.RequestMeta, conversationID: string, input: $models.GroupConversationMemberInput): $CancellablePromise<$models.GroupConversation> {
     return $Call.ByID(3264103052, meta, conversationID, input);
+}
+
+/**
+ * RemoveLocalMCPServer 删除这台电脑上的本地 MCP 服务。
+ */
+export function RemoveLocalMCPServer(meta: $models.RequestMeta, name: string): $CancellablePromise<void> {
+    return $Call.ByID(2665090536, meta, name);
 }
 
 /**
@@ -1428,6 +1449,13 @@ export function UpdateKnowledgeDocumentContent(meta: $models.RequestMeta, knowle
  */
 export function UpdateKnowledgeQAEntry(meta: $models.RequestMeta, knowledgeBaseID: string, entryID: string, input: $models.KnowledgeQAInput): $CancellablePromise<$models.KnowledgeQAEntry> {
     return $Call.ByID(137278157, meta, knowledgeBaseID, entryID, input);
+}
+
+/**
+ * UpdateLocalToolchain 把本机运行环境更新到下载源的最新版本。
+ */
+export function UpdateLocalToolchain(meta: $models.RequestMeta): $CancellablePromise<$models.LocalToolchainUpdate> {
+    return $Call.ByID(2821157325, meta);
 }
 
 /**

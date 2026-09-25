@@ -18,6 +18,7 @@ type Service struct {
 	unreadIndicator     UnreadIndicator
 	conversationWindows ConversationWindowOpener
 	localDevice         LocalDeviceReporter
+	localEnvironment    LocalEnvironmentManager
 }
 
 // Option 配置平台专属的应用服务能力。
@@ -62,6 +63,13 @@ func WithConversationWindowOpener(opener ConversationWindowOpener) Option {
 func WithLocalDevice(reporter LocalDeviceReporter) Option {
 	return func(service *Service) {
 		service.localDevice = reporter
+	}
+}
+
+// WithLocalEnvironment 注入原生端为助理提供的本机运行环境与本地 MCP 服务管理。
+func WithLocalEnvironment(manager LocalEnvironmentManager) Option {
+	return func(service *Service) {
+		service.localEnvironment = manager
 	}
 }
 
@@ -179,6 +187,38 @@ func (s *Service) CurrentDevice(ctx context.Context, meta RequestMeta) (LocalDev
 		return LocalDevice{}, nil
 	}
 	return withNormalizedSlices(s.localDevice.CurrentDevice(ctx, meta))
+}
+
+// GetLocalEnvironment 返回本机为助理提供的运行环境与本地 MCP 服务。
+func (s *Service) GetLocalEnvironment(ctx context.Context, meta RequestMeta) (LocalEnvironment, error) {
+	if s.localEnvironment == nil {
+		return LocalEnvironment{}, methodNotAllowedError(meta, "GetLocalEnvironment")
+	}
+	return withNormalizedSlices(s.localEnvironment.LocalEnvironment(ctx, meta))
+}
+
+// UpdateLocalToolchain 把本机运行环境更新到下载源的最新版本。
+func (s *Service) UpdateLocalToolchain(ctx context.Context, meta RequestMeta) (LocalToolchainUpdate, error) {
+	if s.localEnvironment == nil {
+		return LocalToolchainUpdate{}, methodNotAllowedError(meta, "UpdateLocalToolchain")
+	}
+	return withNormalizedSlices(s.localEnvironment.UpdateLocalToolchain(ctx, meta))
+}
+
+// OpenLocalToolchainFolder 在系统文件管理器中打开本机运行环境的安装位置。
+func (s *Service) OpenLocalToolchainFolder(ctx context.Context, meta RequestMeta) error {
+	if s.localEnvironment == nil {
+		return methodNotAllowedError(meta, "OpenLocalToolchainFolder")
+	}
+	return s.localEnvironment.OpenLocalToolchainFolder(ctx, meta)
+}
+
+// RemoveLocalMCPServer 删除这台电脑上的本地 MCP 服务。
+func (s *Service) RemoveLocalMCPServer(ctx context.Context, meta RequestMeta, name string) error {
+	if s.localEnvironment == nil {
+		return methodNotAllowedError(meta, "RemoveLocalMCPServer")
+	}
+	return s.localEnvironment.RemoveLocalMCPServer(ctx, meta, name)
 }
 
 // ServerURL 返回原生端当前配置的企业服务器地址。

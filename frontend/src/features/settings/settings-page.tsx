@@ -7,6 +7,7 @@ import { PageHeader } from "@/components/page-header"
 import { ChangePasswordForm } from "@/features/settings/change-password-form"
 import { CustomerServiceSettings } from "@/features/settings/customer-service-settings"
 import { DeviceListPage } from "@/features/settings/device-list-page"
+import { LocalEnvironmentSettings } from "@/features/settings/local-environment-settings"
 import { GeneralSettingsForm } from "@/features/settings/general-settings-form"
 import { MemberListPage } from "@/features/settings/members/member-list-page"
 import { NotificationSettingsForm } from "@/features/settings/notification-settings-form"
@@ -22,6 +23,7 @@ const formSections = [
   "preferences",
   "notifications",
   "devices",
+  "local",
   "general",
   "customerService",
 ] as const
@@ -60,13 +62,15 @@ export function SettingsPage({
             title={t(`${section}.title`)}
             description={t(`${section}.description`)}
           />
-          <PageContent variant={section === "devices" ? "default" : "form"}>
+          <PageContent variant={section === "devices" || section === "local" ? "default" : "form"}>
             {section === "profile" ? (
               <ProfileSettingsForm user={identity.user} />
             ) : section === "security" ? (
               <ChangePasswordForm />
             ) : section === "devices" ? (
               <DeviceListPage />
+            ) : section === "local" ? (
+              <LocalEnvironmentSettings />
             ) : section === "notifications" ? (
               <NotificationSettingsForm user={identity.user} />
             ) : section === "general" ? (

@@ -8,6 +8,7 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"errors"
+	"fmt"
 	"net/http"
 	"net/http/httptest"
 	"os"
@@ -129,33 +130,31 @@ func TestExtractRejectsEscapingEntries(t *testing.T) {
 	}
 }
 
-// TestActiveVersionAndStaleCleanup 验证固定版本未就位时沿用语义化版本最高的旧版本；固定版本就位后只清理没有进程使用的旧版本。
+// TestActiveVersionAndStaleCleanup 验证命令使用语义化版本最高的已安装版本，只清理没有进程使用的较低版本。
 func TestActiveVersionAndStaleCleanup(t *testing.T) {
 	root := t.TempDir()
+	// 目录在管理器创建之后建立，创建时的清理不涉及这些版本。
+	running := New(root, t.TempDir(), func() {})
 	for _, version := range []string{"0.9.0", "0.10.0"} {
 		if err := os.MkdirAll(filepath.Join(root, "dist", "uv", version), 0o755); err != nil {
 			t.Fatal(err)
 		}
 	}
-	running := New(root, t.TempDir(), func() {})
-	if version := running.activeVersion("uv", uvVersion); version != "0.10.0" {
-		t.Fatalf("固定版本未就位时应沿用最高的旧版本，实际 %q", version)
+	if version := running.activeVersion("uv"); version != "0.10.0" {
+		t.Fatalf("应使用最高的已安装版本，实际 %q", version)
 	}
 	if running.usable() {
 		t.Fatal("缺少 Node.js 与默认 Python 时不应可用")
 	}
-	running.use("uv", "0.10.0")
-	if err := os.MkdirAll(filepath.Join(root, "dist", "uv", uvVersion), 0o755); err != nil {
-		t.Fatal(err)
-	}
+	running.use("uv", "0.9.0")
 	New(root, t.TempDir(), func() {})
-	if dirExists(filepath.Join(root, "dist", "uv", "0.9.0")) || !dirExists(filepath.Join(root, "dist", "uv", "0.10.0")) {
-		t.Fatal("应只清理没有进程使用的旧版本")
+	if !dirExists(filepath.Join(root, "dist", "uv", "0.9.0")) {
+		t.Fatal("有进程使用的旧版本不应清理")
 	}
 	running.Close()
 	New(root, t.TempDir(), func() {})
-	if dirExists(filepath.Join(root, "dist", "uv", "0.10.0")) {
-		t.Fatal("使用方退出后旧版本未清理")
+	if dirExists(filepath.Join(root, "dist", "uv", "0.9.0")) || !dirExists(filepath.Join(root, "dist", "uv", "0.10.0")) {
+		t.Fatal("使用方退出后应只清理较低版本")
 	}
 }
 
@@ -249,8 +248,8 @@ func TestEnsureBacksOffAfterFailure(t *testing.T) {
 	}
 }
 
-// TestPackageFileURLResolvesIndexLinks 验证从简单索引中按文件名找到下载地址，相对链接按索引页解析并去掉摘要片段，未收录时标为下载失败。
-func TestPackageFileURLResolvesIndexLinks(t *testing.T) {
+// TestIndexLinksResolvesRelativeLinks 验证简单索引中的相对链接按项目页解析，摘要取自链接片段，索引不可用时标为下载失败。
+func TestIndexLinksResolvesRelativeLinks(t *testing.T) {
 	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		if r.URL.Path != "/simple/uv/" {
 			http.NotFound(w, r)
@@ -262,13 +261,13 @@ func TestPackageFileURLResolvesIndexLinks(t *testing.T) {
 </body></html>`))
 	}))
 	t.Cleanup(server.Close)
-	url, err := packageFileURL(context.Background(), http.DefaultClient, server.URL+"/simple", "uv", "uv-0.2.0-py3-none-any.whl")
-	if err != nil || url != server.URL+"/packages/bb/uv-0.2.0-py3-none-any.whl" {
-		t.Fatalf("下载地址不符合预期: %q %v", url, err)
+	links, err := indexLinks(context.Background(), http.DefaultClient, server.URL+"/simple", "uv")
+	if err != nil || len(links) != 2 || links[1] != (indexLink{file: "uv-0.2.0-py3-none-any.whl", url: server.URL + "/packages/bb/uv-0.2.0-py3-none-any.whl", sha256: "11"}) {
+		t.Fatalf("索引链接不符合预期: %+v %v", links, err)
 	}
-	_, err = packageFileURL(context.Background(), http.DefaultClient, server.URL+"/simple", "uv", "uv-9.9.9-py3-none-any.whl")
-	if step, ok := errors.AsType[*stepError](err); !ok || step.failure != FailureDownload {
-		t.Fatalf("未收录的文件应标为下载失败: %v", err)
+	_, err = indexLinks(context.Background(), http.DefaultClient, server.URL+"/missing", "uv")
+	if FailureOf(err) != FailureDownload {
+		t.Fatalf("索引不可用应标为下载失败: %v", err)
 	}
 }
 
@@ -308,6 +307,8 @@ func TestInstallUsesWheelContentDirectory(t *testing.T) {
 // TestLockActiveSkipsVersionBeingRemoved 验证其他进程持有独占锁清理中的版本不会被选入命令环境。
 func TestLockActiveSkipsVersionBeingRemoved(t *testing.T) {
 	root := t.TempDir()
+	manager := New(root, t.TempDir(), func() {})
+	t.Cleanup(manager.Close)
 	for _, version := range []string{"0.9.0", "0.10.0"} {
 		if err := os.MkdirAll(filepath.Join(root, "dist", "uv", version), 0o755); err != nil {
 			t.Fatal(err)
@@ -318,9 +319,7 @@ func TestLockActiveSkipsVersionBeingRemoved(t *testing.T) {
 		t.Fatalf("取得独占锁失败: %v", err)
 	}
 	t.Cleanup(func() { _ = remover.Unlock() })
-	manager := New(root, t.TempDir(), func() {})
-	t.Cleanup(manager.Close)
-	if version := manager.lockActive("uv", uvVersion); version != "0.9.0" {
+	if version := manager.lockActive("uv"); version != "0.9.0" {
 		t.Fatalf("应跳过清理中的版本，实际 %q", version)
 	}
 }
@@ -342,5 +341,82 @@ func TestEnsureRetriesImmediatelyWhenSourcesChange(t *testing.T) {
 	manager.mu.Unlock()
 	if !preparing || sources.PyPIIndexURL != server.URL+"/mirror" {
 		t.Fatalf("下载源变化后未立即重试: preparing=%v sources=%+v", preparing, sources)
+	}
+}
+
+// zipArchive 生成包含指定文件的 zip 内容。
+func zipArchive(t *testing.T, files map[string]string) []byte {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "archive.zip")
+	file, err := os.Create(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	writer := zip.NewWriter(file)
+	for name, content := range files {
+		entry, err := writer.Create(name)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := entry.Write([]byte(content)); err != nil {
+			t.Fatal(err)
+		}
+	}
+	if err := writer.Close(); err != nil {
+		t.Fatal(err)
+	}
+	if err := file.Close(); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(path)
+	if err != nil {
+		t.Fatal(err)
+	}
+	return data
+}
+
+// TestUpdateInstallsLatestReleases 验证更新选取索引中最新的正式 uv 与最新的 Node.js LTS，并按索引给出的摘要校验后安装。
+func TestUpdateInstallsLatestReleases(t *testing.T) {
+	uvSuffix := strings.TrimPrefix(uvArtifacts[platform()].file, "uv-"+uvVersion+"-")
+	uvFile := "uv-99.0.0-" + uvSuffix
+	wheel := zipArchive(t, map[string]string{"uv-99.0.0.data/scripts/uv": "binary"})
+	wheelSum := sha256.Sum256(wheel)
+	nodeFile := "node-v98.0.0" + strings.TrimPrefix(nodeArtifacts[platform()].file, "node-v"+nodeVersion)
+	var nodeArchive []byte
+	if strings.HasSuffix(nodeFile, ".zip") {
+		nodeArchive = zipArchive(t, map[string]string{"node-v98.0.0/node.exe": "binary"})
+	} else {
+		nodeArchive = buildTarGz(t, []tarEntry{{name: "node-v98.0.0/bin/node", content: "binary"}})
+	}
+	nodeSum := sha256.Sum256(nodeArchive)
+	server := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.URL.Path {
+		case "/simple/uv/":
+			_, _ = fmt.Fprintf(w, `<a href="/files/uv-100.0.0rc1-%s#sha256=00">pre</a><a href="/files/%s#sha256=%s">latest</a><a href="/files/uv-1.0.0-%s#sha256=11">old</a>`,
+				uvSuffix, uvFile, hex.EncodeToString(wheelSum[:]), uvSuffix)
+		case "/files/" + uvFile:
+			_, _ = w.Write(wheel)
+		case "/node/index.json":
+			_, _ = w.Write([]byte(`[{"version":"v99.0.0","lts":false},{"version":"v98.0.0","lts":"Future"},{"version":"v24.0.0","lts":"Krypton"}]`))
+		case "/node/v98.0.0/SHASUMS256.txt":
+			_, _ = fmt.Fprintf(w, "%s  %s\n", hex.EncodeToString(nodeSum[:]), nodeFile)
+		case "/node/v98.0.0/" + nodeFile:
+			_, _ = w.Write(nodeArchive)
+		default:
+			http.NotFound(w, r)
+		}
+	}))
+	t.Cleanup(server.Close)
+	manager := New(t.TempDir(), t.TempDir(), func() {})
+	t.Cleanup(manager.Close)
+	sources := Sources{PyPIIndexURL: server.URL + "/simple", NodeDownloadURL: server.URL + "/node"}
+	if err := manager.updateUV(context.Background(), sources); err != nil {
+		t.Fatal(err)
+	}
+	if err := manager.updateNode(context.Background(), sources); err != nil {
+		t.Fatal(err)
+	}
+	if uv, node := manager.activeVersion("uv"), manager.activeVersion("node"); uv != "99.0.0" || node != "98.0.0" {
+		t.Fatalf("更新后的版本不符合预期: uv=%s node=%s", uv, node)
 	}
 }

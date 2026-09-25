@@ -69,8 +69,31 @@ const (
 	LocalToolchainFailureInstall LocalToolchainFailure = "install"
 )
 
-// LocalToolchain 定义本机 Agent 运行环境的准备状态，失败原因只在失败状态下非空。
+// LocalToolchain 定义本机 Agent 运行环境的准备状态，失败原因只在失败状态下非空，Updating 表示正在按用户请求更新。
 type LocalToolchain struct {
-	State   LocalToolchainState    `json:"state"`
-	Failure *LocalToolchainFailure `json:"failure"`
+	State    LocalToolchainState    `json:"state"`
+	Failure  *LocalToolchainFailure `json:"failure"`
+	Updating bool                   `json:"updating"`
+}
+
+// LocalEnvironment 定义本机为助理提供的运行环境与本地 MCP 服务，未安装的组件版本为空。
+type LocalEnvironment struct {
+	Toolchain     LocalToolchain   `json:"toolchain"`
+	Location      string           `json:"location"`
+	UVVersion     string           `json:"uvVersion"`
+	NodeVersion   string           `json:"nodeVersion"`
+	PythonVersion string           `json:"pythonVersion"`
+	MCPServers    []LocalMCPServer `json:"mcpServers"`
+}
+
+// LocalMCPServer 定义这台电脑上主人的助理共用的一个本地 MCP 服务。
+type LocalMCPServer struct {
+	Name    string   `json:"name"`
+	Command string   `json:"command"`
+	Args    []string `json:"args"`
+}
+
+// LocalToolchainUpdate 定义更新本机运行环境的结果，Updated 表示有组件换了版本。
+type LocalToolchainUpdate struct {
+	Updated bool `json:"updated"`
 }

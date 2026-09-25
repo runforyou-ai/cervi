@@ -55,19 +55,11 @@ func download(ctx context.Context, client *http.Client, url, cacheDir string, it
 	defer cancel(nil)
 	stall := time.AfterFunc(downloadStallTimeout, func() { cancel(errDownloadStalled) })
 	defer stall.Stop()
-	request, err := http.NewRequestWithContext(ctx, http.MethodGet, url, nil)
+	response, err := get(ctx, client, url, "*/*")
 	if err != nil {
-		return "", fmt.Errorf("build download request: %w", err)
-	}
-	request.Header.Set("User-Agent", userAgent)
-	response, err := client.Do(request)
-	if err != nil {
-		return "", &stepError{failure: FailureDownload, err: fmt.Errorf("download %s: %w", url, cmp.Or(context.Cause(ctx), err))}
+		return "", err
 	}
 	defer response.Body.Close()
-	if response.StatusCode != http.StatusOK {
-		return "", &stepError{failure: FailureDownload, err: fmt.Errorf("download %s: HTTP %d", url, response.StatusCode)}
-	}
 	partial, err := os.CreateTemp(cacheDir, item.file+".*.part")
 	if err != nil {
 		return "", fmt.Errorf("create download file: %w", err)

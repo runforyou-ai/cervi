@@ -1,6 +1,7 @@
-// Package toolchain 在本机准备 Agent 命令执行使用的 uv、Node.js 与默认 Python，并给出命令的环境变量。
+// Package toolchain 在本机准备 Agent 命令与本地 MCP 服务使用的 uv、Node.js 与默认 Python，并给出命令的环境变量。
 //
-// 工具链根目录下 dist/<名称>/<版本> 只放发行物，升级时整体替换；python、uv-tools、npm-global 与 bin 跨升级保留。
+// 工具链根目录下 dist/<名称>/<版本> 只放发行物，命令使用已安装的最高版本；python、uv-tools、npm-global 与 bin 跨版本保留。
+// 桌面端启动后自动安装内置版本，之后由用户在设置中更新到下载源的最新版本。
 // 运行环境只作用于 Agent 执行的命令，不修改 shell 配置、系统 PATH 与 Windows 注册表。
 // 命令优先使用托管解释器，项目已有的 .venv 与 .python-version 按 uv 的规则使用；用户 uv 配置中的离线与禁止下载设置不作用于 Agent 命令。
 // 旧版本发行物由持有共享锁的进程保留，没有进程使用时才清理。
@@ -28,7 +29,7 @@ import (
 )
 
 const (
-	// pythonInstallTimeout 是安装默认 Python 的时限，超时按下载失败处理。
+	// pythonInstallTimeout 是安装或升级默认 Python 的时限，超时按下载失败处理。
 	pythonInstallTimeout = 30 * time.Minute
 	// retryBaseInterval 是首次准备失败后的重试间隔，连续失败时逐次翻倍。
 	retryBaseInterval = 30 * time.Second
@@ -41,6 +42,12 @@ const (
 	// defaultPythonMarker 是记录已安装默认 Python 版本的文件名。
 	defaultPythonMarker = "default-python"
 )
+
+// ErrBusy 表示运行环境正在准备或更新。
+var ErrBusy = errors.New("toolchain is being prepared or updated")
+
+// ErrNotReady 表示运行环境尚未完成首次准备。
+var ErrNotReady = errors.New("toolchain is not ready")
 
 // State 是运行环境的准备状态。
 type State string
@@ -66,10 +73,19 @@ const (
 	FailureInstall Failure = "install"
 )
 
-// Status 是运行环境的准备状态，失败原因只在失败状态下非空。
+// Status 是运行环境的准备状态，失败原因只在失败状态下非空；Updating 表示正在按用户请求更新。
 type Status struct {
-	State   State
-	Failure Failure
+	State    State
+	Failure  Failure
+	Updating bool
+}
+
+// Info 是运行环境的安装位置与各组件当前使用的版本，未安装的组件版本为空。
+type Info struct {
+	Root   string
+	UV     string
+	Node   string
+	Python string
 }
 
 // stepError 是标明失败原因的准备错误。
@@ -84,6 +100,14 @@ func (e *stepError) Error() string { return e.err.Error() }
 // Unwrap 返回底层错误。
 func (e *stepError) Unwrap() error { return e.err }
 
+// FailureOf 返回准备或更新错误的失败原因，未标明原因的错误发生在本机安装步骤。
+func FailureOf(err error) Failure {
+	if step, ok := errors.AsType[*stepError](err); ok {
+		return step.failure
+	}
+	return FailureInstall
+}
+
 // Sources 是企业服务端下发的下载源，空字段使用官方源。
 type Sources struct {
 	NodeDownloadURL     string
@@ -92,7 +116,7 @@ type Sources struct {
 	NPMRegistry         string
 }
 
-// Manager 在后台准备本机运行环境，并给出 Agent 命令使用的环境变量。
+// Manager 在后台准备本机运行环境，按用户请求更新，并给出 Agent 命令使用的环境变量。
 type Manager struct {
 	root     string
 	cache    string
@@ -105,6 +129,7 @@ type Manager struct {
 
 	mu        sync.Mutex
 	preparing bool
+	updating  bool
 	// sources 是最近一次开始准备时使用的下载源。
 	sources Sources
 	// stopPrepare 取消进行中的准备。
@@ -138,7 +163,7 @@ func DefaultDirs() (string, string, error) {
 	return filepath.Join(home, ".local", "share", "cervi", "toolchains"), cache, nil
 }
 
-// New 创建运行环境管理器并清理没有进程使用、已被固定版本取代的发行物；onChange 在每次准备开始与结束时调用。
+// New 创建运行环境管理器并清理没有进程使用的旧版本发行物；onChange 在准备或更新开始与结束时调用。
 func New(root, cache string, onChange func()) *Manager {
 	ctx, cancel := context.WithCancel(context.Background())
 	m := &Manager{root: root, cache: cache, client: &http.Client{}, onChange: onChange, ctx: ctx, cancel: cancel, inUse: map[string]*flock.Flock{}}
@@ -158,7 +183,7 @@ func (m *Manager) Close() {
 	clear(m.inUse)
 }
 
-// Ensure 在运行环境不是当前固定版本时于后台开始准备，失败后按退避间隔重试；下载源变化时取消进行中的准备并立即按新源重试。
+// Ensure 在已安装版本低于内置版本或缺少默认 Python 时于后台安装内置版本，失败后按退避间隔重试；下载源变化时取消进行中的准备并立即按新源重试。
 // 返回当前是否已有可用的运行环境。
 func (m *Manager) Ensure(sources Sources) bool {
 	m.mu.Lock()
@@ -169,7 +194,7 @@ func (m *Manager) Ensure(sources Sources) bool {
 			m.stopPrepare()
 		}
 	}
-	if !m.preparing && !m.upToDate() && !time.Now().Before(m.retryAt) && m.ctx.Err() == nil {
+	if !m.preparing && !m.updating && !m.upToDate() && !time.Now().Before(m.retryAt) && m.ctx.Err() == nil {
 		ctx, cancel := context.WithCancel(m.ctx)
 		m.preparing, m.stopPrepare = true, cancel
 		m.wg.Add(1)
@@ -178,13 +203,13 @@ func (m *Manager) Ensure(sources Sources) bool {
 	return m.usable()
 }
 
-// Status 返回运行环境的准备状态：已有可用环境时为就绪；已有旧版本时后台升级的进度与失败不在界面展示，命令继续使用旧版本。
+// Status 返回运行环境的准备状态：已有可用环境时为就绪；已有旧版本时后台安装新内置版本的进度与失败不在界面展示，命令继续使用旧版本。
 func (m *Manager) Status() Status {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 	switch {
 	case m.usable():
-		return Status{State: StateReady}
+		return Status{State: StateReady, Updating: m.updating}
 	case m.failure != "" && !m.preparing:
 		return Status{State: StateFailed, Failure: m.failure}
 	default:
@@ -192,15 +217,21 @@ func (m *Manager) Status() Status {
 	}
 }
 
+// Info 返回安装位置与各组件当前使用的版本。
+func (m *Manager) Info() Info {
+	python, _ := os.ReadFile(filepath.Join(m.root, defaultPythonMarker))
+	return Info{Root: m.root, UV: m.activeVersion("uv"), Node: m.activeVersion("node"), Python: strings.TrimSpace(string(python))}
+}
+
 // Environment 返回 Agent 命令的环境变量：前置当前版本的 uv、Node.js 与稳定命令目录，安装与缓存限定在工具链目录。
 // 命令使用的发行物在本进程结束前保持共享锁，其他进程不会将其清理。
 func (m *Manager) Environment(sources Sources) localworkspace.Environment {
-	return m.environment(sources, m.lockActive("uv", uvVersion), m.lockActive("node", nodeVersion))
+	return m.environment(sources, m.lockActive("uv"), m.lockActive("node"))
 }
 
-// lockActive 按优先顺序选出取得共享锁且目录仍在的版本，正被其他进程清理的版本跳过；没有可用版本时返回空串。
-func (m *Manager) lockActive(name, pinned string) string {
-	for _, version := range m.versions(name, pinned) {
+// lockActive 按版本从高到低选出取得共享锁且目录仍在的版本，正被其他进程清理的版本跳过；没有可用版本时返回空串。
+func (m *Manager) lockActive(name string) string {
+	for _, version := range m.versions(name) {
 		if m.use(name, version) && dirExists(filepath.Join(m.root, "dist", name, version)) {
 			return version
 		}
@@ -264,11 +295,11 @@ func (m *Manager) environment(sources Sources, uv, node string) localworkspace.E
 	}
 }
 
-// prepare 准备固定版本的运行环境，结束后记录重试时间并通知调用方；被取消的准备不计为失败。
+// prepare 安装内置版本的运行环境，结束后记录重试时间并通知调用方；被取消的准备不计为失败。
 func (m *Manager) prepare(ctx context.Context, sources Sources) {
 	defer m.wg.Done()
 	m.onChange()
-	err := m.install(ctx, sources)
+	err := m.installBaseline(ctx, sources)
 	cancelled := ctx.Err() != nil
 	m.mu.Lock()
 	m.preparing = false
@@ -280,17 +311,13 @@ func (m *Manager) prepare(ctx context.Context, sources Sources) {
 	default:
 		m.failures++
 		m.retryAt = time.Now().Add(min(retryBaseInterval<<min(m.failures-1, retryMaxDoublings), retryMaxInterval))
-		// 未标明原因的错误发生在本机安装步骤。
-		m.failure = FailureInstall
-		if step, ok := errors.AsType[*stepError](err); ok {
-			m.failure = step.failure
-		}
+		m.failure = FailureOf(err)
 	}
 	retryAt := m.retryAt
 	m.mu.Unlock()
 	switch {
 	case err == nil:
-		slog.Info("Agent 运行环境已就绪", "uv", uvVersion, "node", nodeVersion, "python", PythonVersion)
+		slog.Info("Agent 运行环境已就绪", "info", m.Info())
 		m.removeStale()
 	case !cancelled:
 		slog.Warn("准备 Agent 运行环境失败", "error", err, "retry_at", retryAt)
@@ -298,40 +325,59 @@ func (m *Manager) prepare(ctx context.Context, sources Sources) {
 	m.onChange()
 }
 
-// install 下载并校验固定版本的 uv 与 Node.js，再用 uv 安装默认 Python。
-func (m *Manager) install(ctx context.Context, sources Sources) error {
+// installBaseline 下载并校验内置版本的 uv 与 Node.js（已安装不低于内置版本时跳过），再用 uv 安装内置版本的默认 Python。
+func (m *Manager) installBaseline(ctx context.Context, sources Sources) error {
 	uvItem, uvFound := uvArtifacts[platform()]
 	nodeItem, nodeFound := nodeArtifacts[platform()]
 	if !uvFound || !nodeFound {
 		return fmt.Errorf("unsupported platform %s", platform())
 	}
-	// uv 取自 PyPI 上的 wheel，与 Python 包使用同一个索引。
-	uvURL := func(ctx context.Context) (string, error) {
-		return packageFileURL(ctx, m.client, cmp.Or(sources.PyPIIndexURL, defaultPyPIIndexURL), "uv", uvItem.file)
+	if !atLeast(m.activeVersion("uv"), uvVersion) {
+		// uv 取自 PyPI 上的 wheel，与 Python 包使用同一个索引。
+		resolve := func(ctx context.Context) (string, error) {
+			links, err := indexLinks(ctx, m.client, cmp.Or(sources.PyPIIndexURL, defaultPyPIIndexURL), "uv")
+			if err != nil {
+				return "", err
+			}
+			for _, link := range links {
+				if link.file == uvItem.file {
+					return link.url, nil
+				}
+			}
+			return "", &stepError{failure: FailureDownload, err: fmt.Errorf("package index does not list %s", uvItem.file)}
+		}
+		if err := m.installDist(ctx, "uv", uvVersion, resolve, uvItem, uvWheelContent(uvVersion)); err != nil {
+			return err
+		}
 	}
-	if err := m.installDist(ctx, "uv", uvVersion, uvURL, uvItem, uvWheelContent); err != nil {
-		return err
+	if !atLeast(m.activeVersion("node"), nodeVersion) {
+		resolve := func(context.Context) (string, error) {
+			return nodeFileURL(sources, nodeVersion, nodeItem.file), nil
+		}
+		if err := m.installDist(ctx, "node", nodeVersion, resolve, nodeItem, ""); err != nil {
+			return err
+		}
 	}
-	nodeURL := func(context.Context) (string, error) {
-		return strings.Join([]string{cmp.Or(sources.NodeDownloadURL, defaultNodeDownloadURL), "v" + nodeVersion, nodeItem.file}, "/"), nil
-	}
-	if err := m.installDist(ctx, "node", nodeVersion, nodeURL, nodeItem, ""); err != nil {
-		return err
-	}
-	marker := filepath.Join(m.root, defaultPythonMarker)
-	if installed, _ := os.ReadFile(marker); string(installed) == PythonVersion {
+	if _, err := os.Stat(filepath.Join(m.root, defaultPythonMarker)); err == nil {
 		return nil
 	}
-	// 默认 Python 经命令执行安装，与 Agent 命令使用同一套环境变量与进程管理，不读取用户的 uv 配置文件。
-	if !m.use("uv", uvVersion) || !m.use("node", nodeVersion) {
-		return errors.New("toolchain is being removed by another process")
+	return m.installPython(ctx, sources, PythonVersion, false)
+}
+
+// installPython 用 uv 安装指定的默认 Python，upgrade 为 true 时升级到该系列的最新补丁版本，完成后记录实际版本。
+// 安装不读取用户的 uv 配置文件，与 Agent 命令使用同一套环境变量与进程管理。
+func (m *Manager) installPython(ctx context.Context, sources Sources, request string, upgrade bool) error {
+	uv, node := m.lockActive("uv"), m.lockActive("node")
+	if uv == "" || node == "" {
+		return errors.New("uv or Node.js is not installed")
 	}
-	shell := localworkspace.New(m.root, m.environment(sources, uvVersion, nodeVersion))
+	shell := localworkspace.New(m.root, m.environment(sources, uv, node))
+	command := "uv python install " + request + " --default --no-registry --no-config --preview-features python-install-default"
+	if upgrade {
+		command += " --upgrade"
+	}
 	timeout := pythonInstallTimeout
-	response, err := shell.Execute(ctx, &filesystem.ExecuteRequest{
-		Command: "uv python install " + PythonVersion + " --default --no-registry --no-config --preview-features python-install-default",
-		Timeout: &timeout,
-	})
+	response, err := shell.Execute(ctx, &filesystem.ExecuteRequest{Command: command, Timeout: &timeout})
 	if err != nil {
 		return fmt.Errorf("install python: %w", err)
 	}
@@ -343,7 +389,16 @@ func (m *Manager) install(ctx context.Context, sources Sources) error {
 		}
 		return err
 	}
-	return os.WriteFile(marker, []byte(PythonVersion), 0o644)
+	// 以默认 python 命令报告的版本作为记录。
+	response, err = shell.Execute(ctx, &filesystem.ExecuteRequest{Command: "python --version"})
+	if err != nil {
+		return fmt.Errorf("read python version: %w", err)
+	}
+	output := strings.TrimSpace(response.Output)
+	if response.ExitCode == nil || *response.ExitCode != 0 || !strings.HasPrefix(output, "Python ") {
+		return fmt.Errorf("read python version: %s", output)
+	}
+	return os.WriteFile(filepath.Join(m.root, defaultPythonMarker), []byte(strings.TrimPrefix(output, "Python ")), 0o644)
 }
 
 // installDist 下载并解压一个发行物到 dist/<名称>/<版本>，目录已存在时直接返回；下载地址在需要下载时解析，content 是压缩包内作为版本目录的目录。
@@ -376,30 +431,28 @@ func (m *Manager) installDist(ctx context.Context, name, version string, resolve
 	return err
 }
 
-// upToDate 判断固定版本的 uv、Node.js 与默认 Python 是否都已就位。
+// upToDate 判断已安装的 uv 与 Node.js 不低于内置版本且默认 Python 已安装。
 func (m *Manager) upToDate() bool {
-	installed, _ := os.ReadFile(filepath.Join(m.root, defaultPythonMarker))
-	return dirExists(filepath.Join(m.root, "dist", "uv", uvVersion)) &&
-		dirExists(filepath.Join(m.root, "dist", "node", nodeVersion)) &&
-		string(installed) == PythonVersion
+	_, err := os.Stat(filepath.Join(m.root, defaultPythonMarker))
+	return err == nil && atLeast(m.activeVersion("uv"), uvVersion) && atLeast(m.activeVersion("node"), nodeVersion)
 }
 
-// usable 判断是否已有可用的 uv、Node.js 与默认 Python，版本可以早于固定版本。
+// usable 判断是否已有可用的 uv、Node.js 与默认 Python，版本可以低于内置版本。
 func (m *Manager) usable() bool {
 	_, err := os.Stat(filepath.Join(m.root, defaultPythonMarker))
-	return err == nil && m.activeVersion("uv", uvVersion) != "" && m.activeVersion("node", nodeVersion) != ""
+	return err == nil && m.activeVersion("uv") != "" && m.activeVersion("node") != ""
 }
 
-// activeVersion 返回命令优先使用的发行物版本，没有已就位版本时返回空串。
-func (m *Manager) activeVersion(name, pinned string) string {
-	if versions := m.versions(name, pinned); len(versions) > 0 {
+// activeVersion 返回命令优先使用的发行物版本，即已安装的最高版本，没有已安装版本时返回空串。
+func (m *Manager) activeVersion(name string) string {
+	if versions := m.versions(name); len(versions) > 0 {
 		return versions[0]
 	}
 	return ""
 }
 
-// versions 按优先顺序返回已就位的发行物版本：固定版本在前，其余按语义化版本从高到低。
-func (m *Manager) versions(name, pinned string) []string {
+// versions 按语义化版本从高到低返回已安装的发行物版本。
+func (m *Manager) versions(name string) []string {
 	entries, _ := os.ReadDir(filepath.Join(m.root, "dist", name))
 	var versions []string
 	for _, entry := range entries {
@@ -407,23 +460,15 @@ func (m *Manager) versions(name, pinned string) []string {
 			versions = append(versions, entry.Name())
 		}
 	}
-	slices.SortFunc(versions, func(a, b string) int {
-		switch {
-		case a == pinned:
-			return -1
-		case b == pinned:
-			return 1
-		default:
-			return semver.Compare("v"+b, "v"+a)
-		}
-	})
+	slices.SortFunc(versions, func(a, b string) int { return semver.Compare("v"+b, "v"+a) })
 	return versions
 }
 
-// removeStale 删除中断遗留的解压目录，以及已被固定版本取代且没有任何进程持有共享锁的发行物。
+// removeStale 删除中断遗留的解压目录，以及低于当前最高版本且没有任何进程持有共享锁的发行物。
 func (m *Manager) removeStale() {
-	for _, dist := range []struct{ name, pinned string }{{"uv", uvVersion}, {"node", nodeVersion}} {
-		directory := filepath.Join(m.root, "dist", dist.name)
+	for _, name := range []string{"uv", "node"} {
+		directory := filepath.Join(m.root, "dist", name)
+		active := m.activeVersion(name)
 		entries, _ := os.ReadDir(directory)
 		for _, entry := range entries {
 			path := filepath.Join(directory, entry.Name())
@@ -433,7 +478,7 @@ func (m *Manager) removeStale() {
 				}
 				continue
 			}
-			if !entry.IsDir() || entry.Name() == dist.pinned || !dirExists(filepath.Join(directory, dist.pinned)) {
+			if !entry.IsDir() || entry.Name() == active {
 				continue
 			}
 			// 取得独占锁说明没有进程在使用该版本。
@@ -448,6 +493,16 @@ func (m *Manager) removeStale() {
 			_ = os.Remove(path + ".lock")
 		}
 	}
+}
+
+// atLeast 判断已安装版本不低于目标版本，未安装时返回 false。
+func atLeast(installed, target string) bool {
+	return installed != "" && semver.Compare("v"+installed, "v"+target) >= 0
+}
+
+// nodeFileURL 返回 Node.js 发行物在下载源中的地址。
+func nodeFileURL(sources Sources, version, file string) string {
+	return strings.Join([]string{cmp.Or(sources.NodeDownloadURL, defaultNodeDownloadURL), "v" + version, file}, "/")
 }
 
 // dirExists 判断路径是否为已存在的目录。

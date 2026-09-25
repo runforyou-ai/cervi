@@ -19,6 +19,7 @@ import (
 	"github.com/runforyou-ai/cervi/internal/appservice"
 	"github.com/runforyou-ai/cervi/internal/integration/agentruntime"
 	"github.com/runforyou-ai/cervi/internal/integration/knowledgeretrieval"
+	"github.com/runforyou-ai/cervi/internal/integration/localmcp"
 	"github.com/runforyou-ai/cervi/internal/integration/localworkspace"
 	"github.com/runforyou-ai/cervi/internal/integration/toolchain"
 )
@@ -185,7 +186,7 @@ func newTestWorker(t *testing.T, client *stubRunClient, runtime stubRuntime) *Wo
 	client.completed = map[string]string{}
 	client.failures = map[string]appservice.DeviceRunFailureCode{}
 	client.failedBlocks = map[string]json.RawMessage{}
-	worker := NewWorker(registrar, client, runtime, &stubToolchain{ready: true}, t.TempDir())
+	worker := NewWorker(registrar, client, runtime, &stubToolchain{ready: true}, localmcp.NewStore(filepath.Join(t.TempDir(), "mcp.json"), func() {}), t.TempDir())
 	t.Cleanup(worker.Stop)
 	return worker
 }
