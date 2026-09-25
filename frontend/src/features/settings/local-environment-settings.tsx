@@ -151,7 +151,58 @@ function ToolchainSettings({ environment }: { environment: LocalEnvironmentData 
     <>
       <FieldGroup className="gap-8">
         <Field>
-          <FieldLabel>{t("local.toolchain.components")}</FieldLabel>
+          {/* 组件标题行右侧放运行环境的操作。 */}
+          <div className="flex items-center justify-between gap-3">
+            <FieldLabel>{t("local.toolchain.components")}</FieldLabel>
+            <div className="flex shrink-0 gap-2">
+              {uninstalled ? (
+                <Button
+                  type="button"
+                  size="sm"
+                  disabled={pending !== null}
+                  onClick={() =>
+                    void run(
+                      "install",
+                      async () => {
+                        await installLocalToolchain()
+                        return t("local.toolchain.installStarted")
+                      },
+                      "安装运行环境",
+                    )
+                  }
+                >
+                  {pending === "install" ? t("local.toolchain.installing") : t("local.toolchain.install")}
+                </Button>
+              ) : (
+                <>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={updating || uninstalling || toolchain.state !== LocalToolchainState.LocalToolchainStateReady}
+                    onClick={() =>
+                      void run(
+                        "update",
+                        async () => ((await updateLocalToolchain()).updated ? t("local.toolchain.updated") : t("local.toolchain.upToDate")),
+                        "更新运行环境",
+                      )
+                    }
+                  >
+                    {updating ? t("local.toolchain.updating") : t("local.toolchain.update")}
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    disabled={updating || uninstalling}
+                    onClick={() => setConfirmingUninstall(true)}
+                  >
+                    {t("local.toolchain.uninstall")}
+                  </Button>
+                </>
+              )}
+            </div>
+          </div>
           <ToolchainNotice environment={environment} />
           <ResourceListFrame>
             <ResourceTable
@@ -194,54 +245,6 @@ function ToolchainSettings({ environment }: { environment: LocalEnvironmentData 
             </Button>
           </div>
         </Field>
-        {uninstalled ? (
-          <div>
-            <Button
-              type="button"
-              size="sm"
-              disabled={pending !== null}
-              onClick={() =>
-                void run(
-                  "install",
-                  async () => {
-                    await installLocalToolchain()
-                    return t("local.toolchain.installStarted")
-                  },
-                  "安装运行环境",
-                )
-              }
-            >
-              {pending === "install" ? t("local.toolchain.installing") : t("local.toolchain.install")}
-            </Button>
-          </div>
-        ) : (
-          <div className="flex flex-wrap gap-2">
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={updating || uninstalling || toolchain.state !== LocalToolchainState.LocalToolchainStateReady}
-              onClick={() =>
-                void run(
-                  "update",
-                  async () => ((await updateLocalToolchain()).updated ? t("local.toolchain.updated") : t("local.toolchain.upToDate")),
-                  "更新运行环境",
-                )
-              }
-            >
-              {updating ? t("local.toolchain.updating") : t("local.toolchain.update")}
-            </Button>
-            <Button
-              type="button"
-              variant="outline"
-              size="sm"
-              disabled={updating || uninstalling}
-              onClick={() => setConfirmingUninstall(true)}
-            >
-              {t("local.toolchain.uninstall")}
-            </Button>
-          </div>
-        )}
       </FieldGroup>
       <ConfirmationDialog
         open={confirmingUninstall}
