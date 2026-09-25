@@ -125,7 +125,7 @@ func TestPinnedInboxCursor(t *testing.T) {
 // TestPendingInboxCursor 验证待处理游标按等待起点正序往返，缺少等待起点的游标要求重读。
 func TestPendingInboxCursor(t *testing.T) {
 	identity := &servermodels.Identity{Organization: servermodels.Organization{ID: "organization"}, User: servermodels.User{ID: "user"}}
-	input := LoadInput{Scope: domain.InboxScopePending, PendingKind: domain.InboxPendingKindQueue, QueueFilter: domain.CustomerQueueFilterPublic}
+	input := LoadInput{Scope: domain.InboxScopePending, PendingKind: domain.InboxPendingKindQueue, QueueFilter: domain.ServiceQueueFilterPublic}
 	earlier := time.Date(2026, 9, 9, 0, 0, 0, 123456000, time.UTC)
 	later := earlier.Add(time.Minute)
 	first := inboxCursorPoint{ID: "019d4e1c-40a5-77dd-82e6-6951f9957ba6", WaitingSince: &earlier}

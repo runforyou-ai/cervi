@@ -26,13 +26,13 @@ function scopedListKey(
 export const resourceKeys = {
   /** 当前登录身份、所属企业和用户偏好。 */
   identity: () => ["identity"],
-  /** 客户会话的客户身份与当前周期访客上下文，参数为会话最新消息编号。 */
-  customerProfile: (conversationId?: string, parameters?: KeyParameters) =>
-    scopedListKey("customer-profile", conversationId, parameters),
-  /** 客户会话当前客服周期的业务查询记录，随会话内容变化重读。 */
-  customerBusinessQueries: (conversationId?: string) => itemKey("customer-business-queries", conversationId),
-  /** 客户会话的交接摘要与客户历史周期小结，随会话内容变化重读。 */
-  customerServiceSummaries: (conversationId?: string) => itemKey("customer-service-summaries", conversationId),
+  /** 服务会话发起人的资料，参数为会话最新消息编号。 */
+  requesterProfile: (conversationId?: string, parameters?: KeyParameters) =>
+    scopedListKey("requester-profile", conversationId, parameters),
+  /** 服务会话当前周期的业务查询记录，随会话内容变化重读。 */
+  serviceBusinessQueries: (conversationId?: string) => itemKey("service-business-queries", conversationId),
+  /** 服务会话的交接摘要与同一发起人历史周期小结，随会话内容变化重读。 */
+  serviceSummaries: (conversationId?: string) => itemKey("service-summaries", conversationId),
   /** 按会话编号读取的独立摘要。 */
   conversationSummary: (conversationId?: string) => itemKey("conversation-summary", conversationId),
   /** 指定会话的列表资格。 */
@@ -55,7 +55,7 @@ export const resourceKeys = {
   /** 本机最近打开会话的摘要，参数包含会话编号和列表筛选。 */
   recentConversations: (parameters?: KeyParameters) => listKey("recent-conversations", parameters),
   /** 客服筛选候选。 */
-  customerServiceAssignees: () => ["customer-service-assignees"],
+  serviceAssignees: () => ["service-assignees"],
   /** 客服队列团队。 */
   serviceQueueTeams: () => ["service-queue-teams"],
   /** 渠道筛选候选。 */
@@ -99,14 +99,14 @@ export const resourceKeys = {
   directConversation: (identityId?: string) =>
     itemKey("direct-conversation", identityId),
   /** 可用于 AI 写回复的 AI 员工。 */
-  customerReplyAgents: () => ["customer-reply-agents"],
-  /** 客户会话的 Copilot 线程列表。 */
-  customerCopilotThreads: (conversationId?: string) => itemKey("customer-copilot-threads", conversationId),
-  /** 客户会话 AI 写回复的候选，不带参数时作为该会话全部候选的失效前缀。 */
-  customerReplySuggestions: (conversationId: string, parameters?: KeyParameters) =>
+  serviceReplyAgents: () => ["service-reply-agents"],
+  /** 服务会话的 Copilot 线程列表。 */
+  serviceCopilotThreads: (conversationId?: string) => itemKey("service-copilot-threads", conversationId),
+  /** 服务会话 AI 写回复的候选，不带参数时作为该会话全部候选的失效前缀。 */
+  serviceReplySuggestions: (conversationId: string, parameters?: KeyParameters) =>
     parameters === undefined
-      ? ["customer-reply-suggestions", conversationId]
-      : ["customer-reply-suggestions", conversationId, parameters],
+      ? ["service-reply-suggestions", conversationId]
+      : ["service-reply-suggestions", conversationId, parameters],
   /** 发起内部会话时使用的成员候选项。 */
   memberOptions: () => ["member-options"],
   /** 可发起单聊的对象，含本人名下的助理。 */

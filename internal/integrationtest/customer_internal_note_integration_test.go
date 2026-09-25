@@ -28,14 +28,14 @@ func TestCustomerInternalNotes(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	send := conversationaction.NewSendCustomerTextMessageAction(f.db, nil)
-	noteInput := conversationaction.CustomerTextMessageInput{
+	send := conversationaction.NewSendServiceTextMessageAction(f.db, nil)
+	noteInput := conversationaction.ServiceTextMessageInput{
 		ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(),
-		Body: "客户上个月投诉过物流", Visibility: domain.MessageVisibilityInternalOnly,
+		Body: "客户上个月投诉过物流", Visibility: domain.MessageVisibilityInternal,
 	}
 	// 未领取周期的其他客服同样可以留内部备注。
 	note, err := send.Execute(ctx, f.member, noteInput)
-	if err != nil || note.Visibility != domain.MessageVisibilityInternalOnly {
+	if err != nil || note.Visibility != domain.MessageVisibilityInternal {
 		t.Fatalf("note=%+v err=%v", note, err)
 	}
 
@@ -68,9 +68,9 @@ func TestCustomerInternalNotes(t *testing.T) {
 			continue
 		}
 		listed = true
-		if row.Customer == nil || row.Customer.Preview == nil || *row.Customer.Preview != noteInput.Body ||
-			row.Customer.PreviewVisibility == nil || *row.Customer.PreviewVisibility != domain.MessageVisibilityInternalOnly {
-			t.Fatalf("inbox preview = %+v", row.Customer)
+		if row.Service == nil || row.Service.Preview == nil || *row.Service.Preview != noteInput.Body ||
+			row.Service.PreviewVisibility == nil || *row.Service.PreviewVisibility != domain.MessageVisibilityInternal {
+			t.Fatalf("inbox preview = %+v", row.Service)
 		}
 	}
 	if !listed {
@@ -82,7 +82,7 @@ func TestCustomerInternalNotes(t *testing.T) {
 		t.Fatal(err)
 	}
 	last := history.Messages[len(history.Messages)-1]
-	if last.ID != note.ID || last.Visibility != domain.MessageVisibilityInternalOnly {
+	if last.ID != note.ID || last.Visibility != domain.MessageVisibilityInternal {
 		t.Fatalf("member timeline last message = %+v", last)
 	}
 
@@ -120,7 +120,7 @@ func TestCustomerInternalNotes(t *testing.T) {
 	}
 
 	t.Run("对客消息不能引用内部备注", func(t *testing.T) {
-		_, err := send.Execute(ctx, f.owner, conversationaction.CustomerTextMessageInput{
+		_, err := send.Execute(ctx, f.owner, conversationaction.ServiceTextMessageInput{
 			ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(),
 			Body: "已为您加急", ReplyToMessageID: note.ID,
 		})
@@ -132,9 +132,9 @@ func TestCustomerInternalNotes(t *testing.T) {
 
 	t.Run("内部备注可以引用备注和对客消息", func(t *testing.T) {
 		for _, target := range []string{note.ID, visitorMessage.Message.ID} {
-			saved, err := send.Execute(ctx, f.owner, conversationaction.CustomerTextMessageInput{
+			saved, err := send.Execute(ctx, f.owner, conversationaction.ServiceTextMessageInput{
 				ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(),
-				Body: "我来跟进", ReplyToMessageID: target, Visibility: domain.MessageVisibilityInternalOnly,
+				Body: "我来跟进", ReplyToMessageID: target, Visibility: domain.MessageVisibilityInternal,
 			})
 			if err != nil || saved.ReplyTo == nil || saved.ReplyTo.ID != target {
 				t.Fatalf("note reply to %s = %+v err=%v", target, saved.ReplyTo, err)
@@ -180,7 +180,7 @@ func TestCustomerInternalNotes(t *testing.T) {
 
 	t.Run("同一消息编号跨可见范围冲突", func(t *testing.T) {
 		changed := noteInput
-		changed.Visibility = domain.MessageVisibilityCustomerVisible
+		changed.Visibility = domain.MessageVisibilityShared
 		_, err := send.Execute(ctx, f.member, changed)
 		var conflict *conversationaction.ConflictError
 		if !errors.As(err, &conflict) || conflict.Reason != conversationaction.ConflictReasonIdempotencyMismatch {
@@ -198,11 +198,11 @@ func TestCustomerInternalNotes(t *testing.T) {
 		if _, err := closeSession.Execute(ctx, f.owner, f.conversationID); err != nil {
 			t.Fatal(err)
 		}
-		saved, err := send.Execute(ctx, f.owner, conversationaction.CustomerTextMessageInput{
+		saved, err := send.Execute(ctx, f.owner, conversationaction.ServiceTextMessageInput{
 			ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(),
-			Body: "补一条备注", Visibility: domain.MessageVisibilityInternalOnly,
+			Body: "补一条备注", Visibility: domain.MessageVisibilityInternal,
 		})
-		if err != nil || saved.Visibility != domain.MessageVisibilityInternalOnly {
+		if err != nil || saved.Visibility != domain.MessageVisibilityInternal {
 			t.Fatalf("closed session note=%+v err=%v", saved, err)
 		}
 		// 补记不重开周期，也不推进周期摘要。

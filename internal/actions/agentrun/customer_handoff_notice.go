@@ -126,7 +126,7 @@ func (a *ExecuteAction) HandOffReturnedSession(ctx context.Context, input Return
 		if err != nil {
 			return err
 		}
-		conversation, session, err := chatstate.LockCustomerServiceSession(ctx, tx, input.OrganizationID, queued.ConversationID)
+		conversation, session, err := chatstate.LockServiceSession(ctx, tx, input.OrganizationID, queued.ConversationID)
 		if err != nil {
 			return err
 		}

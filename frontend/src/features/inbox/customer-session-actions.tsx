@@ -13,12 +13,12 @@ import {
   claimServiceSession,
   closeServiceSession,
   isApiError,
-  listCustomerServiceAssignees,
+  listServiceAssignees,
   listServiceQueueTeams,
   reopenServiceSession,
   transferServiceSession,
-  type CustomerInboxConversationData,
-  type CustomerServiceSession,
+  type ServiceInboxConversationData,
+  type ServiceSession,
   type InboxAssignee,
   type ServiceQueueTeam,
 } from "@/api"
@@ -33,13 +33,13 @@ import { useResource } from "@/hooks/use-resource"
 import { apiErrorMessage } from "@/lib/form-errors"
 import { recoverSession } from "@/lib/session-navigation"
 
-type CustomerSummary = CustomerInboxConversationData["customer"]
+type CustomerSummary = ServiceInboxConversationData["service"]
 
 /** 判断客户会话所在渠道是否支持客服回复。 */
 export function customerReplySupported(customer: CustomerSummary) {
   return (
-    customer.channelType === ChannelType.ChannelTypeWebsite ||
-    customer.channelType === ChannelType.ChannelTypeTelegram
+    customer.channel?.type === ChannelType.ChannelTypeWebsite ||
+    customer.channel?.type === ChannelType.ChannelTypeTelegram
   )
 }
 
@@ -63,24 +63,24 @@ export function customerReplyDisabledReason(
 
 /** 管理客服处理周期命令的执行状态、可用操作和关闭确认；只有开启接待的成员可以领取、转交、关闭与重开。 */
 export function useCustomerSessionActions(
-  conversation: CustomerInboxConversationData | null,
+  conversation: ServiceInboxConversationData | null,
   currentIdentityId: string,
   handlesCustomers: boolean,
-  onChanged: (session: CustomerServiceSession) => void,
+  onChanged: (session: ServiceSession) => void,
 ) {
   const { t } = useTranslation("inbox")
   const navigate = useNavigate()
   const [operation, setOperation] = useState("")
   const [closeConfirmationOpen, setCloseConfirmationOpen] = useState(false)
-  const customer = conversation?.customer ?? null
+  const customer = conversation?.service ?? null
   const sessionOpen =
     customer?.serviceSessionStatus === ServiceSessionStatus.ServiceSessionStatusOpen
   const sessionClosed =
     customer?.serviceSessionStatus === ServiceSessionStatus.ServiceSessionStatusClosed
   const assignedToCurrentUser = customer?.assignee?.identityId === currentIdentityId
   const { data: assignees = [] } = useResource(
-    resourceKeys.customerServiceAssignees(),
-    () => listCustomerServiceAssignees(),
+    resourceKeys.serviceAssignees(),
+    () => listServiceAssignees(),
     { enabled: Boolean(customer && sessionOpen && assignedToCurrentUser) },
   )
   const { data: transferTeams = [] } = useResource(
@@ -99,7 +99,7 @@ export function useCustomerSessionActions(
   /** 执行客服处理周期命令，并把命令后的处理周期交给上层刷新受影响视图。 */
   async function run(
     nextOperation: string,
-    execute: (conversationID: string) => Promise<CustomerServiceSession>,
+    execute: (conversationID: string) => Promise<ServiceSession>,
     successMessage: string,
   ) {
     if (!conversation) return

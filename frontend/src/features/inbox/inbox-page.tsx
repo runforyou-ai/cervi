@@ -5,13 +5,13 @@ import { useTranslation } from "react-i18next"
 import { toast } from "sonner"
 
 import {
-  CustomerQueueFilter,
+  ServiceQueueFilter,
   InboxPendingKind,
   InboxScope,
   ServiceSessionStatus,
   isApiError,
-  isCustomerInboxConversation,
-  listCustomerServiceAssignees,
+  isServiceInboxConversation,
+  listServiceAssignees,
   listInboxChannels,
   listServiceQueueTeams,
   openConversationWindow,
@@ -108,8 +108,8 @@ export function InboxPage({
   }, [isNarrowViewport, isNarrowDetailOpen, listViewport])
   const conversationName = useConversationName()
   const { data: assignees = [] } = useResource(
-    resourceKeys.customerServiceAssignees(),
-    () => listCustomerServiceAssignees(),
+    resourceKeys.serviceAssignees(),
+    () => listServiceAssignees(),
     { enabled: !pendingTab },
   )
   const { data: queueTeams = [] } = useResource(
@@ -148,12 +148,12 @@ export function InboxPage({
 
   /** 本人关闭服务会话后取消选中并清空主区，已关闭会话里的其他操作保持选中。 */
   function followCustomerConversation(conversation: InboxConversationData) {
-    if (!isCustomerInboxConversation(conversation) || conversation.id !== selectedConversationId) return
+    if (!isServiceInboxConversation(conversation) || conversation.id !== selectedConversationId) return
     const closing =
-      conversation.customer.serviceSessionStatus === ServiceSessionStatus.ServiceSessionStatusClosed &&
+      conversation.service.serviceSessionStatus === ServiceSessionStatus.ServiceSessionStatusClosed &&
       selectedConversation !== undefined &&
-      isCustomerInboxConversation(selectedConversation) &&
-      selectedConversation.customer.serviceSessionStatus === ServiceSessionStatus.ServiceSessionStatusOpen
+      isServiceInboxConversation(selectedConversation) &&
+      selectedConversation.service.serviceSessionStatus === ServiceSessionStatus.ServiceSessionStatusOpen
     if (!closing) return
     setIsNarrowDetailOpen(false)
     onQueryChange({ conversationId: "" })
@@ -192,7 +192,7 @@ export function InboxPage({
                 ...changes,
                 // 切换条目类型时队列筛选回到全部队列。
                 ...(changes.pendingKind !== undefined
-                  ? { queueFilter: CustomerQueueFilter.CustomerQueueFilterAll, queueTeamId: "" }
+                  ? { queueFilter: ServiceQueueFilter.ServiceQueueFilterAll, queueTeamId: "" }
                   : {}),
               })
             }

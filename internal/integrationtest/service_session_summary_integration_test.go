@@ -213,13 +213,13 @@ func TestHandoffSummary(t *testing.T) {
 		payload, _ := json.Marshal(domain.ServiceSessionHandedOffEvent{ServiceSessionID: session.ID, Reason: domain.AgentHandoffReason("knowledge_gap")})
 		eventType := string(domain.ConversationSystemEventServiceSessionHandedOff)
 		if err := realtime.RunInTx(ctx, f.db, func(ctx context.Context, tx bun.Tx) error {
-			conversation, locked, err := chatstate.LockCustomerServiceSession(ctx, tx, f.owner.Organization.ID, f.conversationID)
+			conversation, locked, err := chatstate.LockServiceSession(ctx, tx, f.owner.Organization.ID, f.conversationID)
 			if err != nil {
 				return err
 			}
 			if _, _, err := chatstate.AppendMessage(ctx, tx, conversation, &servermodels.Message{
 				ID: messageID, OrganizationID: f.owner.Organization.ID, ConversationID: f.conversationID, ServiceSessionID: &session.ID,
-				Type: string(domain.MessageTypeSystem), Visibility: string(domain.MessageVisibilityInternalOnly),
+				Type: string(domain.MessageTypeSystem), Visibility: string(domain.MessageVisibilityInternal),
 				SystemEventType: &eventType, SystemEventPayload: payload, OriginatedAt: time.Now().UTC(),
 			}); err != nil {
 				return err
@@ -303,8 +303,8 @@ func loadSummarySession(t *testing.T, db *bun.DB, conversationID string) *server
 	t.Helper()
 	session := &servermodels.ServiceSession{}
 	if err := db.NewSelect().Model(session).
-		Join("JOIN customer_conversations AS cc ON cc.current_service_session_id = ss.id AND cc.organization_id = ss.organization_id").
-		Where("cc.conversation_id = ?", conversationID).
+		Join("JOIN service_conversations AS svc ON svc.current_service_session_id = ss.id AND svc.organization_id = ss.organization_id").
+		Where("svc.conversation_id = ?", conversationID).
 		Scan(context.Background()); err != nil {
 		t.Fatal(err)
 	}

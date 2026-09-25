@@ -1,21 +1,21 @@
 package domain
 
-// CustomerReplyMode 定义 AI 写回复的生成方式。
-type CustomerReplyMode string
+// ServiceReplyMode 定义 AI 写回复的生成方式。
+type ServiceReplyMode string
 
 const (
-	// CustomerReplyModeReply 根据会话上下文撰写回复。
-	CustomerReplyModeReply CustomerReplyMode = "reply"
-	// CustomerReplyModeRewrite 保留客服草稿原意并改写表达。
-	CustomerReplyModeRewrite CustomerReplyMode = "rewrite"
+	// ServiceReplyModeReply 根据会话上下文撰写回复。
+	ServiceReplyModeReply ServiceReplyMode = "reply"
+	// ServiceReplyModeRewrite 保留客服草稿原意并改写表达。
+	ServiceReplyModeRewrite ServiceReplyMode = "rewrite"
 )
 
-// CustomerReplyTone 定义 AI 写回复的语气。
-type CustomerReplyTone string
+// ServiceReplyTone 定义 AI 写回复的语气。
+type ServiceReplyTone string
 
 const (
-	CustomerReplyToneKeep         CustomerReplyTone = "keep"
-	CustomerReplyToneProfessional CustomerReplyTone = "professional"
-	CustomerReplyToneFriendly     CustomerReplyTone = "friendly"
-	CustomerReplyToneConcise      CustomerReplyTone = "concise"
+	ServiceReplyToneKeep         ServiceReplyTone = "keep"
+	ServiceReplyToneProfessional ServiceReplyTone = "professional"
+	ServiceReplyToneFriendly     ServiceReplyTone = "friendly"
+	ServiceReplyToneConcise      ServiceReplyTone = "concise"
 )

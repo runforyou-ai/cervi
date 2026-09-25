@@ -6,7 +6,7 @@ import {
   ConversationStatus,
   getGroupConversation,
   isAgentInboxConversation,
-  isCustomerInboxConversation,
+  isServiceInboxConversation,
   isDirectInboxConversation,
   isGroupInboxConversation,
   type AgentInboxConversationData,
@@ -109,7 +109,7 @@ export function ConversationMain({
     ? conversationName(displayedConversation)
     : (directTarget?.displayName ?? "")
   const customerConversation =
-    displayedConversation && isCustomerInboxConversation(displayedConversation)
+    displayedConversation && isServiceInboxConversation(displayedConversation)
       ? displayedConversation
       : null
   const directConversation =
@@ -127,7 +127,7 @@ export function ConversationMain({
   const accountDisabledReason = useAccountDisabledReason(displayedConversation)
   const replyDisabledReason = customerConversation
     ? customerReplyDisabledReason(
-        customerConversation.customer,
+        customerConversation.service,
         identity.user.identityId,
         identity.user.handlesCustomers,
         t,
@@ -185,7 +185,7 @@ export function ConversationMain({
           <HandoffSummaryCard
             key={customerConversation.id}
             conversationID={customerConversation.id}
-            assignee={customerConversation.customer.assignee}
+            assignee={customerConversation.service.assignee}
           />
         ) : null}
         <ConversationThread

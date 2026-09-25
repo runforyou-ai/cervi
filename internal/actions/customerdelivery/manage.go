@@ -38,7 +38,7 @@ type Record struct {
 
 // List 读取当前企业客户会话中指定消息的投递状态。
 func (m *Manager) List(ctx context.Context, organizationID, conversationID string, messageIDs []string) ([]Record, error) {
-	exists, err := m.db.NewSelect().TableExpr("customer_conversations").Where("organization_id = ? AND conversation_id = ?", organizationID, conversationID).Exists(ctx)
+	exists, err := m.db.NewSelect().TableExpr("channel_conversations").Where("organization_id = ? AND conversation_id = ?", organizationID, conversationID).Exists(ctx)
 	if err != nil {
 		return nil, err
 	}
@@ -67,7 +67,7 @@ func (m *Manager) Resolve(ctx context.Context, identity *models.Identity, conver
 		if err != nil {
 			return err
 		}
-		conversation, err := chatstate.LockCustomerConversation(ctx, tx, identity.Organization.ID, conversationID)
+		conversation, err := chatstate.LockChannelConversation(ctx, tx, identity.Organization.ID, conversationID)
 		if err != nil {
 			return err
 		}

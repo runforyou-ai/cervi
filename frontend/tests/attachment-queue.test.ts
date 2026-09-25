@@ -46,13 +46,13 @@ function host(overrides: Record<string, (...args: any[]) => any> = {}) {
   const customerSends: any[] = []
   const api: Record<string, any> = {
     FilePurpose: { FilePurposeMessageAttachment: "message_attachment" },
-    MessageVisibility: { MessageVisibilityCustomerVisible: "customer_visible" },
+    MessageVisibility: { MessageVisibilityShared: "shared" },
     MessageAttachmentTransferStatus: {
       MessageAttachmentTransferReady: "ready",
       MessageAttachmentTransferPending: "pending",
       MessageAttachmentTransferFailed: "failed",
     },
-    sendCustomerAttachmentMessage: async (conversationId: string, input: any) => {
+    sendServiceAttachmentMessage: async (conversationId: string, input: any) => {
       customerSends.push({ conversationId, ...input })
       return {
         id: `saved-${input.clientMessageId}`,

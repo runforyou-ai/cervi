@@ -3,8 +3,8 @@ import {
   ConversationType,
   MessageVisibility,
   sendAgentTextMessage,
-  sendCustomerCopilotTextMessage,
-  sendCustomerTextMessage,
+  sendServiceCopilotTextMessage,
+  sendServiceTextMessage,
   sendDirectTextMessage,
   sendGroupTextMessage,
   type ConversationMessageData,
@@ -56,7 +56,7 @@ export function sendComposerTextMessage({
       if (conversationType === ConversationType.ConversationTypeAgent)
         return sendAgentTextMessage(conversationID, directInput)
       if (conversationType === ConversationType.ConversationTypeCopilot)
-        return sendCustomerCopilotTextMessage(conversationID, directInput)
+        return sendServiceCopilotTextMessage(conversationID, directInput)
       return sendDirectTextMessage(conversationID, directInput)
     }
     case ConversationType.ConversationTypeGroup:
@@ -68,16 +68,16 @@ export function sendComposerTextMessage({
         ),
         mentionAll,
       })
-    case ConversationType.ConversationTypeCustomer:
-      return sendCustomerTextMessage(conversationID, {
+    case ConversationType.ConversationTypeChannel:
+      return sendServiceTextMessage(conversationID, {
         ...messageInput,
         replyToMessageId: replyToMessageID,
         visibility,
-        mentionIdentityIds: visibility === MessageVisibility.MessageVisibilityInternalOnly
+        mentionIdentityIds: visibility === MessageVisibility.MessageVisibilityInternal
           ? mentions.map((mention) => mention.identityID)
           : [],
-        translate: translate && visibility === MessageVisibility.MessageVisibilityCustomerVisible,
-        translation: visibility === MessageVisibility.MessageVisibilityCustomerVisible ? translation : null,
+        translate: translate && visibility === MessageVisibility.MessageVisibilityShared,
+        translation: visibility === MessageVisibility.MessageVisibilityShared ? translation : null,
       })
     default:
       throw new Error("不支持的会话类型")

@@ -233,8 +233,8 @@ func (b *Backend) normalizeOutput(output any) {
 
 // normalizeConversation 补全会话列表和单聊查询中的头像地址。
 func (b *Backend) normalizeConversation(conversation *appservice.InboxConversation) {
-	if conversation.Customer != nil {
-		conversation.Customer.ContactAvatarURL = b.absoluteContentURL(conversation.Customer.ContactAvatarURL)
+	if conversation.Service != nil {
+		conversation.Service.RequesterAvatarURL = b.absoluteContentURL(conversation.Service.RequesterAvatarURL)
 	}
 	if conversation.Agent != nil {
 		conversation.Agent.AgentAvatarURL = b.absoluteContentURL(conversation.Agent.AgentAvatarURL)

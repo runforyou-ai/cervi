@@ -8,7 +8,7 @@ import {
   createFileUpload,
   MessageVisibility,
   sendAttachmentMessage,
-  sendCustomerAttachmentMessage,
+  sendServiceAttachmentMessage,
   type ConversationMessageReference,
   type InboxConversationData,
   type MessageAttachment,
@@ -45,7 +45,7 @@ type Batch = {
   conversationID: string
   targetIdentityID: string
   agentIdentityID: string
-  customerConversationID: string
+  servedConversationID: string
   customer: boolean
   replyTo: ConversationMessageReference | null
   jobs: AttachmentJob[]
@@ -102,14 +102,14 @@ export class AttachmentQueue {
       conversationID,
       targetIdentityID = "",
       agentIdentityID = "",
-      customerConversationID = "",
+      servedConversationID = "",
       customer = false,
       replyTo = null,
     }: {
       conversationID: string
       targetIdentityID?: string
       agentIdentityID?: string
-      customerConversationID?: string
+      servedConversationID?: string
       customer?: boolean
       replyTo?: ConversationMessageReference | null
     },
@@ -134,7 +134,7 @@ export class AttachmentQueue {
       this.outgoing.start(scopeID, {
         clientMessageID: selected.id,
         attachment,
-        visibility: MessageVisibility.MessageVisibilityCustomerVisible,
+        visibility: MessageVisibility.MessageVisibilityShared,
         body: selected.body.trim(),
         originatedAt: new Date(now + index).toISOString(),
         replyTo: index === 0 ? replyTo : null,
@@ -165,7 +165,7 @@ export class AttachmentQueue {
       conversationID,
       targetIdentityID,
       agentIdentityID,
-      customerConversationID,
+      servedConversationID,
       customer,
       replyTo,
       jobs,
@@ -253,7 +253,7 @@ export class AttachmentQueue {
     this.emit()
     try {
       if (batch.customer) {
-        const message = await sendCustomerAttachmentMessage(batch.conversationID, {
+        const message = await sendServiceAttachmentMessage(batch.conversationID, {
           clientMessageId: job.id,
           fileId: job.fileID,
           body: job.body,
@@ -274,7 +274,7 @@ export class AttachmentQueue {
         conversationId: batch.targetIdentityID ? "" : batch.conversationID,
         targetIdentityId: batch.targetIdentityID,
         agentIdentityId: batch.agentIdentityID,
-        customerConversationId: batch.customerConversationID,
+        servedConversationId: batch.servedConversationID,
         clientMessageId: job.id,
         fileId: job.fileID,
         body: job.body,
@@ -291,7 +291,7 @@ export class AttachmentQueue {
         batch.conversationID = result.conversationId
         batch.targetIdentityID = ""
         batch.agentIdentityID = ""
-        batch.customerConversationID = ""
+        batch.servedConversationID = ""
         for (const item of batch.jobs) item.conversationID = result.conversationId
         batch.onCreated(result.conversation, result.conversationId)
       }

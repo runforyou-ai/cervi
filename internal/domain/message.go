@@ -9,10 +9,10 @@ const (
 	MessageAuthorSystem  MessageAuthor = "system"
 )
 
-// MessageVisibility 定义消息在客户会话中的可见范围。
+// MessageVisibility 定义消息在服务会话中的可见范围：shared 会话各方可见，internal 仅处理方可见。
 type MessageVisibility string
 
 const (
-	MessageVisibilityCustomerVisible MessageVisibility = "customer_visible"
-	MessageVisibilityInternalOnly    MessageVisibility = "internal_only"
+	MessageVisibilityShared   MessageVisibility = "shared"
+	MessageVisibilityInternal MessageVisibility = "internal"
 )

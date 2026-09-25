@@ -5,7 +5,7 @@ import { useTranslation } from "react-i18next"
 
 import {
   ChannelType,
-  isCustomerInboxConversation,
+  isServiceInboxConversation,
   isAgentInboxConversation,
   isGroupInboxConversation,
   type InboxConversationData,
@@ -16,9 +16,9 @@ import { Tabs, TabsContent } from "@/components/ui/tabs"
 import { ConversationAvatar } from "@/features/inbox/conversation-avatar"
 import { DirectConversationDraftAvatar } from "@/features/inbox/direct-conversation-draft-header"
 import type { ComposerDraftBridge } from "@/features/inbox/conversation-composer-types"
-import { CustomerBusinessQueries } from "@/features/inbox/customer-business-queries"
+import { ServiceBusinessQueries } from "@/features/inbox/customer-business-queries"
 import { CustomerServiceHistory } from "@/features/inbox/customer-service-history"
-import { CustomerCopilotPanel } from "@/features/inbox/customer-copilot-panel"
+import { ServiceCopilotPanel } from "@/features/inbox/customer-copilot-panel"
 import { CustomerProfileDetails } from "@/features/inbox/customer-profile-details"
 import { GroupConversationContext } from "@/features/inbox/group-conversation-context"
 import { HeaderAction } from "@/features/inbox/conversation-header"
@@ -104,8 +104,8 @@ function ConversationSidePanelContent({
   const { t } = useTranslation("inbox")
   const [customerTab, setCustomerTab] = useState("profile")
   const customer =
-    conversation && isCustomerInboxConversation(conversation)
-      ? conversation.customer
+    conversation && isServiceInboxConversation(conversation)
+      ? conversation.service
       : null
   const group =
     conversation && isGroupInboxConversation(conversation)
@@ -157,7 +157,7 @@ function ConversationSidePanelContent({
                 <CustomerProfileDetails
                   conversationID={conversation.id}
                   lastMessageID={conversation.lastMessageId}
-                  website={customer.channelType === ChannelType.ChannelTypeWebsite}
+                  website={customer.channel?.type === ChannelType.ChannelTypeWebsite}
                 />
               </dl>
             </section>
@@ -169,9 +169,9 @@ function ConversationSidePanelContent({
             forceMount
             className="mt-0 flex min-h-0 flex-1 flex-col overflow-hidden data-[state=inactive]:hidden"
           >
-            <CustomerCopilotPanel
+            <ServiceCopilotPanel
               key={conversation.id}
-              customerConversationID={conversation.id}
+              servedConversationID={conversation.id}
               replyDisabledReason={replyDisabledReason}
               customerDraftRef={customerDraftRef}
               active={customerTab === "assistant"}
@@ -182,7 +182,7 @@ function ConversationSidePanelContent({
             value="business"
             className="mt-0 min-h-0 flex-1 overflow-x-hidden overflow-y-auto overscroll-contain"
           >
-            <CustomerBusinessQueries conversationID={conversation.id} />
+            <ServiceBusinessQueries conversationID={conversation.id} />
           </TabsContent>
         </Tabs>
       ) : conversation && group ? (

@@ -71,16 +71,16 @@ type Backend interface {
 	// ReadInboxWindow 重读已加载双向边界之间的完整列表范围。
 	//cervi:route POST /inbox/window/query
 	ReadInboxWindow(context.Context, RequestMeta, InboxWindowInput) (InboxWindow, error)
-	// GetCustomerProfile 返回客户会话的客户身份与当前周期访客上下文。
-	//cervi:route GET /conversations/:conversationID/customer-profile
-	GetCustomerProfile(context.Context, RequestMeta, string) (CustomerProfile, error)
-	// ListCustomerBusinessQueries 返回客户会话当前客服周期内 AI 客服查询业务系统的记录。
+	// GetRequesterProfile 返回服务会话发起人的资料；发起人是客户时给出客户身份与当前周期访客上下文。
+	//cervi:route GET /conversations/:conversationID/requester-profile
+	GetRequesterProfile(context.Context, RequestMeta, string) (RequesterProfile, error)
+	// ListServiceBusinessQueries 返回服务会话当前周期内 AI 员工查询业务系统的记录。
 	//cervi:route GET /conversations/:conversationID/business-queries
-	ListCustomerBusinessQueries(context.Context, RequestMeta, string) (CustomerBusinessQueryList, error)
-	// GetCustomerServiceSummaries 返回客户会话当前周期的交接摘要与同一客户已关闭周期的小结。
+	ListServiceBusinessQueries(context.Context, RequestMeta, string) (ServiceBusinessQueryList, error)
+	// GetServiceSummaries 返回服务会话当前周期的交接摘要与同一发起人已关闭周期的小结。
 	//cervi:route GET /conversations/:conversationID/service-summaries
-	GetCustomerServiceSummaries(context.Context, RequestMeta, string) (CustomerServiceSummaries, error)
-	// UpdateServiceSessionSummary 修改已关闭客服处理周期的小结、是否解决与咨询分类。
+	GetServiceSummaries(context.Context, RequestMeta, string) (ServiceSummaries, error)
+	// UpdateServiceSessionSummary 修改已关闭服务周期的小结、是否解决与咨询分类。
 	//cervi:route PUT /service-sessions/:serviceSessionID/summary
 	UpdateServiceSessionSummary(context.Context, RequestMeta, string, ServiceSessionSummaryInput) (ServiceSessionSummary, error)
 	// GetInboxConversation 返回当前用户有权阅读的独立会话摘要。
@@ -95,9 +95,9 @@ type Backend interface {
 	// SearchInbox 按范围检索会话名称、消息正文与附件文件名、成员和外部联系人。
 	//cervi:route GET /inbox/search
 	SearchInbox(context.Context, RequestMeta, InboxSearchInput) (InboxSearchResult, error)
-	// ListCustomerServiceAssignees 返回有效真人和 AI 客服。
+	// ListServiceAssignees 返回可接待服务会话的有效真人和 AI 员工。
 	//cervi:route GET /inbox/assignees
-	ListCustomerServiceAssignees(context.Context, RequestMeta) (CustomerServiceAssigneeList, error)
+	ListServiceAssignees(context.Context, RequestMeta) (ServiceAssigneeList, error)
 	// ListServiceQueueTeams 返回可作为客服队列的团队，本人所在团队排在前面。
 	//cervi:route GET /inbox/queue-teams
 	ListServiceQueueTeams(context.Context, RequestMeta) (ServiceQueueTeamList, error)
@@ -143,12 +143,12 @@ type Backend interface {
 	// UpdateConversationNotificationSettings 保存当前用户的原生会话提醒设置。
 	//cervi:route PATCH /conversations/:conversationID/notification-settings
 	UpdateConversationNotificationSettings(context.Context, RequestMeta, string, ConversationNotificationSettingsInput) (ConversationNotificationSettings, error)
-	// SendCustomerTextMessage 发送客户会话文本消息。
+	// SendServiceTextMessage 在服务会话中发送回复或内部备注。
 	//cervi:route POST /conversations/:conversationID/messages
-	SendCustomerTextMessage(context.Context, RequestMeta, string, CustomerTextMessageInput) (ConversationMessage, error)
-	// SendCustomerAttachmentMessage 发送客户会话附件消息。
+	SendServiceTextMessage(context.Context, RequestMeta, string, ServiceTextMessageInput) (ConversationMessage, error)
+	// SendServiceAttachmentMessage 在服务会话中发送附件回复。
 	//cervi:route POST /conversations/:conversationID/attachment-messages
-	SendCustomerAttachmentMessage(context.Context, RequestMeta, string, CustomerAttachmentMessageInput) (ConversationMessage, error)
+	SendServiceAttachmentMessage(context.Context, RequestMeta, string, ServiceAttachmentMessageInput) (ConversationMessage, error)
 	// GetConversationTranslation 返回当前成员在客户会话中的翻译状态。
 	//cervi:route GET /conversations/:conversationID/translation
 	GetConversationTranslation(context.Context, RequestMeta, string) (ConversationTranslation, error)
@@ -161,42 +161,42 @@ type Backend interface {
 	// PreviewCustomerReplyTranslation 把客服回复译为客户语言并回译为客服语言，供发送前核对。
 	//cervi:route POST /conversations/:conversationID/reply-translation
 	PreviewCustomerReplyTranslation(context.Context, RequestMeta, string, CustomerReplyTranslationInput) (CustomerReplyTranslationPreview, error)
-	// ListCustomerReplyAgents 返回可用于 AI 写回复的 AI 员工。
+	// ListServiceReplyAgents 返回可用于 AI 写回复的 AI 员工。
 	//cervi:route GET /reply-suggestion-agents
-	ListCustomerReplyAgents(context.Context, RequestMeta) (CustomerReplyAgentList, error)
-	// GenerateCustomerReplySuggestions 使用 AI 员工为客户会话生成对客回复候选。
+	ListServiceReplyAgents(context.Context, RequestMeta) (ServiceReplyAgentList, error)
+	// GenerateServiceReplySuggestions 使用 AI 员工为服务会话生成回复候选。
 	//cervi:route POST /conversations/:conversationID/reply-suggestions
-	GenerateCustomerReplySuggestions(context.Context, RequestMeta, string, CustomerReplySuggestionsInput) (CustomerReplySuggestions, error)
-	// ListCustomerCopilotThreads 返回客户会话的全部 Copilot 线程。
+	GenerateServiceReplySuggestions(context.Context, RequestMeta, string, ServiceReplySuggestionsInput) (ServiceReplySuggestions, error)
+	// ListServiceCopilotThreads 返回服务会话的全部 Copilot 线程。
 	//cervi:route GET /conversations/:conversationID/copilot-threads
-	ListCustomerCopilotThreads(context.Context, RequestMeta, string) (CustomerCopilotThreadList, error)
-	// SendFirstCustomerCopilotMessage 以首条提问创建客户会话的 Copilot 线程。
+	ListServiceCopilotThreads(context.Context, RequestMeta, string) (ServiceCopilotThreadList, error)
+	// SendFirstServiceCopilotMessage 以首条提问创建服务会话的 Copilot 线程。
 	//cervi:route POST /conversations/:conversationID/copilot-threads
-	SendFirstCustomerCopilotMessage(context.Context, RequestMeta, string, FirstCustomerCopilotMessageInput) (FirstCustomerCopilotMessageResult, error)
-	// SendCustomerCopilotTextMessage 向 Copilot 线程发送提问。
+	SendFirstServiceCopilotMessage(context.Context, RequestMeta, string, FirstServiceCopilotMessageInput) (FirstServiceCopilotMessageResult, error)
+	// SendServiceCopilotTextMessage 向 Copilot 线程发送提问。
 	//cervi:route POST /copilot-threads/:threadID/messages
-	SendCustomerCopilotTextMessage(context.Context, RequestMeta, string, CustomerCopilotTextMessageInput) (ConversationMessage, error)
-	// StopCustomerCopilotReply 停止 Copilot 线程中指定的回复并返回实际运行状态。
+	SendServiceCopilotTextMessage(context.Context, RequestMeta, string, ServiceCopilotTextMessageInput) (ConversationMessage, error)
+	// StopServiceCopilotReply 停止 Copilot 线程中指定的回复并返回实际运行状态。
 	//cervi:route POST /copilot-threads/:threadID/runs/:runID/stop
-	StopCustomerCopilotReply(context.Context, RequestMeta, string, string) (AgentRunStatus, error)
+	StopServiceCopilotReply(context.Context, RequestMeta, string, string) (AgentRunStatus, error)
 	// ListCustomerMessageDeliveries 读取当前窗口的外部投递状态。
 	//cervi:route GET /conversations/:conversationID/deliveries
 	ListCustomerMessageDeliveries(context.Context, RequestMeta, string, CustomerDeliveryListInput) (CustomerDeliveryList, error)
 	// ResolveCustomerMessageDelivery 人工处理失败或待确认的投递。
 	//cervi:route POST /conversations/:conversationID/deliveries/:deliveryID/resolve
 	ResolveCustomerMessageDelivery(context.Context, RequestMeta, string, string, CustomerDeliveryResolveInput) error
-	// ClaimServiceSession 领取或接管客户会话最新处理周期。
+	// ClaimServiceSession 领取或接管服务会话的当前周期。
 	//cervi:route POST /conversations/:conversationID/claim
-	ClaimServiceSession(context.Context, RequestMeta, string) (CustomerServiceSession, error)
+	ClaimServiceSession(context.Context, RequestMeta, string) (ServiceSession, error)
 	// TransferServiceSession 把当前负责的处理周期转给成员、团队队列或公共队列。
 	//cervi:route POST /conversations/:conversationID/transfer
-	TransferServiceSession(context.Context, RequestMeta, string, TransferServiceSessionInput) (CustomerServiceSession, error)
-	// CloseServiceSession 关闭客户会话最新处理周期。
+	TransferServiceSession(context.Context, RequestMeta, string, TransferServiceSessionInput) (ServiceSession, error)
+	// CloseServiceSession 关闭服务会话的当前周期。
 	//cervi:route POST /conversations/:conversationID/close
-	CloseServiceSession(context.Context, RequestMeta, string) (CustomerServiceSession, error)
-	// ReopenServiceSession 重新打开客户会话最新处理周期并分配给当前身份。
+	CloseServiceSession(context.Context, RequestMeta, string) (ServiceSession, error)
+	// ReopenServiceSession 重新打开服务会话的当前周期并分配给当前身份。
 	//cervi:route POST /conversations/:conversationID/reopen
-	ReopenServiceSession(context.Context, RequestMeta, string) (CustomerServiceSession, error)
+	ReopenServiceSession(context.Context, RequestMeta, string) (ServiceSession, error)
 	// SendFirstDirectTextMessage 向目标身份发送首条单聊消息并按需创建长期会话。
 	//cervi:route POST /direct-conversations/messages
 	SendFirstDirectTextMessage(context.Context, RequestMeta, FirstDirectTextMessageInput) (FirstDirectTextMessageResult, error)

@@ -328,7 +328,7 @@ func TestRealtimeGatewayDelivery(t *testing.T) {
 	// 客户会话变化经客服共享受众送达全部成员事件流。
 	customerConversationID := uuid.NewV7().String()
 	if err := realtime.RunInTx(ctx, f.db, func(ctx context.Context, _ bun.Tx) error {
-		realtime.Notify(ctx, realtime.CustomerInboxConversationChanged(organizationID, customerConversationID, 3))
+		realtime.Notify(ctx, realtime.ServiceInboxConversationChanged(organizationID, customerConversationID, 3))
 		return nil
 	}); err != nil {
 		t.Fatal(err)

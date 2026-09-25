@@ -46,16 +46,16 @@ func TestCustomerHandlingAuthorization(t *testing.T) {
 	claim := conversationaction.NewClaimServiceSessionAction(f.db, coordinator, newTestTasks(f.db))
 	_, err := claim.Execute(ctx, f.member, f.conversationID)
 	expectHandlingRequired("未开启接待领取", err)
-	send := conversationaction.NewSendCustomerTextMessageAction(f.db, nil)
-	_, err = send.Execute(ctx, f.member, conversationaction.CustomerTextMessageInput{
+	send := conversationaction.NewSendServiceTextMessageAction(f.db, nil)
+	_, err = send.Execute(ctx, f.member, conversationaction.ServiceTextMessageInput{
 		ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "未开启接待的回复",
 	})
 	expectHandlingRequired("未开启接待对客回复", err)
 
 	// 未开启接待的成员仍可写内部备注。
-	if _, err := send.Execute(ctx, f.member, conversationaction.CustomerTextMessageInput{
+	if _, err := send.Execute(ctx, f.member, conversationaction.ServiceTextMessageInput{
 		ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(),
-		Body: "未开启接待的内部备注", Visibility: domain.MessageVisibilityInternalOnly,
+		Body: "未开启接待的内部备注", Visibility: domain.MessageVisibilityInternal,
 	}); err != nil {
 		t.Fatalf("未开启接待写内部备注 = %v", err)
 	}

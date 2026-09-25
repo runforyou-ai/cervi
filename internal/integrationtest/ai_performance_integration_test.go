@@ -46,7 +46,7 @@ func testAIPerformanceReport(t *testing.T, db *bun.DB, identity *servermodels.Id
 	// currentSession 读取客户会话当前的客服周期编号。
 	currentSession := func(conversationID string) string {
 		var sessionID string
-		if err := db.NewSelect().Table("customer_conversations").Column("current_service_session_id").
+		if err := db.NewSelect().Table("service_conversations").Column("current_service_session_id").
 			Where("conversation_id = ?", conversationID).Scan(ctx, &sessionID); err != nil {
 			t.Fatal(err)
 		}
@@ -124,7 +124,7 @@ func testAIPerformanceReport(t *testing.T, db *bun.DB, identity *servermodels.Id
 	humanChannelID := f.newChannel(t, identity.OrganizationIdentity.ID, channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue})
 	repliedInput := visitorInput(humanChannelID, "")
 	replied := f.receive(t, &repliedInput, "怎么修改收货地址")
-	if _, err := conversationaction.NewSendCustomerTextMessageAction(db, tasks).Execute(ctx, identity, conversationaction.CustomerTextMessageInput{
+	if _, err := conversationaction.NewSendServiceTextMessageAction(db, tasks).Execute(ctx, identity, conversationaction.ServiceTextMessageInput{
 		ConversationID: replied.Conversation.ID, ClientMessageID: uuid.NewV7().String(), Body: "我来帮您修改",
 	}); err != nil {
 		t.Fatal(err)

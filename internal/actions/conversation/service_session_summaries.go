@@ -34,18 +34,19 @@ const (
 	ValidationCategoryIDInvalid       ValidationCode = "category_id_invalid"
 )
 
-// ConflictReasonServiceSessionNotClosed 表示客服处理周期尚未关闭，不能修改小结。
+// ConflictReasonServiceSessionNotClosed 表示服务周期尚未关闭，不能修改小结。
 const ConflictReasonServiceSessionNotClosed = "service_session_not_closed"
 
-// ErrServiceSessionNotFound 表示客服处理周期不存在或当前身份无权访问。
+// ErrServiceSessionNotFound 表示服务周期不存在或当前身份无权访问。
 var ErrServiceSessionNotFound = errors.New("service session not found")
 
-// ServiceSessionSummary 表示一个已关闭客服处理周期的结束方式与小结。
+// ServiceSessionSummary 表示一个已关闭服务周期的结束方式与小结。
 type ServiceSessionSummary struct {
 	ServiceSessionID string                              `bun:"id"`
 	ConversationID   string                              `bun:"conversation_id"`
-	ChannelType      domain.ChannelType                  `bun:"channel_type"`
-	ChannelName      string                              `bun:"channel_name"`
+	Source           domain.ServiceSource                `bun:"source"`
+	ChannelType      *domain.ChannelType                 `bun:"channel_type"`
+	ChannelName      *string                             `bun:"channel_name"`
 	ClosedAt         time.Time                           `bun:"closed_at"`
 	CloseReason      domain.ServiceSessionCloseReason    `bun:"close_reason"`
 	Status           *domain.ServiceSessionSummaryStatus `bun:"summary_status"`
@@ -57,7 +58,7 @@ type ServiceSessionSummary struct {
 	EditedByName     *string                             `bun:"edited_by_name"`
 }
 
-// ServiceSummaries 表示客户会话当前周期的交接摘要与同一客户已关闭周期的小结。
+// ServiceSummaries 表示服务会话当前周期的交接摘要与同一发起人已关闭周期的小结。
 type ServiceSummaries struct {
 	Handoff  *domain.HandoffSummary
 	Sessions []ServiceSessionSummary
@@ -67,16 +68,18 @@ type ServiceSummaries struct {
 func serviceSessionSummaryQuery(db bun.IDB, organizationID string) *bun.SelectQuery {
 	return db.NewSelect().
 		TableExpr("service_sessions AS ss").
-		ColumnExpr("ss.id, ss.conversation_id, ch.type AS channel_type, ch.name AS channel_name, ss.closed_at, ss.close_reason").
+		ColumnExpr("ss.id, ss.conversation_id, svc.source, ch.type AS channel_type, ch.name AS channel_name, ss.closed_at, ss.close_reason").
 		ColumnExpr("ss.summary_status, ss.summary, ss.resolved, ss.category_id, sc.name AS category_name, ss.summary_edited_at, editor.display_name AS edited_by_name").
-		Join("JOIN contact_channel_identities AS cci ON cci.id = ss.contact_channel_identity_id AND cci.organization_id = ss.organization_id").
-		Join("JOIN channels AS ch ON ch.id = cci.channel_id AND ch.organization_id = cci.organization_id").
+		Join("JOIN service_conversations AS svc ON svc.id = ss.service_conversation_id AND svc.organization_id = ss.organization_id").
+		Join("LEFT JOIN channel_conversations AS cc ON cc.conversation_id = svc.conversation_id AND cc.organization_id = svc.organization_id").
+		Join("LEFT JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id").
+		Join("LEFT JOIN channels AS ch ON ch.id = cci.channel_id AND ch.organization_id = cci.organization_id").
 		Join("LEFT JOIN service_categories AS sc ON sc.id = ss.category_id AND sc.organization_id = ss.organization_id").
 		Join("LEFT JOIN organization_identities AS editor ON editor.id = ss.summary_edited_by_identity_id AND editor.organization_id = ss.organization_id").
 		Where("ss.organization_id = ? AND ss.status = ?", organizationID, domain.ServiceSessionStatusClosed)
 }
 
-// ListServiceSummariesQuery 读取客户会话的交接摘要与客户历史周期小结。
+// ListServiceSummariesQuery 读取服务会话的交接摘要与客户历史周期小结。
 type ListServiceSummariesQuery struct{ db *bun.DB }
 
 // NewListServiceSummariesQuery 创建客户周期小结查询。
@@ -95,16 +98,15 @@ func (q *ListServiceSummariesQuery) Execute(ctx context.Context, identity *serve
 			return err
 		}
 		var current struct {
-			ContactID      string                 `bun:"contact_id"`
-			HandoffSummary *domain.HandoffSummary `bun:"handoff_summary,type:jsonb"`
+			RequesterSubjectID string                 `bun:"requester_subject_id"`
+			HandoffSummary     *domain.HandoffSummary `bun:"handoff_summary,type:jsonb"`
 		}
 		err := tx.NewSelect().
-			TableExpr("customer_conversations AS cc").
-			ColumnExpr("cci.contact_id").
+			TableExpr("service_conversations AS svc").
+			ColumnExpr("svc.requester_subject_id").
 			ColumnExpr("CASE WHEN ss.status = ? THEN ss.handoff_summary END AS handoff_summary", domain.ServiceSessionStatusOpen).
-			Join("JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id").
-			Join("JOIN service_sessions AS ss ON ss.id = cc.current_service_session_id AND ss.organization_id = cc.organization_id").
-			Where("cc.organization_id = ? AND cc.conversation_id = ?", identity.Organization.ID, conversationID).
+			Join("JOIN service_sessions AS ss ON ss.id = svc.current_service_session_id AND ss.organization_id = svc.organization_id").
+			Where("svc.organization_id = ? AND svc.conversation_id = ?", identity.Organization.ID, conversationID).
 			Scan(ctx, &current)
 		if errors.Is(err, sql.ErrNoRows) {
 			return ErrConversationNotFound
@@ -114,7 +116,7 @@ func (q *ListServiceSummariesQuery) Execute(ctx context.Context, identity *serve
 		}
 		result.Handoff = current.HandoffSummary
 		if err := serviceSessionSummaryQuery(tx, identity.Organization.ID).
-			Where("cci.contact_id = ?", current.ContactID).
+			Where("svc.requester_subject_id = ?", current.RequesterSubjectID).
 			OrderExpr("ss.closed_at DESC, ss.id DESC").
 			Limit(serviceSummaryListLimit).
 			Scan(ctx, &result.Sessions); err != nil {

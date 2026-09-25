@@ -3,7 +3,7 @@ import { useTranslation } from "react-i18next"
 
 import {
   OrganizationIdentityType,
-  isCustomerInboxConversation,
+  isServiceInboxConversation,
   isAgentInboxConversation,
   isDirectInboxConversation,
   isGroupInboxConversation,
@@ -21,8 +21,8 @@ export function ConversationAvatar({
   conversation: InboxConversationData
   className?: string
 }) {
-  const customer = isCustomerInboxConversation(conversation)
-    ? conversation.customer
+  const customer = isServiceInboxConversation(conversation)
+    ? conversation.service
     : null
   const direct = isDirectInboxConversation(conversation)
     ? conversation.direct
@@ -31,15 +31,15 @@ export function ConversationAvatar({
     ? conversation.group
     : null
   const agent = isAgentInboxConversation(conversation) ? conversation.agent : null
-  const badge = customer
-    ? messageChannelTypeDefinition(customer.channelType)
+  const badge = customer?.channel
+    ? messageChannelTypeDefinition(customer.channel.type)
     : undefined
   const contactName =
-    customer?.contactName?.trim() ||
+    customer?.requesterName?.trim() ||
     direct?.peerName.trim() || agent?.agentName.trim() ||
     group?.title.trim()
   const avatarURL =
-    customer?.contactAvatarUrl ?? direct?.peerAvatarUrl ?? agent?.agentAvatarUrl ?? group?.imageUrl
+    customer?.requesterAvatarUrl ?? direct?.peerAvatarUrl ?? agent?.agentAvatarUrl ?? group?.imageUrl
   const fallback = group
     ? "group"
     : agent
@@ -78,8 +78,8 @@ export function ConversationAssigneeAvatar({
   className?: string
 }) {
   const { t } = useTranslation("inbox")
-  const assignee = isCustomerInboxConversation(conversation)
-    ? conversation.customer.assignee
+  const assignee = isServiceInboxConversation(conversation)
+    ? conversation.service.assignee
     : null
   if (!assignee) return null
   const label = t("conversationAssignee", { name: assignee.displayName })

@@ -35,7 +35,7 @@ func (p customerRunPolicy) lockContext(ctx context.Context, db bun.IDB, run *ser
 	if err != nil {
 		return agentRunPolicyContext{}, err
 	}
-	conversation, err := chatstate.LockCustomerConversation(ctx, db, run.OrganizationID, run.ConversationID)
+	conversation, err := chatstate.LockServiceConversation(ctx, db, run.OrganizationID, run.ConversationID)
 	if err != nil {
 		return agentRunPolicyContext{}, err
 	}
@@ -147,7 +147,7 @@ func (p customerRunPolicy) persistMessage(ctx context.Context, db bun.IDB, polic
 // appendCustomerAgentMessage 在客服事务中追加 AI 客服消息：对客文本同事务安排渠道投递并记录有效首响，内部消息只写入时间线。
 func appendCustomerAgentMessage(ctx context.Context, db bun.IDB, enqueuer servertask.TxEnqueuer, policyContext agentRunPolicyContext, message *servermodels.Message) (*servermodels.Message, error) {
 	message, inserted, err := appendAgentMessage(ctx, db, policyContext.Conversation, message)
-	if err != nil || !inserted || message.Type != string(domain.MessageTypeText) || message.Visibility == string(domain.MessageVisibilityInternalOnly) {
+	if err != nil || !inserted || message.Type != string(domain.MessageTypeText) || message.Visibility == string(domain.MessageVisibilityInternal) {
 		return message, err
 	}
 	if policyContext.DeliveryRoute.ChannelType == domain.ChannelTypeTelegram {
@@ -228,7 +228,7 @@ func loadClaimedCustomerMessages(ctx context.Context, db bun.IDB, run *servermod
 	return loadServiceSessionMessages(ctx, db, run.OrganizationID, run.ConversationID, run.ScopeID, boundary.MessageSeq, links)
 }
 
-// loadServiceSessionMessages 读取客服周期内不越过指定消息序号的最近对客消息，客户发言投影为 user，企业侧发言投影为 assistant。
+// loadServiceSessionMessages 读取服务周期内不越过指定消息序号的最近对客消息，客户发言投影为 user，企业侧发言投影为 assistant。
 func loadServiceSessionMessages(ctx context.Context, db bun.IDB, organizationID, conversationID, serviceSessionID string, throughSeq int64, links attachmentLinks) ([]agentruntime.Message, error) {
 	rows := make([]customerMessageRow, 0, agentHistoryLimit)
 	// 仅筛选主消息的客服周期；当前消息主动引用的旧周期原文仍作为一层引用传入。
@@ -248,14 +248,14 @@ func loadServiceSessionMessages(ctx context.Context, db bun.IDB, organizationID,
 		Join("LEFT JOIN conversation_participants AS reply_cp ON reply_cp.id = reply.sender_participant_id AND reply_cp.organization_id = reply.organization_id AND reply_cp.conversation_id = reply.conversation_id").
 		Join("LEFT JOIN chat_subjects AS reply_cs ON reply_cs.id = reply_cp.subject_id AND reply_cs.organization_id = reply_cp.organization_id").
 		Join("LEFT JOIN organization_identities AS reply_oi ON reply_oi.id = reply_cs.source_id AND reply_oi.organization_id = reply_cs.organization_id AND reply_cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
-		Join("LEFT JOIN customer_conversations AS cc ON cc.conversation_id = msg.conversation_id AND cc.organization_id = msg.organization_id").
+		Join("LEFT JOIN channel_conversations AS cc ON cc.conversation_id = msg.conversation_id AND cc.organization_id = msg.organization_id").
 		Join("LEFT JOIN contact_channel_identities AS reply_cci ON reply_cci.id = cc.contact_channel_identity_id AND reply_cci.organization_id = cc.organization_id AND reply_cci.contact_id = reply_cs.source_id AND reply_cs.kind = ?", domain.ChatSubjectKindContact).
 		Join("LEFT JOIN contacts AS reply_c ON reply_c.id = reply_cs.source_id AND reply_c.organization_id = reply_cs.organization_id AND reply_cs.kind = ?", domain.ChatSubjectKindContact).
 		Where("msg.organization_id = ?", organizationID).
 		Where("msg.conversation_id = ?", conversationID).
 		Apply(withContextAttachments).
 		Where("msg.service_session_id = ?", serviceSessionID).
-		Where("msg.visibility = ?", domain.MessageVisibilityCustomerVisible).
+		Where("msg.visibility = ?", domain.MessageVisibilityShared).
 		Where("msg.deleted_at IS NULL").
 		Where("cs.kind IN (?, ?)", domain.ChatSubjectKindContact, domain.ChatSubjectKindOrganizationIdentity).
 		Where("msg.message_seq <= ?", throughSeq).
@@ -381,7 +381,8 @@ func loadCustomerContextMessage(ctx context.Context, db bun.IDB, run *servermode
 		TableExpr("service_sessions AS ss").
 		ColumnExpr("cci.external_id, c.external_user_id, ss.visitor_context").
 		ColumnExpr("COALESCE(cci.display_name, c.display_name) AS name").
-		Join("JOIN contact_channel_identities AS cci ON cci.id = ss.contact_channel_identity_id AND cci.organization_id = ss.organization_id").
+		Join("JOIN channel_conversations AS cc ON cc.organization_id = ss.organization_id AND cc.conversation_id = ss.conversation_id").
+		Join("JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id").
 		Join("JOIN contacts AS c ON c.id = cci.contact_id AND c.organization_id = cci.organization_id").
 		Where("ss.organization_id = ?", run.OrganizationID).
 		Where("ss.id = ?", run.ScopeID).

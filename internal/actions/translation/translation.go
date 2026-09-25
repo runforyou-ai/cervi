@@ -151,7 +151,7 @@ func normalizedLanguage(value string) string {
 
 // authorizeConversation 确认客户会话属于当前企业。
 func authorizeConversation(ctx context.Context, db bun.IDB, organizationID, conversationID string) error {
-	exists, err := db.NewSelect().Model((*servermodels.CustomerConversation)(nil)).
+	exists, err := db.NewSelect().Model((*servermodels.ChannelConversation)(nil)).
 		Where("organization_id = ? AND conversation_id = ?", organizationID, conversationID).
 		Exists(ctx)
 	if err != nil {

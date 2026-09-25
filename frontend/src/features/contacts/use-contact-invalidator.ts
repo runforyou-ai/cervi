@@ -11,7 +11,7 @@ export function contactResourceKeys(kind: "user" | "agent", id?: string) {
     resourceKeys.teamMemberCandidates(),
     resourceKeys.roles(),
     resourceKeys.roleMembers(),
-    resourceKeys.customerServiceAssignees(),
+    resourceKeys.serviceAssignees(),
     resourceKeys.serviceQueueTeams(),
     resourceKeys.memberOptions(),
     resourceKeys.chatTargets(),

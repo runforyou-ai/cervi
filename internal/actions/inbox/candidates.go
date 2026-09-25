@@ -10,18 +10,20 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// customerConversationAccessQuery 共用客户阅读范围和公开摘要所需的有效关联。
-func (q *LoadInboxQuery) customerConversationAccessQuery(organizationID string) *bun.SelectQuery {
-	return q.db.NewSelect().TableExpr("customer_conversations AS cc").
+// serviceConversationAccessQuery 共用服务会话阅读范围和公开摘要所需的有效关联；发起人按聊天主体关联联系人或企业身份，渠道只对渠道来源存在。
+func (q *LoadInboxQuery) serviceConversationAccessQuery(organizationID string) *bun.SelectQuery {
+	return q.db.NewSelect().TableExpr("service_conversations AS svc").
 		ColumnExpr("cv.id, cv.last_activity_at").
-		Join("JOIN conversations AS cv ON cv.id = cc.conversation_id AND cv.organization_id = cc.organization_id").
-		Join("JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id").
-		Join("JOIN contacts AS c ON c.id = cci.contact_id AND c.organization_id = cc.organization_id").
-		Join("JOIN channels AS ch ON ch.id = cci.channel_id AND ch.organization_id = cc.organization_id").
+		Join("JOIN conversations AS cv ON cv.id = svc.conversation_id AND cv.organization_id = svc.organization_id").
+		Join("JOIN service_sessions AS current ON current.organization_id = svc.organization_id AND current.service_conversation_id = svc.id AND current.id = svc.current_service_session_id").
+		Join("JOIN chat_subjects AS requester_cs ON requester_cs.id = svc.requester_subject_id AND requester_cs.organization_id = svc.organization_id").
+		Join("LEFT JOIN contacts AS c ON c.id = requester_cs.source_id AND c.organization_id = requester_cs.organization_id AND requester_cs.kind = ?", domain.ChatSubjectKindContact).
+		Join("LEFT JOIN organization_identities AS requester_oi ON requester_oi.id = requester_cs.source_id AND requester_oi.organization_id = requester_cs.organization_id AND requester_cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
+		Join("LEFT JOIN channel_conversations AS cc ON cc.conversation_id = svc.conversation_id AND cc.organization_id = svc.organization_id").
+		Join("LEFT JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id").
+		Join("LEFT JOIN channels AS ch ON ch.id = cci.channel_id AND ch.organization_id = cci.organization_id").
 		Join("LEFT JOIN messages AS msg ON msg.id = cv.last_message_id AND msg.organization_id = cv.organization_id AND msg.conversation_id = cv.id AND msg.deleted_at IS NULL").
-		Join("JOIN service_sessions AS current ON current.organization_id = cc.organization_id AND current.conversation_id = cc.conversation_id AND current.id = cc.current_service_session_id").
-		Where("cc.organization_id = ?", organizationID).
-		Where("cv.type = ?", domain.ConversationTypeCustomer)
+		Where("svc.organization_id = ?", organizationID)
 }
 
 // memberConversationAccessQuery 按当前有效成员关系读取活跃或归档的内部会话。
@@ -80,7 +82,7 @@ func (q *LoadInboxQuery) listCandidates(identity *servermodels.Identity, input L
 	case domain.InboxScopePending:
 		candidate = q.pendingCandidates(identity, input)
 	case domain.InboxScopeAll:
-		candidate = filterServiceInbox(q.customerConversationAccessQuery(organizationID), input)
+		candidate = filterServiceInbox(q.serviceConversationAccessQuery(organizationID), input)
 	default:
 		queries := make([]*bun.SelectQuery, 0, 3)
 		if input.includesKind(domain.ConversationTypeDirect) {
@@ -106,7 +108,7 @@ func (q *LoadInboxQuery) listCandidates(identity *servermodels.Identity, input L
 // pendingCandidates 读取本人待处理的服务会话，投影条目类型、等待起点与是否有未回应的提醒；筛选 @我 时等待起点取提醒时间。
 func (q *LoadInboxQuery) pendingCandidates(identity *servermodels.Identity, input LoadInput) *bun.SelectQuery {
 	identityID := identity.OrganizationIdentity.ID
-	items := filterServiceInbox(q.customerConversationAccessQuery(identity.Organization.ID), input).
+	items := filterServiceInbox(q.serviceConversationAccessQuery(identity.Organization.ID), input).
 		Where("current.status = ?", domain.ServiceSessionStatusOpen).
 		// 当前周期内提醒本人、且本人之后尚未在会话中发言的最早一条内部备注时间。
 		Join(`LEFT JOIN LATERAL (
@@ -154,9 +156,9 @@ func (q *LoadInboxQuery) pendingCandidates(identity *servermodels.Identity, inpu
 		query = query.Where("items.pending_kind = ?", input.PendingKind)
 	}
 	switch input.QueueFilter {
-	case domain.CustomerQueueFilterPublic:
+	case domain.ServiceQueueFilterPublic:
 		query = query.Where("items.queue_team_id IS NULL")
-	case domain.CustomerQueueFilterTeam:
+	case domain.ServiceQueueFilterTeam:
 		query = query.Where("items.queue_team_id = ?", input.QueueTeamID)
 	}
 	return query
@@ -176,7 +178,7 @@ func (q *LoadInboxQuery) matchConversationNames(identity *servermodels.Identity,
 		Join("LEFT JOIN organization_identities AS peer_oi ON peer_oi.organization_id = dc.organization_id AND peer_oi.id = CASE WHEN dc.first_identity_id = ? THEN dc.second_identity_id ELSE dc.first_identity_id END", identity.OrganizationIdentity.ID).
 		Join("LEFT JOIN agent_conversations AS ac ON ac.organization_id = cv.organization_id AND ac.conversation_id = cv.id").
 		Join("LEFT JOIN organization_identities AS agent_oi ON agent_oi.organization_id = ac.organization_id AND agent_oi.id = ac.agent_identity_id").
-		Join("LEFT JOIN customer_conversations AS cc ON cc.organization_id = cv.organization_id AND cc.conversation_id = cv.id").
+		Join("LEFT JOIN channel_conversations AS cc ON cc.organization_id = cv.organization_id AND cc.conversation_id = cv.id").
 		Join("LEFT JOIN contact_channel_identities AS cci ON cci.organization_id = cc.organization_id AND cci.id = cc.contact_channel_identity_id").
 		Join("LEFT JOIN contacts AS c ON c.organization_id = cci.organization_id AND c.id = cci.contact_id").
 		// 未命名的群按除查看者外的在群成员名称匹配。
@@ -191,5 +193,5 @@ func (q *LoadInboxQuery) matchConversationNames(identity *servermodels.Identity,
 			OR (cv.type = ? AND `+name("COALESCE(cci.display_name, c.display_name)")+` ILIKE ?)`,
 			domain.ConversationTypeGroup, pattern, domain.ChatSubjectKindOrganizationIdentity, identity.OrganizationIdentity.ID, pattern,
 			domain.ConversationTypeDirect, pattern,
-			domain.ConversationTypeAgent, pattern, pattern, domain.ConversationTypeCustomer, pattern)
+			domain.ConversationTypeAgent, pattern, pattern, domain.ConversationTypeChannel, pattern)
 }

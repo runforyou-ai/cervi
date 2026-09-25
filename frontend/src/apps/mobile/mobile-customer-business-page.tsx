@@ -4,7 +4,7 @@ import { useOutletContext } from "react-router"
 
 import type { MobileCustomerConversationContext } from "@/apps/mobile/mobile-customer-conversation-page"
 import { MobilePageHeader, MobileScrollArea } from "@/apps/mobile/mobile-page"
-import { CustomerBusinessQueries } from "@/features/inbox/customer-business-queries"
+import { ServiceBusinessQueries } from "@/features/inbox/customer-business-queries"
 
 /** 全屏展示当前客服周期的业务查询记录，返回时回到客户会话。 */
 export function MobileCustomerBusinessPage() {
@@ -18,7 +18,7 @@ export function MobileCustomerBusinessPage() {
         title={t("contextBusinessTab")}
       />
       <MobileScrollArea storageKey={`customer-business:${conversation.id}`}>
-        <CustomerBusinessQueries conversationID={conversation.id} />
+        <ServiceBusinessQueries conversationID={conversation.id} />
       </MobileScrollArea>
     </section>
   )

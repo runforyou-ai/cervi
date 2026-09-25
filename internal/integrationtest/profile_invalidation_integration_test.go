@@ -253,8 +253,8 @@ func TestAgentProfileConversationInvalidation(t *testing.T) {
 	}
 	// 成员在客户会话中与 AI 员工开启 Copilot 线程；成员不参与客户会话，只以线程创建人出现在线程列表中。
 	threadID := uuid.NewV7().String()
-	if _, err := conversationaction.NewSendFirstCustomerCopilotMessageAction(f.db, scheduler).Execute(ctx, f.member, conversationaction.FirstCustomerCopilotMessageInput{
-		ThreadID: threadID, CustomerConversationID: f.conversationID, AgentIdentityID: created.IdentityID, ClientMessageID: uuid.NewV7().String(), Body: "帮我看看",
+	if _, err := conversationaction.NewSendFirstServiceCopilotMessageAction(f.db, scheduler).Execute(ctx, f.member, conversationaction.FirstServiceCopilotMessageInput{
+		ThreadID: threadID, ServedConversationID: f.conversationID, AgentIdentityID: created.IdentityID, ClientMessageID: uuid.NewV7().String(), Body: "帮我看看",
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -376,7 +376,7 @@ func TestCustomerProfileConversationInvalidation(t *testing.T) {
 		ID    string              `bun:"contact_id"`
 		Stage domain.ContactStage `bun:"stage"`
 	}
-	if err := f.db.NewSelect().TableExpr("customer_conversations AS cc").
+	if err := f.db.NewSelect().TableExpr("channel_conversations AS cc").
 		ColumnExpr("cci.contact_id, c.stage").
 		Join("JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id").
 		Join("JOIN contacts AS c ON c.id = cci.contact_id").
@@ -472,7 +472,7 @@ func TestProfileInvalidationLockOrder(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 	// 成员回复客户后成为会话参与者，再把会话转交给群主，由群主在并发中转交回来。
-	if _, err := conversationaction.NewSendCustomerTextMessageAction(f.db, nil).Execute(ctx, f.member, conversationaction.CustomerTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "成员回复"}); err != nil {
+	if _, err := conversationaction.NewSendServiceTextMessageAction(f.db, nil).Execute(ctx, f.member, conversationaction.ServiceTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "成员回复"}); err != nil {
 		t.Fatal(err)
 	}
 	// 转交会追加系统事件，按实测记录一次转交对客户会话版本的推进次数。

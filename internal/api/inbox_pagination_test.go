@@ -51,7 +51,7 @@ func TestInboxPaginationHTTP(t *testing.T) {
 			backend.input.AssigneeIdentityID != "peer" || backend.input.ChannelID != "channel" || backend.input.Audience != appservice.ServiceAudienceCustomer || backend.input.ServiceStatus != appservice.ServiceSessionStatusClosed) {
 			t.Fatalf("filters lost=%+v", backend.input)
 		}
-		if test.limit == 8 && (backend.input.Scope != appservice.InboxScopePending || backend.input.PendingKind != appservice.InboxPendingKindQueue || backend.input.QueueFilter != appservice.CustomerQueueFilterPublic) {
+		if test.limit == 8 && (backend.input.Scope != appservice.InboxScopePending || backend.input.PendingKind != appservice.InboxPendingKindQueue || backend.input.QueueFilter != appservice.ServiceQueueFilterPublic) {
 			t.Fatalf("pending filters lost=%+v", backend.input)
 		}
 		if test.limit == 9 && !slices.Equal(backend.input.Kinds, []appservice.ConversationType{appservice.ConversationTypeGroup, appservice.ConversationTypeDirect}) {

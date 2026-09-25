@@ -69,14 +69,14 @@ func TestConversationAttentionCustomerPending(t *testing.T) {
 		t.Fatalf("other member ids=%v", ids)
 	}
 	// 其他成员的内部备注计入负责人提醒，并标明可见范围与发送者。
-	note, err := conversationaction.NewSendCustomerTextMessageAction(f.db, nil).Execute(ctx, f.member, conversationaction.CustomerTextMessageInput{
-		ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "我来看看", Visibility: domain.MessageVisibilityInternalOnly,
+	note, err := conversationaction.NewSendServiceTextMessageAction(f.db, nil).Execute(ctx, f.member, conversationaction.ServiceTextMessageInput{
+		ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "我来看看", Visibility: domain.MessageVisibilityInternal,
 	})
 	if err != nil {
 		t.Fatal(err)
 	}
 	if messages := readAttention(t, query, f.owner, f.conversationID, third.Message.ID); len(messages) != 1 || messages[0].ID != note.ID ||
-		messages[0].Visibility != domain.MessageVisibilityInternalOnly || messages[0].SenderName == nil || *messages[0].SenderName != "成员" {
+		messages[0].Visibility != domain.MessageVisibilityInternal || messages[0].SenderName == nil || *messages[0].SenderName != "成员" {
 		t.Fatalf("note=%+v", messages)
 	}
 	// 在其他端读到第二条后，只剩之后的未读。

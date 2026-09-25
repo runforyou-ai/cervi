@@ -49,7 +49,7 @@ func (f customerDeliveryFixture) replyHistory(t *testing.T) []conversationaction
 // sendReply 保存引用回复并读取其固定投递目标。
 func (f customerDeliveryFixture) sendReply(t *testing.T, target string) models.CustomerMessageDelivery {
 	t.Helper()
-	msg, err := conversationaction.NewSendCustomerTextMessageAction(f.db, nil).Execute(context.Background(), f.owner, conversationaction.CustomerTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "引用回答", ReplyToMessageID: target})
+	msg, err := conversationaction.NewSendServiceTextMessageAction(f.db, nil).Execute(context.Background(), f.owner, conversationaction.ServiceTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "引用回答", ReplyToMessageID: target})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -102,9 +102,9 @@ func TestTelegramInternalNoteReplyEligibility(t *testing.T) {
 	f := newCustomerDeliveryFixture(t)
 	ctx := context.Background()
 	f.receiveReply(t, 5001, "客户问题", nil)
-	note, err := conversationaction.NewSendCustomerTextMessageAction(f.db, nil).Execute(ctx, f.owner, conversationaction.CustomerTextMessageInput{
+	note, err := conversationaction.NewSendServiceTextMessageAction(f.db, nil).Execute(ctx, f.owner, conversationaction.ServiceTextMessageInput{
 		ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(),
-		Body: "内部备注：核对过工单", Visibility: domain.MessageVisibilityInternalOnly,
+		Body: "内部备注：核对过工单", Visibility: domain.MessageVisibilityInternal,
 	})
 	if err != nil {
 		t.Fatal(err)
@@ -123,16 +123,16 @@ func TestTelegramInternalNoteReplyEligibility(t *testing.T) {
 	}
 
 	t.Run("尚未投递的对客消息仍可被内部备注引用", func(t *testing.T) {
-		send := conversationaction.NewSendCustomerTextMessageAction(f.db, nil)
-		pending, err := send.Execute(ctx, f.owner, conversationaction.CustomerTextMessageInput{
+		send := conversationaction.NewSendServiceTextMessageAction(f.db, nil)
+		pending, err := send.Execute(ctx, f.owner, conversationaction.ServiceTextMessageInput{
 			ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "稍等，我确认一下",
 		})
 		if err != nil {
 			t.Fatal(err)
 		}
-		noteQuote, err := send.Execute(ctx, f.owner, conversationaction.CustomerTextMessageInput{
+		noteQuote, err := send.Execute(ctx, f.owner, conversationaction.ServiceTextMessageInput{
 			ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(),
-			Body: "这条还没发出去", ReplyToMessageID: pending.ID, Visibility: domain.MessageVisibilityInternalOnly,
+			Body: "这条还没发出去", ReplyToMessageID: pending.ID, Visibility: domain.MessageVisibilityInternal,
 		})
 		if err != nil || noteQuote.ReplyTo == nil || noteQuote.ReplyTo.ID != pending.ID {
 			t.Fatalf("note reply to pending message = %+v err=%v", noteQuote.ReplyTo, err)
@@ -177,7 +177,7 @@ func TestTelegramReplyTargetBoundaries(t *testing.T) {
 	original := f.replyHistory(t)[0]
 	pending := f.send(t, "尚未投递", uuid.NewV7().String())
 	for _, target := range []string{pending.MessageID, other.replyHistory(t)[0].ID, uuid.NewV7().String()} {
-		_, err := conversationaction.NewSendCustomerTextMessageAction(f.db, nil).Execute(context.Background(), f.owner, conversationaction.CustomerTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "无效引用", ReplyToMessageID: target})
+		_, err := conversationaction.NewSendServiceTextMessageAction(f.db, nil).Execute(context.Background(), f.owner, conversationaction.ServiceTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "无效引用", ReplyToMessageID: target})
 		var conflict *conversationaction.ConflictError
 		if !errors.As(err, &conflict) || conflict.Reason != conversationaction.ConflictReasonReplyTargetInvalid {
 			t.Fatalf("target=%s err=%v", target, err)

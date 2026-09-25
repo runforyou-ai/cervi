@@ -113,7 +113,7 @@ type inboxCursor struct {
 	PinOrderVersion    int64                       `json:"pinOrderVersion"`
 	Scope              domain.InboxScope           `json:"scope"`
 	PendingKind        domain.InboxPendingKind     `json:"pendingKind"`
-	QueueFilter        domain.CustomerQueueFilter  `json:"queueFilter"`
+	QueueFilter        domain.ServiceQueueFilter   `json:"queueFilter"`
 	QueueTeamID        string                      `json:"queueTeamId"`
 	ChannelID          string                      `json:"channelId"`
 	Audience           domain.ServiceAudience      `json:"audience"`

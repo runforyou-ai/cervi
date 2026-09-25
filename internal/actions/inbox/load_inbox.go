@@ -30,7 +30,7 @@ type LoadInput struct {
 	Partition          domain.InboxPartition
 	Scope              domain.InboxScope
 	PendingKind        domain.InboxPendingKind
-	QueueFilter        domain.CustomerQueueFilter
+	QueueFilter        domain.ServiceQueueFilter
 	QueueTeamID        string
 	ChannelID          string
 	Audience           domain.ServiceAudience
@@ -62,15 +62,16 @@ type AssigneeSummary struct {
 	AvatarFileID *string
 }
 
-// CustomerConversationSummary 定义收件箱中的客户会话详情。
-type CustomerConversationSummary struct {
+// ServiceConversationSummary 定义收件箱中的服务会话详情；渠道只对渠道来源存在。
+type ServiceConversationSummary struct {
 	Title                     string
-	ContactName               *string
-	ContactAvatarFileID       *string
-	ContactChatSubjectID      string
+	Source                    domain.ServiceSource
+	Audience                  domain.ServiceAudience
+	RequesterName             *string
+	RequesterAvatarFileID     *string
+	RequesterChatSubjectID    string
 	AssigneeChatSubjectID     *string
-	ChannelType               domain.ChannelType
-	ChannelName               string
+	Channel                   *ServiceChannelSummary
 	Preview                   *string
 	PreviewSenderIdentityType *domain.OrganizationIdentityType
 	PreviewVisibility         *domain.MessageVisibility
@@ -83,6 +84,12 @@ type CustomerConversationSummary struct {
 	TeamName *string
 	// UnansweredMentionCount 是当前客服周期内被提醒成员尚未在会话中发言的内部提醒数。
 	UnansweredMentionCount int
+}
+
+// ServiceChannelSummary 定义服务会话的来源渠道。
+type ServiceChannelSummary struct {
+	Type domain.ChannelType
+	Name string
 }
 
 // DirectConversationSummary 定义收件箱中的内部单聊详情。
@@ -140,7 +147,7 @@ type ConversationSummary struct {
 	Pinned               bool
 	LastMessageID        *string
 	LastReadMessageID    *string
-	Customer             *CustomerConversationSummary
+	Service              *ServiceConversationSummary
 	Agent                *AgentConversationSummary
 	Direct               *DirectConversationSummary
 	Group                *GroupConversationSummary
@@ -161,15 +168,18 @@ type UnreadCounts struct {
 	PendingUnread int `bun:"-"`
 }
 
-type customerConversationRow struct {
+type serviceConversationRow struct {
 	ID                        string                           `bun:"id"`
+	Type                      domain.ConversationType          `bun:"type"`
 	Title                     string                           `bun:"title"`
-	ContactName               *string                          `bun:"contact_name"`
-	ContactAvatarFileID       *string                          `bun:"contact_avatar_file_id"`
-	ContactChatSubjectID      string                           `bun:"contact_chat_subject_id"`
+	Source                    domain.ServiceSource             `bun:"source"`
+	Audience                  domain.ServiceAudience           `bun:"audience"`
+	RequesterName             *string                          `bun:"requester_name"`
+	RequesterAvatarFileID     *string                          `bun:"requester_avatar_file_id"`
+	RequesterChatSubjectID    string                           `bun:"requester_chat_subject_id"`
 	AssigneeChatSubjectID     *string                          `bun:"assignee_chat_subject_id"`
-	ChannelType               string                           `bun:"channel_type"`
-	ChannelName               string                           `bun:"channel_name"`
+	ChannelType               *string                          `bun:"channel_type"`
+	ChannelName               *string                          `bun:"channel_name"`
 	Preview                   *string                          `bun:"preview"`
 	PreviewSenderIdentityType *domain.OrganizationIdentityType `bun:"preview_sender_identity_type"`
 	PreviewVisibility         *domain.MessageVisibility        `bun:"preview_visibility"`
@@ -345,18 +355,20 @@ func (q *LoadInboxQuery) loadConversationPage(ctx context.Context, identity *ser
 	return page, nil
 }
 
-// customerConversationDetailsQuery 读取企业内客户会话摘要，不按处理队列限制阅读。
-func (q *LoadInboxQuery) customerConversationDetailsQuery(organizationID, currentIdentityID, userID string) *bun.SelectQuery {
-	return q.customerConversationAccessQuery(organizationID).
+// serviceConversationDetailsQuery 读取企业内服务会话摘要，不按处理队列限制阅读。
+func (q *LoadInboxQuery) serviceConversationDetailsQuery(organizationID, currentIdentityID, userID string) *bun.SelectQuery {
+	return q.serviceConversationAccessQuery(organizationID).
 		ColumnExpr("unread.unread_count AS unread_count").
 		ColumnExpr("unread.mentioned_unread_count AS mentioned_unread_count").
 		ColumnExpr("unanswered.unanswered_mention_count AS unanswered_mention_count").
 		ColumnExpr("state.last_read_message_id::text AS last_read_message_id").
 		ColumnExpr("state.pin_rank IS NOT NULL AS pinned").
+		ColumnExpr("cv.type AS type").
 		ColumnExpr("cv.title AS title").
-		ColumnExpr("COALESCE(cci.display_name, c.display_name) AS contact_name").
-		ColumnExpr("cci.avatar_file_id AS contact_avatar_file_id").
-		ColumnExpr("(SELECT contact_cs.id::text FROM chat_subjects AS contact_cs WHERE contact_cs.organization_id = c.organization_id AND contact_cs.kind = ? AND contact_cs.source_id = c.id) AS contact_chat_subject_id", domain.ChatSubjectKindContact).
+		ColumnExpr("svc.source, svc.audience").
+		ColumnExpr("COALESCE(cci.display_name, c.display_name, requester_oi.display_name) AS requester_name").
+		ColumnExpr("COALESCE(cci.avatar_file_id, requester_oi.avatar_file_id)::text AS requester_avatar_file_id").
+		ColumnExpr("svc.requester_subject_id::text AS requester_chat_subject_id").
 		ColumnExpr("ch.type AS channel_type").
 		ColumnExpr("ch.name AS channel_name").
 		ColumnExpr("? AS preview", messagequery.Summary("msg")).
@@ -402,9 +414,8 @@ func filterServiceInbox(query *bun.SelectQuery, input LoadInput) *bun.SelectQuer
 	if input.ChannelID != "" {
 		query = query.Where("cci.channel_id = ?", input.ChannelID)
 	}
-	// 当前服务会话都来自客户渠道，员工与伙伴的服务会话尚未接入。
-	if input.Audience != "" && input.Audience != domain.ServiceAudienceCustomer {
-		query = query.Where("FALSE")
+	if input.Audience != "" {
+		query = query.Where("svc.audience = ?", input.Audience)
 	}
 	if input.Scope != domain.InboxScopeAll {
 		return query
@@ -557,17 +568,22 @@ func (q *LoadInboxQuery) LoadAgentConversation(ctx context.Context, identity *se
 	return row.summary(), nil
 }
 
-// summary 转换客户会话的统一摘要。
-func (row customerConversationRow) summary() ConversationSummary {
+// summary 转换服务会话的统一摘要。
+func (row serviceConversationRow) summary() ConversationSummary {
 	var assignee *AssigneeSummary
 	if row.AssigneeIdentityID != nil && row.AssigneeType != nil && row.AssigneeDisplayName != nil {
 		assignee = &AssigneeSummary{IdentityID: *row.AssigneeIdentityID, Type: domain.OrganizationIdentityType(*row.AssigneeType), DisplayName: *row.AssigneeDisplayName, AvatarFileID: row.AssigneeAvatarFileID}
 	}
+	var channel *ServiceChannelSummary
+	if row.ChannelType != nil && row.ChannelName != nil {
+		channel = &ServiceChannelSummary{Type: domain.ChannelType(*row.ChannelType), Name: *row.ChannelName}
+	}
 	return ConversationSummary{
-		ID: row.ID, Type: domain.ConversationTypeCustomer, UnreadCount: row.UnreadCount, MentionedUnreadCount: row.MentionedUnreadCount, Pinned: row.Pinned, LastMessageID: row.LastMessageID, LastMessageType: row.LastMessageType, LastReadMessageID: row.LastReadMessageID, LastActivityAt: row.LastActivityAt,
-		Customer: &CustomerConversationSummary{
-			Title: row.Title, ContactName: row.ContactName, ContactAvatarFileID: row.ContactAvatarFileID, ContactChatSubjectID: row.ContactChatSubjectID, AssigneeChatSubjectID: row.AssigneeChatSubjectID,
-			ChannelType: domain.ChannelType(row.ChannelType), ChannelName: row.ChannelName,
+		ID: row.ID, Type: row.Type, UnreadCount: row.UnreadCount, MentionedUnreadCount: row.MentionedUnreadCount, Pinned: row.Pinned, LastMessageID: row.LastMessageID, LastMessageType: row.LastMessageType, LastReadMessageID: row.LastReadMessageID, LastActivityAt: row.LastActivityAt,
+		Service: &ServiceConversationSummary{
+			Title: row.Title, Source: row.Source, Audience: row.Audience,
+			RequesterName: row.RequesterName, RequesterAvatarFileID: row.RequesterAvatarFileID, RequesterChatSubjectID: row.RequesterChatSubjectID, AssigneeChatSubjectID: row.AssigneeChatSubjectID,
+			Channel: channel,
 			Preview: row.Preview, PreviewSenderIdentityType: row.PreviewSenderIdentityType, PreviewVisibility: row.PreviewVisibility, LastMessageAt: row.LastMessageAt,
 			ServiceSessionID: row.ServiceSessionID, ServiceSessionStatus: domain.ServiceSessionStatus(row.ServiceSessionStatus), Assignee: assignee,
 			TeamID: row.TeamID, TeamName: row.TeamName,
@@ -632,14 +648,14 @@ func normalizeQueueFilter(input LoadInput) (LoadInput, error) {
 		return input, nil
 	}
 	if input.QueueFilter == "" {
-		input.QueueFilter = domain.CustomerQueueFilterAll
+		input.QueueFilter = domain.ServiceQueueFilterAll
 	}
 	switch input.QueueFilter {
-	case domain.CustomerQueueFilterAll, domain.CustomerQueueFilterPublic:
+	case domain.ServiceQueueFilterAll, domain.ServiceQueueFilterPublic:
 		if input.QueueTeamID != "" {
 			return input, ErrQueryInvalid
 		}
-	case domain.CustomerQueueFilterTeam:
+	case domain.ServiceQueueFilterTeam:
 		if !common.ValidUUID(input.QueueTeamID) {
 			return input, ErrQueryInvalid
 		}
@@ -684,7 +700,7 @@ func normalizeServiceFilters(input LoadInput) error {
 func normalizeLoadInput(input LoadInput) (LoadInput, error) {
 	input.Scope = domain.InboxScope(strings.TrimSpace(string(input.Scope)))
 	input.PendingKind = domain.InboxPendingKind(strings.TrimSpace(string(input.PendingKind)))
-	input.QueueFilter = domain.CustomerQueueFilter(strings.TrimSpace(string(input.QueueFilter)))
+	input.QueueFilter = domain.ServiceQueueFilter(strings.TrimSpace(string(input.QueueFilter)))
 	input.QueueTeamID = strings.TrimSpace(input.QueueTeamID)
 	input.ChannelID = strings.TrimSpace(input.ChannelID)
 	input.Audience = domain.ServiceAudience(strings.TrimSpace(string(input.Audience)))

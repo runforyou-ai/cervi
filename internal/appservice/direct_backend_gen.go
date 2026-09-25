@@ -173,37 +173,37 @@ func (b *DirectBackend) ReadInboxWindow(ctx context.Context, meta RequestMeta, i
 	return b.ops.ReadInboxWindow(ctx, meta, identity, input)
 }
 
-// GetCustomerProfile 返回客户会话的客户身份与当前周期访客上下文。
-func (b *DirectBackend) GetCustomerProfile(ctx context.Context, meta RequestMeta, conversationID string) (CustomerProfile, error) {
+// GetRequesterProfile 返回服务会话发起人的资料；发起人是客户时给出客户身份与当前周期访客上下文。
+func (b *DirectBackend) GetRequesterProfile(ctx context.Context, meta RequestMeta, conversationID string) (RequesterProfile, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
 	if err != nil {
-		var zero CustomerProfile
+		var zero RequesterProfile
 		return zero, err
 	}
-	return b.ops.GetCustomerProfile(ctx, meta, identity, conversationID)
+	return b.ops.GetRequesterProfile(ctx, meta, identity, conversationID)
 }
 
-// ListCustomerBusinessQueries 返回客户会话当前客服周期内 AI 客服查询业务系统的记录。
-func (b *DirectBackend) ListCustomerBusinessQueries(ctx context.Context, meta RequestMeta, conversationID string) (CustomerBusinessQueryList, error) {
+// ListServiceBusinessQueries 返回服务会话当前周期内 AI 员工查询业务系统的记录。
+func (b *DirectBackend) ListServiceBusinessQueries(ctx context.Context, meta RequestMeta, conversationID string) (ServiceBusinessQueryList, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
 	if err != nil {
-		var zero CustomerBusinessQueryList
+		var zero ServiceBusinessQueryList
 		return zero, err
 	}
-	return b.ops.ListCustomerBusinessQueries(ctx, meta, identity, conversationID)
+	return b.ops.ListServiceBusinessQueries(ctx, meta, identity, conversationID)
 }
 
-// GetCustomerServiceSummaries 返回客户会话当前周期的交接摘要与同一客户已关闭周期的小结。
-func (b *DirectBackend) GetCustomerServiceSummaries(ctx context.Context, meta RequestMeta, conversationID string) (CustomerServiceSummaries, error) {
+// GetServiceSummaries 返回服务会话当前周期的交接摘要与同一发起人已关闭周期的小结。
+func (b *DirectBackend) GetServiceSummaries(ctx context.Context, meta RequestMeta, conversationID string) (ServiceSummaries, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
 	if err != nil {
-		var zero CustomerServiceSummaries
+		var zero ServiceSummaries
 		return zero, err
 	}
-	return b.ops.GetCustomerServiceSummaries(ctx, meta, identity, conversationID)
+	return b.ops.GetServiceSummaries(ctx, meta, identity, conversationID)
 }
 
-// UpdateServiceSessionSummary 修改已关闭客服处理周期的小结、是否解决与咨询分类。
+// UpdateServiceSessionSummary 修改已关闭服务周期的小结、是否解决与咨询分类。
 func (b *DirectBackend) UpdateServiceSessionSummary(ctx context.Context, meta RequestMeta, serviceSessionID string, input ServiceSessionSummaryInput) (ServiceSessionSummary, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
 	if err != nil {
@@ -253,14 +253,14 @@ func (b *DirectBackend) SearchInbox(ctx context.Context, meta RequestMeta, input
 	return b.ops.SearchInbox(ctx, meta, identity, input)
 }
 
-// ListCustomerServiceAssignees 返回有效真人和 AI 客服。
-func (b *DirectBackend) ListCustomerServiceAssignees(ctx context.Context, meta RequestMeta) (CustomerServiceAssigneeList, error) {
+// ListServiceAssignees 返回可接待服务会话的有效真人和 AI 员工。
+func (b *DirectBackend) ListServiceAssignees(ctx context.Context, meta RequestMeta) (ServiceAssigneeList, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
 	if err != nil {
-		var zero CustomerServiceAssigneeList
+		var zero ServiceAssigneeList
 		return zero, err
 	}
-	return b.ops.ListCustomerServiceAssignees(ctx, meta, identity)
+	return b.ops.ListServiceAssignees(ctx, meta, identity)
 }
 
 // ListServiceQueueTeams 返回可作为客服队列的团队，本人所在团队排在前面。
@@ -411,24 +411,24 @@ func (b *DirectBackend) UpdateConversationNotificationSettings(ctx context.Conte
 	return b.ops.UpdateConversationNotificationSettings(ctx, meta, identity, conversationID, input)
 }
 
-// SendCustomerTextMessage 发送客户会话文本消息。
-func (b *DirectBackend) SendCustomerTextMessage(ctx context.Context, meta RequestMeta, conversationID string, input CustomerTextMessageInput) (ConversationMessage, error) {
+// SendServiceTextMessage 在服务会话中发送回复或内部备注。
+func (b *DirectBackend) SendServiceTextMessage(ctx context.Context, meta RequestMeta, conversationID string, input ServiceTextMessageInput) (ConversationMessage, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
 	if err != nil {
 		var zero ConversationMessage
 		return zero, err
 	}
-	return b.ops.SendCustomerTextMessage(ctx, meta, identity, conversationID, input)
+	return b.ops.SendServiceTextMessage(ctx, meta, identity, conversationID, input)
 }
 
-// SendCustomerAttachmentMessage 发送客户会话附件消息。
-func (b *DirectBackend) SendCustomerAttachmentMessage(ctx context.Context, meta RequestMeta, conversationID string, input CustomerAttachmentMessageInput) (ConversationMessage, error) {
+// SendServiceAttachmentMessage 在服务会话中发送附件回复。
+func (b *DirectBackend) SendServiceAttachmentMessage(ctx context.Context, meta RequestMeta, conversationID string, input ServiceAttachmentMessageInput) (ConversationMessage, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
 	if err != nil {
 		var zero ConversationMessage
 		return zero, err
 	}
-	return b.ops.SendCustomerAttachmentMessage(ctx, meta, identity, conversationID, input)
+	return b.ops.SendServiceAttachmentMessage(ctx, meta, identity, conversationID, input)
 }
 
 // GetConversationTranslation 返回当前成员在客户会话中的翻译状态。
@@ -471,64 +471,64 @@ func (b *DirectBackend) PreviewCustomerReplyTranslation(ctx context.Context, met
 	return b.ops.PreviewCustomerReplyTranslation(ctx, meta, identity, conversationID, input)
 }
 
-// ListCustomerReplyAgents 返回可用于 AI 写回复的 AI 员工。
-func (b *DirectBackend) ListCustomerReplyAgents(ctx context.Context, meta RequestMeta) (CustomerReplyAgentList, error) {
+// ListServiceReplyAgents 返回可用于 AI 写回复的 AI 员工。
+func (b *DirectBackend) ListServiceReplyAgents(ctx context.Context, meta RequestMeta) (ServiceReplyAgentList, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
 	if err != nil {
-		var zero CustomerReplyAgentList
+		var zero ServiceReplyAgentList
 		return zero, err
 	}
-	return b.ops.ListCustomerReplyAgents(ctx, meta, identity)
+	return b.ops.ListServiceReplyAgents(ctx, meta, identity)
 }
 
-// GenerateCustomerReplySuggestions 使用 AI 员工为客户会话生成对客回复候选。
-func (b *DirectBackend) GenerateCustomerReplySuggestions(ctx context.Context, meta RequestMeta, conversationID string, input CustomerReplySuggestionsInput) (CustomerReplySuggestions, error) {
+// GenerateServiceReplySuggestions 使用 AI 员工为服务会话生成回复候选。
+func (b *DirectBackend) GenerateServiceReplySuggestions(ctx context.Context, meta RequestMeta, conversationID string, input ServiceReplySuggestionsInput) (ServiceReplySuggestions, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
 	if err != nil {
-		var zero CustomerReplySuggestions
+		var zero ServiceReplySuggestions
 		return zero, err
 	}
-	return b.ops.GenerateCustomerReplySuggestions(ctx, meta, identity, conversationID, input)
+	return b.ops.GenerateServiceReplySuggestions(ctx, meta, identity, conversationID, input)
 }
 
-// ListCustomerCopilotThreads 返回客户会话的全部 Copilot 线程。
-func (b *DirectBackend) ListCustomerCopilotThreads(ctx context.Context, meta RequestMeta, conversationID string) (CustomerCopilotThreadList, error) {
+// ListServiceCopilotThreads 返回服务会话的全部 Copilot 线程。
+func (b *DirectBackend) ListServiceCopilotThreads(ctx context.Context, meta RequestMeta, conversationID string) (ServiceCopilotThreadList, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
 	if err != nil {
-		var zero CustomerCopilotThreadList
+		var zero ServiceCopilotThreadList
 		return zero, err
 	}
-	return b.ops.ListCustomerCopilotThreads(ctx, meta, identity, conversationID)
+	return b.ops.ListServiceCopilotThreads(ctx, meta, identity, conversationID)
 }
 
-// SendFirstCustomerCopilotMessage 以首条提问创建客户会话的 Copilot 线程。
-func (b *DirectBackend) SendFirstCustomerCopilotMessage(ctx context.Context, meta RequestMeta, conversationID string, input FirstCustomerCopilotMessageInput) (FirstCustomerCopilotMessageResult, error) {
+// SendFirstServiceCopilotMessage 以首条提问创建服务会话的 Copilot 线程。
+func (b *DirectBackend) SendFirstServiceCopilotMessage(ctx context.Context, meta RequestMeta, conversationID string, input FirstServiceCopilotMessageInput) (FirstServiceCopilotMessageResult, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
 	if err != nil {
-		var zero FirstCustomerCopilotMessageResult
+		var zero FirstServiceCopilotMessageResult
 		return zero, err
 	}
-	return b.ops.SendFirstCustomerCopilotMessage(ctx, meta, identity, conversationID, input)
+	return b.ops.SendFirstServiceCopilotMessage(ctx, meta, identity, conversationID, input)
 }
 
-// SendCustomerCopilotTextMessage 向 Copilot 线程发送提问。
-func (b *DirectBackend) SendCustomerCopilotTextMessage(ctx context.Context, meta RequestMeta, threadID string, input CustomerCopilotTextMessageInput) (ConversationMessage, error) {
+// SendServiceCopilotTextMessage 向 Copilot 线程发送提问。
+func (b *DirectBackend) SendServiceCopilotTextMessage(ctx context.Context, meta RequestMeta, threadID string, input ServiceCopilotTextMessageInput) (ConversationMessage, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
 	if err != nil {
 		var zero ConversationMessage
 		return zero, err
 	}
-	return b.ops.SendCustomerCopilotTextMessage(ctx, meta, identity, threadID, input)
+	return b.ops.SendServiceCopilotTextMessage(ctx, meta, identity, threadID, input)
 }
 
-// StopCustomerCopilotReply 停止 Copilot 线程中指定的回复并返回实际运行状态。
-func (b *DirectBackend) StopCustomerCopilotReply(ctx context.Context, meta RequestMeta, threadID string, runID string) (AgentRunStatus, error) {
+// StopServiceCopilotReply 停止 Copilot 线程中指定的回复并返回实际运行状态。
+func (b *DirectBackend) StopServiceCopilotReply(ctx context.Context, meta RequestMeta, threadID string, runID string) (AgentRunStatus, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
 	if err != nil {
 		var zero AgentRunStatus
 		return zero, err
 	}
-	return b.ops.StopCustomerCopilotReply(ctx, meta, identity, threadID, runID)
+	return b.ops.StopServiceCopilotReply(ctx, meta, identity, threadID, runID)
 }
 
 // ListCustomerMessageDeliveries 读取当前窗口的外部投递状态。
@@ -550,41 +550,41 @@ func (b *DirectBackend) ResolveCustomerMessageDelivery(ctx context.Context, meta
 	return b.ops.ResolveCustomerMessageDelivery(ctx, meta, identity, conversationID, deliveryID, input)
 }
 
-// ClaimServiceSession 领取或接管客户会话最新处理周期。
-func (b *DirectBackend) ClaimServiceSession(ctx context.Context, meta RequestMeta, conversationID string) (CustomerServiceSession, error) {
+// ClaimServiceSession 领取或接管服务会话的当前周期。
+func (b *DirectBackend) ClaimServiceSession(ctx context.Context, meta RequestMeta, conversationID string) (ServiceSession, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
 	if err != nil {
-		var zero CustomerServiceSession
+		var zero ServiceSession
 		return zero, err
 	}
 	return b.ops.ClaimServiceSession(ctx, meta, identity, conversationID)
 }
 
 // TransferServiceSession 把当前负责的处理周期转给成员、团队队列或公共队列。
-func (b *DirectBackend) TransferServiceSession(ctx context.Context, meta RequestMeta, conversationID string, input TransferServiceSessionInput) (CustomerServiceSession, error) {
+func (b *DirectBackend) TransferServiceSession(ctx context.Context, meta RequestMeta, conversationID string, input TransferServiceSessionInput) (ServiceSession, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
 	if err != nil {
-		var zero CustomerServiceSession
+		var zero ServiceSession
 		return zero, err
 	}
 	return b.ops.TransferServiceSession(ctx, meta, identity, conversationID, input)
 }
 
-// CloseServiceSession 关闭客户会话最新处理周期。
-func (b *DirectBackend) CloseServiceSession(ctx context.Context, meta RequestMeta, conversationID string) (CustomerServiceSession, error) {
+// CloseServiceSession 关闭服务会话的当前周期。
+func (b *DirectBackend) CloseServiceSession(ctx context.Context, meta RequestMeta, conversationID string) (ServiceSession, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
 	if err != nil {
-		var zero CustomerServiceSession
+		var zero ServiceSession
 		return zero, err
 	}
 	return b.ops.CloseServiceSession(ctx, meta, identity, conversationID)
 }
 
-// ReopenServiceSession 重新打开客户会话最新处理周期并分配给当前身份。
-func (b *DirectBackend) ReopenServiceSession(ctx context.Context, meta RequestMeta, conversationID string) (CustomerServiceSession, error) {
+// ReopenServiceSession 重新打开服务会话的当前周期并分配给当前身份。
+func (b *DirectBackend) ReopenServiceSession(ctx context.Context, meta RequestMeta, conversationID string) (ServiceSession, error) {
 	identity, err := b.ops.authenticate(ctx, meta)
 	if err != nil {
-		var zero CustomerServiceSession
+		var zero ServiceSession
 		return zero, err
 	}
 	return b.ops.ReopenServiceSession(ctx, meta, identity, conversationID)

@@ -44,7 +44,7 @@ func (a *MarkWebsiteConversationReadAction) Execute(ctx context.Context, channel
 	if !found {
 		return ErrConversationNotFound
 	}
-	owned, err := a.db.NewSelect().Model((*servermodels.CustomerConversation)(nil)).
+	owned, err := a.db.NewSelect().Model((*servermodels.ChannelConversation)(nil)).
 		Where("cc.organization_id = ? AND cc.conversation_id = ? AND cc.contact_channel_identity_id = ?", channel.OrganizationID, conversationID, visitor.ID).
 		Exists(ctx)
 	if err != nil {
@@ -55,10 +55,10 @@ func (a *MarkWebsiteConversationReadAction) Execute(ctx context.Context, channel
 	}
 	latest := a.db.NewSelect().Model((*servermodels.Conversation)(nil)).Column("cv.last_message_seq").
 		Where("cv.organization_id = ? AND cv.id = ?", channel.OrganizationID, conversationID)
-	if _, err := a.db.NewUpdate().Model((*servermodels.CustomerConversation)(nil)).
-		Set("customer_read_seq = LEAST(?, (?))", messageSeq, latest).
+	if _, err := a.db.NewUpdate().Model((*servermodels.ChannelConversation)(nil)).
+		Set("contact_read_seq = LEAST(?, (?))", messageSeq, latest).
 		Set("updated_at = now()").
-		Where("organization_id = ? AND conversation_id = ? AND customer_read_seq < LEAST(?, (?))", channel.OrganizationID, conversationID, messageSeq, latest).
+		Where("organization_id = ? AND conversation_id = ? AND contact_read_seq < LEAST(?, (?))", channel.OrganizationID, conversationID, messageSeq, latest).
 		Exec(ctx); err != nil {
 		return fmt.Errorf("advance website visitor read position: %w", err)
 	}

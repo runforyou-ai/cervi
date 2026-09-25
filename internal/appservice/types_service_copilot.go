@@ -2,8 +2,8 @@ package appservice
 
 import "time"
 
-// CustomerCopilotThread 定义客户会话中 Copilot 线程的摘要。
-type CustomerCopilotThread struct {
+// ServiceCopilotThread 定义服务会话中 Copilot 线程的摘要。
+type ServiceCopilotThread struct {
 	ID                  string    `json:"id"`
 	Title               string    `json:"title"`
 	AgentIdentityID     string    `json:"agentIdentityId"`
@@ -16,27 +16,27 @@ type CustomerCopilotThread struct {
 	LastActivityAt      time.Time `json:"lastActivityAt"`
 }
 
-// CustomerCopilotThreadList 定义客户会话按最近活动倒序排列的 Copilot 线程。
-type CustomerCopilotThreadList struct {
-	Threads []CustomerCopilotThread `json:"threads"`
+// ServiceCopilotThreadList 定义服务会话按最近活动倒序排列的 Copilot 线程。
+type ServiceCopilotThreadList struct {
+	Threads []ServiceCopilotThread `json:"threads"`
 }
 
-// FirstCustomerCopilotMessageInput 定义新线程的稳定编号、回答的 AI 员工和首条提问。
-type FirstCustomerCopilotMessageInput struct {
+// FirstServiceCopilotMessageInput 定义新线程的稳定编号、回答的 AI 员工和首条提问。
+type FirstServiceCopilotMessageInput struct {
 	ThreadID        string `json:"threadId"`
 	AgentIdentityID string `json:"agentIdentityId"`
 	ClientMessageID string `json:"clientMessageId"`
 	Body            string `json:"body"`
 }
 
-// FirstCustomerCopilotMessageResult 定义首条提问确认的线程和消息。
-type FirstCustomerCopilotMessageResult struct {
-	Thread  CustomerCopilotThread `json:"thread"`
-	Message ConversationMessage   `json:"message"`
+// FirstServiceCopilotMessageResult 定义首条提问确认的线程和消息。
+type FirstServiceCopilotMessageResult struct {
+	Thread  ServiceCopilotThread `json:"thread"`
+	Message ConversationMessage  `json:"message"`
 }
 
-// CustomerCopilotTextMessageInput 定义发给 Copilot 线程的成员提问。
-type CustomerCopilotTextMessageInput struct {
+// ServiceCopilotTextMessageInput 定义发给 Copilot 线程的成员提问。
+type ServiceCopilotTextMessageInput struct {
 	ClientMessageID  string `json:"clientMessageId"`
 	Body             string `json:"body"`
 	ReplyToMessageID string `json:"replyToMessageId"`

@@ -79,8 +79,8 @@ func (q *ListWebsiteMessagesQuery) Execute(ctx context.Context, input MessageHis
 		return MessageHistory{}, ErrConversationNotFound
 	}
 	owned, err := q.db.NewSelect().
-		TableExpr("customer_conversations AS cc").
-		Join("JOIN conversations AS cv ON cv.id = cc.conversation_id AND cv.organization_id = cc.organization_id AND cv.type = ?", domain.ConversationTypeCustomer).
+		TableExpr("channel_conversations AS cc").
+		Join("JOIN conversations AS cv ON cv.id = cc.conversation_id AND cv.organization_id = cc.organization_id AND cv.type = ?", domain.ConversationTypeChannel).
 		Where("cc.organization_id = ?", channel.OrganizationID).
 		Where("cc.conversation_id = ?", input.ConversationID).
 		Where("cc.contact_channel_identity_id = ?", identity.ID).
@@ -95,7 +95,7 @@ func (q *ListWebsiteMessagesQuery) Execute(ctx context.Context, input MessageHis
 	query := q.db.NewSelect().
 		TableExpr("messages AS msg").
 		ColumnExpr("msg.id AS id").
-		ColumnExpr("CASE WHEN cs.kind = ? AND cs.source_id = ? AND ss.contact_channel_identity_id = ? THEN msg.client_message_id END AS client_message_id", domain.ChatSubjectKindContact, identity.ContactID, identity.ID).
+		ColumnExpr("CASE WHEN cs.kind = ? AND cs.source_id = ? THEN msg.client_message_id END AS client_message_id", domain.ChatSubjectKindContact, identity.ContactID).
 		ColumnExpr("msg.message_seq").
 		ColumnExpr("msg.type AS type").
 		ColumnExpr("msg.body AS body").
@@ -132,7 +132,7 @@ func (q *ListWebsiteMessagesQuery) Execute(ctx context.Context, input MessageHis
 		Join("LEFT JOIN chat_subjects AS cs ON cs.id = cp.subject_id AND cs.organization_id = cp.organization_id").
 		Join("LEFT JOIN organization_identities AS oi ON oi.id = cs.source_id AND oi.organization_id = cs.organization_id AND cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
 		Join("LEFT JOIN files AS sav ON sav.id = oi.avatar_file_id AND sav.organization_id = oi.organization_id AND sav.status = ?", domain.FileStatusActive).
-		Join("LEFT JOIN messages AS reply ON reply.id = msg.reply_to_message_id AND reply.organization_id = msg.organization_id AND reply.conversation_id = msg.conversation_id AND reply.type IN (?, ?) AND reply.visibility = ?", domain.MessageTypeText, domain.MessageTypeAttachment, domain.MessageVisibilityCustomerVisible).
+		Join("LEFT JOIN messages AS reply ON reply.id = msg.reply_to_message_id AND reply.organization_id = msg.organization_id AND reply.conversation_id = msg.conversation_id AND reply.type IN (?, ?) AND reply.visibility = ?", domain.MessageTypeText, domain.MessageTypeAttachment, domain.MessageVisibilityShared).
 		Join("LEFT JOIN conversation_participants AS reply_cp ON reply_cp.id = reply.sender_participant_id AND reply_cp.organization_id = reply.organization_id AND reply_cp.conversation_id = reply.conversation_id").
 		Join("LEFT JOIN chat_subjects AS reply_cs ON reply_cs.id = reply_cp.subject_id AND reply_cs.organization_id = reply_cp.organization_id").
 		Join("LEFT JOIN organization_identities AS reply_oi ON reply_oi.id = reply_cs.source_id AND reply_oi.organization_id = reply_cs.organization_id AND reply_cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
@@ -143,7 +143,7 @@ func (q *ListWebsiteMessagesQuery) Execute(ctx context.Context, input MessageHis
 			return query.
 				WhereGroup(" OR ", func(query *bun.SelectQuery) *bun.SelectQuery {
 					return query.Where("msg.type IN (?, ?)", domain.MessageTypeText, domain.MessageTypeAttachment).
-						Where("msg.visibility = ?", domain.MessageVisibilityCustomerVisible)
+						Where("msg.visibility = ?", domain.MessageVisibilityShared)
 				}).
 				WhereGroup(" OR ", func(query *bun.SelectQuery) *bun.SelectQuery {
 					return query.Where("msg.type = ?", domain.MessageTypeSystem).

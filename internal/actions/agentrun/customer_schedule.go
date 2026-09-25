@@ -27,7 +27,7 @@ func (s *Scheduler) ScheduleCustomerAuto(ctx context.Context, db bun.IDB, organi
 	if s.enqueuer == nil {
 		return false, errors.New("agent run scheduler is unavailable")
 	}
-	_, session, err := chatstate.LockCustomerServiceSession(ctx, db, organizationID, conversationID)
+	_, session, err := chatstate.LockServiceSession(ctx, db, organizationID, conversationID)
 	if err != nil {
 		return false, err
 	}
@@ -175,7 +175,8 @@ func loadCustomerAgentEligibility(ctx context.Context, db bun.IDB, session *serv
 	query := identityaction.ApplyCustomerHandlingConditions(db.NewSelect().
 		TableExpr("organization_identities AS oi")).
 		Join("JOIN agents AS a ON a.identity_id = oi.id AND a.organization_id = oi.organization_id").
-		Join("JOIN contact_channel_identities AS cci ON cci.id = ? AND cci.organization_id = oi.organization_id", session.ContactChannelIdentityID).
+		Join("JOIN channel_conversations AS cc ON cc.organization_id = oi.organization_id AND cc.conversation_id = ?", session.ConversationID).
+		Join("JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id").
 		Join("JOIN channels AS c ON c.id = cci.channel_id AND c.organization_id = cci.organization_id").
 		Join("LEFT JOIN telegram_channel_settings AS tcs ON tcs.channel_id = c.id AND tcs.organization_id = c.organization_id").
 		Where("c.type = ? OR (c.type = ? AND tcs.bot_id IS NOT NULL)", domain.ChannelTypeWebsite, domain.ChannelTypeTelegram).

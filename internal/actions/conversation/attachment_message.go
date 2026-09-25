@@ -45,7 +45,7 @@ func (a *SendAttachmentMessageAction) Execute(ctx context.Context, identity *ser
 		(input.ConversationID != "" && !common.ValidUUID(input.ConversationID)) ||
 		(input.TargetIdentityID != "" && !common.ValidUUID(input.TargetIdentityID)) ||
 		(input.AgentIdentityID != "" && (input.TargetIdentityID != "" || !common.ValidUUID(input.AgentIdentityID))) ||
-		(input.CustomerConversationID != "" && (input.AgentIdentityID == "" || !common.ValidUUID(input.CustomerConversationID))) ||
+		(input.ServedConversationID != "" && (input.AgentIdentityID == "" || !common.ValidUUID(input.ServedConversationID))) ||
 		input.ImageWidth < 0 || input.ImageHeight < 0 || utf8.RuneCountInString(input.Body) > 4000 {
 		return AttachmentMessageResult{}, ErrConversationNotFound
 	}
@@ -84,7 +84,7 @@ func (a *SendAttachmentMessageAction) Execute(ctx context.Context, identity *ser
 				}
 				result.Conversation = &summary
 			}
-			if input.AgentIdentityID != "" && input.CustomerConversationID == "" {
+			if input.AgentIdentityID != "" && input.ServedConversationID == "" {
 				summary, err := inboxaction.NewLoadInboxQuery(tx).LoadAgentConversation(ctx, identity, member.Conversation.ID)
 				if err != nil {
 					return err
@@ -123,8 +123,8 @@ func lockAttachmentConversation(ctx context.Context, tx bun.Tx, identity *server
 			}
 		}
 		// 指定所属客户会话时首发 Copilot 线程，否则首发 AI 聊天。
-		if input.CustomerConversationID != "" {
-			if err := ensureCustomerCopilotThread(ctx, tx, identity, conversationID, input.CustomerConversationID, input.AgentIdentityID, title); err != nil {
+		if input.ServedConversationID != "" {
+			if err := ensureServiceCopilotThread(ctx, tx, identity, conversationID, input.ServedConversationID, input.AgentIdentityID, title); err != nil {
 				return chatstate.Member{}, nil, err
 			}
 		} else if err := ensureAgentConversation(ctx, tx, identity, conversationID, input.AgentIdentityID, title); err != nil {
@@ -156,7 +156,7 @@ func lockAttachmentConversation(ctx context.Context, tx bun.Tx, identity *server
 	}
 	// Copilot 线程按所属客户会话授权，提问成员在发送时加入线程参与者。
 	if conversation.Type == string(domain.ConversationTypeCopilot) {
-		copilotContext, err := lockCustomerCopilotSendContext(ctx, tx, identity, conversationID)
+		copilotContext, err := lockServiceCopilotSendContext(ctx, tx, identity, conversationID)
 		if err != nil {
 			return chatstate.Member{}, nil, err
 		}

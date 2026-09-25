@@ -20,8 +20,8 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// testCustomerCopilotThreads 验证 Copilot 线程的创建、多人提问、背景资料、停止回复、会话隔离与实时受众。
-func testCustomerCopilotThreads(t *testing.T, db *bun.DB, identity *servermodels.Identity, providerID, modelID string) {
+// testServiceCopilotThreads 验证 Copilot 线程的创建、多人提问、背景资料、停止回复、会话隔离与实时受众。
+func testServiceCopilotThreads(t *testing.T, db *bun.DB, identity *servermodels.Identity, providerID, modelID string) {
 	ctx := context.Background()
 	created, err := agentaction.NewCreateAgentAction(db).Execute(ctx, identity, agentaction.CreateInput{
 		HandlesCustomers: true, DisplayName: "Copilot 助手",
@@ -49,7 +49,7 @@ func testCustomerCopilotThreads(t *testing.T, db *bun.DB, identity *servermodels
 		t.Fatal(err)
 	}
 	customerID := inbound.Conversation.ID
-	if _, err := conversationaction.NewSendCustomerTextMessageAction(db, nil).Execute(ctx, identity, conversationaction.CustomerTextMessageInput{
+	if _, err := conversationaction.NewSendServiceTextMessageAction(db, nil).Execute(ctx, identity, conversationaction.ServiceTextMessageInput{
 		ConversationID: customerID, ClientMessageID: uuid.NewV7().String(), Body: "我来帮您核实物流",
 	}); err != nil {
 		t.Fatal(err)
@@ -60,14 +60,14 @@ func testCustomerCopilotThreads(t *testing.T, db *bun.DB, identity *servermodels
 	}
 	colleague := newChatLockUser(t, db, identity)
 	outsider := newNavigationFixture(t).owner
-	startThread := conversationaction.NewSendFirstCustomerCopilotMessageAction(db, scheduler)
-	ask := conversationaction.NewSendCustomerCopilotTextMessageAction(db, scheduler)
-	listThreads := conversationaction.NewListCustomerCopilotThreadsQuery(db)
+	startThread := conversationaction.NewSendFirstServiceCopilotMessageAction(db, scheduler)
+	ask := conversationaction.NewSendServiceCopilotTextMessageAction(db, scheduler)
+	listThreads := conversationaction.NewListServiceCopilotThreadsQuery(db)
 	listMessages := conversationaction.NewListConversationMessagesQuery(db)
 
 	threadID := uuid.NewV7().String()
-	firstInput := conversationaction.FirstCustomerCopilotMessageInput{
-		ThreadID: threadID, CustomerConversationID: customerID, AgentIdentityID: created.IdentityID, ClientMessageID: uuid.NewV7().String(), Body: "这个客户之前退过款吗",
+	firstInput := conversationaction.FirstServiceCopilotMessageInput{
+		ThreadID: threadID, ServedConversationID: customerID, AgentIdentityID: created.IdentityID, ClientMessageID: uuid.NewV7().String(), Body: "这个客户之前退过款吗",
 	}
 	first, err := startThread.Execute(ctx, identity, firstInput)
 	if err != nil {
@@ -81,7 +81,7 @@ func testCustomerCopilotThreads(t *testing.T, db *bun.DB, identity *servermodels
 		t.Fatalf("replayed first message = %+v, error = %v", replayed.Message, err)
 	}
 	mismatched := firstInput
-	mismatched.CustomerConversationID = uuid.NewV7().String()
+	mismatched.ServedConversationID = uuid.NewV7().String()
 	var conflict *conversationaction.ConflictError
 	if _, err := startThread.Execute(ctx, identity, mismatched); !errors.As(err, &conflict) {
 		t.Fatalf("mismatched thread replay error = %v", err)
@@ -183,10 +183,10 @@ func testCustomerCopilotThreads(t *testing.T, db *bun.DB, identity *servermodels
 	if err := db.NewSelect().Model(&next).Where("agr.conversation_id = ? AND agr.status = ?", threadID, domain.AgentRunStatusQueued).Scan(ctx); err != nil || next.InputStartSeq != 3 {
 		t.Fatalf("next copilot run = %+v, error = %v", next, err)
 	}
-	if _, err := executor.StopCustomerCopilotReply(ctx, outsider, threadID, next.ID); !errors.Is(err, conversationaction.ErrConversationNotFound) {
+	if _, err := executor.StopServiceCopilotReply(ctx, outsider, threadID, next.ID); !errors.Is(err, conversationaction.ErrConversationNotFound) {
 		t.Fatalf("outsider stop error = %v", err)
 	}
-	if status, err := executor.StopCustomerCopilotReply(ctx, identity, threadID, next.ID); err != nil || status != domain.AgentRunStatusCancelled {
+	if status, err := executor.StopServiceCopilotReply(ctx, identity, threadID, next.ID); err != nil || status != domain.AgentRunStatusCancelled {
 		t.Fatalf("stop copilot reply = %s, error = %v", status, err)
 	}
 	feed.expect(t, feed.customerInbox(threadID, loadConversationVersion(t, db, threadID)))
@@ -204,8 +204,8 @@ func testCustomerCopilotThreads(t *testing.T, db *bun.DB, identity *servermodels
 	if _, err := ask.Execute(ctx, colleague, conversationaction.InternalTextMessageInput{ConversationID: threadID, ClientMessageID: uuid.NewV7().String(), Body: "停用后提问"}); !errors.Is(err, conversationaction.ErrAgentUnavailable) {
 		t.Fatalf("inactive agent ask error = %v", err)
 	}
-	if _, err := startThread.Execute(ctx, colleague, conversationaction.FirstCustomerCopilotMessageInput{
-		ThreadID: uuid.NewV7().String(), CustomerConversationID: customerID, AgentIdentityID: created.IdentityID, ClientMessageID: uuid.NewV7().String(), Body: "新对话",
+	if _, err := startThread.Execute(ctx, colleague, conversationaction.FirstServiceCopilotMessageInput{
+		ThreadID: uuid.NewV7().String(), ServedConversationID: customerID, AgentIdentityID: created.IdentityID, ClientMessageID: uuid.NewV7().String(), Body: "新对话",
 	}); !errors.Is(err, conversationaction.ErrAgentUnavailable) {
 		t.Fatalf("inactive agent new thread error = %v", err)
 	}

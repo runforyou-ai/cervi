@@ -29,14 +29,14 @@ type ServiceSessionAgentRunCoordinator interface {
 	CancelRunContexts([]string)
 }
 
-// ClaimServiceSessionAction 领取或接管客户会话当前处理周期。
+// ClaimServiceSessionAction 领取或接管服务会话当前处理周期。
 type ClaimServiceSessionAction struct {
 	db          *bun.DB
 	coordinator ServiceSessionAgentRunCoordinator
 	enqueuer    servertask.TxEnqueuer
 }
 
-// NewClaimServiceSessionAction 创建客服处理周期领取操作。
+// NewClaimServiceSessionAction 创建服务周期领取操作。
 func NewClaimServiceSessionAction(db *bun.DB, coordinator ServiceSessionAgentRunCoordinator, enqueuer servertask.TxEnqueuer) *ClaimServiceSessionAction {
 	return &ClaimServiceSessionAction{db: db, coordinator: coordinator, enqueuer: enqueuer}
 }
@@ -120,7 +120,7 @@ type TransferServiceSessionAction struct {
 	enqueuer    servertask.TxEnqueuer
 }
 
-// NewTransferServiceSessionAction 创建客服处理周期转交操作。
+// NewTransferServiceSessionAction 创建服务周期转交操作。
 func NewTransferServiceSessionAction(db *bun.DB, coordinator ServiceSessionAgentRunCoordinator, scheduler CustomerAgentMessageScheduler, enqueuer servertask.TxEnqueuer) *TransferServiceSessionAction {
 	return &TransferServiceSessionAction{db: db, coordinator: coordinator, scheduler: scheduler, enqueuer: enqueuer}
 }
@@ -151,17 +151,18 @@ func (a *TransferServiceSessionAction) Execute(ctx context.Context, identity *se
 			return &ConflictError{Reason: ConflictReasonServiceSessionOwned}
 		}
 		if targetIdentity != nil && domain.OrganizationIdentityType(targetIdentity.Type) == domain.OrganizationIdentityTypeAgent {
-			// 读取客服处理周期所属的消息渠道类型，确认该渠道支持 AI 员工承接。
-			var channelType domain.ChannelType
-			if err := tx.NewSelect().TableExpr("contact_channel_identities AS cci").
+			// 渠道会话确认来源渠道支持 AI 员工承接，其他来源由 AI 员工直接回复。
+			var channelTypes []domain.ChannelType
+			if err := tx.NewSelect().TableExpr("channel_conversations AS cc").
 				ColumnExpr("c.type").
+				Join("JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id").
 				Join("JOIN channels AS c ON c.id = cci.channel_id AND c.organization_id = cci.organization_id").
-				Where("cci.id = ?", session.ContactChannelIdentityID).
-				Where("cci.organization_id = ?", session.OrganizationID).
-				Scan(ctx, &channelType); err != nil {
+				Where("cc.conversation_id = ?", session.ConversationID).
+				Where("cc.organization_id = ?", session.OrganizationID).
+				Scan(ctx, &channelTypes); err != nil {
 				return err
 			}
-			if !domain.ChannelSupportsAgentAssignee(channelType) {
+			if len(channelTypes) > 0 && !domain.ChannelSupportsAgentAssignee(channelTypes[0]) {
 				return &ValidationError{Fields: map[string]ValidationCode{"identityId": ValidationTargetIdentityIDInvalid}}
 			}
 		}
@@ -352,14 +353,14 @@ func loadServiceSessionLastMessageSender(ctx context.Context, db bun.IDB, sessio
 	return kind, row.MessageID, nil
 }
 
-// CloseServiceSessionAction 关闭客户会话当前处理周期。
+// CloseServiceSessionAction 关闭服务会话当前处理周期。
 type CloseServiceSessionAction struct {
 	db          *bun.DB
 	coordinator ServiceSessionAgentRunCoordinator
 	enqueuer    servertask.TxEnqueuer
 }
 
-// NewCloseServiceSessionAction 创建客服处理周期关闭操作。
+// NewCloseServiceSessionAction 创建服务周期关闭操作。
 func NewCloseServiceSessionAction(db *bun.DB, coordinator ServiceSessionAgentRunCoordinator, enqueuer servertask.TxEnqueuer) *CloseServiceSessionAction {
 	return &CloseServiceSessionAction{db: db, coordinator: coordinator, enqueuer: enqueuer}
 }
@@ -495,10 +496,10 @@ func CloseAgentServiceSession(ctx context.Context, db bun.IDB, enqueuer serverta
 	return chatstate.TouchConversation(ctx, db, conversation)
 }
 
-// ReopenServiceSessionAction 重新打开已关闭的客户会话处理周期。
+// ReopenServiceSessionAction 重新打开已关闭的服务会话处理周期。
 type ReopenServiceSessionAction struct{ db *bun.DB }
 
-// NewReopenServiceSessionAction 创建客服处理周期重新打开操作。
+// NewReopenServiceSessionAction 创建服务周期重新打开操作。
 func NewReopenServiceSessionAction(db *bun.DB) *ReopenServiceSessionAction {
 	return &ReopenServiceSessionAction{db: db}
 }
@@ -514,7 +515,7 @@ func (a *ReopenServiceSessionAction) Execute(ctx context.Context, identity *serv
 		if err := lockActiveCustomerHandler(ctx, tx, identity); err != nil {
 			return err
 		}
-		conversation, session, err := chatstate.LockCustomerServiceSession(ctx, tx, identity.Organization.ID, conversationID)
+		conversation, session, err := chatstate.LockServiceSession(ctx, tx, identity.Organization.ID, conversationID)
 		if err != nil {
 			return err
 		}
@@ -559,7 +560,7 @@ func (a *ReopenServiceSessionAction) Execute(ctx context.Context, identity *serv
 		return nil
 	})
 	if err != nil {
-		if pgerr.UniqueViolationOn(err, "service_sessions_organization_conversation_open_unique") {
+		if pgerr.UniqueViolationOn(err, "service_sessions_organization_service_conversation_open_unique") {
 			err = &ConflictError{Reason: ConflictReasonServiceSessionAlreadyOpen}
 		}
 		return ServiceSessionResult{}, fmt.Errorf("reopen service session: %w", err)
@@ -576,9 +577,9 @@ func lockActiveCustomerHandler(ctx context.Context, tx bun.Tx, identity *serverm
 	return err
 }
 
-// lockOpenServiceSession 锁定客户会话及其最新且未关闭的客服处理周期。
+// lockOpenServiceSession 锁定服务会话及其最新且未关闭的服务周期。
 func lockOpenServiceSession(ctx context.Context, db bun.IDB, organizationID, conversationID string) (*servermodels.Conversation, *servermodels.ServiceSession, error) {
-	conversation, session, err := chatstate.LockCustomerServiceSession(ctx, db, organizationID, conversationID)
+	conversation, session, err := chatstate.LockServiceSession(ctx, db, organizationID, conversationID)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -588,7 +589,7 @@ func lockOpenServiceSession(ctx context.Context, db bun.IDB, organizationID, con
 	return conversation, session, nil
 }
 
-// serviceSessionResult 转换客服处理周期命令结果。
+// serviceSessionResult 转换服务周期命令结果。
 func serviceSessionResult(session *servermodels.ServiceSession, assignee *servermodels.OrganizationIdentity) ServiceSessionResult {
 	var resultAssignee *ServiceSessionAssignee
 	if assignee != nil {

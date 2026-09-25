@@ -21,19 +21,19 @@ import (
 
 // inboxOps 持有收件箱与客户投递的 Action 和 Query。
 type inboxOps struct {
-	customerDeliveries           *deliveryaction.Manager
-	loadInbox                    *inboxaction.LoadInboxQuery
-	listCustomerServiceAssignees *inboxaction.ListCustomerServiceAssigneesQuery
-	listServiceQueueTeams        *inboxaction.ListServiceQueueTeamsQuery
+	customerDeliveries    *deliveryaction.Manager
+	loadInbox             *inboxaction.LoadInboxQuery
+	listServiceAssignees  *inboxaction.ListServiceAssigneesQuery
+	listServiceQueueTeams *inboxaction.ListServiceQueueTeamsQuery
 }
 
 // newInboxOps 创建收件箱与客户投递的业务实现依赖。
 func newInboxOps(db *bun.DB, taskEnqueuer servertask.TxEnqueuer) inboxOps {
 	return inboxOps{
-		customerDeliveries:           deliveryaction.NewManager(db, taskEnqueuer),
-		loadInbox:                    inboxaction.NewLoadInboxQuery(db),
-		listCustomerServiceAssignees: inboxaction.NewListCustomerServiceAssigneesQuery(db),
-		listServiceQueueTeams:        inboxaction.NewListServiceQueueTeamsQuery(db),
+		customerDeliveries:    deliveryaction.NewManager(db, taskEnqueuer),
+		loadInbox:             inboxaction.NewLoadInboxQuery(db),
+		listServiceAssignees:  inboxaction.NewListServiceAssigneesQuery(db),
+		listServiceQueueTeams: inboxaction.NewListServiceQueueTeamsQuery(db),
 	}
 }
 
@@ -45,7 +45,7 @@ func inboxLoadInput(query InboxQuery) inboxaction.LoadInput {
 	}
 	return inboxaction.LoadInput{
 		Partition: domain.InboxPartition(query.Partition), Scope: domain.InboxScope(query.Scope),
-		PendingKind: domain.InboxPendingKind(query.PendingKind), QueueFilter: domain.CustomerQueueFilter(query.QueueFilter), QueueTeamID: query.QueueTeamID,
+		PendingKind: domain.InboxPendingKind(query.PendingKind), QueueFilter: domain.ServiceQueueFilter(query.QueueFilter), QueueTeamID: query.QueueTeamID,
 		ChannelID: query.ChannelID, Audience: domain.ServiceAudience(query.Audience), ServiceStatus: domain.ServiceSessionStatus(query.ServiceStatus),
 		AssigneeFilter: domain.InboxAssigneeFilter(query.AssigneeFilter), AssigneeIdentityID: query.AssigneeIdentityID, Kinds: kinds,
 		Search: query.Search, SearchRange: inboxaction.SearchRange(query.SearchRange),
@@ -86,14 +86,14 @@ func (o *directOperations) inboxConversationsFromActions(ctx context.Context, me
 		if summary.Agent != nil && summary.Agent.AgentAvatarFileID != nil {
 			avatarFileIDs = append(avatarFileIDs, *summary.Agent.AgentAvatarFileID)
 		}
-		if summary.Customer == nil {
+		if summary.Service == nil {
 			continue
 		}
-		if summary.Customer.ContactAvatarFileID != nil {
-			avatarFileIDs = append(avatarFileIDs, *summary.Customer.ContactAvatarFileID)
+		if summary.Service.RequesterAvatarFileID != nil {
+			avatarFileIDs = append(avatarFileIDs, *summary.Service.RequesterAvatarFileID)
 		}
-		if summary.Customer.Assignee != nil && summary.Customer.Assignee.AvatarFileID != nil {
-			avatarFileIDs = append(avatarFileIDs, *summary.Customer.Assignee.AvatarFileID)
+		if summary.Service.Assignee != nil && summary.Service.Assignee.AvatarFileID != nil {
+			avatarFileIDs = append(avatarFileIDs, *summary.Service.Assignee.AvatarFileID)
 		}
 	}
 	avatarURLs, err := o.activeFileURLs(ctx, identity, avatarFileIDs)
@@ -126,15 +126,15 @@ func (o *directOperations) ListServiceQueueTeams(ctx context.Context, meta Reque
 	return ServiceQueueTeamList{Teams: teams}, nil
 }
 
-// ListCustomerServiceAssignees 返回有效真人和 AI 客服。
-func (o *directOperations) ListCustomerServiceAssignees(ctx context.Context, meta RequestMeta, identity *servermodels.Identity) (CustomerServiceAssigneeList, error) {
-	items, err := o.listCustomerServiceAssignees.Execute(ctx, identity)
+// ListServiceAssignees 返回有效真人和 AI 客服。
+func (o *directOperations) ListServiceAssignees(ctx context.Context, meta RequestMeta, identity *servermodels.Identity) (ServiceAssigneeList, error) {
+	items, err := o.listServiceAssignees.Execute(ctx, identity)
 	if err != nil {
 		if ctx.Err() != nil {
-			return CustomerServiceAssigneeList{}, ctx.Err()
+			return ServiceAssigneeList{}, ctx.Err()
 		}
 		slog.Warn("读取客服候选失败", "organization_id", identity.Organization.ID, "error", err)
-		return CustomerServiceAssigneeList{}, FailedError(meta, cervii18n.ErrorUserListFailed)
+		return ServiceAssigneeList{}, FailedError(meta, cervii18n.ErrorUserListFailed)
 	}
 	avatarFileIDs := make([]string, 0, len(items))
 	for _, item := range items {
@@ -145,13 +145,13 @@ func (o *directOperations) ListCustomerServiceAssignees(ctx context.Context, met
 	avatarURLs, err := o.activeFileURLs(ctx, identity, avatarFileIDs)
 	if err != nil {
 		slog.Warn("读取客服候选头像失败", "organization_id", identity.Organization.ID, "error", err)
-		return CustomerServiceAssigneeList{}, FailedError(meta, cervii18n.ErrorUserListFailed)
+		return ServiceAssigneeList{}, FailedError(meta, cervii18n.ErrorUserListFailed)
 	}
 	assignees := make([]InboxAssignee, 0, len(items))
 	for _, item := range items {
 		assignees = append(assignees, InboxAssignee{IdentityID: item.IdentityID, Type: OrganizationIdentityType(item.Type), DisplayName: item.DisplayName, AvatarURL: optionalFileURL(avatarURLs, item.AvatarFileID)})
 	}
-	return CustomerServiceAssigneeList{Assignees: assignees}, nil
+	return ServiceAssigneeList{Assignees: assignees}, nil
 }
 
 // inboxConversationFromAction 转换完整会话摘要并填充头像地址。
@@ -160,30 +160,36 @@ func inboxConversationFromAction(summary inboxaction.ConversationSummary, avatar
 	if summary.Pending != nil {
 		conversation.Pending = &InboxPendingItem{Kind: InboxPendingKind(summary.Pending.Kind), Since: summary.Pending.Since, Mentioned: summary.Pending.Mentioned}
 	}
-	if summary.Customer != nil {
+	if service := summary.Service; service != nil {
 		var assignee *InboxAssignee
-		if summary.Customer.Assignee != nil {
-			assignee = &InboxAssignee{IdentityID: summary.Customer.Assignee.IdentityID, Type: OrganizationIdentityType(summary.Customer.Assignee.Type), DisplayName: summary.Customer.Assignee.DisplayName, AvatarURL: optionalFileURL(avatarURLs, summary.Customer.Assignee.AvatarFileID)}
+		if service.Assignee != nil {
+			assignee = &InboxAssignee{IdentityID: service.Assignee.IdentityID, Type: OrganizationIdentityType(service.Assignee.Type), DisplayName: service.Assignee.DisplayName, AvatarURL: optionalFileURL(avatarURLs, service.Assignee.AvatarFileID)}
 		}
-		// 不支持外发附件时不给出字节上限，客户端据此关闭入口。
-		attachmentSupported := domain.ChannelSupportsOutboundAttachment(summary.Customer.ChannelType)
-		attachmentByteLimit := int64(0)
-		if attachmentSupported {
-			attachmentByteLimit = domain.ChannelAttachmentLimit(summary.Customer.ChannelType)
+		var channel *ServiceInboxChannel
+		if service.Channel != nil {
+			// 不支持外发附件时不给出字节上限，客户端据此关闭入口。
+			attachmentSupported := domain.ChannelSupportsOutboundAttachment(service.Channel.Type)
+			attachmentByteLimit := int64(0)
+			if attachmentSupported {
+				attachmentByteLimit = domain.ChannelAttachmentLimit(service.Channel.Type)
+			}
+			channel = &ServiceInboxChannel{
+				Type: ChannelType(service.Channel.Type), Name: service.Channel.Name,
+				AttachmentSupported: attachmentSupported, AttachmentByteLimit: attachmentByteLimit,
+				AttachmentCaptionLimit: domain.ChannelCaptionLimit(service.Channel.Type),
+			}
 		}
-		conversation.Customer = &CustomerInboxConversation{
-			Title: summary.Customer.Title, ContactName: summary.Customer.ContactName, ContactChatSubjectID: summary.Customer.ContactChatSubjectID,
-			AssigneeChatSubjectID: summary.Customer.AssigneeChatSubjectID,
-			ContactAvatarURL:      optionalFileURL(avatarURLs, summary.Customer.ContactAvatarFileID),
-			ChannelType:           ChannelType(summary.Customer.ChannelType), ChannelName: summary.Customer.ChannelName,
-			Preview: summary.Customer.Preview, PreviewSenderIdentityType: (*OrganizationIdentityType)(summary.Customer.PreviewSenderIdentityType),
-			PreviewVisibility: (*MessageVisibility)(summary.Customer.PreviewVisibility), LastMessageAt: summary.Customer.LastMessageAt,
-			ServiceSessionID: summary.Customer.ServiceSessionID, ServiceSessionStatus: ServiceSessionStatus(summary.Customer.ServiceSessionStatus), Assignee: assignee,
-			TeamID: summary.Customer.TeamID, TeamName: summary.Customer.TeamName,
-			AttachmentSupported:    attachmentSupported,
-			AttachmentByteLimit:    attachmentByteLimit,
-			AttachmentCaptionLimit: domain.ChannelCaptionLimit(summary.Customer.ChannelType),
-			UnansweredMentionCount: summary.Customer.UnansweredMentionCount,
+		conversation.Service = &ServiceInboxConversation{
+			Title: service.Title, Source: ServiceSource(service.Source), Audience: ServiceAudience(service.Audience),
+			RequesterName: service.RequesterName, RequesterChatSubjectID: service.RequesterChatSubjectID,
+			RequesterAvatarURL:    optionalFileURL(avatarURLs, service.RequesterAvatarFileID),
+			AssigneeChatSubjectID: service.AssigneeChatSubjectID,
+			Channel:               channel,
+			Preview:               service.Preview, PreviewSenderIdentityType: (*OrganizationIdentityType)(service.PreviewSenderIdentityType),
+			PreviewVisibility: (*MessageVisibility)(service.PreviewVisibility), LastMessageAt: service.LastMessageAt,
+			ServiceSessionID: service.ServiceSessionID, ServiceSessionStatus: ServiceSessionStatus(service.ServiceSessionStatus), Assignee: assignee,
+			TeamID: service.TeamID, TeamName: service.TeamName,
+			UnansweredMentionCount: service.UnansweredMentionCount,
 		}
 	}
 	if summary.Direct != nil {

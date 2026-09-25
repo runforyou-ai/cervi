@@ -47,11 +47,11 @@ func (q *ListBusinessQueriesQuery) Execute(ctx context.Context, identity *server
 			Payload     json.RawMessage `bun:"payload"`
 		}, 0)
 		if err := tx.NewSelect().
-			TableExpr("customer_conversations AS cc").
+			TableExpr("service_conversations AS svc").
 			ColumnExpr("arb.id, agr.completed_at, arb.payload").
-			Join("JOIN agent_runs AS agr ON agr.organization_id = cc.organization_id AND agr.scope_kind = ? AND agr.scope_id = cc.current_service_session_id", domain.AgentExecutionScopeServiceSession).
+			Join("JOIN agent_runs AS agr ON agr.organization_id = svc.organization_id AND agr.scope_kind = ? AND agr.scope_id = svc.current_service_session_id", domain.AgentExecutionScopeServiceSession).
 			Join("JOIN agent_run_blocks AS arb ON arb.organization_id = agr.organization_id AND arb.agent_run_id = agr.id").
-			Where("cc.organization_id = ? AND cc.conversation_id = ?", identity.Organization.ID, conversationID).
+			Where("svc.organization_id = ? AND svc.conversation_id = ?", identity.Organization.ID, conversationID).
 			Where("agr.status IN (?)", bun.In([]domain.AgentRunStatus{
 				domain.AgentRunStatusSucceeded, domain.AgentRunStatusFailed, domain.AgentRunStatusCancelled,
 			})).

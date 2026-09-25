@@ -29,7 +29,7 @@ func (a *ExecuteAction) CancelForServiceSession(ctx context.Context, db bun.IDB,
 	return cancelServiceSessionRuns(ctx, db, organizationID, serviceSessionID, agentIdentityID, reason)
 }
 
-// cancelServiceSessionRuns 取消客服周期内负责人的在途运行并结算其输入队列。
+// cancelServiceSessionRuns 取消服务周期内负责人的在途运行并结算其输入队列。
 func cancelServiceSessionRuns(ctx context.Context, db bun.IDB, organizationID, serviceSessionID, agentIdentityID string, reason domain.AgentRunErrorCode) ([]string, error) {
 	lane := &servermodels.AgentLane{}
 	err := db.NewSelect().Model(lane).
@@ -68,7 +68,7 @@ func cancelServiceSessionRuns(ctx context.Context, db bun.IDB, organizationID, s
 func CancelTelegramChannelRuns(ctx context.Context, db bun.IDB, organizationID, channelID string) (int, error) {
 	cancelled := 0
 	var conversationIDs []string
-	if err := db.NewSelect().TableExpr("customer_conversations AS cc").
+	if err := db.NewSelect().TableExpr("channel_conversations AS cc").
 		ColumnExpr("cc.conversation_id").
 		Join("JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id").
 		Where("cc.organization_id = ? AND cci.channel_id = ?", organizationID, channelID).
@@ -76,7 +76,7 @@ func CancelTelegramChannelRuns(ctx context.Context, db bun.IDB, organizationID, 
 		return 0, err
 	}
 	for _, conversationID := range conversationIDs {
-		conversation, session, err := chatstate.LockCustomerServiceSession(ctx, db, organizationID, conversationID)
+		conversation, session, err := chatstate.LockServiceSession(ctx, db, organizationID, conversationID)
 		if err != nil {
 			return 0, err
 		}

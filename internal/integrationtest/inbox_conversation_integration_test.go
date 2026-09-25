@@ -126,11 +126,11 @@ func TestInboxCustomerDetailSnapshot(t *testing.T) {
 	if err := waitChatResult(t, ctx, done); err != nil {
 		t.Fatal(err)
 	}
-	if !snapshot[0].MatchesQuery || snapshot[0].Conversation.Customer.Assignee.IdentityID != f.owner.OrganizationIdentity.ID || snapshot[1].MatchesQuery || snapshot[1].Conversation.Direct == nil {
+	if !snapshot[0].MatchesQuery || snapshot[0].Conversation.Service.Assignee.IdentityID != f.owner.OrganizationIdentity.ID || snapshot[1].MatchesQuery || snapshot[1].Conversation.Direct == nil {
 		t.Fatalf("mixed snapshot=%+v", snapshot)
 	}
 	current, err := query.ReadByIDs(ctx, f.owner, ids, &mine)
-	if err != nil || current[0].MatchesQuery || current[0].Conversation.Customer.Assignee.IdentityID != f.member.OrganizationIdentity.ID {
+	if err != nil || current[0].MatchesQuery || current[0].Conversation.Service.Assignee.IdentityID != f.member.OrganizationIdentity.ID {
 		t.Fatalf("transferred=%+v err=%v", current, err)
 	}
 	if _, err := conversationaction.NewCloseServiceSessionAction(f.db, agentrunaction.NewExecuteAction(f.db, nil, nil, testAttachmentReader(f.db), nil, nil), newTestTasks(f.db)).Execute(ctx, f.member, f.conversationID); err != nil {
@@ -138,7 +138,7 @@ func TestInboxCustomerDetailSnapshot(t *testing.T) {
 	}
 	closed := inboxaction.LoadInput{Scope: domain.InboxScopeAll, AssigneeFilter: domain.InboxAssigneeFilterIdentity, AssigneeIdentityID: f.member.OrganizationIdentity.ID, ServiceStatus: domain.ServiceSessionStatusClosed}
 	current, err = query.ReadByIDs(ctx, f.owner, ids, &closed)
-	if err != nil || !current[0].MatchesQuery || current[0].Conversation.Customer.ServiceSessionStatus != domain.ServiceSessionStatusClosed {
+	if err != nil || !current[0].MatchesQuery || current[0].Conversation.Service.ServiceSessionStatus != domain.ServiceSessionStatusClosed {
 		t.Fatalf("closed=%+v err=%v", current, err)
 	}
 	if _, err := query.ReadByIDs(ctx, f.owner, []string{"bad-id"}, &closed); !errors.Is(err, inboxaction.ErrQueryInvalid) {

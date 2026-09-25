@@ -131,11 +131,11 @@ func (q *GetWebsiteVisitorAttachmentQuery) Execute(ctx context.Context, channelI
 	err = q.db.NewSelect().Model(record).
 		Join("JOIN message_attachments AS ma ON ma.file_id = f.id AND ma.organization_id = f.organization_id").
 		Join("JOIN messages AS msg ON msg.id = ma.message_id AND msg.organization_id = ma.organization_id").
-		Join("JOIN customer_conversations AS cc ON cc.conversation_id = msg.conversation_id AND cc.organization_id = msg.organization_id").
+		Join("JOIN channel_conversations AS cc ON cc.conversation_id = msg.conversation_id AND cc.organization_id = msg.organization_id").
 		Where("f.organization_id = ? AND f.status = ?", channel.OrganizationID, domain.FileStatusActive).
 		Where("ma.transfer_status = ?", domain.MessageAttachmentTransferReady).
 		Where("msg.id = ? AND msg.conversation_id = ?", messageID, conversationID).
-		Where("msg.visibility = ? AND msg.deleted_at IS NULL", domain.MessageVisibilityCustomerVisible).
+		Where("msg.visibility = ? AND msg.deleted_at IS NULL", domain.MessageVisibilityShared).
 		Where("cc.contact_channel_identity_id = ?", identity.ID).
 		Scan(ctx)
 	if errors.Is(err, sql.ErrNoRows) {

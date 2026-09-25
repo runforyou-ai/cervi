@@ -20,8 +20,8 @@ import (
 // agentOps 持有 AI 员工与运行的 Action 和 Query。
 type agentOps struct {
 	agentCoordinator          *agentrunaction.ExecuteAction
-	customerReplySuggestions  *agentrunaction.GenerateCustomerReplySuggestionsAction
-	listCustomerReplyAgents   *agentrunaction.ListCustomerReplyAgentsQuery
+	serviceReplySuggestions   *agentrunaction.GenerateServiceReplySuggestionsAction
+	listServiceReplyAgents    *agentrunaction.ListServiceReplyAgentsQuery
 	listAgentMCPServerOptions *agentaction.ListMCPServerOptionsQuery
 	listAgentModelOptions     *agentaction.ListModelOptionsQuery
 	createAgent               *agentaction.CreateAgentAction
@@ -33,11 +33,11 @@ type agentOps struct {
 }
 
 // newAgentOps 创建 AI 员工与运行的业务实现依赖。
-func newAgentOps(db *bun.DB, agentCoordinator *agentrunaction.ExecuteAction, customerReplySuggestions *agentrunaction.GenerateCustomerReplySuggestionsAction) agentOps {
+func newAgentOps(db *bun.DB, agentCoordinator *agentrunaction.ExecuteAction, serviceReplySuggestions *agentrunaction.GenerateServiceReplySuggestionsAction) agentOps {
 	return agentOps{
 		agentCoordinator:          agentCoordinator,
-		customerReplySuggestions:  customerReplySuggestions,
-		listCustomerReplyAgents:   agentrunaction.NewListCustomerReplyAgentsQuery(db),
+		serviceReplySuggestions:   serviceReplySuggestions,
+		listServiceReplyAgents:    agentrunaction.NewListServiceReplyAgentsQuery(db),
 		listAgentMCPServerOptions: agentaction.NewListMCPServerOptionsQuery(db),
 		listAgentModelOptions:     agentaction.NewListModelOptionsQuery(db),
 		createAgent:               agentaction.NewCreateAgentAction(db),

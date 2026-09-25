@@ -82,7 +82,7 @@ func loadTranscript(ctx context.Context, db bun.IDB, organizationID, serviceSess
 		Join("LEFT JOIN organization_identities AS oi ON oi.id = cs.source_id AND oi.organization_id = cs.organization_id AND cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
 		Where("msg.organization_id = ? AND msg.service_session_id = ?", organizationID, serviceSessionID).
 		Where("msg.type IN (?, ?)", domain.MessageTypeText, domain.MessageTypeAttachment).
-		Where("msg.visibility = ? AND msg.deleted_at IS NULL", domain.MessageVisibilityCustomerVisible).
+		Where("msg.visibility = ? AND msg.deleted_at IS NULL", domain.MessageVisibilityShared).
 		Where("cs.kind IN (?, ?)", domain.ChatSubjectKindContact, domain.ChatSubjectKindOrganizationIdentity).
 		Where("msg.message_seq <= ?", throughSeq).
 		OrderExpr("msg.message_seq DESC").
@@ -222,7 +222,7 @@ func lockSession(ctx context.Context, db bun.IDB, organizationID, serviceSession
 // historyLimit 是注入 AI 上下文的客户历史小结条数上限。
 const historyLimit = 5
 
-// RecentHistory 返回与指定周期同一客户的其他已关闭周期中最近几条有正文的小结，按关闭时间从新到旧排列。
+// RecentHistory 返回与指定周期同一发起人的其他已关闭周期中最近几条有正文的小结，按关闭时间从新到旧排列。
 func RecentHistory(ctx context.Context, db bun.IDB, organizationID, serviceSessionID string) ([]agentruntime.CustomerHistorySummary, error) {
 	rows := make([]struct {
 		ClosedAt time.Time `bun:"closed_at"`
@@ -233,9 +233,9 @@ func RecentHistory(ctx context.Context, db bun.IDB, organizationID, serviceSessi
 	if err := db.NewSelect().
 		TableExpr("service_sessions AS cur").
 		ColumnExpr("ss.closed_at, ss.summary, sc.name AS category, ss.resolved").
-		Join("JOIN contact_channel_identities AS cur_cci ON cur_cci.id = cur.contact_channel_identity_id AND cur_cci.organization_id = cur.organization_id").
-		Join("JOIN contact_channel_identities AS cci ON cci.contact_id = cur_cci.contact_id AND cci.organization_id = cur_cci.organization_id").
-		Join("JOIN service_sessions AS ss ON ss.contact_channel_identity_id = cci.id AND ss.organization_id = cci.organization_id").
+		Join("JOIN service_conversations AS cur_svc ON cur_svc.id = cur.service_conversation_id AND cur_svc.organization_id = cur.organization_id").
+		Join("JOIN service_conversations AS svc ON svc.requester_subject_id = cur_svc.requester_subject_id AND svc.organization_id = cur_svc.organization_id").
+		Join("JOIN service_sessions AS ss ON ss.service_conversation_id = svc.id AND ss.organization_id = svc.organization_id").
 		Join("LEFT JOIN service_categories AS sc ON sc.id = ss.category_id AND sc.organization_id = ss.organization_id").
 		Where("cur.organization_id = ? AND cur.id = ?", organizationID, serviceSessionID).
 		Where("ss.id <> cur.id AND ss.status = ? AND ss.summary_status = ? AND ss.summary IS NOT NULL",

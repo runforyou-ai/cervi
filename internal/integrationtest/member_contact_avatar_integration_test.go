@@ -43,7 +43,7 @@ func TestMemberAndContactAvatars(t *testing.T) {
 	// 为同一联系人补一个更早更新、带头像的渠道身份，原渠道身份暂无头像。
 	existing := servermodels.ContactChannelIdentity{}
 	if err := f.db.NewSelect().Model(&existing).
-		Join("JOIN customer_conversations AS cc ON cc.contact_channel_identity_id = cci.id").
+		Join("JOIN channel_conversations AS cc ON cc.contact_channel_identity_id = cci.id").
 		Where("cc.conversation_id = ?", f.conversationID).
 		Scan(ctx); err != nil {
 		t.Fatal(err)

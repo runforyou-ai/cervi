@@ -21,14 +21,14 @@ import {
   CopilotThreadsLoadState,
   CopilotThreadView,
   useCopilotThreadMeta,
-  useCustomerCopilot,
-  type CustomerCopilot,
+  useServiceCopilot,
+  type ServiceCopilot,
 } from "@/features/inbox/customer-copilot-panel"
 import { focusDialogContainer } from "@/lib/dialog-focus"
 import { cn } from "@/lib/utils"
 
 /** 全屏展示 AI 助手，填入回复后回到客户会话。 */
-export function MobileCustomerCopilotPage() {
+export function MobileServiceCopilotPage() {
   const { t } = useTranslation("inbox")
   const { conversation, customerDraftRef, replyDisabledReason } =
     useOutletContext<MobileCustomerConversationContext>()
@@ -36,8 +36,8 @@ export function MobileCustomerCopilotPage() {
   const conversationPath = `/inbox/customer/${conversation.id}`
   const back = useMobileBack(conversationPath)
   const [threadsOpen, setThreadsOpen] = useState(false)
-  const copilot = useCustomerCopilot({
-    customerConversationID: conversation.id,
+  const copilot = useServiceCopilot({
+    servedConversationID: conversation.id,
     currentUser: identity.user,
     customerDraftRef,
     active: true,
@@ -96,7 +96,7 @@ function CopilotThreadTitle({
   copilot,
   onOpen,
 }: {
-  copilot: CustomerCopilot
+  copilot: ServiceCopilot
   onOpen: () => void
 }) {
   const { t } = useTranslation("inbox")
@@ -121,7 +121,7 @@ function CopilotThreadSheet({
   open,
   onOpenChange,
 }: {
-  copilot: CustomerCopilot
+  copilot: ServiceCopilot
   open: boolean
   onOpenChange: (open: boolean) => void
 }) {

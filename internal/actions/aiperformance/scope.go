@@ -27,7 +27,8 @@ WITH closed AS (
 					OR (m.visibility = ? AND m.type IN (?) AND oi.type = ?))
 		) AS ai_only
 	FROM service_sessions ss
-	JOIN contact_channel_identities cci ON cci.id = ss.contact_channel_identity_id
+	LEFT JOIN channel_conversations cc ON cc.conversation_id = ss.conversation_id AND cc.organization_id = ss.organization_id
+	LEFT JOIN contact_channel_identities cci ON cci.id = cc.contact_channel_identity_id
 	LEFT JOIN organization_identities closer ON closer.id = ss.closed_by_identity_id
 	WHERE ss.organization_id = ? AND ss.status = ? AND ss.summary_status IS DISTINCT FROM ?
 		AND ss.closed_at >= now() - make_interval(days => ?)%s
@@ -51,7 +52,7 @@ func reportScope(identity *servermodels.Identity, input Input) (string, []any) {
 			handedOff, returned, domain.ConversationSystemEventServiceSessionClaimed,
 			domain.ConversationSystemEventServiceSessionTakenOver, domain.ConversationSystemEventServiceSessionTransferred,
 		}),
-		domain.MessageVisibilityCustomerVisible, bun.In([]domain.MessageType{domain.MessageTypeText, domain.MessageTypeAttachment}),
+		domain.MessageVisibilityShared, bun.In([]domain.MessageType{domain.MessageTypeText, domain.MessageTypeAttachment}),
 		domain.OrganizationIdentityTypeUser,
 		identity.Organization.ID, domain.ServiceSessionStatusClosed, domain.ServiceSessionSummaryNoRequest, input.Days,
 	}

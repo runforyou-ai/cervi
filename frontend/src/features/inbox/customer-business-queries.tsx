@@ -2,19 +2,19 @@
 import { BriefcaseBusinessIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
-import { listCustomerBusinessQueries } from "@/api"
+import { listServiceBusinessQueries } from "@/api"
 import { AgentTool } from "@/features/inbox/agent-process"
 import { resourceKeys } from "@/hooks/resource-keys"
 import { useDateTime } from "@/hooks/use-date-time"
 import { useResource } from "@/hooks/use-resource"
 
 /** 随会话内容变化刷新业务查询记录，按调用时间倒序展示，JSON 参数与结果格式化显示。 */
-export function CustomerBusinessQueries({ conversationID }: { conversationID: string }) {
+export function ServiceBusinessQueries({ conversationID }: { conversationID: string }) {
   const { t } = useTranslation("inbox")
   const { formatDateTime } = useDateTime()
   const queries = useResource(
-    resourceKeys.customerBusinessQueries(conversationID),
-    () => listCustomerBusinessQueries(conversationID),
+    resourceKeys.serviceBusinessQueries(conversationID),
+    () => listServiceBusinessQueries(conversationID),
   )
   if (queries.error) {
     return (

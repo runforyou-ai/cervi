@@ -6,12 +6,12 @@ import { useTranslation } from "react-i18next"
 import {
   ChannelType,
   ConversationType,
-  isCustomerInboxConversation,
+  isServiceInboxConversation,
   isAgentInboxConversation,
   isDirectInboxConversation,
   isGroupInboxConversation,
   type AgentInboxConversationData,
-  type CustomerInboxConversationData,
+  type ServiceInboxConversationData,
   type DirectInboxConversationData,
   type GroupInboxConversationData,
   type GroupParticipant,
@@ -47,7 +47,7 @@ export function ConversationThread({
   customerDraftRef,
 }: {
   conversation:
-    | CustomerInboxConversationData
+    | ServiceInboxConversationData
     | AgentInboxConversationData
     | DirectInboxConversationData
     | GroupInboxConversationData
@@ -87,7 +87,7 @@ export function ConversationThread({
       : ConversationType.ConversationTypeDirect)
   const markRead = useConversationReadMarker(
     conversationID,
-    pageActive && conversationType !== ConversationType.ConversationTypeCustomer,
+    pageActive && conversationType !== ConversationType.ConversationTypeChannel,
   )
 
   useEffect(() => {
@@ -101,20 +101,20 @@ export function ConversationThread({
     isAgentInboxConversation(conversation) ||
     isDirectInboxConversation(conversation) ||
     isGroupInboxConversation(conversation) ||
-    customerReplySupported(conversation.customer)
+    customerReplySupported(conversation.service)
   const telegramConversation = Boolean(
     conversation &&
-    isCustomerInboxConversation(conversation) &&
-    conversation.customer.channelType === ChannelType.ChannelTypeTelegram,
+    isServiceInboxConversation(conversation) &&
+    conversation.service.channel?.type === ChannelType.ChannelTypeTelegram,
   )
   const groupConversation =
     conversation && isGroupInboxConversation(conversation) ? conversation : null
   const customerConversation =
-    conversation && isCustomerInboxConversation(conversation) ? conversation : null
+    conversation && isServiceInboxConversation(conversation) ? conversation : null
   // 渠道不支持、周期已关闭或由他人负责时都不能对客回复。
   const customerReplyUnavailable = !replySupported || Boolean(replyDisabledReason)
   // 客户会话的附件入口按渠道外发能力开放。
-  const customerAttachment = customerConversation?.customer ?? null
+  const customerAttachment = customerConversation?.service.channel ?? null
   // 客户会话的内部备注可以提醒企业成员。
   const noteMentionMembers = useResource(resourceKeys.memberOptions(), listAllMemberOptions, {
     enabled: Boolean(customerConversation),

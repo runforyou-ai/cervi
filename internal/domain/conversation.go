@@ -4,11 +4,11 @@ package domain
 type ConversationType string
 
 const (
-	ConversationTypeAgent    ConversationType = "agent"
-	ConversationTypeDirect   ConversationType = "direct"
-	ConversationTypeGroup    ConversationType = "group"
-	ConversationTypeCustomer ConversationType = "customer"
-	ConversationTypeCopilot  ConversationType = "copilot"
+	ConversationTypeAgent   ConversationType = "agent"
+	ConversationTypeDirect  ConversationType = "direct"
+	ConversationTypeGroup   ConversationType = "group"
+	ConversationTypeChannel ConversationType = "channel"
+	ConversationTypeCopilot ConversationType = "copilot"
 )
 
 // ConversationStatus 定义会话生命周期状态。

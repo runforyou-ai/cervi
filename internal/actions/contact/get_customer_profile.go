@@ -48,12 +48,13 @@ func (q *GetCustomerProfileQuery) Execute(ctx context.Context, identity *serverm
 		VisitorContext *domain.VisitorContext `bun:"visitor_context,type:jsonb"`
 	}{}
 	err := q.db.NewSelect().
-		TableExpr("customer_conversations AS cc").
+		TableExpr("channel_conversations AS cc").
 		ColumnExpr("cci.external_id, c.external_user_id, ss.visitor_context").
 		ColumnExpr("(SELECT cm.value FROM contact_methods AS cm WHERE cm.organization_id = c.organization_id AND cm.contact_id = c.id AND cm.type = ? AND cm.is_primary) AS email", domain.ContactMethodTypeEmail).
 		Join("JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id").
 		Join("JOIN contacts AS c ON c.id = cci.contact_id AND c.organization_id = cci.organization_id").
-		Join("LEFT JOIN service_sessions AS ss ON ss.id = cc.current_service_session_id AND ss.organization_id = cc.organization_id").
+		Join("JOIN service_conversations AS svc ON svc.organization_id = cc.organization_id AND svc.conversation_id = cc.conversation_id").
+		Join("LEFT JOIN service_sessions AS ss ON ss.id = svc.current_service_session_id AND ss.organization_id = cc.organization_id").
 		Where("cc.organization_id = ?", identity.Organization.ID).
 		Where("cc.conversation_id = ?", conversationID).
 		Scan(ctx, &row)

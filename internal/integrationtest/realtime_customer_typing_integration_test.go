@@ -18,7 +18,7 @@ import (
 func loadVisitorChatSubjectID(t *testing.T, db *bun.DB, organizationID, conversationID string) string {
 	t.Helper()
 	var value string
-	err := db.NewSelect().TableExpr("customer_conversations AS cc").
+	err := db.NewSelect().TableExpr("channel_conversations AS cc").
 		ColumnExpr("cs.id").
 		Join("JOIN contact_channel_identities AS cci ON cci.organization_id = cc.organization_id AND cci.id = cc.contact_channel_identity_id").
 		Join("JOIN chat_subjects AS cs ON cs.organization_id = cc.organization_id AND cs.kind = ? AND cs.source_id = cci.contact_id", domain.ChatSubjectKindContact).

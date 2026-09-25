@@ -95,7 +95,8 @@ func loadRunCustomer(ctx context.Context, db bun.IDB, run *servermodels.AgentRun
 		TableExpr("service_sessions AS ss").
 		ColumnExpr("cci.external_id, c.external_user_id").
 		ColumnExpr("(SELECT cm.value FROM contact_methods AS cm WHERE cm.organization_id = c.organization_id AND cm.contact_id = c.id AND cm.type = ? AND cm.is_primary) AS email", domain.ContactMethodTypeEmail).
-		Join("JOIN contact_channel_identities AS cci ON cci.id = ss.contact_channel_identity_id AND cci.organization_id = ss.organization_id").
+		Join("JOIN channel_conversations AS cc ON cc.organization_id = ss.organization_id AND cc.conversation_id = ss.conversation_id").
+		Join("JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id").
 		Join("JOIN contacts AS c ON c.id = cci.contact_id AND c.organization_id = cci.organization_id").
 		Where("ss.organization_id = ?", run.OrganizationID).
 		Where("ss.id = ?", run.ScopeID).

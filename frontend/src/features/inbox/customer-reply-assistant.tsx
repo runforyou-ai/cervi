@@ -8,11 +8,11 @@ import {
 import { useTranslation } from "react-i18next"
 
 import {
-  CustomerReplyMode,
-  CustomerReplyTone,
-  generateCustomerReplySuggestions,
+  ServiceReplyMode,
+  ServiceReplyTone,
+  generateServiceReplySuggestions,
   isApiError,
-  listCustomerReplyAgents,
+  listServiceReplyAgents,
 } from "@/api"
 import { IconTooltip } from "@/components/icon-tooltip"
 import { Button } from "@/components/ui/button"
@@ -36,25 +36,25 @@ import { apiErrorMessage } from "@/lib/form-errors"
 import { focusDialogContainer } from "@/lib/dialog-focus"
 import { cn } from "@/lib/utils"
 import { composerToolClass } from "@/features/inbox/composer-tool"
-import { selectCustomerReplyAgentID } from "@/features/inbox/customer-reply-agent"
+import { selectServiceReplyAgentID } from "@/features/inbox/customer-reply-agent"
 import { useCustomerTranslation } from "@/features/inbox/customer-translation"
 
 const replySourceDebounceDelay = 600
 
 const replyModes = [
-  CustomerReplyMode.CustomerReplyModeReply,
-  CustomerReplyMode.CustomerReplyModeRewrite,
+  ServiceReplyMode.ServiceReplyModeReply,
+  ServiceReplyMode.ServiceReplyModeRewrite,
 ] as const
 
 const replyTones = [
-  CustomerReplyTone.CustomerReplyToneKeep,
-  CustomerReplyTone.CustomerReplyToneProfessional,
-  CustomerReplyTone.CustomerReplyToneFriendly,
-  CustomerReplyTone.CustomerReplyToneConcise,
+  ServiceReplyTone.ServiceReplyToneKeep,
+  ServiceReplyTone.ServiceReplyToneProfessional,
+  ServiceReplyTone.ServiceReplyToneFriendly,
+  ServiceReplyTone.ServiceReplyToneConcise,
 ] as const
 
 type ReplyAssistantPreferences = {
-  tone: CustomerReplyTone
+  tone: ServiceReplyTone
   agentIdentityId: string
 }
 
@@ -83,7 +83,7 @@ export function CustomerReplyAssistant({
   const triggerRef = useRef<HTMLButtonElement>(null)
   const [alignOffset, setAlignOffset] = useState(0)
   const [open, setOpen] = useState(false)
-  const [mode, setMode] = useState(CustomerReplyMode.CustomerReplyModeReply)
+  const [mode, setMode] = useState(ServiceReplyMode.ServiceReplyModeReply)
   const storageKey = `cervi.inbox.replyAssistant.${currentIdentityID}`
   const [preferences, setPreferences] = useState<ReplyAssistantPreferences>(
     () => {
@@ -92,11 +92,11 @@ export function CustomerReplyAssistant({
         const stored: unknown = JSON.parse(localStorage.getItem(storageKey) ?? "null")
         const value = (stored ?? {}) as Partial<Record<keyof ReplyAssistantPreferences, unknown>>
         return {
-          tone: replyTones.find((tone) => tone === value.tone) ?? CustomerReplyTone.CustomerReplyToneKeep,
+          tone: replyTones.find((tone) => tone === value.tone) ?? ServiceReplyTone.ServiceReplyToneKeep,
           agentIdentityId: typeof value.agentIdentityId === "string" ? value.agentIdentityId : "",
         }
       } catch {
-        return { tone: CustomerReplyTone.CustomerReplyToneKeep, agentIdentityId: "" }
+        return { tone: ServiceReplyTone.ServiceReplyToneKeep, agentIdentityId: "" }
       }
     },
   )
@@ -117,21 +117,21 @@ export function CustomerReplyAssistant({
 
   useEffect(
     () => () =>
-      void removeResource(resourceKeys.customerReplySuggestions(conversationID)),
+      void removeResource(resourceKeys.serviceReplySuggestions(conversationID)),
     [conversationID, removeResource],
   )
 
   const agentOptions = useResource(
-    resourceKeys.customerReplyAgents(),
-    listCustomerReplyAgents,
+    resourceKeys.serviceReplyAgents(),
+    listServiceReplyAgents,
     { enabled: open, staleTime: 0 },
   )
   const agents = agentOptions.data ?? []
-  const agentIdentityID = selectCustomerReplyAgentID(
+  const agentIdentityID = selectServiceReplyAgentID(
     agents,
     preferences.agentIdentityId,
   )
-  const rewrite = mode === CustomerReplyMode.CustomerReplyModeRewrite
+  const rewrite = mode === ServiceReplyMode.ServiceReplyModeRewrite
   // 翻译发送时候选按本人语言书写，发送时再译为客户语言。
   const customerTranslation = useCustomerTranslation()
   const replyLanguage =
@@ -155,8 +155,8 @@ export function CustomerReplyAssistant({
     source.replyToMessageID === replyToMessageID &&
     (!rewrite || source.draft === draft)
   const suggestions = useResource(
-    resourceKeys.customerReplySuggestions(conversationID, parameters),
-    () => generateCustomerReplySuggestions(conversationID, parameters),
+    resourceKeys.serviceReplySuggestions(conversationID, parameters),
+    () => generateServiceReplySuggestions(conversationID, parameters),
     { enabled: ready, staleTime: Infinity, refetchOnWindowFocus: false },
   )
   const generating =
@@ -165,14 +165,14 @@ export function CustomerReplyAssistant({
       (!sourceCurrent || suggestions.loading || suggestions.refreshing))
   const candidates = suggestions.data?.candidates ?? []
   const modeLabels = {
-    [CustomerReplyMode.CustomerReplyModeReply]: t("replyAssistantModeReply"),
-    [CustomerReplyMode.CustomerReplyModeRewrite]: t("replyAssistantModeRewrite"),
+    [ServiceReplyMode.ServiceReplyModeReply]: t("replyAssistantModeReply"),
+    [ServiceReplyMode.ServiceReplyModeRewrite]: t("replyAssistantModeRewrite"),
   }
   const toneLabels = {
-    [CustomerReplyTone.CustomerReplyToneKeep]: t("replyAssistantToneKeep"),
-    [CustomerReplyTone.CustomerReplyToneProfessional]: t("replyAssistantToneProfessional"),
-    [CustomerReplyTone.CustomerReplyToneFriendly]: t("replyAssistantToneFriendly"),
-    [CustomerReplyTone.CustomerReplyToneConcise]: t("replyAssistantToneConcise"),
+    [ServiceReplyTone.ServiceReplyToneKeep]: t("replyAssistantToneKeep"),
+    [ServiceReplyTone.ServiceReplyToneProfessional]: t("replyAssistantToneProfessional"),
+    [ServiceReplyTone.ServiceReplyToneFriendly]: t("replyAssistantToneFriendly"),
+    [ServiceReplyTone.ServiceReplyToneConcise]: t("replyAssistantToneConcise"),
   }
   // 没有候选时的提示按原因排序：员工读取、可用员工、改写草稿和生成失败。
   const emptyMessage = agentOptions.error
@@ -192,8 +192,8 @@ export function CustomerReplyAssistant({
     if (nextOpen) {
       setMode(
         draft.trim()
-          ? CustomerReplyMode.CustomerReplyModeRewrite
-          : CustomerReplyMode.CustomerReplyModeReply,
+          ? ServiceReplyMode.ServiceReplyModeRewrite
+          : ServiceReplyMode.ServiceReplyModeReply,
       )
       setSource({ draft, replyToMessageID })
       // 按按钮到输入区右边界的距离偏移，使弹层右边缘对齐主消息区右边界。
@@ -224,7 +224,7 @@ export function CustomerReplyAssistant({
     appliedRef.current = true
     onApply(candidate)
     setOpen(false)
-    void removeResource(resourceKeys.customerReplySuggestions(conversationID))
+    void removeResource(resourceKeys.serviceReplySuggestions(conversationID))
   }
 
   /** 使用候选后焦点交给回复输入框。 */
@@ -316,7 +316,7 @@ export function CustomerReplyAssistant({
       )}
       value={preferences.tone}
       onChange={(event) =>
-        updatePreferences({ tone: event.target.value as CustomerReplyTone })
+        updatePreferences({ tone: event.target.value as ServiceReplyTone })
       }
     >
       {replyTones.map((tone) => (

@@ -29,9 +29,9 @@ func (a *ExecuteAction) runTypingNotifications(ctx context.Context, run *serverm
 		return nil, fmt.Errorf("load agent typing sender: %w", err)
 	}
 	if domain.AgentExecutionScopeKind(run.ScopeKind) == domain.AgentExecutionScopeServiceSession {
-		notifications := []realtime.Notification{realtime.CustomerInboxConversationTyping(run.OrganizationID, run.ConversationID, agentSubjectID, active)}
+		notifications := []realtime.Notification{realtime.ServiceInboxConversationTyping(run.OrganizationID, run.ConversationID, agentSubjectID, active)}
 		var channelIdentityID string
-		err := a.db.NewSelect().TableExpr("customer_conversations AS cc").
+		err := a.db.NewSelect().TableExpr("channel_conversations AS cc").
 			ColumnExpr("cci.id").
 			Join("JOIN contact_channel_identities AS cci ON cci.organization_id = cc.organization_id AND cci.id = cc.contact_channel_identity_id").
 			Join("JOIN channels AS c ON c.organization_id = cci.organization_id AND c.id = cci.channel_id AND c.type = ?", domain.ChannelTypeWebsite).

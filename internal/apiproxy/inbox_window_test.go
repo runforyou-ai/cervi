@@ -19,7 +19,7 @@ import (
 func TestBackendInboxWindow(t *testing.T) {
 	filter := appservice.InboxQuery{
 		Scope: appservice.InboxScopeAll, AssigneeFilter: appservice.InboxAssigneeFilterIdentity, AssigneeIdentityID: "peer", Audience: appservice.ServiceAudienceCustomer,
-		ChannelID: "channel", ServiceStatus: appservice.ServiceSessionStatusClosed, Kinds: []appservice.ConversationType{appservice.ConversationTypeCustomer},
+		ChannelID: "channel", ServiceStatus: appservice.ServiceSessionStatusClosed, Kinds: []appservice.ConversationType{appservice.ConversationTypeChannel},
 	}
 	contextInput := appservice.InboxContextInput{Query: filter, AnchorID: "anchor", AnchorCursor: "old", BeforeLimit: 3, AfterLimit: 5}
 	windowInput := appservice.InboxWindowInput{Query: filter, StartCursor: "start", EndCursor: "end"}

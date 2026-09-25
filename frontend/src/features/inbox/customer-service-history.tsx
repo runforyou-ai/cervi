@@ -6,14 +6,14 @@ import { useDateTime } from "@/hooks/use-date-time"
 import {
   ServiceSessionSummaryEditButton,
   ServiceSessionSummaryText,
-  useCustomerServiceSummaries,
+  useServiceSummaries,
 } from "./service-session-summary"
 
 /** 按关闭时间从新到旧列出客户历史周期的小结；鼠标设备在悬停或聚焦时显示修改入口，触屏设备常驻显示。 */
 export function CustomerServiceHistory({ conversationID }: { conversationID: string }) {
   const { t } = useTranslation("inbox")
   const { formatDateTime } = useDateTime()
-  const summaries = useCustomerServiceSummaries(conversationID)
+  const summaries = useServiceSummaries(conversationID)
   if (summaries.error) {
     return <p className="mt-5 text-xs leading-5 text-muted-foreground">{t("summaryLoadError")}</p>
   }
@@ -31,7 +31,7 @@ export function CustomerServiceHistory({ conversationID }: { conversationID: str
             <div className="min-w-0 flex-1">
               <ServiceSessionSummaryText
                 summary={summary}
-                meta={[formatDateTime(summary.closedAt), summary.channelName]}
+                meta={[formatDateTime(summary.closedAt), summary.channelName ?? ""]}
               />
             </div>
             <ServiceSessionSummaryEditButton

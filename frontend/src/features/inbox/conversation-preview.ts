@@ -6,7 +6,7 @@ import {
   MessageType,
   MessageVisibility,
   isAgentInboxConversation,
-  isCustomerInboxConversation,
+  isServiceInboxConversation,
   isDirectInboxConversation,
   isGroupInboxConversation,
   type InboxConversationData,
@@ -15,7 +15,7 @@ import { messagePreview } from "@/lib/message-preview"
 
 /** 返回会话列表项的摘要数据（末条消息、时间、未读等）；列表不支持的会话类型返回 null。 */
 export function inboxConversationSummary(conversation: InboxConversationData) {
-  if (isCustomerInboxConversation(conversation)) return conversation.customer
+  if (isServiceInboxConversation(conversation)) return conversation.service
   if (isAgentInboxConversation(conversation)) return conversation.agent
   if (isDirectInboxConversation(conversation)) return conversation.direct
   if (isGroupInboxConversation(conversation)) return conversation.group
@@ -46,9 +46,9 @@ export function conversationPreview(
             ? t("groupSystemUpdated")
             : t("messagesEmpty"))
   // 客户会话的末条消息是内部备注时，摘要标明来源。
-  return isCustomerInboxConversation(conversation) &&
-    conversation.customer.previewVisibility ===
-      MessageVisibility.MessageVisibilityInternalOnly
+  return isServiceInboxConversation(conversation) &&
+    conversation.service.previewVisibility ===
+      MessageVisibility.MessageVisibilityInternal
     ? t("previewInternalNote", { preview: previewBody })
     : previewBody
 }

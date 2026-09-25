@@ -4,7 +4,7 @@ import { FilterIcon } from "lucide-react"
 import { useTranslation } from "react-i18next"
 
 import {
-  CustomerQueueFilter,
+  ServiceQueueFilter,
   InboxAssigneeFilter,
   InboxPendingKind,
   InboxScope,
@@ -124,7 +124,7 @@ export function InboxFilter({
                   onChange={(event) => onChange(inboxQueueFromParam(event.target.value))}
                 >
                   <option value="">{t("queueFilterAllQueues")}</option>
-                  <option value={CustomerQueueFilter.CustomerQueueFilterPublic}>{t("queueFilterPublicQueue")}</option>
+                  <option value={ServiceQueueFilter.ServiceQueueFilterPublic}>{t("queueFilterPublicQueue")}</option>
                   {queueTeams.filter((team) => team.mine).map((team) => (
                     <option key={team.id} value={team.id}>
                       {team.name}

@@ -156,7 +156,7 @@ func assertCustomerLockSummary(t *testing.T, ctx context.Context, db *bun.DB, co
 		t.Fatal(err)
 	}
 	var session models.ServiceSession
-	if err := db.NewSelect().Model(&session).Join("JOIN customer_conversations AS cc ON cc.current_service_session_id = ss.id AND cc.organization_id = ss.organization_id").Where("cc.conversation_id = ?", conversationID).Scan(ctx); err != nil {
+	if err := db.NewSelect().Model(&session).Join("JOIN service_conversations AS svc ON svc.current_service_session_id = ss.id AND svc.organization_id = ss.organization_id").Where("svc.conversation_id = ?", conversationID).Scan(ctx); err != nil {
 		t.Fatal(err)
 	}
 	var message models.Message
@@ -268,7 +268,7 @@ func TestCustomerInboundAndManagementLocks(t *testing.T) {
 			}
 			f.db.AddQueryHook(chatQueryHook{})
 			gate := newChatQueryGate(t, true, 1, func(event *bun.QueryEvent) bool {
-				return event.Operation() == "SELECT" && strings.Contains(event.Query, `FROM "customer_conversations"`) && strings.Contains(event.Query, "FOR UPDATE")
+				return event.Operation() == "SELECT" && strings.Contains(event.Query, `FROM "service_conversations"`) && strings.Contains(event.Query, "FOR UPDATE")
 			})
 			operated, contended := make(chan error, 1), make(chan error, 1)
 			go func() {
@@ -278,7 +278,7 @@ func TestCustomerInboundAndManagementLocks(t *testing.T) {
 				case "网站入站":
 					_, err = f.visitorMessage(gated, "竞争入站")
 				case "成员回复":
-					_, err = conversationaction.NewSendCustomerTextMessageAction(f.db, nil).Execute(gated, f.owner, conversationaction.CustomerTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "成员回复"})
+					_, err = conversationaction.NewSendServiceTextMessageAction(f.db, nil).Execute(gated, f.owner, conversationaction.ServiceTextMessageInput{ConversationID: f.conversationID, ClientMessageID: uuid.NewV7().String(), Body: "成员回复"})
 				case "领取":
 					_, err = conversationaction.NewClaimServiceSessionAction(f.db, coordinator, newTestTasks(f.db)).Execute(gated, f.owner, f.conversationID)
 				case "转交":
@@ -342,7 +342,7 @@ func TestWebsiteFirstMessageConverges(t *testing.T) {
 	if results[0].Message.ID != results[1].Message.ID || results[0].Conversation.ID != results[1].Conversation.ID {
 		t.Fatalf("results=%+v", results)
 	}
-	for _, table := range []string{"messages", "service_sessions", "customer_conversations"} {
+	for _, table := range []string{"messages", "service_sessions", "service_conversations", "channel_conversations"} {
 		count, err := f.db.NewSelect().TableExpr(table).Where("conversation_id = ?", results[0].Conversation.ID).Count(ctx)
 		if err != nil || count != 1 {
 			t.Fatalf("%s count=%d err=%v", table, count, err)

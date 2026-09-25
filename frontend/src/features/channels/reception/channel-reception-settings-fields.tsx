@@ -13,7 +13,7 @@ import {
   ChannelRoutingTargetType,
   ChannelType,
   OrganizationIdentityType,
-  listCustomerServiceAssignees,
+  listServiceAssignees,
   listAllTeams,
   type ChannelRoutingTarget,
   type InboxAssignee,
@@ -158,7 +158,7 @@ export function ChannelReceptionSettingsFields<
     async () => {
       const [teams, assignees] = await Promise.all([
         listAllTeams(),
-        listCustomerServiceAssignees(),
+        listServiceAssignees(),
       ])
       return { teams, assignees }
     },

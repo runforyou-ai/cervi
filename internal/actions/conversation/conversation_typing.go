@@ -44,7 +44,7 @@ func (a *ReportConversationTypingAction) Execute(ctx context.Context, identity *
 	switch domain.ConversationType(conversationType) {
 	case domain.ConversationTypeDirect, domain.ConversationTypeGroup:
 		return a.publishToMembers(ctx, identity, conversationID, active)
-	case domain.ConversationTypeCustomer:
+	case domain.ConversationTypeChannel:
 		return a.publishToVisitor(ctx, identity, conversationID, active)
 	default:
 		return ErrConversationNotFound
@@ -92,9 +92,10 @@ type customerTypingRoute struct {
 // publishToVisitor 要求当前身份可对客回复网站渠道客户会话，向该渠道身份的访客发布输入状态。
 func (a *ReportConversationTypingAction) publishToVisitor(ctx context.Context, identity *servermodels.Identity, conversationID string, active bool) error {
 	route := customerTypingRoute{}
-	err := a.db.NewSelect().TableExpr("customer_conversations AS cc").
+	err := a.db.NewSelect().TableExpr("channel_conversations AS cc").
 		ColumnExpr("cci.id AS channel_identity_id, ss.status AS session_status, ss.assignee_identity_id").
-		Join("JOIN service_sessions AS ss ON ss.organization_id = cc.organization_id AND ss.conversation_id = cc.conversation_id AND ss.id = cc.current_service_session_id").
+		Join("JOIN service_conversations AS svc ON svc.organization_id = cc.organization_id AND svc.conversation_id = cc.conversation_id").
+		Join("JOIN service_sessions AS ss ON ss.organization_id = cc.organization_id AND ss.conversation_id = cc.conversation_id AND ss.id = svc.current_service_session_id").
 		Join("JOIN contact_channel_identities AS cci ON cci.organization_id = cc.organization_id AND cci.id = cc.contact_channel_identity_id").
 		Join("JOIN channels AS c ON c.organization_id = cci.organization_id AND c.id = cci.channel_id AND c.type = ?", domain.ChannelTypeWebsite).
 		Where("cc.organization_id = ? AND cc.conversation_id = ?", identity.Organization.ID, conversationID).
@@ -144,7 +145,7 @@ func (a *ReportWebsiteVisitorTypingAction) Execute(ctx context.Context, channelI
 		return ErrConversationNotFound
 	}
 	var senderSubjectID string
-	err = a.db.NewSelect().TableExpr("customer_conversations AS cc").
+	err = a.db.NewSelect().TableExpr("channel_conversations AS cc").
 		ColumnExpr("cs.id").
 		Join("JOIN chat_subjects AS cs ON cs.organization_id = cc.organization_id AND cs.kind = ? AND cs.source_id = ?", domain.ChatSubjectKindContact, visitor.ContactID).
 		Where("cc.organization_id = ? AND cc.conversation_id = ?", channel.OrganizationID, conversationID).
@@ -156,6 +157,6 @@ func (a *ReportWebsiteVisitorTypingAction) Execute(ctx context.Context, channelI
 	if err != nil {
 		return fmt.Errorf("authorize website visitor typing: %w", err)
 	}
-	realtime.Publish(realtime.CustomerInboxConversationTyping(channel.OrganizationID, conversationID, senderSubjectID, active))
+	realtime.Publish(realtime.ServiceInboxConversationTyping(channel.OrganizationID, conversationID, senderSubjectID, active))
 	return nil
 }

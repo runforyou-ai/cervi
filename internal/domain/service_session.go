@@ -17,7 +17,16 @@ const (
 	ServiceAudiencePartner  ServiceAudience = "partner"
 )
 
-// ServiceSessionCloseReason 定义客服处理周期的结束方式。
+// ServiceSource 定义服务会话来源：channel 为渠道，cervi_direct 为 Cervi 单聊，cervi_group 为 Cervi 群聊。
+type ServiceSource string
+
+const (
+	ServiceSourceChannel     ServiceSource = "channel"
+	ServiceSourceCerviDirect ServiceSource = "cervi_direct"
+	ServiceSourceCerviGroup  ServiceSource = "cervi_group"
+)
+
+// ServiceSessionCloseReason 定义服务周期的结束方式。
 type ServiceSessionCloseReason string
 
 const (
@@ -32,7 +41,7 @@ const (
 // DefaultMaxServiceSessions 是成员默认的最大接待量。
 const DefaultMaxServiceSessions = 10
 
-// ServiceAttentionReason 定义提醒成员处理客服处理周期的原因。
+// ServiceAttentionReason 定义提醒成员处理服务周期的原因。
 type ServiceAttentionReason string
 
 const (
@@ -46,7 +55,7 @@ const (
 	ServiceAttentionReturned ServiceAttentionReason = "returned"
 )
 
-// ServiceSessionSummaryStatus 定义客服处理周期小结的生成状态。
+// ServiceSessionSummaryStatus 定义服务周期小结的生成状态。
 type ServiceSessionSummaryStatus string
 
 const (

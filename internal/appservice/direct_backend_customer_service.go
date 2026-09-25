@@ -30,7 +30,7 @@ type customerServiceOps struct {
 	archiveCategory       *servicecategoryaction.ArchiveAction
 	getIdentitySecret     *customerserviceaction.GetCustomerIdentitySecretQuery
 	regenerateSecret      *customerserviceaction.RegenerateCustomerIdentitySecretAction
-	getCustomerProfile    *contactaction.GetCustomerProfileQuery
+	getRequesterProfile   *contactaction.GetCustomerProfileQuery
 	listBusinessQueries   *conversationaction.ListBusinessQueriesQuery
 	getSummarySettings    *customerserviceaction.GetServiceSummarySettingsQuery
 	updateSummarySettings *customerserviceaction.UpdateServiceSummarySettingsAction
@@ -51,7 +51,7 @@ func newCustomerServiceOps(db *bun.DB) customerServiceOps {
 		archiveCategory:       servicecategoryaction.NewArchiveAction(db),
 		getIdentitySecret:     customerserviceaction.NewGetCustomerIdentitySecretQuery(db),
 		regenerateSecret:      customerserviceaction.NewRegenerateCustomerIdentitySecretAction(db),
-		getCustomerProfile:    contactaction.NewGetCustomerProfileQuery(db),
+		getRequesterProfile:   contactaction.NewGetCustomerProfileQuery(db),
 		listBusinessQueries:   conversationaction.NewListBusinessQueriesQuery(db),
 		getSummarySettings:    customerserviceaction.NewGetServiceSummarySettingsQuery(db),
 		updateSummarySettings: customerserviceaction.NewUpdateServiceSummarySettingsAction(db),
@@ -90,18 +90,18 @@ func (o *directOperations) RegenerateCustomerIdentitySecret(ctx context.Context,
 	return CustomerIdentitySecret{Secret: secret}, nil
 }
 
-// GetCustomerProfile 返回客户会话的客户身份与当前周期访客上下文。
-func (o *directOperations) GetCustomerProfile(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string) (CustomerProfile, error) {
-	profile, err := o.getCustomerProfile.Execute(ctx, identity, conversationID)
+// GetRequesterProfile 返回服务会话发起人的资料；发起人是客户时给出客户身份与当前周期访客上下文。
+func (o *directOperations) GetRequesterProfile(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string) (RequesterProfile, error) {
+	profile, err := o.getRequesterProfile.Execute(ctx, identity, conversationID)
 	if err != nil {
 		if ctx.Err() != nil {
-			return CustomerProfile{}, ctx.Err()
+			return RequesterProfile{}, ctx.Err()
 		}
 		if errors.Is(err, contactaction.ErrNotFound) {
-			return CustomerProfile{}, NotFoundError(meta, cervii18n.ErrorConversationNotFound)
+			return RequesterProfile{}, NotFoundError(meta, cervii18n.ErrorConversationNotFound)
 		}
 		slog.Warn("读取客户资料失败", "organization_id", identity.Organization.ID, "conversation_id", conversationID, "error", err)
-		return CustomerProfile{}, FailedError(meta, cervii18n.ErrorCustomerProfileLoadFailed)
+		return RequesterProfile{}, FailedError(meta, cervii18n.ErrorCustomerProfileLoadFailed)
 	}
 	result := CustomerProfile{IdentityVerified: profile.IdentityVerified, ExternalUserID: profile.ExternalUserID, Email: profile.Email}
 	if visit := profile.VisitorContext; visit != nil {
@@ -110,26 +110,26 @@ func (o *directOperations) GetCustomerProfile(ctx context.Context, meta RequestM
 			DeviceType: visit.DeviceType, Language: visit.Language, TimeZone: visit.TimeZone, Country: visit.Country,
 		}
 	}
-	return result, nil
+	return RequesterProfile{Customer: &result}, nil
 }
 
-// ListCustomerBusinessQueries 返回客户会话当前客服周期内 AI 客服查询业务系统的记录。
-func (o *directOperations) ListCustomerBusinessQueries(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string) (CustomerBusinessQueryList, error) {
+// ListServiceBusinessQueries 返回服务会话当前服务周期内 AI 员工查询业务系统的记录。
+func (o *directOperations) ListServiceBusinessQueries(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string) (ServiceBusinessQueryList, error) {
 	queries, err := o.listBusinessQueries.Execute(ctx, identity, conversationID)
 	if err != nil {
 		if ctx.Err() != nil {
-			return CustomerBusinessQueryList{}, ctx.Err()
+			return ServiceBusinessQueryList{}, ctx.Err()
 		}
 		if errors.Is(err, conversationaction.ErrConversationNotFound) {
-			return CustomerBusinessQueryList{}, NotFoundError(meta, cervii18n.ErrorConversationNotFound)
+			return ServiceBusinessQueryList{}, NotFoundError(meta, cervii18n.ErrorConversationNotFound)
 		}
 		slog.Warn("读取业务查询记录失败", "organization_id", identity.Organization.ID, "conversation_id", conversationID, "error", err)
-		return CustomerBusinessQueryList{}, FailedError(meta, cervii18n.ErrorBusinessQueriesLoadFailed)
+		return ServiceBusinessQueryList{}, FailedError(meta, cervii18n.ErrorBusinessQueriesLoadFailed)
 	}
-	result := CustomerBusinessQueryList{Queries: make([]CustomerBusinessQuery, 0, len(queries))}
+	result := ServiceBusinessQueryList{Queries: make([]ServiceBusinessQuery, 0, len(queries))}
 	for _, query := range queries {
 		call := query.ToolCall
-		result.Queries = append(result.Queries, CustomerBusinessQuery{
+		result.Queries = append(result.Queries, ServiceBusinessQuery{
 			ID: query.ID, MCPServer: call.MCPServer, ToolName: call.Name, Arguments: call.Arguments, Result: call.Result, Error: call.Error,
 			Status: AgentToolCallStatus(call.Status), Evidence: call.Evidence, CalledAt: query.CalledAt,
 		})
@@ -395,20 +395,20 @@ func serviceSummarySettingsFromDomain(settings domain.ServiceSummarySettings) Se
 	return result
 }
 
-// GetCustomerServiceSummaries 返回客户会话当前周期的交接摘要与同一客户已关闭周期的小结。
-func (o *directOperations) GetCustomerServiceSummaries(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string) (CustomerServiceSummaries, error) {
+// GetServiceSummaries 返回服务会话当前周期的交接摘要与同一发起人已关闭周期的小结。
+func (o *directOperations) GetServiceSummaries(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, conversationID string) (ServiceSummaries, error) {
 	summaries, err := o.listSummaries.Execute(ctx, identity, conversationID)
 	if err != nil {
 		if ctx.Err() != nil {
-			return CustomerServiceSummaries{}, ctx.Err()
+			return ServiceSummaries{}, ctx.Err()
 		}
 		if errors.Is(err, conversationaction.ErrConversationNotFound) {
-			return CustomerServiceSummaries{}, NotFoundError(meta, cervii18n.ErrorConversationNotFound)
+			return ServiceSummaries{}, NotFoundError(meta, cervii18n.ErrorConversationNotFound)
 		}
 		slog.Warn("读取周期小结失败", "organization_id", identity.Organization.ID, "conversation_id", conversationID, "error", err)
-		return CustomerServiceSummaries{}, FailedError(meta, cervii18n.ErrorServiceSummariesLoadFailed)
+		return ServiceSummaries{}, FailedError(meta, cervii18n.ErrorServiceSummariesLoadFailed)
 	}
-	result := CustomerServiceSummaries{Sessions: make([]ServiceSessionSummary, 0, len(summaries.Sessions))}
+	result := ServiceSummaries{Sessions: make([]ServiceSessionSummary, 0, len(summaries.Sessions))}
 	if handoff := summaries.Handoff; handoff != nil {
 		result.Handoff = &HandoffSummary{Request: handoff.Request, Progress: handoff.Progress, Blocker: handoff.Blocker}
 	}
@@ -418,7 +418,7 @@ func (o *directOperations) GetCustomerServiceSummaries(ctx context.Context, meta
 	return result, nil
 }
 
-// UpdateServiceSessionSummary 修改已关闭客服处理周期的小结、是否解决与咨询分类。
+// UpdateServiceSessionSummary 修改已关闭服务周期的小结、是否解决与咨询分类。
 func (o *directOperations) UpdateServiceSessionSummary(ctx context.Context, meta RequestMeta, identity *servermodels.Identity, serviceSessionID string, input ServiceSessionSummaryInput) (ServiceSessionSummary, error) {
 	summary, err := o.updateSummary.Execute(ctx, identity, conversationaction.UpdateServiceSessionSummaryInput{
 		ServiceSessionID: serviceSessionID, Summary: input.Summary, Resolved: input.Resolved, CategoryID: input.CategoryID,
@@ -455,7 +455,7 @@ func (o *directOperations) UpdateServiceSessionSummary(ctx context.Context, meta
 func serviceSessionSummaryFromAction(summary conversationaction.ServiceSessionSummary) ServiceSessionSummary {
 	result := ServiceSessionSummary{
 		ServiceSessionID: summary.ServiceSessionID, ConversationID: summary.ConversationID,
-		ChannelType: ChannelType(summary.ChannelType), ChannelName: summary.ChannelName,
+		Source: ServiceSource(summary.Source), ChannelType: (*ChannelType)(summary.ChannelType), ChannelName: summary.ChannelName,
 		ClosedAt: summary.ClosedAt, CloseReason: ServiceSessionCloseReason(summary.CloseReason),
 		Summary: summary.Summary, Resolved: summary.Resolved, CategoryID: summary.CategoryID, CategoryName: summary.CategoryName,
 		EditedAt: summary.EditedAt, EditedBy: summary.EditedByName,

@@ -74,7 +74,7 @@ func mentionNavigationQuery(db bun.IDB, identity *servermodels.Identity, convers
 		Where(`cv.type = ? OR (cv.type = ? AND cv.status IN (?, ?) AND EXISTS (
 			SELECT 1 FROM conversation_participants AS member
 			WHERE member.organization_id = cv.organization_id AND member.conversation_id = cv.id AND member.subject_id = mine.id AND member.left_at IS NULL
-		))`, domain.ConversationTypeCustomer, domain.ConversationTypeGroup, domain.ConversationStatusActive, domain.ConversationStatusArchived)
+		))`, domain.ConversationTypeChannel, domain.ConversationTypeGroup, domain.ConversationStatusActive, domain.ConversationStatusArchived)
 }
 
 // pendingMentionsQuery 共用提及资格，排除本人消息、连续已查看范围和单条查看记录。

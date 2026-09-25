@@ -49,7 +49,7 @@ func LoadRoute(ctx context.Context, db bun.IDB, organizationID, conversationID s
 // loadRoute 读取外发目标，lock 为 true 时对 Telegram 渠道取共享锁并锁定渠道身份。
 func loadRoute(ctx context.Context, db bun.IDB, organizationID, conversationID string, lock bool) (Route, error) {
 	var route Route
-	query := db.NewSelect().TableExpr("customer_conversations AS cc").
+	query := db.NewSelect().TableExpr("channel_conversations AS cc").
 		ColumnExpr("cci.id AS identity_id, ch.id AS channel_id, ch.type AS channel_type, ch.enabled, tcs.bot_id").
 		Join("JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id").
 		Join("JOIN channels AS ch ON ch.id = cci.channel_id AND ch.organization_id = cci.organization_id").

@@ -39,7 +39,7 @@ func testKnowledgeGaps(t *testing.T, db *bun.DB, identity *servermodels.Identity
 	claim := conversationaction.NewClaimServiceSessionAction(db, coordinator, tasks)
 	closeSession := conversationaction.NewCloseServiceSessionAction(db, coordinator, tasks)
 	reopen := conversationaction.NewReopenServiceSessionAction(db)
-	reply := conversationaction.NewSendCustomerTextMessageAction(db, tasks)
+	reply := conversationaction.NewSendServiceTextMessageAction(db, tasks)
 	agent := f.newAgent(t, "待补知识客服")
 	channelID := f.newChannel(t, agent.IdentityID, channelaction.RoutingTarget{Type: domain.ChannelRoutingTargetTypePublicQueue})
 	list := knowledgegap.NewListQuery(db)
@@ -88,7 +88,7 @@ func testKnowledgeGaps(t *testing.T, db *bun.DB, identity *servermodels.Identity
 	if _, err := claim.Execute(ctx, identity, conversationID); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := reply.Execute(ctx, identity, conversationaction.CustomerTextMessageInput{
+	if _, err := reply.Execute(ctx, identity, conversationaction.ServiceTextMessageInput{
 		ConversationID: conversationID, ClientMessageID: uuid.NewV7().String(), Body: "海外仓订单一般 3 到 5 个工作日送达",
 	}); err != nil {
 		t.Fatal(err)

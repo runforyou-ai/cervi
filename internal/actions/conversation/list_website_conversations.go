@@ -59,7 +59,7 @@ func (q *ListWebsiteConversationsQuery) Execute(ctx context.Context, channelID, 
 	}
 	var rows []conversationSummaryRow
 	err = q.db.NewSelect().
-		TableExpr("customer_conversations AS cc").
+		TableExpr("channel_conversations AS cc").
 		ColumnExpr("cv.id AS id").
 		ColumnExpr("cv.title AS title").
 		ColumnExpr("msg.originated_at AS last_message_at").
@@ -73,15 +73,15 @@ func (q *ListWebsiteConversationsQuery) Execute(ctx context.Context, channelID, 
  SELECT visible.* FROM messages AS visible
  WHERE visible.organization_id = cv.organization_id AND visible.conversation_id = cv.id AND visible.type IN (?, ?) AND visible.visibility = ? AND visible.deleted_at IS NULL
  ORDER BY visible.message_seq DESC LIMIT 1
- ) AS msg ON TRUE`, domain.MessageTypeText, domain.MessageTypeAttachment, domain.MessageVisibilityCustomerVisible).
+ ) AS msg ON TRUE`, domain.MessageTypeText, domain.MessageTypeAttachment, domain.MessageVisibilityShared).
 		Join("LEFT JOIN conversation_participants AS preview_cp ON preview_cp.id = msg.sender_participant_id AND preview_cp.organization_id = msg.organization_id AND preview_cp.conversation_id = msg.conversation_id").
 		Join("LEFT JOIN chat_subjects AS preview_cs ON preview_cs.id = preview_cp.subject_id AND preview_cs.organization_id = preview_cp.organization_id").
 		Join("LEFT JOIN organization_identities AS preview_oi ON preview_oi.id = preview_cs.source_id AND preview_oi.organization_id = preview_cs.organization_id AND preview_cs.kind = ?", domain.ChatSubjectKindOrganizationIdentity).
-		Join("JOIN service_sessions AS current ON current.organization_id = cc.organization_id AND current.conversation_id = cc.conversation_id AND current.id = cc.current_service_session_id").
+		Join("JOIN service_conversations AS svc ON svc.organization_id = cc.organization_id AND svc.conversation_id = cc.conversation_id").
+		Join("JOIN service_sessions AS current ON current.organization_id = svc.organization_id AND current.service_conversation_id = svc.id AND current.id = svc.current_service_session_id").
 		Where("cc.organization_id = ?", channel.OrganizationID).
 		Where("cc.contact_channel_identity_id = ?", identity.ID).
-		Where("current.contact_channel_identity_id = ?", identity.ID).
-		Where("cv.type = ?", domain.ConversationTypeCustomer).
+		Where("cv.type = ?", domain.ConversationTypeChannel).
 		Where("cv.status IN (?, ?)", domain.ConversationStatusActive, domain.ConversationStatusArchived).
 		OrderExpr("msg.originated_at DESC, cv.id DESC").
 		Limit(20).

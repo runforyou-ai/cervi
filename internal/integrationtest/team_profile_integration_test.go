@@ -42,8 +42,8 @@ func TestTeamRenameInvalidatesCustomerInbox(t *testing.T) {
 		t.Fatalf("改名后同步探针 = %+v, 改名前 = %+v", after, before)
 	}
 	row := f.inboxRow(t, f.owner, domain.ServiceSessionStatusOpen)
-	if row.Customer.TeamName == nil || *row.Customer.TeamName != "客户成功团队" {
-		t.Fatalf("收件箱团队名称 = %v", row.Customer.TeamName)
+	if row.Service.TeamName == nil || *row.Service.TeamName != "客户成功团队" {
+		t.Fatalf("收件箱团队名称 = %v", row.Service.TeamName)
 	}
 	if current := loadConversationVersion(t, f.db, f.conversationID); current != version+1 {
 		t.Fatalf("改名后会话版本 = %d, want %d", current, version+1)

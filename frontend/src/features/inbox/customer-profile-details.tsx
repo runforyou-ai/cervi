@@ -1,7 +1,7 @@
 /** 客户会话侧栏的客户身份与当前周期访客上下文。 */
 import { useTranslation } from "react-i18next"
 
-import { getCustomerProfile } from "@/api"
+import { getRequesterProfile } from "@/api"
 import {
   SidePanelField,
   type ProfileField,
@@ -24,10 +24,10 @@ export function CustomerProfileDetails({
 }) {
   const { t } = useTranslation("inbox")
   const profile = useResource(
-    resourceKeys.customerProfile(conversationID, { lastMessageID }),
-    () => getCustomerProfile(conversationID),
+    resourceKeys.requesterProfile(conversationID, { lastMessageID }),
+    () => getRequesterProfile(conversationID),
   )
-  const data = profile.data
+  const data = profile.data?.customer
   if (profile.error) {
     return (
       <p className="text-xs leading-5 text-muted-foreground">

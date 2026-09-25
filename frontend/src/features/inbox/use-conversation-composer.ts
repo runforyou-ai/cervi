@@ -19,13 +19,13 @@ import { useCustomerTranslation } from "./customer-translation"
 /** 组合会话编辑器状态并提供输入交互。 */
 export function useConversationComposer(props: ConversationComposerProps) {
   const { conversationID, conversationType, submitOnEnter = false, disabledReason: replyDisabledReason = null,
-    visibility = MessageVisibility.MessageVisibilityCustomerVisible, onVisibilityChange,
+    visibility = MessageVisibility.MessageVisibilityShared, onVisibilityChange,
     groupParticipants, noteMentionMembers, currentIdentityID = "", customerChannel = null, draftBridgeRef,
   } = props
   // 渠道能力缺省时按不支持附件和输入状态处理，附件说明默认上限 4000 字。
   const customerAttachmentSupported = Boolean(customerChannel?.attachmentSupported)
   const customerTypingSupported =
-    customerChannel?.channelType === ChannelType.ChannelTypeWebsite
+    customerChannel?.type === ChannelType.ChannelTypeWebsite
   const customerAttachmentByteLimit = customerChannel?.attachmentByteLimit ?? 0
   const customerAttachmentCaptionLimit = customerChannel?.attachmentCaptionLimit ?? 4000
   const { t } = useTranslation("inbox")
@@ -49,11 +49,11 @@ export function useConversationComposer(props: ConversationComposerProps) {
   const bodyValue = form.watch("body")
   const isBodyEmpty = !bodyValue.trim()
   const internalNote =
-    visibility === MessageVisibility.MessageVisibilityInternalOnly
+    visibility === MessageVisibility.MessageVisibilityInternal
   // 内部备注不经渠道投递，不受对客发送资格限制。
   const disabledReason = internalNote ? null : replyDisabledReason
   const groupConversation = conversationType === ConversationType.ConversationTypeGroup
-  const customerConversation = conversationType === ConversationType.ConversationTypeCustomer
+  const customerConversation = conversationType === ConversationType.ConversationTypeChannel
   // 单聊与群聊向其他成员上报本人正在输入；客户会话只有网站渠道在对客回复时向访客上报。
   const typingReport = useConversationTypingReport(
     conversationID,
@@ -130,10 +130,10 @@ export function useConversationComposer(props: ConversationComposerProps) {
   /** 用 AI 生成的回复替换当前对客草稿，focus 为真时聚焦输入框。 */
   const applyReplySuggestion = useCallback((reply: string, focus = true) => {
     // 候选回复始终填入对客草稿，内部备注模式下先切回对客页签。
-    if (visibility === MessageVisibility.MessageVisibilityInternalOnly) {
-      draftsRef.current[MessageVisibility.MessageVisibilityCustomerVisible] = reply
+    if (visibility === MessageVisibility.MessageVisibilityInternal) {
+      draftsRef.current[MessageVisibility.MessageVisibilityShared] = reply
       focusAfterSwitchRef.current = focus
-      onVisibilityChange?.(MessageVisibility.MessageVisibilityCustomerVisible)
+      onVisibilityChange?.(MessageVisibility.MessageVisibilityShared)
       return
     }
     form.setValue("body", reply, { shouldDirty: true })
@@ -149,7 +149,7 @@ export function useConversationComposer(props: ConversationComposerProps) {
     draftBridgeRef.current = {
       read: () =>
         internalNote
-          ? (draftsRef.current[MessageVisibility.MessageVisibilityCustomerVisible] ?? "")
+          ? (draftsRef.current[MessageVisibility.MessageVisibilityShared] ?? "")
           : form.getValues("body"),
       replace: (body) => applyReplySuggestion(body, !mobile),
     }
@@ -167,7 +167,7 @@ export function useConversationComposer(props: ConversationComposerProps) {
     // 提示可见时 Enter 切到内部备注，Escape 关闭提示，均不发送对客消息。
     if (!composing && noteMentionHint && (event.key === "Escape" || (event.key === "Enter" && !event.shiftKey))) {
       event.preventDefault()
-      if (event.key === "Enter") switchVisibility(MessageVisibility.MessageVisibilityInternalOnly)
+      if (event.key === "Enter") switchVisibility(MessageVisibility.MessageVisibilityInternal)
       else setMentionQuery(null)
       return
     }

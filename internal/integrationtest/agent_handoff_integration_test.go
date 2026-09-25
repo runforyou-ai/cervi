@@ -32,7 +32,7 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// testServiceSessionReturner 创建管理操作退回客服周期所用的运行协调器。
+// testServiceSessionReturner 创建管理操作退回服务周期所用的运行协调器。
 func testServiceSessionReturner(db *bun.DB) *agentrunaction.ExecuteAction {
 	tasks := newTestTasks(db)
 	if err := tasks.Registry().RegisterJSON(deliveryaction.SendActionName, func(context.Context, deliveryaction.Input) error { return nil }); err != nil {
@@ -149,7 +149,7 @@ func handoffEvents(t *testing.T, db *bun.DB, conversationID string) []domain.Ser
 	}
 	events := make([]domain.ServiceSessionHandedOffEvent, 0, len(messages))
 	for _, message := range messages {
-		if message.Visibility != string(domain.MessageVisibilityInternalOnly) || message.SenderParticipantID != nil {
+		if message.Visibility != string(domain.MessageVisibilityInternal) || message.SenderParticipantID != nil {
 			t.Fatalf("handoff event message = %+v", message)
 		}
 		event := domain.ServiceSessionHandedOffEvent{}
@@ -172,7 +172,7 @@ func returnedEvents(t *testing.T, db *bun.DB, conversationID string) []domain.Se
 	}
 	events := make([]domain.ServiceSessionReturnedEvent, 0, len(messages))
 	for _, message := range messages {
-		if message.Visibility != string(domain.MessageVisibilityInternalOnly) || message.SenderParticipantID != nil {
+		if message.Visibility != string(domain.MessageVisibilityInternal) || message.SenderParticipantID != nil {
 			t.Fatalf("returned event message = %+v", message)
 		}
 		event := domain.ServiceSessionReturnedEvent{}
@@ -896,7 +896,7 @@ func testTelegramInboundReturnVersusRunFailure(t *testing.T, f handoffFixture) {
 	waitChatSignal(t, ctx, gate.reached)
 	go func() {
 		scheduled <- realtime.RunInTx(ctx, f.db, func(ctx context.Context, tx bun.Tx) error {
-			_, session, err := chatstate.LockCustomerServiceSession(ctx, tx, fixture.run.OrganizationID, fixture.run.ConversationID)
+			_, session, err := chatstate.LockServiceSession(ctx, tx, fixture.run.OrganizationID, fixture.run.ConversationID)
 			if err != nil {
 				return err
 			}
@@ -963,7 +963,7 @@ func testServiceSessionOperationEvents(t *testing.T, f handoffFixture) {
 	scheduler := agentrunaction.NewScheduler(f.tasks)
 	owner, member := f.identity.OrganizationIdentity.ID, other.Identity.OrganizationIdentity.ID
 	// 成员回复无人负责的周期即领取。
-	reply, err := conversationaction.NewSendCustomerTextMessageAction(f.db, nil).Execute(ctx, f.identity, conversationaction.CustomerTextMessageInput{
+	reply, err := conversationaction.NewSendServiceTextMessageAction(f.db, nil).Execute(ctx, f.identity, conversationaction.ServiceTextMessageInput{
 		ConversationID: conversationID, ClientMessageID: uuid.NewV7().String(), Body: "在的",
 	})
 	if err != nil {
@@ -1020,7 +1020,7 @@ func testServiceSessionOperationEvents(t *testing.T, f handoffFixture) {
 		}
 		expected := want[index]
 		if message.SystemEventType == nil || *message.SystemEventType != string(expected.eventType) ||
-			message.Visibility != string(domain.MessageVisibilityInternalOnly) || message.ServiceSessionID == nil ||
+			message.Visibility != string(domain.MessageVisibilityInternal) || message.ServiceSessionID == nil ||
 			event.ActorIdentityID != expected.actor || event.ActorDisplayName == "" ||
 			(expected.from == nil) != (event.FromIdentityID == nil) || (expected.from != nil && (*event.FromIdentityID != *expected.from || event.FromDisplayName == nil)) ||
 			(expected.target == nil) != (event.Target == nil) || (expected.target != nil && (event.Target.IdentityID == nil || *event.Target.IdentityID != *expected.target)) ||

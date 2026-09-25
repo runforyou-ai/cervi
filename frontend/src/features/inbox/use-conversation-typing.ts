@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next"
 
 import {
   reportConversationTyping,
-  type CustomerInboxConversation,
+  type ServiceInboxConversation,
   type GroupParticipant,
 } from "@/api"
 import { realtimeClient } from "@/api/realtime"
@@ -66,9 +66,9 @@ export function groupTypingSenderName(participants: GroupParticipant[]): TypingS
 }
 
 /** 按客户与当前负责人的聊天主体解析客户会话的输入者名称。 */
-export function customerTypingSenderName(customer: CustomerInboxConversation): TypingSenderName {
+export function customerTypingSenderName(customer: ServiceInboxConversation): TypingSenderName {
   return (senderSubjectID) => {
-    if (senderSubjectID === customer.contactChatSubjectId) return customer.contactName?.trim() ?? ""
+    if (senderSubjectID === customer.requesterChatSubjectId) return customer.requesterName?.trim() ?? ""
     if (customer.assignee && senderSubjectID === customer.assigneeChatSubjectId) return customer.assignee.displayName
     return null
   }

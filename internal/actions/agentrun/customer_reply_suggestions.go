@@ -26,15 +26,15 @@ import (
 )
 
 const (
-	// customerReplySuggestionTimeout 限制一次回复候选生成的时长，低于服务端 30 秒写超时。
-	customerReplySuggestionTimeout = 25 * time.Second
-	customerReplyDraftMaxRunes     = 4000
+	// serviceReplySuggestionTimeout 限制一次回复候选生成的时长，低于服务端 30 秒写超时。
+	serviceReplySuggestionTimeout = 25 * time.Second
+	customerReplyDraftMaxRunes    = 4000
 )
 
 const (
 	ValidationAgentIdentityIDInvalid       common.FieldCode = "agent_identity_id_invalid"
-	ValidationCustomerReplyModeInvalid     common.FieldCode = "customer_reply_mode_invalid"
-	ValidationCustomerReplyToneInvalid     common.FieldCode = "customer_reply_tone_invalid"
+	ValidationServiceReplyModeInvalid      common.FieldCode = "customer_reply_mode_invalid"
+	ValidationServiceReplyToneInvalid      common.FieldCode = "customer_reply_tone_invalid"
 	ValidationCustomerReplyLanguageInvalid common.FieldCode = "customer_reply_language_invalid"
 )
 
@@ -45,28 +45,28 @@ var (
 	ErrCustomerReplyGenerationFailed = errors.New("customer reply suggestion generation failed")
 )
 
-// CustomerReplySuggestionsInput 定义一次对客回复候选生成的条件。
-type CustomerReplySuggestionsInput struct {
+// ServiceReplySuggestionsInput 定义一次回复候选生成的条件。
+type ServiceReplySuggestionsInput struct {
 	ConversationID   string
 	AgentIdentityID  string
-	Mode             domain.CustomerReplyMode
-	Tone             domain.CustomerReplyTone
+	Mode             domain.ServiceReplyMode
+	Tone             domain.ServiceReplyTone
 	Draft            string // 改写模式必填，写回复模式忽略。
 	ReplyToMessageID string
 	// Language 是候选回复的书写语言，为空时与客户最近消息的语言一致。
 	Language string
 }
 
-// GenerateCustomerReplySuggestionsAction 使用 AI 员工当前配置为客户会话生成对客回复候选，不创建运行记录或消息。
-type GenerateCustomerReplySuggestionsAction struct {
+// GenerateServiceReplySuggestionsAction 使用 AI 员工当前配置为服务会话生成回复候选，不创建运行记录或消息。
+type GenerateServiceReplySuggestionsAction struct {
 	db          *bun.DB
 	generator   agentruntime.ReplyCandidateGenerator
 	attachments *AttachmentReader
 }
 
-// NewGenerateCustomerReplySuggestionsAction 创建对客回复候选生成操作。
-func NewGenerateCustomerReplySuggestionsAction(db *bun.DB, generator agentruntime.ReplyCandidateGenerator, attachments *AttachmentReader) *GenerateCustomerReplySuggestionsAction {
-	return &GenerateCustomerReplySuggestionsAction{db: db, generator: generator, attachments: attachments}
+// NewGenerateServiceReplySuggestionsAction 创建回复候选生成操作。
+func NewGenerateServiceReplySuggestionsAction(db *bun.DB, generator agentruntime.ReplyCandidateGenerator, attachments *AttachmentReader) *GenerateServiceReplySuggestionsAction {
+	return &GenerateServiceReplySuggestionsAction{db: db, generator: generator, attachments: attachments}
 }
 
 // customerReplyReference 定义客服回复所引用的消息摘要。
@@ -83,8 +83,8 @@ type customerReplyContext struct {
 }
 
 // Execute 校验客户会话、对客发送资格、AI 员工和引用消息后生成 1–3 条回复候选。
-func (a *GenerateCustomerReplySuggestionsAction) Execute(ctx context.Context, identity *servermodels.Identity, input CustomerReplySuggestionsInput) ([]string, error) {
-	input, fields := normalizeCustomerReplySuggestionsInput(input)
+func (a *GenerateServiceReplySuggestionsAction) Execute(ctx context.Context, identity *servermodels.Identity, input ServiceReplySuggestionsInput) ([]string, error) {
+	input, fields := normalizeServiceReplySuggestionsInput(input)
 	if len(fields) > 0 {
 		return nil, &conversationaction.ValidationError{Fields: fields}
 	}
@@ -102,7 +102,7 @@ func (a *GenerateCustomerReplySuggestionsAction) Execute(ctx context.Context, id
 	if err != nil {
 		return nil, err
 	}
-	generateCtx, cancel := context.WithTimeout(ctx, customerReplySuggestionTimeout)
+	generateCtx, cancel := context.WithTimeout(ctx, serviceReplySuggestionTimeout)
 	defer cancel()
 	startedAt := time.Now()
 	result, err := a.generator.GenerateReplyCandidates(generateCtx, agentruntime.ReplyCandidatesRequest{
@@ -128,8 +128,8 @@ func (a *GenerateCustomerReplySuggestionsAction) Execute(ctx context.Context, id
 	return result.Candidates, nil
 }
 
-// normalizeCustomerReplySuggestionsInput 规范化并校验回复候选生成条件。
-func normalizeCustomerReplySuggestionsInput(input CustomerReplySuggestionsInput) (CustomerReplySuggestionsInput, map[string]common.FieldCode) {
+// normalizeServiceReplySuggestionsInput 规范化并校验回复候选生成条件。
+func normalizeServiceReplySuggestionsInput(input ServiceReplySuggestionsInput) (ServiceReplySuggestionsInput, map[string]common.FieldCode) {
 	fields := map[string]common.FieldCode{}
 	var valid bool
 	input.ConversationID, valid = common.NormalizeUUID(input.ConversationID)
@@ -147,9 +147,9 @@ func normalizeCustomerReplySuggestionsInput(input CustomerReplySuggestionsInput)
 		}
 	}
 	switch input.Mode {
-	case domain.CustomerReplyModeReply:
+	case domain.ServiceReplyModeReply:
 		input.Draft = ""
-	case domain.CustomerReplyModeRewrite:
+	case domain.ServiceReplyModeRewrite:
 		input.Draft = strings.TrimSpace(input.Draft)
 		if input.Draft == "" {
 			fields["draft"] = conversationaction.ValidationBodyRequired
@@ -157,12 +157,12 @@ func normalizeCustomerReplySuggestionsInput(input CustomerReplySuggestionsInput)
 			fields["draft"] = conversationaction.ValidationBodyTooLong
 		}
 	default:
-		fields["mode"] = ValidationCustomerReplyModeInvalid
+		fields["mode"] = ValidationServiceReplyModeInvalid
 	}
 	switch input.Tone {
-	case domain.CustomerReplyToneKeep, domain.CustomerReplyToneProfessional, domain.CustomerReplyToneFriendly, domain.CustomerReplyToneConcise:
+	case domain.ServiceReplyToneKeep, domain.ServiceReplyToneProfessional, domain.ServiceReplyToneFriendly, domain.ServiceReplyToneConcise:
 	default:
-		fields["tone"] = ValidationCustomerReplyToneInvalid
+		fields["tone"] = ValidationServiceReplyToneInvalid
 	}
 	if input.Language != "" {
 		language, valid := languagetag.Normalize(input.Language)
@@ -175,7 +175,7 @@ func normalizeCustomerReplySuggestionsInput(input CustomerReplySuggestionsInput)
 }
 
 // loadCustomerReplyContext 校验当前成员可以对客发送、AI 员工当前配置有效和引用消息可用，并读取本轮客服周期的对客消息。
-func loadCustomerReplyContext(ctx context.Context, db bun.IDB, identity *servermodels.Identity, input CustomerReplySuggestionsInput, links attachmentLinks) (customerReplyContext, error) {
+func loadCustomerReplyContext(ctx context.Context, db bun.IDB, identity *servermodels.Identity, input ServiceReplySuggestionsInput, links attachmentLinks) (customerReplyContext, error) {
 	organizationID := identity.Organization.ID
 	var session struct {
 		ID                 string  `bun:"id"`
@@ -186,14 +186,15 @@ func loadCustomerReplyContext(ctx context.Context, db bun.IDB, identity *serverm
 		BotID              *int64  `bun:"bot_id"`
 	}
 	err := db.NewSelect().
-		TableExpr("customer_conversations AS cc").
+		TableExpr("channel_conversations AS cc").
 		ColumnExpr("ss.id, ss.status, ss.assignee_identity_id, ch.type AS channel_type, ch.enabled AS channel_enabled, tcs.bot_id").
 		Join("JOIN conversations AS cv ON cv.id = cc.conversation_id AND cv.organization_id = cc.organization_id").
-		Join("JOIN service_sessions AS ss ON ss.id = cc.current_service_session_id AND ss.organization_id = cc.organization_id AND ss.conversation_id = cc.conversation_id").
+		Join("JOIN service_conversations AS svc ON svc.organization_id = cc.organization_id AND svc.conversation_id = cc.conversation_id").
+		Join("JOIN service_sessions AS ss ON ss.id = svc.current_service_session_id AND ss.organization_id = svc.organization_id AND ss.service_conversation_id = svc.id").
 		Join("JOIN contact_channel_identities AS cci ON cci.id = cc.contact_channel_identity_id AND cci.organization_id = cc.organization_id").
 		Join("JOIN channels AS ch ON ch.id = cci.channel_id AND ch.organization_id = cci.organization_id").
 		Join("LEFT JOIN telegram_channel_settings AS tcs ON tcs.channel_id = ch.id AND tcs.organization_id = ch.organization_id").
-		Where("cc.organization_id = ? AND cc.conversation_id = ? AND cv.type = ?", organizationID, input.ConversationID, domain.ConversationTypeCustomer).
+		Where("cc.organization_id = ? AND cc.conversation_id = ? AND cv.type = ?", organizationID, input.ConversationID, domain.ConversationTypeChannel).
 		Scan(ctx, &session)
 	if errors.Is(err, sql.ErrNoRows) {
 		return customerReplyContext{}, conversationaction.ErrConversationNotFound
@@ -253,25 +254,25 @@ func loadCustomerReplyContext(ctx context.Context, db bun.IDB, identity *serverm
 	return result, nil
 }
 
-// CustomerReplyAgent 定义可用于 AI 写回复的 AI 员工。
-type CustomerReplyAgent struct {
+// ServiceReplyAgent 定义可用于 AI 写回复的 AI 员工。
+type ServiceReplyAgent struct {
 	IdentityID  string `bun:"identity_id"`
 	DisplayName string `bun:"display_name"`
 }
 
-// ListCustomerReplyAgentsQuery 读取可用于 AI 写回复的 AI 员工。
-type ListCustomerReplyAgentsQuery struct {
+// ListServiceReplyAgentsQuery 读取可用于 AI 写回复的 AI 员工。
+type ListServiceReplyAgentsQuery struct {
 	db *bun.DB
 }
 
-// NewListCustomerReplyAgentsQuery 创建 AI 写回复可用员工查询。
-func NewListCustomerReplyAgentsQuery(db *bun.DB) *ListCustomerReplyAgentsQuery {
-	return &ListCustomerReplyAgentsQuery{db: db}
+// NewListServiceReplyAgentsQuery 创建 AI 写回复可用员工查询。
+func NewListServiceReplyAgentsQuery(db *bun.DB) *ListServiceReplyAgentsQuery {
+	return &ListServiceReplyAgentsQuery{db: db}
 }
 
 // Execute 返回当前企业活跃且当前托管配置有效的 AI 员工，按显示名排序。
-func (q *ListCustomerReplyAgentsQuery) Execute(ctx context.Context, identity *servermodels.Identity) ([]CustomerReplyAgent, error) {
-	agents := make([]CustomerReplyAgent, 0)
+func (q *ListServiceReplyAgentsQuery) Execute(ctx context.Context, identity *servermodels.Identity) ([]ServiceReplyAgent, error) {
+	agents := make([]ServiceReplyAgent, 0)
 	err := q.db.NewSelect().
 		TableExpr("agents AS a").
 		ColumnExpr("a.identity_id, oi.display_name").
@@ -310,21 +311,21 @@ func customerReplyInstruction(agentInstruction, language string) string {
 }
 
 // customerReplyTask 组装本次生成的模式、语气、引用消息和客服草稿。
-func customerReplyTask(input CustomerReplySuggestionsInput, replyTo *customerReplyReference) string {
+func customerReplyTask(input ServiceReplySuggestionsInput, replyTo *customerReplyReference) string {
 	var task strings.Builder
-	rewrite := input.Mode == domain.CustomerReplyModeRewrite
+	rewrite := input.Mode == domain.ServiceReplyModeRewrite
 	if rewrite {
 		task.WriteString("本次任务：改写客服草稿，保留草稿的原意、事实和承诺，只改进表达。\n")
 	} else {
 		task.WriteString("本次任务：根据沟通记录，撰写客服接下来发给客户的回复。\n")
 	}
-	tone := map[domain.CustomerReplyTone]string{
-		domain.CustomerReplyToneKeep:         "与本轮沟通中客服已有的语气保持一致。",
-		domain.CustomerReplyToneProfessional: "专业、严谨、礼貌。",
-		domain.CustomerReplyToneFriendly:     "友好、亲切、有温度。",
-		domain.CustomerReplyToneConcise:      "简洁、直接，只保留必要信息。",
+	tone := map[domain.ServiceReplyTone]string{
+		domain.ServiceReplyToneKeep:         "与本轮沟通中客服已有的语气保持一致。",
+		domain.ServiceReplyToneProfessional: "专业、严谨、礼貌。",
+		domain.ServiceReplyToneFriendly:     "友好、亲切、有温度。",
+		domain.ServiceReplyToneConcise:      "简洁、直接，只保留必要信息。",
 	}[input.Tone]
-	if rewrite && input.Tone == domain.CustomerReplyToneKeep {
+	if rewrite && input.Tone == domain.ServiceReplyToneKeep {
 		tone = "保持客服草稿原有的语气。"
 	}
 	task.WriteString("语气要求：" + tone + "\n")

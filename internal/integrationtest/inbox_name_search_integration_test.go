@@ -153,12 +153,12 @@ func TestInboxNameSearchRules(t *testing.T) {
 	// 客户会话没有渠道身份名称时以联系人名称展示。
 	if _, err := f.db.NewUpdate().TableExpr("contacts AS c").Set("display_name = ?", "名称搜索客户").
 		Where("c.organization_id = ?", f.owner.Organization.ID).
-		Where("c.id = (SELECT cci.contact_id FROM customer_conversations AS cc JOIN contact_channel_identities AS cci ON cci.organization_id = cc.organization_id AND cci.id = cc.contact_channel_identity_id WHERE cc.conversation_id = ?)", f.conversationID).
+		Where("c.id = (SELECT cci.contact_id FROM channel_conversations AS cc JOIN contact_channel_identities AS cci ON cci.organization_id = cc.organization_id AND cci.id = cc.contact_channel_identity_id WHERE cc.conversation_id = ?)", f.conversationID).
 		Exec(ctx); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := f.db.NewUpdate().TableExpr("contact_channel_identities AS cci").Set("display_name = NULL").
-		Where("cci.id = (SELECT cc.contact_channel_identity_id FROM customer_conversations AS cc WHERE cc.conversation_id = ?)", f.conversationID).
+		Where("cci.id = (SELECT cc.contact_channel_identity_id FROM channel_conversations AS cc WHERE cc.conversation_id = ?)", f.conversationID).
 		Exec(ctx); err != nil {
 		t.Fatal(err)
 	}

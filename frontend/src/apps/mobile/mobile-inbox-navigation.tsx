@@ -4,14 +4,14 @@ import { useTranslation } from "react-i18next"
 import { useSearchParams } from "react-router"
 
 import {
-  CustomerQueueFilter,
+  ServiceQueueFilter,
   InboxAssigneeFilter,
   InboxPendingKind,
   InboxScope,
   OrganizationIdentityType,
   ServiceAudience,
   ServiceSessionStatus,
-  listCustomerServiceAssignees,
+  listServiceAssignees,
   listInboxChannels,
   listServiceQueueTeams,
   type InboxQuery,
@@ -158,8 +158,8 @@ export function MobileInboxFilter({
     { enabled: pending, staleTime: 0 },
   )
   const { data: assignees = [] } = useResource(
-    resourceKeys.customerServiceAssignees(),
-    listCustomerServiceAssignees,
+    resourceKeys.serviceAssignees(),
+    listServiceAssignees,
     { enabled: all, staleTime: 0 },
   )
   const coworkers = assignees.filter((item) => item.identityId !== identity.user.identityId)
@@ -171,7 +171,7 @@ export function MobileInboxFilter({
         : (coworkers.find((item) => item.identityId === value)?.displayName ?? tMobile("inbox.selectedAssignee"))
   const summary = [
     pending ? t(inboxPendingKindOptions.find((item) => item.value === query.pendingKind)?.label ?? "filterAll") : "",
-    pending && query.queueFilter === CustomerQueueFilter.CustomerQueueFilterPublic
+    pending && query.queueFilter === ServiceQueueFilter.ServiceQueueFilterPublic
       ? t("queueFilterPublicQueue")
       : pending ? (queueTeams.find((item) => item.id === query.queueTeamId)?.name ?? "") : "",
     all && inboxAssigneeParam(query) ? assigneeLabel(inboxAssigneeParam(query)) : "",
@@ -259,7 +259,7 @@ export function MobileInboxFilter({
               onChange={(event) => setQueue(event.target.value)}
             >
               <option value="">{t("queueFilterAllQueues")}</option>
-              <option value={CustomerQueueFilter.CustomerQueueFilterPublic}>
+              <option value={ServiceQueueFilter.ServiceQueueFilterPublic}>
                 {t("queueFilterPublicQueue")}
               </option>
               {queueTeams.filter((item) => item.mine).map((item) => (

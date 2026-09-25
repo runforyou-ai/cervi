@@ -19,13 +19,13 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// loadServiceSessionQueue 读取客户会话当前处理周期的负责人与所属队列。
+// loadServiceSessionQueue 读取服务会话当前处理周期的负责人与所属队列。
 func loadServiceSessionQueue(t *testing.T, f customerReadFixture, conversationID string) (*string, *string) {
 	t.Helper()
 	session := &servermodels.ServiceSession{}
 	if err := f.db.NewSelect().Model(session).
-		Join("JOIN customer_conversations AS cc ON cc.current_service_session_id = ss.id AND cc.organization_id = ss.organization_id").
-		Where("ss.organization_id = ? AND cc.conversation_id = ?", f.owner.Organization.ID, conversationID).
+		Join("JOIN service_conversations AS svc ON svc.current_service_session_id = ss.id AND svc.organization_id = ss.organization_id").
+		Where("ss.organization_id = ? AND svc.conversation_id = ?", f.owner.Organization.ID, conversationID).
 		Scan(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -33,7 +33,7 @@ func loadServiceSessionQueue(t *testing.T, f customerReadFixture, conversationID
 }
 
 // queueConversationIDs 按队列筛选读取指定身份待领取条目中的会话编号与所属团队名称。
-func queueConversationIDs(t *testing.T, f customerReadFixture, identity *servermodels.Identity, filter domain.CustomerQueueFilter, teamID string) map[string]*string {
+func queueConversationIDs(t *testing.T, f customerReadFixture, identity *servermodels.Identity, filter domain.ServiceQueueFilter, teamID string) map[string]*string {
 	t.Helper()
 	page, _, err := inboxaction.NewLoadInboxQuery(f.db).Execute(context.Background(), identity, inboxaction.LoadInput{
 		Scope: domain.InboxScopePending, PendingKind: domain.InboxPendingKindQueue, QueueFilter: filter, QueueTeamID: teamID,
@@ -43,7 +43,7 @@ func queueConversationIDs(t *testing.T, f customerReadFixture, identity *serverm
 	}
 	found := make(map[string]*string, len(page.Conversations))
 	for _, row := range page.Conversations {
-		found[row.ID] = row.Customer.TeamName
+		found[row.ID] = row.Service.TeamName
 	}
 	return found
 }
@@ -93,17 +93,17 @@ func TestServiceSessionTeamQueue(t *testing.T) {
 		t.Fatalf("转交到团队队列后归属 = %v, %v", assignee, teamID)
 	}
 
-	if name, ok := queueConversationIDs(t, f, f.member, domain.CustomerQueueFilterTeam, staffed.ID)[f.conversationID]; !ok || name == nil || *name != staffed.Name {
+	if name, ok := queueConversationIDs(t, f, f.member, domain.ServiceQueueFilterTeam, staffed.ID)[f.conversationID]; !ok || name == nil || *name != staffed.Name {
 		t.Fatalf("团队队列筛选缺少会话或团队名称 = %v", name)
 	}
-	if _, ok := queueConversationIDs(t, f, f.member, domain.CustomerQueueFilterPublic, "")[f.conversationID]; ok {
+	if _, ok := queueConversationIDs(t, f, f.member, domain.ServiceQueueFilterPublic, "")[f.conversationID]; ok {
 		t.Fatal("公共队列筛选不应包含团队队列中的会话")
 	}
-	if name, ok := queueConversationIDs(t, f, f.member, domain.CustomerQueueFilterAll, "")[f.conversationID]; !ok || name == nil {
+	if name, ok := queueConversationIDs(t, f, f.member, domain.ServiceQueueFilterAll, "")[f.conversationID]; !ok || name == nil {
 		t.Fatalf("全部队列筛选缺少会话或团队标签 = %v", name)
 	}
 	// 待领取只包含公共队列和本人所在团队的队列。
-	if _, ok := queueConversationIDs(t, f, f.owner, domain.CustomerQueueFilterAll, "")[f.conversationID]; ok {
+	if _, ok := queueConversationIDs(t, f, f.owner, domain.ServiceQueueFilterAll, "")[f.conversationID]; ok {
 		t.Fatal("非团队成员的待领取不应包含该团队队列中的会话")
 	}
 

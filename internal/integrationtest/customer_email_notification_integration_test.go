@@ -113,19 +113,19 @@ func testCustomerEmailNotification(t *testing.T, db *bun.DB, identity *servermod
 	}
 
 	// 真人连续回复只由第一条起算一次检查时间；扫描到期会话时同一会话只投递一个任务。
-	send := conversationaction.NewSendCustomerTextMessageAction(db, nil)
+	send := conversationaction.NewSendServiceTextMessageAction(db, nil)
 	reply := func(body string) conversationaction.ConversationMessage {
 		t.Helper()
-		message, err := send.Execute(ctx, identity, conversationaction.CustomerTextMessageInput{ConversationID: conversationID, ClientMessageID: uuid.NewV7().String(), Body: body})
+		message, err := send.Execute(ctx, identity, conversationaction.ServiceTextMessageInput{ConversationID: conversationID, ClientMessageID: uuid.NewV7().String(), Body: body})
 		if err != nil {
 			t.Fatal(err)
 		}
 		return message
 	}
 	firstReply := reply("已收到您的退款申请")
-	scheduled := customerPositions(t, db, conversationID).CustomerNotifyDueAt
+	scheduled := customerPositions(t, db, conversationID).ContactNotifyDueAt
 	secondReply := reply("退款将在三个工作日内到账")
-	if scheduled == nil || scheduled.Sub(firstReply.OriginatedAt.Add(3*time.Minute)).Abs() > time.Millisecond || !customerPositions(t, db, conversationID).CustomerNotifyDueAt.Equal(*scheduled) {
+	if scheduled == nil || scheduled.Sub(firstReply.OriginatedAt.Add(3*time.Minute)).Abs() > time.Millisecond || !customerPositions(t, db, conversationID).ContactNotifyDueAt.Equal(*scheduled) {
 		t.Fatalf("notification due = %v, first reply = %v", scheduled, firstReply.OriginatedAt)
 	}
 	scanTasks := newTestTasks(db)
@@ -164,7 +164,7 @@ func testCustomerEmailNotification(t *testing.T, db *bun.DB, identity *servermod
 		t.Fatalf("sent emails = %+v", sent)
 	}
 	notified := customerPositions(t, db, conversationID)
-	if notified.CustomerReadSeq != firstReply.MessageSeq || notified.CustomerNotifiedSeq != secondReply.MessageSeq || notified.CustomerNotifyDueAt != nil {
+	if notified.ContactReadSeq != firstReply.MessageSeq || notified.ContactNotifiedSeq != secondReply.MessageSeq || notified.ContactNotifyDueAt != nil {
 		t.Fatalf("customer positions = %+v", notified)
 	}
 	if count := emailNotifiedEvents(t, db, conversationID); count != 1 {
@@ -173,7 +173,7 @@ func testCustomerEmailNotification(t *testing.T, db *bun.DB, identity *servermod
 	if err := mark.Execute(ctx, channelID, input.ExternalID, conversationID, secondReply.MessageSeq+1000); err != nil {
 		t.Fatal(err)
 	}
-	if read := customerPositions(t, db, conversationID).CustomerReadSeq; read <= secondReply.MessageSeq || read >= secondReply.MessageSeq+1000 {
+	if read := customerPositions(t, db, conversationID).ContactReadSeq; read <= secondReply.MessageSeq || read >= secondReply.MessageSeq+1000 {
 		t.Fatalf("clamped read position = %d", read)
 	}
 
@@ -205,14 +205,14 @@ func testCustomerEmailNotification(t *testing.T, db *bun.DB, identity *servermod
 	if err := worker.Execute(ctx, notification); err == nil {
 		t.Fatal("notification succeeded while smtp is unavailable")
 	}
-	if positions := customerPositions(t, db, conversationID); positions.CustomerNotifiedSeq != secondReply.MessageSeq || positions.CustomerNotifyDueAt == nil || emailNotifiedEvents(t, db, conversationID) != 1 {
+	if positions := customerPositions(t, db, conversationID); positions.ContactNotifiedSeq != secondReply.MessageSeq || positions.ContactNotifyDueAt == nil || emailNotifiedEvents(t, db, conversationID) != 1 {
 		t.Fatalf("positions after failure = %+v", positions)
 	}
 	sender.fail = nil
 	if err := worker.Execute(ctx, notification); err != nil {
 		t.Fatal(err)
 	}
-	if sent := sender.sent(); len(sent) != 2 || !strings.Contains(sent[1].Text, "请确认收款账户") || customerPositions(t, db, conversationID).CustomerNotifiedSeq != thirdReply.MessageSeq {
+	if sent := sender.sent(); len(sent) != 2 || !strings.Contains(sent[1].Text, "请确认收款账户") || customerPositions(t, db, conversationID).ContactNotifiedSeq != thirdReply.MessageSeq {
 		t.Fatalf("sent after retry = %+v", sent)
 	}
 	// 访客已读完时收尾清除检查时间；重试耗尽后放弃本批回复并清除检查时间。
@@ -221,12 +221,12 @@ func testCustomerEmailNotification(t *testing.T, db *bun.DB, identity *servermod
 		t.Fatal(err)
 	}
 	makeNotificationDue(t, db, conversationID)
-	if err := worker.Execute(ctx, notification); err != nil || customerPositions(t, db, conversationID).CustomerNotifyDueAt != nil || len(sender.sent()) != 2 {
-		t.Fatalf("read notification due = %v, sent = %d, error = %v", customerPositions(t, db, conversationID).CustomerNotifyDueAt, len(sender.sent()), err)
+	if err := worker.Execute(ctx, notification); err != nil || customerPositions(t, db, conversationID).ContactNotifyDueAt != nil || len(sender.sent()) != 2 {
+		t.Fatalf("read notification due = %v, sent = %d, error = %v", customerPositions(t, db, conversationID).ContactNotifyDueAt, len(sender.sent()), err)
 	}
 	reply("稍后给您回电")
-	if err := worker.FinalizeFailure(ctx, notification, errors.New("mailbox unavailable")); err != nil || customerPositions(t, db, conversationID).CustomerNotifyDueAt != nil {
-		t.Fatalf("finalized notification due = %v, error = %v", customerPositions(t, db, conversationID).CustomerNotifyDueAt, err)
+	if err := worker.FinalizeFailure(ctx, notification, errors.New("mailbox unavailable")); err != nil || customerPositions(t, db, conversationID).ContactNotifyDueAt != nil {
+		t.Fatalf("finalized notification due = %v, error = %v", customerPositions(t, db, conversationID).ContactNotifyDueAt, err)
 	}
 	var eventTimes []time.Time
 	if err := db.NewSelect().Model((*servermodels.Message)(nil)).Column("msg.originated_at").
@@ -245,8 +245,8 @@ func testCustomerEmailNotification(t *testing.T, db *bun.DB, identity *servermod
 // makeNotificationDue 把客户会话的邮件通知检查时间提前到当前时间之前。
 func makeNotificationDue(t *testing.T, db *bun.DB, conversationID string) {
 	t.Helper()
-	if _, err := db.NewUpdate().Model((*servermodels.CustomerConversation)(nil)).
-		Set("customer_notify_due_at = now() - interval '1 second'").
+	if _, err := db.NewUpdate().Model((*servermodels.ChannelConversation)(nil)).
+		Set("contact_notify_due_at = now() - interval '1 second'").
 		Where("conversation_id = ?", conversationID).Exec(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -265,9 +265,9 @@ func notificationTasks(t *testing.T, db *bun.DB, conversationID string) []server
 }
 
 // customerPositions 读取客户已读位置与已通知位置。
-func customerPositions(t *testing.T, db *bun.DB, conversationID string) servermodels.CustomerConversation {
+func customerPositions(t *testing.T, db *bun.DB, conversationID string) servermodels.ChannelConversation {
 	t.Helper()
-	customer := servermodels.CustomerConversation{}
+	customer := servermodels.ChannelConversation{}
 	if err := db.NewSelect().Model(&customer).Where("cc.conversation_id = ?", conversationID).Scan(context.Background()); err != nil {
 		t.Fatal(err)
 	}
@@ -279,7 +279,7 @@ func emailNotifiedEvents(t *testing.T, db *bun.DB, conversationID string) int {
 	t.Helper()
 	count, err := db.NewSelect().Model((*servermodels.Message)(nil)).
 		Where("msg.conversation_id = ? AND msg.system_event_type = ? AND msg.visibility = ?", conversationID,
-			domain.ConversationSystemEventServiceSessionEmailNotified, domain.MessageVisibilityInternalOnly).
+			domain.ConversationSystemEventServiceSessionEmailNotified, domain.MessageVisibilityInternal).
 		Count(context.Background())
 	if err != nil {
 		t.Fatal(err)

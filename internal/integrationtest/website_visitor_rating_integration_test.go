@@ -114,7 +114,7 @@ func TestWebsiteVisitorEventsAndRating(t *testing.T) {
 		t.Fatal(err)
 	}
 	ratedEvent := member.Messages[len(member.Messages)-2]
-	if ratedEvent.SystemEvent == nil || ratedEvent.SystemEvent.Type != domain.ConversationSystemEventServiceSessionRated || ratedEvent.Visibility != domain.MessageVisibilityInternalOnly ||
+	if ratedEvent.SystemEvent == nil || ratedEvent.SystemEvent.Type != domain.ConversationSystemEventServiceSessionRated || ratedEvent.Visibility != domain.MessageVisibilityInternal ||
 		ratedEvent.SystemEvent.Resolved == nil || !*ratedEvent.SystemEvent.Resolved || ratedEvent.SystemEvent.Comment == nil || *ratedEvent.SystemEvent.Comment != "很快就解决了" {
 		t.Fatalf("member rated event=%+v", ratedEvent.SystemEvent)
 	}

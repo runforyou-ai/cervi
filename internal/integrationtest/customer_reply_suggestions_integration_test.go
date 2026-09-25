@@ -33,8 +33,8 @@ func (g *testCustomerReplyGenerator) GenerateReplyCandidates(_ context.Context, 
 	return g.result, g.err
 }
 
-// testCustomerReplySuggestions 验证 AI 写回复的资格校验、上下文范围，以及不产生运行记录和消息。
-func testCustomerReplySuggestions(t *testing.T, db *bun.DB, identity *servermodels.Identity, providerID, modelID string) {
+// testServiceReplySuggestions 验证 AI 写回复的资格校验、上下文范围，以及不产生运行记录和消息。
+func testServiceReplySuggestions(t *testing.T, db *bun.DB, identity *servermodels.Identity, providerID, modelID string) {
 	ctx := context.Background()
 	created, err := agentaction.NewCreateAgentAction(db).Execute(ctx, identity, agentaction.CreateInput{
 		HandlesCustomers: true, DisplayName: "回复建议助手",
@@ -70,15 +70,15 @@ func testCustomerReplySuggestions(t *testing.T, db *bun.DB, identity *servermode
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := conversationaction.NewSendCustomerTextMessageAction(db, nil).Execute(ctx, identity, conversationaction.CustomerTextMessageInput{
+	if _, err := conversationaction.NewSendServiceTextMessageAction(db, nil).Execute(ctx, identity, conversationaction.ServiceTextMessageInput{
 		ConversationID: conversationID, ClientMessageID: uuid.NewV7().String(), Body: "我来帮您查询",
 	}); err != nil {
 		t.Fatal(err)
 	}
 	// 生成上下文只包含对客消息。
-	if _, err := conversationaction.NewSendCustomerTextMessageAction(db, nil).Execute(ctx, identity, conversationaction.CustomerTextMessageInput{
+	if _, err := conversationaction.NewSendServiceTextMessageAction(db, nil).Execute(ctx, identity, conversationaction.ServiceTextMessageInput{
 		ConversationID: conversationID, ClientMessageID: uuid.NewV7().String(), Body: "内部备注：这是重点客户",
-		Visibility: domain.MessageVisibilityInternalOnly,
+		Visibility: domain.MessageVisibilityInternal,
 	}); err != nil {
 		t.Fatal(err)
 	}
@@ -88,10 +88,10 @@ func testCustomerReplySuggestions(t *testing.T, db *bun.DB, identity *servermode
 	}
 
 	generator := &testCustomerReplyGenerator{result: agentruntime.ReplyCandidatesResult{Candidates: []string{"您好，已为您加急处理。", "马上帮您催促仓库发货。"}}}
-	action := agentrunaction.NewGenerateCustomerReplySuggestionsAction(db, generator, testAttachmentReader(db))
-	valid := agentrunaction.CustomerReplySuggestionsInput{
+	action := agentrunaction.NewGenerateServiceReplySuggestionsAction(db, generator, testAttachmentReader(db))
+	valid := agentrunaction.ServiceReplySuggestionsInput{
 		ConversationID: conversationID, AgentIdentityID: created.IdentityID,
-		Mode: domain.CustomerReplyModeRewrite, Tone: domain.CustomerReplyToneFriendly,
+		Mode: domain.ServiceReplyModeRewrite, Tone: domain.ServiceReplyToneFriendly,
 		Draft: "  帮您催一下  ", ReplyToMessageID: current.Message.ID,
 	}
 	candidates, err := action.Execute(ctx, identity, valid)
@@ -128,7 +128,7 @@ func testCustomerReplySuggestions(t *testing.T, db *bun.DB, identity *servermode
 
 	// 写回复模式忽略草稿。
 	reply := valid
-	reply.Mode, reply.Draft, reply.ReplyToMessageID = domain.CustomerReplyModeReply, "", ""
+	reply.Mode, reply.Draft, reply.ReplyToMessageID = domain.ServiceReplyModeReply, "", ""
 	if _, err := action.Execute(ctx, identity, reply); err != nil {
 		t.Fatal(err)
 	}
@@ -138,10 +138,10 @@ func testCustomerReplySuggestions(t *testing.T, db *bun.DB, identity *servermode
 
 	t.Run("输入校验", func(t *testing.T) {
 		input := valid
-		input.Draft, input.Mode, input.Tone = " ", domain.CustomerReplyModeRewrite, "loud"
+		input.Draft, input.Mode, input.Tone = " ", domain.ServiceReplyModeRewrite, "loud"
 		_, err := action.Execute(ctx, identity, input)
 		validationError, ok := errors.AsType[*conversationaction.ValidationError](err)
-		if !ok || validationError.Fields["draft"] != conversationaction.ValidationBodyRequired || validationError.Fields["tone"] != agentrunaction.ValidationCustomerReplyToneInvalid {
+		if !ok || validationError.Fields["draft"] != conversationaction.ValidationBodyRequired || validationError.Fields["tone"] != agentrunaction.ValidationServiceReplyToneInvalid {
 			t.Fatalf("validation error = %v", err)
 		}
 	})
@@ -203,13 +203,13 @@ func testCustomerReplySuggestions(t *testing.T, db *bun.DB, identity *servermode
 		}
 	})
 	t.Run("可用 AI 员工", func(t *testing.T) {
-		listAgents := agentrunaction.NewListCustomerReplyAgentsQuery(db)
+		listAgents := agentrunaction.NewListServiceReplyAgentsQuery(db)
 		containsCreated := func() bool {
 			agents, err := listAgents.Execute(ctx, identity)
 			if err != nil {
 				t.Fatal(err)
 			}
-			return slices.ContainsFunc(agents, func(agent agentrunaction.CustomerReplyAgent) bool {
+			return slices.ContainsFunc(agents, func(agent agentrunaction.ServiceReplyAgent) bool {
 				return agent.IdentityID == created.IdentityID && agent.DisplayName == "回复建议助手"
 			})
 		}
@@ -230,9 +230,9 @@ func testCustomerReplySuggestions(t *testing.T, db *bun.DB, identity *servermode
 	})
 	t.Run("Telegram 渠道不可外发", func(t *testing.T) {
 		f := newAgentTelegramFixture(t, db, identity, providerID, modelID)
-		input := agentrunaction.CustomerReplySuggestionsInput{
+		input := agentrunaction.ServiceReplySuggestionsInput{
 			ConversationID: f.run.ConversationID, AgentIdentityID: created.IdentityID,
-			Mode: domain.CustomerReplyModeReply, Tone: domain.CustomerReplyToneKeep,
+			Mode: domain.ServiceReplyModeReply, Tone: domain.ServiceReplyToneKeep,
 		}
 		for _, statement := range []string{"UPDATE channels SET enabled = false WHERE id = ?", "UPDATE telegram_channel_settings SET bot_id = NULL WHERE channel_id = ?"} {
 			if _, err := db.ExecContext(ctx, statement, f.channel.ID); err != nil {

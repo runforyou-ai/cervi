@@ -258,7 +258,7 @@ func loadSession(ctx context.Context, db bun.IDB, organizationID, serviceSession
 	}
 	loaded := loadedSession{Session: session}
 	if lock {
-		lockedConversation, locked, err := chatstate.LockCustomerServiceSession(ctx, db, organizationID, session.ConversationID)
+		lockedConversation, locked, err := chatstate.LockServiceSession(ctx, db, organizationID, session.ConversationID)
 		if err != nil {
 			return loadedSession{}, err
 		}
@@ -385,7 +385,7 @@ func (w *Worker) reclaim(ctx context.Context, snapshot *servermodels.ServiceSess
 		eventType := string(domain.ConversationSystemEventServiceSessionReturned)
 		if _, _, err := chatstate.AppendMessage(ctx, tx, conversation, &servermodels.Message{
 			ID: uuid.NewV7().String(), OrganizationID: session.OrganizationID, ConversationID: session.ConversationID,
-			ServiceSessionID: &session.ID, Type: string(domain.MessageTypeSystem), Visibility: string(domain.MessageVisibilityInternalOnly),
+			ServiceSessionID: &session.ID, Type: string(domain.MessageTypeSystem), Visibility: string(domain.MessageVisibilityInternal),
 			SystemEventType: &eventType, SystemEventPayload: payload, OriginatedAt: time.Now().UTC(),
 		}); err != nil {
 			return fmt.Errorf("append service session returned event: %w", err)

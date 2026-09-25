@@ -21,20 +21,20 @@ import (
 	"github.com/uptrace/bun"
 )
 
-// SendCustomerAttachmentMessageAction 持久化企业成员发往客户会话的附件消息。
-type SendCustomerAttachmentMessageAction struct {
+// SendServiceAttachmentMessageAction 持久化企业成员发往服务会话的附件消息。
+type SendServiceAttachmentMessageAction struct {
 	enqueuer servertask.TxEnqueuer
 	db       *bun.DB
 }
 
-// NewSendCustomerAttachmentMessageAction 创建成员客户会话附件发送操作。
-func NewSendCustomerAttachmentMessageAction(db *bun.DB, enqueuer servertask.TxEnqueuer) *SendCustomerAttachmentMessageAction {
-	return &SendCustomerAttachmentMessageAction{db: db, enqueuer: enqueuer}
+// NewSendServiceAttachmentMessageAction 创建成员服务会话附件发送操作。
+func NewSendServiceAttachmentMessageAction(db *bun.DB, enqueuer servertask.TxEnqueuer) *SendServiceAttachmentMessageAction {
+	return &SendServiceAttachmentMessageAction{db: db, enqueuer: enqueuer}
 }
 
 // Execute 在一个可重试事务中写入成员客户会话附件回复并激活文件。
-func (a *SendCustomerAttachmentMessageAction) Execute(ctx context.Context, identity *servermodels.Identity, input CustomerAttachmentMessageInput) (ConversationMessage, error) {
-	normalized, fields := normalizeCustomerAttachmentMessageInput(input)
+func (a *SendServiceAttachmentMessageAction) Execute(ctx context.Context, identity *servermodels.Identity, input ServiceAttachmentMessageInput) (ConversationMessage, error) {
+	normalized, fields := normalizeServiceAttachmentMessageInput(input)
 	if len(fields) > 0 {
 		return ConversationMessage{}, &ValidationError{Fields: fields}
 	}
@@ -49,7 +49,7 @@ func (a *SendCustomerAttachmentMessageAction) Execute(ctx context.Context, ident
 		ConversationID: normalized.ConversationID, ClientMessageID: normalized.ClientMessageID,
 		Body: normalized.Body, ReplyToMessageID: normalized.ReplyToMessageID, Type: domain.MessageTypeAttachment,
 		// 附件只用于对客回复，内部备注附件不在本次范围内。
-		Visibility: domain.MessageVisibilityCustomerVisible,
+		Visibility: domain.MessageVisibilityShared,
 		Attachment: &customerAttachmentPayload{FileID: normalized.FileID, ImageWidth: normalized.ImageWidth, ImageHeight: normalized.ImageHeight},
 	}
 	var err error
@@ -81,8 +81,8 @@ func (a *SendCustomerAttachmentMessageAction) Execute(ctx context.Context, ident
 	return ConversationMessage{}, fmt.Errorf("send customer attachment retries exhausted: %w", err)
 }
 
-// normalizeCustomerAttachmentMessageInput 规范化并校验成员客户会话附件输入。
-func normalizeCustomerAttachmentMessageInput(input CustomerAttachmentMessageInput) (CustomerAttachmentMessageInput, map[string]ValidationCode) {
+// normalizeServiceAttachmentMessageInput 规范化并校验成员服务会话附件输入。
+func normalizeServiceAttachmentMessageInput(input ServiceAttachmentMessageInput) (ServiceAttachmentMessageInput, map[string]ValidationCode) {
 	fields := map[string]ValidationCode{}
 	input.Body = strings.TrimSpace(input.Body)
 	var valid bool

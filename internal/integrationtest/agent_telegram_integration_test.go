@@ -317,7 +317,7 @@ func testAgentTelegramReplies(t *testing.T, db *bun.DB, identity *models.Identit
 					t.Fatal(err)
 				}
 				if notice.Type != string(domain.MessageTypeText) || notice.Body == "" ||
-					failure.Type != string(domain.MessageTypeAgentError) || failure.Visibility != string(domain.MessageVisibilityInternalOnly) {
+					failure.Type != string(domain.MessageTypeAgentError) || failure.Visibility != string(domain.MessageVisibilityInternal) {
 					t.Fatalf("notice=%+v failure=%+v", notice, failure)
 				}
 			} else if scenario == "投递入队失败" {

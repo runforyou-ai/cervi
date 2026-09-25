@@ -52,7 +52,7 @@ export function InboxSearchDialog({
     const conversation =
       item.kind === "message" ? item.message.conversation : item.kind === "conversation" ? item.conversation : null
     let conversationId = conversation?.id ?? ""
-    let service = conversation?.type === ConversationType.ConversationTypeCustomer
+    let service = conversation?.type === ConversationType.ConversationTypeChannel
     if (item.kind === "person") {
       if (item.person.kind !== InboxSearchPersonKind.InboxSearchPersonContact) {
         onOpenChange(false)

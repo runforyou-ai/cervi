@@ -4,7 +4,7 @@ import { useTranslation } from "react-i18next"
 
 import {
   isAgentInboxConversation,
-  isCustomerInboxConversation,
+  isServiceInboxConversation,
   isDirectInboxConversation,
   isGroupInboxConversation,
   type GroupInboxConversationData,
@@ -43,9 +43,9 @@ export function useConversationName() {
       if (isDirectInboxConversation(conversation)) {
         return conversation.direct.peerName.trim() || t("unknownSender")
       }
-      if (isCustomerInboxConversation(conversation)) {
+      if (isServiceInboxConversation(conversation)) {
         return (
-          conversation.customer.contactName?.trim() || t("anonymousVisitor")
+          conversation.service.requesterName?.trim() || t("anonymousVisitor")
         )
       }
       if (isGroupInboxConversation(conversation)) {

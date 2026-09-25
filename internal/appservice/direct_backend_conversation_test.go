@@ -24,8 +24,8 @@ func TestConversationMessageCursorRejectsAnotherConversation(t *testing.T) {
 	}
 }
 
-// TestCustomerTextMessageErrorMapsConflicts 验证成员回复冲突保留稳定原因。
-func TestCustomerTextMessageErrorMapsConflicts(t *testing.T) {
+// TestServiceTextMessageErrorMapsConflicts 验证成员回复冲突保留稳定原因。
+func TestServiceTextMessageErrorMapsConflicts(t *testing.T) {
 	tests := []struct {
 		reason  string
 		message string
@@ -36,7 +36,7 @@ func TestCustomerTextMessageErrorMapsConflicts(t *testing.T) {
 		{reason: conversationaction.ConflictReasonChannelOutboundUnsupported, message: "当前消息渠道暂不支持回复。"},
 	}
 	for _, test := range tests {
-		err := customerTextMessageError(context.Background(), RequestMeta{Locale: LocaleChineseSimplified}, &conversationaction.ConflictError{Reason: test.reason}, "organization-1", "conversation-1")
+		err := serviceTextMessageError(context.Background(), RequestMeta{Locale: LocaleChineseSimplified}, &conversationaction.ConflictError{Reason: test.reason}, "organization-1", "conversation-1")
 		var apiError *Error
 		if !errors.As(err, &apiError) || apiError.Kind != ErrorKindConflict || apiError.Reason != test.reason || apiError.Message != test.message {
 			t.Fatalf("error = %#v", err)
@@ -61,7 +61,7 @@ func TestMessageCursorPreservesSequence(t *testing.T) {
 
 // TestCustomerMessageErrorMapsFileNotFound 验证附件文件无效时对外返回文件未找到，而不是笼统的发送失败。
 func TestCustomerMessageErrorMapsFileNotFound(t *testing.T) {
-	err := customerTextMessageError(context.Background(), RequestMeta{}, fileaction.ErrFileNotFound, "org", "conversation")
+	err := serviceTextMessageError(context.Background(), RequestMeta{}, fileaction.ErrFileNotFound, "org", "conversation")
 	applicationError, ok := errors.AsType[*Error](err)
 	if !ok || applicationError.Kind != ErrorKindNotFound {
 		t.Fatalf("mapped error = %#v", err)

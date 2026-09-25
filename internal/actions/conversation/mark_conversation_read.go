@@ -60,7 +60,7 @@ func (a *MarkConversationReadAction) Execute(ctx context.Context, identity *serv
 			return fmt.Errorf("load conversation read type: %w", err)
 		}
 		// 客服阅读按企业内历史访问范围校验并保留参与关系和负责人。
-		if conversationType == domain.ConversationTypeCustomer {
+		if conversationType == domain.ConversationTypeChannel {
 			if err := authorizeConversationHistory(ctx, tx, identity, conversationID); err != nil {
 				return err
 			}

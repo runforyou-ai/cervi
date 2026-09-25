@@ -58,7 +58,7 @@ func (t *Translator) TranslateMessages(ctx context.Context, identity *servermode
 		ColumnExpr("msg.id, msg.body, msg.language, mt.body AS translation").
 		Join("LEFT JOIN message_translations AS mt ON mt.message_id = msg.id AND mt.organization_id = msg.organization_id AND mt.language = ?", target).
 		Where("msg.organization_id = ? AND msg.conversation_id = ? AND msg.id IN (?)", identity.Organization.ID, conversationID, bun.In(ids)).
-		Where("msg.type IN (?) AND msg.visibility = ?", bun.In([]domain.MessageType{domain.MessageTypeText, domain.MessageTypeAttachment}), domain.MessageVisibilityCustomerVisible).
+		Where("msg.type IN (?) AND msg.visibility = ?", bun.In([]domain.MessageType{domain.MessageTypeText, domain.MessageTypeAttachment}), domain.MessageVisibilityShared).
 		Where("msg.deleted_at IS NULL AND msg.body <> ''").
 		Scan(ctx, &messages); err != nil {
 		return nil, fmt.Errorf("load translatable messages: %w", err)

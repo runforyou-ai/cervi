@@ -25,7 +25,7 @@ import (
 
 const maxRatingCommentLength = 1000
 
-// WebsiteServiceSessionRatingInput 定义网站访客对已关闭客服处理周期的评价。
+// WebsiteServiceSessionRatingInput 定义网站访客对已关闭服务周期的评价。
 type WebsiteServiceSessionRatingInput struct {
 	ChannelID        string
 	ExternalID       string
@@ -35,7 +35,7 @@ type WebsiteServiceSessionRatingInput struct {
 	Comment          string
 }
 
-// RateWebsiteServiceSessionAction 保存网站访客对已关闭客服处理周期的评价。
+// RateWebsiteServiceSessionAction 保存网站访客对已关闭服务周期的评价。
 type RateWebsiteServiceSessionAction struct {
 	db       *bun.DB
 	enqueuer servertask.TxEnqueuer
@@ -77,14 +77,14 @@ func (a *RateWebsiteServiceSessionAction) Execute(ctx context.Context, input Web
 		return VisitorRating{}, ErrConversationNotFound
 	}
 	err = realtime.RunInTx(ctx, a.db, func(ctx context.Context, tx bun.Tx) error {
-		conversation, err := chatstate.LockCustomerConversation(ctx, tx, channel.OrganizationID, input.ConversationID)
+		conversation, err := chatstate.LockChannelConversation(ctx, tx, channel.OrganizationID, input.ConversationID)
 		if err != nil {
 			return err
 		}
 		session := &servermodels.ServiceSession{}
 		err = tx.NewSelect().Model(session).
 			Where("ss.organization_id = ? AND ss.conversation_id = ? AND ss.id = ?", channel.OrganizationID, conversation.ID, input.ServiceSessionID).
-			Where("ss.contact_channel_identity_id = ?", visitor.ID).
+			Where("EXISTS (SELECT 1 FROM channel_conversations AS cc WHERE cc.organization_id = ss.organization_id AND cc.conversation_id = ss.conversation_id AND cc.contact_channel_identity_id = ?)", visitor.ID).
 			For("UPDATE").Scan(ctx)
 		if errors.Is(err, sql.ErrNoRows) {
 			return ErrConversationNotFound
@@ -114,7 +114,7 @@ func (a *RateWebsiteServiceSessionAction) Execute(ctx context.Context, input Web
 		eventID := uuid.NewV7().String()
 		if _, _, err := chatstate.AppendMessage(ctx, tx, conversation, &servermodels.Message{
 			ID: eventID, OrganizationID: session.OrganizationID, ConversationID: session.ConversationID,
-			ServiceSessionID: &session.ID, Type: string(domain.MessageTypeSystem), Visibility: string(domain.MessageVisibilityInternalOnly),
+			ServiceSessionID: &session.ID, Type: string(domain.MessageTypeSystem), Visibility: string(domain.MessageVisibilityInternal),
 			SystemEventType: &typeName, SystemEventPayload: payload, OriginatedAt: time.Now().UTC(),
 		}); err != nil {
 			return fmt.Errorf("append service session rated event: %w", err)

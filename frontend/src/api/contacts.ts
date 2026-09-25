@@ -3,8 +3,8 @@ import {
   CreateContact,
   DeleteContact,
   GetContact,
-  GetCustomerProfile,
-  ListCustomerBusinessQueries,
+  GetRequesterProfile,
+  ListServiceBusinessQueries,
   ListContacts,
   RestoreContact,
   UpdateContact,
@@ -27,10 +27,10 @@ export type ContactListQuery = Omit<Partial<ContactListInput>, "deleted">
 const listContactsBound = bind(ListContacts)
 
 /** 读取客户会话的客户身份与当前周期访客上下文。 */
-export const getCustomerProfile = bind(GetCustomerProfile)
+export const getRequesterProfile = bind(GetRequesterProfile)
 
 /** 读取客户会话当前客服周期内 AI 客服查询业务系统的记录。 */
-export const listCustomerBusinessQueries = bind(ListCustomerBusinessQueries)
+export const listServiceBusinessQueries = bind(ListServiceBusinessQueries)
 
 /** 将联系人移入回收站。 */
 export const deleteContact = bind(DeleteContact)
