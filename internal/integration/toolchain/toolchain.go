@@ -23,7 +23,6 @@ import (
 	"sync"
 	"time"
 
-	"github.com/cloudwego/eino/adk/filesystem"
 	"github.com/gofrs/flock"
 	"github.com/runforyou-ai/cervi/internal/integration/localworkspace"
 	"golang.org/x/mod/semver"
@@ -130,9 +129,10 @@ type Manager struct {
 	cancel context.CancelFunc
 	wg     sync.WaitGroup
 
-	mu        sync.Mutex
-	preparing bool
-	updating  bool
+	mu           sync.Mutex
+	preparing    bool
+	updating     bool
+	uninstalling bool
 	// stopPrepare 取消进行中的准备，prepareDone 在准备结束时关闭。
 	stopPrepare context.CancelFunc
 	prepareDone chan struct{}
@@ -189,11 +189,14 @@ func (m *Manager) Close() {
 	clear(m.inUse)
 }
 
-// Ensure 在已安装版本低于内置版本或缺少默认 Python 时于后台安装内置版本，失败后按退避间隔重试；用户已卸载时不安装。
+// Ensure 在已安装版本低于内置版本或默认 Python 低于内置版本时于后台安装内置版本，失败后按退避间隔重试；用户已卸载或正在卸载时不安装。
 // 返回设备是否可以领取运行：已有可用的运行环境，或用户已卸载运行环境。
 func (m *Manager) Ensure() bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if m.uninstalling {
+		return false
+	}
 	if m.uninstalled() {
 		return true
 	}
@@ -206,32 +209,26 @@ func (m *Manager) Ensure() bool {
 	return m.usable()
 }
 
-// Uninstall 删除运行环境的全部文件与下载缓存，并记录用户已卸载；进行中的准备先取消，正在更新时返回 ErrBusy。
-func (m *Manager) Uninstall(ctx context.Context) error {
+// Uninstall 先取消并等待进行中的准备，再删除运行环境的全部文件与下载缓存，全部删除后记录用户已卸载；正在更新或卸载时返回 ErrBusy。
+// 删除失败时不记录卸载，运行环境保持未卸载状态，用户可以关闭占用文件的程序后重试。
+func (m *Manager) Uninstall() error {
 	m.mu.Lock()
-	if m.updating {
+	if m.updating || m.uninstalling {
 		m.mu.Unlock()
 		return ErrBusy
 	}
-	if err := os.MkdirAll(filepath.Dir(m.root), 0o755); err != nil {
-		m.mu.Unlock()
-		return err
-	}
-	// 先记录卸载，之后不再开始新的准备。
-	if err := os.WriteFile(m.uninstalledMarker(), nil, 0o644); err != nil {
-		m.mu.Unlock()
-		return err
-	}
-	stop, done := m.stopPrepare, m.prepareDone
-	preparing := m.preparing
+	m.uninstalling = true
+	stop, done, preparing := m.stopPrepare, m.prepareDone, m.preparing
 	m.mu.Unlock()
+	defer func() {
+		m.mu.Lock()
+		m.uninstalling = false
+		m.mu.Unlock()
+		m.onChange()
+	}()
 	if preparing {
 		stop()
-		select {
-		case <-done:
-		case <-ctx.Done():
-			return ctx.Err()
-		}
+		<-done
 	}
 	m.mu.Lock()
 	// 释放本进程的共享锁，锁文件随目录一起删除。
@@ -241,9 +238,13 @@ func (m *Manager) Uninstall(ctx context.Context) error {
 	clear(m.inUse)
 	m.failures, m.retryAt, m.failure = 0, time.Time{}, ""
 	m.mu.Unlock()
-	err := errors.Join(os.RemoveAll(m.root), os.RemoveAll(m.cache))
-	m.onChange()
-	return err
+	if err := errors.Join(os.RemoveAll(m.root), os.RemoveAll(m.cache)); err != nil {
+		return err
+	}
+	if err := os.MkdirAll(filepath.Dir(m.root), 0o755); err != nil {
+		return err
+	}
+	return os.WriteFile(m.uninstalledMarker(), nil, 0o644)
 }
 
 // Install 清除卸载记录并在后台重新安装内置版本。
@@ -442,47 +443,51 @@ func (m *Manager) installBaseline(ctx context.Context, sources Sources) error {
 			return err
 		}
 	}
-	if _, err := os.Stat(filepath.Join(m.root, defaultPythonMarker)); err == nil {
+	if python, _ := os.ReadFile(filepath.Join(m.root, defaultPythonMarker)); atLeast(strings.TrimSpace(string(python)), PythonVersion) {
 		return nil
 	}
 	return m.installPython(ctx, sources, PythonVersion, false)
 }
 
 // installPython 用 uv 安装指定的默认 Python，upgrade 为 true 时升级到该系列的最新补丁版本，完成后记录实际版本。
-// 安装不读取用户的 uv 配置文件，与 Agent 命令使用同一套环境变量与进程管理。
+// 直接运行工具链中的 uv 与 python，不经过 shell，不读取用户的 uv 配置文件。
 func (m *Manager) installPython(ctx context.Context, sources Sources, request string, upgrade bool) error {
 	uv, node := m.lockActive("uv"), m.lockActive("node")
 	if uv == "" || node == "" {
 		return errors.New("uv or Node.js is not installed")
 	}
-	shell := localworkspace.New(m.root, m.environment(sources, uv, node))
-	command := "uv python install " + request + " --default --no-registry --no-config --preview-features python-install-default"
+	environment := m.environment(sources, uv, node)
+	args := []string{"python", "install", request, "--default", "--no-registry", "--no-config", "--preview-features", "python-install-default"}
 	if upgrade {
-		command += " --upgrade"
+		args = append(args, "--upgrade")
 	}
-	timeout := pythonInstallTimeout
-	response, err := shell.Execute(ctx, &filesystem.ExecuteRequest{Command: command, Timeout: &timeout})
+	installCtx, cancel := context.WithTimeout(ctx, pythonInstallTimeout)
+	defer cancel()
+	output, err := m.run(installCtx, environment, "uv", args...)
 	if err != nil {
-		return fmt.Errorf("install python: %w", err)
-	}
-	if response.TimedOut || response.ExitCode == nil || *response.ExitCode != 0 {
-		err := fmt.Errorf("install python: %s", strings.TrimSpace(response.Output))
+		err = fmt.Errorf("install python: %w: %s", err, output)
 		// uv 下载解释器失败时输出 Failed to download，超时通常发生在下载过程中。
-		if response.TimedOut || strings.Contains(response.Output, "Failed to download") {
+		if errors.Is(installCtx.Err(), context.DeadlineExceeded) || strings.Contains(output, "Failed to download") {
 			return &stepError{failure: FailureDownload, err: err}
 		}
 		return err
 	}
 	// 以默认 python 命令报告的版本作为记录。
-	response, err = shell.Execute(ctx, &filesystem.ExecuteRequest{Command: "python --version"})
+	version, err := m.run(ctx, environment, "python", "-c", "import platform; print(platform.python_version())")
 	if err != nil {
-		return fmt.Errorf("read python version: %w", err)
+		return fmt.Errorf("read python version: %w: %s", err, version)
 	}
-	output := strings.TrimSpace(response.Output)
-	if response.ExitCode == nil || *response.ExitCode != 0 || !strings.HasPrefix(output, "Python ") {
-		return fmt.Errorf("read python version: %s", output)
+	return os.WriteFile(filepath.Join(m.root, defaultPythonMarker), []byte(version), 0o644)
+}
+
+// run 在运行环境中直接运行工具链命令，返回去掉首尾空白的合并输出。
+func (m *Manager) run(ctx context.Context, environment localworkspace.Environment, name string, args ...string) (string, error) {
+	cmd, err := localworkspace.Command(ctx, environment, m.root, name, args...)
+	if err != nil {
+		return "", err
 	}
-	return os.WriteFile(filepath.Join(m.root, defaultPythonMarker), []byte(strings.TrimPrefix(output, "Python ")), 0o644)
+	output, err := cmd.CombinedOutput()
+	return strings.TrimSpace(string(output)), err
 }
 
 // installDist 下载并解压一个发行物到 dist/<名称>/<版本>，目录已存在时直接返回；下载地址在需要下载时解析，content 是压缩包内作为版本目录的目录。
@@ -515,10 +520,10 @@ func (m *Manager) installDist(ctx context.Context, name, version string, resolve
 	return err
 }
 
-// upToDate 判断已安装的 uv 与 Node.js 不低于内置版本且默认 Python 已安装。
+// upToDate 判断已安装的 uv、Node.js 与默认 Python 都不低于内置版本。
 func (m *Manager) upToDate() bool {
-	_, err := os.Stat(filepath.Join(m.root, defaultPythonMarker))
-	return err == nil && atLeast(m.activeVersion("uv"), uvVersion) && atLeast(m.activeVersion("node"), nodeVersion)
+	python, _ := os.ReadFile(filepath.Join(m.root, defaultPythonMarker))
+	return atLeast(strings.TrimSpace(string(python)), PythonVersion) && atLeast(m.activeVersion("uv"), uvVersion) && atLeast(m.activeVersion("node"), nodeVersion)
 }
 
 // usable 判断是否已有可用的 uv、Node.js 与默认 Python，版本可以低于内置版本。

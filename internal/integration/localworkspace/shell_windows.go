@@ -6,7 +6,10 @@ import (
 	"context"
 	"errors"
 	"fmt"
+	"os"
 	"os/exec"
+	"path/filepath"
+	"strings"
 	"syscall"
 	"unsafe"
 
@@ -28,6 +31,27 @@ func shellCommand(ctx context.Context, command string) *exec.Cmd {
 		"-Command", "[Console]::OutputEncoding = [System.Text.Encoding]::UTF8; "+command)
 }
 
+// executableCommand 创建运行可执行文件的命令，ctx 结束时终止命令进程；.cmd 与 .bat 由 cmd.exe 执行，参数按 cmd.exe 规则逐个引用。
+func executableCommand(ctx context.Context, path string, args []string) *exec.Cmd {
+	extension := strings.ToLower(filepath.Ext(path))
+	if extension != ".cmd" && extension != ".bat" {
+		return exec.CommandContext(ctx, path, args...)
+	}
+	interpreter := os.Getenv("ComSpec")
+	if interpreter == "" {
+		interpreter = "cmd.exe"
+	}
+	quoted := make([]string, 0, len(args)+1)
+	quoted = append(quoted, syscall.EscapeArg(path))
+	for _, arg := range args {
+		quoted = append(quoted, syscall.EscapeArg(arg))
+	}
+	cmd := exec.CommandContext(ctx, interpreter)
+	// /s 使 cmd.exe 去掉最外层引号后原样执行其中的命令行。
+	cmd.SysProcAttr = &syscall.SysProcAttr{CmdLine: syscall.EscapeArg(interpreter) + ` /d /s /c "` + strings.Join(quoted, " ") + `"`}
+	return cmd
+}
+
 // processTree 是容纳命令进程及其全部子进程的 Job Object，关闭时终止其中的全部进程。
 type processTree struct {
 	cmd *exec.Cmd
@@ -47,7 +71,10 @@ func newProcessTree(cmd *exec.Cmd) (*processTree, error) {
 		windows.CloseHandle(job)
 		return nil, fmt.Errorf("无法设置进程组：%w", err)
 	}
-	cmd.SysProcAttr = &syscall.SysProcAttr{CreationFlags: windows.CREATE_SUSPENDED}
+	if cmd.SysProcAttr == nil {
+		cmd.SysProcAttr = &syscall.SysProcAttr{}
+	}
+	cmd.SysProcAttr.CreationFlags |= windows.CREATE_SUSPENDED
 	return &processTree{cmd: cmd, job: job}, nil
 }
 

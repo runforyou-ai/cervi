@@ -90,6 +90,11 @@ func shellCommand(ctx context.Context, command string) *exec.Cmd {
 	return exec.CommandContext(ctx, shell, "-c", command)
 }
 
+// executableCommand 创建直接运行可执行文件的命令，ctx 结束时终止命令进程。
+func executableCommand(ctx context.Context, path string, args []string) *exec.Cmd {
+	return exec.CommandContext(ctx, path, args...)
+}
+
 // processTree 是以命令进程为组长的独立进程组。
 type processTree struct {
 	cmd *exec.Cmd
@@ -97,7 +102,10 @@ type processTree struct {
 
 // newProcessTree 让命令在独立进程组中启动。
 func newProcessTree(cmd *exec.Cmd) (*processTree, error) {
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
+	if cmd.SysProcAttr == nil {
+		cmd.SysProcAttr = &syscall.SysProcAttr{}
+	}
+	cmd.SysProcAttr.Setpgid = true
 	return &processTree{cmd: cmd}, nil
 }
 

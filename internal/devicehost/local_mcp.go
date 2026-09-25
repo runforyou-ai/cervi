@@ -5,6 +5,7 @@ package devicehost
 import (
 	"context"
 	"fmt"
+	"io"
 	"log/slog"
 	"slices"
 	"strings"
@@ -26,28 +27,32 @@ const (
 )
 
 // localMCPServer 创建本地 MCP 服务的连接配置：SSE 与 Streamable HTTP 服务按地址与请求头连接；
-// 本地进程的启动命令在运行环境中解析，服务配置的环境变量叠加在运行环境之上，服务的标准输出是协议通道，服务及其子进程调用的 npm 不输出安装摘要与提示。
-func localMCPServer(ctx context.Context, server localmcp.Server, environment localworkspace.Environment, dir string) (agentruntime.MCPServer, error) {
+// 本地进程在建立会话时于运行环境中启动，服务配置的环境变量叠加在运行环境之上，服务及其子进程在同一进程树中，会话关闭时一并终止。
+// 服务的标准输出是协议通道，服务及其子进程调用的 npm 不输出安装摘要与提示；标准错误写入 stderr（为空时丢弃）。
+func localMCPServer(server localmcp.Server, environment localworkspace.Environment, dir string, stderr io.Writer) agentruntime.MCPServer {
 	switch server.Transport() {
 	case localmcp.TypeSSE:
-		return agentruntime.MCPServer{Name: server.Name, Config: mcp.Config{URL: server.URL, ServerType: domain.MCPServerTypeSSE, Headers: server.Headers}}, nil
+		return agentruntime.MCPServer{Name: server.Name, Config: mcp.Config{URL: server.URL, ServerType: domain.MCPServerTypeSSE, Headers: server.Headers}}
 	case localmcp.TypeHTTP:
-		return agentruntime.MCPServer{Name: server.Name, Config: mcp.Config{URL: server.URL, ServerType: domain.MCPServerTypeStreamableHTTP, Headers: server.Headers}}, nil
+		return agentruntime.MCPServer{Name: server.Name, Config: mcp.Config{URL: server.URL, ServerType: domain.MCPServerTypeStreamableHTTP, Headers: server.Headers}}
 	}
 	variables := append(slices.Clone(environment.Variables), "NPM_CONFIG_LOGLEVEL=silent", "NPM_CONFIG_FUND=false", "NPM_CONFIG_UPDATE_NOTIFIER=false")
 	for name, value := range server.Env {
 		variables = append(variables, name+"="+value)
 	}
 	environment.Variables = variables
-	cmd, err := localworkspace.Command(ctx, environment, dir, server.Command, server.Args...)
-	if err != nil {
-		return agentruntime.MCPServer{}, err
+	start := func(ctx context.Context) (io.ReadCloser, io.WriteCloser, error) {
+		process, err := localworkspace.StartProcess(ctx, environment, dir, stderr, server.Command, server.Args...)
+		if err != nil {
+			return nil, nil, err
+		}
+		return process.Stdout, process.Stdin, nil
 	}
-	return agentruntime.MCPServer{Name: server.Name, Config: mcp.Config{Command: cmd}, HandshakeTimeout: localMCPHandshakeTimeout}, nil
+	return agentruntime.MCPServer{Name: server.Name, Config: mcp.Config{Start: start}, HandshakeTimeout: localMCPHandshakeTimeout}
 }
 
-// localMCPConnections 读取本地 MCP 配置并返回本次运行的连接配置；配置无法读取或启动命令无法解析的服务跳过。
-func localMCPConnections(ctx context.Context, store *localmcp.Store, environment localworkspace.Environment, dir string) []agentruntime.MCPServer {
+// localMCPConnections 读取本地 MCP 配置并返回本次运行的连接配置，配置无法读取时不加载本地 MCP 服务。
+func localMCPConnections(store *localmcp.Store, environment localworkspace.Environment, dir string) []agentruntime.MCPServer {
 	servers, err := store.List()
 	if err != nil {
 		slog.Warn("读取本地 MCP 配置失败，本次运行不加载本地 MCP 服务", "error", err)
@@ -55,12 +60,7 @@ func localMCPConnections(ctx context.Context, store *localmcp.Store, environment
 	}
 	connections := make([]agentruntime.MCPServer, 0, len(servers))
 	for _, server := range servers {
-		connection, err := localMCPServer(ctx, server, environment, dir)
-		if err != nil {
-			slog.Warn("本地 MCP 服务的启动命令无法解析，本次运行跳过", "mcp_server", server.Name, "error", err)
-			continue
-		}
-		connections = append(connections, connection)
+		connections = append(connections, localMCPServer(server, environment, dir, nil))
 	}
 	return connections
 }
@@ -78,14 +78,8 @@ func (m *localMCPManager) Add(ctx context.Context, input agentruntime.LocalMCPSe
 	if err := server.Validate(); err != nil {
 		return nil, err
 	}
-	connection, err := localMCPServer(ctx, server, m.environment, m.dir)
-	if err != nil {
-		return nil, err
-	}
 	stderr := &tailBuffer{limit: localMCPStderrBytes}
-	if connection.Config.Command != nil {
-		connection.Config.Command.Stderr = stderr
-	}
+	connection := localMCPServer(server, m.environment, m.dir, stderr)
 	ctx, cancel := context.WithTimeout(ctx, localMCPHandshakeTimeout)
 	defer cancel()
 	session, err := mcp.Connect(ctx, connection.Config)

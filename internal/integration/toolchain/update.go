@@ -14,7 +14,8 @@ import (
 )
 
 // Update 把 uv 与 Node.js 更新到下载源的最新稳定版本，并把默认 Python 升级到同系列的最新补丁版本；返回版本是否有变化。
-// uv 取 PyPI 索引中最新的正式版本并按索引给出的 SHA256 校验，Node.js 取版本索引中最新的 LTS 版本并按官方 SHASUMS256.txt 校验。
+// uv 取 PyPI 索引中最新的正式版本并按索引给出的 SHA256 校验，Node.js 取版本索引中最新的 LTS 版本并按下载源的 SHASUMS256.txt 校验；
+// 更新的校验值与安装包来自同一下载源，首次安装按内置 SHA256 校验。
 // 运行环境尚未完成首次准备时返回 ErrNotReady，正在准备或更新时返回 ErrBusy。
 func (m *Manager) Update(ctx context.Context) (bool, error) {
 	m.mu.Lock()
@@ -92,7 +93,9 @@ func (m *Manager) updateUV(ctx context.Context, sources Sources) error {
 // updateNode 在版本索引列出更高的 LTS 版本时安装该版本。
 func (m *Manager) updateNode(ctx context.Context, sources Sources) error {
 	base := cmp.Or(sources.NodeDownloadURL, defaultNodeDownloadURL)
-	response, err := get(ctx, m.client, base+"/index.json", "application/json")
+	indexCtx, cancel := context.WithTimeoutCause(ctx, downloadStallTimeout, errDownloadStalled)
+	defer cancel()
+	response, err := get(indexCtx, m.client, base+"/index.json", "application/json")
 	if err != nil {
 		return err
 	}
@@ -127,6 +130,8 @@ func (m *Manager) updateNode(ctx context.Context, sources Sources) error {
 
 // nodeChecksum 从指定版本的 SHASUMS256.txt 中读取发行物的 SHA256。
 func nodeChecksum(ctx context.Context, client *http.Client, base, version, file string) (string, error) {
+	ctx, cancel := context.WithTimeoutCause(ctx, downloadStallTimeout, errDownloadStalled)
+	defer cancel()
 	response, err := get(ctx, client, base+"/v"+version+"/SHASUMS256.txt", "text/plain")
 	if err != nil {
 		return "", err

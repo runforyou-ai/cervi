@@ -70,7 +70,7 @@ func (w *Worker) runAgent(runCtx context.Context, meta appservice.RequestMeta, r
 	environment := w.toolchain.Environment()
 	request.Workspace = localworkspace.New(local.folder, environment)
 	request.LocalMCP = &localMCPManager{store: w.localMCP, environment: environment, dir: local.folder}
-	request.MCPConnections = localMCPConnections(ctx, w.localMCP, environment, local.folder)
+	request.MCPConnections = localMCPConnections(w.localMCP, environment, local.folder)
 	// 有效配置包含知识检索时经企业服务端检索运行绑定的知识库。
 	if slices.Contains(assignment.Tools, agentruntime.KnowledgeToolName) {
 		request.KnowledgeSearch = remoteKnowledgeSearch(w.client, meta, runID)

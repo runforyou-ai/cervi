@@ -90,8 +90,8 @@ func (d *desktopDevice) UpdateLocalToolchain(ctx context.Context, meta appservic
 }
 
 // UninstallLocalToolchain 删除运行环境的全部文件与下载缓存，重新安装前不再自动安装。
-func (d *desktopDevice) UninstallLocalToolchain(ctx context.Context, meta appservice.RequestMeta) error {
-	err := d.toolchain.Uninstall(ctx)
+func (d *desktopDevice) UninstallLocalToolchain(_ context.Context, meta appservice.RequestMeta) error {
+	err := d.toolchain.Uninstall()
 	switch {
 	case err == nil:
 		return nil

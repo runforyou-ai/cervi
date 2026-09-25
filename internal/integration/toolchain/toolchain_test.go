@@ -433,7 +433,7 @@ func TestUninstallAndInstall(t *testing.T) {
 		}
 	}
 	manager.use("uv", "0.1.0")
-	if err := manager.Uninstall(context.Background()); err != nil {
+	if err := manager.Uninstall(); err != nil {
 		t.Fatal(err)
 	}
 	if dirExists(root) || dirExists(cache) {
@@ -453,5 +453,51 @@ func TestUninstallAndInstall(t *testing.T) {
 	}
 	if manager.Status().State == StateUninstalled {
 		t.Fatal("重新安装后不应保持卸载状态")
+	}
+}
+
+// TestUninstallFailureStaysRetryable 验证删除失败时不记录卸载，界面仍可再次卸载。
+func TestUninstallFailureStaysRetryable(t *testing.T) {
+	if runtime.GOOS == "windows" {
+		t.Skip("目录权限在 Windows 上不阻止删除")
+	}
+	parent := t.TempDir()
+	root := filepath.Join(parent, "toolchains")
+	manager := New(root, filepath.Join(t.TempDir(), "cache"), func() {})
+	t.Cleanup(manager.Close)
+	locked := filepath.Join(root, "dist", "uv", "0.1.0")
+	if err := os.MkdirAll(filepath.Join(locked, "bin"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	// 去掉目录写权限使其中的文件无法删除。
+	if err := os.Chmod(locked, 0o555); err != nil {
+		t.Fatal(err)
+	}
+	t.Cleanup(func() { _ = os.Chmod(locked, 0o755) })
+	if err := manager.Uninstall(); err == nil {
+		t.Fatal("删除失败时应返回错误")
+	}
+	if manager.uninstalled() || manager.Status().State == StateUninstalled {
+		t.Fatal("删除失败时不应记录卸载")
+	}
+}
+
+// TestUpToDateComparesPythonVersion 验证默认 Python 低于内置版本时视为需要安装。
+func TestUpToDateComparesPythonVersion(t *testing.T) {
+	root := t.TempDir()
+	manager := New(root, t.TempDir(), func() {})
+	t.Cleanup(manager.Close)
+	for _, name := range []string{"uv/" + uvVersion, "node/" + nodeVersion} {
+		if err := os.MkdirAll(filepath.Join(root, "dist", name), 0o755); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for version, expected := range map[string]bool{"3.13.1": false, PythonVersion: true, "3.13.99": true} {
+		if err := os.WriteFile(filepath.Join(root, defaultPythonMarker), []byte(version), 0o644); err != nil {
+			t.Fatal(err)
+		}
+		if manager.upToDate() != expected {
+			t.Fatalf("Python %s 的判断不符合预期", version)
+		}
 	}
 }
